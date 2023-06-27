@@ -1787,8 +1787,8 @@ int get_nr_prach_info_from_index(uint8_t index,
                                  uint8_t *N_dur,
                                  uint16_t *RA_sfn_index,
                                  uint8_t *N_RA_slot,
-				 uint8_t *config_period) {
-
+                                 uint8_t *config_period)
+{
   int x,y;
   int64_t s_map;
   uint8_t format2 = 0xff;
