@@ -807,6 +807,11 @@ typedef struct {
   int8_t nvipc_poll_core;
 } nvipc_params_t;
 
+typedef struct {
+  uint64_t total_prb_aggregate;
+  uint64_t used_prb_aggregate;
+} mac_stats_t;
+
 /*! \brief top level eNB MAC structure */
 typedef struct gNB_MAC_INST_s {
   /// Ethernet parameters for northbound midhaul interface
@@ -929,6 +934,8 @@ typedef struct gNB_MAC_INST_s {
   int16_t frame;
 
   pthread_mutex_t sched_lock;
+
+  mac_stats_t mac_stats;
 
 } gNB_MAC_INST;
 
