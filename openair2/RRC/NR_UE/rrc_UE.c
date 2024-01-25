@@ -1138,16 +1138,64 @@ static void rrc_ue_generate_RRCSetupComplete(const NR_UE_RRC_INST_t *rrc, const 
   nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, size, buffer, deliver_pdu_srb_rlc, NULL);
 }
 
+static void nr_rrc_rrcsetup_fallback(NR_UE_RRC_INST_t *rrc)
+{
+  LOG_W(NR_RRC,
+        "[UE %ld] Recived RRCSetup in response to %s request\n",
+        rrc->ue_id, rrc->ra_trigger == RRC_CONNECTION_REESTABLISHMENT ? "RRCReestablishment" : "RRCResume");
+
+  // discard any stored UE Inactive AS context and suspendConfig
+  // TODO
+
+  // discard any current AS security context including
+  // K_RRCenc key, the K_RRCint key, the K_UPint key and the K_UPenc key
+  // TODO only kgnb is stored
+  memset(rrc->kgnb, 0, sizeof(rrc->kgnb));
+  rrc->as_security_activated = false;
+
+  // release radio resources for all established RBs except SRB0,
+  // including release of the RLC entities, of the associated PDCP entities and of SDAP
+  for (int i = 1; i <= MAX_DRBS_PER_UE; i++) {
+    if (get_DRB_status(rrc, i) != RB_NOT_PRESENT) {
+      set_DRB_status(rrc, i, RB_NOT_PRESENT);
+      nr_pdcp_release_drb(rrc->ue_id, i);
+    }
+  }
+  for (int i = 1; i < NR_NUM_SRB; i++) {
+    if (rrc->Srb[i] != RB_NOT_PRESENT) {
+      rrc->Srb[i] = RB_NOT_PRESENT;
+      nr_pdcp_release_srb(rrc->ue_id, i);
+    }
+  }
+  for (int i = 1; i < NR_MAX_NUM_LCID; i++) {
+    if (rrc->active_RLC_entity[i]) {
+      rrc->active_RLC_entity[i] = false;
+      nr_rlc_release_entity(rrc->ue_id, i);
+    }
+  }
+  nr_sdap_delete_ue_entities(rrc->ue_id);
+
+  // release the RRC configuration except for the default L1 parameter values,
+  // default MAC Cell Group configuration and CCCH configuration
+  // TODO to be completed
+  NR_UE_MAC_reset_cause_t cause = RRC_SETUP_REESTAB_RESUME;
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = cause;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+
+  // indicate to upper layers fallback of the RRC connection
+  // TODO
+
+  // stop timer T380, if running
+  // TODO not implemented yet
+}
+
 static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *rrcSetup)
 {
   // if the RRCSetup is received in response to an RRCReestablishmentRequest
   // or RRCResumeRequest or RRCResumeRequest1
-  // TODO none of the procedures implemented yet
-  if (rrc->ra_trigger == RRC_CONNECTION_REESTABLISHMENT) {
-    LOG_E(NR_RRC, "Handling of RRCSetup in response of RRCReestablishment not implemented yet. Going back to IDLE.\n");
-    nr_rrc_going_to_IDLE(rrc, OTHER, NULL);
-    return;
-  }
+  if (rrc->ra_trigger == RRC_CONNECTION_REESTABLISHMENT || rrc->ra_trigger == RRC_RESUME_REQUEST)
+    nr_rrc_rrcsetup_fallback(rrc);
 
   // perform the cell group configuration procedure in accordance with the received masterCellGroup
   nr_rrc_ue_process_masterCellGroup(rrc,
@@ -1176,6 +1224,9 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
   // Indicate to NAS that the RRC connection has been established (5.3.1.3 of 3GPP TS 24.501)
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_NAS_CONN_ESTABLISH_IND);
   itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, msg_p);
+
+  // resetting the RA trigger state after receiving MSG4 with RRCSetup
+  rrc->ra_trigger = RA_NOT_RUNNING;
 
   // set the content of RRCSetupComplete message
   // TODO procedues described in 5.3.3.4 seems more complex than what we actualy do
