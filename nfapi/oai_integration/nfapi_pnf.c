@@ -1953,7 +1953,7 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   }
 
   while(sync_var<0) {
-    usleep(5000000);
+    usleep(50000);
     printf("[PNF] waiting for OAI to be started\n");
   }
 
