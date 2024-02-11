@@ -901,7 +901,6 @@ void nfapi_vnf_p7_config_destory(nfapi_vnf_p7_config_t* config);
  * This function is blocking and will not return until the nfapi_vnf_p7_stop
  * function is called. 
  */
-extern queue_t gnb_slot_ind_queue;
 int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config);
 int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config);
 

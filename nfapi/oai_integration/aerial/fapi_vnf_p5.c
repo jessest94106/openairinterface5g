@@ -49,7 +49,6 @@ void *aerial_vnf_nr_p7_config_init(void *ptr)
   init_queue(&gnb_rx_ind_queue);
   init_queue(&gnb_crc_ind_queue);
   init_queue(&gnb_uci_ind_queue);
-  init_queue(&gnb_slot_ind_queue);
 
   p7_vnf->config->port = p7_vnf->local_port;
   p7_vnf->config->sync_indication = NULL;
