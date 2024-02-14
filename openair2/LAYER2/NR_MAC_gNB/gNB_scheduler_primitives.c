@@ -3319,7 +3319,7 @@ bool nr_mac_request_release_ue(const gNB_MAC_INST *nrmac, int rnti)
     .gNB_CU_ue_id = ue_data.secondary_ue,
     .gNB_DU_ue_id = rnti,
     .cause = F1AP_CAUSE_RADIO_NETWORK,
-    .cause_value = F1AP_CauseRadioNetwork_rl_failure_others,
+    .cause_value = F1AP_CauseRadioNetwork_rl_failure_rlc,
   };
   nrmac->mac_rrc.ue_context_release_request(&request);
   return true;
