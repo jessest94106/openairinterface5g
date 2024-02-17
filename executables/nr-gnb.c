@@ -147,9 +147,14 @@ static void tx_func(processingData_L1tx_t *info)
     ru_tx_func((void *)&syncMsgRU);
     stop_meas(&info->gNB->phy_proc_tx);
   }
-  /* this thread is done with the sched_info, decrease the reference counter */
-  LOG_D(NR_PHY, "Calling deref_sched_response for id %d (tx_func) in %d.%d\n", info->sched_response_id, frame_tx, slot_tx);
-  deref_sched_response(info->sched_response_id);
+
+  if (NFAPI_MODE == NFAPI_MONOLITHIC) {
+    /* this thread is done with the sched_info, decrease the reference counter.
+     * This only applies for monolithic; in the PNF, the memory is allocated in
+     * a ring buffer that should never be overwritten (one frame duration). */
+    LOG_D(NR_PHY, "Calling deref_sched_response for id %d (tx_func) in %d.%d\n", info->sched_response_id, frame_tx, slot_tx);
+    deref_sched_response(info->sched_response_id);
+  }
 }
 
 void *L1_rx_thread(void *arg) 
