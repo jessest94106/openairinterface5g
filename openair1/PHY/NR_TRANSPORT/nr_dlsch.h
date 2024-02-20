@@ -56,8 +56,6 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
                       time_stats_t *dlsch_interleaving_stats,
                       time_stats_t *dlsch_segmentation_stats);
 
-void nr_emulate_dlsch_payload(uint8_t* payload, uint16_t size);
-
 void dump_pdsch_stats(FILE *fd,PHY_VARS_gNB *gNB);
 
 #endif

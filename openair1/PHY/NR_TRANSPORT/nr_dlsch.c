@@ -93,7 +93,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
     harq->unav_res = ptrsSymbPerSlot * n_ptrs;
 
     /// CRC, coding, interleaving and rate matching
-    AssertFatal(harq->pdu!=NULL,"harq->pdu is null\n");
+    AssertFatal(harq->pdu != NULL, "%4d.%2d no HARQ PDU for PDSCH generation\n", msgTx->frame, msgTx->slot);
 
     /* output and its parts for each dlsch should be aligned on 64 bytes
      * => size_output is a sum of parts sizes rounded up to a multiple of 64

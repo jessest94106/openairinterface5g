@@ -497,7 +497,8 @@ int main(int argc, char **argv)
   dlsch0_ue->dlsch_config.tbslbrm = Tbslbrm;
 	printf("harq process ue mcs = %d Qm = %d, symb %d\n", dlsch0_ue->dlsch_config.mcs, dlsch0_ue->dlsch_config.qamModOrder, nb_symb_sch);
 
-	unsigned char *test_input=dlsch->harq_process.pdu;
+  uint8_t test_input[TBS / 8 + 4]; // + 3 for CRC + 1 additional byte, see nr_dlsch_encoding()
+  dlsch->harq_process.pdu = test_input;
 	//unsigned char test_input[TBS / 8]  __attribute__ ((aligned(16)));
 	for (i = 0; i < TBS / 8; i++)
 		test_input[i] = (unsigned char) rand();
