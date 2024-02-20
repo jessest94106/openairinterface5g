@@ -971,7 +971,7 @@ static uint8_t pack_ul_tti_request_pucch_pdu(nfapi_nr_pucch_pdu_t *pucch_pdu, ui
         && push8(pucch_pdu->pre_dft_occ_len, ppWritePackedMsg, end) && push8(pucch_pdu->add_dmrs_flag, ppWritePackedMsg, end)
         && push16(pucch_pdu->dmrs_scrambling_id, ppWritePackedMsg, end)
         && push8(pucch_pdu->dmrs_cyclic_shift, ppWritePackedMsg, end) && push8(pucch_pdu->sr_flag, ppWritePackedMsg, end)
-        && push16(pucch_pdu->bit_len_harq, ppWritePackedMsg, end) && push16(pucch_pdu->bit_len_csi_part1, ppWritePackedMsg, end)
+        && push8(pucch_pdu->bit_len_harq, ppWritePackedMsg, end) && push16(pucch_pdu->bit_len_csi_part1, ppWritePackedMsg, end)
         && push16(pucch_pdu->bit_len_csi_part2, ppWritePackedMsg, end)
         // Pack RX Beamforming PDU
         && push16(pucch_pdu->beamforming.num_prgs, ppWritePackedMsg, end)
