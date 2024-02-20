@@ -73,34 +73,26 @@ static void handle_nr_rach(NR_UL_IND_t *UL_info)
     return;
   }
   if (UL_info->rach_ind.number_of_pdus) {
-    int frame_diff = UL_info->frame - UL_info->rach_ind.sfn;
-    if (frame_diff < 0) {
-      frame_diff += 1024;
-    }
-    bool in_timewindow = frame_diff == 0 || (frame_diff == 1 && UL_info->slot < 7);
-
-    if (in_timewindow) {
-      LOG_D(MAC,
-            "UL_info[Frame %d, Slot %d] Calling initiate_ra_proc RACH:SFN/SLOT:%d/%d\n",
-            UL_info->frame,
-            UL_info->slot,
-            UL_info->rach_ind.sfn,
-            UL_info->rach_ind.slot);
-      for (int i = 0; i < UL_info->rach_ind.number_of_pdus; i++) {
-        nfapi_nr_prach_indication_pdu_t *rach = UL_info->rach_ind.pdu_list + i;
-        if (rach->num_preamble > 1) {
-          LOG_E(MAC, "Not more than 1 preamble per RACH PDU supported, ignoring the rest\n");
-        }
-        nr_initiate_ra_proc(UL_info->module_id,
-                            UL_info->CC_id,
-                            UL_info->rach_ind.sfn,
-                            UL_info->rach_ind.slot,
-                            rach->preamble_list[0].preamble_index,
-                            rach->freq_index,
-                            rach->symbol_index,
-                            rach->preamble_list[0].timing_advance,
-                            rach->preamble_list[0].preamble_pwr);
+    LOG_D(MAC,
+          "UL_info[Frame %d, Slot %d] Calling initiate_ra_proc RACH:SFN/SLOT:%d/%d\n",
+          UL_info->frame,
+          UL_info->slot,
+          UL_info->rach_ind.sfn,
+          UL_info->rach_ind.slot);
+    for (int i = 0; i < UL_info->rach_ind.number_of_pdus; i++) {
+      nfapi_nr_prach_indication_pdu_t *rach = UL_info->rach_ind.pdu_list + i;
+      if (rach->num_preamble > 1) {
+        LOG_E(MAC, "Not more than 1 preamble per RACH PDU supported, ignoring the rest\n");
       }
+      nr_initiate_ra_proc(UL_info->module_id,
+                          UL_info->CC_id,
+                          UL_info->rach_ind.sfn,
+                          UL_info->rach_ind.slot,
+                          rach->preamble_list[0].preamble_index,
+                          rach->freq_index,
+                          rach->symbol_index,
+                          rach->preamble_list[0].timing_advance,
+                          rach->preamble_list[0].preamble_pwr);
     }
   }
 }
