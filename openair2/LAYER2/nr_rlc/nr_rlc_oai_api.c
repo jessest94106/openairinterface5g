@@ -619,10 +619,6 @@ static void max_retx_reached(void *_ue, nr_rlc_entity_t *entity)
   int i;
   int is_srb;
   int rb_id;
-#if 0
-  MessageDef *msg;
-#endif
-  int is_enb;
 
   /* is it SRB? */
   for (i = 0; i < 2; i++) {
@@ -650,23 +646,18 @@ rb_found:
         is_srb ? "SRB" : "DRB",
         rb_id);
 
-  /* TODO: do something for DRBs? */
-  if (is_srb == 0)
-    return;
+  if (ue->rlf_handler)
+    ue->rlf_handler(ue->ue_id);
+  else
+    LOG_W(RLC, "UE %04x: RLF detected, but no callable RLF handler registered\n", ue->ue_id);
+}
 
-  is_enb = nr_rlc_manager_get_enb_flag(nr_rlc_ue_manager);
-  if (!is_enb)
-    return;
-
-#if 0
-  msg = itti_alloc_new_message(TASK_RLC_ENB, RLC_SDU_INDICATION);
-  RLC_SDU_INDICATION(msg).rnti          = ue->rnti;
-  RLC_SDU_INDICATION(msg).is_successful = 0;
-  RLC_SDU_INDICATION(msg).srb_id        = rb_id;
-  RLC_SDU_INDICATION(msg).message_id    = -1;
-  /* TODO: accept more than 1 instance? here we send to instance id 0 */
-  itti_send_msg_to_task(TASK_RRC_ENB, 0, msg);
-#endif
+void nr_rlc_set_rlf_handler(int ue_id, rlf_handler_t rlf_h)
+{
+  nr_rlc_manager_lock(nr_rlc_ue_manager);
+  nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ue_id);
+  ue->rlf_handler = rlf_h;
+  nr_rlc_manager_unlock(nr_rlc_ue_manager);
 }
 
 void nr_rlc_reestablish_entity(int ue_id, int lc_id)
