@@ -196,6 +196,8 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
     nr_mac->scheduling_info.lc_sched_info[i].Bj = 0;
     nr_timer_stop(&nr_mac->scheduling_info.lc_sched_info[i].Bj_timer);
   }
+  if (nr_mac->data_inactivity_timer)
+    nr_timer_stop(nr_mac->data_inactivity_timer);
   nr_timer_stop(&nr_mac->ra.contention_resolution_timer);
   nr_timer_stop(&nr_mac->scheduling_info.sr_DelayTimer);
   nr_timer_stop(&nr_mac->scheduling_info.retxBSR_Timer);
