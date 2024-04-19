@@ -248,8 +248,7 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
   // TODO beam failure procedure not implemented
 }
 
-void release_mac_configuration(NR_UE_MAC_INST_t *mac,
-                               NR_UE_MAC_reset_cause_t cause)
+void release_mac_configuration(NR_UE_MAC_INST_t *mac, NR_UE_MAC_reset_cause_t cause)
 {
   NR_UE_ServingCell_Info_t *sc = &mac->sc_info;
   // if cause is Re-establishment, release spCellConfig only
