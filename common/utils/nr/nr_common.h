@@ -177,7 +177,7 @@ bool nr_timer_is_active(const NR_timer_t *timer);
  */
 uint32_t nr_timer_elapsed_time(const NR_timer_t *timer);
 
-
+int set_default_nta_offset(frequency_range_t freq_range, uint32_t samples_per_subframe);
 extern const nr_bandentry_t nr_bandtable[];
 
 static inline int get_num_dmrs(uint16_t dmrs_mask )
