@@ -1587,6 +1587,24 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id,
   }
 }
 
+static int get_ta_offset(long *n_TimingAdvanceOffset)
+{
+  if (!n_TimingAdvanceOffset)
+    return -1;
+
+  switch (*n_TimingAdvanceOffset) {
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n0 :
+      return 0;
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n25600 :
+      return 25600;
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n39936 :
+      return 39936;
+    default :
+      AssertFatal(false, "Invalid n-TimingAdvanceOffset\n");
+  }
+  return -1;
+}
+
 void nr_rrc_mac_config_req_sib1(module_id_t module_id,
                                 int cc_idP,
                                 NR_SI_SchedulingInfo_t *si_SchedulingInfo,
@@ -1599,6 +1617,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
   UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
   UPDATE_IE(mac->si_SchedulingInfo, si_SchedulingInfo, NR_SI_SchedulingInfo_t);
   UPDATE_IE(mac->si_SchedulingInfo_v1700, si_SchedulingInfo_v1700, NR_SI_SchedulingInfo_v1700_t);
+  mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
 
   config_common_ue_sa(mac, scc, cc_idP);
   configure_common_BWP_dl(mac,
@@ -1652,6 +1671,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
 
   if (reconfigurationWithSync->spCellConfigCommon) {
     NR_ServingCellConfigCommon_t *scc = reconfigurationWithSync->spCellConfigCommon;
+    mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
     if (scc->physCellId)
       mac->physCellId = *scc->physCellId;
     mac->dmrs_TypeA_Position = scc->dmrs_TypeA_Position;
