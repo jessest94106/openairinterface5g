@@ -2189,7 +2189,7 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
       const DRB_nGRAN_setup_t *drb_config = &pduSession[p].DRBnGRanList[i];
       f1ap_drb_to_be_setup_t *drb = &drbs[nb_drb];
       drb->drb_id = pduSession[p].DRBnGRanList[i].id;
-      drb->rlc_mode = rrc->configuration.um_on_default_drb ? RLC_MODE_UM : RLC_MODE_AM;
+      drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
       drb->up_ul_tnl[0].tl_address = drb_config->UpParamList[0].tlAddress;
       drb->up_ul_tnl[0].port = rrc->eth_params_s.my_portd;
       drb->up_ul_tnl[0].teid = drb_config->UpParamList[0].teId;
