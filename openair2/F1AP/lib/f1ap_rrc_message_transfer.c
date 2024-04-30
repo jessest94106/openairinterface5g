@@ -191,7 +191,7 @@ bool eq_initial_ul_rrc_message_transfer(const f1ap_initial_ul_rrc_message_t *a, 
 /**
  * @brief Initial UL RRC Message Transfer memory management
  */
-void free_initial_ul_rrc_message_transfer(f1ap_initial_ul_rrc_message_t *msg)
+void free_initial_ul_rrc_message_transfer(const f1ap_initial_ul_rrc_message_t *msg)
 {
   DevAssert(msg != NULL);
   free(msg->rrc_container);

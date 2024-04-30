@@ -31,6 +31,6 @@ struct F1AP_F1AP_PDU *encode_initial_ul_rrc_message_transfer(const f1ap_initial_
 bool decode_initial_ul_rrc_message_transfer(const struct F1AP_F1AP_PDU *pdu, f1ap_initial_ul_rrc_message_t *out);
 f1ap_initial_ul_rrc_message_t cp_initial_ul_rrc_message_transfer(const f1ap_initial_ul_rrc_message_t *msg);
 bool eq_initial_ul_rrc_message_transfer(const f1ap_initial_ul_rrc_message_t *a, const f1ap_initial_ul_rrc_message_t *b);
-void free_initial_ul_rrc_message_transfer(f1ap_initial_ul_rrc_message_t *msg);
+void free_initial_ul_rrc_message_transfer(const f1ap_initial_ul_rrc_message_t *msg);
 
 #endif /* F1AP_RRC_MESSAGE_TRANSFER_H_ */
