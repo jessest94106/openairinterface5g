@@ -24,6 +24,10 @@ cmake .. -GNinja -DENABLE_TESTS=ON
 ninja tests
 ```
 
+The user can use either `ninja` or `make`.
+
+# Run unit tests
+
 Then, you can run `ctest` to run all tests:
 
 ```bash
