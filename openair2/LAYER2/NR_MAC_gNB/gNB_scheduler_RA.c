@@ -250,8 +250,114 @@ void find_SSB_and_RO_available(gNB_MAC_INST *nrmac)
         cc->max_association_period,
         N_RA_sfn,
         cc->total_prach_occasions_per_config_period);
-}		
-		
+}
+
+static void schedule_nr_MsgA_pusch(NR_UplinkConfigCommon_t *uplinkConfigCommon,
+                                   gNB_MAC_INST *nr_mac,
+                                   module_id_t module_idP,
+                                   frame_t frameP,
+                                   sub_frame_t slotP,
+                                   nfapi_nr_prach_pdu_t *prach_pdu,
+                                   uint16_t dmrs_TypeA_Position,
+                                   NR_PhysCellId_t physCellId)
+{
+  NR_SCHED_ENSURE_LOCKED(&nr_mac->sched_lock);
+
+  NR_MsgA_PUSCH_Resource_r16_t *msgA_PUSCH_Resource = uplinkConfigCommon->initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice
+                                                          .setup->msgA_PUSCH_Config_r16->msgA_PUSCH_ResourceGroupA_r16;
+
+  int mu = nr_get_mu(uplinkConfigCommon);
+
+  const int n_slots_frame = nr_slots_per_frame[mu];
+  slot_t msgA_pusch_slot = (slotP + msgA_PUSCH_Resource->msgA_PUSCH_TimeDomainOffset_r16) % n_slots_frame;
+  frame_t msgA_pusch_frame = (frameP + ((slotP + msgA_PUSCH_Resource->msgA_PUSCH_TimeDomainOffset_r16) / n_slots_frame)) % 1024;
+
+  int index = ul_buffer_index((int)msgA_pusch_frame, (int)msgA_pusch_slot, mu, nr_mac->UL_tti_req_ahead_size);
+  nfapi_nr_ul_tti_request_t *UL_tti_req = &nr_mac[module_idP].UL_tti_req_ahead[0][index];
+
+  UL_tti_req->SFN = msgA_pusch_frame;
+  UL_tti_req->Slot = msgA_pusch_slot;
+  AssertFatal(is_xlsch_in_slot(nr_mac->ulsch_slot_bitmap[msgA_pusch_slot / 64], msgA_pusch_slot),
+              "Slot %d is not an Uplink slot, invalid msgA_PUSCH_TimeDomainOffset_r16 %ld\n",
+              msgA_pusch_slot,
+              msgA_PUSCH_Resource->msgA_PUSCH_TimeDomainOffset_r16);
+
+  UL_tti_req->pdus_list[UL_tti_req->n_pdus].pdu_type = NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE;
+  UL_tti_req->pdus_list[UL_tti_req->n_pdus].pdu_size = sizeof(nfapi_nr_pusch_pdu_t);
+  nfapi_nr_pusch_pdu_t *pusch_pdu = &UL_tti_req->pdus_list[UL_tti_req->n_pdus].pusch_pdu;
+  memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
+
+  rnti_t ra_rnti = nr_get_ra_rnti(prach_pdu->prach_start_symbol, slotP, prach_pdu->num_ra, 0);
+
+  // Fill PUSCH PDU
+  pusch_pdu->pdu_bit_map = PUSCH_PDU_BITMAP_PUSCH_DATA;
+  pusch_pdu->rnti = ra_rnti;
+  pusch_pdu->handle = 0;
+  pusch_pdu->rb_size = msgA_PUSCH_Resource->nrofPRBs_PerMsgA_PO_r16;
+  pusch_pdu->mcs_table = 0;
+  pusch_pdu->frequency_hopping =
+      msgA_PUSCH_Resource->msgA_IntraSlotFrequencyHopping_r16 ? *msgA_PUSCH_Resource->msgA_IntraSlotFrequencyHopping_r16 : 0;
+  pusch_pdu->dmrs_ports = 1; // 6.2.2 in 38.214 only port 0 to be used
+  AssertFatal(msgA_PUSCH_Resource->startSymbolAndLengthMsgA_PO_r16,
+              "Only SLIV based on startSymbolAndLengthMsgA_PO_r16 implemented\n");
+  int S = 0;
+  int L = 0;
+  SLIV2SL(*msgA_PUSCH_Resource->startSymbolAndLengthMsgA_PO_r16, &S, &L);
+  pusch_pdu->start_symbol_index = S;
+  pusch_pdu->nr_of_symbols = L;
+  pusch_pdu->pusch_data.new_data_indicator = 1;
+  pusch_pdu->nrOfLayers = 1;
+  pusch_pdu->num_dmrs_cdm_grps_no_data = 2; // no data in dmrs symbols as in 6.2.2 in 38.214
+  pusch_pdu->ul_dmrs_symb_pos = get_l_prime(3, 0, pusch_dmrs_pos2, pusch_len1, 10, dmrs_TypeA_Position);
+  pusch_pdu->transform_precoding = *uplinkConfigCommon->initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup->msgA_PUSCH_Config_r16->msgA_TransformPrecoder_r16;
+  pusch_pdu->rb_bitmap[0] = 0;
+  pusch_pdu->rb_start = msgA_PUSCH_Resource->frequencyStartMsgA_PUSCH_r16; // rb_start depends on the RO
+  int locationAndBandwidth = uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth;
+  pusch_pdu->bwp_size = NRRIV2BW(locationAndBandwidth, MAX_BWP_SIZE);
+  pusch_pdu->bwp_start = NRRIV2PRBOFFSET(locationAndBandwidth, MAX_BWP_SIZE);
+  pusch_pdu->subcarrier_spacing = 0;
+  pusch_pdu->cyclic_prefix = 0;
+  pusch_pdu->uplink_frequency_shift_7p5khz = 0;
+  pusch_pdu->vrb_to_prb_mapping = 0;
+  pusch_pdu->dmrs_config_type = 0;
+  pusch_pdu->data_scrambling_id = 0;
+  if (msgA_PUSCH_Resource->msgA_DMRS_Config_r16.msgA_ScramblingID0_r16) {
+    pusch_pdu->ul_dmrs_scrambling_id = *msgA_PUSCH_Resource->msgA_DMRS_Config_r16.msgA_ScramblingID0_r16;
+  } else {
+    pusch_pdu->ul_dmrs_scrambling_id = physCellId;
+  }
+  pusch_pdu->scid =
+      0; // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]. Should match what is sent in DCI 0_1, otherwise set to 0.
+  pusch_pdu->pusch_identity = 0;
+  pusch_pdu->resource_alloc = 1; // type 1
+  pusch_pdu->tx_direct_current_location = 0;
+  pusch_pdu->mcs_index = msgA_PUSCH_Resource->msgA_MCS_r16;
+  pusch_pdu->qam_mod_order = nr_get_Qm_dl(pusch_pdu->mcs_index, pusch_pdu->mcs_table);
+
+  int num_dmrs_symb = 0;
+  for (int i = 10; i < 10 + 3; i++)
+    num_dmrs_symb += (pusch_pdu->ul_dmrs_symb_pos >> i) & 1;
+  AssertFatal(pusch_pdu->mcs_index <= 28, "Exceeding MCS limit for MsgA PUSCH\n");
+  int R = nr_get_code_rate_ul(pusch_pdu->mcs_index, pusch_pdu->mcs_table);
+  pusch_pdu->target_code_rate = R;
+  int TBS = nr_compute_tbs(pusch_pdu->qam_mod_order,
+                       R,
+                       pusch_pdu->rb_size,
+                       pusch_pdu->nr_of_symbols,
+                       num_dmrs_symb * 12, // nb dmrs set for no data in dmrs symbol
+                       0, // nb_rb_oh
+                       0, // to verify tb scaling
+                       pusch_pdu->nrOfLayers)
+        >> 3;
+
+  pusch_pdu->pusch_data.tb_size = TBS;
+  pusch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(TBS << 3, R);
+
+  LOG_D(NR_MAC, "Scheduling MsgA PUSCH in %d.%d\n", msgA_pusch_frame, msgA_pusch_slot);
+
+  UL_tti_req->n_pdus += 1;
+}
+
 void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP)
 {
   gNB_MAC_INST *gNB = RC.nrmac[module_idP];
@@ -416,6 +522,18 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP
                 AssertFatal(1==0,"Invalid PRACH format");
               }
             }
+            if (scc->uplinkConfigCommon->initialUplinkBWP->ext1
+                && scc->uplinkConfigCommon->initialUplinkBWP->ext1->msgA_ConfigCommon_r16) {
+              if (gNB->UE_info.list[0] == NULL)
+                schedule_nr_MsgA_pusch(scc->uplinkConfigCommon,
+                                       gNB,
+                                       module_idP,
+                                       frameP,
+                                       slotP,
+                                       prach_pdu,
+                                       scc->dmrs_TypeA_Position,
+                                       *scc->physCellId);
+            }
           }
         }
       }
@@ -524,18 +642,27 @@ void nr_initiate_ra_proc(module_id_t module_idP,
     ra->rnti = trial;
   }
 
-  ra->ra_state = nrRA_Msg2;
   ra->preamble_frame = frameP;
   ra->preamble_slot = slotP;
   ra->preamble_index = preamble_index;
   ra->timing_offset = timing_offset;
   uint8_t ul_carrier_id = 0; // 0 for NUL 1 for SUL
   ra->RA_rnti = nr_get_ra_rnti(symbol, slotP, freq_index, ul_carrier_id);
+
+  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+  if (scc->uplinkConfigCommon->initialUplinkBWP->ext1 && scc->uplinkConfigCommon->initialUplinkBWP->ext1->msgA_ConfigCommon_r16) {
+    ra->ra_type = RA_2_STEP;
+    ra->ra_state = nrRA_WAIT_MsgA_PUSCH;
+    ra->MsgB_rnti = nr_get_MsgB_rnti(symbol, slotP, freq_index, ul_carrier_id);
+  } else {
+    ra->ra_type = RA_4_STEP;
+    ra->ra_state = nrRA_Msg2;
+  }
+
   int index = ra - cc->ra;
   LOG_I(NR_MAC, "%d.%d UE RA-RNTI %04x TC-RNTI %04x: Activating RA process index %d\n", frameP, slotP, ra->RA_rnti, ra->rnti, index);
 
   // Configure RA BWP
-  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   configure_UE_BWP(nr_mac, scc, NULL, ra, NULL, -1, -1);
 
   uint8_t beam_index = ssb_index_from_prach(module_idP, frameP, slotP, preamble_index, freq_index, symbol);
@@ -1742,18 +1869,18 @@ static void nr_generate_Msg4(module_id_t module_idP,
   // if it is a DL slot, if the RA is in MSG4 state
   if (is_xlsch_in_slot(nr_mac->dlsch_slot_bitmap[slotP / 64], slotP)) {
 
-    NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
-    NR_SearchSpace_t *ss = ra->ra_ss;
+     NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+     NR_SearchSpace_t *ss = ra->ra_ss;
 
-    NR_ControlResourceSet_t *coreset = ra->coreset;
-    AssertFatal(coreset!=NULL,"Coreset cannot be null for RA-Msg4\n");
+     NR_ControlResourceSet_t *coreset = ra->coreset;
+     AssertFatal(coreset!=NULL,"Coreset cannot be null for RA-Msg4\n");
 
-    uint16_t mac_sdu_length = 0;
+     uint16_t mac_sdu_length = 0;
 
-    NR_UE_info_t *UE = find_nr_UE(&nr_mac->UE_info, ra->rnti);
-    if (!UE) {
-      LOG_E(NR_MAC, "want to generate Msg4, but rnti %04x not in the table\n", ra->rnti);
-      return;
+     NR_UE_info_t *UE = find_nr_UE(&nr_mac->UE_info, ra->rnti);
+     if (!UE) {
+       LOG_E(NR_MAC, "want to generate Msg4, but rnti %04x not in the table\n", ra->rnti);
+       return;
     }
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
@@ -1961,9 +2088,20 @@ static void nr_generate_Msg4(module_id_t module_idP,
       memcpy(&buf[mac_pdu_length + mac_subheader_len], buffer, mac_sdu_length);
     }
 
+    rnti_t rnti = ra->ra_type == RA_4_STEP ? ra->rnti : ra->MsgB_rnti;
+
     const int pduindex = nr_mac->pdu_index[CC_id]++;
     prepare_dl_pdus(nr_mac, ra, dl_bwp, dl_req, pucch, dmrs_info, msg4_tda, aggregation_level, CCEIndex, tb_size, harq->ndi, sched_ctrl->tpc1, delta_PRI,
-                    current_harq_pid, time_domain_assignment, CC_id, ra->rnti, harq->round, mcsIndex, tb_scaling, pduindex, rbStart, rbSize);
+                    current_harq_pid,
+                    time_domain_assignment,
+                    CC_id,
+                    rnti,
+                    harq->round,
+                    mcsIndex,
+                    tb_scaling,
+                    pduindex,
+                    rbStart,
+                    rbSize);
 
     // Add padding header and zero rest out if there is space left
     if (ra->mac_pdu_length < harq->tb_size) {
@@ -2208,7 +2346,7 @@ void nr_schedule_RA(module_id_t module_idP,
       LOG_D(NR_MAC, "RA[state:%d]\n", ra->ra_state);
 
       // Check RA Contention Resolution timer
-      if (ra->ra_state >= nrRA_WAIT_Msg3) {
+      if (ra->ra_type == RA_4_STEP && ra->ra_state >= nrRA_WAIT_Msg3) {
         ra->contention_resolution_timer--;
         if (ra->contention_resolution_timer < 0) {
           LOG_W(NR_MAC, "(%d.%d) RA Contention Resolution timer expired for UE 0x%04x, RA procedure failed...\n", frameP, slotP, ra->rnti);
