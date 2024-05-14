@@ -560,6 +560,7 @@ typedef struct NR_UE_UL_BWP {
   uint16_t BWPSize;
   uint16_t BWPStart;
   NR_RACH_ConfigCommon_t *rach_ConfigCommon;
+  NR_MsgA_ConfigCommon_r16_t *msgA_ConfigCommon_r16;
   NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList_Common;
   NR_ConfiguredGrantConfig_t *configuredGrantConfig;
   NR_PUSCH_Config_t *pusch_Config;
@@ -629,6 +630,11 @@ typedef struct NR_tda_info {
   long k2;
   bool valid_tda;
 } NR_tda_info_t;
+
+typedef enum {
+  RA_4_STEP = 0,
+  RA_2_STEP = 1,
+} nr_ra_type_t;
 
 #endif /*__LAYER2_MAC_H__ */
 
