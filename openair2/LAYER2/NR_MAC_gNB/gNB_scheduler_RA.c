@@ -553,6 +553,76 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP
   }
 }
 
+int nr_fill_successrar(const NR_UE_sched_ctrl_t *ue_sched_ctl,
+                       rnti_t crnti,
+                       const unsigned char *ue_cont_res_id,
+                       uint8_t resource_indicator,
+                       uint8_t timing_indicator,
+                       unsigned char *mac_pdu,
+                       int mac_pdu_length)
+{
+  LOG_D(NR_MAC, "mac_pdu_length = %d\n", mac_pdu_length);
+  int timing_advance_cmd = ue_sched_ctl->ta_update;
+  // TS 38.321 - Figure 6.1.5a-1: BI MAC subheader
+  NR_RA_HEADER_BI_MSGB *bi = (NR_RA_HEADER_BI_MSGB *)&mac_pdu[mac_pdu_length];
+  mac_pdu_length += sizeof(NR_RA_HEADER_BI_MSGB);
+
+  bi->E = 1;
+  bi->T1 = 0;
+  bi->T2 = 0;
+  bi->R = 0;
+  bi->BI = 0; // BI = 0, 5ms
+
+  // TS 38.321 - Figure 6.1.5a-3: SuccessRAR MAC subheader
+  NR_RA_HEADER_SUCCESS_RAR_MSGB *SUCESS_RAR_header = (NR_RA_HEADER_SUCCESS_RAR_MSGB *)&mac_pdu[mac_pdu_length];
+  mac_pdu_length += sizeof(NR_RA_HEADER_SUCCESS_RAR_MSGB);
+
+  SUCESS_RAR_header->E = 0;
+  SUCESS_RAR_header->T1 = 0;
+  SUCESS_RAR_header->T2 = 1;
+  SUCESS_RAR_header->S = 0;
+  SUCESS_RAR_header->R = 0;
+
+  // TS 38.321 - Figure 6.2.3a-2: successRAR
+  NR_MAC_SUCCESS_RAR *successRAR = (NR_MAC_SUCCESS_RAR *)&mac_pdu[mac_pdu_length];
+  mac_pdu_length += sizeof(NR_MAC_SUCCESS_RAR);
+
+  successRAR->CONT_RES_1 = ue_cont_res_id[0];
+  successRAR->CONT_RES_2 = ue_cont_res_id[1];
+  successRAR->CONT_RES_3 = ue_cont_res_id[2];
+  successRAR->CONT_RES_4 = ue_cont_res_id[3];
+  successRAR->CONT_RES_5 = ue_cont_res_id[4];
+  successRAR->CONT_RES_6 = ue_cont_res_id[5];
+  successRAR->R = 0;
+  successRAR->CH_ACESS_CPEXT = 1;
+  successRAR->TPC = ue_sched_ctl->tpc0;
+  successRAR->HARQ_FTI = timing_indicator;
+  successRAR->PUCCH_RI = resource_indicator;
+  successRAR->TA1 = (uint8_t)(timing_advance_cmd >> 8); // 4 MSBs of timing advance;
+  successRAR->TA2 = (uint8_t)(timing_advance_cmd & 0xff); // 8 LSBs of timing advance;
+  successRAR->CRNTI_1 = (uint8_t)(crnti >> 8); // 8 MSBs of rnti
+  successRAR->CRNTI_2 = (uint8_t)(crnti & 0xff); // 8 LSBs of rnti
+
+  LOG_D(NR_MAC,
+        "successRAR: Contention Resolution ID 0x%02x%02x%02x%02x%02x%02x R 0x%01x CH_ACESS_CPEXT 0x%02x TPC 0x%02x HARQ_FTI 0x%03x "
+        "PUCCH_RI 0x%04x TA 0x%012x CRNTI 0x%04x\n",
+        successRAR->CONT_RES_1,
+        successRAR->CONT_RES_2,
+        successRAR->CONT_RES_3,
+        successRAR->CONT_RES_4,
+        successRAR->CONT_RES_5,
+        successRAR->CONT_RES_6,
+        successRAR->R,
+        successRAR->CH_ACESS_CPEXT,
+        successRAR->TPC,
+        successRAR->HARQ_FTI,
+        successRAR->PUCCH_RI,
+        timing_advance_cmd,
+        crnti);
+  LOG_D(NR_MAC, "mac_pdu_length = %d\n", mac_pdu_length);
+  return mac_pdu_length;
+}
+
 static bool ra_contains_preamble(const NR_RA_t *ra, uint16_t preamble_index)
 {
   for (int j = 0; j < ra->preambles.num_preambles; j++) {
@@ -1854,33 +1924,32 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   LOG_D(NR_MAC, "numDlDci: %i\n", pdcch_pdu_rel15->numDlDci);
 }
 
-static void nr_generate_Msg4(module_id_t module_idP,
-                             int CC_id,
-                             frame_t frameP,
-                             sub_frame_t slotP,
-                             NR_RA_t *ra,
-                             nfapi_nr_dl_tti_request_t *DL_req,
-                             nfapi_nr_tx_data_request_t *TX_req)
+static void nr_generate_Msg4_MsgB(module_id_t module_idP,
+                                  int CC_id,
+                                  frame_t frameP,
+                                  sub_frame_t slotP,
+                                  NR_RA_t *ra,
+                                  nfapi_nr_dl_tti_request_t *DL_req,
+                                  nfapi_nr_tx_data_request_t *TX_req)
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_idP];
   NR_COMMON_channels_t *cc = &nr_mac->common_channels[CC_id];
   NR_UE_DL_BWP_t *dl_bwp = &ra->DL_BWP;
 
-  // if it is a DL slot, if the RA is in MSG4 state
+   // if it is a DL slot, if the RA is in MSG4 state
   if (is_xlsch_in_slot(nr_mac->dlsch_slot_bitmap[slotP / 64], slotP)) {
+    NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+    NR_SearchSpace_t *ss = ra->ra_ss;
+    const char *ra_type_str = ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4";
+    NR_ControlResourceSet_t *coreset = ra->coreset;
+    AssertFatal(coreset != NULL, "Coreset cannot be null for RA %s\n", ra_type_str);
 
-     NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
-     NR_SearchSpace_t *ss = ra->ra_ss;
+    uint16_t mac_sdu_length = 0;
 
-     NR_ControlResourceSet_t *coreset = ra->coreset;
-     AssertFatal(coreset!=NULL,"Coreset cannot be null for RA-Msg4\n");
-
-     uint16_t mac_sdu_length = 0;
-
-     NR_UE_info_t *UE = find_nr_UE(&nr_mac->UE_info, ra->rnti);
-     if (!UE) {
-       LOG_E(NR_MAC, "want to generate Msg4, but rnti %04x not in the table\n", ra->rnti);
-       return;
+    NR_UE_info_t *UE = find_nr_UE(&nr_mac->UE_info, ra->rnti);
+    if (!UE) {
+      LOG_E(NR_MAC, "want to generate %s, but rnti %04x not in the table\n", ra_type_str, ra->rnti);
+      return;
     }
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
@@ -1975,7 +2044,8 @@ static void nr_generate_Msg4(module_id_t module_idP,
     }
     else {
       uint8_t subheader_len = (mac_sdu_length < 256) ? sizeof(NR_MAC_SUBHEADER_SHORT) : sizeof(NR_MAC_SUBHEADER_LONG);
-      pdu_length = mac_sdu_length + subheader_len + 7; //7 is contetion resolution length
+      pdu_length = mac_sdu_length + subheader_len + 13; // 13 is contention resolution length of msgB. It is divided into 3 parts:
+      // BI MAC subheader (1 Oct) + SuccessRAR MAC subheader (1 Oct) + SuccessRAR (11 Oct)
     }
 
     // increase PRBs until we get to BWPSize or TBS is bigger than MAC PDU size
@@ -1990,7 +2060,7 @@ static void nr_generate_Msg4(module_id_t module_idP,
                                      rbSize, msg4_tda.nrOfSymbols, dmrs_info.N_PRB_DMRS * dmrs_info.N_DMRS_SLOT, 0, tb_scaling,1) >> 3;
     } while (tb_size < pdu_length && mcsIndex<=28);
 
-    AssertFatal(tb_size >= pdu_length,"Cannot allocate Msg4\n");
+    AssertFatal(tb_size >= pdu_length, "Cannot allocate %s\n", ra_type_str);
 
     int i = 0;
     uint16_t *vrb_map = cc[CC_id].vrb_map[beam.idx];
@@ -2053,9 +2123,22 @@ static void nr_generate_Msg4(module_id_t module_idP,
     uint8_t *buf = (uint8_t *) harq->transportBlock;
     // Bytes to be transmitted
     if (harq->round == 0) {
-      // UE Contention Resolution Identity MAC CE
-      uint16_t mac_pdu_length = nr_write_ce_dlsch_pdu(module_idP, nr_mac->sched_ctrlCommon, buf, 255, ra->cont_res_id);
-      LOG_D(NR_MAC,"Encoded contention resolution mac_pdu_length %d\n",mac_pdu_length);
+      uint16_t mac_pdu_length = 0;
+      if (ra->ra_type == RA_4_STEP) {
+        // UE Contention Resolution Identity MAC CE
+        mac_pdu_length = nr_write_ce_dlsch_pdu(module_idP, nr_mac->sched_ctrlCommon, buf, 255, ra->cont_res_id);
+      } else if (ra->ra_type == RA_2_STEP) {
+        mac_pdu_length = nr_fill_successrar(nr_mac->sched_ctrlCommon,
+                                            ra->rnti,
+                                            ra->cont_res_id,
+                                            pucch->resource_indicator,
+                                            pucch->timing_indicator,
+                                            buf,
+                                            mac_pdu_length);
+      } else {
+        AssertFatal(false, "RA type %d not implemented!\n", ra->ra_type);
+      }
+
       uint8_t buffer[CCCH_SDU_SIZE];
       uint8_t mac_subheader_len = sizeof(NR_MAC_SUBHEADER_SHORT);
       // Get RLC data on the SRB (RRCSetup, RRCReestablishment)
@@ -2140,7 +2223,7 @@ static void nr_generate_Msg4(module_id_t module_idP,
 
     if (pucch == NULL) {
       LOG_A(NR_MAC, "(UE RNTI 0x%04x) Skipping Ack of RA-Msg4. CBRA procedure succeeded!\n", ra->rnti);
-      UE->Msg4_ACKed = true;
+      UE->Msg4_MsgB_ACKed = true;
 
       // Pause scheduling according to:
       // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
@@ -2151,17 +2234,18 @@ static void nr_generate_Msg4(module_id_t module_idP,
 
       nr_clear_ra_proc(ra);
     } else {
-      ra->ra_state = nrRA_WAIT_Msg4_ACK;
+      ra->ra_state = nrRA_WAIT_Msg4_MsgB_ACK;
       LOG_I(NR_MAC,"UE %04x Generate msg4: feedback at %4d.%2d, payload %d bytes, next state WAIT_Msg4_ACK\n", ra->rnti, pucch->frame, pucch->ul_slot, harq->tb_size);
     }
   }
 }
 
-static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_frame_t slot, NR_RA_t *ra)
+static void nr_check_Msg4_MsgB_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_frame_t slot, NR_RA_t *ra)
 {
+  const char *ra_type_str = ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4";
   NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[module_id]->UE_info, ra->rnti);
   if (!UE) {
-    LOG_E(NR_MAC, "Cannot check Msg4 ACK/NACK, rnti %04x not in the table\n", ra->rnti);
+    LOG_E(NR_MAC, "Cannot check %s ACK/NACK, rnti %04x not in the table\n", ra_type_str, ra->rnti);
     return;
   }
   const int current_harq_pid = ra->harq_pid;
@@ -2173,10 +2257,14 @@ static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, s
 
   if (harq->is_waiting == 0) {
     if (harq->round == 0) {
-      if (UE->Msg4_ACKed) {
-        LOG_A(NR_MAC, "(UE RNTI 0x%04x) Received Ack of RA-Msg4. CBRA procedure succeeded!\n", ra->rnti);
+      if (UE->Msg4_MsgB_ACKed) {
+        LOG_A(NR_MAC,
+              "%4d.%2d UE %04x: Received Ack of %s. CBRA procedure succeeded!\n",
+              frame, slot, ra->rnti, ra_type_str);
       } else {
-        LOG_I(NR_MAC, "%4d.%2d UE %04x: RA Procedure failed at Msg4!\n", frame, slot, ra->rnti);
+        LOG_I(NR_MAC,
+              "%4d.%2d UE %04x: RA Procedure failed at %s!\n",
+              frame, slot, ra->rnti, ra_type_str);
         nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
       }
 
@@ -2192,8 +2280,8 @@ static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, s
         remove_nr_list(&sched_ctrl->retrans_dl_harq, current_harq_pid);
       }
     } else {
-      LOG_I(NR_MAC, "(UE %04x) Received Nack of RA-Msg4. Preparing retransmission!\n", ra->rnti);
-      ra->ra_state = nrRA_Msg4;
+      LOG_I(NR_MAC, "(UE %04x) Received Nack in %s, preparing retransmission!\n", ra->rnti, nrra_text[ra->ra_state]);
+      ra->ra_state = ra->ra_type == RA_4_STEP ? nrRA_Msg4 : nrRA_MsgB;
     }
   }
 }
@@ -2365,10 +2453,11 @@ void nr_schedule_RA(module_id_t module_idP,
           nr_generate_Msg3_retransmission(module_idP, CC_id, frameP, slotP, ra, ul_dci_req);
           break;
         case nrRA_Msg4:
-          nr_generate_Msg4(module_idP, CC_id, frameP, slotP, ra, DL_req, TX_req);
+        case nrRA_MsgB:
+          nr_generate_Msg4_MsgB(module_idP, CC_id, frameP, slotP, ra, DL_req, TX_req);
           break;
-        case nrRA_WAIT_Msg4_ACK:
-          nr_check_Msg4_Ack(module_idP, CC_id, frameP, slotP, ra);
+        case nrRA_WAIT_Msg4_MsgB_ACK:
+          nr_check_Msg4_MsgB_Ack(module_idP, CC_id, frameP, slotP, ra);
           break;
         default:
           break;
