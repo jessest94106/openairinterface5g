@@ -95,6 +95,18 @@ static bool check_plmn_identity(const f1ap_plmn_t *check_plmn, const f1ap_plmn_t
   return plmn->mcc == check_plmn->mcc && plmn->mnc_digit_length == check_plmn->mnc_digit_length && plmn->mnc == check_plmn->mnc;
 }
 
+void f1_reset_cu_initiated(const f1ap_reset_t *reset)
+{
+  (void) reset;
+  AssertFatal(false, "%s() not implemented yet\n", __func__);
+}
+
+void f1_reset_acknowledge_du_initiated(const f1ap_reset_ack_t *ack)
+{
+  (void) ack;
+  AssertFatal(false, "%s() not implemented yet\n", __func__);
+}
+
 void f1_setup_response(const f1ap_setup_resp_t *resp)
 {
   LOG_I(MAC, "received F1 Setup Response from CU %s\n", resp->gNB_CU_name);
