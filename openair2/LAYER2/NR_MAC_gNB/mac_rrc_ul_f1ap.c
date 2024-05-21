@@ -61,8 +61,10 @@ static void f1_reset_du_initiated_f1ap(const f1ap_reset_t *reset)
 
 static void f1_reset_acknowledge_cu_initiated_f1ap(const f1ap_reset_ack_t *ack)
 {
-  (void) ack;
-  AssertFatal(false, "%s() not implemented yet\n", __func__);
+  MessageDef *msg = itti_alloc_new_message(TASK_MAC_GNB, 0, F1AP_RESET_ACK);
+  f1ap_reset_ack_t *f1ap_msg = &F1AP_RESET_ACK(msg);
+  *f1ap_msg = *ack;
+  itti_send_msg_to_task(TASK_DU_F1, 0, msg);
 }
 
 static void f1_setup_request_f1ap(const f1ap_setup_req_t *req)
