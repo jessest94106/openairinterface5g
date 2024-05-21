@@ -29,6 +29,8 @@
 #include "openair3/ocp-gtpu/gtp_itf.h"
 #include "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
 
+#include "executables/softmodem-common.h"
+
 #include "uper_decoder.h"
 #include "uper_encoder.h"
 
@@ -172,6 +174,24 @@ void f1_setup_response(const f1ap_setup_resp_t *resp)
     mac->f1_config.setup_resp->gNB_CU_name = strdup(resp->gNB_CU_name);
 
   NR_SCHED_UNLOCK(&mac->sched_lock);
+
+  // NOTE: Before accepting any UEs, we should initialize the UE states.
+  // This is to handle cases when DU loses the existing SCTP connection,
+  // and reestablishes a new connection to either a new CU or the same CU.
+  // This triggers a new F1 Setup Request from DU to CU as per the specs.
+  // Reinitializing the UE states is necessary to avoid any inconsistent states
+  // between DU and CU.
+  // NOTE2: do not reset in phy_test, because there is a pre-configured UE in
+  // this case. Once NSA/phy-test use F1, this might be lifted, because
+  // creation of a UE will be requested from higher layers.
+
+  // TS38.473 [Sec 8.2.3.1]: "This procedure also re-initialises the F1AP UE-related
+  // contexts (if any) and erases all related signalling connections
+  // in the two nodes like a Reset procedure would do."
+  if (!get_softmodem_params()->phy_test) {
+    LOG_I(MAC, "Clearing the DU's UE states before, if any.\n");
+    du_clear_all_ue_states();
+  }
 }
 
 void f1_setup_failure(const f1ap_setup_failure_t *failure)
