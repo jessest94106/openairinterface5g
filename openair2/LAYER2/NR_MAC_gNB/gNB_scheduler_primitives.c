@@ -2950,6 +2950,25 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slo
   }
 }
 
+static void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
+{
+  /* remove a reconfigurationWithSync, we don't need it anymore */
+  if (cell_group->spCellConfig->reconfigurationWithSync != NULL) {
+    ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cell_group->spCellConfig->reconfigurationWithSync);
+    cell_group->spCellConfig->reconfigurationWithSync = NULL;
+  }
+  /* remove the rlc_BearerToReleaseList, we don't need it anymore */
+  if (cell_group->rlc_BearerToReleaseList != NULL) {
+    struct NR_CellGroupConfig__rlc_BearerToReleaseList *l = cell_group->rlc_BearerToReleaseList;
+    asn_sequence_del(&l->list, l->list.count, /* free */ 1);
+    free(cell_group->rlc_BearerToReleaseList);
+    cell_group->rlc_BearerToReleaseList = NULL;
+  }
+  /* remove reestablishRLC, we don't need it anymore */
+  for (int i = 0; i < cell_group->rlc_BearerToAddModList->list.count; ++i)
+    free_and_zero(cell_group->rlc_BearerToAddModList->list.array[i]->reestablishRLC);
+}
+
 static void nr_mac_apply_cellgroup(gNB_MAC_INST *mac, NR_UE_info_t *UE, frame_t frame, sub_frame_t slot)
 {
   LOG_D(NR_MAC, "%4d.%2d RNTI %04x: UE inactivity timer expired\n", frame, slot, UE->rnti);
@@ -2965,13 +2984,7 @@ static void nr_mac_apply_cellgroup(gNB_MAC_INST *mac, NR_UE_info_t *UE, frame_t 
     if (LOG_DEBUGFLAG(DEBUG_ASN1))
       xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *)UE->CellGroup);
 
-    /* remove the rlc_BearerToReleaseList, we don't need it anymore */
-    if (UE->CellGroup->rlc_BearerToReleaseList != NULL) {
-      struct NR_CellGroupConfig__rlc_BearerToReleaseList *l = UE->CellGroup->rlc_BearerToReleaseList;
-      asn_sequence_del(&l->list, l->list.count, /* free */1);
-      free(UE->CellGroup->rlc_BearerToReleaseList);
-      UE->CellGroup->rlc_BearerToReleaseList = NULL;
-    }
+    nr_mac_clean_cellgroup(UE->CellGroup);
   }
 
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
