@@ -501,11 +501,12 @@ int find_pdcch_candidate(const gNB_MAC_INST *mac,
                          int cc_id,
                          int aggregation,
                          int nr_of_candidates,
+                         int beam_idx,
                          const NR_sched_pdcch_t *pdcch,
                          const NR_ControlResourceSet_t *coreset,
                          uint32_t Y)
 {
-  const uint16_t *vrb_map = mac->common_channels[cc_id].vrb_map;
+  const uint16_t *vrb_map = mac->common_channels[cc_id].vrb_map[beam_idx];
   const int N_ci = 0;
 
   const int N_rb = pdcch->n_rb;  // nb of rbs of coreset per symbol
@@ -546,6 +547,7 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const int slot,
                   const rnti_t rnti,
                   uint8_t *aggregation_level,
+                  int beam_idx,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
                   NR_sched_pdcch_t *sched_pdcch,
@@ -567,6 +569,7 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                                       CC_id,
                                       *aggregation_level,
                                       nr_of_candidates,
+                                      beam_idx,
                                       sched_pdcch,
                                       coreset,
                                       Y);
@@ -577,9 +580,10 @@ void fill_pdcch_vrb_map(gNB_MAC_INST *mac,
                         int CC_id,
                         NR_sched_pdcch_t *pdcch,
                         int first_cce,
-                        int aggregation){
-
-  uint16_t *vrb_map = mac->common_channels[CC_id].vrb_map;
+                        int aggregation,
+                        int beam)
+{
+  uint16_t *vrb_map = mac->common_channels[CC_id].vrb_map[beam];
 
   int N_rb = pdcch->n_rb; // nb of rbs of coreset per symbol
   int L = pdcch->RegBundleSize;
@@ -2725,7 +2729,9 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slo
 
   NR_SCHED_ENSURE_LOCKED(&gNB_mac->sched_lock);
 
-  uint16_t *vrb_map = gNB_mac->common_channels[CC_id].vrb_map;
+  // TODO implement beam procedures
+  int beam = 0;
+  uint16_t *vrb_map = gNB_mac->common_channels[CC_id].vrb_map[beam];
 
   UE_info->sched_csirs = 0;
 

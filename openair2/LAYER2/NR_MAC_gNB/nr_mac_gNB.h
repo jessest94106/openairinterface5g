@@ -100,6 +100,7 @@
 #define MAX_NUM_OF_SSB 64
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
 #define MIN_NUM_PRBS_TO_SCHEDULE  5
+#define MAX_NUM_BEAM_PERIODS 4
 
 extern const uint8_t nr_rv_round_map[4];
 
@@ -270,10 +271,10 @@ typedef struct {
   /// Template for RA computations
   NR_RA_t ra[NR_NB_RA_PROC_MAX];
   /// VRB map for common channels
-  uint16_t vrb_map[275];
+  uint16_t vrb_map[MAX_NUM_BEAM_PERIODS][275];
   /// VRB map for common channels and PUSCH, dynamically allocated because
   /// length depends on number of slots and RBs
-  uint16_t *vrb_map_UL;
+  uint16_t *vrb_map_UL[MAX_NUM_BEAM_PERIODS];
   ///Number of active SSBs
   int num_active_ssb;
   //Total available prach occasions per configuration period
