@@ -214,11 +214,29 @@ int CU_send_gNB_CU_CONFIGURATION_UPDATE(sctp_assoc_t assoc_id, f1ap_gnb_cu_confi
   return 0;
 }
 
+/**
+ * @brief gNB CU Configuration Update Acknowledge decoding (9.2.1.11 of 3GPP TS 38.473)
+ *        and handling by CU
+ */
 int CU_handle_gNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE(instance_t instance,
                                                       sctp_assoc_t assoc_id,
                                                       uint32_t stream,
                                                       F1AP_F1AP_PDU_t *pdu)
 {
-  LOG_I(F1AP,"Cell Configuration ok (assoc_id %d)\n",assoc_id);
-  return(0);
+  DevAssert(pdu != NULL);
+  if (stream != 0)
+    LOG_W(F1AP, "[SCTP %d] Received gNB CU Configuration Update Acknowledge on stream != 0 (%d)\n", assoc_id, stream);
+  // Decode
+  f1ap_gnb_cu_configuration_update_acknowledge_t msg = {0};
+  if (!decode_f1ap_cu_configuration_update_acknowledge(pdu, &msg)) {
+    LOG_E(F1AP, "Failed to decode gNB CU Configuration Update Acknowledge\n");
+    return -1;
+  }
+  // Allocate ITTI message and send to RRC
+  MessageDef *message_p = itti_alloc_new_message(TASK_CU_F1, 0, F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE);
+  message_p->ittiMsgHeader.originInstance = assoc_id;
+  f1ap_gnb_cu_configuration_update_acknowledge_t *ack = &F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE(message_p);
+  *ack = msg; // copy decoded message to ITTI, the RRC thread will free it
+  itti_send_msg_to_task(TASK_RRC_GNB, GNB_MODULE_ID_TO_INSTANCE(instance), message_p);
+  return 0;
 }
