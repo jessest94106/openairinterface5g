@@ -26,6 +26,28 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef ENABLE_TESTS
+  #define PRINT_ERROR(...) fprintf(stderr, ##__VA_ARGS__)
+#else
+  #define PRINT_ERROR(...)  // Do nothing
+#endif
+
+#define _F1_EQ_CHECK_GENERIC(condition, fmt, ...)                                                  \
+  do {                                                                                             \
+    if (!(condition)) {                                                                            \
+      PRINT_ERROR("F1 Equality Check failure: %s:%d: Condition '%s' failed: " fmt " != " fmt "\n", \
+                  __FILE__,                                                                        \
+                  __LINE__,                                                                        \
+                  #condition,                                                                      \
+                  ##__VA_ARGS__);                                                                  \
+      return false;                                                                                \
+    }                                                                                              \
+  } while (0)
+
+#define _F1_EQ_CHECK_LONG(A, B) _F1_EQ_CHECK_GENERIC(A == B, "%ld", A, B);
+#define _F1_EQ_CHECK_INT(A, B) _F1_EQ_CHECK_GENERIC(A == B, "%d", A, B);
+#define _F1_EQ_CHECK_STR(A, B) _F1_EQ_CHECK_GENERIC(strcmp(A, B) == 0, "'%s'", A, B);
+
 /* macro to look up IE. If mandatory and not found, macro will print
  * descriptive debug message to stderr and force exit in calling function */
 #define F1AP_LIB_FIND_IE(IE_TYPE, ie, container, IE_ID, mandatory)                                   \
