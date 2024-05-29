@@ -1617,3 +1617,151 @@ f1ap_gnb_cu_configuration_update_acknowledge_t cp_f1ap_cu_configuration_update_a
     cp.dedicatedSIDeliveryNeededUEs[i] = msg->dedicatedSIDeliveryNeededUEs[i];
   return cp;
 }
+
+/* ==================================
+ *   F1AP gNB-DU Configuration Ack
+ * ================================== */
+
+/**
+ * @brief F1 gNB-DU Configuration Update Acknowledge message encoding (9.2.1.8 of 3GPP TS 38.473)
+ */
+F1AP_F1AP_PDU_t *encode_f1ap_du_configuration_update_acknowledge(const f1ap_gnb_du_configuration_update_acknowledge_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+  /* Create */
+  /* 0. Message */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, succOut);
+  succOut->procedureCode = F1AP_ProcedureCode_id_gNBDUConfigurationUpdate;
+  succOut->criticality = F1AP_Criticality_reject;
+  succOut->value.present = F1AP_SuccessfulOutcome__value_PR_GNBDUConfigurationUpdateAcknowledge;
+  F1AP_GNBDUConfigurationUpdateAcknowledge_t *ack = &succOut->value.choice.GNBDUConfigurationUpdateAcknowledge;
+  /* Mandatory */
+  /* Transaction Id */
+  asn1cSequenceAdd(ack->protocolIEs.list, F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_GNBDUConfigurationUpdateAcknowledgeIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+  // Cells to be Activated List (O)
+  for (int i = 0; i < msg->num_cells_to_activate; i++) {
+    asn1cSequenceAdd(ack->protocolIEs.list, F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t, ie3);
+    ie3->id = F1AP_ProtocolIE_ID_id_Cells_to_be_Activated_List;
+    ie3->criticality = F1AP_Criticality_reject;
+    ie3->value.present = F1AP_GNBDUConfigurationUpdateAcknowledgeIEs__value_PR_Cells_to_be_Activated_List;
+    asn1cSequenceAdd(ie3->value.choice.Cells_to_be_Activated_List.list,
+                     F1AP_Cells_to_be_Activated_List_ItemIEs_t,
+                     cells_to_be_activated_ies);
+    encode_cells_to_activate(&msg->cells_to_activate[i], cells_to_be_activated_ies);
+  }
+  return pdu;
+}
+
+/**
+ * @brief F1 gNB-DU Configuration Update Acknowledge decoding
+ */
+bool decode_f1ap_du_configuration_update_acknowledge(const F1AP_F1AP_PDU_t *pdu,
+                                                     f1ap_gnb_du_configuration_update_acknowledge_t *out)
+{
+  /* message type */
+  _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_successfulOutcome);
+  AssertError(pdu->choice.successfulOutcome != NULL, return false, "pdu->choice.successfulOutcome is NULL");
+  _F1_EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, F1AP_ProcedureCode_id_gNBDUConfigurationUpdate);
+  _F1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present,
+                   F1AP_SuccessfulOutcome__value_PR_GNBDUConfigurationUpdateAcknowledge);
+  F1AP_GNBDUConfigurationUpdateAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.GNBDUConfigurationUpdateAcknowledge;
+  F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t *ie;
+  /* Check mandatory IEs */
+  F1AP_LIB_FIND_IE(F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    ie = in->protocolIEs.list.array[i];
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_GNBDUConfigurationUpdateAcknowledgeIEs__value_PR_TransactionID);
+        AssertError(ie->value.choice.TransactionID != -1, return false, "ie->value.choice.TransactionID is -1");
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_Cells_to_be_Activated_List: {
+        /* Decode Cells Failed to be Activated List */
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_GNBDUConfigurationUpdateAcknowledgeIEs__value_PR_Cells_to_be_Activated_List);
+        F1AP_Cells_to_be_Activated_List_t *list = &ie->value.choice.Cells_to_be_Activated_List;
+        out->num_cells_to_activate = list->list.count;
+        for (int j = 0; j < out->num_cells_to_activate; j++) {
+          const F1AP_Cells_to_be_Activated_List_ItemIEs_t *itemIE =
+              (F1AP_Cells_to_be_Activated_List_ItemIEs_t *)list->list.array[j];
+          decode_cells_to_activate(&out->cells_to_activate[0], itemIE);
+        }
+        break;
+      }
+      default:
+        AssertError(1 == 0, return false, "F1AP_ProtocolIE_ID_id %ld unknown\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief F1 gNB-DU Configuration Update Acknowledge equality check
+ */
+bool eq_f1ap_du_configuration_update_acknowledge(const f1ap_gnb_du_configuration_update_acknowledge_t *a,
+                                                 const f1ap_gnb_du_configuration_update_acknowledge_t *b)
+{
+  // Transaction ID
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
+  // number of cells to activate
+  _F1_EQ_CHECK_INT(a->num_cells_to_activate, b->num_cells_to_activate);
+  // loop over cells to activate
+  for (int i = 0; i < a->num_cells_to_activate; i++) {
+    _F1_EQ_CHECK_LONG(a->cells_to_activate[i].nr_cellid, b->cells_to_activate[i].nr_cellid);
+    _F1_EQ_CHECK_INT(a->cells_to_activate[i].nrpci, b->cells_to_activate[i].nrpci);
+    if (!eq_f1ap_plmn(&a->cells_to_activate[i].plmn, &b->cells_to_activate[i].plmn))
+      return false;
+    _F1_EQ_CHECK_INT(a->cells_to_activate[i].num_SI, b->cells_to_activate[i].num_SI);
+    for (int s = 0; s < a->cells_to_activate[i].num_SI; s++) {
+      _F1_EQ_CHECK_INT(*a->cells_to_activate[i].SI_msg[s].SI_container, *b->cells_to_activate[i].SI_msg[s].SI_container);
+      _F1_EQ_CHECK_INT(a->cells_to_activate[i].SI_msg[s].SI_container_length,
+                       b->cells_to_activate[i].SI_msg[s].SI_container_length);
+      _F1_EQ_CHECK_INT(a->cells_to_activate[i].SI_msg[s].SI_type, b->cells_to_activate[i].SI_msg[s].SI_type);
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief F1 gNB-DU Configuration Update Acknowledge deep copy
+ */
+f1ap_gnb_du_configuration_update_acknowledge_t cp_f1ap_du_configuration_update_acknowledge(
+    const f1ap_gnb_du_configuration_update_acknowledge_t *msg)
+{
+  f1ap_gnb_du_configuration_update_acknowledge_t cp = {0};
+  // Transaction ID
+  cp.transaction_id = msg->transaction_id;
+  // number of cells to activate
+  cp.num_cells_to_activate = msg->num_cells_to_activate;
+  // Loop through cells to activate
+  for (int i = 0; i < cp.num_cells_to_activate; i++) {
+    cp.cells_to_activate[i] = msg->cells_to_activate[i];
+    for (int s = 0; s < cp.cells_to_activate[i].num_SI; s++) {
+      cp.cells_to_activate[i].SI_msg[s].SI_container = calloc_or_fail(1, sizeof(*cp.cells_to_activate[i].SI_msg[s].SI_container));
+      *cp.cells_to_activate[i].SI_msg[s].SI_container = *msg->cells_to_activate[i].SI_msg[s].SI_container;
+    }
+  }
+  return cp;
+}
+
+/**
+ * @brief gNB-DU Configuration Update Acknowledge memory management
+ */
+void free_f1ap_du_configuration_update_acknowledge(const f1ap_gnb_du_configuration_update_acknowledge_t *msg)
+{
+  // SI_container
+  for (int i = 0; i < msg->num_cells_to_activate; i++) {
+    for (int j = 0; j < msg->cells_to_activate[i].num_SI; j++) {
+      if (msg->cells_to_activate[i].SI_msg[j].SI_container) {
+        free(msg->cells_to_activate[i].SI_msg[j].SI_container);
+      }
+    }
+  }
+}
