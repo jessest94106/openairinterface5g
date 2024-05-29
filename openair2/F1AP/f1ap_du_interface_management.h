@@ -64,4 +64,9 @@ int DU_send_gNB_CU_CONFIGURATION_UPDATE_FAILURE(sctp_assoc_t assoc_id,
 int DU_send_gNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE(sctp_assoc_t assoc_id,
     f1ap_gnb_cu_configuration_update_acknowledge_t *GNBCUConfigurationUpdateAcknowledge);
 
+int DU_handle_gNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(instance_t instance,
+                                                      sctp_assoc_t assoc_id,
+                                                      uint32_t stream,
+                                                      F1AP_F1AP_PDU_t *pdu);
+
 #endif /* F1AP_DU_INTERFACE_MANAGEMENT_H_ */

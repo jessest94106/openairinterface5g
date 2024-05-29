@@ -247,6 +247,11 @@ void *gNB_app_task(void *args_p)
       AssertFatal(cell_to_activate == 1,"No cells to activate or cells > 1 %d\n",cell_to_activate);
 
       break;
+
+    case F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE:
+      LOG_E(GNB_APP, "[gNB %ld] Handling of %s message not implemented yet\n", instance, msg_name);
+      break;
+
     case NGAP_DEREGISTERED_GNB_IND:
       LOG_W(GNB_APP, "[gNB %ld] Received %s: associated AMF %d\n", instance, msg_name,
             NGAP_DEREGISTERED_GNB_IND(msg_p).nb_amf);

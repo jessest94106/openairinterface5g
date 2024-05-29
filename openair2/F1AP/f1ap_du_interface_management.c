@@ -245,6 +245,30 @@ int DU_handle_gNB_CU_CONFIGURATION_UPDATE(instance_t instance, sctp_assoc_t asso
   return 0;
 }
 
+/**
+ * @brief F1 gNB-DU Configuration Update Acknowledge decoding and message transfer
+ */
+int DU_handle_gNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(instance_t instance,
+                                                      sctp_assoc_t assoc_id,
+                                                      uint32_t stream,
+                                                      F1AP_F1AP_PDU_t *pdu)
+{
+  // Decoding
+  f1ap_gnb_du_configuration_update_acknowledge_t in = {0};
+  if (!decode_f1ap_du_configuration_update_acknowledge(pdu, &in)) {
+    LOG_E(F1AP, "Failed to decode gNB-DU Configuration Update Acknowledge\n");
+    free_f1ap_du_configuration_update_acknowledge(&in);
+    return -1;
+  }
+  // Allocate and send an ITTI message
+  MessageDef *msg_p = itti_alloc_new_message(TASK_DU_F1, 0, F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE);
+  f1ap_gnb_du_configuration_update_acknowledge_t *msg = &F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE(msg_p);
+  // Copy the decoded message to the ITTI message (RRC thread will free it)
+  *msg = in; // Copy the decoded message to the ITTI message (RRC thread will free it)
+  itti_send_msg_to_task(TASK_GNB_APP, GNB_MODULE_ID_TO_INSTANCE(assoc_id), msg_p);
+  return 0;
+}
+
 int DU_send_gNB_CU_CONFIGURATION_UPDATE_FAILURE(sctp_assoc_t assoc_id,
     f1ap_gnb_cu_configuration_update_failure_t *GNBCUConfigurationUpdateFailure) {
   AssertFatal(1==0,"received gNB CU CONFIGURATION UPDATE FAILURE with cause %d\n",
