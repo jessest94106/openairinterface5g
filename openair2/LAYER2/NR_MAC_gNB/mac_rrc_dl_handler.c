@@ -728,7 +728,8 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
      * the CellGroupConfig. Below, we trigger a timer, and the CellGroupConfig
      * will be applied after its expiry in nr_mac_apply_cellgroup().*/
     NR_SCHED_LOCK(&mac->sched_lock);
-    nr_mac_enable_ue_rrc_processing_timer(mac, UE, /* apply_cellGroup = */ true);
+    int delay = nr_mac_get_reconfig_delay_slots(UE->current_UL_BWP.scs);
+    nr_mac_interrupt_ue_transmission(mac, UE, FOLLOW_INSYNC_RECONFIG, delay);
     NR_SCHED_UNLOCK(&mac->sched_lock);
     UE->expect_reconfiguration = false;
     /* Re-establish RLC for all remaining bearers */

@@ -2733,9 +2733,8 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slo
     if (UE_info->sched_csirs & (1 << dl_bwp->bwp_id))
       continue;
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-    if (sched_ctrl->rrc_processing_timer > 0) {
+    if (nr_timer_is_active(&sched_ctrl->transm_interrupt))
       continue;
-    }
 
     if (!UE->sc_info.csi_MeasConfig)
       continue;
@@ -2951,15 +2950,15 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slo
 
 static void nr_mac_apply_cellgroup(gNB_MAC_INST *mac, NR_UE_info_t *UE, frame_t frame, sub_frame_t slot)
 {
-  LOG_D(NR_MAC, "%4d.%2d RNTI %04x: RRC processing timer expired\n", frame, slot, UE->rnti);
+  LOG_D(NR_MAC, "%4d.%2d RNTI %04x: UE inactivity timer expired\n", frame, slot, UE->rnti);
 
   /* check if there is a new CellGroupConfig to be applied */
-  if (UE->apply_cellgroup && UE->reconfigCellGroup != NULL) {
-    LOG_D(NR_MAC, "%4d.%2d RNTI %04x: Apply CellGroupConfig after RRC processing timer expiry\n", frame, slot, UE->rnti);
+  if (UE->interrupt_action == FOLLOW_INSYNC_RECONFIG && UE->reconfigCellGroup != NULL) {
+    LOG_D(NR_MAC, "%4d.%2d RNTI %04x: Apply CellGroupConfig after UE inactivity\n", frame, slot, UE->rnti);
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
     UE->CellGroup = UE->reconfigCellGroup;
     UE->reconfigCellGroup = NULL;
-    UE->apply_cellgroup = false;
+    UE->interrupt_action = FOLLOW_INSYNC;
 
     if (LOG_DEBUGFLAG(DEBUG_ASN1))
       xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *)UE->CellGroup);
@@ -2987,31 +2986,34 @@ static void nr_mac_apply_cellgroup(gNB_MAC_INST *mac, NR_UE_info_t *UE, frame_t 
   }
 }
 
-int nr_mac_enable_ue_rrc_processing_timer(gNB_MAC_INST *mac, NR_UE_info_t *UE, bool apply_cellgroup)
+int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs)
+{
+  /* we previously assumed a specific "slot ahead" value for the PHY processing
+   * time. However, we cannot always know it (e.g., third-party PHY), so simply
+   * assume a tentative worst-case slot processing time */
+  const uint16_t sl_ahead = 10;
+  /* 16ms seems to be the most common: See 38.331 Tab 12.1-1 */
+  int delay_ms = NR_RRC_RECONFIGURATION_DELAY_MS + NR_RRC_BWP_SWITCHING_DELAY_MS;
+  return (delay_ms << scs) + sl_ahead;
+}
+
+int nr_mac_interrupt_ue_transmission(gNB_MAC_INST *mac, NR_UE_info_t *UE, interrupt_followup_action_t action, int slots)
 {
   DevAssert(mac != NULL);
   DevAssert(UE != NULL);
   NR_SCHED_ENSURE_LOCKED(&mac->sched_lock);
 
-  const uint16_t sl_ahead = mac->if_inst->sl_ahead;
-  // TODO: account for BWP switch with NR_RRC_BWP_SWITCHING_DELAY_MS
-  int delay = NR_RRC_RECONFIGURATION_DELAY_MS;
-  NR_SubcarrierSpacing_t scs = UE->current_UL_BWP.scs;
+  nr_timer_setup(&UE->UE_sched_ctrl.transm_interrupt, slots, 1);
+  nr_timer_start(&UE->UE_sched_ctrl.transm_interrupt);
+  UE->interrupt_action = action;
 
-  UE->UE_sched_ctrl.rrc_processing_timer = (delay << scs) + sl_ahead;
-  UE->apply_cellgroup = apply_cellgroup;
-  AssertFatal(!UE->apply_cellgroup || (UE->apply_cellgroup && UE->reconfigCellGroup),
-              "logic bug: apply_cellgroup %d and UE->reconfigCellGroup %p: did you try to apply a cellGroup, while none is deposited?\n",
-              UE->apply_cellgroup,
-              UE->reconfigCellGroup);
-
-  // it might happen that timing advance command should be sent during the RRC
-  // processing timer. To prevent this, set a variable as if we would have just
+  // it might happen that timing advance command should be sent during the UE
+  // inactivity time. To prevent this, set a variable as if we would have just
   // sent it. This way, another TA command will for sure be sent in some
-  // frames, after RRC processing timer.
+  // frames, after the inactivity of the UE.
   UE->UE_sched_ctrl.ta_frame = (mac->frame - 1 + 1024) % 1024;
 
-  LOG_D(NR_MAC, "UE %04x: Activate RRC processing timer (%d ms)\n", UE->rnti, delay);
+  LOG_D(NR_MAC, "UE %04x: Interrupt UE transmission (%d slots) action %d reconfigCellGroup %p\n", UE->rnti, slots, UE->interrupt_action, UE->reconfigCellGroup);
   return 0;
 }
 
@@ -3073,10 +3075,10 @@ void nr_mac_update_timers(module_id_t module_id,
     /* check if UL failure and trigger release request if necessary */
     nr_mac_check_ul_failure(mac, UE->rnti, sched_ctrl);
 
-    if (sched_ctrl->rrc_processing_timer > 0) {
-      sched_ctrl->rrc_processing_timer--;
-      if (sched_ctrl->rrc_processing_timer == 0)
-        nr_mac_apply_cellgroup(mac, UE, frame, slot);
+    if (nr_timer_tick(&sched_ctrl->transm_interrupt)) {
+      /* expired */
+      nr_timer_stop(&sched_ctrl->transm_interrupt);
+      nr_mac_apply_cellgroup(mac, UE, frame, slot);
     }
   }
 }

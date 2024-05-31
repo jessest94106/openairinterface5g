@@ -844,9 +844,9 @@ bool nr_mac_prepare_ra_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig
 /* Prepare a new CellGroupConfig to be applied for this UE. We cannot
  * immediatly apply it, as we have to wait for the reconfiguration through RRC.
  * This function sets up everything to apply the reconfiguration. Later, we
- * will trigger the timer with nr_mac_enable_ue_rrc_processing_timer(); upon
- * expiry nr_mac_apply_cellgroup() will apply the CellGroupConfig (radio config
- * etc). */
+ * will trigger the UE inactivity with nr_mac_interrupt_ue_transmission(); upon
+ * expiry, nr_mac_apply_cellgroup() will apply the CellGroupConfig (radio
+ * config etc). */
 bool nr_mac_prepare_cellgroup_update(gNB_MAC_INST *nrmac, NR_UE_info_t *UE, NR_CellGroupConfig_t *CellGroup)
 {
   DevAssert(nrmac != NULL);
