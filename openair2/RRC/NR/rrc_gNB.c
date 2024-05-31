@@ -1983,6 +1983,24 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
 
     rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
   }
+
+  // Reconfiguration should have been sent to the UE, so it will attempt the
+  // handover. In the F1 case, update with new RNTI, and update secondary UE
+  // association, so we can receive the new UE from the target DU (in N2/Xn,
+  // nothing is to be done, we wait for confirmation to release the UE in the
+  // CU/DU)
+  if (UE->ho_context && UE->ho_context->target && UE->ho_context->source) {
+    nr_ho_target_cu_t *target_ctx = UE->ho_context->target;
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+    ue_data.secondary_ue = target_ctx->du_ue_id;
+    ue_data.du_assoc_id = target_ctx->du->assoc_id;
+    cu_remove_f1_ue_data(UE->rrc_ue_id);
+    cu_add_f1_ue_data(UE->rrc_ue_id, &ue_data);
+    LOG_I(NR_RRC, "UE %d handover: update RNTI from %04x to %04x\n", UE->rrc_ue_id, UE->rnti, target_ctx->new_rnti);
+    nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
+    DevAssert(source_ctx->old_rnti == UE->rnti);
+    UE->rnti = target_ctx->new_rnti;
+  }
 }
 
 static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_t instance)
