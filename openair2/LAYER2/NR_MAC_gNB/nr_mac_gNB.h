@@ -166,6 +166,9 @@ typedef struct nr_mac_config_t {
   nr_mac_timers_t timer_config;
   int num_dlharq;
   int num_ulharq;
+  /// beamforming weight matrix size
+  int nb_bfw[2];
+  int32_t *bw_list;
 } nr_mac_config_t;
 
 typedef struct NR_preamble_ue {
