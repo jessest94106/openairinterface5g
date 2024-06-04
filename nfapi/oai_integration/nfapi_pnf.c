@@ -63,6 +63,12 @@
 #include "executables/lte-softmodem.h"
 #include "nfapi/open-nFAPI/pnf/inc/pnf_p7.h"
 
+#ifdef ENABLE_WLS
+#include <nr_fapi_p5.h>
+#include <nr_fapi_p7.h>
+#include "nfapi/oai_integration/wls_integration/include/wls_pnf.h"
+#endif
+
 #ifdef ENABLE_SOCKET
 #include <socket/include/socket_pnf.h>
 #endif
@@ -1752,6 +1758,15 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   p7_config->codec_config.unpack_vendor_extension_tlv = &pnf_nr_phy_unpack_vendor_extension_tlv;
   p7_config->codec_config.pack_vendor_extension_tlv = &pnf_nr_phy_pack_vendor_extention_tlv;
 
+#ifdef ENABLE_WLS
+  p7_config->unpack_func = &fapi_nr_p7_message_unpack;
+  p7_config->hdr_unpack_func = &fapi_nr_p7_message_header_unpack;
+  p7_config->pack_func = &fapi_nr_p7_message_pack;
+  p7_config->send_p7_msg = &wls_pnf_nr_send_p7_message;
+  // pass p7_config to WLS handler
+  wls_pnf_set_p7_config(p7_config);
+#endif
+
 #ifdef ENABLE_SOCKET
   p7_config->unpack_func = &nfapi_nr_p7_message_unpack;
   p7_config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
@@ -1806,10 +1821,11 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
     usleep(50000);
     printf("[PNF] waiting for OAI to be started\n");
   }
-
+#ifndef ENABLE_WLS
   printf("[PNF] Sending PNF_START_RESP\n");
   nfapi_nr_send_pnf_start_resp(config, p7_config->phy_id);
   printf("[PNF] Sending first P7 slot indication\n");
+#endif
 #if 1
   nfapi_pnf_p7_slot_ind(p7_config, p7_config->phy_id, 0, 0);
   printf("[PNF] Sent first P7 slot ind\n");
@@ -2192,6 +2208,17 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
   config->codec_config.unpack_p4_p5_vendor_extension = &pnf_nr_sim_unpack_p4_p5_vendor_extension;
   config->codec_config.pack_p4_p5_vendor_extension = &pnf_nr_sim_pack_p4_p5_vendor_extension;
 
+#ifdef ENABLE_WLS
+  printf("WLS MODE PNF\n");
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating WLS PNF NFAPI start thread %s\n", __FUNCTION__);
+  // Assume it's the FAPI handler, change from within the PNF if it's not the case
+  config->unpack_func = &fapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &fapi_nr_message_header_unpack;
+  config->pack_func = &fapi_nr_p5_message_pack;
+  config->send_p5_msg = &wls_pnf_nr_send_p5_message;
+  //wls_fapi_pnf_nr_start_thread(config);
+  threadCreate(&pnf_p5_init_and_receive_pthread, wls_fapi_pnf_nr_start_thread, config, "NFAPI_WLS_PNF", -1, OAI_PRIORITY_RT_MAX);
+#endif
 
 #ifdef ENABLE_SOCKET
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);

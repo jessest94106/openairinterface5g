@@ -77,12 +77,34 @@ bool isFAPIMessageIDValid(uint16_t id);
 
 int check_nr_fapi_unpack_length(nfapi_nr_phy_msg_type_e msgId, uint32_t unpackedBufLen);
 
-int fapi_nr_message_header_unpack(void *pMessageBuf,
+/*! \brief Decodes a FAPI P5 message header
+ *  \param pMessageBuf A pointer to an encoded P5 message header
+ *  \param messageBufLen The size of the encoded P5 message header
+ *  \param pUnpackedBuf A pointer to the fapi_message_header
+ *  \param unpackedBufLen The size of fapi_message_header structure.
+ *  \param config A pointer to the nfapi configuration structure
+ *  \return true on success, false on failure.
+ *
+ * The function will decode a byte stream pointed to by pMessageBuf into a FAPI p5 header structure pointed to by pUnpackedBuf
+ */
+bool fapi_nr_message_header_unpack(void *pMessageBuf,
                                   uint32_t messageBufLen,
                                   void *pUnpackedBuf,
                                   uint32_t unpackedBufLen,
                                   nfapi_p4_p5_codec_config_t *config);
-int fapi_nr_p7_message_header_unpack(void *pMessageBuf,
+
+/*! \brief Decodes a FAPI P7 message header
+ *  \param pMessageBuf A pointer to an encoded P5 message header
+ *  \param messageBufLen The size of the encoded P5 message header
+ *  \param pUnpackedBuf A pointer to the fapi_message_header
+ *  \param unpackedBufLen The size of fapi_message_header structure.
+ *  \param config A pointer to the nfapi configuration structure
+ *  \return true on success, false on failure.
+ *
+ * This function is a dummy function that points to fapi_nr_message_header_unpack,
+ * since in FAPI there's no difference in the structure of the message headers for P5 and P7
+ */
+bool fapi_nr_p7_message_header_unpack(void *pMessageBuf,
                                   uint32_t messageBufLen,
                                   void *pUnpackedBuf,
                                   uint32_t unpackedBufLen,

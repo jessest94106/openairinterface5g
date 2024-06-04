@@ -28,8 +28,11 @@
 #define NFAPI_PNF_PARAM_GENERAL_OUI_LENGTH 3
 #define NFAPI_MAX_NUM_RF_BANDS 16
 
+#ifdef ENABLE_WLS
+#define NFAPI_MAX_PACKED_MESSAGE_SIZE 1024*1024*2
+#else
 #define NFAPI_MAX_PACKED_MESSAGE_SIZE 32768
-
+#endif
 // The following definition control the size of arrays used in the interface.
 // These may be changed if desired. They are used in the encoder to make sure 
 // that the user has not specified a 'count' larger than the max array, and also

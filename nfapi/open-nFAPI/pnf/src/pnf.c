@@ -49,7 +49,9 @@
 
 #include "NR_MIB.h"
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.h"
-
+#ifdef ENABLE_WLS
+#include "wls_integration/include/wls_pnf.h"
+#endif
 #endif
 
 #define MAX_SCTP_STREAMS 16

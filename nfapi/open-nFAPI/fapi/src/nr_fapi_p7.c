@@ -134,7 +134,7 @@ int fapi_nr_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packed
   return packedMsgLen;
 }
 
-int fapi_nr_p7_message_unpack(void *pMessageBuf,
+bool fapi_nr_p7_message_unpack(void *pMessageBuf,
                               uint32_t messageBufLen,
                               void *pUnpackedBuf,
                               uint32_t unpackedBufLen,
@@ -150,9 +150,9 @@ int fapi_nr_p7_message_unpack(void *pMessageBuf,
               messageBufLen,
               unpackedBufLen);
 
-  if (fapi_nr_message_header_unpack(pMessageBuf, NFAPI_HEADER_LENGTH, &fapi_hdr, sizeof(fapi_message_header_t), 0) < 0) {
+  if (!fapi_nr_message_header_unpack(pMessageBuf, NFAPI_HEADER_LENGTH, &fapi_hdr, sizeof(fapi_message_header_t), 0)) {
     // failed to read the header
-    return -1;
+    return false;
   }
   uint8_t *pReadPackedMessage = pMessageBuf + NFAPI_HEADER_LENGTH;
   uint8_t *end = (uint8_t *)pMessageBuf + messageBufLen;
@@ -160,7 +160,7 @@ int fapi_nr_p7_message_unpack(void *pMessageBuf,
   pMessageHeader->message_id = fapi_hdr.message_id;
   if ((uint8_t *)(pMessageBuf + pMessageHeader->message_length) > end) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack message length is greater than the message buffer \n");
-    return -1;
+    return false;
   }
 
   // look for the specific message
@@ -231,9 +231,9 @@ int fapi_nr_p7_message_unpack(void *pMessageBuf,
 
   if (result == 0) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Unpack failed to unpack message\n");
-    return -1;
+    return false;
   }
-  return 0;
+  return true;
 }
 
 static uint8_t pack_nr_tx_beamforming_pdu(const nfapi_nr_tx_precoding_and_beamforming_t *beamforming_pdu,

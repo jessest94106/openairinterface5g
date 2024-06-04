@@ -54,7 +54,6 @@ bool isFAPIMessageIDValid(const uint16_t id)
 int check_nr_fapi_unpack_length(nfapi_nr_phy_msg_type_e msgId, uint32_t unpackedBufLen)
 {
   int retLen = 0;
-
   // check for size of nFAPI struct without the nFAPI specific parameters
   switch (msgId) {
     case NFAPI_NR_PHY_MSG_TYPE_PARAM_REQUEST:
@@ -165,7 +164,7 @@ int check_nr_fapi_unpack_length(nfapi_nr_phy_msg_type_e msgId, uint32_t unpacked
   return retLen;
 }
 
-int fapi_nr_p7_message_header_unpack(void *pMessageBuf,
+bool fapi_nr_p7_message_header_unpack(void *pMessageBuf,
                                      uint32_t messageBufLen,
                                      void *pUnpackedBuf,
                                      uint32_t unpackedBufLen,
@@ -178,7 +177,7 @@ int fapi_nr_p7_message_header_unpack(void *pMessageBuf,
                                        NULL);
 }
 
-int fapi_nr_message_header_unpack(void *pMessageBuf,
+bool fapi_nr_message_header_unpack(void *pMessageBuf,
                                   uint32_t messageBufLen,
                                   void *pUnpackedBuf,
                                   uint32_t unpackedBufLen,
@@ -190,12 +189,12 @@ int fapi_nr_message_header_unpack(void *pMessageBuf,
 
   if (pMessageBuf == NULL || pUnpackedBuf == NULL || messageBufLen < NFAPI_HEADER_LENGTH
       || unpackedBufLen < sizeof(fapi_message_header_t)) {
-    return -1;
+    return false;
   }
   uint8_t *end = pMessageBuf + messageBufLen;
   // process the header
   int result =
       (pull8(&pReadPackedMessage, &fapi_msg.num_msg, end) && pull8(&pReadPackedMessage, &fapi_msg.opaque_handle, end)
        && pull16(&pReadPackedMessage, &header->message_id, end) && pull32(&pReadPackedMessage, &header->message_length, end));
-  return (result);
+  return result != 0;
 }

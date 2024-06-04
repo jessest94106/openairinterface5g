@@ -33,7 +33,6 @@ extern "C" {
 typedef struct vnf_t vnf_t;
 typedef struct vnf_p7_t vnf_p7_t;
 
-#define NFAPI_MAX_PACKED_MESSAGE_SIZE 32768
 
 /*! The nfapi VNF phy configuration information
  */
