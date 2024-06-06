@@ -52,10 +52,8 @@
 
 char *baseNetAddress ;
 char *netMask ;
-char *broadcastAddr ;
 #define NASHLP_NETPREFIX "<NAS network prefix, two first bytes of network addresses>\n"
 #define NASHLP_NETMASK   "<NAS network mask>\n"
-#define NASHLP_BROADCASTADDR   "<NAS network broadcast address>\n"
 void nas_getparams(void) {
   // this datamodel require this static because we partially keep data like baseNetAddress (malloc on a global)
   // but we loose the opther attributes in nasoptions between two calls if is is not static !
@@ -67,7 +65,6 @@ void nas_getparams(void) {
     /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
     {"NetworkPrefix",    NASHLP_NETPREFIX,       0,              .strptr=&baseNetAddress,        .defstrval="10.0",            TYPE_STRING,  0 },
     {"NetworkMask",      NASHLP_NETMASK,         0,              .strptr=&netMask,               .defstrval="255.255.255.0",   TYPE_STRING,  0 },
-    {"BroadcastAddr",    NASHLP_BROADCASTADDR,   0,              .strptr=&broadcastAddr,         .defstrval="10.0.255.255",    TYPE_STRING,  0 },
   };
   // clang-format on
   config_get(config_get_if(), nasoptions, sizeofArray(nasoptions), "nas.noS1");
@@ -77,77 +74,14 @@ void setBaseNetAddress (char *baseAddr) {
   strcpy(baseNetAddress,baseAddr);
 }
 
-char *getBaseNetAddress (void) {
-  return baseNetAddress;
-}
-
 void setNetMask (char *baseAddr) {
   strcpy(netMask,baseAddr);
 }
 
-char *getNetMask  (void) {
-  return netMask;
-}
-
-void setBroadcastAddress (char *baseAddr) {
-  strcpy(broadcastAddr, baseAddr);
-}
-
-char *getBroadcastAddress (void) {
-  return broadcastAddr;
-}
-
-//Add Gateway to the interface
-int set_gateway(char *interfaceName, char *gateway) {
-  int sock_fd;
-  struct rtentry rt;
-  struct sockaddr_in addr;
-
-  if((sock_fd = socket(AF_INET,SOCK_DGRAM,0)) < 0) {
-    perror("socket failed");
-    return 1;
-  }
-
-  memset (&rt, 0, sizeof (rt));
-  addr.sin_family = AF_INET;
-  /*set Destination addr*/
-  inet_aton("0.0.0.0",&addr.sin_addr);
-  memcpy(&rt.rt_dst, &addr, sizeof(struct sockaddr_in));
-  /*set gateway addr*/
-  inet_aton(gateway,&addr.sin_addr);
-  memcpy(&rt.rt_gateway, &addr, sizeof(struct sockaddr_in));
-  /*set genmask addr*/
-  inet_aton("0.0.0.0",&addr.sin_addr);
-  memcpy(&rt.rt_genmask, &addr, sizeof(struct sockaddr_in));
-  rt.rt_dev = interfaceName;
-  //rt.rt_flags = RTF_UP|RTF_GATEWAY|RTF_DEFAULT;
-  /* SR: rt_flags on 16 bits but RTF_DEFAULT = 0x00010000
-   * therefore doesn't lie in container -> disable it
-   */
-  //rt.rt_flags = RTF_GATEWAY|RTF_DEFAULT;
-  rt.rt_flags = RTF_GATEWAY;
-
-  if (ioctl(sock_fd, SIOCADDRT, &rt) < 0) {
-    close(sock_fd);
-
-    if(strstr(strerror(errno),"File exists") == NULL) {
-      LOG_E(OIP,"ioctl SIOCADDRT failed : %s\n",strerror(errno));
-      return 2;
-    } else { /*if SIOCADDRT error is route exist, retrun success*/
-      LOG_I(OIP,"File Exist ...\n");
-      LOG_I(OIP,"set_gateway OK!\n");
-      return 0;
-    }
-  }
-
-  close(sock_fd);
-  LOG_D(OIP,"Set Gateway OK!\n");
-  return 0;
-}
-
 // sets a genneric interface parameter
 // (SIOCSIFADDR, SIOCSIFNETMASK, SIOCSIFBRDADDR, SIOCSIFFLAGS)
-int setInterfaceParameter(char *interfaceName, char *settingAddress, int operation) {
+static int setInterfaceParameter(const char *interfaceName, const char *settingAddress, int operation)
+{
   int sock_fd;
   struct ifreq ifr;
   struct sockaddr_in addr;
@@ -178,7 +112,8 @@ int setInterfaceParameter(char *interfaceName, char *settingAddress, int operati
 
 // sets a genneric interface parameter
 // (SIOCSIFADDR, SIOCSIFNETMASK, SIOCSIFBRDADDR, SIOCSIFFLAGS)
-int bringInterfaceUp(char *interfaceName, int up) {
+static int bringInterfaceUp(char *interfaceName, int up)
+{
   int sock_fd;
   struct ifreq ifr;
 
@@ -212,27 +147,6 @@ int bringInterfaceUp(char *interfaceName, int up) {
   //   printf("UP/DOWN OK!\n");
   close( sock_fd );
   return 0;
-}
-// non blocking full configuration of the interface (address, net mask, and broadcast mask)
-int NAS_config(char *interfaceName, char *ipAddress, char *networkMask, char *broadcastAddress) {
-  bringInterfaceUp(interfaceName, 0);
-  // sets the machine address
-  int returnValue= setInterfaceParameter(interfaceName, ipAddress,SIOCSIFADDR);
-
-  // sets the machine network mask
-  if(!returnValue)
-    returnValue= setInterfaceParameter(interfaceName, networkMask,SIOCSIFNETMASK);
-
-  // sets the machine broadcast address
-  if(!returnValue)
-    returnValue= setInterfaceParameter(interfaceName, broadcastAddress,SIOCSIFBRDADDR);
-
-  //  if(!returnValue)
-  //  returnValue=set_gateway(interfaceName, broadcastAddress);
-  if(!returnValue)
-    returnValue = bringInterfaceUp(interfaceName, 1);
-
-  return returnValue;
 }
 
 int nas_config_mbms(int interface_id, int thirdOctet, int fourthOctet, char *ifname) {
@@ -370,25 +284,11 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, char *ifname) 
   return returnValue;
 }
 
-// Blocking full configuration of the interface (address, net mask, and broadcast mask)
-int blocking_NAS_config(char *interfaceName, char *ipAddress, char *networkMask, char *broadcastAddress) {
-  char command[200];
-  command[0]='\0';
-  strcat(command, "ifconfig ");
-  strncat(command, interfaceName, sizeof(command) - strlen(command) - 1);
-  strncat(command, " ", sizeof(command) - strlen(command) - 1);
-  strncat(command, ipAddress, sizeof(command) - strlen(command) - 1);
-  strncat(command, " networkMask ", sizeof(command) - strlen(command) - 1);
-  strncat(command, networkMask, sizeof(command) - strlen(command) - 1);
-  strncat(command, " broadcast ", sizeof(command) - strlen(command) - 1);
-  strncat(command, broadcastAddress, sizeof(command) - strlen(command) - 1);
-  // ifconfig nasmesh0 10.0.1.1 networkMask 255.255.255.0 broadcast 10.0.1.255
-  int i = system (command);
-  return i;
-}
+#ifdef STANDALONE
 
 // program help
-void helpOptions(char **argv) {
+static void helpOptions(char **argv)
+{
   printf("Help for %s\n",  argv[0]);
   printf("  -i <interfaceName>\n");
   printf("  -a <IP address>\n");
@@ -404,7 +304,8 @@ void helpOptions(char **argv) {
 }
 
 // creates the broadcast address if it wasn't set before
-void createBroadcast(char *broadcastAddress) {
+static void createBroadcast(char *broadcastAddress)
+{
   int pos=strlen(broadcastAddress)-1;
 
   while(broadcastAddress[pos]!='.')
@@ -415,7 +316,7 @@ void createBroadcast(char *broadcastAddress) {
   broadcastAddress[++pos]='5';
   broadcastAddress[++pos]='\0';
 }
-#ifdef STANDALONE
+
 // main function
 //---------------------------------------------------------------------------
 int main(int argc,char **argv)
@@ -473,7 +374,7 @@ int main(int argc,char **argv)
   }
 
   printf("Command: ifconfig %s %s networkMask %s broadcast %s\n", interfaceName, ipAddress, networkMask, broadcastAddress);
-  NAS_config(interfaceName, ipAddress, networkMask, broadcastAddress);
+
   //test
   //     setBaseNetAddress("11.11");
   //     nas_config(interfaceName, 33, 44);
