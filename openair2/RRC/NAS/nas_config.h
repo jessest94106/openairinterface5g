@@ -62,7 +62,7 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
  * \note
  * @ingroup  _nas
  */
-int nas_config_mbms(int interface_id, int thirdOctet, int fourthOctet, char *ifsuffix);
+int nas_config_mbms(int interface_id, int thirdOctet, int fourthOctet, const char *ifname);
 
 /*! \fn void  setBaseNetAddress(char*)
  * \brief This function sets the basic network address used
