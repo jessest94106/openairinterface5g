@@ -58,7 +58,7 @@ struct nas_ioctl gifr;
 static int fd;
 static int socket_enabled;
 
-void init_socket(void)
+static void init_socket(void)
 {
 
   if ((fd=socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
@@ -69,7 +69,7 @@ void init_socket(void)
   socket_enabled=1;
 }
 
-void rb_ioctl_init(int inst)
+static void rb_ioctl_init(int inst)
 {
 
   /* init the gifr struct for the given inst */
@@ -79,7 +79,7 @@ void rb_ioctl_init(int inst)
 }
 
 
-int rb_validate_config_ipv4(int cx, int inst, int rb)
+static int rb_validate_config_ipv4(int cx, int inst, int rb)
 {
 
   if (inst == -1) {
@@ -228,45 +228,6 @@ int rb_conf_ipv4(int action,int cx, int inst, int rb, int dscp, in_addr_t saddr_
   return(0);
 
 }
-
-
-int rb_stats_req(int inst)
-{
-
-  if ( fd <= 0 ) {
-    return (1);
-  } /* request stats without defining the interface */
-  else if  (inst == -1) {
-    //  printf("Specify an interface for statistics request \n");
-    LOG_E(OIP,"Specify an interface for statistics request \n");
-    return (1);
-  }
-
-  struct nas_msg_statistic_reply *msgrep;
-
-  int err;
-
-  rb_ioctl_init(inst);
-
-  gifr.type =  NAS_MSG_STATISTIC_REQUEST;
-
-  msgrep=(struct nas_msg_statistic_reply *)(gifr.msg);
-
-  if ((err = ioctl(fd, NAS_IOCTL_RRM, &gifr)) < 0 ) {
-    perror("IOCTL error: STATS REQ FAILED\n");
-    LOG_E(OIP,"IOCTL error: STATS REQ FAILED\n");
-  }
-
-  LOG_I(OIP,"ioctl :Statistics request");
-  LOG_I(OIP,"tx_packets = %u, rx_packets = %u\n", msgrep->tx_packets, msgrep->rx_packets);
-  LOG_I(OIP,"tx_bytes = %u, rx_bytes = %u\n", msgrep->tx_bytes, msgrep->rx_bytes);
-  LOG_I(OIP,"tx_errors = %u, rx_errors = %u\n", msgrep->tx_errors, msgrep->rx_errors);
-  LOG_I(OIP,"tx_dropped = %u, rx_dropped = %u\n", msgrep->tx_dropped, msgrep->rx_dropped);
-
-  return (0);
-
-}
-
 
 in_addr_t ipv4_address (int thirdOctet, int fourthOctet)
 {
