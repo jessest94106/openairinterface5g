@@ -51,19 +51,6 @@ void nas_getparams(void);
  */
 int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *ifprefix);
 
-/*! \fn int  nas_config_mbms(char*, int, int)
- * \brief This function initializes the nasmesh interface using the basic values,
- * basic address, network mask and broadcast address, as the default configured
- * ones
- * \param[in] interfaceName, the name of the interface, e.g. nasmesh0 or nasmesh1
- * \param[in] third octet of the ip address e.g. for the 10.1.2.3 address would be 2
- * \param[in] fourth octet of the ip address e.g. for the 10.1.2.3 address would be 3
- * \return 0 on success, otherwise 1, if couldn't open a socket and 2 if the ioctl fails
- * \note
- * @ingroup  _nas
- */
-int nas_config_mbms(int interface_id, int thirdOctet, int fourthOctet, const char *ifname);
-
 /*! \fn void  setBaseNetAddress(char*)
  * \brief This function sets the basic network address used
  * \param[in] baseAddr, the new basic address e.g.for 10.0.1.2, would be 10.0
