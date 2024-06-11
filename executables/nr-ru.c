@@ -746,12 +746,12 @@ static radio_tx_gpio_flag_t get_gpio_flags(RU_t *ru, int slot)
   return flags_gpio;
 }
 
-void tx_rf(RU_t *ru,int frame,int slot, uint64_t timestamp) {
+void tx_rf(RU_t *ru, int frame,int slot, uint64_t timestamp)
+{
   RU_proc_t *proc = &ru->proc;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &ru->config;
   void *txp[ru->nb_tx];
-  unsigned int txs;
   int i;
   T(T_ENB_PHY_OUTPUT_SIGNAL,
     T_INT(0),
@@ -807,7 +807,7 @@ void tx_rf(RU_t *ru,int frame,int slot, uint64_t timestamp) {
     flags_burst = proc->first_tx == 1 ? TX_BURST_START : TX_BURST_MIDDLE;
   }
 
-  if (fp->freq_range == FR2)
+  if (ru->openair0_cfg.gpio_controller != RU_GPIO_CONTROL_NONE)
     flags_gpio = get_gpio_flags(ru, slot);
 
   const int flags = flags_burst | (flags_gpio << 4);
@@ -825,8 +825,11 @@ void tx_rf(RU_t *ru,int frame,int slot, uint64_t timestamp) {
   VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TRX_TST, (timestamp + ru->ts_offset) & 0xffffffff);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_WRITE, 1);
   // prepare tx buffer pointers
-  txs = ru->rfdevice
-            .trx_write_func(&ru->rfdevice, timestamp + ru->ts_offset - sf_extension, txp, siglen + sf_extension, ru->nb_tx, flags);
+  uint32_t txs = ru->rfdevice.trx_write_func(&ru->rfdevice,
+                                             timestamp + ru->ts_offset - sf_extension,
+                                             txp,
+                                             siglen + sf_extension,
+                                             ru->nb_tx, flags);
   LOG_D(PHY,
         "[TXPATH] RU %d aa %d tx_rf, writing to TS %llu, %d.%d, unwrapped_frame %d, slot %d, flags %d, siglen+sf_extension %d, "
         "returned %d, E %f\n",
@@ -1029,7 +1032,8 @@ void *ru_stats_thread(void *param) {
   return(NULL);
 }
 
-void ru_tx_func(void *param) {
+void ru_tx_func(void *param)
+{
   processingData_RU_t *info = (processingData_RU_t *) param;
   RU_t *ru = info->ru;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
@@ -1631,7 +1635,8 @@ void init_precoding_weights(PHY_VARS_gNB *gNB) {
   }
 }*/
 
-void set_function_spec_param(RU_t *ru) {
+void set_function_spec_param(RU_t *ru)
+{
   switch (ru->if_south) {
     case LOCAL_RF:   // this is an RU with integrated RF (RRU, gNB)
       reset_meas(&ru->rx_fhaul);
@@ -1780,20 +1785,19 @@ void init_NR_RU(configmodule_interface_t *cfg, char *rf_config_file)
       }
     }
 
-    gNB_RC           = RC.gNB[0];
-    gNB0             = ru->gNB_list[0];
-    fp               = ru->nr_frame_parms;
+    gNB_RC = RC.gNB[0];
+    gNB0 = ru->gNB_list[0];
+    fp = ru->nr_frame_parms;
     LOG_D(PHY, "RU FUnction:%d ru->if_south:%d\n", ru->function, ru->if_south);
 
     if (gNB0) {
       if ((ru->function != NGFI_RRU_IF5) && (ru->function != NGFI_RRU_IF4p5))
-        AssertFatal(gNB0!=NULL,"gNB0 is null!\n");
+        AssertFatal(gNB0, "gNB0 is null!\n");
 
       if (gNB0 && gNB_RC) {
-        LOG_I(PHY,"Copying frame parms from gNB in RC to gNB %d in ru %d and frame_parms in ru\n",gNB0->Mod_id,ru->idx);
-        memset((void *)fp, 0, sizeof(NR_DL_FRAME_PARMS));
-        memcpy((void *)fp,&gNB_RC->frame_parms,sizeof(NR_DL_FRAME_PARMS));
-        memcpy((void *)&gNB0->frame_parms,(void *)&gNB_RC->frame_parms,sizeof(NR_DL_FRAME_PARMS));
+        LOG_I(PHY,"Copying frame parms from gNB in RC to gNB %d in ru %d and frame_parms in ru\n", gNB0->Mod_id, ru->idx);
+        memcpy((void *)fp, &gNB_RC->frame_parms, sizeof(NR_DL_FRAME_PARMS));
+        memcpy((void *)&gNB0->frame_parms, (void *)&gNB_RC->frame_parms, sizeof(NR_DL_FRAME_PARMS));
         // attach all RU to all gNBs in its list/
         LOG_D(PHY,"ru->num_gNB:%d gNB0->num_RU:%d\n", ru->num_gNB, gNB0->num_RU);
 
@@ -1858,18 +1862,17 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
     printf("Set RU mask to %lx\n",RC.ru_mask);
 
     for (int j = 0; j < RC.nb_RU; j++) {
-      RC.ru[j]                                      = (RU_t *)malloc(sizeof(RU_t));
-      memset((void *)RC.ru[j],0,sizeof(RU_t));
-      RC.ru[j]->idx                                 = j;
-      RC.ru[j]->nr_frame_parms                      = (NR_DL_FRAME_PARMS *)malloc(sizeof(NR_DL_FRAME_PARMS));
-      RC.ru[j]->frame_parms                         = (LTE_DL_FRAME_PARMS *)malloc(sizeof(LTE_DL_FRAME_PARMS));
+      RC.ru[j] = calloc(1, sizeof(*RC.ru[j]));
+      RC.ru[j]->idx = j;
+      RC.ru[j]->nr_frame_parms = calloc(1, sizeof(*RC.ru[j]->nr_frame_parms));
+      RC.ru[j]->frame_parms = calloc(1, sizeof(*RC.ru[j]->frame_parms));
       printf("Creating RC.ru[%d]:%p\n", j, RC.ru[j]);
-      RC.ru[j]->if_timing                           = synch_to_ext_device;
+      RC.ru[j]->if_timing = synch_to_ext_device;
 
       if (RC.nb_nr_L1_inst > 0)
-        RC.ru[j]->num_gNB                           = RUParamList.paramarray[j][RU_ENB_LIST_IDX].numelt;
+        RC.ru[j]->num_gNB = RUParamList.paramarray[j][RU_ENB_LIST_IDX].numelt;
       else
-        RC.ru[j]->num_gNB                           = 0;
+        RC.ru[j]->num_gNB  = 0;
 
       for (int i = 0; i < RC.ru[j]->num_gNB; i++)
         RC.ru[j]->gNB_list[i] = RC.gNB[RUParamList.paramarray[j][RU_ENB_LIST_IDX].iptr[i]];
@@ -1890,10 +1893,8 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
                       "bad GPIO controller in configuration file: '%s'\n",
                       *(RUParamList.paramarray[j][RU_GPIO_CONTROL].strptr));
         }
-      } else {
-        RC.ru[j]->openair0_cfg.gpio_controller = RU_GPIO_CONTROL_GENERIC;
-        LOG_I(PHY, "RU GPIO control set as 'generic'\n");
-      }
+      } else
+        RC.ru[j]->openair0_cfg.gpio_controller = RU_GPIO_CONTROL_NONE;
 
       if (config_isparamset(RUParamList.paramarray[j], RU_TX_SUBDEV)) {
         RC.ru[j]->openair0_cfg.tx_subdev = strdup(*(RUParamList.paramarray[j][RU_TX_SUBDEV].strptr));
@@ -2023,7 +2024,6 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
       RC.ru[j]->att_rx                            = *(RUParamList.paramarray[j][RU_ATT_RX_IDX].uptr);
       RC.ru[j]->if_frequency                      = *(RUParamList.paramarray[j][RU_IF_FREQUENCY].u64ptr);
       RC.ru[j]->if_freq_offset                    = *(RUParamList.paramarray[j][RU_IF_FREQ_OFFSET].iptr);
-      RC.ru[j]->do_precoding                      = *(RUParamList.paramarray[j][RU_DO_PRECODING].iptr);
       RC.ru[j]->sl_ahead                          = *(RUParamList.paramarray[j][RU_SL_AHEAD].iptr);
       RC.ru[j]->num_bands                         = RUParamList.paramarray[j][RU_BAND_LIST_IDX].numelt;
       for (int i = 0; i < RC.ru[j]->num_bands; i++)

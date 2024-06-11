@@ -663,6 +663,7 @@ typedef struct RU_t_s {
   /// structure for analyzing high-level RT measurements
   rt_ru_profiling_t rt_ru_profiling;
   void* scopeData;
+  bool analog_beamforming;
 } RU_t;
 
 
