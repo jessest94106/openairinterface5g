@@ -316,7 +316,7 @@ void mac_top_init_gNB(ngran_node_t node_type,
 
   srand48(0);
 
-  // triggers also PYH initialization in case we have L1 via FAPI
+  // triggers also PHY initialization in case we have L1 via FAPI
   nr_mac_config_scc(RC.nrmac[0], scc, config);
 }
 

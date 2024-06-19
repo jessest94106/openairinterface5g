@@ -22,6 +22,8 @@
 #define NFAPI_MAX_NUM_UCI_INDICATION 8
 #define NFAPI_MAX_NUM_GROUPS 8
 #define NFAPI_MAX_NUM_CB 8
+#define NFAPI_MAX_NUM_PRGS 1
+#define NFAPI_MAX_NUM_BG_IF 1
 
 // Extension to the generic structures for single tlv values
 
@@ -725,7 +727,7 @@ typedef struct
 typedef struct
 {
   uint16_t pm_idx;//Index to precoding matrix (PM) pre-stored at cell configuration. Note: If precoding is not used this parameter should be set to 0. Value: 0->65535.
-  nfapi_nr_dig_bf_interface_t dig_bf_interface_list[1];//max dig_bf_interfaces
+  nfapi_nr_dig_bf_interface_t dig_bf_interface_list[NFAPI_MAX_NUM_BG_IF];//max dig_bf_interfaces
 
 }nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t;
 
@@ -736,7 +738,7 @@ typedef struct
   uint16_t prg_size;//Size in RBs of a precoding resource block group (PRG) – to which same precoding and digital beamforming gets applied. Value: 1->275
   //watchout: dig_bf_interfaces here, in table 3-53 it's dig_bf_interface
   uint8_t  dig_bf_interfaces;//Number of STD ant ports (parallel streams) feeding into the digBF Value: 0->255
-  nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t prgs_list[1];//max prg_size
+  nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t prgs_list[NFAPI_MAX_NUM_PRGS];//max prg_size
 
 }nfapi_nr_tx_precoding_and_beamforming_t;
 
@@ -1141,7 +1143,7 @@ typedef struct {
 //for prach_pdu:
 typedef struct
 {
-  nfapi_nr_dig_bf_interface_t* dig_bf_interface_list;
+  nfapi_nr_dig_bf_interface_t dig_bf_interface_list[NFAPI_MAX_NUM_BG_IF];
 } nfapi_nr_ul_beamforming_number_of_prgs_t;
 
 typedef struct
@@ -1150,7 +1152,7 @@ typedef struct
   uint16_t num_prgs;          // Number of PRGs spanning this allocation. Value : 1->275
   uint16_t prg_size;          // Size in RBs of a precoding resource block group (PRG) – to which the same digital beamforming gets applied. Value: 1->275
   uint8_t dig_bf_interface;   // Number of logical antenna ports (parallel streams) resulting from the Rx combining. Value: 0->255
-  nfapi_nr_ul_beamforming_number_of_prgs_t *prgs_list;
+  nfapi_nr_ul_beamforming_number_of_prgs_t prgs_list[NFAPI_MAX_NUM_PRGS];
 } nfapi_nr_ul_beamforming_t;
 
 typedef struct
