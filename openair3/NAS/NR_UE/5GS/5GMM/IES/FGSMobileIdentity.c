@@ -215,7 +215,7 @@ static int decode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, const 
   guti->amfregionid = *(buffer + decoded);
   decoded++;
   IES_DECODE_U16(buffer, decoded, temp);
-  guti->amfsetid = temp >> 3;
+  guti->amfsetid = (temp >> 6) & 0x3FF;
   guti->amfpointer = temp & 0x3f;
 
   IES_DECODE_U32(buffer, decoded, guti->tmsi);
