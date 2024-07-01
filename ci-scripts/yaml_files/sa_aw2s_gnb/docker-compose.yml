@@ -1,6 +1,6 @@
 services:
     oai-gnb:
-        image: oai-gnb-aw2s:latest
+        image: oaisoftwarealliance/oai-gnb-aw2s:develop
         network_mode: "host"
         container_name: oai-gnb-aw2s
         cap_drop:

@@ -1,6 +1,6 @@
 services:
     oai-gnb:
-        image: oai-gnb-fhi72:latest
+        image: oaisoftwarealliance/oai-gnb-fhi72:develop
         cap_add:
             - SYS_ADMIN
             - IPC_LOCK
