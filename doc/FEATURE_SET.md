@@ -226,7 +226,8 @@ Furthermore, the gNB and UE support
 ##  NR UE PHY Layer ##
 
 *  Initial synchronization
-   - the UE needs to know the position in frequency of the SSBs (via command line parameter in SA)
+   - non-blind synchronization (information required: carrier frequency, bandwidth, numerology)
+   - option to search SSB inside the bandwidth available
 *  Time tracking based on PBCH DMRS
 *  Frequency offset estimation based on PSS and SSS
 *  15kHz and 30kHz SCS for FR1 and 120 kHz SCS for FR2
@@ -281,7 +282,7 @@ Furthermore, the gNB and UE support
 
 *  MAC -> PHY configuration via UE FAPI P5 interface
 *  Basic MAC to control PHY via UE FAPI P7 interface
-*  PHY -> MAC indication (needs some improvement)
+*  PHY -> MAC indication
 
 ## NR UE Higher Layers ##
 
@@ -303,19 +304,21 @@ Furthermore, the gNB and UE support
    - format 01 (C-RNTI)
 * UCI processing
    - ACK/NACK processing
-   - Triggering periodic SR
-   - CSI measurement reporting
+   - Scheduling request procedures
+   - CSI measurement reporting (periodic and aperiodic)
 * DLSCH scheduler
    - Configuration of fapi PDU according to DCI
    - HARQ procedures
 * ULSCH scheduler
    - Configuration of fapi PDU according to DCI
+   - Buffer status reporting procedures
    - Logical channel prioritization of 'data from any logical channel'
+   - UCI on PUSCH
 * NR-CSIRS scheduler
   - Scheduling of NR-CSIRS reception
   - Fill UCI for CSI measurement reporting
 * Scheduler procedures for SRS transmission
-   - Periodic SRS transmission
+   - Periodic and aperiodic SRS transmission
 * Bandwidth part (BWP) operation
    - Operation in configured dedicated BWP through RRCSetup or RRCReconfiguration
 
@@ -352,6 +355,7 @@ Furthermore, the gNB and UE support
    - RRCSetupRequest/RRCSetup/RRCSetupComplete
    - RRC Uplink/Downlink Information transfer carrying NAS messages transparently
    - RRC Reconfiguration/Reconfiguration complete
+   - RRCReestablishmentRequest/RRC Reestablishment/Reestablishment complete
    - Support for master cell group configuration
    - Reception of UECapabilityEnquiry, encoding and transmission of UECapability
 * Interface with PDCP: configuration, DCCH and CCCH message handling
