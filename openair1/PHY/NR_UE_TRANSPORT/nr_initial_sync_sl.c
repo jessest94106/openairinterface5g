@@ -346,7 +346,7 @@ nr_initial_sync_t sl_nr_slss_search(PHY_VARS_NR_UE *UE, UE_nr_rxtx_proc_t *proc,
   int ret = -1;
   uint16_t rx_slss_id = 65535;
 
-  nr_initial_sync_t result = {true, 0};
+  nr_initial_sync_t result = {false, 0};
 
 #ifdef SL_DEBUG_SEARCH_SLSS
   LOG_D(PHY, "SIDELINK SEARCH SLSS: Function:%s\n", __func__);
