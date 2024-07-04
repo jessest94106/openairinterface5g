@@ -59,7 +59,7 @@ Furthermore, the gNB and UE support
    - DMRS configuration type 1 and 2
    - Single and multiple DMRS symbols
    - PTRS support
-   - Support for 1, 2 and 4 TX antennas
+   - Support for up to 4 TX antennas
    - Support for up to 2 layers
    - Support for 256 QAM
 *  NR-CSIRS Generation of sequence at PHY
@@ -68,7 +68,7 @@ Furthermore, the gNB and UE support
    - DMRS configuration type 1 and 2
    - Single and multiple DMRS symbols
    - PTRS support
-   - Support for up to 2 RX antenna
+   - Support for up to 4 RX antennas
    - Support for up to 2 layers
    - Support for 256 QAM
 *  NR-PUCCH
