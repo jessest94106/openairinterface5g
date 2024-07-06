@@ -277,11 +277,7 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
   }
 
   ue->init_averaging = 1;
-
-  // enable MIB/SIB decoding by default
-  ue->decode_MIB = 1;
-  ue->decode_SIB = 1;
-
+  ue->received_config_request = false;
   init_nr_prach_tables(839);
   init_symbol_rotation(fp);
   init_timeshift_rotation(fp);
