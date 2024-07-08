@@ -33,9 +33,7 @@
 //default values according to the examples,
 
 char *baseNetAddress ;
-char *netMask ;
 #define NASHLP_NETPREFIX "<NAS network prefix, two first bytes of network addresses>\n"
-#define NASHLP_NETMASK   "<NAS network mask>\n"
 void nas_getparams(void) {
   // this datamodel require this static because we partially keep data like baseNetAddress (malloc on a global)
   // but we loose the opther attributes in nasoptions between two calls if is is not static !
@@ -46,7 +44,6 @@ void nas_getparams(void) {
     /*   optname                     helpstr                paramflags           XXXptr                               defXXXval               type                 numelt */
     /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
     {"NetworkPrefix",    NASHLP_NETPREFIX,       0,              .strptr=&baseNetAddress,        .defstrval="10.0",            TYPE_STRING,  0 },
-    {"NetworkMask",      NASHLP_NETMASK,         0,              .strptr=&netMask,               .defstrval="255.255.255.0",   TYPE_STRING,  0 },
   };
   // clang-format on
   config_get(config_get_if(), nasoptions, sizeofArray(nasoptions), "nas.noS1");
@@ -56,9 +53,6 @@ void setBaseNetAddress (char *baseAddr) {
   strcpy(baseNetAddress,baseAddr);
 }
 
-void setNetMask (char *baseAddr) {
-  strcpy(netMask,baseAddr);
-}
 
 // sets a genneric interface parameter
 // (SIOCSIFADDR, SIOCSIFNETMASK, SIOCSIFBRDADDR, SIOCSIFFLAGS)
@@ -145,16 +139,16 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
   returnValue= setInterfaceParameter(interfaceName, ipAddress,SIOCSIFADDR);
 
   // sets the machine network mask
-  if(!returnValue)
-    returnValue= setInterfaceParameter(interfaceName, netMask,SIOCSIFNETMASK);
+  if (!returnValue)
+    returnValue = setInterfaceParameter(interfaceName, "255.255.255.0", SIOCSIFNETMASK);
 
   if(!returnValue)
 	  returnValue=bringInterfaceUp(interfaceName, 1);
 
   if(!returnValue)
-    LOG_I(OIP, "Interface %s successfully configured, ip address %s, mask %s\n", interfaceName, ipAddress, netMask);
+    LOG_I(OIP, "Interface %s successfully configured, ip address %s\n", interfaceName, ipAddress);
   else
-    LOG_E(OIP, "Interface %s couldn't be configured (ip address %s, mask %s)\n", interfaceName, ipAddress, netMask);
+    LOG_E(OIP, "Interface %s couldn't be configured (ip address %s)\n", interfaceName, ipAddress);
 
   return returnValue;
 }

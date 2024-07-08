@@ -59,12 +59,4 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
  */
 void setBaseNetAddress(char *baseAddr);
 
-/*! \fn void  setNetMask(char*)
- * \brief This function sets the new default network mask used
- * \param[in] newNetworkMask, the new network mask e.g.for 255.255.0.0
- * \note
- * @ingroup  _nas
- */
-void setNetMask(char *baseAddr);
-
 #endif /*NAS_CONFIG_H_*/
