@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -54,101 +55,82 @@ void setBaseNetAddress (char *baseAddr) {
 }
 
 
-// sets a genneric interface parameter
-// (SIOCSIFADDR, SIOCSIFNETMASK, SIOCSIFBRDADDR, SIOCSIFFLAGS)
-static int setInterfaceParameter(const char *interfaceName, const char *settingAddress, int operation)
+/*
+ * \brief set a genneric interface parameter
+ * \param ifn the name of the interface to modify
+ * \param if_addr the address that needs to be modified
+ * \param operation one of SIOCSIFADDR (set interface address), SIOCSIFNETMASK
+ *   (set network mask), SIOCSIFBRDADDR (set broadcast address), SIOCSIFFLAGS
+ *   (set flags)
+ * \return true on success, false otherwise
+ */
+static bool setInterfaceParameter(int sock_fd, const char *ifn, const char *if_addr, int operation)
 {
-  int sock_fd;
-  struct ifreq ifr;
-  struct sockaddr_in addr;
+  struct ifreq ifr = {0};
+  strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name));
 
-  if((sock_fd = socket(AF_INET,SOCK_DGRAM,0)) < 0)    {
-    LOG_E(OIP,"Setting operation %d, for %s, address, %s : socket failed\n",
-          operation, interfaceName, settingAddress);
-    return 1;
-  }
-
-  memset(&ifr, 0, sizeof(ifr));
-  strncpy(ifr.ifr_name, interfaceName, sizeof(ifr.ifr_name)-1);
-  memset(&addr, 0, sizeof(struct sockaddr_in));
-  addr.sin_family = AF_INET;
-  inet_aton(settingAddress,&addr.sin_addr);
+  struct sockaddr_in addr = {.sin_family = AF_INET};
+  inet_aton(if_addr, &addr.sin_addr);
+  //inet_pton(AF_INET6 or AF_INET)
   memcpy(&ifr.ifr_ifru.ifru_addr,&addr,sizeof(struct sockaddr_in));
 
-  if(ioctl(sock_fd,operation,&ifr) < 0)    {
-    close(sock_fd);
-    LOG_E(OIP,"Setting operation %d, for %s, address, %s : ioctl call failed\n",
-          operation, interfaceName, settingAddress);
-    return 2;
-  }
-
-  close(sock_fd);
-  return 0;
+  bool success = ioctl(sock_fd,operation,&ifr) == 0;
+  if (!success)
+    LOG_E(OIP, "Setting operation %d for %s: ioctl call failed: %d, %s\n", operation, ifn, errno, strerror(errno));
+  return success;
 }
 
-// sets a genneric interface parameter
-// (SIOCSIFADDR, SIOCSIFNETMASK, SIOCSIFBRDADDR, SIOCSIFFLAGS)
-static int bringInterfaceUp(char *interfaceName, int up)
+/*
+ * \brief bring interface up (up != 0) or down (up == 0)
+ */
+typedef enum { INTERFACE_DOWN, INTERFACE_UP } if_action_t;
+static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_action)
 {
-  int sock_fd;
-  struct ifreq ifr;
+  struct ifreq ifr = {0};
+  strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name));
 
-  if((sock_fd = socket(AF_INET,SOCK_DGRAM,0)) < 0) {
-    LOG_E(OIP,"Bringing interface UP, for %s, failed creating socket\n", interfaceName);
-    return 1;
-  }
-
-  memset(&ifr, 0, sizeof(ifr));
-  strncpy(ifr.ifr_name, interfaceName, sizeof(ifr.ifr_name)-1);
-
-  if(up) {
+  if (if_action == INTERFACE_UP) {
     ifr.ifr_flags |= IFF_UP | IFF_NOARP | IFF_MULTICAST;
-
-    if (ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == -1) {
-      close(sock_fd);
-      LOG_E(OIP,"Bringing interface UP, for %s, failed UP ioctl\n", interfaceName);
-      return 2;
-    }
   } else {
-    //        printf("desactivation de %s\n", interfaceName);
     ifr.ifr_flags &= (~IFF_UP);
-
-    if (ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == -1) {
-      close(sock_fd);
-      LOG_E(OIP,"Bringing interface down, for %s, failed UP ioctl\n", interfaceName);
-      return 2;
-    }
   }
 
-  //   printf("UP/DOWN OK!\n");
-  close( sock_fd );
-  return 0;
+  bool success = ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == 0;
+  if (!success) {
+    const char* action = if_action == INTERFACE_DOWN ? "DOWN" : "UP";
+    LOG_E(OIP, "Bringing interface %s for %s: ioctl call failed: %d, %s\n", action, ifn, errno, strerror(errno));
+  }
+  return success;
 }
 
 // non blocking full configuration of the interface (address, and the two lest octets of the address)
 int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *ifpref)
 {
-  //char buf[5];
   char ipAddress[20];
-  char interfaceName[20];
-  int returnValue;
+  char interfaceName[IFNAMSIZ];
   sprintf(ipAddress, "%s.%d.%d", baseNetAddress,thirdOctet,fourthOctet);
-  sprintf(interfaceName, "%s%d", ifpref, interface_id);
-  bringInterfaceUp(interfaceName, 0);
-  // sets the machine address
-  returnValue= setInterfaceParameter(interfaceName, ipAddress,SIOCSIFADDR);
+  snprintf(interfaceName, sizeof(interfaceName), "%s%d", ifpref, interface_id);
 
-  // sets the machine network mask
-  if (!returnValue)
-    returnValue = setInterfaceParameter(interfaceName, "255.255.255.0", SIOCSIFNETMASK);
+  int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock_fd < 0) {
+    LOG_E(UTIL, "Failed creating socket for interface management: %d, %s\n", errno, strerror(errno));
+    return 1;
+  }
 
-  if(!returnValue)
-	  returnValue=bringInterfaceUp(interfaceName, 1);
+  change_interface_state(sock_fd, interfaceName, INTERFACE_DOWN);
+  bool success = setInterfaceParameter(sock_fd, interfaceName, ipAddress, SIOCSIFADDR);
+  // set the machine network mask
+  if (success)
+    success = setInterfaceParameter(sock_fd, interfaceName, "255.255.255.0", SIOCSIFNETMASK);
 
-  if(!returnValue)
+  if (success)
+    success = change_interface_state(sock_fd, interfaceName, INTERFACE_UP);
+
+  if (success)
     LOG_I(OIP, "Interface %s successfully configured, ip address %s\n", interfaceName, ipAddress);
   else
     LOG_E(OIP, "Interface %s couldn't be configured (ip address %s)\n", interfaceName, ipAddress);
 
-  return returnValue;
+  close(sock_fd);
+  return success;
 }
