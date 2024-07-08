@@ -19,34 +19,16 @@
  *      contact@openairinterface.org
  */
 
-/*! \file nas_config.c
-* \brief Configures the nasmesh interface
-* \author Daniel Camara and Navid Nikaein
-* \date 2006-2011
-* \version 0.1
-* \email:navid.nikaein@eurecom.fr
-* \company Eurecom
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <net/route.h>
 
 #include "nas_config.h"
 #include "common/utils/LOG/log.h"
-#include "executables/lte-softmodem.h"
 #include "common/config/config_userapi.h"
-#include "pdcp.h"
 
 //default values according to the examples,
 
@@ -184,101 +166,3 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
 
   return returnValue;
 }
-
-#ifdef STANDALONE
-
-// program help
-static void helpOptions(char **argv)
-{
-  printf("Help for %s\n",  argv[0]);
-  printf("  -i <interfaceName>\n");
-  printf("  -a <IP address>\n");
-  printf("  -n <Net mask>\n");
-  printf("  -b <broadcast address>\n");
-  printf("  -h Shows this help\n");
-  printf("If no option is passed as parameter the default values are: \n");
-  printf("    Interface Name: nasmesh0\n");
-  printf("    IP Address: 10.0.1.1\n");
-  printf("    Net mask: 255.255.255.0\n");
-  printf("    Broadcast address: [Beginning of the IP address].255\n");
-  exit(1);
-}
-
-// creates the broadcast address if it wasn't set before
-static void createBroadcast(char *broadcastAddress)
-{
-  int pos=strlen(broadcastAddress)-1;
-
-  while(broadcastAddress[pos]!='.')
-    pos--;
-
-  broadcastAddress[++pos]='2';
-  broadcastAddress[++pos]='2';
-  broadcastAddress[++pos]='5';
-  broadcastAddress[++pos]='\0';
-}
-
-// main function
-//---------------------------------------------------------------------------
-int main(int argc,char **argv)
-//---------------------------------------------------------------------------
-{
-  int c;
-  char interfaceName[100];
-  char ipAddress[100];
-  char networkMask[100];
-  char broadcastAddress[100];
-  strcpy(interfaceName, "oai0");
-  strcpy(ipAddress, "10.0.1.1");
-  strcpy(networkMask, "255.255.255.0");
-  broadcastAddress[0]='\0';
-
-  while ((c = getopt (argc, argv, "i:a:n:b:h")) != -1)
-    switch (c) {
-      case 'h':
-        helpOptions(argv);
-        break;
-
-      case 'i':
-        strcpy(interfaceName,optarg);
-        break;
-
-      case 'a':
-        strcpy(ipAddress,optarg);
-        break;
-
-      case 'n':
-        strcpy(networkMask,optarg);
-        break;
-
-      case 'b':
-        strcpy(broadcastAddress,optarg);
-        break;
-
-      case '?':
-        if (isprint (optopt))
-          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-        else
-          fprintf (stderr,
-                   "Unknown option character `\\x%x'.\n",
-                   optopt);
-
-        return 1;
-
-      default:
-        abort ();
-    }
-
-  if(strlen(broadcastAddress)==0) {
-    strcpy(broadcastAddress,ipAddress);
-    createBroadcast(broadcastAddress);
-  }
-
-  printf("Command: ifconfig %s %s networkMask %s broadcast %s\n", interfaceName, ipAddress, networkMask, broadcastAddress);
-
-  //test
-  //     setBaseNetAddress("11.11");
-  //     nas_config(interfaceName, 33, 44);
-}
-
-#endif
