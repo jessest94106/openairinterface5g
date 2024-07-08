@@ -136,11 +136,9 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
 {
   //char buf[5];
   char ipAddress[20];
-  char broadcastAddress[20];
   char interfaceName[20];
   int returnValue;
   sprintf(ipAddress, "%s.%d.%d", baseNetAddress,thirdOctet,fourthOctet);
-  sprintf(broadcastAddress, "%s.%d.255",baseNetAddress, thirdOctet);
   sprintf(interfaceName, "%s%d", ifpref, interface_id);
   bringInterfaceUp(interfaceName, 0);
   // sets the machine address
@@ -150,19 +148,13 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
   if(!returnValue)
     returnValue= setInterfaceParameter(interfaceName, netMask,SIOCSIFNETMASK);
 
-  // sets the machine broadcast address
-  if(!returnValue)
-    returnValue= setInterfaceParameter(interfaceName, broadcastAddress,SIOCSIFBRDADDR);
-
   if(!returnValue)
 	  returnValue=bringInterfaceUp(interfaceName, 1);
 
   if(!returnValue)
-    LOG_I(OIP,"Interface %s successfully configured, ip address %s, mask %s broadcast address %s\n",
-          interfaceName, ipAddress, netMask, broadcastAddress);
+    LOG_I(OIP, "Interface %s successfully configured, ip address %s, mask %s\n", interfaceName, ipAddress, netMask);
   else
-    LOG_E(OIP,"Interface %s couldn't be configured (ip address %s, mask %s broadcast address %s)\n",
-          interfaceName, ipAddress, netMask, broadcastAddress);
+    LOG_E(OIP, "Interface %s couldn't be configured (ip address %s, mask %s)\n", interfaceName, ipAddress, netMask);
 
   return returnValue;
 }
