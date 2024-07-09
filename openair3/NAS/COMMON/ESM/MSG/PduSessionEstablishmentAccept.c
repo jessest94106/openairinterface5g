@@ -25,8 +25,6 @@
 #include "openair2/RRC/NAS/nas_config.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 
-extern char *baseNetAddress;
-
 static uint16_t getShort(uint8_t *input)
 {
   uint16_t tmp16;
@@ -105,19 +103,23 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
         psea_msg.pdu_addr_ie.pdu_length = *curPtr++;
         psea_msg.pdu_addr_ie.pdu_type = *curPtr++;
 
+        DevAssert(psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV4);
         if (psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV4) {
-          psea_msg.pdu_addr_ie.pdu_addr_oct1 = *curPtr++;
-          psea_msg.pdu_addr_ie.pdu_addr_oct2 = *curPtr++;
-          psea_msg.pdu_addr_ie.pdu_addr_oct3 = *curPtr++;
-          psea_msg.pdu_addr_ie.pdu_addr_oct4 = *curPtr++;
-          nas_getparams();
-          sprintf(baseNetAddress, "%d.%d", psea_msg.pdu_addr_ie.pdu_addr_oct1, psea_msg.pdu_addr_ie.pdu_addr_oct2);
-          nas_config(1, psea_msg.pdu_addr_ie.pdu_addr_oct3, psea_msg.pdu_addr_ie.pdu_addr_oct4, "oaitun_ue");
-          LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received UE IP: %d.%d.%d.%d\n",
-                psea_msg.pdu_addr_ie.pdu_addr_oct1,
-                psea_msg.pdu_addr_ie.pdu_addr_oct2,
-                psea_msg.pdu_addr_ie.pdu_addr_oct3,
-                psea_msg.pdu_addr_ie.pdu_addr_oct4);
+          pdu_address_t *addr = &psea_msg.pdu_addr_ie;
+          addr->pdu_addr_oct1 = *curPtr++;
+          addr->pdu_addr_oct2 = *curPtr++;
+          addr->pdu_addr_oct3 = *curPtr++;
+          addr->pdu_addr_oct4 = *curPtr++;
+          char ip[20];
+          snprintf(ip,
+                   sizeof(ip),
+                   "%d.%d.%d.%d",
+                   addr->pdu_addr_oct1,
+                   addr->pdu_addr_oct2,
+                   addr->pdu_addr_oct3,
+                   addr->pdu_addr_oct4);
+          nas_config(1, ip, "oaitun_ue");
+          LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received UE IP: %s\n", ip);
         } else {
           curPtr += psea_msg.pdu_addr_ie.pdu_length;
         }

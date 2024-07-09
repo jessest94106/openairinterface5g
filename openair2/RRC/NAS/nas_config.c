@@ -29,31 +29,6 @@
 
 #include "nas_config.h"
 #include "common/utils/LOG/log.h"
-#include "common/config/config_userapi.h"
-
-//default values according to the examples,
-
-char *baseNetAddress ;
-#define NASHLP_NETPREFIX "<NAS network prefix, two first bytes of network addresses>\n"
-void nas_getparams(void) {
-  // this datamodel require this static because we partially keep data like baseNetAddress (malloc on a global)
-  // but we loose the opther attributes in nasoptions between two calls if is is not static !
-  // clang-format off
-  paramdef_t nasoptions[] = {
-    /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-    /*                                            configuration parameters for netlink, includes network parameters when running in noS1 mode                             */
-    /*   optname                     helpstr                paramflags           XXXptr                               defXXXval               type                 numelt */
-    /*--------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-    {"NetworkPrefix",    NASHLP_NETPREFIX,       0,              .strptr=&baseNetAddress,        .defstrval="10.0",            TYPE_STRING,  0 },
-  };
-  // clang-format on
-  config_get(config_get_if(), nasoptions, sizeofArray(nasoptions), "nas.noS1");
-}
-
-void setBaseNetAddress (char *baseAddr) {
-  strcpy(baseNetAddress,baseAddr);
-}
-
 
 /*
  * \brief set a genneric interface parameter
@@ -104,21 +79,19 @@ static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_
 }
 
 // non blocking full configuration of the interface (address, and the two lest octets of the address)
-int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *ifpref)
+bool nas_config(int interface_id, const char *ip, const char *ifpref)
 {
-  char ipAddress[20];
   char interfaceName[IFNAMSIZ];
-  sprintf(ipAddress, "%s.%d.%d", baseNetAddress,thirdOctet,fourthOctet);
   snprintf(interfaceName, sizeof(interfaceName), "%s%d", ifpref, interface_id);
 
   int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock_fd < 0) {
     LOG_E(UTIL, "Failed creating socket for interface management: %d, %s\n", errno, strerror(errno));
-    return 1;
+    return false;
   }
 
   change_interface_state(sock_fd, interfaceName, INTERFACE_DOWN);
-  bool success = setInterfaceParameter(sock_fd, interfaceName, ipAddress, SIOCSIFADDR);
+  bool success = setInterfaceParameter(sock_fd, interfaceName, ip, SIOCSIFADDR);
   // set the machine network mask
   if (success)
     success = setInterfaceParameter(sock_fd, interfaceName, "255.255.255.0", SIOCSIFNETMASK);
@@ -127,9 +100,9 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *if
     success = change_interface_state(sock_fd, interfaceName, INTERFACE_UP);
 
   if (success)
-    LOG_I(OIP, "Interface %s successfully configured, ip address %s\n", interfaceName, ipAddress);
+    LOG_I(OIP, "Interface %s successfully configured, ip address %s\n", interfaceName, ip);
   else
-    LOG_E(OIP, "Interface %s couldn't be configured (ip address %s)\n", interfaceName, ipAddress);
+    LOG_E(OIP, "Interface %s couldn't be configured (ip address %s)\n", interfaceName, ip);
 
   close(sock_fd);
   return success;

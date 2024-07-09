@@ -765,10 +765,13 @@ rrc_ue_establish_drb(
     ip_addr_offset4 = 1;
     LOG_I(OIP,"[UE %d] trying to bring up the OAI interface %d, IP X.Y.%d.%d\n", ue_mod_idP, ip_addr_offset3+ue_mod_idP,
           ip_addr_offset3+ue_mod_idP+1,ip_addr_offset4+ue_mod_idP+1);
-    oip_ifup = nas_config(ip_addr_offset3 + ue_mod_idP + 1, // interface_id
-                          UE_NAS_USE_TUN ? 1 : (ip_addr_offset3 + ue_mod_idP + 1), // third_octet
-                          ip_addr_offset4 + ue_mod_idP + 1, // fourth_octet
-                          "oaitun_oip");
+    char ip[20];
+    snprintf(ip,
+             sizeof(ip),
+             "10.0.%d.%d",
+             UE_NAS_USE_TUN ? 1 : (ip_addr_offset3 + ue_mod_idP + 1),
+             ip_addr_offset4 + ue_mod_idP + 1);
+    oip_ifup = nas_config(ip_addr_offset3 + ue_mod_idP + 1, ip, "oaitun_oip");
 
     if (oip_ifup == 0 && (!UE_NAS_USE_TUN)) { // interface is up --> send a config the DRB
       LOG_I(OIP,"[UE %d] Config the ue net interface %d to send/receive pkt on DRB %ld to/from the protocol stack\n",

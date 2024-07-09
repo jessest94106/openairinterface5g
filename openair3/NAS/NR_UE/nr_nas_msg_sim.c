@@ -53,7 +53,6 @@
 #include "openair3/SECU/nas_stream_eia2.h"
 #include "openair3/UTILS/conversions.h"
 
-extern char *baseNetAddress;
 extern uint16_t NB_UE_INST;
 static nr_ue_nas_t nr_ue_nas = {0};
 static nr_nas_msg_snssai_t nas_allowed_nssai[8];
@@ -842,11 +841,11 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
 void decodeDownlinkNASTransport(as_nas_info_t *initialNasMsg, uint8_t * pdu_buffer){
   uint8_t msg_type = *(pdu_buffer + 16);
   if(msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC){
-    sprintf(baseNetAddress, "%d.%d", *(pdu_buffer + 39),*(pdu_buffer + 40));
-    int third_octet = *(pdu_buffer + 41);
-    int fourth_octet = *(pdu_buffer + 42);
+    uint8_t *ip_p = pdu_buffer + 39;
+    char ip[20];
+    sprintf(ip, "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
     LOG_A(NAS, "Received PDU Session Establishment Accept\n");
-    nas_config(1, third_octet, fourth_octet, "oaitun_ue");
+    nas_config(1, ip, "oaitun_ue");
   } else {
     LOG_E(NAS, "Received unexpected message in DLinformationTransfer %d\n", msg_type);
   }
@@ -1428,17 +1427,11 @@ void *nas_nrue(void *args_p)
             while (offset < payload_container_length) {
               if (*(payload_container + offset) == 0x29) { // PDU address IEI
                 if ((*(payload_container + offset + 1) == 0x05) && (*(payload_container + offset + 2) == 0x01)) { // IPV4
-                  nas_getparams();
-                  sprintf(baseNetAddress, "%d.%d", *(payload_container + offset + 3), *(payload_container + offset + 4));
-                  int third_octet = *(payload_container + offset + 5);
-                  int fourth_octet = *(payload_container + offset + 6);
-                  LOG_I(NAS,
-                        "Received PDU Session Establishment Accept, UE IP: %d.%d.%d.%d\n",
-                        *(payload_container + offset + 3),
-                        *(payload_container + offset + 4),
-                        *(payload_container + offset + 5),
-                        *(payload_container + offset + 6));
-                  nas_config(1, third_octet, fourth_octet, "oaitun_ue");
+                  uint8_t *ip_p = payload_container + offset + 3;
+                  char ip[20];
+                  snprintf(ip, sizeof(ip), "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
+                  LOG_I(NAS, "Received PDU Session Establishment Accept, UE IP: %s\n", ip);
+                  nas_config(1, ip, "oaitun_ue");
                   break;
                 }
               }

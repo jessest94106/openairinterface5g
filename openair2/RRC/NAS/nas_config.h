@@ -19,44 +19,25 @@
  *      contact@openairinterface.org
  */
 
-/*! \file nas_config.h
- * \brief Configures the nasmesh interface
- * \author Daniel Camara and navid nikaein
- * \date 2006-2011
- * \version 0.1
- * \company Eurecom
- */
 #ifndef NAS_CONFIG_H_
 #define NAS_CONFIG_H_
 
+#include <stdbool.h>
 #include <netinet/in.h>
-
-/*! \fn void void nas_getparams(void)(void)
- * \brief This function get parameters used to configure network interface when running in noS1 mode
- * \note
- * @ingroup  _nas
- */
-void nas_getparams(void);
 
 /*! \fn int  nas_config(char*, int, int)
  * \brief This function initializes the nasmesh interface using the basic values,
  * basic address, network mask and broadcast address, as the default configured
  * ones
- * \param[in] interfaceName, the name of the interface, e.g. nasmesh0 or nasmesh1
- * \param[in] third octet of the ip address e.g. for the 10.1.2.3 address would be 2
- * \param[in] fourth octet of the ip address e.g. for the 10.1.2.3 address would be 3
- * \return 0 on success, otherwise 1, if couldn't open a socket and 2 if the ioctl fails
+ * \param[in] interface_id number of this interface, prepended after interface
+ * name
+ * \param[in] ip IPv4 address of this interface as a string
+ * \param[in] ifprefix interface name prefix to which an interface number will
+ * be appended
+ * \return true on success, otherwise false
  * \note
  * @ingroup  _nas
  */
-int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *ifprefix);
-
-/*! \fn void  setBaseNetAddress(char*)
- * \brief This function sets the basic network address used
- * \param[in] baseAddr, the new basic address e.g.for 10.0.1.2, would be 10.0
- * \note
- * @ingroup  _nas
- */
-void setBaseNetAddress(char *baseAddr);
+bool nas_config(int interface_id, const char *ip, const char *ifprefix);
 
 #endif /*NAS_CONFIG_H_*/
