@@ -367,14 +367,14 @@ static void enqueue_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
   if (pthread_mutex_unlock(&pq.m) != 0) abort();
 }
 
-bool pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
-                   const srb_flag_t srb_flagP,
-                   const MBMS_flag_t MBMS_flagP,
-                   const rb_id_t rb_id,
-                   const sdu_size_t sdu_buffer_size,
-                   uint8_t *const sdu_buffer,
-                   const uint32_t *const srcID,
-                   const uint32_t *const dstID)
+bool nr_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
+                      const srb_flag_t srb_flagP,
+                      const MBMS_flag_t MBMS_flagP,
+                      const rb_id_t rb_id,
+                      const sdu_size_t sdu_buffer_size,
+                      uint8_t *const sdu_buffer,
+                      const uint32_t *const srcID,
+                      const uint32_t *const dstID)
 {
   enqueue_pdcp_data_ind(ctxt_pP,
                         srb_flagP,
@@ -1313,7 +1313,7 @@ bool cu_f1u_data_req(protocol_ctxt_t  *ctxt_pP,
     exit(1);
   }
   memcpy(memblock, sdu_buffer, sdu_buffer_size);
-  int ret=pdcp_data_ind(ctxt_pP,srb_flagP, false, rb_id, sdu_buffer_size, memblock, NULL, NULL);
+  int ret = nr_pdcp_data_ind(ctxt_pP, srb_flagP, false, rb_id, sdu_buffer_size, memblock, NULL, NULL);
   if (!ret) {
     LOG_E(RLC, "%s:%d:%s: ERROR: pdcp_data_ind failed\n", __FILE__, __LINE__, __FUNCTION__);
     /* what to do in case of failure? for the moment: nothing */
@@ -1335,16 +1335,6 @@ bool pdcp_data_req(protocol_ctxt_t  *ctxt_pP,
 {
   abort();
   return false;
-}
-
-void pdcp_set_pdcp_data_ind_func(pdcp_data_ind_func_t pdcp_data_ind)
-{
-  /* nothing to do */
-}
-
-void pdcp_set_rlc_data_req_func(send_rlc_data_req_func_t send_rlc_data_req)
-{
-  /* nothing to do */
 }
 
 //Dummy function needed due to LTE dependencies

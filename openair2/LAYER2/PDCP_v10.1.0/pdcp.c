@@ -113,7 +113,7 @@ struct sockaddr_in prose_ctrl_addr;
 struct sockaddr_in prose_pdcp_addr;
 struct sockaddr_in pdcp_sin;
 /* pdcp module parameters and related functions*/
-static pdcp_params_t pdcp_params= {0,NULL};
+static pdcp_params_t pdcp_params = {0};
 rnti_t                 pdcp_UE_UE_module_id_to_rnti[MAX_MOBILES_PER_ENB];
 rnti_t                 pdcp_eNB_UE_instance_to_rnti[MAX_MOBILES_PER_ENB]; // for noS1 mode
 unsigned int           pdcp_eNB_UE_instance_to_rnti_index;
@@ -298,8 +298,8 @@ bool pdcp_data_req(protocol_ctxt_t  *ctxt_pP,
            LOG_UI(PDCP, "Before rlc_data_req 1, srb_flagP: %d, rb_idP: %ld \n", srb_flagP, rb_idP);
       }
 
-      rlc_status = pdcp_params.send_rlc_data_req_func(ctxt_pP, srb_flagP, MBMS_FLAG_YES, rb_idP, muiP,
-                   confirmP, sdu_buffer_sizeP, pdcp_pdu_p,NULL,NULL);
+      rlc_status =
+          rlc_data_req(ctxt_pP, srb_flagP, MBMS_FLAG_YES, rb_idP, muiP, confirmP, sdu_buffer_sizeP, pdcp_pdu_p, NULL, NULL);
     } else {
       rlc_status = RLC_OP_STATUS_OUT_OF_RESSOURCES;
       LOG_E(PDCP,PROTOCOL_CTXT_FMT" PDCP_DATA_REQ SDU DROPPED, OUT OF MEMORY \n",
@@ -467,9 +467,16 @@ bool pdcp_data_req(protocol_ctxt_t  *ctxt_pP,
     if ((pdcp_pdu_p!=NULL) && (srb_flagP == 0) && (ctxt_pP->enb_flag == 1)) {
       LOG_D(PDCP, "pdcp data req on drb %ld, size %d, rnti %lx\n", rb_idP, pdcp_pdu_size, ctxt_pP->rntiMaybeUEid);
 
-      rlc_status = pdcp_params.send_rlc_data_req_func(ctxt_pP, srb_flagP, MBMS_FLAG_NO, rb_idP, muiP,
-                   confirmP, pdcp_pdu_size, pdcp_pdu_p,sourceL2Id,
-                   destinationL2Id);
+      rlc_status = rlc_data_req(ctxt_pP,
+                                srb_flagP,
+                                MBMS_FLAG_NO,
+                                rb_idP,
+                                muiP,
+                                confirmP,
+                                pdcp_pdu_size,
+                                pdcp_pdu_p,
+                                sourceL2Id,
+                                destinationL2Id);
       ret = false;
       switch (rlc_status) {
         case RLC_OP_STATUS_OK:
@@ -2277,18 +2284,6 @@ void rrc_pdcp_config_req (
               PROTOCOL_CTXT_ARGS(ctxt_pP));
     }
   }
-}
-
-pdcp_data_ind_func_t get_pdcp_data_ind_func() {
-  return pdcp_params.pdcp_data_ind_func;
-}
-
-void pdcp_set_rlc_data_req_func(send_rlc_data_req_func_t send_rlc_data_req) {
-  pdcp_params.send_rlc_data_req_func = send_rlc_data_req;
-}
-
-void pdcp_set_pdcp_data_ind_func(pdcp_data_ind_func_t pdcp_data_ind) {
-  pdcp_params.pdcp_data_ind_func = pdcp_data_ind;
 }
 
 uint64_t pdcp_module_init( uint64_t pdcp_optmask, int id) {

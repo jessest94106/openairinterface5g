@@ -416,9 +416,6 @@ static void init_pdcp(void)
   pdcp_initmask = pdcp_initmask | ENB_NAS_USE_TUN_W_MBMS_BIT;
 
   pdcp_module_init(pdcp_initmask, 0);
-
-  pdcp_set_rlc_data_req_func(rlc_data_req);
-  pdcp_set_pdcp_data_ind_func(pdcp_data_ind);
 }
 
 static  void wait_nfapi_init(char *thread_name) {

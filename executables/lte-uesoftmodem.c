@@ -498,8 +498,6 @@ static void init_pdcp(int ue_id) {
     pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
 
   pdcp_module_init(pdcp_initmask, ue_id);
-  pdcp_set_rlc_data_req_func((send_rlc_data_req_func_t) rlc_data_req);
-  pdcp_set_pdcp_data_ind_func((pdcp_data_ind_func_t) pdcp_data_ind);
 }
 
 // Stupid function addition because UE itti messages queues definition is common with eNB
