@@ -28,8 +28,6 @@
 * \email: navid.nikaein@eurecom.fr
 */
 
-#include "SIMULATION/ETH_TRANSPORT/defs.h"
-
 #ifndef EMU_PROTO_H_
 #define EMU_PROTO_H_
 
