@@ -508,9 +508,6 @@ include_directories ("${OPENAIR_DIR}/radio/COMMON")
 #    ???!!! TO BE DOCUMENTED OPTIONS !!!???
 ##############################################################
 
-add_boolean_option(OAI_NW_DRIVER_TYPE_ETHERNET False "????" ON)
-add_boolean_option(OAI_NW_DRIVER_USE_NETLINK True "????" ON)
-
 add_boolean_option(UE_EXPANSION             False         "enable UE_EXPANSION with max 256 UE" ON)
 add_boolean_option(PHY_TX_THREAD            False         "enable UE_EXPANSION with max 256 UE" ON)
 add_boolean_option(PRE_SCD_THREAD           False         "enable UE_EXPANSION with max 256 UE" ON)
@@ -2331,7 +2328,7 @@ endforeach(myExe)
 #ensure that the T header files are generated before targets depending on them
 if (${T_TRACER})
   foreach(i
-        #all "add_executable" definitions (except tests, rb_tool, updatefw)
+        #all "add_executable" definitions (except tests, updatefw)
         lte-softmodem lte-uesoftmodem nr-softmodem
         nr-uesoftmodem dlsim dlsim_tm4 dlsim_tm7
         ulsim pbchsim scansim mbmssim pdcchsim pucchsim prachsim
@@ -2353,85 +2350,6 @@ if (${T_TRACER})
     endif()
   endforeach(i)
 endif (${T_TRACER})
-
-##################################################
-# Generated specific cases is not regular code
-###############################################
-
-################
-# Kernel modules
-###############
-# Set compiler options for kernel modules
-# we need to get out cmake to use the regular Linux Kernel process
-# this is documented as https://www.kernel.org/doc/Documentation/kbuild/modules.txt
-######################################
-
-# retrieve the compiler options to send it to gccxml
-get_directory_property(DirDefs COMPILE_DEFINITIONS )
-foreach( d ${DirDefs} )
-  set(module_cc_opt "${module_cc_opt} -D${d}")
-endforeach()
-get_directory_property( DirDefs INCLUDE_DIRECTORIES )
-foreach( d ${DirDefs} )
-  set(module_cc_opt "${module_cc_opt} -I${d}")
-endforeach()
-
-EXECUTE_PROCESS(COMMAND uname -r
-  OUTPUT_VARIABLE os_release
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-SET(module_build_path /lib/modules/${os_release}/build)
-
-function(make_driver name dir)
-  file(MAKE_DIRECTORY ${OPENAIR_BIN_DIR}/${name})
-  foreach(f  IN  ITEMS ${ARGN})
-    list(APPEND src_path_list ${dir}/${f})
-    string(REGEX REPLACE "c *$" "o" obj ${f})
-    set(objs "${objs} ${obj}")
-  endforeach()
-  CONFIGURE_FILE(${OPENAIR_CMAKE}/tools/Kbuild.cmake ${OPENAIR_BIN_DIR}/${name}/Kbuild)
-  add_custom_command(OUTPUT ${name}.ko
-    COMMAND make -C ${module_build_path} M=${OPENAIR_BIN_DIR}/${name}
-    WORKING_DIRECTORY ${OPENAIR_BIN_DIR}/${name}
-    COMMENT "building ${module}.ko"
-    VERBATIM
-    SOURCES  ${src_path_list}
-    )
-  add_custom_target(${name} DEPENDS ${name}.ko)
-endfunction(make_driver name dir src)
-
-# nashmesh module
-################
-list(APPEND nasmesh_src device.c common.c ioctl.c classifier.c tool.c mesh.c)
-# legacy Makefile was using NAS_NETLINK flag, but other drivers the hereafter flag
-# so, this cmake use OAI_NW_DRIVER_USE_NETLINK everywhere
-if (OAI_NW_DRIVER_USE_NETLINK)
-  list(APPEND nasmesh_src netlink.c)
-endif()
-make_driver(nasmesh  ${OPENAIR2_DIR}/NETWORK_DRIVER/MESH ${nasmesh_src})
-
-# user space tool for configuring MESH IP driver
-################
-add_executable(rb_tool
-  ${OPENAIR2_DIR}/NETWORK_DRIVER/MESH/RB_TOOL/rb_tool.c
-)
-target_include_directories(rb_tool PRIVATE ${OPENAIR2_DIR}/NETWORK_DRIVER/MESH/)
-
-# ???
-####################
-list(APPEND oai_nw_drv_src device.c common.c ioctl.c classifier.c tool.c)
-if(OAI_NW_DRIVER_USE_NETLINK)
-  list(APPEND oai_nw_drv_src netlink.c)
-endif()
-make_driver(oai_nw_drv ${OPENAIR2_DIR}/NETWORK_DRIVER/LTE ${oai_nw_drv_src})
-
-
-# ue_ip: purpose ???
-###############
-list(APPEND ue_ip_src device.c common.c)
-if(OAI_NW_DRIVER_USE_NETLINK)
-  list(APPEND ue_ip_src netlink.c)
-endif()
-make_driver(ue_ip ${OPENAIR2_DIR}/NETWORK_DRIVER/UE_IP ${ue_ip_src})
 
 include(${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_tools/CMakeLists.txt)
 

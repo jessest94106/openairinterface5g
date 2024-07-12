@@ -49,7 +49,6 @@ extern int otg_enabled;
 
 #include "../MAC/mac_extern.h"
 #include "RRC/L2_INTERFACE/openair_rrc_L2_interface.h"
-#include "NETWORK_DRIVER/LITE/constant.h"
 //#include "SIMULATION/ETH_TRANSPORT/extern.h"
 #include "common/utils/LOG/log.h"
 #include "UTIL/OTG/otg_tx.h"
@@ -63,7 +62,6 @@ extern int otg_enabled;
 
 #include <sys/socket.h>
 #include <linux/netlink.h>
-#include "NETWORK_DRIVER/UE_IP/constant.h"
 
 extern char nl_rx_buf[NL_MAX_PAYLOAD];
 extern struct sockaddr_nl nas_src_addr, nas_dest_addr;
@@ -521,7 +519,7 @@ int pdcp_fifo_read_input_sdus_fromnetlinksock (const protocol_ctxt_t *const  ctx
             ctxt.rntiMaybeUEid = pdcp_UE_UE_module_id_to_rnti[ctxt.module_id];
 
             if (rab_id != 0) {
-              if (rab_id == UE_IP_DEFAULT_RAB_ID) {
+              if (rab_id == 1) {
                 LOG_D(PDCP, "PDCP_COLL_KEY_DEFAULT_DRB_VALUE(module_id=%d, rnti=%lx, enb_flag=%d)\n", ctxt.module_id, ctxt.rntiMaybeUEid, ctxt.enb_flag);
                 key = PDCP_COLL_KEY_DEFAULT_DRB_VALUE(ctxt.module_id, ctxt.rntiMaybeUEid, ctxt.enb_flag);
                 h_rc = hashtable_get(pdcp_coll_p, key, (void **)&pdcp_p);
@@ -695,7 +693,7 @@ void pdcp_fifo_read_input_sdus_frompc5s (const protocol_ctxt_t *const  ctxt_pP) 
         //UE
         if (!ctxt.enb_flag) {
           if (rab_id != 0) {
-            if (rab_id == UE_IP_DEFAULT_RAB_ID) {
+            if (rab_id == 1) {
               LOG_D(PDCP, "PDCP_COLL_KEY_DEFAULT_DRB_VALUE(module_id=%d, rnti=%lx, enb_flag=%d)\n", ctxt.module_id, ctxt.rntiMaybeUEid, ctxt.enb_flag);
               key = PDCP_COLL_KEY_DEFAULT_DRB_VALUE(ctxt.module_id, ctxt.rntiMaybeUEid, ctxt.enb_flag);
               h_rc = hashtable_get(pdcp_coll_p, key, (void **)&pdcp_p);
