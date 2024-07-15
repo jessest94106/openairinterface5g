@@ -26,6 +26,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <linux/ipv6.h>
 
 #include "nas_config.h"
 #include "common/utils/LOG/log.h"
@@ -40,17 +41,42 @@
  *   (set flags)
  * \return true on success, false otherwise
  */
-static bool setInterfaceParameter(int sock_fd, const char *ifn, const char *if_addr, int operation)
+static bool setInterfaceParameter(int sock_fd, const char *ifn, int af, const char *if_addr, int operation)
 {
+  DevAssert(af == AF_INET || af == AF_INET6);
   struct ifreq ifr = {0};
   strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name));
+  struct in6_ifreq ifr6 = {0};
 
-  struct sockaddr_in addr = {.sin_family = AF_INET};
-  inet_aton(if_addr, &addr.sin_addr);
-  //inet_pton(AF_INET6 or AF_INET)
-  memcpy(&ifr.ifr_ifru.ifru_addr,&addr,sizeof(struct sockaddr_in));
+  void *ioctl_opt = NULL;
+  if (af == AF_INET) {
+    struct sockaddr_in addr = {.sin_family = AF_INET};
+    int ret = inet_pton(af, if_addr, &addr.sin_addr);
+    if (ret != 1) {
+      LOG_E(OIP, "inet_pton(): cannot convert %s to IPv4 network address\n", if_addr);
+      return false;
+    }
+    memcpy(&ifr.ifr_ifru.ifru_addr,&addr,sizeof(struct sockaddr_in));
+    ioctl_opt = &ifr;
+  } else {
+    struct sockaddr_in6 addr6 = {.sin6_family = AF_INET6};
+    int ret = inet_pton(af, if_addr, &addr6.sin6_addr);
+    if (ret != 1) {
+      LOG_E(OIP, "inet_pton(): cannot convert %s to IPv6 network address\n", if_addr);
+      return false;
+    }
+    memcpy(&ifr6.ifr6_addr, &addr6.sin6_addr, sizeof(struct in6_addr));
+    // we need to get the if index to put it into ifr6
+    if (ioctl(sock_fd, SIOGIFINDEX, &ifr) < 0) {
+      LOG_E(OIP, "ioctl() failed: errno %d, %s\n", errno, strerror(errno));
+      return false;
+    }
+    ifr6.ifr6_ifindex = ifr.ifr_ifindex;
+    ifr6.ifr6_prefixlen = 64;
+    ioctl_opt = &ifr6;
+  }
 
-  bool success = ioctl(sock_fd,operation,&ifr) == 0;
+  bool success = ioctl(sock_fd, operation, ioctl_opt) == 0;
   if (!success)
     LOG_E(OIP, "Setting operation %d for %s: ioctl call failed: %d, %s\n", operation, ifn, errno, strerror(errno));
   return success;
@@ -80,10 +106,12 @@ static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_
 }
 
 // non blocking full configuration of the interface (address, and the two lest octets of the address)
-bool nas_config(int interface_id, const char *ip, const char *ifpref)
+bool nas_config(int interface_id, const char *ipv4, const char *ipv6, const char *ifpref)
 {
   char interfaceName[IFNAMSIZ];
   snprintf(interfaceName, sizeof(interfaceName), "%s%d", ifpref, interface_id);
+
+  AssertFatal(ipv4 != NULL || ipv6 != NULL, "need to have IP address, but none given\n");
 
   int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock_fd < 0) {
@@ -92,18 +120,33 @@ bool nas_config(int interface_id, const char *ip, const char *ifpref)
   }
 
   change_interface_state(sock_fd, interfaceName, INTERFACE_DOWN);
-  bool success = setInterfaceParameter(sock_fd, interfaceName, ip, SIOCSIFADDR);
-  // set the machine network mask
-  if (success)
-    success = setInterfaceParameter(sock_fd, interfaceName, "255.255.255.0", SIOCSIFNETMASK);
+  bool success = true;
+  if (ipv4 != NULL)
+    success = setInterfaceParameter(sock_fd, interfaceName, AF_INET, ipv4, SIOCSIFADDR);
+  // set the machine network mask for IPv4
+  if (success && ipv4 != NULL)
+    success = setInterfaceParameter(sock_fd, interfaceName, AF_INET, "255.255.255.0", SIOCSIFNETMASK);
+
+  if (ipv6 != NULL) {
+    // for setting the IPv6 address, we need an IPv6 socket. For setting IPv4,
+    // we need an IPv4 socket. So do all operations using IPv4 socket, except
+    // for setting the IPv6
+    int sock_fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    if (sock_fd < 0) {
+      LOG_E(UTIL, "Failed creating socket for interface management: %d, %s\n", errno, strerror(errno));
+      success = false;
+    }
+    success = success && setInterfaceParameter(sock_fd, interfaceName, AF_INET6, ipv6, SIOCSIFADDR);
+    close(sock_fd);
+  }
 
   if (success)
     success = change_interface_state(sock_fd, interfaceName, INTERFACE_UP);
 
   if (success)
-    LOG_I(OIP, "Interface %s successfully configured, ip address %s\n", interfaceName, ip);
+    LOG_I(OIP, "Interface %s successfully configured, IPv4 %s, IPv6 %s\n", interfaceName, ipv4, ipv6);
   else
-    LOG_E(OIP, "Interface %s couldn't be configured (ip address %s)\n", interfaceName, ip);
+    LOG_E(OIP, "Interface %s couldn't be configured (IPv4 %s, IPv6 %s)\n", interfaceName, ipv4, ipv6);
 
   close(sock_fd);
   return success;

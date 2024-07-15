@@ -23,7 +23,6 @@
 #define NAS_CONFIG_H_
 
 #include <stdbool.h>
-#include <netinet/in.h>
 
 /*! \fn int  nas_config(char*, int, int)
  * \brief This function initializes the nasmesh interface using the basic values,
@@ -31,14 +30,15 @@
  * ones
  * \param[in] interface_id number of this interface, prepended after interface
  * name
- * \param[in] ip IPv4 address of this interface as a string
+ * \param[in] ipv4 IPv4 address of this interface as a string
+ * \param[in] ipv6 IPv6 address of this interface as a string
  * \param[in] ifprefix interface name prefix to which an interface number will
  * be appended
  * \return true on success, otherwise false
  * \note
  * @ingroup  _nas
  */
-bool nas_config(int interface_id, const char *ip, const char *ifprefix);
+bool nas_config(int interface_id, const char *ipv4, const char *ipv6, const char *ifprefix);
 
 /*!
  * \brief Setup a IPv4 rule in table (interface_id - 1 + 10000) and route to
