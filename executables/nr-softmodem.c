@@ -734,14 +734,18 @@ int main( int argc, char **argv ) {
     printf("ALL RUs ready - init gNBs\n");
 
     for (int idx=0;idx<RC.nb_nr_L1_inst;idx++) RC.gNB[idx]->if_inst->sl_ahead = sl_ahead;
-    if(IS_SOFTMODEM_DOSCOPE) {
+    if (IS_SOFTMODEM_DOSCOPE) {
       sleep(1);
       scopeParms_t p;
-      p.argc=&argc;
-      p.argv=argv;
-      p.gNB=RC.gNB[0];
-      p.ru=RC.ru[0];
-      load_softscope("nr",&p);
+      p.argc = &argc;
+      p.argv = argv;
+      p.gNB = RC.gNB[0];
+      p.ru = RC.ru[0];
+#ifndef ENABLE_IMSCOPE
+      load_softscope("nr", &p);
+#else
+      load_softscope("im", &p);
+#endif
     }
 
     if (NFAPI_MODE != NFAPI_MODE_PNF && NFAPI_MODE != NFAPI_MODE_VNF && NFAPI_MODE != NFAPI_MODE_AERIAL) {

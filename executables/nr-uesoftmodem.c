@@ -521,8 +521,12 @@ int main(int argc, char **argv)
     init_openair0();
     lock_memory_to_ram();
 
-    if(IS_SOFTMODEM_DOSCOPE) {
-      load_softscope("nr",PHY_vars_UE_g[0][0]);
+    if (IS_SOFTMODEM_DOSCOPE) {
+#ifndef ENABLE_IMSCOPE
+      load_softscope("nr", PHY_vars_UE_g[0][0]);
+#else
+      load_softscope("im", PHY_vars_UE_g[0][0]);
+#endif
     }
 
     for (int inst = 0; inst < NB_UE_INST; inst++) {
