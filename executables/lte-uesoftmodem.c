@@ -494,8 +494,13 @@ static void init_pdcp(int ue_id) {
     pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
   }
 
-  if (IS_SOFTMODEM_NOKRNMOD)
-    pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
+  // previous code was:
+  //   if (IS_SOFTMODEM_NOKRNMOD)
+  //     pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
+  // The kernel module (KRNMOD) has been removed from the project, so the 'if'
+  // was removed but the flag 'pdcp_initmask' was kept, as "no kernel module"
+  // was always set. further refactoring could take it out
+  pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
 
   pdcp_module_init(pdcp_initmask, ue_id);
 }

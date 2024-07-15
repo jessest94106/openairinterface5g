@@ -410,7 +410,7 @@ static void init_pdcp(void)
   uint32_t pdcp_initmask = (IS_SOFTMODEM_NOS1) ? LINK_ENB_PDCP_TO_IP_DRIVER_BIT : LINK_ENB_PDCP_TO_GTPV1U_BIT;
 
   if (IS_SOFTMODEM_NOS1)
-    pdcp_initmask = pdcp_initmask | ENB_NAS_USE_TUN_BIT | SOFTMODEM_NOKRNMOD_BIT  ;
+    pdcp_initmask = pdcp_initmask | ENB_NAS_USE_TUN_BIT;
 
   pdcp_initmask = pdcp_initmask | ENB_NAS_USE_TUN_W_MBMS_BIT;
 
