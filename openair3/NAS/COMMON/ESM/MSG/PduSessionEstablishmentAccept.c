@@ -119,6 +119,7 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
                    addr->pdu_addr_oct3,
                    addr->pdu_addr_oct4);
           nas_config(1, ip, "oaitun_ue");
+          setup_ue_ipv4_route(1, ip, "oaitun_ue");
           LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received UE IP: %s\n", ip);
         } else {
           curPtr += psea_msg.pdu_addr_ie.pdu_length;

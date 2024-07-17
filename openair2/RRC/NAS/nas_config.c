@@ -29,6 +29,7 @@
 
 #include "nas_config.h"
 #include "common/utils/LOG/log.h"
+#include "common/utils/system.h"
 
 /*
  * \brief set a genneric interface parameter
@@ -107,3 +108,29 @@ bool nas_config(int interface_id, const char *ip, const char *ifpref)
   close(sock_fd);
   return success;
 }
+
+void setup_ue_ipv4_route(int interface_id, const char *ipv4, const char *ifpref)
+{
+  int table_id = interface_id - 1 + 10000;
+  char interfaceName[IFNAMSIZ];
+  snprintf(interfaceName, sizeof(interfaceName), "%s%d", ifpref, interface_id);
+
+  char command_line[500];
+  int res = sprintf(command_line,
+                    "ip rule add from %s/32 table %d && "
+                    "ip rule add to %s/32 table %d && "
+                    "ip route add default dev %s table %d",
+                    ipv4,
+                    table_id,
+                    ipv4,
+                    table_id,
+                    interfaceName,
+                    table_id);
+
+  if (res < 0) {
+    LOG_E(UTIL, "Could not create ip rule/route commands string\n");
+    return;
+  }
+  background_system(command_line);
+}
+

@@ -40,4 +40,18 @@
  */
 bool nas_config(int interface_id, const char *ip, const char *ifprefix);
 
+/*!
+ * \brief Setup a IPv4 rule in table (interface_id - 1 + 10000) and route to
+ * force packets coming into interface back through it, and workaround
+ * net.ipv4.conf.all.rp_filter=2 (strict source filtering would filter out
+ * responses of packets going out through interface to another IP address not
+ * in same subnet).
+ * \param[in] interface_id number of this interface, prepended after interface
+ * name
+ * \param[in] ipv4 IPv4 address of the UE
+ * \param[in] ifprefix interface name prefix to which an interface number will
+ * be appended
+ */
+void setup_ue_ipv4_route(int interface_id, const char *ipv4, const char *ifpref);
+
 #endif /*NAS_CONFIG_H_*/
