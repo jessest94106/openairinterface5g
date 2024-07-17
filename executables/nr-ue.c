@@ -39,6 +39,7 @@
 #include "RRC/NR/MESSAGES/asn1_msg.h"
 #include "openair1/PHY/TOOLS/phy_scope_interface.h"
 #include "PHY/MODULATION/nr_modulation.h"
+#include "instrumentation.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -480,6 +481,7 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
 
 void processSlotTX(void *arg)
 {
+  TracyCZone(ctx, true);
   nr_rxtx_thread_data_t *rxtxD = (nr_rxtx_thread_data_t *) arg;
   const UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
   PHY_VARS_NR_UE *UE = rxtxD->UE;
@@ -592,10 +594,12 @@ void processSlotTX(void *arg)
   *msgData = newslot;
   pushNotifiedFIFO(UE->tx_resume_ind_fifo + newslot, newElt);
   RU_write(rxtxD, sl_tx_action);
+  TracyCZoneEnd(ctx);
 }
 
 static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc, int *tx_wait_for_dlsch, nr_phy_data_t *phy_data)
 {
+  TracyCZone(ctx, true);
   int sampleShift = INT_MAX;
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
@@ -677,10 +681,12 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc
   } else
     ue_ta_procedures(UE, proc->nr_slot_tx, proc->frame_tx);
 
+  TracyCZoneEnd(ctx);
   return sampleShift;
 }
 
 void UE_dl_processing(void *arg) {
+  TracyCZone(ctx, true);;
   nr_rxtx_thread_data_t *rxtxD = (nr_rxtx_thread_data_t *) arg;
   UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
   PHY_VARS_NR_UE    *UE   = rxtxD->UE;
@@ -688,6 +694,8 @@ void UE_dl_processing(void *arg) {
 
   if (!UE->sl_mode)
     pdsch_processing(UE, proc, phy_data);
+
+  TracyCZoneEnd(ctx);
 }
 
 void dummyWrite(PHY_VARS_NR_UE *UE,openair0_timestamp timestamp, int writeBlockSize) {
@@ -951,6 +959,7 @@ void *UE_thread(void *arg)
 
     // start of normal case, the UE is in sync
     absolute_slot++;
+    TracyCFrameMark;
 
     int slot_nr = absolute_slot % nb_slot_frame;
     nr_rxtx_thread_data_t curMsg = {0};

@@ -75,6 +75,7 @@ fifo_dump_emos_UE emos_dump_UE;
 #include "UTIL/OPT/opt.h"
 #include "intertask_interface.h"
 #include "T.h"
+#include "instrumentation.h"
 
 static const unsigned int gain_table[31] = {100,  112,  126,  141,  158,  178,  200,  224,  251, 282,  316,
                                             359,  398,  447,  501,  562,  631,  708,  794,  891, 1000, 1122,
@@ -378,6 +379,7 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
                                  struct complex16 dl_ch_estimates[][estimateSz],
                                  c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP])
 {
+  TracyCZone(ctx, true);
   int ret = 0;
   DevAssert(ue);
 
@@ -422,6 +424,7 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
     LOG_E(PHY, "[UE %d] frame %d, nr_slot_rx %d, Error decoding PBCH!\n", ue->Mod_id, frame_rx, nr_slot_rx);
   }
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_PBCH_PROCEDURES, VCD_FUNCTION_OUT);
+  TracyCZoneEnd(ctx);
   return ret;
 }
 
@@ -894,6 +897,7 @@ static bool is_ssb_index_transmitted(const PHY_VARS_NR_UE *ue, const int index)
 
 int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_data_t *phy_data)
 {
+  TracyCZone(ctx, true);
   int frame_rx = proc->frame_rx;
   int nr_slot_rx = proc->nr_slot_rx;
   int gNB_id = proc->gNB_id;
@@ -1060,6 +1064,7 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
   LOG_D(PHY, "[UE %d] Frame %d, nr_slot_rx %d: found %d DCIs\n", ue->Mod_id, frame_rx, nr_slot_rx, dci_cnt);
   phy_pdcch_config->nb_search_space = 0;
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PDCCH, VCD_FUNCTION_OUT);
+  TracyCZoneEnd(ctx);
   return sampleShift;
 }
 
@@ -1154,6 +1159,7 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC_C, VCD_FUNCTION_IN);
     // it returns -1 in case of internal failure, or 0 in case of normal result
     int ret_pdsch = nr_ue_pdsch_procedures(ue, proc, dlsch, llr, rxdataF, G);
+    TracyCPlot("pdsch mcs", dlsch->dlsch_config.mcs);
 
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC_C, VCD_FUNCTION_OUT);
 

@@ -38,6 +38,7 @@
 #include <openair1/PHY/NR_UE_TRANSPORT/nr_transport_proto_ue.h>
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
 #include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
+#include "instrumentation.h"
 //#define DEBUG_PBCH
 //#define DEBUG_PBCH_ENCODING
 
@@ -365,6 +366,7 @@ int nr_rx_pbch(PHY_VARS_NR_UE *ue,
                int rxdataFSize,
                const struct complex16 rxdataF[][rxdataFSize])
 {
+  TracyCZone(ctx, true);
   int max_h=0;
   int symbol;
   uint8_t Lmax=frame_parms->Lmax;
@@ -539,5 +541,6 @@ int nr_rx_pbch(PHY_VARS_NR_UE *ue,
       ue->if_inst->dl_indication(&dl_indication);
   }
 
+  TracyCZoneEnd(ctx);
   return 0;
 }
