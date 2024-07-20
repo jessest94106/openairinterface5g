@@ -106,10 +106,7 @@ int netlink_init_mbms_tun(char *ifprefix, int id) {//for UE, id = 1, 2, ...,
 
     if (ret == -1) {
       LOG_E(PDCP, "[NETLINK] Error fcntl (%d:%s)\n",errno, strerror(errno));
-
-      if (LINK_ENB_PDCP_TO_IP_DRIVER) {
-        exit(1);
-      }
+      return 0;
     }
 
     memset(&nas_src_addr, 0, sizeof(nas_src_addr));
@@ -144,9 +141,7 @@ int netlink_init_tun(const char *ifprefix, int num_if, int id)
     if (ret == -1) {
       LOG_E(PDCP, "TUN: Error fcntl (%d:%s)\n",errno, strerror(errno));
 
-      if (LINK_ENB_PDCP_TO_IP_DRIVER) {
-        exit(1);
-      }
+      return 0;
     }
   } /* for */
 

@@ -407,7 +407,7 @@ extern void  phy_free_RU(RU_t *);
 static void init_pdcp(void)
 {
   pdcp_layer_init();
-  uint32_t pdcp_initmask = (IS_SOFTMODEM_NOS1) ? LINK_ENB_PDCP_TO_IP_DRIVER_BIT : LINK_ENB_PDCP_TO_GTPV1U_BIT;
+  uint32_t pdcp_initmask = (IS_SOFTMODEM_NOS1) ? 0 : LINK_ENB_PDCP_TO_GTPV1U_BIT;
 
   if (IS_SOFTMODEM_NOS1)
     pdcp_initmask = pdcp_initmask | ENB_NAS_USE_TUN_BIT;
