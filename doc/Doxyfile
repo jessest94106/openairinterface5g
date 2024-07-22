@@ -1874,8 +1874,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR_UE/rrc_defs.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR_UE/L2_interface_ue.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/L2_INTERFACE/openair_rrc_L2_interface.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NAS/rb_config.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NAS/rb_config.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NAS/nas_config.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NAS/nas_config.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_internode.c \

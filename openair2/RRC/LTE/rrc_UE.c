@@ -68,7 +68,6 @@
 #include "NR_UE-CapabilityRAT-Container.h"
 
 #include "RRC/NAS/nas_config.h"
-#include "RRC/NAS/rb_config.h"
 #if ENABLE_RAL
   #include "rrc_UE_ral.h"
 #endif
@@ -776,13 +775,7 @@ rrc_ue_establish_drb(
             ue_mod_idP,
             ip_addr_offset3+ue_mod_idP,
             (long int)((eNB_index * LTE_maxDRB) + DRB_config->drb_Identity));
-      rb_conf_ipv4(0,//add
-                   ue_mod_idP,//cx align with the UE index
-                   ip_addr_offset3+ue_mod_idP,//inst num_enb+ue_index
-                   (eNB_index * LTE_maxDRB) + DRB_config->drb_Identity,//rb
-                   0,//dscp
-                   ipv4_address(ip_addr_offset3+ue_mod_idP+1,ip_addr_offset4+ue_mod_idP+1),//saddr
-                   ipv4_address(ip_addr_offset3+ue_mod_idP+1,eNB_index+1));//daddr
+      AssertFatal(false, "not implemented\n");
       LOG_D(RRC,"[UE %d] State = Attached (eNB %d)\n",ue_mod_idP,eNB_index);
     }
   } // !EPC_MODE_ENABLED
