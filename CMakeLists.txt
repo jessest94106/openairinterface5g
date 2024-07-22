@@ -1483,10 +1483,6 @@ add_library(L2_UE_LTE_NR
 )
 target_link_libraries(L2_UE_LTE_NR PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
-if (NOT ${NOS1})
-target_compile_definitions(L2_UE PUBLIC -DPDCP_USE_NETLINK)
-endif()
-
 target_link_libraries(L2_UE PRIVATE asn1_lte_rrc_hdrs)
 
 add_library( NR_L2_UE ${NR_L2_SRC_UE} ${MAC_NR_SRC_UE} )
@@ -2004,9 +2000,6 @@ add_executable(lte-uesoftmodem
   ${OPENAIR1_DIR}/PHY/TOOLS/phy_scope_interface.c
   )
 
-if (NOT ${NOS1})
-	target_compile_definitions(lte-uesoftmodem PRIVATE -DPDCP_USE_NETLINK)
-endif()
 target_link_libraries(lte-uesoftmodem PRIVATE
   -Wl,--start-group
   lte_rrc nr_rrc s1ap x2ap m2ap m3ap
@@ -2413,7 +2406,6 @@ endfunction(make_driver name dir src)
 # nashmesh module
 ################
 list(APPEND nasmesh_src device.c common.c ioctl.c classifier.c tool.c mesh.c)
-set(module_cc_opt "${module_cc_opt} -DNAS_NETLINK -DPDCP_USE_NETLINK")
 # legacy Makefile was using NAS_NETLINK flag, but other drivers the hereafter flag
 # so, this cmake use OAI_NW_DRIVER_USE_NETLINK everywhere
 if (OAI_NW_DRIVER_USE_NETLINK)

@@ -136,12 +136,7 @@ int pdcp_fifo_flush_sdus(const protocol_ctxt_t *const  ctxt_pP) {
 	log_dump(PDCP, pdcpData, pdcpHead->data_size, LOG_DUMP_CHAR,"PDCP output to be sent to TUN interface: \n");
       ret = write(nas_sock_fd[0], pdcpData, pdcpHead->data_size);
        LOG_T(PDCP,"[NB PDCP_FIFOS] ret %d TRIED TO PUSH DATA TO rb_id %d handle %d sizeToWrite %d\n",ret,rb_id,nas_sock_fd[0],pdcpHead->data_size);
-    } else if (PDCP_USE_NETLINK) {
-      int sizeToWrite= sizeof (pdcp_data_ind_header_t) + pdcpHead->data_size;
-      memcpy(NLMSG_DATA(nas_nlh_tx), (uint8_t *) pdcpHead,  sizeToWrite);
-      nas_nlh_tx->nlmsg_len = sizeToWrite;
-      ret = sendmsg(nas_sock_fd[0],&nas_msg_tx,0);
-    }  //  PDCP_USE_NETLINK
+    }
     
     AssertFatal(ret >= 0,"[PDCP_FIFOS] pdcp_fifo_flush_sdus (errno: %d %s), nas_sock_fd[0]: %d\n", errno, strerror(errno), nas_sock_fd[0]);
 
@@ -422,9 +417,9 @@ int pdcp_fifo_read_input_sdus_fromnetlinksock (const protocol_ctxt_t *const  ctx
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_FIFO_READ_BUFFER, 0 );
 
     if (len > 0) {
-      for (nas_nlh_rx = (struct nlmsghdr *) nl_rx_buf;
-           NLMSG_OK (nas_nlh_rx, len);
-           nas_nlh_rx = NLMSG_NEXT (nas_nlh_rx, len)) {
+      for (struct nlmsghdr *nas_nlh_rx = (struct nlmsghdr *)nl_rx_buf;
+           NLMSG_OK(nas_nlh_rx, len);
+           nas_nlh_rx = NLMSG_NEXT(nas_nlh_rx, len)) {
         if (nas_nlh_rx->nlmsg_type == NLMSG_DONE) {
           LOG_D(PDCP, "[PDCP][NETLINK] RX NLMSG_DONE\n");
           //return;
@@ -807,15 +802,10 @@ void pdcp_fifo_read_input_sdus_frompc5s (const protocol_ctxt_t *const  ctxt_pP) 
 } /* pdcp_fifo_read_input_sdus_frompc5s */
 
 //-----------------------------------------------------------------------------
-int pdcp_fifo_read_input_sdus (const protocol_ctxt_t *const  ctxt_pP) {
-  if (UE_NAS_USE_TUN || ENB_NAS_USE_TUN) {
-    return pdcp_fifo_read_input_sdus_fromtun (ctxt_pP);
-  } else if (PDCP_USE_NETLINK) {
-    pdcp_fifo_read_input_sdus_frompc5s (ctxt_pP);
-    return pdcp_fifo_read_input_sdus_fromnetlinksock(ctxt_pP);
-  } /* PDCP_USE_NETLINK */
-
-  return 0;
+int pdcp_fifo_read_input_sdus(const protocol_ctxt_t *const ctxt_pP)
+{
+  DevAssert(UE_NAS_USE_TUN || ENB_NAS_USE_TUN);
+  return pdcp_fifo_read_input_sdus_fromtun(ctxt_pP);
 }
 
 //TTN for D2D (PC5S)

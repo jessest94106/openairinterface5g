@@ -543,7 +543,7 @@ static  void wait_nfapi_init(char *thread_name) {
 
 void init_pdcp(void) {
   uint32_t pdcp_initmask = (IS_SOFTMODEM_NOS1) ?
-    PDCP_USE_NETLINK_BIT | LINK_ENB_PDCP_TO_IP_DRIVER_BIT | ENB_NAS_USE_TUN_BIT | SOFTMODEM_NOKRNMOD_BIT:
+    LINK_ENB_PDCP_TO_IP_DRIVER_BIT | ENB_NAS_USE_TUN_BIT | SOFTMODEM_NOKRNMOD_BIT:
     LINK_ENB_PDCP_TO_GTPV1U_BIT;
   
   if (!NODE_IS_DU(get_node_type())) {
@@ -654,12 +654,7 @@ int main( int argc, char **argv ) {
   itti_init(TASK_MAX, tasks_info);
   // initialize mscgen log after ITTI
   init_opt();
-  if(PDCP_USE_NETLINK && !IS_SOFTMODEM_NOS1) {
-    netlink_init();
-    if (get_softmodem_params()->nsa) {
-      init_pdcp();
-    }
-  }
+
 #ifndef PACKAGE_VERSION
 #define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
 #endif

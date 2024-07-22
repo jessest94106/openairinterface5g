@@ -49,7 +49,6 @@
 
 #define MAX_NUMBER_NETIF                 1 //16
 #define ENB_NAS_USE_TUN_W_MBMS_BIT      (1<< 10)
-#define PDCP_USE_NETLINK_BIT            (1<< 11)
 #define LINK_ENB_PDCP_TO_IP_DRIVER_BIT  (1<< 13)
 #define LINK_ENB_PDCP_TO_GTPV1U_BIT     (1<< 14)
 #define UE_NAS_USE_TUN_BIT              (1<< 15)
@@ -59,7 +58,6 @@ typedef struct {
 } pdcp_params_t;
 
 
-#define PDCP_USE_NETLINK          ( get_pdcp_optmask() & PDCP_USE_NETLINK_BIT)
 #define LINK_ENB_PDCP_TO_IP_DRIVER  ( get_pdcp_optmask() & LINK_ENB_PDCP_TO_IP_DRIVER_BIT)
 #define LINK_ENB_PDCP_TO_GTPV1U     ( get_pdcp_optmask() & LINK_ENB_PDCP_TO_GTPV1U_BIT)
 #define UE_NAS_USE_TUN              ( get_pdcp_optmask() & UE_NAS_USE_TUN_BIT)
