@@ -126,14 +126,15 @@ int netlink_init_mbms_tun(char *ifprefix, int id) {//for UE, id = 1, 2, ...,
   return 1;
 }
 
-int netlink_init_tun(char *ifprefix, int num_if, int id) {//for UE, id = 1, 2, ...,
+int netlink_init_tun(const char *ifprefix, int num_if, int id)
+{
   int ret;
   char ifname[64];
 
   int begx = (id == 0) ? 0 : id - 1;
   int endx = (id == 0) ? num_if : id;
   for (int i = begx; i < endx; i++) {
-    sprintf(ifname, "oaitun_%.3s%d",ifprefix,i+1);
+    sprintf(ifname, "%s%d", ifprefix, i + 1);
     nas_sock_fd[i] = tun_alloc(ifname);
 
     if (nas_sock_fd[i] == -1) {

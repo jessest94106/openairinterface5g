@@ -189,7 +189,8 @@ int nas_config_mbms(int interface_id, int thirdOctet, int fourthOctet, char *ifn
 }
 
 // non blocking full configuration of the interface (address, and the two lest octets of the address)
-int nas_config(int interface_id, int thirdOctet, int fourthOctet, char *ifname) {
+int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *ifpref)
+{
   //char buf[5];
   char ipAddress[20];
   char broadcastAddress[20];
@@ -197,8 +198,7 @@ int nas_config(int interface_id, int thirdOctet, int fourthOctet, char *ifname) 
   int returnValue;
   sprintf(ipAddress, "%s.%d.%d", baseNetAddress,thirdOctet,fourthOctet);
   sprintf(broadcastAddress, "%s.%d.255",baseNetAddress, thirdOctet);
-  sprintf(interfaceName, "%s%s%d", (UE_NAS_USE_TUN || ENB_NAS_USE_TUN)?"oaitun_":ifname,
-          UE_NAS_USE_TUN?"ue": (ENB_NAS_USE_TUN?"enb":""),interface_id);
+  sprintf(interfaceName, "%s%d", ifpref, interface_id);
   bringInterfaceUp(interfaceName, 0);
   // sets the machine address
   returnValue= setInterfaceParameter(interfaceName, ipAddress,SIOCSIFADDR);

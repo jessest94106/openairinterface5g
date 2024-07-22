@@ -49,7 +49,7 @@ void nas_getparams(void);
  * \note
  * @ingroup  _nas
  */
-int nas_config(int interface_id, int thirdOctet, int fourthOctet, char *ifsuffix);
+int nas_config(int interface_id, int thirdOctet, int fourthOctet, const char *ifprefix);
 
 /*! \fn int  nas_config_mbms(char*, int, int)
  * \brief This function initializes the nasmesh interface using the basic values,

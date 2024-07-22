@@ -31,7 +31,7 @@
 #ifndef EMU_PROTO_H_
 #define EMU_PROTO_H_
 
-int netlink_init_tun(char *ifsuffix, int num_if, int id);
+int netlink_init_tun(const char *ifprefix, int num_if, int id);
 int netlink_init_mbms_tun(char *ifsuffix, int id);
 
 #endif /* EMU_PROTO_H_ */
