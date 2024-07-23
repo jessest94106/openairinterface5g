@@ -19,12 +19,12 @@
  *      contact@openairinterface.org
  */
 
-#ifndef NAS_CONFIG_H_
-#define NAS_CONFIG_H_
+#ifndef TUN_IF_H_
+#define TUN_IF_H_
 
 #include <stdbool.h>
 
-/*! \fn int  nas_config(char*, int, int)
+/*! \fn int  tun_config(char*, int, int)
  * \brief This function initializes the nasmesh interface using the basic values,
  * basic address, network mask and broadcast address, as the default configured
  * ones
@@ -38,7 +38,7 @@
  * \note
  * @ingroup  _nas
  */
-bool nas_config(int interface_id, const char *ipv4, const char *ipv6, const char *ifprefix);
+bool tun_config(int interface_id, const char *ipv4, const char *ipv6, const char *ifprefix);
 
 /*!
  * \brief Setup a IPv4 rule in table (interface_id - 1 + 10000) and route to
@@ -54,4 +54,4 @@ bool nas_config(int interface_id, const char *ipv4, const char *ipv6, const char
  */
 void setup_ue_ipv4_route(int interface_id, const char *ipv4, const char *ifpref);
 
-#endif /*NAS_CONFIG_H_*/
+#endif /*TUN_IF_H_*/

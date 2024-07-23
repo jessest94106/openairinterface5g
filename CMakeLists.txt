@@ -1931,7 +1931,6 @@ add_executable(lte-softmodem
   ${OPENAIR_DIR}/executables/create_tasks_mbms.c
   ${OPENAIR_DIR}/radio/COMMON/common_lib.c
   ${OPENAIR_DIR}/radio/COMMON/record_player.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${OPENAIR3_DIR}/NAS/UE/nas_ue_task.c
   ${PHY_INTERFACE_DIR}/queue_t.c
   ${OPENAIR_DIR}/common/utils/lte/ue_power.c
@@ -1988,7 +1987,6 @@ add_executable(lte-uesoftmodem
   ${OPENAIR_DIR}/executables/create_tasks_ue.c
   ${OPENAIR_DIR}/radio/COMMON/common_lib.c
   ${OPENAIR_DIR}/radio/COMMON/record_player.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${OPENAIR3_DIR}/NAS/UE/nas_ue_task.c
   ${OPENAIR_DIR}/common/utils/lte/ue_power.c
   ${OPENAIR_DIR}/common/utils/lte/prach_utils.c
@@ -2024,7 +2022,6 @@ add_executable(nr-softmodem
   ${OPENAIR_DIR}/executables/softmodem-common.c
   ${OPENAIR_DIR}/radio/COMMON/common_lib.c
   ${OPENAIR_DIR}/radio/COMMON/record_player.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${OPENAIR_DIR}/common/utils/lte/ue_power.c
   ${OPENAIR_DIR}/common/utils/lte/prach_utils.c
   ${PHY_INTERFACE_DIR}/queue_t.c
@@ -2066,7 +2063,6 @@ target_link_libraries(nr-softmodem PRIVATE
 add_executable(nr-cuup
   executables/nr-cuup.c
   executables/softmodem-common.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${NR_RRC_DIR}/rrc_gNB_UE_context.c
   ${OPENAIR2_DIR}/E1AP/e1ap_setup.c
   ${NR_PDCP_SRC}
@@ -2094,7 +2090,6 @@ add_executable(nr-uesoftmodem
   ${OPENAIR_DIR}/executables/softmodem-common.c
   ${OPENAIR_DIR}/radio/COMMON/common_lib.c
   ${OPENAIR_DIR}/radio/COMMON/record_player.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${OPENAIR2_DIR}/LAYER2/NR_MAC_COMMON/nr_mac_common.c
   ${OPENAIR3_DIR}/NAS/UE/nas_ue_task.c
   ${OPENAIR1_DIR}/PHY/TOOLS/phy_scope_interface.c
@@ -2205,7 +2200,6 @@ add_executable(nr_psbchsim
   ${OPENAIR1_DIR}/SIMULATION/NR_PHY/psbchsim.c
   ${OPENAIR1_DIR}/SIMULATION/NR_PHY/nr_dummy_functions.c
   ${OPENAIR_DIR}/executables/softmodem-common.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${NR_UE_RRC_DIR}/rrc_nsa.c
   ${NFAPI_USER_DIR}/nfapi.c
   ${NFAPI_USER_DIR}/gnb_ind_vars.c
@@ -2232,7 +2226,6 @@ add_executable(nr_dlsim
   ${OPENAIR1_DIR}/SIMULATION/NR_PHY/dlsim.c
   ${OPENAIR1_DIR}/SIMULATION/NR_PHY/nr_dummy_functions.c
   ${OPENAIR_DIR}/executables/softmodem-common.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${NR_UE_RRC_DIR}/rrc_nsa.c
   ${NFAPI_USER_DIR}/nfapi.c
   ${NFAPI_USER_DIR}/gnb_ind_vars.c
@@ -2268,7 +2261,6 @@ add_executable(nr_ulsim
   ${OPENAIR1_DIR}/SIMULATION/NR_PHY/ulsim.c
   ${OPENAIR1_DIR}/SIMULATION/NR_PHY/nr_dummy_functions.c
   ${OPENAIR_DIR}/executables/softmodem-common.c
-  ${OPENAIR2_DIR}/RRC/NAS/nas_config.c
   ${NR_UE_RRC_DIR}/rrc_nsa.c
   ${NFAPI_USER_DIR}/nfapi.c
   ${NFAPI_USER_DIR}/gnb_ind_vars.c

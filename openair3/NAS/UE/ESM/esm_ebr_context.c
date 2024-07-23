@@ -45,7 +45,7 @@ Description Defines functions used to handle EPS bearer contexts.
 #include "esm_ebr.h"
 
 #include "esm_ebr_context.h"
-#include "openair2/RRC/NAS/nas_config.h"
+#include "common/utils/tun_if.h"
 
 #include "emm_sap.h"
 #include "system.h"
@@ -207,7 +207,7 @@ int esm_ebr_context_create(
               char *ip_addr = pdn->ip_addr;
               snprintf(ip, sizeof(ip), "%d.%d.%d.%d", ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]);
               const char *ifn = get_softmodem_params()->nsa ? "oaitun_nru" : "oaitun_ue";
-              nas_config(1, ip, NULL, ifn);
+              tun_config(1, ip, NULL, ifn);
               setup_ue_ipv4_route(1, ip, ifn);
             } break;
 

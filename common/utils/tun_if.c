@@ -28,7 +28,7 @@
 #include <arpa/inet.h>
 #include <linux/ipv6.h>
 
-#include "nas_config.h"
+#include "tun_if.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/system.h"
 
@@ -115,7 +115,7 @@ fail_interface_state:
 }
 
 // non blocking full configuration of the interface (address, and the two lest octets of the address)
-bool nas_config(int interface_id, const char *ipv4, const char *ipv6, const char *ifpref)
+bool tun_config(int interface_id, const char *ipv4, const char *ipv6, const char *ifpref)
 {
   char interfaceName[IFNAMSIZ];
   snprintf(interfaceName, sizeof(interfaceName), "%s%d", ifpref, interface_id);

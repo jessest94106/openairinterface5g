@@ -22,7 +22,7 @@
 #include "PduSessionEstablishmentAccept.h"
 #include "common/utils/LOG/log.h"
 #include "nr_nas_msg_sim.h"
-#include "openair2/RRC/NAS/nas_config.h"
+#include "common/utils/tun_if.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 
 static uint16_t getShort(uint8_t *input)
@@ -132,14 +132,14 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
             addr[i] = *curPtr++;
           char ip[20];
           capture_ipv4_addr(&addr[0], ip, sizeof(ip));
-          nas_config(1, ip, NULL, "oaitun_ue");
+          tun_config(1, ip, NULL, "oaitun_ue");
           setup_ue_ipv4_route(1, ip, "oaitun_ue");
         } else if (psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV6) {
           for (int i = 0; i < 8; ++i)
             addr[i] = *curPtr++;
           char ipv6[40];
           capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
-          nas_config(1, NULL, ipv6, "oaitun_ue");
+          tun_config(1, NULL, ipv6, "oaitun_ue");
         } else if (psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV4V6) {
           // 24.501 Sec 9.11.4.10: "If the PDU session type value indicates
           // IPv4v6, the PDU address information in octet 4 to octet 11
@@ -151,7 +151,7 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
           capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
           char ipv4[20];
           capture_ipv4_addr(&addr[8], ipv4, sizeof(ipv4));
-          nas_config(1, ipv4, ipv6, "oaitun_ue");
+          tun_config(1, ipv4, ipv6, "oaitun_ue");
           setup_ue_ipv4_route(1, ipv4, "oaitun_ue");
         } else {
           LOG_E(NAS, "unknown/unhandled PDU session establishment accept PDU type %d\n", psea_msg.pdu_addr_ie.pdu_type);

@@ -46,7 +46,7 @@
 #include "RegistrationAccept.h"
 #include "FGSDeregistrationRequestUEOriginating.h"
 #include "intertask_interface.h"
-#include "openair2/RRC/NAS/nas_config.h"
+#include "common/utils/tun_if.h"
 #include <openair3/NAS/COMMON/NR_NAS_defs.h>
 #include <openair1/SIMULATION/ETH_TRANSPORT/proto.h>
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
@@ -845,7 +845,7 @@ void decodeDownlinkNASTransport(as_nas_info_t *initialNasMsg, uint8_t * pdu_buff
     char ip[20];
     sprintf(ip, "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
     LOG_A(NAS, "Received PDU Session Establishment Accept\n");
-    nas_config(1, ip, NULL, "oaitun_ue");
+    tun_config(1, ip, NULL, "oaitun_ue");
     setup_ue_ipv4_route(1, ip, "oaitun_ue");
   } else {
     LOG_E(NAS, "Received unexpected message in DLinformationTransfer %d\n", msg_type);
@@ -1432,7 +1432,7 @@ void *nas_nrue(void *args_p)
                   char ip[20];
                   snprintf(ip, sizeof(ip), "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
                   LOG_I(NAS, "Received PDU Session Establishment Accept, UE IP: %s\n", ip);
-                  nas_config(1, ip, NULL, "oaitun_ue");
+                  tun_config(1, ip, NULL, "oaitun_ue");
                   setup_ue_ipv4_route(1, ip, "oaitun_ue");
                   break;
                 }

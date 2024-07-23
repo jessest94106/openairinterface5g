@@ -67,7 +67,7 @@
 #include "NR_RAT-Type.h"
 #include "NR_UE-CapabilityRAT-Container.h"
 
-#include "RRC/NAS/nas_config.h"
+#include "common/utils/tun_if.h"
 #if ENABLE_RAL
   #include "rrc_UE_ral.h"
 #endif
@@ -771,7 +771,7 @@ rrc_ue_establish_drb(
              "10.0.%d.%d",
              UE_NAS_USE_TUN ? 1 : (ip_addr_offset3 + ue_mod_idP + 1),
              ip_addr_offset4 + ue_mod_idP + 1);
-    oip_ifup = nas_config(ip_addr_offset3 + ue_mod_idP + 1, ip, NULL, "oaitun_oip");
+    oip_ifup = tun_config(ip_addr_offset3 + ue_mod_idP + 1, ip, NULL, "oaitun_oip");
 
     if (oip_ifup == 0 && (!UE_NAS_USE_TUN)) { // interface is up --> send a config the DRB
       LOG_I(OIP,"[UE %d] Config the ue net interface %d to send/receive pkt on DRB %ld to/from the protocol stack\n",

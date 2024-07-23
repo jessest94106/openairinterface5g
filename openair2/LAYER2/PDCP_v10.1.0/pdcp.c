@@ -50,7 +50,7 @@
 #include "common/openairinterface5g_limits.h"
 #include "executables/lte-softmodem.h"
 #include "SIMULATION/ETH_TRANSPORT/proto.h"
-#include "openair2/RRC/NAS/nas_config.h"
+#include "common/utils/tun_if.h"
 #include "intertask_interface.h"
 #include "openair3/S1AP/s1ap_eNB.h"
 #include <pthread.h>
@@ -2300,22 +2300,22 @@ uint64_t pdcp_module_init( uint64_t pdcp_optmask, int id) {
     int num_if = (NFAPI_MODE == NFAPI_UE_STUB_PNF || IS_SOFTMODEM_SIML1 || NFAPI_MODE == NFAPI_MODE_STANDALONE_PNF) ? MAX_MOBILES_PER_ENB : 1;
     netlink_init_tun("oaitun_ue", num_if, id);
     if (IS_SOFTMODEM_NOS1)
-      nas_config(1, "10.0.1.2", NULL, "oaitun_ue");
+      tun_config(1, "10.0.1.2", NULL, "oaitun_ue");
     netlink_init_mbms_tun("oaitun_uem", id + 1);
-    nas_config(1, "10.0.2.2", NULL, "oaitun_uem");
+    tun_config(1, "10.0.2.2", NULL, "oaitun_uem");
     LOG_I(PDCP, "UE pdcp will use tun interface\n");
   } else if (ENB_NAS_USE_TUN) {
     netlink_init_tun("oaitun_enb", 1, 0);
-    nas_config(1, "10.0.1.1", NULL, "oaitun_enb");
+    tun_config(1, "10.0.1.1", NULL, "oaitun_enb");
     if (pdcp_optmask & ENB_NAS_USE_TUN_W_MBMS_BIT) {
       netlink_init_mbms_tun("oaitun_enm", 1);
-      nas_config(1, "10.0.2.1", NULL, "oaitun_enm");
+      tun_config(1, "10.0.2.1", NULL, "oaitun_enm");
       LOG_I(PDCP, "ENB pdcp will use mbms tun interface\n");
     }
     LOG_I(PDCP, "ENB pdcp will use tun interface\n");
   } else if (pdcp_optmask & ENB_NAS_USE_TUN_W_MBMS_BIT) {
     netlink_init_mbms_tun("oaitun_enm", 0);
-    nas_config(1, "10.0.2.1", NULL, "oaitun_enm");
+    tun_config(1, "10.0.2.1", NULL, "oaitun_enm");
     LOG_I(PDCP, "ENB pdcp will use mbms tun interface\n");
   }
 
