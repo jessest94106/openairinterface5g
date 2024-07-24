@@ -137,6 +137,7 @@ These modes of operation are supported:
   - evaluation of CQI report
 - MAC scheduling of SR reception
 - Support of up to 16 UEs (can be increased to 32)
+- Intra-frequency handover
 
 ## gNB RLC
 
@@ -221,6 +222,7 @@ These modes of operation are supported:
 - Interface with RRC
 - Interface with GTP-u (tunnel creation/handling for F1-U interface)
 - One CU(-CP) can handle multiple DUs
+- Support for intra-CU mobility (across DUs)
 
 ## gNB E1AP
 

@@ -59,8 +59,8 @@ This is the current status:
   * SA
   * Single cell per DU
   * Multiple DUs connected to one CU (both CP and UP)
+  * Mobility between DUs connected to a single CU
 - Not supported:
-  * Mobility
   * NSA
 
 ## F1-C
