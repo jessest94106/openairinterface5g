@@ -838,7 +838,7 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
       pdusession_failed_t *f = &resp->pdusessions_failed[i];
       f->pdusession_id = msg->pdusession_setup_params[i].pdusession_id;
       f->cause = NGAP_CAUSE_PROTOCOL;
-      f->cause_value = 3; // NGAP_CauseProtocol_message_not_compatible_with_receiver_state
+      f->cause_value = NGAP_CAUSE_PROTOCOL_MSG_NOT_COMPATIBLE_WITH_RECEIVER_STATE;
     }
     itti_send_msg_to_task(TASK_NGAP, instance, msg_resp);
     return;
