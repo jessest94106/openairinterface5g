@@ -245,7 +245,7 @@ void nr_pbch_dmrs_rx(int symbol, const unsigned int *nr_gold_pbch, c16_t *output
   \param length is number of RE in a OFDM symbol
   \param *output pointer to all ptrs RE in a OFDM symbol
 */
-void nr_gen_ref_conj_symbols(uint32_t *in, uint32_t length, c16_t *output, uint16_t offset, int mod_order)
+void nr_gen_ref_conj_symbols(const uint32_t *in, uint32_t length, c16_t *output, uint16_t offset, int mod_order)
 {
   uint8_t idx, b_idx;
   for (int i=0; i<length/mod_order; i++)
