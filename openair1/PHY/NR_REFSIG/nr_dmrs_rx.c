@@ -120,9 +120,9 @@ int nr_pusch_dmrs_rx(PHY_VARS_gNB *gNB,
   return(0);
 }
 
-int nr_pdsch_dmrs_rx(PHY_VARS_NR_UE *ue,
+int nr_pdsch_dmrs_rx(const PHY_VARS_NR_UE *ue,
                      unsigned int Ns,
-                     unsigned int *nr_gold_pdsch,
+                     const unsigned int *nr_gold_pdsch,
                      c16_t *output,
                      unsigned short p,
                      unsigned char lp,
@@ -170,9 +170,9 @@ int nr_pdsch_dmrs_rx(PHY_VARS_NR_UE *ue,
   return(0);
 }
 
-int nr_pdcch_dmrs_rx(PHY_VARS_NR_UE *ue,
+int nr_pdcch_dmrs_rx(const PHY_VARS_NR_UE *ue,
                      unsigned int Ns,
-                     unsigned int *nr_gold_pdcch,
+                     const unsigned int *nr_gold_pdcch,
                      c16_t *output,
                      unsigned short p,
                      unsigned short nb_rb_coreset)
