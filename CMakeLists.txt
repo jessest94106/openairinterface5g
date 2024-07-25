@@ -1271,6 +1271,7 @@ set(L2_NR_SRC
   ${NR_RRC_DIR}/rrc_gNB_radio_bearers.c
   ${NR_RRC_DIR}/rrc_gNB_cuup.c
   ${NR_RRC_DIR}/rrc_gNB_du.c
+  ${NR_RRC_DIR}/rrc_gNB_mobility.c
   )
 
 set(L2_SRC_UE

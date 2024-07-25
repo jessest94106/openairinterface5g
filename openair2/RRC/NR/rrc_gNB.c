@@ -77,6 +77,7 @@
 
 #include "rrc_gNB_NGAP.h"
 #include "rrc_gNB_du.h"
+#include "rrc_gNB_mobility.h"
 
 #include "rrc_gNB_GTPV1U.h"
 
