@@ -627,6 +627,7 @@ void ue_context_release_command(const f1ap_ue_context_release_cmd_t *cmd)
   if (UE->UE_sched_ctrl.ul_failure || cmd->rrc_container_length == 0) {
     /* The UE is already not connected anymore or we have nothing to forward*/
     nr_mac_release_ue(mac, cmd->gNB_DU_ue_id);
+    nr_mac_trigger_release_complete(mac, cmd->gNB_DU_ue_id);
   } else {
     /* UE is in sync: forward release message and mark to be deleted
      * after UL failure */
