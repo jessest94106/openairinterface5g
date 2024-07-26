@@ -324,6 +324,8 @@ static F1AP_GNB_DU_System_Information_t *encode_system_info(const f1ap_gnb_du_sy
 // SETUP REQUEST
 int DU_send_F1_SETUP_REQUEST(sctp_assoc_t assoc_id, const f1ap_setup_req_t *setup_req)
 {
+  LOG_D(F1AP, "DU_send_F1_SETUP_REQUEST\n");
+
   F1AP_F1AP_PDU_t       pdu= {0};
   uint8_t  *buffer;
   uint32_t  len;
