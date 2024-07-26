@@ -197,3 +197,11 @@ uint32_t *nr_gold_pusch(int N_RB_UL, int symbols_per_slot, int Nid, int nscid, i
 {
   return nr_gold_pdsch(N_RB_UL, symbols_per_slot, Nid, nscid, slot, symbol);
 }
+
+uint32_t *nr_gold_csi_rs(int N_RB_DL, int symbols_per_slot, int slot, int symb, uint32_t Nid)
+{
+  int csi_dmrs_init_length = ((N_RB_DL << 4) >> 5) + 1;
+  uint64_t temp_x2 = (1ULL << 10) * ((uint64_t)symbols_per_slot * slot + symb + 1) * ((Nid << 1) + 1) + Nid;
+  uint32_t x2 = temp_x2 % (1U << 31);
+  return gold_cache(x2, csi_dmrs_init_length);
+}

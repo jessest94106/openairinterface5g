@@ -296,18 +296,7 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     srs_vars[gNB_id]->active = false;
 
     // ceil((NB_RB*8(max allocation per RB)*2(QPSK))/32)
-    int csi_dmrs_init_length =  ((fp->N_RB_DL<<4)>>5)+1;
     ue->nr_csi_info = malloc16_clear(sizeof(nr_csi_info_t));
-    ue->nr_csi_info->nr_gold_csi_rs = malloc16(fp->slots_per_frame * sizeof(uint32_t **));
-    AssertFatal(ue->nr_csi_info->nr_gold_csi_rs != NULL, "NR init: csi reference signal malloc failed\n");
-    for (int slot=0; slot<fp->slots_per_frame; slot++) {
-      ue->nr_csi_info->nr_gold_csi_rs[slot] = malloc16(fp->symbols_per_slot * sizeof(uint32_t *));
-      AssertFatal(ue->nr_csi_info->nr_gold_csi_rs[slot] != NULL, "NR init: csi reference signal for slot %d - malloc failed\n", slot);
-      for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-        ue->nr_csi_info->nr_gold_csi_rs[slot][symb] = malloc16(csi_dmrs_init_length * sizeof(uint32_t));
-        AssertFatal(ue->nr_csi_info->nr_gold_csi_rs[slot][symb] != NULL, "NR init: csi reference signal for slot %d symbol %d - malloc failed\n", slot, symb);
-      }
-    }
     ue->nr_csi_info->csi_rs_generated_signal = malloc16(NR_MAX_NB_PORTS * sizeof(int32_t *));
     for (i=0; i<NR_MAX_NB_PORTS; i++) {
       ue->nr_csi_info->csi_rs_generated_signal[i] = malloc16_clear(fp->samples_per_frame_wCP * sizeof(int32_t));
@@ -362,13 +351,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
       free_and_zero(ue->nr_csi_info->csi_rs_generated_signal[i]);
     }
     free_and_zero(ue->nr_csi_info->csi_rs_generated_signal);
-    for (int slot=0; slot<fp->slots_per_frame; slot++) {
-      for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-        free_and_zero(ue->nr_csi_info->nr_gold_csi_rs[slot][symb]);
-      }
-      free_and_zero(ue->nr_csi_info->nr_gold_csi_rs[slot]);
-    }
-    free_and_zero(ue->nr_csi_info->nr_gold_csi_rs);
     free_and_zero(ue->nr_csi_info);
 
     free_and_zero(ue->nr_srs_info);

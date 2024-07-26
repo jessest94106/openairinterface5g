@@ -35,12 +35,6 @@ This function generates NR Gold Sequence(ts 138.211) for the PRS.
 */
 void nr_init_prs(PHY_VARS_gNB* gNB);
 
-/*!\brief This function generates the NR Gold sequence (38-211, Sec 5.2.1) for the PDCCH DMRS.
-@param PHY_VARS_gNB* gNB structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables
-@param Nid is used for the initialization of x2, Physical cell Id by default or upper layer configured pdcch_scrambling_ID
- */
-void nr_init_csi_rs(const NR_DL_FRAME_PARMS *fp, uint32_t ***csi_rs, uint32_t Nid);
-
 int nr_pusch_dmrs_delta(uint8_t dmrs_config_type, unsigned short p);
 
 int nr_pusch_dmrs_rx(PHY_VARS_gNB *gNB,
