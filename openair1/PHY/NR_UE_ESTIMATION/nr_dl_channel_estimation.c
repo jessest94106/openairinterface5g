@@ -1450,8 +1450,7 @@ int nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
 
   delay_t delay = {0};
 
-  for (int aarx = 0; aarx < ue->frame_parms.nb_antennas_rx; aarx++) {
-
+  for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
 #ifdef DEBUG_PDSCH
     printf("\n============================================\n");
     printf("==== Tx port %i, Rx antenna %i, Symbol %i ====\n", p, aarx, symbol);
@@ -1459,8 +1458,8 @@ int nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
 #endif
 
     c16_t *rxF = &rxdataF[aarx][symbol_offset + delta];
-    c16_t *dl_ch = (c16_t *)&dl_ch_estimates[nl * ue->frame_parms.nb_antennas_rx + aarx][ch_offset];
-    memset(dl_ch, 0, sizeof(*dl_ch) * ue->frame_parms.ofdm_symbol_size);
+    c16_t *dl_ch = (c16_t *)&dl_ch_estimates[nl * fp->nb_antennas_rx + aarx][ch_offset];
+    memset(dl_ch, 0, sizeof(*dl_ch) * fp->ofdm_symbol_size);
 
     if (config_type == NFAPI_NR_DMRS_TYPE1 && ue->chest_freq == 0) {
       NFAPI_NR_DMRS_TYPE1_linear_interp(&ue->frame_parms,
@@ -1474,7 +1473,7 @@ int nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
                                         nvar);
 
     } else if (config_type == NFAPI_NR_DMRS_TYPE2 && ue->chest_freq == 0) {
-      NFAPI_NR_DMRS_TYPE2_linear_interp(&ue->frame_parms,
+      NFAPI_NR_DMRS_TYPE2_linear_interp(fp,
                                         rxF,
                                         &pilot[4 * rb_offset],
                                         dl_ch,
@@ -1486,24 +1485,14 @@ int nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
                                         nvar);
 
     } else if (config_type == NFAPI_NR_DMRS_TYPE1) {
-      NFAPI_NR_DMRS_TYPE1_average_prb(&ue->frame_parms,
-                                      rxF,
-                                      &pilot[6 * rb_offset],
-                                      dl_ch,
-                                      bwp_start_subcarrier,
-                                      nb_rb_pdsch);
+      NFAPI_NR_DMRS_TYPE1_average_prb(fp, rxF, &pilot[6 * rb_offset], dl_ch, bwp_start_subcarrier, nb_rb_pdsch);
 
     } else {
-      NFAPI_NR_DMRS_TYPE2_average_prb(&ue->frame_parms,
-                                      rxF,
-                                      &pilot[4 * rb_offset],
-                                      dl_ch,
-                                      bwp_start_subcarrier,
-                                      nb_rb_pdsch);
+      NFAPI_NR_DMRS_TYPE2_average_prb(fp, rxF, &pilot[4 * rb_offset], dl_ch, bwp_start_subcarrier, nb_rb_pdsch);
     }
 
 #ifdef DEBUG_PDSCH
-    dl_ch = (c16_t *)&dl_ch_estimates[nl * ue->frame_parms.nb_antennas_rx + aarx][ch_offset];
+    dl_ch = (c16_t *)&dl_ch_estimates[nl * fp->nb_antennas_rx + aarx][ch_offset];
     for (uint16_t idxP = 0; idxP < ceil((float)nb_rb_pdsch * 12 / 8); idxP++) {
       for (uint8_t idxI = 0; idxI < 8; idxI++) {
         printf("%4d\t%4d\t", dl_ch[idxP * 8 + idxI].r, dl_ch[idxP * 8 + idxI].i);
