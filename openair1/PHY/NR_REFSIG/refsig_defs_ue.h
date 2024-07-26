@@ -51,10 +51,6 @@ int nr_pdsch_dmrs_rx(const PHY_VARS_NR_UE *ue,
                      unsigned short nb_pdsch_rb,
                      uint8_t config_type);
 
-void nr_gold_pdsch(PHY_VARS_NR_UE* ue,
-                   int nscid,
-                   uint32_t nid);
-
 void nr_init_pusch_dmrs(PHY_VARS_NR_UE* ue,
                         uint16_t N_n_scid,
                         uint8_t n_scid);

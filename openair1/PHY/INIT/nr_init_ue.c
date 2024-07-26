@@ -304,28 +304,6 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     common_vars->rxdata[i] = malloc16_clear(num_samples * sizeof(c16_t));
   }
 
-  // ceil(((NB_RB*6(k)*2(QPSK)/32) // 3 RE *2(QPSK)
-  int pdsch_dmrs_init_length =  ((fp->N_RB_DL*12)>>5)+1;
-
-  //PDSCH DMRS init (eNB offset = 0)
-  ue->nr_gold_pdsch[0] = malloc16(fp->slots_per_frame * sizeof(uint32_t ***));
-  uint32_t ****pdsch_dmrs = ue->nr_gold_pdsch[0];
-
-  for (int slot=0; slot<fp->slots_per_frame; slot++) {
-    pdsch_dmrs[slot] = malloc16(fp->symbols_per_slot * sizeof(uint32_t **));
-    AssertFatal(pdsch_dmrs[slot]!=NULL, "NR init: pdsch_dmrs for slot %d - malloc failed\n", slot);
-
-    for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-      pdsch_dmrs[slot][symb] = malloc16(NR_NB_NSCID * sizeof(uint32_t *));
-      AssertFatal(pdsch_dmrs[slot][symb]!=NULL, "NR init: pdsch_dmrs for slot %d symbol %d - malloc failed\n", slot, symb);
-
-      for (int q=0; q<NR_NB_NSCID; q++) {
-        pdsch_dmrs[slot][symb][q] = malloc16(pdsch_dmrs_init_length * sizeof(uint32_t));
-        AssertFatal(pdsch_dmrs[slot][symb][q]!=NULL, "NR init: pdsch_dmrs for slot %d symbol %d nscid %d - malloc failed\n", slot, symb, q);
-      }
-    }
-  }
-
   // DLSCH
   for (gNB_id = 0; gNB_id < ue->n_connected_gNB; gNB_id++) {
     prach_vars[gNB_id] = malloc16_clear(sizeof(NR_UE_PRACH));
@@ -407,21 +385,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     free_and_zero(common_vars->rxdata[i]);
   }
   free_and_zero(common_vars->rxdata);
-
-  for (int slot=0; slot<fp->slots_per_frame; slot++) {
-    for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-      for (int q=0; q<NR_NB_NSCID; q++)
-        free_and_zero(ue->nr_gold_pdsch[0][slot][symb][q]);
-      free_and_zero(ue->nr_gold_pdsch[0][slot][symb]);
-    }
-    free_and_zero(ue->nr_gold_pdsch[0][slot]);
-  }
-  free_and_zero(ue->nr_gold_pdsch[0]);
-
-  for (int gNB_id = 0; gNB_id < ue->n_connected_gNB+1; gNB_id++) {
-
-    // PDSCH
-  }
 
   for (int gNB_id = 0; gNB_id < ue->n_connected_gNB; gNB_id++) {
 

@@ -21,27 +21,6 @@
 
 #include "nr_refsig.h"
 
-void nr_init_pdsch_dmrs(PHY_VARS_gNB* gNB, uint8_t nscid, uint32_t Nid)
-{
-  NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
-  uint32_t ****pdsch_dmrs = gNB->nr_gold_pdsch_dmrs;
-  int pdsch_dmrs_init_length = ((fp->N_RB_DL * 12) >> 5) + 1;
-  for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-    for (int symb = 0; symb < fp->symbols_per_slot; symb++) {
-      uint8_t reset = 1;
-      uint32_t x1 = 0;
-      uint64_t temp_x2 = ((1UL << 17) * (fp->symbols_per_slot * slot + symb + 1) * ((Nid << 1) + 1) + ((Nid << 1) + nscid));
-      uint32_t x2 = temp_x2 % (1U << 31);
-      LOG_D(PHY,"PDSCH DMRS slot %d, symb %d, Nid %d, nscid %d, x2 %x\n",slot, symb, Nid, nscid, x2);
-      for (uint32_t n = 0; n < pdsch_dmrs_init_length; n++) {
-        pdsch_dmrs[slot][symb][nscid][n] = lte_gold_generic(&x1, &x2, reset);
-        reset = 0;
-      }
-    }
-  }
-}
-
-
 void nr_gold_pusch(PHY_VARS_gNB* gNB, int nscid, uint32_t nid)
 {
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;

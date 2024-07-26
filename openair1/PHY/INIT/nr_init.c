@@ -150,34 +150,6 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   nr_generate_modulation_table();
   nr_init_pbch_interleaver(gNB->nr_pbch_interleaver);
 
-  //PDSCH DMRS init
-  gNB->nr_gold_pdsch_dmrs = (uint32_t ****)malloc16(fp->slots_per_frame*sizeof(uint32_t ***));
-  uint32_t ****pdsch_dmrs             = gNB->nr_gold_pdsch_dmrs;
-
-  // ceil(((NB_RB*12(k)*2(QPSK)/32) // 3 RE *2(QPSK)
-  const int pdsch_dmrs_init_length =  ((fp->N_RB_DL*24)>>5)+1;
-  for (int slot=0; slot<fp->slots_per_frame; slot++) {
-    pdsch_dmrs[slot] = (uint32_t ***)malloc16(fp->symbols_per_slot*sizeof(uint32_t **));
-    AssertFatal(pdsch_dmrs[slot]!=NULL, "NR init: pdsch_dmrs for slot %d - malloc failed\n", slot);
-
-    for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-      pdsch_dmrs[slot][symb] = (uint32_t **)malloc16(NR_NB_NSCID*sizeof(uint32_t *));
-      AssertFatal(pdsch_dmrs[slot][symb]!=NULL, "NR init: pdsch_dmrs for slot %d symbol %d - malloc failed\n", slot, symb);
-
-      for (int q=0; q<NR_NB_NSCID; q++) {
-        pdsch_dmrs[slot][symb][q] = malloc16(pdsch_dmrs_init_length * sizeof(uint32_t));
-        AssertFatal(pdsch_dmrs[slot][symb][q]!=NULL, "NR init: pdsch_dmrs for slot %d symbol %d nscid %d - malloc failed\n", slot, symb, q);
-        memset(pdsch_dmrs[slot][symb][q], 0, sizeof(uint32_t) * pdsch_dmrs_init_length);
-      }
-    }
-  }
-
-
-  for (int nscid = 0; nscid < NR_NB_NSCID; nscid++) {
-    gNB->pdsch_gold_init[nscid] = cfg->cell_config.phy_cell_id.value;
-    nr_init_pdsch_dmrs(gNB, nscid, cfg->cell_config.phy_cell_id.value);
-  }
-
   //PUSCH DMRS init
   gNB->nr_gold_pusch_dmrs = (uint32_t ****)malloc16(NR_NB_NSCID*sizeof(uint32_t ***));
 
@@ -319,17 +291,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
   PHY_MEASUREMENTS_gNB *meas = &gNB->measurements;
   free_and_zero(meas->n0_subband_power);
   free_and_zero(meas->n0_subband_power_dB);
-
-  uint32_t ****pdsch_dmrs = gNB->nr_gold_pdsch_dmrs;
-  for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-    for (int symb = 0; symb < fp->symbols_per_slot; symb++) {
-      for (int q = 0; q < NR_NB_NSCID; q++)
-        free_and_zero(pdsch_dmrs[slot][symb][q]);
-      free_and_zero(pdsch_dmrs[slot][symb]);
-    }
-    free_and_zero(pdsch_dmrs[slot]);
-  }
-  free_and_zero(gNB->nr_gold_pdsch_dmrs);
 
   uint32_t ****pusch_dmrs = gNB->nr_gold_pusch_dmrs;
   for(int nscid = 0; nscid < 2; nscid++) {

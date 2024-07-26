@@ -407,13 +407,6 @@ typedef struct PHY_VARS_NR_UE_s {
   uint32_t dmrs_pbch_bitmap_nr[DMRS_PBCH_I_SSB][DMRS_PBCH_N_HF][DMRS_BITMAP_SIZE];
 
 #endif
-
-  /// PDSCH DMRS
-  uint32_t ****nr_gold_pdsch[NUMBER_OF_CONNECTED_eNB_MAX];
-
-  // Scrambling IDs used in PDSCH DMRS
-  uint16_t scramblingID_dlsch[2];
-
   // Scrambling IDs used in PUSCH DMRS
   uint16_t scramblingID_ulsch[2];
 

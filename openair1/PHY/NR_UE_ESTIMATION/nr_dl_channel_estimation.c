@@ -888,12 +888,8 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
   // generate pilot
   int pilot[(nb_rb_coreset + dmrs_ref) * 3] __attribute__((aligned(16)));
   // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
-  nr_pdcch_dmrs_rx(ue,
-                   slot,
-                   nr_gold_pdcch(ue->frame_parms.N_RB_DL, ue->frame_parms.symbols_per_slot, scrambling_id, slot, symbol),
-                   (c16_t *)pilot,
-                   2000,
-                   (nb_rb_coreset + dmrs_ref));
+  const uint32_t *gold = nr_gold_pdcch(ue->frame_parms.N_RB_DL, ue->frame_parms.symbols_per_slot, scrambling_id, slot, symbol);
+  nr_pdcch_dmrs_rx(ue, slot, gold, (c16_t *)pilot, 2000, (nb_rb_coreset + dmrs_ref));
 
   for (aarx=0; aarx<ue->frame_parms.nb_antennas_rx; aarx++) {
 
@@ -1423,35 +1419,33 @@ int nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
                                 c16_t rxdataF[][rxdataFsize],
                                 uint32_t *nvar)
 {
-  int gNB_id = proc->gNB_id;
-  int Ns = proc->nr_slot_rx;
-  const int ch_offset = ue->frame_parms.ofdm_symbol_size * symbol;
-  const int symbol_offset = ue->frame_parms.ofdm_symbol_size * symbol;
+  // int gNB_id = proc->gNB_id;
+  int slot = proc->nr_slot_rx;
+  NR_DL_FRAME_PARMS *fp = &ue->frame_parms;
+  const int ch_offset = fp->ofdm_symbol_size * symbol;
+  const int symbol_offset = fp->ofdm_symbol_size * symbol;
 
 #ifdef DEBUG_PDSCH
-  printf("PDSCH Channel Estimation : gNB_id %d ch_offset %d, symbol_offset %d OFDM size %d, Ncp=%d, Ns=%d, bwp_start_subcarrier=%d symbol %d\n",
-         gNB_id,
-         ch_offset,
-         symbol_offset,
-         ue->frame_parms.ofdm_symbol_size,
-         ue->frame_parms.Ncp,
-         Ns,
-         bwp_start_subcarrier,
-         symbol);
+  printf(
+      "PDSCH Channel Estimation : gNB_id %d ch_offset %d, symbol_offset %d OFDM size %d, Ncp=%d, Ns=%d, bwp_start_subcarrier=%d "
+      "symbol %d\n",
+      gNB_id,
+      ch_offset,
+      symbol_offset,
+      fp->ofdm_symbol_size,
+      fp->Ncp,
+      slot,
+      bwp_start_subcarrier,
+      symbol);
 #endif
 
   // generate pilot for gNB port number 1000+p
   int8_t delta = get_delta(p, config_type);
 
-  // checking if re-initialization of scrambling IDs is needed
-  if (scrambling_id != ue->scramblingID_dlsch[nscid]) {
-    ue->scramblingID_dlsch[nscid] = scrambling_id;
-    nr_gold_pdsch(ue, nscid, scrambling_id);
-  }
-
   c16_t pilot[3280] __attribute__((aligned(16)));
   // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
-  nr_pdsch_dmrs_rx(ue, Ns, ue->nr_gold_pdsch[gNB_id][Ns][symbol][nscid], pilot, 1000 + p, 0, nb_rb_pdsch + rb_offset, config_type);
+  const uint32_t *gold = nr_gold_pdsch(fp->N_RB_DL, fp->symbols_per_slot, scrambling_id, nscid, slot, symbol);
+  nr_pdsch_dmrs_rx(ue, slot, gold, pilot, 1000 + p, 0, nb_rb_pdsch + rb_offset, config_type);
 
   delay_t delay = {0};
 
@@ -1639,6 +1633,8 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
         /*------------------------------------------------------------------------------------------------------- */
         /* 1) Estimate common phase error per PTRS symbol                                                                */
         /*------------------------------------------------------------------------------------------------------- */
+        const uint32_t *gold =
+            nr_gold_pdsch(frame_parms->N_RB_DL, frame_parms->symbols_per_slot, frame_parms->Nid_cell, nscid, nr_slot_rx, symbol);
         nr_ptrs_cpe_estimation(*K_ptrs,
                                *ptrsReOffset,
                                *nb_rb,
@@ -1647,8 +1643,8 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
                                symbol,
                                frame_parms->ofdm_symbol_size,
                                (int16_t *)(rxdataF_comp[0][aarx] + symbol * nb_re_pdsch),
-                               ue->nr_gold_pdsch[gNB_id][nr_slot_rx][symbol][nscid],
-                               (int16_t*)&phase_per_symbol[symbol],
+                               gold,
+                               (int16_t *)&phase_per_symbol[symbol],
                                &ptrs_re_symbol[symbol]);
       }
     }// HARQ 0

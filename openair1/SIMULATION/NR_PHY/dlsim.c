@@ -840,12 +840,6 @@ int main(int argc, char **argv)
 
   init_nr_ue_transport(UE);
 
-  // compute the scrambling IDs for PDSCH DMRS
-  for (int i = 0; i < 2; i++) {
-    UE->scramblingID_dlsch[i] = frame_parms->Nid_cell;
-    nr_gold_pdsch(UE, i, UE->scramblingID_dlsch[i]);
-  }
-
   nr_l2_init_ue(1);
   UE_mac = get_mac_inst(0);
   ue_init_config_request(UE_mac, mu);

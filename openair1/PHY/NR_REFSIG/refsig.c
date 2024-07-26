@@ -183,3 +183,12 @@ uint32_t *nr_gold_pdcch(int N_RB_DL, int symbols_per_slot, unsigned short nid, i
   LOG_D(PHY, "PDCCH DMRS slot %d, symb %d, Nid %d, x2 %x\n", ns, l, nid, x2);
   return gold_cache(x2, pdcch_dmrs_init_length);
 }
+
+uint32_t *nr_gold_pdsch(int N_RB_DL, int symbols_per_slot, int nid, int nscid, int slot, int symbol)
+{
+  int pdsch_dmrs_init_length = ((N_RB_DL * 24) >> 5) + 1;
+  uint64_t x2tmp0 = (((uint64_t)symbols_per_slot * slot + symbol + 1) * (((uint64_t)nid << 1) + 1)) << 17;
+  uint32_t x2 = (x2tmp0 + (nid << 1) + nscid) % (1U << 31); // cinit
+  LOG_D(PHY, "UE DMRS slot %d, symb %d, nscid %d, x2 %x\n", slot, symbol, nscid, x2);
+  return gold_cache(x2, pdsch_dmrs_init_length);
+}

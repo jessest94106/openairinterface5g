@@ -407,12 +407,6 @@ nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
     // the n_frames we got sync
     ue->init_sync_frame = n_frames - 1 - res.syncRes.frame_id;
 
-    // compute the scrambling IDs for PDSCH DMRS
-    for (int i = 0; i < NR_NB_NSCID; i++) {
-      ue->scramblingID_dlsch[i] = fp->Nid_cell;
-      nr_gold_pdsch(ue, i, ue->scramblingID_dlsch[i]);
-    }
-
     nr_init_csi_rs(fp, ue->nr_csi_info->nr_gold_csi_rs, fp->Nid_cell);
 
     // initialize the pusch dmrs
