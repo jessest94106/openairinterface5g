@@ -25,7 +25,7 @@
 #define __NR_REFSIG_DEFS__H__
 
 #include "PHY/defs_nr_UE.h"
-#include "PHY/LTE_REFSIG/lte_refsig.h"
+#include "nr_refsig_common.h"
 
 /*!\brief This function generates the NR Gold sequence (38-211, Sec 5.2.1) for the PBCH DMRS.
 @param PHY_VARS_NR_UE* ue structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables

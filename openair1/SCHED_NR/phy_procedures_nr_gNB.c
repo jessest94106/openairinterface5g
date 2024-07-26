@@ -26,6 +26,7 @@
 #include "PHY/NR_TRANSPORT/nr_ulsch.h"
 #include "PHY/NR_TRANSPORT/nr_dci.h"
 #include "PHY/NR_ESTIMATION/nr_ul_estimation.h"
+#include "PHY/NR_REFSIG/nr_refsig_common.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_interface.h"
 #include "fapi_nr_l1.h"
 #include "common/utils/LOG/log.h"

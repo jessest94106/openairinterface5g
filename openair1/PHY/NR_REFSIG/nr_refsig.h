@@ -25,6 +25,7 @@
 #define __NR_REFSIG__H__
 
 #include "PHY/defs_gNB.h"
+#include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
 #include "PHY/LTE_REFSIG/lte_refsig.h"
 #include "PHY/sse_intrin.h"
 

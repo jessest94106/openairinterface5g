@@ -20,6 +20,7 @@
  */
 
 #include "refsig_defs_ue.h"
+#include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 
 void nr_gold_pbch(uint32_t nr_gold_pbch[2][64][NR_PBCH_DMRS_LENGTH_DWORD], int Nid, int Lmax)
 {
