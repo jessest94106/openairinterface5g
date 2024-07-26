@@ -22,34 +22,6 @@
 #include "refsig_defs_ue.h"
 #include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 
-void nr_gold_pbch(uint32_t nr_gold_pbch[2][64][NR_PBCH_DMRS_LENGTH_DWORD], int Nid, int Lmax)
-{
-  unsigned int n = 0, x1 = 0, x2 = 0;
-  unsigned int i_ssb, i_ssb2;
-  unsigned char l, n_hf, N_hf;
-  uint8_t reset;
-
-  N_hf = (Lmax == 4)? 2:1;
-
-  for (n_hf = 0; n_hf < N_hf; n_hf++) {
-
-    for (l = 0; l < Lmax ; l++) {
-      i_ssb = l & (Lmax-1);
-      i_ssb2 = i_ssb + (n_hf<<2);
-
-      reset = 1;
-      x2 = (1<<11) * (i_ssb2 + 1) * ((Nid>>2) + 1) + (1<<6) * (i_ssb2 + 1) + (Nid&3);
-
-      for (n=0; n<NR_PBCH_DMRS_LENGTH_DWORD; n++) {
-        nr_gold_pbch[n_hf][l][n] = lte_gold_generic(&x1, &x2, reset);
-        reset = 0;
-      }
-
-    }
-  }
-
-}
-
 void nr_gold_pdcch(PHY_VARS_NR_UE* ue,
                    unsigned short nid)
 {

@@ -26,7 +26,6 @@
 #include "PHY/NR_TRANSPORT/nr_ulsch.h"
 #include "PHY/NR_TRANSPORT/nr_dci.h"
 #include "PHY/NR_ESTIMATION/nr_ul_estimation.h"
-#include "PHY/NR_REFSIG/nr_refsig_common.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_interface.h"
 #include "fapi_nr_l1.h"
 #include "common/utils/LOG/log.h"
@@ -109,20 +108,13 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB,int frame,int slot, nfapi_nr_
   nr_generate_pss(&txdataF[0][txdataF_offset], gNB->TX_AMP, ssb_start_symbol, cfg, fp);
   nr_generate_sss(&txdataF[0][txdataF_offset], gNB->TX_AMP, ssb_start_symbol, cfg, fp);
 
-  if (fp->Lmax == 4)
-    nr_generate_pbch_dmrs(gNB->nr_gold_pbch_dmrs[n_hf][ssb_index & 7],
-                          &txdataF[0][txdataF_offset],
-                          gNB->TX_AMP,
-                          ssb_start_symbol,
-                          cfg,
-                          fp);
-  else
-    nr_generate_pbch_dmrs(gNB->nr_gold_pbch_dmrs[0][ssb_index & 7],
-                          &txdataF[0][txdataF_offset],
-                          gNB->TX_AMP,
-                          ssb_start_symbol,
-                          cfg,
-                          fp);
+  int hf = fp->Lmax == 4 ? n_hf : 0;
+  nr_generate_pbch_dmrs(nr_gold_pbch(fp->Lmax, gNB->gNB_config.cell_config.phy_cell_id.value, hf, ssb_index & 7),
+                        &txdataF[0][txdataF_offset],
+                        gNB->TX_AMP,
+                        ssb_start_symbol,
+                        cfg,
+                        fp);
 
 #if T_TRACER
   if (T_ACTIVE(T_GNB_PHY_MIB)) {

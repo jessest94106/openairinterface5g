@@ -25,5 +25,6 @@
 #define __NR_REFSIG_COMMON_H__
 
 uint32_t *gold_cache(uint32_t key, int length);
+uint32_t *nr_gold_pbch(int Lmax, int Nid, int n_hf, int ssb);
 
 #endif

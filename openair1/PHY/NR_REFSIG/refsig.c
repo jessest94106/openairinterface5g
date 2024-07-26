@@ -164,3 +164,11 @@ uint32_t *gold_cache(uint32_t key, int length)
   LOG_D(PHY, "created a gold sequence, start %d; len %d\n", key, length);
   return firstFree + roundedHeaderSz;
 }
+
+uint32_t *nr_gold_pbch(int Lmax, int Nid, int n_hf, int l)
+{
+  int i_ssb = l & (Lmax - 1);
+  int i_ssb2 = i_ssb + (n_hf << 2);
+  uint32_t x2 = (1 << 11) * (i_ssb2 + 1) * ((Nid >> 2) + 1) + (1 << 6) * (i_ssb2 + 1) + (Nid & 3);
+  return gold_cache(x2, NR_PBCH_DMRS_LENGTH_DWORD);
+}

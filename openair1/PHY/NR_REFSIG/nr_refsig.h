@@ -29,11 +29,6 @@
 #include "PHY/LTE_REFSIG/lte_refsig.h"
 #include "PHY/sse_intrin.h"
 
-/*!\brief This function generates the NR Gold sequence (38-211, Sec 5.2.1) for the PBCH DMRS.
-@param PHY_VARS_gNB* gNB structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables
- */
-void nr_init_pbch_dmrs(PHY_VARS_gNB* gNB);
-
 /*
 This function generates NR Gold Sequence(ts 138.211) for the PRS.
 @param PHY_VARS_gNB* gNB structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables

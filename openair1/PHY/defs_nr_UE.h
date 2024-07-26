@@ -408,10 +408,6 @@ typedef struct PHY_VARS_NR_UE_s {
 
 #endif
 
-
-  /// PBCH DMRS sequence
-  uint32_t nr_gold_pbch[2][64][NR_PBCH_DMRS_LENGTH_DWORD];
-
   /// PDSCH DMRS
   uint32_t ****nr_gold_pdsch[NUMBER_OF_CONNECTED_eNB_MAX];
 

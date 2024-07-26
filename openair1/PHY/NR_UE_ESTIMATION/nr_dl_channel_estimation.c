@@ -644,7 +644,6 @@ c32_t nr_pbch_dmrs_correlation(const NR_DL_FRAME_PARMS *fp,
 
 int nr_pbch_channel_estimation(const NR_DL_FRAME_PARMS *fp,
                                const sl_nr_ue_phy_params_t *sl_phy_params,
-                               const uint32_t nr_gold_pbch[2][64][NR_PBCH_DMRS_LENGTH_DWORD],
                                int estimateSz,
                                struct complex16 dl_ch_estimates[][estimateSz],
                                struct complex16 dl_ch_estimates_time[][fp->ofdm_symbol_size],
@@ -679,7 +678,7 @@ int nr_pbch_channel_estimation(const NR_DL_FRAME_PARMS *fp,
 
     AssertFatal(dmrss >= 0 && dmrss < 3, "symbol %d is illegal for PBCH DM-RS \n", dmrss);
 
-    gold_seq = nr_gold_pbch[n_hf][ssb_index];
+    gold_seq = nr_gold_pbch(fp->Lmax, Nid, n_hf, ssb_index);
     lastsymbol = 2;
     num_rbs = 20;
   }

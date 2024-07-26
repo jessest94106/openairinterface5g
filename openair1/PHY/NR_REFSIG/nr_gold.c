@@ -21,38 +21,6 @@
 
 #include "nr_refsig.h"
 
-void nr_init_pbch_dmrs(PHY_VARS_gNB* gNB)
-{
-  unsigned int x1 = 0, x2 = 0;
-  uint16_t Nid, i_ssb, i_ssb2;
-  unsigned char Lmax, l, n_hf, N_hf;
-  nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
-  NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
-  uint8_t reset;
-
-  Nid = cfg->cell_config.phy_cell_id.value;
-
-  Lmax = fp->Lmax;
-  N_hf = (Lmax == 4)? 2:1;
-
-  for (n_hf = 0; n_hf < N_hf; n_hf++) {
-    for (l = 0; l < Lmax ; l++) {
-      i_ssb = l & (Lmax-1);
-      i_ssb2 = i_ssb + (n_hf<<2);
-
-      reset = 1;
-      x2 = (1<<11) * (i_ssb2 + 1) * ((Nid>>2) + 1) + (1<<6) * (i_ssb2 + 1) + (Nid&3);
-
-      for (uint8_t n=0; n<NR_PBCH_DMRS_LENGTH_DWORD; n++) {
-        gNB->nr_gold_pbch_dmrs[n_hf][l][n] = lte_gold_generic(&x1, &x2, reset);
-        reset = 0;
-      }
-
-    }
-  }
-
-}
-
 void nr_init_pdcch_dmrs(PHY_VARS_gNB* gNB, uint32_t Nid)
 {
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;

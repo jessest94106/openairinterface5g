@@ -916,7 +916,6 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
             start_meas(&ue->dlsch_channel_estimation_stats);
             nr_pbch_channel_estimation(&ue->frame_parms,
                                        NULL,
-                                       ue->nr_gold_pbch,
                                        estimateSz,
                                        dl_ch_estimates,
                                        dl_ch_estimates_time,

@@ -143,8 +143,6 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   gNB->max_nb_pdsch = MAX_MOBILES_PER_GNB;
   init_delay_table(fp->ofdm_symbol_size, MAX_DELAY_COMP, NR_MAX_OFDM_SYMBOL_SIZE, fp->delay_table);
 
-  // PBCH DMRS gold sequences generation
-  nr_init_pbch_dmrs(gNB);
   //PDCCH DMRS init
   gNB->nr_gold_pdcch_dmrs = (uint32_t ***)malloc16(fp->slots_per_frame*sizeof(uint32_t **));
   uint32_t ***pdcch_dmrs             = gNB->nr_gold_pdcch_dmrs;
