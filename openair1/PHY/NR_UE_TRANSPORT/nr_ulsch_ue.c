@@ -57,34 +57,22 @@
 
 void nr_pusch_codeword_scrambling_uci(uint8_t *in, uint32_t size, uint32_t Nid, uint32_t n_RNTI, uint32_t* out)
 {
-  uint8_t reset, b_idx;
-  uint32_t x1 = 0, x2 = 0, s = 0, temp_out = 0;
-
-  reset = 1;
-  x2 = (n_RNTI<<15) + Nid;
-
+  uint32_t *seq = gold_cache((n_RNTI << 15) + Nid, (size + 31) / 32);
   for (int i=0; i<size; i++) {
-    b_idx = i&0x1f;
-    if (b_idx==0) {
-      s = lte_gold_generic(&x1, &x2, reset);
-      reset = 0;
-      if (i)
-        out++;
-    }
+    int idx = i / 32;
+    int b_idx = i % 32;
     if (in[i]==NR_PUSCH_x)
-      *out ^= 1<<b_idx;
+      out[idx] ^= 1 << b_idx;
     else if (in[i]==NR_PUSCH_y){
-      if (b_idx!=0)
-        *out ^= (*out & (1<<(b_idx-1)))<<1;
+      if (b_idx)
+        out[idx] ^= (out[idx] & (1 << (b_idx - 1))) << 1;
       else{
-
-        temp_out = *(out-1);
-        *out ^= temp_out>>31;
-
+        uint32_t temp_out = out[idx - 1];
+        out[idx] ^= temp_out >> 31;
       }
     }
     else
-      *out ^= (((in[i])&1) ^ ((s>>b_idx)&1))<<b_idx;
+      out[idx] ^= (((in[i]) & 1) ^ ((seq[idx] >> b_idx) & 1)) << b_idx;
     //printf("i %d b_idx %d in %d s 0x%08x out 0x%08x\n", i, b_idx, in[i], s, *out);
   }
 }
