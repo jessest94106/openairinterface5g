@@ -408,9 +408,6 @@ typedef struct PHY_VARS_NR_UE_s {
 
 #endif
   // Scrambling IDs used in PUSCH DMRS
-  // PRS sequence per gNB, per resource
-  uint32_t *****nr_gold_prs;
-
   c16_t X_u[64][839];
 
   // flag to activate PRB based averaging of channel estimates

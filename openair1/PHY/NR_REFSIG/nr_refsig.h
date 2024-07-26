@@ -26,14 +26,6 @@
 
 #include "PHY/defs_gNB.h"
 #include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
-#include "PHY/LTE_REFSIG/lte_refsig.h"
-#include "PHY/sse_intrin.h"
-
-/*
-This function generates NR Gold Sequence(ts 138.211) for the PRS.
-@param PHY_VARS_gNB* gNB structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables
-*/
-void nr_init_prs(PHY_VARS_gNB* gNB);
 
 int nr_pusch_dmrs_delta(uint8_t dmrs_config_type, unsigned short p);
 

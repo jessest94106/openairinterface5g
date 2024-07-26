@@ -89,9 +89,9 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
   memset(ch_tmp_buf,0,sizeof(ch_tmp_buf));
   memset(chF_interpol,0,sizeof(chF_interpol));
   memset(chT_interpol,0,sizeof(chF_interpol));
-  
-  int slot_prs           = (proc->nr_slot_rx - rep_num*prs_cfg->PRSResourceTimeGap + frame_params->slots_per_frame)%frame_params->slots_per_frame;
-  uint32_t **nr_gold_prs = ue->nr_gold_prs[gNB_id][rsc_id][slot_prs];
+
+  int slot_prs =
+      (proc->nr_slot_rx - rep_num * prs_cfg->PRSResourceTimeGap + frame_params->slots_per_frame) % frame_params->slots_per_frame;
 
   int16_t *rxF, *pil, mod_prs[NR_MAX_PRS_LENGTH << 1];
   const int16_t *fl, *fm, *fmm, *fml, *fmr, *fr;
@@ -113,6 +113,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
   int16_t k_prime_table[K_PRIME_TABLE_ROW_SIZE][K_PRIME_TABLE_COL_SIZE] = PRS_K_PRIME_TABLE;
   for(int l = prs_cfg->SymbolStart; l < prs_cfg->SymbolStart+prs_cfg->NumPRSSymbols; l++)
   {
+    uint32_t *gold_prs = nr_gold_prs(ue->prs_vars[gNB_id]->prs_resource[rsc_id].prs_cfg.NPRSID, slot_prs, l);
     int symInd = l-prs_cfg->SymbolStart;
     if (prs_cfg->CombSize == 2) {
       k_prime = k_prime_table[0][symInd];
@@ -135,7 +136,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
     AssertFatal(num_pilots > 0, "num_pilots needs to be gt 0 or mod_prs[0] UB");
     for (int m = 0; m < num_pilots; m++) 
     {
-      idx = (((nr_gold_prs[l][(m<<1)>>5])>>((m<<1)&0x1f))&3);
+      idx = (((gold_prs[(m << 1) >> 5]) >> ((m << 1) & 0x1f)) & 3);
       mod_prs[m<<1]     = nr_qpsk_mod_table[idx<<1];
       mod_prs[(m<<1)+1] = nr_qpsk_mod_table[(idx<<1) + 1];
     } 

@@ -31,6 +31,8 @@
  */
 
 #include "nr_dci.h"
+#include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
+
 
 void nr_group_sequence_hopping(pucch_GroupHopping_t PUCCH_GroupHopping,
                                uint32_t n_id,

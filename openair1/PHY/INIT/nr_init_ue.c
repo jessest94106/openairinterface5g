@@ -162,32 +162,6 @@ void init_nr_prs_ue_vars(PHY_VARS_NR_UE *ue)
 
   // load the config file params
   RCconfig_nrUE_prs(ue);
-
-  //PRS sequence init
-  ue->nr_gold_prs = malloc16(ue->prs_active_gNBs * sizeof(uint32_t ****));
-  uint32_t *****prs = ue->nr_gold_prs;
-  AssertFatal(prs!=NULL, "%s: positioning reference signal malloc failed\n", __FUNCTION__);
-  for (int gnb = 0; gnb < ue->prs_active_gNBs; gnb++) {
-    prs[gnb] = malloc16(ue->prs_vars[gnb]->NumPRSResources * sizeof(uint32_t ***));
-    AssertFatal(prs[gnb]!=NULL, "%s: positioning reference signal for gnb %d - malloc failed\n", __FUNCTION__, gnb);
-
-    for (int rsc = 0; rsc < ue->prs_vars[gnb]->NumPRSResources; rsc++) {
-      prs[gnb][rsc] = malloc16(fp->slots_per_frame * sizeof(uint32_t **));
-      AssertFatal(prs[gnb][rsc]!=NULL, "%s: positioning reference signal for gnb %d rsc %d- malloc failed\n", __FUNCTION__, gnb, rsc);
-
-      for (int slot=0; slot<fp->slots_per_frame; slot++) {
-        prs[gnb][rsc][slot] = malloc16(fp->symbols_per_slot * sizeof(uint32_t *));
-        AssertFatal(prs[gnb][rsc][slot]!=NULL, "%s: positioning reference signal for gnb %d rsc %d slot %d - malloc failed\n", __FUNCTION__, gnb, rsc, slot);
-
-        for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-          prs[gnb][rsc][slot][symb] = malloc16(NR_MAX_PRS_INIT_LENGTH_DWORD * sizeof(uint32_t));
-          AssertFatal(prs[gnb][rsc][slot][symb]!=NULL, "%s: positioning reference signal for gnb %d rsc %d slot %d symbol %d - malloc failed\n", __FUNCTION__, gnb, rsc, slot, symb);
-        } // for symb
-      } // for slot
-    } // for rsc
-  } // for gnb
-
-  init_nr_gold_prs(ue);
 }
 
 int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
@@ -361,24 +335,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
 
     free_and_zero(ue->prach_vars[gNB_id]);
   }
-
-  for (int gnb = 0; gnb < ue->prs_active_gNBs; gnb++)
-  {
-    for (int rsc = 0; rsc < ue->prs_vars[gnb]->NumPRSResources; rsc++)
-    {
-      for (int slot=0; slot<fp->slots_per_frame; slot++)
-      {
-        for (int symb=0; symb<fp->symbols_per_slot; symb++)
-        {
-          free_and_zero(ue->nr_gold_prs[gnb][rsc][slot][symb]);
-        }
-        free_and_zero(ue->nr_gold_prs[gnb][rsc][slot]);
-      }
-      free_and_zero(ue->nr_gold_prs[gnb][rsc]);
-    }
-    free_and_zero(ue->nr_gold_prs[gnb]);
-  }
-  free_and_zero(ue->nr_gold_prs);
 
   for(int idx = 0; idx < NR_MAX_PRS_COMB_SIZE; idx++)
   {

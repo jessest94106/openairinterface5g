@@ -43,6 +43,7 @@
 #include "PHY/sse_intrin.h"
 #include "PHY/NR_UE_TRANSPORT/pucch_nr.h"
 #include <openair1/PHY/CODING/nrSmallBlock/nr_small_block_defs.h>
+#include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"

@@ -154,9 +154,6 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   // ceil((NB_RB*8(max allocation per RB)*2(QPSK))/32)
   gNB->nr_csi_info = (nr_csi_info_t *)malloc16_clear(sizeof(nr_csi_info_t));
 
-  //PRS init
-  nr_init_prs(gNB);
-
   generate_ul_reference_signal_sequences(SHRT_MAX);
 
   /* Generate low PAPR type 1 sequences for PUSCH DMRS, these are used if transform precoding is enabled.  */
@@ -240,7 +237,6 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
 
 void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
 {
-  NR_DL_FRAME_PARMS* const fp = &gNB->frame_parms;
   const int Ptx = gNB->gNB_config.carrier_config.num_tx_ant.value;
   const int Prx = gNB->gNB_config.carrier_config.num_rx_ant.value;
   const int max_ul_mimo_layers = 4; // taken from phy_init_nr_gNB()
@@ -273,17 +269,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
     free_and_zero(common_vars->txdataF[i]);
     free_and_zero(common_vars->beam_id[i]);
   }
-
-  for (int rsc=0; rsc < gNB->prs_vars.NumPRSResources; rsc++) {
-    for (int slot=0; slot<fp->slots_per_frame; slot++) {
-      for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-        free_and_zero(gNB->nr_gold_prs[rsc][slot][symb]);
-      }
-      free_and_zero(gNB->nr_gold_prs[rsc][slot]);
-    }
-    free_and_zero(gNB->nr_gold_prs[rsc]);
-  }
-  free_and_zero(gNB->nr_gold_prs);
 
   /* Do NOT free per-antenna txdataF/rxdataF: the gNB gets a pointer to the
    * RU's txdataF/rxdataF, and the RU will free that */

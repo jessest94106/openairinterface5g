@@ -21,6 +21,7 @@
 
 #include "nr_transport_common_proto.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
+#include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #define DEBUG_SCRAMBLING(a)
 //#define DEBUG_SCRAMBLING(a) a
