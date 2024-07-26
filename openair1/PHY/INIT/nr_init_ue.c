@@ -304,23 +304,6 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     common_vars->rxdata[i] = malloc16_clear(num_samples * sizeof(c16_t));
   }
 
-  // ceil(((NB_RB<<1)*3)/32) // 3 RE *2(QPSK)
-  int pdcch_dmrs_init_length =  (((fp->N_RB_DL<<1)*3)>>5)+1;
-  //PDCCH DMRS init (gNB offset = 0)
-  ue->nr_gold_pdcch[0] = malloc16(fp->slots_per_frame * sizeof(uint32_t **));
-  uint32_t ***pdcch_dmrs = ue->nr_gold_pdcch[0];
-  AssertFatal(pdcch_dmrs!=NULL, "NR init: pdcch_dmrs malloc failed\n");
-
-  for (int slot=0; slot<fp->slots_per_frame; slot++) {
-    pdcch_dmrs[slot] = malloc16(fp->symbols_per_slot * sizeof(uint32_t *));
-    AssertFatal(pdcch_dmrs[slot]!=NULL, "NR init: pdcch_dmrs for slot %d - malloc failed\n", slot);
-
-    for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-      pdcch_dmrs[slot][symb] = malloc16(pdcch_dmrs_init_length * sizeof(uint32_t));
-      AssertFatal(pdcch_dmrs[slot][symb]!=NULL, "NR init: pdcch_dmrs for slot %d symbol %d - malloc failed\n", slot, symb);
-    }
-  }
-
   // ceil(((NB_RB*6(k)*2(QPSK)/32) // 3 RE *2(QPSK)
   int pdsch_dmrs_init_length =  ((fp->N_RB_DL*12)>>5)+1;
 
@@ -424,13 +407,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     free_and_zero(common_vars->rxdata[i]);
   }
   free_and_zero(common_vars->rxdata);
-
-  for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-    for (int symb = 0; symb < fp->symbols_per_slot; symb++)
-      free_and_zero(ue->nr_gold_pdcch[0][slot][symb]);
-    free_and_zero(ue->nr_gold_pdcch[0][slot]);
-  }
-  free_and_zero(ue->nr_gold_pdcch[0]);
 
   for (int slot=0; slot<fp->slots_per_frame; slot++) {
     for (int symb=0; symb<fp->symbols_per_slot; symb++) {

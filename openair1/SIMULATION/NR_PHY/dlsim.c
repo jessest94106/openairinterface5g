@@ -840,10 +840,6 @@ int main(int argc, char **argv)
 
   init_nr_ue_transport(UE);
 
-  // compute the scramblingID_pdcch and the gold pdcch
-  UE->scramblingID_pdcch = frame_parms->Nid_cell;
-  nr_gold_pdcch(UE, frame_parms->Nid_cell);
-
   // compute the scrambling IDs for PDSCH DMRS
   for (int i = 0; i < 2; i++) {
     UE->scramblingID_dlsch[i] = frame_parms->Nid_cell;

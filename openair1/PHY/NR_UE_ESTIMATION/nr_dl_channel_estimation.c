@@ -842,9 +842,7 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
                                  c16_t pdcch_dl_ch_estimates[][pdcch_est_size],
                                  c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP])
 {
-
-  int Ns = proc->nr_slot_rx;
-  int gNB_id = proc->gNB_id;
+  int slot = proc->nr_slot_rx;
   unsigned char aarx;
   unsigned short k;
   unsigned int pilot_cnt;
@@ -868,8 +866,13 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
   unsigned short coreset_start_subcarrier = first_carrier_offset+(BWPStart + coreset_start_rb)*12;
 
 #ifdef DEBUG_PDCCH
-  printf("PDCCH Channel Estimation : gNB_id %d ch_offset %d, OFDM size %d, Ncp=%d, Ns=%d, symbol %d\n",
-         gNB_id,ch_offset,ue->frame_parms.ofdm_symbol_size,ue->frame_parms.Ncp,Ns,symbol);
+  printf("PDCCH Channel Estimation : gNB_id %d ch_offset %d, OFDM size %d, Ncp=%d, slot=%d, symbol %d\n",
+         gNB_id,
+         ch_offset,
+         ue->frame_parms.ofdm_symbol_size,
+         ue->frame_parms.Ncp,
+         slot,
+         symbol);
 #endif
 
 #if CH_INTERP
@@ -879,19 +882,18 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
 #endif
 
   unsigned short scrambling_id = coreset->pdcch_dmrs_scrambling_id;
-  // checking if re-initialization of scrambling IDs is needed (should be done here but scrambling ID for PDCCH is not taken from RRC)
-  if (scrambling_id != ue->scramblingID_pdcch){
-    ue->scramblingID_pdcch = scrambling_id;
-    nr_gold_pdcch(ue,ue->scramblingID_pdcch);
-  }
-
   int dmrs_ref = 0;
   if (coreset->CoreSetType == NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG)
     dmrs_ref = BWPStart;
   // generate pilot
   int pilot[(nb_rb_coreset + dmrs_ref) * 3] __attribute__((aligned(16)));
   // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
-  nr_pdcch_dmrs_rx(ue, Ns, ue->nr_gold_pdcch[gNB_id][Ns][symbol], (c16_t *)pilot, 2000, (nb_rb_coreset + dmrs_ref));
+  nr_pdcch_dmrs_rx(ue,
+                   slot,
+                   nr_gold_pdcch(ue->frame_parms.N_RB_DL, ue->frame_parms.symbols_per_slot, scrambling_id, slot, symbol),
+                   (c16_t *)pilot,
+                   2000,
+                   (nb_rb_coreset + dmrs_ref));
 
   for (aarx=0; aarx<ue->frame_parms.nb_antennas_rx; aarx++) {
 

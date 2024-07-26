@@ -26,5 +26,6 @@
 
 uint32_t *gold_cache(uint32_t key, int length);
 uint32_t *nr_gold_pbch(int Lmax, int Nid, int n_hf, int ssb);
+uint32_t *nr_gold_pdcch(int N_RB_DL, int symbols_per_slot, unsigned short n_idDMRS, int ns, int l);
 
 #endif

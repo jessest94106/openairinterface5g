@@ -609,9 +609,6 @@ typedef struct PHY_VARS_gNB_s {
   /// PBCH interleaver
   uint8_t nr_pbch_interleaver[NR_POLAR_PBCH_PAYLOAD_BITS];
 
-  /// PDCCH DMRS sequence
-  uint32_t ***nr_gold_pdcch_dmrs;
-
   /// PDSCH DMRS sequence
   uint32_t ****nr_gold_pdsch_dmrs;
 
@@ -638,7 +635,6 @@ typedef struct PHY_VARS_gNB_s {
   /// counter to average prach energh over first 100 prach opportunities
   int prach_energy_counter;
 
-  int pdcch_gold_init;
   int pdsch_gold_init[2];
   int pusch_gold_init[2];
 

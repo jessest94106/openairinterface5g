@@ -143,31 +143,11 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   gNB->max_nb_pdsch = MAX_MOBILES_PER_GNB;
   init_delay_table(fp->ofdm_symbol_size, MAX_DELAY_COMP, NR_MAX_OFDM_SYMBOL_SIZE, fp->delay_table);
 
-  //PDCCH DMRS init
-  gNB->nr_gold_pdcch_dmrs = (uint32_t ***)malloc16(fp->slots_per_frame*sizeof(uint32_t **));
-  uint32_t ***pdcch_dmrs             = gNB->nr_gold_pdcch_dmrs;
-  AssertFatal(pdcch_dmrs!=NULL, "NR init: pdcch_dmrs malloc failed\n");
-
   gNB->bad_pucch = 0;
   if (gNB->TX_AMP == 0)
     gNB->TX_AMP = AMP;
   // ceil(((NB_RB<<1)*3)/32) // 3 RE *2(QPSK)
-  int pdcch_dmrs_init_length =  (((fp->N_RB_DL<<1)*3)>>5)+1;
-
-  for (int slot=0; slot<fp->slots_per_frame; slot++) {
-    pdcch_dmrs[slot] = (uint32_t **)malloc16(fp->symbols_per_slot*sizeof(uint32_t *));
-    AssertFatal(pdcch_dmrs[slot]!=NULL, "NR init: pdcch_dmrs for slot %d - malloc failed\n", slot);
-
-    for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-      pdcch_dmrs[slot][symb] = (uint32_t *)malloc16(pdcch_dmrs_init_length*sizeof(uint32_t));
-      LOG_D(PHY,"pdcch_dmrs[%d][%d] %p\n",slot,symb,pdcch_dmrs[slot][symb]);
-      AssertFatal(pdcch_dmrs[slot][symb]!=NULL, "NR init: pdcch_dmrs for slot %d symbol %d - malloc failed\n", slot, symb);
-    }
-  }
-
   nr_generate_modulation_table();
-  gNB->pdcch_gold_init = cfg->cell_config.phy_cell_id.value;
-  nr_init_pdcch_dmrs(gNB, cfg->cell_config.phy_cell_id.value);
   nr_init_pbch_interleaver(gNB->nr_pbch_interleaver);
 
   //PDSCH DMRS init
@@ -339,14 +319,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
   PHY_MEASUREMENTS_gNB *meas = &gNB->measurements;
   free_and_zero(meas->n0_subband_power);
   free_and_zero(meas->n0_subband_power_dB);
-
-  uint32_t ***pdcch_dmrs = gNB->nr_gold_pdcch_dmrs;
-  for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-    for (int symb = 0; symb < fp->symbols_per_slot; symb++)
-      free_and_zero(pdcch_dmrs[slot][symb]);
-    free_and_zero(pdcch_dmrs[slot]);
-  }
-  free_and_zero(pdcch_dmrs);
 
   uint32_t ****pdsch_dmrs = gNB->nr_gold_pdsch_dmrs;
   for (int slot = 0; slot < fp->slots_per_frame; slot++) {

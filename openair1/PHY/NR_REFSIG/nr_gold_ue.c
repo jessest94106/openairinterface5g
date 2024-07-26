@@ -22,27 +22,6 @@
 #include "refsig_defs_ue.h"
 #include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 
-void nr_gold_pdcch(PHY_VARS_NR_UE* ue,
-                   unsigned short nid)
-{
-  int pdcch_dmrs_init_length = (((ue->frame_parms.N_RB_DL << 1) * 3) >> 5) + 1;
-  for (int ns = 0; ns < ue->frame_parms.slots_per_frame; ns++) {
-    for (int l = 0; l < ue->frame_parms.symbols_per_slot; l++) {
-      uint8_t reset = 1;
-      uint64_t x2tmp0 = ((ue->frame_parms.symbols_per_slot * ns + l + 1) * ((nid << 1) + 1));
-      x2tmp0 <<= 17;
-      x2tmp0 += (nid << 1);
-      uint32_t x1 = 0;
-      uint32_t x2 = x2tmp0 % (1U << 31);  //cinit
-      LOG_D(PHY,"PDCCH DMRS slot %d, symb %d, Nid %d, x2 %x\n", ns, l, nid, x2);
-      for (int n = 0; n < pdcch_dmrs_init_length; n++) {
-        ue->nr_gold_pdcch[0][ns][l][n] = lte_gold_generic(&x1, &x2, reset);
-        reset = 0;
-      }    
-    }
-  }
-}
-
 void nr_gold_pdsch(PHY_VARS_NR_UE* ue,
                    int nscid,
                    uint32_t nid)

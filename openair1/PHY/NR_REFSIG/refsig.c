@@ -172,3 +172,14 @@ uint32_t *nr_gold_pbch(int Lmax, int Nid, int n_hf, int l)
   uint32_t x2 = (1 << 11) * (i_ssb2 + 1) * ((Nid >> 2) + 1) + (1 << 6) * (i_ssb2 + 1) + (Nid & 3);
   return gold_cache(x2, NR_PBCH_DMRS_LENGTH_DWORD);
 }
+
+uint32_t *nr_gold_pdcch(int N_RB_DL, int symbols_per_slot, unsigned short nid, int ns, int l)
+{
+  int pdcch_dmrs_init_length = (((N_RB_DL << 1) * 3) >> 5) + 1;
+  uint64_t x2tmp0 = (((uint64_t)symbols_per_slot * ns + l + 1) * ((nid << 1) + 1));
+  x2tmp0 <<= 17;
+  x2tmp0 += (nid << 1);
+  uint32_t x2 = x2tmp0 % (1U << 31); // cinit
+  LOG_D(PHY, "PDCCH DMRS slot %d, symb %d, Nid %d, x2 %x\n", ns, l, nid, x2);
+  return gold_cache(x2, pdcch_dmrs_init_length);
+}
