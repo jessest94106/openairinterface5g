@@ -22,26 +22,6 @@
 #include "refsig_defs_ue.h"
 #include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 
-void nr_init_pusch_dmrs(PHY_VARS_NR_UE* ue, uint16_t N_n_scid, uint8_t n_scid)
-{
-  NR_DL_FRAME_PARMS *fp = &ue->frame_parms;
-  uint32_t ****pusch_dmrs = ue->nr_gold_pusch_dmrs;
-  int pusch_dmrs_init_length = ((fp->N_RB_UL * 12) >> 5) + 1;
-  for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-    for (int symb = 0; symb < fp->symbols_per_slot; symb++) {
-      int reset = 1;
-      uint32_t x1 = 0;
-      uint64_t t_x2 = ((1UL << 17) * (fp->symbols_per_slot*slot + symb + 1) * ((N_n_scid << 1) + 1) + ((N_n_scid << 1) + n_scid));
-      uint32_t x2 = t_x2 % (1U << 31);
-      LOG_D(PHY,"DMRS slot %d, symb %d, N_n_scid %d, n_scid %d, x2 %x\n", slot, symb, N_n_scid, n_scid, x2);
-      for (int n = 0; n < pusch_dmrs_init_length; n++) {
-        pusch_dmrs[slot][symb][n_scid][n] = lte_gold_generic(&x1, &x2, reset);
-        reset = 0;
-      }
-    }
-  }
-}
-
 void init_nr_gold_prs(PHY_VARS_NR_UE* ue)
 {
   unsigned int x1 = 0, x2 = 0;

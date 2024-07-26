@@ -192,3 +192,8 @@ uint32_t *nr_gold_pdsch(int N_RB_DL, int symbols_per_slot, int nid, int nscid, i
   LOG_D(PHY, "UE DMRS slot %d, symb %d, nscid %d, x2 %x\n", slot, symbol, nscid, x2);
   return gold_cache(x2, pdsch_dmrs_init_length);
 }
+
+uint32_t *nr_gold_pusch(int N_RB_UL, int symbols_per_slot, int Nid, int nscid, int slot, int symbol)
+{
+  return nr_gold_pdsch(N_RB_UL, symbols_per_slot, Nid, nscid, slot, symbol);
+}

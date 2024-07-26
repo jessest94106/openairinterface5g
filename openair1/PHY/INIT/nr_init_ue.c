@@ -200,7 +200,7 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
   NR_UE_CSI_RS **const csirs_vars        = ue->csirs_vars;
   NR_UE_SRS **const srs_vars             = ue->srs_vars;
 
-  int i, slot, symb, gNB_id;
+  int i, gNB_id;
 
   LOG_I(PHY, "Initializing UE vars for gNB TXant %u, UE RXant %u\n", fp->nb_antennas_tx, fp->nb_antennas_rx);
 
@@ -244,26 +244,6 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
 
   /////////////////////////PUSCH DMRS init/////////////////////////
   ///////////
-
-  // ceil(((NB_RB*6(k)*2(QPSK)/32) // 3 RE *2(QPSK)
-  int pusch_dmrs_init_length =  ((fp->N_RB_UL*12)>>5)+1;
-  ue->nr_gold_pusch_dmrs = malloc16(fp->slots_per_frame * sizeof(uint32_t ***));
-  uint32_t ****pusch_dmrs = ue->nr_gold_pusch_dmrs;
-
-  for (slot=0; slot<fp->slots_per_frame; slot++) {
-    pusch_dmrs[slot] = malloc16(fp->symbols_per_slot * sizeof(uint32_t **));
-    AssertFatal(pusch_dmrs[slot]!=NULL, "init_nr_ue_signal: pusch_dmrs for slot %d - malloc failed\n", slot);
-
-    for (symb=0; symb<fp->symbols_per_slot; symb++) {
-      pusch_dmrs[slot][symb] = malloc16(NR_NB_NSCID * sizeof(uint32_t *));
-      AssertFatal(pusch_dmrs[slot][symb]!=NULL, "init_nr_ue_signal: pusch_dmrs for slot %d symbol %d - malloc failed\n", slot, symb);
-
-      for (int q=0; q<NR_NB_NSCID; q++) {
-        pusch_dmrs[slot][symb][q] = malloc16(pusch_dmrs_init_length * sizeof(uint32_t));
-        AssertFatal(pusch_dmrs[slot][symb][q]!=NULL, "init_nr_ue_signal: pusch_dmrs for slot %d symbol %d nscid %d - malloc failed\n", slot, symb, q);
-      }
-    }
-  }
 
   ///////////
   ////////////////////////////////////////////////////////////////////////////////////////////
@@ -362,16 +342,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
 {
   const NR_DL_FRAME_PARMS* fp = &ue->frame_parms;
   phy_term_nr_top();
-
-  for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-    for (int symb = 0; symb < fp->symbols_per_slot; symb++) {
-      for (int q=0; q<NR_NB_NSCID; q++)
-        free_and_zero(ue->nr_gold_pusch_dmrs[slot][symb][q]);
-      free_and_zero(ue->nr_gold_pusch_dmrs[slot][symb]);
-    }
-    free_and_zero(ue->nr_gold_pusch_dmrs[slot]);
-  }
-  free_and_zero(ue->nr_gold_pusch_dmrs);
 
   NR_UE_COMMON* common_vars = &ue->common_vars;
 

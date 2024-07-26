@@ -150,32 +150,6 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   nr_generate_modulation_table();
   nr_init_pbch_interleaver(gNB->nr_pbch_interleaver);
 
-  //PUSCH DMRS init
-  gNB->nr_gold_pusch_dmrs = (uint32_t ****)malloc16(NR_NB_NSCID*sizeof(uint32_t ***));
-
-  uint32_t ****pusch_dmrs = gNB->nr_gold_pusch_dmrs;
-
-  int pusch_dmrs_init_length =  ((fp->N_RB_UL*12)>>5)+1;
-  for(int nscid=0; nscid<NR_NB_NSCID; nscid++) {
-    pusch_dmrs[nscid] = (uint32_t ***)malloc16(fp->slots_per_frame*sizeof(uint32_t **));
-    AssertFatal(pusch_dmrs[nscid]!=NULL, "NR init: pusch_dmrs for nscid %d - malloc failed\n", nscid);
-
-    for (int slot=0; slot<fp->slots_per_frame; slot++) {
-      pusch_dmrs[nscid][slot] = (uint32_t **)malloc16(fp->symbols_per_slot*sizeof(uint32_t *));
-      AssertFatal(pusch_dmrs[nscid][slot]!=NULL, "NR init: pusch_dmrs for slot %d - malloc failed\n", slot);
-
-      for (int symb=0; symb<fp->symbols_per_slot; symb++) {
-        pusch_dmrs[nscid][slot][symb] = (uint32_t *)malloc16(pusch_dmrs_init_length*sizeof(uint32_t));
-        AssertFatal(pusch_dmrs[nscid][slot][symb]!=NULL, "NR init: pusch_dmrs for slot %d symbol %d - malloc failed\n", slot, symb);
-      }
-    }
-  }
-
-  for (int nscid=0; nscid<NR_NB_NSCID; nscid++) {
-    gNB->pusch_gold_init[nscid] = cfg->cell_config.phy_cell_id.value;
-    nr_gold_pusch(gNB, nscid, gNB->pusch_gold_init[nscid]);
-  }
-
   // CSI RS init
   // ceil((NB_RB*8(max allocation per RB)*2(QPSK))/32)
   int csi_dmrs_init_length =  ((fp->N_RB_DL<<4)>>5)+1;
@@ -291,17 +265,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
   PHY_MEASUREMENTS_gNB *meas = &gNB->measurements;
   free_and_zero(meas->n0_subband_power);
   free_and_zero(meas->n0_subband_power_dB);
-
-  uint32_t ****pusch_dmrs = gNB->nr_gold_pusch_dmrs;
-  for(int nscid = 0; nscid < 2; nscid++) {
-    for (int slot = 0; slot < fp->slots_per_frame; slot++) {
-      for (int symb = 0; symb < fp->symbols_per_slot; symb++)
-        free_and_zero(pusch_dmrs[nscid][slot][symb]);
-      free_and_zero(pusch_dmrs[nscid][slot]);
-    }
-    free_and_zero(pusch_dmrs[nscid]);
-  }
-  free_and_zero(pusch_dmrs);
 
   uint32_t ***nr_gold_csi_rs = gNB->nr_csi_info->nr_gold_csi_rs;
   for (int slot = 0; slot < fp->slots_per_frame; slot++) {

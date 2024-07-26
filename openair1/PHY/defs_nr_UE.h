@@ -408,11 +408,6 @@ typedef struct PHY_VARS_NR_UE_s {
 
 #endif
   // Scrambling IDs used in PUSCH DMRS
-  uint16_t scramblingID_ulsch[2];
-
-  /// PUSCH DMRS sequence
-  uint32_t ****nr_gold_pusch_dmrs;
-
   // PRS sequence per gNB, per resource
   uint32_t *****nr_gold_prs;
 

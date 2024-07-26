@@ -408,13 +408,6 @@ nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
     ue->init_sync_frame = n_frames - 1 - res.syncRes.frame_id;
 
     nr_init_csi_rs(fp, ue->nr_csi_info->nr_gold_csi_rs, fp->Nid_cell);
-
-    // initialize the pusch dmrs
-    for (int i = 0; i < NR_NB_NSCID; i++) {
-      ue->scramblingID_ulsch[i] = fp->Nid_cell;
-      nr_init_pusch_dmrs(ue, ue->scramblingID_ulsch[i], i);
-    }
-
     // we also need to take into account the shift by samples_per_frame in case the if is true
     if (res.ssbOffset < sync_pos_frame) {
       res.syncRes.rx_offset = fp->samples_per_frame - sync_pos_frame + res.ssbOffset;
