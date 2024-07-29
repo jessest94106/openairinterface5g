@@ -119,7 +119,6 @@ double          rx_gain_off = 0.0;
 char             *usrp_args = NULL;
 char             *tx_subdev = NULL;
 char             *rx_subdev = NULL;
-char       *rrc_config_path = NULL;
 char *reconfig_file = NULL;
 char *rbconfig_file = NULL;
 char            *uecap_file = NULL;
@@ -221,9 +220,6 @@ static void get_options(configmodule_interface_t *cfg)
   paramdef_t cmdline_params[] =CMDLINE_NRUEPARAMS_DESC ;
   int numparams = sizeofArray(cmdline_params);
   config_get(cfg, cmdline_params, numparams, NULL);
-
-  AssertFatal(rrc_config_path == NULL, "the option \"rrc_config_path\" is deprecated. Please use --reconfig-file and --rbconfig-file separately to point to files reconfig.raw and rbconfig.raw\n");
-
   if (vcdflag > 0)
     ouput_vcd = 1;
 }
