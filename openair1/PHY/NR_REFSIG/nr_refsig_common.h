@@ -24,9 +24,6 @@
 #ifndef __NR_REFSIG_COMMON_H__
 #define __NR_REFSIG_COMMON_H__
 
-struct NR_DL_FRAME_PARMS;
-typedef struct NR_DL_FRAME_PARMS NR_DL_FRAME_PARMS;
-
 uint32_t *gold_cache(uint32_t key, int length);
 
 #endif
