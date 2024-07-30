@@ -31,8 +31,6 @@
 
 #define PDCP_FIFO_C
 
-
-
 extern int otg_enabled;
 
 #include "pdcp.h"
@@ -63,21 +61,11 @@ extern int otg_enabled;
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
-extern char nl_rx_buf[NL_MAX_PAYLOAD];
-extern struct sockaddr_nl nas_src_addr, nas_dest_addr;
-extern struct nlmsghdr *nas_nlh_tx;
-extern struct nlmsghdr *nas_nlh_rx;
-extern struct iovec nas_iov_tx;
-extern struct iovec nas_iov_rx;
-
 extern int nas_sock_fd[MAX_MOBILES_PER_ENB];
 
 extern int nas_sock_mbms_fd;
 
-extern struct msghdr nas_msg_tx;
-extern struct msghdr nas_msg_rx;
-
-
+static char nl_rx_buf[NL_MAX_PAYLOAD];
 
 #  include "openair3/ocp-gtpu/gtp_itf.h"
 
@@ -411,6 +399,7 @@ int pdcp_fifo_read_input_sdus_fromnetlinksock (const protocol_ctxt_t *const  ctx
     rb_id_t          rab_id  = 0;
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_FIFO_READ, 1 );
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_FIFO_READ_BUFFER, 1 );
+    struct msghdr nas_msg_rx;
     len = recvmsg(nas_sock_fd[0], &nas_msg_rx, 0);
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_FIFO_READ_BUFFER, 0 );
 
