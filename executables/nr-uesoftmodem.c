@@ -515,10 +515,7 @@ int main(int argc, char **argv)
                                     get_softmodem_params()->numerology,
                                     nr_band);
         } else {
-          DevAssert(mac->if_module != NULL && mac->if_module->phy_config_request != NULL);
-          mac->if_module->phy_config_request(&mac->phy_config);
           fapi_nr_config_request_t *nrUE_config = &UE[CC_id]->nrUE_config;
-
           nr_init_frame_parms_ue(&UE[CC_id]->frame_parms, nrUE_config, mac->nr_band);
         }
 
