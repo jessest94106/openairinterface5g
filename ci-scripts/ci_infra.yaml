@@ -58,6 +58,8 @@ adb_ue_2:
 
 oc-cn5g:
   Host: avra
+  Namespace: "oaicicd-core-for-ci-ran"
+  CNPath: "/opt/oai-cn5g-fed-develop-2024-april-00102"
   NetworkScript: echo "inet 172.21.6.102"
   RunIperf3Server: False
 
