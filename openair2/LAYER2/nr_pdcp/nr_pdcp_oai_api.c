@@ -615,7 +615,7 @@ uint64_t nr_pdcp_module_init(uint64_t _pdcp_optmask, int id)
     int num_if = (NFAPI_MODE == NFAPI_UE_STUB_PNF || IS_SOFTMODEM_SIML1 || NFAPI_MODE == NFAPI_MODE_STANDALONE_PNF)
                      ? MAX_MOBILES_PER_ENB
                      : 1;
-    netlink_init_tun(ifprefix, num_if, id);
+    tun_init(ifprefix, num_if, id);
     if (IS_SOFTMODEM_NOS1) {
       const char *ip = !get_softmodem_params()->nsa ? "10.0.1.2" : "10.0.1.3";
       tun_config(1, ip, NULL, ifprefix);
@@ -625,7 +625,7 @@ uint64_t nr_pdcp_module_init(uint64_t _pdcp_optmask, int id)
     start_pdcp_tun_ue();
   } else if (ENB_NAS_USE_TUN) {
     char *ifprefix = get_softmodem_params()->nsa ? "oaitun_gnb" : "oaitun_enb";
-    netlink_init_tun(ifprefix, 1, id);
+    tun_init(ifprefix, 1, id);
     tun_config(1, "10.0.1.1", NULL, ifprefix);
     LOG_I(PDCP, "ENB pdcp will use tun interface\n");
     start_pdcp_tun_enb();

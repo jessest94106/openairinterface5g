@@ -24,6 +24,12 @@
 
 #include <stdbool.h>
 
+/* TODO: doc */
+int tun_init(const char *ifprefix, int num_if, int id);
+
+/* TODO: doc */
+int tun_init_mbms(char *ifsuffix, int id);
+
 /*! \fn int  tun_config(char*, int, int)
  * \brief This function initializes the nasmesh interface using the basic values,
  * basic address, network mask and broadcast address, as the default configured

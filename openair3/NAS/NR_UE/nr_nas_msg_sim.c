@@ -48,7 +48,6 @@
 #include "intertask_interface.h"
 #include "common/utils/tun_if.h"
 #include <openair3/NAS/COMMON/NR_NAS_defs.h>
-#include <openair1/SIMULATION/ETH_TRANSPORT/proto.h>
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 #include "openair3/SECU/nas_stream_eia2.h"
 #include "openair3/UTILS/conversions.h"

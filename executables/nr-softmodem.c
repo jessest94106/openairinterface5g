@@ -140,8 +140,6 @@ uint8_t nb_antenna_rx = 1;
 
 int otg_enabled;
 
-#include <SIMULATION/ETH_TRANSPORT/proto.h>
-
 extern void reset_opp_meas(void);
 extern void print_opp_meas(void);
 

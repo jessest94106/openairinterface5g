@@ -2306,8 +2306,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_ESTIMATION/nr_freq_equalization.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_ESTIMATION/nr_measurements_gNB.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_ESTIMATION/nr_ul_channel_estimation.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair1/SIMULATION/ETH_TRANSPORT/proto.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair1/SIMULATION/ETH_TRANSPORT/netlink_init.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/SIMULATION/RF/adc.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/SIMULATION/RF/dac.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/SIMULATION/RF/rf.h \
