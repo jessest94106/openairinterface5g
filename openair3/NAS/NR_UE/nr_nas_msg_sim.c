@@ -1176,7 +1176,7 @@ static void request_default_pdusession(int instance, int nssai_idx)
 {
   MessageDef *message_p = itti_alloc_new_message(TASK_NAS_NRUE, 0, NAS_PDU_SESSION_REQ);
   NAS_PDU_SESSION_REQ(message_p).pdusession_id = 10; /* first or default pdu session */
-  NAS_PDU_SESSION_REQ(message_p).pdusession_type = 0x91;
+  NAS_PDU_SESSION_REQ(message_p).pdusession_type = 0x91; // 0x91 = IPv4, 0x92 = IPv6, 0x93 = IPv4v6
   NAS_PDU_SESSION_REQ(message_p).sst = nas_allowed_nssai[nssai_idx].sst;
   NAS_PDU_SESSION_REQ(message_p).sd = nas_allowed_nssai[nssai_idx].sd;
   itti_send_msg_to_task(TASK_NAS_NRUE, instance, message_p);
