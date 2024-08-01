@@ -96,29 +96,26 @@ def Iperf_ComputeTime(args):
 	return int(result.group('iperf_time'))
 
 def Iperf_analyzeV3TCPJson(filename, iperf_tcp_rate_target):
-	if (not os.path.isfile(filename)):
-		return (False, 'Iperf3 TCP: Log file not present')
-	if (os.path.getsize(filename)==0):
-		return (False, 'Iperf3 TCP: Log file is empty')
-
-	with open(filename) as file:
-		filename = json.load(file)
-		try:
-			sender_bitrate   = round(filename['end']['streams'][0]['sender']['bits_per_second']/1000000,2)
-			receiver_bitrate = round(filename['end']['streams'][0]['receiver']['bits_per_second']/1000000,2)
-		except Exception as e:
-			return (False, 'Could not compute Iperf3 bitrate!')
-
-	snd_msg = f'Sender Bitrate   : {sender_bitrate} Mbps'
-	rcv_msg = f'Receiver Bitrate : {receiver_bitrate} Mbps'
-	success = True
-	if (iperf_tcp_rate_target is not None):
-		if (int(receiver_bitrate) < int(iperf_tcp_rate_target)):
-			rcv_msg += f" (too low! < {iperf_tcp_rate_target} Mbps)"
-			success = False
+	try:
+		with open(filename) as f:
+			 results = json.load(f)
+		sender_bitrate   = round(results['end']['streams'][0]['sender']['bits_per_second'] / 1000000, 2)
+		receiver_bitrate = round(results['end']['streams'][0]['receiver']['bits_per_second'] / 1000000, 2)
+		snd_msg = f'Sender Bitrate   : {sender_bitrate} Mbps'
+		rcv_msg = f'Receiver Bitrate : {receiver_bitrate} Mbps'
+		success = True
+		if (iperf_tcp_rate_target is not None):
+			if (int(receiver_bitrate) < int(iperf_tcp_rate_target)):
+				rcv_msg += f" (too low! < {iperf_tcp_rate_target} Mbps)"
+				success = False
 		else:
 			rcv_msg += f" (target : {iperf_tcp_rate_target} Mbps)"
-	return(success, f'{snd_msg}\n{rcv_msg}')
+		return(success, f'{snd_msg}\n{rcv_msg}')
+	except KeyError as e:
+		e_msg = results.get('error', f'error report not found in {filename}')
+		return (False, f'While parsing Iperf3 results: missing key {e}, {e_msg}')
+	except Exception as e:
+		return (False, f'While parsing Iperf3 results: generic exception: {e}')
 
 def Iperf_analyzeV3BIDIRJson(filename):
 	if (not os.path.isfile(filename)):
