@@ -597,7 +597,7 @@ void processSlotTX(void *arg)
 
 static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc, int *tx_wait_for_dlsch, nr_phy_data_t *phy_data)
 {
-  int sampleShift = 0;
+  int sampleShift = INT_MAX;
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
@@ -991,10 +991,7 @@ void *UE_thread(void *arg)
     nr_rxtx_thread_data_t *curMsgRx = (nr_rxtx_thread_data_t *)NotifiedFifoData(newRx);
     *curMsgRx = (nr_rxtx_thread_data_t){.proc = curMsg.proc, .UE = UE};
     int ret = UE_dl_preprocessing(UE, &curMsgRx->proc, tx_wait_for_dlsch, &curMsgRx->phy_data);
-    if (ret)
-      // if ret is 0, no rx_offset has been computed,
-      // or the computed value is 0 = no offset to do
-      // we store it to apply the drift compensation at beginning of next frame
+    if (ret != INT_MAX)
       shiftForNextFrame = ret;
     pushTpool(&(get_nrUE_params()->Tpool), newRx);
 
