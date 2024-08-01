@@ -14,6 +14,8 @@
 #define  CONFIG_HLP_NTN_KOFFSET            "NTN cellSpecificKoffset-r17 (number of slots for a given subcarrier spacing of 15 kHz)\n"
 #define  CONFIG_HLP_NTN_TA_COMMON          "NTN ta-Common, but given in ms\n"
 #define  CONFIG_HLP_NTN_TA_COMMONDRIFT     "NTN ta-CommonDrift, but given in µs/s\n"
+#define  CONFIG_HLP_AUTONOMOUS_TA          "Autonomously update TA based on DL drift (useful if main contribution to DL drift is movement, e.g. LEO satellite)\n"
+#define  CONFIG_HLP_AGC                    "Rx Gain control used for UE\n"
 
 /***************************************************************************************************************************************/
 /* command line options definitions, CMDLINE_XXXX_DESC macros are used to initialize paramdef_t arrays which are then used as argument
@@ -67,7 +69,8 @@
   {"ntn-koffset",                  CONFIG_HLP_NTN_KOFFSET,     0,               .uptr=&(nrUE_params.ntn_koffset),            .defuintval=0,     TYPE_UINT,     0}, \
   {"ntn-ta-common",                CONFIG_HLP_NTN_TA_COMMON,   0,               .dblptr=&(nrUE_params.ntn_ta_common),        .defdblval=0.0,    TYPE_DOUBLE,   0}, \
   {"ntn-ta-commondrift",           CONFIG_HLP_NTN_TA_COMMONDRIFT, 0,            .dblptr=&(nrUE_params.ntn_ta_commondrift),   .defdblval=0.0,    TYPE_DOUBLE,   0}, \
-  {"agc",                          CONFIG_HLP_AGC,             PARAMFLAG_BOOL,  .iptr=&(nrUE_params.agc),                   .defintval=0,       TYPE_INT,   0}, \
+  {"autonomous-ta",                CONFIG_HLP_AUTONOMOUS_TA,   PARAMFLAG_BOOL,  .iptr=&(nrUE_params.autonomous_ta),          .defintval=0,      TYPE_INT,      0}, \
+  {"agc",                          CONFIG_HLP_AGC,             PARAMFLAG_BOOL,  .iptr=&(nrUE_params.agc),                    .defintval=0,      TYPE_INT,      0}, \
 }
 // clang-format on
 
@@ -93,6 +96,7 @@ typedef struct {
   unsigned int ntn_koffset;
   double ntn_ta_common;
   double ntn_ta_commondrift;
+  int autonomous_ta;
   int agc;
   char *usrp_args;
   char *tx_subdev;
