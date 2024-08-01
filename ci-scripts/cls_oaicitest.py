@@ -108,8 +108,8 @@ def Iperf_analyzeV3TCPJson(filename, iperf_tcp_rate_target):
 			if (int(receiver_bitrate) < int(iperf_tcp_rate_target)):
 				rcv_msg += f" (too low! < {iperf_tcp_rate_target} Mbps)"
 				success = False
-		else:
-			rcv_msg += f" (target : {iperf_tcp_rate_target} Mbps)"
+			else:
+				rcv_msg += f" (target : {iperf_tcp_rate_target} Mbps)"
 		return(success, f'{snd_msg}\n{rcv_msg}')
 	except KeyError as e:
 		e_msg = results.get('error', f'error report not found in {filename}')
