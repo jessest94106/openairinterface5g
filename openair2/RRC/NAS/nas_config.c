@@ -88,21 +88,30 @@ static bool setInterfaceParameter(int sock_fd, const char *ifn, int af, const ch
 typedef enum { INTERFACE_DOWN, INTERFACE_UP } if_action_t;
 static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_action)
 {
+  const char* action = if_action == INTERFACE_DOWN ? "DOWN" : "UP";
+
   struct ifreq ifr = {0};
   strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name));
+  /* get flags of this interface: see netdevice(7) */
+  bool success = ioctl(sock_fd, SIOCGIFFLAGS, (caddr_t)&ifr) == 0;
+  if (!success)
+    goto fail_interface_state;
 
   if (if_action == INTERFACE_UP) {
-    ifr.ifr_flags |= IFF_UP | IFF_NOARP | IFF_MULTICAST;
+    ifr.ifr_flags |= IFF_UP | IFF_NOARP | IFF_POINTOPOINT;
+    ifr.ifr_flags &= ~IFF_MULTICAST;
   } else {
-    ifr.ifr_flags &= (~IFF_UP);
+    ifr.ifr_flags &= ~IFF_UP;
   }
 
-  bool success = ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == 0;
-  if (!success) {
-    const char* action = if_action == INTERFACE_DOWN ? "DOWN" : "UP";
-    LOG_E(OIP, "Bringing interface %s for %s: ioctl call failed: %d, %s\n", action, ifn, errno, strerror(errno));
-  }
-  return success;
+  success = ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == 0;
+  if (!success)
+    goto fail_interface_state;
+  return true;
+
+fail_interface_state:
+  LOG_E(OIP, "Bringing interface %s for %s: ioctl call failed: %d, %s\n", action, ifn, errno, strerror(errno));
+  return false;
 }
 
 // non blocking full configuration of the interface (address, and the two lest octets of the address)
