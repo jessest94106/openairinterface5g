@@ -101,21 +101,23 @@ def Iperf_analyzeV3TCPJson(filename, iperf_tcp_rate_target):
 			 results = json.load(f)
 		sender_bitrate   = round(results['end']['streams'][0]['sender']['bits_per_second'] / 1000000, 2)
 		receiver_bitrate = round(results['end']['streams'][0]['receiver']['bits_per_second'] / 1000000, 2)
-		snd_msg = f'Sender Bitrate   : {sender_bitrate} Mbps'
-		rcv_msg = f'Receiver Bitrate : {receiver_bitrate} Mbps'
-		success = True
-		if (iperf_tcp_rate_target is not None):
-			if (int(receiver_bitrate) < int(iperf_tcp_rate_target)):
-				rcv_msg += f" (too low! < {iperf_tcp_rate_target} Mbps)"
-				success = False
-			else:
-				rcv_msg += f" (target : {iperf_tcp_rate_target} Mbps)"
-		return(success, f'{snd_msg}\n{rcv_msg}')
+	except json.JSONDecodeError as e:
+		return (False, f'Could not decode JSON log file {filename}: {e}')
 	except KeyError as e:
 		e_msg = results.get('error', f'error report not found in {filename}')
 		return (False, f'While parsing Iperf3 results: missing key {e}, {e_msg}')
 	except Exception as e:
-		return (False, f'While parsing Iperf3 results: generic exception: {e}')
+		return (False, f'While parsing Iperf3 results: exception: {e}')
+	snd_msg = f'Sender Bitrate   : {sender_bitrate} Mbps'
+	rcv_msg = f'Receiver Bitrate : {receiver_bitrate} Mbps'
+	success = True
+	if iperf_tcp_rate_target is not None:
+		success = float(receiver_bitrate) >= float(iperf_tcp_rate_target)
+		if success:
+			rcv_msg += f" (target: {iperf_tcp_rate_target})"
+		else:
+			rcv_msg += f" (too low! < {iperf_tcp_rate_target})"
+	return(success, f'{snd_msg}\n{rcv_msg}')
 
 def Iperf_analyzeV3BIDIRJson(filename):
 	try:
@@ -125,16 +127,19 @@ def Iperf_analyzeV3BIDIRJson(filename):
 		receiver_bitrate_ul = round(results['end']['streams'][0]['receiver']['bits_per_second'] / 1000000, 2)
 		sender_bitrate_dl   = round(results['end']['streams'][1]['sender']['bits_per_second'] / 1000000, 2)
 		receiver_bitrate_dl = round(results['end']['streams'][1]['receiver']['bits_per_second'] / 1000000, 2)
-		msg = f'Sender Bitrate DL   : {sender_bitrate_dl} Mbps\n'
-		msg += f'Receiver Bitrate DL : {receiver_bitrate_dl} Mbps\n'
-		msg += f'Sender Bitrate UL   : {sender_bitrate_ul} Mbps\n'
-		msg += f'Receiver Bitrate UL : {receiver_bitrate_ul} Mbps\n'
-		return (True, msg)
+	except json.JSONDecodeError as e:
+		return (False, f'Could not decode JSON log file: {e}')
 	except KeyError as e:
 		e_msg = results.get('error', f'error report not found in {filename}')
 		return (False, f'While parsing Iperf3 results: missing key {e}, {e_msg}')
 	except Exception as e:
-		return (False, f'While parsing Iperf3 results: generic exception: {e}')
+		return (False, f'While parsing Iperf3 results: exception: {e}')
+
+	msg = f'Sender Bitrate DL   : {sender_bitrate_dl} Mbps\n'
+	msg += f'Receiver Bitrate DL : {receiver_bitrate_dl} Mbps\n'
+	msg += f'Sender Bitrate UL   : {sender_bitrate_ul} Mbps\n'
+	msg += f'Receiver Bitrate UL : {receiver_bitrate_ul} Mbps\n'
+	return (True, msg)
 
 def Iperf_analyzeV3UDP(filename, iperf_bitrate_threshold, iperf_packetloss_threshold, target_bitrate):
 	if (not os.path.isfile(filename)):
