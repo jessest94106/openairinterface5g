@@ -197,13 +197,17 @@ These modes of operation are supported:
 ## gNB F1AP
 
 - Integration of F1AP messages and procedures for the control plane exchanges between the CU and DU entities according to 38.473 Rel. 16
-  - F1 Setup request/response/failure
-  - F1 DL/UL RRC message transfer
-  - F1 Initial UL RRC message transfer
-  - F1 UE Context setup request/response
-  - F1 UE Context modification request/response
-  - F1 UE Context modification required
-  - F1 UE Context release req/cmd/complete
+  - F1 Interface Management:
+    * F1 Setup request/response/failure
+  - F1 RRC Message Transfer:
+    * F1 Initial UL RRC Message Transfer
+    * F1 DL RRC Message Transfer
+    * F1 UL RRC Message Transfer
+  - F1 UE Context Management:
+    * F1 UE Context setup request/response
+    * F1 UE Context modification request/response
+    * F1 UE Context modification required
+    * F1 UE Context release req/cmd/complete
   - F1 gNB CU configuration update
   - F1 Reset (handled at DU only, full reset only)
 - Interface with RRC

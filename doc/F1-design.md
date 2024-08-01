@@ -18,38 +18,58 @@
 
 The F1 interface is the functional split of 3GPP between the CU (centralized
 unit: PDCP, RRC, SDAP) and the DU (distributed unit: RLC, MAC, PHY). It is
-standardized in TS 38.470 - 38.473 for 5G NR. No equivalent for 4G exists.
+standardized in TS 38.470 - 38.473 for 5G NR.
 
-We assume that each DU handles only one cell. Multiple DUs connected to one CU
-are supported. Mobility over F1 is not yet supported.
+F1 specs:
+* 3GPP TS 38.470 F1 general aspects and principles
+* 3GPP TS 38.471 F1 layer 1
 
-# Control plane status (F1-C)
+F1-C:
+* 3GPP TS 38.472 F1 signalling transport
+* 3GPP TS 38.473 F1 Application Protocol (F1AP)
 
-## Implementation Status
+F1-U:
+* 3GPP TS 38.474 F1 Data Transport
 
-Note that OAI uses F1 "internally". That means, that even **if you run a
-monolithic gNB, the internal information exchange uses F1**. You can therefore
-expect that everything working in a monolithic deployment should also work in
-F1.  The current implementation is based on R16.3.
+No equivalent for 4G exists.
 
-Note that NSA does NOT follow this logic yet, and does not work with F1.
+## Control plane (F1-C)
 
-The following messages are currently implemented:
+The interface F1-C is designed for the exchange of signalling messages between the
+Radio Network Layer (RNL) and the Transport Network Layer (TNL). It
+consists of F1 Application Protocol messages (F1-AP) exchanged over SCTP.
 
-- F1 Setup Request and F1 Setup Response/Failure
-- Initial UL RRC, UL/DL RRC Message Transfer
-- F1 UE Context management messages for the "good case"
-  * Setup Request/Response
-  * Modification Request/Response
-  * Release Request/Command/Complete
+## Data plane (F1-U)
 
-All other messages are not implemented or not working reliably:
+F1-U uses GTP-U for information exchange.
 
-- F1 CU/DU configuration updade
-- Paging messages
-- Warning Message transmissions
+# OAI Implementation Status
 
-## High-level F1-C code structure
+The implementation of F1AP messages is seamlessly integrated into OAI, supporting both Monolithic SA
+and CU/DU functional split modes. The F1 code is therefore always compiled with nr-softmodem.
+This architecture ensures that even *when operating a monolithic gNB, internal information exchange
+always utilizes F1AP messages*.
+The major difference lies in the CU/DU split scenario, where ASN.1-encoded F1AP messages (F1-C) are
+exchanges over SCTP, via a socket interface.
+
+This is the current status:
+
+- gNB-CU/gNB-DU split
+- Supported deployments:
+  * SA
+  * Single cell per DU
+  * Multiple DUs connected to one CU (both CP and UP)
+- Not supported:
+  * Mobility
+  * NSA
+
+## F1-C
+
+### F1AP messages
+
+Refer to [FEATURE_SET.md](FEATURE_SET.md#gNB-F1AP) to learn about the current F1AP implementation status.
+
+### High-level F1-C code structure
 
 The F1 interface is used internally between CU (mostly RRC) and DU (mostly MAC)
 to exchange information. In DL, the CU sends messages as defined by the
@@ -69,38 +89,94 @@ dedicated handler). In F1, the DU task receives the ITTI message, encodes using
 ASN.1, and sends it over a network socket.  The CU task decodes, and sends the
 same ITTI message to the RRC task as done directly in the monolithic case.
 
+Summary of callbacks and handlers:
+
+| Entity | Callback definition | Callback F1 Implementation | Callback Monolithic SA Implementation | Handler              |
+|--------|---------------------|----------------------------|---------------------------------------|----------------------|
+| CU/RRC | `mac_rrc_dl.h`      | `mac_rrc_dl_f1ap.c`        | `mac_rrc_dl_direct.c`                 |No handler (use ITTI) |
+| DU/MAC | `mac_rrc_ul.h`      | `mac_rrc_ul_f1ap.c`        | `mac_rrc_ul_direct.c`                 |`mac_rrc_dl_handler.c`|
+
+A sequence diagram for downlink F1AP messages over the OAI CU/DU functional split:
+
+```mermaid
+sequenceDiagram
+    box rgba(17,158,189,255) CU/RRC
+    participant TASK_RRC_GNB
+    participant TASK_CU_F1
+    end
+    Note over TASK_RRC_GNB: MAC/RRC callback
+    TASK_RRC_GNB->>+TASK_CU_F1: F1AP message (ITTI)
+    Note over TASK_CU_F1: F1 message encoding
+    Note over TASK_CU_F1: ASN.1 encoding
+    box Grey DU/MAC
+    participant TASK_DU_F1
+    participant MAC
+    end
+    Note over TASK_DU_F1: F1AP DL message handler
+    TASK_CU_F1->>+TASK_DU_F1: SCTP (ITTI)
+    Note over TASK_DU_F1: F1 message decoding
+    Note over TASK_DU_F1: ASN.1 decoding
+    TASK_DU_F1->>+MAC: F1AP message (function call)
+    Note over MAC: MAC DL message handler
 ```
-                             +-------------+
-                             |             |
-                             |   CU/RRC    |
-                             |             |
-                             +-------------+
-                                |       ^
-     Callback def: mac_rrc_dl.h |       | No handler needed:
-     F1 impl: mac_rrc_dl_f1ap.c |       | RRC has ITTI
-Monolithic: mac_rrc_dl_direct.c |       |
-                                |       |
-                             DL |       | UL
-                                |       |
-                                |       | Callback def: mac_rrc_ul.h
-               Message handler: |       | F1 impl: mac_rrc_ul_f1ap.c
-           mac_rrc_dl_handler.c |       | Monolithic: mac_rrc_ul_direct.c
-                                v       |
-                             +-------------+
-                             |             |
-                             |   DU/MAC    |
-                             |             |
-                             +-------------+
+and for the uplink F1AP messages:
+
+```mermaid
+sequenceDiagram
+    box rgba(17,158,189,255) CU/RRC
+    participant TASK_RRC_GNB
+    participant TASK_CU_F1
+    end
+    box Grey DU/MAC
+    participant TASK_DU_F1
+    participant TASK_MAC_GNB
+    end
+    Note over TASK_MAC_GNB: MAC/RRC callback
+    TASK_MAC_GNB->>+TASK_DU_F1: F1AP message (ITTI)
+    Note over TASK_DU_F1: F1 message encoding
+    Note over TASK_DU_F1: ASN.1 encoding
+    Note over TASK_CU_F1: F1AP UL message handler
+    TASK_DU_F1->>+TASK_CU_F1: SCTP (ITTI)
+    Note over TASK_CU_F1: F1 message decoding
+    Note over TASK_CU_F1: ASN.1 decoding
+    TASK_CU_F1->>+TASK_RRC_GNB: F1AP message (ITTI)
 ```
 
-# Data plane status (F1-U)
+Alternative sequence handling (e.g. Monolithic), for downlink:
 
-F1-U uses GTP-U for information exchange. The GTP protocol uses some extensions
-for NR-U protocol to report buffer status, but this is not properly tested and
-might malfunction. One limitation is that the current implementation
-acknowledges each packet individually.
+```mermaid
+sequenceDiagram
+    box rgba(17,158,189,255) RRC
+    participant TASK_RRC_GNB
+    end
+    Note over TASK_RRC_GNB: mac_rrc_dl_direct.c callback
+    box Grey MAC
+    participant TASK_MAC_GNB
+    end
+    TASK_RRC_GNB->>+TASK_MAC_GNB: raw F1AP message
+    Note over TASK_MAC_GNB: mac_rrc_dl_handler.c
+```
+and for the uplink:
 
-Multiple DUs at one CU are supported in the data plane (as in the control plane).
+```mermaid
+sequenceDiagram
+    box rgba(17,158,189,255) RRC
+    participant TASK_RRC_GNB
+    end
+    box Grey MAC
+    participant TASK_MAC_GNB
+    end
+    Note over TASK_MAC_GNB: mac_rrc_ul_direct.c callback
+    TASK_MAC_GNB->>+TASK_RRC_GNB: raw F1AP message (ITTI)
+```
+
+## F1-U
+
+Current status:
+
+* Buffer status report over GTP-U
+* Each packet is acknowledged individually
+* Support of multiple DUs per CU
 
 # How to run
 
