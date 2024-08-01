@@ -118,26 +118,23 @@ def Iperf_analyzeV3TCPJson(filename, iperf_tcp_rate_target):
 		return (False, f'While parsing Iperf3 results: generic exception: {e}')
 
 def Iperf_analyzeV3BIDIRJson(filename):
-	if (not os.path.isfile(filename)):
-		return (False, 'Iperf3 Bidir TCP: Log file not present')
-	if (os.path.getsize(filename)==0):
-		return (False, 'Iperf3 Bidir TCP: Log file is empty')
-
-	with open(filename) as file:
-		filename = json.load(file)
-		try:
-			sender_bitrate_ul   = round(filename['end']['streams'][0]['sender']['bits_per_second']/1000000,2)
-			receiver_bitrate_ul = round(filename['end']['streams'][0]['receiver']['bits_per_second']/1000000,2)
-			sender_bitrate_dl   = round(filename['end']['streams'][1]['sender']['bits_per_second']/1000000,2)
-			receiver_bitrate_dl = round(filename['end']['streams'][1]['receiver']['bits_per_second']/1000000,2)
-		except Exception as e:
-			return (False, 'Could not compute BIDIR bitrate!')
-
-	msg = f'Sender Bitrate DL   : {sender_bitrate_dl} Mbps\n'
-	msg += f'Receiver Bitrate DL : {receiver_bitrate_dl} Mbps\n'
-	msg += f'Sender Bitrate UL   : {sender_bitrate_ul} Mbps\n'
-	msg += f'Receiver Bitrate UL : {receiver_bitrate_ul} Mbps\n'
-	return (True, msg)
+	try:
+		with open(filename) as f:
+			results = json.load(f)
+		sender_bitrate_ul   = round(results['end']['streams'][0]['sender']['bits_per_second'] / 1000000, 2)
+		receiver_bitrate_ul = round(results['end']['streams'][0]['receiver']['bits_per_second'] / 1000000, 2)
+		sender_bitrate_dl   = round(results['end']['streams'][1]['sender']['bits_per_second'] / 1000000, 2)
+		receiver_bitrate_dl = round(results['end']['streams'][1]['receiver']['bits_per_second'] / 1000000, 2)
+		msg = f'Sender Bitrate DL   : {sender_bitrate_dl} Mbps\n'
+		msg += f'Receiver Bitrate DL : {receiver_bitrate_dl} Mbps\n'
+		msg += f'Sender Bitrate UL   : {sender_bitrate_ul} Mbps\n'
+		msg += f'Receiver Bitrate UL : {receiver_bitrate_ul} Mbps\n'
+		return (True, msg)
+	except KeyError as e:
+		e_msg = results.get('error', f'error report not found in {filename}')
+		return (False, f'While parsing Iperf3 results: missing key {e}, {e_msg}')
+	except Exception as e:
+		return (False, f'While parsing Iperf3 results: generic exception: {e}')
 
 def Iperf_analyzeV3UDP(filename, iperf_bitrate_threshold, iperf_packetloss_threshold, target_bitrate):
 	if (not os.path.isfile(filename)):
