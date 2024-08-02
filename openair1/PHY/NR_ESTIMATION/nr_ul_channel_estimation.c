@@ -86,10 +86,10 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   NR_gNB_PUSCH *pusch_vars = &gNB->pusch_vars[ul_id];
   c16_t **ul_ch_estimates = (c16_t **)pusch_vars->ul_ch_estimates;
   const int symbolSize = gNB->frame_parms.ofdm_symbol_size;
-  const int soffset = (Ns & 3) * gNB->frame_parms.symbols_per_slot*symbolSize;
+  const int soffset = (Ns & 3) * gNB->frame_parms.symbols_per_slot * symbolSize;
   const int delta = get_delta(p, pusch_pdu->dmrs_config_type);
-  int ch_offset = symbolSize*symbol;
-  const int symbol_offset = symbolSize*symbol;
+  int ch_offset = symbolSize * symbol;
+  const int symbol_offset = symbolSize * symbol;
   const int k0 = bwp_start_subcarrier;
   const int nb_rb_pusch = pusch_pdu->rb_size;
 
@@ -157,7 +157,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[aarx][symbol_offset];
     c16_t *ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + aarx][ch_offset];
 
-    memset(ul_ch,0,sizeof(*ul_ch)*symbolSize);
+    memset(ul_ch, 0, sizeof(*ul_ch) * symbolSize);
 #ifdef DEBUG_PUSCH
     LOG_I(PHY, "In %s symbol_offset %d, delta %d\n", symbol_offset, delta);
     LOG_I(PHY, "ch est pilot, N_RB_UL %d\n", gNB->frame_parms.N_RB_UL);
@@ -174,10 +174,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
       c16_t *pil   = pilot;
       int re_offset = k0;
       LOG_D(PHY,"PUSCH estimation DMRS type 1, Freq-domain interpolation");
-      // For configuration type 1: k = 4*n + 2*k' + delta,
-      // where k' is 0 or 1, and delta is in Table 6.4.1.1.3-1 from TS 38.211
       int pilot_cnt = 0;
-      int delta = nr_pusch_dmrs_delta(pusch_dmrs_type1, p);
 
       for (int n = 0; n < 3 * nb_rb_pusch; n++) {
         // LS estimation
