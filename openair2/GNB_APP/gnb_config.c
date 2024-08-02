@@ -2041,31 +2041,29 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i) {
 }
 
 int RCconfig_nr_parallel(void) {
-  char *parallel_conf = NULL;
-  char *worker_conf   = NULL;
   extern char *parallel_config;
   extern char *worker_config;
   paramdef_t ThreadParams[]  = THREAD_CONF_DESC;
   paramlist_def_t THREADParamList = {THREAD_CONFIG_STRING_THREAD_STRUCT,NULL,0};
   config_getlist(config_get_if(), &THREADParamList, NULL, 0, NULL);
 
+  char *default_parallel_conf = "PARALLEL_RU_L1_TRX_SPLIT";
+  char *default_worker_conf = "WORKER_ENABLE";
+  char *parallel_conf = default_parallel_conf;
+  char *worker_conf = default_worker_conf;
+
   if(THREADParamList.numelt>0) {
     config_getlist(config_get_if(), &THREADParamList, ThreadParams, sizeofArray(ThreadParams), NULL);
-    parallel_conf = strdup(*(THREADParamList.paramarray[0][THREAD_PARALLEL_IDX].strptr));
-  } else {
-    parallel_conf = strdup("PARALLEL_RU_L1_TRX_SPLIT");
+    parallel_conf = *(THREADParamList.paramarray[0][THREAD_PARALLEL_IDX].strptr);
   }
 
   if(THREADParamList.numelt>0) {
     config_getlist(config_get_if(), &THREADParamList, ThreadParams, sizeofArray(ThreadParams), NULL);
-    worker_conf   = strdup(*(THREADParamList.paramarray[0][THREAD_WORKER_IDX].strptr));
-  } else {
-    worker_conf   = strdup("WORKER_ENABLE");
+    worker_conf = *(THREADParamList.paramarray[0][THREAD_WORKER_IDX].strptr);
   }
 
   if(parallel_config == NULL) set_parallel_conf(parallel_conf);
   if(worker_config == NULL)   set_worker_conf(worker_conf);
-
   return 0;
 }
 
