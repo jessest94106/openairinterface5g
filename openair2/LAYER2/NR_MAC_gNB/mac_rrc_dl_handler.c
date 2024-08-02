@@ -238,8 +238,16 @@ static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
     (*resp_srbs)[i].srb_id = srb->srb_id;
     (*resp_srbs)[i].lcid = c.lcid;
 
-    int ret = ASN_SEQUENCE_ADD(&cellGroupConfig->rlc_BearerToAddModList->list, rlc_BearerConfig);
-    DevAssert(ret == 0);
+    if (rlc_BearerConfig->logicalChannelIdentity == 1) {
+      // CU asks to add SRB1: when creating a cellGroupConfig, we always add it
+      // (see get_initial_cellGroupConfig())
+      const struct NR_CellGroupConfig__rlc_BearerToAddModList *addmod = cellGroupConfig->rlc_BearerToAddModList;
+      DevAssert(addmod->list.count >= 1 && addmod->list.array[0]->logicalChannelIdentity == 1);
+      ASN_STRUCT_FREE(asn_DEF_NR_RLC_BearerConfig, rlc_BearerConfig);
+    } else {
+      int ret = ASN_SEQUENCE_ADD(&cellGroupConfig->rlc_BearerToAddModList->list, rlc_BearerConfig);
+      DevAssert(ret == 0);
+    }
   }
   return srbs_len;
 }
