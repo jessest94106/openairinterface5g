@@ -1120,7 +1120,9 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   uint64_t random_value = 0;
   const char *scause = get_reestab_cause(req->reestablishmentCause);
   const long physCellId = req->ue_Identity.physCellId;
-  LOG_D(NR_RRC, "UE %04x physCellId %ld NR_RRCReestablishmentRequest cause %s\n", msg->crnti, physCellId, scause);
+  long ngap_cause = NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED; /* cause in case of NGAP release req */
+  rrc_gNB_ue_context_t *ue_context_p = NULL;
+  LOG_I(NR_RRC, "UE %04x physCellId %ld NR_RRCReestablishmentRequest cause %s\n", msg->crnti, physCellId, scause);
 
   const nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, assoc_id);
   if (du == NULL) {
@@ -1137,7 +1139,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   }
 
   rnti_t old_rnti = req->ue_Identity.c_RNTI;
-  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context_by_rnti(rrc, assoc_id, old_rnti);
+  ue_context_p = rrc_gNB_get_ue_context_by_rnti(rrc, assoc_id, old_rnti);
   if (ue_context_p == NULL) {
     LOG_E(NR_RRC, "NR_RRCReestablishmentRequest without UE context, fallback to RRC setup\n");
     goto fallback_rrc_setup;
@@ -1150,6 +1152,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
           "RRC Reestablishment Request from different physCellId (%ld) than current physCellId (%d), fallback to RRC setup\n",
           physCellId,
           cell_info->nr_pci);
+    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
     /* 38.401 8.7: "If the UE accessed from a gNB-DU other than the original
      * one, the gNB-CU should trigger the UE Context Setup procedure". Let's
      * assume that the old DU will trigger a release request, also freeing the
@@ -1168,6 +1171,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   if (!UE->as_security_active) {
     /* no active security context, need to restart entire connection */
     LOG_E(NR_RRC, "UE requested Reestablishment without activated AS security\n");
+    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
     goto fallback_rrc_setup;
   }
 
@@ -1176,6 +1180,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     // SSB ARFCN and can't do reestablishment. handle it gracefully by doing
     // RRC setup procedure instead
     LOG_E(NR_RRC, "no MeasurementTimingConfiguration for this cell, cannot perform reestablishment\n");
+    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
     goto fallback_rrc_setup;
   }
 
@@ -1188,14 +1193,16 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   cu_remove_f1_ue_data(UE->rrc_ue_id);
   cu_add_f1_ue_data(UE->rrc_ue_id, &ue_data);
 
-  LOG_I(NR_RRC, "Accept Reestablishment Request UE physCellId %ld cause %s\n", physCellId, scause);
-
   rrc_gNB_generate_RRCReestablishment(ue_context_p, msg->du2cu_rrc_container, old_rnti, du);
   return;
 
 fallback_rrc_setup:
   fill_random(&random_value, sizeof(random_value));
   random_value = random_value & 0x7fffffffff; /* random value is 39 bits */
+
+  /* request release of the "old" UE in case it exists */
+  if (ue_context_p != NULL)
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(0, ue_context_p, NGAP_CAUSE_RADIO_NETWORK, ngap_cause);
 
   rrc_gNB_ue_context_t *new = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
   activate_srb(&new->ue_context, 1);
