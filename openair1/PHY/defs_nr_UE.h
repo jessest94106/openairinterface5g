@@ -648,5 +648,4 @@ static inline void stop_meas_nr_ue_phy(PHY_VARS_NR_UE *ue, int meas_index) {
   stop_meas(&ue->phy_cpu_stats.cpu_time_stats[meas_index]);
 }
 
-#include "SIMULATION/ETH_TRANSPORT/defs.h"
 #endif
