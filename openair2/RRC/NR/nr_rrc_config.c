@@ -2256,7 +2256,7 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
     struct NR_SchedulingInfo2_r17 *si_schedulinginfo2_r17 = CALLOC(1, sizeof(struct NR_SchedulingInfo2_r17));
     si_schedulinginfo2_r17->si_BroadcastStatus_r17 = NR_SchedulingInfo2_r17__si_BroadcastStatus_r17_broadcasting;
     si_schedulinginfo2_r17->si_WindowPosition_r17 = 2;
-    si_schedulinginfo2_r17->si_Periodicity_r17 = NR_SchedulingInfo2_r17__si_Periodicity_r17_rf16;
+    si_schedulinginfo2_r17->si_Periodicity_r17 = NR_SchedulingInfo2_r17__si_Periodicity_r17_rf8;
 
     struct NR_SIB_TypeInfo_v1700 *sib_type_info = CALLOC(1, sizeof(struct NR_SIB_TypeInfo_v1700));
     sib_type_info->sibType_r17.present = NR_SIB_TypeInfo_v1700__sibType_r17_PR_type1_r17;

@@ -870,7 +870,8 @@ int nr_get_default_pucch_res(int pucch_ResourceCommon) {
 
 void nr_configure_pdcch(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
                         NR_ControlResourceSet_t *coreset,
-                        NR_sched_pdcch_t *pdcch) {
+                        NR_sched_pdcch_t *pdcch, 
+                        bool otherSI) {
 
 
   pdcch_pdu->BWPSize = pdcch->BWPSize;
@@ -892,12 +893,17 @@ void nr_configure_pdcch(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
   pdcch_pdu->InterleaverSize = pdcch->InterleaverSize;
   pdcch_pdu->ShiftIndex = pdcch->ShiftIndex;
 
-  if(coreset->controlResourceSetId == 0) {
-    pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_MIB_SIB1;
-  } else{
+  if (otherSI) {
     pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG;
   }
-
+  else {
+    if (coreset->controlResourceSetId == 0) {
+    pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_MIB_SIB1;
+    } else {
+      pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG;
+    }
+  }
+  
   //precoderGranularity
   pdcch_pdu->precoderGranularity = coreset->precoderGranularity;
 }
