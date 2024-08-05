@@ -571,8 +571,8 @@ typedef struct NR_UE_MAC_INST_s {
 
   // order lc info
   A_SEQUENCE_OF(nr_lcordered_info_t) lc_ordered_list;
-
   NR_UE_SCHEDULING_INFO scheduling_info;
+  NR_timer_t *data_inactivity_timer;
 
   int dmrs_TypeA_Position;
   int p_Max;
