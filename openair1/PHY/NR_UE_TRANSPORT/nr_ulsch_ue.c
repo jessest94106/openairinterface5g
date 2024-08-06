@@ -248,11 +248,10 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 
   /////////////////////////ULSCH layer mapping/////////////////////////
   ///////////
-  const int sz = available_bits / mod_order;
+  const int sz = available_bits / mod_order / Nl;
   c16_t tx_layers[Nl][sz];
-  memset(tx_layers, 0, sizeof(tx_layers));
 
-  nr_ue_layer_mapping(d_mod, Nl, available_bits / mod_order, sz, tx_layers);
+  nr_ue_layer_mapping(d_mod, Nl, sz, tx_layers);
 
   ///////////
   ////////////////////////////////////////////////////////////////////////
