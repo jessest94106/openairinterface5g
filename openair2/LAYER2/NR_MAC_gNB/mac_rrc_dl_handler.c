@@ -233,7 +233,8 @@ static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
     nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .priority = priority};
     nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
 
-    (*resp_srbs)[i] = *srb;
+    (*resp_srbs)[i].srb_id = srb->srb_id;
+    (*resp_srbs)[i].lcid = c.lcid;
 
     int ret = ASN_SEQUENCE_ADD(&cellGroupConfig->rlc_BearerToAddModList->list, rlc_BearerConfig);
     DevAssert(ret == 0);
