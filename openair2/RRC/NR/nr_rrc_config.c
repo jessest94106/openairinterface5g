@@ -2245,7 +2245,7 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
   asn1cSeqAdd(&sib1->si_SchedulingInfo->schedulingInfoList.list,schedulingInfo);*/
 
   // sib19 scheduling info
-  // this condition ensures ntn-config is initialized
+  // ensure ntn-config is initialized 
   if (scc->ext2 && scc->ext2->ntn_Config_r17) {
     sib1->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1610_IEs));
     sib1->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1630_IEs));
@@ -2458,7 +2458,7 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
   // TODO: add nonCriticalExtension
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
-    xer_fprint(stdout, &asn_DEF_NR_SIB1, sib1_message->message.choice.c1->choice.systemInformationBlockType1);
+    xer_fprint(stdout, &asn_DEF_NR_BCCH_DL_SCH_Message, sib1_message);
   }
 
   return sib1_message;

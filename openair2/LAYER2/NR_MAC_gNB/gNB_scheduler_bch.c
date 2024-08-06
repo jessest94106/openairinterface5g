@@ -398,7 +398,6 @@ static uint32_t schedule_control_sib1(module_id_t module_id,
   return TBS;
 }
 
-
 static uint32_t schedule_control_other_si(module_id_t module_id,
                                       int CC_id,
                                       NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
@@ -413,7 +412,7 @@ static uint32_t schedule_control_other_si(module_id_t module_id,
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   uint16_t *vrb_map = cc->vrb_map;
 
-  if (gNB_mac->sched_osi == NULL){
+  if (gNB_mac->sched_osi == NULL) {
     gNB_mac->sched_osi = calloc(1, sizeof(NR_UE_sched_osi_ctrl_t));
     struct NR_PDCCH_ConfigCommon__commonSearchSpaceList *commonSearchSpaceList = scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList;
     NR_SearchSpaceId_t osi_SearchSpace = *scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->searchSpaceOtherSystemInformation;
@@ -471,7 +470,7 @@ static uint32_t schedule_control_other_si(module_id_t module_id,
   do {
     if(rbSize < bwpSize && !(vrb_map[rbStart + rbSize]&SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols)))
       rbSize++;
-    else{
+    else {
       if (pdsch->mcs<10)
         pdsch->mcs++;
       else
@@ -744,8 +743,8 @@ static void nr_fill_nfapi_dl_other_si_pdu(int Mod_idP,
   LOG_D(NR_MAC,"sib19:dlDmrsSymbPos = 0x%x\n", pdsch_pdu_rel15->dlDmrsSymbPos);
 
   pdsch_pdu_rel15->maintenance_parms_v3.tbSizeLbrmBytes = nr_compute_tbslbrm(0,
-                                                                             pdsch_pdu_rel15->BWPSize,
-                                                                             1);
+                                                                            pdsch_pdu_rel15->BWPSize,
+                                                                            1);
   pdsch_pdu_rel15->maintenance_parms_v3.ldpcBaseGraph = get_BG(TBS<<3,pdsch_pdu_rel15->targetCodeRate[0]);
 
   /* Fill PDCCH DL DCI PDU */
@@ -933,17 +932,19 @@ void schedule_nr_sib19(module_id_t module_idP,
   NR_COMMON_channels_t *cc = &gNB_mac->common_channels[0];
 
   // get sib19 scheduling info from sib1
-  struct NR_SI_SchedulingInfo_v1700* si_schedulinginfo2_r17 = cc->sib1->message.choice.c1->choice.systemInformationBlockType1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700;
-  struct NR_SchedulingInfo2_r17* sib19_sched_info = NULL;
+  struct NR_SI_SchedulingInfo_v1700 *si_schedulinginfo2_r17 = cc->sib1->message.choice.c1->choice.systemInformationBlockType1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700;
+  struct NR_SchedulingInfo2_r17 *sib19_sched_info = NULL;
+
+  if (!si_schedulinginfo2_r17) {
+    LOG_E(GNB_APP, "SIB1 does not contain si_SchedulingInfo_v1700\n");
+    return;
+  }
 
   bool found = false;
-  for (int i = 0; i < si_schedulinginfo2_r17->schedulingInfoList2_r17.list.count; i++)
-  {
-    for (int j= 0; j < si_schedulinginfo2_r17->schedulingInfoList2_r17.list.array[i]->sib_MappingInfo_r17.list.count; j++)
-    {
+  for (int i = 0; i < si_schedulinginfo2_r17->schedulingInfoList2_r17.list.count; i++) {
+    for (int j= 0; j < si_schedulinginfo2_r17->schedulingInfoList2_r17.list.array[i]->sib_MappingInfo_r17.list.count; j++) {
       if (si_schedulinginfo2_r17->schedulingInfoList2_r17.list.array[i]->sib_MappingInfo_r17.list.array[j]->sibType_r17.choice.type1_r17 == 
-                                                                                    NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType19)
-      {
+                                                                                    NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType19) {
         found = true;
         sib19_sched_info = si_schedulinginfo2_r17->schedulingInfoList2_r17.list.array[i];
         break;
@@ -985,8 +986,7 @@ void schedule_nr_sib19(module_id_t module_idP,
     NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = &gNB_mac->type0_PDCCH_CSS_config[i];
     if(((frameP - 1) % frame == 0) &&
        (slotP == ((sib19_sched_info->si_WindowPosition_r17 % window_length) - 1)) &&
-       (type0_PDCCH_CSS_config->num_rbs > 0))
-       {
+       (type0_PDCCH_CSS_config->num_rbs > 0)) {
 
       LOG_D(NR_MAC,"(%d.%d) SIB19 transmission: ssb_index %d\n", frameP, slotP, type0_PDCCH_CSS_config->ssb_index);
 
@@ -1018,7 +1018,6 @@ void schedule_nr_sib19(module_id_t module_idP,
 
       // Data to be transmitted
       memcpy(tx_req->TLVs[0].value.direct, cc->sib19_bcch_pdu, TBS);
-      xer_fprint(stdout, &asn_DEF_NR_BCCH_DL_SCH_Message,(void *)cc->sib19);
 
       tx_req->PDU_length = TBS;
       tx_req->PDU_index  = pdu_index;

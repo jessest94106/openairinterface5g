@@ -1475,7 +1475,8 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 
     if (get_softmodem_params()->sa) {
       nr_mac_configure_sib1(RC.nrmac[0], &info.plmn, info.nr_cellid, *info.tac);
-      nr_mac_configure_sib19(RC.nrmac[0]);
+      if (scc->ext2 && scc->ext2->ntn_Config_r17)
+        nr_mac_configure_sib19(RC.nrmac[0]);
     }
     
     // read F1 Setup information from config and generated MIB/SIB1
