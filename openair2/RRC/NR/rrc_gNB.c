@@ -1233,11 +1233,11 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
 
   switch (event_triggered->eventId.present) {
     case NR_EventTriggerConfig__eventId_PR_eventA2:
-      LOG_I(NR_RRC, "\nHO LOG: Event A2 (Serving becomes worse than threshold)\n");
+      LOG_I(NR_RRC, "HO LOG: Event A2 (Serving becomes worse than threshold)\n");
       break;
 
     case NR_EventTriggerConfig__eventId_PR_eventA3: {
-      LOG_I(NR_RRC, "\nHO LOG: Event A3 Report - Neighbour Becomes Better than Serving!\n");
+      LOG_I(NR_RRC, "HO LOG: Event A3 Report - Neighbour Becomes Better than Serving!\n");
       const NR_MeasResults_t *measResults = &measurementReport->criticalExtensions.choice.measurementReport->measResults;
 
       for (int serving_cell_idx = 0; serving_cell_idx < measResults->measResultServingMOList.list.count; serving_cell_idx++) {
@@ -1272,7 +1272,7 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
         }
 
         LOG_I(NR_RRC,
-              "HO LOG: Measurement Report has came for the neighbour: %d with RSRP: %d\n",
+              "HO LOG: Measurement Report for the neighbour %d with RSRP: %d\n",
               neighbourCellId,
               neighbourCellRSRP);
 
