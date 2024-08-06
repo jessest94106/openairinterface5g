@@ -1814,7 +1814,7 @@ void *rrc_nrue(void *notUsed)
 
   case NAS_UPLINK_DATA_REQ: {
     uint32_t length;
-    uint8_t *buffer;
+    uint8_t *buffer = NULL;
     NasUlDataReq *req = &NAS_UPLINK_DATA_REQ(msg_p);
     /* Create message for PDCP (ULInformationTransfer_t) */
     length = do_NR_ULInformationTransfer(&buffer, req->nasMsg.length, req->nasMsg.data);
@@ -1823,6 +1823,7 @@ void *rrc_nrue(void *notUsed)
     // error: the remote gNB is hardcoded here
     rb_id_t srb_id = rrc->Srb[2] == RB_ESTABLISHED ? 2 : 1;
     nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, length, buffer, deliver_pdu_srb_rlc, NULL);
+    free(buffer);
     break;
   }
 
