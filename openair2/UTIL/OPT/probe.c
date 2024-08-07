@@ -254,7 +254,7 @@ int opt_create_listener_socket(char *ip_address, uint16_t port) {
     LOG_E(OPT, "Failed to bind socket to (%s:%u): %s\n",
           inet_ntoa(opt_listener.address.sin_addr),
           ntohs(opt_listener.address.sin_port), strerror(errno));
-    opt_type = OPT_NONE;
+    // we log anyway as planned because other OAI process may have created the sink
     close(opt_listener.sd);
     opt_listener.sd = -1;
     return -1;
