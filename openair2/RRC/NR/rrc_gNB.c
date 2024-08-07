@@ -1130,11 +1130,27 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     return;
   }
 
+  // 3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1: RNTI values
+  if (req->ue_Identity.c_RNTI < 0x1 || req->ue_Identity.c_RNTI > 0xffef) {
+    /* c_RNTI range error should not happen */
+    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04lx range error, fallback to RRC setup\n", req->ue_Identity.c_RNTI);
+    goto fallback_rrc_setup;
+  }
+
   if (du->mib == NULL || du->sib1 == NULL) {
     /* we don't have MIB/SIB1 of the DU, and therefore cannot generate the
      * Reestablishment (as we would need the SSB's ARFCN, which we cannot
      * compute). So generate RRC Setup instead */
     LOG_E(NR_RRC, "Reestablishment request: no MIB/SIB1 of DU present, cannot do reestablishment, force setup request\n");
+    goto fallback_rrc_setup;
+  }
+
+  if (du->mtc == NULL) {
+    // some UEs don't send MeasurementTimingConfiguration, so we don't know the
+    // SSB ARFCN and can't do reestablishment. handle it gracefully by doing
+    // RRC setup procedure instead
+    LOG_E(NR_RRC, "no MeasurementTimingConfiguration for this cell, cannot perform reestablishment\n");
+    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
     goto fallback_rrc_setup;
   }
 
@@ -1144,6 +1160,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     LOG_E(NR_RRC, "NR_RRCReestablishmentRequest without UE context, fallback to RRC setup\n");
     goto fallback_rrc_setup;
   }
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
   const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
   if (physCellId != cell_info->nr_pci) {
@@ -1160,26 +1177,9 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
-  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-  // 3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1: RNTI values
-  if (req->ue_Identity.c_RNTI < 0x1 || req->ue_Identity.c_RNTI > 0xffef) {
-    /* c_RNTI range error should not happen */
-    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04lx range error, fallback to RRC setup\n", req->ue_Identity.c_RNTI);
-    goto fallback_rrc_setup;
-  }
-
   if (!UE->as_security_active) {
     /* no active security context, need to restart entire connection */
     LOG_E(NR_RRC, "UE requested Reestablishment without activated AS security\n");
-    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
-    goto fallback_rrc_setup;
-  }
-
-  if (du->mtc == NULL) {
-    // some UEs don't send MeasurementTimingConfiguration, so we don't know the
-    // SSB ARFCN and can't do reestablishment. handle it gracefully by doing
-    // RRC setup procedure instead
-    LOG_E(NR_RRC, "no MeasurementTimingConfiguration for this cell, cannot perform reestablishment\n");
     ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
     goto fallback_rrc_setup;
   }
