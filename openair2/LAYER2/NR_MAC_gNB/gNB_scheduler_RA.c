@@ -1678,7 +1678,8 @@ static void nr_generate_Msg2(module_id_t module_idP,
     NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[module_idP]->UE_info, ra->rnti);
     if (UE) {
       int delay = nr_mac_get_reconfig_delay_slots(ra->DL_BWP.scs);
-      nr_mac_interrupt_ue_transmission(RC.nrmac[module_idP], UE, FOLLOW_INSYNC, delay);
+      interrupt_followup_action_t action = UE->reconfigCellGroup ? FOLLOW_INSYNC_RECONFIG : FOLLOW_INSYNC;
+      nr_mac_interrupt_ue_transmission(RC.nrmac[module_idP], UE, action, delay);
     }
   }
 
