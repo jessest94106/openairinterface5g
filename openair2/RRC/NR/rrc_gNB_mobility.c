@@ -115,6 +115,9 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
     ho_ctx->source->du = source_du;
     ho_ctx->source->du_ue_id = ue_data.secondary_ue;
     ho_ctx->source->old_rnti = ue->rnti;
+
+    int result = asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&ho_ctx->source->old_cellGroupConfig, ue->masterCellGroup);
+    AssertFatal(result == 0, "error during asn_copy() of CellGroupConfig\n");
   }
   ue->ho_context = ho_ctx;
   LOG_A(NR_RRC,
@@ -289,6 +292,20 @@ static void nr_rrc_f1_ho_complete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   LOG_I(NR_RRC, "UE %d Handover: trigger release on DU assoc_id %d\n", UE->rrc_ue_id, source_ctx->du->assoc_id);
 }
 
+static void nr_rrc_cancel_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
+{
+  DevAssert(UE->ho_context != NULL);
+  nr_ho_target_cu_t *target_ctx = UE->ho_context->target;
+  DevAssert(target_ctx != NULL);
+  f1ap_ue_context_release_cmd_t cmd = {
+      .gNB_CU_ue_id = UE->rrc_ue_id,
+      .gNB_DU_ue_id = target_ctx->du_ue_id,
+      .cause = F1AP_CAUSE_RADIO_NETWORK, // better
+      .cause_value = 5, // 5 = F1AP_CauseRadioNetwork_interaction_with_other_procedure
+      .srb_id = DCCH,
+  };
+  rrc->mac_rrc.ue_context_release_command(target_ctx->du->assoc_id, &cmd);
+}
 
 void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du)
 {
@@ -306,12 +323,14 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
   // handover preparation information
   ho_req_ack_t ack = nr_rrc_f1_ho_acknowledge;
   ho_success_t success = nr_rrc_f1_ho_complete;
-  ho_cancel_t cancel = NULL;
+  ho_cancel_t cancel = nr_rrc_cancel_f1_ho;
   nr_initiate_handover(rrc, ue, source_du, target_du, buf, size, ack, success, cancel);
 }
 
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue)
 {
+  if (ue->ho_context->source)
+    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, ue->ho_context->source->old_cellGroupConfig);
   free_ho_ctx(ue->ho_context);
   ue->ho_context = NULL;
 }

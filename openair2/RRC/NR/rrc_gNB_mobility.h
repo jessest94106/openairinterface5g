@@ -28,6 +28,8 @@ typedef struct gNB_RRC_INST_s gNB_RRC_INST;
 typedef struct gNB_RRC_UE_s gNB_RRC_UE_t;
 typedef struct nr_rrc_du_container_t nr_rrc_du_container_t;
 
+typedef struct NR_CellGroupConfig NR_CellGroupConfig_t;
+
 typedef void (*ho_cancel_t)(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue);
 typedef struct nr_ho_source_cu {
   /// pointer to the (source) DU structure
@@ -38,6 +40,9 @@ typedef struct nr_ho_source_cu {
   uint32_t du_ue_id;
   /// old (source) RNTI (to recognize a UE during reestablishment)
   rnti_t old_rnti;
+  /// old (source) CellGroupConfig (to send the cellGroupConfig in case of
+  /// reestablishment)
+  NR_CellGroupConfig_t *old_cellGroupConfig;
   /// function pointer to announce the handover cancellation, e.g.,
   /// reestablishment
   ho_cancel_t ho_cancel;
