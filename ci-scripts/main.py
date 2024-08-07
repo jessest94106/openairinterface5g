@@ -269,7 +269,7 @@ def GetParametersFromXML(action):
 			CiTestObj.nodes = test.findtext('nodes').split(' ')
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
 
-	elif action == 'Iperf':
+	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		CiTestObj.svr_id = test.findtext('svr_id') or None
