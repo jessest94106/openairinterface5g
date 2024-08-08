@@ -236,16 +236,6 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
   ///////////
   ////////////////////////////////////////////////////////////////////////
 
-  /////////////////////////DMRS Modulation/////////////////////////
-  ///////////
-
-  uint16_t n_dmrs = (pusch_pdu->bwp_start + start_rb + nb_rb)*((dmrs_type == pusch_dmrs_type1) ? 6:4);
-  c16_t mod_dmrs[n_dmrs] __attribute((aligned(16)));
-
-  ///////////
-  ////////////////////////////////////////////////////////////////////////
-
-
   /////////////////////////ULSCH layer mapping/////////////////////////
   ///////////
   const int sz = available_bits / mod_order / Nl;
@@ -359,7 +349,12 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
       uint8_t is_ptrs_sym = 0;
       uint16_t dmrs_idx = 0, ptrs_idx = 0;
 
+      uint16_t n_dmrs = (pusch_pdu->bwp_start + start_rb + nb_rb) * ((dmrs_type == pusch_dmrs_type1) ? 6 : 4);
+      c16_t mod_dmrs[n_dmrs] __attribute((aligned(16)));
+      c16_t mod_dmrs_amp[n_dmrs] __attribute((aligned(16)));
+
       c16_t mod_ptrs[nb_rb] __attribute((aligned(16))); // assume maximum number of PTRS per pusch allocation
+      c16_t mod_ptrs_amp[nb_rb] __attribute((aligned(16))); // assume maximum number of PTRS per pusch allocation
 
       if ((ul_dmrs_symb_pos >> l) & 0x01) {
         is_dmrs_sym = 1;
@@ -384,6 +379,10 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                         n_dmrs * 2,
                         DMRS_MOD_ORDER,
                         (int16_t *)mod_dmrs); // currently only codeword 0 is modulated. Qm = 2 as DMRS is QPSK modulated
+          
+          const int tmp = Wt[l_prime[0]] * Wf[k_prime] * AMP;
+          //todo: mult only needed
+          multadd_complex_vector_real_scalar((int16_t*)mod_dmrs,tmp,(int16_t*)mod_dmrs_amp,1,n_dmrs*2);
         } else {
           dmrs_idx = 0;
         }
@@ -400,6 +399,8 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                                                slot,
                                                l);
           nr_modulation(gold, nb_rb, DMRS_MOD_ORDER, (int16_t *)mod_ptrs);
+          const uint16_t beta_ptrs = 1; // temp value until power control is implemented
+          multadd_complex_vector_real_scalar((int16_t*)mod_ptrs,beta_ptrs*AMP,(int16_t*)mod_ptrs_amp,1,nb_rb);
         }
       }
 
@@ -428,7 +429,7 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
           if (pusch_pdu->transform_precoding == transformPrecoder_enabled)
             tx_precoding[nl][sample_offsetF] = c16mulRealShift(dmrs_seq[dmrs_idx], tmp, 15);
           else
-            tx_precoding[nl][sample_offsetF] = c16mulRealShift(mod_dmrs[dmrs_idx], tmp, 15);
+            tx_precoding[nl][sample_offsetF] = mod_dmrs_amp[dmrs_idx];
 
 #ifdef DEBUG_PUSCH_MAPPING
           printf("DMRS: Layer: %d\t, dmrs_idx %d\t l %d \t k %d \t k_prime %d \t n %d \t dmrs: %d %d\n",
@@ -448,8 +449,7 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
           n += (k_prime) ? 0 : 1;
 
         } else if (is_ptrs == 1) {
-          uint16_t beta_ptrs = 1; // temp value until power control is implemented
-          tx_precoding[nl][sample_offsetF] = c16mulRealShift(mod_ptrs[ptrs_idx], beta_ptrs * AMP, 15);
+          tx_precoding[nl][sample_offsetF] = mod_ptrs_amp[ptrs_idx];
           ptrs_idx++;
         } else if (!is_dmrs_sym
                    || allowed_xlsch_re_in_dmrs_symbol(k, start_sc, frame_parms->ofdm_symbol_size, cdm_grps_no_data, dmrs_type)) {
