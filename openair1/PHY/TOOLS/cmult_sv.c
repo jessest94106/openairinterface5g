@@ -24,6 +24,18 @@
 #include <simde/simde-common.h>
 #include <simde/x86/sse.h>
 
+void mult_real_vector_single_vector(const c16_t *x, const int16_t *alpha, c16_t *y, const unsigned int N)
+{
+  const simd_q15_t *alpha_128 = (const simd_q15_t *)alpha;
+  const simd_q15_t *x_128 = (const simd_q15_t *)x;
+  simd_q15_t *y_128 = (simd_q15_t *)y;
+  const unsigned int num_adds = (N + 3) / 4; // ceil(N/4)
+
+  for (uint_fast32_t n = 0; n < num_adds; n++) {
+    y_128[n] = mulhi_int16(x_128[n], *alpha_128);
+  }
+}
+
 void multadd_complex_vector_real_scalar(int16_t *x,
                                         int16_t alpha,
                                         int16_t *y,
@@ -35,19 +47,20 @@ void multadd_complex_vector_real_scalar(int16_t *x,
   int n;
 
   alpha_128 = set1_int16(alpha);
+  const uint32_t num_adds = (N + 3) / 4; // ceil(N/4)
 
-  if (zero_flag == 1)
-    for (n=0; n<N>>2; n++) {
-     // print_shorts("x_128[n]=", &x_128[n]);
-     // print_shorts("alpha_128", &alpha_128);
+  if (zero_flag == 1) {
+    for (n = 0; n < num_adds; n++) {
+      // print_shorts("x_128[n]=", &x_128[n]);
+      // print_shorts("alpha_128", &alpha_128);
       y_128[n] = mulhi_int16(x_128[n],alpha_128);
      // print_shorts("y_128[n]=", &y_128[n]);
     }
-
-  else
-    for (n=0; n<N>>2; n++) {
+  } else {
+    for (n = 0; n < num_adds; n++) {
       y_128[n] = adds_int16(y_128[n],mulhi_int16(x_128[n],alpha_128));
     }
+  }
 
   simde_mm_empty();
   simde_m_empty();
