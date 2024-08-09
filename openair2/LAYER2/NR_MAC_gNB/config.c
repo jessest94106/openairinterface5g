@@ -43,11 +43,10 @@
 
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "SCHED_NR/phy_frame_config_nr.h"
-#include "openair1/PHY/defs_gNB.h"
 
 #include "NR_MIB.h"
 #include "LAYER2/NR_MAC_COMMON/nr_mac_common.h"
-#include "../../../../nfapi/oai_integration/vendor_ext.h"
+#include "nfapi/oai_integration/vendor_ext.h"
 /* Softmodem params */
 #include "executables/softmodem-common.h"
 #include <complex.h>

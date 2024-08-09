@@ -32,7 +32,6 @@
 
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "common/utils/nr/nr_common.h"
-#include "openair1/PHY/defs_nr_common.h"
 #include <limits.h>
 #include <executables/softmodem-common.h>
 

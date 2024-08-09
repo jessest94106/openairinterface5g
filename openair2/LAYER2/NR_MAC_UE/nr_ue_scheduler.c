@@ -35,9 +35,6 @@
 /* exe */
 #include <common/utils/nr/nr_common.h>
 
-/* PHY */
-#include "openair1/PHY/impl_defs_top.h"
-
 /* MAC */
 #include "NR_MAC_COMMON/nr_mac.h"
 #include "NR_MAC_COMMON/nr_mac_common.h"
