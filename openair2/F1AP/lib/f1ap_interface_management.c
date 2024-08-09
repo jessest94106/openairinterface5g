@@ -1427,3 +1427,193 @@ f1ap_gnb_cu_configuration_update_t cp_f1ap_cu_configuration_update(const f1ap_gn
   }
   return cp;
 }
+
+/* ====================================
+ *   F1AP gNB-CU Configuration Ack
+ * ==================================== */
+
+/**
+ * @brief F1 gNB-CU Configuration Update Acknowledge message encoding (9.2.1.11 of 3GPP TS 38.473)
+ *        gNB-DU → gNB-CU
+ */
+F1AP_F1AP_PDU_t *encode_f1ap_cu_configuration_update_acknowledge(const f1ap_gnb_cu_configuration_update_acknowledge_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+  /* Create */
+  /* 0. pdu Type */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_gNBCUConfigurationUpdate;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_SuccessfulOutcome__value_PR_GNBCUConfigurationUpdateAcknowledge;
+  F1AP_GNBCUConfigurationUpdateAcknowledge_t *out = &tmp->value.choice.GNBCUConfigurationUpdateAcknowledge;
+  // Transaction ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_GNBCUConfigurationUpdateAcknowledgeIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+  // Cells Failed to be Activated List (0..1)
+  if (msg->num_cells_failed_to_be_activated > 0) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t, ie2);
+    ie2->id = F1AP_ProtocolIE_ID_id_Cells_Failed_to_be_Activated_List;
+    ie2->criticality = F1AP_Criticality_reject;
+    ie2->value.present = F1AP_GNBCUConfigurationUpdateAcknowledgeIEs__value_PR_Cells_Failed_to_be_Activated_List;
+    F1AP_Cells_Failed_to_be_Activated_List_t *failedCellsList = &ie2->value.choice.Cells_Failed_to_be_Activated_List;
+    for (int i = 0; i < msg->num_cells_failed_to_be_activated; i++) {
+      asn1cSequenceAdd(failedCellsList->list, F1AP_Cells_Failed_to_be_Activated_List_ItemIEs_t, failedCellIE);
+      failedCellIE->id = F1AP_ProtocolIE_ID_id_Cells_Failed_to_be_Activated_List_Item;
+      failedCellIE->criticality = F1AP_Criticality_reject;
+      failedCellIE->value.present = F1AP_Cells_Failed_to_be_Activated_List_ItemIEs__value_PR_Cells_Failed_to_be_Activated_List_Item;
+      F1AP_Cells_Failed_to_be_Activated_List_Item_t *p1 = &failedCellIE->value.choice.Cells_Failed_to_be_Activated_List_Item;
+      // Cause (M)
+      p1->cause.present = F1AP_Cause_PR_radioNetwork;
+      p1->cause.choice.radioNetwork = msg->cells_failed_to_be_activated[i].cause;
+      // NR CGI (M)
+      const f1ap_plmn_t *plmn = &msg->cells_failed_to_be_activated[i].plmn;
+      MCC_MNC_TO_PLMNID(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &(p1->nRCGI.pLMN_Identity));
+      printf("plmn->mcc %d %d %d %ld \n",
+        p1->nRCGI.pLMN_Identity.buf[0], p1->nRCGI.pLMN_Identity.buf[1], p1->nRCGI.pLMN_Identity.buf[2], p1->nRCGI.pLMN_Identity.size);
+      NR_CELL_ID_TO_BIT_STRING(msg->cells_failed_to_be_activated[i].nr_cellid, &(p1->nRCGI.nRCellIdentity));
+    }
+  }
+  return pdu;
+}
+
+/**
+ * @brief F1 gNB-CU Configuration Update Acknowledge decoding (9.2.1.11 of 3GPP TS 38.473)
+ */
+bool decode_f1ap_cu_configuration_update_acknowledge(const F1AP_F1AP_PDU_t *pdu,
+                                                     f1ap_gnb_cu_configuration_update_acknowledge_t *out)
+{
+  /* Message type */
+  _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_successfulOutcome);
+  AssertError(pdu->choice.successfulOutcome != NULL, return false, "pdu->choice.successfulOutcome is NULL");
+  _F1_EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, F1AP_ProcedureCode_id_gNBCUConfigurationUpdate);
+  _F1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present,
+                   F1AP_SuccessfulOutcome__value_PR_GNBCUConfigurationUpdateAcknowledge);
+  /* payload */
+  F1AP_GNBCUConfigurationUpdateAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.GNBCUConfigurationUpdateAcknowledge;
+  F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t *ie;
+  /* Check mandatory IEs */
+  F1AP_LIB_FIND_IE(F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    ie = in->protocolIEs.list.array[i];
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_GNBCUConfigurationUpdateAcknowledgeIEs__value_PR_TransactionID);
+        AssertError(ie->value.choice.TransactionID != -1, return false, "ie->value.choice.TransactionID is -1");
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_Cells_Failed_to_be_Activated_List: {
+        /* Decode Cells Failed to be Activated List */
+        _F1_EQ_CHECK_INT(ie->value.present,
+                         F1AP_GNBCUConfigurationUpdateAcknowledgeIEs__value_PR_Cells_Failed_to_be_Activated_List);
+        F1AP_Cells_Failed_to_be_Activated_List_t *cell_fail_list = &ie->value.choice.Cells_Failed_to_be_Activated_List;
+        out->num_cells_failed_to_be_activated = cell_fail_list->list.count;
+        for (int j = 0; j < out->num_cells_failed_to_be_activated; j++) {
+          const F1AP_Cells_Failed_to_be_Activated_List_ItemIEs_t *itemIE =
+              (F1AP_Cells_Failed_to_be_Activated_List_ItemIEs_t *)cell_fail_list->list.array[j];
+          const F1AP_Cells_Failed_to_be_Activated_List_Item_t *item = &itemIE->value.choice.Cells_Failed_to_be_Activated_List_Item;
+          // NR CGI (M)
+          f1ap_plmn_t *plmn = &out->cells_failed_to_be_activated[j].plmn;
+          TBCD_TO_MCC_MNC(&(item->nRCGI.pLMN_Identity), plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
+          BIT_STRING_TO_NR_CELL_IDENTITY(&item->nRCGI.nRCellIdentity, out->cells_failed_to_be_activated[j].nr_cellid);
+          // Cause (M)
+          switch (item->cause.present) {
+            case F1AP_Cause_PR_radioNetwork:
+              out->cells_failed_to_be_activated[j].cause = item->cause.choice.radioNetwork;
+              break;
+            case F1AP_Cause_PR_transport:
+              out->cells_failed_to_be_activated[j].cause = item->cause.choice.transport;
+              break;
+            case F1AP_Cause_PR_protocol:
+              out->cells_failed_to_be_activated[j].cause = item->cause.choice.protocol;
+              break;
+            case F1AP_Cause_PR_misc:
+              out->cells_failed_to_be_activated[j].cause = item->cause.choice.misc;
+              break;
+            default:
+              AssertError(1 == 0, return false, "Unknown cause type %d\n", item->cause.present);
+              break;
+          }
+        }
+        break;
+      }
+      default:
+        AssertError(1 == 0, return false, "F1AP_ProtocolIE_ID_id %ld unknown\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief F1 gNB-CU Configuration Update Acknowledge check
+ */
+bool eq_f1ap_cu_configuration_update_acknowledge(const f1ap_gnb_cu_configuration_update_acknowledge_t *a,
+                                                 const f1ap_gnb_cu_configuration_update_acknowledge_t *b)
+{
+  // Transaction ID
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
+  // number of cells failed to be activated
+  _F1_EQ_CHECK_INT(a->num_cells_failed_to_be_activated, b->num_cells_failed_to_be_activated);
+  for (int i = 0; i < a->num_cells_failed_to_be_activated; i++) {
+    if (!eq_f1ap_plmn(&a->cells_failed_to_be_activated[i].plmn, &b->cells_failed_to_be_activated[i].plmn))
+      return false;
+    _F1_EQ_CHECK_LONG(a->cells_failed_to_be_activated[i].nr_cellid, b->cells_failed_to_be_activated[i].nr_cellid);
+    _F1_EQ_CHECK_INT(a->cells_failed_to_be_activated[i].cause, b->cells_failed_to_be_activated[i].cause);
+  }
+  // TNL Associations to setup
+  _F1_EQ_CHECK_INT(a->noofTNLAssociations_to_setup, b->noofTNLAssociations_to_setup);
+  for (int i = 0; i < a->noofTNLAssociations_to_setup; i++) {
+    // Explicit comparison of TNL Association fields
+    _F1_EQ_CHECK_INT(a->tnlAssociations_to_setup[i].tl_address, b->tnlAssociations_to_setup[i].tl_address);
+    _F1_EQ_CHECK_INT(a->tnlAssociations_to_setup[i].port, b->tnlAssociations_to_setup[i].port);
+  }
+  // TNL Associations failed to setup
+  _F1_EQ_CHECK_INT(a->noofTNLAssociations_failed, b->noofTNLAssociations_failed);
+  for (int i = 0; i < a->noofTNLAssociations_failed; i++) {
+    // Explicit comparison of TNL Association fields
+    _F1_EQ_CHECK_INT(a->tnlAssociations_failed[i].tl_address, b->tnlAssociations_failed[i].tl_address);
+    _F1_EQ_CHECK_INT(a->tnlAssociations_failed[i].port, b->tnlAssociations_failed[i].port);
+  }
+  // Dedicated SI Delivery Needed UE List
+  _F1_EQ_CHECK_INT(a->noofDedicatedSIDeliveryNeededUEs, b->noofDedicatedSIDeliveryNeededUEs);
+  for (int i = 0; i < a->noofDedicatedSIDeliveryNeededUEs; i++) {
+    _F1_EQ_CHECK_INT(a->dedicatedSIDeliveryNeededUEs[i].gNB_CU_ue_id, b->dedicatedSIDeliveryNeededUEs[i].gNB_CU_ue_id);
+    if (!eq_f1ap_plmn(&a->dedicatedSIDeliveryNeededUEs[i].ue_plmn, &b->dedicatedSIDeliveryNeededUEs[i].ue_plmn))
+      return false;
+    _F1_EQ_CHECK_LONG(a->dedicatedSIDeliveryNeededUEs[i].ue_nr_cellid, b->dedicatedSIDeliveryNeededUEs[i].ue_nr_cellid);
+  }
+  return true;
+}
+
+/**
+ * @brief F1 gNB-CU Configuration Update Acknowledge deep copy
+ */
+f1ap_gnb_cu_configuration_update_acknowledge_t cp_f1ap_cu_configuration_update_acknowledge(
+    const f1ap_gnb_cu_configuration_update_acknowledge_t *msg)
+{
+  f1ap_gnb_cu_configuration_update_acknowledge_t cp = {0};
+  // Transaction ID
+  cp.transaction_id = msg->transaction_id;
+  // number of cells failed to be activated
+  cp.num_cells_failed_to_be_activated = msg->num_cells_failed_to_be_activated;
+  for (int i = 0; i < cp.num_cells_failed_to_be_activated; i++)
+    cp.cells_failed_to_be_activated[i] = msg->cells_failed_to_be_activated[i];
+  // TNL Associations to setup
+  cp.noofTNLAssociations_to_setup = msg->noofTNLAssociations_to_setup;
+  for (int i = 0; i < cp.noofTNLAssociations_to_setup; i++)
+    cp.tnlAssociations_to_setup[i] = msg->tnlAssociations_to_setup[i];
+  // TNL Associations failed to setup
+  cp.noofTNLAssociations_failed = msg->noofTNLAssociations_failed;
+  for (int i = 0; i < cp.noofTNLAssociations_failed; i++)
+    cp.tnlAssociations_failed[i] = msg->tnlAssociations_failed[i];
+  // Dedicated SI Delivery Needed UE List
+  cp.noofDedicatedSIDeliveryNeededUEs = msg->noofDedicatedSIDeliveryNeededUEs;
+  for (int i = 0; i < cp.noofDedicatedSIDeliveryNeededUEs; i++)
+    cp.dedicatedSIDeliveryNeededUEs[i] = msg->dedicatedSIDeliveryNeededUEs[i];
+  return cp;
+}
