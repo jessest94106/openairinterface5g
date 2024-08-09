@@ -970,3 +970,324 @@ f1ap_setup_failure_t cp_f1ap_setup_failure(const f1ap_setup_failure_t *msg)
   cp.transaction_id = msg->transaction_id;
   return cp;
 }
+
+/* ====================================
+ *   F1AP gNB-DU Configuration Update
+ * ==================================== */
+
+/**
+ * @brief F1 gNB-DU Configuration Update encoding (9.2.1.7 of 3GPP TS 38.473)
+ */
+F1AP_F1AP_PDU_t *encode_f1ap_du_configuration_update(const f1ap_gnb_du_configuration_update_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc(1, sizeof(*pdu));
+  AssertFatal(pdu != NULL, "out of memory\n");
+  /* Create */
+  /* 0. Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, initMsg);
+  initMsg->procedureCode = F1AP_ProcedureCode_id_gNBDUConfigurationUpdate;
+  initMsg->criticality   = F1AP_Criticality_reject;
+  initMsg->value.present = F1AP_InitiatingMessage__value_PR_GNBDUConfigurationUpdate;
+  F1AP_GNBDUConfigurationUpdate_t *out = &initMsg->value.choice.GNBDUConfigurationUpdate;
+  /* mandatory */
+  /* c1. Transaction ID (integer value) */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBDUConfigurationUpdateIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_GNBDUConfigurationUpdateIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+  /* mandatory */
+  /* c2. Served_Cells_To_Add */
+  if (msg->num_cells_to_add > 0) {
+    AssertFatal(false, "code for adding cells not tested\n");
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBDUConfigurationUpdateIEs_t, ie2);
+    ie2->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Add_List;
+    ie2->criticality = F1AP_Criticality_reject;
+    ie2->value.present = F1AP_GNBDUConfigurationUpdateIEs__value_PR_Served_Cells_To_Add_List;
+
+    for (int j = 0; j < msg->num_cells_to_add; j++) {
+      const f1ap_served_cell_info_t *cell = &msg->cell_to_add[j].info;
+      const f1ap_gnb_du_system_info_t *sys_info = msg->cell_to_add[j].sys_info;
+      asn1cSequenceAdd(ie2->value.choice.Served_Cells_To_Add_List.list,
+                       F1AP_Served_Cells_To_Add_ItemIEs_t,
+                       served_cells_to_add_item_ies);
+      served_cells_to_add_item_ies->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Add_Item;
+      served_cells_to_add_item_ies->criticality = F1AP_Criticality_reject;
+      served_cells_to_add_item_ies->value.present = F1AP_Served_Cells_To_Add_ItemIEs__value_PR_Served_Cells_To_Add_Item;
+      F1AP_Served_Cells_To_Add_Item_t *served_cells_to_add_item =
+          &served_cells_to_add_item_ies->value.choice.Served_Cells_To_Add_Item;
+      served_cells_to_add_item->served_Cell_Information = encode_served_cell_info(cell);
+      served_cells_to_add_item->gNB_DU_System_Information = encode_system_info(sys_info);
+    }
+  }
+
+  /* mandatory */
+  /* c3. Served_Cells_To_Modify */
+  if (msg->num_cells_to_modify > 0) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBDUConfigurationUpdateIEs_t, ie3);
+    ie3->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Modify_List;
+    ie3->criticality = F1AP_Criticality_reject;
+    ie3->value.present = F1AP_GNBDUConfigurationUpdateIEs__value_PR_Served_Cells_To_Modify_List;
+    for (int i = 0; i < msg->num_cells_to_modify; i++) {
+      const f1ap_served_cell_info_t *cell = &msg->cell_to_modify[i].info;
+      const f1ap_gnb_du_system_info_t *sys_info = msg->cell_to_modify[i].sys_info;
+      asn1cSequenceAdd(ie3->value.choice.Served_Cells_To_Modify_List.list,
+                       F1AP_Served_Cells_To_Modify_ItemIEs_t,
+                       served_cells_to_modify_item_ies);
+      served_cells_to_modify_item_ies->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Modify_Item;
+      served_cells_to_modify_item_ies->criticality = F1AP_Criticality_reject;
+      served_cells_to_modify_item_ies->value.present = F1AP_Served_Cells_To_Modify_ItemIEs__value_PR_Served_Cells_To_Modify_Item;
+      F1AP_Served_Cells_To_Modify_Item_t *served_cells_to_modify_item =
+          &served_cells_to_modify_item_ies->value.choice.Served_Cells_To_Modify_Item;
+
+      F1AP_NRCGI_t *oldNRCGI = &served_cells_to_modify_item->oldNRCGI;
+      const f1ap_plmn_t *old_plmn = &msg->cell_to_modify[i].old_plmn;
+      MCC_MNC_TO_PLMNID(old_plmn->mcc, old_plmn->mnc, old_plmn->mnc_digit_length, &oldNRCGI->pLMN_Identity);
+      NR_CELL_ID_TO_BIT_STRING(msg->cell_to_modify[i].old_nr_cellid, &oldNRCGI->nRCellIdentity);
+
+      served_cells_to_modify_item->served_Cell_Information = encode_served_cell_info(cell);
+      served_cells_to_modify_item->gNB_DU_System_Information = encode_system_info(sys_info);
+    }
+  }
+
+  /* mandatory */
+  /* c4. Served_Cells_To_Delete */
+  if (msg->num_cells_to_delete > 0) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBDUConfigurationUpdateIEs_t, ie4);
+    ie4->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Delete_List;
+    ie4->criticality = F1AP_Criticality_reject;
+    ie4->value.present = F1AP_GNBDUConfigurationUpdateIEs__value_PR_Served_Cells_To_Delete_List;
+    AssertFatal(msg->num_cells_to_delete == 0, "code for deleting cells not tested\n");
+    for (int i = 0; i < msg->num_cells_to_delete; i++) {
+      asn1cSequenceAdd(ie4->value.choice.Served_Cells_To_Delete_List.list,
+                       F1AP_Served_Cells_To_Delete_ItemIEs_t,
+                       served_cells_to_delete_item_ies);
+      served_cells_to_delete_item_ies->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Delete_Item;
+      served_cells_to_delete_item_ies->criticality = F1AP_Criticality_reject;
+      served_cells_to_delete_item_ies->value.present = F1AP_Served_Cells_To_Delete_ItemIEs__value_PR_Served_Cells_To_Delete_Item;
+      F1AP_Served_Cells_To_Delete_Item_t *served_cells_to_delete_item =
+          &served_cells_to_delete_item_ies->value.choice.Served_Cells_To_Delete_Item;
+      F1AP_NRCGI_t *oldNRCGI = &served_cells_to_delete_item->oldNRCGI;
+      const f1ap_plmn_t *plmn = &msg->cell_to_delete[i].plmn;
+      MCC_MNC_TO_PLMNID(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &(oldNRCGI->pLMN_Identity));
+      NR_CELL_ID_TO_BIT_STRING(msg->cell_to_delete[i].nr_cellid, &(oldNRCGI->nRCellIdentity));
+    }
+  }
+
+  /* optional */
+  /* c5. GNB_DU_ID (integer value) */
+  if (msg->gNB_DU_ID != NULL) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBDUConfigurationUpdateIEs_t, ie5);
+    ie5->id = F1AP_ProtocolIE_ID_id_gNB_DU_ID;
+    ie5->criticality = F1AP_Criticality_reject;
+    ie5->value.present = F1AP_GNBDUConfigurationUpdateIEs__value_PR_GNB_DU_ID;
+    asn_int642INTEGER(&ie5->value.choice.GNB_DU_ID, *msg->gNB_DU_ID);
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief F1 gNB-DU Configuration Update decoding (9.2.1.7 of 3GPP TS 38.473)
+ */
+bool decode_f1ap_du_configuration_update(const F1AP_F1AP_PDU_t *pdu, f1ap_gnb_du_configuration_update_t *out)
+{
+  /* Check presence of message type */
+  _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_initiatingMessage);
+  _F1_EQ_CHECK_LONG(pdu->choice.initiatingMessage->procedureCode, F1AP_ProcedureCode_id_gNBDUConfigurationUpdate);
+  _F1_EQ_CHECK_INT(pdu->choice.initiatingMessage->value.present, F1AP_InitiatingMessage__value_PR_GNBDUConfigurationUpdate);
+  /* Check presence of mandatory IEs */
+  F1AP_GNBDUConfigurationUpdate_t *in = &pdu->choice.initiatingMessage->value.choice.GNBDUConfigurationUpdate;
+  F1AP_GNBDUConfigurationUpdateIEs_t *ie;
+  /* Check mandatory IEs */
+  F1AP_LIB_FIND_IE(F1AP_GNBDUConfigurationUpdateIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    AssertError(in->protocolIEs.list.array[i] != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    ie = in->protocolIEs.list.array[i];
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID: {
+        out->transaction_id = ie->value.choice.TransactionID;
+      } break;
+      case F1AP_ProtocolIE_ID_id_Served_Cells_To_Add_List: {
+        /* Served Cells To Add List */
+        AssertError(out->num_cells_to_add > 0, return false, "at least 1 cell to add shall to be present");
+        out->num_cells_to_add = ie->value.choice.Served_Cells_To_Add_List.list.count;
+        for (int i = 0; i < out->num_cells_to_add; i++) {
+          F1AP_Served_Cells_To_Add_Item_t *served_cells_item =
+              &((F1AP_Served_Cells_To_Add_ItemIEs_t *)ie->value.choice.Served_Cells_To_Add_List.list.array[i])
+                   ->value.choice.Served_Cells_To_Add_Item;
+          /* Served Cell Information (M) */
+          if (!decode_served_cell_info(&served_cells_item->served_Cell_Information, &out->cell_to_add[i].info))
+            return false;
+          /* gNB-DU System Information */
+          if (served_cells_item->gNB_DU_System_Information != NULL) {
+            out->cell_to_add[i].sys_info = calloc_or_fail(1, sizeof(*out->cell_to_add[i].sys_info));
+            decode_system_info(served_cells_item->gNB_DU_System_Information, out->cell_to_add[i].sys_info);
+          }
+        }
+      } break;
+      case F1AP_ProtocolIE_ID_id_Served_Cells_To_Modify_List: {
+        /* Served Cells To Modify List (O) */
+        out->num_cells_to_modify = ie->value.choice.Served_Cells_To_Modify_List.list.count;
+        AssertError(out->num_cells_to_modify > 0, return false, "at least 1 cell to modify shall to be present");
+        for (int i = 0; i < out->num_cells_to_modify; i++) {
+          /* Served Cells To Modify List item (count >= 1) */
+          F1AP_Served_Cells_To_Modify_Item_t *served_cells_item =
+              &((F1AP_Served_Cells_To_Modify_ItemIEs_t *)ie->value.choice.Served_Cells_To_Modify_List.list.array[i])
+                   ->value.choice.Served_Cells_To_Modify_Item;
+          /* Old NR CGI (M) */
+          F1AP_NRCGI_t *oldNRCGI = &served_cells_item->oldNRCGI;
+          f1ap_plmn_t *old_plmn = &out->cell_to_modify[i].old_plmn;
+          TBCD_TO_MCC_MNC(&(oldNRCGI->pLMN_Identity), old_plmn->mcc, old_plmn->mnc, old_plmn->mnc_digit_length);
+          /* Old NR CGI Cell ID */
+          BIT_STRING_TO_NR_CELL_IDENTITY(&oldNRCGI->nRCellIdentity, out->cell_to_modify[i].old_nr_cellid);
+          /* Served Cell Information (M) */
+          if (!decode_served_cell_info(&served_cells_item->served_Cell_Information, &out->cell_to_modify[i].info))
+            return false;
+          /* gNB-DU System Information (O) */
+          if (served_cells_item->gNB_DU_System_Information != NULL) {
+            out->cell_to_modify[i].sys_info = calloc_or_fail(1, sizeof(*out->cell_to_modify[i].sys_info));
+            decode_system_info(served_cells_item->gNB_DU_System_Information, out->cell_to_modify[i].sys_info);
+          }
+        }
+      } break;
+      case F1AP_ProtocolIE_ID_id_Served_Cells_To_Delete_List: {
+        /* Served Cells To Delete List */
+        out->num_cells_to_delete = ie->value.choice.Served_Cells_To_Delete_List.list.count;
+        AssertError(out->num_cells_to_delete > 0, return false, "at least 1 cell to delete shall to be present");
+        for (int i = 0; i < out->num_cells_to_delete; i++) {
+          F1AP_Served_Cells_To_Delete_Item_t *served_cells_item =
+              &((F1AP_Served_Cells_To_Delete_ItemIEs_t *)ie->value.choice.Served_Cells_To_Delete_List.list.array[i])
+                   ->value.choice.Served_Cells_To_Delete_Item;
+          F1AP_NRCGI_t *oldNRCGI = &served_cells_item->oldNRCGI;
+          f1ap_plmn_t *plmn = &out->cell_to_delete[i].plmn;
+          /* Old NR CGI (M) */
+          TBCD_TO_MCC_MNC(&(oldNRCGI->pLMN_Identity), plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
+          // NR cellID
+          BIT_STRING_TO_NR_CELL_IDENTITY(&oldNRCGI->nRCellIdentity, out->cell_to_delete[i].nr_cellid);
+        }
+      } break;
+      case F1AP_ProtocolIE_ID_id_Cells_Status_List:
+        /* Cells Status List (O) */
+        AssertError(1 == 0, return false, "F1AP_ProtocolIE_ID_id_Cells_Status_List is not supported");
+        break;
+      case F1AP_ProtocolIE_ID_id_Dedicated_SIDelivery_NeededUE_List:
+        /* Dedicated SI Delivery Needed UE List (O) */
+        AssertError(1 == 0, return false, "F1AP_ProtocolIE_ID_id_Dedicated_SIDelivery_NeededUE_List is not supported");
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_ID:
+        /* gNB-DU ID (O)*/
+        asn_INTEGER2ulong(&ie->value.choice.GNB_DU_ID, out->gNB_DU_ID);
+        break;
+      case F1AP_ProtocolIE_ID_id_GNB_DU_TNL_Association_To_Remove_List:
+        /* Cells Status List (O) */
+        AssertError(1 == 0, return false, "F1AP_ProtocolIE_ID_id_GNB_DU_TNL_Association_To_Remove_List is not supported");
+        break;
+    }
+  }
+  return true;
+}
+
+void free_f1ap_du_configuration_update(const f1ap_gnb_du_configuration_update_t *msg)
+{
+  free(msg->gNB_DU_ID);
+  for (int i = 0; i < msg->num_cells_to_add; i++) {
+    free_f1ap_cell(&msg->cell_to_add[i].info, msg->cell_to_add[i].sys_info);
+  }
+  for (int i = 0; i < msg->num_cells_to_modify; i++) {
+    free_f1ap_cell(&msg->cell_to_modify[i].info, msg->cell_to_modify[i].sys_info);
+  }
+}
+
+/**
+ * @brief F1 gNB-DU Configuration Update check
+ */
+bool eq_f1ap_du_configuration_update(const f1ap_gnb_du_configuration_update_t *a, const f1ap_gnb_du_configuration_update_t *b)
+{
+  if (a->gNB_DU_ID != NULL && b->gNB_DU_ID != NULL)
+    _F1_EQ_CHECK_LONG(*a->gNB_DU_ID, *b->gNB_DU_ID);
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
+  /* to add */
+  _F1_EQ_CHECK_INT(a->num_cells_to_add, b->num_cells_to_add);
+  for (int i = 0; i < a->num_cells_to_add; i++) {
+    if (!eq_f1ap_cell_info(&a->cell_to_add[i].info, &b->cell_to_add[i].info))
+      return false;
+    if (a->cell_to_add[i].sys_info && b->cell_to_add[i].sys_info) {
+      if (!eq_f1ap_sys_info(a->cell_to_add[i].sys_info, b->cell_to_add[i].sys_info))
+        return false;
+    }
+  }
+  /* to delete */
+  _F1_EQ_CHECK_INT(a->num_cells_to_delete, b->num_cells_to_delete);
+  for (int i = 0; i < a->num_cells_to_delete; i++) {
+    _F1_EQ_CHECK_LONG(a->cell_to_delete[i].nr_cellid, b->cell_to_delete[i].nr_cellid);
+    if (!eq_f1ap_plmn(&a->cell_to_delete[i].plmn, &b->cell_to_delete[i].plmn))
+      return false;
+  }
+  /* to modify */
+  _F1_EQ_CHECK_INT(a->num_cells_to_modify, b->num_cells_to_modify);
+  for (int i = 0; i < a->num_cells_to_modify; i++) {
+    if (!eq_f1ap_cell_info(&a->cell_to_modify[i].info, &b->cell_to_modify[i].info))
+      return false;
+    if (a->cell_to_modify[i].sys_info && b->cell_to_modify[i].sys_info) {
+      if (!eq_f1ap_sys_info(a->cell_to_modify[i].sys_info, b->cell_to_modify[i].sys_info))
+        return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief F1 gNB-DU Configuration Update deep copy
+ */
+f1ap_gnb_du_configuration_update_t cp_f1ap_du_configuration_update(const f1ap_gnb_du_configuration_update_t *msg)
+{
+  f1ap_gnb_du_configuration_update_t cp = {0};
+  /* gNB_DU_ID */
+  if (msg->gNB_DU_ID != NULL) {
+    cp.gNB_DU_ID = calloc_or_fail(1, sizeof(*cp.gNB_DU_ID));
+    *cp.gNB_DU_ID = *msg->gNB_DU_ID;
+  }
+  /* transaction_id */
+  cp.transaction_id = msg->transaction_id;
+  /* to add */
+  cp.num_cells_to_add = msg->num_cells_to_add;
+  /* to delete */
+  cp.num_cells_to_delete = msg->num_cells_to_delete;
+  for (int i = 0; i < cp.num_cells_to_delete; i++) {
+    cp.cell_to_delete[i].nr_cellid = msg->cell_to_delete[i].nr_cellid;
+    cp.cell_to_delete[i].plmn = msg->cell_to_delete[i].plmn;
+  }
+  /* to modify */
+  cp.num_cells_to_modify = msg->num_cells_to_modify;
+  for (int i = 0; i < cp.num_cells_to_modify; i++) {
+    cp.cell_to_modify[i].info = msg->cell_to_modify[i].info;
+    f1ap_served_cell_info_t *info = &cp.cell_to_modify[i].info;
+    if (info->measurement_timing_config_len > 0) {
+      info->measurement_timing_config = malloc_or_fail(info->measurement_timing_config_len * sizeof(*info->measurement_timing_config));
+      for (int j = 0; j < info->measurement_timing_config_len; j++)
+        info->measurement_timing_config[j] = msg->cell_to_modify[i].info.measurement_timing_config[j];
+    }
+    /* TAC */
+    info->tac = calloc_or_fail(1, sizeof(*info->tac));
+    *info->tac = *msg->cell_to_modify[i].info.tac;
+    /* System information */
+    cp.cell_to_modify[i].sys_info = malloc_or_fail(sizeof(*cp.cell_to_modify[i].sys_info));
+    f1ap_gnb_du_system_info_t *sys_info = cp.cell_to_modify[i].sys_info;
+    if (msg->cell_to_modify[i].sys_info->mib_length > 0) {
+      sys_info->mib_length = msg->cell_to_modify[i].sys_info->mib_length;
+      sys_info->mib = calloc_or_fail(msg->cell_to_modify[i].sys_info->mib_length, sizeof(*sys_info->mib));
+      for (int j = 0; j < sys_info->mib_length; j++)
+        sys_info->mib[j] = msg->cell_to_modify[i].sys_info->mib[j];
+    }
+    if (msg->cell_to_modify[i].sys_info->sib1_length > 0) {
+      sys_info->sib1_length = msg->cell_to_modify[i].sys_info->sib1_length;
+      sys_info->sib1 = calloc_or_fail(msg->cell_to_modify[i].sys_info->sib1_length, sizeof(*sys_info->sib1));
+      for (int j = 0; j < sys_info->sib1_length; j++)
+        sys_info->sib1[j] = msg->cell_to_modify[i].sys_info->sib1[j];
+    }
+  }
+  return cp;
+}
