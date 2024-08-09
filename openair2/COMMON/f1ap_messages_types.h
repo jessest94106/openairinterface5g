@@ -98,6 +98,11 @@ typedef struct f1ap_plmn_t {
   uint8_t  mnc_digit_length;
 } f1ap_plmn_t;
 
+typedef struct f1ap_cp_tnl_s {
+  in_addr_t tl_address; // currently only IPv4 supported
+  uint16_t port;
+} f1ap_cp_tnl_t;
+
 typedef enum f1ap_mode_t { F1AP_MODE_TDD = 0, F1AP_MODE_FDD = 1 } f1ap_mode_t;
 
 typedef struct f1ap_nr_frequency_info_t {
@@ -229,22 +234,31 @@ typedef struct f1ap_setup_failure_s {
 } f1ap_setup_failure_t;
 
 typedef struct f1ap_gnb_cu_configuration_update_acknowledge_s {
+  uint64_t transaction_id;
+  // Cells Failed to be Activated List
   uint16_t num_cells_failed_to_be_activated;
-  f1ap_plmn_t plmn[F1AP_MAX_NB_CELLS];
-  uint64_t nr_cellid[F1AP_MAX_NB_CELLS];
-  uint16_t cause[F1AP_MAX_NB_CELLS];
+  struct {
+    // NR CGI
+    f1ap_plmn_t plmn;
+    uint64_t nr_cellid;
+    uint16_t cause;
+  } cells_failed_to_be_activated[F1AP_MAX_NB_CELLS];
   int have_criticality;
-  uint16_t criticality_diagnostics; 
+  uint16_t criticality_diagnostics;
+  // gNB-CU TNL Association Setup List
   uint16_t noofTNLAssociations_to_setup;
-  uint16_t have_port[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS];
-  in_addr_t tl_address[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS]; // currently only IPv4 supported
+  f1ap_cp_tnl_t tnlAssociations_to_setup[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS];
+  // gNB-CU TNL Association Failed to Setup List
   uint16_t noofTNLAssociations_failed;
-  in_addr_t tl_address_failed[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS]; // currently only IPv4 supported
-  uint16_t cause_failed[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS];
+  f1ap_cp_tnl_t tnlAssociations_failed[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS];
+  // Dedicated SI Delivery Needed UE List
   uint16_t noofDedicatedSIDeliveryNeededUEs;
-  uint32_t gNB_CU_ue_id[F1AP_MAX_NO_UE_ID]; 
-  f1ap_plmn_t ue_plmn[F1AP_MAX_NO_UE_ID];
-  uint64_t ue_nr_cellid[F1AP_MAX_NO_UE_ID];  
+  struct {
+    uint32_t gNB_CU_ue_id;
+    // NR CGI
+    f1ap_plmn_t ue_plmn;
+    uint64_t ue_nr_cellid;
+  } dedicatedSIDeliveryNeededUEs[F1AP_MAX_NO_UE_ID];
 } f1ap_gnb_cu_configuration_update_acknowledge_t;
 
 typedef struct f1ap_gnb_cu_configuration_update_failure_s {
