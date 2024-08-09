@@ -21,56 +21,46 @@
 
 unsigned char log2_approx(unsigned int x)
 {
+  unsigned char l2 = 0;
+  unsigned int tmp = x >> 1;
 
-  int i;
-  unsigned char l2;
+  while (tmp) {
+    l2++;
+    tmp >>= 1;
+  }
 
-  l2=0;
+  if (l2)
+    l2 += (x >> (l2 - 1)) & 1;
 
-  for (i=0; i<31; i++)
-    if ((x&(1<<i)) != 0)
-      l2 = i+1;
-
-  //l2 = i;
-
-  //  printf("log2_approx = %d\n",l2);
-  return(l2);
+  return l2;
 }
+
 
 unsigned char factor2(unsigned int x)
 {
-
+  unsigned char l2 = 0;
   int i;
-  unsigned char l2;
-
-  l2=0;
-
-  for (i=0; i<31; i++)
-    if ((x&(1<<i)) != 0)
+  for (i = 0; i < 31; i++)
+    if ((x & (1 << i)) != 0)
       break;
 
   l2 = i;
-
-  //printf("factor2(%d) = %d\n",x,l2);
-  return(l2);
+  return l2;
 }
-
-
 
 unsigned char log2_approx64(unsigned long long int x)
 {
+  unsigned char l2 = 0;
+  unsigned long long int tmp = x >> 1;
 
-  int i;
-  unsigned char l2;
+  while (tmp) {
+    l2++;
+    tmp >>= 1;
+  }
 
-  l2=0;
+  if (l2)
+    l2 += (x >> (l2 - 1)) & 1;
 
-  for (i=0; i<63; i++)
-    if ((x&(((long long int) 1)<<i)) != 0)
-      //     l2 = i+1;
-      l2 = i;
-
-  //  printf("log2_approx = %d\n",l2);
-  return(l2);
+  return l2;
 }
 
