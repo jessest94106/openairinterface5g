@@ -860,12 +860,7 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
       // re-initialize ta update variables after RA procedure completion
       UE->UE_sched_ctrl.ta_frame = frameP;
 
-      LOG_I(NR_MAC,
-            "[gNB %d][RAPROC] PUSCH with TC_RNTI 0x%04x received correctly, "
-            "adding UE MAC Context RNTI 0x%04x\n",
-            gnb_mod_idP,
-            current_rnti,
-            ra->rnti);
+      LOG_A(NR_MAC, "%4d.%2d PUSCH with TC_RNTI 0x%04x received correctly\n", frameP, slotP, current_rnti);
 
       NR_UE_sched_ctrl_t *UE_scheduling_control = &UE->UE_sched_ctrl;
       if (ul_cqi != 0xff) {
@@ -884,7 +879,6 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
         process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, ra->CellGroup->rlc_BearerToAddModList);
         nr_clear_ra_proc(ra);
       } else {
-        LOG_A(NR_MAC, "[RAPROC] RA-Msg3 received (sdu_lenP %d)\n", sdu_lenP);
         LOG_D(NR_MAC, "[RAPROC] Received Msg3:\n");
         for (uint32_t k = 0; k < sdu_lenP; k++) {
           LOG_D(NR_MAC, "(%i): 0x%x\n", k, sduP[k]);

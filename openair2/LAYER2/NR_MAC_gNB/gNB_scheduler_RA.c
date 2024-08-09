@@ -560,7 +560,7 @@ static void start_ra_contention_resolution_timer(NR_RA_t *ra, const long ra_Cont
   // Value sf8 corresponds to 8 subframes, value sf16 corresponds to 16 subframes, and so on.
   // We add 2 * K2 because the timer runs from Msg2 transmission till Msg4 ACK reception
   ra->contention_resolution_timer = ((((int)ra_ContentionResolutionTimer + 1) * 8) << scs) + 2 * K2;
-  LOG_I(NR_MAC,
+  LOG_D(NR_MAC,
         "Starting RA Contention Resolution timer with %d ms + 2 * %d K2 (%d slots) duration\n",
         ((int)ra_ContentionResolutionTimer + 1) * 8,
         K2,
