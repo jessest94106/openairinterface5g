@@ -24,6 +24,7 @@
 #include "common/ran_context.h"
 #include "nr_rrc_defs.h"
 #include "rrc_gNB_UE_context.h"
+#include "rrc_gNB_mobility.h"
 #include "openair2/F1AP/f1ap_common.h"
 #include "openair2/F1AP/f1ap_ids.h"
 #include "executables/softmodem-common.h"
@@ -397,7 +398,12 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
   int count = 0;
   rrc_gNB_ue_context_t *ue_context_p = NULL;
   RB_FOREACH(ue_context_p, rrc_nr_ue_tree_s, &rrc->rrc_ue_head) {
-    uint32_t ue_id = ue_context_p->ue_context.rrc_ue_id;
+    gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+    uint32_t ue_id = UE->rrc_ue_id;
+    if (UE->ho_context != NULL) {
+      LOG_W(NR_RRC, "DU disconnected while handover for UE %d active\n", ue_id);
+      nr_rrc_finalize_ho(UE);
+    }
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
     if (ue_data.du_assoc_id == assoc_id) {
       /* this UE belongs to the DU that disconnected, set du_assoc_id to 0,
