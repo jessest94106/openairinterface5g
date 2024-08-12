@@ -19,18 +19,19 @@
  *      contact@openairinterface.org
  */
 
+#include <simde/x86/avx512/lzcnt.h>
+
 unsigned char log2_approx(unsigned int x)
 {
-  unsigned char l2 = 0;
-  unsigned int tmp = x >> 1;
+  const unsigned int round_val = 3037000499U; // 2^31.5
+  if (!x)
+    return 0;
 
-  while (tmp) {
-    l2++;
-    tmp >>= 1;
-  }
-
-  if (l2)
-    l2 += (x >> (l2 - 1)) & 1;
+  int l2 = simde_x_clz32(x);
+  if (x > (round_val >> l2))
+    l2 = 32 - l2;
+  else
+    l2 = 31 - l2;
 
   return l2;
 }
@@ -50,16 +51,15 @@ unsigned char factor2(unsigned int x)
 
 unsigned char log2_approx64(unsigned long long int x)
 {
-  unsigned char l2 = 0;
-  unsigned long long int tmp = x >> 1;
+  const unsigned long long round_val = 13043817825332782212ULL; // 2^63.5
+  if (!x)
+    return 0;
 
-  while (tmp) {
-    l2++;
-    tmp >>= 1;
-  }
-
-  if (l2)
-    l2 += (x >> (l2 - 1)) & 1;
+  int l2 = simde_x_clz64(x);
+  if (x > (round_val >> l2))
+    l2 = 64 - l2;
+  else
+    l2 = 63 - l2;
 
   return l2;
 }
