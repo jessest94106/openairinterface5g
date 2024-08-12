@@ -50,7 +50,6 @@
 
 /* PHY */
 #include "executables/softmodem-common.h"
-#include "openair1/PHY/defs_nr_UE.h"
 
 /* utils */
 #include "assertions.h"
