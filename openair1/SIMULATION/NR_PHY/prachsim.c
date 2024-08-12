@@ -58,8 +58,6 @@
 #define PRACH_WRITE_OUTPUT_DEBUG 1
 
 THREAD_STRUCT thread_struct;
-char *parallel_config = NULL;
-char *worker_config = NULL;
 
 char *uecap_file;
 PHY_VARS_gNB *gNB;

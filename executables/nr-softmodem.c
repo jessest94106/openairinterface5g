@@ -150,9 +150,6 @@ int emulate_rf = 0;
 int numerology = 0;
 
 
-static char *parallel_config = NULL;
-static char *worker_config = NULL;
-
 /* struct for ethernet specific parameters given in eNB conf file */
 eth_params_t *eth_params;
 
@@ -423,10 +420,6 @@ static void get_options(configmodule_interface_t *cfg)
     NB_RU   = RC.nb_RU;
     printf("Configuration: nb_rrc_inst %d, nb_nr_L1_inst %d, nb_ru %hhu\n",NB_gNB_INST,RC.nb_nr_L1_inst,NB_RU);
   }
-
-  if(parallel_config != NULL) set_parallel_conf(parallel_config);
-
-  if(worker_config != NULL) set_worker_conf(worker_config);
 }
 
 void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs],
@@ -655,7 +648,8 @@ int main( int argc, char **argv ) {
 #define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
 #endif
   // strdup to put the sring in the core file for post mortem identification
-  LOG_I(HW, "Version: %s\n", strdup(PACKAGE_VERSION));
+  char *pckg = strdup(PACKAGE_VERSION);
+  LOG_I(HW, "Version: %s\n", pckg);
 
   // don't create if node doesn't connect to RRC/S1/GTP
   const ngran_node_t node_type = get_node_type();
@@ -810,6 +804,7 @@ int main( int argc, char **argv ) {
       RC.ru[ru_id]->ifdevice.trx_end_func(&RC.ru[ru_id]->ifdevice);
   }
 
+  free(pckg);
   logClean();
   printf("Bye.\n");
   return 0;
