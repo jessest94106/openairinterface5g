@@ -39,6 +39,7 @@
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/nr/nr_common.h"
 #include "executables/softmodem-common.h"
+#include "SCHED_NR/sched_nr.h"
 
 //#define DEBUG_DLSCH
 //#define DEBUG_DLSCH_MAPPING
@@ -468,7 +469,16 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
     // The Precoding matrix:
     // The Codebook Type I
     start_meas(&gNB->dlsch_precoding_stats);
-    c16_t **txdataF = gNB->common_vars.txdataF;
+    nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
+    // beam number in multi-beam scenario (concurrent beams)
+    int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+                                        &gNB->common_vars,
+                                        slot,
+                                        frame_parms->symbols_per_slot,
+                                        rel15->StartSymbolIndex,
+                                        rel15->NrOfSymbols);
+
+    c16_t **txdataF = gNB->common_vars.txdataF[beam_nb];
 
     for (int ant = 0; ant < frame_parms->nb_antennas_tx; ant++) {
       for (int l_symbol = rel15->StartSymbolIndex; l_symbol < rel15->StartSymbolIndex + rel15->NrOfSymbols; l_symbol++) {
@@ -477,10 +487,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
         int rb = 0;
         while(rb < rel15->rbSize) {
           //get pmi info
-          const int pmi = (rel15->precodingAndBeamforming.prg_size > 0) ?
-            (rel15->precodingAndBeamforming.prgs_list[(int)rb/rel15->precodingAndBeamforming.prg_size].pm_idx) : 0;
-          const int pmi2 = (rb < (rel15->rbSize - 1) && rel15->precodingAndBeamforming.prg_size > 0) ?
-            (rel15->precodingAndBeamforming.prgs_list[(int)(rb+1)/rel15->precodingAndBeamforming.prg_size].pm_idx) : -1;
+          const int pmi = (pb->prg_size > 0) ? (pb->prgs_list[(int)rb / pb->prg_size].pm_idx) : 0;
+          const int pmi2 = (rb < (rel15->rbSize - 1) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb+1)/pb->prg_size].pm_idx) : -1;
 
           // If pmi of next RB and pmi of current RB are the same, we do 2 RB in a row
           // if pmi differs, or current rb is the end (rel15->rbSize - 1), than we do 1 RB in a row
@@ -576,21 +584,6 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 
     stop_meas(&gNB->dlsch_precoding_stats);
 
-    // TODO: handle precoding
-    // this maps the layers onto antenna ports
-    
-    // handle beamforming ID
-    // each antenna port is assigned a beam_index
-    // since PHY can only handle BF on slot basis we set the whole slot
-
-    // first check if this slot has not already been allocated to another beam
-    if (gNB->common_vars.beam_id[0][slot*frame_parms->symbols_per_slot]==255) {
-      for (int j=0;j<frame_parms->symbols_per_slot;j++) 
-	gNB->common_vars.beam_id[0][slot*frame_parms->symbols_per_slot+j] = rel15->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx;
-    }
-    else {
-      LOG_D(PHY,"beam index for PDSCH allocation already taken\n");
-    }
   }// dlsch loop
 }
 

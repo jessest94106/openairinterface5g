@@ -538,9 +538,11 @@ void fh_if4p5_north_asynch_in(RU_t *ru,int *frame,int *slot) {
     VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_TX0_RU, slot_tx );
   }
 
-  if (ru->feptx_ofdm) ru->feptx_ofdm(ru,frame_tx,slot_tx);
+  if (ru->feptx_ofdm)
+    ru->feptx_ofdm(ru, frame_tx, slot_tx);
 
-  if (ru->fh_south_out) ru->fh_south_out(ru,frame_tx,slot_tx,proc->timestamp_tx);
+  if (ru->fh_south_out)
+    ru->fh_south_out(ru, frame_tx, slot_tx, proc->timestamp_tx);
 }
 
 void fh_if5_north_out(RU_t *ru) {
@@ -715,7 +717,7 @@ static radio_tx_gpio_flag_t get_gpio_flags(RU_t *ru, int slot)
 
       if (ru->common.beam_id) {
         int prev_slot = (slot - 1 + fp->slots_per_frame) % fp->slots_per_frame;
-        const uint8_t *beam_ids = ru->common.beam_id[0];
+        const int *beam_ids = ru->common.beam_id[0];
         int prev_beam = beam_ids[prev_slot * fp->symbols_per_slot];
         int beam = beam_ids[slot * fp->symbols_per_slot];
         if (prev_beam != beam) {
@@ -1041,7 +1043,7 @@ void ru_tx_func(void *param)
   int slot_tx = info->slot_tx;
   int print_frame = 8;
   char filename[40];
- 
+
   int cumul_samples = fp->get_samples_per_slot(0, fp);
   int i = 1;
   for (; i < fp->slots_per_subframe / 2; i++)
@@ -1052,10 +1054,12 @@ void ru_tx_func(void *param)
   int rt_prof_idx = absslot_rx % RT_PROF_DEPTH;
   clock_gettime(CLOCK_MONOTONIC,&ru->rt_ru_profiling.start_RU_TX[rt_prof_idx]);
   // do TX front-end processing if needed (precoding and/or IDFTs)
-  if (ru->feptx_prec) ru->feptx_prec(ru,frame_tx,slot_tx);
+  if (ru->feptx_prec)
+    ru->feptx_prec(ru,frame_tx,slot_tx);
 
   // do OFDM with/without TX front-end processing  if needed
-  if ((ru->fh_north_asynch_in == NULL) && (ru->feptx_ofdm)) ru->feptx_ofdm(ru,frame_tx,slot_tx);
+  if ((ru->fh_north_asynch_in == NULL) && (ru->feptx_ofdm))
+    ru->feptx_ofdm(ru, frame_tx, slot_tx);
 
   if(!emulate_rf) {
     // do outgoing fronthaul (south) if needed

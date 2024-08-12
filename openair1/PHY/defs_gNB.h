@@ -269,14 +269,17 @@ typedef struct {
   c16_t **rxdataF;
   /// \brief holds the transmit data in the frequency domain.
   /// For IFFT_FPGA this points to the same memory as PHY_vars->rx_vars[a].RX_DMA_BUFFER. //?
-  /// - first index: eNB id [0..2] (hard coded)
+  /// - first index: beam (for concurrent beams)
   /// - second index: tx antenna [0..14[ where 14 is the total supported antenna ports.
   /// - third index: sample [0..samples_per_frame_woCP]
-  c16_t **txdataF;
+  c16_t ***txdataF;
   /// \brief Anaglogue beam ID for each OFDM symbol (used when beamforming not done in RU)
-  /// - first index: antenna port
+  /// - first index: beam index (for concurrent beams)
   /// - second index: beam_id [0.. symbols_per_frame[
-  uint8_t **beam_id;  
+  int **beam_id;
+  int num_beams;
+  int num_beams_period;
+  bool analog_bf;
   int32_t *debugBuff;
   int32_t debugBuff_sample_offset;
 } NR_gNB_COMMON;

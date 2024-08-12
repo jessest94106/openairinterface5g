@@ -544,7 +544,7 @@ int main(int argc, char **argv)
     ack_nack_errors=0;
     sr_errors=0;
     n_errors = 0;
-    c16_t **txdataF = gNB->common_vars.txdataF;
+    c16_t **txdataF = gNB->common_vars.txdataF[0];
     for (trial=0; trial<n_trials; trial++) {
       for (int aatx=0;aatx<1;aatx++)
         bzero(txdataF[aatx],frame_parms->ofdm_symbol_size*sizeof(int));

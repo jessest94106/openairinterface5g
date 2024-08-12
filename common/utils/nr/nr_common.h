@@ -39,6 +39,7 @@
 #include "PHY/defs_common.h"
 
 #define NR_MAX_PDSCH_TBS 3824
+#define MAX_NUM_BEAM_PERIODS 4
 #define MAX_BWP_SIZE 275
 #define NR_MAX_NUM_BWP 4
 #define NR_MAX_HARQ_PROCESSES 32

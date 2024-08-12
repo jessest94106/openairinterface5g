@@ -34,7 +34,6 @@
 #define __NR_RRC_PARAMSVALUES__H__
 
 #include "common/config/config_paramdesc.h"
-#include "NR_ServingCellConfigCommon.h"
 
 /*    cell configuration section name */
 #define GNB_CONFIG_STRING_GNB_LIST                              "gNBs"

@@ -532,8 +532,6 @@ static void config_common(gNB_MAC_INST *nrmac,
   nr_pdsch_AntennaPorts_t pdsch_AntennaPorts = config->pdsch_AntennaPorts;
   int num_pdsch_antenna_ports = pdsch_AntennaPorts.N1 * pdsch_AntennaPorts.N2 * pdsch_AntennaPorts.XP;
   cfg->carrier_config.num_tx_ant.value = num_pdsch_antenna_ports;
-  if(nrmac->beam_info.beam_allocation) // analog beamforming
-    cfg->carrier_config.num_tx_ant.value *= nrmac->beam_info.beams_per_period;
   AssertFatal(num_pdsch_antenna_ports > 0 && num_pdsch_antenna_ports < 33, "pdsch_AntennaPorts in 1...32\n");
   cfg->carrier_config.num_tx_ant.tl.tag = NFAPI_NR_CONFIG_NUM_TX_ANT_TAG;
 

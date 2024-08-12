@@ -100,7 +100,6 @@
 #define MAX_NUM_OF_SSB 64
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
 #define MIN_NUM_PRBS_TO_SCHEDULE  5
-#define MAX_NUM_BEAM_PERIODS 4
 
 extern const uint8_t nr_rv_round_map[4];
 
