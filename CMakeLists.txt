@@ -1152,6 +1152,10 @@ add_library(PHY_NR_COMMON ${PHY_NR_SRC_COMMON})
 add_library(PHY_NR ${PHY_NR_SRC})
 target_link_libraries(PHY_NR nr_phy_common nr_common)
 
+add_library(PHY_NR_NO_AVX_256 ${PHY_NR_SRC})
+target_link_libraries(PHY_NR_NO_AVX_256 nr_phy_common nr_common)
+target_compile_definitions(PHY_NR_NO_AVX_256 PUBLIC USE_128BIT)
+
 add_library(PHY_NR_UE ${PHY_NR_UE_SRC})
 target_link_libraries(PHY_NR_UE PRIVATE asn1_nr_rrc_hdrs nr_phy_common nr_common)
 
