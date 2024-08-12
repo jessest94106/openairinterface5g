@@ -52,6 +52,7 @@
 #define REGISTRATION_REQUEST                               0b01000001 /* 65 = 0x41 */
 #define REGISTRATION_ACCEPT                                0b01000010 /* 66 = 0x42 */
 #define REGISTRATION_COMPLETE                              0b01000011 /* 67 = 0x43 */
+#define REGISTRATION_REJECT                                68
 #define FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING          0b01000101
 #define FGS_DEREGISTRATION_ACCEPT                          0b01000110
 #define FGS_AUTHENTICATION_REQUEST                         0b01010110 /* 86 = 0x56 */
