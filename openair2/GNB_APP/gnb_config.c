@@ -946,7 +946,6 @@ void RCconfig_NR_L1(void)
       } else { // other midhaul
       }
     } // for (j = 0; j < RC.nb_nr_L1_inst; j++)
-    printf("Initializing northbound interface for L1\n");
     l1_north_init_gNB();
   } else {
     LOG_I(PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
@@ -1422,7 +1421,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 
       } else if (strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "f1") == 0
                  || strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "cudu") == 0) {
-        printf("Configuring F1 interfaces for MACRLC\n");
         char **f1caddr = MacRLC_ParamList.paramarray[j][MACRLC_LOCAL_N_ADDRESS_IDX].strptr;
         RC.nrmac[j]->eth_params_n.my_addr = strdup(*f1caddr);
         char **f1uaddr = MacRLC_ParamList.paramarray[j][MACRLC_LOCAL_N_ADDRESS_F1U_IDX].strptr;
@@ -1447,16 +1445,14 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         RC.nrmac[j]->eth_params_s.remote_portd = *(MacRLC_ParamList.paramarray[j][MACRLC_REMOTE_S_PORTD_IDX].iptr);
         RC.nrmac[j]->eth_params_s.transp_preference = ETH_UDP_MODE;
 
-        printf("**************** vnf_port:%d\n", RC.nrmac[j]->eth_params_s.my_portc);
         configure_nr_nfapi_vnf(
             RC.nrmac[j]->eth_params_s.my_addr, RC.nrmac[j]->eth_params_s.my_portc, RC.nrmac[j]->eth_params_s.remote_addr, RC.nrmac[j]->eth_params_s.remote_portd, RC.nrmac[j]->eth_params_s.my_portd);
-        printf("**************** RETURNED FROM configure_nfapi_vnf() vnf_port:%d\n", RC.nrmac[j]->eth_params_s.my_portc);
       } else if(strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_PREFERENCE_IDX].strptr), "aerial") == 0){
 #ifdef ENABLE_AERIAL
         RC.nrmac[j]->nvipc_params_s.nvipc_shm_prefix =
             strdup(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_SHM_PREFIX].strptr));
         RC.nrmac[j]->nvipc_params_s.nvipc_poll_core = *(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_POLL_CORE].i8ptr);
-        printf("Configuring VNF for Aerial connection with prefix %s\n", RC.nrmac[j]->eth_params_s.local_if_name);
+        LOG_I(GNB_APP, "Configuring VNF for Aerial connection with prefix %s\n", RC.nrmac[j]->eth_params_s.local_if_name);
         aerial_configure_nr_fapi_vnf();
 #endif
       } else { // other midhaul
@@ -1839,7 +1835,7 @@ void RCconfig_NRRRC(gNB_RRC_INST *rrc)
 
     sprintf(aprefix, "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
 
-    printf("NRRRC %d: Southbound Transport %s\n", i, *(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr));
+    LOG_D(GNB_APP, "NRRRC %d: Southbound Transport %s\n", i, *(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr));
 
     rrc->node_type = get_node_type();
     rrc->node_id        = gnb_id;
