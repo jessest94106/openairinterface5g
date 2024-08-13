@@ -100,13 +100,16 @@ typedef enum {
 } fgs_nas_msg_t;
 
 // TS 24.501
-typedef enum {
-  PLAIN_5GS_MSG = 0,
-  INTEGRITY_PROTECTED = 1,
-  INTEGRITY_PROTECTED_AND_CIPHERED = 2,
-  INTEGRITY_PROTECTED_WITH_NEW_SECU_CTX = 3,
-  INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX = 4,
-} Security_header_t;
+#define FOREACH_HEADER(TYPE_DEF)                     \
+  TYPE_DEF(PLAIN_5GS_MSG, 0)                         \
+  TYPE_DEF(INTEGRITY_PROTECTED, 1)                   \
+  TYPE_DEF(INTEGRITY_PROTECTED_AND_CIPHERED, 2)      \
+  TYPE_DEF(INTEGRITY_PROTECTED_WITH_NEW_SECU_CTX, 3) \
+  TYPE_DEF(INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX, 4)
+
+typedef enum { FOREACH_HEADER(TO_ENUM) } Security_header_t;
+
+static const text_info_t security_header_type_s[] = {FOREACH_HEADER(TO_TEXT)};
 
 // table  9.11.3.2.1
 #define FOREACH_CAUSE(CAUSE_DEF) \

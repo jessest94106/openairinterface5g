@@ -71,13 +71,17 @@ extern uint16_t NB_UE_INST;
 static nr_ue_nas_t nr_ue_nas[MAX_NAS_UE] = {0};
 static nr_nas_msg_snssai_t nas_allowed_nssai[8];
 
-typedef enum {
-  NAS_SECURITY_NO_SECURITY_CONTEXT,
-  NAS_SECURITY_UNPROTECTED,
-  NAS_SECURITY_INTEGRITY_FAILED,
-  NAS_SECURITY_INTEGRITY_PASSED,
-  NAS_SECURITY_BAD_INPUT
-} security_state_t;
+#define FOREACH_STATE(TYPE_DEF)                  \
+  TYPE_DEF(NAS_SECURITY_NO_SECURITY_CONTEXT, 0)  \
+  TYPE_DEF(NAS_SECURITY_NEW_SECURITY_CONTEXT, 1) \
+  TYPE_DEF(NAS_SECURITY_UNPROTECTED, 2)          \
+  TYPE_DEF(NAS_SECURITY_INTEGRITY_FAILED, 3)     \
+  TYPE_DEF(NAS_SECURITY_INTEGRITY_PASSED, 4)     \
+  TYPE_DEF(NAS_SECURITY_BAD_INPUT, 5)
+
+typedef enum { FOREACH_STATE(TO_ENUM) } security_state_t;
+
+static const text_info_t security_state_info[] = {FOREACH_STATE(TO_TEXT)};
 
 static fgmm_msg_header_t set_mm_header(fgs_nas_msg_t type, Security_header_t security)
 {
@@ -1389,7 +1393,7 @@ void *nas_nrue(void *args_p)
 
         security_state_t security_state = nas_security_rx_process(nas, pdu_buffer, pdu_length);
         if (security_state != NAS_SECURITY_INTEGRITY_PASSED && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
-          LOG_E(NAS, "NAS integrity failed, discard incoming message\n");
+          LOG_E(NAS, "NAS integrity failed, discard incoming message: security state is %s\n", security_state_info[security_state].text);
           break;
         }
 
