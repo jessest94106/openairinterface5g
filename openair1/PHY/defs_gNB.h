@@ -123,8 +123,6 @@ typedef struct {
 typedef struct {
   /// Pointers to variables related to DLSCH harq process
   NR_DL_gNB_HARQ_t harq_process;
-  /// beamforming weights for UE-spec transmission (antenna ports 5 or 7..14), for each codeword, maximum 4 layers?
-  int32_t ***ue_spec_bf_weights;
   /// Active flag for baseband transmitter processing
   uint8_t active;
   /// Number of soft channel bits

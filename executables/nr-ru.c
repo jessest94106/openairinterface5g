@@ -1608,37 +1608,6 @@ void configure_rru(void *ruu, void *arg)
   nr_phy_init_RU(ru);
 }
 
-/*
-void init_precoding_weights(PHY_VARS_gNB *gNB) {
-
-  int layer,ru_id,aa,re,ue,tb;
-  LTE_DL_FRAME_PARMS *fp=&gNB->frame_parms;
-  RU_t *ru;
-  LTE_gNB_DLSCH_t *dlsch;
-
-  // init precoding weigths
-  for (ue=0;ue<NUMBER_OF_UE_MAX;ue++) {
-    for (tb=0;tb<2;tb++) {
-      dlsch = gNB->dlsch[ue][tb];
-      for (layer=0; layer<4; layer++) {
-  int nb_tx=0;
-  for (ru_id=0;ru_id<RC.nb_RU;ru_id++) {
-    ru = RC.ru[ru_id];
-    nb_tx+=ru->nb_tx;
-  }
-  dlsch->ue_spec_bf_weights[layer] = (int32_t**)malloc16(nb_tx*sizeof(int32_t*));
-
-  for (aa=0; aa<nb_tx; aa++) {
-    dlsch->ue_spec_bf_weights[layer][aa] = (int32_t *)malloc16(fp->ofdm_symbol_size*sizeof(int32_t));
-    for (re=0;re<fp->ofdm_symbol_size; re++) {
-      dlsch->ue_spec_bf_weights[layer][aa][re] = 0x00007fff;
-    }
-  }
-      }
-    }
-  }
-}*/
-
 void set_function_spec_param(RU_t *ru)
 {
   switch (ru->if_south) {
