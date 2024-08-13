@@ -160,7 +160,6 @@ void rotate_cpx_vector(const c16_t *const x, const c16_t *const alpha, c16_t *y,
     int32_t *xd=(int32_t *)x; 
 
     simde__m128i shift = simde_mm_cvtsi32_si128(output_shift);
-    register simd_q15_t m0,m1,m2,m3;
 
     ((int16_t *)&alpha_128)[0] = alpha->r;
     ((int16_t *)&alpha_128)[1] = -alpha->i;
@@ -174,17 +173,23 @@ void rotate_cpx_vector(const c16_t *const x, const c16_t *const alpha, c16_t *y,
 
 
     for(i=0; i<N>>2; i++) {
-      m0 = simde_mm_setr_epi32(xd[0],xd[0],xd[1],xd[1]);
-      m1 = simde_mm_setr_epi32(xd[2],xd[2],xd[3],xd[3]);
-      m2 = simde_mm_madd_epi16(m0,alpha_128); //complex multiply. result is 32bit [Re Im Re Im]
-      m3 = simde_mm_madd_epi16(m1,alpha_128); //complex multiply. result is 32bit [Re Im Re Im]
-      m2 = simde_mm_sra_epi32(m2,shift);        // shift right by shift in order to  compensate for the input amplitude
-      m3 = simde_mm_sra_epi32(m3,shift);        // shift right by shift in order to  compensate for the input amplitude
-
-      y_128[0] = simde_mm_packs_epi32(m2,m3);        // pack in 16bit integers with saturation [re im re im re im re im]
+      y_128[i] = simde_mm_packs_epi32( // pack in 16bit integers with saturation [re im re im re im re im]
+        simde_mm_sra_epi32(            // shift right by shift in order to  compensate for the input amplitude
+          simde_mm_madd_epi16(         // complex multiply. result is 32bit [Re Im Re Im]
+            simde_mm_setr_epi32( xd[0+i*4], xd[0+i*4], xd[1+i*4], xd[1+i*4]),
+            alpha_128
+          ),
+          shift
+        ),
+        simde_mm_sra_epi32(            // shift right by shift in order to  compensate for the input amplitude
+          simde_mm_madd_epi16(         // complex multiply. result is 32bit [Re Im Re Im]
+            simde_mm_setr_epi32( xd[2+i*4], xd[2+i*4], xd[3+i*4], xd[3+i*4]),
+            alpha_128
+          ),
+          shift
+        )
+      );
       //print_ints("y_128[0]=", &y_128[0]);
-      xd+=4;
-      y_128+=1;
     }
 #if defined(__x86__) || defined(__x86_64__)
   }
