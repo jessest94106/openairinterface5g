@@ -932,8 +932,11 @@ class OaiCiTest():
 		global_status = CONST.ALL_PROCESSES_OK
 		for line in ue_log_file.readlines():
 			result = re.search('nr_synchro_time|Starting NR UE soft modem', str(line))
+			sidelink = re.search('sl-mode', str(line))
 			if result is not None:
 				nrUEFlag = True
+			if sidelink is not None:
+				nrUEFlag = False
 			if nrUEFlag:
 				result = re.search('decode mib', str(line))
 				if result is not None:
