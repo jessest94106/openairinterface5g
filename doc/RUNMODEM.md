@@ -205,6 +205,14 @@ cd cmake_targets
 sudo ./ran_build/build/nr-softmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band66.fr1.25PRB.usrpx300.conf --sa --rfsim --rfsimulator.prop_delay 238.74
 ```
 
+To configure NTN gNB with 32 HARQ processes in downlink and uplink, add these settings in conf files under section `gNBs.[0]`
+```
+...
+    num_dlharq = 32;
+    num_ulharq = 32;
+...
+```
+
 ### NR UE
 
 At UE side, there are two main parameters to cope with the large NTN propagation delay, cellSpecificKoffset and ta-Common.
@@ -285,8 +293,8 @@ In do-ra mode it is possible to mimic the reception of UE Capabilities at gNB by
 To run using the RFsimulator:
 
 ```bash
-sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-LTE-EPC/CONF/gnb.band78.tm1.106PRB.usrpn300.conf --do-ra --rfsim --parallel-config PARALLEL_SINGLE_THREAD
-sudo ./nr-uesoftmodem --do-ra --rfsim --rfsimulator.serveraddr 127.0.0.1 --parallel-config PARALLEL_SINGLE_THREAD
+sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-LTE-EPC/CONF/gnb.band78.tm1.106PRB.usrpn300.conf --do-ra --rfsim
+sudo ./nr-uesoftmodem --do-ra --rfsim --rfsimulator.serveraddr 127.0.0.1
 ```
 
 Using USRPs:

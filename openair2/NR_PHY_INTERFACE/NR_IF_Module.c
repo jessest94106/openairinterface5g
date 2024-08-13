@@ -30,7 +30,6 @@
 * \warning
 */
 
-#include "openair1/SCHED_NR/fapi_nr_l1.h"
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
 #include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
@@ -42,7 +41,6 @@
 #include "openair2/NR_PHY_INTERFACE/nr_sched_response.h"
 
 #define MAX_IF_MODULES 100
-//#define UL_HARQ_PRINT
 
 static NR_IF_Module_t *nr_if_inst[MAX_IF_MODULES];
 extern int oai_nfapi_harq_indication(nfapi_harq_indication_t *harq_ind);

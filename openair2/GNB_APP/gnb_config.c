@@ -675,6 +675,9 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
     verify_gnb_param_notset(gnbp, GNB_DO_SRS_IDX, GNB_CONFIG_STRING_DOSRS);
     verify_gnb_param_notset(gnbp, GNB_FORCE256QAMOFF_IDX, GNB_CONFIG_STRING_FORCE256QAMOFF);
     verify_gnb_param_notset(gnbp, GNB_MAXMIMOLAYERS_IDX, GNB_CONFIG_STRING_MAXMIMOLAYERS);
+    verify_gnb_param_notset(gnbp, GNB_DISABLE_HARQ_IDX, GNB_CONFIG_STRING_DISABLE_HARQ);
+    verify_gnb_param_notset(gnbp, GNB_NUM_DL_HARQ_IDX, GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES);
+    verify_gnb_param_notset(gnbp, GNB_NUM_UL_HARQ_IDX, GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES);
 
     // check for some general sections
     verify_section_notset(cfg, NULL, CONFIG_STRING_L1_LIST);
@@ -1213,6 +1216,10 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
               GNB_CONFIG_STRING_ACTIVE_GNBS,
               num_gnbs);
   paramdef_t GNBParams[] = GNBPARAMS_DESC;
+  /* map parameter checking array instances to parameter definition array instances */
+  checkedparam_t config_check_GNBParams[] = GNBPARAMS_CHECK;
+  for (int i = 0; i < sizeofArray(GNBParams); ++i)
+    GNBParams[i].chkPptr = &(config_check_GNBParams[i]);
   config_getlist(cfg, &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
 
   if (NFAPI_MODE != NFAPI_MODE_PNF) {
@@ -1261,16 +1268,20 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   config.use_deltaMCS = *GNBParamList.paramarray[0][GNB_USE_DELTA_MCS_IDX].iptr != 0;
   config.maxMIMO_layers = *GNBParamList.paramarray[0][GNB_MAXMIMOLAYERS_IDX].iptr;
   config.disable_harq = *GNBParamList.paramarray[0][GNB_DISABLE_HARQ_IDX].iptr;
+  config.num_dlharq = *GNBParamList.paramarray[0][GNB_NUM_DL_HARQ_IDX].iptr;
+  config.num_ulharq =  *GNBParamList.paramarray[0][GNB_NUM_UL_HARQ_IDX].iptr;
   if (config.disable_harq)
     LOG_W(GNB_APP, "\"disable_harq\" is a REL17 feature and is incompatible with REL15 and REL16 UEs!\n");
   LOG_I(GNB_APP,
-        "CSI-RS %d, SRS %d, 256 QAM %s, delta_MCS %s, maxMIMO_Layers %d, HARQ feedback %s\n",
+        "CSI-RS %d, SRS %d, 256 QAM %s, delta_MCS %s, maxMIMO_Layers %d, HARQ feedback %s, num DLHARQ:%d, num ULHARQ:%d\n",
         config.do_CSIRS,
         config.do_SRS,
         config.force_256qam_off ? "force off" : "may be on",
         config.use_deltaMCS ? "on" : "off",
         config.maxMIMO_layers,
-        config.disable_harq ? "disabled" : "enabled");
+        config.disable_harq ? "disabled" : "enabled",
+        config.num_dlharq,
+        config.num_ulharq);
   int tot_ant = config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2 * config.pdsch_AntennaPorts.XP;
   AssertFatal(config.maxMIMO_layers != 0 && config.maxMIMO_layers <= tot_ant, "Invalid maxMIMO_layers %d\n", config.maxMIMO_layers);
 
@@ -2040,35 +2051,6 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i) {
   return 0;
 }
 
-int RCconfig_nr_parallel(void) {
-  char *parallel_conf = NULL;
-  char *worker_conf   = NULL;
-  extern char *parallel_config;
-  extern char *worker_config;
-  paramdef_t ThreadParams[]  = THREAD_CONF_DESC;
-  paramlist_def_t THREADParamList = {THREAD_CONFIG_STRING_THREAD_STRUCT,NULL,0};
-  config_getlist(config_get_if(), &THREADParamList, NULL, 0, NULL);
-
-  if(THREADParamList.numelt>0) {
-    config_getlist(config_get_if(), &THREADParamList, ThreadParams, sizeofArray(ThreadParams), NULL);
-    parallel_conf = strdup(*(THREADParamList.paramarray[0][THREAD_PARALLEL_IDX].strptr));
-  } else {
-    parallel_conf = strdup("PARALLEL_RU_L1_TRX_SPLIT");
-  }
-
-  if(THREADParamList.numelt>0) {
-    config_getlist(config_get_if(), &THREADParamList, ThreadParams, sizeofArray(ThreadParams), NULL);
-    worker_conf   = strdup(*(THREADParamList.paramarray[0][THREAD_WORKER_IDX].strptr));
-  } else {
-    worker_conf   = strdup("WORKER_ENABLE");
-  }
-
-  if(parallel_config == NULL) set_parallel_conf(parallel_conf);
-  if(worker_config == NULL)   set_worker_conf(worker_conf);
-
-  return 0;
-}
-
 void NRRCConfig(void) {
 
   paramlist_def_t MACRLCParamList = {CONFIG_STRING_MACRLC_LIST,NULL,0};
@@ -2093,10 +2075,6 @@ void NRRCConfig(void) {
   // Get num RU instances
   config_getlist(config_get_if(), &RUParamList, NULL, 0, NULL);
   RC.nb_RU     = RUParamList.numelt; 
-  
-  RCconfig_nr_parallel();
-    
-
 }
 
 
