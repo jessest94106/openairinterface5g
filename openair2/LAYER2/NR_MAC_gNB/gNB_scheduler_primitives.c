@@ -893,17 +893,9 @@ void nr_configure_pdcch(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
   pdcch_pdu->InterleaverSize = pdcch->InterleaverSize;
   pdcch_pdu->ShiftIndex = pdcch->ShiftIndex;
 
-  if (otherSI) {
-    pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG;
-  }
-  else {
-    if (coreset->controlResourceSetId == 0) {
-    pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_MIB_SIB1;
-    } else {
-      pdcch_pdu->CoreSetType = NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG;
-    }
-  }
-  
+  pdcch_pdu->CoreSetType =
+      (otherSI || coreset->controlResourceSetId != 0) ? NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG : NFAPI_NR_CSET_CONFIG_MIB_SIB1;
+
   //precoderGranularity
   pdcch_pdu->precoderGranularity = coreset->precoderGranularity;
 }
