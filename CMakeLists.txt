@@ -2367,6 +2367,19 @@ if(ENABLE_TESTS)
     add_library(GTest::gtest ALIAS gtest)
     add_library(GTest::gtest_main ALIAS gtest_main)
   endif()
+
+  find_package(benchmark)
+  if (NOT benchmark_FOUND)
+    message(STATUS "benchmark package not found, will download benchmark automatically. To prevent that install google benchmark on your system (libbenchmark-dev)")
+    include(FetchContent)
+    set(BENCHMARK_ENABLE_TESTING OFF)
+    FetchContent_Declare(
+      benchmark
+      GIT_REPOSITORY https://github.com/google/benchmark.git
+      GIT_TAG v1.9.0
+    )
+    FetchContent_MakeAvailable(benchmark)
+  endif()
 endif()
 
 add_subdirectory(common)
