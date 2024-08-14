@@ -111,18 +111,29 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
 {
   if (nas->security_container == NULL)
     return NAS_SECURITY_NO_SECURITY_CONTEXT;
-  if (pdu_buffer[1] == 0)
-    return NAS_SECURITY_UNPROTECTED;
   /* header is 7 bytes, require at least one byte of payload */
   if (pdu_length < 8)
     return NAS_SECURITY_BAD_INPUT;
-  /* only accept "integrity protected and ciphered" messages */
-  if (pdu_buffer[1] != 2) {
-    LOG_E(NAS, "todo: unhandled security type %d\n", pdu_buffer[2]);
-    return NAS_SECURITY_BAD_INPUT;
+
+  switch (pdu_buffer[1]) {
+    case PLAIN_5GS_MSG:
+      return NAS_SECURITY_UNPROTECTED;
+      break;
+    case INTEGRITY_PROTECTED:
+    case INTEGRITY_PROTECTED_WITH_NEW_SECU_CTX:
+    case INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX:
+      /* only accept "integrity protected and ciphered" messages */
+      if (pdu_buffer[6] == 0)
+        LOG_E(NAS, "Received nas_count_dl = %d\n", pdu_buffer[6]);
+      LOG_E(NAS, "todo: unhandled security type %s (pdu_buffer[1] = %d)\n", security_header_type_s[pdu_buffer[1]].text, pdu_buffer[1]);
+      return NAS_SECURITY_BAD_INPUT;
+      break;
+    default:
+      break;
   }
 
   /* synchronize NAS SQN, based on 24.501 4.4.3.1 */
+  // Sequence number
   int nas_sqn = pdu_buffer[6];
   int target_sqn = nas->security.nas_count_dl & 0xff;
   if (nas_sqn != target_sqn) {
@@ -139,33 +150,34 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
   }
 
   /* check integrity */
-  uint8_t computed_mac[4];
+  uint8_t computed_mac[NAS_INTEGRITY_SIZE];
   nas_stream_cipher_t stream_cipher;
   stream_cipher.context = nas->security_container->integrity_context;
   stream_cipher.count = nas->security.nas_count_dl;
   stream_cipher.bearer = 1; /* todo: don't hardcode */
   stream_cipher.direction = 1;
-  stream_cipher.message = pdu_buffer + 6;
+  stream_cipher.message = pdu_buffer + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH - 1;
   /* length in bits */
-  stream_cipher.blength = (pdu_length - 6) << 3;
+  stream_cipher.blength = (pdu_length - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH + 1) << 3;
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, computed_mac);
 
   uint8_t *received_mac = pdu_buffer + 2;
 
-  if (memcmp(received_mac, computed_mac, 4) != 0)
+  if (memcmp(received_mac, computed_mac, NAS_INTEGRITY_SIZE) != 0)
     return NAS_SECURITY_INTEGRITY_FAILED;
 
   /* decipher */
-  uint8_t buf[pdu_length - 7];
+  uint8_t payload_len = pdu_length - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
+  uint8_t buf[payload_len];
   stream_cipher.context = nas->security_container->ciphering_context;
   stream_cipher.count = nas->security.nas_count_dl;
   stream_cipher.bearer = 1; /* todo: don't hardcode */
   stream_cipher.direction = 1;
-  stream_cipher.message = pdu_buffer + 7;
+  stream_cipher.message = pdu_buffer + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
   /* length in bits */
-  stream_cipher.blength = (pdu_length - 7) << 3;
+  stream_cipher.blength = (payload_len) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
-  memcpy(pdu_buffer + 7, buf, pdu_length - 7);
+  memcpy(pdu_buffer + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH, buf, payload_len);
 
   nas->security.nas_count_dl++;
 
