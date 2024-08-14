@@ -1895,7 +1895,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   }
 }
 
-static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p)
+static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_assoc_t assoc_id)
 {
   const int instance = 0;
   f1ap_ue_context_release_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg_p);
@@ -1904,6 +1904,31 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p)
   if (!ue_context_p) {
     LOG_E(RRC, "could not find UE context for CU UE ID %u, aborting transaction\n", req->gNB_CU_ue_id);
     return;
+  }
+
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  if (UE->ho_context != NULL) {
+    nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
+    bool from_source_du = source_ctx && source_ctx->du->assoc_id == assoc_id;
+    if (from_source_du) {
+      // we received release request from the source DU, but HO is still
+      // ongoing; free the UE, and remove the HO context.
+      LOG_W(NR_RRC, "UE %d: release request from source DU ID %ld during HO, marking HO as complete\n", UE->rrc_ue_id, source_ctx->du->setup_req->gNB_DU_id);
+      RETURN_IF_INVALID_ASSOC_ID(source_ctx->du->assoc_id);
+      f1ap_ue_context_release_cmd_t cmd = {
+          .gNB_CU_ue_id = UE->rrc_ue_id,
+          .gNB_DU_ue_id = source_ctx->du_ue_id,
+          .cause = F1AP_CAUSE_RADIO_NETWORK,
+          .cause_value = 5, // 5 = F1AP_CauseRadioNetwork_interaction_with_other_procedure
+          .srb_id = DCCH,
+      };
+      rrc->mac_rrc.ue_context_release_command(assoc_id, &cmd);
+      nr_rrc_finalize_ho(UE);
+      return;
+    }
+    // if we receive the release request from the target DU (regardless if
+    // successful), we assume it is "genuine" and ask the AMF to release
+    nr_rrc_finalize_ho(UE);
   }
 
   /* TODO: marshall types correctly */
@@ -2430,7 +2455,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_REQ:
-        rrc_CU_process_ue_context_release_request(msg_p);
+        rrc_CU_process_ue_context_release_request(msg_p, msg_p->ittiMsgHeader.originInstance);
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_COMPLETE:
