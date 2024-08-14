@@ -700,8 +700,7 @@ static void nr_rrc_ue_prepare_RRCSetupRequest(NR_UE_RRC_INST_t *rrc)
   nr_rlc_srb_recv_sdu(rrc->ue_id, 0, buf, len);
 }
 
-void nr_rrc_configure_default_SI(NR_UE_RRC_SI_INFO *SI_info,
-                                 NR_SIB1_t *sib1)
+static void nr_rrc_configure_default_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SIB1_t *sib1)
 {
   struct NR_SI_SchedulingInfo *si_SchedulingInfo = sib1->si_SchedulingInfo;
   if (!si_SchedulingInfo)
@@ -751,11 +750,7 @@ static int8_t nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
     switch (bcch_message->message.choice.c1->present) {
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformationBlockType1:
         LOG_D(NR_RRC, "[UE %ld] Decoding SIB1\n", rrc->ue_id);
-        asn1cFreeStruc(asn_DEF_NR_SIB1, SI_info->sib1);
-        NR_SIB1_t *sib1 = bcch_message->message.choice.c1->choice.systemInformationBlockType1;
-        if(!SI_info->sib1)
-          SI_info->sib1 = calloc(1, sizeof(*SI_info->sib1));
-        memcpy(SI_info->sib1, sib1, sizeof(NR_SIB1_t));
+        UPDATE_IE(SI_info->sib1, bcch_message->message.choice.c1->choice.systemInformationBlockType1, NR_SIB1_t);
         if(g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
           xer_fprint(stdout, &asn_DEF_NR_SIB1, (const void *) SI_info->sib1);
         LOG_A(NR_RRC, "SIB1 decoded\n");
@@ -766,10 +761,10 @@ static int8_t nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
           nr_rrc_ue_prepare_RRCSetupRequest(rrc);
         }
         // configure default SI
-        nr_rrc_configure_default_SI(SI_info, sib1);
+        nr_rrc_configure_default_SI(SI_info, SI_info->sib1);
         // configure timers and constant
-        nr_rrc_set_sib1_timers_and_constants(&rrc->timers_and_constants, sib1);
-        nr_rrc_mac_config_req_sib1(rrc->ue_id, 0, sib1->si_SchedulingInfo, sib1->servingCellConfigCommon);
+        nr_rrc_set_sib1_timers_and_constants(&rrc->timers_and_constants, SI_info->sib1);
+        nr_rrc_mac_config_req_sib1(rrc->ue_id, 0, SI_info->sib1->si_SchedulingInfo, SI_info->sib1->servingCellConfigCommon);
         break;
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation:
         LOG_I(NR_RRC, "[UE %ld] Decoding SI\n", rrc->ue_id);
