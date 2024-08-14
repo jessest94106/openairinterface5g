@@ -113,9 +113,9 @@ mui_t rrc_gNB_mui = 0;
 
 // the assoc_id might be 0 (if the DU goes offline). Below helper macro to
 // print an error and return from the function in that case
-#define RETURN_IF_INVALID_ASSOC_ID(ue_data)                                \
+#define RETURN_IF_INVALID_ASSOC_ID(assoc_id)                               \
   {                                                                        \
-    if (ue_data.du_assoc_id == 0) {                                        \
+    if (assoc_id == 0) {                                                   \
       LOG_E(NR_RRC, "cannot send data: invalid assoc_id 0, DU offline\n"); \
       return;                                                              \
     }                                                                      \
@@ -197,7 +197,7 @@ void nr_rrc_transfer_protected_rrc_message(const gNB_RRC_INST *rrc,
 {
   DevAssert(size > 0);
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   f1ap_dl_rrc_message_t dl_rrc = {.gNB_CU_ue_id = ue_p->rrc_ue_id, .gNB_DU_ue_id = ue_data.secondary_ue, .srb_id = srb_id};
   deliver_dl_rrc_message_data_t data = {.rrc = rrc, .dl_rrc = &dl_rrc, .assoc_id = ue_data.du_assoc_id};
   nr_pdcp_data_req_srb(ue_p->rrc_ue_id,
@@ -423,7 +423,7 @@ static void rrc_gNB_generate_RRCSetup(instance_t instance,
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, (char *)buf, size, "[MSG] RRC Setup\n");
   freeSRBlist(SRBs);
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   f1ap_dl_rrc_message_t dl_rrc = {
     .gNB_CU_ue_id = ue_p->rrc_ue_id,
     .gNB_DU_ue_id = ue_data.secondary_ue,
@@ -453,7 +453,7 @@ static void rrc_gNB_generate_RRCReject(module_id_t module_id, rrc_gNB_ue_context
   LOG_I(NR_RRC, " [RAPROC] ue %04x Logical Channel DL-CCCH, Generating NR_RRCReject (bytes %d)\n", ue_p->rnti, size);
 
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   f1ap_dl_rrc_message_t dl_rrc = {
     .gNB_CU_ue_id = ue_p->rrc_ue_id,
     .gNB_DU_ue_id = ue_data.secondary_ue,
@@ -899,7 +899,7 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
                           &security_parameters);
   /* F1AP DL RRC Message Transfer */
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   uint32_t old_gNB_DU_ue_id = old_rnti;
   f1ap_dl_rrc_message_t dl_rrc = {.gNB_CU_ue_id = ue_p->rrc_ue_id,
                                   .gNB_DU_ue_id = ue_data.secondary_ue,
@@ -2655,7 +2655,7 @@ rrc_gNB_generate_RRCRelease(
   gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   const gNB_RRC_UE_t *UE = &ue_context_pP->ue_context;
   f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   f1ap_ue_context_release_cmd_t ue_context_release_cmd = {
     .gNB_CU_ue_id = UE->rrc_ue_id,
     .gNB_DU_ue_id = ue_data.secondary_ue,
@@ -2781,7 +2781,7 @@ void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
 
   /* the callback will fill the UE context setup request and forward it */
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   f1ap_ue_context_setup_t ue_context_setup_req = {
       .gNB_CU_ue_id = ue_p->rrc_ue_id,
       .gNB_DU_ue_id = ue_data.secondary_ue,
@@ -2825,7 +2825,7 @@ void rrc_gNB_generate_UeContextModificationRequest(const gNB_RRC_INST *rrc,
   }
 
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   f1ap_ue_context_modif_req_t ue_context_modif_req = {
       .gNB_CU_ue_id = ue_p->rrc_ue_id,
       .gNB_DU_ue_id = ue_data.secondary_ue,
