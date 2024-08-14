@@ -669,8 +669,12 @@ void ue_context_release_command(const f1ap_ue_context_release_cmd_t *cmd)
   NR_SCHED_LOCK(&mac->sched_lock);
   NR_UE_info_t *UE = find_nr_UE(&mac->UE_info, cmd->gNB_DU_ue_id);
   if (UE == NULL) {
-    LOG_E(MAC, "ERROR: unknown UE with RNTI %04x, ignoring UE Context Release Command\n", cmd->gNB_DU_ue_id);
     NR_SCHED_UNLOCK(&mac->sched_lock);
+    f1ap_ue_context_release_complete_t complete = {
+        .gNB_CU_ue_id = cmd->gNB_CU_ue_id,
+        .gNB_DU_ue_id = cmd->gNB_DU_ue_id,
+    };
+    mac->mac_rrc.ue_context_release_complete(&complete);
     return;
   }
 
