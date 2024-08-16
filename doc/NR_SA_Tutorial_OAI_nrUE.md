@@ -159,6 +159,41 @@ cd ~/openairinterface5g/cmake_targets/ran_build/build
 sudo ./nr-uesoftmodem -r 32 --numerology 3 --band 257 -C 27533280000 --sa --uicc0.imsi 001010000000001 --ssb 72 --rfsim
 ```
 
+### Connection to an NG-Core
+
+A configuration file can be fed to the nrUE command line in order to connect to the local NGC.
+
+The nrUE configuration file (e.g. [ue.conf](../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.conf)) is structured in a key-value format and contains the relevant UICC parameters that are necessary to authenticate the UE to the local 5GC. E.g.:
+
+```shell
+uicc0 = {
+  imsi = "001010000000001";
+  key = "fec86ba6eb707ed08905757b1bb44b8f";
+  opc = "C42449363BBAD02B66D16BC975D77CC1";
+  dnn = "oai";
+  nssai_sst = 1;
+}
+```
+
+| **Parameter** | **Description** | **Default Value** |
+|---------------|-----------------|-------------------|
+| **IMSI** | Unique identifier for the UE within the mobile network. Used by the network to identify the UE during authentication. It ensures that the UE is correctly identified by the network. | 001010000000001 |
+| **key** | Cryptographic key shared between the UE and the network, used for encryption during the authentication process. | `fec86ba6eb707ed08905757b1bb44b8f` |
+| **OPC** | Operator key for the Milenage Authentication and Key Agreement algorithm used for encryption during the authentication process. | Ensures secure communication between the UE and the network by matching the encryption keys. | `C42449363BBAD02B66D16BC975D77CC1` |
+| **DNN** | Specifies the name of the data network the UE wishes to connect to, similar to an APN in 4G networks. | `oai` |
+| **NSSAI** | Allows the UE to select the appropriate network slice, which provides different QoS. | `1` |
+
+The UE configuration must match the one of the network's AMF. The nrUE can connect by default to OAI CN5G with no need to provide the configuration file.
+
+When running the `nr-uesoftmodem`, one can specify the nrUE configuration file using the `-O` option. E.g.:
+
+```bash
+sudo ./nr-uesoftmodem --rfsim --rfsimulator.serveraddr 127.0.0.1 --sa -r 106 --numerology 1 --band 78 -C 3619200000 -O ~/nrue.uicc.conf
+```
+The CL option `--uicc0.imsi`  can override the IMSI value in the configuration file if necessary (e.g. when running multiple UEs): `--uicc0.imsi  001010000000001`.
+
+More details available at [ci-scripts/yaml_files/5g_rfsimulator/README.md](../ci-scripts/yaml_files/5g_rfsimulator/README.md).
+
 ## 5.2 End-to-end connectivity test
 - Ping test from the UE host to the CN5G
 ```bash
