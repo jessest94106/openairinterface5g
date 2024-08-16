@@ -54,13 +54,6 @@ typedef struct {
 } NR_gNB_PUCCH0_LUT_t;
 
 typedef struct {
-  uint32_t pbch_a;
-  uint32_t pbch_a_interleaved;
-  uint32_t pbch_a_prime;
-  uint32_t pbch_e[NR_POLAR_PBCH_E_DWORD];
-} NR_gNB_PBCH;
-
-typedef struct {
   /// Nfapi DLSCH PDU
   nfapi_nr_dl_tti_pdsch_pdu pdsch_pdu;
   /// pointer to pdu from MAC interface (this is "a" in 36.212)
@@ -469,7 +462,6 @@ typedef struct PHY_VARS_gNB_s {
   int max_nb_pdsch;
   int max_nb_pusch;
 
-  NR_gNB_PBCH pbch;
   NR_gNB_COMMON common_vars;
   NR_gNB_PRACH prach_vars;
   NR_gNB_PRS prs_vars;
