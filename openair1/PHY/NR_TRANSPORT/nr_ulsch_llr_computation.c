@@ -31,9 +31,7 @@
  */
 
 #include "PHY/defs_gNB.h"
-#include "PHY/defs_nr_common.h"
 #include "PHY/sse_intrin.h"
-#include "PHY/impl_defs_top.h"
 
 #ifdef __aarch64__
 #define USE_128BIT
@@ -55,13 +53,10 @@ int16_t saturating_sub(int16_t a, int16_t b)
 //----------------------------------------------------------------------------------------------
 // QPSK
 //----------------------------------------------------------------------------------------------
-void nr_ulsch_qpsk_llr(int32_t *rxdataF_comp,
-                      int16_t  *ulsch_llr,
-                      uint32_t nb_re,
-                      uint8_t  symbol)
+void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re, uint8_t symbol)
 {
   c16_t *rxF   = (c16_t *)rxdataF_comp;
-  c16_t *llr32 = (c16_t *)ulsch_llr;
+  c16_t *llr32 = (c16_t *)llr;
   for (int i = 0; i < nb_re; i++) {
     llr32[i].r = rxF[i].r >> 3;
     llr32[i].i = rxF[i].i >> 3;
@@ -72,11 +67,11 @@ void nr_ulsch_qpsk_llr(int32_t *rxdataF_comp,
 // 16-QAM
 //----------------------------------------------------------------------------------------------
 
-void nr_ulsch_16qam_llr(int32_t *rxdataF_comp, int32_t *ul_ch_mag, int16_t *ulsch_llr, uint32_t nb_re, uint8_t symbol)
+void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint32_t nb_re, uint8_t symbol)
 {
   simde__m256i *rxF_256 = (simde__m256i *)rxdataF_comp;
-  simde__m256i *ch_mag = (simde__m256i *)ul_ch_mag;
-  int64_t *llr_64 = (int64_t *)ulsch_llr;
+  simde__m256i *ch_mag = (simde__m256i *)ch_mag_in;
+  int64_t *llr_64 = (int64_t *)llr;
 
 #ifndef USE_128BIT
   simde__m256i xmm0, xmm1, xmm2;
@@ -110,7 +105,7 @@ void nr_ulsch_16qam_llr(int32_t *rxdataF_comp, int32_t *ul_ch_mag, int16_t *ulsc
 
   simde__m128i *rxF_128 = (simde__m128i *)rxF_256;
   simde__m128i *ch_mag_128 = (simde__m128i *)ch_mag;
-  simde__m128i *ulsch_llr_128 = (simde__m128i *)llr_64;
+  simde__m128i *llr_128 = (simde__m128i *)llr_64;
 
   // Each iteration does 4 RE (gives 16 16bit-llrs)
   for (int i = 0; i < (nb_re >> 2); i++) {
@@ -119,9 +114,9 @@ void nr_ulsch_16qam_llr(int32_t *rxdataF_comp, int32_t *ul_ch_mag, int16_t *ulsc
     // registers of even index in xmm0-> |y_R|-|h|^2, registers of odd index in xmm0-> |y_I|-|h|^2
     xmm0 = simde_mm_subs_epi16(*ch_mag_128, xmm0);
 
-    ulsch_llr_128[0] = simde_mm_unpacklo_epi32(*rxF_128, xmm0); // llr128[0] contains the llrs of the 1st,2nd,5th and 6th REs
-    ulsch_llr_128[1] = simde_mm_unpackhi_epi32(*rxF_128, xmm0); // llr128[1] contains the llrs of the 3rd, 4th, 7th and 8th REs
-    ulsch_llr_128 += 2;
+    llr_128[0] = simde_mm_unpacklo_epi32(*rxF_128, xmm0); // llr128[0] contains the llrs of the 1st,2nd,5th and 6th REs
+    llr_128[1] = simde_mm_unpackhi_epi32(*rxF_128, xmm0); // llr128[1] contains the llrs of the 3rd, 4th, 7th and 8th REs
+    llr_128 += 2;
     rxF_128++;
     ch_mag_128++;
   }
@@ -130,17 +125,17 @@ void nr_ulsch_16qam_llr(int32_t *rxdataF_comp, int32_t *ul_ch_mag, int16_t *ulsc
 
   nb_re &= 0x3;
   int16_t *rxDataF_i16 = (int16_t *)rxF_128;
-  int16_t *ul_ch_mag_i16 = (int16_t *)ch_mag_128;
-  int16_t *ulsch_llr_i16 = (int16_t *)ulsch_llr_128;
+  int16_t *ch_mag_i16 = (int16_t *)ch_mag_128;
+  int16_t *llr_i16 = (int16_t *)llr_128;
   for (uint i = 0U; i < nb_re; i++) {
     int16_t real = rxDataF_i16[2 * i];
     int16_t imag = rxDataF_i16[2 * i + 1];
-    int16_t mag_real = ul_ch_mag_i16[2 * i];
-    int16_t mag_imag = ul_ch_mag_i16[2 * i + 1];
-    ulsch_llr_i16[4 * i] = real;
-    ulsch_llr_i16[4 * i + 1] = imag;
-    ulsch_llr_i16[4 * i + 2] = saturating_sub(mag_real, abs(real));
-    ulsch_llr_i16[4 * i + 3] = saturating_sub(mag_imag, abs(imag));
+    int16_t mag_real = ch_mag_i16[2 * i];
+    int16_t mag_imag = ch_mag_i16[2 * i + 1];
+    llr_i16[4 * i] = real;
+    llr_i16[4 * i + 1] = imag;
+    llr_i16[4 * i + 2] = saturating_sub(mag_real, abs(real));
+    llr_i16[4 * i + 3] = saturating_sub(mag_imag, abs(imag));
   }
 }
 
@@ -148,19 +143,14 @@ void nr_ulsch_16qam_llr(int32_t *rxdataF_comp, int32_t *ul_ch_mag, int16_t *ulsc
 // 64-QAM
 //----------------------------------------------------------------------------------------------
 
-void nr_ulsch_64qam_llr(int32_t *rxdataF_comp,
-                        int32_t *ul_ch_mag,
-                        int32_t *ul_ch_magb,
-                        int16_t *ulsch_llr,
-                        uint32_t nb_re,
-                        uint8_t symbol)
+void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int16_t *llr, uint32_t nb_re, uint8_t symbol)
 {
   simde__m256i *rxF = (simde__m256i *)rxdataF_comp;
 
-  simde__m256i *ch_maga = (simde__m256i *)ul_ch_mag;
-  simde__m256i *ch_magb = (simde__m256i *)ul_ch_magb;
+  simde__m256i *ch_maga = (simde__m256i *)ch_mag;
+  simde__m256i *ch_magb = (simde__m256i *)ch_mag2;
 
-  int32_t *llr_32 = (int32_t *)ulsch_llr;
+  int32_t *llr_32 = (int32_t *)llr;
 
 #ifndef USE_128BIT
   simde__m256i xmm0, xmm1, xmm2;
@@ -244,40 +234,40 @@ void nr_ulsch_64qam_llr(int32_t *rxdataF_comp,
   nb_re &= 0x3;
 
   int16_t *rxDataF_i16 = (int16_t *)rxF_128;
-  int16_t *ul_ch_mag_i16 = (int16_t *)ch_mag_128;
-  int16_t *ul_ch_magb_i16 = (int16_t *)ch_magb_128;
+  int16_t *ch_mag_i16 = (int16_t *)ch_mag_128;
+  int16_t *ch_magb_i16 = (int16_t *)ch_magb_128;
   int16_t *llr_i16 = (int16_t *)llr64;
   for (int i = 0; i < nb_re; i++) {
     int16_t real = rxDataF_i16[2 * i];
     int16_t imag = rxDataF_i16[2 * i + 1];
-    int16_t mag_real = ul_ch_mag_i16[2 * i];
-    int16_t mag_imag = ul_ch_mag_i16[2 * i + 1];
+    int16_t mag_real = ch_mag_i16[2 * i];
+    int16_t mag_imag = ch_mag_i16[2 * i + 1];
     llr_i16[6 * i] = real;
     llr_i16[6 * i + 1] = imag;
     llr_i16[6 * i + 2] = saturating_sub(mag_real, abs(real));
     llr_i16[6 * i + 3] = saturating_sub(mag_imag, abs(imag));
-    int16_t mag_realb = ul_ch_magb_i16[2 * i];
-    int16_t mag_imagb = ul_ch_magb_i16[2 * i + 1];
+    int16_t mag_realb = ch_magb_i16[2 * i];
+    int16_t mag_imagb = ch_magb_i16[2 * i + 1];
     llr_i16[6 * i + 4] = saturating_sub(mag_realb, abs(llr_i16[6 * i + 2]));
     llr_i16[6 * i + 5] = saturating_sub(mag_imagb, abs(llr_i16[6 * i + 3]));
   }
   simde_mm_empty();
 }
 
-void nr_ulsch_256qam_llr(int32_t *rxdataF_comp,
-                         int32_t *ul_ch_mag,
-                         int32_t *ul_ch_magb,
-                         int32_t *ul_ch_magc,
-                         int16_t *ulsch_llr,
-                         uint32_t nb_re,
-                         uint8_t symbol)
+void nr_256qam_llr(int32_t *rxdataF_comp,
+                   int32_t *ch_mag,
+                   int32_t *ch_mag2,
+                   int32_t *ch_mag3,
+                   int16_t *llr,
+                   uint32_t nb_re,
+                   uint8_t symbol)
 {
   simde__m256i *rxF_256 = (simde__m256i *)rxdataF_comp;
-  simde__m256i *llr256 = (simde__m256i *)ulsch_llr;
+  simde__m256i *llr256 = (simde__m256i *)llr;
 
-  simde__m256i *ch_maga = (simde__m256i *)ul_ch_mag;
-  simde__m256i *ch_magb = (simde__m256i *)ul_ch_magb;
-  simde__m256i *ch_magc = (simde__m256i *)ul_ch_magc;
+  simde__m256i *ch_maga = (simde__m256i *)ch_mag;
+  simde__m256i *ch_magb = (simde__m256i *)ch_mag2;
+  simde__m256i *ch_magc = (simde__m256i *)ch_mag3;
 #ifndef USE_128BIT
   simde__m256i xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6;
 
@@ -357,26 +347,26 @@ void nr_ulsch_256qam_llr(int32_t *rxdataF_comp,
   if (nb_re & 3) {
     for (int i = 0; i < (nb_re & 0x3); i++) {
       int16_t *rxDataF_i16 = (int16_t *)rxF_128;
-      int16_t *ul_ch_mag_i16 = (int16_t *)ch_maga_128;
-      int16_t *ul_ch_magb_i16 = (int16_t *)ch_magb_128;
-      int16_t *ul_ch_magc_i16 = (int16_t *)ch_magc_128;
-      int16_t *ulsch_llr_i16 = (int16_t *)llr_128;
+      int16_t *ch_mag_i16 = (int16_t *)ch_maga_128;
+      int16_t *ch_magb_i16 = (int16_t *)ch_magb_128;
+      int16_t *ch_magc_i16 = (int16_t *)ch_magc_128;
+      int16_t *llr_i16 = (int16_t *)llr_128;
       int16_t real = rxDataF_i16[2 * i + 0];
       int16_t imag = rxDataF_i16[2 * i + 1];
-      int16_t mag_real = ul_ch_mag_i16[2 * i];
-      int16_t mag_imag = ul_ch_mag_i16[2 * i + 1];
-      ulsch_llr_i16[8 * i] = real;
-      ulsch_llr_i16[8 * i + 1] = imag;
-      ulsch_llr_i16[8 * i + 2] = saturating_sub(mag_real, abs(real));
-      ulsch_llr_i16[8 * i + 3] = saturating_sub(mag_imag, abs(imag));
-      int16_t magb_real = ul_ch_magb_i16[2 * i];
-      int16_t magb_imag = ul_ch_magb_i16[2 * i + 1];
-      ulsch_llr_i16[8 * i + 4] = saturating_sub(magb_real, abs(ulsch_llr_i16[8 * i + 2]));
-      ulsch_llr_i16[8 * i + 5] = saturating_sub(magb_imag, abs(ulsch_llr_i16[8 * i + 3]));
-      int16_t magc_real = ul_ch_magc_i16[2 * i];
-      int16_t magc_imag = ul_ch_magc_i16[2 * i + 1];
-      ulsch_llr_i16[8 * i + 6] = saturating_sub(magc_real, abs(ulsch_llr_i16[8 * i + 4]));
-      ulsch_llr_i16[8 * i + 7] = saturating_sub(magc_imag, abs(ulsch_llr_i16[8 * i + 5]));
+      int16_t mag_real = ch_mag_i16[2 * i];
+      int16_t mag_imag = ch_mag_i16[2 * i + 1];
+      llr_i16[8 * i] = real;
+      llr_i16[8 * i + 1] = imag;
+      llr_i16[8 * i + 2] = saturating_sub(mag_real, abs(real));
+      llr_i16[8 * i + 3] = saturating_sub(mag_imag, abs(imag));
+      int16_t magb_real = ch_magb_i16[2 * i];
+      int16_t magb_imag = ch_magb_i16[2 * i + 1];
+      llr_i16[8 * i + 4] = saturating_sub(magb_real, abs(llr_i16[8 * i + 2]));
+      llr_i16[8 * i + 5] = saturating_sub(magb_imag, abs(llr_i16[8 * i + 3]));
+      int16_t magc_real = ch_magc_i16[2 * i];
+      int16_t magc_imag = ch_magc_i16[2 * i + 1];
+      llr_i16[8 * i + 6] = saturating_sub(magc_real, abs(llr_i16[8 * i + 4]));
+      llr_i16[8 * i + 7] = saturating_sub(magc_imag, abs(llr_i16[8 * i + 5]));
     }
   }
   simde_mm_empty();
@@ -393,34 +383,16 @@ void nr_ulsch_compute_llr(int32_t *rxdataF_comp,
 {
   switch(mod_order){
     case 2:
-      nr_ulsch_qpsk_llr(rxdataF_comp,
-                        ulsch_llr,
-                        nb_re,
-                        symbol);
+      nr_qpsk_llr(rxdataF_comp, ulsch_llr, nb_re, symbol);
       break;
     case 4:
-      nr_ulsch_16qam_llr(rxdataF_comp,
-                         ul_ch_mag,
-                         ulsch_llr,
-                         nb_re,
-                         symbol);
+      nr_16qam_llr(rxdataF_comp, ul_ch_mag, ulsch_llr, nb_re, symbol);
       break;
     case 6:
-    nr_ulsch_64qam_llr(rxdataF_comp,
-                       ul_ch_mag,
-                       ul_ch_magb,
-                       ulsch_llr,
-                       nb_re,
-                       symbol);
+    nr_64qam_llr(rxdataF_comp, ul_ch_mag, ul_ch_magb, ulsch_llr, nb_re, symbol);
       break;
     case 8:
-    nr_ulsch_256qam_llr(rxdataF_comp,
-                        ul_ch_mag,
-                        ul_ch_magb,
-                        ul_ch_magc,
-                        ulsch_llr,
-                        nb_re,
-                        symbol);
+    nr_256qam_llr(rxdataF_comp, ul_ch_mag, ul_ch_magb, ul_ch_magc, ulsch_llr, nb_re, symbol);
       break;
     default:
       AssertFatal(1==0,"nr_ulsch_compute_llr: invalid Qm value, symbol = %d, Qm = %d\n",symbol, mod_order);

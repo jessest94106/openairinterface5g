@@ -52,42 +52,6 @@
 */
 void nr_ue_dlsch_init(NR_UE_DLSCH_t *dlsch_list, int num_dlsch, uint8_t max_ldpc_iterations);
 
-/** \brief This function computes the LLRs for ML (max-logsum approximation) dual-stream QPSK/QPSK reception.
-    @param stream0_in Input from channel compensated (MR combined) stream 0
-    @param stream1_in Input from channel compensated (MR combined) stream 1
-    @param stream0_out Output from LLR unit for stream0
-    @param rho01 Cross-correlation between channels (MR combined)
-    @param length in complex channel outputs*/
-void nr_qpsk_qpsk(int16_t *stream0_in,
-               int16_t *stream1_in,
-               int16_t *stream0_out,
-               int16_t *rho01,
-               int32_t length);
-
-/** \brief This function perform LLR computation for dual-stream (QPSK/QPSK) transmission.
-    @param frame_parms Frame descriptor structure
-    @param rxdataF_comp Compensated channel output
-    @param rxdataF_comp_i Compensated channel output for interference
-    @param rho_i Correlation between channel of signal and inteference
-    @param dlsch_llr llr output
-    @param symbol OFDM symbol index in sub-frame
-    @param len
-    @param first_symbol_flag flag to indicate this is the first symbol of the dlsch
-    @param nb_rb number of RBs for this allocation
-    @param pbch_pss_sss_adj Number of channel bits taken by PBCH/PSS/SSS
-    @param llr128p pointer to pointer to symbol in dlsch_llr*/
-int32_t nr_dlsch_qpsk_qpsk_llr(NR_DL_FRAME_PARMS *frame_parms,
-                            int32_t **rxdataF_comp,
-                            int32_t **rxdataF_comp_i,
-                            int32_t **rho_i,
-                            int16_t *dlsch_llr,
-                            uint8_t symbol,
-                            uint32_t len,
-                            uint8_t first_symbol_flag,
-                            uint16_t nb_rb,
-                            uint16_t pbch_pss_sss_adj,
-                            int16_t **llr128p);
-
 /** \brief This function generates log-likelihood ratios (decoder input) for single-stream QPSK received waveforms
     @param frame_parms Frame descriptor structure
     @param rxdataF_comp Compensated channel output
