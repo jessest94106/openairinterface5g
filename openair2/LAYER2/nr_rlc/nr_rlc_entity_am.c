@@ -1765,9 +1765,7 @@ void nr_rlc_entity_am_recv_sdu(nr_rlc_entity_t *_entity,
   /* log SDUs rejected, at most once per second */
   if (entity->sdu_rejected != 0
       && entity->t_current > entity->t_log_buffer_full + 1000) {
-    LOG_E(RLC, "%s:%d:%s: warning: %d SDU rejected, SDU buffer full\n",
-          __FILE__, __LINE__, __FUNCTION__,
-          entity->sdu_rejected);
+    LOG_E(RLC, "%d SDU rejected, SDU buffer full\n", entity->sdu_rejected);
     entity->sdu_rejected = 0;
     entity->t_log_buffer_full = entity->t_current;
   }
