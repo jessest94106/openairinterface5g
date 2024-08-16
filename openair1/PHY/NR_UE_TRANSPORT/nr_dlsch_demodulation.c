@@ -28,6 +28,7 @@
  * \note
  * \warning
  */
+#include "nr_phy_common.h"
 #include "PHY/defs_nr_UE.h"
 #include "PHY/phy_extern.h"
 #include "nr_transport_proto_ue.h"
@@ -1898,33 +1899,31 @@ static int nr_dlsch_llr(uint32_t rx_size_symbol,
                         NR_UE_DLSCH_t dlsch[2],
                         uint32_t llr_offset[14])
 {
-  uint32_t llr_offset_symbol;
-  
-  if (first_symbol_flag==1)
-    llr_offset[symbol-1] = 0;
-  llr_offset_symbol = llr_offset[symbol-1];
+  if (first_symbol_flag == 1)
+    llr_offset[symbol - 1] = 0;
+  uint32_t llr_offset_symbol = llr_offset[symbol - 1];
 
-  llr_offset[symbol] = len*dlsch[0].dlsch_config.qamModOrder + llr_offset_symbol;
+  llr_offset[symbol] = len * dlsch[0].dlsch_config.qamModOrder + llr_offset_symbol;
  
   switch (dlsch[0].dlsch_config.qamModOrder) {
     case 2 :
-      for(int l=0; l < dlsch[0].Nl; l++)
-        nr_dlsch_qpsk_llr(frame_parms, rxdataF_comp[l][0], layer_llr[l] + llr_offset_symbol, symbol, len, first_symbol_flag, nb_rb);
+      for(int l = 0; l < dlsch[0].Nl; l++)
+        nr_qpsk_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], layer_llr[l] + llr_offset_symbol, len);
       break;
 
     case 4 :
-      for(int l=0; l < dlsch[0].Nl; l++)
-        nr_dlsch_16qam_llr(frame_parms, rxdataF_comp[l][0], layer_llr[l] + llr_offset_symbol, dl_ch_mag, symbol, len, first_symbol_flag, nb_rb);
+      for(int l = 0; l < dlsch[0].Nl; l++)
+        nr_16qam_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], dl_ch_mag, layer_llr[l] + llr_offset_symbol, len);
       break;
 
     case 6 :
       for(int l=0; l < dlsch[0].Nl; l++)
-        nr_dlsch_64qam_llr(frame_parms, rxdataF_comp[l][0], layer_llr[l] + llr_offset_symbol, dl_ch_mag, dl_ch_magb, symbol, len, first_symbol_flag, nb_rb);
+        nr_64qam_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, layer_llr[l] + llr_offset_symbol, len);
       break;
 
     case 8:
       for(int l=0; l < dlsch[0].Nl; l++)
-        nr_dlsch_256qam_llr(frame_parms, rxdataF_comp[l][0], layer_llr[l] + llr_offset_symbol, dl_ch_mag, dl_ch_magb, dl_ch_magr, symbol, len, first_symbol_flag, nb_rb);
+        nr_256qam_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, dl_ch_magr, layer_llr[l] + llr_offset_symbol, len);
       break;
 
     default:
@@ -1937,19 +1936,19 @@ static int nr_dlsch_llr(uint32_t rx_size_symbol,
   if (dlsch1_harq) {
     switch (dlsch[1].dlsch_config.qamModOrder) {
       case 2 :
-        nr_dlsch_qpsk_llr(frame_parms, rxdataF_comp[0][0], layer_llr[0] + llr_offset_symbol, symbol, len, first_symbol_flag, nb_rb);
+        nr_qpsk_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], layer_llr[0] + llr_offset_symbol, len);
         break;
 
       case 4:
-        nr_dlsch_16qam_llr(frame_parms, rxdataF_comp[0][0], layer_llr[0] + llr_offset_symbol, dl_ch_mag, symbol, len, first_symbol_flag, nb_rb);
+        nr_16qam_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], dl_ch_mag, layer_llr[0] + llr_offset_symbol, len);
         break;
 
       case 6 :
-        nr_dlsch_64qam_llr(frame_parms, rxdataF_comp[0][0], layer_llr[0] + llr_offset_symbol, dl_ch_mag, dl_ch_magb, symbol, len, first_symbol_flag, nb_rb);
+        nr_64qam_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, layer_llr[0] + llr_offset_symbol, len);
         break;
 
       case 8 :
-        nr_dlsch_256qam_llr(frame_parms, rxdataF_comp[0][0], layer_llr[0] + llr_offset_symbol, dl_ch_mag, dl_ch_magb, dl_ch_magr, symbol, len, first_symbol_flag, nb_rb);
+        nr_256qam_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, dl_ch_magr, layer_llr[0] + llr_offset_symbol, len);
         break;
 
       default:

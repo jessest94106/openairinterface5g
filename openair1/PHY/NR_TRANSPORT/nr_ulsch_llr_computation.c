@@ -47,21 +47,21 @@ void nr_ulsch_compute_llr(int32_t *rxdataF_comp,
                           uint8_t  symbol,
                           uint8_t  mod_order)
 {
-  switch(mod_order){
+  switch(mod_order) {
     case 2:
-      nr_qpsk_llr(rxdataF_comp, ulsch_llr, nb_re, symbol);
+      nr_qpsk_llr(rxdataF_comp, ulsch_llr, nb_re);
       break;
     case 4:
-      nr_16qam_llr(rxdataF_comp, ul_ch_mag, ulsch_llr, nb_re, symbol);
+      nr_16qam_llr(rxdataF_comp, ul_ch_mag, ulsch_llr, nb_re);
       break;
     case 6:
-    nr_64qam_llr(rxdataF_comp, ul_ch_mag, ul_ch_magb, ulsch_llr, nb_re, symbol);
+    nr_64qam_llr(rxdataF_comp, ul_ch_mag, ul_ch_magb, ulsch_llr, nb_re);
       break;
     case 8:
-    nr_256qam_llr(rxdataF_comp, ul_ch_mag, ul_ch_magb, ul_ch_magc, ulsch_llr, nb_re, symbol);
+    nr_256qam_llr(rxdataF_comp, ul_ch_mag, ul_ch_magb, ul_ch_magc, ulsch_llr, nb_re);
       break;
     default:
-      AssertFatal(1==0,"nr_ulsch_compute_llr: invalid Qm value, symbol = %d, Qm = %d\n",symbol, mod_order);
+      AssertFatal(false, "nr_ulsch_compute_llr: invalid Qm value, symbol = %d, Qm = %d\n",symbol, mod_order);
       break;
   }
 }

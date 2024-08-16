@@ -41,7 +41,7 @@ int16_t saturating_sub(int16_t a, int16_t b)
 //----------------------------------------------------------------------------------------------
 // QPSK
 //----------------------------------------------------------------------------------------------
-void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re, uint8_t symbol)
+void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re)
 {
   c16_t *rxF   = (c16_t *)rxdataF_comp;
   c16_t *llr32 = (c16_t *)llr;
@@ -55,7 +55,7 @@ void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re, uint8_t sy
 // 16-QAM
 //----------------------------------------------------------------------------------------------
 
-void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint32_t nb_re, uint8_t symbol)
+void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint32_t nb_re)
 {
   simde__m256i *rxF_256 = (simde__m256i *)rxdataF_comp;
   simde__m256i *ch_mag = (simde__m256i *)ch_mag_in;
@@ -131,7 +131,7 @@ void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint3
 // 64-QAM
 //----------------------------------------------------------------------------------------------
 
-void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int16_t *llr, uint32_t nb_re, uint8_t symbol)
+void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int16_t *llr, uint32_t nb_re)
 {
   simde__m256i *rxF = (simde__m256i *)rxdataF_comp;
 
@@ -242,13 +242,7 @@ void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int1
   simde_mm_empty();
 }
 
-void nr_256qam_llr(int32_t *rxdataF_comp,
-                   int32_t *ch_mag,
-                   int32_t *ch_mag2,
-                   int32_t *ch_mag3,
-                   int16_t *llr,
-                   uint32_t nb_re,
-                   uint8_t symbol)
+void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int32_t *ch_mag3, int16_t *llr, uint32_t nb_re)
 {
   simde__m256i *rxF_256 = (simde__m256i *)rxdataF_comp;
   simde__m256i *llr256 = (simde__m256i *)llr;

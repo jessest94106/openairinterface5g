@@ -2256,7 +2256,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/pucch_nr.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/sss_nr.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/dci_nr.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/nr_dlsch_llr_computation.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/nr_prach.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/nr_transport_proto_ue.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair1/PHY/NR_UE_TRANSPORT/nr_ue_rf_helpers.c \
