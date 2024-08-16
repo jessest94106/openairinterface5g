@@ -162,11 +162,6 @@ void pdcp_run(const protocol_ctxt_t *const ctxt_pP)
   abort();
 }
 
-/* see file openair2/LAYER2/MAC/main.c for why abstraction_flag is needed
- * this is very hackish - find a proper solution
- */
-uint8_t abstraction_flag=0;
-
 /* forward declarations */
 void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs], NR_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]);
 

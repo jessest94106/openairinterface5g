@@ -497,8 +497,7 @@ void init_gNB(int wait_for_sync) {
       RC.gNB[inst] = (PHY_VARS_gNB *) calloc(1, sizeof(PHY_VARS_gNB));
       LOG_I(PHY,"[nr-gnb.c] gNB structure RC.gNB[%d] allocated @ %p\n",inst,RC.gNB[inst]);
     }
-    gNB                     = RC.gNB[inst];
-    gNB->abstraction_flag   = 0;
+    gNB = RC.gNB[inst];
     /*nr_polar_init(&gNB->nrPolar_params,
       NR_POLAR_PBCH_MESSAGE_TYPE,
       NR_POLAR_PBCH_PAYLOAD_BITS,

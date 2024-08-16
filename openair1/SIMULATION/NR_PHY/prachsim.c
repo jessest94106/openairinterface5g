@@ -135,11 +135,6 @@ int main(int argc, char **argv){
   int prachOccasion = 0;
   double DS_TDL = .03;
 
-  //  int8_t interf1=-19,interf2=-19;
-  //  uint8_t abstraction_flag=0,calibration_flag=0;
-  //  double prach_sinr;
-  //  uint32_t nsymb;
-  //  uint16_t preamble_max, preamble_energy_max;
   FILE *input_fd=NULL;
   char* input_file=NULL;
   int n_bytes=0;
