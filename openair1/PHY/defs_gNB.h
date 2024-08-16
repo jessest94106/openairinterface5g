@@ -146,9 +146,6 @@ typedef struct {
 
 typedef struct {
   /// \brief ?.
-  /// first index: ? [0..1023] (hard coded)
-  int16_t *prachF;
-  /// \brief ?.
   /// second index: rx antenna [0..63] (hard coded) \note Hard coded array size indexed by \c nb_antennas_rx.
   /// third index: frequency-domain sample [0..ofdm_symbol_size*12[
   int16_t **rxsigF;
