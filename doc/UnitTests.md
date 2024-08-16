@@ -25,7 +25,8 @@ ninja tests
 ```
 
 Then, you can run `ctest` to run all tests:
-```
+
+```bash
 $ ctest
 Test project /home/richie/w/ctest/build
     Start 1: nr_rlc_tests
@@ -35,6 +36,8 @@ Test project /home/richie/w/ctest/build
 
 Total Test time (real) =   0.06 sec
 ```
+
+The user can see all available tests by typing `ctest -N` and then run a specific with `ctest -R <test_name>`, e.g. `ctest -R nr_rlc_tests`.
 
 A couple of interesting variables are `--verbose`, `--output-on-failure`.
 
@@ -59,7 +62,8 @@ process is
 
 In the simplest case, in an existing `CMakeLists.txt`, you might add the
 following:
-```
+
+```bash
 if(ENABLE_TESTS)
   add_executable(my_test mytest.c)
   add_dependencies(tests my_test)
