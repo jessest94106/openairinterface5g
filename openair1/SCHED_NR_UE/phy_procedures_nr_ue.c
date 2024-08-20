@@ -287,21 +287,26 @@ void phy_procedures_nrUE_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, n
 
   start_meas_nr_ue_phy(ue, PHY_PROC_TX);
 
-  int harq_pid = phy_data->ulsch.pusch_pdu.pusch_data.harq_process_id;
-  if (ue->ul_harq_processes[harq_pid].ULstatus == ACTIVE)
+  const int harq_pid = phy_data->ulsch.pusch_pdu.pusch_data.harq_process_id;
+  if (ue->ul_harq_processes[harq_pid].ULstatus == ACTIVE) {
+    start_meas_nr_ue_phy(ue, PUSCH_PROC_STATS);
     nr_ue_ulsch_procedures(ue, harq_pid, frame_tx, slot_tx, gNB_id, phy_data, (c16_t **)&txdataF);
+    stop_meas_nr_ue_phy(ue, PUSCH_PROC_STATS);
+  }
 
   ue_srs_procedures_nr(ue, proc, (c16_t **)&txdataF);
 
   pucch_procedures_ue_nr(ue, proc, phy_data, (c16_t **)&txdataF);
 
   LOG_D(PHY, "Sending Uplink data \n");
+  start_meas_nr_ue_phy(ue, OFDM_MOD_STATS);
   nr_ue_pusch_common_procedures(ue,
                                 proc->nr_slot_tx,
                                 &ue->frame_parms,
                                 ue->frame_parms.nb_antennas_tx,
                                 (c16_t **)txdataF,
                                 link_type_ul);
+  stop_meas_nr_ue_phy(ue, OFDM_MOD_STATS);
 
   nr_ue_prach_procedures(ue, proc);
 
