@@ -105,6 +105,7 @@ typedef struct {
   bool termination_procedure;
   uint8_t  *registration_request_buf;
   uint32_t  registration_request_len;
+  instance_t UE_id;
 } nr_ue_nas_t;
 
 typedef enum fgs_protocol_discriminator_e {
