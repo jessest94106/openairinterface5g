@@ -357,8 +357,6 @@ typedef struct {
   /// - first index: ? [0..3] (hard coded)
   /// - first index: ? [0..1179743] (hard coded)
   int16_t **llr_layers;
-  /// DMRS symbol index, to be updated every DMRS symbol within a slot.
-  uint8_t dmrs_symbol;
   // PTRS symbol index, to be updated every PTRS symbol within a slot.
   uint8_t ptrs_symbol_index;
   /// bit mask of PT-RS ofdm symbol indicies

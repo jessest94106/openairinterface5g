@@ -587,18 +587,29 @@ static void config_common(gNB_MAC_INST *nrmac, nr_pdsch_AntennaPorts_t pdsch_Ant
                                               scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols);
 
     AssertFatal(periods_per_frame > 0, "TDD configuration cannot be configured\n");
-    if (frequency_range == FR2) {
-      LOG_I(NR_MAC, "Configuring TDD beam association to default\n");
-      nrmac->tdd_beam_association = malloc16(periods_per_frame * sizeof(int16_t));
-      for (int i = 0; i < periods_per_frame; ++i)
-        nrmac->tdd_beam_association[i] = -1; /* default: beams not configured */
-    } else {
-      nrmac->tdd_beam_association = NULL; /* default: no beams */
-    }
   }
 
   // precoding matrix configuration (to be improved)
   cfg->pmi_list = init_DL_MIMO_codebook(nrmac, pdsch_AntennaPorts);
+}
+
+static void initialize_beam_information(NR_beam_info_t *beam_info, int mu, int slots_per_frame)
+{
+  if(!beam_info->beam_allocation)
+    return;
+
+  int size = mu == 0 ? slots_per_frame << 1 : slots_per_frame;
+  // slots in beam duration gives the number of consecutive slots tied the the same beam
+  AssertFatal(size % beam_info->beam_duration == 0,
+              "Beam duration %d should be divider of number of slots per frame %d\n",
+              beam_info->beam_duration,
+              slots_per_frame);
+  beam_info->beam_allocation_size = size / beam_info->beam_duration;
+  for (int i = 0; i < beam_info->beams_per_period; i++) {
+    beam_info->beam_allocation[i] = malloc16(beam_info->beam_allocation_size * sizeof(int));
+    for (int j = 0; j < beam_info->beam_allocation_size; j++)
+      beam_info->beam_allocation[i][j] = -1;
+  }
 }
 
 void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, const nr_mac_config_t *config)
@@ -614,15 +625,22 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
   const int NTN_gNB_Koffset = get_NTN_Koffset(scc);
   const int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
   const int size = n << (int)ceil(log2((NTN_gNB_Koffset + 13) / n + 1)); // 13 is upper limit for max_fb_time
-
   nrmac->vrb_map_UL_size = size;
-  nrmac->common_channels[0].vrb_map_UL = calloc(size * MAX_BWP_SIZE, sizeof(uint16_t));
-  AssertFatal(nrmac->common_channels[0].vrb_map_UL,
-              "could not allocate memory for RC.nrmac[]->common_channels[0].vrb_map_UL\n");
+
+  int num_beams = 1;
+  if(nrmac->beam_info.beam_allocation)
+    num_beams = nrmac->beam_info.beams_per_period;
+  for (int i = 0; i < num_beams; i++) {
+    nrmac->common_channels[0].vrb_map_UL[i] = calloc(size * MAX_BWP_SIZE, sizeof(uint16_t));
+    AssertFatal(nrmac->common_channels[0].vrb_map_UL[i],
+                "could not allocate memory for RC.nrmac[]->common_channels[0].vrb_map_UL[%d]\n", i);
+  }
 
   nrmac->UL_tti_req_ahead_size = size;
   nrmac->UL_tti_req_ahead[0] = calloc(size, sizeof(nfapi_nr_ul_tti_request_t));
   AssertFatal(nrmac->UL_tti_req_ahead[0], "could not allocate memory for nrmac->UL_tti_req_ahead[0]\n");
+
+  initialize_beam_information(&nrmac->beam_info, *scc->ssbSubcarrierSpacing, n);
 
   LOG_I(NR_MAC, "Configuring common parameters from NR ServingCellConfig\n");
 
