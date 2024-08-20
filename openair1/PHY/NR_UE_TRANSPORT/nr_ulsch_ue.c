@@ -612,8 +612,11 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                     .oob_event_value = 0};
   trace_pdu(&tmp);
 
-  if (nr_ulsch_encoding(UE, ulsch_ue, frame_parms, harq_pid, tb_size, G) == -1)
+  if (nr_ulsch_encoding(UE, ulsch_ue, frame_parms, harq_pid, tb_size, G) == -1) {
+    NR_UL_UE_HARQ_t *harq_process_ulsch = &UE->ul_harq_processes[harq_pid];
+    harq_process_ulsch->ULstatus = SCH_IDLE;
     return;
+  }
 
   ///////////
   ////////////////////////////////////////////////////////////////////
