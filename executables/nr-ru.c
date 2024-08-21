@@ -68,7 +68,6 @@ static int DEFRUTPCORES[] = {-1,-1,-1,-1};
 #include <nfapi/oai_integration/vendor_ext.h>
 #include "executables/nr-softmodem-common.h"
 
-int sl_ahead;
 static void NRRCconfig_RU(configmodule_interface_t *cfg);
 
 /*************************************************************/
