@@ -219,6 +219,9 @@ def GetParametersFromXML(action):
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		if test.findtext('nodes'):
 			CiTestObj.nodes = test.findtext('nodes').split(' ')
+			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+				logging.error('Number of Nodes are not equal to the total number of UEs')
+				sys.exit("Mismatch in number of Nodes and UIs")
 
 	elif action == 'Build_OAI_UE':
 		CiTestObj.Build_OAI_UE_args = test.findtext('Build_OAI_UE_args')
@@ -267,6 +270,9 @@ def GetParametersFromXML(action):
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		if test.findtext('nodes'):
 			CiTestObj.nodes = test.findtext('nodes').split(' ')
+			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+				logging.error('Number of Nodes are not equal to the total number of UEs')
+				sys.exit("Mismatch in number of Nodes and UIs")
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
@@ -275,6 +281,9 @@ def GetParametersFromXML(action):
 		CiTestObj.svr_id = test.findtext('svr_id') or None
 		if test.findtext('nodes'):
 			CiTestObj.nodes = test.findtext('nodes').split(' ')
+			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+				logging.error('Number of Nodes are not equal to the total number of UEs')
+				sys.exit("Mismatch in number of Nodes and UIs")
 		if test.findtext('svr_node'):
 			CiTestObj.svr_node = test.findtext('svr_node')
 		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
@@ -376,23 +385,6 @@ def GetParametersFromXML(action):
 		string_field = test.findtext('services')
 		if string_field is not None:
 			CONTAINERS.services[CONTAINERS.eNB_instance] = string_field
-
-	elif action == 'DeployGenObject' or action == 'UndeployGenObject' or action == 'StatsFromGenObject':
-		string_field=test.findtext('yaml_path')
-		if (string_field is not None):
-			CONTAINERS.yamlPath[0] = string_field
-		string_field=test.findtext('services')
-		if (string_field is not None):
-			CONTAINERS.services[0] = string_field
-		string_field=test.findtext('nb_healthy')
-		if (string_field is not None):
-			CONTAINERS.nb_healthy[0] = int(string_field)
-		string_field=test.findtext('d_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
-		string_field=test.findtext('u_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
 
 	elif action == 'Run_CUDATest' or action == 'Run_NRulsimTest' or action == 'Run_T2Test':
 		ldpc.runargs = test.findtext('physim_run_args')
@@ -865,7 +857,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						if not success:
 							RAN.prematureExit = True
 					elif action == 'Create_Workspace':
-						CONTAINERS.Create_Workspace()
+						CONTAINERS.Create_Workspace(HTML)
 					elif action == 'Deploy_Object':
 						CONTAINERS.DeployObject(HTML, EPC)
 						if CONTAINERS.exitStatus==1:
@@ -884,20 +876,10 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 							RAN.prematureExit = True
 					elif action == 'Deploy_Run_PhySim':
 						PHYSIM.Deploy_PhySim(HTML, RAN)
-					elif action == 'DeployGenObject':
-						CONTAINERS.DeployGenObject(HTML, RAN, CiTestObj)
-						if CONTAINERS.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'UndeployGenObject':
-						CONTAINERS.UndeployGenObject(HTML, RAN, CiTestObj)
-						if CONTAINERS.exitStatus==1:
-							RAN.prematureExit = True
 					elif action == 'IperfFromContainer':
 						CONTAINERS.IperfFromContainer(HTML, RAN, CiTestObj)
 						if CONTAINERS.exitStatus==1:
 							RAN.prematureExit = True
-					elif action == 'StatsFromGenObject':
-						CONTAINERS.StatsFromGenObject(HTML)
 					elif action == 'Push_Images_To_Test_Servers':
 						logging.debug('To be implemented')
 					else:

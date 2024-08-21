@@ -31,7 +31,6 @@
                 001111
                 800813
                 002222
-                800814
                 002223
                 000111
                 100000
@@ -67,12 +66,6 @@
                 <desc>Deploy PNF/Nvidia CUBB in a container</desc>
                 <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial</yaml_path>
                 <services>nv-cubb</services>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
-        </testCase>
-        <testCase id="800814">
-                <class>Create_Workspace</class>
-                <desc>Creating new Workspace for server 0</desc>
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
         </testCase>

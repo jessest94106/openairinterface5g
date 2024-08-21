@@ -94,12 +94,6 @@
     <eNB_serverId>0</eNB_serverId>
     <services>gnb_cucp</services>
   </testCase>
-  <testCase id="800814">
-      <class>Create_Workspace</class>
-      <desc>Creating new Workspace</desc>
-      <eNB_instance>0</eNB_instance>
-      <eNB_serverId>0</eNB_serverId>
-  </testCase>
   <testCase id="330102">
     <class>Deploy_Object</class>
     <desc>Deploy gNB-CU-UP in a container</desc>
@@ -107,12 +101,6 @@
     <eNB_instance>0</eNB_instance>
     <eNB_serverId>0</eNB_serverId>
     <services>gnb_cuup</services>
-  </testCase>
-  <testCase id="800815">
-      <class>Create_Workspace</class>
-      <desc>Creating new Workspace</desc>
-      <eNB_instance>0</eNB_instance>
-      <eNB_serverId>0</eNB_serverId>
   </testCase>
   <testCase id="330103">
     <class>Deploy_Object</class>

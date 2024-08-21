@@ -234,7 +234,6 @@ def ReTagImages(mySSH,IMAGES,ranCommitID,ranBranch,ranAllowMerge,displayedNewTag
 						if not displayedNewTags:
 								logging.debug(f'\u001B[1m Using sanitized version of {image} with {imageTag}\u001B[0m')
 		mySSH.run(f'sed -i -e "s@oaisoftwarealliance/{image}:develop@oai-ci/{imageTag}@" ci-docker-compose.yml',silent=True)
-		mySSH.run(f'sed -i -e "s@{image}:latest@oai-ci/{imageTag}@" ci-docker-compose.yml',silent=True) # temporary solution for not using the new branch
 
 def DeployServices(mySSH,svcName):
 	allServices = []
@@ -979,7 +978,7 @@ class Containerize():
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
 		return True
 
-	def Create_Workspace(self):
+	def Create_Workspace(self,HTML):
 		if self.eNB_serverId[self.eNB_instance] == '0':
 			lIpAddr = self.eNBIPAddress
 			lUserName = self.eNBUserName
@@ -1003,6 +1002,7 @@ class Containerize():
 		sshSession = cls_cmd.getConnection(lIpAddr)
 
 		CreateWorkspace(sshSession, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
 
 	def DeployObject(self, HTML, EPC):
 		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
@@ -1012,6 +1012,7 @@ class Containerize():
 		logging.debug('\u001B[1m Deploying OAI Object on server: ' + lIpAddr + '\u001B[0m')
 		self.deployKind[self.eNB_instance] = True
 		mySSH = cls_cmd.getConnection(lIpAddr, f'{lSourcePath}/{self.yamlPath[self.eNB_instance]}')
+		logging.info(f'Current working directory: {lSourcePath}/{self.yamlPath[self.eNB_instance]}')
 		ReTagImages(mySSH,IMAGES,self.ranCommitID, self.ranBranch, self.ranAllowMerge, self.displayedNewTags)
 		deployStatus,allServices = DeployServices(mySSH,self.services[self.eNB_instance])
 		if deployStatus != 0:
@@ -1031,7 +1032,7 @@ class Containerize():
 				logging.warning(f"Deployment Failed: Trying to copy container logs {self.eNB_logFile[self.eNB_instance]}")
 				CopyinContainerLog(mySSH,lSourcePath,self.yamlPath[0].split('/'),containerName,self.eNB_logFile[self.eNB_instance])
 				status = False
-			logging.debug(GetImageInfo(mySSH, containerName))
+			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [(GetImageInfo(mySSH, containerName))])
 		mySSH.close()
 		if status:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['Healthy deployment!'])
@@ -1057,7 +1058,8 @@ class Containerize():
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.ENB_PROCESS_NOLOGFILE_TO_ANALYZE)
 			self.exitStatus = 1
 		else:
-			self.exitStatus = 1 if any(CheckLogs(self, mySSH, self.yamlPath[0].split('/'), service_name, HTML, RAN) for service_name, _ in services) else 0
+			log_results = [CheckLogs(self, mySSH, self.yamlPath[0].split('/'), service_name, HTML, RAN) for service_name, _ in services]
+			self.exitStatus = 1 if any(log_results) else 0
 			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m') if self.exitStatus == 0 else logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
 		mySSH.close()
 
