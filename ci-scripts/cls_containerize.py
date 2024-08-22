@@ -189,16 +189,15 @@ def GetContainerName(mySSH, svcName):
 
 def GetImageInfo(mySSH, containerName):
 	usedImage = ''
-	ret = mySSH.run('docker inspect --format="ImageUsed: {{.Config.Image}}" ' + containerName)
-	if ret.stdout.count('ImageUsed: oai-ci'):
-		usedImage = ret.stdout.replace('ImageUsed: oai-ci', 'oai-ci').strip()
-		logging.debug('Used image is ' + usedImage)
-	if usedImage != '':
+	ret = mySSH.run('docker inspect --format="{{.Config.Image}}" ' + containerName)
+	usedImage = ret.stdout.strip()
+	logging.debug('Used image is: ' + usedImage)
+	if usedImage:
 		ret = mySSH.run('docker image inspect --format "* Size     = {{.Size}} bytes\n* Creation = {{.Created}}\n* Id       = {{.Id}}" ' + usedImage)
-		imageInfo = f"Used image is {usedImage}\n{ret.stdout}"
+		imageInfo = f"Used image is {usedImage}\n{ret.stdout}\n"
 		return imageInfo
 	else:
-		return "Could not retrieve used image info!\n"
+		return f"Could not retrieve used image info for {containerName}!\n"
 
 def GetContainerHealth(mySSH, containerName):
     if containerName is None:
@@ -1023,6 +1022,7 @@ class Containerize():
 			return
 		services_list = allServices if self.services[self.eNB_instance].split() == [] else self.services[self.eNB_instance].split()
 		status = True
+		imagesInfo=""
 		for svcName in services_list:
 			containerName = GetContainerName(mySSH, svcName)
 			healthyNb,unhealthyNb = GetContainerHealth(mySSH,containerName)
@@ -1032,8 +1032,9 @@ class Containerize():
 				logging.warning(f"Deployment Failed: Trying to copy container logs {self.eNB_logFile[self.eNB_instance]}")
 				CopyinContainerLog(mySSH,lSourcePath,self.yamlPath[0].split('/'),containerName,self.eNB_logFile[self.eNB_instance])
 				status = False
-			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [(GetImageInfo(mySSH, containerName))])
+			imagesInfo += (GetImageInfo(mySSH, containerName))
 		mySSH.close()
+		HTML.CreateHtmlTestRowQueue('N/A', 'OK', [(imagesInfo)])
 		if status:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['Healthy deployment!'])
 		else:
