@@ -113,7 +113,7 @@
 		<class>Attach_UE</class>
 		<desc>Attach UE</desc>
 		<id>idefix</id>
-  </testCase>
+  	</testCase>
 	<testCase id= "010010">
 		<class>Detach_UE</class>
 		<desc>Detach UE</desc>

@@ -68,10 +68,10 @@
     <command>ssh root@192.168.20.2 reboot ; sleep 45</command>
   </testCase>
   <testCase id="800813">
-      <class>Create_Workspace</class>
-      <desc>Creating new Workspace</desc>
-      <eNB_instance>0</eNB_instance>
-      <eNB_serverId>0</eNB_serverId>
+    <class>Create_Workspace</class>
+    <desc>Creating new Workspace</desc>
+    <eNB_instance>0</eNB_instance>
+    <eNB_serverId>0</eNB_serverId>
   </testCase>
   <testCase id="020000">
     <class>Deploy_Object</class>
@@ -81,10 +81,10 @@
     <eNB_serverId>0</eNB_serverId>
   </testCase>
   <testCase id="800814">
-      <class>Create_Workspace</class>
-      <desc>Creating new Workspace</desc>
-      <eNB_instance>1</eNB_instance>
-      <eNB_serverId>1</eNB_serverId>
+    <class>Create_Workspace</class>
+    <desc>Creating new Workspace</desc>
+    <eNB_instance>1</eNB_instance>
+    <eNB_serverId>1</eNB_serverId>
   </testCase>
   <testCase id="020001">
     <class>Deploy_Object</class>
