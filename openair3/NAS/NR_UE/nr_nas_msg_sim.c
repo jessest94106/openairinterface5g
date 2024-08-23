@@ -29,7 +29,6 @@
  * 2023.01.27 Vladimir Dorovskikh 16 digits IMEISV
  */
 
-
 #include <string.h> // memset
 #include <stdlib.h> // malloc, free
 
@@ -100,13 +99,13 @@ security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, 
   /* check integrity */
   uint8_t computed_mac[4];
   nas_stream_cipher_t stream_cipher;
-  stream_cipher.context    = nas->security_container->integrity_context;
-  stream_cipher.count      = nas->security.nas_count_dl;
-  stream_cipher.bearer     = 1;                          /* todo: don't hardcode */
-  stream_cipher.direction  = 1;
-  stream_cipher.message    = pdu_buffer + 6;
+  stream_cipher.context = nas->security_container->integrity_context;
+  stream_cipher.count = nas->security.nas_count_dl;
+  stream_cipher.bearer = 1; /* todo: don't hardcode */
+  stream_cipher.direction = 1;
+  stream_cipher.message = pdu_buffer + 6;
   /* length in bits */
-  stream_cipher.blength    = (pdu_length - 6) << 3;
+  stream_cipher.blength = (pdu_length - 6) << 3;
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, computed_mac);
 
   uint8_t *received_mac = pdu_buffer + 2;
@@ -116,13 +115,13 @@ security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, 
 
   /* decipher */
   uint8_t buf[pdu_length - 7];
-  stream_cipher.context    = nas->security_container->ciphering_context;
-  stream_cipher.count      = nas->security.nas_count_dl;
-  stream_cipher.bearer     = 1;                          /* todo: don't hardcode */
-  stream_cipher.direction  = 1;
-  stream_cipher.message    = pdu_buffer + 7;
+  stream_cipher.context = nas->security_container->ciphering_context;
+  stream_cipher.count = nas->security.nas_count_dl;
+  stream_cipher.bearer = 1; /* todo: don't hardcode */
+  stream_cipher.direction = 1;
+  stream_cipher.message = pdu_buffer + 7;
   /* length in bits */
-  stream_cipher.blength    = (pdu_length - 7) << 3;
+  stream_cipher.blength = (pdu_length - 7) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
   memcpy(pdu_buffer + 7, buf, pdu_length - 7);
 
@@ -131,10 +130,7 @@ security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, 
   return NAS_SECURITY_INTEGRITY_PASSED;
 }
 
-static int nas_protected_security_header_encode(
-  char                                       *buffer,
-  const fgs_nas_message_security_header_t    *header,
-  int                                         length)
+static int nas_protected_security_header_encode(char *buffer, const fgs_nas_message_security_header_t *header, int length)
 {
   LOG_FUNC_IN;
 
@@ -144,18 +140,18 @@ static int nas_protected_security_header_encode(
   ENCODE_U8(buffer, header->protocol_discriminator, size);
 
   /* Encode the security header type */
-  ENCODE_U8(buffer+size, (header->security_header_type & 0xf), size);
+  ENCODE_U8(buffer + size, (header->security_header_type & 0xf), size);
 
   /* Encode the message authentication code */
-  ENCODE_U32(buffer+size, header->message_authentication_code, size);
+  ENCODE_U32(buffer + size, header->message_authentication_code, size);
   /* Encode the sequence number */
-  ENCODE_U8(buffer+size, header->sequence_number, size);
+  ENCODE_U8(buffer + size, header->sequence_number, size);
 
-  LOG_FUNC_RETURN (size);
+  LOG_FUNC_RETURN(size);
 }
 
-static int _nas_mm_msg_encode_header(const mm_msg_header_t *header,
-                                  uint8_t *buffer, uint32_t len) {
+static int _nas_mm_msg_encode_header(const mm_msg_header_t *header, uint8_t *buffer, uint32_t len)
+{
   int size = 0;
 
   /* Check the buffer length */
@@ -165,8 +161,7 @@ static int _nas_mm_msg_encode_header(const mm_msg_header_t *header,
 
   /* Check the protocol discriminator */
   if (header->ex_protocol_discriminator != FGS_MOBILITY_MANAGEMENT_MESSAGE) {
-    LOG_TRACE(ERROR, "ESM-MSG   - Unexpected extened protocol discriminator: 0x%x",
-              header->ex_protocol_discriminator);
+    LOG_TRACE(ERROR, "ESM-MSG   - Unexpected extened protocol discriminator: 0x%x", header->ex_protocol_discriminator);
     return (TLV_ENCODE_PROTOCOL_NOT_SUPPORTED);
   }
 
@@ -201,7 +196,7 @@ static int fill_guti(FGSMobileIdentity *mi, const Guti5GSMobileIdentity_t *guti)
 
 static int fill_imeisv(FGSMobileIdentity *mi, const uicc_t *uicc)
 {
-  int i=0;
+  int i = 0;
   mi->imeisv.typeofidentity = FGS_MOBILE_IDENTITY_IMEISV;
   mi->imeisv.digittac01 = getImeisvDigit(uicc, i++);
   mi->imeisv.digittac02 = getImeisvDigit(uicc, i++);
@@ -219,31 +214,33 @@ static int fill_imeisv(FGSMobileIdentity *mi, const uicc_t *uicc)
   mi->imeisv.digit14 = getImeisvDigit(uicc, i++);
   mi->imeisv.digitsv1 = getImeisvDigit(uicc, i++);
   mi->imeisv.digitsv2 = getImeisvDigit(uicc, i++);
-  mi->imeisv.spare  = 0x0f;
+  mi->imeisv.spare = 0x0f;
   mi->imeisv.oddeven = 0;
   return 19;
 }
 
-int mm_msg_encode(MM_msg *mm_msg, uint8_t *buffer, uint32_t len) {
+int mm_msg_encode(MM_msg *mm_msg, uint8_t *buffer, uint32_t len)
+{
   LOG_FUNC_IN;
   int header_result;
   int encode_result;
   uint8_t msg_type = mm_msg->header.message_type;
 
-
   /* First encode the EMM message header */
   header_result = _nas_mm_msg_encode_header(&mm_msg->header, buffer, len);
 
   if (header_result < 0) {
-    LOG_TRACE(ERROR, "EMM-MSG   - Failed to encode EMM message header "
-              "(%d)", header_result);
+    LOG_TRACE(ERROR,
+              "EMM-MSG   - Failed to encode EMM message header "
+              "(%d)",
+              header_result);
     LOG_FUNC_RETURN(header_result);
   }
 
   buffer += header_result;
   len -= header_result;
 
-  switch(msg_type) {
+  switch (msg_type) {
     case REGISTRATION_REQUEST:
       encode_result = encode_registration_request(&mm_msg->registration_request, buffer, len);
       break;
@@ -260,32 +257,36 @@ int mm_msg_encode(MM_msg *mm_msg, uint8_t *buffer, uint32_t len) {
       encode_result = encode_fgs_uplink_nas_transport(&mm_msg->uplink_nas_transport, buffer, len);
       break;
     case FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING:
-      encode_result = encode_fgs_deregistration_request_ue_originating(&mm_msg->fgs_deregistration_request_ue_originating, buffer, len);
+      encode_result =
+          encode_fgs_deregistration_request_ue_originating(&mm_msg->fgs_deregistration_request_ue_originating, buffer, len);
       break;
     default:
-      LOG_TRACE(ERROR, "EMM-MSG   - Unexpected message type: 0x%x",
-    		  mm_msg->header.message_type);
+      LOG_TRACE(ERROR, "EMM-MSG   - Unexpected message type: 0x%x", mm_msg->header.message_type);
       encode_result = TLV_ENCODE_WRONG_MESSAGE_TYPE;
       break;
       /* TODO: Handle not standard layer 3 messages: SERVICE_REQUEST */
   }
 
   if (encode_result < 0) {
-    LOG_TRACE(ERROR, "EMM-MSG   - Failed to encode L3 EMM message 0x%x "
-              "(%d)", mm_msg->header.message_type, encode_result);
+    LOG_TRACE(ERROR,
+              "EMM-MSG   - Failed to encode L3 EMM message 0x%x "
+              "(%d)",
+              mm_msg->header.message_type,
+              encode_result);
   }
 
   if (encode_result < 0)
-    LOG_FUNC_RETURN (encode_result);
+    LOG_FUNC_RETURN(encode_result);
 
-  LOG_FUNC_RETURN (header_result + encode_result);
+  LOG_FUNC_RETURN(header_result + encode_result);
 }
 
-void transferRES(uint8_t ck[16], uint8_t ik[16], uint8_t *input, uint8_t rand[16], uint8_t *output, uicc_t* uicc) {
-  uint8_t S[100]={0};
+void transferRES(uint8_t ck[16], uint8_t ik[16], uint8_t *input, uint8_t rand[16], uint8_t *output, uicc_t *uicc)
+{
+  uint8_t S[100] = {0};
   S[0] = 0x6B;
-  servingNetworkName (S+1, uicc->imsiStr, uicc->nmc_size);
-  int netNamesize = strlen((char*)S+1);
+  servingNetworkName(S + 1, uicc->imsiStr, uicc->nmc_size);
+  int netNamesize = strlen((char *)S + 1);
   S[1 + netNamesize] = (netNamesize & 0xff00) >> 8;
   S[2 + netNamesize] = (netNamesize & 0x00ff);
   for (int i = 0; i < 16; i++)
@@ -297,7 +298,7 @@ void transferRES(uint8_t ck[16], uint8_t ik[16], uint8_t *input, uint8_t rand[16
   S[29 + netNamesize] = 0x00;
   S[30 + netNamesize] = 0x08;
 
-  uint8_t plmn[3] = { 0x02, 0xf8, 0x39 };
+  uint8_t plmn[3] = {0x02, 0xf8, 0x39};
   uint8_t oldS[100];
   oldS[0] = 0x6B;
   memcpy(&oldS[1], plmn, 3);
@@ -312,10 +313,9 @@ void transferRES(uint8_t ck[16], uint8_t ik[16], uint8_t *input, uint8_t rand[16
   oldS[32] = 0x00;
   oldS[33] = 0x08;
 
-
   uint8_t key[32] = {0};
   memcpy(&key[0], ck, 16);
-  memcpy(&key[16], ik, 16);  //KEY
+  memcpy(&key[16], ik, 16); // KEY
   uint8_t out[32] = {0};
 
   byte_array_t data = {.buf = S, .len = 31 + netNamesize};
@@ -324,44 +324,47 @@ void transferRES(uint8_t ck[16], uint8_t ik[16], uint8_t *input, uint8_t rand[16
   memcpy(output, out + 16, 16);
 }
 
-void derive_kausf(uint8_t ck[16], uint8_t ik[16], uint8_t sqn[6], uint8_t kausf[32], uicc_t *uicc) {
-  uint8_t S[100]={0};
+void derive_kausf(uint8_t ck[16], uint8_t ik[16], uint8_t sqn[6], uint8_t kausf[32], uicc_t *uicc)
+{
+  uint8_t S[100] = {0};
   uint8_t key[32] = {0};
 
   memcpy(&key[0], ck, 16);
-  memcpy(&key[16], ik, 16);  //KEY
+  memcpy(&key[16], ik, 16); // KEY
   S[0] = 0x6A;
-  servingNetworkName (S+1, uicc->imsiStr, uicc->nmc_size);
-  int netNamesize = strlen((char*)S+1);
+  servingNetworkName(S + 1, uicc->imsiStr, uicc->nmc_size);
+  int netNamesize = strlen((char *)S + 1);
   S[1 + netNamesize] = (uint8_t)((netNamesize & 0xff00) >> 8);
   S[2 + netNamesize] = (uint8_t)(netNamesize & 0x00ff);
   for (int i = 0; i < 6; i++) {
-   S[3 + netNamesize + i] = sqn[i];
+    S[3 + netNamesize + i] = sqn[i];
   }
   S[9 + netNamesize] = 0x00;
   S[10 + netNamesize] = 0x06;
 
-  byte_array_t data = {.buf = S, .len = 11 +  netNamesize};
+  byte_array_t data = {.buf = S, .len = 11 + netNamesize};
   kdf(key, data, 32, kausf);
 }
 
-void derive_kseaf(uint8_t kausf[32], uint8_t kseaf[32], uicc_t *uicc) {
-  uint8_t S[100]={0};
-  S[0] = 0x6C;  //FC
-  servingNetworkName (S+1, uicc->imsiStr, uicc->nmc_size);
-  int netNamesize = strlen((char*)S+1);
+void derive_kseaf(uint8_t kausf[32], uint8_t kseaf[32], uicc_t *uicc)
+{
+  uint8_t S[100] = {0};
+  S[0] = 0x6C; // FC
+  servingNetworkName(S + 1, uicc->imsiStr, uicc->nmc_size);
+  int netNamesize = strlen((char *)S + 1);
   S[1 + netNamesize] = (uint8_t)((netNamesize & 0xff00) >> 8);
   S[2 + netNamesize] = (uint8_t)(netNamesize & 0x00ff);
 
-  byte_array_t data = {.buf = S , .len = 3 + netNamesize};
+  byte_array_t data = {.buf = S, .len = 3 + netNamesize};
   kdf(kausf, data, 32, kseaf);
 }
 
-void derive_kamf(uint8_t *kseaf, uint8_t *kamf, uint16_t abba, uicc_t* uicc) {
+void derive_kamf(uint8_t *kseaf, uint8_t *kamf, uint16_t abba, uicc_t *uicc)
+{
   int imsiLen = strlen(uicc->imsiStr);
   uint8_t S[100] = {0};
-  S[0] = 0x6D;  //FC = 0x6D
-  memcpy(&S[1], uicc->imsiStr, imsiLen );
+  S[0] = 0x6D; // FC = 0x6D
+  memcpy(&S[1], uicc->imsiStr, imsiLen);
   S[1 + imsiLen] = (uint8_t)((imsiLen & 0xff00) >> 8);
   S[2 + imsiLen] = (uint8_t)(imsiLen & 0x00ff);
   S[3 + imsiLen] = abba & 0x00ff;
@@ -377,8 +380,8 @@ void derive_kamf(uint8_t *kseaf, uint8_t *kamf, uint16_t abba, uicc_t* uicc) {
 void derive_knas(algorithm_type_dist_t nas_alg_type, uint8_t nas_alg_id, uint8_t kamf[32], uint8_t *knas)
 {
   uint8_t S[20] = {0};
-  uint8_t out[32] = { 0 };
-  S[0] = 0x69;  //FC
+  uint8_t out[32] = {0};
+  S[0] = 0x69; // FC
   S[1] = (uint8_t)(nas_alg_type & 0xFF);
   S[2] = 0x00;
   S[3] = 0x01;
@@ -389,14 +392,15 @@ void derive_knas(algorithm_type_dist_t nas_alg_type, uint8_t nas_alg_id, uint8_t
   byte_array_t data = {.buf = S, .len = 7};
   kdf(kamf, data, 32, out);
 
-  memcpy(knas, out+16, 16);
+  memcpy(knas, out + 16, 16);
 }
 
-void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb){
+void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb)
+{
   /* Compute the KDF input parameter
    * S = FC(0x6E) || UL NAS Count || 0x00 0x04 || 0x01 || 0x00 0x01
    */
-  uint8_t  input[32] = {0};
+  uint8_t input[32] = {0};
   //    uint16_t length    = 4;
   //    int      offset    = 0;
 
@@ -421,12 +425,13 @@ void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb){
   kdf(kamf, data, 32, kgnb);
 
   printf("kgnb : ");
-  for(int pp=0;pp<32;pp++)
-   printf("%02x ",kgnb[pp]);
+  for (int pp = 0; pp < 32; pp++)
+    printf("%02x ", kgnb[pp]);
   printf("\n");
 }
 
-void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas) {
+void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas)
+{
   uint8_t ak[6];
   uint8_t sqn[6];
 
@@ -439,8 +444,8 @@ void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas) {
   uint8_t *kgnb = nas->security.kgnb;
 
   // get RAND for authentication request
-  for(int index = 0; index < 16;index++){
-    rand[index] = buf[8+index];
+  for (int index = 0; index < 16; index++) {
+    rand[index] = buf[8 + index];
   }
 
   uint8_t resTemp[16];
@@ -449,30 +454,30 @@ void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas) {
 
   transferRES(ck, ik, resTemp, rand, output, nas->uicc);
 
-  for(int index = 0; index < 6; index++){
-    sqn[index] = buf[26+index];
+  for (int index = 0; index < 6; index++) {
+    sqn[index] = buf[26 + index];
   }
 
   derive_kausf(ck, ik, sqn, kausf, nas->uicc);
   derive_kseaf(kausf, kseaf, nas->uicc);
   derive_kamf(kseaf, kamf, 0x0000, nas->uicc);
-  derive_kgnb(kamf,0,kgnb);
+  derive_kgnb(kamf, 0, kgnb);
 
   printf("kausf:");
-  for(int i = 0; i < 32; i++){
+  for (int i = 0; i < 32; i++) {
     printf("%x ", kausf[i]);
   }
   printf("\n");
 
   printf("kseaf:");
-  for(int i = 0; i < 32; i++){
+  for (int i = 0; i < 32; i++) {
     printf("%x ", kseaf[i]);
   }
 
   printf("\n");
 
   printf("kamf:");
-  for(int i = 0; i < 32; i++){
+  for (int i = 0; i < 32; i++) {
     printf("%x ", kamf[i]);
   }
   printf("\n");
@@ -491,7 +496,7 @@ nr_ue_nas_t *get_ue_nas_info(module_id_t module_id)
 void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
 {
   int size = sizeof(mm_msg_header_t);
-  fgs_nas_message_t nas_msg={0};
+  fgs_nas_message_t nas_msg = {0};
   MM_msg *mm_msg;
 
   mm_msg = &nas_msg.plain.mm_msg;
@@ -499,7 +504,6 @@ void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   mm_msg->header.ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   mm_msg->header.security_header_type = PLAIN_5GS_MSG;
   mm_msg->header.message_type = REGISTRATION_REQUEST;
-
 
   // set registration request
   mm_msg->registration_request.protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
@@ -511,7 +515,7 @@ void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   mm_msg->registration_request.fgsregistrationtype = INITIAL_REGISTRATION;
   mm_msg->registration_request.naskeysetidentifier.naskeysetidentifier = 1;
   size += 1;
-  if(nas->guti){
+  if (nas->guti) {
     size += fill_guti(&mm_msg->registration_request.fgsmobileidentity, nas->guti);
   } else {
     size += fill_suci(&mm_msg->registration_request.fgsmobileidentity, nas->uicc);
@@ -542,12 +546,12 @@ void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   initialNasMsg->data = malloc16_clear(size * sizeof(Byte_t));
   nas->registration_request_buf = initialNasMsg->data;
 
-  initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data), size);
+  initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data), size);
   nas->registration_request_len = initialNasMsg->length;
-
 }
 
-void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype, uicc_t* uicc) {
+void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype, uicc_t *uicc)
+{
   int size = sizeof(mm_msg_header_t);
   fgs_nas_message_t nas_msg;
   memset(&nas_msg, 0, sizeof(fgs_nas_message_t));
@@ -559,7 +563,6 @@ void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype
   mm_msg->header.security_header_type = PLAIN_5GS_MSG;
   mm_msg->header.message_type = FGS_IDENTITY_RESPONSE;
 
-
   // set identity response
   mm_msg->fgs_identity_response.protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   size += 1;
@@ -567,15 +570,14 @@ void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype
   size += 1;
   mm_msg->fgs_identity_response.messagetype = FGS_IDENTITY_RESPONSE;
   size += 1;
-  if(identitytype == FGS_MOBILE_IDENTITY_SUCI){
+  if (identitytype == FGS_MOBILE_IDENTITY_SUCI) {
     size += fill_suci(&mm_msg->fgs_identity_response.fgsmobileidentity, uicc);
   }
 
   // encode the message
   initialNasMsg->data = (Byte_t *)malloc(size * sizeof(Byte_t));
 
-  initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data), size);
-
+  initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data), size);
 }
 
 static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, uint8_t *buf)
@@ -583,7 +585,7 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   derive_ue_keys(buf, nas);
   OctetString res;
   res.length = 16;
-  res.value = calloc(1,16);
+  res.value = calloc(1, 16);
   memcpy(res.value, nas->security.res, 16);
 
   int size = sizeof(mm_msg_header_t);
@@ -605,13 +607,13 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   mm_msg->fgs_identity_response.messagetype = FGS_AUTHENTICATION_RESPONSE;
   size += 1;
 
-  //set response parameter
+  // set response parameter
   mm_msg->fgs_auth_response.authenticationresponseparameter.res = res;
   size += 18;
   // encode the message
   initialNasMsg->data = (Byte_t *)malloc(size * sizeof(Byte_t));
 
-  initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data), size);
+  initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data), size);
 }
 
 int nas_itti_kgnb_refresh_req(instance_t instance, const uint8_t kgnb[32])
@@ -630,7 +632,7 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
 
   MM_msg *mm_msg;
   nas_stream_cipher_t stream_cipher;
-  uint8_t             mac[4];
+  uint8_t mac[4];
   // set security protected header
   nas_msg.header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   nas_msg.header.security_header_type = INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX;
@@ -647,51 +649,53 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   // set security mode complete
   mm_msg->fgs_security_mode_complete.protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   size += 1;
-  mm_msg->fgs_security_mode_complete.securityheadertype    = PLAIN_5GS_MSG;
+  mm_msg->fgs_security_mode_complete.securityheadertype = PLAIN_5GS_MSG;
   size += 1;
-  mm_msg->fgs_security_mode_complete.messagetype           = FGS_SECURITY_MODE_COMPLETE;
+  mm_msg->fgs_security_mode_complete.messagetype = FGS_SECURITY_MODE_COMPLETE;
   size += 1;
 
   size += fill_imeisv(&mm_msg->fgs_security_mode_complete.fgsmobileidentity, nas->uicc);
 
-  mm_msg->fgs_security_mode_complete.fgsnasmessagecontainer.nasmessagecontainercontents.value  = nas->registration_request_buf;
+  mm_msg->fgs_security_mode_complete.fgsnasmessagecontainer.nasmessagecontainercontents.value = nas->registration_request_buf;
   mm_msg->fgs_security_mode_complete.fgsnasmessagecontainer.nasmessagecontainercontents.length = nas->registration_request_len;
   size += (nas->registration_request_len + 2);
 
   // encode the message
   initialNasMsg->data = (Byte_t *)malloc(size * sizeof(Byte_t));
 
-  int security_header_len = nas_protected_security_header_encode((char*)(initialNasMsg->data),&(nas_msg.header), size);
+  int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->data), &(nas_msg.header), size);
 
-  initialNasMsg->length = security_header_len + mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data+security_header_len), size-security_header_len);
+  initialNasMsg->length =
+      security_header_len
+      + mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
 
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];
-  stream_cipher.context    = nas->security_container->ciphering_context;
+  stream_cipher.context = nas->security_container->ciphering_context;
   AssertFatal(nas->security.nas_count_ul <= 0xffffff, "fatal: NAS COUNT UL too big (todo: fix that)\n");
-  stream_cipher.count      = nas->security.nas_count_ul;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 7);
+  stream_cipher.count = nas->security.nas_count_ul;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 7);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 7) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 7) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
   memcpy(stream_cipher.message, buf, initialNasMsg->length - 7);
 
   /* integrity protection */
-  stream_cipher.context    = nas->security_container->integrity_context;
-  stream_cipher.count      = nas->security.nas_count_ul++;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 6);
+  stream_cipher.context = nas->security_container->integrity_context;
+  stream_cipher.count = nas->security.nas_count_ul++;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 6);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 6) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 6) << 3;
 
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
 
   printf("mac %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
-  for(int i = 0; i < 4; i++){
-     initialNasMsg->data[2+i] = mac[i];
+  for (int i = 0; i < 4; i++) {
+    initialNasMsg->data[2 + i] = mac[i];
   }
 }
 
@@ -711,13 +715,13 @@ static void handle_security_mode_command(nr_ue_nas_t *nas, as_nas_info_t *initia
   derive_knas(0x02, integrity_algorithm, kamf, knas_int);
 
   printf("knas_int: ");
-  for(int i = 0; i < 16; i++){
+  for (int i = 0; i < 16; i++) {
     printf("%x ", knas_int[i]);
   }
   printf("\n");
 
   printf("knas_enc: ");
-  for(int i = 0; i < 16; i++){
+  for (int i = 0; i < 16; i++) {
     printf("%x ", knas_enc[i]);
   }
   printf("\n");
@@ -741,44 +745,46 @@ static void decodeRegistrationAccept(const uint8_t *buf, int len, nr_ue_nas_t *n
   int decoded = decode_registration_accept(&reg_acc, buf, len);
   AssertFatal(decoded > 0, "could not decode registration accept\n");
   if (reg_acc.guti) {
-     AssertFatal(reg_acc.guti->guti.typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI,
-                 "registration accept 5GS Mobile Identity is not GUTI, but %d\n",
-                 reg_acc.guti->guti.typeofidentity);
-     nas->guti = malloc(sizeof(*nas->guti));
-     AssertFatal(nas->guti, "out of memory\n");
-     *nas->guti = reg_acc.guti->guti;
-     free(reg_acc.guti); /* no proper memory management for NAS decoded messages */
+    AssertFatal(reg_acc.guti->guti.typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI,
+                "registration accept 5GS Mobile Identity is not GUTI, but %d\n",
+                reg_acc.guti->guti.typeofidentity);
+    nas->guti = malloc(sizeof(*nas->guti));
+    AssertFatal(nas->guti, "out of memory\n");
+    *nas->guti = reg_acc.guti->guti;
+    free(reg_acc.guti); /* no proper memory management for NAS decoded messages */
   } else {
     LOG_W(NAS, "no GUTI in registration accept\n");
   }
 }
 
-static void generateRegistrationComplete(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, SORTransparentContainer *sortransparentcontainer)
+static void generateRegistrationComplete(nr_ue_nas_t *nas,
+                                         as_nas_info_t *initialNasMsg,
+                                         SORTransparentContainer *sortransparentcontainer)
 {
   int length = 0;
   int size = 0;
   fgs_nas_message_t nas_msg;
   nas_stream_cipher_t stream_cipher;
-  uint8_t             mac[4];
+  uint8_t mac[4];
   memset(&nas_msg, 0, sizeof(fgs_nas_message_t));
   fgs_nas_message_security_protected_t *sp_msg;
 
   sp_msg = &nas_msg.security_protected;
   // set header
   sp_msg->header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  sp_msg->header.security_header_type   = INTEGRITY_PROTECTED_AND_CIPHERED;
+  sp_msg->header.security_header_type = INTEGRITY_PROTECTED_AND_CIPHERED;
   sp_msg->header.message_authentication_code = 0;
-  sp_msg->header.sequence_number        = nas->security.nas_count_ul & 0xff;
+  sp_msg->header.sequence_number = nas->security.nas_count_ul & 0xff;
   length = 7;
   sp_msg->plain.mm_msg.registration_complete.protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   length += 1;
-  sp_msg->plain.mm_msg.registration_complete.securityheadertype    = PLAIN_5GS_MSG;
-  sp_msg->plain.mm_msg.registration_complete.sparehalfoctet        = 0;
+  sp_msg->plain.mm_msg.registration_complete.securityheadertype = PLAIN_5GS_MSG;
+  sp_msg->plain.mm_msg.registration_complete.sparehalfoctet = 0;
   length += 1;
   sp_msg->plain.mm_msg.registration_complete.messagetype = REGISTRATION_COMPLETE;
   length += 1;
 
-  if(sortransparentcontainer) {
+  if (sortransparentcontainer) {
     length += sortransparentcontainer->sortransparentcontainercontents.length;
   }
 
@@ -788,62 +794,62 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
 
   /* Encode the first octet of the header (extended protocol discriminator) */
   ENCODE_U8(initialNasMsg->data + size, sp_msg->header.protocol_discriminator, size);
-  
+
   /* Encode the security header type */
   ENCODE_U8(initialNasMsg->data + size, sp_msg->header.security_header_type, size);
-  
+
   /* Encode the message authentication code */
   ENCODE_U32(initialNasMsg->data + size, sp_msg->header.message_authentication_code, size);
-  
+
   /* Encode the sequence number */
   ENCODE_U8(initialNasMsg->data + size, sp_msg->header.sequence_number, size);
-  
-  
+
   /* Encode the extended protocol discriminator */
   ENCODE_U8(initialNasMsg->data + size, sp_msg->plain.mm_msg.registration_complete.protocoldiscriminator, size);
-    
+
   /* Encode the security header type */
   ENCODE_U8(initialNasMsg->data + size, sp_msg->plain.mm_msg.registration_complete.securityheadertype, size);
-    
+
   /* Encode the message type */
   ENCODE_U8(initialNasMsg->data + size, sp_msg->plain.mm_msg.registration_complete.messagetype, size);
 
-  if(sortransparentcontainer) {
+  if (sortransparentcontainer) {
     encode_registration_complete(&sp_msg->plain.mm_msg.registration_complete, initialNasMsg->data + size, length - size);
   }
 
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];
-  stream_cipher.context    = nas->security_container->ciphering_context;
+  stream_cipher.context = nas->security_container->ciphering_context;
   AssertFatal(nas->security.nas_count_ul <= 0xffffff, "fatal: NAS COUNT UL too big (todo: fix that)\n");
-  stream_cipher.count      = nas->security.nas_count_ul;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 7);
+  stream_cipher.count = nas->security.nas_count_ul;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 7);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 7) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 7) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
   memcpy(stream_cipher.message, buf, initialNasMsg->length - 7);
 
   /* integrity protection */
-  stream_cipher.context    = nas->security_container->integrity_context;
-  stream_cipher.count      = nas->security.nas_count_ul++;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 6);
+  stream_cipher.context = nas->security_container->integrity_context;
+  stream_cipher.count = nas->security.nas_count_ul++;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 6);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 6) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 6) << 3;
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
 
   printf("mac %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
-  for(int i = 0; i < 4; i++){
-     initialNasMsg->data[2+i] = mac[i];
+  for (int i = 0; i < 4; i++) {
+    initialNasMsg->data[2 + i] = mac[i];
   }
 }
 
-void decodeDownlinkNASTransport(as_nas_info_t *initialNasMsg, uint8_t * pdu_buffer){
+void decodeDownlinkNASTransport(as_nas_info_t *initialNasMsg, uint8_t *pdu_buffer)
+{
   uint8_t msg_type = *(pdu_buffer + 16);
-  if(msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC){
+  if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
     uint8_t *ip_p = pdu_buffer + 39;
     char ip[20];
     sprintf(ip, "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
@@ -884,44 +890,46 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
   initialNasMsg->data = calloc(size, sizeof(Byte_t));
   int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->data), &nas_msg.header, size);
 
-  initialNasMsg->length = security_header_len + mm_msg_encode(&sp_msg->plain.mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
+  initialNasMsg->length =
+      security_header_len
+      + mm_msg_encode(&sp_msg->plain.mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
 
   nas_stream_cipher_t stream_cipher;
 
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];
-  stream_cipher.context    = nas->security_container->ciphering_context;
+  stream_cipher.context = nas->security_container->ciphering_context;
   AssertFatal(nas->security.nas_count_ul <= 0xffffff, "fatal: NAS COUNT UL too big (todo: fix that)\n");
-  stream_cipher.count      = nas->security.nas_count_ul;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 7);
+  stream_cipher.count = nas->security.nas_count_ul;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 7);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 7) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 7) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
   memcpy(stream_cipher.message, buf, initialNasMsg->length - 7);
 
   /* integrity protection */
-  stream_cipher.context    = nas->security_container->integrity_context;
-  stream_cipher.count      = nas->security.nas_count_ul++;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 6);
+  stream_cipher.context = nas->security_container->integrity_context;
+  stream_cipher.count = nas->security.nas_count_ul++;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 6);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 6) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 6) << 3;
   uint8_t mac[4];
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
 
   printf("mac %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
-  for(int i = 0; i < 4; i++){
-     initialNasMsg->data[2+i] = mac[i];
+  for (int i = 0; i < 4; i++) {
+    initialNasMsg->data[2 + i] = mac[i];
   }
 }
 
 static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, nas_pdu_session_req_t *pdu_req)
 {
   int size = 0;
-  fgs_nas_message_t nas_msg={0};
+  fgs_nas_message_t nas_msg = {0};
 
   // setup pdu session establishment request
   uint16_t req_length = 7;
@@ -935,11 +943,9 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   pdu_session_establish.pdusessiontype = pdu_req->pdusession_type;
   encode_pdu_session_establishment_request(&pdu_session_establish, req_buffer);
 
-
-
   MM_msg *mm_msg;
   nas_stream_cipher_t stream_cipher;
-  uint8_t             mac[4];
+  uint8_t mac[4];
   nas_msg.header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   nas_msg.header.security_header_type = INTEGRITY_PROTECTED_AND_CIPHERED;
   nas_msg.header.sequence_number = nas->security.nas_count_ul & 0xff;
@@ -956,7 +962,7 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   // set uplink nas transport
   mm_msg->uplink_nas_transport.protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   size += 1;
-  mm_msg->uplink_nas_transport.securityheadertype    = PLAIN_5GS_MSG;
+  mm_msg->uplink_nas_transport.securityheadertype = PLAIN_5GS_MSG;
   size += 1;
   mm_msg->uplink_nas_transport.messagetype = FGS_UPLINK_NAS_TRANSPORT;
   size += 1;
@@ -966,63 +972,64 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   size += 1;
   mm_msg->uplink_nas_transport.fgspayloadcontainer.payloadcontainercontents.length = req_length;
   mm_msg->uplink_nas_transport.fgspayloadcontainer.payloadcontainercontents.value = req_buffer;
-  size += (2+req_length);
+  size += (2 + req_length);
   mm_msg->uplink_nas_transport.pdusessionid = pdu_req->pdusession_id;
   mm_msg->uplink_nas_transport.requesttype = 1;
   size += 3;
   const bool has_nssai_sd = pdu_req->sd != 0xffffff; // 0xffffff means "no SD", TS 23.003
   const size_t nssai_len = has_nssai_sd ? 4 : 1;
   mm_msg->uplink_nas_transport.snssai.length = nssai_len;
-  //Fixme: it seems there are a lot of memory errors in this: this value was on the stack, 
-  // but pushed  in a itti message to another thread
-  // this kind of error seems in many places in 5G NAS
+  // Fixme: it seems there are a lot of memory errors in this: this value was on the stack,
+  //  but pushed  in a itti message to another thread
+  //  this kind of error seems in many places in 5G NAS
   mm_msg->uplink_nas_transport.snssai.value = calloc(1, nssai_len);
   mm_msg->uplink_nas_transport.snssai.value[0] = pdu_req->sst;
   if (has_nssai_sd)
     INT24_TO_BUFFER(pdu_req->sd, &mm_msg->uplink_nas_transport.snssai.value[1]);
   size += 1 + 1 + nssai_len;
-  int dnnSize=strlen(nas->uicc->dnnStr);
-  mm_msg->uplink_nas_transport.dnn.value=calloc(1,dnnSize+1);
+  int dnnSize = strlen(nas->uicc->dnnStr);
+  mm_msg->uplink_nas_transport.dnn.value = calloc(1, dnnSize + 1);
   mm_msg->uplink_nas_transport.dnn.length = dnnSize + 1;
   mm_msg->uplink_nas_transport.dnn.value[0] = dnnSize;
   memcpy(mm_msg->uplink_nas_transport.dnn.value + 1, nas->uicc->dnnStr, dnnSize);
-  size += (1+1+dnnSize+1);
+  size += (1 + 1 + dnnSize + 1);
 
   // encode the message
   initialNasMsg->data = (Byte_t *)malloc(size * sizeof(Byte_t));
-  int security_header_len = nas_protected_security_header_encode((char*)(initialNasMsg->data),&(nas_msg.header), size);
+  int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->data), &(nas_msg.header), size);
 
-  initialNasMsg->length = security_header_len + mm_msg_encode(mm_msg, (uint8_t*)(initialNasMsg->data+security_header_len), size-security_header_len);
+  initialNasMsg->length =
+      security_header_len
+      + mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
 
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];
-  stream_cipher.context    = nas->security_container->ciphering_context;
+  stream_cipher.context = nas->security_container->ciphering_context;
   AssertFatal(nas->security.nas_count_ul <= 0xffffff, "fatal: NAS COUNT UL too big (todo: fix that)\n");
-  stream_cipher.count      = nas->security.nas_count_ul;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 7);
+  stream_cipher.count = nas->security.nas_count_ul;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 7);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 7) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 7) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
   memcpy(stream_cipher.message, buf, initialNasMsg->length - 7);
 
   /* integrity protection */
-  stream_cipher.context    = nas->security_container->integrity_context;
-  stream_cipher.count      = nas->security.nas_count_ul++;
-  stream_cipher.bearer     = 1;
-  stream_cipher.direction  = 0;
-  stream_cipher.message    = (unsigned char *)(initialNasMsg->data + 6);
+  stream_cipher.context = nas->security_container->integrity_context;
+  stream_cipher.count = nas->security.nas_count_ul++;
+  stream_cipher.bearer = 1;
+  stream_cipher.direction = 0;
+  stream_cipher.message = (unsigned char *)(initialNasMsg->data + 6);
   /* length in bits */
-  stream_cipher.blength    = (initialNasMsg->length - 6) << 3;
+  stream_cipher.blength = (initialNasMsg->length - 6) << 3;
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
 
   printf("mac %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
-  for(int i = 0; i < 4; i++){
-     initialNasMsg->data[2+i] = mac[i];
+  for (int i = 0; i < 4; i++) {
+    initialNasMsg->data[2 + i] = mac[i];
   }
 }
-
 
 static uint8_t get_msg_type(uint8_t *pdu_buffer, uint32_t length)
 {
@@ -1066,7 +1073,7 @@ static void send_nas_uplink_data_req(nr_ue_nas_t *nas, const as_nas_info_t *init
   MessageDef *msg = itti_alloc_new_message(TASK_NAS_NRUE, nas->UE_id, NAS_UPLINK_DATA_REQ);
   ul_info_transfer_req_t *req = &NAS_UPLINK_DATA_REQ(msg);
   req->UEid = nas->UE_id;
-  req->nasMsg.data = (uint8_t *) initial_nas_msg->data;
+  req->nasMsg.data = (uint8_t *)initial_nas_msg->data;
   req->nasMsg.length = initial_nas_msg->length;
   itti_send_msg_to_task(TASK_RRC_NRUE, nas->UE_id, msg);
 }
@@ -1207,9 +1214,7 @@ void *nas_nrue_task(void *args_p)
   }
 }
 
-static void handle_registration_accept(nr_ue_nas_t *nas,
-                                       const uint8_t *pdu_buffer,
-                                       uint32_t msg_length)
+static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buffer, uint32_t msg_length)
 {
   LOG_I(NAS, "[UE] Received REGISTRATION ACCEPT message\n");
   decodeRegistrationAccept(pdu_buffer, msg_length, nas);
@@ -1305,8 +1310,7 @@ void *nas_nrue(void *args_p)
         int pdu_length = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length;
 
         security_state_t security_state = nas_security_rx_process(nas, pdu_buffer, pdu_length);
-        if (security_state != NAS_SECURITY_INTEGRITY_PASSED
-            && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
+        if (security_state != NAS_SECURITY_INTEGRITY_PASSED && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
           LOG_E(NAS, "NAS integrity failed, discard incoming message\n");
           break;
         }
@@ -1323,8 +1327,7 @@ void *nas_nrue(void *args_p)
       }
 
       case NR_NAS_CONN_RELEASE_IND:
-        LOG_I(NAS, "[UE %ld] Received %s: cause %u\n",
-              nas->UE_id, ITTI_MSG_NAME (msg_p), NR_NAS_CONN_RELEASE_IND (msg_p).cause);
+        LOG_I(NAS, "[UE %ld] Received %s: cause %u\n", nas->UE_id, ITTI_MSG_NAME(msg_p), NR_NAS_CONN_RELEASE_IND(msg_p).cause);
         // TODO handle connection release
         if (nas->termination_procedure) {
           /* the following is not clean, but probably necessary: we need to give
@@ -1385,8 +1388,7 @@ void *nas_nrue(void *args_p)
             security_state = NAS_SECURITY_INTEGRITY_PASSED;
         }
 
-        if (security_state != NAS_SECURITY_INTEGRITY_PASSED
-            && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
+        if (security_state != NAS_SECURITY_INTEGRITY_PASSED && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
           LOG_E(NAS, "NAS integrity failed, discard incoming message\n");
           break;
         }
@@ -1438,9 +1440,9 @@ void *nas_nrue(void *args_p)
               offset++;
             }
           } break;
-	case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
-	  LOG_E(NAS, "Received PDU Session Establishment reject\n");
-	  break;
+          case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
+            LOG_E(NAS, "Received PDU Session Establishment reject\n");
+            break;
           default:
             LOG_W(NR_RRC, "unknown message type %d\n", msg_type);
             break;
