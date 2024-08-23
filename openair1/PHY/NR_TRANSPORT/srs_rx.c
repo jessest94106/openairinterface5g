@@ -67,23 +67,19 @@ int nr_get_srs_signal(PHY_VARS_gNB *gNB,
                       slot_t slot,
                       nfapi_nr_srs_pdu_t *srs_pdu,
                       nr_srs_info_t *nr_srs_info,
-                      int32_t srs_received_signal[][gNB->frame_parms.ofdm_symbol_size*(1<<srs_pdu->num_symbols)]) {
-
-#ifdef SRS_DEBUG
-  LOG_I(NR_PHY,"Calling %s function\n", __FUNCTION__);
-#endif
-
+                      int32_t srs_received_signal[][gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)])
+{
   c16_t **rxdataF = gNB->common_vars.rxdataF;
   const NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
 
   const uint16_t n_symbols = (slot % RU_RX_SLOT_DEPTH) * frame_parms->symbols_per_slot; // number of symbols until this slot
-  const uint8_t l0 = frame_parms->symbols_per_slot - 1 - srs_pdu->time_start_position;  // starting symbol in this slot
-  const uint64_t symbol_offset = (n_symbols+l0)*frame_parms->ofdm_symbol_size;
+  const uint8_t l0 = srs_pdu->time_start_position;  // starting symbol in this slot
+  const uint64_t symbol_offset = (n_symbols + l0) * frame_parms->ofdm_symbol_size;
   const uint64_t subcarrier_offset = frame_parms->first_carrier_offset + srs_pdu->bwp_start*NR_NB_SC_PER_RB;
 
   const uint8_t N_ap = 1<<srs_pdu->num_ant_ports;
-  const uint8_t N_symb_SRS = 1<<srs_pdu->num_symbols;
-  const uint8_t K_TC = 2<<srs_pdu->comb_size;
+  const uint8_t N_symb_SRS = 1 << srs_pdu->num_symbols;
+  const uint8_t K_TC = 2 << srs_pdu->comb_size;
   const uint16_t M_sc_b_SRS = srs_bandwidth_config[srs_pdu->config_index][srs_pdu->bandwidth_index][0] * NR_NB_SC_PER_RB/K_TC;
 
   int32_t *rx_signal;
