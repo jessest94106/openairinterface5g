@@ -608,10 +608,7 @@ class OaiCiTest():
 			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
 
 	def AttachUE(self, HTML, RAN, EPC, CONTAINERS):
-		if len(self.ue_ids) == len(self.nodes):
-			ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
-		else:
-			ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
+		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		with concurrent.futures.ThreadPoolExecutor() as executor:
 			futures = [executor.submit(ue.attach) for ue in ues]
 			attached = [f.result() for f in futures]
@@ -626,10 +623,7 @@ class OaiCiTest():
 			self.AutoTerminateUEandeNB(HTML, RAN, EPC, CONTAINERS)
 
 	def DetachUE(self, HTML):
-		if len(self.ue_ids) == len(self.nodes):
-			ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
-		else:
-			ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
+		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		with concurrent.futures.ThreadPoolExecutor() as executor:
 			futures = [executor.submit(ue.detach) for ue in ues]
 			[f.result() for f in futures]
@@ -769,10 +763,7 @@ class OaiCiTest():
 
 		if self.ue_ids == []:
 			raise Exception("no module names in self.ue_ids provided")
-		if len(self.ue_ids) == len(self.nodes):
-			ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
-		else:
-			ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
+		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		logging.debug(ues)
 		pingLock = Lock()
 		with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -861,10 +852,7 @@ class OaiCiTest():
 
 		if self.ue_ids == [] or self.svr_id == None:
 			raise Exception("no module names in self.ue_ids or/and self.svr_id provided")
-		if len(self.ue_ids) == len(self.nodes):
-			ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
-		else:
-			ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
+		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		svr = cls_module.Module_UE(self.svr_id,self.svr_node)
 		logging.debug(ues)
 		with concurrent.futures.ThreadPoolExecutor() as executor:

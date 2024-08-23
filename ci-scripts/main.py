@@ -222,6 +222,8 @@ def GetParametersFromXML(action):
 			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
 				logging.error('Number of Nodes are not equal to the total number of UEs')
 				sys.exit("Mismatch in number of Nodes and UIs")
+		else:
+			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 
 	elif action == 'Build_OAI_UE':
 		CiTestObj.Build_OAI_UE_args = test.findtext('Build_OAI_UE_args')
@@ -273,6 +275,8 @@ def GetParametersFromXML(action):
 			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
 				logging.error('Number of Nodes are not equal to the total number of UEs')
 				sys.exit("Mismatch in number of Nodes and UIs")
+		else:
+			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
@@ -284,6 +288,8 @@ def GetParametersFromXML(action):
 			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
 				logging.error('Number of Nodes are not equal to the total number of UEs')
 				sys.exit("Mismatch in number of Nodes and UIs")
+		else:
+			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		if test.findtext('svr_node'):
 			CiTestObj.svr_node = test.findtext('svr_node')
 		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
