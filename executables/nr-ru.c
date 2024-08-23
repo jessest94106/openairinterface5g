@@ -1106,7 +1106,8 @@ void ru_tx_func(void *param)
   LOG_D(PHY,"rt_prof_idx %d : RU_TX time %d\n",rt_prof_idx,(int)(1e9 * (t1->tv_sec - t0->tv_sec) + (t1->tv_nsec-t0->tv_nsec)));
 }
 
-void *ru_thread( void *param ) {
+void *ru_thread(void *param)
+{
   static int ru_thread_status;
   RU_t               *ru      = (RU_t *)param;
   RU_proc_t          *proc    = &ru->proc;
@@ -1339,11 +1340,11 @@ void *ru_thread( void *param ) {
 
         // Do PRACH RU processing
         int prach_id = find_nr_prach_ru(ru, proc->frame_rx, proc->tti_rx, SEARCH_EXIST);
-        if (prach_id>=0) {
+        if (prach_id >= 0) {
           VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_RU_PRACH_RX, 1 );
 
           T(T_GNB_PHY_PRACH_INPUT_SIGNAL, T_INT(proc->frame_rx), T_INT(proc->tti_rx), T_INT(0),
-            T_BUFFER(&ru->common.rxdata[0][fp->get_samples_slot_timestamp(proc->tti_rx-1,fp,0)]/*-ru->N_TA_offset*/, fp->get_samples_per_slot(proc->tti_rx,fp)*4*2));
+          T_BUFFER(&ru->common.rxdata[0][fp->get_samples_slot_timestamp(proc->tti_rx-1,fp,0)]/*-ru->N_TA_offset*/, fp->get_samples_per_slot(proc->tti_rx,fp)*4*2));
           int N_dur = get_nr_prach_duration(ru->prach_list[prach_id].fmt);
 
           for (int prach_oc = 0; prach_oc<ru->prach_list[prach_id].num_prach_ocas; prach_oc++) {
@@ -1354,11 +1355,12 @@ void *ru_thread( void *param ) {
                            ru->prach_list[prach_id].numRA,
                            prachStartSymbol,
                            prach_oc,
-                           proc->frame_rx,proc->tti_rx);
+                           proc->frame_rx,
+                           proc->tti_rx);
           }
           clock_gettime(CLOCK_MONOTONIC,&ru->rt_ru_profiling.return_RU_prachrx[rt_prof_idx]);
           free_nr_ru_prach_entry(ru,prach_id);
-          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_RU_PRACH_RX, 0 );
+          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_RU_PRACH_RX, 0);
         } // end if (prach_id > 0)
       } // end if (ru->feprx)
       else {

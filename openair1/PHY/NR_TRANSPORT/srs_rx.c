@@ -38,7 +38,7 @@
 #include "PHY/CODING/nrSmallBlock/nr_small_block_defs.h"
 #include "PHY/NR_UE_TRANSPORT/srs_modulation_nr.h"
 #include "common/utils/LOG/log.h"
-
+#include "SCHED_NR/sched_nr.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 
 #include "T.h"
@@ -50,11 +50,21 @@ void nr_fill_srs(PHY_VARS_gNB *gNB, frame_t frame, slot_t slot, nfapi_nr_srs_pdu
   bool found = false;
   for (int i = 0; i < gNB->max_nb_srs; i++) {
     NR_gNB_SRS_t *srs = &gNB->srs[i];
-    if (srs->active == 0) {
+    if (srs->active == false) {
       found = true;
       srs->frame = frame;
       srs->slot = slot;
-      srs->active = 1;
+      srs->active = true;
+      srs->beam_nb = 0;
+      if (gNB->common_vars.beam_id) {
+        int fapi_beam_idx = srs_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx;
+        srs->beam_nb = beam_index_allocation(fapi_beam_idx,
+                                             &gNB->common_vars,
+                                             slot,
+                                             NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+                                             srs_pdu->time_start_position,
+                                             1 << srs_pdu->num_symbols);
+      }
       memcpy((void *)&srs->srs_pdu, (void *)srs_pdu, sizeof(nfapi_nr_srs_pdu_t));
       break;
     }
@@ -63,13 +73,13 @@ void nr_fill_srs(PHY_VARS_gNB *gNB, frame_t frame, slot_t slot, nfapi_nr_srs_pdu
 }
 
 int nr_get_srs_signal(PHY_VARS_gNB *gNB,
+                      c16_t **rxdataF,
                       frame_t frame,
                       slot_t slot,
                       nfapi_nr_srs_pdu_t *srs_pdu,
                       nr_srs_info_t *nr_srs_info,
                       int32_t srs_received_signal[][gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)])
 {
-  c16_t **rxdataF = gNB->common_vars.rxdataF;
   const NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
 
   const uint16_t n_symbols = (slot % RU_RX_SLOT_DEPTH) * frame_parms->symbols_per_slot; // number of symbols until this slot

@@ -31,23 +31,26 @@
  */
 
 #include "PHY/defs_gNB.h"
+#include "SCHED_NR/sched_nr.h"
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "openair1/PHY/NR_TRANSPORT/nr_prach.h"
 
 void init_prach_list(PHY_VARS_gNB *gNB)
 {
-  AssertFatal(gNB!=NULL,"gNB is null\n");
-  for (int i=0; i<NUMBER_OF_NR_PRACH_MAX; i++){
+  AssertFatal(gNB != NULL, "gNB is null\n");
+  for (int i = 0; i < NUMBER_OF_NR_PRACH_MAX; i++){
     gNB->prach_vars.list[i].frame = -1;
-    gNB->prach_vars.list[i].slot  = -1;
+    gNB->prach_vars.list[i].slot = -1;
+    gNB->prach_vars.list[i].beam_nb = -1;
   }
 }
 
 void free_nr_prach_entry(PHY_VARS_gNB *gNB, int prach_id)
 {
   gNB->prach_vars.list[prach_id].frame = -1;
-  gNB->prach_vars.list[prach_id].slot  = -1;
+  gNB->prach_vars.list[prach_id].slot = -1;
+  gNB->prach_vars.list[prach_id].beam_nb = -1;
 }
 
 int16_t find_nr_prach(PHY_VARS_gNB *gNB,int frame, int slot, find_type_t type) {
@@ -70,47 +73,54 @@ int16_t find_nr_prach(PHY_VARS_gNB *gNB,int frame, int slot, find_type_t type) {
   return -1;
 }
 
-void nr_fill_prach(PHY_VARS_gNB *gNB,
-		   int SFN,
-		   int Slot,
-		   nfapi_nr_prach_pdu_t *prach_pdu)
+void nr_fill_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_nr_prach_pdu_t *prach_pdu)
 {
-  int prach_id = find_nr_prach(gNB,SFN,Slot,SEARCH_EXIST_OR_FREE);
+  int prach_id = find_nr_prach(gNB, SFN, Slot, SEARCH_EXIST_OR_FREE);
   AssertFatal(((prach_id >= 0) && (prach_id < NUMBER_OF_NR_PRACH_MAX)), "illegal or no prach_id found!!! prach_id %d\n", prach_id);
-
-  gNB->prach_vars.list[prach_id].frame=SFN;
-  gNB->prach_vars.list[prach_id].slot=Slot;
-  LOG_D(NR_PHY,"Copying prach pdu %d bytes to index %d\n",(int)sizeof(*prach_pdu),prach_id);
-  memcpy((void*)&gNB->prach_vars.list[prach_id].pdu,(void*)prach_pdu,sizeof(*prach_pdu));
-
+  gNB_PRACH_list_t *prach = &gNB->prach_vars.list[prach_id];
+  prach->frame = SFN;
+  prach->slot = Slot;
+  prach->beam_nb = 0;
+  if (gNB->common_vars.beam_id) {
+    int fapi_beam_idx = prach_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx;
+    // TODO no idea how to compute final prach symbol here so for now we go til the end of the slot
+    int temp_nb_symbols = NR_NUMBER_OF_SYMBOLS_PER_SLOT - prach_pdu->prach_start_symbol;
+    prach->beam_nb = beam_index_allocation(fapi_beam_idx,
+                                           &gNB->common_vars,
+                                           Slot,
+                                           NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+                                           prach_pdu->prach_start_symbol,
+                                           temp_nb_symbols);
+  }
+  LOG_D(NR_PHY,"Copying prach pdu %d bytes to index %d\n", (int)sizeof(*prach_pdu), prach_id);
+  memcpy(&prach->pdu, prach_pdu, sizeof(*prach_pdu));
 }
 
-void init_prach_ru_list(RU_t *ru) {
-
-  AssertFatal(ru!=NULL,"ruis null\n");
-  for (int i=0; i<NUMBER_OF_NR_RU_PRACH_MAX; i++) {
-			ru->prach_list[i].frame = -1;
-			ru->prach_list[i].slot  = -1;
-	}		
-  pthread_mutex_init(&ru->prach_list_mutex,NULL);
+void init_prach_ru_list(RU_t *ru)
+{
+  AssertFatal(ru != NULL, "ru is null\n");
+  for (int i = 0; i < NUMBER_OF_NR_RU_PRACH_MAX; i++) {
+    ru->prach_list[i].frame = -1;
+    ru->prach_list[i].slot = -1;
+  }
+  pthread_mutex_init(&ru->prach_list_mutex, NULL);
 }
 
-int16_t find_nr_prach_ru(RU_t *ru,int frame,int slot, find_type_t type) {
-
-  AssertFatal(ru!=NULL,"ru is null\n");
+int16_t find_nr_prach_ru(RU_t *ru,int frame,int slot, find_type_t type)
+{
+  AssertFatal(ru != NULL, "ru is null\n");
   pthread_mutex_lock(&ru->prach_list_mutex);
-  for (uint16_t i=0; i<NUMBER_OF_NR_RU_PRACH_MAX; i++) {
-    LOG_D(PHY,"searching for PRACH in %d.%d : prach_index %d=> %d.%d\n", frame,slot,i,
+  for (int i = 0; i < NUMBER_OF_NR_RU_PRACH_MAX; i++) {
+    LOG_D(PHY,"searching for PRACH in %d.%d : prach_index %d=> %d.%d\n",
+          frame,
+          slot,
+          i,
 	  ru->prach_list[i].frame,ru->prach_list[i].slot);
-    if((type == SEARCH_EXIST_OR_FREE) &&
-       (ru->prach_list[i].frame == -1) &&
-       (ru->prach_list[i].slot == -1)) {
-          pthread_mutex_unlock(&ru->prach_list_mutex);
-          return i;
+    if((type == SEARCH_EXIST_OR_FREE) && (ru->prach_list[i].frame == -1) && (ru->prach_list[i].slot == -1)) {
+      pthread_mutex_unlock(&ru->prach_list_mutex);
+      return i;
     }	
-    else if ((type == SEARCH_EXIST) &&
-             (ru->prach_list[i].frame == frame) &&
-             (ru->prach_list[i].slot  == slot)) {
+    else if ((type == SEARCH_EXIST) && (ru->prach_list[i].frame == frame) && (ru->prach_list[i].slot  == slot)) {
       pthread_mutex_unlock(&ru->prach_list_mutex);
       return i;
     }
@@ -119,55 +129,42 @@ int16_t find_nr_prach_ru(RU_t *ru,int frame,int slot, find_type_t type) {
   return -1;
 }
 
-void nr_fill_prach_ru(RU_t *ru,
-		      int SFN,
-		      int Slot,
-		      nfapi_nr_prach_pdu_t *prach_pdu) {
-
-  int prach_id = find_nr_prach_ru(ru,SFN,Slot,SEARCH_EXIST_OR_FREE);
-  AssertFatal( ((prach_id>=0) && (prach_id<NUMBER_OF_NR_PRACH_MAX)) || (prach_id < 0) ,
-              "illegal or no prach_id found!!! prach_id %d\n",prach_id);
+void nr_fill_prach_ru(RU_t *ru, int SFN, int Slot, nfapi_nr_prach_pdu_t *prach_pdu)
+{
+  int prach_id = find_nr_prach_ru(ru, SFN, Slot, SEARCH_EXIST_OR_FREE);
+  AssertFatal(((prach_id >= 0) && (prach_id < NUMBER_OF_NR_PRACH_MAX)) || (prach_id < 0),
+              "illegal or no prach_id found!!! prach_id %d\n",
+              prach_id);
 
   pthread_mutex_lock(&ru->prach_list_mutex);
-  ru->prach_list[prach_id].frame              = SFN;
-  ru->prach_list[prach_id].slot               = Slot;
-  ru->prach_list[prach_id].fmt                = prach_pdu->prach_format;
-  ru->prach_list[prach_id].numRA              = prach_pdu->num_ra;
-  ru->prach_list[prach_id].prachStartSymbol   = prach_pdu->prach_start_symbol;
-  ru->prach_list[prach_id].num_prach_ocas     = prach_pdu->num_prach_ocas;
-  pthread_mutex_unlock(&ru->prach_list_mutex);  
-
+  ru->prach_list[prach_id].frame = SFN;
+  ru->prach_list[prach_id].slot = Slot;
+  ru->prach_list[prach_id].fmt = prach_pdu->prach_format;
+  ru->prach_list[prach_id].numRA = prach_pdu->num_ra;
+  ru->prach_list[prach_id].prachStartSymbol = prach_pdu->prach_start_symbol;
+  ru->prach_list[prach_id].num_prach_ocas = prach_pdu->num_prach_ocas;
+  pthread_mutex_unlock(&ru->prach_list_mutex);
 }
 
-void free_nr_ru_prach_entry(RU_t *ru,
-			    int prach_id) {
-
+void free_nr_ru_prach_entry(RU_t *ru, int prach_id)
+{
   pthread_mutex_lock(&ru->prach_list_mutex);
   ru->prach_list[prach_id].frame = -1;
-	ru->prach_list[prach_id].slot  = -1;
+  ru->prach_list[prach_id].slot  = -1;
   pthread_mutex_unlock(&ru->prach_list_mutex);
-
 }
 
 
-void rx_nr_prach_ru(RU_t *ru,
-		    int prachFormat,
-		    int numRA,
-		    int prachStartSymbol,
-		    int prachOccasion,
-		    int frame,
-		    int slot) {
+void rx_nr_prach_ru(RU_t *ru, int prachFormat, int numRA, int prachStartSymbol, int prachOccasion, int frame, int slot)
+{
+  AssertFatal(ru != NULL,"ru is null\n");
 
-  AssertFatal(ru!=NULL,"ru is null\n");
-
-  int16_t            **rxsigF=NULL;
-  NR_DL_FRAME_PARMS *fp=ru->nr_frame_parms;
-  int slot2=slot;
-
+  int16_t **rxsigF = NULL;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+  int slot2 = slot;
   int16_t *prach[ru->nb_rx];
   int prach_sequence_length = ru->config.prach_config.prach_sequence_length.value;
-
-  int msg1_frequencystart   = ru->config.prach_config.num_prach_fd_occasions_list[numRA].k1.value;
+  int msg1_frequencystart = ru->config.prach_config.num_prach_fd_occasions_list[numRA].k1.value;
 
   int sample_offset_slot;
   if (prachStartSymbol == 0) {
@@ -184,16 +181,24 @@ void rx_nr_prach_ru(RU_t *ru,
       sample_offset_slot = (fp->ofdm_symbol_size + fp->nb_prefix_samples) * prachStartSymbol;
   }
 
-  LOG_D(PHY,"frame %d, slot %d: doing rx_nr_prach_ru for format %d, numRA %d, prachStartSymbol %d, prachOccasion %d\n",frame,slot,prachFormat,numRA,prachStartSymbol,prachOccasion);
+  LOG_D(PHY,
+        "frame %d, slot %d: doing rx_nr_prach_ru for format %d, numRA %d, prachStartSymbol %d, prachOccasion %d\n",
+        frame,
+        slot,
+        prachFormat,
+        numRA,
+        prachStartSymbol,
+        prachOccasion);
 
-  rxsigF            = ru->prach_rxsigF[prachOccasion];
+  rxsigF = ru->prach_rxsigF[prachOccasion];
 
   AssertFatal(ru->if_south == LOCAL_RF || ru->if_south == REMOTE_IF5,
               "we shouldn't call this if if_south != LOCAL_RF or REMOTE_IF5\n");
 
   for (int aa=0; aa<ru->nb_rx; aa++){ 
-    if (prach_sequence_length == 0) slot2=(slot/fp->slots_per_subframe)*fp->slots_per_subframe; 
-    prach[aa] = (int16_t*)&ru->common.rxdata[aa][fp->get_samples_slot_timestamp(slot2,fp,0)+sample_offset_slot-ru->N_TA_offset];
+    if (prach_sequence_length == 0)
+      slot2 = (slot / fp->slots_per_subframe) * fp->slots_per_subframe;
+    prach[aa] = (int16_t*)&ru->common.rxdata[aa][fp->get_samples_slot_timestamp(slot2, fp, 0) + sample_offset_slot - ru->N_TA_offset];
   } 
 
   int reps;
@@ -202,8 +207,13 @@ void rx_nr_prach_ru(RU_t *ru,
   int mu = fp->numerology_index;
 
   if (prach_sequence_length == 0) {
-    LOG_D(PHY,"PRACH (ru %d) in %d.%d, format %d, msg1_frequencyStart %d\n",
-	  ru->idx,frame,slot2,prachFormat,msg1_frequencystart);
+    LOG_D(PHY,
+          "PRACH (ru %d) in %d.%d, format %d, msg1_frequencyStart %d\n",
+	  ru->idx,
+	  frame,
+	  slot2,
+	  prachFormat,
+	  msg1_frequencystart);
     switch (prachFormat) {
     case 0:
       reps = 1;
@@ -235,8 +245,14 @@ void rx_nr_prach_ru(RU_t *ru,
     }
   }
   else {
-    LOG_D(PHY,"PRACH (ru %d) in %d.%d, format %s, msg1_frequencyStart %d,startSymbol %d\n",
-	  ru->idx,frame,slot,prachfmt[prachFormat],msg1_frequencystart,prachStartSymbol);
+    LOG_D(PHY,
+          "PRACH (ru %d) in %d.%d, format %s, msg1_frequencyStart %d,startSymbol %d\n",
+	  ru->idx,
+	  frame,
+	  slot,
+	  prachfmt[prachFormat],
+	  msg1_frequencystart,
+	  prachStartSymbol);
     switch (prachFormat) {
     case 4: //A1
       reps = 2;
@@ -293,7 +309,9 @@ void rx_nr_prach_ru(RU_t *ru,
     dftlen = 2048 >> mu;
   }
 
-  //actually what we should be checking here is how often the current prach crosses a 0.5ms boundary. I am not quite sure for which paramter set this would be the case, so I will ignore it for now and just check if the prach starts on a 0.5ms boundary
+  //actually what we should be checking here is how often the current prach crosses a 0.5ms boundary.
+  //I am not quite sure for which paramter set this would be the case,
+  //so I will ignore it for now and just check if the prach starts on a 0.5ms boundary
   if(fp->numerology_index == 0) {
     if (prachStartSymbol == 0 || prachStartSymbol == 7)
       Ncp += 16;

@@ -436,7 +436,7 @@ int main(int argc, char **argv)
   /* RU handles rxdataF, and gNB just has a pointer. Here, we don't have an RU,
    * so we need to allocate that memory as well. */
   for (i = 0; i < n_rx; i++)
-    gNB->common_vars.rxdataF[i] = malloc16_clear(gNB->frame_parms.samples_per_frame_wCP*sizeof(c16_t));
+    gNB->common_vars.rxdataF[0][i] = malloc16_clear(gNB->frame_parms.samples_per_frame_wCP * sizeof(c16_t));
 
   double fs,txbw,rxbw;
   uint32_t samples;
@@ -540,9 +540,10 @@ int main(int argc, char **argv)
 
   pucch_GroupHopping_t PUCCH_GroupHopping = pucch_tx_pdu.group_hop_flag + (pucch_tx_pdu.sequence_hop_flag<<1);
   double tx_level_fp = 100.0;
-  for(SNR=snr0;SNR<=snr1;SNR+=1){
+  c16_t **rxdataF = gNB->common_vars.rxdataF[0];
+  for(SNR = snr0; SNR <= snr1; SNR += 1) {
     ack_nack_errors=0;
-    sr_errors=0;
+    sr_errors = 0;
     n_errors = 0;
     c16_t **txdataF = gNB->common_vars.txdataF[0];
     for (trial=0; trial<n_trials; trial++) {
@@ -569,7 +570,6 @@ int main(int argc, char **argv)
 
       if (n_trials==1) printf("txlev %d (%f dB), offset %d, sigma2 %f ( %f dB)\n",txlev,10*log10(txlev),startingSymbolIndex*frame_parms->ofdm_symbol_size,sigma2,sigma2_dB);
 
-      c16_t **rxdataF =  gNB->common_vars.rxdataF;
       for (int symb=0; symb<gNB->frame_parms.symbols_per_slot;symb++) {
         if (symb<startingSymbolIndex || symb >= startingSymbolIndex+nrofSymbols) {
           int i0 = symb*gNB->frame_parms.ofdm_symbol_size;
@@ -668,7 +668,7 @@ int main(int argc, char **argv)
         }
         else pucch_pdu.freq_hop_flag = 0;
 
-        nr_decode_pucch0(gNB, nr_frame_tx, nr_slot_tx,&uci_pdu,&pucch_pdu);
+        nr_decode_pucch0(gNB, rxdataF, nr_frame_tx, nr_slot_tx,&uci_pdu,&pucch_pdu);
         if(sr_flag==1){
           if (uci_pdu.sr.sr_indication == 0 || uci_pdu.sr.sr_confidence_level == 1)
             sr_errors+=1;
@@ -721,7 +721,7 @@ int main(int argc, char **argv)
           pucch_pdu.second_hop_prb      = N_RB_DL-1;
         }
         else pucch_pdu.freq_hop_flag = 0;
-        nr_decode_pucch2(gNB,nr_frame_tx,nr_slot_tx,&uci_pdu,&pucch_pdu);
+        nr_decode_pucch2(gNB, rxdataF, nr_frame_tx, nr_slot_tx, &uci_pdu, &pucch_pdu);
         int csi_part1_bytes=pucch_pdu.bit_len_csi_part1>>3;
         if ((pucch_pdu.bit_len_csi_part1&7) > 0) csi_part1_bytes++;
         for (int i=0;i<csi_part1_bytes;i++) {
@@ -752,8 +752,10 @@ int main(int argc, char **argv)
     free(gNB->gNB_config.tdd_table.max_tdd_periodicity_list[i].max_num_of_symbol_per_slot_list);
   free(gNB->gNB_config.tdd_table.max_tdd_periodicity_list);
 
-  for (i = 0; i < n_rx; i++)
-    free(gNB->common_vars.rxdataF[i]);
+  for (int j = 0; j < gNB->common_vars.num_beams_period; j++) {
+    for (i = 0; i < n_rx; i++)
+      free(gNB->common_vars.rxdataF[j][i]);
+  }
   phy_free_nr_gNB(gNB);
   free(RC.gNB[0]);
   free(RC.gNB);

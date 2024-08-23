@@ -181,7 +181,9 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
 
   /* Do NOT allocate per-antenna rxdataF: the gNB gets a pointer to the
    * RU to copy/recover freq-domain memory from there */
-  common_vars->rxdataF = (c16_t **)malloc16(Prx * sizeof(c16_t*));
+  common_vars->rxdataF = (c16_t ***)malloc16(common_vars->num_beams_period * sizeof(c16_t**));
+  for (int i = 0; i < common_vars->num_beams_period; i++)
+    common_vars->rxdataF[i] = (c16_t **)malloc16(Prx * sizeof(c16_t*));
 
   common_vars->num_beams = cfg->dbt_config.num_dig_beams;
   if (common_vars->num_beams > 0) {
@@ -276,6 +278,8 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
 
   /* Do NOT free per-antenna txdataF/rxdataF: the gNB gets a pointer to the
    * RU's txdataF/rxdataF, and the RU will free that */
+  for (int j = 0; j < common_vars->num_beams_period; j++)
+    free_and_zero(common_vars->rxdataF[j]);
   free_and_zero(common_vars->txdataF);
   free_and_zero(common_vars->rxdataF);
   free_and_zero(common_vars->beam_id);

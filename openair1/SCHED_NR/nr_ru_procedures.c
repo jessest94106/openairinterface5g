@@ -339,7 +339,6 @@ void nr_feptx_tp(RU_t *ru, int frame_tx, int slot)
 void nr_fep(void* arg)
 {
   feprx_cmd_t *feprx_cmd = (feprx_cmd_t *)arg;
-
   RU_t *ru         = feprx_cmd->ru;
   int aid          = feprx_cmd->aid;
   int tti_rx       = feprx_cmd->slot;
@@ -347,7 +346,7 @@ void nr_fep(void* arg)
   int endSymbol    = feprx_cmd->endSymbol;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   
-  LOG_D(PHY,"In nr_fep for aid %d, slot = %d, startSymbol %d, endSymbol %d\n", aid, tti_rx,startSymbol,endSymbol);
+  LOG_D(PHY,"aid %d, frame %d slot %d, startSymbol %d, endSymbol %d\n", aid, ru->proc.frame_rx, tti_rx, startSymbol, endSymbol);
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPRX+aid, 1);
 
