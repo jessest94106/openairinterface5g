@@ -116,7 +116,6 @@ static int nr_dlsch_llr(uint32_t rx_size_symbol,
                         unsigned char harq_pid,
                         unsigned char first_symbol_flag,
                         unsigned char symbol,
-                        unsigned short nb_rb,
                         int32_t codeword_TB0,
                         int32_t codeword_TB1,
                         uint32_t len,
@@ -221,17 +220,16 @@ void nr_dlsch_scale_channel(uint32_t rx_size_symbol,
                             uint8_t pilots,
                             uint32_t len,
                             unsigned short nb_rb);
-void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
-                            short n_tx,
-                            short n_rx,
-                            int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
-                            int ***rho,
-                            int32_t dl_ch_mag[][n_rx][rx_size_symbol],
-                            int32_t dl_ch_magb[][n_rx][rx_size_symbol],
-                            int32_t dl_ch_magr[][n_rx][rx_size_symbol],
-                            unsigned char symbol,
-                            unsigned short nb_rb,
-                            int length);
+static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
+                                   short n_tx,
+                                   short n_rx,
+                                   int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
+                                   int ***rho,
+                                   int32_t dl_ch_mag[][n_rx][rx_size_symbol],
+                                   int32_t dl_ch_magb[][n_rx][rx_size_symbol],
+                                   int32_t dl_ch_magr[][n_rx][rx_size_symbol],
+                                   unsigned char symbol,
+                                   int length);
 
 static bool overlap_csi_symbol(fapi_nr_dl_config_csirs_pdu_rel15_t *csi_pdu, int symbol)
 {
@@ -596,7 +594,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                            dl_ch_magb,
                            dl_ch_magr,
                            symbol,
-                           nb_rb_pdsch,
                            nb_re_pdsch);
     if (nl >= 2) // Apply MMSE for 2, 3, and 4 Tx layers
       nr_dlsch_mmse(rx_size_symbol,
@@ -691,7 +688,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                    harq_pid,
                    first_symbol_flag,
                    i,
-                   nb_rb_pdsch,
                    codeword_TB0,
                    codeword_TB1,
                    dl_valid_re[i - 1],
@@ -877,15 +873,13 @@ static void nr_dlsch_channel_compensation(uint32_t rx_size_symbol,
       QAM_amp128r = simde_mm_set1_epi16(QAM256_n3);
     }
 
-    //    printf("comp: rxdataF_comp %p, symbol %d\n",rxdataF_comp[0],symbol);
-
     for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
       dl_ch128 = (simde__m128i *)dl_ch_estimates_ext[(l * frame_parms->nb_antennas_rx) + aarx];
       dl_ch_mag128 = (simde__m128i *)dl_ch_mag[l][aarx];
       dl_ch_mag128b = (simde__m128i *)dl_ch_magb[l][aarx];
       dl_ch_mag128r = (simde__m128i *)dl_ch_magr[l][aarx];
       rxdataF128 = (simde__m128i *)rxdataF_ext[aarx];
-      rxdataF_comp128 = (simde__m128i *)(rxdataF_comp[l][aarx] + symbol * nb_rb * 12);
+      rxdataF_comp128 = (simde__m128i *)(rxdataF_comp[l][aarx] + symbol * rx_size_symbol);
 
       for (int rb = 0; rb < nb_rb_0; rb++) {
         if (mod_order > 2) {
@@ -1260,37 +1254,34 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
   }
 }
 
-void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
-                            short n_tx,
-                            short n_rx,
-                            int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
-                            int ***rho,
-                            int32_t dl_ch_mag[][n_rx][rx_size_symbol],
-                            int32_t dl_ch_magb[][n_rx][rx_size_symbol],
-                            int32_t dl_ch_magr[][n_rx][rx_size_symbol],
-                            unsigned char symbol,
-                            unsigned short nb_rb,
-                            int length) {
-  unsigned char aatx, aarx;
-  int i;
+static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
+                                   short n_tx,
+                                   short n_rx,
+                                   int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
+                                   int ***rho,
+                                   int32_t dl_ch_mag[][n_rx][rx_size_symbol],
+                                   int32_t dl_ch_magb[][n_rx][rx_size_symbol],
+                                   int32_t dl_ch_magr[][n_rx][rx_size_symbol],
+                                   unsigned char symbol,
+                                   int length)
+{
   simde__m128i *rxdataF_comp128_0,*rxdataF_comp128_1,*dl_ch_mag128_0,*dl_ch_mag128_1,*dl_ch_mag128_0b,*dl_ch_mag128_1b,*dl_ch_mag128_0r,*dl_ch_mag128_1r;
-
   uint32_t nb_rb_0 = length/12 + ((length%12)?1:0);
 
-  if (n_rx>1) {
-    for (aatx=0; aatx<n_tx; aatx++) {
-      rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[aatx][0] + symbol * nb_rb * 12);
+  if (n_rx > 1) {
+    for (int aatx = 0; aatx < n_tx; aatx++) {
+      rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[aatx][0] + symbol * rx_size_symbol);
       dl_ch_mag128_0 = (simde__m128i *)dl_ch_mag[aatx][0];
       dl_ch_mag128_0b = (simde__m128i *)dl_ch_magb[aatx][0];
       dl_ch_mag128_0r = (simde__m128i *)dl_ch_magr[aatx][0];
-      for (aarx=1; aarx<n_rx; aarx++) {
-        rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[aatx][aarx] + symbol * nb_rb * 12);
+      for (int aarx = 1; aarx < n_rx; aarx++) {
+        rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[aatx][aarx] + symbol * rx_size_symbol);
         dl_ch_mag128_1 = (simde__m128i *)dl_ch_mag[aatx][aarx];
         dl_ch_mag128_1b = (simde__m128i *)dl_ch_magb[aatx][aarx];
         dl_ch_mag128_1r = (simde__m128i *)dl_ch_magr[aatx][aarx];
 
         // MRC on each re of rb, both on MF output and magnitude (for 16QAM/64QAM/256 llr computation)
-        for (i=0; i<nb_rb_0*3; i++) {
+        for (int i = 0; i < nb_rb_0 * 3; i++) {
           rxdataF_comp128_0[i] = simde_mm_adds_epi16(rxdataF_comp128_0[i],rxdataF_comp128_1[i]);
           dl_ch_mag128_0[i]    = simde_mm_adds_epi16(dl_ch_mag128_0[i],dl_ch_mag128_1[i]);
           dl_ch_mag128_0b[i]   = simde_mm_adds_epi16(dl_ch_mag128_0b[i],dl_ch_mag128_1b[i]);
@@ -1299,14 +1290,14 @@ void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
       }
     }
 #ifdef DEBUG_DLSCH_DEMOD
-    for (i=0; i<nb_rb_0*3; i++) {
-    printf("symbol%d RB %d\n",symbol,i/3);
-    rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[0][0] + symbol * nb_rb * 12);
-    rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[0][n_rx] + symbol * nb_rb * 12);
-    print_shorts("tx 1 mrc_re/mrc_Im:",(int16_t*)&rxdataF_comp128_0[i]);
-    print_shorts("tx 2 mrc_re/mrc_Im:",(int16_t*)&rxdataF_comp128_1[i]);
-    // printf("mrc mag0 = %d = %d \n",((int16_t*)&dl_ch_mag128_0[0])[0],((int16_t*)&dl_ch_mag128_0[0])[1]);
-    // printf("mrc mag0b = %d = %d \n",((int16_t*)&dl_ch_mag128_0b[0])[0],((int16_t*)&dl_ch_mag128_0b[0])[1]);
+    for (int i = 0; i < nb_rb_0 * 3; i++) {
+      printf("symbol%d RB %d\n", symbol,i / 3);
+      rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[0][0] + symbol * rx_size_symbol);
+      rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[0][n_rx] + symbol * rx_size_symbol);
+      print_shorts("tx 1 mrc_re/mrc_Im:",(int16_t*)&rxdataF_comp128_0[i]);
+      print_shorts("tx 2 mrc_re/mrc_Im:",(int16_t*)&rxdataF_comp128_1[i]);
+      // printf("mrc mag0 = %d = %d \n",((int16_t*)&dl_ch_mag128_0[0])[0],((int16_t*)&dl_ch_mag128_0[0])[1]);
+      // printf("mrc mag0b = %d = %d \n",((int16_t*)&dl_ch_mag128_0b[0])[0],((int16_t*)&dl_ch_mag128_0b[0])[1]);
     }
 #endif
     if (rho) {
@@ -1891,7 +1882,6 @@ static int nr_dlsch_llr(uint32_t rx_size_symbol,
                         unsigned char harq_pid,
                         unsigned char first_symbol_flag,
                         unsigned char symbol,
-                        unsigned short nb_rb,
                         int32_t codeword_TB0,
                         int32_t codeword_TB1,
                         uint32_t len,
@@ -1908,22 +1898,22 @@ static int nr_dlsch_llr(uint32_t rx_size_symbol,
   switch (dlsch[0].dlsch_config.qamModOrder) {
     case 2 :
       for(int l = 0; l < dlsch[0].Nl; l++)
-        nr_qpsk_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], layer_llr[l] + llr_offset_symbol, len);
+        nr_qpsk_llr(&rxdataF_comp[l][0][symbol * rx_size_symbol], layer_llr[l] + llr_offset_symbol, len);
       break;
 
     case 4 :
       for(int l = 0; l < dlsch[0].Nl; l++)
-        nr_16qam_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], dl_ch_mag, layer_llr[l] + llr_offset_symbol, len);
+        nr_16qam_llr(&rxdataF_comp[l][0][symbol * rx_size_symbol], dl_ch_mag, layer_llr[l] + llr_offset_symbol, len);
       break;
 
     case 6 :
       for(int l=0; l < dlsch[0].Nl; l++)
-        nr_64qam_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, layer_llr[l] + llr_offset_symbol, len);
+        nr_64qam_llr(&rxdataF_comp[l][0][symbol * rx_size_symbol], dl_ch_mag, dl_ch_magb, layer_llr[l] + llr_offset_symbol, len);
       break;
 
     case 8:
       for(int l=0; l < dlsch[0].Nl; l++)
-        nr_256qam_llr(&rxdataF_comp[l][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, dl_ch_magr, layer_llr[l] + llr_offset_symbol, len);
+        nr_256qam_llr(&rxdataF_comp[l][0][symbol * rx_size_symbol], dl_ch_mag, dl_ch_magb, dl_ch_magr, layer_llr[l] + llr_offset_symbol, len);
       break;
 
     default:
@@ -1936,19 +1926,19 @@ static int nr_dlsch_llr(uint32_t rx_size_symbol,
   if (dlsch1_harq) {
     switch (dlsch[1].dlsch_config.qamModOrder) {
       case 2 :
-        nr_qpsk_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], layer_llr[0] + llr_offset_symbol, len);
+        nr_qpsk_llr(&rxdataF_comp[0][0][symbol * rx_size_symbol], layer_llr[0] + llr_offset_symbol, len);
         break;
 
       case 4:
-        nr_16qam_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], dl_ch_mag, layer_llr[0] + llr_offset_symbol, len);
+        nr_16qam_llr(&rxdataF_comp[0][0][symbol * rx_size_symbol], dl_ch_mag, layer_llr[0] + llr_offset_symbol, len);
         break;
 
       case 6 :
-        nr_64qam_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, layer_llr[0] + llr_offset_symbol, len);
+        nr_64qam_llr(&rxdataF_comp[0][0][symbol * rx_size_symbol], dl_ch_mag, dl_ch_magb, layer_llr[0] + llr_offset_symbol, len);
         break;
 
       case 8 :
-        nr_256qam_llr(&rxdataF_comp[0][0][symbol * nb_rb * 12], dl_ch_mag, dl_ch_magb, dl_ch_magr, layer_llr[0] + llr_offset_symbol, len);
+        nr_256qam_llr(&rxdataF_comp[0][0][symbol * rx_size_symbol], dl_ch_mag, dl_ch_magb, dl_ch_magr, layer_llr[0] + llr_offset_symbol, len);
         break;
 
       default:
