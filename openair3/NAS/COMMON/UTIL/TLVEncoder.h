@@ -24,9 +24,11 @@
 
 #include <arpa/inet.h>  // htonl, htons
 
-#define ENCODE_U8(buffer, value, size)    \
-    *(uint8_t*)(buffer) = value;    \
-    size += sizeof(uint8_t)
+#define ENCODE_U8(buffer, value, size) \
+  do {                                 \
+    *(uint8_t*)(buffer) = value;       \
+    size += sizeof(uint8_t);           \
+  } while (0)
 
 /* Safely encodes a 16-bit value into a buffer, handling
    misalignment by memcpy 2 bytes to buffer in network
@@ -49,11 +51,11 @@
   } while (0)
 
 #define ENCODE_U32(buffer, value, size) \
-  {                                     \
+  do {                                  \
     uint32_t tmp = htonl(value);        \
     memcpy(buffer, &tmp, sizeof(tmp));  \
-  }                                     \
-  size += sizeof(uint32_t)
+    size += sizeof(uint32_t);           \
+  } while (0)
 
 #define IES_ENCODE_U8(buffer, encoded, value)   \
     ENCODE_U8(buffer + encoded, value, encoded)
