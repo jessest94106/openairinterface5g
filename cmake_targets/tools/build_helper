@@ -34,7 +34,7 @@ case "$OS_DISTRO" in
   fedora) OS_BASEDISTRO="fedora"; INSTALLER="dnf"; CMAKE="cmake" ;;
   rhel)   OS_BASEDISTRO="fedora"; INSTALLER="dnf"; CMAKE="cmake3" ;;
   rocky)  OS_BASEDISTRO="fedora"; INSTALLER="dnf"; CMAKE="cmake" ;;
-  centos) OS_BASEDISTRO="centos"; INSTALLER="yum"; CMAKE="cmake3" ;;
+  centos) OS_BASEDISTRO="fedora"; INSTALLER="dnf"; CMAKE="cmake3" ;; # CentOS Stream
   debian) OS_BASEDISTRO="debian"; INSTALLER="apt-get"; CMAKE="cmake" ;;
   ubuntu) OS_BASEDISTRO="debian"; INSTALLER="apt-get"; CMAKE="cmake" ;;
 esac
@@ -108,11 +108,6 @@ check_supported_distribution() {
         "ubuntu20.04") return 0 ;;
         "debian11")    return 0 ;;
         "fedora40")    return 0 ;;
-        "rhel7")       return 0 ;;
-        "rhel7.6")     return 0 ;;
-        "rhel7.7")     return 0 ;;
-        "rhel7.8")     return 0 ;;
-        "rhel7.9")     return 0 ;;
         "rhel8.2")     return 0 ;;
         "rhel8.3")     return 0 ;;
         "rhel8.4")     return 0 ;;
@@ -126,8 +121,7 @@ check_supported_distribution() {
         "rhel9.2")     return 0 ;;
         "rhel9.3")     return 0 ;;
         "rhel9.4")     return 0 ;;
-        "centos7")     return 0 ;;
-        "centos8")     return 0 ;;
+        "centos9")     return 0 ;; # CentOS stream
         "rocky8.7")    return 0 ;;
         "rocky8.8")    return 0 ;;
         "rocky8.9")    return 0 ;;
@@ -385,16 +379,16 @@ install_usrp_uhd_driver() {
         # On newer kernels, it fails to install
         $SUDO apt-get -y install uhd-host
     fi
-    # quick workaround for RHE7.6
+    # quick workaround for below distributions
     local distribution=$(get_distribution_release)
     if [ -z $1 ]; then
-      if [[ "$OS_DISTRO" == "rhel" ]] || [[ "$OS_DISTRO" == "rocky" ]]; then
+      if [[ "$OS_DISTRO" == "rhel" ]] || [[ "$OS_DISTRO" == "rocky" ]] || [[ "$OS_DISTRO" == "centos" ]]; then
           $SUDO /usr/local/bin/uhd_images_downloader
       else
           $SUDO uhd_images_downloader
       fi
     else
-      if [[ "$OS_DISTRO" == "rhel" ]] || [[ "$OS_DISTRO" == "rocky" ]]; then
+      if [[ "$OS_DISTRO" == "rhel" ]] || [[ "$OS_DISTRO" == "rocky" ]] || [[ "$OS_DISTRO" == "centos" ]]; then
           $SUDO /usr/local/bin/uhd_images_downloader -i $1
       else
           $SUDO uhd_images_downloader -i $1
