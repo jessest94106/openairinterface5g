@@ -626,7 +626,7 @@ In the following, we will use these short hands:
 - `du-u-plane-mac-addr`: DU U plane MAC address
 - `pci-address-u-plane-vf`: PCI bus address of the VF for U plane
 
-In the configuration file, in option `fhi_72.dpdk_devices`, the first PCI address is for C-plane and the second for U-plane. 
+In the configuration file, in option `fhi_72.dpdk_devices`, the first PCI address is for U-plane and the second for C-plane.
 
 For both the MAC addresses, you might use the MAC addresses which are
 pre-configured in the RUs (typically `00:11:22:33:44:66`, but that is not
