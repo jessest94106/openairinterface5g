@@ -157,6 +157,42 @@ E.g. to perform a simple simulation of a satellite in geostationary orbit (GEO),
 --rfsimulator.prop_delay 238.74
 ```
 
+For simulation of a satellite in low earth orbit (LEO), two channel models have been added to rfsimulator:
+- `SAT_LEO_TRANS`: transparent LEO satellite with gNB on ground
+- `SAT_LEO_REGEN`: regenerative LEO satellite with gNB on board
+
+Both channel models simulate the delay and Doppler for a circular orbit at 600 km height according to the Matlab function [dopplerShiftCircularOrbit](https://de.mathworks.com/help/satcom/ref/dopplershiftcircularorbit.html).
+An example configuration to simulate a transparent LEO satellite with rfsimulator would be:
+```
+channelmod = {
+  max_chan=10;
+  modellist="modellist_rfsimu_1";
+  modellist_rfsimu_1 = (
+    {
+      model_name     = "rfsimu_channel_enB0"
+      type           = "SAT_LEO_TRANS";
+      noise_power_dB = -100;
+    },
+    {
+      model_name     = "rfsimu_channel_ue0"
+      type           = "SAT_LEO_TRANS";
+      noise_power_dB = -100;
+    }
+  );
+};
+```
+This configuration is also provided in the file `targets/PROJECTS/GENERIC-NR-5GC/CONF/channelmod_rfsimu_LEO_satellite.conf`.
+
+Additionally, rfsimulator has to be configured to apply the channel model.
+This can be done by either providing this line in the conf file in section `rfsimulator`:
+```
+  options = ("chanmod");
+```
+Or by providing this the the command line parameters:
+```
+--rfsimulator.options chanmod
+```
+
 ### gNB
 
 The main parameter to cope with the large NTN propagation delay is the cellSpecificKoffset.
@@ -166,11 +202,12 @@ The unit of the field Koffset is number of slots for a given subcarrier spacing 
 This parameter can be provided to the gNB in the conf file as `cellSpecificKoffset_r17` in the section `servingCellConfigCommon`.
 ```
 ...
-      cellSpecificKoffset_r17 = 478;
+      cellSpecificKoffset_r17 = 478; # GEO satellite
+#      cellSpecificKoffset_r17 = 40; # LEO satellite
 ...
 ```
 
-Besides this, some timers, e.g. `sr_ProhibitTimer_v1700`, `t300`, `t301` and `t319`,  in the conf file section `gNBs.[0].TIMERS` might need to be extended.
+Besides this, some timers, e.g. `sr_ProhibitTimer_v1700`, `t300`, `t301` and `t319`,  in the conf file section `gNBs.[0].TIMERS` might need to be extended for GEO satellites.
 ```
 ...
     TIMERS :
@@ -185,7 +222,7 @@ Besides this, some timers, e.g. `sr_ProhibitTimer_v1700`, `t300`, `t301` and `t3
 ...
 ```
 
-To improve the achievable UL and DL throughput in conditions with large RTT, there is a feature defined in REL17 to disable HARQ feedback.
+To improve the achievable UL and DL throughput in conditions with large RTT (esp. GEO satellites), there is a feature defined in REL17 to disable HARQ feedback.
 This allows to reuse HARQ processes immediately, but it breaks compatibility with UEs not supporting this REL17 feature.
 To enable this feature, the `disable_harq` flag has to be added to the gNB conf file in the section `gNBs.[0]`
 ```
@@ -199,7 +236,7 @@ To enable this feature, the `disable_harq` flag has to be added to the gNB conf 
 ...
 ```
 
-So with these modifications to the file `targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band66.fr1.25PRB.usrpx300.conf` an example gNB command for FDD, 5 MHz BW, 15 kHz SCS, GEO satellite 5G NR NTN is this:
+So with these modifications to the file `targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band66.fr1.25PRB.usrpx300.conf` an example gNB command for FDD, 5 MHz BW, 15 kHz SCS, transparent GEO satellite 5G NR NTN is this:
 ```
 cd cmake_targets
 sudo ./ran_build/build/nr-softmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band66.fr1.25PRB.usrpx300.conf --sa --rfsim --rfsimulator.prop_delay 238.74
@@ -213,16 +250,37 @@ To configure NTN gNB with 32 HARQ processes in downlink and uplink, add these se
 ...
 ```
 
+To simulate a LEO satellite channel model with rfsimulator in UL (DL is simulated at the UE side) either the `channelmod` section as shown before has to be added to the gNB conf file, or a channelmod conf file has to be included like this:
+```
+@include "channelmod_rfsimu_LEO_satellite.conf"
+```
+
+So with these modifications to the file `targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band66.fr1.25PRB.usrpx300.conf` an example gNB command for FDD, 5 MHz BW, 15 kHz SCS, trasparent LEO satellite 5G NR NTN is this:
+```
+cd cmake_targets
+sudo ./ran_build/build/nr-softmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band66.fr1.25PRB.usrpx300.conf --sa --rfsim --rfsimulator.prop_delay 20
+```
+
 ### NR UE
 
 At UE side, there are two main parameters to cope with the large NTN propagation delay, cellSpecificKoffset and ta-Common.
 `cellSpecificKoffset` is the same as for gNB and can be provided to the UE via command line parameter `--ntn-koffset`.
-`ta-Common` is a common timong advance and can be provided to the UE via command line parameter `--ntn-ta-common` in milliseconds.
+`ta-Common` is a common timing advance and can be provided to the UE via command line parameter `--ntn-ta-common` in milliseconds.
 
-So an example NR UE command for FDD, 5MHz BW, 15 kHz SCS, GEO satellite 5G NR NTN is this:
+So an example NR UE command for FDD, 5MHz BW, 15 kHz SCS, transparent GEO satellite 5G NR NTN is this:
 ```
 cd cmake_targets
 sudo ./ran_build/build/nr-uesoftmodem --band 66 -C 2152680000 --CO -400000000 -r 25 --numerology 0 --ssb 48 --sa --rfsim --rfsimulator.prop_delay 238.74 --ntn-koffset 478 --ntn-ta-common 477.48
+```
+
+For LEO satellites a third parameter specifying the NTN propagation delay drift has ben added, ta-CommonDrift.
+`ta-CommonDrift` provides the drift rate of the common timing advance and can be provided to the UE via command line parameter `--ntn-ta-commondrift` in microseconds per second.
+Also, to perform an autonomous TA update based on the DL drift, the boolean parameter `--autonomous-ta` should be added in case of a LEO satellite scenario.
+
+So an example NR UE command for FDD, 5MHz BW, 15 kHz SCS, transparent LEO satellite 5G NR NTN is this:
+```
+cd cmake_targets
+sudo ./ran_build/build/nr-uesoftmodem --band 66 -C 2152680000 --CO -400000000 -r 25 --numerology 0 --ssb 48 --sa --rfsim --rfsimulator.prop_delay 20 --rfsimulator.options chanmod -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/channelmod_rfsimu_LEO_satellite.conf --ntn-koffset 40 --ntn-ta-common 37.74 --ntn-ta-commondrift -50 --autonomous-ta
 ```
 
 # Specific OAI modes
