@@ -188,7 +188,7 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc,
         if (ie->nonCriticalExtension->dedicatedNAS_MessageList) {
           struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *tmp = ext->dedicatedNAS_MessageList;
           for (int i = 0; i < tmp->list.count; i++) {
-            MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NAS_CONN_ESTABLI_CNF);
+            MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_CONN_ESTABLI_CNF);
             NasConnEstabCnf *msg = &NAS_CONN_ESTABLI_CNF(ittiMsg);
             msg->errCode = AS_SUCCESS;
             msg->nasMsg.length = tmp->list.array[i]->size;
@@ -1658,7 +1658,7 @@ static int nr_rrc_ue_decode_dcch(NR_UE_RRC_INST_t *rrc,
             NR_DedicatedNAS_Message_t *dedicatedNAS_Message =
                 dlInformationTransfer->criticalExtensions.choice.dlInformationTransfer->dedicatedNAS_Message;
 
-            MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NAS_DOWNLINK_DATA_IND);
+            MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_DOWNLINK_DATA_IND);
             NasDlDataInd *msg = &NAS_DOWNLINK_DATA_IND(ittiMsg);
             msg->UEid = rrc->ue_id;
             msg->nasMsg.length = dedicatedNAS_Message->size;
@@ -2310,7 +2310,7 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
   rrc->rnti = 0;
 
   // Indicate the release of the RRC connection to upper layers
-  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_NAS_CONN_RELEASE_IND);
+  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NR_NAS_CONN_RELEASE_IND);
   NR_NAS_CONN_RELEASE_IND(msg_p).cause = release_cause;
   itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, msg_p);
 }
