@@ -80,7 +80,7 @@ int nr_get_srs_signal(PHY_VARS_gNB *gNB,
   const uint8_t N_ap = 1<<srs_pdu->num_ant_ports;
   const uint8_t N_symb_SRS = 1 << srs_pdu->num_symbols;
   const uint8_t K_TC = 2 << srs_pdu->comb_size;
-  const uint16_t M_sc_b_SRS = srs_bandwidth_config[srs_pdu->config_index][srs_pdu->bandwidth_index][0] * NR_NB_SC_PER_RB/K_TC;
+  const uint16_t M_sc_b_SRS = get_m_srs(srs_pdu->config_index, srs_pdu->bandwidth_index) * NR_NB_SC_PER_RB / K_TC;
 
   int32_t *rx_signal;
   bool no_srs_signal = true;
