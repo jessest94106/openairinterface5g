@@ -88,7 +88,7 @@
         <testCase id="030011">
                 <class>Iperf</class>
                 <desc>Iperf (DL/30kbps/UDP)(30 sec)</desc>
-                <iperf_args>-u -b 0.03M -t 30 -R -c 10.0.1.1</iperf_args>
+                <iperf_args>-u -b 0.03M -t 20 -R -c 10.0.1.1</iperf_args>
                 <id>rfsim5g_ue</id>
                 <svr_id>rfsim5g_gnb_nos1</svr_id>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
@@ -98,7 +98,7 @@
         <testCase id="030012">
                 <class>Iperf</class>
                 <desc>Iperf (UL/30kbps/UDP)(30 sec)</desc>
-                <iperf_args>-u -b 0.03M -t 30 -c 10.0.1.1</iperf_args>
+                <iperf_args>-u -b 0.03M -t 20 -c 10.0.1.1</iperf_args>
                 <id>rfsim5g_ue</id>
                 <svr_id>rfsim5g_gnb_nos1</svr_id>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>

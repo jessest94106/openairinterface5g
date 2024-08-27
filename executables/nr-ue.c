@@ -802,7 +802,7 @@ void *UE_thread(void *arg)
 
   bool syncRunning = false;
   const int nb_slot_frame = fp->slots_per_frame;
-  int absolute_slot = 0, decoded_frame_rx = INT_MAX, trashed_frames = 0;
+  int absolute_slot = 0, decoded_frame_rx = MAX_FRAME_NUMBER - 1, trashed_frames = 0;
   int tx_wait_for_dlsch[NR_MAX_SLOTS_PER_FRAME];
 
   int num_ind_fifo = nb_slot_frame;
@@ -897,7 +897,7 @@ void *UE_thread(void *arg)
                   "");
       // we have the decoded frame index in the return of the synch process
       // and we shifted above to the first slot of next frame
-      decoded_frame_rx++;
+      decoded_frame_rx = (decoded_frame_rx + 1) % MAX_FRAME_NUMBER;
       // we do ++ first in the regular processing, so it will be begin of frame;
       absolute_slot = decoded_frame_rx * nb_slot_frame - 1;
       if (UE->sl_mode == 2) {
