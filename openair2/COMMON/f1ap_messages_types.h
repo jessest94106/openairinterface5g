@@ -292,8 +292,7 @@ typedef struct f1ap_gnb_du_configuration_update_s {
     f1ap_plmn_t plmn;
     uint64_t nr_cellid; // NR Global Cell Id
   } cell_to_delete[F1AP_MAX_NB_CELLS];
-
-  /// string holding gNB_CU_name
+  /// gNB-DU unique ID, at least within a gNB-CU (0 .. 2^36 - 1)
   uint64_t *gNB_DU_ID;
 } f1ap_gnb_du_configuration_update_t;
 
