@@ -300,8 +300,6 @@ typedef struct f1ap_gnb_du_configuration_update_s {
 typedef struct f1ap_gnb_du_configuration_update_acknowledge_s {
   /// ulong transaction id
   uint64_t transaction_id;
-  /// string holding gNB_CU_name
-  char *gNB_CU_name;
   /// number of DU cells to activate
   uint16_t num_cells_to_activate; // 0< num_cells_to_activate <= 512;
   served_cells_to_activate_t cells_to_activate[F1AP_MAX_NB_CELLS];
