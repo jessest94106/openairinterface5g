@@ -597,7 +597,7 @@ void processSlotTX(void *arg)
 
 static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc, int *tx_wait_for_dlsch, nr_phy_data_t *phy_data)
 {
-  int sampleShift = 0;
+  int sampleShift = INT_MAX;
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
@@ -802,7 +802,7 @@ void *UE_thread(void *arg)
 
   bool syncRunning = false;
   const int nb_slot_frame = fp->slots_per_frame;
-  int absolute_slot = 0, decoded_frame_rx = INT_MAX, trashed_frames = 0;
+  int absolute_slot = 0, decoded_frame_rx = MAX_FRAME_NUMBER - 1, trashed_frames = 0;
   int tx_wait_for_dlsch[NR_MAX_SLOTS_PER_FRAME];
 
   int num_ind_fifo = nb_slot_frame;
@@ -886,7 +886,12 @@ void *UE_thread(void *arg)
       stream_status = STREAM_STATUS_SYNCING;
       syncInFrame(UE, &sync_timestamp, intialSyncOffset);
       openair0_write_reorder_clear_context(&UE->rfdevice);
-      shiftForNextFrame = 0; // will be used to track clock drift
+      UE->max_pos_acc = get_nrUE_params()->ntn_ta_commondrift * 1e-6 * fp->samples_per_frame / get_nrUE_params()->time_sync_I; // ntn_ta_commondrift is in µs/s, max_pos_acc * time_sync_I is in samples/frame
+      shiftForNextFrame = -(UE->init_sync_frame + trashed_frames + 2) * UE->max_pos_acc * get_nrUE_params()->time_sync_I; // compensate for the time drift that happened during initial sync
+      LOG_D(PHY, "max_pos_acc = %d, shiftForNextFrame = %d\n", UE->max_pos_acc, shiftForNextFrame);
+      // TODO: remove this autonomous TA and use up-to-date values of ta-Common, ta-CommonDrift and ta-CommonDriftVariant from received SIB19 instead
+      if (get_nrUE_params()->autonomous_ta)
+        UE->timing_advance -= 2 * shiftForNextFrame;
       // read in first symbol
       AssertFatal(fp->ofdm_symbol_size + fp->nb_prefix_samples0
                       == UE->rfdevice.trx_read_func(&UE->rfdevice,
@@ -897,7 +902,7 @@ void *UE_thread(void *arg)
                   "");
       // we have the decoded frame index in the return of the synch process
       // and we shifted above to the first slot of next frame
-      decoded_frame_rx++;
+      decoded_frame_rx = (decoded_frame_rx + 1) % MAX_FRAME_NUMBER;
       // we do ++ first in the regular processing, so it will be begin of frame;
       absolute_slot = decoded_frame_rx * nb_slot_frame - 1;
       if (UE->sl_mode == 2) {
@@ -947,7 +952,10 @@ void *UE_thread(void *arg)
     if (slot_nr == nb_slot_frame - 1) {
       // we shift of half of measured drift, at each beginning of frame for both rx and tx
       iq_shift_to_apply = shiftForNextFrame;
-      shiftForNextFrame = 0; // We will get a new measured offset if we decode PBCH
+      // TODO: remove this autonomous TA and use up-to-date values of ta-Common, ta-CommonDrift and ta-CommonDriftVariant from received SIB19 instead
+      if (get_nrUE_params()->autonomous_ta)
+        UE->timing_advance -= 2 * shiftForNextFrame;
+      shiftForNextFrame = -round(UE->max_pos_acc * get_nrUE_params()->time_sync_I);
     }
 
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
@@ -991,10 +999,7 @@ void *UE_thread(void *arg)
     nr_rxtx_thread_data_t *curMsgRx = (nr_rxtx_thread_data_t *)NotifiedFifoData(newRx);
     *curMsgRx = (nr_rxtx_thread_data_t){.proc = curMsg.proc, .UE = UE};
     int ret = UE_dl_preprocessing(UE, &curMsgRx->proc, tx_wait_for_dlsch, &curMsgRx->phy_data);
-    if (ret)
-      // if ret is 0, no rx_offset has been computed,
-      // or the computed value is 0 = no offset to do
-      // we store it to apply the drift compensation at beginning of next frame
+    if (ret != INT_MAX)
       shiftForNextFrame = ret;
     pushTpool(&(get_nrUE_params()->Tpool), newRx);
 

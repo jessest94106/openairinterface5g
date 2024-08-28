@@ -86,7 +86,7 @@ services:
         cap_drop:
             - ALL
         environment:
-            USE_ADDITIONAL_OPTIONS: --sa --rfsim --log_config.global_log_options level,nocolor,time
+            USE_ADDITIONAL_OPTIONS: --sa --rfsim --rfsimulator.prop_delay 238.74 --log_config.global_log_options level,nocolor,time
             ASAN_OPTIONS: detect_leaks=0
         depends_on:
             - oai-ext-dn
@@ -94,7 +94,7 @@ services:
             public_net:
                 ipv4_address: 192.168.71.140
         volumes:
-            - ../../conf_files/gnb.sa.band78.273prb.rfsim.2x2.conf:/opt/oai-gnb/etc/gnb.conf
+            - ../../conf_files/gnb.sa.band66.ntn.25prb.rfsim.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
             interval: 10s
@@ -110,7 +110,7 @@ services:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
         environment:
-            USE_ADDITIONAL_OPTIONS: --sa --rfsim -r 273 --numerology 1 --band 78 -C 3450720000 --ssb 1518 --ue-nb-ant-tx 2 --uicc0.imsi 208990100001100 --ue-nb-ant-rx 2 --uecap_file /opt/oai-nr-ue/etc/uecap.xml --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
+            USE_ADDITIONAL_OPTIONS: --band 66 -C 2152680000 --CO -400000000 -r 25 --numerology 0 --ssb 48 --sa --rfsim --rfsimulator.prop_delay 238.74 --ntn-koffset 478 --ntn-ta-common 477.48 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
             - oai-gnb
         networks:
@@ -119,7 +119,6 @@ services:
         devices:
              - /dev/net/tun:/dev/net/tun
         volumes:
-            - ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/uecap_ports2.xml:/opt/oai-nr-ue/etc/uecap.xml
             - ../../conf_files/nrue.uicc.conf:/opt/oai-nr-ue/etc/nr-ue.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-uesoftmodem"
