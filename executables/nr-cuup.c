@@ -19,6 +19,7 @@
  *      contact@openairinterface.org
  */
 
+#include "common/oai_version.h"
 #include "common/utils/simple_executable.h"
 #include "executables/softmodem-common.h"
 #include "common/utils/ocp_itti/intertask_interface.h"
@@ -156,11 +157,8 @@ int main(int argc, char **argv)
     exit_fun("[SOFTMODEM] Error, configuration module init failed\n");
   }
   logInit();
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
-#endif
   // strdup to put the sring in the core file for post mortem identification
-  LOG_I(HW, "Version: %s\n", strdup(PACKAGE_VERSION));
+  LOG_I(HW, "Version: %s\n", strdup(OAI_PACKAGE_VERSION));
   set_softmodem_sighandler();
   itti_init(TASK_MAX, tasks_info);
   int rc;

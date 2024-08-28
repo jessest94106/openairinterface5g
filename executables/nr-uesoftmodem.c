@@ -26,6 +26,7 @@
 #include <signal.h>
 
 #include "T.h"
+#include "common/oai_version.h"
 #include "assertions.h"
 #include "PHY/types.h"
 #include "PHY/defs_nr_UE.h"
@@ -430,11 +431,8 @@ int main(int argc, char **argv)
   if (ouput_vcd) {
     vcd_signal_dumper_init("/tmp/openair_dump_nrUE.vcd");
   }
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
-#endif
   // strdup to put the sring in the core file for post mortem identification
-  char *pckg = strdup(PACKAGE_VERSION);
+  char *pckg = strdup(OAI_PACKAGE_VERSION);
   LOG_I(HW, "Version: %s\n", pckg);
 
   PHY_vars_UE_g = malloc(sizeof(*PHY_vars_UE_g) * NB_UE_INST);

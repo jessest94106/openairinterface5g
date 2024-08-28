@@ -87,6 +87,6 @@ add_custom_target(
 add_dependencies(websrv websrvfront)
 # copy frontend files to a websrv subdirectory of where oai copy all built files
 add_custom_command(TARGET websrvfront
-                   POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/frontend/dist/softmodem-ngx ${OPENAIR_BIN_DIR}/../websrv
-                              COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/helpfiles ${OPENAIR_BIN_DIR}/../websrv/helpfiles
-                   COMMENT "Moving frontend files to:\n   ${OPENAIR_BIN_DIR}/../websrv \n " )
+                   POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/frontend/dist/softmodem-ngx ${CMAKE_CURRENT_BINARY_DIR}/../websrv
+                              COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/helpfiles ${CMAKE_CURRENT_BINARY_DIR}/../websrv/helpfiles
+                   COMMENT "Moving frontend files to: ${CMAKE_CURRENT_BINARY_DIR}/../websrv" )
