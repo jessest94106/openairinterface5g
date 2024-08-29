@@ -182,6 +182,8 @@ typedef struct {
 
 static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
 {
+  /* TODO: cleanup code so that this AssertFatal becomes useless */
+  AssertFatal(sock >= 0 && sock < sizeofArray(bridge->buf), "socket %d is not in range\n", sock);
   buffer_t *ptr=&bridge->buf[sock];
   ptr->circularBuf = calloc(1, sampleToByte(CirSize, 1));
   if (ptr->circularBuf == NULL) {
