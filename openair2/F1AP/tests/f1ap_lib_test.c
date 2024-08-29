@@ -432,6 +432,52 @@ static void test_f1ap_du_configuration_update(void)
 }
 
 /**
+ * @brief Test F1 gNB-DU Configuration Update Acknowledge
+ */
+static void test_f1ap_du_configuration_update_acknowledge(void)
+{
+  // Create message
+  f1ap_gnb_du_configuration_update_acknowledge_t orig = {
+      .transaction_id = 5,
+      .num_cells_to_activate = 1,
+      .cells_to_activate = {{
+          .nr_cellid = 987654321,
+          .nrpci = 50,
+          .plmn = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2},
+          .num_SI = 1,
+          .SI_msg = {{
+              .SI_type = 7,
+              .SI_container_length = 10,
+              .SI_container = malloc(sizeof(uint8_t) * 10),
+          }},
+      }},
+  };
+  for (int i = 0; i < orig.cells_to_activate[0].SI_msg[0].SI_container_length; i++) {
+    orig.cells_to_activate[0].SI_msg[0].SI_container[i] = i;
+  }
+  // ASN.1 enc/dec
+  F1AP_F1AP_PDU_t *f1enc = encode_f1ap_du_configuration_update_acknowledge(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+  // Decoding
+  f1ap_gnb_du_configuration_update_acknowledge_t decoded = {0};
+  bool ret = decode_f1ap_du_configuration_update_acknowledge(f1dec, &decoded);
+  AssertFatal(ret, "decode_f1ap_du_configuration_update_acknowledge(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+  // Equality check
+  ret = eq_f1ap_du_configuration_update_acknowledge(&orig, &decoded);
+  AssertFatal(ret, "eq_f1ap_du_configuration_update_acknowledge(): decoded message doesn't match\n");
+  free_f1ap_du_configuration_update_acknowledge(&decoded);
+  // Deep copy
+  f1ap_gnb_du_configuration_update_acknowledge_t cp = cp_f1ap_du_configuration_update_acknowledge(&orig);
+  ret = eq_f1ap_du_configuration_update_acknowledge(&orig, &cp);
+  AssertFatal(ret, "eq_f1ap_du_configuration_update_acknowledge(): copied message doesn't match\n");
+  // Free
+  free_f1ap_du_configuration_update_acknowledge(&cp);
+  free_f1ap_du_configuration_update_acknowledge(&orig);
+}
+
+/**
  * @brief Test F1 gNB-CU Configuration Update
  */
 static void test_f1ap_cu_configuration_update(void)
@@ -513,5 +559,6 @@ int main()
   test_f1ap_du_configuration_update();
   test_f1ap_cu_configuration_update();
   test_f1ap_cu_configuration_update_acknowledge();
+  test_f1ap_du_configuration_update_acknowledge();
   return 0;
 }
