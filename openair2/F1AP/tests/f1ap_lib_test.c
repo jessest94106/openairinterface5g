@@ -468,6 +468,40 @@ static void test_f1ap_cu_configuration_update(void)
   free_f1ap_cu_configuration_update(&orig);
 }
 
+/**
+ * @brief Test F1 gNB-CU Configuration Update Acknowledge
+ */
+static void test_f1ap_cu_configuration_update_acknowledge(void)
+{
+  // Create the original message
+  f1ap_gnb_cu_configuration_update_acknowledge_t orig = {
+      .transaction_id = 2,
+      .num_cells_failed_to_be_activated = 1,
+      .cells_failed_to_be_activated = {{.nr_cellid = 123456789,
+                                        .plmn = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2},
+                                        .cause = F1AP_CAUSE_RADIO_NETWORK}}
+                                        };
+  // F1AP Enc/dec
+  F1AP_F1AP_PDU_t *f1enc = encode_f1ap_cu_configuration_update_acknowledge(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+  // Decoding
+  f1ap_gnb_cu_configuration_update_acknowledge_t decoded = {0};
+  bool ret = decode_f1ap_cu_configuration_update_acknowledge(f1dec, &decoded);
+  AssertFatal(ret, "decode_f1ap_cu_configuration_update_acknowledge(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+  // Equality check
+  ret = eq_f1ap_cu_configuration_update_acknowledge(&orig, &decoded);
+  AssertFatal(ret, "eq_f1ap_cu_configuration_update_acknowledge(): decoded message doesn't match\n");
+  // No free needed
+  // Deep copy
+  f1ap_gnb_cu_configuration_update_acknowledge_t cp = cp_f1ap_cu_configuration_update_acknowledge(&orig);
+  // Equality check
+  ret = eq_f1ap_cu_configuration_update_acknowledge(&orig, &cp);
+  AssertFatal(ret, "eq_f1ap_cu_configuration_update_acknowledge(): copied message doesn't match\n");
+  // No free needed
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -478,5 +512,6 @@ int main()
   test_f1ap_setup_failure();
   test_f1ap_du_configuration_update();
   test_f1ap_cu_configuration_update();
+  test_f1ap_cu_configuration_update_acknowledge();
   return 0;
 }
