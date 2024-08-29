@@ -24,6 +24,7 @@
 #include "mac_rrc_dl.h"
 #include "nr_rrc_defs.h"
 #include "openair2/F1AP/lib/f1ap_rrc_message_transfer.h"
+#include "openair2/F1AP/lib/f1ap_interface_management.h"
 
 static void f1_reset_cu_initiated_f1ap(sctp_assoc_t assoc_id, const f1ap_reset_t *reset)
 {
@@ -45,6 +46,7 @@ static void f1_setup_response_f1ap(sctp_assoc_t assoc_id, const f1ap_setup_resp_
   *f1ap_msg = *resp;
   if (resp->gNB_CU_name != NULL)
     f1ap_msg->gNB_CU_name = strdup(resp->gNB_CU_name);
+  free_f1ap_setup_response(resp);
   itti_send_msg_to_task(TASK_CU_F1, 0, msg);
 }
 
