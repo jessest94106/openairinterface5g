@@ -824,8 +824,6 @@ double interp(double x, double *xs, double *ys, int count);
 void simde_mm128_separate_real_imag_parts(simde__m128i *out_re, simde__m128i *out_im, simde__m128i in0, simde__m128i in1);
 void simde_mm256_separate_real_imag_parts(simde__m256i *out_re, simde__m256i *out_im, simde__m256i in0, simde__m256i in1);
 
-void mult_real_vector_single_vector(const c16_t *x, const int16_t *alpha, c16_t *y, const unsigned int N);
-
 #ifdef __cplusplus
 }
 #endif

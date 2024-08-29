@@ -386,18 +386,17 @@ static void dmrs_amp_mult(const uint32_t dmrs_port,
                           const uint32_t n_dmrs,
                           const pusch_dmrs_type_t dmrs_type)
 {
-  /*
-  A short array that holds amplitude values used for
-  multiplying with the modulated DMRS vector in 128bit SIMD.
-  */
-  int16_t alpha_dmrs[8] __attribute((aligned(16)));
-  for (int_fast8_t i = 0; i < sizeofArray(alpha_dmrs) / 2; i++) {
-    const int16_t a = Wf[i % 2] * Wt * AMP;
-    alpha_dmrs[2 * i]     = a; // multiplier for real part of DMRS symbol
-    alpha_dmrs[2 * i + 1] = a; // multiplier for img part of DMRS symbol
+  /* short array that hold amplitude for k_prime = 0 and k_prime = 1 */
+  int32_t alpha_dmrs[2] __attribute((aligned(16)));
+  for (int_fast8_t i = 0; i < sizeofArray(alpha_dmrs); i++) {
+    const int32_t a = Wf[i] * Wt * AMP;
+    alpha_dmrs[i] = a;
   }
-  /* multiply mod_dmrs with alpha_dmrs in 4 symbol patches */
-  mult_real_vector_single_vector(mod_dmrs, alpha_dmrs, mod_dmrs_out, n_dmrs);
+
+  /* multiply amplitude with complex DMRS vector */
+  for (int_fast16_t i = 0; i < n_dmrs; i++) {
+    mod_dmrs_out[i] = c16mulRealShift(mod_dmrs[i], alpha_dmrs[i % 2], 15);
+  }
 }
 
 /*

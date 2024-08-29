@@ -24,18 +24,6 @@
 #include <simde/simde-common.h>
 #include <simde/x86/sse.h>
 
-void mult_real_vector_single_vector(const c16_t *x, const int16_t *alpha, c16_t *y, const unsigned int N)
-{
-  const simd_q15_t *alpha_128 = (const simd_q15_t *)alpha;
-  const simd_q15_t *x_128 = (const simd_q15_t *)x;
-  simd_q15_t *y_128 = (simd_q15_t *)y;
-  const unsigned int num_adds = (N + 3) / 4; // ceil(N/4)
-
-  for (uint_fast32_t n = 0; n < num_adds; n++) {
-    y_128[n] = mulhi_int16(x_128[n], *alpha_128);
-  }
-}
-
 void multadd_complex_vector_real_scalar(int16_t *x,
                                         int16_t alpha,
                                         int16_t *y,
