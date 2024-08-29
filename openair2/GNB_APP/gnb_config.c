@@ -94,6 +94,7 @@
 #ifdef ENABLE_AERIAL
 #include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
 #endif
+#include "lib/f1ap_interface_management.h"
 
 extern uint16_t sf_ahead;
 
@@ -2375,6 +2376,8 @@ int gNB_app_handle_f1ap_gnb_cu_configuration_update(f1ap_gnb_cu_configuration_up
     }
   }
   NR_SCHED_UNLOCK(&mac->sched_lock);
+  /* Free F1AP struct after use */
+  free_f1ap_cu_configuration_update(gnb_cu_cfg_update);
   MessageDef *msg_ack_p = NULL;
   if (ret > 0) {
     // generate gNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE
