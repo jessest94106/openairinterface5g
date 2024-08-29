@@ -195,8 +195,9 @@ static void map_data_rb(const c16_t *data, c16_t *out)
 }
 
 /*
-This function is used for a PRB which has the DC subcarrier
-that is not first subcarrier.
+This function is used when a PRB is on both sides of DC.
+The destination buffer in this case in not contiguous so REs are mapped on to a temporary buffer
+so that we can reuse the existing functions. Then it is copied to the destination buffer.
 */
 static void map_over_dc(const unsigned int right_dc,
                         const unsigned int fft_size,
@@ -214,7 +215,7 @@ static void map_over_dc(const unsigned int right_dc,
     c16_t *out_tmp = *out;
     c16_t tmp_out_buf[NR_NB_SC_PER_RB];
     const unsigned int left_dc = NR_NB_SC_PER_RB - right_dc;
-    /* copy out to temp buffer */
+    /* copy out to temp buffer. incase we want to preserve the REs in the out buffer. */
     memcpy(tmp_out_buf, out_tmp, sizeof(c16_t) * left_dc);
     out_tmp -= (fft_size - left_dc);
     memcpy(tmp_out_buf + left_dc, out_tmp, sizeof(c16_t) * right_dc);
@@ -251,33 +252,63 @@ static void map_over_dc(const unsigned int right_dc,
 }
 
 /*
-Map all REs in one OFDM symbol
+Holds params needed for PUSCH resoruce mapping
 */
-static void map_current_symbol(const rnti_t rnti,
-                               const unsigned int K_ptrs,
-                               const unsigned int k_RE_ref,
-                               const unsigned int nb_rb,
-                               const unsigned int bwp_start,
-                               const unsigned int start_rb,
-                               const unsigned int first_sc_offset,
-                               const pusch_dmrs_type_t dmrs_type,
-                               const unsigned int fft_size,
+typedef struct {
+  rnti_t rnti;
+  unsigned int K_ptrs;
+  unsigned int k_RE_ref;
+  unsigned int first_sc_offset;
+  unsigned int fft_size;
+  unsigned int num_rb_max;
+  unsigned int symbols_per_slot;
+  unsigned int slot;
+  unsigned int dmrs_scrambling_id;
+  unsigned int scid;
+  unsigned int dmrs_port;
+  int Wt;
+  int *Wf;
+  unsigned int dmrs_symb_pos;
+  unsigned int ptrs_symb_pos;
+  unsigned int pdu_bit_map;
+  transformPrecoder_t transform_precoding;
+  unsigned int bwp_start;
+  unsigned int start_rb;
+  unsigned int nb_rb;
+  unsigned int start_symbol;
+  unsigned int num_symbols;
+  pusch_dmrs_type_t dmrs_type;
+  unsigned int delta;
+  unsigned int num_cdm_no_data;
+} nr_phy_pxsch_params_t;
+
+/*
+Map all REs in one OFDM symbol
+This function operation is as follows:
+> Computes the number of RB (stop_rb) below DC. (necessarily not below DC as the start_rb can be above DC)
+> Maps REs in the RBs below DC.
+> We call map_over_dc which
+  > maps the REs if a RB sits on both sides of DC & increments pointers else,
+  > it just increments the pointer
+> If there are more RBs to map (nb_rb != stop_rb) i.e, RB above DC then those are mapped
+*/
+static void map_current_symbol(const nr_phy_pxsch_params_t p,
                                const bool dmrs_symbol,
                                const bool ptrs_symbol,
                                const c16_t *dmrs_seq,
                                const c16_t *ptrs_seq,
-                               const unsigned int delta,
                                const c16_t **data,
                                c16_t *out)
 {
-  const unsigned int abs_start_rb = bwp_start + start_rb;
-  const unsigned int start_sc = (first_sc_offset + abs_start_rb * NR_NB_SC_PER_RB) % fft_size;
-  const bool cross_dc = start_sc + nb_rb * NR_NB_SC_PER_RB > fft_size;
-  const unsigned int rb_over_dc = cross_dc ? (fft_size - start_sc) % NR_NB_SC_PER_RB : 0;
-  const unsigned int stop_rb = cross_dc ? (fft_size - start_sc) / NR_NB_SC_PER_RB : nb_rb;
+  const unsigned int abs_start_rb = p.bwp_start + p.start_rb;
+  const unsigned int start_sc = (p.first_sc_offset + abs_start_rb * NR_NB_SC_PER_RB) % p.fft_size;
+  const bool cross_dc = start_sc + p.nb_rb * NR_NB_SC_PER_RB > p.fft_size;
+  const unsigned int rb_over_dc = cross_dc ? (p.fft_size - start_sc) % NR_NB_SC_PER_RB : 0;
+  const unsigned int stop_rb = cross_dc ? (p.fft_size - start_sc) / NR_NB_SC_PER_RB : p.nb_rb;
   const c16_t *data_tmp = *data;
+  /* If current symbol is DMRS symbol */
   if (dmrs_symbol) {
-    const unsigned int dmrs_per_rb = (dmrs_type == pusch_dmrs_type1) ? 6 : 4;
+    const unsigned int dmrs_per_rb = (p.dmrs_type == pusch_dmrs_type1) ? 6 : 4;
     const unsigned int data_per_rb = NR_NB_SC_PER_RB - dmrs_per_rb;
 
     const c16_t *p_mod_dmrs = dmrs_seq + abs_start_rb * dmrs_per_rb;
@@ -285,19 +316,29 @@ static void map_current_symbol(const rnti_t rnti,
     unsigned int rb = 0;
     /* map below/above DC */
     for (; rb < stop_rb; rb++) {
-      map_dmrs_ptr(delta, p_mod_dmrs, out_tmp);
+      map_dmrs_ptr(p.delta, p_mod_dmrs, out_tmp);
       p_mod_dmrs += dmrs_per_rb;
       out_tmp += NR_NB_SC_PER_RB;
     }
+    /* if start_rb is above DC or if stop_rb == nb_rb,
+       every RB is mapped at this point and the following code does nothing
+    */
+
     /* map RB at DC */
-    map_over_dc(rb_over_dc, fft_size, dmrs_per_rb, data_per_rb, delta, 0, &rb, NULL, &p_mod_dmrs, NULL, &out_tmp);
+    /* if a RB is on both sides of DC, the following function handles it.
+       if not, then it just increaments the pointer incase there are more RBs above DC.
+    */
+    map_over_dc(rb_over_dc, p.fft_size, dmrs_per_rb, data_per_rb, p.delta, 0, &rb, NULL, &p_mod_dmrs, NULL, &out_tmp);
+
     /* map above DC */
-    for (; rb < nb_rb; rb++) {
-      map_dmrs_ptr(delta, p_mod_dmrs, out_tmp);
+    /* if there are more RBs, they are mapped in the following part */
+    for (; rb < p.nb_rb; rb++) {
+      map_dmrs_ptr(p.delta, p_mod_dmrs, out_tmp);
       p_mod_dmrs += dmrs_per_rb;
       out_tmp += NR_NB_SC_PER_RB;
     }
 
+    /* if there is data in current DMRS symbol, we map it here. */
     if (map_data_dmrs_ptr) {
       c16_t *out_tmp = out + start_sc;
       unsigned int rb = 0;
@@ -306,46 +347,52 @@ static void map_current_symbol(const rnti_t rnti,
         data_tmp += data_per_rb;
         out_tmp += NR_NB_SC_PER_RB;
       }
-      map_over_dc(rb_over_dc, fft_size, dmrs_per_rb, data_per_rb, delta, 0, &rb, NULL, &p_mod_dmrs, &data_tmp, &out_tmp);
-      for (; rb < nb_rb; rb++) {
+      map_over_dc(rb_over_dc, p.fft_size, dmrs_per_rb, data_per_rb, p.delta, 0, &rb, NULL, &p_mod_dmrs, &data_tmp, &out_tmp);
+      for (; rb < p.nb_rb; rb++) {
         map_data_dmrs_ptr(data_tmp, out_tmp);
         data_tmp += data_per_rb;
         out_tmp += NR_NB_SC_PER_RB;
       }
     }
+  /* If current symbol is a PTRS symbol */
   } else if (ptrs_symbol) {
-    const unsigned int first_ptrs_re = get_first_ptrs_re(rnti, K_ptrs, nb_rb, k_RE_ref) + start_sc;
-    const unsigned int ptrs_idx_re = (start_sc - first_ptrs_re) % NR_NB_SC_PER_RB;
-    unsigned int ptrs_idx_rb = (start_sc - first_ptrs_re) / NR_NB_SC_PER_RB;
+    const unsigned int first_ptrs_re = get_first_ptrs_re(p.rnti, p.K_ptrs, p.nb_rb, p.k_RE_ref) + start_sc;
+    const unsigned int ptrs_idx_re = (start_sc - first_ptrs_re) % NR_NB_SC_PER_RB; // PTRS RE index within RB
+    unsigned int ptrs_idx_rb = (start_sc - first_ptrs_re) / NR_NB_SC_PER_RB; // number of RBs before the first PTRS RB
     unsigned int rb = 0;
     c16_t *out_tmp = out + start_sc;
+    /* map data to RBs before the first PTRS RB */
     for (; rb < ptrs_idx_rb; rb++) {
       map_data_rb(data_tmp, out);
       data_tmp += NR_NB_SC_PER_RB;
       out_tmp += NR_NB_SC_PER_RB;
     }
     const c16_t *p_mod_ptrs = ptrs_seq;
-    ptrs_idx_rb = 0;
+    ptrs_idx_rb = 0; // RB count to check for PTRS RB
+    /* we start to map remaining RB here */
     for (; rb < stop_rb; rb++) {
-      if (ptrs_idx_rb % K_ptrs) {
+      if (ptrs_idx_rb % p.K_ptrs) { // if current RB does not contain PTRS
         map_data_rb(data_tmp, out_tmp);
         data_tmp += NR_NB_SC_PER_RB;
         out_tmp += NR_NB_SC_PER_RB;
-      } else {
+      } else { // if current RB contains PTRS
         map_data_ptrs(ptrs_idx_re, data_tmp, p_mod_ptrs, out_tmp);
-        p_mod_ptrs++;
+        p_mod_ptrs++; // increament once as only one PTRS RE per RB
         data_tmp += (NR_NB_SC_PER_RB - 1);
         out_tmp += NR_NB_SC_PER_RB;
       }
       ptrs_idx_rb++;
     }
-    if (ptrs_idx_rb % K_ptrs) {
-      map_over_dc(rb_over_dc, fft_size, 0, 0, delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
+    if (ptrs_idx_rb % p.K_ptrs) {
+      /* if not a PTRS RB set mod_ptrs to NULL in function arg */
+      map_over_dc(rb_over_dc, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
     } else {
-      map_over_dc(rb_over_dc, fft_size, 0, 0, delta, ptrs_idx_re, &rb, &p_mod_ptrs, NULL, &data_tmp, &out_tmp);
+      /* if a PTRS RB set valid mod_ptrs pointer */
+      map_over_dc(rb_over_dc, p.fft_size, 0, 0, p.delta, ptrs_idx_re, &rb, &p_mod_ptrs, NULL, &data_tmp, &out_tmp);
     }
-    for (; rb < nb_rb; rb++) {
-      if (ptrs_idx_rb % K_ptrs) {
+    /* map remaining RBs above DC */
+    for (; rb < p.nb_rb; rb++) {
+      if (ptrs_idx_rb % p.K_ptrs) {
         map_data_rb(data_tmp, out_tmp);
         data_tmp += NR_NB_SC_PER_RB;
         out_tmp += NR_NB_SC_PER_RB;
@@ -358,6 +405,7 @@ static void map_current_symbol(const rnti_t rnti,
       ptrs_idx_rb++;
     }
   } else {
+    /* only data in this symbol */
     unsigned int rb = 0;
     c16_t *out_tmp = out + start_sc;
     for (; rb < stop_rb; rb++) {
@@ -365,8 +413,8 @@ static void map_current_symbol(const rnti_t rnti,
       data_tmp += NR_NB_SC_PER_RB;
       out_tmp += NR_NB_SC_PER_RB;
     }
-    map_over_dc(rb_over_dc, fft_size, 0, 0, delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
-    for (; rb < nb_rb; rb++) {
+    map_over_dc(rb_over_dc, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
+    for (; rb < p.nb_rb; rb++) {
       map_data_rb(data_tmp, out_tmp);
       data_tmp += NR_NB_SC_PER_RB;
       out_tmp += NR_NB_SC_PER_RB;
@@ -398,37 +446,6 @@ static void dmrs_amp_mult(const uint32_t dmrs_port,
     mod_dmrs_out[i] = c16mulRealShift(mod_dmrs[i], alpha_dmrs[i % 2], 15);
   }
 }
-
-/*
-Holds params needed for PUSCH resoruce mapping
-*/
-typedef struct {
-  rnti_t rnti;
-  unsigned int K_ptrs;
-  unsigned int k_RE_ref;
-  unsigned int first_sc_offset;
-  unsigned int fft_size;
-  unsigned int num_rb_max;
-  unsigned int symbols_per_slot;
-  unsigned int slot;
-  unsigned int dmrs_scrambling_id;
-  unsigned int scid;
-  unsigned int dmrs_port;
-  int Wt;
-  int *Wf;
-  unsigned int dmrs_symb_pos;
-  unsigned int ptrs_symb_pos;
-  unsigned int pdu_bit_map;
-  transformPrecoder_t transform_precoding;
-  unsigned int bwp_start;
-  unsigned int start_rb;
-  unsigned int nb_rb;
-  unsigned int start_symbol;
-  unsigned int num_symbols;
-  pusch_dmrs_type_t dmrs_type;
-  unsigned int delta;
-  unsigned int num_cdm_no_data;
-} nr_phy_pxsch_params_t;
 
 /*
 Map ULSCH data and DMRS in all of the scheduled symbols and PRBs
@@ -483,20 +500,11 @@ static void map_symbols(const nr_phy_pxsch_params_t p,
       const unsigned int beta_ptrs = 1; // temp value until power control is implemented
       multadd_complex_vector_real_scalar((int16_t *)mod_ptrs, beta_ptrs * AMP, (int16_t *)mod_ptrs_amp, 1, p.nb_rb);
     }
-    map_current_symbol(p.rnti,
-                       p.K_ptrs,
-                       p.k_RE_ref,
-                       p.nb_rb,
-                       p.bwp_start,
-                       p.start_rb,
-                       p.first_sc_offset,
-                       p.dmrs_type,
-                       p.fft_size,
+    map_current_symbol(p,
                        dmrs_symbol,
                        ptrs_symbol,
                        mod_dmrs_amp,
                        mod_ptrs_amp,
-                       p.delta,
                        &cur_data, // increments every symbol
                        out + l * p.fft_size);
   }
