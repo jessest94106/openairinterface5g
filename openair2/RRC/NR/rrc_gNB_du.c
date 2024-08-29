@@ -516,8 +516,9 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
 
   /* Send DU Configuration Acknowledgement */
   f1ap_gnb_du_configuration_update_acknowledge_t ack = {.transaction_id = conf_up->transaction_id};
-
   rrc->mac_rrc.gnb_du_configuration_update_acknowledge(assoc_id, &ack);
+  /* free F1AP message after use */
+  free_f1ap_du_configuration_update(conf_up);
 }
 
 void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t *lc, sctp_assoc_t assoc_id)
