@@ -27,6 +27,7 @@
         <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
+ 800813
  000002
  000003
  000004
@@ -42,20 +43,29 @@
                 <images_to_pull>oai-nr-ue-asan</images_to_pull>
         </testCase>
 
+        <testCase id="800813">
+                <class>Create_Workspace</class>
+                <desc>Creating new Workspace</desc>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
+        </testCase>
+
         <testCase id="000002">
-                <class>DeployGenObject</class>
+                <class>Deploy_Object</class>
                 <desc>Deploy OAI 5G UE 1</desc>
-                <yaml_path>yaml_files/5g_rfsimulator_sidelink</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_sidelink</yaml_path>
                 <services>oai-nr-ue-1</services>
-                <nb_healthy>1</nb_healthy>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
         
         <testCase id="000003"> 
-                <class>DeployGenObject</class>
+                <class>Deploy_Object</class>
                 <desc>Deploy OAI 5G UE 2</desc>
-                <yaml_path>yaml_files/5g_rfsimulator_sidelink</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_sidelink</yaml_path>
                 <services>oai-nr-ue-2</services>
-                <nb_healthy>1</nb_healthy>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="000004">
@@ -67,17 +77,19 @@
         <testCase id="000005">
                 <class>Custom_Command</class>
                 <desc>Check that UE synched</desc>
-                <node>localhost</node>
+                <node>cacofonix</node>
                 <command>docker logs rfsim5g-oai-nr-ue-2 | grep -m 1 "PSBCH RX:OK"</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="100001">
-                <class>UndeployGenObject</class>
+                <class>Undeploy_Object</class>
                 <desc>Undeploy all OAI 5G stack</desc>
-                <yaml_path>yaml_files/5g_rfsimulator_sidelink</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_sidelink</yaml_path>
                 <d_retx_th>1,0,0,0</d_retx_th>
                 <u_retx_th>1,0,0,0</u_retx_th>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
 </testCaseList>
