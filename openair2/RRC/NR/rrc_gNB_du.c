@@ -29,6 +29,7 @@
 #include "executables/softmodem-common.h"
 #include "common/utils/ds/seq_arr.h"
 #include "common/utils/alg/foreach.h"
+#include "lib/f1ap_interface_management.h"
 
 int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
 {
@@ -261,7 +262,6 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   DevAssert(rrc);
 
   LOG_I(NR_RRC, "Received F1 Setup Request from gNB_DU %lu (%s) on assoc_id %d\n", req->gNB_DU_id, req->gNB_DU_name, assoc_id);
-
   // check:
   // - it is one cell
   // - PLMN and Cell ID matches
@@ -358,7 +358,8 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
    * allocate memory and copy it in */
   du->setup_req = calloc(1,sizeof(*du->setup_req));
   AssertFatal(du->setup_req, "out of memory\n");
-  *du->setup_req = *req;
+  // Copy F1AP message
+  *du->setup_req = cp_f1ap_setup_request(req);
   // MIB can be null and configured later via DU Configuration Update
   du->mib = mib;
   du->sib1 = sib1;
@@ -379,6 +380,8 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   f1ap_setup_resp_t resp = {.transaction_id = req->transaction_id,
                             .num_cells_to_activate = 1,
                             .cells_to_activate[0] = cell};
+  // free F1AP message after use
+  free_f1ap_setup_request(req);
   int num = read_version(TO_STRING(NR_RRC_VERSION), &resp.rrc_ver[0], &resp.rrc_ver[1], &resp.rrc_ver[2]);
   AssertFatal(num == 3, "could not read RRC version string %s\n", TO_STRING(NR_RRC_VERSION));
   if (rrc->node_name != NULL)
