@@ -202,7 +202,7 @@ void nr_scan_ssb(void *arg)
     /* process pss search on received buffer */
     ssbInfo->syncRes.frame_id = frame_id;
     int nid2;
-    int freq_offset_pss;
+    int freq_offset_pss=0;
     const int sync_pos = pss_synchro_nr((const c16_t **)rxdata,
                                         fp,
                                         pssTime,
