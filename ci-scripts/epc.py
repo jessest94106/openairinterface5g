@@ -73,7 +73,7 @@ class EPCManagement():
 		self.cfgDeploy = '--type start-mini --scenario 1 --capture /tmp/oai-cn5g-v1.5.pcap' #from xml, 'mini' is default normal for docker-network.py
 		self.cfgUnDeploy = '--type stop-mini --scenario 1' #from xml, 'mini' is default normal for docker-network.py
 		self.OCUrl = "https://api.oai.cs.eurecom.fr:6443"
-		self.OCRegistry = "default-route-openshift-image-registry.apps.oai.cs.eurecom.fr/"
+		self.OCRegistry = "default-route-openshift-image-registry.apps.oai.cs.eurecom.fr"
 		self.OCUserName = ''
 		self.OCPassword = ''
 		self.cnID = ''
