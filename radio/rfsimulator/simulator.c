@@ -182,6 +182,8 @@ typedef struct {
 
 static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
 {
+  /* TODO: cleanup code so that this AssertFatal becomes useless */
+  AssertFatal(sock >= 0 && sock < sizeofArray(bridge->buf), "socket %d is not in range\n", sock);
   buffer_t *ptr=&bridge->buf[sock];
   ptr->circularBuf = calloc(1, sampleToByte(CirSize, 1));
   if (ptr->circularBuf == NULL) {
@@ -302,7 +304,12 @@ static void fullwrite(int fd, void *_buf, ssize_t count, rfsimulator_state_t *t)
   while (count) {
     l = write(fd, buf, count);
 
-    if (l <= 0) {
+    if (l == 0) {
+        LOG_E(HW, "write() failed, returned 0\n");
+        return;
+    }
+
+    if (l < 0) {
       if (errno==EINTR)
         continue;
 
@@ -310,8 +317,10 @@ static void fullwrite(int fd, void *_buf, ssize_t count, rfsimulator_state_t *t)
         LOG_D(HW, "write() failed, errno(%d)\n", errno);
         usleep(250);
         continue;
-      } else
+      } else {
+        LOG_E(HW, "write() failed, errno(%d)\n", errno);
         return;
+      }
     }
 
     count -= l;
