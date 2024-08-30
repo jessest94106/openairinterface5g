@@ -1004,6 +1004,11 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
       security_header_len
       + mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
 
+  // Free allocated memory after encode
+  free(req_buffer);
+  free(mm_msg->uplink_nas_transport.dnn.value);
+  free(mm_msg->uplink_nas_transport.snssai.value);
+
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];
   stream_cipher.context = nas->security_container->ciphering_context;
