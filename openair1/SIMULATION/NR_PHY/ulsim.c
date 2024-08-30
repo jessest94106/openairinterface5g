@@ -625,6 +625,7 @@ int main(int argc, char *argv[])
   for (i = 0; i < RC.nb_nr_macrlc_inst; i++)
     RC.nb_nr_mac_CC[i] = 1;
   mac_top_init_gNB(ngran_gNB, scc, NULL /* scd will be updated further below */, &conf);
+  nr_mac_config_scc(RC.nrmac[0], scc, &conf);
 
   NR_ServingCellConfig_t *scd = calloc(1,sizeof(NR_ServingCellConfig_t));
   prepare_scd(scd);
