@@ -614,6 +614,8 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   initialNasMsg->data = (Byte_t *)malloc(size * sizeof(Byte_t));
 
   initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data), size);
+  // Free res value after encode
+  free(res.value);
 }
 
 int nas_itti_kgnb_refresh_req(instance_t instance, const uint8_t kgnb[32])
