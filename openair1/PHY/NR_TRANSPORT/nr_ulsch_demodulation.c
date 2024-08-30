@@ -1445,6 +1445,28 @@ static void nr_pusch_symbol_processing(void *arg)
   }
 }
 
+static uint32_t average_u32(const uint32_t *x, uint16_t size)
+{
+  AssertFatal(size > 0 && x != NULL, "x is NULL or size is 0\n");
+
+  uint64_t sum_x = 0;
+  simde__m256i vec_sum = simde_mm256_setzero_si256();
+
+  int i = 0;
+  for (; i + 8 <= size; i += 8) {
+    simde__m256i vec_data = simde_mm256_loadu_si256((simde__m256i *)&x[i]);
+    vec_sum = simde_mm256_add_epi32(vec_sum, vec_data);
+  }
+  uint32_t *vec_sum32 = (uint32_t *)&vec_sum;
+  for (int k = 0; k < 8; k++) {
+    sum_x += vec_sum32[k];
+  }
+  for (; i < size; i++) {
+    sum_x += x[i];
+  }
+
+  return (uint32_t)(sum_x / size);
+}
 
 int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
                    uint8_t ulsch_id,
@@ -1505,14 +1527,38 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
           pusch_vars->ulsch_power[aarx] = 0;
           pusch_vars->ulsch_noise_power[aarx] = 0;
         }
-        for (int aatx = 0; aatx < rel15_ul->nrOfLayers; aatx++) {
-          pusch_vars->ulsch_power[aarx] += signal_energy_nodc(
-              (c16_t*)&pusch_vars->ul_ch_estimates[aatx * gNB->frame_parms.nb_antennas_rx + aarx][symbol * frame_parms->ofdm_symbol_size],
-              rel15_ul->rb_size * 12);
+
+        int64_t symb_energy = 0;
+        int start_sc = (rel15_ul->bwp_start + rel15_ul->rb_start) * NR_NB_SC_PER_RB;
+        int middle_sc = frame_parms->ofdm_symbol_size - frame_parms->first_carrier_offset;
+        int end_sc = (start_sc + rel15_ul->rb_size * NR_NB_SC_PER_RB - 1) % frame_parms->ofdm_symbol_size;
+
+        for (int s = rel15_ul->start_symbol_index; s < (rel15_ul->start_symbol_index + rel15_ul->nr_of_symbols); s++) {
+          int offset0 = ((slot & 3) * frame_parms->symbols_per_slot + s) * frame_parms->ofdm_symbol_size;
+          int offset = offset0 + (frame_parms->first_carrier_offset + start_sc) % frame_parms->ofdm_symbol_size;
+          c16_t *ul_ch = &gNB->common_vars.rxdataF[aarx][offset];
+          if (end_sc < start_sc) {
+            int64_t symb_energy_aux = signal_energy_nodc(ul_ch, middle_sc - start_sc) * (middle_sc - start_sc);
+            ul_ch = &gNB->common_vars.rxdataF[aarx][offset0];
+            symb_energy_aux += (signal_energy_nodc(ul_ch, end_sc + 1) * (end_sc + 1));
+            symb_energy += symb_energy_aux / (rel15_ul->rb_size * NR_NB_SC_PER_RB);
+          } else {
+            symb_energy += signal_energy_nodc(ul_ch, rel15_ul->rb_size * NR_NB_SC_PER_RB);
+          }
         }
-        for (int rb = 0; rb < rel15_ul->rb_size; rb++)
-          pusch_vars->ulsch_noise_power[aarx] += 
-            n0_subband_power[aarx][rel15_ul->bwp_start + rel15_ul->rb_start + rb] / rel15_ul->rb_size;
+        pusch_vars->ulsch_power[aarx] += (symb_energy / rel15_ul->nr_of_symbols);
+
+        pusch_vars->ulsch_noise_power[aarx] +=
+            average_u32(&n0_subband_power[aarx][rel15_ul->bwp_start + rel15_ul->rb_start], rel15_ul->rb_size);
+
+        LOG_D(PHY,
+              "aa %d, bwp_start%d, rb_start %d, rb_size %d: ulsch_power %d, ulsch_noise_power %d\n",
+              aarx,
+              rel15_ul->bwp_start,
+              rel15_ul->rb_start,
+              rel15_ul->rb_size,
+              pusch_vars->ulsch_power[aarx],
+              pusch_vars->ulsch_noise_power[aarx]);
       }
     }
   }
