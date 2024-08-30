@@ -323,6 +323,24 @@ static int set_bwconfig(char *buf, int debug, telnet_printfunc_t prnt)
     frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth = 51;
     initialUL->locationAndBandwidth = 13750;
     get_softmodem_params()->threequarter_fs = 0;
+  } else if (strcmp(buf, "100") == 0) {
+    *scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB = 646668;
+    frequencyInfoDL->absoluteFrequencyPointA = 643392;
+    AssertFatal(frequencyInfoUL->absoluteFrequencyPointA == NULL, "only handle TDD\n");
+    frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth = 273;
+    initialDL->locationAndBandwidth = 1099;
+    frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth = 273;
+    initialUL->locationAndBandwidth = 1099;
+    get_softmodem_params()->threequarter_fs = 0;
+  } else if (strcmp(buf, "60") == 0) {
+    *scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB = 621984;
+    frequencyInfoDL->absoluteFrequencyPointA = 620040;
+    AssertFatal(frequencyInfoUL->absoluteFrequencyPointA == NULL, "only handle TDD\n");
+    frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth = 162;
+    initialDL->locationAndBandwidth = 31624;
+    frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth = 162;
+    initialUL->locationAndBandwidth = 31624;
+    get_softmodem_params()->threequarter_fs = 0;
   } else {
     ERROR_MSG_RET("unhandled option %s\n", buf);
   }
