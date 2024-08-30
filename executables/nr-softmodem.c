@@ -28,6 +28,7 @@
 
 #undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
 #include <common/utils/assertions.h>
+#include "common/oai_version.h"
 
 #include "PHY/types.h"
 #include "common/ran_context.h"
@@ -644,11 +645,8 @@ int main( int argc, char **argv ) {
   // initialize mscgen log after ITTI
   init_opt();
 
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
-#endif
   // strdup to put the sring in the core file for post mortem identification
-  char *pckg = strdup(PACKAGE_VERSION);
+  char *pckg = strdup(OAI_PACKAGE_VERSION);
   LOG_I(HW, "Version: %s\n", pckg);
 
   // don't create if node doesn't connect to RRC/S1/GTP

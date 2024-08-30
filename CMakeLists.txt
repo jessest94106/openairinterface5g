@@ -84,7 +84,6 @@ set (OPENAIR2_DIR    ${OPENAIR_DIR}/openair2)
 set (OPENAIR3_DIR    ${OPENAIR_DIR}/openair3)
 set (OPENAIR3_DIR    ${OPENAIR_DIR}/openair3)
 set (OPENAIR_CMAKE   ${OPENAIR_DIR}/cmake_targets)
-set (OPENAIR_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
 
 project (OpenAirInterface)
 
@@ -253,12 +252,6 @@ if(GIT_FOUND)
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
 endif()
-
-# Below is a hard-coded info
-set (FIRMWARE_VERSION "No svn information")
-add_definitions("-DFIRMWARE_VERSION=\"${FIRMWARE_VERSION}\"")
-add_definitions("-DPACKAGE_VERSION=\"Branch: ${GIT_BRANCH} Abrev. Hash: ${GIT_COMMIT_HASH} Date: ${GIT_COMMIT_DATE}\"")
-add_definitions("-DPACKAGE_BUGREPORT=\"openair4g-devel@lists.eurecom.fr\"")
 
 # Debug related options
 #########################################
@@ -544,16 +537,8 @@ add_boolean_option(NAS_UE                  True  "NAS UE INSTANCE (<> NAS_MME)" 
 add_boolean_option(RRC_DEFAULT_RAB_IS_AM       True   "set the LTE RLC mode to AM for the default bearer, otherwise it is UM." ON)
 
 # add the binary tree to the search path for include files
-#######################################################
-# We will find ConfigOAI.h after generation in target directory
-include_directories("${OPENAIR_BIN_DIR}")
-# add directories to find all include files
-# the internal rule is to use generic names such as defs.h
-# but to make it uniq name as adding the relative path in the include directtive
-# example: #include "RRC/LTE/rrc_defs.h"
-#find_path (include_dirs_all *.h ${OPENAIR_DIR})
-#find_path (include_dirs_all *.h PATHS /usr/include NO_CMAKE_PATH)
-#include_directories("${include_dirs_all}")
+# We will find common/oai_version.h after generation in target directory
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Legacy exact order
 
