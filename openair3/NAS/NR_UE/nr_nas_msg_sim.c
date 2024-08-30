@@ -1330,6 +1330,8 @@ void *nas_nrue(void *args_p)
           capture_pdu_session_establishment_accept_msg(pdu_buffer, pdu_length);
         }
 
+        // Free NAS buffer memory after use (coming from RRC)
+        free(pdu_buffer);
         break;
       }
 
@@ -1454,6 +1456,8 @@ void *nas_nrue(void *args_p)
             LOG_W(NR_RRC, "unknown message type %d\n", msg_type);
             break;
         }
+        // Free NAS buffer memory after use (coming from RRC)
+        free(pdu_buffer);
 
         if (initialNasMsg.length > 0)
           send_nas_uplink_data_req(nas, &initialNasMsg);
