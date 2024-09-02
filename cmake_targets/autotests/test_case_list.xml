@@ -79,17 +79,19 @@
       <main_exec>ldpctest</main_exec>
       <main_exec_args>-l3872 -s10 -n100
                       -l4224 -s10 -n100
-		              -l4576 -s10 -n100
-	        	      -l4928 -s10 -n100
-	        	      -l5280 -s10 -n100
-	        	      -l5632 -s10 -n100
-	        	      -l6336 -s10 -n100
-	        	      -l7040 -s10 -n100
-	        	      -l7744 -s10 -n100
-	        	      -l8448 -s10 -n100</main_exec_args>
+                      -l4576 -s10 -n100
+                      -l4928 -s10 -n100
+                      -l5280 -s10 -n100
+                      -l5632 -s10 -n100
+                      -l6336 -s10 -n100
+                      -l7040 -s10 -n100
+                      -l7744 -s10 -n100
+                      -l8448 -s10 -n100
+                      -l561 -s10 -n1
+                      -l500 -s10 -n1</main_exec_args>
       <tags>test1 test2 test3 test4 test5 test6 test7 test8 test9 test10</tags>
       <search_expr_true>BLER 0.000000</search_expr_true>
-      <search_expr_false>segmentation fault|assertion|exiting|fatal</search_expr_false>
+      <search_expr_false>segmentation fault|assertion|exiting|fatal|differ</search_expr_false>
       <nruns>3</nruns>
     </testCase>
 

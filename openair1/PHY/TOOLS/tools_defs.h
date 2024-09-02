@@ -52,9 +52,6 @@
 extern "C" {
 #endif
 
-#define CEILIDIV(a,b) ((a+b-1)/b)
-#define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
-
   typedef struct complexd {
     double r;
     double i;

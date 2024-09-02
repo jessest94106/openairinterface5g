@@ -106,12 +106,12 @@
 
   <testCase id="071100">
     <class>Iperf</class>
-    <desc>iperf (DL/500Mbps/UDP)(30 sec)(single-ue profile)</desc>
-    <iperf_args>-u -b 500M -t 30 -R -O 10 -l 9000</iperf_args>
+    <desc>iperf (DL/600Mbps/UDP)(30 sec)(single-ue profile)</desc>
+    <iperf_args>-u -b 600M -t 30 -R -O 10 -l 9000</iperf_args>
     <svr_id>matix-cn5g</svr_id>
     <id>up2</id>
     <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
-    <iperf_bitrate_threshold>50</iperf_bitrate_threshold>
+    <iperf_bitrate_threshold>70</iperf_bitrate_threshold>
   </testCase>
 
   <testCase id="071101">

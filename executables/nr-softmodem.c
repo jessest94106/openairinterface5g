@@ -28,6 +28,7 @@
 
 #undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
 #include <common/utils/assertions.h>
+#include "common/oai_version.h"
 
 #include "PHY/types.h"
 #include "common/ran_context.h"
@@ -161,11 +162,6 @@ void pdcp_run(const protocol_ctxt_t *const ctxt_pP)
 {
   abort();
 }
-
-/* see file openair2/LAYER2/MAC/main.c for why abstraction_flag is needed
- * this is very hackish - find a proper solution
- */
-uint8_t abstraction_flag=0;
 
 /* forward declarations */
 void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs], NR_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]);
@@ -644,11 +640,8 @@ int main( int argc, char **argv ) {
   // initialize mscgen log after ITTI
   init_opt();
 
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
-#endif
   // strdup to put the sring in the core file for post mortem identification
-  char *pckg = strdup(PACKAGE_VERSION);
+  char *pckg = strdup(OAI_PACKAGE_VERSION);
   LOG_I(HW, "Version: %s\n", pckg);
 
   // don't create if node doesn't connect to RRC/S1/GTP

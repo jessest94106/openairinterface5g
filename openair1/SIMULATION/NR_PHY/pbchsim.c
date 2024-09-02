@@ -204,6 +204,7 @@ int main(int argc, char **argv)
 
   channel_desc_t *gNB2UE;
   get_softmodem_params()->sa = 1;
+  get_softmodem_params()->usim_test = 1;
 
   //uint8_t extended_prefix_flag=0;
   //int8_t interf1=-21,interf2=-21;
@@ -230,7 +231,7 @@ int main(int argc, char **argv)
   int frame_length_complex_samples_no_prefix;
   NR_DL_FRAME_PARMS *frame_parms;
 
-  int ret, payload_ret=0;
+  int ret;
   int run_initial_sync=0;
 
   int loglvl=OAILOG_WARNING;
@@ -835,17 +836,15 @@ int main(int argc, char **argv)
                          rxdataF);
 
         if (ret == 0) {
-          // UE->rx_ind.rx_indication_body->mib_pdu.ssb_index;  //not yet detected automatically
-          // UE->rx_ind.rx_indication_body->mib_pdu.ssb_length; //Lmax, not yet detected automatically
-          uint8_t gNB_xtra_byte = 0;
-          for (int i = 0; i < 8; i++)
-            gNB_xtra_byte |= ((gNB->pbch.pbch_a >> (31 - i)) & 1) << (7 - i);
-
-          payload_ret = (result.xtra_byte == gNB_xtra_byte);
-          for (i = 0; i < 3; i++) {
-            payload_ret +=
-                (result.decoded_output[i] == ((msgDataTx.ssb[ssb_index].ssb_pdu.ssb_pdu_rel15.bchPayload >> (8 * i)) & 0xff));
-          }
+          uint32_t xtra_byte = nr_pbch_extra_byte_generation(frame,
+                                                             n_hf,
+                                                             ssb_index,
+                                                             gNB->gNB_config.ssb_table.ssb_subcarrier_offset.value,
+                                                             frame_parms->Lmax);
+          int payload_ret = (result.xtra_byte == xtra_byte);
+          nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &msgDataTx.ssb[ssb_index].ssb_pdu.ssb_pdu_rel15;
+          for (int i = 0; i < 3; i++)
+            payload_ret += (result.decoded_output[i] == ((pdu->bchPayload >> (8 * i)) & 0xff));
           // printf("ret %d\n", payload_ret);
           if (payload_ret != 4)
             n_errors_payload++;

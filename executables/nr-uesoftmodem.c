@@ -26,6 +26,7 @@
 #include <signal.h>
 
 #include "T.h"
+#include "common/oai_version.h"
 #include "assertions.h"
 #include "PHY/types.h"
 #include "PHY/defs_nr_UE.h"
@@ -430,11 +431,8 @@ int main(int argc, char **argv)
   if (ouput_vcd) {
     vcd_signal_dumper_init("/tmp/openair_dump_nrUE.vcd");
   }
-#ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION "UNKNOWN-EXPERIMENTAL"
-#endif
   // strdup to put the sring in the core file for post mortem identification
-  char *pckg = strdup(PACKAGE_VERSION);
+  char *pckg = strdup(OAI_PACKAGE_VERSION);
   LOG_I(HW, "Version: %s\n", pckg);
 
   PHY_vars_UE_g = malloc(sizeof(*PHY_vars_UE_g) * NB_UE_INST);
@@ -493,11 +491,7 @@ int main(int argc, char **argv)
                                     get_softmodem_params()->numerology,
                                     nr_band);
         } else {
-          DevAssert(mac->if_module != NULL && mac->if_module->phy_config_request != NULL);
-          mac->if_module->phy_config_request(&mac->phy_config);
-          mac->phy_config_request_sent = true;
           fapi_nr_config_request_t *nrUE_config = &UE[CC_id]->nrUE_config;
-
           nr_init_frame_parms_ue(&UE[CC_id]->frame_parms, nrUE_config, mac->nr_band);
         }
 
@@ -511,7 +505,6 @@ int main(int argc, char **argv)
           phycfg->sl_config_req.sl_carrier_config.sl_num_rx_ant = get_nrUE_params()->nb_antennas_rx;
           phycfg->sl_config_req.sl_carrier_config.sl_num_tx_ant = get_nrUE_params()->nb_antennas_tx;
           mac->if_module->sl_phy_config_request(phycfg);
-          mac->phy_config_request_sent = true;
           sl_nr_ue_phy_params_t *sl_phy = &UE[CC_id]->SL_UE_PHY_PARAMS;
           nr_init_frame_parms_ue_sl(&sl_phy->sl_frame_params,
                                     &sl_phy->sl_config,

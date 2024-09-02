@@ -53,23 +53,6 @@ typedef struct {
   int lut[MAX_PUCCH0_NID][160][14];
 } NR_gNB_PUCCH0_LUT_t;
 
-
-typedef struct {
-  uint32_t pbch_a;
-  uint32_t pbch_a_interleaved;
-  uint32_t pbch_a_prime;
-  uint32_t pbch_e[NR_POLAR_PBCH_E_DWORD];
-} NR_gNB_PBCH;
-
-
-typedef enum {
-  NR_SCH_IDLE,
-  NR_ACTIVE,
-  NR_CBA_ACTIVE,
-  NR_DISABLED
-} NR_SCH_status_t;
-
-
 typedef struct {
   /// Nfapi DLSCH PDU
   nfapi_nr_dl_tti_pdsch_pdu pdsch_pdu;
@@ -81,8 +64,6 @@ typedef struct {
   uint8_t **c;
   /// Frame where current HARQ round was sent
   uint32_t frame;
-  /// Subframe where current HARQ round was sent
-  uint32_t subframe;
   /// Interleaver outputs
   uint8_t *f;
   /// LDPC lifting size
@@ -165,9 +146,6 @@ typedef struct {
 
 typedef struct {
   /// \brief ?.
-  /// first index: ? [0..1023] (hard coded)
-  int16_t *prachF;
-  /// \brief ?.
   /// second index: rx antenna [0..63] (hard coded) \note Hard coded array size indexed by \c nb_antennas_rx.
   /// third index: frequency-domain sample [0..ofdm_symbol_size*12[
   int16_t **rxsigF;
@@ -221,6 +199,7 @@ typedef struct {
   int llrLen;
   //////////////////////////////////////////////////////////////
 } NR_UL_gNB_HARQ_t;
+
 static inline int lenWithCrc(int nbSeg, int len)
 {
   if (nbSeg > 1)
@@ -237,24 +216,8 @@ static inline int crcType(int nbSeg, int len)
 typedef struct {
   //! estimated rssi (dBm)
   int rx_rssi_dBm;
-  //! estimated correlation (wideband linear) between spatial channels (computed in dlsch_demodulation)
-  int rx_correlation[2];
-  //! estimated correlation (wideband dB) between spatial channels (computed in dlsch_demodulation)
-  int rx_correlation_dB[2];
-  /// Wideband CQI (= SINR)
-  int wideband_cqi[MAX_NUM_RU_PER_gNB];
-  /// Wideband CQI in dB (= SINR dB)
-  int wideband_cqi_dB[MAX_NUM_RU_PER_gNB];
   /// Wideband CQI (sum of all RX antennas, in dB)
   char wideband_cqi_tot;
-  /// Subband CQI per RX antenna and RB (= SINR)
-  int subband_cqi[MAX_NUM_RU_PER_gNB][275];
-  /// Total Subband CQI and RB (= SINR)
-  int subband_cqi_tot[275];
-  /// Subband CQI in dB and RB (= SINR dB)
-  int subband_cqi_dB[MAX_NUM_RU_PER_gNB][275];
-  /// Total Subband CQI and RB
-  int subband_cqi_tot_dB[275];
 } ulsch_measurements_gNB;
 
 typedef struct {
@@ -320,10 +283,6 @@ typedef struct {
 
 
 typedef struct {
-  /// \brief Holds the received data in the frequency domain for the allocated RBs in repeated format.
-  /// - first index: rx antenna id [0..nb_antennas_rx[
-  /// - second index: ? [0..2*ofdm_symbol_size[
-  int32_t **rxdataF_ext;
   /// \brief Hold the channel estimates in time domain based on DRS.
   /// - first index: rx antenna id [0..nb_antennas_rx[
   /// - second index: ? [0..4*ofdm_symbol_size[
@@ -332,10 +291,6 @@ typedef struct {
   /// - first index: rx antenna id [0..nb_antennas_rx[
   /// - second index: ? [0..12*N_RB_UL*frame_parms->symbols_per_tti[
   int32_t **ul_ch_estimates;
-  /// \brief Uplink channel estimates extracted in PRBS.
-  /// - first index: ? [0..7] (hard coded) FIXME! accessed via \c nb_antennas_rx
-  /// - second index: ? [0..12*N_RB_UL*frame_parms->symbols_per_tti[
-  int32_t **ul_ch_estimates_ext;
   /// \brief Holds the compensated signal.
   /// - first index: rx antenna id [0..nb_antennas_rx[
   /// - second index: ? [0..12*N_RB_UL*frame_parms->symbols_per_tti[
@@ -347,7 +302,7 @@ typedef struct {
   /// total signal over antennas
   uint32_t ulsch_power_tot;
   /// measured RX noise power
-  int ulsch_noise_power[8];
+  uint32_t ulsch_noise_power[8];
   /// total noise over antennas
   uint32_t ulsch_noise_power_tot;
   /// \brief llr values.
@@ -379,7 +334,7 @@ typedef struct {
 /// Context data structure for RX/TX portion of slot processing
 typedef struct {
   /// Component Carrier index
-  uint8_t              CC_id;
+  uint8_t CC_id;
   /// timestamp transmitted to HW
   openair0_timestamp timestamp_tx;
   /// slot to act upon for transmission
@@ -393,111 +348,32 @@ typedef struct {
   /// \brief Instance count for RXn-TXnp4 processing thread.
   /// \internal This variable is protected by \ref mutex_rxtx.
   int instance_cnt;
-  /// pthread structure for RXn-TXnp4 processing thread
-  pthread_t pthread;
-  /// pthread attributes for RXn-TXnp4 processing thread
-  pthread_attr_t attr;
   /// condition variable for tx processing thread
   pthread_cond_t cond;
   /// mutex for RXn-TXnp4 processing thread
   pthread_mutex_t mutex;
-  /// scheduling parameters for RXn-TXnp4 thread
-  struct sched_param sched_param_rxtx;
-
-  /// \internal This variable is protected by \ref mutex_RUs_tx.
-  int instance_cnt_RUs;
-  /// condition variable for tx processing thread
-  pthread_cond_t cond_RUs;
-  /// mutex for L1 RXTX processing thread
-  pthread_mutex_t mutex_RUs;
-  /// mutex for L1 TX FH synchronization
-  pthread_mutex_t mutex_RUs_tx;
 } gNB_L1_rxtx_proc_t;
 
 
 /// Context data structure for eNB slot processing
 typedef struct gNB_L1_proc_t_s {
   /// Component Carrier index
-  uint8_t              CC_id;
-  /// thread index
-  int thread_index;
+  uint8_t CC_id;
   /// timestamp received from HW
   openair0_timestamp timestamp_rx;
   /// timestamp to send to "slave rru"
   openair0_timestamp timestamp_tx;
   /// slot to act upon for reception
   int slot_rx;
-  /// slot to act upon for PRACH
-  int slot_prach;
   /// frame to act upon for reception
   int frame_rx;
   /// frame to act upon for transmission
   int frame_tx;
-  /// frame to act upon for PRACH
-  int frame_prach;
-  /// \internal This variable is protected by \ref mutex_td.
-  int instance_cnt_td;
-  /// \internal This variable is protected by \ref mutex_te.
-  int instance_cnt_te;
-  /// \internal This variable is protected by \ref mutex_prach.
-  int instance_cnt_prach;
-  /// \internal This variable is protected by \ref mutex_asynch_rxtx.
-  int instance_cnt_asynch_rxtx;
-  /// pthread structure for eNB single processing thread
-  pthread_t pthread_single;
-  /// pthread structure for asychronous RX/TX processing thread
-  pthread_t pthread_asynch_rxtx;
   /// pthread structure for dumping L1 stats
   pthread_t L1_stats_thread;
-  /// pthread structure for printing time meas
-  pthread_t process_stats_thread;
-  /// pthread structure for reordering L1 tx thread messages
-  pthread_t pthread_tx_reorder;
-  /// flag to indicate first RX acquisition
-  int first_rx;
-  /// flag to indicate first TX transmission
-  int first_tx;
-  /// pthread attributes for single gNB processing thread
-  pthread_attr_t attr_single;
-  /// pthread attributes for prach processing thread
-  pthread_attr_t attr_prach;
-  /// pthread attributes for asynchronous RX thread
-  pthread_attr_t attr_asynch_rxtx;
-  /// scheduling parameters for parallel turbo-decoder thread
-  struct sched_param sched_param_td;
-  /// scheduling parameters for parallel turbo-encoder thread
-  struct sched_param sched_param_te;
-  /// scheduling parameters for single eNB thread
-  struct sched_param sched_param_single;
-  /// scheduling parameters for prach thread
-  struct sched_param sched_param_prach;
-  /// scheduling parameters for asynch_rxtx thread
-  struct sched_param sched_param_asynch_rxtx;
-  pthread_cond_t cond_prach;
-  /// condition variable for asynch RX/TX thread
-  pthread_cond_t cond_asynch_rxtx;
-  /// mutex for parallel turbo-decoder thread
-  pthread_mutex_t mutex_td;
-  /// mutex for parallel turbo-encoder thread
-  pthread_mutex_t mutex_te;
-  /// mutex for PRACH thread
-  pthread_mutex_t mutex_prach;
-  /// mutex for asynch RX/TX thread
-  pthread_mutex_t mutex_asynch_rxtx;
-  /// mutex for RU access to eNB processing (PDSCH/PUSCH)
-  pthread_mutex_t mutex_RU;
-  /// mutex for RU_tx access to eNB_tx processing (PDSCH/PUSCH)
-  pthread_mutex_t mutex_RU_tx;
-  /// mutex for RU access to eNB processing (PRACH)
-  pthread_mutex_t mutex_RU_PRACH;
-  /// mutex for RU access to eNB processing (PRACH BR)
-  pthread_mutex_t mutex_RU_PRACH_br;
-  /// mask for RUs serving eNB (PDSCH/PUSCH)
-  int RU_mask, RU_mask_tx;
-  /// mask for RUs serving eNB (PRACH)
-  int RU_mask_prach;
   /// set of scheduling variables RXn-TXnp4 threads
-  gNB_L1_rxtx_proc_t L1_proc, L1_proc_tx;
+  gNB_L1_rxtx_proc_t L1_proc;
+  gNB_L1_rxtx_proc_t L1_proc_tx;
 } gNB_L1_proc_t;
 
 typedef struct {
@@ -523,8 +399,7 @@ typedef struct {
   //! estimated avg noise power per RB (dBm)
   int n0_subband_power_tot_dBm[275];
   /// PRACH background noise level
-  int            prach_I0;
-
+  int prach_I0;
 } PHY_MEASUREMENTS_gNB;
 
 
@@ -539,25 +414,23 @@ typedef struct {
 /// Top-level PHY Data Structure for gNB
 typedef struct PHY_VARS_gNB_s {
   /// Module ID indicator for this instance
-  module_id_t          Mod_id;
-  uint8_t              CC_id;
-  uint8_t              configured;
-  gNB_L1_proc_t        proc;
-  int                  abstraction_flag;
-  int                  num_RU;
-  RU_t                 *RU_list[MAX_NUM_RU_PER_gNB];
+  module_id_t Mod_id;
+  uint8_t CC_id;
+  uint8_t configured;
+  gNB_L1_proc_t proc;
+  int num_RU;
+  RU_t *RU_list[MAX_NUM_RU_PER_gNB];
   /// Ethernet parameters for northbound midhaul interface
-  eth_params_t         eth_params_n;
+  eth_params_t eth_params_n;
   /// Ethernet parameters for fronthaul interface
-  eth_params_t         eth_params;
-  int                  rx_total_gain_dB;
-  int                  (*nr_start_if)(struct RU_t_s *ru, struct PHY_VARS_gNB_s *gNB);
-  uint8_t              local_flag;
-  nfapi_nr_config_request_scf_t  gNB_config;
-  NR_DL_FRAME_PARMS    frame_parms;
+  eth_params_t eth_params;
+  int rx_total_gain_dB;
+  int (*nr_start_if)(struct RU_t_s *ru, struct PHY_VARS_gNB_s *gNB);
+  nfapi_nr_config_request_scf_t gNB_config;
+  NR_DL_FRAME_PARMS frame_parms;
   PHY_MEASUREMENTS_gNB measurements;
-  NR_IF_Module_t       *if_inst;
-  NR_UL_IND_t          UL_INFO;
+  NR_IF_Module_t *if_inst;
+  NR_UL_IND_t UL_INFO;
 
   /// NFAPI RX ULSCH information
   nfapi_nr_rx_data_pdu_t  rx_pdu_list[MAX_UL_PDUS_PER_SLOT];
@@ -570,7 +443,7 @@ typedef struct PHY_VARS_gNB_s {
   /// NFAPI PRACH information
   nfapi_nr_prach_indication_pdu_t prach_pdu_indication_list[MAX_NUM_NR_RX_RACH_PDUS];
 
-  nfapi_nr_ul_tti_request_t     UL_tti_req;
+  nfapi_nr_ul_tti_request_t UL_tti_req;
   nfapi_nr_uci_indication_t uci_indication;
   
   int max_nb_pucch;
@@ -578,16 +451,15 @@ typedef struct PHY_VARS_gNB_s {
   int max_nb_pdsch;
   int max_nb_pusch;
 
-  NR_gNB_PBCH        pbch;
-  NR_gNB_COMMON      common_vars;
-  NR_gNB_PRACH       prach_vars;
-  NR_gNB_PRS         prs_vars;
+  NR_gNB_COMMON common_vars;
+  NR_gNB_PRACH prach_vars;
+  NR_gNB_PRS prs_vars;
   NR_gNB_PUSCH *pusch_vars;
   NR_gNB_PUCCH_t *pucch;
   NR_gNB_SRS_t *srs;
   NR_gNB_ULSCH_t *ulsch;
   NR_gNB_PHY_STATS_t phy_stats[MAX_MOBILES_PER_GNB];
-  t_nrPolar_params    **polarParams;
+  t_nrPolar_params **polarParams;
 
   /// SRS variables
   nr_srs_info_t **nr_srs_info;
@@ -635,15 +507,11 @@ typedef struct PHY_VARS_gNB_s {
   uint64_t bad_pucch;
   int num_ulprbbl;
   int ulprbbl[275];
-  /*
-  time_stats_t phy_proc;
-  */
+
   time_stats_t phy_proc_tx;
   time_stats_t phy_proc_rx;
   time_stats_t rx_prach;
-  /*
-  time_stats_t ofdm_mod_stats;
-  */
+
   time_stats_t dlsch_encoding_stats;
   time_stats_t dlsch_modulation_stats;
   time_stats_t dlsch_scrambling_stats;
@@ -678,10 +546,6 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t srs_beam_report_stats;
   time_stats_t srs_iq_matrix_stats;
 
-  /*
-  time_stats_t rx_dft_stats;
-  time_stats_t ulsch_freq_offset_estimation_stats;
-  */
   notifiedFIFO_t respPuschSymb;
   notifiedFIFO_t respDecode;
   notifiedFIFO_t resp_L1;
@@ -739,7 +603,7 @@ typedef struct LDPCDecode_s {
 struct ldpcReqId {
   uint16_t rnti;
   uint16_t frame;
-  uint8_t  subframe;
+  uint8_t  slot;
   uint8_t  codeblock;
   uint16_t spare;
 } __attribute__((packed));
@@ -755,12 +619,6 @@ typedef struct processingData_L1 {
   openair0_timestamp timestamp_tx;
   PHY_VARS_gNB *gNB;
 } processingData_L1_t;
-
-typedef enum {
-  FILLED,
-  FILLING,
-  NOT_FILLED
-} msgStatus_t;
 
 typedef struct processingData_L1tx {
   int frame;

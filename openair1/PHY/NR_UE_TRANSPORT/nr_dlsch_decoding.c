@@ -417,7 +417,7 @@ uint32_t nr_dlsch_decoding(PHY_VARS_NR_UE *phy_vars_ue,
     //printf("start rx segment %d\n",r);
     uint32_t E = nr_get_E(G, harq_process->C, dlsch->dlsch_config.qamModOrder, dlsch->Nl, r);
     decParams.R = nr_get_R_ldpc_decoder(dlsch->dlsch_config.rv, E, decParams.BG, decParams.Z, &harq_process->llrLen, harq_process->DLround);
-    union ldpcReqUnion id = {.s={dlsch->rnti,frame,nr_slot_rx,0,0}};
+    union ldpcReqUnion id = {.s = {dlsch->rnti, frame, nr_slot_rx, 0, 0}};
     notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(ldpcDecode_ue_t), id.p, &nf, &nr_processDLSegment);
     ldpcDecode_ue_t * rdata=(ldpcDecode_ue_t *) NotifiedFifoData(req);
 
