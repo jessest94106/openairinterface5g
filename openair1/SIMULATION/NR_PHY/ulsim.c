@@ -1266,30 +1266,20 @@ int main(int argc, char *argv[])
         if (n_trials == 1 && round == 0) {
           __attribute__((unused)) int off = ((nb_rb & 1) == 1) ? 4 : 0;
 
-          LOG_M("rxsigF0_ext.m",
-                "rxsF0_ext",
-                &pusch_vars->rxdataF_ext[0][start_symbol * NR_NB_SC_PER_RB * pusch_pdu->rb_size],
-                nb_symb_sch * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                1,
-                1);
           LOG_M("chestF0.m",
                 "chF0",
                 &pusch_vars->ul_ch_estimates[0][start_symbol * frame_parms->ofdm_symbol_size],
                 frame_parms->ofdm_symbol_size,
                 1,
                 1);
-          LOG_M("chestF0_ext.m",
-                "chF0_ext",
-                &pusch_vars->ul_ch_estimates_ext[0][(start_symbol + 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size))],
-                (nb_symb_sch - 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                1,
-                1);
+
           LOG_M("rxsigF0_comp.m",
                 "rxsF0_comp",
                 &pusch_vars->rxdataF_comp[0][start_symbol * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size))],
                 nb_symb_sch * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
                 1,
                 1);
+
           LOG_M("rxsigF0_llrlayers0.m",
                 "rxsF0_llrlayers0",
                 &pusch_vars->llr_layers[0][0],
@@ -1298,24 +1288,11 @@ int main(int argc, char *argv[])
                 0);
 
           if (precod_nbr_layers == 2) {
-            LOG_M("rxsigF1_ext.m",
-                  "rxsF1_ext",
-                  &pusch_vars->rxdataF_ext[1][start_symbol * NR_NB_SC_PER_RB * pusch_pdu->rb_size],
-                  nb_symb_sch * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                  1,
-                  1);
 
             LOG_M("chestF3.m",
                   "chF3",
                   &pusch_vars->ul_ch_estimates[3][start_symbol * frame_parms->ofdm_symbol_size],
                   frame_parms->ofdm_symbol_size,
-                  1,
-                  1);
-
-            LOG_M("chestF3_ext.m",
-                  "chF3_ext",
-                  &pusch_vars->ul_ch_estimates_ext[3][(start_symbol + 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size))],
-                  (nb_symb_sch - 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
                   1,
                   1);
 
@@ -1335,24 +1312,6 @@ int main(int argc, char *argv[])
           }
 
           if (precod_nbr_layers == 4) {
-            LOG_M("rxsigF1_ext.m",
-                  "rxsF1_ext",
-                  &pusch_vars->rxdataF_ext[1][start_symbol * NR_NB_SC_PER_RB * pusch_pdu->rb_size],
-                  nb_symb_sch * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                  1,
-                  1);
-            LOG_M("rxsigF2_ext.m",
-                  "rxsF2_ext",
-                  &pusch_vars->rxdataF_ext[2][start_symbol * NR_NB_SC_PER_RB * pusch_pdu->rb_size],
-                  nb_symb_sch * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                  1,
-                  1);
-            LOG_M("rxsigF3_ext.m",
-                  "rxsF3_ext",
-                  &pusch_vars->rxdataF_ext[3][start_symbol * NR_NB_SC_PER_RB * pusch_pdu->rb_size],
-                  nb_symb_sch * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                  1,
-                  1);
 
             LOG_M("chestF5.m",
                   "chF5",
@@ -1370,25 +1329,6 @@ int main(int argc, char *argv[])
                   "chF15",
                   &pusch_vars->ul_ch_estimates[15][start_symbol * frame_parms->ofdm_symbol_size],
                   frame_parms->ofdm_symbol_size,
-                  1,
-                  1);
-
-            LOG_M("chestF5_ext.m",
-                  "chF5_ext",
-                  &pusch_vars->ul_ch_estimates_ext[5][(start_symbol + 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size))],
-                  (nb_symb_sch - 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                  1,
-                  1);
-            LOG_M("chestF10_ext.m",
-                  "chF10_ext",
-                  &pusch_vars->ul_ch_estimates_ext[10][(start_symbol + 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size))],
-                  (nb_symb_sch - 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
-                  1,
-                  1);
-            LOG_M("chestF15_ext.m",
-                  "chF15_ext",
-                  &pusch_vars->ul_ch_estimates_ext[15][(start_symbol + 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size))],
-                  (nb_symb_sch - 1) * (off + (NR_NB_SC_PER_RB * pusch_pdu->rb_size)),
                   1,
                   1);
 
