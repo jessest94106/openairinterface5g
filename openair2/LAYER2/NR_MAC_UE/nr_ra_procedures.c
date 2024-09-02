@@ -41,10 +41,14 @@
 #include <executables/softmodem-common.h>
 #include "openair2/LAYER2/RLC/rlc.h"
 
+#include "nr-uesoftmodem.h"
+
 static double get_ta_Common_ms(NR_NTN_Config_r17_t *ntn_Config_r17)
 {
-  if (ntn_Config_r17 && ntn_Config_r17->ta_Info_r17)
-    return ntn_Config_r17->ta_Info_r17->ta_Common_r17 * 4.072e-6; // ta_Common_r17 is in units of 4.072e-3 µs
+  if (ntn_Config_r17 && ntn_Config_r17->ta_Info_r17) {
+    // ta_Common_r17 is in units of 4.072e-3 µs
+    return (ntn_Config_r17->ta_Info_r17->ta_Common_r17 * 4.072e-6 + get_nrUE_params()->ntn_ta_common) * 2;
+  }
   return 0.0;
 }
 
