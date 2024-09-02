@@ -2194,6 +2194,24 @@ static void print_rrc_meas(FILE *f, const NR_MeasResults_t *measresults)
   } else {
     fprintf(f, "NOT PROVIDED\n");
   }
+
+  if (measresults->measResultNeighCells
+      && measresults->measResultNeighCells->present == NR_MeasResults__measResultNeighCells_PR_measResultListNR) {
+    NR_MeasResultListNR_t *meas_neigh = measresults->measResultNeighCells->choice.measResultListNR;
+    for (int i = 0; i < meas_neigh->list.count; ++i) {
+      NR_MeasResultNR_t *measresultneigh = meas_neigh->list.array[i];
+      NR_MeasQuantityResults_t *neigh_mqr = measresultneigh->measResult.cellResults.resultsSSB_Cell;
+      fprintf(f, "    neighboring cell for phyCellId %ld:\n      resultSSB:", *measresultneigh->physCellId);
+      if (mqr != NULL) {
+        const long rrsrp = *neigh_mqr->rsrp - 156;
+        const float rrsrq = (float)(*neigh_mqr->rsrq - 87) / 2.0f;
+        const float rsinr = (float)(*neigh_mqr->sinr - 46) / 2.0f;
+        fprintf(f, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
+      } else {
+        fprintf(f, "NOT PROVIDED\n");
+      }
+    }
+  }
 }
 
 static const char *get_pdusession_status_text(pdu_session_status_t status)
