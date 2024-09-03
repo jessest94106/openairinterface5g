@@ -342,7 +342,7 @@ typedef struct {
 } nr_a2_event_t;
 
 typedef struct {
-  int cell_id;
+  int pci;
   long a3_offset;
   long hysteresis;
   long timeToTrigger;
