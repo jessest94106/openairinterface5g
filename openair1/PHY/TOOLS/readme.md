@@ -54,7 +54,7 @@ Add `-DENABLE_IMSCOPE=ON` to your `cmake` command. Build target `imscope`
 
 ## Running
 
-Run with `-d` flag
+Run with `--imscope` flag
 
 ## Usage notes
 
