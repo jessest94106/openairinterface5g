@@ -1236,7 +1236,7 @@ static void process_Periodical_Measurement_Report(gNB_RRC_UE_t *ue_ctxt, NR_Meas
   measurementReport->criticalExtensions.choice.measurementReport = NULL;
 }
 
-static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, NR_MeasurementReport_t *measurementReport)
+static void process_Event_Based_Measurement_Report(gNB_RRC_UE_t *ue, NR_ReportConfigNR_t *report, NR_MeasurementReport_t *measurementReport)
 {
   NR_EventTriggerConfig_t *event_triggered = report->reportType.choice.eventTriggered;
 
@@ -1250,7 +1250,7 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
       break;
 
     case NR_EventTriggerConfig__eventId_PR_eventA3: {
-      LOG_I(NR_RRC, "HO LOG: Event A3 Report - Neighbour Becomes Better than Serving!\n");
+      LOG_W(NR_RRC, "HO LOG: Event A3 Report - Neighbour Becomes Better than Serving!\n");
       const NR_MeasResults_t *measResults = &measurementReport->criticalExtensions.choice.measurementReport->measResults;
 
       for (int serving_cell_idx = 0; serving_cell_idx < measResults->measResultServingMOList.list.count; serving_cell_idx++) {
@@ -1289,13 +1289,13 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
               neighbourCellId,
               neighbourCellRSRP);
 
-        const f1ap_served_cell_info_t *neighbour_cell_du_context = get_cell_information_by_phycellId(neighbourCellId);
-        const f1ap_served_cell_info_t *serving_cell_du_context = get_cell_information_by_phycellId(servingCellId);
+        const f1ap_served_cell_info_t *neigh_cell = get_cell_information_by_phycellId(neighbourCellId);
+        const f1ap_served_cell_info_t *serving_cell = get_cell_information_by_phycellId(servingCellId);
         const nr_neighbour_gnb_configuration_t *neighbour =
-            get_neighbour_cell_information(serving_cell_du_context->nr_cellid, neighbourCellId);
+            get_neighbour_cell_information(serving_cell->nr_cellid, neighbourCellId);
         // CU does not have f1 connection with neighbour cell context. So  check does serving cell has this phyCellId as a
         // neighbour.
-        if (!neighbour_cell_du_context && neighbour) {
+        if (!neigh_cell && neighbour) {
           // No F1 connection but static neighbour configuration is available
           const nr_a3_event_t *a3_event_configuration = get_a3_configuration(neighbour->physicalCellId);
           // Additional check - This part can be modified according to additional cell specific Handover Margin
@@ -1304,6 +1304,15 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
                   < (neighbourCellRSRP - servingCellRSRP))) {
             LOG_D(NR_RRC, "HO LOG: Trigger N2 HO for the neighbour gnb: %u cell: %lu\n", neighbour->gNB_ID, neighbour->nrcell_id);
           }
+        } else if (neigh_cell && neighbour) {
+          /* we know the cell and are connected to the DU! */
+          gNB_RRC_INST *rrc = RC.nrrrc[0];
+          nr_rrc_du_container_t *source_du = get_du_by_cell_id(rrc, serving_cell->nr_cellid);
+          DevAssert(source_du);
+          nr_rrc_du_container_t *target_du = get_du_by_cell_id(rrc, neigh_cell->nr_cellid);
+          nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+        } else {
+          LOG_W(NR_RRC, "UE %d: received A3 event for stronger neighbor PCI %d, but no such neighbour in configuration\n", ue->rrc_ue_id, neighbourCellId);
         }
       }
 
@@ -1365,12 +1374,10 @@ static void rrc_gNB_process_MeasurementReport(gNB_RRC_UE_t *UE, NR_MeasurementRe
   if (report_config->choice.reportConfigNR->reportType.present == NR_ReportConfigNR__reportType_PR_periodical)
     return process_Periodical_Measurement_Report(UE, measurementReport);
 
-  if (report_config->choice.reportConfigNR->reportType.present != NR_ReportConfigNR__reportType_PR_eventTriggered) {
-    LOG_D(NR_RRC, "Incoming Report Type: %d is not supported! \n", report_config->choice.reportConfigNR->reportType.present);
-    return;
-  }
+  if (report_config->choice.reportConfigNR->reportType.present == NR_ReportConfigNR__reportType_PR_eventTriggered)
+    return process_Event_Based_Measurement_Report(UE, report_config->choice.reportConfigNR, measurementReport);
 
-  process_Event_Based_Measurement_Report(report_config->choice.reportConfigNR, measurementReport);
+  LOG_E(NR_RRC, "Incoming Report Type: %d is not supported! \n", report_config->choice.reportConfigNR->reportType.present);
 }
 
 static int handle_rrcReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCReestablishmentComplete_t *cplt)
