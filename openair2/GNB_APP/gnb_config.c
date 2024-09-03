@@ -1697,6 +1697,11 @@ static void fill_measurement_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
     nr_a3_event_t *a3_event = (nr_a3_event_t *)calloc(1, sizeof(nr_a3_event_t));
     AssertFatal(a3_event != NULL, "out of memory\n");
     a3_event->pci = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_PCI_ID_IDX].i64ptr;
+    AssertFatal(a3_event->pci >= -1 && a3_event->pci < 1024,
+                "entry %s.%s must be -1<=PCI<1024, but is %d\n",
+                measurement_path,
+                MEASUREMENT_EVENTS_PCI_ID,
+                a3_event->pci);
     a3_event->timeToTrigger = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX].i64ptr;
     a3_event->a3_offset = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_OFFSET_IDX].i64ptr;
     a3_event->hysteresis = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_HYSTERESIS_IDX].i64ptr;
