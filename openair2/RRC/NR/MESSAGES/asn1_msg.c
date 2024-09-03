@@ -1262,7 +1262,7 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
       if (!neighbourCell->isIntraFrequencyNeighbour)
         continue;
 
-      const nr_a3_event_t *a3Event = get_a3_configuration(neighbourCell->nrcell_id);
+      const nr_a3_event_t *a3Event = get_a3_configuration(neighbourCell->physicalCellId);
       if (!a3Event || is_default_a3_added)
         continue;
 
