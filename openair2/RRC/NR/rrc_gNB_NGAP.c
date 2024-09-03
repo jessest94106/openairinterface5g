@@ -1180,6 +1180,7 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_
   }
 
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  UE->an_release = true;
 #ifdef E2_AGENT
   signal_rrc_state_changed_to(UE, RC_SM_RRC_IDLE);
 #endif

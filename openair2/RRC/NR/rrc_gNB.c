@@ -2030,7 +2030,13 @@ static void rrc_CU_process_ue_context_release_complete(MessageDef *msg_p)
     return;
   }
 
-  rrc_remove_ue(RC.nrrrc[0], ue_context_p);
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  if (UE->an_release) {
+    /* only trigger release if it has been requested by core
+     * otherwise, it might be CU that requested release on a DU during normal
+     * operation (i.e, handover) */
+    rrc_remove_ue(RC.nrrrc[0], ue_context_p);
+  }
 }
 
 static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, instance_t instance)

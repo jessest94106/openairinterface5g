@@ -289,6 +289,8 @@ typedef struct gNB_RRC_UE_s {
   uint32_t                           ue_reestablishment_counter;
   uint32_t                           ue_reconfiguration_counter;
 
+  bool an_release; // flag if core requested UE release
+
   /* NGUEContextSetup might come with PDU sessions, but setup needs to be
    * delayed after security (and capability); PDU sessions are stored here */
   int n_initial_pdu;
