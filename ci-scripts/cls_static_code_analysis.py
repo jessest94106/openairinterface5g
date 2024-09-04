@@ -218,9 +218,9 @@ class StaticCodeAnalysis():
 		return 0
 
 	def LicenceAndFormattingCheck(self, HTML):
-		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		# Workspace is no longer recreated from scratch.
+		# It implies that this method shall be called last within a build pipeline
+		# where workspace is already created
 		lIpAddr = self.eNBIPAddress
 		lUserName = self.eNBUserName
 		lPassWord = self.eNBPassword
@@ -232,14 +232,7 @@ class StaticCodeAnalysis():
 		logging.debug('Building on server: ' + lIpAddr)
 		cmd = cls_cmd.getConnection(lIpAddr)
 		self.testCase_id = HTML.testCase_id
-		# on RedHat/CentOS .git extension is mandatory
-		result = re.search('([a-zA-Z0-9\:\-\.\/])+\.git', self.ranRepository)
-		if result is not None:
-			full_ran_repo_name = self.ranRepository.replace('git/', 'git')
-		else:
-			full_ran_repo_name = self.ranRepository + '.git'
 
-		CreateWorkspace(cmd, lSourcePath, full_ran_repo_name, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 		check_options = ''
 		if self.ranAllowMerge:
 			check_options = f'--build-arg MERGE_REQUEST=true --build-arg SRC_BRANCH={self.ranBranch}'
@@ -252,7 +245,7 @@ class StaticCodeAnalysis():
 		logDir = f'{lSourcePath}/cmake_targets/build_log_{self.testCase_id}'
 		cmd.run(f'mkdir -p {logDir}')
 		cmd.run('docker image rm oai-formatting-check:latest')
-		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.bionic . > {logDir}/oai-formatting-check.txt 2>&1')
+		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.bionic {lSourcePath} > {logDir}/oai-formatting-check.txt 2>&1')
 
 		cmd.run('docker image rm oai-formatting-check:latest')
 		cmd.run('docker image prune --force')
