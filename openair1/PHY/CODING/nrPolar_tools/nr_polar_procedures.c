@@ -89,40 +89,6 @@ void nr_polar_generate_u(uint64_t *u,
   }
 }
 
-void nr_polar_info_extraction_from_u(uint64_t *Cprime,
-                                     const uint8_t *u,
-                                     const uint8_t *information_bit_pattern,
-                                     const uint8_t *parity_check_bit_pattern,
-                                     uint16_t N,
-                                     uint8_t n_pc)
-{
-  int k = 0;
-
-  if (n_pc > 0) {
-    for (int n = 0; n < N; n++) {
-      if (information_bit_pattern[n] == 1) {
-        if (parity_check_bit_pattern[n] == 0) {
-          int k1 = k >> 6;
-          int k2 = k - (k1 << 6);
-          Cprime[k1] |= (uint64_t)u[n] << k2;
-          k++;
-        }
-      }
-    }
-
-  } else {
-    for (int n = 0; n < N; n++) {
-      if (information_bit_pattern[n] == 1) {
-        int k1 = k >> 6;
-        int k2 = k - (k1 << 6);
-        Cprime[k1] |= (uint64_t)u[n] << k2;
-        k++;
-      }
-    }
-  }
-}
-
-
 static
 void encode_packed_byte(uint8_t* in_out)
 {
@@ -440,78 +406,5 @@ void nr_polar_rate_matching(double *input,
     for (int i=0; i<=E-1; i++){
       output[rmp[i]]=input[i];
     }
-  }
-}
-
-/*
- * De-interleaving of coded bits implementation
- * TS 138.212: Section 5.4.1.3 - Interleaving of coded bits
- */
-void nr_polar_rm_deinterleaving_cb(const int16_t *in, int16_t *out, const uint16_t E)
-{
-  int T = ceil((sqrt(8 * E + 1) - 1) / 2);
-  int v_tab[T][T];
-  memset(v_tab, 0, sizeof(v_tab));
-  int k = 0;
-  for (int i = 0; i < T; i++) {
-    for (int j = 0; j < T - i; j++) {
-      if (k < E) {
-        v_tab[i][j] = k + 1;
-      }
-      k++;
-    }
-  }
-
-  int v[T][T];
-  k = 0;
-  for (int j = 0; j < T; j++) {
-    for (int i = 0; i < T - j; i++) {
-      if (k < E && v_tab[i][j] != 0) {
-        v[i][j] = in[k];
-        k++;
-      } else {
-        v[i][j] = INT_MAX;
-      }
-    }
-  }
-
-  k = 0;
-  memset(out, 0, E * sizeof(*out));
-  for (int i = 0; i < T; i++) {
-    for (int j = 0; j < T - i; j++) {
-      if (v[i][j] != INT_MAX) {
-        out[k] = v[i][j];
-        k++;
-      }
-    }
-  }
-}
-
-void nr_polar_rate_matching_int16(int16_t *input,
-                                  int16_t *output,
-                                  const uint16_t *rmp,
-                                  const uint16_t K,
-                                  const uint16_t N,
-                                  const uint16_t E,
-                                  const uint8_t i_bil)
-{
-  if (i_bil == 1) {
-    nr_polar_rm_deinterleaving_cb(input, input, E);
-  }
-
-  if (E >= N) { // repetition
-    memset(output, 0, N * sizeof(*output));
-    for (int i = 0; i <= E - 1; i++)
-      output[rmp[i]] += input[i];
-  } else {
-    if ((K / (double)E) <= (7.0 / 16))
-      memset(output, 0, N * sizeof(*output)); // puncturing
-    else { // shortening
-      for (int i = 0; i <= N - 1; i++)
-        output[i] = 32767; // instead of INFINITY, to prevent [-Woverflow]
-    }
-
-    for (int i = 0; i <= E - 1; i++)
-      output[rmp[i]] = input[i];
   }
 }

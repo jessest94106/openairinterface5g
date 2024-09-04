@@ -47,8 +47,7 @@ static void nr_polar_delete_list(t_nrPolar_params * polarParams) {
     return;
   if (polarParams->nextPtr)
     nr_polar_delete_list(polarParams->nextPtr);
-  
-  delete_decoder_tree(polarParams);
+
   // From build_polar_tables()
   free(polarParams->rm_tab);
   if (polarParams->crc_generator_matrix)
@@ -71,7 +70,7 @@ static void nr_polar_delete(void) {
   pthread_mutex_unlock(&PolarListMutex);  
 }
 
-t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, uint8_t aggregation_level, int decoder_flag)
+t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, uint8_t aggregation_level)
 {
   // The lock is weak, because we never delete in the list, only at exit time
   // therefore, returning t_nrPolar_params * from the list is safe for future usage
@@ -87,8 +86,6 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
     if (currentPtr->busy == false && currentPtr->idx == PolarKey ) {
       currentPtr->busy=true;
       pthread_mutex_unlock(&PolarListMutex);
-      if (decoder_flag && !currentPtr->tree.root)
-        build_decoder_tree(currentPtr);
       return currentPtr ;
     }
     else
@@ -97,11 +94,10 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
 
   //  printf("currentPtr %p (polarParams %p)\n",currentPtr,polarParams);
   //Else, initialize and add node to the end of the linked list.
-  t_nrPolar_params *newPolarInitNode = calloc(sizeof(t_nrPolar_params),1);
+  t_nrPolar_params *newPolarInitNode = malloc(sizeof(t_nrPolar_params));
+
   AssertFatal(newPolarInitNode, "[nr_polar_init] New t_nrPolar_params * could not be created");
-  newPolarInitNode->busy = true;
-  newPolarInitNode->nextPtr = NULL;
-  newPolarInitNode->nextPtr = PolarList;
+  *newPolarInitNode = (t_nrPolar_params){.busy = true, .nextPtr = PolarList};
   PolarList = newPolarInitNode;
   pthread_mutex_unlock(&PolarListMutex);
   //   LOG_D(PHY,"Setting new polarParams index %d, messageType %d, messageLength %d, aggregation_prime %d\n",(messageType * messageLength * aggregation_prime),messageType,messageLength,aggregation_prime);
@@ -220,6 +216,10 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
                                  newPolarInitNode->K,
                                  newPolarInitNode->N,
                                  newPolarInitNode->encoderLength);
+  if (newPolarInitNode->i_bil) {
+    newPolarInitNode->i_bil_pattern = malloc(sizeof(uint16_t) * newPolarInitNode->encoderLength);
+    nr_polar_rm_deinterleaving_lut(newPolarInitNode->i_bil_pattern, newPolarInitNode->encoderLength);
+  }
   newPolarInitNode->information_bit_pattern = malloc(sizeof(uint8_t) * newPolarInitNode->N);
   newPolarInitNode->parity_check_bit_pattern = malloc(sizeof(uint8_t) * newPolarInitNode->N);
   newPolarInitNode->Q_I_N = malloc(sizeof(int16_t) * (newPolarInitNode->K + newPolarInitNode->n_pc));
@@ -245,8 +245,6 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
   // sort the Q_I_N array in ascending order (first K positions)
   qsort((void *)newPolarInitNode->Q_I_N,newPolarInitNode->K,sizeof(int16_t),intcmp);
 
-  if (decoder_flag == 1) 
-    build_decoder_tree(newPolarInitNode);
   build_polar_tables(newPolarInitNode);
 
   init_polar_deinterleaver_table(newPolarInitNode);

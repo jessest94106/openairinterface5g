@@ -63,18 +63,18 @@ static const uint8_t nr_polar_subblock_interleaver_pattern[32] = {0,1,2,4,3,5,6,
 typedef struct decoder_node_t_s {
   struct decoder_node_t_s *left;
   struct decoder_node_t_s *right;
-  int level;
-  int leaf;
-  int Nv;
-  int first_leaf_index;
-  int all_frozen;
-  int16_t *alpha;
-  int16_t *beta;
+  uint64_t level: 16;
+  uint64_t leaf: 16;
+  uint64_t first_leaf_index: 16;
+  uint64_t all_frozen: 1;
+  uint64_t betaInit: 1;
+  uint32_t alpha;
+  uint32_t beta;
 } decoder_node_t;
 
 typedef struct decoder_tree_t_s {
   decoder_node_t *root;
-  int num_nodes;
+  simde__m256i buffer[1024]; // seems enough but to be refined
 } decoder_tree_t;
 
 typedef struct nrPolar_params {
@@ -100,6 +100,7 @@ typedef struct nrPolar_params {
 
   uint16_t *interleaving_pattern;
   uint16_t *rate_matching_pattern;
+  uint16_t *i_bil_pattern;
   const uint16_t *Q_0_Nminus1;
   int16_t *Q_I_N;
   int16_t *Q_F_N;
@@ -110,13 +111,10 @@ typedef struct nrPolar_params {
   const uint8_t **G_N;
   int groupsize;
   int *rm_tab;
-  uint64_t cprime_tab0[32][256];
-  uint64_t cprime_tab1[32][256];
-  uint64_t B_tab0[32][256];
-  uint64_t B_tab1[32][256];
-  // lowercase: bits, Uppercase: Bits stored in bytes
-  // polar_encoder vectors
-  decoder_tree_t tree;
+  uint64_t cprime_tab0[16][256];
+  uint64_t cprime_tab1[16][256];
+  uint64_t B_tab0[16][256];
+  uint64_t B_tab1[16][256];
 } t_nrPolar_params;
 
 void polar_encoder(uint32_t *input,
@@ -164,19 +162,23 @@ int8_t polar_decoder_dci(double *input,
 
 void generic_polar_decoder(const t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U);
 
-void computeBeta(const t_nrPolar_params *pp,
-                 decoder_node_t *node);
+static inline int16_t *treeAlpha(decoder_node_t *node)
+{
+  return (int16_t *)((uint8_t *)node + node->alpha);
+}
 
-void build_decoder_tree(t_nrPolar_params *pp);
+static inline int8_t *treeBeta(decoder_node_t *node)
+{
+  return (int8_t *)node + node->beta;
+}
+
+void build_decoder_tree(decoder_tree_t *tree, const t_nrPolar_params *pp);
 void build_polar_tables(t_nrPolar_params *polarParams);
 void init_polar_deinterleaver_table(t_nrPolar_params *polarParams);
 
 void nr_polar_print_polarParams(void);
 
-t_nrPolar_params *nr_polar_params (int8_t messageType,
-                                   uint16_t messageLength,
-                                   uint8_t aggregation_level,
-				   int decoder_flag);
+t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, uint8_t aggregation_level);
 
 uint16_t nr_polar_aggregation_prime (uint8_t aggregation_level);
 
@@ -206,14 +208,6 @@ void nr_polar_rate_matching(double *input,
                             uint16_t K,
                             uint16_t N,
                             uint16_t E);
-
-void nr_polar_rate_matching_int16(int16_t *input,
-                                  int16_t *output,
-                                  const uint16_t *rmp,
-                                  const uint16_t K,
-                                  const uint16_t N,
-                                  const uint16_t E,
-                                  const uint8_t i_bil);
 
 void nr_polar_interleaving_pattern(uint16_t K,
                                    uint8_t I_IL,
@@ -255,13 +249,6 @@ void nr_polar_generate_u(uint64_t *u,
                          uint8_t n_pc);
 
 void nr_polar_uxG(uint8_t const* u, size_t N, uint8_t* D);
-
-void nr_polar_info_extraction_from_u(uint64_t *Cprime,
-                                     const uint8_t *u,
-                                     const uint8_t *information_bit_pattern,
-                                     const uint8_t *parity_check_bit_pattern,
-                                     uint16_t N,
-                                     uint8_t n_pc);
 
 void nr_polar_bit_insertion(uint8_t *input,
                             uint8_t *output,
@@ -328,7 +315,52 @@ static inline void nr_polar_deinterleaver(uint8_t *input, uint8_t *output, uint1
     output[pattern[i]] = input[i];
 }
 
-void delete_decoder_tree(t_nrPolar_params *);
+/*
+ * De-interleaving of coded bits implementation
+ * TS 138.212: Section 5.4.1.3 - Interleaving of coded bits
+ */
+static inline void nr_polar_rm_deinterleaving_lut(uint16_t *out, const uint E)
+{
+  int16_t in[E];
+  for (int i = 0; i < E; i++)
+    in[i] = i;
+  int T = ceil((sqrt(8 * E + 1) - 1) / 2);
+  int v_tab[T][T];
+  memset(v_tab, 0, sizeof(v_tab));
+  int k = 0;
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < T - i; j++) {
+      if (k < E) {
+        v_tab[i][j] = k + 1;
+      }
+      k++;
+    }
+  }
+
+  int v[T][T];
+  k = 0;
+  for (int j = 0; j < T; j++) {
+    for (int i = 0; i < T - j; i++) {
+      if (k < E && v_tab[i][j] != 0) {
+        v[i][j] = in[k];
+        k++;
+      } else {
+        v[i][j] = INT_MAX;
+      }
+    }
+  }
+
+  k = 0;
+  memset(out, 0, E * sizeof(*out));
+  for (int i = 0; i < T; i++) {
+    for (int j = 0; j < T - i; j++) {
+      if (v[i][j] != INT_MAX) {
+        out[k] = v[i][j];
+        k++;
+      }
+    }
+  }
+}
 
 extern pthread_mutex_t PolarListMutex;
 static inline void polarReturn(t_nrPolar_params *polarParams)

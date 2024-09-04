@@ -91,11 +91,12 @@ int main(int argc, char *argv[])
 
     case 'L':
     	aggregation_level=atoi(optarg);
-    	if (aggregation_level != 1 && aggregation_level != 2 && aggregation_level != 4 && aggregation_level != 8 && aggregation_level != 16) {
-    		printf("Illegal aggregation level %d \n",aggregation_level);
-    		exit(-1);
-    	}
-    	break;
+      if (aggregation_level != 1 && aggregation_level != 2 && aggregation_level != 4 && aggregation_level != 8
+          && aggregation_level != 16) {
+        printf("Illegal aggregation level %d \n", aggregation_level);
+        exit(-1);
+      }
+      break;
 
     case 'k':
     	testLength=atoi(optarg);
@@ -106,9 +107,10 @@ int main(int argc, char *argv[])
     	break;
 
     case 'h':
-      printf("./polartest\nOptions\n-h Print this help\n-s SNRstart (dB)\n-d SNRinc (dB)\n-f SNRstop (dB)\n-m [0=PBCH|1=DCI|2=UCI]\n"
-             "-i Number of iterations\n-l decoderListSize\n-q Flag for optimized coders usage\n-F Flag for test results logging\n"
-    		 "-L aggregation level (for DCI)\n-k packet_length (bits) for DCI/UCI\n");
+      printf(
+          "./polartest\nOptions\n-h Print this help\n-s SNRstart (dB)\n-d SNRinc (dB)\n-f SNRstop (dB)\n-m [0=PBCH|1=DCI|2=UCI]\n"
+          "-i Number of iterations\n-l decoderListSize\n-q Flag for optimized coders usage\n-F Flag for test results logging\n"
+          "-L aggregation level (for DCI)\n-k packet_length (bits) for DCI/UCI\n");
       exit(-1);
       break;
 
@@ -186,7 +188,7 @@ int main(int argc, char *argv[])
   double channelOutput[coderLength];  //add noise
   int16_t channelOutput_int16[coderLength];
 
-  t_nrPolar_params *currentPtr = nr_polar_params(polarMessageType, testLength, aggregation_level, true);
+  t_nrPolar_params *currentPtr = nr_polar_params(polarMessageType, testLength, aggregation_level);
 
 #ifdef DEBUG_DCI_POLAR_PARAMS
   uint32_t dci_pdu[4];
@@ -283,30 +285,37 @@ int main(int argc, char *argv[])
     	  channelOutput[i] = modulatedInput[i] + (gaussdouble(0.0,1.0) * (1/sqrt(2*SNR_lin)));
 
     	  if (decoder_int16==1) {
-    		  if (channelOutput[i] > 15) channelOutput_int16[i] = 127;
-    		  else if (channelOutput[i] < -16) channelOutput_int16[i] = -128;
-    		  else channelOutput_int16[i] = (int16_t) (8*channelOutput[i]);
-    	  }
+          if (channelOutput[i] > 15)
+            channelOutput_int16[i] = 127;
+          else if (channelOutput[i] < -16)
+            channelOutput_int16[i] = -128;
+          else
+            channelOutput_int16[i] = (int16_t)(8 * channelOutput[i]);
+        }
       }
 
       start_meas(&timeDecoder);
 
       if (decoder_int16==1) {
-    	  decoderState = polar_decoder_int16(channelOutput_int16, (uint64_t *)estimatedOutput, 0,
-                                             polarMessageType, testLength, aggregation_level);
+        decoderState = polar_decoder_int16(channelOutput_int16,
+                                           (uint64_t *)estimatedOutput,
+                                           0,
+                                           polarMessageType,
+                                           testLength,
+                                           aggregation_level);
       } else { //0 --> PBCH, 1 --> DCI, -1 --> UCI
     	  if (polarMessageType == 0) {
-            decoderState = polar_decoder(channelOutput,
-                                         estimatedOutput,
-                                         decoderListSize,
-                                         polarMessageType, testLength, aggregation_level);
-    	  } else if (polarMessageType == 1) {
-            decoderState = polar_decoder_dci(channelOutput,
-                                             estimatedOutput,
-                                             decoderListSize,
-                                             rnti,
-                                             polarMessageType, testLength, aggregation_level);
-    	  }
+          decoderState =
+              polar_decoder(channelOutput, estimatedOutput, decoderListSize, polarMessageType, testLength, aggregation_level);
+        } else if (polarMessageType == 1) {
+          decoderState = polar_decoder_dci(channelOutput,
+                                           estimatedOutput,
+                                           decoderListSize,
+                                           rnti,
+                                           polarMessageType,
+                                           testLength,
+                                           aggregation_level);
+        }
       }
       stop_meas(&timeDecoder);
       
@@ -332,7 +341,12 @@ int main(int argc, char *argv[])
       if (nBitError>0) blockErrorState=1;
 #ifdef DEBUG_POLARTEST
           		  for (int i = 0; i < testArrayLength; i++)
-          			  printf("[polartest/decoderState=%u] testInput[%d]=0x%08x, estimatedOutput[%d]=0x%08x\n",decoderState, i, testInput[i], i, estimatedOutput[i]);
+                  printf("[polartest/decoderState=%u] testInput[%d]=0x%08x, estimatedOutput[%d]=0x%08x\n",
+                         decoderState,
+                         i,
+                         testInput[i],
+                         i,
+                         estimatedOutput[i]);
 #endif
 
       //Iteration times are in microseconds.
