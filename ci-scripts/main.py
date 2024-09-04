@@ -217,6 +217,13 @@ def GetParametersFromXML(action):
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
+		if test.findtext('nodes'):
+			CiTestObj.nodes = test.findtext('nodes').split(' ')
+			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+				logging.error('Number of Nodes are not equal to the total number of UEs')
+				sys.exit("Mismatch in number of Nodes and UIs")
+		else:
+			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 
 	elif action == 'Build_OAI_UE':
 		CiTestObj.Build_OAI_UE_args = test.findtext('Build_OAI_UE_args')
@@ -263,12 +270,28 @@ def GetParametersFromXML(action):
 		CiTestObj.ping_args = test.findtext('ping_args')
 		CiTestObj.ping_packetloss_threshold = test.findtext('ping_packetloss_threshold')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
+		if test.findtext('nodes'):
+			CiTestObj.nodes = test.findtext('nodes').split(' ')
+			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+				logging.error('Number of Nodes are not equal to the total number of UEs')
+				sys.exit("Mismatch in number of Nodes and UIs")
+		else:
+			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
 
-	elif action == 'Iperf':
+	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		CiTestObj.svr_id = test.findtext('svr_id') or None
+		if test.findtext('nodes'):
+			CiTestObj.nodes = test.findtext('nodes').split(' ')
+			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+				logging.error('Number of Nodes are not equal to the total number of UEs')
+				sys.exit("Mismatch in number of Nodes and UIs")
+		else:
+			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+		if test.findtext('svr_node'):
+			CiTestObj.svr_node = test.findtext('svr_node')
 		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
 		CiTestObj.iperf_bitrate_threshold = test.findtext('iperf_bitrate_threshold') or '90'
 		CiTestObj.iperf_profile = test.findtext('iperf_profile') or 'balanced'
@@ -345,7 +368,7 @@ def GetParametersFromXML(action):
 			EPC.cfgUnDeploy = string_field	
 		EPC.cnID = test.findtext('cn_id')
 
-	elif action == 'Deploy_Object' or action == 'Undeploy_Object':
+	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
 		eNB_instance=test.findtext('eNB_instance')
 		if (eNB_instance is None):
 			CONTAINERS.eNB_instance=0
@@ -368,23 +391,6 @@ def GetParametersFromXML(action):
 		string_field = test.findtext('services')
 		if string_field is not None:
 			CONTAINERS.services[CONTAINERS.eNB_instance] = string_field
-
-	elif action == 'DeployGenObject' or action == 'UndeployGenObject' or action == 'StatsFromGenObject':
-		string_field=test.findtext('yaml_path')
-		if (string_field is not None):
-			CONTAINERS.yamlPath[0] = string_field
-		string_field=test.findtext('services')
-		if (string_field is not None):
-			CONTAINERS.services[0] = string_field
-		string_field=test.findtext('nb_healthy')
-		if (string_field is not None):
-			CONTAINERS.nb_healthy[0] = int(string_field)
-		string_field=test.findtext('d_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
-		string_field=test.findtext('u_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
 
 	elif action == 'Run_CUDATest' or action == 'Run_NRulsimTest' or action == 'Run_T2Test':
 		ldpc.runargs = test.findtext('physim_run_args')
@@ -546,10 +552,14 @@ elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
 	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
 		HELP.GenericHelp(CONST.Version)
 		sys.exit('Insufficient Parameter')
-	if RAN.eNBIPAddress == 'none':
+	if os.path.isdir('cmake_targets/log'):
 		cmd = 'zip -r enb.log.' + RAN.BuildId + '.zip cmake_targets/log'
 		logging.info(cmd)
-		zipStatus = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True, timeout=60)
+		try:
+			zipStatus = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True, timeout=60)
+		except subprocess.CalledProcessError as e:
+			logging.error("Command '{}' returned non-zero exit status {}.".format(e.cmd, e.returncode))
+			logging.error("Error output:\n{}".format(e.output))
 		sys.exit(0)
 	RAN.LogCollecteNB()
 elif re.match('^LogCollectHSS$', mode, re.IGNORECASE):
@@ -852,6 +862,8 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						success = CONTAINERS.Clean_Test_Server_Images(HTML)
 						if not success:
 							RAN.prematureExit = True
+					elif action == 'Create_Workspace':
+						CONTAINERS.Create_Workspace(HTML)
 					elif action == 'Deploy_Object':
 						CONTAINERS.DeployObject(HTML, EPC)
 						if CONTAINERS.exitStatus==1:
@@ -870,20 +882,10 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 							RAN.prematureExit = True
 					elif action == 'Deploy_Run_PhySim':
 						PHYSIM.Deploy_PhySim(HTML, RAN)
-					elif action == 'DeployGenObject':
-						CONTAINERS.DeployGenObject(HTML, RAN, CiTestObj)
-						if CONTAINERS.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'UndeployGenObject':
-						CONTAINERS.UndeployGenObject(HTML, RAN, CiTestObj)
-						if CONTAINERS.exitStatus==1:
-							RAN.prematureExit = True
 					elif action == 'IperfFromContainer':
 						CONTAINERS.IperfFromContainer(HTML, RAN, CiTestObj)
 						if CONTAINERS.exitStatus==1:
 							RAN.prematureExit = True
-					elif action == 'StatsFromGenObject':
-						CONTAINERS.StatsFromGenObject(HTML)
 					elif action == 'Push_Images_To_Test_Servers':
 						logging.debug('To be implemented')
 					else:
