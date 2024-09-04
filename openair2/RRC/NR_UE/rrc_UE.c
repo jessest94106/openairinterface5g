@@ -551,14 +551,16 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
   }
 
   int get_sib = 0;
-  if (get_softmodem_params()->sa &&
-      bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_notBarred &&
-      rrc->nrRrcState != RRC_STATE_DETACH_NR) {
+  if (get_softmodem_params()->sa && bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib
+      && bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_notBarred && rrc->nrRrcState != RRC_STATE_DETACH_NR) {
     NR_UE_RRC_SI_INFO *SI_info = &rrc->perNB[gNB_index].SInfo;
     // to schedule MAC to get SI if required
     get_sib = check_si_status(SI_info);
   }
-  nr_rrc_mac_config_req_mib(rrc->ue_id, 0, bcch_message->message.choice.mib, get_sib);
+  if (bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib)
+    nr_rrc_mac_config_req_mib(rrc->ue_id, 0, bcch_message->message.choice.mib, get_sib);
+  else
+    LOG_E(NR_RRC, "RRC-received BCCH message is not a MIB\n");
   ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, bcch_message);
   return;
 }
