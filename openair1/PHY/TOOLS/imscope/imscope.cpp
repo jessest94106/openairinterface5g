@@ -42,6 +42,7 @@ uint64_t get_softmodem_optmask(void);
 #include <sstream>
 #include <mutex>
 #include <thread>
+#include "executables/softmodem-bits.h"
 
 #define MAX_OFFSETS 14
 #define NR_MAX_RB 273
@@ -617,7 +618,6 @@ void *imscope_thread(void *data_void_ptr)
   static double last_frame_time = glfwGetTime();
   static int target_fps = 24;
 
-  const int SOFTMODEM_5GUE_BIT = 1 << 23;
   bool is_ue = (get_softmodem_optmask() & SOFTMODEM_5GUE_BIT) > 0;
   while (!glfwWindowShouldClose(window)) {
     // Poll and handle events (inputs, window resize, etc.)
@@ -704,9 +704,6 @@ void *imscope_thread(void *data_void_ptr)
 
 extern "C" void imscope_autoinit(void *dataptr)
 {
-  // Copied here due to issues with headers
-  const int SOFTMODEM_GNB_BIT = 1 << 21;
-  const int SOFTMODEM_5GUE_BIT = 1 << 23;
   AssertFatal((get_softmodem_optmask() & SOFTMODEM_5GUE_BIT) || (get_softmodem_optmask() & SOFTMODEM_GNB_BIT),
               "Scope cannot find NRUE or GNB context");
 

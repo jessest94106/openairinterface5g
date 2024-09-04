@@ -32,6 +32,7 @@
 #ifndef SOFTMODEM_COMMON_H
 #define SOFTMODEM_COMMON_H
 #include "openair1/PHY/defs_common.h"
+#include "softmodem-bits.h"
 #ifdef __cplusplus
 extern "C"
 {
@@ -276,22 +277,6 @@ extern int usrp_tx_thread;
 // clang-format on
 
 /***************************************************************************************************************************************/
-
-#define SOFTMODEM_NOS1_BIT            (1<<0)
-#define SOFTMODEM_NONBIOT_BIT         (1<<2)
-#define SOFTMODEM_RFSIM_BIT           (1<<10)
-#define SOFTMODEM_SIML1_BIT           (1<<12)
-#define SOFTMODEM_DLSIM_BIT           (1<<13)
-#define SOFTMODEM_DOSCOPE_BIT         (1<<15)
-#define SOFTMODEM_RECPLAY_BIT         (1<<16)
-#define SOFTMODEM_TELNETCLT_BIT       (1<<17)
-#define SOFTMODEM_RECRECORD_BIT       (1<<18)
-#define SOFTMODEM_ENB_BIT             (1<<20)
-#define SOFTMODEM_GNB_BIT             (1<<21)
-#define SOFTMODEM_4GUE_BIT            (1<<22)
-#define SOFTMODEM_5GUE_BIT            (1<<23)
-#define SOFTMODEM_NOSTATS_BIT         (1<<24)
-#define SOFTMODEM_IMSCOPE_BIT         (1<<25)
 
 #define SOFTMODEM_FUNC_BITS (SOFTMODEM_ENB_BIT | SOFTMODEM_GNB_BIT | SOFTMODEM_5GUE_BIT | SOFTMODEM_4GUE_BIT)
 #define MAPPING_SOFTMODEM_FUNCTIONS {{"enb",SOFTMODEM_ENB_BIT},{"gnb",SOFTMODEM_GNB_BIT},{"4Gue",SOFTMODEM_4GUE_BIT},{"5Gue",SOFTMODEM_5GUE_BIT}}
