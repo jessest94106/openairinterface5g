@@ -452,6 +452,8 @@ void build_polar_tables(t_nrPolar_params *polarParams) {
   // rerun again to create groups
   for (int outpos = 0, tcnt = 0; outpos < polarParams->encoderLength; outpos += mingroupsize, tcnt++)
     polarParams->rm_tab[tcnt] = polarParams->rate_matching_pattern[outpos] >> shift;
+
+  build_decoder_tree(polarParams);
 }
 
 

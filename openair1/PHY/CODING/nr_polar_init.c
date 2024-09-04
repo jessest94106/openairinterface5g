@@ -246,8 +246,6 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
   qsort((void *)newPolarInitNode->Q_I_N,newPolarInitNode->K,sizeof(int16_t),intcmp);
 
   build_polar_tables(newPolarInitNode);
-
-  init_polar_deinterleaver_table(newPolarInitNode);
   return newPolarInitNode;
 }
 

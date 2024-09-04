@@ -113,8 +113,7 @@ typedef struct nrPolar_params {
   int *rm_tab;
   uint64_t cprime_tab0[16][256];
   uint64_t cprime_tab1[16][256];
-  uint64_t B_tab0[16][256];
-  uint64_t B_tab1[16][256];
+  decoder_tree_t decoder;
 } t_nrPolar_params;
 
 void polar_encoder(uint32_t *input,
@@ -172,9 +171,8 @@ static inline int8_t *treeBeta(decoder_node_t *node)
   return (int8_t *)node + node->beta;
 }
 
-void build_decoder_tree(decoder_tree_t *tree, const t_nrPolar_params *pp);
+void build_decoder_tree(t_nrPolar_params *pp);
 void build_polar_tables(t_nrPolar_params *polarParams);
-void init_polar_deinterleaver_table(t_nrPolar_params *polarParams);
 
 void nr_polar_print_polarParams(void);
 

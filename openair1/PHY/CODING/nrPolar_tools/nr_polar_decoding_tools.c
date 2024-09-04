@@ -161,8 +161,10 @@ static inline decoder_node_t *new_decoder_node(simde__m256i **buffer,
   if (leaf_sz > 15) // we will use SIMD256
     leaf_sz = (leaf_sz + 15) & ~15;
   const int tree_sz = (sizeof(decoder_node_t) + 31) & ~31;
-  decoder_node_t *node = (decoder_node_t *)*buffer;
-  *buffer = *buffer + (tree_sz + leaf_sz * sizeof(int16_t) + leaf_sz + sizeof(**buffer) - 1) / sizeof(**buffer);
+  uintptr_t tmp = (uintptr_t)*buffer;
+  tmp = (tmp + sizeof(**buffer) - 1) & ~(sizeof(**buffer) - 1);
+  decoder_node_t *node = (decoder_node_t *)tmp;
+  *buffer = (simde__m256i *)(tmp + tree_sz + leaf_sz * sizeof(int16_t) + leaf_sz);
   *node = (decoder_node_t){.first_leaf_index = first_leaf_index,
                            .level = level,
                            .leaf = leaf,
@@ -204,17 +206,16 @@ static inline decoder_node_t *add_nodes(decoder_tree_t *tree,
   return(new_node);
 }
 
-void build_decoder_tree(decoder_tree_t *tree, const t_nrPolar_params *pp)
+void build_decoder_tree(t_nrPolar_params *pp)
 {
-  simde__m256i *buffer = tree->buffer;
-  tree->root = add_nodes(tree, pp->n, 0, pp->information_bit_pattern, &buffer);
-  AssertFatal(buffer < tree->buffer + sizeofArray(tree->buffer),
+  uintptr_t tmp = (uintptr_t)pp->decoder.buffer;
+  tmp = (tmp + sizeof(*pp->decoder.buffer) - 1) & ~(sizeof(*pp->decoder.buffer) - 1);
+  simde__m256i *buffer = (simde__m256i *)tmp;
+  pp->decoder.root = add_nodes(&pp->decoder, pp->n, 0, pp->information_bit_pattern, &buffer);
+  AssertFatal(buffer < pp->decoder.buffer + sizeofArray(pp->decoder.buffer),
               "Arbitrary size too small (also check arbitrary max size of the entire polar decoder) %ld instead of max %ld\n",
-              buffer - tree->buffer,
-              sizeofArray(tree->buffer));
-#ifdef DEBUG_NEW_IMPL
-  printf("root : left %p, right %p\n", tree->root->left, tree->root->right);
-#endif
+              buffer - pp->decoder.buffer,
+              sizeofArray(pp->decoder.buffer));
 }
 
 static inline void applyFtoleft(const t_nrPolar_params *pp, decoder_node_t *node, uint8_t *output)
