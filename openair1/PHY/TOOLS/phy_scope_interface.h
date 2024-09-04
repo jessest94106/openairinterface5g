@@ -154,6 +154,25 @@ void copyData(void *, enum scopeDataType type, void *dataIn, int elementSz, int 
     scope_data->unlockScopeData(type); \
   }
 
+#define UEScopeHasTryLock(ue) \
+  (ue->scopeData && ((scopeData_t *)ue->scopeData)->tryLockScopeData)
+
+#define UETryLockScopeData(ue, type, ...)                           \
+  ue->scopeData && ((scopeData_t *)ue->scopeData)->tryLockScopeData \
+      && ((scopeData_t *)ue->scopeData)->tryLockScopeData(type, ##__VA_ARGS__)
+
+#define UEscopeCopyUnsafe(ue, type, ...) \
+  scopeData_t *scope_data = (scopeData_t *)ue->scopeData; \
+  if (scope_data && scope_data->copyDataUnsafeWithOffset) { \
+    scope_data->copyDataUnsafeWithOffset(type, ##__VA_ARGS__); \
+  }
+
+#define UEunlockScopeData(ue, type) \
+  scopeData_t *scope_data = (scopeData_t *)ue->scopeData; \
+  if (scope_data && scope_data->unlockScopeData) { \
+    scope_data->unlockScopeData(type); \
+  }
+
 extended_kpi_ue* getKPIUE();
 
 #endif

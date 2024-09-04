@@ -74,6 +74,7 @@ typedef struct ImScopeData {
   metadata meta;
   uint64_t time_taken_in_ns;
   uint64_t time_taken_in_ns_per_offset[MAX_OFFSETS];
+  size_t data_copied_per_offset[MAX_OFFSETS];
 } ImScopeData;
 
 typedef struct MovingAverageTimer {
@@ -811,6 +812,7 @@ bool tryLockScopeData(enum scopeDataType type, int elementSz, int colSz, int lin
     scope_data.time_taken_in_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count();
     memset(scope_data.time_taken_in_ns_per_offset, 0, sizeof(scope_data.time_taken_in_ns_per_offset));
+    memset(scope_data.data_copied_per_offset, 0, sizeof(scope_data.data_copied_per_offset));
     return true;
   }
   return false;
@@ -818,6 +820,7 @@ bool tryLockScopeData(enum scopeDataType type, int elementSz, int colSz, int lin
 
 void copyDataUnsafeWithOffset(enum scopeDataType type, void *dataIn, size_t size, size_t offset, int copy_index)
 {
+  AssertFatal(copy_index < MAX_OFFSETS, "Unexpected number of copies per sink. copy_index = %d\n", copy_index);
   ImScopeData &scope_data = scope_array[type];
   auto start = std::chrono::high_resolution_clock::now();
   scopeGraphData_t *data = scope_data.scope_graph_data;
@@ -825,13 +828,19 @@ void copyDataUnsafeWithOffset(enum scopeDataType type, void *dataIn, size_t size
   memcpy(&outptr[offset], dataIn, size);
   scope_data.time_taken_in_ns_per_offset[copy_index] =
       std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start).count();
+  scope_data.data_copied_per_offset[copy_index] = size;
 }
 
 void unlockScopeData(enum scopeDataType type)
 {
   ImScopeData &scope_data = scope_array[type];
+  size_t total_size = 0;
   for (auto i = 0; i < MAX_OFFSETS; i++) {
     scope_data.time_taken_in_ns += scope_data.time_taken_in_ns_per_offset[i];
+    total_size += scope_data.data_copied_per_offset[i];
+  }
+  if (total_size != (uint64_t)scope_data.scope_graph_data->dataSize) {
+    LOG_E(PHY, "Scope is missing data - not all data that was expected was copied - possibly missed copyDataUnsafeWithOffset call\n");
   }
   scope_data.is_data_ready = true;
   scope_data.write_mutex.unlock();
