@@ -1034,12 +1034,14 @@ class Containerize():
 				status = False
 			imagesInfo += (GetImageInfo(mySSH, containerName))
 		mySSH.close()
-		HTML.CreateHtmlTestRowQueue('N/A', 'OK', [(imagesInfo)])
+		imagesInfo += ("\n")
 		if status:
-			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['Healthy deployment!'])
+			imagesInfo += ("Healthy deployment!")
+			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [(imagesInfo)])
 		else:
 			self.exitStatus = 1
-			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Unhealthy deployment! -- Check logs for reason!'])
+			imagesInfo += ("Unhealthy deployment! -- Check logs for reason!")
+			HTML.CreateHtmlTestRowQueue('N/A', 'KO', [(imagesInfo)])
 
 	def UndeployObject(self, HTML, RAN):
 		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
