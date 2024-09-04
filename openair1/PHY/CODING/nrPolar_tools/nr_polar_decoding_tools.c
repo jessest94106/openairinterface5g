@@ -320,13 +320,13 @@ static inline void applyGtoright(const t_nrPolar_params *pp, decoder_node_t *nod
         int avx2len = sz / 16;
 
         for (int i = 0; i < avx2len; i++) {
-          simde__m256i tmp = simde_mm256_sign_epi16(((simde__m256i *)alpha_v)[i], _mm256_cvtepi8_epi16(((simde__m128i *)betal)[i]));
+          simde__m256i tmp = simde_mm256_sign_epi16(((simde__m256i *)alpha_v)[i], simde_mm256_cvtepi8_epi16(((simde__m128i *)betal)[i]));
           ((simde__m256i *)alpha_r)[i] =
 
               simde_mm256_subs_epi16(((simde__m256i *)alpha_v)[i + avx2len], tmp);
         }
       } else if (avx2mod == 8) {
-        simde__m128i tmp = simde_mm_sign_epi16(((simde__m128i *)alpha_v)[0], _mm_cvtepi8_epi16(((simde__m128i *)betal)[0]));
+        simde__m128i tmp = simde_mm_sign_epi16(((simde__m128i *)alpha_v)[0], simde_mm_cvtepi8_epi16(((simde__m128i *)betal)[0]));
         ((simde__m128i *)alpha_r)[0] = simde_mm_subs_epi16(((simde__m128i *)alpha_v)[1], tmp);
       } else {
         for (int i = 0; i < sz; i++) {

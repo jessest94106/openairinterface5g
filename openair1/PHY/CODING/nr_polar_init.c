@@ -57,6 +57,7 @@ static void nr_polar_delete_list(t_nrPolar_params * polarParams) {
   free(polarParams->rate_matching_pattern);
   free(polarParams->information_bit_pattern);
   free(polarParams->parity_check_bit_pattern);
+  free(polarParams->i_bil_pattern);
   free(polarParams->Q_I_N);
   free(polarParams->Q_F_N);
   free(polarParams->Q_PC_N);
