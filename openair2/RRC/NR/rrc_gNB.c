@@ -1282,7 +1282,7 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
         // neighbour.
         if (!neighbour_cell_du_context && neighbour) {
           // No F1 connection but static neighbour configuration is available
-          const nr_a3_event_t *a3_event_configuration = get_a3_configuration(neighbour->nrcell_id);
+          const nr_a3_event_t *a3_event_configuration = get_a3_configuration(neighbour->physicalCellId);
           // Additional check - This part can be modified according to additional cell specific Handover Margin
           if (a3_event_configuration
               && ((a3_event_configuration->a3_offset + a3_event_configuration->hysteresis)
