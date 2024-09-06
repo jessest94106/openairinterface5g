@@ -324,12 +324,12 @@ typedef enum {
 #define MEASUREMENT_EVENTS_THRESHOLD "threshold"
 #define MEASUREMENT_EVENTS_PERIODICAL_BEAM_MEASUREMENT "includeBeamMeasurements"
 #define MEASUREMENT_EVENTS_PERIODICAL_NR_OF_RS_INDEXES "maxNrofRS_IndexesToReport"
-#define MEASUREMENT_EVENTS_CELL_ID "cell_id"
+#define MEASUREMENT_EVENTS_PCI_ID "physCellId"
 #define MEASUREMENT_EVENT_ENABLE "enable"
 // clang-format off
 #define MEASUREMENT_A3_GLOBALPARAMS_DESC                                                                                      \
   {                                                                                                                               \
-        {MEASUREMENT_EVENTS_CELL_ID, "neighbour cellId for A3Report", 0, .i64ptr = NULL, .defint64val = -1, TYPE_INT64, 0},           \
+        {MEASUREMENT_EVENTS_PCI_ID, "neighbour PCI for A3Report", 0, .i64ptr = NULL, .defint64val = -1, TYPE_INT64, 0},           \
         {MEASUREMENT_EVENTS_TIME_TO_TRIGGER, "a3 time to trigger", 0, .i64ptr = NULL, .defint64val = 1, TYPE_INT64, 0}, \
         {MEASUREMENT_EVENTS_OFFSET, "a3 offset", 0, .i64ptr = NULL, .defint64val = 60, TYPE_INT64, 0},                  \
         {MEASUREMENT_EVENTS_HYSTERESIS, "a3 hysteresis", 0, .i64ptr = NULL, .defint64val = 0, TYPE_INT64, 0},           \
@@ -350,7 +350,7 @@ typedef enum {
   }
 // clang-format on
 
-#define MEASUREMENT_EVENTS_CELL_ID_IDX 0
+#define MEASUREMENT_EVENTS_PCI_ID_IDX 0
 #define MEASUREMENT_EVENTS_ENABLE_IDX 0
 #define MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX 1
 #define MEASUREMENT_EVENTS_A2_THRESHOLD_IDX 2

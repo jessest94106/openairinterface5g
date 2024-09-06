@@ -1598,7 +1598,7 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
     paramdef_t NeighbourCellParams[] = GNBNEIGHBOURCELLPARAMS_DESC;
     paramlist_def_t NeighbourCellParamList = {GNB_CONFIG_STRING_NEIGHBOUR_CELL_LIST, NULL, 0};
     config_getlist(config_get_if(), &NeighbourCellParamList, NeighbourCellParams, sizeofArray(NeighbourCellParams), neighbourpath);
-    LOG_D(GNB_APP, "HO LOG: For the Cell: %d Neighbour Cell ELM NUM: %d\n", cell->nr_cell_id, NeighbourCellParamList.numelt);
+    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell->nr_cell_id, NeighbourCellParamList.numelt);
     if (NeighbourCellParamList.numelt < 1)
       continue;
 
@@ -1696,12 +1696,17 @@ static void fill_measurement_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
   for (int i = 0; i < A3_EventList.numelt; i++) {
     nr_a3_event_t *a3_event = (nr_a3_event_t *)calloc(1, sizeof(nr_a3_event_t));
     AssertFatal(a3_event != NULL, "out of memory\n");
-    a3_event->cell_id = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_CELL_ID_IDX].i64ptr;
+    a3_event->pci = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_PCI_ID_IDX].i64ptr;
+    AssertFatal(a3_event->pci >= -1 && a3_event->pci < 1024,
+                "entry %s.%s must be -1<=PCI<1024, but is %d\n",
+                measurement_path,
+                MEASUREMENT_EVENTS_PCI_ID,
+                a3_event->pci);
     a3_event->timeToTrigger = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX].i64ptr;
     a3_event->a3_offset = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_OFFSET_IDX].i64ptr;
     a3_event->hysteresis = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_HYSTERESIS_IDX].i64ptr;
 
-    if (a3_event->cell_id == -1)
+    if (a3_event->pci == -1)
       measurementConfig->is_default_a3_configuration_exists = true;
 
     seq_arr_push_back(measurementConfig->a3_event_list, a3_event, sizeof(nr_a3_event_t));

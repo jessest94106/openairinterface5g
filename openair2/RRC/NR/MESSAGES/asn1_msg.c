@@ -1165,10 +1165,9 @@ static NR_ReportConfigToAddMod_t *prepare_a2_event_report(const nr_a2_event_t *a
 static NR_ReportConfigToAddMod_t *prepare_a3_event_report(const nr_a3_event_t *a3_event)
 {
   NR_ReportConfigToAddMod_t *rc_A3 = calloc(1, sizeof(*rc_A3));
-  rc_A3->reportConfigId =
-      a3_event->cell_id == -1
-          ? 3
-          : a3_event->cell_id + 4; // 3 is default A3 Report Config ID. So cellId(0) specific Report Config ID starts from 4
+  // 3 is default A3 Report Config ID. So cellId(0) specific Report Config ID
+  // starts from 4
+  rc_A3->reportConfigId = a3_event->pci == -1 ? 3 : a3_event->pci + 4;
   rc_A3->reportConfig.present = NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR;
   NR_EventTriggerConfig_t *etrc_A3 = calloc(1, sizeof(*etrc_A3));
   etrc_A3->eventId.present = NR_EventTriggerConfig__eventId_PR_eventA3;
@@ -1194,7 +1193,7 @@ static NR_ReportConfigToAddMod_t *prepare_a3_event_report(const nr_a3_event_t *a
   return rc_A3;
 }
 
-const nr_a3_event_t *get_a3_configuration(int nr_cellid)
+const nr_a3_event_t *get_a3_configuration(int pci)
 {
   gNB_RRC_INST *rrc = RC.nrrrc[0];
   nr_measurement_configuration_t *measurementConfiguration = &rrc->measurementConfiguration;
@@ -1203,7 +1202,7 @@ const nr_a3_event_t *get_a3_configuration(int nr_cellid)
 
   for (uint8_t i = 0; i < measurementConfiguration->a3_event_list->size; i++) {
     nr_a3_event_t *a3_event = (nr_a3_event_t *)seq_arr_at(measurementConfiguration->a3_event_list, i);
-    if (a3_event->cell_id == nr_cellid)
+    if (a3_event->pci == pci)
       return a3_event;
   }
 
@@ -1262,11 +1261,11 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
       if (!neighbourCell->isIntraFrequencyNeighbour)
         continue;
 
-      const nr_a3_event_t *a3Event = get_a3_configuration(neighbourCell->nrcell_id);
+      const nr_a3_event_t *a3Event = get_a3_configuration(neighbourCell->physicalCellId);
       if (!a3Event || is_default_a3_added)
         continue;
 
-      if (a3Event->cell_id == -1)
+      if (a3Event->pci == -1)
         is_default_a3_added = true;
 
       NR_ReportConfigToAddMod_t *rc_A3 = prepare_a3_event_report(a3Event);
@@ -1368,7 +1367,7 @@ int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi)
   LOG_D(NR_RRC, "[gNB %d] do_Paging paging_record: PagingRecordList.count %d\n",
         Mod_id, c1->choice.paging->pagingRecordList->list.count);
   asn_enc_rval_t enc_rval = uper_encode_to_buffer(
-      &asn_DEF_NR_PCCH_Message, NULL, (void *)&pcch_msg, buffer, RRC_BUF_SIZE);
+      &asn_DEF_NR_PCCH_Message, NULL, (void *)&pcch_msg, buffer, NR_RRC_BUF_SIZE);
 
   if ( LOG_DEBUGFLAG(DEBUG_ASN1) ) {
     xer_fprint(stdout, &asn_DEF_NR_PCCH_Message, (void *)&pcch_msg);

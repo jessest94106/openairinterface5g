@@ -787,7 +787,7 @@ sctp_eNB_read_from_socket(
             SCTP_ERROR("sctp_recvmsg (fd %d, len %d ): %s:%d\n", sctp_cnx->sd, n, strerror(errno), errno);
 
             sctp_itti_send_association_resp(
-                sctp_cnx->task_id, sctp_cnx->instance, -1,
+                sctp_cnx->task_id, sctp_cnx->instance, sctp_cnx->assoc_id,
                 sctp_cnx->cnx_id, SCTP_STATE_UNREACHABLE, 0, 0);
 
             close(sctp_cnx->sd);
