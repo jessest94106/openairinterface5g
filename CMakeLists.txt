@@ -23,6 +23,7 @@
 
 cmake_minimum_required (VERSION 3.16)
 project (OpenAirInterface LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
 
 #########################################################
 # Base directories, compatible with legacy OAI building #
@@ -30,6 +31,10 @@ project (OpenAirInterface LANGUAGES C CXX)
 set (OPENAIR_DIR     ${CMAKE_SOURCE_DIR})
 
 include("cmake_targets/macros.cmake")
+if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
+ set(CPM_SOURCE_CACHE ~/.cache/cpm/)
+endif()
+include("cmake_targets/CPM.cmake")
 
 ##############################
 ### CCache: reduce compilation time
@@ -287,6 +292,8 @@ set(KPM_VERSION "KPM_V2_03" CACHE STRING "The KPM SM version to use")
 set_property(CACHE KPM_VERSION PROPERTY STRINGS "KPM_V2_03" "KPM_V3_00")
 message(STATUS "Selected KPM Version: ${KPM_VERSION}")
 
+
+add_boolean_option(ENABLE_IMSCOPE OFF "Enable phy scope based on imgui" ON)
 
 ##################################################
 # ASN.1 grammar C code generation & dependencies #
@@ -2339,30 +2346,24 @@ if(ENABLE_TESTS)
   find_package(GTest)
   if (NOT GTest_FOUND)
     message(STATUS "GTest package not found, will download googletest automatically. To prevent that install google test on your system (libgtest-dev)")
-    include(FetchContent)
-    FetchContent_Declare(
-      googletest
-      GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG        58d77fa8070e8cec2dc1ed015d66b454c8d78850 # 1.12.1
+    CPMAddPackage(
+      NAME googletest
+      GITHUB_REPOSITORY google/googletest
+      GIT_TAG release-1.12.1
+      VERSION 1.12.1
+      OPTIONS "INSTALL_GTEST OFF" "gtest_force_shared_crt" "BUILD_GMOCK OFF"
     )
-    set(BUILD_GMOCK OFF)
-    set(INSTALL_GTEST OFF)
-    FetchContent_MakeAvailable(googletest)
-    add_library(GTest::gtest ALIAS gtest)
-    add_library(GTest::gtest_main ALIAS gtest_main)
   endif()
 
   find_package(benchmark)
   if (NOT benchmark_FOUND)
     message(STATUS "benchmark package not found, will download benchmark automatically. To prevent that install google benchmark on your system (libbenchmark-dev)")
-    include(FetchContent)
-    set(BENCHMARK_ENABLE_TESTING OFF)
-    FetchContent_Declare(
-      benchmark
-      GIT_REPOSITORY https://github.com/google/benchmark.git
-      GIT_TAG v1.9.0
+    CPMAddPackage(
+      NAME benchmark
+      GITHUB_REPOSITORY google/benchmark
+      VERSION 1.9.0
+      OPTIONS "BENCHMARK_ENABLE_TESTING OFF"
     )
-    FetchContent_MakeAvailable(benchmark)
   endif()
 endif()
 

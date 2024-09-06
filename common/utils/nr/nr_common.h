@@ -254,6 +254,9 @@ int get_smallest_supported_bandwidth_index(int scs, frequency_range_t frequency_
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
 
+// Align up to a multiple of 16
+#define ALIGN_UP_16(a) ((a + 15) & ~15)
+
 #ifdef __cplusplus
 #ifdef min
 #undef min

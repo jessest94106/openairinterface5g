@@ -1263,7 +1263,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
   int nb_layer = rel15_ul->nrOfLayers;
   int nb_rx_ant = frame_parms->nb_antennas_rx;
   int dmrs_symbol_flag = (rel15_ul->ul_dmrs_symb_pos >> symbol) & 0x01;
-  int buffer_length = (rel15_ul->rb_size * NR_NB_SC_PER_RB + 15) & ~15;
+  int buffer_length = ALIGN_UP_16(rel15_ul->rb_size * NR_NB_SC_PER_RB);
   c16_t rxFext[nb_rx_ant][buffer_length] __attribute__((aligned(32)));
   c16_t chFext[nb_layer][nb_rx_ant][buffer_length] __attribute__((aligned(32)));
 
@@ -1631,7 +1631,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   // extract the data in the OFDM frame, to the start of the array
   int soffset = (slot % RU_RX_SLOT_DEPTH) * frame_parms->symbols_per_slot * frame_parms->ofdm_symbol_size;
 
-  nb_re_pusch = (nb_re_pusch + 15) & ~15;
+  nb_re_pusch = ALIGN_UP_16(nb_re_pusch);
   int dmrs_symbol;
   if (gNB->chest_time == 0)
     dmrs_symbol = get_valid_dmrs_idx_for_channel_est(rel15_ul->ul_dmrs_symb_pos, meas_symbol);
@@ -1699,8 +1699,8 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   start_meas(&gNB->rx_pusch_symbol_processing_stats);
   int numSymbols = gNB->num_pusch_symbols_per_thread;
 
+  int total_res = 0;
   for(uint8_t symbol = rel15_ul->start_symbol_index; symbol < end_symbol; symbol += numSymbols) {
-    int total_res = 0;
     for (int s = 0; s < numSymbols; s++) { 
       pusch_vars->ul_valid_re_per_slot[symbol+s] = get_nb_re_pusch(frame_parms,rel15_ul,symbol+s);
       pusch_vars->llr_offset[symbol+s] = ((symbol+s) == rel15_ul->start_symbol_index) ? 
@@ -1744,5 +1744,26 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   }
 
   stop_meas(&gNB->rx_pusch_symbol_processing_stats);
+
+  // Copy the data to the scope. This cannot be performed in one call to gNBscopeCopy because the data is not contiguous in the
+  // buffer due to reference symbol extraction and padding. The gNBscopeCopy call is broken up into steps: trylock, copy, unlock.
+  metadata mt = {.slot = slot, .frame = frame};
+  if (gNBTryLockScopeData(gNB, gNBPuschRxIq, sizeof(c16_t), 1, total_res, &mt)) {
+    int buffer_length = ALIGN_UP_16(rel15_ul->rb_size * NR_NB_SC_PER_RB);
+    size_t offset = 0;
+    for (uint8_t symbol = rel15_ul->start_symbol_index; symbol < (rel15_ul->start_symbol_index + rel15_ul->nr_of_symbols);
+         symbol++) {
+      gNBscopeCopyUnsafe(gNB,
+                         gNBPuschRxIq,
+                         &pusch_vars->rxdataF_comp[0][symbol * buffer_length],
+                         sizeof(c16_t) * pusch_vars->ul_valid_re_per_slot[symbol],
+                         offset,
+                         symbol - rel15_ul->start_symbol_index);
+      offset += sizeof(c16_t) * pusch_vars->ul_valid_re_per_slot[symbol];
+    }
+    gNBunlockScopeData(gNB, gNBPuschRxIq)
+  }
+  uint32_t total_llrs = total_res * rel15_ul->qam_mod_order * rel15_ul->nrOfLayers;
+  gNBscopeCopyWithMetadata(gNB, gNBPuschLlr, pusch_vars->llr, sizeof(c16_t), 1, total_llrs, 0, &mt);
   return 0;
 }

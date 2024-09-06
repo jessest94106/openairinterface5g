@@ -718,6 +718,24 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
     }
   */
 #endif
+    if (UEScopeHasTryLock(ue)) {
+      metadata mt = {.frame = proc->frame_rx, .slot = proc->nr_slot_rx };
+      int total_valid_res = 0;
+      for (int i = startSymbIdx; i < startSymbIdx + nbSymb; i++) {
+        total_valid_res = dl_valid_re[i - 1];
+      }
+      if (UETryLockScopeData(ue, pdschRxdataF_comp, sizeof(c16_t), 1,  total_valid_res, &mt)) {
+        size_t offset = 0;
+        for (int i = startSymbIdx; i < startSymbIdx + nbSymb; i++) {
+          size_t data_size = sizeof(c16_t) * dl_valid_re[i - i];
+          UEscopeCopyUnsafe(ue, pdschRxdataF_comp, &rxdataF_comp[0][0][rx_size_symbol * i], data_size, offset, i - startSymbIdx);
+          offset += data_size;
+        }
+        UEunlockScopeData(ue, pdschRxdataF_comp)
+      }
+    } else {
+      UEscopeCopy(ue, pdschRxdataF_comp, rxdataF_comp[0], sizeof(c16_t), nbRx, rx_size_symbol * NR_SYMBOLS_PER_SLOT, 0);
+    }
   }
 
   if (meas_enabled) {
@@ -741,7 +759,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
     T_INT(frame_parms->symbols_per_slot),
     T_BUFFER(&rxdataF_comp[gNB_id][0], 2 * /* ulsch[UE_id]->harq_processes[harq_pid]->nb_rb */ frame_parms->N_RB_UL * 12 * 2));
 #endif
-  UEscopeCopy(ue, pdschRxdataF_comp, rxdataF_comp[0], sizeof(c16_t), nbRx, rx_size_symbol * NR_SYMBOLS_PER_SLOT, 0);
 
   if (ue->phy_sim_pdsch_rxdataF_comp)
     for (int a = 0; a < nbRx; a++) {
