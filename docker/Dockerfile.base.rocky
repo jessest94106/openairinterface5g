@@ -35,6 +35,7 @@ ENV UHD_VERSION=4.4.0.0
 RUN dnf install 'dnf-command(config-manager)' -y && \
     dnf install epel-release -y && crb enable && \
     dnf update -y && \
+    cat /etc/os-release && \
     dnf install -y \
        #gcc needed for build_oai
        gcc gcc-c++ \ 
@@ -42,9 +43,22 @@ RUN dnf install 'dnf-command(config-manager)' -y && \
        file \
        psmisc \
        git \
+       meson \
+       wget \
+       xz \
+       pkg-config \
+       pcre2-devel \
+       m4 \
+       python3-devel \
+       numactl-libs \
+       numactl-devel \
+       gcc-toolset-12-gcc \
+       gcc-toolset-12-gcc-c++ \
        # python3-pip and pyyaml are used for conf template generation
        python3-pip && \
-    pip3 install --ignore-installed pyyaml
+    pip3 install --ignore-installed pyyaml && \
+    echo "/usr/local/lib" > /etc/ld.so.conf.d/local-lib.conf && \
+    echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local-lib.conf
 
 # Add "Tini - A tiny but valid init for containers", https://github.com/krallin/tini
 # it will be copied into target containers, to print exit numbers and handle signals properly
@@ -65,7 +79,8 @@ WORKDIR /oai-ran
 COPY oaienv .
 
 #run build_oai -I to get the builder image
-RUN /bin/sh oaienv && \ 
+RUN /bin/sh oaienv && \
     cd cmake_targets && \
     mkdir -p log && \
-    ./build_oai -I --install-optional-packages -w USRP
+    scl enable gcc-toolset-12 "\
+    ./build_oai -I --install-optional-packages -w USRP"
