@@ -370,7 +370,8 @@ extern int *T_active;
     } \
   } while (0)
 
-#define T23(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10) \
+#define T23(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9, \
+            t10,x10) \
   do { \
     if (T_ACTIVE(t)) { \
       T_LOCAL_DATA \
@@ -390,7 +391,8 @@ extern int *T_active;
     } \
   } while (0)
 
-#define T25(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11) \
+#define T25(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9, \
+            t10,x10,t11,x11) \
   do { \
     if (T_ACTIVE(t)) { \
       T_LOCAL_DATA \
@@ -411,7 +413,8 @@ extern int *T_active;
     } \
   } while (0)
 
-#define T27(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12) \
+#define T27(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9, \
+            t10,x10,t11,x11,t12,x12) \
   do { \
     if (T_ACTIVE(t)) { \
       T_LOCAL_DATA \
@@ -433,7 +436,8 @@ extern int *T_active;
     } \
   } while (0)
 
-#define T29(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13) \
+#define T29(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9, \
+            t10,x10,t11,x11,t12,x12,t13,x13) \
   do { \
     if (T_ACTIVE(t)) { \
       T_LOCAL_DATA \
@@ -456,7 +460,8 @@ extern int *T_active;
     } \
   } while (0)
 
-#define T31(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13,t14,x14) \
+#define T31(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9, \
+            t10,x10,t11,x11,t12,x12,t13,x13,t14,x14) \
   do { \
     if (T_ACTIVE(t)) { \
       T_LOCAL_DATA \
@@ -480,7 +485,8 @@ extern int *T_active;
     } \
   } while (0)
 
-#define T33(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12,t13,x13,t14,x14,t15,x15) \
+#define T33(t,t0,x0,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9, \
+            t10,x10,t11,x11,t12,x12,t13,x13,t14,x14,t15,x15) \
   do { \
     if (T_ACTIVE(t)) { \
       T_LOCAL_DATA \
