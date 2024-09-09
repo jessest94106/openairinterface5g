@@ -1047,7 +1047,7 @@ add_library(PHY_NR_COMMON ${PHY_NR_SRC_COMMON})
 target_link_libraries(PHY_NR_COMMON PUBLIC UTIL)
 
 add_library(PHY_NR ${PHY_NR_SRC})
-target_link_libraries(PHY_NR nr_phy_common nr_common)
+target_link_libraries(PHY_NR nr_phy_common nr_common nr_fapi_p5)
 
 add_library(PHY_NR_NO_AVX_256 ${PHY_NR_SRC})
 target_link_libraries(PHY_NR_NO_AVX_256 nr_phy_common nr_common)
