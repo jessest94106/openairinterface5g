@@ -29,6 +29,7 @@
  */
 
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -38,6 +39,8 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <sys/epoll.h>
+#include <netdb.h>
+
 #include <common/utils/assertions.h>
 #include <common/utils/LOG/log.h>
 #include <common/utils/load_module_shlib.h>
@@ -577,27 +580,62 @@ static int startServer(openair0_device *device) {
   return 0;
 }
 
-static int startClient(openair0_device *device) {
+static int client_try_connect(const char *host, uint16_t port)
+{
+  int sock = -1;
+  int s;
+  struct addrinfo *result = NULL;
+  struct addrinfo *rp = NULL;
+
+  char dport[6];
+  snprintf(dport, sizeof(dport), "%d", port);
+
+  struct addrinfo hints = {
+   .ai_family = AF_UNSPEC,
+   .ai_socktype = SOCK_STREAM,
+  };
+
+  s = getaddrinfo(host, dport, &hints, &result);
+  if (s != 0) {
+    LOG_I(HW, "getaddrinfo: %s\n", gai_strerror(s));
+    return -1;
+  }
+  for (rp = result; rp != NULL; rp = rp->ai_next) {
+    sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (sock == -1) {
+      continue;
+    }
+
+    if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) {
+      LOG_I(HW, "Connection to %s:%d established\n", host, port);
+      break;
+    }
+
+    close(sock);
+  }
+
+  freeaddrinfo(result);
+
+  return sock;
+}
+
+static int startClient(openair0_device *device)
+{
   rfsimulator_state_t *t = device->priv;
   t->role = SIMU_ROLE_CLIENT;
   int sock;
-  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-    LOG_E(HW, "socket(SOCK_STREAM) failed, errno(%d)\n", errno);
-    return -1;
-  }
-  struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(t->port), .sin_addr = {.s_addr = INADDR_ANY}};
-  addr.sin_addr.s_addr = inet_addr(t->ip);
-  bool connected=false;
 
-  while(!connected) {
+  while (true) {
     LOG_I(HW, "Trying to connect to %s:%d\n", t->ip, t->port);
+    sock = client_try_connect(t->ip, t->port);
 
-    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+    if (sock > 0) {
       LOG_I(HW, "Connection to %s:%d established\n", t->ip, t->port);
-      connected=true;
+      break;
     }
 
     LOG_I(HW, "connect() to %s:%d failed, errno(%d)\n", t->ip, t->port, errno);
+    fprintf(stderr, "Could not connect\n");
     sleep(1);
   }
 
