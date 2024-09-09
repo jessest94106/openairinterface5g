@@ -1823,6 +1823,7 @@ void *rrc_nrue(void *notUsed)
     // error: the remote gNB is hardcoded here
     rb_id_t srb_id = rrc->Srb[2] == RB_ESTABLISHED ? 2 : 1;
     nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, length, buffer, deliver_pdu_srb_rlc, NULL);
+    free(req->nasMsg.data);
     free(buffer);
     break;
   }

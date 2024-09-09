@@ -614,6 +614,8 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   initialNasMsg->data = (Byte_t *)malloc(size * sizeof(Byte_t));
 
   initialNasMsg->length = mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data), size);
+  // Free res value after encode
+  free(res.value);
 }
 
 int nas_itti_kgnb_refresh_req(instance_t instance, const uint8_t kgnb[32])
@@ -1002,6 +1004,11 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
       security_header_len
       + mm_msg_encode(mm_msg, (uint8_t *)(initialNasMsg->data + security_header_len), size - security_header_len);
 
+  // Free allocated memory after encode
+  free(req_buffer);
+  free(mm_msg->uplink_nas_transport.dnn.value);
+  free(mm_msg->uplink_nas_transport.snssai.value);
+
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];
   stream_cipher.context = nas->security_container->ciphering_context;
@@ -1323,6 +1330,8 @@ void *nas_nrue(void *args_p)
           capture_pdu_session_establishment_accept_msg(pdu_buffer, pdu_length);
         }
 
+        // Free NAS buffer memory after use (coming from RRC)
+        free(pdu_buffer);
         break;
       }
 
@@ -1447,6 +1456,8 @@ void *nas_nrue(void *args_p)
             LOG_W(NR_RRC, "unknown message type %d\n", msg_type);
             break;
         }
+        // Free NAS buffer memory after use (coming from RRC)
+        free(pdu_buffer);
 
         if (initialNasMsg.length > 0)
           send_nas_uplink_data_req(nas, &initialNasMsg);
