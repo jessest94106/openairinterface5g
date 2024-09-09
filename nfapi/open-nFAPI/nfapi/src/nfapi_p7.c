@@ -935,10 +935,6 @@ static uint8_t pack_ul_tti_request_prach_pdu(nfapi_nr_prach_pdu_t *prach_pdu, ui
     return 0;
   }
 
-  if (prach_pdu->beamforming.num_prgs > 0 || prach_pdu->beamforming.prg_size > 0 || prach_pdu->beamforming.dig_bf_interface > 0) {
-    AssertFatal(1 == 0, "PRACH PDU Beamforming not supported yet");
-  }
-
   // Pack RX Beamforming PDU
   if (!(push16(prach_pdu->beamforming.num_prgs, ppWritePackedMsg, end)
         && push16(prach_pdu->beamforming.prg_size, ppWritePackedMsg, end)
