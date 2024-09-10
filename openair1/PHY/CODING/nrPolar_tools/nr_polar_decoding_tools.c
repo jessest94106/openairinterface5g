@@ -390,17 +390,55 @@ static inline void computeBeta(decoder_node_t *node)
   node->betaInit = true;
 }
 
-void generic_polar_decoder(const t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U)
-{
+void generic_polar_decoder_recursive(t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U) {
   // Apply F to left
   applyFtoleft(pp, node, nr_polar_U);
+  int iter = pp->tree_linearization.iter++;
+  pp->tree_linearization.op_list[iter].op_code = POLAR_OP_CODE_LEFT;
+  pp->tree_linearization.op_list[iter].node = node;
+
   // if left is not a leaf recurse down to the left
   if (node->left->leaf==0)
-    generic_polar_decoder(pp, node->left, nr_polar_U);
+    generic_polar_decoder_recursive(pp, node->left, nr_polar_U);
 
   applyGtoright(pp, node, nr_polar_U);
+  iter = pp->tree_linearization.iter++;
+  pp->tree_linearization.op_list[iter].op_code = POLAR_OP_CODE_RIGHT;
+  pp->tree_linearization.op_list[iter].node = node;
+
   if (node->right->leaf == 0)
-    generic_polar_decoder(pp, node->right, nr_polar_U);
+    generic_polar_decoder_recursive(pp, node->right, nr_polar_U);
 
   computeBeta(node);
+
+  iter = pp->tree_linearization.iter++;
+  pp->tree_linearization.op_list[iter].op_code = POLAR_OP_CODE_BETA;
+  pp->tree_linearization.op_list[iter].node = node;
+}
+
+void generic_polar_decoder(t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U)
+{
+  if (pp->tree_linearization.is_initialized == false) {
+    pp->tree_linearization.iter = 0;
+    generic_polar_decoder_recursive(pp, node, nr_polar_U);
+    pp->tree_linearization.is_initialized = true;
+    AssertFatal(pp->tree_linearization.iter < sizeofArray(pp->tree_linearization.op_list),
+                "Arbitrary size %lu is too small, number of operations is %d",
+                sizeofArray(pp->tree_linearization.op_list),
+                pp->tree_linearization.iter);
+  } else {
+    for (int i = 0; i < pp->tree_linearization.iter; i++) {
+      decoder_node_t *n = pp->tree_linearization.op_list[i].node;
+      switch (pp->tree_linearization.op_list[i].op_code) {
+        case POLAR_OP_CODE_LEFT:
+          applyFtoleft(pp, n, nr_polar_U);
+          break;
+        case POLAR_OP_CODE_RIGHT:
+          applyGtoright(pp, n, nr_polar_U);
+          break;
+        case POLAR_OP_CODE_BETA:
+          computeBeta(n);
+      }
+    }
+  }
 }

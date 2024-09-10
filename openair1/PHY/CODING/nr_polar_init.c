@@ -98,7 +98,7 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
   t_nrPolar_params *newPolarInitNode = malloc(sizeof(t_nrPolar_params));
 
   AssertFatal(newPolarInitNode, "[nr_polar_init] New t_nrPolar_params * could not be created");
-  *newPolarInitNode = (t_nrPolar_params){.busy = true, .nextPtr = PolarList};
+  *newPolarInitNode = (t_nrPolar_params){.busy = true, .nextPtr = PolarList, .tree_linearization.is_initialized = false};
   PolarList = newPolarInitNode;
   pthread_mutex_unlock(&PolarListMutex);
   //   LOG_D(PHY,"Setting new polarParams index %d, messageType %d, messageLength %d, aggregation_prime %d\n",(messageType * messageLength * aggregation_prime),messageType,messageLength,aggregation_prime);

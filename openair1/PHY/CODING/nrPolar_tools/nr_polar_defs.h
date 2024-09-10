@@ -60,6 +60,10 @@ static const uint8_t nr_polar_subblock_interleaver_pattern[32] = {0,1,2,4,3,5,6,
 
 #define uint128_t __uint128_t
 
+#define POLAR_OP_CODE_LEFT 0
+#define POLAR_OP_CODE_RIGHT 1
+#define POLAR_OP_CODE_BETA 2
+
 typedef struct decoder_node_t_s {
   struct decoder_node_t_s *left;
   struct decoder_node_t_s *right;
@@ -114,6 +118,14 @@ typedef struct nrPolar_params {
   uint64_t cprime_tab0[16][256];
   uint64_t cprime_tab1[16][256];
   decoder_tree_t decoder;
+  struct {
+    int iter;
+    bool is_initialized;
+    struct {
+      int op_code;
+      decoder_node_t* node;
+    } op_list[600];
+  } tree_linearization;
 } t_nrPolar_params;
 
 void polar_encoder(uint32_t *input,
@@ -159,7 +171,7 @@ int8_t polar_decoder_dci(double *input,
                          uint16_t messageLength,
                          uint8_t aggregation_level);
 
-void generic_polar_decoder(const t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U);
+void generic_polar_decoder(t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U);
 
 static inline int16_t *treeAlpha(decoder_node_t *node)
 {
