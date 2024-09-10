@@ -20,6 +20,7 @@
  */
 
 #include "openair2/RRC/NR_UE/rrc_proto.h"
+#include "executables/softmodem-common.h"
 
 void init_SI_timers(NR_UE_RRC_SI_INFO *SInfo)
 {
@@ -573,7 +574,8 @@ void handle_rlf_sync(NR_UE_Timers_Constants_t *tac,
   else {
     // OUT_OF_SYNC
     tac->N311_cnt = 0;
-    if(nr_timer_is_active(&tac->T300) ||
+    if(get_softmodem_params()->phy_test ||
+       nr_timer_is_active(&tac->T300) ||
        nr_timer_is_active(&tac->T301) ||
        nr_timer_is_active(&tac->T304) ||
        nr_timer_is_active(&tac->T310) ||
