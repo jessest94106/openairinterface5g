@@ -944,6 +944,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
       delta_pusch = table_38_213_7_1_1_1[0][dci->tpc];
     }
   }
+  delta_pusch = 0; // set to 0 as a workaround for PHY not applying PUSCH tx power
 
   bool is_rar_tx_retx = rnti_type == TYPE_TC_RNTI_;
 
@@ -1297,7 +1298,7 @@ static void nr_update_sr(NR_UE_MAC_INST_t *mac)
 
   // if a Regular BSR has been triggered and logicalChannelSR-DelayTimer is not running
   if (((sched_info->BSR_reporting_active & NR_BSR_TRIGGER_REGULAR) == 0)
-      || is_nr_timer_active(sched_info->sr_DelayTimer))
+      || nr_timer_is_active(&sched_info->sr_DelayTimer))
     return;
 
   nr_lcordered_info_t *lc_info = get_lc_info_from_lcid(mac, sched_info->regularBSR_trigger_lcid);
@@ -1527,7 +1528,7 @@ void nr_ue_ul_scheduler(NR_UE_MAC_INST_t *mac, nr_uplink_indication_t *ul_info)
       NR_LC_SCHEDULING_INFO *sched_info = get_scheduling_info_from_lcid(mac, lcid);
       int32_t bj = sched_info->Bj;
       if (lc_info->pbr < UINT_MAX) {
-        uint32_t slots_elapsed = nr_timer_elapsed_time(sched_info->Bj_timer); // slots elapsed since Bj was last incremented
+        uint32_t slots_elapsed = nr_timer_elapsed_time(&sched_info->Bj_timer); // slots elapsed since Bj was last incremented
         // it is safe to divide by 1k since pbr in lc_info is computed multiplying by 1000 the RRC value to convert kB/s to B/s
         uint32_t pbr_ms = lc_info->pbr / 1000;
         bj += ((pbr_ms * slots_elapsed) >> mac->current_UL_BWP->scs); // each slot length is 1/scs ms

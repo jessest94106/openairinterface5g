@@ -233,7 +233,8 @@ static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
     nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .priority = priority};
     nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
 
-    (*resp_srbs)[i] = *srb;
+    (*resp_srbs)[i].srb_id = srb->srb_id;
+    (*resp_srbs)[i].lcid = c.lcid;
 
     int ret = ASN_SEQUENCE_ADD(&cellGroupConfig->rlc_BearerToAddModList->list, rlc_BearerConfig);
     DevAssert(ret == 0);
@@ -669,8 +670,12 @@ void ue_context_release_command(const f1ap_ue_context_release_cmd_t *cmd)
   NR_SCHED_LOCK(&mac->sched_lock);
   NR_UE_info_t *UE = find_nr_UE(&mac->UE_info, cmd->gNB_DU_ue_id);
   if (UE == NULL) {
-    LOG_E(MAC, "ERROR: unknown UE with RNTI %04x, ignoring UE Context Release Command\n", cmd->gNB_DU_ue_id);
     NR_SCHED_UNLOCK(&mac->sched_lock);
+    f1ap_ue_context_release_complete_t complete = {
+        .gNB_CU_ue_id = cmd->gNB_CU_ue_id,
+        .gNB_DU_ue_id = cmd->gNB_DU_ue_id,
+    };
+    mac->mac_rrc.ue_context_release_complete(&complete);
     return;
   }
 
@@ -743,7 +748,7 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
      * the new UE context (with new C-RNTI), but set up everything to reuse the
      * old config. */
     NR_UE_info_t *oldUE = find_nr_UE(&mac->UE_info, *dl_rrc->old_gNB_DU_ue_id);
-    DevAssert(oldUE);
+    AssertFatal(oldUE, "CU claims we should know UE %04x, but we don't\n", *dl_rrc->old_gNB_DU_ue_id);
     pthread_mutex_lock(&mac->sched_lock);
     /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
      * from the current configuration. Also, expect the reconfiguration from

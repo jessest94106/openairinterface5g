@@ -32,6 +32,7 @@
 #ifndef SOFTMODEM_COMMON_H
 #define SOFTMODEM_COMMON_H
 #include "openair1/PHY/defs_common.h"
+#include "softmodem-bits.h"
 #ifdef __cplusplus
 extern "C"
 {
@@ -76,6 +77,7 @@ extern "C"
 #define CONFIG_HLP_256QAM        "Use the 256 QAM mcs table for PDSCH\n"
 #define CONFIG_HLP_CHESTFREQ     "Set channel estimation type in frequency domain. 0-Linear interpolation (default). 1-PRB based averaging of channel estimates in frequency. \n"
 #define CONFIG_HLP_CHESTTIME     "Set channel estimation type in time domain. 0-Symbols take estimates of the last preceding DMRS symbol (default). 1-Symbol based averaging of channel estimates in time. \n"
+#define CONFIG_HLP_IMSCOPE       "Enable phy scope based on imgui and implot"
 
 #define CONFIG_HLP_NONSTOP       "Go back to frame sync mode after 100 consecutive PBCH failures\n"
 //#define CONFIG_HLP_NUMUES        "Set the number of UEs for the emulation"
@@ -188,6 +190,7 @@ extern int usrp_tx_thread;
   {"sync-ref",              CONFIG_HLP_SYNC_REF,      0,              .uptr=&SYNC_REF,                        .defintval=0,             TYPE_UINT,   0},  \
   {"A" ,                    CONFIG_HLP_TADV,          0,             .iptr=&softmodem_params.command_line_sample_advance,.defintval=0,            TYPE_INT,   0},  \
   {"E" ,                    CONFIG_HLP_TQFS,          PARAMFLAG_BOOL, .iptr=&softmodem_params.threequarter_fs, .defintval=0,            TYPE_INT,    0}, \
+  {"imscope" ,              CONFIG_HLP_IMSCOPE,       PARAMFLAG_BOOL, .uptr=&enable_imscope,                   .defintval=0,            TYPE_UINT,   0}, \
 }
 // clang-format on
 
@@ -226,6 +229,7 @@ extern int usrp_tx_thread;
                {"MONOLITHIC", "PNF", "VNF", "AERIAL","UE_STUB_PNF","UE_STUB_OFFNET","STANDALONE_PNF"}, \
                {NFAPI_MONOLITHIC, NFAPI_MODE_PNF, NFAPI_MODE_VNF, NFAPI_MODE_AERIAL,NFAPI_UE_STUB_PNF,NFAPI_UE_STUB_OFFNET,NFAPI_MODE_STANDALONE_PNF}, \
                7 } }, \
+    { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
@@ -274,21 +278,6 @@ extern int usrp_tx_thread;
 
 /***************************************************************************************************************************************/
 
-#define SOFTMODEM_NOS1_BIT            (1<<0)
-#define SOFTMODEM_NONBIOT_BIT         (1<<2)
-#define SOFTMODEM_RFSIM_BIT           (1<<10)
-#define SOFTMODEM_SIML1_BIT           (1<<12)
-#define SOFTMODEM_DLSIM_BIT           (1<<13)
-#define SOFTMODEM_DOSCOPE_BIT         (1<<15)
-#define SOFTMODEM_RECPLAY_BIT         (1<<16)
-#define SOFTMODEM_TELNETCLT_BIT       (1<<17)
-#define SOFTMODEM_RECRECORD_BIT       (1<<18)
-#define SOFTMODEM_ENB_BIT             (1<<20)
-#define SOFTMODEM_GNB_BIT             (1<<21)
-#define SOFTMODEM_4GUE_BIT            (1<<22)
-#define SOFTMODEM_5GUE_BIT            (1<<23)
-#define SOFTMODEM_NOSTATS_BIT         (1<<24)
-
 #define SOFTMODEM_FUNC_BITS (SOFTMODEM_ENB_BIT | SOFTMODEM_GNB_BIT | SOFTMODEM_5GUE_BIT | SOFTMODEM_4GUE_BIT)
 #define MAPPING_SOFTMODEM_FUNCTIONS {{"enb",SOFTMODEM_ENB_BIT},{"gnb",SOFTMODEM_GNB_BIT},{"4Gue",SOFTMODEM_4GUE_BIT},{"5Gue",SOFTMODEM_5GUE_BIT}}
 
@@ -307,6 +296,7 @@ extern int usrp_tx_thread;
 #define IS_SOFTMODEM_4GUE_BIT        ( get_softmodem_optmask() & SOFTMODEM_4GUE_BIT)
 #define IS_SOFTMODEM_5GUE_BIT        ( get_softmodem_optmask() & SOFTMODEM_5GUE_BIT)
 #define IS_SOFTMODEM_NOSTATS_BIT     ( get_softmodem_optmask() & SOFTMODEM_NOSTATS_BIT)
+#define IS_SOFTMODEM_IMSCOPE_ENABLED ( get_softmodem_optmask() & SOFTMODEM_IMSCOPE_BIT)
 
 typedef struct {
   uint64_t       optmask;

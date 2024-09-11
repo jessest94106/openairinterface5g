@@ -24,6 +24,10 @@
 #include "PHY/impl_defs_top.h"
 #include "PHY/TOOLS/tools_defs.h"
 
+void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re);
+void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint32_t nb_re);
+void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int16_t *llr, uint32_t nb_re);
+void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int32_t *ch_mag3, int16_t *llr, uint32_t nb_re);
 void freq2time(uint16_t ofdm_symbol_size, int16_t *freq_signal, int16_t *time_signal);
 void nr_est_delay(int ofdm_symbol_size, const c16_t *ls_est, c16_t *ch_estimates_time, delay_t *delay);
 unsigned int nr_get_tx_amp(int power_dBm, int power_max_dBm, int total_nb_rb, int nb_rb);

@@ -42,6 +42,8 @@ Running the  [build_oai](../cmake_targets/build_oai) script also generates some 
 
 The build system for OAI uses [cmake](https://cmake.org/) which is a  tool to generate makefiles. The `build_oai` script is a wrapper using `cmake` and `make`/`ninja` to ease the oai build and use. It logs the `cmake` and `ninja`/`make` commands it executes. The file describing how to build the executables from source files is the [CMakeLists.txt](../CMakeLists.txt), it is used as input by cmake to generate the makefiles.
 
+cmake is further extended by using [CPM](https://github.com/cpm-cmake/CPM.cmake). CPM is a cmake script that handles external code dependencies. It is setup to cache downloaded code in `~/.cache/cpm`. While most external dependencies should be handled by system package managers, CPM has the advantage of using any code that is available in a public git repository.
+
 The oai softmodem supports many use cases, and new ones are regularly added. Most of them are accessible using the configuration file or the command line options and continuous effort is done to avoid introducing build options as it makes tests and usage more complicated than run-time options. The following functionalities, originally requiring a specific build are now accessible by configuration or command line options:
 
 - s1, noS1

@@ -281,12 +281,9 @@ int DU_handle_UE_CONTEXT_SETUP_REQUEST(instance_t instance, sctp_assoc_t assoc_i
       memcpy(f1ap_ue_context_setup_req->rrc_container,
              ieRRC->value.choice.RRCContainer.buf, ieRRC->value.choice.RRCContainer.size);
       f1ap_ue_context_setup_req->rrc_container_length = ieRRC->value.choice.RRCContainer.size;
-      // AssertFatal(0, "check configuration, send to appropriate handler\n");
     } else {
       LOG_E(F1AP, " RRCContainer in UEContextSetupRequestIEs size id 0\n");
     }
-  } else {
-    LOG_W(F1AP, "can't find RRCContainer in UEContextSetupRequestIEs by id %ld \n", F1AP_ProtocolIE_ID_id_RRCContainer);
   }
 
   ue_context_setup_request(f1ap_ue_context_setup_req);
@@ -596,6 +593,7 @@ int DU_send_UE_CONTEXT_SETUP_RESPONSE(sctp_assoc_t assoc_id, f1ap_ue_context_set
     F1AP_SRBs_Setup_Item_t *srbs_setup_item=&srbs_setup_item_ies->value.choice.SRBs_Setup_Item;
     /* sRBID */
     srbs_setup_item->sRBID = resp->srbs_to_be_setup[i].srb_id;
+    srbs_setup_item->lCID = resp->srbs_to_be_setup[i].lcid;
   }
   }
 

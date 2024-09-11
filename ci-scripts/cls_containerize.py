@@ -450,9 +450,7 @@ class Containerize():
 		cmd.cd(lSourcePath)
 		# if asterix, copy the entitlement and subscription manager configurations
 		if self.host == 'Red Hat':
-			cmd.run('mkdir -p ./etc-pki-entitlement ./rhsm-conf ./rhsm-ca')
-			cmd.run('cp /etc/rhsm/rhsm.conf ./rhsm-conf/')
-			cmd.run('cp /etc/rhsm/ca/redhat-uep.pem ./rhsm-ca/')
+			cmd.run('mkdir -p ./etc-pki-entitlement')
 			cmd.run('cp /etc/pki/entitlement/*.pem ./etc-pki-entitlement/')
 
 		baseImage = 'ran-base'

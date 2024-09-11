@@ -163,19 +163,19 @@ void nr_timer_setup(NR_timer_t *timer, const uint32_t target, const uint32_t ste
  * @param timer Timer to be checked
  * @return Indication if the timer is expired or not
  */
-bool nr_timer_expired(NR_timer_t timer);
+bool nr_timer_expired(const NR_timer_t *timer);
 /**
  * @brief To check if a timer is active
  * @param timer Timer to be checked
  * @return Indication if the timer is active or not
  */
-bool is_nr_timer_active(NR_timer_t timer);
+bool nr_timer_is_active(const NR_timer_t *timer);
 /**
  * @brief To return how much time has passed since start of timer
  * @param timer Timer to be checked
  * @return Time passed since start of timer
  */
-uint32_t nr_timer_elapsed_time(NR_timer_t timer);
+uint32_t nr_timer_elapsed_time(const NR_timer_t *timer);
 
 
 extern const nr_bandentry_t nr_bandtable[];
@@ -253,6 +253,9 @@ int get_smallest_supported_bandwidth_index(int scs, frequency_range_t frequency_
 
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
+
+// Align up to a multiple of 16
+#define ALIGN_UP_16(a) ((a + 15) & ~15)
 
 #ifdef __cplusplus
 #ifdef min

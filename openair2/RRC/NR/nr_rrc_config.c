@@ -2805,6 +2805,8 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
       && servingcellconfigdedicated->downlinkBWP_ToAddModList->list.count > 0) {
     n_dl_bwp = servingcellconfigdedicated->downlinkBWP_ToAddModList->list.count;
   }
+  int default_dl_bwp = 0;
+  int first_active_dl_bwp = 0;
   if (n_dl_bwp > 0) {
     SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList =
         calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList));
@@ -2813,15 +2815,13 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
       config_downlinkBWP(bwp, scc, servingcellconfigdedicated, NULL, 0, false, bwp_loop, true);
       asn1cSeqAdd(&SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
     }
-    SpCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id =
-        calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id));
-    *SpCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id =
-        servingcellconfigdedicated->firstActiveDownlinkBWP_Id ? *servingcellconfigdedicated->firstActiveDownlinkBWP_Id : 1;
-    SpCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id =
-        calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id));
-    *SpCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id =
-        servingcellconfigdedicated->defaultDownlinkBWP_Id ? *servingcellconfigdedicated->defaultDownlinkBWP_Id : 1;
+    const NR_BWP_Id_t *firstActiveDownlinkBWP_Id = servingcellconfigdedicated->firstActiveDownlinkBWP_Id;
+    first_active_dl_bwp = firstActiveDownlinkBWP_Id ? *firstActiveDownlinkBWP_Id : 1;
+    const NR_BWP_Id_t	*defaultDownlinkBWP_Id = servingcellconfigdedicated->defaultDownlinkBWP_Id;
+    default_dl_bwp = defaultDownlinkBWP_Id ? *defaultDownlinkBWP_Id : 1;
   }
+  asn1cCallocOne(SpCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id, first_active_dl_bwp);
+  asn1cCallocOne(SpCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id, default_dl_bwp);
 
   // Uplink BWPs
   int n_ul_bwp = 0;
@@ -2830,6 +2830,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
       && servingcellconfigdedicated->uplinkConfig->uplinkBWP_ToAddModList->list.count > 0) {
     n_ul_bwp = servingcellconfigdedicated->uplinkConfig->uplinkBWP_ToAddModList->list.count;
   }
+  int first_active_ul_bwp = 0;
   if (n_ul_bwp > 0) {
     uplinkConfig->uplinkBWP_ToAddModList = calloc(1, sizeof(*uplinkConfig->uplinkBWP_ToAddModList));
     for (int bwp_loop = 0; bwp_loop < n_ul_bwp; bwp_loop++) {
@@ -2837,11 +2838,10 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
       config_uplinkBWP(ubwp, bwp_loop, true, uid, configuration, servingcellconfigdedicated, scc, NULL);
       asn1cSeqAdd(&uplinkConfig->uplinkBWP_ToAddModList->list, ubwp);
     }
-    uplinkConfig->firstActiveUplinkBWP_Id = calloc(1, sizeof(*uplinkConfig->firstActiveUplinkBWP_Id));
-    *uplinkConfig->firstActiveUplinkBWP_Id = servingcellconfigdedicated->uplinkConfig->firstActiveUplinkBWP_Id
-                                                 ? *servingcellconfigdedicated->uplinkConfig->firstActiveUplinkBWP_Id
-                                                 : 1;
+    const NR_BWP_Id_t *firstActiveUplinkBWP_Id = servingcellconfigdedicated->uplinkConfig->firstActiveUplinkBWP_Id;
+    first_active_ul_bwp = firstActiveUplinkBWP_Id ? *firstActiveUplinkBWP_Id : 1;
   }
+  asn1cCallocOne(uplinkConfig->firstActiveUplinkBWP_Id, first_active_ul_bwp);
 
   SpCellConfig->spCellConfigDedicated->csi_MeasConfig = calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->csi_MeasConfig));
   SpCellConfig->spCellConfigDedicated->csi_MeasConfig->present = NR_SetupRelease_CSI_MeasConfig_PR_setup;

@@ -143,7 +143,7 @@ int do_RRCReestablishment(rrc_gNB_ue_context_t *const ue_context_pP,
 
 int do_RRCReestablishmentComplete(uint8_t *buffer, size_t buffer_size, int64_t rrc_TransactionIdentifier);
 
-const nr_a3_event_t *get_a3_configuration(int nr_cellid);
+const nr_a3_event_t *get_a3_configuration(int pci);
 NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 int band,
                                 int scs,

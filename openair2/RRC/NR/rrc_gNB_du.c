@@ -40,12 +40,17 @@ int get_ssb_scs(const struct f1ap_served_cell_info_t *cell_info)
   return cell_info->mode == F1AP_MODE_TDD ? cell_info->tdd.tbw.scs : cell_info->fdd.dl_tbw.scs;
 }
 
+static int ssb_arfcn_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
+{
+  /* format has been verified when accepting MeasurementTimingConfiguration */
+  NR_MeasTimingList_t *mtlist = mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
+  return mtlist->list.array[0]->frequencyAndTiming->carrierFreq;
+}
+
 int get_ssb_arfcn(const struct nr_rrc_du_container_t *du)
 {
   DevAssert(du != NULL && du->mtc != NULL);
-  /* format has been verified when accepting MeasurementTimingConfiguration */
-  NR_MeasTimingList_t *mtlist = du->mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
-  return mtlist->list.array[0]->frequencyAndTiming->carrierFreq;
+  return ssb_arfcn_mtc(du->mtc);
 }
 
 static int du_compare(const nr_rrc_du_container_t *a, const nr_rrc_du_container_t *b)
@@ -197,6 +202,58 @@ static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc,
   for_each(cell_neighbour_list, (void *)&ssb_arfcn, is_intra_frequency_neighbour);
 }
 
+static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_configuration, const f1ap_served_cell_info_t *cell, int ssb_arfcn)
+{
+  for (int c = 0; c < neighbour_cell_configuration->size; c++) {
+    const neighbour_cell_configuration_t *neighbour_config = seq_arr_at(neighbour_cell_configuration, c);
+    for (int ni = 0; ni < neighbour_config->neighbour_cells->size; ni++) {
+      const nr_neighbour_gnb_configuration_t *nc = seq_arr_at(neighbour_config->neighbour_cells, ni);
+      if (nc->nrcell_id != cell->nr_cellid)
+        continue;
+      // current cell is in the nc config, check that config matches
+      if (nc->physicalCellId != cell->nr_pci) {
+        LOG_W(NR_RRC, "Cell %ld in neighbour config: PCI mismatch (%d vs %d)\n", cell->nr_cellid, cell->nr_pci, nc->physicalCellId);
+        return false;
+      }
+      if (cell->tac && nc->tac != *cell->tac) {
+        LOG_W(NR_RRC, "Cell %ld in neighbour config: TAC mismatch (%d vs %d)\n", cell->nr_cellid, *cell->tac, nc->tac);
+        return false;
+      }
+      if (ssb_arfcn != nc->absoluteFrequencySSB) {
+        LOG_W(NR_RRC,
+              "Cell %ld in neighbour config: SSB ARFCN mismatch (%d vs %d)\n",
+              cell->nr_cellid,
+              ssb_arfcn,
+              nc->absoluteFrequencySSB);
+        return false;
+      }
+      if (get_ssb_scs(cell) != nc->subcarrierSpacing) {
+        LOG_W(NR_RRC,
+              "Cell %ld in neighbour config: SCS mismatch (%d vs %d)\n",
+              cell->nr_cellid,
+              get_ssb_scs(cell),
+              nc->subcarrierSpacing);
+        return false;
+      }
+      if (cell->plmn.mcc != nc->plmn.mcc || cell->plmn.mnc != nc->plmn.mnc
+          || cell->plmn.mnc_digit_length != nc->plmn.mnc_digit_length) {
+        LOG_W(NR_RRC,
+              "Cell %ld in neighbour config: PLMN mismatch (%03d.%0*d vs %03d.%0*d)\n",
+              cell->nr_cellid,
+              cell->plmn.mcc,
+              cell->plmn.mnc_digit_length,
+              cell->plmn.mnc,
+              nc->plmn.mcc,
+              nc->plmn.mnc_digit_length,
+              nc->plmn.mnc);
+        return false;
+      }
+      LOG_D(NR_RRC, "Cell %ld is neighbor of cell %ld\n", cell->nr_cellid, neighbour_config->nr_cell_id);
+    }
+  }
+  return true;
+}
+
 void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
 {
   AssertFatal(assoc_id != 0, "illegal assoc_id == 0: should be -1 (monolithic) or >0 (split)\n");
@@ -219,10 +276,12 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   f1ap_served_cell_info_t *cell_info = &req->cell[0].info;
   if (!rrc_gNB_plmn_matches(rrc, cell_info)) {
     LOG_E(NR_RRC,
-          "PLMN mismatch: CU %d%d, DU %d%d\n",
+          "PLMN mismatch: CU %03d.%0*d, DU %03d%0*d\n",
           rrc->configuration.mcc[0],
+          rrc->configuration.mnc_digit_length[0],
           rrc->configuration.mnc[0],
           cell_info->plmn.mcc,
+          cell_info->plmn.mnc_digit_length,
           cell_info->plmn.mnc);
     f1ap_setup_failure_t fail = {.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU};
     rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
@@ -263,6 +322,15 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   // "tolerate" this behavior, despite it being mandatory
   NR_MeasurementTimingConfiguration_t *mtc =
       extract_mtc(cell_info->measurement_timing_config, cell_info->measurement_timing_config_len);
+
+  if (rrc->neighbour_cell_configuration
+      && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info, ssb_arfcn_mtc(mtc))) {
+    LOG_E(NR_RRC, "problem with DU %ld in neighbor configuration, rejecting DU\n", req->gNB_DU_id);
+    f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
+    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
+    return;
+  }
 
   const f1ap_gnb_du_system_info_t *sys_info = req->cell[0].sys_info;
   NR_MIB_t *mib = NULL;
@@ -501,7 +569,7 @@ void dump_du_info(const gNB_RRC_INST *rrc, FILE *f)
       fprintf(f, "assoc_id %d", du->assoc_id);
     }
     const f1ap_served_cell_info_t *info = &sr->cell[0].info;
-    fprintf(f, ": nrCellID %ld, PCI %d\n", info->nr_cellid, info->nr_pci);
+    fprintf(f, ": nrCellID %ld, PCI %d, SSB ARFCN %d\n", info->nr_cellid, info->nr_pci, get_ssb_arfcn(du));
 
     if (info->mode == F1AP_MODE_TDD) {
       const f1ap_nr_frequency_info_t *fi = &info->tdd.freqinfo;
