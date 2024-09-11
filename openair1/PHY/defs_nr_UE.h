@@ -50,6 +50,7 @@
 #include "common_lib.h"
 #include "fapi_nr_ue_interface.h"
 #include "assertions.h"
+#include "barrier.h"
 //#include "openair1/SCHED_NR_UE/defs.h"
 
 #ifdef MEX
@@ -73,16 +74,6 @@
 #define bigmalloc16 malloc16
 #define openair_free(y,x) free((y))
 #define PAGE_SIZE 4096
-
-#ifdef NR_UNIT_TEST
-  #define FILE_NAME                " "
-  #define LINE_FILE                (0)
-  #define NR_TST_PHY_PRINTF(...)   printf(__VA_ARGS__)
-#else
-  #define FILE_NAME                (__FILE__)
-  #define LINE_FILE                (__LINE__)
-  #define NR_TST_PHY_PRINTF(...)
-#endif
 
 #define PAGE_MASK 0xfffff000
 #define virt_to_phys(x) (x)
@@ -530,7 +521,7 @@ typedef struct PHY_VARS_NR_UE_s {
   void *phy_sim_pdsch_dl_ch_estimates_ext;
   uint8_t *phy_sim_dlsch_b;
 
-  notifiedFIFO_t tx_resume_ind_fifo[NR_MAX_SLOTS_PER_FRAME];
+  dynamic_barrier_t process_slot_tx_barriers[NR_MAX_SLOTS_PER_FRAME];
 
   // Gain change required for automation RX gain change
   int adjust_rxgain;

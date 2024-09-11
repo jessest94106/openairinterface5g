@@ -99,6 +99,11 @@
 
 static void *NRUE_phy_stub_standalone_pnf_task(void *arg);
 
+static void start_process_slot_tx(void* arg) {
+  notifiedFIFO_elt_t *newTx = arg;
+  pushTpool(&(get_nrUE_params()->Tpool), newTx);
+}
+
 static size_t dump_L1_UE_meas_stats(PHY_VARS_NR_UE *ue, char *output, size_t max_len)
 {
   const char *begin = output;
@@ -486,56 +491,10 @@ void processSlotTX(void *arg)
   nr_phy_data_tx_t phy_data = {0};
   bool sl_tx_action = false;
 
-  // Force sequential execution, even if we launch in // for all slots
-  // at least ULstatus variable is a pure race condition that is quickly detected by assert() in the code because one thread sets it
-  // to active, so the other thread try to steal&run the ul work
-  if (rxtxD->stream_status == STREAM_STATUS_SYNCED) {
-    notifiedFIFO_elt_t *res = pullNotifiedFIFO(UE->tx_resume_ind_fifo + proc->nr_slot_tx);
-    delNotifiedFIFO_elt(res);
-  }
-
   if (UE->if_inst)
     UE->if_inst->slot_indication(UE->Mod_id);
 
-  LOG_D(PHY,
-        "SlotTx %d.%d => slot type %d, wait: %d \n",
-        proc->frame_tx,
-        proc->nr_slot_tx,
-        proc->tx_slot_type,
-        rxtxD->tx_wait_for_dlsch);
   if (proc->tx_slot_type == NR_UPLINK_SLOT || proc->tx_slot_type == NR_MIXED_SLOT) {
-    if (rxtxD->tx_wait_for_dlsch)
-      LOG_D(PHY, "enter wait for tx, slot %d, nb events to wait %d; ", proc->nr_slot_tx, rxtxD->tx_wait_for_dlsch);
-    // wait for rx slots to send indication (if any) that DLSCH decoding is finished
-    for(int i=0; i < rxtxD->tx_wait_for_dlsch; i++) {
-      notifiedFIFO_elt_t *res = pullNotifiedFIFO(UE->tx_resume_ind_fifo + proc->nr_slot_tx);
-      delNotifiedFIFO_elt(res);
-    }
-    LOG_D(PHY, "completed wait for tx, slot %d\n", proc->nr_slot_tx);
-
-    /*
-      This herafter code is costing some perfomance for a check that should be useless
-      But, we face today several bugs arround the matching between events in UE->tx_resume_ind_fifo[slot]
-      and the corresponding tx_wait_for_dlsch[slot]
-      The algorithm is we accumlate the actions that should end before processing a tx slot in tx_wait_for_dlsch[slot]
-      later, other threads push events in UE->tx_resume_ind_fifo[slot]
-      so, the tx encoding starts only when related actions are done (mainly DLSCH ACK/NACK to encode PUCCH)
-      if there is a bug that misses to send a event in UE->tx_resume_ind_fifo[slot], the process hangs, we detect the issue
-      if there is a bug that makes a extra event in UE->tx_resume_ind_fifo[slot], and if we drop the hereafter check
-      the system runs with random race conditions, very hard to debug
-
-      Likely we should later remove completly UE->tx_resume_ind_fifo with notifications,
-      instead,
-      we may run in place the processSlotTX() when the conditions are met (when a decreasing tx_wait_for_dlsch[slot] will become 0)
-      It will remove the condition signals (for a thread safe semaphore or counter) and make the system simpler
-    */
-    notifiedFIFO_elt_t *res = pollNotifiedFIFO(UE->tx_resume_ind_fifo + proc->nr_slot_tx);
-    if (res)
-      LOG_E(NR_PHY,
-            "Internal error: extra event on Tx waiting queue for slot %d, event comes from rx slot %d\n",
-            proc->nr_slot_tx,
-            *(int *)NotifiedFifoData(res));
-
     if (UE->sl_mode == 2 && proc->tx_slot_type == NR_SIDELINK_SLOT) {
       // trigger L2 to run ue_sidelink_scheduler thru IF module
       if (UE->if_inst != NULL && UE->if_inst->sl_indication != NULL) {
@@ -584,13 +543,10 @@ void processSlotTX(void *arg)
     }
   }
 
-  notifiedFIFO_elt_t *newElt = newNotifiedFIFO_elt(sizeof(int), 0, NULL, NULL);
-  int *msgData = (int *)NotifiedFifoData(newElt);
   int slots_per_frame = (UE->sl_mode == 2) ? UE->SL_UE_PHY_PARAMS.sl_frame_params.slots_per_frame
                                            : UE->frame_parms.slots_per_frame;
-  int newslot = (proc->nr_slot_tx + 1) % slots_per_frame;
-  *msgData = newslot;
-  pushNotifiedFIFO(UE->tx_resume_ind_fifo + newslot, newElt);
+  int next_slot = (proc->nr_slot_tx + 1) % slots_per_frame;
+  dynamic_barrier_join(&UE->process_slot_tx_barriers[next_slot]);
   RU_write(rxtxD, sl_tx_action);
 }
 
@@ -841,7 +797,7 @@ void *UE_thread(void *arg)
 
   int num_ind_fifo = nb_slot_frame;
   for(int i = 0; i < num_ind_fifo; i++) {
-    initNotifiedFIFO(UE->tx_resume_ind_fifo + i);
+    dynamic_barrier_init(&UE->process_slot_tx_barriers[i]);
   }
   int shiftForNextFrame = 0;
   int intialSyncOffset = 0;
@@ -956,9 +912,7 @@ void *UE_thread(void *arg)
       // We have resynchronized, maybe after RF loss so we need to purge any existing context
       memset(tx_wait_for_dlsch, 0, sizeof(tx_wait_for_dlsch));
       for (int i = 0; i < num_ind_fifo; i++) {
-        notifiedFIFO_elt_t *res;
-        while ((res = pollNotifiedFIFO(UE->tx_resume_ind_fifo + i)))
-          delNotifiedFIFO_elt(res);
+        dynamic_barrier_reset(&UE->process_slot_tx_barriers[i]);
       }
       continue;
     }
@@ -1056,11 +1010,16 @@ void *UE_thread(void *arg)
     curMsgTx->writeBlockSize = writeBlockSize;
     curMsgTx->proc.timestamp_tx = writeTimestamp;
     curMsgTx->UE = UE;
-    curMsgTx->tx_wait_for_dlsch = tx_wait_for_dlsch[curMsgTx->proc.nr_slot_tx];
     curMsgTx->stream_status = stream_status;
+
+    int sync_to_previous_thread = stream_status == STREAM_STATUS_SYNCED ? 1 : 0;
+    int slot = curMsgTx->proc.nr_slot_tx;
+    dynamic_barrier_update(&UE->process_slot_tx_barriers[slot],
+                           tx_wait_for_dlsch[slot] + sync_to_previous_thread,
+                           start_process_slot_tx,
+                           newTx);
     stream_status = STREAM_STATUS_SYNCED;
-    tx_wait_for_dlsch[curMsgTx->proc.nr_slot_tx] = 0;
-    pushTpool(&(get_nrUE_params()->Tpool), newTx);
+    tx_wait_for_dlsch[slot] = 0;
   }
 
   return NULL;

@@ -39,6 +39,10 @@ typedef struct dynamic_barrier_t {
 /// @param barrier
 void dynamic_barrier_init(dynamic_barrier_t* barrier);
 
+/// @brief Reset the barrier
+/// @param barrier
+void dynamic_barrier_reset(dynamic_barrier_t* barrier);
+
 /// @brief Perform join on the barrier. May run callback if it is already set
 /// @param barrier
 void dynamic_barrier_join(dynamic_barrier_t* barrier);

@@ -31,6 +31,16 @@ void dynamic_barrier_init(dynamic_barrier_t* barrier)
   barrier->completed_jobs = 0;
 }
 
+void dynamic_barrier_reset(dynamic_barrier_t* barrier)
+{
+  barrier->callback = NULL;
+  if (barrier->callback_arg != NULL) {
+    free(barrier->callback_arg);
+  }
+  barrier->callback_arg = NULL;
+  barrier->completed_jobs = 0;
+}
+
 void dynamic_barrier_join(dynamic_barrier_t* barrier)
 {
   int ret = pthread_mutex_lock(&barrier->barrier_lock);
