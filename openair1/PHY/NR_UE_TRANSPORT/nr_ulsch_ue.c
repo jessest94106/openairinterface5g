@@ -91,7 +91,7 @@ all symbols based on different parameters. Then the mapping is done for
 each symbol by calling the function pointers.
 */
 static void (*map_dmrs_ptr)(const unsigned int, const c16_t *, c16_t *);
-static void (*map_data_dmrs_ptr)(const c16_t *, c16_t *);
+static void (*map_data_dmrs_ptr)(const unsigned int num_cdm_no_data, const c16_t *, c16_t *);
 
 /*
 The following set of functions map dmrs and/or data REs in one RB based on
@@ -117,7 +117,7 @@ static void map_dmrs_type1_cdm1_rb(const unsigned int delta, const c16_t *dmrs, 
 Data in DMRS symbol for Type 1, NumCDMGroupNoData = 1 and delta 0 (antenna port 0 and 1).
 There is no data in DMRS symbol for other scenarios in type 1.
 */
-static void map_data_dmrs_type1_cdm1_rb(const c16_t *data, c16_t *out)
+static void map_data_dmrs_type1_cdm1_rb(const unsigned int num_cdm_no_data, const c16_t *data, c16_t *out)
 {
   *(out + 1) = *data++;
   *(out + 3) = *data++;
@@ -143,36 +143,16 @@ static void map_dmrs_type2_rb(const unsigned int delta, const c16_t *dmrs, c16_t
 }
 
 /*
-Map data if type 2, delta 0 NumCDMGrpNoData 1.
+Map data for type 2 DMRS
 */
-static void map_data_dmrs_type2_rb_f1(const c16_t *data, c16_t *out)
+static void map_data_dmrs_type2_rb(const unsigned int num_cdm_no_data, const c16_t *data, c16_t *out)
 {
-  memcpy(out + NR_DMRS_TYPE2_CDM_GRP_SIZE, data, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE * 2);
-  out += NR_DMRS_TYPE2_CDM_GRP_SIZE * 4;
-  data += NR_DMRS_TYPE2_CDM_GRP_SIZE * 2;
-  memcpy(out, data, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE * 2);
-}
-
-/*
-Map data if type 2, delta (0, 2) NumCDMGrpNoData 2, or delta 2 NumCDMGrpNoData 1.
-*/
-static void map_data_dmrs_type2_rb_f2(const c16_t *data, c16_t *out)
-{
-  memcpy(out + NR_DMRS_TYPE2_CDM_GRP_SIZE * 2, data, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE);
-  out += NR_DMRS_TYPE2_CDM_GRP_SIZE * 5;
-  data += NR_DMRS_TYPE2_CDM_GRP_SIZE;
-  memcpy(out, data, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE);
-}
-
-/*
-Map data if type 2, delta 4 NumCDMGrpNoData 1.
-*/
-static void map_data_dmrs_type2_rb_f3(const c16_t *data, c16_t *out)
-{
-  memcpy(out + NR_DMRS_TYPE2_CDM_GRP_SIZE, data, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE);
-  out += NR_DMRS_TYPE2_CDM_GRP_SIZE * 4;
-  data += NR_DMRS_TYPE2_CDM_GRP_SIZE;
-  memcpy(out, data, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE);
+  unsigned int offset = num_cdm_no_data * NR_DMRS_TYPE2_CDM_GRP_SIZE;
+  const unsigned int size = (NR_DMRS_TYPE2_NUM_CDM_GRP - num_cdm_no_data) * NR_DMRS_TYPE2_CDM_GRP_SIZE;
+  memcpy(out + offset, data, sizeof(c16_t) * size);
+  offset += NR_DMRS_TYPE2_CDM_GRP_SIZE * NR_DMRS_TYPE2_NUM_CDM_GRP;
+  data += size;
+  memcpy(out + offset, data, sizeof(c16_t) * size);
 }
 
 /*
@@ -200,6 +180,7 @@ The destination buffer in this case in not contiguous so REs are mapped on to a 
 so that we can reuse the existing functions. Then it is copied to the destination buffer.
 */
 static void map_over_dc(const unsigned int right_dc,
+                        const unsigned int num_cdm_no_data,
                         const unsigned int fft_size,
                         const unsigned int dmrs_per_rb,
                         const unsigned int data_per_rb,
@@ -222,7 +203,7 @@ static void map_over_dc(const unsigned int right_dc,
 
     /* map on to temp buffer */
     if (dmrs && data) {
-      map_data_dmrs_ptr(*data, tmp_out_buf);
+      map_data_dmrs_ptr(num_cdm_no_data, *data, tmp_out_buf);
       *data += data_per_rb;
     } else if (dmrs) {
       map_dmrs_ptr(delta, *dmrs, tmp_out_buf);
@@ -328,7 +309,18 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
     /* if a RB is on both sides of DC, the following function handles it.
        if not, then it just increaments the pointer incase there are more RBs above DC.
     */
-    map_over_dc(rb_over_dc, p.fft_size, dmrs_per_rb, data_per_rb, p.delta, 0, &rb, NULL, &p_mod_dmrs, NULL, &out_tmp);
+    map_over_dc(rb_over_dc,
+                p.num_cdm_no_data,
+                p.fft_size,
+                dmrs_per_rb,
+                data_per_rb,
+                p.delta,
+                0,
+                &rb,
+                NULL,
+                &p_mod_dmrs,
+                NULL,
+                &out_tmp);
 
     /* map above DC */
     /* if there are more RBs, they are mapped in the following part */
@@ -343,13 +335,24 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
       c16_t *out_tmp = out + start_sc;
       unsigned int rb = 0;
       for (; rb < stop_rb; rb++) {
-        map_data_dmrs_ptr(data_tmp, out_tmp);
+        map_data_dmrs_ptr(p.num_cdm_no_data, data_tmp, out_tmp);
         data_tmp += data_per_rb;
         out_tmp += NR_NB_SC_PER_RB;
       }
-      map_over_dc(rb_over_dc, p.fft_size, dmrs_per_rb, data_per_rb, p.delta, 0, &rb, NULL, &p_mod_dmrs, &data_tmp, &out_tmp);
+      map_over_dc(rb_over_dc,
+                  p.num_cdm_no_data,
+                  p.fft_size,
+                  dmrs_per_rb,
+                  data_per_rb,
+                  p.delta,
+                  0,
+                  &rb,
+                  NULL,
+                  &p_mod_dmrs,
+                  &data_tmp,
+                  &out_tmp);
       for (; rb < p.nb_rb; rb++) {
-        map_data_dmrs_ptr(data_tmp, out_tmp);
+        map_data_dmrs_ptr(p.num_cdm_no_data, data_tmp, out_tmp);
         data_tmp += data_per_rb;
         out_tmp += NR_NB_SC_PER_RB;
       }
@@ -385,10 +388,21 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
     }
     if (ptrs_idx_rb % p.K_ptrs) {
       /* if not a PTRS RB set mod_ptrs to NULL in function arg */
-      map_over_dc(rb_over_dc, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
+      map_over_dc(rb_over_dc, p.num_cdm_no_data, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
     } else {
       /* if a PTRS RB set valid mod_ptrs pointer */
-      map_over_dc(rb_over_dc, p.fft_size, 0, 0, p.delta, ptrs_idx_re, &rb, &p_mod_ptrs, NULL, &data_tmp, &out_tmp);
+      map_over_dc(rb_over_dc,
+                  p.num_cdm_no_data,
+                  p.fft_size,
+                  0,
+                  0,
+                  p.delta,
+                  ptrs_idx_re,
+                  &rb,
+                  &p_mod_ptrs,
+                  NULL,
+                  &data_tmp,
+                  &out_tmp);
     }
     /* map remaining RBs above DC */
     for (; rb < p.nb_rb; rb++) {
@@ -413,7 +427,7 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
       data_tmp += NR_NB_SC_PER_RB;
       out_tmp += NR_NB_SC_PER_RB;
     }
-    map_over_dc(rb_over_dc, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
+    map_over_dc(rb_over_dc, p.num_cdm_no_data, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
     for (; rb < p.nb_rb; rb++) {
       map_data_rb(data_tmp, out_tmp);
       data_tmp += NR_NB_SC_PER_RB;
@@ -459,19 +473,10 @@ static void map_symbols(const nr_phy_pxsch_params_t p,
   // asign the function pointers
   if (p.dmrs_type == pusch_dmrs_type1) {
     map_dmrs_ptr = map_dmrs_type1_cdm1_rb;
-    map_data_dmrs_ptr = (p.delta == 0 && p.num_cdm_no_data == 1) ? map_data_dmrs_type1_cdm1_rb : NULL;
+    map_data_dmrs_ptr = (p.num_cdm_no_data == 1) ? map_data_dmrs_type1_cdm1_rb : NULL;
   } else {
     map_dmrs_ptr = map_dmrs_type2_rb;
-    if (p.delta == 0 && p.num_cdm_no_data == 1) {
-      map_data_dmrs_ptr = map_data_dmrs_type2_rb_f1;
-    } else if ((p.delta == 0 && p.num_cdm_no_data == 2) || (p.delta == 2 && p.num_cdm_no_data == 2)
-               || (p.delta == 2 && p.num_cdm_no_data == 1)) {
-      map_data_dmrs_ptr = map_data_dmrs_type2_rb_f2;
-    } else if (p.delta == 4 && p.num_cdm_no_data == 1) {
-      map_data_dmrs_ptr = map_data_dmrs_type2_rb_f3;
-    } else { // no data in DMRS symbols for other combinations
-      map_data_dmrs_ptr = NULL;
-    }
+    map_data_dmrs_ptr = (p.num_cdm_no_data < 3) ? map_data_dmrs_type2_rb : NULL;
   }
   // for all symbols
   const unsigned int n_dmrs = (p.bwp_start + p.start_rb + p.nb_rb) * ((p.dmrs_type == pusch_dmrs_type1) ? 6 : 4);
