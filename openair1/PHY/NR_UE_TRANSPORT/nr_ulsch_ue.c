@@ -102,6 +102,7 @@ applicable.
 
 /*
 DMRS mapping in a RB for Type 1.
+Mapping as in TS 38.211 6.4.1.1.3 k = 4n + 2k^prime + delta
 */
 static void map_dmrs_type1_cdm1_rb(const unsigned int delta, const c16_t *dmrs, c16_t *out)
 {
@@ -132,8 +133,8 @@ static void map_data_dmrs_type1_cdm1_rb(const unsigned int num_cdm_no_data, cons
 
 /*
 Map DMRS for type 2
+Mapping as in TS 38.211 6.4.1.1.3 k = 6n + k^prime + delta
 */
-
 static void map_dmrs_type2_rb(const unsigned int delta, const c16_t *dmrs, c16_t *out)
 {
   memcpy(out + delta, dmrs, sizeof(c16_t) * NR_DMRS_TYPE2_CDM_GRP_SIZE);
@@ -186,50 +187,50 @@ static void map_over_dc(const unsigned int right_dc,
                         const unsigned int data_per_rb,
                         const unsigned int delta,
                         const unsigned int ptrsIdx,
-                        unsigned int *rb,
                         const c16_t **ptrs,
                         const c16_t **dmrs,
                         const c16_t **data,
                         c16_t **out)
 {
-  if (right_dc) {
-    c16_t *out_tmp = *out;
-    c16_t tmp_out_buf[NR_NB_SC_PER_RB];
-    const unsigned int left_dc = NR_NB_SC_PER_RB - right_dc;
-    /* copy out to temp buffer. incase we want to preserve the REs in the out buffer. */
-    memcpy(tmp_out_buf, out_tmp, sizeof(c16_t) * left_dc);
-    out_tmp -= (fft_size - left_dc);
-    memcpy(tmp_out_buf + left_dc, out_tmp, sizeof(c16_t) * right_dc);
+  // if first RE is DC no need to map in this function
+  if (right_dc == 0)
+    return;
 
-    /* map on to temp buffer */
-    if (dmrs && data) {
-      map_data_dmrs_ptr(num_cdm_no_data, *data, tmp_out_buf);
-      *data += data_per_rb;
-    } else if (dmrs) {
-      map_dmrs_ptr(delta, *dmrs, tmp_out_buf);
-      *dmrs += dmrs_per_rb;
-    } else if (ptrs) {
-      map_data_ptrs(ptrsIdx, *data, *ptrs, tmp_out_buf);
-      *data += (NR_NB_SC_PER_RB - 1);
-      *ptrs += 1;
-    } else if (data) {
-      map_data_rb(*data, tmp_out_buf);
-      *data += NR_NB_SC_PER_RB;
-    } else {
-      DevAssert(false);
-    }
+  c16_t *out_tmp = *out;
+  c16_t tmp_out_buf[NR_NB_SC_PER_RB];
+  const unsigned int left_dc = NR_NB_SC_PER_RB - right_dc;
+  /* copy out to temp buffer. incase we want to preserve the REs in the out buffer
+     as we call mapping of data in DMRS symbol after mapping DMRS REs
+  */
+  memcpy(tmp_out_buf, out_tmp, sizeof(c16_t) * left_dc);
+  out_tmp -= (fft_size - left_dc);
+  memcpy(tmp_out_buf + left_dc, out_tmp, sizeof(c16_t) * right_dc);
 
-    /* copy back to out buffer */
-    out_tmp = *out;
-    memcpy(out_tmp, tmp_out_buf, sizeof(c16_t) * left_dc);
-    out_tmp -= (fft_size - left_dc);
-    memcpy(out_tmp, tmp_out_buf + left_dc, sizeof(c16_t) * right_dc);
-    out_tmp += right_dc;
-    *out = out_tmp;
-    *rb += 1;
+  /* map on to temp buffer */
+  if (dmrs && data) {
+    map_data_dmrs_ptr(num_cdm_no_data, *data, tmp_out_buf);
+    *data += data_per_rb;
+  } else if (dmrs) {
+    map_dmrs_ptr(delta, *dmrs, tmp_out_buf);
+    *dmrs += dmrs_per_rb;
+  } else if (ptrs) {
+    map_data_ptrs(ptrsIdx, *data, *ptrs, tmp_out_buf);
+    *data += (NR_NB_SC_PER_RB - 1);
+    *ptrs += 1;
+  } else if (data) {
+    map_data_rb(*data, tmp_out_buf);
+    *data += NR_NB_SC_PER_RB;
   } else {
-    *out = (*out) - fft_size;
+    DevAssert(false);
   }
+
+  /* copy back to out buffer */
+  out_tmp = *out;
+  memcpy(out_tmp, tmp_out_buf, sizeof(c16_t) * left_dc);
+  out_tmp -= (fft_size - left_dc);
+  memcpy(out_tmp, tmp_out_buf + left_dc, sizeof(c16_t) * right_dc);
+  out_tmp += right_dc;
+  *out = out_tmp;
 }
 
 /*
@@ -266,12 +267,8 @@ typedef struct {
 /*
 Map all REs in one OFDM symbol
 This function operation is as follows:
-> Computes the number of RB (stop_rb) below DC. (necessarily not below DC as the start_rb can be above DC)
-> Maps REs in the RBs below DC.
-> We call map_over_dc which
-  > maps the REs if a RB sits on both sides of DC & increments pointers else,
-  > it just increments the pointer
-> If there are more RBs to map (nb_rb != stop_rb) i.e, RB above DC then those are mapped
+mapping is done on RB basis. if RB contains DC and if DC is in middle
+of the RB, then the mapping is done via map_over_dc().
 */
 static void map_current_symbol(const nr_phy_pxsch_params_t p,
                                const bool dmrs_symbol,
@@ -283,9 +280,9 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
 {
   const unsigned int abs_start_rb = p.bwp_start + p.start_rb;
   const unsigned int start_sc = (p.first_sc_offset + abs_start_rb * NR_NB_SC_PER_RB) % p.fft_size;
-  const bool cross_dc = start_sc + p.nb_rb * NR_NB_SC_PER_RB > p.fft_size;
-  const unsigned int rb_over_dc = cross_dc ? (p.fft_size - start_sc) % NR_NB_SC_PER_RB : 0;
-  const unsigned int stop_rb = cross_dc ? (p.fft_size - start_sc) / NR_NB_SC_PER_RB : p.nb_rb;
+  const unsigned int dc_rb = (p.fft_size - start_sc) / NR_NB_SC_PER_RB;
+  const unsigned int rb_over_dc = (p.fft_size - start_sc) % NR_NB_SC_PER_RB;
+  const unsigned int n_cdm = p.num_cdm_no_data;
   const c16_t *data_tmp = *data;
   /* If current symbol is DMRS symbol */
   if (dmrs_symbol) {
@@ -294,37 +291,18 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
 
     const c16_t *p_mod_dmrs = dmrs_seq + abs_start_rb * dmrs_per_rb;
     c16_t *out_tmp = out + start_sc;
-    unsigned int rb = 0;
-    /* map below/above DC */
-    for (; rb < stop_rb; rb++) {
-      map_dmrs_ptr(p.delta, p_mod_dmrs, out_tmp);
-      p_mod_dmrs += dmrs_per_rb;
-      out_tmp += NR_NB_SC_PER_RB;
-    }
-    /* if start_rb is above DC or if stop_rb == nb_rb,
-       every RB is mapped at this point and the following code does nothing
-    */
-
-    /* map RB at DC */
-    /* if a RB is on both sides of DC, the following function handles it.
-       if not, then it just increaments the pointer incase there are more RBs above DC.
-    */
-    map_over_dc(rb_over_dc,
-                p.num_cdm_no_data,
-                p.fft_size,
-                dmrs_per_rb,
-                data_per_rb,
-                p.delta,
-                0,
-                &rb,
-                NULL,
-                &p_mod_dmrs,
-                NULL,
-                &out_tmp);
-
-    /* map above DC */
-    /* if there are more RBs, they are mapped in the following part */
-    for (; rb < p.nb_rb; rb++) {
+    for (unsigned int rb = 0; rb < p.nb_rb; rb++) {
+      if (rb == dc_rb) {
+        // map RB at DC
+        if (rb_over_dc) {
+          // if DC is in middle of RB, the following function handles it.
+          map_over_dc(rb_over_dc, n_cdm, p.fft_size, dmrs_per_rb, data_per_rb, p.delta, 0, NULL, &p_mod_dmrs, NULL, &out_tmp);
+          continue;
+        } else {
+          // else just move the pointer and following function will map the rb
+          out_tmp -= p.fft_size;
+        }
+      }
       map_dmrs_ptr(p.delta, p_mod_dmrs, out_tmp);
       p_mod_dmrs += dmrs_per_rb;
       out_tmp += NR_NB_SC_PER_RB;
@@ -333,26 +311,16 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
     /* if there is data in current DMRS symbol, we map it here. */
     if (map_data_dmrs_ptr) {
       c16_t *out_tmp = out + start_sc;
-      unsigned int rb = 0;
-      for (; rb < stop_rb; rb++) {
-        map_data_dmrs_ptr(p.num_cdm_no_data, data_tmp, out_tmp);
-        data_tmp += data_per_rb;
-        out_tmp += NR_NB_SC_PER_RB;
-      }
-      map_over_dc(rb_over_dc,
-                  p.num_cdm_no_data,
-                  p.fft_size,
-                  dmrs_per_rb,
-                  data_per_rb,
-                  p.delta,
-                  0,
-                  &rb,
-                  NULL,
-                  &p_mod_dmrs,
-                  &data_tmp,
-                  &out_tmp);
-      for (; rb < p.nb_rb; rb++) {
-        map_data_dmrs_ptr(p.num_cdm_no_data, data_tmp, out_tmp);
+      for (unsigned int rb = 0; rb < p.nb_rb; rb++) {
+        if (rb == dc_rb) {
+          if (rb_over_dc) {
+            map_over_dc(rb_over_dc, n_cdm, p.fft_size, dmrs_per_rb, data_per_rb, p.delta, 0, NULL, &p_mod_dmrs, &data_tmp, &out_tmp);
+            continue;
+          } else {
+            out_tmp -= p.fft_size;
+          }
+        }
+        map_data_dmrs_ptr(n_cdm, data_tmp, out_tmp);
         data_tmp += data_per_rb;
         out_tmp += NR_NB_SC_PER_RB;
       }
@@ -361,24 +329,33 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
   } else if (ptrs_symbol) {
     const unsigned int first_ptrs_re = get_first_ptrs_re(p.rnti, p.K_ptrs, p.nb_rb, p.k_RE_ref) + start_sc;
     const unsigned int ptrs_idx_re = (start_sc - first_ptrs_re) % NR_NB_SC_PER_RB; // PTRS RE index within RB
-    unsigned int ptrs_idx_rb = (start_sc - first_ptrs_re) / NR_NB_SC_PER_RB; // number of RBs before the first PTRS RB
-    unsigned int rb = 0;
+    unsigned int non_ptrs_rb = (start_sc - first_ptrs_re) / NR_NB_SC_PER_RB; // number of RBs before the first PTRS RB
+    int ptrs_idx_rb = -non_ptrs_rb; // RB count to check for PTRS RB
     c16_t *out_tmp = out + start_sc;
-    /* map data to RBs before the first PTRS RB */
-    for (; rb < ptrs_idx_rb; rb++) {
-      map_data_rb(data_tmp, out);
-      data_tmp += NR_NB_SC_PER_RB;
-      out_tmp += NR_NB_SC_PER_RB;
-    }
     const c16_t *p_mod_ptrs = ptrs_seq;
-    ptrs_idx_rb = 0; // RB count to check for PTRS RB
-    /* we start to map remaining RB here */
-    for (; rb < stop_rb; rb++) {
-      if (ptrs_idx_rb % p.K_ptrs) { // if current RB does not contain PTRS
+    /* map data to RBs before the first PTRS RB or if current RB has no PTRS */
+    for (unsigned int rb = 0; rb < p.nb_rb; rb++) {
+      if (rb < non_ptrs_rb || ptrs_idx_rb % p.K_ptrs) {
+        if (rb == dc_rb) {
+          if (rb_over_dc) {
+            map_over_dc(rb_over_dc, n_cdm, p.fft_size, 0, 0, p.delta, 0, NULL, NULL, &data_tmp, &out_tmp);
+            continue;
+          } else {
+            out_tmp -= p.fft_size;
+          }
+        }
         map_data_rb(data_tmp, out_tmp);
         data_tmp += NR_NB_SC_PER_RB;
         out_tmp += NR_NB_SC_PER_RB;
-      } else { // if current RB contains PTRS
+      } else {
+        if (rb == dc_rb) {
+          if (rb_over_dc) {
+            map_over_dc(rb_over_dc, n_cdm, p.fft_size, 0, 0, p.delta, ptrs_idx_re, &p_mod_ptrs, NULL, &data_tmp, &out_tmp);
+            continue;
+          } else {
+            out_tmp -= p.fft_size;
+          }
+        }
         map_data_ptrs(ptrs_idx_re, data_tmp, p_mod_ptrs, out_tmp);
         p_mod_ptrs++; // increament once as only one PTRS RE per RB
         data_tmp += (NR_NB_SC_PER_RB - 1);
@@ -386,49 +363,18 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
       }
       ptrs_idx_rb++;
     }
-    if (ptrs_idx_rb % p.K_ptrs) {
-      /* if not a PTRS RB set mod_ptrs to NULL in function arg */
-      map_over_dc(rb_over_dc, p.num_cdm_no_data, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
-    } else {
-      /* if a PTRS RB set valid mod_ptrs pointer */
-      map_over_dc(rb_over_dc,
-                  p.num_cdm_no_data,
-                  p.fft_size,
-                  0,
-                  0,
-                  p.delta,
-                  ptrs_idx_re,
-                  &rb,
-                  &p_mod_ptrs,
-                  NULL,
-                  &data_tmp,
-                  &out_tmp);
-    }
-    /* map remaining RBs above DC */
-    for (; rb < p.nb_rb; rb++) {
-      if (ptrs_idx_rb % p.K_ptrs) {
-        map_data_rb(data_tmp, out_tmp);
-        data_tmp += NR_NB_SC_PER_RB;
-        out_tmp += NR_NB_SC_PER_RB;
-      } else {
-        map_data_ptrs(ptrs_idx_re, data_tmp, p_mod_ptrs, out_tmp);
-        p_mod_ptrs++;
-        data_tmp += (NR_NB_SC_PER_RB - 1);
-        out_tmp += NR_NB_SC_PER_RB;
-      }
-      ptrs_idx_rb++;
-    }
   } else {
     /* only data in this symbol */
-    unsigned int rb = 0;
     c16_t *out_tmp = out + start_sc;
-    for (; rb < stop_rb; rb++) {
-      map_data_rb(data_tmp, out_tmp);
-      data_tmp += NR_NB_SC_PER_RB;
-      out_tmp += NR_NB_SC_PER_RB;
-    }
-    map_over_dc(rb_over_dc, p.num_cdm_no_data, p.fft_size, 0, 0, p.delta, 0, &rb, NULL, NULL, &data_tmp, &out_tmp);
-    for (; rb < p.nb_rb; rb++) {
+    for (unsigned int rb = 0; rb < p.nb_rb; rb++) {
+      if (rb == dc_rb) {
+        if (rb_over_dc) {
+          map_over_dc(rb_over_dc, n_cdm, p.fft_size, 0, 0, p.delta, 0, NULL, NULL, &data_tmp, &out_tmp);
+          continue;
+        } else {
+          out_tmp -= p.fft_size;
+        }
+      }
       map_data_rb(data_tmp, out_tmp);
       data_tmp += NR_NB_SC_PER_RB;
       out_tmp += NR_NB_SC_PER_RB;
