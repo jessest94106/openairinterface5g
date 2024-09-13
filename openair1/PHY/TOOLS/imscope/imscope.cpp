@@ -279,8 +279,17 @@ class IQHist {
       }
     } else if (plot_type == 1) {
       if (ImPlot::BeginPlot(label.c_str(), {(float)ImGui::GetWindowWidth() * 0.3f, (float)ImGui::GetWindowWidth() * 0.3f})) {
-        // Limit the amount of data plotted with scatterplot (issue with vertices/draw call)
-        ImPlot::PlotScatter(label.c_str(), iq_data->real.data(), iq_data->imag.data(), std::min(16000, iq_data->len));
+        int points_drawn = 0;
+        while (points_drawn < iq_data->len) {
+          // Limit the amount of data plotted with PlotScatter call (issue with vertices/draw call)
+          int points_to_draw = std::min(iq_data->len - points_drawn, 16000);
+          ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 1, IMPLOT_AUTO_COL, 1);
+          ImPlot::PlotScatter(label.c_str(),
+                              iq_data->real.data() + points_drawn,
+                              iq_data->imag.data() + points_drawn,
+                              points_to_draw);
+          points_drawn += points_to_draw;
+        }
         ImPlot::EndPlot();
       }
     } else if (plot_type == 2) {
