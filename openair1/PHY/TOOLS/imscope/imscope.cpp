@@ -499,6 +499,16 @@ void ShowUeScope(PHY_VARS_NR_UE *ue, float t)
     time_domain_iq->Draw(iq_data, t, new_data);
     ImGui::TreePop();
   }
+  if (ImGui::TreeNode("Time domain samples - before sync")) {
+    static auto iq_data = new IQData();
+    static auto time_domain_iq = new IQHist("Time domain samples - before sync");
+    bool new_data = false;
+    if (time_domain_iq->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[ueTimeDomainSamplesBeforeSync], t, time_domain_iq->GetEpsilon());
+    }
+    time_domain_iq->Draw(iq_data, t, new_data);
+    ImGui::TreePop();
+  }
   if (ImGui::TreeNode("Broadcast channel")) {
     ImGui::Text("RSRP %d", ue->measurements.ssb_rsrp_dBm[ue->frame_parms.ssb_index]);
     if (ImGui::TreeNode("IQ")) {

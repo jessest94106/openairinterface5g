@@ -707,8 +707,10 @@ void readFrame(PHY_VARS_NR_UE *UE,  openair0_timestamp *timestamp, bool toTrash)
                    + 4 * ((x * fp->samples_per_subframe) + fp->get_samples_slot_timestamp(slot, fp, 0));
       }
 
-      int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, rxp, fp->get_samples_per_slot(slot, fp), fp->nb_antennas_rx);
-      AssertFatal(fp->get_samples_per_slot(slot, fp) == tmp, "");
+      int read_block_size = fp->get_samples_per_slot(slot, fp);
+      int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, rxp, read_block_size, fp->nb_antennas_rx);
+      UEscopeCopy(UE, ueTimeDomainSamplesBeforeSync, rxp[0], sizeof(c16_t), 1, read_block_size, 0);
+      AssertFatal(read_block_size == tmp, "");
 
       if (IS_SOFTMODEM_RFSIM)
         dummyWrite(UE, *timestamp, fp->get_samples_per_slot(slot, fp));
