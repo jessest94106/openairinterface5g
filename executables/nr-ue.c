@@ -445,10 +445,12 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
 
   radio_tx_burst_flag_t flags = TX_BURST_INVALID;
 
-  if (UE->received_config_request && openair0_cfg[0].duplex_mode == duplex_mode_TDD && !get_softmodem_params()->continuous_tx) {
+  if (UE->received_config_request) {
+    if (openair0_cfg[0].duplex_mode == duplex_mode_FDD || get_softmodem_params()->continuous_tx) {
+      flags = TX_BURST_MIDDLE;
     // In case of Sidelink, USRP write needed only in case transmission
     // needs to be done in this slot and not based on tdd ULDL configuration.
-    if (UE->sl_mode == 2) {
+    } else if (UE->sl_mode == 2) {
       if (sl_tx_action)
         flags = TX_BURST_START_AND_END;
     } else {
@@ -465,8 +467,6 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
           flags = TX_BURST_MIDDLE;
       }
     }
-  } else {
-    flags = TX_BURST_MIDDLE;
   }
 
   int tmp = openair0_write_reorder(&UE->rfdevice, proc->timestamp_tx, txp, rxtxD->writeBlockSize, fp->nb_antennas_tx, flags);
