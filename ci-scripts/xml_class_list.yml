@@ -30,7 +30,6 @@
   - Initialize_5GCN
   - Terminate_5GCN
   - IdleSleep
-  - Perform_X2_Handover
   - Build_Image
   - Build_Run_Tests
   - Deploy_Object

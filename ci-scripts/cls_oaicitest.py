@@ -263,10 +263,6 @@ class OaiCiTest():
 		self.UEDevicesOnCmd = []
 		self.UEDevicesRebootCmd = []
 		self.idle_sleep_time = 0
-		self.x2_ho_options = 'network'
-		self.x2NbENBs = 0
-		self.x2ENBBsIds = []
-		self.x2ENBConnectedUEs = []
 		self.repeatCounts = []
 		self.finalStatus = False
 		self.UEIPAddress = ''
@@ -934,55 +930,6 @@ class OaiCiTest():
 	def IdleSleep(self,HTML):
 		time.sleep(self.idle_sleep_time)
 		HTML.CreateHtmlTestRow(str(self.idle_sleep_time) + ' sec', 'OK', CONST.ALL_PROCESSES_OK)
-
-	def X2_Status(self, idx, fileName, EPC):
-		cmd = "curl --silent http://" + EPC.IPAddress + ":9999/stats | jq '.' > " + fileName
-		message = cmd + '\n'
-		logging.debug(cmd)
-		subprocess.run(cmd, shell=True)
-		if idx == 0:
-			cmd = "jq '.mac_stats | length' " + fileName
-			strNbEnbs = subprocess.check_output(cmd, shell=True, universal_newlines=True)
-			self.x2NbENBs = int(strNbEnbs.strip())
-		cnt = 0
-		while cnt < self.x2NbENBs:
-			cmd = "jq '.mac_stats[" + str(cnt) + "].bs_id' " + fileName
-			bs_id = subprocess.check_output(cmd, shell=True, universal_newlines=True)
-			self.x2ENBBsIds[idx].append(bs_id.strip())
-			cmd = "jq '.mac_stats[" + str(cnt) + "].ue_mac_stats | length' " + fileName
-			stNbUEs = subprocess.check_output(cmd, shell=True, universal_newlines=True)
-			nbUEs = int(stNbUEs.strip())
-			ueIdx = 0
-			self.x2ENBConnectedUEs[idx].append([])
-			while ueIdx < nbUEs:
-				cmd = "jq '.mac_stats[" + str(cnt) + "].ue_mac_stats[" + str(ueIdx) + "].rnti' " + fileName
-				rnti = subprocess.check_output(cmd, shell=True, universal_newlines=True)
-				self.x2ENBConnectedUEs[idx][cnt].append(rnti.strip())
-				ueIdx += 1
-			cnt += 1
-
-		cnt = 0
-		while cnt < self.x2NbENBs:
-			msg = "   -- eNB: " + str(self.x2ENBBsIds[idx][cnt]) + " is connected to " + str(len(self.x2ENBConnectedUEs[idx][cnt])) + " UE(s)"
-			logging.debug(msg)
-			message += msg + '\n'
-			ueIdx = 0
-			while ueIdx < len(self.x2ENBConnectedUEs[idx][cnt]):
-				msg = "      -- UE rnti: " + str(self.x2ENBConnectedUEs[idx][cnt][ueIdx])
-				logging.debug(msg)
-				message += msg + '\n'
-				ueIdx += 1
-			cnt += 1
-		return message
-
-	def Perform_X2_Handover(self,HTML,RAN,EPC):
-		html_queue = SimpleQueue()
-		fullMessage = '<pre style="background-color:white">'
-		msg = f'Doing X2 Handover w/ option {self.x2_ho_options}'
-		logging.debug(msg)
-		fullMessage += msg + '\n'
-		if self.x2_ho_options == 'network':
-			HTML.CreateHtmlTestRow('Cannot perform requested X2 Handover', 'KO', CONST.ALL_PROCESSES_OK)
 
 	def LogCollectBuild(self,RAN):
 		# Some pipelines are using "none" IP / Credentials

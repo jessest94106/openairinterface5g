@@ -278,17 +278,6 @@ def GetParametersFromXML(action):
 		else:
 			CiTestObj.idle_sleep_time = int(string_field)
 
-	elif action == 'Perform_X2_Handover':
-		string_field = test.findtext('x2_ho_options')
-		if (string_field is None):
-			CiTestObj.x2_ho_options = 'network'
-		else:
-			if string_field != 'network':
-				logging.error('ERROR: test-case has wrong option ' + string_field)
-				CiTestObj.x2_ho_options = 'network'
-			else:
-				CiTestObj.x2_ho_options = string_field
-
 	elif action == 'Build_PhySim':
 		ldpc.buildargs  = test.findtext('physim_build_args')
 		forced_workspace_cleanup = test.findtext('forced_workspace_cleanup')
@@ -761,8 +750,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						EPC.UndeployEpc(HTML)
 					elif action == 'IdleSleep':
 						CiTestObj.IdleSleep(HTML)
-					elif action == 'Perform_X2_Handover':
-						CiTestObj.Perform_X2_Handover(HTML,RAN,EPC)
 					elif action == 'Build_PhySim':
 						HTML=ldpc.Build_PhySim(HTML,CONST)
 						if ldpc.exitStatus==1:
