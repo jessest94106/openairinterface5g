@@ -225,14 +225,6 @@ def GetParametersFromXML(action):
 		else:
 			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 
-	elif action == 'Build_OAI_UE':
-		CiTestObj.Build_OAI_UE_args = test.findtext('Build_OAI_UE_args')
-		CiTestObj.clean_repository = test.findtext('clean_repository')
-		if (CiTestObj.clean_repository == 'false'):
-			CiTestObj.clean_repository = False
-		else:
-			CiTestObj.clean_repository = True
-
 	elif action == 'Initialize_OAI_UE':
 		CiTestObj.Initialize_OAI_UE_args = test.findtext('Initialize_OAI_UE_args')
 		UE_instance = test.findtext('UE_instance')
@@ -780,8 +772,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						CiTestObj.DataEnableUE(HTML)
 					elif action == 'CheckStatusUE':
 						CiTestObj.CheckStatusUE(HTML)
-					elif action == 'Build_OAI_UE':
-						CiTestObj.BuildOAIUE(HTML)
 					elif action == 'Initialize_OAI_UE':
 						CiTestObj.InitializeOAIUE(HTML,RAN,EPC,CONTAINERS)
 					elif action == 'Terminate_OAI_UE':

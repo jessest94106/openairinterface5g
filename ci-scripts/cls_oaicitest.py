@@ -275,7 +275,6 @@ class OaiCiTest():
 		self.UE_instance = 0
 		self.UESourceCodePath = ''
 		self.UELogFile = ''
-		self.Build_OAI_UE_args = ''
 		self.Initialize_OAI_UE_args = ''
 		self.clean_repository = True
 		self.air_interface=''
@@ -284,112 +283,6 @@ class OaiCiTest():
 		self.svr_node = None
 		self.svr_id = None
 		self.cmd_prefix = '' # prefix before {lte,nr}-uesoftmodem
-
-
-	def BuildOAIUE(self,HTML):
-		if self.UEIPAddress == '' or self.ranRepository == '' or self.ranBranch == '' or self.UEUserName == '' or self.UEPassword == '' or self.UESourceCodePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		SSH = sshconnection.SSHConnection()
-		SSH.open(self.UEIPAddress, self.UEUserName, self.UEPassword)
-		result = re.search('--nrUE', self.Build_OAI_UE_args)
-		if result is not None:
-			self.air_interface='nr-uesoftmodem'
-			ue_prefix = 'NR '
-		else:
-			self.air_interface='lte-uesoftmodem'
-			ue_prefix = ''
-		result = re.search('([a-zA-Z0-9\:\-\.\/])+\.git', self.ranRepository)
-		if result is not None:
-			full_ran_repo_name = self.ranRepository.replace('git/', 'git')
-		else:
-			full_ran_repo_name = self.ranRepository + '.git'
-		SSH.command(f'mkdir -p {self.UESourceCodePath}', '\$', 5)
-		SSH.command(f'cd {self.UESourceCodePath}', '\$', 5)
-		SSH.command(f'if [ ! -e .git ]; then stdbuf -o0 git clone {full_ran_repo_name} .; else stdbuf -o0 git fetch --prune; fi', '\$', 600)
-		# here add a check if git clone or git fetch went smoothly
-		SSH.command('git config user.email "jenkins@openairinterface.org"', '\$', 5)
-		SSH.command('git config user.name "OAI Jenkins"', '\$', 5)
-		if self.clean_repository:
-			SSH.command('ls *.txt', '\$', 5)
-			result = re.search('LAST_BUILD_INFO', SSH.getBefore())
-			if result is not None:
-				mismatch = False
-				SSH.command('grep --colour=never SRC_COMMIT LAST_BUILD_INFO.txt', '\$', 2)
-				result = re.search(self.ranCommitID, SSH.getBefore())
-				if result is None:
-					mismatch = True
-				SSH.command('grep --colour=never MERGED_W_TGT_BRANCH LAST_BUILD_INFO.txt', '\$', 2)
-				if self.ranAllowMerge:
-					result = re.search('YES', SSH.getBefore())
-					if result is None:
-						mismatch = True
-					SSH.command('grep --colour=never TGT_BRANCH LAST_BUILD_INFO.txt', '\$', 2)
-					if self.ranTargetBranch == '':
-						result = re.search('develop', SSH.getBefore())
-					else:
-						result = re.search(self.ranTargetBranch, SSH.getBefore())
-					if result is None:
-						mismatch = True
-				else:
-					result = re.search('NO', SSH.getBefore())
-					if result is None:
-						mismatch = True
-				if not mismatch:
-					SSH.close()
-					HTML.CreateHtmlTestRow(self.Build_OAI_UE_args, 'OK', CONST.ALL_PROCESSES_OK)
-					return
-
-			SSH.command(f'echo {self.UEPassword} | sudo -S git clean -x -d -ff', '\$', 30)
-
-		# if the commit ID is provided use it to point to it
-		if self.ranCommitID != '':
-			SSH.command(f'git checkout -f {self.ranCommitID}', '\$', 30)
-		# if the branch is not develop, then it is a merge request and we need to do 
-		# the potential merge. Note that merge conflicts should already been checked earlier
-		if self.ranAllowMerge:
-			if self.ranTargetBranch == '':
-				if (self.ranBranch != 'develop') and (self.ranBranch != 'origin/develop'):
-					SSH.command('git merge --ff origin/develop -m "Temporary merge for CI"', '\$', 30)
-			else:
-				logging.debug(f'Merging with the target branch: {self.ranTargetBranch}')
-				SSH.command(f'git merge --ff origin/{self.ranTargetBranch} -m "Temporary merge for CI"', '\$', 30)
-		SSH.command('source oaienv', '\$', 5)
-		SSH.command('cd cmake_targets', '\$', 5)
-		SSH.command('mkdir -p log', '\$', 5)
-		SSH.command('chmod 777 log', '\$', 5)
-		# no need to remove in log (git clean did the trick)
-		SSH.command(f'stdbuf -o0 ./build_oai {self.Build_OAI_UE_args} 2>&1 | stdbuf -o0 tee compile_oai_ue.log', 'Bypassing the Tests|build have failed', 1200)
-		SSH.command('ls ran_build/build', '\$', 3)
-		SSH.command('ls ran_build/build', '\$', 3)
-		buildStatus = True
-		result = re.search(self.air_interface, SSH.getBefore())
-		if result is None:
-			buildStatus = False
-		SSH.command(f'mkdir -p build_log_{self.testCase_id}', '\$', 5)
-		SSH.command(f'mv log/* build_log_{self.testCase_id}', '\$', 5)
-		SSH.command(f'mv compile_oai_ue.log build_log_{self.testCase_id}', '\$', 5)
-		if buildStatus:
-			# Generating a BUILD INFO file
-			SSH.command(f'echo "SRC_BRANCH: {self.ranBranch}" > ../LAST_BUILD_INFO.txt', '\$', 2)
-			SSH.command(f'echo "SRC_COMMIT: {self.ranCommitID}" >> ../LAST_BUILD_INFO.txt', '\$', 2)
-			if self.ranAllowMerge:
-				SSH.command('echo "MERGED_W_TGT_BRANCH: YES" >> ../LAST_BUILD_INFO.txt', '\$', 2)
-				if self.ranTargetBranch == '':
-					SSH.command('echo "TGT_BRANCH: develop" >> ../LAST_BUILD_INFO.txt', '\$', 2)
-				else:
-					SSH.command(f'echo "TGT_BRANCH: {self.ranTargetBranch}" >> ../LAST_BUILD_INFO.txt', '\$', 2)
-			else:
-				SSH.command('echo "MERGED_W_TGT_BRANCH: NO" >> ../LAST_BUILD_INFO.txt', '\$', 2)
-			SSH.close()
-			HTML.CreateHtmlTestRow(self.Build_OAI_UE_args, 'OK', CONST.ALL_PROCESSES_OK, 'OAI UE')
-		else:
-			SSH.close()
-			logging.error('\u001B[1m Building OAI UE Failed\u001B[0m')
-			HTML.CreateHtmlTestRow(self.Build_OAI_UE_args, 'KO', CONST.ALL_PROCESSES_OK, 'OAI UE')
-			HTML.CreateHtmlTabFooter(False)
-			self.ConditionalExit()
-
 
 	def InitializeUE(self, HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
