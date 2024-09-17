@@ -30,15 +30,14 @@
 #include "f1ap_messages_types.h"
 #include "ngap_messages_types.h"
 
+/* Definitions according to 3GPP TS 38.463 */
 #define E1AP_MAX_NUM_TRANSAC_IDS 4
 #define E1AP_MAX_NUM_PLMNS 4
 #define E1AP_MAX_NUM_SLICES 1024
 #define E1AP_MAX_NUM_CELL_GROUPS 4
 #define E1AP_MAX_NUM_QOS_FLOWS 4
-#define E1AP_MAX_NUM_NGRAN_DRB 4
 #define E1AP_MAX_NUM_PDU_SESSIONS 4
-#define E1AP_MAX_NUM_DRBS 4
-#define E1AP_MAX_NUM_DRBS 4
+#define E1AP_MAX_NUM_DRBS 32
 #define E1AP_MAX_NUM_UP_PARAM 4
 
 #define E1AP_REGISTER_REQ(mSGpTR)                         (mSGpTR)->ittiMsg.e1ap_register_req
@@ -227,9 +226,9 @@ typedef struct pdu_session_to_setup_s {
   int tl_port;
   int tl_port_dl;
   long numDRB2Setup;
-  DRB_nGRAN_to_setup_t DRBnGRanList[E1AP_MAX_NUM_NGRAN_DRB];
+  DRB_nGRAN_to_setup_t DRBnGRanList[E1AP_MAX_NUM_DRBS];
   long numDRB2Modify;
-  DRB_nGRAN_to_mod_t DRBnGRanModList[E1AP_MAX_NUM_NGRAN_DRB];
+  DRB_nGRAN_to_mod_t DRBnGRanModList[E1AP_MAX_NUM_DRBS];
 } pdu_session_to_setup_t, pdu_session_to_mod_t;
 
 /**
@@ -293,16 +292,16 @@ typedef struct pdu_session_setup_s {
   in_addr_t tlAddress;
   long teId;
   int numDRBSetup;
-  DRB_nGRAN_setup_t DRBnGRanList[E1AP_MAX_NUM_NGRAN_DRB];
+  DRB_nGRAN_setup_t DRBnGRanList[E1AP_MAX_NUM_DRBS];
   int numDRBFailed;
-  DRB_nGRAN_failed_t DRBnGRanFailedList[E1AP_MAX_NUM_NGRAN_DRB];
+  DRB_nGRAN_failed_t DRBnGRanFailedList[E1AP_MAX_NUM_DRBS];
 } pdu_session_setup_t;
 
 typedef struct pdu_session_modif_s {
   long id;
   // setup as part of PDU session modification not supported yet
   int numDRBModified;
-  DRB_nGRAN_modified_t DRBnGRanModList[E1AP_MAX_NUM_NGRAN_DRB];
+  DRB_nGRAN_modified_t DRBnGRanModList[E1AP_MAX_NUM_DRBS];
 } pdu_session_modif_t;
 
 typedef struct e1ap_bearer_setup_resp_s {
