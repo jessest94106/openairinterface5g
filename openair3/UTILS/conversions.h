@@ -31,7 +31,7 @@
     ((x & 0x00FF0000) >> 8) | ((x & 0xFF000000) >> 24))
 
 # define hton_int16(x)   \
-    (((x & 0x00FF) << 8) | ((x & 0xFF00) >> 8)
+    ((((x) & 0x00FF) << 8) | (((x) & 0xFF00) >> 8))
 
 # define ntoh_int32_buf(bUF)        \
     ((*((uint8_t*)bUF)) << 24) | ((*((uint8_t*)bUF + 1)) << 16) | ((*((uint8_t*)bUF + 2)) << 8)   \
