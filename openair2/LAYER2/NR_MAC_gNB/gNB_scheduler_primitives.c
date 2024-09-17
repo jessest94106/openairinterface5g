@@ -3185,7 +3185,7 @@ void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST 
   }
 }
 
-static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame)
+static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int slot, int slots_per_frame)
 {
   return ((frame * slots_per_frame + slot) / beam_info->beam_duration) % beam_info->beam_allocation_size;
 }
@@ -3196,7 +3196,7 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
   if (!beam_info->beam_allocation)
     return (NR_beam_alloc_t) {.new_beam = false, .idx = 0};
 
-  const int index = get_beam_index(beam_info, frame, slot, beam_index, slots_per_frame);
+  const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     NR_beam_alloc_t beam_struct = {.new_beam = false, .idx = i};
     int *beam = &beam_info->beam_allocation[i][index];
@@ -3215,7 +3215,7 @@ void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_
 {
   if(!new_beam) // need to reset only if the beam was allocated specifically for this instance
     return;
-  const int index = get_beam_index(beam_info, frame, slot, beam_index, slots_per_frame);
+  const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     if (beam_info->beam_allocation[i][index] == beam_index)
       beam_info->beam_allocation[i][index] = -1;
