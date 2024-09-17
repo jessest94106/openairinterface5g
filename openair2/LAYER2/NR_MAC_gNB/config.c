@@ -501,7 +501,7 @@ static void config_common(gNB_MAC_INST *nrmac, nr_pdsch_AntennaPorts_t pdsch_Ant
 
   switch (scc->ssb_PositionsInBurst->present) {
     case 1:
-      cfg->ssb_table.ssb_mask_list[0].ssb_mask.value = scc->ssb_PositionsInBurst->choice.shortBitmap.buf[0] << 24;
+      cfg->ssb_table.ssb_mask_list[0].ssb_mask.value = ((uint32_t)scc->ssb_PositionsInBurst->choice.shortBitmap.buf[0]) << 24;
       cfg->ssb_table.ssb_mask_list[1].ssb_mask.value = 0;
       break;
     case 2:
