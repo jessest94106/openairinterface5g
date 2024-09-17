@@ -225,25 +225,6 @@ def GetParametersFromXML(action):
 		else:
 			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 
-	elif action == 'Initialize_OAI_UE':
-		CiTestObj.Initialize_OAI_UE_args = test.findtext('Initialize_OAI_UE_args')
-		UE_instance = test.findtext('UE_instance')
-		if (UE_instance is None):
-			CiTestObj.UE_instance = 0
-		else:
-			CiTestObj.UE_instance = UE_instance
-			
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			CiTestObj.air_interface = 'lte-uesoftmodem'
-		elif (air_interface.lower() in ['nr','lte']):
-			CiTestObj.air_interface = air_interface.lower() +'-uesoftmodem'
-		else :
-			logging.error('OCP UE -- NOT SUPPORTED')
-
-		CiTestObj.cmd_prefix = test.findtext('cmd_prefix') or ""
-
 	elif action == 'Terminate_OAI_UE':
 		UE_instance=test.findtext('UE_instance')
 		if (UE_instance is None):
@@ -772,8 +753,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						CiTestObj.DataEnableUE(HTML)
 					elif action == 'CheckStatusUE':
 						CiTestObj.CheckStatusUE(HTML)
-					elif action == 'Initialize_OAI_UE':
-						CiTestObj.InitializeOAIUE(HTML,RAN,EPC,CONTAINERS)
 					elif action == 'Terminate_OAI_UE':
 						CiTestObj.TerminateOAIUE(HTML,RAN,EPC,CONTAINERS)
 					elif action == 'Ping':
