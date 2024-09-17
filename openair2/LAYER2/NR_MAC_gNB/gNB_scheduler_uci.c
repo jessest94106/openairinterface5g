@@ -423,7 +423,8 @@ static uint8_t pickandreverse_bits(uint8_t *payload, uint16_t bitlen, uint8_t st
   return rev_bits;
 }
 
-static void evaluate_rsrp_report(NR_UE_info_t *UE,
+static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
+                                 NR_UE_info_t *UE,
                                  NR_UE_sched_ctrl_t *sched_ctrl,
                                  uint8_t csi_report_id,
                                  uint8_t *payload,
@@ -463,6 +464,7 @@ static void evaluate_rsrp_report(NR_UE_info_t *UE,
       AssertFatal(false, "Invalid RSRP report type\n");
   }
 
+  rsrp_report->nr_reports = csi_report->CSI_report_bitlen.nb_ssbri_cri;
   uint16_t curr_payload;
   for (int i = 0; i < rsrp_report->nr_reports; i++) {
     int bitlen = csi_report->CSI_report_bitlen.cri_ssbri_bitlen;
@@ -613,7 +615,7 @@ static void extract_pucch_csi_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
                                      frame_t frame,
                                      slot_t slot,
                                      NR_UE_info_t *UE,
-                                     NR_ServingCellConfigCommon_t *scc)
+                                     gNB_MAC_INST *nrmac)
 {
   /** From Table 6.3.1.1.2-3: RI, LI, CQI, and CRI of codebookType=typeI-SinglePanel */
   uint8_t *payload = uci_pdu->csi_part1.csi_part1_payload;
@@ -643,12 +645,13 @@ static void extract_pucch_csi_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
     if ((n_slots_frame*frame + slot - offset)%period == 0) {
       reportQuantity_type = csi_report->reportQuantity_type;
       LOG_D(MAC,"SFN/SF:%d/%d reportQuantity type = %d\n",frame,slot,reportQuantity_type);
-      switch(reportQuantity_type){
+      switch(reportQuantity_type) {
         case NR_CSI_ReportConfig__reportQuantity_PR_cri_RSRP:
-          evaluate_rsrp_report(UE,sched_ctrl,csi_report_id,payload,&cumul_bits,reportQuantity_type);
+          evaluate_rsrp_report(nrmac, UE, sched_ctrl, csi_report_id, payload, &cumul_bits, reportQuantity_type);
           break;
         case NR_CSI_ReportConfig__reportQuantity_PR_ssb_Index_RSRP:
-          evaluate_rsrp_report(UE,sched_ctrl,csi_report_id,payload,&cumul_bits,reportQuantity_type);
+          evaluate_rsrp_report(nrmac, UE, sched_ctrl, csi_report_id, payload, &cumul_bits, reportQuantity_type);
+          beam_selection_procedures(nrmac, UE);
           break;
         case NR_CSI_ReportConfig__reportQuantity_PR_cri_RI_CQI:
           sched_ctrl->CSI_report.cri_ri_li_pmi_cqi_report.print_report = true;
@@ -818,7 +821,7 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   NR_SCHED_LOCK(&nrmac->sched_lock);
 
-  NR_UE_info_t * UE = find_nr_UE(&nrmac->UE_info, uci_234->rnti);
+  NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, uci_234->rnti);
   if (!UE) {
     NR_SCHED_UNLOCK(&nrmac->sched_lock);
     LOG_E(NR_MAC, "%s(): unknown RNTI %04x in PUCCH UCI\n", __func__, uci_234->rnti);
@@ -866,7 +869,7 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
     LOG_D(NR_MAC, "CSI CRC %d\n", uci_234->csi_part1.csi_part1_crc);
     if (uci_234->csi_part1.csi_part1_crc != 1) {
       // API to parse the csi report and store it into sched_ctrl
-      extract_pucch_csi_report(csi_MeasConfig, uci_234, frame, slot, UE, nrmac->common_channels->ServingCellConfigCommon);
+      extract_pucch_csi_report(csi_MeasConfig, uci_234, frame, slot, UE, nrmac);
     }
     free(uci_234->csi_part1.csi_part1_payload);
   }

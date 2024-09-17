@@ -3222,6 +3222,18 @@ void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_
   }
 }
 
+void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
+{
+  RSRP_report_t *rsrp_report = &UE->UE_sched_ctrl.CSI_report.ssb_rsrp_report;
+  // simple beam switching algorithm -> we select beam with highest RSRP from CSI report
+  int new_bf_index = get_fapi_beamforming_index(mac, rsrp_report->resource_id[0]);
+  if (UE->UE_beam_index == new_bf_index)
+    return; // no beam change needed
+
+  LOG_I(NR_MAC, "Switching to beam with ID %d corresponding to SSB %d\n", new_bf_index, rsrp_report->resource_id[0]);
+  UE->UE_beam_index = new_bf_index;
+}
+
 void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_len, void *data)
 {
   gNB_MAC_INST *mac = RC.nrmac[0];
