@@ -873,60 +873,6 @@ class OaiCiTest():
 		messages = [f"UE {ue.getName()}: {log}" for (ue, log) in zip(ues, archive_info)]
 		HTML.CreateHtmlTestRowQueue(f'N/A', 'OK', messages)
 
-	def TerminateOAIUE(self,HTML,RAN,EPC,CONTAINERS):
-		SSH = sshconnection.SSHConnection()
-		SSH.open(self.UEIPAddress, self.UEUserName, self.UEPassword)
-		SSH.command(f'cd {self.UESourceCodePath}/cmake_targets', '\$', 5)
-		SSH.command('ps -aux | grep --color=never softmodem | grep -v grep', '\$', 5)
-		result = re.search('-uesoftmodem', SSH.getBefore())
-		if result is not None:
-			SSH.command(f'echo {self.UEPassword} | sudo -S killall --signal SIGINT -r .*-uesoftmodem || true', '\$', 5)
-			time.sleep(10)
-			SSH.command('ps -aux | grep --color=never softmodem | grep -v grep', '\$', 5)
-			result = re.search('-uesoftmodem', SSH.getBefore())
-			if result is not None:
-				SSH.command(f'echo {self.UEPassword} | sudo -S killall --signal SIGKILL -r .*-uesoftmodem || true', '\$', 5)
-				time.sleep(5)
-		SSH.command(f'rm -f my-lte-uesoftmodem-run {self.UE_instance}.sh', '\$', 5)
-		SSH.close()
-		result = re.search('ue_', str(self.UELogFile))
-		if result is not None:
-			copyin_res = SSH.copyin(self.UEIPAddress, self.UEUserName, self.UEPassword,f'{self.UESourceCodePath}/cmake_targets/{self.UELogFile}', '.')
-			if (copyin_res == -1):
-				logging.debug('\u001B[1;37;41m Could not copy UE logfile to analyze it! \u001B[0m')
-				HTML.htmlUEFailureMsg='Could not copy UE logfile to analyze it!'
-				HTML.CreateHtmlTestRow('N/A', 'KO', CONST.OAI_UE_PROCESS_NOLOGFILE_TO_ANALYZE, 'UE')
-				self.UELogFile = ''
-				return
-			logging.debug('\u001B[1m Analyzing UE logfile \u001B[0m')
-			logStatus = self.AnalyzeLogFile_UE(self.UELogFile,HTML,RAN)
-			result = re.search('--no-L2-connect', str(self.Initialize_OAI_UE_args))
-			if result is not None:
-				ueAction = 'Sniffing'
-			else:
-				ueAction = 'Connection'
-			if (logStatus < 0):
-				logging.debug(f'\u001B[1m {ueAction} Failed \u001B[0m')
-				HTML.htmlUEFailureMsg='<b>' + ueAction + ' Failed</b>\n' + HTML.htmlUEFailureMsg
-				HTML.CreateHtmlTestRow('N/A', 'KO', logStatus, 'UE')
-				if self.air_interface == 'lte-uesoftmodem':
-					# In case of sniffing on commercial eNBs we have random results
-					# Not an error then
-					if (logStatus != CONST.OAI_UE_PROCESS_COULD_NOT_SYNC) or (ueAction != 'Sniffing'):
-						self.Initialize_OAI_UE_args = ''
-						self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
-				else:
-					if (logStatus == CONST.OAI_UE_PROCESS_COULD_NOT_SYNC):
-						self.Initialize_OAI_UE_args = ''
-						self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
-			else:
-				logging.debug(f'\u001B[1m {ueAction} Completed \u001B[0m')
-				HTML.htmlUEFailureMsg='<b>' + ueAction + ' Completed</b>\n' + HTML.htmlUEFailureMsg
-				HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
-			self.UELogFile = ''
-		else:
-			HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
-
 	def AutoTerminateUEandeNB(self,HTML,RAN,EPC,CONTAINERS):
 		if (RAN.Initialize_eNB_args != ''):
 			self.testCase_id = 'AUTO-KILL-RAN'
