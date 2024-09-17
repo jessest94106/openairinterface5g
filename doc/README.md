@@ -69,6 +69,7 @@ Legacy unmaintained files:
 - [Information on how NR nFAPI works](./NR_NFAPI_archi.md)
 - [Flow graph of the L1 in gNB](SW-archi-graph.md)
 - [L1 threads in NR-UE](./nr-ue-design.md)
+- [Information on gNB MAC](./MAC/mac-usage.md)
 
 Legacy unmaintained files:
 - [`5Gnas.md`](./5Gnas.md)
