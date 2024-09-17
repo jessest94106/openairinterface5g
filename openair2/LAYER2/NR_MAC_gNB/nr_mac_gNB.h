@@ -523,16 +523,16 @@ struct CRI_RI_LI_PMI_CQI {
   bool print_report;
 };
 
-typedef struct CRI_SSB_RSRP {
-  uint8_t nr_ssbri_cri;
-  uint8_t CRI_SSBRI[MAX_NR_OF_REPORTED_RS];
-  uint8_t RSRP;
-  uint8_t diff_RSRP[MAX_NR_OF_REPORTED_RS - 1];
-} CRI_SSB_RSRP_t;
+typedef struct RSRP_report {
+  uint8_t nr_reports;
+  uint8_t resource_id[MAX_NR_OF_REPORTED_RS];
+  int RSRP[MAX_NR_OF_REPORTED_RS];
+} RSRP_report_t;
 
 struct CSI_Report {
   struct CRI_RI_LI_PMI_CQI cri_ri_li_pmi_cqi_report;
-  struct CRI_SSB_RSRP ssb_cri_report;
+  RSRP_report_t ssb_rsrp_report;
+  RSRP_report_t csirs_rsrp_report;
 };
 
 #define MAX_SR_BITLEN 8

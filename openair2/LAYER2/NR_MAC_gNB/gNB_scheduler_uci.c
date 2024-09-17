@@ -481,10 +481,11 @@ static bool get_measured_rsrp(uint8_t index, int *rsrp)
 }
 
 //returns the differential RSRP value (upper limit)
-static int get_diff_rsrp(uint8_t index, int strongest_rsrp) {
-  if(strongest_rsrp != -1) {
+static int get_diff_rsrp(uint8_t index, int strongest_rsrp)
+{
+  if(strongest_rsrp != -1)
     return strongest_rsrp + diff_rsrp_ssb_csi_meas_10_1_6_1_2[index];
-  } else
+  else
     return MIN_RSRP_VALUE;
 }
 
@@ -497,7 +498,6 @@ static void tci_handling(NR_UE_info_t *UE, frame_t frame, slot_t slot)
   int curr_ssb_beam_index = 0; //ToDo: yet to know how to identify the serving ssb beam index
   uint8_t target_ssb_beam_index = curr_ssb_beam_index;
   uint8_t is_triggering_ssb_beam_switch =0;
-  uint8_t ssb_idx = 0;
   int pdsch_bwp_id = 0;
   int ssb_index[MAX_NUM_SSB] = {0};
   int ssb_rsrp[MAX_NUM_SSB] = {0};
@@ -505,10 +505,8 @@ static void tci_handling(NR_UE_info_t *UE, frame_t frame, slot_t slot)
   NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
 
-  uint8_t nr_ssbri_cri = 0;
   uint8_t nb_of_csi_ssb_report = UE->csi_report_template[cqi_idx].nb_of_csi_ssb_report;
   int better_rsrp_reported = -140-(-0); /*minimum_measured_RSRP_value - minimum_differntail_RSRP_value*///considering the minimum RSRP value as better RSRP initially
-  uint8_t diff_rsrp_idx = 0;
   uint8_t i, j;
 
   //bwp indicator
@@ -528,22 +526,16 @@ static void tci_handling(NR_UE_info_t *UE, frame_t frame, slot_t slot)
   idx: resource set index
   */
 
-  nr_ssbri_cri = sched_ctrl->CSI_report.ssb_cri_report.nr_ssbri_cri;
+  int nr_ssbri = sched_ctrl->CSI_report.ssb_rsrp_report.nr_reports;
   //extracting the ssb indexes
-  for (ssb_idx = 0; ssb_idx < nr_ssbri_cri; ssb_idx++) {
-    ssb_index[idx * nb_of_csi_ssb_report + ssb_idx] = sched_ctrl->CSI_report.ssb_cri_report.CRI_SSBRI[ssb_idx];
+  for (int ssb_idx = 0; ssb_idx < nr_ssbri; ssb_idx++) {
+    ssb_index[idx * nb_of_csi_ssb_report + ssb_idx] = sched_ctrl->CSI_report.ssb_rsrp_report.resource_id[ssb_idx];
   }
 
   //if strongest measured RSRP is configured
-  int strongest_ssb_rsrp;
-  int rsrp_index = sched_ctrl->CSI_report.ssb_cri_report.RSRP;
-  bool valid = get_measured_rsrp(rsrp_index, &strongest_ssb_rsrp);
-  if (!valid) {
-    LOG_E(NR_MAC, "UE %04x: reported RSRP index %d invalid\n", UE->rnti, rsrp_index);
-    return;
-  }
+  int strongest_ssb_rsrp = sched_ctrl->CSI_report.ssb_rsrp_report.RSRP[0];
   ssb_rsrp[idx * nb_of_csi_ssb_report] = strongest_ssb_rsrp;
-  LOG_D(NR_MAC,"ssb_rsrp = %d\n",strongest_ssb_rsrp);
+  LOG_D(NR_MAC,"ssb_rsrp = %d\n", strongest_ssb_rsrp);
 
   //if current ssb rsrp is greater than better rsrp
   if(ssb_rsrp[idx * nb_of_csi_ssb_report] > better_rsrp_reported) {
@@ -551,8 +543,8 @@ static void tci_handling(NR_UE_info_t *UE, frame_t frame, slot_t slot)
     target_ssb_beam_index = idx * nb_of_csi_ssb_report;
   }
 
-  for(diff_rsrp_idx =1; diff_rsrp_idx < nr_ssbri_cri; diff_rsrp_idx++) {
-    ssb_rsrp[idx * nb_of_csi_ssb_report + diff_rsrp_idx] = get_diff_rsrp(sched_ctrl->CSI_report.ssb_cri_report.diff_RSRP[diff_rsrp_idx-1], strongest_ssb_rsrp);
+  for(int diff_rsrp_idx = 1; diff_rsrp_idx < nr_ssbri; diff_rsrp_idx++) {
+    ssb_rsrp[idx * nb_of_csi_ssb_report + diff_rsrp_idx] = sched_ctrl->CSI_report.ssb_rsrp_report.RSRP[diff_rsrp_idx];
 
     //if current reported rsrp is greater than better rsrp
     if(ssb_rsrp[idx * nb_of_csi_ssb_report + diff_rsrp_idx] > better_rsrp_reported) {
@@ -687,10 +679,6 @@ static void evaluate_rsrp_report(NR_UE_info_t *UE,
                                  int *cumul_bits,
                                  NR_CSI_ReportConfig__reportQuantity_PR reportQuantity_type)
 {
-  nr_csi_report_t *csi_report = &UE->csi_report_template[csi_report_id];
-  uint8_t cri_ssbri_bitlen = csi_report->CSI_report_bitlen.cri_ssbri_bitlen;
-  uint16_t curr_payload;
-
   /*! As per the spec 38.212 and table:  6.3.1.1.2-12 in a single UCI sequence we can have multiple CSI_report
   * the number of CSI_report will depend on number of CSI resource sets that are configured in CSI-ResourceConfig RRC IE
   * From spec 38.331 from the IE CSI-ResourceConfig for SSB RSRP reporting we can configure only one resource set
@@ -708,46 +696,51 @@ static void evaluate_rsrp_report(NR_UE_info_t *UE,
     resources can be received simultaneously by the UE either with a single spatial domain receive filter, or with
     multiple simultaneous spatial domain receive filter
   */
+  nr_csi_report_t *csi_report = &UE->csi_report_template[csi_report_id];
+  RSRP_report_t *rsrp_report;
+  long **index_list;
+  switch (reportQuantity_type) {
+    case NR_CSI_ReportConfig__reportQuantity_PR_ssb_Index_RSRP:
+      rsrp_report = &sched_ctrl->CSI_report.ssb_rsrp_report;
+      index_list = csi_report->SSB_Index_list;
+      break;
+    case NR_CSI_ReportConfig__reportQuantity_PR_cri_RSRP :
+      rsrp_report = &sched_ctrl->CSI_report.csirs_rsrp_report;
+      index_list = csi_report->CSI_Index_list;
+      break;
+    default :
+      AssertFatal(false, "Invalid RSRP report type\n");
+  }
 
-  sched_ctrl->CSI_report.ssb_cri_report.nr_ssbri_cri = csi_report->CSI_report_bitlen.nb_ssbri_cri;
-
-  for (int csi_ssb_idx = 0; csi_ssb_idx < sched_ctrl->CSI_report.ssb_cri_report.nr_ssbri_cri ; csi_ssb_idx++) {
-    curr_payload = pickandreverse_bits(payload, cri_ssbri_bitlen, *cumul_bits);
-
-    if (NR_CSI_ReportConfig__reportQuantity_PR_ssb_Index_RSRP == reportQuantity_type) {
-      sched_ctrl->CSI_report.ssb_cri_report.CRI_SSBRI[csi_ssb_idx] =
-        *(csi_report->SSB_Index_list[cri_ssbri_bitlen>0?((curr_payload)&~(~1U<<(cri_ssbri_bitlen-1))):cri_ssbri_bitlen]);
-      LOG_D(MAC,"SSB_index = %d\n",sched_ctrl->CSI_report.ssb_cri_report.CRI_SSBRI[csi_ssb_idx]);
-    }
-    else {
-      sched_ctrl->CSI_report.ssb_cri_report.CRI_SSBRI[csi_ssb_idx] =
-        *(csi_report->CSI_Index_list[cri_ssbri_bitlen>0?((curr_payload)&~(~1U<<(cri_ssbri_bitlen-1))):cri_ssbri_bitlen]);
-      LOG_D(MAC,"CSI-RS Resource Indicator = %d\n",sched_ctrl->CSI_report.ssb_cri_report.CRI_SSBRI[csi_ssb_idx]);
-    }
-    *cumul_bits += cri_ssbri_bitlen;
-
+  uint16_t curr_payload;
+  for (int i = 0; i < rsrp_report->nr_reports; i++) {
+    int bitlen = csi_report->CSI_report_bitlen.cri_ssbri_bitlen;
+    curr_payload = pickandreverse_bits(payload, bitlen, *cumul_bits);
+    rsrp_report->resource_id[i] = *(index_list[bitlen > 0 ? ((curr_payload) & ~(~1U << (bitlen - 1))) : bitlen]);
+    LOG_D(MAC,"SSB/CSI-RS index = %d\n", rsrp_report->resource_id[i]);
+    *cumul_bits += bitlen;
   }
 
   curr_payload = pickandreverse_bits(payload, 7, *cumul_bits);
-  sched_ctrl->CSI_report.ssb_cri_report.RSRP = curr_payload & 0x7f;
+  int rsrp_index = curr_payload & 0x7f;
   *cumul_bits += 7;
 
-  for (int diff_rsrp_idx =0; diff_rsrp_idx < sched_ctrl->CSI_report.ssb_cri_report.nr_ssbri_cri - 1; diff_rsrp_idx++ ) {
-    curr_payload = pickandreverse_bits(payload, 4, *cumul_bits);
-    sched_ctrl->CSI_report.ssb_cri_report.diff_RSRP[diff_rsrp_idx] = curr_payload & 0x0f;
-    *cumul_bits += 4;
-  }
   csi_report->nb_of_csi_ssb_report++;
-  int strongest_ssb_rsrp;
-  int rsrp_index = sched_ctrl->CSI_report.ssb_cri_report.RSRP;
-  bool valid = get_measured_rsrp(rsrp_index, &strongest_ssb_rsrp);
+  bool valid = get_measured_rsrp(rsrp_index, &rsrp_report->RSRP[0]);
   if (!valid) {
     LOG_E(NR_MAC, "UE %04x: reported RSRP index %d invalid\n", UE->rnti, rsrp_index);
     return;
   }
+
+  for (int i = 1; i < rsrp_report->nr_reports; i++) {
+    curr_payload = pickandreverse_bits(payload, 4, *cumul_bits);
+    rsrp_report->RSRP[i] = get_diff_rsrp(curr_payload & 0x0f, rsrp_report->RSRP[0]);
+    *cumul_bits += 4;
+  }
+
   NR_mac_stats_t *stats = &UE->mac_stats;
   // including ssb rsrp in mac stats
-  stats->cumul_rsrp += strongest_ssb_rsrp;
+  stats->cumul_rsrp += rsrp_report->RSRP[0];
   stats->num_rsrp_meas++;
 }
 
