@@ -1518,6 +1518,11 @@ static int handle_rrcSetupComplete(const protocol_ctxt_t *const ctxt_pP,
   uint8_t xid = setup_complete->rrc_TransactionIdentifier;
   UE->xids[xid] = RRC_ACTION_NONE;
 
+  if (setup_complete->criticalExtensions.present != NR_RRCSetupComplete__criticalExtensions_PR_rrcSetupComplete) {
+    LOG_E(NR_RRC, "malformed RRCSetupComplete received from UE %lx\n", ctxt_pP->rntiMaybeUEid);
+    return -1;
+  }
+
   NR_RRCSetupComplete_IEs_t *setup_complete_ies = setup_complete->criticalExtensions.choice.rrcSetupComplete;
 
   if (setup_complete_ies->ng_5G_S_TMSI_Value != NULL) {

@@ -1092,9 +1092,10 @@ static int8_t handle_dlsch(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
   if (get_softmodem_params()->emulate_l1)
     dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid = g_harq_pid;
 
-  update_harq_status(mac,
-                     dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid,
-                     dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.ack_nack);
+  if (mac->ra.ra_state != nrRA_WAIT_RAR) // no HARQ for MSG2
+    update_harq_status(mac,
+                       dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.harq_pid,
+                       dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.ack_nack);
   if(dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.ack_nack)
     nr_ue_send_sdu(mac, dl_info, pdu_id);
 
