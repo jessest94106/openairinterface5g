@@ -907,7 +907,7 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
           __attribute__ ((aligned(32))) struct complex16 dl_ch_estimates_time[fp->nb_antennas_rx][fp->ofdm_symbol_size];
 
           for (int i=1; i<4; i++) {
-            nr_slot_fep(ue, fp, proc, (ssb_start_symbol + i) % (fp->symbols_per_slot), rxdataF, link_type_dl);
+            nr_slot_fep(ue, fp, proc, (ssb_start_symbol + i) % (fp->symbols_per_slot), rxdataF, link_type_dl, 0);
 
             nr_pbch_channel_estimation(&ue->frame_parms,
                                        NULL,
@@ -971,7 +971,7 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
         {
           for(int j = prs_config->SymbolStart; j < (prs_config->SymbolStart+prs_config->NumPRSSymbols); j++)
           {
-            nr_slot_fep(ue, fp, proc, (j % fp->symbols_per_slot), rxdataF, link_type_dl);
+            nr_slot_fep(ue, fp, proc, (j % fp->symbols_per_slot), rxdataF, link_type_dl, 0);
           }
           nr_prs_channel_estimation(gNB_id, rsc_id, i, ue, proc, fp, rxdataF);
         }
@@ -1000,7 +1000,7 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
 
   uint8_t nb_symb_pdcch = phy_pdcch_config->nb_search_space > 0 ? phy_pdcch_config->pdcch_config[0].coreset.duration : 0;
   for (uint16_t l=0; l<nb_symb_pdcch; l++) {
-    nr_slot_fep(ue, fp, proc, l, rxdataF, link_type_dl);
+    nr_slot_fep(ue, fp, proc, l, rxdataF, link_type_dl, 0);
   }
 
     // Hold the channel estimates in frequency domain.
@@ -1050,7 +1050,7 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     for(int symb_idx = 0; symb_idx < 4; symb_idx++) {
       int symb = ue->csiim_vars[gNB_id]->csiim_config_pdu.l_csiim[symb_idx];
       if (!slot_fep_map[symb]) {
-        nr_slot_fep(ue, &ue->frame_parms, proc, symb, rxdataF, link_type_dl);
+        nr_slot_fep(ue, &ue->frame_parms, proc, symb, rxdataF, link_type_dl, 0);
         slot_fep_map[symb] = true;
       }
     }
@@ -1063,7 +1063,7 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     for(int symb = 0; symb < NR_SYMBOLS_PER_SLOT; symb++) {
       if(is_csi_rs_in_symbol(ue->csirs_vars[gNB_id]->csirs_config_pdu, symb)) {
         if (!slot_fep_map[symb]) {
-          nr_slot_fep(ue, &ue->frame_parms, proc, symb, rxdataF, link_type_dl);
+          nr_slot_fep(ue, &ue->frame_parms, proc, symb, rxdataF, link_type_dl, 0);
           slot_fep_map[symb] = true;
         }
       }
@@ -1082,7 +1082,7 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
 
     for (int m = start_symb_sch; m < (nb_symb_sch + start_symb_sch) ; m++) {
       if (!slot_fep_map[m]) {
-        nr_slot_fep(ue, &ue->frame_parms, proc, m, rxdataF, link_type_dl);
+        nr_slot_fep(ue, &ue->frame_parms, proc, m, rxdataF, link_type_dl, 0);
         slot_fep_map[m] = true;
       }
     }

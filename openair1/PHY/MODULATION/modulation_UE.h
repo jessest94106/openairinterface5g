@@ -53,13 +53,8 @@ int nr_slot_fep(PHY_VARS_NR_UE *ue,
                 const UE_nr_rxtx_proc_t *proc,
                 unsigned char symbol,
                 c16_t rxdataF[][frame_parms->samples_per_slot_wCP],
-                uint32_t linktype);
-int sl_nr_slot_fep(PHY_VARS_NR_UE *ue,
-                   UE_nr_rxtx_proc_t *proc,
-                   unsigned char symbol,
-                   unsigned char Ns,
-                   uint32_t sample_offset,
-                   c16_t rxdataF[][ue->SL_UE_PHY_PARAMS.sl_frame_params.samples_per_slot_wCP]);
+                uint32_t linktype,
+                uint32_t sample_offset);
 
 int nr_slot_fep_init_sync(const NR_DL_FRAME_PARMS *frame_parms,
                           unsigned char symbol,
