@@ -120,14 +120,14 @@ void init_symbol_rotation(NR_DL_FRAME_PARMS *fp);
 
 void init_timeshift_rotation(NR_DL_FRAME_PARMS *fp);
 
-void apply_nr_rotation_RX(NR_DL_FRAME_PARMS *frame_parms,
-			  c16_t *rxdataF,
-                          c16_t *rot,
-			  int slot,
+void apply_nr_rotation_RX(const NR_DL_FRAME_PARMS *frame_parms,
+                          c16_t *rxdataF,
+                          const c16_t *rot,
+                          int slot,
                           int nb_rb,
                           int soffset,
-			  int first_symbol,
-			  int nsymb);
+                          int first_symbol,
+                          int nsymb);
 
 /*! \brief Perform NR precoding. TS 38.211 V15.4.0 subclause 6.3.1.5
   @param[in] datatx_F_precoding, Pointer to n_layers*re data array
