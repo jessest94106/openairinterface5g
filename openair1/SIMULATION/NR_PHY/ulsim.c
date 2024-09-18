@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
 
     case 'P':
       print_perf=1;
-      opp_enabled=1;
+      cpu_meas_enabled = 1;
       break;
 
     case 'L':

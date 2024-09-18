@@ -32,7 +32,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 // global var to enable openair performance profiler
-extern int opp_enabled;
+extern int cpu_meas_enabled;
 extern double cpu_freq_GHz  __attribute__ ((aligned(32)));;
 // structure to store data to compute cpu measurment
 #if defined(__x86_64__) || defined(__i386__)
@@ -74,12 +74,8 @@ typedef struct time_stats {
 } time_stats_t;
 #define MEASURE_ENABLED(X)       (X->meas_enabled)
 
-
-
-
 static inline void start_meas(time_stats_t *ts) __attribute__((always_inline));
 static inline void stop_meas(time_stats_t *ts) __attribute__((always_inline));
-
 
 void print_meas_now(time_stats_t *ts, const char *name, FILE *file_name);
 void print_meas(time_stats_t *ts, const char *name, time_stats_t *total_exec_time, time_stats_t *sf_exec_time);
@@ -130,11 +126,11 @@ static inline uint32_t rdtsc_oai(void) {
 static inline int cpumeas(int action) {
   switch (action) {
     case CPUMEAS_ENABLE:
-      opp_enabled = 1;
+      cpu_meas_enabled = 1;
       break;
 
     case CPUMEAS_DISABLE:
-      opp_enabled = 0;
+      cpu_meas_enabled = 0;
       break;
 
     case CPUMEAS_GETSTATE:
@@ -142,11 +138,11 @@ static inline int cpumeas(int action) {
       break;
   }
 
-  return opp_enabled;
+  return cpu_meas_enabled;
 }
 
 static inline void start_meas(time_stats_t *ts) {
-  if (opp_enabled) {
+  if (cpu_meas_enabled) {
     if (ts->meas_flag==0) {
       ts->trials++;
       ts->in = rdtsc_oai();
@@ -159,7 +155,7 @@ static inline void start_meas(time_stats_t *ts) {
 }
 
 static inline void stop_meas(time_stats_t *ts) {
-  if (opp_enabled) {
+  if (cpu_meas_enabled) {
     long long out = rdtsc_oai();
     if (ts->in) {
       ts->diff += (out - ts->in);
@@ -186,7 +182,7 @@ static inline void reset_meas(time_stats_t *ts) {
 }
 
 static inline void copy_meas(time_stats_t *dst_ts,time_stats_t *src_ts) {
-  if (opp_enabled) {
+  if (cpu_meas_enabled) {
     dst_ts->trials=src_ts->trials;
     dst_ts->diff=src_ts->diff;
     dst_ts->max=src_ts->max;
@@ -195,7 +191,7 @@ static inline void copy_meas(time_stats_t *dst_ts,time_stats_t *src_ts) {
 
 static inline void merge_meas(time_stats_t *dst_ts, const time_stats_t *src_ts)
 {
-  if (!opp_enabled)
+  if (!cpu_meas_enabled)
     return;
   dst_ts->trials += src_ts->trials;
   dst_ts->diff += src_ts->diff;

@@ -631,7 +631,7 @@ int main( int argc, char **argv ) {
   set_taus_seed (0);
   printf("configuring for RAU/RRU\n");
 
-  if (opp_enabled ==1) {
+  if (cpu_meas_enabled) {
     reset_opp_meas();
   }
 
