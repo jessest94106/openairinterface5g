@@ -1145,10 +1145,10 @@ void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
 
       int SR_period; int SR_offset;
 
-      find_period_offset_SR(SchedulingRequestResourceConfig,&SR_period,&SR_offset);
+      find_period_offset_SR(SchedulingRequestResourceConfig, &SR_period, &SR_offset);
       // convert to int to avoid underflow of uint
       int sfn_sf = SFN * n_slots_frame + slot;
-      LOG_D(NR_MAC,"SR_resource_id %d: SR_period %d, SR_offset %d\n",SR_resource_id,SR_period,SR_offset);
+      LOG_D(NR_MAC,"SR_resource_id %d: SR_period %d, SR_offset %d\n", SR_resource_id, SR_period, SR_offset);
       if ((sfn_sf - SR_offset) % SR_period != 0)
         continue;
       LOG_D(NR_MAC, "%4d.%2d Scheduling Request UE %04x identified\n", SFN, slot, UE->rnti);
@@ -1161,7 +1161,7 @@ void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
         if (*pucchresset->resourceList.list.array[i] == *PucchResourceId )
           idx = i;
       }
-      AssertFatal(idx>-1,"SR resource not found among PUCCH resources");
+      AssertFatal(idx > -1, "SR resource not found among PUCCH resources");
 
       const NR_ServingCellConfigCommon_t *scc = nrmac->common_channels[CC_id].ServingCellConfigCommon;
       const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
@@ -1169,10 +1169,7 @@ void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
       const int pucch_index = get_pucch_index(SFN, slot, n_slots_frame, tdd, sched_ctrl->sched_pucch_size);
       NR_sched_pucch_t *curr_pucch = &sched_ctrl->sched_pucch[pucch_index];
 
-      if (curr_pucch->active &&
-          curr_pucch->frame == SFN &&
-          curr_pucch->ul_slot == slot &&
-          curr_pucch->resource_indicator == idx)
+      if (curr_pucch->active && curr_pucch->frame == SFN && curr_pucch->ul_slot == slot && curr_pucch->resource_indicator == idx)
         curr_pucch->sr_flag = true;
       else if (curr_pucch->active) {
         LOG_E(NR_MAC,
@@ -1185,9 +1182,10 @@ void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
         continue;
       }
       else {
-        int beam_idx = 0; // TODO proper beam allocation
+        NR_beam_alloc_t beam = beam_allocation_procedure(&nrmac->beam_info, SFN, slot, UE->UE_beam_index, n_slots_frame);
+        AssertFatal(beam.idx >= 0, "Cannot allocate SR in any available beam\n");
         const int index = ul_buffer_index(SFN, slot, ul_bwp->scs, nrmac->vrb_map_UL_size);
-        uint16_t *vrb_map_UL = &nrmac->common_channels[CC_id].vrb_map_UL[beam_idx][index * MAX_BWP_SIZE];
+        uint16_t *vrb_map_UL = &nrmac->common_channels[CC_id].vrb_map_UL[beam.idx][index * MAX_BWP_SIZE];
         const int bwp_start = ul_bwp->BWPStart;
         const int bwp_size = ul_bwp->BWPSize;
         set_pucch_allocation(ul_bwp, -1, bwp_size, curr_pucch);
