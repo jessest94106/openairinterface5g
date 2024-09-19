@@ -355,7 +355,7 @@ void trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
     sec->confidentialityProtectionIndication = rrc->security.do_drb_ciphering ? SECURITY_REQUIRED
                                                                               : SECURITY_NOT_NEEDED;
     pdu->UP_TL_information.teId = session->gtp_teid;
-    memcpy(&pdu->UP_TL_information.tlAddress, session->upf_addr.buffer, 4); // Fixme: dirty IPv4 target
+    memcpy(&pdu->UP_TL_information.tlAddress, session->upf_addr.buffer, sizeof(in_addr_t));
 
     /* we assume for the moment one DRB per PDU session. Activate the bearer,
      * and configure in RRC. */
