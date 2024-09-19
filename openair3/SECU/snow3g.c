@@ -417,14 +417,14 @@ static uint32_t DIVa(int c)
 
 static void lfsr_init(snow3g_t *s, uint32_t f)
 {
-  uint8_t s0_0 = (s->s[0] >> 24) & 0xff;
-  uint8_t s0_1 = (s->s[0] >> 16) & 0xff;
-  uint8_t s0_2 = (s->s[0] >> 8) & 0xff;
-  uint8_t s0_3 = s->s[0] & 0xff;
-  uint8_t s11_0 = (s->s[11] >> 24) & 0xff;
-  uint8_t s11_1 = (s->s[11] >> 16) & 0xff;
-  uint8_t s11_2 = (s->s[11] >> 8) & 0xff;
-  uint8_t s11_3 = s->s[11] & 0xff;
+  uint32_t s0_0 = (s->s[0] >> 24) & 0xff;
+  uint32_t s0_1 = (s->s[0] >> 16) & 0xff;
+  uint32_t s0_2 = (s->s[0] >> 8) & 0xff;
+  uint32_t s0_3 = s->s[0] & 0xff;
+  uint32_t s11_0 = (s->s[11] >> 24) & 0xff;
+  uint32_t s11_1 = (s->s[11] >> 16) & 0xff;
+  uint32_t s11_2 = (s->s[11] >> 8) & 0xff;
+  uint32_t s11_3 = s->s[11] & 0xff;
 
   uint32_t v0 = (s0_1 << 24)
               | (s0_2 << 16)
@@ -464,14 +464,14 @@ static void lfsr_init(snow3g_t *s, uint32_t f)
 
 static void lfsr_keystream(snow3g_t *s)
 {
-  uint8_t s0_0 = (s->s[0] >> 24) & 0xff;
-  uint8_t s0_1 = (s->s[0] >> 16) & 0xff;
-  uint8_t s0_2 = (s->s[0] >> 8) & 0xff;
-  uint8_t s0_3 = s->s[0] & 0xff;
-  uint8_t s11_0 = (s->s[11] >> 24) & 0xff;
-  uint8_t s11_1 = (s->s[11] >> 16) & 0xff;
-  uint8_t s11_2 = (s->s[11] >> 8) & 0xff;
-  uint8_t s11_3 = s->s[11] & 0xff;
+  uint32_t s0_0 = (s->s[0] >> 24) & 0xff;
+  uint32_t s0_1 = (s->s[0] >> 16) & 0xff;
+  uint32_t s0_2 = (s->s[0] >> 8) & 0xff;
+  uint32_t s0_3 = s->s[0] & 0xff;
+  uint32_t s11_0 = (s->s[11] >> 24) & 0xff;
+  uint32_t s11_1 = (s->s[11] >> 16) & 0xff;
+  uint32_t s11_2 = (s->s[11] >> 8) & 0xff;
+  uint32_t s11_3 = s->s[11] & 0xff;
 
   uint32_t v0 = (s0_1 << 24)
               | (s0_2 << 16)
