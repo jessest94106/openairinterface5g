@@ -652,13 +652,13 @@ static int fill_BEARER_CONTEXT_SETUP_REQUEST(e1ap_bearer_setup_req_t *const bear
       INT24_TO_OCTET_STRING(i->nssai.sd, ieC6_1->sNSSAI.sD);
     }
 
-    ieC6_1->securityIndication.integrityProtectionIndication = i->integrityProtectionIndication;
-    ieC6_1->securityIndication.confidentialityProtectionIndication = i->confidentialityProtectionIndication;
+    ieC6_1->securityIndication.integrityProtectionIndication = i->securityIndication.integrityProtectionIndication;
+    ieC6_1->securityIndication.confidentialityProtectionIndication = i->securityIndication.confidentialityProtectionIndication;
 
     ieC6_1->nG_UL_UP_TNL_Information.present = E1AP_UP_TNL_Information_PR_gTPTunnel;
     asn1cCalloc(ieC6_1->nG_UL_UP_TNL_Information.choice.gTPTunnel, gTPTunnel);
-    TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(i->tlAddress, &gTPTunnel->transportLayerAddress);
-    INT32_TO_OCTET_STRING(i->teId, &gTPTunnel->gTP_TEID);
+    TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(i->UP_TL_information.tlAddress, &gTPTunnel->transportLayerAddress);
+    INT32_TO_OCTET_STRING(i->UP_TL_information.teId, &gTPTunnel->gTP_TEID);
 
     for (DRB_nGRAN_to_setup_t *j = i->DRBnGRanList; j < i->DRBnGRanList + i->numDRB2Setup; j++) {
       asn1cSequenceAdd(ieC6_1->dRB_To_Setup_List_NG_RAN.list, E1AP_DRB_To_Setup_Item_NG_RAN_t, ieC6_1_1);
@@ -951,15 +951,18 @@ static void extract_BEARER_CONTEXT_SETUP_REQUEST(const E1AP_E1AP_PDU_t *pdu, e1a
           if (pdu2Setup->sNSSAI.sD != NULL)
             OCTET_STRING_TO_INT24(pdu2Setup->sNSSAI.sD, pdu_session->nssai.sd);
 
-          pdu_session->integrityProtectionIndication = pdu2Setup->securityIndication.integrityProtectionIndication;
-          pdu_session->confidentialityProtectionIndication = pdu2Setup->securityIndication.confidentialityProtectionIndication;
+          pdu_session->securityIndication.integrityProtectionIndication =
+              pdu2Setup->securityIndication.integrityProtectionIndication;
+          pdu_session->securityIndication.confidentialityProtectionIndication =
+              pdu2Setup->securityIndication.confidentialityProtectionIndication;
 
           if (pdu2Setup->nG_UL_UP_TNL_Information.choice.gTPTunnel) { // Optional IE
             DevAssert(pdu2Setup->nG_UL_UP_TNL_Information.present ==
                       E1AP_UP_TNL_Information_PR_gTPTunnel);
             BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&pdu2Setup->nG_UL_UP_TNL_Information.choice.gTPTunnel->transportLayerAddress,
-                                                       pdu_session->tlAddress);
-            OCTET_STRING_TO_INT32(&pdu2Setup->nG_UL_UP_TNL_Information.choice.gTPTunnel->gTP_TEID, pdu_session->teId);
+                                                       pdu_session->UP_TL_information.tlAddress);
+            OCTET_STRING_TO_INT32(&pdu2Setup->nG_UL_UP_TNL_Information.choice.gTPTunnel->gTP_TEID,
+                                  pdu_session->UP_TL_information.teId);
           }
 
           E1AP_DRB_To_Setup_List_NG_RAN_t *drb2SetupList = &pdu2Setup->dRB_To_Setup_List_NG_RAN;
