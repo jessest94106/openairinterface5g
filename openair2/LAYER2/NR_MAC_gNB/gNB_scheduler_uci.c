@@ -155,9 +155,7 @@ static int get_pucch_index(int frame, int slot, int n_slots_frame, const NR_TDD_
 
 }
 
-void nr_schedule_pucch(gNB_MAC_INST *nrmac,
-                       frame_t frameP,
-                       sub_frame_t slotP)
+void nr_schedule_pucch(gNB_MAC_INST *nrmac, frame_t frameP, sub_frame_t slotP)
 {
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
@@ -198,9 +196,7 @@ void nr_schedule_pucch(gNB_MAC_INST *nrmac,
   }
 }
 
-void nr_csi_meas_reporting(int Mod_idP,
-                           frame_t frame,
-                           sub_frame_t slot)
+void nr_csi_meas_reporting(int Mod_idP,frame_t frame, sub_frame_t slot)
 {
   const int CC_id = 0;
   gNB_MAC_INST *nrmac = RC.nrmac[Mod_idP];
@@ -270,9 +266,10 @@ void nr_csi_meas_reporting(int Mod_idP,
       int bwp_start = ul_bwp->BWPStart;
 
       // going through the list of PUCCH resources to find the one indexed by resource_id
-      int beam_idx = 0; // TODO proper beam allocation
+      NR_beam_alloc_t beam = beam_allocation_procedure(&nrmac->beam_info, sched_frame, sched_slot, UE->UE_beam_index, n_slots_frame);
+      AssertFatal(beam.idx >= 0, "Cannot allocate CSI measurements on PUCCH in any available beam\n");
       const int index = ul_buffer_index(sched_frame, sched_slot, ul_bwp->scs, nrmac->vrb_map_UL_size);
-      uint16_t *vrb_map_UL = &nrmac->common_channels[0].vrb_map_UL[beam_idx][index * MAX_BWP_SIZE];
+      uint16_t *vrb_map_UL = &nrmac->common_channels[0].vrb_map_UL[beam.idx][index * MAX_BWP_SIZE];
       const int m = pucch_Config->resourceToAddModList->list.count;
       for (int j = 0; j < m; j++) {
         NR_PUCCH_Resource_t *pucchres = pucch_Config->resourceToAddModList->list.array[j];
