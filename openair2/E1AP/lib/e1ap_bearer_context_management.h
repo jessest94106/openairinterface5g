@@ -26,4 +26,12 @@
 #include "openair2/COMMON/e1ap_messages_types.h"
 #include "common/platform_types.h"
 
+struct E1AP_E1AP_PDU;
+
+struct E1AP_E1AP_PDU *encode_E1_bearer_context_setup_request(const e1ap_bearer_setup_req_t *msg);
+bool decode_E1_bearer_context_setup_request(const struct E1AP_E1AP_PDU *pdu, e1ap_bearer_setup_req_t *out);
+e1ap_bearer_setup_req_t cp_bearer_context_setup_request(const e1ap_bearer_setup_req_t *msg);
+void free_e1ap_context_setup_request(e1ap_bearer_setup_req_t *msg);
+bool eq_bearer_context_setup_request(const e1ap_bearer_setup_req_t *a, const e1ap_bearer_setup_req_t *b);
+
 #endif /* E1AP_BEARER_CONTEXT_MANAGEMENT_H_ */
