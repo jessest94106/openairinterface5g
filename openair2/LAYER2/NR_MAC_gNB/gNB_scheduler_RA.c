@@ -778,11 +778,7 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
 
   if (is_xlsch_in_slot(nr_mac->ulsch_slot_bitmap[sched_slot / 64], sched_slot)) {
     const int n_slots_frame = nr_slots_per_frame[mu];
-    NR_beam_alloc_t beam_ul = beam_allocation_procedure(&nr_mac->beam_info,
-                                                              sched_frame,
-                                                              sched_slot,
-                                                              ra->beam_id,
-                                                              n_slots_frame);
+    NR_beam_alloc_t beam_ul = beam_allocation_procedure(&nr_mac->beam_info, sched_frame, sched_slot, ra->beam_id, n_slots_frame);
     if (beam_ul.idx < 0)
       return;
     NR_beam_alloc_t beam_dci = beam_allocation_procedure(&nr_mac->beam_info, frame, slot, ra->beam_id, n_slots_frame);
