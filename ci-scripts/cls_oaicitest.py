@@ -475,7 +475,6 @@ class OaiCiTest():
 			jsonReport = ""
 			# note: enable server report collection on the UE side, no need to store and collect server report separately on the server side
 			serverReport = "--get-server-output"
-			logging.info(f'iperf options modified from "{self.iperf_args}" to "{iperf_opt}" for {ue.getName()}')
 		iperf_time = Iperf_ComputeTime(self.iperf_args)
 		# hack: the ADB UEs don't have iperf in $PATH, so we need to hardcode for the moment
 		iperf_ue = '/data/local/tmp/iperf3' if re.search('adb', ue.getName()) else 'iperf3'
