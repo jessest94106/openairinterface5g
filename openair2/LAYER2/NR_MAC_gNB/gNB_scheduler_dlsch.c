@@ -861,7 +861,7 @@ static void pf_dl(module_id_t module_id,
   }
 }
 
-static void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t slot)
+static void nr_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t slot)
 {
   NR_UEs_t *UE_info = &RC.nrmac[module_id]->UE_info;
 
@@ -889,7 +889,7 @@ static void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_
         bw);  // we set the whole BW as max number
 }
 
-nr_pp_impl_dl nr_init_fr1_dlsch_preprocessor(int CC_id) {
+nr_pp_impl_dl nr_init_dlsch_preprocessor(int CC_id) {
   /* during initialization: no mutex needed */
   /* in the PF algorithm, we have to use the TBsize to compute the coefficient.
    * This would include the number of DMRS symbols, which in turn depends on
@@ -914,7 +914,7 @@ nr_pp_impl_dl nr_init_fr1_dlsch_preprocessor(int CC_id) {
     }
   }
 
-  return nr_fr1_dlsch_preprocessor;
+  return nr_dlsch_preprocessor;
 }
 
 void nr_schedule_ue_spec(module_id_t module_id,

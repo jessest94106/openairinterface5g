@@ -82,8 +82,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
                          nfapi_nr_dl_tti_request_t *DL_req,
                          nfapi_nr_tx_data_request_t *TX_req);
 
-/* \brief default FR1 DL preprocessor init routine, returns preprocessor to call */
-nr_pp_impl_dl nr_init_fr1_dlsch_preprocessor(int CC_id);
+/* \brief default DL preprocessor init routine, returns preprocessor to call */
+nr_pp_impl_dl nr_init_dlsch_preprocessor(int CC_id);
 
 void schedule_nr_sib1(module_id_t module_idP,
                       frame_t frameP,
@@ -108,8 +108,8 @@ void schedule_nr_mib(module_id_t module_idP, frame_t frameP, sub_frame_t slotP, 
  * messages, statistics, HARQ handling, ... */
 void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req);
 
-/* \brief default FR1 UL preprocessor init routine, returns preprocessor to call */
-nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id);
+/* \brief default UL preprocessor init routine, returns preprocessor to call */
+nr_pp_impl_ul nr_init_ulsch_preprocessor(int CC_id);
 
 /////// Random Access MAC-PHY interface functions and primitives ///////
 

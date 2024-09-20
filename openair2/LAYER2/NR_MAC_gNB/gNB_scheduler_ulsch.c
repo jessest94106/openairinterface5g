@@ -2147,7 +2147,7 @@ static void pf_ul(module_id_t module_id,
   }
 }
 
-static bool nr_fr1_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t slot)
+static bool nr_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t slot)
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
   // no UEs
@@ -2180,7 +2180,7 @@ static bool nr_fr1_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_
   return true;
 }
 
-nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id)
+nr_pp_impl_ul nr_init_ulsch_preprocessor(int CC_id)
 {
   /* during initialization: no mutex needed */
   /* in the PF algorithm, we have to use the TBsize to compute the coefficient.
@@ -2208,7 +2208,7 @@ nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id)
                                     >> 3;
     }
   }
-  return nr_fr1_ulsch_preprocessor;
+  return nr_ulsch_preprocessor;
 }
 
 void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req)
