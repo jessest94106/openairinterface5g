@@ -40,6 +40,7 @@ void init_SI_timers(NR_UE_RRC_SI_INFO *SInfo)
   nr_timer_setup(&SInfo->sib12_timer, 10800000, 10);
   nr_timer_setup(&SInfo->sib13_timer, 10800000, 10);
   nr_timer_setup(&SInfo->sib14_timer, 10800000, 10);
+  nr_timer_setup(&SInfo->SInfo_r17.sib19_timer, 10800000, 10);
 }
 
 void nr_rrc_SI_timers(NR_UE_RRC_SI_INFO *SInfo)
@@ -113,6 +114,11 @@ void nr_rrc_SI_timers(NR_UE_RRC_SI_INFO *SInfo)
    bool sib14_expired = nr_timer_tick(&SInfo->sib14_timer);
    if (sib14_expired)
      asn1cFreeStruc(asn_DEF_NR_SIB14_r16, SInfo->sib14);
+  }
+  if (SInfo->SInfo_r17.sib19) {
+   bool sib19_expired = nr_timer_tick(&SInfo->SInfo_r17.sib19_timer);
+   if (sib19_expired)
+     asn1cFreeStruc(asn_DEF_NR_SIB19_r17, SInfo->SInfo_r17.sib19);
   }
 }
 

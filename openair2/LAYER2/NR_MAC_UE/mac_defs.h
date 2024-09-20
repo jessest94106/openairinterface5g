@@ -519,6 +519,7 @@ typedef struct NR_UE_MAC_INST_s {
   bool get_otherSI;
   NR_MIB_t *mib;
   struct NR_SI_SchedulingInfo *si_SchedulingInfo;
+  struct NR_SI_SchedulingInfo_v1700 *si_SchedulingInfo_v1700;
   int si_window_start;
   ssb_list_info_t ssb_list[MAX_NUM_BWP_UE];
   prach_association_pattern_t prach_assoc_pattern[MAX_NUM_BWP_UE];
