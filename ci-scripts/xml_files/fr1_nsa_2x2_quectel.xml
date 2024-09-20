@@ -57,6 +57,7 @@
 	</testCase>
 	<testCase id="200000">
 		<class>Custom_Command</class>
+    <always_exec>true</always_exec>
 		<desc>Enable Sleep States (obelix)</desc>
 		<node>obelix</node>
 		<command>sudo cpupower idle-set -E</command>
@@ -69,6 +70,7 @@
 	</testCase>
 	<testCase id="800000">
 		<class>Custom_Command</class>
+    <always_exec>true</always_exec>
 		<desc>Enable Sleep States (asterix)</desc>
 		<node>asterix</node>
 		<command>sudo cpupower idle-set -E</command>
@@ -81,6 +83,7 @@
 	</testCase>
 	<testCase id="010002">
 		<class>Terminate_UE</class>
+    <always_exec>true</always_exec>
 		<desc>Terminate Quectel</desc>
 		<id>nrmodule2_quectel</id>
 	</testCase>
@@ -91,6 +94,7 @@
 	</testCase>
 	<testCase id="010011">
 		<class>Detach_UE</class>
+    <always_exec>true</always_exec>
 		<desc>Detach Quectel</desc>
 		<id>nrmodule2_quectel</id>
 	</testCase>
@@ -183,6 +187,7 @@
 
 	<testCase id="080000">
 		<class>Terminate_eNB</class>
+    <always_exec>true</always_exec>
 		<desc>Terminate eNB</desc>
 		<eNB_instance>0</eNB_instance>
 		<eNB_serverId>0</eNB_serverId>
@@ -191,6 +196,7 @@
 
 	<testCase id="080001">
 		<class>Terminate_eNB</class>
+    <always_exec>true</always_exec>
 		<desc>Terminate gNB</desc>
 		<eNB_instance>1</eNB_instance>
 		<eNB_serverId>1</eNB_serverId>

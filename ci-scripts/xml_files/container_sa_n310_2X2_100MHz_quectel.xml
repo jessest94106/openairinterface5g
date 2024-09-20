@@ -39,6 +39,7 @@
     000001
     040201
     200000
+    033333
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -58,6 +59,7 @@
 
   <testCase id="200000">
     <class>Custom_Command</class>
+    <always_exec>true</always_exec>
     <desc>Enable Sleep States</desc>
     <node>matix</node>
     <command>sudo cpupower idle-set -E</command>
@@ -71,6 +73,7 @@
 
   <testCase id="010010">
     <class>Detach_UE</class>
+    <always_exec>true</always_exec>
     <desc>Detach UE</desc>
     <id>up2</id>
   </testCase>
@@ -139,6 +142,7 @@
 
   <testCase id="040201">
     <class>Undeploy_Object</class>
+    <always_exec>true</always_exec>
     <desc>Undeploy gNB</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n310_2x2_100MHz</yaml_path>
     <eNB_instance>0</eNB_instance>
@@ -146,6 +150,13 @@
     <services>oai-gnb</services>
     <d_retx_th>10,100,100,100</d_retx_th>
     <u_retx_th>10,100,100,100</u_retx_th>
+  </testCase>
+
+  <testCase id="033333">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>0</test_svr_id>
   </testCase>
 
 </testCaseList>

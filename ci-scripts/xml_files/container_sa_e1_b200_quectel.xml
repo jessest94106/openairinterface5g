@@ -49,6 +49,7 @@
     310002
     330201
     200000
+    222222
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -66,6 +67,7 @@
   </testCase>
   <testCase id="310002">
     <class>Terminate_UE</class>
+    <always_exec>true</always_exec>
     <desc>Terminate Quectel</desc>
     <id>idefix</id>
   </testCase>
@@ -76,6 +78,7 @@
   </testCase>
   <testCase id="310011">
     <class>Detach_UE</class>
+    <always_exec>true</always_exec>
     <desc>Detach Quectel</desc>
     <id>idefix</id>
   </testCase>
@@ -118,6 +121,7 @@
   </testCase>
   <testCase id="200000">
     <class>Custom_Command</class>
+    <always_exec>true</always_exec>
     <desc>Enable Sleep States</desc>
     <node>ofqot</node>
     <command>sudo cpupower idle-set -E</command>
@@ -201,12 +205,20 @@
 
   <testCase id="330201">
     <class>Undeploy_Object</class>
-    <desc>Undeploy CU-DU</desc>
+    <always_exec>true</always_exec>
+    <desc>Undeploy CUCP/CU-UP/DU</desc>
     <yaml_path>ci-scripts/yaml_files/sa_e1_b200_gnb</yaml_path>
     <eNB_instance>0</eNB_instance>
     <eNB_serverId>0</eNB_serverId>
     <d_retx_th>10,100,100,100</d_retx_th>
     <u_retx_th>10,100,100,100</u_retx_th>
+  </testCase>
+
+  <testCase id="222222">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>0</test_svr_id>
   </testCase>
 
 </testCaseList>

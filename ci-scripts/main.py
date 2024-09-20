@@ -235,7 +235,7 @@ def ExecuteActionWithParam(action):
 		if action == 'Initialize_UE':
 			success = CiTestObj.InitializeUE(HTML)
 		elif action == 'Attach_UE':
-			success = CiTestObj.AttachUE(HTML, RAN, EPC, CONTAINERS)
+			success = CiTestObj.AttachUE(HTML)
 		elif action == 'Detach_UE':
 			success = CiTestObj.DetachUE(HTML)
 		elif action == 'Terminate_UE':
@@ -259,7 +259,7 @@ def ExecuteActionWithParam(action):
 		else:
 			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
-		success = CiTestObj.Ping(HTML,RAN,EPC,CONTAINERS)
+		success = CiTestObj.Ping(HTML,EPC,CONTAINERS)
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
@@ -286,9 +286,9 @@ def ExecuteActionWithParam(action):
 			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
 			CiTestObj.iperf_options = 'check'
 		if action == 'Iperf':
-			success = CiTestObj.Iperf(HTML,RAN,EPC,CONTAINERS)
+			success = CiTestObj.Iperf(HTML, EPC, CONTAINERS)
 		elif action == 'Iperf2_Unidir':
-			success = CiTestObj.Iperf2_Unidir(HTML,RAN,EPC,CONTAINERS)
+			success = CiTestObj.Iperf2_Unidir(HTML, EPC, CONTAINERS)
 
 	elif action == 'IdleSleep':
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
@@ -376,12 +376,8 @@ def ExecuteActionWithParam(action):
 			CONTAINERS.services[CONTAINERS.eNB_instance] = string_field
 		if action == 'Deploy_Object':
 			success = CONTAINERS.DeployObject(HTML)
-			if not success:
-				CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
 		elif action == 'Undeploy_Object':
 			success = CONTAINERS.UndeployObject(HTML, RAN)
-			if not success:
-				CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
 		elif action == 'Create_Workspace':
 			success = CONTAINERS.Create_Workspace(HTML)
 
@@ -746,7 +742,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				if not test_succeeded:
 					logging.error(f"test ID {test_case_id} action {action} failed ({test_succeeded}), skipping next tests")
 					task_set_succeeded = False
-					CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
 			except Exception as e:
 				s = traceback.format_exc()
 				logging.error(f'while running CI, an exception occurred:\n{s}')

@@ -70,6 +70,7 @@
   </testCase>
   <testCase id="200000">
     <class>Custom_Command</class>
+    <always_exec>true</always_exec>
     <desc>Enable Sleep States</desc>
     <node>ofqot</node>
     <command>sudo cpupower idle-set -E</command>
@@ -82,6 +83,7 @@
   </testCase>
   <testCase id="010002">
     <class>Terminate_UE</class>
+    <always_exec>true</always_exec>
     <desc>Terminate Quectel</desc>
     <id>idefix</id>
   </testCase>
@@ -92,6 +94,7 @@
   </testCase>
   <testCase id="010010">
     <class>Detach_UE</class>
+    <always_exec>true</always_exec>
     <desc>Detach UE</desc>
     <id>idefix</id>
   </testCase>
@@ -203,6 +206,7 @@
 
   <testCase id="030201">
     <class>Undeploy_Object</class>
+    <always_exec>true</always_exec>
     <desc>Undeploy gNB</desc>
     <yaml_path>ci-scripts/yaml_files/sa_b200_gnb</yaml_path>
     <eNB_instance>0</eNB_instance>

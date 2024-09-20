@@ -33,7 +33,6 @@
 030135
 040301 040532 040631 040632 040634 040635 040681 040682 040684 040685 040401 040201
 030231
-040101
 200000
     </TestCaseRequestedList>
     <TestCaseExclusionList></TestCaseExclusionList>
@@ -53,6 +52,7 @@
     </testCase>
     <testCase id="200000">
         <class>Custom_Command</class>
+        <always_exec>true</always_exec>
         <desc>Enable Sleep States</desc>
         <node>starsky</node>
         <command>sudo cpupower idle-set -E</command>
@@ -95,6 +95,7 @@
 
     <testCase id="030231">
         <class>Undeploy_Object</class>
+        <always_exec>true</always_exec>
         <desc>Undeploy RRU/RCC</desc>
         <yaml_path>ci-scripts/yaml_files/lte_b200_tdd_05Mhz_if4.5</yaml_path>
         <eNB_instance>0</eNB_instance>
@@ -108,6 +109,7 @@
     </testCase>
     <testCase id="040201">
         <class>Terminate_UE</class>
+        <always_exec>true</always_exec>
         <desc>Terminate UE</desc>
         <id>adb_ue_1 adb_ue_2</id>
     </testCase>
@@ -118,6 +120,7 @@
     </testCase>
     <testCase id="040401">
         <class>Detach_UE</class>
+        <always_exec>true</always_exec>
         <desc>Detach UE</desc>
         <id>adb_ue_1 adb_ue_2</id>
     </testCase>

@@ -293,7 +293,7 @@ class OaiCiTest():
 		HTML.CreateHtmlTestRowQueue('N/A', 'OK', messages)
 		return True
 
-	def AttachUE(self, HTML, RAN, EPC, CONTAINERS):
+	def AttachUE(self, HTML):
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
 			futures = [executor.submit(ue.attach) for ue in ues]
@@ -307,7 +307,6 @@ class OaiCiTest():
 		else:
 			logging.error(f'error attaching or wrong MTU: attached {attached}, mtus {mtus}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not retrieve UE IP address(es) or MTU(s) wrong!"])
-			self.AutoTerminateUEandeNB(HTML, RAN, EPC, CONTAINERS)
 		return success
 
 	def DetachUE(self, HTML):
@@ -358,7 +357,7 @@ class OaiCiTest():
 		HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
 		return True
 
-	def Ping_common(self, EPC, ue, RAN, logPath):
+	def Ping_common(self, EPC, ue, logPath):
 		# Launch ping on the EPC side (true for ltebox and old open-air-cn)
 		ping_status = 0
 		ueIP = ue.getIP()
@@ -429,7 +428,7 @@ class OaiCiTest():
 
 		return (True, message)
 
-	def Ping(self,HTML,RAN,EPC,CONTAINERS):
+	def Ping(self, HTML, EPC, CONTAINERS):
 		if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
@@ -444,7 +443,7 @@ class OaiCiTest():
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		logging.debug(ues)
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-			futures = [executor.submit(self.Ping_common, EPC, ue, RAN, logPath) for ue in ues]
+			futures = [executor.submit(self.Ping_common, EPC, ue, logPath) for ue in ues]
 			results = [f.result() for f in futures]
 			# each result in results is a tuple, first member goes to successes, second to messages
 			successes, messages = map(list, zip(*results))
@@ -463,10 +462,9 @@ class OaiCiTest():
 			HTML.CreateHtmlTestRowQueue(self.ping_args, 'OK', messages)
 		else:
 			HTML.CreateHtmlTestRowQueue(self.ping_args, 'KO', messages)
-			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
 		return success
 
-	def Iperf_Module(self, EPC, ue, svr, RAN, idx, ue_num, logPath):
+	def Iperf_Module(self, EPC, ue, svr, idx, ue_num, logPath):
 		ueIP = ue.getIP()
 		if not ueIP:
 			return (False, f"UE {ue.getName()} has no IP address")
@@ -512,7 +510,7 @@ class OaiCiTest():
 
 		return (status, f'{ue_header}\n{msg}')
 
-	def Iperf(self,HTML,RAN,EPC,CONTAINERS):
+	def Iperf(self,HTML,EPC,CONTAINERS):
 		if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
@@ -530,7 +528,7 @@ class OaiCiTest():
 		svr = cls_module.Module_UE(self.svr_id,self.svr_node)
 		logging.debug(ues)
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-			futures = [executor.submit(self.Iperf_Module, EPC, ue, svr, RAN, i, len(ues), logPath) for i, ue in enumerate(ues)]
+			futures = [executor.submit(self.Iperf_Module, EPC, ue, svr, i, len(ues), logPath) for i, ue in enumerate(ues)]
 			results = [f.result() for f in futures]
 			# each result in results is a tuple, first member goes to successes, second to messages
 			successes, messages = map(list, zip(*results))
@@ -549,10 +547,9 @@ class OaiCiTest():
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'OK', messages)
 		else:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'KO', messages)
-			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
 		return success
 
-	def Iperf2_Unidir(self,HTML,RAN,EPC,CONTAINERS):
+	def Iperf2_Unidir(self,HTML,EPC,CONTAINERS):
 		if self.ue_ids == [] or self.svr_id == None or len(self.ue_ids) != 1:
 			raise Exception("no module names in self.ue_ids or/and self.svr_id provided, multi UE scenario not supported")
 		ue = cls_module.Module_UE(self.ue_ids[0].strip(),self.nodes[0].strip())
@@ -590,7 +587,6 @@ class OaiCiTest():
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'OK', [f'{ue_header}\n{msg}'])
 		else:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'KO', [f'{ue_header}\n{msg}'])
-			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
 		return success
 
 	def AnalyzeLogFile_UE(self, UElogFile,HTML,RAN):
@@ -873,62 +869,6 @@ class OaiCiTest():
 		messages = [f"UE {ue.getName()}: {log}" for (ue, log) in zip(ues, archive_info)]
 		HTML.CreateHtmlTestRowQueue(f'N/A', 'OK', messages)
 		return True
-
-	def AutoTerminateUEandeNB(self,HTML,RAN,EPC,CONTAINERS):
-		if (RAN.Initialize_eNB_args != ''):
-			self.testCase_id = 'AUTO-KILL-RAN'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN nodes'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			#terminate all RAN nodes eNB/gNB/OCP
-			for instance in range(0, len(RAN.air_interface)):
-				if RAN.air_interface[instance]!='':
-					logging.debug(f'Auto Termination of Instance {instance} : {RAN.air_interface[instance]}')
-					RAN.eNB_instance=instance
-					RAN.TerminateeNB(HTML,EPC)
-		if CONTAINERS.yamlPath[0] != '':
-			self.testCase_id = 'AUTO-KILL-CONTAINERS'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN containers'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			for instance in range(0, len(CONTAINERS.yamlPath)):
-				if CONTAINERS.yamlPath[instance]!='':
-					CONTAINERS.eNB_instance=instance
-					if CONTAINERS.deployKind[instance]:
-						CONTAINERS.UndeployObject(HTML,RAN)
-					else:
-						CONTAINERS.UndeployGenObject(HTML,RAN, self)
-
-	#this function is called only if eNB/gNB fails to start
-	#RH to be re-factored
-	def AutoTerminateeNB(self,HTML,RAN,EPC,CONTAINERS):
-		if (RAN.Initialize_eNB_args != ''):
-			self.testCase_id = 'AUTO-KILL-RAN'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN nodes'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			#terminate all RAN nodes eNB/gNB/OCP
-			for instance in range(0, len(RAN.air_interface)):
-				if RAN.air_interface[instance]!='':
-					logging.debug(f'Auto Termination of Instance {instance} : {RAN.air_interface[instance]}')
-					RAN.eNB_instance=instance
-					RAN.TerminateeNB(HTML,EPC)
-		if CONTAINERS.yamlPath[0] != '':
-			self.testCase_id = 'AUTO-KILL-CONTAINERS'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN containers'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			for instance in range(0, len(CONTAINERS.yamlPath)):
-				if CONTAINERS.yamlPath[instance]!='':
-					CONTAINERS.eNB_instance=instance
-					if CONTAINERS.deployKind[instance]:
-						CONTAINERS.UndeployObject(HTML,RAN)
-					else:
-						CONTAINERS.UndeployGenObject(HTML,RAN,self)
 
 	def LogCollectBuild(self,RAN):
 		# Some pipelines are using "none" IP / Credentials

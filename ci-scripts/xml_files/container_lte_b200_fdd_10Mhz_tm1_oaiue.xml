@@ -41,6 +41,8 @@
 030211
 200000
 200001
+222222
+333333
     </TestCaseRequestedList>
     <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -70,12 +72,14 @@
     </testCase>
     <testCase id="200000">
         <class>Custom_Command</class>
+        <always_exec>true</always_exec>
         <desc>Enable Sleep States (hutch)</desc>
         <node>hutch</node>
         <command>sudo cpupower idle-set -E</command>
     </testCase>
     <testCase id="200001">
         <class>Custom_Command</class>
+        <always_exec>true</always_exec>
         <desc>Enable Sleep States (carabe)</desc>
         <node>carabe</node>
         <command>sudo cpupower idle-set -E</command>
@@ -121,6 +125,7 @@
 
     <testCase id="030211">
         <class>Undeploy_Object</class>
+        <always_exec>true</always_exec>
         <desc>Undeploy eNB</desc>
         <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_10Mhz_tm1_magma</yaml_path>
         <eNB_instance>0</eNB_instance>
@@ -129,6 +134,7 @@
 
     <testCase id="030411">
         <class>Undeploy_Object</class>
+        <always_exec>true</always_exec>
         <desc>Undeploy LTE-UE</desc>
         <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_10Mhz_oai_ue_magma</yaml_path>
         <eNB_instance>1</eNB_instance>
@@ -178,6 +184,20 @@
         <iperf_profile>balanced</iperf_profile>
         <id>lte_oai_ue_carabe</id>
         <svr_id>nano-cn4g</svr_id>
+    </testCase>
+
+    <testCase id="222222">
+        <class>Clean_Test_Server_Images</class>
+        <always_exec>true</always_exec>
+        <desc>Clean Test Images on eNB Test Server</desc>
+        <test_svr_id>0</test_svr_id>
+    </testCase>
+
+    <testCase id="333333">
+        <class>Clean_Test_Server_Images</class>
+        <always_exec>true</always_exec>
+        <desc>Clean Test Images on LTE-UE Test Server</desc>
+        <test_svr_id>1</test_svr_id>
     </testCase>
 
 </testCaseList>

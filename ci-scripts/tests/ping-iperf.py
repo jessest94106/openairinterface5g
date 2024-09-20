@@ -14,7 +14,6 @@ sys.path.append('./') # to find OAI imports below
 import cls_oai_html
 import cls_oaicitest
 import cls_containerize
-import ran
 import epc
 
 class TestPingIperf(unittest.TestCase):
@@ -30,13 +29,12 @@ class TestPingIperf(unittest.TestCase):
 		self.epc.UserName = None
 		self.epc.Password = None
 		self.epc.SourceCodePath = os.getcwd()
-		self.ran = ran.RANManagement()
 
 	def test_ping(self):
 		self.ci.ping_args = "-c3 127.0.0.1"
 		self.ci.ping_packetloss_threshold = "0"
 		# TODO Should need nothing but options and UE(s) to use
-		success = self.ci.Ping(self.html, self.ran, self.epc, self.cont)
+		success = self.ci.Ping(self.html, self.epc, self.cont)
 		self.assertTrue(success)
 
 	def test_iperf(self):
@@ -50,7 +48,7 @@ class TestPingIperf(unittest.TestCase):
 		self.ci.iperf_bitrate_threshold = "0"
 		self.ci.iperf_profile = "balanced"
 		# TODO Should need nothing but options and UE(s) to use
-		success = self.ci.Iperf(self.html, self.ran, self.epc, self.cont)
+		success = self.ci.Iperf(self.html, self.epc, self.cont)
 		self.assertTrue(success)
 
 if __name__ == '__main__':
