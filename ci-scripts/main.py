@@ -596,14 +596,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 		HTML.htmlTabRefs.append(xmlRoot.findtext('htmlTabRef',default='test-tab-0'))
 		HTML.htmlTabNames.append(xmlRoot.findtext('htmlTabName',default='Test-0'))
 		repeatCount = xmlRoot.findtext('repeatCount',default='1')
-		testStability = xmlRoot.findtext('TestUnstable',default='False')
 		CiTestObj.repeatCounts.append(int(repeatCount))
-		if testStability == 'True':
-			CiTestObj.testUnstable = True
-			HTML.testUnstable = True
-			CiTestObj.testMinStableId = xmlRoot.findtext('TestMinId',default='999999')
-			HTML.testMinStableId = CiTestObj.testMinStableId
-			logging.warning('Test is tagged as Unstable -- starting from TestID ' + str(CiTestObj.testMinStableId))
 	all_tests=xmlRoot.findall('testCase')
 
 	exclusion_tests=exclusion_tests.split()
@@ -829,20 +822,11 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 					logging.error(f'while running CI, an exception occurred:\n{s}')
 					HTML.CreateHtmlTestRowQueue("N/A", 'KO', [f"CI test code encountered an exception:\n{s}"])
 					RAN.prematureExit = True
-
-				if RAN.prematureExit:
-					if CiTestObj.testCase_id == CiTestObj.testMinStableId:
-						logging.warning('Scenario has reached minimal stability point')
-						CiTestObj.testStabilityPointReached = True
-						HTML.testStabilityPointReached = True
 		CiTestObj.FailReportCnt += 1
 	if CiTestObj.FailReportCnt == CiTestObj.repeatCounts[0] and RAN.prematureExit:
 		logging.error('\u001B[1;37;41mScenario failed ' + str(CiTestObj.FailReportCnt) + ' time(s)\u001B[0m')
 		HTML.CreateHtmlTabFooter(False)
-		if CiTestObj.testUnstable and (CiTestObj.testStabilityPointReached or CiTestObj.testMinStableId == '999999'):
-			logging.warning('\u001B[1;30;43mScenario has reached minimal stability point -- Not a Failure\u001B[0m')
-		else:
-			sys.exit('Failed Scenario')
+		sys.exit('Failed Scenario')
 	else:
 		logging.info('\u001B[1;37;42mScenario passed after ' + str(CiTestObj.FailReportCnt) + ' time(s)\u001B[0m')
 		HTML.CreateHtmlTabFooter(True)

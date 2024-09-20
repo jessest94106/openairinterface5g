@@ -235,9 +235,6 @@ class OaiCiTest():
 		self.FailReportCnt = 0
 		self.testCase_id = ''
 		self.testXMLfiles = []
-		self.testUnstable = False
-		self.testMinStableId = '999999'
-		self.testStabilityPointReached = False
 		self.desc = ''
 		self.ping_args = ''
 		self.ping_packetloss_threshold = ''
@@ -974,12 +971,6 @@ class OaiCiTest():
 		SSH.command(f'echo {self.UEPassword} | sudo -S zip ue.log.zip ue*.log core* ue_*record.raw ue_*.pcap ue_*txt', '\$', 60)
 		SSH.command(f'echo {self.UEPassword} | sudo -S rm ue*.log core* ue_*record.raw ue_*.pcap ue_*txt', '\$', 5)
 		SSH.close()
-
-	def ConditionalExit(self):
-		if self.testUnstable:
-			if self.testStabilityPointReached or self.testMinStableId == '999999':
-				sys.exit(0)
-		sys.exit(1)
 
 	def ShowTestID(self):
 		logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
