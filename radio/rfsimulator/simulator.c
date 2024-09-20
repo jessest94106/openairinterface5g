@@ -547,30 +547,67 @@ static int rfsimu_vtime_cmd(char *buff, int debug, telnet_printfunc_t prnt, void
   return CMDSTATUS_FOUND;
 }
 
-static int startServer(openair0_device *device) {
-  rfsimulator_state_t *t = (rfsimulator_state_t *) device->priv;
+static int startServer(openair0_device *device)
+{
+  int sock = -1;
+  struct addrinfo *results = NULL;
+  struct addrinfo *rp= NULL;
+
+  rfsimulator_state_t *t = (rfsimulator_state_t *)device->priv;
   t->role = SIMU_ROLE_SERVER;
-  t->listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (t->listen_sock < 0) {
-    LOG_E(HW, "socket(SOCK_STREAM) failed, errno(%d)\n", errno);
+
+  char port[6];
+  snprintf(port, sizeof(port), "%d", t->port);
+
+  struct addrinfo hints = {
+   .ai_family = AF_INET6,
+   .ai_socktype = SOCK_STREAM,
+   .ai_flags = AI_PASSIVE,
+  };
+
+  int s = getaddrinfo(NULL, port, &hints, &results);
+  if (s != 0) {
+    LOG_E(HW, "getaddrinfo: %s\n", gai_strerror(s));
+    freeaddrinfo(results);
     return -1;
   }
+
   int enable = 1;
-  if (setsockopt(t->listen_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) != 0) {
-    LOG_E(HW, "setsockopt(SO_REUSEADDR) failed, errno(%d)\n", errno);
+  int disable = 0;
+  for (rp = results; rp != NULL; rp = rp->ai_next) {
+    sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (sock == -1) {
+      continue;
+    }
+
+    if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &disable, sizeof(int)) != 0) {
+      continue;
+    }
+
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) != 0) {
+      continue;
+    }
+
+    if (bind(sock, rp->ai_addr, rp->ai_addrlen) == 0) {
+      break;
+    }
+
+    close(sock);
+  }
+
+  freeaddrinfo(results);
+
+  if (sock <= 0) {
+    LOG_E(HW, "could not open a socket\n");
     return -1;
   }
-  struct sockaddr_in addr = {.sin_family = AF_INET, .sin_port = htons(t->port), .sin_addr = {.s_addr = INADDR_ANY}};
-  int rc = bind(t->listen_sock, (struct sockaddr *)&addr, sizeof(addr));
-  if (rc < 0) {
-    LOG_E(HW, "bind() failed, errno(%d)\n", errno);
-    return -1;
-  }
+  t->listen_sock = sock;
+
   if (listen(t->listen_sock, 5) != 0) {
     LOG_E(HW, "listen() failed, errno(%d)\n", errno);
     return -1;
   }
-  struct epoll_event ev= {0};
+  struct epoll_event ev = {0};
   ev.events = EPOLLIN;
   ev.data.fd = t->listen_sock;
   if (epoll_ctl(t->epollfd, EPOLL_CTL_ADD, t->listen_sock, &ev) != 0) {
