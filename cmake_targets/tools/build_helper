@@ -673,8 +673,8 @@ install_simde_from_source(){
     if [[ -v SIMDE_VERSION ]]; then
       git checkout -f $SIMDE_VERSION
     else
-      # At time of writing, last working commit for OAI
-      git checkout 389f360a66d4a3bec62b7d71ad8be877487809ba
+      # At time of writing, last working commit for OAI: 1a09d3bc
+      git checkout 1a09d3bc9de47c4d9a5daa23eb753d5322748201
     fi
     # Showing which version is used
     git log -n1
