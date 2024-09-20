@@ -7,5 +7,6 @@ There are some unit tests. From the parent directory, i.e., `ci-scripts/`,
 start with
 
     python tests/deployment.py -v
+    python tests/ping-iperf.py -v
 
 It will indicate if all tests passed.
