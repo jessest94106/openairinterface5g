@@ -226,99 +226,128 @@ NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR get_ssb_len(NR_ServingCellCo
   return NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR_longBitmap;
 }
 
+static struct NR_SCS_SpecificCarrier configure_scs_carrier(int mu, int N_RB)
+{
+  struct NR_SCS_SpecificCarrier scs_sc = {0};
+  scs_sc.offsetToCarrier = 0;
+  scs_sc.subcarrierSpacing = mu;
+  scs_sc.carrierBandwidth = N_RB;
+  return scs_sc;
+}
+
+static struct NR_PUSCH_TimeDomainResourceAllocation *add_PUSCH_TimeDomainResourceAllocation(int startSymbolAndLength)
+{
+  struct NR_PUSCH_TimeDomainResourceAllocation *pusch_alloc = calloc_or_fail(1, sizeof(*pusch_alloc));
+  pusch_alloc->k2 = calloc_or_fail(1, sizeof(*pusch_alloc->k2));
+  *pusch_alloc->k2 = 6;
+  pusch_alloc->mappingType = NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
+  pusch_alloc->startSymbolAndLength = startSymbolAndLength;
+  return pusch_alloc;
+}
+
+/**
+ * Fill ServingCellConfigCommon struct members for unitary simulators
+ */
 void fill_scc_sim(NR_ServingCellConfigCommon_t *scc, uint64_t *ssb_bitmap, int N_RB_DL, int N_RB_UL, int mu_dl, int mu_ul)
 {
-  *scc->physCellId=0;							\
-  //  *scc->n_TimingAdvanceOffset=NR_ServingCellConfigCommon__n_TimingAdvanceOffset_n0;
-  *scc->ssb_periodicityServingCell=NR_ServingCellConfigCommon__ssb_periodicityServingCell_ms20;
-  scc->dmrs_TypeA_Position=NR_ServingCellConfigCommon__dmrs_TypeA_Position_pos2;
-  *scc->ssbSubcarrierSpacing=mu_dl;
-  if (mu_dl == 0) {
-    *scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB=520432;
-    *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0]=38;
-    scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA=520000;
-  } else {
-    *scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB=641032;
-    *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0]=78;
-    scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA=640000;
-  }
-  scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->offsetToCarrier=0;
-  scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing=mu_dl;
-  scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth=N_RB_DL;
-  scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth =
-      PRBalloc_to_locationandbandwidth(N_RB_DL, 0);
-  scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.subcarrierSpacing=mu_dl;//NR_SubcarrierSpacing_kHz30;
-  *scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->controlResourceSetZero=12;
-  *scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->searchSpaceZero=0;
-  struct NR_PDSCH_TimeDomainResourceAllocation *timedomainresourceallocation0 = CALLOC(1,sizeof(NR_PDSCH_TimeDomainResourceAllocation_t));
-  timedomainresourceallocation0->mappingType=NR_PDSCH_TimeDomainResourceAllocation__mappingType_typeA;
-  timedomainresourceallocation0->startSymbolAndLength=54;
-  asn1cSeqAdd(&scc->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list,
-                   timedomainresourceallocation0);
-  struct NR_PDSCH_TimeDomainResourceAllocation *timedomainresourceallocation1 = CALLOC(1,sizeof(NR_PDSCH_TimeDomainResourceAllocation_t));
-  timedomainresourceallocation1->mappingType=NR_PDSCH_TimeDomainResourceAllocation__mappingType_typeA;
-  timedomainresourceallocation1->startSymbolAndLength=57;
-  asn1cSeqAdd(&scc->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list,
-                   timedomainresourceallocation1);
-  *scc->uplinkConfigCommon->frequencyInfoUL->frequencyBandList->list.array[0]=mu_ul?78:38;
-  *scc->uplinkConfigCommon->frequencyInfoUL->absoluteFrequencyPointA=-1;
-  scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->offsetToCarrier=0;
-  scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing=mu_ul;
-  scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth=N_RB_UL;
-  *scc->uplinkConfigCommon->frequencyInfoUL->p_Max=20;
-  scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth = PRBalloc_to_locationandbandwidth(N_RB_UL, 0);
-  scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing=mu_ul;//NR_SubcarrierSpacing_kHz30;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.prach_ConfigurationIndex=98;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.msg1_FDM=NR_RACH_ConfigGeneric__msg1_FDM_one;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.msg1_FrequencyStart=0;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.zeroCorrelationZoneConfig=13;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.preambleReceivedTargetPower=-118;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.preambleTransMax=NR_RACH_ConfigGeneric__preambleTransMax_n10;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.powerRampingStep=NR_RACH_ConfigGeneric__powerRampingStep_dB2;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rach_ConfigGeneric.ra_ResponseWindow=NR_RACH_ConfigGeneric__ra_ResponseWindow_sl20;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->present=NR_RACH_ConfigCommon__ssb_perRACH_OccasionAndCB_PreamblesPerSSB_PR_one;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->choice.one=NR_RACH_ConfigCommon__ssb_perRACH_OccasionAndCB_PreamblesPerSSB__one_n64;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->ra_ContentionResolutionTimer=NR_RACH_ConfigCommon__ra_ContentionResolutionTimer_sf64;
-  *scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->rsrp_ThresholdSSB=19;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->prach_RootSequenceIndex.present=NR_RACH_ConfigCommon__prach_RootSequenceIndex_PR_l139;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->prach_RootSequenceIndex.choice.l139=0;
-  scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->restrictedSetConfig=NR_RACH_ConfigCommon__restrictedSetConfig_unrestrictedSet;
-  struct NR_PUSCH_TimeDomainResourceAllocation *pusch_timedomainresourceallocation0 = CALLOC(1,sizeof(struct NR_PUSCH_TimeDomainResourceAllocation));
-  pusch_timedomainresourceallocation0->k2  = CALLOC(1,sizeof(long));
-  *pusch_timedomainresourceallocation0->k2=6;
-  pusch_timedomainresourceallocation0->mappingType=NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
-  pusch_timedomainresourceallocation0->startSymbolAndLength=55;
-  asn1cSeqAdd(&scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,pusch_timedomainresourceallocation0);
-  struct NR_PUSCH_TimeDomainResourceAllocation *pusch_timedomainresourceallocation1 = CALLOC(1,sizeof(struct NR_PUSCH_TimeDomainResourceAllocation));
-  pusch_timedomainresourceallocation1->k2  = CALLOC(1,sizeof(long));
-  *pusch_timedomainresourceallocation1->k2=6;
-  pusch_timedomainresourceallocation1->mappingType=NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
-  pusch_timedomainresourceallocation1->startSymbolAndLength=38;
-  asn1cSeqAdd(&scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,pusch_timedomainresourceallocation1);
-  *scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->msg3_DeltaPreamble=1;
-  *scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->p0_NominalWithGrant=-90;
- scc->uplinkConfigCommon->initialUplinkBWP->pucch_ConfigCommon->choice.setup->pucch_GroupHopping=NR_PUCCH_ConfigCommon__pucch_GroupHopping_neither; 
- *scc->uplinkConfigCommon->initialUplinkBWP->pucch_ConfigCommon->choice.setup->hoppingId=40;
- *scc->uplinkConfigCommon->initialUplinkBWP->pucch_ConfigCommon->choice.setup->p0_nominal=-90;
- scc->ssb_PositionsInBurst->present=NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR_mediumBitmap;
- *ssb_bitmap=0xff;
- scc->tdd_UL_DL_ConfigurationCommon->referenceSubcarrierSpacing=mu_dl;
- if (mu_dl == 0)
-   scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity=NR_TDD_UL_DL_Pattern__dl_UL_TransmissionPeriodicity_ms10;
- else
-   scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity=NR_TDD_UL_DL_Pattern__dl_UL_TransmissionPeriodicity_ms5;
- scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots=7;
- scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols=6;
- scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots=2;
- scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols=4;
- scc->tdd_UL_DL_ConfigurationCommon->pattern2->dl_UL_TransmissionPeriodicity=321;
+  *scc->physCellId = 0;
+  *scc->ssb_periodicityServingCell = NR_ServingCellConfigCommon__ssb_periodicityServingCell_ms20;
+  scc->dmrs_TypeA_Position = NR_ServingCellConfigCommon__dmrs_TypeA_Position_pos2;
+  *scc->ssbSubcarrierSpacing = mu_dl;
 
- scc->tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSlots=-1;
- scc->tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSymbols=-1;
- scc->tdd_UL_DL_ConfigurationCommon->pattern2->nrofUplinkSlots=-1;
- scc->tdd_UL_DL_ConfigurationCommon->pattern2->nrofUplinkSymbols=-1;
- scc->ss_PBCH_BlockPower=20;
- *scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing=-1;
+  struct NR_FrequencyInfoDL *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
+  if (mu_dl == 0) {
+    *frequencyInfoDL->absoluteFrequencySSB = 520432;
+    *frequencyInfoDL->frequencyBandList.list.array[0] = 38;
+    frequencyInfoDL->absoluteFrequencyPointA = 520000;
+  } else {
+    *frequencyInfoDL->absoluteFrequencySSB = 641032;
+    *frequencyInfoDL->frequencyBandList.list.array[0] = 78;
+    frequencyInfoDL->absoluteFrequencyPointA = 640000;
+  }
+
+  *frequencyInfoDL->scs_SpecificCarrierList.list.array[0] = configure_scs_carrier(mu_dl, N_RB_DL);
+  struct NR_BWP_DownlinkCommon *initialDownlinkBWP = scc->downlinkConfigCommon->initialDownlinkBWP;
+
+  initialDownlinkBWP->genericParameters.locationAndBandwidth = PRBalloc_to_locationandbandwidth(N_RB_DL, 0);
+  initialDownlinkBWP->genericParameters.subcarrierSpacing = mu_dl;
+  *initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->controlResourceSetZero = 12;
+  *initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->searchSpaceZero = 0;
+  struct NR_PDSCH_TimeDomainResourceAllocation *timedomainresourceallocation0 =
+      calloc_or_fail(1, sizeof(*timedomainresourceallocation0));
+  timedomainresourceallocation0->mappingType=NR_PDSCH_TimeDomainResourceAllocation__mappingType_typeA;
+  timedomainresourceallocation0->startSymbolAndLength = 54;
+  asn1cSeqAdd(&initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list,
+              timedomainresourceallocation0);
+  struct NR_PDSCH_TimeDomainResourceAllocation *timedomainresourceallocation1 =
+      calloc_or_fail(1, sizeof(*timedomainresourceallocation1));
+  timedomainresourceallocation1->mappingType = NR_PDSCH_TimeDomainResourceAllocation__mappingType_typeA;
+  timedomainresourceallocation1->startSymbolAndLength = 57;
+  asn1cSeqAdd(&initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList->list,
+              timedomainresourceallocation1);
+
+  struct NR_FrequencyInfoUL *frequencyInfoUL = scc->uplinkConfigCommon->frequencyInfoUL;
+  *frequencyInfoUL->frequencyBandList->list.array[0] = mu_ul ? 78 : 38;
+  *frequencyInfoUL->absoluteFrequencyPointA = -1;
+  *frequencyInfoUL->scs_SpecificCarrierList.list.array[0] = configure_scs_carrier(mu_ul, N_RB_UL);
+  *frequencyInfoUL->p_Max = 20;
+
+  struct NR_BWP_UplinkCommon *initialUplinkBWP = scc->uplinkConfigCommon->initialUplinkBWP;
+  initialUplinkBWP->genericParameters.locationAndBandwidth = PRBalloc_to_locationandbandwidth(N_RB_UL, 0);
+  initialUplinkBWP->genericParameters.subcarrierSpacing = mu_ul;
+
+  struct NR_SetupRelease_RACH_ConfigCommon *rach_ConfigCommon = initialUplinkBWP->rach_ConfigCommon;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.prach_ConfigurationIndex = 98;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.msg1_FDM = NR_RACH_ConfigGeneric__msg1_FDM_one;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.msg1_FrequencyStart = 0;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.zeroCorrelationZoneConfig = 13;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.preambleReceivedTargetPower = -118;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.preambleTransMax = NR_RACH_ConfigGeneric__preambleTransMax_n10;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.powerRampingStep = NR_RACH_ConfigGeneric__powerRampingStep_dB2;
+  rach_ConfigCommon->choice.setup->rach_ConfigGeneric.ra_ResponseWindow = NR_RACH_ConfigGeneric__ra_ResponseWindow_sl20;
+  rach_ConfigCommon->choice.setup->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->present =
+      NR_RACH_ConfigCommon__ssb_perRACH_OccasionAndCB_PreamblesPerSSB_PR_one;
+  rach_ConfigCommon->choice.setup->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->choice.one =
+      NR_RACH_ConfigCommon__ssb_perRACH_OccasionAndCB_PreamblesPerSSB__one_n64;
+  rach_ConfigCommon->choice.setup->ra_ContentionResolutionTimer = NR_RACH_ConfigCommon__ra_ContentionResolutionTimer_sf64;
+  *rach_ConfigCommon->choice.setup->rsrp_ThresholdSSB = 19;
+  rach_ConfigCommon->choice.setup->prach_RootSequenceIndex.present = NR_RACH_ConfigCommon__prach_RootSequenceIndex_PR_l139;
+  rach_ConfigCommon->choice.setup->prach_RootSequenceIndex.choice.l139 = 0;
+  rach_ConfigCommon->choice.setup->restrictedSetConfig = NR_RACH_ConfigCommon__restrictedSetConfig_unrestrictedSet;
+  *rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing = -1;
+  struct NR_SetupRelease_PUSCH_ConfigCommon *pusch_ConfigCommon = initialUplinkBWP->pusch_ConfigCommon;
+
+  asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, add_PUSCH_TimeDomainResourceAllocation(55));
+  asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, add_PUSCH_TimeDomainResourceAllocation(38));
+
+  *pusch_ConfigCommon->choice.setup->msg3_DeltaPreamble = 1;
+  *pusch_ConfigCommon->choice.setup->p0_NominalWithGrant = -90;
+  struct NR_SetupRelease_PUCCH_ConfigCommon *pucch_ConfigCommon = initialUplinkBWP->pucch_ConfigCommon;
+  pucch_ConfigCommon->choice.setup->pucch_GroupHopping = NR_PUCCH_ConfigCommon__pucch_GroupHopping_neither;
+  *pucch_ConfigCommon->choice.setup->hoppingId = 40;
+  *pucch_ConfigCommon->choice.setup->p0_nominal = -90;
+  scc->ssb_PositionsInBurst->present = NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR_mediumBitmap;
+  *ssb_bitmap = 0xff;
+
+  struct NR_TDD_UL_DL_ConfigCommon *tdd_UL_DL_ConfigurationCommon = scc->tdd_UL_DL_ConfigurationCommon;
+  tdd_UL_DL_ConfigurationCommon->referenceSubcarrierSpacing = mu_dl;
+
+  NR_TDD_UL_DL_Pattern_t *p1 = &tdd_UL_DL_ConfigurationCommon->pattern1;
+  p1->dl_UL_TransmissionPeriodicity = (mu_dl == 0) ? NR_TDD_UL_DL_Pattern__dl_UL_TransmissionPeriodicity_ms10
+                                                   : NR_TDD_UL_DL_Pattern__dl_UL_TransmissionPeriodicity_ms5;
+  p1->nrofDownlinkSlots = 7;
+  p1->nrofDownlinkSymbols = 6;
+  p1->nrofUplinkSlots = 2;
+  p1->nrofUplinkSymbols = 4;
+
+  struct NR_TDD_UL_DL_Pattern *p2 = tdd_UL_DL_ConfigurationCommon->pattern2;
+  p2->dl_UL_TransmissionPeriodicity = 321;
+  p2->nrofDownlinkSlots = -1;
+  p2->nrofDownlinkSymbols = -1;
+  p2->nrofUplinkSlots = -1;
+  p2->nrofUplinkSymbols = -1;
+
+  scc->ss_PBCH_BlockPower = 20;
 }
 
 
