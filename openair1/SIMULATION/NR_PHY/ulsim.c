@@ -1421,17 +1421,6 @@ int main(int argc, char *argv[])
           errors_decoding++;
         }
       }
-      if (n_trials == 1) {
-        for (int r = 0; r < UE->ul_harq_processes[harq_pid].C; r++)
-          for (int i = 0; i < UE->ul_harq_processes[harq_pid].K >> 3; i++) {
-            if ((UE->ul_harq_processes[harq_pid].c[r][i] ^ ulsch_gNB->harq_process->c[r][i]) != 0)
-              printf("************");
-            /*printf("r %d: in[%d] %x, out[%d] %x (%x)\n",r,
-              i,UE->ul_harq_processes[harq_pid].c[r][i],
-              i,ulsch_gNB->harq_process->c[r][i],
-              UE->ul_harq_processes[harq_pid].c[r][i]^ulsch_gNB->harq_process->c[r][i]);*/
-          }
-      }
       if (errors_decoding > 0 && error_flag == 0) {
         n_false_positive++;
         if (n_trials==1)
