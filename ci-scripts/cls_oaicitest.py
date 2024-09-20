@@ -486,7 +486,7 @@ class OaiCiTest():
 			port = 5002 + idx
 			# note: some core setups start an iperf3 server automatically, indicated in ci_infra by runIperf3Server: False`
 			t = iperf_time * 2.5
-			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False)
+			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False, silent=True)
 			if runIperf3Server:
 				cmd_svr.run(f'{svr.getCmdPrefix()} nohup timeout -vk3 {t} iperf3 -s -B {svrIP} -p {port} -1 {jsonReport} &', timeout=t)
 			cmd_ue.run(f'{ue.getCmdPrefix()} timeout -vk3 {t} {iperf_ue} -B {ueIP} -c {svrIP} -p {port} {iperf_opt} {jsonReport} {serverReport} -O 5 >> /tmp/{client_filename}', timeout=t)
@@ -495,7 +495,7 @@ class OaiCiTest():
 			cmd_ue.copyin(f'/tmp/{client_filename}', f'{localPath}/{logPath}/{client_filename}')
 			# note: copy iperf3 log to the current directory for log analysis and log collection
 			cmd_ue.copyin(f'/tmp/{client_filename}', f'{localPath}/{client_filename}')
-			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False)
+			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False, silent=True)
 		if udpIperf:
 			status, msg = Iperf_analyzeV3UDP(client_filename, self.iperf_bitrate_threshold, self.iperf_packetloss_threshold, target_bitrate)
 		elif bidirIperf:
