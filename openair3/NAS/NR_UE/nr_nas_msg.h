@@ -101,7 +101,7 @@ typedef struct {
 
 /* Structure of security protected header */
 typedef struct {
-  fgs_protocol_discriminator_t protocol_discriminator;
+  uint8_t protocol_discriminator;
   uint8_t security_header_type;
   uint32_t message_authentication_code;
   uint8_t sequence_number;
