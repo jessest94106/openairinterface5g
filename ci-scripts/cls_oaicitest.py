@@ -37,13 +37,7 @@ import re		# reg
 import pexpect	# pexpect
 import time		# sleep
 import os
-import subprocess
-import xml.etree.ElementTree as ET
 import logging
-import datetime
-import signal
-import statistics as stat
-from multiprocessing import SimpleQueue, Lock
 import concurrent.futures
 import json
 
@@ -508,14 +502,7 @@ class OaiCiTest():
 			logging.info(f'\u001B[1;35m    {l} \u001B[0m')
 		return (status, f'{ue_header}\n{msg}')
 
-	def IperfNoS1(self,HTML,RAN,EPC,CONTAINERS):
-		raise 'IperfNoS1 not implemented'
-
 	def Iperf(self,HTML,RAN,EPC,CONTAINERS):
-		result = re.search('noS1', str(RAN.Initialize_eNB_args))
-		if result is not None:
-			self.IperfNoS1(HTML,RAN,EPC,CONTAINERS)
-			return
 		if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
