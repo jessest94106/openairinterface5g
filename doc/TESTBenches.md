@@ -38,7 +38,7 @@ Note: The available resources, and their current usage, is indicated here:
 
 ![5G OTA Testbench](testbenches_doc_resources/5g-ota-bench.png)
 
-[PDF version](testbenches_doc_resources/5g-ota-bench.pdf) | [LaTeX/TikZ version](testbenches_doc_resources/5g-ota-bench.tex) if you want to modify to reflect your setup
+[LaTeX/TikZ version](testbenches_doc_resources/5g-ota-bench.tex) if you want to modify to reflect your setup
 
 
 ### 5G NSA/Faraday Cage Testbench
