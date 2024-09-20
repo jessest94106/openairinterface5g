@@ -141,9 +141,6 @@ uint8_t nb_antenna_rx = 1;
 
 int otg_enabled;
 
-extern void reset_opp_meas(void);
-extern void print_opp_meas(void);
-
 extern void *udp_eNB_task(void *args_p);
 
 int transmission_mode=1;
@@ -630,10 +627,6 @@ int main( int argc, char **argv ) {
   //randominit (0);
   set_taus_seed (0);
   printf("configuring for RAU/RRU\n");
-
-  if (opp_enabled ==1) {
-    reset_opp_meas();
-  }
 
   cpuf=get_cpu_freq_GHz();
   itti_init(TASK_MAX, tasks_info);

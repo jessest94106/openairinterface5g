@@ -86,17 +86,7 @@
 #include <PHY/NR_ESTIMATION/nr_ul_estimation.h>
 
 // #define USRP_DEBUG 1
-//  Fix per CC openair rf/if device update
-
-time_stats_t softmodem_stats_mt; // main thread
-time_stats_t softmodem_stats_hw; //  hw acquisition
-time_stats_t softmodem_stats_rxtx_sf; // total tx time
-time_stats_t nfapi_meas; // total tx time
-time_stats_t softmodem_stats_rx_sf; // total rx time
-
-
 #include "executables/thread-common.h"
-
 
 //#define TICK_TO_US(ts) (ts.diff)
 #define TICK_TO_US(ts) (ts.trials==0?0:ts.diff/ts.trials)
@@ -213,18 +203,14 @@ static void rx_func(processingData_L1_t *info)
   int64_t absslot_tx = info->timestamp_tx / samples;
   int64_t absslot_rx = absslot_tx - gNB->RU_list[0]->sl_ahead;
   int rt_prof_idx = absslot_rx % RT_PROF_DEPTH;
-  clock_gettime(CLOCK_MONOTONIC,&info->gNB->rt_L1_profiling.start_L1_RX[rt_prof_idx]);
-  start_meas(&softmodem_stats_rxtx_sf);
+  clock_gettime(CLOCK_MONOTONIC, &info->gNB->rt_L1_profiling.start_L1_RX[rt_prof_idx]);
 
   // *******************************************************************
 
   if (NFAPI_MODE == NFAPI_MODE_PNF) {
     // I am a PNF and I need to let nFAPI know that we have a (sub)frame tick
-    //LOG_D(PHY, "oai_nfapi_slot_ind(frame:%u, slot:%d) ********\n", frame_rx, slot_rx);
-    start_meas(&nfapi_meas);
+    // LOG_D(PHY, "oai_nfapi_slot_ind(frame:%u, slot:%d) ********\n", frame_rx, slot_rx);
     handle_nr_slot_ind(frame_rx, slot_rx);
-    stop_meas(&nfapi_meas);
-
   }
   // ****************************************
 
@@ -277,7 +263,6 @@ static void rx_func(processingData_L1_t *info)
 #endif
   }
 
-  stop_meas(&softmodem_stats_rxtx_sf);
   clock_gettime(CLOCK_MONOTONIC, &info->gNB->rt_L1_profiling.return_L1_RX[rt_prof_idx]);
 }
 
@@ -394,7 +379,6 @@ void init_gNB_Tpool(int inst) {
 
 }
 
-
 void term_gNB_Tpool(int inst) {
   PHY_VARS_gNB *gNB = RC.gNB[inst];
   abortTpool(&gNB->threadPool);
@@ -409,30 +393,6 @@ void term_gNB_Tpool(int inst) {
   if (!get_softmodem_params()->emulate_l1)
     pthread_join(proc->L1_stats_thread, NULL);
 }
-
-void reset_opp_meas(void) {
-  int sfn;
-  reset_meas(&softmodem_stats_mt);
-  reset_meas(&softmodem_stats_hw);
-
-  for (sfn=0; sfn < 10; sfn++) {
-    reset_meas(&softmodem_stats_rxtx_sf);
-    reset_meas(&softmodem_stats_rx_sf);
-  }
-}
-
-
-void print_opp_meas(void) {
-  int sfn=0;
-  print_meas(&softmodem_stats_mt, "Main gNB Thread", NULL, NULL);
-  print_meas(&softmodem_stats_hw, "HW Acquisation", NULL, NULL);
-
-  for (sfn=0; sfn < 10; sfn++) {
-    print_meas(&softmodem_stats_rxtx_sf,"[gNB][total_phy_proc_rxtx]",NULL, NULL);
-    print_meas(&softmodem_stats_rx_sf,"[gNB][total_phy_proc_rx]",NULL,NULL);
-  }
-}
-
 
 /// eNB kept in function name for nffapi calls, TO FIX
 void init_eNB_afterRU(void) {

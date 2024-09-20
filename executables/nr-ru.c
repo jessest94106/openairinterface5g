@@ -1040,7 +1040,7 @@ void *ru_stats_thread(void *param) {
   while (!oai_exit) {
     sleep(1);
 
-    if (opp_enabled == 1) {
+    if (cpu_meas_enabled) {
       if (ru->feprx) print_meas(&ru->ofdm_demod_stats,"feprx (all ports)",NULL,NULL);
 
       if (ru->feptx_ofdm) {
@@ -1142,8 +1142,7 @@ void *ru_thread( void *param ) {
   int                slot     = fp->slots_per_frame-1;
   int                frame    = 1023;
   char               threadname[40];
-  int                initial_wait=0;
-  int                opp_enabled0 = opp_enabled;
+  int initial_wait = 0;
 
 #ifndef OAI_FHI72
   bool rx_tti_busy[RU_RX_SLOT_DEPTH] = {false};
@@ -1231,7 +1230,7 @@ void *ru_thread( void *param ) {
       else LOG_I(PHY,"RU %d rf device ready\n",ru->idx);
     } else LOG_I(PHY,"RU %d no rf device\n",ru->idx);
 
-    LOG_I(PHY,"RU %d RF started opp_enabled %d\n",ru->idx,opp_enabled);
+    LOG_I(PHY, "RU %d RF started cpu_meas_enabled %d\n", ru->idx, cpu_meas_enabled);
     // start trx write thread
     if(usrp_tx_thread == 1) {
       if (ru->start_write_thread) {
@@ -1294,8 +1293,7 @@ void *ru_thread( void *param ) {
       continue;
     }
     if (proc->frame_rx>=300)  {
-      initial_wait=0;
-      opp_enabled = opp_enabled0;
+      initial_wait = 0;
     }
     if (initial_wait == 0 && ru->rx_fhaul.trials > 1000) {
         reset_meas(&ru->rx_fhaul);
@@ -1460,7 +1458,7 @@ void init_RU_proc(RU_t *ru) {
 
   if(emulate_rf)
     threadCreate( &proc->pthread_emulateRF, emulatedRF_thread, (void *)proc, "emulateRF", -1, OAI_PRIORITY_RT );
-  if (opp_enabled == 1)
+  if (cpu_meas_enabled)
     threadCreate(&ru->ru_stats_thread, ru_stats_thread, (void *)ru, "ru_stats", -1, OAI_PRIORITY_RT);
   LOG_I(PHY, "Initialized RU proc %d (%s,%s),\n", ru->idx, NB_functions[ru->function], NB_timing[ru->if_timing]);
 }
@@ -1485,7 +1483,7 @@ void kill_NR_RU_proc(int inst) {
   pthread_mutex_unlock( &proc->mutex_fep[0] );
   pthread_join(proc->pthread_FH, NULL);
 
-  if (opp_enabled) {
+  if (cpu_meas_enabled) {
     LOG_D(PHY, "Joining ru_stats_thread\n");
     pthread_join(ru->ru_stats_thread, NULL);
   }
