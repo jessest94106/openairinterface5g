@@ -265,14 +265,6 @@ class HTMLManagement():
 			self.htmlFile.write('</html>\n')
 			self.htmlFile.close()
 
-	def CreateHtmlRetrySeparator(self, cntnumfails):
-		if ((not self.htmlFooterCreated) and (self.htmlHeaderCreated)):
-			self.htmlFile = open('test_results.html', 'a')
-			self.htmlFile.write('      <tr bgcolor = "#F0F0F0" >\n')
-			self.htmlFile.write('        <td colspan="6"><b> ---- Try Run #' + str(cntnumfails) + ' ---- </b></td>\n')
-			self.htmlFile.write('      </tr>\n')
-			self.htmlFile.close()
-
 	def CreateHtmlTestRow(self, options, status, processesStatus, machine='eNB'):
 		if (self.htmlFooterCreated or (not self.htmlHeaderCreated)):
 			return

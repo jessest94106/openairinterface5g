@@ -23,7 +23,6 @@
 	<htmlTabRef>test-t2-offload-dec</htmlTabRef>
 	<htmlTabName>Test T2 Offload Decoder</htmlTabName>
 	<htmlTabIcon>tasks</htmlTabIcon>
-	<repeatCount>1</repeatCount>
         <TestCaseRequestedList>
                 010111 010112 010121 010122 010131 010132
                 010211 010212 010221 010222 010231 010232

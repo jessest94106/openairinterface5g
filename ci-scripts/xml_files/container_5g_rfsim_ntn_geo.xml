@@ -24,7 +24,6 @@
         <htmlTabRef>rfsim-5gnr-ntn-geo</htmlTabRef>
         <htmlTabName>Monolithic SA NTN GEO gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
  100001

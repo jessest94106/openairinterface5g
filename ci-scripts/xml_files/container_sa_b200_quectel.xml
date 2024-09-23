@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-SA-FR1-B200</htmlTabRef>
   <htmlTabName>20 MHz TDD SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     100000
     111111

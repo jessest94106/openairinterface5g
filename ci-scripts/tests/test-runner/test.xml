@@ -25,7 +25,6 @@
         <htmlTabRef>test</htmlTabRef>
         <htmlTabName>Manual testing</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  000001
         </TestCaseRequestedList>

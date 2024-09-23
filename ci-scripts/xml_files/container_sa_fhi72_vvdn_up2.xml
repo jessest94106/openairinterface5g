@@ -24,7 +24,6 @@
   <htmlTabRef>test-5g-fhi72-vvdn</htmlTabRef>
   <htmlTabName>100 MHz TDD SA VVDN</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     200000
     110000

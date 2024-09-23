@@ -24,7 +24,6 @@
 	<htmlTabRef>TEST-NSA-FR1-TM1-B200-terminate</htmlTabRef>
 	<htmlTabName>NSA tear-down in case of problem</htmlTabName>
 	<htmlTabIcon>tasks</htmlTabIcon>
-	<repeatCount>1</repeatCount>
 	<TestCaseRequestedList>
  010001
  010002

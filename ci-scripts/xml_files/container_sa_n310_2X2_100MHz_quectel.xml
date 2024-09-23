@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-SA-FR1-N310-2x2-100MHz</htmlTabRef>
   <htmlTabName>100 MHz TDD SA 2x2</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     100000
     111111

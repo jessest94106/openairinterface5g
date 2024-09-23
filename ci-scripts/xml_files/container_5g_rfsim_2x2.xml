@@ -24,7 +24,6 @@
         <htmlTabRef>rfsim-5gnr-tdd-2x2</htmlTabRef>
         <htmlTabName>Monolithic SA TDD 2x2 gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
  800813

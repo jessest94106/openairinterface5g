@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-5G-NRUE</htmlTabRef>
   <htmlTabName>40 MHz TDD SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     010000 010001
     800813

@@ -24,7 +24,6 @@
         <htmlTabRef>rfsim-5gnr-fdd-phytest</htmlTabRef>
         <htmlTabName>Monolithic FDD phytest gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
  800813

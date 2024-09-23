@@ -24,7 +24,6 @@
   <htmlTabRef>gNB-PHY-Test-60-2x2</htmlTabRef>
   <htmlTabName>Timing phytest 60 MHz 2x2</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
 100000 290101 000001 290109 200000
   </TestCaseRequestedList>

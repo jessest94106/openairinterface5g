@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-SA-FR1-F1-B200</htmlTabRef>
   <htmlTabName>10 MHz FDD F1 SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     100000
     110002

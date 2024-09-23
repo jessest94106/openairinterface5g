@@ -24,7 +24,6 @@
         <htmlTabRef>rfsim-fr2-32prb-5gnr-tdd</htmlTabRef>
         <htmlTabName>Monolithic FR2 gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
  800813

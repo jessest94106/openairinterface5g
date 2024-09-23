@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-SA-FR1-SC-FDMA-B200</htmlTabRef>
   <htmlTabName>40 MHz TDD SA with SC-FDMA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     300000
     311111

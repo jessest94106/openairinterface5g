@@ -232,7 +232,6 @@ class OaiCiTest():
 		self.ranAllowMerge = False
 		self.ranTargetBranch = ''
 
-		self.FailReportCnt = 0
 		self.testCase_id = ''
 		self.testXMLfiles = []
 		self.desc = ''
@@ -246,7 +245,6 @@ class OaiCiTest():
 		self.iperf_options = ''
 		self.iperf_tcp_rate_target = ''
 		self.idle_sleep_time = 0
-		self.repeatCounts = []
 		self.finalStatus = False
 		self.UEIPAddress = ''
 		self.UEUserName = ''

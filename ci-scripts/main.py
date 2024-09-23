@@ -680,8 +680,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	if (HTML.nbTestXMLfiles == 1):
 		HTML.htmlTabRefs.append(xmlRoot.findtext('htmlTabRef',default='test-tab-0'))
 		HTML.htmlTabNames.append(xmlRoot.findtext('htmlTabName',default='Test-0'))
-		repeatCount = xmlRoot.findtext('repeatCount',default='1')
-		CiTestObj.repeatCounts.append(int(repeatCount))
 	all_tests=xmlRoot.findall('testCase')
 
 	exclusion_tests=exclusion_tests.split()
@@ -744,48 +742,42 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	if CONTAINERS.eNB1IPAddress == '172.21.16.137':
 		CONTAINERS.CheckAndAddRoute('nepes', CONTAINERS.eNB1IPAddress, CONTAINERS.eNB1UserName, CONTAINERS.eNB1Password)
 
-	CiTestObj.FailReportCnt = 0
-	RAN.prematureExit=True
+	RAN.prematureExit=False
 	HTML.startTime=int(round(time.time() * 1000))
-	while CiTestObj.FailReportCnt < CiTestObj.repeatCounts[0] and RAN.prematureExit:
-		RAN.prematureExit=False
-		# At every iteration of the retry loop, a separator will be added
-		# pass CiTestObj.FailReportCnt as parameter of HTML.CreateHtmlRetrySeparator
-		HTML.CreateHtmlRetrySeparator(CiTestObj.FailReportCnt)
-		for test_case_id in todo_tests:
+
+	for test_case_id in todo_tests:
+		for test in all_tests:
 			if RAN.prematureExit:
 				break
-			for test in all_tests:
+			id = test.get('id')
+			if test_case_id != id:
+				continue
+			CiTestObj.testCase_id = id
+			HTML.testCase_id=CiTestObj.testCase_id
+			EPC.testCase_id=CiTestObj.testCase_id
+			CiTestObj.desc = test.findtext('desc')
+			HTML.desc=CiTestObj.desc
+			action = test.findtext('class')
+			if (CheckClassValidity(xml_class_list, action, id) == False):
+				continue
+			CiTestObj.ShowTestID()
+			try:
+				ExecuteActionWithParam(action)
 				if RAN.prematureExit:
-					break
-				id = test.get('id')
-				if test_case_id != id:
-					continue
-				CiTestObj.testCase_id = id
-				HTML.testCase_id=CiTestObj.testCase_id
-				EPC.testCase_id=CiTestObj.testCase_id
-				CiTestObj.desc = test.findtext('desc')
-				HTML.desc=CiTestObj.desc
-				action = test.findtext('class')
-				if (CheckClassValidity(xml_class_list, action, id) == False):
-					continue
-				CiTestObj.ShowTestID()
-				try:
-					ExecuteActionWithParam(action)
-					if RAN.prematureExit:
-						CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
-				except Exception as e:
-					s = traceback.format_exc()
-					logging.error(f'while running CI, an exception occurred:\n{s}')
-					HTML.CreateHtmlTestRowQueue("N/A", 'KO', [f"CI test code encountered an exception:\n{s}"])
-					RAN.prematureExit = True
-		CiTestObj.FailReportCnt += 1
-	if CiTestObj.FailReportCnt == CiTestObj.repeatCounts[0] and RAN.prematureExit:
-		logging.error('\u001B[1;37;41mScenario failed ' + str(CiTestObj.FailReportCnt) + ' time(s)\u001B[0m')
+					CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
+			except Exception as e:
+				s = traceback.format_exc()
+				logging.error(f'while running CI, an exception occurred:\n{s}')
+				HTML.CreateHtmlTestRowQueue("N/A", 'KO', [f"CI test code encountered an exception:\n{s}"])
+				RAN.prematureExit = True
+				break
+
+	if RAN.prematureExit:
+		logging.error('\u001B[1;37;41mScenario failed\u001B[0m')
 		HTML.CreateHtmlTabFooter(False)
 		sys.exit('Failed Scenario')
 	else:
-		logging.info('\u001B[1;37;42mScenario passed after ' + str(CiTestObj.FailReportCnt) + ' time(s)\u001B[0m')
+		logging.info('\u001B[1;37;42mScenario passed\u001B[0m')
 		HTML.CreateHtmlTabFooter(True)
 elif re.match('^LoadParams$', mode, re.IGNORECASE):
 	pass

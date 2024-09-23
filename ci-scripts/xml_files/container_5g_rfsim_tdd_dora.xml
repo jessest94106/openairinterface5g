@@ -24,7 +24,6 @@
         <htmlTabRef>rfsim-tdd-dora-5gnr-tdd</htmlTabRef>
         <htmlTabName>Monolithic do-ra TDD gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
  800813

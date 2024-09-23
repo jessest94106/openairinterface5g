@@ -25,7 +25,6 @@
   <htmlTabRef>TEST-LTE-2x2-N3XXi-TM2</htmlTabRef>
   <htmlTabName>2.6 Ghz TDD LTE 2x2 TM2</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
 
 111111

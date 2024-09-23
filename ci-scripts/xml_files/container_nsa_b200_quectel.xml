@@ -24,7 +24,6 @@
 	<htmlTabRef>TEST-NSA-FR1-TM1-B200</htmlTabRef>
 	<htmlTabName>NSA SanityCheck with QUECTEL</htmlTabName>
 	<htmlTabIcon>tasks</htmlTabIcon>
-	<repeatCount>1</repeatCount>
 	<TestCaseRequestedList>
  200000
  100000
