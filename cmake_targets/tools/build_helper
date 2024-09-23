@@ -42,7 +42,7 @@ KERNEL_VERSION=$(uname -r | cut -d '.' -f1)
 KERNEL_MAJOR=$(uname -r | cut -d '.' -f2)
 
 #check if we run inside a container
-IS_CONTAINER=`egrep -c "docker|podman|kubepods|libpod|buildah" /proc/self/cgroup || true`
+IS_CONTAINER=`grep -E -c "docker|podman|kubepods|libpod|buildah" /proc/self/cgroup || true`
 #sudo is not needed when we are root
 if [ "$UID" = 0 ]
 then
@@ -187,7 +187,7 @@ check_warnings() {
   #we look for 'warning:' in the compilation log file
   #this is how gcc starts a warning
   #this is not perfect, we may get false positive
-  warning_count=`grep "warning:" "$1" | egrep -v "jobserver unavailable|disabling jobserver mode" | wc -l`
+  warning_count=`grep "warning:" "$1" | grep -E -v "jobserver unavailable|disabling jobserver mode" | wc -l`
   if [ $warning_count -gt 0 ]; then
     echo_error "WARNING: $warning_count warnings. See $1"
   fi
@@ -223,7 +223,7 @@ compilations() {
     ret=$?
   } > $dlog/$logfile 2>&1
   # Print the errors and warnings for CI purposes
-  egrep -A3 "warning:|error:" $dlog/$logfile || true
+  grep -E -A3 "warning:|error:" $dlog/$logfile || true
   check_warnings "$dlog/$logfile"
   if [[ $ret -eq 0 ]]; then
      echo_success "$targets compiled"

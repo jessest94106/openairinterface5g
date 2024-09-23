@@ -568,7 +568,7 @@ class EPCManagement():
 			mySSH.command('python3 ./core-network.py '+self.cfgUnDeploy, '\$', 60)
 			mySSH.command('docker volume prune --force || true', '\$', 60)
 			time.sleep(2)
-			mySSH.command('tshark -r /tmp/oai-cn5g-v1.5.pcap | egrep --colour=never "Tracking area update" ','\$', 30)
+			mySSH.command('tshark -r /tmp/oai-cn5g-v1.5.pcap | grep -E --colour=never "Tracking area update" ','\$', 30)
 			result = re.search('Tracking area update request', mySSH.getBefore())
 			if result is not None:
 				message = 'UE requested ' + str(mySSH.getBefore().count('Tracking area update request')) + 'Tracking area update request(s)'
@@ -769,7 +769,7 @@ class EPCManagement():
 			mySSH.command('docker cp prod-magma-mme:/tmp/mme_check_run.pcap mme_' + self.testCase_id + '.pcap', '\$', 60)
 		else:
 			mySSH.command('docker cp prod-oai-mme:/tmp/mme_check_run.pcap mme_' + self.testCase_id + '.pcap', '\$', 60)
-		mySSH.command('tshark -r mme_' + self.testCase_id + '.pcap | egrep --colour=never "Tracking area update"', '\$', 60)
+		mySSH.command('tshark -r mme_' + self.testCase_id + '.pcap | grep -E --colour=never "Tracking area update"', '\$', 60)
 		result = re.search('Tracking area update request', mySSH.getBefore())
 		if result is not None:
 			message = 'UE requested ' + str(mySSH.getBefore().count('Tracking area update request')) + 'Tracking area update request(s)'
