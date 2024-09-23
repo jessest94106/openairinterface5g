@@ -11,3 +11,12 @@ start with
     python tests/iperf-analysis.py -v
 
 It will indicate if all tests passed.
+
+# test-runner test
+
+This is not a true test, because the results need to be manually inspected. To
+run this "test", run
+
+    ./run.sh
+
+inside the `test-runner/` directory (important!).
