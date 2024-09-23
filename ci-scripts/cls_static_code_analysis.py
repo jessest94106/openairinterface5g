@@ -214,7 +214,7 @@ class StaticCodeAnalysis():
 		HTML.CreateHtmlTestRowCppCheckResults(CCR)
 		logging.info('\u001B[1m Static Code Analysis Pass\u001B[0m')
 
-		return 0
+		return True
 
 	def LicenceAndFormattingCheck(self, HTML):
 		# Workspace is no longer recreated from scratch.
@@ -356,4 +356,4 @@ class StaticCodeAnalysis():
 			HTML.htmleNBFailureMsg = 'Could not access oai-formatting-check.txt file'
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.ENB_PROCESS_NOLOGFILE_TO_ANALYZE)
 
-		return finalStatus
+		return finalStatus == 0

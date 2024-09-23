@@ -189,7 +189,7 @@ class RANManagement():
 				if not mismatch:
 					mySSH.close()
 					HTML.CreateHtmlTestRow(self.Build_eNB_args, 'OK', CONST.ALL_PROCESSES_OK)
-					return
+					return True
 
 		mySSH.command('echo ' + lPassWord + ' | sudo -S git clean -x -d -ff', '\$', 30)
 		# if the commit ID is provided use it to point to it
@@ -219,10 +219,10 @@ class RANManagement():
 			mySSH.close()
 			HTML.CreateHtmlTestRow(self.Build_eNB_args, 'OK', CONST.ALL_PROCESSES_OK)
 			self.backgroundBuildTestId[int(self.eNB_instance)] = self.testCase_id
-			return
+			return True
 		mySSH.command('stdbuf -o0 ./build_oai ' + self.Build_eNB_args + ' 2>&1 | stdbuf -o0 tee compile_oai_enb.log', 'BUILD SHOULD BE SUCCESSFUL|build have failed', 900)
 		mySSH.close()
-		self.checkBuildeNB(lIpAddr, lUserName, lPassWord, lSourcePath, self.testCase_id, HTML)
+		return self.checkBuildeNB(lIpAddr, lUserName, lPassWord, lSourcePath, self.testCase_id, HTML)
 
 	def checkBuildeNB(self, lIpAddr, lUserName, lPassWord, lSourcePath, testcaseId, HTML):
 		HTML.testCase_id=testcaseId
@@ -283,8 +283,7 @@ class RANManagement():
 		else:
 			logging.error('\u001B[1m Building OAI ' + self.air_interface[self.eNB_instance] + ' Failed\u001B[0m')
 			HTML.CreateHtmlTestRow(self.Build_eNB_args, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlTabFooter(False)
-			sys.exit(1)
+		return buildStatus
 
 	def InitializeeNB(self, HTML, EPC):
 		if self.eNB_serverId[self.eNB_instance] == '0':
@@ -453,8 +452,7 @@ class RANManagement():
 					copyin_res = mySSH.copyin(localEpcIpAddr, localEpcUserName, localEpcPassword, '/tmp/' + self.epcPcapFile, '.')
 					if (copyin_res == 0):
 						mySSH.copyout(lIpAddr, lUserName, lPassWord, self.epcPcapFile, lSourcePath + '/cmake_targets/.')
-				self.prematureExit = True
-				return
+				return False
 			else:
 				mySSH.command('stdbuf -o0 cat enb_' + self.testCase_id + '.log | grep -E --text --color=never -i "wait|sync|Starting|Started"', '\$', 4)
 				if rruCheck:
@@ -492,45 +490,44 @@ class RANManagement():
 
 		mySSH.close()
 
-
 		HTML.CreateHtmlTestRow(f'{self.cmd_prefix} {self.air_interface[self.eNB_instance]} -O {config_file} {extra_options}', 'OK', CONST.ALL_PROCESSES_OK)
 		logging.debug('\u001B[1m Initialize eNB/gNB Completed\u001B[0m')
+		return enbDidSync
 
 	def CheckeNBProcess(self, status_queue):
-		try:
-			# At least the instance 0 SHALL be on!
-			if self.eNBstatuses[0] == 0:
-				lIpAddr = self.eNBIPAddress
-				lUserName = self.eNBUserName
-				lPassWord = self.eNBPassword
-			elif self.eNBstatuses[0] == 1:
-				lIpAddr = self.eNB1IPAddress
-				lUserName = self.eNB1UserName
-				lPassWord = self.eNB1Password
-			elif self.eNBstatuses[0] == 2:
-				lIpAddr = self.eNB2IPAddress
-				lUserName = self.eNB2UserName
-				lPassWord = self.eNB2Password
-			else:
-				lIpAddr = self.eNBIPAddress
-				lUserName = self.eNBUserName
-				lPassWord = self.eNBPassword
-			mySSH = SSH.SSHConnection()
-			mySSH.open(lIpAddr, lUserName, lPassWord)
-			if self.air_interface[self.eNB_instance] == '':
-				pattern = 'softmodem'
-			else:
-				pattern = self.air_interface[self.eNB_instance]
-			mySSH.command('stdbuf -o0 ps -aux | grep --color=never ' + pattern + ' | grep -v grep', '\$', 5)
-			result = re.search(pattern, mySSH.getBefore())
-			if result is None:
-				logging.debug('\u001B[1;37;41m eNB Process Not Found! \u001B[0m')
-				status_queue.put(CONST.ENB_PROCESS_FAILED)
-			else:
-				status_queue.put(CONST.ENB_PROCESS_OK)
-			mySSH.close()
-		except:
-			os.kill(os.getppid(),signal.SIGUSR1)
+		# At least the instance 0 SHALL be on!
+		if self.eNBstatuses[0] == 0:
+			lIpAddr = self.eNBIPAddress
+			lUserName = self.eNBUserName
+			lPassWord = self.eNBPassword
+		elif self.eNBstatuses[0] == 1:
+			lIpAddr = self.eNB1IPAddress
+			lUserName = self.eNB1UserName
+			lPassWord = self.eNB1Password
+		elif self.eNBstatuses[0] == 2:
+			lIpAddr = self.eNB2IPAddress
+			lUserName = self.eNB2UserName
+			lPassWord = self.eNB2Password
+		else:
+			lIpAddr = self.eNBIPAddress
+			lUserName = self.eNBUserName
+			lPassWord = self.eNBPassword
+		mySSH = SSH.SSHConnection()
+		mySSH.open(lIpAddr, lUserName, lPassWord)
+		if self.air_interface[self.eNB_instance] == '':
+			pattern = 'softmodem'
+		else:
+			pattern = self.air_interface[self.eNB_instance]
+		mySSH.command('stdbuf -o0 ps -aux | grep --color=never ' + pattern + ' | grep -v grep', '\$', 5)
+		result = re.search(pattern, mySSH.getBefore())
+		success = result is not None
+		if not success:
+			logging.debug('\u001B[1;37;41m eNB Process Not Found! \u001B[0m')
+			status_queue.put(CONST.ENB_PROCESS_FAILED)
+		else:
+			status_queue.put(CONST.ENB_PROCESS_OK)
+		mySSH.close()
+		return success
 
 	def TerminateeNB(self, HTML, EPC):
 		if self.eNB_serverId[self.eNB_instance] == '0':
@@ -610,6 +607,7 @@ class RANManagement():
 			logStatus = self.AnalyzeLogFile_eNB(extracted_log_file, HTML, self.ran_checkers)
 			HTML.CreateHtmlTestRow(self.runtime_stats, 'OK', CONST.ALL_PROCESSES_OK)
 			self.eNBLogFiles[int(self.eNB_instance)] = ''
+			return True
 		else:
 			analyzeFile = False
 			if self.eNBLogFiles[int(self.eNB_instance)] != '':
@@ -628,7 +626,7 @@ class RANManagement():
 					HTML.htmleNBFailureMsg='Could not copy ' + nodeB_prefix + 'NB logfile to analyze it!'
 					HTML.CreateHtmlTestRow('N/A', 'KO', CONST.ENB_PROCESS_NOLOGFILE_TO_ANALYZE)
 					self.eNBmbmsEnables[int(self.eNB_instance)] = False
-					return
+					return False
 				if self.eNB_serverId[self.eNB_instance] != '0':
 					#*stats.log files + pickle + png
 
@@ -646,9 +644,8 @@ class RANManagement():
 					#display rt stats for gNB only
 					if len(self.datalog_rt_stats)!=0 and nodeB_prefix == 'g':
 						HTML.CreateHtmlDataLogTable(self.datalog_rt_stats)
-					self.prematureExit = True
 					self.eNBmbmsEnables[int(self.eNB_instance)] = False
-					return
+					return False
 				else:
 					HTML.CreateHtmlTestRow(self.runtime_stats, 'OK', CONST.ALL_PROCESSES_OK)
 			else:
@@ -658,6 +655,7 @@ class RANManagement():
 			HTML.CreateHtmlDataLogTable(self.datalog_rt_stats)
 		self.eNBmbmsEnables[int(self.eNB_instance)] = False
 		self.eNBstatuses[int(self.eNB_instance)] = -1
+		return True
 
 	def LogCollecteNB(self):
 		mySSH = SSH.SSHConnection()

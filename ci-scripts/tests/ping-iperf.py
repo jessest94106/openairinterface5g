@@ -36,7 +36,8 @@ class TestPingIperf(unittest.TestCase):
 		self.ci.ping_args = "-c3 127.0.0.1"
 		self.ci.ping_packetloss_threshold = "0"
 		# TODO Should need nothing but options and UE(s) to use
-		self.ci.Ping(self.html, self.ran, self.epc, self.cont)
+		success = self.ci.Ping(self.html, self.ran, self.epc, self.cont)
+		self.assertTrue(success)
 
 	def test_iperf(self):
 		# note: needs to be five seconds because Iperf() adds -O 3, so if it is
@@ -49,7 +50,8 @@ class TestPingIperf(unittest.TestCase):
 		self.ci.iperf_bitrate_threshold = "0"
 		self.ci.iperf_profile = "balanced"
 		# TODO Should need nothing but options and UE(s) to use
-		self.ci.Iperf(self.html, self.ran, self.epc, self.cont)
+		success = self.ci.Iperf(self.html, self.ran, self.epc, self.cont)
+		self.assertTrue(success)
 
 if __name__ == '__main__':
 	unittest.main()

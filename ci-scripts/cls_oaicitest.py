@@ -291,6 +291,7 @@ class OaiCiTest():
 				messages.append(f'{uename}: initialized' if f.result() else f'{uename}: ERROR during Initialization')
 			[f.result() for f in futures]
 		HTML.CreateHtmlTestRowQueue('N/A', 'OK', messages)
+		return True
 
 	def AttachUE(self, HTML, RAN, EPC, CONTAINERS):
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
@@ -300,12 +301,14 @@ class OaiCiTest():
 			futures = [executor.submit(ue.checkMTU) for ue in ues]
 			mtus = [f.result() for f in futures]
 			messages = [f"UE {ue.getName()}: {ue.getIP()}" for ue in ues]
-		if all(attached) and all(mtus):
+		success = all(attached) and all(mtus)
+		if success:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', messages)
 		else:
 			logging.error(f'error attaching or wrong MTU: attached {attached}, mtus {mtus}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not retrieve UE IP address(es) or MTU(s) wrong!"])
 			self.AutoTerminateUEandeNB(HTML, RAN, EPC, CONTAINERS)
+		return success
 
 	def DetachUE(self, HTML):
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
@@ -314,18 +317,21 @@ class OaiCiTest():
 			[f.result() for f in futures]
 			messages = [f"UE {ue.getName()}: detached" for ue in ues]
 		HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
+		return True
 
 	def DataDisableUE(self, HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
 			futures = [executor.submit(ue.dataDisable) for ue in ues]
 			status = [f.result() for f in futures]
-		if all(status):
+		success = all(status)
+		if success:
 			messages = [f"UE {ue.getName()}: data disabled" for ue in ues]
 			HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
 		else:
 			logging.error(f'error enabling data: {status}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not disable UE data!"])
+		return success
 
 	def DataEnableUE(self, HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
@@ -333,12 +339,14 @@ class OaiCiTest():
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
 			futures = [executor.submit(ue.dataEnable) for ue in ues]
 			status = [f.result() for f in futures]
-		if all(status):
+		success = all(status)
+		if success:
 			messages = [f"UE {ue.getName()}: data enabled" for ue in ues]
 			HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
 		else:
 			logging.error(f'error enabling data: {status}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not enable UE data!"])
+		return success
 
 	def CheckStatusUE(self,HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
@@ -348,6 +356,7 @@ class OaiCiTest():
 			futures = [executor.submit(ue.check) for ue in ues]
 			messages = [f.result() for f in futures]
 		HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
+		return True
 
 	def Ping_common(self, EPC, ue, RAN, logPath):
 		# Launch ping on the EPC side (true for ltebox and old open-air-cn)
@@ -455,6 +464,7 @@ class OaiCiTest():
 		else:
 			HTML.CreateHtmlTestRowQueue(self.ping_args, 'KO', messages)
 			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
+		return success
 
 	def Iperf_Module(self, EPC, ue, svr, RAN, idx, ue_num, logPath):
 		ueIP = ue.getIP()
@@ -540,6 +550,7 @@ class OaiCiTest():
 		else:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'KO', messages)
 			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
+		return success
 
 	def Iperf2_Unidir(self,HTML,RAN,EPC,CONTAINERS):
 		if self.ue_ids == [] or self.svr_id == None or len(self.ue_ids) != 1:
@@ -580,6 +591,7 @@ class OaiCiTest():
 		else:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'KO', [f'{ue_header}\n{msg}'])
 			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
+		return success
 
 	def AnalyzeLogFile_UE(self, UElogFile,HTML,RAN):
 		if (not os.path.isfile(f'{UElogFile}')):
@@ -860,6 +872,7 @@ class OaiCiTest():
 		archive_info = [f'Log at: {a}' if a else 'No log available' for a in archives]
 		messages = [f"UE {ue.getName()}: {log}" for (ue, log) in zip(ues, archive_info)]
 		HTML.CreateHtmlTestRowQueue(f'N/A', 'OK', messages)
+		return True
 
 	def AutoTerminateUEandeNB(self,HTML,RAN,EPC,CONTAINERS):
 		if (RAN.Initialize_eNB_args != ''):

@@ -124,7 +124,7 @@ class PhySim:
 			mySSH.close()
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.OC_LOGIN_FAIL)
 			RAN.prematureExit = True
-			return
+			return False
 		else:
 			logging.debug('\u001B[1m   Login to OC Cluster Successfully\u001B[0m')
 		mySSH.command(f'oc project {ocProjectName}', '\$', 30)
@@ -134,7 +134,7 @@ class PhySim:
 			mySSH.close()
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.OC_PROJECT_FAIL)
 			RAN.prematureExit = True
-			return
+			return False
 		else:
 			logging.debug(f'\u001B[1m   Now using project {ocProjectName}\u001B[0m')
 
@@ -155,7 +155,7 @@ class PhySim:
 			mySSH.close()
 			self.AnalyzeLogFile_phySim()
 			RAN.prematureExit = True
-			return
+			return False
 		else:
 			logging.debug('\u001B[1m   Deployed PhySim Successfully using helm chart\u001B[0m')
 		isRunning = False
@@ -187,7 +187,7 @@ class PhySim:
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.OC_PHYSIM_DEPLOY_FAIL)
 			HTML.CreateHtmlTestRowPhySimTestResult(self.testSummary,self.testResult)
 			RAN.prematureExit = True
-			return
+			return False
 		# Waiting to complete the running test
 		count = 0
 		isFinished = False
@@ -255,6 +255,7 @@ class PhySim:
 				HTML.CreateHtmlTestRow('Some test(s) timed-out!', 'KO', CONST.ALL_PROCESSES_OK)
 			HTML.CreateHtmlTestRowPhySimTestResult(self.testSummary,self.testResult)
 			logging.error('\u001B[1m Physical Simulator Fail\u001B[0m')
+		return self.testStatus
 
 	def AnalyzeLogFile_phySim(self):
 		mySSH = SSH.SSHConnection()

@@ -85,6 +85,7 @@ def CreateWorkspace(sshSession, sourcePath, ranRepository, ranCommitID, ranTarge
 		sshSession.command('git log --oneline | head -n5', '\$', 5)
 		logging.error(f'problems during checkout, is at: {sshSession.getBefore()}')
 		self.exitStatus = 1
+		return False
 	else:
 		logging.debug('successful checkout')
 	# if the branch is not develop, then it is a merge request and we need to do
@@ -94,6 +95,7 @@ def CreateWorkspace(sshSession, sourcePath, ranRepository, ranCommitID, ranTarge
 			ranTargetBranch = 'develop'
 		logging.debug(f'Merging with the target branch: {ranTargetBranch}')
 		sshSession.command(f'git merge --ff origin/{ranTargetBranch} -m "Temporary merge for CI"', '\$', 30)
+	return True
 
 def ImageTagToUse(imageName, ranCommitID, ranBranch, ranAllowMerge):
 	shortCommit = ranCommitID[0:8]
@@ -969,8 +971,12 @@ class Containerize():
 		logging.info(f"Running on server {lIpAddr}")
 		sshSession = cls_cmd.getConnection(lIpAddr)
 
-		CreateWorkspace(sshSession, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
-		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+		success = CreateWorkspace(sshSession, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+		if success:
+			HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+		else:
+			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["cannot create workspace"])
+		return success
 
 	def DeployObject(self, HTML):
 		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
@@ -988,7 +994,7 @@ class Containerize():
 			self.exitStatus = 1
 			logging.error('Could not deploy')
 			HTML.CreateHtmlTestRow('Could not deploy', 'KO', CONST.ALL_PROCESSES_OK)
-			return
+			return False
 		services_list = allServices if self.services[self.eNB_instance].split() == [] else self.services[self.eNB_instance].split()
 		status = True
 		imagesInfo=""
@@ -1011,6 +1017,7 @@ class Containerize():
 			self.exitStatus = 1
 			imagesInfo += ("Unhealthy deployment! -- Check logs for reason!")
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', [(imagesInfo)])
+		return status
 
 	def UndeployObject(self, HTML, RAN):
 		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
@@ -1029,11 +1036,13 @@ class Containerize():
 			HTML.htmleNBFailureMsg='Could not copy logfile(s) to analyze it!'
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.ENB_PROCESS_NOLOGFILE_TO_ANALYZE)
 			self.exitStatus = 1
+			return False
 		else:
 			log_results = [CheckLogs(self, mySSH, self.yamlPath[0].split('/'), service_name, HTML, RAN) for service_name, _ in services]
 			self.exitStatus = 1 if any(log_results) else 0
 			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m') if self.exitStatus == 0 else logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
 		mySSH.close()
+		return self.exitStatus == 0
 
 	def CheckAndAddRoute(self, svrName, ipAddr, userName, password):
 		logging.debug('Checking IP routing on ' + svrName)

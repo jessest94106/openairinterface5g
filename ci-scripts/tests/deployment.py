@@ -31,15 +31,15 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.eNBSourceCodePath = os.getcwd()
 
 	def test_deploy(self):
-		self.cont.DeployObject(self.html)
-		self.assertEqual(self.cont.exitStatus, 0)
+		success = self.cont.DeployObject(self.html)
+		self.assertTrue(success)
 		self.cont.UndeployObject(self.html, self.ran)
 
 	def test_deployfails(self):
 		old = self.cont.yamlPath
 		self.cont.yamlPath[0] = 'tests/simple-fail/'
-		self.cont.DeployObject(self.html)
-		self.assertEqual(self.cont.exitStatus, 1)
+		success = self.cont.DeployObject(self.html)
+		self.assertFalse(success)
 		self.cont.UndeployObject(self.html, self.ran)
 		self.cont.yamlPath = old
 
