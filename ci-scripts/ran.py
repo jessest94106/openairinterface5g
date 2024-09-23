@@ -224,27 +224,6 @@ class RANManagement():
 		mySSH.close()
 		self.checkBuildeNB(lIpAddr, lUserName, lPassWord, lSourcePath, self.testCase_id, HTML)
 
-	def CustomCommand(self, HTML):
-		logging.info(f"Executing custom command on {self.node}")
-		cmd = cls_cmd.getConnection(self.node)
-		ret = cmd.run(self.command)
-		cmd.close()
-		logging.debug(f"CustomCommand: {self.command} on node: {self.node} - {'OK, command succeeded' if ret.returncode == 0 else f'Error, return code: {ret.returncode}'}")
-		status = 'OK'
-		message = []
-		if ret.returncode != 0 and not self.command_fail:
-			message = [ret.stdout]
-			logging.warning(f'CustomCommand output: {message}')
-			status = 'Warning'
-		if self.command_fail: # important command since it would make the pipeline fail, so show output in HTML
-			message = [ret.stdout]
-		if ret.returncode != 0 and self.command_fail:
-			message = [ret.stdout]
-			logging.error(f'CustomCommand failed: output: {message}')
-			status = 'KO'
-			self.prematureExit = True
-		HTML.CreateHtmlTestRowQueue(self.command, status, message)
-
 	def checkBuildeNB(self, lIpAddr, lUserName, lPassWord, lSourcePath, testcaseId, HTML):
 		HTML.testCase_id=testcaseId
 

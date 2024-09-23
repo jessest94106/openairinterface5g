@@ -450,10 +450,10 @@ def ExecuteActionWithParam(action):
 			RAN.prematureExit = True
 
 	elif action == 'Custom_Command':
-		RAN.node = test.findtext('node')
-		RAN.command = test.findtext('command')
-		RAN.command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
-		RAN.CustomCommand(HTML)
+		node = test.findtext('node')
+		command = test.findtext('command')
+		command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
+		cls_oaicitest.Custom_Command(HTML, node, command, command_fail)
 
 	elif action == 'Pull_Cluster_Image':
 		string_field = test.findtext('images_to_pull')
