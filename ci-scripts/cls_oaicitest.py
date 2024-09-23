@@ -900,7 +900,6 @@ class OaiCiTest():
 						CONTAINERS.UndeployObject(HTML,RAN)
 					else:
 						CONTAINERS.UndeployGenObject(HTML,RAN, self)
-		RAN.prematureExit=True
 
 	#this function is called only if eNB/gNB fails to start
 	#RH to be re-factored
@@ -930,7 +929,6 @@ class OaiCiTest():
 						CONTAINERS.UndeployObject(HTML,RAN)
 					else:
 						CONTAINERS.UndeployGenObject(HTML,RAN,self)
-		RAN.prematureExit=True
 
 	def LogCollectBuild(self,RAN):
 		# Some pipelines are using "none" IP / Credentials

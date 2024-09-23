@@ -27,12 +27,40 @@
         <htmlTabIcon>wrench</htmlTabIcon>
         <TestCaseRequestedList>
  000001
+ 000002
+ 000003
+ 000004
         </TestCaseRequestedList>
         <TestCaseExclusionList></TestCaseExclusionList>
 
         <testCase id="000001">
                 <class>Custom_Command</class>
                 <desc>This should succeed</desc>
+                <node>localhost</node>
+                <command>true</command>
+                <command_fail>yes</command_fail>
+        </testCase>
+
+        <testCase id="000002">
+                <class>Custom_Command</class>
+                <desc>This should fail</desc>
+                <node>localhost</node>
+                <command>false</command>
+                <command_fail>yes</command_fail>
+        </testCase>
+
+        <testCase id="000003">
+                <class>Custom_Command</class>
+                <desc>This should be skipped</desc>
+                <node>localhost</node>
+                <command>true</command>
+                <command_fail>yes</command_fail>
+        </testCase>
+
+        <testCase id="000004">
+                <class>Custom_Command</class>
+                <desc>This should be executed because marked so</desc>
+                <always_exec>true</always_exec>
                 <node>localhost</node>
                 <command>true</command>
                 <command_fail>yes</command_fail>

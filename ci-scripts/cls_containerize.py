@@ -84,7 +84,6 @@ def CreateWorkspace(sshSession, sourcePath, ranRepository, ranCommitID, ranTarge
 	if sshSession.getBefore().count(f'HEAD is now at {ranCommitID[:6]}') != 1:
 		sshSession.command('git log --oneline | head -n5', '\$', 5)
 		logging.error(f'problems during checkout, is at: {sshSession.getBefore()}')
-		self.exitStatus = 1
 		return False
 	else:
 		logging.debug('successful checkout')
@@ -319,7 +318,6 @@ class Containerize():
 		self.yamlPath = ['', '', '']
 		self.services = ['', '', '']
 		self.nb_healthy = [0, 0, 0]
-		self.exitStatus = 0
 		self.eNB_logFile = ['', '', '']
 
 		self.testCase_id = ''
@@ -991,7 +989,6 @@ class Containerize():
 		deployStatus,allServices = DeployServices(mySSH,self.services[self.eNB_instance])
 		if deployStatus != 0:
 			mySSH.close()
-			self.exitStatus = 1
 			logging.error('Could not deploy')
 			HTML.CreateHtmlTestRow('Could not deploy', 'KO', CONST.ALL_PROCESSES_OK)
 			return False
@@ -1014,7 +1011,6 @@ class Containerize():
 			imagesInfo += ("Healthy deployment!")
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [(imagesInfo)])
 		else:
-			self.exitStatus = 1
 			imagesInfo += ("Unhealthy deployment! -- Check logs for reason!")
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', [(imagesInfo)])
 		return status
@@ -1035,14 +1031,16 @@ class Containerize():
 		if not copyin_res:
 			HTML.htmleNBFailureMsg='Could not copy logfile(s) to analyze it!'
 			HTML.CreateHtmlTestRow('N/A', 'KO', CONST.ENB_PROCESS_NOLOGFILE_TO_ANALYZE)
-			self.exitStatus = 1
 			return False
 		else:
 			log_results = [CheckLogs(self, mySSH, self.yamlPath[0].split('/'), service_name, HTML, RAN) for service_name, _ in services]
-			self.exitStatus = 1 if any(log_results) else 0
-			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m') if self.exitStatus == 0 else logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
+			success = any(log_results)
 		mySSH.close()
-		return self.exitStatus == 0
+		if success:
+			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m')
+		else:
+			logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
+		return success
 
 	def CheckAndAddRoute(self, svrName, ipAddr, userName, password):
 		logging.debug('Checking IP routing on ' + svrName)

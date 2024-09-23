@@ -55,7 +55,6 @@ class RANManagement():
 
 	def __init__(self):
 		
-		self.prematureExit = False
 		self.ranRepository = ''
 		self.ranBranch = ''
 		self.ranAllowMerge = False
@@ -1269,7 +1268,6 @@ class RANManagement():
 					rruMsg = 'Slave RRU DID NOT receive the RRU_frame_resynch command from RAU'
 					logging.debug('\u001B[1;37;41m ' + rruMsg + ' \u001B[0m')
 					htmleNBFailureMsg += rruMsg + '\n'
-					self.prematureExit = True
 					global_status = CONST.ENB_PROCESS_SLAVE_RRU_NOT_SYNCED
 		if foundSegFault:
 			logging.debug('\u001B[1;37;41m ' + nodeB_prefix + 'NB ended with a Segmentation Fault! \u001B[0m')

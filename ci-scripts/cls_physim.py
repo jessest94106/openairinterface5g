@@ -52,7 +52,6 @@ class PhySim:
 		self.ranCommitID= ""
 		self.ranAllowMerge= ""
 		self.ranTargetBranch= ""
-		self.exitStatus=0
 		self.forced_workspace_cleanup=False
 		#private attributes
 		self.__workSpacePath=''
@@ -111,7 +110,6 @@ class PhySim:
 		if res_enc is None and res_dec is None:
 			logging.error(f'no statistics: res_enc {res_enc} res_dec {res_dec}')
 			HTML.CreateHtmlTestRowQueue(self.runargs, 'KO', ['no statistics'])
-			self.exitStatus = 1
 			os.system(f'mv {self.__runLogFile} {self.__runLogPath}/.')
 			return False
 
@@ -124,7 +122,6 @@ class PhySim:
 			error_msg = f'Processing time exceeds a limit of {thrs_KO} us'
 			logging.error(error_msg)
 			HTML.CreateHtmlTestRowQueue(self.runargs, 'KO', [info + '\n' + error_msg])
-			self.exitStatus = 1
 		return success
 
 	def __CheckResults_NRulsimTest(self, HTML, CONST, testcase_id):
@@ -136,7 +133,6 @@ class PhySim:
 			error_msg = f'could not recover test result file {filename}'
 			logging.error(error_msg)
 			HTML.CreateHtmlTestRowQueue("could not recover results", 'KO', [error_msg])
-			self.exitStatus = 1
 			return False
 
 		PUSCH_OK = False
@@ -153,7 +149,6 @@ class PhySim:
 			error_msg = 'error: no "PUSCH test OK"'
 			logging.error(error_msg)
 			HTML.CreateHtmlTestRowQueue(self.runargs, 'KO', 1, [error_msg])
-			self.exitStatus = 1
 		return PUSCH_OK
 
 	def __CheckBuild_PhySim(self, HTML, CONST):
@@ -169,13 +164,10 @@ class PhySim:
 		with open(self.__buildLogFile) as f:
 			if 'BUILD SHOULD BE SUCCESSFUL' in f.read():
 				HTML.CreateHtmlTestRow(self.buildargs, 'OK', CONST.ALL_PROCESSES_OK, 'PhySim')
-				self.exitStatus=0
 				return True
 		logging.error('\u001B[1m Building Physical Simulators Failed\u001B[0m')
 		HTML.CreateHtmlTestRow(self.buildargs, 'KO', CONST.ALL_PROCESSES_OK, 'LDPC')
 		HTML.CreateHtmlTabFooter(False)
-		#exitStatus=1 will do a sys.exit in main
-		self.exitStatus = 1
 		return False
 
 

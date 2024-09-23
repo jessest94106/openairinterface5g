@@ -446,6 +446,8 @@ class HTMLManagement():
 				self.htmlFile.write(f'        <td bgcolor = "lightgreen" >{status}</td>\n')
 			elif (str(status) == 'KO'):
 				self.htmlFile.write(f'        <td bgcolor = "lightcoral" >{status}</td>\n')
+			elif str(status) == 'SKIP':
+				self.htmlFile.write(f'        <td bgcolor = "lightgray" >{status}</td>\n')
 			else:
 				addOrangeBK = True
 				self.htmlFile.write(f'        <td bgcolor = "orange" >{status}</td>\n')
