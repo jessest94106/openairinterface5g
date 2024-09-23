@@ -777,7 +777,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 					elif action == 'Create_Workspace':
 						CONTAINERS.Create_Workspace(HTML)
 					elif action == 'Deploy_Object':
-						CONTAINERS.DeployObject(HTML, EPC)
+						CONTAINERS.DeployObject(HTML)
 						if CONTAINERS.exitStatus==1:
 							CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
 							RAN.prematureExit = True

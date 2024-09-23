@@ -978,7 +978,7 @@ class Containerize():
 		CreateWorkspace(sshSession, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
 
-	def DeployObject(self, HTML, EPC):
+	def DeployObject(self, HTML):
 		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
 		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
 			HELP.GenericHelp(CONST.Version)
