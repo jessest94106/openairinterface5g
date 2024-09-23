@@ -28,7 +28,6 @@
     000000
     111111
     222222
-    333333
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -49,13 +48,7 @@
   <testCase id="222222">
     <class>Detach_UE</class>
     <desc>Terminate UE</desc>
-    <id>sphex_quectel</id>
-  </testCase>
-
-  <testCase id="333333">
-    <class>Terminate_UE</class>
-    <desc>Terminate UE</desc>
-    <id>sphex_quectel</id>
+    <id>up2-aerial</id>
   </testCase>
 
 </testCaseList>

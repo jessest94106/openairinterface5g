@@ -28,17 +28,14 @@
         <TestCaseRequestedList>
                 111111
                 000222
-                001111
                 800813
                 002222
                 002223
                 000111
-                100000
                 000011
                 000022
                 000033
                 000222
-                003333
                 222222
         </TestCaseRequestedList>
         <TestCaseExclusionList></TestCaseExclusionList>
@@ -50,17 +47,13 @@
                 <images_to_pull>oai-gnb-aerial</images_to_pull>
         </testCase>
 
-        <testCase id="001111">
-                <class>Initialize_UE</class>
-                <desc>Initialize Quectel</desc>
-                <id>sphex_quectel</id>
-        </testCase>
         <testCase id="800813">
                 <class>Create_Workspace</class>
                 <desc>Creating new Workspace for server 0</desc>
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
         </testCase>
+
         <testCase id="002222">
                 <class>Deploy_Object</class>
                 <desc>Deploy PNF/Nvidia CUBB in a container</desc>
@@ -69,6 +62,7 @@
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
         </testCase>
+
         <testCase id="002223">
                 <class>Deploy_Object</class>
                 <desc>Deploy VNF in a container</desc>
@@ -81,40 +75,33 @@
         <testCase id="000111">
                 <class>Attach_UE</class>
                 <desc>Attach Quectel</desc>
-                <id>sphex_quectel</id>
-        </testCase>
-
-        <testCase id="100000">
-                <class>Custom_Command</class>
-                <desc>Adding a IP route</desc>
-                <node>sphex</node>
-                <command>sudo ip route add 192.168.71.128/26 via 12.1.1.151 dev wwan0</command>
+                <id>up2-aerial</id>
         </testCase>
 
         <testCase id="000011">
                 <class>Ping</class>
                 <desc>Ping: 100pings in 20sec</desc>
-                <id>sphex_quectel</id>
+                <id>up2-aerial</id>
                 <ping_args>-c 100 -i 0.2 %cn_ip%</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
 
         <testCase id="000022">
                 <class>Iperf</class>
-                <desc>iperf (DL/UDP/80M)(30 sec)(single-ue profile)</desc>
-                <iperf_args>-u -b 150M -t 30 -R</iperf_args>
+                <desc>iperf (DL/UDP/700M)(30 sec)(single-ue profile)</desc>
+                <iperf_args>-u -b 700M -t 30 -R</iperf_args>
                 <svr_id>porcepix-cn5g</svr_id>
-                <id>sphex_quectel</id>
+                <id>up2-aerial</id>
                 <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
         </testCase>
 
         <testCase id="000033">
                 <class>Iperf</class>
-                <desc>iperf (UL/UDP/40M)(30 sec)(single-ue profile)</desc>
-                <iperf_args>-u -b 40M -t 30</iperf_args>
+                <desc>iperf (UL/UDP/50M)(30 sec)(single-ue profile)</desc>
+                <iperf_args>-u -b 50M -t 30</iperf_args>
                 <svr_id>porcepix-cn5g</svr_id>
-                <id>sphex_quectel</id>
+                <id>up2-aerial</id>
                 <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
         </testCase>
@@ -122,13 +109,7 @@
         <testCase id="000222">
                 <class>Detach_UE</class>
                 <desc>Detach Quectel</desc>
-                <id>sphex_quectel</id>
-        </testCase>
-
-        <testCase id="003333">
-                <class>Terminate_UE</class>
-                <desc>Terminate Quectel</desc>
-                <id>sphex_quectel</id>
+                <id>up2-aerial</id>
         </testCase>
 
         <testCase id="222222">
