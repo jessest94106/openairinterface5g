@@ -36,6 +36,7 @@ Replaces xml_files/enb_usrp210_band40_test_05mhz_tm1.xml
 040301 040501 040602 040601 040603 040604 040605 040642 040641 040643 040644 040645 040401 040201
 030204
 200000
+222222
     </TestCaseRequestedList>
     <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -216,6 +217,13 @@ Replaces xml_files/enb_usrp210_band40_test_05mhz_tm1.xml
         <iperf_packetloss_threshold>50</iperf_packetloss_threshold>
         <id>adb_ue_1 adb_ue_2</id>
         <svr_id>ltebox-nano</svr_id>
+    </testCase>
+
+    <testCase id="222222">
+        <class>Clean_Test_Server_Images</class>
+        <always_exec>true</always_exec>
+        <desc>Clean Test Images on Test Server</desc>
+        <test_svr_id>0</test_svr_id>
     </testCase>
 
 </testCaseList>

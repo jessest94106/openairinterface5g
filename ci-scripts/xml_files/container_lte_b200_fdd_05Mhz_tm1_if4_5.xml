@@ -35,6 +35,7 @@
 040301 040531 040633 040634 040636 040671 040672 040673 040401 040201
 030231
 200000
+222222
     </TestCaseRequestedList>
     <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -187,6 +188,13 @@
         <iperf_args>-t 30</iperf_args>
         <id>adb_ue_1</id>
         <svr_id>ltebox-nano</svr_id>
+    </testCase>
+
+    <testCase id="222222">
+        <class>Clean_Test_Server_Images</class>
+        <always_exec>true</always_exec>
+        <desc>Clean Test Images on Test Server</desc>
+        <test_svr_id>0</test_svr_id>
     </testCase>
 
 </testCaseList>
