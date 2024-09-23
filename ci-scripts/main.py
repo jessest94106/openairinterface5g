@@ -102,7 +102,16 @@ def AssignParams(params_dict):
 
 
 
-def GetParametersFromXML(action):
+def ExecuteActionWithParam(action):
+	global SSH
+	global EPC
+	global RAN
+	global HTML
+	global CONTAINERS
+	global SCA
+	global PHYSIM
+	global CLUSTER
+	global ldpc
 	if action == 'Build_eNB' or action == 'Build_Image' or action == 'Build_Proxy' or action == "Build_Cluster_Image" or action == "Build_Run_Tests":
 		RAN.Build_eNB_args=test.findtext('Build_eNB_args')
 		CONTAINERS.imageKind=test.findtext('kind')
@@ -139,6 +148,23 @@ def GetParametersFromXML(action):
 		proxy_commit = test.findtext('proxy_commit')
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
+		if action == 'Build_eNB':
+			RAN.BuildeNB(HTML)
+		elif action == 'Build_Image':
+			success = CONTAINERS.BuildImage(HTML)
+			if not success:
+				RAN.prematureExit = True
+		elif action == 'Build_Proxy':
+			success = CONTAINERS.BuildProxy(HTML)
+			if not success:
+				RAN.prematureExit = True
+		elif action == 'Build_Cluster_Image':
+			if not CLUSTER.BuildClusterImage(HTML):
+				RAN.prematureExit = True
+		elif action == 'Build_Run_Tests':
+			success = CONTAINERS.BuildRunTests(HTML)
+			if not success:
+				RAN.prematureExit = True
 
 	elif action == 'Initialize_eNB':
 		RAN.eNB_Trace=test.findtext('eNB_Trace')
@@ -174,6 +200,7 @@ def GetParametersFromXML(action):
 
 		cmd_prefix = test.findtext('cmd_prefix')
 		if cmd_prefix is not None: RAN.cmd_prefix = cmd_prefix
+		RAN.InitializeeNB(HTML, EPC)
 
 	elif action == 'Terminate_eNB':
 		eNB_instance=test.findtext('eNB_instance')
@@ -201,6 +228,7 @@ def GetParametersFromXML(action):
 			RAN.air_interface[RAN.eNB_instance] = 'lte-softmodem'
 		else:
 			RAN.air_interface[RAN.eNB_instance] = air_interface.lower() +'-softmodem'
+		RAN.TerminateeNB(HTML, EPC)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
@@ -211,6 +239,20 @@ def GetParametersFromXML(action):
 				sys.exit("Mismatch in number of Nodes and UIs")
 		else:
 			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+		if action == 'Initialize_UE':
+			CiTestObj.InitializeUE(HTML)
+		elif action == 'Attach_UE':
+			CiTestObj.AttachUE(HTML, RAN, EPC, CONTAINERS)
+		elif action == 'Detach_UE':
+			CiTestObj.DetachUE(HTML)
+		elif action == 'Terminate_UE':
+			CiTestObj.TerminateUE(HTML)
+		elif action == 'CheckStatusUE':
+			CiTestObj.CheckStatusUE(HTML)
+		elif action == 'DataEnable_UE':
+			CiTestObj.DataEnableUE(HTML)
+		elif action == 'DataDisable_UE':
+			CiTestObj.DataDisableUE(HTML)
 
 	elif action == 'Ping':
 		CiTestObj.ping_args = test.findtext('ping_args')
@@ -224,6 +266,7 @@ def GetParametersFromXML(action):
 		else:
 			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
+		CiTestObj.Ping(HTML,RAN,EPC,CONTAINERS)
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
@@ -249,14 +292,10 @@ def GetParametersFromXML(action):
 		if CiTestObj.iperf_options != 'check' and CiTestObj.iperf_options != 'sink':
 			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
 			CiTestObj.iperf_options = 'check'
-
-	elif action == 'Iperf2_Unidir':
-		CiTestObj.iperf_args = test.findtext('iperf_args')
-		CiTestObj.ue_ids = test.findtext('id').split(' ')
-		CiTestObj.svr_id = test.findtext('svr_id') or None
-		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
-		CiTestObj.iperf_bitrate_threshold = test.findtext('iperf_bitrate_threshold') or '90'
-		CiTestObj.iperf_profile = test.findtext('iperf_profile') or 'balanced'
+		if action == 'Iperf':
+			CiTestObj.Iperf(HTML,RAN,EPC,CONTAINERS)
+		elif action == 'Iperf2_Unidir':
+			CiTestObj.Iperf2_Unidir(HTML,RAN,EPC,CONTAINERS)
 
 	elif action == 'IdleSleep':
 		string_field = test.findtext('idle_sleep_time_in_sec')
@@ -264,6 +303,7 @@ def GetParametersFromXML(action):
 			CiTestObj.idle_sleep_time = 5
 		else:
 			CiTestObj.idle_sleep_time = int(string_field)
+		CiTestObj.IdleSleep(HTML)
 
 	elif action == 'Build_PhySim':
 		ldpc.buildargs  = test.findtext('physim_build_args')
@@ -275,33 +315,54 @@ def GetParametersFromXML(action):
 				ldpc.forced_workspace_cleanup=True
 			else:
 				ldpc.forced_workspace_cleanup=False
+		HTML=ldpc.Build_PhySim(HTML,CONST)
+		if ldpc.exitStatus==1:
+			RAN.prematureExit = True
+
+	elif action == 'Deploy_Run_PhySim':
+		PHYSIM.Deploy_PhySim(HTML, RAN)
 
 	elif action == 'Initialize_MME':
 		string_field = test.findtext('option')
 		if (string_field is not None):
 			EPC.mmeConfFile = string_field
+		EPC.InitializeMME(HTML)
 
 	elif action == 'Initialize_HSS' or action == 'Initialize_SPGW':
-		pass
+		if action == 'Initialize_HSS':
+			EPC.InitializeHSS(HTML)
+		elif action == 'Initialize_SPGW':
+			EPC.InitializeSPGW(HTML)
 	elif action == 'Terminate_HSS' or action == 'Terminate_MME' or action == 'Terminate_SPGW':
-		pass
+		if action == 'Terminate_HSS':
+			EPC.TerminateHSS(HTML)
+		elif action == 'Terminate_MME':
+			EPC.TerminateMME(HTML)
+		elif action == 'Terminate_SPGW':
+			EPC.TerminateSPGW(HTML)
 
 	elif action == 'Deploy_EPC':
 		string_field = test.findtext('parameters')
 		if (string_field is not None):
 			EPC.yamlPath = string_field
+		EPC.DeployEpc(HTML)
+
+	elif action == 'Undeploy_EPC':
+		EPC.UndeployEpc(HTML)
 
 	elif action == 'Initialize_5GCN':
 		string_field = test.findtext('args')
 		if (string_field is not None):
 			EPC.cfgDeploy = string_field	
 		EPC.cnID = test.findtext('cn_id')
+		EPC.Initialize5GCN(HTML)
 
 	elif action == 'Terminate_5GCN':
 		string_field = test.findtext('args')
 		if (string_field is not None):
 			EPC.cfgUnDeploy = string_field	
 		EPC.cnID = test.findtext('cn_id')
+		EPC.Terminate5GCN(HTML)
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
 		eNB_instance=test.findtext('eNB_instance')
@@ -326,22 +387,47 @@ def GetParametersFromXML(action):
 		string_field = test.findtext('services')
 		if string_field is not None:
 			CONTAINERS.services[CONTAINERS.eNB_instance] = string_field
+		if action == 'Deploy_Object':
+			CONTAINERS.DeployObject(HTML)
+			if CONTAINERS.exitStatus==1:
+				CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
+				RAN.prematureExit = True
+		elif action == 'Undeploy_Object':
+			CONTAINERS.UndeployObject(HTML, RAN)
+			if CONTAINERS.exitStatus == 1:
+				CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
+				RAN.prematureExit = True
+		elif action == 'Create_Workspace':
+			CONTAINERS.Create_Workspace(HTML)
 
 	elif action == 'Run_CUDATest' or action == 'Run_NRulsimTest' or action == 'Run_T2Test':
 		ldpc.runargs = test.findtext('physim_run_args')
 		ldpc.runsim = test.findtext('physim_run')
 		ldpc.timethrs = test.findtext('physim_time_threshold')
+		if action == 'Run_CUDATest':
+			HTML=ldpc.Run_CUDATest(HTML,CONST,id)
+		elif action == 'Run_NRulsimTest':
+			HTML=ldpc.Run_NRulsimTest(HTML,CONST,id)
+		elif action == 'Run_T2Test':
+			HTML=ldpc.Run_T2Test(HTML,CONST,id)
+		if ldpc.exitStatus==1:
+			RAN.prematureExit = True
 
 	elif action == 'LicenceAndFormattingCheck':
-		pass
+		ret = SCA.LicenceAndFormattingCheck(HTML)
+		if ret != 0:
+			RAN.prematureExit = True
 
 	elif action == 'Cppcheck_Analysis':
-		pass
+		SCA.CppCheckAnalysis(HTML)
 
 	elif action == 'Push_Local_Registry':
 		string_field = test.findtext('registry_svr_id')
 		if (string_field is not None):
 			CONTAINERS.registrySvrId = string_field
+		success = CONTAINERS.Push_Image_to_Local_Registry(HTML)
+		if not success:
+			RAN.prematureExit = True
 
 	elif action == 'Pull_Local_Registry':
 		string_field = test.findtext('test_svr_id')
@@ -351,15 +437,24 @@ def GetParametersFromXML(action):
 		string_field = test.findtext('images_to_pull')
 		if (string_field is not None):
 			CONTAINERS.imageToPull = string_field.split()
+		success = CONTAINERS.Pull_Image_from_Local_Registry(HTML)
+		if not success:
+			RAN.prematureExit = True
 
 	elif action == 'Clean_Test_Server_Images':
 		string_field = test.findtext('test_svr_id')
 		if (string_field is not None):
 			CONTAINERS.testSvrId = string_field
+		success = CONTAINERS.Clean_Test_Server_Images(HTML)
+		if not success:
+			RAN.prematureExit = True
+
 	elif action == 'Custom_Command':
 		RAN.node = test.findtext('node')
 		RAN.command = test.findtext('command')
 		RAN.command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
+		RAN.CustomCommand(HTML)
+
 	elif action == 'Pull_Cluster_Image':
 		string_field = test.findtext('images_to_pull')
 		if (string_field is not None):
@@ -367,8 +462,11 @@ def GetParametersFromXML(action):
 		string_field = test.findtext('test_svr_id')
 		if (string_field is not None):
 			CLUSTER.testSvrId = string_field
+		if not CLUSTER.PullClusterImage(HTML,RAN):
+			RAN.prematureExit = True
+
 	else:
-		logging.warning(f"unknown action {action} from option-parsing point-of-view")
+		logging.warning(f"unknown action {action}, skip step")
 
 
 #check if given test is in list
@@ -672,136 +770,10 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				if (CheckClassValidity(xml_class_list, action, id) == False):
 					continue
 				CiTestObj.ShowTestID()
-				GetParametersFromXML(action)
 				try:
-					if action == 'Build_eNB':
-						RAN.BuildeNB(HTML)
-					elif action == 'Custom_Command':
-						RAN.CustomCommand(HTML)
-						if RAN.prematureExit:
-							CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
-					elif action == 'Initialize_eNB':
-						RAN.InitializeeNB(HTML, EPC)
-						if RAN.prematureExit:
-							CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
-					elif action == 'Terminate_eNB':
-						RAN.TerminateeNB(HTML, EPC)
-					elif action == 'Initialize_UE':
-						CiTestObj.InitializeUE(HTML)
-					elif action == 'Terminate_UE':
-						CiTestObj.TerminateUE(HTML)
-					elif action == 'Attach_UE':
-						CiTestObj.AttachUE(HTML, RAN, EPC, CONTAINERS)
-					elif action == 'Detach_UE':
-						CiTestObj.DetachUE(HTML)
-					elif action == 'DataDisable_UE':
-						CiTestObj.DataDisableUE(HTML)
-					elif action == 'DataEnable_UE':
-						CiTestObj.DataEnableUE(HTML)
-					elif action == 'CheckStatusUE':
-						CiTestObj.CheckStatusUE(HTML)
-					elif action == 'Ping':
-						CiTestObj.Ping(HTML,RAN,EPC,CONTAINERS)
-					elif action == 'Iperf':
-						CiTestObj.Iperf(HTML,RAN,EPC,CONTAINERS)
-					elif action == 'Iperf2_Unidir':
-						CiTestObj.Iperf2_Unidir(HTML,RAN,EPC,CONTAINERS)
-					elif action == 'Initialize_HSS':
-						EPC.InitializeHSS(HTML)
-					elif action == 'Terminate_HSS':
-						EPC.TerminateHSS(HTML)
-					elif action == 'Initialize_MME':
-						EPC.InitializeMME(HTML)
-					elif action == 'Terminate_MME':
-						EPC.TerminateMME(HTML)
-					elif action == 'Initialize_SPGW':
-						EPC.InitializeSPGW(HTML)
-					elif action == 'Terminate_SPGW':
-						EPC.TerminateSPGW(HTML)
-					elif action == 'Initialize_5GCN':
-						EPC.Initialize5GCN(HTML)
-					elif action == 'Terminate_5GCN':
-						EPC.Terminate5GCN(HTML)
-					elif action == 'Deploy_EPC':
-						EPC.DeployEpc(HTML)
-					elif action == 'Undeploy_EPC':
-						EPC.UndeployEpc(HTML)
-					elif action == 'IdleSleep':
-						CiTestObj.IdleSleep(HTML)
-					elif action == 'Build_PhySim':
-						HTML=ldpc.Build_PhySim(HTML,CONST)
-						if ldpc.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'Run_CUDATest':
-						HTML=ldpc.Run_CUDATest(HTML,CONST,id)
-						if ldpc.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'Run_T2Test':
-						HTML=ldpc.Run_T2Test(HTML,CONST,id)
-						if ldpc.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'Run_NRulsimTest':
-						HTML=ldpc.Run_NRulsimTest(HTML,CONST,id)
-						if ldpc.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'Pull_Cluster_Image':
-						if not CLUSTER.PullClusterImage(HTML,RAN):
-							RAN.prematureExit = True
-					elif action == 'Build_Cluster_Image':
-						if not CLUSTER.BuildClusterImage(HTML):
-							RAN.prematureExit = True
-					elif action == 'Build_Image':
-						success = CONTAINERS.BuildImage(HTML)
-						if not success:
-							RAN.prematureExit = True
-					elif action == 'Build_Run_Tests':
-						success = CONTAINERS.BuildRunTests(HTML)
-						if not success:
-							RAN.prematureExit = True
-					elif action == 'Build_Proxy':
-						success = CONTAINERS.BuildProxy(HTML)
-						if not success:
-							RAN.prematureExit = True
-					elif action == 'Push_Local_Registry':
-						success = CONTAINERS.Push_Image_to_Local_Registry(HTML)
-						if not success:
-							RAN.prematureExit = True
-					elif action == 'Pull_Local_Registry':
-						success = CONTAINERS.Pull_Image_from_Local_Registry(HTML)
-						if not success:
-							RAN.prematureExit = True
-					elif action == 'Clean_Test_Server_Images':
-						success = CONTAINERS.Clean_Test_Server_Images(HTML)
-						if not success:
-							RAN.prematureExit = True
-					elif action == 'Create_Workspace':
-						CONTAINERS.Create_Workspace(HTML)
-					elif action == 'Deploy_Object':
-						CONTAINERS.DeployObject(HTML)
-						if CONTAINERS.exitStatus==1:
-							CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
-							RAN.prematureExit = True
-					elif action == 'Undeploy_Object':
-						CONTAINERS.UndeployObject(HTML, RAN)
-						if CONTAINERS.exitStatus == 1:
-							CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
-							RAN.prematureExit = True
-					elif action == 'Cppcheck_Analysis':
-						SCA.CppCheckAnalysis(HTML)
-					elif action == 'LicenceAndFormattingCheck':
-						ret = SCA.LicenceAndFormattingCheck(HTML)
-						if ret != 0:
-							RAN.prematureExit = True
-					elif action == 'Deploy_Run_PhySim':
-						PHYSIM.Deploy_PhySim(HTML, RAN)
-					elif action == 'IperfFromContainer':
-						CONTAINERS.IperfFromContainer(HTML, RAN, CiTestObj)
-						if CONTAINERS.exitStatus==1:
-							RAN.prematureExit = True
-					elif action == 'Push_Images_To_Test_Servers':
-						logging.debug('To be implemented')
-					else:
-						sys.exit('Invalid class (action) from xml')
+					ExecuteActionWithParam(action)
+					if RAN.prematureExit:
+						CiTestObj.AutoTerminateeNB(HTML,RAN,EPC,CONTAINERS)
 				except Exception as e:
 					s = traceback.format_exc()
 					logging.error(f'while running CI, an exception occurred:\n{s}')
