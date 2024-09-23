@@ -239,6 +239,11 @@ def Custom_Command(HTML, node, command, command_fail):
     HTML.CreateHtmlTestRowQueue(command, status, message)
     return status == 'OK' or status == 'Warning'
 
+def IdleSleep(HTML, idle_sleep_time):
+	time.sleep(idle_sleep_time)
+	HTML.CreateHtmlTestRow(f"{idle_sleep_time} sec", 'OK', CONST.ALL_PROCESSES_OK)
+	return True
+
 #-----------------------------------------------------------
 # OaiCiTest Class Definition
 #-----------------------------------------------------------
@@ -263,7 +268,6 @@ class OaiCiTest():
 		self.iperf_profile = ''
 		self.iperf_options = ''
 		self.iperf_tcp_rate_target = ''
-		self.idle_sleep_time = 0
 		self.finalStatus = False
 		self.UEIPAddress = ''
 		self.UEUserName = ''
@@ -914,10 +918,6 @@ class OaiCiTest():
 					else:
 						CONTAINERS.UndeployGenObject(HTML,RAN,self)
 		RAN.prematureExit=True
-
-	def IdleSleep(self,HTML):
-		time.sleep(self.idle_sleep_time)
-		HTML.CreateHtmlTestRow(str(self.idle_sleep_time) + ' sec', 'OK', CONST.ALL_PROCESSES_OK)
 
 	def LogCollectBuild(self,RAN):
 		# Some pipelines are using "none" IP / Credentials

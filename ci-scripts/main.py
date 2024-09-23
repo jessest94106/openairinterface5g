@@ -298,12 +298,8 @@ def ExecuteActionWithParam(action):
 			CiTestObj.Iperf2_Unidir(HTML,RAN,EPC,CONTAINERS)
 
 	elif action == 'IdleSleep':
-		string_field = test.findtext('idle_sleep_time_in_sec')
-		if (string_field is None):
-			CiTestObj.idle_sleep_time = 5
-		else:
-			CiTestObj.idle_sleep_time = int(string_field)
-		CiTestObj.IdleSleep(HTML)
+		st = test.findtext('idle_sleep_time_in_sec') or "5"
+		cls_oaicitest.IdleSleep(HTML, int(st))
 
 	elif action == 'Build_PhySim':
 		ldpc.buildargs  = test.findtext('physim_build_args')
