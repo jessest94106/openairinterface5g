@@ -33,9 +33,7 @@
 #include "queue.h"
 #include "tree.h"
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t       *instance_p,
-                         ngap_rrc_establishment_cause_t  cause)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t *instance_p, const ngap_rrc_establishment_cause_t cause)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;
@@ -86,10 +84,9 @@ ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t       *instance_p,
   return amf_highest_capacity_p;
 }
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t       *instance_p,
-                                    ngap_rrc_establishment_cause_t  cause,
-                                    int                        selected_plmn_identity)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t *instance_p,
+                                                         const ngap_rrc_establishment_cause_t cause,
+                                                         const int selected_plmn_identity)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;
@@ -156,11 +153,10 @@ ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t       *instance_p,
   return amf_highest_capacity_p;
 }
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t       *instance_p,
-                                     ngap_rrc_establishment_cause_t  cause,
-                                     int                        selected_plmn_identity,
-                                     uint8_t                    amf_setid)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t *instance_p,
+                                                           const ngap_rrc_establishment_cause_t cause,
+                                                           const int selected_plmn_identity,
+                                                           uint8_t amf_setid)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
 
@@ -234,9 +230,9 @@ ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t       *instance_p,
   return NULL;
 }
 
-struct ngap_gNB_amf_data_s *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *instance_p,
-                                                              ngap_rrc_establishment_cause_t cause,
-                                                              nr_guami_t guami)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *instance_p,
+                                                       const ngap_rrc_establishment_cause_t cause,
+                                                       const nr_guami_t guami)
 {
   struct ngap_gNB_amf_data_s *amf_data_p             = NULL;
 
@@ -326,7 +322,7 @@ struct ngap_gNB_amf_data_s *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_
   return NULL;
 }
 
-struct ngap_gNB_amf_data_s *ngap_gNB_nnsf_select_amf_by_guami_no_cause(ngap_gNB_instance_t *instance_p, nr_guami_t guami)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami_no_cause(ngap_gNB_instance_t *instance_p, const nr_guami_t guami)
 {
   struct ngap_gNB_amf_data_s *amf_data_p             = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;

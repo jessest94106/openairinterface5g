@@ -148,26 +148,38 @@ void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering)
   nr_pdcp_config_set_security(UE->rrc_ue_id, DL_SCH_LCID_DCCH, true, &security_parameters);
 }
 
-//------------------------------------------------------------------------------
-/*
-* Initial UE NAS message on S1AP.
-*/
+/** @brief Process AMF Identifier and fill GUAMI struct members */
+static nr_guami_t get_guami(const uint32_t amf_Id)
+{
+  nr_guami_t guami = {0};
+  guami.amf_region_id = (amf_Id >> 16) & 0xff;
+  guami.amf_set_id = (amf_Id >> 6) & 0x3ff;
+  guami.amf_pointer = amf_Id & 0x3f;
+  return guami;
+}
+
+/**
+ * @brief Prepare the Initial UE Message (Uplink NAS) to be forwarded to the AMF over N2
+ *        extracts NAS PDU, Selected PLMN and Registered AMF from the RRCSetupComplete
+ */
 void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRCSetupComplete_IEs_t *rrcSetupComplete)
-//------------------------------------------------------------------------------
 {
   MessageDef *message_p = itti_alloc_new_message(TASK_RRC_GNB, rrc->module_id, NGAP_NAS_FIRST_REQ);
   ngap_nas_first_req_t *req = &NGAP_NAS_FIRST_REQ(message_p);
   memset(req, 0, sizeof(*req));
 
+  // RAN UE NGAP ID
   req->gNB_ue_ngap_id = UE->rrc_ue_id;
 
+  // RRC Establishment Cause
   /* Assume that cause is coded in the same way in RRC and NGap, just check that the value is in NGap range */
   AssertFatal(UE->establishment_cause < NGAP_RRC_CAUSE_LAST, "Establishment cause invalid (%jd/%d)!", UE->establishment_cause, NGAP_RRC_CAUSE_LAST);
   req->establishment_cause = UE->establishment_cause;
 
-  /* Forward NAS message */
+  // NAS-PDU
   req->nas_pdu = create_byte_array(rrcSetupComplete->dedicatedNAS_Message.size, rrcSetupComplete->dedicatedNAS_Message.buf);
 
+  // Selected PLMN Identity: indicates the selected PLMN id for the non-3GPP access
   /* selected_plmn_identity: IE is 1-based, convert to 0-based (C array) */
   int selected_plmn_identity = rrcSetupComplete->selectedPLMN_Identity - 1;
   if (selected_plmn_identity != 0)
@@ -175,32 +187,29 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
 
   req->selected_plmn_identity = 0; /* always zero because we only support one */
 
-  /* Fill UE identities with available information */
+  /* 5G-S-TMSI */
   if (UE->Initialue_identity_5g_s_TMSI.presence) {
-    /* Fill s-TMSI */
+    // 5G-S-TMSI
     req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_FiveG_s_tmsi;
     req->ue_identity.s_tmsi.amf_set_id = UE->Initialue_identity_5g_s_TMSI.amf_set_id;
     req->ue_identity.s_tmsi.amf_pointer = UE->Initialue_identity_5g_s_TMSI.amf_pointer;
     req->ue_identity.s_tmsi.m_tmsi = UE->Initialue_identity_5g_s_TMSI.fiveg_tmsi;
   } else if (rrcSetupComplete->registeredAMF != NULL) {
+    /**
+     * Fetch the AMF-Identifier from the registeredAMF IE
+     * The IE AMF-Identifier (AMFI) comprises of an AMF Region ID (8b),
+     * an AMF Set ID (10b) and an AMF Pointer (6b)
+     * as specified in TS 23.003 [21], clause 2.10.1. */
     NR_RegisteredAMF_t *r_amf = rrcSetupComplete->registeredAMF;
     req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_guami;
-
-    /* The IE AMF-Identifier (AMFI) comprises of an AMF Region ID (8b), an AMF Set ID (10b) and an AMF Pointer (6b) as specified in TS 23.003 [21], clause 2.10.1. */
     uint32_t amf_Id = BIT_STRING_to_uint32(&r_amf->amf_Identifier);
-    req->ue_identity.guami.amf_region_id = (amf_Id >> 16) & 0xff;
-    req->ue_identity.guami.amf_set_id = (amf_Id >> 6) & 0x3ff;
-    req->ue_identity.guami.amf_pointer = amf_Id & 0x3f;
-
-    UE->ue_guami.amf_region_id = req->ue_identity.guami.amf_region_id;
-    UE->ue_guami.amf_set_id = req->ue_identity.guami.amf_set_id;
-    UE->ue_guami.amf_pointer = req->ue_identity.guami.amf_pointer;
-
+    UE->ue_guami = req->ue_identity.guami = get_guami(amf_Id);
     LOG_I(NGAP,
-          "Build NGAP_NAS_FIRST_REQ adding in s_TMSI: GUAMI amf_set_id %u amf_region_id %u ue %x\n",
+          "GUAMI in NGAP_NAS_FIRST_REQ (UE %04x): AMF Set ID %u, Region ID %u, Pointer %u\n",
+          UE->rnti,
           req->ue_identity.guami.amf_set_id,
           req->ue_identity.guami.amf_region_id,
-          UE->rnti);
+          req->ue_identity.guami.amf_pointer);
   } else {
     req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_NONE;
   }
