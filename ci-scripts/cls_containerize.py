@@ -200,24 +200,18 @@ def GetImageInfo(mySSH, containerName):
 
 def GetContainerHealth(mySSH, containerName):
     if containerName is None:
-        return 0, 0
-    unhealthyNb = 0
-    healthyNb = 0
+        return False
     time.sleep(5)
     for _ in range(3):
         if containerName != 'db_init':
             result = mySSH.run(f'docker inspect --format="{{{{.State.Health.Status}}}}" {containerName}')
-            unhealthyNb = result.stdout.count('unhealthy')
-            healthyNb = result.stdout.count('healthy') - unhealthyNb
-            if healthyNb == 1:
-                break
+            if result.stdout == 'healthy':
+                return True
             else:
                 time.sleep(10)
         else:
-            unhealthyNb = 0
-            healthyNb = 1
-            break
-    return healthyNb, unhealthyNb
+            return True
+    return False
 
 def ReTagImages(mySSH,IMAGES,ranCommitID,ranBranch,ranAllowMerge,displayedNewTags):
 	mySSH.run('cp docker-compose.y*ml ci-docker-compose.yml', 5)
@@ -1000,10 +994,10 @@ class Containerize():
 		imagesInfo=""
 		for svcName in services_list:
 			containerName = GetContainerName(mySSH, svcName)
-			healthyNb,unhealthyNb = GetContainerHealth(mySSH,containerName)
+			healthy = GetContainerHealth(mySSH,containerName)
 			self.testCase_id = HTML.testCase_id
 			self.eNB_logFile[self.eNB_instance] = f'{svcName}-{self.testCase_id}.log'
-			if unhealthyNb: 
+			if not healthy:
 				logging.warning(f"Deployment Failed: Trying to copy container logs {self.eNB_logFile[self.eNB_instance]}")
 				CopyinContainerLog(mySSH,lSourcePath,self.yamlPath[0].split('/'),containerName,self.eNB_logFile[self.eNB_instance])
 				status = False
