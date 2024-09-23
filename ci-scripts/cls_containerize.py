@@ -1044,37 +1044,6 @@ class Containerize():
 			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m') if self.exitStatus == 0 else logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
 		mySSH.close()
 
-	def StatsFromGenObject(self, HTML):
-		self.exitStatus = 0
-		ymlPath = self.yamlPath[0].split('/')
-		logPath = '../cmake_targets/log/' + ymlPath[1]
-
-		# if the containers are running, recover the logs!
-		myCmd = cls_cmd.LocalCmd(d = self.yamlPath[0])
-		cmd = 'docker-compose -f docker-compose-ci.yml ps --all'
-		deployStatus = myCmd.run(cmd, timeout=30)
-		cmd = 'docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}" '
-		anyLogs = False
-		for state in deployStatus.stdout.split('\n'):
-			res = re.search('Name|NAME|----------', state)
-			if res is not None:
-				continue
-			if len(state) == 0:
-				continue
-			res = re.search('^(?P<container_name>[a-zA-Z0-9\-\_]+) ', state)
-			if res is not None:
-				anyLogs = True
-				cmd += res.group('container_name') + ' '
-		message = ''
-		if anyLogs:
-			stats = myCmd.run(cmd, timeout=30)
-			for statLine in stats.stdout.split('\n'):
-				logging.debug(statLine)
-				message += statLine + '\n'
-		myCmd.close()
-
-		HTML.CreateHtmlTestRowQueue(self.pingOptions, 'OK', [message])
-
 	def CheckAndAddRoute(self, svrName, ipAddr, userName, password):
 		logging.debug('Checking IP routing on ' + svrName)
 		mySSH = SSH.SSHConnection()
