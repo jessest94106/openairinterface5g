@@ -290,27 +290,7 @@ def CheckLogs(self,mySSH,ymlPath,service_name,HTML,RAN):
 	else:
 		logging.info(f'Skipping to analyze log for service name {service_name}')
 	return isFailed
-# pyshark livecapture launches 2 processes:
-# * One using dumpcap -i lIfs -w - (ie redirecting the packets to STDOUT)
-# * One using tshark -i - -w loFile (ie capturing from STDIN from previous process)
-# but in fact the packets are read by the following loop before being in fact
-# really written to loFile.
-# So it is mandatory to keep the loop
-def LaunchPySharkCapture(lIfs, lFilter, loFile):
-	capture = pyshark.LiveCapture(interface=lIfs, bpf_filter=lFilter, output_file=loFile, debug=False)
-	for packet in capture.sniff_continuously():
-		pass
 
-def StopPySharkCapture(testcase):
-	with cls_cmd.LocalCmd() as myCmd:
-		cmd = 'killall tshark'
-		myCmd.run(cmd, reportNonZero=False)
-		cmd = 'killall dumpcap'
-		myCmd.run(cmd, reportNonZero=False)
-		time.sleep(5)
-		cmd = f'mv /tmp/capture_{testcase}.pcap ../cmake_targets/log/{testcase}/.'
-		myCmd.run(cmd, timeout=100, reportNonZero=False)
-	return False
 #-----------------------------------------------------------
 # Class Declaration
 #-----------------------------------------------------------
@@ -1063,34 +1043,6 @@ class Containerize():
 			self.exitStatus = 1 if any(log_results) else 0
 			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m') if self.exitStatus == 0 else logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
 		mySSH.close()
-
-	def CaptureOnDockerNetworks(self):
-		myCmd = cls_cmd.LocalCmd(d = self.yamlPath[0])
-		cmd = 'docker-compose -f docker-compose-ci.yml config | grep com.docker.network.bridge.name | sed -e "s@^.*name: @@"'
-		networkNames = myCmd.run(cmd, silent=True)
-		myCmd.close()
-		# Allow only: control plane RAN (SCTP), HTTP of control in CN (port 80), PFCP traffic (port 8805), MySQL (port 3306)
-		capture_filter = 'sctp or port 80 or port 8805 or icmp or port 3306'
-		interfaces = []
-		iInterfaces = ''
-		for name in networkNames.stdout.split('\n'):
-			if re.search('rfsim', name) is not None or re.search('l2sim', name) is not None:
-				interfaces.append(name)
-				iInterfaces += f'-i {name} '
-		ymlPath = self.yamlPath[0].split('/')
-		output_file = f'/tmp/capture_{ymlPath[1]}.pcap'
-		self.tsharkStarted = True
-		# On old systems (ubuntu 18), pyshark live-capture is buggy.
-		# Going back to old method
-		if sys.version_info < (3, 7):
-			cmd = f'nohup tshark -f "{capture_filter}" {iInterfaces} -w {output_file} > /tmp/tshark.log 2>&1 &'
-			myCmd = cls_cmd.LocalCmd()
-			myCmd.run(cmd, timeout=5, reportNonZero=False)
-			myCmd.close()
-			return
-		x = threading.Thread(target = LaunchPySharkCapture, args = (interfaces,capture_filter,output_file,))
-		x.daemon = True
-		x.start()
 
 	def StatsFromGenObject(self, HTML):
 		self.exitStatus = 0
