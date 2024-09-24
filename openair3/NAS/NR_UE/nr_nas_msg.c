@@ -93,7 +93,7 @@ static void servingNetworkName(uint8_t *msg, char *imsiStr, int nmc_size)
   memcpy(msg + 13, imsiStr, 3);
 }
 
-security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, int pdu_length)
+static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, int pdu_length)
 {
   if (nas->security_container == NULL)
     return NAS_SECURITY_NO_SECURITY_CONTEXT;
@@ -438,7 +438,7 @@ void derive_knas(algorithm_type_dist_t nas_alg_type, uint8_t nas_alg_id, uint8_t
   memcpy(knas, out + 16, 16);
 }
 
-void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb)
+static void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb)
 {
   /* Compute the KDF input parameter
    * S = FC(0x6E) || UL NAS Count || 0x00 0x04 || 0x01 || 0x00 0x01
@@ -473,7 +473,7 @@ void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb)
   printf("\n");
 }
 
-void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas)
+static void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas)
 {
   uint8_t ak[6];
   uint8_t sqn[6];
