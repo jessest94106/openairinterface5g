@@ -375,6 +375,7 @@ def ExecuteActionWithParam(action):
 		string_field = test.findtext('services')
 		if string_field is not None:
 			CONTAINERS.services[CONTAINERS.eNB_instance] = string_field
+		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
 		if action == 'Deploy_Object':
 			success = CONTAINERS.DeployObject(HTML)
 		elif action == 'Undeploy_Object':

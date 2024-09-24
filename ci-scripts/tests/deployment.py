@@ -24,6 +24,9 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont = cls_containerize.Containerize()
 		self.ran = ran.RANManagement()
 		self.cont.yamlPath[0] = 'tests/simple-dep/'
+		self.cont.ranAllowMerge = True
+		self.cont.ranBranch = 'develop'
+		self.cont.ranCommitID = '1234567890'
 		self.cont.eNB_serverId[0] = '0'
 		self.cont.eNBIPAddress = 'localhost'
 		self.cont.eNBUserName = None
