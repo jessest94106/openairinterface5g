@@ -10,7 +10,10 @@ start with
     python tests/ping-iperf.py -v
     python tests/iperf-analysis.py -v
 
-It will indicate if all tests passed.
+It will indicate if all tests passed. It assumes that these images are present:
+
+- `oai-ci/oai-nr-ue:develop-12345678`
+- `oai-ci/oai-gnb:develop-12345678`
 
 # test-runner test
 
