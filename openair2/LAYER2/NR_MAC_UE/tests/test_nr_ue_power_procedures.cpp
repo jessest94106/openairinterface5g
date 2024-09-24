@@ -695,8 +695,7 @@ TEST(test_srs_power, tpc_accumulation)
   mac.nr_band = 78;
   mac.f_b_f_c = 0;
   mac.pusch_power_control_initialized = true;
-  mac.srs_power_control_initialized = true;
-  mac.h_b_f_c = 0;
+  current_UL_BWP.srs_power_control_initialized = true;
 
   NR_SRS_Config_t srs_Config = {0};
   current_UL_BWP.srs_Config = &srs_Config;

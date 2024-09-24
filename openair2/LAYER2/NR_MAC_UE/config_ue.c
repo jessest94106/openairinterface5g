@@ -1513,6 +1513,7 @@ static void configure_common_BWP_ul(NR_UE_MAC_INST_t *mac, int bwp_id, NR_BWP_Up
     bwp->channel_bandwidth = get_supported_bw_mhz(mac->frequency_range, bw_index);
     // Minumum transmission power depends on bandwidth, precalculate it here
     bwp->P_CMIN = nr_get_Pcmin(bw_index);
+    bwp->srs_power_control_initialized = false;
     if (bwp_id == 0) {
       mac->sc_info.initial_ul_BWPSize = bwp->BWPSize;
       mac->sc_info.initial_ul_BWPStart = bwp->BWPStart;

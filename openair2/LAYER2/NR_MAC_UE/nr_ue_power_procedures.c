@@ -653,22 +653,22 @@ int get_srs_tx_power_ue(NR_UE_MAC_INST_t *mac,
                                                == NR_SRS_ResourceSet__srs_PowerControlAdjustmentStates_separateClosedLoop;
 
     if (!is_tpc_accumulation_provided && (!is_configured_for_pusch_on_current_bwp || separate_pc_adjustment_state)) {
-      if (!mac->srs_power_control_initialized) {
+      if (!current_UL_BWP->srs_power_control_initialized) {
         NR_PRACH_RESOURCES_t *prach_resources = &mac->ra.prach_resources;
         float DELTA_P_rampup_requested =
             (prach_resources->RA_PREAMBLE_POWER_RAMPING_COUNTER - 1) * prach_resources->RA_PREAMBLE_POWER_RAMPING_STEP;
         float DELTA_P_rampup = P_CMAX - (P_0_SRS + m_srs_component + alpha * pathloss);
         DELTA_P_rampup = min(DELTA_P_rampup_requested, max(0, DELTA_P_rampup));
-        mac->srs_power_control_initialized = true;
-        mac->h_b_f_c = DELTA_P_rampup + mac->delta_msg2;
+        current_UL_BWP->srs_power_control_initialized = true;
+        current_UL_BWP->h_b_f_c = DELTA_P_rampup + mac->delta_msg2;
       } else {
         int P_CMIN = mac->current_UL_BWP->P_CMIN;
-        if (!((srs_power_without_h_b_f_c + mac->h_b_f_c >= P_CMAX && delta_srs > 0)
-              || (srs_power_without_h_b_f_c + mac->h_b_f_c <= P_CMIN && delta_srs < 0))) {
-          mac->h_b_f_c += delta_srs;
+        if (!((srs_power_without_h_b_f_c + current_UL_BWP->h_b_f_c >= P_CMAX && delta_srs > 0)
+              || (srs_power_without_h_b_f_c + current_UL_BWP->h_b_f_c <= P_CMIN && delta_srs < 0))) {
+          current_UL_BWP->h_b_f_c += delta_srs;
         }
       }
-      h_b_f_c = mac->h_b_f_c;
+      h_b_f_c = current_UL_BWP->h_b_f_c;
     } else {
       // Case 3: No accumulation
       h_b_f_c = delta_srs;
