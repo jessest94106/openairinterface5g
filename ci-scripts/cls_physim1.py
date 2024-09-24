@@ -214,7 +214,7 @@ class PhySim:
 		mySSH.command('for pod in $(oc get pods | tail -n +2 | awk \'{print $1}\'); do oc describe pod $pod >> cmake_targets/log/physim_pods_summary.txt; done', '\$', 10)
 		mySSH.copyin(lIpAddr, lUserName, lPassWord, lSourcePath + '/cmake_targets/log/physim_test.txt', '.')
 		try:
-			listLogFiles =  subprocess.check_output('egrep --colour=never "Execution Log file|Linux oai-" physim_test.txt', shell=True, universal_newlines=True)
+			listLogFiles =  subprocess.check_output('grep -E --colour=never "Execution Log file|Linux oai-" physim_test.txt', shell=True, universal_newlines=True)
 			for line in listLogFiles.split('\n'):
 				res1 = re.search('Linux (?P<pod>oai-[a-zA-Z0-9\-]+) ', str(line))
 				res2 = re.search('Execution Log file = (?P<name>[a-zA-Z0-9\-\/\.\_\+]+)', str(line))

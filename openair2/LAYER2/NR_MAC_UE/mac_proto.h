@@ -88,6 +88,7 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id,
 void nr_rrc_mac_config_req_sib1(module_id_t module_id,
                                 int cc_idP,
                                 NR_SI_SchedulingInfo_t *si_SchedulingInfo,
+                                NR_SI_SchedulingInfo_v1700_t *si_SchedulingInfo_v1700,
                                 NR_ServingCellConfigCommonSIB_t *scc);
 
 void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id,
@@ -375,7 +376,7 @@ int16_t compute_nr_SSB_PL(NR_UE_MAC_INST_t *mac, short ssb_rsrp_dBm);
 // PUSCH scheduler:
 // - Calculate the slot in which ULSCH should be scheduled. This is current slot + K2,
 // - where K2 is the offset between the slot in which UL DCI is received and the slot
-// - in which ULSCH should be scheduled. K2 is configured in RRC configuration.  
+// - in which ULSCH should be scheduled. K2 is configured in RRC configuration.
 // PUSCH Msg3 scheduler:
 // - scheduled by RAR UL grant according to 8.3 of TS 38.213
 int nr_ue_pusch_scheduler(const NR_UE_MAC_INST_t *mac,

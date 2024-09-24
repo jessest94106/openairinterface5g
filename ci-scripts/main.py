@@ -225,47 +225,6 @@ def GetParametersFromXML(action):
 		else:
 			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 
-	elif action == 'Build_OAI_UE':
-		CiTestObj.Build_OAI_UE_args = test.findtext('Build_OAI_UE_args')
-		CiTestObj.clean_repository = test.findtext('clean_repository')
-		if (CiTestObj.clean_repository == 'false'):
-			CiTestObj.clean_repository = False
-		else:
-			CiTestObj.clean_repository = True
-
-	elif action == 'Initialize_OAI_UE':
-		CiTestObj.Initialize_OAI_UE_args = test.findtext('Initialize_OAI_UE_args')
-		UE_instance = test.findtext('UE_instance')
-		if (UE_instance is None):
-			CiTestObj.UE_instance = 0
-		else:
-			CiTestObj.UE_instance = UE_instance
-			
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			CiTestObj.air_interface = 'lte-uesoftmodem'
-		elif (air_interface.lower() in ['nr','lte']):
-			CiTestObj.air_interface = air_interface.lower() +'-uesoftmodem'
-		else :
-			logging.error('OCP UE -- NOT SUPPORTED')
-
-		CiTestObj.cmd_prefix = test.findtext('cmd_prefix') or ""
-
-	elif action == 'Terminate_OAI_UE':
-		UE_instance=test.findtext('UE_instance')
-		if (UE_instance is None):
-			CiTestObj.UE_instance = '0'
-		else:
-			CiTestObj.UE_instance = int(UE_instance)
-		
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			CiTestObj.air_interface = 'lte-uesoftmodem'
-		else:
-			CiTestObj.air_interface = air_interface.lower() +'-uesoftmodem'
-
 	elif action == 'Ping':
 		CiTestObj.ping_args = test.findtext('ping_args')
 		CiTestObj.ping_packetloss_threshold = test.findtext('ping_packetloss_threshold')
@@ -318,17 +277,6 @@ def GetParametersFromXML(action):
 			CiTestObj.idle_sleep_time = 5
 		else:
 			CiTestObj.idle_sleep_time = int(string_field)
-
-	elif action == 'Perform_X2_Handover':
-		string_field = test.findtext('x2_ho_options')
-		if (string_field is None):
-			CiTestObj.x2_ho_options = 'network'
-		else:
-			if string_field != 'network':
-				logging.error('ERROR: test-case has wrong option ' + string_field)
-				CiTestObj.x2_ho_options = 'network'
-			else:
-				CiTestObj.x2_ho_options = string_field
 
 	elif action == 'Build_PhySim':
 		ldpc.buildargs  = test.findtext('physim_build_args')
@@ -520,12 +468,6 @@ if re.match('^TerminateeNB$', mode, re.IGNORECASE):
 	RAN.eNB_serverId[0]='0'
 	RAN.eNBSourceCodePath='/tmp/'
 	RAN.TerminateeNB(HTML, EPC)
-elif re.match('^TerminateOAIUE$', mode, re.IGNORECASE):
-	if CiTestObj.UEIPAddress == '' or CiTestObj.UEUserName == '' or CiTestObj.UEPassword == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	signal.signal(signal.SIGUSR1, receive_signal)
-	CiTestObj.TerminateOAIUE(HTML,RAN,EPC,CONTAINERS)
 elif re.match('^TerminateHSS$', mode, re.IGNORECASE):
 	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
 		HELP.GenericHelp(CONST.Version)
@@ -780,12 +722,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						CiTestObj.DataEnableUE(HTML)
 					elif action == 'CheckStatusUE':
 						CiTestObj.CheckStatusUE(HTML)
-					elif action == 'Build_OAI_UE':
-						CiTestObj.BuildOAIUE(HTML)
-					elif action == 'Initialize_OAI_UE':
-						CiTestObj.InitializeOAIUE(HTML,RAN,EPC,CONTAINERS)
-					elif action == 'Terminate_OAI_UE':
-						CiTestObj.TerminateOAIUE(HTML,RAN,EPC,CONTAINERS)
 					elif action == 'Ping':
 						CiTestObj.Ping(HTML,RAN,EPC,CONTAINERS)
 					elif action == 'Iperf':
@@ -814,8 +750,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 						EPC.UndeployEpc(HTML)
 					elif action == 'IdleSleep':
 						CiTestObj.IdleSleep(HTML)
-					elif action == 'Perform_X2_Handover':
-						CiTestObj.Perform_X2_Handover(HTML,RAN,EPC)
 					elif action == 'Build_PhySim':
 						HTML=ldpc.Build_PhySim(HTML,CONST)
 						if ldpc.exitStatus==1:

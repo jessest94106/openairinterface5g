@@ -30,27 +30,30 @@ void multadd_complex_vector_real_scalar(int16_t *x,
                                         uint8_t zero_flag,
                                         uint32_t N)
 {
-
   simd_q15_t alpha_128,*x_128=(simd_q15_t *)x,*y_128=(simd_q15_t*)y;
   int n;
 
   alpha_128 = set1_int16(alpha);
+  const uint32_t num_simd_adds = N / 4;
+  const uint32_t num_adds = N % 4;
 
-  if (zero_flag == 1)
-    for (n=0; n<N>>2; n++) {
-     // print_shorts("x_128[n]=", &x_128[n]);
-     // print_shorts("alpha_128", &alpha_128);
+  if (zero_flag == 1) {
+    for (n = 0; n < num_simd_adds; n++) {
       y_128[n] = mulhi_int16(x_128[n],alpha_128);
-     // print_shorts("y_128[n]=", &y_128[n]);
     }
-
-  else
-    for (n=0; n<N>>2; n++) {
+    for (n = 0; n < num_adds; n++) {
+      const uint32_t offset = num_simd_adds * 4;
+      y[offset + n] = (x[offset + n] * alpha) >> 16;
+    }
+  } else {
+    for (n = 0; n < num_simd_adds; n++) {
       y_128[n] = adds_int16(y_128[n],mulhi_int16(x_128[n],alpha_128));
     }
-
-  simde_mm_empty();
-  simde_m_empty();
+    for (n = 0; n < num_adds; n++) {
+      const uint32_t offset = num_simd_adds * 4;
+      y[offset + n] += (x[offset + n] * alpha) >> 16;
+    }
+  }
 }
 
 void multadd_real_vector_complex_scalar(const int16_t *x, const int16_t *alpha, int16_t *y, uint32_t N)

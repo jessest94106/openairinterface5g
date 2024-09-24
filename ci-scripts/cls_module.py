@@ -35,8 +35,6 @@ import subprocess
 from datetime import datetime
 import yaml
 
-#for log rotation mgt
-import cls_log_mgt
 import cls_cmd
 
 class Module_UE:
@@ -220,25 +218,6 @@ class Module_UE:
 
 	def _disableTrace(self):
 		raise Exception("not implemented")
-		mySSH = sshconnection.SSHConnection()
-		mySSH.open(self.HostIPAddress, self.HostUsername, self.HostPassword)
-		mySSH.command('echo ' + ' '  + ' | sudo -S killall --signal=SIGINT *QLog*', '\$',5)
-		mySSH.close()
-
 
 	def _logCollect(self):
 		raise Exception("not implemented")
-		mySSH = sshconnection.SSHConnection()
-		mySSH.open(self.HostIPAddress, self.HostUsername, self.HostPassword)
-		#archive qlog to USB stick in /media/usb-drive/ci_qlogs with datetime suffix
-		now=datetime.now()
-		now_string = now.strftime("%Y%m%d-%H%M")
-		source='ci_qlog'
-		destination= self.LogStore + '/ci_qlog_'+now_string+'.zip'
-		#qlog artifact is zipped into the target folder
-		mySSH.command('echo $USER; echo ' + ' '  + ' | nohup sudo -S zip -r '+destination+' '+source+' > /dev/null 2>&1 &','\$', 10)
-		mySSH.close()
-		#post action : log cleaning to make sure enough space is reserved for the next run
-		Log_Mgt=cls_log_mgt.Log_Mgt(self.HostUsername,self.HostIPAddress, self.HostPassword, self.LogStore)
-		return destination
-

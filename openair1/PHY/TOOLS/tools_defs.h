@@ -52,6 +52,9 @@
 extern "C" {
 #endif
 
+#define ALIGNARRAYSIZE(a, b) (((a + b - 1) / b) * b)
+#define ALNARS_16_4(a) ALIGNARRAYSIZE(a, 4)
+
   typedef struct complexd {
     double r;
     double i;

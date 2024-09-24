@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
 
     case 'P':
       print_perf=1;
-      opp_enabled=1;
+      cpu_meas_enabled = 1;
       break;
 
     case 'L':
@@ -1420,17 +1420,6 @@ int main(int argc, char *argv[])
               printf("\x1B[34m""[frame %d][trial %d]\t1st bit in error in decoding     = %d\n" "\x1B[0m", frame, trial, i);*/
           errors_decoding++;
         }
-      }
-      if (n_trials == 1) {
-        for (int r = 0; r < UE->ul_harq_processes[harq_pid].C; r++)
-          for (int i = 0; i < UE->ul_harq_processes[harq_pid].K >> 3; i++) {
-            if ((UE->ul_harq_processes[harq_pid].c[r][i] ^ ulsch_gNB->harq_process->c[r][i]) != 0)
-              printf("************");
-            /*printf("r %d: in[%d] %x, out[%d] %x (%x)\n",r,
-              i,UE->ul_harq_processes[harq_pid].c[r][i],
-              i,ulsch_gNB->harq_process->c[r][i],
-              UE->ul_harq_processes[harq_pid].c[r][i]^ulsch_gNB->harq_process->c[r][i]);*/
-          }
       }
       if (errors_decoding > 0 && error_flag == 0) {
         n_false_positive++;

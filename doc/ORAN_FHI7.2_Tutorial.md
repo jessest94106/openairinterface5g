@@ -783,6 +783,12 @@ Edit the sample OAI gNB configuration file and check following parameters:
   * `ru_addr`: RU C- and U-plane MAC-addresses (format `UU:VV:WW:XX:YY:ZZ`,
     hexadecimal numbers)
   * `mtu`: Maximum Transmission Unit for the RU, specified by RU vendor
+  * `dpdk_mem_size`: the huge page size that should be pre-allocated by DPDK
+    _for NUMA node 0_; by default, this is 8192 MiB (corresponding to 8 huge
+    pages à 1024 MiB each, see above). In the current implementation, you
+    cannot preallocate memory on NUMA nodes other than 0; in this case, set
+    this to 0 (no pre-allocation) and so that DPDK will allocate it on-demand
+    on the right NUMA node.
   * `fh_config`: parameters that need to match RU parameters
     * timing parameters (starting with `T`) depend on the RU: `Tadv_cp_dl` is a
       single number, the rest pairs of numbers `(x, y)` specifying minimum and

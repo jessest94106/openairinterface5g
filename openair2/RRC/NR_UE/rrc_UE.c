@@ -264,7 +264,7 @@ void process_nsa_message(NR_UE_RRC_INST_t *rrc, nsa_message_t nsa_message_type, 
       ASN_STRUCT_FREE(asn_DEF_NR_RRCReconfiguration, RRCReconfiguration);
     }
     break;
-    
+
     case nr_RadioBearerConfigX_r15: {
       NR_RadioBearerConfig_t *RadioBearerConfig=NULL;
       asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
@@ -428,6 +428,43 @@ bool check_si_validity(NR_UE_RRC_SI_INFO *SI_info, int si_type)
   return true;
 }
 
+bool check_si_validity_r17(NR_UE_RRC_SI_INFO_r17 *SI_info, int si_type)
+{
+  switch (si_type) {
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType15:
+      if (!SI_info->sib15)
+        return false;
+      break;
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType16:
+      if (!SI_info->sib16)
+        return false;
+      break;
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType17:
+      if (!SI_info->sib17)
+        return false;
+      break;
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType18:
+      if (!SI_info->sib18)
+        return false;
+      break;
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType19:
+      if (!SI_info->sib19)
+        return false;
+      break;
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType20:
+      if (!SI_info->sib20)
+        return false;
+      break;
+    case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType21:
+      if (!SI_info->sib21)
+        return false;
+      break;
+    default :
+      AssertFatal(false, "Invalid SIB r17 type %d\n", si_type);
+  }
+  return true;
+}
+
 int check_si_status(NR_UE_RRC_SI_INFO *SI_info)
 {
   // schedule reception of SIB1 if RRC doesn't have it
@@ -444,6 +481,20 @@ int check_si_status(NR_UE_RRC_SI_INFO *SI_info)
           // if RRC has no valid version of one of the default configured SI
           // Then schedule reception of otherSI
           if (!check_si_validity(SI_info, si_index))
+            return 2;
+        }
+      }
+    }
+
+    // Check if RRC has configured default SI
+    // from SIB15 to SIB21 as current r17 version
+    if (SI_info->SInfo_r17.default_otherSI_map_r17) {
+      for (int i = 15; i < 22; i++) {
+        int si_index = i - 15;
+        if ((SI_info->SInfo_r17.default_otherSI_map_r17 >> si_index) & 0x01) {
+          // if RRC has no valid version of one of the default configured SI
+          // Then schedule reception of otherSI
+          if (!check_si_validity_r17(&SI_info->SInfo_r17, si_index))
             return 2;
         }
       }
@@ -476,7 +527,7 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
   }
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NR_BCCH_BCH_Message, (void *)bcch_message);
-  
+    
   // Actions following cell selection while T311 is running
   NR_UE_Timers_Constants_t *timers = &rrc->timers_and_constants;
   if (nr_timer_is_active(&timers->T311)) {
@@ -621,6 +672,13 @@ static int nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si)
         memcpy(SI_info->sib12, typeandinfo->choice.sib14_v1610, sizeof(NR_SIB14_r16_t));
         nr_timer_start(&SI_info->sib14_timer);
         break;
+
+      case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib19_v1700:
+        if(!SI_info->SInfo_r17.sib19)
+          SI_info->SInfo_r17.sib19 = calloc(1, sizeof(*SI_info->SInfo_r17.sib19));
+        asn_copy(&asn_DEF_NR_SIB19_r17, (void **) &SI_info->SInfo_r17.sib19, typeandinfo->choice.sib19_v1700);
+        nr_timer_start(&SI_info->SInfo_r17.sib19_timer);
+        break;
       default:
         break;
     }
@@ -703,14 +761,35 @@ static void nr_rrc_ue_prepare_RRCSetupRequest(NR_UE_RRC_INST_t *rrc)
 static void nr_rrc_configure_default_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SIB1_t *sib1)
 {
   struct NR_SI_SchedulingInfo *si_SchedulingInfo = sib1->si_SchedulingInfo;
-  if (!si_SchedulingInfo)
-    return;
-  SI_info->default_otherSI_map = 0;
-  for (int i = 0; i < si_SchedulingInfo->schedulingInfoList.list.count; i++) {
-    struct NR_SchedulingInfo *schedulingInfo = si_SchedulingInfo->schedulingInfoList.list.array[i];
-    for (int j = 0; j < schedulingInfo->sib_MappingInfo.list.count; j++) {
-      struct NR_SIB_TypeInfo *sib_Type = schedulingInfo->sib_MappingInfo.list.array[j];
-      SI_info->default_otherSI_map |= 1 << sib_Type->type;
+  struct NR_SI_SchedulingInfo_v1700 *si_SchedulingInfo_v1700 = NULL;
+
+  if (sib1->nonCriticalExtension && sib1->nonCriticalExtension->nonCriticalExtension
+      && sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+      && sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700) {
+    si_SchedulingInfo_v1700 = sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700;
+  }
+
+  if (si_SchedulingInfo) {
+    SI_info->default_otherSI_map = 0;
+    for (int i = 0; i < si_SchedulingInfo->schedulingInfoList.list.count; i++) {
+      struct NR_SchedulingInfo *schedulingInfo = si_SchedulingInfo->schedulingInfoList.list.array[i];
+      for (int j = 0; j < schedulingInfo->sib_MappingInfo.list.count; j++) {
+        struct NR_SIB_TypeInfo *sib_Type = schedulingInfo->sib_MappingInfo.list.array[j];
+        SI_info->default_otherSI_map |= 1 << sib_Type->type;
+      }
+    }
+  }
+
+  if (si_SchedulingInfo_v1700) {
+    SI_info->SInfo_r17.default_otherSI_map_r17 = 0;
+    for (int i = 0; i < si_SchedulingInfo_v1700->schedulingInfoList2_r17.list.count; i++) {
+      struct NR_SchedulingInfo2_r17 *schedulingInfo2 = si_SchedulingInfo_v1700->schedulingInfoList2_r17.list.array[i];
+      for (int j = 0; j < schedulingInfo2->sib_MappingInfo_r17.list.count; j++) {
+        struct NR_SIB_TypeInfo_v1700 *sib_TypeInfo_v1700 = schedulingInfo2->sib_MappingInfo_r17.list.array[j];
+        if (sib_TypeInfo_v1700->sibType_r17.present == NR_SIB_TypeInfo_v1700__sibType_r17_PR_type1_r17) {
+          SI_info->SInfo_r17.default_otherSI_map_r17 |= 1 << sib_TypeInfo_v1700->sibType_r17.choice.type1_r17;
+        }
+      }
     }
   }
 }
@@ -764,8 +843,16 @@ static int8_t nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
         nr_rrc_configure_default_SI(SI_info, SI_info->sib1);
         // configure timers and constant
         nr_rrc_set_sib1_timers_and_constants(&rrc->timers_and_constants, SI_info->sib1);
-        nr_rrc_mac_config_req_sib1(rrc->ue_id, 0, SI_info->sib1->si_SchedulingInfo, SI_info->sib1->servingCellConfigCommon);
+
+        NR_SI_SchedulingInfo_v1700_t *si_SchedulingInfo_v1700 = NULL;
+        if (SI_info->sib1->nonCriticalExtension && SI_info->sib1->nonCriticalExtension->nonCriticalExtension
+            && SI_info->sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension) {
+          si_SchedulingInfo_v1700 = SI_info->sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700;
+        }
+
+        nr_rrc_mac_config_req_sib1(rrc->ue_id, 0, SI_info->sib1->si_SchedulingInfo, si_SchedulingInfo_v1700, SI_info->sib1->servingCellConfigCommon);
         break;
+
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation:
         LOG_I(NR_RRC, "[UE %ld] Decoding SI\n", rrc->ue_id);
         NR_SystemInformation_t *si = bcch_message->message.choice.c1->choice.systemInformation;
@@ -1776,7 +1863,7 @@ void *rrc_nrue(void *notUsed)
   case NR_RRC_MAC_SBCCH_DATA_IND:
     LOG_D(NR_RRC, "[UE %ld] Received %s: gNB %d\n", instance, ITTI_MSG_NAME(msg_p), NR_RRC_MAC_SBCCH_DATA_IND(msg_p).gnb_index);
     NRRrcMacSBcchDataInd *sbcch = &NR_RRC_MAC_SBCCH_DATA_IND(msg_p);
-    
+
     nr_rrc_ue_decode_NR_SBCCH_SL_BCH_Message(rrc, sbcch->gnb_index,sbcch->frame, sbcch->slot, sbcch->sdu,
                                              sbcch->sdu_size, sbcch->rx_slss_id);
     break;

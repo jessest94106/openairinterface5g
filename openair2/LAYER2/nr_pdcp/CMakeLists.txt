@@ -19,6 +19,10 @@
 # *      contact@openairinterface.org
 # */
 
-add_subdirectory(nr_rlc)
-add_subdirectory(nr_pdcp)
-add_subdirectory(NR_MAC_UE)
+add_library(nr_pdcp_snow3g OBJECT
+            nr_pdcp_integrity_nia1.c
+            nr_pdcp_security_nea1.c)
+
+if (ENABLE_TESTS)
+  add_subdirectory(tests)
+endif ()
