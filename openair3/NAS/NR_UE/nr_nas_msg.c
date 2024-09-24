@@ -1474,11 +1474,11 @@ void *nas_nrue(void *args_p)
 
         uint8_t *pdu_buffer = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.nas_data;
         int pdu_length = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length;
+        int msg_type = get_msg_type(pdu_buffer, pdu_length);
 
         security_state_t security_state = nas_security_rx_process(nas, pdu_buffer, pdu_length);
         /* special cases accepted without protection */
         if (security_state == NAS_SECURITY_UNPROTECTED) {
-          int msg_type = get_msg_type(pdu_buffer, pdu_length);
           /* for the moment, only FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING is accepted */
           if (msg_type == FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING)
             security_state = NAS_SECURITY_INTEGRITY_PASSED;
@@ -1488,8 +1488,6 @@ void *nas_nrue(void *args_p)
           LOG_E(NAS, "NAS integrity failed, discard incoming message\n");
           break;
         }
-
-        int msg_type = get_msg_type(pdu_buffer, pdu_length);
 
         switch (msg_type) {
           case FGS_IDENTITY_REQUEST:
