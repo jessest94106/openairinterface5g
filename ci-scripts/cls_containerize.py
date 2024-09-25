@@ -85,7 +85,6 @@ def CreateWorkspace(sshSession, sourcePath, ranRepository, ranCommitID, ranTarge
 		sshSession.command('git log --oneline | head -n5', '\$', 5)
 		logging.error(f'problems during checkout, is at: {sshSession.getBefore()}')
 		self.exitStatus = 1
-		HTML.CreateHtmlTestRowQueue('N/A', 'KO', "could not checkout correctly")
 	else:
 		logging.debug('successful checkout')
 	# if the branch is not develop, then it is a merge request and we need to do
