@@ -35,6 +35,27 @@ class TestCmd(unittest.TestCase):
             self.assertEqual(ret.returncode, 0)
             self.assertEqual(ret.stdout, "test")
 
+    def test_local_script(self):
+        ret = cls_cmd.runScript("localhost", "tests/scripts/hello-world.sh", 1)
+        self.assertEqual(ret.args, "tests/scripts/hello-world.sh")
+        self.assertEqual(ret.returncode, 0)
+        self.assertEqual(ret.stdout, "+ echo hello, world\nhello, world")
+
+        ret = cls_cmd.runScript("localhost", "tests/scripts/hello-fail.sh", 1, "TESTFAIL")
+        self.assertEqual(ret.args, "tests/scripts/hello-fail.sh TESTFAIL")
+        self.assertEqual(ret.returncode, 1)
+        self.assertEqual(ret.stdout, "TESTFAIL")
+
+        ret = cls_cmd.runScript("localhost", "tests/scripts/hello-fail.sh", 1, "TESTFAIL2", "/tmp/result")
+        self.assertEqual(ret.args, "tests/scripts/hello-fail.sh TESTFAIL2 &> /tmp/result")
+        self.assertEqual(ret.returncode, 1)
+        self.assertEqual(ret.stdout, "")
+        with cls_cmd.getConnection("localhost") as ssh:
+            ret = ssh.run("cat /tmp/result")
+            self.assertEqual(ret.args, "cat /tmp/result")
+            self.assertEqual(ret.returncode, 0)
+            self.assertEqual(ret.stdout, "TESTFAIL2")
+
     @unittest.skip("need to be able to passwordlessly SSH to localhost, also disable stty -ixon")
     def test_remote_cmd(self):
         with cls_cmd.getConnection("127.0.0.1") as cmd:
@@ -51,6 +72,28 @@ class TestCmd(unittest.TestCase):
             self.assertEqual(ret.args, "echo test")
             self.assertEqual(ret.returncode, 0)
             self.assertEqual(ret.stdout, "test")
+
+    @unittest.skip("need to be able to passwordlessly SSH to localhost, also disable stty -ixon")
+    def test_remote_script(self):
+        ret = cls_cmd.runScript("127.0.0.1", "tests/scripts/hello-world.sh", 1)
+        self.assertEqual(ret.args, "tests/scripts/hello-world.sh")
+        self.assertEqual(ret.returncode, 0)
+        self.assertEqual(ret.stdout, "+ echo hello, world\nhello, world")
+
+        ret = cls_cmd.runScript("127.0.0.1", "tests/scripts/hello-fail.sh", 1, "TESTFAIL")
+        self.assertEqual(ret.args, "tests/scripts/hello-fail.sh TESTFAIL")
+        self.assertEqual(ret.returncode, 1)
+        self.assertEqual(ret.stdout, "TESTFAIL")
+
+        ret = cls_cmd.runScript("127.0.0.1", "tests/scripts/hello-fail.sh", 1, "TESTFAIL2", "/tmp/result")
+        self.assertEqual(ret.args, "tests/scripts/hello-fail.sh TESTFAIL2 &> /tmp/result")
+        self.assertEqual(ret.returncode, 1)
+        self.assertEqual(ret.stdout, "")
+        with cls_cmd.getConnection("localhost") as ssh:
+            ret = ssh.run("cat /tmp/result")
+            self.assertEqual(ret.args, "cat /tmp/result")
+            self.assertEqual(ret.returncode, 0)
+            self.assertEqual(ret.stdout, "TESTFAIL2")
 
 if __name__ == '__main__':
 	unittest.main()
