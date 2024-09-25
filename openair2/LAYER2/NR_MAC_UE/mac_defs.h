@@ -554,6 +554,13 @@ typedef struct {
   A_SEQUENCE_OF(si_schedinfo_config_t) si_SchedInfo_list;
 } si_schedInfo_t;
 
+typedef struct ntn_timing_advance_components {
+// N_common_ta_adj and N_UE_TA_adj are in ms
+double N_common_ta_adj;
+double N_UE_TA_adj;
+long cell_specific_k_offset;
+} ntn_timing_advance_componets_t;
+
 /*!\brief Top level UE MAC structure */
 typedef struct NR_UE_MAC_INST_s {
   module_id_t ue_id;
@@ -622,6 +629,8 @@ typedef struct NR_UE_MAC_INST_s {
   int p_Max;
   int p_Max_alt;
   int n_ta_offset; // -1 not present, otherwise value to be applied
+
+  ntn_timing_advance_componets_t ntn_ta;
 
   long pdsch_HARQ_ACK_Codebook;
 

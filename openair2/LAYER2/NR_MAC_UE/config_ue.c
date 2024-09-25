@@ -1775,16 +1775,23 @@ void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, NR_SIB19_r17_t *sib1
   // ntn-Config-r17 deep copy into mac
   asn_copy(&asn_DEF_NR_NTN_Config_r17, (void **)&mac->sc_info.ntn_Config_r17, sib19_r17->ntn_Config_r17);
 
+  // populate ntn_ta structure from mac
   // if ephemerisInfo_r17 present in SIB19
   if (mac->sc_info.ntn_Config_r17->ephemerisInfo_r17 && mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17
       && (mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionX_r17 != 0
           || mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionY_r17 != 0
           || mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionZ_r17 != 0)) {
-    get_nrUE_params()->ntn_ta_common =
+    mac->ntn_ta.N_UE_TA_adj =
         calculate_ue_sat_ta(get_position(module_id), mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17);
   }
-
-  get_nrUE_params()->ntn_koffset = *mac->sc_info.ntn_Config_r17->cellSpecificKoffset_r17;
+  // if cellSpecificKoffset_r17 is present
+  if (sib19_r17->ntn_Config_r17->cellSpecificKoffset_r17) {
+    mac->ntn_ta.cell_specific_k_offset = *sib19_r17->ntn_Config_r17->cellSpecificKoffset_r17;
+  }
+  // Check if ta_Info_r17 is present and convert directly ta_Common_r17 (is in units of 4.072e-3 µs)
+  if (sib19_r17->ntn_Config_r17->ta_Info_r17) {
+    mac->ntn_ta.N_common_ta_adj = sib19_r17->ntn_Config_r17->ta_Info_r17->ta_Common_r17 * 4.072e-6;
+  }
 }
 
 static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,

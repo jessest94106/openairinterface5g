@@ -156,7 +156,7 @@ void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
   ue->if_inst     = nr_ue_if_module_init(UE_id);
   ue->dci_thres   = 0;
   ue->target_Nid_cell = -1;
-  ue->timing_advance = ue->frame_parms.samples_per_subframe * get_nrUE_params()->ntn_ta_common;
+  ue->timing_advance = ue->frame_parms.samples_per_subframe * 2 * get_nrUE_params()->ntn_ta_common;
 
   check_position(UE_id);
   // initialize all signal buffers

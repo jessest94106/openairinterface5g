@@ -40,16 +40,13 @@
 
 #include <executables/softmodem-common.h>
 #include "openair2/LAYER2/RLC/rlc.h"
+#include "openair2/LAYER2/NR_MAC_UE/mac_defs.h"
 
 #include "nr-uesoftmodem.h"
 
-static double get_ta_Common_ms(NR_NTN_Config_r17_t *ntn_Config_r17)
+static double get_ta_Common_ms(const ntn_timing_advance_componets_t* ntn_ta)
 {
-  if (ntn_Config_r17 && ntn_Config_r17->ta_Info_r17) {
-    // ta_Common_r17 is in units of 4.072e-3 µs
-    return (ntn_Config_r17->ta_Info_r17->ta_Common_r17 * 4.072e-6 + get_nrUE_params()->ntn_ta_common) * 2;
-  }
-  return 0.0;
+  return (ntn_ta->N_common_ta_adj + ntn_ta->N_UE_TA_adj) * 2;
 }
 
 int16_t get_prach_tx_power(NR_UE_MAC_INST_t *mac)
@@ -625,7 +622,7 @@ void nr_Msg3_transmitted(NR_UE_MAC_INST_t *mac, uint8_t CC_id, frame_t frameP, s
 {
   RA_config_t *ra = &mac->ra;
   NR_RACH_ConfigCommon_t *nr_rach_ConfigCommon = mac->current_UL_BWP->rach_ConfigCommon;
-  const double ta_Common_ms = get_ta_Common_ms(mac->sc_info.ntn_Config_r17);
+  const double ta_Common_ms = get_ta_Common_ms(&mac->ntn_ta);
   const int mu = mac->current_UL_BWP->scs;
   const int slots_per_ms = nr_slots_per_frame[mu] / 10;
 
