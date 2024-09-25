@@ -95,6 +95,16 @@
 #include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
 #endif
 
+/**
+ * @brief Helper define to allocate and initialize SetupRelease structures
+ */
+#define INIT_SETUP_RELEASE(type, element)                                    \
+  do {                                                                       \
+    element = calloc_or_fail(1, sizeof(*element));                           \
+    (element)->present = NR_SetupRelease_##type##_PR_setup;                  \
+    (element)->choice.setup = CALLOC(1, sizeof(*((element)->choice.setup))); \
+  } while (0)
+
 extern uint16_t sf_ahead;
 
 void prepare_scc(NR_ServingCellConfigCommon_t *scc) {
