@@ -140,19 +140,6 @@ def GetParametersFromXML(action):
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
 
-	elif action == 'WaitEndBuild_eNB':
-		RAN.Build_eNB_args=test.findtext('Build_eNB_args')
-		eNB_instance=test.findtext('eNB_instance')
-		if (eNB_instance is None):
-			RAN.eNB_instance=0
-		else:
-			RAN.eNB_instance=int(eNB_instance)
-		eNB_serverId=test.findtext('eNB_serverId')
-		if (eNB_serverId is None):
-			RAN.eNB_serverId[RAN.eNB_instance]='0'
-		else:
-			RAN.eNB_serverId[RAN.eNB_instance]=eNB_serverId
-
 	elif action == 'Initialize_eNB':
 		RAN.eNB_Trace=test.findtext('eNB_Trace')
 		RAN.eNB_Stats=test.findtext('eNB_Stats')
@@ -689,8 +676,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				try:
 					if action == 'Build_eNB':
 						RAN.BuildeNB(HTML)
-					elif action == 'WaitEndBuild_eNB':
-						RAN.WaitBuildeNBisFinished(HTML)
 					elif action == 'Custom_Command':
 						RAN.CustomCommand(HTML)
 						if RAN.prematureExit:

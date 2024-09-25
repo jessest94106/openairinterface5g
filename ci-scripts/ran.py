@@ -224,41 +224,6 @@ class RANManagement():
 		mySSH.close()
 		self.checkBuildeNB(lIpAddr, lUserName, lPassWord, lSourcePath, self.testCase_id, HTML)
 
-	def WaitBuildeNBisFinished(self, HTML):
-		if self.eNB_serverId[self.eNB_instance] == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		logging.debug('Waiting for end of build on server: ' + lIpAddr)
-		mySSH = SSH.SSHConnection()
-		mySSH.open(lIpAddr, lUserName, lPassWord)
-		count = 40
-		buildOAIprocess = True
-		while (count > 0) and buildOAIprocess:
-			mySSH.command('ps aux | grep --color=never build_ | grep -v grep', '\$', 6)
-			result = re.search('build_oai', mySSH.getBefore())
-			if result is None:
-				buildOAIprocess = False
-			else:
-				count -= 1
-				time.sleep(30)
-		mySSH.close()
-		self.checkBuildeNB(lIpAddr, lUserName, lPassWord, lSourcePath, self.backgroundBuildTestId[int(self.eNB_instance)], HTML)
-
 	def CustomCommand(self, HTML):
 		logging.info(f"Executing custom command on {self.node}")
 		cmd = cls_cmd.getConnection(self.node)

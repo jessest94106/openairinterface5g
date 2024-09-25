@@ -6,7 +6,6 @@
   - Run_T2Test
   - Run_NRulsimTest
   - Build_eNB
-  - WaitEndBuild_eNB
   - Initialize_eNB
   - Terminate_eNB
   - Initialize_UE
