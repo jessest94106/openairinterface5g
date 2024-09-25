@@ -27,69 +27,22 @@
   EMAIL   : Lionel.Gauthier@eurecom.fr, navid.nikaein@eurecom.fr, kroempa@gmail.com
 */
 
-#include <string.h>
-#include <inttypes.h>
-
-#include "common/utils/LOG/log.h"
-#include "common/utils/nr/nr_common.h"
-#include "assertions.h"
-#include "oai_asn1.h"
 #include "executables/softmodem-common.h"
 #include "gnb_config.h"
-#include "gnb_paramdef.h"
 #include "enb_paramdef.h"
 #include "UTIL/OTG/otg.h"
-#include "UTIL/OTG/otg_externs.h"
-#include "intertask_interface.h"
-#include "ngap_gNB.h"
-#include "sctp_eNB_task.h"
 #include "sctp_default_values.h"
-#include "F1AP_CauseRadioNetwork.h"
 #include "f1ap_common.h"
-// #include "SystemInformationBlockType2.h"
-// #include "LAYER2/MAC/extern.h"
-// #include "LAYER2/MAC/proto.h"
 #include "PHY/INIT/nr_phy_init.h"
 #include "radio/ETHERNET/ethernet_lib.h"
 #include "nfapi_vnf.h"
 #include "nfapi_pnf.h"
-#include "nr_pdcp/nr_pdcp_oai_api.h"
-
-//#include "L1_paramdef.h"
 #include "prs_nr_paramdef.h"
 #include "L1_nr_paramdef.h"
 #include "MACRLC_nr_paramdef.h"
-#include "common/config/config_userapi.h"
-//#include "RRC_config_tools.h"
 #include "gnb_paramdef.h"
 #include "NR_MAC_gNB/mac_proto.h"
-#include <openair3/ocp-gtpu/gtp_itf.h>
-
-#include "NR_asn_constant.h"
-#include "executables/thread-common.h"
-#include "NR_SCS-SpecificCarrier.h"
-#include "NR_TDD-UL-DL-ConfigCommon.h"
-#include "NR_FrequencyInfoUL.h"
-#include "NR_RACH-ConfigGeneric.h"
-#include "NR_RACH-ConfigCommon.h"
-#include "NR_PUSCH-TimeDomainResourceAllocation.h"
-#include "NR_PUSCH-ConfigCommon.h"
-#include "NR_PUCCH-ConfigCommon.h"
-#include "NR_PDSCH-TimeDomainResourceAllocation.h"
-#include "NR_PDSCH-ConfigCommon.h"
-#include "NR_RateMatchPattern.h"
-#include "NR_RateMatchPatternLTE-CRS.h"
-#include "NR_SearchSpace.h"
-#include "NR_ControlResourceSet.h"
-#include "NR_MeasurementTimingConfiguration.h"
-#include "NR_EUTRA-MBSFN-SubframeConfig.h"
-#include "uper_decoder.h"
-#include "uper_encoder.h"
-#include "common/utils/ds/seq_arr.h"
-
-#include "RRC/NR/MESSAGES/asn1_msg.h"
 #include "RRC/NR/nr_rrc_extern.h"
-#include "openair2/LAYER2/nr_pdcp/nr_pdcp.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 #ifdef ENABLE_AERIAL
 #include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
@@ -104,8 +57,6 @@
     (element)->present = NR_SetupRelease_##type##_PR_setup;                  \
     (element)->choice.setup = CALLOC(1, sizeof(*((element)->choice.setup))); \
   } while (0)
-
-extern uint16_t sf_ahead;
 
 /**
  * Allocate memory and initialize ServingCellConfigCommon struct members
