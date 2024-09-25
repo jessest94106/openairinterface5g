@@ -29,7 +29,10 @@
 
 bool eq_f1ap_plmn(const f1ap_plmn_t *a, const f1ap_plmn_t *b)
 {
-  return a->mcc == b->mcc && a->mnc == b->mnc && a->mnc_digit_length == b->mnc_digit_length;
+  _F1_EQ_CHECK_INT(a->mcc, b->mcc);
+  _F1_EQ_CHECK_INT(a->mnc, b->mnc);
+  _F1_EQ_CHECK_INT(a->mnc_digit_length, b->mnc_digit_length);
+  return true;
 }
 
 uint8_t *cp_octet_string(const OCTET_STRING_t *os, int *len)
