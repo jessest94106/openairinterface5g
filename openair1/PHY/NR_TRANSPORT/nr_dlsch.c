@@ -410,8 +410,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
               c16_t *txFc = &txdataF_precoding[layer][l_symbol][start_sc];
               c16_t *txlc = &tx_layer[cur_re];
               for (i = (upper_limit >> 2) << 2; i < upper_limit; i++) {
-                txFc[i].r = ((txlc[i].r * amp) >> 14) + 1;
-                txFc[i].i = ((txlc[i].i * amp) >> 14) + 1;
+                txFc[i].r = (((txlc[i].r * amp) >> 14) + 1) >> 1;
+                txFc[i].i = (((txlc[i].i * amp) >> 14) + 1) >> 1;
               }
             }
             cur_re += upper_limit;
@@ -442,8 +442,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
                 c16_t *txFc = txdataF_precoding[layer][l_symbol];
                 c16_t *txlc = &tx_layer[cur_re];
                 for (i = (remaining_re >> 2) << 2; i < remaining_re; i++) {
-                  txFc[i].r = ((txlc[i].r * amp) >> 14) + 1;
-                  txFc[i].i = ((txlc[i].i * amp) >> 14) + 1;
+                  txFc[i].r = (((txlc[i].r * amp) >> 14) + 1) >> 1;
+                  txFc[i].i = (((txlc[i].i * amp) >> 14) + 1) >> 1;
                 }
               }
             } // remaining_re > 0
