@@ -250,8 +250,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
           NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
           const uint32_t *gold =
               nr_gold_pdsch(fp->N_RB_DL, fp->symbols_per_slot, rel15->dlDmrsScramblingId, rel15->SCID, slot, l_symbol);
-          nr_modulation(gold, n_dmrs * DMRS_MOD_ORDER, DMRS_MOD_ORDER,
-                        (int16_t *)mod_dmrs); // Qm = 2 as DMRS is QPSK modulated
+          // Qm = 2 as DMRS is QPSK modulated
+          nr_modulation(gold, n_dmrs * DMRS_MOD_ORDER, DMRS_MOD_ORDER, (int16_t *)mod_dmrs);
 
 #ifdef DEBUG_DLSCH
           printf("DMRS modulation (symbol %d, %d symbols, type %d):\n", l_symbol, n_dmrs, dmrs_Type);
