@@ -106,10 +106,10 @@ class LocalCmd(Cmd):
 			if line.strip().endswith('&'):
 				# if we wait for stdout, subprocess does not return before the end of the command
 				# however, we don't want to wait for commands with &, so just return fake command
-				ret = sp.run(line, shell=True, cwd=self.cwd, timeout=5)
+				ret = sp.run(line, shell=True, cwd=self.cwd, timeout=5, executable='/bin/bash')
 				time.sleep(0.1)
 			else:
-				ret = sp.run(line, shell=True, cwd=self.cwd, stdout=sp.PIPE, stderr=sp.STDOUT, timeout=timeout)
+				ret = sp.run(line, shell=True, cwd=self.cwd, stdout=sp.PIPE, stderr=sp.STDOUT, timeout=timeout, executable='/bin/bash')
 		except Exception as e:
 			ret = sp.CompletedProcess(args=line, returncode=255, stdout=f'Exception: {str(e)}'.encode('utf-8'))
 		if ret.stdout is None:
