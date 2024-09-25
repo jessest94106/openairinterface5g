@@ -44,6 +44,7 @@ import cls_containerize	 #class Containerize for all container-based operations 
 import cls_static_code_analysis  #class for static code analysis
 import cls_physim1		 #class PhySim for physical simulators deploy and run
 import cls_cluster		 # class for building/deploying on cluster
+import cls_native        # class for all native/source-based operations
 
 import sshconnection 
 import epc
@@ -149,7 +150,7 @@ def ExecuteActionWithParam(action):
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
 		if action == 'Build_eNB':
-			success = RAN.BuildeNB(HTML)
+			success = cls_native.Native.Build(HTML.testCase_id, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
 		elif action == 'Build_Image':
 			success = CONTAINERS.BuildImage(HTML)
 		elif action == 'Build_Proxy':
