@@ -31,7 +31,7 @@
 	<TestCaseExclusionList></TestCaseExclusionList>
 	<testCase id="000002">
 		<class>Create_Workspace</class>
-		<desc>Creating new Workspace</desc>
+		<desc>Create new Workspace</desc>
 	</testCase>
 	<testCase id="000001">
 		<class>Build_Cluster_Image</class>

@@ -45,7 +45,6 @@ from multiprocessing import Process, Lock, SimpleQueue
 import helpreadme as HELP
 import constants as CONST
 import cls_cmd
-from cls_containerize import CreateWorkspace
 
 #-----------------------------------------------------------
 # Class Declaration

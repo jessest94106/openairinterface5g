@@ -60,41 +60,21 @@ import cls_oaicitest
 #-----------------------------------------------------------
 IMAGES = ['oai-enb', 'oai-lte-ru', 'oai-lte-ue', 'oai-gnb', 'oai-nr-cuup', 'oai-gnb-aw2s', 'oai-nr-ue', 'oai-gnb-asan', 'oai-nr-ue-asan', 'oai-nr-cuup-asan', 'oai-gnb-aerial', 'oai-gnb-fhi72']
 
-def CreateWorkspace(sshSession, sourcePath, ranRepository, ranCommitID, ranTargetBranch, ranAllowMerge):
+def CreateWorkspace(host, sourcePath, ranRepository, ranCommitID, ranTargetBranch, ranAllowMerge):
 	if ranCommitID == '':
 		logging.error('need ranCommitID in CreateWorkspace()')
-		sys.exit('Insufficient Parameter in CreateWorkspace()')
+		raise ValueError('Insufficient Parameter in CreateWorkspace(): need ranCommitID')
 
-	sshSession.command(f'rm -rf {sourcePath}', '\$', 10)
-	sshSession.command('mkdir -p ' + sourcePath, '\$', 5)
-	(sshSession.cd(sourcePath) if isinstance(sshSession, cls_cmd.Cmd) else sshSession.command('cd ' + sourcePath, '\$', 5))
-	# Recent version of git (>2.20?) should handle missing .git extension # without problems
-	if ranTargetBranch == 'null':
-		ranTargetBranch = 'develop'
-	baseBranch = re.sub('origin/', '', ranTargetBranch)
-	sshSession.command(f'git clone --filter=blob:none -n -b {baseBranch} {ranRepository} .', '\$', 60)
-	if sshSession.getBefore().count('error') > 0 or sshSession.getBefore().count('error') > 0:
-		sys.exit('error during clone')
-	sshSession.command('git config user.email "jenkins@openairinterface.org"', '\$', 5)
-	sshSession.command('git config user.name "OAI Jenkins"', '\$', 5)
-
-	sshSession.command('mkdir -p cmake_targets/log', '\$', 5)
-	# if the commit ID is provided use it to point to it
-	sshSession.command(f'git checkout -f {ranCommitID}', '\$', 30)
-	if sshSession.getBefore().count(f'HEAD is now at {ranCommitID[:6]}') != 1:
-		sshSession.command('git log --oneline | head -n5', '\$', 5)
-		logging.error(f'problems during checkout, is at: {sshSession.getBefore()}')
-		return False
-	else:
-		logging.debug('successful checkout')
-	# if the branch is not develop, then it is a merge request and we need to do
-	# the potential merge. Note that merge conflicts should already been checked earlier
+	script = "scripts/create_workspace.sh"
+	options = f"{sourcePath} {ranRepository} {ranCommitID}"
 	if ranAllowMerge:
 		if ranTargetBranch == '':
 			ranTargetBranch = 'develop'
-		logging.debug(f'Merging with the target branch: {ranTargetBranch}')
-		sshSession.command(f'git merge --ff origin/{ranTargetBranch} -m "Temporary merge for CI"', '\$', 30)
-	return True
+		options += f" {ranTargetBranch}"
+	logging.info(f'execute "{script}" with options "{options}" on node {host}')
+	ret = cls_cmd.runScript(host, script, 90, options)
+	logging.debug(f'"{script}" finished with code {ret.returncode}, output:\n{ret.stdout}')
+	return ret.returncode == 0
 
 def CreateTag(ranCommitID, ranBranch, ranAllowMerge):
 	shortCommit = ranCommitID[0:8]
@@ -1000,12 +980,9 @@ class Containerize():
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
 		
-		logging.info(f"Running on server {lIpAddr}")
-		sshSession = cls_cmd.getConnection(lIpAddr)
-
-		success = CreateWorkspace(sshSession, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+		success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 		if success:
-			HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [f"created workspace {lSourcePath}"])
 		else:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["cannot create workspace"])
 		return success

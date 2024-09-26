@@ -33,7 +33,7 @@
 
 	<testCase id="000000">
 		<class>Create_Workspace</class>
-		<desc>Creating new Workspace</desc>
+		<desc>Create new Workspace</desc>
 	</testCase>
 
 	<testCase id="010101">
