@@ -8,5 +8,6 @@ start with
 
     python tests/deployment.py -v
     python tests/ping-iperf.py -v
+    python tests/iperf-analysis.py -v
 
 It will indicate if all tests passed.
