@@ -394,7 +394,6 @@ typedef struct PHY_VARS_NR_UE_s {
   uint8_t          prs_active_gNBs;
   NR_DL_UE_HARQ_t  dl_harq_processes[2][NR_MAX_DLSCH_HARQ_PROCESSES];
   NR_UL_UE_HARQ_t  ul_harq_processes[NR_MAX_ULSCH_HARQ_PROCESSES];
-  
   //Paging parameters
   uint32_t              IMSImod1024;
   uint32_t              PF;
@@ -540,6 +539,10 @@ typedef struct {
   int gNB_id;
   /// NR slot index within frame_tx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_tx;
+  /// NR slot index tx offset to resume
+  /// in case of NTN, tx_offset can be changed dynamically via SIB19
+  /// we need to notify the right tx thread slot based on TX offset change
+  int nr_slot_tx_offset;
   int rx_slot_type;
   /// NR slot index within frame_rx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_rx;

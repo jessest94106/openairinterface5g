@@ -923,7 +923,7 @@ void nr_get_RA_window(NR_UE_MAC_INST_t *mac)
 
   NR_RACH_ConfigCommon_t *setup = mac->current_UL_BWP->rach_ConfigCommon;
   AssertFatal(&setup->rach_ConfigGeneric != NULL, "In %s: FATAL! rach_ConfigGeneric is NULL...\n", __FUNCTION__);
-  const double ta_Common_ms = get_ta_Common_ms(mac->sc_info.ntn_Config_r17);
+  const double ta_Common_ms = get_ta_Common_ms(&mac->ntn_ta);
   const int mu = mac->current_DL_BWP->scs;
   const int slots_per_ms = nr_slots_per_frame[mu] / 10;
 

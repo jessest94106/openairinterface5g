@@ -1777,10 +1777,12 @@ void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, NR_SIB19_r17_t *sib1
 
   // populate ntn_ta structure from mac
   // if ephemerisInfo_r17 present in SIB19
-  if (mac->sc_info.ntn_Config_r17->ephemerisInfo_r17 && mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17
-      && (mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionX_r17 != 0
-          || mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionY_r17 != 0
-          || mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionZ_r17 != 0)) {
+  struct NR_EphemerisInfo_r17 *ephemeris_info = mac->sc_info.ntn_Config_r17->ephemerisInfo_r17;
+  struct NR_PositionVelocity_r17 *position_velocity = mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17;
+
+  if (ephemeris_info && position_velocity
+      && (position_velocity->positionX_r17 != 0 || position_velocity->positionY_r17 != 0
+          || position_velocity->positionZ_r17 != 0)) {
     mac->ntn_ta.N_UE_TA_adj =
         calculate_ue_sat_ta(get_position(module_id), mac->sc_info.ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17);
   }
