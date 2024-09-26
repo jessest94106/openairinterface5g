@@ -101,7 +101,7 @@ class LocalCmd(Cmd):
 
 	def run(self, line, timeout=300, silent=False, reportNonZero=True):
 		if not silent:
-			logging.info(line)
+			logging.info(f"local> {line}")
 		try:
 			if line.strip().endswith('&'):
 				# if we wait for stdout, subprocess does not return before the end of the command
@@ -168,6 +168,7 @@ class RemoteCmd(Cmd):
 
 	def __init__(self, hostname, d=None):
 		cIdx = 0
+		self.hostname = hostname
 		logging.getLogger('paramiko').setLevel(logging.ERROR) # prevent spamming through Paramiko
 		self.client = paramiko.SSHClient()
 		self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -205,7 +206,7 @@ class RemoteCmd(Cmd):
 
 	def run(self, line, timeout=300, silent=False, reportNonZero=True):
 		if not silent:
-			logging.info(line)
+			logging.info(f"ssh[{self.hostname}]> {line}")
 		if self.cwd:
 			line = f"cd {self.cwd} && {line}"
 		try:
@@ -235,7 +236,7 @@ class RemoteCmd(Cmd):
 	# if recursive is True, tgt must be a directory (and src is file or directory)
 	# if recursive is False, tgt and src must be a file name
 	def copyout(self, src, tgt, recursive=False):
-		logging.debug(f"copyout: local:{src} -> remote:{tgt}")
+		logging.debug(f"copyout: local:{src} -> {self.hostname}:{tgt}")
 		if recursive:
 			tmpfile = f"{uuid.uuid4()}.tar"
 			abstmpfile = f"/tmp/{tmpfile}"
@@ -253,7 +254,7 @@ class RemoteCmd(Cmd):
 	# if recursive is True, tgt must be a directory (and src is file or directory)
 	# if recursive is False, tgt and src must be a file name
 	def copyin(self, src, tgt, recursive=False):
-		logging.debug(f"copyin: remote:{src} -> local:{tgt}")
+		logging.debug(f"copyin: {self.hostname}:{src} -> local:{tgt}")
 		if recursive:
 			tmpfile = f"{uuid.uuid4()}.tar"
 			abstmpfile = f"/tmp/{tmpfile}"
