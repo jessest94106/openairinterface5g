@@ -129,6 +129,8 @@ class LocalCmd(Cmd):
 	def copyin(self, src, tgt, recursive=False):
 		if src[0] != '/' or tgt[0] != '/':
 			raise Exception(f'support only absolute file paths (src {src} tgt {tgt})!')
+		if src == tgt:
+			return # nothing to copy, file is already where it should go
 		opt = '-r' if recursive else ''
 		return self.run(f'cp {opt} {src} {tgt}').returncode == 0
 
