@@ -644,8 +644,6 @@ class Containerize():
 		buildProxy = mySSH.getBefore().count('o such image') != 0
 		if buildProxy:
 			mySSH.command(self.cli + ' build ' + self.cliBuildOptions + ' --target oai-lte-multi-ue-proxy --tag proxy:' + tag + ' --file docker/Dockerfile.ubuntu18.04 . > cmake_targets/log/proxy-build.log 2>&1', '\$', 180)
-			# Note: at this point, OAI images are flattened, but we cannot do this
-			# here, as the flatten script is not in the proxy repo
 			mySSH.command(self.cli + ' image inspect --format=\'Size = {{.Size}} bytes\' proxy:' + tag, '\$', 5)
 			mySSH.command(self.cli + ' image prune --force || true','\$', 15)
 			if mySSH.getBefore().count('o such image') != 0:
