@@ -30,7 +30,6 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,16 +38,12 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <sys/epoll.h>
-#include <string.h>
-
 #include <common/utils/assertions.h>
 #include <common/utils/LOG/log.h>
 #include <common/utils/load_module_shlib.h>
 #include <common/utils/telnetsrv/telnetsrv.h>
 #include <common/config/config_userapi.h>
 #include "common_lib.h"
-#include <openair1/PHY/defs_eNB.h>
-#include "openair1/PHY/defs_UE.h"
 #define CHANNELMOD_DYNAMICLOAD
 #include <openair1/SIMULATION/TOOLS/sim.h>
 #include "rfsimulator.h"

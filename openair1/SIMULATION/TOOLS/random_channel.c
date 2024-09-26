@@ -25,11 +25,9 @@
 #include <string.h>
 #include <complex.h>
 
-
 #include "PHY/TOOLS/tools_defs.h"
 #include "sim.h"
 #include "scm_corrmat.h"
-#include "common/utils/LOG/log.h"
 #include "common/config/config_userapi.h"
 #include "common/utils/telnetsrv/telnetsrv.h"
 #include "common/utils/load_module_shlib.h"
