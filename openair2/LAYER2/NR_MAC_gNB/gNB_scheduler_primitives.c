@@ -558,23 +558,13 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
 
   const uint32_t Y = is_common ? 0 : get_Y(ss, slot, rnti);
   uint8_t nr_of_candidates;
-  for (int i=0; i<5; i++) {
+  for (int i = 0; i < 5; i++) {
     // for now taking the lowest value among the available aggregation levels
-    find_aggregation_candidates(aggregation_level,
-                                &nr_of_candidates,
-                                ss,
-                                1<<i);
-    if(nr_of_candidates>0)
+    find_aggregation_candidates(aggregation_level, &nr_of_candidates, ss, 1 << i);
+    if(nr_of_candidates > 0)
       break;
   }
-  int CCEIndex = find_pdcch_candidate(nrmac,
-                                      CC_id,
-                                      *aggregation_level,
-                                      nr_of_candidates,
-                                      beam_idx,
-                                      sched_pdcch,
-                                      coreset,
-                                      Y);
+  int CCEIndex = find_pdcch_candidate(nrmac, CC_id, *aggregation_level, nr_of_candidates, beam_idx, sched_pdcch, coreset, Y);
   return CCEIndex;
 }
 

@@ -983,7 +983,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
                           NR_UE_info_t *UE,
                           frame_t frame,
                           sub_frame_t slot,
-                          int beam_index,
+                          int ue_beam,
                           int r_pucch,
                           int is_common)
 {
@@ -1073,7 +1073,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
     else { // unoccupied occasion
       // checking if in ul_slot the resources potentially to be assigned to this PUCCH are available
       set_pucch_allocation(ul_bwp, r_pucch, bwp_size, curr_pucch);
-      NR_beam_alloc_t beam = beam_allocation_procedure(&mac->beam_info, pucch_frame, pucch_slot, beam_index, n_slots_frame);
+      NR_beam_alloc_t beam = beam_allocation_procedure(&mac->beam_info, pucch_frame, pucch_slot, ue_beam, n_slots_frame);
       if (beam.idx < 0) {
         LOG_D(NR_MAC,
               "DL %4d.%2d, UL_ACK %4d.%2d beam resources for this occasion are already occupied, move to the following occasion\n",
@@ -1093,7 +1093,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
               slot,
               pucch_frame,
               pucch_slot);
-        reset_beam_status(&mac->beam_info, pucch_frame, pucch_slot, beam_index, n_slots_frame, beam.new_beam);
+        reset_beam_status(&mac->beam_info, pucch_frame, pucch_slot, ue_beam, n_slots_frame, beam.new_beam);
         continue;
       }
       // allocating a new PUCCH structure for this occasion
