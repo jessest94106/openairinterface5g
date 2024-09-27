@@ -897,6 +897,7 @@ class Containerize():
 			myCmd.close()
 			HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 			return False
+		pulled_images = []
 		for image in self.imageToPull:
 			tagToUse = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
 			imageTag = f"{image}:{tagToUse}"
@@ -911,6 +912,7 @@ class Containerize():
 				return False
 			myCmd.run(f'docker tag {imagePrefix}/{imageTag} oai-ci/{imageTag}')
 			myCmd.run(f'docker rmi {imagePrefix}/{imageTag}')
+			pulled_images += [f"oai-ci/{imageTag}"]
 		response = myCmd.run(f'docker logout {imagePrefix}')
 		if response.returncode != 0:
 			msg = 'Could not log off from local registry'
@@ -919,7 +921,8 @@ class Containerize():
 			HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 			return False
 		myCmd.close()
-		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+		msg = "Pulled Images:\n" + '\n'.join(pulled_images)
+		HTML.CreateHtmlTestRowQueue('N/A', 'OK', [msg])
 		return True
 
 	def Clean_Test_Server_Images(self, HTML):
