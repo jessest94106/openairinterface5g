@@ -14,7 +14,7 @@ services:
             TZ: Europe/Paris
             USE_ADDITIONAL_OPTIONS: --sa
         volumes:
-            - ../../conf_files/gnb.sa.band78.51prb.aw2s.ddsuu.conf:/opt/oai-gnb-aw2s/etc/gnb.conf
+            - ../../conf_files/gnb.sa.band78.51prb.aw2s.ddsuu.2x2.conf:/opt/oai-gnb-aw2s/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
             interval: 10s
