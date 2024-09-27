@@ -62,7 +62,7 @@ void *aerial_vnf_nr_p7_config_init(void *ptr)
   p7_vnf->config->nr_uci_indication = &aerial_phy_nr_uci_indication;
   p7_vnf->config->srs_indication = NULL;
   p7_vnf->config->sr_indication = &aerial_phy_sr_indication;
-  p7_vnf->config->cqi_indication = &aerial_phy_cqi_indication;
+  p7_vnf->config->cqi_indication = NULL;
   p7_vnf->config->lbt_dl_indication = &aerial_phy_lbt_dl_indication;
   p7_vnf->config->nb_harq_indication = &aerial_phy_nb_harq_indication;
   p7_vnf->config->nrach_indication = &aerial_phy_nrach_indication;

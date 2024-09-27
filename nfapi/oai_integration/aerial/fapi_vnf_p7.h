@@ -185,7 +185,6 @@ int aerial_phy_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind);
 int aerial_phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind);
 int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind);
 int aerial_phy_sr_indication(struct nfapi_vnf_p7_config *config, nfapi_sr_indication_t *ind);
-int aerial_phy_cqi_indication(struct nfapi_vnf_p7_config *config, nfapi_cqi_indication_t *ind);
 int aerial_phy_lbt_dl_indication(struct nfapi_vnf_p7_config *config, nfapi_lbt_dl_indication_t *ind);
 int aerial_phy_nb_harq_indication(struct nfapi_vnf_p7_config *config, nfapi_nb_harq_indication_t *ind);
 int aerial_phy_nrach_indication(struct nfapi_vnf_p7_config *config, nfapi_nrach_indication_t *ind);
