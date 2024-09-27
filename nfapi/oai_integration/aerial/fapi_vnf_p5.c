@@ -55,7 +55,7 @@ void *aerial_vnf_nr_p7_config_init(void *ptr)
   p7_vnf->config->port = p7_vnf->local_port;
   p7_vnf->config->sync_indication = NULL;
   p7_vnf->config->slot_indication = NULL;
-  p7_vnf->config->harq_indication = &aerial_phy_harq_indication;
+  p7_vnf->config->harq_indication = NULL;
   p7_vnf->config->nr_crc_indication = &aerial_phy_nr_crc_indication;
   p7_vnf->config->nr_rx_data_indication = &aerial_phy_nr_rx_data_indication;
   p7_vnf->config->nr_rach_indication = &aerial_phy_nr_rach_indication;

@@ -136,47 +136,6 @@ extern pthread_cond_t nfapi_sync_cond;
 extern pthread_mutex_t nfapi_sync_mutex;
 extern int nfapi_sync_var;
 
-int aerial_phy_harq_indication(struct nfapi_vnf_p7_config *config, nfapi_harq_indication_t *ind)
-{
-  struct PHY_VARS_eNB_s *eNB = RC.eNB[0][0];
-  LOG_D(MAC,
-        "%s() NFAPI SFN/SF:%d number_of_harqs:%u\n",
-        __FUNCTION__,
-        NFAPI_SFNSF2DEC(ind->sfn_sf),
-        ind->harq_indication_body.number_of_harqs);
-  AssertFatal(pthread_mutex_lock(&eNB->UL_INFO_mutex) == 0, "Mutex lock failed");
-  if (NFAPI_MODE == NFAPI_MODE_VNF) {
-    int8_t index = NFAPI_SFNSF2SF(ind->sfn_sf);
-
-    UL_RCC_INFO.harq_ind[index] = *ind;
-
-    assert(ind->harq_indication_body.number_of_harqs <= NFAPI_HARQ_IND_MAX_PDU);
-    if (ind->harq_indication_body.number_of_harqs > 0) {
-      UL_RCC_INFO.harq_ind[index].harq_indication_body.harq_pdu_list =
-          malloc(sizeof(nfapi_harq_indication_pdu_t) * NFAPI_HARQ_IND_MAX_PDU);
-    }
-    for (int i = 0; i < ind->harq_indication_body.number_of_harqs; i++) {
-      memcpy(&UL_RCC_INFO.harq_ind[index].harq_indication_body.harq_pdu_list[i],
-             &ind->harq_indication_body.harq_pdu_list[i],
-             sizeof(nfapi_harq_indication_pdu_t));
-    }
-  } else {
-    eNB->UL_INFO.harq_ind = *ind;
-    eNB->UL_INFO.harq_ind.harq_indication_body.harq_pdu_list = eNB->harq_pdu_list;
-
-    assert(ind->harq_indication_body.number_of_harqs <= NFAPI_HARQ_IND_MAX_PDU);
-    for (int i = 0; i < ind->harq_indication_body.number_of_harqs; i++) {
-      memcpy(&eNB->UL_INFO.harq_ind.harq_indication_body.harq_pdu_list[i],
-             &ind->harq_indication_body.harq_pdu_list[i],
-             sizeof(eNB->UL_INFO.harq_ind.harq_indication_body.harq_pdu_list[i]));
-    }
-  }
-  AssertFatal(pthread_mutex_unlock(&eNB->UL_INFO_mutex) == 0, "Mutex unlock failed");
-  // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
-  // mac_harq_ind(p7_vnf->mac, ind);
-  return 1;
-}
-
 int aerial_phy_nr_crc_indication(nfapi_nr_crc_indication_t *ind)
 {
   if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
