@@ -370,14 +370,6 @@ int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
   return 1;
 }
 
-int aerial_phy_nrach_indication(struct nfapi_vnf_p7_config *config, nfapi_nrach_indication_t *ind)
-{
-  // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
-  // mac_nrach_ind(p7_vnf->mac, ind);
-  return 1;
-}
-
-
 NR_Sched_Rsp_t g_sched_resp;
 void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_t slot, NR_Sched_Rsp_t* sched_info);
 int oai_fapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req);
