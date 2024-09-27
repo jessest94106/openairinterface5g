@@ -228,8 +228,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
       // Loop Over OFDM symbols:
       for (int l_symbol = rel15->StartSymbolIndex; l_symbol < rel15->StartSymbolIndex + rel15->NrOfSymbols; l_symbol++) {
         /// DMRS QPSK modulation
-        uint8_t k_prime=0;
-        uint16_t n=0;
+        uint8_t k_prime = 0;
+        uint16_t n = 0;
         if ((dmrs_symbol_map & (1 << l_symbol))) { // DMRS time occasion
           // The reference point for is subcarrier 0 of the lowest-numbered resource block in CORESET 0 if the corresponding
           // PDCCH is associated with CORESET 0 and Type0-PDCCH common search space and is addressed to SI-RNTI
@@ -254,7 +254,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 #ifdef DEBUG_DLSCH
           printf("DMRS modulation (symbol %d, %d symbols, type %d):\n", l_symbol, n_dmrs, dmrs_Type);
           for (int i = 0; i < n_dmrs / 2; i += 8) {
-            for (int j=0; j<8; j++) {
+            for (int j = 0; j < 8; j++) {
               printf("%d %d\t", mod_dmrs[i + j].r, mod_dmrs[i + j].i);
             }
             printf("\n");
@@ -339,8 +339,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
                                                         dmrs_Type)) {
               txdataF_precoding[layer][l_symbol][k] = c16mulRealShift(tx_layer[cur_re], amp, 15);
 #ifdef DEBUG_DLSCH_MAPPING
-              printf("m %u\t l %d \t k %d \t txdataF: %d %d\n",
-                     m,
+              printf("re %u\t l %d \t k %d \t txdataF: %d %d\n",
+                     cur_re,
                      l_symbol,
                      k,
                      txdataF_precoding[layer][l_symbol][k].r,
@@ -392,13 +392,13 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
               const simde__m128i txL = simde_mm_loadu_si128(txl + i);
               simde_mm_storeu_si128(txF + i, simde_mm_mulhrs_epi16(amp64, txL));
 #ifdef DEBUG_DLSCH_MAPPING
-              if ((i&1) > 0)
-                printf("m %u\t l %d \t k %d \t txdataF: %d %d\n",
-                       m,
+              for (int j = 0; j < 4; j++)
+                printf("re %u\t l %d \t k %d \t txdataF: %d %d\n",
+                       cur_re + 4 * i + j,
                        l_symbol,
-                       start_sc + (i >> 1),
-                       txdataF_precoding[layer][l_symbol][start_sc].r,
-                       txdataF_precoding[layer][l_symbol][start_sc].i);
+                       start_sc + 4 * i + j,
+                       txdataF_precoding[layer][l_symbol][start_sc + 4 * i + j].r,
+                       txdataF_precoding[layer][l_symbol][start_sc + 4 * i + j].i);
 #endif
               /* handle this, mute RE */
               /*else {
@@ -410,8 +410,11 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
               c16_t *txFc = &txdataF_precoding[layer][l_symbol][start_sc];
               c16_t *txlc = &tx_layer[cur_re];
               for (i = (upper_limit >> 2) << 2; i < upper_limit; i++) {
-                txFc[i].r = ((txlc[i].r * amp) >> 14) + 1;
-                txFc[i].i = ((txlc[i].i * amp) >> 14) + 1;
+                txFc[i].r = (((txlc[i].r * amp) >> 14) + 1) >> 1;
+                txFc[i].i = (((txlc[i].i * amp) >> 14) + 1) >> 1;
+#ifdef DEBUG_DLSCH_MAPPING
+                printf("re %u\t l %d \t k %d \t txdataF: %d %d\n", cur_re + i, l_symbol, start_sc + i, txFc[i].r, txFc[i].i);
+#endif
               }
             }
             cur_re += upper_limit;
@@ -422,15 +425,14 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
               for (i = 0; i < (remaining_re >> 2); i++) {
                 const simde__m128i txL = simde_mm_loadu_si128(txl + i);
                 simde_mm_storeu_si128(txF + i, simde_mm_mulhrs_epi16(amp64, txL));
-
 #ifdef DEBUG_DLSCH_MAPPING
-                 if ((i&1) > 0)
-                   printf("m %u\t l %d \t k %d \t txdataF: %d %d\n",
-                          m,
-                          l_symbol,
-                          i >> 1,
-                          txdataF_precoding[layer][l_symbol][i >> 1].r,
-                          txdataF_precoding[layer][l_symbol][i >> 1].i);
+                for (int j = 0; j < 4; j++)
+                  printf("re %u\t l %d \t k %d \t txdataF: %d %d\n",
+                         cur_re + 4 * i + j,
+                         l_symbol,
+                         4 * i + j,
+                         txdataF_precoding[layer][l_symbol][4 * i + j].r,
+                         txdataF_precoding[layer][l_symbol][4 * i + j].i);
 #endif
                 /* handle this, mute RE */
                  /*else {
@@ -442,8 +444,11 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
                 c16_t *txFc = txdataF_precoding[layer][l_symbol];
                 c16_t *txlc = &tx_layer[cur_re];
                 for (i = (remaining_re >> 2) << 2; i < remaining_re; i++) {
-                  txFc[i].r = ((txlc[i].r * amp) >> 14) + 1;
-                  txFc[i].i = ((txlc[i].i * amp) >> 14) + 1;
+                  txFc[i].r = (((txlc[i].r * amp) >> 14) + 1) >> 1;
+                  txFc[i].i = (((txlc[i].i * amp) >> 14) + 1) >> 1;
+#ifdef DEBUG_DLSCH_MAPPING
+                  printf("re %u\t l %d \t k %d \t txdataF: %d %d\n", cur_re + i, l_symbol, i, txFc[i].r, txFc[i].i);
+#endif
                 }
               }
             } // remaining_re > 0
@@ -525,7 +530,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
                         ant, pmi_pdu->num_ant_ports);
             AssertFatal(rel15->nrOfLayers == pmi_pdu->numLayers, "Number of layers %d doesn't match to the one in precoding matrix %d\n",
                         rel15->nrOfLayers, pmi_pdu->numLayers);
-            if((subCarrier + re_cnt) < frame_parms->ofdm_symbol_size){ // within ofdm_symbol_size, use SIMDe
+            if ((subCarrier + re_cnt) < frame_parms->ofdm_symbol_size) { // within ofdm_symbol_size, use SIMDe
               nr_layer_precoder_simd(rel15->nrOfLayers,
                                      NR_SYMBOLS_PER_SLOT,
                                      frame_parms->ofdm_symbol_size,
@@ -537,8 +542,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
                                      re_cnt,
                                      &txdataF[ant][txdataF_offset_per_symbol]);
               subCarrier += re_cnt;
-            }
-            else{ // crossing ofdm_symbol_size, use simple arithmetic operations
+            } else { // crossing ofdm_symbol_size, use simple arithmetic operations
               for (int i = 0; i < re_cnt; i++) {
                 txdataF[ant][txdataF_offset_per_symbol + subCarrier] =
                     nr_layer_precoder_cm(rel15->nrOfLayers,
@@ -552,7 +556,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 #ifdef DEBUG_DLSCH_MAPPING
                 printf("antenna %d\t l %d \t subCarrier %d \t txdataF: %d %d\n",
                        ant,
-                       symbol,
+                       l_symbol,
                        subCarrier,
                        txdataF[ant][l_symbol * frame_parms->ofdm_symbol_size + subCarrier + txdataF_offset].r,
                        txdataF[ant][l_symbol * frame_parms->ofdm_symbol_size + subCarrier + txdataF_offset].i);
