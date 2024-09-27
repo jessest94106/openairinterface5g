@@ -180,7 +180,6 @@ typedef struct {
 
 } vnf_info;
 
-int aerial_phy_sync_indication(struct nfapi_vnf_p7_config *config, uint8_t sync);
 int aerial_phy_harq_indication(struct nfapi_vnf_p7_config *config, nfapi_harq_indication_t *ind);
 int aerial_phy_nr_crc_indication(nfapi_nr_crc_indication_t *ind);
 int aerial_phy_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind);

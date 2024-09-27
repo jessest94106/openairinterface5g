@@ -136,21 +136,6 @@ extern pthread_cond_t nfapi_sync_cond;
 extern pthread_mutex_t nfapi_sync_mutex;
 extern int nfapi_sync_var;
 
-int aerial_phy_sync_indication(struct nfapi_vnf_p7_config *config, uint8_t sync)
-{
-  // NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] SYNC %s\n", sync==1 ? "ACHIEVED" : "LOST");
-
-  if (sync == 1 && nfapi_sync_var != 0) {
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Signal to OAI main code that it can go\n");
-    pthread_mutex_lock(&nfapi_sync_mutex);
-    nfapi_sync_var = 0;
-    pthread_cond_broadcast(&nfapi_sync_cond);
-    pthread_mutex_unlock(&nfapi_sync_mutex);
-  }
-
-  return (0);
-}
-
 int aerial_phy_harq_indication(struct nfapi_vnf_p7_config *config, nfapi_harq_indication_t *ind)
 {
   struct PHY_VARS_eNB_s *eNB = RC.eNB[0][0];
