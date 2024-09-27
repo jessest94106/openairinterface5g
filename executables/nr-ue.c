@@ -594,7 +594,11 @@ void processSlotTX(void *arg)
   RU_write(rxtxD, sl_tx_action);
 }
 
-static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc, int *tx_wait_for_dlsch, nr_phy_data_t *phy_data)
+static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
+                               const UE_nr_rxtx_proc_t *proc,
+                               int *tx_wait_for_dlsch,
+                               nr_phy_data_t *phy_data,
+                               bool *stats_printed)
 {
   int sampleShift = INT_MAX;
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
@@ -602,7 +606,6 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
   if (IS_SOFTMODEM_NOS1 || IS_SA_MODE(get_softmodem_params())) {
-
     // Start synchronization with a target gNB
     if (UE->synch_request.received_synch_request == 1) {
       fapi_nr_synch_request_t *synch_req = &UE->synch_request.synch_req;
@@ -654,6 +657,16 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc
       // indicate to tx thread to wait for DLSCH decoding
       const int ack_nack_slot = (proc->nr_slot_rx + phy_data->dlsch[0].dlsch_config.k1_feedback) % UE->frame_parms.slots_per_frame;
       tx_wait_for_dlsch[ack_nack_slot]++;
+    }
+  } else {
+    // good time to print statistics, we don't have to spend time  to decode DCI
+    if (proc->frame_rx % 128 == 0) {
+      if (*stats_printed == false) {
+        print_ue_mac_stats(UE->Mod_id, proc->frame_rx, proc->nr_slot_rx);
+        *stats_printed = true;
+      }
+    } else {
+      *stats_printed = false;
     }
   }
 
@@ -833,6 +846,7 @@ void *UE_thread(void *arg)
   int shiftForNextFrame = 0;
   int intialSyncOffset = 0;
   openair0_timestamp sync_timestamp;
+  bool stats_printed = false;
 
   if (get_softmodem_params()->sync_ref && UE->sl_mode == 2) {
     UE->is_synchronized = 1;
@@ -1029,7 +1043,7 @@ void *UE_thread(void *arg)
     notifiedFIFO_elt_t *newRx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_rx, NULL, UE_dl_processing);
     nr_rxtx_thread_data_t *curMsgRx = (nr_rxtx_thread_data_t *)NotifiedFifoData(newRx);
     *curMsgRx = (nr_rxtx_thread_data_t){.proc = curMsg.proc, .UE = UE};
-    int ret = UE_dl_preprocessing(UE, &curMsgRx->proc, tx_wait_for_dlsch, &curMsgRx->phy_data);
+    int ret = UE_dl_preprocessing(UE, &curMsgRx->proc, tx_wait_for_dlsch, &curMsgRx->phy_data, &stats_printed);
     if (ret != INT_MAX)
       shiftForNextFrame = ret;
     pushTpool(&(get_nrUE_params()->Tpool), newRx);

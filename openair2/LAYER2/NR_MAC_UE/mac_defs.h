@@ -385,13 +385,15 @@ typedef struct {
   uint32_t R;
   uint32_t TBS;
   int last_ndi;
-} NR_UE_HARQ_STATUS_t;
+  int round;
+} NR_UE_DL_HARQ_STATUS_t;
 
 typedef struct {
   uint32_t R;
   uint32_t TBS;
   int last_ndi;
-} NR_UL_HARQ_INFO_t;
+  int round;
+} NR_UE_UL_HARQ_INFO_t;
 
 typedef struct {
   uint8_t freq_hopping;
@@ -510,6 +512,31 @@ typedef enum {
   ON_PUSCH
 } CSI_mapping_t;
 
+typedef struct {
+  uint64_t rounds[NR_MAX_HARQ_ROUNDS_FOR_STATS];
+  uint64_t total_bits;
+  uint64_t total_symbols;
+  uint64_t target_code_rate;
+  uint64_t qam_mod_order;
+  uint64_t rb_size;
+  uint64_t nr_of_symbols;
+} ue_mac_dir_stats_t;
+
+typedef struct {
+  ue_mac_dir_stats_t dl;
+  ue_mac_dir_stats_t ul;
+  uint32_t bad_dci;
+  uint32_t ulsch_DTX;
+  uint64_t ulsch_total_bytes_scheduled;
+  uint32_t pucch0_DTX;
+  int cumul_rsrp;
+  uint8_t num_rsrp_meas;
+  char srs_stats[50]; // Statistics may differ depending on SRS usage
+  int pusch_snrx10;
+  int deltaMCS;
+  int NPRB;
+} ue_mac_stats_t;
+
 /*!\brief Top level UE MAC structure */
 typedef struct NR_UE_MAC_INST_s {
   module_id_t ue_id;
@@ -594,8 +621,8 @@ typedef struct NR_UE_MAC_INST_s {
 
   // Defined for abstracted mode
   nr_downlink_indication_t dl_info;
-  NR_UE_HARQ_STATUS_t dl_harq_info[NR_MAX_HARQ_PROCESSES];
-  NR_UL_HARQ_INFO_t ul_harq_info[NR_MAX_HARQ_PROCESSES];
+  NR_UE_DL_HARQ_STATUS_t dl_harq_info[NR_MAX_HARQ_PROCESSES];
+  NR_UE_UL_HARQ_INFO_t ul_harq_info[NR_MAX_HARQ_PROCESSES];
 
   NR_TAG_Id_t tag_Id;
   A_SEQUENCE_OF(NR_TAG_t) TAG_list;
@@ -615,6 +642,7 @@ typedef struct NR_UE_MAC_INST_s {
   bool pusch_power_control_initialized;
   int delta_msg2;
   pthread_mutex_t if_mutex;
+  ue_mac_stats_t stats;
 } NR_UE_MAC_INST_t;
 
 /*@}*/

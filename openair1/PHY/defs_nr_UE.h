@@ -520,8 +520,6 @@ typedef struct PHY_VARS_NR_UE_s {
   SLIST_HEAD(ral_thresholds_gen_poll_s, ral_threshold_phy_t) ral_thresholds_gen_polled[RAL_LINK_PARAM_GEN_MAX];
   SLIST_HEAD(ral_thresholds_lte_poll_s, ral_threshold_phy_t) ral_thresholds_lte_polled[RAL_LINK_PARAM_LTE_MAX];
 #endif
-  int dl_errors;
-  _Atomic(int) dl_stats[16];
   void* scopeData;
   // Pointers to hold PDSCH data only for phy simulators
   void *phy_sim_rxdataF;

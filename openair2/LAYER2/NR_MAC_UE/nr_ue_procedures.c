@@ -806,7 +806,7 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
   /* MCS */
   dlsch_pdu->mcs = dci->mcs;
 
-  NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[dci->harq_pid.val];
+  NR_UE_DL_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[dci->harq_pid.val];
   /* NDI (only if CRC scrambled by C-RNTI or CS-RNTI or new-RNTI or TC-RNTI)*/
   if (dl_conf_req->pdu_type == FAPI_NR_DL_CONFIG_TYPE_SI_DLSCH ||
       dl_conf_req->pdu_type == FAPI_NR_DL_CONFIG_TYPE_RA_DLSCH ||
@@ -815,9 +815,9 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
     dlsch_pdu->new_data_indicator = true;
     current_harq->R = 0;
     current_harq->TBS = 0;
-  }
-  else
+  } else {
     dlsch_pdu->new_data_indicator = false;
+  }
 
   if (dl_conf_req->pdu_type != FAPI_NR_DL_CONFIG_TYPE_SI_DLSCH &&
       dl_conf_req->pdu_type != FAPI_NR_DL_CONFIG_TYPE_RA_DLSCH) {
@@ -935,6 +935,12 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
                     dci_ind->N_CCE,
                     frame,
                     slot);
+    if (dlsch_pdu->new_data_indicator)
+      current_harq->round = 0;
+    else
+      current_harq->round++;
+    if (current_harq->round < sizeofArray(mac->stats.dl.rounds))
+      mac->stats.dl.rounds[current_harq->round]++;
   }
 
   LOG_D(MAC,
@@ -1126,7 +1132,7 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
   /* MCS (for transport block 1)*/
   dlsch_pdu->mcs = dci->mcs;
   /* NDI (for transport block 1)*/
-  NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[dci->harq_pid.val];
+  NR_UE_DL_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[dci->harq_pid.val];
   if (dci->ndi != current_harq->last_ndi) {
     // new data
     dlsch_pdu->new_data_indicator = true;
@@ -1275,6 +1281,12 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
                   dci_ind->N_CCE,
                   frame,
                   slot);
+  if (dlsch_pdu->new_data_indicator)
+    current_harq->round = 0;
+  else
+    current_harq->round++;
+  if (current_harq->round < sizeofArray(mac->stats.dl.rounds))
+    mac->stats.dl.rounds[current_harq->round]++;
   // send the ack/nack slot number to phy to indicate tx thread to wait for DLSCH decoding
   dlsch_pdu->k1_feedback = feedback_ti;
 
@@ -1432,10 +1444,11 @@ nr_dci_format_t nr_ue_process_dci_indication_pdu(NR_UE_MAC_INST_t *mac, frame_t 
       nr_extract_dci_info(mac, dci->dci_format, dci->payloadSize, dci->rnti, dci->ss_type, dci->payloadBits, slot);
   if (format == NR_DCI_NONE)
     return NR_DCI_NONE;
-  dci_pdu_rel15_t *def_dci_pdu_rel15 = &mac->def_dci_pdu_rel15[slot][format];
-  int ret = nr_ue_process_dci(mac, frame, slot, def_dci_pdu_rel15, dci, format);
-  if (ret < 0)
+  int ret = nr_ue_process_dci(mac, frame, slot, mac->def_dci_pdu_rel15[slot] + format, dci, format);
+  if (ret < 0) {
+    mac->stats.bad_dci++;
     return NR_DCI_NONE;
+  }
   return format;
 }
 
@@ -1459,7 +1472,7 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
                      frame_t frame,
                      int slot)
 {
-  NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_id];
+  NR_UE_DL_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_id];
   current_harq->active = true;
   current_harq->ack_received = false;
   current_harq->pucch_resource_indicator = pucch_id;
@@ -1486,7 +1499,7 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
     // looking for other active HARQ processes with feedback in the same frame/slot
     if (i == harq_id)
       continue;
-    NR_UE_HARQ_STATUS_t *harq = &mac->dl_harq_info[i];
+    NR_UE_DL_HARQ_STATUS_t *harq = &mac->dl_harq_info[i];
     if (harq->active &&
         harq->ul_frame == current_harq->ul_frame &&
         harq->ul_slot == current_harq->ul_slot) {
@@ -2331,7 +2344,7 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
 
     for (int dl_harq_pid = 0; dl_harq_pid < num_dl_harq; dl_harq_pid++) {
 
-      NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[dl_harq_pid];
+      NR_UE_DL_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[dl_harq_pid];
 
       if (current_harq->active) {
         LOG_D(PHY, "HARQ pid %d is active for %d.%d\n",
