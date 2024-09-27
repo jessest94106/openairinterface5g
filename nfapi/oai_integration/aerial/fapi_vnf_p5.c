@@ -283,7 +283,7 @@ int aerial_nr_send_config_request(nfapi_vnf_config_t *config, int p5_idx)
   pnf_info *pnf = vnf->pnfs;
   phy_info *phy = pnf->phys;
 
-  nfapi_nr_config_request_scf_t *req = &RC.nrmac[0]->config[0]; //&RC.gNB[0]->gNB_config; // check
+  nfapi_nr_config_request_scf_t *req = &RC.nrmac[0]->config[0];
 
   NFAPI_TRACE(NFAPI_TRACE_INFO,
               "[VNF] %d.%d pnf p7 %s:%d timing %u %u %u %u\n",

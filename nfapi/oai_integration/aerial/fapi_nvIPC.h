@@ -37,7 +37,6 @@
 #include "nv_ipc_utils.h"
 #include "nvlog.h"
 #include "nfapi/open-nFAPI/vnf/public_inc/nfapi_vnf_interface.h"
-#include "openair1/PHY/defs_gNB.h"
 #include "debug.h"
 
 typedef struct {

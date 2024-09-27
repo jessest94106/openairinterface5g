@@ -33,6 +33,8 @@
 #include "fapi_vnf_p7.h"
 #include "nr_nfapi_p7.h"
 
+#include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h" // for handle_nr_srs_measurements()
+
 extern RAN_CONTEXT_t RC;
 extern UL_RCC_IND_t UL_RCC_INFO;
 extern uint16_t sf_ahead;
@@ -430,26 +432,10 @@ int aerial_phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
 
 int aerial_phy_nr_srs_indication(nfapi_nr_srs_indication_t *ind)
 {
-  struct PHY_VARS_gNB_s *gNB = RC.gNB[0];
-
-  gNB->UL_INFO.srs_ind = *ind;
-
-  if (ind->number_of_pdus > 0)
-    gNB->UL_INFO.srs_ind.pdu_list = malloc(sizeof(nfapi_nr_srs_indication_pdu_t) * ind->number_of_pdus);
-
-  for (int i = 0; i < ind->number_of_pdus; i++) {
-    memcpy(&gNB->UL_INFO.srs_ind.pdu_list[i], &ind->pdu_list[i], sizeof(ind->pdu_list[0]));
-
-    LOG_D(MAC,
-          "%s() NFAPI SFN/Slot:%d.%d SRS_IND:number_of_pdus:%d UL_INFO:pdus:%d\n",
-          __FUNCTION__,
-          ind->sfn,
-          ind->slot,
-          ind->number_of_pdus,
-          gNB->UL_INFO.srs_ind.number_of_pdus);
-  }
-
-
+  // or queue to decouple, but I think it should be fast (in all likelihood,
+  // the VNF has nothing to do)
+  for (int i = 0; i < ind->number_of_pdus; ++i)
+    handle_nr_srs_measurements(0, ind->sfn, ind->slot, &ind->pdu_list[i]);
   return 1;
 }
 
