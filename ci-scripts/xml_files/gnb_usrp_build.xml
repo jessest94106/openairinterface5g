@@ -46,7 +46,7 @@
 
 	<testCase id="100000">
 		<class>Custom_Command</class>
-		<desc>To reboot USRP</desc>
+		<desc>Reboot USRP</desc>
 		<node>caracal</node>
 		<command>ssh root@192.168.20.2 reboot</command>
         </testCase>
