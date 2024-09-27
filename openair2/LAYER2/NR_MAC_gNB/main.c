@@ -41,6 +41,7 @@
 
 #include "common/ran_context.h"
 #include "executables/softmodem-common.h"
+#include "openair2/RRC/NR/MESSAGES/asn1_msg.h"
 
 extern RAN_CONTEXT_t RC;
 

@@ -34,39 +34,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "collection/tree.h"
 #include "collection/linear_alloc.h"
 #include "common/utils/ds/seq_arr.h"
 #include "nr_rrc_common.h"
 #include "ds/byte_array.h"
-
 #include "common/platform_constants.h"
 #include "common/platform_types.h"
 #include "mac_rrc_dl.h"
 #include "cucp_cuup_if.h"
-
-#include "NR_SIB1.h"
-#include "NR_RRCReconfigurationComplete.h"
-#include "NR_RRCReconfiguration.h"
-#include "NR_RRCReestablishmentRequest.h"
 #include "NR_BCCH-BCH-Message.h"
 #include "NR_BCCH-DL-SCH-Message.h"
-#include "NR_BCCH-BCH-Message.h"
-#include "NR_PLMN-IdentityInfo.h"
-#include "NR_MCC-MNC-Digit.h"
-#include "NR_NG-5G-S-TMSI.h"
-
-#include "NR_UE-NR-Capability.h"
-#include "NR_UE-MRDC-Capability.h"
-#include "NR_MeasResults.h"
 #include "NR_CellGroupConfig.h"
-#include "NR_ServingCellConfigCommon.h"
-#include "NR_EstablishmentCause.h"
+#include "NR_MeasurementReport.h"
 #include "NR_MeasurementTimingConfiguration.h"
-
-//-------------------
-
+#include "NR_RRCReconfiguration.h"
+#include "NR_UE-CapabilityRAT-ContainerList.h"
+#include "NR_UL-CCCH-Message.h"
+#include "NR_UE-MRDC-Capability.h"
+#include "NR_UE-NR-Capability.h"
 #include "intertask_interface.h"
 
 // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs

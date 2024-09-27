@@ -30,79 +30,70 @@
 #define RRC_GNB_C
 #define RRC_GNB_C
 
-#include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <netinet/sctp.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
-
-#include "nr_rrc_config.h"
-#include "nr_rrc_defs.h"
-#include "nr_rrc_extern.h"
-#include "assertions.h"
-#include "common/ran_context.h"
-#include "oai_asn1.h"
-#include "rrc_gNB_radio_bearers.h"
-
-#include "RRC/L2_INTERFACE/openair_rrc_L2_interface.h"
-#include "LAYER2/NR_MAC_gNB/mac_proto.h"
-#include "common/utils/LOG/log.h"
+#include "openair2/RRC/NR/nr_rrc_proto.h"
+#include "openair2/RRC/NR/rrc_gNB_UE_context.h"
+#include "openair3/SECU/key_nas_deriver.h"
+#include "openair3/ocp-gtpu/gtp_itf.h"
+#include "BIT_STRING.h"
+#include "F1AP_CauseProtocol.h"
+#include "F1AP_CauseRadioNetwork.h"
+#include "NGAP_CauseRadioNetwork.h"
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_mac.h"
+#include "OCTET_STRING.h"
+#include "PHY/defs_common.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
-#include "openair2/E1AP/e1ap_asnc.h"
-
-#include "NR_BCCH-BCH-Message.h"
-#include "NR_UL-DCCH-Message.h"
-#include "NR_DL-DCCH-Message.h"
-#include "NR_DL-CCCH-Message.h"
-#include "NR_UL-CCCH-Message.h"
-#include "NR_RRCReject.h"
-#include "NR_RejectWaitTime.h"
-#include "NR_RRCSetup.h"
-
-#include "NR_CellGroupConfig.h"
-#include "NR_MeasResults.h"
-#include "NR_UL-CCCH-Message.h"
-#include "NR_RRCSetupRequest-IEs.h"
-#include "NR_RRCSetupComplete-IEs.h"
-#include "NR_RRCReestablishmentRequest-IEs.h"
-#include "NR_MIB.h"
-#include "uper_encoder.h"
-#include "uper_decoder.h"
-
-#include "common/platform_types.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
-
+#include "RRC/NR/mac_rrc_dl.h"
+#include "RRC/NR/nr_rrc_common.h"
+#include "SIMULATION/TOOLS/sim.h"
 #include "T.h"
-
-#include "openair3/SECU/secu_defs.h"
-
-#include "rrc_gNB_NGAP.h"
-#include "rrc_gNB_du.h"
-#include "rrc_gNB_mobility.h"
-
-#include "rrc_gNB_GTPV1U.h"
-
+#include "asn_codecs.h"
+#include "asn_internal.h"
+#include "assertions.h"
+#include "byte_array.h"
+#include "common/ngran_types.h"
+#include "common/openairinterface5g_limits.h"
+#include "common/platform_constants.h"
+#include "common/ran_context.h"
+#include "common_lib.h"
+#include "constr_SEQUENCE.h"
+#include "constr_TYPE.h"
+#include "cucp_cuup_if.h"
+#include "e1ap_messages_types.h"
+#include "executables/softmodem-common.h"
+#include "f1ap_messages_types.h"
+#include "gtpv1_u_messages_types.h"
+#include "intertask_interface.h"
+#include "linear_alloc.h"
+#include "ngap_messages_types.h"
 #include "nr_pdcp/nr_pdcp_entity.h"
 #include "nr_pdcp/nr_pdcp_oai_api.h"
-
-#include "intertask_interface.h"
-#include "SIMULATION/TOOLS/sim.h" // for taus
-
-#include "executables/softmodem-common.h"
-#include <openair2/RRC/NR/rrc_gNB_UE_context.h>
-#include <openair2/X2AP/x2ap_eNB.h>
-#include <openair3/SECU/key_nas_deriver.h>
-#include <openair3/ocp-gtpu/gtp_itf.h>
-#include <openair2/RRC/NR/nr_rrc_proto.h>
+#include "nr_rrc_defs.h"
+#include "nr_rrc_extern.h"
+#include "oai_asn1.h"
 #include "openair2/F1AP/f1ap_common.h"
 #include "openair2/F1AP/f1ap_ids.h"
 #include "openair2/F1AP/lib/f1ap_lib_extern.h"
-#include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
-#include "openair2/E1AP/e1ap.h"
-#include "cucp_cuup_if.h"
 #include "lib/f1ap_interface_management.h"
-
-#include "BIT_STRING.h"
-#include "assertions.h"
+#include "rrc_gNB_NGAP.h"
+#include "rrc_gNB_du.h"
+#include "rrc_gNB_mobility.h"
+#include "rrc_gNB_radio_bearers.h"
+#include "rrc_messages_types.h"
+#include "seq_arr.h"
+#include "tree.h"
+#include "uper_decoder.h"
+#include "uper_encoder.h"
+#include "utils.h"
+#include "x2ap_messages_types.h"
+#include "xer_encoder.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"

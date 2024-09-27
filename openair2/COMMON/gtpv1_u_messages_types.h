@@ -24,6 +24,7 @@
 
 #include "LTE_asn_constant.h"
 #include "NR_asn_constant.h"
+#include "s1ap_messages_types.h"
 
 #define GTPV1U_MAX_BEARERS_PER_UE max_val_LTE_DRB_Identity
 #define NR_GTPV1U_MAX_BEARERS_PER_UE max_val_NR_DRB_Identity

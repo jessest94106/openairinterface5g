@@ -28,15 +28,18 @@
  * \email: lionel.gauthier@eurecom.fr
  */
 
+#include "rrc_gNB_UE_context.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <limits.h>
 #include <time.h>
-
+#include "RRC/NR/nr_rrc_defs.h"
+#include "T.h"
+#include "assertions.h"
+#include "common/platform_constants.h"
 #include "common/utils/LOG/log.h"
-#include "rrc_gNB_UE_context.h"
+#include "linear_alloc.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "tree.h"
 
 static void rrc_gNB_ue_context_update_time(rrc_gNB_ue_context_t *ctxt)
 {

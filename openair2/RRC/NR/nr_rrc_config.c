@@ -28,18 +28,33 @@
  * \email: raymond.knopp@eurecom.fr, kroempa@gmail.com
  */
 
-#include "openair3/UTILS/conversions.h"
 #include "nr_rrc_config.h"
+#include <endian.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "BIT_STRING.h"
+#include "NULL.h"
+#include "RRC/NR/MESSAGES/asn1_msg.h"
+#include "RRC/NR/nr_rrc_proto.h"
+#include "SIMULATION/TOOLS/sim.h"
+#include "T.h"
+#include "asn_SET_OF.h"
+#include "asn_codecs.h"
+#include "asn_internal.h"
+#include "assertions.h"
+#include "common/openairinterface5g_limits.h"
+#include "common/utils/T/T.h"
 #include "common/utils/nr/nr_common.h"
-#include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
+#include "constr_TYPE.h"
 #include "executables/softmodem-common.h"
 #include "oai_asn1.h"
-#include "SIMULATION/TOOLS/sim.h" // for taus();
-
-#include "NR_MeasurementTimingConfiguration.h"
-
+#include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
+#include "openair3/UTILS/conversions.h"
 #include "uper_decoder.h"
 #include "uper_encoder.h"
+#include "utils.h"
+#include "xer_encoder.h"
 
 const uint8_t slotsperframe[5] = {10, 20, 40, 80, 160};
 
@@ -3090,8 +3105,6 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   return cellGroupConfig;
 }
 
-#include "common/ran_context.h"
-#include "nr_rrc_defs.h"
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const int uid,
                             NR_UE_NR_Capability_t *uecap,

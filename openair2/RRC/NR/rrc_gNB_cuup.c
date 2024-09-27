@@ -19,9 +19,24 @@
  *      contact@openairinterface.org
  */
 
+#include <netinet/in.h>
+#include <netinet/sctp.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include "PHY/defs_common.h"
+#include "RRC/NR/nr_rrc_proto.h"
+#include "T.h"
+#include "as_message.h"
+#include "assertions.h"
 #include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "e1ap_messages_types.h"
+#include "intertask_interface.h"
 #include "nr_rrc_defs.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "rrc_messages_types.h"
+#include "tree.h"
 
 static int cuup_compare(const nr_rrc_cuup_container_t *a, const nr_rrc_cuup_container_t *b)
 {

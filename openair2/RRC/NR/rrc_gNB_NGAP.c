@@ -29,56 +29,63 @@
  */
 
 #include "rrc_gNB_NGAP.h"
-#include "RRC/L2_INTERFACE/openair_rrc_L2_interface.h"
-#include "rrc_eNB_S1AP.h"
-#include "gnb_config.h"
-#include "openair2/LAYER2/NR_MAC_COMMON/nr_mac.h"
-#include "common/ran_context.h"
-
-#include "oai_asn1.h"
-#include "intertask_interface.h"
-#include "nr_pdcp/nr_pdcp_oai_api.h"
-#include "pdcp_primitives.h"
-#include "SDAP/nr_sdap/nr_sdap.h"
-
-#include "openair3/ocp-gtpu/gtp_itf.h"
+#include <netinet/in.h>
+#include <netinet/sctp.h>
 #include <openair3/ocp-gtpu/gtp_itf.h>
-#include "RRC/LTE/rrc_eNB_GTPV1U.h"
-#include "RRC/NR/rrc_gNB_GTPV1U.h"
-
-#include "S1AP_NAS-PDU.h"
-#include "executables/softmodem-common.h"
-#include "openair3/SECU/key_nas_deriver.h"
-
-#include "ngap_gNB_defs.h"
-#include "ngap_gNB_ue_context.h"
-#include "ngap_gNB_management_procedures.h"
-#include "NR_ULInformationTransfer.h"
-#include "RRC/NR/MESSAGES/asn1_msg.h"
-#include "NR_UERadioAccessCapabilityInformation.h"
-#include "NR_UE-CapabilityRAT-ContainerList.h"
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "E1AP_ConfidentialityProtectionIndication.h"
+#include "E1AP_IntegrityProtectionIndication.h"
 #include "NGAP_CauseRadioNetwork.h"
-#include "f1ap_messages_types.h"
-#include "openair2/F1AP/f1ap_ids.h"
-#include "openair2/E1AP/e1ap_asnc.h"
-#include "openair2/E1AP/e1ap.h"
-#include "NGAP_asn_constant.h"
-#include "NGAP_PDUSessionResourceSetupRequestTransfer.h"
-#include "NGAP_PDUSessionResourceModifyRequestTransfer.h"
-#include "NGAP_ProtocolIE-Field.h"
-#include "NGAP_GTPTunnel.h"
-#include "NGAP_QosFlowSetupRequestItem.h"
-#include "NGAP_QosFlowAddOrModifyRequestItem.h"
-#include "NGAP_NonDynamic5QIDescriptor.h"
 #include "NGAP_Dynamic5QIDescriptor.h"
-#include "conversions.h"
+#include "NGAP_GTPTunnel.h"
+#include "NGAP_NonDynamic5QIDescriptor.h"
+#include "NGAP_PDUSessionResourceModifyRequestTransfer.h"
+#include "NGAP_PDUSessionResourceSetupRequestTransfer.h"
+#include "NGAP_QosFlowAddOrModifyRequestItem.h"
+#include "NGAP_QosFlowSetupRequestItem.h"
+#include "NGAP_asn_constant.h"
+#include "NGAP_ProtocolIE-Field.h"
+#include "NR_UE-NR-Capability.h"
+#include "NR_UERadioAccessCapabilityInformation.h"
+#include "MAC/mac.h"
+#include "OCTET_STRING.h"
+#include "PHY/defs_common.h"
+#include "RRC/NR/MESSAGES/asn1_msg.h"
+#include "RRC/NR/nr_rrc_common.h"
+#include "RRC/NR/nr_rrc_defs.h"
+#include "RRC/NR/nr_rrc_proto.h"
+#include "RRC/NR/rrc_gNB_UE_context.h"
 #include "RRC/NR/rrc_gNB_radio_bearers.h"
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_mac.h"
+#include "T.h"
+#include "aper_decoder.h"
+#include "asn_codecs.h"
+#include "assertions.h"
+#include "common/ngran_types.h"
+#include "common/platform_constants.h"
+#include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "constr_TYPE.h"
+#include "conversions.h"
+#include "e1ap_messages_types.h"
+#include "f1ap_messages_types.h"
+#include "gtpv1_u_messages_types.h"
+#include "intertask_interface.h"
+#include "nr_pdcp/nr_pdcp_entity.h"
+#include "nr_pdcp/nr_pdcp_oai_api.h"
+#include "oai_asn1.h"
+#include "openair2/F1AP/f1ap_ids.h"
+#include "openair3/SECU/key_nas_deriver.h"
+#include "rrc_messages_types.h"
+#include "s1ap_messages_types.h"
+#include "uper_encoder.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
 #endif
-
-#include "uper_encoder.h"
 
 extern RAN_CONTEXT_t RC;
 
