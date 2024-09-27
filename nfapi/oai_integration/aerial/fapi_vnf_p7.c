@@ -370,13 +370,6 @@ int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
   return 1;
 }
 
-int aerial_phy_lbt_dl_indication(struct nfapi_vnf_p7_config *config, nfapi_lbt_dl_indication_t *ind)
-{
-  // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
-  // mac_lbt_dl_ind(p7_vnf->mac, ind);
-  return 1;
-}
-
 int aerial_phy_nb_harq_indication(struct nfapi_vnf_p7_config *config, nfapi_nb_harq_indication_t *ind)
 {
   // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
