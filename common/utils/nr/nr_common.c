@@ -1149,6 +1149,20 @@ void init_delay_table(uint16_t ofdm_symbol_size,
   }
 }
 
+int set_default_nta_offset(frequency_range_t freq_range, uint32_t samples_per_subframe)
+{
+  // ta_offset_samples : ta_offset = samples_per_subframe : (Δf_max x N_f / 1000)
+  // As described in Section 4.3.1 in 38.211
+
+  // TODO There is no way for the UE to know about LTE-NR coexistence case
+  //      as mentioned in Table 7.1.2-2 of 38.133
+  //      LTE-NR coexistence means the presence of an active LTE service in the same band as NR in current deployment
+  //      We assume no coexistence
+
+  uint64_t numer = (freq_range == FR1 ? 25600 : 13792) * (uint64_t)samples_per_subframe;
+  return numer / (4096 * 480);
+}
+
 void nr_timer_start(NR_timer_t *timer)
 {
   timer->active = true;

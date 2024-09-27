@@ -1545,6 +1545,45 @@ static void configure_common_BWP_ul(NR_UE_MAC_INST_t *mac, int bwp_id, NR_BWP_Up
   }
 }
 
+static void configure_timeAlignmentTimer(NR_timer_t *time_alignment_timer, NR_TimeAlignmentTimer_t timer_config, int scs)
+{
+  uint32_t timer_ms = 0;
+  switch (timer_config) {
+    case NR_TimeAlignmentTimer_ms500 :
+      timer_ms = 500;
+      break;
+    case NR_TimeAlignmentTimer_ms750 :
+      timer_ms = 750;
+      break;
+    case NR_TimeAlignmentTimer_ms1280 :
+      timer_ms = 1280;
+      break;
+    case NR_TimeAlignmentTimer_ms1920 :
+      timer_ms = 1920;
+      break;
+    case NR_TimeAlignmentTimer_ms2560 :
+      timer_ms = 2560;
+      break;
+    case NR_TimeAlignmentTimer_ms5120 :
+      timer_ms = 5120;
+      break;
+    case NR_TimeAlignmentTimer_ms10240 :
+      timer_ms = 10240;
+      break;
+    case NR_TimeAlignmentTimer_infinity :
+      timer_ms = UINT_MAX;
+      break;
+    default :
+      AssertFatal(false, "Invalid timeAlignmentTimer\n");
+  }
+  // length of slot is (1/2^scs)ms
+  uint32_t n_slots = timer_ms != UINT_MAX ? (timer_ms << scs) : UINT_MAX;
+  bool timer_was_active = nr_timer_is_active(time_alignment_timer);
+  nr_timer_setup(time_alignment_timer, n_slots, 1); // 1 slot update rate
+  if (timer_was_active)
+    nr_timer_start(time_alignment_timer);
+}
+
 void nr_rrc_mac_config_req_reset(module_id_t module_id,
                                  NR_UE_MAC_reset_cause_t cause)
 {
@@ -1577,6 +1616,8 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id,
       nr_ue_mac_default_configs(mac);
       nr_ue_reset_sync_state(mac);
       release_mac_configuration(mac, cause);
+      // apply the timeAlignmentTimerCommon included in SIB1
+      configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->timeAlignmentTimerCommon, mac->current_UL_BWP->scs);
       // new sync with old cell ID (re-establishment on the same cell)
       sync_req.target_Nid_cell = mac->physCellId;
       sync_req.ssb_bw_scan = false;
@@ -1585,6 +1626,24 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id,
     default:
       AssertFatal(false, "Invalid MAC reset cause %d\n", cause);
   }
+}
+
+static int get_ta_offset(long *n_TimingAdvanceOffset)
+{
+  if (!n_TimingAdvanceOffset)
+    return -1;
+
+  switch (*n_TimingAdvanceOffset) {
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n0 :
+      return 0;
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n25600 :
+      return 25600;
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n39936 :
+      return 39936;
+    default :
+      AssertFatal(false, "Invalid n-TimingAdvanceOffset\n");
+  }
+  return -1;
 }
 
 void nr_rrc_mac_config_req_sib1(module_id_t module_id,
@@ -1599,15 +1658,18 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
   UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
   UPDATE_IE(mac->si_SchedulingInfo, si_SchedulingInfo, NR_SI_SchedulingInfo_t);
   UPDATE_IE(mac->si_SchedulingInfo_v1700, si_SchedulingInfo_v1700, NR_SI_SchedulingInfo_v1700_t);
+  mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
 
   config_common_ue_sa(mac, scc, cc_idP);
   configure_common_BWP_dl(mac,
                           0, // bwp-id
                           &scc->downlinkConfigCommon.initialDownlinkBWP);
-  if (scc->uplinkConfigCommon)
+  if (scc->uplinkConfigCommon) {
+    mac->timeAlignmentTimerCommon = scc->uplinkConfigCommon->timeAlignmentTimerCommon;
     configure_common_BWP_ul(mac,
                             0, // bwp-id
                             &scc->uplinkConfigCommon->initialUplinkBWP);
+  }
   // set current BWP only if coming from non-connected state
   // otherwise it is just a periodically update of the SIB1 content
   if (mac->state < UE_CONNECTED) {
@@ -1615,6 +1677,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
     AssertFatal(mac->current_DL_BWP, "Couldn't find DL-BWP0\n");
     mac->current_UL_BWP = get_ul_bwp_structure(mac, 0, false);
     AssertFatal(mac->current_UL_BWP, "Couldn't find DL-BWP0\n");
+    configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->timeAlignmentTimerCommon, mac->current_UL_BWP->scs);
   }
 
   // Setup the SSB to Rach Occasions mapping according to the config
@@ -1652,6 +1715,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
 
   if (reconfigurationWithSync->spCellConfigCommon) {
     NR_ServingCellConfigCommon_t *scc = reconfigurationWithSync->spCellConfigCommon;
+    mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
     if (scc->physCellId)
       mac->physCellId = *scc->physCellId;
     mac->dmrs_TypeA_Position = scc->dmrs_TypeA_Position;
@@ -1939,12 +2003,29 @@ static void configure_maccellgroup(NR_UE_MAC_INST_t *mac, const NR_MAC_CellGroup
     }
   }
   if (mcg->tag_Config) {
-    // TODO TAG not handled
-    if(mcg->tag_Config->tag_ToAddModList) {
+    if (mcg->tag_Config->tag_ToReleaseList) {
+      for (int i = 0; i < mcg->tag_Config->tag_ToReleaseList->list.count; i++) {
+        for (int j = 0; j < mac->TAG_list.count; j++) {
+          if (*mcg->tag_Config->tag_ToReleaseList->list.array[i] == mac->TAG_list.array[j]->tag_Id)
+            asn_sequence_del(&mac->TAG_list, j, 1);
+        }
+      }
+    }
+    if (mcg->tag_Config->tag_ToAddModList) {
       for (int i = 0; i < mcg->tag_Config->tag_ToAddModList->list.count; i++) {
-        if (mcg->tag_Config->tag_ToAddModList->list.array[i]->timeAlignmentTimer !=
-            NR_TimeAlignmentTimer_infinity)
-          LOG_E(NR_MAC, "TimeAlignmentTimer not handled\n");
+        int j;
+        for (j = 0; j < mac->TAG_list.count; j++) {
+          if (mac->TAG_list.array[j]->tag_Id == mcg->tag_Config->tag_ToAddModList->list.array[i]->tag_Id)
+            break;
+        }
+        if (j < mac->TAG_list.count) {
+          UPDATE_IE(mac->TAG_list.array[j], mcg->tag_Config->tag_ToAddModList->list.array[i], NR_TAG_t);
+        }
+        else {
+          NR_TAG_t *local_tag = NULL;
+          UPDATE_IE(local_tag, mcg->tag_Config->tag_ToAddModList->list.array[i], NR_TAG_t);
+          ASN_SEQUENCE_ADD(&mac->TAG_list, local_tag);
+        }
       }
     }
   }
@@ -2428,6 +2509,7 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
       handle_reconfiguration_with_sync(mac, cc_idP, spCellConfig->reconfigurationWithSync);
     }
     if (scd) {
+      mac->tag_Id = scd->tag_Id;
       configure_servingcell_info(mac, scd);
       configure_BWPs(mac, scd);
     }
@@ -2435,6 +2517,12 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
 
   if (cell_group_config->mac_CellGroupConfig)
     configure_maccellgroup(mac, cell_group_config->mac_CellGroupConfig);
+
+  for (int j = 0; j < mac->TAG_list.count; j++) {
+    // apply the Timing Advance Command for the indicated TAG
+    if (mac->TAG_list.array[j]->tag_Id == mac->tag_Id)
+      configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->TAG_list.array[j]->timeAlignmentTimer, mac->current_UL_BWP->scs);
+  }
 
   configure_logicalChannelBearer(mac,
                                  cell_group_config->rlc_BearerToAddModList,
