@@ -370,13 +370,6 @@ int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
   return 1;
 }
 
-int aerial_phy_srs_indication(struct nfapi_vnf_p7_config *config, nfapi_srs_indication_t *ind)
-{
-  // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
-  // mac_srs_ind(p7_vnf->mac, ind);
-  return 1;
-}
-
 int aerial_phy_sr_indication(struct nfapi_vnf_p7_config *config, nfapi_sr_indication_t *ind)
 {
   struct PHY_VARS_eNB_s *eNB = RC.eNB[0][0];
