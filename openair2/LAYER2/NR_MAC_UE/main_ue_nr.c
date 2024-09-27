@@ -192,7 +192,6 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
   for (int i = 0; i < NR_MAX_NUM_LCID; i++) {
     LOG_D(NR_MAC, "Applying default logical channel config for LCID %d\n", i);
     nr_mac->scheduling_info.lc_sched_info[i].Bj = 0;
-    nr_mac->scheduling_info.lc_sched_info[i].LCID_buffer_with_data = false;
     nr_mac->scheduling_info.lc_sched_info[i].LCID_buffer_remain = 0;
   }
 
