@@ -370,69 +370,6 @@ int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
   return 1;
 }
 
-int aerial_phy_sr_indication(struct nfapi_vnf_p7_config *config, nfapi_sr_indication_t *ind)
-{
-  struct PHY_VARS_eNB_s *eNB = RC.eNB[0][0];
-  LOG_D(MAC, "%s() NFAPI SFN/SF:%d srs:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(ind->sfn_sf), ind->sr_indication_body.number_of_srs);
-  AssertFatal(pthread_mutex_lock(&eNB->UL_INFO_mutex) == 0, "Mutex lock failed");
-  if (NFAPI_MODE == NFAPI_MODE_VNF) {
-    int8_t index = NFAPI_SFNSF2SF(ind->sfn_sf);
-
-    UL_RCC_INFO.sr_ind[index] = *ind;
-    LOG_D(MAC,
-          "%s() UL_INFO[%d].sr_ind.sr_indication_body.number_of_srs:%d\n",
-          __FUNCTION__,
-          index,
-          eNB->UL_INFO.sr_ind.sr_indication_body.number_of_srs);
-    if (ind->sr_indication_body.number_of_srs > 0) {
-      assert(ind->sr_indication_body.number_of_srs <= NFAPI_SR_IND_MAX_PDU);
-      UL_RCC_INFO.sr_ind[index].sr_indication_body.sr_pdu_list = malloc(sizeof(nfapi_sr_indication_pdu_t) * NFAPI_SR_IND_MAX_PDU);
-    }
-
-    assert(ind->sr_indication_body.number_of_srs <= NFAPI_SR_IND_MAX_PDU);
-    for (int i = 0; i < ind->sr_indication_body.number_of_srs; i++) {
-      nfapi_sr_indication_pdu_t *dest_pdu = &UL_RCC_INFO.sr_ind[index].sr_indication_body.sr_pdu_list[i];
-      nfapi_sr_indication_pdu_t *src_pdu = &ind->sr_indication_body.sr_pdu_list[i];
-
-      LOG_D(MAC,
-            "SR_IND[PDU:%d %d][rnti:%x cqi:%d channel:%d]\n",
-            index,
-            i,
-            src_pdu->rx_ue_information.rnti,
-            src_pdu->ul_cqi_information.ul_cqi,
-            src_pdu->ul_cqi_information.channel);
-
-      memcpy(dest_pdu, src_pdu, sizeof(*src_pdu));
-    }
-  } else {
-    nfapi_sr_indication_t *dest_ind = &eNB->UL_INFO.sr_ind;
-    nfapi_sr_indication_pdu_t *dest_pdu_list = eNB->sr_pdu_list;
-    *dest_ind = *ind;
-    dest_ind->sr_indication_body.sr_pdu_list = dest_pdu_list;
-    LOG_D(MAC,
-          "%s() eNB->UL_INFO.sr_ind.sr_indication_body.number_of_srs:%d\n",
-          __FUNCTION__,
-          eNB->UL_INFO.sr_ind.sr_indication_body.number_of_srs);
-
-    assert(eNB->UL_INFO.sr_ind.sr_indication_body.number_of_srs <= NFAPI_SR_IND_MAX_PDU);
-    for (int i = 0; i < eNB->UL_INFO.sr_ind.sr_indication_body.number_of_srs; i++) {
-      nfapi_sr_indication_pdu_t *dest_pdu = &dest_ind->sr_indication_body.sr_pdu_list[i];
-      nfapi_sr_indication_pdu_t *src_pdu = &ind->sr_indication_body.sr_pdu_list[i];
-      LOG_D(MAC,
-            "SR_IND[PDU:%d][rnti:%x cqi:%d channel:%d]\n",
-            i,
-            src_pdu->rx_ue_information.rnti,
-            src_pdu->ul_cqi_information.ul_cqi,
-            src_pdu->ul_cqi_information.channel);
-      memcpy(dest_pdu, src_pdu, sizeof(*src_pdu));
-    }
-  }
-  AssertFatal(pthread_mutex_unlock(&eNB->UL_INFO_mutex) == 0, "Mutex unlock failed");
-  // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
-  // mac_sr_ind(p7_vnf->mac, ind);
-  return 1;
-}
-
 int aerial_phy_lbt_dl_indication(struct nfapi_vnf_p7_config *config, nfapi_lbt_dl_indication_t *ind)
 {
   // vnf_p7_info* p7_vnf = (vnf_p7_info*)(config->user_data);
