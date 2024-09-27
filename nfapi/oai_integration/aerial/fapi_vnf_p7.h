@@ -180,10 +180,7 @@ typedef struct {
 
 } vnf_info;
 
-int aerial_wake_gNB_rxtx(PHY_VARS_gNB *gNB, uint16_t sfn, uint16_t slot);
-int aerial_wake_eNB_rxtx(PHY_VARS_eNB *eNB, uint16_t sfn, uint16_t sf);
 int aerial_phy_sync_indication(struct nfapi_vnf_p7_config *config, uint8_t sync);
-int aerial_phy_slot_indication(struct nfapi_vnf_p7_config *config, uint16_t phy_id, uint16_t sfn, uint16_t slot);
 int aerial_phy_harq_indication(struct nfapi_vnf_p7_config *config, nfapi_harq_indication_t *ind);
 int aerial_phy_nr_crc_indication(nfapi_nr_crc_indication_t *ind);
 int aerial_phy_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind);
