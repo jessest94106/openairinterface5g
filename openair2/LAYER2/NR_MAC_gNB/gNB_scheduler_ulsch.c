@@ -1848,9 +1848,10 @@ static void pf_ul(module_id_t module_id,
     const NR_bler_options_t *bo = &nrmac->ul_bler;
     const int max_mcs_table = (current_BWP->mcs_table == 0 || current_BWP->mcs_table == 2) ? 28 : 27;
     const int max_mcs = min(bo->max_mcs, max_mcs_table); /* no per-user maximum MCS yet */
-    if (bo->harq_round_max == 1)
+    if (bo->harq_round_max == 1) {
       sched_pusch->mcs = max_mcs;
-    else {
+      sched_ctrl->ul_bler_stats.mcs = sched_pusch->mcs;
+    } else {
       sched_pusch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->ul_bler_stats, max_mcs, frame);
       LOG_D(NR_MAC,"%d.%d starting mcs %d bleri %f\n",frame,slot,sched_pusch->mcs,sched_ctrl->ul_bler_stats.bler);
     }
