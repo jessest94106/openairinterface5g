@@ -93,6 +93,9 @@ COPY --from=gnb-base /usr/local/bin/uhd_find_devices /usr/local/bin
 COPY --from=gnb-base /usr/local/lib64/libuhd.so.4.4.0 /usr/local/lib64
 COPY --from=gnb-base /usr/local/lib64/uhd/utils/uhd_images_downloader.py /opt/oai-gnb/bin
 
+## Copy E2 SM models
+COPY --from=gnb-build /usr/local/lib64/flexric /usr/local/lib64/flexric
+
 WORKDIR /usr/local/share/uhd/rfnoc
 COPY --from=gnb-base /usr/local/share/uhd/rfnoc/ .
 

@@ -58,8 +58,9 @@ RUN rm -f /etc/rhsm-host && \
        python3-devel \
        numactl-libs \
        numactl-devel \
-       gcc-toolset-12-gcc \
-       gcc-toolset-12-gcc-c++ \
+       #use gcc-13 to avoid problems of default gcc-11 in FlexRIC
+       gcc-toolset-13-gcc \
+       gcc-toolset-13-gcc-c++ \
        # python3-pip and pyyaml are used for conf template generation
        python3-pip && \
     pip3 install --ignore-installed pyyaml && \
@@ -91,6 +92,6 @@ COPY oaienv .
 RUN /bin/sh oaienv && \
     cd cmake_targets && \
     mkdir -p log && \
-    scl enable gcc-toolset-12 "\
+    scl enable gcc-toolset-13 "\
     ./build_oai -I --install-optional-packages -w USRP" && \
     rm /etc/pki/entitlement/*pem

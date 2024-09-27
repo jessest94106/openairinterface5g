@@ -99,6 +99,8 @@ COPY --from=gnb-build \
 COPY --from=gnb-base /usr/local/bin/uhd_find_devices /usr/local/bin
 COPY --from=gnb-base /usr/local/lib/libuhd.so.4.4.0 /usr/local/lib
 COPY --from=gnb-base /usr/local/lib/uhd/utils/uhd_images_downloader.py /opt/oai-gnb/bin
+## Copy E2 SM models
+COPY --from=gnb-build /usr/local/lib/flexric /usr/local/lib/flexric
 
 RUN /bin/bash -c "ln -s /usr/local/lib/liboai_usrpdevif.so /usr/local/lib/liboai_device.so" && \
     ldconfig && \
