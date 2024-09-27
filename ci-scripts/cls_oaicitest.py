@@ -144,8 +144,8 @@ def Iperf_analyzeV3UDP(filename, iperf_bitrate_threshold, iperf_packetloss_thres
 	receiver_bitrate = None
 	with open(filename, 'r') as server_file:
 		for line in server_file.readlines():
-			res_sender = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>\d+)/(?P<sentPack>\d+) \((?P<lost>[0-9\.]+).*?\s+(sender)', line)
-			res_receiver = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<receivedPack>\d+)\s+\((?P<lost>[0-9\.]+)%\).*?(receiver)', line)
+			res_sender = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]?bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<sentPack>-?\d+) \((?P<lost>[0-9\.]+).*?\s+(sender)', line)
+			res_receiver = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]?bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<receivedPack>-?\d+)\s+\((?P<lost>[0-9\.]+)%\).*?(receiver)', line)
 			if res_sender is not None:
 				sender_bitrate = res_sender.group('bitrate')
 				sender_unit = res_sender.group('unit')
