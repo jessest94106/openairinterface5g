@@ -435,8 +435,12 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP
       const int16_t n_ra_rb = get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value, mu_pusch);
       index = ul_buffer_index(frameP, slotP, mu, gNB->vrb_map_UL_size);
       uint16_t *vrb_map_UL = &cc->vrb_map_UL[beam.idx][index * MAX_BWP_SIZE];
-      for (int i = 0; i < n_ra_rb * fdm; ++i)
+      for (int i = 0; i < n_ra_rb * fdm; ++i) {
+        AssertFatal(
+            !(vrb_map_UL[bwp_start + rach_ConfigGeneric->msg1_FrequencyStart + i] & SL_to_bitmap(start_symbol, N_t_slot * N_dur)),
+            "PRACH resources are already occupied!\n");
         vrb_map_UL[bwp_start + rach_ConfigGeneric->msg1_FrequencyStart + i] |= SL_to_bitmap(start_symbol, N_t_slot * N_dur);
+      }
     }
   }
 }

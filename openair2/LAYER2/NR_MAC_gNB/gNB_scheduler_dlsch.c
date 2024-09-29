@@ -683,9 +683,10 @@ static void pf_dl(module_id_t module_id,
       const NR_bler_options_t *bo = &mac->dl_bler;
       const int max_mcs_table = current_BWP->mcsTableIdx == 1 ? 27 : 28;
       const int max_mcs = min(sched_ctrl->dl_max_mcs, max_mcs_table);
-      if (bo->harq_round_max == 1)
-        sched_pdsch->mcs = max_mcs;
-      else
+      if (bo->harq_round_max == 1) {
+        sched_pdsch->mcs = min(bo->max_mcs, max_mcs);
+        sched_ctrl->dl_bler_stats.mcs = sched_pdsch->mcs;
+      } else
         sched_pdsch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->dl_bler_stats, max_mcs, frame);
       sched_pdsch->nrOfLayers = get_dl_nrOfLayers(sched_ctrl, current_BWP->dci_format);
       sched_pdsch->pm_index =
@@ -980,7 +981,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     UE->mac_stats.dl.current_bytes = 0;
     UE->mac_stats.dl.current_rbs = 0;
 
-    /* update TA and set ta_apply every 10 frames.
+    /* update TA and set ta_apply every 100 frames.
      * Possible improvement: take the periodicity from input file.
      * If such UE is not scheduled now, it will be by the preprocessor later.
      * If we add the CE, ta_apply will be reset */

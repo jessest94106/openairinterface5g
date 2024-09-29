@@ -685,7 +685,7 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
 
   dlsch_pdu->pduBitmap = 0;
   NR_UE_DL_BWP_t *current_DL_BWP = mac->current_DL_BWP;
-  NR_PDSCH_Config_t *pdsch_config = (current_DL_BWP || !mac->get_sib1) ? current_DL_BWP->pdsch_Config : NULL;
+  NR_PDSCH_Config_t *pdsch_config = (current_DL_BWP && !mac->get_sib1) ? current_DL_BWP->pdsch_Config : NULL;
   if (dci_ind->ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
     dlsch_pdu->BWPSize =
         mac->type0_PDCCH_CSS_config.num_rbs ? mac->type0_PDCCH_CSS_config.num_rbs : mac->sc_info.initial_dl_BWPSize;

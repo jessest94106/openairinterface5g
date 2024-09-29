@@ -278,7 +278,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
        slot, because otherwise we would allocate the current slot in
        UL_tti_req_ahead), but be aware that, e.g., K2 is allowed to be larger
        (schedule_nr_prach will assert if resources are not free). */
-    const sub_frame_t n_slots_ahead = nr_slots_per_frame[*scc->ssbSubcarrierSpacing] - 1;
+    const sub_frame_t n_slots_ahead = nr_slots_per_frame[*scc->ssbSubcarrierSpacing] - 1 + get_NTN_Koffset(scc);
     const frame_t f = (frame + (slot + n_slots_ahead) / nr_slots_per_frame[*scc->ssbSubcarrierSpacing]) % 1024;
     const sub_frame_t s = (slot + n_slots_ahead) % nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
     schedule_nr_prach(module_idP, f, s);
