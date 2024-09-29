@@ -1762,7 +1762,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
       // print_shorts(" H_h_H=",(int16_t*)&conjH_H_elements[ctx*nl+rtx][0][0]);
       // print_shorts(" Inv_H_h_H=",(int16_t*)&inv_H_h_H[ctx*nl+rtx][0]);
       nr_a_mult_b(inv_H_h_H[ctx][rtx],
-                  (c16_t *)(rxdataF_comp[ctx][0] + symbol * nb_rb * 12),
+                  (c16_t *)(rxdataF_comp[ctx][0] + symbol * rx_size_symbol),
                   outtemp,
                   nb_rb_0,
                   shift - (fp_flag == 1 ? 2 : 0));
@@ -1778,7 +1778,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
 
   //Copy zero_forcing out to output array
   for (int rtx = 0; rtx < nl; rtx++)
-    nr_element_sign(rxdataF_zforcing[rtx], (c16_t *)(rxdataF_comp[rtx][0] + symbol * nb_rb * 12), nb_rb_0, + 1);
+    nr_element_sign(rxdataF_zforcing[rtx], (c16_t *)(rxdataF_comp[rtx][0] + symbol * rx_size_symbol), nb_rb_0, + 1);
 
   //Update LLR thresholds with the Matrix determinant
   simde__m128i *dl_ch_mag128_0=NULL,*dl_ch_mag128b_0=NULL,*dl_ch_mag128r_0=NULL,*determ_fin_128;
