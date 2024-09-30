@@ -267,7 +267,7 @@ int websrv_callback_get_softmodemhelp(const struct _u_request *request, struct _
   int httpstatus = 204; // no content
   char *hlpfile = strstr(request->http_url, "helpfiles");
   if (hlpfile != NULL) {
-    char *hlppath = malloc(strlen(hlpfile) + strlen(websrvparams.fpath) + 1);
+    char *hlppath = malloc(strlen(hlpfile) + strlen(websrvparams.fpath) + 2);
     sprintf(hlppath, "%s/%s", websrvparams.fpath, hlpfile);
     help_string = websrv_read_file(hlppath);
     if (help_string == NULL) {
@@ -291,9 +291,10 @@ int websrv_callback_default(const struct _u_request *request, struct _u_response
   LOG_I(UTIL, "[websrv] Requested file is: %s %s\n", request->http_verb, request->http_url);
   websrv_dump_request("default ", request, websrvparams.dbglvl);
 
-  char *fpath = malloc(strlen(request->http_url) + strlen(websrvparams.fpath) + 2);
+  const char *index_file_name = "index.html";
+  char *fpath = malloc(strlen(request->http_url) + strlen(websrvparams.fpath) + strlen(index_file_name) + 2);
   if ((strcmp(request->http_url + 1, websrvparams.fpath) == 0) || (strcmp(request->http_url, "/") == 0)) {
-    sprintf(fpath, "%s/index.html", websrvparams.fpath);
+    sprintf(fpath, "%s/%s", websrvparams.fpath, index_file_name);
   } else {
     sprintf(fpath, "%s/%s", websrvparams.fpath, request->http_url);
   }
