@@ -239,6 +239,19 @@ def Custom_Command(HTML, node, command, command_fail):
     HTML.CreateHtmlTestRowQueue(command, status, message)
     return status == 'OK' or status == 'Warning'
 
+def Custom_Script(HTML, node, script, command_fail):
+	logging.info(f"Executing custom script on {node}")
+	ret = cls_cmd.runScript(node, script, 90)
+	logging.debug(f"Custom_Script: {script} on node: {node} - return code {ret.returncode}, output:\n{ret.stdout}")
+	status = 'OK'
+	message = [ret.stdout]
+	if ret.returncode != 0 and not command_fail:
+		status = 'Warning'
+	if ret.returncode != 0 and command_fail:
+		status = 'KO'
+	HTML.CreateHtmlTestRowQueue(script, status, message)
+	return status == 'OK' or status == 'Warning'
+
 def IdleSleep(HTML, idle_sleep_time):
 	time.sleep(idle_sleep_time)
 	HTML.CreateHtmlTestRow(f"{idle_sleep_time} sec", 'OK', CONST.ALL_PROCESSES_OK)

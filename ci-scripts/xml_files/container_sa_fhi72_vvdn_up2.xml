@@ -45,10 +45,10 @@
   <TestCaseExclusionList></TestCaseExclusionList>
 
   <testCase id="200000">
-    <class>Custom_Command</class>
+    <class>Custom_Script</class>
     <desc>Setup sriov and network interfaces VVDN</desc>
     <node>cacofonix</node>
-    <command>/opt/FHI7.2/setup_sriov_vvdn.sh</command>
+    <script>yaml_files/sa_fhi_7.2_vvdn_gnb/setup_sriov_vvdn.sh</script>
     <command_fail>yes</command_fail>
   </testCase>
 
@@ -157,11 +157,11 @@
   </testCase>
 
   <testCase id="888888">
-    <class>Custom_Command</class>
+    <class>Custom_Script</class>
     <always_exec>true</always_exec>
     <desc>Set CPU to idle state, set kernel parameters to default values</desc>
     <node>cacofonix</node>
-    <command>/opt/FHI7.2/setup_cleanup.sh</command>
+    <script>yaml_files/sa_fhi_7.2_vvdn_gnb/setup_cleanup.sh</script>
     <command_fail>yes</command_fail>
   </testCase>
 

@@ -42,4 +42,5 @@
   - Pull_Local_Registry
   - Clean_Test_Server_Images
   - Custom_Command
+  - Custom_Script
   - Create_Workspace
