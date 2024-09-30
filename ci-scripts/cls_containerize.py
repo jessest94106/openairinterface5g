@@ -291,7 +291,7 @@ def CheckLogs(self, yaml, service_name, HTML, RAN):
 			success = False
 		else:
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
-		HTML.htmlUEFailureMsg = ""
+		HTML.htmleNBFailureMsg = ""
 	else:
 		logging.info(f'Skipping to analyze log for service name {service_name}')
 		HTML.CreateHtmlTestRowQueue(f"service {service_name}", 'OK', ["no analysis function"])
