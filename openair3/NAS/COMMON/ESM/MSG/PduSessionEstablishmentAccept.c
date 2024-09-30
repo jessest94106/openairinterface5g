@@ -128,14 +128,14 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
 
         uint8_t *addr = psea_msg.pdu_addr_ie.pdu_addr_oct;
         if (psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV4) {
-          for (int i = 0; i < 4; ++i)
+          for (int i = 0; i < IPv4_ADDRESS_LENGTH; ++i)
             addr[i] = *curPtr++;
           char ip[20];
           capture_ipv4_addr(&addr[0], ip, sizeof(ip));
           tun_config(1, ip, NULL, "oaitun_ue");
           setup_ue_ipv4_route(1, ip, "oaitun_ue");
         } else if (psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV6) {
-          for (int i = 0; i < 8; ++i)
+          for (int i = 0; i < IPv6_INTERFACE_ID_LENGTH; ++i)
             addr[i] = *curPtr++;
           char ipv6[40];
           capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
@@ -145,12 +145,12 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
           // IPv4v6, the PDU address information in octet 4 to octet 11
           // contains an interface identifier for the IPv6 link local address
           // and in octet 12 to octet 15 contains an IPv4 address."
-          for (int i = 0; i < 12; ++i)
+          for (int i = 0; i < IPv4_ADDRESS_LENGTH + IPv6_INTERFACE_ID_LENGTH; ++i)
             addr[i] = *curPtr++;
           char ipv6[40];
           capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
           char ipv4[20];
-          capture_ipv4_addr(&addr[8], ipv4, sizeof(ipv4));
+          capture_ipv4_addr(&addr[IPv6_INTERFACE_ID_LENGTH], ipv4, sizeof(ipv4));
           tun_config(1, ipv4, ipv6, "oaitun_ue");
           setup_ue_ipv4_route(1, ipv4, "oaitun_ue");
         } else {
