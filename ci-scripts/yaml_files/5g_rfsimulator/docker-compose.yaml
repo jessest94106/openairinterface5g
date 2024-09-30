@@ -81,7 +81,7 @@ services:
             timeout: 5s
             retries: 5
     oai-gnb:
-        image: oaisoftwarealliance/oai-gnb:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}
         container_name: rfsim5g-oai-gnb
         cap_drop:
             - ALL
@@ -101,7 +101,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue
         cap_drop:
             - ALL
@@ -125,7 +125,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue2:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue2
         cap_drop:
             - ALL
@@ -149,7 +149,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue3:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue3
         cap_drop:
             - ALL
@@ -173,7 +173,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue4:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue4
         cap_drop:
             - ALL
@@ -197,7 +197,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue5:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue5
         cap_drop:
             - ALL
@@ -221,7 +221,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue6:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue6
         cap_drop:
             - ALL
@@ -245,7 +245,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue7:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue7
         cap_drop:
             - ALL
@@ -269,7 +269,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue8:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue8
         cap_drop:
             - ALL
@@ -293,7 +293,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue9:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue9
         cap_drop:
             - ALL
@@ -317,7 +317,7 @@ services:
             timeout: 5s
             retries: 5
     oai-nr-ue10:
-        image: oaisoftwarealliance/oai-nr-ue:develop
+        image: ${REGISTRY:-oaisoftwarealliance}/${NRUE_IMG:-oai-nr-ue}:${TAG:-develop}
         container_name: rfsim5g-oai-nr-ue10
         cap_drop:
             - ALL

@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-5G-AW2S</htmlTabRef>
   <htmlTabName>20 MHz TDD SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     010000
     001000
@@ -57,6 +56,7 @@
     004000
     000002
     030000
+    333333
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -68,7 +68,7 @@
   </testCase>
   <testCase id="800813">
     <class>Create_Workspace</class>
-    <desc>Creating new Workspace</desc>
+    <desc>Create new Workspace</desc>
     <eNB_instance>0</eNB_instance>
     <eNB_serverId>0</eNB_serverId>
   </testCase>
@@ -243,12 +243,14 @@
 
   <testCase id="003000">
     <class>Detach_UE</class>
+    <always_exec>true</always_exec>
     <desc>Detach UE</desc>
     <id>amarisoft_ue_1 amarisoft_ue_2 amarisoft_ue_3 amarisoft_ue_4 amarisoft_ue_5 amarisoft_ue_6 amarisoft_ue_7 amarisoft_ue_8 amarisoft_ue_9 amarisoft_ue_10 amarisoft_ue_11 amarisoft_ue_12 amarisoft_ue_13 amarisoft_ue_14 amarisoft_ue_15 amarisoft_ue_16</id>
   </testCase>
 
   <testCase id="004000">
     <class>Terminate_UE</class>
+    <always_exec>true</always_exec>
     <desc>Terminate UE</desc>
     <id>amarisoft_ue</id>
   </testCase>
@@ -261,10 +263,18 @@
 
   <testCase id="030000">
     <class>Undeploy_Object</class>
+    <always_exec>true</always_exec>
     <desc>Undeploy gNB</desc>
     <yaml_path>ci-scripts/yaml_files/sa_aw2s_gnb</yaml_path>
     <eNB_instance>0</eNB_instance>
     <eNB_serverId>0</eNB_serverId>
+  </testCase>
+
+  <testCase id="333333">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>0</test_svr_id>
   </testCase>
 
 </testCaseList>

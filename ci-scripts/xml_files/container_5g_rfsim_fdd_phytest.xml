@@ -24,7 +24,6 @@
         <htmlTabRef>rfsim-5gnr-fdd-phytest</htmlTabRef>
         <htmlTabName>Monolithic FDD phytest gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  111111
  800813
@@ -36,6 +35,7 @@
  030011
  030012
  100011
+ 222222
         </TestCaseRequestedList>
         <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -54,7 +54,7 @@
         </testCase>
         <testCase id="800813">
                 <class>Create_Workspace</class>
-                <desc>Creating new Workspace</desc>
+                <desc>Create new Workspace</desc>
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
         </testCase>
@@ -120,12 +120,20 @@
 
         <testCase id="100011">
                 <class>Undeploy_Object</class>
+                <always_exec>true</always_exec>
                 <desc>Undeploy all OAI 5G stack</desc>
                 <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_fdd_phytest</yaml_path>
                 <d_retx_th>10,100,100,100</d_retx_th> <!-- phytest: will fail at start! -->
                 <u_retx_th>10,100,100,100</u_retx_th> <!-- phytest: will fail at start! -->
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
+        </testCase>
+
+        <testCase id="222222">
+                <class>Clean_Test_Server_Images</class>
+                <always_exec>true</always_exec>
+                <desc>Clean Test Images on Test Server</desc>
+                <test_svr_id>0</test_svr_id>
         </testCase>
 
 </testCaseList>
