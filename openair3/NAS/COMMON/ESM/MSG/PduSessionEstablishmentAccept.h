@@ -120,10 +120,13 @@ typedef struct session_ambr_s {
 /* Optional Presence IE - TS 24.501 Table 8.3.2.1.1 */
 
 typedef struct pdu_address_s {
-  uint8_t pdu_iei;        /* PDU Address IEI (0x29) */
-  uint8_t pdu_length;     /* Length of PDU address contents */
-  uint8_t pdu_type;       /* PDU session type value */
-  /// PDU address information (depending on type, up to 12 bytes)
+  // PDU address IEI (0x29) (octet 1)
+  uint8_t pdu_iei;
+  // Length of PDU address contents (octet 2)
+  uint8_t pdu_length;
+  // PDU session type value (9.11.4.11 of TS 24.501)
+  uint8_t pdu_type;
+  // PDU address IE (depending on type, up to 12 bytes)
   uint8_t pdu_addr_oct[IPv4_ADDRESS_LENGTH + IPv6_INTERFACE_ID_LENGTH];
 } pdu_address_t; /* TS 24.501 9.11.4.10 */
 

@@ -23,6 +23,7 @@
  * \brief simulator for nr nas message
  * \author Yoshio INOUE, Masayuki HARADA
  * \email yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com
+ * \protocol 5GS (5GMM and 5GSM)
  * \date 2020
  * \version 0.1
  */
