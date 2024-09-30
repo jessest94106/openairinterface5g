@@ -37,6 +37,7 @@
 #include "LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
+#include "openair1/PHY/TOOLS/phy_scope_interface.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -958,6 +959,7 @@ void *UE_thread(void *arg)
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
     openair0_timestamp rx_timestamp;
     int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, &rx_timestamp, rxp, readBlockSize, fp->nb_antennas_rx);
+    UEscopeCopy(UE, ueTimeDomainSamples, rxp[0], sizeof(c16_t), 1, readBlockSize, 0);
     AssertFatal(readBlockSize == tmp, "");
 
     if(slot_nr == (nb_slot_frame - 1)) {

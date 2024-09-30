@@ -73,6 +73,7 @@ enum scopeDataType {
   MAX_SCOPE_TYPES,
   gNBPuschRxIq = MAX_SCOPE_TYPES,
   gNBPuschLlr,
+  ueTimeDomainSamples,
   EXTRA_SCOPE_TYPES
 };
 
