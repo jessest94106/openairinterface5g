@@ -366,7 +366,7 @@ void rx_prach0(PHY_VARS_eNB *eNB,
           if (fp->threequarter_fs==0) {
             if (prach_fmt == 4) {
               dft(DFT_4096,prach2,rxsigF[aa],1);
-              fft_size=2048;
+              fft_size=4096;
             } else {
               dft(DFT_24576,prach2,rxsigF[aa],1);
 
