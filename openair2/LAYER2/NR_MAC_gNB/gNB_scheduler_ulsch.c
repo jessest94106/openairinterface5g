@@ -446,18 +446,19 @@ static int nr_process_mac_pdu(instance_t module_idP,
 
         LOG_D(MAC, "[RAPROC] Received SDU for CCCH length %d for UE %04x\n", mac_len, UE->rnti);
 
-        prepare_initial_ul_rrc_message(RC.nrmac[module_idP], UE);
-        mac_rlc_data_ind(module_idP,
-                         UE->rnti,
-                         module_idP,
-                         frameP,
-                         ENB_FLAG_YES,
-                         MBMS_FLAG_NO,
-                         0,
-                         (char *) (pduP + mac_subheader_len),
-                         mac_len,
-                         1,
-                         NULL);
+        if (prepare_initial_ul_rrc_message(RC.nrmac[module_idP], UE)) {
+          mac_rlc_data_ind(module_idP,
+                          UE->rnti,
+                          module_idP,
+                          frameP,
+                          ENB_FLAG_YES,
+                          MBMS_FLAG_NO,
+                          0,
+                          (char *) (pduP + mac_subheader_len),
+                          mac_len,
+                          1,
+                          NULL);
+        }
         break;
 
       case UL_SCH_LCID_DTCH ... (UL_SCH_LCID_DTCH + 28):
@@ -498,7 +499,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
         break;
 
       default:
-        LOG_E(NR_MAC, "Received unknown MAC header (LCID = 0x%02x)\n", rx_lcid);
+        LOG_E(NR_MAC, "RNTI %0x, received unknown MAC header (LCID = 0x%02x)\n", UE->rnti, rx_lcid);
         return -1;
         break;
       }
