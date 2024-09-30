@@ -25,6 +25,7 @@
   <htmlTabName>10 MHz FDD F1 SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
   <TestCaseRequestedList>
+    111111
     100000
     110002
     800813
@@ -56,8 +57,16 @@
     100001
     130201
     200000
+    222222
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
+
+  <testCase id="111111">
+    <class>Pull_Local_Registry</class>
+    <desc>Pull Images from Local Registry</desc>
+    <test_svr_id>0</test_svr_id>
+    <images_to_pull>oai-gnb</images_to_pull>
+  </testCase>
 
   <testCase id="110000">
     <class>Initialize_UE</class>
@@ -236,6 +245,13 @@
     <eNB_serverId>0</eNB_serverId>
     <d_retx_th>10,100,100,100</d_retx_th>
     <u_retx_th>10,100,100,100</u_retx_th>
+  </testCase>
+
+  <testCase id="222222">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>0</test_svr_id>
   </testCase>
 
 </testCaseList>

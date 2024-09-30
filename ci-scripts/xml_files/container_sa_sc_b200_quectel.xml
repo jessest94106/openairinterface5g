@@ -46,6 +46,7 @@
     210002
     230201
     400000
+    222222
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -207,6 +208,13 @@
     <eNB_serverId>0</eNB_serverId>
     <d_retx_th>10,100,100,100</d_retx_th>
     <u_retx_th>10,100,100,100</u_retx_th>
+  </testCase>
+
+  <testCase id="222222">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>0</test_svr_id>
   </testCase>
 
 </testCaseList>
