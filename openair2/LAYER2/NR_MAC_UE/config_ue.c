@@ -1901,6 +1901,7 @@ static uint32_t nr_get_sf_periodicBSRTimer(long periodicBSR)
       break;
     case NR_BSR_Config__periodicBSR_Timer_infinity:
       timer = UINT_MAX;
+      break;
     default:
       AssertFatal(false, "Invalid periodicBSR_Timer %ld\n", periodicBSR);
   }

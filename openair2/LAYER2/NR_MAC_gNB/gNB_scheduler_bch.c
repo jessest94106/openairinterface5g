@@ -386,7 +386,7 @@ static uint32_t schedule_control_sib1(module_id_t module_id,
   pdsch->mcs = 0; // starting from mcs 0
   gNB_mac->sched_ctrlCommon->num_total_bytes = num_total_bytes;
 
-  uint8_t nr_of_candidates;
+  uint8_t nr_of_candidates = 0;
 
   for (int i=0; i<3; i++) {
     find_aggregation_candidates(&gNB_mac->sched_ctrlCommon->aggregation_level, &nr_of_candidates, gNB_mac->sched_ctrlCommon->search_space,4<<i);

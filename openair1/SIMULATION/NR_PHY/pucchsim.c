@@ -463,7 +463,7 @@ int main(int argc, char **argv)
   s_im = malloc(n_tx*sizeof(double*));
   r_re = malloc(n_rx*sizeof(double*));
   r_im = malloc(n_rx*sizeof(double*));
-  memcpy((void*)&gNB->frame_parms,(void*)frame_parms,sizeof(frame_parms));
+  memcpy((void *)&gNB->frame_parms, (void *)frame_parms, sizeof(*frame_parms));
   for (int aatx=0; aatx<n_tx; aatx++) {
     s_re[aatx] = calloc(1,frame_length_complex_samples*sizeof(double));
     s_im[aatx] = calloc(1,frame_length_complex_samples*sizeof(double));

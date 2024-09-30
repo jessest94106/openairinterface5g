@@ -82,7 +82,7 @@ void nr_fill_sl_rx_indication(sl_nr_rx_indication_t *rx_ind,
       sl_nr_ssb_pdu_t *ssb_pdu = &rx_ind->rx_indication_body[n_pdus - 1].ssb_pdu;
       if (typeSpecific) {
         uint8_t *psbch_decoded_output = (uint8_t *)typeSpecific;
-        memcpy(ssb_pdu->psbch_payload, psbch_decoded_output, sizeof(4)); // 4 bytes of PSBCH payload bytes
+        memcpy(ssb_pdu->psbch_payload, psbch_decoded_output, 4); // 4 bytes of PSBCH payload bytes
         ssb_pdu->rsrp_dbm = sl_phy_params->psbch.rsrp_dBm_per_RE;
         ssb_pdu->rx_slss_id = rx_slss_id;
         ssb_pdu->decode_status = true;

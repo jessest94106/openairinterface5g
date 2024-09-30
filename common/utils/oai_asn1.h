@@ -154,17 +154,10 @@ static inline uint16_t BIT_STRING_to_uint16(const BIT_STRING_t *asn) {
 
   DevCheck ((asn->size > 0) && (asn->size <= 2), asn->size, 0, 0);
 
-  switch (asn->size) {
-    case 2:
-      result |= asn->buf[index++] << (8 - asn->bits_unused);
-
-    case 1:
-      result |= asn->buf[index] >> asn->bits_unused;
-      break;
-
-    default:
-      break;
+  if (asn->size == 2) {
+    result |= asn->buf[index++] << (8 - asn->bits_unused);
   }
+  result |= asn->buf[index] >> asn->bits_unused;
 
   return result;
 }
