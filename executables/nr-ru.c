@@ -622,6 +622,7 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
                                      rxp,
                                      samples_per_slot,
                                      ru->nb_rx);
+    gNBscopeCopy(ru, gNbTimeDomainSamples, rxp[0], sizeof(c16_t), 1, samples_per_slot, 0);
   }
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_READ, 0 );

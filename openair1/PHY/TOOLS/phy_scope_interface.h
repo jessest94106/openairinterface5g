@@ -75,6 +75,7 @@ enum scopeDataType {
   gNBPuschLlr,
   ueTimeDomainSamples,
   ueTimeDomainSamplesBeforeSync,
+  gNbTimeDomainSamples,
   EXTRA_SCOPE_TYPES
 };
 
@@ -129,12 +130,12 @@ void copyData(void *, enum scopeDataType type, void *dataIn, int elementSz, int 
   }
 #define gNBscopeCopyWithMetadata(gnb, type, ...) \
   if (gnb->scopeData) {              \
-    ((scopeData_t *)gnb->scopeData)->copyData((scopeData_t *)gNB->scopeData, type, ##__VA_ARGS__); \
+    ((scopeData_t *)gnb->scopeData)->copyData((scopeData_t *)gnb->scopeData, type, ##__VA_ARGS__); \
   }
 #define gNBscopeCopy(gnb, type, ...) \
   if (gnb->scopeData) {              \
     metadata mt = {.slot = -1, .frame = -1}; \
-    ((scopeData_t *)gnb->scopeData)->copyData((scopeData_t *)gNB->scopeData, type, ##__VA_ARGS__, &mt); \
+    ((scopeData_t *)gnb->scopeData)->copyData((scopeData_t *)gnb->scopeData, type, ##__VA_ARGS__, &mt); \
   }
 #define GnbScopeUpdate(gnb, type, numElt) \
   if (gnb->scopeData)                     \

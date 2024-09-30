@@ -581,6 +581,16 @@ void ShowGnbScope(PHY_VARS_gNB *gNB, float t)
     pusch_llr_plot->Draw(t, gNBPuschLlr, "PUSCH LLR");
     ImGui::TreePop();
   }
+  if (ImGui::TreeNode("Time domain samples")) {
+    static auto iq_data = new IQData();
+    static auto time_domain_iq = new IQHist("Time domain samples");
+    bool new_data = false;
+    if (time_domain_iq->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[gNbTimeDomainSamples], t, time_domain_iq->GetEpsilon());
+    }
+    time_domain_iq->Draw(iq_data, t, new_data);
+    ImGui::TreePop();
+  }
 }
 
 void *imscope_thread(void *data_void_ptr)
@@ -751,6 +761,7 @@ extern "C" void imscope_autoinit(void *dataptr)
     scope->copyDataUnsafeWithOffset = copyDataUnsafeWithOffset;
     scope->unlockScopeData = unlockScopeData;
     scope_params->gNB->scopeData = scope;
+    scope_params->ru->scopeData = scope;
   } else {
     PHY_VARS_NR_UE *ue = (PHY_VARS_NR_UE *)dataptr;
     scopeData_t *scope = (scopeData_t *)calloc(1, sizeof(scopeData_t));
