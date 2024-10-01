@@ -91,16 +91,13 @@ static int16_t ssb_index_from_prach(module_id_t module_idP,
   
   float  num_ssb_per_RO = ssb_per_rach_occasion[cfg->prach_config.ssb_per_rach.value];	
   uint16_t start_symbol_index = 0;
-  uint8_t mu,N_dur=0,N_t_slot=0,start_symbol = 0, temp_start_symbol = 0, N_RA_slot=0;
+  uint8_t N_dur=0,N_t_slot=0,start_symbol = 0, temp_start_symbol = 0, N_RA_slot=0;
   uint16_t format,RA_sfn_index = -1;
   uint8_t config_period = 1;
   uint16_t prach_occasion_id = -1;
   uint8_t num_active_ssb = cc->num_active_ssb;
 
-  if (rach_ConfigCommon->msg1_SubcarrierSpacing)
-    mu = *rach_ConfigCommon->msg1_SubcarrierSpacing;
-  else
-    mu = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+  int mu = nr_get_mu(scc->uplinkConfigCommon);
 
   get_nr_prach_info_from_index(config_index,
 			       (int)frameP,
@@ -167,7 +164,7 @@ void find_SSB_and_RO_available(gNB_MAC_INST *nrmac)
   nfapi_nr_config_request_scf_t *cfg = &nrmac->config[0];
   NR_RACH_ConfigCommon_t *rach_ConfigCommon = scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup;
   uint8_t config_index = rach_ConfigCommon->rach_ConfigGeneric.prach_ConfigurationIndex;
-  uint8_t mu,N_dur=0,N_t_slot=0,start_symbol=0,N_RA_slot = 0;
+  uint8_t N_dur=0,N_t_slot=0,start_symbol=0,N_RA_slot = 0;
   uint16_t format,N_RA_sfn = 0,unused_RA_occasion,repetition = 0;
   uint8_t num_active_ssb = 0;
   uint8_t max_association_period = 1;
@@ -204,10 +201,7 @@ void find_SSB_and_RO_available(gNB_MAC_INST *nrmac)
       break;
     }
 
-  if (rach_ConfigCommon->msg1_SubcarrierSpacing)
-    mu = *rach_ConfigCommon->msg1_SubcarrierSpacing;
-  else
-    mu = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+  int mu = nr_get_mu(scc->uplinkConfigCommon);
 
   // prach is scheduled according to configuration index and tables 6.3.3.2.2 to 6.3.3.2.4
   get_nr_prach_occasion_info_from_index(config_index,
@@ -267,11 +261,7 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP
   NR_COMMON_channels_t *cc = gNB->common_channels;
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_RACH_ConfigCommon_t *rach_ConfigCommon = scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup;
-  int mu;
-  if (rach_ConfigCommon->msg1_SubcarrierSpacing)
-    mu = *rach_ConfigCommon->msg1_SubcarrierSpacing;
-  else
-    mu = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+  int mu = nr_get_mu(scc->uplinkConfigCommon);
   int index = ul_buffer_index(frameP, slotP, mu, gNB->UL_tti_req_ahead_size);
   nfapi_nr_ul_tti_request_t *UL_tti_req = &RC.nrmac[module_idP]->UL_tti_req_ahead[0][index];
   nfapi_nr_config_request_scf_t *cfg = &RC.nrmac[module_idP]->config[0];

@@ -327,4 +327,6 @@ int get_nrofHARQ_ProcessesForPDSCH(const NR_UE_ServingCell_Info_t *sc_info);
 
 int get_nrofHARQ_ProcessesForPUSCH(const NR_UE_ServingCell_Info_t *sc_info);
 
+int nr_get_mu(const NR_UplinkConfigCommon_t *uplinkConfigCommon);
+
 #endif
