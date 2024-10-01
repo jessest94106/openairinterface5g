@@ -6,7 +6,6 @@
   - Run_T2Test
   - Run_NRulsimTest
   - Build_eNB
-  - WaitEndBuild_eNB
   - Initialize_eNB
   - Terminate_eNB
   - Initialize_UE
@@ -38,10 +37,10 @@
   - Deploy_Run_PhySim
   - DeployGenObject
   - UndeployGenObject
-  - StatsFromGenObject
   - LicenceAndFormattingCheck
   - Push_Local_Registry
   - Pull_Local_Registry
   - Clean_Test_Server_Images
   - Custom_Command
+  - Custom_Script
   - Create_Workspace

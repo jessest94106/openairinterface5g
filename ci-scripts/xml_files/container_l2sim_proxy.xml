@@ -24,7 +24,6 @@
         <htmlTabRef>l2sim-4glte-5gnr-proxy-build</htmlTabRef>
         <htmlTabName>Build L2sim proxy image</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
-        <repeatCount>1</repeatCount>
         <TestCaseRequestedList>
  100001
  000001
@@ -33,7 +32,7 @@
 
         <testCase id="100001">
                 <class>Create_Workspace</class>
-                <desc>Creating new Workspace</desc>
+                <desc>Create new Workspace</desc>
                 <eNB_instance>1</eNB_instance>
                 <eNB_serverId>1</eNB_serverId>
         </testCase>

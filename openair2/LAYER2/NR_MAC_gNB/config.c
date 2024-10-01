@@ -694,7 +694,27 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
     NR_RA_t *ra = &cc->ra[n];
     nr_clear_ra_proc(ra);
   }
+
+  nr_fill_sched_osi(nrmac, scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon);
   NR_SCHED_UNLOCK(&nrmac->sched_lock);
+}
+
+void nr_fill_sched_osi(gNB_MAC_INST *nrmac, const struct NR_SetupRelease_PDCCH_ConfigCommon *pdcch_ConfigCommon)
+{
+  NR_SearchSpaceId_t *osi_SearchSpace = pdcch_ConfigCommon->choice.setup->searchSpaceOtherSystemInformation;
+  if (osi_SearchSpace) {
+    nrmac->sched_osi = CALLOC(1, sizeof(*nrmac->sched_osi));
+
+    struct NR_PDCCH_ConfigCommon__commonSearchSpaceList *commonSearchSpaceList =
+        pdcch_ConfigCommon->choice.setup->commonSearchSpaceList;
+    AssertFatal(commonSearchSpaceList->list.count > 0, "common SearchSpace list has 0 elements\n");
+    for (int i = 0; i < commonSearchSpaceList->list.count; i++) {
+      NR_SearchSpace_t *ss = commonSearchSpaceList->list.array[i];
+      if (ss->searchSpaceId == *osi_SearchSpace)
+        nrmac->sched_osi->search_space = ss;
+    }
+    AssertFatal(nrmac->sched_osi->search_space != NULL, "SearchSpace cannot be null for OSI\n");
+  }
 }
 
 void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const f1ap_plmn_t *plmn, uint64_t cellID, int tac)
@@ -707,6 +727,17 @@ void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const f1ap_plmn_t *plmn, uint64_
   cc->sib1 = sib1;
   cc->sib1_bcch_length = encode_SIB1_NR(sib1, cc->sib1_bcch_pdu, sizeof(cc->sib1_bcch_pdu));
   AssertFatal(cc->sib1_bcch_length > 0, "could not encode SIB1\n");
+}
+
+void nr_mac_configure_sib19(gNB_MAC_INST *nrmac)
+{
+  AssertFatal(get_softmodem_params()->sa > 0, "error: SIB19 only applicable for SA\n");
+  NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
+  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+  NR_BCCH_DL_SCH_Message_t *sib19 = get_SIB19_NR(scc);
+  cc->sib19 = sib19;
+  cc->sib19_bcch_length = encode_SIB19_NR(sib19, cc->sib19_bcch_pdu, sizeof(cc->sib19_bcch_pdu));
+  AssertFatal(cc->sib19_bcch_length > 0, "could not encode SIB19\n");
 }
 
 bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t *CellGroup)

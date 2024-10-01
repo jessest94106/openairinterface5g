@@ -46,8 +46,8 @@ void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re)
   c16_t *rxF   = (c16_t *)rxdataF_comp;
   c16_t *llr32 = (c16_t *)llr;
   for (int i = 0; i < nb_re; i++) {
-    llr32[i].r = rxF[i].r >> 3;
-    llr32[i].i = rxF[i].i >> 3;
+    llr32[i].r = rxF[i].r >> 4;
+    llr32[i].i = rxF[i].i >> 4;
   }
 }
 

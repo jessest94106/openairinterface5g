@@ -24,7 +24,6 @@
   <htmlTabRef>TEST-5G-NRUE</htmlTabRef>
   <htmlTabName>40 MHz TDD SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
-  <repeatCount>1</repeatCount>
   <TestCaseRequestedList>
     010000 010001
     800813
@@ -37,6 +36,8 @@
     000100
     000200
     040001 040000
+    333333
+    444444
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -69,7 +70,7 @@
   </testCase>
   <testCase id="800813">
     <class>Create_Workspace</class>
-    <desc>Creating new Workspace</desc>
+    <desc>Create new Workspace</desc>
     <eNB_instance>0</eNB_instance>
     <eNB_serverId>0</eNB_serverId>
   </testCase>
@@ -82,7 +83,7 @@
   </testCase>
   <testCase id="800814">
     <class>Create_Workspace</class>
-    <desc>Creating new Workspace</desc>
+    <desc>Create new Workspace</desc>
     <eNB_instance>1</eNB_instance>
     <eNB_serverId>1</eNB_serverId>
   </testCase>
@@ -140,6 +141,7 @@
 
   <testCase id="040000">
     <class>Undeploy_Object</class>
+    <always_exec>true</always_exec>
     <desc>Undeploy gNB</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n310_gnb</yaml_path>
     <eNB_instance>0</eNB_instance>
@@ -150,10 +152,25 @@
   
   <testCase id="040001">
     <class>Undeploy_Object</class>
+    <always_exec>true</always_exec>
     <desc>Undeploy nr UE</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n310_nrue</yaml_path>
     <eNB_instance>1</eNB_instance>
     <eNB_serverId>1</eNB_serverId>
+  </testCase>
+
+  <testCase id="333333">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>0</test_svr_id>
+  </testCase>
+
+  <testCase id="444444">
+    <class>Clean_Test_Server_Images</class>
+    <always_exec>true</always_exec>
+    <desc>Clean Test Images on Test Server</desc>
+    <test_svr_id>1</test_svr_id>
   </testCase>
 
 </testCaseList>

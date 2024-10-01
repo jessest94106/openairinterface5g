@@ -799,7 +799,14 @@ int main(int argc, char **argv)
         proc.nr_slot_rx = ssb_slot;
         proc.gNB_id = 0;
         for (int i = UE->symbol_offset + 1; i < UE->symbol_offset + 4; i++) {
-          nr_slot_fep(UE, frame_parms, &proc, i % frame_parms->symbols_per_slot, rxdataF, link_type_dl);
+          nr_slot_fep(UE,
+                      frame_parms,
+                      proc.nr_slot_rx,
+                      i % frame_parms->symbols_per_slot,
+                      rxdataF,
+                      link_type_dl,
+                      0,
+                      UE->common_vars.rxdata);
 
           nr_pbch_channel_estimation(&UE->frame_parms,
                                      &UE->SL_UE_PHY_PARAMS,

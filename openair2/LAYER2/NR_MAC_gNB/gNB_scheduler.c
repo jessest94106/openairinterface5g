@@ -263,8 +263,12 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
   schedule_nr_mib(module_idP, frame, slot, &sched_info->DL_req);
 
   // This schedules SIB1
-  if (get_softmodem_params()->sa == 1)
+  // SIB19 will be scheduled if ntn_Config_r17 is initialized
+  if (get_softmodem_params()->sa == 1) {
     schedule_nr_sib1(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req);
+    if (cc->sib19)
+      schedule_nr_sib19(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req, cc->sib19_bcch_length, cc->sib19_bcch_pdu);
+  }
 
   // This schedule PRACH if we are not in phy_test mode
   if (get_softmodem_params()->phy_test == 0) {
@@ -274,7 +278,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
        slot, because otherwise we would allocate the current slot in
        UL_tti_req_ahead), but be aware that, e.g., K2 is allowed to be larger
        (schedule_nr_prach will assert if resources are not free). */
-    const sub_frame_t n_slots_ahead = nr_slots_per_frame[*scc->ssbSubcarrierSpacing] - 1;
+    const sub_frame_t n_slots_ahead = nr_slots_per_frame[*scc->ssbSubcarrierSpacing] - 1 + get_NTN_Koffset(scc);
     const frame_t f = (frame + (slot + n_slots_ahead) / nr_slots_per_frame[*scc->ssbSubcarrierSpacing]) % 1024;
     const sub_frame_t s = (slot + n_slots_ahead) % nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
     schedule_nr_prach(module_idP, f, s);

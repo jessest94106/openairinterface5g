@@ -35,6 +35,7 @@
 040301 040531 040633 040634 040636 040671 040672 040673 040401 040201
 030231
 200000
+222222
     </TestCaseRequestedList>
     <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -53,6 +54,7 @@
     </testCase>
     <testCase id="200000">
         <class>Custom_Command</class>
+        <always_exec>true</always_exec>
         <desc>Enable Sleep States</desc>
         <node>hutch</node>
         <command>sudo cpupower idle-set -E</command>
@@ -65,7 +67,7 @@
     </testCase>
     <testCase id="800813">
         <class>Create_Workspace</class>
-        <desc>Creating new Workspace for server 0</desc>
+        <desc>Create new Workspace for server 0</desc>
         <eNB_instance>0</eNB_instance>
         <eNB_serverId>0</eNB_serverId>
     </testCase>
@@ -94,6 +96,7 @@
 
     <testCase id="030231">
         <class>Undeploy_Object</class>
+        <always_exec>true</always_exec>
         <desc>Undeploy RCC/RRU</desc>
         <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_05Mhz_if4.5</yaml_path>
         <eNB_instance>0</eNB_instance>
@@ -107,6 +110,7 @@
     </testCase>
     <testCase id="040201">
         <class>Terminate_UE</class>
+        <always_exec>true</always_exec>
         <desc>Terminate UE</desc>
         <id>adb_ue_1 adb_ue_2</id>
     </testCase>
@@ -117,6 +121,7 @@
     </testCase>
     <testCase id="040401">
         <class>Detach_UE</class>
+        <always_exec>true</always_exec>
         <desc>Detach UEs</desc>
         <id>adb_ue_1 adb_ue_2</id>
     </testCase>
@@ -183,6 +188,13 @@
         <iperf_args>-t 30</iperf_args>
         <id>adb_ue_1</id>
         <svr_id>ltebox-nano</svr_id>
+    </testCase>
+
+    <testCase id="222222">
+        <class>Clean_Test_Server_Images</class>
+        <always_exec>true</always_exec>
+        <desc>Clean Test Images on Test Server</desc>
+        <test_svr_id>0</test_svr_id>
     </testCase>
 
 </testCaseList>

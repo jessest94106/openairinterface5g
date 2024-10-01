@@ -37,13 +37,7 @@ import re		# reg
 import pexpect	# pexpect
 import time		# sleep
 import os
-import subprocess
-import xml.etree.ElementTree as ET
 import logging
-import datetime
-import signal
-import statistics as stat
-from multiprocessing import SimpleQueue, Lock
 import concurrent.futures
 import json
 
@@ -150,8 +144,8 @@ def Iperf_analyzeV3UDP(filename, iperf_bitrate_threshold, iperf_packetloss_thres
 	receiver_bitrate = None
 	with open(filename, 'r') as server_file:
 		for line in server_file.readlines():
-			res_sender = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>\d+)/(?P<sentPack>\d+) \((?P<lost>[0-9\.]+).*?\s+(sender)', line)
-			res_receiver = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>\d+)/(?P<receivedPack>\d+) \((?P<lost>[0-9\.]+).*?\s+(receiver)', line)
+			res_sender = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]?bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<sentPack>-?\d+) \((?P<lost>[0-9\.]+).*?\s+(sender)', line)
+			res_receiver = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]?bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<receivedPack>-?\d+)\s+\((?P<lost>[0-9\.]+)%\).*?(receiver)', line)
 			if res_sender is not None:
 				sender_bitrate = res_sender.group('bitrate')
 				sender_unit = res_sender.group('unit')
@@ -226,6 +220,43 @@ def Iperf_analyzeV2UDP(server_filename, iperf_bitrate_threshold, iperf_packetlos
 			pal_msg += f' (too high! >{self.iperf_packetloss_threshold}%)'
 		return (result, f'{req_msg}\n{bir_msg}\n{brl_msg}\n{jit_msg}\n{pal_msg}')
 
+def Custom_Command(HTML, node, command, command_fail):
+    logging.info(f"Executing custom command on {node}")
+    cmd = cls_cmd.getConnection(node)
+    ret = cmd.run(command)
+    cmd.close()
+    logging.debug(f"Custom_Command: {command} on node: {node} - {'OK, command succeeded' if ret.returncode == 0 else f'Error, return code: {ret.returncode}'}")
+    status = 'OK'
+    message = []
+    if ret.returncode != 0 and not command_fail:
+        message = [ret.stdout]
+        logging.warning(f'Custom_Command output: {message}')
+        status = 'Warning'
+    if ret.returncode != 0 and command_fail:
+        message = [ret.stdout]
+        logging.error(f'Custom_Command failed: output: {message}')
+        status = 'KO'
+    HTML.CreateHtmlTestRowQueue(command, status, message)
+    return status == 'OK' or status == 'Warning'
+
+def Custom_Script(HTML, node, script, command_fail):
+	logging.info(f"Executing custom script on {node}")
+	ret = cls_cmd.runScript(node, script, 90)
+	logging.debug(f"Custom_Script: {script} on node: {node} - return code {ret.returncode}, output:\n{ret.stdout}")
+	status = 'OK'
+	message = [ret.stdout]
+	if ret.returncode != 0 and not command_fail:
+		status = 'Warning'
+	if ret.returncode != 0 and command_fail:
+		status = 'KO'
+	HTML.CreateHtmlTestRowQueue(script, status, message)
+	return status == 'OK' or status == 'Warning'
+
+def IdleSleep(HTML, idle_sleep_time):
+	time.sleep(idle_sleep_time)
+	HTML.CreateHtmlTestRow(f"{idle_sleep_time} sec", 'OK', CONST.ALL_PROCESSES_OK)
+	return True
+
 #-----------------------------------------------------------
 # OaiCiTest Class Definition
 #-----------------------------------------------------------
@@ -238,12 +269,8 @@ class OaiCiTest():
 		self.ranAllowMerge = False
 		self.ranTargetBranch = ''
 
-		self.FailReportCnt = 0
 		self.testCase_id = ''
 		self.testXMLfiles = []
-		self.testUnstable = False
-		self.testMinStableId = '999999'
-		self.testStabilityPointReached = False
 		self.desc = ''
 		self.ping_args = ''
 		self.ping_packetloss_threshold = ''
@@ -254,8 +281,6 @@ class OaiCiTest():
 		self.iperf_profile = ''
 		self.iperf_options = ''
 		self.iperf_tcp_rate_target = ''
-		self.idle_sleep_time = 0
-		self.repeatCounts = []
 		self.finalStatus = False
 		self.UEIPAddress = ''
 		self.UEUserName = ''
@@ -279,8 +304,9 @@ class OaiCiTest():
 				messages.append(f'{uename}: initialized' if f.result() else f'{uename}: ERROR during Initialization')
 			[f.result() for f in futures]
 		HTML.CreateHtmlTestRowQueue('N/A', 'OK', messages)
+		return True
 
-	def AttachUE(self, HTML, RAN, EPC, CONTAINERS):
+	def AttachUE(self, HTML):
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
 			futures = [executor.submit(ue.attach) for ue in ues]
@@ -288,12 +314,13 @@ class OaiCiTest():
 			futures = [executor.submit(ue.checkMTU) for ue in ues]
 			mtus = [f.result() for f in futures]
 			messages = [f"UE {ue.getName()}: {ue.getIP()}" for ue in ues]
-		if all(attached) and all(mtus):
+		success = all(attached) and all(mtus)
+		if success:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', messages)
 		else:
 			logging.error(f'error attaching or wrong MTU: attached {attached}, mtus {mtus}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not retrieve UE IP address(es) or MTU(s) wrong!"])
-			self.AutoTerminateUEandeNB(HTML, RAN, EPC, CONTAINERS)
+		return success
 
 	def DetachUE(self, HTML):
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
@@ -302,18 +329,21 @@ class OaiCiTest():
 			[f.result() for f in futures]
 			messages = [f"UE {ue.getName()}: detached" for ue in ues]
 		HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
+		return True
 
 	def DataDisableUE(self, HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
 			futures = [executor.submit(ue.dataDisable) for ue in ues]
 			status = [f.result() for f in futures]
-		if all(status):
+		success = all(status)
+		if success:
 			messages = [f"UE {ue.getName()}: data disabled" for ue in ues]
 			HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
 		else:
 			logging.error(f'error enabling data: {status}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not disable UE data!"])
+		return success
 
 	def DataEnableUE(self, HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
@@ -321,12 +351,14 @@ class OaiCiTest():
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
 			futures = [executor.submit(ue.dataEnable) for ue in ues]
 			status = [f.result() for f in futures]
-		if all(status):
+		success = all(status)
+		if success:
 			messages = [f"UE {ue.getName()}: data enabled" for ue in ues]
 			HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
 		else:
 			logging.error(f'error enabling data: {status}')
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["Could not enable UE data!"])
+		return success
 
 	def CheckStatusUE(self,HTML):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
@@ -336,8 +368,9 @@ class OaiCiTest():
 			futures = [executor.submit(ue.check) for ue in ues]
 			messages = [f.result() for f in futures]
 		HTML.CreateHtmlTestRowQueue('NA', 'OK', messages)
+		return True
 
-	def Ping_common(self, EPC, ue, RAN, CONTAINERS, printLock):
+	def Ping_common(self, EPC, ue, logPath):
 		# Launch ping on the EPC side (true for ltebox and old open-air-cn)
 		ping_status = 0
 		ueIP = ue.getIP()
@@ -345,10 +378,6 @@ class OaiCiTest():
 			return (False, f"UE {ue.getName()} has no IP address")
 		ping_log_file = f'ping_{self.testCase_id}_{ue.getName()}.log'
 		ping_time = re.findall("-c *(\d+)",str(self.ping_args))
-		# Creating destination log folder if needed on the python executor workspace
-		ymlPath = CONTAINERS.yamlPath[0].split('/')
-		logPath = f'../cmake_targets/log/{ymlPath[2]}'
-		os.system(f'mkdir -p {logPath}')
 		local_ping_log_file = f'{logPath}/{ping_log_file}'
 		# if has pattern %cn_ip%, replace with core IP address, else we assume the IP is present
 		if re.search('%cn_ip%', self.ping_args):
@@ -369,7 +398,6 @@ class OaiCiTest():
 		ue_header = f'UE {ue.getName()} ({ueIP})'
 		if response.returncode != 0:
 			message = ue_header + ': ping crashed: TIMEOUT?'
-			logging.error('\u001B[1;37;41m ' + message + ' \u001B[0m')
 			return (False, message)
 
 		#copy the ping log file to have it locally for analysis (ping stats)
@@ -381,13 +409,11 @@ class OaiCiTest():
 		result = re.search(', (?P<packetloss>[0-9\.]+)% packet loss, time [0-9\.]+ms', ping_output)
 		if result is None:
 			message = ue_header + ': Packet Loss Not Found!'
-			logging.error(f'\u001B[1;37;41m {message} \u001B[0m')
 			return (False, message)
 		packetloss = result.group('packetloss')
 		result = re.search('rtt min\/avg\/max\/mdev = (?P<rtt_min>[0-9\.]+)\/(?P<rtt_avg>[0-9\.]+)\/(?P<rtt_max>[0-9\.]+)\/[0-9\.]+ ms', ping_output)
 		if result is None:
 			message = ue_header + ': Ping RTT_Min RTT_Avg RTT_Max Not Found!'
-			logging.error(f'\u001B[1;37;41m {message} \u001B[0m')
 			return (False, message)
 		rtt_min = result.group('rtt_min')
 		rtt_avg = result.group('rtt_avg')
@@ -398,59 +424,60 @@ class OaiCiTest():
 		avg_msg = f'RTT(Avg)   : {rtt_avg} ms'
 		max_msg = f'RTT(Max)   : {rtt_max} ms'
 
-		# adding a lock for cleaner display in command line
-		printLock.acquire()
-		logging.info(f'\u001B[1;37;44m ping result for {ue_header} \u001B[0m')
-		logging.info(f'\u001B[1;34m    {pal_msg} \u001B[0m')
-		logging.info(f'\u001B[1;34m    {min_msg} \u001B[0m')
-		logging.info(f'\u001B[1;34m    {avg_msg} \u001B[0m')
-		logging.info(f'\u001B[1;34m    {max_msg} \u001B[0m')
-
 		message = f'{ue_header}\n{pal_msg}\n{min_msg}\n{avg_msg}\n{max_msg}'
 
 		#checking packet loss compliance
 		if float(packetloss) > float(self.ping_packetloss_threshold):
 			message += '\nPacket Loss too high'
-			logging.error(f'\u001B[1;37;41m Packet Loss too high; Target: {self.ping_packetloss_threshold}%\u001B[0m')
-			printLock.release()
 			return (False, message)
 		elif float(packetloss) > 0:
 			message += '\nPacket Loss is not 0%'
-			logging.info('\u001B[1;30;43m Packet Loss is not 0% \u001B[0m')
 
 		if self.ping_rttavg_threshold != '':
 			if float(rtt_avg) > float(self.ping_rttavg_threshold):
 				ping_rttavg_error_msg = f'RTT(Avg) too high: {rtt_avg} ms; Target: {self.ping_rttavg_threshold} ms'
 				message += f'\n {ping_rttavg_error_msg}'
-				logging.error('\u001B[1;37;41m'+ ping_rttavg_error_msg +' \u001B[0m')
-				printLock.release()
 				return (False, message)
-		printLock.release()
 
 		return (True, message)
 
-	def Ping(self,HTML,RAN,EPC,CONTAINERS):
+	def Ping(self, HTML, EPC, CONTAINERS):
 		if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
 
 		if self.ue_ids == []:
 			raise Exception("no module names in self.ue_ids provided")
+		# Creating destination log folder if needed on the python executor workspace
+		with cls_cmd.getConnection('localhost') as local:
+			ymlPath = CONTAINERS.yamlPath[0].split('/')
+			logPath = f'{os.getcwd()}/../cmake_targets/log/{ymlPath[-1]}'
+			local.run(f'mkdir -p {logPath}', silent=True)
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		logging.debug(ues)
-		pingLock = Lock()
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-			futures = [executor.submit(self.Ping_common, EPC, ue, RAN, CONTAINERS, pingLock) for ue in ues]
+			futures = [executor.submit(self.Ping_common, EPC, ue, logPath) for ue in ues]
 			results = [f.result() for f in futures]
 			# each result in results is a tuple, first member goes to successes, second to messages
 			successes, messages = map(list, zip(*results))
-		if len(successes) == len(ues) and all(successes):
+
+		success = len(successes) == len(ues) and all(successes)
+		logger = logging.info if success else logging.error
+		hcolor = "\u001B[1;37;44m" if success else "\u001B[1;37;41m"
+		lcolor = "\u001B[1;34m" if success else "\u001B[1;31m"
+		for m in messages:
+			lines = m.split('\n')
+			logger(f'{hcolor} ping result for {lines[0]} \u001B[0m')
+			for l in lines[1:]:
+				logger(f'{lcolor}    {l}\u001B[0m')
+
+		if success:
 			HTML.CreateHtmlTestRowQueue(self.ping_args, 'OK', messages)
 		else:
 			HTML.CreateHtmlTestRowQueue(self.ping_args, 'KO', messages)
-			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
+		return success
 
-	def Iperf_Module(self, EPC, ue, svr, RAN, idx, ue_num, CONTAINERS):
+	def Iperf_Module(self, EPC, ue, svr, idx, ue_num, logPath):
 		ueIP = ue.getIP()
 		if not ueIP:
 			return (False, f"UE {ue.getName()} has no IP address")
@@ -465,58 +492,38 @@ class OaiCiTest():
 		udpIperf = re.search('-u', iperf_opt) is not None
 		bidirIperf = re.search('--bidir', iperf_opt) is not None
 		client_filename = f'iperf_client_{self.testCase_id}_{ue.getName()}.log'
-		ymlPath = CONTAINERS.yamlPath[0].split('/')
-		logPath = f'../cmake_targets/log/{ymlPath[2]}'
-		# Creating destination log folder if needed on the python executor workspace
-		os.system(f'mkdir -p {logPath}')
 		if udpIperf:
 			target_bitrate, iperf_opt = Iperf_ComputeModifiedBW(idx, ue_num, self.iperf_profile, self.iperf_args)
 			# note: for UDP testing we don't want to use json report - reports 0 Mbps received bitrate
 			jsonReport = ""
 			# note: enable server report collection on the UE side, no need to store and collect server report separately on the server side
 			serverReport = "--get-server-output"
-			logging.info(f'iperf options modified from "{self.iperf_args}" to "{iperf_opt}" for {ue.getName()}')
 		iperf_time = Iperf_ComputeTime(self.iperf_args)
 		# hack: the ADB UEs don't have iperf in $PATH, so we need to hardcode for the moment
 		iperf_ue = '/data/local/tmp/iperf3' if re.search('adb', ue.getName()) else 'iperf3'
 		ue_header = f'UE {ue.getName()} ({ueIP})'
-		# create log directory on executor node
-		with cls_cmd.getConnection('localhost') as local:
-			local.run(f'mkdir -p {logPath}')
 		with cls_cmd.getConnection(ue.getHost()) as cmd_ue, cls_cmd.getConnection(EPC.IPAddress) as cmd_svr:
 			port = 5002 + idx
 			# note: some core setups start an iperf3 server automatically, indicated in ci_infra by runIperf3Server: False`
 			t = iperf_time * 2.5
-			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False)
+			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False, silent=True)
 			if runIperf3Server:
 				cmd_svr.run(f'{svr.getCmdPrefix()} nohup timeout -vk3 {t} iperf3 -s -B {svrIP} -p {port} -1 {jsonReport} &', timeout=t)
 			cmd_ue.run(f'{ue.getCmdPrefix()} timeout -vk3 {t} {iperf_ue} -B {ueIP} -c {svrIP} -p {port} {iperf_opt} {jsonReport} {serverReport} -O 5 >> /tmp/{client_filename}', timeout=t)
-			localPath = f'{os.getcwd()}'
-			# note: copy iperf3 log to the directory for log collection, used by pipelines running on executor machine
-			cmd_ue.copyin(f'/tmp/{client_filename}', f'{localPath}/{logPath}/{client_filename}')
 			# note: copy iperf3 log to the current directory for log analysis and log collection
-			cmd_ue.copyin(f'/tmp/{client_filename}', f'{localPath}/{client_filename}')
-			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False)
+			dest_filename = f'{logPath}/{client_filename}'
+			cmd_ue.copyin(f'/tmp/{client_filename}', dest_filename)
+			cmd_ue.run(f'rm /tmp/{client_filename}', reportNonZero=False, silent=True)
 		if udpIperf:
-			status, msg = Iperf_analyzeV3UDP(client_filename, self.iperf_bitrate_threshold, self.iperf_packetloss_threshold, target_bitrate)
+			status, msg = Iperf_analyzeV3UDP(dest_filename, self.iperf_bitrate_threshold, self.iperf_packetloss_threshold, target_bitrate)
 		elif bidirIperf:
-			status, msg = Iperf_analyzeV3BIDIRJson(client_filename)
+			status, msg = Iperf_analyzeV3BIDIRJson(dest_filename)
 		else:
-			status, msg = Iperf_analyzeV3TCPJson(client_filename, self.iperf_tcp_rate_target)
+			status, msg = Iperf_analyzeV3TCPJson(dest_filename, self.iperf_tcp_rate_target)
 
-		logging.info(f'\u001B[1;37;45m iperf result for {ue_header}\u001B[0m')
-		for l in msg.split('\n'):
-			logging.info(f'\u001B[1;35m    {l} \u001B[0m')
 		return (status, f'{ue_header}\n{msg}')
 
-	def IperfNoS1(self,HTML,RAN,EPC,CONTAINERS):
-		raise 'IperfNoS1 not implemented'
-
-	def Iperf(self,HTML,RAN,EPC,CONTAINERS):
-		result = re.search('noS1', str(RAN.Initialize_eNB_args))
-		if result is not None:
-			self.IperfNoS1(HTML,RAN,EPC,CONTAINERS)
-			return
+	def Iperf(self,HTML,EPC,CONTAINERS):
 		if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
@@ -525,21 +532,37 @@ class OaiCiTest():
 
 		if self.ue_ids == [] or self.svr_id == None:
 			raise Exception("no module names in self.ue_ids or/and self.svr_id provided")
+		# create log directory on executor node
+		with cls_cmd.getConnection('localhost') as local:
+			ymlPath = CONTAINERS.yamlPath[0].split('/')
+			logPath = f'{os.getcwd()}/../cmake_targets/log/{ymlPath[-1]}'
+			local.run(f'mkdir -p {logPath}', silent=True)
 		ues = [cls_module.Module_UE(ue_id, server_name) for ue_id, server_name in zip(self.ue_ids, self.nodes)]
 		svr = cls_module.Module_UE(self.svr_id,self.svr_node)
 		logging.debug(ues)
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-			futures = [executor.submit(self.Iperf_Module, EPC, ue, svr, RAN, i, len(ues), CONTAINERS) for i, ue in enumerate(ues)]
+			futures = [executor.submit(self.Iperf_Module, EPC, ue, svr, i, len(ues), logPath) for i, ue in enumerate(ues)]
 			results = [f.result() for f in futures]
 			# each result in results is a tuple, first member goes to successes, second to messages
 			successes, messages = map(list, zip(*results))
-		if len(successes) == len(ues) and all(successes):
+
+		success = len(successes) == len(ues) and all(successes)
+		logger = logging.info if success else logging.error
+		hcolor = "\u001B[1;37;45m" if success else "\u001B[1;37;41m"
+		lcolor = "\u001B[1;35m" if success else "\u001B[1;31m"
+		for m in messages:
+			lines = m.split('\n')
+			logger(f'{hcolor} iperf result for {lines[0]} \u001B[0m')
+			for l in lines[1:]:
+				logger(f'{lcolor}    {l}\u001B[0m')
+
+		if success:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'OK', messages)
 		else:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'KO', messages)
-			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
+		return success
 
-	def Iperf2_Unidir(self,HTML,RAN,EPC,CONTAINERS):
+	def Iperf2_Unidir(self,HTML,EPC,CONTAINERS):
 		if self.ue_ids == [] or self.svr_id == None or len(self.ue_ids) != 1:
 			raise Exception("no module names in self.ue_ids or/and self.svr_id provided, multi UE scenario not supported")
 		ue = cls_module.Module_UE(self.ue_ids[0].strip(),self.nodes[0].strip())
@@ -552,7 +575,7 @@ class OaiCiTest():
 			return (False, f"Iperf server {ue.getName()} has no IP address")
 		server_filename = f'iperf_server_{self.testCase_id}_{ue.getName()}.log'
 		ymlPath = CONTAINERS.yamlPath[0].split('/')
-		logPath = f'../cmake_targets/log/{ymlPath[-1]}'
+		logPath = f'{os.getcwd()}/../cmake_targets/log/{ymlPath[-1]}'
 		iperf_time = Iperf_ComputeTime(self.iperf_args)
 		target_bitrate, iperf_opt = Iperf_ComputeModifiedBW(0, 1, self.iperf_profile, self.iperf_args)
 		t = iperf_time*2.5
@@ -577,7 +600,7 @@ class OaiCiTest():
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'OK', [f'{ue_header}\n{msg}'])
 		else:
 			HTML.CreateHtmlTestRowQueue(self.iperf_args, 'KO', [f'{ue_header}\n{msg}'])
-			self.AutoTerminateUEandeNB(HTML,RAN,EPC,CONTAINERS)
+		return success
 
 	def AnalyzeLogFile_UE(self, UElogFile,HTML,RAN):
 		if (not os.path.isfile(f'{UElogFile}')):
@@ -858,68 +881,7 @@ class OaiCiTest():
 		archive_info = [f'Log at: {a}' if a else 'No log available' for a in archives]
 		messages = [f"UE {ue.getName()}: {log}" for (ue, log) in zip(ues, archive_info)]
 		HTML.CreateHtmlTestRowQueue(f'N/A', 'OK', messages)
-
-	def AutoTerminateUEandeNB(self,HTML,RAN,EPC,CONTAINERS):
-		if (RAN.Initialize_eNB_args != ''):
-			self.testCase_id = 'AUTO-KILL-RAN'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN nodes'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			#terminate all RAN nodes eNB/gNB/OCP
-			for instance in range(0, len(RAN.air_interface)):
-				if RAN.air_interface[instance]!='':
-					logging.debug(f'Auto Termination of Instance {instance} : {RAN.air_interface[instance]}')
-					RAN.eNB_instance=instance
-					RAN.TerminateeNB(HTML,EPC)
-		if CONTAINERS.yamlPath[0] != '':
-			self.testCase_id = 'AUTO-KILL-CONTAINERS'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN containers'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			for instance in range(0, len(CONTAINERS.yamlPath)):
-				if CONTAINERS.yamlPath[instance]!='':
-					CONTAINERS.eNB_instance=instance
-					if CONTAINERS.deployKind[instance]:
-						CONTAINERS.UndeployObject(HTML,RAN)
-					else:
-						CONTAINERS.UndeployGenObject(HTML,RAN, self)
-		RAN.prematureExit=True
-
-	#this function is called only if eNB/gNB fails to start
-	#RH to be re-factored
-	def AutoTerminateeNB(self,HTML,RAN,EPC,CONTAINERS):
-		if (RAN.Initialize_eNB_args != ''):
-			self.testCase_id = 'AUTO-KILL-RAN'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN nodes'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			#terminate all RAN nodes eNB/gNB/OCP
-			for instance in range(0, len(RAN.air_interface)):
-				if RAN.air_interface[instance]!='':
-					logging.debug(f'Auto Termination of Instance {instance} : {RAN.air_interface[instance]}')
-					RAN.eNB_instance=instance
-					RAN.TerminateeNB(HTML,EPC)
-		if CONTAINERS.yamlPath[0] != '':
-			self.testCase_id = 'AUTO-KILL-CONTAINERS'
-			HTML.testCase_id = self.testCase_id
-			self.desc = 'Automatic Termination of all RAN containers'
-			HTML.desc = self.desc
-			self.ShowTestID()
-			for instance in range(0, len(CONTAINERS.yamlPath)):
-				if CONTAINERS.yamlPath[instance]!='':
-					CONTAINERS.eNB_instance=instance
-					if CONTAINERS.deployKind[instance]:
-						CONTAINERS.UndeployObject(HTML,RAN)
-					else:
-						CONTAINERS.UndeployGenObject(HTML,RAN,self)
-		RAN.prematureExit=True
-
-	def IdleSleep(self,HTML):
-		time.sleep(self.idle_sleep_time)
-		HTML.CreateHtmlTestRow(str(self.idle_sleep_time) + ' sec', 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def LogCollectBuild(self,RAN):
 		# Some pipelines are using "none" IP / Credentials
@@ -988,12 +950,6 @@ class OaiCiTest():
 		SSH.command(f'echo {self.UEPassword} | sudo -S zip ue.log.zip ue*.log core* ue_*record.raw ue_*.pcap ue_*txt', '\$', 60)
 		SSH.command(f'echo {self.UEPassword} | sudo -S rm ue*.log core* ue_*record.raw ue_*.pcap ue_*txt', '\$', 5)
 		SSH.close()
-
-	def ConditionalExit(self):
-		if self.testUnstable:
-			if self.testStabilityPointReached or self.testMinStableId == '999999':
-				sys.exit(0)
-		sys.exit(1)
 
 	def ShowTestID(self):
 		logging.info(f'\u001B[1m----------------------------------------\u001B[0m')

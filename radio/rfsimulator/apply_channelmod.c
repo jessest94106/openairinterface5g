@@ -22,20 +22,9 @@
 */
 
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdbool.h>
-#include <errno.h>
 #include <complex.h>
-
-#include <common/utils/assertions.h>
 #include <common/utils/LOG/log.h>
-#include <common/config/config_userapi.h>
 #include <openair1/SIMULATION/TOOLS/sim.h>
-#include <common/utils/telnetsrv/telnetsrv.h>
-#include <common/utils/load_module_shlib.h>
 #include "rfsimulator.h"
 
 /*

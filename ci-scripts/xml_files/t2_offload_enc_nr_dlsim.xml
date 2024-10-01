@@ -23,7 +23,6 @@
 	<htmlTabRef>test-t2-offload-enc</htmlTabRef>
 	<htmlTabName>Test T2 Offload Encoder</htmlTabName>
 	<htmlTabIcon>tasks</htmlTabIcon>
-	<repeatCount>1</repeatCount>
         <TestCaseRequestedList>
                 000111 000112 000121 000122 000131 000132
                 000211 000212 000221 000222 000231 000232

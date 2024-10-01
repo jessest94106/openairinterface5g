@@ -509,9 +509,9 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
       int32_t median[MAX_ANT][MAX_ANT];
       for (int aatx = 0; aatx < nl; aatx++)
         for (int aarx = 0; aarx < n_rx; aarx++) {
-          // LOG_I(PHY, "nb_rb %d len %d avg_%d_%d Power per SC is %d\n",nb_rb, len,aarx, aatx,avg[aatx*n_rx+aarx]);
           avgs = cmax(avgs, avg[aatx][aarx]);
-          // LOG_I(PHY, "avgs Power per SC is %d\n", avgs);
+          LOG_D(PHY, "nb_rb %d avg_%d_%d Power per SC is %d\n", nb_rb_pdsch, aarx, aatx, avg[aatx][aarx]);
+          LOG_D(PHY, "avgs Power per SC is %d\n", avgs);
           median[aatx][aarx] = avg[aatx][aarx];
         }
       if (nl > 1) {
@@ -523,7 +523,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
         }
       }
       *log2_maxh = (log2_approx(avgs) / 2) + 1;
-      // LOG_I(PHY, "avgs Power per SC is %d lg2_maxh %d\n", avgs,  log2_maxh);
       LOG_D(PHY, "[DLSCH] AbsSubframe %d.%d log2_maxh = %d (%d)\n", frame % 1024, nr_slot_rx, *log2_maxh, avgs);
     }
     stop_meas_nr_ue_phy(ue, DLSCH_CHANNEL_LEVEL_STATS);
@@ -1099,10 +1098,9 @@ void nr_dlsch_channel_level(uint32_t rx_size_symbol,
   simde__m128i *dl_ch128, avg128D;
   //nb_rb*nre = y * 2^x
   int16_t x = factor2(len);
-  int16_t y = (len)>>x;
-  LOG_D(NR_PHY, "%s: %d = %d * 2^(%d)\n", __func__, len, y, x);
+  int16_t y = (len) >> x;
   uint32_t nb_rb_0 = len / NR_NB_SC_PER_RB + ((len % NR_NB_SC_PER_RB) ? 1 : 0);
-
+  LOG_D(NR_PHY, "nb_rb_0 %d len %d = %d * 2^(%d)\n", nb_rb_0, len, y, x);
   for (int aatx = 0; aatx < n_tx; aatx++) {
     for (int aarx = 0; aarx < n_rx; aarx++) {
       //clear average level
@@ -1118,7 +1116,7 @@ void nr_dlsch_channel_level(uint32_t rx_size_symbol,
       }
       int32_t *tmp = (int32_t *)&avg128D;
       avg[aatx][aarx] = ((int64_t)tmp[0] + tmp[1] + tmp[2] + tmp[3]) / y;
-      //  printf("Channel level : %d\n",avg[(aatx<<1)+aarx]);
+      LOG_D(PHY, "Channel level: %d\n", avg[aatx][aarx]);
     }
   }
 }
@@ -1152,7 +1150,7 @@ static void nr_dlsch_channel_level_median(uint32_t rx_size_symbol,
       }
 
       median[aatx][aarx] = (max + min) >> 1;
-      //printf("Channel level  median [%d]: %d max = %d min = %d\n",aatx*n_rx + aarx, median[aatx*n_rx + aarx],max,min);
+      LOG_D(PHY, "Channel level  median [%d][%d]: %d max = %ld min = %ld\n", aatx, aarx, median[aatx][aarx], max, min);
     }
   }
 }

@@ -2244,6 +2244,29 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
 
   asn1cSeqAdd(&sib1->si_SchedulingInfo->schedulingInfoList.list,schedulingInfo);*/
 
+  // sib19 scheduling info
+  // ensure ntn-config is initialized 
+  if (scc->ext2 && scc->ext2->ntn_Config_r17) {
+    sib1->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1610_IEs));
+    sib1->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1630_IEs));
+    sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1700_IEs));
+
+    struct NR_SI_SchedulingInfo_v1700 *sib_v17_scheduling_info = CALLOC(1, sizeof(struct NR_SI_SchedulingInfo_v1700));
+
+    struct NR_SchedulingInfo2_r17 *si_schedulinginfo2_r17 = CALLOC(1, sizeof(struct NR_SchedulingInfo2_r17));
+    si_schedulinginfo2_r17->si_BroadcastStatus_r17 = NR_SchedulingInfo2_r17__si_BroadcastStatus_r17_broadcasting;
+    si_schedulinginfo2_r17->si_WindowPosition_r17 = 2;
+    si_schedulinginfo2_r17->si_Periodicity_r17 = NR_SchedulingInfo2_r17__si_Periodicity_r17_rf8;
+
+    struct NR_SIB_TypeInfo_v1700 *sib_type_info = CALLOC(1, sizeof(struct NR_SIB_TypeInfo_v1700));
+    sib_type_info->sibType_r17.present = NR_SIB_TypeInfo_v1700__sibType_r17_PR_type1_r17;
+    sib_type_info->sibType_r17.choice.type1_r17 = NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType19;
+
+    asn1cSeqAdd(&si_schedulinginfo2_r17->sib_MappingInfo_r17.list, sib_type_info);
+    asn1cSeqAdd(&sib_v17_scheduling_info->schedulingInfoList2_r17.list, si_schedulinginfo2_r17);
+    sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700 = sib_v17_scheduling_info;
+  }
+
   // servingCellConfigCommon
   asn1cCalloc(sib1->servingCellConfigCommon, ServCellCom);
   NR_BWP_DownlinkCommon_t *initialDownlinkBWP = &ServCellCom->downlinkConfigCommon.initialDownlinkBWP;
@@ -2434,7 +2457,10 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
   // nonCriticalExtension
   // TODO: add nonCriticalExtension
 
-  //xer_fprint(stdout, &asn_DEF_NR_SIB1, (const void*)sib1_message->message.choice.c1->choice.systemInformationBlockType1);
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NR_BCCH_DL_SCH_Message, sib1_message);
+  }
+
   return sib1_message;
 }
 
@@ -2452,6 +2478,53 @@ int encode_SIB1_NR(NR_BCCH_DL_SCH_Message_t *sib1, uint8_t *buffer, int max_buff
   asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_BCCH_DL_SCH_Message, NULL, sib1, buffer, max_buffer_size);
   AssertFatal(enc_rval.encoded > 0 && enc_rval.encoded <= max_buffer_size * 8, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
   return (enc_rval.encoded + 7) / 8;
+}
+
+NR_BCCH_DL_SCH_Message_t *get_SIB19_NR(const NR_ServingCellConfigCommon_t *scc)
+{
+  NR_BCCH_DL_SCH_Message_t *sib_message = CALLOC(1, sizeof(NR_BCCH_DL_SCH_Message_t));
+  sib_message->message.present = NR_BCCH_DL_SCH_MessageType_PR_c1;
+  sib_message->message.choice.c1 = CALLOC(1,sizeof(struct NR_BCCH_DL_SCH_MessageType__c1));
+  sib_message->message.choice.c1->present = NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation;
+  sib_message->message.choice.c1->choice.systemInformation = CALLOC(1,sizeof(struct NR_SystemInformation));
+
+  struct NR_SystemInformation *sib = sib_message->message.choice.c1->choice.systemInformation;
+  sib->criticalExtensions.present = NR_SystemInformation__criticalExtensions_PR_systemInformation;
+  sib->criticalExtensions.choice.systemInformation = CALLOC(1, sizeof(struct NR_SystemInformation_IEs));
+
+  struct NR_SystemInformation_IEs *ies = sib->criticalExtensions.choice.systemInformation;
+
+  SystemInformation_IEs__sib_TypeAndInfo__Member *sib19 = NULL;
+  sib19 = CALLOC(1, sizeof(SystemInformation_IEs__sib_TypeAndInfo__Member));
+  sib19->present = NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib19_v1700;
+  sib19->choice.sib19_v1700 = CALLOC(1, sizeof(struct NR_SIB19_r17));
+
+  // use ntn-config from NR_ServingCellConfigCommon_t
+  const int copy_result = asn_copy(&asn_DEF_NR_NTN_Config_r17, (void **) &sib19->choice.sib19_v1700->ntn_Config_r17, scc->ext2->ntn_Config_r17);
+  AssertFatal(copy_result == 0, "Was unable to copy ntn_Config_r17 from scc to SIB19 structure\n");
+
+  asn1cSeqAdd(&ies->sib_TypeAndInfo.list, sib19);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NR_BCCH_DL_SCH_Message, sib_message);
+  }
+
+  return sib_message;
+}
+
+int encode_SIB19_NR(NR_BCCH_DL_SCH_Message_t *sib19, uint8_t *buffer, int max_buffer_size)
+{
+  asn_enc_rval_t enc_rval;
+
+  enc_rval = uper_encode_to_buffer(&asn_DEF_NR_BCCH_DL_SCH_Message, NULL, sib19, buffer, 150);
+  AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
+
+  return ((enc_rval.encoded + 7) / 8);
+}
+
+void free_SIB19_NR(NR_BCCH_DL_SCH_Message_t *sib19)
+{
+  ASN_STRUCT_FREE(asn_DEF_NR_BCCH_DL_SCH_Message, sib19);
 }
 
 static NR_PhysicalCellGroupConfig_t *configure_phy_cellgroup(void)

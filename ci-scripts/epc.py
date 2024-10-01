@@ -135,6 +135,7 @@ class EPCManagement():
 			logging.error('This option should not occur!')
 		mySSH.close()
 		HTML.CreateHtmlTestRow(self.Type, 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def InitializeMME(self, HTML):
 		if self.IPAddress == '' or self.UserName == '' or self.Password == '' or self.SourceCodePath == '' or self.Type == '':
@@ -175,6 +176,7 @@ class EPCManagement():
 			logging.error('This option should not occur!')
 		mySSH.close()
 		HTML.CreateHtmlTestRow(self.Type, 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def SetMmeIPAddress(self):
 		# Not an error if we don't need an EPC
@@ -241,12 +243,14 @@ class EPCManagement():
 			logging.error('This option should not occur!')
 		mySSH.close()
 		HTML.CreateHtmlTestRow(self.Type, 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def Initialize5GCN(self, HTML):
 		if self.IPAddress == '' or self.UserName == '' or self.Password == '' or self.Type == '':
 			HELP.GenericHelp(CONST.Version)
 			HELP.EPCSrvHelp(self.IPAddress, self.UserName, self.Password, self.Type)
-			sys.exit('Insufficient EPC Parameters')
+			logging.error('Insufficient EPC Parameters')
+			return False
 		mySSH = cls_cmd.getConnection(self.IPAddress)
 		html_cell = ''
 		if re.match('ltebox', self.Type, re.IGNORECASE):
@@ -306,7 +310,8 @@ class EPCManagement():
 				HTML.CreateHtmlTestRow('N/A', 'KO', report)
 				HTML.CreateHtmlTabFooter(False)
 				mySSH.close()
-				sys.exit("OC OAI CN5G: CN deployment failed!")
+				logging.error("OC OAI CN5G: CN deployment failed!")
+				return False
 			for line in report.stdout.split('\n')[1:]:
 				columns = line.strip().split()
 				name = columns[0]
@@ -317,6 +322,7 @@ class EPCManagement():
 			logging.error('This option should not occur!')
 		mySSH.close()
 		HTML.CreateHtmlTestRowQueue(self.Type, 'OK', [html_cell])
+		return True
 
 	def SetAmfIPAddress(self):
 		# Not an error if we don't need an 5GCN
@@ -472,6 +478,7 @@ class EPCManagement():
 			logging.error('This should not happen!')
 		mySSH.close()
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def TerminateMME(self, HTML):
 		mySSH = SSH.SSHConnection()
@@ -499,6 +506,7 @@ class EPCManagement():
 			logging.error('This should not happen!')
 		mySSH.close()
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def TerminateSPGW(self, HTML):
 		mySSH = SSH.SSHConnection()
@@ -542,6 +550,7 @@ class EPCManagement():
 			logging.error('This should not happen!')
 		mySSH.close()
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
+		return True
 
 	def Terminate5GCN(self, HTML):
 		mySSH = cls_cmd.getConnection(self.IPAddress)
@@ -583,25 +592,29 @@ class EPCManagement():
 			if not succeeded:
 				HTML.CreateHtmlTestRow('N/A', 'KO', report)
 				HTML.CreateHtmlTabFooter(False)
-				sys.exit("OC OAI CN5G: CN undeployment failed!")
+				logging.error("OC OAI CN5G: CN undeployment failed!")
+				return False
 			else:
 				message = report.stdout
 		else:
 			logging.error('This should not happen!')
 		mySSH.close()
 		HTML.CreateHtmlTestRowQueue(self.Type, 'OK', [message])
+		return True
 
 	def DeployEpc(self, HTML):
 		logging.debug('Trying to deploy')
 		if not re.match('OAI-Rel14-Docker', self.Type, re.IGNORECASE):
 			HTML.CreateHtmlTestRow(self.Type, 'KO', CONST.INVALID_PARAMETER)
 			HTML.CreateHtmlTabFooter(False)
-			sys.exit('Deploy not possible with this EPC type: ' + self.Type)
+			logging.error('Deploy not possible with this EPC type: ' + self.Type)
+			return False
 
 		if self.IPAddress == '' or self.UserName == '' or self.Password == '' or self.SourceCodePath == '' or self.Type == '':
 			HELP.GenericHelp(CONST.Version)
 			HELP.EPCSrvHelp(self.IPAddress, self.UserName, self.Password, self.SourceCodePath, self.Type)
-			sys.exit('Insufficient EPC Parameters')
+			logging.error('Insufficient EPC Parameters')
+			return False
 		mySSH = SSH.SSHConnection()
 		mySSH.open(self.IPAddress, self.UserName, self.Password)
 		mySSH.command('docker-compose --version', '\$', 5)
@@ -610,7 +623,8 @@ class EPCManagement():
 			mySSH.close()
 			HTML.CreateHtmlTestRow(self.Type, 'KO', CONST.INVALID_PARAMETER)
 			HTML.CreateHtmlTabFooter(False)
-			sys.exit('docker-compose not installed on ' + self.IPAddress)
+			logging.error('docker-compose not installed on ' + self.IPAddress)
+			return False
 
 		# Checking if it is a MAGMA deployment
 		self.isMagmaUsed = False
@@ -660,7 +674,8 @@ class EPCManagement():
 		if not db_init_status:
 			HTML.CreateHtmlTestRow(self.Type, 'KO', CONST.INVALID_PARAMETER)
 			HTML.CreateHtmlTabFooter(False)
-			sys.exit('Cassandra DB deployment/configuration went wrong!')
+			logging.error('Cassandra DB deployment/configuration went wrong!')
+			return True
 
 		# deploying EPC cNFs
 		mySSH.command('docker-compose up -d oai_spgwu', '\$', 60)
@@ -729,10 +744,12 @@ class EPCManagement():
 			mySSH.close()
 			logging.debug('Deployment OK')
 			HTML.CreateHtmlTestRowQueue(self.Type, 'OK', [html_cell])
+			return True
 		else:
 			mySSH.close()
 			logging.debug('Deployment went wrong')
 			HTML.CreateHtmlTestRowQueue(self.Type, 'KO', [html_cell])
+			return False
 
 	def UndeployEpc(self, HTML):
 		logging.debug('Trying to undeploy')
@@ -802,9 +819,11 @@ class EPCManagement():
 		if noMoreContainerNb == nbContainers and noMoreNetworkNb == 2:
 			logging.debug('Undeployment OK')
 			HTML.CreateHtmlTestRowQueue(self.Type, 'OK', [message])
+			return True
 		else:
 			logging.debug('Undeployment went wrong')
 			HTML.CreateHtmlTestRowQueue(self.Type, 'KO', [message])
+			return False
 
 	def LogCollectHSS(self):
 		mySSH = SSH.SSHConnection()

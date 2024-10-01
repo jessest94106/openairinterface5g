@@ -263,7 +263,8 @@ class Cluster:
 			return False
 		for image in self.imageToPull:
 			imagePrefix = f'{self.OCRegistry}/{CI_OC_RAN_NAMESPACE}'
-			imageTag = cls_containerize.ImageTagToUse(image, self.ranCommitID, self.ranBranch, self.ranAllowMerge)
+			tag = cls_containerize.CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
+			imageTag = f"{image}:{tag}"
 			ret = cmd.run(f'docker pull {imagePrefix}/{imageTag}')
 			if ret.returncode != 0:
 				logging.error(f'Could not pull {image} from local registry : {self.OCRegistry}')

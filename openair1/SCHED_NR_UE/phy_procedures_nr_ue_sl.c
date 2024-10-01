@@ -149,7 +149,12 @@ static int nr_ue_psbch_procedures(PHY_VARS_NR_UE *ue,
   } else {
     result = decoded_pdu;
     sl_phy_params->psbch.rx_ok++;
-    LOG_I(NR_PHY, "%d:%d PSBCH RX:OK. RSRP: %d dB/RE\n", proc->frame_rx, proc->nr_slot_rx, sl_phy_params->psbch.rsrp_dB_per_RE);
+    LOG_I(NR_PHY,
+          "[UE%d] %d:%d PSBCH RX:OK. RSRP: %d dB/RE\n",
+          ue->Mod_id,
+          proc->frame_rx,
+          proc->nr_slot_rx,
+          sl_phy_params->psbch.rsrp_dB_per_RE);
   }
 
   nr_fill_sl_indication(&sl_indication, &rx_ind, NULL, proc, ue, phy_data);
@@ -191,7 +196,7 @@ int psbch_pscch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr
     const int numsym = (fp->Ncp) ? SL_NR_NUM_SYMBOLS_SSB_EXT_CP : SL_NR_NUM_SYMBOLS_SSB_NORMAL_CP;
 
     for (int sym = 0; sym < numsym;) {
-      nr_slot_fep(ue, fp, proc, sym, rxdataF, link_type_sl);
+      nr_slot_fep(ue, fp, proc->nr_slot_rx, sym, rxdataF, link_type_sl, 0, ue->common_vars.rxdata);
 
       start_meas(&sl_phy_params->channel_estimation_stats);
       nr_pbch_channel_estimation(fp,

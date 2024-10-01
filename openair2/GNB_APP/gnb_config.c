@@ -216,6 +216,13 @@ void prepare_scc(NR_ServingCellConfigCommon_t *scc) {
   scc->ext2 = CALLOC(1, sizeof(*scc->ext2));
   scc->ext2->ntn_Config_r17 = CALLOC(1, sizeof(*scc->ext2->ntn_Config_r17));
   scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 = CALLOC(1, sizeof(*scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17));
+
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17 = CALLOC(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17));
+  scc->ext2->ntn_Config_r17->ta_Info_r17 = CALLOC(1, sizeof(*scc->ext2->ntn_Config_r17->ta_Info_r17));
+
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present = NR_EphemerisInfo_r17_PR_positionVelocity_r17;
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17 =
+      CALLOC(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17));
 }
 
 // Section 4.1 in 38.213
@@ -436,8 +443,27 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
   AssertFatal(*scc->uplinkConfigCommon->initialUplinkBWP->pucch_ConfigCommon->choice.setup->pucch_ResourceCommon < 2,
 	      "pucch_ResourceConfig should be 0 or 1 for now\n");
 
-  if(*scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 == 0) {
+  if (*scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 == 0) {
     free(scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17);
+    scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 = NULL;
+  }
+  if (scc->ext2->ntn_Config_r17->ta_Info_r17->ta_Common_r17 == -1) {
+    free(scc->ext2->ntn_Config_r17->ta_Info_r17);
+    scc->ext2->ntn_Config_r17->ta_Info_r17 = NULL;
+  }
+  if (scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionX_r17 == LONG_MAX
+      && scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionY_r17 == LONG_MAX
+      && scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionZ_r17 == LONG_MAX
+      && scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->velocityVX_r17 == LONG_MAX
+      && scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->velocityVY_r17 == LONG_MAX
+      && scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->velocityVZ_r17 == LONG_MAX) {
+    free(scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17);
+    free(scc->ext2->ntn_Config_r17->ephemerisInfo_r17);
+    scc->ext2->ntn_Config_r17->ephemerisInfo_r17 = NULL;
+  }
+
+  if (!scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 && !scc->ext2->ntn_Config_r17->ta_Info_r17
+      && !scc->ext2->ntn_Config_r17->ephemerisInfo_r17) {
     free(scc->ext2->ntn_Config_r17);
     free(scc->ext2);
     scc->ext2 = NULL;
@@ -1447,9 +1473,12 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     f1ap_served_cell_info_t info;
     read_du_cell_info(cfg, NODE_IS_DU(node_type), &gnb_id, &gnb_du_id, &name, &info, 1);
 
-    if (get_softmodem_params()->sa)
+    if (get_softmodem_params()->sa) {
       nr_mac_configure_sib1(RC.nrmac[0], &info.plmn, info.nr_cellid, *info.tac);
-
+      if (scc->ext2 && scc->ext2->ntn_Config_r17)
+        nr_mac_configure_sib19(RC.nrmac[0]);
+    }
+    
     // read F1 Setup information from config and generated MIB/SIB1
     // and store it at MAC for sending later
     NR_BCCH_BCH_Message_t *mib = RC.nrmac[0]->common_channels[0].mib;

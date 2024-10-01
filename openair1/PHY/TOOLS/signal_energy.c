@@ -21,7 +21,6 @@
 
 #include "tools_defs.h"
 #include "PHY/impl_defs_top.h"
-#include "PHY/sse_intrin.h"
 
 // Compute Energy of a complex signal vector, removing the DC component!
 // input  : points to vector
