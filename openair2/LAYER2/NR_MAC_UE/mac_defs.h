@@ -609,6 +609,7 @@ typedef struct NR_UE_MAC_INST_s {
   bool pucch_power_control_initialized;
   int f_b_f_c;
   bool pusch_power_control_initialized;
+  int delta_msg2;
 } NR_UE_MAC_INST_t;
 
 /*@}*/

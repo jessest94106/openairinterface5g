@@ -240,6 +240,12 @@ int get_pusch_tx_power_ue(
   bool is_rar_tx_retx,
   bool transform_precoding);
 
+int get_srs_tx_power_ue(NR_UE_MAC_INST_t *mac,
+                        NR_SRS_Resource_t *srs_resource,
+                        NR_SRS_ResourceSet_t *srs_resource_set,
+                        int delta_srs,
+                        bool is_configured_for_pusch_on_current_bwp);
+
 int nr_ue_configure_pucch(NR_UE_MAC_INST_t *mac,
                            int slot,
                            frame_t frame,

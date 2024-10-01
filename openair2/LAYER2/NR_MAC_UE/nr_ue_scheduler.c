@@ -1058,7 +1058,8 @@ int configure_srs_pdu(NR_UE_MAC_INST_t *mac,
                       NR_SRS_Resource_t *srs_resource,
                       fapi_nr_ul_config_srs_pdu *srs_config_pdu,
                       int period,
-                      int offset)
+                      int offset,
+                      NR_SRS_ResourceSet_t *srs_resource_set)
 {
   NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
 
@@ -1099,6 +1100,11 @@ int configure_srs_pdu(NR_UE_MAC_INST_t *mac,
     srs_config_pdu->t_srs = period;
     srs_config_pdu->t_offset = offset;
   }
+
+  bool is_configured_for_pusch_on_current_bwp = true;
+  int delta_srs = 0; // DCI format 2_3 not implemented
+  srs_config_pdu->tx_power =
+      get_srs_tx_power_ue(mac, srs_resource, srs_resource_set, delta_srs, is_configured_for_pusch_on_current_bwp);
 
 #ifdef SRS_DEBUG
   LOG_I(NR_MAC,"Frame = %i, slot = %i\n", frame, slot);
@@ -1142,10 +1148,11 @@ void nr_ue_aperiodic_srs_scheduling(NR_UE_MAC_INST_t *mac, long resource_trigger
 
   int slot_offset = 0;
   NR_SRS_Resource_t *srs_resource = NULL;
+  NR_SRS_ResourceSet_t *srs_resource_set = NULL;
   for(int rs = 0; rs < srs_config->srs_ResourceSetToAddModList->list.count; rs++) {
 
     // Find aperiodic resource set
-    NR_SRS_ResourceSet_t *srs_resource_set = srs_config->srs_ResourceSetToAddModList->list.array[rs];
+    srs_resource_set = srs_config->srs_ResourceSetToAddModList->list.array[rs];
     if(srs_resource_set->resourceType.present != NR_SRS_ResourceSet__resourceType_PR_aperiodic)
       continue;
     // the resource trigger need to match the DCI one
@@ -1186,7 +1193,7 @@ void nr_ue_aperiodic_srs_scheduling(NR_UE_MAC_INST_t *mac, long resource_trigger
   fapi_nr_ul_config_request_pdu_t *pdu = lockGet_ul_config(mac, sched_frame, sched_slot, FAPI_NR_UL_CONFIG_TYPE_SRS);
   if (!pdu)
     return;
-  int ret = configure_srs_pdu(mac, srs_resource, &pdu->srs_config_pdu, 0, 0);
+  int ret = configure_srs_pdu(mac, srs_resource, &pdu->srs_config_pdu, 0, 0, srs_resource_set);
   if (ret != 0)
     remove_ul_config_last_item(pdu);
   release_ul_config(pdu, false);
@@ -1204,9 +1211,10 @@ static bool nr_ue_periodic_srs_scheduling(NR_UE_MAC_INST_t *mac, frame_t frame, 
   }
 
   bool srs_scheduled = false;
+  NR_SRS_ResourceSet_t *srs_resource_set = NULL;
   for(int rs = 0; rs < srs_config->srs_ResourceSetToAddModList->list.count; rs++) {
     // Find periodic resource set
-    NR_SRS_ResourceSet_t *srs_resource_set = srs_config->srs_ResourceSetToAddModList->list.array[rs];
+    srs_resource_set = srs_config->srs_ResourceSetToAddModList->list.array[rs];
     if(srs_resource_set->resourceType.present != NR_SRS_ResourceSet__resourceType_PR_periodic) {
       continue;
     }
@@ -1237,7 +1245,7 @@ static bool nr_ue_periodic_srs_scheduling(NR_UE_MAC_INST_t *mac, frame_t frame, 
       fapi_nr_ul_config_request_pdu_t *pdu = lockGet_ul_config(mac, frame, slot, FAPI_NR_UL_CONFIG_TYPE_SRS);
       if (!pdu)
         return false;
-      int ret = configure_srs_pdu(mac, srs_resource, &pdu->srs_config_pdu, period, offset);
+      int ret = configure_srs_pdu(mac, srs_resource, &pdu->srs_config_pdu, period, offset, srs_resource_set);
       if (ret != 0)
         remove_ul_config_last_item(pdu);
       else
