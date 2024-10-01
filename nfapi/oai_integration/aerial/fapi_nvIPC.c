@@ -102,16 +102,8 @@ static int ipc_handle_rx_msg(nv_ipc_t *ipc, nv_ipc_msg_t *msg)
     }
   }
 
-  int messageBufLen = msg->msg_len;
-  int dataBufLen = msg->data_len;
-  uint8_t msgbuf[messageBufLen];
-  uint8_t databuf[dataBufLen];
-  memcpy(msgbuf, msg->msg_buf, messageBufLen);
-  memcpy(databuf, msg->data_buf, dataBufLen);
-  uint8_t *pReadPackedMessage = msgbuf;
-  uint8_t *pReadData = databuf;
-  uint8_t *end = msgbuf + messageBufLen;
-  uint8_t *data_end = databuf + dataBufLen;
+  uint8_t *pReadPackedMessage = msg->msg_buf;
+  uint8_t *end = msg->msg_buf + msg->msg_len;
 
   // unpack FAPI messages and handle them
   if (vnf_config != 0) {
@@ -209,6 +201,9 @@ static int ipc_handle_rx_msg(nv_ipc_t *ipc, nv_ipc_msg_t *msg)
       }
 
       case NFAPI_NR_PHY_MSG_TYPE_RX_DATA_INDICATION: {
+        uint8_t *pReadData = msg->data_buf;
+        int dataBufLen = msg->data_len;
+        uint8_t *data_end = msg->data_buf + dataBufLen;
         nfapi_nr_rx_data_indication_t ind;
         ind.header.message_id = fapi_msg.message_id;
         ind.header.message_length = fapi_msg.message_length;
