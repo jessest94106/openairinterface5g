@@ -34,55 +34,60 @@ typedef struct {
 #define TO_TEXT(LabEl, nUmID) {nUmID, #LabEl},
 #define TO_ENUM(LabEl, nUmID ) LabEl = nUmID,
 
-#define FOREACH_TYPE(TYPE_DEF)                               \
-  TYPE_DEF(REGISTRATION_REQUEST, 0x41)                       \
-  TYPE_DEF(REGISTRATION_ACCEPT, 0x42)                        \
-  TYPE_DEF(REGISTRATION_COMPLETE, 0x43)                      \
-  TYPE_DEF(REGISTRATION_REJECT, 0x44)                        \
-  TYPE_DEF(FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING, 0x45)  \
-  TYPE_DEF(FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING, 0x46)   \
-  TYPE_DEF(DeregistrationrequestUEterminated, 0x47)          \
-  TYPE_DEF(DeregistrationacceptUEterminated, 0x48)           \
-  TYPE_DEF(FGS_SERVICE_REQUEST, 0x4c)                        \
-  TYPE_DEF(FGS_SERVICE_REJECT, 0x4d)                         \
-  TYPE_DEF(FGS_SERVICE_ACCEPT, 0x4e)                         \
-  TYPE_DEF(Controlplaneservicerequest, 0x4f)                 \
-  TYPE_DEF(Networkslicespecificauthenticationcommand, 0x50)  \
-  TYPE_DEF(Networkslicespecificauthenticationcomplete, 0x51) \
-  TYPE_DEF(Networkslicespecificauthenticationresult, 0x52)   \
-  TYPE_DEF(Configurationupdatecommand, 0x54)                 \
-  TYPE_DEF(Configurationupdatecomplete, 0x55)                \
-  TYPE_DEF(FGS_AUTHENTICATION_REQUEST, 0x56)                 \
-  TYPE_DEF(FGS_AUTHENTICATION_RESPONSE, 0x57)                \
-  TYPE_DEF(Authenticationreject, 0x58)                       \
-  TYPE_DEF(Authenticationfailure, 0x59)                      \
-  TYPE_DEF(Authenticationresult, 0x5a)                       \
-  TYPE_DEF(FGS_IDENTITY_REQUEST, 0x5b)                       \
-  TYPE_DEF(FGS_IDENTITY_RESPONSE, 0x5c)                      \
-  TYPE_DEF(FGS_SECURITY_MODE_COMMAND, 0x5d)                  \
-  TYPE_DEF(FGS_SECURITY_MODE_COMPLETE, 0x5e)                 \
-  TYPE_DEF(Securitymodereject, 0x5f)                         \
-  TYPE_DEF(SGMMstatus, 0x64)                                 \
-  TYPE_DEF(Notification, 0x65)                               \
-  TYPE_DEF(Notificationresponse, 0x66)                       \
-  TYPE_DEF(FGS_UPLINK_NAS_TRANSPORT, 0x67)                   \
-  TYPE_DEF(FGS_DOWNLINK_NAS_TRANSPORT, 0x68)                 \
-  TYPE_DEF(FGS_PDU_SESSION_ESTABLISHMENT_REQ, 0xc1)          \
-  TYPE_DEF(FGS_PDU_SESSION_ESTABLISHMENT_ACC, 0xc2)          \
-  TYPE_DEF(FGS_PDU_SESSION_ESTABLISHMENT_REJ, 0xc3)          \
-  TYPE_DEF(PDUsessionauthenticationcommand, 0xc5)            \
-  TYPE_DEF(PDUsessionauthenticationcomplete, 0xc6)           \
-  TYPE_DEF(PDUsessionauthenticationresult, 0xc7)             \
-  TYPE_DEF(PDUsessionmodificationrequest, 0xc9)              \
-  TYPE_DEF(PDUsessionmodificationreject, 0xca)               \
-  TYPE_DEF(PDUsessionmodificationcommand, 0xcb)              \
-  TYPE_DEF(PDUsessionmodificationcomplete, 0xcc)             \
-  TYPE_DEF(PDUsessionmodificationcommandreject, 0xcd)        \
-  TYPE_DEF(PDUsessionreleaserequest, 0xd1)                   \
-  TYPE_DEF(PDUsessionreleasereject, 0xd2)                    \
-  TYPE_DEF(PDUsessionreleasecommand, 0xd3)                   \
-  TYPE_DEF(PDUsessionreleasecomplete, 0xd4)                  \
-  TYPE_DEF(SGSMstatus, 0xd6)
+/* Message types defintions for:
+   (a) 5GS Mobility Management (5GMM) (IDs 0x41 - 0x68)
+       Table 9.7.1 of 3GPP TS 24.501
+   (b) 5GS Session Management (5GSM) (IDs 0xc1 - 0xd6)
+       Table 9.7.2 of 3GPP TS 24.501 */
+#define FOREACH_TYPE(TYPE_DEF)                                         \
+  TYPE_DEF(FGS_REGISTRATION_REQUEST, 0x41)                             \
+  TYPE_DEF(FGS_REGISTRATION_ACCEPT, 0x42)                              \
+  TYPE_DEF(FGS_REGISTRATION_COMPLETE, 0x43)                            \
+  TYPE_DEF(FGS_REGISTRATION_REJECT, 0x44)                              \
+  TYPE_DEF(FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING, 0x45)            \
+  TYPE_DEF(FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING, 0x46)             \
+  TYPE_DEF(FGS_DEREGISTRATION_REQUEST_UE_TERMINATED, 0x47)             \
+  TYPE_DEF(FGS_DEREGISTRATION_ACCEPT_UE_TERMINATED, 0x48)              \
+  TYPE_DEF(FGS_SERVICE_REQUEST, 0x4c)                                  \
+  TYPE_DEF(FGS_SERVICE_REJECT, 0x4d)                                   \
+  TYPE_DEF(FGS_SERVICE_ACCEPT, 0x4e)                                   \
+  TYPE_DEF(FGS_CONTROL_PLANE_SERVICE_REQUEST, 0x4f)                    \
+  TYPE_DEF(FGS_NSS_AUTHENTICATION_COMMAND, 0x50)                       \
+  TYPE_DEF(FGS_NSS_AUTHENTICATION_COMPLETE, 0x51)                      \
+  TYPE_DEF(FGS_NSS_AUTHENTICATION_RESULT, 0x52)                        \
+  TYPE_DEF(FGS_CONFIGURATION_UPDATE_COMMAND, 0x54)                     \
+  TYPE_DEF(FGS_CONFIGURATION_UPDATE_COMPLETE, 0x55)                    \
+  TYPE_DEF(FGS_AUTHENTICATION_REQUEST, 0x56)                           \
+  TYPE_DEF(FGS_AUTHENTICATION_RESPONSE, 0x57)                          \
+  TYPE_DEF(FGS_AUTHENTICATION_REJECT, 0x58)                            \
+  TYPE_DEF(FGS_AUTHENTICATION_FAILURE, 0x59)                           \
+  TYPE_DEF(FGS_AUTHENTICATION_RESULT, 0x5a)                            \
+  TYPE_DEF(FGS_IDENTITY_REQUEST, 0x5b)                                 \
+  TYPE_DEF(FGS_IDENTITY_RESPONSE, 0x5c)                                \
+  TYPE_DEF(FGS_SECURITY_MODE_COMMAND, 0x5d)                            \
+  TYPE_DEF(FGS_SECURITY_MODE_COMPLETE, 0x5e)                           \
+  TYPE_DEF(FGS_SECURITY_MODE_REJECT, 0x5f)                             \
+  TYPE_DEF(FGS_5GMM_STATUS, 0x64)                                      \
+  TYPE_DEF(FGS_NOTIFICATION, 0x65)                                     \
+  TYPE_DEF(FGS_NOTIFICATION_RESPONSE, 0x66)                            \
+  TYPE_DEF(FGS_UPLINK_NAS_TRANSPORT, 0x67)                             \
+  TYPE_DEF(FGS_DOWNLINK_NAS_TRANSPORT, 0x68)                           \
+  TYPE_DEF(FGS_PDU_SESSION_ESTABLISHMENT_REQ, 0xc1)                    \
+  TYPE_DEF(FGS_PDU_SESSION_ESTABLISHMENT_ACC, 0xc2)                    \
+  TYPE_DEF(FGS_PDU_SESSION_ESTABLISHMENT_REJ, 0xc3)                    \
+  TYPE_DEF(FGS_PDU_SESSION_AUTH_COMMAND, 0xc5)                         \
+  TYPE_DEF(FGS_PDU_SESSION_AUTH_COMPLETE, 0xc6)                        \
+  TYPE_DEF(FGS_PDU_SESSION_AUTH_RESULT, 0xc7)                          \
+  TYPE_DEF(FGS_PDU_SESSION_MODIFICATION_REQ, 0xc9)                     \
+  TYPE_DEF(FGS_PDU_SESSION_MODIFICATION_REJ, 0xca)                     \
+  TYPE_DEF(FGS_PDU_SESSION_MODIFICATION_COMMAND, 0xcb)                 \
+  TYPE_DEF(FGS_PDU_SESSION_MODIFICATION_COMPLETE, 0xcc)                \
+  TYPE_DEF(FGS_PDU_SESSION_MODIFICATION_COMMAND_REJ, 0xcd)             \
+  TYPE_DEF(FGS_PDU_SESSION_RELEASE_REQ, 0xd1)                          \
+  TYPE_DEF(FGS_PDU_SESSION_RELEASE_REJ, 0xd2)                          \
+  TYPE_DEF(FGS_PDU_SESSION_RELEASE_COMMAND, 0xd3)                      \
+  TYPE_DEF(FGS_PDU_SESSION_RELEASE_COMPLETE, 0xd4)                     \
+  TYPE_DEF(FGS_5GSM_STATUS, 0xd6)
 
 static const text_info_t message_text_info[] = {
   FOREACH_TYPE(TO_TEXT)
@@ -91,7 +96,7 @@ static const text_info_t message_text_info[] = {
 //! Tasks id of each task
 typedef enum {
   FOREACH_TYPE(TO_ENUM)
-} SGSmobilitymanagementmessages_t;
+} fgs_nas_msg_t;
 
 // TS 24.501
 typedef enum {

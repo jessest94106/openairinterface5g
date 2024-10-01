@@ -24,6 +24,7 @@
 #include "PduSessionEstablishmentAccept.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/tun_if.h"
+#include "NR_NAS_defs.h"
 
 static uint16_t getShort(uint8_t *input)
 {
