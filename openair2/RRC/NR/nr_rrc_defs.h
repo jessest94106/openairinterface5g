@@ -69,14 +69,6 @@
 
 #include "intertask_interface.h"
 
-/* TODO: be sure this include is correct.
- * It solves a problem of compilation of the RRH GW,
- * issue #186.
- */
-  #include "as_message.h"
-
-  #include "commonDef.h"
-
 #define PROTOCOL_NR_RRC_CTXT_UE_FMT                PROTOCOL_CTXT_FMT
 #define PROTOCOL_NR_RRC_CTXT_UE_ARGS(CTXT_Pp)      PROTOCOL_NR_CTXT_ARGS(CTXT_Pp)
 
