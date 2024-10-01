@@ -56,7 +56,7 @@ paramdef_t websrvoptions[] = {
     {"listenport", "<local port>\n", 0, uptr : &(websrvparams.listenport), defuintval : 8090, TYPE_UINT, 0},
     {"priority", "<scheduling policy (0-99)\n", 0, iptr : &websrvparams.priority, defuintval : 0, TYPE_INT, 0},
     {"debug", "<debug level>\n", 0, uptr : &websrvparams.dbglvl, defuintval : 0, TYPE_UINT, 0},
-    {"fpath", "<file directory>\n", 0, strptr : &websrvparams.fpath, defstrval : "websrv", TYPE_STRING, 0},
+    {"fpath", "<file directory>\n", 0, strptr : &websrvparams.fpath, defstrval : "common/utils/websrv", TYPE_STRING, 0},
     {"cert", "<cert file>\n", 0, strptr : &websrvparams.certfile, defstrval : NULL, TYPE_STRING, 0},
     {"key", "<key file>\n", 0, strptr : &websrvparams.keyfile, defstrval : NULL, TYPE_STRING, 0},
     {"rootca", "<root ca file>\n", 0, strptr : &websrvparams.rootcafile, defstrval : NULL, TYPE_STRING, 0},

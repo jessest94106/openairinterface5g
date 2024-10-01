@@ -244,7 +244,7 @@ The web server back-end is using the [oai configuration module](Config/Rtusage).
 | `listenaddr` | `ipV4 address, ascii format` | "0.0.0.0" | local address the back-end  is listening on |
 | `listenport` | `integer` | 8090 | port number the server is listening on |
 | debug | `integer` | 0 | When not 0, http  requests headers and json objects dump are added to back-end traces |
-| fpath | character string | websrv | The path to on-disk http server resources . The default value matches the front-end installation when running  the softmodem from the executables repository. |
+| fpath | character string | common/utils/websrv | The path to on-disk http server resources . The default value matches the front-end installation when running  the softmodem from the executables repository. |
 | cert, key, rootca | `character string` | null | certificates and key used to trigger https protocol (not tested) |
 |                   |                              |                   |                                                              |
 
