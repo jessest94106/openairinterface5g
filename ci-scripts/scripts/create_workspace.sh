@@ -23,3 +23,4 @@ git config advice.detachedHead false
 mkdir -p cmake_targets/log
 git checkout -f ${ref}
 [ -n "${merge}" ] && git merge --ff ${merge} -m "Temporary merge for CI"
+exit 0
