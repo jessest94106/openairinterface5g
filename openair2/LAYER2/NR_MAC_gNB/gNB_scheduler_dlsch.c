@@ -736,6 +736,53 @@ static void pf_dl(module_id_t module_id,
     NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;
     sched_pdsch->dl_harq_pid = sched_ctrl->available_dl_harq.head;
 
+    /* MCS has been set above */
+    sched_pdsch->time_domain_allocation = get_dl_tda(mac, scc, slot);
+    AssertFatal(sched_pdsch->time_domain_allocation>=0,"Unable to find PDSCH time domain allocation in list\n");
+
+    const int coresetid = sched_ctrl->coreset->controlResourceSetId;
+    sched_pdsch->tda_info = get_dl_tda_info(dl_bwp,
+                                            sched_ctrl->search_space->searchSpaceType->present,
+                                            sched_pdsch->time_domain_allocation,
+                                            scc->dmrs_TypeA_Position,
+                                            1,
+                                            TYPE_C_RNTI_,
+                                            coresetid,
+                                            false);
+    AssertFatal(sched_pdsch->tda_info.valid_tda, "Invalid TDA from get_dl_tda_info\n");
+
+    NR_tda_info_t *tda_info = &sched_pdsch->tda_info;
+
+    const uint16_t slbitmap = SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
+
+    // TODO assuming beam 0 for now
+    uint16_t *rballoc_mask = mac->common_channels[CC_id].vrb_map[0];
+    dl_bwp_info_t bwp_info = get_bwp_start_size(mac, iterator->UE);
+    int rbStart = 0; // WRT BWP start
+    int rbStop = bwp_info.bwpSize - 1;
+    int bwp_start = bwp_info.bwpStart;
+    // Freq-demain allocation
+    while (rbStart < rbStop && (rballoc_mask[rbStart + bwp_start] & slbitmap))
+      rbStart++;
+
+    uint16_t max_rbSize = 1;
+
+    while (rbStart + max_rbSize <= rbStop && !(rballoc_mask[rbStart + max_rbSize + bwp_start] & slbitmap))
+      max_rbSize++;
+
+    if (max_rbSize < min_rbSize) {
+      LOG_D(NR_MAC,
+            "(%d.%d) Cannot schedule RNTI %04x, rbStart %d, rbSize %d, rbStop %d\n",
+            frame,
+            slot,
+            rnti,
+            rbStart,
+            max_rbSize,
+            rbStop);
+      iterator++;
+      continue;
+    }
+
     // TODO properly set the beam index (currently only done for RA)
     int beam = 0;
 
@@ -777,40 +824,6 @@ static void pf_dl(module_id_t module_id,
 
     sched_ctrl->cce_index = CCEIndex;
     fill_pdcch_vrb_map(mac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, beam);
-
-    /* MCS has been set above */
-    sched_pdsch->time_domain_allocation = get_dl_tda(mac, scc, slot);
-    AssertFatal(sched_pdsch->time_domain_allocation>=0,"Unable to find PDSCH time domain allocation in list\n");
-
-    const int coresetid = sched_ctrl->coreset->controlResourceSetId;
-    sched_pdsch->tda_info = get_dl_tda_info(dl_bwp,
-                                            sched_ctrl->search_space->searchSpaceType->present,
-                                            sched_pdsch->time_domain_allocation,
-                                            scc->dmrs_TypeA_Position,
-                                            1,
-                                            TYPE_C_RNTI_,
-                                            coresetid,
-                                            false);
-    AssertFatal(sched_pdsch->tda_info.valid_tda, "Invalid TDA from get_dl_tda_info\n");
-
-    NR_tda_info_t *tda_info = &sched_pdsch->tda_info;
-
-    const uint16_t slbitmap = SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
-
-    // TODO assuming beam 0 for now
-    uint16_t *rballoc_mask = mac->common_channels[CC_id].vrb_map[0];
-    dl_bwp_info_t bwp_info = get_bwp_start_size(mac, iterator->UE);
-    int rbStart = 0;  // WRT BWP start
-    int rbStop = bwp_info.bwpSize - 1;
-    int bwp_start = bwp_info.bwpStart;
-    // Freq-demain allocation
-    while (rbStart < rbStop && (rballoc_mask[rbStart + bwp_start] & slbitmap))
-      rbStart++;
-
-    uint16_t max_rbSize = 1;
-
-    while (rbStart + max_rbSize <= rbStop && !(rballoc_mask[rbStart + max_rbSize + bwp_start] & slbitmap))
-      max_rbSize++;
 
     sched_pdsch->dmrs_parms = get_dl_dmrs_params(scc, dl_bwp, tda_info, sched_pdsch->nrOfLayers);
     sched_pdsch->Qm = nr_get_Qm_dl(sched_pdsch->mcs, dl_bwp->mcsTableIdx);
