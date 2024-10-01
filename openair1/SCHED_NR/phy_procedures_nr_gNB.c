@@ -729,8 +729,8 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx)
 
   const int soffset = (slot_rx & 3) * gNB->frame_parms.symbols_per_slot * gNB->frame_parms.ofdm_symbol_size;
   int offset = 10 * gNB->frame_parms.ofdm_symbol_size + gNB->frame_parms.first_carrier_offset;
-  LOG_D(PHY,
-        "frame %d, slot %d: UL signal energy %d\n",
+  LOG_D(NR_PHY,
+        "frame %d, slot %d: UL signal energy %u\n",
         frame_rx,
         slot_rx,
         signal_energy_nodc(&gNB->common_vars.rxdataF[0][soffset + offset + (47 * 12)], 12 * 18));
@@ -761,8 +761,8 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx)
           nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_pdu_format0 = &gNB->uci_pdu_list[num_ucis].pucch_pdu_format_0_1;
 
           offset = pucch_pdu->start_symbol_index*gNB->frame_parms.ofdm_symbol_size + (gNB->frame_parms.first_carrier_offset+pucch_pdu->prb_start*12);
-          LOG_D(PHY,
-                "frame %d, slot %d: PUCCH signal energy %d\n",
+          LOG_D(NR_PHY,
+                "frame %d, slot %d: PUCCH signal energy %u\n",
                 frame_rx,
                 slot_rx,
                 signal_energy_nodc(&gNB->common_vars.rxdataF[0][soffset + offset], 12));

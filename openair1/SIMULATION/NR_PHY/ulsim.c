@@ -723,7 +723,7 @@ int main(int argc, char *argv[])
 
   NR_gNB_ULSCH_t *ulsch_gNB = &gNB->ulsch[UE_id];
 
-  NR_Sched_Rsp_t *Sched_INFO = malloc(sizeof(*Sched_INFO));
+  NR_Sched_Rsp_t *Sched_INFO = malloc16_clear(sizeof(*Sched_INFO));
   memset((void*)Sched_INFO,0,sizeof(*Sched_INFO));
   nfapi_nr_ul_tti_request_t *UL_tti_req = &Sched_INFO->UL_tti_req;
   Sched_INFO->sched_response_id = -1;
@@ -1070,6 +1070,7 @@ int main(int argc, char *argv[])
           srs_pdu->subcarrier_spacing = frame_parms->subcarrier_spacing;
           srs_pdu->num_ant_ports = n_tx == 4 ? 2 : n_tx == 2 ? 1 : 0;
           srs_pdu->sequence_id = 40;
+          srs_pdu->time_start_position = frame_parms->symbols_per_slot - 1;
           srs_pdu->config_index = rrc_get_max_nr_csrs(srs_pdu->bwp_size, srs_pdu->bandwidth_index);
           srs_pdu->resource_type = NR_SRS_Resource__resourceType_PR_periodic;
           srs_pdu->t_srs = 1;
