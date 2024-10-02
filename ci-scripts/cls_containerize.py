@@ -214,7 +214,9 @@ def WriteEnvFile(ssh, services, wd, tag):
 		ret = ssh.run(f'docker image inspect {checkimg}', reportNonZero=False)
 		if ret.returncode == 0:
 			logging.info(f"detected pulled image {checkimg}")
-			if "oai-gnb" in image: envs["GNB_IMG"] = "oai-gnb-asan"
+			if "oai-enb" in image: envs["ENB_IMG"] = "oai-enb-asan"
+			elif "oai-gnb" in image: envs["GNB_IMG"] = "oai-gnb-asan"
+			elif "oai-lte-ue" in image: envs["LTEUE_IMG"] = "oai-lte-ue-asan"
 			elif "oai-nr-ue" in image: envs["NRUE_IMG"] = "oai-nr-ue-asan"
 			elif "oai-nr-cuup" in image: envs["NRCUUP_IMG"] = "oai-nr-cuup-asan"
 			else: logging.warning("undetected image format {image}, cannot use asan")
