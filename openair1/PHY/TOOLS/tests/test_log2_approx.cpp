@@ -16,6 +16,15 @@ TEST(log2_approx, complete)
     EXPECT_EQ(log2_approx(i), log2_approx_ref(i));
 }
 
+TEST(log2_approx, boundaries)
+{
+  for (int i = 0; i < 32; i++) {
+    uint32_t i2 = std::pow(2.0, i + 0.5);
+    EXPECT_EQ(log2_approx(i2), i) << "log2(" << i2 << ")";
+    EXPECT_EQ(log2_approx(i2 + 1), i + 1) << "log2(" << i2 + 1 << ")";
+  }
+}
+
 TEST(log2_approx64, boundaries)
 {
   for (int i = 0; i < 64; i++) {
