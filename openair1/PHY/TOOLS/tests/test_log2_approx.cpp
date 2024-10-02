@@ -10,11 +10,6 @@ uint8_t log2_approx_ref(uint32_t x)
   return std::round(std::log2(x));
 }
 
-uint8_t log2_approx64_ref(unsigned long long int x)
-{
-  return std::round(std::log2(static_cast<long double>(x)));
-}
-
 TEST(log2_approx, complete)
 {
   for (uint32_t i = 0; i < UINT32_MAX; i++)
@@ -23,12 +18,10 @@ TEST(log2_approx, complete)
 
 TEST(log2_approx64, boundaries)
 {
-  for (long double i = 0; i < 64; i++) {
-    unsigned long long i2 = std::pow(2.0L, i + 0.5L);
-    for (unsigned long long j = -10; j <= 10; j++) {
-      unsigned long long x = i2 + j;
-      EXPECT_EQ(log2_approx64(x), log2_approx64_ref(x));
-    }
+  for (int i = 0; i < 64; i++) {
+    unsigned long long int i2 = std::pow(2.0L, i + 0.5L);
+    EXPECT_EQ(log2_approx64(i2), i) << "log2(" << i2 << ")";
+    EXPECT_EQ(log2_approx64(i2 + 1), i + 1) << "log2(" << i2 + 1 << ")";
   }
 }
 
