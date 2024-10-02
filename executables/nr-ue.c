@@ -815,7 +815,7 @@ void *UE_thread(void *arg)
   } else {
     //warm up the RF board 
     int64_t tmp;
-    for (int i=0; i< 50; i++)
+    for (int i = 0; i < 50; i++)
       readFrame(UE, &tmp, true);
   }
 
