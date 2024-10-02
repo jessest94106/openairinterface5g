@@ -593,6 +593,7 @@ static int startServer(openair0_device *device)
     }
 
     close(sock);
+    sock = -1;
   }
 
   freeaddrinfo(results);
@@ -649,6 +650,7 @@ static int client_try_connect(const char *host, uint16_t port)
     }
 
     close(sock);
+    sock = -1;
   }
 
   freeaddrinfo(result);
