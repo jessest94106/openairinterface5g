@@ -444,7 +444,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
           mac_len = 6;
         }
 
-        LOG_D(MAC, "[RAPROC] Received SDU for CCCH length %d for UE %04x\n", mac_len, UE->rnti);
+        LOG_I(MAC, "[RAPROC] Received SDU for CCCH length %d for UE %04x\n", mac_len, UE->rnti);
 
         if (prepare_initial_ul_rrc_message(RC.nrmac[module_idP], UE)) {
           mac_rlc_data_ind(module_idP,
@@ -458,6 +458,8 @@ static int nr_process_mac_pdu(instance_t module_idP,
                           mac_len,
                           1,
                           NULL);
+        } else {
+          LOG_E(NR_MAC, "prepare_initial_ul_rrc_message() returned false, cannot forward CCCH message\n");
         }
         break;
 
