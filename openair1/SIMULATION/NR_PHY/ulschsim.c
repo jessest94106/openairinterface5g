@@ -45,7 +45,6 @@
 #include "openair1/SIMULATION/TOOLS/sim.h"
 #include "openair1/SIMULATION/RF/rf.h"
 #include "openair1/SIMULATION/NR_PHY/nr_unitary_defs.h"
-#include "common/utils/threadPool/thread-pool.h"
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.h"
 #include "executables/nr-uesoftmodem.h"
 #include "nfapi/oai_integration/vendor_ext.h"
@@ -91,9 +90,8 @@ void deref_sched_response(int _)
   exit(1);
 }
 
-int nr_postDecode_sim(PHY_VARS_gNB *gNB, notifiedFIFO_elt_t *req, int *nb_ok)
+int nr_postDecode_sim(PHY_VARS_gNB *gNB, ldpcDecode_t *rdata, int *nb_ok)
 {
-  ldpcDecode_t *rdata = (ldpcDecode_t*) NotifiedFifoData(req);
   NR_UL_gNB_HARQ_t *ulsch_harq = rdata->ulsch_harq;
   int r = rdata->segment_r;
 
@@ -107,8 +105,10 @@ int nr_postDecode_sim(PHY_VARS_gNB *gNB, notifiedFIFO_elt_t *req, int *nb_ok)
   }
 
   // if all segments are done
-  if (rdata->nbSegments == ulsch_harq->processedSegments)
+  if (rdata->nbSegments == ulsch_harq->processedSegments) {
     return *nb_ok == rdata->nbSegments;
+  }
+
   return 0;
 }
 
@@ -594,20 +594,23 @@ int main(int argc, char **argv)
       exit(-1);
 #endif
 
-     int nbDecode = nr_ulsch_decoding(gNB, UE_id, channel_output_fixed, frame_parms, rel15_ul, frame, subframe, harq_pid, G);
-     int nb_ok = 0;
-     if (nbDecode > 0)
-       while (nbDecode > 0) {
-         notifiedFIFO_elt_t *req = pullTpool(&gNB->respDecode, &gNB->threadPool);
-         ret = nr_postDecode_sim(gNB, req, &nb_ok);
-         delNotifiedFIFO_elt(req);
-         nbDecode--;
-       }
+      ldpcDecode_t arr[16] = {0};
+      task_ans_t ans[16] = {0};
+      thread_info_tm_t t_info = {.buf = (uint8_t *)arr, .cap = 16, .len = 0, .ans = ans};
+      int nbDecode =
+          nr_ulsch_decoding(gNB, UE_id, channel_output_fixed, frame_parms, rel15_ul, frame, subframe, harq_pid, G, &t_info);
+      DevAssert(nbDecode > 0);
 
+      int nb_ok = 0;
+      join_task_ans(t_info.ans, t_info.len);
+      for (size_t i = 0; i < nbDecode; ++i) {
+        ret = nr_postDecode_sim(gNB, &arr[i], &nb_ok);
+      }
+      nbDecode = 0;
       if (ret)
         n_errors++;
     }
-    
+
     printf("*****************************************\n");
     printf("SNR %f, BLER %f (false positive %f)\n", SNR,
            (float) n_errors / (float) n_trials,
@@ -633,6 +636,7 @@ int main(int argc, char **argv)
   term_nr_ue_signal(UE, 1);
   free(UE);
 
+  abortTpool(&gNB->threadPool);
   phy_free_nr_gNB(gNB);
   free(RC.gNB[0]);
   free(RC.gNB);

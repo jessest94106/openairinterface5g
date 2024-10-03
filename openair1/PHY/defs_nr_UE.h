@@ -576,6 +576,7 @@ typedef struct {
   int pssCorrPeakPower;
   int pssCorrAvgPower;
   int adjust_rxgain;
+  task_ans_t *ans;
 } nr_ue_ssb_scan_t;
 
 typedef struct nr_phy_data_tx_s {
@@ -632,6 +633,7 @@ typedef struct LDPCDecode_ue_s {
   time_stats_t ts_deinterleave;
   time_stats_t ts_rate_unmatch;
   time_stats_t ts_ldpc_decode;
+  task_ans_t *ans;
 } ldpcDecode_ue_t;
 
 static inline void start_meas_nr_ue_phy(PHY_VARS_NR_UE *ue, int meas_index) {
