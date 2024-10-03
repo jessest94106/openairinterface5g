@@ -3194,8 +3194,10 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
       beam_struct.new_beam = true;
       *beam = beam_index;
     }
-    if (*beam == beam_index)
+    if (*beam == beam_index) {
+      LOG_D(NR_MAC, "%d.%d Using beam structure with index %d for beam %d (%s)\n", frame, slot, beam_struct.idx, beam_index, beam_struct.new_beam ? "new beam" : "old beam");
       return beam_struct;
+    }
   }
 
   return (NR_beam_alloc_t) {.new_beam = false, .idx = -1};
@@ -3220,7 +3222,7 @@ void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   if (UE->UE_beam_index == new_bf_index)
     return; // no beam change needed
 
-  LOG_I(NR_MAC, "Switching to beam with ID %d corresponding to SSB %d\n", new_bf_index, rsrp_report->resource_id[0]);
+  LOG_I(NR_MAC, "[UE %x] Switching to beam with ID %d (SSB number %d)\n", UE->rnti, new_bf_index, rsrp_report->resource_id[0]);
   UE->UE_beam_index = new_bf_index;
 }
 
