@@ -108,14 +108,14 @@
                 <class>Attach_UE</class>
                 <desc>Attach OAI UE (Wait for IP)</desc>
                 <id>rfsim4g_ue</id>
-                <nodes>obelix</nodes>
+                <nodes>cacofonix</nodes>
         </testCase>
 
         <testCase id="020011">
                 <class>Ping</class>
                 <desc>Ping Traffic-Gen from LTE-UE</desc>
                 <id>rfsim4g_ue</id>
-                <nodes>obelix</nodes>
+                <nodes>cacofonix</nodes>
                 <ping_args> -c 20 192.168.61.11</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -125,7 +125,7 @@
                 <desc>Ping LTE-UE from Traffic-Gen</desc>
                 <id>rfsim4g_ext_dn</id>
                 <ping_args>-c 20 12.0.0.2</ping_args>
-                <nodes>obelix</nodes>
+                <nodes>cacofonix</nodes>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
 
@@ -137,8 +137,8 @@
                 <iperf_args>-u -t 30 -b 2M -R</iperf_args>
                 <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
-                <nodes>obelix</nodes>
-                <svr_node>obelix</svr_node>
+                <nodes>cacofonix</nodes>
+                <svr_node>cacofonix</svr_node>
         </testCase>
 
         <testCase id="030011">
@@ -149,8 +149,8 @@
                 <iperf_args>-u -t 30 -b 1M</iperf_args>
                 <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
-                <nodes>obelix</nodes>
-                <svr_node>obelix</svr_node>
+                <nodes>cacofonix</nodes>
+                <svr_node>cacofonix</svr_node>
         </testCase>
 
         <testCase id="100011">
