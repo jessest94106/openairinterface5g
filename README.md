@@ -43,6 +43,7 @@ Please see [NOTICE](NOTICE.md) file for third party software that is included in
 
  *  [General overview of documentation](./doc/README.md)
  *  [The implemented features](./doc/FEATURE_SET.md)
+ *  [System Requirements for Using OAI Stack](./doc/system_requirements.md)
  *  [How to build](./doc/BUILD.md)
  *  [How to run the modems](./doc/RUNMODEM.md)
 

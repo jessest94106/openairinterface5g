@@ -983,10 +983,17 @@ void deliver_sdu_srb0(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
   s0->send_initial_ul_rrc_message(s0->ue_id, (unsigned char *)buf, size, s0->data);
 }
 
-void nr_rlc_activate_srb0(int ue_id,
+bool nr_rlc_activate_srb0(int ue_id,
                           void *data,
                           void (*send_initial_ul_rrc_message)(int ue_id, const uint8_t *sdu, sdu_size_t sdu_len, void *data))
 {
+  nr_rlc_manager_lock(nr_rlc_ue_manager);
+  nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ue_id);
+  if (ue->srb0 != NULL) {
+    LOG_W(RLC, "SRB0 already exists for UE %x, do nothing\n", ue_id);
+    nr_rlc_manager_unlock(nr_rlc_ue_manager);
+    return false;
+  }
   struct srb0_data *srb0_data = calloc(1, sizeof(struct srb0_data));
   AssertFatal(srb0_data, "out of memory\n");
 
@@ -994,21 +1001,13 @@ void nr_rlc_activate_srb0(int ue_id,
   srb0_data->data = data;
   srb0_data->send_initial_ul_rrc_message = send_initial_ul_rrc_message;
 
-  nr_rlc_manager_lock(nr_rlc_ue_manager);
-  nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ue_id);
-  if (ue->srb0 != NULL) {
-    LOG_W(RLC, "SRB0 already exists for UE %d, do nothing\n", ue_id);
-    free(srb0_data);
-    nr_rlc_manager_unlock(nr_rlc_ue_manager);
-    return;
-  }
-
   nr_rlc_entity_t *nr_rlc_tm = new_nr_rlc_entity_tm(10000,
-                                   deliver_sdu_srb0, srb0_data);
+                                  deliver_sdu_srb0, srb0_data);
   nr_rlc_ue_add_srb_rlc_entity(ue, 0, nr_rlc_tm);
 
   LOG_I(RLC, "Activated srb0 for UE %d\n", ue_id);
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
+  return true;
 }
 
 rlc_op_status_t rrc_rlc_config_req(const protocol_ctxt_t* const ctxt_pP,

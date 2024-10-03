@@ -1280,7 +1280,7 @@ static void handle_aperiodic_srs_type(struct NR_SRS_ResourceSet__resourceType__a
               struct NR_SRS_ResourceSet__resourceType__aperiodic__ext1__aperiodicSRS_ResourceTriggerList);
 }
 
-static void setup_srsresourceset(NR_SRS_ResourceSet_t *target, NR_SRS_ResourceSet_t *source)
+static void setup_srsresourceset(NR_UE_UL_BWP_t *bwp, NR_SRS_ResourceSet_t *target, NR_SRS_ResourceSet_t *source)
 {
   target->srs_ResourceSetId = source->srs_ResourceSetId;
   if (source->srs_ResourceIdList)
@@ -1311,15 +1311,20 @@ static void setup_srsresourceset(NR_SRS_ResourceSet_t *target, NR_SRS_ResourceSe
     }
   }
   target->usage = source->usage;
+  if (source->alpha) {
+    bwp->h_b_f_c = 0;
+  }
   UPDATE_IE(target->alpha, source->alpha, NR_Alpha_t);
-  if (source->p0)
+  if (source->p0) {
+    bwp->h_b_f_c = 0;
     UPDATE_IE(target->p0, source->p0, long);
+  }
   if (source->pathlossReferenceRS)
     UPDATE_IE(target->pathlossReferenceRS, source->pathlossReferenceRS, struct NR_PathlossReferenceRS_Config);
   UPDATE_IE(target->srs_PowerControlAdjustmentStates, source->srs_PowerControlAdjustmentStates, long);
 }
 
-static void setup_srsconfig(NR_SRS_Config_t *source, NR_SRS_Config_t *target)
+static void setup_srsconfig(NR_UE_UL_BWP_t *bwp, NR_SRS_Config_t *source, NR_SRS_Config_t *target)
 {
   UPDATE_IE(target->tpc_Accumulation, source->tpc_Accumulation, long);
   // SRS-Resource
@@ -1337,14 +1342,25 @@ static void setup_srsconfig(NR_SRS_Config_t *source, NR_SRS_Config_t *target)
                         srs_ResourceId);
   }
   // SRS-ResourceSet
-  if (source->srs_ResourceSetToAddModList) {
+  struct NR_SRS_Config__srs_ResourceSetToAddModList *source_srs_list = source->srs_ResourceSetToAddModList;
+  if (source_srs_list) {
     if (!target->srs_ResourceSetToAddModList)
       target->srs_ResourceSetToAddModList = calloc(1, sizeof(*target->srs_ResourceSetToAddModList));
-    ADDMOD_IE_FROMLIST_WFUNCTION(source->srs_ResourceSetToAddModList,
-                                 target->srs_ResourceSetToAddModList,
-                                 srs_ResourceSetId,
-                                 NR_SRS_ResourceSet_t,
-                                 setup_srsresourceset);
+    struct NR_SRS_Config__srs_ResourceSetToAddModList *target_srs_list = target->srs_ResourceSetToAddModList;
+
+    for (int i = 0; i < source_srs_list->list.count; i++) {
+      long srs_resource_id = source_srs_list->list.array[i]->srs_ResourceSetId;
+      int j;
+      for (j = 0; j < target_srs_list->list.count; j++) {
+        if (srs_resource_id == target_srs_list->list.array[j]->srs_ResourceSetId)
+          break;
+      }
+      if (j == target_srs_list->list.count) {
+        NR_SRS_ResourceSet_t *new = calloc(1, sizeof(*new));
+        ASN_SEQUENCE_ADD(&target_srs_list->list, new);
+      }
+      setup_srsresourceset(bwp, target_srs_list->list.array[j], source_srs_list->list.array[i]);
+    }
   }
   if (source->srs_ResourceSetToReleaseList) {
     RELEASE_IE_FROMLIST(source->srs_ResourceSetToReleaseList,
@@ -1459,7 +1475,7 @@ static void configure_dedicated_BWP_ul(NR_UE_MAC_INST_t *mac, int bwp_id, NR_BWP
       if (ul_dedicated->srs_Config->present == NR_SetupRelease_SRS_Config_PR_setup) {
         if (!bwp->srs_Config)
           bwp->srs_Config = calloc(1, sizeof(*bwp->srs_Config));
-        setup_srsconfig(ul_dedicated->srs_Config->choice.setup, bwp->srs_Config);
+        setup_srsconfig(bwp, ul_dedicated->srs_Config->choice.setup, bwp->srs_Config);
       }
     }
     AssertFatal(!ul_dedicated->configuredGrantConfig, "configuredGrantConfig not supported\n");
@@ -1513,6 +1529,7 @@ static void configure_common_BWP_ul(NR_UE_MAC_INST_t *mac, int bwp_id, NR_BWP_Up
     bwp->channel_bandwidth = get_supported_bw_mhz(mac->frequency_range, bw_index);
     // Minumum transmission power depends on bandwidth, precalculate it here
     bwp->P_CMIN = nr_get_Pcmin(bw_index);
+    bwp->srs_power_control_initialized = false;
     if (bwp_id == 0) {
       mac->sc_info.initial_ul_BWPSize = bwp->BWPSize;
       mac->sc_info.initial_ul_BWPStart = bwp->BWPStart;

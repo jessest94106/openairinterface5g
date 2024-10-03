@@ -577,6 +577,9 @@ typedef struct NR_UE_UL_BWP {
   int channel_bandwidth;
   // Minimum transmission power according to 38.101 6.3.1
   float P_CMIN;
+  // SRS power control adjustment state
+  int h_b_f_c;
+  bool srs_power_control_initialized;
 } NR_UE_UL_BWP_t;
 
 // non-BWP serving cell configuration

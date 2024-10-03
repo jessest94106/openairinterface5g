@@ -1255,7 +1255,7 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
 }
 
 static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
-                                   short n_tx,
+                                   short nl,
                                    short n_rx,
                                    int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
                                    int ***rho,
@@ -1266,19 +1266,19 @@ static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
                                    int length)
 {
   simde__m128i *rxdataF_comp128_0,*rxdataF_comp128_1,*dl_ch_mag128_0,*dl_ch_mag128_1,*dl_ch_mag128_0b,*dl_ch_mag128_1b,*dl_ch_mag128_0r,*dl_ch_mag128_1r;
-  uint32_t nb_rb_0 = length/12 + ((length%12)?1:0);
+  uint32_t nb_rb_0 = length / 12 + ((length % 12) ? 1 : 0);
 
   if (n_rx > 1) {
-    for (int aatx = 0; aatx < n_tx; aatx++) {
-      rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[aatx][0] + symbol * rx_size_symbol);
-      dl_ch_mag128_0 = (simde__m128i *)dl_ch_mag[aatx][0];
-      dl_ch_mag128_0b = (simde__m128i *)dl_ch_magb[aatx][0];
-      dl_ch_mag128_0r = (simde__m128i *)dl_ch_magr[aatx][0];
+    for (int l = 0; l < nl; l++) {
+      rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[l][0] + symbol * rx_size_symbol);
+      dl_ch_mag128_0 = (simde__m128i *)dl_ch_mag[l][0];
+      dl_ch_mag128_0b = (simde__m128i *)dl_ch_magb[l][0];
+      dl_ch_mag128_0r = (simde__m128i *)dl_ch_magr[l][0];
       for (int aarx = 1; aarx < n_rx; aarx++) {
-        rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[aatx][aarx] + symbol * rx_size_symbol);
-        dl_ch_mag128_1 = (simde__m128i *)dl_ch_mag[aatx][aarx];
-        dl_ch_mag128_1b = (simde__m128i *)dl_ch_magb[aatx][aarx];
-        dl_ch_mag128_1r = (simde__m128i *)dl_ch_magr[aatx][aarx];
+        rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[l][aarx] + symbol * rx_size_symbol);
+        dl_ch_mag128_1 = (simde__m128i *)dl_ch_mag[l][aarx];
+        dl_ch_mag128_1b = (simde__m128i *)dl_ch_magb[l][aarx];
+        dl_ch_mag128_1r = (simde__m128i *)dl_ch_magr[l][aarx];
 
         // MRC on each re of rb, both on MF output and magnitude (for 16QAM/64QAM/256 llr computation)
         for (int i = 0; i < nb_rb_0 * 3; i++) {
@@ -1291,7 +1291,7 @@ static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
     }
 #ifdef DEBUG_DLSCH_DEMOD
     for (int i = 0; i < nb_rb_0 * 3; i++) {
-      printf("symbol%d RB %d\n", symbol,i / 3);
+      printf("symbol%d RB %d\n", symbol, i / 3);
       rxdataF_comp128_0 = (simde__m128i *)(rxdataF_comp[0][0] + symbol * rx_size_symbol);
       rxdataF_comp128_1 = (simde__m128i *)(rxdataF_comp[0][n_rx] + symbol * rx_size_symbol);
       print_shorts("tx 1 mrc_re/mrc_Im:",(int16_t*)&rxdataF_comp128_0[i]);
@@ -1675,7 +1675,7 @@ void nr_conjch0_mult_ch1(int *ch0,
  */
 static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                           unsigned char n_rx,
-                          unsigned char n_tx, // number of layer
+                          unsigned char nl, // number of layer
                           int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
                           int32_t dl_ch_mag[][n_rx][rx_size_symbol],
                           int32_t dl_ch_magb[][n_rx][rx_size_symbol],
@@ -1688,25 +1688,24 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                           int length,
                           uint32_t noise_var)
 {
-  int *ch0r, *ch0c;
-  uint32_t nb_rb_0 = length/12 + ((length%12)?1:0);
+  uint32_t nb_rb_0 = length / 12 + ((length % 12) ? 1 : 0);
   c16_t determ_fin[12 * nb_rb_0] __attribute__((aligned(32)));
 
   ///Allocate H^*H matrix elements and sub elements
-  c16_t conjH_H_elements_data[n_rx][n_tx][n_tx][12 * nb_rb_0];
+  c16_t conjH_H_elements_data[n_rx][nl][nl][12 * nb_rb_0];
   memset(conjH_H_elements_data, 0, sizeof(conjH_H_elements_data));
-  c16_t *conjH_H_elements[n_rx][n_tx][n_tx];
+  c16_t *conjH_H_elements[n_rx][nl][nl];
   for (int aarx = 0; aarx < n_rx; aarx++)
-    for (int rtx = 0; rtx < n_tx; rtx++)
-      for (int ctx = 0; ctx < n_tx; ctx++)
+    for (int rtx = 0; rtx < nl; rtx++)
+      for (int ctx = 0; ctx < nl; ctx++)
         conjH_H_elements[aarx][rtx][ctx] = conjH_H_elements_data[aarx][rtx][ctx];
 
   //Compute H^*H matrix elements and sub elements:(1/2^log2_maxh)*conjH_H_elements
-  for (int rtx=0;rtx<n_tx;rtx++) {//row
-    for (int ctx=0;ctx<n_tx;ctx++) {//column
-      for (int aarx=0;aarx<n_rx;aarx++)  {
-        ch0r = (int *)dl_ch_estimates_ext[rtx*n_rx+aarx];
-        ch0c = (int *)dl_ch_estimates_ext[ctx*n_rx+aarx];
+  for (int rtx = 0; rtx < nl; rtx++) {//row
+    for (int ctx = 0; ctx < nl; ctx++) {//column
+      for (int aarx = 0; aarx < n_rx; aarx++)  {
+        int *ch0r = (int *)dl_ch_estimates_ext[rtx * n_rx + aarx];
+        int *ch0c = (int *)dl_ch_estimates_ext[ctx * n_rx + aarx];
         nr_conjch0_mult_ch1(ch0r,
                             ch0c,
                             (int32_t *)conjH_H_elements[aarx][ctx][rtx], // sic
@@ -1721,7 +1720,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
   // Add noise_var such that: H^h * H + noise_var * I
   if (noise_var != 0) {
     simde__m128i nvar_128i = simde_mm_set1_epi32(noise_var >> 3);
-    for (int p = 0; p < n_tx; p++) {
+    for (int p = 0; p < nl; p++) {
       simde__m128i *conjH_H_128i = (simde__m128i *)conjH_H_elements[0][p][p];
       for (int k = 0; k < 3 * nb_rb_0; k++) {
         conjH_H_128i[0] = simde_mm_add_epi32(conjH_H_128i[0], nvar_128i);
@@ -1732,15 +1731,15 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
 
   //Compute the inverse and determinant of the H^*H matrix
   //Allocate the inverse matrix
-  c16_t *inv_H_h_H[n_tx][n_tx];
-  c16_t inv_H_h_H_data[n_tx][n_tx][12 * nb_rb_0];
+  c16_t *inv_H_h_H[nl][nl];
+  c16_t inv_H_h_H_data[nl][nl][12 * nb_rb_0];
   memset(inv_H_h_H_data, 0, sizeof(inv_H_h_H_data));
-  for (int rtx = 0; rtx < n_tx; rtx++)
-    for (int ctx = 0; ctx < n_tx; ctx++)
+  for (int rtx = 0; rtx < nl; rtx++)
+    for (int ctx = 0; ctx < nl; ctx++)
       inv_H_h_H[ctx][rtx] = inv_H_h_H_data[ctx][rtx];
 
   int fp_flag = 1;//0: float point calc 1: Fixed point calc
-  nr_matrix_inverse(n_tx,
+  nr_matrix_inverse(nl,
                     conjH_H_elements[0], // Input matrix
                     inv_H_h_H, // Inverse
                     determ_fin, // determin
@@ -1751,30 +1750,33 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
   // multiply Matrix inversion pf H_h_H by the rx signal vector
   c16_t outtemp[12 * nb_rb_0] __attribute__((aligned(32)));
   //Allocate rxdataF for zforcing out
-  c16_t rxdataF_zforcing[n_tx][12 * nb_rb_0];
+  c16_t rxdataF_zforcing[nl][12 * nb_rb_0];
   memset(rxdataF_zforcing, 0, sizeof(rxdataF_zforcing));
 
-  for (int rtx=0;rtx<n_tx;rtx++) {//Output Layers row
+  for (int rtx = 0; rtx < nl; rtx++) {//Output Layers row
     // loop over Layers rtx=0,...,N_Layers-1
-    for (int ctx = 0; ctx < n_tx; ctx++) { // column multi
+    for (int ctx = 0; ctx < nl; ctx++) { // column multi
       // printf("Computing r_%d c_%d\n",rtx,ctx);
-      // print_shorts(" H_h_H=",(int16_t*)&conjH_H_elements[ctx*n_tx+rtx][0][0]);
-      // print_shorts(" Inv_H_h_H=",(int16_t*)&inv_H_h_H[ctx*n_tx+rtx][0]);
-      nr_a_mult_b(inv_H_h_H[ctx][rtx], (c16_t *)(rxdataF_comp[ctx][0] + symbol * nb_rb * 12), outtemp, nb_rb_0, shift - (fp_flag == 1 ? 2 : 0));
-      nr_a_sum_b(rxdataF_zforcing[rtx], outtemp,
-                 nb_rb_0); // a =a + b
+      // print_shorts(" H_h_H=",(int16_t*)&conjH_H_elements[ctx*nl+rtx][0][0]);
+      // print_shorts(" Inv_H_h_H=",(int16_t*)&inv_H_h_H[ctx*nl+rtx][0]);
+      nr_a_mult_b(inv_H_h_H[ctx][rtx],
+                  (c16_t *)(rxdataF_comp[ctx][0] + symbol * rx_size_symbol),
+                  outtemp,
+                  nb_rb_0,
+                  shift - (fp_flag == 1 ? 2 : 0));
+      nr_a_sum_b(rxdataF_zforcing[rtx], outtemp, nb_rb_0); // a = a + b
     }
 #ifdef DEBUG_DLSCH_DEMOD
-    printf("Computing layer_%d \n",rtx);;
-    print_shorts(" Rx signal:=",(int16_t*)&rxdataF_zforcing[rtx][0]);
-    print_shorts(" Rx signal:=",(int16_t*)&rxdataF_zforcing[rtx][4]);
-    print_shorts(" Rx signal:=",(int16_t*)&rxdataF_zforcing[rtx][8]);
+    printf("Computing layer_%d \n", rtx);
+    print_shorts(" Rx signal:=", (int16_t*)&rxdataF_zforcing[rtx][0]);
+    print_shorts(" Rx signal:=", (int16_t*)&rxdataF_zforcing[rtx][4]);
+    print_shorts(" Rx signal:=", (int16_t*)&rxdataF_zforcing[rtx][8]);
 #endif
   }
 
   //Copy zero_forcing out to output array
-  for (int rtx=0;rtx<n_tx;rtx++)
-    nr_element_sign(rxdataF_zforcing[rtx], (c16_t *)(rxdataF_comp[rtx][0] + symbol * nb_rb * 12), nb_rb_0, +1);
+  for (int rtx = 0; rtx < nl; rtx++)
+    nr_element_sign(rxdataF_zforcing[rtx], (c16_t *)(rxdataF_comp[rtx][0] + symbol * rx_size_symbol), nb_rb_0, + 1);
 
   //Update LLR thresholds with the Matrix determinant
   simde__m128i *dl_ch_mag128_0=NULL,*dl_ch_mag128b_0=NULL,*dl_ch_mag128r_0=NULL,*determ_fin_128;
@@ -1783,7 +1785,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
   short nr_realpart[8]__attribute__((aligned(16))) = {1,0,1,0,1,0,1,0};
   determ_fin_128      = (simde__m128i *)&determ_fin[0];
 
-  if (mod_order>2) {
+  if (mod_order > 2) {
     if (mod_order == 4) {
       QAM_amp128 = simde_mm_set1_epi16(QAM16_n1);  //2/sqrt(10)
       QAM_amp128b = simde_mm_setzero_si128();
@@ -1801,25 +1803,24 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
     dl_ch_mag128b_0 = (simde__m128i *)dl_ch_magb[0][0];
     dl_ch_mag128r_0 = (simde__m128i *)dl_ch_magr[0][0];
 
-    for (int rb=0; rb<3*nb_rb_0; rb++) {
+    for (int rb = 0; rb < 3 * nb_rb_0; rb++) {
       //for symmetric H_h_H matrix, the determinant is only real values
-        mmtmpD2 = simde_mm_sign_epi16(determ_fin_128[0],*(simde__m128i*)&nr_realpart[0]);//set imag part to 0
-        mmtmpD3 = simde_mm_shufflelo_epi16(mmtmpD2,SIMDE_MM_SHUFFLE(2,3,0,1));
-        mmtmpD3 = simde_mm_shufflehi_epi16(mmtmpD3,SIMDE_MM_SHUFFLE(2,3,0,1));
-        mmtmpD2 = simde_mm_add_epi16(mmtmpD2,mmtmpD3);
+      mmtmpD2 = simde_mm_sign_epi16(determ_fin_128[0],*(simde__m128i*)&nr_realpart[0]);//set imag part to 0
+      mmtmpD3 = simde_mm_shufflelo_epi16(mmtmpD2,SIMDE_MM_SHUFFLE(2,3,0,1));
+      mmtmpD3 = simde_mm_shufflehi_epi16(mmtmpD3,SIMDE_MM_SHUFFLE(2,3,0,1));
+      mmtmpD2 = simde_mm_add_epi16(mmtmpD2,mmtmpD3);
 
-        dl_ch_mag128_0[0] = mmtmpD2;
-        dl_ch_mag128b_0[0] = mmtmpD2;
-        dl_ch_mag128r_0[0] = mmtmpD2;
+      dl_ch_mag128_0[0] = mmtmpD2;
+      dl_ch_mag128b_0[0] = mmtmpD2;
+      dl_ch_mag128r_0[0] = mmtmpD2;
 
-        dl_ch_mag128_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128_0[0],QAM_amp128);
-        dl_ch_mag128_0[0] = simde_mm_slli_epi16(dl_ch_mag128_0[0],1);
+      dl_ch_mag128_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128_0[0],QAM_amp128);
+      dl_ch_mag128_0[0] = simde_mm_slli_epi16(dl_ch_mag128_0[0],1);
 
-        dl_ch_mag128b_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128b_0[0],QAM_amp128b);
-        dl_ch_mag128b_0[0] = simde_mm_slli_epi16(dl_ch_mag128b_0[0],1);
-        dl_ch_mag128r_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128r_0[0],QAM_amp128r);
-        dl_ch_mag128r_0[0] = simde_mm_slli_epi16(dl_ch_mag128r_0[0],1);
-
+      dl_ch_mag128b_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128b_0[0],QAM_amp128b);
+      dl_ch_mag128b_0[0] = simde_mm_slli_epi16(dl_ch_mag128b_0[0],1);
+      dl_ch_mag128r_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128r_0[0],QAM_amp128r);
+      dl_ch_mag128r_0[0] = simde_mm_slli_epi16(dl_ch_mag128r_0[0],1);
 
       determ_fin_128 += 1;
       dl_ch_mag128_0 += 1;
