@@ -354,6 +354,363 @@ void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int
   simde_mm_empty();
 }
 
+csi_mapping_parms_t get_csi_mapping_parms(int row, int b, int l0, int l1)
+{
+  AssertFatal(b != 0, "Invalid CSI frequency domain mapping: no bit selected in bitmap\n");
+  csi_mapping_parms_t csi_parms = {0};
+  int found = 0;
+  int fi = 0;
+  int k_n[6];
+  // implementation of table 7.4.1.5.3-1 of 38.211
+  // lprime and kprime are the max value of l' and k'
+  switch (row) {
+    case 1:
+      csi_parms.ports = 1;
+      csi_parms.kprime = 0;
+      csi_parms.lprime = 0;
+      csi_parms.size = 3;
+      while (found < 1) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi;
+          found++;
+        }
+        else
+          fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = 0;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[0] + (i << 2);
+      }
+      break;
+    case 2:
+      csi_parms.ports = 1;
+      csi_parms.kprime = 0;
+      csi_parms.lprime = 0;
+      csi_parms.size = 1;
+      while (found < 1) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi;
+          found++;
+        }
+        else
+          fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = 0;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[0];
+      }
+      break;
+    case 3:
+      csi_parms.ports = 2;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 1;
+      while (found < 1) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        else
+          fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = 0;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[0];
+      }
+      break;
+    case 4:
+      csi_parms.ports = 4;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 2;
+      while (found < 1) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 2;
+          found++;
+        }
+        else
+          fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[0] + (i << 1);
+      }
+      break;
+    case 5:
+      csi_parms.ports = 4;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 2;
+      while (found < 1) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        else
+          fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0 + i;
+        csi_parms.koverline[i] = k_n[0];
+      }
+      break;
+    case 6:
+      csi_parms.ports = 8;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 4;
+      while (found < 4) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    case 7:
+      csi_parms.ports = 8;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 4;
+      while (found < 2) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0 + (i >> 1);
+        csi_parms.koverline[i] = k_n[i % 2];
+      }
+      break;
+    case 8:
+      csi_parms.ports = 8;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 1;
+      csi_parms.size = 2;
+      while (found < 2) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    case 9:
+      csi_parms.ports = 12;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 6;
+      while (found < 6) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    case 10:
+      csi_parms.ports = 12;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 1;
+      csi_parms.size = 3;
+      while (found < 3) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    case 11:
+      csi_parms.ports = 16;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 8;
+      while (found < 4) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0 + (i >> 2);
+        csi_parms.koverline[i] = k_n[i % 4];
+      }
+      break;
+    case 12:
+      csi_parms.ports = 16;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 1;
+      csi_parms.size = 4;
+      while (found < 4) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    case 13:
+      csi_parms.ports = 24;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 12;
+      while (found < 3) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        if (i < 6)
+          csi_parms.loverline[i] = l0 + i / 3;
+        else
+          csi_parms.loverline[i] = l1 + i / 9;
+        csi_parms.koverline[i] = k_n[i % 3];
+      }
+      break;
+    case 14:
+      csi_parms.ports = 24;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 1;
+      csi_parms.size = 6;
+      while (found < 3) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        if (i < 3)
+          csi_parms.loverline[i] = l0;
+        else
+          csi_parms.loverline[i] = l1;
+        csi_parms.koverline[i] = k_n[i % 3];
+      }
+      break;
+    case 15:
+      csi_parms.ports = 24;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 3;
+      csi_parms.size = 3;
+      while (found < 3) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    case 16:
+      csi_parms.ports = 32;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 0;
+      csi_parms.size = 16;
+      while (found < 4) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        if (i < 8)
+          csi_parms.loverline[i] = l0 + (i >> 2);
+        else
+          csi_parms.loverline[i] = l1 + (i / 12);
+        csi_parms.koverline[i] = k_n[i % 4];
+      }
+      break;
+    case 17:
+      csi_parms.ports = 32;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 1;
+      csi_parms.size = 8;
+      while (found < 4) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        if (i < 4)
+          csi_parms.loverline[i] = l0;
+        else
+          csi_parms.loverline[i] = l1;
+        csi_parms.koverline[i] = k_n[i % 4];
+      }
+      break;
+    case 18:
+      csi_parms.ports = 32;
+      csi_parms.kprime = 1;
+      csi_parms.lprime = 3;
+      csi_parms.size = 4;
+      while (found < 4) {
+        if ((b >> fi) & 0x01) {
+          k_n[found] = fi << 1;
+          found++;
+        }
+        fi++;
+      }
+      for (int i = 0; i < csi_parms.size; i++) {
+        csi_parms.j[i] = i;
+        csi_parms.loverline[i] = l0;
+        csi_parms.koverline[i] = k_n[i];
+      }
+      break;
+    default:
+      AssertFatal(false, "Row %d is not valid for CSI Table 7.4.1.5.3-1\n", row);
+  }
+  return csi_parms;
+}
+
 void freq2time(uint16_t ofdm_symbol_size, int16_t *freq_signal, int16_t *time_signal)
 {
   const idft_size_idx_t idft_size = get_idft(ofdm_symbol_size);

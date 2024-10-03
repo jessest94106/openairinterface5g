@@ -21,6 +21,7 @@
 
 #include "PHY/MODULATION/nr_modulation.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
+#include "PHY/nr_phy_common/inc/nr_phy_common.h"
 
 //#define NR_CSIRS_DEBUG
 
@@ -60,379 +61,13 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
   //*8(max allocation per RB)*2(QPSK))
   int csi_rs_length =  frame_parms->N_RB_DL << 4;
   int16_t mod_csi[frame_parms->symbols_per_slot][csi_rs_length>>1] __attribute__((aligned(16)));
-  uint16_t b = csi_params->freq_domain;
   uint32_t beta = amp;
   nr_csi_info->csi_rs_generated_signal_bits = log2_approx(amp);
 
-  AssertFatal(b != 0, "Invalid CSI frequency domain mapping: no bit selected in bitmap\n");
-  int size, ports, kprime, lprime;
-  int j[16], k_n[6], koverline[16], loverline[16];
-  int found = 0;
-  int fi = 0;
-  // implementation of table 7.4.1.5.3-1 of 38.211
-  // lprime and kprime are the max value of l' and k'
-  switch (csi_params->row) {
-    case 1:
-      ports = 1;
-      kprime = 0;
-      lprime = 0;
-      size = 3;
-      while (found < 1) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi;
-          found++;
-        }
-        else
-          fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = 0;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[0] + (i<<2);
-      }
-      break;
-    case 2:
-      ports = 1;
-      kprime = 0;
-      lprime = 0;
-      size = 1;
-      while (found < 1) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi;
-          found++;
-        }
-        else
-          fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = 0;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[0];
-      }
-      break;
-    case 3:
-      ports = 2;
-      kprime = 1;
-      lprime = 0;
-      size = 1;
-      while (found < 1) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        else
-          fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = 0;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[0];
-      }
-      break;
-    case 4:
-      ports = 4;
-      kprime = 1;
-      lprime = 0;
-      size = 2;
-      while (found < 1) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 2;
-          found++;
-        }
-        else
-          fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[0] + (i << 1);
-      }
-      break;
-    case 5:
-      ports = 4;
-      kprime = 1;
-      lprime = 0;
-      size = 2;
-      while (found < 1) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        else
-          fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0 + i;
-        koverline[i] = k_n[0];
-      }
-      break;
-    case 6:
-      ports = 8;
-      kprime = 1;
-      lprime = 0;
-      size = 4;
-      while (found < 4) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    case 7:
-      ports = 8;
-      kprime = 1;
-      lprime = 0;
-      size = 4;
-      while (found < 2) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0 + (i >> 1);
-        koverline[i] = k_n[i % 2];
-      }
-      break;
-    case 8:
-      ports = 8;
-      kprime = 1;
-      lprime = 1;
-      size = 2;
-      while (found < 2) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    case 9:
-      ports = 12;
-      kprime = 1;
-      lprime = 0;
-      size = 6;
-      while (found < 6) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    case 10:
-      ports = 12;
-      kprime = 1;
-      lprime = 1;
-      size = 3;
-      while (found < 3) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    case 11:
-      ports = 16;
-      kprime = 1;
-      lprime = 0;
-      size = 8;
-      while (found < 4) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0 + (i >> 2);
-        koverline[i] = k_n[i % 4];
-      }
-      break;
-    case 12:
-      ports = 16;
-      kprime = 1;
-      lprime = 1;
-      size = 4;
-      while (found < 4) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    case 13:
-      ports = 24;
-      kprime = 1;
-      lprime = 0;
-      size = 12;
-      while (found < 3) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        if (i < 6)
-          loverline[i] = csi_params->symb_l0 + i / 3;
-        else
-          loverline[i] = csi_params->symb_l1 + i / 9;
-        koverline[i] = k_n[i % 3];
-      }
-      break;
-    case 14:
-      ports = 24;
-      kprime = 1;
-      lprime = 1;
-      size = 6;
-      while (found < 3) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        if (i < 3)
-          loverline[i] = csi_params->symb_l0;
-        else
-          loverline[i] = csi_params->symb_l1;
-        koverline[i] = k_n[i%3];
-      }
-      break;
-    case 15:
-      ports = 24;
-      kprime = 1;
-      lprime = 3;
-      size = 3;
-      while (found < 3) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    case 16:
-      ports = 32;
-      kprime = 1;
-      lprime = 0;
-      size = 16;
-      while (found < 4) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        if (i < 8)
-          loverline[i] = csi_params->symb_l0 + (i>>2);
-        else
-          loverline[i] = csi_params->symb_l1 + (i/12);
-        koverline[i] = k_n[i % 4];
-      }
-      break;
-    case 17:
-      ports = 32;
-      kprime = 1;
-      lprime = 1;
-      size = 8;
-      while (found < 4) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        if (i < 4)
-          loverline[i] = csi_params->symb_l0;
-        else
-          loverline[i] = csi_params->symb_l1;
-        koverline[i] = k_n[i % 4];
-      }
-      break;
-    case 18:
-      ports = 32;
-      kprime = 1;
-      lprime = 3;
-      size = 4;
-      while (found < 4) {
-        if ((b >> fi) & 0x01) {
-          k_n[found] = fi << 1;
-          found++;
-        }
-        fi++;
-      }
-      for (int i = 0; i < size; i++) {
-        j[i] = i;
-        loverline[i] = csi_params->symb_l0;
-        koverline[i] = k_n[i];
-      }
-      break;
-    default:
-      AssertFatal(false, "Row %d is not valid for CSI Table 7.4.1.5.3-1\n", csi_params->row);
-  }
-
-#ifdef NR_CSIRS_DEBUG
-  printf(" row %d, n. of ports %d\n k' ",csi_params->row,ports);
-  for (int kp = 0; kp <= kprime; kp++)
-    printf("%d, ",kp);
-  printf("l' ");
-  for (int lp = 0; lp <= lprime; lp++)
-    printf("%d, ", lp);
-  printf("\n k overline ");
-  for (int i = 0; i < size; i++)
-    printf("%d, ",koverline[i]);
-  printf("\n l overline ");
-  for (int i = 0; i < size; i++)
-    printf("%d, ",loverline[i]);
-  printf("\n");
-#endif
-
+  csi_mapping_parms_t phy_csi_parms = get_csi_mapping_parms(csi_params->row,
+                                                            csi_params->freq_domain,
+                                                            csi_params->symb_l0,
+                                                            csi_params->symb_l1);
 
   // setting the frequency density from its index
   double rho = 0;
@@ -454,7 +89,7 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
   }
 
   double alpha = 0;
-  if (ports == 1)
+  if (phy_csi_parms.ports == 1)
     alpha = rho;
   else
     alpha = 2 * rho;
@@ -482,6 +117,7 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
       AssertFatal(false, "Invalid cdm type index for CSI\n");
   }
 
+  int kprime = phy_csi_parms.kprime;
   int csi_length;
   if (rho < 1) {
     if (csi_params->freq_density == 0) {
@@ -498,21 +134,21 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
 #endif
 
   if (N_cdm_groups)
-    *N_cdm_groups = size;
+    *N_cdm_groups = phy_csi_parms.size;
   if (CDM_group_size)
     *CDM_group_size = gs;
   if (k_prime)
     *k_prime = kprime;
   if (l_prime)
-    *l_prime = lprime;
+    *l_prime = phy_csi_parms.lprime;
   if (N_ports)
-    *N_ports = ports;
+    *N_ports = phy_csi_parms.ports;
   if (j_cdm)
-    memcpy(j_cdm, j, 16 * sizeof(uint8_t));
+    memcpy(j_cdm, phy_csi_parms.j, 16 * sizeof(uint8_t));
   if (k_overline)
-    memcpy(k_overline, koverline, 16 * sizeof(uint8_t));
+    memcpy(k_overline, phy_csi_parms.koverline, 16 * sizeof(uint8_t));
   if (l_overline)
-    memcpy(l_overline, loverline, 16 * sizeof(uint8_t));
+    memcpy(l_overline, phy_csi_parms.loverline, 16 * sizeof(uint8_t));
 
 #ifdef NR_CSIRS_DEBUG
   if (N_ports)
@@ -527,7 +163,12 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
     LOG_I(NR_PHY, "nr_csi_info->lprime = %d\n", *l_prime);
   if (N_cdm_groups) {
     for(int ji = 0; ji < *N_cdm_groups; ji++) {
-      LOG_I(NR_PHY, "(CDM group %d) j = %d, koverline = %d, loverline = %d\n", ji, j[ji], koverline[ji], loverline[ji]);
+      LOG_I(NR_PHY,
+            "(CDM group %d) j = %d, koverline = %d, loverline = %d\n",
+            ji,
+            phy_csi_parms.j[ji],
+            phy_csi_parms.koverline[ji],
+            phy_csi_parms.loverline[ji]);
     }
   }
 #endif
@@ -553,7 +194,7 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
       AssertFatal(false, "Invalid SS power offset density index for CSI\n");
   }
 
-  for (int lp = 0; lp <= lprime; lp++) {
+  for (int lp = 0; lp <= phy_csi_parms.lprime; lp++) {
     int symb = csi_params->symb_l0;
     const uint32_t *gold =
         nr_gold_csi_rs(frame_parms->N_RB_DL, frame_parms->symbols_per_slot, slot, symb + lp, csi_params->scramb_id);
@@ -578,23 +219,22 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
   }
 
   uint16_t start_sc = frame_parms->first_carrier_offset;
-
   // resource mapping according to 38.211 7.4.1.5.3
   for (int n = csi_params->start_rb; n < (csi_params->start_rb + csi_params->nr_of_rbs); n++) {
    if ((csi_params->freq_density > 1) || (csi_params->freq_density == (n % 2))) {  // for freq density 0.5 checks if even or odd RB
-    for (int ji = 0; ji < size; ji++) { // loop over CDM groups
+    for (int ji = 0; ji < phy_csi_parms.size; ji++) { // loop over CDM groups
       for (int s = 0 ; s < gs; s++)  { // loop over each CDM group size
-        int p = s + j[ji] * gs; // port index
+        int p = s + phy_csi_parms.j[ji] * gs; // port index
         for (int kp = 0; kp <= kprime; kp++) { // loop over frequency resource elements within a group
           // frequency index of current resource element
-          int k = (start_sc + (n * NR_NB_SC_PER_RB) + koverline[ji] + kp) % (frame_parms->ofdm_symbol_size);
+          int k = (start_sc + (n * NR_NB_SC_PER_RB) + phy_csi_parms.koverline[ji] + kp) % (frame_parms->ofdm_symbol_size);
           // wf according to tables 7.4.5.3-2 to 7.4.5.3-5
           int wf = kp == 0 ? 1 : (-2 * (s % 2) + 1);
           int na = n * alpha;
-          int kpn = (rho * koverline[ji]) / NR_NB_SC_PER_RB;
+          int kpn = (rho * phy_csi_parms.koverline[ji]) / NR_NB_SC_PER_RB;
           int mprime = na + kp + kpn; // sequence index
-          for (int lp = 0; lp <= lprime; lp++) { // loop over frequency resource elements within a group
-            int l = lp + loverline[ji];
+          for (int lp = 0; lp <= phy_csi_parms.lprime; lp++) { // loop over frequency resource elements within a group
+            int l = lp + phy_csi_parms.loverline[ji];
             // wt according to tables 7.4.5.3-2 to 7.4.5.3-5
             int wt;
             if (s < 2)
