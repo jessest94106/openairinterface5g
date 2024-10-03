@@ -1339,7 +1339,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
   }
 
   if (nb_layer == 2) {
-    if (rel15_ul->qam_mod_order < 6) {
+    if (rel15_ul->qam_mod_order <= 6) {
       nr_ulsch_compute_ML_llr(pusch_vars,
                               symbol,
                               (c16_t*)&pusch_vars->rxdataF_comp[0][symbol * buffer_length],
@@ -1370,7 +1370,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
                             buffer_length);
     }
   }
-  if (nb_layer != 2 || rel15_ul->qam_mod_order >= 6)
+  if (nb_layer != 2 || rel15_ul->qam_mod_order > 6)
     for (int aatx = 0; aatx < nb_layer; aatx++) 
       nr_ulsch_compute_llr((int32_t*)&pusch_vars->rxdataF_comp[aatx * nb_rx_ant][symbol * buffer_length],
                           (int32_t*)rxF_ch_maga[aatx],
@@ -1687,7 +1687,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
     for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++)
       avgs = cmax(avgs, avg[nl * frame_parms->nb_antennas_rx + aarx]);
 
-  if (rel15_ul->nrOfLayers == 2 && rel15_ul->qam_mod_order >= 6)
+  if (rel15_ul->nrOfLayers == 2 && rel15_ul->qam_mod_order > 6)
     pusch_vars->log2_maxh = (log2_approx(avgs) >> 1) - 3; // for MMSE
   else
     pusch_vars->log2_maxh = (log2_approx(avgs) >> 1) + 1 + log2_approx(frame_parms->nb_antennas_rx >> 1);
