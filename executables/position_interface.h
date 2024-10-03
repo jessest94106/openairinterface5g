@@ -34,5 +34,5 @@ typedef struct {
 
 void config_position_coordinates(int Mod_id);
 position_t *init_position_coordinates(char *sectionName);
-position_t *get_position(int Mod_id);
+position_t *get_position_coordinates(int Mod_id);
 #endif

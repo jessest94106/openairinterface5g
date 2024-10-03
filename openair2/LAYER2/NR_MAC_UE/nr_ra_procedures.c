@@ -42,12 +42,6 @@
 #include "openair2/LAYER2/RLC/rlc.h"
 #include "openair2/LAYER2/NR_MAC_UE/mac_defs.h"
 
-#include "nr-uesoftmodem.h"
-
-static double get_ta_Common_ms(const ntn_timing_advance_componets_t* ntn_ta)
-{
-  return (ntn_ta->N_common_ta_adj + ntn_ta->N_UE_TA_adj) * 2;
-}
 
 int16_t get_prach_tx_power(NR_UE_MAC_INST_t *mac)
 {
@@ -622,7 +616,7 @@ void nr_Msg3_transmitted(NR_UE_MAC_INST_t *mac, uint8_t CC_id, frame_t frameP, s
 {
   RA_config_t *ra = &mac->ra;
   NR_RACH_ConfigCommon_t *nr_rach_ConfigCommon = mac->current_UL_BWP->rach_ConfigCommon;
-  const double ta_Common_ms = get_ta_Common_ms(&mac->ntn_ta);
+  const double ta_Common_ms = GET_COMPLETE_TIME_ADVANCE_MS(mac);
   const int mu = mac->current_UL_BWP->scs;
   const int slots_per_ms = nr_slots_per_frame[mu] / 10;
 
@@ -923,7 +917,7 @@ void nr_get_RA_window(NR_UE_MAC_INST_t *mac)
 
   NR_RACH_ConfigCommon_t *setup = mac->current_UL_BWP->rach_ConfigCommon;
   AssertFatal(&setup->rach_ConfigGeneric != NULL, "In %s: FATAL! rach_ConfigGeneric is NULL...\n", __FUNCTION__);
-  const double ta_Common_ms = get_ta_Common_ms(&mac->ntn_ta);
+  const double ta_Common_ms = GET_COMPLETE_TIME_ADVANCE_MS(mac);
   const int mu = mac->current_DL_BWP->scs;
   const int slots_per_ms = nr_slots_per_frame[mu] / 10;
 

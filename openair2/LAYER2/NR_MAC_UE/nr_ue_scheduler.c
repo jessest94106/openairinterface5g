@@ -1266,9 +1266,9 @@ void nr_ue_aperiodic_srs_scheduling(NR_UE_MAC_INST_t *mac, long resource_trigger
     return;
   }
 
-  AssertFatal(slot_offset > DURATION_RX_TO_TX,
-              "Slot offset between DCI and aperiodic SRS (%d) needs to be higher than DURATION_RX_TO_TX (%d)\n",
-              slot_offset, DURATION_RX_TO_TX);
+  AssertFatal(slot_offset > GET_DURATION_RX_TO_TX(mac),
+              "Slot offset between DCI and aperiodic SRS (%d) needs to be higher than DURATION_RX_TO_TX (%ld)\n",
+              slot_offset, GET_DURATION_RX_TO_TX(mac));
   int n_slots_frame = nr_slots_per_frame[current_UL_BWP->scs];
   int sched_slot = (slot + slot_offset) % n_slots_frame;
   NR_TDD_UL_DL_ConfigCommon_t *tdd_config = mac->tdd_UL_DL_ConfigurationCommon;
@@ -1732,7 +1732,7 @@ static uint8_t nr_locate_BsrIndexByBufferSize(const uint32_t *table, int size, i
 // PUSCH scheduler:
 // - Calculate the slot in which ULSCH should be scheduled. This is current slot + K2,
 // - where K2 is the offset between the slot in which UL DCI is received and the slot
-// - in which ULSCH should be scheduled. K2 is configured in RRC configuration.  
+// - in which ULSCH should be scheduled. K2 is configured in RRC configuration.
 // PUSCH Msg3 scheduler:
 // - scheduled by RAR UL grant according to 8.3 of TS 38.213
 // Note: Msg3 tx in the uplink symbols of mixed slot
@@ -1772,24 +1772,24 @@ int nr_ue_pusch_scheduler(const NR_UE_MAC_INST_t *mac,
         AssertFatal(1 == 0, "Invalid numerology %i\n", mu);
     }
 
-    AssertFatal((k2 + delta) > DURATION_RX_TO_TX,
-                "Slot offset (%ld) for Msg3 needs to be higher than DURATION_RX_TO_TX (%d). Please set min_rxtxtime at least to %d in gNB config file or gNBs.[0].min_rxtxtime=%d via command line.\n",
+    AssertFatal((k2 + delta) > GET_DURATION_RX_TO_TX(mac),
+                "Slot offset (%ld) for Msg3 needs to be higher than DURATION_RX_TO_TX (%ld). Please set min_rxtxtime at least to %ld in gNB config file or gNBs.[0].min_rxtxtime=%ld via command line.\n",
                 k2,
-                DURATION_RX_TO_TX,
-                DURATION_RX_TO_TX,
-                DURATION_RX_TO_TX);
+                GET_DURATION_RX_TO_TX(mac),
+                GET_DURATION_RX_TO_TX(mac),
+                GET_DURATION_RX_TO_TX(mac));
 
     *slot_tx = (current_slot + k2 + delta) % nr_slots_per_frame[mu];
     *frame_tx = (current_frame + (current_slot + k2 + delta) / nr_slots_per_frame[mu]) % MAX_FRAME_NUMBER;
 
   } else {
 
-    AssertFatal(k2 > DURATION_RX_TO_TX,
-                "Slot offset K2 (%ld) needs to be higher than DURATION_RX_TO_TX (%d). Please set min_rxtxtime at least to %d in gNB config file or gNBs.[0].min_rxtxtime=%d via command line.\n",
+    AssertFatal(k2 > GET_DURATION_RX_TO_TX(mac),
+                "Slot offset K2 (%ld) needs to be higher than DURATION_RX_TO_TX (%ld). Please set min_rxtxtime at least to %ld in gNB config file or gNBs.[0].min_rxtxtime=%ld via command line.\n",
                 k2,
-                DURATION_RX_TO_TX,
-                DURATION_RX_TO_TX,
-                DURATION_RX_TO_TX);
+                GET_DURATION_RX_TO_TX(mac),
+                GET_DURATION_RX_TO_TX(mac),
+                GET_DURATION_RX_TO_TX(mac));
 
     if (k2 < 0) { // This can happen when a false DCI is received
       LOG_W(PHY, "%d.%d. Received k2 %ld\n", current_frame, current_slot, k2);
