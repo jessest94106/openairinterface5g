@@ -124,8 +124,18 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
       case IEI_PDU_ADDRESS:
         LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received PDU Address IE\n");
         psea_msg.pdu_addr_ie.pdu_length = *curPtr++;
-        psea_msg.pdu_addr_ie.pdu_type = *curPtr++;
 
+        /* Octet 3 */
+        // PDU type (3 bits)
+        psea_msg.pdu_addr_ie.pdu_type = *curPtr & 0x07;
+        // SMF's IPv6 link local address (1 bit)
+        uint8_t si6lla = (*curPtr >> 3) & 0x01;
+        if (si6lla)
+          LOG_E(NAS, "SMF's IPv6 link local address is not handled\n");
+        curPtr++;
+
+        /* Octet 4 to n */
+        // PDU address information
         uint8_t *addr = psea_msg.pdu_addr_ie.pdu_addr_oct;
         if (psea_msg.pdu_addr_ie.pdu_type == PDU_SESSION_TYPE_IPV4) {
           for (int i = 0; i < IPv4_ADDRESS_LENGTH; ++i)
