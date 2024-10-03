@@ -27,7 +27,6 @@
 void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
                         int32_t **dataF,
                         const int16_t amp,
-                        nr_csi_info_t *nr_csi_info,
                         const nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params,
                         const int slot,
                         const csi_mapping_parms_t *phy_csi_parms)
@@ -54,7 +53,6 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
   int csi_rs_length =  frame_parms->N_RB_DL << 4;
   int16_t mod_csi[frame_parms->symbols_per_slot][csi_rs_length>>1] __attribute__((aligned(16)));
   uint32_t beta = amp;
-  nr_csi_info->csi_rs_generated_signal_bits = log2_approx(amp);
 
   // setting the frequency density from its index
   double rho = 0;

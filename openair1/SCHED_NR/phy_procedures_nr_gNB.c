@@ -227,7 +227,6 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
       nr_generate_csi_rs(&gNB->frame_parms,
                          (int32_t **)gNB->common_vars.txdataF,
                          gNB->TX_AMP,
-                         gNB->nr_csi_info,
                          csi_params,
                          slot,
                          &mapping_parms);
