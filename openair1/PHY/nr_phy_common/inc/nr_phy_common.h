@@ -34,6 +34,7 @@ typedef struct {
   int loverline[16];
 } csi_mapping_parms_t;
 csi_mapping_parms_t get_csi_mapping_parms(int row, int b, int l0, int l1);
+int get_cdm_group_size(int cdm_type);
 void nr_qpsk_llr(int32_t *rxdataF_comp, int16_t *llr, uint32_t nb_re);
 void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint32_t nb_re);
 void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int16_t *llr, uint32_t nb_re);

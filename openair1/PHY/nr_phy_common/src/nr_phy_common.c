@@ -354,6 +354,29 @@ void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int
   simde_mm_empty();
 }
 
+int get_cdm_group_size(int cdm_type)
+{
+  // CDM group size from CDM type index
+  int gs = 0;
+  switch (cdm_type) {
+    case 0:
+      gs = 1;
+      break;
+    case 1:
+      gs = 2;
+      break;
+    case 2:
+      gs = 4;
+      break;
+    case 3:
+      gs = 8;
+      break;
+    default:
+      AssertFatal(false, "Invalid cdm type index for CSI\n");
+  }
+  return gs;
+}
+
 csi_mapping_parms_t get_csi_mapping_parms(int row, int b, int l0, int l1)
 {
   AssertFatal(b != 0, "Invalid CSI frequency domain mapping: no bit selected in bitmap\n");
