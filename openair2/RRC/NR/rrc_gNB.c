@@ -1851,11 +1851,17 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
 
   if (resp->drbs_to_be_setup_length > 0) {
+    int num_drb = get_number_active_drbs(UE);
+    DevAssert(num_drb == 0 || num_drb == resp->drbs_to_be_setup_length);
+
     /* Note: we would ideally check that SRB2 is acked, but at least LiteOn DU
      * seems buggy and does not ack, so simply check that locally we activated */
     AssertFatal(UE->Srb[1].Active && UE->Srb[2].Active, "SRBs 1 and 2 must be active during DRB Establishment");
     store_du_f1u_tunnel(resp->drbs_to_be_setup, resp->drbs_to_be_setup_length, UE);
-    e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
+    if (num_drb == 0)
+      e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
+    else
+      cuup_notify_reestablishment(rrc, UE);
   }
 
   rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
