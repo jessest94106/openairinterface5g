@@ -815,6 +815,11 @@ void *UE_thread(void *arg)
 
   if (get_softmodem_params()->sync_ref && UE->sl_mode == 2) {
     UE->is_synchronized = 1;
+  } else {
+    //warm up the RF board 
+    int64_t tmp;
+    for (int i = 0; i < 50; i++)
+      readFrame(UE, &tmp, true);
   }
 
   while (!oai_exit) {
