@@ -112,16 +112,6 @@ extern RAN_CONTEXT_t RC;
 
 mui_t rrc_gNB_mui = 0;
 
-// the assoc_id might be 0 (if the DU goes offline). Below helper macro to
-// print an error and return from the function in that case
-#define RETURN_IF_INVALID_ASSOC_ID(assoc_id)                               \
-  {                                                                        \
-    if (assoc_id == 0) {                                                   \
-      LOG_E(NR_RRC, "cannot send data: invalid assoc_id 0, DU offline\n"); \
-      return;                                                              \
-    }                                                                      \
-  }
-
 ///---------------------------------------------------------------------------------------------------------------///
 ///---------------------------------------------------------------------------------------------------------------///
 
