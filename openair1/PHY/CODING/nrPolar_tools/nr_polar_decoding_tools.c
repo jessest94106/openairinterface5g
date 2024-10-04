@@ -321,24 +321,16 @@ static inline void applyGtoright(const t_nrPolar_params *pp, decoder_node_t *nod
 
         for (int i = 0; i < avx2len; i++) {
           simde__m256i tmp = simde_mm256_sign_epi16(((simde__m256i *)alpha_v)[i], simde_mm256_cvtepi8_epi16(((simde__m128i *)betal)[i]));
-          ((simde__m256i *)alpha_r)[i] =
-
-              simde_mm256_subs_epi16(((simde__m256i *)alpha_v)[i + avx2len], tmp);
+          ((simde__m256i *)alpha_r)[i] = simde_mm256_subs_epi16(((simde__m256i *)alpha_v)[i + avx2len], tmp);
         }
       } else if (avx2mod == 8) {
         simde__m128i tmp = simde_mm_sign_epi16(((simde__m128i *)alpha_v)[0], simde_mm_cvtepi8_epi16(((simde__m128i *)betal)[0]));
         ((simde__m128i *)alpha_r)[0] = simde_mm_subs_epi16(((simde__m128i *)alpha_v)[1], tmp);
       } else {
-        for (int i = 0; i < sz; i++) {
-          int temp_alpha_r = alpha_v[i + sz] - (betal[i] * alpha_v[i]);
-          if (temp_alpha_r > SHRT_MAX) {
-            alpha_r[i] = SHRT_MAX;
-          } else if (temp_alpha_r < -SHRT_MAX) {
-            alpha_r[i] = -SHRT_MAX;
-          } else {
-            alpha_r[i] = temp_alpha_r;
-          }
-        }
+        simde__m128i tmp = simde_mm_sign_epi16(*(simde__m128i *)alpha_v, simde_mm_cvtepi8_epi16(*(simde__m128i *)betal));
+        simde__m128i tmp2 = simde_mm_loadu_si128((simde__m128i *)(alpha_v + sz));
+        simde__m128i res = simde_mm_subs_epi16(tmp2, tmp);
+        simde_mm_storeu_si128(alpha_r, res);
       }
     }
     if (sz == 1) { // apply hard decision on right node
