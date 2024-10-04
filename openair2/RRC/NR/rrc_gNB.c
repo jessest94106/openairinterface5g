@@ -94,6 +94,7 @@
 #include <openair2/RRC/NR/nr_rrc_proto.h>
 #include "openair2/F1AP/f1ap_common.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "openair2/F1AP/lib/f1ap_lib_extern.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
 #include "openair2/E1AP/e1ap.h"
 #include "cucp_cuup_if.h"
@@ -1839,11 +1840,6 @@ void rrc_gNB_process_initial_ul_rrc_message(sctp_assoc_t assoc_id, const f1ap_in
     }
   }
   ASN_STRUCT_FREE(asn_DEF_NR_UL_CCCH_Message, ul_ccch_msg);
-
-  if (ul_rrc->rrc_container)
-    free(ul_rrc->rrc_container);
-  if (ul_rrc->du2cu_rrc_container)
-    free(ul_rrc->du2cu_rrc_container);
 }
 
 void rrc_gNB_process_release_request(const module_id_t gnb_mod_idP, x2ap_ENDC_sgnb_release_request_t *m)
@@ -2161,12 +2157,12 @@ static pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, 
 static f1ap_qos_characteristics_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param)
 {
   f1ap_qos_characteristics_t qos_char = {0};
-  if (qos_param->fiveQI_type == dynamic) {
-    qos_char.qos_type = dynamic;
+  if (qos_param->fiveQI_type == DYNAMIC) {
+    qos_char.qos_type = DYNAMIC;
     qos_char.dynamic.fiveqi = qos_param->fiveQI;
     qos_char.dynamic.qos_priority_level = qos_param->qos_priority;
   } else {
-    qos_char.qos_type = non_dynamic;
+    qos_char.qos_type = NON_DYNAMIC;
     qos_char.non_dynamic.fiveqi = qos_param->fiveQI;
     qos_char.non_dynamic.qos_priority_level = qos_param->qos_priority;
   }
@@ -2189,7 +2185,7 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
       const DRB_nGRAN_setup_t *drb_config = &pduSession[p].DRBnGRanList[i];
       f1ap_drb_to_be_setup_t *drb = &drbs[nb_drb];
       drb->drb_id = pduSession[p].DRBnGRanList[i].id;
-      drb->rlc_mode = rrc->configuration.um_on_default_drb ? RLC_MODE_UM : RLC_MODE_AM;
+      drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
       drb->up_ul_tnl[0].tl_address = drb_config->UpParamList[0].tlAddress;
       drb->up_ul_tnl[0].port = rrc->eth_params_s.my_portd;
       drb->up_ul_tnl[0].teid = drb_config->UpParamList[0].teId;
@@ -2439,6 +2435,7 @@ void *rrc_gnb_task(void *args_p) {
         AssertFatal(NODE_IS_CU(RC.nrrrc[instance]->node_type) || NODE_IS_MONOLITHIC(RC.nrrrc[instance]->node_type),
                     "should not receive F1AP_INITIAL_UL_RRC_MESSAGE, need call by CU!\n");
         rrc_gNB_process_initial_ul_rrc_message(msg_p->ittiMsgHeader.originInstance, &F1AP_INITIAL_UL_RRC_MESSAGE(msg_p));
+        free_initial_ul_rrc_message_transfer(&F1AP_INITIAL_UL_RRC_MESSAGE(msg_p));
         break;
 
       /* Messages from PDCP */
@@ -2513,6 +2510,12 @@ void *rrc_gnb_task(void *args_p) {
       case F1AP_GNB_DU_CONFIGURATION_UPDATE:
         AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type), "should not receive F1AP_SETUP_REQUEST in DU!\n");
         rrc_gNB_process_f1_du_configuration_update(&F1AP_GNB_DU_CONFIGURATION_UPDATE(msg_p), msg_p->ittiMsgHeader.originInstance);
+        break;
+
+      case F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE:
+        AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type),
+                    "should not receive F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE in DU!\n");
+        LOG_E(NR_RRC, "Handling of F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE not implemented\n");
         break;
 
       /* Messages from X2AP */
