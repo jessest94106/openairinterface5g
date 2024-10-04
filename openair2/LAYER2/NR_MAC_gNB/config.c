@@ -615,11 +615,20 @@ static void config_common(gNB_MAC_INST *nrmac,
       }
     }
   }
+
+  if (nrmac->beam_info.beam_allocation) {
+    cfg->analog_beamforming_ve.num_beams_period_vendor_ext.tl.tag = NFAPI_NR_FAPI_NUM_BEAMS_PERIOD_VENDOR_EXTENSION_TAG;
+    cfg->analog_beamforming_ve.num_beams_period_vendor_ext.value = nrmac->beam_info.beams_per_period;
+    cfg->num_tlv++;
+    cfg->analog_beamforming_ve.analog_bf_vendor_ext.tl.tag = NFAPI_NR_FAPI_ANALOG_BF_VENDOR_EXTENSION_TAG;
+    cfg->analog_beamforming_ve.analog_bf_vendor_ext.value = 1;  // analog BF enabled
+    cfg->num_tlv++;
+  }
 }
 
 static void initialize_beam_information(NR_beam_info_t *beam_info, int mu, int slots_per_frame)
 {
-  if(!beam_info->beam_allocation)
+  if (!beam_info->beam_allocation)
     return;
 
   int size = mu == 0 ? slots_per_frame << 1 : slots_per_frame;

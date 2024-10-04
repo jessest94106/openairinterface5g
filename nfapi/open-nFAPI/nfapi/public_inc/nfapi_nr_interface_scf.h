@@ -484,6 +484,11 @@ typedef struct {
   nfapi_nr_pm_pdu_t *pmi_pdu;
 } nfapi_nr_pm_list_t;
 
+typedef struct {
+  nfapi_uint8_tlv_t num_beams_period_vendor_ext;
+  nfapi_uint8_tlv_t analog_bf_vendor_ext;
+} nfapi_nr_analog_beamforming_ve_t;
+
 // ERROR enums
 typedef enum {    // Table 2-22
   NFAPI_NR_PARAM_MSG_OK = 0, 
@@ -597,6 +602,7 @@ typedef struct {
   nfapi_nr_nfapi_t              nfapi_config;
   nfapi_nr_pm_list_t            pmi_list;
   nfapi_nr_dbt_pdu_t            dbt_config;
+  nfapi_nr_analog_beamforming_ve_t analog_beamforming_ve;
 } nfapi_nr_config_request_scf_t;
 
 typedef enum {
