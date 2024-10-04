@@ -293,7 +293,7 @@ set_property(CACHE KPM_VERSION PROPERTY STRINGS "KPM_V2_03" "KPM_V3_00")
 message(STATUS "Selected KPM Version: ${KPM_VERSION}")
 
 
-add_boolean_option(ENABLE_IMSCOPE OFF "Enable phy scope based on imgui" ON)
+add_boolean_option(ENABLE_IMSCOPE OFF "Enable phy scope based on imgui" OFF)
 
 ##################################################
 # ASN.1 grammar C code generation & dependencies #
