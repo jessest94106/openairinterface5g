@@ -869,6 +869,11 @@ void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
     return;
   }
 
+  if(csirs_config_pdu->csi_type == 2) {
+    LOG_E(NR_PHY, "Handling of ZP CSI-RS not handled yet at PHY\n");
+    return;
+  }
+
   const NR_DL_FRAME_PARMS *frame_parms = &ue->frame_parms;
   int32_t csi_rs_received_signal[frame_parms->nb_antennas_rx][frame_parms->samples_per_slot_wCP];
   int16_t log2_re = 0;

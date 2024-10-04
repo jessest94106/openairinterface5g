@@ -354,6 +354,166 @@ void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int
   simde_mm_empty();
 }
 
+void csi_rs_resource_mapping(int32_t **dataF,
+                             int csi_rs_length,
+                             int16_t mod_csi[][csi_rs_length >> 1],
+                             int ofdm_symbol_size,
+                             int dataF_offset,
+                             int start_sc,
+                             const csi_mapping_parms_t *mapping_parms,
+                             int start_rb,
+                             int nb_rbs,
+                             double alpha,
+                             int beta,
+                             double rho,
+                             int gs,
+                             int freq_density)
+{
+  // resource mapping according to 38.211 7.4.1.5.3
+  for (int n = start_rb; n < (start_rb + nb_rbs); n++) {
+    if ((freq_density > 1) || (freq_density == (n % 2))) {  // for freq density 0.5 checks if even or odd RB
+      for (int ji = 0; ji < mapping_parms->size; ji++) { // loop over CDM groups
+        for (int s = 0 ; s < gs; s++)  { // loop over each CDM group size
+          int p = s + mapping_parms->j[ji] * gs; // port index
+          for (int kp = 0; kp <= mapping_parms->kprime; kp++) { // loop over frequency resource elements within a group
+            // frequency index of current resource element
+            int k = (start_sc + (n * NR_NB_SC_PER_RB) + mapping_parms->koverline[ji] + kp) % (ofdm_symbol_size);
+            // wf according to tables 7.4.5.3-2 to 7.4.5.3-5
+            int wf = kp == 0 ? 1 : (-2 * (s % 2) + 1);
+            int na = n * alpha;
+            int kpn = (rho * mapping_parms->koverline[ji]) / NR_NB_SC_PER_RB;
+            int mprime = na + kp + kpn; // sequence index
+            for (int lp = 0; lp <= mapping_parms->lprime; lp++) { // loop over frequency resource elements within a group
+              int l = lp + mapping_parms->loverline[ji];
+              // wt according to tables 7.4.5.3-2 to 7.4.5.3-5
+              int wt;
+              if (s < 2)
+                wt = 1;
+              else if (s < 4)
+                wt = -2 * (lp % 2) + 1;
+              else if (s < 6)
+                wt = -2 * (lp / 2) + 1;
+              else {
+                if ((lp == 0) || (lp == 3))
+                  wt = 1;
+                else
+                  wt = -1;
+              }
+              int index = ((l * ofdm_symbol_size + k) << 1) + (2 * dataF_offset);
+              ((int16_t*)dataF[p])[index] = (beta * wt * wf * mod_csi[l][mprime << 1]) >> 15;
+              ((int16_t*)dataF[p])[index + 1] = (beta * wt * wf * mod_csi[l][(mprime << 1) + 1]) >> 15;
+              LOG_D(PHY,
+                    "l,k (%d,%d)  seq. index %d \t port %d \t (%d,%d)\n",
+                    l,
+                    k,
+                    mprime,
+                    p + 3000,
+                    ((int16_t*)dataF[p])[index],
+                    ((int16_t*)dataF[p])[index + 1]);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void get_modulated_csi_symbols(int symbols_per_slot,
+                               int slot,
+                               int N_RB_DL,
+                               int mod_length,
+                               int16_t mod_csi[][(N_RB_DL << 4) >> 1],
+                               int lprime,
+                               int l0,
+                               int l1,
+                               int row,
+                               int scramb_id)
+{
+  for (int lp = 0; lp <= lprime; lp++) {
+    int symb = l0;
+    const uint32_t *gold =
+        nr_gold_csi_rs(N_RB_DL, symbols_per_slot, slot, symb + lp, scramb_id);
+    nr_modulation(gold, mod_length, DMRS_MOD_ORDER, mod_csi[symb + lp]);
+    if ((row == 5) || (row == 7) || (row == 11) || (row == 13) || (row == 16)) {
+      const uint32_t *gold =
+          nr_gold_csi_rs(N_RB_DL, symbols_per_slot, slot, symb + 1, scramb_id);
+      nr_modulation(gold, mod_length, DMRS_MOD_ORDER, mod_csi[symb + 1]);
+    }
+    if ((row == 14) || (row == 13) || (row == 16) || (row == 17)) {
+      symb = l1;
+      const uint32_t *gold =
+          nr_gold_csi_rs(N_RB_DL, symbols_per_slot, slot, symb + lp, scramb_id);
+      nr_modulation(gold, mod_length, DMRS_MOD_ORDER, mod_csi[symb + lp]);
+      if ((row == 13) || (row == 16)) {
+        const uint32_t *gold =
+            nr_gold_csi_rs(N_RB_DL, symbols_per_slot, slot, symb + 1, scramb_id);
+        nr_modulation(gold, mod_length, DMRS_MOD_ORDER, mod_csi[symb + 1]);
+      }
+    }
+  }
+}
+
+uint32_t get_csi_beta_amplitude(const int16_t amp, int power_control_offset_ss)
+{
+  uint32_t beta = amp;
+  // assuming amp is the amplitude of SSB channels
+  switch (power_control_offset_ss) {
+    case 0:
+      beta = (amp * ONE_OVER_SQRT2_Q15) >> 15;
+      break;
+    case 1:
+      beta = amp;
+      break;
+    case 2:
+      beta = (amp * ONE_OVER_SQRT2_Q15) >> 14;
+      break;
+    case 3:
+      beta = amp << 1;
+      break;
+    default:
+      AssertFatal(false, "Invalid SS power offset density index for CSI\n");
+  }
+  return beta;
+}
+
+int get_csi_modulation_length(double rho, int freq_density, int kprime, int start_rb, int nr_rbs)
+{
+  int csi_length = 0;
+  if (rho < 1) {
+    if (freq_density == 0) {
+      csi_length = (((start_rb + nr_rbs) >> 1) << kprime) << 1;
+    } else {
+      csi_length = ((((start_rb + nr_rbs) >> 1) << kprime) + 1) << 1;
+    }
+  } else {
+    csi_length = (((uint16_t) rho * (start_rb + nr_rbs)) << kprime) << 1;
+  }
+  return csi_length;
+}
+
+double get_csi_rho(int freq_density)
+{
+  // setting the frequency density from its index
+  double rho = 0;
+  switch (freq_density) {
+    case 0:
+      rho = 0.5;
+      break;
+    case 1:
+      rho = 0.5;
+      break;
+     case 2:
+      rho = 1;
+      break;
+     case 3:
+      rho = 3;
+      break;
+    default:
+      AssertFatal(false, "Invalid frequency density index for CSI\n");
+  }
+  return rho;
+}
+
 int get_cdm_group_size(int cdm_type)
 {
   // CDM group size from CDM type index
