@@ -1864,7 +1864,27 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
       cuup_notify_reestablishment(rrc, UE);
   }
 
-  rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+  if (UE->ho_context == NULL) {
+    rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+  } else {
+    // case of handover
+    // handling of "target CU" information
+    DevAssert(UE->ho_context->target != NULL);
+    DevAssert(resp->crnti != NULL);
+    UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
+    UE->ho_context->target->new_rnti = *resp->crnti;
+
+    uint8_t xid = rrc_gNB_get_next_transaction_identifier(0);
+    UE->xids[xid] = RRC_DEDICATED_RECONF;
+    uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
+    int size = rrc_gNB_encode_RRCReconfiguration(rrc, UE, xid, NULL, buffer, sizeof(buffer), true);
+    DevAssert(size > 0 && size <= sizeof(buffer));
+
+    // TODO N2 38.413 sec 9.3.1.21: admitted PDU sessions (in UE), Target to
+    // Source Transparent Container (9.3.1.21) which encodes the RRC
+    // reconfiguration above
+    UE->ho_context->target->ho_req_ack(rrc, UE, buffer, size);
+  }
 }
 
 static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p)

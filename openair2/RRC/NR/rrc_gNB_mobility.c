@@ -31,6 +31,11 @@
 #include "rrc_gNB_UE_context.h"
 #include "openair2/F1AP/f1ap_ids.h"
 #include "MESSAGES/asn1_msg.h"
+#include "nr_pdcp/nr_pdcp_oai_api.h"
+#include "openair3/SECU/key_nas_deriver.h"
+
+/* declared in rrc_gNB.c: should be cleaned up through helper function? useful? */
+extern mui_t rrc_gNB_mui;
 
 typedef enum { HO_CTX_BOTH, HO_CTX_SOURCE, HO_CTX_TARGET } ho_ctx_type_t;
 static nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type)
@@ -198,6 +203,75 @@ void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc, int nr_cgi, uint8_t *ho_prep_info, 
 }
 */
 
+typedef struct deliver_ue_ctxt_modification_data_t {
+  gNB_RRC_INST *rrc;
+  f1ap_ue_context_modif_req_t *modification_req;
+  sctp_assoc_t assoc_id;
+} deliver_ue_ctxt_modification_data_t;
+static void rrc_deliver_ue_ctxt_modif_req(void *deliver_pdu_data, ue_id_t ue_id, int srb_id, char *buf, int size, int sdu_id)
+{
+  DevAssert(deliver_pdu_data != NULL);
+  deliver_ue_ctxt_modification_data_t *data = deliver_pdu_data;
+  data->modification_req->rrc_container = (uint8_t*)buf;
+  data->modification_req->rrc_container_length = size;
+  data->rrc->mac_rrc.ue_context_modification_request(data->assoc_id, data->modification_req);
+}
+static void rrc_gNB_trigger_reconfiguration_for_handover(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, uint8_t *rrc_reconf, int rrc_reconf_len)
+{
+  f1_ue_data_t ue_data = cu_get_f1_ue_data(ue->rrc_ue_id);
+
+  TransmActionInd_t transmission_action_indicator = TransmActionInd_STOP;
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
+  f1ap_ue_context_modif_req_t ue_context_modif_req = {
+      .gNB_CU_ue_id = ue->rrc_ue_id,
+      .gNB_DU_ue_id = ue_data.secondary_ue,
+      .plmn.mcc = rrc->configuration.mcc[0],
+      .plmn.mnc = rrc->configuration.mnc[0],
+      .plmn.mnc_digit_length = rrc->configuration.mnc_digit_length[0],
+      .nr_cellid = rrc->nr_cellid, // TODO target cell ID
+      .servCellId = 0, // TODO: correct value?
+      .ReconfigComplOutcome = RRCreconf_success,
+      .transm_action_ind = &transmission_action_indicator,
+  };
+  deliver_ue_ctxt_modification_data_t data = {.rrc = rrc,
+                                              .modification_req = &ue_context_modif_req,
+                                              .assoc_id = ue_data.du_assoc_id};
+  int srb_id = 1;
+  nr_pdcp_data_req_srb(ue->rrc_ue_id,
+                       srb_id,
+                       rrc_gNB_mui++,
+                       rrc_reconf_len,
+                       (unsigned char *const)rrc_reconf,
+                       rrc_deliver_ue_ctxt_modif_req,
+                       &data);
+}
+
+static void nr_rrc_f1_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t *rrc_reconf_buf, uint32_t rrc_reconf_len)
+{
+  // N2/Xn HO: fill with UE caps, as-context, rrc reconf, send to source CU
+  // also, fill the UE->rnti from the new one (in F1 case, happens after
+  // confirmation of ue ctxt modif
+
+  // F1 HO: handling of "source CU" information
+  DevAssert(UE->ho_context->source != NULL);
+  rrc_gNB_trigger_reconfiguration_for_handover(rrc, UE, rrc_reconf_buf, rrc_reconf_len);
+  LOG_A(NR_RRC, "HO acknowledged: Send reconfiguration for UE %u/RNTI %04x...\n", UE->rrc_ue_id, UE->rnti);
+
+  /* Re-establish SRB2 according to clause 5.3.5.6.3 of 3GPP TS 38.331
+   * (SRB1 is re-established with RRCReestablishment message)
+   */
+  int srb_id = 2;
+  if (UE->Srb[srb_id].Active) {
+    nr_pdcp_entity_security_keys_and_algos_t security_parameters;
+    /* Derive the keys from kgnb */
+    nr_derive_key(RRC_ENC_ALG, UE->ciphering_algorithm, UE->kgnb, security_parameters.ciphering_key);
+    nr_derive_key(RRC_INT_ALG, UE->integrity_algorithm, UE->kgnb, security_parameters.integrity_key);
+    security_parameters.integrity_algorithm = UE->integrity_algorithm;
+    security_parameters.ciphering_algorithm = UE->ciphering_algorithm;
+    nr_pdcp_reestablishment(UE->rrc_ue_id, srb_id, true, &security_parameters);
+  }
+}
+
 void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du)
 {
   DevAssert(rrc != NULL);
@@ -212,7 +286,7 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
   // here: target Cell is preselected, target CU has access to UE information
   // and therefore also the PDU sessions. Orig RRC reconfiguration should be in
   // handover preparation information
-  ho_req_ack_t ack = NULL;
+  ho_req_ack_t ack = nr_rrc_f1_ho_acknowledge;
   ho_success_t success = NULL;
   ho_cancel_t cancel = NULL;
   nr_initiate_handover(rrc, ue, source_du, target_du, buf, size, ack, success, cancel);
