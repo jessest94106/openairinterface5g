@@ -2023,7 +2023,7 @@ unsigned int mask_flip(unsigned int x) {
   return((((x>>8) + (x<<8))&0xffff)>>6);
 }
 
-static pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, rrc_pdu_session_param_t *pduSession)
+pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, rrc_pdu_session_param_t *pduSession)
 {
   pdusession_t *pdu = &pduSession->param;
   for (int i = 0; i < pdu->nb_qos; i++) {
@@ -2035,7 +2035,7 @@ static pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, 
 }
 
 /* \bref return F1AP QoS characteristics based on Qos flow parameters */
-static f1ap_qos_characteristics_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param)
+f1ap_qos_characteristics_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param)
 {
   f1ap_qos_characteristics_t qos_char = {0};
   if (qos_param->fiveQI_type == DYNAMIC) {
