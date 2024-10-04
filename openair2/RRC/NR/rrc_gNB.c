@@ -1558,6 +1558,14 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
       LOG_I(RRC, "UE %d: transaction %d still ongoing for action %d\n", UE->rrc_ue_id, i, UE->xids[i]);
     }
   }
+
+  if (UE->ho_context != NULL) {
+    LOG_A(NR_RRC, "handover for UE %d/RNTI %04x complete!\n", UE->rrc_ue_id, UE->rnti);
+    DevAssert(UE->ho_context->target != NULL);
+
+    UE->ho_context->target->ho_success(rrc, UE);
+    nr_rrc_finalize_ho(UE);
+  }
 }
 
 static void rrc_gNB_generate_UECapabilityEnquiry(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue)
