@@ -41,6 +41,9 @@ RUN /bin/sh oaienv && \
 FROM registry.access.redhat.com/ubi9/ubi:latest AS oai-gnb-aw2s
 ENV TZ=Europe/Paris
 
+# Install EPEL for RHEL9
+RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+
 RUN dnf update -y && \
     dnf install -y \
         procps-ng \
@@ -50,7 +53,8 @@ RUN dnf update -y && \
         lksctp-tools \
         tzdata \
         net-tools \
-        iputils && \
+        iputils \
+        yaml-cpp-devel && \
     echo "/usr/local/lib" > /etc/ld.so.conf.d/local-lib.conf && \
     echo "/usr/local/lib64" >> /etc/ld.so.conf.d/local-lib.conf
 
@@ -69,6 +73,7 @@ COPY --from=gnb-build \
     /oai-ran/cmake_targets/ran_build/build/libdfts.so \
     /oai-ran/cmake_targets/ran_build/build/libldpc*.so \
     /oai-ran/cmake_targets/ran_build/build/libtelnetsrv.so \
+    /oai-ran/cmake_targets/ran_build/build/libparams_yaml.so \
     /usr/local/lib/
 
 COPY --from=gnb-base \
@@ -98,4 +103,4 @@ WORKDIR /opt/oai-gnb-aw2s
 
 COPY --from=gnb-base /tini /tini
 ENTRYPOINT ["/tini", "-v", "--", "/opt/oai-gnb-aw2s/bin/entrypoint.sh"]
-CMD ["/opt/oai-gnb-aw2s/bin/nr-softmodem", "-O", "/opt/oai-gnb-aw2s/etc/gnb.conf"]
+CMD ["/opt/oai-gnb-aw2s/bin/nr-softmodem"]
