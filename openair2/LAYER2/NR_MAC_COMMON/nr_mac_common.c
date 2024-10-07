@@ -5333,28 +5333,19 @@ int get_FeedbackDisabled(NR_DownlinkHARQ_FeedbackDisabled_r17_t *downlinkHARQ_Fe
   return (downlinkHARQ_FeedbackDisabled_r17->buf[byte_index] >> (7 - bit_index)) & 1;
 }
 
-int nr_get_mu(const NR_UplinkConfigCommon_t *uplinkConfigCommon)
+int nr_get_prach_mu(const NR_MsgA_ConfigCommon_r16_t *msgacc, const NR_RACH_ConfigCommon_t *rach_ConfigCommon)
 {
   int mu;
-  NR_BWP_UplinkCommon_t *initialUplinkBWP = uplinkConfigCommon->initialUplinkBWP;
 
   // if 2-Step configuration file exists
-  if (initialUplinkBWP->ext1 && initialUplinkBWP->ext1->msgA_ConfigCommon_r16) {
-    if (initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16) {
-      // Choose Subcarrier Spacing of configuration file of 2-Step
-      const NR_MsgA_ConfigCommon_r16_t *msgacc = initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup;
-      mu = *msgacc->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16;
-    } else {
-      // Choose Subcarrier Spacing of configuration file of 4-Step
-      mu = uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
-    }
-  } else {
-    if (initialUplinkBWP->rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing) {
-      mu = *initialUplinkBWP->rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing;
-    } else {
-      mu = uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
-    }
-  }
+  if (msgacc && msgacc->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16) {
+    // Choose Subcarrier Spacing of configuration file of 2-Step
+    mu = *msgacc->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16;
+  } else if (rach_ConfigCommon->msg1_SubcarrierSpacing) {
+    // Choose Subcarrier Spacing of configuration file of 4-Step
+    mu = *rach_ConfigCommon->msg1_SubcarrierSpacing;
+  } else
+    AssertFatal(false, "PRACH subcarrier spacing mandatory present for L139, not supported otherwise\n");
 
   return mu;
 }

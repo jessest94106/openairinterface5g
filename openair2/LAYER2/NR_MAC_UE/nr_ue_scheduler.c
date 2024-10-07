@@ -1804,13 +1804,6 @@ static void build_ro_list(NR_UE_MAC_INST_t *mac)
   NR_RACH_ConfigGeneric_t *rach_ConfigGeneric = &setup->rach_ConfigGeneric;
 
   config_index = rach_ConfigGeneric->prach_ConfigurationIndex;
-
-  int mu;
-  if (setup->msg1_SubcarrierSpacing)
-    mu = *setup->msg1_SubcarrierSpacing;
-  else
-    mu = mac->current_UL_BWP->scs;
-
   msg1_FDM = rach_ConfigGeneric->msg1_FDM;
 
   switch (msg1_FDM){
@@ -1830,6 +1823,7 @@ static void build_ro_list(NR_UE_MAC_INST_t *mac)
   int unpaired = mac->phy_config.config_req.cell_config.frame_duplex_type;
 
   const int64_t *prach_config_info_p = get_prach_config_info(mac->frequency_range, config_index, unpaired);
+  int mu = nr_get_prach_mu(mac->current_UL_BWP->msgA_ConfigCommon_r16, setup);
 
   // Identify the proper PRACH Configuration Index table according to the operating frequency
   LOG_D(NR_MAC,"mu = %u, PRACH config index  = %u, unpaired = %u\n", mu, config_index, unpaired);
@@ -2935,12 +2929,9 @@ static void nr_ue_prach_scheduler(NR_UE_MAC_INST_t *mac, frame_t frameP, sub_fra
       if (ra->ra_type == RA_4_STEP) {
         nr_Msg1_transmitted(mac);
       } else if (ra->ra_type == RA_2_STEP) {
-        const NR_MsgA_ConfigCommon_r16_t *msgacc = mac->current_UL_BWP->msgA_ConfigCommon_r16;
-        int mu = (int)*msgacc->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16;
-
         NR_MsgA_PUSCH_Resource_r16_t *msgA_PUSCH_Resource =
             mac->current_UL_BWP->msgA_ConfigCommon_r16->msgA_PUSCH_Config_r16->msgA_PUSCH_ResourceGroupA_r16;
-
+        int mu = nr_get_prach_mu(mac->current_UL_BWP->msgA_ConfigCommon_r16, setup);
         const int n_slots_frame = nr_slots_per_frame[mu];
         slot_t msgA_pusch_slot = (slotP + msgA_PUSCH_Resource->msgA_PUSCH_TimeDomainOffset_r16) % n_slots_frame;
         frame_t msgA_pusch_frame =
