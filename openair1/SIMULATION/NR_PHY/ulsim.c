@@ -936,6 +936,7 @@ int main(int argc, char *argv[])
   }
   //---------------
   int ret = 1;
+  int srs_ret = do_SRS;
   for (SNR = snr0; SNR <= snr1; SNR += snr_step) {
 
     varArray_t *table_rx=initVarArray(1000,sizeof(double));
@@ -970,6 +971,9 @@ int main(int argc, char *argv[])
     int min_pusch_delay = INT_MAX;
     int max_pusch_delay = INT_MIN;
     int delay_pusch_est_count = 0;
+
+    int64_t sum_srs_snr = 0;
+    int srs_snr_count = 0;
 
     for (trial = 0; trial < n_trials; trial++) {
 
@@ -1436,6 +1440,10 @@ int main(int argc, char *argv[])
       max_pusch_delay = max(ulsch_gNB->delay.est_delay, max_pusch_delay);
       delay_pusch_est_count++;
 
+      if (do_SRS == 1) {
+        sum_srs_snr += gNB->srs->snr;
+        srs_snr_count++;
+      }
     } // trial loop
 
     roundStats/=((float)n_trials);
@@ -1471,8 +1479,14 @@ int main(int argc, char *argv[])
 
     printf(") Avg round %.2f, Eff Rate %.4f bits/slot, Eff Throughput %.2f, TBS %u bits/slot\n", roundStats,effRate,effTP,TBS);
 
-    printf("DMRS-PUSCH delay estimation: min %i, max %i, average %f\n",
-           min_pusch_delay >> 1, max_pusch_delay >> 1, (double)sum_pusch_delay / (2 * delay_pusch_est_count));
+    double av_delay = (double)sum_pusch_delay / (2 * delay_pusch_est_count);
+    printf("DMRS-PUSCH delay estimation: min %i, max %i, average %2.1f\n", min_pusch_delay >> 1, max_pusch_delay >> 1, av_delay);
+
+    if (do_SRS == 1) {
+      float srs_snr_av = (float)sum_srs_snr / srs_snr_count;
+      srs_ret = srs_snr_av >= 0.7 * SNR || srs_snr_av > 30 ? 0 : 1;
+      printf("SNR based on SRS: %2.1f dB\n", srs_snr_av);
+    }
 
     printf("*****************************************\n");
     printf("\n");
@@ -1519,7 +1533,7 @@ int main(int argc, char *argv[])
     if(n_trials==1)
       break;
 
-    if ((float)effTP >= eff_tp_check) {
+    if (srs_ret == 0 && (float)effTP >= eff_tp_check) {
       printf("*************\n");
       printf("PUSCH test OK\n");
       printf("*************\n");

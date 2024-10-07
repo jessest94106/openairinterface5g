@@ -258,6 +258,8 @@ typedef struct {
   uint32_t frame;
   /// Slot where current SRS pdu was received
   uint32_t slot;
+  /// Measured SNR
+  int8_t snr;
   /// ULSCH PDU
   nfapi_nr_srs_pdu_t srs_pdu;
 } NR_gNB_SRS_t;
