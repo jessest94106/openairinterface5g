@@ -42,6 +42,14 @@ extern RAN_CONTEXT_t RC;
 
 //#define ENABLE_MAC_PAYLOAD_DEBUG 1
 
+/* This function checks whether the given Dl/UL slot is set
+   in the input bitmap, which is a mask indicating in which
+   slot to transmit (among those available in the TDD configuration) */
+static bool is_xlsch_in_slot(uint64_t bitmap, sub_frame_t slot)
+{
+  return (bitmap >> (slot % 64)) & 0x01;
+}
+
 uint32_t target_dl_mcs = 9;
 uint32_t target_dl_Nl = 1;
 uint32_t target_dl_bw = 50;

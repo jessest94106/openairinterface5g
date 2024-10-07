@@ -138,7 +138,6 @@ static const int diff_rsrp_ssb_csi_meas_10_1_6_1_2[16] = {
 
 static int get_pucch_index(int frame, int slot, const frame_structure_t *fs, int sched_pucch_size)
 {
-  gNB_MAC_INST *nrmac = RC.nrmac[0];
   // PUCCH structures are indexed by slot in the PUCCH period determined by sched_pucch_size number of UL slots
   // this functions return the index to the structure for slot passed to the function
   const int n_ul_slots_period = get_ul_slots_per_period(fs);
@@ -150,7 +149,7 @@ static int get_pucch_index(int frame, int slot, const frame_structure_t *fs, int
   // ((slot % nr_slots_period) - first_ul_slot_period) gives the progressive number of the slot in this TDD period
   int ul_period_slot = -1;
   for (int i = 0; i <= slot % fs->numb_slots_period; i++) {
-    if (is_xlsch_in_slot(nrmac->ulsch_slot_bitmap[i / 64], i)) {
+    if (is_ul_slot(i, fs)) {
       ul_period_slot++;
     }
   }
@@ -173,7 +172,7 @@ void nr_schedule_pucch(gNB_MAC_INST *nrmac, frame_t frameP, sub_frame_t slotP)
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
 
-  if (!is_xlsch_in_slot(nrmac->ulsch_slot_bitmap[slotP / 64], slotP))
+  if (!is_ul_slot(slotP, &nrmac->frame_structure))
     return;
 
   UE_iterator(nrmac->UE_info.list, UE) {
@@ -247,7 +246,7 @@ void nr_csi_meas_reporting(int Mod_idP,frame_t frame, sub_frame_t slot)
       if ((sched_frame * n_slots_frame + sched_slot - offset) % period != 0)
         continue;
 
-      AssertFatal(is_xlsch_in_slot(nrmac->ulsch_slot_bitmap[sched_slot / 64], sched_slot), "CSI reporting slot %d is not set for an uplink slot\n", sched_slot);
+      AssertFatal(is_ul_slot(sched_slot, &nrmac->frame_structure), "CSI reporting slot %d is not set for an uplink slot\n", sched_slot);
       LOG_D(NR_MAC, "CSI reporting in frame %d slot %d CSI report ID %ld\n", sched_frame, sched_slot, csirep->reportConfigId);
 
       const NR_PUCCH_ResourceSet_t *pucchresset = pucch_Config->resourceSetToAddModList->list.array[1]; // set with formats >1
@@ -1030,7 +1029,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
     // check if the slot is UL
     if (fs->is_tdd) {
       int mod_slot = pucch_slot % fs->numb_slots_period;
-      if (!is_xlsch_in_slot(mac->ulsch_slot_bitmap[mod_slot / 64], mod_slot))
+      if (!is_ul_slot(mod_slot, fs))
         continue;
     }
     const int pucch_frame = (frame + ((slot + pdsch_to_harq_feedback[f] + NTN_gNB_Koffset) / n_slots_frame)) % MAX_FRAME_NUMBER;
@@ -1134,7 +1133,7 @@ void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
 
-  if (!is_xlsch_in_slot(nrmac->ulsch_slot_bitmap[slot / 64], slot))
+  if (!is_ul_slot(slot, &nrmac->frame_structure))
     return;
   const int CC_id = 0;
   UE_iterator(nrmac->UE_info.list, UE) {

@@ -122,10 +122,6 @@ void clear_beam_information(NR_beam_info_t *beam_info, int frame, int slot, int 
   }
 }
 
-bool is_xlsch_in_slot(uint64_t bitmap, sub_frame_t slot) {
-  return (bitmap >> (slot % 64)) & 0x01;
-}
-
 /**
  * @brief Returns true for:
  *        (1) FDD

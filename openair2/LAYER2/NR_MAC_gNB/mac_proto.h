@@ -352,7 +352,6 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
 
 int binomial(int n, int k);
 
-bool is_xlsch_in_slot(uint64_t bitmap, sub_frame_t slot);
 bool is_ul_slot(const slot_t slot, const frame_structure_t *fs);
 bool is_dl_slot(const slot_t slot, const frame_structure_t *fs);
 bool is_mixed_slot(const slot_t slot, const frame_structure_t *fs);

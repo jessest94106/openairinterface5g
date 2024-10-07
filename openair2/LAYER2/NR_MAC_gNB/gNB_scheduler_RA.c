@@ -278,7 +278,7 @@ static void schedule_nr_MsgA_pusch(NR_UplinkConfigCommon_t *uplinkConfigCommon,
 
   UL_tti_req->SFN = msgA_pusch_frame;
   UL_tti_req->Slot = msgA_pusch_slot;
-  AssertFatal(is_xlsch_in_slot(nr_mac->ulsch_slot_bitmap[msgA_pusch_slot / 64], msgA_pusch_slot),
+  AssertFatal(is_ul_slot(msgA_pusch_slot, &nr_mac->frame_structure),
               "Slot %d is not an Uplink slot, invalid msgA_PUSCH_TimeDomainOffset_r16 %ld\n",
               msgA_pusch_slot,
               msgA_PUSCH_Resource->msgA_PUSCH_TimeDomainOffset_r16);
@@ -376,7 +376,7 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, sub_frame_t slotP
   nfapi_nr_ul_tti_request_t *UL_tti_req = &RC.nrmac[module_idP]->UL_tti_req_ahead[0][index];
   nfapi_nr_config_request_scf_t *cfg = &RC.nrmac[module_idP]->config[0];
 
-  if (is_nr_UL_slot(scc->tdd_UL_DL_ConfigurationCommon, slotP, cc->frame_type)) {
+  if (is_ul_slot(slotP, &RC.nrmac[module_idP]->frame_structure)) {
     const NR_RACH_ConfigGeneric_t *rach_ConfigGeneric = &rach_ConfigCommon->rach_ConfigGeneric;
     uint8_t config_index = rach_ConfigGeneric->prach_ConfigurationIndex;
     uint8_t N_dur, N_t_slot, start_symbol = 0, N_RA_slot;
@@ -787,7 +787,7 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
   const int sched_frame = (frame + (slot + K2) / nr_slots_per_frame[mu]) % MAX_FRAME_NUMBER;
   const int sched_slot = (slot + K2) % nr_slots_per_frame[mu];
 
-  if (is_xlsch_in_slot(nr_mac->ulsch_slot_bitmap[sched_slot / 64], sched_slot)) {
+  if (is_ul_slot(sched_slot, &nr_mac->frame_structure)) {
     const int n_slots_frame = nr_slots_per_frame[mu];
     NR_beam_alloc_t beam_ul = beam_allocation_procedure(&nr_mac->beam_info, sched_frame, sched_slot, ra->beam_id, n_slots_frame);
     if (beam_ul.idx < 0)
@@ -957,7 +957,6 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
 
 static bool get_feasible_msg3_tda(const NR_ServingCellConfigCommon_t *scc,
                                   int mu_delta,
-                                  uint64_t ulsch_slot_bitmap[3],
                                   const NR_PUSCH_TimeDomainResourceAllocationList_t *tda_list,
                                   int frame,
                                   int slot,
@@ -976,7 +975,7 @@ static bool get_feasible_msg3_tda(const NR_ServingCellConfigCommon_t *scc,
     int abs_slot = slot + k2 + mu_delta;
     int temp_frame = (frame + (abs_slot / slots_per_frame)) & 1023;
     int temp_slot = abs_slot % slots_per_frame; // msg3 slot according to 8.3 in 38.213
-    if (fs->is_tdd && !is_xlsch_in_slot(ulsch_slot_bitmap[temp_slot / 64], temp_slot))
+    if (fs->is_tdd && !is_ul_slot(temp_slot, fs))
       continue;
 
     const tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
@@ -1385,7 +1384,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
   gNB_MAC_INST *nr_mac = RC.nrmac[module_idP];
 
   // no DL -> cannot send Msg2
-  if (!is_xlsch_in_slot(nr_mac->dlsch_slot_bitmap[slotP / 64], slotP)) {
+  if (!is_dl_slot(slotP, &nr_mac->frame_structure)) {
     return;
   }
 
@@ -1415,7 +1414,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
   const NR_UE_UL_BWP_t *ul_bwp = &ra->UL_BWP;
   bool ret = get_feasible_msg3_tda(scc,
                                    DELTA[ul_bwp->scs],
-                                   nr_mac->ulsch_slot_bitmap,
                                    ul_bwp->tdaList_Common,
                                    frameP,
                                    slotP,
@@ -1946,8 +1944,8 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
   NR_COMMON_channels_t *cc = &nr_mac->common_channels[CC_id];
   NR_UE_DL_BWP_t *dl_bwp = &ra->DL_BWP;
 
-   // if it is a DL slot, if the RA is in MSG4 state
-  if (is_xlsch_in_slot(nr_mac->dlsch_slot_bitmap[slotP / 64], slotP)) {
+  // if it is a DL slot, if the RA is in MSG4 state
+  if (is_dl_slot(slotP, &nr_mac->frame_structure)) {
     NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
     NR_SearchSpace_t *ss = ra->ra_ss;
     const char *ra_type_str = ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4";
