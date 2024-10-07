@@ -37,6 +37,7 @@
 #include "LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
+#include "openair1/PHY/TOOLS/phy_scope_interface.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -706,8 +707,10 @@ void readFrame(PHY_VARS_NR_UE *UE,  openair0_timestamp *timestamp, bool toTrash)
                    + 4 * ((x * fp->samples_per_subframe) + fp->get_samples_slot_timestamp(slot, fp, 0));
       }
 
-      int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, rxp, fp->get_samples_per_slot(slot, fp), fp->nb_antennas_rx);
-      AssertFatal(fp->get_samples_per_slot(slot, fp) == tmp, "");
+      int read_block_size = fp->get_samples_per_slot(slot, fp);
+      int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, rxp, read_block_size, fp->nb_antennas_rx);
+      UEscopeCopy(UE, ueTimeDomainSamplesBeforeSync, rxp[0], sizeof(c16_t), 1, read_block_size, 0);
+      AssertFatal(read_block_size == tmp, "");
 
       if (IS_SOFTMODEM_RFSIM)
         dummyWrite(UE, *timestamp, fp->get_samples_per_slot(slot, fp));
@@ -812,6 +815,11 @@ void *UE_thread(void *arg)
 
   if (get_softmodem_params()->sync_ref && UE->sl_mode == 2) {
     UE->is_synchronized = 1;
+  } else {
+    //warm up the RF board 
+    int64_t tmp;
+    for (int i = 0; i < 50; i++)
+      readFrame(UE, &tmp, true);
   }
 
   while (!oai_exit) {
@@ -962,6 +970,7 @@ void *UE_thread(void *arg)
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
     openair0_timestamp rx_timestamp;
     int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, &rx_timestamp, rxp, readBlockSize, fp->nb_antennas_rx);
+    UEscopeCopy(UE, ueTimeDomainSamples, rxp[0], sizeof(c16_t), 1, readBlockSize, 0);
     AssertFatal(readBlockSize == tmp, "");
 
     if(slot_nr == (nb_slot_frame - 1)) {

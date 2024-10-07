@@ -44,7 +44,7 @@ static void f1ap_write_drb_qos_param(const f1ap_qos_flow_level_qos_parameters_t 
   int type = drb_qos_in->qos_characteristics.qos_type;
 
   const f1ap_qos_characteristics_t *drb_qos_char_in = &drb_qos_in->qos_characteristics;
-  if (type == non_dynamic) {
+  if (type == NON_DYNAMIC) {
     asn1_qosparam->qoS_Characteristics.present = F1AP_QoS_Characteristics_PR_non_Dynamic_5QI;
     asn1cCalloc(asn1_qosparam->qoS_Characteristics.choice.non_Dynamic_5QI, tmp);
 
@@ -130,7 +130,7 @@ static void f1ap_write_flows_mapped(const f1ap_flows_mapped_to_drb_t *flows_mapp
     const f1ap_qos_characteristics_t *flow_qos_char_in = &flow_qos_params_in->qos_characteristics;
 
     int type = flow_qos_params_in->qos_characteristics.qos_type;
-    if (type == non_dynamic) {
+    if (type == NON_DYNAMIC) {
       QosParams->present = F1AP_QoS_Characteristics_PR_non_Dynamic_5QI;
       asn1cCalloc(QosParams->choice.non_Dynamic_5QI, tmp);
 
@@ -483,12 +483,15 @@ int CU_send_UE_CONTEXT_SETUP_REQUEST(sctp_assoc_t assoc_id, f1ap_ue_context_setu
       /* 12.1.4 rLCMode */
       /* TODO use rlc_mode from f1ap_drb_to_be_setup */
       switch (f1ap_ue_context_setup_req->drbs_to_be_setup[i].rlc_mode) {
-        case RLC_MODE_AM:
+        case F1AP_RLC_MODE_AM:
           drbs_toBeSetup_item->rLCMode = F1AP_RLCMode_rlc_am;
           break;
-
-        default:
+        case F1AP_RLC_MODE_UM_BIDIR:
           drbs_toBeSetup_item->rLCMode = F1AP_RLCMode_rlc_um_bidirectional;
+          break;
+        default:
+          AssertFatal(false, "modes other than AM/UM-Bidir not supported\n");
+          break;
       }
 
       /* OPTIONAL */
@@ -1218,12 +1221,15 @@ int CU_send_UE_CONTEXT_MODIFICATION_REQUEST(sctp_assoc_t assoc_id, f1ap_ue_conte
       /* 12.1.4 rLCMode */
       /* TODO use rlc_mode from f1ap_drb_to_be_setup */
       switch (f1ap_ue_context_modification_req->drbs_to_be_setup[i].rlc_mode) {
-        case RLC_MODE_AM:
+        case F1AP_RLC_MODE_AM:
           drbs_toBeSetupMod_item->rLCMode = F1AP_RLCMode_rlc_am;
           break;
-
-        default:
+        case F1AP_RLC_MODE_UM_BIDIR:
           drbs_toBeSetupMod_item->rLCMode = F1AP_RLCMode_rlc_um_bidirectional;
+          break;
+        default:
+          AssertFatal(false, "modes other than AM/UM-Bidir not supported\n");
+          break;
       }
 
       /* OPTIONAL */

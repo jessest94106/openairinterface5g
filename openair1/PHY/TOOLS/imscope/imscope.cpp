@@ -279,8 +279,17 @@ class IQHist {
       }
     } else if (plot_type == 1) {
       if (ImPlot::BeginPlot(label.c_str(), {(float)ImGui::GetWindowWidth() * 0.3f, (float)ImGui::GetWindowWidth() * 0.3f})) {
-        // Limit the amount of data plotted with scatterplot (issue with vertices/draw call)
-        ImPlot::PlotScatter(label.c_str(), iq_data->real.data(), iq_data->imag.data(), std::min(16000, iq_data->len));
+        int points_drawn = 0;
+        while (points_drawn < iq_data->len) {
+          // Limit the amount of data plotted with PlotScatter call (issue with vertices/draw call)
+          int points_to_draw = std::min(iq_data->len - points_drawn, 16000);
+          ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 1, IMPLOT_AUTO_COL, 1);
+          ImPlot::PlotScatter(label.c_str(),
+                              iq_data->real.data() + points_drawn,
+                              iq_data->imag.data() + points_drawn,
+                              points_to_draw);
+          points_drawn += points_to_draw;
+        }
         ImPlot::EndPlot();
       }
     } else if (plot_type == 2) {
@@ -480,6 +489,26 @@ void ShowUeScope(PHY_VARS_NR_UE *ue, float t)
     pdsch_iq_hist->Draw(iq_data, t, new_data);
     ImGui::TreePop();
   }
+  if (ImGui::TreeNode("Time domain samples")) {
+    static auto iq_data = new IQData();
+    static auto time_domain_iq = new IQHist("Time domain samples");
+    bool new_data = false;
+    if (time_domain_iq->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[ueTimeDomainSamples], t, time_domain_iq->GetEpsilon());
+    }
+    time_domain_iq->Draw(iq_data, t, new_data);
+    ImGui::TreePop();
+  }
+  if (ImGui::TreeNode("Time domain samples - before sync")) {
+    static auto iq_data = new IQData();
+    static auto time_domain_iq = new IQHist("Time domain samples - before sync");
+    bool new_data = false;
+    if (time_domain_iq->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[ueTimeDomainSamplesBeforeSync], t, time_domain_iq->GetEpsilon());
+    }
+    time_domain_iq->Draw(iq_data, t, new_data);
+    ImGui::TreePop();
+  }
   if (ImGui::TreeNode("Broadcast channel")) {
     ImGui::Text("RSRP %d", ue->measurements.ssb_rsrp_dBm[ue->frame_parms.ssb_index]);
     if (ImGui::TreeNode("IQ")) {
@@ -550,6 +579,16 @@ void ShowGnbScope(PHY_VARS_gNB *gNB, float t)
   if (ImGui::TreeNode("PUSCH LLRs")) {
     static auto pusch_llr_plot = new LLRPlot();
     pusch_llr_plot->Draw(t, gNBPuschLlr, "PUSCH LLR");
+    ImGui::TreePop();
+  }
+  if (ImGui::TreeNode("Time domain samples")) {
+    static auto iq_data = new IQData();
+    static auto time_domain_iq = new IQHist("Time domain samples");
+    bool new_data = false;
+    if (time_domain_iq->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[gNbTimeDomainSamples], t, time_domain_iq->GetEpsilon());
+    }
+    time_domain_iq->Draw(iq_data, t, new_data);
     ImGui::TreePop();
   }
 }
@@ -722,6 +761,7 @@ extern "C" void imscope_autoinit(void *dataptr)
     scope->copyDataUnsafeWithOffset = copyDataUnsafeWithOffset;
     scope->unlockScopeData = unlockScopeData;
     scope_params->gNB->scopeData = scope;
+    scope_params->ru->scopeData = scope;
   } else {
     PHY_VARS_NR_UE *ue = (PHY_VARS_NR_UE *)dataptr;
     scopeData_t *scope = (scopeData_t *)calloc(1, sizeof(scopeData_t));

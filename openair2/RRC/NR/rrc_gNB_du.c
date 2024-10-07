@@ -29,6 +29,7 @@
 #include "executables/softmodem-common.h"
 #include "common/utils/ds/seq_arr.h"
 #include "common/utils/alg/foreach.h"
+#include "lib/f1ap_interface_management.h"
 
 int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
 {
@@ -261,6 +262,8 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   DevAssert(rrc);
 
   LOG_I(NR_RRC, "Received F1 Setup Request from gNB_DU %lu (%s) on assoc_id %d\n", req->gNB_DU_id, req->gNB_DU_name, assoc_id);
+  // pre-fill F1 Setup Failure message
+  f1ap_setup_failure_t fail = {.transaction_id = F1AP_get_next_transaction_identifier(0, 0)};
 
   // check:
   // - it is one cell
@@ -269,7 +272,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   // else reject
   if (req->num_cells_available != 1) {
     LOG_E(NR_RRC, "can only handle on DU cell, but gNB_DU %ld has %d\n", req->gNB_DU_id, req->num_cells_available);
-    f1ap_setup_failure_t fail = {.cause = F1AP_CauseRadioNetwork_gNB_CU_Cell_Capacity_Exceeded};
+    fail.cause = F1AP_CauseRadioNetwork_gNB_CU_Cell_Capacity_Exceeded;
     rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
     return;
   }
@@ -283,7 +286,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
           cell_info->plmn.mcc,
           cell_info->plmn.mnc_digit_length,
           cell_info->plmn.mnc);
-    f1ap_setup_failure_t fail = {.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU};
+    fail.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU;
     rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
     return;
   }
@@ -295,7 +298,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
             it->setup_req->gNB_DU_name,
             it->assoc_id,
             it->setup_req->gNB_DU_id);
-      f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
+      fail.cause = F1AP_CauseMisc_unspecified;
       rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
       return;
     }
@@ -312,7 +315,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
             exist_info->nr_pci,
             new_info->nr_cellid,
             new_info->nr_pci);
-      f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
+      fail.cause = F1AP_CauseMisc_unspecified;
       rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
       return;
     }
@@ -339,7 +342,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && get_softmodem_params()->sa)) {
     if (!extract_sys_info(sys_info, &mib, &sib1)) {
       LOG_W(RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
-      f1ap_setup_failure_t fail = {.cause = F1AP_CauseProtocol_semantic_error};
+      fail.cause = F1AP_CauseProtocol_semantic_error;
       rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
       ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
       return;
@@ -358,7 +361,8 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
    * allocate memory and copy it in */
   du->setup_req = calloc(1,sizeof(*du->setup_req));
   AssertFatal(du->setup_req, "out of memory\n");
-  *du->setup_req = *req;
+  // Copy F1AP message
+  *du->setup_req = cp_f1ap_setup_request(req);
   // MIB can be null and configured later via DU Configuration Update
   du->mib = mib;
   du->sib1 = sib1;
@@ -379,6 +383,8 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   f1ap_setup_resp_t resp = {.transaction_id = req->transaction_id,
                             .num_cells_to_activate = 1,
                             .cells_to_activate[0] = cell};
+  // free F1AP message after use
+  free_f1ap_setup_request(req);
   int num = read_version(TO_STRING(NR_RRC_VERSION), &resp.rrc_ver[0], &resp.rrc_ver[1], &resp.rrc_ver[2]);
   AssertFatal(num == 3, "could not read RRC version string %s\n", TO_STRING(NR_RRC_VERSION));
   if (rrc->node_name != NULL)
@@ -510,8 +516,9 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
 
   /* Send DU Configuration Acknowledgement */
   f1ap_gnb_du_configuration_update_acknowledge_t ack = {.transaction_id = conf_up->transaction_id};
-
   rrc->mac_rrc.gnb_du_configuration_update_acknowledge(assoc_id, &ack);
+  /* free F1AP message after use */
+  free_f1ap_du_configuration_update(conf_up);
 }
 
 void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t *lc, sctp_assoc_t assoc_id)

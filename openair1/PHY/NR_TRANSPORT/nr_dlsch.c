@@ -72,6 +72,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
     const int layerSz = frame_parms->N_RB_DL * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB;
     const int dmrs_Type = rel15->dmrsConfigType;
     const int nb_re_dmrs = rel15->numDmrsCdmGrpsNoData * (rel15->dmrsConfigType == NFAPI_NR_DMRS_TYPE1 ? 6 : 4);
+    const int amp_dmrs = (int)((double)amp * sqrt(rel15->numDmrsCdmGrpsNoData)); // 3GPP TS 38.214 Section 4.1: Table 4.1-1
     LOG_D(PHY,"pdsch: BWPStart %d, BWPSize %d, rbStart %d, rbsize %d\n",
           rel15->BWPStart,rel15->BWPSize,rel15->rbStart,rel15->rbSize);
     const int n_dmrs = (rel15->BWPStart + rel15->rbStart + rel15->rbSize) * nb_re_dmrs;
@@ -296,7 +297,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
             /* Map DMRS Symbol */
             if ((dmrs_symbol_map & (1 << l_symbol))
                 && (k == ((start_sc + get_dmrs_freq_idx(n, k_prime, delta, dmrs_Type)) % (frame_parms->ofdm_symbol_size)))) {
-              txdataF_precoding[layer][l_symbol][k] = c16mulRealShift(mod_dmrs[dmrs_idx], Wt[l_prime] * Wf[k_prime] * amp, 15);
+              txdataF_precoding[layer][l_symbol][k] = c16mulRealShift(mod_dmrs[dmrs_idx], Wt[l_prime] * Wf[k_prime] * amp_dmrs, 15);
 #ifdef DEBUG_DLSCH_MAPPING
               printf("dmrs_idx %u\t l %d \t k %d \t k_prime %d \t n %d \t txdataF: %d %d\n",
                      dmrs_idx,
