@@ -497,6 +497,9 @@ int main(int argc, char **argv)
 
         UE[CC_id]->sl_mode = get_softmodem_params()->sl_mode;
         init_actor(&UE[CC_id]->sync_actor, "SYNC_", -1);
+        for (int i = 0; i < NUM_DL_ACTORS; i++) {
+          init_actor(&UE[CC_id]->dl_actors[i], "DL_", -1);
+        }
         init_nr_ue_vars(UE[CC_id], inst);
 
         if (UE[CC_id]->sl_mode) {

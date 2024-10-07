@@ -83,6 +83,7 @@
 #define bzero(s,n) (memset((s),0,(n)))
 /// suppress compiler warning for unused arguments
 #define UNUSED(x) (void)x;
+#define NUM_DL_ACTORS 2
 
 #include "impl_defs_top.h"
 #include "impl_defs_nr.h"
@@ -531,6 +532,7 @@ typedef struct PHY_VARS_NR_UE_s {
   sl_nr_sidelink_mode_t sl_mode;
   sl_nr_ue_phy_params_t SL_UE_PHY_PARAMS;
   Actor_t sync_actor;
+  Actor_t dl_actors[NUM_DL_ACTORS];
 } PHY_VARS_NR_UE;
 
 typedef struct {
