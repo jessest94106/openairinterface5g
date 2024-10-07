@@ -872,7 +872,7 @@ void *UE_thread(void *arg)
       }
       syncMsg->UE = UE;
       memset(&syncMsg->proc, 0, sizeof(syncMsg->proc));
-      pushTpool(&(get_nrUE_params()->Tpool), Msg);
+      pushNotifiedFIFO(&UE->sync_actor.fifo, Msg);
       trashed_frames = 0;
       syncRunning = true;
       continue;

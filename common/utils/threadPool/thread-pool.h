@@ -30,6 +30,7 @@
 #include <stdalign.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/syscall.h>
 #include "assertions.h"
 #include "common/utils/time_meas.h"

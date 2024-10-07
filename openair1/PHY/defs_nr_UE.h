@@ -51,6 +51,7 @@
 #include "fapi_nr_ue_interface.h"
 #include "assertions.h"
 #include "barrier.h"
+#include "actor.h"
 //#include "openair1/SCHED_NR_UE/defs.h"
 
 #ifdef MEX
@@ -529,6 +530,7 @@ typedef struct PHY_VARS_NR_UE_s {
   // Sidelink parameters
   sl_nr_sidelink_mode_t sl_mode;
   sl_nr_ue_phy_params_t SL_UE_PHY_PARAMS;
+  Actor_t sync_actor;
 } PHY_VARS_NR_UE;
 
 typedef struct {

@@ -636,7 +636,7 @@ if (cap_FOUND)
   target_link_libraries(UTIL PRIVATE cap)
   target_compile_definitions(UTIL PRIVATE HAVE_LIB_CAP)
 endif()
-target_link_libraries(UTIL PUBLIC ${T_LIB} pthread LOG thread-pool utils barrier)
+target_link_libraries(UTIL PUBLIC ${T_LIB} pthread LOG thread-pool utils barrier actor)
 
 set(SECURITY_SRC
   ${OPENAIR3_DIR}/SECU/secu_defs.c
