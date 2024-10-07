@@ -29,6 +29,7 @@
 #include "nfapi/oai_integration/aerial/fapi_nvIPC.h"
 #endif
 #include "vnf_p7.h"
+#include "nr_fapi_p7_utils.h"
 
 #ifdef NDEBUG
 #  warning assert is disabled
@@ -1511,6 +1512,7 @@ void vnf_handle_nr_slot_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf
 			{
 				(vnf_p7->_public.nr_slot_indication)(&ind);
 			}
+      free_slot_indication(&ind);
 		}
 
 	}
@@ -1537,6 +1539,7 @@ void vnf_handle_nr_rx_data_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* 
 			{
 				(vnf_p7->_public.nr_rx_data_indication)(&ind);
 			}
+      free_rx_data_indication(&ind);
 		}
 	}
 }
@@ -1563,6 +1566,7 @@ void vnf_handle_nr_crc_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_
 			{
 				(vnf_p7->_public.nr_crc_indication)(&ind);
 			}
+      free_crc_indication(&ind);
 		}
 	}
 }
@@ -1588,6 +1592,7 @@ void vnf_handle_nr_srs_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_
 			{
 				(vnf_p7->_public.nr_srs_indication)(&ind);
 			}
+      free_srs_indication(&ind);
 		}
 	}
 }
@@ -1614,6 +1619,7 @@ void vnf_handle_nr_uci_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_
 			{
 				(vnf_p7->_public.nr_uci_indication)(&ind);
 			}
+      free_uci_indication(&ind);
 		}
 	}
 }
@@ -1640,6 +1646,7 @@ void vnf_handle_nr_rach_indication(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf
 			{
 				(vnf_p7->_public.nr_rach_indication)(&ind);
 			}
+      free_rach_indication(&ind);
 		}
 	}
 }
