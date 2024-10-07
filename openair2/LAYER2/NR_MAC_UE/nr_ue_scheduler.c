@@ -2402,22 +2402,25 @@ static bool schedule_uci_on_pusch(NR_UE_MAC_INST_t *mac,
   // and does not transmit the PUCCH if the UE does not multiplex aperiodic or semi-persistent CSI reports in the PUSCH
   bool mux_done = false;
   if (pucch->n_harq > 0) {
-    pusch_pdu->pusch_uci.harq_ack_bit_length = pucch->n_harq;
-    pusch_pdu->pusch_uci.harq_payload = pucch->ack_payload;
     NR_PUSCH_Config_t *pusch_Config = mac->current_UL_BWP->pusch_Config;
-    AssertFatal(pusch_Config && pusch_Config->uci_OnPUSCH, "UCI on PUSCH need to be configured\n");
-    NR_UCI_OnPUSCH_t *onPusch = pusch_Config->uci_OnPUSCH->choice.setup;
-    AssertFatal(onPusch &&
-                onPusch->betaOffsets &&
-                onPusch->betaOffsets->present == NR_UCI_OnPUSCH__betaOffsets_PR_semiStatic,
-                "Only semistatic beta offset is supported\n");
-    NR_BetaOffsets_t *beta_offsets = onPusch->betaOffsets->choice.semiStatic;
-    pusch_pdu->pusch_uci.beta_offset_harq_ack = pucch->n_harq > 2 ?
-                                                       (pucch->n_harq < 12 ? *beta_offsets->betaOffsetACK_Index2 :
-                                                       *beta_offsets->betaOffsetACK_Index3) :
-                                                       *beta_offsets->betaOffsetACK_Index1;
-    pusch_pdu->pusch_uci.alpha_scaling = onPusch->scaling;
-    mux_done = true;
+    if (pusch_Config && pusch_Config->uci_OnPUSCH) {
+      NR_UCI_OnPUSCH_t *onPusch = pusch_Config->uci_OnPUSCH->choice.setup;
+      AssertFatal(onPusch &&
+                  onPusch->betaOffsets &&
+                  onPusch->betaOffsets->present == NR_UCI_OnPUSCH__betaOffsets_PR_semiStatic,
+                  "Only semistatic beta offset is supported\n");
+      NR_BetaOffsets_t *beta_offsets = onPusch->betaOffsets->choice.semiStatic;
+      pusch_pdu->pusch_uci.harq_ack_bit_length = pucch->n_harq;
+      pusch_pdu->pusch_uci.harq_payload = pucch->ack_payload;
+      pusch_pdu->pusch_uci.beta_offset_harq_ack = pucch->n_harq > 2 ?
+                                                  (pucch->n_harq < 12 ? *beta_offsets->betaOffsetACK_Index2 :
+                                                  *beta_offsets->betaOffsetACK_Index3) :
+                                                  *beta_offsets->betaOffsetACK_Index1;
+      pusch_pdu->pusch_uci.alpha_scaling = onPusch->scaling;
+      mux_done = true;
+    } else {
+      LOG_E(NR_MAC, "UCI on PUSCH need to be configured to schedule UCI on PUSCH\n");
+    }
   }
   if (pusch_pdu->pusch_uci.csi_part1_bit_length == 0 && pusch_pdu->pusch_uci.csi_part2_bit_length == 0) {
     // To support this we would need to shift some bits into CSI part2 -> need to change the logic
