@@ -635,7 +635,7 @@ static int client_try_connect(const char *host, uint16_t port)
 
   s = getaddrinfo(host, dport, &hints, &result);
   if (s != 0) {
-    LOG_I(HW, "getaddrinfo: %s\n", gai_strerror(s));
+    LOG_E(HW, "getaddrinfo: %s\n", gai_strerror(s));
     return -1;
   }
   for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -645,7 +645,6 @@ static int client_try_connect(const char *host, uint16_t port)
     }
 
     if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) {
-      LOG_I(HW, "Connection to %s:%d established\n", host, port);
       break;
     }
 
@@ -674,7 +673,6 @@ static int startClient(openair0_device *device)
     }
 
     LOG_I(HW, "connect() to %s:%d failed, errno(%d)\n", t->ip, t->port, errno);
-    fprintf(stderr, "Could not connect\n");
     sleep(1);
   }
 
