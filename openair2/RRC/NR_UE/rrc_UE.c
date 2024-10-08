@@ -140,10 +140,6 @@ static void nr_rrc_ue_process_RadioBearerConfig(NR_UE_RRC_INST_t *ue_rrc,
                                                 NR_RadioBearerConfig_t *const radioBearerConfig);
 static void nr_rrc_ue_generate_rrcReestablishmentComplete(const NR_UE_RRC_INST_t *rrc, const NR_RRCReestablishment_t *rrcReestablishment);
 static void process_lte_nsa_msg(NR_UE_RRC_INST_t *rrc, nsa_msg_t *msg, int msg_len);
-static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc,
-                                                 int gNB_index,
-                                                 NR_RRCReconfiguration_t *rrcReconfiguration);
-
 static void nr_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc, NR_UECapabilityEnquiry_t *UECapabilityEnquiry);
 static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
                                               OCTET_STRING_t *masterCellGroup,
