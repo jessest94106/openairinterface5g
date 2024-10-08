@@ -1041,6 +1041,4 @@ void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
   nr_fill_rx_indication(&rx_ind, FAPI_NR_CSIRS_IND, ue, NULL, NULL, 1, proc, (void *)&csirs_measurements, NULL);
   if (ue->if_inst && ue->if_inst->dl_indication)
     ue->if_inst->dl_indication(&dl_indication);
-
-  return;
 }
