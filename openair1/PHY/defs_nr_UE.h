@@ -548,9 +548,8 @@ typedef struct PHY_VARS_NR_UE_s {
   sl_nr_ue_phy_params_t SL_UE_PHY_PARAMS;
   Actor_t sync_actor;
   Actor_t dl_actors[NUM_DL_ACTORS];
-  
+  Actor_t ul_actor;
   ntn_config_message_t* ntn_config_message;
-
 } PHY_VARS_NR_UE;
 
 typedef struct {
@@ -632,7 +631,6 @@ typedef struct nr_rxtx_thread_data_s {
   nr_phy_data_t phy_data;
   int tx_wait_for_dlsch;
   int rx_offset;
-  enum stream_status_e stream_status;
 } nr_rxtx_thread_data_t;
 
 typedef struct LDPCDecode_ue_s {
