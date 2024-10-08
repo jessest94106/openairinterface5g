@@ -1972,8 +1972,10 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
   f1ap_ue_context_release_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg_p);
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, req->gNB_CU_ue_id);
+  // TODO what happens if no AMF connected? should also handle, set an_release true
   if (!ue_context_p) {
     LOG_E(RRC, "could not find UE context for CU UE ID %u, aborting transaction\n", req->gNB_CU_ue_id);
+    // TODO just request the DU to release to make it happy
     return;
   }
 
