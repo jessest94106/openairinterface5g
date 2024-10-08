@@ -244,10 +244,10 @@ steps look like this:
    `ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf` (note that the path
    is relative to the directory in which the docker-compose file is located).
    Further, an environment variable `USE_ADDITIONAL_OPTIONS` is declared,
-   referencing the relevant options `--sa -E --rfsim` (you can ignore logging
+   referencing the relevant options `-E --rfsim` (you can ignore logging
    options). You would therefore run the gNB from source like this:
    ```
-   sudo ./cmake_targets/ran_build/build/nr-softmodem -O ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf --sa -E --rfsim
+   sudo ./cmake_targets/ran_build/build/nr-softmodem -O ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf -E --rfsim
    ```
    To run this on your local machine, assuming you have a 5GC installed, you
    might need to change IP information in the config to match your core.

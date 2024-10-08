@@ -132,7 +132,7 @@ Offload of the channel encoding and decoding to the AMD Xilinx T2 card is enable
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr-softmodem --sa -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --ldpc-offload-enable --ldpc_offload.dpdk_dev 01:00.0
+sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --ldpc-offload-enable --ldpc_offload.dpdk_dev 01:00.0
 ```
 
 # Limitations
