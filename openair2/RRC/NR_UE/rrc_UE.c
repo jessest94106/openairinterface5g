@@ -1004,11 +1004,10 @@ void nr_rrc_cellgroup_configuration(NR_UE_RRC_INST_t *rrc, NR_CellGroupConfig_t 
 
   nr_rrc_manage_rlc_bearers(rrc, cellGroupConfig);
 
-  AssertFatal(cellGroupConfig->sCellToReleaseList == NULL,
-              "Secondary serving cell release not implemented\n");
-
-  AssertFatal(cellGroupConfig->sCellToAddModList == NULL,
-              "Secondary serving cell addition not implemented\n");
+  if (cellGroupConfig->ext1)
+    AssertFatal(cellGroupConfig->ext1->reportUplinkTxDirectCurrent == NULL, "Reporting of UplinkTxDirectCurrent not implemented\n");
+  AssertFatal(cellGroupConfig->sCellToReleaseList == NULL, "Secondary serving cell release not implemented\n");
+  AssertFatal(cellGroupConfig->sCellToAddModList == NULL, "Secondary serving cell addition not implemented\n");
 }
 
 
