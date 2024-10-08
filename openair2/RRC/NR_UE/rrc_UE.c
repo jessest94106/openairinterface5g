@@ -164,43 +164,81 @@ static void set_DRB_status(NR_UE_RRC_INST_t *rrc, NR_DRB_Identity_t drb_id, NR_R
   rrc->status_DRBs[drb_id - 1] = status;
 }
 
-static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc,
-                                                 int gNB_index,
-                                                 NR_RRCReconfiguration_t *rrcReconfiguration)
+static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530)
+{
+  if (rec_1530->fullConfig) {
+    // TODO perform the full configuration procedure as specified in 5.3.5.11 of 331
+    LOG_E(NR_RRC, "RRCReconfiguration includes fullConfig but this is not implemented yet\n");
+  }
+  if (rec_1530->masterCellGroup)
+    nr_rrc_ue_process_masterCellGroup(rrc, rec_1530->masterCellGroup, rec_1530->fullConfig);
+  if (rec_1530->masterKeyUpdate) {
+    // TODO perform AS security key update procedure as specified in 5.3.5.7
+    LOG_E(NR_RRC, "RRCReconfiguration includes masterKeyUpdate but this is not implemented yet\n");
+  }
+  /* Check if there is dedicated NAS information to forward to NAS */
+  if (rec_1530->dedicatedNAS_MessageList) {
+    struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *tmp = rec_1530->dedicatedNAS_MessageList;
+    for (int i = 0; i < tmp->list.count; i++) {
+      MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_CONN_ESTABLI_CNF);
+      nas_establish_cnf_t *msg = &NAS_CONN_ESTABLI_CNF(ittiMsg);
+      msg->errCode = AS_SUCCESS;
+      msg->nasMsg.length = tmp->list.array[i]->size;
+      msg->nasMsg.nas_data = tmp->list.array[i]->buf;
+      itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
+    }
+    tmp->list.count = 0; // to prevent the automatic free by ASN1_FREE
+  }
+  if (rec_1530->dedicatedSIB1_Delivery) {
+    // TODO perform the action upon reception of SIB1 as specified in 5.2.2.4.2
+    LOG_E(NR_RRC, "RRCReconfiguration includes dedicatedSIB1-Delivery but this is not handled yet\n");
+  }
+  if (rec_1530->dedicatedSystemInformationDelivery) {
+    // TODO perform the action upon reception of System Information as specified in 5.2.2.4
+    LOG_E(NR_RRC, "RRCReconfiguration includes dedicatedSystemInformationDelivery but this is not handled yet\n");
+  }
+  if (rec_1530->otherConfig) {
+    // TODO perform the other configuration procedure as specified in 5.3.5.9
+    LOG_E(NR_RRC, "RRCReconfiguration includes otherConfig but this is not handled yet\n");
+  }
+  NR_RRCReconfiguration_v1540_IEs_t *rec_1540 = rec_1530->nonCriticalExtension;
+  if (rec_1540) {
+    NR_RRCReconfiguration_v1560_IEs_t *rec_1560 = rec_1540->nonCriticalExtension;
+    if (rec_1560->sk_Counter) {
+      // TODO perform AS security key update procedure as specified in 5.3.5.7
+      LOG_E(NR_RRC, "RRCReconfiguration includes sk-Counter but this is not implemented yet\n");
+    }
+    if (rec_1560->mrdc_SecondaryCellGroupConfig) {
+      // TODO perform handling of mrdc-SecondaryCellGroupConfig as specified in 5.3.5.3
+      LOG_E(NR_RRC, "RRCReconfiguration includes mrdc-SecondaryCellGroupConfig but this is not handled yet\n");
+    }
+    if (rec_1560->radioBearerConfig2) {
+      // TODO This field can only be used if the UE supports NR-DC or NE-DC
+      // if received perform radio bearer configuration
+      LOG_E(NR_RRC, "RRCReconfiguration includes radioBearerConfig2 but this is not handled yet\n");
+    }
+  }
+}
+
+static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_index, NR_RRCReconfiguration_t *reconfiguration)
 {
   rrcPerNB_t *rrcNB = rrc->perNB + gNB_index;
 
-  switch (rrcReconfiguration->criticalExtensions.present) {
+  switch (reconfiguration->criticalExtensions.present) {
     case NR_RRCReconfiguration__criticalExtensions_PR_rrcReconfiguration: {
-      NR_RRCReconfiguration_IEs_t *ie = rrcReconfiguration->criticalExtensions.choice.rrcReconfiguration;
+      NR_RRCReconfiguration_IEs_t *ie = reconfiguration->criticalExtensions.choice.rrcReconfiguration;
 
-      if (ie->radioBearerConfig != NULL) {
-        LOG_I(NR_RRC, "radio Bearer Configuration is present\n");
+      if (ie->radioBearerConfig) {
+        LOG_I(NR_RRC, "RRCReconfiguration includes radio Bearer Configuration\n");
         nr_rrc_ue_process_RadioBearerConfig(rrc, ie->radioBearerConfig);
         if (LOG_DEBUGFLAG(DEBUG_ASN1))
           xer_fprint(stdout, &asn_DEF_NR_RadioBearerConfig, (const void *)ie->radioBearerConfig);
       }
 
-      if (ie->nonCriticalExtension) {
-        NR_RRCReconfiguration_v1530_IEs_t *ext = ie->nonCriticalExtension;
-        if (ext->masterCellGroup)
-          nr_rrc_ue_process_masterCellGroup(rrc, ext->masterCellGroup, ext->fullConfig);
-        /* Check if there is dedicated NAS information to forward to NAS */
-        if (ie->nonCriticalExtension->dedicatedNAS_MessageList) {
-          struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *tmp = ext->dedicatedNAS_MessageList;
-          for (int i = 0; i < tmp->list.count; i++) {
-            MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_CONN_ESTABLI_CNF);
-            nas_establish_cnf_t *msg = &NAS_CONN_ESTABLI_CNF(ittiMsg);
-            msg->errCode = AS_SUCCESS;
-            msg->nasMsg.length = tmp->list.array[i]->size;
-            msg->nasMsg.nas_data = tmp->list.array[i]->buf;
-            itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
-          }
-          tmp->list.count = 0; // to prevent the automatic free by ASN1_FREE
-        }
-      }
+      if (ie->nonCriticalExtension)
+        nr_rrc_process_reconfiguration_v1530(rrc, ie->nonCriticalExtension);
 
-      if (ie->secondaryCellGroup != NULL) {
+      if (ie->secondaryCellGroup) {
         NR_CellGroupConfig_t *cellGroupConfig = NULL;
         asn_dec_rval_t dec_rval = uper_decode(NULL,
                                               &asn_DEF_NR_CellGroupConfig, // might be added prefix later
@@ -228,15 +266,14 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc,
         nr_rrc_mac_config_req_cg(rrc->ue_id, 0, cellGroupConfig, rrc->UECap.UE_NR_Capability);
         asn1cFreeStruc(asn_DEF_NR_CellGroupConfig, cellGroupConfig);
       }
-      if (ie->measConfig != NULL) {
-        LOG_I(NR_RRC, "Measurement Configuration is present\n");
+      if (ie->measConfig) {
+        LOG_I(NR_RRC, "RRCReconfiguration includes Measurement Configuration\n");
         nr_rrc_ue_process_measConfig(rrcNB, ie->measConfig, &rrc->timers_and_constants);
       }
-      if (ie->lateNonCriticalExtension != NULL) {
-        //  unuse now
+      if (ie->lateNonCriticalExtension) {
+        LOG_E(NR_RRC, "RRCReconfiguration includes lateNonCriticalExtension. Not handled.\n");
       }
     } break;
-
     case NR_RRCReconfiguration__criticalExtensions_PR_NOTHING:
     case NR_RRCReconfiguration__criticalExtensions_PR_criticalExtensionsFuture:
     default:
@@ -258,7 +295,7 @@ void process_nsa_message(NR_UE_RRC_INST_t *rrc, nsa_message_t nsa_message_type, 
       if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
         LOG_E(NR_RRC, "NR_RRCReconfiguration decode error\n");
         // free the memory
-        SEQUENCE_free( &asn_DEF_NR_RRCReconfiguration, RRCReconfiguration, 1 );
+        SEQUENCE_free(&asn_DEF_NR_RRCReconfiguration, RRCReconfiguration, 1);
         return;
       }
       nr_rrc_ue_process_rrcReconfiguration(rrc, 0, RRCReconfiguration);
