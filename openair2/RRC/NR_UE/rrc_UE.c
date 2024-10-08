@@ -606,6 +606,7 @@ NR_UE_RRC_INST_t* nr_rrc_init_ue(char* uecap_file, int nb_inst, int num_ant_tx)
     rrc->ul_bwp_id = 0;
     rrc->as_security_activated = false;
     rrc->detach_after_release = false;
+    rrc->reconfig_after_reestab = false;
 
     FILE *f = NULL;
     if (uecap_file)
@@ -1761,6 +1762,8 @@ static void nr_rrc_ue_process_rrcReestablishment(NR_UE_RRC_INST_t *rrc,
 
   // resetting the RA trigger state after receiving MSG4 with RRCReestablishment
   rrc->ra_trigger = RA_NOT_RUNNING;
+  // to flag 1st reconfiguration after reestablishment
+  rrc->reconfig_after_reestab = true;
 
   // submit the RRCReestablishmentComplete message to lower layers for transmission
   nr_rrc_ue_generate_rrcReestablishmentComplete(rrc, rrcReestablishment);
@@ -1801,6 +1804,17 @@ static int nr_rrc_ue_decode_dcch(NR_UE_RRC_INST_t *rrc,
 
         case NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration: {
           nr_rrc_ue_process_rrcReconfiguration(rrc, gNB_indexP, c1->choice.rrcReconfiguration);
+          if (rrc->reconfig_after_reestab) {
+            // if this is the first RRCReconfiguration message after successful completion of the RRC re-establishment procedure
+            // resume SRB2 and DRBs that are suspended
+            if (rrc->Srb[2] == RB_SUSPENDED)
+              rrc->Srb[2] = RB_ESTABLISHED;
+            for (int i = 1; i <= MAX_DRBS_PER_UE; i++) {
+              if (get_DRB_status(rrc, i) == RB_SUSPENDED)
+                set_DRB_status(rrc, i, RB_ESTABLISHED);
+            }
+            rrc->reconfig_after_reestab = false;
+          }
           nr_rrc_ue_generate_RRCReconfigurationComplete(rrc, Srb_id, c1->choice.rrcReconfiguration->rrc_TransactionIdentifier);
         } break;
 

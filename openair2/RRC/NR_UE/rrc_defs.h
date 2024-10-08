@@ -230,7 +230,8 @@ typedef struct NR_UE_RRC_INST_s {
   NR_RRCRelease_t *RRCRelease;
   long selected_plmn_identity;
   Rrc_State_NR_t nrRrcState;
-
+  // flag to identify 1st reconfiguration after reestablishment
+  bool reconfig_after_reestab;
   //Sidelink params
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;
 
