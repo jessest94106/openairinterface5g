@@ -996,40 +996,39 @@ static void nr_rrc_manage_rlc_bearers(NR_UE_RRC_INST_t *rrc,
   }
 }
 
+static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc, NR_ReconfigurationWithSync_t *reconfigurationWithSync)
+{
+  // perform Reconfiguration with sync according to 5.3.5.5.2
+  if (!rrc->as_security_activated && !(get_softmodem_params()->phy_test || get_softmodem_params()->do_ra)) {
+    // if the AS security is not activated, perform the actions upon going to RRC_IDLE as specified in 5.3.11
+    // with the release cause 'other' upon which the procedure ends
+    NR_Release_Cause_t release_cause = OTHER;
+    nr_rrc_going_to_IDLE(rrc, release_cause, NULL);
+    return;
+  }
+
+  if (reconfigurationWithSync->spCellConfigCommon &&
+      reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon &&
+      reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL &&
+      reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB)
+    rrc->arfcn_ssb = *reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB;
+
+  NR_UE_Timers_Constants_t *tac = &rrc->timers_and_constants;
+  nr_timer_stop(&tac->T310);
+  int t304_value = nr_rrc_get_T304(reconfigurationWithSync->t304);
+  nr_timer_setup(&tac->T304, t304_value, 10); // 10ms step
+  nr_timer_start(&tac->T304);
+  rrc->rnti = reconfigurationWithSync->newUE_Identity;
+  // reset the MAC entity of this cell group (done at MAC in handle_reconfiguration_with_sync)
+}
+
 void nr_rrc_cellgroup_configuration(NR_UE_RRC_INST_t *rrc, NR_CellGroupConfig_t *cellGroupConfig)
 {
-  NR_UE_Timers_Constants_t *tac = &rrc->timers_and_constants;
-
   NR_SpCellConfig_t *spCellConfig = cellGroupConfig->spCellConfig;
-  if(spCellConfig != NULL) {
-    if (spCellConfig->reconfigurationWithSync != NULL) {
-      NR_ReconfigurationWithSync_t *reconfigurationWithSync = spCellConfig->reconfigurationWithSync;
-      if (reconfigurationWithSync->spCellConfigCommon &&
-          reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon &&
-          reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL &&
-          reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB)
-        rrc->arfcn_ssb = *reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB;
-      // perform Reconfiguration with sync according to 5.3.5.5.2
-      if (!rrc->as_security_activated && rrc->nrRrcState != RRC_STATE_IDLE_NR) {
-        // perform the actions upon going to RRC_IDLE as specified in 5.3.11
-        // with the release cause 'other' upon which the procedure ends
-        // TODO
-      }
-      nr_timer_stop(&tac->T310);
-      int t304_value = nr_rrc_get_T304(reconfigurationWithSync->t304);
-      nr_timer_setup(&tac->T304, t304_value, 10); // 10ms step
-      nr_timer_start(&tac->T304);
-      rrc->rnti = reconfigurationWithSync->newUE_Identity;
-      // resume suspended radio bearers
-      for (int i = 0; i < NR_NUM_SRB; i++) {
-        if (rrc->Srb[i] == RB_SUSPENDED)
-          rrc->Srb[i] = RB_ESTABLISHED;
-      }
-      for (int i = 1; i <= MAX_DRBS_PER_UE; i++) {
-        if (get_DRB_status(rrc, i) == RB_SUSPENDED)
-          set_DRB_status(rrc, i, RB_ESTABLISHED);
-      }
-      // TODO reset MAC
+  if(spCellConfig) {
+    if (spCellConfig->reconfigurationWithSync) {
+      LOG_I(NR_RRC, "Processing reconfigurationWithSync\n");
+      nr_rrc_process_reconfigurationWithSync(rrc, spCellConfig->reconfigurationWithSync);
     }
     nr_rrc_handle_SetupRelease_RLF_TimersAndConstants(rrc, spCellConfig->rlf_TimersAndConstants);
     if (spCellConfig->spCellConfigDedicated) {

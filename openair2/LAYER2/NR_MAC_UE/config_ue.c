@@ -1734,35 +1734,32 @@ void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id,
 
 static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
                                              int cc_idP,
-                                             const NR_ReconfigurationWithSync_t *reconfigurationWithSync)
+                                             const NR_ReconfigurationWithSync_t *reconfWithSync)
 {
-  mac->crnti = reconfigurationWithSync->newUE_Identity;
+  reset_mac_inst(mac);
+  mac->crnti = reconfWithSync->newUE_Identity;
   LOG_I(NR_MAC, "Configuring CRNTI %x\n", mac->crnti);
 
   RA_config_t *ra = &mac->ra;
-  if (reconfigurationWithSync->rach_ConfigDedicated) {
-    AssertFatal(
-        reconfigurationWithSync->rach_ConfigDedicated->present == NR_ReconfigurationWithSync__rach_ConfigDedicated_PR_uplink,
-        "RACH on supplementaryUplink not supported\n");
-    UPDATE_IE(ra->rach_ConfigDedicated, reconfigurationWithSync->rach_ConfigDedicated->choice.uplink, NR_RACH_ConfigDedicated_t);
+  if (reconfWithSync->rach_ConfigDedicated) {
+    AssertFatal(reconfWithSync->rach_ConfigDedicated->present == NR_ReconfigurationWithSync__rach_ConfigDedicated_PR_uplink,
+                "RACH on supplementaryUplink not supported\n");
+    UPDATE_IE(ra->rach_ConfigDedicated, reconfWithSync->rach_ConfigDedicated->choice.uplink, NR_RACH_ConfigDedicated_t);
   }
 
-  if (reconfigurationWithSync->spCellConfigCommon) {
-    NR_ServingCellConfigCommon_t *scc = reconfigurationWithSync->spCellConfigCommon;
+  if (reconfWithSync->spCellConfigCommon) {
+    NR_ServingCellConfigCommon_t *scc = reconfWithSync->spCellConfigCommon;
     mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
     if (scc->physCellId)
       mac->physCellId = *scc->physCellId;
     mac->dmrs_TypeA_Position = scc->dmrs_TypeA_Position;
     UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
     config_common_ue(mac, scc, cc_idP);
+    const int bwp_id = 0;
     if (scc->downlinkConfigCommon)
-      configure_common_BWP_dl(mac,
-                              0, // bwp-id
-                              scc->downlinkConfigCommon->initialDownlinkBWP);
+      configure_common_BWP_dl(mac, bwp_id, scc->downlinkConfigCommon->initialDownlinkBWP);
     if (scc->uplinkConfigCommon)
-      configure_common_BWP_ul(mac,
-                              0, // bwp-id
-                              scc->uplinkConfigCommon->initialUplinkBWP);
+      configure_common_BWP_ul(mac, bwp_id, scc->uplinkConfigCommon->initialUplinkBWP);
   }
 
   mac->state = UE_NOT_SYNC;
