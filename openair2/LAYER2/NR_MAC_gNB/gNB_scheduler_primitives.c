@@ -3302,7 +3302,27 @@ void nr_mac_reset_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl)
   sched_ctrl->pusch_consecutive_dtx_cnt = 0;
 }
 
-void nr_mac_check_ul_failure(const gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl)
+/* \brief trigger a release request towards the CU.
+ * \returns true if release was requested, else false (in which case the CU
+ * does not know the UE, and we can safely remove it). */
+bool nr_mac_request_release_ue(const gNB_MAC_INST *nrmac, int rnti)
+{
+  if (!du_exists_f1_ue_data(rnti)) {
+    LOG_W(NR_MAC, "UE %04x: no CU-UE ID stored, cannot request release\n", rnti);
+    return false;
+  }
+  f1_ue_data_t ue_data = du_get_f1_ue_data(rnti);
+  f1ap_ue_context_release_req_t request = {
+    .gNB_CU_ue_id = ue_data.secondary_ue,
+    .gNB_DU_ue_id = rnti,
+    .cause = F1AP_CAUSE_RADIO_NETWORK,
+    .cause_value = F1AP_CauseRadioNetwork_rl_failure_others,
+  };
+  nrmac->mac_rrc.ue_context_release_request(&request);
+  return true;
+}
+
+void nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl)
 {
   if (!sched_ctrl->ul_failure)
     return;
@@ -3312,14 +3332,9 @@ void nr_mac_check_ul_failure(const gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ct
    * stop at 0 and we wait for a UE release command from upper layers */
   if (sched_ctrl->ul_failure_timer == 1) {
     LOG_W(MAC, "UE %04x: request release after UL failure timer expiry\n", rnti);
-    f1_ue_data_t ue_data = du_get_f1_ue_data(rnti);
-    f1ap_ue_context_release_req_t request = {
-      .gNB_CU_ue_id = ue_data.secondary_ue,
-      .gNB_DU_ue_id = rnti,
-      .cause = F1AP_CAUSE_RADIO_NETWORK,
-      .cause_value = F1AP_CauseRadioNetwork_rl_failure_others,
-    };
-    nrmac->mac_rrc.ue_context_release_request(&request);
+    bool requested = nr_mac_request_release_ue(nrmac, rnti);
+    if (!requested)
+      nr_mac_release_ue(nrmac, rnti);
   }
 }
 
