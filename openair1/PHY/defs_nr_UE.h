@@ -89,6 +89,7 @@
 #include "impl_defs_nr.h"
 #include "time_meas.h"
 #include "PHY/CODING/coding_defs.h"
+#include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/TOOLS/tools_defs.h"
 #include "common/platform_types.h"
 #include "NR_UE_TRANSPORT/nr_transport_ue.h"
@@ -481,9 +482,10 @@ typedef struct PHY_VARS_NR_UE_s {
   /// N0 (used for abstraction)
   double N0;
 
+  /// NR LDPC coding related
+  nrLDPC_coding_interface_t nrLDPC_coding_interface;
   uint8_t max_ldpc_iterations;
 
-  int ldpc_offload_enable;
   /// SRS variables
   nr_srs_info_t *nr_srs_info;
 

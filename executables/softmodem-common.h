@@ -108,7 +108,6 @@ extern "C"
 #define CONFIG_HLP_CONTINUOUS_TX "perform continuous transmission, even in TDD mode (to work around USRP issues)\n"
 #define CONFIG_HLP_STATS_DISABLE "disable globally the stats generation and persistence"
 #define CONFIG_HLP_NOITTI        "Do not start itti threads, call queue processing in place, inside the caller thread"
-#define CONFIG_HLP_LDPC_OFFLOAD  "Enable LDPC offload to AMD Xilinx T2 telco card\n"
 #define CONFIG_HLP_SYNC_REF      "UE acts a Sync Reference in Sidelink. 0-none 1-GNB 2-GNSS 4-localtiming\n"
 #define CONFIG_HLP_TADV                                                                                                      \
   "Set RF board timing_advance to compensate fix delay inside the RF board between Rx and Tx timestamps (RF board internal " \
@@ -181,7 +180,6 @@ extern int usrp_tx_thread;
   {"continuous-tx",         CONFIG_HLP_CONTINUOUS_TX, PARAMFLAG_BOOL, .iptr=&CONTINUOUS_TX,                   .defintval=0,             TYPE_INT,    0},  \
   {"disable-stats",         CONFIG_HLP_STATS_DISABLE, PARAMFLAG_BOOL, .iptr=&stats_disabled,                  .defintval=0,             TYPE_INT,    0},  \
   {"no-itti-threads",       CONFIG_HLP_NOITTI,        PARAMFLAG_BOOL, .iptr=&softmodem_params.no_itti,        .defintval=0,             TYPE_INT,    0},  \
-  {"ldpc-offload-enable",   CONFIG_HLP_LDPC_OFFLOAD,  PARAMFLAG_BOOL, .iptr=&LDPC_OFFLOAD_FLAG,               .defstrval=0,             TYPE_INT,    0},  \
   {"sync-ref",              CONFIG_HLP_SYNC_REF,      0,              .uptr=&SYNC_REF,                        .defintval=0,             TYPE_UINT,   0},  \
   {"A" ,                    CONFIG_HLP_TADV,          0,             .iptr=&softmodem_params.command_line_sample_advance,.defintval=0,            TYPE_INT,   0},  \
   {"E" ,                    CONFIG_HLP_TQFS,          PARAMFLAG_BOOL, .iptr=&softmodem_params.threequarter_fs, .defintval=0,            TYPE_INT,    0}, \
@@ -222,7 +220,6 @@ extern int usrp_tx_thread;
                {"MONOLITHIC", "PNF", "VNF", "AERIAL","UE_STUB_PNF","UE_STUB_OFFNET","STANDALONE_PNF"}, \
                {NFAPI_MONOLITHIC, NFAPI_MODE_PNF, NFAPI_MODE_VNF, NFAPI_MODE_AERIAL,NFAPI_UE_STUB_PNF,NFAPI_UE_STUB_OFFNET,NFAPI_MODE_STANDALONE_PNF}, \
                7 } }, \
-    { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
