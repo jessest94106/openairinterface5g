@@ -29,7 +29,7 @@
 * \note
 * \warning
  */
-#ifdef ENABLE_AERIAL
+
 #include "fapi_vnf_p7.h"
 #include "nr_nfapi_p7.h"
 
@@ -293,7 +293,6 @@ int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind)
   // memset(sched_resp, 0, sizeof(*sched_resp));
   gNB_dlsch_ulsch_scheduler(0, slot_ind->sfn, slot_ind->slot, &g_sched_resp);
   if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-#ifdef ENABLE_AERIAL
     bool send_slt_resp = false;
     if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs> 0) {
       oai_fapi_dl_tti_req(&g_sched_resp.DL_req);
@@ -314,7 +313,6 @@ int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind)
     if (send_slt_resp) {
       oai_fapi_send_end_request(0,slot_ind->sfn, slot_ind->slot);
     }
-#endif
   }
 
   return 1;
@@ -862,4 +860,3 @@ int fapi_nr_pack_and_send_p7_message(vnf_p7_t *vnf_p7, nfapi_p7_message_header_t
     return aerial_send_P7_msg(FAPI_buffer, len_FAPI, header);
   }
 }
-#endif

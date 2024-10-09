@@ -29,7 +29,7 @@
 * \note
 * \warning
 */
-#ifdef ENABLE_AERIAL
+
 #define _GNU_SOURCE
 #include <sched.h>
 #include <stdio.h>
@@ -681,4 +681,3 @@ int nvIPC_Init(nvipc_params_t nvipc_params_s)
   aerial_pnf_nr_connection_indication_cb(vnf_config, 1);
   return 0;
 }
-#endif

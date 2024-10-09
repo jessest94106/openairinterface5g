@@ -29,7 +29,7 @@
 * \note
 * \warning
  */
-#ifdef ENABLE_AERIAL
+
 #include "fapi_vnf_p5.h"
 #include "fapi_vnf_p7.h"
 #include "nfapi/open-nFAPI/vnf/inc/vnf_p7.h"
@@ -617,4 +617,3 @@ int oai_fapi_send_end_request(int cell, uint32_t frame, uint32_t slot){
   }
   return retval;
 }
-#endif

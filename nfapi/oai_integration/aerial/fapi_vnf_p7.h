@@ -30,7 +30,6 @@
 * \warning
  */
 
-#ifdef ENABLE_AERIAL
 #ifndef OPENAIRINTERFACE_FAPI_VNF_P7_H
 #define OPENAIRINTERFACE_FAPI_VNF_P7_H
 
@@ -230,4 +229,3 @@ uint8_t aerial_unpack_nr_rach_indication(uint8_t **ppReadPackedMsg,
 // int fapi_nr_p7_message_pack(void *pMessageBuf, void *pPackedBuf, uint32_t packedBufLen, nfapi_p7_codec_config_t* config);
 int fapi_nr_pack_and_send_p7_message(vnf_p7_t *vnf_p7, nfapi_p7_message_header_t *header);
 #endif // OPENAIRINTERFACE_FAPI_VNF_P7_H
-#endif
