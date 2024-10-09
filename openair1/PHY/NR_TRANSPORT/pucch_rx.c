@@ -53,6 +53,7 @@
 #include "SCHED_NR/sched_nr.h"
 
 #include "T.h"
+#include "nr_phy_common.h"
 
 //#define DEBUG_NR_PUCCH_RX 1
 
@@ -1086,15 +1087,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
 
   pucch2_lev /= Prx * pucch_pdu->nr_of_symbols;
   int pucch2_levdB = dB_fixed(pucch2_lev);
-  int scaling = 0;
-  if (pucch2_levdB > 72)
-    scaling = 4;
-  else if (pucch2_levdB > 66)
-    scaling = 3;
-  else if (pucch2_levdB > 60)
-    scaling = 2;
-  else if (pucch2_levdB > 54)
-    scaling = 1;
+  int scaling = max((log2_approx64(pucch2_lev) >> 1) - 8, 0);
 
   LOG_D(NR_PHY,
         "%d.%d Decoding pucch2 for %d symbols, %d PRB, nb_harq %d, nb_sr %d, nb_csi %d/%d, pucch2_lev %d dB (scaling %d)\n",
@@ -1180,6 +1173,140 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
            slot,pucch_pdu->start_symbol_index,symb,pucch_pdu->dmrs_scrambling_id);
 #endif
     uint32_t *sGold = gold_cache(x2, pucch_pdu->prb_start / 4 + ngroup / 2);
+
+    // Compute pilot conjugate
+    int16_t pil_re16[4 * pucch_pdu->prb_size] __attribute__((aligned(32)));
+    int16_t pil_im16[4 * pucch_pdu->prb_size] __attribute__((aligned(32)));
+    simde__m128i m1 = simde_mm_set_epi16(-1, -1, -1, -1, -1, -1, -1, -1);
+    for (int group = 0, goldIdx = pucch_pdu->prb_start / 4; group < ngroup; group++) {
+      uint8_t *sGold8 = (uint8_t *)&sGold[goldIdx];
+      ((simde__m64 *)&pil_re16[8 * group])[0] = byte2m64_re[sGold8[(group & 1) << 1]];
+      ((simde__m64 *)&pil_re16[8 * group])[1] = byte2m64_re[sGold8[1 + ((group & 1) << 1)]];
+      simde__m128i dmrs_im;
+      ((simde__m64 *)&dmrs_im)[0] = byte2m64_im[sGold8[(group & 1) << 1]];
+      ((simde__m64 *)&dmrs_im)[1] = byte2m64_im[sGold8[1 + ((group & 1) << 1)]];
+      *((simde__m128i *)&pil_im16[8 * group]) = simde_mm_mullo_epi16(dmrs_im, m1);
+      if ((group & 1) == 1)
+        goldIdx++;
+    }
+
+    // Compute delay
+    c16_t ch_ls[128] __attribute__((aligned(32))) = {0};
+    int prb_size_loop = (pucch_pdu->prb_size >> 1) << 1;
+    for (int aa = 0; aa < Prx; aa++) {
+      int prb = 0;
+      for (; prb < prb_size_loop; prb += 2) {
+        simde__m128i res_re, res_im;
+        complex_mult_simd(*(simde__m128i *)&pil_re16[4 * prb],
+                          *(simde__m128i *)&pil_im16[4 * prb],
+                          *(simde__m128i *)&rd_re_ext[aa][symb][4 * prb],
+                          *(simde__m128i *)&rd_im_ext[aa][symb][4 * prb],
+                          &res_re,
+                          &res_im,
+                          0,
+                          0,
+                          0);
+        int16_t *re = (int16_t *)&res_re;
+        int16_t *im = (int16_t *)&res_im;
+        for (int idx = 0; idx < 8; idx++) {
+          for (int k = 0; k < 3 && 12 * prb + 3 * idx + k < 128; k++) {
+            ch_ls[12 * prb + 3 * idx + k] = (c16_t){re[idx], im[idx]};
+          }
+        }
+      }
+      for (; prb < pucch_pdu->prb_size; prb++) {
+        int16_t *rd_re_ext_p = &rd_re_ext[aa][symb][4 * prb];
+        int16_t *rd_im_ext_p = &rd_im_ext[aa][symb][4 * prb];
+        for (int idx = 0; idx < 4; idx++) {
+          c16_t ch = c16mulShift((c16_t){pil_re16[idx + 4 * prb], pil_im16[idx + 4 * prb]},
+                                 (c16_t){rd_re_ext_p[idx], rd_im_ext_p[idx]},
+                                 0);
+          for (int k = 0; k < 3 && 12 * prb + 3 * idx + k < 128; k++) {
+            ch_ls[12 * prb + 3 * idx + k] = ch;
+          }
+        }
+      }
+    }
+    c16_t ch_temp[128] __attribute__((aligned(32))) = {0};
+    delay_t delay = {0};
+    nr_est_delay(128, ch_ls, ch_temp, &delay);
+    int delay_idx = get_delay_idx(delay.est_delay, MAX_DELAY_COMP);
+    c16_t *delay_table = frame_parms->delay_table128[delay_idx];
+
+    // Apply delay compensation
+    for (int aa = 0; aa < Prx; aa++) {
+      for (int prb = 0; prb < pucch_pdu->prb_size; prb++) {
+        int prb12 = 12 * prb;
+        simde__m128i delay_table_128_re = simde_mm_set_epi16(delay_table[prb12 + 11].r,
+                                                             delay_table[prb12 + 9].r,
+                                                             delay_table[prb12 + 8].r,
+                                                             delay_table[prb12 + 6].r,
+                                                             delay_table[prb12 + 5].r,
+                                                             delay_table[prb12 + 3].r,
+                                                             delay_table[prb12 + 2].r,
+                                                             delay_table[prb12].r);
+        simde__m128i delay_table_128_im = simde_mm_set_epi16(delay_table[prb12 + 11].i,
+                                                             delay_table[prb12 + 9].i,
+                                                             delay_table[prb12 + 8].i,
+                                                             delay_table[prb12 + 6].i,
+                                                             delay_table[prb12 + 5].i,
+                                                             delay_table[prb12 + 3].i,
+                                                             delay_table[prb12 + 2].i,
+                                                             delay_table[prb12].i);
+        int prb8 = 8 * prb;
+        complex_mult_simd(*(simde__m128i *)&r_re_ext[aa][symb][prb8],
+                          *(simde__m128i *)&r_im_ext[aa][symb][prb8],
+                          delay_table_128_re,
+                          delay_table_128_im,
+                          (simde__m128i *)&r_re_ext[aa][symb][prb8],
+                          (simde__m128i *)&r_im_ext[aa][symb][prb8],
+                          0,
+                          3,
+                          5);
+      }
+
+      int prb = 0;
+      for (; prb < prb_size_loop; prb += 2) {
+        int prb12 = 12 * prb;
+        simde__m128i delay_table_128_re = simde_mm_set_epi16(delay_table[prb12 + 22].r,
+                                                             delay_table[prb12 + 19].r,
+                                                             delay_table[prb12 + 16].r,
+                                                             delay_table[prb12 + 13].r,
+                                                             delay_table[prb12 + 10].r,
+                                                             delay_table[prb12 + 7].r,
+                                                             delay_table[prb12 + 4].r,
+                                                             delay_table[prb12 + 1].r);
+        simde__m128i delay_table_128_im = simde_mm_set_epi16(delay_table[prb12 + 22].i,
+                                                             delay_table[prb12 + 19].i,
+                                                             delay_table[prb12 + 16].i,
+                                                             delay_table[prb12 + 13].i,
+                                                             delay_table[prb12 + 10].i,
+                                                             delay_table[prb12 + 7].i,
+                                                             delay_table[prb12 + 4].i,
+                                                             delay_table[prb12 + 1].i);
+        int prb4 = 4 * prb;
+        complex_mult_simd(*(simde__m128i *)&rd_re_ext[aa][symb][prb4],
+                          *(simde__m128i *)&rd_im_ext[aa][symb][prb4],
+                          delay_table_128_re,
+                          delay_table_128_im,
+                          (simde__m128i *)&rd_re_ext[aa][symb][prb4],
+                          (simde__m128i *)&rd_im_ext[aa][symb][prb4],
+                          0,
+                          3,
+                          5);
+      }
+      for (; prb < pucch_pdu->prb_size; prb++) {
+        int16_t *rd_re_ext_p = &rd_re_ext[aa][symb][4 * prb];
+        int16_t *rd_im_ext_p = &rd_im_ext[aa][symb][4 * prb];
+        for (int idx = 0; idx < 4; idx++) {
+          int k = 3 * idx + 12 * prb;
+          c16_t tmp = c16mulShift((c16_t){rd_re_ext_p[idx], rd_im_ext_p[idx]}, delay_table[k + 1], 8);
+          rd_re_ext_p[idx] = tmp.r;
+          rd_im_ext_p[idx] = tmp.i;
+        }
+      }
+    }
+
     for (int group = 0, goldIdx = pucch_pdu->prb_start / 4; group < ngroup; group++) {
       // each group has 8*nc_group_size elements, compute 1 complex correlation with DMRS per group
       // non-coherent combining across groups
