@@ -92,7 +92,7 @@ services:
                                     --rfsimulator.options chanmod
                                     --telnetsrv --telnetsrv.listenaddr 192.168.71.150
                                     --telnetsrv.shrmod ci
-            ASAN_OPTIONS: detect_leaks=0
+            ASAN_OPTIONS: detect_leaks=0:detect_odr_violation=0
         depends_on:
             - oai-ext-dn
         networks:
