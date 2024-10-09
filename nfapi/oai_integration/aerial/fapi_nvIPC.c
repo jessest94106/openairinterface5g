@@ -79,24 +79,6 @@ static int ipc_handle_rx_msg(nv_ipc_t *ipc, nv_ipc_msg_t *msg)
     return -1;
   }
 
-  char *p_cpu_data = NULL;
-  if (msg->data_buf != NULL) {
-    int gpu;
-    if (msg->data_pool == NV_IPC_MEMPOOL_CUDA_DATA) {
-      gpu = 1;
-    } else {
-      gpu = 0;
-    }
-
-    if (gpu) {
-      p_cpu_data = cpu_buf_recv;
-      memset(cpu_buf_recv, 0, RECV_BUF_LEN);
-      ipc->cuda_memcpy_to_host(ipc, p_cpu_data, msg->data_buf, RECV_BUF_LEN);
-    } else {
-      p_cpu_data = msg->data_buf;
-    }
-  }
-
   uint8_t *pReadPackedMessage = msg->msg_buf;
   uint8_t *end = msg->msg_buf + msg->msg_len;
 
