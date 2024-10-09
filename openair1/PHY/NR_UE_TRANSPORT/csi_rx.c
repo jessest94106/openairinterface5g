@@ -884,6 +884,7 @@ void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
   if(!ue->csirs_vars[gNB_id]->active) {
     return;
   }
+  ue->csirs_vars[gNB_id]->active = 0;
 
   const fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_config_pdu = &ue->csirs_vars[gNB_id]->csirs_config_pdu;
 
