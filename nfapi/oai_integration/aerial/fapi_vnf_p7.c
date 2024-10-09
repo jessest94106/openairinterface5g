@@ -146,9 +146,6 @@ int aerial_phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind)
   }
   if (!put_queue(&gnb_rach_ind_queue, rach_ind)) {
     LOG_E(NR_MAC, "Put_queue failed for rach_ind\n");
-    for (int i = 0; i < ind->number_of_pdus; i++) {
-      free(rach_ind->pdu_list[i].preamble_list);
-    }
     free(rach_ind->pdu_list);
     free(rach_ind);
   } else {
