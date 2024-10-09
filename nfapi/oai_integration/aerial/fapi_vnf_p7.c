@@ -41,152 +41,139 @@ extern int nfapi_sync_var;
 
 int aerial_phy_nr_crc_indication(nfapi_nr_crc_indication_t *ind)
 {
-  if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-    nfapi_nr_crc_indication_t *crc_ind = CALLOC(1, sizeof(*crc_ind));
-    crc_ind->header.message_id = ind->header.message_id;
-    crc_ind->number_crcs = ind->number_crcs;
-    crc_ind->sfn = ind->sfn;
-    crc_ind->slot = ind->slot;
-    if (ind->number_crcs > 0) {
-      crc_ind->crc_list = CALLOC(NFAPI_NR_CRC_IND_MAX_PDU, sizeof(nfapi_nr_crc_t));
-      AssertFatal(crc_ind->crc_list != NULL, "Memory not allocated for crc_ind->crc_list in phy_nr_crc_indication.");
+  nfapi_nr_crc_indication_t *crc_ind = CALLOC(1, sizeof(*crc_ind));
+  crc_ind->header.message_id = ind->header.message_id;
+  crc_ind->number_crcs = ind->number_crcs;
+  crc_ind->sfn = ind->sfn;
+  crc_ind->slot = ind->slot;
+  if (ind->number_crcs > 0) {
+    crc_ind->crc_list = CALLOC(NFAPI_NR_CRC_IND_MAX_PDU, sizeof(nfapi_nr_crc_t));
+    AssertFatal(crc_ind->crc_list != NULL, "Memory not allocated for crc_ind->crc_list in phy_nr_crc_indication.");
+  }
+  for (int j = 0; j < ind->number_crcs; j++) {
+    crc_ind->crc_list[j].handle = ind->crc_list[j].handle;
+    crc_ind->crc_list[j].rnti = ind->crc_list[j].rnti;
+    crc_ind->crc_list[j].harq_id = ind->crc_list[j].harq_id;
+    crc_ind->crc_list[j].tb_crc_status = ind->crc_list[j].tb_crc_status;
+    crc_ind->crc_list[j].num_cb = ind->crc_list[j].num_cb;
+    crc_ind->crc_list[j].cb_crc_status = ind->crc_list[j].cb_crc_status;
+    crc_ind->crc_list[j].ul_cqi = ind->crc_list[j].ul_cqi;
+    crc_ind->crc_list[j].timing_advance = ind->crc_list[j].timing_advance;
+    crc_ind->crc_list[j].rssi = ind->crc_list[j].rssi;
+    if (crc_ind->crc_list[j].tb_crc_status != 0) {
+      LOG_D(NR_MAC,
+            "Received crc_ind.harq_id %d status %d for index %d SFN SLot %u %u with rnti %04x\n",
+            crc_ind->crc_list[j].harq_id,
+            crc_ind->crc_list[j].tb_crc_status,
+            j,
+            crc_ind->sfn,
+            crc_ind->slot,
+            crc_ind->crc_list[j].rnti);
     }
-    for (int j = 0; j < ind->number_crcs; j++) {
-      crc_ind->crc_list[j].handle = ind->crc_list[j].handle;
-      crc_ind->crc_list[j].rnti = ind->crc_list[j].rnti;
-      crc_ind->crc_list[j].harq_id = ind->crc_list[j].harq_id;
-      crc_ind->crc_list[j].tb_crc_status = ind->crc_list[j].tb_crc_status;
-      crc_ind->crc_list[j].num_cb = ind->crc_list[j].num_cb;
-      crc_ind->crc_list[j].cb_crc_status = ind->crc_list[j].cb_crc_status;
-      crc_ind->crc_list[j].ul_cqi = ind->crc_list[j].ul_cqi;
-      crc_ind->crc_list[j].timing_advance = ind->crc_list[j].timing_advance;
-      crc_ind->crc_list[j].rssi = ind->crc_list[j].rssi;
-      if (crc_ind->crc_list[j].tb_crc_status != 0) {
-        LOG_D(NR_MAC,
-              "Received crc_ind.harq_id %d status %d for index %d SFN SLot %u %u with rnti %04x\n",
-              crc_ind->crc_list[j].harq_id,
-              crc_ind->crc_list[j].tb_crc_status,
-              j,
-              crc_ind->sfn,
-              crc_ind->slot,
-              crc_ind->crc_list[j].rnti);
-      }
-    }
-    if (!put_queue(&gnb_crc_ind_queue, crc_ind)) {
-      LOG_E(NR_MAC, "Put_queue failed for crc_ind\n");
-      free(crc_ind->crc_list);
-      free(crc_ind);
-    }
-  } else {
-    LOG_E(NR_MAC, "NFAPI_MODE = %d not NFAPI_MODE_AERIAL(3)\n", nfapi_getmode());
+  }
+  if (!put_queue(&gnb_crc_ind_queue, crc_ind)) {
+    LOG_E(NR_MAC, "Put_queue failed for crc_ind\n");
+    free(crc_ind->crc_list);
+    free(crc_ind);
   }
   return 1;
 }
 
 int aerial_phy_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind)
 {
-  if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-    nfapi_nr_rx_data_indication_t *rx_ind = CALLOC(1, sizeof(*rx_ind));
-    rx_ind->header.message_id = ind->header.message_id;
-    rx_ind->sfn = ind->sfn;
-    rx_ind->slot = ind->slot;
-    rx_ind->number_of_pdus = ind->number_of_pdus;
+  nfapi_nr_rx_data_indication_t *rx_ind = CALLOC(1, sizeof(*rx_ind));
+  rx_ind->header.message_id = ind->header.message_id;
+  rx_ind->sfn = ind->sfn;
+  rx_ind->slot = ind->slot;
+  rx_ind->number_of_pdus = ind->number_of_pdus;
 
-    if (ind->number_of_pdus > 0) {
-      rx_ind->pdu_list = CALLOC(NFAPI_NR_RX_DATA_IND_MAX_PDU, sizeof(nfapi_nr_rx_data_pdu_t));
-      AssertFatal(rx_ind->pdu_list != NULL, "Memory not allocated for rx_ind->pdu_list in phy_nr_rx_data_indication.");
+  if (ind->number_of_pdus > 0) {
+    rx_ind->pdu_list = CALLOC(NFAPI_NR_RX_DATA_IND_MAX_PDU, sizeof(nfapi_nr_rx_data_pdu_t));
+    AssertFatal(rx_ind->pdu_list != NULL, "Memory not allocated for rx_ind->pdu_list in phy_nr_rx_data_indication.");
+  }
+  for (int j = 0; j < ind->number_of_pdus; j++) {
+    rx_ind->pdu_list[j].handle = ind->pdu_list[j].handle;
+    rx_ind->pdu_list[j].rnti = ind->pdu_list[j].rnti;
+    rx_ind->pdu_list[j].harq_id = ind->pdu_list[j].harq_id;
+    rx_ind->pdu_list[j].pdu_length = ind->pdu_list[j].pdu_length;
+    rx_ind->pdu_list[j].ul_cqi = ind->pdu_list[j].ul_cqi;
+    rx_ind->pdu_list[j].timing_advance = ind->pdu_list[j].timing_advance;
+    rx_ind->pdu_list[j].rssi = ind->pdu_list[j].rssi;
+    // Only copy PDU data if there's any to copy
+    if (rx_ind->pdu_list[j].pdu_length > 0) {
+      rx_ind->pdu_list[j].pdu = calloc(rx_ind->pdu_list[j].pdu_length, sizeof(uint8_t));
+      memcpy(rx_ind->pdu_list[j].pdu, ind->pdu_list[j].pdu, ind->pdu_list[j].pdu_length);
     }
-    for (int j = 0; j < ind->number_of_pdus; j++) {
-      rx_ind->pdu_list[j].handle = ind->pdu_list[j].handle;
-      rx_ind->pdu_list[j].rnti = ind->pdu_list[j].rnti;
-      rx_ind->pdu_list[j].harq_id = ind->pdu_list[j].harq_id;
-      rx_ind->pdu_list[j].pdu_length = ind->pdu_list[j].pdu_length;
-      rx_ind->pdu_list[j].ul_cqi = ind->pdu_list[j].ul_cqi;
-      rx_ind->pdu_list[j].timing_advance = ind->pdu_list[j].timing_advance;
-      rx_ind->pdu_list[j].rssi = ind->pdu_list[j].rssi;
-      // Only copy PDU data if there's any to copy
-      if (rx_ind->pdu_list[j].pdu_length > 0) {
-        rx_ind->pdu_list[j].pdu = calloc(rx_ind->pdu_list[j].pdu_length, sizeof(uint8_t));
-        memcpy(rx_ind->pdu_list[j].pdu, ind->pdu_list[j].pdu, ind->pdu_list[j].pdu_length);
-      }
-      LOG_D(NR_MAC,
-            "(%d.%d) Handle %d for index %d, RNTI, %04x, HARQID %d\n",
-            ind->sfn,
-            ind->slot,
-            ind->pdu_list[j].handle,
-            j,
-            ind->pdu_list[j].rnti,
-            ind->pdu_list[j].harq_id);
-    }
-    if (!put_queue(&gnb_rx_ind_queue, rx_ind)) {
-      LOG_E(NR_MAC, "Put_queue failed for rx_ind\n");
-      free(rx_ind->pdu_list);
-      free(rx_ind);
-    }
-  } else {
-    LOG_E(NR_MAC, "NFAPI_MODE = %d not NFAPI_MODE_AERIAL(3)\n", nfapi_getmode());
+    LOG_D(NR_MAC,
+          "(%d.%d) Handle %d for index %d, RNTI, %04x, HARQID %d\n",
+          ind->sfn,
+          ind->slot,
+          ind->pdu_list[j].handle,
+          j,
+          ind->pdu_list[j].rnti,
+          ind->pdu_list[j].harq_id);
+  }
+  if (!put_queue(&gnb_rx_ind_queue, rx_ind)) {
+    LOG_E(NR_MAC, "Put_queue failed for rx_ind\n");
+    free(rx_ind->pdu_list);
+    free(rx_ind);
   }
   return 1;
 }
 
 int aerial_phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind)
 {
-  if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-    nfapi_nr_rach_indication_t *rach_ind = CALLOC(1, sizeof(*rach_ind));
-    rach_ind->header.message_id = ind->header.message_id;
-    rach_ind->sfn = ind->sfn;
-    rach_ind->slot = ind->slot;
-    rach_ind->number_of_pdus = ind->number_of_pdus;
-    rach_ind->pdu_list = CALLOC(rach_ind->number_of_pdus, sizeof(*rach_ind->pdu_list));
-    AssertFatal(rach_ind->pdu_list != NULL, "Memory not allocated for rach_ind->pdu_list in phy_nr_rach_indication.");
+  nfapi_nr_rach_indication_t *rach_ind = CALLOC(1, sizeof(*rach_ind));
+  rach_ind->header.message_id = ind->header.message_id;
+  rach_ind->sfn = ind->sfn;
+  rach_ind->slot = ind->slot;
+  rach_ind->number_of_pdus = ind->number_of_pdus;
+  rach_ind->pdu_list = CALLOC(rach_ind->number_of_pdus, sizeof(*rach_ind->pdu_list));
+  AssertFatal(rach_ind->pdu_list != NULL, "Memory not allocated for rach_ind->pdu_list in phy_nr_rach_indication.");
+  for (int i = 0; i < ind->number_of_pdus; i++) {
+    rach_ind->pdu_list[i].phy_cell_id = ind->pdu_list[i].phy_cell_id;
+    rach_ind->pdu_list[i].symbol_index = ind->pdu_list[i].symbol_index;
+    rach_ind->pdu_list[i].slot_index = ind->pdu_list[i].slot_index;
+    rach_ind->pdu_list[i].freq_index = ind->pdu_list[i].freq_index;
+    rach_ind->pdu_list[i].avg_rssi = ind->pdu_list[i].avg_rssi;
+    rach_ind->pdu_list[i].avg_snr = ind->pdu_list[i].avg_snr;
+    rach_ind->pdu_list[i].num_preamble = ind->pdu_list[i].num_preamble;
+    for (int j = 0; j < ind->pdu_list[i].num_preamble; j++) {
+      rach_ind->pdu_list[i].preamble_list[j].preamble_index = ind->pdu_list[i].preamble_list[j].preamble_index;
+      rach_ind->pdu_list[i].preamble_list[j].timing_advance = ind->pdu_list[i].preamble_list[j].timing_advance;
+      rach_ind->pdu_list[i].preamble_list[j].preamble_pwr = ind->pdu_list[i].preamble_list[j].preamble_pwr;
+    }
+  }
+  if (!put_queue(&gnb_rach_ind_queue, rach_ind)) {
+    LOG_E(NR_MAC, "Put_queue failed for rach_ind\n");
     for (int i = 0; i < ind->number_of_pdus; i++) {
-      rach_ind->pdu_list[i].phy_cell_id = ind->pdu_list[i].phy_cell_id;
-      rach_ind->pdu_list[i].symbol_index = ind->pdu_list[i].symbol_index;
-      rach_ind->pdu_list[i].slot_index = ind->pdu_list[i].slot_index;
-      rach_ind->pdu_list[i].freq_index = ind->pdu_list[i].freq_index;
-      rach_ind->pdu_list[i].avg_rssi = ind->pdu_list[i].avg_rssi;
-      rach_ind->pdu_list[i].avg_snr = ind->pdu_list[i].avg_snr;
-      rach_ind->pdu_list[i].num_preamble = ind->pdu_list[i].num_preamble;
-      for (int j = 0; j < ind->pdu_list[i].num_preamble; j++) {
-        rach_ind->pdu_list[i].preamble_list[j].preamble_index = ind->pdu_list[i].preamble_list[j].preamble_index;
-        rach_ind->pdu_list[i].preamble_list[j].timing_advance = ind->pdu_list[i].preamble_list[j].timing_advance;
-        rach_ind->pdu_list[i].preamble_list[j].preamble_pwr = ind->pdu_list[i].preamble_list[j].preamble_pwr;
-      }
+      free(rach_ind->pdu_list[i].preamble_list);
     }
-    if (!put_queue(&gnb_rach_ind_queue, rach_ind)) {
-      LOG_E(NR_MAC, "Put_queue failed for rach_ind\n");
-      for (int i = 0; i < ind->number_of_pdus; i++) {
-        free(rach_ind->pdu_list[i].preamble_list);
-      }
-      free(rach_ind->pdu_list);
-      free(rach_ind);
-    } else {
-      LOG_I(NR_MAC, "RACH.indication put_queue successfull\n");
-    }
+    free(rach_ind->pdu_list);
+    free(rach_ind);
   } else {
-    LOG_E(NR_MAC, "NFAPI_MODE = %d not NFAPI_MODE_AERIAL(3)\n", nfapi_getmode());
+    LOG_I(NR_MAC, "RACH.indication put_queue successfull\n");
   }
   return 1;
 }
 
 int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
 {
-  if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-    nfapi_nr_uci_indication_t *uci_ind = CALLOC(1, sizeof(*uci_ind));
-    AssertFatal(uci_ind, "Memory not allocated for uci_ind in phy_nr_uci_indication.");
-    *uci_ind = *ind;
+  nfapi_nr_uci_indication_t *uci_ind = CALLOC(1, sizeof(*uci_ind));
+  AssertFatal(uci_ind, "Memory not allocated for uci_ind in phy_nr_uci_indication.");
+  *uci_ind = *ind;
 
-    uci_ind->uci_list = CALLOC(NFAPI_NR_UCI_IND_MAX_PDU, sizeof(nfapi_nr_uci_t));
-    AssertFatal(uci_ind->uci_list != NULL, "Memory not allocated for uci_ind->uci_list in phy_nr_uci_indication.");
-    for (int i = 0; i < ind->num_ucis; i++) {
-      uci_ind->uci_list[i] = ind->uci_list[i];
+  uci_ind->uci_list = CALLOC(NFAPI_NR_UCI_IND_MAX_PDU, sizeof(nfapi_nr_uci_t));
+  AssertFatal(uci_ind->uci_list != NULL, "Memory not allocated for uci_ind->uci_list in phy_nr_uci_indication.");
+  for (int i = 0; i < ind->num_ucis; i++) {
+    uci_ind->uci_list[i] = ind->uci_list[i];
 
-      switch (uci_ind->uci_list[i].pdu_type) {
-        case NFAPI_NR_UCI_PUSCH_PDU_TYPE:
-          LOG_E(MAC, "%s(): unhandled NFAPI_NR_UCI_PUSCH_PDU_TYPE\n", __func__);
-          break;
+    switch (uci_ind->uci_list[i].pdu_type) {
+      case NFAPI_NR_UCI_PUSCH_PDU_TYPE:
+        LOG_E(MAC, "%s(): unhandled NFAPI_NR_UCI_PUSCH_PDU_TYPE\n", __func__);
+        break;
 
-        case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {
+      case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {
 //          nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_ind_pdu = &uci_ind->uci_list[i].pucch_pdu_format_0_1;
 //          nfapi_nr_uci_pucch_pdu_format_0_1_t *ind_pdu = &ind->uci_list[i].pucch_pdu_format_0_1;
 //          if (ind_pdu->sr) {
@@ -205,49 +192,49 @@ int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
 //            for (int j = 0; j < uci_ind_pdu->harq->num_harq; j++)
 //              uci_ind_pdu->harq->harq_list[j].harq_value = ind_pdu->harq->harq_list[j].harq_value;
 //          }
-          break;
-        }
+        break;
+      }
 
-        case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE: {
-          nfapi_nr_uci_pucch_pdu_format_2_3_4_t *uci_ind_pdu = &uci_ind->uci_list[i].pucch_pdu_format_2_3_4;
-          nfapi_nr_uci_pucch_pdu_format_2_3_4_t *ind_pdu = &ind->uci_list[i].pucch_pdu_format_2_3_4;
-          *uci_ind_pdu = *ind_pdu;
-          if (ind_pdu->harq.harq_payload) {
-            uci_ind_pdu->harq.harq_payload = CALLOC(1, sizeof(*uci_ind_pdu->harq.harq_payload));
-            AssertFatal(uci_ind_pdu->harq.harq_payload != NULL,
-                        "Memory not allocated for uci_ind_pdu->harq.harq_payload in phy_nr_uci_indication.");
-            *uci_ind_pdu->harq.harq_payload = *ind_pdu->harq.harq_payload;
-          }
-          if (ind_pdu->sr.sr_payload) {
-            uci_ind_pdu->sr.sr_payload = CALLOC(1, sizeof(*uci_ind_pdu->sr.sr_payload));
-            AssertFatal(uci_ind_pdu->sr.sr_payload != NULL,
-                        "Memory not allocated for uci_ind_pdu->sr.sr_payload in phy_nr_uci_indication.");
-            //SCF222.10.02 sr_bit_len values from 1 to 8, payload always just one byte
-            uci_ind_pdu->sr.sr_payload[0] = ind_pdu->sr.sr_payload[0];
-          }
-          if (ind_pdu->csi_part1.csi_part1_payload) {
-            uint8_t byte_len = (ind_pdu->csi_part1.csi_part1_bit_len / 8) + 1;
-            uci_ind_pdu->csi_part1.csi_part1_payload = calloc(byte_len, sizeof(uint8_t));
-            AssertFatal(uci_ind_pdu->csi_part1.csi_part1_payload != NULL,
-                        "Memory not allocated for uci_ind_pdu->csi_part1.csi_part1_payload in phy_nr_uci_indication.");
-            memcpy(uci_ind_pdu->csi_part1.csi_part1_payload,ind_pdu->csi_part1.csi_part1_payload,byte_len);
-          }
-          if (ind_pdu->csi_part2.csi_part2_payload) {
-            uint8_t byte_len = (ind_pdu->csi_part2.csi_part2_bit_len / 8) + 1;
-            uci_ind_pdu->csi_part2.csi_part2_payload = calloc(byte_len, sizeof(uint8_t));
-            AssertFatal(uci_ind_pdu->csi_part2.csi_part2_payload != NULL,
-                        "Memory not allocated for uci_ind_pdu->csi_part2.csi_part2_payload in phy_nr_uci_indication.");
-            memcpy(uci_ind_pdu->csi_part2.csi_part2_payload,ind_pdu->csi_part2.csi_part2_payload,byte_len);
-          }
-          break;
+      case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE: {
+        nfapi_nr_uci_pucch_pdu_format_2_3_4_t *uci_ind_pdu = &uci_ind->uci_list[i].pucch_pdu_format_2_3_4;
+        nfapi_nr_uci_pucch_pdu_format_2_3_4_t *ind_pdu = &ind->uci_list[i].pucch_pdu_format_2_3_4;
+        *uci_ind_pdu = *ind_pdu;
+        if (ind_pdu->harq.harq_payload) {
+          uci_ind_pdu->harq.harq_payload = CALLOC(1, sizeof(*uci_ind_pdu->harq.harq_payload));
+          AssertFatal(uci_ind_pdu->harq.harq_payload != NULL,
+                      "Memory not allocated for uci_ind_pdu->harq.harq_payload in phy_nr_uci_indication.");
+          *uci_ind_pdu->harq.harq_payload = *ind_pdu->harq.harq_payload;
         }
+        if (ind_pdu->sr.sr_payload) {
+          uci_ind_pdu->sr.sr_payload = CALLOC(1, sizeof(*uci_ind_pdu->sr.sr_payload));
+          AssertFatal(uci_ind_pdu->sr.sr_payload != NULL,
+                      "Memory not allocated for uci_ind_pdu->sr.sr_payload in phy_nr_uci_indication.");
+          //SCF222.10.02 sr_bit_len values from 1 to 8, payload always just one byte
+          uci_ind_pdu->sr.sr_payload[0] = ind_pdu->sr.sr_payload[0];
+        }
+        if (ind_pdu->csi_part1.csi_part1_payload) {
+          uint8_t byte_len = (ind_pdu->csi_part1.csi_part1_bit_len / 8) + 1;
+          uci_ind_pdu->csi_part1.csi_part1_payload = calloc(byte_len, sizeof(uint8_t));
+          AssertFatal(uci_ind_pdu->csi_part1.csi_part1_payload != NULL,
+                      "Memory not allocated for uci_ind_pdu->csi_part1.csi_part1_payload in phy_nr_uci_indication.");
+          memcpy(uci_ind_pdu->csi_part1.csi_part1_payload,ind_pdu->csi_part1.csi_part1_payload,byte_len);
+        }
+        if (ind_pdu->csi_part2.csi_part2_payload) {
+          uint8_t byte_len = (ind_pdu->csi_part2.csi_part2_bit_len / 8) + 1;
+          uci_ind_pdu->csi_part2.csi_part2_payload = calloc(byte_len, sizeof(uint8_t));
+          AssertFatal(uci_ind_pdu->csi_part2.csi_part2_payload != NULL,
+                      "Memory not allocated for uci_ind_pdu->csi_part2.csi_part2_payload in phy_nr_uci_indication.");
+          memcpy(uci_ind_pdu->csi_part2.csi_part2_payload,ind_pdu->csi_part2.csi_part2_payload,byte_len);
+        }
+        break;
       }
     }
+  }
 
-    if (!put_queue(&gnb_uci_ind_queue, uci_ind)) {
-      LOG_E(NR_MAC, "Put_queue failed for uci_ind\n");
-      for (int i = 0; i < ind->num_ucis; i++) {
-        if (uci_ind->uci_list[i].pdu_type == NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE) {
+  if (!put_queue(&gnb_uci_ind_queue, uci_ind)) {
+    LOG_E(NR_MAC, "Put_queue failed for uci_ind\n");
+    for (int i = 0; i < ind->num_ucis; i++) {
+      if (uci_ind->uci_list[i].pdu_type == NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE) {
 //          if (uci_ind->uci_list[i].pucch_pdu_format_0_1.harq) {
 //            free(uci_ind->uci_list[i].pucch_pdu_format_0_1.harq->harq_list);
 //            uci_ind->uci_list[i].pucch_pdu_format_0_1.harq->harq_list = NULL;
@@ -258,20 +245,17 @@ int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
 //            free(uci_ind->uci_list[i].pucch_pdu_format_0_1.sr);
 //            uci_ind->uci_list[i].pucch_pdu_format_0_1.sr = NULL;
 //          }
-        }
-        if (uci_ind->uci_list[i].pdu_type == NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE) {
-          free(uci_ind->uci_list[i].pucch_pdu_format_2_3_4.harq.harq_payload);
-          free(uci_ind->uci_list[i].pucch_pdu_format_2_3_4.csi_part1.csi_part1_payload);
-          free(uci_ind->uci_list[i].pucch_pdu_format_2_3_4.csi_part2.csi_part2_payload);
-        }
       }
-      free(uci_ind->uci_list);
-      uci_ind->uci_list = NULL;
-      free(uci_ind);
-      uci_ind = NULL;
+      if (uci_ind->uci_list[i].pdu_type == NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE) {
+        free(uci_ind->uci_list[i].pucch_pdu_format_2_3_4.harq.harq_payload);
+        free(uci_ind->uci_list[i].pucch_pdu_format_2_3_4.csi_part1.csi_part1_payload);
+        free(uci_ind->uci_list[i].pucch_pdu_format_2_3_4.csi_part2.csi_part2_payload);
+      }
     }
-  } else {
-    LOG_E(NR_MAC, "NFAPI_MODE = %d not NFAPI_MODE_AERIAL(3)\n", nfapi_getmode());
+    free(uci_ind->uci_list);
+    uci_ind->uci_list = NULL;
+    free(uci_ind);
+    uci_ind = NULL;
   }
   return 1;
 }
@@ -292,27 +276,26 @@ int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind)
   // Call into the scheduler (this is hardcoded and should be init properly!)
   // memset(sched_resp, 0, sizeof(*sched_resp));
   gNB_dlsch_ulsch_scheduler(0, slot_ind->sfn, slot_ind->slot, &g_sched_resp);
-  if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-    bool send_slt_resp = false;
-    if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs> 0) {
-      oai_fapi_dl_tti_req(&g_sched_resp.DL_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.UL_tti_req.n_pdus > 0) {
-      oai_fapi_ul_tti_req(&g_sched_resp.UL_tti_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.TX_req.Number_of_PDUs > 0) {
-      oai_fapi_tx_data_req(&g_sched_resp.TX_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.UL_dci_req.numPdus > 0) {
-      oai_fapi_ul_dci_req(&g_sched_resp.UL_dci_req);
-      send_slt_resp = true;
-    }
-    if (send_slt_resp) {
-      oai_fapi_send_end_request(0,slot_ind->sfn, slot_ind->slot);
-    }
+
+  bool send_slt_resp = false;
+  if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs> 0) {
+    oai_fapi_dl_tti_req(&g_sched_resp.DL_req);
+    send_slt_resp = true;
+  }
+  if (g_sched_resp.UL_tti_req.n_pdus > 0) {
+    oai_fapi_ul_tti_req(&g_sched_resp.UL_tti_req);
+    send_slt_resp = true;
+  }
+  if (g_sched_resp.TX_req.Number_of_PDUs > 0) {
+    oai_fapi_tx_data_req(&g_sched_resp.TX_req);
+    send_slt_resp = true;
+  }
+  if (g_sched_resp.UL_dci_req.numPdus > 0) {
+    oai_fapi_ul_dci_req(&g_sched_resp.UL_dci_req);
+    send_slt_resp = true;
+  }
+  if (send_slt_resp) {
+    oai_fapi_send_end_request(0,slot_ind->sfn, slot_ind->slot);
   }
 
   return 1;
