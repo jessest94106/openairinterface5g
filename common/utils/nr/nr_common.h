@@ -122,6 +122,29 @@ typedef enum frequency_range_e {
   FR2
 } frequency_range_t;
 
+#define MAX_NUM_SLOTS_ALLOWED 80 // up to numerology 3 (120 KHz SCS) is supported
+enum slot_type { TDD_NR_DOWNLINK_SLOT, TDD_NR_UPLINK_SLOT, TDD_NR_MIXED_SLOT };
+
+typedef struct tdd_bitmap {
+  enum slot_type slot_type;
+  uint8_t num_dl_symbols;
+  uint8_t num_ul_symbols;
+} tdd_bitmap_t;
+
+typedef struct tdd_period_config_s {
+  tdd_bitmap_t tdd_slot_bitmap[MAX_NUM_SLOTS_ALLOWED];
+  uint8_t num_dl_slots;
+  uint8_t num_ul_slots;
+} tdd_period_config_t;
+
+typedef struct frame_structure_s {
+  tdd_period_config_t period_cfg;
+  int8_t numb_slots_frame;
+  int8_t numb_slots_period;
+  int8_t numb_period_frame;
+  bool is_tdd;
+} frame_structure_t;
+
 typedef struct {
   /// Time shift in number of samples estimated based on DMRS-PDSCH/PUSCH
   int est_delay;
