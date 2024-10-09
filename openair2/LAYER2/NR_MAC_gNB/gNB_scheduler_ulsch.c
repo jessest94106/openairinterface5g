@@ -1754,7 +1754,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   return true;
 }
 
-uint32_t ul_pf_tbs[3][29]; // pre-computed, approximate TBS values for PF coefficient
+uint32_t ul_pf_tbs[5][29]; // pre-computed, approximate TBS values for PF coefficient
 typedef struct UEsched_s {
   float coef;
   NR_UE_info_t * UE;
@@ -2221,11 +2221,11 @@ nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id)
    * which should approximately(!) give us the TBsize. In particular, the
    * number of symbols, the number of DMRS symbols, and the exact Qm and R, are
    * not correct*/
-  for (int mcsTableIdx = 0; mcsTableIdx < 3; ++mcsTableIdx) {
+  for (int mcsTableIdx = 0; mcsTableIdx < 5; ++mcsTableIdx) {
     for (int mcs = 0; mcs < 29; ++mcs) {
-      if (mcs > 27 && mcsTableIdx == 1)
+      if (mcs > 27 && (mcsTableIdx == 1 || mcsTableIdx == 3 || mcsTableIdx == 4))
         continue;
-      const uint8_t Qm = nr_get_Qm_dl(mcs, mcsTableIdx);
+      const uint8_t Qm = nr_get_Qm_ul(mcs, mcsTableIdx);
       const uint16_t R = nr_get_code_rate_ul(mcs, mcsTableIdx);
       /* note: we do not update R/Qm based on low MCS or pi2BPSK */
       ul_pf_tbs[mcsTableIdx][mcs] = nr_compute_tbs(Qm,
