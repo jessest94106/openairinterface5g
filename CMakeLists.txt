@@ -501,6 +501,12 @@ if (ENABLE_LDPC_T2)
   add_library(ldpc_t2 MODULE ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_offload.c)
   set_target_properties(ldpc_t2 PROPERTIES COMPILE_FLAGS "-DALLOW_EXPERIMENTAL_API")
   target_link_libraries(ldpc_t2 ${LIBDPDK_T2_LDFLAGS} ${PMD_T2})
+  set(PHY_NRLDPC_CODING_T2_SRC
+    ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_t2/nrLDPC_coding_t2.c
+  )
+  add_library(ldpc_slot_t2 MODULE ${PHY_NRLDPC_CODING_T2_SRC})
+  set_target_properties(ldpc_slot_t2 PROPERTIES COMPILE_FLAGS "-DALLOW_EXPERIMENTAL_API")
+  target_link_libraries(ldpc_slot_t2 PRIVATE ldpc_gen_HEADERS ${LIBDPDK_T2_LDFLAGS} ${PMD_T2})
 endif()
 
 ##########################################################
@@ -2059,7 +2065,7 @@ endif()
 add_dependencies(nr-softmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc ldpc_slot_segment)
 
 if (ENABLE_LDPC_T2)
-  add_dependencies(nr-softmodem ldpc_t2)
+  add_dependencies(nr-softmodem ldpc_t2 ldpc_slot_t2)
 endif()
 
 # force the generation of ASN.1 so that we don't need to wait during the build
@@ -2117,6 +2123,10 @@ add_dependencies( nr-uesoftmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc ldpc_s
 if (ENABLE_LDPC_CUDA)
    add_dependencies(nr-uesoftmodem ldpc_cuda)
    add_dependencies(nr-softmodem ldpc_cuda)
+endif()
+
+if (ENABLE_LDPC_T2)
+  add_dependencies(nr-uesoftmodem ldpc_t2 ldpc_slot_t2)
 endif()
 
 # force the generation of ASN.1 so that we don't need to wait during the build
@@ -2274,7 +2284,7 @@ add_executable(nr_ulsim
   )
 
 if (ENABLE_LDPC_T2)
-  add_dependencies(nr_ulsim ldpc_t2)
+  add_dependencies(nr_ulsim ldpc_t2 ldpc_slot_t2)
 endif()
 add_dependencies(nr_ulsim ldpc_slot_segment)
 
@@ -2343,7 +2353,7 @@ if (${T_TRACER})
         PHY_COMMON PHY PHY_UE PHY_NR PHY_NR_COMMON PHY_NR_UE PHY_RU PHY_MEX
         L2 L2_LTE L2_NR L2_LTE_NR L2_UE NR_L2_UE L2_UE_LTE_NR MAC_NR_COMMON MAC_UE_NR ngap
         CN_UTILS GTPV1U SCTP_CLIENT MME_APP LIB_NAS_UE NB_IoT SIMU OPENAIR0_LIB
-        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_t2 ldpc_cl ldpc_cuda ldpc ldpc_slot_segment
+        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_t2 ldpc_cl ldpc_cuda ldpc ldpc_slot_segment ldpc_slot_t2
         dfts config_internals nr_common)
     if (TARGET ${i})
       add_dependencies(${i} generate_T)

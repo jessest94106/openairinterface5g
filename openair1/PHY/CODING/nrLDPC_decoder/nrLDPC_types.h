@@ -107,23 +107,6 @@ typedef struct nrLDPC_dec_params {
 } t_nrLDPC_dec_params;
 
 /**
-   Structure containing LDPC offload parameters.
- */
-typedef struct nrLDPCoffload_params {
-    uint8_t BG; /**< Base graph */
-    uint16_t Z;
-    uint16_t Kr;
-    uint8_t rv;
-    uint16_t n_cb;
-    uint16_t F; /**< Filler bits */
-    uint8_t Qm; /**< Modulation */
-    uint8_t C;
-    uint8_t numMaxIter;
-    uint8_t setCombIn;
-    nrLDPC_params_per_cb_t perCB[NR_LDPC_MAX_NUM_CB];
-} t_nrLDPCoffload_params;
-
-/**
    Structure containing LDPC decoder processing time statistics.
  */
 #ifndef CODEGEN
