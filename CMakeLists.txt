@@ -508,6 +508,19 @@ endif()
 
 ##########################################################
 
+# LDPC offload library - XDMA
+##########################################################
+add_boolean_option(ENABLE_LDPC_XDMA OFF "Build support for LDPC Offload to XDMA library" OFF)
+if (ENABLE_LDPC_XDMA)
+  set(PHY_NRLDPC_CODING_XDMA_SRC
+  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_xdma/nrLDPC_coding_xdma_offload.c
+  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_xdma/nrLDPC_coding_xdma.c
+  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_encoder.c
+  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_load.c
+  )
+  add_library(ldpc_xdma MODULE ${PHY_NRLDPC_CODING_XDMA_SRC})
+endif()
+
 include_directories ("${OPENAIR_DIR}/radio/COMMON")
 
 ##############################################################
@@ -2065,6 +2078,10 @@ if (ENABLE_LDPC_T2)
   add_dependencies(nr-softmodem ldpc_t2)
 endif()
 
+if (ENABLE_LDPC_XDMA)
+  add_dependencies(nr-softmodem ldpc_xdma)
+endif()
+
 # force the generation of ASN.1 so that we don't need to wait during the build
 target_link_libraries(nr-softmodem PRIVATE
   asn1_lte_rrc asn1_nr_rrc asn1_s1ap asn1_ngap asn1_m2ap asn1_m3ap asn1_x2ap asn1_f1ap asn1_lpp)
@@ -2124,6 +2141,10 @@ endif()
 
 if (ENABLE_LDPC_T2)
   add_dependencies(nr-uesoftmodem ldpc_t2)
+endif()
+
+if (ENABLE_LDPC_XDMA)
+  add_dependencies(nr-uesoftmodem ldpc_xdma)
 endif()
 
 # force the generation of ASN.1 so that we don't need to wait during the build
@@ -2283,6 +2304,9 @@ add_executable(nr_ulsim
 if (ENABLE_LDPC_T2)
   add_dependencies(nr_ulsim ldpc_t2)
 endif()
+if (ENABLE_LDPC_XDMA)
+  add_dependencies(nr_ulsim ldpc_xdma)
+endif()
 add_dependencies(nr_ulsim ldpc_slot_segment)
 
 target_link_libraries(nr_ulsim PRIVATE
@@ -2350,7 +2374,7 @@ if (${T_TRACER})
         PHY_COMMON PHY PHY_UE PHY_NR PHY_NR_COMMON PHY_NR_UE PHY_RU PHY_MEX
         L2 L2_LTE L2_NR L2_LTE_NR L2_UE NR_L2_UE L2_UE_LTE_NR MAC_NR_COMMON MAC_UE_NR ngap
         CN_UTILS GTPV1U SCTP_CLIENT MME_APP LIB_NAS_UE NB_IoT SIMU OPENAIR0_LIB
-        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_cl ldpc_cuda ldpc ldpc_slot_segment ldpc_t2
+        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_cl ldpc_cuda ldpc ldpc_slot_segment ldpc_t2 ldpc_xdma
         dfts config_internals nr_common)
     if (TARGET ${i})
       add_dependencies(${i} generate_T)
