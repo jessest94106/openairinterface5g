@@ -38,6 +38,8 @@
 #include "nfapi/open-nFAPI/vnf/public_inc/nfapi_vnf_interface.h"
 #include "debug.h"
 
+#include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
+
 typedef struct {
   uint8_t num_msg;
   uint8_t opaque_handle;
@@ -53,6 +55,6 @@ int aerial_send_P7_msg_with_data(void *packedBuf,
                                       uint32_t dataLength,
                                       nfapi_p7_message_header_t *header);
 void set_config(nfapi_vnf_config_t *conf);
-int nvIPC_Init(nvipc_params_t);
+int nvIPC_Init(nvipc_params_t nvipc_params_s);
 
 #endif // OPENAIRINTERFACE_FAPI_NVIPC_H
