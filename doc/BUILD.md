@@ -217,6 +217,30 @@ cmake-gui ../../..
 ```
 You can of course use all standard cmake/ninja/make commands in this directory.
 
+## cmake presets
+
+CMake presets are common project configure options. See https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html
+
+Configure presets:
+
+ - `default`: Configure compilation with default options
+ - `tests`: Same as above but ENABLE_TESTS and SANITIZE_ADDRESS is ON
+
+Build presets:
+
+ - `5gdefault`: Build the software for NR rfsimulator test
+ - `default`: same as 5gdefault
+ - `4gdefault`: Build the software for LTE rfsimulator test
+ - `tests`: build all unit tests
+
+To configure using configuration preset:
+
+    cmake --preset <preset_name>
+
+To build using a build preset:
+
+    cmake --build --preset <preset_name>
+
 # Cross Compile
 
 If you want to use cross-compiler on x86 platform for aarch64 version, please refer the [cross-compile.md](./cross-compile.md) for more information.
