@@ -1,5 +1,5 @@
 
-CPMAddPackage("gh:ocornut/imgui#v1.90.9")
+CPMAddPackage("gh:ocornut/imgui#v1.91.3-docking")
 add_library(imgui
   ${imgui_SOURCE_DIR}/imgui_draw.cpp
   ${imgui_SOURCE_DIR}/imgui.cpp
