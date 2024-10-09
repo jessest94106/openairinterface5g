@@ -88,11 +88,6 @@ static int ipc_handle_rx_msg(nv_ipc_t *ipc, nv_ipc_msg_t *msg)
       gpu = 0;
     }
 
-#ifdef NVIPC_CUDA_ENABLE
-    // Test CUDA: call CUDA functions to change all string to lower case
-    test_cuda_to_lower_case(test_cuda_device_id, msg->data_buf, TEST_DATA_BUF_LEN, gpu);
-#endif
-
     if (gpu) {
       p_cpu_data = cpu_buf_recv;
       memset(cpu_buf_recv, 0, RECV_BUF_LEN);
@@ -647,11 +642,7 @@ int load_hard_code_config(nv_ipc_config_t *config, int module_type, nv_ipc_trans
     return -1;
   }
 
-#ifdef NVIPC_CUDA_ENABLE
-  int test_cuda_device_id = get_cuda_device_id();
-#else
   int test_cuda_device_id = -1;
-#endif
   LOG_D(NFAPI_VNF,"CUDA device ID configured : %d \n", test_cuda_device_id);
   config->transport_config.shm.cuda_device_id = test_cuda_device_id;
   if (test_cuda_device_id >= 0) {
