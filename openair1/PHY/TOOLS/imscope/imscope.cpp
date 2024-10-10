@@ -693,6 +693,13 @@ void *imscope_thread(void *data_void_ptr)
     // Start the Dear ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
+
+    static bool reset_ini_settings = false;
+    if (reset_ini_settings)
+    {
+      ImGui::LoadIniSettingsFromDisk("imscope-init.ini");
+      reset_ini_settings = false;
+    }
     ImGui::NewFrame();
 
     int display_w, display_h;
@@ -712,6 +719,12 @@ void *imscope_thread(void *data_void_ptr)
       if (ImGui::BeginMenu("Options")) {
         ImGui::Checkbox("Show imgui demo window", &show_imgui_demo_window);
         ImGui::Checkbox("Show implot demo window", &show_implot_demo_window);
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Layout")) {
+        if (ImGui::MenuItem("Reset")) {
+           reset_ini_settings = true;
+        }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
