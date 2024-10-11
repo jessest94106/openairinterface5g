@@ -196,7 +196,7 @@ static void test_f1ap_setup_request(void)
   /* gNB_DU_name */
   uint8_t *gNB_DU_name = calloc(strlen("OAI DU") + 1, sizeof(uint8_t));
   AssertFatal(gNB_DU_name != NULL, "out of memory\n");
-  memcpy((void *)gNB_DU_name, "OAI DU", strlen("OAI DU") + 1);
+  memcpy(gNB_DU_name, "OAI DU", strlen("OAI DU") + 1);
   /* sys_info */
   uint8_t *mib = calloc(3, sizeof(uint8_t));
   uint8_t *sib1 = calloc(3, sizeof(uint8_t));
