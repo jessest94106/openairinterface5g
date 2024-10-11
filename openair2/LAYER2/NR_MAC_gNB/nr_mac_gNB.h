@@ -792,6 +792,11 @@ typedef struct f1_config_t {
   uint32_t gnb_id; // associated gNB's ID, not used in DU itself
 } f1_config_t;
 
+typedef struct {
+  char *nvipc_shm_prefix;
+  int8_t nvipc_poll_core;
+} nvipc_params_t;
+
 /*! \brief top level eNB MAC structure */
 typedef struct gNB_MAC_INST_s {
   /// Ethernet parameters for northbound midhaul interface
