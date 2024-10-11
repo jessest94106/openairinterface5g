@@ -220,20 +220,20 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
     if (csirs->active == 1) {
       LOG_D(PHY, "CSI-RS generation started in frame %d.%d\n",frame,slot);
       nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csirs->csirs_pdu.csi_rs_pdu_rel15;
+      if (csi_params->csi_type == 2) { // ZP-CSI
+        csirs->active = 0;
+        return;
+      }
+      csi_mapping_parms_t mapping_parms = get_csi_mapping_parms(csi_params->row,
+                                                                csi_params->freq_domain,
+                                                                csi_params->symb_l0,
+                                                                csi_params->symb_l1);
       nr_generate_csi_rs(&gNB->frame_parms,
                          (int32_t **)gNB->common_vars.txdataF,
                          gNB->TX_AMP,
-                         gNB->nr_csi_info,
                          csi_params,
                          slot,
-                         NULL,
-                         NULL,
-                         NULL,
-                         NULL,
-                         NULL,
-                         NULL,
-                         NULL,
-                         NULL);
+                         &mapping_parms);
       csirs->active = 0;
     }
   }

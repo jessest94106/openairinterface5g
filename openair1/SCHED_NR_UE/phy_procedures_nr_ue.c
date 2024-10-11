@@ -1081,7 +1081,6 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
       }
     }
     nr_ue_csi_rs_procedures(ue, proc, rxdataF);
-    ue->csirs_vars[gNB_id]->active = 0;
   }
 
   if (dlsch[0].active) {

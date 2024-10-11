@@ -311,6 +311,13 @@ typedef struct {
 } NR_UE_CSI_RS;
 
 typedef struct {
+  uint8_t csi_rs_generated_signal_bits;
+  int32_t **csi_rs_generated_signal;
+  bool csi_im_meas_computed;
+  uint32_t interference_plus_noise_power;
+} nr_csi_info_t;
+
+typedef struct {
   bool active;
   fapi_nr_ul_config_srs_pdu srs_config_pdu;
 } NR_UE_SRS;

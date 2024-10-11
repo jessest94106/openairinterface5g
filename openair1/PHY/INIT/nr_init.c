@@ -150,10 +150,6 @@ int phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   nr_generate_modulation_table();
   nr_init_pbch_interleaver(gNB->nr_pbch_interleaver);
 
-  // CSI RS init
-  // ceil((NB_RB*8(max allocation per RB)*2(QPSK))/32)
-  gNB->nr_csi_info = (nr_csi_info_t *)malloc16_clear(sizeof(nr_csi_info_t));
-
   generate_ul_reference_signal_sequences(SHRT_MAX);
 
   /* Generate low PAPR type 1 sequences for PUSCH DMRS, these are used if transform precoding is enabled.  */
@@ -240,8 +236,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
   PHY_MEASUREMENTS_gNB *meas = &gNB->measurements;
   free_and_zero(meas->n0_subband_power);
   free_and_zero(meas->n0_subband_power_dB);
-
-  free_and_zero(gNB->nr_csi_info);
 
   for (int id = 0; id < gNB->max_nb_srs; id++) {
     for(int i=0; i<MAX_NUM_NR_SRS_AP; i++) {

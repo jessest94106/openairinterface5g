@@ -37,7 +37,6 @@
 #include <semaphore.h>
 #include "fapi_nr_ue_interface.h"
 #include "openair2/PHY_INTERFACE/queue_t.h"
-#include "nfapi_nr_interface_scf.h"
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
 #include "NR_Packet_Drop.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/sidelink_nr_ue_interface.h"

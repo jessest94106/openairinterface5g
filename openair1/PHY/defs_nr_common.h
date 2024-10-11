@@ -119,13 +119,6 @@ typedef struct {
   nfapi_nr_srs_pdu_t srs_pdu;
 } nr_srs_info_t;
 
-typedef struct {
-  uint8_t csi_rs_generated_signal_bits;
-  int32_t **csi_rs_generated_signal;
-  bool csi_im_meas_computed;
-  uint32_t interference_plus_noise_power;
-} nr_csi_info_t;
-
 typedef struct NR_DL_FRAME_PARMS NR_DL_FRAME_PARMS;
 
 typedef uint32_t (*get_samples_per_slot_t)(int slot, const NR_DL_FRAME_PARMS *fp);
