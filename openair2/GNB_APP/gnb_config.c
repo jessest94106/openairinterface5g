@@ -49,6 +49,11 @@
 #endif
 #include "lib/f1ap_interface_management.h"
 
+static int DEFBANDS[] = {7};
+static int DEFENBS[] = {0};
+static int DEFBFW[] = {0x00007fff};
+static int DEFRUTPCORES[] = {-1,-1,-1,-1};
+
 /**
  * @brief Helper define to allocate and initialize SetupRelease structures
  */
@@ -1267,6 +1272,21 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.pdsch_AntennaPorts.XP,
         config.pusch_AntennaPorts);
 
+  paramdef_t RUParams[] = RUPARAMS_DESC;
+  paramlist_def_t RUParamList = {CONFIG_STRING_RU_LIST, NULL, 0};
+  config_getlist(config_get_if(), &RUParamList, RUParams, sizeofArray(RUParams), NULL);
+  int num_tx = 0;
+  if (RUParamList.numelt > 0) {
+    for (int i = 0; i < RUParamList.numelt; i++)
+      num_tx += *(RUParamList.paramarray[i][RU_NB_TX_IDX].uptr);
+    AssertFatal(num_tx >= config.pdsch_AntennaPorts.XP * config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2,
+                "Number of logical antenna ports (set in config file with pdsch_AntennaPorts) cannot be larger than physical antennas (nb_tx)\n");
+  }
+  else {
+    // TODO temporary solution for 3rd party RU or nFAPI, in which case we don't have RU section present in the config file
+    num_tx = config.pdsch_AntennaPorts.XP * config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2;
+    LOG_E(GNB_APP, "RU information not present in config file. Assuming physical antenna ports equal to logical antenna ports %d\n", num_tx);
+  }
   config.minRXTXTIME = *GNBParamList.paramarray[0][GNB_MINRXTXTIME_IDX].iptr;
   LOG_I(GNB_APP, "minTXRXTIME %d\n", config.minRXTXTIME);
   config.sib1_tda = *GNBParamList.paramarray[0][GNB_SIB1_TDA_IDX].iptr;
@@ -1323,6 +1343,19 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.timer_config.t311,
         config.timer_config.n311,
         config.timer_config.t319);
+
+  if (config_isparamset(GNBParamList.paramarray[0], GNB_BEAMWEIGHTS_IDX)) {
+    int n = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].numelt;
+    AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
+    // each beam is described by a set of weights (one for each antenna)
+    // on the other hand in case of analog beamforming an index to the RU beam identifier is provided
+    config.nb_bfw[0] = num_tx;  // number of tx antennas
+    config.nb_bfw[1] = n / num_tx; // number of beams
+    config.bw_list = malloc16_clear(n * sizeof(*config.bw_list));
+    for (int b = 0; b < n; b++) {
+      config.bw_list[b] = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].iptr[b];
+    }
+  }
 
   NR_ServingCellConfigCommon_t *scc = get_scc_config(cfg, config.minRXTXTIME);
   //xer_fprint(stdout, &asn_DEF_NR_ServingCellConfigCommon, scc);
@@ -1424,6 +1457,8 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
       }
+      // triggers also PHY initialization in case we have L1 via FAPI
+      nr_mac_config_scc(RC.nrmac[j], scc, &config);
     } //  for (j=0;j<RC.nb_nr_macrlc_inst;j++)
 
     uint64_t gnb_du_id = 0;
@@ -2408,7 +2443,7 @@ ngran_node_t get_node_type(void)
   char aprefix[MAX_OPTNAME_SIZE*2 + 8];
   sprintf(aprefix, "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
   config_getlist(config_get_if(), &GNBE1ParamList, GNBE1Params, sizeofArray(GNBE1Params), aprefix);
-  if ( MacRLC_ParamList.numelt > 0) {
+  if (MacRLC_ParamList.numelt > 0) {
     RC.nb_nr_macrlc_inst = MacRLC_ParamList.numelt; 
     for (int j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       if (strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "f1") == 0) {

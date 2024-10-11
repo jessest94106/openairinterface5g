@@ -42,7 +42,7 @@
 #include "PHY/defs_gNB.h"
 #include "PHY/sse_intrin.h"
 #include "PHY/NR_UE_TRANSPORT/pucch_nr.h"
-#include <openair1/PHY/CODING/nrSmallBlock/nr_small_block_defs.h>
+#include "PHY/CODING/nrSmallBlock/nr_small_block_defs.h"
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
@@ -50,6 +50,7 @@
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "nfapi/oai_integration/vendor_ext.h"
+#include "SCHED_NR/sched_nr.h"
 
 #include "T.h"
 
@@ -62,15 +63,25 @@ void nr_fill_pucch(PHY_VARS_gNB *gNB,
 {
 
   if (NFAPI_MODE == NFAPI_MODE_PNF)
-    gNB->pucch[0].active = 0; // check if ture in monolithic mode
+    gNB->pucch[0].active = false; // check if true in monolithic mode
 
   bool found = false;
   for (int i = 0; i < gNB->max_nb_pucch; i++) {
     NR_gNB_PUCCH_t *pucch = &gNB->pucch[i];
-    if (pucch->active == 0) {
+    if (pucch->active == false) {
       pucch->frame = frame;
       pucch->slot = slot;
-      pucch->active = 1;
+      pucch->active = true;
+      pucch->beam_nb = 0;
+      if (gNB->common_vars.beam_id) {
+        int fapi_beam_idx = pucch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx;
+        pucch->beam_nb = beam_index_allocation(fapi_beam_idx,
+                                               &gNB->common_vars,
+                                               slot,
+                                               NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+                                               pucch_pdu->start_symbol_index,
+                                               pucch_pdu->nr_of_symbols);
+      }
       memcpy((void *)&pucch->pucch_pdu, (void *)pucch_pdu, sizeof(nfapi_nr_pucch_pdu_t));
       LOG_D(PHY,
             "Programming PUCCH[%d] for %d.%d, format %d, nb_harq %d, nb_sr %d, nb_csi %d\n",
@@ -148,12 +159,12 @@ static const int16_t idft12_im[12][12] = {
 };
 //************************************************************************//
 void nr_decode_pucch0(PHY_VARS_gNB *gNB,
+                      c16_t **rxdataF,
                       int frame,
                       int slot,
                       nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_pdu,
                       nfapi_nr_pucch_pdu_t *pucch_pdu)
 {
-  c16_t **rxdataF = gNB->common_vars.rxdataF;
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   int soffset = (slot & 3) * frame_parms->symbols_per_slot * frame_parms->ofdm_symbol_size;
 
@@ -1012,13 +1023,12 @@ void init_pucch2_luts() {
 
 
 void nr_decode_pucch2(PHY_VARS_gNB *gNB,
+                      c16_t **rxdataF,
                       int frame,
                       int slot,
                       nfapi_nr_uci_pucch_pdu_format_2_3_4_t* uci_pdu,
                       nfapi_nr_pucch_pdu_t* pucch_pdu)
 {
-
-  c16_t **rxdataF = gNB->common_vars.rxdataF;
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   //pucch_GroupHopping_t pucch_GroupHopping = pucch_pdu->group_hop_flag + (pucch_pdu->sequence_hop_flag<<1);
 

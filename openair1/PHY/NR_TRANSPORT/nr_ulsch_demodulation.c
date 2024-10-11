@@ -1394,6 +1394,7 @@ typedef struct puschSymbolProc_s {
   int16_t **llr_layers;
   int16_t *scramblingSequence;
   uint32_t nvar;
+  int beam_nb;
 } puschSymbolProc_t;
 
 static void nr_pusch_symbol_processing(void *arg)
@@ -1416,7 +1417,7 @@ static void nr_pusch_symbol_processing(void *arg)
              frame_parms,
              pusch_vars,
              rel15_ul,
-             gNB->common_vars.rxdataF,
+             gNB->common_vars.rxdataF[rdata->beam_nb],
              (c16_t**)gNB->pusch_vars[ulsch_id].ul_ch_estimates,
              rdata->llr_layers,
              soffset,
@@ -1471,7 +1472,8 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
                    uint8_t ulsch_id,
                    uint32_t frame,
                    uint8_t slot,
-                   unsigned char harq_pid)
+                   unsigned char harq_pid,
+                   int beam_nb)
 {
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   nfapi_nr_pusch_pdu_t *rel15_ul = &gNB->ulsch[ulsch_id].harq_process->ulsch_pdu;
@@ -1503,6 +1505,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
                                     get_dmrs_port(nl, rel15_ul->dmrs_ports),
                                     symbol,
                                     ulsch_id,
+                                    beam_nb,
                                     bwp_start_subcarrier,
                                     rel15_ul,
                                     &max_ch,
@@ -1535,10 +1538,10 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
         for (int s = rel15_ul->start_symbol_index; s < (rel15_ul->start_symbol_index + rel15_ul->nr_of_symbols); s++) {
           int offset0 = ((slot & 3) * frame_parms->symbols_per_slot + s) * frame_parms->ofdm_symbol_size;
           int offset = offset0 + (frame_parms->first_carrier_offset + start_sc) % frame_parms->ofdm_symbol_size;
-          c16_t *ul_ch = &gNB->common_vars.rxdataF[aarx][offset];
+          c16_t *ul_ch = &gNB->common_vars.rxdataF[beam_nb][aarx][offset];
           if (end_sc < start_sc) {
             int64_t symb_energy_aux = signal_energy_nodc(ul_ch, middle_sc - start_sc) * (middle_sc - start_sc);
-            ul_ch = &gNB->common_vars.rxdataF[aarx][offset0];
+            ul_ch = &gNB->common_vars.rxdataF[beam_nb][aarx][offset0];
             symb_energy_aux += (signal_energy_nodc(ul_ch, end_sc + 1) * (end_sc + 1));
             symb_energy += symb_energy_aux / (rel15_ul->rb_size * NR_NB_SC_PER_RB);
           } else {
@@ -1644,7 +1647,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   c16_t temp_rxFext[frame_parms->nb_antennas_rx][buffer_length] __attribute__((aligned(32)));
   for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) 
     for (int nl = 0; nl < rel15_ul->nrOfLayers; nl++)
-      nr_ulsch_extract_rbs(gNB->common_vars.rxdataF[aarx],
+      nr_ulsch_extract_rbs(gNB->common_vars.rxdataF[beam_nb][aarx],
                            (c16_t *)pusch_vars->ul_ch_estimates[nl * frame_parms->nb_antennas_rx + aarx],
                            temp_rxFext[aarx],
                            (c16_t*)&ul_ch_estimates_ext[nl * frame_parms->nb_antennas_rx + aarx][meas_symbol * nb_re_pusch],
@@ -1723,6 +1726,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
       rdata->llr_layers = pusch_vars->llr_layers;
       rdata->scramblingSequence = scramblingSequence;
       rdata->nvar = nvar;
+      rdata->beam_nb = beam_nb;
 
       if (rel15_ul->pdu_bit_map & PUSCH_PDU_BITMAP_PUSCH_PTRS) {
         nr_pusch_symbol_processing(rdata);

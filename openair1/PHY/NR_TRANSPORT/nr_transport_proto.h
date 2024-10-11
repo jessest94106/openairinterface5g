@@ -127,7 +127,8 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
                    uint8_t ulsch_id,
                    uint32_t frame,
                    uint8_t slot,
-                   unsigned char harq_pid);
+                   unsigned char harq_pid,
+                   int beam_nb);
 
 /*!
 \brief This function implements the idft transform precoding in PUSCH
@@ -297,6 +298,7 @@ void nr_fill_srs(PHY_VARS_gNB *gNB,
                  nfapi_nr_srs_pdu_t *srs_pdu);
 
 int nr_get_srs_signal(PHY_VARS_gNB *gNB,
+                      c16_t **rxdataF,
                       frame_t frame,
                       slot_t slot,
                       nfapi_nr_srs_pdu_t *srs_pdu,
@@ -326,12 +328,14 @@ void nr_decode_pucch1(c16_t **rxdataF,
                       uint8_t nr_bit);
 
 void nr_decode_pucch2(PHY_VARS_gNB *gNB,
+                      c16_t **rxdataF,
                       int frame,
                       int slot,
                       nfapi_nr_uci_pucch_pdu_format_2_3_4_t* uci_pdu,
                       nfapi_nr_pucch_pdu_t* pucch_pdu);
 
 void nr_decode_pucch0(PHY_VARS_gNB *gNB,
+                      c16_t **rxdataF,
                       int frame,
                       int slot,
                       nfapi_nr_uci_pucch_pdu_format_0_1_t* uci_pdu,

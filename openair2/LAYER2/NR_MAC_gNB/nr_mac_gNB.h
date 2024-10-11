@@ -100,7 +100,6 @@
 #define MAX_NUM_OF_SSB 64
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
 #define MIN_NUM_PRBS_TO_SCHEDULE  5
-#define MAX_NUM_BEAM_PERIODS 4
 
 extern const uint8_t nr_rv_round_map[4];
 
@@ -166,6 +165,9 @@ typedef struct nr_mac_config_t {
   nr_mac_timers_t timer_config;
   int num_dlharq;
   int num_ulharq;
+  /// beamforming weight matrix size
+  int nb_bfw[2];
+  int32_t *bw_list;
 } nr_mac_config_t;
 
 typedef struct NR_preamble_ue {
@@ -913,7 +915,7 @@ typedef struct gNB_MAC_INST_s {
   uint8_t min_grant_mcs;
   bool identity_pm;
   int precoding_matrix_size[NR_MAX_NB_LAYERS];
-
+  int fapi_beam_index[MAX_NUM_OF_SSB];
   nr_mac_rrc_ul_if_t mac_rrc;
   f1_config_t f1_config;
   int16_t frame;

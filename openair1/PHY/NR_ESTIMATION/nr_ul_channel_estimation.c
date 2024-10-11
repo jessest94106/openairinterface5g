@@ -71,6 +71,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
                                 unsigned short p,
                                 unsigned char symbol,
                                 int ul_id,
+                                int beam_nb,
                                 unsigned short bwp_start_subcarrier,
                                 nfapi_nr_pusch_pdu_t *pusch_pdu,
                                 int *max_ch,
@@ -153,7 +154,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   memset(delay, 0, sizeof(*delay));
 
   for (int aarx=0; aarx<gNB->frame_parms.nb_antennas_rx; aarx++) {
-    c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[aarx][symbol_offset + slot_offset];
+    c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[beam_nb][aarx][symbol_offset + slot_offset];
     c16_t *ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + aarx][symbol_offset];
 
     memset(ul_ch, 0, sizeof(*ul_ch) * symbolSize);

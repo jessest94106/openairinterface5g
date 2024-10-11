@@ -73,13 +73,6 @@ void free_gNB_dlsch(NR_gNB_DLSCH_t *dlsch, uint16_t N_RB, const NR_DL_FRAME_PARM
   }
   free(harq->c);
   free(harq->pdu);
-
-  for (int layer = 0; layer < max_layers; layer++) {
-    for (int aa = 0; aa < 64; aa++)
-      free(dlsch->ue_spec_bf_weights[layer][aa]);
-    free(dlsch->ue_spec_bf_weights[layer]);
-  }
-  free(dlsch->ue_spec_bf_weights);
 }
 
 NR_gNB_DLSCH_t new_gNB_dlsch(NR_DL_FRAME_PARMS *frame_parms, uint16_t N_RB)
@@ -95,19 +88,6 @@ NR_gNB_DLSCH_t new_gNB_dlsch(NR_DL_FRAME_PARMS *frame_parms, uint16_t N_RB)
   LOG_D(PHY,"Allocating %d segments (MAX %d, N_PRB %d)\n",a_segments,MAX_NUM_NR_DLSCH_SEGMENTS_PER_LAYER,N_RB);
   uint32_t dlsch_bytes = a_segments*1056;  // allocated bytes per segment
   NR_gNB_DLSCH_t dlsch;
-
-  dlsch.ue_spec_bf_weights = (int32_t ***)malloc16(max_layers * sizeof(int32_t **));
-  for (int layer=0; layer<max_layers; layer++) {
-    dlsch.ue_spec_bf_weights[layer] = (int32_t **)malloc16(64 * sizeof(int32_t *));
-
-    for (int aa=0; aa<64; aa++) {
-      dlsch.ue_spec_bf_weights[layer][aa] = (int32_t *)malloc16(OFDM_SYMBOL_SIZE_COMPLEX_SAMPLES * sizeof(int32_t));
-
-      for (int re=0; re<OFDM_SYMBOL_SIZE_COMPLEX_SAMPLES; re++) {
-        dlsch.ue_spec_bf_weights[layer][aa][re] = 0x00007fff;
-      }
-    }
-  }
 
   NR_DL_gNB_HARQ_t *harq = &dlsch.harq_process;
   bzero(harq, sizeof(NR_DL_gNB_HARQ_t));
