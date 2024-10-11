@@ -132,6 +132,7 @@ void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
           }
           free(future_ul_tti_req->pdus_list[i].srs_pdu.beamforming.prgs_list);
         }
+        break;
       default:
         break;
     }
