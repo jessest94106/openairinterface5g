@@ -150,8 +150,8 @@
 
   <testCase id="270001">
     <class>Iperf</class>
-    <desc>iperf (UL/6Mbps/UDP)(30 sec)(single-ue profile)</desc>
-    <iperf_args>-u -b 6M -t 30</iperf_args>
+    <desc>iperf (UL/18Mbps/UDP)(30 sec)</desc>
+    <iperf_args>-u -b 18M -t 30</iperf_args>
     <id>idefix</id>
     <svr_id>sabox-nepes</svr_id>
     <iperf_packetloss_threshold>1</iperf_packetloss_threshold>
