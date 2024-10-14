@@ -779,7 +779,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
 
       uint32_t n_RS_Id = 0;
       if (NR_DMRS_ulconfig->transformPrecodingEnabled &&
-          NR_DMRS_ulconfig->transformPrecodingEnabled->nPUSCH_Identity != NULL)
+          NR_DMRS_ulconfig->transformPrecodingEnabled->nPUSCH_Identity)
         n_RS_Id = *NR_DMRS_ulconfig->transformPrecodingEnabled->nPUSCH_Identity;
       else
         n_RS_Id = mac->physCellId;
