@@ -1399,8 +1399,12 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
   int xid = ue_cap_info->rrc_TransactionIdentifier;
-  DevAssert(UE->xids[xid] == RRC_UECAPABILITY_ENQUIRY);
+  rrc_action_t a = UE->xids[xid];
   UE->xids[xid] = RRC_ACTION_NONE;
+  if (a != RRC_UECAPABILITY_ENQUIRY) {
+    LOG_E(NR_RRC, "UE %d: received unsolicited UE Capability Information, aborting procedure\n", UE->rrc_ue_id);
+    return -1;
+  }
 
   LOG_I(NR_RRC, "UE %d: received UE capabilities (xid %d)\n", UE->rrc_ue_id, xid);
   int eutra_index = -1;
