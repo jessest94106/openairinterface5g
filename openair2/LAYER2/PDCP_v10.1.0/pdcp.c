@@ -1107,16 +1107,17 @@ bool pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
       break;
     }
   }
-
-  Pdcp_stats_rx[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]++;
-  Pdcp_stats_rx_tmp_w[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]++;
-  Pdcp_stats_rx_bytes[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+=(sdu_buffer_sizeP  - payload_offset);
-  Pdcp_stats_rx_bytes_tmp_w[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+=(sdu_buffer_sizeP  - payload_offset);
-
-  Pdcp_stats_rx_sn[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]=sequence_number;
-  Pdcp_stats_rx_aiat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+= (pdcp_enb[ctxt_pP->module_id].sfn - Pdcp_stats_rx_iat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]);
-  Pdcp_stats_rx_aiat_tmp_w[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+=(pdcp_enb[ctxt_pP->module_id].sfn - Pdcp_stats_rx_iat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]);
-  Pdcp_stats_rx_iat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]=pdcp_enb[ctxt_pP->module_id].sfn;
+  if( pdcp_uid < MAX_MOBILES_PER_ENB ) {
+    Pdcp_stats_rx[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]++;
+    Pdcp_stats_rx_tmp_w[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]++;
+    Pdcp_stats_rx_bytes[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+=(sdu_buffer_sizeP  - payload_offset);
+    Pdcp_stats_rx_bytes_tmp_w[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+=(sdu_buffer_sizeP  - payload_offset);
+    
+    Pdcp_stats_rx_sn[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]=sequence_number;
+    Pdcp_stats_rx_aiat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+= (pdcp_enb[ctxt_pP->module_id].sfn - Pdcp_stats_rx_iat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]);
+    Pdcp_stats_rx_aiat_tmp_w[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]+=(pdcp_enb[ctxt_pP->module_id].sfn - Pdcp_stats_rx_iat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]);
+    Pdcp_stats_rx_iat[ctxt_pP->module_id][pdcp_uid][rb_idP+rb_offset]=pdcp_enb[ctxt_pP->module_id].sfn;
+  }
   free(sdu_buffer_pP);
 
   if (ctxt_pP->enb_flag) {
