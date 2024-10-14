@@ -1498,16 +1498,16 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
 
   rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(ctxt_pP, ue_context_p, ue_cap_info);
 
+  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   if (UE->n_initial_pdu > 0) {
     /* there were PDU sessions with the NG UE Context setup, but we had to set
      * up security and request capabilities, so trigger PDU sessions now. The
      * UE NAS message will be forwarded in the corresponding reconfiguration,
      * the Initial context setup response after reconfiguration complete. */
-    gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
     trigger_bearer_setup(rrc, UE, UE->n_initial_pdu, UE->initial_pdus, 0);
   } else {
-    rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(ctxt_pP, ue_context_p);
-    rrc_forward_ue_nas_message(RC.nrrrc[ctxt_pP->instance], UE);
+    rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(rrc, UE);
+    rrc_forward_ue_nas_message(rrc, UE);
   }
 
   return 0;
@@ -1579,13 +1579,8 @@ static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const N
   return;
 }
 
-static void handle_rrcReconfigurationComplete(const protocol_ctxt_t *const ctxt_pP,
-                                              rrc_gNB_ue_context_t *ue_context_p,
-                                              const NR_RRCReconfigurationComplete_t *reconfig_complete)
+static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCReconfigurationComplete_t *reconfig_complete)
 {
-  AssertFatal(ue_context_p != NULL, "Processing %s() for UE %lx, ue_context_p is NULL\n", __func__, ctxt_pP->rntiMaybeUEid);
-  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-
   uint8_t xid = reconfig_complete->rrc_TransactionIdentifier;
   UE->ue_reconfiguration_counter++;
   LOG_I(NR_RRC, "UE %d: Receive RRC Reconfiguration Complete message (xid %d)\n", UE->rrc_ue_id, xid);
@@ -1593,22 +1588,22 @@ static void handle_rrcReconfigurationComplete(const protocol_ctxt_t *const ctxt_
   switch (UE->xids[xid]) {
     case RRC_PDUSESSION_RELEASE: {
       gtpv1u_gnb_delete_tunnel_req_t req = {0};
-      gtpv1u_delete_ngu_tunnel(ctxt_pP->instance, &req);
+      gtpv1u_delete_ngu_tunnel(rrc->module_id, &req);
       // NGAP_PDUSESSION_RELEASE_RESPONSE
-      rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(ctxt_pP, ue_context_p, xid);
+      rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(rrc, UE, xid);
     } break;
     case RRC_PDUSESSION_ESTABLISH:
       if (UE->n_initial_pdu > 0) {
         /* PDU sessions through initial UE context setup */
-        rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(ctxt_pP, ue_context_p);
+        rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(rrc, UE);
         UE->n_initial_pdu = 0;
         free(UE->initial_pdus);
         UE->initial_pdus = NULL;
       } else if (UE->nb_of_pdusessions > 0)
-        rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(ctxt_pP, ue_context_p, xid);
+        rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(rrc, UE, xid);
       break;
     case RRC_PDUSESSION_MODIFY:
-      rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(ctxt_pP, ue_context_p, xid);
+      rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(rrc, UE, xid);
       break;
     case RRC_REESTABLISH_COMPLETE:
     case RRC_DEDICATED_RECONF:
@@ -1670,7 +1665,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_rrcReconfigurationComplete:
-        handle_rrcReconfigurationComplete(ctxt_pP, ue_context_p, ul_dcch_msg->message.choice.c1->choice.rrcReconfigurationComplete);
+        handle_rrcReconfigurationComplete(rrc, UE, ul_dcch_msg->message.choice.c1->choice.rrcReconfigurationComplete);
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_rrcSetupComplete:
@@ -1735,7 +1730,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         } else {
           /* we already have capabilities, and no PDU sessions to setup, ack
            * this UE */
-          rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(ctxt_pP, ue_context_p);
+          rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(rrc, UE);
           rrc_forward_ue_nas_message(RC.nrrrc[0], &ue_context_p->ue_context);
         }
         break;

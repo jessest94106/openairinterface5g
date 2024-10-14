@@ -44,11 +44,7 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
 
 int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t instance);
 
-void
-rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(
-    const protocol_ctxt_t *const ctxt_pP,
-    rrc_gNB_ue_context_t          *const ue_context_pP
-);
+void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE);
 
 int rrc_gNB_process_NGAP_DOWNLINK_NAS(MessageDef *msg_p, instance_t instance, mui_t *rrc_gNB_mui);
 
@@ -59,23 +55,13 @@ rrc_gNB_send_NGAP_UPLINK_NAS(
   NR_UL_DCCH_Message_t     *const ul_dcch_msg
 );
 
-void
-rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(
-  const protocol_ctxt_t    *const ctxt_pP,
-  rrc_gNB_ue_context_t     *const ue_context_pP,
-  uint8_t                   xid
-);
+void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t xid);
 
 void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t instance);
 
 int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t instance);
 
-int
-rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(
-  const protocol_ctxt_t    *const ctxt_pP,
-  rrc_gNB_ue_context_t     *const ue_context_pP,
-  uint8_t                   xid
-);
+int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t xid);
 
 void
 rrc_gNB_modify_dedicatedRRCReconfiguration(
@@ -100,12 +86,7 @@ void rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(const protocol_ctxt_t *const ctxt_pP,
 
 int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_t instance);
 
-void
-rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(
-  const protocol_ctxt_t    *const ctxt_pP,
-  rrc_gNB_ue_context_t     *const ue_context_pP,
-  uint8_t                   xid
-);
+void rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t xid);
 
 void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering);
 
