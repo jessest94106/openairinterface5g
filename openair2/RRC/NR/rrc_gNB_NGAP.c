@@ -93,7 +93,7 @@ static const uint16_t NGAP_INTEGRITY_NIA3_MASK = 0x2000;
 
 #define INTEGRITY_ALGORITHM_NONE NR_IntegrityProtAlgorithm_nia0
 
-static bool rrc_gNB_process_security(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, ngap_security_capabilities_t *security_capabilities_pP);
+static void set_UE_security_algos(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const ngap_security_capabilities_t *cap);
 
 /*!
  *\brief save security key.
@@ -458,7 +458,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   UE->nas_pdu = req->nas_pdu;
 
   /* security */
-  rrc_gNB_process_security(rrc, UE, &req->security_capabilities);
+  set_UE_security_algos(rrc, UE, &req->security_capabilities);
   set_UE_security_key(UE, req->security_key);
 
   /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
@@ -591,44 +591,29 @@ static e_NR_IntegrityProtAlgorithm rrc_gNB_select_integrity(const gNB_RRC_INST *
   return ret;
 }
 
-static bool rrc_gNB_process_security(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, ngap_security_capabilities_t *security_capabilities_pP)
+/*
+ * \brief set security algorithms
+ * \param rrc     pointer to RRC context
+ * \param UE      UE context
+ * \param cap     security capabilities for this UE
+ */
+static void set_UE_security_algos(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const ngap_security_capabilities_t *cap)
 {
-  bool                                                  changed = false;
-  NR_CipheringAlgorithm_t                               cipheringAlgorithm;
-  e_NR_IntegrityProtAlgorithm                           integrityProtAlgorithm;
-
   /* Save security parameters */
-  UE->security_capabilities = *security_capabilities_pP;
-  // translation
-  LOG_D(NR_RRC,
-        "NAS security_capabilities.encryption_algorithms %u AS ciphering_algorithm %lu NAS security_capabilities.integrity_algorithms %u AS integrity_algorithm %u\n",
-        UE->security_capabilities.nRencryption_algorithms,
-        (unsigned long)UE->ciphering_algorithm,
-        UE->security_capabilities.nRintegrity_algorithms,
-        UE->integrity_algorithm);
+  UE->security_capabilities = *cap;
+
   /* Select relevant algorithms */
-  cipheringAlgorithm = rrc_gNB_select_ciphering(rrc, UE->security_capabilities.nRencryption_algorithms);
+  NR_CipheringAlgorithm_t cipheringAlgorithm = rrc_gNB_select_ciphering(rrc, cap->nRencryption_algorithms);
+  e_NR_IntegrityProtAlgorithm integrityProtAlgorithm = rrc_gNB_select_integrity(rrc, cap->nRintegrity_algorithms);
 
-  if (UE->ciphering_algorithm != cipheringAlgorithm) {
-    UE->ciphering_algorithm = cipheringAlgorithm;
-    changed = true;
-  }
-
-  integrityProtAlgorithm = rrc_gNB_select_integrity(rrc, UE->security_capabilities.nRintegrity_algorithms);
-
-  if (UE->integrity_algorithm != integrityProtAlgorithm) {
-    UE->integrity_algorithm = integrityProtAlgorithm;
-    changed = true;
-  }
+  UE->ciphering_algorithm = cipheringAlgorithm;
+  UE->integrity_algorithm = integrityProtAlgorithm;
 
   LOG_I(NR_RRC,
-        "[UE %d] Selected security algorithms (%p): ciphering %lx, integrity %x (algorithms %s)\n",
+        "[UE %d] Selected security algorithms: ciphering %lx, integrity %x\n",
         UE->rrc_ue_id,
-        security_capabilities_pP,
         cipheringAlgorithm,
-        integrityProtAlgorithm,
-        changed ? "changed" : "are the same");
-  return changed;
+        integrityProtAlgorithm);
 }
 
 //------------------------------------------------------------------------------
