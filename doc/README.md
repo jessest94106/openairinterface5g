@@ -115,3 +115,8 @@ The other SDRs (AW2S, LimeSDR, ...) have no READMEs.
 
 - [UnitTests.md](./UnitTests.md) explains the unit testing setup
 - [TESTBenches.md](./TESTBenches.md) lists the CI setup and links to pipelines
+
+# Developer tools
+
+- [formatting](../tools/formatting/README.md) is a clang-format error detection tool
+- [iwyu](../tools/iwyu/README.md) is a tool to detect `#include` errors
