@@ -1302,17 +1302,20 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
 
 static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, NR_MeasurementReport_t *measurementReport)
 {
-  LOG_D(NR_RRC, "Process Measurement Report\n");
+  gNB_RRC_UE_t *UE = &ue_context->ue_context;
+  NR_MeasurementReport__criticalExtensions_PR p = measurementReport->criticalExtensions.present;
+  if (p != NR_MeasurementReport__criticalExtensions_PR_measurementReport
+      || measurementReport->criticalExtensions.choice.measurementReport == NULL) {
+    LOG_E(NR_RRC, "UE %d: expected presence of MeasurementReport, but has %d (%p)\n", UE->rrc_ue_id, p, measurementReport->criticalExtensions.choice.measurementReport);
+    return;
+  }
+
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NR_MeasurementReport, (void *)measurementReport);
 
-  DevAssert(measurementReport->criticalExtensions.present == NR_MeasurementReport__criticalExtensions_PR_measurementReport
-            && measurementReport->criticalExtensions.choice.measurementReport != NULL);
-
-  gNB_RRC_UE_t *ue_ctxt = &ue_context->ue_context;
-  NR_MeasConfig_t *meas_config = ue_ctxt->measConfig;
+  NR_MeasConfig_t *meas_config = UE->measConfig;
   if (meas_config == NULL) {
-    LOG_I(NR_RRC, "Unexpected Measurement Report from UE with id: %d\n", ue_ctxt->rrc_ue_id);
+    LOG_I(NR_RRC, "Unexpected Measurement Report from UE with id: %d\n", UE->rrc_ue_id);
     return;
   }
 
