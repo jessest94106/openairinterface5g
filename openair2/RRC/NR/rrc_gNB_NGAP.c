@@ -93,7 +93,7 @@ static const uint16_t NGAP_INTEGRITY_NIA3_MASK = 0x2000;
 
 #define INTEGRITY_ALGORITHM_NONE NR_IntegrityProtAlgorithm_nia0
 
-static int rrc_gNB_process_security(const protocol_ctxt_t *const ctxt_pP, rrc_gNB_ue_context_t *const ue_context_pP, ngap_security_capabilities_t *security_capabilities_pP);
+static bool rrc_gNB_process_security(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, ngap_security_capabilities_t *security_capabilities_pP);
 
 /*! \fn void process_gNB_security_key (const protocol_ctxt_t* const ctxt_pP, eNB_RRC_UE_t * const ue_context_pP, uint8_t *security_key)
  *\brief save security key.
@@ -449,6 +449,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
     return (-1);
   }
   PROTOCOL_CTXT_SET_BY_INSTANCE(&ctxt, instance, GNB_FLAG_YES, UE->rrc_ue_id, 0, 0);
+  gNB_RRC_INST *rrc = RC.nrrrc[ctxt.module_id];
   UE->amf_ue_ngap_id = req->amf_ue_ngap_id;
 
   /* store guami in gNB_RRC_UE_t context;
@@ -465,7 +466,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   UE->nas_pdu = req->nas_pdu;
 
   /* security */
-  rrc_gNB_process_security(&ctxt, ue_context_p, &req->security_capabilities);
+  rrc_gNB_process_security(rrc, UE, &req->security_capabilities);
   process_gNB_security_key(&ctxt, ue_context_p, req->security_key);
 
   /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
@@ -532,11 +533,8 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(const protocol_ctxt_t *const c
   itti_send_msg_to_task (TASK_NGAP, ctxt_pP->instance, msg_p);
 }
 
-static NR_CipheringAlgorithm_t rrc_gNB_select_ciphering(
-    const protocol_ctxt_t *const ctxt_pP,
-    uint16_t algorithms)
+static NR_CipheringAlgorithm_t rrc_gNB_select_ciphering(const gNB_RRC_INST *rrc, uint16_t algorithms)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   int i;
   /* preset nea0 as fallback */
   int ret = 0;
@@ -568,11 +566,8 @@ static NR_CipheringAlgorithm_t rrc_gNB_select_ciphering(
   return ret;
 }
 
-static e_NR_IntegrityProtAlgorithm rrc_gNB_select_integrity(
-    const protocol_ctxt_t *const ctxt_pP,
-    uint16_t algorithms)
+static e_NR_IntegrityProtAlgorithm rrc_gNB_select_integrity(const gNB_RRC_INST *rrc, uint16_t algorithms)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   int i;
   /* preset nia0 as fallback */
   int ret = 0;
@@ -604,32 +599,30 @@ static e_NR_IntegrityProtAlgorithm rrc_gNB_select_integrity(
   return ret;
 }
 
-static int rrc_gNB_process_security(const protocol_ctxt_t *const ctxt_pP, rrc_gNB_ue_context_t *const ue_context_pP, ngap_security_capabilities_t *security_capabilities_pP)
+static bool rrc_gNB_process_security(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, ngap_security_capabilities_t *security_capabilities_pP)
 {
   bool                                                  changed = false;
   NR_CipheringAlgorithm_t                               cipheringAlgorithm;
   e_NR_IntegrityProtAlgorithm                           integrityProtAlgorithm;
-  gNB_RRC_UE_t *UE = &ue_context_pP->ue_context;
 
   /* Save security parameters */
   UE->security_capabilities = *security_capabilities_pP;
   // translation
   LOG_D(NR_RRC,
-        "[gNB %d] NAS security_capabilities.encryption_algorithms %u AS ciphering_algorithm %lu NAS security_capabilities.integrity_algorithms %u AS integrity_algorithm %u\n",
-        ctxt_pP->module_id,
+        "NAS security_capabilities.encryption_algorithms %u AS ciphering_algorithm %lu NAS security_capabilities.integrity_algorithms %u AS integrity_algorithm %u\n",
         UE->security_capabilities.nRencryption_algorithms,
         (unsigned long)UE->ciphering_algorithm,
         UE->security_capabilities.nRintegrity_algorithms,
         UE->integrity_algorithm);
   /* Select relevant algorithms */
-  cipheringAlgorithm = rrc_gNB_select_ciphering(ctxt_pP, UE->security_capabilities.nRencryption_algorithms);
+  cipheringAlgorithm = rrc_gNB_select_ciphering(rrc, UE->security_capabilities.nRencryption_algorithms);
 
   if (UE->ciphering_algorithm != cipheringAlgorithm) {
     UE->ciphering_algorithm = cipheringAlgorithm;
     changed = true;
   }
 
-  integrityProtAlgorithm = rrc_gNB_select_integrity(ctxt_pP, UE->security_capabilities.nRintegrity_algorithms);
+  integrityProtAlgorithm = rrc_gNB_select_integrity(rrc, UE->security_capabilities.nRintegrity_algorithms);
 
   if (UE->integrity_algorithm != integrityProtAlgorithm) {
     UE->integrity_algorithm = integrityProtAlgorithm;
@@ -637,8 +630,7 @@ static int rrc_gNB_process_security(const protocol_ctxt_t *const ctxt_pP, rrc_gN
   }
 
   LOG_I(NR_RRC,
-        "[gNB %d][UE %d] Selected security algorithms (%p): ciphering %lx, integrity %x (algorithms %s)\n",
-        ctxt_pP->module_id,
+        "[UE %d] Selected security algorithms (%p): ciphering %lx, integrity %x (algorithms %s)\n",
         UE->rrc_ue_id,
         security_capabilities_pP,
         cipheringAlgorithm,
