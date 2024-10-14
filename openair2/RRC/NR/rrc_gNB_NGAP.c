@@ -126,18 +126,9 @@ void process_gNB_security_key (
   LOG_I(NR_RRC, "[gNB %d][UE %x] Saved security key %s\n", ctxt_pP->module_id, UE->rnti, ascii_buffer);
 }
 
-//------------------------------------------------------------------------------
-void
-nr_rrc_pdcp_config_security(
-    const protocol_ctxt_t  *const ctxt_pP,
-    rrc_gNB_ue_context_t   *const ue_context_pP,
-    const uint8_t          enable_ciphering
-)
-//------------------------------------------------------------------------------
+void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering)
 {
-  //uint8_t                            *k_kdf  = NULL;
   static int                          print_keys= 1;
-  gNB_RRC_UE_t *UE = &ue_context_pP->ue_context;
 
   /* Derive the keys from kgnb */
   nr_pdcp_entity_security_keys_and_algos_t security_parameters;
@@ -157,7 +148,7 @@ nr_rrc_pdcp_config_security(
     }
   }
 
-  nr_pdcp_config_set_security(ctxt_pP->rntiMaybeUEid, DCCH, true, &security_parameters);
+  nr_pdcp_config_set_security(UE->rrc_ue_id, DCCH, true, &security_parameters);
 }
 
 //------------------------------------------------------------------------------
@@ -478,7 +469,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   process_gNB_security_key(&ctxt, ue_context_p, req->security_key);
 
   /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
-  nr_rrc_pdcp_config_security(&ctxt, ue_context_p, 0);
+  nr_rrc_pdcp_config_security(UE, false);
 
   rrc_gNB_generate_SecurityModeCommand(&ctxt, ue_context_p);
   if (req->nb_of_pdusessions > 0) {

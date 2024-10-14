@@ -1733,7 +1733,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         }
 
         /* configure ciphering */
-        nr_rrc_pdcp_config_security(ctxt_pP, ue_context_p, 1);
+        nr_rrc_pdcp_config_security(&ue_context_p->ue_context, true);
         ue_context_p->ue_context.as_security_active = true;
 
         /* trigger UE capability enquiry if we don't have them yet */

@@ -112,12 +112,7 @@ rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(
   uint8_t                   xid
 );
 
-void
-nr_rrc_pdcp_config_security(
-    const protocol_ctxt_t  *const ctxt_pP,
-    rrc_gNB_ue_context_t   *const ue_context_pP,
-    const uint8_t          send_security_mode_command
-);
+void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering);
 
 int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance);
 
