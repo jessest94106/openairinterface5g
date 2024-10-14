@@ -189,10 +189,10 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc,
           struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *tmp = ext->dedicatedNAS_MessageList;
           for (int i = 0; i < tmp->list.count; i++) {
             MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_CONN_ESTABLI_CNF);
-            NasConnEstabCnf *msg = &NAS_CONN_ESTABLI_CNF(ittiMsg);
+            nas_establish_cnf_t *msg = &NAS_CONN_ESTABLI_CNF(ittiMsg);
             msg->errCode = AS_SUCCESS;
             msg->nasMsg.length = tmp->list.array[i]->size;
-            msg->nasMsg.data = tmp->list.array[i]->buf;
+            msg->nasMsg.nas_data = tmp->list.array[i]->buf;
             itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
           }
           tmp->list.count = 0; // to prevent the automatic free by ASN1_FREE
@@ -998,7 +998,7 @@ static void rrc_ue_generate_RRCSetupComplete(const NR_UE_RRC_INST_t *rrc, const 
     as_nas_info_t initialNasMsg;
     nr_ue_nas_t *nas = get_ue_nas_info(rrc->ue_id);
     generateRegistrationRequest(&initialNasMsg, nas);
-    nas_msg = (char*)initialNasMsg.data;
+    nas_msg = (char *)initialNasMsg.nas_data;
     nas_msg_length = initialNasMsg.length;
   } else {
     nas_msg = nr_nas_attach_req_imsi_dummy_NSA_case;
@@ -1751,10 +1751,11 @@ static int nr_rrc_ue_decode_dcch(NR_UE_RRC_INST_t *rrc,
                 dlInformationTransfer->criticalExtensions.choice.dlInformationTransfer->dedicatedNAS_Message;
 
             MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_DOWNLINK_DATA_IND);
-            NasDlDataInd *msg = &NAS_DOWNLINK_DATA_IND(ittiMsg);
+            dl_info_transfer_ind_t *msg = &NAS_DOWNLINK_DATA_IND(ittiMsg);
             msg->UEid = rrc->ue_id;
             msg->nasMsg.length = dedicatedNAS_Message->size;
-            msg->nasMsg.data = dedicatedNAS_Message->buf;
+            msg->nasMsg.nas_data = malloc(msg->nasMsg.length);
+            memcpy(msg->nasMsg.nas_data, dedicatedNAS_Message->buf, msg->nasMsg.length);
             itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
             dedicatedNAS_Message->buf = NULL; // to keep the buffer, up to NAS to free it
           }
@@ -1907,15 +1908,15 @@ void *rrc_nrue(void *notUsed)
   case NAS_UPLINK_DATA_REQ: {
     uint32_t length;
     uint8_t *buffer = NULL;
-    NasUlDataReq *req = &NAS_UPLINK_DATA_REQ(msg_p);
+    ul_info_transfer_req_t *req = &NAS_UPLINK_DATA_REQ(msg_p);
     /* Create message for PDCP (ULInformationTransfer_t) */
-    length = do_NR_ULInformationTransfer(&buffer, req->nasMsg.length, req->nasMsg.data);
+    length = do_NR_ULInformationTransfer(&buffer, req->nasMsg.length, req->nasMsg.nas_data);
     /* Transfer data to PDCP */
     // check if SRB2 is created, if yes request data_req on SRB2
     // error: the remote gNB is hardcoded here
     rb_id_t srb_id = rrc->Srb[2] == RB_ESTABLISHED ? 2 : 1;
     nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, length, buffer, deliver_pdu_srb_rlc, NULL);
-    free(req->nasMsg.data);
+    free(req->nasMsg.nas_data);
     free(buffer);
     break;
   }
