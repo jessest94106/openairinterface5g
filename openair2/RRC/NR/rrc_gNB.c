@@ -918,15 +918,8 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
 }
 
 /// @brief Function tha processes RRCReestablishmentComplete message sent by the UE, after RRCReestasblishment request.
-/// @param ctxt_pP Protocol context containing information regarding the UE and gNB
-/// @param reestablish_rnti is the old C-RNTI
-/// @param ue_context_pP  UE context container information regarding the UE
-/// @param xid Transaction Identifier used in RRC messages
-static void rrc_gNB_process_RRCReestablishmentComplete(const protocol_ctxt_t *const ctxt_pP,
-                                                       rrc_gNB_ue_context_t *ue_context_pP,
-                                                       const uint8_t xid)
+static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const uint8_t xid)
 {
-  gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
   LOG_I(NR_RRC, "UE %d Processing NR_RRCReestablishmentComplete from UE\n", ue_p->rrc_ue_id);
 
   int i = 0;
@@ -935,7 +928,6 @@ static void rrc_gNB_process_RRCReestablishmentComplete(const protocol_ctxt_t *co
 
   ue_p->Srb[1].Active = 1;
 
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
 
   cellGroupConfig->spCellConfig = ue_p->masterCellGroup->spCellConfig;
@@ -981,7 +973,7 @@ static void rrc_gNB_process_RRCReestablishmentComplete(const protocol_ctxt_t *co
   /* Create drb-ToAddModList */
   NR_DRB_ToAddModList_t *DRBs = createDRBlist(ue_p, true);
 
-  uint8_t new_xid = rrc_gNB_get_next_transaction_identifier(ctxt_pP->module_id);
+  uint8_t new_xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   ue_p->xids[new_xid] = RRC_REESTABLISH_COMPLETE;
   uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
   int size = do_RRCReconfiguration(ue_p,
@@ -1356,19 +1348,14 @@ static void rrc_gNB_process_MeasurementReport(gNB_RRC_UE_t *UE, NR_MeasurementRe
   process_Event_Based_Measurement_Report(report_config->choice.reportConfigNR, measurementReport);
 }
 
-static int handle_rrcReestablishmentComplete(const protocol_ctxt_t *const ctxt_pP,
-                                             rrc_gNB_ue_context_t *ue_context_p,
-                                             const NR_RRCReestablishmentComplete_t *reestablishment_complete)
+static int handle_rrcReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCReestablishmentComplete_t *cplt)
 {
-  DevAssert(ue_context_p != NULL);
-  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-
-  NR_RRCReestablishmentComplete__criticalExtensions_PR p = reestablishment_complete->criticalExtensions.present;
+  NR_RRCReestablishmentComplete__criticalExtensions_PR p = cplt->criticalExtensions.present;
   if (p != NR_RRCReestablishmentComplete__criticalExtensions_PR_rrcReestablishmentComplete) {
     LOG_E(NR_RRC, "UE %d: expected presence of rrcReestablishmentComplete, but message has %d\n", UE->rrc_ue_id, p);
     return -1;
   }
-  rrc_gNB_process_RRCReestablishmentComplete(ctxt_pP, ue_context_p, reestablishment_complete->rrc_TransactionIdentifier);
+  rrc_gNB_process_RRCReestablishmentComplete(rrc, UE, cplt->rrc_TransactionIdentifier);
 
   UE->ue_reestablishment_counter++;
   return 0;
@@ -1718,9 +1705,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_rrcReestablishmentComplete:
-        if (handle_rrcReestablishmentComplete(ctxt_pP, ue_context_p, ul_dcch_msg->message.choice.c1->choice.rrcReestablishmentComplete)
-            == -1)
-          return -1;
+        handle_rrcReestablishmentComplete(rrc, UE, ul_dcch_msg->message.choice.c1->choice.rrcReestablishmentComplete);
         break;
 
       default:
