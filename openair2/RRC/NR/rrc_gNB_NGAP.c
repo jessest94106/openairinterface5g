@@ -652,32 +652,21 @@ int rrc_gNB_process_NGAP_DOWNLINK_NAS(MessageDef *msg_p, instance_t instance, mu
   return 0;
 }
 
-//------------------------------------------------------------------------------
-void
-rrc_gNB_send_NGAP_UPLINK_NAS(
-  const protocol_ctxt_t    *const ctxt_pP,
-  rrc_gNB_ue_context_t     *const ue_context_pP,
-  NR_UL_DCCH_Message_t     *const ul_dcch_msg
-)
-//------------------------------------------------------------------------------
+void rrc_gNB_send_NGAP_UPLINK_NAS(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_UL_DCCH_Message_t *const ul_dcch_msg)
 {
     MessageDef *msg_p;
     NR_ULInformationTransfer_t *ulInformationTransfer = ul_dcch_msg->message.choice.c1->choice.ulInformationTransfer;
-    gNB_RRC_UE_t *UE = &ue_context_pP->ue_context;
 
     if (ulInformationTransfer->criticalExtensions.present == NR_ULInformationTransfer__criticalExtensions_PR_ulInformationTransfer) {
       NR_DedicatedNAS_Message_t *nas = ulInformationTransfer->criticalExtensions.choice.ulInformationTransfer->dedicatedNAS_Message;
         uint8_t *buf = malloc(nas->size);
         AssertFatal(buf != NULL, "out of memory\n");
         memcpy(buf, nas->buf, nas->size);
-        msg_p = itti_alloc_new_message (TASK_RRC_GNB, 0, NGAP_UPLINK_NAS);
+        msg_p = itti_alloc_new_message (TASK_RRC_GNB, rrc->module_id, NGAP_UPLINK_NAS);
         NGAP_UPLINK_NAS(msg_p).gNB_ue_ngap_id = UE->rrc_ue_id;
         NGAP_UPLINK_NAS (msg_p).nas_pdu.length = nas->size;
         NGAP_UPLINK_NAS (msg_p).nas_pdu.buffer = buf;
-        // extract_imsi(NGAP_UPLINK_NAS (msg_p).nas_pdu.buffer,
-        //               NGAP_UPLINK_NAS (msg_p).nas_pdu.length,
-        //               ue_context_pP);
-        itti_send_msg_to_task (TASK_NGAP, ctxt_pP->instance, msg_p);
+        itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
         LOG_D(NR_RRC,"Send RRC GNB UL Information Transfer \n");
     }
 }
