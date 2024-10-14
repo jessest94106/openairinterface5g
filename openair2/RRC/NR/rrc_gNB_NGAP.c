@@ -95,35 +95,27 @@ static const uint16_t NGAP_INTEGRITY_NIA3_MASK = 0x2000;
 
 static bool rrc_gNB_process_security(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, ngap_security_capabilities_t *security_capabilities_pP);
 
-/*! \fn void process_gNB_security_key (const protocol_ctxt_t* const ctxt_pP, eNB_RRC_UE_t * const ue_context_pP, uint8_t *security_key)
+/*!
  *\brief save security key.
- *\param ctxt_pP         Running context.
- *\param ue_context_pP   UE context.
+ *\param UE              UE context.
  *\param security_key_pP The security key received from NGAP.
  */
-//------------------------------------------------------------------------------
-void process_gNB_security_key (
-  const protocol_ctxt_t *const ctxt_pP,
-  rrc_gNB_ue_context_t  *const ue_context_pP,
-  uint8_t               *security_key_pP
-)
-//------------------------------------------------------------------------------
+static void set_UE_security_key(gNB_RRC_UE_t *UE, uint8_t *security_key_pP)
 {
-  char ascii_buffer[65];
-  uint8_t i;
-  gNB_RRC_UE_t *UE = &ue_context_pP->ue_context;
+  int i;
 
   /* Saves the security key */
   memcpy(UE->kgnb, security_key_pP, SECURITY_KEY_LENGTH);
   memset(UE->nh, 0, SECURITY_KEY_LENGTH);
   UE->nh_ncc = -1;
 
+  char ascii_buffer[65];
   for (i = 0; i < 32; i++) {
     sprintf(&ascii_buffer[2 * i], "%02X", UE->kgnb[i]);
   }
+  ascii_buffer[2 * 1] = '\0';
 
-  ascii_buffer[2 * i] = '\0';
-  LOG_I(NR_RRC, "[gNB %d][UE %x] Saved security key %s\n", ctxt_pP->module_id, UE->rnti, ascii_buffer);
+  LOG_I(NR_RRC, "[UE %x] Saved security key %s\n", UE->rnti, ascii_buffer);
 }
 
 void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering)
@@ -467,7 +459,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
 
   /* security */
   rrc_gNB_process_security(rrc, UE, &req->security_capabilities);
-  process_gNB_security_key(&ctxt, ue_context_p, req->security_key);
+  set_UE_security_key(UE, req->security_key);
 
   /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
   nr_rrc_pdcp_config_security(UE, false);
