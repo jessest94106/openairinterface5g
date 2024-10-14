@@ -471,15 +471,14 @@ static void rrc_gNB_generate_RRCReject(module_id_t module_id, rrc_gNB_ue_context
 /*
 * Process the rrc setup complete message from UE (SRB1 Active)
 */
-static void rrc_gNB_process_RRCSetupComplete(const protocol_ctxt_t *const ctxt_pP, rrc_gNB_ue_context_t *ue_context_pP, NR_RRCSetupComplete_IEs_t *rrcSetupComplete)
+static void rrc_gNB_process_RRCSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRCSetupComplete_IEs_t *rrcSetupComplete)
 //-----------------------------------------------------------------------------
 {
-  LOG_A(NR_RRC, "UE %d Processing NR_RRCSetupComplete from UE\n", ue_context_pP->ue_context.rrc_ue_id);
-  ue_context_pP->ue_context.Srb[1].Active = 1;
-  ue_context_pP->ue_context.Srb[2].Active = 0;
-  AssertFatal(ctxt_pP->rntiMaybeUEid == ue_context_pP->ue_context.rrc_ue_id, "logic bug: inconsistent IDs, must use CU UE ID!\n");
+  LOG_A(NR_RRC, "UE %d Processing NR_RRCSetupComplete from UE\n", UE->rrc_ue_id);
+  UE->Srb[1].Active = 1;
+  UE->Srb[2].Active = 0;
 
-  rrc_gNB_send_NGAP_NAS_FIRST_REQ(ctxt_pP, ue_context_pP, rrcSetupComplete);
+  rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
 }
 
 //-----------------------------------------------------------------------------
@@ -1514,21 +1513,14 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
   return 0;
 }
 
-static int handle_rrcSetupComplete(const protocol_ctxt_t *const ctxt_pP,
-                                   rrc_gNB_ue_context_t *ue_context_p,
-                                   const NR_RRCSetupComplete_t *setup_complete)
+static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCSetupComplete_t *setup_complete)
 {
-  if (!ue_context_p) {
-    LOG_I(NR_RRC, "Processing NR_RRCSetupComplete UE %lx, ue_context_p is NULL\n", ctxt_pP->rntiMaybeUEid);
-    return -1;
-  }
-  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   uint8_t xid = setup_complete->rrc_TransactionIdentifier;
   UE->xids[xid] = RRC_ACTION_NONE;
 
   if (setup_complete->criticalExtensions.present != NR_RRCSetupComplete__criticalExtensions_PR_rrcSetupComplete) {
-    LOG_E(NR_RRC, "malformed RRCSetupComplete received from UE %lx\n", ctxt_pP->rntiMaybeUEid);
-    return -1;
+    LOG_E(NR_RRC, "malformed RRCSetupComplete received from UE %d\n", UE->rrc_ue_id);
+    return;
   }
 
   NR_RRCSetupComplete_IEs_t *setup_complete_ies = setup_complete->criticalExtensions.choice.rrcSetupComplete;
@@ -1539,7 +1531,7 @@ static int handle_rrcSetupComplete(const protocol_ctxt_t *const ctxt_pP,
       const BIT_STRING_t *part2 = &setup_complete_ies->ng_5G_S_TMSI_Value->choice.ng_5G_S_TMSI_Part2;
       if (part2->size != 2) {
         LOG_E(NR_RRC, "wrong ng_5G_S_TMSI_Part2 size, expected 2, provided %lu", part2->size);
-        return -1;
+        return;
       }
 
       if (UE->Initialue_identity_5g_s_TMSI.presence) {
@@ -1555,7 +1547,7 @@ static int handle_rrcSetupComplete(const protocol_ctxt_t *const ctxt_pP,
       const NR_NG_5G_S_TMSI_t *bs_stmsi = &setup_complete_ies->ng_5G_S_TMSI_Value->choice.ng_5G_S_TMSI;
       if (bs_stmsi->size != 6) {
         LOG_E(NR_RRC, "wrong ng_5G_S_TMSI size, expected 6, provided %lu", bs_stmsi->size);
-        return -1;
+        return;
       }
 
       fiveg_s_TMSI = BIT_STRING_to_uint64(bs_stmsi);
@@ -1583,9 +1575,8 @@ static int handle_rrcSetupComplete(const protocol_ctxt_t *const ctxt_pP,
     }
   }
 
-  rrc_gNB_process_RRCSetupComplete(ctxt_pP, ue_context_p, setup_complete->criticalExtensions.choice.rrcSetupComplete);
-  LOG_I(NR_RRC, PROTOCOL_NR_RRC_CTXT_UE_FMT " UE State = NR_RRC_CONNECTED \n", PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP));
-  return 0;
+  rrc_gNB_process_RRCSetupComplete(rrc, UE, setup_complete->criticalExtensions.choice.rrcSetupComplete);
+  return;
 }
 
 static void handle_rrcReconfigurationComplete(const protocol_ctxt_t *const ctxt_pP,
@@ -1644,10 +1635,10 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
                         const sdu_size_t sdu_sizeP)
 //-----------------------------------------------------------------------------
 {
-  gNB_RRC_INST *gnb_rrc_inst = RC.nrrrc[ctxt_pP->module_id];
+  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
 
   /* we look up by CU UE ID! Do NOT change back to RNTI! */
-  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(gnb_rrc_inst, ctxt_pP->rntiMaybeUEid);
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, ctxt_pP->rntiMaybeUEid);
   if (!ue_context_p) {
     LOG_E(RRC, "could not find UE context for CU UE ID %lu, aborting transaction\n", ctxt_pP->rntiMaybeUEid);
     return -1;
@@ -1683,8 +1674,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_rrcSetupComplete:
-        if (handle_rrcSetupComplete(ctxt_pP, ue_context_p, ul_dcch_msg->message.choice.c1->choice.rrcSetupComplete) == -1)
-          return -1;
+        handle_rrcSetupComplete(rrc, UE, ul_dcch_msg->message.choice.c1->choice.rrcSetupComplete);
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_measurementReport:
@@ -1741,7 +1731,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
            * to set up security, so trigger PDU sessions now. The UE NAS
            * message will be forwarded in the corresponding reconfiguration,
            * the Initial context setup response after reconfiguration complete. */
-          trigger_bearer_setup(gnb_rrc_inst, UE, UE->n_initial_pdu, UE->initial_pdus, 0);
+          trigger_bearer_setup(rrc, UE, UE->n_initial_pdu, UE->initial_pdus, 0);
         } else {
           /* we already have capabilities, and no PDU sessions to setup, ack
            * this UE */

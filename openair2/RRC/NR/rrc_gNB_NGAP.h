@@ -40,12 +40,7 @@
 #include "NR_UL-DCCH-Message.h"
 #include "NGAP_CauseRadioNetwork.h"
 
-void
-rrc_gNB_send_NGAP_NAS_FIRST_REQ(
-    const protocol_ctxt_t     *const ctxt_pP,
-    rrc_gNB_ue_context_t      *ue_context_pP,
-    NR_RRCSetupComplete_IEs_t *rrcSetupComplete
-);
+void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRCSetupComplete_IEs_t *rrcSetupComplete);
 
 int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t instance);
 

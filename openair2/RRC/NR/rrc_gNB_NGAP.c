@@ -147,26 +147,20 @@ void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering)
 /*
 * Initial UE NAS message on S1AP.
 */
-void
-rrc_gNB_send_NGAP_NAS_FIRST_REQ(
-    const protocol_ctxt_t     *const ctxt_pP,
-    rrc_gNB_ue_context_t      *ue_context_pP,
-    NR_RRCSetupComplete_IEs_t *rrcSetupComplete
-)
+void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRCSetupComplete_IEs_t *rrcSetupComplete)
 //------------------------------------------------------------------------------
 {
-  // gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
-  MessageDef         *message_p         = NULL;
-  gNB_RRC_UE_t *UE = &ue_context_pP->ue_context;
-
-  message_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_NAS_FIRST_REQ);
+  MessageDef *message_p = itti_alloc_new_message(TASK_RRC_GNB, rrc->module_id, NGAP_NAS_FIRST_REQ);
   ngap_nas_first_req_t *req = &NGAP_NAS_FIRST_REQ(message_p);
   memset(req, 0, sizeof(*req));
 
   req->gNB_ue_ngap_id = UE->rrc_ue_id;
 
   /* Assume that cause is coded in the same way in RRC and NGap, just check that the value is in NGap range */
-  AssertFatal(UE->establishment_cause < NGAP_RRC_CAUSE_LAST, "Establishment cause invalid (%jd/%d) for gNB %d!", UE->establishment_cause, NGAP_RRC_CAUSE_LAST, ctxt_pP->module_id);
+  AssertFatal(UE->establishment_cause < NGAP_RRC_CAUSE_LAST,
+              "Establishment cause invalid (%jd/%d)!",
+              UE->establishment_cause,
+              NGAP_RRC_CAUSE_LAST);
   req->establishment_cause = UE->establishment_cause;
 
   /* Forward NAS message */
@@ -207,8 +201,7 @@ rrc_gNB_send_NGAP_NAS_FIRST_REQ(
     UE->ue_guami.amf_pointer = req->ue_identity.guami.amf_pointer;
 
     LOG_I(NGAP,
-          "[gNB %d] Build NGAP_NAS_FIRST_REQ adding in s_TMSI: GUAMI amf_set_id %u amf_region_id %u ue %x\n",
-          ctxt_pP->module_id,
+          "Build NGAP_NAS_FIRST_REQ adding in s_TMSI: GUAMI amf_set_id %u amf_region_id %u ue %x\n",
           req->ue_identity.guami.amf_set_id,
           req->ue_identity.guami.amf_region_id,
           UE->rnti);
@@ -216,7 +209,7 @@ rrc_gNB_send_NGAP_NAS_FIRST_REQ(
     req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_NONE;
   }
 
-  itti_send_msg_to_task (TASK_NGAP, ctxt_pP->instance, message_p);
+  itti_send_msg_to_task(TASK_NGAP, rrc->module_id, message_p);
 }
 
 static void fill_qos(NGAP_QosFlowSetupRequestList_t *qos, pdusession_t *session)
