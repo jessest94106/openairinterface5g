@@ -1207,10 +1207,8 @@ fallback_rrc_setup:
   return;
 }
 
-static void process_Periodical_Measurement_Report(rrc_gNB_ue_context_t *ue_context, NR_MeasurementReport_t *measurementReport)
+static void process_Periodical_Measurement_Report(gNB_RRC_UE_t *ue_ctxt, NR_MeasurementReport_t *measurementReport)
 {
-  // LOG_I(NR_RRC, "Periodical Event Report! Do Nothing for now...\n");
-  gNB_RRC_UE_t *ue_ctxt = &ue_context->ue_context;
   ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, ue_ctxt->measResults);
   ue_ctxt->measResults = NULL;
 
@@ -1300,9 +1298,8 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
   }
 }
 
-static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, NR_MeasurementReport_t *measurementReport)
+static void rrc_gNB_process_MeasurementReport(gNB_RRC_UE_t *UE, NR_MeasurementReport_t *measurementReport)
 {
-  gNB_RRC_UE_t *UE = &ue_context->ue_context;
   NR_MeasurementReport__criticalExtensions_PR p = measurementReport->criticalExtensions.present;
   if (p != NR_MeasurementReport__criticalExtensions_PR_measurementReport
       || measurementReport->criticalExtensions.choice.measurementReport == NULL) {
@@ -1350,7 +1347,7 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
   }
 
   if (report_config->choice.reportConfigNR->reportType.present == NR_ReportConfigNR__reportType_PR_periodical)
-    return process_Periodical_Measurement_Report(ue_context, measurementReport);
+    return process_Periodical_Measurement_Report(UE, measurementReport);
 
   if (report_config->choice.reportConfigNR->reportType.present != NR_ReportConfigNR__reportType_PR_eventTriggered) {
     LOG_D(NR_RRC, "Incoming Report Type: %d is not supported! \n", report_config->choice.reportConfigNR->reportType.present);
@@ -1655,20 +1652,12 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
     LOG_E(RRC, "could not find UE context for CU UE ID %lu, aborting transaction\n", ctxt_pP->rntiMaybeUEid);
     return -1;
   }
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
   if ((Srb_id != 1) && (Srb_id != 2)) {
     LOG_E(NR_RRC, "Received message on SRB%ld, should not have ...\n", Srb_id);
   } else {
     LOG_D(NR_RRC, "Received message on SRB%ld\n", Srb_id);
-  }
-
-  LOG_D(NR_RRC, "Decoding UL-DCCH Message\n");
-  {
-    for (int i = 0; i < sdu_sizeP; i++) {
-      LOG_T(NR_RRC, "%x.", Rx_sdu[i]);
-    }
-
-    LOG_T(NR_RRC, "\n");
   }
 
   NR_UL_DCCH_Message_t *ul_dcch_msg = NULL;
@@ -1699,11 +1688,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_measurementReport:
-        DevAssert(ul_dcch_msg != NULL
-                  && ul_dcch_msg->message.present == NR_UL_DCCH_MessageType_PR_c1
-                  && ul_dcch_msg->message.choice.c1
-                  && ul_dcch_msg->message.choice.c1->present == NR_UL_DCCH_MessageType__c1_PR_measurementReport);
-        rrc_gNB_process_MeasurementReport(ue_context_p, ul_dcch_msg->message.choice.c1->choice.measurementReport);
+        rrc_gNB_process_MeasurementReport(UE, ul_dcch_msg->message.choice.c1->choice.measurementReport);
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_ulInformationTransfer:
