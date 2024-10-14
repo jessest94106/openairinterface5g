@@ -1364,8 +1364,11 @@ static int handle_rrcReestablishmentComplete(const protocol_ctxt_t *const ctxt_p
   DevAssert(ue_context_p != NULL);
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
-  DevAssert(reestablishment_complete->criticalExtensions.present
-            == NR_RRCReestablishmentComplete__criticalExtensions_PR_rrcReestablishmentComplete);
+  NR_RRCReestablishmentComplete__criticalExtensions_PR p = reestablishment_complete->criticalExtensions.present;
+  if (p != NR_RRCReestablishmentComplete__criticalExtensions_PR_rrcReestablishmentComplete) {
+    LOG_E(NR_RRC, "UE %d: expected presence of rrcReestablishmentComplete, but message has %d\n", UE->rrc_ue_id, p);
+    return -1;
+  }
   rrc_gNB_process_RRCReestablishmentComplete(ctxt_pP, ue_context_p, reestablishment_complete->rrc_TransactionIdentifier);
 
   UE->ue_reestablishment_counter++;
