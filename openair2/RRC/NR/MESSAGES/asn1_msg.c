@@ -519,12 +519,10 @@ int do_RRCSetup(rrc_gNB_ue_context_t *const ue_context_pP,
   return ((enc_rval.encoded + 7) / 8);
 }
 
-int do_NR_SecurityModeCommand(
-  const protocol_ctxt_t *const ctxt_pP,
-  uint8_t *const buffer,
-  const uint8_t Transaction_id,
-  const uint8_t cipheringAlgorithm,
-  NR_IntegrityProtAlgorithm_t integrityProtAlgorithm)
+int do_NR_SecurityModeCommand(uint8_t *const buffer,
+                              const uint8_t Transaction_id,
+                              const uint8_t cipheringAlgorithm,
+                              NR_IntegrityProtAlgorithm_t integrityProtAlgorithm)
 //------------------------------------------------------------------------------
 {
   NR_DL_DCCH_Message_t dl_dcch_msg={0};
@@ -555,7 +553,6 @@ int do_NR_SecurityModeCommand(
   AssertFatal(enc_rval.encoded >0 , "ASN1 message encoding failed (%s, %lu)!\n",
               enc_rval.failed_type->name, enc_rval.encoded);
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message,&dl_dcch_msg);
-  LOG_D(NR_RRC, "[gNB %d] securityModeCommand for UE %lx Encoded %zd bits (%zd bytes)\n", ctxt_pP->module_id, ctxt_pP->rntiMaybeUEid, enc_rval.encoded, (enc_rval.encoded + 7) / 8);
 
   //  rrc_ue_process_ueCapabilityEnquiry(0,1000,&dl_dcch_msg.message.choice.c1.choice.ueCapabilityEnquiry,0);
   //  exit(-1);

@@ -463,8 +463,8 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
 
   /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
   nr_rrc_pdcp_config_security(UE, false);
+  rrc_gNB_generate_SecurityModeCommand(rrc, UE);
 
-  rrc_gNB_generate_SecurityModeCommand(&ctxt, ue_context_p);
   if (req->nb_of_pdusessions > 0) {
     /* if there are PDU sessions to setup, store them to be created once
      * security (and UE capabilities) are received */
