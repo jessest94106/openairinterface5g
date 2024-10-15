@@ -879,18 +879,16 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
 {
   rrc_gNB_ue_context_t *ue_context_p = NULL;
 
-  protocol_ctxt_t ctxt;
   ngap_pdusession_modify_req_t *req = &NGAP_PDUSESSION_MODIFY_REQ(msg_p);
 
-  ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[instance], req->gNB_ue_ngap_id);
+  gNB_RRC_INST *rrc = RC.nrrrc[instance];
+  ue_context_p = rrc_gNB_get_ue_context(rrc, req->gNB_ue_ngap_id);
   if (ue_context_p == NULL) {
     LOG_W(NR_RRC, "[gNB %ld] In NGAP_PDUSESSION_MODIFY_REQ: unknown UE from NGAP ids (%u)\n", instance, req->gNB_ue_ngap_id);
     // TO implement return setup failed
     return (-1);
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-  PROTOCOL_CTXT_SET_BY_INSTANCE(&ctxt, instance, GNB_FLAG_YES, UE->rrc_ue_id, 0, 0);
-  ctxt.eNB_index = 0;
   bool all_failed = true;
   for (int i = 0; i < req->nb_pdusessions_tomodify; i++) {
     rrc_pdu_session_param_t *sess;
@@ -925,8 +923,7 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
   }
 
   if (!all_failed) {
-    LOG_D(NR_RRC, "generate RRCReconfiguration \n");
-    rrc_gNB_modify_dedicatedRRCReconfiguration(&ctxt, ue_context_p);
+    rrc_gNB_modify_dedicatedRRCReconfiguration(rrc, UE);
   } else {
     LOG_I(NR_RRC,
           "pdu session modify failed, fill NGAP_PDUSESSION_MODIFY_RESP with the pdu session information that failed to modify \n");
