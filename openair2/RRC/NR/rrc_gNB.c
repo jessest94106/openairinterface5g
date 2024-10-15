@@ -1001,13 +1001,9 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
 }
 //-----------------------------------------------------------------------------
 
-int nr_rrc_reconfiguration_req(rrc_gNB_ue_context_t *const ue_context_pP,
-                               protocol_ctxt_t *const ctxt_pP,
-                               const int dl_bwp_id,
-                               const int ul_bwp_id)
+int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int dl_bwp_id, const int ul_bwp_id)
 {
-  uint8_t xid = rrc_gNB_get_next_transaction_identifier(ctxt_pP->module_id);
-  gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
+  uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   ue_p->xids[xid] = RRC_DEDICATED_RECONF;
 
   NR_CellGroupConfig_t *masterCellGroup = ue_p->masterCellGroup;
@@ -1022,7 +1018,6 @@ int nr_rrc_reconfiguration_req(rrc_gNB_ue_context_t *const ue_context_pP,
   uint8_t buffer[NR_RRC_BUF_SIZE];
   int size = do_RRCReconfiguration(ue_p, buffer, NR_RRC_BUF_SIZE, xid, NULL, NULL, NULL, NULL, NULL, NULL, masterCellGroup);
 
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
 
   return 0;
@@ -2052,8 +2047,7 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p)
       xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
 
     /* trigger reconfiguration */
-    nr_rrc_reconfiguration_req(ue_context_p, &ctxt, 0, 0);
-    //rrc_gNB_generate_dedicatedRRCReconfiguration(&ctxt, ue_context_p);
+    nr_rrc_reconfiguration_req(rrc, UE, 0, 0);
     return;
   }
   LOG_W(RRC,

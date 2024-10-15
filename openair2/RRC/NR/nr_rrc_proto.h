@@ -79,10 +79,7 @@ void *rrc_gnb_task(void *args_p);
    \ *reOffset Pointer to RE Offset Value */
 void rrc_config_dl_ptrs_params(NR_BWP_Downlink_t *bwp, long *ptrsNrb, long *ptrsMcs, long *epre_Ratio, long *reOffset);
 
-int nr_rrc_reconfiguration_req(rrc_gNB_ue_context_t         *const ue_context_pP,
-                               protocol_ctxt_t              *const ctxt_pP,
-                               const int                    dl_bwp_id,
-                               const int                    ul_bwp_id);
+int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int dl_bwp_id, const int ul_bwp_id);
 
 void
 rrc_gNB_generate_dedicatedRRCReconfiguration_release(
