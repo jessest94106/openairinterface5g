@@ -45,8 +45,6 @@
 #include "NR_CellGroupConfig.h"
 
 #define NR_MAX_SUPPORTED_DL_LAYERS 4
-void rrc_init_nr_srb_param(NR_LCHAN_DESC *chan);
-
 
 void rrc_gNB_generate_SgNBAdditionRequestAcknowledge( 
      const protocol_ctxt_t  *const ctxt_pP,
