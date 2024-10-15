@@ -71,6 +71,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
                                 unsigned short p,
                                 unsigned char symbol,
                                 int ul_id,
+                                int beam_nb,
                                 unsigned short bwp_start_subcarrier,
                                 nfapi_nr_pusch_pdu_t *pusch_pdu,
                                 int *max_ch,
@@ -153,7 +154,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   memset(delay, 0, sizeof(*delay));
 
   for (int aarx=0; aarx<gNB->frame_parms.nb_antennas_rx; aarx++) {
-    c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[aarx][symbol_offset + slot_offset];
+    c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[beam_nb][aarx][symbol_offset + slot_offset];
     c16_t *ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + aarx][symbol_offset];
 
     memset(ul_ch, 0, sizeof(*ul_ch) * symbolSize);
@@ -596,17 +597,6 @@ void nr_pusch_ptrs_processing(PHY_VARS_gNB *gNB,
   } // Antenna loop
 }
 
-uint32_t calc_power(const int16_t *x, const uint32_t size) {
-  int64_t sum_x = 0;
-  int64_t sum_x2 = 0;
-  for(int k = 0; k<size; k++) {
-    sum_x = sum_x + x[k];
-    sum_x2 = sum_x2 + x[k]*x[k];
-  }
-
-  return sum_x2/size - (sum_x/size)*(sum_x/size);
-}
-
 int nr_srs_channel_estimation(
     const PHY_VARS_gNB *gNB,
     const int frame,
@@ -643,27 +633,20 @@ int nr_srs_channel_estimation(
 
   const uint32_t arr_len = frame_parms->nb_antennas_rx * N_ap * M_sc_b_SRS;
 
-  int16_t ch_real[arr_len];
-  memset(ch_real, 0, arr_len * sizeof(int16_t));
-  
-  int16_t ch_imag[arr_len];
-  memset(ch_imag, 0, arr_len * sizeof(int16_t));
- 
-  int16_t noise_real[arr_len];
-  memset(noise_real, 0, arr_len * sizeof(int16_t));
- 
-  int16_t noise_imag[arr_len];
-  memset(noise_imag, 0, arr_len * sizeof(int16_t));
+  c16_t ch[arr_len];
+  memset(ch, 0, arr_len * sizeof(c16_t));
 
-  int16_t ls_estimated[2];
+  c16_t noise[arr_len];
+  memset(noise, 0, arr_len * sizeof(c16_t));
 
   uint8_t mem_offset = ((16 - ((long)&srs_estimated_channel_freq[0][0][subcarrier_offset + nr_srs_info->k_0_p[0][0]])) & 0xF) >> 2; // >> 2 <=> /sizeof(int32_t)
 
   // filt16_end is {4096,8192,8192,8192,12288,16384,16384,16384,0,0,0,0,0,0,0,0}
   // The End of OFDM symbol corresponds to the position of last 16384 in the filter
-  // The multadd_real_vector_complex_scalar applies the remaining 8 zeros of filter, therefore, to avoid a buffer overflow,
+  // The c16multaddVectRealComplex applies the remaining 8 zeros of filter, therefore, to avoid a buffer overflow,
   // we added 8 in the array size
-  int32_t srs_est[frame_parms->ofdm_symbol_size*(1<<srs_pdu->num_symbols) + mem_offset + 8] __attribute__ ((aligned(32)));
+  int32_t srs_est[frame_parms->ofdm_symbol_size * (1 << srs_pdu->num_symbols) + mem_offset + 8] __attribute__((aligned(32)));
+  c16_t ls_estimated = {0};
 
   for (int ant = 0; ant < frame_parms->nb_antennas_rx; ant++) {
 
@@ -681,14 +664,12 @@ int nr_srs_channel_estimation(
         subcarrier -= frame_parms->ofdm_symbol_size;
       }
 
-      int16_t *srs_estimated_channel16 = (int16_t *)&srs_est[subcarrier + mem_offset];
+      c16_t *srs_estimated_channel16 = (c16_t *)&srs_est[subcarrier + mem_offset];
 
       for (int k = 0; k < M_sc_b_SRS; k++) {
 
         if (k%fd_cdm==0) {
-
-          ls_estimated[0] = 0;
-          ls_estimated[1] = 0;
+          ls_estimated = (c16_t){0, 0};
           uint16_t subcarrier_cdm = subcarrier;
 
           for (int cdm_idx = 0; cdm_idx < fd_cdm; cdm_idx++) {
@@ -700,8 +681,8 @@ int nr_srs_channel_estimation(
 
             // We know that nr_srs_info->srs_generated_signal_bits bits are enough to represent the generated_real and generated_imag.
             // So we only need a nr_srs_info->srs_generated_signal_bits shift to ensure that the result fits into 16 bits.
-            ls_estimated[0] += (int16_t)(((int32_t)generated_real*received_real + (int32_t)generated_imag*received_imag)>>nr_srs_info->srs_generated_signal_bits);
-            ls_estimated[1] += (int16_t)(((int32_t)generated_real*received_imag - (int32_t)generated_imag*received_real)>>nr_srs_info->srs_generated_signal_bits);
+            ls_estimated.r += (int16_t)(((int32_t)generated_real*received_real + (int32_t)generated_imag*received_imag)>>nr_srs_info->srs_generated_signal_bits);
+            ls_estimated.i += (int16_t)(((int32_t)generated_real*received_imag - (int32_t)generated_imag*received_real)>>nr_srs_info->srs_generated_signal_bits);
 
             // Subcarrier increment
             subcarrier_cdm += K_TC;
@@ -711,8 +692,7 @@ int nr_srs_channel_estimation(
           }
         }
 
-        srs_ls_estimated_channel[subcarrier].r = ls_estimated[0];
-        srs_ls_estimated_channel[subcarrier].i = ls_estimated[1];
+        srs_ls_estimated_channel[subcarrier] = ls_estimated;
 
 #ifdef SRS_DEBUG
         int subcarrier_log = subcarrier-subcarrier_offset;
@@ -727,48 +707,48 @@ int nr_srs_channel_estimation(
               subcarrier_log,
               ((c16_t*)srs_generated_signal[p_index])[subcarrier].r, ((c16_t*)srs_generated_signal[p_index])[subcarrier].i,
               ((c16_t*)srs_received_signal[ant])[subcarrier].r, ((c16_t*)srs_received_signal[ant])[subcarrier].i,
-              ls_estimated[0], ls_estimated[1]);
+              ls_estimated.r, ls_estimated.i);
 #endif
 
         const uint16_t sc_offset = subcarrier + mem_offset;
 
         // Channel interpolation
-        if(srs_pdu->comb_size == 0) {
-          if(k == 0) { // First subcarrier case
+        if (srs_pdu->comb_size == 0) {
+          if (k == 0) { // First subcarrier case
             // filt8_start is {12288,8192,4096,0,0,0,0,0}
-            multadd_real_vector_complex_scalar(filt8_start, ls_estimated, srs_estimated_channel16, 8);
-          } else if(subcarrier < K_TC) { // Start of OFDM symbol case
+            c16multaddVectRealComplex(filt8_start, &ls_estimated, srs_estimated_channel16, 8);
+          } else if (subcarrier < K_TC) { // Start of OFDM symbol case
             // filt8_start is {12288,8192,4096,0,0,0,0,0}
-            srs_estimated_channel16 = (int16_t *)&srs_est[subcarrier];
+            srs_estimated_channel16 = (c16_t *)&srs_est[subcarrier];
             const short *filter = mem_offset == 0 ? filt8_start : filt8_start_shift2;
-            multadd_real_vector_complex_scalar(filter, ls_estimated, srs_estimated_channel16, 8);
-          } else if((subcarrier+K_TC)>=frame_parms->ofdm_symbol_size || k == (M_sc_b_SRS-1)) { // End of OFDM symbol or last subcarrier cases
+            c16multaddVectRealComplex(filter, &ls_estimated, srs_estimated_channel16, 8);
+          } else if ((subcarrier + K_TC) >= frame_parms->ofdm_symbol_size || k == (M_sc_b_SRS - 1)) { // End of OFDM symbol or last subcarrier cases
             // filt8_end is {4096,8192,12288,16384,0,0,0,0}
             const short *filter = mem_offset == 0 || k == (M_sc_b_SRS - 1) ? filt8_end : filt8_end_shift2;
-            multadd_real_vector_complex_scalar(filter, ls_estimated, srs_estimated_channel16, 8);
-          } else if(k%2 == 1) { // 1st middle case
+            c16multaddVectRealComplex(filter, &ls_estimated, srs_estimated_channel16, 8);
+          } else if (k % 2 == 1) { // 1st middle case
             // filt8_middle2 is {4096,8192,8192,8192,4096,0,0,0}
-            multadd_real_vector_complex_scalar(filt8_middle2, ls_estimated, srs_estimated_channel16, 8);
-          } else if(k%2 == 0) { // 2nd middle case
+            c16multaddVectRealComplex(filt8_middle2, &ls_estimated, srs_estimated_channel16, 8);
+          } else if (k % 2 == 0) { // 2nd middle case
             // filt8_middle4 is {0,0,4096,8192,8192,8192,4096,0}
-            multadd_real_vector_complex_scalar(filt8_middle4, ls_estimated, srs_estimated_channel16, 8);
-            srs_estimated_channel16 = (int16_t *)&srs_est[sc_offset];
+            c16multaddVectRealComplex(filt8_middle4, &ls_estimated, srs_estimated_channel16, 8);
+            srs_estimated_channel16 = (c16_t *)&srs_est[sc_offset];
           }
         } else {
-          if(k == 0) { // First subcarrier case
+          if (k == 0) { // First subcarrier case
             // filt16_start is {12288,8192,8192,8192,4096,0,0,0,0,0,0,0,0,0,0,0}
-            multadd_real_vector_complex_scalar(filt16_start, ls_estimated, srs_estimated_channel16, 16);
-          } else if(subcarrier < K_TC) { // Start of OFDM symbol case
-            srs_estimated_channel16 = (int16_t *)&srs_est[sc_offset];
+            c16multaddVectRealComplex(filt16_start, &ls_estimated, srs_estimated_channel16, 16);
+          } else if (subcarrier < K_TC) { // Start of OFDM symbol case
+            srs_estimated_channel16 = (c16_t *)&srs_est[sc_offset];
             // filt16_start is {12288,8192,8192,8192,4096,0,0,0,0,0,0,0,0,0,0,0}
-            multadd_real_vector_complex_scalar(filt16_start, ls_estimated, srs_estimated_channel16, 16);
-          } else if((subcarrier+K_TC)>=frame_parms->ofdm_symbol_size || k == (M_sc_b_SRS-1)) { // End of OFDM symbol or last subcarrier cases
+            c16multaddVectRealComplex(filt16_start, &ls_estimated, srs_estimated_channel16, 16);
+          } else if ((subcarrier + K_TC) >= frame_parms->ofdm_symbol_size || k == (M_sc_b_SRS - 1)) { // End of OFDM symbol or last subcarrier cases
             // filt16_end is {4096,8192,8192,8192,12288,16384,16384,16384,0,0,0,0,0,0,0,0}
-            multadd_real_vector_complex_scalar(filt16_end, ls_estimated, srs_estimated_channel16, 16);
+            c16multaddVectRealComplex(filt16_end, &ls_estimated, srs_estimated_channel16, 16);
           } else { // Middle case
             // filt16_middle4 is {4096,8192,8192,8192,8192,8192,8192,8192,4096,0,0,0,0,0,0,0}
-            multadd_real_vector_complex_scalar(filt16_middle4, ls_estimated, srs_estimated_channel16, 16);
-            srs_estimated_channel16 = (int16_t *)&srs_est[sc_offset];
+            c16multaddVectRealComplex(filt16_middle4, &ls_estimated, srs_estimated_channel16, 16);
+            srs_estimated_channel16 = (c16_t *)&srs_est[sc_offset];
           }
         }
 
@@ -789,15 +769,14 @@ int nr_srs_channel_estimation(
       if (subcarrier>frame_parms->ofdm_symbol_size) {
         subcarrier -= frame_parms->ofdm_symbol_size;
       }
-      uint16_t base_idx = ant*N_ap*M_sc_b_SRS + p_index*M_sc_b_SRS;
+      uint16_t base_idx = ant * N_ap * M_sc_b_SRS + p_index * M_sc_b_SRS;
       for (int k = 0; k < M_sc_b_SRS; k++) {
-        ch_real[base_idx+k] = ((c16_t*)srs_estimated_channel_freq[ant][p_index])[subcarrier].r;
-        ch_imag[base_idx+k] = ((c16_t*)srs_estimated_channel_freq[ant][p_index])[subcarrier].i;
-        noise_real[base_idx+k] = abs(srs_ls_estimated_channel[subcarrier].r - ch_real[base_idx+k]);
-        noise_imag[base_idx+k] = abs(srs_ls_estimated_channel[subcarrier].i - ch_imag[base_idx+k]);
+        ch[base_idx + k] = ((c16_t *)srs_estimated_channel_freq[ant][p_index])[subcarrier];
+        noise[base_idx + k].r = abs(srs_ls_estimated_channel[subcarrier].r - ch[base_idx + k].r);
+        noise[base_idx + k].i = abs(srs_ls_estimated_channel[subcarrier].i - ch[base_idx + k].i);
         subcarrier += K_TC;
         if (subcarrier >= frame_parms->ofdm_symbol_size) {
-          subcarrier=subcarrier-frame_parms->ofdm_symbol_size;
+          subcarrier = subcarrier - frame_parms->ofdm_symbol_size;
         }
       }
 
@@ -823,9 +802,10 @@ int nr_srs_channel_estimation(
               subcarrier_log,
               srs_ls_estimated_channel[subcarrier].r,
               srs_ls_estimated_channel[subcarrier].i,
-              ((c16_t*)srs_estimated_channel_freq[ant][p_index])[subcarrier].r,
-              ((c16_t*)srs_estimated_channel_freq[ant][p_index])[subcarrier].i,
-              noise_real[base_idx+(k/K_TC)], noise_imag[base_idx+(k/K_TC)]);
+              ((c16_t *)srs_estimated_channel_freq[ant][p_index])[subcarrier].r,
+              ((c16_t *)srs_estimated_channel_freq[ant][p_index])[subcarrier].i,
+              noise[base_idx + (k / K_TC)].r,
+              noise[base_idx + (k / K_TC)].i);
 
         // Subcarrier increment
         subcarrier++;
@@ -852,7 +832,7 @@ int nr_srs_channel_estimation(
   } // for (int ant = 0; ant < frame_parms->nb_antennas_rx; ant++)
 
   // Compute signal power
-  uint32_t signal_power = calc_power(ch_real, arr_len) + calc_power(ch_imag, arr_len);
+  uint32_t signal_power = max(signal_energy_nodc(ch, arr_len), 1);
 
 #ifdef SRS_DEBUG
   LOG_I(NR_PHY,"signal_power = %u\n", signal_power);
@@ -864,11 +844,6 @@ int nr_srs_channel_estimation(
   }
 
   // Compute noise power
-
-  const uint8_t signal_power_bits = log2_approx(signal_power);
-  const uint8_t factor_bits = signal_power_bits < 32 ? 32 - signal_power_bits : 0; // 32 due to input of dB_fixed(uint32_t x)
-  const int32_t factor_dB = dB_fixed(1<<factor_bits);
-
   const uint8_t srs_symbols_per_rb = srs_pdu->comb_size == 0 ? 6 : 3;
   const uint8_t n_noise_est = frame_parms->nb_antennas_rx*N_ap*srs_symbols_per_rb;
   uint64_t sum_re = 0;
@@ -885,19 +860,19 @@ int nr_srs_channel_estimation(
 
     for (int ant = 0; ant < frame_parms->nb_antennas_rx; ant++) {
       for (int p_index = 0; p_index < N_ap; p_index++) {
-        uint16_t base_idx = ant*N_ap*M_sc_b_SRS + p_index*M_sc_b_SRS + rb*srs_symbols_per_rb;
+        uint16_t base_idx = ant * N_ap * M_sc_b_SRS + p_index * M_sc_b_SRS + rb * srs_symbols_per_rb;
         for (int srs_symb = 0; srs_symb < srs_symbols_per_rb; srs_symb++) {
-          sum_re = sum_re + noise_real[base_idx+srs_symb];
-          sum_re2 = sum_re2 + noise_real[base_idx+srs_symb]*noise_real[base_idx+srs_symb];
-          sum_im = sum_im + noise_imag[base_idx+srs_symb];
-          sum_im2 = sum_im2 + noise_imag[base_idx+srs_symb]*noise_imag[base_idx+srs_symb];
+          sum_re = sum_re + noise[base_idx + srs_symb].r;
+          sum_re2 = sum_re2 + noise[base_idx + srs_symb].r * noise[base_idx + srs_symb].r;
+          sum_im = sum_im + noise[base_idx + srs_symb].i;
+          sum_im2 = sum_im2 + noise[base_idx + srs_symb].i * noise[base_idx + srs_symb].i;
         } // for (int srs_symb = 0; srs_symb < srs_symbols_per_rb; srs_symb++)
       } // for (int p_index = 0; p_index < N_ap; p_index++)
     } // for (int ant = 0; ant < frame_parms->nb_antennas_rx; ant++)
 
     noise_power_per_rb[rb] = max(sum_re2 / n_noise_est - (sum_re / n_noise_est) * (sum_re / n_noise_est) +
                                  sum_im2 / n_noise_est - (sum_im / n_noise_est) * (sum_im / n_noise_est), 1);
-    snr_per_rb[rb] = dB_fixed((int32_t)((signal_power<<factor_bits)/noise_power_per_rb[rb])) - factor_dB;
+    snr_per_rb[rb] = dB_fixed(signal_power) - dB_fixed(noise_power_per_rb[rb]);
 
 #ifdef SRS_DEBUG
     LOG_I(NR_PHY,"noise_power_per_rb[%i] = %i, snr_per_rb[%i] = %i dB\n", rb, noise_power_per_rb[rb], rb, snr_per_rb[rb]);
@@ -905,9 +880,9 @@ int nr_srs_channel_estimation(
 
   } // for (int rb = 0; rb < m_SRS_b; rb++)
 
-  const uint32_t noise_power = max(calc_power(noise_real, arr_len) + calc_power(noise_imag, arr_len), 1);
+  const uint32_t noise_power = max(signal_energy_nodc(noise, arr_len), 1);
 
-  *snr = dB_fixed((int32_t)((signal_power<<factor_bits)/(noise_power))) - factor_dB;
+  *snr = dB_fixed(signal_power) - dB_fixed(noise_power);
 
 #ifdef SRS_DEBUG
   LOG_I(NR_PHY,"noise_power = %u, SNR = %i dB\n", noise_power, *snr);

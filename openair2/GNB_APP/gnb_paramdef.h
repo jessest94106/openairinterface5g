@@ -131,22 +131,23 @@ typedef enum {
 #define GNB_CONFIG_STRING_DRBS                          "drbs"
 #define GNB_CONFIG_STRING_USE_DELTA_MCS                 "use_deltaMCS"
 #define GNB_CONFIG_HLP_USE_DELTA_MCS                    "Use deltaMCS-based power headroom reporting in PUSCH-Config"
-#define GNB_CONFIG_HLP_FORCEUL256QAMOFF                   "suppress activation of UL 256 QAM despite UE support"
+#define GNB_CONFIG_HLP_FORCEUL256QAMOFF                 "suppress activation of UL 256 QAM despite UE support"
 #define GNB_CONFIG_STRING_FORCEUL256QAMOFF              "force_UL256qam_off"
-#define GNB_CONFIG_STRING_GNB_DU_ID "gNB_DU_ID"
-#define GNB_CONFIG_STRING_GNB_CU_UP_ID "gNB_CU_UP_ID"
-#define GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES "num_dlharq"
-#define GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES "num_ulharq"
+#define GNB_CONFIG_STRING_GNB_DU_ID                     "gNB_DU_ID"
+#define GNB_CONFIG_STRING_GNB_CU_UP_ID                  "gNB_CU_UP_ID"
+#define GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES          "num_dlharq"
+#define GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES          "num_ulharq"
+#define GNB_CONFIG_STRING_BEAM_WEIGHTS_LIST             "beam_weights"
 
 #define GNB_CONFIG_HLP_STRING_ENABLE_SDAP               "enable the SDAP layer\n"
 #define GNB_CONFIG_HLP_FORCE256QAMOFF                   "suppress activation of 256 QAM despite UE support"
 #define GNB_CONFIG_HLP_MAXMIMOLAYERS                    "limit on maxMIMO-layers for DL"
 #define GNB_CONFIG_HLP_DISABLE_HARQ                     "disable feedback for all HARQ processes (REL17 feature)"
 #define GNB_CONFIG_HLP_STRING_DRBS                      "Number of total DRBs to establish, including the mandatory for PDU SEssion (default=1)\n"
-#define GNB_CONFIG_HLP_GNB_DU_ID "defines the gNB-DU ID (only applicable for DU)"
-#define GNB_CONFIG_HLP_GNB_CU_UP_ID "defines the gNB-CU-UP ID (only applicable for CU-UP)"
-#define GNB_CONFIG_HLP_NUM_DL_HARQ "Set Num DL harq processes. Valid values 2,4,6,8,10,12,16,32. Default 16"
-#define GNB_CONFIG_HLP_NUM_UL_HARQ "Set Num UL harq processes. Valid values 16,32. Default 16"
+#define GNB_CONFIG_HLP_GNB_DU_ID                        "defines the gNB-DU ID (only applicable for DU)"
+#define GNB_CONFIG_HLP_GNB_CU_UP_ID                     "defines the gNB-CU-UP ID (only applicable for CU-UP)"
+#define GNB_CONFIG_HLP_NUM_DL_HARQ                      "Set Num DL harq processes. Valid values 2,4,6,8,10,12,16,32. Default 16"
+#define GNB_CONFIG_HLP_NUM_UL_HARQ                      "Set Num UL harq processes. Valid values 16,32. Default 16"
 
 /*-----------------------------------------------------------------------------------------------------------------------------------------*/
 /*                                            cell configuration parameters                                                                */
@@ -187,8 +188,9 @@ typedef enum {
 {GNB_CONFIG_STRING_FORCEUL256QAMOFF, GNB_CONFIG_HLP_FORCEUL256QAMOFF, 0,.iptr=NULL, .defintval=0,                 TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_MAXMIMOLAYERS, GNB_CONFIG_HLP_MAXMIMOLAYERS, 0,     .iptr=NULL,  .defintval=-1,                TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_DISABLE_HARQ, GNB_CONFIG_HLP_DISABLE_HARQ, PARAMFLAG_BOOL, .iptr=NULL, .defintval=0,           TYPE_INT,       0},  \
-{GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES, GNB_CONFIG_HLP_NUM_DL_HARQ,   0, .iptr=NULL,   .defintval=16,              TYPE_INT,     0}, \
-{GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES, GNB_CONFIG_HLP_NUM_UL_HARQ,   0, .iptr=NULL,   .defintval=16,              TYPE_INT,     0}, \
+{GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES, GNB_CONFIG_HLP_NUM_DL_HARQ, 0, .iptr=NULL, .defintval=16,                TYPE_INT,       0},  \
+{GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES, GNB_CONFIG_HLP_NUM_UL_HARQ, 0, .iptr=NULL, .defintval=16,                TYPE_INT,       0},  \
+{GNB_CONFIG_STRING_BEAM_WEIGHTS_LIST,            NULL,   0,       .iptr=NULL,       .defintarrayval=0,            TYPE_INTARRAY,  0},  \
 }
 // clang-format on
 
@@ -228,6 +230,7 @@ typedef enum {
 #define GNB_DISABLE_HARQ_IDX            32
 #define GNB_NUM_DL_HARQ_IDX             33
 #define GNB_NUM_UL_HARQ_IDX             34
+#define GNB_BEAMWEIGHTS_IDX             35
 
 #define TRACKING_AREA_CODE_OKRANGE {0x0001,0xFFFD}
 #define NUM_DL_HARQ_OKVALUES {2,4,6,8,10,12,16,32}
@@ -267,8 +270,9 @@ typedef enum {
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
-  { .s1 =  { config_check_intval, NUM_DL_HARQ_OKVALUES,8 } },      \
-  { .s1 =  { config_check_intval, NUM_UL_HARQ_OKVALUES,2 } },      \
+  { .s1 =  { config_check_intval, NUM_DL_HARQ_OKVALUES,8 } },     \
+  { .s1 =  { config_check_intval, NUM_UL_HARQ_OKVALUES,2 } },     \
+  { .s5 = { NULL } },                                             \
 }
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -633,3 +637,4 @@ typedef enum {
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 #endif
+

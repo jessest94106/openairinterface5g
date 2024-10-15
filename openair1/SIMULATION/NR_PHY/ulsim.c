@@ -625,6 +625,7 @@ int main(int argc, char *argv[])
   for (i = 0; i < RC.nb_nr_macrlc_inst; i++)
     RC.nb_nr_mac_CC[i] = 1;
   mac_top_init_gNB(ngran_gNB, scc, NULL /* scd will be updated further below */, &conf);
+  nr_mac_config_scc(RC.nrmac[0], scc, &conf);
 
   NR_ServingCellConfig_t *scd = calloc(1,sizeof(NR_ServingCellConfig_t));
   prepare_scd(scd);
@@ -656,7 +657,7 @@ int main(int argc, char *argv[])
   /* RU handles rxdataF, and gNB just has a pointer. Here, we don't have an RU,
    * so we need to allocate that memory as well. */
   for (i = 0; i < n_rx; i++)
-    gNB->common_vars.rxdataF[i] = malloc16_clear(gNB->frame_parms.samples_per_frame_wCP*sizeof(int32_t));
+    gNB->common_vars.rxdataF[0][i] = malloc16_clear(gNB->frame_parms.samples_per_frame_wCP*sizeof(int32_t));
   N_RB_DL = gNB->frame_parms.N_RB_DL;
 
   /* no RU: need to have rxdata */
@@ -723,7 +724,7 @@ int main(int argc, char *argv[])
 
   NR_gNB_ULSCH_t *ulsch_gNB = &gNB->ulsch[UE_id];
 
-  NR_Sched_Rsp_t *Sched_INFO = malloc(sizeof(*Sched_INFO));
+  NR_Sched_Rsp_t *Sched_INFO = malloc16_clear(sizeof(*Sched_INFO));
   memset((void*)Sched_INFO,0,sizeof(*Sched_INFO));
   nfapi_nr_ul_tti_request_t *UL_tti_req = &Sched_INFO->UL_tti_req;
   Sched_INFO->sched_response_id = -1;
@@ -936,6 +937,7 @@ int main(int argc, char *argv[])
   }
   //---------------
   int ret = 1;
+  int srs_ret = do_SRS;
   for (SNR = snr0; SNR <= snr1; SNR += snr_step) {
 
     varArray_t *table_rx=initVarArray(1000,sizeof(double));
@@ -970,6 +972,9 @@ int main(int argc, char *argv[])
     int min_pusch_delay = INT_MAX;
     int max_pusch_delay = INT_MIN;
     int delay_pusch_est_count = 0;
+
+    int64_t sum_srs_snr = 0;
+    int srs_snr_count = 0;
 
     for (trial = 0; trial < n_trials; trial++) {
 
@@ -1070,6 +1075,7 @@ int main(int argc, char *argv[])
           srs_pdu->subcarrier_spacing = frame_parms->subcarrier_spacing;
           srs_pdu->num_ant_ports = n_tx == 4 ? 2 : n_tx == 2 ? 1 : 0;
           srs_pdu->sequence_id = 40;
+          srs_pdu->time_start_position = frame_parms->symbols_per_slot - 1;
           srs_pdu->config_index = rrc_get_max_nr_csrs(srs_pdu->bwp_size, srs_pdu->bandwidth_index);
           srs_pdu->resource_type = NR_SRS_Resource__resourceType_PR_periodic;
           srs_pdu->t_srs = 1;
@@ -1228,7 +1234,7 @@ int main(int argc, char *argv[])
           for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++)
             nr_slot_fep_ul(&gNB->frame_parms,
                            (int32_t *)rxdata[aa],
-                           (int32_t *)gNB->common_vars.rxdataF[aa],
+                           (int32_t *)gNB->common_vars.rxdataF[0][aa],
                            symbol,
                            slot,
                            0);
@@ -1236,7 +1242,7 @@ int main(int argc, char *argv[])
         int offset = (slot & 3) * gNB->frame_parms.symbols_per_slot * gNB->frame_parms.ofdm_symbol_size;
         for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++)  {
           apply_nr_rotation_RX(&gNB->frame_parms,
-                               gNB->common_vars.rxdataF[aa],
+                               gNB->common_vars.rxdataF[0][aa],
                                gNB->frame_parms.symbol_rotation[1],
                                slot,
                                gNB->frame_parms.N_RB_UL,
@@ -1249,15 +1255,15 @@ int main(int argc, char *argv[])
 
         if (n_trials == 1 && round == 0) {
           LOG_M("rxsig0.m", "rx0", &rxdata[0][slot_offset], slot_length, 1, 1);
-          LOG_M("rxsigF0.m", "rxsF0", gNB->common_vars.rxdataF[0], 14 * frame_parms->ofdm_symbol_size, 1, 1);
+          LOG_M("rxsigF0.m", "rxsF0", gNB->common_vars.rxdataF[0][0], 14 * frame_parms->ofdm_symbol_size, 1, 1);
           if (precod_nbr_layers > 1) {
             LOG_M("rxsig1.m", "rx1", &rxdata[1][slot_offset], slot_length, 1, 1);
-            LOG_M("rxsigF1.m", "rxsF1", gNB->common_vars.rxdataF[1], 14 * frame_parms->ofdm_symbol_size, 1, 1);
+            LOG_M("rxsigF1.m", "rxsF1", gNB->common_vars.rxdataF[0][1], 14 * frame_parms->ofdm_symbol_size, 1, 1);
             if (precod_nbr_layers == 4) {
               LOG_M("rxsig2.m", "rx2", &rxdata[2][slot_offset], slot_length, 1, 1);
               LOG_M("rxsig3.m", "rx3", &rxdata[3][slot_offset], slot_length, 1, 1);
-              LOG_M("rxsigF2.m", "rxsF2", gNB->common_vars.rxdataF[2], 14 * frame_parms->ofdm_symbol_size, 1, 1);
-              LOG_M("rxsigF3.m", "rxsF3", gNB->common_vars.rxdataF[3], 14 * frame_parms->ofdm_symbol_size, 1, 1);
+              LOG_M("rxsigF2.m", "rxsF2", gNB->common_vars.rxdataF[0][2], 14 * frame_parms->ofdm_symbol_size, 1, 1);
+              LOG_M("rxsigF3.m", "rxsF3", gNB->common_vars.rxdataF[0][3], 14 * frame_parms->ofdm_symbol_size, 1, 1);
             }
           }
         }
@@ -1435,6 +1441,10 @@ int main(int argc, char *argv[])
       max_pusch_delay = max(ulsch_gNB->delay.est_delay, max_pusch_delay);
       delay_pusch_est_count++;
 
+      if (do_SRS == 1) {
+        sum_srs_snr += gNB->srs->snr;
+        srs_snr_count++;
+      }
     } // trial loop
 
     roundStats/=((float)n_trials);
@@ -1470,8 +1480,14 @@ int main(int argc, char *argv[])
 
     printf(") Avg round %.2f, Eff Rate %.4f bits/slot, Eff Throughput %.2f, TBS %u bits/slot\n", roundStats,effRate,effTP,TBS);
 
-    printf("DMRS-PUSCH delay estimation: min %i, max %i, average %f\n",
-           min_pusch_delay >> 1, max_pusch_delay >> 1, (double)sum_pusch_delay / (2 * delay_pusch_est_count));
+    double av_delay = (double)sum_pusch_delay / (2 * delay_pusch_est_count);
+    printf("DMRS-PUSCH delay estimation: min %i, max %i, average %2.1f\n", min_pusch_delay >> 1, max_pusch_delay >> 1, av_delay);
+
+    if (do_SRS == 1) {
+      float srs_snr_av = (float)sum_srs_snr / srs_snr_count;
+      srs_ret = srs_snr_av >= 0.7 * SNR || srs_snr_av > 30 ? 0 : 1;
+      printf("SNR based on SRS: %2.1f dB\n", srs_snr_av);
+    }
 
     printf("*****************************************\n");
     printf("\n");
@@ -1518,7 +1534,7 @@ int main(int argc, char *argv[])
     if(n_trials==1)
       break;
 
-    if ((float)effTP >= eff_tp_check) {
+    if (srs_ret == 0 && (float)effTP >= eff_tp_check) {
       printf("*************\n");
       printf("PUSCH test OK\n");
       printf("*************\n");

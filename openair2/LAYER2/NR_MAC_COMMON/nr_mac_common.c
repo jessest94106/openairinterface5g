@@ -655,6 +655,7 @@ NR_tda_info_t get_dl_tda_info(const NR_UE_DL_BWP_t *dl_BWP,
     case TYPE_CS_RNTI_:
     case TYPE_MCS_C_RNTI_:
     case TYPE_RA_RNTI_:
+    case TYPE_MSGB_RNTI_:
     case TYPE_TC_RNTI_:
       if(tdalist)
         tda_info = set_tda_info_from_list(tdalist, tda_index);
@@ -2658,16 +2659,17 @@ long get_transformPrecoding(const NR_UE_UL_BWP_t *current_UL_BWP, nr_dci_format_
       && current_UL_BWP->configuredGrantConfig->transformPrecoder)
     return *current_UL_BWP->configuredGrantConfig->transformPrecoder;
 
-  if (dci_format == NR_UL_DCI_FORMAT_0_1
+  long msg3_tp = NR_PUSCH_Config__transformPrecoder_disabled;
+  if (current_UL_BWP && current_UL_BWP->rach_ConfigCommon && current_UL_BWP->rach_ConfigCommon->msg3_transformPrecoder)
+    msg3_tp = NR_PUSCH_Config__transformPrecoder_enabled;
+
+  if (dci_format != NR_UL_DCI_FORMAT_0_0
       && current_UL_BWP
       && current_UL_BWP->pusch_Config
       && current_UL_BWP->pusch_Config->transformPrecoder)
     return *current_UL_BWP->pusch_Config->transformPrecoder;
 
-  if (current_UL_BWP && current_UL_BWP->rach_ConfigCommon && current_UL_BWP->rach_ConfigCommon->msg3_transformPrecoder)
-    return NR_PUSCH_Config__transformPrecoder_enabled;
-
-  return NR_PUSCH_Config__transformPrecoder_disabled;
+  return msg3_tp;
 }
 
 uint8_t get_pusch_nb_antenna_ports(NR_PUSCH_Config_t *pusch_Config,
@@ -5312,6 +5314,15 @@ rnti_t nr_get_ra_rnti(uint8_t s_id, uint8_t t_id, uint8_t f_id, uint8_t ul_carri
   return ra_rnti;
 }
 
+rnti_t nr_get_MsgB_rnti(uint8_t s_id, uint8_t t_id, uint8_t f_id, uint8_t ul_carrier_id)
+{
+  // 3GPP TS 38.321 Section 5.1.3a
+  rnti_t MsgB_rnti = 1 + s_id + 14 * t_id + 1120 * f_id + 8960 * ul_carrier_id + 17920;
+  LOG_D(MAC, "f_id %d t_id %d s_id %d ul_carrier_id %d Computed MsgB_RNTI is 0x%04X\n", f_id, t_id, s_id, ul_carrier_id, MsgB_rnti);
+
+  return MsgB_rnti;
+}
+
 int get_FeedbackDisabled(NR_DownlinkHARQ_FeedbackDisabled_r17_t *downlinkHARQ_FeedbackDisabled_r17, int harq_pid)
 {
   if (downlinkHARQ_FeedbackDisabled_r17 == NULL)
@@ -5321,4 +5332,21 @@ int get_FeedbackDisabled(NR_DownlinkHARQ_FeedbackDisabled_r17_t *downlinkHARQ_Fe
   const int bit_index = harq_pid % 8;
 
   return (downlinkHARQ_FeedbackDisabled_r17->buf[byte_index] >> (7 - bit_index)) & 1;
+}
+
+int nr_get_prach_mu(const NR_MsgA_ConfigCommon_r16_t *msgacc, const NR_RACH_ConfigCommon_t *rach_ConfigCommon)
+{
+  int mu;
+
+  // if 2-Step configuration file exists
+  if (msgacc && msgacc->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16) {
+    // Choose Subcarrier Spacing of configuration file of 2-Step
+    mu = *msgacc->rach_ConfigCommonTwoStepRA_r16.msgA_SubcarrierSpacing_r16;
+  } else if (rach_ConfigCommon->msg1_SubcarrierSpacing) {
+    // Choose Subcarrier Spacing of configuration file of 4-Step
+    mu = *rach_ConfigCommon->msg1_SubcarrierSpacing;
+  } else
+    AssertFatal(false, "PRACH subcarrier spacing mandatory present for L139, not supported otherwise\n");
+
+  return mu;
 }

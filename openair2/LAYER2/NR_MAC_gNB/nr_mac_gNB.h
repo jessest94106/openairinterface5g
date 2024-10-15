@@ -100,7 +100,6 @@
 #define MAX_NUM_OF_SSB 64
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
 #define MIN_NUM_PRBS_TO_SCHEDULE  5
-#define MAX_NUM_BEAM_PERIODS 4
 
 extern const uint8_t nr_rv_round_map[4];
 
@@ -114,16 +113,18 @@ typedef struct {
 } NR_list_t;
 
 typedef enum {
-  nrRA_gNB_IDLE = 0,
-  nrRA_Msg2 = 1,
-  nrRA_WAIT_Msg3 = 2,
-  nrRA_Msg3_retransmission = 3,
-  nrRA_Msg4 = 4,
-  nrRA_WAIT_Msg4_ACK = 5,
+  nrRA_gNB_IDLE,
+  nrRA_Msg2,
+  nrRA_WAIT_MsgA_PUSCH,
+  nrRA_WAIT_Msg3,
+  nrRA_Msg3_retransmission,
+  nrRA_Msg4,
+  nrRA_MsgB,
+  nrRA_WAIT_Msg4_MsgB_ACK,
 } RA_gNB_state_t;
 
 static const char *const nrra_text[] =
-    {"IDLE", "Msg2", "WAIT_Msg3", "Msg3_retransmission", "Msg3_dcch_dtch", "Msg4", "WAIT_Msg4_ACK"};
+    {"IDLE", "Msg2", "WAIT_MsgA_PUSCH", "WAIT_Msg3", "Msg3_retransmission", "Msg3_dcch_dtch", "Msg4", "MsgB", "WAIT_Msg4_ACK"};
 
 typedef struct {
   int idx;
@@ -166,6 +167,9 @@ typedef struct nr_mac_config_t {
   nr_mac_timers_t timer_config;
   int num_dlharq;
   int num_ulharq;
+  /// beamforming weight matrix size
+  int nb_bfw[2];
+  int32_t *bw_list;
 } nr_mac_config_t;
 
 typedef struct NR_preamble_ue {
@@ -219,6 +223,8 @@ typedef struct {
   rnti_t rnti;
   /// RA RNTI allocated from received PRACH
   uint16_t RA_rnti;
+  /// MsgB RNTI allocated from received MsgA
+  uint16_t MsgB_rnti;
   /// Received UE Contention Resolution Identifier
   uint8_t cont_res_id[6];
   /// Msg3 first RB
@@ -247,6 +253,7 @@ typedef struct {
   /// Preambles for contention-free access
   NR_preamble_ue_t preambles;
   int contention_resolution_timer;
+  nr_ra_type_t ra_type;
   /// CFRA flag
   bool cfra;
   // BWP for RA
@@ -753,7 +760,7 @@ typedef struct {
   NR_UE_NR_Capability_t *capability;
   // UE selected beam index
   uint8_t UE_beam_index;
-  bool Msg4_ACKed;
+  bool Msg4_MsgB_ACKed;
   float ul_thr_ue;
   float dl_thr_ue;
   long pdsch_HARQ_ACK_Codebook;
@@ -791,6 +798,11 @@ typedef struct f1_config_t {
   f1ap_setup_resp_t *setup_resp;
   uint32_t gnb_id; // associated gNB's ID, not used in DU itself
 } f1_config_t;
+
+typedef struct {
+  char *nvipc_shm_prefix;
+  int8_t nvipc_poll_core;
+} nvipc_params_t;
 
 /*! \brief top level eNB MAC structure */
 typedef struct gNB_MAC_INST_s {
@@ -908,7 +920,7 @@ typedef struct gNB_MAC_INST_s {
   uint8_t min_grant_mcs;
   bool identity_pm;
   int precoding_matrix_size[NR_MAX_NB_LAYERS];
-
+  int fapi_beam_index[MAX_NUM_OF_SSB];
   nr_mac_rrc_ul_if_t mac_rrc;
   f1_config_t f1_config;
   int16_t frame;

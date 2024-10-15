@@ -49,6 +49,11 @@
 #endif
 #include "lib/f1ap_interface_management.h"
 
+static int DEFBANDS[] = {7};
+static int DEFENBS[] = {0};
+static int DEFBFW[] = {0x00007fff};
+static int DEFRUTPCORES[] = {-1,-1,-1,-1};
+
 /**
  * @brief Helper define to allocate and initialize SetupRelease structures
  */
@@ -144,6 +149,28 @@ void prepare_scc(NR_ServingCellConfigCommon_t *scc)
   scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present = NR_EphemerisInfo_r17_PR_positionVelocity_r17;
   scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17 =
       calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17));
+}
+void prepare_msgA_scc(NR_ServingCellConfigCommon_t *scc) {
+  NR_BWP_UplinkCommon_t *initialUplinkBWP = scc->uplinkConfigCommon->initialUplinkBWP;
+  // Add the struct ext1
+  initialUplinkBWP->ext1 = calloc(1, sizeof(*initialUplinkBWP->ext1));
+  initialUplinkBWP->ext1->msgA_ConfigCommon_r16 = calloc(1, sizeof(*initialUplinkBWP->ext1->msgA_ConfigCommon_r16));
+  initialUplinkBWP->ext1->msgA_ConfigCommon_r16->present = NR_SetupRelease_MsgA_ConfigCommon_r16_PR_setup;
+  initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup =
+      calloc(1, sizeof(*initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup));
+  NR_MsgA_ConfigCommon_r16_t *NR_MsgA_ConfigCommon_r16 = initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup;
+  NR_MsgA_ConfigCommon_r16->rach_ConfigCommonTwoStepRA_r16.rach_ConfigGenericTwoStepRA_r16.msgB_ResponseWindow_r16 =
+      calloc(1, sizeof(long));
+  NR_MsgA_ConfigCommon_r16->rach_ConfigCommonTwoStepRA_r16.msgA_RSRP_Threshold_r16 = calloc(1, sizeof(NR_RSRP_Range_t));
+
+  NR_MsgA_ConfigCommon_r16->rach_ConfigCommonTwoStepRA_r16.msgA_CB_PreamblesPerSSB_PerSharedRO_r16 = calloc(1, sizeof(long));
+
+  NR_MsgA_ConfigCommon_r16->msgA_PUSCH_Config_r16 = calloc(1, sizeof(NR_MsgA_PUSCH_Config_r16_t));
+  NR_MsgA_PUSCH_Config_r16_t *msgA_PUSCH_Config_r16 = NR_MsgA_ConfigCommon_r16->msgA_PUSCH_Config_r16;
+  msgA_PUSCH_Config_r16->msgA_PUSCH_ResourceGroupA_r16 = calloc(1, sizeof(NR_MsgA_PUSCH_Resource_r16_t));
+  NR_MsgA_PUSCH_Resource_r16_t *msgA_PUSCH_Resource = msgA_PUSCH_Config_r16->msgA_PUSCH_ResourceGroupA_r16;
+  msgA_PUSCH_Resource->startSymbolAndLengthMsgA_PO_r16 = calloc(1, sizeof(long));
+  msgA_PUSCH_Config_r16->msgA_TransformPrecoder_r16 = calloc(1, sizeof(long));
 }
 
 // Section 4.1 in 38.213
@@ -266,7 +293,7 @@ void fill_scc_sim(NR_ServingCellConfigCommon_t *scc, uint64_t *ssb_bitmap, int N
   rach_ConfigCommon->choice.setup->prach_RootSequenceIndex.present = NR_RACH_ConfigCommon__prach_RootSequenceIndex_PR_l139;
   rach_ConfigCommon->choice.setup->prach_RootSequenceIndex.choice.l139 = 0;
   rach_ConfigCommon->choice.setup->restrictedSetConfig = NR_RACH_ConfigCommon__restrictedSetConfig_unrestrictedSet;
-  *rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing = -1;
+  *rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing = mu_ul;
   struct NR_SetupRelease_PUSCH_ConfigCommon *pusch_ConfigCommon = initialUplinkBWP->pusch_ConfigCommon;
 
   asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, add_PUSCH_TimeDomainResourceAllocation(55));
@@ -382,6 +409,14 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
   if ((int)*scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing == -1) {
     free(scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing);
     scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->msg1_SubcarrierSpacing=NULL;
+  }
+
+  if (scc->uplinkConfigCommon->initialUplinkBWP->ext1
+      && (int)scc->uplinkConfigCommon->initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice.setup->msgA_PUSCH_Config_r16
+                 ->msgA_PUSCH_ResourceGroupA_r16->msgA_PUSCH_TimeDomainOffset_r16
+             == 0) {
+    free(scc->uplinkConfigCommon->initialUplinkBWP->ext1);
+    scc->uplinkConfigCommon->initialUplinkBWP->ext1 = NULL;
   }
 
   if ((int)*scc->n_TimingAdvanceOffset == -1) {
@@ -935,14 +970,20 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
   uint64_t ssb_bitmap=0xff;
   prepare_scc(scc);
   paramdef_t SCCsParams[] = SCCPARAMS_DESC(scc);
+  prepare_msgA_scc(scc);
+  paramdef_t MsgASCCsParams[] = MSGASCCPARAMS_DESC(scc);
   paramlist_def_t SCCsParamList = {GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, NULL, 0};
+  paramlist_def_t MsgASCCsParamList = {GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, NULL, 0};
 
   char aprefix[MAX_OPTNAME_SIZE*2 + 8];
   sprintf(aprefix, "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
   config_getlist(cfg, &SCCsParamList, NULL, 0, aprefix);
-  if (SCCsParamList.numelt > 0) {
+  config_getlist(cfg, &MsgASCCsParamList, NULL, 0, aprefix);
+
+  if (SCCsParamList.numelt > 0 || MsgASCCsParamList.numelt > 0) {
     sprintf(aprefix, "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST,0,GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, 0);
     config_get(cfg, SCCsParams, sizeofArray(SCCsParams), aprefix);
+    config_get(cfg, MsgASCCsParams, sizeofArray(MsgASCCsParams), aprefix);
     struct NR_FrequencyInfoDL *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
     LOG_I(RRC,
           "Read in ServingCellConfigCommon (PhysCellId %d, ABSFREQSSB %d, DLBand %d, ABSFREQPOINTA %d, DLBW "
@@ -1267,6 +1308,21 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.pdsch_AntennaPorts.XP,
         config.pusch_AntennaPorts);
 
+  paramdef_t RUParams[] = RUPARAMS_DESC;
+  paramlist_def_t RUParamList = {CONFIG_STRING_RU_LIST, NULL, 0};
+  config_getlist(config_get_if(), &RUParamList, RUParams, sizeofArray(RUParams), NULL);
+  int num_tx = 0;
+  if (RUParamList.numelt > 0) {
+    for (int i = 0; i < RUParamList.numelt; i++)
+      num_tx += *(RUParamList.paramarray[i][RU_NB_TX_IDX].uptr);
+    AssertFatal(num_tx >= config.pdsch_AntennaPorts.XP * config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2,
+                "Number of logical antenna ports (set in config file with pdsch_AntennaPorts) cannot be larger than physical antennas (nb_tx)\n");
+  }
+  else {
+    // TODO temporary solution for 3rd party RU or nFAPI, in which case we don't have RU section present in the config file
+    num_tx = config.pdsch_AntennaPorts.XP * config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2;
+    LOG_E(GNB_APP, "RU information not present in config file. Assuming physical antenna ports equal to logical antenna ports %d\n", num_tx);
+  }
   config.minRXTXTIME = *GNBParamList.paramarray[0][GNB_MINRXTXTIME_IDX].iptr;
   LOG_I(GNB_APP, "minTXRXTIME %d\n", config.minRXTXTIME);
   config.sib1_tda = *GNBParamList.paramarray[0][GNB_SIB1_TDA_IDX].iptr;
@@ -1323,6 +1379,19 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.timer_config.t311,
         config.timer_config.n311,
         config.timer_config.t319);
+
+  if (config_isparamset(GNBParamList.paramarray[0], GNB_BEAMWEIGHTS_IDX)) {
+    int n = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].numelt;
+    AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
+    // each beam is described by a set of weights (one for each antenna)
+    // on the other hand in case of analog beamforming an index to the RU beam identifier is provided
+    config.nb_bfw[0] = num_tx;  // number of tx antennas
+    config.nb_bfw[1] = n / num_tx; // number of beams
+    config.bw_list = malloc16_clear(n * sizeof(*config.bw_list));
+    for (int b = 0; b < n; b++) {
+      config.bw_list[b] = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].iptr[b];
+    }
+  }
 
   NR_ServingCellConfigCommon_t *scc = get_scc_config(cfg, config.minRXTXTIME);
   //xer_fprint(stdout, &asn_DEF_NR_ServingCellConfigCommon, scc);
@@ -1424,6 +1493,8 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
       }
+      // triggers also PHY initialization in case we have L1 via FAPI
+      nr_mac_config_scc(RC.nrmac[j], scc, &config);
     } //  for (j=0;j<RC.nb_nr_macrlc_inst;j++)
 
     uint64_t gnb_du_id = 0;
@@ -2408,7 +2479,7 @@ ngran_node_t get_node_type(void)
   char aprefix[MAX_OPTNAME_SIZE*2 + 8];
   sprintf(aprefix, "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
   config_getlist(config_get_if(), &GNBE1ParamList, GNBE1Params, sizeofArray(GNBE1Params), aprefix);
-  if ( MacRLC_ParamList.numelt > 0) {
+  if (MacRLC_ParamList.numelt > 0) {
     RC.nb_nr_macrlc_inst = MacRLC_ParamList.numelt; 
     for (int j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       if (strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "f1") == 0) {

@@ -1662,7 +1662,7 @@ void extract_BEARER_CONTEXT_RELEASE_COMMAND(const E1AP_E1AP_PDU_t *pdu, e1ap_bea
         if ((ie->value.choice.Cause.present != E1AP_Cause_PR_NOTHING) &&
             (ie->value.choice.Cause.present != E1AP_Cause_PR_choice_extension))
           bearerCxt->cause = ie->value.choice.Cause.choice.radioNetwork;
-
+        break;
                                                  
       default:
         LOG_E(E1AP, "Handle for this IE is not implemented (or) invalid IE detected\n");
