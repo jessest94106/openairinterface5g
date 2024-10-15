@@ -59,13 +59,6 @@ typedef struct pdsch_scope_req_s {
 */
 void nr_ue_dlsch_init(NR_UE_DLSCH_t *dlsch_list, int num_dlsch, uint8_t max_ldpc_iterations);
 
-void nr_dlsch_deinterleaving(uint8_t symbol,
-                             uint8_t start_symbol,
-                             uint16_t L,
-                             uint16_t *llr,
-                             uint16_t *llr_deint,
-                             uint16_t nb_rb_pdsch);
-
 void nr_conjch0_mult_ch1(c16_t *ch0, c16_t *ch1, c16_t *ch0conj_ch1, unsigned short nb_rb, unsigned char output_shift0);
 
 /** \brief This is the alternative top-level entry point for DLSCH decoding in UE.
