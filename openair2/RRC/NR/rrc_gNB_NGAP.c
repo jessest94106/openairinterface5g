@@ -1091,7 +1091,6 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_
 {
   gNB_RRC_INST *rrc = RC.nrrrc[0];
   uint32_t gNB_ue_ngap_id = 0;
-  protocol_ctxt_t ctxt;
   gNB_ue_ngap_id = NGAP_UE_CONTEXT_RELEASE_COMMAND(msg_p).gNB_ue_ngap_id;
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[instance], gNB_ue_ngap_id);
 
@@ -1124,9 +1123,7 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_
   /* special case: the DU might be offline, in which case the f1_ue_data exists
    * but is set to 0 */
   if (cu_exists_f1_ue_data(UE->rrc_ue_id) && cu_get_f1_ue_data(UE->rrc_ue_id).du_assoc_id != 0) {
-    PROTOCOL_CTXT_SET_BY_INSTANCE(&ctxt, instance, GNB_FLAG_YES, UE->rrc_ue_id, 0, 0);
-    ctxt.eNB_index = 0;
-    rrc_gNB_generate_RRCRelease(&ctxt, ue_context_p);
+    rrc_gNB_generate_RRCRelease(rrc, UE);
 
     /* UE will be freed after UE context release complete */
   } else {
