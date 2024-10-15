@@ -481,14 +481,9 @@ static void rrc_gNB_process_RRCSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
   rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
 }
 
-//-----------------------------------------------------------------------------
-void rrc_gNB_generate_dedicatedRRCReconfiguration(const protocol_ctxt_t *const ctxt_pP, rrc_gNB_ue_context_t *ue_context_pP)
-//-----------------------------------------------------------------------------
+static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
-
-  uint8_t xid = rrc_gNB_get_next_transaction_identifier(ctxt_pP->module_id);
-  gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
+  uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   ue_p->xids[xid] = RRC_PDUSESSION_ESTABLISH;
   struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *dedicatedNAS_MessageList = CALLOC(1, sizeof(*dedicatedNAS_MessageList));
 
@@ -569,16 +564,6 @@ void rrc_gNB_generate_dedicatedRRCReconfiguration(const protocol_ctxt_t *const c
   ue_p->DRB_ReleaseList = NULL;
 
   LOG_I(NR_RRC, "UE %d: Generate RRCReconfiguration (bytes %d, xid %d)\n", ue_p->rrc_ue_id, size, xid);
-  LOG_D(NR_RRC,
-        "[FRAME %05d][RRC_gNB][MOD %u][][--- PDCP_DATA_REQ/%d Bytes (rrcReconfiguration to UE %x MUI %d) --->][PDCP][MOD %u][RB %u]\n",
-        ctxt_pP->frame,
-        ctxt_pP->module_id,
-        size,
-        ue_p->rnti,
-        rrc_gNB_mui,
-        ctxt_pP->module_id,
-        DCCH);
-
   nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
 }
 
@@ -1877,8 +1862,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
   }
 
-  protocol_ctxt_t ctxt = {.rntiMaybeUEid = resp->gNB_CU_ue_id, .module_id = instance};
-  rrc_gNB_generate_dedicatedRRCReconfiguration(&ctxt, ue_context_p);
+  rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
 }
 
 static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p)
@@ -1947,8 +1931,7 @@ static void rrc_CU_process_ue_context_release_complete(MessageDef *msg_p)
 static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, instance_t instance)
 {
   f1ap_ue_context_modif_resp_t *resp = &F1AP_UE_CONTEXT_MODIFICATION_RESP(msg_p);
-  protocol_ctxt_t ctxt = {.rntiMaybeUEid = resp->gNB_CU_ue_id, .module_id = instance, .instance = instance, .enb_flag = 1, .eNB_index = instance};
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt.module_id];
+  gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, resp->gNB_CU_ue_id);
   if (!ue_context_p) {
     LOG_E(RRC, "could not find UE context for CU UE ID %u, aborting transaction\n", resp->gNB_CU_ue_id);
@@ -1976,7 +1959,7 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
     }
     UE->masterCellGroup = cellGroupConfig;
 
-    rrc_gNB_generate_dedicatedRRCReconfiguration(&ctxt, ue_context_p);
+    rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
   }
 }
 
