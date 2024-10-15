@@ -35,10 +35,8 @@
 extern int cpu_meas_enabled;
 extern double cpu_freq_GHz  __attribute__ ((aligned(32)));;
 // structure to store data to compute cpu measurment
-#if defined(__x86_64__) || defined(__i386__)
+#if defined(__x86_64__) || defined(__i386__) || defined(__arm__) || defined(__aarch64__)
   typedef long long oai_cputime_t;
-#elif defined(__arm__) || defined(__aarch64__)
-  typedef uint32_t oai_cputime_t;
 #else
   #error "building on unsupported CPU architecture"
 #endif
