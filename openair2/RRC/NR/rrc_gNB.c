@@ -1946,11 +1946,10 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
   }
 }
 
-static void rrc_CU_process_ue_modification_required(MessageDef *msg_p)
+static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_t instance)
 {
+  gNB_RRC_INST *rrc = RC.nrrrc[instance];
   f1ap_ue_context_modif_required_t *required = &F1AP_UE_CONTEXT_MODIFICATION_REQUIRED(msg_p);
-  protocol_ctxt_t ctxt = {.rntiMaybeUEid = required->gNB_CU_ue_id, .module_id = 0, .instance = 0, .enb_flag = 1, .eNB_index = 0};
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt.module_id];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, required->gNB_CU_ue_id);
   if (ue_context_p == NULL) {
     LOG_E(RRC, "Could not find UE context for CU UE ID %d, cannot handle UE context modification request\n", required->gNB_CU_ue_id);
@@ -2344,7 +2343,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_REQUIRED:
-        rrc_CU_process_ue_modification_required(msg_p);
+        rrc_CU_process_ue_modification_required(msg_p, instance);
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_REQ:
