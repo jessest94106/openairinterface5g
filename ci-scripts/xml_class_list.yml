@@ -4,7 +4,6 @@
   - Build_PhySim
   - Run_CUDATest
   - Run_T2Test
-  - Run_NRulsimTest
   - Build_eNB
   - Initialize_eNB
   - Terminate_eNB

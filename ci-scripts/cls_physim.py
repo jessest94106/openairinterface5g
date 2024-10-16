@@ -123,33 +123,6 @@ class PhySim:
 			HTML.CreateHtmlTestRowQueue(self.runargs, 'KO', [info + '\n' + error_msg])
 		return success
 
-	def __CheckResults_NRulsimTest(self, HTML, CONST, testcase_id):
-		#retrieve run log file and store it locally
-		mySSH = sshconnection.SSHConnection()
-		filename = self.__workSpacePath + self.__runLogFile
-		ret = mySSH.copyin(self.eNBIpAddr, self.eNBUserName, self.eNBPassWord, filename, '.')
-		if ret != 0:
-			error_msg = f'could not recover test result file {filename}'
-			logging.error(error_msg)
-			HTML.CreateHtmlTestRowQueue("could not recover results", 'KO', [error_msg])
-			return False
-
-		PUSCH_OK = False
-		with open(self.__runLogFile) as f:
-			PUSCH_OK = 'PUSCH test OK' in f.read()
-
-		# once parsed move the local logfile to its folder for tidiness
-		os.system(f'mv {self.__runLogFile} {self.__runLogPath}/.')
-
-		#updating the HTML with results
-		if PUSCH_OK:
-			HTML.CreateHtmlTestRowQueue(self.runargs, 'OK', 1, ["succeeded"])
-		else:
-			error_msg = 'error: no "PUSCH test OK"'
-			logging.error(error_msg)
-			HTML.CreateHtmlTestRowQueue(self.runargs, 'KO', 1, [error_msg])
-		return PUSCH_OK
-
 	def __CheckBuild_PhySim(self, HTML, CONST):
 		self.__workSpacePath=self.eNBSourceCodePath+'/cmake_targets/'
 		mySSH = sshconnection.SSHConnection()
@@ -249,14 +222,3 @@ class PhySim:
 		mySSH.run(f'sudo {self.__workSpacePath}ran_build/build/{self.runsim} {self.runargs} > {self.__workSpacePath}{self.__runLogFile} 2>&1')
 		mySSH.close()
 		return self.__CheckResults_LDPCt2Test(htmlObj,constObj,testcase_id)
-
-	def Run_NRulsimTest(self, htmlObj, constObj, testcase_id):
-		self.__workSpacePath=self.eNBSourceCodePath+'/cmake_targets/'
-		os.system(f'mkdir -p ./{self.__runLogPath}')
-		self.__runLogFile = f'physim_{testcase_id}.log'
-		mySSH = sshconnection.SSHConnection()
-		mySSH.open(self.eNBIpAddr, self.eNBUserName, self.eNBPassWord)
-		mySSH.command(f'cd {self.__workSpacePath}', '\$', 5)
-		mySSH.command(f'sudo {self.__workSpacePath}ran_build/build/nr_ulsim {self.runargs} > {self.__runLogFile} 2>&1', '\$', 30)
-		mySSH.close()
-		return self.__CheckResults_NRulsimTest(htmlObj, constObj, testcase_id)

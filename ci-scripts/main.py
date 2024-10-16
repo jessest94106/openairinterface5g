@@ -377,14 +377,12 @@ def ExecuteActionWithParam(action):
 		elif action == 'Create_Workspace':
 			success = CONTAINERS.Create_Workspace(HTML)
 
-	elif action == 'Run_CUDATest' or action == 'Run_NRulsimTest' or action == 'Run_T2Test':
+	elif action == 'Run_CUDATest' or action == 'Run_T2Test':
 		ldpc.runargs = test.findtext('physim_run_args')
 		ldpc.runsim = test.findtext('physim_run')
 		ldpc.timethrs = test.findtext('physim_time_threshold')
 		if action == 'Run_CUDATest':
 			success = ldpc.Run_CUDATest(HTML,CONST,id)
-		elif action == 'Run_NRulsimTest':
-			success = ldpc.Run_NRulsimTest(HTML,CONST,id)
 		elif action == 'Run_T2Test':
 			success = ldpc.Run_T2Test(HTML,CONST,id)
 
