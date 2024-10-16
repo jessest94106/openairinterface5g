@@ -75,9 +75,7 @@ void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance,
                                                    int num_pdu,
                                                    uint32_t pdu_session_id[256]);
 
-void rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(const protocol_ctxt_t *const ctxt_pP,
-                                           rrc_gNB_ue_context_t *const ue_context_pP,
-                                           const NR_UECapabilityInformation_t *const ue_cap_info);
+void rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_UECapabilityInformation_t *const ue_cap_info);
 
 int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_t instance);
 

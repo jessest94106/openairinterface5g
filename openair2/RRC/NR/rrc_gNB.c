@@ -1390,19 +1390,14 @@ void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   UE->nas_pdu.length = 0;
 }
 
-static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
-                                          rrc_gNB_ue_context_t *ue_context_p,
-                                          const NR_UECapabilityInformation_t *ue_cap_info)
+static void handle_ueCapabilityInformation(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_UECapabilityInformation_t *ue_cap_info)
 {
-  AssertFatal(ue_context_p != NULL, "Processing %s() for UE %lx, ue_context_p is NULL\n", __func__, ctxt_pP->rntiMaybeUEid);
-  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-
   int xid = ue_cap_info->rrc_TransactionIdentifier;
   rrc_action_t a = UE->xids[xid];
   UE->xids[xid] = RRC_ACTION_NONE;
   if (a != RRC_UECAPABILITY_ENQUIRY) {
     LOG_E(NR_RRC, "UE %d: received unsolicited UE Capability Information, aborting procedure\n", UE->rrc_ue_id);
-    return -1;
+    return;
   }
 
   LOG_I(NR_RRC, "UE %d: received UE capabilities (xid %d)\n", UE->rrc_ue_id, xid);
@@ -1420,7 +1415,7 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
                                                       (void **)&UE->ue_cap_buffer.buf);
     if (UE->ue_cap_buffer.len <= 0) {
       LOG_E(RRC, "could not encode UE-CapabilityRAT-ContainerList, abort handling capabilities\n");
-      return -1;
+      return;
     }
 
     for (int i = 0; i < ue_CapabilityRAT_ContainerList->list.count; i++) {
@@ -1443,10 +1438,7 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
         }
 
         if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-          LOG_E(NR_RRC,
-                PROTOCOL_NR_RRC_CTXT_UE_FMT " Failed to decode nr UE capabilities (%zu bytes)\n",
-                PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP),
-                dec_rval.consumed);
+          LOG_E(NR_RRC, "UE %d: Failed to decode nr UE capabilities (%zu bytes)\n", UE->rrc_ue_id, dec_rval.consumed);
           ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
           UE->UE_Capability_nr = 0;
         }
@@ -1454,7 +1446,7 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
         UE->UE_Capability_size = ue_cap_container->ue_CapabilityRAT_Container.size;
         if (eutra_index != -1) {
           LOG_E(NR_RRC, "fatal: more than 1 eutra capability\n");
-          exit(1);
+          return;
         }
         eutra_index = i;
       }
@@ -1477,10 +1469,7 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
         }
 
         if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-          LOG_E(NR_RRC,
-                PROTOCOL_NR_RRC_CTXT_FMT " Failed to decode nr UE capabilities (%zu bytes)\n",
-                PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP),
-                dec_rval.consumed);
+          LOG_E(NR_RRC, "UE %d: Failed to decode nr UE capabilities (%zu bytes)\n", UE->rrc_ue_id, dec_rval.consumed);
           ASN_STRUCT_FREE(asn_DEF_NR_UE_MRDC_Capability, UE->UE_Capability_MRDC);
           UE->UE_Capability_MRDC = 0;
         }
@@ -1493,12 +1482,11 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
     }
 
     if (eutra_index == -1)
-      return -1;
+      return;
   }
 
-  rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(ctxt_pP, ue_context_p, ue_cap_info);
+  rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(rrc, UE, ue_cap_info);
 
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
   if (UE->n_initial_pdu > 0) {
     /* there were PDU sessions with the NG UE Context setup, but we had to set
      * up security and request capabilities, so trigger PDU sessions now. The
@@ -1510,7 +1498,7 @@ static int handle_ueCapabilityInformation(const protocol_ctxt_t *const ctxt_pP,
     rrc_forward_ue_nas_message(rrc, UE);
   }
 
-  return 0;
+  return;
 }
 
 static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCSetupComplete_t *setup_complete)
@@ -1726,9 +1714,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_ueCapabilityInformation:
-        if (handle_ueCapabilityInformation(ctxt_pP, ue_context_p, ul_dcch_msg->message.choice.c1->choice.ueCapabilityInformation)
-            == -1)
-          return -1;
+        handle_ueCapabilityInformation(rrc, UE, ul_dcch_msg->message.choice.c1->choice.ueCapabilityInformation);
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_rrcReestablishmentComplete:
