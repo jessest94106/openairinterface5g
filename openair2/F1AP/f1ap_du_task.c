@@ -34,6 +34,7 @@
 #include "f1ap_du_interface_management.h"
 #include "f1ap_du_ue_context_management.h"
 #include "f1ap_du_rrc_message_transfer.h"
+#include "lib/f1ap_rrc_message_transfer.h"
 #include "f1ap_du_task.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
 
@@ -180,6 +181,7 @@ void *F1AP_DU_task(void *arg) {
 
       case F1AP_UL_RRC_MESSAGE: // to rrc
         DU_send_UL_NR_RRC_MESSAGE_TRANSFER(assoc_id, &F1AP_UL_RRC_MESSAGE(msg));
+        free_ul_rrc_message_transfer(&F1AP_UL_RRC_MESSAGE(msg));
         break;
 
       case F1AP_UE_CONTEXT_SETUP_RESP:
