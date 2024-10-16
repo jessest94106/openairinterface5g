@@ -160,9 +160,6 @@ void pdcp_run(const protocol_ctxt_t *const ctxt_pP)
   abort();
 }
 
-/* forward declarations */
-void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs], NR_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]);
-
 /*---------------------BMC: timespec helpers -----------------------------*/
 
 struct timespec min_diff_time = { .tv_sec = 0, .tv_nsec = 0 };
@@ -404,57 +401,6 @@ static void get_options(configmodule_interface_t *cfg)
     NRRCConfig();
     NB_gNB_INST = RC.nb_nr_inst;
     NB_RU   = RC.nb_RU;
-  }
-}
-
-void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs],
-                             NR_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]) {
-  for (int CC_id=0; CC_id<MAX_NUM_CCs; CC_id++) {
-    frame_parms[CC_id] = (NR_DL_FRAME_PARMS *) malloc(sizeof(NR_DL_FRAME_PARMS));
-    config[CC_id] = (nfapi_nr_config_request_scf_t *) malloc(sizeof(nfapi_nr_config_request_scf_t));
-    config[CC_id]->ssb_config.scs_common.value = 1;
-    config[CC_id]->cell_config.frame_duplex_type.value = 1; //FDD
-    //config[CC_id]->subframe_config.dl_cyclic_prefix_type.value = 0; //NORMAL
-    config[CC_id]->carrier_config.dl_grid_size[1].value = 106;
-    config[CC_id]->carrier_config.ul_grid_size[1].value = 106;
-    config[CC_id]->cell_config.phy_cell_id.value = 0;
-    ///dl frequency to be filled in
-    /*  //Set some default values that may be overwritten while reading options
-        frame_parms[CC_id]->frame_type          = FDD;
-        frame_parms[CC_id]->tdd_config          = 3;
-        frame_parms[CC_id]->tdd_config_S        = 0;
-        frame_parms[CC_id]->N_RB_DL             = 100;
-        frame_parms[CC_id]->N_RB_UL             = 100;
-        frame_parms[CC_id]->Ncp                 = NORMAL;
-        frame_parms[CC_id]->Ncp_UL              = NORMAL;
-        frame_parms[CC_id]->Nid_cell            = 0;
-        frame_parms[CC_id]->num_MBSFN_config    = 0;
-        frame_parms[CC_id]->nb_antenna_ports_gNB  = 1;
-        frame_parms[CC_id]->nb_antennas_tx      = 1;
-        frame_parms[CC_id]->nb_antennas_rx      = 1;
-
-        frame_parms[CC_id]->nushift             = 0;
-
-        frame_parms[CC_id]->phich_config_common.phich_resource = oneSixth;
-        frame_parms[CC_id]->phich_config_common.phich_duration = normal;
-        // UL RS Config
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.cyclicShift = 0;//n_DMRS1 set to 0
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.groupHoppingEnabled = 0;
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.sequenceHoppingEnabled = 0;
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.groupAssignmentPUSCH = 0;
-
-        frame_parms[CC_id]->prach_config_common.rootSequenceIndex=22;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.zeroCorrelationZoneConfig=1;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.prach_ConfigIndex=0;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.highSpeedFlag=0;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.prach_FreqOffset=0;
-
-    //    downlink_frequency[CC_id][0] = 2680000000; // Use float to avoid issue with frequency over 2^31.
-    //    downlink_frequency[CC_id][1] = downlink_frequency[CC_id][0];
-    //    downlink_frequency[CC_id][2] = downlink_frequency[CC_id][0];
-    //    downlink_frequency[CC_id][3] = downlink_frequency[CC_id][0];
-        frame_parms[CC_id]->dl_CarrierFreq=downlink_frequency[CC_id][0];
-    */
   }
 }
 
