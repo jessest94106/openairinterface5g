@@ -1315,7 +1315,7 @@ void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
     return; // no problem: the UE will re-request a NAS PDU
 
   uint8_t buffer[4096];
-  unsigned int xid = rrc_gNB_get_next_transaction_identifier(0);
+  unsigned int xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   uint32_t length = do_NR_DLInformationTransfer(buffer, sizeof(buffer), xid, UE->nas_pdu.length, UE->nas_pdu.buffer);
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, buffer, length, "[MSG] RRC DL Information Transfer\n");
   rb_id_t srb_id = UE->Srb[2].Active ? DCCH1 : DCCH;
@@ -2445,7 +2445,7 @@ void rrc_gNB_generate_SecurityModeCommand(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
   T(T_ENB_RRC_SECURITY_MODE_COMMAND, T_INT(0), T_INT(0), T_INT(0), T_INT(ue_p->rrc_ue_id));
   NR_IntegrityProtAlgorithm_t integrity_algorithm = (NR_IntegrityProtAlgorithm_t)ue_p->integrity_algorithm;
   int size = do_NR_SecurityModeCommand(buffer,
-                                       rrc_gNB_get_next_transaction_identifier(0),
+                                       rrc_gNB_get_next_transaction_identifier(rrc->module_id),
                                        ue_p->ciphering_algorithm,
                                        integrity_algorithm);
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, (char *)buffer, size, "[MSG] RRC Security Mode Command\n");
