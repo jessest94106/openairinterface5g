@@ -79,12 +79,6 @@ void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE);
 unsigned int rrc_gNB_get_next_transaction_identifier(module_id_t gnb_mod_idP);
 
 void
-rrc_gNB_generate_UECapabilityEnquiry(
-  const protocol_ctxt_t *const ctxt_pP,
-  rrc_gNB_ue_context_t  *const ue_context_pP
-);
-
-void
 rrc_gNB_generate_RRCRelease(
   const protocol_ctxt_t *const ctxt_pP,
   rrc_gNB_ue_context_t  *const ue_context_pP

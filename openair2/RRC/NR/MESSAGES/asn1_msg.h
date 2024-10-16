@@ -86,9 +86,7 @@ int do_NR_SecurityModeCommand(uint8_t *const buffer,
                               const uint8_t cipheringAlgorithm,
                               NR_IntegrityProtAlgorithm_t integrityProtAlgorithm);
 
-int do_NR_SA_UECapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,
-                                 uint8_t               *const buffer,
-                                 const uint8_t                Transaction_id);
+int do_NR_SA_UECapabilityEnquiry(uint8_t *const buffer, const uint8_t Transaction_id);
 
 int do_NR_RRCRelease(uint8_t *buffer, size_t buffer_size, uint8_t Transaction_id);
 

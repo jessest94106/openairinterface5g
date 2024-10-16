@@ -559,12 +559,7 @@ int do_NR_SecurityModeCommand(uint8_t *const buffer,
   return((enc_rval.encoded+7)/8);
 }
 
-/*TODO*/
-//------------------------------------------------------------------------------
-int do_NR_SA_UECapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,
-                                 uint8_t               *const buffer,
-                                 const uint8_t         Transaction_id)
-//------------------------------------------------------------------------------
+int do_NR_SA_UECapabilityEnquiry(uint8_t *const buffer, const uint8_t Transaction_id)
 {
   NR_UE_CapabilityRequestFilterNR_t *sa_band_filter;
   NR_FreqBandList_t *sa_band_list;
@@ -624,7 +619,7 @@ int do_NR_SA_UECapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,
               enc_rval.failed_type->name, enc_rval.encoded);
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
 
-  LOG_D(NR_RRC, "[gNB %d] NR UECapabilityRequest for UE %lx Encoded %zd bits (%zd bytes)\n", ctxt_pP->module_id, ctxt_pP->rntiMaybeUEid, enc_rval.encoded, (enc_rval.encoded + 7) / 8);
+  LOG_D(NR_RRC, "NR UECapabilityRequestEncoded %zd bits (%zd bytes)\n", enc_rval.encoded, (enc_rval.encoded + 7) / 8);
 
   return((enc_rval.encoded+7)/8);
 }

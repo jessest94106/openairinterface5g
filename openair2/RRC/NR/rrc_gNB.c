@@ -1623,7 +1623,22 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
     }
   }
 }
-//-----------------------------------------------------------------------------
+
+static void rrc_gNB_generate_UECapabilityEnquiry(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue)
+{
+  uint8_t buffer[100];
+
+  T(T_ENB_RRC_UE_CAPABILITY_ENQUIRY, T_INT(rrc->module_id), T_INT(0), T_INT(0), T_INT(ue->rrc_ue_id));
+  uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
+  ue->xids[xid] = RRC_UECAPABILITY_ENQUIRY;
+  int size = do_NR_SA_UECapabilityEnquiry(buffer, xid);
+  LOG_I(NR_RRC, "UE %d: Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry (bytes %d, xid %d)\n", ue->rrc_ue_id, size, xid);
+
+  AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
+
+  nr_rrc_transfer_protected_rrc_message(rrc, ue, DCCH, buffer, size);
+}
+
 int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
                         const rb_id_t Srb_id,
                         const uint8_t *const Rx_sdu,
@@ -1682,38 +1697,15 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_securityModeComplete:
-        // to avoid segmentation fault
-        if (!ue_context_p) {
-          LOG_I(NR_RRC, "Processing securityModeComplete UE %lx, ue_context_p is NULL\n", ctxt_pP->rntiMaybeUEid);
-          break;
-        }
-
-        LOG_I(NR_RRC,
-              PROTOCOL_NR_RRC_CTXT_UE_FMT " received securityModeComplete on UL-DCCH %d from UE\n",
-              PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP),
-              DCCH);
-        LOG_D(NR_RRC,
-              PROTOCOL_NR_RRC_CTXT_UE_FMT
-              " RLC RB %02d --- RLC_DATA_IND %d bytes "
-              "(securityModeComplete) ---> RRC_eNB\n",
-              PROTOCOL_NR_RRC_CTXT_UE_ARGS(ctxt_pP),
-              DCCH,
-              sdu_sizeP);
-
-        if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
-          xer_fprint(stdout, &asn_DEF_NR_UL_DCCH_Message, (void *)ul_dcch_msg);
-        }
-
         /* configure ciphering */
-        nr_rrc_pdcp_config_security(&ue_context_p->ue_context, true);
-        ue_context_p->ue_context.as_security_active = true;
+        nr_rrc_pdcp_config_security(UE, true);
+        UE->as_security_active = true;
 
         /* trigger UE capability enquiry if we don't have them yet */
-        if (ue_context_p->ue_context.ue_cap_buffer.len == 0) {
-          rrc_gNB_generate_UECapabilityEnquiry(ctxt_pP, ue_context_p);
+        if (UE->ue_cap_buffer.len == 0) {
+          rrc_gNB_generate_UECapabilityEnquiry(rrc, UE);
           /* else blocks are executed after receiving UE capability info */
-        } else if (ue_context_p->ue_context.n_initial_pdu > 0) {
-          gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+        } else if (UE->n_initial_pdu > 0) {
           /* there were PDU sessions with the NG UE Context setup, but we had
            * to set up security, so trigger PDU sessions now. The UE NAS
            * message will be forwarded in the corresponding reconfiguration,
@@ -1723,7 +1715,7 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
           /* we already have capabilities, and no PDU sessions to setup, ack
            * this UE */
           rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(rrc, UE);
-          rrc_forward_ue_nas_message(RC.nrrrc[0], &ue_context_p->ue_context);
+          rrc_forward_ue_nas_message(rrc, UE);
         }
         break;
 
@@ -2573,28 +2565,6 @@ void rrc_gNB_generate_SecurityModeCommand(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
   LOG_I(NR_RRC, "UE %u Logical Channel DL-DCCH, Generate SecurityModeCommand (bytes %d)\n", ue_p->rrc_ue_id, size);
 
   nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
-}
-
-void
-rrc_gNB_generate_UECapabilityEnquiry(
-  const protocol_ctxt_t *const ctxt_pP,
-  rrc_gNB_ue_context_t          *const ue_context_pP
-)
-//-----------------------------------------------------------------------------
-{
-  uint8_t buffer[100];
-
-  T(T_ENB_RRC_UE_CAPABILITY_ENQUIRY, T_INT(ctxt_pP->module_id), T_INT(ctxt_pP->frame), T_INT(ctxt_pP->subframe), T_INT(ctxt_pP->rntiMaybeUEid));
-  gNB_RRC_UE_t *ue = &ue_context_pP->ue_context;
-  uint8_t xid = rrc_gNB_get_next_transaction_identifier(ctxt_pP->module_id);
-  ue->xids[xid] = RRC_UECAPABILITY_ENQUIRY;
-  int size = do_NR_SA_UECapabilityEnquiry(ctxt_pP, buffer, xid);
-  LOG_I(NR_RRC, "UE %d: Logical Channel DL-DCCH, Generate NR UECapabilityEnquiry (bytes %d, xid %d)\n", ue->rrc_ue_id, size, xid);
-
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
-  AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
-
-  nr_rrc_transfer_protected_rrc_message(rrc, ue, DCCH, buffer, size);
 }
 
 typedef struct deliver_ue_ctxt_release_data_t {
