@@ -309,15 +309,6 @@ void install_nr_schedule_handlers(NR_IF_Module_t *if_inst)
   if_inst->NR_PHY_config_req = nr_phy_config_request;
   if_inst->NR_Schedule_response = nr_schedule_response;
 }
-/*
-void install_schedule_handlers(IF_Module_t *if_inst)
-{
-  if_inst->PHY_config_req = phy_config_request;
-  if_inst->schedule_response = schedule_response;
-}*/
-
-/// this function is a temporary addition for NR configuration
-
 
 void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
                                int N_RB_DL,
