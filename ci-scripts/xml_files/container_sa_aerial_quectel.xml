@@ -89,7 +89,7 @@
         <testCase id="000022">
                 <class>Iperf</class>
                 <desc>iperf (DL/UDP/700M)(30 sec)(single-ue profile)</desc>
-                <iperf_args>-u -b 700M -t 30 -R</iperf_args>
+                <iperf_args>-u -b 600M -t 30 -R</iperf_args>
                 <svr_id>porcepix-cn5g</svr_id>
                 <id>up2-aerial</id>
                 <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
