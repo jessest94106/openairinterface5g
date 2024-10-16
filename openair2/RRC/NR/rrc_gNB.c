@@ -1614,33 +1614,29 @@ static void rrc_gNB_generate_UECapabilityEnquiry(gNB_RRC_INST *rrc, gNB_RRC_UE_t
   nr_rrc_transfer_protected_rrc_message(rrc, ue, DCCH, buffer, size);
 }
 
-int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
-                        const rb_id_t Srb_id,
-                        const uint8_t *const Rx_sdu,
-                        const sdu_size_t sdu_sizeP)
-//-----------------------------------------------------------------------------
+static int rrc_gNB_decode_dcch(gNB_RRC_INST *rrc, const f1ap_ul_rrc_message_t *msg)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[ctxt_pP->module_id];
-
   /* we look up by CU UE ID! Do NOT change back to RNTI! */
-  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, ctxt_pP->rntiMaybeUEid);
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, msg->gNB_CU_ue_id);
   if (!ue_context_p) {
-    LOG_E(RRC, "could not find UE context for CU UE ID %lu, aborting transaction\n", ctxt_pP->rntiMaybeUEid);
+    LOG_E(RRC, "could not find UE context for CU UE ID %u, aborting transaction\n", msg->gNB_CU_ue_id);
     return -1;
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
-  if ((Srb_id != 1) && (Srb_id != 2)) {
-    LOG_E(NR_RRC, "Received message on SRB%ld, should not have ...\n", Srb_id);
-  } else {
-    LOG_D(NR_RRC, "Received message on SRB%ld\n", Srb_id);
+  if (msg->srb_id < 1 || msg->srb_id > 2) {
+    LOG_E(NR_RRC, "Received message on SRB %d, discarding message\n", msg->srb_id);
+    return -1;
   }
 
+  LOG_D(NR_RRC, "UE %d: Decoding DCCH %d size %d\n", UE->rrc_ue_id, msg->srb_id, msg->rrc_container_length);
+  LOG_DUMPMSG(RRC, DEBUG_RRC, (char *)msg->rrc_container, msg->rrc_container_length, "[MSG] RRC UL Information Transfer \n");
   NR_UL_DCCH_Message_t *ul_dcch_msg = NULL;
-  asn_dec_rval_t dec_rval = uper_decode(NULL, &asn_DEF_NR_UL_DCCH_Message, (void **)&ul_dcch_msg, Rx_sdu, sdu_sizeP, 0, 0);
+  asn_dec_rval_t dec_rval =
+      uper_decode(NULL, &asn_DEF_NR_UL_DCCH_Message, (void **)&ul_dcch_msg, msg->rrc_container, msg->rrc_container_length, 0, 0);
 
   if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-    LOG_E(NR_RRC, "Failed to decode UL-DCCH (%zu bytes)\n", dec_rval.consumed);
+    LOG_E(NR_RRC, "UE %d: Failed to decode UL-DCCH (%zu bytes)\n", UE->rrc_ue_id, dec_rval.consumed);
     return -1;
   }
 
@@ -1667,7 +1663,6 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_ulInformationTransfer:
-        LOG_DUMPMSG(RRC, DEBUG_RRC, (char *)Rx_sdu, sdu_sizeP, "[MSG] RRC UL Information Transfer \n");
         rrc_gNB_send_NGAP_UPLINK_NAS(rrc, UE, ul_dcch_msg);
         break;
 
@@ -1695,7 +1690,6 @@ int rrc_gNB_decode_dcch(const protocol_ctxt_t *const ctxt_pP,
         break;
 
       case NR_UL_DCCH_MessageType__c1_PR_securityModeFailure:
-        LOG_DUMPMSG(NR_RRC, DEBUG_RRC, (char *)Rx_sdu, sdu_sizeP, "[MSG] NR RRC Security Mode Failure\n");
         LOG_E(NR_RRC, "UE %d: received securityModeFailure\n", ue_context_p->ue_context.rrc_ue_id);
         LOG_W(NR_RRC, "Cannot continue as no AS security is activated (implementation missing)\n");
         break;
@@ -2324,7 +2318,6 @@ void *rrc_gnb_task(void *args_p) {
   MessageDef *msg_p;
   instance_t                         instance;
   int                                result;
-  protocol_ctxt_t ctxt = {.module_id = 0, .enb_flag = 1, .instance = 0, .rntiMaybeUEid = 0, .frame = -1, .subframe = -1, .eNB_index = 0, .brOption = false};
 
   long stats_timer_id = 1;
   if (!IS_SOFTMODEM_NOSTATS_BIT) {
@@ -2371,23 +2364,7 @@ void *rrc_gnb_task(void *args_p) {
       /* Messages from PDCP */
       /* From DU -> CU */
       case F1AP_UL_RRC_MESSAGE:
-        PROTOCOL_CTXT_SET_BY_INSTANCE(&ctxt,
-                                      instance,
-                                      GNB_FLAG_YES,
-                                      F1AP_UL_RRC_MESSAGE(msg_p).gNB_CU_ue_id,
-                                      0,
-                                      0);
-        LOG_D(NR_RRC,
-              "Decoding DCCH %d: ue %04lx, inst %ld, ctxt %p, size %d\n",
-              F1AP_UL_RRC_MESSAGE(msg_p).srb_id,
-              ctxt.rntiMaybeUEid,
-              instance,
-              &ctxt,
-              F1AP_UL_RRC_MESSAGE(msg_p).rrc_container_length);
-        rrc_gNB_decode_dcch(&ctxt,
-                            F1AP_UL_RRC_MESSAGE(msg_p).srb_id,
-                            F1AP_UL_RRC_MESSAGE(msg_p).rrc_container,
-                            F1AP_UL_RRC_MESSAGE(msg_p).rrc_container_length);
+        rrc_gNB_decode_dcch(RC.nrrrc[instance], &F1AP_UL_RRC_MESSAGE(msg_p));
         free(F1AP_UL_RRC_MESSAGE(msg_p).rrc_container);
         break;
 
