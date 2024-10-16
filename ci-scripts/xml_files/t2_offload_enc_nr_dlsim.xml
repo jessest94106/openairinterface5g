@@ -35,8 +35,8 @@
 		<desc>Run nr_dlsim with CPU: SNR = 30, MCS = 5, 106 PRBs, 1 layer</desc>
 		<always_exec>true</always_exec>
 		<physim_run>nr_dlsim</physim_run>
-		<physim_time_threshold>200</physim_time_threshold>
-		<physim_run_args>-n100 -s30 -S30.2 -e5 -b106 -R106 -X8 -P</physim_run_args>
+		<physim_time_threshold>230</physim_time_threshold>
+		<physim_run_args>-n100 -s30 -S30.2 -e5 -b106 -R106 -X 8,9,10,11,12 -P</physim_run_args>
 	</testCase>
 
 	<testCase id="000112">
@@ -53,8 +53,8 @@
 		<desc>Run nr_dlsim with CPU: SNR = 30, MCS = 15, 106 PRBs, 1 layer</desc>
 		<always_exec>true</always_exec>
 		<physim_run>nr_dlsim</physim_run>
-		<physim_time_threshold>3000</physim_time_threshold>
-		<physim_run_args>-n100 -s30 -S30.2 -e15 -b106 -R106 -X8 -P</physim_run_args>
+		<physim_time_threshold>300</physim_time_threshold>
+		<physim_run_args>-n100 -s30 -S30.2 -e15 -b106 -R106 -X 8,9,10,11,12 -P</physim_run_args>
 	</testCase>
 
 	<testCase id="000122">
@@ -71,8 +71,8 @@
                 <desc>Run nr_dlsim with CPU: SNR = 30, MCS = 25, 106 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>400</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e25 -b106 -R106 -X8 -P</physim_run_args>
+                <physim_time_threshold>350</physim_time_threshold>
+                <physim_run_args>-n100 -s30 -S30.2 -e25 -b106 -R106 -X 8,9,10,11,12 -P</physim_run_args>
         </testCase>
 
         <testCase id="000132">
@@ -90,7 +90,7 @@
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
                 <physim_time_threshold>300</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e5 -b273 -R273 -X8 -P</physim_run_args>
+                <physim_run_args>-n100 -s30 -S30.2 -e5 -b273 -R273 -X 8,9,10,11,12 -P</physim_run_args>
         </testCase>
 
         <testCase id="000212">
@@ -107,8 +107,8 @@
                 <desc>Run nr_dlsim with CPU: SNR = 30, MCS = 15, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>450</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e15 -b273 -R273 -X8 -P</physim_run_args>
+                <physim_time_threshold>350</physim_time_threshold>
+                <physim_run_args>-n100 -s30 -S30.2 -e15 -b273 -R273 -X 8,9,10,11,12 -P</physim_run_args>
         </testCase>
 
         <testCase id="000222">
@@ -125,8 +125,8 @@
                 <desc>Run nr_dlsim with CPU: SNR = 30, MCS = 25, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>500</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e25 -b273 -R273 -X8 -P</physim_run_args>
+                <physim_time_threshold>400</physim_time_threshold>
+                <physim_run_args>-n100 -s30 -S30.2 -e25 -b273 -R273 -X 8,9,10,11,12 -P</physim_run_args>
         </testCase>
 
         <testCase id="000232">
@@ -143,8 +143,8 @@
                 <desc>Run nr_dlsim with CPU: SNR = 30, MCS = 5, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>350</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e5 -b273 -R273 -X8 -x2 -z2 -y2 -P</physim_run_args>
+                <physim_time_threshold>400</physim_time_threshold>
+                <physim_run_args>-n100 -s30 -S30.2 -e5 -b273 -R273 -X 8,9,10,11,12 -x2 -z2 -y2 -P</physim_run_args>
         </testCase>
 
         <testCase id="000312">
@@ -161,8 +161,8 @@
                 <desc>Run nr_dlsim with CPU: SNR = 30, MCS = 15, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>600</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e15 -b273 -R273 -X8 -x2 -z2 -y2 -P</physim_run_args>
+                <physim_time_threshold>450</physim_time_threshold>
+                <physim_run_args>-n100 -s30 -S30.2 -e15 -b273 -R273 -X 8,9,10,11,12 -x2 -z2 -y2 -P</physim_run_args>
         </testCase>
 
         <testCase id="000322">
@@ -179,8 +179,8 @@
                 <desc>Run nr_dlsim with CPU: SNR = 30, MCS = 25, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>800</physim_time_threshold>
-                <physim_run_args>-n100 -s30 -S30.2 -e25 -b273 -R273 -X8 -x2 -z2 -y2 -P</physim_run_args>
+                <physim_time_threshold>500</physim_time_threshold>
+                <physim_run_args>-n100 -s30 -S30.2 -e25 -b273 -R273 -X 8,9,10,11,12 -x2 -z2 -y2 -P</physim_run_args>
         </testCase>
 
         <testCase id="000332">
@@ -188,7 +188,7 @@
                 <desc>Run nr_dlsim with T2 LDPC offload: SNR = 30, MCS = 25, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
                 <physim_run>nr_dlsim</physim_run>
-                <physim_time_threshold>800</physim_time_threshold>
+                <physim_time_threshold>500</physim_time_threshold>
                 <physim_run_args>-n100 -s30 -S30.2 -e25 -b273 -R273 -c -x2 -z2 -y2 -P --ldpc_offload.dpdk_dev d8:00.0</physim_run_args>
         </testCase>
 
