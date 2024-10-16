@@ -151,7 +151,7 @@
                 <class>Custom_Command</class>
                 <desc>Simulate a disruption of DL radio channel (ploss 55)(5 sec)</desc>
                 <node>cacofonix</node>
-                <command>echo channelmod modify 0 ploss 55 | nc -N 192.168.71.181 8091 &amp;&amp; sleep 5</command>
+                <command>echo channelmod modify 0 ploss 55 | nc 192.168.71.181 8091 &amp;&amp; sleep 5</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
@@ -159,7 +159,7 @@
                 <class>Custom_Command</class>
                 <desc>Get UE sync state (UE ID 0)</desc>
                 <node>cacofonix</node>
-                <command>echo ciUE sync_state 0 | nc -N 192.168.71.181 8091 | grep -E UE_NOT_SYNC</command>
+                <command>echo ciUE sync_state 0 | nc 192.168.71.181 8091 | grep -E UE_NOT_SYNC</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
@@ -167,7 +167,7 @@
                 <class>Custom_Command</class>
                 <desc>Restoration of the original DL channel conditions (ploss 0)(5 sec)</desc>
                 <node>cacofonix</node>
-                <command>echo channelmod modify 0 ploss 0 | nc -N 192.168.71.181 8091 &amp;&amp; sleep 5</command>
+                <command>echo channelmod modify 0 ploss 0 | nc 192.168.71.181 8091 &amp;&amp; sleep 5</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
@@ -175,7 +175,7 @@
                 <class>Custom_Command</class>
                 <desc>Get UE sync state (UE ID 0)</desc>
                 <node>cacofonix</node>
-                <command>echo ciUE sync_state 0 | nc -N 192.168.71.181 8091 | grep -E UE_CONNECTED &amp;&amp; sleep 10</command>
+                <command>echo ciUE sync_state 0 | nc 192.168.71.181 8091 | grep -E UE_CONNECTED &amp;&amp; sleep 10</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
