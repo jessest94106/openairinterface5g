@@ -186,6 +186,8 @@ int DU_handle_F1_SETUP_RESPONSE(instance_t instance, sctp_assoc_t assoc_id, uint
   }
   LOG_D(F1AP, "Sending F1AP_SETUP_RESP ITTI message\n");
   f1_setup_response(&resp);
+  // free F1AP message after use
+  free_f1ap_setup_response(&resp);
   return 0;
 }
 
