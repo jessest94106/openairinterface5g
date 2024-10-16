@@ -92,27 +92,18 @@ unsigned short config_frames[4] = {2,9,11,13};
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
 int nfapi_sync_var=-1; //!< protected by mutex \ref nfapi_sync_mutex
-
-extern uint8_t nfapi_mode; // Default to monolithic mode
 THREAD_STRUCT thread_struct;
 pthread_cond_t sync_cond;
 pthread_mutex_t sync_mutex;
 int sync_var=-1; //!< protected by mutex \ref sync_mutex.
 int config_sync_var=-1;
-
-volatile int             start_gNB = 0;
 int oai_exit = 0;
-
-int NB_UE_INST = 0;
-
 static int wait_for_sync = 0;
 
 unsigned int mmapped_dma=0;
 
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
 int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
-
-//Temp fix for inexistent NR upper layer
 unsigned char NB_gNB_INST = 1;
 char *uecap_file;
 
@@ -131,26 +122,10 @@ double rx_gain[MAX_NUM_CCs][4] = {{110,0,0,0},{20,0,0,0}};
 double rx_gain_off = 0.0;
 
 static int tx_max_power[MAX_NUM_CCs]; /* =  {0,0}*/;
-
-
 int chain_offset=0;
-
-uint8_t dci_Format = 0;
-uint8_t nb_antenna_tx = 1;
-uint8_t nb_antenna_rx = 1;
-
-int otg_enabled;
-
 extern void *udp_eNB_task(void *args_p);
-
-int transmission_mode=1;
 int emulate_rf = 0;
 int numerology = 0;
-
-
-/* struct for ethernet specific parameters given in eNB conf file */
-eth_params_t *eth_params;
-
 double cpuf;
 
 /* hack: pdcp_run() is required by 4G scheduler which is compiled into
