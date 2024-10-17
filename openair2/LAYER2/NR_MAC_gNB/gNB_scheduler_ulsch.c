@@ -1655,7 +1655,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   if (reuse_old_tda && nrOfLayers == retInfo->nrOfLayers) {
     /* Check the resource is enough for retransmission */
     const uint16_t slbitmap = SL_to_bitmap(retInfo->tda_info.startSymbolIndex, retInfo->tda_info.nrOfSymbols);
-    while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+    while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap))
       rbStart++;
     if (rbStart + retInfo->rbSize > bwpSize) {
       LOG_D(NR_MAC, "[UE %04x][%4d.%2d] could not allocate UL retransmission: no resources (rbStart %d, retInfo->rbSize %d, bwpSize %d) \n",
@@ -1676,10 +1676,10 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
     /* the retransmission will use a different time domain allocation, check
      * that we have enough resources */
     const uint16_t slbitmap = SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
-    while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+    while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap))
       rbStart++;
     int rbSize = 0;
-    while (rbStart + rbSize < bwpSize && (rballoc_mask[rbStart + rbSize] & slbitmap) == slbitmap)
+    while (rbStart + rbSize < bwpSize && !(rballoc_mask[rbStart + rbSize] & slbitmap))
       rbSize++;
     uint32_t new_tbs;
     uint16_t new_rbSize;
@@ -1762,7 +1762,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   /* Mark the corresponding RBs as used */
   n_rb_sched -= sched_pusch->rbSize;
   for (int rb = 0; rb < sched_ctrl->sched_pusch.rbSize; rb++)
-    rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] ^= SL_to_bitmap(sched_pusch->tda_info.startSymbolIndex, sched_pusch->tda_info.nrOfSymbols);
+    rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] |= SL_to_bitmap(sched_pusch->tda_info.startSymbolIndex, sched_pusch->tda_info.nrOfSymbols);
   return true;
 }
 
@@ -1907,7 +1907,7 @@ static void pf_ul(module_id_t module_id,
       LOG_D(NR_MAC,"Looking for min_rb %d RBs, starting at %d num_dmrs_cdm_grps_no_data %d\n",
             min_rb, rbStart, sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data);
       const uint16_t slbitmap = SL_to_bitmap(sched_pusch->tda_info.startSymbolIndex, sched_pusch->tda_info.nrOfSymbols);
-      while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+      while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap))
         rbStart++;
       if (rbStart + min_rb >= bwpSize) {
         LOG_D(NR_MAC, "[UE %04x][%4d.%2d] could not allocate continuous UL data: no resources (rbStart %d, min_rb %d, bwpSize %d)\n",
@@ -1964,7 +1964,7 @@ static void pf_ul(module_id_t module_id,
       /* Mark the corresponding RBs as used */
       n_rb_sched -= sched_pusch->rbSize;
       for (int rb = 0; rb < sched_ctrl->sched_pusch.rbSize; rb++)
-        rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] ^= slbitmap;
+        rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] |= slbitmap;
 
       remainUEs--;
       continue;
@@ -2033,11 +2033,11 @@ static void pf_ul(module_id_t module_id,
     int rbStart = 0;
     const uint16_t slbitmap = SL_to_bitmap(sched_pusch->tda_info.startSymbolIndex, sched_pusch->tda_info.nrOfSymbols);
     const uint16_t bwpSize = current_BWP->BWPSize;
-    while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+    while (rbStart < bwpSize && (rballoc_mask[rbStart] & slbitmap))
       rbStart++;
     sched_pusch->rbStart = rbStart;
     uint16_t max_rbSize = 1;
-    while (rbStart + max_rbSize < bwpSize && (rballoc_mask[rbStart + max_rbSize] & slbitmap) == slbitmap)
+    while (rbStart + max_rbSize < bwpSize && !(rballoc_mask[rbStart + max_rbSize] & slbitmap))
       max_rbSize++;
 
     if (rbStart + min_rb >= bwpSize || max_rbSize < min_rb) {
@@ -2109,7 +2109,7 @@ static void pf_ul(module_id_t module_id,
 
     n_rb_sched -= sched_pusch->rbSize;
     for (int rb = 0; rb < sched_ctrl->sched_pusch.rbSize; rb++)
-      rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] ^= slbitmap;
+      rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] |= slbitmap;
 
     /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
     remainUEs--;
@@ -2202,8 +2202,8 @@ static bool nr_fr1_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_
   uint16_t rballoc_mask[bwpSize];
 
   /* Calculate mask: if any RB in vrb_map_UL is blocked (1), the current RB will be 0 */
-  for (int i = 0; i < bwpSize; i++)
-    rballoc_mask[i] = (i >= st && i <= e)*SL_to_bitmap(startSymbolIndex, nrOfSymbols);
+  for (int i = st; i < e; i++)
+    rballoc_mask[i] = vrb_map_UL[bwpStart + i];
 
   int bw = scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
   int average_agg_level = 4; // TODO find a better estimation

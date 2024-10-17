@@ -477,7 +477,7 @@ static bool allocate_dl_retransmission(module_id_t module_id,
       rbSize = 0;
 
       const uint16_t slbitmap = SL_to_bitmap(retInfo->tda_info.startSymbolIndex, retInfo->tda_info.nrOfSymbols);
-      while (rbStart < rbStop && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+      while (rbStart < rbStop && (rballoc_mask[rbStart] & slbitmap))
         rbStart++;
 
       if (rbStart >= rbStop) {
@@ -488,9 +488,7 @@ static bool allocate_dl_retransmission(module_id_t module_id,
         return false;
       }
 
-      while (rbStart + rbSize <= rbStop &&
-             (rballoc_mask[rbStart + rbSize] & slbitmap) == slbitmap &&
-             rbSize < retInfo->rbSize)
+      while (rbStart + rbSize <= rbStop && !(rballoc_mask[rbStart + rbSize] & slbitmap) &&  rbSize < retInfo->rbSize)
         rbSize++;
     }
   } else {
@@ -502,10 +500,10 @@ static bool allocate_dl_retransmission(module_id_t module_id,
                                                    layers);
 
     const uint16_t slbitmap = SL_to_bitmap(temp_tda.startSymbolIndex, temp_tda.nrOfSymbols);
-    while (rbStart < rbStop && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+    while (rbStart < rbStop && (rballoc_mask[rbStart] & slbitmap))
       rbStart++;
 
-    while (rbStart + rbSize <= rbStop && (rballoc_mask[rbStart + rbSize] & slbitmap) == slbitmap)
+    while (rbStart + rbSize <= rbStop && !(rballoc_mask[rbStart + rbSize] & slbitmap))
       rbSize++;
 
     uint32_t new_tbs;
@@ -594,7 +592,7 @@ static bool allocate_dl_retransmission(module_id_t module_id,
   *n_rb_sched -= sched_ctrl->sched_pdsch.rbSize;
 
   for (int rb = 0; rb < sched_ctrl->sched_pdsch.rbSize; rb++)
-    rballoc_mask[rb + sched_ctrl->sched_pdsch.rbStart] ^= SL_to_bitmap(retInfo->tda_info.startSymbolIndex, retInfo->tda_info.nrOfSymbols);
+    rballoc_mask[rb + sched_ctrl->sched_pdsch.rbStart] |= SL_to_bitmap(retInfo->tda_info.startSymbolIndex, retInfo->tda_info.nrOfSymbols);
 
   return true;
 }
@@ -810,12 +808,12 @@ static void pf_dl(module_id_t module_id,
     int rbStart = 0;
     get_start_stop_allocation(mac, iterator->UE, &rbStart, &rbStop);
     // Freq-demain allocation
-    while (rbStart < rbStop && (rballoc_mask[rbStart] & slbitmap) != slbitmap)
+    while (rbStart < rbStop && (rballoc_mask[rbStart] & slbitmap))
       rbStart++;
 
     uint16_t max_rbSize = 1;
 
-    while (rbStart + max_rbSize <= rbStop && (rballoc_mask[rbStart + max_rbSize] & slbitmap) == slbitmap)
+    while (rbStart + max_rbSize <= rbStop && !(rballoc_mask[rbStart + max_rbSize] & slbitmap))
       max_rbSize++;
 
     sched_pdsch->dmrs_parms = get_dl_dmrs_params(scc,
@@ -851,7 +849,7 @@ static void pf_dl(module_id_t module_id,
     n_rb_sched -= sched_pdsch->rbSize;
 
     for (int rb = 0; rb < sched_pdsch->rbSize; rb++)
-      rballoc_mask[rb + sched_pdsch->rbStart] ^= slbitmap;
+      rballoc_mask[rb + sched_pdsch->rbStart] |= slbitmap;
 
     remainUEs--;
     iterator++;
@@ -891,14 +889,10 @@ static void nr_fr1_dlsch_preprocessor(module_id_t module_id, frame_t frame, sub_
   int n_rb_sched = 0;
 
   for (int i = 0; i < bwpSize; i++) {
-    // calculate mask: init with "NOT" vrb_map:
-    // if any RB in vrb_map is blocked (1), the current RBG will be 0
-    rballoc_mask[i] = (~vrb_map[i+BWPStart])&0x3fff; //bitwise not and 14 symbols
-
+    rballoc_mask[i] = vrb_map[i + BWPStart];
     // if all the pdsch symbols are free
-    if ((rballoc_mask[i]&slbitmap) == slbitmap) {
+    if (!(rballoc_mask[i] & slbitmap))
       n_rb_sched++;
-    }
   }
 
   /* Retrieve amount of data to send for this UE */
