@@ -631,8 +631,12 @@ int main( int argc, char **argv ) {
   // don't create if node doesn't connect to RRC/S1/GTP
   const ngran_node_t node_type = get_node_type();
 
-  if (RC.nb_nr_L1_inst > 0)
+  if (RC.nb_nr_L1_inst > 0) {
+    // Initialize gNB structure in RAN context
+    init_gNB(wait_for_sync);
+    // Initialize L1
     RCconfig_NR_L1();
+  }
 
   if (NFAPI_MODE != NFAPI_MODE_PNF) {
     int ret = create_gNB_tasks(node_type, uniqCfg);
@@ -650,10 +654,6 @@ int main( int argc, char **argv ) {
 
   // start the main threads
   number_of_cards = 1;
-
-  if (RC.nb_nr_L1_inst > 0) {
-    init_gNB(wait_for_sync);
-  }
 
   wait_gNBs();
   int sl_ahead = NFAPI_MODE == NFAPI_MODE_AERIAL ? 0 : 6;
