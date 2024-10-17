@@ -27,27 +27,64 @@
   EMAIL   : Lionel.Gauthier@eurecom.fr, navid.nikaein@eurecom.fr, kroempa@gmail.com
 */
 
-#include "executables/softmodem-common.h"
 #include "gnb_config.h"
-#include "enb_paramdef.h"
-#include "UTIL/OTG/otg.h"
-#include "sctp_default_values.h"
-#include "f1ap_common.h"
-#include "PHY/INIT/nr_phy_init.h"
-#include "radio/ETHERNET/ethernet_lib.h"
-#include "nfapi_vnf.h"
-#include "nfapi_pnf.h"
-#include "prs_nr_paramdef.h"
+#include <limits.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include "BIT_STRING.h"
 #include "L1_nr_paramdef.h"
 #include "MACRLC_nr_paramdef.h"
-#include "gnb_paramdef.h"
-#include "NR_MAC_gNB/mac_proto.h"
+#include "PHY/INIT/nr_phy_init.h"
+#include "PHY/defs_common.h"
+#include "PHY/defs_gNB.h"
+#include "PHY/defs_nr_common.h"
+#include "RRC/NR/nr_rrc_config.h"
 #include "RRC/NR/nr_rrc_extern.h"
+#include "RRC_nr_paramsvalues.h"
+#include "T.h"
+#include "asn_SEQUENCE_OF.h"
+#include "asn_codecs.h"
+#include "asn_internal.h"
+#include "NR_MAC_gNB/nr_mac_gNB.h"
+#include "NR_MAC_gNB/mac_proto.h"
+#include "common/5g_platform_types.h"
+#include "common/config/config_paramdesc.h"
+#include "common/config/config_userapi.h"
+#include "common/openairinterface5g_limits.h"
+#include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "common_lib.h"
+#include "constr_TYPE.h"
+#include "enb_paramdef.h"
+#include "executables/softmodem-common.h"
+#include "f1ap_common.h"
+#include "gnb_paramdef.h"
+#include "lib/f1ap_interface_management.h"
 #include "nfapi/oai_integration/vendor_ext.h"
+#include "nfapi_pnf.h"
+#include "nfapi_vnf.h"
+#include "ngap_gNB.h"
+#include "ngap_messages_types.h"
+#include "nr_common.h"
+#include "oai_asn1.h"
+#include "openair1/PHY/defs_common.h"
+#include "prs_nr_paramdef.h"
+#include "radio/ETHERNET/if_defs.h"
+#include "rrc_messages_types.h"
+#include "s1ap_messages_types.h"
+#include "sctp_default_values.h"
+#include "seq_arr.h"
+#include "uper_encoder.h"
+#include "utils.h"
+#include "x2ap_messages_types.h"
 #ifdef ENABLE_AERIAL
 #include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
 #endif
-#include "lib/f1ap_interface_management.h"
 
 static int DEFBANDS[] = {7};
 static int DEFENBS[] = {0};
