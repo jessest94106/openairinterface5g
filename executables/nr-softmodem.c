@@ -273,10 +273,6 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
 
   RCconfig_verify(cfg, node_type);
 
-  if(NFAPI_MODE != NFAPI_MODE_AERIAL){
-    RCconfig_nr_prs();
-  }
-
   if (RC.nb_nr_macrlc_inst > 0)
     RCconfig_nr_macrlc(cfg);
 
@@ -636,6 +632,9 @@ int main( int argc, char **argv ) {
     init_gNB(wait_for_sync);
     // Initialize L1
     RCconfig_NR_L1();
+    // Initialize Positioning Reference Signal configuration
+    if(NFAPI_MODE != NFAPI_MODE_PNF && NFAPI_MODE != NFAPI_MODE_AERIAL)
+      RCconfig_nr_prs();
   }
 
   if (NFAPI_MODE != NFAPI_MODE_PNF) {

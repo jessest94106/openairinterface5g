@@ -746,25 +746,15 @@ void RCconfig_nr_prs(void)
   prs_config_t *prs_config = NULL;
   char str[7][100] = {0};
 
+  AssertFatal(RC.gNB != NULL, "gNB context is null, cannot complete PRS configuration\n");
+
   paramdef_t PRS_Params[] = PRS_PARAMS_DESC;
   paramlist_def_t PRS_ParamList = {CONFIG_STRING_PRS_CONFIG,NULL,0};
-  if (RC.gNB == NULL) {
-    RC.gNB                       = (PHY_VARS_gNB **)malloc((1+NUMBER_OF_gNB_MAX)*sizeof(PHY_VARS_gNB*));
-    LOG_I(NR_PHY,"RC.gNB = %p\n",RC.gNB);
-    memset(RC.gNB,0,(1+NUMBER_OF_gNB_MAX)*sizeof(PHY_VARS_gNB*));
-  }
-
   config_getlist(config_get_if(), &PRS_ParamList, PRS_Params, sizeofArray(PRS_Params), NULL);
 
   if (PRS_ParamList.numelt > 0) {
     for (j = 0; j < RC.nb_nr_L1_inst; j++) {
-
-      if (RC.gNB[j] == NULL) {
-        RC.gNB[j]                       = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
-        LOG_I(NR_PHY,"RC.gNB[%d] = %p\n",j,RC.gNB[j]);
-        memset(RC.gNB[j],0,sizeof(PHY_VARS_gNB));
-	      RC.gNB[j]->Mod_id  = j;
-      }
+      AssertFatal(RC.gNB[j] != NULL, "gNB L1 instance is null at index %d, cannot complete L1 configuration\n", j);
 
       RC.gNB[j]->prs_vars.NumPRSResources = *(PRS_ParamList.paramarray[j][NUM_PRS_RESOURCES].uptr);
       for (k = 0; k < RC.gNB[j]->prs_vars.NumPRSResources; k++)
