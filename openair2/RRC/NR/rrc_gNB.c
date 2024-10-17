@@ -1372,7 +1372,7 @@ static int handle_rrcReestablishmentComplete(const protocol_ctxt_t *const ctxt_p
   return 0;
 }
 
-static void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
+void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
 {
   if (UE->nas_pdu.buffer == NULL || UE->nas_pdu.length == 0)
     return; // no problem: the UE will re-request a NAS PDU

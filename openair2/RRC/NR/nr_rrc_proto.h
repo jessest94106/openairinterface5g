@@ -74,6 +74,8 @@ int parse_CG_ConfigInfo(gNB_RRC_INST *rrc, NR_CG_ConfigInfo_t *CG_ConfigInfo, x2
 
 void rrc_gNB_generate_SecurityModeCommand(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p);
 
+void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE);
+
 unsigned int rrc_gNB_get_next_transaction_identifier(module_id_t gnb_mod_idP);
 
 void
