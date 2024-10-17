@@ -98,7 +98,6 @@ pthread_mutex_t sync_mutex;
 int sync_var=-1; //!< protected by mutex \ref sync_mutex.
 int config_sync_var=-1;
 int oai_exit = 0;
-static int wait_for_sync = 0;
 
 unsigned int mmapped_dma=0;
 
@@ -550,7 +549,7 @@ int main( int argc, char **argv ) {
 
   if (RC.nb_nr_L1_inst > 0) {
     // Initialize gNB structure in RAN context
-    init_gNB(wait_for_sync);
+    init_gNB();
     // Initialize L1
     RCconfig_NR_L1();
     // Initialize Positioning Reference Signal configuration

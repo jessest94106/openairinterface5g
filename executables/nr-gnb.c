@@ -442,9 +442,9 @@ void init_eNB_afterRU(void) {
 /**
  * @brief Initialize gNB struct in RAN context
  */
-void init_gNB(int wait_for_sync)
+void init_gNB()
 {
-  LOG_I(NR_PHY, "Initializing gNB threads wait_for_sync:%d\n", wait_for_sync);
+  LOG_I(NR_PHY, "Initializing gNB RAN context: RC.nb_nr_L1_inst = %d \n", RC.nb_nr_L1_inst);
   if (RC.gNB == NULL) {
     RC.gNB = (PHY_VARS_gNB **)calloc_or_fail(RC.nb_nr_L1_inst, sizeof(PHY_VARS_gNB *));
     LOG_D(NR_PHY, "gNB L1 structure RC.gNB allocated @ %p\n", RC.gNB);

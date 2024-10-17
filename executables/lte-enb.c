@@ -131,7 +131,7 @@ static struct {
 extern double cpuf;
 
 
-void init_eNB(int);
+void init_eNB();
 void stop_eNB(int nb_inst);
 
 int wakeup_tx(PHY_VARS_eNB *eNB, int frame_rx, int subframe_rx, int frame_tx, int subframe_tx, uint64_t timestamp_tx);
@@ -1219,7 +1219,8 @@ void init_eNB_afterRU(void) {
 }
 
 
-void init_eNB(int wait_for_sync) {
+void init_eNB()
+{
   int CC_id;
   int inst;
   PHY_VARS_eNB *eNB;

@@ -532,8 +532,8 @@ int main ( int argc, char **argv )
   printf("RC.nb_L1_inst:%d\n", RC.nb_L1_inst);
 
   if (RC.nb_L1_inst > 0) {
-    printf("Initializing eNB threads wait_for_sync:%d\n", get_softmodem_params()->wait_for_sync);
-    init_eNB(get_softmodem_params()->wait_for_sync);
+    printf("Initializing eNB threads\n");
+    init_eNB();
   }
   for (int x=0; x < RC.nb_L1_inst; x++)
     for (int CC_id=0; CC_id<RC.nb_L1_CC[x]; CC_id++) {
