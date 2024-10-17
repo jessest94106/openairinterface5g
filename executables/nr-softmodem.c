@@ -21,66 +21,13 @@
 
 
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
-#include <sched.h>
 
-
-#include "T.h"
-
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-#include <common/utils/assertions.h>
-#include "common/oai_version.h"
-
-#include "PHY/types.h"
-#include "common/ran_context.h"
-
-#include "PHY/defs_gNB.h"
-#include "PHY/defs_common.h"
 #include "common/config/config_userapi.h"
-#include "common/utils/load_module_shlib.h"
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
-#include "radio/COMMON/common_lib.h"
-#include "radio/ETHERNET/if_defs.h"
-
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
-#include "PHY/phy_vars.h"
 #include "RRC/LTE/rrc_vars.h"
-#include "PHY_INTERFACE/phy_interface_vars.h"
-#include "gnb_config.h"
-#include "SIMULATION/TOOLS/sim.h"
-
 #ifdef SMBV
 #include "PHY/TOOLS/smbv.h"
 unsigned short config_frames[4] = {2,9,11,13};
 #endif
-
-#include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
-#include "UTIL/OPT/opt.h"
-#include "LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
-
-#include "intertask_interface.h"
-
-#include "PHY/INIT/nr_phy_init.h"
-
-#include "system.h"
-#include <openair2/GNB_APP/gnb_app.h>
-#include "PHY/TOOLS/phy_scope_interface.h"
-#include "PHY/TOOLS/nr_phy_scope.h"
-#include "nr-softmodem.h"
-#include "executables/softmodem-common.h"
-#include "executables/thread-common.h"
-#include "NB_IoT_interface.h"
-#include "x2ap_eNB.h"
-#include "ngap_gNB.h"
-#include "gnb_paramdef.h"
-#include <openair3/ocp-gtpu/gtp_itf.h>
-#include "nfapi/oai_integration/vendor_ext.h"
-#include "gnb_config.h"
-#include "openair2/E1AP/e1ap_common.h"
-#include "LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
 #ifdef ENABLE_AERIAL
 #include "nfapi/oai_integration/aerial/fapi_nvIPC.h"
 #endif
@@ -88,6 +35,58 @@ unsigned short config_frames[4] = {2,9,11,13};
 #include "openair2/E2AP/flexric/src/agent/e2_agent_api.h"
 #include "openair2/E2AP/RAN_FUNCTION/init_ran_func.h"
 #endif
+#include "nr-softmodem.h"
+#include <common/utils/assertions.h>
+#include <openair2/GNB_APP/gnb_app.h>
+#include <openair3/ocp-gtpu/gtp_itf.h>
+#include <pthread.h>
+#include <sched.h>
+#include <simple_executable.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include "LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
+#include "NR_MAC_COMMON/nr_mac_extern.h"
+#include "NR_PHY_INTERFACE/NR_IF_Module.h"
+#include "LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
+#include "PHY/INIT/nr_phy_init.h"
+#include "PHY/TOOLS/phy_scope_interface.h"
+#include "PHY/defs_common.h"
+#include "PHY/defs_gNB.h"
+#include "PHY/defs_nr_common.h"
+#include "PHY/phy_vars.h"
+#include "RRC/NR/nr_rrc_defs.h"
+#include "RRC/NR/nr_rrc_proto.h"
+#include "RRC_nr_paramsvalues.h"
+#include "SIMULATION/TOOLS/sim.h"
+#include "T.h"
+#include "UTIL/OPT/opt.h"
+#include "common/config/config_userapi.h"
+#include "common/ngran_types.h"
+#include "common/oai_version.h"
+#include "common/ran_context.h"
+#include "common/utils/LOG/log.h"
+#include "e1ap_messages_types.h"
+#include "executables/softmodem-common.h"
+#include "gnb_config.h"
+#include "gnb_paramdef.h"
+#include "intertask_interface.h"
+#include "nfapi/oai_integration/vendor_ext.h"
+#include "nfapi_interface.h"
+#include "nfapi_nr_interface_scf.h"
+#include "ngap_gNB.h"
+#include "nr-softmodem-common.h"
+#include "openair2/E1AP/e1ap_common.h"
+#include "pdcp.h"
+#include "radio/COMMON/common_lib.h"
+#include "s1ap_eNB.h"
+#include "sctp_eNB_task.h"
+#include "softmodem-bits.h"
+#include "system.h"
+#include "time_meas.h"
+#include "utils.h"
+#include "x2ap_eNB.h"
 
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
@@ -424,7 +423,6 @@ void init_pdcp(void) {
 }
 
 #ifdef E2_AGENT
-#include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h" // need to get info from MAC
 static void initialize_agent(ngran_node_t node_type, e2_agent_args_t oai_args)
 {
   AssertFatal(oai_args.sm_dir != NULL , "Please, specify the directory where the SMs are located in the config file, i.e., add in config file the next line: e2_agent = {near_ric_ip_addr = \"127.0.0.1\"; sm_dir = \"/usr/local/lib/flexric/\");} ");
