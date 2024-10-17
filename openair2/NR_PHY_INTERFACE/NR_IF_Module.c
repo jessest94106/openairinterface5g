@@ -31,14 +31,20 @@
 */
 
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
-#include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
-#include "common/ran_context.h"
+#include "PHY/defs_common.h"
+#include "common/platform_constants.h"
+#include "common/utils/T/T.h"
 #include "executables/softmodem-common.h"
-#include "nfapi/oai_integration/vendor_ext.h" 
 #include "nfapi/oai_integration/gnb_ind_vars.h"
-#include "openair2/PHY_INTERFACE/queue_t.h"
+#include "nfapi/oai_integration/vendor_ext.h"
+#include "nfapi_interface.h"
 #include "openair2/NR_PHY_INTERFACE/nr_sched_response.h"
+#include "openair2/PHY_INTERFACE/queue_t.h"
+#include "utils.h"
 
 #define MAX_IF_MODULES 100
 
