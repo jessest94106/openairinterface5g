@@ -1087,6 +1087,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
       pucch2_lev += signal_energy_nodc(rp[aa][symb], nb_re_pucch);
     }
   }
+  int decoderState=2;
   pucch2_lev /= Prx * Prx * pucch_pdu->nr_of_symbols;
   int pucch2_levdB = dB_fixed(pucch2_lev);
   int scaling = 0;
@@ -1099,8 +1100,10 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
   else if (pucch2_levdB > 54)
     scaling = 1;
 
+  if (pucch2_levdB < gNB->measurements.n0_subband_power_avg_dB + (gNB->pucch0_thres/10))
+    decoderState=1;
   LOG_D(PHY,
-        "%d.%d Decoding pucch2 for %d symbols, %d PRB, nb_harq %d, nb_sr %d, nb_csi %d/%d, pucch2_lev %d dB (scaling %d)\n",
+        "%d.%d Decoding pucch2 for %d symbols, %d PRB, nb_harq %d, nb_sr %d, nb_csi %d/%d, pucch2_lev %d dB (scaling %d), n0+thres %d decoderState %d\n",
         frame,
         slot,
         pucch_pdu->nr_of_symbols,
@@ -1110,7 +1113,9 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
         pucch_pdu->bit_len_csi_part1,
         pucch_pdu->bit_len_csi_part2,
         pucch2_levdB,
-        scaling);
+        scaling,
+        gNB->measurements.n0_subband_power_avg_dB+(gNB->pucch0_thres/10),
+        decoderState);
 
   int nc_group_size=1; // 2 PRB
   int ngroup = prb_size_ext/nc_group_size/2;
@@ -1365,7 +1370,6 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
 
   uint64_t decodedPayload[2];
   uint8_t corr_dB;
-  int decoderState=2;
   if (nb_bit < 12) { // short blocklength case
     simde__m256i *rp_re[Prx2][2];
     simde__m256i *rp2_re[Prx2][2];
