@@ -457,14 +457,6 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   // this is malloced pointers, we pass it for later free()
   UE->nas_pdu = req->nas_pdu;
 
-  /* security */
-  set_UE_security_algos(rrc, UE, &req->security_capabilities);
-  set_UE_security_key(UE, req->security_key);
-
-  /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
-  nr_rrc_pdcp_config_security(UE, false);
-  rrc_gNB_generate_SecurityModeCommand(rrc, UE);
-
   if (req->nb_of_pdusessions > 0) {
     /* if there are PDU sessions to setup, store them to be created once
      * security (and UE capabilities) are received */
@@ -473,6 +465,35 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
     AssertFatal(UE->initial_pdus != NULL, "out of memory\n");
     for (int i = 0; i < UE->n_initial_pdu; ++i)
       UE->initial_pdus[i] = req->pdusession_param[i];
+  }
+
+  /* security */
+  set_UE_security_algos(rrc, UE, &req->security_capabilities);
+  set_UE_security_key(UE, req->security_key);
+
+  /* TS 38.413: "store the received Security Key in the UE context and, if the
+   * NG-RAN node is required to activate security for the UE, take this
+   * security key into use.": I interpret this as "if AS security is already
+   * active, don't do anything" */
+  if (!UE->as_security_active) {
+    /* configure only integrity, ciphering comes after receiving SecurityModeComplete */
+    nr_rrc_pdcp_config_security(UE, false);
+    rrc_gNB_generate_SecurityModeCommand(rrc, UE);
+  } else {
+    /* if AS security key is active, we also have the UE capabilities. Then,
+     * there are two possibilities: we should set up PDU sessions, and/or
+     * forward the NAS message. */
+    if (req->nb_of_pdusessions > 0) {
+      // do not remove the above allocation which is reused here: this is used
+      // in handle_rrcReconfigurationComplete() to know that we need to send a
+      // Initial context setup response message
+      trigger_bearer_setup(rrc, UE, UE->n_initial_pdu, UE->initial_pdus, 0);
+    } else {
+      /* no PDU sesion to setup: acknowledge this message, and forward NAS
+       * message, if required */
+      rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(&ctxt, ue_context_p);
+      rrc_forward_ue_nas_message(rrc, UE);
+    }
   }
 
 #ifdef E2_AGENT
