@@ -834,135 +834,133 @@ void RCconfig_nr_prs(void)
   }
 }
 
+#define ALL_SYMBOLS_TAKEN 0x3FFF
+
+/**
+ * @brief Get number or blacklisted UL PRBs and their mapping from gNB config
+ */
+static int get_prb_blacklist(uint8_t instance, uint16_t *prbbl)
+{
+  paramdef_t GNBSParams[] = GNBSPARAMS_DESC;
+  paramlist_def_t GNBParamList = {GNB_CONFIG_STRING_GNB_LIST, NULL, 0};
+  config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
+  int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
+  AssertFatal(num_gnbs > 0, "Failed to parse config file, no GNBs found in field %s \n", GNB_CONFIG_STRING_ACTIVE_GNBS);
+  paramdef_t GNBParams[] = GNBPARAMS_DESC;
+  config_getlist(config_get_if(), &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
+
+  int num_prbbl = 0;
+  char *ulprbbl = *GNBParamList.paramarray[0][GNB_ULPRBBLACKLIST_IDX].strptr;
+
+  if (!ulprbbl)
+    return -1;
+
+  LOG_D(NR_PHY, "PRB blacklist found: %s\n", ulprbbl);
+  char *save = NULL;
+  char *pt = strtok_r(ulprbbl, ",", &save);
+
+  while (pt) {
+    const int rb = atoi(pt);
+    AssertFatal(rb < MAX_BWP_SIZE, "RB %d out of bounds (max 275 PRBs)\n", rb);
+    prbbl[rb] = ALL_SYMBOLS_TAKEN;
+    LOG_D(NR_PHY, "Blacklisting prb %d\n", rb);
+    pt = strtok_r(NULL, ",", &save);
+    num_prbbl++;
+  }
+  return num_prbbl;
+}
+
 void RCconfig_NR_L1(void)
 {
-  int j = 0;
-  if (RC.gNB == NULL) {
-    RC.gNB = (PHY_VARS_gNB **)malloc((1 + NUMBER_OF_gNB_MAX) * sizeof(PHY_VARS_gNB *));
-    LOG_I(NR_PHY, "RC.gNB = %p\n", RC.gNB);
-    memset(RC.gNB, 0, (1 + NUMBER_OF_gNB_MAX) * sizeof(PHY_VARS_gNB *));
+  LOG_I(NR_PHY, "Initializing NR L1: RC.nb_nr_L1_inst = %d\n", RC.nb_nr_L1_inst);
 
-    if (RC.gNB[j] == NULL) {
-      RC.gNB[j] = calloc(1, sizeof(PHY_VARS_gNB));
-    }
-  }
-  if (NFAPI_MODE != NFAPI_MODE_PNF) {
-    paramdef_t GNBSParams[] = GNBSPARAMS_DESC;
-    ////////// Identification parameters
-    paramdef_t GNBParams[] = GNBPARAMS_DESC;
+  for (int j = 0; j < RC.nb_nr_L1_inst; j++) {
+    PHY_VARS_gNB *gNB = RC.gNB[j];
+    AssertFatal(RC.gNB[j] != NULL, "gNB L1 instance is null at index %d, cannot complete L1 configuration\n", j);
+    // gNB params
+    if (NFAPI_MODE != NFAPI_MODE_PNF) {
+      paramdef_t GNBSParams[] = GNBSPARAMS_DESC;
+      paramlist_def_t GNBParamList = {GNB_CONFIG_STRING_GNB_LIST, NULL, 0};
+      config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
+      int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
+      AssertFatal(num_gnbs > 0, "Failed to parse config file, no GNBs found in field %s \n", GNB_CONFIG_STRING_ACTIVE_GNBS);
 
-    paramlist_def_t GNBParamList = {GNB_CONFIG_STRING_GNB_LIST, NULL, 0};
+      paramdef_t GNBParams[] = GNBPARAMS_DESC;
+      config_getlist(config_get_if(), &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
+      int N1 = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_N1_IDX].iptr;
+      int N2 = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_N2_IDX].iptr;
+      int XP = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
 
-    config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
-    int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
-    AssertFatal(num_gnbs > 0, "Failed to parse config file no gnbs %s \n", GNB_CONFIG_STRING_ACTIVE_GNBS);
-
-    config_getlist(config_get_if(), &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
-    int N1 = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_N1_IDX].iptr;
-    int N2 = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_N2_IDX].iptr;
-    int XP = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
-    char *ulprbbl = *GNBParamList.paramarray[0][GNB_ULPRBBLACKLIST_IDX].strptr;
-    if (ulprbbl)
-      LOG_D(NR_PHY, "PRB blacklist %s\n", ulprbbl);
-    char *save = NULL;
-    char *pt = strtok_r(ulprbbl, ",", &save);
-    int prbbl[275];
-    int num_prbbl = 0;
-    memset(prbbl, 0, 275 * sizeof(int));
-
-    while (pt) {
-      const int rb = atoi(pt);
-      AssertFatal(rb < 275, "RB %d out of bounds (max 275)\n", rb);
-      prbbl[rb] = 0x3FFF; // all symbols taken
-      LOG_D(NR_PHY, "Blacklisting prb %d\n", atoi(pt));
-      pt = strtok_r(NULL, ",", &save);
-      num_prbbl++;
-    }
-
-    RC.gNB[j]->num_ulprbbl = num_prbbl;
-    LOG_D(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_prbbl);
-    memcpy(RC.gNB[j]->ulprbbl, prbbl, 275 * sizeof(int));
-
-    RC.gNB[j]->ap_N1 = N1;
-    RC.gNB[j]->ap_N2 = N2;
-    RC.gNB[j]->ap_XP = XP;
-  }
-
-  paramdef_t L1_Params[] = L1PARAMS_DESC;
-  paramlist_def_t L1_ParamList = {CONFIG_STRING_L1_LIST, NULL, 0};
-
-  config_getlist(config_get_if(), &L1_ParamList, L1_Params, sizeofArray(L1_Params), NULL);
-
-  if (L1_ParamList.numelt > 0) {
-    for (j = 0; j < RC.nb_nr_L1_inst; j++) {
-      if (RC.gNB[j] == NULL) {
-        RC.gNB[j] = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
-        memset(RC.gNB[j], 0, sizeof(PHY_VARS_gNB));
-        RC.gNB[j]->Mod_id = j;
+      // PRB Blacklist
+      uint16_t prbbl[MAX_BWP_SIZE] = {0};
+      int num_ulprbbl = get_prb_blacklist(j, prbbl);
+      if (num_ulprbbl != -1) {
+        RC.gNB[j]->num_ulprbbl = num_ulprbbl;
+        LOG_D(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", RC.gNB[j]->num_ulprbbl);
+        memcpy(RC.gNB[j]->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
       }
-      AssertFatal(*L1_ParamList.paramarray[j][L1_THREAD_POOL_SIZE].uptr == 2022, "thread_pool_size removed, please use --thread-pool\n");
-      RC.gNB[j]->ofdm_offset_divisor = *(L1_ParamList.paramarray[j][L1_OFDM_OFFSET_DIVISOR].uptr);
-      RC.gNB[j]->pucch0_thres = *(L1_ParamList.paramarray[j][L1_PUCCH0_DTX_THRESHOLD].uptr);
-      RC.gNB[j]->prach_thres = *(L1_ParamList.paramarray[j][L1_PRACH_DTX_THRESHOLD].uptr);
-      RC.gNB[j]->pusch_thres = *(L1_ParamList.paramarray[j][L1_PUSCH_DTX_THRESHOLD].uptr);
-      RC.gNB[j]->srs_thres = *(L1_ParamList.paramarray[j][L1_SRS_DTX_THRESHOLD].uptr);
-      RC.gNB[j]->max_ldpc_iterations = *(L1_ParamList.paramarray[j][L1_MAX_LDPC_ITERATIONS].uptr);
-      RC.gNB[j]->L1_rx_thread_core = *(L1_ParamList.paramarray[j][L1_RX_THREAD_CORE].iptr);
-      RC.gNB[j]->L1_tx_thread_core = *(L1_ParamList.paramarray[j][L1_TX_THREAD_CORE].iptr);
-      LOG_I(PHY,"L1_RX_THREAD_CORE %d (%d)\n",*(L1_ParamList.paramarray[j][L1_RX_THREAD_CORE].iptr),L1_RX_THREAD_CORE);
-      RC.gNB[j]->TX_AMP = (int16_t)(32767.0 / pow(10.0, .05 * (double)(*L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr)));
-      RC.gNB[j]->phase_comp = *L1_ParamList.paramarray[j][L1_PHASE_COMP].uptr;
-      LOG_I(PHY, "TX_AMP = %d (-%d dBFS)\n", RC.gNB[j]->TX_AMP, *L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr);
-      AssertFatal(RC.gNB[j]->TX_AMP > 300, "TX_AMP is too small, must be larger than 300 (is %d)\n", RC.gNB[j]->TX_AMP);
-      if (strcmp(*(L1_ParamList.paramarray[j][L1_TRANSPORT_N_PREFERENCE_IDX].strptr), "local_mac") == 0) {
-        // sf_ahead = 2; // Need 4 subframe gap between RX and TX
-      } else if (strcmp(*(L1_ParamList.paramarray[j][L1_TRANSPORT_N_PREFERENCE_IDX].strptr), "nfapi") == 0) {
-        RC.gNB[j]->eth_params_n.my_addr = strdup(*(L1_ParamList.paramarray[j][L1_LOCAL_N_ADDRESS_IDX].strptr));
-        RC.gNB[j]->eth_params_n.remote_addr = strdup(*(L1_ParamList.paramarray[j][L1_REMOTE_N_ADDRESS_IDX].strptr));
-        RC.gNB[j]->eth_params_n.my_portc = *(L1_ParamList.paramarray[j][L1_LOCAL_N_PORTC_IDX].iptr);
-        RC.gNB[j]->eth_params_n.remote_portc = *(L1_ParamList.paramarray[j][L1_REMOTE_N_PORTC_IDX].iptr);
-        RC.gNB[j]->eth_params_n.my_portd = *(L1_ParamList.paramarray[j][L1_LOCAL_N_PORTD_IDX].iptr);
-        RC.gNB[j]->eth_params_n.remote_portd = *(L1_ParamList.paramarray[j][L1_REMOTE_N_PORTD_IDX].iptr);
-        RC.gNB[j]->eth_params_n.transp_preference = ETH_UDP_MODE;
 
-        // sf_ahead = 2; // Cannot cope with 4 subframes betweem RX and TX - set it to 2
+      // Antenna ports
+      gNB->ap_N1 = N1;
+      gNB->ap_N2 = N2;
+      gNB->ap_XP = XP;
+    }
+
+    // L1 params
+    paramdef_t L1_Params[] = L1PARAMS_DESC;
+    paramlist_def_t L1_ParamList = {CONFIG_STRING_L1_LIST, NULL, 0};
+    config_getlist(config_get_if(), &L1_ParamList, L1_Params, sizeofArray(L1_Params), NULL);
+    if (L1_ParamList.numelt > 0) {
+      AssertFatal(*L1_ParamList.paramarray[j][L1_THREAD_POOL_SIZE].uptr == 2022,
+                  "thread_pool_size removed, please use --thread-pool\n");
+      gNB->ofdm_offset_divisor = *(L1_ParamList.paramarray[j][L1_OFDM_OFFSET_DIVISOR].uptr);
+      gNB->pucch0_thres = *(L1_ParamList.paramarray[j][L1_PUCCH0_DTX_THRESHOLD].uptr);
+      gNB->prach_thres = *(L1_ParamList.paramarray[j][L1_PRACH_DTX_THRESHOLD].uptr);
+      gNB->pusch_thres = *(L1_ParamList.paramarray[j][L1_PUSCH_DTX_THRESHOLD].uptr);
+      gNB->srs_thres = *(L1_ParamList.paramarray[j][L1_SRS_DTX_THRESHOLD].uptr);
+      gNB->max_ldpc_iterations = *(L1_ParamList.paramarray[j][L1_MAX_LDPC_ITERATIONS].uptr);
+      gNB->L1_rx_thread_core = *(L1_ParamList.paramarray[j][L1_RX_THREAD_CORE].iptr);
+      gNB->L1_tx_thread_core = *(L1_ParamList.paramarray[j][L1_TX_THREAD_CORE].iptr);
+      LOG_I(NR_PHY, "L1_RX_THREAD_CORE %d (%d)\n", *(L1_ParamList.paramarray[j][L1_RX_THREAD_CORE].iptr), L1_RX_THREAD_CORE);
+      gNB->TX_AMP = (int16_t)(32767.0 / pow(10.0, .05 * (double)(*L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr)));
+      gNB->phase_comp = *L1_ParamList.paramarray[j][L1_PHASE_COMP].uptr;
+      LOG_I(NR_PHY, "TX_AMP = %d (-%d dBFS)\n", gNB->TX_AMP, *L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr);
+      AssertFatal(gNB->TX_AMP > 300, "TX_AMP is too small, must be larger than 300 (is %d)\n", gNB->TX_AMP);
+      // Midhaul configuration
+      if (strcmp(*(L1_ParamList.paramarray[j][L1_TRANSPORT_N_PREFERENCE_IDX].strptr), "local_mac") == 0) {
+        // do nothing
+      } else if (strcmp(*(L1_ParamList.paramarray[j][L1_TRANSPORT_N_PREFERENCE_IDX].strptr), "nfapi") == 0) {
+        gNB->eth_params_n.my_addr = strdup(*(L1_ParamList.paramarray[j][L1_LOCAL_N_ADDRESS_IDX].strptr));
+        gNB->eth_params_n.remote_addr = strdup(*(L1_ParamList.paramarray[j][L1_REMOTE_N_ADDRESS_IDX].strptr));
+        gNB->eth_params_n.my_portc = *(L1_ParamList.paramarray[j][L1_LOCAL_N_PORTC_IDX].iptr);
+        gNB->eth_params_n.remote_portc = *(L1_ParamList.paramarray[j][L1_REMOTE_N_PORTC_IDX].iptr);
+        gNB->eth_params_n.my_portd = *(L1_ParamList.paramarray[j][L1_LOCAL_N_PORTD_IDX].iptr);
+        gNB->eth_params_n.remote_portd = *(L1_ParamList.paramarray[j][L1_REMOTE_N_PORTD_IDX].iptr);
+        gNB->eth_params_n.transp_preference = ETH_UDP_MODE;
 
         RC.nb_nr_macrlc_inst = 1; // This is used by mac_top_init_gNB()
 
-        // This is used by init_gNB_afterRU()
         RC.nb_nr_CC = (int *)malloc((1 + RC.nb_nr_inst) * sizeof(int));
         RC.nb_nr_CC[0] = 1;
 
-        LOG_D(PHY,
-              "%s() NFAPI PNF mode - RC.nb_nr_inst=1 this is because phy_init_RU() uses that to index and not RC.num_gNB - why the "
-              "2 similar variables?\n",
-              __FUNCTION__);
-        LOG_D(PHY, "%s() NFAPI PNF mode - RC.nb_nr_CC[0]=%d for init_gNB_afterRU()\n", __FUNCTION__, RC.nb_nr_CC[0]);
-        LOG_D(PHY,
-              "%s() NFAPI PNF mode - RC.nb_nr_macrlc_inst:%d because used by mac_top_init_gNB()\n",
-              __FUNCTION__,
+        LOG_D(NR_PHY,
+              "RC.nb_nr_CC[0] = %d for init_gNB_afterRU()\n"
+              "RC.nb_nr_macrlc_inst = %d (used by mac_top_init_gNB())\n",
+              RC.nb_nr_CC[0],
               RC.nb_nr_macrlc_inst);
 
-        configure_nr_nfapi_pnf(RC.gNB[j]->eth_params_n.remote_addr,
-                               RC.gNB[j]->eth_params_n.remote_portc,
-                               RC.gNB[j]->eth_params_n.my_addr,
-                               RC.gNB[j]->eth_params_n.my_portd,
-                               RC.gNB[j]->eth_params_n.remote_portd);
-      } else { // other midhaul
+        configure_nr_nfapi_pnf(gNB->eth_params_n.remote_addr,
+                               gNB->eth_params_n.remote_portc,
+                               gNB->eth_params_n.my_addr,
+                               gNB->eth_params_n.my_portd,
+                               gNB->eth_params_n.remote_portd);
+      } else {
+        // other midhaul, do nothing
       }
-    } // for (j = 0; j < RC.nb_nr_L1_inst; j++)
-    l1_north_init_gNB();
-  } else {
-    LOG_E(PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
-
-    // need to create some structures for VNF
-
-    j = 0;
-
-    if (RC.gNB[j] == NULL) {
-      RC.gNB[j] = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
-      memset((void *)RC.gNB[j], 0, sizeof(PHY_VARS_gNB));
-      RC.gNB[j]->Mod_id = j;
+      LOG_D(NR_PHY, "Initializing northbound interface for L1\n");
+      l1_north_init_gNB();
+    } else {
+      LOG_E(NR_PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
     }
   }
 }
@@ -1258,8 +1256,6 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
 void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 {
   int j = 0;
-  uint16_t prbbl[275] = {0};
-  int num_prbbl = 0;
 
   paramlist_def_t GNBParamList = {GNB_CONFIG_STRING_GNB_LIST, NULL, 0};
   paramdef_t GNBSParams[] = GNBSPARAMS_DESC;
@@ -1276,21 +1272,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     GNBParams[i].chkPptr = &(config_check_GNBParams[i]);
   config_getlist(cfg, &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
 
-  if (NFAPI_MODE != NFAPI_MODE_PNF) {
-    ////////// Identification parameters
-
-    char *ulprbbl = *GNBParamList.paramarray[0][GNB_ULPRBBLACKLIST_IDX].strptr;
-    char *save = NULL;
-    char *pt = strtok_r(ulprbbl, ",", &save);
-    memset(prbbl, 0, sizeof(prbbl));
-    while (pt) {
-      const int prb = atoi(pt);
-      AssertFatal(prb < 275, "RB %d out of bounds (max 275)\n", prb);
-      prbbl[prb] = 0x3FFF; // all symbols taken
-      pt = strtok_r(NULL, ",", &save);
-      num_prbbl++;
-    }
-  }
   paramdef_t MacRLC_Params[] = MACRLCPARAMS_DESC;
   paramlist_def_t MacRLC_ParamList = {CONFIG_STRING_MACRLC_LIST, NULL, 0};
   /* map parameter checking array instances to parameter definition array instances */
@@ -1482,8 +1463,13 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       RC.nrmac[j]->min_grant_prb = *(MacRLC_ParamList.paramarray[j][MACRLC_MIN_GRANT_PRB_IDX].u8ptr);
       RC.nrmac[j]->min_grant_mcs = *(MacRLC_ParamList.paramarray[j][MACRLC_MIN_GRANT_MCS_IDX].u8ptr);
       RC.nrmac[j]->identity_pm = *(MacRLC_ParamList.paramarray[j][MACRLC_IDENTITY_PM_IDX].u8ptr);
-      RC.nrmac[j]->num_ulprbbl = num_prbbl;
-      memcpy(RC.nrmac[j]->ulprbbl, prbbl, 275 * sizeof(prbbl[0]));
+      // PRB Blacklist
+      uint16_t prbbl[MAX_BWP_SIZE] = {0};
+      int num_ulprbbl = get_prb_blacklist(j, prbbl);
+      if (num_ulprbbl != -1) {
+        LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_ulprbbl);
+        memcpy(RC.nrmac[j]->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
+      }
       bool ab = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMFORMING_IDX].u8ptr;
       if (ab) {
         NR_beam_info_t *beam_info = &RC.nrmac[j]->beam_info;
