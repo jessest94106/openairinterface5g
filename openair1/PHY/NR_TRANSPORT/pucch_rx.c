@@ -1088,7 +1088,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
     }
   }
 
-  pucch2_lev /= Prx * Prx * pucch_pdu->nr_of_symbols;
+  pucch2_lev /= Prx * pucch_pdu->nr_of_symbols;
   int pucch2_levdB = dB_fixed(pucch2_lev);
   int scaling = 0;
   if (pucch2_levdB > 72)
@@ -1100,7 +1100,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
   else if (pucch2_levdB > 54)
     scaling = 1;
 
-  LOG_D(PHY,
+  LOG_D(NR_PHY,
         "%d.%d Decoding pucch2 for %d symbols, %d PRB, nb_harq %d, nb_sr %d, nb_csi %d/%d, pucch2_lev %d dB (scaling %d)\n",
         frame,
         slot,
@@ -1369,7 +1369,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
   int decoderState = 2;
   if (pucch2_levdB < gNB->measurements.n0_subband_power_avg_dB + (gNB->pucch0_thres / 10))
     decoderState = 1; // assuming missed detection, only attempt to decode for polar case (with CRC)
-  LOG_D(PHY, "n0+thres %d decoderState %d\n", gNB->measurements.n0_subband_power_avg_dB + (gNB->pucch0_thres / 10), decoderState);
+  LOG_D(NR_PHY, "n0+thres %d decoderState %d\n", gNB->measurements.n0_subband_power_avg_dB + (gNB->pucch0_thres / 10), decoderState);
   if (nb_bit < 12 && decoderState == 2) { // short blocklength case
     simde__m256i *rp_re[Prx2][2];
     simde__m256i *rp2_re[Prx2][2];
