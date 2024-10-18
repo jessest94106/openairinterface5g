@@ -888,6 +888,11 @@ void put_UE_in_freelist(module_id_t mod_id, rnti_t rnti, bool removeFlag) {
     pthread_mutex_unlock(&lock_ue_freelist);
     return;
   }
+  if (eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs >= NFAPI_RELEASE_MAX_RNTI) {
+    LOG_E(PHY, "List of UE to release is full\n");
+    pthread_mutex_unlock(&lock_ue_freelist);
+    return;
+  }
   eNB_MAC->UE_free_ctrl[i].rnti = rnti;
   eNB_MAC->UE_free_ctrl[i].removeContextFlg = removeFlag;
   eNB_MAC->UE_free_ctrl[i].raFlag = 0;
