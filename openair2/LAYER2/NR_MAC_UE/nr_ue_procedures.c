@@ -735,7 +735,7 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
     return -1;
   }
   dlsch_pdu->rb_offset = dlsch_pdu->start_rb + dlsch_pdu->BWPStart;
-  if (mac->get_sib1)
+  if (mac->get_sib1 || mac->get_otherSI)
     dlsch_pdu->rb_offset -= dlsch_pdu->BWPStart;
 
   /* TIME_DOM_RESOURCE_ASSIGNMENT */
