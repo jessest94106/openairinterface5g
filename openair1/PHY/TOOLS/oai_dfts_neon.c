@@ -1549,7 +1549,7 @@ void dft512(int16_t *x,int16_t *y,unsigned char scale)
 {
 
   simdshort_q15_t xtmp[256],*xtmpp,*x64 = (simdshort_q15_t *)x;
-  simd_q15_t ytmp[128],*tw512_128p=(simd_q15_t*)tw512,*tw512a_128p=(simd_q15_t *)tw512a,*tw512b_128p=(simd_q15_t *)tw512b,*y128=(simd_q15_t *)y,*y128p=(simd_q15_t *)y;
+  simd_q15_t ytmp[128],*tw512a_128p=(simd_q15_t *)tw512a,*tw512b_128p=(simd_q15_t *)tw512b,*y128=(simd_q15_t *)y,*y128p=(simd_q15_t *)y;
   simd_q15_t *ytmpp = &ytmp[0];
   int i;
   simd_q15_t ONE_OVER_SQRT2_Q15_128 = set1_int16(ONE_OVER_SQRT2_Q15);
