@@ -358,8 +358,15 @@ static inline void computeBeta(decoder_node_t *node)
 #endif
   assert(node->level);
   const int sz = 1 << (node->level - 1);
-  if (node->left->all_frozen==0) { // if left node is not aggregation of frozen bits
-    assert(node->left->betaInit && node->right->betaInit);
+  if (node->left->all_frozen == 0) { // if left node is not aggregation of frozen bits
+    if (!node->left->betaInit) {
+      memset(betal, -1, sz);
+      node->left->betaInit = true;
+    }
+    if (!node->right->betaInit) {
+      memset(betar, -1, sz);
+      node->right->betaInit = true;
+    }
     int avx2mod = sz & 31;
     if (avx2mod == 0) {
       int avx2len = sz / 16;
