@@ -1119,6 +1119,7 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
   }
   /* phy-test has hardcoded allocation, so no use to handle CSI reports */
   if ((uci_234->pduBitmap >> 2) & 0x01 && !get_softmodem_params()->phy_test) {
+    LOG_D(NR_MAC, "CSI CRC %d\n", uci_234->csi_part1.csi_part1_crc);
     if (uci_234->csi_part1.csi_part1_crc != 1) {
       // API to parse the csi report and store it into sched_ctrl
       extract_pucch_csi_report(csi_MeasConfig, uci_234, frame, slot, UE, nrmac->common_channels->ServingCellConfigCommon);
