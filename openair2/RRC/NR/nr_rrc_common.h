@@ -59,6 +59,4 @@ typedef struct SRB_INFO_TABLE_ENTRY_NR_s {
   uint8_t status;
 } NR_SRB_INFO_TABLE_ENTRY;
 
-void rrc_init_nr_srb_param(NR_LCHAN_DESC *chan);
-
 #endif

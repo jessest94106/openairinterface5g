@@ -142,7 +142,7 @@ void *F1AP_DU_task(void *arg) {
         createF1inst(myInstance, msgSetup, nc);
         du_task_send_sctp_association_req(myInstance, nc);
         instance_t gtpInst = du_create_gtpu_instance_to_cu(nc);
-        AssertFatal(gtpInst != 0, "cannot create DU F1-U GTP module\n");
+        AssertFatal(gtpInst > 0, "cannot create DU F1-U GTP module\n");
         getCxt(myInstance)->gtpInst = gtpInst;
         DUuniqInstance = gtpInst;
       } break;
