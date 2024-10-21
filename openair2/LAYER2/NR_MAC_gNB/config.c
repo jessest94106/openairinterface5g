@@ -136,7 +136,7 @@ int precoding_weigths_generation(nfapi_nr_pm_list_t *mat,
               double complex res_code;
               for (int i_rows = 0; i_rows < N1 * N2; i_rows++) {
                 nfapi_nr_pm_weights_t *weights = &mat->pmi_pdu[pmiq].weights[j_col][i_rows];
-                res_code = sqrt(1 / (double)(L * num_antenna_ports)) * v_lm[llc][mmc][i_rows];
+                res_code = sqrt(1 / (double)L) * v_lm[llc][mmc][i_rows];
                 c16_t precoder_weight = convert_precoder_weight(res_code);
                 weights->precoder_weight_Re = precoder_weight.r;
                 weights->precoder_weight_Im = precoder_weight.i;
@@ -153,7 +153,7 @@ int precoding_weigths_generation(nfapi_nr_pm_list_t *mat,
               }
               for (int i_rows = N1 * N2; i_rows < 2 * N1 * N2; i_rows++) {
                 nfapi_nr_pm_weights_t *weights = &mat->pmi_pdu[pmiq].weights[j_col][i_rows];
-                res_code = sqrt(1 / (double)(L * num_antenna_ports)) * (phase_sign)*theta_n[nn] * v_lm[llc][mmc][i_rows - N1 * N2];
+                res_code = sqrt(1 / (double)L) * (phase_sign)*theta_n[nn] * v_lm[llc][mmc][i_rows - N1 * N2];
                 c16_t precoder_weight = convert_precoder_weight(res_code);
                 weights->precoder_weight_Re = precoder_weight.r;
                 weights->precoder_weight_Im = precoder_weight.i;

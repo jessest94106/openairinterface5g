@@ -1227,6 +1227,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
     dci_payload.ndi = harq->ndi;
     dci_payload.dai[0].val = pucch ? (pucch->dai_c-1)&3 : 0;
     dci_payload.tpc = sched_ctrl->tpc1; // TPC for PUCCH: table 7.2.1-1 in 38.213
+    // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
+    sched_ctrl->tpc1 = 1;
     dci_payload.pucch_resource_indicator = pucch ? pucch->resource_indicator : 0;
     dci_payload.pdsch_to_harq_feedback_timing_indicator.val = pucch ? pucch->timing_indicator : 0; // PDSCH to HARQ TI
     dci_payload.antenna_ports.val = dmrs_parms->dmrs_ports_id;

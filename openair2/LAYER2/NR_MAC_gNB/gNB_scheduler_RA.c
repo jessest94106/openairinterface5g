@@ -924,6 +924,9 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                  1, // Not toggling NDI in msg3 retransmissions
                  ul_bwp);
 
+    // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
+    ra->msg3_TPC = 1;
+
     fill_dci_pdu_rel15(sc_info,
                        &ra->DL_BWP,
                        ul_bwp,
@@ -2199,6 +2202,9 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                     rbStart,
                     rbSize);
 
+    // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
+    sched_ctrl->tpc1 = 1;
+
     // Add padding header and zero rest out if there is space left
     if (ra->mac_pdu_length < harq->tb_size) {
       NR_MAC_SUBHEADER_FIXED *padding = (NR_MAC_SUBHEADER_FIXED *) &buf[ra->mac_pdu_length];
@@ -2351,7 +2357,7 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
   NR_MAC_RAR *rar = (NR_MAC_RAR *) (dlsch_buffer + 2);
   unsigned char csi_req = 0, tpc_command;
 
-  tpc_command = 3; // this is 0 dB
+  tpc_command = 3; // This is 0 dB in RAR UL grant
 
   /// E/T/R/R/BI subheader ///
   // E = 1, MAC PDU includes another MAC sub-PDU (RAPID)
@@ -2383,7 +2389,7 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
 
   // UL grant
 
-  ra->msg3_TPC = tpc_command;
+  ra->msg3_TPC = 1; // This is 0 dB in UL DCI
 
   if (pusch_pdu->frequency_hopping)
     AssertFatal(1==0,"PUSCH with frequency hopping currently not supported");

@@ -1886,13 +1886,11 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_radio_bearers.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_NGAP.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/nr_rrc_proto.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/nr_rrc_common.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_UE_context.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/MESSAGES/asn1_msg.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/MESSAGES/asn1_msg.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_UE_context.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/cucp_cuup_e1ap.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/nr_rrc_common.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/nr_rrc_config.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_radio_bearers.h \

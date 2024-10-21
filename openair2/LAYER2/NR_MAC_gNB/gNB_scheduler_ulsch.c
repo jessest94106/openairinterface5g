@@ -2620,6 +2620,9 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
                  cur_harq->ndi,
                  current_BWP);
 
+    // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
+    UE->UE_sched_ctrl.tpc0 = 1;
+
     fill_dci_pdu_rel15(&UE->sc_info,
                        &UE->current_DL_BWP,
                        current_BWP,

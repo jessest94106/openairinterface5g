@@ -123,11 +123,6 @@ int nr_rlc_get_available_tx_space(const rnti_t rntiP, const logical_chan_id_t ch
   return 0;
 }
 
-void rrc_gNB_generate_dedicatedRRCReconfiguration(const protocol_ctxt_t *const ctxt_pP, rrc_gNB_ue_context_t *ue_context_pP)
-{
-  abort();
-}
-
 void nr_rlc_add_drb(int rnti, int drb_id, const NR_RLC_BearerConfig_t *rlc_BearerConfig)
 {
   abort();

@@ -92,7 +92,11 @@
 struct T_header;
 
 /* to define message ID */
+#ifdef CHECK_T_TYPE
 #define T_ID(x) ((struct T_header *)(uintptr_t)(x))
+#else
+#define T_ID(x) x
+#endif
 
 /* T macro tricks */
 extern int T_stdout;
