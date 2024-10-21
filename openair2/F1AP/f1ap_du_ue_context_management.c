@@ -111,8 +111,9 @@ static void f1ap_read_drb_nssai(const F1AP_SNSSAI_t *asn1_nssai, nssai_t *nssai)
 {
   OCTET_STRING_TO_INT8(&asn1_nssai->sST, nssai->sst);
   nssai->sd = 0xffffff;
-  if (asn1_nssai->sD != NULL)
-    memcpy((uint8_t *)&nssai->sd, asn1_nssai->sD->buf, 3);
+  if (asn1_nssai->sD != NULL) {
+    BUFFER_TO_INT24(asn1_nssai->sD->buf, nssai->sd);
+  }
 }
 
 int DU_handle_UE_CONTEXT_SETUP_REQUEST(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
