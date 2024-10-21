@@ -873,9 +873,6 @@ add_library(dfts MODULE ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts.c ${OPENAIR1_DIR}/PHY
 set(PHY_SRC_COMMON
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/dci_tools_common.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/lte_mcs.c
-#  ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/slss.c
-#  ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/sldch.c
-#  ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/slsch.c
   ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/get_pmi.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/group_hopping.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/phich_common.c
@@ -936,13 +933,9 @@ set(PHY_SRC
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/pcfich.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/pucch.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/pmch.c
-#  ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/ulsch_demodulation.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/ulsch_decoding.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/rar_tools.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/uci_tools.c
-#  ${OPENAIR1_DIR}/PHY/LTE_ESTIMATION/freq_equalization.c
-#  ${OPENAIR1_DIR}/PHY/LTE_ESTIMATION/lte_adjust_sync_eNB.c
-#  ${OPENAIR1_DIR}/PHY/LTE_ESTIMATION/lte_ul_channel_estimation.c
   ${OPENAIR1_DIR}/PHY/LTE_ESTIMATION/lte_eNB_measurements.c
   ${OPENAIR1_DIR}/PHY/INIT/lte_init.c
   )
@@ -1233,7 +1226,6 @@ set(L2_SRC
   ${PDCP_DIR}/pdcp_util.c
   ${PDCP_DIR}/pdcp_security.c
   ${OPENAIR2_DIR}/LAYER2/openair2_proc.c
-#  ${RRC_DIR}/rrc_UE.c
   ${RRC_DIR}/rrc_eNB.c
   ${RRC_DIR}/rrc_eNB_endc.c
   ${RRC_DIR}/rrc_eNB_S1AP.c
@@ -1248,7 +1240,6 @@ set(L2_SRC
 
 set(L2_RRC_SRC
   ${OPENAIR2_DIR}/LAYER2/openair2_proc.c
-  #  ${RRC_DIR}/rrc_UE.c
   ${RRC_DIR}/rrc_eNB.c
   ${RRC_DIR}/rrc_eNB_endc.c
   ${RRC_DIR}/rrc_eNB_S1AP.c
@@ -2305,10 +2296,6 @@ foreach(myExe s1ap
     -Wl,--start-group SECURITY UTIL -Wl,--end-group m rt CONFIG_LIB
     )
 endforeach(myExe)
-
-# to be added
-#../targets/TEST/PDCP/test_pdcp.c
-#../targets/TEST/PDCP/with_rlc/test_pdcp_rlc.c
 
 #ensure that the T header files are generated before targets depending on them
 if (${T_TRACER})
