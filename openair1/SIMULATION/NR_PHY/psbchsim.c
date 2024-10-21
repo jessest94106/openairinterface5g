@@ -25,6 +25,7 @@
 #include "common/utils/load_module_shlib.h"
 #include "PHY/MODULATION/nr_modulation.h"
 #include "NR_SL-SSB-TimeAllocation-r16.h"
+#include "nr-uesoftmodem.h"
 
 void e1_bearer_context_setup(const e1ap_bearer_setup_req_t *req)
 {
@@ -54,12 +55,13 @@ double cpuf;
 void get_num_re_dmrs(nfapi_nr_ue_pusch_pdu_t *pusch_pdu, uint8_t *nb_dmrs_re_per_rb, uint16_t *number_dmrs_symbols)
 {
 }
-uint64_t downlink_frequency[1][1];
-int32_t uplink_frequency_offset[1][1];
+
+uint64_t downlink_frequency[MAX_NUM_CCs][4];
+int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 THREAD_STRUCT thread_struct;
 instance_t DUuniqInstance = 0;
 instance_t CUuniqInstance = 0;
-openair0_config_t openair0_cfg[1];
+openair0_config_t openair0_cfg[MAX_CARDS];
 
 RAN_CONTEXT_t RC;
 int oai_exit = 0;
@@ -80,9 +82,11 @@ int8_t nr_mac_rrc_data_req_ue(const module_id_t Mod_idP,
   return 0;
 }
 
-void get_nrUE_params(void)
+nrUE_params_t nrUE_params = {0};
+
+nrUE_params_t *get_nrUE_params(void)
 {
-  return;
+  return &nrUE_params;
 }
 uint8_t check_if_ue_is_sl_syncsource()
 {
