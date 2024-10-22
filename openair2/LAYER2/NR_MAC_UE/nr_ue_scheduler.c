@@ -3450,7 +3450,7 @@ static bool fill_mac_sdu(NR_UE_MAC_INST_t *mac,
     *pdu -= sh_size;
     lcids_data_status[lc_idx] = false;
     (*num_lcids_same_priority)--;
-    LOG_D(NR_MAC, "No data to transmit for RB with LCID 0x%02x\n and hence set to false", lcid);
+    LOG_D(NR_MAC, "No data to transmit for RB with LCID 0x%02x and hence set to false\n", lcid);
     return 0;
   }
 
