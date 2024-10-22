@@ -90,7 +90,6 @@ class RANManagement():
 		self.runtime_stats= ''
 		self.datalog_rt_stats={}
 		self.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
-		self.eNB_Trace = '' #if 'yes', Tshark will be launched at initialization
 		self.USRPIPAddress = ''
 		#checkers from xml
 		self.ran_checkers={}
@@ -129,23 +128,6 @@ class RANManagement():
 		mySSH = SSH.SSHConnection()
 		cwd = os.getcwd()
 		
-		#Get pcap on enb and/or gnb if enabled in the xml 
-		if self.eNB_Trace=='yes':
-			if self.air_interface[self.eNB_instance] == 'lte-softmodem':
-				pcapfile_prefix="enb_"
-			else:
-				pcapfile_prefix="gnb_"
-			mySSH.open(lIpAddr, lUserName, lPassWord)
-			eth_interface = 'any'
-			fltr = 'sctp'
-			logging.debug('\u001B[1m Launching tshark on xNB on interface ' + eth_interface + ' with filter "' + fltr + '"\u001B[0m')
-			pcapfile = pcapfile_prefix + self.testCase_id + '_log.pcap'
-			mySSH.command('echo ' + lPassWord + ' | sudo -S rm -f /tmp/' + pcapfile , '\$', 5)
-			mySSH.command('echo $USER; nohup sudo -E tshark  -i ' + eth_interface + ' -f "' + fltr + '" -w /tmp/' + pcapfile + ' > /dev/null 2>&1 &','\$', 5)
-			mySSH.close()
-			
-
-
 		# If tracer options is on, running tshark on EPC side and capture traffic b/ EPC and eNB
 		if EPC.IPAddress != "none":
 			localEpcIpAddr = EPC.IPAddress
