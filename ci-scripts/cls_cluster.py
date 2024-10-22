@@ -50,9 +50,9 @@ CN_CONTAINERS = ["", "-c nrf", "-c amf", "-c smf", "-c upf", "-c ausf", "-c udm"
 def OC_login(cmd, ocUserName, ocPassword, ocProjectName):
 	if ocUserName == '' or ocPassword == '' or ocProjectName == '':
 		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter: no OC Credentials')
+		raise ValueError('Insufficient Parameter: no OC Credentials')
 	if OCRegistry.startswith("http") or OCRegistry.endswith("/"):
-		sys.exit(f'ocRegistry {OCRegistry} should not start with http:// or https:// and not end on a slash /')
+		raise ValueError(f'ocRegistry {OCRegistry} should not start with http:// or https:// and not end on a slash /')
 	ret = cmd.run(f'oc login -u {ocUserName} -p {ocPassword} --server {OCUrl}')
 	if ret.returncode != 0:
 		logging.error('\u001B[1m OC Cluster Login Failed\u001B[0m')
@@ -244,7 +244,7 @@ class Cluster:
 		if self.testSvrId == None: self.testSvrId = self.eNBIPAddress
 		if self.imageToPull == '':
 			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+			raise ValueError('Insufficient Parameter')
 		logging.debug(f'Pull OC image {self.imageToPull} to server {self.testSvrId}')
 		self.testCase_id = HTML.testCase_id
 		cmd = cls_cmd.getConnection(self.testSvrId)
@@ -282,19 +282,19 @@ class Cluster:
 	def BuildClusterImage(self, HTML):
 		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
 			HELP.GenericHelp(CONST.Version)
-			sys.exit(f'Insufficient Parameter: ranRepository {self.ranRepository} ranBranch {ranBranch} ranCommitID {self.ranCommitID}')
+			raise ValueError(f'Insufficient Parameter: ranRepository {self.ranRepository} ranBranch {ranBranch} ranCommitID {self.ranCommitID}')
 		lIpAddr = self.eNBIPAddress
 		lSourcePath = self.eNBSourceCodePath
 		if lIpAddr == '' or lSourcePath == '':
-			sys.exit('Insufficient Parameter: eNBSourceCodePath missing')
+			raise ValueError('Insufficient Parameter: eNBSourceCodePath missing')
 		ocUserName = self.OCUserName
 		ocPassword = self.OCPassword
 		ocProjectName = self.OCProjectName
 		if ocUserName == '' or ocPassword == '' or ocProjectName == '':
 			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter: no OC Credentials')
+			raise ValueError('Insufficient Parameter: no OC Credentials')
 		if self.OCRegistry.startswith("http") or self.OCRegistry.endswith("/"):
-			sys.exit(f'ocRegistry {self.OCRegistry} should not start with http:// or https:// and not end on a slash /')
+			raise ValueError(f'ocRegistry {self.OCRegistry} should not start with http:// or https:// and not end on a slash /')
 
 		logging.debug(f'Building on cluster triggered from server: {lIpAddr}')
 		self.cmd = cls_cmd.RemoteCmd(lIpAddr)

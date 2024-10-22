@@ -31,7 +31,6 @@ import subprocess as sp
 import os
 import paramiko
 import uuid
-import sys
 import time
 
 SSHTIMEOUT=7

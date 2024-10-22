@@ -31,14 +31,12 @@
 #-----------------------------------------------------------
 # Import
 #-----------------------------------------------------------
-import sys              # arg
 import re               # reg
 import fileinput
 import logging
 import os
 import time
 import subprocess
-from multiprocessing import Process, Lock, SimpleQueue
 
 import constants as CONST
 

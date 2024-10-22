@@ -36,8 +36,6 @@ import re               # reg
 import logging
 import os
 from pathlib import Path
-import time
-from multiprocessing import Process, Lock, SimpleQueue
 
 #-----------------------------------------------------------
 # OAI Testing modules

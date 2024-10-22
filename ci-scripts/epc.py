@@ -38,8 +38,6 @@ import os
 import time
 import signal
 
-from multiprocessing import Process, Lock, SimpleQueue
-
 #-----------------------------------------------------------
 # OAI Testing modules
 #-----------------------------------------------------------

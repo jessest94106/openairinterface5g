@@ -57,17 +57,13 @@ import cls_oai_html
 #-----------------------------------------------------------
 import sys		# arg
 import re		# reg
-import pexpect	# pexpect
 import time		# sleep
 import os
 import subprocess
 import xml.etree.ElementTree as ET
 import logging
-import datetime
 import signal
-import subprocess
 import traceback
-from multiprocessing import Process, Lock, SimpleQueue
 logging.basicConfig(
 	level=logging.DEBUG,
 	stream=sys.stdout,
@@ -161,8 +157,6 @@ def ExecuteActionWithParam(action):
 			success = CONTAINERS.BuildRunTests(HTML)
 
 	elif action == 'Initialize_eNB':
-		RAN.eNB_Trace=test.findtext('eNB_Trace')
-		RAN.eNB_Stats=test.findtext('eNB_Stats')
 		datalog_rt_stats_file=test.findtext('rt_stats_cfg')
 		if datalog_rt_stats_file is None:
 			RAN.datalog_rt_stats_file='datalog_rt_stats.default.yaml'

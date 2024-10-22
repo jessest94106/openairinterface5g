@@ -34,7 +34,6 @@ import sshconnection
 #to update the HTML object
 import cls_oai_html
 import cls_cmd
-from multiprocessing import SimpleQueue
 #for log folder maintenance
 import os
 import re

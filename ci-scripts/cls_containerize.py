@@ -36,18 +36,12 @@ import re	       # reg
 import logging
 import os
 import shutil
-import subprocess
 import time
-import pyshark
-import threading
-import cls_cmd
-from multiprocessing import Process, Lock, SimpleQueue
 from zipfile import ZipFile
 
 #-----------------------------------------------------------
 # OAI Testing modules
 #-----------------------------------------------------------
-import cls_cluster as OC
 import cls_cmd
 import sshconnection as SSH
 import helpreadme as HELP
