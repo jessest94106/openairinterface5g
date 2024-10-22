@@ -87,33 +87,6 @@ void nr_rlc_sdu_segment_list_append(nr_rlc_sdu_segment_t **list,
   *end = sdu;
 }
 
-nr_rlc_sdu_segment_t *nr_rlc_sdu_segment_list_add(
-    int (*sn_compare)(void *, int, int), void *sn_compare_data,
-    nr_rlc_sdu_segment_t *list, nr_rlc_sdu_segment_t *sdu_segment)
-{
-  nr_rlc_sdu_segment_t head;
-  nr_rlc_sdu_segment_t *cur;
-  nr_rlc_sdu_segment_t *prev;
-
-  head.next = list;
-  cur = list;
-  prev = &head;
-
-  /* order is by 'sn', if 'sn' is the same then order is by 'so' */
-  while (cur != NULL) {
-    /* check if 'sdu_segment' is before 'cur' in the list */
-    if (sn_compare(sn_compare_data, cur->sdu->sn, sdu_segment->sdu->sn) > 0 ||
-        (cur->sdu->sn == sdu_segment->sdu->sn && cur->so > sdu_segment->so)) {
-      break;
-    }
-    prev = cur;
-    cur = cur->next;
-  }
-  prev->next = sdu_segment;
-  sdu_segment->next = cur;
-  return head.next;
-}
-
 void nr_rlc_free_sdu_segment_list(nr_rlc_sdu_segment_t *l)
 {
   nr_rlc_sdu_segment_t *cur;
