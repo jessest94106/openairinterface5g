@@ -30,7 +30,11 @@ nr_rlc_sdu_segment_t *nr_rlc_new_sdu(
     char *buffer, int size,
     int upper_layer_id)
 {
-  nr_rlc_sdu_t *sdu         = calloc(1, sizeof(nr_rlc_sdu_t));
+  /* allocate sdu header and data together */
+  nr_rlc_sdu_t *sdu = malloc(sizeof(nr_rlc_sdu_t) + size);
+  /* only memset the header */
+  memset(sdu, 0 , sizeof(*sdu));
+
   nr_rlc_sdu_segment_t *ret = calloc(1, sizeof(nr_rlc_sdu_segment_t));
   if (sdu == NULL || ret == NULL)
     goto oom;
@@ -38,9 +42,7 @@ nr_rlc_sdu_segment_t *nr_rlc_new_sdu(
   sdu->ref_count      = 1;
   sdu->sn             = -1;                 /* set later */
   sdu->upper_layer_id = upper_layer_id;
-  sdu->data           = malloc(size);
-  if (sdu->data == NULL)
-    goto oom;
+  sdu->data           = (char*)(sdu + 1);
   memcpy(sdu->data, buffer, size);
   sdu->size           = size;
   sdu->retx_count     = -1;
@@ -64,7 +66,6 @@ int nr_rlc_free_sdu_segment(nr_rlc_sdu_segment_t *sdu)
 
   sdu->sdu->free_count++;
   if (sdu->sdu->free_count == sdu->sdu->ref_count) {
-    free(sdu->sdu->data);
     free(sdu->sdu);
     ret = 1;
   }
