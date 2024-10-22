@@ -91,7 +91,6 @@ class RANManagement():
 		self.datalog_rt_stats={}
 		self.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
 		self.eNB_Trace = '' #if 'yes', Tshark will be launched at initialization
-		self.eNB_Stats = '' #if 'yes', Statistics Monitor will be launched at initialization		
 		self.USRPIPAddress = ''
 		#checkers from xml
 		self.ran_checkers={}
@@ -226,19 +225,6 @@ class RANManagement():
 		mySSH.command('chmod 775 ./my-lte-softmodem-run' + str(self.eNB_instance) + '.sh', '\$', 5)
 		mySSH.command('echo ' + lPassWord + ' | sudo -S rm -Rf enb_' + self.testCase_id + '.log', '\$', 5)
 		mySSH.command('echo $USER; nohup sudo -E stdbuf -o0 ./my-lte-softmodem-run' + str(self.eNB_instance) + '.sh > ' + lSourcePath + '/cmake_targets/enb_' + self.testCase_id + '.log 2>&1 &', lUserName, 10)
-
-
-		#stats monitoring during runtime
-		time.sleep(20)
-		monitor_file='../ci-scripts/stats_monitor.py'
-		conf_file='../ci-scripts/stats_monitor_conf.yaml'
-		if self.eNB_Stats=='yes':
-			if self.air_interface[self.eNB_instance] == 'lte-softmodem':
-				mySSH.command('echo $USER; nohup python3 ' + monitor_file + ' ' + conf_file + ' ' + self.testCase_id + ' enb 2>&1 > enb_stats_monitor_execution.log &', '\$', 5)
-			else:
-				mySSH.command('echo $USER; nohup python3 ' + monitor_file + ' ' + conf_file + ' ' + self.testCase_id + ' gnb 2>&1 > gnb_stats_monitor_execution.log &', '\$', 5)
-
-
 
 		self.eNBLogFiles[int(self.eNB_instance)] = 'enb_' + self.testCase_id + '.log'
 		if extra_options != '':
@@ -453,9 +439,6 @@ class RANManagement():
 					#debug / tentative
 					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './nrL1_stats.log', self.eNBSourceCodePath + '/cmake_targets/')
 					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './nrMAC_stats.log', self.eNBSourceCodePath + '/cmake_targets/')
-					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './gnb_stats_monitor.pickle', self.eNBSourceCodePath + '/cmake_targets/')
-					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './gnb_stats_monitor.png', self.eNBSourceCodePath + '/cmake_targets/')
-					#
 					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './' + fileToAnalyze, self.eNBSourceCodePath + '/cmake_targets/')
 				logging.debug('\u001B[1m Analyzing ' + nodeB_prefix + 'NB logfile \u001B[0m ' + fileToAnalyze)
 				logStatus = self.AnalyzeLogFile_eNB(fileToAnalyze, HTML, self.ran_checkers)
