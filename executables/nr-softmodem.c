@@ -605,11 +605,7 @@ int main( int argc, char **argv ) {
     LOG_W(UTIL,
           "no SYS_NICE capability: cannot set thread priority and affinity, consider running with sudo for optimum performance\n");
 
-  if (get_softmodem_params()->do_ra)
-    AssertFatal(get_softmodem_params()->phy_test == 0,"RA and phy_test are mutually exclusive\n");
-
-  if (get_softmodem_params()->sa)
-    AssertFatal(get_softmodem_params()->phy_test == 0,"Standalone mode and phy_test are mutually exclusive\n");
+  softmodem_verify_mode(get_softmodem_params());
 
 #if T_TRACER
   T_Config_Init();

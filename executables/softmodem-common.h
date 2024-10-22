@@ -330,6 +330,7 @@ typedef struct {
 } softmodem_params_t;
 
 #define IS_SA_MODE(sM_params) (!(sM_params)->phy_test && !(sM_params)->do_ra && !(sM_params)->nsa)
+void softmodem_verify_mode(const softmodem_params_t *p);
 
 uint64_t get_softmodem_optmask(void);
 uint64_t set_softmodem_optmask(uint64_t bitmask);
