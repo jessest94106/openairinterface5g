@@ -466,11 +466,12 @@ void generate_Msg2(module_id_t module_idP,
   } else {
     if ((ra->Msg2_frame == frameP) && (ra->Msg2_subframe == subframeP)) {
       LOG_I(MAC,
-            "[eNB %d] CC_id %d Frame %d, subframeP %d: Generating RAR DCI, state %s\n",
+            "[eNB %d] CC_id %d Frame %d, subframeP %d: Generating RAR DCI for rnti %x, state %s\n",
             module_idP,
             CC_idP,
             frameP,
             subframeP,
+            ra->RA_rnti,
             era_text[ra->eRA_state]);
       // Allocate 4 PRBS starting in RB 0
       first_rb = 0;

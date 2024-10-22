@@ -98,6 +98,8 @@
 
 #include "SIMULATION/TOOLS/sim.h" // for taus
 
+#include "openair1/PHY/LTE_TRANSPORT/transport_proto.h"
+
 #define ASN_MAX_ENCODE_SIZE 4096
 #define NUMBEROF_DRBS_TOBE_ADDED 1
 static int encode_CG_ConfigInfo(char *buffer,int buffer_size,rrc_eNB_ue_context_t *const ue_context_pP,int *enc_size);
@@ -878,7 +880,7 @@ rrc_eNB_free_UE(
 void put_UE_in_freelist(module_id_t mod_id, rnti_t rnti, bool removeFlag) {
   eNB_MAC_INST                             *eNB_MAC = RC.mac[mod_id];
   pthread_mutex_lock(&lock_ue_freelist);
-  LOG_I(PHY,"add ue %x in free list, context flag: %d\n", rnti, removeFlag);
+  LOG_I(PHY, "adding ue %x in UE to free list, context flag: %d\n", rnti, removeFlag);
   int i;
   for (i=0; i < sizeofArray(eNB_MAC->UE_free_ctrl); i++) 
     if (eNB_MAC->UE_free_ctrl[i].rnti == 0)
@@ -888,23 +890,20 @@ void put_UE_in_freelist(module_id_t mod_id, rnti_t rnti, bool removeFlag) {
     pthread_mutex_unlock(&lock_ue_freelist);
     return;
   }
-  if (eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs >= NFAPI_RELEASE_MAX_RNTI) {
-    LOG_E(PHY, "List of UE to release is full\n");
-    pthread_mutex_unlock(&lock_ue_freelist);
-    return;
-  }
   eNB_MAC->UE_free_ctrl[i].rnti = rnti;
   eNB_MAC->UE_free_ctrl[i].removeContextFlg = removeFlag;
   eNB_MAC->UE_free_ctrl[i].raFlag = 0;
-  eNB_MAC->UE_release_req.ue_release_request_body.ue_release_request_TLVs_list[eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs].rnti = rnti;
-  eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs++;
+  if (eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs < NFAPI_RELEASE_MAX_RNTI) {
+    eNB_MAC->UE_release_req.ue_release_request_body
+        .ue_release_request_TLVs_list[eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs]
+        .rnti = rnti;
+    eNB_MAC->UE_release_req.ue_release_request_body.number_of_TLVs++;
+  } else {
+    LOG_E(PHY, "fapi List of UE to release is full\n");
+  }
+
   pthread_mutex_unlock(&lock_ue_freelist);
 }
-
-extern int16_t find_dlsch(uint16_t rnti, PHY_VARS_eNB *eNB,find_type_t type);
-extern int16_t find_ulsch(uint16_t rnti, PHY_VARS_eNB *eNB,find_type_t type);
-extern void clean_eNb_ulsch(LTE_eNB_ULSCH_t *ulsch);
-extern void clean_eNb_dlsch(LTE_eNB_DLSCH_t *dlsch);
 
 void release_UE_in_freeList(module_id_t mod_id) {
   PHY_VARS_eNB                             *eNB_PHY = NULL;
@@ -923,13 +922,11 @@ void release_UE_in_freeList(module_id_t mod_id) {
       int id;
       // clean ULSCH entries for rnti
       id = find_ulsch(rnti, eNB_PHY, eNB_MAC->UE_free_ctrl[ue_num].raFlag ? SEARCH_EXIST_RA : SEARCH_EXIST);
-
       if (id >= 0)
         clean_eNb_ulsch(eNB_PHY->ulsch[id]);
 
         // clean DLSCH entries for rnti
       id = find_dlsch(rnti, eNB_PHY, eNB_MAC->UE_free_ctrl[ue_num].raFlag ? SEARCH_EXIST_RA : SEARCH_EXIST);
-
       if (id >= 0)
         clean_eNb_dlsch(eNB_PHY->dlsch[id][0]);
 

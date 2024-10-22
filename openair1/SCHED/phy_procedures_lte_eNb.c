@@ -1339,9 +1339,20 @@ void pusch_procedures(PHY_VARS_eNB *eNB,L1_rxtx_proc_t *proc) {
 
     ulsch_harq = ulsch->harq_processes[harq_pid];
 
-    if (ulsch->rnti>0) LOG_D(PHY,"eNB->ulsch[%d]->harq_processes[harq_pid:%d] SFN/SF:%04d%d: PUSCH procedures, UE %d/%x ulsch_harq[status:%d SFN/SF:%04d%d handled:%d]\n",
-                               i, harq_pid, frame,subframe,i,ulsch->rnti,
-                              ulsch_harq->status, ulsch_harq->frame, ulsch_harq->subframe, ulsch_harq->handled);
+    if (ulsch->rnti > 0)
+      LOG_D(PHY,
+            "eNB->ulsch[%d]->harq_processes[harq_pid:%d] SFN/SF:%04d%d: PUSCH procedures, UE %d/%x ulsch_harq[status:%d "
+            "SFN/SF:%04d%d handled:%d]\n",
+            i,
+            harq_pid,
+            frame,
+            subframe,
+            i,
+            ulsch->rnti,
+            ulsch_harq->status,
+            ulsch_harq->frame,
+            ulsch_harq->subframe,
+            ulsch_harq->handled);
 
     if ((ulsch->rnti>0) &&
         (ulsch_harq->status == ACTIVE) &&
