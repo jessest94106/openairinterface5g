@@ -2100,7 +2100,7 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
   }
 }
 
-static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_t instance)
+static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_t instance, sctp_assoc_t assoc_id)
 {
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   f1ap_ue_context_modif_required_t *required = &F1AP_UE_CONTEXT_MODIFICATION_REQUIRED(msg_p);
@@ -2114,6 +2114,12 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_
       .cause_value = F1AP_CauseRadioNetwork_unknown_or_already_allocated_gnb_cu_ue_f1ap_id,
     };
     rrc->mac_rrc.ue_context_modification_refuse(msg_p->ittiMsgHeader.originInstance, &refuse);
+    return;
+  }
+
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  if (UE->ho_context && UE->ho_context->source && UE->ho_context->source->du && UE->ho_context->source->du->assoc_id == assoc_id) {
+    LOG_W(NR_RRC, "UE %d: UE Context Modification Required during handover, ignoring message\n", UE->rrc_ue_id);
     return;
   }
 
@@ -2515,7 +2521,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_REQUIRED:
-        rrc_CU_process_ue_modification_required(msg_p, instance);
+        rrc_CU_process_ue_modification_required(msg_p, instance, msg_p->ittiMsgHeader.originInstance);
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_REQ:
