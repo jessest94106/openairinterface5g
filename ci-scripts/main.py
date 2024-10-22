@@ -57,17 +57,13 @@ import cls_oai_html
 #-----------------------------------------------------------
 import sys		# arg
 import re		# reg
-import pexpect	# pexpect
 import time		# sleep
 import os
 import subprocess
 import xml.etree.ElementTree as ET
 import logging
-import datetime
 import signal
-import subprocess
 import traceback
-from multiprocessing import Process, Lock, SimpleQueue
 logging.basicConfig(
 	level=logging.DEBUG,
 	stream=sys.stdout,

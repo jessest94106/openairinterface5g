@@ -34,7 +34,6 @@
 #-----------------------------------------------------------
 import sys		# arg
 import re		# reg
-import pexpect	# pexpect
 import time		# sleep
 import os
 import logging
@@ -44,15 +43,10 @@ import json
 #import our libs
 import helpreadme as HELP
 import constants as CONST
-import cls_cluster as OC
 import sshconnection
 
 import cls_module
 import cls_cmd
-
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
-import matplotlib.pyplot as plt
-import numpy as np
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes

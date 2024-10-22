@@ -25,14 +25,10 @@
 #---------------------------------------------------------------------
 
 #to use isfile
-import os
-import sys
 import logging
 #time.sleep
 import time
 import re
-import subprocess
-from datetime import datetime
 import yaml
 
 import cls_cmd
@@ -208,13 +204,6 @@ class Module_UE:
 
 	def _enableTrace(self):
 		raise Exception("not implemented")
-		mySSH = sshconnection.SSHConnection()
-		mySSH.open(self.HostIPAddress, self.HostUsername, self.HostPassword)
-		#delete old artifacts
-		mySSH.command('echo ' + ' '  + ' | sudo -S rm -rf ci_qlog','\$',5)
-		#start Trace, artifact is created in home dir
-		mySSH.command('echo $USER; nohup sudo -E QLog/QLog -s ci_qlog -f NR5G.cfg > /dev/null 2>&1 &','\$', 5)
-		mySSH.close()
 
 	def _disableTrace(self):
 		raise Exception("not implemented")

@@ -36,7 +36,6 @@ import re               # reg
 import logging
 import os
 import time
-from multiprocessing import Process, Lock, SimpleQueue
 import yaml
 import cls_cmd
 
