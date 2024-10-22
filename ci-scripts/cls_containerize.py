@@ -38,7 +38,6 @@ import os
 import shutil
 import subprocess
 import time
-import pyshark
 import threading
 import cls_cmd
 from multiprocessing import Process, Lock, SimpleQueue
