@@ -480,7 +480,7 @@ int main(int argc, char **argv)
         NR_UE_MAC_INST_t *mac = get_mac_inst(inst);
         init_nr_ue_phy_cpu_stats(&UE[CC_id]->phy_cpu_stats);
 
-        if (get_softmodem_params()->sa || get_softmodem_params()->sl_mode) { // set frame config to initial values from command line
+        if (IS_SA_MODE(get_softmodem_params()) || get_softmodem_params()->sl_mode) { // set frame config to initial values from command line
                                                                             // and assume that the SSB is centered on the grid
           uint16_t nr_band = get_softmodem_params()->band;
           mac->nr_band = nr_band;

@@ -783,7 +783,7 @@ void nr_ue_get_rach(NR_UE_MAC_INST_t *mac, int CC_id, frame_t frame, uint8_t gNB
           ra->Msg3_size = size_sdu + sizeof(NR_MAC_SUBHEADER_SHORT) + sizeof(NR_MAC_SUBHEADER_SHORT);
         }
 
-      } else if (!get_softmodem_params()->sa) {
+      } else if (!IS_SA_MODE(get_softmodem_params())) {
         uint8_t temp_pdu[16] = {0};
         size_sdu = nr_write_ce_ulsch_pdu(temp_pdu, mac, 0,  &(mac->crnti), NULL, NULL, NULL);
         ra->Msg3_size = size_sdu;

@@ -116,7 +116,7 @@ RB_PROTOTYPE(rrc_nr_ue_tree_s, rrc_gNB_ue_context_s, entries,
 
 void rrc_add_nsa_user(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p, x2ap_ENDC_sgnb_addition_req_t *m)
 {
-  AssertFatal(!get_softmodem_params()->sa, "%s() cannot be called in SA mode, it is intrinsically for NSA\n", __func__);
+  AssertFatal(!IS_SA_MODE(get_softmodem_params()), "%s() cannot be called in SA mode, it is intrinsically for NSA\n", __func__);
   // generate nr-Config-r15 containers for LTE RRC : inside message for X2 EN-DC (CG-Config Message from 38.331)
   const nr_mac_config_t *configuration = &RC.nrmac[0]->radio_config;
   MessageDef *msg;
@@ -153,7 +153,7 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p, x2a
   }
 
   // NR RRCReconfiguration
-  if (get_softmodem_params()->phy_test == 1 || get_softmodem_params()->do_ra == 1 || get_softmodem_params()->sa == 1){
+  if (get_softmodem_params()->phy_test == 1 || get_softmodem_params()->do_ra == 1) {
     UE->rb_config = get_default_rbconfig(10 /* EPS bearer ID */, 1 /* drb ID */, NR_CipheringAlgorithm_nea0, NR_SecurityConfig__keyToUse_master);
   } else {
     /* TODO: handle more than one bearer */

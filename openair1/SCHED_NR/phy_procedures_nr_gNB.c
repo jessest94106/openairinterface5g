@@ -95,7 +95,7 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
   const int sc_offset = (fp->freq_range == FR1) ? pdu->SsbSubcarrierOffset >> scs : pdu->SsbSubcarrierOffset;
   fp->ssb_start_subcarrier = (12 * prb_offset + sc_offset);
 
-  if (fp->print_ue_help_cmdline_log && get_softmodem_params()->sa) {
+  if (fp->print_ue_help_cmdline_log && IS_SA_MODE(get_softmodem_params())) {
     fp->print_ue_help_cmdline_log = false;
     if (fp->dl_CarrierFreq != fp->ul_CarrierFreq)
       LOG_A(PHY,

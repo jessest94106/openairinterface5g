@@ -340,7 +340,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   NR_MIB_t *mib = NULL;
   NR_SIB1_t *sib1 = NULL;
 
-  if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && get_softmodem_params()->sa)) {
+  if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
     if (!extract_sys_info(sys_info, &mib, &sib1)) {
       LOG_W(RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
       fail.cause = F1AP_CauseProtocol_semantic_error;
@@ -491,7 +491,7 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
 
     const f1ap_gnb_du_system_info_t *sys_info = conf_up->cell_to_modify[0].sys_info;
 
-    if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && get_softmodem_params()->sa)) {
+    if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
       // MIB is mandatory, so will be overwritten. SIB1 is optional, so will
       // only be overwritten if present in sys_info
       ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);

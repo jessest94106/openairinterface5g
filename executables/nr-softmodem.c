@@ -304,15 +304,14 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
     init_pdcp();
   }
 
-  if (is_x2ap_enabled() ) { //&& !NODE_IS_DU(node_type)
+  if (get_softmodem_params()->nsa) { //&& !NODE_IS_DU(node_type)
 	  LOG_I(X2AP, "X2AP enabled \n");
 	  __attribute__((unused)) uint32_t x2_register_gnb_pending = gNB_app_register_x2 (gnb_id_start, gnb_id_end);
   }
 
   /* For the CU case the gNB registration with the AMF might have to take place after the F1 setup, as the PLMN info
      * can originate from the DU. Add check on whether x2ap is enabled to account for ENDC NSA scenario.*/
-  if ((get_softmodem_params()->sa || is_x2ap_enabled()) &&
-      !NODE_IS_DU(node_type)) {
+  if (IS_SA_MODE(get_softmodem_params()) && !NODE_IS_DU(node_type)) {
     /* Try to register each gNB */
     //registered_gnb = 0;
     __attribute__((unused)) uint32_t register_gnb_pending = gNB_app_register (gnb_id_start, gnb_id_end);
@@ -324,7 +323,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
       return -1;
     }
 
-    if (is_x2ap_enabled()) {
+    if (get_softmodem_params()->nsa) {
       if(itti_create_task(TASK_X2AP, x2ap_task, NULL) < 0) {
         LOG_E(X2AP, "Create task for X2AP failed\n");
       }
@@ -333,8 +332,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
     }
   }
 
-  if (get_softmodem_params()->sa &&
-      !NODE_IS_DU(node_type)) {
+  if (IS_SA_MODE(get_softmodem_params()) && !NODE_IS_DU(node_type)) {
 
     char*             gnb_ipv4_address_for_NGU      = NULL;
     uint32_t          gnb_port_for_NGU              = 0;
@@ -383,7 +381,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
     }
 
     //Use check on x2ap to consider the NSA scenario 
-    if((is_x2ap_enabled() || get_softmodem_params()->sa) && (node_type != ngran_gNB_CUCP)) {
+    if((is_x2ap_enabled() || IS_SA_MODE(get_softmodem_params())) && (node_type != ngran_gNB_CUCP)) {
       if (itti_create_task (TASK_GTPV1_U, &gtpv1uTask, NULL) < 0) {
         LOG_E(GTPU, "Create task for GTPV1U failed\n");
         return -1;

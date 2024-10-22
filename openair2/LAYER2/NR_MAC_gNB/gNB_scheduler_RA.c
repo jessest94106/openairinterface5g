@@ -2291,7 +2291,7 @@ void nr_clear_ra_proc(NR_RA_t *ra)
   NR_SCHED_ENSURE_LOCKED(&RC.nrmac[0]->sched_lock);
   memset(ra, 0, sizeof(*ra));
   ra->ra_state = nrRA_gNB_IDLE;
-  if (get_softmodem_params()->sa) { // in SA, prefill with allowed preambles
+  if (IS_SA_MODE(get_softmodem_params())) { // in SA, prefill with allowed preambles
     ra->preambles.num_preambles = MAX_NUM_NR_PRACH_PREAMBLES;
     for (int i = 0; i < MAX_NUM_NR_PRACH_PREAMBLES; i++)
       ra->preambles.preamble_list[i] = i;
