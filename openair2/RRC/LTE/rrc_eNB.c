@@ -3891,7 +3891,11 @@ check_handovers(
           ue_context_p->ue_context.handover_info->buf,
           PDCP_TRANSMISSION_MODE_CONTROL);
         ue_context_p->ue_context.handover_info->state = HO_COMPLETE;
-        LOG_I(RRC, "RRC Sends RRCConnectionReconfiguration to UE %d  at frame %d and subframe %d \n", ue_context_p->ue_context.rnti, ctxt_pP->frame,ctxt_pP->subframe);
+        LOG_I(RRC,
+              "RRC Sends RRCConnectionReconfiguration to UE %x  at frame %d and subframe %d \n",
+              ue_context_p->ue_context.rnti,
+              ctxt_pP->frame,
+              ctxt_pP->subframe);
       }
 
       /* in the target, UE in HO_ACK mode */
@@ -7573,16 +7577,16 @@ void rrc_eNB_process_ENDC_DC_prep_timeout(module_id_t module_id, x2ap_ENDC_dc_pr
 
   ue_context = rrc_eNB_get_ue_context(RC.rrc[module_id], m->rnti);
   if (ue_context == NULL) {
-    LOG_E(RRC, "receiving DC prep timeout for unknown UE rnti %d\n", m->rnti);
+    LOG_E(RRC, "receiving DC prep timeout for unknown UE rnti %x\n", m->rnti);
     return;
   }
 
   if (ue_context->ue_context.StatusRrc != RRC_NR_NSA) {
-    LOG_E(RRC, "receiving DC prep timeout for UE rnti %d not in state RRC_NR_NSA\n", m->rnti);
+    LOG_E(RRC, "receiving DC prep timeout for UE rnti %x not in state RRC_NR_NSA\n", m->rnti);
     return;
   }
 
-  LOG_I(RRC, "DC prep timeout for UE rnti %d, put back to RRC_RECONFIGURED mode\n", m->rnti);
+  LOG_I(RRC, "DC prep timeout for UE rnti %x, put back to RRC_RECONFIGURED mode\n", m->rnti);
   ue_context->ue_context.StatusRrc = RRC_RECONFIGURED;
 }
 
@@ -7593,7 +7597,7 @@ void rrc_eNB_process_ENDC_sgNB_release_required(module_id_t module_id, x2ap_ENDC
 
   ue_context = rrc_eNB_find_ue_context_from_gnb_rnti(RC.rrc[module_id], m->gnb_rnti);
   if (ue_context == NULL) {
-    LOG_E(RRC, "receiving ENDC SgNB Release Required for unknown UE (with gNB's rnti %d)\n", m->gnb_rnti);
+    LOG_E(RRC, "receiving ENDC SgNB Release Required for unknown UE (with gNB's rnti %x)\n", m->gnb_rnti);
     return;
   }
 
