@@ -1133,9 +1133,8 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/UICC/usim_interface.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/UICC/usim_interface.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/ocp-gtpu/gtp_itf.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/NR_UE/nr_nas_msg_sim.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/NR_UE/ue_process_nas.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/NR_UE/nr_nas_msg_sim.c \
+@CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/NR_UE/nr_nas_msg.h \
+@CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/NR_UE/nr_nas_msgc \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/UE/nas_itti_messaging.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/UE/user_defs.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/UE/EMM/emm_proc.h \
@@ -1584,7 +1583,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/COMMON/ESM/MSG/ActivateDefaultEpsBearerContextAccept.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/COMMON/userDef.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/COMMON/nr_common.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair3/NAS/gNB/network_process_nas.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair3/UTILS/conversions.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/X2AP/x2ap_eNB_encoder.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/X2AP/x2ap_eNB_management_procedures.c \

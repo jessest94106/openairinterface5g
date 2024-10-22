@@ -1781,7 +1781,7 @@ add_library(LIB_NAS_SIMUE
   ${NAS_SRC}UE/nas_parser.c
   ${NAS_SRC}UE/nas_proc.c
   ${NAS_SRC}UE/nas_user.c
-  ${NAS_SRC}NR_UE/nr_nas_msg_sim.c
+  ${NAS_SRC}NR_UE/nr_nas_msg.c
   ${libnas_api_OBJS}
   ${libnas_ue_api_OBJS}
   ${libnas_emm_msg_OBJS}
@@ -1844,8 +1844,6 @@ add_library(NB_IoT MODULE ${NBIOT_SOURCES} )
 
 add_library(LIB_5GNAS_GNB
   ${NAS_SRC}/COMMON/nr_common.c
-  ${NAS_SRC}/gNB/network_process_nas.c
-  ${NAS_SRC}/NR_UE/ue_process_nas.c
   ${OPENAIR3_DIR}//UICC/usim_interface.c
   )
 

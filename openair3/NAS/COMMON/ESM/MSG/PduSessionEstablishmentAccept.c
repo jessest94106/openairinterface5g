@@ -21,7 +21,7 @@
 
 #include "PduSessionEstablishmentAccept.h"
 #include "common/utils/LOG/log.h"
-#include "nr_nas_msg_sim.h"
+#include "nr_nas_msg.h"
 #include "common/utils/tun_if.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 
