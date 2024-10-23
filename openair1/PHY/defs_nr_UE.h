@@ -83,7 +83,7 @@
 #define bzero(s,n) (memset((s),0,(n)))
 /// suppress compiler warning for unused arguments
 #define UNUSED(x) (void)x;
-#define NUM_DL_ACTORS 2
+#define NUM_DL_ACTORS 4
 
 #include "impl_defs_top.h"
 #include "impl_defs_nr.h"
