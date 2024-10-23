@@ -113,11 +113,9 @@ int decode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei
 
   uint8_t typeofidentity = *(buffer + decoded) & 0x7;
 
-  if (typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI) {
+  AssertFatal(typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI, "Mobile Identity encoding of type %d not implemented\n", typeofidentity);
+  if (typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI)
     decoded_rc = decode_guti_5gs_mobile_identity(&fgsmobileidentity->guti, buffer + decoded);
-  } else {
-    AssertFatal(false, "Mobile Identity encoding of type %d not implemented\n", typeofidentity);
-  }
 
   if (decoded_rc < 0) {
     return decoded_rc;
