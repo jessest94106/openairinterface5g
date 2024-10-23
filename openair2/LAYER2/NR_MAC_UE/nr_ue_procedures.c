@@ -3777,7 +3777,7 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
 int nr_write_ce_msg3_pdu(uint8_t *mac_ce, NR_UE_MAC_INST_t *mac, rnti_t crnti, uint8_t *mac_ce_end)
 {
   uint8_t *pdu = mac_ce;
-  if (!get_softmodem_params()->sa && get_softmodem_params()->do_ra && mac->ra.ra_state != nrRA_SUCCEEDED) {
+  if (IS_SA_MODE(get_softmodem_params()) && mac->ra.ra_state != nrRA_SUCCEEDED) {
     LOG_D(NR_MAC, "Generating C-RNTI MAC CE with C-RNTI %x\n", crnti);
     *(NR_MAC_SUBHEADER_FIXED *)mac_ce = (NR_MAC_SUBHEADER_FIXED){.R = 0, .LCID = UL_SCH_LCID_C_RNTI};
     mac_ce += sizeof(NR_MAC_SUBHEADER_FIXED);
@@ -3834,37 +3834,37 @@ int nr_write_ce_ulsch_pdu(uint8_t *mac_ce,
       *ceLong = (NR_BSR_LONG){0};
       mac_ce += sizeof(NR_BSR_LONG);
       // int NR_BSR_LONG_SIZE = 1;
-      if (bsr->bsr.lc_bsr[0] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[0] && mac_ce < mac_ce_end) {
         ceLong->LcgID0 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[0];
+        *mac_ce++ = bsr->bsr.lcg_bsr[0];
       }
-      if (bsr->bsr.lc_bsr[1] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[1] && mac_ce < mac_ce_end) {
         ceLong->LcgID1 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[1];
+        *mac_ce++ = bsr->bsr.lcg_bsr[1];
       }
-      if (bsr->bsr.lc_bsr[2] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[2] && mac_ce < mac_ce_end) {
         ceLong->LcgID2 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[2];
+        *mac_ce++ = bsr->bsr.lcg_bsr[2];
       }
-      if (bsr->bsr.lc_bsr[3] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[3] && mac_ce < mac_ce_end) {
         ceLong->LcgID3 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[3];
+        *mac_ce++ = bsr->bsr.lcg_bsr[3];
       }
-      if (bsr->bsr.lc_bsr[4] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[4] && mac_ce < mac_ce_end) {
         ceLong->LcgID4 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[4];
+        *mac_ce++ = bsr->bsr.lcg_bsr[4];
       }
-      if (bsr->bsr.lc_bsr[5] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[5] && mac_ce < mac_ce_end) {
         ceLong->LcgID5 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[5];
+        *mac_ce++ = bsr->bsr.lcg_bsr[5];
       }
-      if (bsr->bsr.lc_bsr[6] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[6] && mac_ce < mac_ce_end) {
         ceLong->LcgID6 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[6];
+        *mac_ce++ = bsr->bsr.lcg_bsr[6];
       }
-      if (bsr->bsr.lc_bsr[7] && mac_ce < mac_ce_end) {
+      if (bsr->bsr.lcg_bsr[7] && mac_ce < mac_ce_end) {
         ceLong->LcgID7 = 1;
-        *mac_ce++ = bsr->bsr.lc_bsr[7];
+        *mac_ce++ = bsr->bsr.lcg_bsr[7];
       }
       *mac_pdu_subheader_ptr =
           (NR_MAC_SUBHEADER_SHORT){.LCID = bsr->type_bsr == b_long ? UL_SCH_LCID_L_BSR : UL_SCH_LCID_L_TRUNCATED_BSR,
@@ -3873,20 +3873,19 @@ int nr_write_ce_ulsch_pdu(uint8_t *mac_ce,
             "[UE] Generating ULSCH PDU : long_bsr size %d Lcgbit 0x%02x Buffer_size %d %d %d %d %d %d %d %d\n",
             ((NR_MAC_SUBHEADER_SHORT *)mac_pdu_subheader_ptr)->L,
             *mac_ce,
-            bsr->bsr.lc_bsr[0],
-            bsr->bsr.lc_bsr[1],
-            bsr->bsr.lc_bsr[2],
-            bsr->bsr.lc_bsr[3],
-            bsr->bsr.lc_bsr[4],
-            bsr->bsr.lc_bsr[5],
-            bsr->bsr.lc_bsr[6],
-            bsr->bsr.lc_bsr[7]);
+            bsr->bsr.lcg_bsr[0],
+            bsr->bsr.lcg_bsr[1],
+            bsr->bsr.lcg_bsr[2],
+            bsr->bsr.lcg_bsr[3],
+            bsr->bsr.lcg_bsr[4],
+            bsr->bsr.lcg_bsr[5],
+            bsr->bsr.lcg_bsr[6],
+            bsr->bsr.lcg_bsr[7]);
     } break;
     case b_none:
       break;
     default:
       DevAssert(false);
->>>>>>> 4a6be6c8ce (fix BSR report malformed, add SHORT BSR when it can (instead of LONG BSR) simplify the code and make the code more explicit, but the may structure remain (nr_write_ce_ulsch_pdu interface is complex, merging it into the called would make simpler and more interstandable code), fix some asserts related to this part of code)
   }
 
   return mac_ce - pdu;

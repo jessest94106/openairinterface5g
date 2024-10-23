@@ -176,7 +176,7 @@ typedef struct {
   union {
     NR_BSR_SHORT s;
     NR_BSR_LONG l;
-    uint8_t lc_bsr[8];
+    uint8_t lcg_bsr[8];
   } bsr;
   enum { b_none, b_long, b_short, b_short_trunc, b_long_trunc } type_bsr;
 } type_bsr_t;
