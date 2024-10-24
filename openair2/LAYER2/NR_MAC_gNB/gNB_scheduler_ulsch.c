@@ -501,7 +501,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
         break;
 
       default:
-        LOG_E(NR_MAC, "RNTI %0x, received unknown MAC header (LCID = 0x%02x)\n", UE->rnti, rx_lcid);
+        LOG_E(NR_MAC, "RNTI %0x [%d.%d], received unknown MAC header (LCID = 0x%02x)\n", UE->rnti, frameP, slot, rx_lcid);
         return -1;
         break;
       }

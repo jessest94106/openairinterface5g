@@ -3450,7 +3450,7 @@ static bool fill_mac_sdu(NR_UE_MAC_INST_t *mac,
     *pdu -= sh_size;
     lcids_data_status[lc_idx] = false;
     (*num_lcids_same_priority)--;
-    LOG_D(NR_MAC, "No data to transmit for RB with LCID 0x%02x\n and hence set to false", lcid);
+    LOG_D(NR_MAC, "No data to transmit for RB with LCID 0x%02x and hence set to false\n", lcid);
     return 0;
   }
 
@@ -3608,7 +3608,11 @@ uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
             buflen_remain);
 
       if (num_lcids_same_priority == count_same_priority_lcids) {
-        buflen_ep = (buflen_remain - (count_same_priority_lcids * sh_size)) / count_same_priority_lcids;
+        const int32_t buflen_ep_tmp = (buflen_remain - (count_same_priority_lcids * sh_size)) / count_same_priority_lcids;
+        /* after serving equal priority LCIDs in the first round, buflen_remain could be > 0 and < (count_same_priority_lcids * sh_size)
+           if above division yeilds a remainder. hence the following sets buflen_ep to 0 if there is not enough buffer left for subsequent rounds
+        */
+        buflen_ep = buflen_ep_tmp < 0 ? 0 : buflen_ep_tmp;
       }
 
       while (buflen_remain > 0) {
