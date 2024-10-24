@@ -315,7 +315,6 @@ double cpuf;
 configmodule_interface_t *uniqCfg = NULL;
 int main(int argc, char **argv)
 {
-  char c;
   int test_freqdomain_loopback = 0, test_slss_search = 0;
   int frame = 5, slot = 10, frame_tx = 0, slot_tx = 0;
   int loglvl = OAILOG_INFO;
@@ -343,6 +342,7 @@ int main(int argc, char **argv)
 
   randominit(0);
 
+  int c;
   while ((c = getopt(argc, argv, "--:O:c:hn:o:s:FIL:N:R:S:T:")) != -1) {
 
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */
