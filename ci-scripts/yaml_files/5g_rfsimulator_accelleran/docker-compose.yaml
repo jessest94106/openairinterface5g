@@ -6,9 +6,9 @@ services:
             - ALL
         network_mode: "host"
         environment:
-            USE_ADDITIONAL_OPTIONS: --sa --rfsim --MACRLCs.[0].local_n_address 172.21.16.109 --MACRLCs.[0].remote_n_address 172.21.6.22 --log_config.global_log_options level,nocolor,time
+            USE_ADDITIONAL_OPTIONS: --rfsim --MACRLCs.[0].local_n_address 172.21.16.109 --MACRLCs.[0].remote_n_address 172.21.6.22 --log_config.global_log_options level,nocolor,time
         volumes:
-            - ../../conf_files/gnb-du.band78.106prb.rfsim.conf:/opt/oai-gnb/etc/gnb.conf
+            - ../../conf_files/gnb-du.sa.band78.106prb.rfsim.accelleran.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
             interval: 10s
@@ -24,7 +24,7 @@ services:
             - NET_RAW    # for ping
         network_mode: "host"
         environment:
-            USE_ADDITIONAL_OPTIONS: --sa --rfsim -r 106 --numerology 1 -C 3619200000 --uicc0.imsi 208990100001140 --rfsimulator.serveraddr 127.0.0.1 --log_config.global_log_options level,nocolor,time
+            USE_ADDITIONAL_OPTIONS: --rfsim -r 106 --numerology 1 -C 3619200000 --uicc0.imsi 208990100001140 --rfsimulator.serveraddr 127.0.0.1 --log_config.global_log_options level,nocolor,time
         depends_on:
             - oai-du
         devices:

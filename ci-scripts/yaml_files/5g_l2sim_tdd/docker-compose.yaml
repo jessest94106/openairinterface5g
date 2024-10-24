@@ -88,7 +88,7 @@ services:
         network_mode: "host"
         environment:
             TZ: Europe/Paris
-            USE_ADDITIONAL_OPTIONS: --sa --nfapi VNF --emulate-l1 --log_config.global_log_options level,time,thread_id,nocolor
+            USE_ADDITIONAL_OPTIONS: --nfapi VNF --emulate-l1 --log_config.global_log_options level,time,thread_id,nocolor
             ASAN_OPTIONS: detect_leaks=0
         depends_on:
             - oai-upf
@@ -130,7 +130,7 @@ services:
         environment:
             TZ: Europe/Paris
             OPENAIR_DIR: /opt/oai-nr-ue
-            USE_ADDITIONAL_OPTIONS: --nfapi STANDALONE_PNF --node-number 2 --sa --emulate-l1 --log_config.global_log_options level,time,thread_id,nocolor
+            USE_ADDITIONAL_OPTIONS: --nfapi STANDALONE_PNF --node-number 2 --emulate-l1 --log_config.global_log_options level,time,thread_id,nocolor
             ASAN_OPTIONS: detect_leaks=0
         devices:
              - /dev/net/tun:/dev/net/tun
