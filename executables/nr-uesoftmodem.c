@@ -84,7 +84,7 @@ unsigned short config_frames[4] = {2,9,11,13};
 #include "executables/softmodem-common.h"
 #include "executables/thread-common.h"
 
-#include "nr_nas_msg_sim.h"
+#include "nr_nas_msg.h"
 #include <openair1/PHY/MODULATION/nr_modulation.h>
 #include "openair2/GNB_APP/gnb_paramdef.h"
 
@@ -335,7 +335,7 @@ static void trigger_stop(int sig)
 static void trigger_deregistration(int sig)
 {
   if (!stop_immediately) {
-    MessageDef *msg = itti_alloc_new_message(TASK_RRC_UE_SIM, 0, NAS_DEREGISTRATION_REQ);
+    MessageDef *msg = itti_alloc_new_message(TASK_NAS_NRUE, 0, NAS_DEREGISTRATION_REQ);
     NAS_DEREGISTRATION_REQ(msg).cause = AS_DETACH;
     itti_send_msg_to_task(TASK_NAS_NRUE, 0, msg);
     stop_immediately = true;

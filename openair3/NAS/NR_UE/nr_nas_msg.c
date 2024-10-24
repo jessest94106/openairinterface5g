@@ -19,7 +19,7 @@
  *      contact@openairinterface.org
  */
 
-/*! \file nr_nas_msg_sim.c
+/*! \file nr_nas_msg.c
  * \brief simulator for nr nas message
  * \author Yoshio INOUE, Masayuki HARADA
  * \email yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com
@@ -35,7 +35,7 @@
 #include "nas_log.h"
 #include "TLVDecoder.h"
 #include "TLVEncoder.h"
-#include "nr_nas_msg_sim.h"
+#include "nr_nas_msg.h"
 #include "aka_functions.h"
 #include "secu_defs.h"
 #include "kdf.h"
@@ -1393,7 +1393,7 @@ void *nas_nrue(void *args_p)
         if (security_state == NAS_SECURITY_UNPROTECTED) {
           int msg_type = get_msg_type(pdu_buffer, pdu_length);
           /* for the moment, only FGS_DEREGISTRATION_ACCEPT is accepted */
-          if (msg_type == FGS_DEREGISTRATION_ACCEPT)
+          if (msg_type == FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING)
             security_state = NAS_SECURITY_INTEGRITY_PASSED;
         }
 
@@ -1420,7 +1420,7 @@ void *nas_nrue(void *args_p)
           case REGISTRATION_ACCEPT:
             handle_registration_accept(nas, pdu_buffer, pdu_length);
             break;
-          case FGS_DEREGISTRATION_ACCEPT:
+          case FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING:
             LOG_I(NAS, "received deregistration accept\n");
             break;
           case FGS_PDU_SESSION_ESTABLISHMENT_ACC: {
@@ -1451,6 +1451,10 @@ void *nas_nrue(void *args_p)
           } break;
           case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
             LOG_E(NAS, "Received PDU Session Establishment reject\n");
+            break;
+          case REGISTRATION_REJECT:
+            LOG_E(NAS, "Received Registration reject cause: %s\n", cause_text_info[pdu_buffer[17]].text);
+            exit(1);
             break;
           default:
             LOG_W(NR_RRC, "unknown message type %d\n", msg_type);
