@@ -98,6 +98,7 @@
 #include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
 #include "openair2/E1AP/e1ap.h"
 #include "cucp_cuup_if.h"
+#include "lib/f1ap_interface_management.h"
 
 #include "BIT_STRING.h"
 #include "assertions.h"
@@ -2309,7 +2310,7 @@ void *rrc_gnb_task(void *args_p) {
       /* From DU -> CU */
       case F1AP_UL_RRC_MESSAGE:
         rrc_gNB_decode_dcch(RC.nrrrc[instance], &F1AP_UL_RRC_MESSAGE(msg_p));
-        free(F1AP_UL_RRC_MESSAGE(msg_p).rrc_container);
+        free_ul_rrc_message_transfer(&F1AP_UL_RRC_MESSAGE(msg_p));
         break;
 
       case NGAP_DOWNLINK_NAS:
@@ -2332,6 +2333,7 @@ void *rrc_gnb_task(void *args_p) {
       case F1AP_SETUP_REQ:
         AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type), "should not receive F1AP_SETUP_REQUEST in DU!\n");
         rrc_gNB_process_f1_setup_req(&F1AP_SETUP_REQ(msg_p), msg_p->ittiMsgHeader.originInstance);
+        free_f1ap_setup_request(&F1AP_SETUP_REQ(msg_p));
         break;
 
       case F1AP_UE_CONTEXT_SETUP_RESP:
@@ -2361,6 +2363,7 @@ void *rrc_gnb_task(void *args_p) {
       case F1AP_GNB_DU_CONFIGURATION_UPDATE:
         AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type), "should not receive F1AP_SETUP_REQUEST in DU!\n");
         rrc_gNB_process_f1_du_configuration_update(&F1AP_GNB_DU_CONFIGURATION_UPDATE(msg_p), msg_p->ittiMsgHeader.originInstance);
+        free_f1ap_du_configuration_update(&F1AP_GNB_DU_CONFIGURATION_UPDATE(msg_p));
         break;
 
       case F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE:
