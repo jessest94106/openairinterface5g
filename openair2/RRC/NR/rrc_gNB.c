@@ -909,6 +909,17 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
                    NR_RLC_BearerConfig__reestablishRLC_true);
   }
 
+  /* TODO: remove a reconfigurationWithSync, we don't need it for
+   * reestablishment. The whole reason why this might be here is that we store
+   * the CellGroupConfig (after handover), and simply reuse it for
+   * reestablishment, instead of re-requesting the CellGroupConfig from the DU.
+   * Hence, add below hack; the solution would be to request the
+   * CellGroupConfig from the DU when doing reestablishment. */
+  if (cellGroupConfig->spCellConfig->reconfigurationWithSync != NULL) {
+    ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cellGroupConfig->spCellConfig->reconfigurationWithSync);
+    cellGroupConfig->spCellConfig->reconfigurationWithSync = NULL;
+  }
+
   /* Re-establish SRB2 according to clause 5.3.5.6.3 of 3GPP TS 38.331
    * (SRB1 is re-established with RRCReestablishment message)
    */
