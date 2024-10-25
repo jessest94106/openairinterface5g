@@ -1423,32 +1423,9 @@ void *nas_nrue(void *args_p)
           case FGS_DEREGISTRATION_ACCEPT:
             LOG_I(NAS, "received deregistration accept\n");
             break;
-          case FGS_PDU_SESSION_ESTABLISHMENT_ACC: {
-            uint8_t offset = 0;
-            uint8_t *payload_container = pdu_buffer;
-            offset += SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
-            uint32_t payload_container_length = htons(((dl_nas_transport_t *)(pdu_buffer + offset))->payload_container_length);
-            if ((payload_container_length >= PAYLOAD_CONTAINER_LENGTH_MIN)
-                && (payload_container_length <= PAYLOAD_CONTAINER_LENGTH_MAX))
-              offset += (PLAIN_5GS_NAS_MESSAGE_HEADER_LENGTH + 3);
-            if (offset < NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length)
-              payload_container = pdu_buffer + offset;
-
-            while (offset < payload_container_length) {
-              if (*(payload_container + offset) == 0x29) { // PDU address IEI
-                if ((*(payload_container + offset + 1) == 0x05) && (*(payload_container + offset + 2) == 0x01)) { // IPV4
-                  uint8_t *ip_p = payload_container + offset + 3;
-                  char ip[20];
-                  snprintf(ip, sizeof(ip), "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
-                  LOG_I(NAS, "Received PDU Session Establishment Accept, UE IP: %s\n", ip);
-                  tun_config(1, ip, NULL, "oaitun_ue");
-                  setup_ue_ipv4_route(1, ip, "oaitun_ue");
-                  break;
-                }
-              }
-              offset++;
-            }
-          } break;
+          case FGS_PDU_SESSION_ESTABLISHMENT_ACC:
+            capture_pdu_session_establishment_accept_msg(pdu_buffer, pdu_length);
+            break;
           case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
             LOG_E(NAS, "Received PDU Session Establishment reject\n");
             break;
