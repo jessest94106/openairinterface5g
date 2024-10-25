@@ -24,6 +24,7 @@
 #include "common/ran_context.h"
 #include "nr_rrc_defs.h"
 #include "rrc_gNB_UE_context.h"
+#include "rrc_gNB_mobility.h"
 #include "openair2/F1AP/f1ap_common.h"
 #include "openair2/F1AP/f1ap_ids.h"
 #include "executables/softmodem-common.h"
@@ -395,7 +396,12 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
   int count = 0;
   rrc_gNB_ue_context_t *ue_context_p = NULL;
   RB_FOREACH(ue_context_p, rrc_nr_ue_tree_s, &rrc->rrc_ue_head) {
-    uint32_t ue_id = ue_context_p->ue_context.rrc_ue_id;
+    gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+    uint32_t ue_id = UE->rrc_ue_id;
+    if (UE->ho_context != NULL) {
+      LOG_W(NR_RRC, "DU disconnected while handover for UE %d active\n", ue_id);
+      nr_rrc_finalize_ho(UE);
+    }
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
     if (ue_data.du_assoc_id == assoc_id) {
       /* this UE belongs to the DU that disconnected, set du_assoc_id to 0,
@@ -559,6 +565,18 @@ nr_rrc_du_container_t *get_du_by_assoc_id(gNB_RRC_INST *rrc, sctp_assoc_t assoc_
   return RB_FIND(rrc_du_tree, &rrc->dus, &e);
 }
 
+/* \brief find DU by cell ID. Note: currently the CU is limited to one cell per
+ * DU, hence here, DU == cell. Modify this to look up a specific cell. */
+nr_rrc_du_container_t *get_du_by_cell_id(gNB_RRC_INST *rrc, uint64_t cell_id)
+{
+  nr_rrc_du_container_t *du = NULL;
+  RB_FOREACH(du, rrc_du_tree, &rrc->dus) {
+    if (cell_id == du->setup_req->cell[0].info.nr_cellid)
+      return du;
+  }
+  return NULL;
+}
+
 void dump_du_info(const gNB_RRC_INST *rrc, FILE *f)
 {
   fprintf(f, "%ld connected DUs \n", rrc->num_dus);
@@ -589,4 +607,32 @@ void dump_du_info(const gNB_RRC_INST *rrc, FILE *f)
       fprintf(f, "         UL band %d ARFCN %d SCS %d (kHz) PRB %d\n", ufi->band, ufi->arfcn, 15 * (1 << utb->scs), utb->nrb);
     }
   }
+}
+
+nr_rrc_du_container_t *find_target_du(gNB_RRC_INST *rrc, sctp_assoc_t source_assoc_id)
+{
+  nr_rrc_du_container_t *target_du = NULL;
+  nr_rrc_du_container_t *it = NULL;
+  bool next_du = false;
+  RB_FOREACH (it, rrc_du_tree, &rrc->dus) {
+    if (next_du == false && source_assoc_id != it->assoc_id) {
+      continue;
+    } else if (source_assoc_id == it->assoc_id) {
+      next_du = true;
+    } else {
+      target_du = it;
+      break;
+    }
+  }
+  if (target_du == NULL) {
+    RB_FOREACH (it, rrc_du_tree, &rrc->dus) {
+      if (source_assoc_id == it->assoc_id) {
+        continue;
+      } else {
+        target_du = it;
+        break;
+      }
+    }
+  }
+  return target_du;
 }

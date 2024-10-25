@@ -38,6 +38,7 @@
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
 #include "openair1/PHY/TOOLS/phy_scope_interface.h"
+#include "PHY/MODULATION/nr_modulation.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -604,9 +605,23 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc
 
     // Start synchronization with a target gNB
     if (UE->synch_request.received_synch_request == 1) {
+      fapi_nr_synch_request_t *synch_req = &UE->synch_request.synch_req;
       UE->is_synchronized = 0;
-      UE->UE_scan_carrier = UE->synch_request.synch_req.ssb_bw_scan;
-      UE->target_Nid_cell = UE->synch_request.synch_req.target_Nid_cell;
+      UE->UE_scan_carrier = synch_req->ssb_bw_scan;
+      UE->target_Nid_cell = synch_req->target_Nid_cell;
+
+      uint64_t dl_bw = (12 * fp->N_RB_DL) * (15000 << fp->numerology_index);
+      uint64_t dl_CarrierFreq = (dl_bw >> 1) + (uint64_t)UE->nrUE_config.carrier_config.dl_frequency * 1000;
+      uint64_t ul_bw = (12 * fp->N_RB_UL) * (15000 << fp->numerology_index);
+      uint64_t ul_CarrierFreq = (ul_bw >> 1) + (uint64_t)UE->nrUE_config.carrier_config.uplink_frequency * 1000;
+      if (dl_CarrierFreq != fp->dl_CarrierFreq || ul_CarrierFreq != fp->ul_CarrierFreq) {
+        fp->dl_CarrierFreq = dl_CarrierFreq;
+        fp->ul_CarrierFreq = ul_CarrierFreq;
+        nr_rf_card_config_freq(&openair0_cfg[UE->rf_map.card], ul_CarrierFreq, dl_CarrierFreq, 0);
+        UE->rfdevice.trx_set_freq_func(&UE->rfdevice, &openair0_cfg[0]);
+        init_symbol_rotation(fp);
+      }
+
       clean_UE_harq(UE);
       UE->synch_request.received_synch_request = 0;
     }
