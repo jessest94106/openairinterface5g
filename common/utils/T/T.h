@@ -177,6 +177,7 @@ extern int *T_active;
 #else /* #ifdef __cplusplus */
 
 /* C version of T_HEADER with time */
+#ifdef CHECK_T_TYPE
 #define T_HEADER(x) \
   do { \
     if (!__builtin_types_compatible_p(typeof(x), struct T_header *)) { \
@@ -191,6 +192,16 @@ extern int *T_active;
     T_LOCAL_size += sizeof(struct timespec); \
     T_PUT_int(1, (int)(uintptr_t)(x)); \
   } while (0)
+#else /* CHECK_T_TYPE */
+#define T_HEADER(x) \
+  do { \
+    struct timespec T_HEADER_time; \
+    if (clock_gettime(CLOCK_REALTIME, &T_HEADER_time)) abort(); \
+    memcpy(T_LOCAL_buf, &T_HEADER_time, sizeof(struct timespec)); \
+    T_LOCAL_size += sizeof(struct timespec); \
+    T_PUT_int(1, (int)(uintptr_t)(x)); \
+  } while (0)
+#endif /* CHECK_T_TYPE */
 
 #endif /* #ifdef __cplusplus */
 
@@ -207,6 +218,7 @@ extern int *T_active;
 #else /* #ifdef __cplusplus */
 
 /* C version of T_HEADER without time */
+#ifdef CHECK_T_TYPE
 #define T_HEADER(x) \
   do { \
     if (!__builtin_types_compatible_p(typeof(x), struct T_header *)) { \
@@ -217,6 +229,12 @@ extern int *T_active;
     } \
     T_PUT_int(1, (int)(uintptr_t)(x)); \
   } while (0)
+#else /* CHECK_T_TYPE */
+#define T_HEADER(x) \
+  do { \
+    T_PUT_int(1, (int)(uintptr_t)(x)); \
+  } while (0)
+#endif /* CHECK_T_TYPE */
 
 #endif /* #ifdef __cplusplus */
 
