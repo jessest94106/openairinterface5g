@@ -848,16 +848,15 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
   }
 }
 
-void decodeDownlinkNASTransport(as_nas_info_t *initialNasMsg, uint8_t *pdu_buffer)
+/**
+ * @brief Handle DL NAS Transport and process piggybacked 5GSM messages
+ */
+static void handleDownlinkNASTransport(uint8_t *pdu_buffer, uint32_t msg_length)
 {
   uint8_t msg_type = *(pdu_buffer + 16);
   if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
-    uint8_t *ip_p = pdu_buffer + 39;
-    char ip[20];
-    sprintf(ip, "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
-    LOG_A(NAS, "Received PDU Session Establishment Accept\n");
-    tun_config(1, ip, NULL, "oaitun_ue");
-    setup_ue_ipv4_route(1, ip, "oaitun_ue");
+    LOG_A(NAS, "Received PDU Session Establishment Accept in DL NAS Transport\n");
+    capture_pdu_session_establishment_accept_msg(pdu_buffer, msg_length);
   } else {
     LOG_E(NAS, "Received unexpected message in DLinformationTransfer %d\n", msg_type);
   }
@@ -1415,7 +1414,7 @@ void *nas_nrue(void *args_p)
             handle_security_mode_command(nas, &initialNasMsg, pdu_buffer, pdu_length);
             break;
           case FGS_DOWNLINK_NAS_TRANSPORT:
-            decodeDownlinkNASTransport(&initialNasMsg, pdu_buffer);
+            handleDownlinkNASTransport(pdu_buffer, pdu_length);
             break;
           case REGISTRATION_ACCEPT:
             handle_registration_accept(nas, pdu_buffer, pdu_length);
