@@ -172,8 +172,6 @@ void f1_setup_response(const f1ap_setup_resp_t *resp)
   AssertFatal(mac->f1_config.setup_resp != NULL, "out of memory\n");
   // Copy F1AP message
   *mac->f1_config.setup_resp = cp_f1ap_setup_response(resp);
-  // free F1AP message after copy
-  free_f1ap_setup_response(resp);
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
   // NOTE: Before accepting any UEs, we should initialize the UE states.
