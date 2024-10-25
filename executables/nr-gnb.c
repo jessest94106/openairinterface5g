@@ -412,7 +412,7 @@ void init_eNB_afterRU(void) {
     // map antennas and PRACH signals to gNB RX
     if (0) AssertFatal(gNB->num_RU>0,"Number of RU attached to gNB %d is zero\n",gNB->Mod_id);
 
-    LOG_D(PHY, "Mapping RX ports from %d RUs to gNB %d\n", gNB->num_RU, gNB->Mod_id);
+    LOG_D(NR_PHY, "Mapping RX ports from %d RUs to gNB %d\n", gNB->num_RU, gNB->Mod_id);
 
     for (ru_id=0,aa=0; ru_id<gNB->num_RU; ru_id++) {
       AssertFatal(gNB->RU_list[ru_id]->common.rxdataF != NULL, "RU %d : common.rxdataF is NULL\n", gNB->RU_list[ru_id]->idx);

@@ -365,7 +365,6 @@ static void get_options(configmodule_interface_t *cfg)
     memset((void *)&RC,0,sizeof(RC));
     /* Read RC configuration file */
     NRRCConfig();
-    NB_RU   = RC.nb_RU;
   }
 }
 
