@@ -560,7 +560,7 @@ uint8_t *get_ether_addr(const char *addr, struct rte_ether_addr *ether_addr)
   return NULL;
 }
 
-bool set_fh_init(struct xran_fh_init *fh_init)
+static bool set_fh_init(struct xran_fh_init *fh_init)
 {
   memset(fh_init, 0, sizeof(*fh_init));
 
@@ -765,7 +765,7 @@ static bool set_maxmin_pd(const paramdef_t *pd, int num, const char *name, uint1
 }
 
 extern uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw);
-bool set_fh_config(int ru_idx, int num_rus, const openair0_config_t *oai0, struct xran_fh_config *fh_config)
+static bool set_fh_config(int ru_idx, int num_rus, const openair0_config_t *oai0, struct xran_fh_config *fh_config)
 {
   AssertFatal(num_rus == 1 || num_rus == 2, "only support 1 or 2 RUs as of now\n");
   AssertFatal(ru_idx < num_rus, "illegal ru_idx %d: must be < %d\n", ru_idx, num_rus);
@@ -883,6 +883,23 @@ bool set_fh_config(int ru_idx, int num_rus, const openair0_config_t *oai0, struc
   fh_config->log_level = 1;
   fh_config->max_sections_per_slot = 8;
   fh_config->max_sections_per_symbol = 8;
+
+  return true;
+}
+
+bool get_xran_config(const openair0_config_t *openair0_cfg, struct xran_fh_init *fh_init, struct xran_fh_config *fh_config)
+{
+  if (!set_fh_init(fh_init)) {
+    printf("could not read FHI 7.2/ORAN config\n");
+    return false;
+  }
+
+  for (int32_t o_xu_id = 0; o_xu_id < fh_init->xran_ports; o_xu_id++) {
+    if (!set_fh_config(o_xu_id, fh_init->xran_ports, openair0_cfg, &fh_config[o_xu_id])) {
+      printf("could not read FHI 7.2/RU-specific config\n");
+      return false;
+    }
+  }
 
   return true;
 }
