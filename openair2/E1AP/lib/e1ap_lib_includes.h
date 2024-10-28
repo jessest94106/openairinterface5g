@@ -24,6 +24,7 @@
 
 #include "E1AP_E1AP-PDU.h"
 #include "E1AP_ProcedureCode.h"
+#include "E1AP_SuccessfulOutcome.h"
 #include "E1AP_InitiatingMessage.h"
 #include "E1AP_ProtocolIE-ID.h"
 #include "E1AP_ProtocolIE-Field.h"
@@ -45,5 +46,12 @@
 #include "E1AP_System-BearerContextSetupRequest.h"
 #include "E1AP_MaximumIPdatarate.h"
 #include "E1AP_PDU-Session-Type.h"
+// E1 Bearer Context Setup Response
+#include "E1AP_PDU-Session-Resource-Setup-Item.h"
+#include "E1AP_DRB-Setup-Item-NG-RAN.h"
+#include "E1AP_UP-Parameters-Item.h"
+#include "E1AP_QoS-Flow-Item.h"
+#include "E1AP_DRB-Failed-List-NG-RAN.h"
+#include "E1AP_DRB-Failed-Item-NG-RAN.h"
 
 #endif /* E1AP_LIB_INCLUDES_H_ */
