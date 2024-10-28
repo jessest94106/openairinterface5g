@@ -159,8 +159,67 @@ static void test_bearer_context_setup_request(void)
   free_e1ap_context_setup_request(&orig);
 }
 
+/**
+ * @brief Test E1AP Bearer Context Setup Response encoding/decoding
+ */
+static void test_bearer_context_setup_response(void)
+{
+  // Step 1: Initialize the E1AP Bearer Context Setup Response
+  e1ap_bearer_setup_resp_t orig = {
+      .gNB_cu_cp_ue_id = 1234,
+      .gNB_cu_up_ue_id = 5678,
+      .numPDUSessions = 1,
+      .pduSession[0].id = 1,
+      .pduSession[0].tlAddress = 167772161,
+      .pduSession[0].teId = 0x12345,
+      .pduSession[0].numDRBSetup = 1,
+      .pduSession[0].numDRBFailed = 0,
+      .pduSession[0].DRBnGRanList[0].id = 1,
+      .pduSession[0].DRBnGRanList[0].numUpParam = 1,
+      .pduSession[0].DRBnGRanList[0].numQosFlowSetup = 1,
+      .pduSession[0].DRBnGRanList[0].qosFlows[0].qfi = 1,
+      .pduSession[0].DRBnGRanList[0].UpParamList[0].cell_group_id = MCG,
+      .pduSession[0].DRBnGRanList[0].UpParamList[0].teId = 0x34345,
+      .pduSession[0].DRBnGRanList[0].UpParamList[0].tlAddress = 167772161,
+  };
+  // E1AP encode the original message
+  E1AP_E1AP_PDU_t *enc = encode_E1_bearer_context_setup_response(&orig);
+
+  // E1AP decode the encoded message
+  E1AP_E1AP_PDU_t *dec = e1ap_encode_decode(enc);
+
+  // Free the E1AP encoded message
+  e1ap_msg_free(enc);
+
+  // E1 message decode
+  e1ap_bearer_setup_resp_t decoded = {0};
+  bool ret = decode_E1_bearer_context_setup_response(dec, &decoded);
+  AssertFatal(ret, "decode_E1_bearer_context_setup_response(): could not decode message\n");
+
+  // Free the E1AP decoded message
+  e1ap_msg_free(dec);
+
+  // Equality check original/decoded
+  ret = eq_bearer_context_setup_response(&orig, &decoded);
+  AssertFatal(ret, "eq_bearer_context_setup_response(): decoded message doesn't match\n");
+
+  // Free the memory for the decoded message
+  free_e1ap_context_setup_response(&decoded);
+
+  // Deep copy and equality check of the original message
+  e1ap_bearer_setup_resp_t cp = cp_bearer_context_setup_response(&orig);
+  ret = eq_bearer_context_setup_response(&orig, &cp);
+  AssertFatal(ret, "eq_bearer_context_setup_response(): copied message doesn't match\n");
+
+  // Free the copied message and original
+  free_e1ap_context_setup_response(&cp);
+  free_e1ap_context_setup_response(&orig);
+}
+
 int main()
 {
+  // E1 Bearer Context Setup
   test_bearer_context_setup_request();
+  test_bearer_context_setup_response();
   return 0;
 }
