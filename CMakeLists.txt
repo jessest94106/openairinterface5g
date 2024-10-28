@@ -32,7 +32,7 @@ set (OPENAIR_DIR     ${CMAKE_SOURCE_DIR})
 
 include("cmake_targets/macros.cmake")
 if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
- set(CPM_SOURCE_CACHE ~/.cache/cpm/)
+  set(CPM_SOURCE_CACHE ~/.cache/cpm/ CACHE FILEPATH "Directory to download CPM dependencies")
 endif()
 include("cmake_targets/CPM.cmake")
 
