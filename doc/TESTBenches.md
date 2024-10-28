@@ -195,7 +195,7 @@ information on how the images are built.
   - NR performance tests: 2x2 configuration, 60 MHz and 100 MHz bandwidth
 - [RAN-SA-FHI72-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-FHI72-CN5G/)
   ~5G-NR
-  - cacofonix + FHI72 + VVDN (gNB), up2 (Quectel RM520N UE), OAI CN5G
+  - cacofonix + FHI72 + Metanoia (gNB), up2 (Quectel RM520N UE), OAI CN5G
   - OpenShift cluster for CN deployment
   - FHI 7.2 testing with 100 MHz bandwidth, 2 layers in DL
 
