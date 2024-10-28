@@ -45,7 +45,6 @@ int l1_north_init_gNB()
 {
   AssertFatal(RC.nb_nr_L1_inst > 0, "Failed to init PHY callbacks: nb_nr_L1_inst = %d\n", RC.nb_nr_L1_inst);
   AssertFatal(RC.gNB != NULL, "Failed to init PHY callbacks: RC.gNB is null\n");
-  LOG_I(NR_PHY, "RC.nb_nr_L1_inst = %d\n", RC.nb_nr_L1_inst);
 
   for (uint8_t i = 0; i < RC.nb_nr_L1_inst; i++) {
 

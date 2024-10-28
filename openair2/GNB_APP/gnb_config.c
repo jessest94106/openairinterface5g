@@ -928,17 +928,6 @@ void RCconfig_NR_L1(void)
         gNB->eth_params_n.remote_portd = *(L1_ParamList.paramarray[j][L1_REMOTE_N_PORTD_IDX].iptr);
         gNB->eth_params_n.transp_preference = ETH_UDP_MODE;
 
-        RC.nb_nr_macrlc_inst = 1; // This is used by mac_top_init_gNB()
-
-        RC.nb_nr_CC = (int *)malloc((1 + RC.nb_nr_inst) * sizeof(int));
-        RC.nb_nr_CC[0] = 1;
-
-        LOG_D(NR_PHY,
-              "RC.nb_nr_CC[0] = %d for init_gNB_afterRU()\n"
-              "RC.nb_nr_macrlc_inst = %d (used by mac_top_init_gNB())\n",
-              RC.nb_nr_CC[0],
-              RC.nb_nr_macrlc_inst);
-
         configure_nr_nfapi_pnf(gNB->eth_params_n.remote_addr,
                                gNB->eth_params_n.remote_portc,
                                gNB->eth_params_n.my_addr,
@@ -1372,7 +1361,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   NR_ServingCellConfig_t *scd = get_scd_config(cfg);
 
   if (MacRLC_ParamList.numelt > 0) {
-    RC.nb_nr_macrlc_inst = MacRLC_ParamList.numelt;
     ngran_node_t node_type = get_node_type();
     mac_top_init_gNB(node_type, scc, scd, &config);
     RC.nb_nr_mac_CC = (int *)malloc(RC.nb_nr_macrlc_inst * sizeof(int));
@@ -2133,16 +2121,29 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i) {
   return 0;
 }
 
-void NRRCConfig(void) {
+static pthread_mutex_t rc_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool rc_done = false;
 
-  paramlist_def_t MACRLCParamList = {CONFIG_STRING_MACRLC_LIST,NULL,0};
-  paramlist_def_t L1ParamList     = {CONFIG_STRING_L1_LIST,NULL,0};
-  paramlist_def_t RUParamList     = {CONFIG_STRING_RU_LIST,NULL,0};
+/**
+ * @brief This function is initializing the RAN context
+ *        the its various layer instances
+ */
+void NRRCConfig(void)
+{
+  // Call NRRCConfig only once
+  pthread_mutex_lock(&rc_mutex);
+  if (rc_done) {
+    LOG_E(GNB_APP, "RAN Context has been already initialized\n");
+    pthread_mutex_unlock(&rc_mutex);
+    return;
+  }
+
+  memset((void *)&RC, 0, sizeof(RC));
+
   paramdef_t GNBSParams[]         = GNBSPARAMS_DESC;
-  
-/* get global parameters, defined outside any section in the config file */
-
   config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
+
+  // Set num of gNBs instances
   RC.nb_nr_inst = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
   AssertFatal(RC.nb_nr_inst == NUMBER_OF_gNB_MAX,
               "Configuration error: RC.nb_nr_inst (%d) must equal NUMBER_OF_gNB_MAX (%d).\n"
@@ -2150,18 +2151,38 @@ void NRRCConfig(void) {
               "Ensure that nb_nr_inst matches the maximum allowed gNB instances in this configuration.",
               RC.nb_nr_inst, NUMBER_OF_gNB_MAX);
 
-  // Get num MACRLC instances
+  // Set num MACRLC instances
+  paramlist_def_t MACRLCParamList = {CONFIG_STRING_MACRLC_LIST, NULL, 0};
   config_getlist(config_get_if(), &MACRLCParamList, NULL, 0, NULL);
-  RC.nb_nr_macrlc_inst  = MACRLCParamList.numelt;
-  // Get num L1 instances
+  RC.nb_nr_macrlc_inst = MACRLCParamList.numelt;
+
+  // Set num L1 instances
+  paramlist_def_t L1ParamList = {CONFIG_STRING_L1_LIST, NULL, 0};
   config_getlist(config_get_if(), &L1ParamList, NULL, 0, NULL);
   RC.nb_nr_L1_inst = L1ParamList.numelt;
-  
-  // Get num RU instances
-  config_getlist(config_get_if(), &RUParamList, NULL, 0, NULL);
-  RC.nb_RU     = RUParamList.numelt; 
-}
 
+  // Set num RU instances
+  paramlist_def_t RUParamList = {CONFIG_STRING_RU_LIST, NULL, 0};
+  config_getlist(config_get_if(), &RUParamList, NULL, 0, NULL);
+  RC.nb_RU = RUParamList.numelt;
+
+  // Set num component carriers
+  RC.nb_nr_CC = calloc_or_fail(1, sizeof(*RC.nb_nr_CC));
+  *RC.nb_nr_CC = RC.nb_nr_L1_inst;
+  AssertFatal(*RC.nb_nr_CC <= MAX_NUM_CCs, "Configured number of CCs (%d) not supported\n", *RC.nb_nr_CC);
+
+  LOG_I(GNB_APP,
+        "Initialized RAN Context: RC.nb_nr_inst = %d, RC.nb_nr_macrlc_inst = %d, RC.nb_nr_L1_inst = %d, RC.nb_RU = %d, "
+        "RC.nb_nr_CC[0] = %d\n",
+        RC.nb_nr_inst,
+        RC.nb_nr_macrlc_inst,
+        RC.nb_nr_L1_inst,
+        RC.nb_RU,
+        *RC.nb_nr_CC);
+
+  rc_done = true;
+  pthread_mutex_unlock(&rc_mutex);
+}
 
 int RCconfig_NR_X2(MessageDef *msg_p, uint32_t i) {
   int   J, l;
@@ -2465,12 +2486,9 @@ ngran_node_t get_node_type(void)
   char aprefix[MAX_OPTNAME_SIZE*2 + 8];
   sprintf(aprefix, "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
   config_getlist(config_get_if(), &GNBE1ParamList, GNBE1Params, sizeofArray(GNBE1Params), aprefix);
-  if (MacRLC_ParamList.numelt > 0) {
-    RC.nb_nr_macrlc_inst = MacRLC_ParamList.numelt; 
-    for (int j = 0; j < RC.nb_nr_macrlc_inst; j++) {
-      if (strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "f1") == 0) {
-        return ngran_gNB_DU; // MACRLCs present in config: it must be a DU
-      }
+  for (int j = 0; j < MacRLC_ParamList.numelt; j++) {
+    if (strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "f1") == 0) {
+      return ngran_gNB_DU; // MACRLCs present in config: it must be a DU
     }
   }
 

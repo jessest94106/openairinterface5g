@@ -246,8 +246,6 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
   if (RC.nb_nr_macrlc_inst > 0)
     RCconfig_nr_macrlc(cfg);
 
-  LOG_D(PHY, "%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
-
   if (RC.nb_nr_L1_inst>0) AssertFatal(l1_north_init_gNB()==0,"could not initialize L1 north interface\n");
 
   AssertFatal (gnb_nb <= RC.nb_nr_inst,
@@ -360,12 +358,6 @@ static void get_options(configmodule_interface_t *cfg)
   get_common_options(cfg, SOFTMODEM_GNB_BIT);
   config_process_cmdline(cfg, cmdline_params, sizeofArray(cmdline_params), NULL);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
-
-  if ( !(CONFIG_ISFLAGSET(CONFIG_ABORT)) ) {
-    memset((void *)&RC,0,sizeof(RC));
-    /* Read RC configuration file */
-    NRRCConfig();
-  }
 }
 
 void wait_RUs(void) {
@@ -502,6 +494,7 @@ int main( int argc, char **argv ) {
   lock_memory_to_ram();
   get_options(uniqCfg);
 
+
   EPC_MODE_ENABLED = !IS_SOFTMODEM_NOS1;
 
   if (CONFIG_ISFLAGSET(CONFIG_ABORT) ) {
@@ -536,6 +529,9 @@ int main( int argc, char **argv ) {
 
   // don't create if node doesn't connect to RRC/S1/GTP
   const ngran_node_t node_type = get_node_type();
+  // Init RAN context
+  if (!(CONFIG_ISFLAGSET(CONFIG_ABORT)))
+    NRRCConfig();
 
   if (RC.nb_nr_L1_inst > 0) {
     // Initialize gNB structure in RAN context

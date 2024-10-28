@@ -402,8 +402,6 @@ void init_eNB_afterRU(void) {
   PHY_VARS_gNB *gNB;
 
   for (inst=0; inst<RC.nb_nr_inst; inst++) {
-    LOG_D(PHY, "RC.nb_nr_CC[inst:%d]:%p\n", inst, RC.gNB[inst]);
-
     gNB = RC.gNB[inst];
     gNB->ldpc_offload_flag = get_softmodem_params()->ldpc_offload_flag;
 
