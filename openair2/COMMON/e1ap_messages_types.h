@@ -27,8 +27,8 @@
 #include <netinet/in.h>
 #include <netinet/sctp.h>
 #include "common/ngran_types.h"
-#include "f1ap_messages_types.h"
-#include "ngap_messages_types.h"
+#include "common/platform_types.h"
+#include "common/5g_platform_types.h"
 
 /* Definitions according to 3GPP TS 38.463 */
 #define E1AP_MAX_NUM_TRANSAC_IDS 4

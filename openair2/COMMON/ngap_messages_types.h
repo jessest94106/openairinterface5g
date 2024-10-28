@@ -29,6 +29,7 @@
 
 #ifndef NGAP_MESSAGES_TYPES_H_
 #define NGAP_MESSAGES_TYPES_H_
+#include "common/5g_platform_types.h"
 #include "common/platform_constants.h"
 #include "common/platform_types.h"
 #include "common/5g_platform_types.h"
