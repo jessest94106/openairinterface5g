@@ -2136,6 +2136,11 @@ void NRRCConfig(void) {
 
   config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
   RC.nb_nr_inst = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
+  AssertFatal(RC.nb_nr_inst == NUMBER_OF_gNB_MAX,
+              "Configuration error: RC.nb_nr_inst (%d) must equal NUMBER_OF_gNB_MAX (%d).\n"
+              "Currently, only one instance of each layer (L1, L2, L3) is supported.\n"
+              "Ensure that nb_nr_inst matches the maximum allowed gNB instances in this configuration.",
+              RC.nb_nr_inst, NUMBER_OF_gNB_MAX);
 
   // Get num MACRLC instances
   config_getlist(config_get_if(), &MACRLCParamList, NULL, 0, NULL);
@@ -2383,7 +2388,6 @@ int gNB_app_handle_f1ap_gnb_cu_configuration_update(f1ap_gnb_cu_configuration_up
         gnb_cu_cfg_update->num_cells_to_activate, RC.nb_nr_inst);
 
   AssertFatal(gnb_cu_cfg_update->num_cells_to_activate == 1, "only one cell supported at the moment\n");
-  AssertFatal(RC.nb_nr_inst == 1, "expected one instance\n");
   gNB_MAC_INST *mac = RC.nrmac[0];
   NR_SCHED_LOCK(&mac->sched_lock);
   for (j = 0; j < gnb_cu_cfg_update->num_cells_to_activate; j++) {

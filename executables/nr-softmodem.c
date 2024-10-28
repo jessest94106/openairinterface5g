@@ -103,7 +103,6 @@ unsigned int mmapped_dma=0;
 
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
 int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
-unsigned char NB_gNB_INST = 1;
 char *uecap_file;
 
 runmode_t mode = normal_txrx;
@@ -255,18 +254,12 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
                "Number of gNB is greater than gNB defined in configuration file (%d/%d)!",
                gnb_nb, RC.nb_nr_inst);
 
-  LOG_D(GNB_APP, "Allocating gNB_RRC_INST for %d instances\n", RC.nb_nr_inst);
+  LOG_D(GNB_APP, "Allocating gNB_RRC_INST\n");
+  RC.nrrrc = calloc(1, sizeof(*RC.nrrrc));
+  RC.nrrrc[0] = calloc(1, sizeof(gNB_RRC_INST));
+  RCconfig_NRRRC(RC.nrrrc[0]);
 
-  if (RC.nb_nr_inst > 0) {
-    AssertFatal(RC.nb_nr_inst == 1, "multiple RRC instances are not supported\n");
-    RC.nrrrc = calloc(1, sizeof(*RC.nrrrc));
-    RC.nrrrc[0] = calloc(1,sizeof(gNB_RRC_INST));
-    RCconfig_NRRRC(RC.nrrrc[0]);
-  }
-
-  if (RC.nb_nr_inst > 0 &&
-      !get_softmodem_params()->nsa &&
-      !(node_type == ngran_gNB_DU))  {
+  if (!get_softmodem_params()->nsa && !(node_type == ngran_gNB_DU)) {
     // we start pdcp in both cuup (for drb) and cucp (for srb)
     init_pdcp();
   }
@@ -373,7 +366,6 @@ static void get_options(configmodule_interface_t *cfg)
     memset((void *)&RC,0,sizeof(RC));
     /* Read RC configuration file */
     NRRCConfig();
-    NB_gNB_INST = RC.nb_nr_inst;
     NB_RU   = RC.nb_RU;
   }
 }

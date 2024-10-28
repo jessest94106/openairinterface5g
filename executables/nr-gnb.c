@@ -400,10 +400,7 @@ void term_gNB_Tpool(int inst) {
 void init_eNB_afterRU(void) {
   int inst,ru_id,i,aa;
   PHY_VARS_gNB *gNB;
-  LOG_D(PHY, "%s() RC.nb_nr_inst:%d\n", __FUNCTION__, RC.nb_nr_inst);
 
-  if(NFAPI_MODE == NFAPI_MODE_PNF)
-    RC.nb_nr_inst = 1;
   for (inst=0; inst<RC.nb_nr_inst; inst++) {
     LOG_D(PHY, "RC.nb_nr_CC[inst:%d]:%p\n", inst, RC.gNB[inst]);
 
