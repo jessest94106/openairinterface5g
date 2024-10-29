@@ -151,7 +151,8 @@ int nr_ue_pdcch_procedures(PHY_VARS_NR_UE *ue,
 
 void nr_ue_csi_im_procedures(PHY_VARS_NR_UE *ue,
                              const UE_nr_rxtx_proc_t *proc,
-                             c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP]);
+                             c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP],
+                             const fapi_nr_dl_config_csiim_pdu_rel15_t *csiim_config_pdu);
 
 void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
                              const UE_nr_rxtx_proc_t *proc,
