@@ -424,8 +424,8 @@ static void nr_ue_scheduled_response_dl(NR_UE_MAC_INST_t *mac,
         phy->csiim_vars[0]->active = true;
         break;
       case FAPI_NR_DL_CONFIG_TYPE_CSI_RS:
-        phy->csirs_vars[0]->csirs_config_pdu = pdu->csirs_config_pdu.csirs_config_rel15;
-        phy->csirs_vars[0]->active = true;
+        phy_data->csirs_vars.csirs_config_pdu = pdu->csirs_config_pdu.csirs_config_rel15;
+        phy_data->csirs_vars.active = true;
         break;
       case FAPI_NR_DL_CONFIG_TYPE_RA_DLSCH: {
         fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_config_pdu = &pdu->dlsch_config_pdu.dlsch_config_rel15;

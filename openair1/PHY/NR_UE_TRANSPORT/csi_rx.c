@@ -877,16 +877,9 @@ static void nr_ue_generate_csi_rs(const fapi_nr_dl_config_csirs_pdu_rel15_t *csi
 
 void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
                              const UE_nr_rxtx_proc_t *proc,
-                             c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP])
+                             c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP],
+                             fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_config_pdu)
 {
-
-  int gNB_id = proc->gNB_id;
-  if(!ue->csirs_vars[gNB_id]->active) {
-    return;
-  }
-  ue->csirs_vars[gNB_id]->active = 0;
-
-  const fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_config_pdu = &ue->csirs_vars[gNB_id]->csirs_config_pdu;
 
 #ifdef NR_CSIRS_DEBUG
   LOG_I(NR_PHY, "csirs_config_pdu->subcarrier_spacing = %i\n", csirs_config_pdu->subcarrier_spacing);
