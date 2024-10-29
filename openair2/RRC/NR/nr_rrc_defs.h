@@ -243,6 +243,7 @@ typedef struct gNB_RRC_UE_s {
   uint64_t                           ng_5G_S_TMSI_Part1;
   NR_EstablishmentCause_t            establishment_cause;
 
+  uint64_t nr_cellid;
   uint32_t                           rrc_ue_id;
   uint64_t amf_ue_ngap_id;
   nr_rrc_guami_t                     ue_guami;

@@ -1053,6 +1053,7 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   UE = &ue_context_p->ue_context;
   UE->establishment_cause = rrcSetupRequest->establishmentCause;
+  UE->nr_cellid = msg->nr_cellid;
   UE->masterCellGroup = cellGroupConfig;
   activate_srb(UE, 1);
   rrc_gNB_generate_RRCSetup(0, msg->crnti, ue_context_p, msg->du2cu_rrc_container, msg->du2cu_rrc_container_length);
@@ -1202,6 +1203,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
 
   // update with new RNTI, and update secondary UE association
   UE->rnti = msg->crnti;
+  UE->nr_cellid = msg->nr_cellid;
   f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
   ue_data.secondary_ue = msg->gNB_DU_ue_id;
   cu_remove_f1_ue_data(UE->rrc_ue_id);
@@ -2107,6 +2109,7 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
     nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
     DevAssert(source_ctx->old_rnti == UE->rnti);
     UE->rnti = target_ctx->new_rnti;
+    UE->nr_cellid = target_ctx->du->setup_req->cell[0].info.nr_cellid;
   }
 }
 
