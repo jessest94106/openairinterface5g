@@ -41,7 +41,7 @@ import constants as CONST
 #-----------------------------------------------------------
 
 
-def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER):
+def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER):
 
 
     py_param_file_present = False
@@ -78,7 +78,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             CiTestObj.ranRepository = matchReg.group(1)
             RAN.ranRepository=matchReg.group(1)
             HTML.ranRepository=matchReg.group(1)
-            ldpc.ranRepository=matchReg.group(1)
             CONTAINERS.ranRepository=matchReg.group(1)
             SCA.ranRepository=matchReg.group(1)
             PHYSIM.ranRepository=matchReg.group(1)
@@ -89,7 +88,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             else:
                 matchReg = re.match('^\-\-ranAllowMerge=(.+)$', myArgv, re.IGNORECASE)
             doMerge = matchReg.group(1)
-            ldpc.ranAllowMerge=matchReg.group(1)
             if ((doMerge == 'true') or (doMerge == 'True')):
                 CiTestObj.ranAllowMerge = True
                 RAN.ranAllowMerge=True
@@ -106,7 +104,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             CiTestObj.ranBranch = matchReg.group(1)
             RAN.ranBranch=matchReg.group(1)
             HTML.ranBranch=matchReg.group(1)
-            ldpc.ranBranch=matchReg.group(1)
             CONTAINERS.ranBranch=matchReg.group(1)
             SCA.ranBranch=matchReg.group(1)
             PHYSIM.ranBranch=matchReg.group(1)
@@ -119,7 +116,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             CiTestObj.ranCommitID = matchReg.group(1)
             RAN.ranCommitID=matchReg.group(1)
             HTML.ranCommitID=matchReg.group(1)
-            ldpc.ranCommitID=matchReg.group(1)
             CONTAINERS.ranCommitID=matchReg.group(1)
             SCA.ranCommitID=matchReg.group(1)
             PHYSIM.ranCommitID=matchReg.group(1)
@@ -132,7 +128,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             CiTestObj.ranTargetBranch = matchReg.group(1)
             RAN.ranTargetBranch=matchReg.group(1)
             HTML.ranTargetBranch=matchReg.group(1)
-            ldpc.ranTargetBranch=matchReg.group(1)
             CONTAINERS.ranTargetBranch=matchReg.group(1)
             SCA.ranTargetBranch=matchReg.group(1)
             PHYSIM.ranTargetBranch=matchReg.group(1)
@@ -141,7 +136,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             if re.match('^\-\-eNBIPAddress=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match('^\-\-eNBIPAddress=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBIPAddress=matchReg.group(1)
-                ldpc.eNBIpAddr=matchReg.group(1)
                 CONTAINERS.eNBIPAddress=matchReg.group(1)
                 SCA.eNBIPAddress=matchReg.group(1)
                 PHYSIM.eNBIPAddress=matchReg.group(1)
@@ -158,7 +152,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             if re.match('^\-\-eNBUserName=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match('^\-\-eNBUserName=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBUserName=matchReg.group(1)
-                ldpc.eNBUserName=matchReg.group(1)
                 CONTAINERS.eNBUserName=matchReg.group(1)
                 SCA.eNBUserName=matchReg.group(1)
                 PHYSIM.eNBUserName=matchReg.group(1)
@@ -175,7 +168,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             if re.match('^\-\-eNBPassword=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match('^\-\-eNBPassword=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBPassword=matchReg.group(1)
-                ldpc.eNBPassWord=matchReg.group(1)
                 CONTAINERS.eNBPassword=matchReg.group(1)
                 SCA.eNBPassword=matchReg.group(1)
                 PHYSIM.eNBPassword=matchReg.group(1)
@@ -192,7 +184,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUST
             if re.match('^\-\-eNBSourceCodePath=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match('^\-\-eNBSourceCodePath=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBSourceCodePath=matchReg.group(1)
-                ldpc.eNBSourceCodePath=matchReg.group(1)
                 CONTAINERS.eNBSourceCodePath=matchReg.group(1)
                 SCA.eNBSourceCodePath=matchReg.group(1)
                 PHYSIM.eNBSourceCodePath=matchReg.group(1)
