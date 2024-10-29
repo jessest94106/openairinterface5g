@@ -177,7 +177,6 @@ void nr_phy_config_request_sim_pbchsim(PHY_VARS_gNB *gNB,
 configmodule_interface_t *uniqCfg = NULL;
 int main(int argc, char **argv)
 {
-  char c;
   int i,aa,start_symbol;
   double sigma2, sigma2_dB=10,SNR,snr0=-2.0,snr1=2.0;
   double cfo=0;
@@ -246,6 +245,7 @@ int main(int argc, char **argv)
     exit_fun("[NR_PBCHSIM] Error, configuration module init failed\n");
   }
 
+  int c;
   while ((c = getopt (argc, argv, "--:O:c:F:g:hIL:m:M:n:N:o:P:r:R:s:S:x:y:z:")) != -1) {
 
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */

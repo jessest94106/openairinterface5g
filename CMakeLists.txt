@@ -32,7 +32,7 @@ set (OPENAIR_DIR     ${CMAKE_SOURCE_DIR})
 
 include("cmake_targets/macros.cmake")
 if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
- set(CPM_SOURCE_CACHE ~/.cache/cpm/)
+  set(CPM_SOURCE_CACHE ~/.cache/cpm/ CACHE FILEPATH "Directory to download CPM dependencies")
 endif()
 include("cmake_targets/CPM.cmake")
 
@@ -1271,6 +1271,7 @@ set(L2_NR_SRC
   ${NR_RRC_DIR}/rrc_gNB_radio_bearers.c
   ${NR_RRC_DIR}/rrc_gNB_cuup.c
   ${NR_RRC_DIR}/rrc_gNB_du.c
+  ${NR_RRC_DIR}/rrc_gNB_mobility.c
   )
 
 set(L2_SRC_UE
@@ -1781,7 +1782,7 @@ add_library(LIB_NAS_SIMUE
   ${NAS_SRC}UE/nas_parser.c
   ${NAS_SRC}UE/nas_proc.c
   ${NAS_SRC}UE/nas_user.c
-  ${NAS_SRC}NR_UE/nr_nas_msg_sim.c
+  ${NAS_SRC}NR_UE/nr_nas_msg.c
   ${libnas_api_OBJS}
   ${libnas_ue_api_OBJS}
   ${libnas_emm_msg_OBJS}
@@ -1844,8 +1845,6 @@ add_library(NB_IoT MODULE ${NBIOT_SOURCES} )
 
 add_library(LIB_5GNAS_GNB
   ${NAS_SRC}/COMMON/nr_common.c
-  ${NAS_SRC}/gNB/network_process_nas.c
-  ${NAS_SRC}/NR_UE/ue_process_nas.c
   ${OPENAIR3_DIR}//UICC/usim_interface.c
   )
 

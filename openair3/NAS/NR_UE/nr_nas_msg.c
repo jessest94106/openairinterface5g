@@ -19,7 +19,7 @@
  *      contact@openairinterface.org
  */
 
-/*! \file nr_nas_msg_sim.c
+/*! \file nr_nas_msg.c
  * \brief simulator for nr nas message
  * \author Yoshio INOUE, Masayuki HARADA
  * \email yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com
@@ -35,7 +35,7 @@
 #include "nas_log.h"
 #include "TLVDecoder.h"
 #include "TLVEncoder.h"
-#include "nr_nas_msg_sim.h"
+#include "nr_nas_msg.h"
 #include "aka_functions.h"
 #include "secu_defs.h"
 #include "kdf.h"
@@ -848,16 +848,15 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
   }
 }
 
-void decodeDownlinkNASTransport(as_nas_info_t *initialNasMsg, uint8_t *pdu_buffer)
+/**
+ * @brief Handle DL NAS Transport and process piggybacked 5GSM messages
+ */
+static void handleDownlinkNASTransport(uint8_t *pdu_buffer, uint32_t msg_length)
 {
   uint8_t msg_type = *(pdu_buffer + 16);
   if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
-    uint8_t *ip_p = pdu_buffer + 39;
-    char ip[20];
-    sprintf(ip, "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
-    LOG_A(NAS, "Received PDU Session Establishment Accept\n");
-    tun_config(1, ip, NULL, "oaitun_ue");
-    setup_ue_ipv4_route(1, ip, "oaitun_ue");
+    LOG_A(NAS, "Received PDU Session Establishment Accept in DL NAS Transport\n");
+    capture_pdu_session_establishment_accept_msg(pdu_buffer, msg_length);
   } else {
     LOG_E(NAS, "Received unexpected message in DLinformationTransfer %d\n", msg_type);
   }
@@ -1393,7 +1392,7 @@ void *nas_nrue(void *args_p)
         if (security_state == NAS_SECURITY_UNPROTECTED) {
           int msg_type = get_msg_type(pdu_buffer, pdu_length);
           /* for the moment, only FGS_DEREGISTRATION_ACCEPT is accepted */
-          if (msg_type == FGS_DEREGISTRATION_ACCEPT)
+          if (msg_type == FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING)
             security_state = NAS_SECURITY_INTEGRITY_PASSED;
         }
 
@@ -1415,42 +1414,23 @@ void *nas_nrue(void *args_p)
             handle_security_mode_command(nas, &initialNasMsg, pdu_buffer, pdu_length);
             break;
           case FGS_DOWNLINK_NAS_TRANSPORT:
-            decodeDownlinkNASTransport(&initialNasMsg, pdu_buffer);
+            handleDownlinkNASTransport(pdu_buffer, pdu_length);
             break;
           case REGISTRATION_ACCEPT:
             handle_registration_accept(nas, pdu_buffer, pdu_length);
             break;
-          case FGS_DEREGISTRATION_ACCEPT:
+          case FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING:
             LOG_I(NAS, "received deregistration accept\n");
             break;
-          case FGS_PDU_SESSION_ESTABLISHMENT_ACC: {
-            uint8_t offset = 0;
-            uint8_t *payload_container = pdu_buffer;
-            offset += SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
-            uint32_t payload_container_length = htons(((dl_nas_transport_t *)(pdu_buffer + offset))->payload_container_length);
-            if ((payload_container_length >= PAYLOAD_CONTAINER_LENGTH_MIN)
-                && (payload_container_length <= PAYLOAD_CONTAINER_LENGTH_MAX))
-              offset += (PLAIN_5GS_NAS_MESSAGE_HEADER_LENGTH + 3);
-            if (offset < NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length)
-              payload_container = pdu_buffer + offset;
-
-            while (offset < payload_container_length) {
-              if (*(payload_container + offset) == 0x29) { // PDU address IEI
-                if ((*(payload_container + offset + 1) == 0x05) && (*(payload_container + offset + 2) == 0x01)) { // IPV4
-                  uint8_t *ip_p = payload_container + offset + 3;
-                  char ip[20];
-                  snprintf(ip, sizeof(ip), "%d.%d.%d.%d", *(ip_p), *(ip_p + 1), *(ip_p + 2), *(ip_p + 3));
-                  LOG_I(NAS, "Received PDU Session Establishment Accept, UE IP: %s\n", ip);
-                  tun_config(1, ip, NULL, "oaitun_ue");
-                  setup_ue_ipv4_route(1, ip, "oaitun_ue");
-                  break;
-                }
-              }
-              offset++;
-            }
-          } break;
+          case FGS_PDU_SESSION_ESTABLISHMENT_ACC:
+            capture_pdu_session_establishment_accept_msg(pdu_buffer, pdu_length);
+            break;
           case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
             LOG_E(NAS, "Received PDU Session Establishment reject\n");
+            break;
+          case REGISTRATION_REJECT:
+            LOG_E(NAS, "Received Registration reject cause: %s\n", cause_text_info[pdu_buffer[17]].text);
+            exit(1);
             break;
           default:
             LOG_W(NR_RRC, "unknown message type %d\n", msg_type);

@@ -77,6 +77,7 @@
 
 #include "rrc_gNB_NGAP.h"
 #include "rrc_gNB_du.h"
+#include "rrc_gNB_mobility.h"
 
 #include "rrc_gNB_GTPV1U.h"
 
@@ -98,6 +99,7 @@
 #include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
 #include "openair2/E1AP/e1ap.h"
 #include "cucp_cuup_if.h"
+#include "lib/f1ap_interface_management.h"
 
 #include "BIT_STRING.h"
 #include "assertions.h"
@@ -111,16 +113,6 @@
 extern RAN_CONTEXT_t RC;
 
 mui_t rrc_gNB_mui = 0;
-
-// the assoc_id might be 0 (if the DU goes offline). Below helper macro to
-// print an error and return from the function in that case
-#define RETURN_IF_INVALID_ASSOC_ID(assoc_id)                               \
-  {                                                                        \
-    if (assoc_id == 0) {                                                   \
-      LOG_E(NR_RRC, "cannot send data: invalid assoc_id 0, DU offline\n"); \
-      return;                                                              \
-    }                                                                      \
-  }
 
 ///---------------------------------------------------------------------------------------------------------------///
 ///---------------------------------------------------------------------------------------------------------------///
@@ -481,6 +473,60 @@ static void rrc_gNB_process_RRCSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
   rrc_gNB_send_NGAP_NAS_FIRST_REQ(rrc, UE, rrcSetupComplete);
 }
 
+static int rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc,
+                                             gNB_RRC_UE_t *UE,
+                                             uint8_t xid,
+                                             struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *nas_messages,
+                                             uint8_t *buf,
+                                             int max_len,
+                                             bool reestablish)
+{
+  NR_CellGroupConfig_t *cellGroupConfig = UE->masterCellGroup;
+  nr_rrc_du_container_t *du = get_du_for_ue(rrc, UE->rrc_ue_id);
+  DevAssert(du != NULL);
+  f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
+  NR_MeasConfig_t *measconfig = NULL;
+  if (du->mtc != NULL) {
+    int scs = get_ssb_scs(cell_info);
+    int band = get_dl_band(cell_info);
+    const NR_MeasTimingList_t *mtlist = du->mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
+    const NR_MeasTiming_t *mt = mtlist->list.array[0];
+    const neighbour_cell_configuration_t *neighbour_config = get_neighbour_config(cell_info->nr_cellid);
+    seq_arr_t *neighbour_cells = NULL;
+    if (neighbour_config)
+      neighbour_cells = neighbour_config->neighbour_cells;
+
+    measconfig = get_MeasConfig(mt, band, scs, &rrc->measurementConfiguration, neighbour_cells);
+  }
+
+  if (UE->measConfig)
+    free_MeasConfig(UE->measConfig);
+
+  UE->measConfig = measconfig;
+
+  NR_SRB_ToAddModList_t *SRBs = createSRBlist(UE, reestablish);
+  NR_DRB_ToAddModList_t *DRBs = createDRBlist(UE, reestablish);
+
+  int size = do_RRCReconfiguration(UE,
+                                   buf,
+                                   max_len,
+                                   xid,
+                                   SRBs,
+                                   DRBs,
+                                   UE->DRB_ReleaseList,
+                                   NULL,
+                                   measconfig,
+                                   nas_messages,
+                                   cellGroupConfig);
+  LOG_DUMPMSG(NR_RRC, DEBUG_RRC, (char *)buf, size, "[MSG] RRC Reconfiguration\n");
+  freeSRBlist(SRBs);
+  freeDRBlist(DRBs);
+  ASN_STRUCT_FREE(asn_DEF_NR_DRB_ToReleaseList, UE->DRB_ReleaseList);
+  UE->DRB_ReleaseList = NULL;
+
+  return size;
+}
+
 static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
 {
   uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
@@ -517,51 +563,10 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
   for (int i = 0; i < ue_p->nb_of_pdusessions; i++)
     clear_nas_pdu(&ue_p->pduSession[i].param.nas_pdu);
 
-  NR_CellGroupConfig_t *cellGroupConfig = ue_p->masterCellGroup;
-
-  const nr_rrc_du_container_t *du = get_du_for_ue(rrc, ue_p->rrc_ue_id);
-  DevAssert(du != NULL);
-  f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-  NR_MeasConfig_t *measconfig = NULL;
-
-  if (du->mtc != NULL) {
-    int scs = get_ssb_scs(cell_info);
-    int band = get_dl_band(cell_info);
-    const NR_MeasTimingList_t *mtlist = du->mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
-    const NR_MeasTiming_t *mt = mtlist->list.array[0];
-    const neighbour_cell_configuration_t *neighbour_config = get_neighbour_config(cell_info->nr_cellid);
-    seq_arr_t *neighbour_cells = NULL;
-    if (neighbour_config)
-      neighbour_cells = neighbour_config->neighbour_cells;
-
-    measconfig = get_MeasConfig(mt, band, scs, &rrc->measurementConfiguration, neighbour_cells);
-  }
-
-  if (ue_p->measConfig)
-    free_MeasConfig(ue_p->measConfig);
-
-  ue_p->measConfig = measconfig;
-
   uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
-  NR_SRB_ToAddModList_t *SRBs = createSRBlist(ue_p, false);
-  NR_DRB_ToAddModList_t *DRBs = createDRBlist(ue_p, false);
-
-  int size = do_RRCReconfiguration(ue_p,
-                                   buffer,
-                                   NR_RRC_BUF_SIZE,
-                                   xid,
-                                   SRBs,
-                                   DRBs,
-                                   ue_p->DRB_ReleaseList,
-                                   NULL,
-                                   measconfig,
-                                   dedicatedNAS_MessageList,
-                                   cellGroupConfig);
-  LOG_DUMPMSG(NR_RRC, DEBUG_RRC, (char *)buffer, size, "[MSG] RRC Reconfiguration\n");
-  freeSRBlist(SRBs);
-  freeDRBlist(DRBs);
-  ASN_STRUCT_FREE(asn_DEF_NR_DRB_ToReleaseList, ue_p->DRB_ReleaseList);
-  ue_p->DRB_ReleaseList = NULL;
+  // TODO refactor dedicatedNAS_MessageList
+  int size = rrc_gNB_encode_RRCReconfiguration(rrc, ue_p, xid, dedicatedNAS_MessageList, buffer, sizeof(buffer), false);
+  DevAssert(size > 0 && size <= sizeof(buffer));
 
   LOG_I(NR_RRC, "UE %d: Generate RRCReconfiguration (bytes %d, xid %d)\n", ue_p->rrc_ue_id, size, xid);
   nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
@@ -905,6 +910,17 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
                    NR_RLC_BearerConfig__reestablishRLC_true);
   }
 
+  /* TODO: remove a reconfigurationWithSync, we don't need it for
+   * reestablishment. The whole reason why this might be here is that we store
+   * the CellGroupConfig (after handover), and simply reuse it for
+   * reestablishment, instead of re-requesting the CellGroupConfig from the DU.
+   * Hence, add below hack; the solution would be to request the
+   * CellGroupConfig from the DU when doing reestablishment. */
+  if (cellGroupConfig->spCellConfig->reconfigurationWithSync != NULL) {
+    ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cellGroupConfig->spCellConfig->reconfigurationWithSync);
+    cellGroupConfig->spCellConfig->reconfigurationWithSync = NULL;
+  }
+
   /* Re-establish SRB2 according to clause 5.3.5.6.3 of 3GPP TS 38.331
    * (SRB1 is re-established with RRCReestablishment message)
    */
@@ -1026,9 +1042,18 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
     return;
   }
 
+  NR_CellGroupConfig_t *cellGroupConfig = NULL;
+  asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
+                                                 &asn_DEF_NR_CellGroupConfig,
+                                                 (void **)&cellGroupConfig,
+                                                 msg->du2cu_rrc_container,
+                                                 msg->du2cu_rrc_container_length);
+  AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
+
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   UE = &ue_context_p->ue_context;
   UE->establishment_cause = rrcSetupRequest->establishmentCause;
+  UE->masterCellGroup = cellGroupConfig;
   activate_srb(UE, 1);
   rrc_gNB_generate_RRCSetup(0, msg->crnti, ue_context_p, msg->du2cu_rrc_container, msg->du2cu_rrc_container_length);
 }
@@ -1048,6 +1073,20 @@ static const char *get_reestab_cause(NR_ReestablishmentCause_t c)
   return "UNKNOWN Failure (ASN.1 decoder error?)";
 }
 
+static rrc_gNB_ue_context_t *rrc_gNB_get_ue_context_source_cell(gNB_RRC_INST *rrc_instance_pP, long pci, rnti_t rntiP)
+{
+  rrc_gNB_ue_context_t *ue_context_p;
+  RB_FOREACH(ue_context_p, rrc_nr_ue_tree_s, &rrc_instance_pP->rrc_ue_head) {
+    gNB_RRC_UE_t *ue = &ue_context_p->ue_context;
+    if (!ue->ho_context || !ue->ho_context->source)
+      continue;
+    nr_ho_source_cu_t *source_ctx = ue->ho_context->source;
+    if (source_ctx->old_rnti == rntiP && source_ctx->du->setup_req->cell[0].info.nr_pci == pci)
+      return ue_context_p;
+  }
+  return NULL;
+}
+
 static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
                                                  sctp_assoc_t assoc_id,
                                                  const NR_RRCReestablishmentRequest_IEs_t *req,
@@ -1058,7 +1097,12 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   const long physCellId = req->ue_Identity.physCellId;
   long ngap_cause = NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED; /* cause in case of NGAP release req */
   rrc_gNB_ue_context_t *ue_context_p = NULL;
-  LOG_I(NR_RRC, "UE %04x physCellId %ld NR_RRCReestablishmentRequest cause %s\n", msg->crnti, physCellId, scause);
+  LOG_I(NR_RRC,
+        "Reestablishment RNTI %04x req C-RNTI %04lx physCellId %ld cause %s\n",
+        msg->crnti,
+        req->ue_Identity.c_RNTI,
+        physCellId,
+        scause);
 
   const nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, assoc_id);
   if (du == NULL) {
@@ -1093,13 +1137,47 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   rnti_t old_rnti = req->ue_Identity.c_RNTI;
   ue_context_p = rrc_gNB_get_ue_context_by_rnti(rrc, assoc_id, old_rnti);
   if (ue_context_p == NULL) {
-    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest without UE context, fallback to RRC setup\n");
-    goto fallback_rrc_setup;
+    ue_context_p = rrc_gNB_get_ue_context_source_cell(rrc, physCellId, old_rnti);
+    if (ue_context_p == NULL) {
+      LOG_E(NR_RRC, "NR_RRCReestablishmentRequest without UE context, fallback to RRC setup\n");
+      goto fallback_rrc_setup;
+    }
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
+  /* should check phys cell ID to identify the correct cell */
   const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-  if (physCellId != cell_info->nr_pci) {
+  const f1ap_served_cell_info_t *previous_cell_info = get_cell_information_by_phycellId(physCellId);
+
+  nr_ho_source_cu_t *source_ctx = UE->ho_context ? UE->ho_context->source : NULL;
+  DevAssert(!source_ctx || source_ctx->du->setup_req->num_cells_available == 1);
+  bool ho_reestab_on_source = source_ctx && previous_cell_info->nr_cellid == source_ctx->du->setup_req->cell[0].info.nr_cellid;
+
+  if (ho_reestab_on_source) {
+    /* the UE came back on the source DU while doing handover, release at
+     * target DU and and update the association to the initial DU one */
+    LOG_W(NR_RRC, "handover for UE %d/RNTI %04x failed, rollback to original cell\n", UE->rrc_ue_id, UE->rnti);
+
+    // find the transaction of handover (the corresponding reconfig) and abort it
+    for (int i = 0; i < NR_RRC_TRANSACTION_IDENTIFIER_NUMBER; ++i) {
+      if (UE->xids[i] == RRC_DEDICATED_RECONF)
+        UE->xids[i] = RRC_ACTION_NONE;
+    }
+
+    source_ctx->ho_cancel(rrc, UE);
+
+    /* we need the original CellGroupConfig */
+    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
+    UE->masterCellGroup = source_ctx->old_cellGroupConfig;
+    source_ctx->old_cellGroupConfig = NULL;
+
+    /* update to old DU assoc id -- RNTI + secondary DU UE ID further below */
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+    ue_data.du_assoc_id = source_ctx->du->assoc_id;
+    cu_remove_f1_ue_data(UE->rrc_ue_id);
+    cu_add_f1_ue_data(UE->rrc_ue_id, &ue_data);
+    nr_rrc_finalize_ho(UE);
+  } else if (physCellId != cell_info->nr_pci) {
     /* UE was moving from previous cell so quickly that RRCReestablishment for previous cell was received in this cell */
     LOG_I(NR_RRC,
           "RRC Reestablishment Request from different physCellId (%ld) than current physCellId (%d), fallback to RRC setup\n",
@@ -1159,7 +1237,7 @@ static void process_Periodical_Measurement_Report(gNB_RRC_UE_t *ue_ctxt, NR_Meas
   measurementReport->criticalExtensions.choice.measurementReport = NULL;
 }
 
-static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, NR_MeasurementReport_t *measurementReport)
+static void process_Event_Based_Measurement_Report(gNB_RRC_UE_t *ue, NR_ReportConfigNR_t *report, NR_MeasurementReport_t *measurementReport)
 {
   NR_EventTriggerConfig_t *event_triggered = report->reportType.choice.eventTriggered;
 
@@ -1173,7 +1251,7 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
       break;
 
     case NR_EventTriggerConfig__eventId_PR_eventA3: {
-      LOG_I(NR_RRC, "HO LOG: Event A3 Report - Neighbour Becomes Better than Serving!\n");
+      LOG_W(NR_RRC, "HO LOG: Event A3 Report - Neighbour Becomes Better than Serving!\n");
       const NR_MeasResults_t *measResults = &measurementReport->criticalExtensions.choice.measurementReport->measResults;
 
       for (int serving_cell_idx = 0; serving_cell_idx < measResults->measResultServingMOList.list.count; serving_cell_idx++) {
@@ -1212,13 +1290,13 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
               neighbourCellId,
               neighbourCellRSRP);
 
-        const f1ap_served_cell_info_t *neighbour_cell_du_context = get_cell_information_by_phycellId(neighbourCellId);
-        const f1ap_served_cell_info_t *serving_cell_du_context = get_cell_information_by_phycellId(servingCellId);
+        const f1ap_served_cell_info_t *neigh_cell = get_cell_information_by_phycellId(neighbourCellId);
+        const f1ap_served_cell_info_t *serving_cell = get_cell_information_by_phycellId(servingCellId);
         const nr_neighbour_gnb_configuration_t *neighbour =
-            get_neighbour_cell_information(serving_cell_du_context->nr_cellid, neighbourCellId);
+            get_neighbour_cell_information(serving_cell->nr_cellid, neighbourCellId);
         // CU does not have f1 connection with neighbour cell context. So  check does serving cell has this phyCellId as a
         // neighbour.
-        if (!neighbour_cell_du_context && neighbour) {
+        if (!neigh_cell && neighbour) {
           // No F1 connection but static neighbour configuration is available
           const nr_a3_event_t *a3_event_configuration = get_a3_configuration(neighbour->physicalCellId);
           // Additional check - This part can be modified according to additional cell specific Handover Margin
@@ -1227,6 +1305,15 @@ static void process_Event_Based_Measurement_Report(NR_ReportConfigNR_t *report, 
                   < (neighbourCellRSRP - servingCellRSRP))) {
             LOG_D(NR_RRC, "HO LOG: Trigger N2 HO for the neighbour gnb: %u cell: %lu\n", neighbour->gNB_ID, neighbour->nrcell_id);
           }
+        } else if (neigh_cell && neighbour) {
+          /* we know the cell and are connected to the DU! */
+          gNB_RRC_INST *rrc = RC.nrrrc[0];
+          nr_rrc_du_container_t *source_du = get_du_by_cell_id(rrc, serving_cell->nr_cellid);
+          DevAssert(source_du);
+          nr_rrc_du_container_t *target_du = get_du_by_cell_id(rrc, neigh_cell->nr_cellid);
+          nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+        } else {
+          LOG_W(NR_RRC, "UE %d: received A3 event for stronger neighbor PCI %d, but no such neighbour in configuration\n", ue->rrc_ue_id, neighbourCellId);
         }
       }
 
@@ -1288,12 +1375,10 @@ static void rrc_gNB_process_MeasurementReport(gNB_RRC_UE_t *UE, NR_MeasurementRe
   if (report_config->choice.reportConfigNR->reportType.present == NR_ReportConfigNR__reportType_PR_periodical)
     return process_Periodical_Measurement_Report(UE, measurementReport);
 
-  if (report_config->choice.reportConfigNR->reportType.present != NR_ReportConfigNR__reportType_PR_eventTriggered) {
-    LOG_D(NR_RRC, "Incoming Report Type: %d is not supported! \n", report_config->choice.reportConfigNR->reportType.present);
-    return;
-  }
+  if (report_config->choice.reportConfigNR->reportType.present == NR_ReportConfigNR__reportType_PR_eventTriggered)
+    return process_Event_Based_Measurement_Report(UE, report_config->choice.reportConfigNR, measurementReport);
 
-  process_Event_Based_Measurement_Report(report_config->choice.reportConfigNR, measurementReport);
+  LOG_E(NR_RRC, "Incoming Report Type: %d is not supported! \n", report_config->choice.reportConfigNR->reportType.present);
 }
 
 static int handle_rrcReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCReestablishmentComplete_t *cplt)
@@ -1544,6 +1629,14 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
     if (UE->xids[i] != RRC_ACTION_NONE) {
       LOG_I(RRC, "UE %d: transaction %d still ongoing for action %d\n", UE->rrc_ue_id, i, UE->xids[i]);
     }
+  }
+
+  if (UE->ho_context != NULL) {
+    LOG_A(NR_RRC, "handover for UE %d/RNTI %04x complete!\n", UE->rrc_ue_id, UE->rnti);
+    DevAssert(UE->ho_context->target != NULL);
+
+    UE->ho_context->target->ho_success(rrc, UE);
+    nr_rrc_finalize_ho(UE);
   }
 }
 
@@ -1838,25 +1931,78 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
 
   if (resp->drbs_to_be_setup_length > 0) {
+    int num_drb = get_number_active_drbs(UE);
+    DevAssert(num_drb == 0 || num_drb == resp->drbs_to_be_setup_length);
+
     /* Note: we would ideally check that SRB2 is acked, but at least LiteOn DU
      * seems buggy and does not ack, so simply check that locally we activated */
     AssertFatal(UE->Srb[1].Active && UE->Srb[2].Active, "SRBs 1 and 2 must be active during DRB Establishment");
     store_du_f1u_tunnel(resp->drbs_to_be_setup, resp->drbs_to_be_setup_length, UE);
-    e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
+    if (num_drb == 0)
+      e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
+    else
+      cuup_notify_reestablishment(rrc, UE);
   }
 
-  rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+  if (UE->ho_context == NULL) {
+    rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+  } else {
+    // case of handover
+    // handling of "target CU" information
+    DevAssert(UE->ho_context->target != NULL);
+    DevAssert(resp->crnti != NULL);
+    UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
+    UE->ho_context->target->new_rnti = *resp->crnti;
+
+    uint8_t xid = rrc_gNB_get_next_transaction_identifier(0);
+    UE->xids[xid] = RRC_DEDICATED_RECONF;
+    uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
+    int size = rrc_gNB_encode_RRCReconfiguration(rrc, UE, xid, NULL, buffer, sizeof(buffer), true);
+    DevAssert(size > 0 && size <= sizeof(buffer));
+
+    // TODO N2 38.413 sec 9.3.1.21: admitted PDU sessions (in UE), Target to
+    // Source Transparent Container (9.3.1.21) which encodes the RRC
+    // reconfiguration above
+    UE->ho_context->target->ho_req_ack(rrc, UE, buffer, size);
+  }
 }
 
-static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p)
+static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_assoc_t assoc_id)
 {
   const int instance = 0;
   f1ap_ue_context_release_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg_p);
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, req->gNB_CU_ue_id);
+  // TODO what happens if no AMF connected? should also handle, set an_release true
   if (!ue_context_p) {
     LOG_E(RRC, "could not find UE context for CU UE ID %u, aborting transaction\n", req->gNB_CU_ue_id);
+    // TODO just request the DU to release to make it happy
     return;
+  }
+
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  if (UE->ho_context != NULL) {
+    nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
+    bool from_source_du = source_ctx && source_ctx->du->assoc_id == assoc_id;
+    if (from_source_du) {
+      // we received release request from the source DU, but HO is still
+      // ongoing; free the UE, and remove the HO context.
+      LOG_W(NR_RRC, "UE %d: release request from source DU ID %ld during HO, marking HO as complete\n", UE->rrc_ue_id, source_ctx->du->setup_req->gNB_DU_id);
+      RETURN_IF_INVALID_ASSOC_ID(source_ctx->du->assoc_id);
+      f1ap_ue_context_release_cmd_t cmd = {
+          .gNB_CU_ue_id = UE->rrc_ue_id,
+          .gNB_DU_ue_id = source_ctx->du_ue_id,
+          .cause = F1AP_CAUSE_RADIO_NETWORK,
+          .cause_value = 5, // 5 = F1AP_CauseRadioNetwork_interaction_with_other_procedure
+          .srb_id = DCCH,
+      };
+      rrc->mac_rrc.ue_context_release_command(assoc_id, &cmd);
+      nr_rrc_finalize_ho(UE);
+      return;
+    }
+    // if we receive the release request from the target DU (regardless if
+    // successful), we assume it is "genuine" and ask the AMF to release
+    nr_rrc_finalize_ho(UE);
   }
 
   /* TODO: marshall types correctly */
@@ -1944,9 +2090,27 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
 
     rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
   }
+
+  // Reconfiguration should have been sent to the UE, so it will attempt the
+  // handover. In the F1 case, update with new RNTI, and update secondary UE
+  // association, so we can receive the new UE from the target DU (in N2/Xn,
+  // nothing is to be done, we wait for confirmation to release the UE in the
+  // CU/DU)
+  if (UE->ho_context && UE->ho_context->target && UE->ho_context->source) {
+    nr_ho_target_cu_t *target_ctx = UE->ho_context->target;
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+    ue_data.secondary_ue = target_ctx->du_ue_id;
+    ue_data.du_assoc_id = target_ctx->du->assoc_id;
+    cu_remove_f1_ue_data(UE->rrc_ue_id);
+    cu_add_f1_ue_data(UE->rrc_ue_id, &ue_data);
+    LOG_I(NR_RRC, "UE %d handover: update RNTI from %04x to %04x\n", UE->rrc_ue_id, UE->rnti, target_ctx->new_rnti);
+    nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
+    DevAssert(source_ctx->old_rnti == UE->rnti);
+    UE->rnti = target_ctx->new_rnti;
+  }
 }
 
-static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_t instance)
+static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_t instance, sctp_assoc_t assoc_id)
 {
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   f1ap_ue_context_modif_required_t *required = &F1AP_UE_CONTEXT_MODIFICATION_REQUIRED(msg_p);
@@ -1960,6 +2124,12 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_
       .cause_value = F1AP_CauseRadioNetwork_unknown_or_already_allocated_gnb_cu_ue_f1ap_id,
     };
     rrc->mac_rrc.ue_context_modification_refuse(msg_p->ittiMsgHeader.originInstance, &refuse);
+    return;
+  }
+
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  if (UE->ho_context && UE->ho_context->source && UE->ho_context->source->du && UE->ho_context->source->du->assoc_id == assoc_id) {
+    LOG_W(NR_RRC, "UE %d: UE Context Modification Required during handover, ignoring message\n", UE->rrc_ue_id);
     return;
   }
 
@@ -2010,7 +2180,7 @@ unsigned int mask_flip(unsigned int x) {
   return((((x>>8) + (x<<8))&0xffff)>>6);
 }
 
-static pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, rrc_pdu_session_param_t *pduSession)
+pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, rrc_pdu_session_param_t *pduSession)
 {
   pdusession_t *pdu = &pduSession->param;
   for (int i = 0; i < pdu->nb_qos; i++) {
@@ -2022,7 +2192,7 @@ static pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, 
 }
 
 /* \bref return F1AP QoS characteristics based on Qos flow parameters */
-static f1ap_qos_characteristics_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param)
+f1ap_qos_characteristics_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param)
 {
   f1ap_qos_characteristics_t qos_char = {0};
   if (qos_param->fiveQI_type == DYNAMIC) {
@@ -2181,6 +2351,24 @@ static void print_rrc_meas(FILE *f, const NR_MeasResults_t *measresults)
   } else {
     fprintf(f, "NOT PROVIDED\n");
   }
+
+  if (measresults->measResultNeighCells
+      && measresults->measResultNeighCells->present == NR_MeasResults__measResultNeighCells_PR_measResultListNR) {
+    NR_MeasResultListNR_t *meas_neigh = measresults->measResultNeighCells->choice.measResultListNR;
+    for (int i = 0; i < meas_neigh->list.count; ++i) {
+      NR_MeasResultNR_t *measresultneigh = meas_neigh->list.array[i];
+      NR_MeasQuantityResults_t *neigh_mqr = measresultneigh->measResult.cellResults.resultsSSB_Cell;
+      fprintf(f, "    neighboring cell for phyCellId %ld:\n      resultSSB:", *measresultneigh->physCellId);
+      if (mqr != NULL) {
+        const long rrsrp = *neigh_mqr->rsrp - 156;
+        const float rrsrq = (float)(*neigh_mqr->rsrq - 87) / 2.0f;
+        const float rsinr = (float)(*neigh_mqr->sinr - 46) / 2.0f;
+        fprintf(f, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
+      } else {
+        fprintf(f, "NOT PROVIDED\n");
+      }
+    }
+  }
 }
 
 static const char *get_pdusession_status_text(pdu_session_status_t status)
@@ -2309,7 +2497,7 @@ void *rrc_gnb_task(void *args_p) {
       /* From DU -> CU */
       case F1AP_UL_RRC_MESSAGE:
         rrc_gNB_decode_dcch(RC.nrrrc[instance], &F1AP_UL_RRC_MESSAGE(msg_p));
-        free(F1AP_UL_RRC_MESSAGE(msg_p).rrc_container);
+        free_ul_rrc_message_transfer(&F1AP_UL_RRC_MESSAGE(msg_p));
         break;
 
       case NGAP_DOWNLINK_NAS:
@@ -2332,6 +2520,7 @@ void *rrc_gnb_task(void *args_p) {
       case F1AP_SETUP_REQ:
         AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type), "should not receive F1AP_SETUP_REQUEST in DU!\n");
         rrc_gNB_process_f1_setup_req(&F1AP_SETUP_REQ(msg_p), msg_p->ittiMsgHeader.originInstance);
+        free_f1ap_setup_request(&F1AP_SETUP_REQ(msg_p));
         break;
 
       case F1AP_UE_CONTEXT_SETUP_RESP:
@@ -2343,11 +2532,11 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_REQUIRED:
-        rrc_CU_process_ue_modification_required(msg_p, instance);
+        rrc_CU_process_ue_modification_required(msg_p, instance, msg_p->ittiMsgHeader.originInstance);
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_REQ:
-        rrc_CU_process_ue_context_release_request(msg_p);
+        rrc_CU_process_ue_context_release_request(msg_p, msg_p->ittiMsgHeader.originInstance);
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_COMPLETE:
@@ -2361,6 +2550,7 @@ void *rrc_gnb_task(void *args_p) {
       case F1AP_GNB_DU_CONFIGURATION_UPDATE:
         AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type), "should not receive F1AP_SETUP_REQUEST in DU!\n");
         rrc_gNB_process_f1_du_configuration_update(&F1AP_GNB_DU_CONFIGURATION_UPDATE(msg_p), msg_p->ittiMsgHeader.originInstance);
+        free_f1ap_du_configuration_update(&F1AP_GNB_DU_CONFIGURATION_UPDATE(msg_p));
         break;
 
       case F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE:

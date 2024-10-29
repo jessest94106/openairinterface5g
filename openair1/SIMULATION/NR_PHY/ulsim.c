@@ -145,7 +145,6 @@ int main(int argc, char *argv[])
 {
   FILE *csv_file = NULL;
   char *filename_csv = NULL;
-  char c;
   int i;
   double SNR, snr0 = -2.0, snr1 = 2.0;
   double sigma, sigma_dB;
@@ -224,6 +223,7 @@ int main(int argc, char *argv[])
   /* initialize the sin-cos table */
   InitSinLUT();
 
+  int c;
   while ((c = getopt(argc, argv, "--:O:a:b:c:d:ef:g:h:i:k:m:n:op:q:r:s:t:u:v:w:y:z:C:F:G:H:I:M:N:PR:S:T:U:L:ZW:E:X:")) != -1) {
 
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */

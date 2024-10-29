@@ -143,10 +143,13 @@ In the last lines:
 
 # Configuration of the MAC
 
-## Split-related options
+## Split-related options (running in a DU)
 
 See [nFAPI documentation](../L2NFAPI.md) or [Aerial
-tutorial](../Aerial_FAPI_Split_Tutorial.md).
+tutorial](../Aerial_FAPI_Split_Tutorial.md) for information about the FAPI
+split.
+
+See [F1 documentation](../F1-design.md) for information about the F1 split.
 
 ## MAC scheduler-related configuration options
 

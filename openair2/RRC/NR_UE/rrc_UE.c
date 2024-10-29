@@ -68,7 +68,7 @@
 
 #include "SIMULATION/TOOLS/sim.h" // for taus
 
-#include "nr_nas_msg_sim.h"
+#include "nr_nas_msg.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
 
 static NR_UE_RRC_INST_t *NR_UE_rrc_inst;

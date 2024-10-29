@@ -97,7 +97,6 @@ nrUE_params_t *get_nrUE_params(void) {
 configmodule_interface_t *uniqCfg = NULL;
 int main(int argc, char **argv)
 {
-  char c;
   int i;//,l;
   double sigma2, sigma2_dB=10,SNR,snr0=-2.0,snr1=2.0;
   double cfo=0;
@@ -155,6 +154,7 @@ int main(int argc, char **argv)
   randominit(0);
   logInit();
 
+  int c;
   while ((c = getopt (argc, argv, "--:O:f:hA:f:g:i:I:P:B:b:t:T:m:n:r:o:s:S:x:y:z:N:F:GR:IL:q:cd:")) != -1) {
 
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */

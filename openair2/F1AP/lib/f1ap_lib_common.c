@@ -37,32 +37,24 @@ bool eq_f1ap_plmn(const f1ap_plmn_t *a, const f1ap_plmn_t *b)
 
 bool eq_f1ap_freq_info(const f1ap_nr_frequency_info_t *a, const f1ap_nr_frequency_info_t *b)
 {
-  if (a->arfcn != b->arfcn)
-    return false;
-  if (a->band != b->band)
-    return false;
+  _F1_EQ_CHECK_INT(a->arfcn, b->arfcn);
+  _F1_EQ_CHECK_INT(a->band, b->band);
   return true;
 }
 
 bool eq_f1ap_tx_bandwidth(const f1ap_transmission_bandwidth_t *a, const f1ap_transmission_bandwidth_t *b)
 {
-  if (a->nrb != b->nrb)
-    return false;
-  if (a->scs != b->scs)
-    return false;
+  _F1_EQ_CHECK_INT(a->nrb, b->nrb);
+  _F1_EQ_CHECK_INT(a->scs, b->scs);
   return true;
 }
 
 bool eq_f1ap_cell_info(const f1ap_served_cell_info_t *a, const f1ap_served_cell_info_t *b)
 {
-  if (a->nr_cellid != b->nr_cellid)
-    return false;
-  if (a->nr_pci != b->nr_pci)
-    return false;
-  if (*a->tac != *b->tac)
-    return false;
-  if (a->mode != b->mode)
-    return false;
+  _F1_EQ_CHECK_LONG(a->nr_cellid, b->nr_cellid);
+  _F1_EQ_CHECK_INT(a->nr_pci, b->nr_pci);
+  _F1_EQ_CHECK_INT(*a->tac, *b->tac);
+  _F1_EQ_CHECK_INT(a->mode, b->mode);
   if (a->mode == F1AP_MODE_TDD) {
     /* TDD */
     if (!eq_f1ap_tx_bandwidth(&a->tdd.tbw, &b->tdd.tbw))
@@ -80,10 +72,8 @@ bool eq_f1ap_cell_info(const f1ap_served_cell_info_t *a, const f1ap_served_cell_
     if (!eq_f1ap_freq_info(&a->fdd.ul_freqinfo, &b->fdd.ul_freqinfo))
       return false;
   }
-  if (a->measurement_timing_config_len != b->measurement_timing_config_len)
-    return false;
-  if (*a->measurement_timing_config != *b->measurement_timing_config)
-    return false;
+  _F1_EQ_CHECK_INT(a->measurement_timing_config_len, b->measurement_timing_config_len);
+  _F1_EQ_CHECK_INT(*a->measurement_timing_config, *b->measurement_timing_config);
   if (!eq_f1ap_plmn(&a->plmn, &b->plmn))
     return false;
   return true;
@@ -92,19 +82,13 @@ bool eq_f1ap_cell_info(const f1ap_served_cell_info_t *a, const f1ap_served_cell_
 bool eq_f1ap_sys_info(const f1ap_gnb_du_system_info_t *a, const f1ap_gnb_du_system_info_t *b)
 {
   /* MIB */
-  if (a->mib_length != b->mib_length)
-    return false;
-  for (int i = 0; i < a->mib_length; i++) {
-      if (a->mib[i] != b->mib[i])
-          return false;
-  }
+  _F1_EQ_CHECK_INT(a->mib_length, b->mib_length);
+  for (int i = 0; i < a->mib_length; i++)
+    _F1_EQ_CHECK_INT(a->mib[i], b->mib[i]);
   /* SIB1 */
-  if (a->sib1_length != b->sib1_length)
-    return false;
-  for (int i = 0; i < a->sib1_length; i++) {
-      if (a->sib1[i] != b->sib1[i])
-          return false;
-  }
+  _F1_EQ_CHECK_INT(a->sib1_length, b->sib1_length);
+  for (int i = 0; i < a->sib1_length; i++)
+    _F1_EQ_CHECK_INT(a->sib1[i], b->sib1[i]);
   return true;
 }
 

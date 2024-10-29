@@ -181,6 +181,15 @@ uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue)
   return DRB_INACTIVE;
 }
 
+int get_number_active_drbs(gNB_RRC_UE_t *ue)
+{
+  int n = 0;
+  for (int i = 0; i < MAX_DRBS_PER_UE; ++i)
+    if (ue->established_drbs[i].status != DRB_INACTIVE)
+      n++;
+  return n;
+}
+
 bool drb_is_active(gNB_RRC_UE_t *ue, uint8_t drb_id)
 {
   drb_t *drb = get_drb(ue, drb_id);

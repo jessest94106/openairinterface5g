@@ -43,6 +43,7 @@
 #include <string.h>
 #include <pthread.h>
 #include "common/utils/ds/seq_arr.h"
+#include "common/utils/nr/nr_common.h"
 
 #define NR_SCHED_LOCK(lock)                                        \
   do {                                                             \
@@ -664,8 +665,8 @@ typedef struct {
   NR_list_t retrans_ul_harq;
   NR_UE_mac_ce_ctrl_t UE_mac_ce_ctrl; // MAC CE related information
 
-  /// Timer for RRC processing procedures
-  uint32_t rrc_processing_timer;
+  /// Timer for RRC processing procedures and transmission activity
+  NR_timer_t transm_interrupt;
 
   /// sri, ul_ri and tpmi based on SRS
   nr_srs_feedback_t srs_feedback;
@@ -738,6 +739,8 @@ typedef struct nr_mac_rrc_ul_if_s {
   initial_ul_rrc_message_transfer_func_t initial_ul_rrc_message_transfer;
 } nr_mac_rrc_ul_if_t;
 
+typedef enum interrupt_followup_action { FOLLOW_INSYNC, FOLLOW_INSYNC_RECONFIG, FOLLOW_OUTOFSYNC  } interrupt_followup_action_t;
+
 /*! \brief UE list used by gNB to order UEs/CC for scheduling*/
 typedef struct {
   rnti_t rnti;
@@ -756,7 +759,7 @@ typedef struct {
   /// reestablishRLC has to be signaled in RRCreconfiguration
   bool reestablish_rlc;
   NR_CellGroupConfig_t *reconfigCellGroup;
-  bool apply_cellgroup;
+  interrupt_followup_action_t interrupt_action;
   NR_UE_NR_Capability_t *capability;
   // UE selected beam index
   uint8_t UE_beam_index;

@@ -50,6 +50,7 @@
 #define CHANNELMOD_DYNAMICLOAD
 #include <openair1/SIMULATION/TOOLS/sim.h>
 #include "rfsimulator.h"
+#include "hashtable.h"
 
 #define PORT 4043 //default TCP port for this simulator
 //
@@ -81,6 +82,8 @@
 // since all I/Q's would flow through the same TCP transport.
 // Until a convenient management is implemented, the MAX_FD_RFSIMU is used everywhere (instead of
 // FD_SETSIE) and reduced to 125. This should allow for around 20 simultaeous UEs.
+//
+// An indirection level via hashtable was added to allow the software to use FDs above MAX_FD_RFSIMU.
 //
 // #define MAX_FD_RFSIMU FD_SETSIZE
 #define MAX_FD_RFSIMU 250
@@ -162,6 +165,9 @@ typedef struct {
   uint16_t port;
   int saveIQfile;
   buffer_t buf[MAX_FD_RFSIMU];
+  int next_buf;
+  // Hashtable used as an indirection level between file descriptor and the buf array
+  hash_table_t *fd_to_buf_map;
   int rx_num_channels;
   int tx_num_channels;
   double sample_rate;
@@ -178,11 +184,38 @@ typedef struct {
   double prop_delay_ms;
 } rfsimulator_state_t;
 
+
+static buffer_t *get_buff_from_socket(rfsimulator_state_t *simulator_state, int socket)
+{
+  uint64_t buffer_index;
+  if (hashtable_get(simulator_state->fd_to_buf_map, socket, (void **)&buffer_index) == HASH_TABLE_OK) {
+    return &simulator_state->buf[buffer_index];
+  } else {
+    return NULL;
+  }
+}
+
+static void add_buff_to_socket_mapping(rfsimulator_state_t *simulator_state, int socket, uint64_t buff_index)
+{
+  hashtable_rc_t rc = hashtable_insert(simulator_state->fd_to_buf_map, socket, (void *)buff_index);
+  AssertFatal(rc == HASH_TABLE_OK,
+              "%s sock = %d\n",
+              rc == HASH_TABLE_INSERT_OVERWRITTEN_DATA ? "Duplicate entry in hashtable" : "Hashtable is not allocated",
+              socket);
+}
+
+static void remove_buff_to_socket_mapping(rfsimulator_state_t *simulator_state, int socket)
+{
+  // Failure is fine here
+  hashtable_remove(simulator_state->fd_to_buf_map, socket);
+}
+
 static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
 {
   /* TODO: cleanup code so that this AssertFatal becomes useless */
   AssertFatal(sock >= 0 && sock < sizeofArray(bridge->buf), "socket %d is not in range\n", sock);
-  buffer_t *ptr=&bridge->buf[sock];
+  uint64_t buff_index = bridge->next_buf++ % MAX_FD_RFSIMU;
+  buffer_t *ptr=&bridge->buf[buff_index];
   ptr->circularBuf = calloc(1, sampleToByte(CirSize, 1));
   if (ptr->circularBuf == NULL) {
     LOG_E(HW, "malloc(%lu) failed\n", sampleToByte(CirSize, 1));
@@ -235,6 +268,7 @@ static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
     random_channel(ptr->channel_model,false);
     LOG_I(HW, "Random channel %s in rfsimulator activated\n", modelname);
   }
+  add_buff_to_socket_mapping(bridge, sock, buff_index);
   return 0;
 }
 
@@ -243,17 +277,23 @@ static void removeCirBuf(rfsimulator_state_t *bridge, int sock) {
     LOG_E(HW, "epoll_ctl(EPOLL_CTL_DEL) failed\n");
   }
   close(sock);
-  free(bridge->buf[sock].circularBuf);
-  // Fixme: no free_channel_desc_scm(bridge->buf[sock].channel_model) implemented
-  // a lot of mem leaks
-  //free(bridge->buf[sock].channel_model);
-  memset(&bridge->buf[sock], 0, sizeof(buffer_t));
-  bridge->buf[sock].conn_sock=-1;
-  nb_ue--;
+  buffer_t* buf = get_buff_from_socket(bridge, sock);
+  if (buf) {
+    free(buf->circularBuf);
+    // Fixme: no free_channel_desc_scm(bridge->buf[sock].channel_model) implemented
+    // a lot of mem leaks
+    //free(bridge->buf[sock].channel_model);
+    memset(buf, 0, sizeof(buffer_t));
+    buf->conn_sock=-1;
+    remove_buff_to_socket_mapping(bridge, sock);
+    nb_ue--;
+  }
 }
 
 static void socketError(rfsimulator_state_t *bridge, int sock) {
-  if (bridge->buf[sock].conn_sock!=-1) {
+  buffer_t* buf = get_buff_from_socket(bridge, sock);
+  if (!buf) return;
+  if (buf->conn_sock != -1) {
     LOG_W(HW, "Lost socket\n");
     removeCirBuf(bridge, sock);
 
@@ -789,7 +829,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
 
       rfsimulator_write_internal(t, t->lastWroteTS > 1 ? t->lastWroteTS - 1 : 0, samplesVoid, 1, t->tx_num_channels, 1, false);
 
-      buffer_t *b = &t->buf[conn_sock];
+      buffer_t *b = get_buff_from_socket(t, conn_sock);
       if (b->channel_model)
         b->channel_model->start_TS = t->lastWroteTS;
     } else {
@@ -798,8 +838,8 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
         continue;
       }
 
-      buffer_t *b=&t->buf[fd];
-
+      buffer_t *b = get_buff_from_socket(t, fd);
+      if (!b) continue;
       if ( b->circularBuf == NULL ) {
         LOG_E(HW, "Received data on not connected socket %d\n", events[nbEv].data.fd);
         continue;
@@ -1044,6 +1084,7 @@ static void rfsimulator_end(openair0_device *device) {
       removeCirBuf(s, b->conn_sock);
   }
   close(s->epollfd);
+  hashtable_destroy(&s->fd_to_buf_map);
 }
 static int rfsimulator_stop(openair0_device *device) {
   return 0;
@@ -1059,6 +1100,12 @@ static int rfsimulator_set_gains(openair0_device *device, openair0_config_t *ope
 static int rfsimulator_write_init(openair0_device *device) {
   return 0;
 }
+
+void do_not_free_integer(void *integer)
+{
+  (void)integer;
+}
+
 __attribute__((__visibility__("default")))
 int device_init(openair0_device *device, openair0_config_t *openair0_cfg) {
   // to change the log level, use this on command line
@@ -1104,6 +1151,8 @@ int device_init(openair0_device *device, openair0_config_t *openair0_cfg) {
 
   for (int i = 0; i < MAX_FD_RFSIMU; i++)
     rfsimulator->buf[i].conn_sock=-1;
+  rfsimulator->next_buf = 0;
+  rfsimulator->fd_to_buf_map = hashtable_create(MAX_FD_RFSIMU, NULL, do_not_free_integer);
 
   AssertFatal((rfsimulator->epollfd = epoll_create1(0)) != -1, "epoll_create1() failed, errno(%d)", errno);
   // we need to call randominit() for telnet server (use gaussdouble=>uniformrand)

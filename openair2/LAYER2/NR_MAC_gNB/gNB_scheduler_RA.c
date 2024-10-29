@@ -40,7 +40,6 @@
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/nr/nr_common.h"
 #include "UTIL/OPT/opt.h"
-#include "SIMULATION/TOOLS/sim.h" // for taus
 
 /* rlc */
 #include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
@@ -677,16 +676,6 @@ static NR_RA_t *find_free_nr_RA(NR_RA_t *ra_base, int ra_count, uint16_t preambl
   return NULL;
 }
 
-static const NR_RA_t *find_nr_RA_rnti(const NR_RA_t *ra_base, int ra_count, rnti_t rnti)
-{
-  for (int i = 0; i < ra_count; ++i) {
-    const NR_RA_t *ra = &ra_base[i];
-    if (ra->ra_state != nrRA_gNB_IDLE && ra->rnti == rnti)
-      return ra;
-  }
-  return NULL;
-}
-
 void nr_initiate_ra_proc(module_id_t module_idP,
                          int CC_id,
                          frame_t frameP,
@@ -712,23 +701,13 @@ void nr_initiate_ra_proc(module_id_t module_idP,
   }
 
   if (ra->rnti == 0) { // This condition allows for the usage of a preconfigured rnti for the CFRA
-    int loop = 0;
-    bool exist_connected_ue, exist_in_pending_ra_ue;
-    rnti_t trial = 0;
-    do {
-      // 3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1: RNTI values
-      while (trial < 1 || trial > 0xffef)
-        trial = (taus() % 0xffef) + 1;
-      exist_connected_ue = find_nr_UE(&nr_mac->UE_info, trial) != NULL;
-      exist_in_pending_ra_ue = find_nr_RA_rnti(cc->ra, sizeofArray(cc->ra), ra->rnti) != NULL;
-      loop++;
-    } while (loop < 100 && (exist_connected_ue || exist_in_pending_ra_ue) );
-    if (loop == 100) {
+    bool rnti_found = nr_mac_get_new_rnti(&nr_mac->UE_info, cc->ra, sizeofArray(cc->ra), &ra->rnti);
+    if (!rnti_found) {
       LOG_E(NR_MAC, "initialisation random access: no more available RNTIs for new UE\n");
+      nr_clear_ra_proc(ra);
       NR_SCHED_UNLOCK(&nr_mac->sched_lock);
       return;
     }
-    ra->rnti = trial;
   }
 
   ra->preamble_frame = frameP;
@@ -1698,12 +1677,9 @@ static void nr_generate_Msg2(module_id_t module_idP,
   if (ra->cfra) {
     NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[module_idP]->UE_info, ra->rnti);
     if (UE) {
-      const NR_ServingCellConfig_t *servingCellConfig = UE->CellGroup ? UE->CellGroup->spCellConfig->spCellConfigDedicated : NULL;
-      uint32_t delay_ms = servingCellConfig && servingCellConfig->downlinkBWP_ToAddModList
-                              ? NR_RRC_SETUP_DELAY_MS + NR_RRC_BWP_SWITCHING_DELAY_MS
-                              : NR_RRC_SETUP_DELAY_MS;
-      NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-      sched_ctrl->rrc_processing_timer = (delay_ms << ra->DL_BWP.scs);
+      int delay = nr_mac_get_reconfig_delay_slots(ra->DL_BWP.scs);
+      interrupt_followup_action_t action = UE->reconfigCellGroup ? FOLLOW_INSYNC_RECONFIG : FOLLOW_INSYNC;
+      nr_mac_interrupt_ue_transmission(RC.nrmac[module_idP], UE, action, delay);
     }
   }
 
@@ -2248,8 +2224,9 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
       // Msg4 may transmit a RRCReconfiguration, for example when UE sends RRCReestablishmentComplete and MAC CE for C-RNTI in Msg3.
       // In that case, gNB will generate a RRCReconfiguration that will be transmitted in Msg4, so we need to apply CellGroup after the Ack,
-      // UE->apply_cellgroup was already set when processing RRCReestablishment message
-      nr_mac_enable_ue_rrc_processing_timer(nr_mac, UE, UE->apply_cellgroup);
+      // UE->reconfigCellGroup was already set when processing RRCReestablishment message
+      int delay = nr_mac_get_reconfig_delay_slots(UE->current_UL_BWP.scs);
+      nr_mac_interrupt_ue_transmission(nr_mac, UE, UE->interrupt_action, delay);
 
       nr_clear_ra_proc(ra);
     } else {
@@ -2291,8 +2268,9 @@ static void nr_check_Msg4_MsgB_Ack(module_id_t module_id, int CC_id, frame_t fra
       // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
       // Msg4 may transmit a RRCReconfiguration, for example when UE sends RRCReestablishmentComplete and MAC CE for C-RNTI in Msg3.
       // In that case, gNB will generate a RRCReconfiguration that will be transmitted in Msg4, so we need to apply CellGroup after the Ack,
-      // UE->apply_cellgroup was already set when processing RRCReestablishment message
-      nr_mac_enable_ue_rrc_processing_timer(RC.nrmac[module_id], UE, UE->apply_cellgroup);
+      // UE->reconfigCellGroup already set when processing RRCReestablishment message
+      int delay = nr_mac_get_reconfig_delay_slots(UE->current_UL_BWP.scs);
+      nr_mac_interrupt_ue_transmission(RC.nrmac[module_id], UE, UE->interrupt_action, delay);
 
       nr_clear_ra_proc(ra);
       if (sched_ctrl->retrans_dl_harq.head >= 0) {
@@ -2457,8 +2435,9 @@ void nr_schedule_RA(module_id_t module_idP,
         ra->contention_resolution_timer--;
         if (ra->contention_resolution_timer < 0) {
           LOG_W(NR_MAC, "(%d.%d) RA Contention Resolution timer expired for UE 0x%04x, RA procedure failed...\n", frameP, slotP, ra->rnti);
-          nr_mac_release_ue(mac, ra->rnti);
-          nr_mac_trigger_release_complete(mac, ra->rnti);
+          bool requested = nr_mac_request_release_ue(mac, ra->rnti);
+          if (!requested)
+            nr_mac_release_ue(mac, ra->rnti);
           nr_clear_ra_proc(ra);
           continue;
         }
