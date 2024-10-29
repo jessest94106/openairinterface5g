@@ -256,8 +256,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
 
   LOG_D(GNB_APP, "Allocating gNB_RRC_INST\n");
   RC.nrrrc = calloc(1, sizeof(*RC.nrrrc));
-  RC.nrrrc[0] = calloc(1, sizeof(gNB_RRC_INST));
-  RCconfig_NRRRC(RC.nrrrc[0]);
+  RC.nrrrc[0] = RCconfig_NRRRC();
 
   if (!get_softmodem_params()->nsa && !(node_type == ngran_gNB_DU)) {
     // we start pdcp in both cuup (for drb) and cucp (for srb)

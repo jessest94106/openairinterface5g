@@ -1773,8 +1773,14 @@ static void fill_measurement_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
   }
 }
 
-void RCconfig_NRRRC(gNB_RRC_INST *rrc)
+/**
+ * @brief Allocates and initializes RRC instances
+ *        Currently assuming 1 instance
+ */
+gNB_RRC_INST *RCconfig_NRRRC()
 {
+  // Allocate memory for 1 RRC instance
+  gNB_RRC_INST *rrc = calloc(1, sizeof(*rrc));
 
   int num_gnbs = 0;
   char aprefix[MAX_OPTNAME_SIZE*2 + 8];
@@ -1914,7 +1920,9 @@ void RCconfig_NRRRC(gNB_RRC_INST *rrc)
   }//End if (num_gnbs>0)
 
   config_security(rrc);
-}//End RCconfig_NRRRC function
+
+  return rrc;
+}
 
 int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i) {
 

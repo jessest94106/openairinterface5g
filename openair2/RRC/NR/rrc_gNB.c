@@ -219,7 +219,7 @@ static void init_NR_SI(gNB_RRC_INST *rrc)
     AssertFatal(NODE_IS_MONOLITHIC(rrc->node_type), "phy_test and do_ra only work in monolithic\n");
     rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_allocate_new_ue_context(rrc);
     LOG_I(NR_RRC,"Adding new user (%p)\n",ue_context_p);
-    if (!NODE_IS_CU(RC.nrrrc[0]->node_type)) {
+    if (!NODE_IS_CU(rrc->node_type)) {
       rrc_add_nsa_user(rrc,ue_context_p,NULL);
     }
   }
