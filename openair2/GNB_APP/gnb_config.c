@@ -863,7 +863,7 @@ void RCconfig_NR_L1(void)
     int XP = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
     char *ulprbbl = *GNBParamList.paramarray[0][GNB_ULPRBBLACKLIST_IDX].strptr;
     if (ulprbbl)
-      LOG_I(NR_PHY, "PRB blacklist %s\n", ulprbbl);
+      LOG_D(NR_PHY, "PRB blacklist %s\n", ulprbbl);
     char *save = NULL;
     char *pt = strtok_r(ulprbbl, ",", &save);
     int prbbl[275];
@@ -874,13 +874,13 @@ void RCconfig_NR_L1(void)
       const int rb = atoi(pt);
       AssertFatal(rb < 275, "RB %d out of bounds (max 275)\n", rb);
       prbbl[rb] = 0x3FFF; // all symbols taken
-      LOG_I(NR_PHY, "Blacklisting prb %d\n", atoi(pt));
+      LOG_D(NR_PHY, "Blacklisting prb %d\n", atoi(pt));
       pt = strtok_r(NULL, ",", &save);
       num_prbbl++;
     }
 
     RC.gNB[j]->num_ulprbbl = num_prbbl;
-    LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_prbbl);
+    LOG_D(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_prbbl);
     memcpy(RC.gNB[j]->ulprbbl, prbbl, 275 * sizeof(int));
 
     RC.gNB[j]->ap_N1 = N1;
@@ -897,7 +897,6 @@ void RCconfig_NR_L1(void)
     for (j = 0; j < RC.nb_nr_L1_inst; j++) {
       if (RC.gNB[j] == NULL) {
         RC.gNB[j] = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
-        LOG_I(NR_PHY, "RC.gNB[%d] = %p\n", j, RC.gNB[j]);
         memset(RC.gNB[j], 0, sizeof(PHY_VARS_gNB));
         RC.gNB[j]->Mod_id = j;
       }
@@ -934,9 +933,15 @@ void RCconfig_NR_L1(void)
         RC.nb_nr_CC = (int *)malloc((1 + RC.nb_nr_inst) * sizeof(int));
         RC.nb_nr_CC[0] = 1;
 
-        LOG_I(PHY, "%s() NFAPI PNF mode - RC.nb_nr_inst=1 this is because phy_init_RU() uses that to index and not RC.num_gNB - why the 2 similar variables?\n", __FUNCTION__);
-        LOG_I(PHY, "%s() NFAPI PNF mode - RC.nb_nr_CC[0]=%d for init_gNB_afterRU()\n", __FUNCTION__, RC.nb_nr_CC[0]);
-        LOG_I(PHY, "%s() NFAPI PNF mode - RC.nb_nr_macrlc_inst:%d because used by mac_top_init_gNB()\n", __FUNCTION__, RC.nb_nr_macrlc_inst);
+        LOG_D(PHY,
+              "%s() NFAPI PNF mode - RC.nb_nr_inst=1 this is because phy_init_RU() uses that to index and not RC.num_gNB - why the "
+              "2 similar variables?\n",
+              __FUNCTION__);
+        LOG_D(PHY, "%s() NFAPI PNF mode - RC.nb_nr_CC[0]=%d for init_gNB_afterRU()\n", __FUNCTION__, RC.nb_nr_CC[0]);
+        LOG_D(PHY,
+              "%s() NFAPI PNF mode - RC.nb_nr_macrlc_inst:%d because used by mac_top_init_gNB()\n",
+              __FUNCTION__,
+              RC.nb_nr_macrlc_inst);
 
         configure_nr_nfapi_pnf(RC.gNB[j]->eth_params_n.remote_addr,
                                RC.gNB[j]->eth_params_n.remote_portc,
@@ -948,7 +953,7 @@ void RCconfig_NR_L1(void)
     } // for (j = 0; j < RC.nb_nr_L1_inst; j++)
     l1_north_init_gNB();
   } else {
-    LOG_I(PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
+    LOG_E(PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
 
     // need to create some structures for VNF
 
@@ -957,7 +962,6 @@ void RCconfig_NR_L1(void)
     if (RC.gNB[j] == NULL) {
       RC.gNB[j] = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
       memset((void *)RC.gNB[j], 0, sizeof(PHY_VARS_gNB));
-      LOG_I(PHY, "RC.gNB[%d] = %p\n", j, RC.gNB[j]);
       RC.gNB[j]->Mod_id = j;
     }
   }
@@ -2153,8 +2157,6 @@ void NRRCConfig(void) {
   paramdef_t GNBSParams[]         = GNBSPARAMS_DESC;
   
 /* get global parameters, defined outside any section in the config file */
-
-  LOG_I(GNB_APP, "Getting GNBSParams\n");
 
   config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
   RC.nb_nr_inst = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;

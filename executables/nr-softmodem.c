@@ -265,7 +265,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
   uint32_t                        gnb_id_end = gnb_id_start + gnb_nb;
   LOG_D(GNB_APP, "%s(gnb_nb:%d)\n", __FUNCTION__, gnb_nb);
   itti_wait_ready(1);
-  LOG_I(PHY, "%s() Task ready initialize structures\n", __FUNCTION__);
+  LOG_D(PHY, "%s() Task ready initialize structures\n", __FUNCTION__);
 
 #ifdef ENABLE_AERIAL
   AssertFatal(NFAPI_MODE == NFAPI_MODE_AERIAL,"Can only be run with '--nfapi AERIAL' when compiled with AERIAL support, if you want to run other (n)FAPI modes, please run ./build_oai without -w AERIAL");
@@ -280,7 +280,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
   if (RC.nb_nr_macrlc_inst > 0)
     RCconfig_nr_macrlc(cfg);
 
-  LOG_I(PHY, "%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
+  LOG_D(PHY, "%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
 
   if (RC.nb_nr_L1_inst>0) AssertFatal(l1_north_init_gNB()==0,"could not initialize L1 north interface\n");
 
@@ -288,7 +288,7 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
                "Number of gNB is greater than gNB defined in configuration file (%d/%d)!",
                gnb_nb, RC.nb_nr_inst);
 
-  LOG_I(GNB_APP,"Allocating gNB_RRC_INST for %d instances\n",RC.nb_nr_inst);
+  LOG_D(GNB_APP, "Allocating gNB_RRC_INST for %d instances\n", RC.nb_nr_inst);
 
   if (RC.nb_nr_inst > 0) {
     AssertFatal(RC.nb_nr_inst == 1, "multiple RRC instances are not supported\n");
@@ -472,7 +472,7 @@ void wait_RUs(void) {
   }
 
   pthread_mutex_unlock(&RC.ru_mutex);
-  LOG_I(PHY,"RUs configured\n");
+  LOG_D(PHY, "RUs configured\n");
 }
 
 void wait_gNBs(void) {

@@ -363,7 +363,6 @@ void wait_RUs(void) {
   }
 
   pthread_mutex_unlock(&RC.ru_mutex);
-  LOG_I(PHY,"RUs configured\n");
 }
 
 void wait_eNBs(void) {

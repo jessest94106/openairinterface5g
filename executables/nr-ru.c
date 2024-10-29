@@ -88,7 +88,7 @@ int attach_rru(RU_t *ru) {
     memset((void *)&rru_config_msg,0,sizeof(rru_config_msg));
     rru_config_msg.type = RAU_tick;
     rru_config_msg.len  = sizeof(RRU_CONFIG_msg_t)-MAX_RRU_CONFIG_SIZE;
-    LOG_I(PHY,"Sending RAU tick to RRU %d\n",ru->idx);
+    LOG_D(PHY, "Sending RAU tick to RRU %d\n", ru->idx);
     AssertFatal((ru->ifdevice.trx_ctlsend_func(&ru->ifdevice,&rru_config_msg,rru_config_msg.len)!=-1),
                 "RU %d cannot access remote radio\n",ru->idx);
     msg_len  = sizeof(RRU_CONFIG_msg_t)-MAX_RRU_CONFIG_SIZE+sizeof(RRU_capabilities_t);
@@ -97,7 +97,7 @@ int attach_rru(RU_t *ru) {
     if ((len = ru->ifdevice.trx_ctlrecv_func(&ru->ifdevice,
                &rru_config_msg,
                msg_len))<0) {
-      LOG_I(PHY,"Waiting for RRU %d\n",ru->idx);
+      LOG_D(PHY, "Waiting for RRU %d\n", ru->idx);
     } else if (rru_config_msg.type == RRU_capabilities) {
       AssertFatal(rru_config_msg.len==msg_len,"Received capabilities with incorrect length (%d!=%d)\n",(int)rru_config_msg.len,(int)msg_len);
       LOG_I(PHY,"Received capabilities from RRU %d (len %d/%d, num_bands %d,max_pdschReferenceSignalPower %d, max_rxgain %d, nb_tx %d, nb_rx %d)\n",ru->idx,
@@ -1756,7 +1756,7 @@ void init_NR_RU(configmodule_interface_t *cfg, char *rf_config_file)
         AssertFatal(gNB0, "gNB0 is null!\n");
 
       if (gNB0 && gNB_RC) {
-        LOG_I(PHY,"Copying frame parms from gNB in RC to gNB %d in ru %d and frame_parms in ru\n", gNB0->Mod_id, ru->idx);
+        LOG_D(PHY, "Copying frame parms from gNB in RC to gNB %d in ru %d and frame_parms in ru\n", gNB0->Mod_id, ru->idx);
         memcpy((void *)fp, &gNB_RC->frame_parms, sizeof(NR_DL_FRAME_PARMS));
         memcpy((void *)&gNB0->frame_parms, (void *)&gNB_RC->frame_parms, sizeof(NR_DL_FRAME_PARMS));
         // attach all RU to all gNBs in its list/
@@ -1772,14 +1772,14 @@ void init_NR_RU(configmodule_interface_t *cfg, char *rf_config_file)
     init_RU_proc(ru);
     if (ru->if_south != REMOTE_IF4p5) {
       int threadCnt = ru->num_tpcores;
-      if (threadCnt < 2) LOG_E(PHY,"Number of threads for gNB should be more than 1. Allocated only %d\n",threadCnt);
-      else LOG_I(PHY,"RU Thread pool size %d\n",threadCnt);
+      if (threadCnt < 2)
+        LOG_E(PHY, "Number of threads for gNB should be more than 1. Allocated only %d\n", threadCnt);
       char pool[80];
       int s_offset = sprintf(pool,"%d",ru->tpcores[0]);
       for (int icpu=1; icpu<threadCnt; icpu++) {
          s_offset+=sprintf(pool+s_offset,",%d",ru->tpcores[icpu]);
       }
-      LOG_I(PHY,"RU thread-pool core string %s\n",pool);
+      LOG_I(PHY, "RU thread-pool core string %s (size %d)\n", pool, threadCnt);
       ru->threadPool = (tpool_t*)malloc(sizeof(tpool_t));
       initTpool(pool, ru->threadPool, cpumeas(CPUMEAS_GETSTATE));
       // FEP RX result FIFO
@@ -1879,7 +1879,7 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
           LOG_E(PHY, "Erroneous RU clock source in the provided configuration file: '%s'\n", *(RUParamList.paramarray[j][RU_SDR_CLK_SRC].strptr));
         }
       } else {
-        LOG_I(PHY,"Setting clock source to internal\n");
+        LOG_D(PHY, "Setting clock source to internal\n");
         RC.ru[j]->openair0_cfg.clock_source = internal;
       }
 
@@ -1897,7 +1897,7 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
           LOG_E(PHY, "Erroneous RU time source in the provided configuration file: '%s'\n", *(RUParamList.paramarray[j][RU_SDR_CLK_SRC].strptr));
         }
       } else {
-        LOG_I(PHY,"Setting time source to internal\n");
+        LOG_D(PHY, "Setting time source to internal\n");
         RC.ru[j]->openair0_cfg.time_source = internal;
       }
 
