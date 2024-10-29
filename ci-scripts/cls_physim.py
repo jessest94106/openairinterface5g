@@ -40,21 +40,13 @@ import re
 
 class PhySim:
 	def __init__(self):
-		self.buildargs = ""
 		self.runargs = ""
 		self.eNBIpAddr = ""
 		self.eNBUserName = ""
 		self.eNBPassWord = ""
 		self.eNBSourceCodePath = ""
-		self.ranRepository = ""
-		self.ranBranch = ""
-		self.ranCommitID= ""
-		self.ranAllowMerge= ""
-		self.ranTargetBranch= ""
-		self.forced_workspace_cleanup=False
 		#private attributes
 		self.__workSpacePath=''
-		self.__buildLogFile='compile_phy_sim.log'
 		self.__runLogFile=''
 		self.__runLogPath='phy_sim_logs'
 
@@ -123,77 +115,9 @@ class PhySim:
 			HTML.CreateHtmlTestRowQueue(self.runargs, 'KO', [info + '\n' + error_msg])
 		return success
 
-	def __CheckBuild_PhySim(self, HTML, CONST):
-		self.__workSpacePath=self.eNBSourceCodePath+'/cmake_targets/'
-		mySSH = sshconnection.SSHConnection()
-		mySSH.open(self.eNBIpAddr, self.eNBUserName, self.eNBPassWord)
-		#retrieve compile log file and store it locally
-		mySSH.copyin(self.eNBIpAddr, self.eNBUserName, self.eNBPassWord, self.__workSpacePath+self.__buildLogFile, '.')
-		#delete older run log file
-		mySSH.command('rm ' + self.__workSpacePath+self.__runLogFile, '\$', 5)
-		mySSH.close()
-		#check build result from local compile log file
-		with open(self.__buildLogFile) as f:
-			if 'BUILD SHOULD BE SUCCESSFUL' in f.read():
-				HTML.CreateHtmlTestRow(self.buildargs, 'OK', CONST.ALL_PROCESSES_OK, 'PhySim')
-				return True
-		logging.error('\u001B[1m Building Physical Simulators Failed\u001B[0m')
-		HTML.CreateHtmlTestRow(self.buildargs, 'KO', CONST.ALL_PROCESSES_OK, 'LDPC')
-		HTML.CreateHtmlTabFooter(False)
-		return False
-
-
 #-----------------$
 #PUBLIC Methods$
 #-----------------$
-
-	def Build_PhySim(self,htmlObj,constObj):
-		mySSH = sshconnection.SSHConnection()
-		mySSH.open(self.eNBIpAddr, self.eNBUserName, self.eNBPassWord)
-
-		#create working dir
-		mySSH.command('mkdir -p ' + self.eNBSourceCodePath, '\$', 5)
-		mySSH.command('cd ' + self.eNBSourceCodePath, '\$', 5)
-
-		if not self.ranRepository.lower().endswith('.git'):
-			self.ranRepository+='.git'
-
-		#git clone
-		mySSH.command('if [ ! -e .git ]; then stdbuf -o0 git clone '  + self.ranRepository + ' .; else stdbuf -o0 git fetch --prune; fi', '\$', 600)
-		#git config
-		mySSH.command('git config user.email "jenkins@openairinterface.org"', '\$', 5)
-		mySSH.command('git config user.name "OAI Jenkins"', '\$', 5)
-
-		#git clean depending on self.forced_workspace_cleanup captured in xml
-		if self.forced_workspace_cleanup==True:
-			logging.info('Cleaning workspace ...')
-			mySSH.command('echo ' + self.eNBPassWord + ' | sudo -S git clean -x -d -ff', '\$', 30)
-		else:
-			logging.info('Workspace cleaning was disabled')
-
-		# if the commit ID is provided, use it to point to it
-		if self.ranCommitID != '':
-			mySSH.command('git checkout -f ' + self.ranCommitID, '\$', 30)
-		# if the branch is not develop, then it is a merge request and we need to do
-		# the potential merge. Note that merge conflicts should have already been checked earlier
-		if (self.ranAllowMerge):
-			if self.ranTargetBranch == '':
-				if (self.ranBranch != 'develop') and (self.ranBranch != 'origin/develop'):
-					mySSH.command('git merge --ff origin/develop -m "Temporary merge for CI"', '\$', 30)
-			else:
-				logging.info('Merging with the target branch: ' + self.ranTargetBranch)
-				mySSH.command('git merge --ff origin/' + self.ranTargetBranch + ' -m "Temporary merge for CI"', '\$', 30)
-
-		#build
-		mySSH.command('source oaienv', '\$', 5)
-		mySSH.command('cd cmake_targets', '\$', 5)
-		mySSH.command('mkdir -p log', '\$', 5)
-		mySSH.command(f'./build_oai {self.buildargs} 2>&1 | tee {self.__buildLogFile}', '\$', 1500)
-
-		mySSH.close()
-		return __CheckBuild_PhySim(htmlObj,constObj)
-
-
 	def Run_CUDATest(self,htmlObj,constObj,testcase_id):
 		self.__workSpacePath = self.eNBSourceCodePath+'/cmake_targets/'
 		#create run logs folder locally

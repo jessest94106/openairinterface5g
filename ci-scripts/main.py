@@ -289,18 +289,6 @@ def ExecuteActionWithParam(action):
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
 		success = cls_oaicitest.IdleSleep(HTML, int(st))
 
-	elif action == 'Build_PhySim':
-		ldpc.buildargs  = test.findtext('physim_build_args')
-		forced_workspace_cleanup = test.findtext('forced_workspace_cleanup')
-		if (forced_workspace_cleanup is None):
-			ldpc.forced_workspace_cleanup=False
-		else:
-			if re.match('true', forced_workspace_cleanup, re.IGNORECASE):
-				ldpc.forced_workspace_cleanup=True
-			else:
-				ldpc.forced_workspace_cleanup=False
-		success = ldpc.Build_PhySim(HTML,CONST)
-
 	elif action == 'Deploy_Run_PhySim':
 		success = PHYSIM.Deploy_PhySim(HTML)
 
