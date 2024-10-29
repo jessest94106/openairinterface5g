@@ -211,7 +211,7 @@ static void init_NR_SI(gNB_RRC_INST *rrc)
     rrc->carrier.SIB23 = (uint8_t *) malloc16(100);
     AssertFatal(rrc->carrier.SIB23 != NULL, "cannot allocate memory for SIB");
     rrc->carrier.sizeof_SIB23 = do_SIB23_NR(&rrc->carrier);
-    LOG_I(NR_RRC,"do_SIB23_NR, size %d \n ", rrc->carrier.sizeof_SIB23);
+    LOG_I(NR_RRC, "do_SIB23_NR, size %d\n", rrc->carrier.sizeof_SIB23);
     AssertFatal(rrc->carrier.sizeof_SIB23 != 255,"FATAL, RC.nrrrc[mod].carrier[CC_id].sizeof_SIB23 == 255");
   }
 
