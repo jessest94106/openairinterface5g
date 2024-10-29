@@ -182,24 +182,25 @@ int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 		NFAPI_TRACE(NFAPI_TRACE_DEBUG, "This is the slot_ind queue size %ld in %s():%d\n",
 			    gnb_slot_ind_queue.num_items, __FUNCTION__, __LINE__);
 		if (slot_ind) {
-			gNB->UL_INFO.frame     = slot_ind->sfn;
-			gNB->UL_INFO.slot      = slot_ind->slot;
+      NR_UL_IND_t UL_INFO = {.frame = slot_ind->sfn, .slot = slot_ind->slot};
 
-			NFAPI_TRACE(NFAPI_TRACE_DEBUG, "gNB->UL_INFO.frame = %d and slot %d, prev_slot = %d\n",
-				    gNB->UL_INFO.frame, gNB->UL_INFO.slot, prev_slot);
-			if (setup_done && prev_slot != gNB->UL_INFO.slot) { //Give the VNF sufficient time to setup before starting scheduling  && prev_slot != gNB->UL_INFO.slot
+      NFAPI_TRACE(NFAPI_TRACE_DEBUG, "UL_INFO.frame = %d and slot %d, prev_slot = %d\n", UL_INFO.frame, UL_INFO.slot, prev_slot);
+      if (setup_done && prev_slot != UL_INFO.slot) { // Give the VNF sufficient time to setup before starting scheduling  &&
+                                                     // prev_slot != UL_INFO.slot
 
-				//Call the scheduler
-				gNB->UL_INFO.module_id = gNB->Mod_id;
-				gNB->UL_INFO.CC_id     = gNB->CC_id;
-				NFAPI_TRACE(NFAPI_TRACE_DEBUG, "Calling NR_UL_indication for gNB->UL_INFO.frame = %d and slot %d\n",
-					    gNB->UL_INFO.frame, gNB->UL_INFO.slot);
-				gNB->if_inst->NR_UL_indication(&gNB->UL_INFO);
-				prev_slot = gNB->UL_INFO.slot;
-			}
-			free(slot_ind);
-			slot_ind = NULL;
-		}
+        // Call the scheduler
+        UL_INFO.module_id = gNB->Mod_id;
+        UL_INFO.CC_id = gNB->CC_id;
+        NFAPI_TRACE(NFAPI_TRACE_DEBUG,
+                    "Calling NR_UL_indication for UL_INFO.frame = %d and slot %d\n",
+                    UL_INFO.frame,
+                    UL_INFO.slot);
+        gNB->if_inst->NR_UL_indication(&UL_INFO);
+        prev_slot = UL_INFO.slot;
+      }
+      free(slot_ind);
+      slot_ind = NULL;
+    }
 
 		selectRetval = pselect(maxSock+1, &rfds, NULL, NULL, &pselect_timeout, NULL);
 

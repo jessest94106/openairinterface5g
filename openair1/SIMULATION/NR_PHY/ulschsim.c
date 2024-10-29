@@ -575,7 +575,6 @@ int main(int argc, char **argv)
       printf("\n");
       exit(-1);
 #endif
-
       nr_ulsch_decoding(gNB, frame_parms, frame, subframe, &G, &UE_id, 1);
       bool crc_valid = check_crc(harq_process_gNB->b, lenWithCrc(1, (harq_process_gNB->TBS) << 3), crcType(1, (harq_process_gNB->TBS) << 3));
       if (!crc_valid) {

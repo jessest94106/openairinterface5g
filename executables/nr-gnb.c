@@ -220,10 +220,10 @@ static void rx_func(processingData_L1_t *info)
     LOG_D(NR_PHY, "%d.%d Starting RX processing\n", frame_rx, slot_rx);
 
     // UE-specific RX processing for subframe n
-    // TODO: check if this is correct for PARALLEL_RU_L1_TRX_SPLIT
-
+    NR_UL_IND_t UL_INFO = {.frame = frame_rx, .slot = slot_rx, .module_id = gNB->Mod_id, .CC_id = gNB->CC_id};
     // Do PRACH RU processing
-    L1_nr_prach_procedures(gNB,frame_rx,slot_rx);
+    UL_INFO.rach_ind.pdu_list = UL_INFO.prach_pdu_indication_list;
+    L1_nr_prach_procedures(gNB, frame_rx, slot_rx, &UL_INFO.rach_ind);
 
     //WA: comment rotation in tx/rx
     if (gNB->phase_comp) {
@@ -242,15 +242,11 @@ static void rx_func(processingData_L1_t *info)
         }
       }
     }
-    phy_procedures_gNB_uespec_RX(gNB, frame_rx, slot_rx);
+    phy_procedures_gNB_uespec_RX(gNB, frame_rx, slot_rx, &UL_INFO);
 
     // Call the scheduler
     start_meas(&gNB->ul_indication_stats);
-    gNB->UL_INFO.frame = frame_rx;
-    gNB->UL_INFO.slot = slot_rx;
-    gNB->UL_INFO.module_id = gNB->Mod_id;
-    gNB->UL_INFO.CC_id = gNB->CC_id;
-    gNB->if_inst->NR_UL_indication(&gNB->UL_INFO);
+    gNB->if_inst->NR_UL_indication(&UL_INFO);
     stop_meas(&gNB->ul_indication_stats);
 
 #ifndef OAI_FHI72
@@ -462,16 +458,10 @@ void init_gNB()
 
     // Register MAC interface module
     AssertFatal((gNB->if_inst = NR_IF_Module_init(inst)) != NULL, "Cannot register interface");
-    LOG_I(NR_PHY, "Registered with MAC interface module (%p)\n", gNB->if_inst);
 
-    // Set function pointers in MAC IF module
+    LOG_I(NR_PHY, "Registered with MAC interface module (%p)\n", gNB->if_inst);
     gNB->if_inst->NR_Schedule_response = nr_schedule_response;
     gNB->if_inst->NR_PHY_config_req = nr_phy_config_request;
-
-    // Clear UL_INFO and set rx/crc indication lists
-    memset((void *)&gNB->UL_INFO, 0, sizeof(gNB->UL_INFO));
-    gNB->UL_INFO.rx_ind.pdu_list = gNB->rx_pdu_list;
-    gNB->UL_INFO.crc_ind.crc_list = gNB->crc_pdu_list;
 
     gNB->prach_energy_counter = 0;
     gNB->chest_time = get_softmodem_params()->chest_time;
