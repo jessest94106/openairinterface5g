@@ -4561,43 +4561,41 @@ __attribute__((always_inline)) static inline void dft12f_simd256(simd256_q15_t *
 
   simd256_q15_t tmp_dft12[12];
 
-  simd256_q15_t *tmp_dft12_ptr = &tmp_dft12[0];
-
   // msg("dft12\n");
 
   bfly4_tw1_256(x0,
 		x3,
 		x6,
 		x9,
-		tmp_dft12_ptr,
-		tmp_dft12_ptr+3,
-		tmp_dft12_ptr+6,
-		tmp_dft12_ptr+9);
+		tmp_dft12,
+		tmp_dft12+3,
+		tmp_dft12+6,
+		tmp_dft12+9);
 
 
   bfly4_tw1_256(x1,
 		x4,
 		x7,
 		x10,
-		tmp_dft12_ptr+1,
-		tmp_dft12_ptr+4,
-		tmp_dft12_ptr+7,
-		tmp_dft12_ptr+10);
+		tmp_dft12+1,
+		tmp_dft12+4,
+		tmp_dft12+7,
+		tmp_dft12+10);
   
 
   bfly4_tw1_256(x2,
 		x5,
 		x8,
 		x11,
-		tmp_dft12_ptr+2,
-		tmp_dft12_ptr+5,
-		tmp_dft12_ptr+8,
-		tmp_dft12_ptr+11);
+		tmp_dft12+2,
+		tmp_dft12+5,
+		tmp_dft12+8,
+		tmp_dft12+11);
   
   //  k2=0;
-  bfly3_tw1_256(tmp_dft12_ptr,
-		tmp_dft12_ptr+1,
-		tmp_dft12_ptr+2,
+  bfly3_tw1_256(tmp_dft12,
+		tmp_dft12+1,
+		tmp_dft12+2,
 		y0,
 		y4,
 		y8);
@@ -4605,9 +4603,9 @@ __attribute__((always_inline)) static inline void dft12f_simd256(simd256_q15_t *
   
   
   //  k2=1;
-  bfly3_256(tmp_dft12_ptr+3,
-	    tmp_dft12_ptr+4,
-	    tmp_dft12_ptr+5,
+  bfly3_256(tmp_dft12+3,
+	    tmp_dft12+4,
+	    tmp_dft12+5,
 	    y1,
 	    y5,
 	    y9,
@@ -4617,9 +4615,9 @@ __attribute__((always_inline)) static inline void dft12f_simd256(simd256_q15_t *
   
   
   //  k2=2;
-  bfly3_256(tmp_dft12_ptr+6,
-	    tmp_dft12_ptr+7,
-	    tmp_dft12_ptr+8,
+  bfly3_256(tmp_dft12+6,
+	    tmp_dft12+7,
+	    tmp_dft12+8,
 	    y2,
 	    y6,
 	    y10,
@@ -4627,9 +4625,9 @@ __attribute__((always_inline)) static inline void dft12f_simd256(simd256_q15_t *
 	    W4_12_256);
   
   //  k2=3;
-  bfly3_256(tmp_dft12_ptr+9,
-	    tmp_dft12_ptr+10,
-	    tmp_dft12_ptr+11,
+  bfly3_256(tmp_dft12+9,
+	    tmp_dft12+10,
+	    tmp_dft12+11,
 	    y3,
 	    y7,
 	    y11,
