@@ -15,3 +15,9 @@ target_link_libraries(test_log2_approx PRIVATE GTest::gtest LOG minimal_lib)
 add_dependencies(tests test_log2_approx)
 add_test(NAME test_log2_approx
   COMMAND ./test_log2_approx --gtest_filter=-log2_approx.complete)
+
+add_executable(dft_test test_dft.c ../dfts_load.c)
+target_link_libraries(dft_test minimal_lib shlib_loader SIMU m)
+add_dependencies(tests dft_test)
+add_dependencies(dft_test dfts) # trigger build of dfts (shared lib for DFT)
+add_test(NAME dft_test COMMAND ./dft_test)
