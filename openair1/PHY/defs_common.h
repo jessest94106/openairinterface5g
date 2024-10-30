@@ -1060,7 +1060,12 @@ static inline void wait_sync(char *thread_name)
     pthread_cond_wait( &sync_cond, &sync_mutex );
 
   AssertFatal((rc = pthread_mutex_unlock( &sync_mutex ))==0,"sync mutex unlock error");
-  LOG_D(PHY, "got sync (%s)\n", thread_name);
+  LOG_I(PHY, "got sync (%s)\n", thread_name);
+  /*
+   * Raphael Defosseux: added for CI to get faster the got sync message.
+   */
+  fflush(stdout);
+  fflush(stderr);
 }
 
 
