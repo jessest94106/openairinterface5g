@@ -1210,11 +1210,6 @@ static int get_user_nssai_idx(const nr_nas_msg_snssai_t allowed_nssai[8], const 
 
 void *nas_nrue_task(void *args_p)
 {
-  for (int UE_id = 0; UE_id < NB_UE_INST; UE_id++) {
-    // This sets UE uicc from command line. Needs to be called 2 seconds into nr-ue runtime, otherwise the unused command line
-    // arguments will be reported as unused and the modem asserts.
-    (void)get_ue_nas_info(UE_id);
-  }
   while (1) {
     nas_nrue(NULL);
   }
@@ -1452,4 +1447,10 @@ void *nas_nrue(void *args_p)
     AssertFatal(result == EXIT_SUCCESS, "Failed to free memory (%d)!\n", result);
   }
   return NULL;
+}
+
+void nas_init_nrue(int num_ues) {
+  for (int i = 0; i < num_ues; i++) {
+    (void)get_ue_nas_info(i);
+  }
 }
