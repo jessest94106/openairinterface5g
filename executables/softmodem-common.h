@@ -142,7 +142,6 @@ extern "C"
 #define EMULATE_L1          softmodem_params.emulate_l1
 #define CONTINUOUS_TX       softmodem_params.continuous_tx
 #define SYNC_REF            softmodem_params.sync_ref
-#define LDPC_OFFLOAD_FLAG   softmodem_params.ldpc_offload_flag
 
 #define DEFAULT_RFCONFIG_FILE    "/usr/local/etc/syriq/ue.band7.tm1.PRB100.NR40.dat";
 
@@ -321,7 +320,6 @@ typedef struct {
   int            continuous_tx;
   uint32_t       sync_ref;
   int no_itti;
-  int ldpc_offload_flag;
   int threequarter_fs;
 } softmodem_params_t;
 
