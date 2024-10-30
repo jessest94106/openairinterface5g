@@ -29,6 +29,9 @@
 #include "nfapi/oai_integration/aerial/fapi_nvIPC.h"
 #endif
 #include "vnf_p7.h"
+#ifdef ENABLE_WLS
+#include <wls_integration/include/wls_vnf.h>
+#endif
 #include "nr_fapi_p7_utils.h"
 
 #ifdef NDEBUG

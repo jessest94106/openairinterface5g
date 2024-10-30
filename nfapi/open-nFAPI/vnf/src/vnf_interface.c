@@ -579,6 +579,7 @@ int nfapi_nr_vnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_con
 		return -1;
   AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
 	vnf_t* _this = (vnf_t*)(config);
+#ifndef ENABLE_WLS
 
 	nfapi_vnf_phy_info_t* phy = nfapi_vnf_phy_info_list_find(config, req->header.phy_id);
 
@@ -600,7 +601,7 @@ int nfapi_nr_vnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_con
 	req->nfapi_config.timing_info_period.tl.tag = NFAPI_NR_NFAPI_TIMING_INFO_PERIOD_TAG;
 	req->nfapi_config.timing_info_period.value = phy->timing_info_period;
 	req->num_tlv++;
-
+#endif
 	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_config_request_scf_t));
 }
 

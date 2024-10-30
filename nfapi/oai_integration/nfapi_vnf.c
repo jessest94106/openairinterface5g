@@ -36,12 +36,15 @@
 #include "nfapi_vnf.h"
 #include <vnf.h>
 #include <vnf_p7.h>
+#ifdef ENABLE_WLS
+#include <wls_integration/include/wls_vnf.h>
+#include "nr_fapi_p5.h"
+#include "nr_fapi_p7.h"
+#endif
 
 #ifdef ENABLE_SOCKET
 #include <socket/include/socket_vnf.h>
 #endif
-#include <vnf.h>
-#include <vnf_p7.h>
 
 #include "nfapi.h"
 #include "vendor_ext.h"
@@ -1450,6 +1453,13 @@ void *configure_nr_p7_vnf(void *ptr)
   p7_vnf->config->unpack_func = &nfapi_nr_p7_message_unpack;
   p7_vnf->config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
   p7_vnf->config->pack_func = &nfapi_nr_p7_message_pack;
+#ifdef ENABLE_WLS
+  p7_vnf->config->unpack_func = &fapi_nr_p7_message_unpack;
+  p7_vnf->config->hdr_unpack_func = &fapi_nr_p7_message_header_unpack;
+  p7_vnf->config->pack_func = &fapi_nr_p7_message_pack;
+  p7_vnf->config->send_p7_msg = &wls_vnf_nr_send_p7_message;
+  wls_vnf_set_p7_config(p7_vnf->config);
+#endif
 
 #ifdef ENABLE_SOCKET
   p7_vnf->config->unpack_func = &nfapi_nr_p7_message_unpack;
@@ -1516,7 +1526,9 @@ int pnf_nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_pnf_st
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Sending NFAPI_VNF_PARAM_REQUEST phy_id:%d\n", pnf->phys[0].id);
   memset(&req, 0, sizeof(req));
   req.header.message_id = NFAPI_NR_PHY_MSG_TYPE_PARAM_REQUEST;
-
+#ifdef ENABLE_WLS
+  req.header.phy_id = 0;
+#endif
 #ifdef ENABLE_SOCKET
   req.header.phy_id = pnf->phys[0].id;
 #endif
@@ -1866,6 +1878,17 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->codec_config.allocate = &vnf_nr_allocate;
   config->codec_config.deallocate = &vnf_nr_deallocate;
   memset(&UL_RCC_INFO, 0, sizeof(UL_RCC_IND_t));
+
+#ifdef ENABLE_WLS
+  config->unpack_func = &fapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &fapi_nr_message_header_unpack;
+  config->pack_func = &fapi_nr_p5_message_pack;
+  config->send_p5_msg = &wls_vnf_nr_send_p5_message;
+  printf("WLS MODE PNF\n");
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating WLS VNF NFAPI start thread %s\n", __FUNCTION__);
+  //wls_fapi_pnf_nr_start_thread(config);
+  threadCreate(&vnf_p5_init_and_receive_pthread, wls_fapi_vnf_nr_start_thread, config, "NFAPI_WLS_VNF", -1, OAI_PRIORITY_RT_MAX);
+#endif
 
 #ifdef ENABLE_SOCKET
   config->unpack_func = &nfapi_nr_p5_message_unpack;
