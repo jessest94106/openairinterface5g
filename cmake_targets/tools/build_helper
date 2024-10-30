@@ -613,13 +613,11 @@ check_install_oai_software() {
       git \
       pkgconfig \
       libconfig-devel \
-      libffi-devel \
       lksctp-tools \
       lksctp-tools-devel \
       libtool \
       ninja-build \
       make \
-      openssl \
       openssl-devel \
       patch \
       readline-devel \
