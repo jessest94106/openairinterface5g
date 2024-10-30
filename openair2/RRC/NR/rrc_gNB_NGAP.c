@@ -32,6 +32,7 @@
 #include "RRC/L2_INTERFACE/openair_rrc_L2_interface.h"
 #include "rrc_eNB_S1AP.h"
 #include "gnb_config.h"
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_mac.h"
 #include "common/ran_context.h"
 
 #include "oai_asn1.h"
@@ -140,7 +141,7 @@ void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering)
     }
   }
 
-  nr_pdcp_config_set_security(UE->rrc_ue_id, DCCH, true, &security_parameters);
+  nr_pdcp_config_set_security(UE->rrc_ue_id, DL_SCH_LCID_DCCH, true, &security_parameters);
 }
 
 //------------------------------------------------------------------------------

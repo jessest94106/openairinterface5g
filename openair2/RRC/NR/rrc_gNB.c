@@ -568,7 +568,7 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
   DevAssert(size > 0 && size <= sizeof(buffer));
 
   LOG_UE_DL_EVENT(ue_p, "Generate RRCReconfiguration (bytes %d, xid %d)\n", size, xid);
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, buffer, size);
 }
 
 void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
@@ -677,7 +677,7 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
     clear_nas_pdu(&ue_p->pduSession[i].param.nas_pdu);
 
   LOG_I(NR_RRC, "UE %d: Generate RRCReconfiguration (bytes %d)\n", ue_p->rrc_ue_id, size);
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, buffer, size);
 }
 
 //-----------------------------------------------------------------------------
@@ -729,7 +729,7 @@ void rrc_gNB_generate_dedicatedRRCReconfiguration_release(gNB_RRC_INST *rrc,
   }
 
   LOG_I(NR_RRC, "UE %d: Generate NR_RRCReconfiguration (bytes %d)\n", ue_p->rrc_ue_id, size);
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, buffer, size);
 }
 
 /* \brief find existing PDU session inside E1AP Bearer Modif message, or
@@ -860,10 +860,10 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
   uint32_t old_gNB_DU_ue_id = old_rnti;
   f1ap_dl_rrc_message_t dl_rrc = {.gNB_CU_ue_id = ue_p->rrc_ue_id,
                                   .gNB_DU_ue_id = ue_data.secondary_ue,
-                                  .srb_id = DCCH,
+                                  .srb_id = DL_SCH_LCID_DCCH,
                                   .old_gNB_DU_ue_id = &old_gNB_DU_ue_id};
   deliver_dl_rrc_message_data_t data = {.rrc = rrc, .dl_rrc = &dl_rrc, .assoc_id = ue_data.du_assoc_id};
-  nr_pdcp_data_req_srb(ue_p->rrc_ue_id, DCCH, rrc_gNB_mui++, size, (unsigned char *const)buffer, rrc_deliver_dl_rrc_message, &data);
+  nr_pdcp_data_req_srb(ue_p->rrc_ue_id, DL_SCH_LCID_DCCH, rrc_gNB_mui++, size, (unsigned char *const)buffer, rrc_deliver_dl_rrc_message, &data);
 
   /* RRCReestablishment has been generated, let's enable ciphering now. */
   security_parameters.ciphering_algorithm = ue_p->ciphering_algorithm;
@@ -965,7 +965,7 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
         ue_p->rrc_ue_id,
         ue_p->rnti,
         size);
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, buffer, size);
 }
 //-----------------------------------------------------------------------------
 
@@ -986,7 +986,7 @@ int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int 
   uint8_t buffer[NR_RRC_BUF_SIZE];
   int size = do_RRCReconfiguration(ue_p, buffer, NR_RRC_BUF_SIZE, xid, NULL, NULL, NULL, NULL, NULL, NULL, masterCellGroup);
 
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, buffer, size);
 
   return 0;
 }
@@ -1406,7 +1406,7 @@ void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   unsigned int xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   uint32_t length = do_NR_DLInformationTransfer(buffer, sizeof(buffer), xid, UE->nas_pdu.length, UE->nas_pdu.buffer);
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, buffer, length, "[MSG] RRC DL Information Transfer\n");
-  rb_id_t srb_id = UE->Srb[2].Active ? DCCH1 : DCCH;
+  rb_id_t srb_id = UE->Srb[2].Active ? DL_SCH_LCID_DCCH1 : DL_SCH_LCID_DCCH;
   nr_rrc_transfer_protected_rrc_message(rrc, UE, srb_id, buffer, length);
   // no need to free UE->nas_pdu.buffer, do_NR_DLInformationTransfer() did that
   UE->nas_pdu.buffer = NULL;
@@ -1654,7 +1654,7 @@ static void rrc_gNB_generate_UECapabilityEnquiry(gNB_RRC_INST *rrc, gNB_RRC_UE_t
 
   AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
 
-  nr_rrc_transfer_protected_rrc_message(rrc, ue, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue, DL_SCH_LCID_DCCH, buffer, size);
 }
 
 static int rrc_gNB_decode_dcch(gNB_RRC_INST *rrc, const f1ap_ul_rrc_message_t *msg)
@@ -2001,7 +2001,7 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
           .gNB_DU_ue_id = source_ctx->du_ue_id,
           .cause = F1AP_CAUSE_RADIO_NETWORK,
           .cause_value = 5, // 5 = F1AP_CauseRadioNetwork_interaction_with_other_procedure
-          .srb_id = DCCH,
+          .srb_id = DL_SCH_LCID_DCCH,
       };
       rrc->mac_rrc.ue_context_release_command(assoc_id, &cmd);
       nr_rrc_finalize_ho(UE);
@@ -2649,7 +2649,7 @@ void rrc_gNB_generate_SecurityModeCommand(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, (char *)buffer, size, "[MSG] RRC Security Mode Command\n");
   LOG_I(NR_RRC, "UE %u Logical Channel DL-DCCH, Generate SecurityModeCommand (bytes %d)\n", ue_p->rrc_ue_id, size);
 
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DCCH, buffer, size);
+  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, buffer, size);
 }
 
 typedef struct deliver_ue_ctxt_release_data_t {
@@ -2684,10 +2684,10 @@ void rrc_gNB_generate_RRCRelease(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
     .gNB_DU_ue_id = ue_data.secondary_ue,
     .cause = F1AP_CAUSE_RADIO_NETWORK,
     .cause_value = 10, // 10 = F1AP_CauseRadioNetwork_normal_release
-    .srb_id = DCCH,
+    .srb_id = DL_SCH_LCID_DCCH,
   };
   deliver_ue_ctxt_release_data_t data = {.rrc = rrc, .release_cmd = &ue_context_release_cmd, .assoc_id = ue_data.du_assoc_id};
-  nr_pdcp_data_req_srb(UE->rrc_ue_id, DCCH, rrc_gNB_mui++, size, buffer, rrc_deliver_ue_ctxt_release_cmd, &data);
+  nr_pdcp_data_req_srb(UE->rrc_ue_id, DL_SCH_LCID_DCCH, rrc_gNB_mui++, size, buffer, rrc_deliver_ue_ctxt_release_cmd, &data);
 }
 
 int rrc_gNB_generate_pcch_msg(sctp_assoc_t assoc_id, const NR_SIB1_t *sib1, uint32_t tmsi, uint8_t paging_drx)
