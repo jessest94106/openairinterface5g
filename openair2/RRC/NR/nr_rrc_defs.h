@@ -422,11 +422,11 @@ typedef struct gNB_RRC_INST_s {
 } gNB_RRC_INST;
 
 #define UE_LOG_FMT "(cellID %lx, UE ID %d RNTI %04x)"
-#define UE_LOG_ARGS(ue_P) (ue_P)->nr_cellid, (ue_P)->rrc_ue_id, (ue_P)->rnti
+#define UE_LOG_ARGS(ue_context) (ue_context)->nr_cellid, (ue_context)->rrc_ue_id, (ue_context)->rnti
 
-#define LOG_UE_DL_EVENT(ue_P, fMt, ...) LOG_A(NR_RRC, "[DL] " UE_LOG_FMT " " fMt, UE_LOG_ARGS(ue_P) __VA_OPT__(,) __VA_ARGS__)
-#define LOG_UE_EVENT(ue_P, fMt, ...)    LOG_A(NR_RRC, "[--] " UE_LOG_FMT " " fMt, UE_LOG_ARGS(ue_P) __VA_OPT__(,) __VA_ARGS__)
-#define LOG_UE_UL_EVENT(ue_P, fMt, ...) LOG_A(NR_RRC, "[UL] " UE_LOG_FMT " " fMt, UE_LOG_ARGS(ue_P) __VA_OPT__(,) __VA_ARGS__)
+#define LOG_UE_DL_EVENT(ue_context, fmt, ...) LOG_A(NR_RRC, "[DL] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
+#define LOG_UE_EVENT(ue_context, fmt, ...)    LOG_A(NR_RRC, "[--] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
+#define LOG_UE_UL_EVENT(ue_context, fmt, ...) LOG_A(NR_RRC, "[UL] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
 
 #include "nr_rrc_proto.h" //should be put here otherwise compilation error
 
