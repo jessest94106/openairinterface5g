@@ -1678,7 +1678,6 @@ set (libnas_utils_OBJS
   ${NAS_SRC}COMMON/UTIL/nas_timer.c
   ${NAS_SRC}COMMON/UTIL/socket.c
   ${NAS_SRC}COMMON/UTIL/stty.c
-  ${NAS_SRC}COMMON/UTIL/TLVEncoder.c
   ${NAS_SRC}COMMON/UTIL/TLVDecoder.c
   ${NAS_SRC}COMMON/UTIL/OctetString.c
 )
