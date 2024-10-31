@@ -468,12 +468,7 @@ static int config_frame_structure(int mu,
     fs->numb_slots_period = fs->numb_slots_frame / fs->numb_period_frame;
     fs->is_tdd = true;
     config_tdd_patterns(scc->tdd_UL_DL_ConfigurationCommon, fs);
-    set_tdd_config_nr(cfg,
-                      mu,
-                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots,
-                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols,
-                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols);
+    set_tdd_config_nr(cfg, fs);
   } else { // FDD
     fs->is_tdd = false;
     fs->numb_period_frame = 1;
@@ -521,10 +516,10 @@ static void config_common(gNB_MAC_INST *nrmac,
     }
   }
   struct NR_FrequencyInfoUL *frequencyInfoUL = scc->uplinkConfigCommon->frequencyInfoUL;
+  int scs = frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
   frequency_range = *frequencyInfoUL->frequencyBandList->list.array[0] > 256 ? FR2 : FR1;
-  bw_index = get_supported_band_index(frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
-                                      frequency_range,
-                                      frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth);
+  bw_index =
+      get_supported_band_index(scs, frequency_range, frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth);
   cfg->carrier_config.uplink_bandwidth.value = get_supported_bw_mhz(frequency_range, bw_index);
   cfg->carrier_config.uplink_bandwidth.tl.tag = NFAPI_NR_CONFIG_UPLINK_BANDWIDTH_TAG; // temporary
   cfg->num_tlv++;
@@ -543,7 +538,7 @@ static void config_common(gNB_MAC_INST *nrmac,
   cfg->num_tlv++;
 
   for (int i = 0; i < 5; i++) {
-    if (i == frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing) {
+    if (i == scs) {
       cfg->carrier_config.ul_grid_size[i].value = frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
       cfg->carrier_config.ul_k0[i].value = frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->offsetToCarrier;
       cfg->carrier_config.ul_grid_size[i].tl.tag = NFAPI_NR_CONFIG_UL_GRID_SIZE_TAG;
@@ -642,21 +637,15 @@ static void config_common(gNB_MAC_INST *nrmac,
     prach_fd_occasion->k1.value =
         NRRIV2PRBOFFSET(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE)
         + rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart
-        + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value,
-                       frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing)
-           * i);
+        + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value, scs) * i);
     if (IS_SA_MODE(get_softmodem_params())) {
       prach_fd_occasion->k1.value =
           NRRIV2PRBOFFSET(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE)
           + rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart
-          + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value,
-                         frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing)
-             * i);
+          + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value, scs) * i);
     } else {
       prach_fd_occasion->k1.value = rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart
-                                    + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value,
-                                                   frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing)
-                                       * i);
+                                    + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value, scs) * i);
     }
     prach_fd_occasion->k1.tl.tag = NFAPI_NR_CONFIG_K1_TAG;
     cfg->num_tlv++;
@@ -789,14 +778,18 @@ static void config_common(gNB_MAC_INST *nrmac,
       cfg->tdd_table.tdd_period.value = *scc->tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530;
     }
     LOG_D(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
-    int periods_per_frame = set_tdd_config_nr(cfg,
-                                              frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                                              scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols);
-
-    AssertFatal(periods_per_frame > 0, "TDD configuration cannot be configured\n");
+    NR_TDD_UL_DL_Pattern_t *pattern1 = &scc->tdd_UL_DL_ConfigurationCommon->pattern1;
+    tdd_period_config_t period_cfg = {.num_dl_slots = pattern1->nrofDownlinkSlots,
+                                      .num_ul_slots = pattern1->nrofUplinkSlots,
+                                      .tdd_slot_bitmap[0].slot_type = TDD_NR_MIXED_SLOT,
+                                      .tdd_slot_bitmap[0].num_dl_symbols = pattern1->nrofDownlinkSymbols,
+                                      .tdd_slot_bitmap[0].num_ul_symbols = pattern1->nrofUplinkSymbols};
+    frame_structure_t fs = {.period_cfg = period_cfg, .is_tdd = true};
+    fs.numb_slots_frame = nr_slots_per_frame[scs];
+    fs.numb_period_frame = get_nb_periods_per_frame(cfg->tdd_table.tdd_period.value);
+    fs.numb_slots_period = ((1 << scs) * NR_NUMBER_OF_SUBFRAMES_PER_FRAME) / fs.numb_period_frame;
+    set_tdd_config_nr(cfg, &fs);
+    AssertFatal(fs.numb_period_frame > 0, "TDD configuration cannot be configured\n");
   }
 
   int nb_tx = config->nb_bfw[0]; // number of tx antennas
