@@ -912,6 +912,8 @@ typedef struct gNB_MAC_INST_s {
 
   /// maximum number of slots before a UE will be scheduled ULSCH automatically
   uint32_t ulsch_max_frame_inactivity;
+  /// instance of the frame structure configuration
+  frame_structure_t frame_structure;
 
   /// DL preprocessor for differentiated scheduling
   nr_pp_impl_dl pre_processor_dl;
