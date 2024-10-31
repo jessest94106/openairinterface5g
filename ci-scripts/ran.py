@@ -70,7 +70,6 @@ class RANManagement():
 		self.runtime_stats= ''
 		self.datalog_rt_stats={}
 		self.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
-		self.USRPIPAddress = ''
 		#checkers from xml
 		self.ran_checkers={}
 		self.cmd_prefix = '' # prefix before {lte,nr}-softmodem

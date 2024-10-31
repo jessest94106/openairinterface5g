@@ -108,8 +108,6 @@ def ExecuteActionWithParam(action, ctx, node):
 		else:
 			RAN.datalog_rt_stats_file=datalog_rt_stats_file
 		RAN.Initialize_eNB_args=test.findtext('Initialize_eNB_args')
-		USRPIPAddress = test.findtext('USRP_IPAddress') or ''
-
 		#local variable air_interface
 		air_interface = test.findtext('air_interface')		
 		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
