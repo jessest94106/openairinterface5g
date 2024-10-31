@@ -464,6 +464,7 @@ static int config_frame_structure(int mu,
     cfg->tdd_table.tdd_period.tl.tag = NFAPI_NR_CONFIG_TDD_PERIOD_TAG;
     cfg->num_tlv++;
     cfg->tdd_table.tdd_period.value = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
+    LOG_D(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
     fs->numb_period_frame = get_nb_periods_per_frame(cfg->tdd_table.tdd_period.value);
     fs->numb_slots_period = fs->numb_slots_frame / fs->numb_period_frame;
     fs->is_tdd = true;
@@ -765,32 +766,9 @@ static void config_common(gNB_MAC_INST *nrmac,
   cfg->num_tlv++;
   cfg->num_tlv++;
 
-  // TDD Table Configuration
-  if (cfg->cell_config.frame_duplex_type.value == TDD) {
-    cfg->tdd_table.tdd_period.tl.tag = NFAPI_NR_CONFIG_TDD_PERIOD_TAG;
-    cfg->num_tlv++;
-    if (scc->tdd_UL_DL_ConfigurationCommon->pattern1.ext1 == NULL) {
-      cfg->tdd_table.tdd_period.value = scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity;
-    } else {
-      AssertFatal(scc->tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530 != NULL,
-                  "In %s: scc->tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530 is null\n",
-                  __FUNCTION__);
-      cfg->tdd_table.tdd_period.value = *scc->tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530;
-    }
-    LOG_D(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
-    NR_TDD_UL_DL_Pattern_t *pattern1 = &scc->tdd_UL_DL_ConfigurationCommon->pattern1;
-    tdd_period_config_t period_cfg = {.num_dl_slots = pattern1->nrofDownlinkSlots,
-                                      .num_ul_slots = pattern1->nrofUplinkSlots,
-                                      .tdd_slot_bitmap[0].slot_type = TDD_NR_MIXED_SLOT,
-                                      .tdd_slot_bitmap[0].num_dl_symbols = pattern1->nrofDownlinkSymbols,
-                                      .tdd_slot_bitmap[0].num_ul_symbols = pattern1->nrofUplinkSymbols};
-    frame_structure_t fs = {.period_cfg = period_cfg, .is_tdd = true};
-    fs.numb_slots_frame = nr_slots_per_frame[scs];
-    fs.numb_period_frame = get_nb_periods_per_frame(cfg->tdd_table.tdd_period.value);
-    fs.numb_slots_period = ((1 << scs) * NR_NUMBER_OF_SUBFRAMES_PER_FRAME) / fs.numb_period_frame;
-    set_tdd_config_nr(cfg, &fs);
-    AssertFatal(fs.numb_period_frame > 0, "TDD configuration cannot be configured\n");
-  }
+  // Frame structure configuration
+  uint8_t mu = frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+  config_frame_structure(mu, scc, cfg, &nrmac->frame_structure);
 
   int nb_tx = config->nb_bfw[0]; // number of tx antennas
   int nb_beams = config->nb_bfw[1]; // number of beams
