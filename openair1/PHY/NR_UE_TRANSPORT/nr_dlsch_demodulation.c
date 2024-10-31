@@ -589,20 +589,21 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                            symbol,
                            nb_re_pdsch);
     if (nl >= 2) // Apply MMSE for 2, 3, and 4 Tx layers
-      nr_dlsch_mmse(rx_size_symbol,
-                    n_rx,
-                    nl,
-                    rxdataF_comp,
-                    dl_ch_mag,
-                    dl_ch_magb,
-                    dl_ch_magr,
-                    dl_ch_estimates_ext,
-                    nb_rb_pdsch,
-                    dlsch_config->qamModOrder,
-                    *log2_maxh,
-                    symbol,
-                    nb_re_pdsch,
-                    nvar);
+      if (nb_re_pdsch)
+        nr_dlsch_mmse(rx_size_symbol,
+                      n_rx,
+                      nl,
+                      rxdataF_comp,
+                      dl_ch_mag,
+                      dl_ch_magb,
+                      dl_ch_magr,
+                      dl_ch_estimates_ext,
+                      nb_rb_pdsch,
+                      dlsch_config->qamModOrder,
+                      *log2_maxh,
+                      symbol,
+                      nb_re_pdsch,
+                      nvar);
   }
   stop_meas_nr_ue_phy(ue, DLSCH_MRC_MMSE_STATS);
 
