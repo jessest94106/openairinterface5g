@@ -920,6 +920,41 @@ void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsc
 }
 
 
+static struct NR_PUSCH_TimeDomainResourceAllocation *set_TimeDomainResourceAllocation(const int k2, uint8_t index, int ul_symb)
+{
+  struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAlloc = calloc_or_fail(1, sizeof(*puschTdrAlloc));
+  puschTdrAlloc->k2 = calloc_or_fail(1, sizeof(*puschTdrAlloc->k2));
+  *puschTdrAlloc->k2 = k2;
+  puschTdrAlloc->mappingType = NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
+  switch (index) {
+    case 0:
+      puschTdrAlloc->startSymbolAndLength = get_SLIV(0, 13);
+      break;
+    case 1:
+      puschTdrAlloc->startSymbolAndLength = get_SLIV(0, 12);
+      break;
+    case 2:
+      // UL TDA index 2 for mixed slot (TDD)
+      puschTdrAlloc->startSymbolAndLength =
+          get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1); // starting in fist ul symbol til the last but one
+      break;
+    case 3: {
+      // UL TDA index 3 for msg3 in the mixed slot (TDD)
+      int no_mix_slot = ul_symb < 3 ? 1 : 0; // we need at least 2 symbols for scheduling Msg3
+      *puschTdrAlloc->k2 += no_mix_slot;
+      if (no_mix_slot)
+        puschTdrAlloc->startSymbolAndLength = get_SLIV(0, 13); // full allocation if there is no mixed slot
+      else
+        puschTdrAlloc->startSymbolAndLength =
+            get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1); // starting in fist ul symbol til the last but one
+      }
+      break;
+    default:
+      break;
+  }
+  return puschTdrAlloc;
+}
+
 void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
 {
   //TODO change to accomodate for SRS
@@ -933,52 +968,33 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
 
   uint8_t DELTA[4]= {2,3,4,6}; // Delta parameter for Msg3
   int mu = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
+  struct NR_SetupRelease_PUSCH_ConfigCommon *pusch_ConfigCommon = scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon;
 
   // UL TDA index 0 is basic slot configuration starting in symbol 0 til the last but one symbol
-  struct NR_PUSCH_TimeDomainResourceAllocation *pusch_timedomainresourceallocation = CALLOC(1,sizeof(struct NR_PUSCH_TimeDomainResourceAllocation));
-  pusch_timedomainresourceallocation->k2 = CALLOC(1,sizeof(long));
-  *pusch_timedomainresourceallocation->k2 = k2;
-  pusch_timedomainresourceallocation->mappingType = NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
-  pusch_timedomainresourceallocation->startSymbolAndLength = get_SLIV(0, 13);
-  asn1cSeqAdd(&scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,pusch_timedomainresourceallocation); 
+  asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, set_TimeDomainResourceAllocation(k2, 0, 0));
 
   // UL TDA index 1 in case of SRS
-  struct NR_PUSCH_TimeDomainResourceAllocation *pusch_timedomainresourceallocation1 = CALLOC(1,sizeof(struct NR_PUSCH_TimeDomainResourceAllocation));
-  pusch_timedomainresourceallocation1->k2 = CALLOC(1,sizeof(long));
-  *pusch_timedomainresourceallocation1->k2 = k2;
-  pusch_timedomainresourceallocation1->mappingType = NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
-  pusch_timedomainresourceallocation1->startSymbolAndLength = get_SLIV(0, 12);
-  asn1cSeqAdd(&scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,pusch_timedomainresourceallocation1);
+  asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, set_TimeDomainResourceAllocation(k2, 1, 0));
 
   if(frame_type==TDD) {
     if(scc->tdd_UL_DL_ConfigurationCommon) {
       int ul_symb = scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols;
       if (ul_symb>1) {
         // UL TDA index 2 for mixed slot (TDD)
-        pusch_timedomainresourceallocation = CALLOC(1,sizeof(struct NR_PUSCH_TimeDomainResourceAllocation));
-        pusch_timedomainresourceallocation->k2 = CALLOC(1,sizeof(long));
-        *pusch_timedomainresourceallocation->k2 = k2;
-        pusch_timedomainresourceallocation->mappingType = NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
-        pusch_timedomainresourceallocation->startSymbolAndLength = get_SLIV(14 - ul_symb, ul_symb - 1); // starting in fist ul symbol til the last but one
-        asn1cSeqAdd(&scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,pusch_timedomainresourceallocation);
+        asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,
+                    set_TimeDomainResourceAllocation(k2, 2, ul_symb));
       }
       // UL TDA index 3 for msg3 in the mixed slot (TDD)
       int nb_periods_per_frame = get_nb_periods_per_frame(scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity);
       int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
-      struct NR_PUSCH_TimeDomainResourceAllocation *pusch_timedomainresourceallocation_msg3 = CALLOC(1,sizeof(struct NR_PUSCH_TimeDomainResourceAllocation));
-      pusch_timedomainresourceallocation_msg3->k2 = CALLOC(1,sizeof(long));
-      int no_mix_slot = ul_symb < 3 ? 1 : 0; // we need at least 2 symbols for scheduling Msg3
-      *pusch_timedomainresourceallocation_msg3->k2 = nb_slots_per_period - DELTA[mu] + no_mix_slot;
-      if(*pusch_timedomainresourceallocation_msg3->k2 < min_fb_delay)
-        *pusch_timedomainresourceallocation_msg3->k2 += nb_slots_per_period;
-      AssertFatal(*pusch_timedomainresourceallocation_msg3->k2 < 33,"Computed k2 for msg3 %ld is larger than the range allowed by RRC (0..32)\n",
-                  *pusch_timedomainresourceallocation_msg3->k2);
-      pusch_timedomainresourceallocation_msg3->mappingType = NR_PUSCH_TimeDomainResourceAllocation__mappingType_typeB;
-      if(no_mix_slot)
-        pusch_timedomainresourceallocation_msg3->startSymbolAndLength = get_SLIV(0, 13); // full allocation if there is no mixed slot
-      else
-        pusch_timedomainresourceallocation_msg3->startSymbolAndLength = get_SLIV(14 - ul_symb, ul_symb - 1); // starting in fist ul symbol til the last but one
-      asn1cSeqAdd(&scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,pusch_timedomainresourceallocation_msg3);
+      int k2_msg3 = nb_slots_per_period - DELTA[mu];
+      struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAllocMsg3 = set_TimeDomainResourceAllocation(k2_msg3, 3, ul_symb);
+      if (*puschTdrAllocMsg3->k2 < min_fb_delay)
+        *puschTdrAllocMsg3->k2 += nb_slots_per_period;
+      AssertFatal(*puschTdrAllocMsg3->k2 < 33,
+                  "Computed k2 for msg3 %ld is larger than the range allowed by RRC (0..32)\n",
+                  *puschTdrAllocMsg3->k2);
+      asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, puschTdrAllocMsg3);
     }
   }
 }
