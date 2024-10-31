@@ -66,7 +66,6 @@ class RANManagement():
 		self.imageKind = ''
 		self.air_interface = ''
 		self.eNBOptions = ['', '', '']
-		self.eNBmbmsEnables = [False, False, False]
 		self.eNBstatuses = [-1, -1, -1]
 		self.runtime_stats= ''
 		#checkers from xml
@@ -234,9 +233,6 @@ class RANManagement():
 		isRRU = False
 		isSlave = False
 		slaveReceivesFrameResyncCmd = False
-		X2HO_state = CONST.X2_HO_REQ_STATE__IDLE
-		X2HO_inNbProcedures = 0
-		X2HO_outNbProcedures = 0
 		global_status = CONST.ALL_PROCESSES_OK
 		# Runtime statistics
 		runTime = ''
@@ -297,31 +293,6 @@ class RANManagement():
 				if result is not None:
 					fields=line.split(':')
 					nbContextSwitches = 'nbContextSwitches : ' + fields[1].replace('\n','')
-			if X2HO_state == CONST.X2_HO_REQ_STATE__IDLE:
-				result = re.search('target eNB Receives X2 HO Req X2AP_HANDOVER_REQ', str(line))
-				if result is not None:
-					X2HO_state = CONST.X2_HO_REQ_STATE__TARGET_RECEIVES_REQ
-				result = re.search('source eNB receives the X2 HO ACK X2AP_HANDOVER_REQ_ACK', str(line))
-				if result is not None:
-					X2HO_state = CONST.X2_HO_REQ_STATE__SOURCE_RECEIVES_REQ_ACK
-			if X2HO_state == CONST.X2_HO_REQ_STATE__TARGET_RECEIVES_REQ:
-				result = re.search('Received LTE_RRCConnectionReconfigurationComplete from UE', str(line))
-				if result is not None:
-					X2HO_state = CONST.X2_HO_REQ_STATE__TARGET_RRC_RECFG_COMPLETE
-			if X2HO_state == CONST.X2_HO_REQ_STATE__TARGET_RRC_RECFG_COMPLETE:
-				result = re.search('issue rrc_eNB_send_PATH_SWITCH_REQ', str(line))
-				if result is not None:
-					X2HO_state = CONST.X2_HO_REQ_STATE__TARGET_SENDS_SWITCH_REQ
-			if X2HO_state == CONST.X2_HO_REQ_STATE__TARGET_SENDS_SWITCH_REQ:
-				result = re.search('received path switch ack S1AP_PATH_SWITCH_REQ_ACK', str(line))
-				if result is not None:
-					X2HO_state = CONST.X2_HO_REQ_STATE__IDLE
-					X2HO_inNbProcedures += 1
-			if X2HO_state == CONST.X2_HO_REQ_STATE__SOURCE_RECEIVES_REQ_ACK:
-				result = re.search('source eNB receives the X2 UE CONTEXT RELEASE X2AP_UE_CONTEXT_RELEASE', str(line))
-				if result is not None:
-					X2HO_state = CONST.X2_HO_REQ_STATE__IDLE
-					X2HO_outNbProcedures += 1
 
 			if self.eNBOptions[0] != '':
 				res1 = re.search('max_rxgain (?P<requested_option>[0-9]+)', self.eNBOptions[0])
@@ -419,10 +390,6 @@ class RANManagement():
 			result = re.search('dropping, not enough RBs', str(line))
 			if result is not None:
 				dropNotEnoughRBs += 1
-			if self.eNBmbmsEnables[0]:
-				result = re.search('MBMS USER-PLANE.*Requesting.*bytes from RLC', str(line))
-				if result is not None:
-					mbmsRequestMsg += 1
 			#FR1 NSA test : add new markers to make sure gNB is used
 			result = re.search(r'\[gNB [0-9]+\]\[RAPROC\] PUSCH with TC_RNTI 0x[0-9a-fA-F]+ received correctly, adding UE MAC Context RNTI 0x[0-9a-fA-F]+', str(line))
 			if result is not None:
@@ -657,19 +624,6 @@ class RANManagement():
 			logging.debug('\u001B[1;30;43m ' + rrcMsg + ' \u001B[0m')
 			htmleNBFailureMsg += rrcMsg + '\n'
 			rrcMsg = ' -- ' + str(rrcReestablishReject) + ' were rejected'
-			logging.debug('\u001B[1;30;43m ' + rrcMsg + ' \u001B[0m')
-			htmleNBFailureMsg += rrcMsg + '\n'
-		if self.eNBmbmsEnables[0]:
-			if mbmsRequestMsg > 0:
-				rrcMsg = 'eNB requested ' + str(mbmsRequestMsg) + ' times the RLC for MBMS USER-PLANE'
-				logging.debug('\u001B[1;30;43m ' + rrcMsg + ' \u001B[0m')
-				htmleNBFailureMsg += rrcMsg + '\n'
-		if X2HO_inNbProcedures > 0:
-			rrcMsg = 'eNB completed ' + str(X2HO_inNbProcedures) + ' X2 Handover Connection procedure(s)'
-			logging.debug('\u001B[1;30;43m ' + rrcMsg + ' \u001B[0m')
-			htmleNBFailureMsg += rrcMsg + '\n'
-		if X2HO_outNbProcedures > 0:
-			rrcMsg = 'eNB completed ' + str(X2HO_outNbProcedures) + ' X2 Handover Release procedure(s)'
 			logging.debug('\u001B[1;30;43m ' + rrcMsg + ' \u001B[0m')
 			htmleNBFailureMsg += rrcMsg + '\n'
 		if self.eNBOptions[0] != '':

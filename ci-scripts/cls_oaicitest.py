@@ -604,7 +604,6 @@ class OaiCiTest():
 		nrDecodeMib = 0
 		nrFoundDCI = 0
 		nrCRCOK = 0
-		mbms_messages = 0
 		nbPduSessAccept = 0
 		nbPduDiscard = 0
 		HTML.htmlUEFailureMsg=''
@@ -678,10 +677,6 @@ class OaiCiTest():
 			result = re.search('No cell synchronization found, abandoning', str(line))
 			if result is not None:
 				no_cell_sync_found = True
-			if RAN.eNBmbmsEnables[0]:
-				result = re.search('TRIED TO PUSH MBMS DATA', str(line))
-				if result is not None:
-					mbms_messages += 1
 			result = re.search(r"MIB Information => ([a-zA-Z]{1,10}), ([a-zA-Z]{1,10}), NidCell (?P<nidcell>\d{1,3}), N_RB_DL (?P<n_rb_dl>\d{1,3}), PHICH DURATION (?P<phich_duration>\d), PHICH RESOURCE (?P<phich_resource>.{1,4}), TX_ANT (?P<tx_ant>\d)", str(line))
 			if result is not None and (not mib_found):
 				try:
@@ -811,15 +806,6 @@ class OaiCiTest():
 		if macBsrTimerExpiredCount > 0:
 			statMsg = f'UE showed {fatalErrorCount} "MAC BSR Triggered ReTxBSR Timer expiry" message(s)'
 			logging.debug(f'\u001B[1;30;43m{statMsg}\u001B[0m')
-			HTML.htmlUEFailureMsg=HTML.htmlUEFailureMsg + statMsg + '\n'
-		if RAN.eNBmbmsEnables[0]:
-			if mbms_messages > 0:
-				statMsg = f'UE showed {mbms_messages} "TRIED TO PUSH MBMS DATA" message(s)'
-				logging.debug(f'\u001B[1;30;43m{statMsg}\u001B[0m')
-			else:
-				statMsg = 'UE did NOT SHOW "TRIED TO PUSH MBMS DATA" message(s)'
-				logging.debug(f'\u001B[1;30;41m{statMsg}\u001B[0m')
-				global_status = CONST.OAI_UE_PROCESS_NO_MBMS_MSGS
 			HTML.htmlUEFailureMsg=HTML.htmlUEFailureMsg + statMsg + '\n'
 		if foundSegFault:
 			logging.debug('\u001B[1;37;41m UE ended with a Segmentation Fault! \u001B[0m')
