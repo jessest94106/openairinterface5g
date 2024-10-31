@@ -2209,7 +2209,7 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
     int mnc = plmn->mnc;
     if (plmn->mnc_digit_length == 3) {
       asn1cSequenceAdd(nr_plmn->mnc.list, NR_MCC_MNC_Digit_t, mnc0);
-      *mnc0 = (0 / 100) % 10;
+      *mnc0 = (mnc / 100) % 10;
     }
     asn1cSequenceAdd(nr_plmn->mnc.list, NR_MCC_MNC_Digit_t, mnc1);
     *mnc1 = (mnc / 10) % 10;
