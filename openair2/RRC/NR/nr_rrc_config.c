@@ -905,7 +905,17 @@ void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsc
   if(frame_type==TDD) {
     // TDD
     if(tdd_UL_DL_ConfigurationCommon) {
-      int dl_symb = tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols;
+      int dl_symb = 0;
+      if (tdd_UL_DL_ConfigurationCommon->pattern2 && tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSymbols)
+        AssertFatal(tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSymbols == tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols,
+                    "nrofDownlinkSymbols in pattern1 %ld and pattern2 %ld must be the same in current implementation\n",
+                    tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSymbols,
+                    tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols);
+      if (tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols != 0) {
+        dl_symb = tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols;
+      } else if (tdd_UL_DL_ConfigurationCommon->pattern2) {
+        dl_symb = tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSymbols;
+      }
       if(dl_symb > 1) {
         // mixed slot TDA with TDA index 2
         struct NR_PDSCH_TimeDomainResourceAllocation *timedomainresourceallocation2 = CALLOC(1,sizeof(NR_PDSCH_TimeDomainResourceAllocation_t));
@@ -1014,9 +1024,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
       scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList;
   AssertFatal(tda->list.count == 0, "already have pusch_TimeDomainAllocationList members\n");
 
-  frame_type_t frame_type = get_frame_type(*scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0], *scc->ssbSubcarrierSpacing);
   const int k2 = min_fb_delay;
-
   uint8_t DELTA[4]= {2,3,4,6}; // Delta parameter for Msg3
   int mu = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
   struct NR_SetupRelease_PUSCH_ConfigCommon *pusch_ConfigCommon = scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon;
@@ -1027,26 +1035,37 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
   // UL TDA index 1 in case of SRS
   asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, set_TimeDomainResourceAllocation(k2, 1, 0));
 
-  if(frame_type==TDD) {
-    if(scc->tdd_UL_DL_ConfigurationCommon) {
-      int ul_symb = scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols;
-      if (ul_symb>1) {
-        // UL TDA index 2 for mixed slot (TDD)
-        asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,
-                    set_TimeDomainResourceAllocation(k2, 2, ul_symb));
-      }
-      // UL TDA index 3 for msg3 in the mixed slot (TDD)
-      int nb_periods_per_frame = get_nb_periods_per_frame(scc->tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity);
-      int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
-      int k2_msg3 = nb_slots_per_period - DELTA[mu];
-      struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAllocMsg3 = set_TimeDomainResourceAllocation(k2_msg3, 3, ul_symb);
-      if (*puschTdrAllocMsg3->k2 < min_fb_delay)
-        *puschTdrAllocMsg3->k2 += nb_slots_per_period;
-      AssertFatal(*puschTdrAllocMsg3->k2 < 33,
-                  "Computed k2 for msg3 %ld is larger than the range allowed by RRC (0..32)\n",
-                  *puschTdrAllocMsg3->k2);
-      asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, puschTdrAllocMsg3);
+  if (scc->tdd_UL_DL_ConfigurationCommon) {
+    int ul_symb = 0;
+    NR_TDD_UL_DL_Pattern_t *p1 = &scc->tdd_UL_DL_ConfigurationCommon->pattern1;
+    NR_TDD_UL_DL_Pattern_t *p2 = scc->tdd_UL_DL_ConfigurationCommon->pattern2;
+    if (p2 && p2->nrofUplinkSymbols)
+      AssertFatal(p2->nrofUplinkSymbols == p1->nrofUplinkSymbols,
+                  "nrofDownlinkSymbols in pattern1 %ld and pattern2 %ld must be the same in current implementation\n",
+                  p1->nrofUplinkSymbols,
+                  p2->nrofUplinkSymbols);
+    if (p1->nrofUplinkSymbols) {
+      ul_symb = p1->nrofUplinkSymbols;
+    } else if (p2) {
+      ul_symb = p1->nrofUplinkSymbols;
     }
+    if (ul_symb>1) {
+      // UL TDA index 2 for mixed slot (TDD)
+      asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list,
+                  set_TimeDomainResourceAllocation(k2, 2, ul_symb));
+    }
+    // UL TDA index 3 for msg3 in the mixed slot (TDD)
+    int tdd_period_idx = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
+    int nb_periods_per_frame = get_nb_periods_per_frame(tdd_period_idx);
+    int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
+    int k2_msg3 = nb_slots_per_period - DELTA[mu];
+    struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAllocMsg3 = set_TimeDomainResourceAllocation(k2_msg3, 3, ul_symb);
+    if (*puschTdrAllocMsg3->k2 < min_fb_delay)
+      *puschTdrAllocMsg3->k2 += nb_slots_per_period;
+    AssertFatal(*puschTdrAllocMsg3->k2 < 33,
+                "Computed k2 for msg3 %ld is larger than the range allowed by RRC (0..32)\n",
+                *puschTdrAllocMsg3->k2);
+    asn1cSeqAdd(&pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList->list, puschTdrAllocMsg3);
   }
 }
 
