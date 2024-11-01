@@ -47,19 +47,19 @@ int l1_north_init_gNB() {
 
     AssertFatal(RC.nb_nr_L1_inst>0,"nb_nr_L1_inst=%d\n",RC.nb_nr_L1_inst);
     AssertFatal(RC.gNB!=NULL,"RC.gNB is null\n");
-    LOG_I(PHY,"%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
+    LOG_D(PHY, "%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
 
     for (int i=0; i<RC.nb_nr_L1_inst; i++) {
       AssertFatal(RC.gNB[i]!=NULL,"RC.gNB[%d] is null\n",i);
 
       if ((RC.gNB[i]->if_inst =  NR_IF_Module_init(i))<0) return(-1);
-      
-      LOG_I(PHY,"%s() RC.gNB[%d] installing callbacks\n", __FUNCTION__, i);
+
+      LOG_D(PHY, "%s() RC.gNB[%d] installing callbacks\n", __FUNCTION__, i);
       RC.gNB[i]->if_inst->NR_PHY_config_req = nr_phy_config_request;
       RC.gNB[i]->if_inst->NR_Schedule_response = nr_schedule_response;
     }
   } else {
-    LOG_I(PHY,"%s() Not installing PHY callbacks - RC.nb_nr_L1_inst:%d RC.gNB:%p\n", __FUNCTION__, RC.nb_nr_L1_inst, RC.gNB);
+    LOG_D(PHY, "%s() Not installing PHY callbacks - RC.nb_nr_L1_inst:%d RC.gNB:%p\n", __FUNCTION__, RC.nb_nr_L1_inst, RC.gNB);
   }
 
   return(0);
@@ -125,7 +125,7 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
 
   AssertFatal(Ptx > 0 && Ptx < 9,"Ptx %d is not supported\n", Ptx);
   AssertFatal(Prx > 0 && Prx < 9,"Prx %d is not supported\n", Prx);
-  LOG_I(PHY, "[gNB %d]About to wait for gNB to be configured\n", gNB->Mod_id);
+  LOG_D(PHY, "[gNB %d]About to wait for gNB to be configured\n", gNB->Mod_id);
 
   while(gNB->configured == 0)
     usleep(10000);
@@ -381,8 +381,7 @@ void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
   init_symbol_rotation(fp);
   init_timeshift_rotation(fp);
 
-  gNB->configured    = 1;
-  LOG_I(PHY,"gNB configured\n");
+  gNB->configured = 1;
 }
 
 void nr_phy_config_request(NR_PHY_Config_t *phy_config)
@@ -406,7 +405,7 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   LOG_I(PHY, "DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %d Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, dlul_offset);
 
   fp->threequarter_fs = get_softmodem_params()->threequarter_fs;
-  LOG_A(PHY,"Configuring MIB for instance %d, : (Nid_cell %d,DL freq %llu, UL freq %llu)\n",
+  LOG_D(PHY,"Configuring MIB for instance %d, : (Nid_cell %d,DL freq %llu, UL freq %llu)\n",
         Mod_id,
         gNB_config->cell_config.phy_cell_id.value,
         (unsigned long long)fp->dl_CarrierFreq,
@@ -434,8 +433,6 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   fp->ofdm_offset_divisor = RC.gNB[Mod_id]->ofdm_offset_divisor;
   init_symbol_rotation(fp);
   init_timeshift_rotation(fp);
-
-  LOG_I(PHY,"gNB %d configured\n",Mod_id);
 }
 
 void init_DLSCH_struct(PHY_VARS_gNB *gNB, processingData_L1tx_t *msg)
@@ -476,7 +473,6 @@ void init_nr_transport(PHY_VARS_gNB *gNB)
 
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   const nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
-  LOG_I(PHY, "Initialise nr transport\n");
 
   int nb_slots_per_period = cfg->cell_config.frame_duplex_type.value ?
                             fp->slots_per_frame / get_nb_periods_per_frame(cfg->tdd_table.tdd_period.value) :

@@ -69,12 +69,6 @@
 
 #include "intertask_interface.h"
 
-#define PROTOCOL_NR_RRC_CTXT_UE_FMT                PROTOCOL_CTXT_FMT
-#define PROTOCOL_NR_RRC_CTXT_UE_ARGS(CTXT_Pp)      PROTOCOL_NR_CTXT_ARGS(CTXT_Pp)
-
-#define PROTOCOL_NR_RRC_CTXT_FMT                   PROTOCOL_CTXT_FMT
-#define PROTOCOL_NR_RRC_CTXT_ARGS(CTXT_Pp)         PROTOCOL_NR_CTXT_ARGS(CTXT_Pp)
-
 // 3GPP TS 38.331 Section 12 Table 12.1-1: UE performance requirements for RRC procedures for UEs
 #define NR_RRC_SETUP_DELAY_MS           10
 #define NR_RRC_RECONFIGURATION_DELAY_MS 10
@@ -243,6 +237,7 @@ typedef struct gNB_RRC_UE_s {
   uint64_t                           ng_5G_S_TMSI_Part1;
   NR_EstablishmentCause_t            establishment_cause;
 
+  uint64_t nr_cellid;
   uint32_t                           rrc_ue_id;
   uint64_t amf_ue_ngap_id;
   nr_rrc_guami_t                     ue_guami;
@@ -425,6 +420,13 @@ typedef struct gNB_RRC_INST_s {
   size_t num_cuups;
 
 } gNB_RRC_INST;
+
+#define UE_LOG_FMT "(cellID %lx, UE ID %d RNTI %04x)"
+#define UE_LOG_ARGS(ue_context) (ue_context)->nr_cellid, (ue_context)->rrc_ue_id, (ue_context)->rnti
+
+#define LOG_UE_DL_EVENT(ue_context, fmt, ...) LOG_A(NR_RRC, "[DL] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
+#define LOG_UE_EVENT(ue_context, fmt, ...)    LOG_A(NR_RRC, "[--] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
+#define LOG_UE_UL_EVENT(ue_context, fmt, ...) LOG_A(NR_RRC, "[UL] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
 
 #include "nr_rrc_proto.h" //should be put here otherwise compilation error
 

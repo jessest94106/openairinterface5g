@@ -615,11 +615,10 @@ static void set_UE_security_algos(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, con
   UE->ciphering_algorithm = cipheringAlgorithm;
   UE->integrity_algorithm = integrityProtAlgorithm;
 
-  LOG_I(NR_RRC,
-        "[UE %d] Selected security algorithms: ciphering %lx, integrity %x\n",
-        UE->rrc_ue_id,
-        cipheringAlgorithm,
-        integrityProtAlgorithm);
+  LOG_UE_EVENT(UE,
+               "Selected security algorithms: ciphering %lx, integrity %x\n",
+               cipheringAlgorithm,
+               integrityProtAlgorithm);
 }
 
 //------------------------------------------------------------------------------
@@ -1143,7 +1142,6 @@ void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance,
   NGAP_UE_CONTEXT_RELEASE_COMPLETE(msg).num_pdu_sessions = num_pdu;
   for (int i = 0; i < num_pdu; ++i)
     NGAP_UE_CONTEXT_RELEASE_COMPLETE(msg).pdu_session_id[i] = pdu_session_id[i];
-  LOG_W(RRC, "trigger release with %d pdu\n", num_pdu);
   itti_send_msg_to_task(TASK_NGAP, instance, msg);
 }
 
