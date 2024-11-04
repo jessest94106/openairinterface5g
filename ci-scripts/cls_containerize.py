@@ -846,6 +846,11 @@ class Containerize():
 				mySSH.close()
 				HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 				return False
+			# Creating a develop tag on the local private registry
+			if not self.ranAllowMerge:
+				mySSH.command(f'docker image tag {image}:{orgTag} {imagePrefix}/{image}:develop', '\$', 5)
+				mySSH.command(f'docker push {imagePrefix}/{image}:develop', '\$', 120)
+				mySSH.command(f'docker rmi {imagePrefix}/{image}:develop', '\$', 120)
 			mySSH.command(f'docker rmi {imagePrefix}/{imageTag} {image}:{orgTag}', '\$', 30)
 
 		mySSH.command(f'docker logout {imagePrefix}', '\$', 5)
