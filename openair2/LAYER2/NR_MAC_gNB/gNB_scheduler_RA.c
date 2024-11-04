@@ -1455,7 +1455,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
   AssertFatal(coreset, "Coreset cannot be null for RA-Msg2\n");
   const int coresetid = coreset->controlResourceSetId;
   // Calculate number of symbols
-  int time_domain_assignment = get_dl_tda(nr_mac, scc, slotP);
+  int time_domain_assignment = get_dl_tda(nr_mac, slotP);
   int mux_pattern = type0_PDCCH_CSS_config ? type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern : 1;
   NR_tda_info_t tda_info = get_dl_tda_info(dl_bwp,
                                            ss->searchSpaceType->present,
@@ -2031,7 +2031,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       return;
     }
 
-    uint8_t time_domain_assignment = get_dl_tda(nr_mac, scc, slotP);
+    uint8_t time_domain_assignment = get_dl_tda(nr_mac, slotP);
     int mux_pattern = type0_PDCCH_CSS_config ? type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern : 1;
     NR_tda_info_t msg4_tda = get_dl_tda_info(dl_bwp,
                                              ss->searchSpaceType->present,
