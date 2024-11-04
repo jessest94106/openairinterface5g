@@ -982,7 +982,7 @@ static bool get_feasible_msg3_tda(const NR_ServingCellConfigCommon_t *scc,
     const tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
     int s = get_slot_idx_in_period(temp_slot, fs);
     // check if enough symbols in case of mixed slot
-    bool is_mixed = (tdd_slot_bitmap[s].slot_type == TDD_NR_MIXED_SLOT);
+    bool is_mixed = is_mixed_slot(s, fs);
     // if the mixed slot has not enough symbols, skip
     if (is_mixed && tdd_slot_bitmap[s].num_ul_symbols < 3)
       continue;

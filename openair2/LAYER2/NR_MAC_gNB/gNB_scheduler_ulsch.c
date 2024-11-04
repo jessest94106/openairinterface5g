@@ -52,8 +52,7 @@ int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
     // if there is uplink symbols in mixed slot
     int s = get_slot_idx_in_period(slot, fs);
     tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
-    if ((tdd_slot_bitmap[s].num_ul_symbols > 1)
-        && (tdd_slot_bitmap[s].slot_type == TDD_NR_MIXED_SLOT)) {
+    if ((tdd_slot_bitmap[s].num_ul_symbols > 1) && is_mixed_slot(s, fs)) {
       return 2;
     }
   }

@@ -386,8 +386,7 @@ int get_first_ul_slot(const frame_structure_t *fs, bool mixed)
 
   if (fs->is_tdd) {
     for (int i = 0; i < fs->numb_slots_period; i++) {
-      bool is_mixed = fs->period_cfg.tdd_slot_bitmap[i].num_ul_symbols && fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_MIXED_SLOT;
-      if ((mixed && is_mixed) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
+      if ((mixed && is_ul_slot(i, fs)) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
         return i;
       }
     }
@@ -486,8 +485,7 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
   /* Populate the indices of UL slots in the TDD period from the bitmap
   count also mixed slots with UL symbols if flag count_mixed is present */
   for (int i = 0; i < fs->numb_slots_period; i++) {
-    bool is_mixed = (fs->period_cfg.tdd_slot_bitmap[i].num_ul_symbols > 1) && (fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_MIXED_SLOT);
-    if ((count_mixed && is_mixed) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
+    if ((count_mixed && is_ul_slot(i, fs)) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
       ul_slot_idxs[ul_slot_count++] = i;
     }
   }
