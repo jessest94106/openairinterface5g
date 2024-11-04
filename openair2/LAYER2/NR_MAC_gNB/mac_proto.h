@@ -412,9 +412,6 @@ uint8_t get_mcs_from_cqi(int mcs_table, int cqi_table, int cqi_idx);
 
 uint8_t get_dl_nrOfLayers(const NR_UE_sched_ctrl_t *sched_ctrl, const nr_dci_format_t dci_format);
 
-void set_sched_pucch_list(NR_UE_sched_ctrl_t *sched_ctrl,
-                          const NR_UE_UL_BWP_t *ul_bwp,
-                          const NR_ServingCellConfigCommon_t *scc);
 void free_sched_pucch_list(NR_UE_sched_ctrl_t *sched_ctrl);
 
 int get_dl_tda(const gNB_MAC_INST *nrmac, int slot);
