@@ -952,47 +952,45 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
     ra->ra_state = nrRA_WAIT_Msg3;
     ra->Msg3_frame = sched_frame;
     ra->Msg3_slot = sched_slot;
-
   }
 }
 
-static bool get_feasible_msg3_tda(frame_type_t frame_type,
-                                  const NR_ServingCellConfigCommon_t *scc,
+static bool get_feasible_msg3_tda(const NR_ServingCellConfigCommon_t *scc,
                                   int mu_delta,
                                   uint64_t ulsch_slot_bitmap[3],
                                   const NR_PUSCH_TimeDomainResourceAllocationList_t *tda_list,
-                                  int slots_per_frame,
                                   int frame,
                                   int slot,
                                   NR_RA_t *ra,
                                   NR_beam_info_t *beam_info,
-                                  const NR_TDD_UL_DL_Pattern_t *tdd)
+                                  const frame_structure_t *fs)
 {
   DevAssert(tda_list != NULL);
 
   const int NTN_gNB_Koffset = get_NTN_Koffset(scc);
 
-  int tdd_period_slot = tdd ? slots_per_frame / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) : slots_per_frame;
+  int slots_per_frame = fs->numb_slots_frame;
   for (int i = 0; i < tda_list->list.count; i++) {
     // check if it is UL
     long k2 = *tda_list->list.array[i]->k2 + NTN_gNB_Koffset;
     int abs_slot = slot + k2 + mu_delta;
     int temp_frame = (frame + (abs_slot / slots_per_frame)) & 1023;
     int temp_slot = abs_slot % slots_per_frame; // msg3 slot according to 8.3 in 38.213
-    if ((frame_type == TDD) && !is_xlsch_in_slot(ulsch_slot_bitmap[temp_slot / 64], temp_slot))
+    if (fs->is_tdd && !is_xlsch_in_slot(ulsch_slot_bitmap[temp_slot / 64], temp_slot))
       continue;
 
+    const tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
+    int s = get_slot_idx_in_period(temp_slot, fs);
     // check if enough symbols in case of mixed slot
-    bool is_mixed = false;
-    if (frame_type == TDD) {
-      bool has_mixed = tdd->nrofUplinkSymbols != 0 || tdd->nrofDownlinkSymbols != 0;
-      is_mixed = has_mixed && ((temp_slot % tdd_period_slot) == tdd->nrofDownlinkSlots);
-    }
+    bool is_mixed = (tdd_slot_bitmap[s].slot_type == TDD_NR_MIXED_SLOT);
     // if the mixed slot has not enough symbols, skip
-    if (is_mixed && tdd->nrofUplinkSymbols < 3)
+    if (is_mixed && tdd_slot_bitmap[s].num_ul_symbols < 3)
       continue;
 
-    uint16_t slot_mask = is_mixed ? SL_to_bitmap(14 - tdd->nrofUplinkSymbols, tdd->nrofUplinkSymbols) : 0x3fff;
+    uint16_t slot_mask =
+        is_mixed ? SL_to_bitmap(NR_NUMBER_OF_SYMBOLS_PER_SLOT - tdd_slot_bitmap[s].num_ul_symbols,
+                                tdd_slot_bitmap[s].num_ul_symbols)
+                 : 0x3fff;
     long startSymbolAndLength = tda_list->list.array[i]->startSymbolAndLength;
     int start, nr;
     SLIV2SL(startSymbolAndLength, &start, &nr);
@@ -1415,18 +1413,15 @@ static void nr_generate_Msg2(module_id_t module_idP,
     return;
 
   const NR_UE_UL_BWP_t *ul_bwp = &ra->UL_BWP;
-  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
-  bool ret = get_feasible_msg3_tda(cc->frame_type,
-                                   scc,
+  bool ret = get_feasible_msg3_tda(scc,
                                    DELTA[ul_bwp->scs],
                                    nr_mac->ulsch_slot_bitmap,
                                    ul_bwp->tdaList_Common,
-                                   nr_slots_per_frame[ul_bwp->scs],
                                    frameP,
                                    slotP,
                                    ra,
                                    &nr_mac->beam_info,
-                                   tdd);
+                                   &nr_mac->frame_structure);
   if (!ret || ra->Msg3_tda_id > 15) {
     LOG_D(NR_MAC, "UE RNTI %04x %d.%d: infeasible Msg3 TDA\n", ra->rnti, frameP, slotP);
     reset_beam_status(&nr_mac->beam_info, frameP, slotP, ra->beam_id, n_slots_frame, beam.new_beam);
