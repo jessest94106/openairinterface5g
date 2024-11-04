@@ -391,12 +391,12 @@ void rrc_remove_nsa_user(gNB_RRC_INST *rrc, int rnti) {
   rrc_gNB_ue_context_t *ue_context;
   int                  e_rab;
 
-  LOG_D(RRC, "calling rrc_remove_nsa_user rnti %d\n", rnti);
+  LOG_D(RRC, "calling rrc_remove_nsa_user rnti %x\n", rnti);
   PROTOCOL_CTXT_SET_BY_MODULE_ID(&ctxt, rrc->module_id, GNB_FLAG_YES, rnti, 0, 0, rrc->module_id);
 
   ue_context = rrc_gNB_get_ue_context_by_rnti_any_du(rrc, rnti);
   if (ue_context == NULL) {
-    LOG_W(RRC, "rrc_remove_nsa_user: rnti %d not found\n", rnti);
+    LOG_W(RRC, "rrc_remove_nsa_user: rnti %x not found\n", rnti);
     return;
   }
 
@@ -411,7 +411,7 @@ void rrc_remove_nsa_user(gNB_RRC_INST *rrc, int rnti) {
   gtpv1u_enb_delete_tunnel_req_t tmp={0};
   tmp.rnti=rnti;
   tmp.from_gnb=1;
-  LOG_D(RRC, "ue_context->ue_context.nb_of_e_rabs %d will be deleted for rnti %d\n", ue_context->ue_context.nb_of_e_rabs, rnti);
+  LOG_D(RRC, "ue_context->ue_context.nb_of_e_rabs %d will be deleted for rnti %x\n", ue_context->ue_context.nb_of_e_rabs, rnti);
   for (e_rab = 0; e_rab < ue_context->ue_context.nb_of_e_rabs; e_rab++) {
     tmp.eps_bearer_id[tmp.num_erab++]= ue_context->ue_context.nsa_gtp_ebi[e_rab];
     // erase data
