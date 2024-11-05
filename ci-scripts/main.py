@@ -46,7 +46,6 @@ import cls_physim1		 #class PhySim for physical simulators deploy and run
 import cls_cluster		 # class for building/deploying on cluster
 import cls_native        # class for all native/source-based operations
 
-import sshconnection 
 import epc
 import ran
 import cls_oai_html
@@ -100,7 +99,6 @@ def AssignParams(params_dict):
 
 
 def ExecuteActionWithParam(action):
-	global SSH
 	global EPC
 	global RAN
 	global HTML
@@ -484,7 +482,6 @@ mode = ''
 
 CiTestObj = cls_oaicitest.OaiCiTest()
  
-SSH = sshconnection.SSHConnection()
 EPC = epc.EPCManagement()
 RAN = ran.RANManagement()
 HTML = cls_oai_html.HTMLManagement()
