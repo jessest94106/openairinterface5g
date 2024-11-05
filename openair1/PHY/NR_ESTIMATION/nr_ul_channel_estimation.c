@@ -63,25 +63,27 @@ __attribute__((always_inline)) inline c16_t c32x16cumulVectVectWithSteps(c16_t *
   return c16x32div(cumul, N);
 }
 
-int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
-                                unsigned char Ns,
-                                int nl,
-                                unsigned short p,
-                                unsigned char symbol,
-                                int ul_id,
-                                int beam_nb,
-                                unsigned short bwp_start_subcarrier,
-                                nfapi_nr_pusch_pdu_t *pusch_pdu,
-                                int *max_ch,
-                                uint32_t *nvar)
+static void nr_pusch_antenna_processing(void *arg)
 {
-  c16_t pilot[3280] __attribute__((aligned(32)));
-  const int chest_freq = gNB->chest_freq;
+  puschAntennaProc_t *rdata = (puschAntennaProc_t *)arg;
 
-#ifdef DEBUG_CH
-  FILE *debug_ch_est;
-  debug_ch_est = fopen("debug_ch_est.txt", "w");
-#endif
+  PHY_VARS_gNB *gNB = rdata->gNB;
+  unsigned char Ns = rdata->Ns;
+  int nl = rdata->nl;
+  unsigned short p = rdata->p;
+  unsigned char symbol = rdata->symbol;
+  int ul_id = rdata->ul_id;
+  int aarx = rdata->aarx;
+  int numAntennas = rdata->numAntennas;
+  unsigned short bwp_start_subcarrier = rdata->bwp_start_subcarrier;
+  nfapi_nr_pusch_pdu_t *pusch_pdu = rdata->pusch_pdu;
+  int *max_ch = rdata->max_ch;
+  c16_t *pilot = rdata->pilot;
+  uint64_t noise_amp2 = *(rdata->noise_amp2);
+  int nest_count = *(rdata->nest_count);
+  delay_t *delay = rdata->delay;
+
+  const int chest_freq = gNB->chest_freq;
   NR_gNB_PUSCH *pusch_vars = &gNB->pusch_vars[ul_id];
   c16_t **ul_ch_estimates = (c16_t **)pusch_vars->ul_ch_estimates;
   const int symbolSize = gNB->frame_parms.ofdm_symbol_size;
@@ -90,75 +92,23 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   const int symbol_offset = symbolSize * symbol;
   const int k0 = bwp_start_subcarrier;
   const int nb_rb_pusch = pusch_pdu->rb_size;
-
-  LOG_D(PHY,
-        "symbol_offset %d, slot_offset %d, OFDM size %d, Ns = %d, k0 = %d, symbol %d\n",
-        symbol_offset,
-        slot_offset,
-        symbolSize,
-        Ns,
-        k0,
-        symbol);
-
-  //------------------generate DMRS------------------//
-
-  if (pusch_pdu->transform_precoding == transformPrecoder_disabled) {
-    // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
-    NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
-    const uint32_t *gold = nr_gold_pusch(fp->N_RB_UL,
-                                         fp->symbols_per_slot,
-                                         gNB->gNB_config.cell_config.phy_cell_id.value,
-                                         pusch_pdu->scid,
-                                         Ns,
-                                         symbol);
-    nr_pusch_dmrs_rx(gNB,
-                     Ns,
-                     gold,
-                     pilot,
-                     (1000 + p),
-                     0,
-                     nb_rb_pusch,
-                     (pusch_pdu->bwp_start + pusch_pdu->rb_start) * NR_NB_SC_PER_RB,
-                     pusch_pdu->dmrs_config_type);
-  } else { // if transform precoding or SC-FDMA is enabled in Uplink
-    // NR_SC_FDMA supports type1 DMRS so only 6 DMRS REs per RB possible
-    const int index = get_index_for_dmrs_lowpapr_seq(nb_rb_pusch * (NR_NB_SC_PER_RB / 2));
-    const uint8_t u = pusch_pdu->dfts_ofdm.low_papr_group_number;
-    const uint8_t v = pusch_pdu->dfts_ofdm.low_papr_sequence_number;
-    c16_t *dmrs_seq = gNB_dmrs_lowpaprtype1_sequence[u][v][index];
-    LOG_D(PHY, "Transform Precoding params. u: %d, v: %d, index for dmrsseq: %d\n", u, v, index);
-    AssertFatal(index >= 0,
-                "Num RBs not configured according to 3GPP 38.211 section 6.3.1.4. For PUSCH with transform precoding, num RBs "
-                "cannot be multiple of any other primenumber other than 2,3,5\n");
-    AssertFatal(dmrs_seq != NULL, "DMRS low PAPR seq not found, check if DMRS sequences are generated");
-    nr_pusch_lowpaprtype1_dmrs_rx(gNB, Ns, dmrs_seq, pilot, 1000, 0, nb_rb_pusch, 0, pusch_pdu->dmrs_config_type);
-#ifdef DEBUG_PUSCH
-    printf("NR_UL_CHANNEL_EST: index %d, u %d,v %d\n", index, u, v);
-    LOG_M("gNb_DMRS_SEQ.m", "gNb_DMRS_SEQ", dmrs_seq, 6 * nb_rb_pusch, 1, 1);
-#endif
-  }
-  //------------------------------------------------//
-
-#ifdef DEBUG_PUSCH
-
-  for (int i = 0; i < (6 * nb_rb_pusch); i++) {
-    LOG_I(PHY, "In %s: %d + j*(%d)\n", __FUNCTION__, pilot[i].r, pilot[i].i);
-  }
-
-#endif
-
-  int nest_count = 0;
-  uint64_t noise_amp2 = 0;
-  c16_t ul_ls_est[symbolSize] __attribute__((aligned(32)));
-  memset(ul_ls_est, 0, sizeof(c16_t) * symbolSize);
-  delay_t *delay = &gNB->ulsch[ul_id].delay;
-  memset(delay, 0, sizeof(*delay));
-
-  for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx++) {
-    c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[beam_nb][aarx][symbol_offset + slot_offset];
-    c16_t *ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + aarx][symbol_offset];
-
+  const int beam_nb = rdata->beam_nb;
+  for (int antenna = aarx; antenna < aarx + numAntennas; antenna++) {
+    c16_t ul_ls_est[symbolSize] __attribute__((aligned(32)));
+    memset(ul_ls_est, 0, sizeof(c16_t) * symbolSize);
+    c16_t *rxdataF = (c16_t *)&gNB->common_vars.rxdataF[beam_nb][antenna][symbol_offset + slot_offset];
+    c16_t *ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + antenna][symbol_offset];
     memset(ul_ch, 0, sizeof(*ul_ch) * symbolSize);
+
+    LOG_D(PHY,
+          "symbol_offset %d, slot_offset %d, OFDM size %d, Ns = %d, k0 = %d, symbol %d\n",
+          symbol_offset,
+          slot_offset,
+          symbolSize,
+          Ns,
+          k0,
+          symbol);
+
 #ifdef DEBUG_PUSCH
     LOG_I(PHY, "symbol_offset %d, delta %d\n", symbol_offset, delta);
     LOG_I(PHY, "ch est pilot, N_RB_UL %d\n", gNB->frame_parms.N_RB_UL);
@@ -188,14 +138,14 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
         }
 
         c16_t ch16 = {.r = (int16_t)ch.r, .i = (int16_t)ch.i};
-        *max_ch = max(*max_ch, max(abs(ch.r), abs(ch.i)));
+        *max_ch = max(abs(ch.r), abs(ch.i));
         for (int k = pilot_cnt << 1; k < (pilot_cnt << 1) + 4; k++) {
           ul_ls_est[k] = ch16;
         }
         pilot_cnt += 2;
       }
 
-      nr_est_delay(gNB->frame_parms.ofdm_symbol_size, ul_ls_est, (c16_t *)pusch_vars->ul_ch_estimates_time[aarx], delay);
+      nr_est_delay(gNB->frame_parms.ofdm_symbol_size, ul_ls_est, (c16_t *)pusch_vars->ul_ch_estimates_time[antenna], delay);
       int delay_idx = get_delay_idx(delay->est_delay, MAX_DELAY_COMP);
       c16_t *ul_delay_table = gNB->frame_parms.delay_table[delay_idx];
 
@@ -220,8 +170,8 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
                  pil->i,
                  rxF->r,
                  rxF->i,
-                 ch16.r,
-                 ch16.i);
+                 ch.r,
+                 ch.i);
 #endif
 
           if (pilot_cnt == 0) {
@@ -243,7 +193,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
 
       // Revert delay
       pilot_cnt = 0;
-      ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + aarx][symbol_offset];
+      ul_ch = &ul_ch_estimates[nl * gNB->frame_parms.nb_antennas_rx + antenna][symbol_offset];
       int inv_delay_idx = get_delay_idx(-delay->est_delay, MAX_DELAY_COMP);
       c16_t *ul_inv_delay_table = gNB->frame_parms.delay_table[inv_delay_idx];
       for (int n = 0; n < 3 * nb_rb_pusch; n++) {
@@ -274,16 +224,16 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
         c16_t ch1 = c16mulShift(*pil, rx[(k0 + n + 1) % symbolSize], 15);
         pil++;
         c16_t ch = c16addShift(ch0, ch1, 1);
-        *max_ch = max(*max_ch, max(abs(ch.r), abs(ch.i)));
+        *max_ch = max(abs(ch.r), abs(ch.i));
         multadd_real_four_symbols_vector_complex_scalar(filt8_rep4, &ch, &ul_ls_est[n]);
         ul_ls_est[n + 4] = ch;
         ul_ls_est[n + 5] = ch;
         noise_amp2 += c16amp2(c16sub(ch0, ch));
-        nest_count++;
+        nest_count += 1;
       }
 
       // Delay compensation
-      nr_est_delay(gNB->frame_parms.ofdm_symbol_size, ul_ls_est, (c16_t *)pusch_vars->ul_ch_estimates_time[aarx], delay);
+      nr_est_delay(gNB->frame_parms.ofdm_symbol_size, ul_ls_est, (c16_t *)pusch_vars->ul_ch_estimates_time[antenna], delay);
       int delay_idx = get_delay_idx(-delay->est_delay, MAX_DELAY_COMP);
       c16_t *ul_delay_table = gNB->frame_parms.delay_table[delay_idx];
       for (int n = 0; n < nb_rb_pusch * NR_NB_SC_PER_RB; n++) {
@@ -317,7 +267,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
 
       for (int pilot_cnt = 6; pilot_cnt < 6 * (nb_rb_pusch - 1); pilot_cnt += 6) {
         ch = c32x16cumulVectVectWithSteps(pilot, &pil_offset, 1, rxF, &re_offset, 2, symbolSize, 6);
-        *max_ch = max(*max_ch, max(abs(ch.r), abs(ch.i)));
+        *max_ch = max(abs(ch.r), abs(ch.i));
 
 #if NO_INTERP
         for (c16_t *end = ul_ch + 12; ul_ch < end; ul_ch++)
@@ -401,7 +351,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
         re_offset = (re_offset + 5) % symbolSize;
 
         ch = c16x32div(ch0, 4);
-        *max_ch = max(*max_ch, max(abs(ch.r), abs(ch.i)));
+        *max_ch = max(abs(ch.r), abs(ch.i));
 
 #if NO_INTERP
         for (c16_t *end = ul_ch + 12; ul_ch < end; ul_ch++)
@@ -457,6 +407,153 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
       printf("%d\n", idxP);
     }
 #endif
+    // update the values inside the arrays
+    *(rdata->noise_amp2) = noise_amp2;
+    *(rdata->nest_count) = nest_count;
+  }
+}
+
+
+int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
+                                unsigned char Ns,
+                                int nl,
+                                unsigned short p,
+                                unsigned char symbol,
+                                int ul_id,
+                                int beam_nb,
+                                unsigned short bwp_start_subcarrier,
+                                nfapi_nr_pusch_pdu_t *pusch_pdu,
+                                int *max_ch,
+                                uint32_t *nvar)
+{
+  c16_t pilot[3280] __attribute__((aligned(32)));
+
+#ifdef DEBUG_CH
+  FILE *debug_ch_est;
+  debug_ch_est = fopen("debug_ch_est.txt", "w");
+#endif
+
+  const int nb_rb_pusch = pusch_pdu->rb_size;
+
+  //------------------generate DMRS------------------//
+
+  if (pusch_pdu->transform_precoding == transformPrecoder_disabled) {
+    // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
+    NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
+    const uint32_t *gold = nr_gold_pusch(fp->N_RB_UL,
+                                         fp->symbols_per_slot,
+                                         gNB->gNB_config.cell_config.phy_cell_id.value,
+                                         pusch_pdu->scid,
+                                         Ns,
+                                         symbol);
+    nr_pusch_dmrs_rx(gNB,
+                     Ns,
+                     gold,
+                     pilot,
+                     (1000 + p),
+                     0,
+                     nb_rb_pusch,
+                     (pusch_pdu->bwp_start + pusch_pdu->rb_start) * NR_NB_SC_PER_RB,
+                     pusch_pdu->dmrs_config_type);
+  } else { // if transform precoding or SC-FDMA is enabled in Uplink
+    // NR_SC_FDMA supports type1 DMRS so only 6 DMRS REs per RB possible
+    const int index = get_index_for_dmrs_lowpapr_seq(nb_rb_pusch * (NR_NB_SC_PER_RB / 2));
+    const uint8_t u = pusch_pdu->dfts_ofdm.low_papr_group_number;
+    const uint8_t v = pusch_pdu->dfts_ofdm.low_papr_sequence_number;
+    c16_t *dmrs_seq = gNB_dmrs_lowpaprtype1_sequence[u][v][index];
+    LOG_D(PHY, "Transform Precoding params. u: %d, v: %d, index for dmrsseq: %d\n", u, v, index);
+    AssertFatal(index >= 0,
+                "Num RBs not configured according to 3GPP 38.211 section 6.3.1.4. For PUSCH with transform precoding, num RBs "
+                "cannot be multiple of any other primenumber other than 2,3,5\n");
+    AssertFatal(dmrs_seq != NULL, "DMRS low PAPR seq not found, check if DMRS sequences are generated");
+    nr_pusch_lowpaprtype1_dmrs_rx(gNB, Ns, dmrs_seq, pilot, 1000, 0, nb_rb_pusch, 0, pusch_pdu->dmrs_config_type);
+#ifdef DEBUG_PUSCH
+    printf("NR_UL_CHANNEL_EST: index %d, u %d,v %d\n", index, u, v);
+    LOG_M("gNb_DMRS_SEQ.m", "gNb_DMRS_SEQ", dmrs_seq, 6 * nb_rb_pusch, 1, 1);
+#endif
+  }
+  //------------------------------------------------//
+
+#ifdef DEBUG_PUSCH
+
+  for (int i = 0; i < (6 * nb_rb_pusch); i++) {
+    LOG_I(PHY, "In %s: %d + j*(%d)\n", __FUNCTION__, pilot[i].r, pilot[i].i);
+  }
+
+#endif
+
+  int nbAarx = 0;
+  int nest_count = 0;
+  uint64_t noise_amp2 = 0;
+  delay_t *delay = &gNB->ulsch[ul_id].delay;
+  memset(delay, 0, sizeof(*delay));
+
+  int nb_antennas_rx = gNB->frame_parms.nb_antennas_rx;
+  delay_t delay_arr[nb_antennas_rx];
+  uint64_t noise_amp2_arr[nb_antennas_rx];
+  int max_ch_arr[nb_antennas_rx];
+  int nest_count_arr[nb_antennas_rx];
+
+  for (int i = 0; i < nb_antennas_rx; ++i) {
+    max_ch_arr[i] = *max_ch;
+    nest_count_arr[i] = nest_count;
+    noise_amp2_arr[i] = noise_amp2;
+    delay_arr[i] = *delay;
+  }
+
+  start_meas(&gNB->pusch_channel_estimation_antenna_processing_stats);
+  int numAntennas = gNB->dmrs_num_antennas_per_thread;
+  for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx += numAntennas) {
+    union puschAntennaReqUnion id = {.s = {ul_id, 0}};
+    id.p = 1 + aarx;
+    notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(puschAntennaProc_t),
+                                                  id.p,
+                                                  &gNB->respPuschAarx,
+                                                  &nr_pusch_antenna_processing); // create a job for Tpool
+    puschAntennaProc_t *rdata = (puschAntennaProc_t *)NotifiedFifoData(req); // data for the job
+
+    // Local init in the current loop
+    rdata->gNB = gNB;
+    rdata->Ns = Ns;
+    rdata->nl = nl;
+    rdata->p = p;
+    rdata->symbol = symbol;
+    rdata->aarx = aarx;
+    rdata->numAntennas = numAntennas;
+    rdata->ul_id = ul_id;
+    rdata->bwp_start_subcarrier = bwp_start_subcarrier;
+    rdata->pusch_pdu = pusch_pdu;
+    rdata->max_ch = &max_ch_arr[rdata->aarx];
+    rdata->pilot = pilot;
+    rdata->nest_count = &nest_count_arr[rdata->aarx];
+    rdata->noise_amp2 = &noise_amp2_arr[rdata->aarx];
+    rdata->delay = &delay_arr[rdata->aarx];
+    rdata->beam_nb = beam_nb;
+    // Call the nr_pusch_antenna_processing function
+    pushTpool(&gNB->threadPool, req);
+    nbAarx++;
+
+    LOG_D(PHY, "Added Antenna (count %d) to process, in pipe\n", nbAarx);
+  } // Antenna Loop
+
+  while (nbAarx > 0) {
+    notifiedFIFO_elt_t *req = pullTpool(&gNB->respPuschAarx, &gNB->threadPool);
+    nbAarx--;
+    delNotifiedFIFO_elt(req);
+  }
+
+  stop_meas(&gNB->pusch_channel_estimation_antenna_processing_stats);
+  for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx++) {
+    *max_ch = max(*max_ch, max_ch_arr[aarx]);
+    noise_amp2 += noise_amp2_arr[aarx];
+    nest_count += nest_count_arr[aarx];
+  }
+  // get the maximum delay
+  *delay = delay_arr[0];
+  for (int aarx = 1; aarx < gNB->frame_parms.nb_antennas_rx; aarx++) {
+    if (delay_arr[aarx].est_delay >= delay->est_delay) {
+      *delay = delay_arr[aarx];
+    }
   }
 
 #ifdef DEBUG_CH
