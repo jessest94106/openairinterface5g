@@ -52,7 +52,7 @@ import cls_oaicitest
 # Helper functions used here and in other classes
 # (e.g., cls_cluster.py)
 #-----------------------------------------------------------
-IMAGES = ['oai-enb', 'oai-lte-ru', 'oai-lte-ue', 'oai-gnb', 'oai-nr-cuup', 'oai-gnb-aw2s', 'oai-nr-ue', 'oai-gnb-asan', 'oai-nr-ue-asan', 'oai-nr-cuup-asan', 'oai-gnb-aerial', 'oai-gnb-fhi72']
+IMAGES = ['oai-enb', 'oai-lte-ru', 'oai-lte-ue', 'oai-gnb', 'oai-nr-cuup', 'oai-gnb-aw2s', 'oai-nr-ue', 'oai-enb-asan', 'oai-gnb-asan', 'oai-lte-ue-asan', 'oai-nr-ue-asan', 'oai-nr-cuup-asan', 'oai-gnb-aerial', 'oai-gnb-fhi72']
 
 def CreateWorkspace(host, sourcePath, ranRepository, ranCommitID, ranTargetBranch, ranAllowMerge):
 	if ranCommitID == '':
@@ -208,7 +208,9 @@ def WriteEnvFile(ssh, services, wd, tag):
 		ret = ssh.run(f'docker image inspect {checkimg}', reportNonZero=False)
 		if ret.returncode == 0:
 			logging.info(f"detected pulled image {checkimg}")
-			if "oai-gnb" in image: envs["GNB_IMG"] = "oai-gnb-asan"
+			if "oai-enb" in image: envs["ENB_IMG"] = "oai-enb-asan"
+			elif "oai-gnb" in image: envs["GNB_IMG"] = "oai-gnb-asan"
+			elif "oai-lte-ue" in image: envs["LTEUE_IMG"] = "oai-lte-ue-asan"
 			elif "oai-nr-ue" in image: envs["NRUE_IMG"] = "oai-nr-ue-asan"
 			elif "oai-nr-cuup" in image: envs["NRCUUP_IMG"] = "oai-nr-cuup-asan"
 			else: logging.warning("undetected image format {image}, cannot use asan")
@@ -415,7 +417,9 @@ class Containerize():
 				imageNames.append(('oai-gnb-aerial', 'gNB.aerial', 'oai-gnb-aerial', ''))
 				# Building again the 5G images with Address Sanitizer
 				imageNames.append(('ran-build', 'build', 'ran-build-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
+				imageNames.append(('oai-enb', 'eNB', 'oai-enb-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
 				imageNames.append(('oai-gnb', 'gNB', 'oai-gnb-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
+				imageNames.append(('oai-lte-ue', 'lteUE', 'oai-lte-ue-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
 				imageNames.append(('oai-nr-ue', 'nrUE', 'oai-nr-ue-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
 				imageNames.append(('oai-nr-cuup', 'nr-cuup', 'oai-nr-cuup-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
 				imageNames.append(('ran-build-fhi72', 'build.fhi72', 'ran-build-fhi72', ''))
@@ -783,7 +787,7 @@ class Containerize():
 		HTML.CreateHtmlTestRowQueue("Build unit tests", 'OK', [dockerfile])
 
 		# it worked, build and execute tests, and close connection
-		ret = cmd.run(f'docker run -a STDOUT --rm ran-unittests:{baseTag} ctest --output-on-failure --no-label-summary -j$(nproc)')
+		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --rm ran-unittests:{baseTag} ctest --output-on-failure --no-label-summary -j$(nproc)')
 		cmd.run(f'docker rmi ran-unittests:{baseTag}')
 		build_log_name = f'build_log_{self.testCase_id}'
 		CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
@@ -846,6 +850,11 @@ class Containerize():
 				mySSH.close()
 				HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 				return False
+			# Creating a develop tag on the local private registry
+			if not self.ranAllowMerge:
+				mySSH.command(f'docker image tag {image}:{orgTag} {imagePrefix}/{image}:develop', '\$', 5)
+				mySSH.command(f'docker push {imagePrefix}/{image}:develop', '\$', 120)
+				mySSH.command(f'docker rmi {imagePrefix}/{image}:develop', '\$', 120)
 			mySSH.command(f'docker rmi {imagePrefix}/{imageTag} {image}:{orgTag}', '\$', 30)
 
 		mySSH.command(f'docker logout {imagePrefix}', '\$', 5)

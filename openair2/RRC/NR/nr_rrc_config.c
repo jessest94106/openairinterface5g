@@ -1990,7 +1990,8 @@ NR_MeasurementTimingConfiguration_t *get_new_MeasurementTimingConfiguration(cons
 int encode_MeasurementTimingConfiguration(const struct NR_MeasurementTimingConfiguration *mtc, uint8_t *buf, int buf_len)
 {
   DevAssert(mtc != NULL);
-  xer_fprint(stdout, &asn_DEF_NR_MeasurementTimingConfiguration, mtc);
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_MeasurementTimingConfiguration, mtc);
   asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_MeasurementTimingConfiguration, NULL, mtc, buf, buf_len);
   AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
   return (enc_rval.encoded + 7) / 8;
@@ -2209,7 +2210,7 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
     int mnc = plmn->mnc;
     if (plmn->mnc_digit_length == 3) {
       asn1cSequenceAdd(nr_plmn->mnc.list, NR_MCC_MNC_Digit_t, mnc0);
-      *mnc0 = (0 / 100) % 10;
+      *mnc0 = (mnc / 100) % 10;
     }
     asn1cSequenceAdd(nr_plmn->mnc.list, NR_MCC_MNC_Digit_t, mnc1);
     *mnc1 = (mnc / 10) % 10;

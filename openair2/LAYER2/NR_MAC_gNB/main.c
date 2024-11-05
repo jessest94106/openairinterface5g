@@ -217,8 +217,6 @@ void mac_top_init_gNB(ngran_node_t node_type,
 
   AssertFatal(RC.nb_nr_macrlc_inst == 1, "what is the point of calling %s() if you don't need exactly one MAC?\n", __func__);
 
-  LOG_I(MAC, "[MAIN] Init function start:nb_nr_macrlc_inst=%d\n",RC.nb_nr_macrlc_inst);
-
   if (RC.nb_nr_macrlc_inst > 0) {
 
     RC.nrmac = (gNB_MAC_INST **) malloc16(RC.nb_nr_macrlc_inst *sizeof(gNB_MAC_INST *));

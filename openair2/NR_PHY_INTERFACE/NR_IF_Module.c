@@ -369,8 +369,7 @@ static void match_crc_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, nfapi_nr_crc
     rx_ind_unmatched->pdu_list = calloc(rx_ind_unmatched->number_of_pdus, sizeof(nfapi_nr_pdu_t));
     for (int i = 0; i < rx_ind->number_of_pdus; i++) {
       if (!crc_ind_has_rnti(crc_ind, rx_ind->pdu_list[i].rnti)) {
-        LOG_I(NR_MAC, "rx_ind->pdu_list[%d].rnti %d does not match any crc_ind pdu rnti\n",
-              i, rx_ind->pdu_list[i].rnti);
+        LOG_I(NR_MAC, "rx_ind->pdu_list[%d].rnti %x does not match any crc_ind pdu rnti\n", i, rx_ind->pdu_list[i].rnti);
         rx_ind_unmatched->pdu_list[num_unmatched_rxs] = rx_ind->pdu_list[i];
         num_unmatched_rxs++;
         remove_rx_pdu(rx_ind, i);
@@ -497,13 +496,13 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
 
 NR_IF_Module_t *NR_IF_Module_init(int Mod_id) {
   AssertFatal(Mod_id<MAX_MODULES,"Asking for Module %d > %d\n",Mod_id,MAX_IF_MODULES);
-  LOG_I(PHY,"Installing callbacks for IF_Module - UL_indication\n");
+  LOG_D(PHY, "Installing callbacks for IF_Module - UL_indication\n");
 
   if (nr_if_inst[Mod_id]==NULL) {
     nr_if_inst[Mod_id] = (NR_IF_Module_t*)malloc(sizeof(NR_IF_Module_t));
     memset((void*)nr_if_inst[Mod_id],0,sizeof(NR_IF_Module_t));
 
-    LOG_I(MAC,"Allocating shared L1/L2 interface structure for instance %d @ %p\n",Mod_id,nr_if_inst[Mod_id]);
+    LOG_D(MAC, "Allocating shared L1/L2 interface structure for instance %d @ %p\n", Mod_id, nr_if_inst[Mod_id]);
 
     nr_if_inst[Mod_id]->CC_mask=0;
     nr_if_inst[Mod_id]->NR_UL_indication = NR_UL_indication;

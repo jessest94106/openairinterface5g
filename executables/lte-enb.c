@@ -1095,7 +1095,7 @@ void init_transport(PHY_VARS_eNB *eNB) {
           exit(-1);
         } else {
           eNB->dlsch[i][j]->rnti=0;
-          LOG_D(PHY,"dlsch[%d][%d] => %p rnti:%d\n",i,j,eNB->dlsch[i][j], eNB->dlsch[i][j]->rnti);
+          LOG_D(PHY, "dlsch[%d][%d] => %p rnti:%x\n", i, j, eNB->dlsch[i][j], eNB->dlsch[i][j]->rnti);
         }
       }
     }

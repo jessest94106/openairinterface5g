@@ -863,7 +863,7 @@ void RCconfig_NR_L1(void)
     int XP = *GNBParamList.paramarray[0][GNB_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
     char *ulprbbl = *GNBParamList.paramarray[0][GNB_ULPRBBLACKLIST_IDX].strptr;
     if (ulprbbl)
-      LOG_I(NR_PHY, "PRB blacklist %s\n", ulprbbl);
+      LOG_D(NR_PHY, "PRB blacklist %s\n", ulprbbl);
     char *save = NULL;
     char *pt = strtok_r(ulprbbl, ",", &save);
     int prbbl[275];
@@ -874,13 +874,13 @@ void RCconfig_NR_L1(void)
       const int rb = atoi(pt);
       AssertFatal(rb < 275, "RB %d out of bounds (max 275)\n", rb);
       prbbl[rb] = 0x3FFF; // all symbols taken
-      LOG_I(NR_PHY, "Blacklisting prb %d\n", atoi(pt));
+      LOG_D(NR_PHY, "Blacklisting prb %d\n", atoi(pt));
       pt = strtok_r(NULL, ",", &save);
       num_prbbl++;
     }
 
     RC.gNB[j]->num_ulprbbl = num_prbbl;
-    LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_prbbl);
+    LOG_D(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_prbbl);
     memcpy(RC.gNB[j]->ulprbbl, prbbl, 275 * sizeof(int));
 
     RC.gNB[j]->ap_N1 = N1;
@@ -897,7 +897,6 @@ void RCconfig_NR_L1(void)
     for (j = 0; j < RC.nb_nr_L1_inst; j++) {
       if (RC.gNB[j] == NULL) {
         RC.gNB[j] = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
-        LOG_I(NR_PHY, "RC.gNB[%d] = %p\n", j, RC.gNB[j]);
         memset(RC.gNB[j], 0, sizeof(PHY_VARS_gNB));
         RC.gNB[j]->Mod_id = j;
       }
@@ -934,9 +933,15 @@ void RCconfig_NR_L1(void)
         RC.nb_nr_CC = (int *)malloc((1 + RC.nb_nr_inst) * sizeof(int));
         RC.nb_nr_CC[0] = 1;
 
-        LOG_I(PHY, "%s() NFAPI PNF mode - RC.nb_nr_inst=1 this is because phy_init_RU() uses that to index and not RC.num_gNB - why the 2 similar variables?\n", __FUNCTION__);
-        LOG_I(PHY, "%s() NFAPI PNF mode - RC.nb_nr_CC[0]=%d for init_gNB_afterRU()\n", __FUNCTION__, RC.nb_nr_CC[0]);
-        LOG_I(PHY, "%s() NFAPI PNF mode - RC.nb_nr_macrlc_inst:%d because used by mac_top_init_gNB()\n", __FUNCTION__, RC.nb_nr_macrlc_inst);
+        LOG_D(PHY,
+              "%s() NFAPI PNF mode - RC.nb_nr_inst=1 this is because phy_init_RU() uses that to index and not RC.num_gNB - why the "
+              "2 similar variables?\n",
+              __FUNCTION__);
+        LOG_D(PHY, "%s() NFAPI PNF mode - RC.nb_nr_CC[0]=%d for init_gNB_afterRU()\n", __FUNCTION__, RC.nb_nr_CC[0]);
+        LOG_D(PHY,
+              "%s() NFAPI PNF mode - RC.nb_nr_macrlc_inst:%d because used by mac_top_init_gNB()\n",
+              __FUNCTION__,
+              RC.nb_nr_macrlc_inst);
 
         configure_nr_nfapi_pnf(RC.gNB[j]->eth_params_n.remote_addr,
                                RC.gNB[j]->eth_params_n.remote_portc,
@@ -946,10 +951,9 @@ void RCconfig_NR_L1(void)
       } else { // other midhaul
       }
     } // for (j = 0; j < RC.nb_nr_L1_inst; j++)
-    printf("Initializing northbound interface for L1\n");
     l1_north_init_gNB();
   } else {
-    LOG_I(PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
+    LOG_E(PHY, "No " CONFIG_STRING_L1_LIST " configuration found");
 
     // need to create some structures for VNF
 
@@ -958,7 +962,6 @@ void RCconfig_NR_L1(void)
     if (RC.gNB[j] == NULL) {
       RC.gNB[j] = (PHY_VARS_gNB *)malloc(sizeof(PHY_VARS_gNB));
       memset((void *)RC.gNB[j], 0, sizeof(PHY_VARS_gNB));
-      LOG_I(PHY, "RC.gNB[%d] = %p\n", j, RC.gNB[j]);
       RC.gNB[j]->Mod_id = j;
     }
   }
@@ -1422,7 +1425,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 
       } else if (strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "f1") == 0
                  || strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_N_PREFERENCE_IDX].strptr), "cudu") == 0) {
-        printf("Configuring F1 interfaces for MACRLC\n");
         char **f1caddr = MacRLC_ParamList.paramarray[j][MACRLC_LOCAL_N_ADDRESS_IDX].strptr;
         RC.nrmac[j]->eth_params_n.my_addr = strdup(*f1caddr);
         char **f1uaddr = MacRLC_ParamList.paramarray[j][MACRLC_LOCAL_N_ADDRESS_F1U_IDX].strptr;
@@ -1447,16 +1449,14 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         RC.nrmac[j]->eth_params_s.remote_portd = *(MacRLC_ParamList.paramarray[j][MACRLC_REMOTE_S_PORTD_IDX].iptr);
         RC.nrmac[j]->eth_params_s.transp_preference = ETH_UDP_MODE;
 
-        printf("**************** vnf_port:%d\n", RC.nrmac[j]->eth_params_s.my_portc);
         configure_nr_nfapi_vnf(
             RC.nrmac[j]->eth_params_s.my_addr, RC.nrmac[j]->eth_params_s.my_portc, RC.nrmac[j]->eth_params_s.remote_addr, RC.nrmac[j]->eth_params_s.remote_portd, RC.nrmac[j]->eth_params_s.my_portd);
-        printf("**************** RETURNED FROM configure_nfapi_vnf() vnf_port:%d\n", RC.nrmac[j]->eth_params_s.my_portc);
       } else if(strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_PREFERENCE_IDX].strptr), "aerial") == 0){
 #ifdef ENABLE_AERIAL
         RC.nrmac[j]->nvipc_params_s.nvipc_shm_prefix =
             strdup(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_SHM_PREFIX].strptr));
         RC.nrmac[j]->nvipc_params_s.nvipc_poll_core = *(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_POLL_CORE].i8ptr);
-        printf("Configuring VNF for Aerial connection with prefix %s\n", RC.nrmac[j]->eth_params_s.local_if_name);
+        LOG_I(GNB_APP, "Configuring VNF for Aerial connection with prefix %s\n", RC.nrmac[j]->eth_params_s.local_if_name);
         aerial_configure_nr_fapi_vnf();
 #endif
       } else { // other midhaul
@@ -1839,7 +1839,7 @@ void RCconfig_NRRRC(gNB_RRC_INST *rrc)
 
     sprintf(aprefix, "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
 
-    printf("NRRRC %d: Southbound Transport %s\n", i, *(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr));
+    LOG_D(GNB_APP, "NRRRC %d: Southbound Transport %s\n", i, *(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr));
 
     rrc->node_type = get_node_type();
     rrc->node_id        = gnb_id;
@@ -2157,8 +2157,6 @@ void NRRCConfig(void) {
   paramdef_t GNBSParams[]         = GNBSPARAMS_DESC;
   
 /* get global parameters, defined outside any section in the config file */
-
-  LOG_I(GNB_APP, "Getting GNBSParams\n");
 
   config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
   RC.nb_nr_inst = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
