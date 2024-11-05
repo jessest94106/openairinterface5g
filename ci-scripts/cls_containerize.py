@@ -43,7 +43,6 @@ from zipfile import ZipFile
 # OAI Testing modules
 #-----------------------------------------------------------
 import cls_cmd
-import sshconnection as SSH
 import helpreadme as HELP
 import constants as CONST
 import cls_oaicitest
@@ -600,24 +599,22 @@ class Containerize():
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter (need proxyCommit for proxy build)')
 		logging.debug('Building on server: ' + lIpAddr)
-		mySSH = SSH.SSHConnection()
-		mySSH.open(lIpAddr, lUserName, lPassWord)
+		ssh = cls_cmd.getConnection(lIpAddr)
 
 		# Check that we are on Ubuntu
-		mySSH.command('hostnamectl', '\$', 5)
-		result = re.search('Ubuntu',  mySSH.getBefore())
+		ret = ssh.run('hostnamectl')
+		result = re.search('Ubuntu',  ret.stdout)
 		self.host = result.group(0)
 		if self.host != 'Ubuntu':
-			logging.error('\u001B[1m Can build proxy only on Ubuntu server\u001B[0m')
-			mySSH.close()
-			sys.exit(1)
+			ssh.close()
+			raise Exception('Can build proxy only on Ubuntu server')
 
 		self.cli = 'docker'
 		self.cliBuildOptions = ''
 
 		# Workaround for some servers, we need to erase completely the workspace
 		if self.forcedWorkspaceCleanup:
-			mySSH.command('echo ' + lPassWord + ' | sudo -S rm -Rf ' + lSourcePath, '\$', 15)
+			ssh.run(f'echo {lPassWord} | sudo -S rm -Rf {lSourcePath}')
 
 		oldRanCommidID = self.ranCommitID
 		oldRanRepository = self.ranRepository
@@ -627,7 +624,7 @@ class Containerize():
 		self.ranRepository = 'https://github.com/EpiSci/oai-lte-5g-multi-ue-proxy.git'
 		self.ranAllowMerge = False
 		self.ranTargetBranch = 'master'
-		mySSH.command('cd ' +lSourcePath, '\$', 3)
+		ssh.cd(lSourcePath)
 		# to prevent accidentally overwriting data that might be used later
 		self.ranCommitID = oldRanCommidID
 		self.ranRepository = oldRanRepository
@@ -635,22 +632,21 @@ class Containerize():
 		self.ranTargetBranch = oldRanTargetBranch
 
 		# Let's remove any previous run artifacts if still there
-		mySSH.command(self.cli + ' image prune --force', '\$', 30)
+		ssh.run(f'{self.cli} image prune --force')
 		# Remove any previous proxy image
-		mySSH.command(self.cli + ' image rm oai-lte-multi-ue-proxy:latest || true', '\$', 30)
+		ssh.run(f'{self.cli} image rm oai-lte-multi-ue-proxy:latest')
 
 		tag = self.proxyCommit
 		logging.debug('building L2sim proxy image for tag ' + tag)
 		# check if the corresponding proxy image with tag exists. If not, build it
-		mySSH.command(self.cli + ' image inspect --format=\'Size = {{.Size}} bytes\' proxy:' + tag, '\$', 5)
-		buildProxy = mySSH.getBefore().count('o such image') != 0
-		if buildProxy:
-			mySSH.command(self.cli + ' build ' + self.cliBuildOptions + ' --target oai-lte-multi-ue-proxy --tag proxy:' + tag + ' --file docker/Dockerfile.ubuntu18.04 . > cmake_targets/log/proxy-build.log 2>&1', '\$', 180)
-			mySSH.command(self.cli + ' image inspect --format=\'Size = {{.Size}} bytes\' proxy:' + tag, '\$', 5)
-			mySSH.command(self.cli + ' image prune --force || true','\$', 15)
-			if mySSH.getBefore().count('o such image') != 0:
+		ret = ssh.run(f'{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
+		if ret.returncode != 0:
+			ssh.run(f'{self.cli} build {self.cliBuildOptions} --target oai-lte-multi-ue-proxy --tag proxy:{tag} --file docker/Dockerfile.ubuntu18.04 . > cmake_targets/log/proxy-build.log 2>&1')
+			ssh.run(f'{self.cli} image prune --force')
+			ret = ssh.run(f'{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
+			if ret.returncode != 0:
 				logging.error('\u001B[1m Build of L2sim proxy failed\u001B[0m')
-				mySSH.close()
+				ssh.close()
 				HTML.CreateHtmlTestRow('commit ' + tag, 'KO', CONST.ALL_PROCESSES_OK)
 				HTML.CreateHtmlTabFooter(False)
 				return False
@@ -658,33 +654,34 @@ class Containerize():
 			logging.debug('L2sim proxy image for tag ' + tag + ' already exists, skipping build')
 
 		# retag the build images to that we pick it up later
-		mySSH.command('docker image tag proxy:' + tag + ' oai-lte-multi-ue-proxy:latest', '\$', 5)
+		ssh.run(f'docker image tag proxy:{tag} oai-lte-multi-ue-proxy:latest')
 
 		# no merge: is a push to develop, tag the image so we can push it to the registry
 		if not self.ranAllowMerge:
-			mySSH.command('docker image tag proxy:' + tag + ' proxy:develop', '\$', 5)
+			ssh.run('docker image tag proxy:{tag} proxy:develop')
 
 		# we assume that the host on which this is built will also run the proxy. The proxy
 		# currently requires the following command, and the docker-compose up mechanism of
 		# the CI does not allow to run arbitrary commands. Note that the following actually
 		# belongs to the deployment, not the build of the proxy...
 		logging.warning('the following command belongs to deployment, but no mechanism exists to exec it there!')
-		mySSH.command('sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up', '\$', 5)
+		ssh.run('sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up')
 
 		# Analyzing the logs
 		if buildProxy:
 			self.testCase_id = HTML.testCase_id
-			mySSH.command('cd ' + lSourcePath + '/cmake_targets', '\$', 5)
-			mySSH.command('mkdir -p proxy_build_log_' + self.testCase_id, '\$', 5)
-			mySSH.command('mv log/* ' + 'proxy_build_log_' + self.testCase_id, '\$', 5)
+			ssh.cd(f'{lSourcePath}/cmake_targets')
+			ssh.run(f'mkdir -p proxy_build_log_{self.testCase_id}')
+			ssh.run(f'mv log/* proxy_build_log_{self.testCase_id}')
 			if (os.path.isfile('./proxy_build_log_' + self.testCase_id + '.zip')):
 				os.remove('./proxy_build_log_' + self.testCase_id + '.zip')
 			if (os.path.isdir('./proxy_build_log_' + self.testCase_id)):
 				shutil.rmtree('./proxy_build_log_' + self.testCase_id)
-			mySSH.command('zip -r -qq proxy_build_log_' + self.testCase_id + '.zip proxy_build_log_' + self.testCase_id, '\$', 5)
-			mySSH.copyin(lIpAddr, lUserName, lPassWord, lSourcePath + '/cmake_targets/build_log_' + self.testCase_id + '.zip', '.')
+			ssh.run(f'zip -r -qq proxy_build_log_{self.testCase_id}.zip proxy_build_log_{self.testCase_id}')
+			filename = f'build_log_{self.testCase_id}.zip'
+			ssh.copyin(f'{lSourcePath}/cmake_targets/{filename}', filename)
 			# don't delete such that we might recover the zips
-			#mySSH.command('rm -f build_log_' + self.testCase_id + '.zip','\$', 5)
+			#ssh.run(f'rm -f build_log_{self.testCase_id}.zip')
 
 		# we do not analyze the logs (we assume the proxy builds fine at this stage),
 		# but need to have the following information to correctly display the HTML
@@ -696,11 +693,11 @@ class Containerize():
 		files['Target Image Creation'] = errorandwarnings
 		collectInfo = {}
 		collectInfo['proxy'] = files
-		mySSH.command('docker image inspect --format=\'Size = {{.Size}} bytes\' proxy:' + tag, '\$', 5)
-		result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', mySSH.getBefore())
+		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
+		result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
 		# Cleaning any created tmp volume
-		mySSH.command(self.cli + ' volume prune --force || true','\$', 15)
-		mySSH.close()
+		ssh.run(f'{self.cli} volume prune --force')
+		ssh.close()
 
 		allImagesSize = {}
 		if result is not None:
@@ -822,14 +819,13 @@ class Containerize():
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
 		logging.debug('Pushing images from server: ' + lIpAddr)
-		mySSH = SSH.SSHConnection()
-		mySSH.open(lIpAddr, lUserName, lPassWord)
+		ssh = cls_cmd.getConnection(lIpAddr)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
-		mySSH.command(f'docker login -u oaicicd -p oaicicd {imagePrefix}', '\$', 5)
-		if re.search('Login Succeeded', mySSH.getBefore()) is None:
+		ret = ssh.run(f'docker login -u oaicicd -p oaicicd {imagePrefix}')
+		if ret.returncode != 0:
 			msg = 'Could not log into local registry'
 			logging.error(msg)
-			mySSH.close()
+			ssh.close()
 			HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 			return False
 
@@ -839,33 +835,32 @@ class Containerize():
 		for image in IMAGES:
 			tagToUse = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
 			imageTag = f"{image}:{tagToUse}"
-			mySSH.command(f'docker image tag {image}:{orgTag} {imagePrefix}/{imageTag}', '\$', 5)
-			if re.search('Error response from daemon: No such image:', mySSH.getBefore()) is not None:
+			ret = ssh.run(f'docker image tag {image}:{orgTag} {imagePrefix}/{imageTag}')
+			if ret.returncode != 0:
 				continue
-			mySSH.command(f'docker push {imagePrefix}/{imageTag}', '\$', 120)
-			if re.search(': digest:', mySSH.getBefore()) is None:
-				logging.debug(mySSH.getBefore())
+			ret = ssh.run(f'docker push {imagePrefix}/{imageTag}')
+			if ret.returncode != 0:
 				msg = f'Could not push {image} to local registry : {imageTag}'
 				logging.error(msg)
-				mySSH.close()
+				ssh.close()
 				HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 				return False
 			# Creating a develop tag on the local private registry
 			if not self.ranAllowMerge:
-				mySSH.command(f'docker image tag {image}:{orgTag} {imagePrefix}/{image}:develop', '\$', 5)
-				mySSH.command(f'docker push {imagePrefix}/{image}:develop', '\$', 120)
-				mySSH.command(f'docker rmi {imagePrefix}/{image}:develop', '\$', 120)
-			mySSH.command(f'docker rmi {imagePrefix}/{imageTag} {image}:{orgTag}', '\$', 30)
+				ssh.run(f'docker image tag {image}:{orgTag} {imagePrefix}/{image}:develop')
+				ssh.run(f'docker push {imagePrefix}/{image}:develop')
+				ssh.run(f'docker rmi {imagePrefix}/{image}:develop')
+			ssh.run(f'docker rmi {imagePrefix}/{imageTag} {image}:{orgTag}')
 
-		mySSH.command(f'docker logout {imagePrefix}', '\$', 5)
-		if re.search('Removing login credentials', mySSH.getBefore()) is None:
+		ret = ssh.run(f'docker logout {imagePrefix}')
+		if ret.returncode != 0:
 			msg = 'Could not log off from local registry'
 			logging.error(msg)
-			mySSH.close()
+			ssh.close()
 			HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
 			return False
 
-		mySSH.close()
+		ssh.close()
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
 		return True
 
