@@ -32,7 +32,6 @@ sudo apt install -y gcc-11-aarch64-linux-gnu \
                     g++-11-aarch64-linux-gnu
 
 sudo apt-get install -y \
-    libatlas-base-dev:arm64 \
     libblas-dev:arm64 \
     libc6-dev-i386 \
     liblapack-dev:arm64 \
