@@ -591,12 +591,10 @@ union puschSymbolReqUnion {
 };
 
 typedef struct puschAntennaProc_s {
-  PHY_VARS_gNB *gNB;
   unsigned char Ns;
   int nl;
   unsigned short p;
   unsigned char symbol;
-  int ul_id;
   unsigned short bwp_start_subcarrier;
   int aarx;
   int beam_nb;
@@ -607,6 +605,10 @@ typedef struct puschAntennaProc_s {
   int *nest_count;
   uint64_t *noise_amp2;
   delay_t *delay;
+  int chest_freq;
+  NR_gNB_PUSCH *pusch_vars;
+  NR_DL_FRAME_PARMS *frame_parms;
+  c16_t ***rxdataF;
 } puschAntennaProc_t;
 
 struct puschAntennaReqId {
