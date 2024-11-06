@@ -381,6 +381,7 @@ typedef struct f1ap_cu_to_du_rrc_info_s {
   byte_array_t *cg_configinfo;
   byte_array_t *ue_cap;
   byte_array_t *meas_config;
+  byte_array_t *meas_timing_config;
   byte_array_t *ho_prep_info;
 } f1ap_cu_to_du_rrc_info_t;
 
