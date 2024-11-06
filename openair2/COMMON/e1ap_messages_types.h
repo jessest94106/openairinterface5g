@@ -40,6 +40,8 @@
 #define E1AP_MAX_NUM_DRBS 32
 #define E1AP_MAX_NUM_UP_PARAM 4
 #define E1AP_SECURITY_KEY_SIZE 16 // keys have 128 bits length
+#define E1AP_MAX_TL_ADDRESSES 16
+#define E1AP_MAX_GTP_TL_ADDRESSES 16
 
 #define E1AP_REGISTER_REQ(mSGpTR)                         (mSGpTR)->ittiMsg.e1ap_register_req
 #define E1AP_SETUP_REQ(mSGpTR)                            (mSGpTR)->ittiMsg.e1ap_setup_req
@@ -83,6 +85,21 @@ typedef struct PLMN_ID_s {
   int mnc_digit_length;
 } PLMN_ID_t;
 
+typedef struct {
+  in_addr_t ipsec_tl_address;
+  uint8_t num_gtp_tl_addresses;
+  in_addr_t gtp_tl_addresses[E1AP_MAX_GTP_TL_ADDRESSES];
+} tnl_address_info_item_t;
+
+typedef struct {
+  // Transport UP LayerAddresses Info to Add List
+  tnl_address_info_item_t addresses_to_add[E1AP_MAX_TL_ADDRESSES];
+  uint8_t num_addresses_to_add;
+  // Transport UP Layer Addresses Info to Remove List
+  tnl_address_info_item_t addresses_to_remove[E1AP_MAX_TL_ADDRESSES];
+  uint8_t num_addresses_to_remove;
+} tnl_address_info_t;
+
 typedef nssai_t e1ap_nssai_t;
 
 typedef struct e1ap_net_config_t {
@@ -123,7 +140,12 @@ typedef struct e1ap_register_req_t {
 } e1ap_register_req_t;
 
 typedef struct e1ap_setup_resp_s {
+  // Transaction ID
   long transac_id;
+  // gNB-CU-CP Name
+  char* gNB_cu_cp_name;
+  // Transport Network Layer Address Info
+  tnl_address_info_t* tnla_info;
 } e1ap_setup_resp_t;
 
 /* E1AP Setup Failure */
