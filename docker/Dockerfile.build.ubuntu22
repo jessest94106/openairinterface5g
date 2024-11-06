@@ -36,7 +36,12 @@ WORKDIR /oai-ran
 COPY . .
 
 # build all targets so final targets can be created afterwards
-RUN /bin/sh oaienv && \
+RUN \
+   # Mount CCache cache direrctory
+   --mount=type=cache,target=/root/.cache/ccache/ \
+   # Mount CPM package cache
+   --mount=type=cache,target=/root/.cache/cpm/ \
+    /bin/sh oaienv && \
     cd cmake_targets && \
     mkdir -p log && \
     ./build_oai -c --ninja \
@@ -54,7 +59,10 @@ RUN /bin/sh oaienv && \
     ldd ran_build/build/*.so
 
 ## Build FlexRIC for SM Models
-RUN mkdir -p openair2/E2AP/flexric/build && \
+RUN \
+    # Mount CCache cache direrctory
+    --mount=type=cache,target=/root/.cache/ccache/ \
+    mkdir -p openair2/E2AP/flexric/build && \
     cd openair2/E2AP/flexric/build && \
     cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
           -DXAPP_MULTILANGUAGE=OFF \
