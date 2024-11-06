@@ -841,8 +841,8 @@ set(PHY_LDPC_OPTIM8SEGMULTI_SRC
   ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c
   ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim8segmulti.c
   )
-add_library(ldpc MODULE ${PHY_LDPC_OPTIM8SEGMULTI_SRC} )
-target_link_libraries(ldpc PRIVATE ldpc_gen_HEADERS)
+add_library(ldpc_optim8segmulti MODULE ${PHY_LDPC_OPTIM8SEGMULTI_SRC} )
+target_link_libraries(ldpc_optim8segmulti PRIVATE ldpc_gen_HEADERS)
 
 set(PHY_LDPC_CUDA_SRC
   ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder_LYC/nrLDPC_decoder_LYC.cu
@@ -895,7 +895,7 @@ add_library(coding MODULE ${PHY_TURBOSRC} )
 
 add_library(dfts MODULE ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts.c ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts_neon.c)
 
-add_library(ldpc_slot_segment MODULE ${PHY_NRLDPC_CODING_SEGMENT_SRC})
+add_library(ldpc MODULE ${PHY_NRLDPC_CODING_SEGMENT_SRC})
 
 set(PHY_SRC_COMMON
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/dci_tools_common.c
@@ -1084,7 +1084,6 @@ set(PHY_SRC_UE
   ${OPENAIR1_DIR}/PHY/TOOLS/simde_operations.c
   ${PHY_POLARSRC}
   ${PHY_SMALLBLOCKSRC}
-  ${PHY_NR_CODINGIF}
   ${PHY_NRLDPC_CODINGIF}
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/pucch_rx.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/srs_rx.c
@@ -1140,7 +1139,6 @@ set(PHY_SRC_UE
   ${OPENAIR1_DIR}/PHY/INIT/nr_init_ue.c
   ${PHY_POLARSRC}
   ${PHY_SMALLBLOCKSRC}
-  ${PHY_NR_CODINGIF}
   ${PHY_NRLDPC_CODINGIF}
   )
 
@@ -2072,7 +2070,7 @@ if(E2_AGENT)
 endif()
 
 
-add_dependencies(nr-softmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc ldpc_slot_segment)
+add_dependencies(nr-softmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc_optim8segmulti ldpc)
 
 if (ENABLE_LDPC_T2)
   add_dependencies(nr-softmodem ldpc_t2)
@@ -2133,7 +2131,7 @@ target_link_libraries(nr-uesoftmodem PRIVATE pthread m CONFIG_LIB rt nr_ue_phy_m
 target_link_libraries(nr-uesoftmodem PRIVATE ${T_LIB})
 target_link_libraries(nr-uesoftmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
-add_dependencies( nr-uesoftmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc ldpc_slot_segment)
+add_dependencies( nr-uesoftmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc_optim8segmulti ldpc)
 if (ENABLE_LDPC_CUDA)
    add_dependencies(nr-uesoftmodem ldpc_cuda)
    add_dependencies(nr-softmodem ldpc_cuda)
@@ -2201,7 +2199,7 @@ add_executable(ldpctest
    ${OPENAIR1_DIR}/PHY/CODING/TESTBENCH/ldpctest.c
    )
 
-add_dependencies(ldpctest ldpc_orig ldpc_optim ldpc_optim8seg ldpc)
+add_dependencies(ldpctest ldpc_orig ldpc_optim ldpc_optim8seg ldpc_optim8segmulti)
 if (ENABLE_LDPC_CUDA)
   add_dependencies(ldpctest ldpc_cuda)
 endif()
@@ -2307,7 +2305,10 @@ endif()
 if (ENABLE_LDPC_XDMA)
   add_dependencies(nr_ulsim ldpc_xdma)
 endif()
-add_dependencies(nr_ulsim ldpc_slot_segment)
+if (ENABLE_LDPC_CUDA)
+  add_dependencies(nr_ulsim ldpc_cuda)
+endif()
+add_dependencies(nr_ulsim ldpc ldpc_orig ldpc_optim ldpc_optim8seg ldpc_optim8segmulti)
 
 target_link_libraries(nr_ulsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON nr_rrc CONFIG_LIB L2_NR HASHTABLE x2ap SECURITY ngap -lz -Wl,--end-group
@@ -2374,7 +2375,7 @@ if (${T_TRACER})
         PHY_COMMON PHY PHY_UE PHY_NR PHY_NR_COMMON PHY_NR_UE PHY_RU PHY_MEX
         L2 L2_LTE L2_NR L2_LTE_NR L2_UE NR_L2_UE L2_UE_LTE_NR MAC_NR_COMMON MAC_UE_NR ngap
         CN_UTILS GTPV1U SCTP_CLIENT MME_APP LIB_NAS_UE NB_IoT SIMU OPENAIR0_LIB
-        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_cl ldpc_cuda ldpc ldpc_slot_segment ldpc_t2 ldpc_xdma
+        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_optim8segmulti ldpc_cl ldpc_cuda ldpc ldpc_t2 ldpc_xdma
         dfts config_internals nr_common)
     if (TARGET ${i})
       add_dependencies(${i} generate_T)

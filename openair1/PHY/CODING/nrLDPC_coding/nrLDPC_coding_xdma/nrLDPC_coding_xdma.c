@@ -103,7 +103,7 @@ int32_t nrLDPC_coding_init(void)
   char *encoder_shlibversion = NULL;
   paramdef_t LoaderParams[] = {
     {"num_threads_prepare", NULL, 0, .iptr = &num_threads_prepare_max, .defintval = 0, TYPE_INT, 0, NULL},
-    {"encoder_shlibversion", NULL, 0, .strptr = &encoder_shlibversion, .defstrval = "", TYPE_STRING, 0, NULL},
+    {"encoder_shlibversion", NULL, 0, .strptr = &encoder_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL},
     {"user_device", NULL, 0, .strptr = &user_device, .defstrval = DEVICE_NAME_DEFAULT_USER, TYPE_STRING, 0, NULL},
     {"enc_read_device", NULL, 0, .strptr = &enc_read_device, .defstrval = DEVICE_NAME_DEFAULT_ENC_READ, TYPE_STRING, 0, NULL},
     {"enc_write_device", NULL, 0, .strptr = &enc_write_device, .defstrval = DEVICE_NAME_DEFAULT_ENC_WRITE, TYPE_STRING, 0, NULL},
