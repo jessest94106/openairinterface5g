@@ -618,17 +618,15 @@ typedef enum dft_size_idx {
   case Sz:            \
     return DFT_##Sz;  \
     break;
-static inline
-dft_size_idx_t get_dft(int ofdm_symbol_size)
+static inline dft_size_idx_t get_dft(int size)
 {
-  switch (ofdm_symbol_size) {
+  switch (size) {
     FOREACH_DFTSZ(FIND_ENUM)
     default:
-      printf("function get_dft : unsupported ofdm symbol size \n");
-      assert(0);
+      AssertFatal(false, "function get_dft : unsupported DFT size %d\n", size);
       break;
   }
-  return DFT_SIZE_IDXTABLESIZE; // never reached and will trigger assertion in idft function;
+  return DFT_SIZE_IDXTABLESIZE;
 }
 
 #define SZ_iENUM(Sz) IDFT_##Sz,
@@ -678,14 +676,12 @@ struct {
     return IDFT_##iSz;  \
     break;
 
-static inline
-idft_size_idx_t get_idft(int ofdm_symbol_size)
+static inline idft_size_idx_t get_idft(int size)
 {
-  switch (ofdm_symbol_size) {
+  switch (size) {
     FOREACH_IDFTSZ(FIND_iENUM)
     default:
-      printf("function get_idft : unsupported ofdm symbol size \n");
-      assert(0);
+      AssertFatal(false, "function get_idft : unsupported iDFT size %d\n", size);
       break;
   }
   return IDFT_SIZE_IDXTABLESIZE; // never reached and will trigger assertion in idft function
