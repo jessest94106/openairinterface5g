@@ -104,6 +104,11 @@ typedef struct e1ap_setup_req_s {
   } plmn[E1AP_MAX_NUM_PLMNS];
 } e1ap_setup_req_t;
 
+typedef struct e1ap_cucp_setup_req_s {
+  char* gNB_cu_cp_name;
+  uint64_t transac_id;
+} e1ap_cucp_setup_req_t;
+
 typedef struct e1ap_register_req_t {
   e1ap_setup_req_t setup_req;
   e1ap_net_config_t net_config;
