@@ -26,4 +26,11 @@
 #include "openair2/COMMON/e1ap_messages_types.h"
 #include "common/platform_types.h"
 
+/* GNB-CU-UP E1 Setup Request */
+struct E1AP_E1AP_PDU *encode_e1ap_cuup_setup_request(const e1ap_setup_req_t *msg);
+bool decode_e1ap_cuup_setup_request(const struct E1AP_E1AP_PDU *pdu, e1ap_setup_req_t *out);
+e1ap_setup_req_t cp_e1ap_cuup_setup_request(const e1ap_setup_req_t *msg);
+void free_e1ap_cuup_setup_request(e1ap_setup_req_t *msg);
+bool eq_e1ap_cuup_setup_request(const e1ap_setup_req_t *a, const e1ap_setup_req_t *b);
+
 #endif /* E1AP_INTERFACE_MANAGEMENT_H_ */

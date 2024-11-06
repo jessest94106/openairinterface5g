@@ -53,5 +53,10 @@
 #include "E1AP_QoS-Flow-Item.h"
 #include "E1AP_DRB-Failed-List-NG-RAN.h"
 #include "E1AP_DRB-Failed-Item-NG-RAN.h"
+// E1 Setup
+#include "E1AP_SupportedPLMNs-Item.h"
+#include "E1AP_Slice-Support-List.h"
+#include "E1AP_Slice-Support-Item.h"
+#include "E1AP_ProtocolIE-Field.h"
 
 #endif /* E1AP_LIB_INCLUDES_H_ */
