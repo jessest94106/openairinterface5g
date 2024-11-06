@@ -6,6 +6,7 @@ scripts.
 There are some unit tests. From the parent directory, i.e., `ci-scripts/`,
 start with
 
+    python tests/build.py -v
     python tests/cmd.py -v
     python tests/deployment.py -v
     python tests/iperf-analysis.py -v

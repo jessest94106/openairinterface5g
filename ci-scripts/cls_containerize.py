@@ -601,21 +601,7 @@ class Containerize():
 		logging.debug('Building on server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 
-		# Check that we are on Ubuntu
-		ret = ssh.run('hostnamectl')
-		result = re.search('Ubuntu',  ret.stdout)
-		self.host = result.group(0)
-		if self.host != 'Ubuntu':
-			ssh.close()
-			raise Exception('Can build proxy only on Ubuntu server')
-
-		self.cli = 'docker'
-		self.cliBuildOptions = ''
-
-		# Workaround for some servers, we need to erase completely the workspace
-		if self.forcedWorkspaceCleanup:
-			ssh.run(f'echo {lPassWord} | sudo -S rm -Rf {lSourcePath}')
-
+		self.testCase_id = HTML.testCase_id
 		oldRanCommidID = self.ranCommitID
 		oldRanRepository = self.ranRepository
 		oldRanAllowMerge = self.ranAllowMerge
@@ -624,26 +610,35 @@ class Containerize():
 		self.ranRepository = 'https://github.com/EpiSci/oai-lte-5g-multi-ue-proxy.git'
 		self.ranAllowMerge = False
 		self.ranTargetBranch = 'master'
-		ssh.cd(lSourcePath)
-		# to prevent accidentally overwriting data that might be used later
-		self.ranCommitID = oldRanCommidID
-		self.ranRepository = oldRanRepository
-		self.ranAllowMerge = oldRanAllowMerge
-		self.ranTargetBranch = oldRanTargetBranch
 
 		# Let's remove any previous run artifacts if still there
-		ssh.run(f'{self.cli} image prune --force')
+		ssh.run('docker image prune --force')
 		# Remove any previous proxy image
-		ssh.run(f'{self.cli} image rm oai-lte-multi-ue-proxy:latest')
+		ssh.run('docker image rm oai-lte-multi-ue-proxy:latest')
 
 		tag = self.proxyCommit
 		logging.debug('building L2sim proxy image for tag ' + tag)
 		# check if the corresponding proxy image with tag exists. If not, build it
-		ret = ssh.run(f'{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
-		if ret.returncode != 0:
-			ssh.run(f'{self.cli} build {self.cliBuildOptions} --target oai-lte-multi-ue-proxy --tag proxy:{tag} --file docker/Dockerfile.ubuntu18.04 . > cmake_targets/log/proxy-build.log 2>&1')
-			ssh.run(f'{self.cli} image prune --force')
-			ret = ssh.run(f'{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
+		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
+		buildProxy = ret.returncode != 0 # if no image, build new proxy
+		if buildProxy:
+			ssh.run(f'rm -Rf {lSourcePath}')
+			success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+			if not success:
+				raise Exception("could not clone proxy repository")
+
+			filename = f'build_log_{self.testCase_id}'
+			fullpath = f'{lSourcePath}/{filename}'
+
+			ssh.run(f'docker build --target oai-lte-multi-ue-proxy --tag proxy:{tag} --file {lSourcePath}/docker/Dockerfile.ubuntu18.04 {lSourcePath} > {fullpath} 2>&1')
+			ssh.run(f'zip -r -qq {fullpath}.zip {fullpath}')
+			local_file = f"{os.getcwd()}/../cmake_targets/log/{filename}.zip"
+			ssh.copyin(f'{fullpath}.zip', local_file)
+			# don't delete such that we might recover the zips
+			#ssh.run(f'rm -f {fullpath}.zip')
+
+			ssh.run('docker image prune --force')
+			ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
 			if ret.returncode != 0:
 				logging.error('\u001B[1m Build of L2sim proxy failed\u001B[0m')
 				ssh.close()
@@ -656,10 +651,6 @@ class Containerize():
 		# retag the build images to that we pick it up later
 		ssh.run(f'docker image tag proxy:{tag} oai-lte-multi-ue-proxy:latest')
 
-		# no merge: is a push to develop, tag the image so we can push it to the registry
-		if not self.ranAllowMerge:
-			ssh.run('docker image tag proxy:{tag} proxy:develop')
-
 		# we assume that the host on which this is built will also run the proxy. The proxy
 		# currently requires the following command, and the docker-compose up mechanism of
 		# the CI does not allow to run arbitrary commands. Note that the following actually
@@ -667,21 +658,11 @@ class Containerize():
 		logging.warning('the following command belongs to deployment, but no mechanism exists to exec it there!')
 		ssh.run('sudo ifconfig lo: 127.0.0.2 netmask 255.0.0.0 up')
 
-		# Analyzing the logs
-		if buildProxy:
-			self.testCase_id = HTML.testCase_id
-			ssh.cd(f'{lSourcePath}/cmake_targets')
-			ssh.run(f'mkdir -p proxy_build_log_{self.testCase_id}')
-			ssh.run(f'mv log/* proxy_build_log_{self.testCase_id}')
-			if (os.path.isfile('./proxy_build_log_' + self.testCase_id + '.zip')):
-				os.remove('./proxy_build_log_' + self.testCase_id + '.zip')
-			if (os.path.isdir('./proxy_build_log_' + self.testCase_id)):
-				shutil.rmtree('./proxy_build_log_' + self.testCase_id)
-			ssh.run(f'zip -r -qq proxy_build_log_{self.testCase_id}.zip proxy_build_log_{self.testCase_id}')
-			filename = f'build_log_{self.testCase_id}.zip'
-			ssh.copyin(f'{lSourcePath}/cmake_targets/{filename}', filename)
-			# don't delete such that we might recover the zips
-			#ssh.run(f'rm -f build_log_{self.testCase_id}.zip')
+		# to prevent accidentally overwriting data that might be used later
+		self.ranCommitID = oldRanCommidID
+		self.ranRepository = oldRanRepository
+		self.ranAllowMerge = oldRanAllowMerge
+		self.ranTargetBranch = oldRanTargetBranch
 
 		# we do not analyze the logs (we assume the proxy builds fine at this stage),
 		# but need to have the following information to correctly display the HTML
@@ -696,7 +677,7 @@ class Containerize():
 		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
 		result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
 		# Cleaning any created tmp volume
-		ssh.run(f'{self.cli} volume prune --force')
+		ssh.run('docker volume prune --force')
 		ssh.close()
 
 		allImagesSize = {}
