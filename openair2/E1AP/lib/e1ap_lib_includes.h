@@ -58,5 +58,11 @@
 #include "E1AP_Slice-Support-List.h"
 #include "E1AP_Slice-Support-Item.h"
 #include "E1AP_ProtocolIE-Field.h"
+#include "E1AP_Transport-UP-Layer-Addresses-Info-To-Add-List.h"
+#include "E1AP_Transport-UP-Layer-Addresses-Info-To-Add-Item.h"
+#include "E1AP_Transport-UP-Layer-Addresses-Info-To-Remove-List.h"
+#include "E1AP_Transport-UP-Layer-Addresses-Info-To-Remove-Item.h"
+#include "E1AP_GTPTLAs.h"
+#include "E1AP_GTPTLA-Item.h"
 
 #endif /* E1AP_LIB_INCLUDES_H_ */

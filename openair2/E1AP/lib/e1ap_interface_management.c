@@ -235,3 +235,214 @@ bool eq_e1ap_cuup_setup_request(const e1ap_setup_req_t *a, const e1ap_setup_req_
   }
   return true;
 }
+
+/* ====================================
+ *     GNB-CU-UP E1 SETUP RESPONSE
+ * ==================================== */
+
+/**
+ * @brief Encode GNB-CU-UP E1 Setup Response
+ */
+E1AP_E1AP_PDU_t *encode_e1ap_cuup_setup_response(const e1ap_setup_resp_t *msg)
+{
+  E1AP_E1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+  /* Create */
+  /* 0. pdu Type */
+  pdu->present = E1AP_E1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, initMsg);
+  initMsg->procedureCode = E1AP_ProcedureCode_id_gNB_CU_UP_E1Setup;
+  initMsg->criticality = E1AP_Criticality_reject;
+  initMsg->value.present = E1AP_SuccessfulOutcome__value_PR_GNB_CU_UP_E1SetupResponse;
+  E1AP_GNB_CU_UP_E1SetupResponse_t *out = &pdu->choice.successfulOutcome->value.choice.GNB_CU_UP_E1SetupResponse;
+  // Transaction ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupResponseIEs_t, ieC1);
+  ieC1->id = E1AP_ProtocolIE_ID_id_TransactionID;
+  ieC1->criticality = E1AP_Criticality_reject;
+  ieC1->value.present = E1AP_GNB_CU_UP_E1SetupResponseIEs__value_PR_TransactionID;
+  ieC1->value.choice.TransactionID = msg->transac_id;
+  // Encode gNB_CU_CP_Name (O)
+  if (msg->gNB_cu_cp_name) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupResponseIEs_t, ieC2);
+    ieC2->id = E1AP_ProtocolIE_ID_id_gNB_CU_CP_Name;
+    ieC2->criticality = E1AP_Criticality_ignore;
+    ieC2->value.present = E1AP_GNB_CU_UP_E1SetupResponseIEs__value_PR_GNB_CU_CP_Name;
+    OCTET_STRING_fromBuf(&ieC2->value.choice.GNB_CU_CP_Name, msg->gNB_cu_cp_name, strlen(msg->gNB_cu_cp_name));
+  }
+  // Encode TNLA Info (O)
+  if (msg->tnla_info) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupResponseIEs_t, ieC3);
+    ieC3->id = E1AP_ProtocolIE_ID_id_Transport_Layer_Address_Info;
+    ieC3->criticality = E1AP_Criticality_ignore;
+    ieC3->value.present = E1AP_GNB_CU_UP_E1SetupResponseIEs__value_PR_Transport_Layer_Address_Info;
+    // Transport UP Layer Addresses Info to Add List
+    for (int i = 0; i < msg->tnla_info->num_addresses_to_add; i++) {
+      E1AP_Transport_UP_Layer_Addresses_Info_To_Add_List_t *a = calloc_or_fail(1, sizeof(*a));
+      ieC3->value.choice.Transport_Layer_Address_Info.transport_UP_Layer_Addresses_Info_To_Add_List =
+          (struct E1AP_Transport_UP_Layer_Addresses_Info_To_Add_List *)a;
+      asn1cSequenceAdd(a->list, E1AP_Transport_UP_Layer_Addresses_Info_To_Add_Item_t, ieC4);
+      in_addr_t *ipsec = &msg->tnla_info->addresses_to_add[i].ipsec_tl_address;
+      TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(*ipsec, &ieC4->iP_SecTransportLayerAddress);
+      for (int j = 0; j < msg->tnla_info->addresses_to_add[i].num_gtp_tl_addresses; j++) {
+        E1AP_GTPTLAs_t *g = calloc_or_fail(1, sizeof(*g));
+        ieC4->gTPTransportLayerAddressesToAdd = (struct E1AP_GTPTLAs *)g;
+        asn1cSequenceAdd(g->list, E1AP_GTPTLA_Item_t, ieC5);
+        in_addr_t *gtp_tlna = &msg->tnla_info->addresses_to_add[i].gtp_tl_addresses[j];
+        TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(*gtp_tlna, &ieC5->gTPTransportLayerAddresses);
+      }
+    }
+    // Transport UP Layer Addresses Info to Remove List
+    for (int i = 0; i < msg->tnla_info->num_addresses_to_remove; i++) {
+      E1AP_Transport_UP_Layer_Addresses_Info_To_Remove_List_t *a = calloc_or_fail(1, sizeof(*a));
+      ieC3->value.choice.Transport_Layer_Address_Info.transport_UP_Layer_Addresses_Info_To_Remove_List =
+          (struct E1AP_Transport_UP_Layer_Addresses_Info_To_Remove_List *)a;
+      asn1cSequenceAdd(a->list, E1AP_Transport_UP_Layer_Addresses_Info_To_Remove_Item_t, ieC4);
+      in_addr_t *ipsec = &msg->tnla_info->addresses_to_remove[i].ipsec_tl_address;
+      TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(*ipsec, &ieC4->iP_SecTransportLayerAddress);
+      for (int j = 0; j < msg->tnla_info->addresses_to_remove[i].num_gtp_tl_addresses; j++) {
+        E1AP_GTPTLAs_t *g = calloc_or_fail(1, sizeof(*g));
+        ieC4->gTPTransportLayerAddressesToRemove = (struct E1AP_GTPTLAs *)g;
+        asn1cSequenceAdd(g->list, E1AP_GTPTLA_Item_t, ieC5);
+        in_addr_t *gtp_tlna = &msg->tnla_info->addresses_to_remove[i].gtp_tl_addresses[j];
+        TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(*gtp_tlna, &ieC5->gTPTransportLayerAddresses);
+      }
+    }
+  }
+  return pdu;
+}
+
+/**
+ * @brief Decode GNB-CU-UP E1 Setup Response
+ */
+bool decode_e1ap_cuup_setup_response(const E1AP_E1AP_PDU_t *pdu, e1ap_setup_resp_t *out)
+{
+  _E1_EQ_CHECK_INT(pdu->present, E1AP_E1AP_PDU_PR_successfulOutcome);
+  _E1_EQ_CHECK_INT(pdu->choice.successfulOutcome->procedureCode, E1AP_ProcedureCode_id_gNB_CU_UP_E1Setup);
+  _E1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present, E1AP_SuccessfulOutcome__value_PR_GNB_CU_UP_E1SetupResponse);
+  const E1AP_GNB_CU_UP_E1SetupResponse_t *in = &pdu->choice.successfulOutcome->value.choice.GNB_CU_UP_E1SetupResponse;
+  E1AP_GNB_CU_UP_E1SetupResponseIEs_t *ie;
+  // Transaction ID (M)
+  E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupResponseIEs_t, ie, in, E1AP_ProtocolIE_ID_id_TransactionID, true);
+  // Decode TNLA Info (O)
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    ie = in->protocolIEs.list.array[i];
+    AssertFatal(ie != NULL, "in->protocolIEs.list.array[i] shall not be null");
+    switch (ie->id) {
+      case E1AP_ProtocolIE_ID_id_TransactionID:
+        out->transac_id = ie->value.choice.TransactionID;
+        break;
+
+      case E1AP_ProtocolIE_ID_id_gNB_CU_CP_Name:
+        // gNB-CU-CP Name (O)
+        E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupResponseIEs_t, ie, in, E1AP_ProtocolIE_ID_id_gNB_CU_CP_Name, false);
+        _E1_EQ_CHECK_INT(ie->value.present, E1AP_GNB_CU_UP_E1SetupResponseIEs__value_PR_GNB_CU_CP_Name);
+        if (ie != NULL) {
+          out->gNB_cu_cp_name = calloc_or_fail(ie->value.choice.GNB_CU_CP_Name.size + 1, sizeof(char));
+          memcpy(out->gNB_cu_cp_name, ie->value.choice.GNB_CU_CP_Name.buf, ie->value.choice.GNB_CU_CP_Name.size);
+        }
+        break;
+
+      case E1AP_ProtocolIE_ID_id_Transport_Layer_Address_Info:
+        E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupResponseIEs_t, ie, in, E1AP_ProtocolIE_ID_id_Transport_Layer_Address_Info, false);
+        out->tnla_info = calloc_or_fail(1, sizeof(*out->tnla_info));
+        // Transport UP Layer Addresses Info to Add List
+        const E1AP_Transport_UP_Layer_Addresses_Info_To_Add_List_t *a =
+            ie->value.choice.Transport_Layer_Address_Info.transport_UP_Layer_Addresses_Info_To_Add_List;
+        out->tnla_info->num_addresses_to_add = a->list.count;
+        for (int i = 0; i < a->list.count; i++) {
+          const E1AP_Transport_UP_Layer_Addresses_Info_To_Add_Item_t *item = a->list.array[i];
+          tnl_address_info_item_t *to_add = &out->tnla_info->addresses_to_add[i];
+          BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&item->iP_SecTransportLayerAddress, to_add->ipsec_tl_address);
+          const E1AP_GTPTLAs_t *gtp_list = item->gTPTransportLayerAddressesToAdd;
+          to_add->num_gtp_tl_addresses = gtp_list->list.count;
+          for (int j = 0; j < gtp_list->list.count; j++) {
+            const E1AP_GTPTLA_Item_t *gtp_item = gtp_list->list.array[j];
+            BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&gtp_item->gTPTransportLayerAddresses, to_add->gtp_tl_addresses[j]);
+          }
+        }
+        // Transport UP Layer Addresses Info to Remove List
+        const E1AP_Transport_UP_Layer_Addresses_Info_To_Remove_List_t *r =
+            ie->value.choice.Transport_Layer_Address_Info.transport_UP_Layer_Addresses_Info_To_Remove_List;
+        out->tnla_info->num_addresses_to_remove = r->list.count;
+
+        for (int i = 0; i < r->list.count; i++) {
+          const E1AP_Transport_UP_Layer_Addresses_Info_To_Remove_Item_t *item = r->list.array[i];
+          tnl_address_info_item_t *to_remove = &out->tnla_info->addresses_to_remove[i];
+          BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&item->iP_SecTransportLayerAddress, to_remove->ipsec_tl_address);
+
+          const E1AP_GTPTLAs_t *gtp_list = item->gTPTransportLayerAddressesToRemove;
+          to_remove->num_gtp_tl_addresses = gtp_list->list.count;
+          for (int j = 0; j < gtp_list->list.count; j++) {
+            const E1AP_GTPTLA_Item_t *gtp_item = gtp_list->list.array[j];
+            BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&gtp_item->gTPTransportLayerAddresses, to_remove->gtp_tl_addresses[j]);
+          }
+        }
+        break;
+
+      default:
+        PRINT_ERROR("Handle for this IE %ld is not implemented (or) invalid IE detected\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief Deep copy GNB-CU-UP E1 Setup Response
+ */
+e1ap_setup_resp_t cp_e1ap_cuup_setup_response(const e1ap_setup_resp_t *msg)
+{
+  e1ap_setup_resp_t cp = {0};
+  cp.transac_id = msg->transac_id;
+  if (msg->gNB_cu_cp_name) {
+    cp.gNB_cu_cp_name = strdup(msg->gNB_cu_cp_name);
+  }
+  if (msg->tnla_info) {
+    cp.tnla_info = calloc_or_fail(1, sizeof(*cp.tnla_info));
+    *cp.tnla_info = *msg->tnla_info;
+  }
+  return cp;
+}
+
+/**
+ * @brief Free GNB-CU-UP E1 Setup Response
+ */
+void free_e1ap_cuup_setup_response(e1ap_setup_resp_t *msg)
+{
+  free(msg->gNB_cu_cp_name);
+  free(msg->tnla_info);
+}
+
+/**
+ * @brief Equality check for GNB-CU-UP E1 Setup Response
+ */
+bool eq_e1ap_cuup_setup_response(const e1ap_setup_resp_t *a, const e1ap_setup_resp_t *b)
+{
+  _E1_EQ_CHECK_LONG(a->transac_id, b->transac_id);
+  if ((a->gNB_cu_cp_name && !b->gNB_cu_cp_name) || (!a->gNB_cu_cp_name && b->gNB_cu_cp_name))
+    return false;
+  if (a->gNB_cu_cp_name && b->gNB_cu_cp_name)
+    _E1_EQ_CHECK_STR(a->gNB_cu_cp_name, b->gNB_cu_cp_name);
+  if ((a->tnla_info && !b->tnla_info) || (!a->tnla_info && b->tnla_info))
+    return false;
+  if (a->tnla_info && b->tnla_info) {
+    _E1_EQ_CHECK_INT(a->tnla_info->num_addresses_to_add, b->tnla_info->num_addresses_to_add);
+    _E1_EQ_CHECK_INT(a->tnla_info->num_addresses_to_remove, b->tnla_info->num_addresses_to_remove);
+    for (int i = 0; i < a->tnla_info->num_addresses_to_add; i++) {
+      tnl_address_info_item_t *a_to_add = &a->tnla_info->addresses_to_add[i];
+      tnl_address_info_item_t *b_to_add = &b->tnla_info->addresses_to_add[i];
+      _E1_EQ_CHECK_LONG(a_to_add->ipsec_tl_address, b_to_add->ipsec_tl_address);
+      for (int j = 0; j < a_to_add->num_gtp_tl_addresses; j++) {
+        _E1_EQ_CHECK_LONG(a_to_add->gtp_tl_addresses[j], b_to_add->gtp_tl_addresses[j]);
+      }
+    }
+    for (int i = 0; i < a->tnla_info->num_addresses_to_remove; i++) {
+      tnl_address_info_item_t *a_to_rem = &a->tnla_info->addresses_to_remove[i];
+      tnl_address_info_item_t *b_to_rem = &b->tnla_info->addresses_to_remove[i];
+      _E1_EQ_CHECK_LONG(a_to_rem->ipsec_tl_address, b_to_rem->ipsec_tl_address);
+      for (int j = 0; j < a_to_rem->num_gtp_tl_addresses; j++) {
+        _E1_EQ_CHECK_LONG(a_to_rem->gtp_tl_addresses[j], b_to_rem->gtp_tl_addresses[j]);
+      }
+    }
+  }
+  return true;
+}
