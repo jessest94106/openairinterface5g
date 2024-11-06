@@ -91,6 +91,7 @@ typedef struct e1ap_net_config_t {
   uint16_t remotePortN3;
 } e1ap_net_config_t;
 
+/* GNB-CU-UP E1 Setup Request */
 typedef struct e1ap_setup_req_s {
   uint64_t              gNB_cu_up_id;
   char *                gNB_cu_up_name;
