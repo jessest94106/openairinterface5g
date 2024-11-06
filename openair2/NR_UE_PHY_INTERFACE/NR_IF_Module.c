@@ -1150,8 +1150,8 @@ int nr_ue_ul_indication(nr_uplink_indication_t *ul_info)
 
   if (is_nr_UL_slot(mac->tdd_UL_DL_ConfigurationCommon, ul_info->slot, mac->frame_type))
     nr_ue_ul_scheduler(mac, ul_info);
-  pthread_mutex_unlock(&mac->if_mutex);
-
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   return 0;
 }
 
@@ -1272,16 +1272,19 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
   else
     // DL indication to process data channels
     ret2 = nr_ue_dl_processing(dl_info);
-  pthread_mutex_unlock(&mac->if_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   return ret2;
 }
 
 void nr_ue_slot_indication(uint8_t mod_id)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
-  pthread_mutex_lock(&mac->if_mutex);
+  int ret = pthread_mutex_lock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   update_mac_timers(mac);
-  pthread_mutex_unlock(&mac->if_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
 nr_ue_if_module_t *nr_ue_if_module_init(uint32_t module_id)

@@ -885,7 +885,8 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id,
   else if (sched_sib == 2)
     mac->get_otherSI = true;
   nr_ue_decode_mib(mac, cc_idP);
-  pthread_mutex_unlock(&mac->if_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
 static void setup_puschpowercontrol(NR_UE_MAC_INST_t *mac, NR_PUSCH_PowerControl_t *source, NR_PUSCH_PowerControl_t *target)
@@ -1654,7 +1655,8 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id,
     default:
       AssertFatal(false, "Invalid MAC reset cause %d\n", cause);
   }
-  pthread_mutex_unlock(&mac->if_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
 static int get_ta_offset(long *n_TimingAdvanceOffset)
@@ -1716,7 +1718,8 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
 
   if (!get_softmodem_params()->emulate_l1)
     mac->if_module->phy_config_request(&mac->phy_config);
-  pthread_mutex_unlock(&mac->if_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
 void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id,
@@ -2573,5 +2576,6 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
 
   if (!mac->dl_config_request || !mac->ul_config_request)
     ue_init_config_request(mac, mac->current_DL_BWP->scs);
-  pthread_mutex_unlock(&mac->if_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
