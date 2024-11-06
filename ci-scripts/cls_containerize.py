@@ -1027,10 +1027,6 @@ class Containerize():
 				containerName = GetContainerName(ssh, svc, f"{wd}/docker-compose.y*ml")
 				healthy = GetContainerHealth(ssh, containerName)
 				if not healthy:
-					tgtlogfile = f'{svc}-{HTML.testCase_id}.log'
-					logging.warning(f"Deployment Failed: Trying to copy container logs to {tgtlogfile}")
-					yaml_dir = yaml.split('/')[-1]
-					CopyinContainerLog(ssh, lSourcePath, yaml_dir, containerName, tgtlogfile)
 					imagesInfo += [f"Failed to deploy: service {svc}"]
 					fstatus = False
 				else:
