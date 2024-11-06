@@ -132,11 +132,6 @@ information on how the images are built.
   ~5G-NR
   - caracal + N310
   - pure performance test through phy-test scheduler, see command line for more details
-- [RAN-Interop-F1](https://jenkins-oai.eurecom.fr/job/RAN-Interop-F1/)
-  ~5G-NR
-  - ofqot (DU, 1x UE)
-  - F1 interoperability: set up connection between Accelleran CU and OAI DU and pass all traffic over F1
-  - 3rd-party gNB/CU interoperability: set up connection between Accelleran CU and OAI UE and test connectivity
 - [RAN-L2-Sim-Test-4G](https://jenkins-oai.eurecom.fr/job/RAN-L2-Sim-Test-4G/)
   ~4G-LTE
   - obelix (eNB, 1x UE, OAI EPC)

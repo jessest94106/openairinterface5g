@@ -493,29 +493,6 @@ pipeline {
             }
           }
         }
-        stage ("Interop-F1") {
-          when { expression {do5Gtest} }
-          steps {
-            script {
-              triggerSlaveJob ('RAN-Interop-F1', 'Interop-F1')
-            }
-          }
-          post {
-            always {
-              script {
-                // Using a unique variable name for each test stage to avoid overwriting on a global variable
-                // due to parallel-time concurrency
-                f1InteropStatus = finalizeSlaveJob('RAN-Interop-F1')
-              }
-            }
-            failure {
-              script {
-                currentBuild.result = 'FAILURE'
-                failingStages += f1InteropStatus
-              }
-            }
-          }
-        }
         stage ("Sanity-Check OAI-CN5G") {
           when { expression {do5Gtest} }
           steps {
