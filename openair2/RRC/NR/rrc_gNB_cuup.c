@@ -37,6 +37,7 @@
 #include "openair2/F1AP/f1ap_ids.h"
 #include "rrc_messages_types.h"
 #include "tree.h"
+#include "e1ap_interface_management.h"
 
 static int cuup_compare(const nr_rrc_cuup_container_t *a, const nr_rrc_cuup_container_t *b)
 {
@@ -198,7 +199,7 @@ int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, e1ap_setup_req_t *req)
   nr_rrc_cuup_container_t *cuup = malloc(sizeof(*cuup));
   AssertFatal(cuup, "out of memory\n");
   cuup->setup_req = malloc(sizeof(*cuup->setup_req));
-  *cuup->setup_req = *req;
+  *cuup->setup_req = cp_e1ap_cuup_setup_request(req);
   cuup->assoc_id = assoc_id;
   RB_INSERT(rrc_cuup_tree, &rrc->cuups, cuup);
   rrc->num_cuups++;

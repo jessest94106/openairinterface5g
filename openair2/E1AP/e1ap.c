@@ -34,6 +34,7 @@
 #include "gtp_itf.h"
 #include "openair2/LAYER2/nr_pdcp/cucp_cuup_handler.h"
 #include "lib/e1ap_bearer_context_management.h"
+#include "lib/e1ap_interface_management.h"
 
 #define E1AP_NUM_MSG_HANDLERS 14
 typedef int (*e1ap_message_processing_t)(sctp_assoc_t assoc_id, e1ap_upcp_inst_t *inst, const E1AP_E1AP_PDU_t *message_p);
@@ -161,86 +162,6 @@ int e1ap_send_ERROR_INDICATION(instance_t instance, E1AP_ErrorIndication_t *Erro
   return -1;
 }
 
-/*
-    E1 Setup: can be sent on both ways, to be refined
-*/
-static void fill_SETUP_REQUEST(e1ap_setup_req_t *setup, E1AP_E1AP_PDU_t *pdu)
-{
-  /* Create */
-  /* 0. pdu Type */
-  pdu->present = E1AP_E1AP_PDU_PR_initiatingMessage;
-  asn1cCalloc(pdu->choice.initiatingMessage, initMsg);
-  initMsg->procedureCode = E1AP_ProcedureCode_id_gNB_CU_UP_E1Setup;
-  initMsg->criticality   = E1AP_Criticality_reject;
-  initMsg->value.present       = E1AP_InitiatingMessage__value_PR_GNB_CU_UP_E1SetupRequest;
-  E1AP_GNB_CU_UP_E1SetupRequest_t *e1SetupUP = &initMsg->value.choice.GNB_CU_UP_E1SetupRequest;
-  /* mandatory */
-  /* c1. Transaction ID (integer value) */
-  asn1cSequenceAdd(e1SetupUP->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ieC1);
-  ieC1->id                         = E1AP_ProtocolIE_ID_id_TransactionID;
-  ieC1->criticality                = E1AP_Criticality_reject;
-  ieC1->value.present              = E1AP_GNB_CU_UP_E1SetupRequestIEs__value_PR_TransactionID;
-  setup->transac_id = E1AP_get_next_transaction_identifier();
-  ieC1->value.choice.TransactionID = setup->transac_id;
-  LOG_D(E1AP, "Transaction ID of setup request %ld\n", setup->transac_id);
-  /* mandatory */
-  /* c2. GNB_CU_ID (integer value) */
-  asn1cSequenceAdd(e1SetupUP->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ieC2);
-  ieC2->id                       = E1AP_ProtocolIE_ID_id_gNB_CU_UP_ID;
-  ieC2->criticality              = E1AP_Criticality_reject;
-  ieC2->value.present            = E1AP_GNB_CU_UP_E1SetupRequestIEs__value_PR_GNB_CU_UP_ID;
-  asn_int642INTEGER(&ieC2->value.choice.GNB_CU_UP_ID, setup->gNB_cu_up_id);
-
-  /* optional */
-  if (setup->gNB_cu_up_name) {
-    asn1cSequenceAdd(e1SetupUP->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ieC3);
-    ieC3->id = E1AP_ProtocolIE_ID_id_gNB_CU_UP_Name;
-    ieC3->criticality = E1AP_Criticality_ignore;
-    ieC3->value.present = E1AP_GNB_CU_UP_E1SetupRequestIEs__value_PR_GNB_CU_UP_Name;
-    OCTET_STRING_fromBuf(&ieC3->value.choice.GNB_CU_UP_Name, setup->gNB_cu_up_name, strlen(setup->gNB_cu_up_name));
-  }
-
-  /* mandatory */
-  /* c4. CN Support */
-  asn1cSequenceAdd(e1SetupUP->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ieC4);
-  ieC4->id = E1AP_ProtocolIE_ID_id_CNSupport;
-  ieC4->criticality = E1AP_Criticality_reject;
-  ieC4->value.present = E1AP_GNB_CU_UP_E1SetupRequestIEs__value_PR_CNSupport;
-  ieC4->value.choice.CNSupport = E1AP_CNSupport_c_5gc; /* only 5GC supported */
-
-  /* mandatory */
-  /* c5. Supported PLMNs */
-  asn1cSequenceAdd(e1SetupUP->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ieC5);
-  ieC5->id = E1AP_ProtocolIE_ID_id_SupportedPLMNs;
-  ieC5->criticality = E1AP_Criticality_reject;
-  ieC5->value.present = E1AP_GNB_CU_UP_E1SetupRequestIEs__value_PR_SupportedPLMNs_List;
-
-  int numSupportedPLMNs = setup->supported_plmns;
-
-  for (int i = 0; i < numSupportedPLMNs; i++) {
-    asn1cSequenceAdd(ieC5->value.choice.SupportedPLMNs_List.list, E1AP_SupportedPLMNs_Item_t, supportedPLMN);
-    /* 5.1 PLMN Identity */
-    PLMN_ID_t *id = &setup->plmn[i].id;
-    MCC_MNC_TO_PLMNID(id->mcc, id->mnc, id->mnc_digit_length, &supportedPLMN->pLMN_Identity);
-
-    int n = setup->plmn[i].supported_slices;
-    if (setup->plmn[i].slice != NULL && n > 0) {
-      supportedPLMN->slice_Support_List = calloc(1, sizeof(*supportedPLMN->slice_Support_List));
-      AssertFatal(supportedPLMN->slice_Support_List != NULL, "out of memory\n");
-      for (int s = 0; s < n; ++s) {
-        asn1cSequenceAdd(supportedPLMN->slice_Support_List->list, E1AP_Slice_Support_Item_t, slice);
-        e1ap_nssai_t *nssai = &setup->plmn[i].slice[s];
-        INT8_TO_OCTET_STRING(nssai->sst, &slice->sNSSAI.sST);
-        if (nssai->sd != 0xffffff) {
-          slice->sNSSAI.sD = malloc(sizeof(*slice->sNSSAI.sD));
-          AssertFatal(slice->sNSSAI.sD != NULL, "out of memory\n");
-          INT24_TO_OCTET_STRING(nssai->sd, slice->sNSSAI.sD);
-        }
-      }
-    }
-  }
-}
-
 static void fill_SETUP_RESPONSE(const e1ap_setup_resp_t *e1ap_setup_resp, E1AP_E1AP_PDU_t *pdu)
 {
   /* Create */
@@ -316,74 +237,17 @@ void e1apCUCP_send_SETUP_FAILURE(sctp_assoc_t assoc_id, long transac_id)
   e1ap_encode_send(CPtype, assoc_id, &pdu, 0, __func__);
 }
 
-static void extract_SETUP_REQUEST(const E1AP_E1AP_PDU_t *pdu, e1ap_setup_req_t *req)
-{
-  E1AP_GNB_CU_UP_E1SetupRequestIEs_t *ie;
-  E1AP_GNB_CU_UP_E1SetupRequest_t *in = &pdu->choice.initiatingMessage->value.choice.GNB_CU_UP_E1SetupRequest;
-
-  /* transac_id */
-  F1AP_FIND_PROTOCOLIE_BY_ID(E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_TransactionID, true);
-  req->transac_id = ie->value.choice.TransactionID;
-  LOG_D(E1AP, "gNB CU UP E1 setup request transaction ID: %ld\n", req->transac_id);
-
-  /* gNB CU UP ID */
-  F1AP_FIND_PROTOCOLIE_BY_ID(E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_gNB_CU_UP_ID, true);
-  asn_INTEGER2ulong(&ie->value.choice.GNB_CU_UP_ID, &req->gNB_cu_up_id);
-  LOG_D(E1AP, "gNB CU UP ID: %ld\n", req->gNB_cu_up_id);
-
-  /* gNB CU UP name */
-  F1AP_FIND_PROTOCOLIE_BY_ID(E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_gNB_CU_UP_Name, false);
-  req->gNB_cu_up_name = NULL;
-  if (ie != NULL) {
-    req->gNB_cu_up_name = calloc(ie->value.choice.GNB_CU_UP_Name.size + 1, sizeof(char));
-    AssertFatal(req->gNB_cu_up_name != NULL, "out of memory\n");
-    memcpy(req->gNB_cu_up_name, ie->value.choice.GNB_CU_UP_Name.buf, ie->value.choice.GNB_CU_UP_Name.size);
-    LOG_D(E1AP, "req->gNB_cu_up_name %s\n", req->gNB_cu_up_name);
-  }
-
-  /* CN Support */
-  F1AP_FIND_PROTOCOLIE_BY_ID(E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_CNSupport, true);
-  AssertFatal(ie->value.choice.CNSupport == E1AP_CNSupport_c_5gc, "only 5GC CN Support supported\n");
-
-  /* Supported PLMNs */
-  F1AP_FIND_PROTOCOLIE_BY_ID(E1AP_GNB_CU_UP_E1SetupRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_SupportedPLMNs, true);
-  req->supported_plmns = ie->value.choice.SupportedPLMNs_List.list.count;
-  LOG_D(E1AP, "Number of supported PLMNs: %d\n", req->supported_plmns);
-
-  for (int i = 0; i < req->supported_plmns; i++) {
-    E1AP_SupportedPLMNs_Item_t *supported_plmn_item =
-        (E1AP_SupportedPLMNs_Item_t *)(ie->value.choice.SupportedPLMNs_List.list.array[i]);
-
-    /* PLMN Identity */
-    PLMN_ID_t *id = &req->plmn[i].id;
-    PLMNID_TO_MCC_MNC(&supported_plmn_item->pLMN_Identity, id->mcc, id->mnc, id->mnc_digit_length);
-    LOG_D(E1AP, "MCC %d MNC %d\n", id->mcc, id->mnc);
-
-    /* NSSAI */
-    if (supported_plmn_item->slice_Support_List) {
-      int n = supported_plmn_item->slice_Support_List->list.count;
-      req->plmn[i].supported_slices = n;
-      req->plmn[i].slice = calloc(n, sizeof(*req->plmn[i].slice));
-      AssertFatal(req->plmn[i].slice != NULL, "out of memory\n");
-      for (int s = 0; s < n; ++s) {
-        e1ap_nssai_t *slice = &req->plmn[i].slice[s];
-        const E1AP_SNSSAI_t *es = &supported_plmn_item->slice_Support_List->list.array[s]->sNSSAI;
-        OCTET_STRING_TO_INT8(&es->sST, slice->sst);
-        slice->sd = 0xffffff;
-        if (es->sD != NULL)
-          OCTET_STRING_TO_INT24(es->sD, slice->sd);
-        LOG_D(E1AP, "SST %d SD %06x\n", slice->sst, slice->sd);
-      }
-    }
-  }
-}
-
 int e1apCUCP_handle_SETUP_REQUEST(sctp_assoc_t assoc_id, e1ap_upcp_inst_t *inst, const E1AP_E1AP_PDU_t *pdu)
 {
   DevAssert(pdu != NULL);
   /* Create ITTI message and send to queue */
   MessageDef *msg_p = itti_alloc_new_message(TASK_CUCP_E1, 0 /*unused by callee*/, E1AP_SETUP_REQ);
-  extract_SETUP_REQUEST(pdu, &E1AP_SETUP_REQ(msg_p));
+  // Decode E1 CU-UP Setup Request
+  if (!decode_e1ap_cuup_setup_request(pdu, &E1AP_SETUP_REQ(msg_p))) {
+    free_e1ap_cuup_setup_request(&E1AP_SETUP_REQ(msg_p));
+    return -1;
+  }
+
   msg_p->ittiMsgHeader.originInstance = assoc_id;
 
   if (E1AP_SETUP_REQ(msg_p).supported_plmns > 0) {
@@ -1276,9 +1140,10 @@ static void e1_task_send_sctp_association_req(long task_id, instance_t instance,
 
 static void e1apCUUP_send_SETUP_REQUEST(sctp_assoc_t assoc_id, e1ap_setup_req_t *setup)
 {
-  E1AP_E1AP_PDU_t pdu = {0};
-  fill_SETUP_REQUEST(setup, &pdu);
-  e1ap_encode_send(UPtype, assoc_id, &pdu, 0, __func__);
+  setup->transac_id = E1AP_get_next_transaction_identifier();
+  LOG_D(E1AP, "Transaction ID of setup request %ld\n", setup->transac_id);
+  E1AP_E1AP_PDU_t *pdu = encode_e1ap_cuup_setup_request(setup);
+  e1ap_encode_send(UPtype, assoc_id, pdu, 0, __func__);
 }
 
 static void e1_task_handle_sctp_association_resp(E1_t type,
