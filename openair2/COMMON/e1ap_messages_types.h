@@ -72,6 +72,11 @@ typedef enum cell_group_id_e {
   SCG,
 } cell_group_id_t;
 
+typedef enum CN_Support_e {
+  cn_support_EPC = 0,
+  cn_support_5GC,
+} cn_Support_t;
+
 typedef struct PLMN_ID_s {
   int mcc;
   int mnc;
@@ -97,6 +102,8 @@ typedef struct e1ap_setup_req_s {
   char *                gNB_cu_up_name;
   uint64_t              transac_id;
   int                   supported_plmns;
+  // CN Support
+  cn_Support_t cn_support;
   struct {
     PLMN_ID_t id;
     int supported_slices;
