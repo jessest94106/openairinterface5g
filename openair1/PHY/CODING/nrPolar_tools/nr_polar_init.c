@@ -30,9 +30,9 @@
  * \warning
  */
 
-#include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
+#include "nr_polar_defs.h"
+#include "nr_polar_psbch_defs.h"
 #include "PHY/NR_TRANSPORT/nr_dci.h"
-#include "nrPolar_tools/nr_polar_psbch_defs.h"
 
 #define PolarKey ((messageType << 24) | (messageLength << 8) | aggregation_level)
 static t_nrPolar_params *PolarList = NULL;

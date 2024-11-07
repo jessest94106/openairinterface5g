@@ -772,7 +772,7 @@ set(PHY_TURBOSRC
   ${OPENAIR1_DIR}/PHY/CODING/3gpplte_turbo_decoder.c
 )
 set(PHY_POLARSRC
-  ${OPENAIR1_DIR}/PHY/CODING/nr_polar_init.c
+  ${OPENAIR1_DIR}/PHY/CODING/nrPolar_tools/nr_polar_init.c
   ${OPENAIR1_DIR}/PHY/CODING/nrPolar_tools/nr_bitwise_operations.c
   ${OPENAIR1_DIR}/PHY/CODING/nrPolar_tools/nr_crc_byte.c
   ${OPENAIR1_DIR}/PHY/CODING/nrPolar_tools/nr_polar_decoder.c
