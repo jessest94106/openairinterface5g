@@ -30,8 +30,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "E1AP/lib/e1ap_bearer_context_management.h"
-#include "E1AP/lib/e1ap_lib_includes.h"
+#include "common/utils/utils.h"
+#include "e1ap_bearer_context_management.h"
+#include "e1ap_interface_management.h"
+#include "e1ap_lib_includes.h"
 #include "common/utils/assertions.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
@@ -216,10 +218,49 @@ static void test_bearer_context_setup_response(void)
   free_e1ap_context_setup_response(&orig);
 }
 
+/**
+ * @brief Test CU-UP Setup Request encoding/decoding
+ */
+static void test_e1_cuup_setup_request(void)
+{
+  e1ap_setup_req_t orig = {.gNB_cu_up_id = 1234,
+                           .gNB_cu_up_name = strdup("OAI CU-UP"),
+                           .transac_id = 42,
+                           .supported_plmns = 1,
+                           .cn_support = cn_support_5GC,
+                           .plmn[0] = {.id = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2},
+                                       .supported_slices = 1}};
+  orig.plmn[0].slice = malloc_or_fail(sizeof(*orig.plmn[0].slice));
+  orig.plmn[0].slice->sst = 0x01;
+  orig.plmn[0].slice->sd = 0x01;
+
+  E1AP_E1AP_PDU_t *encoded = encode_e1ap_cuup_setup_request(&orig);
+  E1AP_E1AP_PDU_t *decoded_msg = e1ap_encode_decode(encoded);
+  e1ap_msg_free(encoded);
+
+  e1ap_setup_req_t decoded = {0};
+  bool ret = decode_e1ap_cuup_setup_request(decoded_msg, &decoded);
+  AssertFatal(ret, "Failed to decode setup request");
+  e1ap_msg_free(decoded_msg);
+
+  ret = eq_e1ap_cuup_setup_request(&orig, &decoded);
+  AssertFatal(ret, "Decoded setup request doesn't match original");
+  free_e1ap_cuup_setup_request(&decoded);
+
+  e1ap_setup_req_t cp = cp_e1ap_cuup_setup_request(&orig);
+  ret = eq_e1ap_cuup_setup_request(&orig, &cp);
+  AssertFatal(ret, "eq_e1ap_cuup_setup_request(): copied message doesn't match\n");
+
+  free_e1ap_cuup_setup_request(&orig);
+  free_e1ap_cuup_setup_request(&cp);
+}
+
 int main()
 {
   // E1 Bearer Context Setup
   test_bearer_context_setup_request();
   test_bearer_context_setup_response();
+  // E1 Interface Management
+  test_e1_cuup_setup_request();
   return 0;
 }
