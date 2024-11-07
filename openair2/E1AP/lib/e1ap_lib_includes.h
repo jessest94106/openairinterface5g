@@ -25,6 +25,8 @@
 #include "E1AP_E1AP-PDU.h"
 #include "E1AP_ProcedureCode.h"
 #include "E1AP_SuccessfulOutcome.h"
+#include "E1AP_UnsuccessfulOutcome.h"
+#include "E1AP_CriticalityDiagnostics-IE-List.h"
 #include "E1AP_InitiatingMessage.h"
 #include "E1AP_ProtocolIE-ID.h"
 #include "E1AP_ProtocolIE-Field.h"

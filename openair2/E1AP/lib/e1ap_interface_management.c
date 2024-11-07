@@ -32,6 +32,63 @@
 #include "e1ap_messages_types.h"
 #include "e1ap_interface_management.h"
 
+void encode_criticality_diagnostics(const criticality_diagnostics_t *msg, E1AP_CriticalityDiagnostics_t *out)
+{
+  // Procedure Code (O)
+  if (msg->procedure_code) {
+    out->procedureCode = calloc_or_fail(1, sizeof(*out->procedureCode));
+    *out->procedureCode = *msg->procedure_code;
+  }
+  // Triggering Message (O)
+  if (msg->triggering_msg) {
+    out->triggeringMessage = calloc_or_fail(1, sizeof(*out->triggeringMessage));
+    *out->triggeringMessage = *msg->triggering_msg;
+  }
+  // Procedure Criticality (O)
+  if (msg->procedure_criticality) {
+    out->procedureCriticality = calloc_or_fail(1, sizeof(*out->procedureCriticality));
+    *out->procedureCriticality = *msg->procedure_criticality;
+  }
+  for (int i = 0; i < msg->num_errors; i++) {
+    out->iEsCriticalityDiagnostics = calloc_or_fail(1, sizeof(*out->iEsCriticalityDiagnostics));
+    asn1cSequenceAdd(out->iEsCriticalityDiagnostics->list, struct E1AP_CriticalityDiagnostics_IE_List__Member, ieC0);
+    ieC0->iE_ID = msg->errors[i].ie_id;
+    ieC0->typeOfError = msg->errors[i].error_type;
+    ieC0->iECriticality = msg->errors[i].criticality;
+  }
+}
+
+bool decode_criticality_diagnostics(const E1AP_CriticalityDiagnostics_t *in, criticality_diagnostics_t *out)
+{
+  // Procedure Code (O)
+  if (in->procedureCode) {
+    out->procedure_code = malloc_or_fail(sizeof(*out->procedure_code));
+    *out->procedure_code = *in->procedureCode;
+  }
+  // Triggering Message (O)
+  if (in->triggeringMessage) {
+    out->triggering_msg = malloc_or_fail(sizeof(*out->triggering_msg));
+    *out->triggering_msg = *in->triggeringMessage;
+  }
+  // Procedure Criticality (O)
+  if (in->procedureCriticality) {
+    out->procedure_criticality = malloc_or_fail(sizeof(*out->procedure_criticality));
+    *out->procedure_criticality = *in->procedureCriticality;
+  }
+  // Criticality Diagnostics IE list
+  if (in->iEsCriticalityDiagnostics) {
+    for (int i = 0; i < in->iEsCriticalityDiagnostics->list.count; i++) {
+      struct E1AP_CriticalityDiagnostics_IE_List__Member *ie = in->iEsCriticalityDiagnostics->list.array[i];
+      out->num_errors++;
+      out->errors[i].ie_id = ie->iE_ID;
+      out->errors[i].error_type = ie->typeOfError;
+      out->errors[i].criticality = ie->iECriticality;
+    }
+  }
+
+  return true;
+}
+
 /* ====================================
  *      GNB-CU-UP E1 SETUP REQUEST
  * ==================================== */
@@ -442,6 +499,228 @@ bool eq_e1ap_cuup_setup_response(const e1ap_setup_resp_t *a, const e1ap_setup_re
       for (int j = 0; j < a_to_rem->num_gtp_tl_addresses; j++) {
         _E1_EQ_CHECK_LONG(a_to_rem->gtp_tl_addresses[j], b_to_rem->gtp_tl_addresses[j]);
       }
+    }
+  }
+  return true;
+}
+
+/* ====================================
+ *     GNB-CU-UP E1 SETUP FAILURE
+ * ==================================== */
+
+static E1AP_Cause_t encode_e1ap_cause_ie(const e1ap_cause_t *cause)
+{
+  E1AP_Cause_t ie;
+  switch (cause->type) {
+    case E1AP_CAUSE_RADIO_NETWORK:
+      ie.present = E1AP_Cause_PR_radioNetwork;
+      ie.choice.radioNetwork = cause->value;
+      break;
+    case E1AP_CAUSE_TRANSPORT:
+      ie.present = E1AP_Cause_PR_transport;
+      ie.choice.transport = cause->value;
+      break;
+    case E1AP_CAUSE_PROTOCOL:
+      ie.present = E1AP_Cause_PR_protocol;
+      ie.choice.protocol = cause->value;
+      break;
+    case E1AP_CAUSE_MISC:
+      ie.present = E1AP_Cause_PR_misc;
+      ie.choice.misc = cause->value;
+      break;
+    default:
+      ie.present = E1AP_Cause_PR_NOTHING;
+      break;
+  }
+  return ie;
+}
+
+static e1ap_cause_t decode_e1ap_cause_ie(const E1AP_Cause_t *ie)
+{
+  e1ap_cause_t cause;
+  // Decode the 'choice' field based on the 'present' value
+  switch (ie->present) {
+    case E1AP_Cause_PR_radioNetwork:
+      cause.value = ie->choice.radioNetwork;
+      cause.type = E1AP_CAUSE_RADIO_NETWORK;
+      break;
+    case E1AP_Cause_PR_transport:
+      cause.value = ie->choice.transport;
+      cause.type = E1AP_CAUSE_TRANSPORT;
+      break;
+    case E1AP_Cause_PR_protocol:
+      cause.value = ie->choice.protocol;
+      cause.type = E1AP_CAUSE_PROTOCOL;
+      break;
+    case E1AP_Cause_PR_misc:
+      cause.value = ie->choice.misc;
+      cause.type = E1AP_CAUSE_MISC;
+      break;
+    default:
+      cause.type = E1AP_CAUSE_NOTHING;
+      break;
+  }
+  return cause;
+}
+
+/**
+ * @brief Encoder for GNB-CU-UP E1 Setup Failure
+ * @ref 9.2.1.6 GNB-CU-UP E1 SETUP FAILURE of 3GPP TS 38.463
+ */
+E1AP_E1AP_PDU_t *encode_e1ap_cuup_setup_failure(const e1ap_setup_fail_t *msg)
+{
+  E1AP_E1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(E1AP_E1AP_PDU_t));
+  // Allocate and populate the unsuccessfulOutcome structure
+  pdu->present = E1AP_E1AP_PDU_PR_unsuccessfulOutcome;
+  asn1cCalloc(pdu->choice.unsuccessfulOutcome, initMsg);
+  initMsg->procedureCode = E1AP_ProcedureCode_id_gNB_CU_UP_E1Setup;
+  initMsg->criticality = E1AP_Criticality_reject;
+  initMsg->value.present = E1AP_UnsuccessfulOutcome__value_PR_GNB_CU_UP_E1SetupFailure;
+  E1AP_GNB_CU_UP_E1SetupFailure_t *out = &pdu->choice.unsuccessfulOutcome->value.choice.GNB_CU_UP_E1SetupFailure;
+  // Transaction ID
+  asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie1);
+  ie1->id = E1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = E1AP_Criticality_reject;
+  ie1->value.present = E1AP_GNB_CU_UP_E1SetupFailureIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transac_id;
+  // Cause
+  asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie2);
+  ie2->id = E1AP_ProtocolIE_ID_id_Cause;
+  ie2->criticality = E1AP_Criticality_ignore;
+  ie2->value.present = E1AP_GNB_CU_UP_E1SetupFailureIEs__value_PR_Cause;
+  ie2->value.choice.Cause = encode_e1ap_cause_ie(&msg->cause);
+  // Time To Wait (O)
+  if (msg->time_to_wait) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie3);
+    ie3->id = E1AP_ProtocolIE_ID_id_TimeToWait;
+    ie3->criticality = E1AP_Criticality_ignore;
+    ie3->value.present = E1AP_GNB_CU_UP_E1SetupFailureIEs__value_PR_TimeToWait;
+    ie3->value.choice.TimeToWait = *msg->time_to_wait;
+  }
+  // Criticality Diagnostics (O)
+  if (msg->crit_diag) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie4);
+    ie4->id = E1AP_ProtocolIE_ID_id_CriticalityDiagnostics;
+    ie4->criticality = E1AP_Criticality_ignore;
+    ie4->value.present = E1AP_GNB_CU_UP_E1SetupFailureIEs__value_PR_CriticalityDiagnostics;
+    encode_criticality_diagnostics(msg->crit_diag, &ie4->value.choice.CriticalityDiagnostics);
+  }
+  return pdu;
+}
+
+/**
+ * @brief Decoder for GNB-CU-UP E1 Setup Failure
+ */
+bool decode_e1ap_cuup_setup_failure(const E1AP_E1AP_PDU_t *pdu, e1ap_setup_fail_t *out)
+{
+  _E1_EQ_CHECK_INT(pdu->present, E1AP_E1AP_PDU_PR_unsuccessfulOutcome);
+  _E1_EQ_CHECK_INT(pdu->choice.unsuccessfulOutcome->procedureCode, E1AP_ProcedureCode_id_gNB_CU_UP_E1Setup);
+  const E1AP_GNB_CU_UP_E1SetupFailure_t *in = &pdu->choice.unsuccessfulOutcome->value.choice.GNB_CU_UP_E1SetupFailure;
+  E1AP_GNB_CU_UP_E1SetupFailureIEs_t *ie;
+  // Check mandatory IEs first
+  E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie, in, E1AP_ProtocolIE_ID_id_TransactionID, true);
+  E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie, in, E1AP_ProtocolIE_ID_id_Cause, true);
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    ie = in->protocolIEs.list.array[i];
+    AssertFatal(ie != NULL, "in->protocolIEs.list.array[i] shall not be null");
+    switch (ie->id) {
+      case E1AP_ProtocolIE_ID_id_TransactionID:
+        out->transac_id = ie->value.choice.TransactionID;
+        break;
+      case E1AP_ProtocolIE_ID_id_Cause:
+        // Cause
+        E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie, in, E1AP_ProtocolIE_ID_id_Cause, true);
+        out->cause = decode_e1ap_cause_ie(&ie->value.choice.Cause);
+        break;
+      case E1AP_ProtocolIE_ID_id_Transport_Layer_Address_Info:
+        // Time To Wait (O)
+        E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie, in, E1AP_ProtocolIE_ID_id_TimeToWait, false);
+        out->time_to_wait = calloc_or_fail(1, sizeof(*out->time_to_wait));
+        *out->time_to_wait = ie->value.choice.TimeToWait;
+        break;
+      case E1AP_ProtocolIE_ID_id_CriticalityDiagnostics:
+        // Criticality Diagnostics (O)
+        E1AP_LIB_FIND_IE(E1AP_GNB_CU_UP_E1SetupFailureIEs_t, ie, in, E1AP_ProtocolIE_ID_id_CriticalityDiagnostics, false);
+        out->crit_diag = calloc_or_fail(1, sizeof(*out->crit_diag));
+        decode_criticality_diagnostics(&ie->value.choice.CriticalityDiagnostics, out->crit_diag);
+        break;
+      default:
+        PRINT_ERROR("Handle for this IE %ld is not implemented (or) invalid IE detected\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief Deep copy of GNB-CU-UP E1 Setup Failure message
+ */
+e1ap_setup_fail_t cp_e1ap_cuup_setup_failure(const e1ap_setup_fail_t *msg)
+{
+  e1ap_setup_fail_t cp = {0};
+  cp.transac_id = msg->transac_id;
+  cp.cause = msg->cause;
+  if (msg->time_to_wait) {
+    cp.time_to_wait = calloc_or_fail(1, sizeof(*cp.time_to_wait));
+    *cp.time_to_wait = *msg->time_to_wait;
+  }
+  if (msg->crit_diag) {
+    cp.crit_diag = calloc_or_fail(1, sizeof(*cp.crit_diag));
+    *cp.crit_diag = *msg->crit_diag;
+    if (msg->crit_diag->procedure_code) {
+      cp.crit_diag->procedure_code = calloc_or_fail(1, sizeof(*cp.crit_diag->procedure_code));
+      *cp.crit_diag->procedure_code = *msg->crit_diag->procedure_code;
+    }
+    if (msg->crit_diag->procedure_criticality) {
+      cp.crit_diag->procedure_criticality = calloc_or_fail(1, sizeof(*cp.crit_diag->procedure_criticality));
+      *cp.crit_diag->procedure_criticality = *msg->crit_diag->procedure_criticality;
+    }
+    if (msg->crit_diag->triggering_msg) {
+      cp.crit_diag->triggering_msg = calloc_or_fail(1, sizeof(*cp.crit_diag->triggering_msg));
+      *cp.crit_diag->triggering_msg = *msg->crit_diag->triggering_msg;
+    }
+  }
+  return cp;
+}
+
+/**
+ * @brief Free memory allocated for GNB-CU-UP E1 Setup Failure message
+ */
+void free_e1ap_cuup_setup_failure(e1ap_setup_fail_t *msg)
+{
+  free(msg->time_to_wait);
+  if (msg->crit_diag) {
+    free(msg->crit_diag->triggering_msg);
+    free(msg->crit_diag->procedure_code);
+    free(msg->crit_diag->procedure_criticality);
+  }
+  free(msg->crit_diag);
+}
+
+/**
+ * @brief Equality check for GNB-CU-UP E1 Setup Failure message
+ */
+bool eq_e1ap_cuup_setup_failure(const e1ap_setup_fail_t *a, const e1ap_setup_fail_t *b)
+{
+  _E1_EQ_CHECK_LONG(a->transac_id, b->transac_id);
+  _E1_EQ_CHECK_INT(a->cause.type, b->cause.type);
+  _E1_EQ_CHECK_INT(a->cause.value, b->cause.value);
+  if (a->time_to_wait && b->time_to_wait)
+    _E1_EQ_CHECK_LONG(*a->time_to_wait, *b->time_to_wait);
+  if (a->crit_diag && b->crit_diag) {
+    if (a->crit_diag->procedure_code && b->crit_diag->procedure_code)
+      _E1_EQ_CHECK_LONG(*(a->crit_diag->procedure_code), *(b->crit_diag->procedure_code));
+    if (a->crit_diag->triggering_msg && b->crit_diag->triggering_msg)
+      _E1_EQ_CHECK_LONG(*(a->crit_diag->triggering_msg), *(b->crit_diag->triggering_msg));
+    if (a->crit_diag->procedure_criticality && b->crit_diag->procedure_criticality)
+      _E1_EQ_CHECK_LONG(*(a->crit_diag->procedure_criticality), *(b->crit_diag->procedure_criticality));
+    _E1_EQ_CHECK_INT(a->crit_diag->num_errors, b->crit_diag->num_errors);
+    for (int i = 0; i < a->crit_diag->num_errors; i++) {
+      const criticality_diagnostics_ie_t *a_err = &a->crit_diag->errors[i];
+      const criticality_diagnostics_ie_t *b_err = &b->crit_diag->errors[i];
+      _E1_EQ_CHECK_INT(a_err->ie_id, b_err->ie_id);
+      _E1_EQ_CHECK_INT(a_err->error_type, b_err->error_type);
+      _E1_EQ_CHECK_INT(a_err->criticality, b_err->criticality);
     }
   }
   return true;

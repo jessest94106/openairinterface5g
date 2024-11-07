@@ -40,4 +40,11 @@ e1ap_setup_resp_t cp_e1ap_cuup_setup_response(const e1ap_setup_resp_t *msg);
 void free_e1ap_cuup_setup_response(e1ap_setup_resp_t *msg);
 bool eq_e1ap_cuup_setup_response(const e1ap_setup_resp_t *a, const e1ap_setup_resp_t *b);
 
+/* GNB-CU-UP E1 Setup Failure */
+struct E1AP_E1AP_PDU *encode_e1ap_cuup_setup_failure(const e1ap_setup_fail_t *msg);
+bool decode_e1ap_cuup_setup_failure(const struct E1AP_E1AP_PDU *pdu, e1ap_setup_fail_t *out);
+e1ap_setup_fail_t cp_e1ap_cuup_setup_failure(const e1ap_setup_fail_t *msg);
+void free_e1ap_cuup_setup_failure(e1ap_setup_fail_t *msg);
+bool eq_e1ap_cuup_setup_failure(const e1ap_setup_fail_t *a, const e1ap_setup_fail_t *b);
+
 #endif /* E1AP_INTERFACE_MANAGEMENT_H_ */
