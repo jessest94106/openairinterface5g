@@ -42,6 +42,7 @@
 #define E1AP_SECURITY_KEY_SIZE 16 // keys have 128 bits length
 #define E1AP_MAX_TL_ADDRESSES 16
 #define E1AP_MAX_GTP_TL_ADDRESSES 16
+#define E1AP_MAX_NUM_ERRORS 256
 
 #define E1AP_REGISTER_REQ(mSGpTR)                         (mSGpTR)->ittiMsg.e1ap_register_req
 #define E1AP_SETUP_REQ(mSGpTR)                            (mSGpTR)->ittiMsg.e1ap_setup_req
@@ -159,6 +160,33 @@ typedef struct PLMN_ID_s {
   int mnc_digit_length;
 } PLMN_ID_t;
 
+typedef enum { CRITICALITY_REJECT = 0, CRITICALITY_IGNORE, CRITICALITY_NOTIFY } criticality_t;
+
+typedef enum {
+  ERROR_TYPE_NOT_UNDERSTOOD = 0,
+  ERROR_TYPE_MISSING,
+} error_type_t;
+
+typedef enum {
+  TRIGGERING_MSG_INITIATING = 0,
+  TRIGGERING_MSG_SUCCESSFUL_OUTCOME,
+  TRIGGERING_MSG_UNSUCCESSFUL_OUTCOME
+} triggering_msg_t;
+
+typedef struct criticality_diagnostics_ie_s {
+  criticality_t criticality;
+  int ie_id;
+  error_type_t error_type;
+} criticality_diagnostics_ie_t;
+
+typedef struct criticality_diagnostics_s {
+  int *procedure_code;
+  triggering_msg_t *triggering_msg;
+  criticality_t *procedure_criticality;
+  int num_errors;
+  criticality_diagnostics_ie_t errors[E1AP_MAX_NUM_ERRORS];
+} criticality_diagnostics_t;
+
 typedef struct {
   in_addr_t ipsec_tl_address;
   uint8_t num_gtp_tl_addresses;
@@ -225,6 +253,9 @@ typedef struct e1ap_setup_resp_s {
 /* E1AP Setup Failure */
 typedef struct e1ap_setup_fail_s {
   long transac_id;
+  e1ap_cause_t cause;
+  long *time_to_wait;
+  criticality_diagnostics_t *crit_diag;
 } e1ap_setup_fail_t;
 
 typedef struct up_params_s {
