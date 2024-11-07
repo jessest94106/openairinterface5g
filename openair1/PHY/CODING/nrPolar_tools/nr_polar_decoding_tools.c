@@ -28,22 +28,22 @@
  * \email turker.yilmaz@eurecom.fr
  * \note
  * \warning
-*/
+ */
 
 #include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
 #include "PHY/sse_intrin.h"
 #include "PHY/impl_defs_top.h"
 
-//#define DEBUG_NEW_IMPL 1
+// #define DEBUG_NEW_IMPL 1
 
 static inline void updateBit(uint8_t listSize,
-			     uint16_t row,
-			     uint16_t col,
-			     uint16_t xlen,
-			     uint8_t ylen,
-			     int zlen,
-			     uint8_t bit[xlen][ylen][zlen],
-			     uint8_t bitU[xlen][ylen])
+                             uint16_t row,
+                             uint16_t col,
+                             uint16_t xlen,
+                             uint8_t ylen,
+                             int zlen,
+                             uint8_t bit[xlen][ylen][zlen],
+                             uint8_t bitU[xlen][ylen])
 {
   const uint offset = (xlen / (pow(2, (ylen - col))));
 
@@ -64,18 +64,12 @@ static inline void updateBit(uint8_t listSize,
   bitU[row][col] = 1;
 }
 
-static inline void computeLLR(uint16_t row,
-			      uint16_t col,
-			      uint8_t i,
-			      uint16_t offset,
-			      int xlen,
-			      int ylen,
-			      int zlen,
-			      double llr[xlen][ylen][zlen])
+static inline void
+computeLLR(uint16_t row, uint16_t col, uint8_t i, uint16_t offset, int xlen, int ylen, int zlen, double llr[xlen][ylen][zlen])
 {
   double a = llr[row][col + 1][i];
   double b = llr[row + offset][col + 1][i];
-  llr[row][col][i] = log((exp(a + b) + 1) / (exp(a) + exp(b))); //eq. (8a)
+  llr[row][col][i] = log((exp(a + b) + 1) / (exp(a) + exp(b))); // eq. (8a)
 }
 
 void updateLLR(uint8_t listSize,
@@ -113,14 +107,13 @@ void updateLLR(uint8_t listSize,
 }
 
 void updatePathMetric(double *pathMetric,
-		      uint8_t listSize,
-		      uint8_t bitValue,
-		      uint16_t row,
-		      int xlen,
-		      int ylen,
-		      int zlen,
-		      double llr[xlen][ylen][zlen]
-		      )
+                      uint8_t listSize,
+                      uint8_t bitValue,
+                      uint16_t row,
+                      int xlen,
+                      int ylen,
+                      int zlen,
+                      double llr[xlen][ylen][zlen])
 {
   const int multiplier = (2 * bitValue) - 1;
   for (uint i = 0; i < listSize; i++)
@@ -128,12 +121,12 @@ void updatePathMetric(double *pathMetric,
 }
 
 void updatePathMetric2(double *pathMetric,
-		       uint8_t listSize,
-		       uint16_t row,
-		       int xlen,
-		       int ylen,
-		       int zlen,
-		       double llr[xlen][ylen][zlen])
+                       uint8_t listSize,
+                       uint16_t row,
+                       int xlen,
+                       int ylen,
+                       int zlen,
+                       double llr[xlen][ylen][zlen])
 {
   double tempPM[listSize];
   memcpy(tempPM, pathMetric, (sizeof(double) * listSize));
@@ -172,7 +165,7 @@ static inline decoder_node_t *new_decoder_node(simde__m256i **buffer,
                            .alpha = tree_sz,
                            .beta = tree_sz + leaf_sz * sizeof(int16_t),
                            .betaInit = false};
-  return(node);
+  return (node);
 }
 
 static inline decoder_node_t *add_nodes(decoder_tree_t *tree,
@@ -181,7 +174,7 @@ static inline decoder_node_t *add_nodes(decoder_tree_t *tree,
                                         const uint8_t *information_bit_pattern,
                                         simde__m256i **buffer)
 {
-  if (level==0) {
+  if (level == 0) {
 #ifdef DEBUG_NEW_IMPL
     printf("leaf %d (%s)\n", first_leaf_index, information_bit_pattern[first_leaf_index] == 1 ? "information or crc" : "frozen");
 #endif
@@ -203,7 +196,7 @@ static inline decoder_node_t *add_nodes(decoder_tree_t *tree,
   decoder_node_t *new_node = new_decoder_node(buffer, level, first_leaf_index, false, false);
   new_node->left = add_nodes(tree, level - 1, first_leaf_index, information_bit_pattern, buffer);
   new_node->right = add_nodes(tree, level - 1, first_leaf_index + (Nv / 2), information_bit_pattern, buffer);
-  return(new_node);
+  return (new_node);
 }
 
 void build_decoder_tree(t_nrPolar_params *pp)
@@ -225,7 +218,12 @@ static inline void applyFtoleft(const t_nrPolar_params *pp, decoder_node_t *node
   int8_t *betal = treeBeta(node->left);
 
 #ifdef DEBUG_NEW_IMPL
-  printf("applyFtoleft %d, Nv %d (level %d,node->left (leaf %d, AF %d))\n",node->first_leaf_index,node->Nv,node->level,node->left->leaf,node->left->all_frozen);
+  printf("applyFtoleft %d, Nv %d (level %d,node->left (leaf %d, AF %d))\n",
+         node->first_leaf_index,
+         node->Nv,
+         node->level,
+         node->left->leaf,
+         node->left->all_frozen);
 
   for (int i = 0; i < node->Nv; i++)
     printf("i%d (frozen %d): alpha_v[i] = %d\n", i, 1 - pp->information_bit_pattern[node->first_leaf_index + i], alpha_v[i]);
@@ -238,7 +236,7 @@ static inline void applyFtoleft(const t_nrPolar_params *pp, decoder_node_t *node
       int avx2len = sz / 16;
 
       //      printf("avx2len %d\n",avx2len);
-      for (int i=0;i<avx2len;i++) {
+      for (int i = 0; i < avx2len; i++) {
         simde__m256i a256 = ((simde__m256i *)alpha_v)[i];
         simde__m256i b256 = ((simde__m256i *)alpha_v)[i + avx2len];
         simde__m256i absa256 = simde_mm256_abs_epi16(a256);
@@ -246,22 +244,20 @@ static inline void applyFtoleft(const t_nrPolar_params *pp, decoder_node_t *node
         simde__m256i minabs256 = simde_mm256_min_epi16(absa256, absb256);
         ((simde__m256i *)alpha_l)[i] = simde_mm256_sign_epi16(minabs256, simde_mm256_sign_epi16(a256, b256));
       }
-    }
-    else if (avx2mod == 8) {
+    } else if (avx2mod == 8) {
       simde__m128i a128 = *((simde__m128i *)alpha_v);
       simde__m128i b128 = ((simde__m128i *)alpha_v)[1];
       simde__m128i absa128 = simde_mm_abs_epi16(a128);
       simde__m128i absb128 = simde_mm_abs_epi16(b128);
       simde__m128i minabs128 = simde_mm_min_epi16(absa128, absb128);
-      *((simde__m128i*)alpha_l) =simde_mm_sign_epi16(minabs128,simde_mm_sign_epi16(a128,b128));
-    }
-    else if (avx2mod == 4) {
+      *((simde__m128i *)alpha_l) = simde_mm_sign_epi16(minabs128, simde_mm_sign_epi16(a128, b128));
+    } else if (avx2mod == 4) {
       simde__m64 a64 = *((simde__m64 *)alpha_v);
       simde__m64 b64 = ((simde__m64 *)alpha_v)[1];
       simde__m64 absa64 = simde_mm_abs_pi16(a64);
       simde__m64 absb64 = simde_mm_abs_pi16(b64);
       simde__m64 minabs64 = simde_mm_min_pi16(absa64, absb64);
-      *((simde__m64*)alpha_l) =simde_mm_sign_pi16(minabs64,simde_mm_sign_pi16(a64,b64));
+      *((simde__m64 *)alpha_l) = simde_mm_sign_pi16(minabs64, simde_mm_sign_pi16(a64, b64));
     } else { // equivalent scalar code to above, activated only on non x86/ARM architectures
       for (int i = 0; i < sz; i++) {
         int16_t a = alpha_v[i];
@@ -280,11 +276,11 @@ static inline void applyFtoleft(const t_nrPolar_params *pp, decoder_node_t *node
       betal[0] = tmp * 2 - 1;
       node->left->betaInit = true;
 #ifdef DEBUG_NEW_IMPL
-      printf("betal[0] %d (%p)\n",betal[0],&betal[0]);
+      printf("betal[0] %d (%p)\n", betal[0], &betal[0]);
 #endif
       output[node->first_leaf_index] = tmp;
 #ifdef DEBUG_NEW_IMPL
-      printf("Setting bit %d to %d (LLR %d)\n",node->first_leaf_index,(betal[0]+1)>>1,alpha_l[0]);
+      printf("Setting bit %d to %d (LLR %d)\n", node->first_leaf_index, (betal[0] + 1) >> 1, alpha_l[0]);
 #endif
     }
   }
@@ -298,7 +294,12 @@ static inline void applyGtoright(const t_nrPolar_params *pp, decoder_node_t *nod
   int8_t *betar = treeBeta(node->right);
 
 #ifdef DEBUG_NEW_IMPL
-  printf("applyGtoright %d, Nv %d (level %d), (leaf %d, AF %d)\n",node->first_leaf_index,node->Nv,node->level,node->right->leaf,node->right->all_frozen);
+  printf("applyGtoright %d, Nv %d (level %d), (leaf %d, AF %d)\n",
+         node->first_leaf_index,
+         node->Nv,
+         node->level,
+         node->right->leaf,
+         node->right->all_frozen);
 #endif
   assert(node->level);
   const int sz = 1 << (node->level - 1);
@@ -320,7 +321,8 @@ static inline void applyGtoright(const t_nrPolar_params *pp, decoder_node_t *nod
         int avx2len = sz / 16;
 
         for (int i = 0; i < avx2len; i++) {
-          simde__m256i tmp = simde_mm256_sign_epi16(((simde__m256i *)alpha_v)[i], simde_mm256_cvtepi8_epi16(((simde__m128i *)betal)[i]));
+          simde__m256i tmp =
+              simde_mm256_sign_epi16(((simde__m256i *)alpha_v)[i], simde_mm256_cvtepi8_epi16(((simde__m128i *)betal)[i]));
           ((simde__m256i *)alpha_r)[i] = simde_mm256_subs_epi16(((simde__m256i *)alpha_v)[i + avx2len], tmp);
         }
       } else if (avx2mod == 8) {
@@ -340,7 +342,7 @@ static inline void applyGtoright(const t_nrPolar_params *pp, decoder_node_t *nod
       output[node->first_leaf_index + 1] = tmp;
 
 #ifdef DEBUG_NEW_IMPL
-      printf("Setting bit %d to %d (LLR %d)\n",node->first_leaf_index+1,(betar[0]+1)>>1,alpha_r[0]);
+      printf("Setting bit %d to %d (LLR %d)\n", node->first_leaf_index + 1, (betar[0] + 1) >> 1, alpha_r[0]);
 #endif
     }
   }
@@ -354,7 +356,10 @@ static inline void computeBeta(decoder_node_t *node)
   int8_t *betal = treeBeta(node->left);
   int8_t *betar = treeBeta(node->right);
 #ifdef DEBUG_NEW_IMPL
-  printf("Computing beta @ level %d first_leaf_index %d (all_frozen %d)\n",node->level,node->first_leaf_index,node->left->all_frozen);
+  printf("Computing beta @ level %d first_leaf_index %d (all_frozen %d)\n",
+         node->level,
+         node->first_leaf_index,
+         node->left->all_frozen);
 #endif
   assert(node->level);
   const int sz = 1 << (node->level - 1);
@@ -370,7 +375,7 @@ static inline void computeBeta(decoder_node_t *node)
     int avx2mod = sz & 31;
     if (avx2mod == 0) {
       int avx2len = sz / 16;
-      for (int i=0;i<avx2len;i++) {
+      for (int i = 0; i < avx2len; i++) {
         ((simde__m256i *)betav)[i] =
             simde_mm256_xor_si256(simde_mm256_xor_si256(((simde__m256i *)betar)[i], ((simde__m256i *)betal)[i]),
                                   *(simde__m256i *)all11);
@@ -389,7 +394,8 @@ static inline void computeBeta(decoder_node_t *node)
   node->betaInit = true;
 }
 
-void generic_polar_decoder_recursive(t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U) {
+void generic_polar_decoder_recursive(t_nrPolar_params *pp, decoder_node_t *node, uint8_t *nr_polar_U)
+{
   // Apply F to left
   applyFtoleft(pp, node, nr_polar_U);
   int iter = pp->tree_linearization.iter++;
@@ -397,7 +403,7 @@ void generic_polar_decoder_recursive(t_nrPolar_params *pp, decoder_node_t *node,
   pp->tree_linearization.op_list[iter].node = node;
 
   // if left is not a leaf recurse down to the left
-  if (node->left->leaf==0)
+  if (node->left->leaf == 0)
     generic_polar_decoder_recursive(pp, node->left, nr_polar_U);
 
   applyGtoright(pp, node, nr_polar_U);

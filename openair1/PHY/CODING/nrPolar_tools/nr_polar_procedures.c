@@ -89,8 +89,7 @@ void nr_polar_generate_u(uint64_t *u,
   }
 }
 
-static
-void encode_packed_byte(uint8_t* in_out)
+static void encode_packed_byte(uint8_t *in_out)
 {
   //    *in_out ^= 0xAA & (*in_out << 1);
   //    *in_out ^= 0xCC & (*in_out << 2);
@@ -101,36 +100,33 @@ void encode_packed_byte(uint8_t* in_out)
   *in_out ^= *in_out >> 4;
 }
 
-static
-void polar_encode_bits(uint8_t* in_out, size_t N)
+static void polar_encode_bits(uint8_t *in_out, size_t N)
 {
   size_t const num_bytes_per_block = N >> 3;
-  for(size_t i = 0; i < num_bytes_per_block; ++i){
+  for (size_t i = 0; i < num_bytes_per_block; ++i) {
     encode_packed_byte(&in_out[i]);
   }
 }
 
-static 
-uint32_t log2_floor(uint32_t x) 
+static uint32_t log2_floor(uint32_t x)
 {
-  if(x == 0)
-    return 0; 
+  if (x == 0)
+    return 0;
   uint32_t clz = __builtin_clz(x);
   return 31U - clz;
 }
 
-static
-void polar_encode_bytes(uint8_t* in_out, size_t N)
+static void polar_encode_bytes(uint8_t *in_out, size_t N)
 {
   size_t brnch_sz = 1;
   size_t n_brnch = N >> 4;
-  size_t const blck_pwr = log2_floor(N); 
+  size_t const blck_pwr = log2_floor(N);
   for (size_t stage = 3; stage < blck_pwr; ++stage) {
     for (size_t brnch = 0; brnch < n_brnch; ++brnch) {
-        for(size_t byte = 0; byte < brnch_sz; ++byte){
-          size_t const dst = 2*brnch_sz*brnch + byte;
-          in_out[dst] ^= in_out[dst + brnch_sz];
-        }
+      for (size_t byte = 0; byte < brnch_sz; ++byte) {
+        size_t const dst = 2 * brnch_sz * brnch + byte;
+        in_out[dst] ^= in_out[dst + brnch_sz];
+      }
     }
     n_brnch >>= 1;
     brnch_sz <<= 1;
@@ -139,12 +135,12 @@ void polar_encode_bytes(uint8_t* in_out, size_t N)
 
 void nr_polar_uxG(uint8_t const *u, size_t N, uint8_t *D2)
 {
-  assert(N > 7); 
-  uint8_t tmp[N/8];
-  for(int i = 0; i < N/8; ++i)
-    tmp[i] = u[N/8 - 1 - i];
+  assert(N > 7);
+  uint8_t tmp[N / 8];
+  for (int i = 0; i < N / 8; ++i)
+    tmp[i] = u[N / 8 - 1 - i];
 
-  reverse_bits_u8(tmp, N/8, D2);
+  reverse_bits_u8(tmp, N / 8, D2);
 
   // Do the encoding/xor for the bottom 3 levels of the tree.
   // Thus, data remaining to encode, is in 2^3 type.
@@ -153,49 +149,40 @@ void nr_polar_uxG(uint8_t const *u, size_t N, uint8_t *D2)
   polar_encode_bytes(D2, N);
 }
 
-void nr_polar_bit_insertion(uint8_t *input,
-			    uint8_t *output,
-			    uint16_t N,
-			    uint16_t K,
-			    int16_t *Q_I_N,
-			    int16_t *Q_PC_N,
-			    uint8_t n_PC)
+void nr_polar_bit_insertion(uint8_t *input, uint8_t *output, uint16_t N, uint16_t K, int16_t *Q_I_N, int16_t *Q_PC_N, uint8_t n_PC)
 {
   int k = 0;
 
-  if (n_PC>0) {
+  if (n_PC > 0) {
     /*
      *
      */
   } else {
-    for (int n=0; n<=N-1; n++) {
+    for (int n = 0; n <= N - 1; n++) {
       output[n] = 0;
-      for (int m=0; m<=(K+n_PC)-1; m++) {
-	if ( n == Q_I_N[m]) {
+      for (int m = 0; m <= (K + n_PC) - 1; m++) {
+        if (n == Q_I_N[m]) {
           output[n] = input[k];
           k++;
           break;
-  }
+        }
       }
     }
   }
 }
 
-
-uint32_t nr_polar_output_length(uint16_t K,
-				uint16_t E,
-				uint8_t n_max)
+uint32_t nr_polar_output_length(uint16_t K, uint16_t E, uint8_t n_max)
 {
   int n_1, n_2, n_min = 5;
-  double R_min=1.0/8;
-  
-  if ( (E <= (9.0/8)*pow(2,ceil(log2(E))-1)) && (K/E < 9.0/16) ) {
-    n_1 = ceil(log2(E))-1;
+  double R_min = 1.0 / 8;
+
+  if ((E <= (9.0 / 8) * pow(2, ceil(log2(E)) - 1)) && (K / E < 9.0 / 16)) {
+    n_1 = ceil(log2(E)) - 1;
   } else {
     n_1 = ceil(log2(E));
   }
-  
-  n_2 = ceil(log2(K/R_min));
+
+  n_2 = ceil(log2(K / R_min));
 
   int n = n_max;
   if (n > n_1)
@@ -206,9 +193,9 @@ uint32_t nr_polar_output_length(uint16_t K,
     n = n_min;
 
   /*printf("nr_polar_output_length: K %d, E %d, n %d (n_max %d,n_min %d, n_1 %d,n_2 %d)\n",
-	 K,E,n,n_max,n_min,n_1,n_2);
-	 exit(-1);*/
-  return ((uint32_t) pow(2.0,n)); //=polar_code_output_length
+   K,E,n,n_max,n_min,n_1,n_2);
+   exit(-1);*/
+  return ((uint32_t)pow(2.0, n)); //=polar_code_output_length
 }
 
 void nr_polar_info_bit_pattern(uint8_t *ibp,
@@ -269,7 +256,7 @@ void nr_polar_info_bit_pattern(uint8_t *ibp,
     const int end = Q_Ftmp_N[N];
     int m;
     for (m = 0; m <= end; m++) {
-      AssertFatal(m < N+1, "Buffer boundary overflow");
+      AssertFatal(m < N + 1, "Buffer boundary overflow");
       if (Q_0_Nminus1[n] == Q_Ftmp_N[m]) {
         break;
       }
@@ -309,7 +296,6 @@ void nr_polar_info_bit_pattern(uint8_t *ibp,
 
   // Information and Parity Chack Bit Pattern
   for (int n = 0; n <= N - 1; n++) {
-
     ibp[n] = 0;
     for (int m = 0; m <= (K + n_PC) - 1; m++) {
       if (n == Q_I_N[m]) {
@@ -328,11 +314,7 @@ void nr_polar_info_bit_pattern(uint8_t *ibp,
   }
 }
 
-
-void nr_polar_info_bit_extraction(uint8_t *input,
-				  uint8_t *output,
-				  uint8_t *pattern,
-				  uint16_t size)
+void nr_polar_info_bit_extraction(uint8_t *input, uint8_t *output, uint8_t *pattern, uint16_t size)
 {
   uint16_t j = 0;
   for (int i = 0; i < size; i++) {
@@ -343,13 +325,7 @@ void nr_polar_info_bit_extraction(uint8_t *input,
   }
 }
 
-
-void nr_polar_rate_matching_pattern(uint16_t *rmp,
-				    uint16_t *J,
-				    const uint8_t *P_i_,
-				    uint16_t K,
-				    uint16_t N,
-				    uint16_t E)
+void nr_polar_rate_matching_pattern(uint16_t *rmp, uint16_t *J, const uint8_t *P_i_, uint16_t K, uint16_t N, uint16_t E)
 {
   uint16_t d[N];
   for (int m = 0; m < N; m++)
@@ -357,54 +333,49 @@ void nr_polar_rate_matching_pattern(uint16_t *rmp,
   uint16_t y[N];
   memset(y, 0, sizeof(y));
 
-  for (int m=0; m<=N-1; m++){
+  for (int m = 0; m <= N - 1; m++) {
     int i = floor((32 * m) / N);
-    J[m] = (P_i_[i]*(N/32)) + (m%(N/32));
+    J[m] = (P_i_[i] * (N / 32)) + (m % (N / 32));
     y[m] = d[J[m]];
   }
 
-  if (E>=N) { //repetition
-    for (int k=0; k<=E-1; k++) {
+  if (E >= N) { // repetition
+    for (int k = 0; k <= E - 1; k++) {
       int ind = (k % N);
-      rmp[k]=y[ind];
+      rmp[k] = y[ind];
     }
   } else {
-    if ( (K/(double)E) <= (7.0/16) ) { //puncturing
-      for (int k=0; k<=E-1; k++) {
-        rmp[k]=y[k+N-E];
+    if ((K / (double)E) <= (7.0 / 16)) { // puncturing
+      for (int k = 0; k <= E - 1; k++) {
+        rmp[k] = y[k + N - E];
       }
-    } else { //shortening
-      for (int k=0; k<=E-1; k++) {
-        rmp[k]=y[k];
+    } else { // shortening
+      for (int k = 0; k <= E - 1; k++) {
+        rmp[k] = y[k];
       }
     }
   }
 }
 
-
-void nr_polar_rate_matching(double *input,
-			    double *output,
-			    uint16_t *rmp,
-			    uint16_t K,
-			    uint16_t N,
-			    uint16_t E)
+void nr_polar_rate_matching(double *input, double *output, uint16_t *rmp, uint16_t K, uint16_t N, uint16_t E)
 {
-  if (E>=N) { //repetition
-    for (int i=0; i<=N-1; i++) output[i]=0;
-    for (int i=0; i<=E-1; i++){
-      output[rmp[i]]+=input[i];
+  if (E >= N) { // repetition
+    for (int i = 0; i <= N - 1; i++)
+      output[i] = 0;
+    for (int i = 0; i <= E - 1; i++) {
+      output[rmp[i]] += input[i];
     }
   } else {
-    if ( (K/(double)E) <= (7.0/16) ) { //puncturing
+    if ((K / (double)E) <= (7.0 / 16)) { // puncturing
       for (int i = 0; i <= N - 1; i++)
         output[i] = 0;
-    } else { //shortening
+    } else { // shortening
       for (int i = 0; i <= N - 1; i++)
         output[i] = INFINITY;
     }
 
-    for (int i=0; i<=E-1; i++){
-      output[rmp[i]]=input[i];
+    for (int i = 0; i <= E - 1; i++) {
+      output[rmp[i]] = input[i];
     }
   }
 }

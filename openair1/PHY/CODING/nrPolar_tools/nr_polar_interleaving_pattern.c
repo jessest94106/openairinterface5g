@@ -28,11 +28,12 @@
  * \email turker.yilmaz@eurecom.fr
  * \note
  * \warning
-*/
+ */
 
 #include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
 
-void nr_polar_interleaving_pattern(uint16_t K, uint8_t I_IL, uint16_t *PI_k_){
+void nr_polar_interleaving_pattern(uint16_t K, uint8_t I_IL, uint16_t *PI_k_)
+{
   uint K_IL_max = 164;
   uint8_t interleaving_pattern_table[164] = {
       0,   2,   4,   7,   9,   14,  19,  20,  24,  25,  26,  28,  31,  34,  42,  45,  49,  50,  51,  53, 54, 56,  58,  59,

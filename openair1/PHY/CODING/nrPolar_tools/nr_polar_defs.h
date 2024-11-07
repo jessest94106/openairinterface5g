@@ -28,7 +28,7 @@
  * \email raymond.knopp@eurecom.fr, turker.yilmaz@eurecom.fr
  * \note
  * \warning
-*/
+ */
 
 #ifndef __NR_POLAR_DEFS__H__
 #define __NR_POLAR_DEFS__H__
@@ -43,17 +43,18 @@
 #include "PHY/CODING/nrPolar_tools/nr_polar_uci_defs.h"
 #include "PHY/CODING/nrPolar_tools/nr_polar_pbch_defs.h"
 #include "PHY/CODING/coding_defs.h"
-//#include "SIMULATION/TOOLS/sim.h"
+// #include "SIMULATION/TOOLS/sim.h"
 
-#define NR_POLAR_DECODER_LISTSIZE 8 //uint8_t
+#define NR_POLAR_DECODER_LISTSIZE 8 // uint8_t
 
-#define NR_POLAR_AGGREGATION_LEVEL_1_PRIME 149 //uint16_t
-#define NR_POLAR_AGGREGATION_LEVEL_2_PRIME 151 //uint16_t
-#define NR_POLAR_AGGREGATION_LEVEL_4_PRIME 157 //uint16_t
-#define NR_POLAR_AGGREGATION_LEVEL_8_PRIME 163 //uint16_t
-#define NR_POLAR_AGGREGATION_LEVEL_16_PRIME 167 //uint16_t
+#define NR_POLAR_AGGREGATION_LEVEL_1_PRIME 149 // uint16_t
+#define NR_POLAR_AGGREGATION_LEVEL_2_PRIME 151 // uint16_t
+#define NR_POLAR_AGGREGATION_LEVEL_4_PRIME 157 // uint16_t
+#define NR_POLAR_AGGREGATION_LEVEL_8_PRIME 163 // uint16_t
+#define NR_POLAR_AGGREGATION_LEVEL_16_PRIME 167 // uint16_t
 
-static const uint8_t nr_polar_subblock_interleaver_pattern[32] = {0,1,2,4,3,5,6,7,8,16,9,17,10,18,11,19,12,20,13,21,14,22,15,23,24,25,26,28,27,29,30,31};
+static const uint8_t nr_polar_subblock_interleaver_pattern[32] = {0,  1,  2,  4,  3,  5,  6,  7,  8,  16, 9,  17, 10, 18, 11, 19,
+                                                                  12, 20, 13, 21, 14, 22, 15, 23, 24, 25, 26, 28, 27, 29, 30, 31};
 
 #define Nmax 1024
 #define nmax 10
@@ -82,7 +83,7 @@ typedef struct decoder_tree_t_s {
 } decoder_tree_t;
 
 typedef struct nrPolar_params {
-  //messageType: 0=PBCH, 1=DCI, -1=UCI
+  // messageType: 0=PBCH, 1=DCI, -1=UCI
 
   struct nrPolar_params *nextPtr __attribute__((aligned(16)));
   bool busy;
@@ -123,16 +124,12 @@ typedef struct nrPolar_params {
     bool is_initialized;
     struct {
       int op_code;
-      decoder_node_t* node;
+      decoder_node_t *node;
     } op_list[600];
   } tree_linearization;
 } t_nrPolar_params;
 
-void polar_encoder(uint32_t *input,
-                   uint32_t *output,
-                   int8_t messageType,
-                   uint16_t messageLength,
-                   uint8_t aggregation_level);
+void polar_encoder(uint32_t *input, uint32_t *output, int8_t messageType, uint16_t messageLength, uint8_t aggregation_level);
 
 void polar_encoder_dci(uint32_t *in,
                        uint32_t *out,
@@ -190,7 +187,7 @@ void nr_polar_print_polarParams(void);
 
 t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, uint8_t aggregation_level);
 
-uint16_t nr_polar_aggregation_prime (uint8_t aggregation_level);
+uint16_t nr_polar_aggregation_prime(uint8_t aggregation_level);
 
 const uint8_t **nr_polar_kronecker_power_matrices(uint8_t n);
 
@@ -201,27 +198,13 @@ const uint16_t *nr_polar_sequence_pattern(uint8_t n);
  * @param K Number of bits to encode (=payloadBits+crcParityBits)
  * @param E
  * @param n_max */
-uint32_t nr_polar_output_length(uint16_t K,
-                                uint16_t E,
-                                uint8_t n_max);
+uint32_t nr_polar_output_length(uint16_t K, uint16_t E, uint8_t n_max);
 
-void nr_polar_rate_matching_pattern(uint16_t *rmp,
-                                    uint16_t *J,
-                                    const uint8_t *P_i_,
-                                    uint16_t K,
-                                    uint16_t N,
-                                    uint16_t E);
+void nr_polar_rate_matching_pattern(uint16_t *rmp, uint16_t *J, const uint8_t *P_i_, uint16_t K, uint16_t N, uint16_t E);
 
-void nr_polar_rate_matching(double *input,
-                            double *output,
-                            uint16_t *rmp,
-                            uint16_t K,
-                            uint16_t N,
-                            uint16_t E);
+void nr_polar_rate_matching(double *input, double *output, uint16_t *rmp, uint16_t K, uint16_t N, uint16_t E);
 
-void nr_polar_interleaving_pattern(uint16_t K,
-                                   uint8_t I_IL,
-                                   uint16_t *PI_k_);
+void nr_polar_interleaving_pattern(uint16_t K, uint8_t I_IL, uint16_t *PI_k_);
 
 void nr_polar_info_bit_pattern(uint8_t *ibp,
                                uint8_t *pcbp,
@@ -236,18 +219,11 @@ void nr_polar_info_bit_pattern(uint8_t *ibp,
                                const uint8_t n_PC,
                                const uint8_t n_pc_wm);
 
-void nr_polar_info_bit_extraction(uint8_t *input,
-                                  uint8_t *output,
-                                  uint8_t *pattern,
-                                  uint16_t size);
+void nr_polar_info_bit_extraction(uint8_t *input, uint8_t *output, uint8_t *pattern, uint16_t size);
 
-void nr_bit2byte_uint32_8(uint32_t *in,
-                          uint16_t arraySize,
-                          uint8_t *out);
+void nr_bit2byte_uint32_8(uint32_t *in, uint16_t arraySize, uint8_t *out);
 
-void nr_byte2bit_uint8_32(uint8_t *in,
-                          uint16_t arraySize,
-                          uint32_t *out);
+void nr_byte2bit_uint8_32(uint8_t *in, uint16_t arraySize, uint32_t *out);
 
 const uint8_t **crc24c_generator_matrix(uint16_t payloadSizeBits);
 
@@ -258,15 +234,9 @@ void nr_polar_generate_u(uint64_t *u,
                          uint16_t N,
                          uint8_t n_pc);
 
-void nr_polar_uxG(uint8_t const* u, size_t N, uint8_t* D);
+void nr_polar_uxG(uint8_t const *u, size_t N, uint8_t *D);
 
-void nr_polar_bit_insertion(uint8_t *input,
-                            uint8_t *output,
-                            uint16_t N,
-                            uint16_t K,
-                            int16_t *Q_I_N,
-                            int16_t *Q_PC_N,
-                            uint8_t n_PC);
+void nr_polar_bit_insertion(uint8_t *input, uint8_t *output, uint16_t N, uint16_t K, int16_t *Q_I_N, int16_t *Q_PC_N, uint8_t n_PC);
 
 void nr_matrix_multiplication_uint8_1D_uint8_2D(const uint8_t *matrix1,
                                                 const uint8_t **matrix2,
@@ -274,46 +244,39 @@ void nr_matrix_multiplication_uint8_1D_uint8_2D(const uint8_t *matrix1,
                                                 uint16_t row,
                                                 uint16_t col);
 
-void nr_sort_asc_double_1D_array_ind(double *matrix,
-                                     uint8_t *ind,
-                                     uint8_t len);
+void nr_sort_asc_double_1D_array_ind(double *matrix, uint8_t *ind, uint8_t len);
 
 void nr_free_double_2D_array(double **input, uint16_t xlen);
 
 #ifndef __cplusplus
 void updateLLR(uint8_t listSize,
-	       uint16_t row,
-	       uint16_t col,
-	        uint16_t xlen,
-	       uint8_t ylen,
-	       int zlen,
-	       double  llr[xlen][ylen][zlen],
-	       uint8_t llrU[xlen][ylen],
-	       uint8_t bit[xlen][ylen][zlen],
-	       uint8_t bitU[xlen][ylen]
-	       );
+               uint16_t row,
+               uint16_t col,
+               uint16_t xlen,
+               uint8_t ylen,
+               int zlen,
+               double llr[xlen][ylen][zlen],
+               uint8_t llrU[xlen][ylen],
+               uint8_t bit[xlen][ylen][zlen],
+               uint8_t bitU[xlen][ylen]);
 void updatePathMetric(double *pathMetric,
-		      uint8_t listSize,
-		      uint8_t bitValue,
-		      uint16_t row,
-		      int xlen,
-		      int ylen,
-		      int zlen,
-		      double llr[xlen][ylen][zlen]
-		      );
+                      uint8_t listSize,
+                      uint8_t bitValue,
+                      uint16_t row,
+                      int xlen,
+                      int ylen,
+                      int zlen,
+                      double llr[xlen][ylen][zlen]);
 void updatePathMetric2(double *pathMetric,
-		       uint8_t listSize,
-		       uint16_t row,
-		       int xlen,
-		       int ylen,
-		       int zlen,
-		       double llr[xlen][ylen][zlen]);
+                       uint8_t listSize,
+                       uint16_t row,
+                       int xlen,
+                       int ylen,
+                       int zlen,
+                       double llr[xlen][ylen][zlen]);
 #endif
-//Also nr_polar_rate_matcher
-static inline void nr_polar_interleaver(uint8_t *input,
-                                        uint8_t *output,
-                                        uint16_t *pattern,
-                                        uint16_t size)
+// Also nr_polar_rate_matcher
+static inline void nr_polar_interleaver(uint8_t *input, uint8_t *output, uint16_t *pattern, uint16_t size)
 {
   for (int i = 0; i < size; i++)
     output[i] = input[pattern[i]];
