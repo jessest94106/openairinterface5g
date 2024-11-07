@@ -145,12 +145,13 @@ sctp_assoc_t get_new_cuup_for_ue(const gNB_RRC_INST *rrc, const gNB_RRC_UE_t *ue
 /**
  * @brief Trigger E1AP Setup Failure on CU-CP
 */
-static void e1ap_setup_failure(sctp_assoc_t assoc_id, uint64_t transac_id)
+static void e1ap_setup_failure(sctp_assoc_t assoc_id, uint64_t transac_id, e1ap_cause_t cause)
 {
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, E1AP_SETUP_FAIL);
   msg_p->ittiMsgHeader.originInstance = assoc_id;
   e1ap_setup_fail_t *setup_fail = &E1AP_SETUP_FAIL(msg_p);
   setup_fail->transac_id = transac_id;
+  setup_fail->cause = cause;
   LOG_I(NR_RRC, "Triggering E1AP Setup Failure for transac_id %ld, assoc_id %ld\n",
         transac_id,
         msg_p->ittiMsgHeader.originInstance);
@@ -176,7 +177,8 @@ int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, e1ap_setup_req_t *req)
             c->setup_req->gNB_cu_up_id,
             c->setup_req->gNB_cu_up_name,
             c->assoc_id);
-      e1ap_setup_failure(assoc_id, req->transac_id);
+      e1ap_cause_t cause = { .type = E1AP_CAUSE_RADIO_NETWORK, .value = E1AP_RADIO_CAUSE_UNKNOWN_ALREADY_ALLOCATED_GNB_CU_UP_UE_E1AP_ID};
+      e1ap_setup_failure(assoc_id, req->transac_id, cause);
       return -1;
     }
   }
@@ -190,7 +192,8 @@ int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, e1ap_setup_req_t *req)
             id->mnc,
             rrc->configuration.mcc[i],
             rrc->configuration.mnc[i]);
-      e1ap_setup_failure(assoc_id, req->transac_id);
+      e1ap_cause_t cause = { .type = E1AP_CAUSE_RADIO_NETWORK, .value = E1AP_RADIO_CAUSE_OTHER};
+      e1ap_setup_failure(assoc_id, req->transac_id, cause);
       return -1;
     }
   }
