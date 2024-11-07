@@ -255,6 +255,45 @@ static void test_e1_cuup_setup_request(void)
   free_e1ap_cuup_setup_request(&cp);
 }
 
+/**
+ * @brief Test CU-UP Setup Response encoding/decoding
+ */
+static void test_e1_cuup_setup_response(void)
+{
+  e1ap_setup_resp_t orig = {.transac_id = 42,
+                            .gNB_cu_cp_name = strdup("OAI CU-CP"),
+                            .tnla_info = malloc(sizeof(tnl_address_info_t))};
+  orig.tnla_info->num_addresses_to_add = 1;
+  orig.tnla_info->num_addresses_to_remove = 1;
+  orig.tnla_info->addresses_to_add[0].num_gtp_tl_addresses = 1;
+  orig.tnla_info->addresses_to_add[0].ipsec_tl_address = 0xC0A80001;
+  orig.tnla_info->addresses_to_add[0].gtp_tl_addresses[0] = 0xC0A80002;
+  orig.tnla_info->num_addresses_to_remove = 1;
+  orig.tnla_info->addresses_to_remove[0].num_gtp_tl_addresses = 1;
+  orig.tnla_info->addresses_to_remove[0].ipsec_tl_address = 0xC0A80003;
+  orig.tnla_info->addresses_to_remove[0].gtp_tl_addresses[0] = 0xC0A80004;
+
+  E1AP_E1AP_PDU_t *encoded = encode_e1ap_cuup_setup_response(&orig);
+  E1AP_E1AP_PDU_t *decoded_msg = e1ap_encode_decode(encoded);
+  e1ap_msg_free(encoded);
+
+  e1ap_setup_resp_t decoded = {0};
+  bool ret = decode_e1ap_cuup_setup_response(decoded_msg, &decoded);
+  AssertFatal(ret, "Failed to decode setup response");
+  e1ap_msg_free(decoded_msg);
+
+  ret = eq_e1ap_cuup_setup_response(&orig, &decoded);
+  AssertFatal(ret, "Decoded setup response doesn't match original");
+  free_e1ap_cuup_setup_response(&decoded);
+
+  e1ap_setup_resp_t cp = cp_e1ap_cuup_setup_response(&orig);
+  ret = eq_e1ap_cuup_setup_response(&orig, &cp);
+  AssertFatal(ret, "eq_e1ap_cuup_setup_response(): copied message doesn't match\n");
+
+  free_e1ap_cuup_setup_response(&orig);
+  free_e1ap_cuup_setup_response(&cp);
+}
+
 int main()
 {
   // E1 Bearer Context Setup
@@ -262,5 +301,6 @@ int main()
   test_bearer_context_setup_response();
   // E1 Interface Management
   test_e1_cuup_setup_request();
+  test_e1_cuup_setup_response();
   return 0;
 }
