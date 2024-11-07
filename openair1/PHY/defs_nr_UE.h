@@ -396,8 +396,6 @@ typedef struct PHY_VARS_NR_UE_s {
   nr_synch_request_t synch_request;
 
   NR_UE_PRACH     *prach_vars[NUMBER_OF_CONNECTED_gNB_MAX];
-  NR_UE_CSI_IM    *csiim_vars[NUMBER_OF_CONNECTED_gNB_MAX];
-  NR_UE_CSI_RS    *csirs_vars[NUMBER_OF_CONNECTED_gNB_MAX];
   NR_UE_SRS       *srs_vars[NUMBER_OF_CONNECTED_gNB_MAX];
   NR_UE_PRS       *prs_vars[NR_MAX_PRS_COMB_SIZE];
   uint8_t          prs_active_gNBs;
@@ -603,7 +601,8 @@ typedef struct nr_phy_data_s {
 
   // Sidelink Rx action decided by MAC
   sl_nr_rx_config_type_enum_t sl_rx_action;
-
+  NR_UE_CSI_RS csirs_vars;
+  NR_UE_CSI_IM csiim_vars;
 } nr_phy_data_t;
 
 enum stream_status_e { STREAM_STATUS_UNSYNC, STREAM_STATUS_SYNCING, STREAM_STATUS_SYNCED};

@@ -453,6 +453,7 @@ int main(int argc, char **argv)
     init_pdcp(0);
   else
     init_pdcp(mode_offset + ue_id_g);
+  nas_init_nrue(NB_UE_INST);
 
   init_NR_UE(NB_UE_INST, get_nrUE_params()->uecap_file, get_nrUE_params()->reconfig_file, get_nrUE_params()->rbconfig_file);
 

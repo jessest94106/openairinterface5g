@@ -1058,29 +1058,28 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
   __attribute__ ((aligned(32))) c16_t rxdataF[ue->frame_parms.nb_antennas_rx][rxdataF_sz];
 
   // do procedures for CSI-IM
-  if ((ue->csiim_vars[gNB_id]) && (ue->csiim_vars[gNB_id]->active == 1)) {
+  if (phy_data->csiim_vars.active == 1) {
     for(int symb_idx = 0; symb_idx < 4; symb_idx++) {
-      int symb = ue->csiim_vars[gNB_id]->csiim_config_pdu.l_csiim[symb_idx];
+      int symb = phy_data->csiim_vars.csiim_config_pdu.l_csiim[symb_idx];
       if (!slot_fep_map[symb]) {
         nr_slot_fep(ue, &ue->frame_parms, proc->nr_slot_rx, symb, rxdataF, link_type_dl, 0, ue->common_vars.rxdata);
         slot_fep_map[symb] = true;
       }
     }
-    nr_ue_csi_im_procedures(ue, proc, rxdataF);
-    ue->csiim_vars[gNB_id]->active = 0;
+    nr_ue_csi_im_procedures(ue, proc, rxdataF, &phy_data->csiim_vars.csiim_config_pdu);
   }
 
   // do procedures for CSI-RS
-  if ((ue->csirs_vars[gNB_id]) && (ue->csirs_vars[gNB_id]->active == 1)) {
+  if (phy_data->csirs_vars.active == 1) {
     for(int symb = 0; symb < NR_SYMBOLS_PER_SLOT; symb++) {
-      if(is_csi_rs_in_symbol(ue->csirs_vars[gNB_id]->csirs_config_pdu, symb)) {
+      if(is_csi_rs_in_symbol(phy_data->csirs_vars.csirs_config_pdu, symb)) {
         if (!slot_fep_map[symb]) {
           nr_slot_fep(ue, &ue->frame_parms, proc->nr_slot_rx, symb, rxdataF, link_type_dl, 0, ue->common_vars.rxdata);
           slot_fep_map[symb] = true;
         }
       }
     }
-    nr_ue_csi_rs_procedures(ue, proc, rxdataF);
+    nr_ue_csi_rs_procedures(ue, proc, rxdataF, &phy_data->csirs_vars.csirs_config_pdu);
   }
 
   if (dlsch[0].active) {
