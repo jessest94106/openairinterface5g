@@ -143,17 +143,6 @@ def AnalyzeBuildLogs(buildRoot, images, globalStatus):
 		collectInfo[image] = files
 	return collectInfo
 
-def GetCredentials(instance):
-    server_id = instance.eNB_serverId[instance.eNB_instance]
-    if server_id == '0':
-        return (instance.eNBIPAddress, instance.eNBUserName, instance.eNBPassword, instance.eNBSourceCodePath)
-    elif server_id == '1':
-        return (instance.eNB1IPAddress, instance.eNB1UserName, instance.eNB1Password, instance.eNB1SourceCodePath)
-    elif server_id == '2':
-        return (instance.eNB2IPAddress, instance.eNB2UserName, instance.eNB2Password, instance.eNB2SourceCodePath)
-    else:
-        raise Exception ("Only supports maximum of 3 servers")
-
 def GetContainerName(ssh, svcName, file):
 	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".container_name'", silent=True)
 	return ret.stdout
@@ -355,28 +344,23 @@ class Containerize():
 # Container management functions
 #-----------------------------------------------------------
 
+	def GetCredentials(self, server_id):
+		if server_id == '0':
+			ip, path = self.eNBIPAddress, self.eNBSourceCodePath
+		elif server_id == '1':
+			ip, path = self.eNB1IPAddress, self.eNB1SourceCodePath
+		elif server_id == '2':
+			ip, path = self.eNB2IPAddress, self.eNB2SourceCodePath
+		else:
+			raise ValueError(f"unknown server ID '{server_id}'")
+		if ip == '' or path == '':
+			HELP.GenericHelp(CONST.Version)
+			raise ValueError(f'Insufficient Parameter: IP/node {ip}, path {path}')
+		return (ip, path)
+
 	def BuildImage(self, HTML):
-		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		if self.eNB_serverId[self.eNB_instance] == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		svr = self.eNB_serverId[self.eNB_instance]
+		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
 		cmd = cls_cmd.RemoteCmd(lIpAddr)
 	
@@ -574,30 +558,8 @@ class Containerize():
 			return False
 
 	def BuildProxy(self, HTML):
-		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		if self.eNB_serverId[self.eNB_instance] == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		if self.proxyCommit is None:
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter (need proxyCommit for proxy build)')
+		svr = self.eNB_serverId[self.eNB_instance]
+		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 
@@ -698,27 +660,8 @@ class Containerize():
 			return False
 
 	def BuildRunTests(self, HTML):
-		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		if self.eNB_serverId[self.eNB_instance] == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		svr = self.eNB_serverId[self.eNB_instance]
+		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
 		cmd = cls_cmd.RemoteCmd(lIpAddr)
 		cmd.cd(lSourcePath)
@@ -781,24 +724,7 @@ class Containerize():
 			return False
 
 	def Push_Image_to_Local_Registry(self, HTML):
-		if self.registrySvrId == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.registrySvrId == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.registrySvrId == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		lIpAddr, lSourcePath = self.GetCredentials(self.registrySvrId)
 		logging.debug('Pushing images from server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
@@ -846,26 +772,7 @@ class Containerize():
 		return True
 
 	def Pull_Image_from_Local_Registry(self, HTML):
-		# This method can be called either onto a remote server (different from python executor)
-		# or directly on the python executor (ie lIpAddr == 'none')
-		if self.testSvrId == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.testSvrId == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.testSvrId == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		lIpAddr, lSourcePath = self.GetCredentials(self.testSvrId)
 		logging.debug('\u001B[1m Pulling image(s) on server: ' + lIpAddr + '\u001B[0m')
 		myCmd = cls_cmd.getConnection(lIpAddr)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
@@ -905,26 +812,7 @@ class Containerize():
 		return True
 
 	def Clean_Test_Server_Images(self, HTML):
-		# This method can be called either onto a remote server (different from python executor)
-		# or directly on the python executor (ie lIpAddr == 'none')
-		if self.testSvrId == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.testSvrId == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.testSvrId == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		lIpAddr, lSourcePath = self.GetCredentials(self.testSvrId)
 		if lIpAddr != 'none':
 			logging.debug('Removing test images from server: ' + lIpAddr)
 			myCmd = cls_cmd.RemoteCmd(lIpAddr)
@@ -943,25 +831,8 @@ class Containerize():
 		return True
 
 	def Create_Workspace(self,HTML):
-		if self.eNB_serverId[self.eNB_instance] == '0':
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-			lSourcePath = self.eNBSourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '1':
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-			lSourcePath = self.eNB1SourceCodePath
-		elif self.eNB_serverId[self.eNB_instance] == '2':
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-			lSourcePath = self.eNB2SourceCodePath
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		
+		svr = self.eNB_serverId[self.eNB_instance]
+		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 		if success:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [f"created workspace {lSourcePath}"])
@@ -970,10 +841,8 @@ class Containerize():
 		return success
 
 	def DeployObject(self, HTML):
-		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		svr = self.eNB_serverId[self.eNB_instance]
+		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('\u001B[1m Deploying OAI Object on server: ' + lIpAddr + '\u001B[0m')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		wd = f'{lSourcePath}/{yaml}'
@@ -1016,10 +885,8 @@ class Containerize():
 		return fstatus
 
 	def UndeployObject(self, HTML, RAN):
-		lIpAddr, lUserName, lPassWord, lSourcePath = GetCredentials(self)
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
+		svr = self.eNB_serverId[self.eNB_instance]
+		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {lIpAddr}\u001B[0m')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		wd = f'{lSourcePath}/{yaml}'
