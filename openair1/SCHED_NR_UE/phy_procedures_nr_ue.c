@@ -409,13 +409,13 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
   if (ret==0) {
 
 #ifdef DEBUG_PHY_PROC
-    uint16_t frame_tx;
-    LOG_D(PHY,"[UE %d] frame %d, nr_slot_rx %d, Received PBCH (MIB): frame_tx %d. N_RB_DL %d\n",
-    ue->Mod_id,
-    frame_rx,
-    nr_slot_rx,
-    frame_tx,
-    ue->frame_parms.N_RB_DL);
+    LOG_D(PHY,
+          "[UE %d] frame %d, nr_slot_rx %d, Received PBCH (MIB): ssb idx: %d, N_RB_DL %d\n",
+          ue->Mod_id,
+          frame_rx,
+          nr_slot_rx,
+          ssb_index,
+          ue->frame_parms.N_RB_DL);
 #endif
 
   } else {
