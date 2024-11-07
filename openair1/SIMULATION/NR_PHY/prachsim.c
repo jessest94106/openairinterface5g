@@ -662,9 +662,6 @@ int main(int argc, char **argv){
     LOG_M("txsig0_frame.m","txs0", txdata[0],frame_parms->samples_per_frame,1,1);
   #endif
 
-  // multipath channel
-  // dump_nr_prach_config(&gNB->frame_parms,subframe);
-
   for (i = 0; i < frame_parms->samples_per_subframe; i++) {
     for (aa=0; aa<1; aa++) {
       if (awgn_flag == 0) {

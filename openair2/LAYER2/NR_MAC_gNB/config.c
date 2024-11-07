@@ -712,14 +712,6 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
           (nrmac->ulsch_slot_bitmap[slot / 64] & ((uint64_t)1 << (slot % 64))) != 0);
   }
 
-  if (get_softmodem_params()->phy_test) {
-    nrmac->pre_processor_dl = nr_preprocessor_phytest;
-    nrmac->pre_processor_ul = nr_ul_preprocessor_phytest;
-  } else {
-    nrmac->pre_processor_dl = nr_init_fr1_dlsch_preprocessor(0);
-    nrmac->pre_processor_ul = nr_init_fr1_ulsch_preprocessor(0);
-  }
-
   NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
   NR_SCHED_LOCK(&nrmac->sched_lock);
   for (int n = 0; n < NR_NB_RA_PROC_MAX; n++) {

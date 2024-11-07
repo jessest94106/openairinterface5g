@@ -92,28 +92,17 @@ unsigned short config_frames[4] = {2,9,11,13};
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
 int nfapi_sync_var=-1; //!< protected by mutex \ref nfapi_sync_mutex
-
-extern uint8_t nfapi_mode; // Default to monolithic mode
 THREAD_STRUCT thread_struct;
 pthread_cond_t sync_cond;
 pthread_mutex_t sync_mutex;
 int sync_var=-1; //!< protected by mutex \ref sync_mutex.
 int config_sync_var=-1;
-
-volatile int             start_gNB = 0;
 int oai_exit = 0;
-
-int NB_UE_INST = 0;
-
-static int wait_for_sync = 0;
 
 unsigned int mmapped_dma=0;
 
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
 int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
-
-//Temp fix for inexistent NR upper layer
-unsigned char NB_gNB_INST = 1;
 char *uecap_file;
 
 runmode_t mode = normal_txrx;
@@ -131,26 +120,10 @@ double rx_gain[MAX_NUM_CCs][4] = {{110,0,0,0},{20,0,0,0}};
 double rx_gain_off = 0.0;
 
 static int tx_max_power[MAX_NUM_CCs]; /* =  {0,0}*/;
-
-
 int chain_offset=0;
-
-uint8_t dci_Format = 0;
-uint8_t nb_antenna_tx = 1;
-uint8_t nb_antenna_rx = 1;
-
-int otg_enabled;
-
 extern void *udp_eNB_task(void *args_p);
-
-int transmission_mode=1;
 int emulate_rf = 0;
 int numerology = 0;
-
-
-/* struct for ethernet specific parameters given in eNB conf file */
-eth_params_t *eth_params;
-
 double cpuf;
 
 /* hack: pdcp_run() is required by 4G scheduler which is compiled into
@@ -159,9 +132,6 @@ void pdcp_run(const protocol_ctxt_t *const ctxt_pP)
 {
   abort();
 }
-
-/* forward declarations */
-void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs], NR_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]);
 
 /*---------------------BMC: timespec helpers -----------------------------*/
 
@@ -273,14 +243,8 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
 
   RCconfig_verify(cfg, node_type);
 
-  if(NFAPI_MODE != NFAPI_MODE_AERIAL){
-    RCconfig_nr_prs();
-  }
-
   if (RC.nb_nr_macrlc_inst > 0)
     RCconfig_nr_macrlc(cfg);
-
-  LOG_D(PHY, "%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
 
   if (RC.nb_nr_L1_inst>0) AssertFatal(l1_north_init_gNB()==0,"could not initialize L1 north interface\n");
 
@@ -288,18 +252,11 @@ static int create_gNB_tasks(ngran_node_t node_type, configmodule_interface_t *cf
                "Number of gNB is greater than gNB defined in configuration file (%d/%d)!",
                gnb_nb, RC.nb_nr_inst);
 
-  LOG_D(GNB_APP, "Allocating gNB_RRC_INST for %d instances\n", RC.nb_nr_inst);
+  LOG_D(GNB_APP, "Allocating gNB_RRC_INST\n");
+  RC.nrrrc = calloc(1, sizeof(*RC.nrrrc));
+  RC.nrrrc[0] = RCconfig_NRRRC();
 
-  if (RC.nb_nr_inst > 0) {
-    AssertFatal(RC.nb_nr_inst == 1, "multiple RRC instances are not supported\n");
-    RC.nrrrc = calloc(1, sizeof(*RC.nrrrc));
-    RC.nrrrc[0] = calloc(1,sizeof(gNB_RRC_INST));
-    RCconfig_NRRRC(RC.nrrrc[0]);
-  }
-
-  if (RC.nb_nr_inst > 0 &&
-      !get_softmodem_params()->nsa &&
-      !(node_type == ngran_gNB_DU))  {
+  if (!get_softmodem_params()->nsa && !(node_type == ngran_gNB_DU)) {
     // we start pdcp in both cuup (for drb) and cucp (for srb)
     init_pdcp();
   }
@@ -401,65 +358,6 @@ static void get_options(configmodule_interface_t *cfg)
   get_common_options(cfg, SOFTMODEM_GNB_BIT);
   config_process_cmdline(cfg, cmdline_params, sizeofArray(cmdline_params), NULL);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
-
-  if ( !(CONFIG_ISFLAGSET(CONFIG_ABORT)) ) {
-    memset((void *)&RC,0,sizeof(RC));
-    /* Read RC configuration file */
-    NRRCConfig();
-    NB_gNB_INST = RC.nb_nr_inst;
-    NB_RU   = RC.nb_RU;
-  }
-}
-
-void set_default_frame_parms(nfapi_nr_config_request_scf_t *config[MAX_NUM_CCs],
-                             NR_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]) {
-  for (int CC_id=0; CC_id<MAX_NUM_CCs; CC_id++) {
-    frame_parms[CC_id] = (NR_DL_FRAME_PARMS *) malloc(sizeof(NR_DL_FRAME_PARMS));
-    config[CC_id] = (nfapi_nr_config_request_scf_t *) malloc(sizeof(nfapi_nr_config_request_scf_t));
-    config[CC_id]->ssb_config.scs_common.value = 1;
-    config[CC_id]->cell_config.frame_duplex_type.value = 1; //FDD
-    //config[CC_id]->subframe_config.dl_cyclic_prefix_type.value = 0; //NORMAL
-    config[CC_id]->carrier_config.dl_grid_size[1].value = 106;
-    config[CC_id]->carrier_config.ul_grid_size[1].value = 106;
-    config[CC_id]->cell_config.phy_cell_id.value = 0;
-    ///dl frequency to be filled in
-    /*  //Set some default values that may be overwritten while reading options
-        frame_parms[CC_id]->frame_type          = FDD;
-        frame_parms[CC_id]->tdd_config          = 3;
-        frame_parms[CC_id]->tdd_config_S        = 0;
-        frame_parms[CC_id]->N_RB_DL             = 100;
-        frame_parms[CC_id]->N_RB_UL             = 100;
-        frame_parms[CC_id]->Ncp                 = NORMAL;
-        frame_parms[CC_id]->Ncp_UL              = NORMAL;
-        frame_parms[CC_id]->Nid_cell            = 0;
-        frame_parms[CC_id]->num_MBSFN_config    = 0;
-        frame_parms[CC_id]->nb_antenna_ports_gNB  = 1;
-        frame_parms[CC_id]->nb_antennas_tx      = 1;
-        frame_parms[CC_id]->nb_antennas_rx      = 1;
-
-        frame_parms[CC_id]->nushift             = 0;
-
-        frame_parms[CC_id]->phich_config_common.phich_resource = oneSixth;
-        frame_parms[CC_id]->phich_config_common.phich_duration = normal;
-        // UL RS Config
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.cyclicShift = 0;//n_DMRS1 set to 0
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.groupHoppingEnabled = 0;
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.sequenceHoppingEnabled = 0;
-        frame_parms[CC_id]->pusch_config_common.ul_ReferenceSignalsPUSCH.groupAssignmentPUSCH = 0;
-
-        frame_parms[CC_id]->prach_config_common.rootSequenceIndex=22;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.zeroCorrelationZoneConfig=1;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.prach_ConfigIndex=0;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.highSpeedFlag=0;
-        frame_parms[CC_id]->prach_config_common.prach_ConfigInfo.prach_FreqOffset=0;
-
-    //    downlink_frequency[CC_id][0] = 2680000000; // Use float to avoid issue with frequency over 2^31.
-    //    downlink_frequency[CC_id][1] = downlink_frequency[CC_id][0];
-    //    downlink_frequency[CC_id][2] = downlink_frequency[CC_id][0];
-    //    downlink_frequency[CC_id][3] = downlink_frequency[CC_id][0];
-        frame_parms[CC_id]->dl_CarrierFreq=downlink_frequency[CC_id][0];
-    */
-  }
 }
 
 void wait_RUs(void) {
@@ -596,6 +494,7 @@ int main( int argc, char **argv ) {
   lock_memory_to_ram();
   get_options(uniqCfg);
 
+
   EPC_MODE_ENABLED = !IS_SOFTMODEM_NOS1;
 
   if (CONFIG_ISFLAGSET(CONFIG_ABORT) ) {
@@ -630,9 +529,19 @@ int main( int argc, char **argv ) {
 
   // don't create if node doesn't connect to RRC/S1/GTP
   const ngran_node_t node_type = get_node_type();
+  // Init RAN context
+  if (!(CONFIG_ISFLAGSET(CONFIG_ABORT)))
+    NRRCConfig();
 
-  if (RC.nb_nr_L1_inst > 0)
+  if (RC.nb_nr_L1_inst > 0) {
+    // Initialize gNB structure in RAN context
+    init_gNB();
+    // Initialize L1
     RCconfig_NR_L1();
+    // Initialize Positioning Reference Signal configuration
+    if(NFAPI_MODE != NFAPI_MODE_PNF && NFAPI_MODE != NFAPI_MODE_AERIAL)
+      RCconfig_nr_prs();
+  }
 
   if (NFAPI_MODE != NFAPI_MODE_PNF) {
     int ret = create_gNB_tasks(node_type, uniqCfg);
@@ -650,10 +559,6 @@ int main( int argc, char **argv ) {
 
   // start the main threads
   number_of_cards = 1;
-
-  if (RC.nb_nr_L1_inst > 0) {
-    init_gNB(wait_for_sync);
-  }
 
   wait_gNBs();
   int sl_ahead = NFAPI_MODE == NFAPI_MODE_AERIAL ? 0 : 6;
