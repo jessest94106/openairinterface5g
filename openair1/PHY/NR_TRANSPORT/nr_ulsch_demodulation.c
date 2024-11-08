@@ -1486,14 +1486,16 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
 
   int total_res = 0;
   for(uint8_t symbol = rel15_ul->start_symbol_index; symbol < end_symbol; symbol += numSymbols) {
+    int res_per_task = 0;
     for (int s = 0; s < numSymbols; s++) { 
       pusch_vars->ul_valid_re_per_slot[symbol+s] = get_nb_re_pusch(frame_parms,rel15_ul,symbol+s);
       pusch_vars->llr_offset[symbol+s] = ((symbol+s) == rel15_ul->start_symbol_index) ? 
                                          0 : 
                                          pusch_vars->llr_offset[symbol+s-1] + pusch_vars->ul_valid_re_per_slot[symbol+s-1] * rel15_ul->qam_mod_order;
-      total_res+=pusch_vars->ul_valid_re_per_slot[symbol+s];
+      res_per_task += pusch_vars->ul_valid_re_per_slot[symbol + s];
     }
-    if (total_res > 0) {
+    total_res += res_per_task;
+    if (res_per_task > 0) {
       union puschSymbolReqUnion id = {.s={ulsch_id,frame,slot,0}};
       id.p=1+symbol;
       notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(puschSymbolProc_t), id.p, &gNB->respPuschSymb, &nr_pusch_symbol_processing); // create a job for Tpool
