@@ -38,6 +38,7 @@
 #include <simde/simde-common.h>
 #include <simde/x86/sse.h>
 #include <simde/x86/avx2.h>
+#include "common/utils/LOG/log.h"
 
 #define simd_q15_t simde__m128i
 #define simdshort_q15_t simde__m64
@@ -623,7 +624,7 @@ static inline dft_size_idx_t get_dft(int size)
   switch (size) {
     FOREACH_DFTSZ(FIND_ENUM)
     default:
-      AssertFatal(false, "function get_dft : unsupported DFT size %d\n", size);
+      LOG_E(UTIL, "function get_dft : unsupported DFT size %d\n", size);
       break;
   }
   return DFT_SIZE_IDXTABLESIZE;
