@@ -382,20 +382,6 @@ rfsim4g_ue_fembms:
   CmdPrefix: docker exec rfsim4g-oai-lte-ue0
   IF: oaitun_uem1
 
-l2sim5g_ue:
-  Host: "%%current_host%%"
-  AttachScript: docker start l2sim-oai-nr-ue0
-  DetachScript: docker stop l2sim-oai-nr-ue0
-  NetworkScript: docker exec l2sim-oai-nr-ue0 ip a show dev oaitun_ue1
-  CmdPrefix: docker exec l2sim-oai-nr-ue0
-  IF: oaitun_ue1
-  MTU: 1500
-
-l2sim5g_ext_dn:
-  Host: "%%current_host%%"
-  NetworkScript: docker exec l2sim-oai-ext-dn ip a show dev eth0
-  CmdPrefix: docker exec l2sim-oai-ext-dn
-
 l2sim4g_ue:
   Host: "%%current_host%%"
   AttachScript: docker start l2sim4g-oai-lte-ue1
