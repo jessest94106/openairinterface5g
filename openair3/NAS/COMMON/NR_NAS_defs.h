@@ -256,6 +256,7 @@ typedef enum {
 } cause_secu_id_t;
 								
 // IEI (information element identifier) are spread in each message definition
+#define IEI_NULL 0x00
 #define IEI_RAND 0x21
 #define IEI_AUTN 0x20
 #define IEI_EAP  0x78
