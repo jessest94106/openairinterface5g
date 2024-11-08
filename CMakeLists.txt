@@ -1897,12 +1897,6 @@ add_executable(measurement_display
   ${OPENAIR_DIR}/common/utils/threadPool/measurement_display.c)
 target_link_libraries (measurement_display minimal_lib)
 
-add_executable(test5Gnas
-  ${OPENAIR_DIR}/openair3/TEST/test5Gnas.c
-)
-target_link_libraries (test5Gnas LIB_5GNAS_GNB minimal_lib )
-
-
 # lte-softmodem is both eNB and UE implementation
 ###################################################
 

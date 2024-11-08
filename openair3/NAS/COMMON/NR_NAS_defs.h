@@ -25,7 +25,6 @@
 
 #include <common/utils/LOG/log.h>
 #include <openair3/UICC/usim_interface.h>
-#include <openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h>
 
 /* TS 24.007 possible L3 formats:
    Table 11.1: Formats of information elements
@@ -381,18 +380,6 @@ int resToresStar(uint8_t *msg, const uicc_t* uicc);
 
 int identityResponse(void **msg, nr_user_nas_t *UE);
 int authenticationResponse(void **msg, nr_user_nas_t *UE);
-void UEprocessNAS(void *msg,nr_user_nas_t *UE);
-void SGSabortUE(void *msg, NRUEcontext_t *UE) ;
-void SGSregistrationReq(void *msg, NRUEcontext_t *UE);
-void SGSderegistrationUEReq(void *msg, NRUEcontext_t *UE);
-void SGSauthenticationResp(void *msg, NRUEcontext_t *UE);
-void SGSidentityResp(void *msg, NRUEcontext_t *UE);
-void SGSsecurityModeComplete(void *msg, NRUEcontext_t *UE);
-void SGSregistrationComplete(void *msg, NRUEcontext_t *UE);
-void processNAS(void *msg, NRUEcontext_t *UE);
-int identityRequest(void **msg, NRUEcontext_t *UE);
-int authenticationRequest(void **msg, NRUEcontext_t *UE);
-int securityModeCommand(void **msg, NRUEcontext_t *UE);
 void servingNetworkName(uint8_t *msg, char * imsiStr, int nmc_size);
 
 #endif
