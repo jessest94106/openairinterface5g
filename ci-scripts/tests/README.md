@@ -6,9 +6,10 @@ scripts.
 There are some unit tests. From the parent directory, i.e., `ci-scripts/`,
 start with
 
+    python tests/cmd.py -v
     python tests/deployment.py -v
-    python tests/ping-iperf.py -v
     python tests/iperf-analysis.py -v
+    python tests/ping-iperf.py -v
 
 It will indicate if all tests passed. It assumes that these images are present:
 
