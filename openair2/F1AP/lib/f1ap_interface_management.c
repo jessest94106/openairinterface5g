@@ -534,16 +534,16 @@ bool decode_f1ap_setup_request(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_req_t *out
   return true;
 }
 
-static void copy_f1ap_served_cell_info(f1ap_served_cell_info_t *dest, const f1ap_served_cell_info_t *src) {
+void copy_f1ap_served_cell_info(f1ap_served_cell_info_t *dest, const f1ap_served_cell_info_t *src)
+{
+  // shallow copy
   *dest = *src;
-  dest->mode = src->mode;
-  dest->tdd = src->tdd;
-  dest->fdd = src->fdd;
-  dest->plmn = src->plmn;
+  // tac
   if (src->tac) {
     dest->tac = malloc_or_fail(sizeof(*dest->tac));
     *dest->tac = *src->tac;
   }
+  // measurement timing config
   if (src->measurement_timing_config_len) {
     dest->measurement_timing_config = calloc_or_fail(src->measurement_timing_config_len, sizeof(*dest->measurement_timing_config));
     memcpy(dest->measurement_timing_config, src->measurement_timing_config, src->measurement_timing_config_len);
