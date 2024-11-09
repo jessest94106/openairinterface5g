@@ -11,10 +11,14 @@ start with
     python tests/iperf-analysis.py -v
     python tests/ping-iperf.py -v
 
-It will indicate if all tests passed. It assumes that these images are present:
+It will indicate if all tests passed. `tests/deployment.py` requires these
+images to be present:
 
 - `oai-ci/oai-nr-ue:develop-12345678`
 - `oai-ci/oai-gnb:develop-12345678`
+
+It will try to download `oaisoftwarealliance/oai-{gnb,nr-ue}:develop`
+automatically and retag the images.
 
 # test-runner test
 

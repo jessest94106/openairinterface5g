@@ -15,9 +15,24 @@ import cls_oai_html
 import cls_oaicitest
 import cls_containerize
 import ran
+import cls_cmd
 
 class TestDeploymentMethods(unittest.TestCase):
+	def _pull_image(self, cmd, image):
+		ret = cmd.run(f"docker inspect oai-ci/{image}:develop-12345678")
+		if ret.returncode == 0: # exists
+			return
+		ret = cmd.run(f"docker pull oaisoftwarealliance/{image}:develop")
+		self.assertEqual(ret.returncode, 0)
+		ret = cmd.run(f"docker tag oaisoftwarealliance/{image}:develop oai-ci/{image}:develop-12345678")
+		self.assertEqual(ret.returncode, 0)
+		ret = cmd.run(f"docker rmi oaisoftwarealliance/{image}:develop")
+		self.assertEqual(ret.returncode, 0)
+
 	def setUp(self):
+		with cls_cmd.getConnection("localhost") as cmd:
+			self._pull_image(cmd, "oai-gnb")
+			self._pull_image(cmd, "oai-nr-ue")
 		self.html = cls_oai_html.HTMLManagement()
 		self.html.testCaseId = "000000"
 		self.ci = cls_oaicitest.OaiCiTest()
