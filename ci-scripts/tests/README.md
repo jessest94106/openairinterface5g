@@ -3,8 +3,12 @@ scripts.
 
 # Unit test
 
-There are some unit tests. From the parent directory, i.e., `ci-scripts/`,
-start with
+This repository contains unit tests. To run them, switch to the parent
+directory, i.e., `ci-scripts/`, and run
+
+    python3 -m unittest tests/*.py
+
+To run individual unit tests, start them like so:
 
     python tests/build.py -v
     python tests/cmd.py -v
@@ -12,8 +16,8 @@ start with
     python tests/iperf-analysis.py -v
     python tests/ping-iperf.py -v
 
-It will indicate if all tests passed. `tests/deployment.py` requires these
-images to be present:
+The logs will indicate if all tests passed. `tests/deployment.py` requires
+these images to be present:
 
 - `oai-ci/oai-nr-ue:develop-12345678`
 - `oai-ci/oai-gnb:develop-12345678`
