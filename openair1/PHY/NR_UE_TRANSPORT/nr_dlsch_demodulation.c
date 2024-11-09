@@ -589,20 +589,21 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                            symbol,
                            nb_re_pdsch);
     if (nl >= 2) // Apply MMSE for 2, 3, and 4 Tx layers
-      nr_dlsch_mmse(rx_size_symbol,
-                    n_rx,
-                    nl,
-                    rxdataF_comp,
-                    dl_ch_mag,
-                    dl_ch_magb,
-                    dl_ch_magr,
-                    dl_ch_estimates_ext,
-                    nb_rb_pdsch,
-                    dlsch_config->qamModOrder,
-                    *log2_maxh,
-                    symbol,
-                    nb_re_pdsch,
-                    nvar);
+      if (nb_re_pdsch)
+        nr_dlsch_mmse(rx_size_symbol,
+                      n_rx,
+                      nl,
+                      rxdataF_comp,
+                      dl_ch_mag,
+                      dl_ch_magb,
+                      dl_ch_magr,
+                      dl_ch_estimates_ext,
+                      nb_rb_pdsch,
+                      dlsch_config->qamModOrder,
+                      *log2_maxh,
+                      symbol,
+                      nb_re_pdsch,
+                      nvar);
   }
   stop_meas_nr_ue_phy(ue, DLSCH_MRC_MMSE_STATS);
 
@@ -1333,50 +1334,6 @@ void nr_a_sum_b(c16_t *input_x, c16_t *input_y, unsigned short nb_rb)
   }
 }
 
-/* Zero Forcing Rx function: nr_a_mult_b()
- * Compute the complex Multiplication c=a*b
- *
- * */
-void nr_a_mult_b(c16_t *a, c16_t *b, c16_t *c, unsigned short nb_rb, unsigned char output_shift0)
-{
-  //This function is used to compute complex multiplications
-  short nr_conjugate[8]__attribute__((aligned(16))) = {1,-1,1,-1,1,-1,1,-1};
-  unsigned short rb;
-  simde__m128i *a_128,*b_128, *c_128, mmtmpD0,mmtmpD1,mmtmpD2,mmtmpD3;
-
-  a_128 = (simde__m128i *)a;
-  b_128 = (simde__m128i *)b;
-
-  c_128 = (simde__m128i *)c;
-
-  for (rb=0; rb<3*nb_rb; rb++) {
-    // the real part
-    mmtmpD0 = simde_mm_sign_epi16(a_128[0],*(simde__m128i*)&nr_conjugate[0]);
-    mmtmpD0 = simde_mm_madd_epi16(mmtmpD0,b_128[0]); //Re: (a_re*b_re - a_im*b_im)
-
-    // the imag part
-    mmtmpD1 = simde_mm_shufflelo_epi16(a_128[0],SIMDE_MM_SHUFFLE(2,3,0,1));
-    mmtmpD1 = simde_mm_shufflehi_epi16(mmtmpD1,SIMDE_MM_SHUFFLE(2,3,0,1));
-    mmtmpD1 = simde_mm_madd_epi16(mmtmpD1,b_128[0]);//Im: (x_im*y_re + x_re*y_im)
-
-    mmtmpD0 = simde_mm_srai_epi32(mmtmpD0,output_shift0);
-    mmtmpD1 = simde_mm_srai_epi32(mmtmpD1,output_shift0);
-    mmtmpD2 = simde_mm_unpacklo_epi32(mmtmpD0,mmtmpD1);
-    mmtmpD3 = simde_mm_unpackhi_epi32(mmtmpD0,mmtmpD1);
-
-    c_128[0] = simde_mm_packs_epi32(mmtmpD2,mmtmpD3);
-
-    /*printf("\n Computing mult \n");
-    print_shorts("a:",(int16_t*)&a_128[0]);
-    print_shorts("b:",(int16_t*)&b_128[0]);
-    print_shorts("pack:",(int16_t*)&c_128[0]);*/
-
-    a_128+=1;
-    b_128+=1;
-    c_128+=1;
-  }
-}
-
 /* Zero Forcing Rx function: nr_element_sign()
  * Compute b=sign*a
  *
@@ -1448,7 +1405,7 @@ static void nr_determin(int size,
                   nb_rb,
                   ((rtx & 1) == 1 ? -1 : 1) * ((ctx & 1) == 1 ? -1 : 1) * sign,
                   shift0);
-      nr_a_mult_b(a44[ctx][rtx], outtemp, rtx == 0 ? ad_bc : outtemp1, nb_rb, shift0);
+      mult_complex_vectors(a44[ctx][rtx], outtemp, rtx == 0 ? ad_bc : outtemp1, sizeofArray(outtemp1), shift0);
 
       if (rtx != 0)
         nr_a_sum_b(ad_bc, outtemp1, nb_rb);
@@ -1759,11 +1716,11 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
       // printf("Computing r_%d c_%d\n",rtx,ctx);
       // print_shorts(" H_h_H=",(int16_t*)&conjH_H_elements[ctx*nl+rtx][0][0]);
       // print_shorts(" Inv_H_h_H=",(int16_t*)&inv_H_h_H[ctx*nl+rtx][0]);
-      nr_a_mult_b(inv_H_h_H[ctx][rtx],
-                  (c16_t *)(rxdataF_comp[ctx][0] + symbol * rx_size_symbol),
-                  outtemp,
-                  nb_rb_0,
-                  shift - (fp_flag == 1 ? 2 : 0));
+      mult_complex_vectors(inv_H_h_H[ctx][rtx],
+                           (c16_t *)(rxdataF_comp[ctx][0] + symbol * rx_size_symbol),
+                           outtemp,
+                           sizeofArray(outtemp),
+                           shift - (fp_flag == 1 ? 2 : 0));
       nr_a_sum_b(rxdataF_zforcing[rtx], outtemp, nb_rb_0); // a = a + b
     }
 #ifdef DEBUG_DLSCH_DEMOD

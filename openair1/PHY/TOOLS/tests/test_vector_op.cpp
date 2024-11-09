@@ -38,22 +38,33 @@ void exit_function(const char *file, const char *function, const int line, const
 }
 #include <cstdio>
 #include "common/utils/LOG/log.h"
-#include "benchmark/benchmark.h"
 #include "openair1/PHY/TOOLS/phy_test_tools.hpp"
 
-static void BM_rotate_cpx_vector(benchmark::State &state)
+int main()
 {
-  int vector_size = state.range(0);
-  auto input_complex_16 = generate_random_c16(vector_size);
-  auto input_alpha = generate_random_c16(1);
-  AlignedVector512<c16_t> output;
-  output.resize(vector_size);
-  int shift = 2;
-  for (auto _ : state) {
-    rotate_cpx_vector(input_complex_16.data(), input_alpha.data(), output.data(), vector_size, shift);
+  const int shift = 15; // it should always be 15 to keep int16 in same range
+  for (int vector_size = 1237; vector_size < 1237 + 8; vector_size++) {
+    auto input1 = generate_random_c16(vector_size);
+    auto input2 = generate_random_c16(vector_size);
+    AlignedVector512<c16_t> output;
+    output.resize(vector_size);
+    mult_complex_vectors(input1.data(), input2.data(), output.data(), vector_size, shift);
+    for (int i = 0; i < vector_size; i++) {
+      c16_t res = c16mulShift(input1[i], input2[i], shift);
+      if (output[i].r != res.r || output[i].i != res.i) {
+        printf("Error at %d: (%d,%d) * (%d,%d) = (%d,%d) (should be (%d,%d))\n",
+               i,
+               input1[i].r,
+               input1[i].i,
+               input2[i].r,
+               input2[i].i,
+               output[i].r,
+               output[i].i,
+               res.r,
+               res.i);
+        return 1;
+      }
+    }
   }
+  return 0;
 }
-
-BENCHMARK(BM_rotate_cpx_vector)->RangeMultiplier(4)->Range(100, 20000);
-
-BENCHMARK_MAIN();

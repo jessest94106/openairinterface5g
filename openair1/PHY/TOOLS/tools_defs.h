@@ -38,6 +38,7 @@
 #include <simde/simde-common.h>
 #include <simde/x86/sse.h>
 #include <simde/x86/avx2.h>
+#include "common/utils/LOG/log.h"
 
 #define simd_q15_t simde__m128i
 #define simdshort_q15_t simde__m64
@@ -90,7 +91,7 @@ extern "C" {
     int dim2;
     int dim3;
     int dim4;
-    uint8_t data[];
+    uint8_t data[] __attribute__((aligned(32)));
   } fourDimArray_t;
 
   static inline fourDimArray_t *allocateFourDimArray(int elmtSz, int dim1, int dim2, int dim3, int dim4)
@@ -357,6 +358,74 @@ static __attribute__((always_inline)) inline void multadd_real_four_symbols_vect
     simde_mm_storeu_si128((simd_q15_t *)y, y_128);
 }
 
+// Multiply two vectors of complex int16 and take the most significant bits (shift by 15 in normal case)
+// works only with little endian storage (for big endian, modify the srai/ssli at the end)
+static __attribute__((always_inline)) inline void mult_complex_vectors(const c16_t *in1,
+                                                                       const c16_t *in2,
+                                                                       c16_t *out,
+                                                                       const int size,
+                                                                       const int shift)
+{
+  const simde__m256i complex_shuffle256 = simde_mm256_set_epi8(29,
+                                                               28,
+                                                               31,
+                                                               30,
+                                                               25,
+                                                               24,
+                                                               27,
+                                                               26,
+                                                               21,
+                                                               20,
+                                                               23,
+                                                               22,
+                                                               17,
+                                                               16,
+                                                               19,
+                                                               18,
+                                                               13,
+                                                               12,
+                                                               15,
+                                                               14,
+                                                               9,
+                                                               8,
+                                                               11,
+                                                               10,
+                                                               5,
+                                                               4,
+                                                               7,
+                                                               6,
+                                                               1,
+                                                               0,
+                                                               3,
+                                                               2);
+  const simde__m256i conj256 = simde_mm256_set_epi16(-1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1);
+  int i;
+  // do 8 multiplications at a time
+  for (i = 0; i < size - 7; i += 8) {
+    const simde__m256i i1 = simde_mm256_loadu_epi32((simde__m256i *)(in1 + i));
+    const simde__m256i i2 = simde_mm256_loadu_epi32((simde__m256i *)(in2 + i));
+    const simde__m256i i2swap = simde_mm256_shuffle_epi8(i2, complex_shuffle256);
+    const simde__m256i i2conj = simde_mm256_sign_epi16(i2, conj256);
+    const simde__m256i re = simde_mm256_madd_epi16(i1, i2conj);
+    const simde__m256i im = simde_mm256_madd_epi16(i1, i2swap);
+    simde_mm256_storeu_si256(
+        (simde__m256i *)(out + i),
+        simde_mm256_blend_epi16(simde_mm256_srai_epi32(re, shift), simde_mm256_slli_epi32(im, 16 - shift), 0xAA));
+  }
+  if (size - i > 4) {
+    const simde__m128i i1 = simde_mm_loadu_epi32((simde__m128i *)(in1 + i));
+    const simde__m128i i2 = simde_mm_loadu_epi32((simde__m128i *)(in2 + i));
+    const simde__m128i i2swap = simde_mm_shuffle_epi8(i2, *(simde__m128i *)&complex_shuffle256);
+    const simde__m128i i2conj = simde_mm_sign_epi16(i2, *(simde__m128i *)&conj256);
+    const simde__m128i re = simde_mm_madd_epi16(i1, i2conj);
+    const simde__m128i im = simde_mm_madd_epi16(i1, i2swap);
+    simde_mm_storeu_si128((simde__m128i *)(out + i),
+                          simde_mm_blend_epi16(simde_mm_srai_epi32(re, shift), simde_mm_slli_epi32(im, 16 - shift), 0xAA));
+    i += 4;
+  }
+  for (; i < size; i++)
+    out[i] = c16mulShift(in1[i], in2[i], shift);
+}
 /*!\fn void multadd_complex_vector_real_scalar(int16_t *x,int16_t alpha,int16_t *y,uint8_t zero_flag,uint32_t N)
 This function performs componentwise multiplication and accumulation of a real scalar and a complex vector.
 @param x Vector input (Q1.15) in the format |Re0 Im0|Re1 Im 1| ...
@@ -550,17 +619,15 @@ typedef enum dft_size_idx {
   case Sz:            \
     return DFT_##Sz;  \
     break;
-static inline
-dft_size_idx_t get_dft(int ofdm_symbol_size)
+static inline dft_size_idx_t get_dft(int size)
 {
-  switch (ofdm_symbol_size) {
+  switch (size) {
     FOREACH_DFTSZ(FIND_ENUM)
     default:
-      printf("function get_dft : unsupported ofdm symbol size \n");
-      assert(0);
+      LOG_E(UTIL, "function get_dft : unsupported DFT size %d\n", size);
       break;
   }
-  return DFT_SIZE_IDXTABLESIZE; // never reached and will trigger assertion in idft function;
+  return DFT_SIZE_IDXTABLESIZE;
 }
 
 #define SZ_iENUM(Sz) IDFT_##Sz,
@@ -610,14 +677,12 @@ struct {
     return IDFT_##iSz;  \
     break;
 
-static inline
-idft_size_idx_t get_idft(int ofdm_symbol_size)
+static inline idft_size_idx_t get_idft(int size)
 {
-  switch (ofdm_symbol_size) {
+  switch (size) {
     FOREACH_IDFTSZ(FIND_iENUM)
     default:
-      printf("function get_idft : unsupported ofdm symbol size \n");
-      assert(0);
+      AssertFatal(false, "function get_idft : unsupported iDFT size %d\n", size);
       break;
   }
   return IDFT_SIZE_IDXTABLESIZE; // never reached and will trigger assertion in idft function
