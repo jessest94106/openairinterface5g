@@ -37,6 +37,8 @@
 #include "TLVDecoder.h"
 #include "FGSMobileIdentity.h"
 
+#define MIN_LEN_FGS_MOBILE_ID_IE 3 // type of identity "No identity"
+
 static int decode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, const uint8_t *buffer);
 
 static int encode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, uint8_t *buffer);
@@ -77,6 +79,10 @@ int decode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei
 
 int encode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei, uint8_t *buffer, uint32_t len)
 {
+  // Return if buffer is shorter than min length
+  if (len < MIN_LEN_FGS_MOBILE_ID_IE)
+    return -1;
+
   int encoded_rc = TLV_ENCODE_VALUE_DOESNT_MATCH;
   uint32_t encoded = 0;
 
@@ -86,6 +92,7 @@ int encode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei
   }
 
   encoded = encoded + 2;
+  len -= encoded;
 
   if (fgsmobileidentity->guti.typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI) {
     encoded_rc = encode_guti_5gs_mobile_identity(&fgsmobileidentity->guti,
