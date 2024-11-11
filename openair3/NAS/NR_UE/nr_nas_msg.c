@@ -29,27 +29,40 @@
  * 2023.01.27 Vladimir Dorovskikh 16 digits IMEISV
  */
 
-#include <string.h> // memset
-#include <stdlib.h> // malloc, free
-
-#include "nas_log.h"
-#include "TLVDecoder.h"
-#include "TLVEncoder.h"
 #include "nr_nas_msg.h"
+#include <netinet/in.h>
 #include "NR_NAS_defs.h"
-#include "aka_functions.h"
-#include "secu_defs.h"
-#include "kdf.h"
-#include "key_nas_deriver.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include "AuthenticationResponseParameter.h"
+#include "FGCNasMessageContainer.h"
+#include "FGSDeregistrationRequestUEOriginating.h"
+#include "FGSDeregistrationType.h"
+#include "LOG/log.h"
+#include "NasKeySetIdentifier.h"
+#include "NrUESecurityCapability.h"
+#include "OctetString.h"
 #include "PduSessionEstablishRequest.h"
 #include "PduSessionEstablishmentAccept.h"
 #include "RegistrationAccept.h"
-#include "FGSDeregistrationRequestUEOriginating.h"
-#include "intertask_interface.h"
+#include "SORTransparentContainer.h"
+#include "T.h"
+#include "TLVEncoder.h"
+#include "aka_functions.h"
+#include "assertions.h"
+#include "common/utils/ds/byte_array.h"
 #include "common/utils/tun_if.h"
-#include "openair2/SDAP/nr_sdap/nr_sdap.h"
-#include "openair3/SECU/nas_stream_eia2.h"
+#include "commonDef.h"
+#include "intertask_interface.h"
+#include "kdf.h"
+#include "key_nas_deriver.h"
+#include "nas_log.h"
+#include "openair3/UICC/usim_interface.h"
 #include "openair3/UTILS/conversions.h"
+#include "secu_defs.h"
+#include "utils.h"
 
 #define MAX_NAS_UE 4
 

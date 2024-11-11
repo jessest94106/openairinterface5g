@@ -31,16 +31,21 @@
 #ifndef __NR_NAS_MSG_SIM_H__
 #define __NR_NAS_MSG_SIM_H__
 
-#include "RegistrationRequest.h"
-#include "FGSIdentityResponse.h"
+#include <common/utils/assertions.h>
+#include <openair3/UICC/usim_interface.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include "FGSAuthenticationResponse.h"
-#include "FGSNASSecurityModeComplete.h"
 #include "FGSDeregistrationRequestUEOriginating.h"
+#include "FGSIdentityResponse.h"
+#include "FGSMobileIdentity.h"
+#include "FGSNASSecurityModeComplete.h"
+#include "FGSUplinkNasTransport.h"
 #include "RegistrationComplete.h"
+#include "RegistrationRequest.h"
 #include "fgs_service_request.h"
 #include "as_message.h"
-#include "FGSUplinkNasTransport.h"
-#include <openair3/UICC/usim_interface.h>
+#include "NR_NAS_defs.h"
 #include "secu_defs.h"
 #include "NR_NAS_defs.h"
 
