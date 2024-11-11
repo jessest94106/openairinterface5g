@@ -116,14 +116,13 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
   /* Optional Presence IEs */
   while (curPtr < buffer + msg_length) {
     uint8_t psea_iei = *curPtr++;
+    LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received %s IEI\n", iei_text_desc[psea_iei].text);
     switch (psea_iei) {
       case IEI_5GSM_CAUSE: /* Ommited */
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received 5GSM Cause IEI\n");
         curPtr++;
         break;
 
       case IEI_PDU_ADDRESS:
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received PDU Address IE\n");
         psea_msg.pdu_addr_ie.pdu_length = *curPtr++;
 
         /* Octet 3 */
@@ -171,52 +170,44 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
         break;
 
       case IEI_RQ_TIMER_VALUE: /* Ommited */
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received RQ timer value IE\n");
         curPtr++; /* TS 24.008 10.5.7.3 */
         break;
 
       case IEI_SNSSAI: {
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received S-NSSAI IE\n");
         uint8_t snssai_length = *curPtr;
         curPtr += (snssai_length + sizeof(snssai_length));
         break;
       }
 
       case IEI_ALWAYSON_PDU: /* Ommited */
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received Always-on PDU Session indication IE\n");
         curPtr++;
         break;
 
       case IEI_MAPPED_EPS: {
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received Mapped EPS bearer context IE\n");
         uint16_t mapped_eps_length = getShort(curPtr);
         curPtr += mapped_eps_length;
         break;
       }
 
       case IEI_EAP_MSG: {
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received EAP message IE\n");
         uint16_t eap_length = getShort(curPtr);
         curPtr += (eap_length + sizeof(eap_length));
         break;
       }
 
       case IEI_AUTH_QOS_DESC: {
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received Authorized QoS flow descriptions IE\n");
         psea_msg.qos_fd_ie.length = getShort(curPtr);
         curPtr += (psea_msg.qos_fd_ie.length + sizeof(psea_msg.qos_fd_ie.length));
         break;
       }
 
       case IEI_EXT_CONF_OPT: {
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received Extended protocol configuration options IE\n");
         psea_msg.ext_pp_ie.length = getShort(curPtr);
         curPtr += (psea_msg.ext_pp_ie.length + sizeof(psea_msg.ext_pp_ie.length));
         break;
       }
 
       case IEI_DNN: {
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Received DNN IE\n");
         psea_msg.dnn_ie.dnn_length = *curPtr++;
         char apn[APN_MAX_LEN];
 
@@ -232,7 +223,6 @@ void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_
       }
 
       default:
-        LOG_T(NAS, "PDU SESSION ESTABLISHMENT ACCEPT - Not known IE\n");
         curPtr = buffer + msg_length; // we force stop processing
         break;
     }
