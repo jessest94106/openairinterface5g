@@ -558,7 +558,7 @@ void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   size += 10;
 
   // encode the message
-  initialNasMsg->nas_data = malloc16_clear(size * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc16_clear(size * sizeof(*initialNasMsg->nas_data));
   nas->registration_request_buf = initialNasMsg->nas_data;
 
   initialNasMsg->length = mm_msg_encode(mm_msg, initialNasMsg->nas_data, size);
@@ -603,7 +603,7 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   size += fill_fgstmsi(&mm_msg->service_request.fiveg_s_tmsi, nas->guti);
 
   /* message encoding */
-  initialNasMsg->nas_data = (Byte_t *)malloc(size * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
   if (security_protected) {
     // security protected encoding
     int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &(nas_msg.header), size);
@@ -668,7 +668,7 @@ void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype
   }
 
   // encode the message
-  initialNasMsg->nas_data = malloc(size * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
 
   initialNasMsg->length = mm_msg_encode(mm_msg, initialNasMsg->nas_data, size);
 }
@@ -704,7 +704,7 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   mm_msg->fgs_auth_response.authenticationresponseparameter.res = res;
   size += 18;
   // encode the message
-  initialNasMsg->nas_data = malloc(size * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
 
   initialNasMsg->length = mm_msg_encode(mm_msg, initialNasMsg->nas_data, size);
   // Free res value after encode
@@ -756,7 +756,7 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   size += (nas->registration_request_len + 2);
 
   // encode the message
-  initialNasMsg->nas_data = malloc(size * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
 
   int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &(nas_msg.header), size);
 
@@ -884,7 +884,7 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
   }
 
   // encode the message
-  initialNasMsg->nas_data = malloc(length * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc_or_fail(length * sizeof(*initialNasMsg->nas_data));
   initialNasMsg->length = length;
 
   /* Encode the first octet of the header (extended protocol discriminator) */
@@ -981,7 +981,7 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
   size += fill_guti(&dereg_req->fgsmobileidentity, nas->guti);
 
   // encode the message
-  initialNasMsg->nas_data = calloc(size, sizeof(Byte_t));
+  initialNasMsg->nas_data = calloc_or_fail(size, sizeof(*initialNasMsg->nas_data));
   int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &nas_msg.header, size);
 
   initialNasMsg->length =
@@ -1089,7 +1089,7 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   size += (1 + 1 + dnnSize + 1);
 
   // encode the message
-  initialNasMsg->nas_data = (Byte_t *)malloc(size * sizeof(Byte_t));
+  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
   int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &(nas_msg.header), size);
 
   initialNasMsg->length =

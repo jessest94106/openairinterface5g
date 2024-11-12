@@ -173,7 +173,7 @@ int process_nas_establish_req(int msg_id, const nas_establish_req_t* req,
   ind->tac = DEFAULT_TAC;
 
   if (req->initialNasMsg.length > 0) {
-    ind->initialNasMsg.data = (Byte_t*)malloc(req->initialNasMsg.length);
+    ind->initialNasMsg.data = malloc(req->initialNasMsg.length);
 
     if (ind->initialNasMsg.data) {
       memcpy(ind->initialNasMsg.data, req->initialNasMsg.data,
@@ -250,7 +250,7 @@ int process_ul_info_transfer_req(int msg_id, const ul_info_transfer_req_t* req,
   ind->UEid = 1;  // Valid UEid starts at index 1
 
   if (req->nasMsg.length > 0) {
-    ind->nasMsg.data = (Byte_t*)malloc(req->nasMsg.length);
+    ind->nasMsg.data = malloc(req->nasMsg.length);
 
     if (ind->nasMsg.data) {
       memcpy(ind->nasMsg.data, req->nasMsg.data, req->nasMsg.length);
@@ -360,7 +360,7 @@ int process_nas_establish_rsp(int msg_id, const nas_establish_rsp_t* rsp,
   cnf->errCode = rsp->errCode;
 
   if (rsp->nasMsg.length > 0) {
-    cnf->nasMsg.data = (Byte_t*)malloc(rsp->nasMsg.length);
+    cnf->nasMsg.data = malloc(rsp->nasMsg.length);
 
     if (cnf->nasMsg.data) {
       memcpy(cnf->nasMsg.data, rsp->nasMsg.data,
@@ -426,7 +426,7 @@ int process_dl_info_transfer_req(int msg_id, const dl_info_transfer_req_t* req,
 
   /* Setup downlink information indication message */
   if (req->nasMsg.length > 0) {
-    ind->nasMsg.data = (Byte_t*)malloc(req->nasMsg.length);
+    ind->nasMsg.data = malloc(req->nasMsg.length);
 
     if (ind->nasMsg.data) {
       memcpy(ind->nasMsg.data, req->nasMsg.data, req->nasMsg.length);
