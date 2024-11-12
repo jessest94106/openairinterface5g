@@ -42,6 +42,8 @@ Normally it should be fine to run both executables on the same host using the `l
 
 ## 5G L2 nFAPI simulator
 
+**Note: L2 simulator does not work anymore.**
+
 ### Download and Build the Proxy Server (from EpiSci)
 
 ```bash
@@ -76,13 +78,10 @@ This proxy allows to perform L2 nFAPI simulator for:
 * 5G-SA
 
 ### L2 Simulator as Docker Containers
-Another tutorial for 5G SA mode with 1 User is available [here](../ci-scripts/yaml_files/5g_l2sim_tdd/README.md).
 
-----
-
-[oai wiki home](https://gitlab.eurecom.fr/oai/openairinterface5g/wikis/home)
-
-[oai softmodem features](FEATURE_SET.md)
-
-[oai softmodem build procedure](BUILD.md)
-
+There used to be docker deployment with L2sim that was run in the CI. Since L2
+simulator does not work anymore, it has been removed. However, you can see the
+old `README.md` from tag `2024.w44`
+[here](https://gitlab.eurecom.fr/oai/openairinterface5g/-/blob/2024.w44/ci-scripts/yaml_files/5g_l2sim_tdd/README.md).
+In the same directory is a `docker-compose.yaml` file that can be used to run
+L2sim.
