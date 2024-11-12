@@ -37,7 +37,7 @@
 #include "FGSNASSecurityModeComplete.h"
 #include "FGSDeregistrationRequestUEOriginating.h"
 #include "RegistrationComplete.h"
-#include "EMM/MSG/fgs_service_request.h"
+#include "fgs_service_request.h"
 #include "as_message.h"
 #include "FGSUplinkNasTransport.h"
 #include <openair3/UICC/usim_interface.h>

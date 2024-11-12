@@ -36,6 +36,7 @@
 #include "TLVDecoder.h"
 #include "TLVEncoder.h"
 #include "nr_nas_msg.h"
+#include "NR_NAS_defs.h"
 #include "aka_functions.h"
 #include "secu_defs.h"
 #include "kdf.h"
@@ -46,7 +47,6 @@
 #include "FGSDeregistrationRequestUEOriginating.h"
 #include "intertask_interface.h"
 #include "common/utils/tun_if.h"
-#include <openair3/NAS/COMMON/NR_NAS_defs.h>
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 #include "openair3/SECU/nas_stream_eia2.h"
 #include "openair3/UTILS/conversions.h"
