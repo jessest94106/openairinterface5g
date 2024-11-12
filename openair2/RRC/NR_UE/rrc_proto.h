@@ -55,7 +55,7 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
 
 void handle_RRCRelease(NR_UE_RRC_INST_t *rrc);
 
-void set_rlf_sib1_timers_and_constants(NR_UE_Timers_Constants_t *tac, NR_SIB1_t *sib1);
+void set_rlf_sib1_timers_and_constants(NR_UE_Timers_Constants_t *tac, NR_UE_TimersAndConstants_t *ue_TimersAndConstants);
 
 /**\brief RRC UE task.
    \param void *args_p Pointer on arguments to start the task. */
