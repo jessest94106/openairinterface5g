@@ -62,11 +62,11 @@ $ sudo -E ./build/proxy $number_of_ues --nr
 
 ### Start gNB
 ```bash
-$ sudo -E ./nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi VNF --noS1 --sa --emulate-l1
+$ sudo -E ./nr-softmodem -O ../ci-scripts/conf_files/episci/proxy_rcc.band78.tm1.106PRB.nfapi.conf --nfapi VNF --noS1 --emulate-l1
 ```
 ### Start UE
 ```bash
-$ sudo -E ./nr-uesoftmodem -O ../ci-scripts/conf_files/nrue.uicc.conf --nfapi STANDALONE_PNF --node-number 2 --sa --emulate-l1
+$ sudo -E ./nr-uesoftmodem -O ../ci-scripts/conf_files/nrue.uicc.conf --nfapi STANDALONE_PNF --node-number 2 --emulate-l1
 ```
 ### EpiSci's Documentation
 A more detailed tutorial is available on the [EpiSci GitHub Repository](https://github.com/EpiSci/oai-lte-5g-multi-ue-proxy#readme).

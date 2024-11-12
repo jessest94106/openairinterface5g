@@ -3004,7 +3004,7 @@ static void nr_mac_apply_cellgroup(gNB_MAC_INST *mac, NR_UE_info_t *UE, frame_t 
 
   reset_srs_stats(UE);
 
-  if (get_softmodem_params()->sa) {
+  if (IS_SA_MODE(get_softmodem_params())) {
     // add all available DL,UL HARQ processes for this UE in SA
     create_dl_harq_list(sched_ctrl, &UE->sc_info);
     create_ul_harq_list(sched_ctrl, &UE->sc_info);

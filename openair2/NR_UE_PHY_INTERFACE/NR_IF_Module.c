@@ -342,7 +342,7 @@ static bool is_my_dci(NR_UE_MAC_INST_t *mac, nfapi_nr_dl_dci_pdu_t *received_pdu
         (received_pdu->RNTI != mac->ra.ra_rnti || mac->ra.RA_RAPID_found))
       return false;
   }
-  if (get_softmodem_params()->sa) {
+  if (IS_SA_MODE(get_softmodem_params())) {
     if (mac->state == UE_NOT_SYNC)
       return false;
     if (received_pdu->RNTI == 0xFFFF)

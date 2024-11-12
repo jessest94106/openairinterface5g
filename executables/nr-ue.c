@@ -286,7 +286,7 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg)
     LOG_D(NR_MAC, "The received sfn/slot [%d %d] from proxy\n",
           frame, slot);
 
-    if (get_softmodem_params()->sa && mac->mib == NULL) {
+    if (IS_SA_MODE(get_softmodem_params()) && mac->mib == NULL) {
       LOG_D(NR_MAC, "We haven't gotten MIB. Lets see if we received it\n");
       nr_ue_dl_indication(&mac->dl_info);
       process_queued_nr_nfapi_msgs(mac, sfn_slot);
@@ -392,7 +392,7 @@ static void UE_synch(void *arg) {
     ret = sl_nr_slss_search(UE, &syncD->proc, SL_NR_SSB_REPETITION_IN_FRAMES);
   } else {
     nr_get_carrier_frequencies(UE, &dl_carrier, &ul_carrier);
-    ret = nr_initial_sync(&syncD->proc, UE, 2, get_softmodem_params()->sa, syncD->gscnInfo, syncD->numGscn);
+    ret = nr_initial_sync(&syncD->proc, UE, 2, IS_SA_MODE(get_softmodem_params()), syncD->gscnInfo, syncD->numGscn);
   }
 
   if (ret.cell_detected) {
@@ -601,7 +601,7 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE, const UE_nr_rxtx_proc_t *proc
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
-  if (IS_SOFTMODEM_NOS1 || get_softmodem_params()->sa) {
+  if (IS_SOFTMODEM_NOS1 || IS_SA_MODE(get_softmodem_params())) {
 
     // Start synchronization with a target gNB
     if (UE->synch_request.received_synch_request == 1) {
@@ -1056,7 +1056,7 @@ void init_NR_UE(int nb_inst, char *uecap_file, char *reconfig_file, char *rbconf
     NR_UE_MAC_INST_t *mac = get_mac_inst(i);
     mac->if_module = nr_ue_if_module_init(i);
     AssertFatal(mac->if_module, "can not initialize IF module\n");
-    if (!get_softmodem_params()->sa || !get_softmodem_params()->sl_mode) {
+    if (!IS_SA_MODE(get_softmodem_params()) || !get_softmodem_params()->sl_mode) {
       init_nsa_message(&rrc_inst[i], reconfig_file, rbconfig_file);
       nr_rlc_activate_srb0(mac_inst[i].crnti, NULL, send_srb0_rrc);
     }

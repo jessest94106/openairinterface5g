@@ -980,7 +980,7 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
                                      *scc->ssbSubcarrierSpacing,
                                      *frequencyInfoDL->absoluteFrequencySSB);
     LOG_I(RRC, "absoluteFrequencySSB %ld corresponds to %lu Hz\n", *frequencyInfoDL->absoluteFrequencySSB, ssb_freq);
-    if (get_softmodem_params()->sa)
+    if (IS_SA_MODE(get_softmodem_params()))
       check_ssb_raster(ssb_freq, *frequencyInfoDL->frequencyBandList.list.array[0], *scc->ssbSubcarrierSpacing);
     fix_scc(scc, ssb_bitmap);
   }
@@ -1203,7 +1203,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
   req->cell[0].info.measurement_timing_config = mtc_buf;
   req->cell[0].info.measurement_timing_config_len = len;
 
-  if (get_softmodem_params()->sa) {
+  if (IS_SA_MODE(get_softmodem_params())) {
     // in NSA we don't transmit SIB1, so cannot fill DU system information
     // so cannot send MIB either
 
@@ -1467,7 +1467,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     f1ap_served_cell_info_t info;
     read_du_cell_info(cfg, NODE_IS_DU(node_type), &gnb_id, &gnb_du_id, &name, &info, 1);
 
-    if (get_softmodem_params()->sa) {
+    if (IS_SA_MODE(get_softmodem_params())) {
       nr_mac_configure_sib1(RC.nrmac[0], &info.plmn, info.nr_cellid, *info.tac);
       if (scc->ext2 && scc->ext2->ntn_Config_r17)
         nr_mac_configure_sib19(RC.nrmac[0]);
@@ -1796,7 +1796,7 @@ gNB_RRC_INST *RCconfig_NRRRC()
     config_getlist(config_get_if(), &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
     if (GNBParamList.paramarray[i][GNB_GNB_ID_IDX].uptr == NULL) {
     // Calculate a default gNB ID
-      if (get_softmodem_params()->sa) { 
+      if (IS_SA_MODE(get_softmodem_params())) {
         uint32_t hash;
         hash = ngap_generate_gNB_id ();
         gnb_id = i + (hash & 0xFFFFFF8);
@@ -1950,7 +1950,7 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i) {
       for (k = 0; k < GNBParamList.numelt; k++) {
         if (GNBParamList.paramarray[k][GNB_GNB_ID_IDX].uptr == NULL) {
           // Calculate a default gNB ID
-          if (get_softmodem_params()->sa) {
+          if (IS_SA_MODE(get_softmodem_params())) {
             uint32_t hash;
           
           hash = ngap_generate_gNB_id ();
@@ -2091,7 +2091,7 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i) {
             // SCTP SETTING
             NGAP_REGISTER_GNB_REQ (msg_p).sctp_out_streams = SCTP_OUT_STREAMS;
             NGAP_REGISTER_GNB_REQ (msg_p).sctp_in_streams  = SCTP_IN_STREAMS;
-            if (get_softmodem_params()->sa) {
+            if (IS_SA_MODE(get_softmodem_params())) {
               sprintf(aprefix,"%s.[%i].%s",GNB_CONFIG_STRING_GNB_LIST,k,GNB_CONFIG_STRING_SCTP_CONFIG);
               config_get(config_get_if(), SCTPParams, sizeofArray(SCTPParams), aprefix);
               NGAP_REGISTER_GNB_REQ (msg_p).sctp_in_streams = (uint16_t)*(SCTPParams[GNB_SCTP_INSTREAMS_IDX].uptr);
@@ -2218,7 +2218,7 @@ int RCconfig_NR_X2(MessageDef *msg_p, uint32_t i) {
       for (k = 0; k < GNBParamList.numelt; k++) {
         if (GNBParamList.paramarray[k][GNB_GNB_ID_IDX].uptr == NULL) {
           // Calculate a default eNB ID
-          if (get_softmodem_params()->sa) {
+          if (IS_SA_MODE(get_softmodem_params())) {
             uint32_t hash;
             hash = ngap_generate_gNB_id ();
             gnb_id = k + (hash & 0xFFFFFF8);
@@ -2353,7 +2353,7 @@ int RCconfig_NR_X2(MessageDef *msg_p, uint32_t i) {
             X2AP_REGISTER_ENB_REQ (msg_p).sctp_out_streams = SCTP_OUT_STREAMS;
             X2AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams  = SCTP_IN_STREAMS;
 
-            if (get_softmodem_params()->sa) {
+            if (IS_SA_MODE(get_softmodem_params())) {
               sprintf(aprefix,"%s.[%i].%s",GNB_CONFIG_STRING_GNB_LIST,k,GNB_CONFIG_STRING_SCTP_CONFIG);
               config_get(config_get_if(), SCTPParams, sizeofArray(SCTPParams), aprefix);
               X2AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams = (uint16_t)*(SCTPParams[GNB_SCTP_INSTREAMS_IDX].uptr);

@@ -407,6 +407,9 @@ int main(int argc, char **argv)
 
   get_common_options(uniqCfg, SOFTMODEM_5GUE_BIT);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
+
+  softmodem_verify_mode(get_softmodem_params());
+
 #if T_TRACER
   T_Config_Init();
 #endif
@@ -462,12 +465,6 @@ int main(int argc, char **argv)
     get_channel_model_mode(uniqCfg);
   }
 
-  if (get_softmodem_params()->do_ra)
-    AssertFatal(get_softmodem_params()->phy_test == 0,"RA and phy_test are mutually exclusive\n");
-
-  if (get_softmodem_params()->sa)
-    AssertFatal(get_softmodem_params()->phy_test == 0,"Standalone mode and phy_test are mutually exclusive\n");
-
   if (!get_softmodem_params()->nsa && get_softmodem_params()->emulate_l1)
     start_oai_nrue_threads();
 
@@ -481,7 +478,7 @@ int main(int argc, char **argv)
         NR_UE_MAC_INST_t *mac = get_mac_inst(inst);
         init_nr_ue_phy_cpu_stats(&UE[CC_id]->phy_cpu_stats);
 
-        if (get_softmodem_params()->sa || get_softmodem_params()->sl_mode) { // set frame config to initial values from command line
+        if (IS_SA_MODE(get_softmodem_params()) || get_softmodem_params()->sl_mode) { // set frame config to initial values from command line
                                                                             // and assume that the SSB is centered on the grid
           uint16_t nr_band = get_softmodem_params()->band;
           mac->nr_band = nr_band;

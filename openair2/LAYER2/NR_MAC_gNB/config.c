@@ -437,7 +437,7 @@ static void config_common(gNB_MAC_INST *nrmac,
         + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value,
                        frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing)
            * i);
-    if (get_softmodem_params()->sa) {
+    if (IS_SA_MODE(get_softmodem_params())) {
       prach_fd_occasion->k1.value =
           NRRIV2PRBOFFSET(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE)
           + rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart
@@ -743,7 +743,7 @@ void nr_fill_sched_osi(gNB_MAC_INST *nrmac, const struct NR_SetupRelease_PDCCH_C
 
 void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const f1ap_plmn_t *plmn, uint64_t cellID, int tac)
 {
-  AssertFatal(get_softmodem_params()->sa > 0, "error: SIB1 only applicable for SA\n");
+  AssertFatal(IS_SA_MODE(get_softmodem_params()), "error: SIB1 only applicable for SA\n");
 
   NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
@@ -755,7 +755,7 @@ void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const f1ap_plmn_t *plmn, uint64_
 
 void nr_mac_configure_sib19(gNB_MAC_INST *nrmac)
 {
-  AssertFatal(get_softmodem_params()->sa > 0, "error: SIB19 only applicable for SA\n");
+  AssertFatal(IS_SA_MODE(get_softmodem_params()), "error: SIB19 only applicable for SA\n");
   NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_BCCH_DL_SCH_Message_t *sib19 = get_SIB19_NR(scc);

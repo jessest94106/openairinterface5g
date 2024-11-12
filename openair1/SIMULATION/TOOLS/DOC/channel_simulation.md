@@ -86,11 +86,11 @@ When the `chanmod` option is enabled, the RF channel simulator with a channel mo
 Example run of OAI RFSIM on the same machine with activation of the channel model via command line:
 gNB:
 ```bash
-sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --gNBs.[0].min_rxtxtime 6 --rfsim --sa --rfsimulator.options chanmod --telnetsrv
+sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --gNBs.[0].min_rxtxtime 6 --rfsim --rfsimulator.options chanmod --telnetsrv
 ```
 UE:
 ```bash
-sudo ./nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 --rfsim --sa --rfsimulator.serveraddr 127.0.0.1 --uicc0.imsi 001010000000001 -O ../../../ci-scripts/conf_files/nrue.uicc.conf --rfsimulator.options chanmod
+sudo ./nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 --rfsim --rfsimulator.serveraddr 127.0.0.1 --uicc0.imsi 001010000000001 -O ../../../ci-scripts/conf_files/nrue.uicc.conf --rfsimulator.options chanmod
 ```
 where `@include "channelmod_rfsimu.conf"` has been added at the end of `ci-scripts/conf_files/channelmod_rfsimu.conf` which has been copied to `targets/PROJECTS/GENERIC-LTE-EPC/CONF/`.
 
@@ -131,7 +131,7 @@ Example usage, set the offset for the selected model of the selected `modellist`
 
 e.g. with the softmodem:
 ```bash
-sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --gNBs.[0].min_rxtxtime 6 --rfsim --sa --rfsimulator.options chanmod --telnetsrv --channelmod.modellist modellist_rfsimu_2 --channelmod.modellist_rfsimu_2.[1].offset 120
+sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --gNBs.[0].min_rxtxtime 6 --rfsim --rfsimulator.options chanmod --telnetsrv --channelmod.modellist modellist_rfsimu_2 --channelmod.modellist_rfsimu_2.[1].offset 120
 ```
 
 ## Real time control and monitoring with telnet server
