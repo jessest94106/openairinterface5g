@@ -38,10 +38,6 @@
 
 typedef struct fgs_deregistration_request_ue_originating_msg_tag {
   /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
   FGSDeregistrationType deregistrationtype;
   NasKeySetIdentifier naskeysetidentifier;
   FGSMobileIdentity fgsmobileidentity;

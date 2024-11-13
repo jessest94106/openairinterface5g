@@ -46,10 +46,6 @@
 
 typedef struct fgs_security_mode_complete_msg_tag {
   /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
   FGSMobileIdentity fgsmobileidentity;
   FGCNasMessageContainer fgsnasmessagecontainer;
 } fgs_security_mode_complete_msg;

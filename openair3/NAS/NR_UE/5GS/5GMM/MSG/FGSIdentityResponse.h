@@ -45,10 +45,6 @@
 
 typedef struct fgmm_identity_response_msg_s {
   /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
   FGSMobileIdentity fgsmobileidentity;
 } fgmm_identity_response_msg;
 

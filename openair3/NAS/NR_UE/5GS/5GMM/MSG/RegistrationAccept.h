@@ -49,12 +49,7 @@
 
 typedef struct registration_accept_msg_tag {
   /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
   FGSRegistrationResult fgsregistrationresult;
-
   /* Optional fields */
   FGSMobileIdentity *guti;
 } registration_accept_msg;

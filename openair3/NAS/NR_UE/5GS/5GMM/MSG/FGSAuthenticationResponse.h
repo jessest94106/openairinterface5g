@@ -50,10 +50,6 @@
 
 typedef struct fgs_authentication_response_msg_tag {
   /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
   AuthenticationResponseParameter authenticationresponseparameter;
 } fgs_authentication_response_msg;
 

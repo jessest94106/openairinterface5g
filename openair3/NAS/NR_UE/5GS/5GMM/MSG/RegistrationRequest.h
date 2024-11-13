@@ -98,14 +98,9 @@ typedef enum registration_request_iei_tag {
 
 typedef struct registration_request_msg_tag {
   /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
   FGSRegistrationType fgsregistrationtype;
   NasKeySetIdentifier naskeysetidentifier;
   FGSMobileIdentity fgsmobileidentity;
-
   /* Optional fields */
   uint32_t presencemask;
   FGMMCapability fgmmcapability;
