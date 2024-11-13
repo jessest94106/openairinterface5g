@@ -132,3 +132,57 @@ int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_
 
   LOG_FUNC_RETURN(size);
 }
+
+/**
+ * @brief Decode plain 5GMM header from buffer and return fgmm_msg_header_t instance
+ */
+uint8_t decode_5gmm_msg_header(fgmm_msg_header_t *mm_header, const uint8_t *buffer, uint32_t len)
+{
+  if (len < sizeof(fgmm_msg_header_t)) {
+    PRINT_NAS_ERROR("Failed to decode plain 5GMM header: buffer length too short\n");
+    return -1;
+  }
+  mm_header->ex_protocol_discriminator = *buffer++;
+  mm_header->security_header_type = *buffer++;
+  mm_header->message_type = *buffer++;
+  return sizeof(*mm_header);
+}
+
+/**
+ * @brief Decode plain 5GSM header from buffer and return fgsm_msg_header_t instance
+ */
+uint8_t decode_5gsm_msg_header(fgsm_msg_header_t *sm_header, const uint8_t *buffer, uint32_t len)
+{
+  if (len < sizeof(fgsm_msg_header_t)) {
+    PRINT_NAS_ERROR("Failed to decode plain 5GSM header: buffer length too short\n");
+    return -1;
+  }
+  sm_header->ex_protocol_discriminator = *buffer++;
+  sm_header->pdu_session_id = *buffer++;
+  sm_header->pti = *buffer++;
+  sm_header->message_type = *buffer++;
+  return sizeof(*sm_header);
+}
+
+/**
+ * @brief Decode security protected 5GS header from buffer and return fgs_nas_message_security_header_t instance
+ */
+int decode_5gs_security_protected_header(fgs_nas_message_security_header_t *header, const uint8_t *buf, uint32_t len)
+{
+  int decoded = 0;
+  if (len < sizeof(fgs_nas_message_security_header_t)) {
+    PRINT_NAS_ERROR("Failed to decode security protected 5GS header: buffer length too short\n");
+    return -1;
+  }
+  header->protocol_discriminator = *buf++;
+  decoded++;
+  header->security_header_type = *buf++;
+  decoded++;
+  uint32_t tmp;
+  memcpy(&tmp, buf, sizeof(tmp));
+  decoded += sizeof(tmp);
+  header->message_authentication_code = htonl(tmp);
+  header->sequence_number = *buf++;
+  decoded++;
+  return decoded;
+}
