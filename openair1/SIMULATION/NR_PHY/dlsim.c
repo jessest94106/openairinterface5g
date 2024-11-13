@@ -940,6 +940,7 @@ int main(int argc, char **argv)
   for (SNR = snr0; SNR < snr1; SNR += .2) {
 
     varArray_t *table_tx=initVarArray(1000,sizeof(double));
+    reset_meas(&gNB->phy_proc_tx);
     reset_meas(&gNB->dlsch_scrambling_stats);
     reset_meas(&gNB->dlsch_interleaving_stats);
     reset_meas(&gNB->dlsch_rate_matching_stats);
@@ -1033,11 +1034,13 @@ int main(int argc, char **argv)
         msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.bchPayload=0x001234;
         msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.SsbBlockIndex = 0;
         msgDataTx->gNB = gNB;
-        if (run_initial_sync)
+        if (run_initial_sync) {
           nr_common_signal_procedures(gNB,frame,slot,msgDataTx->ssb[0].ssb_pdu);
-        else
+        } else {
+          start_meas(&gNB->phy_proc_tx);
           phy_procedures_gNB_TX(msgDataTx,frame,slot,1);
-            
+          stop_meas(&gNB->phy_proc_tx);
+        }
         int txdataF_offset = slot * frame_parms->samples_per_slot_wCP;
         
         if (n_trials==1) {
