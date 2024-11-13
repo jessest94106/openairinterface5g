@@ -30,25 +30,26 @@
  * \warning
  */
 
-#include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
+#include "nr_polar_defs.h"
+#include "nr_polar_psbch_defs.h"
 #include "PHY/NR_TRANSPORT/nr_dci.h"
-#include "nrPolar_tools/nr_polar_psbch_defs.h"
 
-#define PolarKey ((messageType<<24)|(messageLength<<8)|aggregation_level)
-static t_nrPolar_params * PolarList=NULL;
-pthread_mutex_t PolarListMutex=PTHREAD_MUTEX_INITIALIZER;
+#define PolarKey ((messageType << 24) | (messageLength << 8) | aggregation_level)
+static t_nrPolar_params *PolarList = NULL;
+pthread_mutex_t PolarListMutex = PTHREAD_MUTEX_INITIALIZER;
 
-static int intcmp(const void *p1,const void *p2) {
-  return(*(int16_t *)p1 > *(int16_t *)p2);
+static int intcmp(const void *p1, const void *p2)
+{
+  return (*(int16_t *)p1 > *(int16_t *)p2);
 }
 
-static void nr_polar_delete_list(t_nrPolar_params * polarParams) {
+static void nr_polar_delete_list(t_nrPolar_params *polarParams)
+{
   if (!polarParams)
     return;
   if (polarParams->nextPtr)
     nr_polar_delete_list(polarParams->nextPtr);
-  
-  delete_decoder_tree(polarParams);
+
   // From build_polar_tables()
   free(polarParams->rm_tab);
   if (polarParams->crc_generator_matrix)
@@ -58,55 +59,55 @@ static void nr_polar_delete_list(t_nrPolar_params * polarParams) {
   free(polarParams->rate_matching_pattern);
   free(polarParams->information_bit_pattern);
   free(polarParams->parity_check_bit_pattern);
+  free(polarParams->i_bil_pattern);
   free(polarParams->Q_I_N);
   free(polarParams->Q_F_N);
   free(polarParams->Q_PC_N);
   free(polarParams);
 }
 
-static void nr_polar_delete(void) {
+static void nr_polar_delete(void)
+{
   pthread_mutex_lock(&PolarListMutex);
   nr_polar_delete_list(PolarList);
-  PolarList=NULL;
-  pthread_mutex_unlock(&PolarListMutex);  
+  PolarList = NULL;
+  pthread_mutex_unlock(&PolarListMutex);
 }
 
-t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, uint8_t aggregation_level, int decoder_flag)
+t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, uint8_t aggregation_level)
 {
   // The lock is weak, because we never delete in the list, only at exit time
   // therefore, returning t_nrPolar_params * from the list is safe for future usage
   pthread_mutex_lock(&PolarListMutex);
-  if(!PolarList)
+  if (!PolarList)
     atexit(nr_polar_delete);
-  
+
   t_nrPolar_params *currentPtr = PolarList;
-  //Parse the list. If the node is already created, return without initialization.
+  // Parse the list. If the node is already created, return without initialization.
   while (currentPtr != NULL) {
-    //printf("currentPtr->idx %d, (%d,%d)\n",currentPtr->idx,currentPtr->payloadBits,currentPtr->encoderLength);
-    //LOG_D(PHY,"Looking for index %d\n",(messageType * messageLength * aggregation_prime));
-    if (currentPtr->busy == false && currentPtr->idx == PolarKey ) {
-      currentPtr->busy=true;
+    // printf("currentPtr->idx %d, (%d,%d)\n",currentPtr->idx,currentPtr->payloadBits,currentPtr->encoderLength);
+    // LOG_D(PHY,"Looking for index %d\n",(messageType * messageLength * aggregation_prime));
+    if (currentPtr->busy == false && currentPtr->idx == PolarKey) {
+      currentPtr->busy = true;
       pthread_mutex_unlock(&PolarListMutex);
-      if (decoder_flag && !currentPtr->tree.root)
-        build_decoder_tree(currentPtr);
-      return currentPtr ;
-    }
-    else
+      return currentPtr;
+    } else
       currentPtr = currentPtr->nextPtr;
   }
 
   //  printf("currentPtr %p (polarParams %p)\n",currentPtr,polarParams);
-  //Else, initialize and add node to the end of the linked list.
-  t_nrPolar_params *newPolarInitNode = calloc(sizeof(t_nrPolar_params),1);
+  // Else, initialize and add node to the end of the linked list.
+  t_nrPolar_params *newPolarInitNode = malloc(sizeof(t_nrPolar_params));
+
   AssertFatal(newPolarInitNode, "[nr_polar_init] New t_nrPolar_params * could not be created");
-  newPolarInitNode->busy = true;
-  newPolarInitNode->nextPtr = NULL;
-  newPolarInitNode->nextPtr = PolarList;
+  *newPolarInitNode = (t_nrPolar_params){.busy = true, .nextPtr = PolarList, .tree_linearization.is_initialized = false};
   PolarList = newPolarInitNode;
   pthread_mutex_unlock(&PolarListMutex);
-  //   LOG_D(PHY,"Setting new polarParams index %d, messageType %d, messageLength %d, aggregation_prime %d\n",(messageType * messageLength * aggregation_prime),messageType,messageLength,aggregation_prime);
+  //   LOG_D(PHY,"Setting new polarParams index %d, messageType %d, messageLength %d, aggregation_prime %d\n",(messageType *
+  //   messageLength * aggregation_prime),messageType,messageLength,aggregation_prime);
   newPolarInitNode->idx = PolarKey;
-  //printf("newPolarInitNode->idx %d, (%d,%d,%d:%d)\n",newPolarInitNode->idx,messageType,messageLength,aggregation_prime,aggregation_level);
+  // printf("newPolarInitNode->idx %d,
+  // (%d,%d,%d:%d)\n",newPolarInitNode->idx,messageType,messageLength,aggregation_prime,aggregation_level);
 
   if (messageType == NR_POLAR_PBCH_MESSAGE_TYPE) {
     newPolarInitNode->n_max = NR_POLAR_PBCH_N_MAX;
@@ -120,7 +121,8 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
     newPolarInitNode->encoderLength = NR_POLAR_PBCH_E;
     newPolarInitNode->crcCorrectionBits = NR_POLAR_PBCH_CRC_ERROR_CORRECTION_BITS;
     newPolarInitNode->crc_generator_matrix = crc24c_generator_matrix(newPolarInitNode->payloadBits); // G_P
-    //printf("Initializing polar parameters for PBCH (K %d, E %d)\n",newPolarInitNode->payloadBits,newPolarInitNode->encoderLength);
+    // printf("Initializing polar parameters for PBCH (K %d, E
+    // %d)\n",newPolarInitNode->payloadBits,newPolarInitNode->encoderLength);
 
   } else if (messageType == NR_POLAR_DCI_MESSAGE_TYPE) {
     newPolarInitNode->n_max = NR_POLAR_DCI_N_MAX;
@@ -133,11 +135,15 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
     newPolarInitNode->payloadBits = messageLength;
     newPolarInitNode->encoderLength = aggregation_level * 108;
     newPolarInitNode->crcCorrectionBits = NR_POLAR_DCI_CRC_ERROR_CORRECTION_BITS;
-    newPolarInitNode->crc_generator_matrix = crc24c_generator_matrix(newPolarInitNode->payloadBits + newPolarInitNode->crcParityBits); // G_P
-    //printf("Initializing polar parameters for DCI (K %d, E %d, L %d)\n",newPolarInitNode->payloadBits,newPolarInitNode->encoderLength,aggregation_level);
+    newPolarInitNode->crc_generator_matrix =
+        crc24c_generator_matrix(newPolarInitNode->payloadBits + newPolarInitNode->crcParityBits); // G_P
+    // printf("Initializing polar parameters for DCI (K %d, E %d, L
+    // %d)\n",newPolarInitNode->payloadBits,newPolarInitNode->encoderLength,aggregation_level);
 
   } else if (messageType == NR_POLAR_UCI_PUCCH_MESSAGE_TYPE) {
-    AssertFatal(aggregation_level > 2, "Aggregation level (%d) for PUCCH 2 encoding is NPRB and should be > 2\n", aggregation_level);
+    AssertFatal(aggregation_level > 2,
+                "Aggregation level (%d) for PUCCH 2 encoding is NPRB and should be > 2\n",
+                aggregation_level);
     AssertFatal(messageLength > 11, "Message length %d is too short for polar encoding of UCI\n", messageLength);
 
     // TS 38.212 - Section 6.3.1.2.1 UCI encoded by Polar code
@@ -178,7 +184,7 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
     newPolarInitNode->i_bil = NR_POLAR_PUCCH_I_BIL;
     newPolarInitNode->payloadBits = messageLength;
     newPolarInitNode->crcCorrectionBits = NR_POLAR_PUCCH_CRC_ERROR_CORRECTION_BITS;
-    //LOG_D(PHY,"New polar node, encoderLength %d, aggregation_level %d\n",newPolarInitNode->encoderLength,aggregation_level);
+    // LOG_D(PHY,"New polar node, encoderLength %d, aggregation_level %d\n",newPolarInitNode->encoderLength,aggregation_level);
   } else if (messageType == SL_NR_POLAR_PSBCH_MESSAGE_TYPE) { // PSBCH
     newPolarInitNode->n_max = SL_NR_POLAR_PSBCH_N_MAX;
     newPolarInitNode->i_il = SL_NR_POLAR_PSBCH_I_IL;
@@ -200,17 +206,13 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
   }
 
   newPolarInitNode->K = newPolarInitNode->payloadBits + newPolarInitNode->crcParityBits; // Number of bits to encode.
-  newPolarInitNode->N = nr_polar_output_length(newPolarInitNode->K,
-                                               newPolarInitNode->encoderLength,
-                                               newPolarInitNode->n_max);
+  newPolarInitNode->N = nr_polar_output_length(newPolarInitNode->K, newPolarInitNode->encoderLength, newPolarInitNode->n_max);
   newPolarInitNode->n = log2(newPolarInitNode->N);
   newPolarInitNode->G_N = nr_polar_kronecker_power_matrices(newPolarInitNode->n);
   // polar_encoder vectors:
   newPolarInitNode->Q_0_Nminus1 = nr_polar_sequence_pattern(newPolarInitNode->n);
   newPolarInitNode->interleaving_pattern = malloc(sizeof(uint16_t) * newPolarInitNode->K);
-  nr_polar_interleaving_pattern(newPolarInitNode->K,
-                                newPolarInitNode->i_il,
-                                newPolarInitNode->interleaving_pattern);
+  nr_polar_interleaving_pattern(newPolarInitNode->K, newPolarInitNode->i_il, newPolarInitNode->interleaving_pattern);
 
   newPolarInitNode->rate_matching_pattern = malloc(sizeof(uint16_t) * newPolarInitNode->encoderLength);
   uint16_t J[newPolarInitNode->N];
@@ -220,11 +222,16 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
                                  newPolarInitNode->K,
                                  newPolarInitNode->N,
                                  newPolarInitNode->encoderLength);
+  if (newPolarInitNode->i_bil) {
+    newPolarInitNode->i_bil_pattern = malloc(sizeof(uint16_t) * newPolarInitNode->encoderLength);
+    nr_polar_rm_deinterleaving_lut(newPolarInitNode->i_bil_pattern, newPolarInitNode->encoderLength);
+  }
   newPolarInitNode->information_bit_pattern = malloc(sizeof(uint8_t) * newPolarInitNode->N);
   newPolarInitNode->parity_check_bit_pattern = malloc(sizeof(uint8_t) * newPolarInitNode->N);
   newPolarInitNode->Q_I_N = malloc(sizeof(int16_t) * (newPolarInitNode->K + newPolarInitNode->n_pc));
-  newPolarInitNode->Q_F_N = malloc( sizeof(int16_t) * (newPolarInitNode->N + 1)); // Last element shows the final array index assigned a value.
-  newPolarInitNode->Q_PC_N = malloc( sizeof(int16_t) * (newPolarInitNode->n_pc));
+  newPolarInitNode->Q_F_N =
+      malloc(sizeof(int16_t) * (newPolarInitNode->N + 1)); // Last element shows the final array index assigned a value.
+  newPolarInitNode->Q_PC_N = malloc(sizeof(int16_t) * (newPolarInitNode->n_pc));
 
   for (int i = 0; i <= newPolarInitNode->N; i++)
     newPolarInitNode->Q_F_N[i] = -1; // Empty array.
@@ -243,26 +250,26 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
                             newPolarInitNode->n_pc_wm);
 
   // sort the Q_I_N array in ascending order (first K positions)
-  qsort((void *)newPolarInitNode->Q_I_N,newPolarInitNode->K,sizeof(int16_t),intcmp);
+  qsort((void *)newPolarInitNode->Q_I_N, newPolarInitNode->K, sizeof(int16_t), intcmp);
 
-  if (decoder_flag == 1) 
-    build_decoder_tree(newPolarInitNode);
   build_polar_tables(newPolarInitNode);
-
-  init_polar_deinterleaver_table(newPolarInitNode);
   return newPolarInitNode;
 }
 
-void nr_polar_print_polarParams() {
+void nr_polar_print_polarParams()
+{
   uint8_t i = 0;
 
   if (PolarList == NULL) {
     printf("polarParams is empty.\n");
   } else {
-    t_nrPolar_params * polarParams=PolarList;
+    t_nrPolar_params *polarParams = PolarList;
     while (polarParams != NULL) {
-      printf("polarParams[%d] = %d, %d, %d\n", i,
-             polarParams->idx>>24, (polarParams->idx>>8)&0xFFFF, polarParams->idx&0xFF);
+      printf("polarParams[%d] = %d, %d, %d\n",
+             i,
+             polarParams->idx >> 24,
+             (polarParams->idx >> 8) & 0xFFFF,
+             polarParams->idx & 0xFF);
       polarParams = polarParams->nextPtr;
       i++;
     }
@@ -271,11 +278,18 @@ void nr_polar_print_polarParams() {
   return;
 }
 
-uint16_t nr_polar_aggregation_prime (uint8_t aggregation_level) {
-  if (aggregation_level == 0) return 0;
-  else if (aggregation_level == 1) return NR_POLAR_AGGREGATION_LEVEL_1_PRIME;
-  else if (aggregation_level == 2) return NR_POLAR_AGGREGATION_LEVEL_2_PRIME;
-  else if (aggregation_level == 4) return NR_POLAR_AGGREGATION_LEVEL_4_PRIME;
-  else if (aggregation_level == 8) return NR_POLAR_AGGREGATION_LEVEL_8_PRIME;
-  else return NR_POLAR_AGGREGATION_LEVEL_16_PRIME; //aggregation_level == 16
+uint16_t nr_polar_aggregation_prime(uint8_t aggregation_level)
+{
+  if (aggregation_level == 0)
+    return 0;
+  else if (aggregation_level == 1)
+    return NR_POLAR_AGGREGATION_LEVEL_1_PRIME;
+  else if (aggregation_level == 2)
+    return NR_POLAR_AGGREGATION_LEVEL_2_PRIME;
+  else if (aggregation_level == 4)
+    return NR_POLAR_AGGREGATION_LEVEL_4_PRIME;
+  else if (aggregation_level == 8)
+    return NR_POLAR_AGGREGATION_LEVEL_8_PRIME;
+  else
+    return NR_POLAR_AGGREGATION_LEVEL_16_PRIME; // aggregation_level == 16
 }

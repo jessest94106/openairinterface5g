@@ -70,6 +70,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   mac->p_Max = INT_MIN;
   mac->p_Max_alt = INT_MIN;
   mac->n_ta_offset = -1;
+  pthread_mutex_init(&mac->if_mutex, NULL);
   reset_mac_inst(mac);
 
   // need to inizialize because might not been setup (optional timer)
@@ -160,7 +161,7 @@ NR_UE_MAC_INST_t *nr_l2_init_ue(int nb_inst)
     mac->ue_id = j;
     nr_ue_init_mac(mac);
     nr_ue_mac_default_configs(mac);
-    if (get_softmodem_params()->sa)
+    if (IS_SA_MODE(get_softmodem_params()))
       ue_init_config_request(mac, get_softmodem_params()->numerology);
   }
 

@@ -223,7 +223,7 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc,
 
         nr_rrc_cellgroup_configuration(rrc, cellGroupConfig);
 
-        AssertFatal(!get_softmodem_params()->sa, "secondaryCellGroup only used in NSA for now\n");
+        AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
         nr_rrc_mac_config_req_cg(rrc->ue_id, 0, cellGroupConfig, rrc->UECap.UE_NR_Capability);
         asn1cFreeStruc(asn_DEF_NR_CellGroupConfig, cellGroupConfig);
       }
@@ -551,7 +551,7 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
   }
 
   int get_sib = 0;
-  if (get_softmodem_params()->sa && bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib
+  if (IS_SA_MODE(get_softmodem_params()) && bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib
       && bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_notBarred && rrc->nrRrcState != RRC_STATE_DETACH_NR) {
     NR_UE_RRC_SI_INFO *SI_info = &rrc->perNB[gNB_index].SInfo;
     // to schedule MAC to get SI if required
@@ -994,7 +994,7 @@ static void rrc_ue_generate_RRCSetupComplete(const NR_UE_RRC_INST_t *rrc, const 
   const char *nas_msg;
   int   nas_msg_length;
 
-  if (get_softmodem_params()->sa) {
+  if (IS_SA_MODE(get_softmodem_params())) {
     as_nas_info_t initialNasMsg;
     nr_ue_nas_t *nas = get_ue_nas_info(rrc->ue_id);
     generateRegistrationRequest(&initialNasMsg, nas);

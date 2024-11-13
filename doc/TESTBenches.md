@@ -132,11 +132,6 @@ information on how the images are built.
   ~5G-NR
   - caracal + N310
   - pure performance test through phy-test scheduler, see command line for more details
-- [RAN-Interop-F1](https://jenkins-oai.eurecom.fr/job/RAN-Interop-F1/)
-  ~5G-NR
-  - ofqot (DU, 1x UE)
-  - F1 interoperability: set up connection between Accelleran CU and OAI DU and pass all traffic over F1
-  - 3rd-party gNB/CU interoperability: set up connection between Accelleran CU and OAI UE and test connectivity
 - [RAN-L2-Sim-Test-4G](https://jenkins-oai.eurecom.fr/job/RAN-L2-Sim-Test-4G/)
   ~4G-LTE
   - obelix (eNB, 1x UE, OAI EPC)
@@ -244,10 +239,10 @@ steps look like this:
    `ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf` (note that the path
    is relative to the directory in which the docker-compose file is located).
    Further, an environment variable `USE_ADDITIONAL_OPTIONS` is declared,
-   referencing the relevant options `--sa -E --rfsim` (you can ignore logging
+   referencing the relevant options `-E --rfsim` (you can ignore logging
    options). You would therefore run the gNB from source like this:
    ```
-   sudo ./cmake_targets/ran_build/build/nr-softmodem -O ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf --sa -E --rfsim
+   sudo ./cmake_targets/ran_build/build/nr-softmodem -O ci-scripts/conf_files/gnb.sa.band78.106prb.rfsim.conf -E --rfsim
    ```
    To run this on your local machine, assuming you have a 5GC installed, you
    might need to change IP information in the config to match your core.

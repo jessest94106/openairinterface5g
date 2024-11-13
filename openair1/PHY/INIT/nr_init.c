@@ -41,28 +41,24 @@
 #include "SCHED_NR/fapi_nr_l1.h"
 #include "PHY/NR_REFSIG/ul_ref_seq_nr.h"
 
-int l1_north_init_gNB() {
+int l1_north_init_gNB()
+{
+  AssertFatal(RC.nb_nr_L1_inst > 0, "Failed to init PHY callbacks: nb_nr_L1_inst = %d\n", RC.nb_nr_L1_inst);
+  AssertFatal(RC.gNB != NULL, "Failed to init PHY callbacks: RC.gNB is null\n");
 
-  if (RC.nb_nr_L1_inst > 0 &&  RC.gNB != NULL) {
+  for (uint8_t i = 0; i < RC.nb_nr_L1_inst; i++) {
 
-    AssertFatal(RC.nb_nr_L1_inst>0,"nb_nr_L1_inst=%d\n",RC.nb_nr_L1_inst);
-    AssertFatal(RC.gNB!=NULL,"RC.gNB is null\n");
-    LOG_D(PHY, "%s() RC.nb_nr_L1_inst:%d\n", __FUNCTION__, RC.nb_nr_L1_inst);
-
-    for (int i=0; i<RC.nb_nr_L1_inst; i++) {
-      AssertFatal(RC.gNB[i]!=NULL,"RC.gNB[%d] is null\n",i);
-
-      if ((RC.gNB[i]->if_inst =  NR_IF_Module_init(i))<0) return(-1);
-
-      LOG_D(PHY, "%s() RC.gNB[%d] installing callbacks\n", __FUNCTION__, i);
-      RC.gNB[i]->if_inst->NR_PHY_config_req = nr_phy_config_request;
-      RC.gNB[i]->if_inst->NR_Schedule_response = nr_schedule_response;
+    if ((RC.gNB[i]->if_inst = NR_IF_Module_init(i)) < 0) {
+      LOG_E(NR_PHY, "Error: Failed to initialize NR_IF_Module for gNB[%d]\n", i);
+      return -1;
     }
-  } else {
-    LOG_D(PHY, "%s() Not installing PHY callbacks - RC.nb_nr_L1_inst:%d RC.gNB:%p\n", __FUNCTION__, RC.nb_nr_L1_inst, RC.gNB);
+
+    LOG_D(NR_PHY, "RC.gNB[%d]: installing callbacks\n", i);
+    RC.gNB[i]->if_inst->NR_PHY_config_req = nr_phy_config_request;
+    RC.gNB[i]->if_inst->NR_Schedule_response = nr_schedule_response;
   }
 
-  return(0);
+  return 0;
 }
 
 NR_gNB_PHY_STATS_t *get_phy_stats(PHY_VARS_gNB *gNB, uint16_t rnti)
@@ -312,15 +308,6 @@ void install_nr_schedule_handlers(NR_IF_Module_t *if_inst)
   if_inst->NR_PHY_config_req = nr_phy_config_request;
   if_inst->NR_Schedule_response = nr_schedule_response;
 }
-/*
-void install_schedule_handlers(IF_Module_t *if_inst)
-{
-  if_inst->PHY_config_req = phy_config_request;
-  if_inst->schedule_response = schedule_response;
-}*/
-
-/// this function is a temporary addition for NR configuration
-
 
 void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
                                int N_RB_DL,

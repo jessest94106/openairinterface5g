@@ -39,14 +39,12 @@ import constants as CONST
 
 
 import cls_oaicitest		 #main class for OAI CI test framework
-import cls_physim		 #class PhySim for physical simulators build and test
 import cls_containerize	 #class Containerize for all container-based operations on RAN/UE objects
 import cls_static_code_analysis  #class for static code analysis
 import cls_physim1		 #class PhySim for physical simulators deploy and run
 import cls_cluster		 # class for building/deploying on cluster
 import cls_native        # class for all native/source-based operations
 
-import sshconnection 
 import epc
 import ran
 import cls_oai_html
@@ -87,7 +85,6 @@ def CheckClassValidity(xml_class_list,action,id):
 		resp=True
 	return resp
 
-
 #assigning parameters to object instance attributes (even if the attributes do not exist !!)
 def AssignParams(params_dict):
 
@@ -95,12 +92,8 @@ def AssignParams(params_dict):
 		setattr(CiTestObj, key, value)
 		setattr(RAN, key, value)
 		setattr(HTML, key, value)
-		setattr(ldpc, key, value)
-
-
 
 def ExecuteActionWithParam(action):
-	global SSH
 	global EPC
 	global RAN
 	global HTML
@@ -108,7 +101,6 @@ def ExecuteActionWithParam(action):
 	global SCA
 	global PHYSIM
 	global CLUSTER
-	global ldpc
 	if action == 'Build_eNB' or action == 'Build_Image' or action == 'Build_Proxy' or action == "Build_Cluster_Image" or action == "Build_Run_Tests":
 		RAN.Build_eNB_args=test.findtext('Build_eNB_args')
 		CONTAINERS.imageKind=test.findtext('kind')
@@ -289,18 +281,6 @@ def ExecuteActionWithParam(action):
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
 		success = cls_oaicitest.IdleSleep(HTML, int(st))
 
-	elif action == 'Build_PhySim':
-		ldpc.buildargs  = test.findtext('physim_build_args')
-		forced_workspace_cleanup = test.findtext('forced_workspace_cleanup')
-		if (forced_workspace_cleanup is None):
-			ldpc.forced_workspace_cleanup=False
-		else:
-			if re.match('true', forced_workspace_cleanup, re.IGNORECASE):
-				ldpc.forced_workspace_cleanup=True
-			else:
-				ldpc.forced_workspace_cleanup=False
-		success = ldpc.Build_PhySim(HTML,CONST)
-
 	elif action == 'Deploy_Run_PhySim':
 		success = PHYSIM.Deploy_PhySim(HTML)
 
@@ -377,16 +357,11 @@ def ExecuteActionWithParam(action):
 		elif action == 'Create_Workspace':
 			success = CONTAINERS.Create_Workspace(HTML)
 
-	elif action == 'Run_CUDATest' or action == 'Run_NRulsimTest' or action == 'Run_T2Test':
-		ldpc.runargs = test.findtext('physim_run_args')
-		ldpc.runsim = test.findtext('physim_run')
-		ldpc.timethrs = test.findtext('physim_time_threshold')
-		if action == 'Run_CUDATest':
-			success = ldpc.Run_CUDATest(HTML,CONST,id)
-		elif action == 'Run_NRulsimTest':
-			success = ldpc.Run_NRulsimTest(HTML,CONST,id)
-		elif action == 'Run_T2Test':
-			success = ldpc.Run_T2Test(HTML,CONST,id)
+	elif action == 'Run_Physim':
+		physim_options = test.findtext('physim_run_args')
+		physim_test = test.findtext('physim_test')
+		physim_threshold = test.findtext('physim_time_threshold') or 'inf'
+		success = cls_native.Native.Run_Physim(HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
 
 	elif action == 'LicenceAndFormattingCheck':
 		success = SCA.LicenceAndFormattingCheck(HTML)
@@ -484,7 +459,6 @@ mode = ''
 
 CiTestObj = cls_oaicitest.OaiCiTest()
  
-SSH = sshconnection.SSHConnection()
 EPC = epc.EPCManagement()
 RAN = ran.RANManagement()
 HTML = cls_oai_html.HTMLManagement()
@@ -493,15 +467,12 @@ SCA = cls_static_code_analysis.StaticCodeAnalysis()
 PHYSIM = cls_physim1.PhySim()
 CLUSTER = cls_cluster.Cluster()
 
-ldpc=cls_physim.PhySim()    #create an instance for LDPC test using GPU or CPU build
-
-
 #-----------------------------------------------------------
 # Parsing Command Line Arguments
 #-----------------------------------------------------------
 
 import args_parse
-py_param_file_present, py_params, mode = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,EPC,ldpc,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER)
+py_param_file_present, py_params, mode = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER)
 
 
 
@@ -695,26 +666,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	signal.signal(signal.SIGUSR1, receive_signal)
 
 	HTML.CreateHtmlTabHeader()
-
-	# On CI bench w/ containers, we need to validate if IP routes are set
-	if EPC.IPAddress == '172.21.16.136':
-		CONTAINERS.CheckAndAddRoute('porcepix', EPC.IPAddress, EPC.UserName, EPC.Password)
-	if EPC.IPAddress == '172.21.16.137':
-		CONTAINERS.CheckAndAddRoute('nepes', EPC.IPAddress, EPC.UserName, EPC.Password)
-	if CONTAINERS.eNBIPAddress == '172.21.16.127':
-		CONTAINERS.CheckAndAddRoute('asterix', CONTAINERS.eNBIPAddress, CONTAINERS.eNBUserName, CONTAINERS.eNBPassword)
-	if CONTAINERS.eNB1IPAddress == '172.21.16.127':
-		CONTAINERS.CheckAndAddRoute('asterix', CONTAINERS.eNB1IPAddress, CONTAINERS.eNB1UserName, CONTAINERS.eNB1Password)
-	if CONTAINERS.eNBIPAddress == '172.21.16.128':
-		CONTAINERS.CheckAndAddRoute('obelix', CONTAINERS.eNBIPAddress, CONTAINERS.eNBUserName, CONTAINERS.eNBPassword)
-	if CONTAINERS.eNB1IPAddress == '172.21.16.128':
-		CONTAINERS.CheckAndAddRoute('obelix', CONTAINERS.eNB1IPAddress, CONTAINERS.eNB1UserName, CONTAINERS.eNB1Password)
-	if CONTAINERS.eNBIPAddress == '172.21.16.109' or CONTAINERS.eNBIPAddress == 'ofqot':
-		CONTAINERS.CheckAndAddRoute('ofqot', CONTAINERS.eNBIPAddress, CONTAINERS.eNBUserName, CONTAINERS.eNBPassword)
-	if CONTAINERS.eNBIPAddress == '172.21.16.137':
-		CONTAINERS.CheckAndAddRoute('nepes', CONTAINERS.eNBIPAddress, CONTAINERS.eNBUserName, CONTAINERS.eNBPassword)
-	if CONTAINERS.eNB1IPAddress == '172.21.16.137':
-		CONTAINERS.CheckAndAddRoute('nepes', CONTAINERS.eNB1IPAddress, CONTAINERS.eNB1UserName, CONTAINERS.eNB1Password)
 
 	task_set_succeeded = True
 	HTML.startTime=int(round(time.time() * 1000))

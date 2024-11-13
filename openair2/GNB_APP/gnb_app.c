@@ -54,8 +54,6 @@
 #include "gnb_config.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 
-extern unsigned char NB_gNB_INST;
-
 extern RAN_CONTEXT_t RC;
 
 #define GNB_REGISTER_RETRY_DELAY 10
@@ -71,7 +69,8 @@ uint32_t gNB_app_register(uint32_t gnb_id_start, uint32_t gnb_id_end)//, const E
 
   for (gnb_id = gnb_id_start; (gnb_id < gnb_id_end) ; gnb_id++) {
     {
-      if(get_softmodem_params()->sa){
+      if (IS_SA_MODE(get_softmodem_params())) {
+
         // note:  there is an implicit relationship between the data structure and the message name
         msg_p = itti_alloc_new_message (TASK_GNB_APP, 0, NGAP_REGISTER_GNB_REQ); //Message Temporarily reuse
 

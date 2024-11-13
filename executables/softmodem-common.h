@@ -123,9 +123,7 @@ extern "C"
 #define CONTINUOUS_TX       softmodem_params.continuous_tx
 #define PHY_TEST            softmodem_params.phy_test
 #define DO_RA               softmodem_params.do_ra
-#define SA                  softmodem_params.sa
 #define SL_MODE             softmodem_params.sl_mode
-#define WAIT_FOR_SYNC       softmodem_params.wait_for_sync
 #define CHAIN_OFFSET        softmodem_params.chain_offset
 #define NUMEROLOGY          softmodem_params.numerology
 #define BAND                softmodem_params.band
@@ -155,13 +153,11 @@ extern int usrp_tx_thread;
   {"thread-pool",           CONFIG_HLP_TPOOL,         0,              .strptr=&TP_CONFIG,                     .defstrval="-1,-1,-1,-1,-1,-1,-1,-1",  TYPE_STRING, 0},     \
   {"phy-test",              CONFIG_HLP_PHYTST,        PARAMFLAG_BOOL, .iptr=&PHY_TEST,                        .defintval=0,             TYPE_INT,    0},  \
   {"do-ra",                 CONFIG_HLP_DORA,          PARAMFLAG_BOOL, .iptr=&DO_RA,                           .defintval=0,             TYPE_INT,    0},  \
-  {"sa",                    CONFIG_HLP_SA,            PARAMFLAG_BOOL, .iptr=&SA,                              .defintval=0,             TYPE_INT,    0},  \
   {"sl-mode",               CONFIG_HLP_SL_MODE,       0,              .u8ptr=&SL_MODE,                        .defintval=0,             TYPE_UINT8,  0},  \
   {"usim-test",             CONFIG_HLP_USIM,          PARAMFLAG_BOOL, .u8ptr=&USIM_TEST,                      .defintval=0,             TYPE_UINT8,  0},  \
   {"clock-source",          CONFIG_HLP_CLK,           0,              .uptr=&CLOCK_SOURCE,                    .defintval=0,             TYPE_UINT,   0},  \
   {"time-source",           CONFIG_HLP_TME,           0,              .uptr=&TIMING_SOURCE,                   .defintval=0,             TYPE_UINT,   0},  \
   {"tune-offset",           CONFIG_HLP_TUNE_OFFSET,   0,              .dblptr=&TUNE_OFFSET,                   .defintval=0,             TYPE_DOUBLE, 0},  \
-  {"wait-for-sync",         NULL,                     PARAMFLAG_BOOL, .iptr=&WAIT_FOR_SYNC,                   .defintval=0,             TYPE_INT,    0},  \
   {"C" ,                    CONFIG_HLP_DLF,           0,              .u64ptr=&(downlink_frequency[0][0]),    .defuintval=0,            TYPE_UINT64, 0},  \
   {"CO" ,                   CONFIG_HLP_ULF,           0,              .iptr=&(uplink_frequency_offset[0][0]), .defintval=0,             TYPE_INT,    0},  \
   {"a" ,                    CONFIG_HLP_CHOFF,         0,              .iptr=&CHAIN_OFFSET,                    .defintval=0,             TYPE_INT,    0},  \
@@ -196,8 +192,6 @@ extern int usrp_tx_thread;
 
 // clang-format off
 #define CMDLINE_PARAMS_CHECK_DESC {         \
-    { .s5 = { NULL } },                     \
-    { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
     { .s5 = { NULL } },                     \
@@ -305,11 +299,9 @@ typedef struct {
   char *threadPoolConfig;
   int            phy_test;
   int            do_ra;
-  int            sa;
   uint8_t        sl_mode;
   uint8_t        usim_test;
   int            emulate_rf;
-  int            wait_for_sync; //eNodeB only
   int            chain_offset;
   int            numerology;
   int            band;
@@ -332,6 +324,9 @@ typedef struct {
   int ldpc_offload_flag;
   int threequarter_fs;
 } softmodem_params_t;
+
+#define IS_SA_MODE(sM_params) (!(sM_params)->phy_test && !(sM_params)->do_ra && !(sM_params)->nsa)
+void softmodem_verify_mode(const softmodem_params_t *p);
 
 uint64_t get_softmodem_optmask(void);
 uint64_t set_softmodem_optmask(uint64_t bitmask);

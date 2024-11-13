@@ -1819,7 +1819,7 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
 
   if (RUParamList.numelt > 0) {
     RC.ru = (RU_t **)malloc(RC.nb_RU*sizeof(RU_t *));
-    RC.ru_mask = (1 << NB_RU) - 1;
+    RC.ru_mask = (1 << RC.nb_RU) - 1;
 
     for (int j = 0; j < RC.nb_RU; j++) {
       RC.ru[j] = calloc(1, sizeof(*RC.ru[j]));

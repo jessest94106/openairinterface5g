@@ -65,7 +65,6 @@ queue_t nr_dl_tti_req_queue;
 queue_t nr_tx_req_queue;
 queue_t nr_ul_dci_req_queue;
 queue_t nr_ul_tti_req_queue;
-pthread_mutex_t mac_IF_mutex;
 static void save_pdsch_pdu_for_crnti(nfapi_nr_dl_tti_request_t *dl_tti_request);
 
 void nrue_init_standalone_socket(int tx_port, int rx_port)
@@ -343,7 +342,7 @@ static bool is_my_dci(NR_UE_MAC_INST_t *mac, nfapi_nr_dl_dci_pdu_t *received_pdu
         (received_pdu->RNTI != mac->ra.ra_rnti || mac->ra.RA_RAPID_found))
       return false;
   }
-  if (get_softmodem_params()->sa) {
+  if (IS_SA_MODE(get_softmodem_params())) {
     if (mac->state == UE_NOT_SYNC)
       return false;
     if (received_pdu->RNTI == 0xFFFF)
@@ -1141,19 +1140,18 @@ void update_harq_status(NR_UE_MAC_INST_t *mac, uint8_t harq_pid, uint8_t ack_nac
 
 int nr_ue_ul_indication(nr_uplink_indication_t *ul_info)
 {
-  int ret = pthread_mutex_lock(&mac_IF_mutex);
-  AssertFatal(!ret, "mutex failed %d\n", ret);
-  LOG_D(PHY, "Locked in ul, slot %d\n", ul_info->slot);
-
   module_id_t module_id = ul_info->module_id;
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
+  int ret = pthread_mutex_lock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
+  LOG_D(PHY, "Locked in ul, slot %d\n", ul_info->slot);
 
   LOG_T(NR_MAC, "Not calling scheduler mac->ra.ra_state = %d\n", mac->ra.ra_state);
 
   if (is_nr_UL_slot(mac->tdd_UL_DL_ConfigurationCommon, ul_info->slot, mac->frame_type))
     nr_ue_ul_scheduler(mac, ul_info);
-  pthread_mutex_unlock(&mac_IF_mutex);
-
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   return 0;
 }
 
@@ -1264,26 +1262,29 @@ static uint32_t nr_ue_dl_processing(nr_downlink_indication_t *dl_info)
 
 int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
 {
-  int ret = pthread_mutex_lock(&mac_IF_mutex);
-  AssertFatal(!ret, "mutex failed %d\n", ret);
   uint32_t ret2 = 0;
   NR_UE_MAC_INST_t *mac = get_mac_inst(dl_info->module_id);
+  int ret = pthread_mutex_lock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   if (!dl_info->dci_ind && !dl_info->rx_ind)
     // DL indication to process DCI reception
     nr_ue_dl_scheduler(mac, dl_info);
   else
     // DL indication to process data channels
     ret2 = nr_ue_dl_processing(dl_info);
-  pthread_mutex_unlock(&mac_IF_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   return ret2;
 }
 
 void nr_ue_slot_indication(uint8_t mod_id)
 {
-  pthread_mutex_lock(&mac_IF_mutex);
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
+  int ret = pthread_mutex_lock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
   update_mac_timers(mac);
-  pthread_mutex_unlock(&mac_IF_mutex);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
 nr_ue_if_module_t *nr_ue_if_module_init(uint32_t module_id)
@@ -1309,7 +1310,6 @@ nr_ue_if_module_t *nr_ue_if_module_init(uint32_t module_id)
     nr_ue_if_module_inst[module_id]->ul_indication = nr_ue_ul_indication;
     nr_ue_if_module_inst[module_id]->slot_indication = nr_ue_slot_indication;
   }
-  pthread_mutex_init(&mac_IF_mutex, NULL);
 
   return nr_ue_if_module_inst[module_id];
 }

@@ -171,8 +171,6 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
   NR_DL_FRAME_PARMS *const fp            = &ue->frame_parms;
   NR_UE_COMMON *const common_vars        = &ue->common_vars;
   NR_UE_PRACH **const prach_vars         = ue->prach_vars;
-  NR_UE_CSI_IM **const csiim_vars        = ue->csiim_vars;
-  NR_UE_CSI_RS **const csirs_vars        = ue->csirs_vars;
   NR_UE_SRS **const srs_vars             = ue->srs_vars;
 
   LOG_I(PHY, "Initializing UE vars for gNB TXant %u, UE RXant %u\n", fp->nb_antennas_tx, fp->nb_antennas_rx);
@@ -259,12 +257,7 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
   // DLSCH
   for (int gNB_id = 0; gNB_id < ue->n_connected_gNB; gNB_id++) {
     prach_vars[gNB_id] = malloc16_clear(sizeof(NR_UE_PRACH));
-    csiim_vars[gNB_id] = malloc16_clear(sizeof(NR_UE_CSI_IM));
-    csirs_vars[gNB_id] = malloc16_clear(sizeof(NR_UE_CSI_RS));
     srs_vars[gNB_id] = malloc16_clear(sizeof(NR_UE_SRS));
-
-    csiim_vars[gNB_id]->active = false;
-    csirs_vars[gNB_id]->active = false;
     srs_vars[gNB_id]->active = false;
 
     // ceil((NB_RB*8(max allocation per RB)*2(QPSK))/32)
@@ -283,7 +276,7 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
   init_timeshift_rotation(fp);
 
   // initialize to false only for SA since in do-ra and phy-test it is already set to true before getting here
-  if (get_softmodem_params()->sa)
+  if (IS_SA_MODE(get_softmodem_params()))
     ue->received_config_request = false;
 
   return 0;
@@ -326,8 +319,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
 
     free_and_zero(ue->nr_srs_info);
 
-    free_and_zero(ue->csiim_vars[gNB_id]);
-    free_and_zero(ue->csirs_vars[gNB_id]);
     free_and_zero(ue->srs_vars[gNB_id]);
 
     free_and_zero(ue->prach_vars[gNB_id]);

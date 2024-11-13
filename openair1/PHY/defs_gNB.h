@@ -514,7 +514,7 @@ typedef struct PHY_VARS_gNB_s {
   int srs_thres;
   uint64_t bad_pucch;
   int num_ulprbbl;
-  int ulprbbl[275];
+  uint16_t ulprbbl [MAX_BWP_SIZE];
 
   time_stats_t phy_proc_tx;
   time_stats_t phy_proc_rx;
