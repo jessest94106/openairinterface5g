@@ -54,6 +54,6 @@ typedef struct fgs_security_mode_complete_msg_tag {
   FGCNasMessageContainer fgsnasmessagecontainer;
 } fgs_security_mode_complete_msg;
 
-int encode_fgs_security_mode_complete(fgs_security_mode_complete_msg *fgs_security_mode_comp, uint8_t *buffer, uint32_t len);
+int encode_fgs_security_mode_complete(const fgs_security_mode_complete_msg *fgs_security_mode_comp, uint8_t *buffer, uint32_t len);
 
 #endif /* ! defined(FGS_NAS_SECURITY_MODE_COMPLETE_H_) */

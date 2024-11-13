@@ -35,9 +35,15 @@ typedef struct SORTransparentContainer_tag {
   OctetString sortransparentcontainercontents;
 } SORTransparentContainer;
 
-int encode_sor_transparent_container(SORTransparentContainer *sortransparentcontainer, uint8_t iei, uint8_t *buffer, uint32_t len);
+int encode_sor_transparent_container(const SORTransparentContainer *sortransparentcontainer,
+                                     uint8_t iei,
+                                     uint8_t *buffer,
+                                     uint32_t len);
 
-int decode_sor_transparent_container(SORTransparentContainer *sortransparentcontainer, uint8_t iei, uint8_t *buffer, uint32_t len);
+int decode_sor_transparent_container(SORTransparentContainer *sortransparentcontainer,
+                                     uint8_t iei,
+                                     const uint8_t *buffer,
+                                     uint32_t len);
 
 void dump_sor_transparent_container_xml(SORTransparentContainer *sortransparentcontainer, uint8_t iei);
 

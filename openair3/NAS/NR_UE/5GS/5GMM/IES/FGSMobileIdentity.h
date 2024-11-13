@@ -148,11 +148,11 @@ typedef union FGSMobileIdentity_tag {
 } FGSMobileIdentity;
 // clang-format on
 
-int encode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei, uint8_t *buffer, uint32_t len);
+int encode_5gs_mobile_identity(const FGSMobileIdentity *fgsmobileidentity, uint8_t iei, uint8_t *buffer, uint32_t len);
 
 int decode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei, const uint8_t *buffer, uint32_t len);
 
-int encode_stmsi_5gs_mobile_identity(uint8_t *buffer, Stmsi5GSMobileIdentity_t *stmsi, uint32_t len);
+int encode_stmsi_5gs_mobile_identity(uint8_t *buffer, const Stmsi5GSMobileIdentity_t *stmsi, uint32_t len);
 int decode_stmsi_5gs_mobile_identity(Stmsi5GSMobileIdentity_t *stmsi, const uint8_t *buffer, uint32_t len);
 
 #endif /* FGS MOBILE IDENTITY_H_ */

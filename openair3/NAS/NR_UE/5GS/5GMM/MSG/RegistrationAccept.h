@@ -61,6 +61,6 @@ typedef struct registration_accept_msg_tag {
 
 int decode_registration_accept(registration_accept_msg *registrationaccept, const uint8_t *buffer, uint32_t len);
 
-int encode_registration_accept(registration_accept_msg *registrationaccept, uint8_t *buffer, uint32_t len);
+int encode_registration_accept(const registration_accept_msg *registrationaccept, uint8_t *buffer, uint32_t len);
 
 #endif /* ! defined(REGISTRATION_ACCEPT_H_) */

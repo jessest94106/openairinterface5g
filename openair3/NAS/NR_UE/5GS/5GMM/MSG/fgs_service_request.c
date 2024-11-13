@@ -38,7 +38,7 @@
 /**
  * @brief Encode 5GMM NAS Service Request message (8.2.16 of 3GPP TS 24.501)
  */
-int encode_fgs_service_request(uint8_t *buffer, fgs_service_request_msg_t *service_request, uint32_t len)
+int encode_fgs_service_request(uint8_t *buffer, const fgs_service_request_msg_t *service_request, uint32_t len)
 {
   // Return if buffer is shorter than min length
   if (len < MIN_LEN_FGS_SERVICE_REQUEST)

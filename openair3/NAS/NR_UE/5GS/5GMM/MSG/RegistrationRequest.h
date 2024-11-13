@@ -112,8 +112,8 @@ typedef struct registration_request_msg_tag {
   NrUESecurityCapability nruesecuritycapability;
 } registration_request_msg;
 
-int decode_registration_request(registration_request_msg *registrationrequest, uint8_t *buffer, uint32_t len);
+int decode_registration_request(registration_request_msg *registrationrequest, const uint8_t *buffer, uint32_t len);
 
-int encode_registration_request(registration_request_msg *registrationrequest, uint8_t *buffer, uint32_t len);
+int encode_registration_request(const registration_request_msg *registrationrequest, uint8_t *buffer, uint32_t len);
 
 #endif /* ! defined(REGISTRATION_REQUEST_H_) */

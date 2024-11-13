@@ -57,6 +57,8 @@ typedef struct fgs_authentication_response_msg_tag {
   AuthenticationResponseParameter authenticationresponseparameter;
 } fgs_authentication_response_msg;
 
-int encode_fgs_authentication_response(fgs_authentication_response_msg *authentication_response, uint8_t *buffer, uint32_t len);
+int encode_fgs_authentication_response(const fgs_authentication_response_msg *authentication_response,
+                                       uint8_t *buffer,
+                                       uint32_t len);
 
 #endif /* ! defined(FGS_AUTHENTICATION_RESPONSE_H_) */

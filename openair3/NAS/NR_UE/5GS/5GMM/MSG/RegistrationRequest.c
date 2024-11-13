@@ -34,7 +34,7 @@
 
 #define IEI_NULL 0x00
 
-int decode_registration_request(registration_request_msg *registration_request, uint8_t *buffer, uint32_t len)
+int decode_registration_request(registration_request_msg *registration_request, const uint8_t *buffer, uint32_t len)
 {
   uint32_t decoded = 0;
   int decoded_result = 0;
@@ -68,7 +68,7 @@ int decode_registration_request(registration_request_msg *registration_request, 
   return decoded;
 }
 
-int encode_registration_request(registration_request_msg *registration_request, uint8_t *buffer, uint32_t len)
+int encode_registration_request(const registration_request_msg *registration_request, uint8_t *buffer, uint32_t len)
 {
   int encoded = 0;
   int encode_result = 0;

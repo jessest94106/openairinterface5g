@@ -33,7 +33,7 @@
 #include "FGCNasMessageContainer.h"
 #include "FGSMobileIdentity.h"
 
-int encode_fgs_security_mode_complete(fgs_security_mode_complete_msg *fgs_security_mode_comp, uint8_t *buffer, uint32_t len)
+int encode_fgs_security_mode_complete(const fgs_security_mode_complete_msg *fgs_security_mode_comp, uint8_t *buffer, uint32_t len)
 {
   int encoded = 0;
   int encode_result = 0;

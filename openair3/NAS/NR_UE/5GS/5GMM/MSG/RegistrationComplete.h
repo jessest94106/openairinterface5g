@@ -41,8 +41,8 @@ typedef struct registration_complete_msg_tag {
   SORTransparentContainer *sortransparentcontainer;
 } registration_complete_msg;
 
-int decode_registration_complete(registration_complete_msg *registrationcomplete, uint8_t *buffer, uint32_t len);
+int decode_registration_complete(registration_complete_msg *registrationcomplete, const uint8_t *buffer, uint32_t len);
 
-int encode_registration_complete(registration_complete_msg *registrationcomplete, uint8_t *buffer, uint32_t len);
+int encode_registration_complete(const registration_complete_msg *registrationcomplete, uint8_t *buffer, uint32_t len);
 
 #endif /* ! defined(REGISTRATION_COMPLETE_H_) */

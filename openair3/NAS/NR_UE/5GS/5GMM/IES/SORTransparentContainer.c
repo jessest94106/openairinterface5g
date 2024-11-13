@@ -30,7 +30,10 @@
 
 //#define NAS_DEBUG 1
 
-int decode_sor_transparent_container(SORTransparentContainer *sortransparentcontainer, uint8_t iei, uint8_t *buffer, uint32_t len)
+int decode_sor_transparent_container(SORTransparentContainer *sortransparentcontainer,
+                                     uint8_t iei,
+                                     const uint8_t *buffer,
+                                     uint32_t len)
 {
   int decoded = 0;
   int decode_result;
@@ -61,7 +64,10 @@ int decode_sor_transparent_container(SORTransparentContainer *sortransparentcont
   LOG_FUNC_RETURN(decoded);
 }
 
-int encode_sor_transparent_container(SORTransparentContainer *sortransparentcontainer, uint8_t iei, uint8_t *buffer, uint32_t len)
+int encode_sor_transparent_container(const SORTransparentContainer *sortransparentcontainer,
+                                     uint8_t iei,
+                                     uint8_t *buffer,
+                                     uint32_t len)
 {
   uint8_t *lenPtr;
   uint32_t encoded = 0;

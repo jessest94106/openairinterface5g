@@ -42,6 +42,6 @@ typedef struct {
   uint8_t value;
 } FGMMCapability;
 
-int encode_5gmm_capability(FGMMCapability *fgmmcapability, uint8_t iei, uint8_t *buffer, uint32_t len);
+int encode_5gmm_capability(const FGMMCapability *fgmmcapability, uint8_t iei, uint8_t *buffer, uint32_t len);
 
 #endif /* FGMM_CAPABILITY_H_ */

@@ -47,7 +47,7 @@ typedef struct fgs_deregistration_request_ue_originating_msg_tag {
   FGSMobileIdentity fgsmobileidentity;
 } fgs_deregistration_request_ue_originating_msg;
 
-int encode_fgs_deregistration_request_ue_originating(fgs_deregistration_request_ue_originating_msg *registrationrequest,
+int encode_fgs_deregistration_request_ue_originating(const fgs_deregistration_request_ue_originating_msg *registrationrequest,
                                                      uint8_t *buffer,
                                                      uint32_t len);
 

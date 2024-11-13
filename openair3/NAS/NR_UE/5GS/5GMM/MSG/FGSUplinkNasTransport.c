@@ -34,7 +34,7 @@
 #include <string.h>
 #include "TLVEncoder.h"
 
-int encode_fgs_payload_container(FGSPayloadContainer *paycontainer, uint8_t iei, uint8_t *buffer, uint32_t len)
+static int encode_fgs_payload_container(const FGSPayloadContainer *paycontainer, uint8_t iei, uint8_t *buffer, uint32_t len)
 {
   uint32_t encoded = 0;
   int encode_result;
@@ -62,7 +62,7 @@ int encode_fgs_payload_container(FGSPayloadContainer *paycontainer, uint8_t iei,
   return encoded;
 }
 
-int encode_nssai(OctetString *nssai, uint8_t iei, uint8_t *buffer)
+static int encode_nssai(const OctetString *nssai, uint8_t iei, uint8_t *buffer)
 {
   uint32_t encoded = 0;
   int encode_result;
@@ -84,7 +84,7 @@ int encode_nssai(OctetString *nssai, uint8_t iei, uint8_t *buffer)
   return encoded;
 }
 
-int encode_dnn(OctetString *dnn, uint8_t iei, uint8_t *buffer)
+static int encode_dnn(const OctetString *dnn, uint8_t iei, uint8_t *buffer)
 {
   uint32_t encoded = 0;
   int encode_result;
@@ -106,7 +106,7 @@ int encode_dnn(OctetString *dnn, uint8_t iei, uint8_t *buffer)
   return encoded;
 }
 
-int encode_fgs_uplink_nas_transport(fgs_uplink_nas_transport_msg *fgs_up_nas_transport, uint8_t *buffer, uint32_t len)
+int encode_fgs_uplink_nas_transport(const fgs_uplink_nas_transport_msg *fgs_up_nas_transport, uint8_t *buffer, uint32_t len)
 {
   int encoded = 0;
   int encode_result = 0;

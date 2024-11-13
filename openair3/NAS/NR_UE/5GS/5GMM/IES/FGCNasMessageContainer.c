@@ -60,7 +60,7 @@ int decode_fgc_nas_message_container(FGCNasMessageContainer *nasmessagecontainer
 
   return decoded;
 }
-int encode_fgc_nas_message_container(FGCNasMessageContainer *nasmessagecontainer, uint8_t iei, uint8_t *buffer, uint32_t len)
+int encode_fgc_nas_message_container(const FGCNasMessageContainer *nasmessagecontainer, uint8_t iei, uint8_t *buffer, uint32_t len)
 {
   uint32_t encoded = 0;
   int encode_result;

@@ -53,7 +53,7 @@ typedef struct {
   FGCNasMessageContainer *fgsnasmessagecontainer;
 } fgs_service_request_msg_t;
 
-int encode_fgs_service_request(uint8_t *buffer, fgs_service_request_msg_t *servicerequest, uint32_t len);
+int encode_fgs_service_request(uint8_t *buffer, const fgs_service_request_msg_t *servicerequest, uint32_t len);
 int decode_fgs_service_request(fgs_service_request_msg_t *sr, const uint8_t *buffer, uint32_t len);
 
 #endif /* ! defined(FGS_SERVICE_REQUEST_H_) */

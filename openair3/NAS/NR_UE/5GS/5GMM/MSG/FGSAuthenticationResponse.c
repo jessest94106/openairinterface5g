@@ -37,7 +37,9 @@
 
 #include "FGSAuthenticationResponse.h"
 
-int encode_fgs_authentication_response(fgs_authentication_response_msg *authentication_response, uint8_t *buffer, uint32_t len)
+int encode_fgs_authentication_response(const fgs_authentication_response_msg *authentication_response,
+                                       uint8_t *buffer,
+                                       uint32_t len)
 {
   int encoded = 0;
   int encode_result = 0;

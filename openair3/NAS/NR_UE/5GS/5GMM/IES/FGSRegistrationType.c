@@ -49,7 +49,7 @@ int decode_5gs_registration_type(FGSRegistrationType *fgsregistrationtype, uint8
   return decoded;
 }
 
-int encode_5gs_registration_type(FGSRegistrationType *fgsregistrationtype)
+int encode_5gs_registration_type(const FGSRegistrationType *fgsregistrationtype)
 {
   uint8_t bufferReturn;
   uint8_t *buffer = &bufferReturn;

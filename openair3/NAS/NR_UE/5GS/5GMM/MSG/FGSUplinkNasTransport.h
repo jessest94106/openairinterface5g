@@ -66,6 +66,6 @@ typedef struct fgs_uplink_nas_transport_msg_tag {
   OctetString dnn;
 } fgs_uplink_nas_transport_msg;
 
-int encode_fgs_uplink_nas_transport(fgs_uplink_nas_transport_msg *fgs_security_mode_comp, uint8_t *buffer, uint32_t len);
+int encode_fgs_uplink_nas_transport(const fgs_uplink_nas_transport_msg *fgs_security_mode_comp, uint8_t *buffer, uint32_t len);
 
 #endif /* ! defined(FGS_UPLINK_NAS_TRANSPORT_H_) */

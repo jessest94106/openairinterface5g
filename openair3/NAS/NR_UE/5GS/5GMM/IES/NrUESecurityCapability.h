@@ -45,6 +45,9 @@ typedef struct {
   uint8_t EIA;
 } NrUESecurityCapability;
 
-int encode_nrue_security_capability(NrUESecurityCapability *nruesecuritycapability, uint8_t iei, uint8_t *buffer, uint32_t len);
+int encode_nrue_security_capability(const NrUESecurityCapability *nruesecuritycapability,
+                                    uint8_t iei,
+                                    uint8_t *buffer,
+                                    uint32_t len);
 
 #endif /* NRUE_SECURITY_CAPABILITY_H_ */

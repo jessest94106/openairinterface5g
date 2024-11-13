@@ -23,14 +23,14 @@
 #include <stdint.h>
 #include "SORTransparentContainer.h"
 
-int decode_registration_complete(registration_complete_msg *registration_complete, uint8_t *buffer, uint32_t len)
+int decode_registration_complete(registration_complete_msg *registration_complete, const uint8_t *buffer, uint32_t len)
 {
   uint32_t decoded = 0;
   int decoded_result = 0;
 
   /* Decoding mandatory fields */
   if ((decoded_result =
-           decode_sor_transparent_container(&registration_complete->sortransparentcontainer, 0, buffer + decoded, len - decoded))
+           decode_sor_transparent_container(registration_complete->sortransparentcontainer, 0, buffer + decoded, len - decoded))
       < 0)
     return decoded_result;
   else
@@ -39,7 +39,7 @@ int decode_registration_complete(registration_complete_msg *registration_complet
   return decoded;
 }
 
-int encode_registration_complete(registration_complete_msg *registration_complete, uint8_t *buffer, uint32_t len)
+int encode_registration_complete(const registration_complete_msg *registration_complete, uint8_t *buffer, uint32_t len)
 {
   int encoded = 0;
   int encode_result = 0;

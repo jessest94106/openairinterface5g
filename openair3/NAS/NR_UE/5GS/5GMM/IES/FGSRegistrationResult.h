@@ -48,7 +48,7 @@ typedef struct {
   uint8_t registrationresult: 3;
 } FGSRegistrationResult;
 
-uint16_t encode_fgs_registration_result(FGSRegistrationResult *fgsregistrationresult);
+uint16_t encode_fgs_registration_result(const FGSRegistrationResult *fgsregistrationresult);
 
 int decode_fgs_registration_result(FGSRegistrationResult *fgsregistrationresult, uint8_t iei, uint16_t value, uint32_t len);
 

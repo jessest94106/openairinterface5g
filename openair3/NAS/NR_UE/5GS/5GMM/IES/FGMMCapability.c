@@ -35,7 +35,7 @@
 #include "TLVDecoder.h"
 #include "FGMMCapability.h"
 
-int encode_5gmm_capability(FGMMCapability *fgmmcapability, uint8_t iei, uint8_t *buffer, uint32_t len)
+int encode_5gmm_capability(const FGMMCapability *fgmmcapability, uint8_t iei, uint8_t *buffer, uint32_t len)
 {
   int encoded = 0;
   if (iei) {

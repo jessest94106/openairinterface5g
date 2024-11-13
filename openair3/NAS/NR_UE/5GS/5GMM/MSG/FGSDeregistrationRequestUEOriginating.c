@@ -32,12 +32,12 @@
 
 #define IEI_NULL 0x00
 
-int encode_fgs_deregistration_request_ue_originating(fgs_deregistration_request_ue_originating_msg *drr,
+int encode_fgs_deregistration_request_ue_originating(const fgs_deregistration_request_ue_originating_msg *drr,
                                                      uint8_t *buffer,
                                                      uint32_t len)
 {
   int encoded = 0;
-  FGSDeregistrationType *dt = &drr->deregistrationtype;
+  const FGSDeregistrationType *dt = &drr->deregistrationtype;
   *(buffer + encoded) = ((dt->switchoff & 0x1) << 7) | ((dt->reregistration_required & 0x1) << 6) | ((dt->access_type & 0x3) << 4);
 
   int encode_result;

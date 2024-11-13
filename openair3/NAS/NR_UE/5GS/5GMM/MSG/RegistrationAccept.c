@@ -65,7 +65,7 @@ int decode_registration_accept(registration_accept_msg *registration_accept, con
   return decoded;
 }
 
-int encode_registration_accept(registration_accept_msg *registration_accept, uint8_t *buffer, uint32_t len)
+int encode_registration_accept(const registration_accept_msg *registration_accept, uint8_t *buffer, uint32_t len)
 {
   int encoded = 0;
 

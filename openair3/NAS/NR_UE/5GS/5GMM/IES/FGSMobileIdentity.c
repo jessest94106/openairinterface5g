@@ -41,11 +41,11 @@
 
 static int decode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, const uint8_t *buffer);
 
-static int encode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, uint8_t *buffer);
-static int encode_suci_5gs_mobile_identity(Suci5GSMobileIdentity_t *suci, uint8_t *buffer);
-static int encode_imeisv_5gs_mobile_identity(Imeisv5GSMobileIdentity_t *imeisv, uint8_t *buffer);
+static int encode_guti_5gs_mobile_identity(const Guti5GSMobileIdentity_t *guti, uint8_t *buffer);
+static int encode_suci_5gs_mobile_identity(const Suci5GSMobileIdentity_t *suci, uint8_t *buffer);
+static int encode_imeisv_5gs_mobile_identity(const Imeisv5GSMobileIdentity_t *imeisv, uint8_t *buffer);
 
-int encode_stmsi_5gs_mobile_identity(uint8_t *buffer, Stmsi5GSMobileIdentity_t *stmsi, uint32_t len)
+int encode_stmsi_5gs_mobile_identity(uint8_t *buffer, const Stmsi5GSMobileIdentity_t *stmsi, uint32_t len)
 {
   // Return if buffer is shorter than min length
   if (len < LEN_5G_FGS_TMSI_IE)
@@ -126,7 +126,7 @@ int decode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei
   return (decoded + decoded_rc);
 }
 
-int encode_5gs_mobile_identity(FGSMobileIdentity *fgsmobileidentity, uint8_t iei, uint8_t *buffer, uint32_t len)
+int encode_5gs_mobile_identity(const FGSMobileIdentity *fgsmobileidentity, uint8_t iei, uint8_t *buffer, uint32_t len)
 {
   // Return if buffer is shorter than min length
   if (len < MIN_LEN_FGS_MOBILE_ID_IE)
@@ -222,7 +222,7 @@ static int decode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, const 
   return decoded;
 }
 
-static int encode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, uint8_t *buffer)
+static int encode_guti_5gs_mobile_identity(const Guti5GSMobileIdentity_t *guti, uint8_t *buffer)
 {
   uint32_t encoded = 0;
   uint16_t temp;
@@ -245,7 +245,7 @@ static int encode_guti_5gs_mobile_identity(Guti5GSMobileIdentity_t *guti, uint8_
   return encoded;
 }
 
-static int encode_suci_5gs_mobile_identity(Suci5GSMobileIdentity_t *suci, uint8_t *buffer)
+static int encode_suci_5gs_mobile_identity(const Suci5GSMobileIdentity_t *suci, uint8_t *buffer)
 {
   uint32_t encoded = 0;
   *(buffer + encoded) = (suci->supiformat << 4) | (suci->typeofidentity);
@@ -269,7 +269,7 @@ static int encode_suci_5gs_mobile_identity(Suci5GSMobileIdentity_t *suci, uint8_
   *(buffer + encoded) = suci->homenetworkpki;
   encoded++;
 
-  char *ptr = suci->schemeoutput;
+  const char *ptr = suci->schemeoutput;
   while (ptr < suci->schemeoutput + strlen(suci->schemeoutput)) {
     buffer[encoded] = ((*(ptr + 1) - '0') << 4) | (*(ptr) - '0');
     encoded++;
@@ -281,7 +281,7 @@ static int encode_suci_5gs_mobile_identity(Suci5GSMobileIdentity_t *suci, uint8_
   return encoded;
 }
 
-static int encode_imeisv_5gs_mobile_identity(Imeisv5GSMobileIdentity_t *imeisv, uint8_t *buffer)
+static int encode_imeisv_5gs_mobile_identity(const Imeisv5GSMobileIdentity_t *imeisv, uint8_t *buffer)
 {
   uint32_t encoded = 0;
   *(buffer + encoded) = 0x00 | (imeisv->digittac01 << 4) | (imeisv->oddeven << 3) | (imeisv->typeofidentity);

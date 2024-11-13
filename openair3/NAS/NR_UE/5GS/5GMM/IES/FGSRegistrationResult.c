@@ -46,7 +46,7 @@ int decode_fgs_registration_result(FGSRegistrationResult *fgsregistrationresult,
   return decoded;
 }
 
-uint16_t encode_fgs_registration_result(FGSRegistrationResult *fgsregistrationresult)
+uint16_t encode_fgs_registration_result(const FGSRegistrationResult *fgsregistrationresult)
 {
   uint16_t bufferReturn;
   uint16_t *buffer = &bufferReturn;
