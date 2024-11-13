@@ -48,7 +48,6 @@
 #include "RegistrationAccept.h"
 #include "SORTransparentContainer.h"
 #include "T.h"
-#include "TLVEncoder.h"
 #include "aka_functions.h"
 #include "assertions.h"
 #include "common/utils/ds/byte_array.h"
@@ -775,7 +774,6 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
                                          SORTransparentContainer *sortransparentcontainer)
 {
   int length = 0;
-  int size = 0;
   fgs_nas_message_t nas_msg;
   nas_stream_cipher_t stream_cipher;
   uint8_t mac[4];
@@ -783,52 +781,42 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
   fgs_nas_message_security_protected_t *sp_msg;
 
   sp_msg = &nas_msg.security_protected;
-  // set header
+  // set security protected header
   sp_msg->header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   sp_msg->header.security_header_type = INTEGRITY_PROTECTED_AND_CIPHERED;
   sp_msg->header.message_authentication_code = 0;
   sp_msg->header.sequence_number = nas->security.nas_count_ul & 0xff;
   length = 7;
-  sp_msg->plain.mm_msg.registration_complete.protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
+  // set plain 5GMM header
+  sp_msg->plain.mm_msg.header.ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   length += 1;
-  sp_msg->plain.mm_msg.registration_complete.securityheadertype = PLAIN_5GS_MSG;
-  sp_msg->plain.mm_msg.registration_complete.sparehalfoctet = 0;
+  sp_msg->plain.mm_msg.header.security_header_type = PLAIN_5GS_MSG;
   length += 1;
-  sp_msg->plain.mm_msg.registration_complete.messagetype = FGS_REGISTRATION_COMPLETE;
+  sp_msg->plain.mm_msg.header.message_type = FGS_REGISTRATION_COMPLETE;
   length += 1;
 
   if (sortransparentcontainer) {
+    sp_msg->plain.mm_msg.registration_complete.sortransparentcontainer = sortransparentcontainer;
     length += sortransparentcontainer->sortransparentcontainercontents.length;
   }
 
   // encode the message
   initialNasMsg->nas_data = malloc_or_fail(length * sizeof(*initialNasMsg->nas_data));
   initialNasMsg->length = length;
-
-  /* Encode the first octet of the header (extended protocol discriminator) */
-  ENCODE_U8(initialNasMsg->nas_data + size, sp_msg->header.protocol_discriminator, size);
-
-  /* Encode the security header type */
-  ENCODE_U8(initialNasMsg->nas_data + size, sp_msg->header.security_header_type, size);
-
-  /* Encode the message authentication code */
-  ENCODE_U32(initialNasMsg->nas_data + size, sp_msg->header.message_authentication_code, size);
-
-  /* Encode the sequence number */
-  ENCODE_U8(initialNasMsg->nas_data + size, sp_msg->header.sequence_number, size);
-
-  /* Encode the extended protocol discriminator */
-  ENCODE_U8(initialNasMsg->nas_data + size, sp_msg->plain.mm_msg.registration_complete.protocoldiscriminator, size);
-
-  /* Encode the security header type */
-  ENCODE_U8(initialNasMsg->nas_data + size, sp_msg->plain.mm_msg.registration_complete.securityheadertype, size);
-
-  /* Encode the message type */
-  ENCODE_U8(initialNasMsg->nas_data + size, sp_msg->plain.mm_msg.registration_complete.messagetype, size);
-
-  if (sortransparentcontainer) {
-    encode_registration_complete(&sp_msg->plain.mm_msg.registration_complete, initialNasMsg->nas_data + size, length - size);
+  // encode security protected header
+  int encoded = nas_protected_security_header_encode(initialNasMsg->nas_data, &sp_msg->header, length);
+  if (encoded < 0) {
+    LOG_E(NAS, "generateRegistrationComplete: failed to encode security protected header\n");
+    return;
   }
+  // encode 5GMM plain header
+  encoded = _nas_mm_msg_encode_header(&sp_msg->plain.mm_msg.header, initialNasMsg->nas_data + encoded, length - encoded);
+  if (encoded < 0) {
+    LOG_E(NAS, "generateRegistrationComplete: failed to encode 5GMM plain header\n");
+    return;
+  }
+
+  encode_registration_complete(&sp_msg->plain.mm_msg.registration_complete, initialNasMsg->nas_data + encoded, length - encoded);
 
   /* ciphering */
   uint8_t buf[initialNasMsg->length - 7];

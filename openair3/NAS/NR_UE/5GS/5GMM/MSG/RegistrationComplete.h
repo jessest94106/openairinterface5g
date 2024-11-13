@@ -37,14 +37,8 @@
 #define REGISTRATION_COMPLETE_H_
 
 typedef struct registration_complete_msg_tag {
-  /* Mandatory fields */
-  uint8_t protocoldiscriminator;
-  SecurityHeaderType securityheadertype: 4;
-  uint8_t sparehalfoctet: 4;
-  MessageType messagetype;
-
   /* Optional fields */
-  SORTransparentContainer sortransparentcontainer;
+  SORTransparentContainer *sortransparentcontainer;
 } registration_complete_msg;
 
 int decode_registration_complete(registration_complete_msg *registrationcomplete, uint8_t *buffer, uint32_t len);

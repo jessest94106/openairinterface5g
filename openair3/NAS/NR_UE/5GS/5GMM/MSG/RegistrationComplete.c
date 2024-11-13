@@ -44,8 +44,11 @@ int encode_registration_complete(registration_complete_msg *registration_complet
   int encoded = 0;
   int encode_result = 0;
 
+  if (!registration_complete->sortransparentcontainer)
+    return encoded;
+
   if ((encode_result =
-           encode_sor_transparent_container(&registration_complete->sortransparentcontainer, 0, buffer + encoded, len - encoded))
+           encode_sor_transparent_container(registration_complete->sortransparentcontainer, 0, buffer + encoded, len - encoded))
       < 0) // Return in case of error
     return encode_result;
   else
