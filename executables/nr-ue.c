@@ -631,6 +631,14 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
+  // process what RRC thread sent to MAC
+  MessageDef *msg = NULL;
+  do {
+    itti_poll_msg(TASK_MAC_UE, &msg);
+    if (msg)
+      process_msg_rcc_to_mac(msg);
+  } while (msg);
+
   if (IS_SOFTMODEM_NOS1 || IS_SA_MODE(get_softmodem_params())) {
     /* send tick to RLC and PDCP every ms */
     if (proc->nr_slot_rx % fp->slots_per_subframe == 0) {
@@ -875,10 +883,18 @@ void *UE_thread(void *arg)
         syncRunning = false;
         if (UE->is_synchronized) {
           UE->synch_request.received_synch_request = 0;
-          if (UE->sl_mode == 2)
+          if (UE->sl_mode == SL_MODE2_SUPPORTED)
             decoded_frame_rx = UE->SL_UE_PHY_PARAMS.sync_params.DFN;
-          else
+          else {
+            // We must wait the RRC layer decoded the MIB and sent us the frame number
+            MessageDef *msg = NULL;
+            itti_receive_msg(TASK_MAC_UE, &msg);
+            if (msg)
+              process_msg_rcc_to_mac(msg);
+            else
+              LOG_E(PHY, "It seems we arbort while trying to sync\n");
             decoded_frame_rx = mac->mib_frame;
+          }
           LOG_A(PHY,
                 "UE synchronized! decoded_frame_rx=%d UE->init_sync_frame=%d trashed_frames=%d\n",
                 decoded_frame_rx,

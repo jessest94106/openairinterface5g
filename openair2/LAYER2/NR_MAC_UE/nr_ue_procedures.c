@@ -615,6 +615,14 @@ static int nr_ue_process_dci_ul_01(NR_UE_MAC_INST_t *mac,
                                 dci_ind->rnti,
                                 dci_ind->ss_type,
                                 NR_UL_DCI_FORMAT_0_1);
+  LOG_D(NR_MAC_DCI,
+      "add ul dci harq %d for %d.%d %d.%d round %d\n",
+        pdu->pusch_config_pdu.pusch_data.harq_process_id,
+        frame,
+        slot,
+        frame_tx,
+        slot_tx,
+        0);
   if (ret != 0)
     remove_ul_config_last_item(pdu);
   release_ul_config(pdu, false);

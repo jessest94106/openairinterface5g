@@ -2573,7 +2573,15 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
 
     dci_pdu_rel15_t uldci_payload;
     memset(&uldci_payload, 0, sizeof(uldci_payload));
-
+    if (current_BWP->dci_format == NR_UL_DCI_FORMAT_0_1)
+      LOG_D(NR_MAC_DCI,
+            "add ul dci harq %d for %d.%d %d.%d round %d\n",
+            harq_id,
+            frame,
+            slot,
+            sched_pusch->frame,
+            sched_pusch->slot,
+            sched_ctrl->ul_harq_processes[harq_id].round);
     config_uldci(&UE->sc_info,
                  pusch_pdu,
                  &uldci_payload,

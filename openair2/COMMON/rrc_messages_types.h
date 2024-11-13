@@ -96,12 +96,15 @@
 
 #define NAS_OAI_TUN_NSA(mSGpTR)         (mSGpTR)->ittiMsg.nas_oai_tun_nsa
 #define NAS_PDU_SESSION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nas_pdu_session_req
+#define NR_MAC_RRC_CONFIG_RESET(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_reset
+#define NR_MAC_RRC_CONFIG_CG(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_cg
+#define NR_MAC_RRC_CONFIG_MIB(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_mib
+#define NR_MAC_RRC_CONFIG_SIB1(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_sib1
 
 #define NR_RRC_RLC_MAXRTX(mSGpTR) (mSGpTR)->ittiMsg.nr_rlc_maxrtx_indication
 
-//-------------------------------------------------------------------------------------------//
 typedef struct RrcStateInd_s {
-  Rrc_State_t     state;
+  Rrc_State_t state;
   Rrc_Sub_State_t sub_state;
 } RrcStateInd;
 
