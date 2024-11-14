@@ -36,8 +36,6 @@
 
 extern RAN_CONTEXT_t RC;
 
-
-
 static void nr_fill_nfapi_pucch(gNB_MAC_INST *nrmac,
                                 frame_t frame,
                                 sub_frame_t slot,
@@ -97,13 +95,6 @@ static void nr_fill_nfapi_pucch(gNB_MAC_INST *nrmac,
 
 #define MIN_RSRP_VALUE -141
 #define MAX_RSRP_VALUE -43
-#define MAX_NUM_SSB 128
-#define MAX_SSB_SCHED 8
-#define L1_RSRP_HYSTERIS 10 //considering 10 dBm as hysterisis for avoiding frequent SSB Beam Switching. !Fixme provide exact value if any
-//#define L1_DIFF_RSRP_STEP_SIZE 2
-
-static int ssb_index_sorted[MAX_NUM_SSB] = {0};
-static int ssb_rsrp_sorted[MAX_NUM_SSB] = {0};
 
 //Measured RSRP Values Table 10.1.16.1-1 from 36.133
 //Stored all the upper limits[Max RSRP Value of corresponding index]
@@ -402,71 +393,6 @@ static void handle_dl_harq(NR_UE_info_t * UE,
   }
 }
 
-static int checkTargetSSBInFirst64TCIStates_pdschConfig(int ssb_index_t, NR_UE_info_t *UE)
-{
-  const NR_PDSCH_Config_t *pdsch_Config = UE->current_DL_BWP.pdsch_Config;
-  int nb_tci_states = pdsch_Config ? pdsch_Config->tci_StatesToAddModList->list.count : 0;
-  NR_TCI_State_t *tci =NULL;
-
-  for(int i=0; i<nb_tci_states && i<64; i++) {
-    tci = (NR_TCI_State_t *)pdsch_Config->tci_StatesToAddModList->list.array[i];
-
-    if(tci != NULL) {
-      if(tci->qcl_Type1.referenceSignal.present == NR_QCL_Info__referenceSignal_PR_ssb) {
-        if(tci->qcl_Type1.referenceSignal.choice.ssb == ssb_index_t)
-          return tci->tci_StateId;  // returned TCI state ID
-      }
-      // if type2 is configured
-      else if(tci->qcl_Type2 != NULL && tci->qcl_Type2->referenceSignal.present == NR_QCL_Info__referenceSignal_PR_ssb) {
-        if(tci->qcl_Type2->referenceSignal.choice.ssb == ssb_index_t)
-          return tci->tci_StateId; // returned TCI state ID
-      } else LOG_I(NR_MAC,"SSB index is not found in first 64 TCI states of TCI_statestoAddModList[%d]", i);
-    }
-  }
-
-  // tci state not identified in first 64 TCI States of PDSCH Config
-  return -1;
-}
-
-static int checkTargetSSBInTCIStates_pdcchConfig(int ssb_index_t, NR_UE_info_t *UE)
-{
-  NR_TCI_State_t *tci =NULL;
-  NR_TCI_StateId_t *tci_id = NULL;
-  NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  NR_ControlResourceSet_t *coreset = sched_ctrl->coreset;
-  int flag = 0;
-  int tci_stateID = -1;
-  const NR_PDSCH_Config_t *pdsch_Config = UE->current_DL_BWP.pdsch_Config;
-  int nb_tci_states = pdsch_Config ? pdsch_Config->tci_StatesToAddModList->list.count : 0;
-  for(int i=0; i<nb_tci_states && i<128; i++) {
-    tci = (NR_TCI_State_t *)pdsch_Config->tci_StatesToAddModList->list.array[i];
-
-    if(tci != NULL && tci->qcl_Type1.referenceSignal.present == NR_QCL_Info__referenceSignal_PR_ssb) {
-      if(tci->qcl_Type1.referenceSignal.choice.ssb == ssb_index_t) {
-        flag = 1;
-        tci_stateID = tci->tci_StateId;
-        break;
-      } else if(tci->qcl_Type2 != NULL && tci->qcl_Type2->referenceSignal.present == NR_QCL_Info__referenceSignal_PR_ssb) {
-        flag = 1;
-        tci_stateID = tci->tci_StateId;
-        break;
-      }
-    }
-
-    if(flag != 0 && tci_stateID != -1 && coreset != NULL) {
-      for(i=0; i<64 && i<coreset->tci_StatesPDCCH_ToAddList->list.count; i++) {
-        tci_id = coreset->tci_StatesPDCCH_ToAddList->list.array[i];
-
-        if(tci_id != NULL && *tci_id == tci_stateID)
-          return tci_stateID;
-      }
-    }
-  }
-
-  // Need to implement once configuration is received
-  return -1;
-}
-
 //returns the measured RSRP value (upper limit)
 static bool get_measured_rsrp(uint8_t index, int *rsrp)
 {
@@ -488,181 +414,6 @@ static int get_diff_rsrp(uint8_t index, int strongest_rsrp)
   else
     return MIN_RSRP_VALUE;
 }
-
-//identifies the target SSB Beam index
-//keeps the required date for PDCCH and PDSCH TCI state activation/deactivation CE consutruction globally
-//handles triggering of PDCCH and PDSCH MAC CEs
-static void tci_handling(NR_UE_info_t *UE, frame_t frame, slot_t slot)
-{
-  int cqi_idx = 0;
-  int curr_ssb_beam_index = 0; //ToDo: yet to know how to identify the serving ssb beam index
-  uint8_t target_ssb_beam_index = curr_ssb_beam_index;
-  uint8_t is_triggering_ssb_beam_switch =0;
-  int pdsch_bwp_id = 0;
-  int ssb_index[MAX_NUM_SSB] = {0};
-  int ssb_rsrp[MAX_NUM_SSB] = {0};
-  uint8_t idx = 0;
-  NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
-  NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-
-  uint8_t nb_of_csi_ssb_report = UE->csi_report_template[cqi_idx].nb_of_csi_ssb_report;
-  int better_rsrp_reported = -140-(-0); /*minimum_measured_RSRP_value - minimum_differntail_RSRP_value*///considering the minimum RSRP value as better RSRP initially
-  uint8_t i, j;
-
-  //bwp indicator
-  int n_dl_bwp = UE->sc_info.n_dl_bwp;
-  const int bwp_id = dl_bwp->bwp_id;
-  if (n_dl_bwp < 4)
-    pdsch_bwp_id = bwp_id;
-  else
-    pdsch_bwp_id = bwp_id - 1; // as per table 7.3.1.1.2-1 in 38.212
-
-  /*Example:
-  CRI_SSBRI: 1 2 3 4| 5 6 7 8| 9 10 1 2|
-  nb_of_csi_ssb_report = 3 //3 sets as above
-  nr_ssbri_cri = 4 //each set has 4 elements
-  storing ssb indexes in ssb_index array as ssb_index[0] = 1 .. ssb_index[4] = 5
-  ssb_rsrp[0] = strongest rsrp in first set, ssb_rsrp[4] = strongest rsrp in second set, ..
-  idx: resource set index
-  */
-
-  int nr_ssbri = sched_ctrl->CSI_report.ssb_rsrp_report.nr_reports;
-  //extracting the ssb indexes
-  for (int ssb_idx = 0; ssb_idx < nr_ssbri; ssb_idx++) {
-    ssb_index[idx * nb_of_csi_ssb_report + ssb_idx] = sched_ctrl->CSI_report.ssb_rsrp_report.resource_id[ssb_idx];
-  }
-
-  //if strongest measured RSRP is configured
-  int strongest_ssb_rsrp = sched_ctrl->CSI_report.ssb_rsrp_report.RSRP[0];
-  ssb_rsrp[idx * nb_of_csi_ssb_report] = strongest_ssb_rsrp;
-  LOG_D(NR_MAC,"ssb_rsrp = %d\n", strongest_ssb_rsrp);
-
-  //if current ssb rsrp is greater than better rsrp
-  if(ssb_rsrp[idx * nb_of_csi_ssb_report] > better_rsrp_reported) {
-    better_rsrp_reported = ssb_rsrp[idx * nb_of_csi_ssb_report];
-    target_ssb_beam_index = idx * nb_of_csi_ssb_report;
-  }
-
-  for(int diff_rsrp_idx = 1; diff_rsrp_idx < nr_ssbri; diff_rsrp_idx++) {
-    ssb_rsrp[idx * nb_of_csi_ssb_report + diff_rsrp_idx] = sched_ctrl->CSI_report.ssb_rsrp_report.RSRP[diff_rsrp_idx];
-
-    //if current reported rsrp is greater than better rsrp
-    if(ssb_rsrp[idx * nb_of_csi_ssb_report + diff_rsrp_idx] > better_rsrp_reported) {
-      better_rsrp_reported = ssb_rsrp[idx * nb_of_csi_ssb_report + diff_rsrp_idx];
-      target_ssb_beam_index = idx * nb_of_csi_ssb_report + diff_rsrp_idx;
-    }
-  }
-
-  if(ssb_index[target_ssb_beam_index] != ssb_index[curr_ssb_beam_index] && ssb_rsrp[target_ssb_beam_index] > ssb_rsrp[curr_ssb_beam_index]) {
-    if( ssb_rsrp[target_ssb_beam_index] - ssb_rsrp[curr_ssb_beam_index] > L1_RSRP_HYSTERIS) {
-      is_triggering_ssb_beam_switch = 1;
-      LOG_D(NR_MAC, "Triggering ssb beam switching using tci\n");
-    }
-  }
-
-  if(is_triggering_ssb_beam_switch) {
-    //filling pdcch tci state activativation mac ce structure fields
-    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.is_scheduled = 1;
-    //OAI currently focusing on Non CA usecase hence 0 is considered as serving
-    //cell id
-    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.servingCellId = 0; //0 for PCell as 38.331 v15.9.0 page 353 //serving cell id for which this MAC CE applies
-    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.coresetId = 0; //coreset id for which the TCI State id is being indicated
-
-    /* 38.321 v15.8.0 page 66
-    TCI State ID: This field indicates the TCI state identified by TCI-StateId as specified in TS 38.331 [5] applicable
-    to the Control Resource Set identified by CORESET ID field.
-    If the field of CORESET ID is set to 0,
-      this field indicates a TCI-StateId for a TCI state of the first 64 TCI-states configured by tci-States-ToAddModList and tciStates-ToReleaseList in the PDSCH-Config in the active BWP.
-    If the field of CORESET ID is set to the other value than 0,
-     this field indicates a TCI-StateId configured by tci-StatesPDCCH-ToAddList and tciStatesPDCCH-ToReleaseList in the controlResourceSet identified by the indicated CORESET ID.
-    The length of the field is 7 bits
-     */
-    if(sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.coresetId == 0) {
-      int tci_state_id = checkTargetSSBInFirst64TCIStates_pdschConfig(ssb_index[target_ssb_beam_index], UE);
-
-      if( tci_state_id != -1)
-        sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tciStateId = tci_state_id;
-      else {
-        //identify the best beam within first 64 TCI States of PDSCH
-        //Config TCI-states-to-addModList
-        int flag = 0;
-
-        for(i =0; ssb_index_sorted[i]!=0; i++) {
-          tci_state_id = checkTargetSSBInFirst64TCIStates_pdschConfig(ssb_index_sorted[i],UE) ;
-
-          if(tci_state_id != -1 && ssb_rsrp_sorted[i] > ssb_rsrp[curr_ssb_beam_index] && ssb_rsrp_sorted[i] - ssb_rsrp[curr_ssb_beam_index] > L1_RSRP_HYSTERIS) {
-            sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tciStateId = tci_state_id;
-            flag = 1;
-            break;
-          }
-        }
-
-        if(flag == 0 || ssb_rsrp_sorted[i] < ssb_rsrp[curr_ssb_beam_index] || ssb_rsrp_sorted[i] - ssb_rsrp[curr_ssb_beam_index] < L1_RSRP_HYSTERIS) {
-          sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.is_scheduled = 0;
-        }
-      }
-    } else {
-      int tci_state_id = checkTargetSSBInTCIStates_pdcchConfig(ssb_index[target_ssb_beam_index], UE);
-
-      if (tci_state_id !=-1)
-        sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tciStateId = tci_state_id;
-      else {
-        //identify the best beam within CORESET/PDCCH
-        ////Config TCI-states-to-addModList
-        int flag = 0;
-
-        for(i =0; ssb_index_sorted[i]!=0; i++) {
-          tci_state_id = checkTargetSSBInTCIStates_pdcchConfig(ssb_index_sorted[i], UE);
-
-          if( tci_state_id != -1 && ssb_rsrp_sorted[i] > ssb_rsrp[curr_ssb_beam_index] && ssb_rsrp_sorted[i] - ssb_rsrp[curr_ssb_beam_index] > L1_RSRP_HYSTERIS) {
-            sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tciStateId = tci_state_id;
-            flag = 1;
-            break;
-          }
-        }
-
-        if(flag == 0 || ssb_rsrp_sorted[i] < ssb_rsrp[curr_ssb_beam_index] || ssb_rsrp_sorted[i] - ssb_rsrp[curr_ssb_beam_index] < L1_RSRP_HYSTERIS) {
-          sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.is_scheduled = 0;
-        }
-      }
-    }
-
-    sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI = sched_ctrl->coreset ?
-                                                                   sched_ctrl->coreset->tci_PresentInDCI : NULL;
-
-    //filling pdsch tci state activation deactivation mac ce structure fields
-    if(sched_ctrl->UE_mac_ce_ctrl.pdcch_state_ind.tci_present_inDCI) {
-      sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.is_scheduled = 1;
-      /*
-      Serving Cell ID: This field indicates the identity of the Serving Cell for which the MAC CE applies
-      Considering only PCell exists. Serving cell index of PCell is always 0, hence configuring 0
-      */
-      sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.servingCellId = 0;
-      /*
-      BWP ID: This field indicates a DL BWP for which the MAC CE applies as the codepoint of the DCI bandwidth
-      part indicator field as specified in TS 38.212
-      */
-      sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.bwpId = pdsch_bwp_id;
-
-      /*
-       * TODO ssb_rsrp_sort() API yet to code to find 8 best beams, rrc configuration
-       * is required
-       */
-      for(i = 0; i<8; i++) {
-        sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.tciStateActDeact[i] = i;
-      }
-
-      sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.highestTciStateActivated = 8;
-
-      for(i = 0, j =0; i<MAX_TCI_STATES; i++) {
-        if(sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.tciStateActDeact[i]) {
-          sched_ctrl->UE_mac_ce_ctrl.pdsch_TCI_States_ActDeact.codepoint[j] = i;
-          j++;
-        }
-      }
-    }//tci_presentInDCI
-  }//is-triggering_beam_switch
-} // tci handling
 
 static uint8_t pickandreverse_bits(uint8_t *payload, uint16_t bitlen, uint8_t start_bit)
 {
@@ -1116,8 +867,6 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
     if (uci_234->csi_part1.csi_part1_crc != 1) {
       // API to parse the csi report and store it into sched_ctrl
       extract_pucch_csi_report(csi_MeasConfig, uci_234, frame, slot, UE, nrmac->common_channels->ServingCellConfigCommon);
-      // TCI handling function
-      tci_handling(UE, frame, slot);
     }
     free(uci_234->csi_part1.csi_part1_payload);
   }
