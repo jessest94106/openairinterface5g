@@ -42,7 +42,10 @@ NICs we have tested so far:
 |E810-C         |4.20 0x8001784e 22.0.9  |
 |Intel XXV710   |6.02 0x80003888         |
 
-**Note**: With AMD servers/desktop machines with PCIe 5.0 we have only used E810 cards. 
+**Note**:
+
+- With AMD servers/desktop machines with PCIe 5.0 we have only used E810 cards.
+- If you are using Mellanox NIC, please be aware that DPDK can't bind the NIC as vfio-pci. Instead it must be bind with mlx driver.
 
 PTP enabled switches and grandmaster clock we have in are lab:
 
@@ -617,63 +620,103 @@ The 7.2 fronthaul uses the xran library, which requires DPDK. In this step, we
 need to configure network interfaces to send data to the RU, and configure DPDK
 to bind to the corresponding PCI interfaces. More specifically, in the
 following we use [SR-IOV](https://en.wikipedia.org/wiki/Single-root_input/output_virtualization)
-to create multiple virtual functions (VFs) through which Control plane (C
+to create one or multiple virtual functions (VFs) through which Control plane (C
 plane) and User plane (U plane) traffic will flow. The following commands are
 not persistant, and have to be repeated after reboot.
 
 In the following, we will use these short hands:
 
-- `physical-interface`: Physical network interface through which you can access the RU
-- `vlan`: VLAN tags as defined in the RU configuration
-- `mtu`: the MTU as specified by the RU vendor, and supported by the NIC
-- `du-c-plane-mac-addr`: DU C plane MAC address
-- `pci-address-c-plane-vf`: PCI bus address of the VF for C plane
-- `du-u-plane-mac-addr`: DU U plane MAC address
-- `pci-address-u-plane-vf`: PCI bus address of the VF for U plane
+- `IF_NAME`: Physical network interface through which you can access the RU
+- `VLAN`: the VLAN tag as recommended by the RU vendor
+- `MTU`: the MTU as specified by the RU vendor, and supported by the NIC
+- `DU_U_PLANE_MAC_ADD`: DU U plane MAC address
+- `U_PLANE_PCI_BUS_ADD`: PCI bus address of the VF for U plane
+- `DU_C_PLANE_MAC_ADD`: DU C plane MAC address
+- `C_PLANE_PCI_BUS_ADD`: PCI bus address of the VF for C plane
 
 In the configuration file, in option `fhi_72.dpdk_devices`, the first PCI address is for U-plane and the second for C-plane.
 
-For both the MAC addresses, you might use the MAC addresses which are
-pre-configured in the RUs (typically `00:11:22:33:44:66`, but that is not
-always the case). Note that if your system has Intel E-810 NIC cards/ICE
-driver, you have to choose different MAC addresses (valid for above-mentioned
-kernels). If the RU vendor requires untagged traffic, remove the VLAN tagging
+RU might support either one DU MAC address for both CU planes or two different.
+i.e. VVDN Gen3, Metanoia support only one, Benetel550 supports both cases
+
+
+**Note**
+
+- X710 NIC supports the same DU MAC address for multiple VFs
+- E-810 NIC requires different DU MAC addresses for multiple VFs
+
+If the RU vendor requires untagged traffic, remove the VLAN tagging
 in the below command and configure VLAN on the switch as "access VLAN". In case
 the MTU is different than 1500, you have to update the MTU on the switch
 interface as well.
 
-First, set maximum ring buffers:
+### Set maximum ring buffers:
+
+As a first step, please set up the maximum allowed buffer size to your desired interface. To check the maximum value, please execute the following command:
 ```bash
-sudo ethtool -g <physical-interface>
-sudo ethtool -G <physical-interface> rx 4096     # assumes 4096 is max
-sudo ethtool -G <physical-interface> tx 4096     # assumes 4096 is max
+sudo ethtool -g $IF_NAME
 ```
 
-Set the maximum MTU in the physical interface:
 ```bash
-sudo ifconfig <physical-interface> mtu <mtu>
+set -x
+IF_NAME=<YOUR_PHYSICAL_INTERFACE_NAME>
+MAX_RING_BUFFER_SIZE=<YOUR_PHYSICAL_INTERFACE_MAX_BUFFER_SIZE>
+
+sudo ethtool -G $IF_NAME rx $MAX_RING_BUFFER_SIZE tx $MAX_RING_BUFFER_SIZE
 ```
 
-(Re-)create two VFs, load the Linux "Base Driver for Intel Ethernet Adaptive
-Virtual Function" (in case you use Intel ethernet card), and set up the VFs.
+### Set the maximum MTU in the physical interface:
+```bash
+set -x
+IF_NAME=<YOUR_PHYSICAL_INTERFACE_NAME>
+MTU=<RU_MTU>
+
+sudo ip link set $IF_NAME mtu $MTU
+```
+
+### (Re-)create VF(s)
+
+#### one VF
 
 ```bash
+set -x
+IF_NAME=<YOUR_PHYSICAL_INTERFACE_NAME>
+DU_CU_PLANE_MAC_ADD=<YOUR_DU_CU_PLANE_MAC_ADDRESS>
+VLAN=<RU_VLAN>
+MTU=<RU_MTU>
+
 sudo modprobe iavf
-sudo sh -c echo "0" > /sys/class/net/<physical-interface>/device/sriov_numvfs
-sudo sh -c echo "2" > /sys/class/net/<physical-interface>/device/sriov_numvfs
-sudo ip link set <physical-interface> vf 0 mac <du-c-plane-mac-addr> vlan <vlan> mtu <mtu> spoofchk off
-sudo ip link set <physical-interface> vf 1 mac <du-u-plane-mac-addr> vlan <vlan> mtu <mtu> spoofchk off
+sudo sh -c 'echo 0 > /sys/class/net/$IF_NAME/device/sriov_numvfs'
+sudo sh -c 'echo 1 > /sys/class/net/$IF_NAME/device/sriov_numvfs'
+sudo ip link set $IF_NAME vf 0 mac $DU_CU_PLANE_MAC_ADD vlan $VLAN mtu $MTU spoofchk off # set CU planes PCI address
 ```
 
-After running the above commands, the kernel created virtual functions that
+#### two VFs
+
+```bash
+set -x
+IF_NAME=<YOUR_PHYSICAL_INTERFACE_NAME>
+DU_U_PLANE_MAC_ADD=<YOUR_DU_U_PLANE_MAC_ADDRESS>
+DU_C_PLANE_MAC_ADD=<YOUR_DU_C_PLANE_MAC_ADDRESS> # can be same as for U plane -> depends if the NIC supports the same MAC address
+VLAN=<RU_VLAN>
+MTU=<RU_MTU>
+
+sudo modprobe iavf
+sudo sh -c 'echo 0 > /sys/class/net/$IF_NAME/device/sriov_numvfs'
+sudo sh -c 'echo 2 > /sys/class/net/$IF_NAME/device/sriov_numvfs'
+sudo ip link set $IF_NAME vf 0 mac $DU_U_PLANE_MAC_ADD vlan $VLAN mtu $MTU spoofchk off # set U plane PCI address
+sudo ip link set $IF_NAME vf 1 mac $DU_C_PLANE_MAC_ADD vlan $VLAN mtu $MTU spoofchk off # set C plane PCI address
+```
+
+After running the above commands, the kernel created VF(s) that
 have been assigned a PCI address under the same device and vendor ID. For
 instance, use `sudo lshw -c network -businfo` to get a list of PCI addresses
-and interface names, locate the PCI address of `<physical-interface>`, then use
+and interface names, locate the PCI address of `$IF_NAME`, then use
 `lspci | grep Virtual` to get all virtual interfaces and use the ones with the
 same Device/Vendor ID parts (first two numbers).
 
 <details>
-<summary>Example</summary>
+<summary>Example with two VFs</summary>
 
 The machine in this example has an Intel X710 card. The interface
 <physical-interface> in question is `eno12409`. Running `lshw` gives:
@@ -706,41 +749,68 @@ The hardware card `31:00.1` has two associated virtual functions `31:06.0` and
 `31:06.1`.
 </details>
 
+### Bind VF(s)
+
 Now, unbind any pre-existing DPDK devices, load the "Virtual Function I/O"
-driver `vfio_pci`, and bind DPDK to these devices:
+driver `vfio_pci` or `mlx5_core`, and bind DPDK to these devices.
 
-```
-sudo /usr/local/bin/dpdk-devbind.py --unbind <pci-address-c-plane-vf>
-sudo /usr/local/bin/dpdk-devbind.py --unbind <pci-address-u-plane-vf>
-sudo modprobe vfio_pci
-sudo /usr/local/bin/dpdk-devbind.py --bind vfio-pci <pci-address-c-plane-vf>
-sudo /usr/local/bin/dpdk-devbind.py --bind vfio-pci <pci-address-u-plane-vf>
+#### Bind one VF
+
+```bash
+set -x
+CU_PLANE_PCI_BUS_ADD=<YOUR_CU_PLANE_PCI_BUS_ADDRESS>
+DRIVER=<YOUR_DRIVER> # set to `vfio_pci` or `mlx5_core`, depending on your NIC
+
+sudo /usr/local/bin/dpdk-devbind.py --unbind $CU_PLANE_PCI_BUS_ADD
+sudo modprobe $DRIVER
+sudo /usr/local/bin/dpdk-devbind.py --bind $DRIVER $CU_PLANE_PCI_BUS_ADD
 ```
 
-We recommand to put the above commands into a script file to quickly repeat them.
+#### Bind two VFs
+
+```bash
+set -x
+U_PLANE_PCI_BUS_ADD=<YOUR_U_PLANE_PCI_BUS_ADDRESS>
+C_PLANE_PCI_BUS_ADD=<YOUR_C_PLANE_PCI_BUS_ADDRESS>
+DRIVER=<YOUR_DRIVER> # set to `vfio_pci` or `mlx5_core`, depending on your NIC
+
+sudo /usr/local/bin/dpdk-devbind.py --unbind $U_PLANE_PCI_BUS_ADD
+sudo /usr/local/bin/dpdk-devbind.py --unbind $C_PLANE_PCI_BUS_ADD
+sudo modprobe $DRIVER
+sudo /usr/local/bin/dpdk-devbind.py --bind $DRIVER $U_PLANE_PCI_BUS_ADD
+sudo /usr/local/bin/dpdk-devbind.py --bind $DRIVER $C_PLANE_PCI_BUS_ADD
+```
+
+We recommand to put the above four steps into one script file to quickly repeat them.
 
 <details>
-<summary>Example script for Benetel 550-A/650 with Intel X710 on host</summary>
+<summary>Example script for Benetel 550-A/650 with Intel X710 on host with two VFs</summary>
 
-```console
+```bash
 set -x
+IF_NAME=eno12409
+MAX_RING_BUFFER_SIZE=4096
+MTU=9600
+DU_U_PLANE_MAC_ADD=00:11:22:33:44:66
+DU_C_PLANE_MAC_ADD=00:11:22:33:44:67
+VLAN=3
+U_PLANE_PCI_BUS_ADD=31:06.0
+C_PLANE_PCI_BUS_ADD=31:06.1
+DRIVER=vfio_pci
 
-sudo ethtool -G eno12409 rx 4096
-sudo ethtool -G eno12409 tx 4096
-sudo ifconfig eno12409 mtu 9216
-
-sudo modprobe -r iavf
+sudo ethtool -G $IF_NAME rx $MAX_RING_BUFFER_SIZE tx $MAX_RING_BUFFER_SIZE
+sudo ip link set $IF_NAME mtu $MTU
 sudo modprobe iavf
-sudo sh -c 'echo 0 > /sys/class/net/eno12409/device/sriov_numvfs'
-sudo sh -c 'echo 2 > /sys/class/net/eno12409/device/sriov_numvfs'
-sudo ip link set eno12409 vf 0 mac 00:11:22:33:44:66 vlan 3 qos 0 spoofchk off mtu 9216
-sudo ip link set eno12409 vf 1 mac 00:11:22:33:44:67 vlan 3 qos 0 spoofchk off mtu 9216
-
-sudo /usr/local/bin/dpdk-devbind.py --unbind 31:06.0
-sudo /usr/local/bin/dpdk-devbind.py --unbind 31:06.1
-sudo modprobe vfio-pci
-sudo /usr/local/bin/dpdk-devbind.py --bind vfio-pci 31:06.0
-sudo /usr/local/bin/dpdk-devbind.py --bind vfio-pci 31:06.1
+sudo sh -c 'echo 0 > /sys/class/net/$IF_NAME/device/sriov_numvfs'
+sudo sh -c 'echo 2 > /sys/class/net/$IF_NAME/device/sriov_numvfs'
+sudo ip link set $IF_NAME vf 0 mac $DU_U_PLANE_MAC_ADD vlan $VLAN mtu $MTU spoofchk off # set U plane PCI address
+sudo ip link set $IF_NAME vf 1 mac $DU_C_PLANE_MAC_ADD vlan $VLAN mtu $MTU spoofchk off # set C plane PCI address
+sleep 1
+sudo /usr/local/bin/dpdk-devbind.py --unbind $U_PLANE_PCI_BUS_ADD
+sudo /usr/local/bin/dpdk-devbind.py --unbind $C_PLANE_PCI_BUS_ADD
+sudo modprobe $DRIVER
+sudo /usr/local/bin/dpdk-devbind.py --bind $DRIVER $U_PLANE_PCI_BUS_ADD
+sudo /usr/local/bin/dpdk-devbind.py --bind $DRIVER $C_PLANE_PCI_BUS_ADD
 ```
 </details>
 
