@@ -220,7 +220,6 @@ def CopyinContainerLog(ssh, lSourcePath, yaml, containerName, filename):
 	remote_filename = f"{lSourcePath}/cmake_targets/log/{filename}"
 	ssh.run(f'docker logs {containerName} &> {remote_filename}')
 	local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml}"
-	os.system(f'mkdir -p {local_dir}')
 	local_filename = f"{local_dir}/{filename}"
 	return ssh.copyin(remote_filename, local_filename)
 
@@ -844,6 +843,9 @@ class Containerize():
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('\u001B[1m Deploying OAI Object on server: ' + lIpAddr + '\u001B[0m')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
+		# creating the log folder by default
+		local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml.split('/')[-1]}"
+		os.system(f'mkdir -p {local_dir}')
 		wd = f'{lSourcePath}/{yaml}'
 
 		with cls_cmd.getConnection(lIpAddr) as ssh:
