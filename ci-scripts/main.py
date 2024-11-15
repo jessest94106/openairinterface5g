@@ -370,10 +370,8 @@ def ExecuteActionWithParam(action):
 		success = SCA.CppCheckAnalysis(HTML)
 
 	elif action == 'Push_Local_Registry':
-		string_field = test.findtext('registry_svr_id')
-		if (string_field is not None):
-			CONTAINERS.registrySvrId = string_field
-		success = CONTAINERS.Push_Image_to_Local_Registry(HTML)
+		svr_id = test.findtext('svr_id')
+		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id)
 
 	elif action == 'Pull_Local_Registry':
 		string_field = test.findtext('test_svr_id')

@@ -334,7 +334,6 @@ class Containerize():
 		self.cliOptions = ''
 
 		self.imageToCopy = ''
-		self.registrySvrId = ''
 		self.testSvrId = ''
 		self.imageToPull = []
 		#checkers from xml
@@ -725,8 +724,8 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def Push_Image_to_Local_Registry(self, HTML):
-		lIpAddr, lSourcePath = self.GetCredentials(self.registrySvrId)
+	def Push_Image_to_Local_Registry(self, HTML, svr_id):
+		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
 		logging.debug('Pushing images from server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
