@@ -176,10 +176,10 @@ def ExistEnvFilePrint(ssh, wd, prompt='env vars in existing'):
 	logging.info(f'{prompt} {wd}/.env: {env_vars}')
 	return True
 
-def WriteEnvFile(ssh, services, wd, tag):
+def WriteEnvFile(ssh, services, wd, tag, flexric_tag):
 	ret = ssh.run(f'cat {wd}/.env', silent=True, reportNonZero=False)
 	registry = "oai-ci" # pull_images() gives us this registry path
-	envs = {"REGISTRY":registry, "TAG": tag}
+	envs = {"REGISTRY":registry, "TAG": tag, "FLEXRIC_TAG": flexric_tag}
 	if ret.returncode == 0: # it exists, we have to update
 		# transforms env file to dictionary
 		old_envs = {}
@@ -339,6 +339,8 @@ class Containerize():
 		self.imageToPull = []
 		#checkers from xml
 		self.ran_checkers={}
+
+		self.flexricTag = ''
 
 #-----------------------------------------------------------
 # Container management functions
@@ -859,7 +861,7 @@ class Containerize():
 				return False
 
 			ExistEnvFilePrint(ssh, wd)
-			WriteEnvFile(ssh, services, wd, self.deploymentTag)
+			WriteEnvFile(ssh, services, wd, self.deploymentTag, self.flexricTag)
 
 			logging.info(f"will start services {services}")
 			status = ssh.run(f'docker compose -f {wd}/docker-compose.y*ml up -d -- {services}')

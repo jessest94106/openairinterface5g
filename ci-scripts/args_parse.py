@@ -264,6 +264,9 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER):
         elif re.match('^\-\-BuildId=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match('^\-\-BuildId=(.+)$', myArgv, re.IGNORECASE)
             RAN.BuildId = matchReg.group(1)
+        elif re.match('^\-\-FlexRicTag=(.+)$', myArgv, re.IGNORECASE):
+            matchReg = re.match('^\-\-FlexRicTag=(.+)$', myArgv, re.IGNORECASE)
+            CONTAINERS.flexricTag = matchReg.group(1)
         else:
             HELP.GenericHelp(CONST.Version)
             sys.exit('Invalid Parameter: ' + myArgv)
