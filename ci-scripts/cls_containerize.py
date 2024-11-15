@@ -335,7 +335,6 @@ class Containerize():
 
 		self.imageToCopy = ''
 		self.testSvrId = ''
-		self.imageToPull = []
 		#checkers from xml
 		self.ran_checkers={}
 
@@ -772,45 +771,44 @@ class Containerize():
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
 		return True
 
-	def Pull_Image_from_Local_Registry(self, HTML):
-		lIpAddr, lSourcePath = self.GetCredentials(self.testSvrId)
-		logging.debug('\u001B[1m Pulling image(s) on server: ' + lIpAddr + '\u001B[0m')
-		myCmd = cls_cmd.getConnection(lIpAddr)
-		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
-		response = myCmd.run(f'docker login -u oaicicd -p oaicicd {imagePrefix}')
-		if response.returncode != 0:
-			msg = 'Could not log into local registry'
-			logging.error(msg)
-			myCmd.close()
-			HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
-			return False
-		pulled_images = []
-		for image in self.imageToPull:
-			tagToUse = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
-			imageTag = f"{image}:{tagToUse}"
-			cmd = f'docker pull {imagePrefix}/{imageTag}'
-			response = myCmd.run(cmd, timeout=120)
+	def Pull_Image(cmd, images, tag, registry, username, password):
+		if username is not None and password is not None:
+			logging.info(f"logging into registry {username}@{registry}")
+			response = cmd.run(f'docker login -u {username} -p {password} {registry}', silent=True, reportNonZero=False)
 			if response.returncode != 0:
-				logging.debug(response)
-				msg = f'Could not pull {image} from local registry : {imageTag}'
+				msg = f'Could not log into registry {username}@{registry}'
 				logging.error(msg)
-				myCmd.close()
-				HTML.CreateHtmlTestRow('msg', 'KO', CONST.ALL_PROCESSES_OK)
-				return False
-			myCmd.run(f'docker tag {imagePrefix}/{imageTag} oai-ci/{imageTag}')
-			myCmd.run(f'docker rmi {imagePrefix}/{imageTag}')
+				return False, msg
+		pulled_images = []
+		for image in images:
+			imageTag = f"{image}:{tag}"
+			response = cmd.run(f'docker pull {registry}/{imageTag}')
+			if response.returncode != 0:
+				msg = f'Could not pull {image} from local registry: {imageTag}'
+				logging.error(msg)
+				return False, msg
+			cmd.run(f'docker tag {registry}/{imageTag} oai-ci/{imageTag}')
+			cmd.run(f'docker rmi {registry}/{imageTag}')
 			pulled_images += [f"oai-ci/{imageTag}"]
-		response = myCmd.run(f'docker logout {imagePrefix}')
-		if response.returncode != 0:
-			msg = 'Could not log off from local registry'
-			logging.error(msg)
-			myCmd.close()
-			HTML.CreateHtmlTestRow(msg, 'KO', CONST.ALL_PROCESSES_OK)
-			return False
-		myCmd.close()
+		if username is not None and password is not None:
+			response = cmd.run(f'docker logout {registry}')
+			# we have the images, if logout fails it's no problem
 		msg = "Pulled Images:\n" + '\n'.join(pulled_images)
-		HTML.CreateHtmlTestRowQueue('N/A', 'OK', [msg])
-		return True
+		return True, msg
+
+	def Pull_Image_from_Registry(self, HTML, svr_id, images, tag=None, registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
+		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
+		logging.debug('\u001B[1m Pulling image(s) on server: ' + lIpAddr + '\u001B[0m')
+		if not tag:
+			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
+		with cls_cmd.getConnection(lIpAddr) as cmd:
+			success, msg = Containerize.Pull_Image(cmd, images, tag, registry, username, password)
+		param = f"on node {lIpAddr}"
+		if success:
+			HTML.CreateHtmlTestRowQueue(param, 'OK', [msg])
+		else:
+			HTML.CreateHtmlTestRowQueue(param, 'KO', [msg])
+		return success
 
 	def Clean_Test_Server_Images(self, HTML):
 		lIpAddr, lSourcePath = self.GetCredentials(self.testSvrId)

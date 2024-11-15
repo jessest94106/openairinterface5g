@@ -374,14 +374,9 @@ def ExecuteActionWithParam(action):
 		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id)
 
 	elif action == 'Pull_Local_Registry':
-		string_field = test.findtext('test_svr_id')
-		if (string_field is not None):
-			CONTAINERS.testSvrId = string_field
-		CONTAINERS.imageToPull.clear()
-		string_field = test.findtext('images_to_pull')
-		if (string_field is not None):
-			CONTAINERS.imageToPull = string_field.split()
-		success = CONTAINERS.Pull_Image_from_Local_Registry(HTML)
+		svr_id = test.findtext('svr_id')
+		images = test.findtext('images').split()
+		success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images)
 
 	elif action == 'Clean_Test_Server_Images':
 		string_field = test.findtext('test_svr_id')
