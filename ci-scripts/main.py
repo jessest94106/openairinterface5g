@@ -410,7 +410,7 @@ def ExecuteActionWithParam(action):
 		string_field = test.findtext('test_svr_id')
 		if (string_field is not None):
 			CLUSTER.testSvrId = string_field
-		success = CLUSTER.PullClusterImage(HTML, RAN)
+		success = CLUSTER.PullClusterImage(HTML)
 
 	else:
 		logging.warning(f"unknown action {action}, skip step")

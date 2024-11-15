@@ -240,7 +240,7 @@ class Cluster:
 	def _undeploy_pod(self, filename):
 		self.cmd.run(f'oc delete -f {filename}')
 
-	def PullClusterImage(self, HTML, RAN):
+	def PullClusterImage(self, HTML):
 		if self.testSvrId == None: self.testSvrId = self.eNBIPAddress
 		if self.imageToPull == '':
 			HELP.GenericHelp(CONST.Version)
