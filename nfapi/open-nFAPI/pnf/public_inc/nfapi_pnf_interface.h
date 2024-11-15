@@ -571,8 +571,8 @@ typedef struct
 typedef struct 
 {
 	//uint16_t sfn_slot
-	int16_t sfn;
-	int16_t slot;
+	uint16_t sfn;
+	uint16_t slot;
 	//TODO: Change P7 structs to NR
 	nfapi_nr_dl_tti_request_t* dl_tti_req;//nfapi_dl_config_request_t* dl_config_req; 
 	nfapi_nr_ul_tti_request_t* ul_tti_req;//nfapi_ul_config_request_t* ul_config_req;
