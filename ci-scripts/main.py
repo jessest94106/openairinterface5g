@@ -373,15 +373,17 @@ def ExecuteActionWithParam(action):
 		svr_id = test.findtext('svr_id')
 		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id)
 
-	elif action == 'Pull_Local_Registry':
+	elif action == 'Pull_Local_Registry' or action == 'Clean_Test_Server_Images':
 		svr_id = test.findtext('svr_id')
 		images = test.findtext('images').split()
-		success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images)
-
-	elif action == 'Clean_Test_Server_Images':
-		svr_id = test.findtext('svr_id')
-		images = test.findtext('images').split()
-		success = CONTAINERS.Clean_Test_Server_Images(HTML, svr_id, images)
+		# hack: for FlexRIC, we need to overwrite the tag to use
+		tag = None
+		if len(images) == 1 and images[0] == "oai-flexric":
+			tag = CONTAINERS.flexricTag
+		if action == "Pull_Local_Registry":
+			success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images, tag=tag)
+		if action == "Clean_Test_Server_Images":
+			success = CONTAINERS.Clean_Test_Server_Images(HTML, svr_id, images, tag=tag)
 
 	elif action == 'Custom_Command':
 		node = test.findtext('node')
