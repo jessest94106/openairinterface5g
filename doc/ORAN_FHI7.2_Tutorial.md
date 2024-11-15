@@ -484,12 +484,15 @@ Contact the RU vendor and get the configuration manual to understand the below c
 
 ### Benetel 650
 
-- **Valid only for version RAN650-1v1.0.4-dda1bf5**
-- TDD pattern `DDDDDDDSUU`, 5ms
+**Valid only for version RAN650-1v1.0.4-dda1bf5**
+
+The OAI configuration file [`gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf) corresponds to:
+- TDD pattern `DDDSU`, 2.5ms
 - Bandwidth 100MHz
-- MTU 9216 (this is the maximum we can configure on our switch)
+- MTU 9600
 - 4TX4R
-- The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-benetel650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-benetel650.conf) corresponds to below RU configuration. 
+
+#### RU configuration
 
 After switching on the radio or rebooting, wait for the radio bring up to complete, which you can follow using `tail -f  /tmp/logs/radio_status`. Once you will see `[INFO] Radio bringup complete`, you can configure the RU via editing `/etc/ru_config.cfg`
 
@@ -509,12 +512,15 @@ dl_ul_tuning_special_slot=0xfd00000
 
 ### Benetel 550
 
+**Valid only for version RAN550-1v1.0.4-605a25a**
 
-- **Valid only for version RAN550-1v1.0.4-605a25a**
+The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf) corresponds to:
 - TDD pattern `DDDDDDDSUU`, 5ms
 - Bandwidth 100MHz
+- MTU 9600
 - 4TX4R
-- The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf) corresponds to below RU configuration.
+
+#### RU configuration
 
 After switching on the radio or rebooting, wait for the radio bring up to complete, which you can follow using `tail -f  /tmp/logs/radio_status`. Once you will see `[INFO] Radio bringup complete`, you can configure the RU via editing `/etc/ru_config.cfg`
 
@@ -532,48 +538,56 @@ flexran_prach_workaround=disabled
 dl_tuning_special_slot=0x13b6
 ```
 
-### LiteON
+### LITEON
 
+**Verson 01.00.08**
+The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-liteon.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-liteon.conf) corresponds to:
 - TDD pattern `DDDSU`, 2.5ms
 - Bandwidth 100MHz
-- Default MTU is 1500
+- MTU 1500 (the above mentioned LITEON version doesn't support jumbo frames)
+
+#### RU configuration
 
 SSH to the unit as user `user`. Write `enable` in the terminal to enter the configuration console; the password should be in the user guide. Use the command `show oru-status` to check the RU status. The output should be similar to:
-
 ```bash
 # show oru-status 
 Sync State  : SYNCHRONIZED
 RF State    : Ready
 DPD         : Ready
+DuConnected : notReady
 ```
 
-Once the RU is PTP synced, and RF state and DPD are `Ready`, write `configure` in the terminal to set:
+Also, you can use `show running-config` to display the current RU configuration. 
 
+Once the RU is PTP synced, and RF state and DPD are `Ready`, write `configure terminal` to set:
 - Center frequency 
 - Bandwidth
 - Compression Bitwidth
 - TX/RX attenuation
 
-To configure 4TX and 4RX antennas, you have to repeat the below steps after every reboot, so don't restart the RU after entering below commands:
-
+After each reboot, the PRACH has to be manually configured.
+To do so, please login to RU as user `root` and run below commands:
 ```bash
 devmem 0x80001014 32 0x00050004
 devmem 0x80001018 32 0x00070006
 devmem 0x8000201C 32 0x00000001
 ```
 
-If you want to set MTU size to 9000 then use the below command: 
-
+If you have RU version that supports jumbo frames, please enable it as:
 ```bash
 devmem 0x8000200C 32 0x00000001
 ```
 
 ### VVDN LPRU
 
+**Version 3.x**
+
+The OAI configuration file [`gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf) corresponds to:
 - TDD pattern `DDDSU`, 2.5ms
 - Bandwidth 100MHz
-- MTU 9216 (this is the maximum we can configure on our switch)
-- The OAI configuration file [`gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf) corresponds to below RU configuration. 
+- MTU 9600
+
+#### RU configuration
 
 Check in the RU user manual how to configure the center frequency. There are multiple ways to do it. We set the center frequency by editing `sysrepocfg` database. You can use `sysrepocfg --edit=vi -d running` to do the same. You can edit the `startup` database to make the center frequency change persistent. 
 
@@ -607,12 +621,36 @@ Execute the below commands on every restart
 ```bash
 xml_parser 4x4-config.xml
 ## To enable prach compression
-mw.l a0010024 1919
+mw.l a0010024 1919 # format `<PRACH-comp-method><PRACH-compr-value><PUSCH-comp-method><PUSCH-compr-value>
 ## This will show the current configuration
 /etc/scripts/lpru_configuration.sh
 ## Edit the sysrepo to ACTIVATE the carrier when you want to use the RU
+## option 1 - activation by writing directly in register
+mw.l a0050010 <YOUR-RU-VLAN>3 # e.g. VLAN = 4 => `mw.l a0050010 43`
+## option 2 - activation via sysrepocfg command
 sysrepocfg --edit=vi -d running
 ```
+
+### Metanoia RU
+
+**Version 2.0.6**
+
+The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf) corresponds to:
+- TDD pattern `DDDSU`, 2.5ms (`DDDDDDDSUU`, 5ms, also supported)
+- Bandwidth 100MHz
+- 4TX4R
+
+The RU configuration is stored in `/etc/rumanager.conf`. The required modifications:
+1. `processing_element/vlan_id`
+2. `processing_element/du_mac_address`
+3. `low_level_tx_endpoint/compression_type` -> `STATIC`
+4. `low_level_rx_endpoint/compression_type` -> `STATIC`
+5. `low_level_rx_endpoint/compression/fs-offset` -> `8`
+6. `center-of-channel-bandwidth` -> `3750000000`
+7. `tx_gain_correction` -> tested with `6020` (please be careful to not fry the RU)
+8. `rx_gain_correction` -> tested with `-903` (please be careful to not fry the RU)
+
+At this stage, RU must be rebooted so the changes apply.
 
 ## Configure Network Interfaces and DPDK VFs
 
@@ -821,9 +859,19 @@ sudo /usr/local/bin/dpdk-devbind.py --bind $DRIVER $C_PLANE_PCI_BUS_ADD
 **Beware in the following section to let in the range of isolated cores the parameters that should be (i.e. `L1s.L1_rx_thread_core`, `L1s.L1_tx_thread_core`, `RUs.ru_thread_core`, `fhi_72.io_core` and `fhi_72.worker_cores`)**
 
 Sample configuration files for OAI gNB, specific to the manufacturer of the radio unit, are available at:
-1. LITE-ON RU: [`gnb.sa.band78.273prb.fhi72.4x4-liteon.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-liteon.conf) (band n78, 273 PRBs, 3.5GHz center freq, 4x4 antenna configuration with 9 bit I/Q samples (compressed) for PUSCH/PDSCH/PRACH, 2-layer DL MIMO, UL SISO)
-2. Benetel 650 RU: [`gnb.sa.band78.273prb.fhi72.4x4-benetel650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x2-benetel650.conf) (band n78, 273 PRBs, 3.5GHz center freq, 4x2 antenna configuration with 9 bit I/Q samples (compressed) for PUSCH/PDSCH/PRACH, 2-layer DL MIMO, UL SISO)
-3. VVDN RU: [`gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf) (band n77, 273 PRBs, 4.0GHz center freq, 4x4 antenna configuration with 9 bit I/Q samples (compressed) for PUSCH/PDSCH/PRACH, 2-layer DL MIMO, UL SISO)
+1. LITEON RU:
+[`gnb.sa.band78.273prb.fhi72.4x4-liteon.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-liteon.conf)
+2. VVDN RU:
+[`gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band77.273prb.fhi72.4x4-vvdn.conf)
+[`gnb.sa.band77.106prb.fhi72.4x4-vvdn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band77.106prb.fhi72.4x4-vvdn.conf)
+[`gnb.sa.band77.273prb.fhi72.2x2-vvdn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band77.273prb.fhi72.2x2-vvdn.conf)
+3. Benetel 650 RU:
+[`gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf)
+4. Benetel 550 RU:
+[`gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf)
+[`gnb.sa.band78.273prb.fhi72.4x2-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x2-benetel550.conf)
+5. Metanoia RU:
+[`gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf)
 
 Edit the sample OAI gNB configuration file and check following parameters:
 
@@ -848,16 +896,15 @@ Edit the sample OAI gNB configuration file and check following parameters:
 * `fhi_72` (FrontHaul Interface) section: this config follows the structure
   that is employed by the xRAN library (`xran_fh_init` and `xran_fh_config`
   structs in the code):
-  * `dpdk_devices`: PCI addresses of NIC VFs binded to the DPDK (not the physical NIC but the VFs, use `lspci | grep Virtual`)
+  * `dpdk_devices`: PCI addresses of NIC VFs binded to the DPDK (not the physical NIC but the VFs, use `lspci | grep Virtual`) in the format `{VF-U-plane, VF-C-plane}`;
+    if one VF used per RU, U and C planes will share the same VF => depends on the RU capabilities
   * `system_core`: absolute CPU core ID for DPDK control threads, it should be an isolated core, in our environment we are using CPU 0
     (`rte_mp_handle`, `eal-intr-thread`, `iavf-event-thread`)
   * `io_core`: absolute CPU core ID for XRAN library, it should be an isolated core, in our environment we are using CPU 4
   * `worker_cores`: array of absolute CPU core IDs for XRAN library, they should be isolated cores, in our environment we are using CPU 2
-  * `du_addr`: DU C- and U-plane MAC-addresses (format `UU:VV:WW:XX:YY:ZZ`,
-    hexadecimal numbers)
-  * `ru_addr`: RU C- and U-plane MAC-addresses (format `UU:VV:WW:XX:YY:ZZ`,
-    hexadecimal numbers)
-  * `mtu`: Maximum Transmission Unit for the RU, specified by RU vendor
+  * `ru_addr`: RU U- and C-plane MAC-addresses (format `UU:VV:WW:XX:YY:ZZ`, hexadecimal numbers)
+  * `mtu`: Maximum Transmission Unit for the RU, specified by RU vendor; either 1500 or 9600 B (Jumbo Frames); if not set, 1500 is used
+  * `file_prefix` : used to specify a unique prefix for shared memory and files created by multiple DPDK processes; if not set, default value of `wls_0` is used
   * `dpdk_mem_size`: the huge page size that should be pre-allocated by DPDK
     _for NUMA node 0_; by default, this is 8192 MiB (corresponding to 8 huge
     pages à 1024 MiB each, see above). In the current implementation, you
@@ -874,17 +921,19 @@ Edit the sample OAI gNB configuration file and check following parameters:
       * `iq_width_prach`: Width of PRACH IQ samples: if 16, no compression, if <16, applies
         compression
     * `prach_config`: PRACH-specific configuration
-      * `eAxC_offset`:  PRACH antenna offset
+      * `eAxC_offset`:  PRACH antenna offset; if not set, default value of `N = max(Nrx,Ntx)` is used
       * `kbar`: the PRACH guard interval, provided in RU
 
 Layer mapping (eAxC offsets) happens as follows:
-- For PUSCH/PDSCH, the layers are mapped to `[0,1,...,N-1]` where `N` is the
+- For PUSCH/PDSCH, the layers are mapped to `[0,1,...,Nrx-1]/[0,1,...,Ntx-1]` where `Nrx/Ntx` is the
   respective RX/TX number of antennas.
-- For PRACH, the layers are mapped to `[No,No+1,...No+N-1]` where No is the
-  `fhi_72.fh_config.[0].prach_config.eAxC_offset` and `N` the number of receive
-  antennas.
+- For PRACH, the layers are mapped to `[No,No+1,...No+Nrx-1]` where `No` is the
+  `fhi_72.fh_config.[0].prach_config.eAxC_offset`. Please be aware that the following equation must be fullfilled: `No >= max(Nrx,Ntx)`.
 
-xRAN SRS reception is not supported.
+**Note**
+
+- At the moment, OAI is compatible with CAT A O-RU only. Therefore, SRS is not supported.
+- XRAN retreives DU MAC address with `rte_eth_macaddr_get()` function. Hence, `fhi_72.du_addr` parameter is not taken into account.
 
 # Start and Operation of OAI gNB
 
@@ -990,7 +1039,7 @@ Some caveats:
 
 For two RUs each using a 4x4 configuration, make sure to configure the 8x8
 configuration, i.e., set `nb_tx` and `nb_rx` under `RUs` to 8 each (NOT two
-RUs!). Also, set the antenna port information as listed above, i.e.,
+`RUs`!). Also, set the antenna port information as listed above, i.e.,
 
 ```
 pdsch_AntennaPorts_XP = 2;
@@ -1004,11 +1053,10 @@ Next, configure the `fhi_72` section as indicated below:
 
 ```
 fhi_72 = {
-   dpdk_devices = ("ru1_up_vf_pci", "ru1_cp_vf_pci", "ru2_up_vf_pci", "ru2_cp_vf_pci");
+   dpdk_devices = ("ru1_up_vf_pci", "ru1_cp_vf_pci", "ru2_up_vf_pci", "ru2_cp_vf_pci"); # two VFs can be used as well
    // core config as always
-   du_addr = ("du_ru1_up_mac_addr", "du_ru1_cp_mac_addr", "du_ru2_up_mac_addr", "du_ru2_cp_mac_addr");
-   ru_addr = ("ru1_up_mac_addr", "ru1_cp_mac_addr", "ru2_up_mac_addr", "ru2_cp_mac_addr");
-   // mtu, file_prefix ...
+   ru_addr = ("ru1_up_mac_addr", "ru1_cp_mac_addr", "ru2_up_mac_addr", "ru2_cp_mac_addr"); # if two VFs, set two RU MAC addresses (one per RU)
+   // mtu
    fh_config = (
      {
        // timing, ru_config, prach_config of RU1
@@ -1020,12 +1068,12 @@ fhi_72 = {
 };
 ```
 
-i.e., for `dpdk_devices`, `du_addr`, and `ru_addr` is configured for
+i.e., for `dpdk_devices`, and `ru_addr` is configured for
 both RUs in a (flat) array, and the individual radio configuration is given for
 each RU individually inside the `fh_config`.
 
 <details>
-<summary>Sample FHI 7.2 configuration for two RUs (Benetel 550 and 650)</summary>
+<summary>Sample FHI 7.2 configuration for two RUs (2 x Benetel 650)</summary>
 
 ```
 fhi_72 = {
@@ -1033,12 +1081,10 @@ fhi_72 = {
   system_core = 0;
   io_core = 1;
   worker_cores = (2);
-  du_addr = ("00:11:22:33:44:66","00:11:22:33:44:67","00:11:22:33:44:66","00:11:22:33:44:67");
-  ru_addr = ("70:b3:d5:e1:5b:ff","70:b3:d5:e1:5b:ff","70:b3:d5:e1:5b:81", "70:b3:d5:e1:5b:81");
-  mtu = 9216;
-  file_prefix = "fhi_72";
+  ru_addr = ("8c:1f:64:d1:10:46","8c:1f:64:d1:10:46","8c:1f:64:d1:10:43","8c:1f:64:d1:10:43")
+  mtu = 9600;
   fh_config = (
-# RAN650
+# RAN650 #1
    {
     Tadv_cp_dl = 125;
     T2a_cp_dl = (259, 500);
@@ -1053,11 +1099,8 @@ fhi_72 = {
       iq_width = 9;
       iq_width_prach = 9;
     };
-    prach_config = {
-      eAxC_offset = 4;
-    };
   },
-# RAN550
+# RAN650 #2
   {
     Tadv_cp_dl = 125;
     T2a_cp_dl = (259, 500);
@@ -1072,38 +1115,35 @@ fhi_72 = {
       iq_width = 9;
       iq_width_prach = 9;
     };
-    prach_config = {
-      eAxC_offset = 4;
-    };
   });
 ```
 </details>
 
 Compare also with the example (DU) configuration in
-[`gnb-du.sa.band78.106prb.fhi72.8x8-benetel-650-550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band78.106prb.fhi72.8x8-benetel-650-550.conf).
+[`gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf).
 
 Afterwards, start the gNB with the modified configuration file. If everything
 went well, you should see the RU counters for both RUs go up:
 
 ```
-[NR_PHY]   [o-du 0][rx  614400 pps   61440 kbps  844953][tx 1275076 pps  127488 kbps 1998585][Total Msgs_Rcvd 614400]
-[NR_PHY]   [o_du0][pusch0  107520 prach0   46080]
-[NR_PHY]   [o_du0][pusch1  107520 prach1   46080]
-[NR_PHY]   [o_du0][pusch2  107520 prach2   46080]
-[NR_PHY]   [o_du0][pusch3  107520 prach3   46080]
-[NR_PHY]   [o-du 1][rx  614400 pps   61440 kbps  844953][tx 1275076 pps  127488 kbps 1998585][Total Msgs_Rcvd 614400]
-[NR_PHY]   [o_du1][pusch0  107520 prach0   46080]
-[NR_PHY]   [o_du1][pusch1  107520 prach1   46080]
-[NR_PHY]   [o_du1][pusch2  107520 prach2   46080]
-[NR_PHY]   [o_du1][pusch3  107520 prach3   46080]
+[NR_PHY]   [o-du 0][rx   63488 pps   63264 kbps 2759808][tx  127684 pps  127116 kbps 4717971][Total Msgs_Rcvd 63488]
+[NR_PHY]   [o_du0][pusch0   14336 prach0    1536]
+[NR_PHY]   [o_du0][pusch1   14336 prach1    1536]
+[NR_PHY]   [o_du0][pusch2   14336 prach2    1536]
+[NR_PHY]   [o_du0][pusch3   14336 prach3    1536]
+[NR_PHY]   [o-du 1][rx   63544 pps   63320 kbps 2763240][tx  127684 pps  127116 kbps 4717971][Total Msgs_Rcvd 63544]
+[NR_PHY]   [o_du1][pusch0   14350 prach0    1536]
+[NR_PHY]   [o_du1][pusch1   14350 prach1    1536]
+[NR_PHY]   [o_du1][pusch2   14350 prach2    1536]
+[NR_PHY]   [o_du1][pusch3   14350 prach3    1536]
 ```
 
 You can also verify that there is signal on all RX antennas like so:
 ```bash
 $ cat nrL1_stats.log
 [...]
-max_IO = 66 (81), min_I0 = 0 (53), avg_I0 = 51 dB(46.48.45.46.51.56.55.45.)
-PRACH I0 = 38.0 dB
+max_IO = 55 (85), min_I0 = 0 (136), avg_I0 = 44 dB(43.44.43.45.44.43.43.45.)
+PRACH I0 = 30.6 dB
 ```
 
 Note the eight entries after `avg_IO`.
@@ -1119,7 +1159,7 @@ Your email should contain below information:
 - A clear subject in your email.
 - For all the queries there should be [Query\] in the subject of the email and for problems there should be [Problem\].
 - In case of a problem, add a small description.
-- Do not share any photos unless you want to share a diagram. 
+- Do not share any screenshots/photos unless you want to share a diagram.
 - OAI gNB/DU/CU/CU-CP/CU-UP configuration file in `.conf` format only.
 - Logs of OAI gNB/DU/CU/CU-CP/CU-UP in `.log` or `.txt` format only.
 - RU Vendor and Version.
