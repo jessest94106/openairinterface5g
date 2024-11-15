@@ -44,15 +44,15 @@
   <testCase id="010000">
     <class>Pull_Cluster_Image</class>
     <desc>Pull Images from Cluster</desc>
-    <images_to_pull>oai-gnb</images_to_pull>
-    <test_svr_id>avra</test_svr_id>
+    <images>oai-gnb</images>
+    <node>avra</node>
   </testCase>
 
   <testCase id="010001">
     <class>Pull_Cluster_Image</class>
     <desc>Pull Images from Cluster</desc>
-    <images_to_pull>oai-nr-ue</images_to_pull>
-    <test_svr_id>caracal</test_svr_id>
+    <images>oai-nr-ue</images>
+    <node>caracal</node>
   </testCase>
 
   <testCase id = "030000">

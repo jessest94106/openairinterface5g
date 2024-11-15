@@ -397,13 +397,9 @@ def ExecuteActionWithParam(action):
 		success = cls_oaicitest.Custom_Script(HTML, node, script, command_fail)
 
 	elif action == 'Pull_Cluster_Image':
-		string_field = test.findtext('images_to_pull')
-		if (string_field is not None):
-			CLUSTER.imageToPull = string_field.split()
-		string_field = test.findtext('test_svr_id')
-		if (string_field is not None):
-			CLUSTER.testSvrId = string_field
-		success = CLUSTER.PullClusterImage(HTML)
+		images = test.findtext('images').split()
+		node = test.findtext('node')
+		success = CLUSTER.PullClusterImage(HTML, node, images)
 
 	else:
 		logging.warning(f"unknown action {action}, skip step")

@@ -46,8 +46,8 @@
   <testCase id="111111">
     <class>Pull_Cluster_Image</class>
     <desc>Pull Images from Cluster</desc>
-    <images_to_pull>oai-gnb</images_to_pull>
-    <test_svr_id>matix</test_svr_id>
+    <images>oai-gnb</images>
+    <node>matix</node>
   </testCase>
 
   <testCase id="100000">
