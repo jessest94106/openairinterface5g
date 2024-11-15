@@ -334,7 +334,7 @@ static void trigger_stop(int sig)
 }
 static void trigger_deregistration(int sig)
 {
-  if (!stop_immediately) {
+  if (!stop_immediately && IS_SA_MODE(get_softmodem_params())) {
     MessageDef *msg = itti_alloc_new_message(TASK_NAS_NRUE, 0, NAS_DEREGISTRATION_REQ);
     NAS_DEREGISTRATION_REQ(msg).cause = AS_DETACH;
     itti_send_msg_to_task(TASK_NAS_NRUE, 0, msg);
