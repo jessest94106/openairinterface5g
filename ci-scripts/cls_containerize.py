@@ -167,7 +167,7 @@ def GetContainerHealth(ssh, containerName):
 	return False
 
 def ExistEnvFilePrint(ssh, wd, prompt='env vars in existing'):
-	ret = ssh.run(f'cat {wd}/.env', silent=True)
+	ret = ssh.run(f'cat {wd}/.env', silent=True, reportNonZero=False)
 	if ret.returncode != 0:
 		return False
 	env_vars = ret.stdout.strip().splitlines()
@@ -175,7 +175,7 @@ def ExistEnvFilePrint(ssh, wd, prompt='env vars in existing'):
 	return True
 
 def WriteEnvFile(ssh, services, wd, tag):
-	ret = ssh.run(f'cat {wd}/.env', silent=True)
+	ret = ssh.run(f'cat {wd}/.env', silent=True, reportNonZero=False)
 	registry = "oai-ci" # pull_images() gives us this registry path
 	envs = {"REGISTRY":registry, "TAG": tag}
 	if ret.returncode == 0: # it exists, we have to update
