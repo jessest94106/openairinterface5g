@@ -153,7 +153,7 @@ pipeline {
                         if (eNB_AllowMergeRequestProcess) {
                             sh "git fetch"
                             sh "./ci-scripts/doGitLabMerge.sh --src-branch ${eNB_Branch} --src-commit ${eNB_CommitID} --target-branch ${eNB_TargetBranch} --target-commit latest"
-                        } else {
+                        } else if (eNB_CommitID != 'develop') {
                             sh "git fetch"
                             sh "git checkout -f ${eNB_CommitID}"
                         }
