@@ -409,13 +409,13 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
   if (ret==0) {
 
 #ifdef DEBUG_PHY_PROC
-    uint16_t frame_tx;
-    LOG_D(PHY,"[UE %d] frame %d, nr_slot_rx %d, Received PBCH (MIB): frame_tx %d. N_RB_DL %d\n",
-    ue->Mod_id,
-    frame_rx,
-    nr_slot_rx,
-    frame_tx,
-    ue->frame_parms.N_RB_DL);
+    LOG_D(PHY,
+          "[UE %d] frame %d, nr_slot_rx %d, Received PBCH (MIB): ssb idx: %d, N_RB_DL %d\n",
+          ue->Mod_id,
+          frame_rx,
+          nr_slot_rx,
+          ssb_index,
+          ue->frame_parms.N_RB_DL);
 #endif
 
   } else {
@@ -882,12 +882,21 @@ static bool nr_ue_dlsch_procedures(PHY_VARS_NR_UE *ue,
   return dec;
 }
 
+static bool is_ssb_index_transmitted(const PHY_VARS_NR_UE *ue, const int index)
+{
+  if (ue->received_config_request) {
+    const fapi_nr_config_request_t *cfg = &ue->nrUE_config;
+    const uint32_t curr_mask = cfg->ssb_table.ssb_mask_list[index / 32].ssb_mask;
+    return ((curr_mask >> (31 - (index % 32))) & 0x01);
+  } else
+    return ue->frame_parms.ssb_index == index;
+}
+
 int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_data_t *phy_data)
 {
   int frame_rx = proc->frame_rx;
   int nr_slot_rx = proc->nr_slot_rx;
   int gNB_id = proc->gNB_id;
-  fapi_nr_config_request_t *cfg = &ue->nrUE_config;
   NR_DL_FRAME_PARMS *fp = &ue->frame_parms;
   NR_UE_PDCCH_CONFIG *phy_pdcch_config = &phy_data->phy_pdcch_config;
   int sampleShift = INT_MAX;
@@ -901,16 +910,18 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
   const uint32_t rxdataF_sz = ue->frame_parms.samples_per_slot_wCP;
   __attribute__ ((aligned(32))) c16_t rxdataF[ue->frame_parms.nb_antennas_rx][rxdataF_sz];
   // checking if current frame is compatible with SSB periodicity
-  if (cfg->ssb_table.ssb_period == 0 || !(frame_rx % (1 << (cfg->ssb_table.ssb_period - 1)))) {
+
+  const int default_ssb_period = 2;
+  const int ssb_period = ue->received_config_request ? ue->nrUE_config.ssb_table.ssb_period : default_ssb_period;
+  if (ssb_period == 0 || !(frame_rx % (1 << (ssb_period - 1)))) {
     const int estimateSz = fp->symbols_per_slot * fp->ofdm_symbol_size;
     // loop over SSB blocks
-    for(int ssb_index=0; ssb_index<fp->Lmax; ssb_index++) {
-      uint32_t curr_mask = cfg->ssb_table.ssb_mask_list[ssb_index/32].ssb_mask;
-      // check if if current SSB is transmitted
-      if ((curr_mask >> (31-(ssb_index%32))) &0x01) {
+    for (int ssb_index = 0; ssb_index < fp->Lmax; ssb_index++) {
+      // check if current SSB is transmitted
+      if (is_ssb_index_transmitted(ue, ssb_index)) {
         int ssb_start_symbol = nr_get_ssb_start_symbol(fp, ssb_index);
         int ssb_slot = ssb_start_symbol/fp->symbols_per_slot;
-        int ssb_slot_2 = (cfg->ssb_table.ssb_period == 0) ? ssb_slot+(fp->slots_per_frame>>1) : -1;
+        int ssb_slot_2 = (ssb_period == 0) ? ssb_slot + (fp->slots_per_frame >> 1) : -1;
 
         if (ssb_slot == nr_slot_rx || ssb_slot_2 == nr_slot_rx) {
           VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PBCH, VCD_FUNCTION_IN);
