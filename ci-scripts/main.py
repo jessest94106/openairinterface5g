@@ -634,7 +634,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	#(6 digits or less than 6 digits followed by +)
 	for test in exclusion_tests:
 		if     (not re.match('^[0-9]{6}$', test) and
-				not re.match('^[0-9]{1,5}\+$', test)):
+				not re.match('^[0-9]{1,5}\\+$', test)):
 			logging.error('exclusion test is invalidly formatted: ' + test)
 			sys.exit(1)
 		else:
@@ -645,7 +645,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	#be verbose
 	for test in requested_tests:
 		if     (re.match('^[0-9]{6}$', test) or
-				re.match('^[0-9]{1,5}\+$', test)):
+				re.match('^[0-9]{1,5}\\+$', test)):
 			logging.info('test group/case requested: ' + test)
 		else:
 			logging.error('requested test is invalidly formatted: ' + test)
