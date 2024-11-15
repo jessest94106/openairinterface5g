@@ -379,10 +379,9 @@ def ExecuteActionWithParam(action):
 		success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images)
 
 	elif action == 'Clean_Test_Server_Images':
-		string_field = test.findtext('test_svr_id')
-		if (string_field is not None):
-			CONTAINERS.testSvrId = string_field
-		success = CONTAINERS.Clean_Test_Server_Images(HTML)
+		svr_id = test.findtext('svr_id')
+		images = test.findtext('images').split()
+		success = CONTAINERS.Clean_Test_Server_Images(HTML, svr_id, images)
 
 	elif action == 'Custom_Command':
 		node = test.findtext('node')

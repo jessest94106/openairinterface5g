@@ -334,7 +334,6 @@ class Containerize():
 		self.cliOptions = ''
 
 		self.imageToCopy = ''
-		self.testSvrId = ''
 		#checkers from xml
 		self.ran_checkers={}
 
@@ -810,24 +809,27 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue(param, 'KO', [msg])
 		return success
 
-	def Clean_Test_Server_Images(self, HTML):
-		lIpAddr, lSourcePath = self.GetCredentials(self.testSvrId)
-		if lIpAddr != 'none':
-			logging.debug('Removing test images from server: ' + lIpAddr)
-			myCmd = cls_cmd.RemoteCmd(lIpAddr)
-		else:
-			logging.debug('Removing test images locally')
-			myCmd = cls_cmd.LocalCmd()
-
-		for image in IMAGES:
+	def Clean_Test_Server_Images(self, HTML, svr_id, images, tag=None):
+		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
+		logging.debug(f'\u001B[1m Cleaning image(s) from server: {lIpAddr}\u001B[0m')
+		if not tag:
 			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
-			imageTag = f"{image}:{tag}"
-			cmd = f'docker rmi oai-ci/{imageTag}'
-			myCmd.run(cmd, reportNonZero=False)
 
-		myCmd.close()
-		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
-		return True
+		status = True
+		with cls_cmd.getConnection(lIpAddr) as myCmd:
+			removed_images = []
+			for image in images:
+				fullImage = f"oai-ci/{image}:{tag}"
+				cmd = f'docker rmi {fullImage}'
+				if myCmd.run(cmd).returncode != 0:
+					status = False
+				removed_images += [fullImage]
+
+		msg = "Removed Images:\n" + '\n'.join(removed_images)
+		s = 'OK' if status else 'KO'
+		param = f"on node {lIpAddr}"
+		HTML.CreateHtmlTestRowQueue(param, s, [msg])
+		return status
 
 	def Create_Workspace(self,HTML):
 		svr = self.eNB_serverId[self.eNB_instance]

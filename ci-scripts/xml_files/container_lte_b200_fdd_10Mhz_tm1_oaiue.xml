@@ -190,14 +190,16 @@
         <class>Clean_Test_Server_Images</class>
         <always_exec>true</always_exec>
         <desc>Clean Test Images on eNB Test Server</desc>
-        <test_svr_id>0</test_svr_id>
+        <svr_id>0</svr_id>
+        <images>oai-enb</images>
     </testCase>
 
     <testCase id="333333">
         <class>Clean_Test_Server_Images</class>
         <always_exec>true</always_exec>
         <desc>Clean Test Images on LTE-UE Test Server</desc>
-        <test_svr_id>1</test_svr_id>
+        <svr_id>1</svr_id>
+        <images>oai-lte-ue</images>
     </testCase>
 
 </testCaseList>
