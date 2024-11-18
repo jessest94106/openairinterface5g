@@ -641,7 +641,7 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   int size = sizeof(fgmm_msg_header_t);
   fgmm_nas_msg_security_protected_t nas_msg = {0};
   nas_stream_cipher_t stream_cipher;
-  uint8_t mac[4];
+  uint8_t mac[NAS_INTEGRITY_SIZE];
   // set security protected header
   fgs_nas_message_security_header_t *sp = &nas_msg.header;
   sp->protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
@@ -767,7 +767,7 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
 {
   int length = 0;
   nas_stream_cipher_t stream_cipher;
-  uint8_t mac[4];
+  uint8_t mac[NAS_INTEGRITY_SIZE];
   fgmm_nas_msg_security_protected_t sp = {0};
 
   // set security protected header
@@ -1016,7 +1016,7 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
   stream_cipher.message = (unsigned char *)(initialNasMsg->nas_data + 6);
   /* length in bits */
   stream_cipher.blength = (initialNasMsg->length - 6) << 3;
-  uint8_t mac[4];
+  uint8_t mac[NAS_INTEGRITY_SIZE];
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
 
   printf("mac %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
@@ -1042,7 +1042,7 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   encode_pdu_session_establishment_request(&pdu_session_establish, req_buffer);
 
   nas_stream_cipher_t stream_cipher;
-  uint8_t mac[4];
+  uint8_t mac[NAS_INTEGRITY_SIZE];
 
   // 5GMM security protected message
   fgmm_nas_msg_security_protected_t sp_msg = {0};
