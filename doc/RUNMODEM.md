@@ -83,7 +83,12 @@ You should see the X2 messages in Wireshark and at the eNB.
 
 The standalone mode is the default mode. 
 
-It is not necessary to run either the gNB or the UE using the `--sa` flag in the command line for standalone mode.
+Before tag `2024.w45`, the default mode was NSA. Thus, in the past, to run
+either the gNB or the UE in standalone mode, it was necessary to provide the
+`--sa` flag in the command line. This is not necessary anymore; if in doubt,
+you can provide `--sa` on the command line. The gNB will ignore this option if
+not relevant; the UE might complain that it does not know this option, which
+means that standalone is already active.
 
 The default (SA) mode does the following:
 - At the gNB:
