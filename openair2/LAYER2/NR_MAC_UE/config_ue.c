@@ -1771,16 +1771,18 @@ static double calculate_ue_sat_ta(position_t *position_params, struct NR_Positio
 void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, NR_SIB19_r17_t *sib19_r17)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
-  struct NR_NTN_Config_r17 *ntn_Config_r17 = mac->sc_info.ntn_Config_r17;
-
+  int ret = pthread_mutex_lock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
+  
   // update ntn_Config_r17 with received values
+  struct NR_NTN_Config_r17 *ntn_Config_r17 = mac->sc_info.ntn_Config_r17;
   UPDATE_IE(ntn_Config_r17, sib19_r17->ntn_Config_r17, NR_NTN_Config_r17_t);
 
   // populate ntn_ta structure from mac
   // if ephemerisInfo_r17 present in SIB19
   struct NR_EphemerisInfo_r17 *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
   if (ephemeris_info) {
-    struct NR_PositionVelocity_r17 *position_velocity = ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17;
+    struct NR_PositionVelocity_r17 *position_velocity = ephemeris_info->choice.positionVelocity_r17;
     if (position_velocity
         && (position_velocity->positionX_r17 != 0 || position_velocity->positionY_r17 != 0
             || position_velocity->positionZ_r17 != 0)) {
@@ -1798,6 +1800,9 @@ void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, NR_SIB19_r17_t *sib1
     if (ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17)
       mac->ntn_ta.ntn_ta_commondrift = *ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17 * 0.2e-3;
   }
+  mac->ntn_ta.ntn_params_changed = true;
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
 static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,

@@ -70,6 +70,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   mac->p_Max = INT_MIN;
   mac->p_Max_alt = INT_MIN;
   mac->n_ta_offset = -1;
+  mac->ntn_ta.ntn_params_changed = false;
   pthread_mutex_init(&mac->if_mutex, NULL);
   reset_mac_inst(mac);
 

@@ -322,6 +322,11 @@ typedef struct UE_NR_SCAN_INFO_s {
   int32_t freq_offset_Hz[3][10];
 } UE_NR_SCAN_INFO_t;
 
+typedef struct {
+  bool update;
+  fapi_nr_dl_ntn_config_command_pdu ntn_config_params;
+} ntn_config_message_t;
+
 /// Top-level PHY Data Structure for UE
 typedef struct PHY_VARS_NR_UE_s {
   /// \brief Module ID indicator for this instance
@@ -532,6 +537,9 @@ typedef struct PHY_VARS_NR_UE_s {
   sl_nr_ue_phy_params_t SL_UE_PHY_PARAMS;
   Actor_t sync_actor;
   Actor_t dl_actors[NUM_DL_ACTORS];
+  
+  ntn_config_message_t* ntn_config_message;
+
 } PHY_VARS_NR_UE;
 
 typedef struct {

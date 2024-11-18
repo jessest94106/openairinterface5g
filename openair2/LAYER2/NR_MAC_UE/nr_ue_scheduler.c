@@ -62,6 +62,8 @@
 
 static void nr_ue_prach_scheduler(NR_UE_MAC_INST_t *mac, frame_t frameP, sub_frame_t slotP);
 static void schedule_ta_command(fapi_nr_dl_config_request_t *dl_config, NR_UE_MAC_INST_t *mac);
+static void schedule_ntn_config_command(fapi_nr_dl_config_request_t *dl_config, NR_UE_MAC_INST_t *mac);
+
 static void nr_ue_fill_phr(NR_UE_MAC_INST_t *mac,
                            NR_SINGLE_ENTRY_PHR_MAC_CE *phr,
                            float P_CMAX,
@@ -1266,9 +1268,9 @@ void nr_ue_aperiodic_srs_scheduling(NR_UE_MAC_INST_t *mac, long resource_trigger
     return;
   }
 
-  AssertFatal(slot_offset > GET_DURATION_RX_TO_TX(mac),
+  AssertFatal(slot_offset > GET_DURATION_RX_TO_TX(&mac->ntn_ta),
               "Slot offset between DCI and aperiodic SRS (%d) needs to be higher than DURATION_RX_TO_TX (%ld)\n",
-              slot_offset, GET_DURATION_RX_TO_TX(mac));
+              slot_offset, GET_DURATION_RX_TO_TX(&mac->ntn_ta));
   int n_slots_frame = nr_slots_per_frame[current_UL_BWP->scs];
   int sched_slot = (slot + slot_offset) % n_slots_frame;
   NR_TDD_UL_DL_ConfigCommon_t *tdd_config = mac->tdd_UL_DL_ConfigurationCommon;
@@ -1368,6 +1370,11 @@ void nr_ue_dl_scheduler(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info
 
   if (mac->ul_time_alignment.ta_apply != no_ta)
     schedule_ta_command(dl_config, mac);
+  
+  if (mac->ntn_ta.ntn_params_changed) {
+    mac->ntn_ta.ntn_params_changed = false;
+    schedule_ntn_config_command(dl_config, mac);
+  }
 
   nr_scheduled_response_t scheduled_response = {.dl_config = dl_config,
                                                 .module_id = mac->ue_id,
@@ -1772,24 +1779,24 @@ int nr_ue_pusch_scheduler(const NR_UE_MAC_INST_t *mac,
         AssertFatal(1 == 0, "Invalid numerology %i\n", mu);
     }
 
-    AssertFatal((k2 + delta) > GET_DURATION_RX_TO_TX(mac),
+    AssertFatal((k2 + delta) > GET_DURATION_RX_TO_TX(&mac->ntn_ta),
                 "Slot offset (%ld) for Msg3 needs to be higher than DURATION_RX_TO_TX (%ld). Please set min_rxtxtime at least to %ld in gNB config file or gNBs.[0].min_rxtxtime=%ld via command line.\n",
                 k2,
-                GET_DURATION_RX_TO_TX(mac),
-                GET_DURATION_RX_TO_TX(mac),
-                GET_DURATION_RX_TO_TX(mac));
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta),
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta),
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta));
 
     *slot_tx = (current_slot + k2 + delta) % nr_slots_per_frame[mu];
     *frame_tx = (current_frame + (current_slot + k2 + delta) / nr_slots_per_frame[mu]) % MAX_FRAME_NUMBER;
 
   } else {
 
-    AssertFatal(k2 > GET_DURATION_RX_TO_TX(mac),
+    AssertFatal(k2 > GET_DURATION_RX_TO_TX(&mac->ntn_ta),
                 "Slot offset K2 (%ld) needs to be higher than DURATION_RX_TO_TX (%ld). Please set min_rxtxtime at least to %ld in gNB config file or gNBs.[0].min_rxtxtime=%ld via command line.\n",
                 k2,
-                GET_DURATION_RX_TO_TX(mac),
-                GET_DURATION_RX_TO_TX(mac),
-                GET_DURATION_RX_TO_TX(mac));
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta),
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta),
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta));
 
     if (k2 < 0) { // This can happen when a false DCI is received
       LOG_W(PHY, "%d.%d. Received k2 %ld\n", current_frame, current_slot, k2);
@@ -3589,6 +3596,17 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
 #endif
 
   return mac_ce_info.num_sdus > 0; // success if we got at least one sdu
+}
+
+static void schedule_ntn_config_command(fapi_nr_dl_config_request_t *dl_config, NR_UE_MAC_INST_t *mac)
+{
+  fapi_nr_dl_ntn_config_command_pdu *ntn_config_command_pdu = &dl_config->dl_config_list[dl_config->number_pdus].ntn_config_command_pdu;
+  ntn_config_command_pdu->cell_specific_k_offset = mac->ntn_ta.cell_specific_k_offset;
+  ntn_config_command_pdu->N_common_ta_adj = mac->ntn_ta.N_common_ta_adj;
+  ntn_config_command_pdu->N_UE_TA_adj = mac->ntn_ta.N_UE_TA_adj;
+  ntn_config_command_pdu->ntn_total_time_advance_ms = (mac->ntn_ta.N_common_ta_adj + mac->ntn_ta.N_UE_TA_adj) * 2;
+  dl_config->dl_config_list[dl_config->number_pdus].pdu_type = FAPI_NR_DL_NTN_CONFIG_PARAMS;
+  dl_config->number_pdus += 1;
 }
 
 static void schedule_ta_command(fapi_nr_dl_config_request_t *dl_config, NR_UE_MAC_INST_t *mac)

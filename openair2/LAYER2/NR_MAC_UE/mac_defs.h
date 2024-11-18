@@ -554,14 +554,16 @@ typedef struct {
 } si_schedInfo_t;
 
 typedef struct ntn_timing_advance_components {
-// N_common_ta_adj represents common propagation delay received in SIB19 (ms)
-double N_common_ta_adj;
-// N_UE_TA_adj calculated propagation delay from UE and SAT (ms)
-double N_UE_TA_adj;
-// drift rate of common ta in µs/s
-double ntn_ta_commondrift;
-// cell scheduling offset expressed in terms of 15kHz SCS
-long cell_specific_k_offset;
+  // N_common_ta_adj represents common propagation delay received in SIB19 (ms)
+  double N_common_ta_adj;
+  // N_UE_TA_adj calculated propagation delay from UE and SAT (ms)
+  double N_UE_TA_adj;
+  // drift rate of common ta in µs/s
+  double ntn_ta_commondrift;
+  // cell scheduling offset expressed in terms of 15kHz SCS
+  long cell_specific_k_offset;
+
+  bool ntn_params_changed;
 } ntn_timing_advance_componets_t;
 
 /*!\brief Top level UE MAC structure */
@@ -673,9 +675,20 @@ typedef struct NR_UE_MAC_INST_s {
   ue_mac_stats_t stats;
 } NR_UE_MAC_INST_t;
 
-#define GET_NTN_UE_K_OFFSET(mac, scs) (mac->ntn_ta.cell_specific_k_offset << scs)
-#define GET_COMPLETE_TIME_ADVANCE_MS(mac) ((mac)->ntn_ta.N_common_ta_adj + (mac)->ntn_ta.N_UE_TA_adj * 2)
-#define GET_DURATION_RX_TO_TX(mac) (NR_UE_CAPABILITY_SLOT_RX_TO_TX + (mac)->ntn_ta.cell_specific_k_offset)
+static inline int GET_NTN_UE_K_OFFSET(const ntn_timing_advance_componets_t *ntn_ta, int scs)
+{
+  return (int)ntn_ta->cell_specific_k_offset << scs;
+}
+
+static inline double GET_COMPLETE_TIME_ADVANCE_MS(const ntn_timing_advance_componets_t *ntn_ta)
+{
+  return (ntn_ta->N_common_ta_adj + ntn_ta->N_UE_TA_adj) * 2;
+}
+
+static inline long GET_DURATION_RX_TO_TX(const ntn_timing_advance_componets_t *ntn_ta)
+{
+  return NR_UE_CAPABILITY_SLOT_RX_TO_TX + ntn_ta->cell_specific_k_offset;
+}
 
 /*@}*/
 #endif /*__LAYER2_MAC_DEFS_H__ */

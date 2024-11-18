@@ -157,6 +157,9 @@ void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
   ue->dci_thres   = 0;
   ue->target_Nid_cell = -1;
 
+  ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
+  ue->ntn_config_message->update = false;
+
   config_position_coordinates(UE_id);
   // initialize all signal buffers
   init_nr_ue_signal(ue, nb_connected_gNB);
@@ -826,13 +829,12 @@ void *UE_thread(void *arg)
       readFrame(UE, &tmp, true);
   }
 
-  double ntn_ta_common = GET_COMPLETE_TIME_ADVANCE_MS(mac);
-  int ntn_koffset = GET_NTN_UE_K_OFFSET(mac, 0);
+  double ntn_ta_common = 0;
+  int ntn_koffset = 0;
 
-  int duration_rx_to_tx = GET_DURATION_RX_TO_TX(mac);
+  int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
   int nr_slot_tx_offset = 0;
   bool update_ntn_system_information = false;
-  bool apply_duration_next_run = false;
 
   while (!oai_exit) {
     nr_slot_tx_offset = 0;
@@ -945,17 +947,18 @@ void *UE_thread(void *arg)
 
     if (update_ntn_system_information) {
       update_ntn_system_information = false;
-      int ta_offset = UE->frame_parms.samples_per_subframe * (GET_COMPLETE_TIME_ADVANCE_MS(mac) - ntn_ta_common);
+      int ta_offset = UE->frame_parms.samples_per_subframe * (UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms - ntn_ta_common);
 
       UE->timing_advance += ta_offset;
-      ntn_ta_common = GET_COMPLETE_TIME_ADVANCE_MS(mac);
-      ntn_koffset = GET_NTN_UE_K_OFFSET(mac, 0);
+      ntn_ta_common = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
+      ntn_koffset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
       timing_advance = ntn_koffset * (UE->frame_parms.samples_per_subframe >> mac->current_UL_BWP->scs);
     }
 
-    if (ntn_koffset != (GET_NTN_UE_K_OFFSET(mac, 0)) && ntn_ta_common != GET_COMPLETE_TIME_ADVANCE_MS(mac)) {
+    if (UE->ntn_config_message->update) {
+      UE->ntn_config_message->update = false;
       update_ntn_system_information = true;
-      nr_slot_tx_offset = mac->ntn_ta.cell_specific_k_offset % nb_slot_frame;
+      nr_slot_tx_offset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset % nb_slot_frame;
     }
 
     int slot_nr = absolute_slot % nb_slot_frame;
@@ -1059,13 +1062,8 @@ void *UE_thread(void *arg)
     stream_status = STREAM_STATUS_SYNCED;
     tx_wait_for_dlsch[slot] = 0;
     // apply new duration next run to avoid thread dead lock
-    if (apply_duration_next_run) {
-      duration_rx_to_tx = GET_DURATION_RX_TO_TX(mac);
-      apply_duration_next_run = false;
-    }
-
-    if (duration_rx_to_tx != GET_DURATION_RX_TO_TX(mac)) {
-      apply_duration_next_run = true;
+    if (update_ntn_system_information) {
+      duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
     }
   }
 
