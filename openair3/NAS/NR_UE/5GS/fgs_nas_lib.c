@@ -50,67 +50,55 @@ int _nas_mm_msg_encode_header(const fgmm_msg_header_t *header, uint8_t *buffer, 
 
 int mm_msg_encode(const fgmm_nas_message_plain_t *p, uint8_t *buffer, uint32_t len)
 {
-  LOG_FUNC_IN;
-  int header_result;
-  int encode_result;
   uint8_t msg_type = p->header.message_type;
-
+  int enc_msg = 0;
   /* First encode the 5GMM message header */
-  header_result = _nas_mm_msg_encode_header(&p->header, buffer, len);
+  int enc_header = _nas_mm_msg_encode_header(&p->header, buffer, len);
 
-  if (header_result < 0) {
-    LOG_TRACE(ERROR,
-              "Failed to encode 5GMM message header"
-              "(%d)",
-              header_result);
-    LOG_FUNC_RETURN(header_result);
+  if (enc_header < 0) {
+    PRINT_NAS_ERROR("Failed to encode 5GMM message header\n");
+    return enc_header;
   }
 
-  buffer += header_result;
-  len -= header_result;
+  buffer += enc_header;
+  len -= enc_header;
 
   switch (msg_type) {
     case FGS_REGISTRATION_REQUEST:
-      encode_result = encode_registration_request(&p->mm_msg.registration_request, buffer, len);
+      enc_msg = encode_registration_request(&p->mm_msg.registration_request, buffer, len);
       break;
     case FGS_IDENTITY_RESPONSE:
-      encode_result = encode_fgmm_identity_response(buffer, &p->mm_msg.fgs_identity_response, len);
+      enc_msg = encode_fgmm_identity_response(buffer, &p->mm_msg.fgs_identity_response, len);
       break;
     case FGS_AUTHENTICATION_RESPONSE:
-      encode_result = encode_fgs_authentication_response(&p->mm_msg.fgs_auth_response, buffer, len);
+      enc_msg = encode_fgs_authentication_response(&p->mm_msg.fgs_auth_response, buffer, len);
       break;
     case FGS_SECURITY_MODE_COMPLETE:
-      encode_result = encode_fgs_security_mode_complete(&p->mm_msg.fgs_security_mode_complete, buffer, len);
+      enc_msg = encode_fgs_security_mode_complete(&p->mm_msg.fgs_security_mode_complete, buffer, len);
       break;
     case FGS_UPLINK_NAS_TRANSPORT:
-      encode_result = encode_fgs_uplink_nas_transport(&p->mm_msg.uplink_nas_transport, buffer, len);
+      enc_msg = encode_fgs_uplink_nas_transport(&p->mm_msg.uplink_nas_transport, buffer, len);
       break;
     case FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING:
-      encode_result =
+      enc_msg =
           encode_fgs_deregistration_request_ue_originating(&p->mm_msg.fgs_deregistration_request_ue_originating, buffer, len);
       break;
     case FGS_SERVICE_REQUEST:
-      encode_result = encode_fgs_service_request(buffer, &p->mm_msg.service_request, len);
+      enc_msg = encode_fgs_service_request(buffer, &p->mm_msg.service_request, len);
       break;
     default:
       LOG_TRACE(ERROR, " Unexpected message type: 0x%x", p->header.message_type);
-      encode_result = TLV_ENCODE_WRONG_MESSAGE_TYPE;
+      enc_msg = TLV_ENCODE_WRONG_MESSAGE_TYPE;
       break;
       /* TODO: Handle not standard layer 3 messages: SERVICE_REQUEST */
   }
 
-  if (encode_result < 0) {
-    LOG_TRACE(ERROR,
-              " Failed to encode L3 EMM message 0x%x "
-              "(%d)",
-              p->header.message_type,
-              encode_result);
+  if (enc_msg < 0) {
+    PRINT_NAS_ERROR("Failed to encode 5GMM message\n");
+    return enc_msg;
   }
 
-  if (encode_result < 0)
-    LOG_FUNC_RETURN(encode_result);
-
-  LOG_FUNC_RETURN(header_result + encode_result);
+  return enc_header + enc_msg;
 }
 
 int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_security_header_t *header, int length)
