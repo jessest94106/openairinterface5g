@@ -542,7 +542,7 @@ void set_dl_maxmimolayers(NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig,
 
   NR_SCS_SpecificCarrier_t *scs_carrier = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0];
   int band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
-  const frequency_range_t freq_range = band < 100 ? FR1 : FR2;
+  const frequency_range_t freq_range = band < 257 ? FR1 : FR2;
   const int scs = scs_carrier->subcarrierSpacing;
   const int bw_size = scs_carrier->carrierBandwidth;
 
@@ -2302,7 +2302,7 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
   }
 
   const NR_FreqBandIndicatorNR_t band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
-  frequency_range_t frequency_range = band < 100 ? FR1 : FR2;
+  frequency_range_t frequency_range = band > 256 ? FR2 : FR1;
   sib1->servingCellConfigCommon->downlinkConfigCommon.frequencyInfoDL.offsetToPointA = get_ssb_offset_to_pointA(*scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB,
                                scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA,
                                scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.subcarrierSpacing,
