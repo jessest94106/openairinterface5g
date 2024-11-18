@@ -613,7 +613,7 @@ static void pf_dl(module_id_t module_id,
   gNB_MAC_INST *mac = RC.nrmac[module_id];
   NR_ServingCellConfigCommon_t *scc=mac->common_channels[0].ServingCellConfigCommon;
   // UEs that could be scheduled
-  UEsched_t UE_sched[MAX_MOBILES_PER_GNB] = {0};
+  UEsched_t UE_sched[MAX_MOBILES_PER_GNB + 1] = {0};
   int remainUEs = max_num_ue;
   int curUE = 0;
   int CC_id = 0;

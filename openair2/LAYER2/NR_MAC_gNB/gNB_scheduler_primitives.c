@@ -2962,8 +2962,9 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slo
 
 static void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
 {
+  DevAssert(cell_group != NULL);
   /* remove a reconfigurationWithSync, we don't need it anymore */
-  if (cell_group->spCellConfig->reconfigurationWithSync != NULL) {
+  if (cell_group->spCellConfig && cell_group->spCellConfig->reconfigurationWithSync != NULL) {
     ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cell_group->spCellConfig->reconfigurationWithSync);
     cell_group->spCellConfig->reconfigurationWithSync = NULL;
   }
