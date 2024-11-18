@@ -24,6 +24,24 @@
 
 #include <stdint.h>
 
+#define PRINT_NAS_ERROR(...) fprintf(stderr, ##__VA_ARGS__)
+
+#define _NAS_EQ_CHECK_GENERIC(condition, fmt, ...)                                                      \
+  do {                                                                                                  \
+    if (!(condition)) {                                                                                 \
+      PRINT_NAS_ERROR("NAS Equality Check failure: %s:%d: Condition '%s' failed: " fmt " != " fmt "\n", \
+                      __FILE__,                                                                         \
+                      __LINE__,                                                                         \
+                      #condition,                                                                       \
+                      ##__VA_ARGS__);                                                                   \
+      return false;                                                                                     \
+    }                                                                                                   \
+  } while (0)
+
+#define _NAS_EQ_CHECK_LONG(A, B) _NAS_EQ_CHECK_GENERIC(A == B, "%ld", A, B);
+#define _NAS_EQ_CHECK_INT(A, B) _NAS_EQ_CHECK_GENERIC(A == B, "%d", A, B);
+#define _NAS_EQ_CHECK_STR(A, B) _NAS_EQ_CHECK_GENERIC(strcmp(A, B) == 0, "'%s'", A, B);
+
 /* Map task id to printable name. */
 typedef struct {
   int id;
