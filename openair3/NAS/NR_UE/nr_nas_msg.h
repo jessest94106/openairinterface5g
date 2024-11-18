@@ -51,14 +51,6 @@
 /* 3GPP TS 24.501: 9.11.3.50 Service type */
 #define SERVICE_TYPE_DATA 0x1
 
-/* List of allowed NSSAI from NAS messaging. */
-typedef struct {
-  int sst;
-  int hplmn_sst;
-  int sd;
-  int hplmn_sd;
-} nr_nas_msg_snssai_t;
-
 /* Security Key for SA UE */
 typedef struct {
   uint8_t kausf[32];

@@ -69,7 +69,6 @@
 
 extern uint16_t NB_UE_INST;
 static nr_ue_nas_t nr_ue_nas[MAX_NAS_UE] = {0};
-static nr_nas_msg_snssai_t nas_allowed_nssai[8];
 
 #define FOREACH_STATE(TYPE_DEF)                  \
   TYPE_DEF(NAS_SECURITY_NO_SECURITY_CONTEXT, 0)  \
@@ -737,30 +736,6 @@ static void handle_security_mode_command(nr_ue_nas_t *nas, as_nas_info_t *initia
   generateSecurityModeComplete(nas, initialNasMsg);
 }
 
-static void decodeRegistrationAccept(const uint8_t *buf, int len, nr_ue_nas_t *nas)
-{
-  registration_accept_msg reg_acc = {0};
-  /* it seems there is no 5G corresponding emm_msg_decode() function, so here
-   * we just jump to the right decision */
-  buf += 7; /* skip security header */
-  buf += 2; /* skip prot discriminator, security header, half octet */
-  AssertFatal(*buf == 0x42, "this is not a NAS Registration Accept\n");
-  buf++;
-  int decoded = decode_registration_accept(&reg_acc, buf, len);
-  AssertFatal(decoded > 0, "could not decode registration accept\n");
-  if (reg_acc.guti) {
-    AssertFatal(reg_acc.guti->guti.typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI,
-                "registration accept 5GS Mobile Identity is not GUTI, but %d\n",
-                reg_acc.guti->guti.typeofidentity);
-    nas->guti = malloc(sizeof(*nas->guti));
-    AssertFatal(nas->guti, "out of memory\n");
-    *nas->guti = reg_acc.guti->guti;
-    free(reg_acc.guti); /* no proper memory management for NAS decoded messages */
-  } else {
-    LOG_W(NAS, "no GUTI in registration accept\n");
-  }
-}
-
 static void generateRegistrationComplete(nr_ue_nas_t *nas,
                                          as_nas_info_t *initialNasMsg,
                                          SORTransparentContainer *sortransparentcontainer)
@@ -1185,109 +1160,13 @@ static void send_nas_detach_req(nr_ue_nas_t *nas, bool wait_release)
   itti_send_msg_to_task(TASK_RRC_NRUE, nas->UE_id, msg);
 }
 
-static void parse_allowed_nssai(nr_nas_msg_snssai_t nssaiList[8], const uint8_t *buf, const uint32_t len)
-{
-  int nssai_cnt = 0;
-  const uint8_t *end = buf + len;
-  while (buf < end) {
-    const int length = *buf++;
-    nr_nas_msg_snssai_t *nssai = nssaiList + nssai_cnt;
-    nssai->sd = 0xffffff;
-
-    switch (length) {
-      case 1:
-        nssai->sst = *buf++;
-        nssai_cnt++;
-        break;
-
-      case 2:
-        nssai->sst = *buf++;
-        nssai->hplmn_sst = *buf++;
-        nssai_cnt++;
-        break;
-
-      case 4:
-        nssai->sst = *buf++;
-        nssai->sd = 0xffffff & ntoh_int24_buf(buf);
-        buf += 3;
-        nssai_cnt++;
-        break;
-
-      case 5:
-        nssai->sst = *buf++;
-        nssai->sd = 0xffffff & ntoh_int24_buf(buf);
-        buf += 3;
-        nssai->hplmn_sst = *buf++;
-        nssai_cnt++;
-        break;
-
-      case 8:
-        nssai->sst = *buf++;
-        nssai->sd = 0xffffff & ntoh_int24_buf(buf);
-        buf += 3;
-        nssai->hplmn_sst = *buf++;
-        nssai->hplmn_sd = 0xffffff & ntoh_int24_buf(buf);
-        buf += 3;
-        nssai_cnt++;
-        break;
-
-      default:
-        LOG_E(NAS, "UE received unknown length in an allowed S-NSSAI\n");
-        break;
-    }
-  }
-}
-
-/* Extract Allowed NSSAI from Regestration Accept according to
-   3GPP TS 24.501 Table 8.2.7.1.1
-*/
-static void get_allowed_nssai(nr_nas_msg_snssai_t nssai[8], const uint8_t *pdu_buffer, const uint32_t pdu_length)
-{
-  if ((pdu_buffer == NULL) || (pdu_length <= 0))
-    return;
-
-  const uint8_t *end = pdu_buffer + pdu_length;
-  if (((fgs_nas_message_security_header_t *)(pdu_buffer))->security_header_type > 0) {
-    pdu_buffer += SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
-  }
-
-  pdu_buffer += 1 + 1 + 1 + 2; // Mandatory fields offset
-  /* optional fields */
-  while (pdu_buffer < end) {
-    const int type = *pdu_buffer++;
-    int length = 0;
-    switch (type) {
-      case 0x77: // 5GS mobile identity
-        pdu_buffer += ntoh_int16_buf(pdu_buffer) + sizeof(uint16_t);
-        break;
-
-      case 0x4A: // PLMN list
-      case 0x54: // 5GS tracking area identity
-        pdu_buffer += *pdu_buffer + 1; // offset length + 1 byte which contains the length
-        break;
-
-      case 0x15: // allowed NSSAI
-        length = *pdu_buffer++;
-        parse_allowed_nssai(nssai, pdu_buffer, length);
-        pdu_buffer += length;
-        break;
-
-      default:
-        LOG_W(NAS, "This NAS IEI (0x%2.2x) is not handled when extracting list of allowed NSSAI\n", type);
-        length = *pdu_buffer++;
-        pdu_buffer += length;
-        break;
-    }
-  }
-}
-
-static void request_default_pdusession(nr_ue_nas_t *nas, int nssai_idx)
+static void request_default_pdusession(nr_ue_nas_t *nas)
 {
   MessageDef *message_p = itti_alloc_new_message(TASK_NAS_NRUE, nas->UE_id, NAS_PDU_SESSION_REQ);
   NAS_PDU_SESSION_REQ(message_p).pdusession_id = 10; /* first or default pdu session */
   NAS_PDU_SESSION_REQ(message_p).pdusession_type = 0x91; // 0x91 = IPv4, 0x92 = IPv6, 0x93 = IPv4v6
-  NAS_PDU_SESSION_REQ(message_p).sst = nas_allowed_nssai[nssai_idx].sst;
-  NAS_PDU_SESSION_REQ(message_p).sd = nas_allowed_nssai[nssai_idx].sd;
+  NAS_PDU_SESSION_REQ(message_p).sst = nas->uicc->nssai_sst;
+  NAS_PDU_SESSION_REQ(message_p).sd = nas->uicc->nssai_sd;
   itti_send_msg_to_task(TASK_NAS_NRUE, nas->UE_id, message_p);
 }
 
@@ -1308,11 +1187,52 @@ void *nas_nrue_task(void *args_p)
   }
 }
 
+static void process_guti(Guti5GSMobileIdentity_t *guti, nr_ue_nas_t *nas)
+{
+  AssertFatal(guti->typeofidentity == FGS_MOBILE_IDENTITY_5G_GUTI,
+              "registration accept 5GS Mobile Identity is not GUTI, but %d\n",
+              guti->typeofidentity);
+  nas->guti = malloc_or_fail(sizeof(*nas->guti));
+  *nas->guti = *guti;
+}
+
 static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buffer, uint32_t msg_length)
 {
   LOG_I(NAS, "[UE] Received REGISTRATION ACCEPT message\n");
-  decodeRegistrationAccept(pdu_buffer, msg_length, nas);
-  get_allowed_nssai(nas_allowed_nssai, pdu_buffer, msg_length);
+  registration_accept_msg msg = {0};
+  fgs_nas_message_security_header_t sp_header = {0};
+  const uint8_t *end = pdu_buffer + msg_length;
+  // security protected header
+  int decoded = decode_5gs_security_protected_header(&sp_header, pdu_buffer, msg_length);
+  if (!decoded) {
+    LOG_E(NAS, "NAS Registration Accept: failed to decode security protected header\n");
+    return;
+  }
+  pdu_buffer += decoded;
+  // plain header
+  fgmm_msg_header_t mm_header = {0};
+  if ((decoded = decode_5gmm_msg_header(&mm_header, pdu_buffer, end - pdu_buffer)) < 0) {
+    LOG_E(NAS, "Failed to decode NAS Registration Accept\n");
+    return;
+  }
+  if (mm_header.message_type != FGS_REGISTRATION_ACCEPT) {
+    LOG_E(NAS, "Failed to process NAS Registration Accept: wrong message type\n");
+    return;
+  }
+  pdu_buffer += decoded;
+  // plain payload
+  if ((decoded = decode_registration_accept(&msg, pdu_buffer, end - pdu_buffer)) < 0) {
+    LOG_E(NAS, "Failed to decode NAS Registration Accept\n");
+    return;
+  }
+  pdu_buffer += decoded;
+  // process GUTI
+  if (msg.guti) {
+    process_guti(&msg.guti->guti, nas);
+    free(msg.guti);
+  } else {
+    LOG_W(NAS, "no GUTI in registration accept\n");
+  }
 
   as_nas_info_t initialNasMsg = {0};
   generateRegistrationComplete(nas, &initialNasMsg, NULL);
@@ -1320,11 +1240,10 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
     send_nas_uplink_data_req(nas, &initialNasMsg);
     LOG_I(NAS, "Send NAS_UPLINK_DATA_REQ message(RegistrationComplete)\n");
   }
-  const int nssai_idx = get_user_nssai_idx(nas_allowed_nssai, nas);
-  if (nssai_idx < 0) {
+  if (get_user_nssai_idx(msg.nas_allowed_nssai, nas) < 0) {
     LOG_E(NAS, "NSSAI parameters not match with allowed NSSAI. Couldn't request PDU session.\n");
   } else {
-    request_default_pdusession(nas, nssai_idx);
+    request_default_pdusession(nas);
   }
 }
 

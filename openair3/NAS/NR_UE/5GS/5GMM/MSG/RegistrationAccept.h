@@ -40,6 +40,14 @@
 #ifndef REGISTRATION_ACCEPT_H_
 #define REGISTRATION_ACCEPT_H_
 
+// 9.11.3.37 of 3GPP TS 24.501
+typedef struct {
+  int sst;
+  int hplmn_sst;
+  int sd;
+  int hplmn_sd;
+} nr_nas_msg_snssai_t;
+
 /*
  * Message name: Registration accept
  * Description: The REGISTRATION ACCEPT message is sent by the AMF to the UE. See table 8.2.7.1.1.
@@ -52,6 +60,10 @@ typedef struct registration_accept_msg_tag {
   FGSRegistrationResult fgsregistrationresult;
   /* Optional fields */
   FGSMobileIdentity *guti;
+  // Allowed NSSAI (O)
+  nr_nas_msg_snssai_t nas_allowed_nssai[8];
+  // Configured NSSAI (O)
+  nr_nas_msg_snssai_t config_nssai[8];
 } registration_accept_msg;
 
 int decode_registration_accept(registration_accept_msg *registrationaccept, const uint8_t *buffer, uint32_t len);
