@@ -471,12 +471,12 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
     start_meas(&gNB->dlsch_precoding_stats);
     nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
     // beam number in multi-beam scenario (concurrent beams)
+    int bitmap = SL_to_bitmap(rel15->StartSymbolIndex, rel15->NrOfSymbols);
     int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
                                         &gNB->common_vars,
                                         slot,
                                         frame_parms->symbols_per_slot,
-                                        rel15->StartSymbolIndex,
-                                        rel15->NrOfSymbols);
+                                        bitmap);
 
     c16_t **txdataF = gNB->common_vars.txdataF[beam_nb];
 
