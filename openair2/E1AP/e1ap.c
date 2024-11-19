@@ -676,9 +676,9 @@ static int fill_BEARER_CONTEXT_SETUP_REQUEST(e1ap_bearer_setup_req_t *const bear
       roTimer->t_Reordering = j->pdcp_config.reorderingTimer;
       ieC6_1_1->pDCP_Configuration.rLC_Mode = j->pdcp_config.rLC_Mode;
       /* Cell Group config */
-      for (cell_group_t *k = j->cellGroupList; k < j->cellGroupList + j->numCellGroups; k++) {
+      for (cell_group_id_t *k = j->cellGroupList; k < j->cellGroupList + j->numCellGroups; k++) {
         asn1cSequenceAdd(ieC6_1_1->cell_Group_Information.list, E1AP_Cell_Group_Information_Item_t, ieC6_1_1_1);
-        ieC6_1_1_1->cell_Group_ID = k->id;
+        ieC6_1_1_1->cell_Group_ID = *j->cellGroupList;
       }
       /* QoS Flows */
       for (qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlow2Setup; k++) {
@@ -992,7 +992,7 @@ static void extract_BEARER_CONTEXT_SETUP_REQUEST(const E1AP_E1AP_PDU_t *pdu, e1a
             for (int k = 0; k < cellGroupList->list.count; k++) {
               E1AP_Cell_Group_Information_Item_t *cg2Setup = cellGroupList->list.array[k];
 
-              drb->cellGroupList[k].id = cg2Setup->cell_Group_ID;
+              drb->cellGroupList[k] = cg2Setup->cell_Group_ID;
             }
 
             E1AP_QoS_Flow_QoS_Parameter_List_t *qos2SetupList = &drb2Setup->qos_flow_Information_To_Be_Setup;

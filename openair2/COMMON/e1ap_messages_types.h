@@ -118,10 +118,6 @@ typedef struct e1ap_setup_fail_s {
   long transac_id;
 } e1ap_setup_fail_t;
 
-typedef struct cell_group_s {
-  cell_group_id_t id;
-} cell_group_t;
-
 typedef struct up_params_s {
   in_addr_t tlAddress;
   long teId;
@@ -155,7 +151,7 @@ typedef struct drb_to_setup_s {
   in_addr_t tlAddress;
   long teId;
   int numCellGroups;
-  cell_group_t cellGroupList[E1AP_MAX_NUM_CELL_GROUPS];
+  cell_group_id_t cellGroupList[E1AP_MAX_NUM_CELL_GROUPS];
 } drb_to_setup_t;
 
 typedef struct qos_characteristics_s {
@@ -221,7 +217,7 @@ typedef struct DRB_nGRAN_to_setup_s {
 
   /* Cell Group Information (clause 9.3.1.11) */
   int numCellGroups;
-  cell_group_t cellGroupList[E1AP_MAX_NUM_CELL_GROUPS];
+  cell_group_id_t cellGroupList[E1AP_MAX_NUM_CELL_GROUPS];
 
   /* DRB QoS Flows Parameters (clause 9.3.1.26) */
   int numQosFlow2Setup;
