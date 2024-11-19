@@ -46,6 +46,30 @@ int main()
   for (int vector_size = 1237; vector_size < 1237 + 8; vector_size++) {
     auto input1 = generate_random_c16(vector_size);
     auto input2 = generate_random_c16(vector_size);
+
+    // Clip the input for -32768 because this will make different result
+    // C version promote the int16 to int before doing the conjugate (so negate imaginary part)
+    // simd version do it on the int16, so the result overflows to -32768
+    // other overflows exist, but they make the same
+    // in C we do with int promotion, for real part:
+    // (int)x.r*(int)y.r - (int)x.i*(int)y.i
+    // that can overflow because each multiplication result is full int range
+    // so when we sum, it overflows
+    // _mm256_madd_epi16() overflows also, as do regular addition instruction
+    // so the result will be the same (the same wrong value)
+    
+    for(auto it = input1.begin(); it != input1.end(); it++ ) {
+      if (it->r == -32768)
+	it->r=-32767;
+      if (it->i == -32768)
+	it->i=-32767;
+    }
+    for(auto it = input2.begin(); it != input2.end(); it++ ) {
+      if (it->r == -32768)
+	it->r=-32767;
+      if (it->i == -32768)
+	it->i=-32767;
+    }
     AlignedVector512<c16_t> output;
     output.resize(vector_size);
     mult_complex_vectors(input1.data(), input2.data(), output.data(), vector_size, shift);

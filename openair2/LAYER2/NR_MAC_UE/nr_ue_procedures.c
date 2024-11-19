@@ -1514,6 +1514,11 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
         current_harq->dai_cumul);
 }
 
+initial_pucch_resource_t get_initial_pucch_resource(const int idx)
+{
+  return initial_pucch_resource[idx];
+}
+
 int nr_ue_configure_pucch(NR_UE_MAC_INST_t *mac,
                            int slot,
                            frame_t frame,
@@ -1534,10 +1539,9 @@ int nr_ue_configure_pucch(NR_UE_MAC_INST_t *mac,
   LOG_D(NR_MAC, "initial_pucch_id %d, pucch_resource %p\n", pucch->initial_pucch_id, pucch->pucch_resource);
   // configure pucch from Table 9.2.1-1
   // only for ack/nack
-  if (pucch->initial_pucch_id > -1 &&
-      pucch->pucch_resource == NULL) {
+  if (pucch->initial_pucch_id > -1 && pucch->pucch_resource == NULL) {
     const int idx = *current_UL_BWP->pucch_ConfigCommon->pucch_ResourceCommon;
-    const initial_pucch_resource_t pucch_resourcecommon = initial_pucch_resource[idx];
+    const initial_pucch_resource_t pucch_resourcecommon = get_initial_pucch_resource(idx);
     pucch_pdu->format_type = pucch_resourcecommon.format;
     pucch_pdu->start_symbol_index = pucch_resourcecommon.startingSymbolIndex;
     pucch_pdu->nr_of_symbols = pucch_resourcecommon.nrofSymbols;
@@ -2524,7 +2528,7 @@ bool trigger_periodic_scheduling_request(NR_UE_MAC_INST_t *mac, PUCCH_sched_t *p
       AssertFatal(sr_count < 2, "Cannot handle more than 1 SR per slot yet\n");
     }
   }
-  return sr_count > 0 ? true : false;
+  return sr_count > 0;
 }
 
 int8_t nr_ue_get_SR(NR_UE_MAC_INST_t *mac, frame_t frame, slot_t slot, NR_SchedulingRequestId_t sr_id)
@@ -2537,12 +2541,14 @@ int8_t nr_ue_get_SR(NR_UE_MAC_INST_t *mac, frame_t frame, slot_t slot, NR_Schedu
     return 0;
   }
 
-  LOG_D(NR_MAC, "[UE %d] Frame %d slot %d SR %s for ID %ld\n",
+  LOG_D(NR_MAC,
+        "[UE %d] Frame %d slot %d SR %s for ID %ld, timer %d\n",
         mac->ue_id,
         frame,
         slot,
         sr_info->pending ? "pending" : "not pending",
-        sr_id); // todo
+        sr_id, // todo
+        nr_timer_is_active(&sr_info->prohibitTimer));
 
   // TODO check if the PUCCH resource for the SR transmission occasion does not overlap with a UL-SCH resource
   if (!sr_info->pending || nr_timer_is_active(&sr_info->prohibitTimer))
@@ -3772,9 +3778,23 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
   }
 }
 
+int nr_write_ce_msg3_pdu(uint8_t *mac_ce, NR_UE_MAC_INST_t *mac, rnti_t crnti, uint8_t *mac_ce_end)
+{
+  uint8_t *pdu = mac_ce;
+  if (IS_SA_MODE(get_softmodem_params()) && mac->ra.ra_state != nrRA_SUCCEEDED) {
+    LOG_D(NR_MAC, "Generating C-RNTI MAC CE with C-RNTI %x\n", crnti);
+    *(NR_MAC_SUBHEADER_FIXED *)mac_ce = (NR_MAC_SUBHEADER_FIXED){.R = 0, .LCID = UL_SCH_LCID_C_RNTI};
+    mac_ce += sizeof(NR_MAC_SUBHEADER_FIXED);
+    // C-RNTI MAC CE (2 octets)
+    memcpy(mac_ce, &crnti, sizeof(crnti));
+    // update pointer and length
+    mac_ce += sizeof(crnti);
+  }
+  return mac_ce - pdu;
+}
+
 /**
  * Function:      generating MAC CEs (MAC CE and subheader) for the ULSCH PDU
- * Notes:         TODO: PHR and BSR reporting
  * Parameters:
  * @mac_ce        pointer to the MAC sub-PDUs including the MAC CEs
  * @mac           pointer to the MAC instance
@@ -3783,157 +3803,97 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
 int nr_write_ce_ulsch_pdu(uint8_t *mac_ce,
                           NR_UE_MAC_INST_t *mac,
                           NR_SINGLE_ENTRY_PHR_MAC_CE *power_headroom,
-                          uint16_t *crnti,
-                          NR_BSR_SHORT *truncated_bsr,
-                          NR_BSR_SHORT *short_bsr,
-                          NR_BSR_LONG  *long_bsr)
+                          const type_bsr_t *bsr,
+                          uint8_t *mac_ce_end)
 {
-  int      mac_ce_len = 0;
   uint8_t *pdu = mac_ce;
   if (power_headroom) {
     // MAC CE fixed subheader
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->R = 0;
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->LCID = UL_SCH_LCID_SINGLE_ENTRY_PHR;
-    mac_ce++;
-
-    // PHR MAC CE (1 octet)
-    ((NR_SINGLE_ENTRY_PHR_MAC_CE *) mac_ce)->PH = power_headroom->PH;
-    ((NR_SINGLE_ENTRY_PHR_MAC_CE *) mac_ce)->R1 = 0;
-    ((NR_SINGLE_ENTRY_PHR_MAC_CE *) mac_ce)->PCMAX = power_headroom->PCMAX;
-    ((NR_SINGLE_ENTRY_PHR_MAC_CE *) mac_ce)->R2 = 0;
-
-    // update pointer and length
-    int mac_ce_size = sizeof(NR_SINGLE_ENTRY_PHR_MAC_CE);
-    mac_ce += mac_ce_size;
-    mac_ce_len += mac_ce_size + sizeof(NR_MAC_SUBHEADER_FIXED);
+    *(NR_MAC_SUBHEADER_FIXED *)mac_ce = (NR_MAC_SUBHEADER_FIXED){.R = 0, .LCID = UL_SCH_LCID_SINGLE_ENTRY_PHR};
+    mac_ce += sizeof(NR_MAC_SUBHEADER_FIXED);
+    *(NR_SINGLE_ENTRY_PHR_MAC_CE *)mac_ce = *power_headroom;
+    mac_ce += sizeof(NR_SINGLE_ENTRY_PHR_MAC_CE);
     LOG_D(NR_MAC, "[UE] Generating ULSCH PDU : power_headroom pdu %p mac_ce %p b\n",
           pdu, mac_ce);
   }
 
-  if (crnti && (!IS_SA_MODE(get_softmodem_params()) && get_softmodem_params()->do_ra && mac->ra.ra_state != nrRA_SUCCEEDED)) {
-    LOG_D(NR_MAC, "In %s: generating C-RNTI MAC CE with C-RNTI %x\n", __FUNCTION__, (*crnti));
-
-    // MAC CE fixed subheader
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->R = 0;
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->LCID = UL_SCH_LCID_C_RNTI;
-    mac_ce++;
-
-    // C-RNTI MAC CE (2 octets)
-    memcpy(mac_ce, crnti, sizeof(*crnti));
-
-    // update pointer and length
-    int mac_ce_size = sizeof(uint16_t);
-    mac_ce += mac_ce_size;
-    mac_ce_len += mac_ce_size + sizeof(NR_MAC_SUBHEADER_FIXED);
+  switch (bsr->type_bsr) {
+    case b_short:
+    case b_short_trunc: {
+      *(NR_MAC_SUBHEADER_FIXED *)mac_ce =
+          (NR_MAC_SUBHEADER_FIXED){.R = 0, .LCID = bsr->type_bsr == b_short ? UL_SCH_LCID_S_BSR : UL_SCH_LCID_S_TRUNCATED_BSR};
+      mac_ce += sizeof(NR_MAC_SUBHEADER_FIXED);
+      *(NR_BSR_SHORT *)mac_ce = bsr->bsr.s;
+      mac_ce += sizeof(NR_BSR_SHORT);
+      LOG_D(NR_MAC, "[UE] Generating ULSCH PDU : bsr Buffer_size %d LcgID %d \n", bsr->bsr.s.Buffer_size, bsr->bsr.s.LcgID);
+    } break;
+    case b_long:
+    case b_long_trunc: {
+      // ch 6.1.3.1. TS 38.321
+      NR_MAC_SUBHEADER_SHORT *mac_pdu_subheader_ptr = (NR_MAC_SUBHEADER_SHORT *)mac_ce;
+      mac_ce += sizeof(NR_MAC_SUBHEADER_SHORT);
+      uint8_t *mark = mac_ce;
+      // Could move to nr_get_sdu()
+      NR_BSR_LONG *ceLong = (NR_BSR_LONG *)mac_ce;
+      *ceLong = (NR_BSR_LONG){0};
+      mac_ce += sizeof(NR_BSR_LONG);
+      // int NR_BSR_LONG_SIZE = 1;
+      if (bsr->bsr.lcg_bsr[0] && mac_ce < mac_ce_end) {
+        ceLong->LcgID0 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[0];
+      }
+      if (bsr->bsr.lcg_bsr[1] && mac_ce < mac_ce_end) {
+        ceLong->LcgID1 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[1];
+      }
+      if (bsr->bsr.lcg_bsr[2] && mac_ce < mac_ce_end) {
+        ceLong->LcgID2 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[2];
+      }
+      if (bsr->bsr.lcg_bsr[3] && mac_ce < mac_ce_end) {
+        ceLong->LcgID3 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[3];
+      }
+      if (bsr->bsr.lcg_bsr[4] && mac_ce < mac_ce_end) {
+        ceLong->LcgID4 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[4];
+      }
+      if (bsr->bsr.lcg_bsr[5] && mac_ce < mac_ce_end) {
+        ceLong->LcgID5 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[5];
+      }
+      if (bsr->bsr.lcg_bsr[6] && mac_ce < mac_ce_end) {
+        ceLong->LcgID6 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[6];
+      }
+      if (bsr->bsr.lcg_bsr[7] && mac_ce < mac_ce_end) {
+        ceLong->LcgID7 = 1;
+        *mac_ce++ = bsr->bsr.lcg_bsr[7];
+      }
+      *mac_pdu_subheader_ptr =
+          (NR_MAC_SUBHEADER_SHORT){.LCID = bsr->type_bsr == b_long ? UL_SCH_LCID_L_BSR : UL_SCH_LCID_L_TRUNCATED_BSR,
+                                   .L = mac_ce - mark};
+      LOG_D(NR_MAC,
+            "[UE] Generating ULSCH PDU : long_bsr size %d Lcgbit 0x%02x Buffer_size %d %d %d %d %d %d %d %d\n",
+            ((NR_MAC_SUBHEADER_SHORT *)mac_pdu_subheader_ptr)->L,
+            *mac_ce,
+            bsr->bsr.lcg_bsr[0],
+            bsr->bsr.lcg_bsr[1],
+            bsr->bsr.lcg_bsr[2],
+            bsr->bsr.lcg_bsr[3],
+            bsr->bsr.lcg_bsr[4],
+            bsr->bsr.lcg_bsr[5],
+            bsr->bsr.lcg_bsr[6],
+            bsr->bsr.lcg_bsr[7]);
+    } break;
+    case b_none:
+      break;
+    default:
+      DevAssert(false);
   }
 
-  if (truncated_bsr) {
-
-	// MAC CE fixed subheader
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->R = 0;
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->LCID = UL_SCH_LCID_S_TRUNCATED_BSR;
-    mac_ce++;
-
-    // Short truncated BSR MAC CE (1 octet)
-    ((NR_BSR_SHORT_TRUNCATED *) mac_ce)-> Buffer_size = truncated_bsr->Buffer_size;
-    ((NR_BSR_SHORT_TRUNCATED *) mac_ce)-> LcgID = truncated_bsr->LcgID;;
-
-    // update pointer and length
-    int mac_ce_size = sizeof(NR_BSR_SHORT_TRUNCATED);
-    mac_ce += mac_ce_size;
-    mac_ce_len += mac_ce_size + sizeof(NR_MAC_SUBHEADER_FIXED);
-    LOG_D(NR_MAC, "[UE] Generating ULSCH PDU : truncated_bsr Buffer_size %d LcgID %d pdu %p mac_ce %p\n",
-          truncated_bsr->Buffer_size, truncated_bsr->LcgID, pdu, mac_ce);
-
-  } else if (short_bsr) {
-
-	// MAC CE fixed subheader
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->R = 0;
-    ((NR_MAC_SUBHEADER_FIXED *) mac_ce)->LCID = UL_SCH_LCID_S_BSR;
-    mac_ce++;
-
-    // Short truncated BSR MAC CE (1 octet)
-    ((NR_BSR_SHORT *) mac_ce)->Buffer_size = short_bsr->Buffer_size;
-    ((NR_BSR_SHORT *) mac_ce)->LcgID = short_bsr->LcgID;
-
-    // update pointer and length
-    int mac_ce_size = sizeof(NR_BSR_SHORT);
-    mac_ce += mac_ce_size;
-    mac_ce_len += mac_ce_size + sizeof(NR_MAC_SUBHEADER_FIXED);
-    LOG_D(NR_MAC, "[UE] Generating ULSCH PDU : short_bsr Buffer_size %d LcgID %d pdu %p mac_ce %p\n",
-          short_bsr->Buffer_size, short_bsr->LcgID, pdu, mac_ce);
-  } else if (long_bsr) {
-
-	// MAC CE variable subheader
-    // ch 6.1.3.1. TS 38.321
-    ((NR_MAC_SUBHEADER_SHORT *) mac_ce)->R = 0;
-    ((NR_MAC_SUBHEADER_SHORT *) mac_ce)->F = 0;
-    ((NR_MAC_SUBHEADER_SHORT *) mac_ce)->LCID = UL_SCH_LCID_L_BSR;
-
-    NR_MAC_SUBHEADER_SHORT *mac_pdu_subheader_ptr = (NR_MAC_SUBHEADER_SHORT *) mac_ce;
-    mac_ce += 2;
-
-    // Could move to nr_get_sdu()
-    uint8_t *Buffer_size_ptr= (uint8_t*) mac_ce + 1;
-    //int NR_BSR_LONG_SIZE = 1;
-    if (long_bsr->Buffer_size0 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID0 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID0 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size0;
-    }
-    if (long_bsr->Buffer_size1 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID1 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID1 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size1;
-    }
-    if (long_bsr->Buffer_size2 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID2 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID2 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size2;
-    }
-    if (long_bsr->Buffer_size3 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID3 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID3 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size3;
-    }
-    if (long_bsr->Buffer_size4 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID4 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID4 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size4;
-    }
-    if (long_bsr->Buffer_size5 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID5 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID5 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size5;
-    }
-    if (long_bsr->Buffer_size6 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID6 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID6 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size6;
-    }
-    if (long_bsr->Buffer_size7 == 0) {
-      ((NR_BSR_LONG *) mac_ce)->LcgID7 = 0;
-    } else {
-      ((NR_BSR_LONG *) mac_ce)->LcgID7 = 1;
-      *Buffer_size_ptr++ = long_bsr->Buffer_size7;
-    }
-    int mac_ce_size = ((NR_MAC_SUBHEADER_SHORT *) mac_pdu_subheader_ptr)->L = (uint8_t*) Buffer_size_ptr - (uint8_t*) mac_ce;
-    LOG_D(NR_MAC, "[UE] Generating ULSCH PDU : long_bsr size %d Lcgbit 0x%02x Buffer_size %d %d %d %d %d %d %d %d\n", mac_ce_size, *((uint8_t*) mac_ce),
-          ((NR_BSR_LONG *) mac_ce)->Buffer_size0, ((NR_BSR_LONG *) mac_ce)->Buffer_size1, ((NR_BSR_LONG *) mac_ce)->Buffer_size2, ((NR_BSR_LONG *) mac_ce)->Buffer_size3,
-          ((NR_BSR_LONG *) mac_ce)->Buffer_size4, ((NR_BSR_LONG *) mac_ce)->Buffer_size5, ((NR_BSR_LONG *) mac_ce)->Buffer_size6, ((NR_BSR_LONG *) mac_ce)->Buffer_size7);
-    mac_ce_len += mac_ce_size + sizeof(NR_MAC_SUBHEADER_SHORT);
-  }
-
-  return mac_ce_len;
+  return mac_ce - pdu;
 }
-
 
 /////////////////////////////////////
 //    Random Access Response PDU   //

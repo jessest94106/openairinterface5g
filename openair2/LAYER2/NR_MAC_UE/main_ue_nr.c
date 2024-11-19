@@ -192,7 +192,6 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
   for (int i = 0; i < NR_MAX_NUM_LCID; i++) {
     LOG_D(NR_MAC, "Applying default logical channel config for LCID %d\n", i);
     nr_mac->scheduling_info.lc_sched_info[i].Bj = 0;
-    nr_mac->scheduling_info.lc_sched_info[i].LCID_buffer_with_data = false;
     nr_mac->scheduling_info.lc_sched_info[i].LCID_buffer_remain = 0;
   }
 
@@ -325,28 +324,4 @@ void release_mac_configuration(NR_UE_MAC_INST_t *mac, NR_UE_MAC_reset_cause_t ca
   memset(&mac->ul_time_alignment, 0, sizeof(mac->ul_time_alignment));
   for (int i = mac->TAG_list.count; i > 0 ; i--)
     asn_sequence_del(&mac->TAG_list, i - 1, 1);
-}
-
-void free_rach_structures(NR_UE_MAC_INST_t *nr_mac, int bwp_id)
-{
-  for (int j = 0; j < MAX_NB_PRACH_CONF_PERIOD_IN_ASSOCIATION_PATTERN_PERIOD; j++)
-    for (int k = 0; k < MAX_NB_FRAME_IN_PRACH_CONF_PERIOD; k++)
-      for (int l = 0; l < MAX_NB_SLOT_IN_FRAME; l++)
-        free(nr_mac->prach_assoc_pattern[bwp_id].prach_conf_period_list[j].prach_occasion_slot_map[k][l].prach_occasion);
-
-  free(nr_mac->ssb_list[bwp_id].tx_ssb);
-}
-
-void reset_ra(NR_UE_MAC_INST_t *nr_mac, bool free_prach)
-{
-  RA_config_t *ra = &nr_mac->ra;
-  if(ra->rach_ConfigDedicated)
-    asn1cFreeStruc(asn_DEF_NR_RACH_ConfigDedicated, ra->rach_ConfigDedicated);
-  memset(ra, 0, sizeof(RA_config_t));
-
-  if (!free_prach)
-    return;
-
-  for (int i = 0; i < MAX_NUM_BWP_UE; i++)
-    free_rach_structures(nr_mac, i);
 }

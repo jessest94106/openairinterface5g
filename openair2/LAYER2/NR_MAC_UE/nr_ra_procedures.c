@@ -785,7 +785,7 @@ void nr_ue_get_rach(NR_UE_MAC_INST_t *mac, int CC_id, frame_t frame, uint8_t gNB
 
       } else if (!IS_SA_MODE(get_softmodem_params())) {
         uint8_t temp_pdu[16] = {0};
-        size_sdu = nr_write_ce_ulsch_pdu(temp_pdu, mac, 0,  &(mac->crnti), NULL, NULL, NULL);
+        size_sdu = nr_write_ce_msg3_pdu(temp_pdu, mac, mac->crnti, temp_pdu + sizeof(temp_pdu));
         ra->Msg3_size = size_sdu;
       }
     } else if (ra->RA_window_cnt != -1) { // RACH is active
@@ -1075,4 +1075,28 @@ void prepare_msg4_msgb_feedback(NR_UE_MAC_INST_t *mac, int pid, int ack_nack)
   if (ret != 0)
     remove_ul_config_last_item(pdu);
   release_ul_config(pdu, false);
+}
+
+void free_rach_structures(NR_UE_MAC_INST_t *nr_mac, int bwp_id)
+{
+  for (int j = 0; j < MAX_NB_PRACH_CONF_PERIOD_IN_ASSOCIATION_PATTERN_PERIOD; j++)
+    for (int k = 0; k < MAX_NB_FRAME_IN_PRACH_CONF_PERIOD; k++)
+      for (int l = 0; l < MAX_NB_SLOT_IN_FRAME; l++)
+        free(nr_mac->prach_assoc_pattern[bwp_id].prach_conf_period_list[j].prach_occasion_slot_map[k][l].prach_occasion);
+
+  free(nr_mac->ssb_list[bwp_id].tx_ssb);
+}
+
+void reset_ra(NR_UE_MAC_INST_t *nr_mac, bool free_prach)
+{
+  RA_config_t *ra = &nr_mac->ra;
+  if (ra->rach_ConfigDedicated)
+    asn1cFreeStruc(asn_DEF_NR_RACH_ConfigDedicated, ra->rach_ConfigDedicated);
+  memset(ra, 0, sizeof(RA_config_t));
+
+  if (!free_prach)
+    return;
+
+  for (int i = 0; i < MAX_NUM_BWP_UE; i++)
+    free_rach_structures(nr_mac, i);
 }

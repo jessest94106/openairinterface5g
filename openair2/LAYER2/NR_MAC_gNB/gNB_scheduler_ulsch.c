@@ -1790,7 +1790,7 @@ static void pf_ul(module_id_t module_id,
 
   const int min_rb = nrmac->min_grant_prb;
   // UEs that could be scheduled
-  UEsched_t UE_sched[MAX_MOBILES_PER_GNB] = {0};
+  UEsched_t UE_sched[MAX_MOBILES_PER_GNB + 1] = {0};
   int remainUEs = max_num_ue;
   int curUE = 0;
 

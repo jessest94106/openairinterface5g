@@ -70,8 +70,7 @@
 
 #define NR_BSR_TRIGGER_NONE      (0) /* No BSR Trigger */
 #define NR_BSR_TRIGGER_REGULAR   (1) /* For Regular and ReTxBSR Expiry Triggers */
-#define NR_BSR_TRIGGER_PERIODIC  (2) /* For BSR Periodic Timer Expiry Trigger */
-#define NR_BSR_TRIGGER_PADDING   (4) /* For Padding BSR Trigger */
+#define NR_BSR_TRIGGER_PERIODIC (2) /* For BSR Periodic Timer Expiry Trigger */
 
 #define NR_INVALID_LCGID (NR_MAX_NUM_LCGID)
 
@@ -184,6 +183,15 @@ typedef enum {
 #undef UE_STATE
 } NR_UE_L2_STATE_t;
 
+typedef struct {
+  pucch_format_nr_t format;
+  uint8_t startingSymbolIndex;
+  uint8_t nrofSymbols;
+  uint16_t PRB_offset;
+  uint8_t nb_CS_indexes;
+  uint8_t initial_CS_indexes[MAX_NB_CYCLIC_SHIFT];
+} initial_pucch_resource_t;
+
 typedef enum {
   GO_TO_IDLE,
   DETACH,
@@ -194,21 +202,12 @@ typedef enum {
 typedef struct {
   // after multiplexing buffer remain for each lcid
   int32_t LCID_buffer_remain;
-  // buffer status for each lcid
-  bool LCID_buffer_with_data;
   // logical channel group id of this LCID
   long LCGID;
   // Bj bucket usage per lcid
   int32_t Bj;
   NR_timer_t Bj_timer;
 } NR_LC_SCHEDULING_INFO;
-
-typedef struct {
-  // buffer status for each lcgid
-  uint8_t BSR; // should be more for mesh topology
-  // keep the number of bytes in rlc buffer for each lcgid
-  int32_t BSR_bytes;
-} NR_LCG_SCHEDULING_INFO;
 
 typedef struct {
   bool active_SR_ID;
@@ -244,8 +243,6 @@ typedef struct {
 typedef struct {
   // lcs scheduling info
   NR_LC_SCHEDULING_INFO lc_sched_info[NR_MAX_NUM_LCID];
-  // lcg scheduling info
-  NR_LCG_SCHEDULING_INFO lcg_sched_info[NR_MAX_NUM_LCGID];
   // SR INFO
   nr_sr_info_t sr_info[NR_MAX_SR_ID];
   /// BSR report flag management

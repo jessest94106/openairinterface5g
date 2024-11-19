@@ -43,19 +43,16 @@
 //#define DEBUG_RXDATA
 //#define SRS_IND_DEBUG
 
-int beam_index_allocation(int fapi_beam_index,
-                          NR_gNB_COMMON *common_vars,
-                          int slot,
-                          int symbols_per_slot,
-                          int start_symbol,
-                          int nb_symbols)
+int beam_index_allocation(int fapi_beam_index, NR_gNB_COMMON *common_vars, int slot, int symbols_per_slot, int bitmap_symbols)
 {
   if (!common_vars->beam_id)
     return 0;
 
   int idx = -1;
   for (int j = 0; j < common_vars->num_beams_period; j++) {
-    for (int i = start_symbol; i < start_symbol + nb_symbols; i++) {
+    for (int i = 0; i < symbols_per_slot; i++) {
+      if (((bitmap_symbols >> i) & 0x01) == 0)
+        continue;
       int current_beam = common_vars->beam_id[j][slot * symbols_per_slot + i];
       if (current_beam == -1 || current_beam == fapi_beam_index)
         idx = j;
@@ -68,8 +65,10 @@ int beam_index_allocation(int fapi_beam_index,
       break;
   }
   AssertFatal(idx >= 0, "Couldn't allocate beam ID %d\n", fapi_beam_index);
-  for (int j = start_symbol; j < start_symbol + nb_symbols; j++)
-    common_vars->beam_id[idx][slot * symbols_per_slot + j] = fapi_beam_index;
+  for (int j = 0; j < symbols_per_slot; j++) {
+    if (((bitmap_symbols >> j) & 0x01))
+      common_vars->beam_id[idx][slot * symbols_per_slot + j] = fapi_beam_index;
+  }
   LOG_D(PHY, "Allocating beam %d in slot %d\n", idx, slot);
   return idx;
 }
@@ -129,12 +128,12 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
   c16_t ***txdataF = gNB->common_vars.txdataF;
   int txdataF_offset = slot * fp->samples_per_slot_wCP;
   // beam number in a scenario with multiple concurrent beams
+  int bitmap = SL_to_bitmap(ssb_start_symbol, 4); // 4 ssb symbols
   int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
                                       &gNB->common_vars,
                                       slot,
                                       fp->symbols_per_slot,
-                                      ssb_start_symbol,
-                                      4); // 4 ssb symbols
+                                      bitmap);
 
   nr_generate_pss(&txdataF[beam_nb][0][txdataF_offset], gNB->TX_AMP, ssb_start_symbol, cfg, fp);
   nr_generate_sss(&txdataF[beam_nb][0][txdataF_offset], gNB->TX_AMP, ssb_start_symbol, cfg, fp);
@@ -253,7 +252,6 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   for (int i = 0; i < NR_SYMBOLS_PER_SLOT; i++){
     NR_gNB_CSIRS_t *csirs = &msgTx->csirs_pdu[i];
     if (csirs->active == 1) {
-      AssertFatal(gNB->common_vars.beam_id == NULL, "Cannot handle CSI in the framework of beamforming yet\n");
       LOG_D(PHY, "CSI-RS generation started in frame %d.%d\n",frame,slot);
       nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csirs->csirs_pdu.csi_rs_pdu_rel15;
       if (csi_params->csi_type == 2) { // ZP-CSI
@@ -264,8 +262,19 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
                                                                 csi_params->freq_domain,
                                                                 csi_params->symb_l0,
                                                                 csi_params->symb_l1);
+      nfapi_nr_tx_precoding_and_beamforming_t *pb = &csi_params->precodingAndBeamforming;
+      int csi_bitmap = 0;
+      int lprime_num = mapping_parms.lprime + 1;
+      for (int j = 0; j < mapping_parms.size; j++)
+        csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
+      int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+                                          &gNB->common_vars,
+                                          slot,
+                                          fp->symbols_per_slot,
+                                          csi_bitmap);
+
       nr_generate_csi_rs(&gNB->frame_parms,
-                         (int32_t **)gNB->common_vars.txdataF[0],
+                         (int32_t **)gNB->common_vars.txdataF[beam_nb],
                          gNB->TX_AMP,
                          csi_params,
                          slot,

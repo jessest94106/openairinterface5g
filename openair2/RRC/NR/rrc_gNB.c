@@ -915,7 +915,7 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
    * reestablishment, instead of re-requesting the CellGroupConfig from the DU.
    * Hence, add below hack; the solution would be to request the
    * CellGroupConfig from the DU when doing reestablishment. */
-  if (cellGroupConfig->spCellConfig->reconfigurationWithSync != NULL) {
+  if (cellGroupConfig->spCellConfig && cellGroupConfig->spCellConfig->reconfigurationWithSync) {
     ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cellGroupConfig->spCellConfig->reconfigurationWithSync);
     cellGroupConfig->spCellConfig->reconfigurationWithSync = NULL;
   }
