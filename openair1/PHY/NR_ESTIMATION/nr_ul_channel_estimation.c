@@ -499,6 +499,8 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     delay_arr[i] = *delay;
   }
 
+  notifiedFIFO_t respPuschAarx;
+  initNotifiedFIFO(&respPuschAarx);
   start_meas(&gNB->pusch_channel_estimation_antenna_processing_stats);
   int numAntennas = gNB->dmrs_num_antennas_per_thread;
   for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx += numAntennas) {
@@ -506,7 +508,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     id.p = 1 + aarx;
     notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(puschAntennaProc_t),
                                                   id.p,
-                                                  &gNB->respPuschAarx,
+                                                  &respPuschAarx,
                                                   &nr_pusch_antenna_processing); // create a job for Tpool
     puschAntennaProc_t *rdata = (puschAntennaProc_t *)NotifiedFifoData(req); // data for the job
 
@@ -537,7 +539,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   } // Antenna Loop
 
   while (nbAarx > 0) {
-    notifiedFIFO_elt_t *req = pullTpool(&gNB->respPuschAarx, &gNB->threadPool);
+    notifiedFIFO_elt_t *req = pullTpool(&respPuschAarx, &gNB->threadPool);
     nbAarx--;
     delNotifiedFIFO_elt(req);
   }

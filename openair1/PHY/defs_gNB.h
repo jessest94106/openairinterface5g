@@ -554,7 +554,6 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t srs_beam_report_stats;
   time_stats_t srs_iq_matrix_stats;
 
-  notifiedFIFO_t respPuschAarx;
   notifiedFIFO_t respPuschSymb;
   notifiedFIFO_t respDecode;
   notifiedFIFO_t resp_L1;

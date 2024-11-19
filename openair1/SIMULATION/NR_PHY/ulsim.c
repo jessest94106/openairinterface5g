@@ -573,7 +573,6 @@ int main(int argc, char *argv[])
   initNotifiedFIFO(&gNB->respDecode);
 
   initNotifiedFIFO(&gNB->respPuschSymb);
-  initNotifiedFIFO(&gNB->respPuschAarx);
   initNotifiedFIFO(&gNB->L1_tx_free);
   initNotifiedFIFO(&gNB->L1_tx_filled);
   initNotifiedFIFO(&gNB->L1_tx_out);
