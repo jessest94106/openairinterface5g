@@ -12,6 +12,15 @@
   </tr>
 </table>
 
+This is the general overview page of the OpenAirInterface documentation.  
+This page groups links to general information, tutorials, design documents, radio integration, and special-purpose libraries.
+
+**IMPORTANT NOTE:**  
+Before reading this documentation, we strongly advise you to keep your own repository rebased on `develop`
+or at least to checkout the documentation on the version of the repository you are using.  
+Then the documentation will better reflect the features available in your repository so that you may avoid some errors.  
+Beware if you previously pulled the `develop` branch that your repository may be now behind `develop`.
+
 [[_TOC_]]
 
 # General
