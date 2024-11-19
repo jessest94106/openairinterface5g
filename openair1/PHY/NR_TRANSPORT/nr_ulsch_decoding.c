@@ -232,7 +232,7 @@ int decode_offload(PHY_VARS_gNB *phy_vars_gNB,
 {
   NR_gNB_ULSCH_t *ulsch = &phy_vars_gNB->ulsch[ULSCH_id];
   NR_UL_gNB_HARQ_t *harq_process = ulsch->harq_process;
-  int16_t z_ol[NR_LDPC_MAX_NUM_CB * LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
+  int16_t z_ol[LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
   int8_t l_ol[NR_LDPC_MAX_NUM_CB * LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
   const int kc = decParams->BG == 2 ? 52 : 68;
   uint32_t A = (harq_process->TBS) << 3;
@@ -247,8 +247,8 @@ int decode_offload(PHY_VARS_gNB *phy_vars_gNB,
 
   for (int r = 0; r < harq_process->C; r++) {
     decParams->perCB[r].E_cb = nr_get_E(G, harq_process->C, decParams->Qm, pusch_pdu->nrOfLayers, r);
-    memcpy(&z_ol[offset], ulsch_llr + r_offset, decParams->perCB[r].E_cb * sizeof(*z_ol));
-    simde__m128i *pv_ol128 = (simde__m128i *)&z_ol[offset];
+    memcpy(z_ol, ulsch_llr + r_offset, decParams->perCB[r].E_cb * sizeof(int16_t));
+    simde__m128i *pv_ol128 = (simde__m128i *)z_ol;
     simde__m128i *pl_ol128 = (simde__m128i *)&l_ol[offset];
     for (int i = 0, j = 0; j < ((kc * harq_process->Z) >> 4) + 1; i += 2, j++) {
       pl_ol128[j] = simde_mm_packs_epi16(pv_ol128[i], pv_ol128[i + 1]);
