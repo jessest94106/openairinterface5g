@@ -94,6 +94,10 @@ docker compose up -d
 
 ## 4.2 Run OAI gNB
 
+**Note:** From tag `2024.w45`, OAI gNB runs by default in standalone (SA) mode.  
+In earlier versions the default mode was non-standalone (NSA).  
+If you are using an earlier version than `2024.w45`, you should add the `--sa` argument to the sample commands below to obtain a correct behavior.
+
 ### USRP B210
 ```bash
 cd ~/openairinterface5g/cmake_targets/ran_build/build
@@ -126,6 +130,11 @@ sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band
 # 5. OAI UE
 
 ## 5.1 Run OAI nrUE
+
+**Note:** From tag `2024.w45`, OAI nrUE runs by default in standalone (SA) mode.  
+In earlier versions the default mode was non-standalone (NSA).  
+If you are using an earlier version than `2024.w45`, you should add the `--sa` argument to the sample commands below to obtain a correct behavior.
+
 ### USRP B210
 Important notes:
 - This should be run in a second Ubuntu 22.04 host, other than gNB
@@ -193,6 +202,10 @@ sudo ./nr-uesoftmodem --rfsim --rfsimulator.serveraddr 127.0.0.1 -r 106 --numero
 The CL option `--uicc0.imsi`  can override the IMSI value in the configuration file if necessary (e.g. when running multiple UEs): `--uicc0.imsi  001010000000001`.
 
 More details available at [ci-scripts/yaml_files/5g_rfsimulator/README.md](../ci-scripts/yaml_files/5g_rfsimulator/README.md).
+
+**Note:** From tag `2024.w45`, OAI nrUE runs by default in standalone (SA) mode.  
+In earlier versions the default mode was non-standalone (NSA).  
+If you are using an earlier version than `2024.w45`, you should add the `--sa` argument to the sample commands above to obtain a correct behavior.
 
 ## 5.2 End-to-end connectivity test
 - Ping test from the UE host to the CN5G

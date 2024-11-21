@@ -103,6 +103,10 @@ docker compose up -d
 
 ## 4.2 Run OAI gNB
 
+**Note:** From tag `2024.w45`, OAI gNB runs by default in standalone (SA) mode.  
+In earlier versions the default mode was non-standalone (NSA).  
+If you are using an earlier version than `2024.w45`, you should add the `--sa` argument to the sample commands below to obtain a correct behavior.
+
 ### USRP B210
 ```bash
 cd ~/openairinterface5g/cmake_targets/ran_build/build
