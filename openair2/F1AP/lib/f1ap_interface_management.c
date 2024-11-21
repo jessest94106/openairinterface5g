@@ -959,7 +959,7 @@ bool decode_f1ap_setup_failure(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_failure_t 
  */
 bool eq_f1ap_setup_failure(const f1ap_setup_failure_t *a, const f1ap_setup_failure_t *b)
 {
-  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
   return true;
 }
 
