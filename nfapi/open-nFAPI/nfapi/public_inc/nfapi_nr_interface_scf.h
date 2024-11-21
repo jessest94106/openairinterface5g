@@ -11,6 +11,7 @@
 
 #include "stddef.h"
 #include "common/platform_types.h"
+#include "common/utils/nr/nr_common.h"
 #include "nfapi_interface.h"
 #include "nfapi_nr_interface.h"
 
@@ -495,7 +496,7 @@ typedef struct {
   uint16_t pm_idx;
   uint16_t numLayers;
   uint16_t num_ant_ports;
-  nfapi_nr_pm_weights_t weights[4][4]; // TODO temporary hardcoding
+  nfapi_nr_pm_weights_t weights[NR_MAX_NB_LAYERS][NR_MAX_CSI_PORTS];
 } nfapi_nr_pm_pdu_t;
 
 

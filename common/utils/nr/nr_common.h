@@ -87,6 +87,7 @@ static inline const char *rnti_types(nr_rnti_type_t rr)
 #define NR_NUMBER_OF_SYMBOLS_PER_SLOT 14
 #define NR_NUMBER_OF_SYMBOLS_PER_SLOT_EXTENDED_CP 12
 #define NR_MAX_NB_LAYERS 4 // 8
+#define NR_MAX_CSI_PORTS 4
 
 // Since the IQ samples are represented by SQ15 R+I (see https://en.wikipedia.org/wiki/Q_(number_format)) we need to compensate when
 // calcualting signal energy. Instead of shifting each sample right by 15, we can normalize the result in dB scale once its

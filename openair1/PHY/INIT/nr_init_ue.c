@@ -262,8 +262,8 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
 
     // ceil((NB_RB*8(max allocation per RB)*2(QPSK))/32)
     ue->nr_csi_info = malloc16_clear(sizeof(nr_csi_info_t));
-    ue->nr_csi_info->csi_rs_generated_signal = malloc16(NR_MAX_NB_PORTS * sizeof(*ue->nr_csi_info->csi_rs_generated_signal));
-    for (int i = 0; i < NR_MAX_NB_PORTS; i++) {
+    ue->nr_csi_info->csi_rs_generated_signal = malloc16(NR_MAX_CSI_PORTS * sizeof(*ue->nr_csi_info->csi_rs_generated_signal));
+    for (int i = 0; i < NR_MAX_CSI_PORTS; i++) {
       ue->nr_csi_info->csi_rs_generated_signal[i] =
           malloc16_clear(fp->samples_per_frame_wCP * sizeof(**ue->nr_csi_info->csi_rs_generated_signal));
     }
@@ -311,7 +311,7 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
 
   for (int gNB_id = 0; gNB_id < ue->n_connected_gNB; gNB_id++) {
 
-    for (int i=0; i<NR_MAX_NB_PORTS; i++) {
+    for (int i = 0; i < NR_MAX_CSI_PORTS; i++) {
       free_and_zero(ue->nr_csi_info->csi_rs_generated_signal[i]);
     }
     free_and_zero(ue->nr_csi_info->csi_rs_generated_signal);

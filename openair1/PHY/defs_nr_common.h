@@ -68,8 +68,6 @@
 
 #define NR_MAX_PDCCH_AGG_LEVEL 16 // 3GPP TS 38.211 V15.8 Section 7.3.2 Table 7.3.2.1-1: Supported PDCCH aggregation levels
 
-#define NR_MAX_NB_PORTS 32
-
 #define MAX_NUM_NR_DLSCH_SEGMENTS_PER_LAYER 36
 
 #define MAX_NUM_NR_ULSCH_SEGMENTS_PER_LAYER 34

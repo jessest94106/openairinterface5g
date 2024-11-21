@@ -879,6 +879,9 @@ void RCconfig_NR_L1(void)
 
       // Antenna ports
       set_antenna_ports(&GNBParamList, &gNB->ap_N1, &gNB->ap_N2, &gNB->ap_XP);
+      AssertFatal(gNB->ap_N1 * gNB->ap_N2 * gNB->ap_XP <= NR_MAX_CSI_PORTS,
+                  "Number of antenna ports set in config file exceeds the supported value of %d\n",
+                  NR_MAX_CSI_PORTS);
     }
 
     // L1 params
