@@ -1676,6 +1676,32 @@ static int get_ta_offset(long *n_TimingAdvanceOffset)
   return -1;
 }
 
+static void configure_si_schedulingInfo(NR_UE_MAC_INST_t *mac,
+                                        NR_SI_SchedulingInfo_t *si_SchedulingInfo,
+                                        NR_SI_SchedulingInfo_v1700_t *si_SchedulingInfo_v1700)
+{
+  asn_sequence_empty(&mac->si_SchedInfo.si_SchedInfo_list);
+  if (si_SchedulingInfo) {
+    mac->si_SchedInfo.si_WindowLength = si_SchedulingInfo->si_WindowLength;
+    for (int i = 0; i < si_SchedulingInfo->schedulingInfoList.list.count; i++) {
+      si_schedinfo_config_t *config = calloc_or_fail(1, sizeof(*config));
+      config->type = NR_SI_INFO;
+      config->si_WindowPosition = i + 1;
+      config->si_Periodicity = si_SchedulingInfo->schedulingInfoList.list.array[i]->si_Periodicity;
+      ASN_SEQUENCE_ADD(&mac->si_SchedInfo.si_SchedInfo_list, config);
+    }
+  }
+  if (si_SchedulingInfo_v1700) {
+    for (int i = 0; i < si_SchedulingInfo_v1700->schedulingInfoList2_r17.list.count; i++) {
+      si_schedinfo_config_t *config = calloc_or_fail(1, sizeof(*config));
+      config->type = NR_SI_INFO_v1700;
+      config->si_WindowPosition = si_SchedulingInfo_v1700->schedulingInfoList2_r17.list.array[i]->si_WindowPosition_r17;
+      config->si_Periodicity = si_SchedulingInfo_v1700->schedulingInfoList2_r17.list.array[i]->si_Periodicity_r17;
+      ASN_SEQUENCE_ADD(&mac->si_SchedInfo.si_SchedInfo_list, config);
+    }
+  }
+}
+
 void nr_rrc_mac_config_req_sib1(module_id_t module_id,
                                 int cc_idP,
                                 NR_SI_SchedulingInfo_t *si_SchedulingInfo,
@@ -1688,8 +1714,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
   AssertFatal(scc, "SIB1 SCC should not be NULL\n");
 
   UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
-  UPDATE_IE(mac->si_SchedulingInfo, si_SchedulingInfo, NR_SI_SchedulingInfo_t);
-  UPDATE_IE(mac->si_SchedulingInfo_v1700, si_SchedulingInfo_v1700, NR_SI_SchedulingInfo_v1700_t);
+  configure_si_schedulingInfo(mac, si_SchedulingInfo, si_SchedulingInfo_v1700);
   mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
 
   config_common_ue_sa(mac, scc, cc_idP);

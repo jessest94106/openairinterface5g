@@ -510,6 +510,23 @@ typedef enum {
   ON_PUSCH
 } CSI_mapping_t;
 
+typedef enum {
+  NR_SI_INFO,
+  NR_SI_INFO_v1700
+} nr_si_info_type;
+
+typedef struct {
+  nr_si_info_type type;
+  long si_Periodicity;
+  long si_WindowPosition;
+} si_schedinfo_config_t;
+
+typedef struct {
+  int si_window_start;
+  int si_WindowLength;
+  A_SEQUENCE_OF(si_schedinfo_config_t) si_SchedInfo_list;
+} si_schedInfo_t;
+
 /*!\brief Top level UE MAC structure */
 typedef struct NR_UE_MAC_INST_s {
   module_id_t ue_id;
@@ -520,9 +537,8 @@ typedef struct NR_UE_MAC_INST_s {
   bool get_sib1;
   bool get_otherSI;
   NR_MIB_t *mib;
-  struct NR_SI_SchedulingInfo *si_SchedulingInfo;
-  struct NR_SI_SchedulingInfo_v1700 *si_SchedulingInfo_v1700;
-  int si_window_start;
+
+  si_schedInfo_t si_SchedInfo;
   ssb_list_info_t ssb_list[MAX_NUM_BWP_UE];
   prach_association_pattern_t prach_assoc_pattern[MAX_NUM_BWP_UE];
 
