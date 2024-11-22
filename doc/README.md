@@ -62,6 +62,7 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
 - [How to run with E2 agent](../openair2/E2AP/README.md)
 - [How to run the physical simulators](./physical-simulators.md)
 - [How to setup OAI with Nvidia Aerial and Foxconn](./Aerial_FAPI_Split_Tutorial.md)
+- [How to setup OAI with AMD T2 Telco card](./LDPC_T2_OFFLOAD_SETUP.md)
 - [How to do a handover](./handover-tutorial.md)
 
 Legacy unmaintained files:
@@ -80,6 +81,7 @@ Legacy unmaintained files:
 - [Flow graph of the L1 in gNB](SW-archi-graph.md)
 - [L1 threads in NR-UE](./nr-ue-design.md)
 - [Information on gNB MAC](./MAC/mac-usage.md)
+- [Information on gNB RRC](./RRC/rrc-usage.md)
 
 Legacy unmaintained files:
 - [`5Gnas.md`](./5Gnas.md)
