@@ -67,6 +67,57 @@ queue_t nr_ul_dci_req_queue;
 queue_t nr_ul_tti_req_queue;
 static void save_pdsch_pdu_for_crnti(nfapi_nr_dl_tti_request_t *dl_tti_request);
 
+void print_ue_mac_stats(const module_id_t mod, const int frame_rx, const int slot_rx)
+{
+  NR_UE_MAC_INST_t *mac = get_mac_inst(mod);
+  int ret = pthread_mutex_lock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
+
+  char txt[1024];
+  char *end = txt + sizeof(txt);
+  char *cur = txt;
+
+  float nbul = 0;
+  for (uint64_t *p = mac->stats.ul.rounds; p < mac->stats.ul.rounds + NR_MAX_HARQ_ROUNDS_FOR_STATS; p++)
+    nbul += *p;
+  if (nbul < 1)
+    nbul = 1;
+
+  float nbdl = 0;
+  for (uint64_t *p = mac->stats.dl.rounds; p < mac->stats.dl.rounds + NR_MAX_HARQ_ROUNDS_FOR_STATS; p++)
+    nbdl += *p;
+  if (nbdl < 1)
+    nbdl = 1;
+
+  cur += snprintf(cur, end - cur, "UE %d stats sfn: %d.%d, cumulated bad DCI %d\n", mod, frame_rx, slot_rx, mac->stats.bad_dci);
+
+  cur += snprintf(cur, end - cur, "    DL harq: %lu", mac->stats.dl.rounds[0]);
+  int nb;
+  for (nb = NR_MAX_HARQ_ROUNDS_FOR_STATS - 1; nb > 1; nb--)
+    if (mac->stats.ul.rounds[nb])
+      break;
+  for (int i = 1; i < nb + 1; i++)
+    cur += snprintf(cur, end - cur, "/%lu", mac->stats.dl.rounds[i]);
+
+  cur += snprintf(cur, end - cur, "\n    Ul harq: %lu", mac->stats.ul.rounds[0]);
+  for (nb = NR_MAX_HARQ_ROUNDS_FOR_STATS - 1; nb > 1; nb--)
+    if (mac->stats.ul.rounds[nb])
+      break;
+  for (int i = 1; i < nb + 1; i++)
+    cur += snprintf(cur, end - cur, "/%lu", mac->stats.ul.rounds[i]);
+  snprintf(cur,
+           end - cur,
+           " avg code rate %.01f, avg bit/symbol %.01f, avg per TB: "
+           "(nb RBs %.01f, nb symbols %.01f)\n",
+           (double)mac->stats.ul.target_code_rate / (mac->stats.ul.total_bits * 1024 * 10), // See const Table_51311 definition
+           (double)mac->stats.ul.total_bits / mac->stats.ul.total_symbols,
+           mac->stats.ul.rb_size / nbul,
+           mac->stats.ul.nr_of_symbols / nbul);
+  LOG_I(NR_MAC, "%s", txt);
+  ret = pthread_mutex_unlock(&mac->if_mutex);
+  AssertFatal(!ret, "mutex failed %d\n", ret);
+}
+
 void nrue_init_standalone_socket(int tx_port, int rx_port)
 {
   {
@@ -1120,7 +1171,7 @@ static int8_t handle_csirs_measurements(NR_UE_MAC_INST_t *mac,
 
 void update_harq_status(NR_UE_MAC_INST_t *mac, uint8_t harq_pid, uint8_t ack_nack)
 {
-  NR_UE_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_pid];
+  NR_UE_DL_HARQ_STATUS_t *current_harq = &mac->dl_harq_info[harq_pid];
 
   if (current_harq->active) {
     LOG_D(PHY,"Updating harq_status for harq_id %d, ack/nak %d\n", harq_pid, current_harq->ack);

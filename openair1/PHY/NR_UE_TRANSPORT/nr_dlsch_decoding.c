@@ -285,7 +285,6 @@ uint32_t nr_dlsch_decoding(PHY_VARS_NR_UE *phy_vars_ue,
   }
 
   // HARQ stats
-  phy_vars_ue->dl_stats[harq_process->DLround]++;
   LOG_D(PHY, "Round %d RV idx %d\n", harq_process->DLround, dlsch->dlsch_config.rv);
   uint16_t nb_rb;// = 30;
   uint8_t dmrs_Type = dlsch->dlsch_config.dmrsConfigType;

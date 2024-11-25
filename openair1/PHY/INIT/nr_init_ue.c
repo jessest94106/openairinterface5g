@@ -467,10 +467,10 @@ void nr_init_ul_harq_processes(NR_UL_UE_HARQ_t harq_list[NR_MAX_ULSCH_HARQ_PROCE
 void init_nr_ue_transport(PHY_VARS_NR_UE *ue) {
 
   nr_init_dl_harq_processes(ue->dl_harq_processes, NR_MAX_DLSCH_HARQ_PROCESSES, ue->frame_parms.N_RB_DL);
-  nr_init_ul_harq_processes(ue->ul_harq_processes, NR_MAX_ULSCH_HARQ_PROCESSES, ue->frame_parms.N_RB_UL, ue->frame_parms.nb_antennas_tx);
-
-  for(int i=0; i<5; i++)
-    ue->dl_stats[i] = 0;
+  nr_init_ul_harq_processes(ue->ul_harq_processes,
+                            NR_MAX_ULSCH_HARQ_PROCESSES,
+                            ue->frame_parms.N_RB_UL,
+                            ue->frame_parms.nb_antennas_tx);
 }
 
 void clean_UE_harq(PHY_VARS_NR_UE *UE)

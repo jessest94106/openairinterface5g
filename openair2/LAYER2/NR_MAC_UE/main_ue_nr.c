@@ -240,8 +240,7 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
   nr_mac->scheduling_info.phr_info.was_mac_reset = true;
 
   // flush the soft buffers for all DL HARQ processes
-  for (int k = 0; k < NR_MAX_HARQ_PROCESSES; k++)
-    memset(&nr_mac->dl_harq_info[k], 0, sizeof(NR_UE_HARQ_STATUS_t));
+  memset(nr_mac->dl_harq_info, 0, sizeof(nr_mac->dl_harq_info));
 
   // for each DL HARQ process, consider the next received transmission for a TB as the very first transmission
   for (int k = 0; k < NR_MAX_HARQ_PROCESSES; k++)
