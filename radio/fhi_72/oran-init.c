@@ -396,35 +396,20 @@ static void oran_allocate_buffers(void *handle,
   xran_5g_prach_req(pi->instanceHandle, prach, prachdecomp, oai_xran_fh_rx_prach_callback, &portInstances->prach_tag);
 }
 
-int *oai_oran_initialize(const openair0_config_t *openair0_cfg)
+int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_config *xran_fh_config)
 {
   int32_t xret = 0;
 
-  struct xran_fh_init init = {0};
-  if (!set_fh_init(&init)) {
-    printf("could not read FHI 7.2/ORAN config\n");
-    return NULL;
-  }
-  print_fh_init(&init);
-
-  /* read all configuration before starting anything */
-  struct xran_fh_config xran_fh_config[XRAN_PORTS_NUM] = {0};
-  for (int32_t o_xu_id = 0; o_xu_id < init.xran_ports; o_xu_id++) {
-    if (!set_fh_config(o_xu_id, init.xran_ports, openair0_cfg, &xran_fh_config[o_xu_id])) {
-      printf("could not read FHI 7.2/RU-specific config\n");
-      return NULL;
-    }
-    print_fh_config(&xran_fh_config[o_xu_id]);
-  }
-
-  xret = xran_init(0, NULL, &init, NULL, &gxran_handle);
+  print_fh_init(xran_fh_init);
+  xret = xran_init(0, NULL, xran_fh_init, NULL, &gxran_handle);
   if (xret != XRAN_STATUS_SUCCESS) {
     printf("xran_init failed %d\n", xret);
     exit(-1);
   }
 
   /** process all the O-RU|O-DU for use case */
-  for (int32_t o_xu_id = 0; o_xu_id < init.xran_ports; o_xu_id++) {
+  for (int32_t o_xu_id = 0; o_xu_id < xran_fh_init->xran_ports; o_xu_id++) {
+    print_fh_config(&xran_fh_config[o_xu_id]);
     xret = xran_open(gxran_handle, &xran_fh_config[o_xu_id]);
     if (xret != XRAN_STATUS_SUCCESS) {
       printf("xran_open failed %d\n", xret);
@@ -432,7 +417,7 @@ int *oai_oran_initialize(const openair0_config_t *openair0_cfg)
     }
 
     int sector = 0;
-    printf("Initialize ORAN port instance %d (%d) sector %d\n", o_xu_id, init.xran_ports, sector);
+    printf("Initialize ORAN port instance %d (%d) sector %d\n", o_xu_id, xran_fh_init->xran_ports, sector);
     oran_port_instance_t *pi = &gPortInst[o_xu_id][sector];
     struct xran_cb_tag tag = {.cellId = sector, .oXuId = o_xu_id};
     pi->prach_tag = tag;
