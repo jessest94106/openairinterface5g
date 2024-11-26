@@ -1006,17 +1006,11 @@ static bool get_feasible_msg3_tda(frame_type_t frame_type,
   return false;
 }
 
-static void nr_get_Msg3alloc(module_id_t module_id,
-                             int CC_id,
-                             NR_ServingCellConfigCommon_t *scc,
-                             sub_frame_t current_slot,
-                             frame_t current_frame,
-                             NR_RA_t *ra)
+static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, frame_t current_frame, NR_RA_t *ra)
 {
   DevAssert(ra->Msg3_tda_id >= 0 && ra->Msg3_tda_id < 16);
 
   uint16_t msg3_nb_rb = 8; // sdu has 6 or 8 bytes
-  gNB_MAC_INST *mac = RC.nrmac[module_id];
 
   NR_UE_UL_BWP_t *ul_bwp = &ra->UL_BWP;
   NR_UE_ServingCell_Info_t *sc_info = &ra->sc_info;
@@ -1055,7 +1049,10 @@ static void nr_get_Msg3alloc(module_id_t module_id,
     rbSize = 0;
     while (rbStart < bwpSize && (vrb_map_UL[rbStart + bwpStart] & SL_to_bitmap(ra->msg3_startsymb, ra->msg3_nbSymb)))
       rbStart++;
-    AssertFatal(rbStart + msg3_nb_rb - 1 < bwpSize, "no space to allocate Msg 3 for RA!\n");
+    if (rbStart + msg3_nb_rb > bwpSize) {
+      LOG_D(NR_MAC, "No space to allocate Msg 3\n");
+      return false;
+    }
     while (rbStart + rbSize < bwpSize
            && !(vrb_map_UL[rbStart + bwpStart + rbSize] & SL_to_bitmap(ra->msg3_startsymb, ra->msg3_nbSymb)) && rbSize < msg3_nb_rb)
       rbSize++;
@@ -1063,6 +1060,7 @@ static void nr_get_Msg3alloc(module_id_t module_id,
   ra->msg3_nb_rb = msg3_nb_rb;
   ra->msg3_first_rb = rbStart;
   ra->msg3_bwp_start = bwpStart;
+  return true;
 }
 
 static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
@@ -1492,6 +1490,13 @@ static void nr_generate_Msg2(module_id_t module_idP,
     return;
   }
 
+  bool msg3_ret = nr_get_Msg3alloc(nr_mac, CC_id, slotP, frameP, ra);
+  if (!msg3_ret) {
+    reset_beam_status(&nr_mac->beam_info, ra->Msg3_frame, ra->Msg3_slot, ra->beam_id, n_slots_frame, ra->Msg3_beam.new_beam);
+    reset_beam_status(&nr_mac->beam_info, frameP, slotP, ra->beam_id, n_slots_frame, beam.new_beam);
+    return;
+  }
+
   LOG_D(NR_MAC, "Msg2 startSymbolIndex.nrOfSymbols %d.%d\n", tda_info.startSymbolIndex, tda_info.nrOfSymbols);
 
   // look up the PDCCH PDU for this CC, BWP, and CORESET. If it does not exist, create it. This is especially
@@ -1658,7 +1663,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
   nfapi_nr_pdu_t *tx_req = &TX_req->pdu_list[TX_req->Number_of_PDUs];
 
   // Program UL processing for Msg3
-  nr_get_Msg3alloc(module_idP, CC_id, scc, slotP, frameP, ra);
   nr_add_msg3(module_idP, CC_id, frameP, slotP, ra, (uint8_t *)&tx_req->TLVs[0].value.direct[0]);
 
   // Start RA contention resolution timer in Msg3 transmission slot (current slot + K2)
