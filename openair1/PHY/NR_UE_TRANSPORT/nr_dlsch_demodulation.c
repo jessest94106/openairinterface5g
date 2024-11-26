@@ -28,6 +28,8 @@
  * \note
  * \warning
  */
+
+#include "common/platform_constants.h"
 #include "nr_phy_common.h"
 #include "PHY/defs_nr_UE.h"
 #include "PHY/phy_extern.h"

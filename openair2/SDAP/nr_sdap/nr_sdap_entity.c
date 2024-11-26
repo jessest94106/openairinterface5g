@@ -20,14 +20,18 @@
  */
 
 #include "nr_sdap_entity.h"
-#include "common/utils/LOG/log.h"
 #include <openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.h>
 #include <openair3/ocp-gtpu/gtp_itf.h>
-#include "openair2/LAYER2/nr_pdcp/nr_pdcp_ue_manager.h"
-
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include <unistd.h>
+#include "PHY/defs_common.h"
+#include "T.h"
+#include "assertions.h"
+#include "common/utils/T/T.h"
+#include "gtpv1_u_messages_types.h"
+#include "intertask_interface.h"
+#include "rlc.h"
 
 typedef struct {
   nr_sdap_entity_t *sdap_entity_llist;

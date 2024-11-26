@@ -22,27 +22,50 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-#include "nr_pdcp_asn1_utils.h"
-#include "nr_pdcp_ue_manager.h"
-#include "nr_pdcp_timer_thread.h"
-#include "NR_RadioBearerConfig.h"
-#include "NR_RLC-BearerConfig.h"
-#include "NR_RLC-Config.h"
-#include "NR_CellGroupConfig.h"
-#include "openair2/RRC/NR/nr_rrc_proto.h"
-#include "common/utils/mem/oai_memory.h"
-#include <stdint.h>
-
-/* from OAI */
-#include "oai_asn1.h"
 #include "nr_pdcp_oai_api.h"
-#include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
-#include "openair2/F1AP/f1ap_ids.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <openair3/ocp-gtpu/gtp_itf.h>
-#include "openair2/SDAP/nr_sdap/nr_sdap.h"
-#include "gnb_config.h"
-#include "executables/softmodem-common.h"
+#include <pthread.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include "LAYER2/MAC/mac_extern.h"
+#include "LTE_DRB-ToAddModList.h"
+#include "LTE_DRB-ToReleaseList.h"
+#include "LTE_PMCH-InfoList-r9.h"
+#include "LTE_SRB-ToAddModList.h"
+#include "NR_DRB-ToAddMod.h"
+#include "NR_QFI.h"
+#include "NR_SDAP-Config.h"
+#include "NR_SRB-ToAddMod.h"
+#include "SDAP/nr_sdap/nr_sdap_entity.h"
+#include "assertions.h"
+#include "common/ngran_types.h"
+#include "common/platform_constants.h"
+#include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "common/utils/tun_if.h"
 #include "cuup_cucp_if.h"
+#include "executables/lte-softmodem.h"
+#include "executables/softmodem-common.h"
+#include "f1ap_messages_types.h"
+#include "gnb_config.h"
+#include "gtpv1_u_messages_types.h"
+#include "hashtable.h"
+#include "intertask_interface.h"
+#include "common/utils/LOG/log.h"
+#include "nfapi/oai_integration/vendor_ext.h"
+#include "nr_pdcp_asn1_utils.h"
+#include "nr_pdcp_timer_thread.h"
+#include "nr_pdcp_ue_manager.h"
+#include "openair2/F1AP/f1ap_ids.h"
+#include "openair2/SDAP/nr_sdap/nr_sdap.h"
+#include "pdcp.h"
+#include "pdcp_messages_types.h"
+#include "rlc.h"
+#include "utils.h"
 
 #define TODO do { \
     printf("%s:%d:%s: todo\n", __FILE__, __LINE__, __FUNCTION__); \

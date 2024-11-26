@@ -24,6 +24,7 @@
 
 #include "LTE_asn_constant.h"
 #include "NR_asn_constant.h"
+#include "s1ap_messages_types.h"
 
 #define GTPV1U_MAX_BEARERS_PER_UE max_val_LTE_DRB_Identity
 #define NR_GTPV1U_MAX_BEARERS_PER_UE max_val_NR_DRB_Identity
@@ -170,13 +171,10 @@ typedef struct {
 typedef struct gtpv1u_gnb_create_tunnel_req_s {
   ue_id_t                ue_id;
   int                    num_tunnels;
-  //teid_t                 upf_NGu_teid[NR_GTPV1U_MAX_BEARERS_PER_UE];  ///< Tunnel Endpoint Identifier
   teid_t                 outgoing_teid[NR_GTPV1U_MAX_BEARERS_PER_UE];
   int outgoing_qfi[NR_GTPV1U_MAX_BEARERS_PER_UE];
   pdusessionid_t         pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
   ebi_t                  incoming_rb_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
-  //ebi_t                  outgoing_rb_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
-  //transport_layer_addr_t upf_addr[NR_GTPV1U_MAX_BEARERS_PER_UE];
   transport_layer_addr_t dst_addr[NR_GTPV1U_MAX_BEARERS_PER_UE];
 } gtpv1u_gnb_create_tunnel_req_t;
 

@@ -20,20 +20,33 @@
  */
 
 #include "cucp_cuup_handler.h"
-
+#include <netinet/in.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "NR_DRB-ToAddMod.h"
 #include "NR_DRB-ToAddModList.h"
-
-#include "common/platform_types.h"
-#include "intertask_interface.h"
-#include "openair2/COMMON/e1ap_messages_types.h"
-#include "openair3/ocp-gtpu/gtp_itf.h"
-#include "openair2/F1AP/f1ap_ids.h"
-#include "nr_pdcp_oai_api.h"
-#include "cuup_cucp_if.h"
+#include "NR_PDCP-Config.h"
+#include "NR_QFI.h"
+#include "NR_SDAP-Config.h"
+#include "PHY/defs_common.h"
+#include "RRC/NR/nr_rrc_common.h"
+#include "SDAP/nr_sdap/nr_sdap_entity.h"
+#include "asn_internal.h"
+#include "assertions.h"
+#include "common/utils/T/T.h"
 #include "common/utils/oai_asn1.h"
-#include "openair2/SDAP/nr_sdap/nr_sdap.h"
+#include "constr_TYPE.h"
+#include "cuup_cucp_if.h"
+#include "gtpv1_u_messages_types.h"
+#include "nr_pdcp/nr_pdcp_entity.h"
+#include "nr_pdcp_oai_api.h"
+#include "openair2/COMMON/e1ap_messages_types.h"
 #include "openair2/E1AP/e1ap_common.h"
 #include "openair2/F1AP/f1ap_common.h"
+#include "openair2/F1AP/f1ap_ids.h"
+#include "openair2/SDAP/nr_sdap/nr_sdap.h"
+#include "openair3/ocp-gtpu/gtp_itf.h"
 
 static void fill_DRB_configList_e1(NR_DRB_ToAddModList_t *DRB_configList, const pdu_session_to_setup_t *pdu)
 {

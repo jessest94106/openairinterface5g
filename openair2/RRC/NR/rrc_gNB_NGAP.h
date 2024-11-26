@@ -31,14 +31,14 @@
 #ifndef RRC_GNB_NGAP_H_
 #define RRC_GNB_NGAP_H_
 
-#include "rrc_gNB_UE_context.h"
-#include "nr_rrc_defs.h"
-#include "nr_rrc_extern.h"
-
+#include <assertions.h>
+#include <stdint.h>
 #include "NR_RRCSetupComplete-IEs.h"
-#include "NR_RegisteredAMF.h"
+#include "NR_UECapabilityInformation.h"
 #include "NR_UL-DCCH-Message.h"
-#include "NGAP_CauseRadioNetwork.h"
+#include "intertask_interface.h"
+#include "ngap_messages_types.h"
+#include "nr_rrc_defs.h"
 
 void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRCSetupComplete_IEs_t *rrcSetupComplete);
 

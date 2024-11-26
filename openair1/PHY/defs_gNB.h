@@ -33,6 +33,7 @@
 #ifndef __PHY_DEFS_GNB__H__
 #define __PHY_DEFS_GNB__H__
 
+#include "common/platform_constants.h"
 #include "defs_nr_common.h"
 #include "CODING/nrPolar_tools/nr_polar_pbch_defs.h"
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
