@@ -505,8 +505,10 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
       // MIB is mandatory, so will be overwritten. SIB1 is optional, so will
       // only be overwritten if present in sys_info
       ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
-      if (sys_info->sib1 != NULL)
+      if (sys_info->sib1 != NULL) {
         ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
+        du->sib1 = NULL;
+      }
 
       NR_MIB_t *mib = NULL;
       if (!extract_sys_info(sys_info, &mib, &du->sib1)) {
