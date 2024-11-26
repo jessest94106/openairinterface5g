@@ -1013,7 +1013,6 @@ static void nr_get_Msg3alloc(module_id_t module_id,
                              frame_t current_frame,
                              NR_RA_t *ra)
 {
-  // msg3 is scheduled in mixed slot in the following TDD period
   DevAssert(ra->Msg3_tda_id >= 0 && ra->Msg3_tda_id < 16);
 
   uint16_t msg3_nb_rb = 8; // sdu has 6 or 8 bytes
@@ -1056,7 +1055,7 @@ static void nr_get_Msg3alloc(module_id_t module_id,
     rbSize = 0;
     while (rbStart < bwpSize && (vrb_map_UL[rbStart + bwpStart] & SL_to_bitmap(ra->msg3_startsymb, ra->msg3_nbSymb)))
       rbStart++;
-    AssertFatal(rbStart < bwpSize - msg3_nb_rb, "no space to allocate Msg 3 for RA!\n");
+    AssertFatal(rbStart + msg3_nb_rb - 1 < bwpSize, "no space to allocate Msg 3 for RA!\n");
     while (rbStart + rbSize < bwpSize
            && !(vrb_map_UL[rbStart + bwpStart + rbSize] & SL_to_bitmap(ra->msg3_startsymb, ra->msg3_nbSymb)) && rbSize < msg3_nb_rb)
       rbSize++;
