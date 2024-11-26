@@ -656,7 +656,7 @@ static uint8_t *fill_msg3_pdu_from_rlc(NR_UE_MAC_INST_t *mac, uint8_t *pdu, int 
 {
   RA_config_t *ra = &mac->ra;
   // regular Msg3/MsgA_PUSCH with PDU coming from higher layers
-  *(NR_MAC_SUBHEADER_FIXED *)pdu = (NR_MAC_SUBHEADER_FIXED){.LCID = UL_SCH_LCID_CCCH};
+  *(NR_MAC_SUBHEADER_FIXED *)pdu = (NR_MAC_SUBHEADER_FIXED){.LCID = UL_SCH_LCID_CCCH_48_BITS};
   pdu += sizeof(NR_MAC_SUBHEADER_FIXED);
   tbs_size_t len = mac_rlc_data_req(mac->ue_id,
                                     mac->ue_id,

@@ -427,12 +427,24 @@ typedef struct {
 #define DL_SCH_LCID_CON_RES_ID                     0x3E
 #define DL_SCH_LCID_PADDING                        0x3F
 
-#define UL_SCH_LCID_CCCH1                          0x00
+#define UL_SCH_LCID_CCCH_64_BITS                   0x00
 #define UL_SCH_LCID_SRB1                           0x01
 #define UL_SCH_LCID_SRB2                           0x02
 #define UL_SCH_LCID_SRB3                           0x03
 #define UL_SCH_LCID_DTCH                           0x04
-#define UL_SCH_LCID_CCCH                           0x34
+#define UL_SCH_LCID_EXTENDED_LCID_2_OCT            0x21
+#define UL_SCH_LCID_EXTENDED_LCID_1_OCT            0x22
+#define UL_SCH_LCID_CCCH_48_BITS_REDCAP            0x23
+#define UL_SCH_LCID_CCCH_64_BITS_REDCAP            0x24
+#define UL_SCH_LCID_TRUNCATED_ENHANCED_BFR         0x2B
+#define UL_SCH_LCID_TIMING_ADVANCE_REPORT          0x2C
+#define UL_SCH_LCID_TRUNCATED_SIDELINK_BSR         0x2D
+#define UL_SCH_LCID_SIDELINK_BSR                   0x2E
+#define UL_SCH_LCID_LBT_FAILURE_4_OCT              0x30
+#define UL_SCH_LCID_LBT_FAILURE_1_OCT              0x31
+#define UL_SCH_LCID_BFR                            0x32
+#define UL_SCH_LCID_TRUNCATED_BFR                  0x33
+#define UL_SCH_LCID_CCCH_48_BITS                   0x34
 #define UL_SCH_LCID_RECOMMENDED_BITRATE_QUERY      0x35
 #define UL_SCH_LCID_MULTI_ENTRY_PHR_4_OCT          0x36
 #define UL_SCH_LCID_CONFIGURED_GRANT_CONFIRMATION  0x37
