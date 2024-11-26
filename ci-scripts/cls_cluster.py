@@ -73,7 +73,7 @@ def OC_deploy_CN(cmd, ocUserName, ocPassword, ocNamespace, path):
 	if not succeeded:
 		return False, CONST.OC_LOGIN_FAIL
 	cmd.run('helm uninstall oai5gcn --wait --timeout 60s')
-	ret = cmd.run(f'helm install --wait --timeout 60s oai5gcn {path}/ci-scripts/charts/oai-5g-basic/.')
+	ret = cmd.run(f'helm install --wait --timeout 120s oai5gcn {path}/ci-scripts/charts/oai-5g-basic/.')
 	if ret.returncode != 0:
 		logging.error('OC OAI CN5G: Deployment failed')
 		OC_logout(cmd)
