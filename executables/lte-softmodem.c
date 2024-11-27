@@ -193,6 +193,16 @@ bool nr_pdcp_data_req_drb(protocol_ctxt_t *ctxt_pP,
   abort();
 }
 
+/* hack: nfapi code is common for 4G/5G, so some function calls are hardcoded.
+ * Provide body for 5G function not used in 4G code */
+void handle_nr_srs_measurements(const module_id_t module_id,
+                                const frame_t frame,
+                                const sub_frame_t slot,
+                                nfapi_nr_srs_indication_pdu_t *srs_ind)
+{
+  return;
+}
+
 /* forward declarations */
 void set_default_frame_parms(LTE_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]);
 
