@@ -448,7 +448,7 @@ static void update_cell_info(nr_rrc_du_container_t *du, const f1ap_served_cell_i
   f1ap_served_cell_info_t *ci = &du->setup_req->cell[0].info;
   // make sure no memory is allocated
   free_f1ap_cell(ci, NULL);
-  copy_f1ap_served_cell_info(ci, new_ci);
+  *ci = copy_f1ap_served_cell_info(new_ci);
 
   NR_MeasurementTimingConfiguration_t *new_mtc =
       extract_mtc(new_ci->measurement_timing_config, new_ci->measurement_timing_config_len);

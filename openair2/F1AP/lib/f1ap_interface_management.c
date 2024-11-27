@@ -534,20 +534,56 @@ bool decode_f1ap_setup_request(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_req_t *out
   return true;
 }
 
-void copy_f1ap_served_cell_info(f1ap_served_cell_info_t *dest, const f1ap_served_cell_info_t *src)
+f1ap_served_cell_info_t copy_f1ap_served_cell_info(const f1ap_served_cell_info_t *src)
 {
-  // shallow copy
-  *dest = *src;
-  // tac
+  f1ap_served_cell_info_t dst = {
+    .plmn = src->plmn,
+    .nr_cellid = src->nr_cellid,
+    .nr_pci = src->nr_pci,
+    .num_ssi = src->num_ssi,
+    .mode = src->mode,
+  };
+
+  for (int i = 0; i < src->num_ssi; ++i)
+    dst.nssai[i] = src->nssai[i];
+
+  if (src->mode == F1AP_MODE_TDD)
+    dst.tdd = src->tdd;
+  else
+    dst.fdd = src->fdd;
+
   if (src->tac) {
-    dest->tac = malloc_or_fail(sizeof(*dest->tac));
-    *dest->tac = *src->tac;
+    dst.tac = malloc_or_fail(sizeof(*dst.tac));
+    *dst.tac = *src->tac;
   }
-  // measurement timing config
-  if (src->measurement_timing_config_len) {
-    dest->measurement_timing_config = calloc_or_fail(src->measurement_timing_config_len, sizeof(*dest->measurement_timing_config));
-    memcpy(dest->measurement_timing_config, src->measurement_timing_config, src->measurement_timing_config_len);
+
+  if (src->measurement_timing_config_len > 0) {
+    dst.measurement_timing_config_len = src->measurement_timing_config_len;
+    dst.measurement_timing_config = calloc_or_fail(src->measurement_timing_config_len, sizeof(*dst.measurement_timing_config));
+    memcpy(dst.measurement_timing_config, src->measurement_timing_config, src->measurement_timing_config_len);
   }
+  return dst;
+}
+
+static f1ap_gnb_du_system_info_t *copy_f1ap_gnb_du_system_info(const f1ap_gnb_du_system_info_t *src)
+{
+  if (!src)
+    return NULL;
+
+  f1ap_gnb_du_system_info_t *dst = calloc_or_fail(1, sizeof(*dst));
+  if (src->mib_length > 0) {
+    dst->mib_length = src->mib_length;
+    dst->mib = calloc_or_fail(src->mib_length, sizeof(*src->mib));
+    memcpy(dst->mib, src->mib, dst->mib_length);
+  }
+
+  if (src->sib1_length > 0) {
+    dst->sib1_length = src->sib1_length;
+    dst->sib1 = calloc_or_fail(src->sib1_length, sizeof(*dst->sib1));
+    memcpy(dst->sib1, src->sib1, dst->sib1_length);
+  }
+
+  return dst;
 }
 
 /**
@@ -567,25 +603,9 @@ f1ap_setup_req_t cp_f1ap_setup_request(const f1ap_setup_req_t *msg)
   cp.num_cells_available = msg->num_cells_available;
   for (int n = 0; n < msg->num_cells_available; n++) {
     /* cell.info */
-    f1ap_served_cell_info_t *sci = &cp.cell[n].info;
-    const f1ap_served_cell_info_t *msg_sci = &msg->cell[n].info;
-    copy_f1ap_served_cell_info(sci, msg_sci);
+    cp.cell[n].info = copy_f1ap_served_cell_info(&msg->cell[n].info);
     /* cell.sys_info */
-    if (msg->cell[n].sys_info) {
-      f1ap_gnb_du_system_info_t *orig_sys_info = msg->cell[n].sys_info;
-      f1ap_gnb_du_system_info_t *copy_sys_info = calloc_or_fail(1, sizeof(*copy_sys_info));
-      cp.cell[n].sys_info = copy_sys_info;
-      if (orig_sys_info->mib_length > 0) {
-        copy_sys_info->mib = calloc_or_fail(orig_sys_info->mib_length, sizeof(*copy_sys_info->mib));
-        copy_sys_info->mib_length = orig_sys_info->mib_length;
-        memcpy(copy_sys_info->mib, orig_sys_info->mib, copy_sys_info->mib_length);
-      }
-      if (orig_sys_info->sib1_length > 0) {
-        copy_sys_info->sib1 = calloc_or_fail(orig_sys_info->sib1_length, sizeof(*copy_sys_info->sib1));
-        copy_sys_info->sib1_length = orig_sys_info->sib1_length;
-        memcpy(copy_sys_info->sib1, orig_sys_info->sib1, copy_sys_info->sib1_length);
-      }
-    }
+    cp.cell[n].sys_info = copy_f1ap_gnb_du_system_info(msg->cell[n].sys_info);
   }
   for (int i = 0; i < sizeofArray(msg->rrc_ver); i++)
     cp.rrc_ver[i] = msg->rrc_ver[i];
