@@ -15,11 +15,8 @@ if (ENABLE_LDPC_T2)
   endif()
 
   message(STATUS "T2 build: use ${PMD_T2}")
-  set(PHY_NRLDPC_CODING_T2_SRC
-    ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_t2/nrLDPC_coding_t2.c
-  )
+  add_library(ldpc_t2 MODULE nrLDPC_coding_t2.c)
 
-  add_library(ldpc_t2 MODULE ${PHY_NRLDPC_CODING_T2_SRC})
   set_target_properties(ldpc_t2 PROPERTIES COMPILE_FLAGS "-DALLOW_EXPERIMENTAL_API")
   set_target_properties(ldpc_t2 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
   target_link_libraries(ldpc_t2 PRIVATE ldpc_gen_HEADERS ${LIBDPDK_T2_LDFLAGS} ${PMD_T2})
@@ -30,9 +27,5 @@ if (ENABLE_LDPC_T2)
   add_dependencies(nr_ulschsim ldpc_t2)
   add_dependencies(nr_dlsim ldpc_t2)
   add_dependencies(nr_dlschsim ldpc_t2)
-
-  if (${T_TRACER})
-    add_dependencies(ldpc_t2 generate_T)
-  endif(${T_TRACER})
 
 endif()
