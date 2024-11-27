@@ -72,7 +72,7 @@ static int read_slice_info(const F1AP_ServedPLMNs_Item_t *plmn, nssai_t *nssai, 
 /**
  * @brief F1AP Setup Request memory management
  */
-static void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_du_system_info_t *sys_info)
+void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_du_system_info_t *sys_info)
 {
   if (sys_info) {
     free(sys_info->mib);
