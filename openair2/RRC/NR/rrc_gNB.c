@@ -2498,6 +2498,7 @@ void *rrc_gnb_task(void *args_p) {
     switch (ITTI_MSG_ID(msg_p)) {
       case TERMINATE_MESSAGE:
         LOG_W(NR_RRC, " *** Exiting NR_RRC thread\n");
+        timer_remove(stats_timer_id);
         itti_exit_task();
         break;
 
