@@ -81,6 +81,13 @@ bool eq_f1ap_cell_info(const f1ap_served_cell_info_t *a, const f1ap_served_cell_
 
 bool eq_f1ap_sys_info(const f1ap_gnb_du_system_info_t *a, const f1ap_gnb_du_system_info_t *b)
 {
+  if (!a && !b)
+    return true;
+
+  /* will fail if not both a/b NULL or set */
+  if ((!a) ^ (!b))
+    return false;
+
   /* MIB */
   _F1_EQ_CHECK_INT(a->mib_length, b->mib_length);
   for (int i = 0; i < a->mib_length; i++)
