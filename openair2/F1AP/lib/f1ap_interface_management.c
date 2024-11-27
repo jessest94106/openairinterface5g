@@ -1236,10 +1236,8 @@ bool eq_f1ap_du_configuration_update(const f1ap_gnb_du_configuration_update_t *a
   for (int i = 0; i < a->num_cells_to_add; i++) {
     if (!eq_f1ap_cell_info(&a->cell_to_add[i].info, &b->cell_to_add[i].info))
       return false;
-    if (a->cell_to_add[i].sys_info && b->cell_to_add[i].sys_info) {
-      if (!eq_f1ap_sys_info(a->cell_to_add[i].sys_info, b->cell_to_add[i].sys_info))
-        return false;
-    }
+    if (!eq_f1ap_sys_info(a->cell_to_add[i].sys_info, b->cell_to_add[i].sys_info))
+      return false;
   }
   /* to delete */
   _F1_EQ_CHECK_INT(a->num_cells_to_delete, b->num_cells_to_delete);
@@ -1251,12 +1249,13 @@ bool eq_f1ap_du_configuration_update(const f1ap_gnb_du_configuration_update_t *a
   /* to modify */
   _F1_EQ_CHECK_INT(a->num_cells_to_modify, b->num_cells_to_modify);
   for (int i = 0; i < a->num_cells_to_modify; i++) {
+    if (!eq_f1ap_plmn(&a->cell_to_modify[i].old_plmn, &b->cell_to_modify[i].old_plmn))
+      return false;
+    _F1_EQ_CHECK_LONG(a->cell_to_modify[i].old_nr_cellid, b->cell_to_modify[i].old_nr_cellid);
     if (!eq_f1ap_cell_info(&a->cell_to_modify[i].info, &b->cell_to_modify[i].info))
       return false;
-    if (a->cell_to_modify[i].sys_info && b->cell_to_modify[i].sys_info) {
-      if (!eq_f1ap_sys_info(a->cell_to_modify[i].sys_info, b->cell_to_modify[i].sys_info))
-        return false;
-    }
+    if (!eq_f1ap_sys_info(a->cell_to_modify[i].sys_info, b->cell_to_modify[i].sys_info))
+      return false;
   }
   return true;
 }
@@ -1276,6 +1275,10 @@ f1ap_gnb_du_configuration_update_t cp_f1ap_du_configuration_update(const f1ap_gn
   cp.transaction_id = msg->transaction_id;
   /* to add */
   cp.num_cells_to_add = msg->num_cells_to_add;
+  for (int i = 0; i < cp.num_cells_to_add; ++i) {
+    cp.cell_to_add[i].info = copy_f1ap_served_cell_info(&msg->cell_to_add[i].info);
+    cp.cell_to_add[i].sys_info = copy_f1ap_gnb_du_system_info(msg->cell_to_add[i].sys_info);
+  }
   /* to delete */
   cp.num_cells_to_delete = msg->num_cells_to_delete;
   for (int i = 0; i < cp.num_cells_to_delete; i++) {
@@ -1285,31 +1288,10 @@ f1ap_gnb_du_configuration_update_t cp_f1ap_du_configuration_update(const f1ap_gn
   /* to modify */
   cp.num_cells_to_modify = msg->num_cells_to_modify;
   for (int i = 0; i < cp.num_cells_to_modify; i++) {
-    cp.cell_to_modify[i].info = msg->cell_to_modify[i].info;
-    f1ap_served_cell_info_t *info = &cp.cell_to_modify[i].info;
-    if (info->measurement_timing_config_len > 0) {
-      info->measurement_timing_config = malloc_or_fail(info->measurement_timing_config_len * sizeof(*info->measurement_timing_config));
-      for (int j = 0; j < info->measurement_timing_config_len; j++)
-        info->measurement_timing_config[j] = msg->cell_to_modify[i].info.measurement_timing_config[j];
-    }
-    /* TAC */
-    info->tac = calloc_or_fail(1, sizeof(*info->tac));
-    *info->tac = *msg->cell_to_modify[i].info.tac;
-    /* System information */
-    cp.cell_to_modify[i].sys_info = malloc_or_fail(sizeof(*cp.cell_to_modify[i].sys_info));
-    f1ap_gnb_du_system_info_t *sys_info = cp.cell_to_modify[i].sys_info;
-    if (msg->cell_to_modify[i].sys_info->mib_length > 0) {
-      sys_info->mib_length = msg->cell_to_modify[i].sys_info->mib_length;
-      sys_info->mib = calloc_or_fail(msg->cell_to_modify[i].sys_info->mib_length, sizeof(*sys_info->mib));
-      for (int j = 0; j < sys_info->mib_length; j++)
-        sys_info->mib[j] = msg->cell_to_modify[i].sys_info->mib[j];
-    }
-    if (msg->cell_to_modify[i].sys_info->sib1_length > 0) {
-      sys_info->sib1_length = msg->cell_to_modify[i].sys_info->sib1_length;
-      sys_info->sib1 = calloc_or_fail(msg->cell_to_modify[i].sys_info->sib1_length, sizeof(*sys_info->sib1));
-      for (int j = 0; j < sys_info->sib1_length; j++)
-        sys_info->sib1[j] = msg->cell_to_modify[i].sys_info->sib1[j];
-    }
+    cp.cell_to_modify[i].old_plmn = msg->cell_to_modify[i].old_plmn;
+    cp.cell_to_modify[i].old_nr_cellid = msg->cell_to_modify[i].old_nr_cellid;
+    cp.cell_to_modify[i].info = copy_f1ap_served_cell_info(&msg->cell_to_modify[i].info);
+    cp.cell_to_modify[i].sys_info = copy_f1ap_gnb_du_system_info(msg->cell_to_modify[i].sys_info);
   }
   return cp;
 }
