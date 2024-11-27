@@ -28,26 +28,36 @@
  * @ingroup _ngap
  */
 
- 
+#include "ngap_gNB_nas_procedures.h"
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-
+#include <string.h>
+#include "BIT_STRING.h"
+#include "INTEGER.h"
+#include "ngap_msg_includes.h"
+#include "OCTET_STRING.h"
+#include "PHY/defs_common.h"
+#include "T.h"
+#include "aper_encoder.h"
+#include "asn_application.h"
+#include "asn_codecs.h"
 #include "assertions.h"
+#include "common/utils/T/T.h"
+#include "constr_TYPE.h"
 #include "conversions.h"
-
-#include "intertask_interface.h"
-
 #include "ngap_common.h"
 #include "ngap_gNB_defs.h"
-
-#include "ngap_gNB_itti_messaging.h"
-
 #include "ngap_gNB_encoder.h"
+#include "ngap_gNB_itti_messaging.h"
+#include "ngap_gNB_management_procedures.h"
 #include "ngap_gNB_nnsf.h"
 #include "ngap_gNB_ue_context.h"
-#include "ngap_gNB_nas_procedures.h"
-#include "ngap_gNB_management_procedures.h"
+#include "oai_asn1.h"
+#include "s1ap_messages_types.h"
+#include "xer_encoder.h"
 
 static void allocCopy(OCTET_STRING_t *out, ngap_pdu_t in)
 {

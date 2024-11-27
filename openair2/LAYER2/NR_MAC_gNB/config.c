@@ -30,26 +30,37 @@
 
  */
 
-#include "common/platform_types.h"
-#include "common/platform_constants.h"
-#include "common/ran_context.h"
-#include "common/utils/nr/nr_common.h"
-#include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
-
+#include <complex.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include "BIT_STRING.h"
+#include "LAYER2/NR_MAC_COMMON/nr_mac_common.h"
+#include "LAYER2/NR_MAC_gNB/mac_proto.h"
+#include "NR_MIB.h"
+#include "NR_MAC_COMMON/nr_mac_extern.h"
+#include "NR_MAC_gNB/nr_mac_gNB.h"
 #include "NR_BCCH-BCH-Message.h"
 #include "NR_ServingCellConfigCommon.h"
-#include "uper_encoder.h"
-
-#include "LAYER2/NR_MAC_gNB/mac_proto.h"
-#include "SCHED_NR/phy_frame_config_nr.h"
-
 #include "NR_MIB.h"
-#include "LAYER2/NR_MAC_COMMON/nr_mac_common.h"
-#include "nfapi/oai_integration/vendor_ext.h"
-/* Softmodem params */
+#include "PHY/TOOLS/tools_defs.h"
+#include "PHY/defs_common.h"
+#include "RRC/NR/nr_rrc_config.h"
+#include "SCHED_NR/phy_frame_config_nr.h"
+#include "T.h"
+#include "asn_internal.h"
+#include "assertions.h"
+#include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "common/utils/nr/nr_common.h"
 #include "executables/softmodem-common.h"
-#include <complex.h>
+#include "f1ap_messages_types.h"
+#include "nfapi/oai_integration/vendor_ext.h"
+#include "nfapi_interface.h"
+#include "nfapi_nr_interface.h"
+#include "nfapi_nr_interface_scf.h"
+#include "utils.h"
 
 extern RAN_CONTEXT_t RC;
 //extern int l2_init_gNB(void);

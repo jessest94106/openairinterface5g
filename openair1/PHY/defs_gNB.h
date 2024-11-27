@@ -33,6 +33,7 @@
 #ifndef __PHY_DEFS_GNB__H__
 #define __PHY_DEFS_GNB__H__
 
+#include "common/platform_constants.h"
 #include "defs_nr_common.h"
 #include "CODING/nrPolar_tools/nr_polar_pbch_defs.h"
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
@@ -543,6 +544,7 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t ulsch_decoding_stats;
   time_stats_t ulsch_deinterleaving_stats;
   time_stats_t ulsch_channel_estimation_stats;
+  time_stats_t pusch_channel_estimation_antenna_processing_stats;
   time_stats_t ulsch_llr_stats;
   time_stats_t rx_srs_stats;
   time_stats_t generate_srs_stats;
@@ -562,7 +564,10 @@ typedef struct PHY_VARS_gNB_s {
   notifiedFIFO_t L1_rx_out;
   notifiedFIFO_t resp_RU_tx;
   tpool_t threadPool;
+  int nbSymb;
+  int nbAarx;
   int num_pusch_symbols_per_thread;
+  int dmrs_num_antennas_per_thread;
   pthread_t L1_rx_thread;
   int L1_rx_thread_core;
   pthread_t L1_tx_thread;
@@ -582,6 +587,37 @@ struct puschSymbolReqId {
 
 union puschSymbolReqUnion {
   struct puschSymbolReqId s;
+  uint64_t p;
+};
+
+typedef struct puschAntennaProc_s {
+  unsigned char Ns;
+  int nl;
+  unsigned short p;
+  unsigned char symbol;
+  unsigned short bwp_start_subcarrier;
+  int aarx;
+  int beam_nb;
+  int numAntennas;
+  nfapi_nr_pusch_pdu_t *pusch_pdu;
+  int *max_ch;
+  c16_t *pilot;
+  int *nest_count;
+  uint64_t *noise_amp2;
+  delay_t *delay;
+  int chest_freq;
+  NR_gNB_PUSCH *pusch_vars;
+  NR_DL_FRAME_PARMS *frame_parms;
+  c16_t ***rxdataF;
+} puschAntennaProc_t;
+
+struct puschAntennaReqId {
+  uint16_t ul_id;
+  uint16_t spare;
+} __attribute__((packed));
+
+union puschAntennaReqUnion {
+  struct puschAntennaReqId s;
   uint64_t p;
 };
 

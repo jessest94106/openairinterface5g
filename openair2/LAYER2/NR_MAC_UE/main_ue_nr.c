@@ -60,7 +60,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   mac->get_sib1 = false;
   mac->get_otherSI = false;
   memset(&mac->phy_config, 0, sizeof(mac->phy_config));
-  mac->si_window_start = -1;
+  mac->si_SchedInfo.si_window_start = -1;
   mac->servCellIndex = 0;
   mac->harq_ACK_SpatialBundlingPUCCH = false;
   mac->harq_ACK_SpatialBundlingPUSCH = false;
@@ -240,8 +240,7 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
   nr_mac->scheduling_info.phr_info.was_mac_reset = true;
 
   // flush the soft buffers for all DL HARQ processes
-  for (int k = 0; k < NR_MAX_HARQ_PROCESSES; k++)
-    memset(&nr_mac->dl_harq_info[k], 0, sizeof(NR_UE_HARQ_STATUS_t));
+  memset(nr_mac->dl_harq_info, 0, sizeof(nr_mac->dl_harq_info));
 
   // for each DL HARQ process, consider the next received transmission for a TB as the very first transmission
   for (int k = 0; k < NR_MAX_HARQ_PROCESSES; k++)
@@ -262,7 +261,7 @@ void release_mac_configuration(NR_UE_MAC_INST_t *mac, NR_UE_MAC_reset_cause_t ca
     asn1cFreeStruc(asn_DEF_NR_MIB, mac->mib);
     asn1cFreeStruc(asn_DEF_NR_SearchSpace, mac->search_space_zero);
     asn1cFreeStruc(asn_DEF_NR_ControlResourceSet, mac->coreset0);
-    asn1cFreeStruc(asn_DEF_NR_SI_SchedulingInfo, mac->si_SchedulingInfo);
+    asn_sequence_empty(&mac->si_SchedInfo.si_SchedInfo_list);
     asn1cFreeStruc(asn_DEF_NR_TDD_UL_DL_ConfigCommon, mac->tdd_UL_DL_ConfigurationCommon);
     for (int i = mac->lc_ordered_list.count; i > 0 ; i--)
       asn_sequence_del(&mac->lc_ordered_list, i - 1, 1);

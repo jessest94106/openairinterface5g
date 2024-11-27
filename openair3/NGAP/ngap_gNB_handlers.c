@@ -27,26 +27,31 @@
  * \version 0.1
  */
  
-#include <stdint.h>
-
-#include "intertask_interface.h"
-
-#include "ngap_common.h"
-// #include "ngap_gNB.h"
-#include "ngap_gNB_defs.h"
 #include "ngap_gNB_handlers.h"
-#include "ngap_gNB_decoder.h"
-
-#include "ngap_gNB_ue_context.h"
-#include "ngap_gNB_trace.h"
-#include "ngap_gNB_nas_procedures.h"
-#include "ngap_gNB_management_procedures.h"
-
-#include "ngap_gNB_default_values.h"
-
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "INTEGER.h"
+#include "ngap_msg_includes.h"
+#include "OCTET_STRING.h"
+#include "PHY/defs_common.h"
+#include "T.h"
 #include "assertions.h"
+#include "common/utils/T/T.h"
+#include "constr_TYPE.h"
 #include "conversions.h"
-#include "NGAP_NonDynamic5QIDescriptor.h"
+#include "intertask_interface.h"
+#include "ngap_common.h"
+#include "ngap_gNB_decoder.h"
+#include "ngap_gNB_defs.h"
+#include "ngap_gNB_management_procedures.h"
+#include "ngap_gNB_nas_procedures.h"
+#include "ngap_gNB_trace.h"
+#include "ngap_gNB_ue_context.h"
+#include "ngap_messages_types.h"
+#include "oai_asn1.h"
+#include "queue.h"
 
 static void allocCopy(ngap_pdu_t *out, OCTET_STRING_t in)
 {

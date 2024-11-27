@@ -370,26 +370,20 @@ def ExecuteActionWithParam(action):
 		success = SCA.CppCheckAnalysis(HTML)
 
 	elif action == 'Push_Local_Registry':
-		string_field = test.findtext('registry_svr_id')
-		if (string_field is not None):
-			CONTAINERS.registrySvrId = string_field
-		success = CONTAINERS.Push_Image_to_Local_Registry(HTML)
+		svr_id = test.findtext('svr_id')
+		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id)
 
-	elif action == 'Pull_Local_Registry':
-		string_field = test.findtext('test_svr_id')
-		if (string_field is not None):
-			CONTAINERS.testSvrId = string_field
-		CONTAINERS.imageToPull.clear()
-		string_field = test.findtext('images_to_pull')
-		if (string_field is not None):
-			CONTAINERS.imageToPull = string_field.split()
-		success = CONTAINERS.Pull_Image_from_Local_Registry(HTML)
-
-	elif action == 'Clean_Test_Server_Images':
-		string_field = test.findtext('test_svr_id')
-		if (string_field is not None):
-			CONTAINERS.testSvrId = string_field
-		success = CONTAINERS.Clean_Test_Server_Images(HTML)
+	elif action == 'Pull_Local_Registry' or action == 'Clean_Test_Server_Images':
+		svr_id = test.findtext('svr_id')
+		images = test.findtext('images').split()
+		# hack: for FlexRIC, we need to overwrite the tag to use
+		tag = None
+		if len(images) == 1 and images[0] == "oai-flexric":
+			tag = CONTAINERS.flexricTag
+		if action == "Pull_Local_Registry":
+			success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images, tag=tag)
+		if action == "Clean_Test_Server_Images":
+			success = CONTAINERS.Clean_Test_Server_Images(HTML, svr_id, images, tag=tag)
 
 	elif action == 'Custom_Command':
 		node = test.findtext('node')
@@ -404,13 +398,9 @@ def ExecuteActionWithParam(action):
 		success = cls_oaicitest.Custom_Script(HTML, node, script, command_fail)
 
 	elif action == 'Pull_Cluster_Image':
-		string_field = test.findtext('images_to_pull')
-		if (string_field is not None):
-			CLUSTER.imageToPull = string_field.split()
-		string_field = test.findtext('test_svr_id')
-		if (string_field is not None):
-			CLUSTER.testSvrId = string_field
-		success = CLUSTER.PullClusterImage(HTML, RAN)
+		images = test.findtext('images').split()
+		node = test.findtext('node')
+		success = CLUSTER.PullClusterImage(HTML, node, images)
 
 	else:
 		logging.warning(f"unknown action {action}, skip step")
@@ -634,7 +624,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	#(6 digits or less than 6 digits followed by +)
 	for test in exclusion_tests:
 		if     (not re.match('^[0-9]{6}$', test) and
-				not re.match('^[0-9]{1,5}\+$', test)):
+				not re.match('^[0-9]{1,5}\\+$', test)):
 			logging.error('exclusion test is invalidly formatted: ' + test)
 			sys.exit(1)
 		else:
@@ -645,7 +635,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	#be verbose
 	for test in requested_tests:
 		if     (re.match('^[0-9]{6}$', test) or
-				re.match('^[0-9]{1,5}\+$', test)):
+				re.match('^[0-9]{1,5}\\+$', test)):
 			logging.info('test group/case requested: ' + test)
 		else:
 			logging.error('requested test is invalidly formatted: ' + test)

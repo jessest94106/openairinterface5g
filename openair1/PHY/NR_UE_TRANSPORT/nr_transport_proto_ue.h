@@ -200,13 +200,6 @@ int nr_rx_pbch(PHY_VARS_NR_UE *ue,
 #define modOrder(I_MCS,I_TBS) ((I_MCS-I_TBS)*2+2) // Find modulation order from I_TBS and I_MCS
 #endif
 
-int dump_ue_stats(PHY_VARS_NR_UE *phy_vars_ue,
-                  const UE_nr_rxtx_proc_t *proc,
-                  char *buffer,
-                  int length,
-                  runmode_t mode,
-                  int input_level_dBm);
-
 /*!
   \brief This function performs the initial cell search procedure - PSS detection, SSS detection and PBCH detection.  At the
   end, the basic frame parameters are known (Frame configuration - TDD/FDD and cyclic prefix length,

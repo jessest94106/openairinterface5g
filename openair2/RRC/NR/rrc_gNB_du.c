@@ -20,17 +20,37 @@
  */
 
 #include "rrc_gNB_du.h"
-#include "rrc_gNB_NGAP.h"
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include "F1AP_CauseMisc.h"
+#include "F1AP_CauseProtocol.h"
+#include "F1AP_CauseRadioNetwork.h"
+#include "PHY/defs_common.h"
+#include "T.h"
+#include "asn_codecs.h"
+#include "assertions.h"
 #include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "common/utils/alg/foreach.h"
+#include "common/utils/ds/seq_arr.h"
+#include "constr_TYPE.h"
+#include "executables/softmodem-common.h"
+#include "f1ap_messages_types.h"
+#include "ngap_messages_types.h"
 #include "nr_rrc_defs.h"
-#include "rrc_gNB_UE_context.h"
 #include "rrc_gNB_mobility.h"
 #include "openair2/F1AP/f1ap_common.h"
 #include "openair2/F1AP/f1ap_ids.h"
-#include "executables/softmodem-common.h"
-#include "common/utils/ds/seq_arr.h"
-#include "common/utils/alg/foreach.h"
 #include "lib/f1ap_interface_management.h"
+#include "rrc_gNB_NGAP.h"
+#include "rrc_gNB_UE_context.h"
+#include "rrc_messages_types.h"
+#include "s1ap_messages_types.h"
+#include "tree.h"
+#include "uper_decoder.h"
+#include "utils.h"
+#include "xer_encoder.h"
 
 int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
 {

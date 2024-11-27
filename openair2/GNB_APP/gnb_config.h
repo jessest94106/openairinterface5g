@@ -29,23 +29,13 @@
 
 #ifndef GNB_CONFIG_H_
 #define GNB_CONFIG_H_
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <libconfig.h>
-
-#include "commonDef.h"
-#include "common/platform_types.h"
-#include "common/platform_constants.h"
-#include "PHY/defs_eNB.h"
-#include "s1ap_messages_types.h"
-#include "ngap_messages_types.h"
-#include "f1ap_messages_types.h"
-#include "e1ap_messages_types.h"
-
-#include "rrc_messages_types.h"
-#include "intertask_interface.h"
+#include <stdint.h>
 #include "RRC/NR/nr_rrc_defs.h"
+#include "assertions.h"
+#include "common/config/config_load_configmodule.h"
+#include "common/ngran_types.h"
+#include "f1ap_messages_types.h"
+#include "intertask_interface.h"
 
 #define IPV4_STR_ADDR_TO_INT_NWBO(AdDr_StR,NwBo,MeSsAgE ) do {\
             struct in_addr inp;\

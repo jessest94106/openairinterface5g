@@ -28,30 +28,49 @@
  * \email: raymond.knopp@eurecom.fr
  */
 
+#include <assert.h>
+#include <assertions.h>
+#include <openair2/RRC/NR/nr_rrc_proto.h>
+#include <openair2/RRC/NR/rrc_gNB_UE_context.h>
+#include <openair3/ocp-gtpu/gtp_itf.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "MESSAGES/asn1_msg.h"
+#include "OCTET_STRING.h"
+#include "PHY/defs_common.h"
+#include "RRC/NR/nr_rrc_config.h"
+#include "T.h"
+#include "asn_codecs.h"
+#include "asn_internal.h"
+#include "assertions.h"
+#include "common/ngran_types.h"
+#include "common/ran_context.h"
+#include "common/utils/T/T.h"
+#include "constr_TYPE.h"
+#include "executables/nr-softmodem.h"
+#include "executables/softmodem-common.h"
+#include "gtpv1_u_messages_types.h"
+#include "intertask_interface.h"
+#include "ngap_messages_types.h"
+#include "nr_pdcp/nr_pdcp_entity.h"
+#include "nr_pdcp/nr_pdcp_oai_api.h"
 #include "nr_rrc_defs.h"
-#include "NR_RRCReconfiguration.h"
-#include "NR_UE-NR-Capability.h"
-//#include "NR_UE-CapabilityRAT-ContainerList.h"
-#include "LTE_UE-CapabilityRAT-ContainerList.h"
-#include "NR_CellGroupConfig.h"
-#include "NR_CG-Config.h"
-//#include "NR_SRB-ToAddModList.h"
-#include "uper_encoder.h"
-#include "uper_decoder.h"
+#include "openair2/F1AP/f1ap_ids.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "openair2/RRC/NR/rrc_gNB_GTPV1U.h"
-#include "openair2/F1AP/f1ap_ids.h"
-#include "executables/softmodem-common.h"
-#include "executables/nr-softmodem.h"
-#include <openair2/RRC/NR/rrc_gNB_UE_context.h>
-#include <openair3/ocp-gtpu/gtp_itf.h>
-#include "openair3/SECU/secu_defs.h"
 #include "openair3/SECU/key_nas_deriver.h"
-
-#include <openair2/RRC/NR/nr_rrc_proto.h>
-#include "nr_pdcp/nr_pdcp_oai_api.h"
-#include "MESSAGES/asn1_msg.h"
+#include "rlc.h"
+#include "s1ap_messages_types.h"
+#include "tree.h"
+#include "uper_decoder.h"
+#include "uper_encoder.h"
+#include "x2ap_messages_types.h"
+#include "xer_decoder.h"
+#include "xer_encoder.h"
 
 void rrc_parse_ue_capabilities(gNB_RRC_INST *rrc, NR_UE_CapabilityRAT_ContainerList_t *UE_CapabilityRAT_ContainerList, x2ap_ENDC_sgnb_addition_req_t *m, NR_CG_ConfigInfo_IEs_t *cg_config_info)
 {
