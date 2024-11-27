@@ -467,6 +467,7 @@ int main(int argc, char **argv){
   ru->nb_rx          = n_rx;
   ru->num_gNB        = 1;
   ru->gNB_list[0]    = gNB;
+  gNB->num_RU = 1;
   gNB->gNB_config.carrier_config.num_tx_ant.value = 1;
   gNB->gNB_config.carrier_config.num_rx_ant.value = 1;
   if (mu == 0)
