@@ -812,15 +812,6 @@ static bool set_fh_config(int ru_idx, int num_rus, enum xran_category xran_cat, 
   fh_config->nULCenterFreqARFCN = 0; // center frequency for UL in NR-ARFCN; not used in xran
   fh_config->ttiCb = NULL; // check tti_to_phy_cb(), tx_cp_dl_cb() and tx_cp_ul_cb => first_call
   fh_config->ttiCbParam = NULL; // check tti_to_phy_cb(), tx_cp_dl_cb() and tx_cp_ul_cb => first_call
-  fh_config->Tadv_cp_dl = *gpd(fhp, nfh, ORAN_FH_CONFIG_TADV_CP_DL)->uptr; // not used in xran
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T2A_CP_DL, &fh_config->T2a_min_cp_dl, &fh_config->T2a_max_cp_dl)) // not used in xran
-    return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T2A_CP_UL, &fh_config->T2a_min_cp_ul, &fh_config->T2a_max_cp_ul)) // not used in xran
-    return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T2A_UP, &fh_config->T2a_min_up, &fh_config->T2a_max_up)) // not used in xran
-    return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_TA3, &fh_config->Ta3_min, &fh_config->Ta3_max)) // not used in xran
-    return false;
   if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_DL, &fh_config->T1a_min_cp_dl, &fh_config->T1a_max_cp_dl))
     return false;
   if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_UL, &fh_config->T1a_min_cp_ul, &fh_config->T1a_max_cp_ul))

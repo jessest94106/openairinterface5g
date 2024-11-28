@@ -57,11 +57,6 @@
 
 #define CONFIG_STRING_ORAN_FH "fh_config"
 
-#define ORAN_FH_CONFIG_TADV_CP_DL "Tadv_cp_dl"
-#define ORAN_FH_CONFIG_T2A_CP_DL "T2a_cp_dl"
-#define ORAN_FH_CONFIG_T2A_CP_UL "T2a_cp_ul"
-#define ORAN_FH_CONFIG_T2A_UP "T2a_up"
-#define ORAN_FH_CONFIG_TA3 "Ta3"
 #define ORAN_FH_CONFIG_T1A_CP_DL "T1a_cp_dl"
 #define ORAN_FH_CONFIG_T1A_CP_UL "T1a_cp_ul"
 #define ORAN_FH_CONFIG_T1A_UP "T1a_up"
@@ -73,11 +68,6 @@
 
 // clang-format off
 #define ORAN_FH_DESC { \
-  {ORAN_FH_CONFIG_TADV_CP_DL,   "Tadv parameter of RU\n",      PARAMFLAG_MANDATORY, .uptr=NULL, .defuintval=0,     TYPE_UINT,      0}, \
-  {ORAN_FH_CONFIG_T2A_CP_DL,    "T2a_cp_dl" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
-  {ORAN_FH_CONFIG_T2A_CP_UL,    "T2a_cp_ul" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
-  {ORAN_FH_CONFIG_T2A_UP,       "T2a_up" ORAN_FH_HLP_CPLT,     PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
-  {ORAN_FH_CONFIG_TA3,          "Ta3" ORAN_FH_HLP_CPLT,        PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
   {ORAN_FH_CONFIG_T1A_CP_DL,    "T1a_cp_dl" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
   {ORAN_FH_CONFIG_T1A_CP_UL,    "T1a_cp_ul" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
   {ORAN_FH_CONFIG_T1A_UP,       "T1a_up" ORAN_FH_HLP_CPLT,     PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
