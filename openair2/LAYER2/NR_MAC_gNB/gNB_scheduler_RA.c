@@ -2429,7 +2429,8 @@ void nr_schedule_RA(module_id_t module_idP,
     NR_COMMON_channels_t *cc = &mac->common_channels[CC_id];
     for (int i = 0; i < NR_NB_RA_PROC_MAX; i++) {
       NR_RA_t *ra = &cc->ra[i];
-      LOG_D(NR_MAC, "RA[state:%d]\n", ra->ra_state);
+      if (ra->ra_state != nrRA_gNB_IDLE)
+        LOG_D(NR_MAC, "RA[%d] frame.slot %d.%d state: %d\n", i, frameP, slotP, ra->ra_state);
 
       // Check RA Contention Resolution timer
       if (ra->ra_type == RA_4_STEP && ra->ra_state >= nrRA_WAIT_Msg3) {

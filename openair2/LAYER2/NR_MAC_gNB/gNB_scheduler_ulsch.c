@@ -585,38 +585,36 @@ void handle_nr_ul_harq(const int CC_idP,
                        const nfapi_nr_crc_t *crc_pdu)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
-  NR_SCHED_LOCK(&nrmac->sched_lock);
-
-  NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, crc_pdu->rnti);
-  bool UE_waiting_CFRA_msg3 = get_UE_waiting_CFRA_msg3(nrmac, CC_idP, frame, slot, crc_pdu->rnti);
-
-  if (!UE || UE_waiting_CFRA_msg3 == true) {
-    LOG_D(NR_MAC, "handle harq for rnti %04x, in RA process\n", crc_pdu->rnti);
-    for (int i = 0; i < NR_NB_RA_PROC_MAX; ++i) {
-      NR_RA_t *ra = &nrmac->common_channels[CC_idP].ra[i];
-      if (ra->ra_state >= nrRA_WAIT_Msg3 && ra->rnti == crc_pdu->rnti) {
-        NR_SCHED_UNLOCK(&nrmac->sched_lock);
-        return;
-      }
-    }
-    NR_SCHED_UNLOCK(&nrmac->sched_lock);
-    LOG_D(NR_MAC, "no RA proc for RNTI 0x%04x in Msg3/MsgA-PUSCH\n", crc_pdu->rnti);
-    return;
-  }
   if (nrmac->radio_config.disable_harq) {
     LOG_D(NR_MAC, "skipping UL feedback handling as HARQ is disabled\n");
-    NR_SCHED_UNLOCK(&nrmac->sched_lock);
     return;
   }
+
+  NR_SCHED_LOCK(&nrmac->sched_lock);
+  for (int i = 0; i < NR_NB_RA_PROC_MAX; ++i) {
+    NR_RA_t *ra = &nrmac->common_channels[CC_idP].ra[i];
+    // if we find any ongoing RA that has already scheduled MSG3
+    // and it is expecting its reception in current frame and slot with matching RNTI
+    // we can exit the function (no HARQ involved)
+    if (ra->ra_state >= nrRA_WAIT_Msg3 && ra->rnti == crc_pdu->rnti && frame == ra->Msg3_frame && slot == ra->Msg3_slot) {
+      LOG_D(NR_MAC, "UL for rnti %04x in RA (MSG3), no need to process HARQ\n", crc_pdu->rnti);
+      NR_SCHED_UNLOCK(&nrmac->sched_lock);
+      return;
+    }
+  }
+
+  NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, crc_pdu->rnti);
+  if (!UE) {
+    NR_SCHED_UNLOCK(&nrmac->sched_lock);
+    LOG_E(NR_MAC, "Couldn't identify UE connected with current UL HARQ process\n");
+    return;
+  }
+
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   int8_t harq_pid = sched_ctrl->feedback_ul_harq.head;
   LOG_D(NR_MAC, "Comparing crc_pdu->harq_id vs feedback harq_pid = %d %d\n",crc_pdu->harq_id, harq_pid);
   while (crc_pdu->harq_id != harq_pid || harq_pid < 0) {
-    LOG_W(NR_MAC,
-          "Unexpected ULSCH HARQ PID %d (have %d) for RNTI 0x%04x (ignore this warning for RA)\n",
-          crc_pdu->harq_id,
-          harq_pid,
-          crc_pdu->rnti);
+    LOG_W(NR_MAC, "Unexpected ULSCH HARQ PID %d (have %d) for RNTI 0x%04x\n", crc_pdu->harq_id, harq_pid, crc_pdu->rnti);
     if (harq_pid < 0) {
       NR_SCHED_UNLOCK(&nrmac->sched_lock);
       return;
