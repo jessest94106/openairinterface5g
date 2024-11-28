@@ -138,8 +138,8 @@ extern int usrp_tx_thread;
   {"clock-source",          CONFIG_HLP_CLK,           0,              .uptr=&CLOCK_SOURCE,                    .defintval=0,             TYPE_UINT,   0},  \
   {"time-source",           CONFIG_HLP_TME,           0,              .uptr=&TIMING_SOURCE,                   .defintval=0,             TYPE_UINT,   0},  \
   {"tune-offset",           CONFIG_HLP_TUNE_OFFSET,   0,              .dblptr=&TUNE_OFFSET,                   .defintval=0,             TYPE_DOUBLE, 0},  \
-  {"C" ,                    CONFIG_HLP_DLF,           0,              .u64ptr=&(downlink_frequency[0][0]),    .defint64val=0,           TYPE_UINT64, 0},  \
-  {"CO" ,                   CONFIG_HLP_ULF,           0,              .iptr=&(uplink_frequency_offset[0][0]), .defintval=0,             TYPE_INT,    0},  \
+  {"C" ,                    CONFIG_HLP_DLF,           0,              .u64ptr=&(downlink_frequency[0][0]),    .defuintval=0,            TYPE_UINT64, 0},  \
+  {"CO" ,                   CONFIG_HLP_ULF,           0,              .i64ptr=&(uplink_frequency_offset[0][0]), .defintval=0,           TYPE_INT64,  0},  \
   {"a" ,                    CONFIG_HLP_CHOFF,         0,              .iptr=&CHAIN_OFFSET,                    .defintval=0,             TYPE_INT,    0},  \
   {"d" ,                    CONFIG_HLP_SOFTS,         PARAMFLAG_BOOL, .uptr=&do_forms,                        .defintval=0,             TYPE_UINT,   0},  \
   {"q" ,                    CONFIG_HLP_STMON,         PARAMFLAG_BOOL, .iptr=&cpu_meas_enabled,                     .defintval=0,             TYPE_INT,    0},  \
@@ -330,7 +330,7 @@ char *get_softmodem_function(void);
 #define SOFTMODEM_RTSIGNAL  (SIGRTMIN+1)
 void set_softmodem_sighandler(void);
 extern uint64_t downlink_frequency[MAX_NUM_CCs][4];
-extern int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
+extern int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 extern int usrp_tx_thread;
 extern int sf_ahead;
 extern int oai_exit;

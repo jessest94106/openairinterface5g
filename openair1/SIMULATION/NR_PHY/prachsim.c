@@ -79,7 +79,7 @@ RU_t *ru;
 double cpuf;
 //uint8_t nfapi_mode=0;
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
-int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 uint32_t N_RB_DL = 106;
 
 NR_IF_Module_t *NR_IF_Module_init(int Mod_id) { return (NULL); }
