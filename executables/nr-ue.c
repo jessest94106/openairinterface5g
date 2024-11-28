@@ -443,6 +443,7 @@ static void UE_synch(void *arg) {
 static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
 {
   PHY_VARS_NR_UE *UE = rxtxD->UE;
+  const fapi_nr_config_request_t *cfg = &UE->nrUE_config;
   const UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
 
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
@@ -466,10 +467,10 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
         flags = TX_BURST_START_AND_END;
     } else {
       int slots_frame = fp->slots_per_frame;
-      int curr_slot = nr_ue_slot_select(&UE->nrUE_config, slot);
+      int curr_slot = nr_ue_slot_select(cfg, slot);
       if (curr_slot != NR_DOWNLINK_SLOT) {
-        int next_slot = nr_ue_slot_select(&UE->nrUE_config, (slot + 1) % slots_frame);
-        int prev_slot = nr_ue_slot_select(&UE->nrUE_config, (slot + slots_frame - 1) % slots_frame);
+        int next_slot = nr_ue_slot_select(cfg, (slot + 1) % slots_frame);
+        int prev_slot = nr_ue_slot_select(cfg, (slot + slots_frame - 1) % slots_frame);
         if (prev_slot == NR_DOWNLINK_SLOT)
           flags = TX_BURST_START;
         else if (next_slot == NR_DOWNLINK_SLOT)
