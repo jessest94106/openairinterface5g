@@ -119,9 +119,8 @@ static void test_initial_ul_rrc_message_transfer(void)
  */
 static void test_dl_rrc_message_transfer(void)
 {
-  uint8_t *rrc = calloc(strlen("RRC Container") + 1, sizeof(uint8_t));
-  uint32_t *old_gNB_DU_ue_id = calloc(1, sizeof(uint32_t));
-  AssertFatal(rrc != NULL && old_gNB_DU_ue_id != NULL, "out of memory\n");
+  uint8_t *rrc = calloc_or_fail(strlen("RRC Container") + 1, sizeof(*rrc));
+  uint32_t *old_gNB_DU_ue_id = calloc_or_fail(1, sizeof(*old_gNB_DU_ue_id));
   memcpy((void *)rrc, "RRC Container", strlen("RRC Container") + 1);
 
   f1ap_dl_rrc_message_t orig = {
@@ -194,12 +193,11 @@ static void test_f1ap_setup_request(void)
 {
   /* allocate memory */
   /* gNB_DU_name */
-  uint8_t *gNB_DU_name = calloc(strlen("OAI DU") + 1, sizeof(uint8_t));
-  AssertFatal(gNB_DU_name != NULL, "out of memory\n");
+  uint8_t *gNB_DU_name = calloc_or_fail(strlen("OAI DU") + 1, sizeof(*gNB_DU_name));
   memcpy(gNB_DU_name, "OAI DU", strlen("OAI DU") + 1);
   /* sys_info */
-  uint8_t *mib = calloc(3, sizeof(uint8_t));
-  uint8_t *sib1 = calloc(3, sizeof(uint8_t));
+  uint8_t *mib = calloc_or_fail(3, sizeof(*mib));
+  uint8_t *sib1 = calloc_or_fail(3, sizeof(*sib1));
   f1ap_gnb_du_system_info_t sys_info = {
       .mib_length = 3,
       .mib = mib,
@@ -208,11 +206,10 @@ static void test_f1ap_setup_request(void)
   };
   /* measurement_timing_information */
   int measurement_timing_config_len = strlen("0") + 1;
-  uint8_t *measurement_timing_information = calloc(measurement_timing_config_len, sizeof(uint8_t));
-  AssertFatal(measurement_timing_information != NULL, "out of memory\n");
+  uint8_t *measurement_timing_information = calloc_or_fail(measurement_timing_config_len, sizeof(*measurement_timing_information));
   memcpy((void *)measurement_timing_information, "0", measurement_timing_config_len);
   /* TAC */
-  uint32_t *tac = calloc(1, sizeof(uint32_t));
+  uint32_t *tac = calloc_or_fail(1, sizeof(*tac));
   /*
    * TDD test
    */
@@ -245,7 +242,7 @@ static void test_f1ap_setup_request(void)
       .rrc_ver[2] = 56,
       .cell[0].info = info,
   };
-  orig.cell[0].sys_info = calloc(1, sizeof(*orig.cell[0].sys_info));
+  orig.cell[0].sys_info = calloc_or_fail(1, sizeof(*orig.cell[0].sys_info));
   *orig.cell[0].sys_info = sys_info;
   // encode
   F1AP_F1AP_PDU_t *f1enc = encode_f1ap_setup_request(&orig);
@@ -311,8 +308,7 @@ static void test_f1ap_setup_response(void)
   /* gNB_CU_name */
   char *cu_name = "OAI-CU";
   int len = strlen(cu_name) + 1;
-  uint8_t *gNB_CU_name = calloc(len, sizeof(uint8_t));
-  AssertFatal(gNB_CU_name != NULL, "out of memory\n");
+  uint8_t *gNB_CU_name = calloc_or_fail(len, sizeof(*gNB_CU_name));
   memcpy((void *)gNB_CU_name, cu_name, len);
   /* create message */
   f1ap_setup_resp_t orig = {
@@ -393,8 +389,8 @@ static void test_f1ap_setup_failure(void)
 static void test_f1ap_du_configuration_update(void)
 {
   /* sys_info */
-  uint8_t *mib = calloc(3, sizeof(uint8_t));
-  uint8_t *sib1 = calloc(3, sizeof(uint8_t));
+  uint8_t *mib = calloc_or_fail(3, sizeof(*mib));
+  uint8_t *sib1 = calloc_or_fail(3, sizeof(*sib1));
   f1ap_gnb_du_system_info_t sys_info = {
       .mib_length = 3,
       .mib = mib,
@@ -404,12 +400,10 @@ static void test_f1ap_du_configuration_update(void)
   /* measurement_timing_information modify */
   char *s = "1";
   int measurement_timing_config_len = strlen(s) + 1;
-  uint8_t *measurement_timing_config_mod = calloc(measurement_timing_config_len, sizeof(uint8_t));
-  AssertFatal(measurement_timing_config_mod != NULL, "out of memory\n");
+  uint8_t *measurement_timing_config_mod = calloc_or_fail(measurement_timing_config_len, sizeof(*measurement_timing_config_mod));
   memcpy((void *)measurement_timing_config_mod, s, measurement_timing_config_len);
   /* TAC modify */
-  uint32_t *tac = calloc(1, sizeof(uint32_t));
-  AssertFatal(tac != NULL, "out of memory\n");
+  uint32_t *tac = calloc_or_fail(1, sizeof(*tac));
   *tac = 456;
   /* info modify */
   f1ap_served_cell_info_t info = {
@@ -437,8 +431,7 @@ static void test_f1ap_du_configuration_update(void)
       .cell_to_delete[0].plmn.mnc = 1,
       .cell_to_delete[0].plmn.mnc_digit_length = 3,
   };
-  orig.cell_to_modify[0].sys_info = calloc(1, sizeof(*orig.cell_to_modify[0].sys_info));
-  AssertFatal(orig.cell_to_modify[0].sys_info != NULL, "out of memory\n");
+  orig.cell_to_modify[0].sys_info = calloc_or_fail(1, sizeof(*orig.cell_to_modify[0].sys_info));
   *orig.cell_to_modify[0].sys_info = sys_info;
 
   F1AP_F1AP_PDU_t *f1enc = encode_f1ap_du_configuration_update(&orig);
