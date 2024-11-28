@@ -11,7 +11,7 @@ unsigned int mmapped_dma=0;
 uint32_t timing_advance;
 int8_t threequarter_fs;
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
-int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 int cpu_meas_enabled;
 THREAD_STRUCT thread_struct;
 uint32_t target_ul_mcs = 9;

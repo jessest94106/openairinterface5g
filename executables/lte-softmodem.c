@@ -101,7 +101,7 @@ int oai_exit = 0;
 int NB_UE_INST = 0;
 
 uint64_t                 downlink_frequency[MAX_NUM_CCs][4];
-int32_t                  uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t                  uplink_frequency_offset[MAX_NUM_CCs][4];
 
 int UE_scan = 1;
 int UE_scan_carrier = 0;
