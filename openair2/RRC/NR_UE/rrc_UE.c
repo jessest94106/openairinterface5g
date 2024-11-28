@@ -972,9 +972,12 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc, NR_Rec
 
   NR_UE_Timers_Constants_t *tac = &rrc->timers_and_constants;
   nr_timer_stop(&tac->T310);
-  int t304_value = nr_rrc_get_T304(reconfigurationWithSync->t304);
-  nr_timer_setup(&tac->T304, t304_value, 10); // 10ms step
-  nr_timer_start(&tac->T304);
+  if (!get_softmodem_params()->phy_test) {
+    // T304 is stopped upon completion of RA procedure which is not done in phy-test mode
+    int t304_value = nr_rrc_get_T304(reconfigurationWithSync->t304);
+    nr_timer_setup(&tac->T304, t304_value, 10); // 10ms step
+    nr_timer_start(&tac->T304);
+  }
   rrc->rnti = reconfigurationWithSync->newUE_Identity;
   // reset the MAC entity of this cell group (done at MAC in handle_reconfiguration_with_sync)
 }
