@@ -53,7 +53,10 @@ bool eq_f1ap_cell_info(const f1ap_served_cell_info_t *a, const f1ap_served_cell_
 {
   _F1_EQ_CHECK_LONG(a->nr_cellid, b->nr_cellid);
   _F1_EQ_CHECK_INT(a->nr_pci, b->nr_pci);
-  _F1_EQ_CHECK_INT(*a->tac, *b->tac);
+  if ((!a->tac) ^ (!b->tac))
+    return false;
+  if (a->tac)
+    _F1_EQ_CHECK_INT(*a->tac, *b->tac);
   _F1_EQ_CHECK_INT(a->mode, b->mode);
   if (a->mode == F1AP_MODE_TDD) {
     /* TDD */
