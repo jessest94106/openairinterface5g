@@ -115,9 +115,12 @@ int mm_msg_encode(const fgmm_nas_message_plain_t *p, uint8_t *buffer, uint32_t l
 
 int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_security_header_t *header, int length)
 {
-  LOG_FUNC_IN;
-
   int size = 0;
+
+  if (length < sizeof(fgs_nas_message_security_header_t)) {
+    PRINT_NAS_ERROR("Could not encode the NAS security header\n");
+    return -1;
+  }
 
   /* Encode the protocol discriminator) */
   ENCODE_U8(buffer, header->protocol_discriminator, size);
@@ -130,7 +133,7 @@ int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_
   /* Encode the sequence number */
   ENCODE_U8(buffer + size, header->sequence_number, size);
 
-  LOG_FUNC_RETURN(size);
+  return size;
 }
 
 /**

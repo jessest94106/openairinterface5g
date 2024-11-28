@@ -667,7 +667,7 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   // encode the message
   initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
 
-  int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, &nas_msg.header, size);
+  int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, sp, size);
 
   initialNasMsg->length =
       security_header_len
