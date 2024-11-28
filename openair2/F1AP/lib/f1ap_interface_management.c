@@ -173,7 +173,7 @@ static bool decode_served_cell_info(const F1AP_Served_Cell_Information_t *in, f1
     OCTET_STRING_TO_INT24(in->fiveGS_TAC, *info->tac);
   }
   // NR CGI (M)
-  TBCD_TO_MCC_MNC(&(in->nRCGI.pLMN_Identity), info->plmn.mcc, info->plmn.mnc, info->plmn.mnc_digit_length);
+  PLMNID_TO_MCC_MNC(&(in->nRCGI.pLMN_Identity), info->plmn.mcc, info->plmn.mnc, info->plmn.mnc_digit_length);
   // NR Cell Identity (M)
   BIT_STRING_TO_NR_CELL_IDENTITY(&in->nRCGI.nRCellIdentity, info->nr_cellid);
   // NR PCI (M)
@@ -310,7 +310,7 @@ static bool decode_cells_to_activate(served_cells_to_activate_t *out, const F1AP
               "in->value.present != F1AP_Cells_to_be_Activated_List_ItemIEs__value_PR_Cells_to_be_Activated_List_Item\n");
   const F1AP_Cells_to_be_Activated_List_Item_t *cell = &in->value.choice.Cells_to_be_Activated_List_Item;
   // NR CGI (M)
-  TBCD_TO_MCC_MNC(&cell->nRCGI.pLMN_Identity, out->plmn.mcc, out->plmn.mnc, out->plmn.mnc_digit_length);
+  PLMNID_TO_MCC_MNC(&cell->nRCGI.pLMN_Identity, out->plmn.mcc, out->plmn.mnc, out->plmn.mnc_digit_length);
   BIT_STRING_TO_NR_CELL_IDENTITY(&cell->nRCGI.nRCellIdentity, out->nr_cellid);
   // NR PCI (O)
   if (cell->nRPCI != NULL)
@@ -1162,7 +1162,7 @@ bool decode_f1ap_du_configuration_update(const F1AP_F1AP_PDU_t *pdu, f1ap_gnb_du
           /* Old NR CGI (M) */
           F1AP_NRCGI_t *oldNRCGI = &served_cells_item->oldNRCGI;
           f1ap_plmn_t *old_plmn = &out->cell_to_modify[i].old_plmn;
-          TBCD_TO_MCC_MNC(&(oldNRCGI->pLMN_Identity), old_plmn->mcc, old_plmn->mnc, old_plmn->mnc_digit_length);
+          PLMNID_TO_MCC_MNC(&oldNRCGI->pLMN_Identity, old_plmn->mcc, old_plmn->mnc, old_plmn->mnc_digit_length);
           /* Old NR CGI Cell ID */
           BIT_STRING_TO_NR_CELL_IDENTITY(&oldNRCGI->nRCellIdentity, out->cell_to_modify[i].old_nr_cellid);
           /* Served Cell Information (M) */
@@ -1186,7 +1186,7 @@ bool decode_f1ap_du_configuration_update(const F1AP_F1AP_PDU_t *pdu, f1ap_gnb_du
           F1AP_NRCGI_t *oldNRCGI = &served_cells_item->oldNRCGI;
           f1ap_plmn_t *plmn = &out->cell_to_delete[i].plmn;
           /* Old NR CGI (M) */
-          TBCD_TO_MCC_MNC(&(oldNRCGI->pLMN_Identity), plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
+          PLMNID_TO_MCC_MNC(&(oldNRCGI->pLMN_Identity), plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
           // NR cellID
           BIT_STRING_TO_NR_CELL_IDENTITY(&oldNRCGI->nRCellIdentity, out->cell_to_delete[i].nr_cellid);
         }
@@ -1541,7 +1541,7 @@ bool decode_f1ap_cu_configuration_update_acknowledge(const F1AP_F1AP_PDU_t *pdu,
           const F1AP_Cells_Failed_to_be_Activated_List_Item_t *item = &itemIE->value.choice.Cells_Failed_to_be_Activated_List_Item;
           // NR CGI (M)
           f1ap_plmn_t *plmn = &out->cells_failed_to_be_activated[j].plmn;
-          TBCD_TO_MCC_MNC(&(item->nRCGI.pLMN_Identity), plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
+          PLMNID_TO_MCC_MNC(&(item->nRCGI.pLMN_Identity), plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
           BIT_STRING_TO_NR_CELL_IDENTITY(&item->nRCGI.nRCellIdentity, out->cells_failed_to_be_activated[j].nr_cellid);
           // Cause (M)
           switch (item->cause.present) {
