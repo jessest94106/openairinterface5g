@@ -88,11 +88,12 @@ static void fill_DRB_configList_e1(NR_DRB_ToAddModList_t *DRB_configList, const 
     pdcp_config->t_Reordering = calloc(1, sizeof(*pdcp_config->t_Reordering));
     *pdcp_config->t_Reordering = drb->pdcp_config.reorderingTimer;
     pdcp_config->ext1 = NULL;
-    if (pdu->integrityProtectionIndication == 0 || // Required
-        pdu->integrityProtectionIndication == 1) { // Preferred
-        asn1cCallocOne(drbCfg->integrityProtection, NR_PDCP_Config__drb__integrityProtection_enabled);
+    const security_indication_t *sec = &pdu->securityIndication;
+    if (sec->integrityProtectionIndication == SECURITY_REQUIRED ||
+        sec->integrityProtectionIndication == SECURITY_PREFERRED) {
+      asn1cCallocOne(drbCfg->integrityProtection, NR_PDCP_Config__drb__integrityProtection_enabled);
     }
-    if (pdu->confidentialityProtectionIndication == 2) { // Not Needed
+    if (sec->confidentialityProtectionIndication == SECURITY_NOT_NEEDED) {
       asn1cCalloc(pdcp_config->ext1, ext1);
       asn1cCallocOne(ext1->cipheringDisabled, NR_PDCP_Config__ext1__cipheringDisabled_true);
     }
@@ -188,8 +189,8 @@ void e1_bearer_context_setup(const e1ap_bearer_setup_req_t *req)
                               req_drb->id,
                               req_pdu->sessionId,
                               qfi,
-                              req_pdu->tlAddress,
-                              req_pdu->teId,
+                              req_pdu->UP_TL_information.tlAddress,
+                              req_pdu->UP_TL_information.teId,
                               nr_pdcp_data_req_drb,
                               sdap_data_req,
                               &resp_n3);

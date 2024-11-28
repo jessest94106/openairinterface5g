@@ -349,11 +349,13 @@ void trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
     if (cuup_nssai.sst == 0)
       cuup_nssai = pdu->nssai; /* for CU-UP selection below */
 
-    pdu->integrityProtectionIndication = rrc->security.do_drb_integrity ? E1AP_IntegrityProtectionIndication_required : E1AP_IntegrityProtectionIndication_not_needed;
-
-    pdu->confidentialityProtectionIndication = rrc->security.do_drb_ciphering ? E1AP_ConfidentialityProtectionIndication_required : E1AP_ConfidentialityProtectionIndication_not_needed;
-    pdu->teId = session->gtp_teid;
-    memcpy(&pdu->tlAddress, session->upf_addr.buffer, 4); // Fixme: dirty IPv4 target
+    security_indication_t *sec = &pdu->securityIndication;
+    sec->integrityProtectionIndication = rrc->security.do_drb_integrity ? SECURITY_REQUIRED
+                                                                        : SECURITY_NOT_NEEDED;
+    sec->confidentialityProtectionIndication = rrc->security.do_drb_ciphering ? SECURITY_REQUIRED
+                                                                              : SECURITY_NOT_NEEDED;
+    pdu->UP_TL_information.teId = session->gtp_teid;
+    memcpy(&pdu->UP_TL_information.tlAddress, session->upf_addr.buffer, sizeof(in_addr_t));
 
     /* we assume for the moment one DRB per PDU session. Activate the bearer,
      * and configure in RRC. */
@@ -380,9 +382,10 @@ void trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
 
       drb->numCellGroups = 1; // assume one cell group associated with a DRB
 
+      // Set all Cell Group IDs to MCG
       for (int k=0; k < drb->numCellGroups; k++) {
-        cell_group_t *cellGroup = drb->cellGroupList + k;
-        cellGroup->id = 0; // MCG
+        cell_group_id_t *cellGroup = drb->cellGroupList + k;
+        *cellGroup = MCG;
       }
 
       drb->numQosFlow2Setup = session->nb_qos;
