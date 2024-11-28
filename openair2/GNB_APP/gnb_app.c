@@ -238,10 +238,6 @@ void *gNB_app_task(void *args_p)
 
       break;
 
-    case F1AP_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE:
-      LOG_E(GNB_APP, "[gNB %ld] Handling of %s message not implemented yet\n", instance, msg_name);
-      break;
-
     case NGAP_DEREGISTERED_GNB_IND:
       LOG_W(GNB_APP, "[gNB %ld] Received %s: associated AMF %d\n", instance, msg_name,
             NGAP_DEREGISTERED_GNB_IND(msg_p).nb_amf);
