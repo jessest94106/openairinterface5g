@@ -53,7 +53,7 @@ message(STATUS "No specific telnet functions for 4Gue")
 message(STATUS "Add 5Gue specific telnet functions in libtelnetsrv_5Gue.so")
 add_library(telnetsrv_5Gue MODULE telnetsrv_5Gue_measurements.c)
 add_dependencies(telnetsrv telnetsrv_5Gue)
-target_link_libraries(telnetsrv_5Gue PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+target_link_libraries(telnetsrv_5Gue PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs UTIL)
 
 message(STATUS "Add CI specific telnet functions in libtelnetsrv_ci.so")
 add_library(telnetsrv_ci MODULE telnetsrv_ci.c)
@@ -79,4 +79,3 @@ add_dependencies(telnetsrv telnetsrv_rrc)
 set_target_properties(telnetsrv telnetsrv_enb telnetsrv_5Gue telnetsrv_ci telnetsrv_ciUE telnetsrv_bearer telnetsrv_rrc
                       PROPERTIES LIBRARY_OUTPUT_DIRECTORY ../../..
 )
-
