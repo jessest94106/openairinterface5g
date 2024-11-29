@@ -401,6 +401,54 @@ void terminate_task(task_id_t task_id, module_id_t mod_id) {
 //extern void  free_transport(PHY_VARS_gNB *);
 extern void  nr_phy_free_RU(RU_t *);
 
+int stop_L1(module_id_t gnb_id)
+{
+  RU_t *ru = RC.ru[gnb_id];
+  if (!ru) {
+    LOG_W(GNB_APP, "no RU configured\n");
+    return -1;
+  }
+
+  if (!RC.gNB[gnb_id]->configured) {
+    LOG_W(GNB_APP, "L1 already stopped\n");
+    return -1;
+  }
+
+  LOG_I(GNB_APP, "stopping nr-softmodem\n");
+  oai_exit = 1;
+
+  /* these tasks/layers need to pick up new configuration */
+  if (RC.nb_nr_L1_inst > 0)
+    stop_gNB(RC.nb_nr_L1_inst);
+
+  if (RC.nb_RU > 0)
+    stop_RU(RC.nb_RU);
+
+  /* stop trx devices, multiple carrier currently not supported by RU */
+  if (ru->rfdevice.trx_stop_func) {
+    ru->rfdevice.trx_stop_func(&ru->rfdevice);
+    LOG_I(GNB_APP, "turned off RU rfdevice\n");
+  }
+
+  if (ru->ifdevice.trx_stop_func) {
+    ru->ifdevice.trx_stop_func(&ru->ifdevice);
+    LOG_I(GNB_APP, "turned off RU ifdevice\n");
+  }
+
+  /* release memory used by the RU/gNB threads (incomplete), after all
+   * threads have been stopped (they partially use the same memory) */
+  for (int inst = 0; inst < RC.nb_RU; inst++) {
+    nr_phy_free_RU(RC.ru[inst]);
+  }
+
+  for (int inst = 0; inst < RC.nb_nr_L1_inst; inst++) {
+    phy_free_nr_gNB(RC.gNB[inst]);
+  }
+
+  RC.gNB[gnb_id]->configured = 0;
+  return 0;
+}
+
 static  void wait_nfapi_init(char *thread_name)
 {
   pthread_mutex_lock( &nfapi_sync_mutex );
@@ -629,36 +677,14 @@ int main( int argc, char **argv ) {
   printf("TYPE <CTRL-C> TO TERMINATE\n");
   itti_wait_tasks_end(NULL);
   printf("Returned from ITTI signal handler\n");
-  oai_exit=1;
 
-  // cleanup
-  if (RC.nb_nr_L1_inst > 0)
-    stop_gNB(RC.nb_nr_L1_inst);
-
-  if (RC.nb_RU > 0)
-    stop_RU(RC.nb_RU);
-
-  /* release memory used by the RU/gNB threads (incomplete), after all
-   * threads have been stopped (they partially use the same memory) */
-  for (int inst = 0; inst < RC.nb_RU; inst++) {
-    nr_phy_free_RU(RC.ru[inst]);
-  }
-
-  for (int inst = 0; inst < RC.nb_nr_L1_inst; inst++) {
-    phy_free_nr_gNB(RC.gNB[inst]);
-  }
+  if (RC.nb_nr_L1_inst > 0 || RC.nb_RU > 0)
+    stop_L1(0);
 
   pthread_cond_destroy(&sync_cond);
   pthread_mutex_destroy(&sync_mutex);
   pthread_cond_destroy(&nfapi_sync_cond);
   pthread_mutex_destroy(&nfapi_sync_mutex);
-
-  // *** Handle per CC_id openair0
-
-  for(ru_id = 0; ru_id < RC.nb_RU; ru_id++) {
-    if (RC.ru[ru_id]->ifdevice.trx_end_func)
-      RC.ru[ru_id]->ifdevice.trx_end_func(&RC.ru[ru_id]->ifdevice);
-  }
 
   free(pckg);
   logClean();
