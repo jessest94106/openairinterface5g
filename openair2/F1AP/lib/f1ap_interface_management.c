@@ -1022,7 +1022,6 @@ F1AP_F1AP_PDU_t *encode_f1ap_du_configuration_update(const f1ap_gnb_du_configura
   /* mandatory */
   /* c2. Served_Cells_To_Add */
   if (msg->num_cells_to_add > 0) {
-    AssertFatal(false, "code for adding cells not tested\n");
     asn1cSequenceAdd(out->protocolIEs.list, F1AP_GNBDUConfigurationUpdateIEs_t, ie2);
     ie2->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Add_List;
     ie2->criticality = F1AP_Criticality_reject;
@@ -1080,7 +1079,6 @@ F1AP_F1AP_PDU_t *encode_f1ap_du_configuration_update(const f1ap_gnb_du_configura
     ie4->id = F1AP_ProtocolIE_ID_id_Served_Cells_To_Delete_List;
     ie4->criticality = F1AP_Criticality_reject;
     ie4->value.present = F1AP_GNBDUConfigurationUpdateIEs__value_PR_Served_Cells_To_Delete_List;
-    AssertFatal(msg->num_cells_to_delete == 0, "code for deleting cells not tested\n");
     for (int i = 0; i < msg->num_cells_to_delete; i++) {
       asn1cSequenceAdd(ie4->value.choice.Served_Cells_To_Delete_List.list,
                        F1AP_Served_Cells_To_Delete_ItemIEs_t,
@@ -1134,8 +1132,8 @@ bool decode_f1ap_du_configuration_update(const F1AP_F1AP_PDU_t *pdu, f1ap_gnb_du
       } break;
       case F1AP_ProtocolIE_ID_id_Served_Cells_To_Add_List: {
         /* Served Cells To Add List */
-        AssertError(out->num_cells_to_add > 0, return false, "at least 1 cell to add shall to be present");
         out->num_cells_to_add = ie->value.choice.Served_Cells_To_Add_List.list.count;
+        AssertError(out->num_cells_to_add > 0, return false, "at least 1 cell to add shall to be present");
         for (int i = 0; i < out->num_cells_to_add; i++) {
           F1AP_Served_Cells_To_Add_Item_t *served_cells_item =
               &((F1AP_Served_Cells_To_Add_ItemIEs_t *)ie->value.choice.Served_Cells_To_Add_List.list.array[i])
