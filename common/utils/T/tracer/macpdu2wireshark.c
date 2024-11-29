@@ -347,7 +347,7 @@ void nr_dl(void *_d, event e)
 {
   ev_data *d = _d;
 
-  if (e.e[d->dl_rnti].i == 0xffff) {
+  if (e.e[d->nr_dl_rnti].i == 0xffff) {
     if (d->no_sib) return;
 
     if (d->max_sib && d->cur_sib == d->max_sib) return;
@@ -356,7 +356,7 @@ void nr_dl(void *_d, event e)
   }
 
   trace_nr(d, NR_DIRECTION_DOWNLINK,
-           e.e[d->dl_rnti].i != 0xffff ? NR_C_RNTI : NR_SI_RNTI,
+           e.e[d->nr_dl_rnti].i != 0xffff ? NR_C_RNTI : NR_SI_RNTI,
            e.e[d->nr_dl_rnti].i, e.e[d->nr_dl_frame].i, e.e[d->nr_dl_slot].i,
            e.e[d->nr_dl_harq_pid].i, e.e[d->nr_dl_data].b,
            e.e[d->nr_dl_data].bsize, NO_PREAMBLE);
