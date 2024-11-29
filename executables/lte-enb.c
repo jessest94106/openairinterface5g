@@ -44,27 +44,16 @@
 
 #define _GNU_SOURCE
 #include <pthread.h>
-
-
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "assertions.h"
 
-
 #include "PHY/types.h"
-
 #include "PHY/INIT/phy_init.h"
 
 #include "PHY/defs_eNB.h"
 #include "SCHED/sched_eNB.h"
 #include "PHY/LTE_TRANSPORT/transport_proto.h"
 #include "nfapi/oai_integration/vendor_ext.h"
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "radio/COMMON/common_lib.h"
-
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
 #include "PHY/LTE_TRANSPORT/if4_tools.h"
 #include "PHY/LTE_ESTIMATION/lte_estimation.h"
@@ -101,8 +90,6 @@ struct timing_info_t {
 } timing_info;
 
 // Fix per CC openair rf/if device update
-
-extern int oai_exit;
 
 extern int transmission_mode;
 
@@ -927,7 +914,7 @@ void init_eNB_proc(int inst) {
 
     if (cpu_meas_enabled)
       threadCreate(&proc->process_stats_thread, process_stats_thread, (void *)eNB, "opp stats", -1, sched_get_priority_min(SCHED_OAI));
-    if (!IS_SOFTMODEM_NOSTATS_BIT)
+    if (!IS_SOFTMODEM_NOSTATS)
       threadCreate(&proc->L1_stats_thread, L1_stats_thread, (void *)eNB, "L1 stats", -1, sched_get_priority_min(SCHED_OAI));
   }
 

@@ -295,12 +295,12 @@ static inline void nr_polar_deinterleaver(uint8_t *input, uint8_t *output, uint1
 static inline void nr_polar_rm_deinterleaving_lut(uint16_t *out, const uint E)
 {
   int16_t in[E];
-  for (int i = 0; i < E; i++)
+  for (uint i = 0; i < E; i++)
     in[i] = i;
   int T = ceil((sqrt(8 * E + 1) - 1) / 2);
   int v_tab[T][T];
   memset(v_tab, 0, sizeof(v_tab));
-  int k = 0;
+  uint k = 0;
   for (int i = 0; i < T; i++) {
     for (int j = 0; j < T - i; j++) {
       if (k < E) {

@@ -25,7 +25,6 @@
 
 #include <sys/sysinfo.h>
 #include "radio/COMMON/common_lib.h"
-#undef MALLOC
 #include "assertions.h"
 #include "PHY/types.h"
 

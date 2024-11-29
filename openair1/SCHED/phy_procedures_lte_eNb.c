@@ -1429,8 +1429,6 @@ void pusch_procedures(PHY_VARS_eNB *eNB,L1_rxtx_proc_t *proc) {
     stop_meas(&eNB->ulsch_decoding_stats);
 }
 
-extern int oai_exit;
-
 void fill_rx_indication(PHY_VARS_eNB *eNB,
                         int ULSCH_id,
                         int frame,

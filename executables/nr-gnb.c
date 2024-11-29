@@ -33,8 +33,6 @@
 #define _GNU_SOURCE
 #include <pthread.h>
 
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "assertions.h"
 #include <common/utils/LOG/log.h>
 #include <common/utils/system.h>
@@ -54,13 +52,7 @@
 #include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
 
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "radio/COMMON/common_lib.h"
-
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "PHY/LTE_TRANSPORT/if4_tools.h"
 
 #include "PHY/phy_extern.h"
@@ -376,9 +368,9 @@ void init_gNB_Tpool(int inst) {
   // this will be removed when the msgDataTx is not necessary anymore
   gNB->msgDataTx = msgDataTx;
 
-  if ((!get_softmodem_params()->emulate_l1) && (!IS_SOFTMODEM_NOSTATS_BIT) && (NFAPI_MODE!=NFAPI_MODE_VNF) && (NFAPI_MODE != NFAPI_MODE_AERIAL))
-     threadCreate(&proc->L1_stats_thread,nrL1_stats_thread,(void*)gNB,"L1_stats",-1,OAI_PRIORITY_RT_LOW);
-
+  if ((!get_softmodem_params()->emulate_l1) && (!IS_SOFTMODEM_NOSTATS) && (NFAPI_MODE != NFAPI_MODE_VNF)
+      && (NFAPI_MODE != NFAPI_MODE_AERIAL))
+    threadCreate(&proc->L1_stats_thread, nrL1_stats_thread, (void *)gNB, "L1_stats", -1, OAI_PRIORITY_RT_LOW);
 }
 
 void term_gNB_Tpool(int inst) {

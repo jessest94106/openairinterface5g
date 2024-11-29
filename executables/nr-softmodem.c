@@ -82,7 +82,6 @@ unsigned short config_frames[4] = {2,9,11,13};
 #include "radio/COMMON/common_lib.h"
 #include "s1ap_eNB.h"
 #include "sctp_eNB_task.h"
-#include "softmodem-bits.h"
 #include "system.h"
 #include "time_meas.h"
 #include "utils.h"
@@ -350,7 +349,8 @@ static void get_options(configmodule_interface_t *cfg)
 {
   paramdef_t cmdline_params[] = CMDLINE_PARAMS_DESC_GNB ;
   CONFIG_SETRTFLAG(CONFIG_NOEXITONHELP);
-  get_common_options(cfg, SOFTMODEM_GNB_BIT);
+  IS_SOFTMODEM_GNB = true;
+  get_common_options(cfg);
   config_process_cmdline(cfg, cmdline_params, sizeofArray(cmdline_params), NULL);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
 }

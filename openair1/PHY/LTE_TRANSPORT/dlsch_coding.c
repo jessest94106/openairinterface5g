@@ -58,8 +58,6 @@
   uint64_t deadline,
   uint64_t period);*/
 
-extern int oai_exit;
-
 void free_eNB_dlsch(LTE_eNB_DLSCH_t *dlsch) {
   int i, r, aa, layer;
 

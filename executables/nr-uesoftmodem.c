@@ -403,8 +403,8 @@ int main(int argc, char **argv)
   // get options and fill parameters from configuration file
 
   get_options(uniqCfg); // Command-line options specific for NRUE
-
-  get_common_options(uniqCfg, SOFTMODEM_5GUE_BIT);
+  IS_SOFTMODEM_5GUE = true;
+  get_common_options(uniqCfg);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
 
   softmodem_verify_mode(get_softmodem_params());

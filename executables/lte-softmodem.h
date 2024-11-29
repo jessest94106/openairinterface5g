@@ -20,7 +20,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "radio/COMMON/common_lib.h"
-//#undef MALLOC
 #include "assertions.h"
 #include "PHY/types.h"
 #include "PHY/defs_eNB.h"
@@ -121,9 +120,6 @@ extern uint64_t downlink_frequency[MAX_NUM_CCs][4];
 extern int32_t  uplink_frequency_offset[MAX_NUM_CCs][4];
 
 extern int rx_input_level_dBm;
-
-extern int oai_exit;
-
 extern openair0_config_t openair0_cfg[MAX_CARDS];
 extern pthread_cond_t sync_cond;
 extern pthread_mutex_t sync_mutex;

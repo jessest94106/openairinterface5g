@@ -72,8 +72,6 @@ const short conjugate2[8]__attribute__((aligned(16))) = {1,-1,1,-1,1,-1,1,-1};
 PHY_VARS_NR_UE *PHY_vars_UE_g[1][1] = { { NULL } };
 uint16_t n_rnti = 0x1234;
 openair0_config_t openair0_cfg[MAX_CARDS];
-
-uint64_t get_softmodem_optmask(void) {return 0;}
 static softmodem_params_t softmodem_params;
 softmodem_params_t *get_softmodem_params(void) {
   return &softmodem_params;
