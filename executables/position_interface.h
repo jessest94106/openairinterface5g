@@ -47,7 +47,7 @@
 }
 // clang-format on
 
-typedef struct {
+typedef struct position {
   double positionX;
   double positionY;
   double positionZ;

@@ -1749,7 +1749,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
 }
 
 // computes delay between ue and sat based on SIB19 ephemeris data
-static double calculate_ue_sat_ta(position_t *position_params, struct NR_PositionVelocity_r17 *sat_pos)
+static double calculate_ue_sat_ta(const position_t *position_params, struct NR_PositionVelocity_r17 *sat_pos)
 {
   // get UE position coordinates
   double posx = position_params->positionX;
@@ -1768,7 +1768,7 @@ static double calculate_ue_sat_ta(position_t *position_params, struct NR_Positio
   return ta_ms;
 }
 
-void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, NR_SIB19_r17_t *sib19_r17)
+void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, const position_t *pos, NR_SIB19_r17_t *sib19_r17)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1786,7 +1786,7 @@ void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, NR_SIB19_r17_t *sib1
     if (position_velocity
         && (position_velocity->positionX_r17 != 0 || position_velocity->positionY_r17 != 0
             || position_velocity->positionZ_r17 != 0)) {
-      mac->ntn_ta.N_UE_TA_adj = calculate_ue_sat_ta(get_position_coordinates(module_id), position_velocity);
+      mac->ntn_ta.N_UE_TA_adj = calculate_ue_sat_ta(pos, position_velocity);
     }
   }
   // if cellSpecificKoffset_r17 is present
