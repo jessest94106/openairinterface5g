@@ -449,6 +449,57 @@ int stop_L1(module_id_t gnb_id)
   return 0;
 }
 
+/*
+ * Restart the nr-softmodem after it has been soft-stopped with stop_L1L2()
+ */
+#include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
+int start_L1L2(module_id_t gnb_id)
+{
+  LOG_I(GNB_APP, "starting nr-softmodem\n");
+  /* block threads */
+  oai_exit = 0;
+  sync_var = -1;
+  extern void init_sched_response(void);
+  init_sched_response();
+
+  /* update config */
+  gNB_MAC_INST *mac = RC.nrmac[0];
+  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
+  nr_mac_config_scc(mac, scc, &mac->radio_config);
+
+  NR_BCCH_BCH_Message_t *mib = mac->common_channels[0].mib;
+  const NR_BCCH_DL_SCH_Message_t *sib1 = mac->common_channels[0].sib1;
+
+  /* update existing config in F1 Setup request structures */
+  f1ap_setup_req_t *sr = mac->f1_config.setup_req;
+  DevAssert(sr->num_cells_available == 1);
+  f1ap_served_cell_info_t *info = &sr->cell[0].info;
+  DevAssert(info->mode == F1AP_MODE_TDD);
+  DevAssert(scc->tdd_UL_DL_ConfigurationCommon != NULL);
+  info->tdd = read_tdd_config(scc); /* updates radio config */
+  /* send gNB-DU configuration update to RRC */
+  f1ap_gnb_du_configuration_update_t update = {
+    .transaction_id = 1,
+    .num_cells_to_modify = 1,
+  };
+  update.cell_to_modify[0].old_nr_cellid = info->nr_cellid;
+  update.cell_to_modify[0].info = *info;
+  update.cell_to_modify[0].sys_info = get_sys_info(mib, sib1);
+  mac->mac_rrc.gnb_du_configuration_update(&update);
+
+  init_NR_RU(config_get_if(), NULL);
+
+  start_NR_RU();
+  wait_RUs();
+  init_eNB_afterRU();
+  LOG_I(GNB_APP, "Sending sync to all threads\n");
+  pthread_mutex_lock(&sync_mutex);
+  sync_var=0;
+  pthread_cond_broadcast(&sync_cond);
+  pthread_mutex_unlock(&sync_mutex);
+  return 0;
+}
+
 static  void wait_nfapi_init(char *thread_name)
 {
   pthread_mutex_lock( &nfapi_sync_mutex );
