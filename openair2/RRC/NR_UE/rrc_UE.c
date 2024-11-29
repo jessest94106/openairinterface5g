@@ -242,8 +242,8 @@ static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si,
         SI_info->SInfo_r17.sib19_validity = true;
         if (g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
           xer_fprint(stdout, &asn_DEF_NR_SIB19_r17, (const void *)typeandinfo->choice.sib19_v1700);
-        position_t *p = get_position_coordinates(0);
-        nr_rrc_mac_config_req_sib19_r17(ue_id, p, typeandinfo->choice.sib19_v1700);
+        position_t p = get_position_coordinates(0);
+        nr_rrc_mac_config_req_sib19_r17(ue_id, &p, typeandinfo->choice.sib19_v1700);
         nr_timer_start(&SI_info->SInfo_r17.sib19_timer);
         break;
       default:

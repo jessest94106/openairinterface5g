@@ -160,7 +160,6 @@ void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
   ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
   ue->ntn_config_message->update = false;
 
-  config_position_coordinates(UE_id);
   // initialize all signal buffers
   init_nr_ue_signal(ue, nb_connected_gNB);
 
