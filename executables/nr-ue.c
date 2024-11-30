@@ -558,6 +558,13 @@ void processSlotTX(void *arg)
   TracyCZoneEnd(ctx);
 }
 
+static uint64_t get_carrier_frequency(const int N_RB, const int mu, const uint32_t pointA_freq_khz)
+{
+  const uint64_t bw = (NR_NB_SC_PER_RB * N_RB) * MU_SCS(mu);
+  const uint64_t carrier_freq = (pointA_freq_khz + bw / 2) * 1000;
+  return carrier_freq;
+}
+
 static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
                                const UE_nr_rxtx_proc_t *proc,
                                int *tx_wait_for_dlsch,
@@ -584,10 +591,9 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
       UE->target_Nid_cell = UE->synch_request.synch_req.target_Nid_cell;
       UE->target_Nid_cell = synch_req->target_Nid_cell;
 
-      uint64_t dl_bw = (12 * fp->N_RB_DL) * (15000 << fp->numerology_index);
-      uint64_t dl_CarrierFreq = (dl_bw >> 1) + (uint64_t)UE->nrUE_config.carrier_config.dl_frequency * 1000;
-      uint64_t ul_bw = (12 * fp->N_RB_UL) * (15000 << fp->numerology_index);
-      uint64_t ul_CarrierFreq = (ul_bw >> 1) + (uint64_t)UE->nrUE_config.carrier_config.uplink_frequency * 1000;
+      const fapi_nr_ue_carrier_config_t *cfg = &UE->nrUE_config.carrier_config;
+      uint64_t dl_CarrierFreq = get_carrier_frequency(fp->N_RB_DL, fp->numerology_index, cfg->dl_frequency);
+      uint64_t ul_CarrierFreq = get_carrier_frequency(fp->N_RB_UL, fp->numerology_index, cfg->uplink_frequency);
       if (dl_CarrierFreq != fp->dl_CarrierFreq || ul_CarrierFreq != fp->ul_CarrierFreq) {
         fp->dl_CarrierFreq = dl_CarrierFreq;
         fp->ul_CarrierFreq = ul_CarrierFreq;
