@@ -725,6 +725,10 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
           timing_advance,
           sduP,
           rssi);
+    if (harq_pid < 0) {
+      LOG_E(NR_MAC, "UE %04x received ULSCH when feedback UL HARQ %d (unexpected ULSCH transmission)\n", rntiP, harq_pid);
+      return;
+    }
 
     // if not missed detection (10dB threshold for now)
     if (rssi > 0) {
@@ -1401,10 +1405,10 @@ void handle_nr_srs_measurements(const module_id_t module_id,
       const int ul_prbblack_SNR_threshold = nr_mac->ul_prbblack_SNR_threshold;
       uint16_t *ulprbbl = nr_mac->ulprbbl;
 
-      uint16_t num_rbs = nr_srs_bf_report.prg_size * nr_srs_bf_report.prgs.num_prgs;
+      uint16_t num_rbs = nr_srs_bf_report.prg_size * nr_srs_bf_report.reported_symbol_list[0].num_prgs;
       memset(ulprbbl, 0, num_rbs * sizeof(uint16_t));
       for (int rb = 0; rb < num_rbs; rb++) {
-        int snr = (nr_srs_bf_report.prgs.prg_list[rb / nr_srs_bf_report.prg_size].rb_snr >> 1) - 64;
+        int snr = (nr_srs_bf_report.reported_symbol_list[0].prg_list[rb / nr_srs_bf_report.prg_size].rb_snr >> 1) - 64;
         if (snr < wide_band_snr_dB - ul_prbblack_SNR_threshold) {
           ulprbbl[rb] = 0x3FFF; // all symbols taken
         }
