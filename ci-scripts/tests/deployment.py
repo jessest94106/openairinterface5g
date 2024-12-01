@@ -65,6 +65,15 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.assertFalse(deploy)
 		self.cont.yamlPath = old
 
+	def test_deployfails_2svc(self):
+		# fails reliably
+		old = self.cont.yamlPath
+		self.cont.yamlPath[0] = 'tests/simple-fail-2svc/'
+		deploy = self.cont.DeployObject(self.html)
+		self.cont.UndeployObject(self.html, self.ran)
+		self.assertFalse(deploy)
+		self.cont.yamlPath = old
+
 	def test_deploy_ran(self):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb"
