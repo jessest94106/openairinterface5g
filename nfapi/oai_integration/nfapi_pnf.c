@@ -78,16 +78,12 @@ extern int nfapi_sync_var;
 extern int sync_var;
 
 nfapi_tx_request_pdu_t *tx_request_pdu[1023][10][10]; // [frame][subframe][max_num_pdus]
-uint8_t nr_tx_pdus[32][16][4096];
 nfapi_nr_pdu_t *tx_data_request[1023][20][10]; //[frame][slot][max_num_pdus]
 uint8_t tx_pdus[32][8][4096];
 
 nfapi_ue_release_request_body_t release_rntis;
 
-nfapi_nr_pnf_param_response_t g_pnf_param_resp;
-
-
-nfapi_pnf_p7_config_t *p7_config_g = NULL;
+static nfapi_pnf_p7_config_t *p7_config_g = NULL;
 
 void *pnf_allocate(size_t size) {
   return malloc(size);
@@ -1727,8 +1723,8 @@ int pnf_nr_sim_pack_vendor_extention_tlv(void *ve, uint8_t **ppWritePackedMsg, u
   return -1;
 }
 
-nfapi_dl_config_request_t dummy_dl_config_req;
-nfapi_tx_request_t dummy_tx_req;
+static nfapi_dl_config_request_t dummy_dl_config_req;
+static nfapi_tx_request_t dummy_tx_req;
 
 int start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi_start_request_t *req) {
   printf("[PNF] Received NFAPI_START_REQ phy_id:%d\n", req->header.phy_id);

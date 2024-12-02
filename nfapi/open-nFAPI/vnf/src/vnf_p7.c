@@ -2068,7 +2068,7 @@ void vnf_handle_timing_info(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7)
         }
 }
 
-int16_t vnf_pnf_sfnslot_delta;
+static int16_t vnf_pnf_sfnslot_delta;
 
 void vnf_nr_handle_timing_info(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7)
 {

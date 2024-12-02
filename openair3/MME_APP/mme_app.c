@@ -232,7 +232,7 @@ void *MME_app_task(void *args_p) {
 
   /* Try to register each MCE */
   // This assumes that node_type of all RRC instances is the same
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     //register_mce_pending = MCE_app_register(RC.rrc[0]->node_type, mce_id_start, mce_id_end);
   }
 
@@ -264,41 +264,41 @@ void *MME_app_task(void *args_p) {
       break;
 
     case M3AP_REGISTER_MCE_CNF: //M3AP_REGISTER_MCE_CNF debería
-      //AssertFatal(!NODE_IS_DU(RC.rrc[0]->node_type), "Should not have received S1AP_REGISTER_ENB_CNF\n");
-       // if (EPC_MODE_ENABLED) {
-       //   LOG_I(MME_APP, "[MCE %d] Received %s: associated MME %d\n", instance, ITTI_MSG_NAME (msg_p),
-       //         M3AP_REGISTER_MCE_CNF(msg_p).nb_mme);
-       //   DevAssert(register_mce_pending > 0);
-       //   register_mce_pending--;
+      // AssertFatal(!NODE_IS_DU(RC.rrc[0]->node_type), "Should not have received S1AP_REGISTER_ENB_CNF\n");
+      //  if ((!IS_SOFTMODEM_NOS1)) {
+      //    LOG_I(MME_APP, "[MCE %d] Received %s: associated MME %d\n", instance, ITTI_MSG_NAME (msg_p),
+      //          M3AP_REGISTER_MCE_CNF(msg_p).nb_mme);
+      //    DevAssert(register_mce_pending > 0);
+      //    register_mce_pending--;
 
-       //   /* Check if at least MCE is registered with one MME */
-       //   if (M3AP_REGISTER_MCE_CNF(msg_p).nb_mme > 0) {
-       //     registered_mce++;
-       //   }
+      //   /* Check if at least MCE is registered with one MME */
+      //   if (M3AP_REGISTER_MCE_CNF(msg_p).nb_mme > 0) {
+      //     registered_mce++;
+      //   }
 
-       //   /* Check if all register MCE requests have been processed */
-       //   if (register_mce_pending == 0) {
-       //     if (registered_mce == mce_nb) {
-       //       /* If all MCE are registered, start L2L1 task */
-       //      // MessageDef *msg_init_p;
-       //      // msg_init_p = itti_alloc_new_message (TASK_ENB_APP, 0, INITIALIZE_MESSAGE);
-       //      // itti_send_msg_to_task (TASK_L2L1, INSTANCE_DEFAULT, msg_init_p);
-       //     } else {
-       //       LOG_W(MME_APP, " %d MCE not associated with a MME, retrying registration in %d seconds ...\n",
-       //             mce_nb - registered_mce,  MCE_REGISTER_RETRY_DELAY);
+      //   /* Check if all register MCE requests have been processed */
+      //   if (register_mce_pending == 0) {
+      //     if (registered_mce == mce_nb) {
+      //       /* If all MCE are registered, start L2L1 task */
+      //      // MessageDef *msg_init_p;
+      //      // msg_init_p = itti_alloc_new_message (TASK_ENB_APP, 0, INITIALIZE_MESSAGE);
+      //      // itti_send_msg_to_task (TASK_L2L1, INSTANCE_DEFAULT, msg_init_p);
+      //     } else {
+      //       LOG_W(MME_APP, " %d MCE not associated with a MME, retrying registration in %d seconds ...\n",
+      //             mce_nb - registered_mce,  MCE_REGISTER_RETRY_DELAY);
 
-       //       /* Restart the MCE registration process in MCE_REGISTER_RETRY_DELAY seconds */
-       //       if (timer_setup (MCE_REGISTER_RETRY_DELAY, 0, TASK_MME_APP, INSTANCE_DEFAULT, TIMER_ONE_SHOT,
-       //                        NULL, &mce_register_retry_timer_id) < 0) {
-       //         LOG_E(MME_APP, " Can not start MCE register retry timer, use \"sleep\" instead!\n");
-       //         sleep(MCE_REGISTER_RETRY_DELAY);
-       //         /* Restart the registration process */
-       //         registered_mce = 0;
-       //         register_mce_pending = MCE_app_register (RC.rrc[0]->node_type,mce_id_start, mce_id_end);
-       //       }
-       //     }
-       //   }
-       // } /* if (EPC_MODE_ENABLED) */
+      //       /* Restart the MCE registration process in MCE_REGISTER_RETRY_DELAY seconds */
+      //       if (timer_setup (MCE_REGISTER_RETRY_DELAY, 0, TASK_MME_APP, INSTANCE_DEFAULT, TIMER_ONE_SHOT,
+      //                        NULL, &mce_register_retry_timer_id) < 0) {
+      //         LOG_E(MME_APP, " Can not start MCE register retry timer, use \"sleep\" instead!\n");
+      //         sleep(MCE_REGISTER_RETRY_DELAY);
+      //         /* Restart the registration process */
+      //         registered_mce = 0;
+      //         register_mce_pending = MCE_app_register (RC.rrc[0]->node_type,mce_id_start, mce_id_end);
+      //       }
+      //     }
+      //   }
+      // } /* if ((!IS_SOFTMODEM_NOS1)) */
 
       break;
 
@@ -345,32 +345,35 @@ void *MME_app_task(void *args_p) {
    //   break;
 
     case M3AP_DEREGISTERED_MCE_IND: //M3AP_DEREGISTERED_MCE_IND debería
-      if (EPC_MODE_ENABLED) {
-  	LOG_W(MME_APP, "[MCE %ld] Received %s: associated MME %d\n", instance, ITTI_MSG_NAME (msg_p),
-  	      M3AP_DEREGISTERED_MCE_IND(msg_p).nb_mme);
-  	/* TODO handle recovering of registration */
+      if (!IS_SOFTMODEM_NOS1) {
+        LOG_W(MME_APP,
+              "[MCE %ld] Received %s: associated MME %d\n",
+              instance,
+              ITTI_MSG_NAME(msg_p),
+              M3AP_DEREGISTERED_MCE_IND(msg_p).nb_mme);
+        /* TODO handle recovering of registration */
       }
 
       break;
 
     case TIMER_HAS_EXPIRED:
-        //if (EPC_MODE_ENABLED) {
-	//      LOG_I(MME_APP, " Received %s: timer_id %ld\n", ITTI_MSG_NAME (msg_p), TIMER_HAS_EXPIRED(msg_p).timer_id);
+      // if ((!IS_SOFTMODEM_NOS1)) {
+      //      LOG_I(MME_APP, " Received %s: timer_id %ld\n", ITTI_MSG_NAME (msg_p), TIMER_HAS_EXPIRED(msg_p).timer_id);
 
-	//      if (TIMER_HAS_EXPIRED (msg_p).timer_id == mce_register_retry_timer_id) {
-	//	/* Restart the registration process */
-	//	registered_mce = 0;
-	//	//register_mce_pending = MCE_app_register (RC.rrc[0]->node_type, mce_id_start, mce_id_end);
-	//      }
+      //      if (TIMER_HAS_EXPIRED (msg_p).timer_id == mce_register_retry_timer_id) {
+      //	/* Restart the registration process */
+      //	registered_mce = 0;
+      //	//register_mce_pending = MCE_app_register (RC.rrc[0]->node_type, mce_id_start, mce_id_end);
+      //      }
 
-	//      //if (TIMER_HAS_EXPIRED (msg_p).timer_id == x2_mce_register_retry_timer_id) {
-	//      //  /* Restart the registration process */
-	//      //  x2_registered_mce = 0;
-	//      //  x2_register_mce_pending = MCE_app_register_x2 (mce_id_start, mce_id_end);
-	//      //}
-        //} /* if (EPC_MODE_ENABLED) */
-	if(TIMER_HAS_EXPIRED(msg_p).timer_id == m3_mme_register_session_start_timer_id){
-		MME_app_send_m3ap_session_start_req(0);
+      //      //if (TIMER_HAS_EXPIRED (msg_p).timer_id == x2_mce_register_retry_timer_id) {
+      //      //  /* Restart the registration process */
+      //      //  x2_registered_mce = 0;
+      //      //  x2_register_mce_pending = MCE_app_register_x2 (mce_id_start, mce_id_end);
+      //      //}
+      //} /* if ((!IS_SOFTMODEM_NOS1)) */
+      if (TIMER_HAS_EXPIRED(msg_p).timer_id == m3_mme_register_session_start_timer_id) {
+        MME_app_send_m3ap_session_start_req(0);
 	}
 
       break;

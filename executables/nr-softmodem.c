@@ -107,11 +107,9 @@ char *uecap_file;
 runmode_t mode = normal_txrx;
 
 #if MAX_NUM_CCs == 1
-rx_gain_t rx_gain_mode[MAX_NUM_CCs][4] = {{max_gain,max_gain,max_gain,max_gain}};
 double tx_gain[MAX_NUM_CCs][4] = {{20,0,0,0}};
 double rx_gain[MAX_NUM_CCs][4] = {{110,0,0,0}};
 #else
-rx_gain_t rx_gain_mode[MAX_NUM_CCs][4] = {{max_gain,max_gain,max_gain,max_gain},{max_gain,max_gain,max_gain,max_gain}};
 double tx_gain[MAX_NUM_CCs][4] = {{20,0,0,0},{20,0,0,0}};
 double rx_gain[MAX_NUM_CCs][4] = {{110,0,0,0},{20,0,0,0}};
 #endif
@@ -489,9 +487,6 @@ int main( int argc, char **argv ) {
   logInit();
   lock_memory_to_ram();
   get_options(uniqCfg);
-
-
-  EPC_MODE_ENABLED = !IS_SOFTMODEM_NOS1;
 
   if (CONFIG_ISFLAGSET(CONFIG_ABORT) ) {
     fprintf(stderr,"Getting configuration failed\n");

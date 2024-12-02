@@ -124,6 +124,7 @@ extern struct rrc_eNB_ue_context_s *get_first_ue_context(eNB_RRC_INST *rrc_insta
 pthread_mutex_t      rrc_release_freelist;
 RRC_release_list_t   rrc_release_info;
 pthread_mutex_t      lock_ue_freelist;
+static uint8_t DRB2LCHAN[8];
 
 void
 openair_rrc_on(
@@ -846,7 +847,7 @@ rrc_eNB_free_UE(
     return;
   }
 
-  if(EPC_MODE_ENABLED) {
+  if ((!IS_SOFTMODEM_NOS1)) {
     if ((ue_context_pP->ue_context.ul_failure_timer >= 20000) && (mac_eNB_get_rrc_status(enb_mod_idP, rnti) >= RRC_CONNECTED)) {
       LOG_I(RRC, "[eNB %d] S1AP_UE_CONTEXT_RELEASE_REQ sent for RNTI %x, cause 21, radio connection with ue lost\n", enb_mod_idP, rnti);
       rrc_eNB_send_S1AP_UE_CONTEXT_RELEASE_REQ(enb_mod_idP, ue_context_pP, S1AP_CAUSE_RADIO_NETWORK,
@@ -1031,7 +1032,7 @@ rrc_eNB_process_RRCConnectionSetupComplete(
   ue_context_pP->ue_context.ue_rrc_inactivity_timer = 1; // set rrc inactivity timer when UE goes into RRC_CONNECTED
   T(T_ENB_RRC_CONNECTION_SETUP_COMPLETE, T_INT(ctxt_pP->module_id), T_INT(ctxt_pP->frame), T_INT(ctxt_pP->subframe), T_INT(ctxt_pP->rntiMaybeUEid));
 
-  if (EPC_MODE_ENABLED == 1) {
+  if ((!IS_SOFTMODEM_NOS1) == 1) {
     // Forward message to S1AP layer
     rrc_eNB_send_S1AP_NAS_FIRST_REQ(ctxt_pP, ue_context_pP, rrcConnectionSetupComplete);
   } else {
@@ -1374,7 +1375,7 @@ rrc_eNB_process_RRCConnectionReestablishmentComplete(
   ue_context_pP->ue_context.Srb1.Active = 1;
   //ue_context_pP->ue_context.Srb2.Srb_info.Srb_id = 2;
 
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     hashtable_rc_t    h_rc;
     int               j;
     rrc_ue_s1ap_ids_t *rrc_ue_s1ap_ids_p = NULL;
@@ -1450,13 +1451,13 @@ rrc_eNB_process_RRCConnectionReestablishmentComplete(
       put_UE_in_freelist(ctxt_pP->module_id, ctxt_pP->rntiMaybeUEid, 0);
       return;
     }
-  } /* EPC_MODE_ENABLED */
+  } /* (!IS_SOFTMODEM_NOS1) */
 
   /* Update RNTI in ue_context */
   ue_context_pP->ue_id_rnti = ctxt_pP->rntiMaybeUEid; // here ue_id_rnti is just a key, may be something else
   ue_context_pP->ue_context.rnti = ctxt_pP->rntiMaybeUEid;
 
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     uint8_t send_security_mode_command = false;
     rrc_pdcp_config_security(
       ctxt_pP,
@@ -5109,7 +5110,7 @@ rrc_eNB_configure_rbs_handover(struct rrc_eNB_ue_context_s *ue_context_p, protoc
 
   rrc_rlc_config_asn1_req(ctxt_pP, ue_context_p->ue_context.SRB_configList, (LTE_DRB_ToAddModList_t *)NULL, (LTE_DRB_ToReleaseList_t *)NULL, (LTE_PMCH_InfoList_r9_t *)NULL, 0, 0);
 
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     rrc_eNB_process_security (
       ctxt_pP,
       ue_context_p,
@@ -5257,7 +5258,7 @@ rrc_eNB_process_RRCConnectionReconfigurationComplete(
           LOG_D(RRC, "[eNB %d] Frame %d: Establish RLC UM Bidirectional, DRB %d Active\n",
                 ctxt_pP->module_id, ctxt_pP->frame, (int)DRB_configList->list.array[i]->drb_Identity);
 
-          if (!EPC_MODE_ENABLED && !ENB_NAS_USE_TUN) {
+          if (IS_SOFTMODEM_NOS1 && !ENB_NAS_USE_TUN) {
             LOG_I(OIP, "[eNB %d] trying to bring up the OAI interface oai%d\n",
                   ctxt_pP->module_id,
                   ctxt_pP->module_id);
@@ -5276,7 +5277,7 @@ rrc_eNB_process_RRCConnectionReconfigurationComplete(
               LOG_D(RRC, "[eNB %d] State = Attached (UE rnti %x module id %u)\n",
                     ctxt_pP->module_id, ue_context_pP->ue_context.rnti, ue_module_id);
             } /* oip_ifup */
-          } /* !EPC_MODE_ENABLED && ENB_NAS_USE_TUN*/
+          } /* !(!IS_SOFTMODEM_NOS1) && ENB_NAS_USE_TUN*/
 
           LOG_D(RRC,
                 PROTOCOL_RRC_CTXT_UE_FMT" RRC_eNB --- MAC_CONFIG_REQ  (DRB) ---> MAC_eNB\n",
@@ -6365,7 +6366,7 @@ rrc_eNB_decode_dcch(
           /*NN: revise the condition */
           /*FK: left the condition as is for the case MME is used (S1 mode) but setting  dedicated_DRB = 1 otherwise (noS1 mode) so that no second RRCReconfiguration message activationg more DRB is sent as this causes problems with the nasmesh driver.*/
 
-          if (EPC_MODE_ENABLED || get_softmodem_params()->emulate_l1) {
+          if (!IS_SOFTMODEM_NOS1 || get_softmodem_params()->emulate_l1) {
             if (ue_context_p->ue_context.StatusRrc == RRC_RECONFIGURED) {
               dedicated_DRB = 1;
               LOG_I(RRC,
@@ -6461,7 +6462,7 @@ rrc_eNB_decode_dcch(
             ul_dcch_msg->message.choice.c1.choice.rrcConnectionReconfigurationComplete.rrc_TransactionIdentifier);
         }
 
-        if (EPC_MODE_ENABLED) {
+        if (!IS_SOFTMODEM_NOS1) {
           if (dedicated_DRB == 1) {
             //    rrc_eNB_send_S1AP_E_RAB_SETUP_RESP(ctxt_pP,
             //               ue_context_p,
@@ -6538,7 +6539,7 @@ rrc_eNB_decode_dcch(
             LOG_I(RRC,"issue rrc_eNB_send_PATH_SWITCH_REQ \n");
             rrc_eNB_send_PATH_SWITCH_REQ(ctxt_pP,ue_context_p);
           }
-        } /* EPC_MODE_ENABLED */
+        } /* (!IS_SOFTMODEM_NOS1) */
 
         break;
 
@@ -6837,7 +6838,7 @@ rrc_eNB_decode_dcch(
             ue_context_p->ue_context.does_nr = 0;
         }
 
-        if (EPC_MODE_ENABLED) {
+        if (!IS_SOFTMODEM_NOS1) {
           rrc_eNB_send_S1AP_UE_CAPABILITIES_IND(ctxt_pP,
                                                 ue_context_p,
                                                 ul_dcch_msg);
@@ -6875,7 +6876,7 @@ rrc_eNB_decode_dcch(
         LOG_DUMPMSG(RRC,DEBUG_RRC,(char *)Rx_sdu,sdu_sizeP,
                     "[MSG] RRC UL Information Transfer \n");
 
-        if (EPC_MODE_ENABLED == 1) {
+        if (!IS_SOFTMODEM_NOS1) {
           rrc_eNB_send_S1AP_UPLINK_NAS(ctxt_pP,
                                        ue_context_p,
                                        ul_dcch_msg);
@@ -7264,7 +7265,7 @@ void rrc_subframe_process(protocol_ctxt_t *const ctxt_pP, const int CC_id) {
               ue_context_p->ue_context.rnti,
               ue_context_p->ue_context.ue_release_timer_thres_s1);
 
-        if (EPC_MODE_ENABLED)
+        if (!IS_SOFTMODEM_NOS1)
           rrc_eNB_generate_RRCConnectionRelease(ctxt_pP, ue_context_p);
         else
           removed_ue_count = add_ue_to_remove(ue_to_be_removed, removed_ue_count, ue_context_p);
@@ -7318,7 +7319,7 @@ void rrc_subframe_process(protocol_ctxt_t *const ctxt_pP, const int CC_id) {
           ue_context_p->ue_context.ue_release_timer_rrc = 1;
           ue_context_p->ue_context.ue_release_timer_thres_rrc = 100;
 
-          if (EPC_MODE_ENABLED) {
+          if (!IS_SOFTMODEM_NOS1) {
             if (rrc_release_info.RRC_release_ctrl[release_num].flag == 4) { // if timer_s1 == 0
               rrc_eNB_send_S1AP_UE_CONTEXT_RELEASE_CPLT(ctxt_pP->module_id,
                   ue_context_p->ue_context.eNB_ue_s1ap_id);
@@ -7343,7 +7344,7 @@ void rrc_subframe_process(protocol_ctxt_t *const ctxt_pP, const int CC_id) {
             if (rrc_ue_s1ap_ids != NULL) {
               rrc_eNB_S1AP_remove_ue_ids(RC.rrc[ctxt_pP->module_id], rrc_ue_s1ap_ids);
             }
-          } /* EPC_MODE_ENABLED */
+          } /* (!IS_SOFTMODEM_NOS1) */
 
           rrc_release_info.RRC_release_ctrl[release_num].flag = 0;
           rrc_release_info.num_UEs--;

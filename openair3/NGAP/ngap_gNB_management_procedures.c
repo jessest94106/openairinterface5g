@@ -39,7 +39,7 @@
 #include "queue.h"
 #include "tree.h"
 
-ngap_gNB_internal_data_t ngap_gNB_internal_data;
+static ngap_gNB_internal_data_t ngap_gNB_internal_data;
 
 RB_GENERATE(ngap_amf_map, ngap_gNB_amf_data_s, entry, ngap_gNB_compare_assoc_id);
 

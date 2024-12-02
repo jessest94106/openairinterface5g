@@ -1767,7 +1767,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   return true;
 }
 
-uint32_t ul_pf_tbs[5][29]; // pre-computed, approximate TBS values for PF coefficient
+static uint32_t ul_pf_tbs[5][29]; // pre-computed, approximate TBS values for PF coefficient
 typedef struct UEsched_s {
   float coef;
   NR_UE_info_t * UE;
