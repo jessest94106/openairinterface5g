@@ -462,4 +462,20 @@ typedef struct {
   int ue_id;
 } RlcMaxRtxIndication;
 
+#include "openair2/RRC/NR_UE/rrc_defs.h"
+typedef struct {
+  NR_ReestablishmentCause_t cause;
+} nr_mac_rrc_config_reset_t;
+typedef struct {
+  NR_CellGroupConfig_t *cellGroupConfig;
+  NR_UE_NR_Capability_t *UE_NR_Capability;
+} nr_mac_rrc_config_cg_t;
+typedef struct {
+  NR_BCCH_BCH_Message_t *bcch;
+  int get_sib;
+} nr_mac_rrc_config_mib_t;
+typedef struct {
+  NR_SIB1_t *sib1;
+} nr_mac_rrc_config_sib1_t;
+
 #endif /* RRC_MESSAGES_TYPES_H_ */
