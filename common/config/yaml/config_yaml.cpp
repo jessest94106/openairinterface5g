@@ -286,10 +286,10 @@ extern "C" int config_yaml_getlist(configmodule_interface_t *cfg,
     return -1;
   }
 
+  ParamList->numelt = node.size();
   if (!node.IsSequence()) {
     return -1;
   }
-  ParamList->numelt = node.size();
 
   if (ParamList->numelt > 0 && params != NULL) {
     ParamList->paramarray = static_cast<paramdef_t **>(config_allocate_new(cfg, ParamList->numelt * sizeof(paramdef_t *), true));

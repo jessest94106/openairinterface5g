@@ -364,6 +364,23 @@ TEST(yaml_config, test_int_array) {
   end_configmodule(cfg);
 }
 
+TEST(yaml_config, test_read_mapping_as_list) {
+  configmodule_interface_t *cfg = static_cast<configmodule_interface_t*>(calloc(1, sizeof(*cfg)));
+  cfg->cfgP[0] = strdup("test_read_mapping_as_list.yaml");
+  EXPECT_EQ(config_yaml_init(cfg), 0);
+
+
+  paramlist_def_t pl = {0};
+  strncpy(pl.listname, "fhi_72", sizeof(pl.listname) - 1);
+  config_yaml_getlist(cfg, &pl, NULL, 0, /* prefix */ NULL);
+  EXPECT_NE(pl.numelt, 0);
+  EXPECT_EQ(pl.numelt, 3);
+
+  config_yaml_end(cfg);
+  free(cfg->cfgP[0]);
+  end_configmodule(cfg);
+}
+
 int main(int argc, char** argv)
 {
   logInit();
