@@ -300,14 +300,14 @@ void nr_feptx_tp(RU_t *ru, int frame_tx, int slot)
   start_meas(&ru->ofdm_total_stats);
 
   size_t const sz = ru->nb_tx + (ru->half_slot_parallelization > 0) * ru->nb_tx;
-  AssertFatal(sz < 64, "Please, increase the buffer size");
-  feptx_cmd_t arr[64] = {0};
-  task_ans_t ans[64] = {0};
+  feptx_cmd_t arr[sz];
+  task_ans_t ans;
+  init_task_ans(&ans, sz);
 
   int nbfeptx = 0;
   for (int aid = 0; aid < ru->nb_tx; aid++) {
     feptx_cmd_t *feptx_cmd = &arr[nbfeptx];
-    feptx_cmd->ans = &ans[nbfeptx];
+    feptx_cmd->ans = &ans;
 
     feptx_cmd->aid = aid;
     feptx_cmd->ru = ru;
@@ -321,7 +321,7 @@ void nr_feptx_tp(RU_t *ru, int frame_tx, int slot)
     nbfeptx++;
     if (ru->half_slot_parallelization > 0) {
       feptx_cmd_t *feptx_cmd = &arr[nbfeptx];
-      feptx_cmd->ans = &ans[nbfeptx];
+      feptx_cmd->ans = &ans;
 
       feptx_cmd->aid = aid;
       feptx_cmd->ru = ru;
@@ -334,8 +334,7 @@ void nr_feptx_tp(RU_t *ru, int frame_tx, int slot)
       nbfeptx++;
     }
   }
-
-  join_task_ans(ans, nbfeptx);
+  join_task_ans(&ans);
 
   stop_meas(&ru->ofdm_total_stats);
   if (ru->idx == 0)
@@ -379,13 +378,13 @@ void nr_fep_tp(RU_t *ru, int slot) {
   start_meas(&ru->ofdm_demod_stats);
 
   size_t const sz = ru->nb_rx + (ru->half_slot_parallelization > 0) * ru->nb_rx;
-  AssertFatal(sz < 64, "Please, increase buffer size");
-  feprx_cmd_t arr[64] = {0};
-  task_ans_t ans[64] = {0};
+  feprx_cmd_t arr[sz];
+  task_ans_t ans;
+  init_task_ans(&ans, sz);
 
   for (int aid=0;aid<ru->nb_rx;aid++) {
     feprx_cmd_t *feprx_cmd = &arr[nbfeprx];
-    feprx_cmd->ans = &ans[nbfeprx];
+    feprx_cmd->ans = &ans;
 
     feprx_cmd->aid = aid;
     feprx_cmd->ru = ru;
@@ -399,7 +398,7 @@ void nr_fep_tp(RU_t *ru, int slot) {
     nbfeprx++;
     if (ru->half_slot_parallelization > 0) {
       feprx_cmd_t *feprx_cmd = &arr[nbfeprx];
-      feprx_cmd->ans = &ans[nbfeprx];
+      feprx_cmd->ans = &ans;
 
       feprx_cmd->aid = aid;
       feprx_cmd->ru = ru;
@@ -413,8 +412,7 @@ void nr_fep_tp(RU_t *ru, int slot) {
       nbfeprx++;
     }
   }
-
-  join_task_ans(ans, nbfeprx);
+  join_task_ans(&ans);
 
   stop_meas(&ru->ofdm_demod_stats);
   if (ru->idx == 0) VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPRX, 0 );

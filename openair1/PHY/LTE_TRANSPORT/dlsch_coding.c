@@ -348,12 +348,12 @@ int dlsch_encoding(PHY_VARS_eNB *eNB,
   }
 
   turboEncode_t arr[hadlsch->C];
-  task_ans_t ans[hadlsch->C];
-  memset(ans, 0, hadlsch->C * sizeof(task_ans_t));
+  task_ans_t ans;
+  init_task_ans(&ans, hadlsch->C);
 
   for (int r = 0, r_offset = 0; r < hadlsch->C; r++) {
     turboEncode_t *rdata = &arr[r];
-    rdata->ans = &ans[r];
+    rdata->ans = &ans;
 
     rdata->input=hadlsch->c[r];
     rdata->Kr_bytes= ( r<hadlsch->Cminus ? hadlsch->Kminus : hadlsch->Kplus) >>3;
@@ -382,7 +382,7 @@ int dlsch_encoding(PHY_VARS_eNB *eNB,
       r_offset += Nl*Qm * ((GpmodC==0?0:1) + (Gp/C));
   }
 
-  join_task_ans(ans, hadlsch->C);
+  join_task_ans(&ans);
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_ENB_DLSCH_ENCODING, VCD_FUNCTION_OUT);
   return(0);
@@ -449,12 +449,12 @@ int dlsch_encoding_fembms_pmch(PHY_VARS_eNB *eNB,
       return(-1);
   }
   turboEncode_t arr[hadlsch->C];
-  task_ans_t ans[hadlsch->C];
-  memset(ans, 0, hadlsch->C * sizeof(task_ans_t));
+  task_ans_t ans;
+  init_task_ans(&ans, hadlsch->C);
 
   for (int r = 0, r_offset = 0; r < hadlsch->C; r++) {
     turboEncode_t *rdata = &arr[r];
-    rdata->ans = &ans[r];
+    rdata->ans = &ans;
 
     rdata->input=hadlsch->c[r];
     rdata->Kr_bytes= ( r<hadlsch->Cminus ? hadlsch->Kminus : hadlsch->Kplus) >>3;
@@ -483,7 +483,7 @@ int dlsch_encoding_fembms_pmch(PHY_VARS_eNB *eNB,
       r_offset += Nl*Qm * ((GpmodC==0?0:1) + (Gp/C));
   }
 
-  join_task_ans(ans, hadlsch->C);
+  join_task_ans(&ans);
 
   return(0);
 }

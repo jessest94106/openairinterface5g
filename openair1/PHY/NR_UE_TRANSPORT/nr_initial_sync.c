@@ -308,8 +308,8 @@ nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
         fp->N_RB_DL,
         numGscn);
 
-  task_ans_t ans[numGscn];
-  memset(ans, 0, sizeof(ans));
+  task_ans_t ans;
+  init_task_ans(&ans, numGscn);
   nr_ue_ssb_scan_t ssb_info[numGscn];
   for (int s = 0; s < numGscn; s++) {
     nr_ue_ssb_scan_t *ssbInfo = &ssb_info[s];
@@ -331,7 +331,7 @@ nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
           ssbInfo->gscnInfo.gscn,
           ssbInfo->gscnInfo.ssbFirstSC,
           ssbInfo->gscnInfo.ssRef);
-    ssbInfo->ans = &ans[s];
+    ssbInfo->ans = &ans;
     task_t t = {.func = nr_scan_ssb, .args = ssbInfo};
     pushTpool(&get_nrUE_params()->Tpool, t);
   }
@@ -339,7 +339,7 @@ nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
   // Collect the scan results
   nr_ue_ssb_scan_t res = {0};
   if (numGscn > 0) {
-    join_task_ans(ans, numGscn);
+    join_task_ans(&ans);
     for (int i = 0; i < numGscn; i++) {
       nr_ue_ssb_scan_t *ssbInfo = &ssb_info[i];
       if (ssbInfo->syncRes.cell_detected) {

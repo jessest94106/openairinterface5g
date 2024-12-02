@@ -506,8 +506,8 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   int num_jobs = CEILIDIV(gNB->frame_parms.nb_antennas_rx, numAntennas);
   puschAntennaProc_t rdatas[num_jobs];
   memset(rdatas, 0, sizeof(rdatas));
-  task_ans_t ans[num_jobs];
-  memset(ans, 0, sizeof(ans));
+  task_ans_t ans;
+  init_task_ans(&ans, num_jobs);
   for (int job_id = 0; job_id < num_jobs; job_id++) {
     puschAntennaProc_t *rdata = &rdatas[job_id];
     task_t task = {.func = nr_pusch_antenna_processing, .args = rdata};
@@ -531,7 +531,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     rdata->pusch_vars = &gNB->pusch_vars[ul_id];
     rdata->chest_freq = gNB->chest_freq;
     rdata->rxdataF = gNB->common_vars.rxdataF;
-    rdata->ans = &ans[job_id];
+    rdata->ans = &ans;
     // Call the nr_pusch_antenna_processing function
     if (job_id == num_jobs - 1) {
       // Run the last job inline
@@ -539,10 +539,9 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     } else {
       pushTpool(&gNB->threadPool, task);
     }
-    LOG_D(PHY, "Added Antenna (count %d/%d) to process, in pipe\n", job_id, num_jobs);
   } // Antenna Loop
 
-  join_task_ans(ans, num_jobs - 1);
+  join_task_ans(&ans);
 
   stop_meas(&gNB->pusch_channel_estimation_antenna_processing_stats);
   for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx++) {
