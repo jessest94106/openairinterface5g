@@ -265,7 +265,7 @@ extern "C" int config_yaml_get(configmodule_interface_t *cfg, paramdef_t *cfgopt
     }
   }
   config_yaml::GetParams(cfg, node, cfgoptions, numoptions);
-  return 0;
+  return numoptions;
 }
 
 extern "C" int config_yaml_getlist(configmodule_interface_t *cfg,
