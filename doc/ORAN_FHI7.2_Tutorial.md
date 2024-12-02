@@ -911,6 +911,7 @@ Edit the sample OAI gNB configuration file and check following parameters:
     cannot preallocate memory on NUMA nodes other than 0; in this case, set
     this to 0 (no pre-allocation) and so that DPDK will allocate it on-demand
     on the right NUMA node.
+  * `owdm_enable`: used for eCPRI One-Way Delay Measurements; it depends if the RU supports it; if not set to 1 (enabled), default value is 0 (disabled)
   * `fh_config`: parameters that need to match RU parameters
     * timing parameters (starting with `T`) depend on the RU: `Tadv_cp_dl` is a
       single number, the rest pairs of numbers `(x, y)` specifying minimum and

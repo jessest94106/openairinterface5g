@@ -59,55 +59,6 @@ static void print_fh_eowd_cmn(unsigned index, const struct xran_ecpri_del_meas_c
       eowd_cmn->owdm_PlLength);
 }
 
-static void print_fh_eowd_port(unsigned index, unsigned vf, const struct xran_ecpri_del_meas_port *eowd_port)
-{
-  printf("\
-    eowd_port[%u][%u]:\n\
-      t1 %ld\n\
-      t2 %ld\n\
-      tr %ld\n\
-      delta %ld\n\
-      portid %d\n\
-      runMeas %d\n\
-      currentMeasID %d\n\
-      msState %d\n\
-      numMeas %d\n\
-      txDone %d\n\
-      rspTimerIdx %ld\n\
-      delaySamples [%ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld, %ld]\n\
-      delayAvg %ld\n",
-      index,
-      vf,
-      eowd_port->t1,
-      eowd_port->t2,
-      eowd_port->tr,
-      eowd_port->delta,
-      eowd_port->portid,
-      eowd_port->runMeas,
-      eowd_port->currentMeasID,
-      eowd_port->msState,
-      eowd_port->numMeas,
-      eowd_port->txDone,
-      eowd_port->rspTimerIdx,
-      eowd_port->delaySamples[0],
-      eowd_port->delaySamples[1],
-      eowd_port->delaySamples[2],
-      eowd_port->delaySamples[3],
-      eowd_port->delaySamples[4],
-      eowd_port->delaySamples[5],
-      eowd_port->delaySamples[6],
-      eowd_port->delaySamples[7],
-      eowd_port->delaySamples[8],
-      eowd_port->delaySamples[9],
-      eowd_port->delaySamples[10],
-      eowd_port->delaySamples[11],
-      eowd_port->delaySamples[12],
-      eowd_port->delaySamples[13],
-      eowd_port->delaySamples[14],
-      eowd_port->delaySamples[15],
-      eowd_port->delayAvg);
-}
-
 static void print_fh_init_io_cfg(const struct xran_io_cfg *io_cfg)
 {
   printf("\
@@ -183,11 +134,8 @@ static void print_fh_init_io_cfg(const struct xran_io_cfg *io_cfg)
       io_cfg->nEthLinePerPort,
       io_cfg->nEthLineSpeed,
       io_cfg->one_vf_cu_plane);
-  print_fh_eowd_cmn(0, &io_cfg->eowd_cmn[0]);
-  print_fh_eowd_cmn(1, &io_cfg->eowd_cmn[1]);
-  for (int i = 0; i < 2; ++i)
-    for (int v = 0; v < io_cfg->num_vfs; ++v)
-      print_fh_eowd_port(i, v, &io_cfg->eowd_port[i][v]);
+  print_fh_eowd_cmn(io_cfg->id, &io_cfg->eowd_cmn[io_cfg->id]);
+  printf("eowd_port (filled within xran library)\n");
 }
 
 static void print_fh_init_eaxcid_conf(const struct xran_eaxcid_config *eaxcid_conf)
@@ -522,9 +470,28 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   io_cfg->nEthLineSpeed = *gpd(fhip, nump, ORAN_CONFIG_NETHSPEED)->uptr; // 10G,25G,40G,100G speed of Physical connection on O-RU
   io_cfg->one_vf_cu_plane = (io_cfg->num_vfs == num_rus); // C-plane and U-plane use one VF
 
-  /* use owdm to calculate T12 and T34 -> CUS specification, section 2.3.3.3 */
-  // io_cfg->eowd_cmn[2] // ecpri one-way delay measurements common settings for O-DU and O-RU
-  // io_cfg->eowd_port[2][XRAN_VF_MAX] // ecpri owd measurements per port variables for O-DU and O-RU
+  /* eCPRI One-Way Delay Measurements common settings for O-DU and O-RU;
+    use owdm to calculate T12 and T34 -> CUS specification, section 2.3.3.3;
+    this is an optional feature that RU might or might not support;
+    to verify if RU supports, please check in the official RU documentation or
+    via M-plane the o-ran-ecpri-delay@<version>.yang capability;
+    this functionality is improved in F release */
+  /* if RU does support, io_cfg->eowd_cmn[0] should only be filled as id = O_DU; io_cfg->eowd_cmn[1] only used if id = O_RU */
+  const uint16_t owdm_enable = *gpd(fhip, nump, ORAN_CONFIG_ECPRI_OWDM)->uptr;
+  if (owdm_enable) {
+    io_cfg->eowd_cmn[0].initiator_en = 1; // 1 -> initiator (always O-DU), 0 -> recipient (always O-RU)
+    io_cfg->eowd_cmn[0].numberOfSamples = 8; // total number of samples to be collected and averaged per port
+    io_cfg->eowd_cmn[0].filterType = 0; // 0 -> simple average based on number of measurements; not used in xran in both E and F releases
+    io_cfg->eowd_cmn[0].responseTo = 10000000; // response timeout in [ns]
+    io_cfg->eowd_cmn[0].measVf = 0; // VF using the OWD transmitter; within xran, the measurements are calculated per each supported VF, but starts from measVf
+    io_cfg->eowd_cmn[0].measState = 0; // the state of the OWD transmitter; 0 -> OWDMTX_INIT (enum xran_owdm_tx_state)
+    io_cfg->eowd_cmn[0].measId = 0; // measurement ID to be used by the transmitter
+    io_cfg->eowd_cmn[0].measMethod = 0; // measurement method; 0 -> XRAN_REQUEST (enum xran_owd_meas_method)
+    io_cfg->eowd_cmn[0].owdm_enable = 1; // 1 -> enabled; 0 -> disabled
+    io_cfg->eowd_cmn[0].owdm_PlLength = 40; // payload in the measurement packet; 40 <= PlLength <= 1400
+  }
+  /* eCPRI OWDM per port variables for O-DU; this parameter is filled within xran library */
+  // eowd_port[0][XRAN_VF_MAX]
 
   return true;
 }
