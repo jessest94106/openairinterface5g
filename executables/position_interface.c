@@ -23,21 +23,17 @@
 
 extern uint16_t NB_UE_INST;
 
-static position_t read_position_coordinates(char *sectionName)
+static void read_position_coordinates(char *sectionName, position_t *position)
 {
-  position_t p;
-  position_t *position = &p;
   paramdef_t position_params[] = POSITION_CONFIG_PARAMS_DEF;
   int ret = config_get(config_get_if(), position_params, sizeofArray(position_params), sectionName);
   AssertFatal(ret >= 0, "configuration couldn't be performed for position name: %s", sectionName);
-  
-  return p;
 }
 
-position_t get_position_coordinates(int Mod_id)
+void get_position_coordinates(int Mod_id, position_t *position)
 {
   AssertFatal(Mod_id < NB_UE_INST, "Mod_id must be less than NB_UE_INST. Mod_id:%d NB_UE_INST:%d", Mod_id, NB_UE_INST);
   char positionName[64];
   snprintf(positionName, sizeof(positionName), "position%d", Mod_id);
-  return read_position_coordinates(positionName);
+  read_position_coordinates(positionName, position);
 }

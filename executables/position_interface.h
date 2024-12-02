@@ -53,5 +53,6 @@ typedef struct position {
   double positionZ;
 } position_t;
 
-position_t get_position_coordinates(int Mod_id);
+void get_position_coordinates(int Mod_id, position_t *position);
+
 #endif
