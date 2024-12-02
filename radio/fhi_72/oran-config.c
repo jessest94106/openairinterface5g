@@ -812,14 +812,17 @@ static bool set_fh_config(int ru_idx, int num_rus, enum xran_category xran_cat, 
   fh_config->nULCenterFreqARFCN = 0; // center frequency for UL in NR-ARFCN; not used in xran
   fh_config->ttiCb = NULL; // check tti_to_phy_cb(), tx_cp_dl_cb() and tx_cp_ul_cb => first_call
   fh_config->ttiCbParam = NULL; // check tti_to_phy_cb(), tx_cp_dl_cb() and tx_cp_ul_cb => first_call
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_DL, &fh_config->T1a_min_cp_dl, &fh_config->T1a_max_cp_dl))
+
+  /* DU delay profile */
+  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_DL, &fh_config->T1a_min_cp_dl, &fh_config->T1a_max_cp_dl)) // E - min not used in xran, max yes; F - both min and max are used in xran
     return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_UL, &fh_config->T1a_min_cp_ul, &fh_config->T1a_max_cp_ul))
+  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_UL, &fh_config->T1a_min_cp_ul, &fh_config->T1a_max_cp_ul)) // both E and F - min not used in xran, max yes
     return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_UP, &fh_config->T1a_min_up, &fh_config->T1a_max_up))
+  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_UP, &fh_config->T1a_min_up, &fh_config->T1a_max_up)) // both E and F - min not used in xran, max yes
     return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_TA4, &fh_config->Ta4_min, &fh_config->Ta4_max))
+  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_TA4, &fh_config->Ta4_min, &fh_config->Ta4_max)) // both E and F - min not used in xran, max yes
     return false;
+
   fh_config->enableCP = 1; // enable C-plane
   fh_config->prachEnable = 1; // enable PRACH
   fh_config->srsEnable = 0; // enable SRS; used only if XRAN_CATEGORY_B
