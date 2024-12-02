@@ -117,7 +117,8 @@ void vnf_nr_handle_pnf_param_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_
 		nfapi_nr_pnf_param_response_t msg;
 			
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >= 0)
+	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
+    if (result)
 		{
 			// Invoke the call back
 			if(config->pnf_nr_param_resp)
@@ -188,7 +189,8 @@ void vnf_nr_handle_pnf_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf
 		nfapi_nr_pnf_config_response_t msg;
 		
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >= 0)
+	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
+		if (result)
 		{
 			// Invoke the call back
 			if(config->pnf_nr_config_resp)
@@ -258,7 +260,8 @@ void vnf_nr_handle_pnf_start_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_
 		nfapi_nr_pnf_start_response_t msg;
 	
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >= 0)
+	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
+		if (result)
 		{
 			if(config->pnf_nr_start_resp)
 			{
@@ -428,7 +431,8 @@ void vnf_nr_handle_param_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_conf
 		nfapi_nr_param_response_scf_t msg;
 		
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >= 0)
+	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
+		if (result)
 		{
 			
 			if (msg.error_code == NFAPI_NR_PARAM_MSG_OK)
@@ -495,7 +499,8 @@ void vnf_nr_handle_config_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_con
 		nfapi_nr_config_response_scf_t msg;
 		
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >=0 )
+	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
+		if (result)
 		{
 			// check the error code:
 
@@ -602,7 +607,8 @@ void vnf_nr_handle_start_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_conf
 		nfapi_nr_start_response_scf_t msg;
 		
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config) >= 0)
+	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
+		if (result)
 		{	// check the error code
 			if (msg.error_code == NFAPI_NR_START_MSG_OK){
 				if(config->nr_start_resp)
@@ -1085,7 +1091,8 @@ void vnf_nr_handle_p4_p5_message(void *pRecvMsg, int recvMsgLen, int p5_idx, nfa
 	}
 
 	// unpack the message header
-	if (nfapi_nr_p5_message_header_unpack(pRecvMsg, recvMsgLen, &messageHeader, sizeof(nfapi_nr_p4_p5_message_header_t), &config->codec_config) < 0)
+  const bool result = config->hdr_unpack_func(pRecvMsg, recvMsgLen, &messageHeader, sizeof(nfapi_nr_p4_p5_message_header_t), &config->codec_config);
+	if (!result)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "Unpack message header failed, ignoring\n");
 		return;
@@ -1295,9 +1302,9 @@ int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_
         }
 
         nfapi_nr_p4_p5_message_header_t header;
-        int unpack_result = nfapi_nr_p5_message_header_unpack(header_buffer, header_buffer_size, &header, sizeof(header), 0);
-        if (unpack_result < 0) {
-          NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF Failed to decode message header %d\n", unpack_result);
+        const bool result = config->hdr_unpack_func(header_buffer, header_buffer_size, &header, sizeof(header), 0);
+        if (!result) {
+          NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF Failed to decode message header\n");
           return 0;
         }
         message_size = header.message_length + header_buffer_size;
