@@ -570,7 +570,6 @@ static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   // Start synchronization with a target gNB
   if (UE->synch_request.received_synch_request == 1) {
-    UE->is_synchronized = 0;
     // if upper layers signal BW scan we do as instructed by command line parameter
     // if upper layers disable BW scan we set it to false
     if (UE->synch_request.synch_req.ssb_bw_scan)
@@ -590,7 +589,15 @@ static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
       init_symbol_rotation(fp);
     }
 
+    /* Clearing UE harq while DL actors are active causes race condition.
+        So we let the current execution to complete here.*/
+    for (int i = 0; i < NUM_DL_ACTORS; i++) {
+      flush_actor(UE->dl_actors + i);
+    }
+    /*TODO: Flush UL jobs */
+
     clean_UE_harq(UE);
+    UE->is_synchronized = 0;
     UE->synch_request.received_synch_request = 0;
     return 0;
   }

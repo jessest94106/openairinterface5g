@@ -49,4 +49,9 @@ void destroy_actor(Actor_t *actor);
 /// @param actor
 void shutdown_actor(Actor_t *actor);
 
+/// @brief This function will return when all current jobs in the queue are finished.
+/// The caller should make sure no new jobs are added to the queue between this function call and return.
+/// @param actor
+void flush_actor(Actor_t *actor);
+
 #endif
