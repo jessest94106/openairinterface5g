@@ -53,7 +53,7 @@ if(ENABLE_UESCOPE OR ENABLE_ENBSCOPE OR ENABLE_NRSCOPE)
   target_link_libraries(uescope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
   add_library(nrscope MODULE nr_phy_scope.c)
-  target_link_libraries(nrscope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+  target_link_libraries(nrscope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs UTIL)
 
   # all libraries should be written to root build dir (default creates the same hierarchie under build as existing for sources)
   set_target_properties(enbscope uescope nrscope 

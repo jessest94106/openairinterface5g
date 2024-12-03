@@ -480,7 +480,6 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
 
 #endif
 
-  int nbAarx = 0;
   int nest_count = 0;
   uint64_t noise_amp2 = 0;
   delay_t *delay = &gNB->ulsch[ul_id].delay;
@@ -503,9 +502,10 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
   initNotifiedFIFO(&respPuschAarx);
   start_meas(&gNB->pusch_channel_estimation_antenna_processing_stats);
   int numAntennas = gNB->dmrs_num_antennas_per_thread;
-  for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx += numAntennas) {
+  int num_jobs = CEILIDIV(gNB->frame_parms.nb_antennas_rx, numAntennas);
+  for (int job_id = 0; job_id < num_jobs; job_id++) {
     union puschAntennaReqUnion id = {.s = {ul_id, 0}};
-    id.p = 1 + aarx;
+    id.p = 1 + job_id * numAntennas;
     notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(puschAntennaProc_t),
                                                   id.p,
                                                   &respPuschAarx,
@@ -517,7 +517,7 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     rdata->nl = nl;
     rdata->p = p;
     rdata->symbol = symbol;
-    rdata->aarx = aarx;
+    rdata->aarx = job_id * numAntennas;
     rdata->numAntennas = numAntennas;
     rdata->bwp_start_subcarrier = bwp_start_subcarrier;
     rdata->pusch_pdu = pusch_pdu;
@@ -532,15 +532,19 @@ int nr_pusch_channel_estimation(PHY_VARS_gNB *gNB,
     rdata->chest_freq = gNB->chest_freq;
     rdata->rxdataF = gNB->common_vars.rxdataF;
     // Call the nr_pusch_antenna_processing function
-    pushTpool(&gNB->threadPool, req);
-    nbAarx++;
-
-    LOG_D(PHY, "Added Antenna (count %d) to process, in pipe\n", nbAarx);
+    if (job_id == num_jobs - 1) {
+      // Run the last job inline
+      nr_pusch_antenna_processing(rdata);
+      delNotifiedFIFO_elt(req);
+    } else {
+      pushTpool(&gNB->threadPool, req);
+    }
+    LOG_D(PHY, "Added Antenna (count %d/%d) to process, in pipe\n", job_id, num_jobs);
   } // Antenna Loop
 
-  while (nbAarx > 0) {
+  while (num_jobs - 1 > 0) {
     notifiedFIFO_elt_t *req = pullTpool(&respPuschAarx, &gNB->threadPool);
-    nbAarx--;
+    num_jobs--;
     delNotifiedFIFO_elt(req);
   }
 

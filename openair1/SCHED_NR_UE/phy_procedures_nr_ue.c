@@ -75,6 +75,7 @@ fifo_dump_emos_UE emos_dump_UE;
 #include "UTIL/OPT/opt.h"
 #include "intertask_interface.h"
 #include "T.h"
+#include "instrumentation.h"
 
 static const unsigned int gain_table[31] = {100,  112,  126,  141,  158,  178,  200,  224,  251, 282,  316,
                                             359,  398,  447,  501,  562,  631,  708,  794,  891, 1000, 1122,
@@ -378,6 +379,7 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
                                  struct complex16 dl_ch_estimates[][estimateSz],
                                  c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP])
 {
+  TracyCZone(ctx, true);
   int ret = 0;
   DevAssert(ue);
 
@@ -422,6 +424,7 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
     LOG_E(PHY, "[UE %d] frame %d, nr_slot_rx %d, Error decoding PBCH!\n", ue->Mod_id, frame_rx, nr_slot_rx);
   }
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_PBCH_PROCEDURES, VCD_FUNCTION_OUT);
+  TracyCZoneEnd(ctx);
   return ret;
 }
 
@@ -632,18 +635,6 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
   return 0;
 }
 
-// This function release the Tx working thread for one pending information, like dlsch ACK/NACK
-static void send_dl_done_to_tx_thread(notifiedFIFO_t *nf, int rx_slot)
-{
-  if (nf) {
-    notifiedFIFO_elt_t *newElt = newNotifiedFIFO_elt(sizeof(int), 0, NULL, NULL);
-    // We put rx slot only for tracing purpose
-    int *msgData = (int *) NotifiedFifoData(newElt);
-    *msgData = rx_slot;
-    pushNotifiedFIFO(nf, newElt);
-  }
-}
-
 static uint32_t compute_csi_rm_unav_res(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_config)
 {
   uint32_t unav_res = 0;
@@ -737,7 +728,7 @@ static bool nr_ue_dlsch_procedures(PHY_VARS_NR_UE *ue,
     // don't wait anymore
     LOG_E(NR_PHY, "Internal error  nr_ue_dlsch_procedure() called but no active cw on slot %d, harq %d\n", nr_slot_rx, harq_pid);
     const int ack_nack_slot = (proc->nr_slot_rx + dlsch[0].dlsch_config.k1_feedback) % ue->frame_parms.slots_per_frame;
-    send_dl_done_to_tx_thread(ue->tx_resume_ind_fifo + ack_nack_slot, proc->nr_slot_rx);
+    dynamic_barrier_join(&ue->process_slot_tx_barriers[ack_nack_slot]);
     return false;
   }
 
@@ -873,7 +864,7 @@ static bool nr_ue_dlsch_procedures(PHY_VARS_NR_UE *ue,
   // DLSCH decoding finished! don't wait anymore in Tx process, we know if we should answer ACK/NACK PUCCH
   if (dlsch[0].rnti_type == TYPE_C_RNTI_) {
     const int ack_nack_slot = (proc->nr_slot_rx + dlsch[0].dlsch_config.k1_feedback) % ue->frame_parms.slots_per_frame;
-    send_dl_done_to_tx_thread(ue->tx_resume_ind_fifo + ack_nack_slot, proc->nr_slot_rx);
+    dynamic_barrier_join(&ue->process_slot_tx_barriers[ack_nack_slot]);
   }
 
   if (ue->phy_sim_dlsch_b)
@@ -894,6 +885,7 @@ static bool is_ssb_index_transmitted(const PHY_VARS_NR_UE *ue, const int index)
 
 int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_data_t *phy_data)
 {
+  TracyCZone(ctx, true);
   int frame_rx = proc->frame_rx;
   int nr_slot_rx = proc->nr_slot_rx;
   int gNB_id = proc->gNB_id;
@@ -1044,6 +1036,7 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
   LOG_D(PHY, "[UE %d] Frame %d, nr_slot_rx %d: found %d DCIs\n", ue->Mod_id, frame_rx, nr_slot_rx, dci_cnt);
   phy_pdcch_config->nb_search_space = 0;
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PDCCH, VCD_FUNCTION_OUT);
+  TracyCZoneEnd(ctx);
   return sampleShift;
 }
 
@@ -1138,6 +1131,7 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC_C, VCD_FUNCTION_IN);
     // it returns -1 in case of internal failure, or 0 in case of normal result
     int ret_pdsch = nr_ue_pdsch_procedures(ue, proc, dlsch, llr, rxdataF, G);
+    TracyCPlot("pdsch mcs", dlsch->dlsch_config.mcs);
 
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC_C, VCD_FUNCTION_OUT);
 
@@ -1152,9 +1146,8 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
       nr_ue_dlsch_procedures(ue, proc, dlsch, llr, G);
     else {
       LOG_E(NR_PHY, "Demodulation impossible, internal error\n");
-      send_dl_done_to_tx_thread(
-          ue->tx_resume_ind_fifo + (proc->nr_slot_rx + dlsch_config->k1_feedback) % ue->frame_parms.slots_per_frame,
-          proc->nr_slot_rx);
+      int ack_nack_slot = (proc->nr_slot_rx + dlsch_config->k1_feedback) % ue->frame_parms.slots_per_frame;
+      dynamic_barrier_join(&ue->process_slot_tx_barriers[ack_nack_slot]);
       LOG_W(NR_PHY, "nr_ue_pdsch_procedures failed in slot %d\n", proc->nr_slot_rx);
     }
 

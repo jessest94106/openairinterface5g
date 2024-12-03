@@ -72,7 +72,7 @@ static int read_slice_info(const F1AP_ServedPLMNs_Item_t *plmn, nssai_t *nssai, 
 /**
  * @brief F1AP Setup Request memory management
  */
-static void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_du_system_info_t *sys_info)
+void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_du_system_info_t *sys_info)
 {
   if (sys_info) {
     free(sys_info->mib);
@@ -84,71 +84,75 @@ static void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_d
 }
 
 /**
+ * @brief Encode NR Frequency Info (9.3.1.17 of 3GPP TS 38.473)
+ */
+static F1AP_NRFreqInfo_t encode_frequency_info(const f1ap_nr_frequency_info_t *info)
+{
+  F1AP_NRFreqInfo_t nrFreqInfo = {0};
+  // NR ARFCN
+  nrFreqInfo.nRARFCN = info->arfcn;
+  int num_bands = 1;
+  // Frequency Band List
+  for (int j = 0; j < num_bands; j++) {
+    asn1cSequenceAdd(nrFreqInfo.freqBandListNr.list, F1AP_FreqBandNrItem_t, nr_freqBandNrItem);
+    // NR Frequency Band
+    nr_freqBandNrItem->freqBandIndicatorNr = info->band;
+  }
+  return nrFreqInfo;
+}
+
+/**
+ * @brief Encode Transmission Bandwidth (9.3.1.15 of 3GPP TS 38.473)
+ */
+static F1AP_Transmission_Bandwidth_t encode_tx_bandwidth(const f1ap_transmission_bandwidth_t *info)
+{
+  F1AP_Transmission_Bandwidth_t tb = {0};
+  tb.nRSCS = info->scs;
+  tb.nRNRB = to_NRNRB(info->nrb);
+  return tb;
+}
+
+/**
  * @brief Encoding of Served Cell Information (9.3.1.10 of 3GPP TS 38.473)
  */
 static F1AP_Served_Cell_Information_t encode_served_cell_info(const f1ap_served_cell_info_t *c)
 {
   F1AP_Served_Cell_Information_t scell_info = {0};
-  // NR CGI
+  // NR CGI (M)
   MCC_MNC_TO_PLMNID(c->plmn.mcc, c->plmn.mnc, c->plmn.mnc_digit_length, &(scell_info.nRCGI.pLMN_Identity));
   NR_CELL_ID_TO_BIT_STRING(c->nr_cellid, &(scell_info.nRCGI.nRCellIdentity));
-  // NR PCI
+  // NR PCI (M)
   scell_info.nRPCI = c->nr_pci; // int 0..1007
-  // 5GS TAC
+  // 5GS TAC (O)
   if (c->tac != NULL) {
     uint32_t tac = htonl(*c->tac);
     asn1cCalloc(scell_info.fiveGS_TAC, netOrder);
     OCTET_STRING_fromBuf(netOrder, ((char *)&tac) + 1, 3);
   }
-  // Served PLMNs
+  // Served PLMNs 1..<maxnoofBPLMNs>
   asn1cSequenceAdd(scell_info.servedPLMNs.list, F1AP_ServedPLMNs_Item_t, servedPLMN_item);
+  // PLMN Identity (M)
   MCC_MNC_TO_PLMNID(c->plmn.mcc, c->plmn.mnc, c->plmn.mnc_digit_length, &servedPLMN_item->pLMN_Identity);
-  // NR-Mode-Info
+  // NR-Mode-Info (M)
   F1AP_NR_Mode_Info_t *nR_Mode_Info = &scell_info.nR_Mode_Info;
-  if (c->mode == F1AP_MODE_FDD) { // FDD
+  if (c->mode == F1AP_MODE_FDD) { // FDD Info
     const f1ap_fdd_info_t *fdd = &c->fdd;
     nR_Mode_Info->present = F1AP_NR_Mode_Info_PR_fDD;
     asn1cCalloc(nR_Mode_Info->choice.fDD, fDD_Info);
-    /* FDD.1.1 UL NRFreqInfo ARFCN */
-    fDD_Info->uL_NRFreqInfo.nRARFCN = fdd->ul_freqinfo.arfcn;
-    /* FDD.1.3 freqBandListNr */
-    int ul_band = 1;
-    for (int j = 0; j < ul_band; j++) {
-      asn1cSequenceAdd(fDD_Info->uL_NRFreqInfo.freqBandListNr.list, F1AP_FreqBandNrItem_t, nr_freqBandNrItem);
-      /* FDD.1.3.1 freqBandIndicatorNr*/
-      nr_freqBandNrItem->freqBandIndicatorNr = fdd->ul_freqinfo.band;
-    }
-    /* FDD.2.1 DL NRFreqInfo ARFCN */
-    fDD_Info->dL_NRFreqInfo.nRARFCN = fdd->dl_freqinfo.arfcn;
-    /* FDD.2.3 freqBandListNr */
-    int dl_bands = 1;
-    for (int j = 0; j < dl_bands; j++) {
-      asn1cSequenceAdd(fDD_Info->dL_NRFreqInfo.freqBandListNr.list, F1AP_FreqBandNrItem_t, nr_freqBandNrItem);
-      /* FDD.2.3.1 freqBandIndicatorNr*/
-      nr_freqBandNrItem->freqBandIndicatorNr = fdd->dl_freqinfo.band;
-    } // for FDD : DL freq_Bands
-    /* FDD.3 UL Transmission Bandwidth */
-    fDD_Info->uL_Transmission_Bandwidth.nRSCS = fdd->ul_tbw.scs;
-    fDD_Info->uL_Transmission_Bandwidth.nRNRB = to_NRNRB(fdd->ul_tbw.nrb);
-    /* FDD.4 DL Transmission Bandwidth */
-    fDD_Info->dL_Transmission_Bandwidth.nRSCS = fdd->dl_tbw.scs;
-    fDD_Info->dL_Transmission_Bandwidth.nRNRB = to_NRNRB(fdd->dl_tbw.nrb);
-  } else if (c->mode == F1AP_MODE_TDD) {
+    // NR Frequency Info
+    fDD_Info->uL_NRFreqInfo = encode_frequency_info(&fdd->ul_freqinfo);
+    fDD_Info->dL_NRFreqInfo = encode_frequency_info(&fdd->dl_freqinfo);
+    // Transmission Bandwidth
+    fDD_Info->uL_Transmission_Bandwidth = encode_tx_bandwidth(&fdd->ul_tbw);
+    fDD_Info->dL_Transmission_Bandwidth = encode_tx_bandwidth(&fdd->dl_tbw);
+  } else if (c->mode == F1AP_MODE_TDD) { // TDD Info
     const f1ap_tdd_info_t *tdd = &c->tdd;
     nR_Mode_Info->present = F1AP_NR_Mode_Info_PR_tDD;
     asn1cCalloc(nR_Mode_Info->choice.tDD, tDD_Info);
-    /* TDD.1.1 nRFreqInfo ARFCN */
-    tDD_Info->nRFreqInfo.nRARFCN = tdd->freqinfo.arfcn;
-    /* TDD.1.3 freqBandListNr */
-    int bands = 1;
-    for (int j = 0; j < bands; j++) {
-      asn1cSequenceAdd(tDD_Info->nRFreqInfo.freqBandListNr.list, F1AP_FreqBandNrItem_t, nr_freqBandNrItem);
-      /* TDD.1.3.1 freqBandIndicatorNr*/
-      nr_freqBandNrItem->freqBandIndicatorNr = tdd->freqinfo.band;
-    }
-    /* TDD.2 transmission_Bandwidth */
-    tDD_Info->transmission_Bandwidth.nRSCS = tdd->tbw.scs;
-    tDD_Info->transmission_Bandwidth.nRNRB = to_NRNRB(tdd->tbw.nrb);
+    // NR Frequency Info
+    tDD_Info->nRFreqInfo = encode_frequency_info(&tdd->freqinfo);
+    // Transmission Bandwidth
+    tDD_Info->transmission_Bandwidth = encode_tx_bandwidth(&tdd->tbw);
   } else {
     AssertFatal(false, "unknown duplex mode %d\n", c->mode);
   }
@@ -530,16 +534,16 @@ bool decode_f1ap_setup_request(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_req_t *out
   return true;
 }
 
-static void copy_f1ap_served_cell_info(f1ap_served_cell_info_t *dest, const f1ap_served_cell_info_t *src) {
+void copy_f1ap_served_cell_info(f1ap_served_cell_info_t *dest, const f1ap_served_cell_info_t *src)
+{
+  // shallow copy
   *dest = *src;
-  dest->mode = src->mode;
-  dest->tdd = src->tdd;
-  dest->fdd = src->fdd;
-  dest->plmn = src->plmn;
+  // tac
   if (src->tac) {
     dest->tac = malloc_or_fail(sizeof(*dest->tac));
     *dest->tac = *src->tac;
   }
+  // measurement timing config
   if (src->measurement_timing_config_len) {
     dest->measurement_timing_config = calloc_or_fail(src->measurement_timing_config_len, sizeof(*dest->measurement_timing_config));
     memcpy(dest->measurement_timing_config, src->measurement_timing_config, src->measurement_timing_config_len);
@@ -955,7 +959,7 @@ bool decode_f1ap_setup_failure(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_failure_t 
  */
 bool eq_f1ap_setup_failure(const f1ap_setup_failure_t *a, const f1ap_setup_failure_t *b)
 {
-  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
   return true;
 }
 

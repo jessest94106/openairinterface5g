@@ -446,19 +446,9 @@ static void update_cell_info(nr_rrc_du_container_t *du, const f1ap_served_cell_i
 
   AssertFatal(du->setup_req->num_cells_available == 1, "expected 1 cell for DU, but has %d\n", du->setup_req->num_cells_available);
   f1ap_served_cell_info_t *ci = &du->setup_req->cell[0].info;
-
-  ci->nr_cellid = new_ci->nr_cellid;
-  ci->nr_pci = new_ci->nr_pci;
-  if (new_ci->tac != NULL)
-    *ci->tac = *new_ci->tac;
-  ci->num_ssi = new_ci->num_ssi;
-  for (int s = 0; s < new_ci->num_ssi; ++s)
-    ci->nssai[s] = new_ci->nssai[s];
-  ci->mode = new_ci->mode;
-  if (ci->mode == F1AP_MODE_TDD)
-    ci->tdd = new_ci->tdd;
-  else
-    ci->fdd = new_ci->fdd;
+  // make sure no memory is allocated
+  free_f1ap_cell(ci, NULL);
+  copy_f1ap_served_cell_info(ci, new_ci);
 
   NR_MeasurementTimingConfiguration_t *new_mtc =
       extract_mtc(new_ci->measurement_timing_config, new_ci->measurement_timing_config_len);

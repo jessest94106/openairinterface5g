@@ -88,6 +88,7 @@ unsigned short config_frames[4] = {2,9,11,13};
 #include <openair1/PHY/MODULATION/nr_modulation.h>
 #include "openair2/GNB_APP/gnb_paramdef.h"
 #include "pdcp.h"
+#include "actor.h"
 
 extern const char *duplex_mode[];
 THREAD_STRUCT thread_struct;
@@ -495,6 +496,10 @@ int main(int argc, char **argv)
         }
 
         UE[CC_id]->sl_mode = get_softmodem_params()->sl_mode;
+        init_actor(&UE[CC_id]->sync_actor, "SYNC_", -1);
+        for (int i = 0; i < NUM_DL_ACTORS; i++) {
+          init_actor(&UE[CC_id]->dl_actors[i], "DL_", -1);
+        }
         init_nr_ue_vars(UE[CC_id], inst);
 
         if (UE[CC_id]->sl_mode) {
