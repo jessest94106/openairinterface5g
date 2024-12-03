@@ -103,7 +103,7 @@ static void print_fh_init_io_cfg(const struct xran_io_cfg *io_cfg)
     pkt_proc_core_64_127 %016lx\n\
     pkt_aux_core %d\n\
     timing_core %d\n\
-    port [%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, ]\n\
+    port (filled within xran library)\n\
     io_sleep %d\n\
     nEthLinePerPort %d\n\
     nEthLineSpeed %d\n\
@@ -114,22 +114,6 @@ static void print_fh_init_io_cfg(const struct xran_io_cfg *io_cfg)
       io_cfg->pkt_proc_core_64_127,
       io_cfg->pkt_aux_core,
       io_cfg->timing_core,
-      io_cfg->port[XRAN_UP_VF],
-      io_cfg->port[XRAN_CP_VF],
-      io_cfg->port[XRAN_UP_VF1],
-      io_cfg->port[XRAN_CP_VF1],
-      io_cfg->port[XRAN_UP_VF2],
-      io_cfg->port[XRAN_CP_VF2],
-      io_cfg->port[XRAN_UP_VF3],
-      io_cfg->port[XRAN_CP_VF3],
-      io_cfg->port[XRAN_UP_VF4],
-      io_cfg->port[XRAN_CP_VF4],
-      io_cfg->port[XRAN_UP_VF5],
-      io_cfg->port[XRAN_CP_VF5],
-      io_cfg->port[XRAN_UP_VF6],
-      io_cfg->port[XRAN_CP_VF6],
-      io_cfg->port[XRAN_UP_VF7],
-      io_cfg->port[XRAN_CP_VF7],
       io_cfg->io_sleep,
       io_cfg->nEthLinePerPort,
       io_cfg->nEthLineSpeed,
@@ -587,7 +571,7 @@ static bool set_fh_init(struct xran_fh_init *fh_init, enum xran_category xran_ca
   fh_init->dpdkBasebandFecMode = 0; // DPDK Baseband FEC device mode (0-SW, 1-HW); not used in xran
   fh_init->dpdkBasebandDevice = NULL; // DPDK Baseband device address; not used in xran
   /* used to specify a unique prefix for shared memory, and files created by multiple DPDK processes;
-    is it necessary */
+    it is necessary */
   fh_init->filePrefix = strdup(*gpd(fhip, nump, ORAN_CONFIG_FILE_PREFIX)->strptr);
   /* maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be
     communicated in a single xRAN network layer transaction. Supported 1500 bytes and 9600 bytes (Jumbo Frame);
@@ -650,7 +634,9 @@ static bool set_fh_prach_config(const openair0_config_t *oai0,
 
   /* xran defines PDSCH eAxC IDs as [0...Ntx-1];
      xran defines PUSCH eAxC IDs as [0...Nrx-1];
-     PRACH offset must be >= max(Ntx, Nrx) */
+     xran assumes PRACH offset >= max(Ntx, Nrx). However, we made a workaround that xran supports PRACH eAxC IDs same as PUSCH eAxC IDs.
+     This is achieved with is_prach and filter_id parameters in the patch.
+     Please note that this approach only applies to the RUs that support this functionality, e.g. LITEON RU. */
   uint8_t offset = *gpd(prachp, nprach, ORAN_PRACH_CONFIG_EAXC_OFFSET)->u8ptr;
   prach_config->eAxC_offset = (offset != 0) ? offset : max_num_ant;
 
@@ -771,8 +757,8 @@ static bool set_fh_config(int ru_idx, int num_rus, enum xran_category xran_cat, 
   fh_config->nAntElmTRx = 0; // number of antenna elements for TX and RX = SRS; used only if XRAN_CATEGORY_B
   fh_config->nDLFftSize = 0; // DL FFT size; not used in xran
   fh_config->nULFftSize = 0; // UL FFT size; not used in xran
-  fh_config->nDLRBs = oai0->num_rb_dl; // DL PRB
-  fh_config->nULRBs = oai0->num_rb_dl; // UL PRB; in xran not used as id = O_DU,  but used in oaioran.c/oran-init.c
+  fh_config->nDLRBs = oai0->num_rb_dl; // DL PRB; used in oaioran.c/oran-init.c; not used in xran, neither in E nor in F release
+  fh_config->nULRBs = oai0->num_rb_dl; // UL PRB; used in oaioran.c/oran-init.c; in xran E release not used so the patch fixes it, but in xran F release this value is properly used
   fh_config->nDLAbsFrePointA = 0; // Abs Freq Point A of the Carrier Center Frequency for in KHz Value; not used in xran
   fh_config->nULAbsFrePointA = 0; // Abs Freq Point A of the Carrier Center Frequency for in KHz Value; not used in xran
   fh_config->nDLCenterFreqARFCN = 0; // center frequency for DL in NR-ARFCN; not used in xran
@@ -797,9 +783,9 @@ static bool set_fh_config(int ru_idx, int num_rus, enum xran_category xran_cat, 
   fh_config->puschMaskSlot = 0; // specific which slot PUSCH channel masked; only used if id = O_RU
   fh_config->cp_vlan_tag = *gpd(fhp, nfh, ORAN_FH_CONFIG_CP_VLAN_TAG)->uptr; // C-plane VLAN tag; not used in xran; needed for M-plane
   fh_config->up_vlan_tag = *gpd(fhp, nfh, ORAN_FH_CONFIG_UP_VLAN_TAG)->uptr; // U-plane VLAN tag; not used in xran; needed for M-plane
-  fh_config->debugStop = 0; // enable auto stop; not used in xran
+  fh_config->debugStop = 0; // enable auto stop; only used if id = O_RU
   fh_config->debugStopCount = 0; // enable auto stop after number of Tx packets; not used in xran
-  fh_config->DynamicSectionEna = 0; // enable dynamic C-Plane section allocation; not used in xran
+  fh_config->DynamicSectionEna = 0; // enable dynamic C-Plane section allocation
   fh_config->GPS_Alpha = 0; // refers to alpha as defined in section 9.7.2 of ORAN spec. this value should be alpha*(1/1.2288ns), range 0 - 1e7 (ns); offset_nsec = (pConf->GPS_Beta - offset_sec * 100) * 1e7 + pConf->GPS_Alpha
   fh_config->GPS_Beta = 0; // beta value as defined in section 9.7.2 of ORAN spec. range -32767 ~ +32767; offset_sec = pConf->GPS_Beta / 100
 
