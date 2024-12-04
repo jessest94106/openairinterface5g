@@ -145,10 +145,6 @@ def AnalyzeBuildLogs(buildRoot, images, globalStatus):
 		collectInfo[image] = files
 	return collectInfo
 
-def GetContainerName(ssh, svcName, file):
-	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".container_name'", silent=True)
-	return ret.stdout
-
 def GetImageName(ssh, svcName, file):
 	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".image'", silent=True)
 	if ret.returncode != 0:
