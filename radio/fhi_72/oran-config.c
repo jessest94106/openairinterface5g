@@ -120,6 +120,11 @@ static void print_fh_init_io_cfg(const struct xran_io_cfg *io_cfg)
       io_cfg->one_vf_cu_plane);
   print_fh_eowd_cmn(io_cfg->id, &io_cfg->eowd_cmn[io_cfg->id]);
   printf("eowd_port (filled within xran library)\n");
+#ifdef F_RELEASE
+  printf("\
+    bbu_offload %d\n",
+      io_cfg->bbu_offload);
+#endif
 }
 
 static void print_fh_init_eaxcid_conf(const struct xran_eaxcid_config *eaxcid_conf)
@@ -179,6 +184,13 @@ void print_fh_init(const struct xran_fh_init *fh_init)
   printf("\
   totalBfWeights %d\n",
       fh_init->totalBfWeights);
+#ifdef F_RELEASE
+  printf("\
+  mlogxranenable %d\n\
+  dlCpProcBurst %d\n",
+      fh_init->mlogxranenable,
+      fh_init->dlCpProcBurst);
+#endif
 }
 
 static void print_prach_config(const struct xran_prach_config *prach_conf)
@@ -215,6 +227,11 @@ static void print_prach_config(const struct xran_prach_config *prach_conf)
       prach_conf->timeOffset,
       prach_conf->freqOffset,
       prach_conf->eAxC_offset);
+#ifdef F_RELEASE
+  printf("\
+    nPrachConfIdxLTE %d\n",
+      prach_conf->nPrachConfIdxLTE);
+#endif
 }
 
 static void print_srs_config(const struct xran_srs_config *srs_conf)
@@ -374,6 +391,14 @@ void print_fh_config(const struct xran_fh_config *fh_config)
       fh_config->GPS_Alpha,
       fh_config->GPS_Beta);
 
+#ifdef F_RELEASE
+  printf("\
+  srsEnableCp %d\n\
+  SrsDelaySym %d\n",
+      fh_config->srsEnableCp,
+      fh_config->SrsDelaySym);
+#endif
+
   print_prach_config(&fh_config->prach_conf);
   print_srs_config(&fh_config->srs_conf);
   print_frame_config(&fh_config->frame_conf);
@@ -398,6 +423,17 @@ void print_fh_config(const struct xran_fh_config *fh_config)
       fh_config->log_level,
       fh_config->max_sections_per_slot,
       fh_config->max_sections_per_symbol);
+
+#ifdef F_RELEASE
+  printf("\
+  RunSlotPrbMapBySymbolEnable %d\n\
+  dssEnable %d\n\
+  dssPeriod %d\n\
+  technology[XRAN_MAX_DSS_PERIODICITY] (not filled as DSS disabled)\n",
+      fh_config->RunSlotPrbMapBySymbolEnable,
+      fh_config->dssEnable,
+      fh_config->dssPeriod);
+#endif
 }
 
 static const paramdef_t *gpd(const paramdef_t *pd, int num, const char *name)
@@ -476,6 +512,10 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   }
   /* eCPRI OWDM per port variables for O-DU; this parameter is filled within xran library */
   // eowd_port[0][XRAN_VF_MAX]
+
+#ifdef F_RELEASE
+  io_cfg->bbu_offload = 0; // enable packet handling on BBU cores
+#endif
 
   return true;
 }
@@ -594,6 +634,12 @@ static bool set_fh_init(struct xran_fh_init *fh_init, enum xran_category xran_ca
 
   fh_init->totalBfWeights = 0; // only used if id = O_RU (for emulation); C-plane extension types; section 5.4.6 of CUS spec
 
+#ifdef F_RELEASE
+  fh_init->mlogxranenable = 0; // enable mlog; 0 -> disabled
+  fh_init->dlCpProcBurst = 0; /* 1 -> DL CP processing will be done on single symbol,
+                                 0 -> DL CP processing will be spread across all allowed symbols and multiple cores to reduce burstiness */
+#endif
+
   return true;
 }
 
@@ -631,6 +677,9 @@ static bool set_fh_prach_config(const openair0_config_t *oai0,
   prach_config->numPrbc = 0;
   prach_config->timeOffset = 0;
   prach_config->freqOffset = 0;
+#ifdef F_RELEASE
+  prach_config->nPrachConfIdxLTE = 0; // used only if DSS enabled and technology is XRAN_RAN_LTE
+#endif
 
   /* xran defines PDSCH eAxC IDs as [0...Ntx-1];
      xran defines PUSCH eAxC IDs as [0...Nrx-1];
@@ -779,6 +828,10 @@ static bool set_fh_config(int ru_idx, int num_rus, enum xran_category xran_cat, 
   fh_config->enableCP = 1; // enable C-plane
   fh_config->prachEnable = 1; // enable PRACH
   fh_config->srsEnable = 0; // enable SRS; used only if XRAN_CATEGORY_B
+#ifdef F_RELEASE
+  fh_config->srsEnableCp = 0; // enable SRS CP; used only if XRAN_CATEGORY_B
+  fh_config->SrsDelaySym = 0; // number of SRS delay symbols; used only if XRAN_CATEGORY_B
+#endif
   fh_config->puschMaskEnable = 0; // enable PUSCH mask; only used if id = O_RU
   fh_config->puschMaskSlot = 0; // specific which slot PUSCH channel masked; only used if id = O_RU
   fh_config->cp_vlan_tag = *gpd(fhp, nfh, ORAN_FH_CONFIG_CP_VLAN_TAG)->uptr; // C-plane VLAN tag; not used in xran; needed for M-plane
@@ -819,6 +872,14 @@ static bool set_fh_config(int ru_idx, int num_rus, enum xran_category xran_cat, 
           In this case, O-RU is not expected to perform any PRACH specific processing. */
   fh_config->max_sections_per_slot = 0; // not used in xran
   fh_config->max_sections_per_symbol = 0; // not used in xran
+
+#ifdef F_RELEASE
+  fh_config->RunSlotPrbMapBySymbolEnable = 0; // enable PRB mapping by symbol with multisection
+
+  fh_config->dssEnable = 0; // enable DSS (extension-9)
+  fh_config->dssPeriod = 0; // DSS pattern period for LTE/NR
+  // fh_config->technology[XRAN_MAX_DSS_PERIODICITY] // technology array represents slot is LTE(0)/NR(1); used only if DSS enabled
+#endif
 
   return true;
 }
