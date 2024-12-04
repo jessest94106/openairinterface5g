@@ -219,9 +219,9 @@ def GetServices(ssh, requested, file):
     else:
         return requested
 
-def CopyinContainerLog(ssh, lSourcePath, yaml, containerName, filename):
+def CopyinServiceLog(ssh, lSourcePath, yaml, svcName, wd_yaml, filename):
 	remote_filename = f"{lSourcePath}/cmake_targets/log/{filename}"
-	ssh.run(f'docker logs {containerName} &> {remote_filename}')
+	ssh.run(f'docker compose -f {wd_yaml} logs {svcName} --no-log-prefix &> {remote_filename}')
 	local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml}"
 	local_filename = f"{local_dir}/{filename}"
 	return ssh.copyin(remote_filename, local_filename)
@@ -903,7 +903,7 @@ class Containerize():
 			if services is not None:
 				all_serv = " ".join([s for s, _ in services])
 				ssh.run(f'docker compose -f {wd}/docker-compose.y*ml stop -- {all_serv}')
-				copyin_res = all(CopyinContainerLog(ssh, lSourcePath, yaml_dir, c, f'{s}-{HTML.testCase_id}.log') for s, c in services)
+				copyin_res = all(CopyinServiceLog(ssh, lSourcePath, yaml_dir, s, f"{wd}/docker-compose.y*ml", f'{s}-{HTML.testCase_id}.log') for s, c in services)
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd}/docker-compose.y*ml down -v')
