@@ -78,8 +78,10 @@ Tested libxran releases:
 | Vendor                                  |
 |-----------------------------------------|
 | `oran_e_maintenance_release_v1.0`       |
+| `oran_f_release_v1.0`                   |
 
-**Note**: The libxran driver of OAI identifies the above version as "5.1.0" (E is fifth letter, then 1.0).
+
+**Note**: The libxran driver of OAI identifies the above E release version as "5.1.0" (E is fifth letter, then 1.0), and the above F release as "6.1.0".
 
 ## Configure your server
 
@@ -379,19 +381,22 @@ cd ~/openairinterface5g/
 
 ## Build ORAN Fronthaul Interface Library
 
-Download ORAN FHI DU library and checkout the correct version.
+Download ORAN FHI DU library, checkout the correct version, and apply the correct patch (available in `oai_folder/cmake_targets/tools/oran_fhi_integration_patches`).
 
+### E release
 ```bash
 git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git ~/phy
 cd ~/phy
 git checkout oran_e_maintenance_release_v1.0
+git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/E/oaioran_E.patch
 ```
 
-Apply the patch (available in `oai_folder/cmake_targets/tools/oran_fhi_integration_patches/E`):
-
+### F release
 ```bash
+git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git ~/phy
 cd ~/phy
-git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/E/oaioran_E.patch
+git checkout oran_f_release_v1.0
+git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/F/oaioran_F.patch
 ```
 
 Compile the fronthaul interface library by calling `make` and the option
@@ -404,7 +409,8 @@ environment variables `RTE_SDK` for the path to the source tree of DPDK, and
 ```bash
 cd ~/phy/fhi_lib/lib
 make clean
-RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1
+RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1 # E release
+WIRELESS_SDK_TOOLCHAIN=gcc RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1 # F release
 ...
 [AR] build/libxran.so
 ./build/libxran.so
