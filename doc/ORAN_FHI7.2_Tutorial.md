@@ -929,7 +929,9 @@ Layer mapping (eAxC offsets) happens as follows:
 - For PUSCH/PDSCH, the layers are mapped to `[0,1,...,Nrx-1]/[0,1,...,Ntx-1]` where `Nrx/Ntx` is the
   respective RX/TX number of antennas.
 - For PRACH, the layers are mapped to `[No,No+1,...No+Nrx-1]` where `No` is the
-  `fhi_72.fh_config.[0].prach_config.eAxC_offset`. Please be aware that the following equation must be fullfilled: `No >= max(Nrx,Ntx)`.
+  `fhi_72.fh_config.[0].prach_config.eAxC_offset`. xran assumes PRACH offset `No >= max(Nrx,Ntx)`.
+  However, we made a workaround that xran supports PRACH eAxC IDs same as PUSCH eAxC IDs. This is achieved with `is_prach` and `filter_id` parameters in the patch.
+  Please note that this approach only applies to the RUs that support this functionality, e.g. LITEON RU.
 
 **Note**
 
