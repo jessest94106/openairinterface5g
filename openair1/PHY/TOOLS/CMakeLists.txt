@@ -47,10 +47,10 @@ if(ENABLE_UESCOPE OR ENABLE_ENBSCOPE OR ENABLE_NRSCOPE)
   target_link_libraries(xforms_common PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
   add_library(enbscope MODULE lte_enb_scope.c $<TARGET_OBJECTS:xforms_common>)
-  target_link_libraries(enbscope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+  target_link_libraries(enbscope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs UTIL)
 
   add_library(uescope MODULE lte_ue_scope.c $<TARGET_OBJECTS:xforms_common>)
-  target_link_libraries(uescope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+  target_link_libraries(uescope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs UTIL)
 
   add_library(nrscope MODULE nr_phy_scope.c)
   target_link_libraries(nrscope PUBLIC forms PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs UTIL)
