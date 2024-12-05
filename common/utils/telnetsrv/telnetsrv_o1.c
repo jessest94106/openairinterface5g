@@ -391,12 +391,21 @@ static int start_modem(char *buf, int debug, telnet_printfunc_t prnt)
   return 0;
 }
 
+extern void du_clear_all_ue_states();
+static int remove_mac_ues(char *buf, int debug, telnet_printfunc_t prnt)
+{
+  du_clear_all_ue_states();
+  prnt("OK\n");
+  return 0;
+}
+
 static telnetshell_cmddef_t o1cmds[] = {
   {"stats", "", get_stats},
   {"config", "[]", set_config},
   {"bwconfig", "", set_bwconfig},
   {"stop_modem", "", stop_modem},
   {"start_modem", "", start_modem},
+  {"remove_mac_ues", "", remove_mac_ues},
   {"", "", NULL},
 };
 
