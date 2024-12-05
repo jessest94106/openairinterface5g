@@ -91,19 +91,26 @@ static fgmm_msg_header_t set_mm_header(fgs_nas_msg_t type, Security_header_t sec
   return mm_header;
 }
 
-static void servingNetworkName(uint8_t *msg, char *imsiStr, int nmc_size)
+static void servingNetworkName(uint8_t *msg, char *imsiStr, int mnc_size)
 {
   // SNN-network-identifier in TS 24.501
   // TS 24.501: If the MNC of the serving PLMN has two digits, then a zero is added at the beginning.
-  const char *format = "5G:mnc000.mcc000.3gppnetwork.org";
-  memcpy(msg, format, strlen(format));
 
-  if (nmc_size == 2)
-    memcpy(msg + 7, imsiStr + 3, 2);
-  else
-    memcpy(msg + 6, imsiStr + 3, 3);
+  // MNC
+  char mnc[4];
+  if (mnc_size == 2) {
+    snprintf(mnc, sizeof(mnc), "0%c%c", imsiStr[3], imsiStr[4]);
+  } else {
+    snprintf(mnc, sizeof(mnc), "%c%c%c", imsiStr[3], imsiStr[4], imsiStr[5]);
+  }
 
-  memcpy(msg + 13, imsiStr, 3);
+  // MCC
+  char mcc[4];
+  snprintf(mcc, sizeof(mcc), "%c%c%c", imsiStr[0], imsiStr[1], imsiStr[2]);
+
+  int size = 64;
+
+  snprintf((char *)msg, size, "5G:mnc%3s.mcc%3s.3gppnetwork.org", mnc, mcc);
 }
 
 static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, int pdu_length)
