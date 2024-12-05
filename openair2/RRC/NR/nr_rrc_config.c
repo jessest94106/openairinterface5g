@@ -51,6 +51,7 @@
 #include "oai_asn1.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
+#include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair3/UTILS/conversions.h"
 #include "uper_decoder.h"
 #include "uper_encoder.h"
@@ -313,9 +314,13 @@ static uint64_t get_ssb_bitmap(const NR_ServingCellConfigCommon_t *scc)
   return bitmap;
 }
 
-static int set_ideal_period(const int n_slots_period, const int n_ul_slots_period)
+static int set_ideal_period(bool is_csi)
 {
-  return MAX_MOBILES_PER_GNB * 2 * n_slots_period / n_ul_slots_period; // 2 reports per UE (RSRP and RI-PMI-CQI)
+  const frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
+  const int nb_slots_per_period = fs->numb_slots_period;
+  const int n_ul_slots_per_period = get_ul_slots_per_period(fs); // full UL + mixed with UL symbols
+  // 2 reports per UE (RSRP and RI-PMI-CQI)
+  return is_csi ? MAX_MOBILES_PER_GNB * 2 * nb_slots_per_period / n_ul_slots_per_period : nb_slots_per_period * MAX_MOBILES_PER_GNB;
 }
 
 static void set_csirs_periodicity(NR_NZP_CSI_RS_Resource_t *nzpcsi0,
@@ -390,16 +395,6 @@ static void config_csirs(const NR_ServingCellConfigCommon_t *servingcellconfigco
     nzpcsirs0->aperiodicTriggeringOffset = NULL;
     nzpcsirs0->trs_Info = NULL;
     asn1cSeqAdd(&csi_MeasConfig->nzp_CSI_RS_ResourceSetToAddModList->list,nzpcsirs0);
-
-    const NR_TDD_UL_DL_Pattern_t *tdd = servingcellconfigcommon->tdd_UL_DL_ConfigurationCommon ?
-                                        &servingcellconfigcommon->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
-
-    const int n_slots_frame = slotsperframe[*servingcellconfigcommon->ssbSubcarrierSpacing];
-    const int nb_slots_per_period = tdd ? n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity): n_slots_frame;
-    const int nb_dl_slots_period = tdd ? tdd->nrofDownlinkSlots : n_slots_frame;
-    const int n_ul_slots_period = tdd ? (tdd->nrofUplinkSlots + (tdd->nrofUplinkSymbols > 0)) : n_slots_frame;
-    const int ideal_period = set_ideal_period(nb_slots_per_period, n_ul_slots_period); // same periodicity as CSI measurement report
-
     if(!csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList)
       csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList = calloc(1,sizeof(*csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList));
     NR_NZP_CSI_RS_Resource_t *nzpcsi0 = calloc(1,sizeof(*nzpcsi0));
@@ -448,7 +443,12 @@ static void config_csirs(const NR_ServingCellConfigCommon_t *servingcellconfigco
     nzpcsi0->powerControlOffsetSS = calloc(1,sizeof(*nzpcsi0->powerControlOffsetSS));
     *nzpcsi0->powerControlOffsetSS = NR_NZP_CSI_RS_Resource__powerControlOffsetSS_db0;
     nzpcsi0->scramblingID = *servingcellconfigcommon->physCellId;
-    set_csirs_periodicity(nzpcsi0, id, ideal_period, nb_slots_per_period, nb_dl_slots_period);
+
+    const int ideal_period = set_ideal_period(true); // same periodicity as CSI measurement report
+    const frame_structure_t *fs = &(RC.nrmac[0]->frame_structure);
+    const int nb_dl_slots_period = get_full_dl_slots_per_period(fs); // full DL slots
+    set_csirs_periodicity(nzpcsi0, id, ideal_period, fs->numb_slots_period, nb_dl_slots_period);
+
     nzpcsi0->qcl_InfoPeriodicCSI_RS = calloc(1,sizeof(*nzpcsi0->qcl_InfoPeriodicCSI_RS));
     *nzpcsi0->qcl_InfoPeriodicCSI_RS = 0;
     asn1cSeqAdd(&csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList->list,nzpcsi0);
@@ -629,15 +629,12 @@ long rrc_get_max_nr_csrs(const int max_rbs, const long b_SRS) {
 static struct NR_SRS_Resource__resourceType__periodic *configure_periodic_srs(const NR_ServingCellConfigCommon_t *scc,
                                                                               const int uid)
 {
+  frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
+  int offset = get_ul_slot_offset(fs, uid, false); // only full UL slots for SRS
 
-  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
-  const int n_slots_frame = slotsperframe[*scc->ssbSubcarrierSpacing];
-  const int ul_slots_period = tdd ? tdd->nrofUplinkSlots : n_slots_frame;
-  const int n_slots_period = tdd ? n_slots_frame/get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) : n_slots_frame;
-  const int first_full_ul_slot = n_slots_period - ul_slots_period;
-  const int ideal_period = n_slots_period * MAX_MOBILES_PER_GNB;
-  const int offset = first_full_ul_slot + (uid % ul_slots_period) + (n_slots_period * (uid / ul_slots_period));
   AssertFatal(offset < 2560, "Cannot allocate SRS configuration for uid %d, not enough resources\n", uid);
+  const int ideal_period = set_ideal_period(false);
+
   struct NR_SRS_Resource__resourceType__periodic *periodic_srs = calloc(1,sizeof(*periodic_srs));
   if (ideal_period < 5) {
     periodic_srs->periodicityAndOffset_p.present = NR_SRS_PeriodicityAndOffset_PR_sl4;
@@ -1651,16 +1648,14 @@ static void set_csi_meas_periodicity(const NR_ServingCellConfigCommon_t *scc,
                                      int curr_bwp,
                                      bool is_rsrp)
 {
-  const frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
-  const NR_TDD_UL_DL_Pattern_t *tdd = scc->tdd_UL_DL_ConfigurationCommon ? &scc->tdd_UL_DL_ConfigurationCommon->pattern1 : NULL;
-  const int n_slots_frame = slotsperframe[*scc->ssbSubcarrierSpacing];
-  const int n_ul_slots_period = tdd ? (tdd->nrofUplinkSlots + (tdd->nrofUplinkSymbols > 0)) : n_slots_frame;
-  const int n_slots_period = tdd ? n_slots_frame / get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity) : n_slots_frame;
-  const int ideal_period = set_ideal_period(n_slots_period, n_ul_slots_period);
-  const int first_ul_slot_period = tdd ? get_first_ul_slot(fs, true) : 0;
+  const int ideal_period = set_ideal_period(true);
   const int num_pucch2 = get_nb_pucch2_per_slot(scc, curr_bwp);
   const int idx = (uid * 2 / num_pucch2) + is_rsrp;
-  const int offset = first_ul_slot_period + idx % n_ul_slots_period + (idx / n_ul_slots_period) * n_slots_period;
+
+  frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
+  int offset = get_ul_slot_offset(fs, idx, true);
+
+  LOG_D(NR_MAC, "set_csi_meas_periodicity: uid = %d, offset = %d, ideal_period = %d", uid, offset, ideal_period);
   AssertFatal(offset < 320, "Not enough UL slots to accomodate all possible UEs. Need to rework the implementation\n");
 
   if (ideal_period < 5) {
