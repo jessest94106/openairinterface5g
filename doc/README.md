@@ -43,6 +43,7 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
   * [OAI 5GC](./NR_SA_Tutorial_OAI_CN5G.md)
   * [OAI gNB with COTS UE](./NR_SA_Tutorial_COTS_UE.md)
   * [OAI NR-UE](./NR_SA_Tutorial_OAI_nrUE.md)
+  * [Multiple OAI NR-UE with RFsimulator](./NR_SA_Tutorial_OAI_multi_UE.md)
 - [RUNMODEM.md](./RUNMODEM.md): Generic information on how to
   * Run simulators
   * Run with hardware
