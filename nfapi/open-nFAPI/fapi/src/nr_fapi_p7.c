@@ -1509,7 +1509,7 @@ uint8_t unpack_ul_dci_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg
   return 1;
 }
 
-static uint8_t pack_tx_data_pdu_list_value(void *tlv, uint8_t **ppWritePackedMsg, uint8_t *end)
+static uint8_t pack_tx_data_pdu_list_value(void *tlv, uint8_t **ppWritePackedMsg, uint8_t *end, uint32_t *payload_offset)
 {
   nfapi_nr_pdu_t *value = (nfapi_nr_pdu_t *)tlv;
   if (!(push32(value->PDU_length, ppWritePackedMsg, end) && push16(value->PDU_index, ppWritePackedMsg, end)
@@ -1517,8 +1517,15 @@ static uint8_t pack_tx_data_pdu_list_value(void *tlv, uint8_t **ppWritePackedMsg
     return 0;
 
   for (int i = 0; i < value->num_TLV; ++i) {
-    if (!(push16(value->TLVs[i].tag, ppWritePackedMsg, end) && push32(value->TLVs[i].length, ppWritePackedMsg, end)))
+    if (!push16(value->TLVs[i].tag, ppWritePackedMsg, end))
       return 0;
+#ifdef ENABLE_AERIAL
+    if (!push16(value->TLVs[i].length, ppWritePackedMsg, end))
+      return 0;
+#else
+    if (!push32(value->TLVs[i].length, ppWritePackedMsg, end))
+      return 0;
+#endif
     const uint32_t byte_len = (value->TLVs[i].length + 3) / 4;
     switch (value->TLVs[i].tag) {
       case 0: {
@@ -1537,7 +1544,14 @@ static uint8_t pack_tx_data_pdu_list_value(void *tlv, uint8_t **ppWritePackedMsg
 
         break;
       }
-
+      case 2: {
+        // Currently Tag = 2 is only used for Aerial
+        if (!push32(*payload_offset, ppWritePackedMsg, end)) {
+          return 0;
+        }
+        *payload_offset += value->TLVs[i].length;
+        break;
+      }
       default: {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "FIXME : Invalid tag value %d \n", value->TLVs[i].tag);
         break;
@@ -1555,9 +1569,9 @@ uint8_t pack_tx_data_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *end
   if (!(push16(pNfapiMsg->SFN, ppWritePackedMsg, end) && push16(pNfapiMsg->Slot, ppWritePackedMsg, end)
         && push16(pNfapiMsg->Number_of_PDUs, ppWritePackedMsg, end)))
     return 0;
-
+  uint32_t payload_offset = 0;
   for (int i = 0; i < pNfapiMsg->Number_of_PDUs; i++) {
-    if (!pack_tx_data_pdu_list_value(&pNfapiMsg->pdu_list[i], ppWritePackedMsg, end)) {
+    if (!pack_tx_data_pdu_list_value(&pNfapiMsg->pdu_list[i], ppWritePackedMsg, end, &payload_offset)) {
       NFAPI_TRACE(NFAPI_TRACE_ERROR,
                   "%s():%d. Error packing TX_DATA.request PDU #%d, PDU length = %d PDU IDX = %d\n",
                   __FUNCTION__,
