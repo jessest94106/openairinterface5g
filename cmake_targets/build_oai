@@ -48,6 +48,7 @@ CMAKE_BUILD_TYPE="RelWithDebInfo"
 CMAKE_CMD="$CMAKE"
 OPTIONAL_LIBRARIES="telnetsrv enbscope uescope nrscope ldpc_cuda ldpc_t2 websrv oai_iqplayer imscope"
 TARGET_LIST=""
+BUILD_TOOL_OPT="-j$(nproc)"
 
 function print_help() {
   echo_info "
@@ -56,6 +57,8 @@ for a number of distributions (Ubuntu 22-24, Fedora, RHEL9).
 Options:
 --arch-native
    Passes -march=native to the compiler.
+--build-tool-opt
+   Pass options to build tool (ninja/make), e.g. -k (\"keep going\")
 -c | --clean
    Erase all files to make a rebuild from start
 -C | --clean-all
@@ -160,6 +163,9 @@ function main() {
        --arch-native)
             echo_fatal "Error: specify --arch-native on the command line to cmake directly: ./build_oai --cmake-opt \"-DCMAKE_C_FLAGS=-march=native -DCMAKE_CXX_FLAGS=-march=native\""
             shift;;
+       --build-tool-opt)
+            BUILD_TOOL_OPT+=" $2"
+            shift 2;;
        -c | --clean)
             CLEAN=1
             shift;;
@@ -490,7 +496,7 @@ function main() {
     CMAKE_CMD="$CMAKE_CMD ../../.."
     echo_info "Running \"$CMAKE_CMD\""
     eval $CMAKE_CMD
-    compilations $BUILD_DIR all.txt $TARGET_LIST
+    compilations $BUILD_DIR all.txt "$TARGET_LIST" "${BUILD_TOOL_OPT}"
     ###################
     # Doxygen Support #
     ###################
@@ -513,9 +519,9 @@ function main() {
       cd $DIR/nas_sim_tools/build
 
       ${CMAKE_CMD% *} ..
-      compilations nas_sim_tools usim.txt usim
-      compilations nas_sim_tools nvram.txt nvram
-      compilations nas_sim_tools conf2uedata.txt conf2uedata
+      compilations nas_sim_tools usim.txt "usim" "${BUILD_TOOL_OPT}"
+      compilations nas_sim_tools nvram.txt "nvram" "${BUILD_TOOL_OPT}"
+      compilations nas_sim_tools conf2uedata.txt "conf2uedata" "${BUILD_TOOL_OPT}"
 
       # generate USIM data
       if [ -f conf2uedata ]; then
