@@ -89,6 +89,7 @@
       <yaml_path>ci-scripts/yaml_files/5g_sa_n310_2x2_60MHz</yaml_path>
       <eNB_instance>0</eNB_instance>
       <eNB_serverId>0</eNB_serverId>
+      <num_attempts>3</num_attempts>
   </testCase>
 
   <testCase id="000001">
