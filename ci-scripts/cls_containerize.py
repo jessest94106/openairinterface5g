@@ -337,6 +337,7 @@ class Containerize():
 		self.imageToCopy = ''
 		#checkers from xml
 		self.ran_checkers={}
+		self.num_attempts = 1
 
 		self.flexricTag = ''
 
@@ -844,50 +845,55 @@ class Containerize():
 
 	def DeployObject(self, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
+		num_attempts = self.num_attempts
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('\u001B[1m Deploying OAI Object on server: ' + lIpAddr + '\u001B[0m')
+		logging.debug(f'Deploying OAI Object on server: {lIpAddr}')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		# creating the log folder by default
 		local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml.split('/')[-1]}"
 		os.system(f'mkdir -p {local_dir}')
 		wd = f'{lSourcePath}/{yaml}'
-
+		wd_yaml = f'{wd}/docker-compose.y*ml'
+		yaml_dir = yaml.split('/')[-1]
 		with cls_cmd.getConnection(lIpAddr) as ssh:
-			services = GetServices(ssh, self.services[self.eNB_instance], f"{wd}/docker-compose.y*ml")
+			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
 			if services == [] or services == ' ' or services == None:
-				msg = "Cannot determine services to start"
+				msg = 'Cannot determine services to start'
 				logging.error(msg)
 				HTML.CreateHtmlTestRowQueue('N/A', 'KO', [msg])
 				return False
-
 			ExistEnvFilePrint(ssh, wd)
 			WriteEnvFile(ssh, services, wd, self.deploymentTag, self.flexricTag)
-
-			logging.info(f"will start services {services}")
-			status = ssh.run(f'docker compose -f {wd}/docker-compose.y*ml up -d -- {services}')
-			if status.returncode != 0:
-				msg = f"cannot deploy services {services}: {status.stdout}"
-				logging.error(msg)
-				HTML.CreateHtmlTestRowQueue('N/A', 'KO', [msg])
-				return False
-
-			imagesInfo = []
-			fstatus = True
-			for svc in services.split():
-				containerName = GetContainerName(ssh, svc, f"{wd}/docker-compose.y*ml")
-				healthy = GetContainerHealth(ssh, containerName)
-				if not healthy:
-					imagesInfo += [f"Failed to deploy: service {svc}"]
-					fstatus = False
-				else:
-					image = GetImageName(ssh, svc, f"{wd}/docker-compose.y*ml")
-					logging.info(f"service {svc} healthy, container {containerName}, image {image}")
-					imagesInfo += [f"service {svc} healthy, image {image}"]
-		if fstatus:
+			if num_attempts <= 0:
+				raise ValueError(f'Invalid value for num_attempts: {num_attempts}, must be greater than 0')
+			for attempt in range(num_attempts):
+				imagesInfo = []
+				healthInfo = []
+				logging.info(f'will start services {services}')
+				status = ssh.run(f'docker compose -f {wd_yaml} up -d -- {services}')
+				if status.returncode != 0:
+					msg = f'cannot deploy services {services}: {status.stdout}'
+					logging.error(msg)
+					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', [msg])
+					return False
+				for svc in services.split():
+					health, msg = GetServiceHealth(ssh, svc, f'{wd_yaml}')
+					logging.info(msg)
+					imagesInfo.append(msg)
+					healthInfo.append(health)
+				deployed = all(healthInfo)
+				if deployed:
+					break
+				elif (attempt < num_attempts - 1):
+					logging.warning(f'Failed to deploy on attempt {attempt}, restart services {services}')
+					for svc in services.split():
+						CopyinServiceLog(ssh, lSourcePath, yaml_dir, svc, wd_yaml, f'{svc}-{HTML.testCase_id}-attempt{attempt}.log')
+					ssh.run(f'docker compose -f {wd_yaml} down -- {services}')
+		if deployed:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['\n'.join(imagesInfo)])
 		else:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
-		return fstatus
+		return deployed
 
 	def UndeployObject(self, HTML, RAN):
 		svr = self.eNB_serverId[self.eNB_instance]

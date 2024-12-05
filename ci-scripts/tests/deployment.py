@@ -47,6 +47,7 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.eNBUserName = None
 		self.cont.eNBPassword = None
 		self.cont.eNBSourceCodePath = os.getcwd()
+		self.cont.num_attempts = 3
 
 	def test_deploy(self):
 		self.cont.yamlPath[0] = 'tests/simple-dep/'
