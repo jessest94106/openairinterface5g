@@ -1693,6 +1693,14 @@ static void nr_generate_Msg2(module_id_t module_idP,
 
   LOG_A(NR_MAC, "%d.%d Send RAR to RA-RNTI %04x\n", frameP, slotP, ra->RA_rnti);
 
+  tx_req->PDU_index = pduindex;
+  tx_req->num_TLV = 1;
+  tx_req->TLVs[0].length = pdsch_pdu_rel15->TBSize[0];
+  tx_req->PDU_length = compute_PDU_length(tx_req->num_TLV, pdsch_pdu_rel15->TBSize[0]);
+  TX_req->SFN = frameP;
+  TX_req->Number_of_PDUs++;
+  TX_req->Slot = slotP;
+
   T(T_GNB_MAC_DL_RAR_PDU_WITH_DATA,
     T_INT(module_idP),
     T_INT(CC_id),
@@ -1701,14 +1709,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
     T_INT(slotP),
     T_INT(0),
     T_BUFFER(&tx_req->TLVs[0].value.direct[0], tx_req->TLVs[0].length));
-
-  tx_req->PDU_index = pduindex;
-  tx_req->num_TLV = 1;
-  tx_req->TLVs[0].length = pdsch_pdu_rel15->TBSize[0];
-  tx_req->PDU_length = compute_PDU_length(tx_req->num_TLV, pdsch_pdu_rel15->TBSize[0]);
-  TX_req->SFN = frameP;
-  TX_req->Number_of_PDUs++;
-  TX_req->Slot = slotP;
 
   // Mark the corresponding symbols RBs as used
   fill_pdcch_vrb_map(nr_mac, CC_id, &ra->sched_pdcch, CCEIndex, aggregation_level, beam.idx);
