@@ -681,6 +681,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   // beam number in multi-beam scenario (concurrent beams)
   int bitmap = SL_to_bitmap(rel15->StartSymbolIndex, rel15->NrOfSymbols);
   int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+                                      &gNB->gNB_config.dbt_config,
                                       &gNB->common_vars,
                                       slot,
                                       frame_parms->symbols_per_slot,
