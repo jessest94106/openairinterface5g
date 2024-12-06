@@ -19,34 +19,44 @@
  *      contact@openairinterface.org
  */
 
-#ifndef ACTOR_H
-#define ACTOR_H
-#include "notified_fifo.h"
+#include "task_ans.h"
+#include "assertions.h"
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
 
-#define INIT_ACTOR(ptr, name, core_affinity) init_actor((Actor_t *)ptr, name, core_affinity);
+void completed_task_ans(task_ans_t* task)
+{
+  DevAssert(task != NULL);
 
-#define DESTROY_ACTOR(ptr) destroy_actor((Actor_t *)ptr);
+  if (atomic_load_explicit(&task->status, memory_order_acquire) != 0)
+    AssertFatal(0, "Task already finished?");
 
-#define SHUTDOWN_ACTOR(ptr) shutdown_actor((Actor_t *)ptr);
+  atomic_store_explicit(&task->status, 1, memory_order_release);
+}
 
-typedef struct Actor_t {
-  notifiedFIFO_t fifo;
-  bool terminate;
-  pthread_t thread;
-} Actor_t;
+void join_task_ans(task_ans_t* arr, size_t len)
+{
+  DevAssert(len < INT_MAX);
+  DevAssert(arr != NULL);
 
-/// @brief Initialize the actor. Starts actor thread
-/// @param actor
-/// @param name Actor name. Thread name will be derived from it
-/// @param core_affinity Core affinity. Specify -1 for no affinity
-void init_actor(Actor_t *actor, const char *name, int core_affinity);
-
-/// @brief Destroy the actor. Free the memory, stop the thread.
-/// @param actor
-void destroy_actor(Actor_t *actor);
-
-/// @brief Gracefully shutdown the actor, letting all tasks previously started finish
-/// @param actor
-void shutdown_actor(Actor_t *actor);
-
-#endif
+  // Spin lock inspired by:
+  // The Art of Writing Efficient Programs:
+  // An advanced programmer's guide to efficient hardware utilization
+  // and compiler optimizations using C++ examples
+  const struct timespec ns = {0, 1};
+  uint64_t i = 0;
+  int j = len - 1;
+  for (; j != -1; i++) {
+    for (; j != -1; --j) {
+      int const task_completed = 1;
+      if (atomic_load_explicit(&arr[j].status, memory_order_acquire) != task_completed)
+        break;
+    }
+    if (i % 8 == 0) {
+      nanosleep(&ns, NULL);
+    }
+  }
+}

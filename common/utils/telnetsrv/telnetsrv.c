@@ -53,7 +53,6 @@
 #include <sys/resource.h>
 #include "common/utils/load_module_shlib.h"
 #include "common/config/config_userapi.h"
-#include "common/utils/threadPool/thread-pool.h"
 #include "executables/softmodem-common.h"
 #include <readline/history.h>
 #include "common/oai_version.h"

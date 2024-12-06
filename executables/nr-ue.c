@@ -40,6 +40,7 @@
 #include "openair1/PHY/TOOLS/phy_scope_interface.h"
 #include "PHY/MODULATION/nr_modulation.h"
 #include "instrumentation.h"
+#include "common/utils/threadPool/notified_fifo.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -101,8 +102,10 @@
 static void *NRUE_phy_stub_standalone_pnf_task(void *arg);
 
 static void start_process_slot_tx(void* arg) {
-  notifiedFIFO_elt_t *newTx = arg;
-  pushTpool(&(get_nrUE_params()->Tpool), newTx);
+  task_t task;
+  task.args = arg;
+  task.func = processSlotTX;
+  pushTpool(&(get_nrUE_params()->Tpool), task);
 }
 
 static size_t dump_L1_UE_meas_stats(PHY_VARS_NR_UE *ue, char *output, size_t max_len)
@@ -487,7 +490,7 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
 void processSlotTX(void *arg)
 {
   TracyCZone(ctx, true);
-  nr_rxtx_thread_data_t *rxtxD = (nr_rxtx_thread_data_t *) arg;
+  nr_rxtx_thread_data_t *rxtxD = arg;
   const UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
   PHY_VARS_NR_UE *UE = rxtxD->UE;
   nr_phy_data_tx_t phy_data = {0};
@@ -550,6 +553,7 @@ void processSlotTX(void *arg)
   int next_slot = (proc->nr_slot_tx + 1) % slots_per_frame;
   dynamic_barrier_join(&UE->process_slot_tx_barriers[next_slot]);
   RU_write(rxtxD, sl_tx_action);
+  free(rxtxD);
   TracyCZoneEnd(ctx);
 }
 
@@ -823,7 +827,7 @@ void *UE_thread(void *arg)
 
   while (!oai_exit) {
     if (syncRunning) {
-      notifiedFIFO_elt_t *res=tryPullTpool(&nf,&(get_nrUE_params()->Tpool));
+      notifiedFIFO_elt_t *res = pollNotifiedFIFO(&nf);
 
       if (res) {
         syncRunning = false;
@@ -1003,7 +1007,7 @@ void *UE_thread(void *arg)
       nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.frame_tx, curMsg.proc.gNB_id);
 
     // RX slot processing. We launch and forget.
-    notifiedFIFO_elt_t *newRx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_rx, NULL, UE_dl_processing);
+    notifiedFIFO_elt_t *newRx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_tx, NULL, UE_dl_processing);
     nr_rxtx_thread_data_t *curMsgRx = (nr_rxtx_thread_data_t *)NotifiedFifoData(newRx);
     *curMsgRx = (nr_rxtx_thread_data_t){.proc = curMsg.proc, .UE = UE};
     int ret = UE_dl_preprocessing(UE, &curMsgRx->proc, tx_wait_for_dlsch, &curMsgRx->phy_data, &stats_printed);
@@ -1013,8 +1017,7 @@ void *UE_thread(void *arg)
 
     // Start TX slot processing here. It runs in parallel with RX slot processing
     // in current code, DURATION_RX_TO_TX constant is the limit to get UL data to encode from a RX slot
-    notifiedFIFO_elt_t *newTx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_tx, NULL, processSlotTX);
-    nr_rxtx_thread_data_t *curMsgTx = (nr_rxtx_thread_data_t *)NotifiedFifoData(newTx);
+    nr_rxtx_thread_data_t *curMsgTx = calloc(1, sizeof(*curMsgTx));
     curMsgTx->proc = curMsg.proc;
     curMsgTx->writeBlockSize = writeBlockSize;
     curMsgTx->proc.timestamp_tx = writeTimestamp;
@@ -1026,7 +1029,7 @@ void *UE_thread(void *arg)
     dynamic_barrier_update(&UE->process_slot_tx_barriers[slot],
                            tx_wait_for_dlsch[slot] + sync_to_previous_thread,
                            start_process_slot_tx,
-                           newTx);
+                           curMsgTx);
     stream_status = STREAM_STATUS_SYNCED;
     tx_wait_for_dlsch[slot] = 0;
   }

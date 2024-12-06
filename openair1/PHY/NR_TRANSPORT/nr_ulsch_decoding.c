@@ -50,6 +50,10 @@
 //#define DEBUG_ULSCH_DECODING
 //#define gNB_DEBUG_TRACE
 
+#include <stdint.h>
+#include <time.h>
+#include <stdalign.h>
+
 #define OAI_UL_LDPC_MAX_NUM_LLR 27000//26112 // NR_LDPC_NCOL_BG1*NR_LDPC_ZMAX = 68*384
 //#define DEBUG_CRC
 #ifdef DEBUG_CRC
@@ -181,6 +185,9 @@ static void nr_processULSegment(void *arg)
     LOG_E(PHY, "ulsch_decoding.c: Problem in rate_matching\n");
     rdata->decodeIterations = max_ldpc_iterations + 1;
     set_abort(&ulsch_harq->abort_decode, true);
+
+    // Task completed
+    completed_task_ans(rdata->ans);
     return;
   }
 
@@ -220,6 +227,9 @@ static void nr_processULSegment(void *arg)
 
   if (rdata->decodeIterations <= p_decoderParms->numMaxIter)
     memcpy(ulsch_harq->c[r],llrProcBuf,  Kr>>3);
+
+  // Task completed
+  completed_task_ans(rdata->ans);
 }
 
 int decode_offload(PHY_VARS_gNB *phy_vars_gNB,
@@ -320,7 +330,8 @@ int nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
                       uint32_t frame,
                       uint8_t nr_tti_rx,
                       uint8_t harq_pid,
-                      uint32_t G)
+                      uint32_t G,
+                      thread_info_tm_t *t_info)
 {
   if (!ulsch_llr) {
     LOG_E(PHY, "ulsch_decoding.c: NULL ulsch_llr pointer\n");
@@ -430,9 +441,12 @@ int nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
   set_abort(&harq_process->abort_decode, false);
   for (int r = 0; r < harq_process->C; r++) {
     int E = nr_get_E(G, harq_process->C, Qm, n_layers, r);
-    union ldpcReqUnion id = {.s = {ulsch->rnti, frame, nr_tti_rx, 0, 0}};
-    notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(ldpcDecode_t), id.p, &phy_vars_gNB->respDecode, &nr_processULSegment);
-    ldpcDecode_t *rdata = (ldpcDecode_t *)NotifiedFifoData(req);
+
+    ldpcDecode_t *rdata = &((ldpcDecode_t *)t_info->buf)[t_info->len];
+    DevAssert(t_info->len < t_info->cap);
+    rdata->ans = &t_info->ans[t_info->len];
+    t_info->len += 1;
+
     decParams.R = nr_get_R_ldpc_decoder(pusch_pdu->pusch_data.rv_index,
                                         E,
                                         decParams.BG,
@@ -457,7 +471,10 @@ int nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
     rdata->ulsch = ulsch;
     rdata->ulsch_id = ULSCH_id;
     rdata->tbslbrm = pusch_pdu->maintenance_parms_v3.tbSizeLbrmBytes;
-    pushTpool(&phy_vars_gNB->threadPool, req);
+
+    task_t t = {.func = &nr_processULSegment, .args = rdata};
+    pushTpool(&phy_vars_gNB->threadPool, t);
+
     LOG_D(PHY, "Added a block to decode, in pipe: %d\n", r);
     r_offset += E;
     offset += ((harq_process->K >> 3) - (harq_process->F >> 3) - ((harq_process->C > 1) ? 3 : 0));

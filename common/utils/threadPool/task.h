@@ -19,34 +19,12 @@
  *      contact@openairinterface.org
  */
 
-#ifndef ACTOR_H
-#define ACTOR_H
-#include "notified_fifo.h"
+#ifndef TASK_WORK_STEALING_THREAD_POOL_H
+#define TASK_WORK_STEALING_THREAD_POOL_H
 
-#define INIT_ACTOR(ptr, name, core_affinity) init_actor((Actor_t *)ptr, name, core_affinity);
-
-#define DESTROY_ACTOR(ptr) destroy_actor((Actor_t *)ptr);
-
-#define SHUTDOWN_ACTOR(ptr) shutdown_actor((Actor_t *)ptr);
-
-typedef struct Actor_t {
-  notifiedFIFO_t fifo;
-  bool terminate;
-  pthread_t thread;
-} Actor_t;
-
-/// @brief Initialize the actor. Starts actor thread
-/// @param actor
-/// @param name Actor name. Thread name will be derived from it
-/// @param core_affinity Core affinity. Specify -1 for no affinity
-void init_actor(Actor_t *actor, const char *name, int core_affinity);
-
-/// @brief Destroy the actor. Free the memory, stop the thread.
-/// @param actor
-void destroy_actor(Actor_t *actor);
-
-/// @brief Gracefully shutdown the actor, letting all tasks previously started finish
-/// @param actor
-void shutdown_actor(Actor_t *actor);
+typedef struct {
+  void* args;
+  void (*func)(void* args);
+} task_t;
 
 #endif
