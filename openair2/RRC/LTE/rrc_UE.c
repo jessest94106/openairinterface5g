@@ -238,7 +238,7 @@ static int rrc_set_state (module_id_t ue_mod_idP, Rrc_State_t state) {
 
 //-----------------------------------------------------------------------------
 static int rrc_set_sub_state( module_id_t ue_mod_idP, Rrc_Sub_State_t subState ) {
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     switch (UE_rrc_inst[ue_mod_idP].RrcState) {
       case RRC_STATE_INACTIVE:
         AssertFatal ((RRC_SUB_STATE_INACTIVE_FIRST <= subState) && (subState <= RRC_SUB_STATE_INACTIVE_LAST),
@@ -546,7 +546,7 @@ static void rrc_ue_generate_RRCConnectionSetupComplete(const protocol_ctxt_t *co
   const char *nas_msg;
   int   nas_msg_length;
 
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     nas_msg = (char *)UE_rrc_inst[ctxt_pP->module_id].initialNasMsg.nas_data;
     nas_msg_length  = UE_rrc_inst[ctxt_pP->module_id].initialNasMsg.length;
   } else {
@@ -760,7 +760,7 @@ rrc_ue_establish_drb(
   LOG_I(RRC,"[UE %d] Frame %d: processing RRCConnectionReconfiguration: reconfiguring DRB %ld/LCID %d\n",
         ue_mod_idP, frameP, DRB_config->drb_Identity, (int)*DRB_config->logicalChannelIdentity);
 
-  if(!EPC_MODE_ENABLED) {
+  if (IS_SOFTMODEM_NOS1) {
     ip_addr_offset3 = 0;
     ip_addr_offset4 = 1;
     LOG_I(OIP,"[UE %d] trying to bring up the OAI interface %d, IP X.Y.%d.%d\n", ue_mod_idP, ip_addr_offset3+ue_mod_idP,
@@ -781,7 +781,7 @@ rrc_ue_establish_drb(
       AssertFatal(false, "not implemented\n");
       LOG_D(RRC,"[UE %d] State = Attached (eNB %d)\n",ue_mod_idP,eNB_index);
     }
-  } // !EPC_MODE_ENABLED
+  }
 
   return(0);
 }
@@ -2919,7 +2919,7 @@ int decode_BCCH_DLSCH_Message(
   }
 
   if (rrc_get_sub_state(ctxt_pP->module_id) == RRC_SUB_STATE_IDLE_SIB_COMPLETE) {
-    if ((UE_rrc_inst[ctxt_pP->module_id].initialNasMsg.nas_data != NULL) || (!EPC_MODE_ENABLED)) {
+    if ((UE_rrc_inst[ctxt_pP->module_id].initialNasMsg.nas_data != NULL) || IS_SOFTMODEM_NOS1) {
       rrc_ue_generate_RRCConnectionRequest(ctxt_pP, 0);
       rrc_set_sub_state( ctxt_pP->module_id, RRC_SUB_STATE_IDLE_CONNECTING );
     }
@@ -3092,65 +3092,6 @@ int decode_SIB1_MBMS( const protocol_ctxt_t *const ctxt_pP, const uint8_t eNB_in
   UE_rrc_inst[ctxt_pP->module_id].Info[eNB_index].SIStatus_MBMS = 1;
   UE_rrc_inst[ctxt_pP->module_id].Info[eNB_index].SIB1systemInfoValueTag_MBMS = sib1_MBMS->systemInfoValueTag_r14;
 
-  /*
-  if (EPC_MODE_ENABLED) 
-    {
-      int cell_valid = 0;
-
-      if (sib1->cellAccessRelatedInfo.cellBarred == LTE_SystemInformationBlockType1__cellAccessRelatedInfo__cellBarred_notBarred) {
-        int plmn;
-        int plmn_number;
-        plmn_number = sib1->cellAccessRelatedInfo.plmn_IdentityList.list.count;
-
-        for (plmn = 0; plmn < plmn_number; plmn++) {
-          LTE_PLMN_Identity_t *plmn_Identity;
-          plmn_Identity = &sib1->cellAccessRelatedInfo.plmn_IdentityList.list.array[plmn]->plmn_Identity;
-
-          if (
-            (
-              (plmn_Identity->mcc == NULL)
-              ||
-              (
-                (UE_rrc_inst[ctxt_pP->module_id].plmnID.MCCdigit1 == *(plmn_Identity->mcc->list.array[0])) &&
-                (UE_rrc_inst[ctxt_pP->module_id].plmnID.MCCdigit2 == *(plmn_Identity->mcc->list.array[1])) &&
-                (UE_rrc_inst[ctxt_pP->module_id].plmnID.MCCdigit3 == *(plmn_Identity->mcc->list.array[2]))
-              )
-            )
-            &&
-            (UE_rrc_inst[ctxt_pP->module_id].plmnID.MNCdigit1 == *(plmn_Identity->mnc.list.array[0]))
-            &&
-            (UE_rrc_inst[ctxt_pP->module_id].plmnID.MNCdigit2 == *(plmn_Identity->mnc.list.array[1]))
-            &&
-            (
-              ((UE_rrc_inst[ctxt_pP->module_id].plmnID.MNCdigit3 == 0xf) && (plmn_Identity->mnc.list.count == 2))
-              ||
-              (UE_rrc_inst[ctxt_pP->module_id].plmnID.MNCdigit3 == *(plmn_Identity->mnc.list.array[2]))
-            )
-          ) {
-            MessageDef  *msg_p;
-            msg_p = itti_alloc_new_message(TASK_RRC_UE, 0, NAS_CELL_SELECTION_CNF);
-            NAS_CELL_SELECTION_CNF (msg_p).errCode = AS_SUCCESS;
-            NAS_CELL_SELECTION_CNF (msg_p).cellID = BIT_STRING_to_uint32(&sib1->cellAccessRelatedInfo.cellIdentity);
-            NAS_CELL_SELECTION_CNF (msg_p).tac = BIT_STRING_to_uint16(&sib1->cellAccessRelatedInfo.trackingAreaCode);
-            NAS_CELL_SELECTION_CNF (msg_p).rat = 0xFF;
-            NAS_CELL_SELECTION_CNF (msg_p).rsrq = rsrq;
-            NAS_CELL_SELECTION_CNF (msg_p).rsrp = rsrp;
-            itti_send_msg_to_task(TASK_NAS_UE, ctxt_pP->instance, msg_p);
-            cell_valid = 1;
-            break;
-          }
-        }
-      }
-
-      if (cell_valid == 0) {
-        MessageDef  *msg_p;
-        msg_p = itti_alloc_new_message(TASK_RRC_UE, 0, PHY_FIND_NEXT_CELL_REQ);
-        itti_send_msg_to_task(TASK_PHY_UE, ctxt_pP->instance, msg_p);
-        LOG_E(RRC, "Synched with a cell, but PLMN doesn't match our SIM, the message PHY_FIND_NEXT_CELL_REQ is sent but lost in current UE implementation! \n");
-      }
-    }
-  }
-  */
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SIB1, VCD_FUNCTION_OUT );
   return 0;
 }
@@ -3300,7 +3241,7 @@ int decode_SIB1( const protocol_ctxt_t *const ctxt_pP, const uint8_t eNB_index, 
   UE_rrc_inst[ctxt_pP->module_id].Info[eNB_index].SIStatus = 1;
   UE_rrc_inst[ctxt_pP->module_id].Info[eNB_index].SIB1systemInfoValueTag = sib1->systemInfoValueTag;
 
-  if (EPC_MODE_ENABLED) {
+  if (!IS_SOFTMODEM_NOS1) {
     int cell_valid = 0;
 
     if (sib1->cellAccessRelatedInfo.cellBarred == LTE_SystemInformationBlockType1__cellAccessRelatedInfo__cellBarred_notBarred) {
@@ -3962,7 +3903,7 @@ int decode_SI( const protocol_ctxt_t *const ctxt_pP, const uint8_t eNB_index ) {
 
           // After SI is received, prepare RRCConnectionRequest
           if (UE_rrc_inst[ctxt_pP->module_id].MBMS_flag < 3) // see -Q option
-            if (EPC_MODE_ENABLED) {
+            if (!IS_SOFTMODEM_NOS1) {
               rrc_ue_generate_RRCConnectionRequest( ctxt_pP, eNB_index );
             }
 

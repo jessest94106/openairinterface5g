@@ -349,7 +349,6 @@ void configure_rru(void *, void *arg);
 struct timespec timespec_add(struct timespec lhs, struct timespec rhs);
 struct timespec timespec_sub(struct timespec lhs, struct timespec rhs);
 extern uint8_t nfapi_mode;
-extern int16_t vnf_pnf_sfnslot_delta;
 #ifdef __cplusplus
 }
 #endif

@@ -560,7 +560,7 @@ void ulsch_channel_level(int32_t **drs_ch_estimates_ext,
   simde_m_empty();
 }
 
-int ulsch_power_LUT[750];
+static int ulsch_power_LUT[750];
 
 void init_ulsch_power_LUT(void) {
   int i;

@@ -873,8 +873,8 @@ static simde__m256i pucch2_11bit[2048 * 2];
 static simde__m256i *pucch2_lut[9] =
     {pucch2_3bit, pucch2_4bit, pucch2_5bit, pucch2_6bit, pucch2_7bit, pucch2_8bit, pucch2_9bit, pucch2_10bit, pucch2_11bit};
 
-simde__m64 pucch2_polar_4bit[16];
-simde__m128i pucch2_polar_llr_num_lut[256],pucch2_polar_llr_den_lut[256];
+static simde__m64 pucch2_polar_4bit[16];
+static simde__m128i pucch2_polar_llr_num_lut[256], pucch2_polar_llr_den_lut[256];
 
 void init_pucch2_luts() {
 

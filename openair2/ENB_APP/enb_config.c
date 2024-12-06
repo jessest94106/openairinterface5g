@@ -295,7 +295,7 @@ int RCconfig_RRC(uint32_t i, eNB_RRC_INST *rrc) {
 
     if (ENBParamList.paramarray[i][ENB_ENB_ID_IDX].uptr == NULL) {
       // Calculate a default eNB ID
-      if (EPC_MODE_ENABLED) {
+      if ((!IS_SOFTMODEM_NOS1)) {
         uint32_t hash;
         hash = s1ap_generate_eNB_id ();
         enb_id = i + (hash & 0xFFFF8);
@@ -1892,7 +1892,7 @@ int RCconfig_M2(MessageDef *msg_p, uint32_t i) {
       for (k = 0; k < ENBParamList.numelt; k++) {
         if (ENBParamList.paramarray[k][ENB_ENB_ID_IDX].uptr == NULL) {
           // Calculate a default eNB ID
-          if (EPC_MODE_ENABLED) {
+          if ((!IS_SOFTMODEM_NOS1)) {
             uint32_t hash;
             hash = s1ap_generate_eNB_id ();
             enb_id = k + (hash & 0xFFFF8);
@@ -2072,7 +2072,7 @@ int RCconfig_M2(MessageDef *msg_p, uint32_t i) {
             M2AP_REGISTER_ENB_REQ (msg_p).sctp_out_streams = SCTP_OUT_STREAMS;
             M2AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams  = SCTP_IN_STREAMS;
 
-            if (EPC_MODE_ENABLED) {
+            if ((!IS_SOFTMODEM_NOS1)) {
               sprintf(aprefix,"%s.[%i].%s",ENB_CONFIG_STRING_ENB_LIST,k,ENB_CONFIG_STRING_SCTP_CONFIG);
               config_get(config_get_if(), SCTPParams, sizeofArray(SCTPParams), aprefix);
               M2AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams = (uint16_t)*(SCTPParams[ENB_SCTP_INSTREAMS_IDX].uptr);
@@ -2140,7 +2140,7 @@ int RCconfig_S1(
       for (int k = 0; k < ENBParamList.numelt; k++) {
         if (ENBParamList.paramarray[k][ENB_ENB_ID_IDX].uptr == NULL) {
           // Calculate a default eNB ID
-          if (EPC_MODE_ENABLED) {
+          if ((!IS_SOFTMODEM_NOS1)) {
             uint32_t hash = 0;
             hash = s1ap_generate_eNB_id();
             enb_id = k + (hash & 0xFFFF8);
@@ -2374,7 +2374,7 @@ int RCconfig_S1(
             S1AP_REGISTER_ENB_REQ (msg_p).sctp_out_streams = SCTP_OUT_STREAMS;
             S1AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams  = SCTP_IN_STREAMS;
 
-            if (EPC_MODE_ENABLED) {
+            if ((!IS_SOFTMODEM_NOS1)) {
               sprintf(aprefix,"%s.[%i].%s",ENB_CONFIG_STRING_ENB_LIST,k,ENB_CONFIG_STRING_SCTP_CONFIG);
               config_get(config_get_if(), SCTPParams, sizeofArray(SCTPParams), aprefix);
               S1AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams = (uint16_t)*(SCTPParams[ENB_SCTP_INSTREAMS_IDX].uptr);
@@ -2432,7 +2432,7 @@ int RCconfig_X2(MessageDef *msg_p, uint32_t i) {
       for (k = 0; k < ENBParamList.numelt; k++) {
         if (ENBParamList.paramarray[k][ENB_ENB_ID_IDX].uptr == NULL) {
           // Calculate a default eNB ID
-          if (EPC_MODE_ENABLED) {
+          if ((!IS_SOFTMODEM_NOS1)) {
             uint32_t hash;
             hash = s1ap_generate_eNB_id ();
             enb_id = k + (hash & 0xFFFF8);
@@ -2584,7 +2584,7 @@ int RCconfig_X2(MessageDef *msg_p, uint32_t i) {
             X2AP_REGISTER_ENB_REQ (msg_p).sctp_out_streams = SCTP_OUT_STREAMS;
             X2AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams  = SCTP_IN_STREAMS;
 
-            if (EPC_MODE_ENABLED) {
+            if ((!IS_SOFTMODEM_NOS1)) {
               sprintf(aprefix,"%s.[%i].%s",ENB_CONFIG_STRING_ENB_LIST,k,ENB_CONFIG_STRING_SCTP_CONFIG);
               config_get(config_get_if(), SCTPParams, sizeofArray(SCTPParams), aprefix);
               X2AP_REGISTER_ENB_REQ (msg_p).sctp_in_streams = (uint16_t)*(SCTPParams[ENB_SCTP_INSTREAMS_IDX].uptr);
@@ -2659,7 +2659,7 @@ void RCConfig(void) {
   /* get global parameters, defined outside any section in the config file */
   printf("Getting ENBSParams\n");
   config_get(config_get_if(), ENBSParams, sizeofArray(ENBSParams), NULL);
-  //EPC_MODE_ENABLED = ((*ENBSParams[ENB_NOS1_IDX].uptr) == 0);
+  //(!IS_SOFTMODEM_NOS1) = ((*ENBSParams[ENB_NOS1_IDX].uptr) == 0);
   RC.nb_inst = ENBSParams[ENB_ACTIVE_ENBS_IDX].numelt;
 
   if (RC.nb_inst > 0) {
