@@ -78,8 +78,10 @@ Tested libxran releases:
 | Vendor                                  |
 |-----------------------------------------|
 | `oran_e_maintenance_release_v1.0`       |
+| `oran_f_release_v1.0`                   |
 
-**Note**: The libxran driver of OAI identifies the above version as "5.1.0" (E is fifth letter, then 1.0).
+
+**Note**: The libxran driver of OAI identifies the above E release version as "5.1.0" (E is fifth letter, then 1.0), and the above F release as "6.1.0".
 
 ## Configure your server
 
@@ -379,19 +381,22 @@ cd ~/openairinterface5g/
 
 ## Build ORAN Fronthaul Interface Library
 
-Download ORAN FHI DU library and checkout the correct version.
+Download ORAN FHI DU library, checkout the correct version, and apply the correct patch (available in `oai_folder/cmake_targets/tools/oran_fhi_integration_patches`).
 
+### E release
 ```bash
 git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git ~/phy
 cd ~/phy
 git checkout oran_e_maintenance_release_v1.0
+git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/E/oaioran_E.patch
 ```
 
-Apply the patch (available in `oai_folder/cmake_targets/tools/oran_fhi_integration_patches/E`):
-
+### F release
 ```bash
+git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git ~/phy
 cd ~/phy
-git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/E/oaioran_E.patch
+git checkout oran_f_release_v1.0
+git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/F/oaioran_F.patch
 ```
 
 Compile the fronthaul interface library by calling `make` and the option
@@ -404,7 +409,8 @@ environment variables `RTE_SDK` for the path to the source tree of DPDK, and
 ```bash
 cd ~/phy/fhi_lib/lib
 make clean
-RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1
+RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1 # E release
+WIRELESS_SDK_TOOLCHAIN=gcc RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1 # F release
 ...
 [AR] build/libxran.so
 ./build/libxran.so
@@ -911,6 +917,7 @@ Edit the sample OAI gNB configuration file and check following parameters:
     cannot preallocate memory on NUMA nodes other than 0; in this case, set
     this to 0 (no pre-allocation) and so that DPDK will allocate it on-demand
     on the right NUMA node.
+  * `owdm_enable`: used for eCPRI One-Way Delay Measurements; it depends if the RU supports it; if not set to 1 (enabled), default value is 0 (disabled)
   * `fh_config`: parameters that need to match RU parameters
     * timing parameters (starting with `T`) depend on the RU: `Tadv_cp_dl` is a
       single number, the rest pairs of numbers `(x, y)` specifying minimum and
@@ -928,7 +935,9 @@ Layer mapping (eAxC offsets) happens as follows:
 - For PUSCH/PDSCH, the layers are mapped to `[0,1,...,Nrx-1]/[0,1,...,Ntx-1]` where `Nrx/Ntx` is the
   respective RX/TX number of antennas.
 - For PRACH, the layers are mapped to `[No,No+1,...No+Nrx-1]` where `No` is the
-  `fhi_72.fh_config.[0].prach_config.eAxC_offset`. Please be aware that the following equation must be fullfilled: `No >= max(Nrx,Ntx)`.
+  `fhi_72.fh_config.[0].prach_config.eAxC_offset`. xran assumes PRACH offset `No >= max(Nrx,Ntx)`.
+  However, we made a workaround that xran supports PRACH eAxC IDs same as PUSCH eAxC IDs. This is achieved with `is_prach` and `filter_id` parameters in the patch.
+  Please note that this approach only applies to the RUs that support this functionality, e.g. LITEON RU.
 
 **Note**
 
