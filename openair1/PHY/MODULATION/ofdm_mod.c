@@ -133,12 +133,6 @@ void PHY_ofdm_mod(int *input, /// pointer to complex input
   if (nb_symbols == 0)
     return;
 
-  int16_t temp[2 * 2 * 6144 * 4] __attribute__((aligned(32)));
-  int i, j;
-
-  volatile int *output_ptr = (int *)0;
-
-  int *temp_ptr = (int *)0;
   idft_size_idx_t idft_size = get_idft(fftsize);
 
 #ifdef DEBUG_OFDM_MOD
@@ -150,7 +144,7 @@ void PHY_ofdm_mod(int *input, /// pointer to complex input
          output);
 #endif
 
-  for (i = 0; i < nb_symbols; i++) {
+  for (int i = 0; i < nb_symbols; i++) {
 #ifdef DEBUG_OFDM_MOD
     printf("[PHY] symbol %d/%d offset %d (%p,%p -> %p)\n",
            i,
@@ -162,57 +156,62 @@ void PHY_ofdm_mod(int *input, /// pointer to complex input
 #endif
 
     // on AVX2 need 256-bit alignment
-    idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
 
     // Copy to frame buffer with Cyclic Extension
     // Note:  will have to adjust for synchronization offset!
 
     switch (etype) {
-      case CYCLIC_PREFIX:
-        output_ptr = &output[(i * fftsize) + ((1 + i) * nb_prefix_samples)];
-        temp_ptr = (int *)temp;
-
-        //      msg("Doing cyclic prefix method\n");
-
-        {
-          memcpy((void *)output_ptr, (void *)temp_ptr, fftsize << 2);
+      case CYCLIC_PREFIX: {
+        int *output_ptr = &output[(i * fftsize) + ((1 + i) * nb_prefix_samples)];
+        if ((uintptr_t)output_ptr % 32 == 0) {
+          // output ptr is aligned, do ifft inplace
+          idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)output_ptr, 1);
+        } else {
+          // output ptr is not aligned, needs an extra memcpy
+          c16_t temp[fftsize] __attribute__((aligned(32)));
+          idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
+          memcpy((void *)output_ptr, (void *)temp, fftsize << 2);
         }
+        // perform cyclic prefix insertion
         memcpy((void *)&output_ptr[-nb_prefix_samples], (void *)&output_ptr[fftsize - nb_prefix_samples], nb_prefix_samples << 2);
         break;
+      }
 
-      case CYCLIC_SUFFIX:
+      case CYCLIC_SUFFIX: {
+        c16_t temp[fftsize] __attribute__((aligned(32)));
+        idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
+        int *output_ptr = &output[(i * fftsize) + (i * nb_prefix_samples)];
 
-        output_ptr = &output[(i * fftsize) + (i * nb_prefix_samples)];
-
-        temp_ptr = (int *)temp;
+        int *temp_ptr = (int *)temp;
 
         //      msg("Doing cyclic suffix method\n");
 
-        for (j = 0; j < fftsize; j++) {
+        for (int j = 0; j < fftsize; j++) {
           output_ptr[j] = temp_ptr[2 * j];
         }
 
-        for (j = 0; j < nb_prefix_samples; j++)
+        for (int j = 0; j < nb_prefix_samples; j++)
           output_ptr[fftsize + j] = output_ptr[j];
-
         break;
+      }
 
       case ZEROS:
 
         break;
 
-      case NONE:
-
+      case NONE: {
+        c16_t temp[fftsize] __attribute__((aligned(32)));
+        idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
         //      msg("NO EXTENSION!\n");
-        output_ptr = &output[fftsize];
+        int *output_ptr = &output[fftsize];
 
-        temp_ptr = (int *)temp;
+        int *temp_ptr = (int *)temp;
 
-        for (j = 0; j < fftsize; j++) {
+        for (int j = 0; j < fftsize; j++) {
           output_ptr[j] = temp_ptr[2 * j];
         }
-
         break;
+      }
 
       default:
         break;
