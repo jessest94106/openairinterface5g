@@ -77,7 +77,7 @@ void nr_fill_ulsch(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_pusch_pdu_t 
     int fapi_beam_idx = ulsch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx;
     int bitmap = SL_to_bitmap(ulsch_pdu->start_symbol_index, ulsch_pdu->nr_of_symbols);
     ulsch->beam_nb = beam_index_allocation(fapi_beam_idx,
-                                           &gNB->gNB_config.dbt_config,
+                                           &gNB->gNB_config.analog_beamforming_ve,
                                            &gNB->common_vars,
                                            slot,
                                            NR_NUMBER_OF_SYMBOLS_PER_SLOT,

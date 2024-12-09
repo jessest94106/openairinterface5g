@@ -46,7 +46,7 @@
 //#define SRS_IND_DEBUG
 
 int beam_index_allocation(int fapi_beam_index,
-                          nfapi_nr_dbt_pdu_t *dbt_config,
+                          nfapi_nr_analog_beamforming_ve_t *analog_bf,
                           NR_gNB_COMMON *common_vars,
                           int slot,
                           int symbols_per_slot,
@@ -56,7 +56,7 @@ int beam_index_allocation(int fapi_beam_index,
     return 0;
 
   int idx = -1;
-  int ru_beam_idx = dbt_config->dig_beam_list[fapi_beam_index].txru_list[0].dig_beam_weight_Re;
+  int ru_beam_idx =  analog_bf->analog_beam_list[fapi_beam_index].value;
   for (int j = 0; j < common_vars->num_beams_period; j++) {
     for (int i = 0; i < symbols_per_slot; i++) {
       if (((bitmap_symbols >> i) & 0x01) == 0)
@@ -138,7 +138,7 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
   // beam number in a scenario with multiple concurrent beams
   int bitmap = SL_to_bitmap(ssb_start_symbol, 4); // 4 ssb symbols
   int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
-                                      &cfg->dbt_config,
+                                      &cfg->analog_beamforming_ve,
                                       &gNB->common_vars,
                                       slot,
                                       fp->symbols_per_slot,
@@ -280,7 +280,7 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
       for (int j = 0; j < mapping_parms.size; j++)
         csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
       int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
-                                          &cfg->dbt_config,
+                                          &cfg->analog_beamforming_ve,
                                           &gNB->common_vars,
                                           slot,
                                           fp->symbols_per_slot,

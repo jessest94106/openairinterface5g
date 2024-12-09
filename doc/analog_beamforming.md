@@ -10,6 +10,8 @@ There are three main beamforming techinques: analog, digital and hybrid. The nam
 
 The presence of a limited number of predefined beams at RU poses constraints to the scheduler at gNB. As a matter of fact, the scheduler can serve only a limited number of beams, depending on the RU characteristics (possibly only 1), in a given time scale, that also depends on the RU characteristics (e.g. 1 slot or 1 symbol). This limitation doesn't exist for digital beamforming.
 
+To be noted that in our implementation analog beamforming is only supported in non-split/monolithic mode because we don't support yet SCF P19 interface that would be needed to manage these procedure in a split scenario with SCF FAPI.
+
 # Configuration file fields for analog beamforming
 
 A set of parameters in configuration files controls the implementation of analog beamforming and instructs the scheduler on how to behave in such scenarios. Since most notably this technique in 5G is employed in FR2, the configuration file example currently available is a RFsim one for band 261. [Config file example](../ci-scripts/conf_files/gnb.sa.band261.u3.32prb.rfsim.conf)

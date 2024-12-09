@@ -86,7 +86,7 @@ void nr_fill_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_nr_prach_pdu_t *p
     int temp_nb_symbols = NR_NUMBER_OF_SYMBOLS_PER_SLOT - prach_pdu->prach_start_symbol;
     int bitmap = SL_to_bitmap(prach_pdu->prach_start_symbol, temp_nb_symbols);
     prach->beam_nb = beam_index_allocation(fapi_beam_idx,
-                                           &gNB->gNB_config.dbt_config,
+                                           &gNB->gNB_config.analog_beamforming_ve,
                                            &gNB->common_vars,
                                            Slot,
                                            NR_NUMBER_OF_SYMBOLS_PER_SLOT,
