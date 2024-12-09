@@ -782,6 +782,7 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
                   const nfapi_nr_pusch_pdu_t *pusch_pdu,
                   dci_pdu_rel15_t *dci_pdu_rel15,
                   nr_srs_feedback_t *srs_feedback,
+                  int *tpmi,
                   int time_domain_assignment,
                   uint8_t tpc,
                   uint8_t ndi,
@@ -830,6 +831,7 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
                                     dci_pdu_rel15->srs_resource_indicator,
                                     srs_feedback,
                                     &pusch_pdu->nrOfLayers,
+                                    tpmi,
                                     &dci_pdu_rel15->precoding_information.val);
 
       // antenna_ports.val = 0 for transform precoder is disabled, dmrs-Type=1, maxLength=1, Rank=1/2/3/4
