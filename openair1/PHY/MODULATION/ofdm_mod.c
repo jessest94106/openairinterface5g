@@ -122,36 +122,43 @@ void nr_normal_prefix_mod(c16_t *txdataF, c16_t *txdata, uint8_t nsymb, const NR
 
 }
 
-void PHY_ofdm_mod(int *input,                       /// pointer to complex input
-                  int *output,                      /// pointer to complex output
-                  int fftsize,            /// FFT_SIZE
-                  unsigned char nb_symbols,         /// number of OFDM symbols
-                  unsigned short nb_prefix_samples,  /// cyclic prefix length
-                  Extension_t etype                /// type of extension
-                 )
+void PHY_ofdm_mod(int *input, /// pointer to complex input
+                  int *output, /// pointer to complex output
+                  int fftsize, /// FFT_SIZE
+                  unsigned char nb_symbols, /// number of OFDM symbols
+                  unsigned short nb_prefix_samples, /// cyclic prefix length
+                  Extension_t etype /// type of extension
+)
 {
+  if (nb_symbols == 0)
+    return;
 
-  if(nb_symbols == 0) return;
+  int16_t temp[2 * 2 * 6144 * 4] __attribute__((aligned(32)));
+  int i, j;
 
-  int16_t temp[2*2*6144*4] __attribute__((aligned(32)));
-  int i,j;
+  volatile int *output_ptr = (int *)0;
 
-  volatile int *output_ptr=(int*)0;
-
-  int *temp_ptr=(int*)0;
+  int *temp_ptr = (int *)0;
   idft_size_idx_t idft_size = get_idft(fftsize);
 
 #ifdef DEBUG_OFDM_MOD
   printf("[PHY] OFDM mod (size %d,prefix %d) Symbols %d, input %p, output %p\n",
-      fftsize,nb_prefix_samples,nb_symbols,input,output);
+         fftsize,
+         nb_prefix_samples,
+         nb_symbols,
+         input,
+         output);
 #endif
 
-
-
-  for (i=0; i<nb_symbols; i++) {
-
+  for (i = 0; i < nb_symbols; i++) {
 #ifdef DEBUG_OFDM_MOD
-    printf("[PHY] symbol %d/%d offset %d (%p,%p -> %p)\n",i,nb_symbols,i*fftsize+(i*nb_prefix_samples),input,&input[i*fftsize],&output[(i*fftsize) + ((i)*nb_prefix_samples)]);
+    printf("[PHY] symbol %d/%d offset %d (%p,%p -> %p)\n",
+           i,
+           nb_symbols,
+           i * fftsize + (i * nb_prefix_samples),
+           input,
+           &input[i * fftsize],
+           &output[(i * fftsize) + ((i)*nb_prefix_samples)]);
 #endif
 
     // on AVX2 need 256-bit alignment
@@ -161,69 +168,57 @@ void PHY_ofdm_mod(int *input,                       /// pointer to complex input
     // Note:  will have to adjust for synchronization offset!
 
     switch (etype) {
-    case CYCLIC_PREFIX:
-      output_ptr = &output[(i*fftsize) + ((1+i)*nb_prefix_samples)];
-      temp_ptr = (int *)temp;
+      case CYCLIC_PREFIX:
+        output_ptr = &output[(i * fftsize) + ((1 + i) * nb_prefix_samples)];
+        temp_ptr = (int *)temp;
 
+        //      msg("Doing cyclic prefix method\n");
 
-      //      msg("Doing cyclic prefix method\n");
+        {
+          memcpy((void *)output_ptr, (void *)temp_ptr, fftsize << 2);
+        }
+        memcpy((void *)&output_ptr[-nb_prefix_samples], (void *)&output_ptr[fftsize - nb_prefix_samples], nb_prefix_samples << 2);
+        break;
 
-      {
-        memcpy((void*)output_ptr,(void*)temp_ptr,fftsize<<2);
-      }
-      memcpy((void*)&output_ptr[-nb_prefix_samples],(void*)&output_ptr[fftsize-nb_prefix_samples],nb_prefix_samples<<2);
-      break;
+      case CYCLIC_SUFFIX:
 
-    case CYCLIC_SUFFIX:
+        output_ptr = &output[(i * fftsize) + (i * nb_prefix_samples)];
 
+        temp_ptr = (int *)temp;
 
-      output_ptr = &output[(i*fftsize)+ (i*nb_prefix_samples)];
+        //      msg("Doing cyclic suffix method\n");
 
-      temp_ptr = (int *)temp;
+        for (j = 0; j < fftsize; j++) {
+          output_ptr[j] = temp_ptr[2 * j];
+        }
 
-      //      msg("Doing cyclic suffix method\n");
+        for (j = 0; j < nb_prefix_samples; j++)
+          output_ptr[fftsize + j] = output_ptr[j];
 
-      for (j=0; j<fftsize ; j++) {
-        output_ptr[j] = temp_ptr[2*j];
-      }
+        break;
 
+      case ZEROS:
 
-      for (j=0; j<nb_prefix_samples; j++)
-        output_ptr[fftsize+j] = output_ptr[j];
+        break;
 
-      break;
+      case NONE:
 
-    case ZEROS:
+        //      msg("NO EXTENSION!\n");
+        output_ptr = &output[fftsize];
 
-      break;
+        temp_ptr = (int *)temp;
 
-    case NONE:
+        for (j = 0; j < fftsize; j++) {
+          output_ptr[j] = temp_ptr[2 * j];
+        }
 
-      //      msg("NO EXTENSION!\n");
-      output_ptr = &output[fftsize];
+        break;
 
-      temp_ptr = (int *)temp;
-
-      for (j=0; j<fftsize ; j++) {
-        output_ptr[j] = temp_ptr[2*j];
-
-
-      }
-
-      break;
-
-    default:
-      break;
-
+      default:
+        break;
     }
-
-
-
   }
-
-
 }
-
 
 void do_OFDM_mod(c16_t **txdataF, c16_t **txdata, uint32_t frame,uint16_t next_slot, LTE_DL_FRAME_PARMS *frame_parms)
 {
