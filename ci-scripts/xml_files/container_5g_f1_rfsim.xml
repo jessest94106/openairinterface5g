@@ -39,6 +39,12 @@
  040002
  030021
  030022
+ 040021
+ 000030
+ 040022
+ 040023
+ 020022
+ 040024
  100021
  222222
         </TestCaseRequestedList>
@@ -72,6 +78,12 @@
                 <services>oai-cu oai-du oai-nr-ue</services>
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
+        </testCase>
+
+        <testCase id="000030">
+                <class>IdleSleep</class>
+                <desc>Sleep</desc>
+                <idle_sleep_time_in_sec>5</idle_sleep_time_in_sec>
         </testCase>
 
         <testCase id="000023">
@@ -149,9 +161,9 @@
 
         <testCase id="040021">
                 <class>Custom_Command</class>
-                <desc>Simulate a disruption of DL radio channel (ploss 55)(5 sec)</desc>
+                <desc>Simulate a disruption of DL radio channel (ploss 55)</desc>
                 <node>cacofonix</node>
-                <command>echo channelmod modify 0 ploss 55 | nc 192.168.71.181 8091 &amp;&amp; sleep 5</command>
+                <command>echo channelmod modify 0 ploss 55 | nc 192.168.71.181 8091</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
@@ -165,9 +177,9 @@
 
         <testCase id="040023">
                 <class>Custom_Command</class>
-                <desc>Restoration of the original DL channel conditions (ploss 0)(5 sec)</desc>
+                <desc>Restoration of the original DL channel conditions (ploss 20)</desc>
                 <node>cacofonix</node>
-                <command>echo channelmod modify 0 ploss 0 | nc 192.168.71.181 8091 &amp;&amp; sleep 5</command>
+                <command>echo channelmod modify 0 ploss 20 | nc 192.168.71.181 8091</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
@@ -175,7 +187,7 @@
                 <class>Custom_Command</class>
                 <desc>Get UE sync state (UE ID 0)</desc>
                 <node>cacofonix</node>
-                <command>echo ciUE sync_state 0 | nc 192.168.71.181 8091 | grep -E UE_CONNECTED &amp;&amp; sleep 10</command>
+                <command>echo ciUE sync_state 0 | nc 192.168.71.181 8091 | grep -E UE_CONNECTED</command>
                 <command_fail>yes</command_fail>
         </testCase>
 
@@ -184,8 +196,8 @@
                 <always_exec>true</always_exec>
                 <desc>Undeploy all OAI 5G stack</desc>
                 <yaml_path>ci-scripts/yaml_files/5g_f1_rfsimulator</yaml_path>
-                <d_retx_th>30,30,100,100</d_retx_th>
-                <u_retx_th>30,30,100,100</u_retx_th>
+                <d_retx_th>30,100,100,100</d_retx_th>
+                <u_retx_th>30,100,100,100</u_retx_th>
                 <eNB_instance>0</eNB_instance>
                 <eNB_serverId>0</eNB_serverId>
         </testCase>
