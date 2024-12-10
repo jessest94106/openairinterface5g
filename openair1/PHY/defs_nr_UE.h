@@ -85,6 +85,15 @@
 #define UNUSED(x) (void)x;
 #define NUM_DL_ACTORS 4
 
+// Set the number of barriers for processSlotTX to 512. This value has to be at least 483 for NTN where
+// DL-to-UL offset is up to 483. The selected value is also half of the frame range so that
+// (slot + frame * slots_per_frame) % NUM_PROCESS_SLOT_TX_BARRIERS is contiguous between the last slot of
+// frame 1023 and first slot of frame 0
+// e.g. in numerology 1:
+//       (19 + 1023 * 20) % 512 = 511
+//       (0  + 0 * 20) % 512 = 0
+#define NUM_PROCESS_SLOT_TX_BARRIERS 512
+
 #include "impl_defs_top.h"
 #include "impl_defs_nr.h"
 #include "time_meas.h"
@@ -527,7 +536,7 @@ typedef struct PHY_VARS_NR_UE_s {
   void *phy_sim_pdsch_dl_ch_estimates_ext;
   uint8_t *phy_sim_dlsch_b;
 
-  dynamic_barrier_t process_slot_tx_barriers[NR_MAX_SLOTS_PER_FRAME];
+  dynamic_barrier_t process_slot_tx_barriers[NUM_PROCESS_SLOT_TX_BARRIERS];
 
   // Gain change required for automation RX gain change
   int adjust_rxgain;
