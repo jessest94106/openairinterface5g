@@ -114,19 +114,37 @@ $OPENAIR_DIR/cmake_targets/ran_build/build/conf2uedata -c $OPENAIR_DIR/openair3/
 
 Similarly as for 4G, first launch the gNB, here in an example for the phytest:
 
-```bash
-sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-LTE-EPC/CONF/gnb.band78.tm1.106PRB.usrpn300.conf --gNBs.[0].min_rxtxtime 6 --phy-test --rfsim --rfsimulator.serveraddr server
-```
+run gNB:
 
-`--gNBs.[0].min_rxtxtime 6` is due to the UE not being able to handle shorter
+  ```bash
+  sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-LTE-EPC/CONF/gnb.band78.tm1.106PRB.usrpn300.conf --gNBs.[0].min_rxtxtime 6 --phy-test --rfsim --rfsimulator.serveraddr server
+  ```
+
+where `--gNBs.[0].min_rxtxtime 6` is due to the UE not being able to handle shorter
 RX/TX times.  As in the 4G case above, you can define an `rfsimulator` section
 in the config file.
 
-Then, launch the UE:
+and run UE:
 
-```bash
-sudo ./nr-uesoftmodem --rfsim --phy-test --rfsimulator.serveraddr <TARGET_GNB_IP_ADDRESS>
-```
+  ```bash
+  sudo ./nr-uesoftmodem --rfsim --phy-test --rfsimulator.serveraddr <TARGET_GNB_IP_ADDRESS>
+  ```
+
+To run OAI RFSimulator for SA mode, gNB:
+
+  ```bash
+  sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf --rfsim --rfsimulator.serveraddr server
+  ```
+
+and UE:
+
+  ```bash
+  sudo ./nr-uesoftmodem --rfsim --rfsimulator.serveraddr <TARGET_GNB_IP_ADDRESS>
+  ```
+
+In the commands for the UE, `TARGET_GNB_IP_ADDRESS` can be 127.0.0.1 if both UE and gNB run on the same machine.
+
+If necessary the user can provide a custom UICC configuration file to the UE with command line option `-O ue.conf`. In case of a multi-UE scenario, the user shall provide a different IMSI to each UE with the command line option `--uicc0.imsi` followed by the IMSI, e.g. `--uicc0.imsi 001010000000001`.
 
 Notes:
 

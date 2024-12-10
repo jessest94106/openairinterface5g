@@ -409,6 +409,8 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
                    rxdataF);
 
   if (ret==0) {
+    T(T_NRUE_PHY_MIB, T_INT(frame_rx), T_INT(nr_slot_rx),
+      T_INT(ssb_index), T_BUFFER(result.decoded_output, 3));
 
 #ifdef DEBUG_PHY_PROC
     LOG_D(PHY,

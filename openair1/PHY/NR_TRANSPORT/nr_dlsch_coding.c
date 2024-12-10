@@ -117,7 +117,7 @@ NR_gNB_DLSCH_t new_gNB_dlsch(NR_DL_FRAME_PARMS *frame_parms, uint16_t N_RB)
   return(dlsch);
 }
 
-void ldpc8blocks(void *p)
+static void ldpc8blocks(void *p)
 {
   encoder_implemparams_t *impp=(encoder_implemparams_t *) p;
   NR_DL_gNB_HARQ_t *harq = (NR_DL_gNB_HARQ_t *)impp->harq;
@@ -232,6 +232,9 @@ void ldpc8blocks(void *p)
 #endif
     r_offset += E;
   }
+
+  // Task running in // completed
+  completed_task_ans(impp->ans);
 }
 
 int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
@@ -369,24 +372,23 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
     }
     ldpc_interface_offload.LDPCencoder(harq->c, &impp.output, &impp);
   } else {
-    notifiedFIFO_t nf;
-    initNotifiedFIFO(&nf);
-    int nbJobs = 0;
-    for (int j = 0; j < (impp.n_segments / 8 + ((impp.n_segments & 7) == 0 ? 0 : 1)); j++) {
-      notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(impp), j, &nf, ldpc8blocks);
-      encoder_implemparams_t *perJobImpp = (encoder_implemparams_t *)NotifiedFifoData(req);
+    size_t const n_seg = (impp.n_segments / 8 + ((impp.n_segments & 7) == 0 ? 0 : 1));
+
+    encoder_implemparams_t arr[n_seg];
+    task_ans_t ans[n_seg];
+    memset(ans, 0, n_seg * sizeof(task_ans_t));
+
+    for (int j = 0; j < n_seg; j++) {
+      encoder_implemparams_t *perJobImpp = &arr[j];
       *perJobImpp = impp;
       perJobImpp->macro_num = j;
-      pushTpool(&gNB->threadPool, req);
-      nbJobs++;
+      perJobImpp->ans = &ans[j];
+
+      task_t t = {.func = ldpc8blocks, .args = perJobImpp};
+      pushTpool(&gNB->threadPool, t);
     }
-    while (nbJobs) {
-      notifiedFIFO_elt_t *req = pullTpool(&nf, &gNB->threadPool);
-      if (req == NULL)
-        break; // Tpool has been stopped
-      delNotifiedFIFO_elt(req);
-      nbJobs--;
-    }
+
+    join_task_ans(ans, n_seg);
   }
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ENCODING, VCD_FUNCTION_OUT);
   return 0;

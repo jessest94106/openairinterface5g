@@ -37,6 +37,7 @@
 #define ORAN_CONFIG_NETHPERPORT "eth_lines"
 #define ORAN_CONFIG_NETHSPEED "eth_speed"
 #define ORAN_CONFIG_DPDK_MEM_SIZE "dpdk_mem_size"
+#define ORAN_CONFIG_ECPRI_OWDM "owdm_enable"
 
 // clang-format off
 // TODO: PCI addr check
@@ -52,16 +53,12 @@
   {ORAN_CONFIG_NETHPERPORT,     "number of links per port\n",               0,                   .uptr=NULL,       .defuintval=1,       TYPE_UINT,       0}, \
   {ORAN_CONFIG_NETHSPEED,       "ethernet speed link\n",                    0,                   .uptr=NULL,       .defuintval=10,      TYPE_UINT,       0}, \
   {ORAN_CONFIG_DPDK_MEM_SIZE,   "DPDK huge page pre-allocation in MiB\n",   0,                   .uptr=NULL,       .defuintval=8192,    TYPE_UINT,       0}, \
+  {ORAN_CONFIG_ECPRI_OWDM,      "eCPRI One-Way Delay Measurements\n",       PARAMFLAG_BOOL,      .uptr=NULL,       .defuintval=0,       TYPE_UINT,       0}, \
 }
 // clang-format on
 
 #define CONFIG_STRING_ORAN_FH "fh_config"
 
-#define ORAN_FH_CONFIG_TADV_CP_DL "Tadv_cp_dl"
-#define ORAN_FH_CONFIG_T2A_CP_DL "T2a_cp_dl"
-#define ORAN_FH_CONFIG_T2A_CP_UL "T2a_cp_ul"
-#define ORAN_FH_CONFIG_T2A_UP "T2a_up"
-#define ORAN_FH_CONFIG_TA3 "Ta3"
 #define ORAN_FH_CONFIG_T1A_CP_DL "T1a_cp_dl"
 #define ORAN_FH_CONFIG_T1A_CP_UL "T1a_cp_ul"
 #define ORAN_FH_CONFIG_T1A_UP "T1a_up"
@@ -73,11 +70,6 @@
 
 // clang-format off
 #define ORAN_FH_DESC { \
-  {ORAN_FH_CONFIG_TADV_CP_DL,   "Tadv parameter of RU\n",      PARAMFLAG_MANDATORY, .uptr=NULL, .defuintval=0,     TYPE_UINT,      0}, \
-  {ORAN_FH_CONFIG_T2A_CP_DL,    "T2a_cp_dl" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
-  {ORAN_FH_CONFIG_T2A_CP_UL,    "T2a_cp_ul" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
-  {ORAN_FH_CONFIG_T2A_UP,       "T2a_up" ORAN_FH_HLP_CPLT,     PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
-  {ORAN_FH_CONFIG_TA3,          "Ta3" ORAN_FH_HLP_CPLT,        PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
   {ORAN_FH_CONFIG_T1A_CP_DL,    "T1a_cp_dl" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
   {ORAN_FH_CONFIG_T1A_CP_UL,    "T1a_cp_ul" ORAN_FH_HLP_CPLT,  PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \
   {ORAN_FH_CONFIG_T1A_UP,       "T1a_up" ORAN_FH_HLP_CPLT,     PARAMFLAG_MANDATORY, .uptr=NULL, .defintarrayval=0, TYPE_UINTARRAY, 0}, \

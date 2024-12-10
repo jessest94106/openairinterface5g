@@ -43,6 +43,7 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
   * [OAI 5GC](./NR_SA_Tutorial_OAI_CN5G.md)
   * [OAI gNB with COTS UE](./NR_SA_Tutorial_COTS_UE.md)
   * [OAI NR-UE](./NR_SA_Tutorial_OAI_nrUE.md)
+  * [Multiple OAI NR-UE with RFsimulator](./NR_SA_Tutorial_OAI_multi_UE.md)
 - [RUNMODEM.md](./RUNMODEM.md): Generic information on how to
   * Run simulators
   * Run with hardware
@@ -64,6 +65,7 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
 - [How to setup OAI with Nvidia Aerial and Foxconn](./Aerial_FAPI_Split_Tutorial.md)
 - [How to setup OAI with AMD T2 Telco card](./LDPC_T2_OFFLOAD_SETUP.md)
 - [How to do a handover](./handover-tutorial.md)
+- [How to setup gNB frequency](./gNB_frequency_setup.md)
 
 Legacy unmaintained files:
 - [`L2NFAPI_NOS1.md`](./L2NFAPI_NOS1.md), [`L2NFAPI_S1.md`](./L2NFAPI_S1.md):

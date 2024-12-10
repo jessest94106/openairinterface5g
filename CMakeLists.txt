@@ -1569,6 +1569,10 @@ set(libnas_emm_msg_OBJS
   ${NAS_SRC}COMMON/EMM/MSG/UplinkNasTransport.c
 )
 
+set(libnas_fgs_msg_OBJS
+  ${NAS_SRC}COMMON/EMM/MSG/fgs_service_request.c
+)
+
 set(libnas_esm_msg_OBJS
   ${NAS_SRC}COMMON/ESM/MSG/ActivateDedicatedEpsBearerContextAccept.c
   ${NAS_SRC}COMMON/ESM/MSG/ActivateDedicatedEpsBearerContextReject.c
@@ -1682,7 +1686,6 @@ set (libnas_utils_OBJS
   ${NAS_SRC}COMMON/UTIL/nas_timer.c
   ${NAS_SRC}COMMON/UTIL/socket.c
   ${NAS_SRC}COMMON/UTIL/stty.c
-  ${NAS_SRC}COMMON/UTIL/TLVEncoder.c
   ${NAS_SRC}COMMON/UTIL/TLVDecoder.c
   ${NAS_SRC}COMMON/UTIL/OctetString.c
 )
@@ -1793,6 +1796,7 @@ add_library(LIB_NAS_SIMUE
   ${libnas_api_OBJS}
   ${libnas_ue_api_OBJS}
   ${libnas_emm_msg_OBJS}
+  ${libnas_fgs_msg_OBJS}
   ${libnas_esm_msg_OBJS}
   ${libnas_ies_OBJS}
   ${libnas_utils_OBJS}
@@ -1839,6 +1843,7 @@ include_directories(${NAS_SRC}UE)
 include_directories(${NAS_SRC}UE/API/USER)
 include_directories(${NAS_SRC}UE/API/USIM)
 include_directories(${NAS_SRC}UE/EMM)
+include_directories(${NAS_SRC}UE/EMM/MSG)
 include_directories(${NAS_SRC}UE/EMM/SAP)
 include_directories(${NAS_SRC}UE/ESM)
 include_directories(${NAS_SRC}UE/ESM/SAP)
@@ -1904,12 +1909,6 @@ add_executable(nfapi_test
 add_executable(measurement_display
   ${OPENAIR_DIR}/common/utils/threadPool/measurement_display.c)
 target_link_libraries (measurement_display minimal_lib)
-
-add_executable(test5Gnas
-  ${OPENAIR_DIR}/openair3/TEST/test5Gnas.c
-)
-target_link_libraries (test5Gnas LIB_5GNAS_GNB minimal_lib )
-
 
 # lte-softmodem is both eNB and UE implementation
 ###################################################

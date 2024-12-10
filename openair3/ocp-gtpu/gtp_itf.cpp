@@ -155,7 +155,7 @@ class gtpEndPoints {
   }
 };
 
-gtpEndPoints globGtp;
+static gtpEndPoints globGtp;
 
 // note TEid 0 is reserved for specific usage: echo req/resp, error and supported extensions
 static  teid_t gtpv1uNewTeid(void) {

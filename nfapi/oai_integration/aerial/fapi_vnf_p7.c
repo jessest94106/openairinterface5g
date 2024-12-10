@@ -380,84 +380,32 @@ static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
   }
 
   nfapi_nr_p7_message_header_t *pMessageHeader = pMessageBuf;
-  uint8_t *end = pPackedBuf + packedBufLen;
   uint8_t *data_end = pDataBuf + dataBufLen;
-  uint8_t *pWritePackedMessage = pPackedBuf;
   uint8_t *pDataPackedMessage = pDataBuf;
-  uint8_t *pPackMessageEnd = pPackedBuf + packedBufLen;
-  uint8_t *pPackedLengthField = &pWritePackedMessage[4];
-  uint8_t *pPacketBodyField = &pWritePackedMessage[8];
-  uint8_t *pPacketBodyFieldStart = &pWritePackedMessage[8];
   uint8_t *pPackedDataField = &pDataPackedMessage[0];
   uint8_t *pPackedDataFieldStart = &pDataPackedMessage[0];
-
-  // PHY API message header
-  // Number of messages [0]
-  // Opaque handle [1]
-  // PHY API Message structure
-  // Message type ID [2,3]
-  // Message Length [4,5,6,7]
-  // Message Body [8,...]
-  if (!(push8(1, &pWritePackedMessage, pPackMessageEnd) && push8(0, &pWritePackedMessage, pPackMessageEnd)
-        && push16(pMessageHeader->message_id, &pWritePackedMessage, pPackMessageEnd))) {
-    NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack header failed\n");
-    return -1;
-  }
-
-  uint8_t **ppWriteBody = &pPacketBodyField;
   uint8_t **ppWriteData = &pPackedDataField;
+  const uint32_t dataBufLen32 = (dataBufLen + 3) / 4;
   nfapi_nr_tx_data_request_t *pNfapiMsg = (nfapi_nr_tx_data_request_t *)pMessageHeader;
-
-  if (!(push16(pNfapiMsg->SFN, ppWriteBody, end) && push16(pNfapiMsg->Slot, ppWriteBody, end)
-        && push16(pNfapiMsg->Number_of_PDUs, ppWriteBody, end))) {
-    return 0;
-  }
-
+  // Actual payloads are packed in a separate buffer
   for (int i = 0; i < pNfapiMsg->Number_of_PDUs; i++) {
     nfapi_nr_pdu_t *value = (nfapi_nr_pdu_t *)&pNfapiMsg->pdu_list[i];
     // recalculate PDU_Length for Aerial (leave only the size occupied in the payload buffer afterward)
     // assuming there is only 1 TLV present
     value->PDU_length = value->TLVs[0].length;
-    if (!(push32(value->PDU_length, ppWriteBody, end) && // cuBB expects TX_DATA.request PDUSize to be 32 bit
-          push16(value->PDU_index, ppWriteBody, end) && push32(value->num_TLV, ppWriteBody, end))) {
-      return 0;
-    }
-    uint16_t k = 0;
-    uint16_t total_number_of_tlvs = value->num_TLV;
-
-    for (; k < total_number_of_tlvs; ++k) {
-      // For Aerial, the TLV tag is always 2
-      if (!(push16(/*value->TLVs[k].tag*/ 2, ppWriteBody, end) && push16(/*value->TLVs[k].length*/ 4, ppWriteBody, end))) {
-        return 0;
-      }
-      // value
-      if (!push32(0, ppWriteBody, end)) {
-        return 0;
-      }
-    }
-  }
-
-  // Actual payloads are packed in a separate buffer
-  for (int i = 0; i < pNfapiMsg->Number_of_PDUs; i++) {
-    nfapi_nr_pdu_t *value = (nfapi_nr_pdu_t *)&pNfapiMsg->pdu_list[i];
-
-    uint16_t k = 0;
-    uint16_t total_number_of_tlvs = value->num_TLV;
-
-    for (; k < total_number_of_tlvs; ++k) {
+    for (uint32_t k = 0; k < value->num_TLV; ++k) {
+      // Ensure tag is 2
+      value->TLVs[k].tag = 2;
+      uint32_t num_values_to_push = ((value->TLVs[k].length + 3) / 4);
       if (value->TLVs[k].length > 0) {
         if (value->TLVs[k].length % 4 != 0) {
-          if (!pusharray32(value->TLVs[k].value.direct,
-                           (dataBufLen + 3) / 4,
-                           ((value->TLVs[k].length + 3) / 4) - 1,
-                           ppWriteData,
-                           data_end)) {
+          if (!pusharray32(value->TLVs[k].value.direct, dataBufLen32, num_values_to_push - 1, ppWriteData, data_end)) {
             return 0;
           }
           int bytesToAdd = 4 - (4 - (value->TLVs[k].length % 4)) % 4;
           if (bytesToAdd != 4) {
             for (int j = 0; j < bytesToAdd; j++) {
-              uint8_t toPush = (uint8_t)(value->TLVs[k].value.direct[((value->TLVs[k].length + 3) / 4) - 1] >> (j * 8));
+              uint8_t toPush = (uint8_t)(value->TLVs[k].value.direct[num_values_to_push - 1] >> (j * 8));
               if (!push8(toPush, ppWriteData, data_end)) {
                 return 0;
               }
@@ -465,11 +413,7 @@ static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
           }
         } else {
           // no padding needed
-          if (!pusharray32(value->TLVs[k].value.direct,
-                           (dataBufLen + 3) / 4,
-                           ((value->TLVs[k].length + 3) / 4),
-                           ppWriteData,
-                           data_end)) {
+          if (!pusharray32(value->TLVs[k].value.direct, dataBufLen32, num_values_to_push, ppWriteData, data_end)) {
             return 0;
           }
         }
@@ -484,26 +428,12 @@ static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
   uintptr_t dataEnd = (uintptr_t)pPackedDataField;
   data_len[0] = dataEnd - dataHead;
 
-  // check for a valid message length
-  uintptr_t msgHead = (uintptr_t)pPacketBodyFieldStart;
-  uintptr_t msgEnd = (uintptr_t)pPacketBodyField;
-  uint32_t packedMsgLen = msgEnd - msgHead;
-  uint16_t packedMsgLen16;
-  if (packedMsgLen > packedBufLen + dataBufLen) {
-    NFAPI_TRACE(NFAPI_TRACE_ERROR, "Packed message length error %d, buffer supplied %d\n", packedMsgLen, packedBufLen);
-    return 0;
-  } else {
-    packedMsgLen16 = (uint16_t)packedMsgLen;
-  }
 
-  // Update the message length in the header
-  pMessageHeader->message_length = packedMsgLen16;
+   if (!fapi_nr_p7_message_pack(pMessageBuf, pPackedBuf, packedBufLen, config)) {
+     return -1;
+   }
 
-  // Update the message length in the header
-  if (!push32(packedMsgLen, &pPackedLengthField, pPackMessageEnd))
-    return 0;
-
-  return (packedMsgLen16);
+  return (int32_t)(pMessageHeader->message_length);
 }
 
 

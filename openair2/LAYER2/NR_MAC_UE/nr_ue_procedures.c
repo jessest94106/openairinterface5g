@@ -301,6 +301,12 @@ int8_t nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
     nr_mac_rrc_data_ind_ue(mac->ue_id, cc_id, gNB_index, 0, 0, 0, mac->physCellId, 0, NR_BCCH_DL_SCH, (uint8_t *) pduP, pdu_len);
     mac->get_sib1 = false;
     mac->get_otherSI = false;
+    T(T_NRUE_MAC_DL_PDU_WITH_DATA,
+      T_INT(SI_RNTI),
+      T_INT(-1 /* frame, unavailable here */),
+      T_INT(-1 /* slot, unavailable here */),
+      T_INT(0 /* harq_pid */),
+      T_BUFFER(pduP, pdu_len));
   }
   else
     LOG_E(NR_MAC, "Got NACK on NR-BCCH-DL-SCH-Message (%s)\n", mac->get_sib1 ? "SIB1" : "other SI");
@@ -3588,8 +3594,9 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
 {
   frame_t frameP = dl_info->frame;
   int slot = dl_info->slot;
-  uint8_t *pduP = (dl_info->rx_ind->rx_indication_body + pdu_id)->pdsch_pdu.pdu;
-  int32_t pdu_len = (int32_t)(dl_info->rx_ind->rx_indication_body + pdu_id)->pdsch_pdu.pdu_length;
+  fapi_nr_pdsch_pdu_t *pdsch_pdu = &(dl_info->rx_ind->rx_indication_body + pdu_id)->pdsch_pdu;
+  uint8_t *pduP = pdsch_pdu->pdu;
+  int32_t pdu_len = (int32_t)pdsch_pdu->pdu_length;
   uint8_t gNB_index = dl_info->gNB_index;
   uint8_t CC_id = dl_info->cc_id;
   uint8_t done = 0;
@@ -3598,6 +3605,8 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
   if (!pduP) {
     return;
   }
+
+  T(T_NRUE_MAC_DL_PDU_WITH_DATA, T_INT(mac->crnti), T_INT(frameP), T_INT(slot), T_INT(pdsch_pdu->harq_pid), T_BUFFER(pduP, pdu_len));
 
   LOG_D(MAC,
         "[%d.%d]: processing PDU %d (with length %d) of %d total number of PDUs...\n",
@@ -3963,6 +3972,9 @@ static void nr_ue_process_rar(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *d
   NR_MAC_RAR *rar = (NR_MAC_RAR *) (dlsch_buffer + 1);   // RAR subPDU pointer
   uint8_t preamble_index = ra->ra_PreambleIndex;
   uint16_t rnti = mac->ra.ra_rnti;
+
+  T(T_NRUE_MAC_DL_RAR_PDU_WITH_DATA, T_INT(rnti), T_INT(frame), T_INT(slot),
+    T_BUFFER(dlsch_buffer, dl_info->rx_ind->rx_indication_body[pdu_id].pdsch_pdu.pdu_length));
 
   LOG_D(NR_MAC, "[%d.%d]: [UE %d][RAPROC] invoking MAC for received RAR (current preamble %d)\n", frame, slot, mac->ue_id, preamble_index);
 

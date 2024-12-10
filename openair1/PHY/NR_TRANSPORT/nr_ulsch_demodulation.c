@@ -1179,6 +1179,7 @@ typedef struct puschSymbolProc_s {
   int16_t *scramblingSequence;
   uint32_t nvar;
   int beam_nb;
+  task_ans_t *ans;
 } puschSymbolProc_t;
 
 static void nr_pusch_symbol_processing(void *arg)
@@ -1227,6 +1228,9 @@ static void nr_pusch_symbol_processing(void *arg)
     for (int i = 0; i < end; i++)
       llr16[i] = llr_ptr[i] * s[i];
   }
+
+  // Task running in // completed
+  completed_task_ans(rdata->ans);
 }
 
 static uint32_t average_u32(const uint32_t *x, uint16_t size)
@@ -1483,8 +1487,13 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
 
   start_meas(&gNB->rx_pusch_symbol_processing_stats);
   int numSymbols = gNB->num_pusch_symbols_per_thread;
-
   int total_res = 0;
+  int const loop_iter = rel15_ul->nr_of_symbols / numSymbols;
+  puschSymbolProc_t arr[loop_iter];
+  task_ans_t arr_ans[loop_iter];
+
+  memset(arr_ans, 0, loop_iter * sizeof(task_ans_t));
+  int sz_arr = 0;
   for(uint8_t symbol = rel15_ul->start_symbol_index; symbol < end_symbol; symbol += numSymbols) {
     int res_per_task = 0;
     for (int s = 0; s < numSymbols; s++) { 
@@ -1496,10 +1505,9 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
     }
     total_res += res_per_task;
     if (res_per_task > 0) {
-      union puschSymbolReqUnion id = {.s={ulsch_id,frame,slot,0}};
-      id.p=1+symbol;
-      notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(puschSymbolProc_t), id.p, &gNB->respPuschSymb, &nr_pusch_symbol_processing); // create a job for Tpool
-      puschSymbolProc_t *rdata = (puschSymbolProc_t*)NotifiedFifoData(req); // data for the job
+      puschSymbolProc_t *rdata = &arr[sz_arr];
+      rdata->ans = &arr_ans[sz_arr];
+      ++sz_arr;
 
       rdata->gNB = gNB;
       rdata->frame_parms = frame_parms;
@@ -1517,7 +1525,8 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
       if (rel15_ul->pdu_bit_map & PUSCH_PDU_BITMAP_PUSCH_PTRS) {
         nr_pusch_symbol_processing(rdata);
       } else {
-        pushTpool(&gNB->threadPool, req);
+        task_t t = {.func = &nr_pusch_symbol_processing, .args = rdata};
+        pushTpool(&gNB->threadPool, t);
         nbSymb++;
       }
 
@@ -1525,12 +1534,9 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
     }
   } // symbol loop
 
-  while (nbSymb) {
-    notifiedFIFO_elt_t *req = pullTpool(&gNB->respPuschSymb, &gNB->threadPool);
-    nbSymb--;
-    delNotifiedFIFO_elt(req);
+  if (nbSymb > 0) {
+    join_task_ans(arr_ans, sz_arr);
   }
-
   stop_meas(&gNB->rx_pusch_symbol_processing_stats);
 
   // Copy the data to the scope. This cannot be performed in one call to gNBscopeCopy because the data is not contiguous in the

@@ -47,6 +47,7 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.eNBUserName = None
 		self.cont.eNBPassword = None
 		self.cont.eNBSourceCodePath = os.getcwd()
+		self.cont.num_attempts = 3
 
 	def test_deploy(self):
 		self.cont.yamlPath[0] = 'tests/simple-dep/'
@@ -60,6 +61,15 @@ class TestDeploymentMethods(unittest.TestCase):
 		# fails reliably
 		old = self.cont.yamlPath
 		self.cont.yamlPath[0] = 'tests/simple-fail/'
+		deploy = self.cont.DeployObject(self.html)
+		self.cont.UndeployObject(self.html, self.ran)
+		self.assertFalse(deploy)
+		self.cont.yamlPath = old
+
+	def test_deployfails_2svc(self):
+		# fails reliably
+		old = self.cont.yamlPath
+		self.cont.yamlPath[0] = 'tests/simple-fail-2svc/'
 		deploy = self.cont.DeployObject(self.html)
 		self.cont.UndeployObject(self.html, self.ran)
 		self.assertFalse(deploy)

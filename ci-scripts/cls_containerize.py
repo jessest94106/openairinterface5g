@@ -145,10 +145,6 @@ def AnalyzeBuildLogs(buildRoot, images, globalStatus):
 		collectInfo[image] = files
 	return collectInfo
 
-def GetContainerName(ssh, svcName, file):
-	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".container_name'", silent=True)
-	return ret.stdout
-
 def GetImageName(ssh, svcName, file):
 	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".image'", silent=True)
 	if ret.returncode != 0:
@@ -156,17 +152,18 @@ def GetImageName(ssh, svcName, file):
 	else:
 		return ret.stdout.strip()
 
-def GetContainerHealth(ssh, containerName):
-	if containerName is None:
-		return False
-	if 'db_init' in containerName or 'db-init' in containerName: # exits with 0, there cannot be healthy
-		return True
+def GetServiceHealth(ssh, svcName, file):
+	if svcName is None:
+		return False, f"Service {svcName} not found in {file}"
+	image = GetImageName(ssh, svcName, file)
+	if 'db_init' in svcName or 'db-init' in svcName: # exits with 0, there cannot be healthy
+		return True, f"Service {svcName} healthy, image {image}"
 	for _ in range(8):
-		result = ssh.run(f'docker inspect --format="{{{{.State.Health.Status}}}}" {containerName}', silent=True)
+		result = ssh.run(f"docker compose -f {file} ps --format json {svcName}  | jq -r 'if type==\"array\" then .[0].Health else .Health end'", silent=True)
 		if result.stdout == 'healthy':
-			return True
+			return True, f"Service {svcName} healthy, image {image}"
 		time.sleep(5)
-	return False
+	return False, f"Failed to deploy: service {svcName}"
 
 def ExistEnvFilePrint(ssh, wd, prompt='env vars in existing'):
 	ret = ssh.run(f'cat {wd}/.env', silent=True, reportNonZero=False)
@@ -218,9 +215,9 @@ def GetServices(ssh, requested, file):
     else:
         return requested
 
-def CopyinContainerLog(ssh, lSourcePath, yaml, containerName, filename):
+def CopyinServiceLog(ssh, lSourcePath, yaml, svcName, wd_yaml, filename):
 	remote_filename = f"{lSourcePath}/cmake_targets/log/{filename}"
-	ssh.run(f'docker logs {containerName} &> {remote_filename}')
+	ssh.run(f'docker compose -f {wd_yaml} logs {svcName} --no-log-prefix &> {remote_filename}')
 	local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml}"
 	local_filename = f"{local_dir}/{filename}"
 	return ssh.copyin(remote_filename, local_filename)
@@ -336,6 +333,7 @@ class Containerize():
 		self.imageToCopy = ''
 		#checkers from xml
 		self.ran_checkers={}
+		self.num_attempts = 1
 
 		self.flexricTag = ''
 
@@ -843,50 +841,55 @@ class Containerize():
 
 	def DeployObject(self, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
+		num_attempts = self.num_attempts
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('\u001B[1m Deploying OAI Object on server: ' + lIpAddr + '\u001B[0m')
+		logging.debug(f'Deploying OAI Object on server: {lIpAddr}')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		# creating the log folder by default
 		local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml.split('/')[-1]}"
 		os.system(f'mkdir -p {local_dir}')
 		wd = f'{lSourcePath}/{yaml}'
-
+		wd_yaml = f'{wd}/docker-compose.y*ml'
+		yaml_dir = yaml.split('/')[-1]
 		with cls_cmd.getConnection(lIpAddr) as ssh:
-			services = GetServices(ssh, self.services[self.eNB_instance], f"{wd}/docker-compose.y*ml")
+			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
 			if services == [] or services == ' ' or services == None:
-				msg = "Cannot determine services to start"
+				msg = 'Cannot determine services to start'
 				logging.error(msg)
 				HTML.CreateHtmlTestRowQueue('N/A', 'KO', [msg])
 				return False
-
 			ExistEnvFilePrint(ssh, wd)
 			WriteEnvFile(ssh, services, wd, self.deploymentTag, self.flexricTag)
-
-			logging.info(f"will start services {services}")
-			status = ssh.run(f'docker compose -f {wd}/docker-compose.y*ml up -d -- {services}')
-			if status.returncode != 0:
-				msg = f"cannot deploy services {services}: {status.stdout}"
-				logging.error(msg)
-				HTML.CreateHtmlTestRowQueue('N/A', 'KO', [msg])
-				return False
-
-			imagesInfo = []
-			fstatus = True
-			for svc in services.split():
-				containerName = GetContainerName(ssh, svc, f"{wd}/docker-compose.y*ml")
-				healthy = GetContainerHealth(ssh, containerName)
-				if not healthy:
-					imagesInfo += [f"Failed to deploy: service {svc}"]
-					fstatus = False
-				else:
-					image = GetImageName(ssh, svc, f"{wd}/docker-compose.y*ml")
-					logging.info(f"service {svc} healthy, container {containerName}, image {image}")
-					imagesInfo += [f"service {svc} healthy, image {image}"]
-		if fstatus:
+			if num_attempts <= 0:
+				raise ValueError(f'Invalid value for num_attempts: {num_attempts}, must be greater than 0')
+			for attempt in range(num_attempts):
+				imagesInfo = []
+				healthInfo = []
+				logging.info(f'will start services {services}')
+				status = ssh.run(f'docker compose -f {wd_yaml} up -d -- {services}')
+				if status.returncode != 0:
+					msg = f'cannot deploy services {services}: {status.stdout}'
+					logging.error(msg)
+					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', [msg])
+					return False
+				for svc in services.split():
+					health, msg = GetServiceHealth(ssh, svc, f'{wd_yaml}')
+					logging.info(msg)
+					imagesInfo.append(msg)
+					healthInfo.append(health)
+				deployed = all(healthInfo)
+				if deployed:
+					break
+				elif (attempt < num_attempts - 1):
+					logging.warning(f'Failed to deploy on attempt {attempt}, restart services {services}')
+					for svc in services.split():
+						CopyinServiceLog(ssh, lSourcePath, yaml_dir, svc, wd_yaml, f'{svc}-{HTML.testCase_id}-attempt{attempt}.log')
+					ssh.run(f'docker compose -f {wd_yaml} down -- {services}')
+		if deployed:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['\n'.join(imagesInfo)])
 		else:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
-		return fstatus
+		return deployed
 
 	def UndeployObject(self, HTML, RAN):
 		svr = self.eNB_serverId[self.eNB_instance]
@@ -902,7 +905,7 @@ class Containerize():
 			if services is not None:
 				all_serv = " ".join([s for s, _ in services])
 				ssh.run(f'docker compose -f {wd}/docker-compose.y*ml stop -- {all_serv}')
-				copyin_res = all(CopyinContainerLog(ssh, lSourcePath, yaml_dir, c, f'{s}-{HTML.testCase_id}.log') for s, c in services)
+				copyin_res = all(CopyinServiceLog(ssh, lSourcePath, yaml_dir, s, f"{wd}/docker-compose.y*ml", f'{s}-{HTML.testCase_id}.log') for s, c in services)
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd}/docker-compose.y*ml down -v')

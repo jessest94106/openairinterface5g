@@ -19,29 +19,12 @@
  *      contact@openairinterface.org
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
+#ifndef TASK_WORK_STEALING_THREAD_POOL_H
+#define TASK_WORK_STEALING_THREAD_POOL_H
 
-#include "TLVEncoder.h"
+typedef struct {
+  void* args;
+  void (*func)(void* args);
+} task_t;
 
-int errorCodeEncoder = 0;
-
-const char *const errorCodeStringEncoder[] = {
-    "No error",
-    "Buffer NULL",
-    "Buffer too short",
-    "Octet string too long for IEI",
-    "Wrong message type",
-    "Protocol not supported",
-};
-
-void tlv_encode_perror(void)
-{
-  if (errorCodeEncoder >= 0)
-    // No error or TLV_DECODE_ERR_OK
-    return;
-
-  printf("error: (%d, %s)\n", errorCodeEncoder, errorCodeStringEncoder[errorCodeEncoder * -1]);
-}
-
+#endif

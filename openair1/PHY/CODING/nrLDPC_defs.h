@@ -64,6 +64,7 @@ typedef struct {
   nrLDPC_params_per_cb_t perCB[NR_LDPC_MAX_NUM_CB];
   // Redundancy version index
   uint8_t rv;
+  task_ans_t *ans;
 } encoder_implemparams_t;
 
 typedef int32_t(LDPC_initfunc_t)(void);

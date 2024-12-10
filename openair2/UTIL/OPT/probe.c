@@ -93,7 +93,7 @@ int opt_enabled=0;
 //static unsigned char g_PDUBuffer[1600];
 //static unsigned int g_PDUOffset;
 
-FILE *file_fd = NULL;
+static FILE *file_fd = NULL;
 const pcap_hdr_t file_header = {
     0xa1b2c3d4, /* magic number */
     2,
@@ -120,7 +120,7 @@ typedef struct {
   struct sockaddr_in address;
 } opt_listener_t;
 
-opt_listener_t opt_listener;
+static opt_listener_t opt_listener;
 
 unsigned short checksum(unsigned short *ptr, int length) {
   int sum = 0;
