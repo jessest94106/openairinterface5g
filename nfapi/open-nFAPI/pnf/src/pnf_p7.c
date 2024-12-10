@@ -785,20 +785,13 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 
 	// save the curren time, sfn and slot
 	pnf_p7->slot_start_time_hr = pnf_get_current_time_hr();
-	int slot_ahead = 0;
-	uint32_t sfn_slot_tx = sfnslot_add_slot(sfn, slot, slot_ahead);
-	uint16_t sfn_tx = NFAPI_SFNSLOT2SFN(sfn_slot_tx);
-	uint8_t slot_tx = NFAPI_SFNSLOT2SLOT(sfn_slot_tx);
 
 	//We align the pnf_p7 sfn/slot with tx sfn/slot, and vnf is synced with pnf_p7 sfn/slot. This is so that the scheduler runs slot_ahead from rx thread.
 
-	pnf_p7->sfn = sfn_tx;
-	pnf_p7->slot = slot_tx; 
+	pnf_p7->sfn = sfn;
+	pnf_p7->slot = slot;
 
-	uint32_t rx_slot_dec = NFAPI_SFNSLOT2DEC(sfn, slot);
-	uint8_t buffer_index_rx = rx_slot_dec % 20; 
-
-	uint32_t tx_slot_dec = NFAPI_SFNSLOT2DEC(sfn_tx,slot_tx);
+	uint32_t tx_slot_dec = NFAPI_SFNSLOT2DEC(sfn,slot);
 	uint8_t buffer_index_tx = tx_slot_dec % 20;
 
 	// If the subframe_buffer has been configured
@@ -826,11 +819,9 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 			pnf_p7->slot_shift = 0;
 		}
 
-		nfapi_pnf_p7_slot_buffer_t* rx_slot_buffer = &(pnf_p7->slot_buffer[buffer_index_rx]);
-
 		nfapi_pnf_p7_slot_buffer_t* tx_slot_buffer = &(pnf_p7->slot_buffer[buffer_index_tx]);
 
-		if(tx_slot_buffer->dl_tti_req.dl_tti_request_body.nPDUs > 0 && tx_slot_buffer->dl_tti_req.SFN == sfn_tx && tx_slot_buffer->dl_tti_req.Slot == slot_tx)
+		if(tx_slot_buffer->dl_tti_req.dl_tti_request_body.nPDUs > 0 && tx_slot_buffer->dl_tti_req.SFN == sfn && tx_slot_buffer->dl_tti_req.Slot == slot)
 		{
 			DevAssert(pnf_p7->_public.dl_tti_req_fn != NULL);
 			(pnf_p7->_public.dl_tti_req_fn)(NULL, &(pnf_p7->_public), &tx_slot_buffer->dl_tti_req);
@@ -838,7 +829,7 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
       tx_slot_buffer->dl_tti_req.Slot = -1;
 		}
 
-		if(tx_slot_buffer->ul_tti_req.n_pdus > 0 && tx_slot_buffer->ul_tti_req.SFN == sfn_tx && tx_slot_buffer->ul_tti_req.Slot == slot_tx)
+		if(tx_slot_buffer->ul_tti_req.n_pdus > 0 && tx_slot_buffer->ul_tti_req.SFN == sfn && tx_slot_buffer->ul_tti_req.Slot == slot)
 		{
 			DevAssert(pnf_p7->_public.ul_tti_req_fn != NULL);
 			(pnf_p7->_public.ul_tti_req_fn)(NULL, &(pnf_p7->_public), &tx_slot_buffer->ul_tti_req);
@@ -846,7 +837,7 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
       tx_slot_buffer->ul_tti_req.Slot = -1;
 		}
 
-		if(tx_slot_buffer->tx_data_req.Number_of_PDUs > 0 && tx_slot_buffer->tx_data_req.SFN == sfn_tx && tx_slot_buffer->tx_data_req.Slot == slot_tx)
+		if(tx_slot_buffer->tx_data_req.Number_of_PDUs > 0 && tx_slot_buffer->tx_data_req.SFN == sfn && tx_slot_buffer->tx_data_req.Slot == slot)
 		{
 			DevAssert(pnf_p7->_public.tx_data_req_fn != NULL);
 			(pnf_p7->_public.tx_data_req_fn)(&(pnf_p7->_public), &tx_slot_buffer->tx_data_req);
@@ -854,18 +845,13 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
       tx_slot_buffer->tx_data_req.Slot = - 1;
 		}
 
-		if(tx_slot_buffer->ul_dci_req.numPdus > 0 && tx_slot_buffer->ul_dci_req.SFN == sfn_tx && tx_slot_buffer->ul_dci_req.Slot == slot_tx)
+		if(tx_slot_buffer->ul_dci_req.numPdus > 0 && tx_slot_buffer->ul_dci_req.SFN == sfn && tx_slot_buffer->ul_dci_req.Slot == slot)
 		{
 			DevAssert(pnf_p7->_public.ul_dci_req_fn != NULL);
       (pnf_p7->_public.ul_dci_req_fn)(NULL, &(pnf_p7->_public), &tx_slot_buffer->ul_dci_req);
       tx_slot_buffer->ul_dci_req.SFN = -1;
       tx_slot_buffer->ul_dci_req.Slot = -1;
 		}
-
-		//reset slot buffer 
-
-    pnf_p7->slot_buffer[buffer_index_rx].sfn = -1;
-    pnf_p7->slot_buffer[buffer_index_rx].slot = -1;
 
 		//send the periodic timing info if configured
 		if(pnf_p7->_public.timing_info_mode_periodic && (pnf_p7->timing_info_period_counter++) == pnf_p7->_public.timing_info_period)
