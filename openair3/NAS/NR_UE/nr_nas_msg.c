@@ -62,6 +62,8 @@
 #include "openair3/UTILS/conversions.h"
 #include "secu_defs.h"
 #include "utils.h"
+#include "openair2/SDAP/nr_sdap/nr_sdap.h"
+#include "fgs_nas_utils.h"
 
 #define MAX_NAS_UE 4
 
@@ -816,6 +818,121 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
 }
 
 /**
+ * @brief Capture IPv4 PDU Session Address
+ */
+static int capture_ipv4_addr(const uint8_t *addr, char *ip, size_t len)
+{
+  return snprintf(ip, len, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
+}
+
+/**
+ * @brief Capture IPv6 PDU Session Address
+ */
+static int capture_ipv6_addr(const uint8_t *addr, char *ip, size_t len)
+{
+  // 24.501 Sec 9.11.4.10: "an interface identifier for the IPv6 link local
+  // address": link local starts with fe80::, and only the last 64bits are
+  // given (middle is zero)
+  return snprintf(ip,
+                  len,
+                  "fe80::%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+                  addr[0],
+                  addr[1],
+                  addr[2],
+                  addr[3],
+                  addr[4],
+                  addr[5],
+                  addr[6],
+                  addr[7]);
+}
+
+/**
+ * @brief Process PDU Session Address in PDU Session Establishment Accept message
+ *        and configure the tun interface
+ */
+static void process_pdu_session_addr(pdu_session_establishment_accept_msg_t *msg)
+{
+  uint8_t *addr = msg->pdu_addr_ie.pdu_addr_oct;
+
+  switch (msg->pdu_addr_ie.pdu_type) {
+    case PDU_SESSION_TYPE_IPV4: {
+      char ip[20];
+      capture_ipv4_addr(&addr[0], ip, sizeof(ip));
+      tun_config(1, ip, NULL, "oaitun_ue");
+      setup_ue_ipv4_route(1, ip, "oaitun_ue");
+    } break;
+
+    case PDU_SESSION_TYPE_IPV6: {
+      char ipv6[40];
+      capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
+      tun_config(1, NULL, ipv6, "oaitun_ue");
+    } break;
+
+    case PDU_SESSION_TYPE_IPV4V6: {
+      char ipv6[40];
+      capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
+      char ipv4[20];
+      capture_ipv4_addr(&addr[IPv6_INTERFACE_ID_LENGTH], ipv4, sizeof(ipv4));
+      tun_config(1, ipv4, ipv6, "oaitun_ue");
+      setup_ue_ipv4_route(1, ipv4, "oaitun_ue");
+    } break;
+
+    default:
+      LOG_E(NAS, "Unknown PDU Session Address type %d\n", msg->pdu_addr_ie.pdu_type);
+      break;
+  }
+}
+
+/**
+ * @brief Handle PDU Session Establishment Accept and process decoded message
+ */
+static void handle_pdu_session_accept(uint8_t *pdu_buffer, uint32_t msg_length)
+{
+  pdu_session_establishment_accept_msg_t msg = {0};
+  int size = 0;
+  int decoded = 0;
+
+  // Security protected NAS header (7 bytes)
+  fgs_nas_message_security_header_t sec_nas_hdr = {0};
+  if ((decoded = decode_5gs_security_protected_header(&sec_nas_hdr, pdu_buffer, msg_length)) < 0) {
+    LOG_E(NAS, "decode_5gs_security_protected_header failure in PDU Session Establishment Accept decoding\n");
+    return;
+  }
+  size += decoded;
+
+  // decode plain 5GMM message header
+  fgmm_msg_header_t mm_header = {0};
+  if ((decoded = decode_5gmm_msg_header(&mm_header, pdu_buffer + size, msg_length - size)) < 0) {
+    LOG_E(NAS, "decode_5gmm_msg_header failure in PDU Session Establishment Accept decoding\n");
+    return;
+  }
+  size += decoded;
+
+  /* Process container (5GSM message) */
+  // Payload container type and spare (1 octet)
+  size++;
+  // Payload container length
+  uint16_t iei_len = 0;
+  GET_SHORT(pdu_buffer + size, iei_len);
+  size += sizeof(iei_len);
+  // decode plain 5GSM message header
+  fgsm_msg_header_t sm_header = {0};
+  if ((decoded = decode_5gsm_msg_header(&sm_header, pdu_buffer + size, msg_length - size)) < 0) {
+    LOG_E(NAS, "decode_5gsm_msg_header failure in PDU Session Establishment Accept decoding\n");
+    return;
+  }
+  size += decoded;
+
+  // decode PDU Session Establishment Accept
+  if (!decode_pdu_session_establishment_accept_msg(&msg, pdu_buffer + size, msg_length))
+    LOG_E(NAS, "decode_pdu_session_establishment_accept_msg failure\n");
+
+  // process PDU Session
+  process_pdu_session_addr(&msg);
+  set_qfi_pduid(msg.qos_rules.rule->qfi, sm_header.pdu_session_id);
+}
+
+/**
  * @brief Handle DL NAS Transport and process piggybacked 5GSM messages
  */
 static void handleDownlinkNASTransport(uint8_t *pdu_buffer, uint32_t msg_length)
@@ -823,7 +940,7 @@ static void handleDownlinkNASTransport(uint8_t *pdu_buffer, uint32_t msg_length)
   uint8_t msg_type = *(pdu_buffer + 16);
   if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
     LOG_A(NAS, "Received PDU Session Establishment Accept in DL NAS Transport\n");
-    capture_pdu_session_establishment_accept_msg(pdu_buffer, msg_length);
+    handle_pdu_session_accept(pdu_buffer, msg_length);
   } else {
     LOG_E(NAS, "Received unexpected message in DLinformationTransfer %d\n", msg_type);
   }
@@ -1281,7 +1398,7 @@ void *nas_nrue(void *args_p)
         if (msg_type == FGS_REGISTRATION_ACCEPT) {
           handle_registration_accept(nas, pdu_buffer, pdu_length);
         } else if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
-          capture_pdu_session_establishment_accept_msg(pdu_buffer, pdu_length);
+          handle_pdu_session_accept(pdu_buffer, pdu_length);
         }
 
         // Free NAS buffer memory after use (coming from RRC)
@@ -1378,7 +1495,7 @@ void *nas_nrue(void *args_p)
             LOG_I(NAS, "received deregistration accept\n");
             break;
           case FGS_PDU_SESSION_ESTABLISHMENT_ACC:
-            capture_pdu_session_establishment_accept_msg(pdu_buffer, pdu_length);
+            handle_pdu_session_accept(pdu_buffer, pdu_length);
             break;
           case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
             LOG_E(NAS, "Received PDU Session Establishment reject\n");

@@ -23,6 +23,8 @@
 #define FGS_NAS_UTILS_H
 
 #include <stdint.h>
+#include <arpa/inet.h>
+#include <string.h> // For memcpy
 
 #define PRINT_NAS_ERROR(...) fprintf(stderr, ##__VA_ARGS__)
 
@@ -50,5 +52,11 @@ typedef struct {
 
 #define TO_TEXT(LabEl, nUmID) {nUmID, #LabEl},
 #define TO_ENUM(LabEl, nUmID ) LabEl = nUmID,
+
+#define GET_SHORT(input, size) ({           \
+    uint16_t tmp16;                         \
+    memcpy(&tmp16, (input), sizeof(tmp16)); \
+    size += htons(tmp16);                   \
+})
 
 #endif // FGS_NAS_UTILS_H

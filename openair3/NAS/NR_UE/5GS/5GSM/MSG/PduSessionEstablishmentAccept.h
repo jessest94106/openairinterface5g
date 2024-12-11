@@ -23,8 +23,8 @@
 #define PDU_SESSION_ESTABLISHMENT_ACCEPT_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "fgs_nas_utils.h"
-#include "NR_NAS_defs.h" // TEMP: to be removed in later commit
 
 /* PDU Session Establish Accept Optional IE Identifiers - TS 24.501 Table 8.3.2.1.1 */
 
@@ -79,6 +79,8 @@ typedef enum { FOREACH_IEI(TO_ENUM) } pduSessionEstablishment_IEI_t;
 #define APN_MAX_LEN 100
 #define APN_MIN_LEN 1
 
+#define MAX_NUM_QOS_RULES 64
+
 /* Mandatory Presence IE - TS 24.501 Table 8.3.2.1.1 */
 
 typedef struct packet_filter_create_qos_rule_s {
@@ -99,17 +101,26 @@ typedef struct packet_filter_s {
 } packet_filter_t;
 
 typedef struct qos_rule_s {
-  uint8_t id; /* QoS rule identifier */
-  uint16_t length; /* Length of QoS Rule */
-  uint8_t oc; /* Rule operation code (3bits) */
-  uint8_t dqr; /* DQR bit (1 bit) */
-  uint8_t nb_pf; /* Number of packet filters (4 bits) */
-  uint8_t prcd; /* QoS rule precedence */
-  uint8_t qfi; /* QoS Flow Identifier */
+  // QoS rule identifier
+  uint8_t id;
+  // Length of QoS Rule
+  uint16_t length;
+  // Rule operation code
+  uint8_t oc;
+  // Default QoS Rule
+  bool dqr;
+  // Number of packet filters
+  uint8_t nb_pf;
+  // QoS rule precedence
+  uint8_t precendence;
+  // QoS Flow Identifier
+  uint8_t qfi;
 } qos_rule_t;
 
 typedef struct auth_qos_rules_s {
   uint16_t length; /* Length of QoS rules IE */
+  // QoS rules (M)
+  qos_rule_t rule[MAX_NUM_QOS_RULES];
 } auth_qos_rule_t; /* QoS Rule as defined in 24.501 Figure 9.11.4.13.2 */
 
 typedef struct session_ambr_s {
@@ -147,20 +158,24 @@ typedef struct qos_fd_s {
 } qos_fd_t; /* TS 24.501 9.11.4.12 - Ommited, only length is processed*/
 
 typedef struct pdu_session_establishment_accept_msg_s {
-  /* Mandatory presence */
-  fgsm_msg_header_t header;
-  uint8_t pdu_type; /* PDU Session Type */
-  uint8_t ssc_mode; /* SSC mode */
-  auth_qos_rule_t qos_rules; /* Authorized QoS rules */
-  session_ambr_t sess_ambr; /* Session-AMBR */
-
-  /* Optional presence */
-  dnn_t dnn_ie; /* Data Network Name */
-  pdu_address_t pdu_addr_ie; /* PDU Address */
-  ext_pP_t ext_pp_ie; /* Extended Protocol Configuration Options */
-  qos_fd_t qos_fd_ie; /* QoS flow descriptions */
+  // PDU Session Type (M)
+  uint8_t pdu_type;
+  // Selected SSC Mode (M)
+  uint8_t ssc_mode;
+  // Authorized QoS rules (M)
+  auth_qos_rule_t qos_rules;
+  // Session-AMBR (M)
+  session_ambr_t sess_ambr;
+  // Data Network Name (O)
+  dnn_t dnn_ie;
+  // PDU Address (O)
+  pdu_address_t pdu_addr_ie;
+  // Extended Protocol Configuration Options (O)
+  ext_pP_t ext_pp_ie;
+  // QoS flow descriptions (O)
+  qos_fd_t qos_fd_ie;
 } pdu_session_establishment_accept_msg_t; /* 24.501 Table 8.3.2.1.1 */
 
-void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_length);
+int decode_pdu_session_establishment_accept_msg(pdu_session_establishment_accept_msg_t *psea_msg, uint8_t *buffer, uint32_t msg_length);
 
 #endif
