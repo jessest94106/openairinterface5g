@@ -286,13 +286,14 @@ static int gtpv1uCreateAndSendMsg(int h,
   return  !GTPNOK;
 }
 
-static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool seqNumFlag, bool npduNumFlag)
+void gtpv1uSendDirect(instance_t instance,
+                      ue_id_t ue_id,
+                      int bearer_id,
+                      uint8_t *buf,
+                      size_t len,
+                      bool seqNumFlag,
+                      bool npduNumFlag)
 {
-  uint8_t *buf = req->buffer + req->offset;
-  size_t len = req->length;
-  ue_id_t ue_id = req->ue_id;
-  int bearer_id = req->bearer_id;
-
   pthread_mutex_lock(&globGtp.gtp_lock);
   getInstRetVoid(compatInst(instance));
   getUeRetVoid(inst, ue_id);
@@ -365,6 +366,16 @@ static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool 
                            NULL,
                            0);
   }
+}
+
+static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool seqNumFlag, bool npduNumFlag)
+{
+  uint8_t *buf = req->buffer + req->offset;
+  size_t len = req->length;
+  ue_id_t ue_id = req->ue_id;
+  int bearer_id = req->bearer_id;
+
+  gtpv1uSendDirect(instance, ue_id, bearer_id, buf, len, seqNumFlag, npduNumFlag);
 }
 
 static void fillDlDeliveryStatusReport(extensionHeader_t *extensionHeader, uint32_t RLC_buffer_availability, uint32_t NR_PDCP_PDU_SN){
