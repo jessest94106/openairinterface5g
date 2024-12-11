@@ -368,16 +368,6 @@ void gtpv1uSendDirect(instance_t instance,
   }
 }
 
-static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool seqNumFlag, bool npduNumFlag)
-{
-  uint8_t *buf = req->buffer + req->offset;
-  size_t len = req->length;
-  ue_id_t ue_id = req->ue_id;
-  int bearer_id = req->bearer_id;
-
-  gtpv1uSendDirect(instance, ue_id, bearer_id, buf, len, seqNumFlag, npduNumFlag);
-}
-
 static void fillDlDeliveryStatusReport(extensionHeader_t *extensionHeader, uint32_t RLC_buffer_availability, uint32_t NR_PDCP_PDU_SN){
 
   extensionHeader->buffer[0] = (1+sizeof(DlDataDeliveryStatus_flagsT)+(NR_PDCP_PDU_SN>0?3:0)+(NR_PDCP_PDU_SN>0?1:0)+1)/4;
@@ -1319,11 +1309,6 @@ void *gtpv1uTask(void *args)  {
       LOG_D(GTPU, "GTP-U received %s for instance %ld\n", messages_info[msgType].name, myInstance);
       switch (msgType) {
           // DATA TO BE SENT TO UDP
-
-        case GTPV1U_TUNNEL_DATA_REQ: {
-          gtpv1uSend(compatInst(myInstance), &GTPV1U_TUNNEL_DATA_REQ(message_p), false, false);
-        }
-        break;
 
         case GTPV1U_DU_BUFFER_REPORT_REQ:{
           gtpv1uSendDlDeliveryStatus(compatInst(myInstance), &GTPV1U_DU_BUFFER_REPORT_REQ(message_p));
