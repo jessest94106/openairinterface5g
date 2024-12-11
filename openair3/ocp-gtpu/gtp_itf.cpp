@@ -286,38 +286,47 @@ static int gtpv1uCreateAndSendMsg(int h,
   return  !GTPNOK;
 }
 
-static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool seqNumFlag, bool npduNumFlag) {
-  uint8_t *buffer=req->buffer+req->offset;
-  size_t length=req->length;
-  ue_id_t ue_id=req->ue_id;
-  int  bearer_id=req->bearer_id;
+static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool seqNumFlag, bool npduNumFlag)
+{
+  uint8_t *buf = req->buffer + req->offset;
+  size_t len = req->length;
+  ue_id_t ue_id = req->ue_id;
+  int bearer_id = req->bearer_id;
+
   pthread_mutex_lock(&globGtp.gtp_lock);
   getInstRetVoid(compatInst(instance));
   getUeRetVoid(inst, ue_id);
 
-  auto ptr2=ptrUe->second.bearers.find(bearer_id);
+  auto ptr2 = ptrUe->second.bearers.find(bearer_id);
 
-  if ( ptr2 == ptrUe->second.bearers.end() ) {
-    LOG_E(GTPU,"[%ld] GTP-U instance: sending a packet to a non existant UE:RAB: %lx/%x\n", instance, ue_id, bearer_id);
+  if (ptr2 == ptrUe->second.bearers.end()) {
+    LOG_E(GTPU, "[%ld] GTP-U instance: sending a packet to a non existant UE:RAB: %lx/%x\n", instance, ue_id, bearer_id);
     pthread_mutex_unlock(&globGtp.gtp_lock);
     return;
   }
 
-  LOG_D(GTPU,"[%ld] sending a packet to UE:RAB:teid %lx/%x/%x, len %lu, oldseq %d, oldnum %d\n",
-        instance, ue_id, bearer_id,ptr2->second.teid_outgoing,length, ptr2->second.seqNum,ptr2->second.npduNum );
+  LOG_D(GTPU,
+        "[%ld] sending a packet to UE:RAB:teid %lx/%x/%x, len %lu, oldseq %d, oldnum %d\n",
+        instance,
+        ue_id,
+        bearer_id,
+        ptr2->second.teid_outgoing,
+        len,
+        ptr2->second.seqNum,
+        ptr2->second.npduNum);
 
-  if(seqNumFlag)
+  if (seqNumFlag)
     ptr2->second.seqNum++;
 
-  if(npduNumFlag)
+  if (npduNumFlag)
     ptr2->second.npduNum++;
 
   // copy to release the mutex
-  gtpv1u_bearer_t tmp=ptr2->second;
+  gtpv1u_bearer_t tmp = ptr2->second;
   pthread_mutex_unlock(&globGtp.gtp_lock);
 
   if (tmp.outgoing_qfi != -1) {
-    Gtpv1uExtHeaderT ext = { 0 };
+    Gtpv1uExtHeaderT ext = {0};
     ext.ExtHeaderLen = 1; // in quad bytes  EXT_HDR_LNTH_OCTET_UNITS
     ext.pdusession_cntr.spare = 0;
     ext.pdusession_cntr.PDU_type = UL_PDU_SESSION_INFORMATION;
@@ -331,8 +340,8 @@ static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool 
                            tmp.outgoing_port,
                            GTP_GPDU,
                            tmp.teid_outgoing,
-                           buffer,
-                           length,
+                           buf,
+                           len,
                            seqNumFlag,
                            npduNumFlag,
                            tmp.seqNum,
@@ -341,8 +350,20 @@ static void gtpv1uSend(instance_t instance, gtpv1u_tunnel_data_req_t *req, bool 
                            (uint8_t *)&ext,
                            sizeof(ext));
   } else {
-    gtpv1uCreateAndSendMsg(
-        compatInst(instance), tmp.outgoing_ip_addr, tmp.outgoing_port, GTP_GPDU, tmp.teid_outgoing, buffer, length, seqNumFlag, npduNumFlag, tmp.seqNum, tmp.npduNum, NO_MORE_EXT_HDRS, NULL, 0);
+    gtpv1uCreateAndSendMsg(compatInst(instance),
+                           tmp.outgoing_ip_addr,
+                           tmp.outgoing_port,
+                           GTP_GPDU,
+                           tmp.teid_outgoing,
+                           buf,
+                           len,
+                           seqNumFlag,
+                           npduNumFlag,
+                           tmp.seqNum,
+                           tmp.npduNum,
+                           NO_MORE_EXT_HDRS,
+                           NULL,
+                           0);
   }
 }
 
