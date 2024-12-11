@@ -62,7 +62,10 @@ typedef struct {
   int64_t       nbBytes;
   int64_t       tv_sec;  // nb of secs since EPOCH
   int64_t       tv_usec; // nb of µsecs since EPOCH
-  int64_t       rfu2;    // pad for 256 bits alignement required by AVX2
+  // pad for 512 bits alignement required by AVX512
+  int64_t       rfu2;
+  int64_t       rfu3;
+  int64_t       rfu4;
 } iqrec_t;
 #define DEF_NB_SF           120000               // default nb of sf or ms to capture (2 minutes at 5MHz)
 #define DEF_SF_FILE         "/tmp/iqfile"        // default subframes file name
