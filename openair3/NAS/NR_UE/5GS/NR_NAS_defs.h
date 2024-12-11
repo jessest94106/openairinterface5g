@@ -264,7 +264,7 @@ typedef union {
   fgmm_msg_header_t header;
   registration_request_msg registration_request;
   fgs_service_request_msg_t service_request;
-  fgs_identiy_response_msg fgs_identity_response;
+  fgmm_identity_response_msg fgs_identity_response;
   fgs_authentication_response_msg fgs_auth_response;
   fgs_deregistration_request_ue_originating_msg fgs_deregistration_request_ue_originating;
   fgs_security_mode_complete_msg fgs_security_mode_complete;

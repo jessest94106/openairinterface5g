@@ -43,16 +43,15 @@
  * Direction: UE to AMF
  */
 
-typedef struct fgs_identiy_response_msg_tag {
+typedef struct fgmm_identity_response_msg_s {
   /* Mandatory fields */
   uint8_t protocoldiscriminator;
   SecurityHeaderType securityheadertype: 4;
   uint8_t sparehalfoctet: 4;
   MessageType messagetype;
   FGSMobileIdentity fgsmobileidentity;
+} fgmm_identity_response_msg;
 
-} fgs_identiy_response_msg;
-
-int encode_identiy_response(fgs_identiy_response_msg *fgs_identity_reps, uint8_t *buffer, uint32_t len);
+int encode_fgmm_identity_response(uint8_t *buffer, const fgmm_identity_response_msg *fgs_identity_reps, uint32_t len);
 
 #endif /* ! defined(FGS_IDENTITY_RESPONSE_H_) */

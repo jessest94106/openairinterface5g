@@ -31,7 +31,7 @@
 #include "FGSIdentityResponse.h"
 #include <stdint.h>
 
-int encode_identiy_response(fgs_identiy_response_msg *fgs_identity_reps, uint8_t *buffer, uint32_t len)
+int encode_fgmm_identity_response(uint8_t *buffer, const fgmm_identity_response_msg *fgs_identity_reps, uint32_t len)
 {
   int encoded = 0;
   int encode_result = 0;

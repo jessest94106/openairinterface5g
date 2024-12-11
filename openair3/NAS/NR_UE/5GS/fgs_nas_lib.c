@@ -74,7 +74,7 @@ int mm_msg_encode(const MM_msg *mm_msg, uint8_t *buffer, uint32_t len)
       encode_result = encode_registration_request(&mm_msg->registration_request, buffer, len);
       break;
     case FGS_IDENTITY_RESPONSE:
-      encode_result = encode_identiy_response(&mm_msg->fgs_identity_response, buffer, len);
+      encode_result = encode_fgmm_identity_response(buffer, &mm_msg->fgs_identity_response, len);
       break;
     case FGS_AUTHENTICATION_RESPONSE:
       encode_result = encode_fgs_authentication_response(&mm_msg->fgs_auth_response, buffer, len);
