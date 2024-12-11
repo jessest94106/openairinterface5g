@@ -851,8 +851,11 @@ void *UE_thread(void *arg)
         stream_status = STREAM_STATUS_UNSYNC;
       } else {
         if (IS_SOFTMODEM_IQPLAYER || IS_SOFTMODEM_IQRECORDER) {
-          // For IQ recorder-player we force synchronization to happen in 280 ms
-          while (trashed_frames != 28) {
+          /* For IQ recorder-player we force synchronization to happen in a fixed duration so that
+             the replay runs in sync with recorded samples.
+          */
+          const unsigned int sync_in_frames = UE->rfdevice.openair0_cfg->recplay_conf->u_f_sync;
+          while (trashed_frames != sync_in_frames) {
             readFrame(UE, &sync_timestamp, true);
             trashed_frames += 2;
           }
