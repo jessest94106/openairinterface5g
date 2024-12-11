@@ -193,7 +193,7 @@ instance_t legacyInstanceMapping=0;
     auto ptrUe=insT->ue2te_mapping.find(Ue);                        \
                                                                         \
   if (  ptrUe==insT->ue2te_mapping.end() ) {                          \
-    LOG_E(GTPU, "[%ld] gtpv1uSend failed: while getting ue id %ld in hashtable ue_mapping\n", instance, ue_id); \
+    LOG_E(GTPU, "[%ld] %s failed: while getting ue id %ld in hashtable ue_mapping\n", instance, __func__, ue_id); \
     pthread_mutex_unlock(&globGtp.gtp_lock);                            \
     return;                                                             \
   }
@@ -202,7 +202,7 @@ instance_t legacyInstanceMapping=0;
     auto ptrUe=insT->ue2te_mapping.find(Ue);                        \
                                                                         \
   if (  ptrUe==insT->ue2te_mapping.end() ) {                          \
-    LOG_E(GTPU, "[%ld] gtpv1uSend failed: while getting ue id %ld in hashtable ue_mapping\n", instance, ue_id); \
+    LOG_E(GTPU, "[%ld] %s failed: while getting ue id %ld in hashtable ue_mapping\n", instance, __func__, ue_id); \
     pthread_mutex_unlock(&globGtp.gtp_lock);                            \
     return GTPNOK;                                                             \
   }
