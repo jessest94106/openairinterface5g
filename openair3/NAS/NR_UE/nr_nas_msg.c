@@ -491,29 +491,13 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
 
   // NAS is security protected if has valid security contexts
   bool security_protected = nas->security_container->ciphering_context && nas->security_container->integrity_context;
+
+  // Set 5GMM plain header
   fgmm_nas_message_plain_t plain = {0};
-  fgs_service_request_msg_t *mm_msg;
-  fgmm_nas_msg_security_protected_t sp = {0};
-  fgmm_msg_header_t mm_header = set_mm_header(FGS_SERVICE_REQUEST, PLAIN_5GS_MSG);
-
-  if (security_protected) {
-    /* Set security protected 5GS NAS message header (see 9.1.1 of 3GPP TS 24.501) */
-    sp.header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-    sp.header.security_header_type = INTEGRITY_PROTECTED;
-    sp.header.sequence_number = nas->security.nas_count_ul & 0xff;
-    size += sizeof(fgs_nas_message_security_header_t);
-    mm_msg = &sp.plain.mm_msg.service_request;
-    // Plain 5GMM header
-    sp.plain.header = mm_header;
-  } else {
-    // Set Mobility Management plain message header
-    mm_msg = &plain.mm_msg.service_request;
-    // Plain 5GMM header
-    plain.header = mm_header;
-  }
-  size += sizeof(mm_header);
-
-  // Fill Service Request
+  plain.header = set_mm_header(FGS_SERVICE_REQUEST, PLAIN_5GS_MSG);
+  size += sizeof(plain.header);
+  // Set plain FGMM Service Request
+  fgs_service_request_msg_t *mm_msg = &plain.mm_msg.service_request;
   // Service Type
   mm_msg->serviceType = SERVICE_TYPE_DATA;
   // NAS key set identifier
@@ -523,9 +507,21 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   // 5G-S-TMSI
   size += fill_fgstmsi(&mm_msg->fiveg_s_tmsi, nas->guti);
 
-  /* message encoding */
-  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
   if (security_protected) {
+    fgmm_nas_msg_security_protected_t sp = {0};
+
+    // Set security protected 5GS NAS message header (see 9.1.1 of 3GPP TS 24.501)
+    sp.header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
+    sp.header.security_header_type = INTEGRITY_PROTECTED;
+    sp.header.sequence_number = nas->security.nas_count_ul & 0xff;
+    size += sizeof(sp.header);
+
+    // Payload: plain message
+    sp.plain = plain;
+
+    // Allocate NAS message for encoding
+    initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
+
     // security protected encoding
     int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, &sp.header, size);
     initialNasMsg->length =
@@ -554,12 +550,14 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
     /* length in bits */
     stream_cipher.blength = (initialNasMsg->length - 6) << 3;
     stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
-    printf("Integrity protected initial NAS message: mac = %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
+    LOG_D(NAS, "Integrity protected initial NAS message: mac = %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
     for (int i = 0; i < 4; i++)
       initialNasMsg->nas_data[2 + i] = mac[i];
   } else {
     // plain encoding
-    initialNasMsg->length = mm_msg_encode(&plain, (uint8_t *)(initialNasMsg->nas_data), size);
+    // Allocate NAS message for encoding
+    initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
+    initialNasMsg->length = mm_msg_encode(&plain, initialNasMsg->nas_data, size);
     LOG_I(NAS, "PLAIN_5GS_MSG initial NAS message: Service Request with length %d \n", initialNasMsg->length);
   }
 }
