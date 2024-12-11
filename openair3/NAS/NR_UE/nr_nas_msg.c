@@ -77,6 +77,15 @@ typedef enum {
   NAS_SECURITY_BAD_INPUT
 } security_state_t;
 
+static fgmm_msg_header_t set_mm_header(fgs_nas_msg_t type, Security_header_t security)
+{
+  fgmm_msg_header_t mm_header = {0};
+  mm_header.ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
+  mm_header.security_header_type = security;
+  mm_header.message_type = type;
+  return mm_header;
+}
+
 static void servingNetworkName(uint8_t *msg, char *imsiStr, int nmc_size)
 {
   // SNN-network-identifier in TS 24.501
@@ -432,11 +441,8 @@ void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   fgmm_nas_message_plain_t plain = {0};
 
   // Plain 5GMM header
-  fgmm_msg_header_t *mm_header = &plain.header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_REGISTRATION_REQUEST;
-  size += 3;
+  plain.header = set_mm_header(FGS_REGISTRATION_REQUEST, PLAIN_5GS_MSG);
+  size += sizeof(plain.header);
 
   // Plain 5GMM msg
   registration_request_msg *mm_msg = &plain.mm_msg.registration_request;
@@ -488,7 +494,7 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   fgmm_nas_message_plain_t plain = {0};
   fgs_service_request_msg_t *mm_msg;
   fgmm_nas_msg_security_protected_t sp = {0};
-  fgmm_msg_header_t *mm_header;
+  fgmm_msg_header_t mm_header = set_mm_header(FGS_SERVICE_REQUEST, PLAIN_5GS_MSG);
 
   if (security_protected) {
     /* Set security protected 5GS NAS message header (see 9.1.1 of 3GPP TS 24.501) */
@@ -498,17 +504,14 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
     size += sizeof(fgs_nas_message_security_header_t);
     mm_msg = &sp.plain.mm_msg.service_request;
     // Plain 5GMM header
-    mm_header = &sp.plain.header;
+    sp.plain.header = mm_header;
   } else {
     // Set Mobility Management plain message header
     mm_msg = &plain.mm_msg.service_request;
     // Plain 5GMM header
-    mm_header = &plain.header;
+    plain.header = mm_header;
   }
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_SERVICE_REQUEST;
-  size += sizeof(*mm_header);
+  size += sizeof(mm_header);
 
   // Fill Service Request
   // Service Type
@@ -567,11 +570,8 @@ void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype
   fgmm_nas_message_plain_t plain = {0};
 
   // Plain 5GMM header
-  fgmm_msg_header_t *mm_header = &plain.header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_IDENTITY_RESPONSE;
-  size += 3;
+  plain.header = set_mm_header(FGS_IDENTITY_RESPONSE, PLAIN_5GS_MSG);
+  size += sizeof(plain.header);
 
   // set identity response
   fgmm_identity_response_msg *mm_msg = &plain.mm_msg.fgs_identity_response;
@@ -597,11 +597,8 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   fgmm_nas_message_plain_t plain = {0};
 
   // Plain 5GMM header
-  fgmm_msg_header_t *mm_header = &plain.header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_AUTHENTICATION_RESPONSE;
-  size += 3;
+  plain.header = set_mm_header(FGS_AUTHENTICATION_RESPONSE, PLAIN_5GS_MSG);
+  size += sizeof(plain.header);
 
   // set response parameter
   fgs_authentication_response_msg *mm_msg = &plain.mm_msg.fgs_auth_response;
@@ -640,11 +637,8 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   fgmm_nas_message_plain_t *plain = &nas_msg.plain;
 
   // Plain 5GMM header
-  fgmm_msg_header_t *mm_header = &plain->header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_SECURITY_MODE_COMPLETE;
-  size += 3;
+  plain->header = set_mm_header(FGS_SECURITY_MODE_COMPLETE, PLAIN_5GS_MSG);
+  size += sizeof(plain->header);
 
   // Plain 5GMM payload
   fgs_security_mode_complete_msg *mm_msg = &plain->mm_msg.fgs_security_mode_complete;
@@ -767,11 +761,8 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
   sp.header.sequence_number = nas->security.nas_count_ul & 0xff;
   length = 7;
   // set plain 5GMM header
-  fgmm_msg_header_t *mm_header = &sp.plain.header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_REGISTRATION_COMPLETE;
-  length += 3;
+  sp.plain.header = set_mm_header(FGS_REGISTRATION_COMPLETE, PLAIN_5GS_MSG);
+  length += sizeof(sp.plain.header);
 
   registration_complete_msg *mm_msg = &sp.plain.mm_msg.registration_complete;
   if (sortransparentcontainer) {
@@ -789,7 +780,7 @@ static void generateRegistrationComplete(nr_ue_nas_t *nas,
     return;
   }
   // encode 5GMM plain header
-  encoded = _nas_mm_msg_encode_header(mm_header, initialNasMsg->nas_data + encoded, length - encoded);
+  encoded = _nas_mm_msg_encode_header(&sp.plain.header, initialNasMsg->nas_data + encoded, length - encoded);
   if (encoded < 0) {
     LOG_E(NAS, "generateRegistrationComplete: failed to encode 5GMM plain header\n");
     return;
@@ -851,11 +842,8 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
   int size = sizeof(sp_msg.header);
 
   // Plain 5GMM header
-  fgmm_msg_header_t *mm_header = &sp_msg.plain.header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX;
-  mm_header->message_type = FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING;
-  size += 3;
+  sp_msg.plain.header = set_mm_header(FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING, INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX);
+  size += sizeof(sp_msg.plain.header);
 
   // Plain 5GMM
   fgs_deregistration_request_ue_originating_msg *mm_msg = &sp_msg.plain.mm_msg.fgs_deregistration_request_ue_originating;
@@ -938,11 +926,8 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   fgmm_nas_message_plain_t *plain = &sp_msg.plain;
 
   // Plain 5GMM header
-  fgmm_msg_header_t *mm_header = &plain->header;
-  mm_header->ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
-  mm_header->security_header_type = PLAIN_5GS_MSG;
-  mm_header->message_type = FGS_UPLINK_NAS_TRANSPORT;
-  size += 3;
+  plain->header = set_mm_header(FGS_UPLINK_NAS_TRANSPORT, PLAIN_5GS_MSG);
+  size += sizeof(plain->header);
 
   fgs_uplink_nas_transport_msg *mm_msg = &plain->mm_msg.uplink_nas_transport;
   mm_msg->payloadcontainertype.iei = 0;
