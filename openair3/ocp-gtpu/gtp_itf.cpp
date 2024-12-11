@@ -403,9 +403,10 @@ static void gtpv1uSendDlDeliveryStatus(instance_t instance, gtpv1u_DU_buffer_rep
       compatInst(instance), tmp.outgoing_ip_addr, tmp.outgoing_port, GTP_GPDU, tmp.teid_outgoing, NULL, 0, false, false, 0, 0, NR_RAN_CONTAINER, extensionHeader->buffer, extensionHeader->length);
 }
 
-static void gtpv1uEndTunnel(instance_t instance, gtpv1u_tunnel_data_req_t *req) {
-  ue_id_t ue_id=req->ue_id;
-  int  bearer_id=req->bearer_id;
+static void gtpv1uEndTunnel(instance_t instance, gtpv1u_enb_end_marker_req_t *req)
+{
+  ue_id_t ue_id=req->rnti;
+  int  bearer_id=req->rab_id;
   pthread_mutex_lock(&globGtp.gtp_lock);
   getInstRetVoid(compatInst(instance));
   getUeRetVoid(inst, ue_id);
@@ -1305,8 +1306,8 @@ void *gtpv1uTask(void *args)  {
           break;
 
         case GTPV1U_ENB_END_MARKER_REQ:
-          gtpv1uEndTunnel(compatInst(myInstance), &GTPV1U_TUNNEL_DATA_REQ(message_p));
-          itti_free(TASK_GTPV1_U, GTPV1U_TUNNEL_DATA_REQ(message_p).buffer);
+          gtpv1uEndTunnel(compatInst(myInstance), &GTPV1U_ENB_END_MARKER_REQ(message_p));
+          itti_free(TASK_GTPV1_U, GTPV1U_ENB_END_MARKER_REQ(message_p).buffer);
           break;
 
         case GTPV1U_ENB_DATA_FORWARDING_REQ:
