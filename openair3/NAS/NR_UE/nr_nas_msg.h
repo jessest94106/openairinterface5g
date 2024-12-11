@@ -35,15 +35,6 @@
 #include <openair3/UICC/usim_interface.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "FGSAuthenticationResponse.h"
-#include "FGSDeregistrationRequestUEOriginating.h"
-#include "FGSIdentityResponse.h"
-#include "FGSMobileIdentity.h"
-#include "FGSNASSecurityModeComplete.h"
-#include "FGSUplinkNasTransport.h"
-#include "RegistrationComplete.h"
-#include "RegistrationRequest.h"
-#include "fgs_service_request.h"
 #include "as_message.h"
 #include "NR_NAS_defs.h"
 #include "secu_defs.h"
@@ -91,54 +82,6 @@ typedef struct {
   uint32_t registration_request_len;
   instance_t UE_id;
 } nr_ue_nas_t;
-
-typedef enum fgs_protocol_discriminator_e {
-  /* Protocol discriminator identifier for 5GS Mobility Management */
-  FGS_MOBILITY_MANAGEMENT_MESSAGE = 0x7E,
-
-  /* Protocol discriminator identifier for 5GS Session Management */
-  FGS_SESSION_MANAGEMENT_MESSAGE = 0x2E,
-} fgs_protocol_discriminator_t;
-
-typedef union {
-  fgmm_msg_header_t header;
-  registration_request_msg registration_request;
-  fgs_service_request_msg_t service_request;
-  fgs_identiy_response_msg fgs_identity_response;
-  fgs_authentication_response_msg fgs_auth_response;
-  fgs_deregistration_request_ue_originating_msg fgs_deregistration_request_ue_originating;
-  fgs_security_mode_complete_msg fgs_security_mode_complete;
-  registration_complete_msg registration_complete;
-  fgs_uplink_nas_transport_msg uplink_nas_transport;
-} MM_msg;
-
-typedef struct {
-  MM_msg mm_msg; /* 5GS Mobility Management messages */
-} fgs_nas_message_plain_t;
-
-typedef struct {
-  fgs_nas_message_security_header_t header;
-  fgs_nas_message_plain_t plain;
-} fgs_nas_message_security_protected_t;
-
-typedef union {
-  fgs_nas_message_security_header_t header;
-  fgs_nas_message_security_protected_t security_protected;
-  fgs_nas_message_plain_t plain;
-} fgs_nas_message_t;
-
-typedef struct {
-  union {
-    fgmm_msg_header_t plain_nas_msg_header;
-    struct security_protected_nas_msg_header_s {
-      uint8_t ex_protocol_discriminator;
-      uint8_t security_header_type;
-      uint16_t message_authentication_code1;
-      uint16_t message_authentication_code2;
-      uint8_t sequence_number;
-    } security_protected_nas_msg_header_t;
-  } choice;
-} nas_msg_header_t;
 
 nr_ue_nas_t *get_ue_nas_info(module_id_t module_id);
 void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas);

@@ -30,10 +30,10 @@
 #include "FGSMobileIdentity.h"
 #include "NasKeySetIdentifier.h"
 #include "ServiceType.h"
-#include "NR_NAS_defs.h"
 
 #define LEN_FGS_MOBILE_ID_CONTENTS_SIZE 2 // octets
 #define MIN_LEN_FGS_SERVICE_REQUEST 10 // octets
+#define IEI_NULL 0x00
 
 /**
  * @brief Encode 5GMM NAS Service Request message (8.2.16 of 3GPP TS 24.501)

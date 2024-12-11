@@ -20,7 +20,7 @@
  */
 
 /*! \file nr_nas_msg.c
- * \brief simulator for nr nas message
+ * \brief Definitions of handlers and callbacks for NR NAS UE task
  * \author Yoshio INOUE, Masayuki HARADA
  * \email yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com
  * \date 2020
@@ -40,7 +40,6 @@
 #include "FGCNasMessageContainer.h"
 #include "FGSDeregistrationRequestUEOriginating.h"
 #include "FGSDeregistrationType.h"
-#include "LOG/log.h"
 #include "NasKeySetIdentifier.h"
 #include "NrUESecurityCapability.h"
 #include "OctetString.h"
@@ -158,50 +157,6 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
   return NAS_SECURITY_INTEGRITY_PASSED;
 }
 
-static int nas_protected_security_header_encode(char *buffer, const fgs_nas_message_security_header_t *header, int length)
-{
-  LOG_FUNC_IN;
-
-  int size = 0;
-
-  /* Encode the protocol discriminator) */
-  ENCODE_U8(buffer, header->protocol_discriminator, size);
-
-  /* Encode the security header type */
-  ENCODE_U8(buffer + size, (header->security_header_type & 0xf), size);
-
-  /* Encode the message authentication code */
-  ENCODE_U32(buffer + size, header->message_authentication_code, size);
-  /* Encode the sequence number */
-  ENCODE_U8(buffer + size, header->sequence_number, size);
-
-  LOG_FUNC_RETURN(size);
-}
-
-static int _nas_mm_msg_encode_header(const fgmm_msg_header_t *header, uint8_t *buffer, uint32_t len)
-{
-  int size = 0;
-
-  /* Check the buffer length */
-  if (len < sizeof(fgmm_msg_header_t)) {
-    return (TLV_ENCODE_BUFFER_TOO_SHORT);
-  }
-
-  /* Check the protocol discriminator */
-  if (header->ex_protocol_discriminator != FGS_MOBILITY_MANAGEMENT_MESSAGE) {
-    LOG_TRACE(ERROR, "ESM-MSG   - Unexpected extened protocol discriminator: 0x%x", header->ex_protocol_discriminator);
-    return (TLV_ENCODE_PROTOCOL_NOT_SUPPORTED);
-  }
-
-  /* Encode the extendedprotocol discriminator */
-  ENCODE_U8(buffer + size, header->ex_protocol_discriminator, size);
-  /* Encode the security header type */
-  ENCODE_U8(buffer + size, (header->security_header_type & 0xf), size);
-  /* Encode the message type */
-  ENCODE_U8(buffer + size, header->message_type, size);
-  return (size);
-}
-
 static int fill_suci(FGSMobileIdentity *mi, const uicc_t *uicc)
 {
   mi->suci.typeofidentity = FGS_MOBILE_IDENTITY_SUCI;
@@ -257,71 +212,6 @@ static int fill_imeisv(FGSMobileIdentity *mi, const uicc_t *uicc)
   mi->imeisv.spare = 0x0f;
   mi->imeisv.oddeven = 0;
   return 19;
-}
-
-int mm_msg_encode(MM_msg *mm_msg, uint8_t *buffer, uint32_t len)
-{
-  LOG_FUNC_IN;
-  int header_result;
-  int encode_result;
-  uint8_t msg_type = mm_msg->header.message_type;
-
-  /* First encode the EMM message header */
-  header_result = _nas_mm_msg_encode_header(&mm_msg->header, buffer, len);
-
-  if (header_result < 0) {
-    LOG_TRACE(ERROR,
-              "EMM-MSG   - Failed to encode EMM message header "
-              "(%d)",
-              header_result);
-    LOG_FUNC_RETURN(header_result);
-  }
-
-  buffer += header_result;
-  len -= header_result;
-
-  switch (msg_type) {
-    case FGS_REGISTRATION_REQUEST:
-      encode_result = encode_registration_request(&mm_msg->registration_request, buffer, len);
-      break;
-    case FGS_IDENTITY_RESPONSE:
-      encode_result = encode_identiy_response(&mm_msg->fgs_identity_response, buffer, len);
-      break;
-    case FGS_AUTHENTICATION_RESPONSE:
-      encode_result = encode_fgs_authentication_response(&mm_msg->fgs_auth_response, buffer, len);
-      break;
-    case FGS_SECURITY_MODE_COMPLETE:
-      encode_result = encode_fgs_security_mode_complete(&mm_msg->fgs_security_mode_complete, buffer, len);
-      break;
-    case FGS_UPLINK_NAS_TRANSPORT:
-      encode_result = encode_fgs_uplink_nas_transport(&mm_msg->uplink_nas_transport, buffer, len);
-      break;
-    case FGS_DEREGISTRATION_REQUEST_UE_ORIGINATING:
-      encode_result =
-          encode_fgs_deregistration_request_ue_originating(&mm_msg->fgs_deregistration_request_ue_originating, buffer, len);
-      break;
-    case FGS_SERVICE_REQUEST:
-      encode_result = encode_fgs_service_request(buffer, &mm_msg->service_request, len);
-      break;
-    default:
-      LOG_TRACE(ERROR, "EMM-MSG   - Unexpected message type: 0x%x", mm_msg->header.message_type);
-      encode_result = TLV_ENCODE_WRONG_MESSAGE_TYPE;
-      break;
-      /* TODO: Handle not standard layer 3 messages: SERVICE_REQUEST */
-  }
-
-  if (encode_result < 0) {
-    LOG_TRACE(ERROR,
-              "EMM-MSG   - Failed to encode L3 EMM message 0x%x "
-              "(%d)",
-              mm_msg->header.message_type,
-              encode_result);
-  }
-
-  if (encode_result < 0)
-    LOG_FUNC_RETURN(encode_result);
-
-  LOG_FUNC_RETURN(header_result + encode_result);
 }
 
 void transferRES(uint8_t ck[16], uint8_t ik[16], uint8_t *input, uint8_t rand[16], uint8_t *output, uicc_t *uicc)
@@ -786,7 +676,7 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   // encode the message
   initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
 
-  int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &(nas_msg.header), size);
+  int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, &nas_msg.header, size);
 
   initialNasMsg->length =
       security_header_len
@@ -1010,7 +900,7 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
 
   // encode the message
   initialNasMsg->nas_data = calloc_or_fail(size, sizeof(*initialNasMsg->nas_data));
-  int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &nas_msg.header, size);
+  int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, &nas_msg.header, size);
 
   initialNasMsg->length =
       security_header_len
@@ -1118,7 +1008,7 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
 
   // encode the message
   initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
-  int security_header_len = nas_protected_security_header_encode((char *)(initialNasMsg->nas_data), &(nas_msg.header), size);
+  int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, &nas_msg.header, size);
 
   initialNasMsg->length =
       security_header_len

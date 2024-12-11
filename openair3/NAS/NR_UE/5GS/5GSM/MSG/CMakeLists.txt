@@ -1,3 +1,10 @@
 add_library(fgs_5gsm_lib OBJECT PduSessionEstablishRequest.c
                             PduSessionEstablishmentAccept.c)
-target_include_directories(fgs_5gsm_lib PUBLIC . ../../)
+
+target_link_libraries(fgs_5gsm_lib PUBLIC nas_common_ies_lib)
+
+target_include_directories(fgs_5gsm_lib PUBLIC .
+    ../../5GMM/MSG # NOTE: to be removed in a later commit
+    ../../5GMM/IES # NOTE: to be removed in a later commit
+    ../../
+)

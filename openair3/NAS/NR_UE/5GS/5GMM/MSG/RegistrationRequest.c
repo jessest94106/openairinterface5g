@@ -28,10 +28,11 @@
  */
 
 #include "RegistrationRequest.h"
-#include "NR_NAS_defs.h"
 #include <stdint.h>
 #include "T.h"
 #include "nas_log.h"
+
+#define IEI_NULL 0x00
 
 int decode_registration_request(registration_request_msg *registration_request, uint8_t *buffer, uint32_t len)
 {

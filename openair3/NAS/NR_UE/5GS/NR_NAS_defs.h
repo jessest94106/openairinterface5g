@@ -24,15 +24,16 @@
 
 #include <stdint.h>
 #include "openair3/UICC/usim_interface.h"
-
-/* Map task id to printable name. */
-typedef struct {
-  int id;
-  char text[256];
-} text_info_t;
-
-#define TO_TEXT(LabEl, nUmID) {nUmID, #LabEl},
-#define TO_ENUM(LabEl, nUmID ) LabEl = nUmID,
+#include "fgs_nas_utils.h"
+#include "FGSAuthenticationResponse.h"
+#include "FGSDeregistrationRequestUEOriginating.h"
+#include "FGSIdentityResponse.h"
+#include "FGSMobileIdentity.h"
+#include "FGSNASSecurityModeComplete.h"
+#include "FGSUplinkNasTransport.h"
+#include "RegistrationComplete.h"
+#include "RegistrationRequest.h"
+#include "fgs_service_request.h"
 
 /* Message types defintions for:
    (a) 5GS Mobility Management (5GMM) (IDs 0x41 - 0x68)
@@ -220,9 +221,6 @@ typedef enum {
   FOREACH_CAUSE_SECU(TO_ENUM)
 } cause_secu_id_t;
 								
-// IEIs (Information Element Identifier)
-#define IEI_NULL 0x00
-
 /**
  * Security protected 5GS NAS message header (9.1.1 of 3GPP TS 24.501)
  * either 5GMM or 5GSM
@@ -239,6 +237,15 @@ typedef struct {
   uint8_t sequence_number;
 } __attribute__((packed)) fgs_nas_message_security_header_t;
 
+/// 5GS Protocol Discriminator identifiers
+
+typedef enum fgs_protocol_discriminator_e {
+  // 5GS Mobility Management
+  FGS_MOBILITY_MANAGEMENT_MESSAGE = 0x7E,
+  // 5GS Session Management
+  FGS_SESSION_MANAGEMENT_MESSAGE = 0x2E,
+} fgs_protocol_discriminator_t;
+
 /// 5GMM - 5GS mobility management
 
 /**
@@ -250,6 +257,46 @@ typedef struct {
   uint8_t security_header_type;
   uint8_t message_type;
 } fgmm_msg_header_t;
+
+/// 5GS legacy defs
+
+typedef union {
+  fgmm_msg_header_t header;
+  registration_request_msg registration_request;
+  fgs_service_request_msg_t service_request;
+  fgs_identiy_response_msg fgs_identity_response;
+  fgs_authentication_response_msg fgs_auth_response;
+  fgs_deregistration_request_ue_originating_msg fgs_deregistration_request_ue_originating;
+  fgs_security_mode_complete_msg fgs_security_mode_complete;
+  registration_complete_msg registration_complete;
+  fgs_uplink_nas_transport_msg uplink_nas_transport;
+} MM_msg;
+
+typedef struct {
+  MM_msg mm_msg; /* 5GS Mobility Management messages */
+} fgs_nas_message_plain_t;
+
+typedef struct {
+  fgs_nas_message_security_header_t header;
+  fgs_nas_message_plain_t plain;
+} fgs_nas_message_security_protected_t;
+typedef union {
+  fgs_nas_message_security_header_t header;
+  fgs_nas_message_security_protected_t security_protected;
+  fgs_nas_message_plain_t plain;
+} fgs_nas_message_t;
+typedef struct {
+  union {
+    fgmm_msg_header_t plain_nas_msg_header;
+    struct security_protected_nas_msg_header_s {
+      uint8_t ex_protocol_discriminator;
+      uint8_t security_header_type;
+      uint16_t message_authentication_code1;
+      uint16_t message_authentication_code2;
+      uint8_t sequence_number;
+    } security_protected_nas_msg_header_t;
+  } choice;
+} nas_msg_header_t;
 
 /// 5GSM - 5GS session management
 
@@ -267,5 +314,11 @@ typedef struct {
   // Message type
   uint8_t message_type;
 } fgsm_msg_header_t;
+
+/// Function prototypes
+
+int mm_msg_encode(const MM_msg *mm_msg, uint8_t *buffer, uint32_t len);
+int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_security_header_t *header, int length);
+int _nas_mm_msg_encode_header(const fgmm_msg_header_t *header, uint8_t *buffer, uint32_t len);
 
 #endif // NR_NAS_DEFS_H

@@ -7,3 +7,7 @@ add_library(fgs_5gmm_ies_lib OBJECT
   FGCNasMessageContainer.c
   SORTransparentContainer.c
 )
+
+target_link_libraries(fgs_5gmm_ies_lib PUBLIC
+    nas_common_ies_lib
+)

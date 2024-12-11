@@ -28,8 +28,9 @@
  */
 
 #include "FGSDeregistrationRequestUEOriginating.h"
-#include "NR_NAS_defs.h"
 #include <stdint.h>
+
+#define IEI_NULL 0x00
 
 int encode_fgs_deregistration_request_ue_originating(fgs_deregistration_request_ue_originating_msg *drr,
                                                      uint8_t *buffer,

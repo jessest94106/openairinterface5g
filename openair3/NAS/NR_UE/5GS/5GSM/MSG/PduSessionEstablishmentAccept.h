@@ -23,7 +23,8 @@
 #define PDU_SESSION_ESTABLISHMENT_ACCEPT_H_
 
 #include <stdint.h>
-#include "NR_NAS_defs.h"
+#include "fgs_nas_utils.h"
+#include "NR_NAS_defs.h" // TEMP: to be removed in later commit
 
 /* PDU Session Establish Accept Optional IE Identifiers - TS 24.501 Table 8.3.2.1.1 */
 
