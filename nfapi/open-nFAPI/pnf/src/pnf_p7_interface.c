@@ -272,7 +272,13 @@ int nfapi_pnf_p7_nr_rx_data_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_rx_data_
 	}
 
 	pnf_p7_t* _this = (pnf_p7_t*)(config);
-	return pnf_nr_p7_pack_and_send_p7_message(_this, (nfapi_nr_p7_message_header_t*)ind, sizeof(nfapi_nr_rx_data_indication_t));
+
+	int ret = pnf_nr_p7_pack_and_send_p7_message(_this, (nfapi_nr_p7_message_header_t*)ind, sizeof(nfapi_nr_rx_data_indication_t));
+  if (ret == 0) {
+    for (int i = 0; i < ind->number_of_pdus; ++i)
+      _this->nr_stats.ul.bytes += ind->pdu_list[i].pdu_length;
+  }
+  return ret;
 }
 
 int nfapi_pnf_p7_nr_crc_ind(nfapi_pnf_p7_config_t* config, nfapi_nr_crc_indication_t* ind)

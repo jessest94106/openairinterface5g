@@ -878,7 +878,18 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 
 	}
 
-	if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
+  if (sfn % 128 == 0 && slot == 0) {
+    pnf_p7_nr_stats_t* s = &pnf_p7->nr_stats;
+    int ontime = s->dl_tti.ontime + s->ul_tti.ontime + s->ul_dci.ontime + s->tx_data.ontime;
+    int late = s->dl_tti.late + s->ul_tti.late + s->ul_dci.late + s->tx_data.late;
+
+    float dl_thr = (float) s->dl.bytes * 8 / 1000 / 1000 / 1.28f; // every 128 frames = 1.28 s
+    float ul_thr = (float) s->ul.bytes * 8 / 1000 / 1000 / 1.28f;
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "[P7:%d] msgs ontime %d thr DL %.2f UL %.2f msg late %d (vtime)\n", pnf_p7->_public.phy_id, ontime, dl_thr, ul_thr, late);
+    memset(s, 0, sizeof(*s));
+  }
+
+  if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
 		return -1;
@@ -1285,7 +1296,7 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_dl_tti_request_t *req = &pnf_p7->slot_buffer[buffer_index].dl_tti_req;
-      pnf_p7->stats.dl_tti_ontime++;
+      pnf_p7->nr_stats.dl_tti.ontime++;
 
       NFAPI_TRACE(NFAPI_TRACE_DEBUG,
                   "POPULATE DL_TTI_REQ current tx sfn/slot:%d.%d p7 msg sfn/slot: %d.%d buffer_index:%d\n",
@@ -1301,7 +1312,7 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
       if (pnf_p7->_public.timing_info_mode_aperiodic)
         pnf_p7->timing_info_aperiodic_send = 1;
 
-      pnf_p7->stats.dl_tti_late++;
+      pnf_p7->nr_stats.dl_tti.late++;
     }
     if (pthread_mutex_unlock(&(pnf_p7->mutex)) != 0) {
       NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
@@ -1418,7 +1429,7 @@ void pnf_handle_ul_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_ul_tti_request_t* req = &pnf_p7->slot_buffer[buffer_index].ul_tti_req;
-      pnf_p7->stats.ul_tti_ontime++;
+      pnf_p7->nr_stats.ul_tti.ontime++;
 
       NFAPI_TRACE(NFAPI_TRACE_DEBUG,
                   "POPULATE UL_TTI.request current tx sfn/slot:%d.%d p7 msg sfn/slot: %d.%d buffer_index:%d\n",
@@ -1438,7 +1449,7 @@ void pnf_handle_ul_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
       if (pnf_p7->_public.timing_info_mode_aperiodic)
         pnf_p7->timing_info_aperiodic_send = 1;
 
-      pnf_p7->stats.ul_tti_late++;
+      pnf_p7->nr_stats.ul_tti.late++;
     }
 
     if (pthread_mutex_unlock(&(pnf_p7->mutex)) != 0) {
@@ -1537,7 +1548,7 @@ void pnf_handle_ul_dci_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_ul_dci_request_t *req = &pnf_p7->slot_buffer[buffer_index].ul_dci_req;
-      pnf_p7->stats.ul_dci_ontime++;
+      pnf_p7->nr_stats.ul_dci.ontime++;
 
       NFAPI_TRACE(NFAPI_TRACE_DEBUG,
                   "POPULATE UL_DCI.request current tx sfn/slot:%d.%d p7 msg sfn/slot: %d.%d buffer_index:%d\n",
@@ -1554,7 +1565,7 @@ void pnf_handle_ul_dci_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
         pnf_p7->timing_info_aperiodic_send = 1;
       }
 
-      pnf_p7->stats.ul_dci_late++;
+      pnf_p7->nr_stats.ul_dci.late++;
     }
 
     if (pthread_mutex_unlock(&(pnf_p7->mutex)) != 0) {
@@ -1650,7 +1661,7 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_tx_data_request_t *req = &pnf_p7->slot_buffer[buffer_index].tx_data_req;
-      pnf_p7->stats.tx_data_ontime++;
+      pnf_p7->nr_stats.tx_data.ontime++;
 
       NFAPI_TRACE(NFAPI_TRACE_DEBUG,
                   "POPULATE TX_data.request current tx sfn/slot:%d.%d p7 msg sfn/slot: %d.%d buffer_index:%d\n",
@@ -1660,8 +1671,12 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
                   slot,
                   buffer_index);
 
-      if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, req, sizeof(*req), &pnf_p7->_public.codec_config) != 0)
+      if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, req, sizeof(*req), &pnf_p7->_public.codec_config) == 0) {
+        for (int i = 0; i < req->Number_of_PDUs; ++i)
+          pnf_p7->nr_stats.dl.bytes += req->pdu_list[i].PDU_length;
+      } else {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unpack TX_data.request\n");
+      }
     } else {
       NFAPI_TRACE(NFAPI_TRACE_INFO,
                   "%s() TX_DATA_REQUEST Request is outside of window REQ:SFN_SLOT:%d CURR:SFN_SLOT:%d\n",
@@ -1673,7 +1688,7 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
         pnf_p7->timing_info_aperiodic_send = 1;
       }
 
-      pnf_p7->stats.tx_data_late++;
+      pnf_p7->nr_stats.tx_data.late++;
     }
 
     if (pthread_mutex_unlock(&(pnf_p7->mutex)) != 0) {
