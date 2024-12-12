@@ -30,6 +30,8 @@
 #include "pnf_p7.h"
 #include "nr_fapi_p7_utils.h" // for 5G/NR message utils
 
+#include "common/ran_context.h"
+#include <SCHED_NR/phy_frame_config_nr.h>
 #define FAPI2_IP_DSCP	0
 
 extern int sf_ahead;
@@ -1320,6 +1322,30 @@ bool is_nr_p7_request_in_window(const uint16_t sfn, const uint16_t slot, const c
     diff = NFAPI_MAX_SFNSLOTDEC - diff;
   if (diff > timing_window) {
     NFAPI_TRACE(NFAPI_TRACE_WARN, "[%d] %s is out of window %d (delta:%d) [max:%d]\n", curr, name, recv, diff, timing_window);
+    return false;
+  }
+  return true;
+}
+
+/*! \brief Checks if the slot a message is intended to configure is of the appropriate type ( DL or UL slot )
+ *  \param sfn The SFN from a P7 message
+ *  \param slot The Slot from a P7 message
+ *  \param name A string with the message name (e.g. DL_TTI.request) for the warning
+ *  \param type The slot type intended for the message ( NR_DOWNLINK_SLOT or NR_UPLINK_SLOT )
+ *  \return true if the slot type is correct, false if not
+ *
+ * The function will take a SFN and Slot and check if it is of the intended type ( DL or UL ), indicated by parameter type
+ * Will print a warning if the check fails and return false
+ * returns true on success
+ */
+bool check_nr_nfapi_p7_slot_type(const uint16_t sfn, const uint16_t slot, const char* name, int type)
+{
+  DevAssert(RC.gNB != NULL && RC.gNB[0] != NULL);
+  PHY_VARS_gNB *gNB = RC.gNB[0];
+  nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
+  const int slot_type = nr_slot_select(cfg, sfn, slot);
+  if(slot_type != type && slot_type != NR_MIXED_SLOT) {
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "%4d.%2d Slot type is not appropriate for %s\n", sfn, slot, name);
     return false;
   }
   return true;
