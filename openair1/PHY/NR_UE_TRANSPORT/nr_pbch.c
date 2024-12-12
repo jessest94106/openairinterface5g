@@ -211,7 +211,7 @@ int nr_pbch_channel_level(struct complex16 dl_ch_estimates_ext[][PBCH_MAX_RE_PER
   int16_t nb_rb=nb_re/12;
   simde__m128i avg128;
   simde__m128i *dl_ch128;
-  int avg1=0,avg2=0;
+  int avg2=0;
 
   for (int aarx=0; aarx<frame_parms->nb_antennas_rx; aarx++) {
     //clear average level
@@ -231,6 +231,7 @@ int nr_pbch_channel_level(struct complex16 dl_ch_estimates_ext[][PBCH_MAX_RE_PER
       }*/
     }
 
+    int avg1 = 0;
     for (int i = 0; i < 4; i++)
       avg1 += ((int *)&avg128)[i] / (nb_rb * 12);
 
