@@ -818,13 +818,29 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 
 		nfapi_pnf_p7_slot_buffer_t* tx_slot_buffer = &(pnf_p7->slot_buffer[buffer_index_tx]);
 
-		if(tx_slot_buffer->dl_tti_req.dl_tti_request_body.nPDUs > 0 && tx_slot_buffer->dl_tti_req.SFN == sfn && tx_slot_buffer->dl_tti_req.Slot == slot)
-		{
-			DevAssert(pnf_p7->_public.dl_tti_req_fn != NULL);
-			(pnf_p7->_public.dl_tti_req_fn)(NULL, &(pnf_p7->_public), &tx_slot_buffer->dl_tti_req);
+    nfapi_nr_dl_tti_request_t* dl_tti_req = &tx_slot_buffer->dl_tti_req;
+    nfapi_nr_tx_data_request_t* tx_data_req = &tx_slot_buffer->tx_data_req;
+    if (dl_tti_req->dl_tti_request_body.nPDUs > 0 && dl_tti_req->SFN == sfn && dl_tti_req->Slot == slot) {
+      DevAssert(pnf_p7->_public.dl_tti_req_fn != NULL);
+      DevAssert(pnf_p7->_public.tx_data_req_fn != NULL);
+      if (tx_data_req->Number_of_PDUs > 0 && tx_data_req->SFN == sfn && tx_data_req->Slot == slot) {
+        (pnf_p7->_public.dl_tti_req_fn)(NULL, &(pnf_p7->_public), dl_tti_req);
+        (pnf_p7->_public.tx_data_req_fn)(&(pnf_p7->_public), tx_data_req);
+      } else {
+        NFAPI_TRACE(NFAPI_TRACE_ERROR, "%4d.%2d no corresponding tx_data.request for dl_tti.request, dropping\n", sfn, slot);
+      }
       tx_slot_buffer->dl_tti_req.SFN = -1;
       tx_slot_buffer->dl_tti_req.Slot = -1;
-		}
+      tx_slot_buffer->tx_data_req.SFN = -1;
+      tx_slot_buffer->tx_data_req.Slot = -1;
+    }
+    if (tx_data_req->Number_of_PDUs > 0 && tx_data_req->SFN == sfn && tx_data_req->Slot == slot) {
+      // there is a tx_data.request in this slot, but no corresponding
+      // dl_tti.request (when they need to come pairwise)
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "%4d.%2d no corresponding dl_tti.request for tx_data.request, dropping\n", sfn, slot);
+      tx_slot_buffer->tx_data_req.SFN = -1;
+      tx_slot_buffer->tx_data_req.Slot = -1;
+    }
 
 		if(tx_slot_buffer->ul_tti_req.n_pdus > 0 && tx_slot_buffer->ul_tti_req.SFN == sfn && tx_slot_buffer->ul_tti_req.Slot == slot)
 		{
@@ -832,14 +848,6 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 			(pnf_p7->_public.ul_tti_req_fn)(NULL, &(pnf_p7->_public), &tx_slot_buffer->ul_tti_req);
       tx_slot_buffer->ul_tti_req.SFN = -1;
       tx_slot_buffer->ul_tti_req.Slot = -1;
-		}
-
-		if(tx_slot_buffer->tx_data_req.Number_of_PDUs > 0 && tx_slot_buffer->tx_data_req.SFN == sfn && tx_slot_buffer->tx_data_req.Slot == slot)
-		{
-			DevAssert(pnf_p7->_public.tx_data_req_fn != NULL);
-			(pnf_p7->_public.tx_data_req_fn)(&(pnf_p7->_public), &tx_slot_buffer->tx_data_req);
-      tx_slot_buffer->tx_data_req.SFN = -1;
-      tx_slot_buffer->tx_data_req.Slot = - 1;
 		}
 
 		if(tx_slot_buffer->ul_dci_req.numPdus > 0 && tx_slot_buffer->ul_dci_req.SFN == sfn && tx_slot_buffer->ul_dci_req.Slot == slot)
