@@ -209,25 +209,17 @@ static void nr_ulsch_channel_level(int size_est,
                                    uint32_t len,
                                    uint8_t nrOfLayers)
 {
-  simde__m128i *ul_ch128, avg128U;
-
   int16_t x = factor2(len);
   int16_t y = (len)>>x;
 
   for (int aatx = 0; aatx < nrOfLayers; aatx++) {
     for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
-      //clear average level
-      avg128U = simde_mm_setzero_si128();
 
-      ul_ch128 = (simde__m128i *)&ul_ch_estimates_ext[aatx * frame_parms->nb_antennas_rx + aarx][symbol * len];
+      simde__m128i *ul_ch128 = (simde__m128i *)&ul_ch_estimates_ext[aatx * frame_parms->nb_antennas_rx + aarx][symbol * len];
 
-      for (int i = 0; i < len >> 2; i++) {
-        avg128U = simde_mm_add_epi32(avg128U, simde_mm_srai_epi32(simde_mm_madd_epi16(ul_ch128[i], ul_ch128[i]), x));
-      }
-
-      int32_t *avg32i = (int32_t *)&avg128U;
-      int64_t avg64 = (int64_t)avg32i[0] + avg32i[1] + avg32i[2] + avg32i[3];
-      avg[aatx * frame_parms->nb_antennas_rx + aarx] = avg64 / y;
+      //compute average level
+      avg[aatx * frame_parms->nb_antennas_rx + aarx] = simde_mm_average(ul_ch128, len, x, y);
+      //LOG_D(PHY, "Channel level: %d\n", avg[aatx * frame_parms->nb_antennas_rx + aarx]);
     }
   }
 
