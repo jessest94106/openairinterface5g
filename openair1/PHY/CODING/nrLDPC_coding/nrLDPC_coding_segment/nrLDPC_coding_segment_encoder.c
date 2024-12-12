@@ -190,13 +190,6 @@ static int nrLDPC_prepare_TB_encoding(nrLDPC_slot_encoding_parameters_t *nrLDPC_
   impp.output = nrLDPC_TB_encoding_parameters->segments->output;
   impp.K = nrLDPC_TB_encoding_parameters->K;
   impp.F = nrLDPC_TB_encoding_parameters->F;
-  impp.Qm = nrLDPC_TB_encoding_parameters->Qm;
-  impp.Tbslbrm = nrLDPC_TB_encoding_parameters->tbslbrm;
-  impp.G = nrLDPC_TB_encoding_parameters->G;
-  for (int r = 0; r < nrLDPC_TB_encoding_parameters->C; r++) {
-    impp.perCB[r].E_cb = nrLDPC_TB_encoding_parameters->segments[r].E;
-  }
-  impp.rv = nrLDPC_TB_encoding_parameters->rv_index;
 
   size_t const n_seg = (impp.n_segments / 8 + ((impp.n_segments & 7) == 0 ? 0 : 1));
 
