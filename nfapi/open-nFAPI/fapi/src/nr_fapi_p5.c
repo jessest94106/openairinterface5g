@@ -714,16 +714,7 @@ uint8_t unpack_nr_param_response(uint8_t **ppReadPackedMsg, uint8_t *end, void *
       {NFAPI_NR_NFAPI_TIMING_INFO_MODE_TAG, &pNfapiMsg->nfapi_config.timing_info_mode, &unpack_uint8_tlv_value},
       {NFAPI_NR_NFAPI_TIMING_INFO_PERIOD_TAG, &pNfapiMsg->nfapi_config.timing_info_period, &unpack_uint8_tlv_value},
   };
-  // print ppReadPackedMsg
-  uint8_t *ptr = *ppReadPackedMsg;
-  printf("\n Read message unpack_param_response:   ");
 
-  while (ptr < end) {
-    printf(" 0x%02x", *ptr);
-    ptr++;
-  }
-
-  printf("\n");
   return (pull8(ppReadPackedMsg, &pNfapiMsg->error_code, end) && pull8(ppReadPackedMsg, &pNfapiMsg->num_tlv, end)
           && unpack_nr_tlv_list(unpack_fns,
                                 sizeof(unpack_fns) / sizeof(unpack_tlv_t),
