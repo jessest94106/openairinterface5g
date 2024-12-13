@@ -388,7 +388,6 @@ void nr_ulsch_qpsk_qpsk(c16_t *stream0_in, c16_t *stream1_in, c16_t *stream0_out
     }
   }
 #endif
-  simde_mm_empty();
 }
 
 
@@ -1056,7 +1055,6 @@ void nr_ulsch_qam16_qam16(c16_t *stream0_in,
     stream0_128i_out[3] = simde_mm_unpackhi_epi32(xmm1_128, xmm3_128); // 8 LLRs, 2 REs
   }
 #endif
-  simde_mm_empty();
 }
 
 /*
@@ -1777,7 +1775,6 @@ void nr_ulsch_qam64_qam64(c16_t *stream0_in,
     }
   }
 #endif
-  simde_mm_empty();
 }
 
 static void nr_ulsch_shift_llr(int16_t **llr_layers, uint32_t nb_re, uint32_t rxdataF_ext_offset, uint8_t mod_order, int shift)

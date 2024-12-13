@@ -279,8 +279,6 @@ void phy_viterbi_lte_sse2(int8_t *y,uint8_t *decoded_bytes,uint16_t n)
     TB_ptr2-=64;
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 #ifdef TEST_DEBUG

@@ -3633,8 +3633,6 @@ void idft65536(int16_t *x,int16_t *y,unsigned char scale)
 
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 int16_t twa98304[65536] __attribute__((aligned(32)));

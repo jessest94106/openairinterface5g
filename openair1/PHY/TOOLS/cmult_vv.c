@@ -87,8 +87,6 @@ int mult_cpx_conj_vector(int16_t *x1,
   }
 
 
-  simde_mm_empty();
-  simde_m_empty();
 
   return(0);
 }
@@ -150,8 +148,6 @@ int mult_cpx_vector(int16_t *x1, //Q15
     x2_128++;
     y_128++;
   }
-  simde_mm_empty();
-  simde_m_empty();
   return(0);
 }
 
@@ -207,7 +203,5 @@ int multadd_cpx_vector(int16_t *x1,
     x2_128++;
     y_128++;
   }
-  simde_mm_empty();
-  simde_m_empty();
   return(0);
 }

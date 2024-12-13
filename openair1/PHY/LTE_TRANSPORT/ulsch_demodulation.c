@@ -216,8 +216,6 @@ int32_t ulsch_qpsk_llr(LTE_DL_FRAME_PARMS *frame_parms,
     (*llrp128)++;
   }
 
-  simde_mm_empty();
-  simde_m_empty();
   return(0);
 }
 
@@ -245,8 +243,6 @@ void ulsch_16qam_llr(LTE_DL_FRAME_PARMS *frame_parms,
     //    print_bytes("rxF[i+1]",&rxF[i+1]);
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void ulsch_64qam_llr(LTE_DL_FRAME_PARMS *frame_parms,
@@ -289,8 +285,6 @@ void ulsch_64qam_llr(LTE_DL_FRAME_PARMS *frame_parms,
     (*llrp32)+=12;
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void ulsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
@@ -347,8 +341,6 @@ void ulsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
       }
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void ulsch_extract_rbs_single(int32_t **rxdataF,
@@ -524,8 +516,6 @@ void ulsch_channel_compensation(int32_t **rxdataF_ext,
     }
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void ulsch_channel_level(int32_t **drs_ch_estimates_ext,
@@ -556,8 +546,6 @@ void ulsch_channel_level(int32_t **drs_ch_estimates_ext,
                        ((float *)&avg128U)[3])/(float)(nb_rb*12));
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 static int ulsch_power_LUT[750];

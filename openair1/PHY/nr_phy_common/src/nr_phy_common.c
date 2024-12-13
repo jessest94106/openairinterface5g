@@ -109,7 +109,6 @@ void nr_16qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag_in, int16_t *llr, uint3
     ch_mag_128++;
   }
 
-  simde_mm_empty();
 
   nb_re &= 0x3;
   int16_t *rxDataF_i16 = (int16_t *)rxF_128;
@@ -238,7 +237,6 @@ void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int1
     llr_i16[6 * i + 4] = saturating_sub(mag_realb, abs(llr_i16[6 * i + 2]));
     llr_i16[6 * i + 5] = saturating_sub(mag_imagb, abs(llr_i16[6 * i + 3]));
   }
-  simde_mm_empty();
 }
 
 void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int32_t *ch_mag3, int16_t *llr, uint32_t nb_re)
@@ -350,7 +348,6 @@ void nr_256qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int
       llr_i16[8 * i + 7] = saturating_sub(magc_imag, abs(llr_i16[8 * i + 5]));
     }
   }
-  simde_mm_empty();
 }
 
 void freq2time(uint16_t ofdm_symbol_size, int16_t *freq_signal, int16_t *time_signal)

@@ -1391,8 +1391,6 @@ uint8_t phy_threegpplte_turbo_decoder16(int16_t *y,
   fclose(fdsse4);
 #endif
 #if defined(__x86_64__) || defined(__i386__)
-  simde_mm_empty();
-  simde_m_empty();
 #endif
   if (iteration_cnt > max_iterations)
     set_abort(ab, true);

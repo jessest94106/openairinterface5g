@@ -263,8 +263,6 @@ void nr_pbch_detection_mrc(NR_DL_FRAME_PARMS *frame_parms,
     }
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void nr_pbch_unscrambling(int16_t *demod_pbch_e,
