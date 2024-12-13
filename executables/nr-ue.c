@@ -443,6 +443,7 @@ static void UE_synch(void *arg) {
 static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
 {
   PHY_VARS_NR_UE *UE = rxtxD->UE;
+  const fapi_nr_config_request_t *cfg = &UE->nrUE_config;
   const UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
 
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
@@ -466,10 +467,10 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
         flags = TX_BURST_START_AND_END;
     } else {
       int slots_frame = fp->slots_per_frame;
-      int curr_slot = nr_ue_slot_select(&UE->nrUE_config, slot);
+      int curr_slot = nr_ue_slot_select(cfg, slot);
       if (curr_slot != NR_DOWNLINK_SLOT) {
-        int next_slot = nr_ue_slot_select(&UE->nrUE_config, (slot + 1) % slots_frame);
-        int prev_slot = nr_ue_slot_select(&UE->nrUE_config, (slot + slots_frame - 1) % slots_frame);
+        int next_slot = nr_ue_slot_select(cfg, (slot + 1) % slots_frame);
+        int prev_slot = nr_ue_slot_select(cfg, (slot + slots_frame - 1) % slots_frame);
         if (prev_slot == NR_DOWNLINK_SLOT)
           flags = TX_BURST_START;
         else if (next_slot == NR_DOWNLINK_SLOT)
@@ -554,6 +555,52 @@ void processSlotTX(void *arg)
   TracyCZoneEnd(ctx);
 }
 
+static uint64_t get_carrier_frequency(const int N_RB, const int mu, const uint32_t pointA_freq_khz)
+{
+  const uint64_t bw = (NR_NB_SC_PER_RB * N_RB) * MU_SCS(mu);
+  const uint64_t carrier_freq = (pointA_freq_khz + bw / 2) * 1000;
+  return carrier_freq;
+}
+
+static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
+{
+  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  // Start synchronization with a target gNB
+  if (UE->synch_request.received_synch_request == 1) {
+    // if upper layers signal BW scan we do as instructed by command line parameter
+    // if upper layers disable BW scan we set it to false
+    if (UE->synch_request.synch_req.ssb_bw_scan)
+      UE->UE_scan_carrier = get_nrUE_params()->UE_scan_carrier;
+    else
+      UE->UE_scan_carrier = false;
+    UE->target_Nid_cell = UE->synch_request.synch_req.target_Nid_cell;
+
+    const fapi_nr_ue_carrier_config_t *cfg = &UE->nrUE_config.carrier_config;
+    uint64_t dl_CarrierFreq = get_carrier_frequency(fp->N_RB_DL, fp->numerology_index, cfg->dl_frequency);
+    uint64_t ul_CarrierFreq = get_carrier_frequency(fp->N_RB_UL, fp->numerology_index, cfg->uplink_frequency);
+    if (dl_CarrierFreq != fp->dl_CarrierFreq || ul_CarrierFreq != fp->ul_CarrierFreq) {
+      fp->dl_CarrierFreq = dl_CarrierFreq;
+      fp->ul_CarrierFreq = ul_CarrierFreq;
+      nr_rf_card_config_freq(&openair0_cfg[UE->rf_map.card], ul_CarrierFreq, dl_CarrierFreq, 0);
+      UE->rfdevice.trx_set_freq_func(&UE->rfdevice, &openair0_cfg[0]);
+      init_symbol_rotation(fp);
+    }
+
+    /* Clearing UE harq while DL actors are active causes race condition.
+        So we let the current execution to complete here.*/
+    for (int i = 0; i < NUM_DL_ACTORS; i++) {
+      flush_actor(UE->dl_actors + i);
+    }
+    /*TODO: Flush UL jobs */
+
+    clean_UE_harq(UE);
+    UE->is_synchronized = 0;
+    UE->synch_request.received_synch_request = 0;
+    return 0;
+  }
+  return 1;
+}
+
 static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
                                const UE_nr_rxtx_proc_t *proc,
                                int *tx_wait_for_dlsch,
@@ -567,35 +614,6 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
   if (IS_SOFTMODEM_NOS1 || IS_SA_MODE(get_softmodem_params())) {
-    // Start synchronization with a target gNB
-    if (UE->synch_request.received_synch_request == 1) {
-      fapi_nr_synch_request_t *synch_req = &UE->synch_request.synch_req;
-      UE->is_synchronized = 0;
-      // if upper layers signal BW scan we do as instructed by command line parameter
-      // if upper layers disable BW scan we set it to false
-      if (UE->synch_request.synch_req.ssb_bw_scan)
-        UE->UE_scan_carrier = get_nrUE_params()->UE_scan_carrier;
-      else
-        UE->UE_scan_carrier = false;
-      UE->target_Nid_cell = UE->synch_request.synch_req.target_Nid_cell;
-      UE->target_Nid_cell = synch_req->target_Nid_cell;
-
-      uint64_t dl_bw = (12 * fp->N_RB_DL) * (15000 << fp->numerology_index);
-      uint64_t dl_CarrierFreq = (dl_bw >> 1) + (uint64_t)UE->nrUE_config.carrier_config.dl_frequency * 1000;
-      uint64_t ul_bw = (12 * fp->N_RB_UL) * (15000 << fp->numerology_index);
-      uint64_t ul_CarrierFreq = (ul_bw >> 1) + (uint64_t)UE->nrUE_config.carrier_config.uplink_frequency * 1000;
-      if (dl_CarrierFreq != fp->dl_CarrierFreq || ul_CarrierFreq != fp->ul_CarrierFreq) {
-        fp->dl_CarrierFreq = dl_CarrierFreq;
-        fp->ul_CarrierFreq = ul_CarrierFreq;
-        nr_rf_card_config_freq(&openair0_cfg[UE->rf_map.card], ul_CarrierFreq, dl_CarrierFreq, 0);
-        UE->rfdevice.trx_set_freq_func(&UE->rfdevice, &openair0_cfg[0]);
-        init_symbol_rotation(fp);
-      }
-
-      clean_UE_harq(UE);
-      UE->synch_request.received_synch_request = 0;
-    }
-
     /* send tick to RLC and PDCP every ms */
     if (proc->nr_slot_rx % fp->slots_per_subframe == 0) {
       void nr_rlc_tick(int frame, int subframe);
@@ -927,6 +945,10 @@ void *UE_thread(void *arg)
       }
       continue;
     }
+
+    /* check if MAC has sent sync request */
+    if (handle_sync_req_from_mac(UE) == 0)
+      continue;
 
     // start of normal case, the UE is in sync
     absolute_slot++;

@@ -447,7 +447,7 @@ uint8_t sl_determine_sci_1a_len(uint16_t *num_subchannels,
  *  @param nr_slot  : slot number
  *  @param frame duplex type  : Frame type
     @returns int : 0 or Sidelink slot type */
-int sl_nr_ue_slot_select(sl_nr_phy_config_request_t *cfg, int nr_slot, uint8_t frame_duplex_type);
+int sl_nr_ue_slot_select(const sl_nr_phy_config_request_t *cfg, int nr_slot, uint8_t frame_duplex_type);
 
 void nr_ue_sidelink_scheduler(nr_sidelink_indication_t *sl_ind, NR_UE_MAC_INST_t *mac);
 
