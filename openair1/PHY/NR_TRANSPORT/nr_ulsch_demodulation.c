@@ -351,7 +351,7 @@ static void nr_ulsch_det_HhH (int32_t *after_mf_00,//a
                               int32_t *after_mf_01,//b
                               int32_t *after_mf_10,//c
                               int32_t *after_mf_11,//d
-                              int32_t *det_fin,//1/ad-bc
+                              uint32_t *det_fin,//1/ad-bc
                               unsigned short nb_rb,
                               unsigned char symbol,
                               int32_t shift)
@@ -493,11 +493,12 @@ static simde__m128i nr_ulsch_comp_muli_sum(simde__m128i input_x,
   //print_ints("rx_re:",(int32_t*)&xy_re_128[0]);
   //print_ints("rx_Img:",(int32_t*)&xy_im_128[0]);
   //divide by matrix det and convert back to Q15 before packing
-  int sum_det =0;
-  for (int k=0; k<4;k++) {
-    sum_det += ((((int *)&det)[k])>>2);
-    //printf("det_%d = %d log2 =%d \n",k,(((int *)&det[0])[k]),log2_approx(((int *)&det[0])[k]));
-    }
+  uint64_t sum_det = 0;
+  for (int k = 0; k < 4; k++) {
+    sum_det += (((uint32_t *)&det)[k]);
+  }
+  // Add bias to reduce rounding error
+  sum_det = (sum_det + 2) >> 2;
 
   int b = log2_approx(sum_det) - 8;
   if (b > 0) {
@@ -680,7 +681,7 @@ static uint8_t nr_ulsch_mmse_2layers(NR_DL_FRAME_PARMS *frame_parms,
   int32_t af_mf_01[12*nb_rb] __attribute__((aligned(32)));
   int32_t af_mf_10[12*nb_rb] __attribute__((aligned(32)));
   int32_t af_mf_11[12*nb_rb] __attribute__((aligned(32)));
-  int32_t determ_fin[12*nb_rb] __attribute__((aligned(32)));
+  uint32_t determ_fin[12*nb_rb] __attribute__((aligned(32)));
 
   switch (n_rx) {
     case 2://
@@ -945,12 +946,12 @@ static uint8_t nr_ulsch_mmse_2layers(NR_DL_FRAME_PARMS *frame_parms,
 
     // Magnitude computation
     if (mod_order > 2) {
-
-      int sum_det = 0;
+      uint64_t sum_det = 0;
       for (int k = 0; k < 4; k++) {
-        AssertFatal(((int *)&determ_fin_128[0])[k] > 0 ,"Right shifting negative values is UB" );
-        sum_det += ((((uint32_t *)&determ_fin_128[0])[k]) >> 2);
+        sum_det += (((uint32_t *)&determ_fin_128[0])[k]);
       }
+      // Add bias to reduce rounding error
+      sum_det = (sum_det + 2) >> 2;
 
       int b = log2_approx(sum_det) - 8;
       if (b > 0) {
