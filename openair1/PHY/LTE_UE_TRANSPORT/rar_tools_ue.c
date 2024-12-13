@@ -39,7 +39,7 @@
 #include "PHY/LTE_TRANSPORT/transport_vars.h"
 
 #include "assertions.h"
-static int8_t delta_PUSCH_msg2[8] = {-6, -4, -2, 0, 2, 4, 6, 8};
+static const int8_t delta_PUSCH_msg2[8] = {-6, -4, -2, 0, 2, 4, 6, 8};
 
 int generate_ue_ulsch_params_from_rar(PHY_VARS_UE *ue,
 				      UE_rxtx_proc_t *proc,
