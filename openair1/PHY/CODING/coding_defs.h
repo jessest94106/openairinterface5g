@@ -304,17 +304,17 @@ void ccodelte_encode(int32_t numbits, uint8_t add_crc, uint8_t *inPtr, uint8_t *
 \brief This function initializes the generator polynomials for an LTE convolutional code.*/
 void ccodelte_init(void);
 
-/*!\fn void ccodelte_init_inv(void)
+/*!\fn void ccodelte_init_inv(unsigned char  ccodelte_table_rev[128])
 \brief This function initializes the trellis structure for decoding an LTE convolutional code.*/
-void ccodelte_init_inv(void);
+void ccodelte_init_inv(unsigned char ccodelte_table_rev[128]);
 
 /*!\fn void ccodelte_init(void)
 \brief This function initializes the generator polynomials for an DAB convolutional code (first 3 bits).*/
 void ccodedab_init(void);
 
-/*!\fn void ccodelte_init_inv(void)
+/*!\fn void ccodelte_init_inv(unsigned char  ccodelte_table_rev[128])
 \brief This function initializes the trellis structure for decoding an DAB convolutional code (first 3 bits).*/
-void ccodedab_init_inv(void);
+void ccodedab_init_inv(unsigned char ccodelte_table_rev[128]);
 
 /*!\fn void crcTableInit(void)
 \brief This function initializes the different crc tables.*/
@@ -399,7 +399,7 @@ void phy_viterbi_lte_sse2(int8_t *y, uint8_t *decoded_bytes, uint16_t n);
 */
 void phy_generate_viterbi_tables(void);
 
-/*!\fn void phy_generate_viterbi_tables_lte(void)
+/*!\fn void phy_generate_viterbi_tables_lte(bool dabflag)
 \brief This routine initializes metric tables for the optimized LTE Viterbi decoder.
 */
 void phy_generate_viterbi_tables_lte(void);
