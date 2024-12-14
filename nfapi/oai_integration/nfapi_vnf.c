@@ -609,7 +609,7 @@ int phy_slot_indication(struct nfapi_vnf_p7_config *config, uint16_t phy_id, uin
   static uint8_t first_time = 1;
 
   if (first_time) {
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] slot indication %d\n", NFAPI_SFNSLOT2DEC(sfn, slot));
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] slot indication %d.%d\n", sfn, slot);
     first_time = 0;
   }
 
