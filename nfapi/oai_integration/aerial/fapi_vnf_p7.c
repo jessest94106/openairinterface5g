@@ -103,12 +103,7 @@ extern int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind);
 
 int aerial_phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
 {
-  uint8_t vnf_slot_ahead = 0;
-  uint32_t vnf_sfn_slot = sfnslot_add_slot(ind->sfn, ind->slot, vnf_slot_ahead);
-  uint16_t vnf_sfn = NFAPI_SFNSLOT2SFN(vnf_sfn_slot);
-  uint8_t vnf_slot = NFAPI_SFNSLOT2SLOT(vnf_sfn_slot);
-  LOG_D(MAC, "VNF SFN/Slot %d.%d \n", vnf_sfn, vnf_slot);
-  // printf( "VNF SFN/Slot %d.%d \n", vnf_sfn, vnf_slot);
+  LOG_D(MAC, "VNF SFN/Slot %d.%d \n", ind->sfn, ind->slot);
   trigger_scheduler(ind);
 
   return 1;
