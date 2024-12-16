@@ -240,24 +240,14 @@ static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
       }
     }
 
+    uint8_t *gtp_buf = (uint8_t *)(buf + offset);
+    size_t gtp_len = size - offset;
+
     // Pushing SDAP SDU to GTP-U Layer
-    MessageDef *message_p = itti_alloc_new_message_sized(TASK_PDCP_ENB,
-                                                         0,
-                                                         GTPV1U_TUNNEL_DATA_REQ,
-                                                         sizeof(gtpv1u_tunnel_data_req_t)
-                                                           + size + GTPU_HEADER_OVERHEAD_MAX - offset);
-    AssertFatal(message_p != NULL, "OUT OF MEMORY");
-    gtpv1u_tunnel_data_req_t *req = &GTPV1U_TUNNEL_DATA_REQ(message_p);
-    uint8_t *gtpu_buffer_p = (uint8_t *) (req + 1);
-    memcpy(gtpu_buffer_p + GTPU_HEADER_OVERHEAD_MAX, buf + offset, size - offset);
-    req->buffer        = gtpu_buffer_p;
-    req->length        = size - offset;
-    req->offset        = GTPU_HEADER_OVERHEAD_MAX;
-    req->ue_id         = ue_id;
-    req->bearer_id     = pdusession_id;
-    LOG_D(SDAP, "%s()  sending message to gtp size %d\n", __func__,  size-offset);
+    LOG_D(SDAP, "sending message to gtp size %ld\n", gtp_len);
     // very very dirty hack gloabl var N3GTPUInst
-    itti_send_msg_to_task(TASK_GTPV1_U, *N3GTPUInst, message_p);
+    instance_t inst = *N3GTPUInst;
+    gtpv1uSendDirect(inst, ue_id, pdusession_id, gtp_buf, gtp_len, false, false);
   } else { //nrUE
     /*
      * TS 37.324 5.2 Data transfer

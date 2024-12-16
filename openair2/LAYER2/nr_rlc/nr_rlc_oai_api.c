@@ -40,6 +40,7 @@
 
 #include "openair2/F1AP/f1ap_du_rrc_message_transfer.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "openair3/ocp-gtpu/gtp_itf.h"
 
 extern RAN_CONTEXT_t RC;
 
@@ -525,18 +526,9 @@ rb_found:
 	itti_send_msg_to_task(TASK_DU_F1, ENB_MODULE_ID_TO_INSTANCE(0 /*ctxt_pP->module_id*/), msg);
 	return;
       } else {
-	MessageDef *msg = itti_alloc_new_message_sized(TASK_RLC_ENB, 0, GTPV1U_TUNNEL_DATA_REQ,
-						       sizeof(gtpv1u_tunnel_data_req_t) + size);
-	gtpv1u_tunnel_data_req_t *req=&GTPV1U_TUNNEL_DATA_REQ(msg);
-	req->buffer=(uint8_t*)(req+1);
-	memcpy(req->buffer,buf,size);
-	req->length=size;
-	req->offset = 0;
-	req->ue_id = ue->ue_id;
-	req->bearer_id=rb_id;
 	LOG_D(RLC, "Received uplink user-plane traffic at RLC-DU to be sent to the CU, size %d \n", size);
 	extern instance_t DUuniqInstance;
-	itti_send_msg_to_task(TASK_GTPV1_U, DUuniqInstance, msg);
+        gtpv1uSendDirect(DUuniqInstance, ue->ue_id, rb_id, (uint8_t*) buf, size, false, false);
 	return;
       }
     }

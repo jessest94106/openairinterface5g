@@ -597,7 +597,6 @@ bool pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
   uint8_t      rb_offset= (srb_flagP == 0) ? DTCH -1 :0;
   uint16_t     pdcp_uid=0;
 
-  MessageDef  *message_p        = NULL;
   uint32_t    rx_hfn_for_count;
   int         pdcp_sn_for_count;
   int         security_ok;
@@ -999,19 +998,11 @@ bool pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
 
   if (LINK_ENB_PDCP_TO_GTPV1U) {
     if ((true == ctxt_pP->enb_flag) && (false == srb_flagP)) {
-      LOG_D(PDCP, "Sending packet to GTP, Calling GTPV1U_TUNNEL_DATA_REQ  ue %lx rab %ld len %u\n", ctxt_pP->rntiMaybeUEid, rb_id + 4, sdu_buffer_sizeP - payload_offset);
-      message_p = itti_alloc_new_message_sized(TASK_PDCP_ENB, 0, GTPV1U_TUNNEL_DATA_REQ,
-                                              sizeof(gtpv1u_tunnel_data_req_t) +
-                                              sdu_buffer_sizeP - payload_offset + GTPU_HEADER_OVERHEAD_MAX );
-      AssertFatal(message_p != NULL, "OUT OF MEMORY");
-      gtpv1u_tunnel_data_req_t *req=&GTPV1U_TUNNEL_DATA_REQ(message_p);
-      req->buffer       = (uint8_t*)(req+1);
-      memcpy(req->buffer + GTPU_HEADER_OVERHEAD_MAX, sdu_buffer_pP + payload_offset, sdu_buffer_sizeP - payload_offset);
-      req->length       = sdu_buffer_sizeP - payload_offset;
-      req->offset       = GTPU_HEADER_OVERHEAD_MAX;
-      req->ue_id = ctxt_pP->rntiMaybeUEid;
-      req->bearer_id    = rb_id + 4;
-      itti_send_msg_to_task(TASK_GTPV1_U, INSTANCE_DEFAULT, message_p);
+      ue_id_t ue_id = ctxt_pP->rntiMaybeUEid;
+      uint8_t *gtp_buf = sdu_buffer_pP + payload_offset;
+      size_t gtp_len = sdu_buffer_sizeP - payload_offset;
+      LOG_D(PDCP, "Sending packet to GTP  ue %lx rab %ld len %ld\n", ue_id, rb_id + 4, gtp_len);
+      gtpv1uSendDirect(INSTANCE_DEFAULT, ue_id, rb_id + 4, gtp_buf, gtp_len, false, false);
       packet_forwarded = true;
     }
   } else {

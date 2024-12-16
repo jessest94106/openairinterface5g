@@ -1474,6 +1474,7 @@ add_library(L2_UE
   ${MAC_SRC_UE}
 )
 target_link_libraries(L2_UE PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+target_link_libraries(L2_UE PRIVATE GTPV1U)
 
 add_library(L2_UE_LTE_NR
   ${L2_RRC_SRC_UE}
