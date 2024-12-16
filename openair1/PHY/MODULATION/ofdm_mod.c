@@ -122,7 +122,7 @@ void nr_normal_prefix_mod(c16_t *txdataF, c16_t *txdata, uint8_t nsymb, const NR
 
 }
 
-void PHY_ofdm_mod(int *input, /// pointer to complex input
+void PHY_ofdm_mod(const int *input, /// pointer to complex input
                   int *output, /// pointer to complex output
                   int fftsize, /// FFT_SIZE
                   unsigned char nb_symbols, /// number of OFDM symbols
