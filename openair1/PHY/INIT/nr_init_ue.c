@@ -358,6 +358,7 @@ void free_nr_ue_dl_harq(NR_DL_UE_HARQ_t harq_list[2][NR_MAX_DLSCH_HARQ_PROCESSES
         free_and_zero(harq_list[j][i].c[r]);
         free_and_zero(harq_list[j][i].d[r]);
       }
+      free_and_zero(harq_list[j][i].b);
       free_and_zero(harq_list[j][i].c);
       free_and_zero(harq_list[j][i].d);
     }
@@ -408,6 +409,7 @@ void nr_init_dl_harq_processes(NR_DL_UE_HARQ_t harq_list[2][NR_MAX_DLSCH_HARQ_PR
       memset(harq_list[j] + i, 0, sizeof(NR_DL_UE_HARQ_t));
       init_downlink_harq_status(harq_list[j] + i);
 
+      harq_list[j][i].b = malloc16_clear(a_segments * 1056);
       harq_list[j][i].c = malloc16(a_segments*sizeof(uint8_t *));
       harq_list[j][i].d = malloc16(a_segments*sizeof(int16_t *));
       const int sz=5*8448*sizeof(int16_t);

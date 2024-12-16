@@ -40,6 +40,7 @@
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "PHY/impl_defs_top.h"
 #include "PHY/defs_common.h"
+#include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/CODING/nrLDPC_extern.h"
 #include "PHY/CODING/nrLDPC_decoder/nrLDPC_types.h"
 #include "executables/rt_profiling.h"
@@ -494,9 +495,10 @@ typedef struct PHY_VARS_gNB_s {
   /// OFDM symbol offset divisor for UL
   uint32_t ofdm_offset_divisor;
 
-  int ldpc_offload_flag;
-
+  /// NR LDPC coding related
+  nrLDPC_coding_interface_t nrLDPC_coding_interface;
   int max_ldpc_iterations;
+
   /// indicate the channel estimation technique in time domain
   int chest_time;
   /// indicate the channel estimation technique in freq domain

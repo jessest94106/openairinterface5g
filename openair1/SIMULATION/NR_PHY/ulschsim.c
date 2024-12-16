@@ -33,6 +33,7 @@
 #include "PHY/defs_nr_common.h"
 #include "PHY/defs_nr_UE.h"
 #include "PHY/defs_gNB.h"
+#include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/INIT/nr_phy_init.h"
 #include "PHY/NR_REFSIG/refsig_defs_ue.h"
 #include "PHY/MODULATION/modulation_eNB.h"
@@ -90,28 +91,6 @@ void deref_sched_response(int _)
   exit(1);
 }
 
-int nr_postDecode_sim(PHY_VARS_gNB *gNB, ldpcDecode_t *rdata, int *nb_ok)
-{
-  NR_UL_gNB_HARQ_t *ulsch_harq = rdata->ulsch_harq;
-  int r = rdata->segment_r;
-
-  bool decodeSuccess = (rdata->decodeIterations <= rdata->decoderParms.numMaxIter);
-  ulsch_harq->processedSegments++;
-
-  if (decodeSuccess) {
-    memcpy(ulsch_harq->b+rdata->offset,
-           ulsch_harq->c[r],
-           rdata->Kr_bytes - (ulsch_harq->F>>3) -((ulsch_harq->C>1)?3:0));
-  }
-
-  // if all segments are done
-  if (rdata->nbSegments == ulsch_harq->processedSegments) {
-    return *nb_ok == rdata->nbSegments;
-  }
-
-  return 0;
-}
-
 nrUE_params_t nrUE_params;
 
 nrUE_params_t *get_nrUE_params(void) {
@@ -143,7 +122,6 @@ int main(int argc, char **argv)
   NR_DL_FRAME_PARMS *frame_parms;
   double sigma;
   unsigned char qbits = 8;
-  int ret=0;
   int loglvl = OAILOG_WARNING;
   uint64_t SSB_positions=0x01;
   uint16_t nb_symb_sch = 12;
@@ -439,6 +417,7 @@ int main(int argc, char **argv)
 
   UE->frame_parms.nb_antennas_tx = n_tx;
   UE->frame_parms.nb_antennas_rx = 1;
+  UE->nrLDPC_coding_interface = gNB->nrLDPC_coding_interface;
 
   //phy_init_nr_top(frame_parms);
   if (init_nr_ue_signal(UE, 1) != 0) {
@@ -447,6 +426,8 @@ int main(int argc, char **argv)
   }
 
   nr_init_ul_harq_processes(UE->ul_harq_processes, NR_MAX_ULSCH_HARQ_PROCESSES, UE->frame_parms.N_RB_UL, UE->frame_parms.nb_antennas_tx);
+
+  initFloatingCoresTpool(1, &nrUE_params.Tpool, false, "UE-tpool");
 
   unsigned char harq_pid = 0;
   unsigned int TBS = 8424;
@@ -530,7 +511,8 @@ int main(int argc, char **argv)
   unsigned int G = available_bits;
 
   if (input_fd == NULL) {
-    nr_ulsch_encoding(UE, ulsch_ue, frame_parms, harq_pid, TBS>>3, G);
+    uint8_t ULSCH_ids[] = {0};
+    nr_ulsch_encoding(UE, ulsch_ue, 0, 0, &G, 1, ULSCH_ids);
   }
   
   printf("\n");
@@ -594,21 +576,11 @@ int main(int argc, char **argv)
       exit(-1);
 #endif
 
-      ldpcDecode_t arr[16] = {0};
-      task_ans_t ans[16] = {0};
-      thread_info_tm_t t_info = {.buf = (uint8_t *)arr, .cap = 16, .len = 0, .ans = ans};
-      int nbDecode =
-          nr_ulsch_decoding(gNB, UE_id, channel_output_fixed, frame_parms, rel15_ul, frame, subframe, harq_pid, G, &t_info);
-      DevAssert(nbDecode > 0);
-
-      int nb_ok = 0;
-      join_task_ans(t_info.ans, t_info.len);
-      for (size_t i = 0; i < nbDecode; ++i) {
-        ret = nr_postDecode_sim(gNB, &arr[i], &nb_ok);
-      }
-      nbDecode = 0;
-      if (ret)
+      nr_ulsch_decoding(gNB, frame_parms, frame, subframe, &G, &UE_id, 1);
+      bool crc_valid = check_crc(harq_process_gNB->b, lenWithCrc(1, (harq_process_gNB->TBS) << 3), crcType(1, (harq_process_gNB->TBS) << 3));
+      if (!crc_valid) {
         n_errors++;
+      }
     }
 
     printf("*****************************************\n");
@@ -632,6 +604,8 @@ int main(int argc, char **argv)
   for (int i = 0; i < nb_slots_to_set; ++i)
     free(gNB->gNB_config.tdd_table.max_tdd_periodicity_list[i].max_num_of_symbol_per_slot_list);
   free(gNB->gNB_config.tdd_table.max_tdd_periodicity_list);
+
+  free_nrLDPC_coding_interface(&gNB->nrLDPC_coding_interface);
 
   term_nr_ue_signal(UE, 1);
   free(UE);
