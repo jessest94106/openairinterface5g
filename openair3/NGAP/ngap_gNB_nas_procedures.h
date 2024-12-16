@@ -49,6 +49,8 @@ int ngap_gNB_handle_nas_first_req(
 int ngap_gNB_initial_ctxt_resp(
   instance_t instance, ngap_initial_context_setup_resp_t *initial_ctxt_resp_p);
 
+int ngap_gNB_initial_ctxt_fail(instance_t instance, ngap_initial_context_setup_fail_t *initial_ctxt_fail);
+
 int ngap_gNB_ue_capabilities(instance_t instance,
                              ngap_ue_cap_info_ind_t *ue_cap_info_ind_p);
 

@@ -553,9 +553,12 @@ typedef struct ngap_initial_context_setup_resp_s {
 } ngap_initial_context_setup_resp_t;
 
 typedef struct ngap_initial_context_setup_fail_s {
-  uint32_t  gNB_ue_ngap_id;
+  uint32_t gNB_ue_ngap_id;
 
-  /* TODO add cause */
+  uint64_t amf_ue_ngap_id;
+
+  ngap_Cause_t cause;
+  long cause_value;
 } ngap_initial_context_setup_fail_t, ngap_ue_ctxt_modification_fail_t, ngap_pdusession_setup_req_fail_t;
 
 typedef struct ngap_nas_non_delivery_ind_s {

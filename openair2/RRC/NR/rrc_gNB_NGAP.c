@@ -432,12 +432,11 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
 
   if (ue_context_p == NULL) {
     /* Can not associate this message to an UE index, send a failure to NGAP and discard it! */
-    MessageDef *msg_fail_p = NULL;
     LOG_W(NR_RRC, "[gNB %ld] In NGAP_INITIAL_CONTEXT_SETUP_REQ: unknown UE from NGAP ids (%u)\n", instance, req->gNB_ue_ngap_id);
-    msg_fail_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_INITIAL_CONTEXT_SETUP_FAIL);
-    NGAP_INITIAL_CONTEXT_SETUP_FAIL(msg_fail_p).gNB_ue_ngap_id = req->gNB_ue_ngap_id;
-    // TODO add failure cause when defined!
-    itti_send_msg_to_task(TASK_NGAP, instance, msg_fail_p);
+    rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_FAIL(req->gNB_ue_ngap_id,
+                                                 NULL,
+                                                 NGAP_CAUSE_RADIO_NETWORK,
+                                                 NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_LOCAL_UE_NGAP_ID);
     return (-1);
   }
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
@@ -540,6 +539,20 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_
   resp->nb_of_pdusessions = pdu_sessions_done;
   resp->nb_of_pdusessions_failed = pdu_sessions_failed;
   itti_send_msg_to_task (TASK_NGAP, rrc->module_id, msg_p);
+}
+
+void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_FAIL(uint32_t gnb,
+                                                  const rrc_gNB_ue_context_t *const ue_context_pP,
+                                                  const ngap_Cause_t causeP,
+                                                  const long cause_valueP)
+{
+  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_INITIAL_CONTEXT_SETUP_FAIL);
+  ngap_initial_context_setup_fail_t *fail = &NGAP_INITIAL_CONTEXT_SETUP_FAIL(msg_p);
+  memset(fail, 0, sizeof(*fail));
+  fail->gNB_ue_ngap_id = gnb;
+  fail->cause = causeP;
+  fail->cause_value = cause_valueP;
+  itti_send_msg_to_task(TASK_NGAP, 0, msg_p);
 }
 
 static NR_CipheringAlgorithm_t rrc_gNB_select_ciphering(const gNB_RRC_INST *rrc, uint16_t algorithms)
