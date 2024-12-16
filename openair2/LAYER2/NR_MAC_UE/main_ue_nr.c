@@ -70,6 +70,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   mac->p_Max = INT_MIN;
   mac->p_Max_alt = INT_MIN;
   mac->n_ta_offset = -1;
+  mac->ntn_ta.ntn_params_changed = false;
   pthread_mutex_init(&mac->if_mutex, NULL);
   reset_mac_inst(mac);
 
@@ -86,29 +87,6 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
 
   mac->pucch_power_control_initialized = false;
   mac->pusch_power_control_initialized = false;
-
-  // Fake SIB19 reception for NTN
-  // TODO: remove this and implement the actual SIB19 reception instead!
-  if (get_nrUE_params()->ntn_koffset || get_nrUE_params()->ntn_ta_common || get_nrUE_params()->ntn_ta_commondrift) {
-    NR_SIB19_r17_t *sib19_r17 = calloc(1, sizeof(*sib19_r17));
-    sib19_r17->ntn_Config_r17 = calloc(1, sizeof(*sib19_r17->ntn_Config_r17));
-
-    // NTN cellSpecificKoffset-r17
-    if (get_nrUE_params()->ntn_koffset) {
-      asn1cCallocOne(sib19_r17->ntn_Config_r17->cellSpecificKoffset_r17, get_nrUE_params()->ntn_koffset);
-    }
-
-    // NTN ta-Common-r17
-    if (get_nrUE_params()->ntn_ta_common || get_nrUE_params()->ntn_ta_commondrift) {
-      sib19_r17->ntn_Config_r17->ta_Info_r17 = calloc(1, sizeof(*sib19_r17->ntn_Config_r17->ta_Info_r17));
-      sib19_r17->ntn_Config_r17->ta_Info_r17->ta_Common_r17 = get_nrUE_params()->ntn_ta_common / 4.072e-6; // ta-Common-r17 is in units of 4.072e-3 µs, ntn_ta_common is in ms
-      if (get_nrUE_params()->ntn_ta_commondrift)
-        asn1cCallocOne(sib19_r17->ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17, get_nrUE_params()->ntn_ta_commondrift / 0.2e-3); // is in units of 0.2e-3 µs/s, ntn_ta_commondrift is in µs/s
-    }
-
-    nr_rrc_mac_config_req_sib19_r17(mac->ue_id, sib19_r17);
-    asn1cFreeStruc(asn_DEF_NR_SIB19_r17, sib19_r17);
-  }
 }
 
 void nr_ue_mac_default_configs(NR_UE_MAC_INST_t *mac)

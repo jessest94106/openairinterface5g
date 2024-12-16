@@ -326,6 +326,19 @@ static void configure_dlsch(NR_UE_DLSCH_t *dlsch0,
   }
 }
 
+static void configure_ntn_params(PHY_VARS_NR_UE *ue, fapi_nr_dl_ntn_config_command_pdu* ntn_params_message)
+{
+  if (!ue->ntn_config_message) {
+    ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
+  }
+
+  ue->ntn_config_message->ntn_config_params.cell_specific_k_offset = ntn_params_message->cell_specific_k_offset;
+  ue->ntn_config_message->ntn_config_params.N_common_ta_adj = ntn_params_message->N_common_ta_adj;
+  ue->ntn_config_message->ntn_config_params.ntn_ta_commondrift = ntn_params_message->ntn_ta_commondrift;
+  ue->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms = ntn_params_message->ntn_total_time_advance_ms;
+  ue->ntn_config_message->update = true;
+}
+
 static void configure_ta_command(PHY_VARS_NR_UE *ue, fapi_nr_ta_command_pdu *ta_command_pdu)
 {
   /* Time Alignment procedure
@@ -450,6 +463,9 @@ static void nr_ue_scheduled_response_dl(NR_UE_MAC_INST_t *mac,
       } break;
       case FAPI_NR_CONFIG_TA_COMMAND:
         configure_ta_command(phy, &pdu->ta_command_pdu);
+        break;
+      case FAPI_NR_DL_NTN_CONFIG_PARAMS:
+        configure_ntn_params(phy, &pdu->ntn_config_command_pdu);
         break;
       default:
         LOG_W(PHY, "unhandled dl pdu type %d \n", pdu->pdu_type);

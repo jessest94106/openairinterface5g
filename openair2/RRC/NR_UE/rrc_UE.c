@@ -62,6 +62,7 @@
 
 #include "common/utils/LOG/log.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
+#include "executables/position_interface.h"
 
 #ifndef CELLULAR
   #include "RRC/NR/MESSAGES/asn1_msg.h"
@@ -165,7 +166,7 @@ static void set_DRB_status(NR_UE_RRC_INST_t *rrc, NR_DRB_Identity_t drb_id, NR_R
   rrc->status_DRBs[drb_id - 1] = status;
 }
 
-static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si)
+static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, instance_t ue_id, position_t *position)
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SI, VCD_FUNCTION_IN);
 
@@ -241,6 +242,14 @@ static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si)
         SI_info->SInfo_r17.sib19_validity = true;
         if (g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
           xer_fprint(stdout, &asn_DEF_NR_SIB19_r17, (const void *)typeandinfo->choice.sib19_v1700);
+        
+        // allocate memory for position coordinates
+        if (!position)
+          position = CALLOC(1, sizeof(*position));
+        // populate position with position from config file
+        get_position_coordinates(ue_id, position);
+
+        nr_rrc_mac_config_req_sib19_r17(ue_id, position, typeandinfo->choice.sib19_v1700);
         nr_timer_start(&SI_info->SInfo_r17.sib19_timer);
         break;
       default:
@@ -386,7 +395,7 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
       SEQUENCE_free(&asn_DEF_NR_SystemInformation, si, 1);
     } else {
       LOG_I(NR_RRC, "[UE %ld] Decoding dedicatedSystemInformationDelivery\n", rrc->ue_id);
-      nr_decode_SI(SI_info, si);
+      nr_decode_SI(SI_info, si, rrc->ue_id, rrc->position_coordinates);
     }
   }
   if (rec_1530->otherConfig) {
@@ -895,7 +904,7 @@ static int8_t nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation:
         LOG_I(NR_RRC, "[UE %ld] Decoding SI\n", rrc->ue_id);
         NR_SystemInformation_t *si = bcch_message->message.choice.c1->choice.systemInformation;
-        nr_decode_SI(SI_info, si);
+        nr_decode_SI(SI_info, si, rrc->ue_id, rrc->position_coordinates);
         break;
       case NR_BCCH_DL_SCH_MessageType__c1_PR_NOTHING:
       default:

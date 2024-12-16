@@ -129,9 +129,6 @@ int               otg_enabled;
 double            cpuf;
 uint32_t       N_RB_DL    = 106;
 
-// NTN cellSpecificKoffset-r17, but in slots for DL SCS
-unsigned int NTN_UE_Koffset = 0;
-
 int create_tasks_nrue(uint32_t ue_nb) {
   LOG_D(NR_RRC, "%s(ue_nb:%d)\n", __FUNCTION__, ue_nb);
   itti_wait_ready(1);
@@ -517,9 +514,6 @@ int main(int argc, char **argv)
         }
       }
     }
-
-    // NTN cellSpecificKoffset-r17, but in slots for DL SCS
-    NTN_UE_Koffset = nrUE_params.ntn_koffset << PHY_vars_UE_g[0][0]->frame_parms.numerology_index;
 
     init_openair0();
     lock_memory_to_ram();
