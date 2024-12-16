@@ -420,12 +420,38 @@ static void test_f1ap_du_configuration_update(void)
       .plmn.mnc_digit_length = 3,
       .tac = tac,
   };
+  char *mtc2_data = "mtc2";
+  uint8_t *mtc2 = (void*)strdup(mtc2_data);
+  int mtc2_len = strlen(mtc2_data);
+  f1ap_served_cell_info_t info2 = {
+      .mode = F1AP_MODE_FDD,
+      .fdd.ul_freqinfo.arfcn = 640000,
+      .fdd.ul_freqinfo.band = 78,
+      .fdd.dl_freqinfo.arfcn = 600000,
+      .fdd.dl_freqinfo.band = 78,
+      .fdd.ul_tbw.nrb = 66,
+      .fdd.ul_tbw.scs = 1,
+      .fdd.dl_tbw.nrb = 66,
+      .fdd.dl_tbw.scs = 1,
+      .measurement_timing_config_len = mtc2_len,
+      .measurement_timing_config = mtc2,
+      .nr_cellid = 123456,
+      .plmn.mcc = 2,
+      .plmn.mnc = 2,
+      .plmn.mnc_digit_length = 2,
+  };
   /* create message */
   f1ap_gnb_du_configuration_update_t orig = {
       .transaction_id = 2,
+      .num_cells_to_add = 1,
+      .cell_to_add[0].info = info2,
       .num_cells_to_modify = 1,
       .cell_to_modify[0].info = info,
-      .num_cells_to_delete = 0,
+      .cell_to_modify[0].old_nr_cellid = 1235UL,
+      .cell_to_modify[0].old_plmn.mcc = 208,
+      .cell_to_modify[0].old_plmn.mnc = 88,
+      .cell_to_modify[0].old_plmn.mnc_digit_length = 2,
+      .num_cells_to_delete = 1,
       .cell_to_delete[0].nr_cellid = 1234UL,
       .cell_to_delete[0].plmn.mcc = 1,
       .cell_to_delete[0].plmn.mnc = 1,

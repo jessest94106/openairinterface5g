@@ -401,6 +401,105 @@ void terminate_task(task_id_t task_id, module_id_t mod_id) {
 //extern void  free_transport(PHY_VARS_gNB *);
 extern void  nr_phy_free_RU(RU_t *);
 
+int stop_L1(module_id_t gnb_id)
+{
+  RU_t *ru = RC.ru[gnb_id];
+  if (!ru) {
+    LOG_W(GNB_APP, "no RU configured\n");
+    return -1;
+  }
+
+  if (!RC.gNB[gnb_id]->configured) {
+    LOG_W(GNB_APP, "L1 already stopped\n");
+    return -1;
+  }
+
+  LOG_I(GNB_APP, "stopping nr-softmodem\n");
+  oai_exit = 1;
+
+  /* these tasks/layers need to pick up new configuration */
+  if (RC.nb_nr_L1_inst > 0)
+    stop_gNB(RC.nb_nr_L1_inst);
+
+  if (RC.nb_RU > 0)
+    stop_RU(RC.nb_RU);
+
+  /* stop trx devices, multiple carrier currently not supported by RU */
+  if (ru->rfdevice.trx_stop_func) {
+    ru->rfdevice.trx_stop_func(&ru->rfdevice);
+    LOG_I(GNB_APP, "turned off RU rfdevice\n");
+  }
+
+  if (ru->ifdevice.trx_stop_func) {
+    ru->ifdevice.trx_stop_func(&ru->ifdevice);
+    LOG_I(GNB_APP, "turned off RU ifdevice\n");
+  }
+
+  /* release memory used by the RU/gNB threads (incomplete), after all
+   * threads have been stopped (they partially use the same memory) */
+  for (int inst = 0; inst < RC.nb_RU; inst++) {
+    nr_phy_free_RU(RC.ru[inst]);
+  }
+
+  for (int inst = 0; inst < RC.nb_nr_L1_inst; inst++) {
+    phy_free_nr_gNB(RC.gNB[inst]);
+  }
+
+  RC.gNB[gnb_id]->configured = 0;
+  return 0;
+}
+
+/*
+ * Restart the nr-softmodem after it has been soft-stopped with stop_L1L2()
+ */
+#include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
+int start_L1L2(module_id_t gnb_id)
+{
+  LOG_I(GNB_APP, "starting nr-softmodem\n");
+  /* block threads */
+  oai_exit = 0;
+  sync_var = -1;
+  extern void init_sched_response(void);
+  init_sched_response();
+
+  /* update config */
+  gNB_MAC_INST *mac = RC.nrmac[0];
+  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
+  nr_mac_config_scc(mac, scc, &mac->radio_config);
+
+  NR_BCCH_BCH_Message_t *mib = mac->common_channels[0].mib;
+  const NR_BCCH_DL_SCH_Message_t *sib1 = mac->common_channels[0].sib1;
+
+  /* update existing config in F1 Setup request structures */
+  f1ap_setup_req_t *sr = mac->f1_config.setup_req;
+  DevAssert(sr->num_cells_available == 1);
+  f1ap_served_cell_info_t *info = &sr->cell[0].info;
+  DevAssert(info->mode == F1AP_MODE_TDD);
+  DevAssert(scc->tdd_UL_DL_ConfigurationCommon != NULL);
+  info->tdd = read_tdd_config(scc); /* updates radio config */
+  /* send gNB-DU configuration update to RRC */
+  f1ap_gnb_du_configuration_update_t update = {
+    .transaction_id = 1,
+    .num_cells_to_modify = 1,
+  };
+  update.cell_to_modify[0].old_nr_cellid = info->nr_cellid;
+  update.cell_to_modify[0].info = *info;
+  update.cell_to_modify[0].sys_info = get_sys_info(mib, sib1);
+  mac->mac_rrc.gnb_du_configuration_update(&update);
+
+  init_NR_RU(config_get_if(), NULL);
+
+  start_NR_RU();
+  wait_RUs();
+  init_eNB_afterRU();
+  LOG_I(GNB_APP, "Sending sync to all threads\n");
+  pthread_mutex_lock(&sync_mutex);
+  sync_var=0;
+  pthread_cond_broadcast(&sync_cond);
+  pthread_mutex_unlock(&sync_mutex);
+  return 0;
+}
+
 static  void wait_nfapi_init(char *thread_name)
 {
   pthread_mutex_lock( &nfapi_sync_mutex );
@@ -629,36 +728,14 @@ int main( int argc, char **argv ) {
   printf("TYPE <CTRL-C> TO TERMINATE\n");
   itti_wait_tasks_end(NULL);
   printf("Returned from ITTI signal handler\n");
-  oai_exit=1;
 
-  // cleanup
-  if (RC.nb_nr_L1_inst > 0)
-    stop_gNB(RC.nb_nr_L1_inst);
-
-  if (RC.nb_RU > 0)
-    stop_RU(RC.nb_RU);
-
-  /* release memory used by the RU/gNB threads (incomplete), after all
-   * threads have been stopped (they partially use the same memory) */
-  for (int inst = 0; inst < RC.nb_RU; inst++) {
-    nr_phy_free_RU(RC.ru[inst]);
-  }
-
-  for (int inst = 0; inst < RC.nb_nr_L1_inst; inst++) {
-    phy_free_nr_gNB(RC.gNB[inst]);
-  }
+  if (RC.nb_nr_L1_inst > 0 || RC.nb_RU > 0)
+    stop_L1(0);
 
   pthread_cond_destroy(&sync_cond);
   pthread_mutex_destroy(&sync_mutex);
   pthread_cond_destroy(&nfapi_sync_cond);
   pthread_mutex_destroy(&nfapi_sync_mutex);
-
-  // *** Handle per CC_id openair0
-
-  for(ru_id = 0; ru_id < RC.nb_RU; ru_id++) {
-    if (RC.ru[ru_id]->ifdevice.trx_end_func)
-      RC.ru[ru_id]->ifdevice.trx_end_func(&RC.ru[ru_id]->ifdevice);
-  }
 
   free(pckg);
   logClean();

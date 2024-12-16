@@ -180,4 +180,8 @@ void nr_phy_free_RU(RU_t *ru)
       free_and_zero(ru->common.beam_id[i]);
     free_and_zero(ru->common.beam_id);
   }
+
+  PHY_VARS_gNB *gNB0 = ru->gNB_list[0];
+  gNB0->num_RU--;
+  DevAssert(gNB0->num_RU >= 0);
 }
