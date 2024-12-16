@@ -452,7 +452,7 @@ static uint64_t get_u64_mask(const paramdef_t *pd)
   for (int i = 0; i < pd->numelt; ++i) {
     int num = pd->iptr[i];
     AssertFatal(num >= 0 && num < 64, "cannot put element of %d in 64-bit mask\n", num);
-    mask |= 1 << num;
+    mask |= 1LL << num;
   }
   return mask;
 }
