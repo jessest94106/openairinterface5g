@@ -170,10 +170,10 @@ void PHY_ofdm_mod(const int *input, /// pointer to complex input
           // output ptr is not aligned, needs an extra memcpy
           c16_t temp[fftsize] __attribute__((aligned(32)));
           idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
-          memcpy((void *)output_ptr, (void *)temp, fftsize << 2);
+          memcpy((void *)output_ptr, (void *)temp, sizeof(temp));
         }
         // perform cyclic prefix insertion
-        memcpy((void *)&output_ptr[-nb_prefix_samples], (void *)&output_ptr[fftsize - nb_prefix_samples], nb_prefix_samples << 2);
+        memcpy((void *)&output_ptr[-nb_prefix_samples], (void *)&output_ptr[fftsize - nb_prefix_samples], nb_prefix_samples * sizeof(c16_t));
         break;
       }
 
@@ -181,17 +181,8 @@ void PHY_ofdm_mod(const int *input, /// pointer to complex input
         c16_t temp[fftsize] __attribute__((aligned(32)));
         idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
         int *output_ptr = &output[(i * fftsize) + (i * nb_prefix_samples)];
-
-        int *temp_ptr = (int *)temp;
-
-        //      msg("Doing cyclic suffix method\n");
-
-        for (int j = 0; j < fftsize; j++) {
-          output_ptr[j] = temp_ptr[2 * j];
-        }
-
-        for (int j = 0; j < nb_prefix_samples; j++)
-          output_ptr[fftsize + j] = output_ptr[j];
+        memcpy(output_ptr, temp, sizeof(temp));
+        memcpy(&output_ptr[fftsize], temp, nb_prefix_samples * sizeof(c16_t));
         break;
       }
 
@@ -202,14 +193,8 @@ void PHY_ofdm_mod(const int *input, /// pointer to complex input
       case NONE: {
         c16_t temp[fftsize] __attribute__((aligned(32)));
         idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
-        //      msg("NO EXTENSION!\n");
-        int *output_ptr = &output[fftsize];
-
-        int *temp_ptr = (int *)temp;
-
-        for (int j = 0; j < fftsize; j++) {
-          output_ptr[j] = temp_ptr[2 * j];
-        }
+        int *output_ptr = &output[i * fftsize];
+        memcpy(output_ptr, temp, sizeof(temp));
         break;
       }
 
