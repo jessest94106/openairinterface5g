@@ -40,6 +40,9 @@ This section deals with basic functions for OFDM Modulation.
 #include "PHY/LTE_TRANSPORT/transport_common_proto.h"
 //#define DEBUG_OFDM_MOD
 
+// Use 64-byte alignment for IDFT output buffer to ensure no
+// runtime error in case IDFT implementation uses AVX-512.
+#define IDFT_OUTPUT_BUFFER_ALIGNMENT 64
 
 void normal_prefix_mod(int32_t *txdataF,int32_t *txdata,uint8_t nsymb,LTE_DL_FRAME_PARMS *frame_parms)
 {
@@ -163,12 +166,13 @@ void PHY_ofdm_mod(const int *input, /// pointer to complex input
     switch (etype) {
       case CYCLIC_PREFIX: {
         int *output_ptr = &output[(i * fftsize) + ((1 + i) * nb_prefix_samples)];
+        // Current idft implementation uses AVX-256: Check if buffer is already aligned to 256 bits (32 bytes)
         if ((uintptr_t)output_ptr % 32 == 0) {
           // output ptr is aligned, do ifft inplace
           idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)output_ptr, 1);
         } else {
           // output ptr is not aligned, needs an extra memcpy
-          c16_t temp[fftsize] __attribute__((aligned(32)));
+          c16_t temp[fftsize] __attribute__((aligned(IDFT_OUTPUT_BUFFER_ALIGNMENT)));
           idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
           memcpy((void *)output_ptr, (void *)temp, sizeof(temp));
         }
@@ -178,7 +182,8 @@ void PHY_ofdm_mod(const int *input, /// pointer to complex input
       }
 
       case CYCLIC_SUFFIX: {
-        c16_t temp[fftsize] __attribute__((aligned(32)));
+        // Use alignment of 64 bytes
+        c16_t temp[fftsize] __attribute__((aligned(IDFT_OUTPUT_BUFFER_ALIGNMENT)));
         idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
         int *output_ptr = &output[(i * fftsize) + (i * nb_prefix_samples)];
         memcpy(output_ptr, temp, sizeof(temp));
@@ -191,7 +196,7 @@ void PHY_ofdm_mod(const int *input, /// pointer to complex input
         break;
 
       case NONE: {
-        c16_t temp[fftsize] __attribute__((aligned(32)));
+        c16_t temp[fftsize] __attribute__((aligned(IDFT_OUTPUT_BUFFER_ALIGNMENT)));
         idft(idft_size, (int16_t *)&input[i * fftsize], (int16_t *)temp, 1);
         int *output_ptr = &output[i * fftsize];
         memcpy(output_ptr, temp, sizeof(temp));
