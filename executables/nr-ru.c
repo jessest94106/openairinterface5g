@@ -1443,6 +1443,12 @@ void kill_NR_RU_proc(int inst) {
   RU_t *ru = RC.ru[inst];
   RU_proc_t *proc = &ru->proc;
 
+  if (ru->if_south != REMOTE_IF4p5) {
+    abortTpool(ru->threadPool);
+    abortNotifiedFIFO(ru->respfeprx);
+    abortNotifiedFIFO(ru->respfeptx);
+  }
+
   /* Note: it seems pthread_FH and and FEP thread below both use
    * mutex_fep/cond_fep. Thus, we unlocked above for pthread_FH above and do
    * the same for FEP thread below again (using broadcast() to ensure both

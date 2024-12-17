@@ -131,6 +131,7 @@ check_supported_distribution() {
         "rocky9.2")    return 0 ;;
         "rocky9.3")    return 0 ;;
         "rocky9.4")    return 0 ;;
+        "rocky9.5")    return 0 ;;
     esac
     return 1
 }

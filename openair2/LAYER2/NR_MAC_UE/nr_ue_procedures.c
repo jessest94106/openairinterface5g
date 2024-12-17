@@ -147,13 +147,6 @@ static nr_dci_format_t nr_extract_dci_info(NR_UE_MAC_INST_t *mac,
                                            const uint8_t *dci_pdu,
                                            const int slot);
 
-static int get_NTN_UE_Koffset(NR_NTN_Config_r17_t *ntn_Config_r17, int scs)
-{
-  if (ntn_Config_r17 && ntn_Config_r17->cellSpecificKoffset_r17)
-    return *ntn_Config_r17->cellSpecificKoffset_r17 << scs;
-  return 0;
-}
-
 int get_rnti_type(const NR_UE_MAC_INST_t *mac, const uint16_t rnti)
 {
   const RA_config_t *ra = &mac->ra;
@@ -506,7 +499,7 @@ static int nr_ue_process_dci_ul_00(NR_UE_MAC_INST_t *mac,
 
   frame_t frame_tx;
   int slot_tx;
-  const int ntn_ue_koffset = get_NTN_UE_Koffset(mac->sc_info.ntn_Config_r17, mac->current_UL_BWP->scs);
+  const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, mac->current_UL_BWP->scs);
   if (-1 == nr_ue_pusch_scheduler(mac, 0, frame, slot, &frame_tx, &slot_tx, tda_info.k2 + ntn_ue_koffset)) {
     LOG_E(MAC, "Cannot schedule PUSCH\n");
     return -1;
@@ -604,7 +597,7 @@ static int nr_ue_process_dci_ul_01(NR_UE_MAC_INST_t *mac,
     tda_info.k2 = csi_K2;
   }
 
-  const int ntn_ue_koffset = get_NTN_UE_Koffset(mac->sc_info.ntn_Config_r17, mac->current_UL_BWP->scs);
+  const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, mac->current_UL_BWP->scs);
   if (-1 == nr_ue_pusch_scheduler(mac, 0, frame, slot, &frame_tx, &slot_tx, tda_info.k2 + ntn_ue_koffset)) {
     LOG_E(MAC, "Cannot schedule PUSCH\n");
     return -1;
@@ -921,14 +914,14 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
 
   /* PDSCH_TO_HARQ_FEEDBACK_TIME_IND */
   // according to TS 38.213 9.2.3
-  const int ntn_ue_koffset = get_NTN_UE_Koffset(mac->sc_info.ntn_Config_r17, dlsch_pdu->SubcarrierSpacing);
+  const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, dlsch_pdu->SubcarrierSpacing);
   const uint16_t feedback_ti = 1 + dci->pdsch_to_harq_feedback_timing_indicator.val + ntn_ue_koffset;
 
   if (rnti_type != TYPE_RA_RNTI_ && rnti_type != TYPE_SI_RNTI_) {
-    AssertFatal(feedback_ti > DURATION_RX_TO_TX,
-                "PDSCH to HARQ feedback time (%d) needs to be higher than DURATION_RX_TO_TX (%d).\n",
+    AssertFatal(feedback_ti > GET_DURATION_RX_TO_TX(&mac->ntn_ta),
+                "PDSCH to HARQ feedback time (%d) needs to be higher than DURATION_RX_TO_TX (%ld).\n",
                 feedback_ti,
-                DURATION_RX_TO_TX);
+                GET_DURATION_RX_TO_TX(&mac->ntn_ta));
     // set the harq status at MAC for feedback
     const int tpc[] = {-1, 0, 1, 3};
     set_harq_status(mac,
@@ -1266,14 +1259,14 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
 
   /* PDSCH_TO_HARQ_FEEDBACK_TIME_IND */
   // according to TS 38.213 Table 9.2.3-1
-  const int ntn_ue_koffset = get_NTN_UE_Koffset(mac->sc_info.ntn_Config_r17, dlsch_pdu->SubcarrierSpacing);
+  const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, dlsch_pdu->SubcarrierSpacing);
   const uint16_t feedback_ti = pucch_Config->dl_DataToUL_ACK->list.array[dci->pdsch_to_harq_feedback_timing_indicator.val][0] + ntn_ue_koffset;
 
-  AssertFatal(feedback_ti > DURATION_RX_TO_TX,
-              "PDSCH to HARQ feedback time (%d) needs to be higher than DURATION_RX_TO_TX (%d). Min feedback time set in config "
+  AssertFatal(feedback_ti > GET_DURATION_RX_TO_TX(&mac->ntn_ta),
+              "PDSCH to HARQ feedback time (%d) needs to be higher than DURATION_RX_TO_TX (%ld). Min feedback time set in config "
               "file (min_rxtxtime).\n",
               feedback_ti,
-              DURATION_RX_TO_TX);
+              GET_DURATION_RX_TO_TX(&mac->ntn_ta));
 
   // set the harq status at MAC for feedback
   const int tpc[] = {-1, 0, 1, 3};
@@ -3453,7 +3446,7 @@ static void set_time_alignment(NR_UE_MAC_INST_t *mac, int ta, ta_type_t type, in
   ul_time_alignment->ta_command = ta;
   ul_time_alignment->ta_apply = type;
 
-  const int ntn_ue_koffset = get_NTN_UE_Koffset(mac->sc_info.ntn_Config_r17, mac->current_UL_BWP->scs);
+  const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, mac->current_UL_BWP->scs);
   const int n_slots_frame = nr_slots_per_frame[mac->current_UL_BWP->scs];
   ul_time_alignment->frame = (frame + (slot + ntn_ue_koffset) / n_slots_frame) % MAX_FRAME_NUMBER;
   ul_time_alignment->slot = (slot + ntn_ue_koffset) % n_slots_frame;
@@ -4108,7 +4101,7 @@ static void nr_ue_process_rar(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *d
       LOG_E(MAC, "Cannot schedule Msg3. Something wrong in TDA information\n");
       return;
     }
-    const int ntn_ue_koffset = get_NTN_UE_Koffset(mac->sc_info.ntn_Config_r17, mac->current_UL_BWP->scs);
+    const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, mac->current_UL_BWP->scs);
     ret = nr_ue_pusch_scheduler(mac, is_Msg3, frame, slot, &frame_tx, &slot_tx, tda_info.k2 + ntn_ue_koffset);
 
     // TA command

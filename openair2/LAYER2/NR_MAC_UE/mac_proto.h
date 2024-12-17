@@ -91,8 +91,8 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id,
                                 NR_SI_SchedulingInfo_v1700_t *si_SchedulingInfo_v1700,
                                 NR_ServingCellConfigCommonSIB_t *scc);
 
-void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id,
-                                     NR_SIB19_r17_t *sib19_r17);
+struct position; /* forward declaration */
+void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, const struct position *pos, NR_SIB19_r17_t *sib19_r17);
 
 void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t cause);
 
@@ -447,7 +447,7 @@ uint8_t sl_determine_sci_1a_len(uint16_t *num_subchannels,
  *  @param nr_slot  : slot number
  *  @param frame duplex type  : Frame type
     @returns int : 0 or Sidelink slot type */
-int sl_nr_ue_slot_select(sl_nr_phy_config_request_t *cfg, int nr_slot, uint8_t frame_duplex_type);
+int sl_nr_ue_slot_select(const sl_nr_phy_config_request_t *cfg, int nr_slot, uint8_t frame_duplex_type);
 
 void nr_ue_sidelink_scheduler(nr_sidelink_indication_t *sl_ind, NR_UE_MAC_INST_t *mac);
 

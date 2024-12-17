@@ -1166,7 +1166,7 @@ static int read_du_cell_info(configmodule_interface_t *cfg,
   return 1;
 }
 
-static f1ap_tdd_info_t read_tdd_config(const NR_ServingCellConfigCommon_t *scc)
+f1ap_tdd_info_t read_tdd_config(const NR_ServingCellConfigCommon_t *scc)
 {
   const NR_FrequencyInfoDL_t *dl = scc->downlinkConfigCommon->frequencyInfoDL;
   f1ap_tdd_info_t tdd = {
@@ -1195,7 +1195,27 @@ static f1ap_fdd_info_t read_fdd_config(const NR_ServingCellConfigCommon_t *scc)
   return fdd;
 }
 
-static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
+f1ap_gnb_du_system_info_t *get_sys_info(NR_BCCH_BCH_Message_t *mib, const NR_BCCH_DL_SCH_Message_t *sib1)
+{
+  int buf_len = 3;
+  f1ap_gnb_du_system_info_t *sys_info = calloc_or_fail(1, sizeof(*sys_info));
+
+  sys_info->mib = calloc_or_fail(buf_len, sizeof(*sys_info->mib));
+  DevAssert(mib != NULL);
+  sys_info->mib_length = encode_MIB_NR(mib, 0, sys_info->mib, buf_len);
+  DevAssert(sys_info->mib_length == buf_len);
+
+  DevAssert(sib1 != NULL);
+  NR_SIB1_t *bcch_SIB1 = sib1->message.choice.c1->choice.systemInformationBlockType1;
+  sys_info->sib1 = calloc_or_fail(NR_MAX_SIB_LENGTH / 8, sizeof(*sys_info->sib1));
+  asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_SIB1, NULL, (void *)bcch_SIB1, sys_info->sib1, NR_MAX_SIB_LENGTH / 8);
+  AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
+  sys_info->sib1_length = (enc_rval.encoded + 7) / 8;
+
+  return sys_info;
+}
+
+f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
                                          const char *name,
                                          const f1ap_served_cell_info_t *info,
                                          const NR_ServingCellConfigCommon_t *scc,
@@ -1244,24 +1264,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
   if (IS_SA_MODE(get_softmodem_params())) {
     // in NSA we don't transmit SIB1, so cannot fill DU system information
     // so cannot send MIB either
-
-    int buf_len = 3; // this is what we assume in monolithic
-    req->cell[0].sys_info = calloc(1, sizeof(*req->cell[0].sys_info));
-    AssertFatal(req->cell[0].sys_info != NULL, "out of memory\n");
-    f1ap_gnb_du_system_info_t *sys_info = req->cell[0].sys_info;
-    sys_info->mib = calloc(buf_len, sizeof(*sys_info->mib));
-    DevAssert(sys_info->mib != NULL);
-    DevAssert(mib != NULL);
-    // encode only the mib message itself
-    sys_info->mib_length = encode_MIB_NR_setup(mib->message.choice.mib, 0, sys_info->mib, buf_len);
-    DevAssert(sys_info->mib_length == buf_len);
-
-    DevAssert(sib1 != NULL);
-    NR_SIB1_t *bcch_SIB1 = sib1->message.choice.c1->choice.systemInformationBlockType1;
-    sys_info->sib1 = calloc(NR_MAX_SIB_LENGTH / 8, sizeof(*sys_info->sib1));
-    asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_SIB1, NULL, (void *)bcch_SIB1, sys_info->sib1, NR_MAX_SIB_LENGTH / 8);
-    AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
-    sys_info->sib1_length = (enc_rval.encoded + 7) / 8;
+    req->cell[0].sys_info = get_sys_info(mib, sib1);
   }
 
   int num = read_version(TO_STRING(NR_RRC_VERSION), &req->rrc_ver[0], &req->rrc_ver[1], &req->rrc_ver[2]);

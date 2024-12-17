@@ -1941,7 +1941,8 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
 
     NR_UE_info_t *UE = find_nr_UE(&nr_mac->UE_info, ra->rnti);
     if (!UE) {
-      LOG_E(NR_MAC, "want to generate %s, but rnti %04x not in the table\n", ra_type_str, ra->rnti);
+      LOG_E(NR_MAC, "want to generate %s, but rnti %04x not in the table. Abort RA\n", ra_type_str, ra->rnti);
+      nr_clear_ra_proc(ra);
       return;
     }
 

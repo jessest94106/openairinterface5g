@@ -50,7 +50,8 @@ void *actor_thread(void *arg)
       break;
     }
 
-    elt->processingFunc(NotifiedFifoData(elt));
+    if (elt->processingFunc) // processing function can be NULL
+      elt->processingFunc(NotifiedFifoData(elt));
     if (elt->reponseFifo) {
       pushNotifiedFIFO(elt->reponseFifo, elt);
     } else
@@ -84,4 +85,15 @@ void shutdown_actor(Actor_t *actor)
   delNotifiedFIFO_elt(elt);
   abortNotifiedFIFO(&response_fifo);
   pthread_join(actor->thread, NULL);
+}
+
+void flush_actor(Actor_t *actor)
+{
+  notifiedFIFO_t response_fifo;
+  initNotifiedFIFO(&response_fifo);
+  notifiedFIFO_elt_t *elt = newNotifiedFIFO_elt(0, 0, &response_fifo, NULL);
+  pushNotifiedFIFO(&actor->fifo, elt);
+  elt = pullNotifiedFIFO(&response_fifo);
+  delNotifiedFIFO_elt(elt);
+  abortNotifiedFIFO(&response_fifo);
 }

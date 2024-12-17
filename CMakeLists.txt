@@ -485,26 +485,6 @@ target_link_libraries(params_libconfig PRIVATE config_internals ${libconfig_LIBR
 add_library(shlib_loader OBJECT common/utils/load_module_shlib.c)
 target_link_libraries(shlib_loader PRIVATE CONFIG_LIB)
 
-##########################################################
-
-# LDPC offload library - AMD T2 Accelerator Card
-##########################################################
-
-add_boolean_option(ENABLE_LDPC_T2 OFF "Build support for LDPC Offload to T2 library" OFF)
-if (ENABLE_LDPC_T2)
-  pkg_check_modules(LIBDPDK_T2 REQUIRED libdpdk=20.11.9)
-  find_library(PMD_T2 NAMES rte_baseband_accl_ldpc HINTS ${LIBDPDK_T2_LIBRARY_DIRS})
-  if (NOT PMD_T2)
-    message(FATAL_ERROR "could not find poll-mode driver for AccelerComm T2 LDPC Offload (rte_baseband_accl_ldpc.so)")
-  endif()
-  message(STATUS "T2 build: use ${PMD_T2}")
-  add_library(ldpc_t2 MODULE ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_offload.c)
-  set_target_properties(ldpc_t2 PROPERTIES COMPILE_FLAGS "-DALLOW_EXPERIMENTAL_API")
-  target_link_libraries(ldpc_t2 ${LIBDPDK_T2_LDFLAGS} ${PMD_T2})
-endif()
-
-##########################################################
-
 include_directories ("${OPENAIR_DIR}/radio/COMMON")
 
 ##############################################################
@@ -770,14 +750,6 @@ include_directories(${NFAPI_USER_DIR})
 
 # Layer 1
 #############################
-set(PHY_TURBOSRC
-  ${OPENAIR1_DIR}/PHY/CODING/3gpplte_sse.c
-  ${OPENAIR1_DIR}/PHY/CODING/3gpplte.c
-  ${OPENAIR1_DIR}/PHY/CODING/3gpplte_turbo_decoder_sse_8bit.c
-  ${OPENAIR1_DIR}/PHY/CODING/3gpplte_turbo_decoder_sse_16bit.c
-  ${OPENAIR1_DIR}/PHY/CODING/3gpplte_turbo_decoder_avx2_16bit.c
-  ${OPENAIR1_DIR}/PHY/CODING/3gpplte_turbo_decoder.c
-)
 set(PHY_POLARSRC
   ${OPENAIR1_DIR}/PHY/CODING/nrPolar_tools/nr_polar_init.c
   ${OPENAIR1_DIR}/PHY/CODING/nrPolar_tools/nr_bitwise_operations.c
@@ -800,75 +772,15 @@ set(PHY_TURBOIF
   ${OPENAIR1_DIR}/PHY/CODING/coding_load.c
 )
 
-set(PHY_LDPC_ORIG_SRC
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder.c
-)
-add_library(ldpc_orig MODULE ${PHY_LDPC_ORIG_SRC} )
-target_link_libraries(ldpc_orig PRIVATE ldpc_gen_HEADERS)
-
-set(PHY_LDPC_OPTIM_SRC
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim.c
-  )
-add_library(ldpc_optim MODULE ${PHY_LDPC_OPTIM_SRC} )
-target_link_libraries(ldpc_optim PRIVATE ldpc_gen_HEADERS)
-
-set(PHY_LDPC_OPTIM8SEG_SRC
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim8seg.c
-)
-add_library(ldpc_optim8seg MODULE ${PHY_LDPC_OPTIM8SEG_SRC} )
-target_link_libraries(ldpc_optim8seg PRIVATE ldpc_gen_HEADERS)
-
-set(PHY_LDPC_OPTIM8SEGMULTI_SRC
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder.c
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim8segmulti.c
-  )
-add_library(ldpc MODULE ${PHY_LDPC_OPTIM8SEGMULTI_SRC} )
-target_link_libraries(ldpc PRIVATE ldpc_gen_HEADERS)
-
-set(PHY_LDPC_CUDA_SRC
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder_LYC/nrLDPC_decoder_LYC.cu
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim8segmulti.c
-)
-
-set(PHY_LDPC_CL_SRC
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_CL.c
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim8segmulti.c
-)
-add_custom_target( nrLDPC_decoder_kernels_CL
-                   COMMAND gcc ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_CL.c -dD -DNRLDPC_KERNEL_SOURCE -E -o ${CMAKE_CURRENT_BINARY_DIR}/nrLDPC_decoder_kernels_CL.clc
-                   SOURCES ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_CL.c
-)
-add_library(ldpc_cl MODULE ${PHY_LDPC_CL_SRC} )
-target_link_libraries(ldpc_cl OpenCL)
-add_dependencies(ldpc_cl nrLDPC_decoder_kernels_CL)
-
 set(PHY_NR_CODINGIF
   ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_load.c
 )
 
-##############################################
-# Base CUDA setting
-##############################################
-
-add_boolean_option(ENABLE_LDPC_CUDA OFF "Build support for CUDA" OFF)
-if (ENABLE_LDPC_CUDA)
-  find_package(CUDA REQUIRED)
-  SET(CUDA_NVCC_FLAG "${CUDA_NVCC_FLAGS};-arch=sm_60;")
-  SET(CUDA_VERBOSE_BUILD ON)
-  cuda_add_library(ldpc_cuda MODULE ${PHY_LDPC_CUDA_SRC})
-  set_target_properties(ldpc_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  if (NOT CUDA_FOUND)
-    message(FATAL_ERROR "no CUDA found")
-  endif()
-endif()
-
-add_library(coding MODULE ${PHY_TURBOSRC} )
+set(PHY_NRLDPC_CODINGIF
+  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface_load.c
+)
 
 add_library(dfts MODULE ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts.c ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts_neon.c)
-
 
 set(PHY_SRC_COMMON
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/dci_tools_common.c
@@ -1057,7 +969,7 @@ set(PHY_SRC_UE
   ${OPENAIR1_DIR}/PHY/TOOLS/simde_operations.c
   ${PHY_POLARSRC}
   ${PHY_SMALLBLOCKSRC}
-  ${PHY_NR_CODINGIF}
+  ${PHY_NRLDPC_CODINGIF}
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/pucch_rx.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/srs_rx.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_uci_tools_common.c
@@ -1112,7 +1024,7 @@ set(PHY_SRC_UE
   ${OPENAIR1_DIR}/PHY/INIT/nr_init_ue.c
   ${PHY_POLARSRC}
   ${PHY_SMALLBLOCKSRC}
-  ${PHY_NR_CODINGIF}
+  ${PHY_NRLDPC_CODINGIF}
   )
 
 
@@ -1474,6 +1386,7 @@ add_library(L2_UE
   ${MAC_SRC_UE}
 )
 target_link_libraries(L2_UE PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+target_link_libraries(L2_UE PRIVATE GTPV1U)
 
 add_library(L2_UE_LTE_NR
   ${L2_RRC_SRC_UE}
@@ -1942,6 +1855,7 @@ target_link_libraries(lte-softmodem PRIVATE
 target_link_libraries(lte-softmodem PRIVATE pthread m CONFIG_LIB rt sctp)
 target_link_libraries(lte-softmodem PRIVATE ${T_LIB})
 target_link_libraries(lte-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+target_link_libraries(lte-softmodem PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES} ${lapack_LIBRARIES})
 
 if(E2_AGENT)
   target_compile_definitions(lte-softmodem PRIVATE ${E2AP_VERSION} ${KPM_VERSION} E2_AGENT)
@@ -1997,6 +1911,7 @@ target_link_libraries(lte-uesoftmodem PRIVATE
 target_link_libraries(lte-uesoftmodem PRIVATE pthread m CONFIG_LIB rt sctp)
 target_link_libraries(lte-uesoftmodem PRIVATE ${T_LIB})
 target_link_libraries(lte-uesoftmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+target_link_libraries(lte-uesoftmodem PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES} ${lapack_LIBRARIES})
 
 # force the generation of ASN.1 so that we don't need to wait during the build
 target_link_libraries(lte-uesoftmodem PRIVATE
@@ -2043,12 +1958,6 @@ if(E2_AGENT)
 endif()
 
 
-add_dependencies(nr-softmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc)
-
-if (ENABLE_LDPC_T2)
-  add_dependencies(nr-softmodem ldpc_t2)
-endif()
-
 # force the generation of ASN.1 so that we don't need to wait during the build
 target_link_libraries(nr-softmodem PRIVATE
   asn1_lte_rrc asn1_nr_rrc asn1_s1ap asn1_ngap asn1_m2ap asn1_m3ap asn1_x2ap asn1_f1ap asn1_lpp)
@@ -2079,6 +1988,7 @@ add_executable(nr-uesoftmodem
   ${rrc_h}
   ${s1ap_h}
   ${OPENAIR_DIR}/executables/nr-uesoftmodem.c
+  ${OPENAIR_DIR}/executables/position_interface.c
   ${OPENAIR_DIR}/executables/nr-ue.c
   ${OPENAIR_DIR}/executables/softmodem-common.c
   ${OPENAIR_DIR}/radio/COMMON/common_lib.c
@@ -2099,12 +2009,6 @@ target_link_libraries(nr-uesoftmodem PRIVATE
 target_link_libraries(nr-uesoftmodem PRIVATE pthread m CONFIG_LIB rt nr_ue_phy_meas)
 target_link_libraries(nr-uesoftmodem PRIVATE ${T_LIB})
 target_link_libraries(nr-uesoftmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
-
-add_dependencies( nr-uesoftmodem ldpc_orig ldpc_optim ldpc_optim8seg ldpc )
-if (ENABLE_LDPC_CUDA)
-   add_dependencies(nr-uesoftmodem ldpc_cuda)
-   add_dependencies(nr-softmodem ldpc_cuda)
-endif()
 
 # force the generation of ASN.1 so that we don't need to wait during the build
 target_link_libraries(nr-uesoftmodem PRIVATE
@@ -2159,11 +2063,6 @@ add_executable(ldpctest
    ${PHY_NR_CODINGIF}
    ${OPENAIR1_DIR}/PHY/CODING/TESTBENCH/ldpctest.c
    )
-
-add_dependencies(ldpctest ldpc_orig ldpc_optim ldpc_optim8seg ldpc)
-if (ENABLE_LDPC_CUDA)
-  add_dependencies(ldpctest ldpc_cuda)
-endif()
 target_link_libraries(ldpctest PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON -Wl,--end-group
   m pthread dl shlib_loader ${T_LIB}
@@ -2260,10 +2159,6 @@ add_executable(nr_ulsim
   ${PHY_INTERFACE_DIR}/queue_t.c
   )
 
-if (ENABLE_LDPC_T2)
-  add_dependencies(nr_ulsim ldpc_t2)
-endif()
-
 target_link_libraries(nr_ulsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON nr_rrc CONFIG_LIB L2_NR HASHTABLE x2ap SECURITY ngap -lz -Wl,--end-group
   m pthread ${T_LIB} ITTI dl shlib_loader nr_ue_phy_meas
@@ -2322,14 +2217,14 @@ if (${T_TRACER})
         #all "add_library" definitions
         ITTI lte_rrc nr_rrc s1ap x2ap m2ap m3ap f1ap
         params_libconfig oai_usrpdevif oai_bladerfdevif oai_lmssdrdevif oai_iqplayer
-        oai_eth_transpro oai_mobipass coding HASHTABLE UTIL OMG_SUMO
+        oai_eth_transpro oai_mobipass HASHTABLE UTIL OMG_SUMO
         SECURITY SCHED_LIB SCHED_NR_LIB SCHED_RU_LIB SCHED_UE_LIB SCHED_NR_UE_LIB default_sched remote_sched RAL
         NFAPI_LIB NFAPI_PNF_LIB NFAPI_VNF_LIB NFAPI_USER_LIB
         MISC_NFAPI_LTE_LIB MISC_NFAPI_NR_LIB
         PHY_COMMON PHY PHY_UE PHY_NR PHY_NR_COMMON PHY_NR_UE PHY_RU PHY_MEX
         L2 L2_LTE L2_NR L2_LTE_NR L2_UE NR_L2_UE L2_UE_LTE_NR MAC_NR_COMMON MAC_UE_NR ngap
         CN_UTILS GTPV1U SCTP_CLIENT MME_APP LIB_NAS_UE NB_IoT SIMU OPENAIR0_LIB
-        ldpc_orig ldpc_optim ldpc_optim8seg ldpc_t2 ldpc_cl ldpc_cuda ldpc dfts config_internals nr_common)
+        dfts config_internals nr_common)
     if (TARGET ${i})
       add_dependencies(${i} generate_T)
     endif()

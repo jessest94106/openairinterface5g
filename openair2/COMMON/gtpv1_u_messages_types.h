@@ -30,7 +30,6 @@
 #define NR_GTPV1U_MAX_BEARERS_PER_UE max_val_NR_DRB_Identity
 
 #define GTPV1U_ENB_TUNNEL_DATA_IND(mSGpTR)    (mSGpTR)->ittiMsg.Gtpv1uTunnelDataInd
-#define GTPV1U_TUNNEL_DATA_REQ(mSGpTR)    (mSGpTR)->ittiMsg.Gtpv1uTunnelDataReq
 #define GTPV1U_ENB_DATA_FORWARDING_REQ(mSGpTR)    (mSGpTR)->ittiMsg.Gtpv1uDataForwardingReq
 #define GTPV1U_ENB_DATA_FORWARDING_IND(mSGpTR)    (mSGpTR)->ittiMsg.Gtpv1uDataForwardingInd
 #define GTPV1U_ENB_END_MARKER_REQ(mSGpTR)     (mSGpTR)->ittiMsg.Gtpv1uEndMarkerReq
@@ -106,15 +105,6 @@ typedef struct gtpv1u_enb_delete_tunnel_resp_s {
   uint8_t                status;               ///< Status of S1U endpoint deleteion (Failed = 0xFF or Success = 0x0)
   teid_t                 enb_S1u_teid;         ///< local S1U Tunnel Endpoint Identifier to be deleted
 } gtpv1u_enb_delete_tunnel_resp_t;
-
-
-typedef struct gtpv1u_tunnel_data_req_s {
-  uint8_t               *buffer;
-  uint32_t               length;
-  uint32_t               offset;               ///< start of message offset in buffer
-  ue_id_t                ue_id;
-  rb_id_t                bearer_id;
-} gtpv1u_tunnel_data_req_t;
 
 typedef struct gtpv1u_enb_data_forwarding_req_s {
   uint8_t               *buffer;

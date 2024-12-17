@@ -328,6 +328,10 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
         ngap_gNB_initial_ctxt_resp(instance, &NGAP_INITIAL_CONTEXT_SETUP_RESP(received_msg));
         break;
 
+      case NGAP_INITIAL_CONTEXT_SETUP_FAIL:
+        ngap_gNB_initial_ctxt_fail(instance, &NGAP_INITIAL_CONTEXT_SETUP_FAIL(received_msg));
+        break;
+
       case NGAP_PDUSESSION_SETUP_RESP:
         ngap_gNB_pdusession_setup_resp(instance, &NGAP_PDUSESSION_SETUP_RESP(received_msg));
         break;

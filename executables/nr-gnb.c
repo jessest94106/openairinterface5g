@@ -383,12 +383,16 @@ void init_gNB_Tpool(int inst) {
 
 void term_gNB_Tpool(int inst) {
   PHY_VARS_gNB *gNB = RC.gNB[inst];
-  abortTpool(&gNB->threadPool);
-  abortNotifiedFIFO(&gNB->respDecode);
   abortNotifiedFIFO(&gNB->resp_L1);
+  pthread_join(gNB->L1_rx_thread, NULL);
+  abortNotifiedFIFO(&gNB->L1_tx_out);
+  pthread_join(gNB->L1_tx_thread, NULL);
+
+  abortTpool(&gNB->threadPool);
+  abortNotifiedFIFO(&gNB->respPuschSymb);
+  abortNotifiedFIFO(&gNB->respDecode);
   abortNotifiedFIFO(&gNB->L1_tx_free);
   abortNotifiedFIFO(&gNB->L1_tx_filled);
-  abortNotifiedFIFO(&gNB->L1_tx_out);
   abortNotifiedFIFO(&gNB->L1_rx_out);
 
   gNB_L1_proc_t *proc = &gNB->proc;
@@ -403,7 +407,6 @@ void init_eNB_afterRU(void) {
 
   for (inst=0; inst<RC.nb_nr_inst; inst++) {
     gNB = RC.gNB[inst];
-    gNB->ldpc_offload_flag = get_softmodem_params()->ldpc_offload_flag;
 
     phy_init_nr_gNB(gNB);
 
