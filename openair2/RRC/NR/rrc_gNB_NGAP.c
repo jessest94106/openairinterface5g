@@ -433,10 +433,10 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   if (ue_context_p == NULL) {
     /* Can not associate this message to an UE index, send a failure to NGAP and discard it! */
     LOG_W(NR_RRC, "[gNB %ld] In NGAP_INITIAL_CONTEXT_SETUP_REQ: unknown UE from NGAP ids (%u)\n", instance, req->gNB_ue_ngap_id);
+    ngap_cause_t cause = { .type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_LOCAL_UE_NGAP_ID};
     rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_FAIL(req->gNB_ue_ngap_id,
                                                  NULL,
-                                                 NGAP_CAUSE_RADIO_NETWORK,
-                                                 NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_LOCAL_UE_NGAP_ID);
+                                                 cause);
     return (-1);
   }
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
@@ -530,8 +530,8 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_
       session->status = PDU_SESSION_STATUS_FAILED;
       pdusession_failed_t *fail = &resp->pdusessions_failed[pdu_sessions_failed];
       fail->pdusession_id = session->param.pdusession_id;
-      fail->cause = NGAP_CAUSE_RADIO_NETWORK;
-      fail->cause_value = NGAP_CauseRadioNetwork_unknown_PDU_session_ID;
+      fail->cause.type = NGAP_CAUSE_RADIO_NETWORK;
+      fail->cause.value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID;
       pdu_sessions_failed++;
     }
   }
@@ -543,15 +543,13 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_
 
 void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_FAIL(uint32_t gnb,
                                                   const rrc_gNB_ue_context_t *const ue_context_pP,
-                                                  const ngap_Cause_t causeP,
-                                                  const long cause_valueP)
+                                                  const ngap_cause_t causeP)
 {
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_INITIAL_CONTEXT_SETUP_FAIL);
   ngap_initial_context_setup_fail_t *fail = &NGAP_INITIAL_CONTEXT_SETUP_FAIL(msg_p);
   memset(fail, 0, sizeof(*fail));
   fail->gNB_ue_ngap_id = gnb;
   fail->cause = causeP;
-  fail->cause_value = cause_valueP;
   itti_send_msg_to_task(TASK_NGAP, 0, msg_p);
 }
 
@@ -738,8 +736,8 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       session->status = PDU_SESSION_STATUS_FAILED;
       pdusession_failed_t *fail = &resp->pdusessions_failed[pdu_sessions_failed];
       fail->pdusession_id = session->param.pdusession_id;
-      fail->cause = NGAP_CAUSE_RADIO_NETWORK;
-      fail->cause_value = NGAP_CauseRadioNetwork_unknown_PDU_session_ID;
+      fail->cause.type = NGAP_CAUSE_RADIO_NETWORK;
+      fail->cause.value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID;
       pdu_sessions_failed++;
     }
     resp->nb_of_pdusessions = pdu_sessions_done;
@@ -794,8 +792,8 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
     for (int i = 0; i < resp->nb_of_pdusessions_failed; ++i) {
       pdusession_failed_t *f = &resp->pdusessions_failed[i];
       f->pdusession_id = msg->pdusession_setup_params[i].pdusession_id;
-      f->cause = NGAP_CAUSE_PROTOCOL;
-      f->cause_value = NGAP_CAUSE_PROTOCOL_MSG_NOT_COMPATIBLE_WITH_RECEIVER_STATE;
+      f->cause.type = NGAP_CAUSE_PROTOCOL;
+      f->cause.value = NGAP_CAUSE_PROTOCOL_MSG_NOT_COMPATIBLE_WITH_RECEIVER_STATE;
     }
     itti_send_msg_to_task(TASK_NGAP, instance, msg_resp);
     return;
@@ -926,17 +924,18 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
       UE->nb_of_pdusessions++;
       sess->status = PDU_SESSION_STATUS_FAILED;
       sess->param.pdusession_id = sessMod->pdusession_id;
-      sess->cause = NGAP_CAUSE_RADIO_NETWORK;
-      UE->pduSession[i].cause_value = NGAP_CauseRadioNetwork_unknown_PDU_session_ID;
+      sess->cause.type = NGAP_CAUSE_RADIO_NETWORK;
+      UE->pduSession[i].cause.type = NGAP_CAUSE_RADIO_NETWORK;
+      UE->pduSession[i].cause.value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID;
     } else {
       all_failed = false;
       sess->status = PDU_SESSION_STATUS_NEW;
       sess->param.pdusession_id = sessMod->pdusession_id;
-      sess->cause = NGAP_CAUSE_RADIO_NETWORK;
-      sess->cause_value = NGAP_CauseRadioNetwork_multiple_PDU_session_ID_instances;
+      sess->cause.type = NGAP_CAUSE_RADIO_NETWORK;
+      sess->cause.value = NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_PDU_SESSION_ID_INSTANCES;
       sess->status = PDU_SESSION_STATUS_NEW;
       sess->param.pdusession_id = sessMod->pdusession_id;
-      sess->cause = NGAP_CAUSE_NOTHING;
+      sess->cause.type = NGAP_CAUSE_NOTHING;
       if (sessMod->nas_pdu.buffer != NULL) {
         UE->pduSession[i].param.nas_pdu = sessMod->nas_pdu;
       }
@@ -964,8 +963,8 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
     for (int i = 0; i < UE->nb_of_pdusessions; i++) {
       if (UE->pduSession[i].status == PDU_SESSION_STATUS_FAILED) {
         msg->pdusessions_failed[i].pdusession_id = UE->pduSession[i].param.pdusession_id;
-        msg->pdusessions_failed[i].cause = UE->pduSession[i].cause;
-        msg->pdusessions_failed[i].cause_value = UE->pduSession[i].cause_value;
+        msg->pdusessions_failed[i].cause.type = UE->pduSession[i].cause.type;
+        msg->pdusessions_failed[i].cause.value = UE->pduSession[i].cause.value;
       }
     }
     itti_send_msg_to_task(TASK_NGAP, instance, msg_fail_p);
@@ -1000,7 +999,7 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
         LOG_I(NR_RRC, "update pdu session %d \n", pduSession->param.pdusession_id);
         // Update UE->pduSession
         pduSession->status = PDU_SESSION_STATUS_ESTABLISHED;
-        pduSession->cause = NGAP_CAUSE_NOTHING;
+        pduSession->cause.type = NGAP_CAUSE_NOTHING;
         for (int qos_flow_index = 0; qos_flow_index < UE->pduSession[i].param.nb_qos; qos_flow_index++) {
           pduSession->param.qos[qos_flow_index] = UE->pduSession[i].param.qos[qos_flow_index];
         }
@@ -1022,16 +1021,16 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       } else {
         LOG_W(NR_RRC, "PDU SESSION modify of a not existing pdu session %d \n", UE->pduSession[i].param.pdusession_id);
         resp->pdusessions_failed[pdu_sessions_failed].pdusession_id = UE->pduSession[i].param.pdusession_id;
-        resp->pdusessions_failed[pdu_sessions_failed].cause = NGAP_CAUSE_RADIO_NETWORK;
-        resp->pdusessions_failed[pdu_sessions_failed].cause_value = NGAP_CauseRadioNetwork_unknown_PDU_session_ID;
+        ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID};
+        resp->pdusessions_failed[pdu_sessions_failed].cause = cause;
         pdu_sessions_failed++;
       }
     } else if ((UE->pduSession[i].status == PDU_SESSION_STATUS_NEW) || (UE->pduSession[i].status == PDU_SESSION_STATUS_ESTABLISHED)) {
       LOG_D(NR_RRC, "PDU SESSION is NEW or already ESTABLISHED\n");
     } else if (UE->pduSession[i].status == PDU_SESSION_STATUS_FAILED) {
       resp->pdusessions_failed[pdu_sessions_failed].pdusession_id = UE->pduSession[i].param.pdusession_id;
-      resp->pdusessions_failed[pdu_sessions_failed].cause = UE->pduSession[i].cause;
-      resp->pdusessions_failed[pdu_sessions_failed].cause_value = UE->pduSession[i].cause_value;
+      resp->pdusessions_failed[pdu_sessions_failed].cause.type = UE->pduSession[i].cause.type;
+      resp->pdusessions_failed[pdu_sessions_failed].cause.value = UE->pduSession[i].cause.value;
       pdu_sessions_failed++;
     }
     else
@@ -1055,7 +1054,9 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
 }
 
 //------------------------------------------------------------------------------
-void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(const module_id_t gnb_mod_idP, const rrc_gNB_ue_context_t *const ue_context_pP, const ngap_Cause_t causeP, const long cause_valueP)
+void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(const module_id_t gnb_mod_idP,
+                                              const rrc_gNB_ue_context_t *const ue_context_pP,
+                                              const ngap_cause_t causeP)
 //------------------------------------------------------------------------------
 {
   if (ue_context_pP == NULL) {
@@ -1066,8 +1067,8 @@ void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(const module_id_t gnb_mod_idP, con
     ngap_ue_release_req_t *req = &NGAP_UE_CONTEXT_RELEASE_REQ(msg);
     memset(req, 0, sizeof(*req));
     req->gNB_ue_ngap_id = UE->rrc_ue_id;
-    req->cause = causeP;
-    req->cause_value = cause_valueP;
+    req->cause.type = causeP.type;
+    req->cause.value = causeP.value;
     for (int i = 0; i < UE->nb_of_pdusessions; i++) {
       req->pdusessions[i].pdusession_id = UE->pduSession[i].param.pdusession_id;
       req->nb_of_pdusessions++;
@@ -1268,8 +1269,8 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
       int j=UE->nb_of_pdusessions++;
       UE->pduSession[j].status = PDU_SESSION_STATUS_FAILED;
       UE->pduSession[j].param.pdusession_id = cmd->pdusession_release_params[pdusession].pdusession_id;
-      UE->pduSession[j].cause = NGAP_CAUSE_RADIO_NETWORK;
-      UE->pduSession[j].cause_value = 30;
+      ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID};
+      UE->pduSession[j].cause = cause;
       continue;
     }
     if (pduSession->status == PDU_SESSION_STATUS_FAILED) {

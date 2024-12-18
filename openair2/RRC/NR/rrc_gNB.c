@@ -594,7 +594,7 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
       continue;
     }
 
-    if (ue_p->pduSession[i].cause != NGAP_CAUSE_NOTHING) {
+    if (ue_p->pduSession[i].cause.type != NGAP_CAUSE_NOTHING) {
       // set xid of failure pdu session
       ue_p->pduSession[i].xid = xid;
       ue_p->pduSession[i].status = PDU_SESSION_STATUS_FAILED;
@@ -610,10 +610,10 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
     }
 
     if (j == MAX_DRBS_PER_UE) {
+      ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_unspecified};
       ue_p->pduSession[i].xid = xid;
       ue_p->pduSession[i].status = PDU_SESSION_STATUS_FAILED;
-      ue_p->pduSession[i].cause = NGAP_CAUSE_RADIO_NETWORK;
-      ue_p->pduSession[i].cause_value = NGAP_CauseRadioNetwork_unspecified;
+      ue_p->pduSession[i].cause = cause;
       continue;
     }
 
@@ -634,10 +634,10 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
 
         default:
           LOG_E(NR_RRC, "not supported 5qi %lu\n", ue_p->pduSession[i].param.qos[qos_flow_index].fiveQI);
+          ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_not_supported_5QI_value};
           ue_p->pduSession[i].status = PDU_SESSION_STATUS_FAILED;
           ue_p->pduSession[i].xid = xid;
-          ue_p->pduSession[i].cause = NGAP_CAUSE_RADIO_NETWORK;
-          ue_p->pduSession[i].cause_value = NGAP_CauseRadioNetwork_not_supported_5QI_value;
+          ue_p->pduSession[i].cause = cause;
           continue;
       }
         LOG_I(NR_RRC,
@@ -1222,9 +1222,10 @@ fallback_rrc_setup:
   fill_random(&random_value, sizeof(random_value));
   random_value = random_value & 0x7fffffffff; /* random value is 39 bits */
 
+  ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = ngap_cause};
   /* request release of the "old" UE in case it exists */
   if (ue_context_p != NULL)
-    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(0, ue_context_p, NGAP_CAUSE_RADIO_NETWORK, ngap_cause);
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(0, ue_context_p, cause);
 
   rrc_gNB_ue_context_t *new = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
   activate_srb(&new->ue_context, 1);
@@ -2031,10 +2032,8 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
 
   /* TODO: marshall types correctly */
   LOG_I(NR_RRC, "received UE Context Release Request for UE %u, forwarding to AMF\n", req->gNB_CU_ue_id);
-  rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(instance,
-                                           ue_context_p,
-                                           NGAP_CAUSE_RADIO_NETWORK,
-                                           NGAP_CAUSE_RADIO_NETWORK_RADIO_CONNECTION_WITH_UE_LOST);
+  ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_RADIO_CONNECTION_WITH_UE_LOST};
+  rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(instance, ue_context_p, cause);
 }
 
 static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
