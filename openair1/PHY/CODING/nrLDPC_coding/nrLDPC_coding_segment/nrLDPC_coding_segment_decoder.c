@@ -25,6 +25,7 @@
 
 
 // [from gNB coding]
+#include "nr_rate_matching.h"
 #include "PHY/defs_gNB.h"
 #include "PHY/CODING/coding_extern.h"
 #include "PHY/CODING/coding_defs.h"

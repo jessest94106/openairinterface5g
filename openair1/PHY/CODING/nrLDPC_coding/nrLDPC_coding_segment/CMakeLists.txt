@@ -2,6 +2,7 @@ add_library(ldpc MODULE
   nrLDPC_coding_segment_decoder.c
   nrLDPC_coding_segment_encoder.c
   ${PHY_NR_CODINGIF}
+  nr_rate_matching.c
 )
 set_target_properties(ldpc PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
