@@ -47,6 +47,7 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER):
     py_param_file_present = False
     py_params={}
 
+    force_local = False
     while len(argvs) > 1:
         myArgv = argvs.pop(1)	# 0th is this file's name
 
@@ -54,6 +55,9 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER):
         if re.match('^\-\-help$', myArgv, re.IGNORECASE):
             HELP.GenericHelp(CONST.Version)
             sys.exit(0)
+        if re.match('^\-\-local$', myArgv, re.IGNORECASE):
+            force_local = True
+
 
 	    #--apply=<filename> as parameters file, to replace inline parameters
         elif re.match('^\-\-Apply=(.+)$', myArgv, re.IGNORECASE):
@@ -271,4 +275,4 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER):
             HELP.GenericHelp(CONST.Version)
             sys.exit('Invalid Parameter: ' + myArgv)
 
-    return py_param_file_present, py_params, mode
+    return py_param_file_present, py_params, mode, force_local
