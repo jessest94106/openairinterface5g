@@ -314,8 +314,13 @@ int main(int argc, char **argv) {
   rfdevice.trx_start_func(&rfdevice);
   
   while(!oai_exit) {
-    for (int i=0; i<antennas; i++)
-      read(fd, samplesTx[i], DFT*sizeof(c16_t));
+    for (int i=0; i<antennas; i++) {
+      ssize_t len = read(fd, samplesTx[i], DFT*sizeof(c16_t));
+      if (len < 0) {
+        fprintf(stderr, "error during read(): errno %d, %s\n", errno, strerror(errno));
+        exit(1);
+      }
+    }
     rfdevice.trx_read_func(&rfdevice, &timestamp, samplesRx, DFT, antennas);
     rfdevice.trx_write_func(&rfdevice, timestamp + TxAdvanceInDFTSize * DFT, samplesTx, DFT, antennas, 0);
   }
