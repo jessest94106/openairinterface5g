@@ -1481,15 +1481,16 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   start_meas(&gNB->rx_pusch_symbol_processing_stats);
   int numSymbols = gNB->num_pusch_symbols_per_thread;
   int total_res = 0;
-  int const loop_iter = rel15_ul->nr_of_symbols / numSymbols;
+  int const loop_iter = CEILIDIV(rel15_ul->nr_of_symbols, numSymbols);
   puschSymbolProc_t arr[loop_iter];
   task_ans_t arr_ans[loop_iter];
 
-  memset(arr_ans, 0, loop_iter * sizeof(task_ans_t));
+  memset(arr_ans, 0, sizeof(arr_ans));
   int sz_arr = 0;
-  for(uint8_t symbol = rel15_ul->start_symbol_index; symbol < end_symbol; symbol += numSymbols) {
+  for(uint8_t task_index = 0; task_index < loop_iter; task_index++) {
+    int symbol = task_index * numSymbols + rel15_ul->start_symbol_index;
     int res_per_task = 0;
-    for (int s = 0; s < numSymbols; s++) { 
+    for (int s = 0; s < numSymbols && s + symbol < end_symbol; s++) {
       pusch_vars->ul_valid_re_per_slot[symbol+s] = get_nb_re_pusch(frame_parms,rel15_ul,symbol+s);
       pusch_vars->llr_offset[symbol+s] = ((symbol+s) == rel15_ul->start_symbol_index) ? 
                                          0 : 
@@ -1507,7 +1508,8 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
       rdata->rel15_ul = rel15_ul;
       rdata->slot = slot;
       rdata->startSymbol = symbol;
-      rdata->numSymbols = numSymbols;
+      // Last task processes remainder symbols
+      rdata->numSymbols = task_index == loop_iter - 1 ? rel15_ul->nr_of_symbols - (loop_iter - 1) * numSymbols : numSymbols;
       rdata->ulsch_id = ulsch_id;
       rdata->llr = pusch_vars->llr;
       rdata->llr_layers = pusch_vars->llr_layers;
