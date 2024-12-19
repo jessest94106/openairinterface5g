@@ -1715,10 +1715,6 @@ add_library(minimal_lib
   )
 target_link_libraries(minimal_lib PUBLIC pthread dl ${T_LIB} LOG)
 
-add_executable(nfapi_test
-  ${OPENAIR_DIR}/openair2/NR_PHY_INTERFACE/nfapi_5g_test.c
-  )
-
 add_executable(measurement_display
   ${OPENAIR_DIR}/common/utils/threadPool/measurement_display.c)
 target_link_libraries (measurement_display minimal_lib)
