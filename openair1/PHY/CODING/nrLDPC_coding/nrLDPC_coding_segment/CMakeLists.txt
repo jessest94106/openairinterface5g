@@ -1,8 +1,21 @@
-add_library(ldpc MODULE
-  nrLDPC_coding_segment_decoder.c
-  nrLDPC_coding_segment_encoder.c
-  ${PHY_NR_CODINGIF}
+add_library(nr_coding_segment_utils OBJECT
+  nrLDPC_load.c
   nr_rate_matching.c
+)
+
+add_library(nr_coding_segment_decoder OBJECT
+  nrLDPC_coding_segment_decoder.c
+)
+
+add_library(nr_coding_segment_encoder OBJECT
+  nrLDPC_coding_segment_encoder.c
+)
+
+add_library(ldpc MODULE)
+target_link_libraries(ldpc PRIVATE
+  nr_coding_segment_decoder
+  nr_coding_segment_encoder
+  nr_coding_segment_utils
 )
 set_target_properties(ldpc PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 

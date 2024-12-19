@@ -10,11 +10,13 @@ if (ENABLE_LDPC_XDMA)
   add_library(ldpc_xdma MODULE
               nrLDPC_coding_xdma_offload.c
               nrLDPC_coding_xdma.c
-              ../nrLDPC_coding_segment/nrLDPC_coding_segment_encoder.c
-              ../../nrLDPC_load.c
-              ../nrLDPC_coding_segment/nr_rate_matching.c
   )
   target_include_directories(ldpc_xdma PRIVATE ../nrLDPC_coding_segment)
+
+  target_link_libraries(ldpc_xdma PRIVATE
+    nr_coding_segment_encoder
+    nr_coding_segment_utils
+  )
   set_target_properties(ldpc_xdma PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
   add_dependencies(nr-softmodem ldpc_xdma)

@@ -772,10 +772,6 @@ set(PHY_TURBOIF
   ${OPENAIR1_DIR}/PHY/CODING/coding_load.c
 )
 
-set(PHY_NR_CODINGIF
-  ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_load.c
-)
-
 set(PHY_NRLDPC_CODINGIF
   ${OPENAIR1_DIR}/PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface_load.c
 )
@@ -2058,12 +2054,11 @@ target_link_libraries(smallblocktest PRIVATE
 
 
 add_executable(ldpctest
-   ${PHY_NR_CODINGIF}
    ${OPENAIR1_DIR}/PHY/CODING/TESTBENCH/ldpctest.c
    )
 target_link_libraries(ldpctest PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON -Wl,--end-group
-  m pthread dl shlib_loader ${T_LIB}
+  m pthread dl shlib_loader ${T_LIB} nr_coding_segment_utils
   )
 
 add_executable(nr_dlschsim
