@@ -70,6 +70,8 @@ static void save_pdsch_pdu_for_crnti(nfapi_nr_dl_tti_request_t *dl_tti_request);
 void print_ue_mac_stats(const module_id_t mod, const int frame_rx, const int slot_rx)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod);
+  if (mac->state != UE_CONNECTED)
+    return;
   int ret = pthread_mutex_lock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 
