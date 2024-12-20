@@ -602,7 +602,7 @@ static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
     for (int i = 0; i < NUM_DL_ACTORS; i++) {
       flush_actor(UE->dl_actors + i);
     }
-    /*TODO: Flush UL jobs */
+    flush_actor(&UE->ul_actor);
 
     clean_UE_harq(UE);
     UE->is_synchronized = 0;
