@@ -1129,7 +1129,7 @@ static void e1_task_handle_sctp_association_resp(E1_t type,
     if (getCxtE1(instance)->gtpInstF1U < 0)
       getCxtE1(instance)->gtpInstF1U = cuup_task_create_gtpu_instance_to_du(&IPaddr);
     if (getCxtE1(instance)->gtpInstF1U < 0)
-      LOG_E(E1AP, "Failed to create CUUP F1-U UDP listener");
+      LOG_E(E1AP, "Failed to create CUUP F1-U UDP listener\n");
     extern instance_t CUuniqInstance;
     CUuniqInstance = getCxtE1(instance)->gtpInstF1U;
     cuup_init_n3(instance);
@@ -1152,7 +1152,7 @@ void cuup_init_n3(instance_t instance)
     legacyInstanceMapping = getCxtE1(instance)->gtpInstN3 = gtpv1Init(tmp);
   }
   if (getCxtE1(instance)->gtpInstN3 < 0)
-    LOG_E(E1AP, "Failed to create CUUP N3 UDP listener");
+    LOG_E(E1AP, "Failed to create CUUP N3 UDP listener\n");
   extern instance_t *N3GTPUInst;
   N3GTPUInst = &getCxtE1(instance)->gtpInstN3;
 }
