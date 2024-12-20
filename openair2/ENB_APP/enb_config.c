@@ -266,9 +266,13 @@ int RCconfig_RRC(uint32_t i, eNB_RRC_INST *rrc) {
   paramlist_def_t ENBParamList = {ENB_CONFIG_STRING_ENB_LIST,NULL,0};
   checkedparam_t config_check_CCparams[] = CCPARAMS_CHECK;
   paramdef_t CCsParams[] = CCPARAMS_DESC(ccparams_lte);
+  static_assert(sizeofArray(config_check_CCparams) == sizeofArray(CCsParams),
+                "config_check_CCparams and CCsParams should have the same size");
   paramlist_def_t CCsParamList = {ENB_CONFIG_STRING_COMPONENT_CARRIERS,NULL,0};
   paramdef_t eMTCParams[]              = EMTCPARAMS_DESC((&eMTCconfig));
   checkedparam_t config_check_eMTCparams[] = EMTCPARAMS_CHECK;
+  static_assert(sizeofArray(config_check_eMTCparams) == sizeofArray(eMTCParams),
+                "config_check_eMTCparams and eMTCParamsCCsParams should have the same size");
   srb1_params_t srb1_params;
   memset((void *)&srb1_params,0,sizeof(srb1_params_t));
   paramdef_t SRB1Params[] = SRB1PARAMS_DESC(srb1_params);
@@ -320,6 +324,8 @@ int RCconfig_RRC(uint32_t i, eNB_RRC_INST *rrc) {
         paramlist_def_t PLMNParamList = {ENB_CONFIG_STRING_PLMN_LIST, NULL, 0};
         /* map parameter checking array instances to parameter definition array instances */
         checkedparam_t config_check_PLMNParams [] = PLMNPARAMS_CHECK;
+        static_assert(sizeofArray(config_check_PLMNParams) == sizeofArray(PLMNParams),
+                      "config_check_PLMNParams and PLMNParams should have the same size");
 
         for (int I = 0; I < sizeofArray(PLMNParams); ++I)
           PLMNParams[I].chkPptr = &(config_check_PLMNParams[I]);
@@ -1910,6 +1916,8 @@ int RCconfig_M2(MessageDef *msg_p, uint32_t i) {
             paramlist_def_t PLMNParamList = {ENB_CONFIG_STRING_PLMN_LIST, NULL, 0};
             /* map parameter checking array instances to parameter definition array instances */
             checkedparam_t config_check_PLMNParams [] = PLMNPARAMS_CHECK;
+            static_assert(sizeofArray(config_check_PLMNParams) == sizeofArray(PLMNParams),
+                          "config_check_PLMNParams and PLMNParams should have the same size");
 
             for (int I = 0; I < sizeofArray(PLMNParams); ++I)
               PLMNParams[I].chkPptr = &(config_check_PLMNParams[I]);
@@ -2159,6 +2167,8 @@ int RCconfig_S1(
             paramdef_t CCsParams[] = CCPARAMS_DESC(ccparams_lte);
             /* map parameter checking array instances to parameter definition array instances */
             checkedparam_t config_check_CCparams[] = CCPARAMS_CHECK;
+            static_assert(sizeofArray(config_check_CCparams) == sizeofArray(CCsParams),
+                          "config_check_CCparams and CCsParams should have the same size");
 
             for (int I = 0; I < sizeofArray(CCsParams); I++) {
               CCsParams[I].chkPptr = &(config_check_CCparams[I]);
@@ -2166,6 +2176,8 @@ int RCconfig_S1(
 
             /* map parameter checking array instances to parameter definition array instances */
             checkedparam_t config_check_PLMNParams [] = PLMNPARAMS_CHECK;
+            static_assert(sizeofArray(config_check_PLMNParams) == sizeofArray(PLMNParams),
+                          "config_check_PLMNParams and PLMNParams should have the same size");
 
             for (int I = 0; I < sizeofArray(PLMNParams); ++I) {
               PLMNParams[I].chkPptr = &(config_check_PLMNParams[I]);
@@ -2413,6 +2425,8 @@ int RCconfig_X2(MessageDef *msg_p, uint32_t i) {
   config_get(config_get_if(), ENBSParams, sizeofArray(ENBSParams), NULL);
   checkedparam_t config_check_CCparams[] = CCPARAMS_CHECK;
   paramdef_t CCsParams[] = CCPARAMS_DESC(ccparams_lte);
+  static_assert(sizeofArray(config_check_CCparams) == sizeofArray(CCsParams),
+                "config_check_CCparams and CCsParams should have the same size");
   paramlist_def_t CCsParamList = {ENB_CONFIG_STRING_COMPONENT_CARRIERS, NULL, 0};
 
   /* map parameter checking array instances to parameter definition array instances */
@@ -2450,6 +2464,8 @@ int RCconfig_X2(MessageDef *msg_p, uint32_t i) {
             paramlist_def_t PLMNParamList = {ENB_CONFIG_STRING_PLMN_LIST, NULL, 0};
             /* map parameter checking array instances to parameter definition array instances */
             checkedparam_t config_check_PLMNParams [] = PLMNPARAMS_CHECK;
+            static_assert(sizeofArray(config_check_PLMNParams) == sizeofArray(PLMNParams),
+                          "config_check_PLMNParams and PLMNParams should have the same size");
 
             for (int I = 0; I < sizeofArray(PLMNParams); ++I)
               PLMNParams[I].chkPptr = &(config_check_PLMNParams[I]);
