@@ -13,7 +13,7 @@ The `UE_thread` function in `nr-ue.c` is the main top level thread that interact
 
 The UE exits when at any point in operation it gets out of synchronization. When the command line option `--non-stop` is used, the UE goes to 'Initial Synchronization' mode when it loses synchronization with gNB. However, this feature is not fully implemented and it is a work in progress at the time of writing this documentation. This will be the default behavior (not a command line option) when the feature is fully implemented.
 
-UE uses actors which are threads dedicated to particular activity. Sync Actor handles initial sync. DL Actors handle DLSCH PHY procedures. UL procedures are processed directly on the threadpool
+UE uses actors which are threads dedicated to particular activity. Sync Actor handles initial sync. DL Actors handle DLSCH PHY procedures. UL procedures are are run on the UL Actor
 
 ![design](nr-ue-threads.svg)
 
