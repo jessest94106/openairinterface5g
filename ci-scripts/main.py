@@ -212,13 +212,17 @@ def ExecuteActionWithParam(action):
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
-		if test.findtext('nodes'):
-			CiTestObj.nodes = test.findtext('nodes').split(' ')
-			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
-				logging.error('Number of Nodes are not equal to the total number of UEs')
-				sys.exit("Mismatch in number of Nodes and UIs")
+		if force_local:
+			# Change all execution targets to localhost
+			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
 		else:
-			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+			if test.findtext('nodes'):
+				CiTestObj.nodes = test.findtext('nodes').split(' ')
+				if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+					logging.error('Number of Nodes are not equal to the total number of UEs')
+					sys.exit("Mismatch in number of Nodes and UIs")
+			else:
+				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		if action == 'Initialize_UE':
 			success = CiTestObj.InitializeUE(HTML)
 		elif action == 'Attach_UE':
@@ -238,13 +242,17 @@ def ExecuteActionWithParam(action):
 		CiTestObj.ping_args = test.findtext('ping_args')
 		CiTestObj.ping_packetloss_threshold = test.findtext('ping_packetloss_threshold')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
-		if test.findtext('nodes'):
-			CiTestObj.nodes = test.findtext('nodes').split(' ')
-			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
-				logging.error('Number of Nodes are not equal to the total number of UEs')
-				sys.exit("Mismatch in number of Nodes and UIs")
+		if force_local:
+			# Change all execution targets to localhost
+			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
 		else:
-			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+			if test.findtext('nodes'):
+				CiTestObj.nodes = test.findtext('nodes').split(' ')
+				if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+					logging.error('Number of Nodes are not equal to the total number of UEs')
+					sys.exit("Mismatch in number of Nodes and UIs")
+			else:
+				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
 		success = CiTestObj.Ping(HTML,EPC,CONTAINERS)
 
@@ -252,15 +260,19 @@ def ExecuteActionWithParam(action):
 		CiTestObj.iperf_args = test.findtext('iperf_args')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		CiTestObj.svr_id = test.findtext('svr_id') or None
-		if test.findtext('nodes'):
-			CiTestObj.nodes = test.findtext('nodes').split(' ')
-			if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
-				logging.error('Number of Nodes are not equal to the total number of UEs')
-				sys.exit("Mismatch in number of Nodes and UIs")
+		if force_local:
+			# Change all execution targets to localhost
+			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
 		else:
-			CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+			if test.findtext('nodes'):
+				CiTestObj.nodes = test.findtext('nodes').split(' ')
+				if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
+					logging.error('Number of Nodes are not equal to the total number of UEs')
+					sys.exit("Mismatch in number of Nodes and UIs")
+			else:
+				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		if test.findtext('svr_node'):
-			CiTestObj.svr_node = test.findtext('svr_node')
+			CiTestObj.svr_node = test.findtext('svr_node') if not force_local else 'localhost'
 		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
 		CiTestObj.iperf_bitrate_threshold = test.findtext('iperf_bitrate_threshold') or '90'
 		CiTestObj.iperf_profile = test.findtext('iperf_profile') or 'balanced'
@@ -356,6 +368,9 @@ def ExecuteActionWithParam(action):
 		elif action == 'Undeploy_Object':
 			success = CONTAINERS.UndeployObject(HTML, RAN)
 		elif action == 'Create_Workspace':
+			if force_local:
+				# Do not create a working directory when running locally. Current repo directory will be used
+				return True
 			success = CONTAINERS.Create_Workspace(HTML)
 
 	elif action == 'Run_Physim':
@@ -375,6 +390,9 @@ def ExecuteActionWithParam(action):
 		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id)
 
 	elif action == 'Pull_Local_Registry' or action == 'Clean_Test_Server_Images':
+		if force_local:
+			# Do not pull or remove images when running locally. User is supposed to handle image creation & cleanup
+			return True
 		svr_id = test.findtext('svr_id')
 		images = test.findtext('images').split()
 		# hack: for FlexRIC, we need to overwrite the tag to use
@@ -463,7 +481,9 @@ CLUSTER = cls_cluster.Cluster()
 #-----------------------------------------------------------
 
 import args_parse
-py_param_file_present, py_params, mode = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER)
+# Force local execution, move all execution targets to localhost
+force_local = False
+py_param_file_present, py_params, mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER)
 
 
 
