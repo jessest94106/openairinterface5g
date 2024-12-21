@@ -708,6 +708,7 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
   const int current_rnti = rntiP;
   LOG_D(NR_MAC, "rx_sdu for rnti %04x\n", current_rnti);
   const int target_snrx10 = gNB_mac->pusch_target_snrx10;
+  const int rssi_threshold = gNB_mac->pusch_rssi_threshold;
   const int pusch_failure_thres = gNB_mac->pusch_failure_thres;
 
   NR_UE_info_t *UE = find_nr_UE(&gNB_mac->UE_info, current_rnti);
@@ -748,6 +749,8 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
         UE_scheduling_control->tpc0 = nr_get_tpc(target_snrx10, ul_cqi, 30, txpower_calc);
       if (UE_scheduling_control->ph < 0 && UE_scheduling_control->tpc0 > 1)
         UE_scheduling_control->tpc0 = 1;
+
+      UE_scheduling_control->tpc0 = nr_limit_tpc(UE_scheduling_control->tpc0, rssi, rssi_threshold);
 
       if (timing_advance != 0xffff)
         UE_scheduling_control->ta_update = timing_advance;
