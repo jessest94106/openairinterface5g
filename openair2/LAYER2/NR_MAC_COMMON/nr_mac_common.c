@@ -2822,6 +2822,7 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
                                       dci_field_t srs_resource_indicator,
                                       nr_srs_feedback_t *srs_feedback,
                                       const uint8_t *nrOfLayers,
+                                      int *tpmi,
                                       uint32_t *val)
 {
   // It is only applicable to codebook based transmission. This field occupies 0 bits for non-codebook based
@@ -2841,6 +2842,7 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
   long max_rank = *pusch_Config->maxRank;
   long *ul_FullPowerTransmission = pusch_Config->ext1 ? pusch_Config->ext1->ul_FullPowerTransmission_r16 : NULL;
   long *codebookSubset = pusch_Config->codebookSubset;
+  int ul_tpmi = tpmi ? *tpmi : srs_feedback ? srs_feedback->tpmi : -1;
 
   if (pusch_antenna_ports == 2) {
 
@@ -2854,21 +2856,21 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
       if (ul_FullPowerTransmission && *ul_FullPowerTransmission == NR_PUSCH_Config__ext1__ul_FullPowerTransmission_r16_fullpowerMode1) {
         nbits = 2;
         if (val && srs_feedback) {
-          AssertFatal(srs_feedback->tpmi <= 2,"TPMI %d is invalid!\n", srs_feedback->tpmi);
-          *val = srs_feedback->tpmi;
+          AssertFatal(ul_tpmi <= 2,"TPMI %d is invalid!\n", ul_tpmi);
+          *val = ul_tpmi;
         }
       } else {
         if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
           nbits = 1;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 1,"TPMI %d is invalid!\n", srs_feedback->tpmi);
-            *val = srs_feedback->tpmi;
+            AssertFatal(ul_tpmi <= 1,"TPMI %d is invalid!\n", ul_tpmi);
+            *val = ul_tpmi;
           }
         } else {
           nbits = 3;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 5,"TPMI %d is invalid!\n", srs_feedback->tpmi);
-            *val = srs_feedback->tpmi;
+            AssertFatal(ul_tpmi <= 5,"TPMI %d is invalid!\n", ul_tpmi);
+            *val = ul_tpmi;
           }
         }
       }
@@ -2881,25 +2883,25 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
       if (ul_FullPowerTransmission && *ul_FullPowerTransmission == NR_PUSCH_Config__ext1__ul_FullPowerTransmission_r16_fullpowerMode1) {
         nbits = 2;
         if (val && srs_feedback) {
-          AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 2) || (*nrOfLayers==2 && srs_feedback->tpmi == 0),
-                      "TPMI %d is invalid!\n", srs_feedback->tpmi);
-          *val = *nrOfLayers==1 ? table_7_3_1_1_2_4A_1layer[srs_feedback->tpmi] : 2;
+          AssertFatal((*nrOfLayers==1 && ul_tpmi <= 2) || (*nrOfLayers==2 && ul_tpmi == 0),
+                      "TPMI %d is invalid!\n", ul_tpmi);
+          *val = *nrOfLayers==1 ? table_7_3_1_1_2_4A_1layer[ul_tpmi] : 2;
         }
       } else {
         if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
           nbits = 2;
           if (val && srs_feedback) {
-            AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 1) || (*nrOfLayers==2 && srs_feedback->tpmi == 0),
-                        "TPMI %d is invalid!\n", srs_feedback->tpmi);
-            *val = *nrOfLayers==1 ? srs_feedback->tpmi : 2;
+            AssertFatal((*nrOfLayers==1 && ul_tpmi <= 1) || (*nrOfLayers==2 && ul_tpmi == 0),
+                        "TPMI %d is invalid!\n", ul_tpmi);
+            *val = *nrOfLayers==1 ? ul_tpmi : 2;
           }
         } else {
           nbits = 4;
           if (val && srs_feedback) {
-            AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 5) || (*nrOfLayers==2 && srs_feedback->tpmi <= 2),
-                        "TPMI %d is invalid!\n", srs_feedback->tpmi);
-            *val = *nrOfLayers==1 ? table_7_3_1_1_2_4_1layer_fullyAndPartialAndNonCoherent[srs_feedback->tpmi] :
-                                    table_7_3_1_1_2_4_2layers_fullyAndPartialAndNonCoherent[srs_feedback->tpmi];
+            AssertFatal((*nrOfLayers==1 && ul_tpmi <= 5) || (*nrOfLayers==2 && ul_tpmi <= 2),
+                        "TPMI %d is invalid!\n", ul_tpmi);
+            *val = *nrOfLayers==1 ? table_7_3_1_1_2_4_1layer_fullyAndPartialAndNonCoherent[ul_tpmi] :
+                                    table_7_3_1_1_2_4_2layers_fullyAndPartialAndNonCoherent[ul_tpmi];
           }
         }
       }
@@ -2918,36 +2920,36 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
         if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
           nbits = 3;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 3 || srs_feedback->tpmi == 13, "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal(ul_tpmi <= 3 || ul_tpmi == 13, "TPMI %d is invalid!\n", ul_tpmi);
           }
         } else {
           nbits = 4;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 15, "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal(ul_tpmi <= 15, "TPMI %d is invalid!\n", ul_tpmi);
           }
         }
         if (val && srs_feedback) {
-          *val = table_7_3_1_1_2_3A[srs_feedback->tpmi];
+          *val = table_7_3_1_1_2_3A[ul_tpmi];
         }
       } else {
         if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
           nbits = 2;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 3, "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal(ul_tpmi <= 3, "TPMI %d is invalid!\n", ul_tpmi);
           }
         } else if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_partialAndNonCoherent) {
           nbits = 4;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 11, "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal(ul_tpmi <= 11, "TPMI %d is invalid!\n", ul_tpmi);
           }
         } else {
           nbits = 5;
           if (val && srs_feedback) {
-            AssertFatal(srs_feedback->tpmi <= 27, "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal(ul_tpmi <= 27, "TPMI %d is invalid!\n", ul_tpmi);
           }
         }
         if (val && srs_feedback) {
-          *val = srs_feedback->tpmi;
+          *val = ul_tpmi;
         }
       }
     } else {
@@ -2965,48 +2967,48 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
           if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
             nbits = 4;
             if (val && srs_feedback) {
-              AssertFatal((*nrOfLayers==1 && (srs_feedback->tpmi <= 3 || srs_feedback->tpmi==13)) || (*nrOfLayers==2 && srs_feedback->tpmi <= 6),
-                          "TPMI %d is invalid!\n", srs_feedback->tpmi);
+              AssertFatal((*nrOfLayers==1 && (ul_tpmi <= 3 || ul_tpmi==13)) || (*nrOfLayers==2 && ul_tpmi <= 6),
+                          "TPMI %d is invalid!\n", ul_tpmi);
             }
           } else {
             nbits = 5;
             if (val && srs_feedback) {
-              AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 15) || (*nrOfLayers==2 && srs_feedback->tpmi <= 13),
-                          "TPMI %d is invalid!\n", srs_feedback->tpmi);
+              AssertFatal((*nrOfLayers==1 && ul_tpmi <= 15) || (*nrOfLayers==2 && ul_tpmi <= 13),
+                          "TPMI %d is invalid!\n", ul_tpmi);
             }
           }
           if (val && srs_feedback) {
-            *val = *nrOfLayers==1 ? table_7_3_1_1_2_2A_1layer[srs_feedback->tpmi] : table_7_3_1_1_2_2A_2layers[srs_feedback->tpmi];
+            *val = *nrOfLayers==1 ? table_7_3_1_1_2_2A_1layer[ul_tpmi] : table_7_3_1_1_2_2A_2layers[ul_tpmi];
           }
         } else {
           if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
             nbits = 4;
             if (val && srs_feedback) {
-              AssertFatal((*nrOfLayers==1 && (srs_feedback->tpmi <= 3 || srs_feedback->tpmi == 13)) || (*nrOfLayers==2 && srs_feedback->tpmi <= 6) ||
-                          (*nrOfLayers==3 && srs_feedback->tpmi <= 1) || (*nrOfLayers==4 && srs_feedback->tpmi == 0),
-                          "TPMI %d is invalid!\n", srs_feedback->tpmi);
+              AssertFatal((*nrOfLayers==1 && (ul_tpmi <= 3 || ul_tpmi == 13)) || (*nrOfLayers==2 && ul_tpmi <= 6) ||
+                          (*nrOfLayers==3 && ul_tpmi <= 1) || (*nrOfLayers==4 && ul_tpmi == 0),
+                          "TPMI %d is invalid!\n", ul_tpmi);
             }
           } else {
             nbits = 6;
             if (val && srs_feedback) {
-              AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 15) || (*nrOfLayers==2 && srs_feedback->tpmi <= 13) ||
-                          (*nrOfLayers==3 && srs_feedback->tpmi <= 2) || (*nrOfLayers==4 && srs_feedback->tpmi <= 2),
-                          "TPMI %d is invalid!\n", srs_feedback->tpmi);
+              AssertFatal((*nrOfLayers==1 && ul_tpmi <= 15) || (*nrOfLayers==2 && ul_tpmi <= 13) ||
+                          (*nrOfLayers==3 && ul_tpmi <= 2) || (*nrOfLayers==4 && ul_tpmi <= 2),
+                          "TPMI %d is invalid!\n", ul_tpmi);
             }
           }
           if (val && srs_feedback) {
             switch (*nrOfLayers) {
               case 1:
-                *val = table_7_3_1_1_2_2B_1layer[srs_feedback->tpmi];
+                *val = table_7_3_1_1_2_2B_1layer[ul_tpmi];
                 break;
               case 2:
-                *val = table_7_3_1_1_2_2B_2layers[srs_feedback->tpmi];
+                *val = table_7_3_1_1_2_2B_2layers[ul_tpmi];
                 break;
               case 3:
-                *val = table_7_3_1_1_2_2B_3layers[srs_feedback->tpmi];
+                *val = table_7_3_1_1_2_2B_3layers[ul_tpmi];
                 break;
               case 4:
-                *val = table_7_3_1_1_2_2B_4layers[srs_feedback->tpmi];
+                *val = table_7_3_1_1_2_2B_4layers[ul_tpmi];
                 break;
               default:
                 LOG_E(NR_MAC,"Number of layers %d is invalid!\n", *nrOfLayers);
@@ -3017,38 +3019,38 @@ uint8_t compute_precoding_information(NR_PUSCH_Config_t *pusch_Config,
         if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent) {
           nbits = 4;
           if (val && srs_feedback) {
-            AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 3) || (*nrOfLayers==2 && srs_feedback->tpmi <= 5) ||
-                        (*nrOfLayers==3 && srs_feedback->tpmi == 0) || (*nrOfLayers==4 && srs_feedback->tpmi == 0),
-                        "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal((*nrOfLayers==1 && ul_tpmi <= 3) || (*nrOfLayers==2 && ul_tpmi <= 5) ||
+                        (*nrOfLayers==3 && ul_tpmi == 0) || (*nrOfLayers==4 && ul_tpmi == 0),
+                        "TPMI %d is invalid!\n", ul_tpmi);
           }
         } else if (codebookSubset && *codebookSubset == NR_PUSCH_Config__codebookSubset_partialAndNonCoherent) {
           nbits = 5;
           if (val && srs_feedback) {
-            AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 11) || (*nrOfLayers==2 && srs_feedback->tpmi <= 13) ||
-                        (*nrOfLayers==3 && srs_feedback->tpmi <= 2) || (*nrOfLayers==4 && srs_feedback->tpmi <= 2),
-                        "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal((*nrOfLayers==1 && ul_tpmi <= 11) || (*nrOfLayers==2 && ul_tpmi <= 13) ||
+                        (*nrOfLayers==3 && ul_tpmi <= 2) || (*nrOfLayers==4 && ul_tpmi <= 2),
+                        "TPMI %d is invalid!\n", ul_tpmi);
           }
         } else {
           nbits = 6;
           if (val && srs_feedback) {
-            AssertFatal((*nrOfLayers==1 && srs_feedback->tpmi <= 28) || (*nrOfLayers==2 && srs_feedback->tpmi <= 22) ||
-                        (*nrOfLayers==3 && srs_feedback->tpmi <= 7) || (*nrOfLayers==4 && srs_feedback->tpmi <= 5),
-                        "TPMI %d is invalid!\n", srs_feedback->tpmi);
+            AssertFatal((*nrOfLayers==1 && ul_tpmi <= 28) || (*nrOfLayers==2 && ul_tpmi <= 22) ||
+                        (*nrOfLayers==3 && ul_tpmi <= 7) || (*nrOfLayers==4 && ul_tpmi <= 5),
+                        "TPMI %d is invalid!\n", ul_tpmi);
           }
         }
         if (val && srs_feedback) {
           switch (*nrOfLayers) {
             case 1:
-              *val = table_7_3_1_1_2_2_1layer[srs_feedback->tpmi];
+              *val = table_7_3_1_1_2_2_1layer[ul_tpmi];
               break;
             case 2:
-              *val = table_7_3_1_1_2_2_2layers[srs_feedback->tpmi];
+              *val = table_7_3_1_1_2_2_2layers[ul_tpmi];
               break;
             case 3:
-              *val = table_7_3_1_1_2_2_3layers[srs_feedback->tpmi];
+              *val = table_7_3_1_1_2_2_3layers[ul_tpmi];
               break;
             case 4:
-              *val = table_7_3_1_1_2_2_4layers[srs_feedback->tpmi];
+              *val = table_7_3_1_1_2_2_4layers[ul_tpmi];
               break;
             default:
               LOG_E(NR_MAC,"Number of layers %d is invalid!\n", *nrOfLayers);
@@ -3299,7 +3301,8 @@ uint16_t nr_dci_size(const NR_UE_DL_BWP_t *DL_BWP,
       size += dci_pdu->srs_resource_indicator.nbits;
       LOG_D(NR_MAC, "dci_pdu->srs_resource_indicator.nbits %d\n", dci_pdu->srs_resource_indicator.nbits);
       // Precoding info and number of layers
-      dci_pdu->precoding_information.nbits = compute_precoding_information(pusch_Config, srs_config, dci_pdu->srs_resource_indicator, NULL, NULL, NULL);
+      dci_pdu->precoding_information.nbits =
+          compute_precoding_information(pusch_Config, srs_config, dci_pdu->srs_resource_indicator, NULL, NULL, NULL, NULL);
       size += dci_pdu->precoding_information.nbits;
       LOG_D(NR_MAC, "dci_pdu->precoding_informaiton.nbits=%d\n", dci_pdu->precoding_information.nbits);
       // Antenna ports

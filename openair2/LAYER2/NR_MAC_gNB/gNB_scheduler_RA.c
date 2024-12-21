@@ -894,6 +894,7 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                  pusch_pdu,
                  &uldci_payload,
                  NULL,
+                 NULL,
                  ra->Msg3_tda_id,
                  ra->msg3_TPC,
                  1, // Not toggling NDI in msg3 retransmissions

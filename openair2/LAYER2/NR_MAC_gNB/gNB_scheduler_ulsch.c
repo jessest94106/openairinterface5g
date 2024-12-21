@@ -2256,6 +2256,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
 
     uint16_t rnti = UE->rnti;
     sched_ctrl->SR = false;
+    int *tpmi = NULL;
 
     int8_t harq_id = sched_pusch->ul_harq_pid;
     if (harq_id < 0) {
@@ -2297,6 +2298,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
        * retransmissions */
       cur_harq->sched_pusch.time_domain_allocation = sched_pusch->time_domain_allocation;
       cur_harq->sched_pusch.nrOfLayers = sched_pusch->nrOfLayers;
+      cur_harq->sched_pusch.tpmi = sched_pusch->tpmi;
       sched_ctrl->sched_ul_bytes += sched_pusch->tb_size;
       UE->mac_stats.ul.total_rbs += sched_pusch->rbSize;
 
@@ -2397,6 +2399,10 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
     else
       pusch_pdu->data_scrambling_id = *scc->physCellId;
     pusch_pdu->nrOfLayers = sched_pusch->nrOfLayers;
+    // If nrOfLayers is the same as in srs_feedback, we use the best TPMI, i.e. the one in srs_feedback.
+    // Otherwise, we use the valid TPMI that we saved in the first transmission.
+    if (pusch_pdu->nrOfLayers != (sched_ctrl->srs_feedback.ul_ri + 1))
+      tpmi = &sched_pusch->tpmi;
     pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
 
     /* FAPI: DMRS */
@@ -2572,6 +2578,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
                  pusch_pdu,
                  &uldci_payload,
                  &sched_ctrl->srs_feedback,
+                 tpmi,
                  sched_pusch->time_domain_allocation,
                  UE->UE_sched_ctrl.tpc0,
                  cur_harq->ndi,

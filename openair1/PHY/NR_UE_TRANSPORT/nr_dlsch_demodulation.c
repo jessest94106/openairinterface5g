@@ -1098,28 +1098,20 @@ void nr_dlsch_channel_level(uint32_t rx_size_symbol,
                             int32_t avg[MAX_ANT][MAX_ANT],
                             uint32_t len)
 {
-  simde__m128i *dl_ch128, avg128D;
-  //nb_rb*nre = y * 2^x
   int16_t x = factor2(len);
   int16_t y = (len) >> x;
+
   uint32_t nb_rb_0 = len / NR_NB_SC_PER_RB + ((len % NR_NB_SC_PER_RB) ? 1 : 0);
   LOG_D(NR_PHY, "nb_rb_0 %d len %d = %d * 2^(%d)\n", nb_rb_0, len, y, x);
+
   for (int aatx = 0; aatx < n_tx; aatx++) {
     for (int aarx = 0; aarx < n_rx; aarx++) {
-      //clear average level
-      avg128D = simde_mm_setzero_si128();
 
-      dl_ch128 = (simde__m128i *)dl_ch_estimates_ext[(aatx * n_rx) + aarx];
+      simde__m128i *dl_ch128 = (simde__m128i *)dl_ch_estimates_ext[(aatx * n_rx) + aarx];
 
-      for (int rb = 0; rb < nb_rb_0; rb++) {
-        avg128D = simde_mm_add_epi32(avg128D,simde_mm_srai_epi32(simde_mm_madd_epi16(dl_ch128[0],dl_ch128[0]),x));
-        avg128D = simde_mm_add_epi32(avg128D,simde_mm_srai_epi32(simde_mm_madd_epi16(dl_ch128[1],dl_ch128[1]),x));
-        avg128D = simde_mm_add_epi32(avg128D,simde_mm_srai_epi32(simde_mm_madd_epi16(dl_ch128[2],dl_ch128[2]),x));
-        dl_ch128+=3;
-      }
-      int32_t *tmp = (int32_t *)&avg128D;
-      avg[aatx][aarx] = ((int64_t)tmp[0] + tmp[1] + tmp[2] + tmp[3]) / y;
-      LOG_D(PHY, "Channel level: %d\n", avg[aatx][aarx]);
+      //compute average level
+      avg[aatx][aarx] = simde_mm_average(dl_ch128, nb_rb_0 * 12, x, y);
+      //LOG_D(PHY, "Channel level: %d\n", avg[aatx][aarx]);
     }
   }
 }
