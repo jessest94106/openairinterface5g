@@ -194,9 +194,6 @@ void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int1
   simde__m128i *rxF_128 = (simde__m128i *)rxF;
   simde__m128i *ch_mag_128 = (simde__m128i *)ch_maga;
   simde__m128i *ch_magb_128 = (simde__m128i *)ch_magb;
-
-  simde__m64 *llr64 = (simde__m64 *)llr_32;
-
   // Each iteration does 4 RE (gives 24 16bit-llrs)
   for (int i = 0; i < (nb_re >> 2); i++) {
     simde__m128i xmm0, xmm1, xmm2;
@@ -206,12 +203,18 @@ void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int1
     xmm2 = simde_mm_abs_epi16(xmm1);
     xmm2 = simde_mm_subs_epi16(*ch_magb_128, xmm2);
 
-    *llr64++ = simde_mm_set_pi32(simde_mm_extract_epi32(xmm1, 0), simde_mm_extract_epi32(xmm0, 0));
-    *llr64++ = simde_mm_set_pi32(simde_mm_extract_epi32(xmm0, 1), simde_mm_extract_epi32(xmm2, 0));
-    *llr64++ = simde_mm_set_pi32(simde_mm_extract_epi32(xmm2, 1), simde_mm_extract_epi32(xmm1, 1));
-    *llr64++ = simde_mm_set_pi32(simde_mm_extract_epi32(xmm1, 2), simde_mm_extract_epi32(xmm0, 2));
-    *llr64++ = simde_mm_set_pi32(simde_mm_extract_epi32(xmm0, 3), simde_mm_extract_epi32(xmm2, 2));
-    *llr64++ = simde_mm_set_pi32(simde_mm_extract_epi32(xmm2, 3), simde_mm_extract_epi32(xmm1, 3));
+    *llr_32++ = simde_mm_extract_epi32(xmm0, 0);
+    *llr_32++ = simde_mm_extract_epi32(xmm1, 0);
+    *llr_32++ = simde_mm_extract_epi32(xmm2, 0);
+    *llr_32++ = simde_mm_extract_epi32(xmm0, 1);
+    *llr_32++ = simde_mm_extract_epi32(xmm1, 1);
+    *llr_32++ = simde_mm_extract_epi32(xmm2, 1);
+    *llr_32++ = simde_mm_extract_epi32(xmm0, 2);
+    *llr_32++ = simde_mm_extract_epi32(xmm1, 2);
+    *llr_32++ = simde_mm_extract_epi32(xmm2, 2);
+    *llr_32++ = simde_mm_extract_epi32(xmm0, 3);
+    *llr_32++ = simde_mm_extract_epi32(xmm1, 3);
+    *llr_32++ = simde_mm_extract_epi32(xmm2, 3);
     rxF_128++;
     ch_mag_128++;
     ch_magb_128++;
@@ -222,7 +225,7 @@ void nr_64qam_llr(int32_t *rxdataF_comp, int32_t *ch_mag, int32_t *ch_mag2, int1
   int16_t *rxDataF_i16 = (int16_t *)rxF_128;
   int16_t *ch_mag_i16 = (int16_t *)ch_mag_128;
   int16_t *ch_magb_i16 = (int16_t *)ch_magb_128;
-  int16_t *llr_i16 = (int16_t *)llr64;
+  int16_t *llr_i16 = (int16_t *)llr_32;
   for (int i = 0; i < nb_re; i++) {
     int16_t real = rxDataF_i16[2 * i];
     int16_t imag = rxDataF_i16[2 * i + 1];

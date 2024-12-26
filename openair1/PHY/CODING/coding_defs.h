@@ -399,7 +399,7 @@ void phy_viterbi_lte_sse2(int8_t *y, uint8_t *decoded_bytes, uint16_t n);
 */
 void phy_generate_viterbi_tables(void);
 
-/*!\fn void phy_generate_viterbi_tables_lte(bool dabflag)
+/*!\fn void phy_generate_viterbi_tables_lte(void)
 \brief This routine initializes metric tables for the optimized LTE Viterbi decoder.
 */
 void phy_generate_viterbi_tables_lte(void);

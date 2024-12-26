@@ -1513,7 +1513,6 @@ const static int16_t tw64c[96] __attribute__((aligned(32))) = {
 -12539,-30273,-20787,-25330,-27244,-18205,-31356,-9512
                                                  };
 #define simd_q15_t simde__m128i
-#define simdshort_q15_t simde__m64
 #define shiftright_int16(a,shift) simde_mm_srai_epi16(a,shift)
 #define mulhi_int16(a,b) simde_mm_mulhrs_epi16 (a,b)
 #define simd256_q15_t simde__m256i

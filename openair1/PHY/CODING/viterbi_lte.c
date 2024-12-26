@@ -47,13 +47,10 @@ static int8_t m1_table[64*16*16*16] __attribute__ ((aligned(16)));
 
 
 // Set up Viterbi tables for SSE2 implementation
-void phy_generate_viterbi_tables_lte(bool dabflag)
+void phy_generate_viterbi_tables_lte( void )
 {
   uint8_t ccodelte_table_rev[128];
-  if (dabflag)
-    ccodedab_init_inv(ccodelte_table_rev);
-  else
-    ccodelte_init_inv(ccodelte_table_rev);
+  ccodelte_init_inv(ccodelte_table_rev);
 
   int8_t w[8],in0,in1,in2;
   uint8_t state,index0,index1;

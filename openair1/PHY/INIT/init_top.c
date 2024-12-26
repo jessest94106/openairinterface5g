@@ -63,7 +63,7 @@ void generate_qpsk_table(void) {
 
 void init_lte_top(LTE_DL_FRAME_PARMS *frame_parms) {
   ccodelte_init();
-  phy_generate_viterbi_tables_lte(false);
+  phy_generate_viterbi_tables_lte();
   load_codinglib();
   generate_ul_ref_sigs();
   generate_ul_ref_sigs_rx();

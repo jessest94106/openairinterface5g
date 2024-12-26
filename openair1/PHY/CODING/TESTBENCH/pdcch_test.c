@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
 
   ccodelte_init();
 
-  phy_generate_viterbi_tables_lte(false);
+  phy_generate_viterbi_tables_lte();
   lte_frame_parms = &(PHY_config->lte_frame_parms);
   lte_frame_parms->N_RB_DL            = 25;   //50 for 10MHz and 25 for 5 MHz
   lte_frame_parms->Ncp                = 1;
