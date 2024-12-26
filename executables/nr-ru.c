@@ -1555,8 +1555,13 @@ void init_NR_RU(configmodule_interface_t *cfg, char *rf_config_file)
       }
     }
 
-    PHY_VARS_gNB *gNB_RC = RC.gNB[0];
-    PHY_VARS_gNB *gNB0 = ru->gNB_list[0];
+
+    PHY_VARS_gNB *gNB_RC = NULL;
+    PHY_VARS_gNB *gNB0 = NULL;
+    if (RC.nb_nr_L1_inst > 0) {
+      gNB_RC = RC.gNB[0];
+      gNB0 = ru->gNB_list[0];
+    }
     LOG_D(PHY, "RU FUnction:%d ru->if_south:%d\n", ru->function, ru->if_south);
 
     if (gNB0) {
