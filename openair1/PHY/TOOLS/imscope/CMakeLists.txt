@@ -29,7 +29,15 @@ add_library(implot
 target_link_libraries(implot PUBLIC imgui)
 target_include_directories(implot PUBLIC ${implot_SOURCE_DIR})
 
-add_library(imscope MODULE imscope.cpp ../phy_scope_interface.c)
+add_library(imscope MODULE imscope.cpp ../phy_scope_interface.c imscope_common.cpp imscope_init.cpp)
 target_link_libraries(imscope PUBLIC imgui_glfw_backend glfw imgui_opengl_renderer OpenGL::OpenGL implot UTIL)
 set_target_properties(imscope PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 configure_file(imgui.ini ${CMAKE_BINARY_DIR}/imscope-init.ini COPYONLY)
+
+add_library(imscope_record MODULE ../phy_scope_interface.c imscope_common.cpp imscope_record.cpp)
+target_link_libraries(imscope_record PRIVATE UTIL)
+set_target_properties(imscope_record PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_executable(imscope_iq_file_viewer imscope.cpp imscope_iq_file_viewer.cpp ../phy_scope_interface.c imscope_common.cpp)
+target_link_libraries(imscope_iq_file_viewer PRIVATE imgui_glfw_backend glfw imgui_opengl_renderer OpenGL::OpenGL implot UTIL minimal_lib shlib_loader)
+set_target_properties(imscope_iq_file_viewer PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")

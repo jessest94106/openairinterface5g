@@ -112,6 +112,7 @@ typedef struct scopeData_s {
   bool (*tryLockScopeData)(enum scopeDataType type, int elementSz, int colSz, int lineSz, metadata *meta);
   void (*copyDataUnsafeWithOffset)(enum scopeDataType type, void *dataIn, size_t size, size_t offset, int copy_index);
   void (*unlockScopeData)(enum scopeDataType type);
+  void (*dumpScopeData)(int slot, int frame);
 } scopeData_t;
 
 int load_softscope(char *exectype, void *initarg);
@@ -157,6 +158,12 @@ void copyData(void *, enum scopeDataType type, void *dataIn, int elementSz, int 
     scope_data->unlockScopeData(type); \
   }
 
+#define gNBdumpScopeData(gnb, slot, frame) \
+  scopeData_t *scope_data = (scopeData_t *)gnb->scopeData; \
+  if (scope_data && scope_data->dumpScopeData) { \
+    scope_data->dumpScopeData(slot, frame); \
+  }
+
 #define UEScopeHasTryLock(ue) \
   (ue->scopeData && ((scopeData_t *)ue->scopeData)->tryLockScopeData)
 
@@ -176,6 +183,18 @@ void copyData(void *, enum scopeDataType type, void *dataIn, int elementSz, int 
     scope_data->unlockScopeData(type); \
   }
 
+#define UEdumpScopeData(ue, slot, frame) \
+  scopeData_t *scope_data = (scopeData_t *)ue->scopeData; \
+  if (scope_data && scope_data->dumpScopeData) { \
+    scope_data->dumpScopeData(slot, frame); \
+  } \
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 extended_kpi_ue* getKPIUE();
+#ifdef __cplusplus
+}
+#endif
 
 #endif
