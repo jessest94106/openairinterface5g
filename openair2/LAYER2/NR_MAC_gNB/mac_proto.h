@@ -319,7 +319,7 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
 
 bool transition_ra_connected_nr_ue(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE);
 bool add_connected_nr_ue(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE);
-void nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, NR_UE_info_t *UE, bool success);
+bool nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, NR_UE_info_t *UE, bool success);
 void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti);
 NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroupConfig_t *CellGroup);
 int nr_get_default_pucch_res(int pucch_ResourceCommon);

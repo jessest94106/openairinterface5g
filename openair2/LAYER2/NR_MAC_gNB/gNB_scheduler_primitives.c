@@ -3297,7 +3297,9 @@ void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_le
   NR_SCHED_ENSURE_LOCKED(&mac->sched_lock);
 
   uint8_t du2cu[1024];
-  int encoded = encode_cellGroupConfig(UE->CellGroup, du2cu, sizeof(du2cu));
+  int encoded_len = 0;
+  if (UE->CellGroup)
+    encoded_len = encode_cellGroupConfig(UE->CellGroup, du2cu, sizeof(du2cu));
 
   DevAssert(mac->f1_config.setup_req != NULL);
   AssertFatal(mac->f1_config.setup_req->num_cells_available == 1, "can handle only one cell\n");
@@ -3308,8 +3310,8 @@ void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_le
     .crnti = rnti,
     .rrc_container = (uint8_t *) sdu,
     .rrc_container_length = sdu_len,
-    .du2cu_rrc_container = (uint8_t *) du2cu,
-    .du2cu_rrc_container_length = encoded
+    .du2cu_rrc_container = encoded_len ? (uint8_t *) du2cu : NULL,
+    .du2cu_rrc_container_length = encoded_len
   };
   mac->mac_rrc.initial_ul_rrc_message_transfer(0, &ul_rrc_msg);
 }
@@ -3331,12 +3333,14 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = cellGroupConfig;
 
+  if (!cellGroupConfig)
+    return true;
+    
   /* the cellGroup sent to CU specifies there is SRB1, so create it */
   DevAssert(cellGroupConfig->rlc_BearerToAddModList->list.count == 1);
   const NR_RLC_BearerConfig_t *bearer = cellGroupConfig->rlc_BearerToAddModList->list.array[0];
   DevAssert(bearer->servedRadioBearer->choice.srb_Identity == srb_id);
   nr_rlc_add_srb(UE->rnti, bearer->servedRadioBearer->choice.srb_Identity, bearer);
-
   int priority = bearer->mac_LogicalChannelConfig->ul_SpecificParameters->priority;
   nr_lc_config_t c = {.lcid = bearer->logicalChannelIdentity, .priority = priority};
   nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
