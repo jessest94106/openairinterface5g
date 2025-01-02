@@ -192,10 +192,10 @@ In the `MACRLCs` section of the gNB/DU configuration file:
 * `identity_precoding_matrix` (default 0=false): flag to enable to use only
   the identity precoding matrix in DL precoding
 * `set_analog_beamforming` (default 0=false): flag to enable analog
-  beamforming
-* `beam_duration`: duration/number of consecutive slots for a given set of
+  beamforming (for more information [`analog_beamforming.md`](../analog_beamforming.md))
+* `beam_duration` (default 1): duration/number of consecutive slots for a given set of
   beams, depending on hardware switching performance
-* `beams_per_period`: set of beams that can be simultaneously allocated in a
+* `beams_per_period` (default 1): set of beams that can be simultaneously allocated in a
   period (`beam_duration`)
 
 In the `gNBs` section of the gNB/DU configuration file: some of the parameters
