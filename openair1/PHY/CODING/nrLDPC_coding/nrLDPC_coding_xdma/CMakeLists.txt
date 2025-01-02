@@ -13,6 +13,11 @@ if (ENABLE_LDPC_XDMA)
   )
   target_include_directories(ldpc_xdma PRIVATE ../nrLDPC_coding_segment)
 
+  #ensure that the T header files are generated before targets depending on them
+  if (${T_TRACER})
+    add_dependencies(ldpc_xdma generate_T)
+  endif (${T_TRACER})
+
   target_link_libraries(ldpc_xdma PRIVATE
     nr_coding_segment_encoder
     nr_coding_segment_utils
