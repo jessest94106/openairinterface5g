@@ -226,7 +226,7 @@ compilations() {
     ret=$?
   } > $dlog/$logfile 2>&1
   # Print the errors and warnings for CI purposes
-  grep -E -A3 "warning:|error:" $dlog/$logfile || true
+  grep -E -A5 -B5 "warning:|error:| Error " $dlog/$logfile || true
   check_warnings "$dlog/$logfile"
   if [[ $ret -eq 0 ]]; then
      echo_success "$targets compiled"
