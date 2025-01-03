@@ -323,7 +323,7 @@ one_measurement_t test_ldpc(short max_iterations,
         decParams[j].R = code_rate_vec[R_ind]; // 13;
         decParams[j].numMaxIter = max_iterations;
         decParams[j].outMode = nrLDPC_outMode_BIT;
-        decParams[j].E = block_length;
+        decParams[j].Kprime = block_length;
         ldpc_toCompare.LDPCinit();
     }
     for (int j = 0; j < n_segments; j++) {

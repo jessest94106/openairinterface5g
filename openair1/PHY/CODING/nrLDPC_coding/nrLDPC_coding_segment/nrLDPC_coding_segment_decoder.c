@@ -193,7 +193,7 @@ static void nr_process_decode_segment(void *arg)
 
   memset(rdata->c, 0, Kr_bytes);
   p_decoderParms->crc_type = crcType(rdata->C, A);
-  p_decoderParms->E = lenWithCrc(rdata->C, A);
+  p_decoderParms->Kprime = lenWithCrc(rdata->C, A);
 
   // set first 2*Z_c bits to zeros
 
