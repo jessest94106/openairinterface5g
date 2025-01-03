@@ -152,7 +152,7 @@ void copyDataUnsafeWithOffset(enum scopeDataType type, void *dataIn, size_t size
 
 void unlockScopeData(enum scopeDataType type);
 
-void dumpScopeData(int slot, int frame);
+void dumpScopeData(int slot, int frame, const char *cause_string);
 
 void *imscope_record_thread(void *data_void_ptr);
 void *imscope_thread(void *data_void_ptr);

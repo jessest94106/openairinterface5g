@@ -35,7 +35,7 @@ set_target_properties(imscope PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY
 configure_file(imgui.ini ${CMAKE_BINARY_DIR}/imscope-init.ini COPYONLY)
 
 add_library(imscope_record MODULE ../phy_scope_interface.c imscope_common.cpp imscope_record.cpp)
-target_link_libraries(imscope_record PRIVATE UTIL)
+target_link_libraries(imscope_record PRIVATE UTIL atomic)
 set_target_properties(imscope_record PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_executable(imscope_iq_file_viewer imscope.cpp imscope_iq_file_viewer.cpp ../phy_scope_interface.c imscope_common.cpp)
