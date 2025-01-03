@@ -406,8 +406,8 @@ int main(int argc, char **argv)
   if ((format < 2) && (actual_payload == 4)) do_DTX=1;
 
   if (random_payload) {
-    srand(time(NULL));   // Initialization, should only be called once.
-    actual_payload = rand();      // Returns a pseudo-random integer between 0 and RAND_MAX.
+    double tmp = uniformrandom();
+    memcpy(&actual_payload, &tmp, sizeof(actual_payload));
   }
   actual_payload &= nr_bit < 64 ? (1UL << nr_bit) - 1: 0xffffffffffffffff;
 
