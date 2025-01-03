@@ -64,7 +64,8 @@
  * \brief decoding parameter of transport blocks
  * \var decoderParms decoder parameters
  * \var Qm modulation order
- * \var Kc size of base graph input
+ * \var Kc ratio between the number of columns in the parity check matrix and the lifting size
+ * it is fixed for a given base graph while the lifting size is chosen to have a sufficient number of columns
  * \var rv_index
  * \var max_number_iterations maximum number of LDPC iterations
  * \var abort_decode pointer to decode abort flag
@@ -127,14 +128,13 @@ static void nr_process_decode_segment(void *arg)
 {
   nrLDPC_decoding_parameters_t *rdata = (nrLDPC_decoding_parameters_t *)arg;
   t_nrLDPC_dec_params *p_decoderParms = &rdata->decoderParms;
-  const int Kr = rdata->K;
-  const int Kr_bytes = Kr >> 3;
-  const int K_bits_F = Kr - rdata->F;
+  const int K = rdata->K;
+  const int Kprime = K - rdata->F;
   const int A = rdata->A;
   const int E = rdata->E;
   const int Qm = rdata->Qm;
   const int rv_index = rdata->rv_index;
-  const uint8_t kc = rdata->Kc;
+  const uint8_t Kc = rdata->Kc;
   short *ulsch_llr = rdata->llr;
   int8_t llrProcBuf[OAI_LDPC_DECODER_MAX_NUM_LLR] __attribute__((aligned(32)));
 
@@ -177,7 +177,7 @@ static void nr_process_decode_segment(void *arg)
                                *rdata->d_to_be_cleared,
                                E,
                                rdata->F,
-                               Kr - rdata->F - 2 * (p_decoderParms->Z))
+                               K - rdata->F - 2 * (p_decoderParms->Z))
       == -1) {
 
     stop_meas(rdata->p_ts_rate_unmatch);
@@ -191,7 +191,7 @@ static void nr_process_decode_segment(void *arg)
 
   *rdata->d_to_be_cleared = false;
 
-  memset(rdata->c, 0, Kr_bytes);
+  memset(rdata->c, 0, K >> 3);
   p_decoderParms->crc_type = crcType(rdata->C, A);
   p_decoderParms->Kprime = lenWithCrc(rdata->C, A);
 
@@ -203,16 +203,16 @@ static void nr_process_decode_segment(void *arg)
 
   memset(z, 0, 2 * rdata->Z * sizeof(*z));
   // set Filler bits
-  memset(z + K_bits_F, 127, rdata->F * sizeof(*z));
+  memset(z + Kprime, 127, rdata->F * sizeof(*z));
   // Move coded bits before filler bits
-  memcpy(z + 2 * rdata->Z, rdata->d, (K_bits_F - 2 * rdata->Z) * sizeof(*z));
+  memcpy(z + 2 * rdata->Z, rdata->d, (Kprime - 2 * rdata->Z) * sizeof(*z));
   // skip filler bits
-  memcpy(z + Kr, rdata->d + (Kr - 2 * rdata->Z), (kc * rdata->Z - Kr) * sizeof(*z));
+  memcpy(z + K, rdata->d + (K - 2 * rdata->Z), (Kc * rdata->Z - K) * sizeof(*z));
   // Saturate coded bits before decoding into 8 bits values
   simde__m128i *pv = (simde__m128i *)&z;
   int8_t l[68 * 384 + 16] __attribute__((aligned(16)));
   simde__m128i *pl = (simde__m128i *)&l;
-  for (int i = 0, j = 0; j < ((kc * rdata->Z) >> 4) + 1; i += 2, j++) {
+  for (int i = 0, j = 0; j < ((Kc * rdata->Z) >> 4) + 1; i += 2, j++) {
     pl[j] = simde_mm_packs_epi16(pv[i], pv[i + 1]);
   }
   //////////////////////////////////////////////////////////////////////////////////////////
@@ -226,7 +226,7 @@ static void nr_process_decode_segment(void *arg)
       ldpc_interface_segment.LDPCdecoder(p_decoderParms, 0, 0, 0, l, llrProcBuf, p_procTime, rdata->abort_decode);
 
   if (decodeIterations <= p_decoderParms->numMaxIter) {
-    memcpy(rdata->c,llrProcBuf,  Kr>>3);
+    memcpy(rdata->c,llrProcBuf,  K>>3);
     *rdata->decodeSuccess = true;
   } else {
     *rdata->decodeSuccess = false;

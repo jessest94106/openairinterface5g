@@ -61,7 +61,7 @@ static void ldpc8blocks_coding_segment(void *p)
   uint32_t A = nrLDPC_TB_encoding_parameters->A;
 
   unsigned int G = nrLDPC_TB_encoding_parameters->G;
-  LOG_D(PHY,"dlsch coding A %d  Kr %d G %d (nb_rb %d, mod_order %d)\n",
+  LOG_D(PHY,"dlsch coding A %d K %d G %d (nb_rb %d, mod_order %d)\n",
         A,impp->K,G, nb_rb,(int)mod_order);
 
   // nrLDPC_encoder output is in "d"
@@ -123,7 +123,7 @@ static void ldpc8blocks_coding_segment(void *p)
     stop_meas(&nrLDPC_TB_encoding_parameters->segments[rr].ts_rate_match);
     if (impp->K - impp->F - 2 * impp->Zc > E) {
       LOG_E(PHY,
-            "dlsch coding A %d  Kr %d G %d (nb_rb %d, mod_order %d)\n",
+            "dlsch coding A %d K %d G %d (nb_rb %d, mod_order %d)\n",
             A,
             impp->K,
             G,
@@ -131,7 +131,7 @@ static void ldpc8blocks_coding_segment(void *p)
             (int)mod_order);
 
       LOG_E(NR_PHY,
-            "Rate Matching, Code segment %d/%d (coded bits (G) %u, E %d, Kr %d, Filler bits %d, Filler offset %d mod_order %d, "
+            "Rate Matching, Code segment %d/%d (coded bits (G) %u, E %d, K %d, Filler bits %d, Filler offset %d mod_order %d, "
             "nb_rb %d)...\n",
             rr,
             impp->n_segments,
