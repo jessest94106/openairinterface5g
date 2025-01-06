@@ -257,7 +257,6 @@ int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_de
     t_info->len += 1;
 
     decParams.R = nrLDPC_TB_decoding_parameters->segments[r].R;
-    decParams.setCombIn = !nrLDPC_TB_decoding_parameters->segments[r].d_to_be_cleared;
     rdata->decoderParms = decParams;
     rdata->llr = nrLDPC_TB_decoding_parameters->segments[r].llr;
     rdata->Kc = decParams.BG == 2 ? 52 : 68;
