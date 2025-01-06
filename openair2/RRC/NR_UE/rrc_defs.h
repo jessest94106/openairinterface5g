@@ -202,8 +202,6 @@ typedef struct rrcPerNB {
   NR_RSRP_Range_t s_measure;
 } rrcPerNB_t;
 
-/* forward declaration */
-struct position;
 typedef struct NR_UE_RRC_INST_s {
   instance_t ue_id;
   rrcPerNB_t perNB[NB_CNX_UE];
@@ -243,9 +241,6 @@ typedef struct NR_UE_RRC_INST_s {
   bool reconfig_after_reestab;
   //Sidelink params
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;
-
-  struct position *position_coordinates;
-
 } NR_UE_RRC_INST_t;
 
 #endif

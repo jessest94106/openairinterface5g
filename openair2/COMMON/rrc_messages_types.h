@@ -100,6 +100,7 @@
 #define NR_MAC_RRC_CONFIG_CG(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_cg
 #define NR_MAC_RRC_CONFIG_MIB(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_mib
 #define NR_MAC_RRC_CONFIG_SIB1(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_sib1
+#define NR_MAC_RRC_CONFIG_OTHER_SIB(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_other_sib
 
 #define NR_RRC_RLC_MAXRTX(mSGpTR) (mSGpTR)->ittiMsg.nr_rlc_maxrtx_indication
 
@@ -477,5 +478,8 @@ typedef struct {
 typedef struct {
   NR_SIB1_t *sib1;
 } nr_mac_rrc_config_sib1_t;
+typedef struct {
+  NR_SIB19_r17_t *sib19;
+} nr_mac_rrc_config_other_sib_t;
 
 #endif /* RRC_MESSAGES_TYPES_H_ */

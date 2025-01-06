@@ -141,6 +141,9 @@ void process_msg_rcc_to_mac(MessageDef *msg)
       nr_rrc_mac_config_req_sib1(ue_id, 0, sib1);
       SEQUENCE_free(&asn_DEF_NR_SIB1, NR_MAC_RRC_CONFIG_SIB1(msg).sib1, ASFM_FREE_EVERYTHING);
     } break;
+    case NR_MAC_RRC_CONFIG_OTHER_SIB:
+      nr_rrc_mac_config_other_sib(ue_id, NR_MAC_RRC_CONFIG_OTHER_SIB(msg).sib19);
+      break;
     default:
       LOG_E(NR_MAC, "Unexpected msg from RRC: %d\n", ITTI_MSG_ID(msg));
   }

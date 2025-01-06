@@ -87,6 +87,7 @@ MESSAGE_DEF(NR_MAC_RRC_CONFIG_RESET, MESSAGE_PRIORITY_MED, nr_mac_rrc_config_res
 MESSAGE_DEF(NR_MAC_RRC_CONFIG_CG, MESSAGE_PRIORITY_MED, nr_mac_rrc_config_cg_t, nr_mac_rrc_config_cg)
 MESSAGE_DEF(NR_MAC_RRC_CONFIG_MIB, MESSAGE_PRIORITY_MED, nr_mac_rrc_config_mib_t, nr_mac_rrc_config_mib)
 MESSAGE_DEF(NR_MAC_RRC_CONFIG_SIB1, MESSAGE_PRIORITY_MED, nr_mac_rrc_config_sib1_t, nr_mac_rrc_config_sib1)
+MESSAGE_DEF(NR_MAC_RRC_CONFIG_OTHER_SIB, MESSAGE_PRIORITY_MED, nr_mac_rrc_config_other_sib_t, nr_mac_rrc_config_other_sib)
 
 // eNB: RLC -> RRC messages
 MESSAGE_DEF(RLC_SDU_INDICATION,         MESSAGE_PRIORITY_MED,       RlcSduIndication,           rlc_sdu_indication)
