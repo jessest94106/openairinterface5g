@@ -3011,10 +3011,10 @@ void nr_ue_send_sdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info, in
 // Fixme: Intel Endianess only procedure
 static inline int readBits(const uint8_t *dci, int *start, int length)
 {
-  const int mask[] = {0, 1, 3, 7, 0xf, 0x1f, 0x3f, 0x7f, 0xff, 0x1ff, 0x3ff, 0x7ff, 0xfff, 0x1fff, 0x3fff, 0x7fff, 0xffff};
+  uint32_t mask = (1U << length) - 1;
   uint64_t *tmp = (uint64_t *)dci;
   *start -= length;
-  return *tmp >> *start & mask[length];
+  return *tmp >> *start & mask;
 }
 
 static void extract_10_ra_rnti(dci_pdu_rel15_t *dci_pdu_rel15, const uint8_t *dci_pdu, int pos, const int N_RB)
