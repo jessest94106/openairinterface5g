@@ -390,24 +390,6 @@ int8_t nr_ue_process_dci_freq_dom_resource_assignment(nfapi_nr_ue_pusch_pdu_t *p
       const int tmp=(start_DLBWP + n_RB_DLBWP) % P;
       int last_RBG = tmp ? tmp : P;
       writeBit(rb_bitmap, currentBit, last_bit_rbg, last_RBG);
-
-      dlsch_config_pdu->number_rbs = count_bits(dlsch_config_pdu->rb_bitmap, sizeofArray(dlsch_config_pdu->rb_bitmap));
-      // Temporary code to process type0 as type1 when the RB allocation is contiguous
-      int state = 0;
-      for (int i = 0; i < sizeof(dlsch_config_pdu->rb_bitmap) * 8; i++) {
-        int allocated = dlsch_config_pdu->rb_bitmap[i / 8] & (1 << (i % 8));
-        if (allocated) {
-          if (state == 0) {
-            dlsch_config_pdu->start_rb = i;
-            state = 1;
-          } else
-            AssertFatal(state == 1, "non-contiguous RB allocation in RB allocation type 0 not implemented");
-        } else {
-          if (state == 1) {
-            state = 2;
-          }
-        }
-      }
     }
     else if (pdsch_Config &&
              pdsch_Config->resourceAllocation == NR_PDSCH_Config__resourceAllocation_dynamicSwitch)
