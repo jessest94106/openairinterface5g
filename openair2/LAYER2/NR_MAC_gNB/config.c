@@ -283,6 +283,206 @@ nfapi_nr_pm_list_t init_DL_MIMO_codebook(gNB_MAC_INST *gNB, nr_pdsch_AntennaPort
   return mat;
 }
 
+/**
+ * @brief Configures the TDD period, including bitmap, in the frame structure
+ *
+ * This function sets the TDD period configuration for DL, UL, and mixed slots in
+ * the specified frame structure instance, according to the given pattern, and
+ * updates the bitmap.
+ *
+ * @param pattern NR_TDD_UL_DL_Pattern_t configuration containing TDD slots and symbols configuration
+ * @param fs frame_structure_t pointer
+ * @param curr_total_slot current position in the slot bitmap to start from
+ *
+ * @return Number of slots in the configured TDD period
+ */
+static uint8_t set_tdd_bmap_period(NR_TDD_UL_DL_Pattern_t *pattern, tdd_period_config_t *pc, int8_t curr_total_slot)
+{
+  int8_t n_dl_slot = pattern->nrofDownlinkSlots;
+  int8_t n_ul_slot = pattern->nrofUplinkSlots;
+  int8_t n_dl_symbols = pattern->nrofDownlinkSymbols;
+  int8_t n_ul_symbols = pattern->nrofUplinkSymbols;
+
+  // Total slots in the period: if DL/UL symbols are present, is mixed slot
+  const bool has_mixed_slot = (n_ul_symbols + n_dl_symbols) > 0;
+  int8_t total_slot = has_mixed_slot ? n_dl_slot + n_ul_slot + 1 : n_dl_slot + n_ul_slot;
+
+  /** Update TDD period configuration:
+   * mixed slots with DL symbols are counted as DL slots
+   * mixed slots with UL symbols are counted as UL slots */
+  pc->num_dl_slots += (n_dl_slot + (n_dl_symbols > 0));
+  pc->num_ul_slots += (n_ul_slot + (n_ul_symbols > 0));
+
+  // Populate the slot bitmap for each slot in the TDD period
+  for (int i = 0; i < total_slot; i++) {
+    tdd_bitmap_t *bitmap = &pc->tdd_slot_bitmap[i + curr_total_slot];
+    if (i < n_dl_slot)
+      bitmap->slot_type = TDD_NR_DOWNLINK_SLOT;
+    else if ((i == n_dl_slot) && has_mixed_slot) {
+      bitmap->slot_type = TDD_NR_MIXED_SLOT;
+      bitmap->num_dl_symbols = n_dl_symbols;
+      bitmap->num_ul_symbols = n_ul_symbols;
+    } else if (n_ul_slot)
+      bitmap->slot_type = TDD_NR_UPLINK_SLOT;
+  }
+
+  LOG_I(NR_MAC,
+        "Set TDD configuration period to: %d DL slots, %d UL slots, %d slots per period (NR_TDD_UL_DL_Pattern is %d DL slots, %d "
+        "UL slots, %d DL symbols, %d UL symbols)\n",
+        pc->num_dl_slots,
+        pc->num_ul_slots,
+        total_slot,
+        n_dl_slot,
+        n_ul_slot,
+        n_dl_symbols,
+        n_ul_symbols);
+
+  return total_slot;
+}
+
+/**
+ * @brief Configures TDD patterns (1 or 2) in the frame structure
+ *
+ * This function sets up the TDD configuration in the frame structure by applying
+ * DL and UL patterns as defined in NR_TDD_UL_DL_ConfigCommon.
+ * It handles both TDD pattern1 and pattern2.
+ *
+ * @param tdd NR_TDD_UL_DL_ConfigCommon_t pointer containing pattern1 and pattern2
+ * @param fs  Pointer to the frame structure to update with the configured TDD patterns.
+ *
+ * @return void
+ */
+static void config_tdd_patterns(NR_TDD_UL_DL_ConfigCommon_t *tdd, frame_structure_t *fs)
+{
+  int num_of_patterns = 1;
+  uint8_t nb_slots_p2 = 0;
+  // Reset num dl/ul slots
+  tdd_period_config_t *pc = &fs->period_cfg;
+  pc->num_dl_slots = 0;
+  pc->num_ul_slots = 0;
+  // Pattern1
+  uint8_t nb_slots_p1 = set_tdd_bmap_period(&tdd->pattern1, pc, 0);
+  // Pattern2
+  if (tdd->pattern2) {
+    num_of_patterns++;
+    nb_slots_p2 = set_tdd_bmap_period(tdd->pattern2, pc, nb_slots_p1);
+  }
+  LOG_I(NR_MAC,
+        "Configured %d TDD patterns (total slots: pattern1 = %d, pattern2 = %d)\n",
+        num_of_patterns,
+        nb_slots_p1,
+        nb_slots_p2);
+}
+
+/**
+ * @brief Get number of DL slots per period (full DL slots + mixed slots with DL symbols)
+ */
+int get_dl_slots_per_period(const frame_structure_t *fs)
+{
+  return fs->is_tdd ? fs->period_cfg.num_dl_slots : fs->numb_slots_frame;
+}
+
+/**
+ * @brief Get number of UL slots per period (full UL slots + mixed slots with UL symbols)
+ */
+int get_ul_slots_per_period(const frame_structure_t *fs)
+{
+  return fs->is_tdd ? fs->period_cfg.num_ul_slots : fs->numb_slots_frame;
+}
+
+/**
+ * @brief Get number of full UL slots per period
+ * @param fs Pointer to the frame structure
+ * @return Number of full UL slots
+ */
+int get_full_ul_slots_per_period(const frame_structure_t *fs)
+{
+  DevAssert(fs);
+
+  if (!fs->is_tdd)
+    return fs->numb_slots_frame;
+
+  int count = 0;
+
+  for (int i = 0; i < fs->numb_slots_period; i++)
+    if (fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT)
+      count++;
+
+  LOG_D(NR_MAC, "Full UL slots in TDD period: %d\n", count);
+  return count;
+}
+
+/**
+ * @brief Get number of full DL slots per period
+ * @param fs Pointer to the frame structure
+ * @return Number of full DL slots
+ */
+int get_full_dl_slots_per_period(const frame_structure_t *fs)
+{
+  DevAssert(fs);
+
+  if (!fs->is_tdd)
+    return fs->numb_slots_frame;
+
+  int count = 0;
+
+  for (int i = 0; i < fs->numb_slots_period; i++)
+    if (fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_DOWNLINK_SLOT)
+      count++;
+
+  LOG_D(NR_MAC, "Full DL slots in TDD period: %d\n", count);
+  return count;
+}
+
+/**
+ * @brief Get number of UL slots per frame
+ */
+int get_ul_slots_per_frame(const frame_structure_t *fs)
+{
+  return fs->is_tdd ? fs->numb_period_frame * get_ul_slots_per_period(fs) : fs->numb_slots_frame;
+}
+
+/**
+ * @brief Configures the frame structure and the NFAPI config request
+ *        depending on the duplex mode. If TDD, does the TDD patterns
+ *        and TDD periods configuration.
+ *
+ * @param mu numerology
+ * @param scc pointer to scc
+ * @param cfg pointer to NFAPI config request
+ * @param fs  pointer to the frame structure to update
+ *
+ * @return Number of periods in frame
+ */
+static int config_frame_structure(int mu,
+                                  NR_ServingCellConfigCommon_t *scc,
+                                  nfapi_nr_config_request_scf_t *cfg,
+                                  frame_structure_t *fs)
+{
+  fs->numb_slots_frame = nr_slots_per_frame[mu];
+  if (cfg->cell_config.frame_duplex_type.value == TDD) {
+    cfg->tdd_table.tdd_period.tl.tag = NFAPI_NR_CONFIG_TDD_PERIOD_TAG;
+    cfg->num_tlv++;
+    cfg->tdd_table.tdd_period.value = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
+    fs->numb_period_frame = get_nb_periods_per_frame(cfg->tdd_table.tdd_period.value);
+    fs->numb_slots_period = fs->numb_slots_frame / fs->numb_period_frame;
+    fs->is_tdd = true;
+    config_tdd_patterns(scc->tdd_UL_DL_ConfigurationCommon, fs);
+    set_tdd_config_nr(cfg,
+                      mu,
+                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots,
+                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSymbols,
+                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
+                      scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols);
+  } else { // FDD
+    fs->is_tdd = false;
+    fs->numb_period_frame = 1;
+    fs->numb_slots_period = nr_slots_per_frame[mu];
+  }
+  AssertFatal(fs->numb_period_frame > 0, "Frame configuration cannot be configured!\n");
+  return fs->numb_period_frame;
+}
+
 static void config_common(gNB_MAC_INST *nrmac,
                           const nr_mac_config_t *config,
                           NR_ServingCellConfigCommon_t *scc)

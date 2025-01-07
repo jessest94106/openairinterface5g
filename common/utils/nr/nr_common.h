@@ -279,6 +279,8 @@ int get_smallest_supported_bandwidth_index(int scs, frequency_range_t frequency_
 unsigned short get_m_srs(int c_srs, int b_srs);
 unsigned short get_N_b_srs(int c_srs, int b_srs);
 
+int get_slot_idx_in_period(const int slot, const frame_structure_t *fs);
+
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
 

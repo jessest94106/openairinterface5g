@@ -676,6 +676,14 @@ uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t nrarfcn)
   return frequency;
 }
 
+/**
+ * @brief Get the slot index within the period
+ */
+int get_slot_idx_in_period(const int slot, const frame_structure_t *fs)
+{
+  return slot % fs->numb_slots_period;
+}
+
 int get_first_ul_slot(int nrofDownlinkSlots, int nrofDownlinkSymbols, int nrofUplinkSymbols)
 {
   return (nrofDownlinkSlots + (nrofDownlinkSymbols != 0 && nrofUplinkSymbols == 0));
