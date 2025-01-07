@@ -375,6 +375,28 @@ static void config_tdd_patterns(NR_TDD_UL_DL_ConfigCommon_t *tdd, frame_structur
 }
 
 /**
+ * @brief Get the first UL slot index in period
+ * @param fs frame structure
+ * @param mixed indicates whether to include in the count also mixed slot with UL symbols or only full UL slot
+ * @return slot index
+ */
+int get_first_ul_slot(const frame_structure_t *fs, bool mixed)
+{
+  DevAssert(fs);
+
+  if (fs->is_tdd) {
+    for (int i = 0; i < fs->numb_slots_period; i++) {
+      bool is_mixed = fs->period_cfg.tdd_slot_bitmap[i].num_ul_symbols && fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_MIXED_SLOT;
+      if ((mixed && is_mixed) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
+        return i;
+      }
+    }
+  }
+
+  return 0; // FDD
+}
+
+/**
  * @brief Get number of DL slots per period (full DL slots + mixed slots with DL symbols)
  */
 int get_dl_slots_per_period(const frame_structure_t *fs)
@@ -908,7 +930,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
   int nr_ulstart_slot = 0;
   if (tdd) {
     nr_dl_slots = tdd->nrofDownlinkSlots + (tdd->nrofDownlinkSymbols != 0);
-    nr_ulstart_slot = get_first_ul_slot(tdd->nrofDownlinkSlots, tdd->nrofDownlinkSymbols, tdd->nrofUplinkSymbols);
+    nr_ulstart_slot = get_first_ul_slot(&nrmac->frame_structure, true);
     nr_slots_period /= get_nb_periods_per_frame(tdd->dl_UL_TransmissionPeriodicity);
   } else {
     // if TDD configuration is not present and the band is not FDD, it means it is a dynamic TDD configuration

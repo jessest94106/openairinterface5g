@@ -684,11 +684,6 @@ int get_slot_idx_in_period(const int slot, const frame_structure_t *fs)
   return slot % fs->numb_slots_period;
 }
 
-int get_first_ul_slot(int nrofDownlinkSlots, int nrofDownlinkSymbols, int nrofUplinkSymbols)
-{
-  return (nrofDownlinkSlots + (nrofDownlinkSymbols != 0 && nrofUplinkSymbols == 0));
-}
-
 int get_dmrs_port(int nl, uint16_t dmrs_ports)
 {
 

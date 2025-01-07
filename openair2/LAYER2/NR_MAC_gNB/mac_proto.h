@@ -39,6 +39,7 @@ void set_cset_offset(uint16_t);
 void get_K1_K2(int N1, int N2, int *K1, int *K2, int layers);
 int get_NTN_Koffset(const NR_ServingCellConfigCommon_t *scc);
 
+int get_first_ul_slot(const frame_structure_t *fs, bool mixed);
 int get_ul_slots_per_period(const frame_structure_t *fs);
 int get_ul_slots_per_frame(const frame_structure_t *fs);
 int get_dl_slots_per_period(const frame_structure_t *fs);
