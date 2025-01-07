@@ -443,6 +443,41 @@ int get_ul_slots_per_frame(const frame_structure_t *fs)
 }
 
 /**
+ * @brief Get the nth UL slot offset for UE index idx in a TDD period using the frame structure bitmap
+ * @param fs frame structure
+ * @param idx UE index
+ * @param count_mixed indicates whether counting mixed slot with UL symbols (e.g. for SRS) or only full UL slots
+ * @return slot index offset
+ */
+int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
+{
+  DevAssert(fs);
+
+  // FDD
+  if (!fs->is_tdd)
+    return idx;
+
+  // UL slots indexes in period
+  int ul_slot_idxs[fs->numb_slots_period];
+  int ul_slot_count = 0;
+
+  /* Populate the indices of UL slots in the TDD period from the bitmap
+  count also mixed slots with UL symbols if flag count_mixed is present */
+  for (int i = 0; i < fs->numb_slots_period; i++) {
+    bool is_mixed = (fs->period_cfg.tdd_slot_bitmap[i].num_ul_symbols > 1) && (fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_MIXED_SLOT);
+    if ((count_mixed && is_mixed) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
+      ul_slot_idxs[ul_slot_count++] = i;
+    }
+  }
+
+  // Compute slot index offset
+  int period_idx = idx / ul_slot_count; // wrap up the count of complete TDD periods spanned by the index
+  int ul_slot_idx_in_period = idx % ul_slot_count; // wrap up the UL slot index within the current TDD period
+
+  return ul_slot_idxs[ul_slot_idx_in_period] + period_idx * fs->numb_slots_period;
+}
+
+/**
  * @brief Configures the frame structure and the NFAPI config request
  *        depending on the duplex mode. If TDD, does the TDD patterns
  *        and TDD periods configuration.

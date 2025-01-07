@@ -44,6 +44,7 @@ int get_ul_slots_per_frame(const frame_structure_t *fs);
 int get_dl_slots_per_period(const frame_structure_t *fs);
 int get_full_ul_slots_per_period(const frame_structure_t *fs);
 int get_full_dl_slots_per_period(const frame_structure_t *fs);
+int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed);
 
 void mac_top_init_gNB(ngran_node_t node_type,
                       NR_ServingCellConfigCommon_t *scc,
