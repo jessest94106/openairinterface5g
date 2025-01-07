@@ -133,7 +133,7 @@
                 <class>Ping</class>
                 <desc>Ping ext-dn from both UEs</desc>
                 <id>rfsim5g_ue rfsim5g_ue2</id>
-                <nodes>selfix selfix</nodes>
+                <nodes>carabe carabe</nodes>
                 <ping_args>-c 20 192.168.70.135</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -142,14 +142,14 @@
                 <class>Attach_UE</class>
                 <desc>Attach OAI UE 1 and 2</desc>
                 <id>rfsim5g_ue rfsim5g_ue2</id>
-                <nodes>selfix selfix</nodes>
+                <nodes>carabe carabe</nodes>
         </testCase>
 
         <testCase id="444444">
                 <class>Detach_UE</class>
                 <desc>Detach OAI UE 1 and 2</desc>
                 <id>rfsim5g_ue rfsim5g_ue2</id>
-                <nodes>selfix selfix</nodes>
+                <nodes>carabe carabe</nodes>
         </testCase>
 
         <testCase id="100001">
