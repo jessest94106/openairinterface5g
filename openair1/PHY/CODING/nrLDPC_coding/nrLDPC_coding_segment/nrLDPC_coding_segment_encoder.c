@@ -73,7 +73,7 @@ static void ldpc8blocks_coding_segment(void *p)
   for (int r = 0; r < nrLDPC_TB_encoding_parameters->C; r++)
     c[r] = nrLDPC_TB_encoding_parameters->segments[r].c;
   start_meas(&nrLDPC_TB_encoding_parameters->segments[impp->macro_num * 8].ts_ldpc_encode);
-  ldpc_interface_segment.LDPCencoder(c, d, impp);
+  LDPCencoder(c, d, impp);
   stop_meas(&nrLDPC_TB_encoding_parameters->segments[impp->macro_num * 8].ts_ldpc_encode);
   // Compute where to place in output buffer that is concatenation of all segments
 
