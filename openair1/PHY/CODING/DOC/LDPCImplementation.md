@@ -114,9 +114,11 @@ Libraries implementing the slotwise LDPC coding must be named `libldpc<_version>
 The interface of the library is defined in [nrLDPC_defs.h](file://../nrLDPC_defs.h).
 The code loading the LDPC library is in [nrLDPC_load.c](file://../nrLDPC_load.c), in function `load_nrLDPClib`, which must be called at init time.
 
+*Note: LDPC segment coding libraries are not loaded directly by OAI but by the intermediate library `libldpc.so` which is implementing the LDPC slot coding interface using a LDPC segment coding library.*
+
 ### Selecting the LDPC library at run time
 
-By default the function `int load_nrLDPClib(void)` looks for `libldpc.so`, this default behavior can be changed using the oai loader configuration options in the configuration file or from the command line as shown below:
+By default the function `int load_nrLDPClib(void)` looks for `libldpc_optim8segmulti.so`, this default behavior can be changed using the oai loader configuration options in the configuration file or from the command line as shown below:
 
 #### Examples of ldpc shared lib selection when running nr softmodem's:
 
@@ -133,7 +135,7 @@ loading `libldpc_optim8seg.so` instead of `libldpc_optim8segmulti.so`:
 ........................
 ```
 
-loading `libldpc_cl.so` instead of `libldpc.so`:
+loading `libldpc_cl.so` instead of `libldpc_optim8segmulti.so`:
 
 `make ldpc_cl`
 
