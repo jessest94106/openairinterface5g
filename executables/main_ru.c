@@ -75,7 +75,7 @@ int sync_var=-1; //!< protected by mutex \ref sync_mutex.
 int config_sync_var=-1;
 
 int oai_exit = 0;
-uint16_t sf_ahead = 4;
+int sf_ahead = 4;
 RU_t ru_m;
 
 

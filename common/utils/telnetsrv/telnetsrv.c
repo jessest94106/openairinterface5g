@@ -54,6 +54,7 @@
 #include "common/utils/load_module_shlib.h"
 #include "common/config/config_userapi.h"
 #include "executables/softmodem-common.h"
+#include "common/utils/threadPool/notified_fifo.h"
 #include <readline/history.h>
 #include "common/oai_version.h"
 

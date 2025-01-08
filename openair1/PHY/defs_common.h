@@ -60,8 +60,7 @@
 //#include <complex.h>
 #include "time_meas.h"
 #include "common/platform_types.h"
-#include "common/ran_context.h"
-#include "nr-softmodem-common.h"
+#include "softmodem-common.h"
 #define MAX_NUM_RU_PER_eNB 64
 
 #include <pthread.h>

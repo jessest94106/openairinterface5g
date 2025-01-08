@@ -79,7 +79,7 @@ void *UE_thread(void *arg);
 int init_timer_thread(void);
 
 int tx_req_num_elems;
-extern uint16_t sf_ahead;
+extern int sf_ahead;
 //extern int tx_req_UE_MAC1();
 
 void ue_stub_rx_handler(unsigned int, char *);

@@ -3021,7 +3021,7 @@ int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs)
   /* we previously assumed a specific "slot ahead" value for the PHY processing
    * time. However, we cannot always know it (e.g., third-party PHY), so simply
    * assume a tentative worst-case slot processing time */
-  const uint16_t sl_ahead = 10;
+  const int sl_ahead = 10;
   /* 16ms seems to be the most common: See 38.331 Tab 12.1-1 */
   int delay_ms = NR_RRC_RECONFIGURATION_DELAY_MS + NR_RRC_BWP_SWITCHING_DELAY_MS;
   return (delay_ms << scs) + sl_ahead;

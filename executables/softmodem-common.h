@@ -31,11 +31,14 @@
  */
 #ifndef SOFTMODEM_COMMON_H
 #define SOFTMODEM_COMMON_H
-#include "openair1/PHY/defs_common.h"
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+#include <stdint.h>
+#include "common/config/config_load_configmodule.h"
+
 /* help strings definition for command line options, used in CMDLINE_XXX_DESC macros and printed when -h option is used */
 #define CONFIG_HLP_RFCFGF        "Configuration file for front-end (e.g. LMS7002M)\n"
 #define CONFIG_HLP_SPLIT73       "Split 7.3 (below rate matching) option: <cu|du>:<remote ip address>:<remote port>\n"
@@ -349,8 +352,9 @@ void set_softmodem_sighandler(void);
 extern uint64_t downlink_frequency[MAX_NUM_CCs][4];
 extern int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 extern int usrp_tx_thread;
-extern uint16_t sl_ahead;
-extern uint16_t sf_ahead;
+extern int sl_ahead;
+extern int sf_ahead;
+extern int oai_exit;
 
 void ru_tx_func(void *param);
 void configure_ru(void *, void *arg);
