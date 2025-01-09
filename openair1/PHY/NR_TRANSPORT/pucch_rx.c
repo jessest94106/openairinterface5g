@@ -1102,12 +1102,14 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
     c16_t ch_temp[128] __attribute__((aligned(32))) = {0};
     delay_t delay = {0};
     nr_est_delay(128, ch_ls, ch_temp, &delay);
-    int delay_idx = get_delay_idx(delay.est_delay, MAX_DELAY_COMP);
-    c16_t *delay_table = frame_parms->delay_table128[delay_idx];
 
     // Apply delay compensation on the input
-    for (int aa = 0; aa < Prx; aa++)
-      mult_complex_vectors(rp[aa][symb], delay_table, rp[aa][symb], nb_re_pucch, 8);
+    if (delay.est_delay != 0) {
+      int delay_idx = get_delay_idx(delay.est_delay, MAX_DELAY_COMP);
+      c16_t *delay_table = frame_parms->delay_table128[delay_idx];
+      for (int aa = 0; aa < Prx; aa++)
+        mult_complex_vectors(rp[aa][symb], delay_table, rp[aa][symb], nb_re_pucch, 8);
+    }
 
     // extract again DMRS, and signal, after delay compensation
     for (int aa = 0; aa < Prx; aa++) {
