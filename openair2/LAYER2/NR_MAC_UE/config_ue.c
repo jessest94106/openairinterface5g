@@ -1725,6 +1725,11 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
       reset_mac_inst(mac);
       mac->state = UE_PERFORMING_RA; // still in sync but need to restart RA
       break;
+    case REJECT:
+      reset_ra(mac, false);
+      reset_mac_inst(mac);
+      mac->state = UE_BARRED;
+      break;
     case RE_ESTABLISHMENT:
       reset_mac_inst(mac);
       nr_ue_mac_default_configs(mac);

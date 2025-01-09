@@ -148,6 +148,7 @@
 // Define the UE L2 states with X-Macro
 #define NR_UE_L2_STATES \
   UE_STATE(UE_NOT_SYNC) \
+  UE_STATE(UE_BARRED) \
   UE_STATE(UE_RECEIVING_SIB) \
   UE_STATE(UE_PERFORMING_RA) \
   UE_STATE(UE_CONNECTED) \
@@ -199,6 +200,7 @@ typedef enum {
   RE_ESTABLISHMENT,
   RRC_SETUP_REESTAB_RESUME,
   UL_SYNC_LOST_T430_EXPIRED,
+  REJECT,
 } NR_UE_MAC_reset_cause_t;
 
 typedef struct {

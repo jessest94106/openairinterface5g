@@ -1394,8 +1394,44 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
   rrc_ue_generate_RRCSetupComplete(rrc, rrcSetup->rrc_TransactionIdentifier);
 }
 
-static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc,
-                                    const NRRrcMacCcchDataInd *ind)
+static void nr_rrc_process_rrcreject(NR_UE_RRC_INST_t *rrc, const NR_RRCReject_t *rrcReject)
+{
+  // stop timer T300, T302, T319 if running;
+  NR_UE_Timers_Constants_t *timers = &rrc->timers_and_constants;
+  nr_timer_stop(&timers->T300);
+  nr_timer_stop(&timers->T302);
+  nr_timer_stop(&timers->T319);
+
+  // reset MAC and release the default MAC Cell Group configuration
+  NR_UE_MAC_reset_cause_t cause = REJECT;
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = cause;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+
+  // if waitTime is configured in the RRCReject: start timer T302, with the timer value set to the waitTime
+  NR_RejectWaitTime_t *waitTime = NULL;
+  if (rrcReject->criticalExtensions.present == NR_RRCReject__criticalExtensions_PR_rrcReject) {
+    NR_RRCReject_IEs_t *ies = rrcReject->criticalExtensions.choice.rrcReject;
+    waitTime = ies->waitTime; // Wait time value in seconds
+  }
+  if (waitTime) {
+    nr_timer_setup(&timers->T302, *waitTime * 1000, 10);
+    nr_timer_start(&timers->T302);
+  } else {
+    LOG_W(RRC, "Error: waitTime should be always included in RRCReject message\n");
+  }
+
+  // TODO if RRCReject is received in response to a request from upper layers
+  //      inform the upper layer that access barring is applicable for all access categories except categories '0' and '2'
+
+  // TODO if RRCReject is received in response to an RRCSetupRequest
+  //      inform upper layers about the failure to setup the RRC connection, upon which the procedure ends
+
+  // TODO else if RRCReject is received in response to an RRCResumeRequest or an RRCResumeRequest1
+  //      Resume not implemented yet
+}
+
+static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc, const NRRrcMacCcchDataInd *ind)
 {
   NR_DL_CCCH_Message_t *dl_ccch_msg = NULL;
   asn_dec_rval_t dec_rval;
@@ -1423,6 +1459,7 @@ static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc,
 
        case NR_DL_CCCH_MessageType__c1_PR_rrcReject:
          LOG_I(NR_RRC, "[UE%ld] Logical Channel DL-CCCH (SRB0), Received RRCReject \n", rrc->ue_id);
+         nr_rrc_process_rrcreject(rrc, dl_ccch_msg->message.choice.c1->choice.rrcReject);
          rval = 0;
          break;
 
