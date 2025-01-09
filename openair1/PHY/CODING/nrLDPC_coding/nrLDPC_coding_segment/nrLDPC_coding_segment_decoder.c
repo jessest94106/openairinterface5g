@@ -191,7 +191,6 @@ static void nr_process_decode_segment(void *arg)
 
   *rdata->d_to_be_cleared = false;
 
-  memset(rdata->c, 0, K >> 3);
   p_decoderParms->crc_type = crcType(rdata->C, A);
   p_decoderParms->Kprime = lenWithCrc(rdata->C, A);
 
@@ -229,6 +228,7 @@ static void nr_process_decode_segment(void *arg)
     memcpy(rdata->c,llrProcBuf,  K>>3);
     *rdata->decodeSuccess = true;
   } else {
+    memset(rdata->c, 0, K >> 3);
     *rdata->decodeSuccess = false;
   }
   stop_meas(rdata->p_ts_ldpc_decode);
