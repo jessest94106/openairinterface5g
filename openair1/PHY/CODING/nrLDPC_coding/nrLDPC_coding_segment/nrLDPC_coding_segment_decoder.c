@@ -20,9 +20,8 @@
  */
 
 /*! \file PHY/CODING/nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_decoder.c
-* \brief Top-level routines for decoding LDPC transport channels
-*/
-
+ * \brief Top-level routines for decoding LDPC transport channels
+ */
 
 // [from gNB coding]
 #include "PHY/defs_gNB.h"
@@ -45,10 +44,10 @@
 #include <stdint.h>
 #include <syscall.h>
 #include <time.h>
-//#define gNB_DEBUG_TRACE
+// #define gNB_DEBUG_TRACE
 
-#define OAI_LDPC_DECODER_MAX_NUM_LLR 27000 //26112 // NR_LDPC_NCOL_BG1*NR_LDPC_ZMAX = 68*384
-//#define DEBUG_CRC
+#define OAI_LDPC_DECODER_MAX_NUM_LLR 27000 // 26112 // NR_LDPC_NCOL_BG1*NR_LDPC_ZMAX = 68*384
+// #define DEBUG_CRC
 #ifdef DEBUG_CRC
 #define PRINT_CRC_CHECK(a) a
 #else
@@ -76,7 +75,7 @@
  * \var F filler bits size
  * \var r segment index in TB
  * \var E input llr segment size
- * \var C number of segments 
+ * \var C number of segments
  * \var llr input llr segment array
  * \var d Pointers to code blocks before LDPC decoding (38.212 V15.4.0 section 5.3.2)
  * \var d_to_be_cleared
@@ -89,8 +88,7 @@
  * \var p_ts_rate_unmatch pointer to rate unmatching time stats
  * \var p_ts_ldpc_decode pointer to decoding time stats
  */
-typedef struct nrLDPC_decoding_parameters_s{
-
+typedef struct nrLDPC_decoding_parameters_s {
   t_nrLDPC_dec_params decoderParms;
 
   uint8_t Qm;
@@ -166,7 +164,6 @@ static void nr_process_decode_segment(void *arg)
 
   ///////////////////////// ulsch_harq->e =====> ulsch_harq->d /////////////////////////
 
-
   if (nr_rate_matching_ldpc_rx(rdata->tbslbrm,
                                p_decoderParms->BG,
                                p_decoderParms->Z,
@@ -179,7 +176,6 @@ static void nr_process_decode_segment(void *arg)
                                rdata->F,
                                K - rdata->F - 2 * (p_decoderParms->Z))
       == -1) {
-
     stop_meas(rdata->p_ts_rate_unmatch);
     LOG_E(PHY, "nrLDPC_coding_segment_decoder.c: Problem in rate_matching\n");
 
@@ -225,7 +221,7 @@ static void nr_process_decode_segment(void *arg)
       ldpc_interface_segment.LDPCdecoder(p_decoderParms, 0, 0, 0, l, llrProcBuf, p_procTime, rdata->abort_decode);
 
   if (decodeIterations <= p_decoderParms->numMaxIter) {
-    memcpy(rdata->c,llrProcBuf,  K>>3);
+    memcpy(rdata->c, llrProcBuf, K >> 3);
     *rdata->decodeSuccess = true;
   } else {
     memset(rdata->c, 0, K >> 3);
@@ -237,9 +233,10 @@ static void nr_process_decode_segment(void *arg)
   completed_task_ans(rdata->ans);
 }
 
-int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters, int pusch_id, thread_info_tm_t *t_info)
+int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters,
+                               int pusch_id,
+                               thread_info_tm_t *t_info)
 {
-
   nrLDPC_TB_decoding_parameters_t *nrLDPC_TB_decoding_parameters = &nrLDPC_slot_decoding_parameters->TBs[pusch_id];
 
   *nrLDPC_TB_decoding_parameters->processedSegments = 0;
@@ -250,7 +247,6 @@ int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_de
   decParams.outMode = 0;
 
   for (int r = 0; r < nrLDPC_TB_decoding_parameters->C; r++) {
-
     nrLDPC_decoding_parameters_t *rdata = &((nrLDPC_decoding_parameters_t *)t_info->buf)[t_info->len];
     DevAssert(t_info->len < t_info->cap);
     rdata->ans = &t_info->ans[t_info->len];
@@ -286,29 +282,26 @@ int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_de
   return nrLDPC_TB_decoding_parameters->C;
 }
 
-int32_t nrLDPC_coding_init(void){
-
+int32_t nrLDPC_coding_init(void)
+{
   char *segment_shlibversion = NULL;
   paramdef_t LoaderParams[] = {
-    {"segment_shlibversion", NULL, 0, .strptr = &segment_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL}
-  };
+      {"segment_shlibversion", NULL, 0, .strptr = &segment_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL}};
   config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_segment");
   load_LDPClib(segment_shlibversion, &ldpc_interface_segment);
 
   return 0;
-
 }
 
-int32_t nrLDPC_coding_shutdown(void){
-
+int32_t nrLDPC_coding_shutdown(void)
+{
   free_LDPClib(&ldpc_interface_segment);
 
   return 0;
-
 }
 
-int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters){
-
+int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
+{
   int nbSegments = 0;
   for (int pusch_id = 0; pusch_id < nrLDPC_slot_decoding_parameters->nb_TBs; pusch_id++) {
     nrLDPC_TB_decoding_parameters_t *nrLDPC_TB_decoding_parameters = &nrLDPC_slot_decoding_parameters->TBs[pusch_id];
@@ -338,6 +331,4 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
     }
   }
   return 0;
-
 }
-

@@ -92,24 +92,20 @@ int32_t nrLDPC_coding_init(void);
 int32_t nrLDPC_coding_shutdown(void);
 int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *slot_params, int frame_rx, int slot_rx);
 // int32_t nrLDPC_coding_encoder(void);
-int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params,
-                 int frame_rx,
-                 int slot_rx,
-                 tpool_t *ldpc_threadPool);
+int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params, int frame_rx, int slot_rx, tpool_t *ldpc_threadPool);
 void nr_ulsch_FPGA_decoding_prepare_blocks(void *args);
 
 int32_t nrLDPC_coding_init(void)
 {
   char *encoder_shlibversion = NULL;
   paramdef_t LoaderParams[] = {
-    {"num_threads_prepare", NULL, 0, .iptr = &num_threads_prepare_max, .defintval = 0, TYPE_INT, 0, NULL},
-    {"encoder_shlibversion", NULL, 0, .strptr = &encoder_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL},
-    {"user_device", NULL, 0, .strptr = &user_device, .defstrval = DEVICE_NAME_DEFAULT_USER, TYPE_STRING, 0, NULL},
-    {"enc_read_device", NULL, 0, .strptr = &enc_read_device, .defstrval = DEVICE_NAME_DEFAULT_ENC_READ, TYPE_STRING, 0, NULL},
-    {"enc_write_device", NULL, 0, .strptr = &enc_write_device, .defstrval = DEVICE_NAME_DEFAULT_ENC_WRITE, TYPE_STRING, 0, NULL},
-    {"dec_read_device", NULL, 0, .strptr = &dec_read_device, .defstrval = DEVICE_NAME_DEFAULT_DEC_READ, TYPE_STRING, 0, NULL},
-    {"dec_write_device", NULL, 0, .strptr = &dec_write_device, .defstrval = DEVICE_NAME_DEFAULT_DEC_WRITE, TYPE_STRING, 0, NULL}
-  };
+      {"num_threads_prepare", NULL, 0, .iptr = &num_threads_prepare_max, .defintval = 0, TYPE_INT, 0, NULL},
+      {"encoder_shlibversion", NULL, 0, .strptr = &encoder_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL},
+      {"user_device", NULL, 0, .strptr = &user_device, .defstrval = DEVICE_NAME_DEFAULT_USER, TYPE_STRING, 0, NULL},
+      {"enc_read_device", NULL, 0, .strptr = &enc_read_device, .defstrval = DEVICE_NAME_DEFAULT_ENC_READ, TYPE_STRING, 0, NULL},
+      {"enc_write_device", NULL, 0, .strptr = &enc_write_device, .defstrval = DEVICE_NAME_DEFAULT_ENC_WRITE, TYPE_STRING, 0, NULL},
+      {"dec_read_device", NULL, 0, .strptr = &dec_read_device, .defstrval = DEVICE_NAME_DEFAULT_DEC_READ, TYPE_STRING, 0, NULL},
+      {"dec_write_device", NULL, 0, .strptr = &dec_write_device, .defstrval = DEVICE_NAME_DEFAULT_DEC_WRITE, TYPE_STRING, 0, NULL}};
   config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_xdma");
   AssertFatal(num_threads_prepare_max != 0, "nrLDPC_coding_xdma.num_threads_prepare was not provided");
 
@@ -138,10 +134,7 @@ int32_t nrLDPC_coding_encoder(void)
 }
 */
 
-int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params,
-                 int frame_rx,
-                 int slot_rx,
-                 tpool_t *ldpc_threadPool)
+int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params, int frame_rx, int slot_rx, tpool_t *ldpc_threadPool)
 {
   const uint32_t K = TB_params->K;
   const int Kc = TB_params->BG == 2 ? 52 : 68;
@@ -220,10 +213,9 @@ int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params,
   // calculate required number of jobs
   uint32_t r_while = 0;
   while (r_while < TB_params->C) {
-
     // calculate number of segments processed in the new job
     uint32_t modulus = (TB_params->C - r_while) % (num_threads_prepare_max - num_threads_prepare);
-    uint32_t quotient = (TB_params->C - r_while) / (num_threads_prepare_max - num_threads_prepare); 
+    uint32_t quotient = (TB_params->C - r_while) / (num_threads_prepare_max - num_threads_prepare);
     uint32_t r_span_max = modulus == 0 ? quotient : quotient + 1;
 
     // saturate to be sure to not go above C
@@ -257,7 +249,7 @@ int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params,
       args->r_first = r;
 
       uint32_t modulus = (TB_params->C - r) % (num_threads_prepare_max - num_threads_prepare);
-      uint32_t quotient = (TB_params->C - r) / (num_threads_prepare_max - num_threads_prepare); 
+      uint32_t quotient = (TB_params->C - r) / (num_threads_prepare_max - num_threads_prepare);
       uint32_t r_span_max = modulus == 0 ? quotient : quotient + 1;
 
       uint32_t r_span = TB_params->C - r < r_span_max ? TB_params->C - r : r_span_max;
