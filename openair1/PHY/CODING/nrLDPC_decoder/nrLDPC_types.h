@@ -86,11 +86,10 @@ typedef struct nrLDPC_dec_params {
     uint16_t Z; /**< Lifting size */
     uint8_t R; /**< Decoding rate: Format 15,13,... for code rates 1/5, 1/3,... */
     uint8_t numMaxIter; /**< Maximum number of iterations */
-    int E;
+    int Kprime; /**< Size of the payload bits and CRC bits in the code block */
     e_nrLDPC_outMode outMode; /**< Output format */
-    int crc_type;
-    int (*check_crc)(uint8_t* decoded_bytes, uint32_t n, uint8_t crc_type);
-    uint8_t setCombIn;
+    int crc_type; /**< Size and type of the parity check bits (16, 24A or 24B) */
+    int (*check_crc)(uint8_t* decoded_bytes, uint32_t n, uint8_t crc_type); /**< Parity check function */
 } t_nrLDPC_dec_params;
 
 /**
