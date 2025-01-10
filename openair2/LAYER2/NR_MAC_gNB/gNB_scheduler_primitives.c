@@ -558,23 +558,13 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
 
   const uint32_t Y = is_common ? 0 : get_Y(ss, slot, rnti);
   uint8_t nr_of_candidates;
-  for (int i=0; i<5; i++) {
+  for (int i = 0; i < 5; i++) {
     // for now taking the lowest value among the available aggregation levels
-    find_aggregation_candidates(aggregation_level,
-                                &nr_of_candidates,
-                                ss,
-                                1<<i);
-    if(nr_of_candidates>0)
+    find_aggregation_candidates(aggregation_level, &nr_of_candidates, ss, 1 << i);
+    if(nr_of_candidates > 0)
       break;
   }
-  int CCEIndex = find_pdcch_candidate(nrmac,
-                                      CC_id,
-                                      *aggregation_level,
-                                      nr_of_candidates,
-                                      beam_idx,
-                                      sched_pdcch,
-                                      coreset,
-                                      Y);
+  int CCEIndex = find_pdcch_candidate(nrmac, CC_id, *aggregation_level, nr_of_candidates, beam_idx, sched_pdcch, coreset, Y);
   return CCEIndex;
 }
 
@@ -3185,7 +3175,7 @@ void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST 
   }
 }
 
-static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame)
+static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int slot, int slots_per_frame)
 {
   return ((frame * slots_per_frame + slot) / beam_info->beam_duration) % beam_info->beam_allocation_size;
 }
@@ -3196,7 +3186,7 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
   if (!beam_info->beam_allocation)
     return (NR_beam_alloc_t) {.new_beam = false, .idx = 0};
 
-  const int index = get_beam_index(beam_info, frame, slot, beam_index, slots_per_frame);
+  const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     NR_beam_alloc_t beam_struct = {.new_beam = false, .idx = i};
     int *beam = &beam_info->beam_allocation[i][index];
@@ -3204,8 +3194,10 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
       beam_struct.new_beam = true;
       *beam = beam_index;
     }
-    if (*beam == beam_index)
+    if (*beam == beam_index) {
+      LOG_D(NR_MAC, "%d.%d Using beam structure with index %d for beam %d (%s)\n", frame, slot, beam_struct.idx, beam_index, beam_struct.new_beam ? "new beam" : "old beam");
       return beam_struct;
+    }
   }
 
   return (NR_beam_alloc_t) {.new_beam = false, .idx = -1};
@@ -3215,11 +3207,23 @@ void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_
 {
   if(!new_beam) // need to reset only if the beam was allocated specifically for this instance
     return;
-  const int index = get_beam_index(beam_info, frame, slot, beam_index, slots_per_frame);
+  const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     if (beam_info->beam_allocation[i][index] == beam_index)
       beam_info->beam_allocation[i][index] = -1;
   }
+}
+
+void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
+{
+  RSRP_report_t *rsrp_report = &UE->UE_sched_ctrl.CSI_report.ssb_rsrp_report;
+  // simple beam switching algorithm -> we select beam with highest RSRP from CSI report
+  int new_bf_index = get_fapi_beamforming_index(mac, rsrp_report->resource_id[0]);
+  if (UE->UE_beam_index == new_bf_index)
+    return; // no beam change needed
+
+  LOG_I(NR_MAC, "[UE %x] Switching to beam with ID %d (SSB number %d)\n", UE->rnti, new_bf_index, rsrp_report->resource_id[0]);
+  UE->UE_beam_index = new_bf_index;
 }
 
 void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_len, void *data)

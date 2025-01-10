@@ -220,14 +220,10 @@ Calls nr_schedule_ulsch(): It is divided into the "preprocessor" and the
 "postprocessor": the first makes the scheduling decisions, the second fills
 nFAPI structures to indicate to the PHY what it is supposed to do. To signal
 which users have how many resources, the preprocessor populates the
-NR_sched_pusch_t (for values changing every TTI, e.g., frequency domain
-allocation) and NR_sched_pusch_save_t (for values changing less frequently, at
-least in FR1 [to my understanding], e.g., DMRS fields when the time domain
-allocation stays between TTIs) structures. Furthermore, the preprocessor is an
+NR_sched_pusch_t structures. Furthermore, the preprocessor is an
 exchangeable module that schedules differently based on a particular
-use-case/deployment type, e.g., one user for phytest [in
-nr_ul_preprocessor_phytest()], multiple users in FR1
-[nr_fr1_ulsch_preprocessor()], or maybe FR2 [does not exist yet]:
+use-case/deployment type, e.g., one user for phytest in
+[nr_ul_preprocessor_phytest()], multiple users in [nr_ulsch_preprocessor()]:
 * calls preprocessor via pre_processor_ul(): the preprocessor is responsible
   for allocating CCEs (using allocate_nr_CCEs()) and deciding on resource
   allocation for the UEs including TB size. Note that we do not yet have
@@ -258,8 +254,7 @@ NR_UE_sched_ctrl_t structure of affected users. In particular, the field rbSize
 decides whether a user is to be allocated. Furthermore, the preprocessor is an
 exchangeable module that schedules differently based on a particular
 use-case/deployment type, e.g., one user for phytest [in
-nr_preprocessor_phytest()], multiple users in FR1
-[nr_fr1_dlsch_preprocessor()], or maybe FR2 [does not exist yet].
+nr_preprocessor_phytest()], multiple users [nr_dlsch_preprocessor()].
 * calls preprocessor via pre_processor_dl(): the preprocessor is responsible
   for allocating CCEs and PUCCH (using allocate_nr_CCEs() and
   nr_acknack_scheduling()) and deciding on the frequency/time domain

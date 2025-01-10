@@ -84,6 +84,7 @@ Legacy unmaintained files:
 - [L1 threads in NR-UE](./nr-ue-design.md)
 - [Information on gNB MAC](./MAC/mac-usage.md)
 - [Information on gNB RRC](./RRC/rrc-usage.md)
+- [Information on analog beamforming implementation](./analog_beamforming.md)
 
 Legacy unmaintained files:
 - [`5Gnas.md`](./5Gnas.md)

@@ -82,8 +82,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
                          nfapi_nr_dl_tti_request_t *DL_req,
                          nfapi_nr_tx_data_request_t *TX_req);
 
-/* \brief default FR1 DL preprocessor init routine, returns preprocessor to call */
-nr_pp_impl_dl nr_init_fr1_dlsch_preprocessor(int CC_id);
+/* \brief default DL preprocessor init routine, returns preprocessor to call */
+nr_pp_impl_dl nr_init_dlsch_preprocessor(int CC_id);
 
 void schedule_nr_sib1(module_id_t module_idP,
                       frame_t frameP,
@@ -108,8 +108,8 @@ void schedule_nr_mib(module_id_t module_idP, frame_t frameP, sub_frame_t slotP, 
  * messages, statistics, HARQ handling, ... */
 void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req);
 
-/* \brief default FR1 UL preprocessor init routine, returns preprocessor to call */
-nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id);
+/* \brief default UL preprocessor init routine, returns preprocessor to call */
+nr_pp_impl_ul nr_init_ulsch_preprocessor(int CC_id);
 
 /////// Random Access MAC-PHY interface functions and primitives ///////
 
@@ -447,7 +447,7 @@ void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST 
 int get_fapi_beamforming_index(gNB_MAC_INST *mac, int ssb_idx);
 NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame);
 void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame, bool new_beam);
-
+void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE);
 void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t frameP, sub_frame_t slotP);
 
 size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset_rsrp);
