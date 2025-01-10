@@ -27,6 +27,7 @@
 // [from gNB coding]
 #include <syscall.h>
 
+#include <nr_rate_matching.h>
 #include "PHY/CODING/coding_defs.h"
 #include "PHY/CODING/coding_extern.h"
 #include "PHY/CODING/lte_interleaver_inline.h"
