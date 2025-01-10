@@ -987,8 +987,11 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
       if (ra->ra_state != nrRA_WAIT_Msg3)
         continue;
 
-      if( (frameP!=ra->Msg3_frame) || (slotP!=ra->Msg3_slot))
+      if((frameP!=ra->Msg3_frame) || (slotP!=ra->Msg3_slot))
         continue;
+
+      if (ul_cqi != 0xff)
+        ra->msg3_TPC = nr_get_tpc(target_snrx10, ul_cqi, 30, 0);
 
       handle_msg3_failed_rx(ra, i, gNB_mac->ul_bler.harq_round_max);
     }

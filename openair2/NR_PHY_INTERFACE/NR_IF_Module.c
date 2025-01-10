@@ -94,7 +94,8 @@ void handle_nr_rach(NR_UL_IND_t *UL_info)
                           UL_info->rach_ind.pdu_list[i].preamble_list[0].preamble_index,
                           UL_info->rach_ind.pdu_list[i].freq_index,
                           UL_info->rach_ind.pdu_list[i].symbol_index,
-                          UL_info->rach_ind.pdu_list[i].preamble_list[0].timing_advance);
+                          UL_info->rach_ind.pdu_list[i].preamble_list[0].timing_advance,
+                          UL_info->rach_ind.pdu_list[i].preamble_list[0].preamble_pwr);
     }
   }
 }

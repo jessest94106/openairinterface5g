@@ -120,16 +120,15 @@ void nr_schedule_RA(module_id_t module_idP,
                     nfapi_nr_dl_tti_request_t *DL_req,
                     nfapi_nr_tx_data_request_t *TX_req);
 
-/* \brief Function to indicate a received preamble on PRACH.  It initiates the RA procedure.
-@param module_idP Instance ID of gNB
-@param preamble_index index of the received RA request
-@param slotP Slot number on which to act
-@param timing_offset Offset in samples of the received PRACH w.r.t. eNB timing. This is used to
-@param rnti RA rnti corresponding to this PRACH preamble
-@param rach_resource type (0=non BL/CE,1 CE level 0,2 CE level 1, 3 CE level 2,4 CE level 3)
-*/
-void nr_initiate_ra_proc(module_id_t module_idP, int CC_id, frame_t frameP, sub_frame_t slotP,
-                         uint16_t preamble_index, uint8_t freq_index, uint8_t symbol, int16_t timing_offset);
+void nr_initiate_ra_proc(module_id_t module_idP,
+                         int CC_id,
+                         frame_t frameP,
+                         int slotP,
+                         uint16_t preamble_index,
+                         uint8_t freq_index,
+                         uint8_t symbol,
+                         int16_t timing_offset,
+                         uint32_t preamble_power);
 
 void nr_clear_ra_proc(NR_RA_t *ra);
 
