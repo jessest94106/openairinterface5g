@@ -29,8 +29,6 @@
 #include <sys/sysinfo.h>
 #include <math.h>
 
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "common/utils/nr/nr_common.h"
 #include "common/utils/assertions.h"
 #include "common/utils/system.h"
@@ -71,7 +69,7 @@ static int DEFRUTPCORES[] = {-1,-1,-1,-1};
 #include <nfapi/oai_integration/vendor_ext.h>
 #include "executables/nr-softmodem-common.h"
 
-uint16_t sl_ahead;
+int sl_ahead;
 static void NRRCconfig_RU(configmodule_interface_t *cfg);
 
 /*************************************************************/

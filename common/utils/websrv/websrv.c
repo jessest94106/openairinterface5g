@@ -736,7 +736,7 @@ int websrv_callback_get_softmodemstatus(const struct _u_request *request, struct
     inet_ntop(AF_INET, &(websrvparams.instance.bind_address->sin_addr), ipstr, INET_ADDRSTRLEN);
   else
     sprintf(ipstr, "%s", "0.0.0.0");
-  snprintf(srvinfo, sizeof(srvinfo) - 1, "%s:%hu %s", ipstr, websrvparams.instance.port, get_softmodem_function(NULL));
+  snprintf(srvinfo, sizeof(srvinfo) - 1, "%s:%hu %s", ipstr, websrvparams.instance.port, get_softmodem_function());
   json_t *modemvars = json_array();
   websrv_add_modeminfo(modemvars, "connected to", srvinfo, "string");
   websrv_add_modeminfo(modemvars, "config_file", CONFIG_GETCONFFILE, "configfile");

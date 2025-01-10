@@ -230,7 +230,7 @@ int vnf_nr_unpack_vendor_extension_tlv(nfapi_tl_t *tl,
 }
 void install_nr_schedule_handlers(NR_IF_Module_t *if_inst);
 void install_schedule_handlers(IF_Module_t *if_inst);
-extern uint16_t sf_ahead;
+extern int sf_ahead;
 
 void oai_create_enb(void) {
   int bodge_counter=0;

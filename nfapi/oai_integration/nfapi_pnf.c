@@ -2435,7 +2435,7 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot) {
     //send VNF slot indication, which is aligned with TX thread, so that it can call the scheduler
     nfapi_nr_slot_indication_scf_t *ind;
     ind = (nfapi_nr_slot_indication_scf_t *) malloc(sizeof(nfapi_nr_slot_indication_scf_t));
-    uint8_t slot_ahead = 6;
+    int slot_ahead = 6;
     uint32_t sfn_slot_tx = sfnslot_add_slot(sfn, slot, slot_ahead);
     uint16_t sfn_tx = NFAPI_SFNSLOT2SFN(sfn_slot_tx);
     uint8_t slot_tx = NFAPI_SFNSLOT2SLOT(sfn_slot_tx);

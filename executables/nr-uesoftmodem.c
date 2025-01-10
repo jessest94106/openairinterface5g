@@ -98,7 +98,7 @@ nrUE_params_t nrUE_params = {0};
 pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
 int nfapi_sync_var=-1; //!< protected by mutex \ref nfapi_sync_mutex
-uint16_t sf_ahead=6; //??? value ???
+int sf_ahead = 6; //??? value ???
 pthread_cond_t sync_cond;
 pthread_mutex_t sync_mutex;
 int sync_var=-1; //!< protected by mutex \ref sync_mutex.
@@ -403,8 +403,8 @@ int main(int argc, char **argv)
   // get options and fill parameters from configuration file
 
   get_options(uniqCfg); // Command-line options specific for NRUE
-
-  get_common_options(uniqCfg, SOFTMODEM_5GUE_BIT);
+  IS_SOFTMODEM_5GUE = true;
+  get_common_options(uniqCfg);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
 
   softmodem_verify_mode(get_softmodem_params());

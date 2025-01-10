@@ -1165,9 +1165,9 @@ STATICFORXSCOPE void nrUEinitScope(PHY_VARS_NR_UE *ue)
 }
 
 void nrscope_autoinit(void *dataptr) {
-  AssertFatal( (IS_SOFTMODEM_GNB_BIT||IS_SOFTMODEM_5GUE_BIT),"Scope cannot find NRUE or GNB context");
+  AssertFatal((IS_SOFTMODEM_GNB || IS_SOFTMODEM_5GUE), "Scope cannot find NRUE or GNB context");
 
-  if (IS_SOFTMODEM_GNB_BIT)
+  if (IS_SOFTMODEM_GNB)
     gNBinitScope(dataptr);
   else
     nrUEinitScope(dataptr);

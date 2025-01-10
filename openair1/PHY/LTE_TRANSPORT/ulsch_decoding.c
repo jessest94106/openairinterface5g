@@ -42,8 +42,6 @@
 #include "PHY_INTERFACE/phy_interface.h"
 #include "transport_proto.h"
 
-extern int oai_exit;
-
 static const int8_t wACK_RX[5][4] = {{-1, -1, -1, -1}, {-1, 1, -1, 1}, {-1, -1, 1, 1}, {-1, 1, 1, -1}, {1, 1, 1, 1}};
 
 void free_eNB_ulsch(LTE_eNB_ULSCH_t *ulsch) {

@@ -77,8 +77,6 @@ void deref_sched_response(int _)
   LOG_E(PHY, "fatal\n");
   exit(1);
 }
-
-uint64_t get_softmodem_optmask(void) {return 0;}
 static softmodem_params_t softmodem_params;
 softmodem_params_t *get_softmodem_params(void) {
   return &softmodem_params;

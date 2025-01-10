@@ -41,9 +41,6 @@
 #include "PHY/MODULATION/modulation_UE.h"
 #include "PHY/LTE_ESTIMATION/lte_estimation.h"
 
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "PHY/phy_extern_ue.h"
 #include "LAYER2/MAC/mac_extern.h"
 #include "LAYER2/MAC/mac_proto.h"
@@ -82,7 +79,7 @@ void *UE_thread(void *arg);
 int init_timer_thread(void);
 
 int tx_req_num_elems;
-extern uint16_t sf_ahead;
+extern int sf_ahead;
 //extern int tx_req_UE_MAC1();
 
 void ue_stub_rx_handler(unsigned int, char *);

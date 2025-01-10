@@ -23,10 +23,7 @@
 extern "C" {
 #include "openair2/LAYER2/NR_MAC_UE/mac_proto.h"
 #include "executables/softmodem-common.h"
-uint64_t get_softmodem_optmask(void)
-{
-  return 0;
-}
+
 static softmodem_params_t softmodem_params;
 softmodem_params_t *get_softmodem_params(void)
 {

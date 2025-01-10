@@ -844,7 +844,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
     {
         case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
         {
-            nfapi_nr_dl_tti_request_t *dl_tti_request = MALLOC(sizeof(*dl_tti_request));
+            nfapi_nr_dl_tti_request_t *dl_tti_request = malloc16(sizeof(*dl_tti_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, dl_tti_request,
                                             sizeof(*dl_tti_request), NULL) < 0)
             {
@@ -868,7 +868,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 
         case NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST:
         {
-            nfapi_nr_tx_data_request_t *tx_data_request = MALLOC(sizeof(*tx_data_request));
+            nfapi_nr_tx_data_request_t *tx_data_request = malloc16(sizeof(*tx_data_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, tx_data_request,
                                         sizeof(*tx_data_request), NULL) < 0)
             {
@@ -888,7 +888,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 
         case NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST:
         {
-            nfapi_nr_ul_dci_request_t *ul_dci_request = MALLOC(sizeof(*ul_dci_request));
+            nfapi_nr_ul_dci_request_t *ul_dci_request = malloc16(sizeof(*ul_dci_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, ul_dci_request,
                                             sizeof(*ul_dci_request), NULL) < 0)
             {
@@ -908,7 +908,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 
         case NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST:
         {
-            nfapi_nr_ul_tti_request_t *ul_tti_request = MALLOC(sizeof(*ul_tti_request));
+            nfapi_nr_ul_tti_request_t *ul_tti_request = malloc16(sizeof(*ul_tti_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, ul_tti_request,
                                            sizeof(*ul_tti_request), NULL) < 0)
             {

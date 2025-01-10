@@ -88,7 +88,6 @@
 #include "openair1/SIMULATION/NR_PHY/nr_unitary_defs.h"
 #include "openair1/SIMULATION/TOOLS/sim.h"
 #include "openair2/RRC/LTE/rrc_vars.h"
-#include "softmodem-bits.h"
 #include "thread-pool.h"
 #include "time_meas.h"
 #include "utils.h"
@@ -108,7 +107,7 @@ int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 double cpuf;
 char *uecap_file;
 
-uint16_t sl_ahead=0;
+int sl_ahead = 0;
 //uint8_t nfapi_mode = 0;
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
 THREAD_STRUCT thread_struct;
@@ -623,7 +622,7 @@ int main(int argc, char **argv)
   get_softmodem_params()->phy_test = 1;
   get_softmodem_params()->usim_test = 1;
   get_softmodem_params()->do_ra = 0;
-  set_softmodem_optmask(SOFTMODEM_DLSIM_BIT);
+  IS_SOFTMODEM_DLSIM = true;
 
   if (snr1set==0)
     snr1 = snr0+10;
