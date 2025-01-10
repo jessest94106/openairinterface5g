@@ -31,8 +31,8 @@ void completed_task_ans(task_ans_t* task)
 {
   DevAssert(task != NULL);
 
-  if (atomic_load_explicit(&task->status, memory_order_acquire) != 0)
-    AssertFatal(0, "Task already finished?");
+  int status = atomic_load_explicit(&task->status, memory_order_acquire);
+  AssertFatal(status == 0, "Task not expected to be finished here. Status = %d\n", status);
 
   atomic_store_explicit(&task->status, 1, memory_order_release);
 }
