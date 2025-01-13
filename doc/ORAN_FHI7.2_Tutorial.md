@@ -917,6 +917,17 @@ Edit the sample OAI gNB configuration file and check following parameters:
     cannot preallocate memory on NUMA nodes other than 0; in this case, set
     this to 0 (no pre-allocation) and so that DPDK will allocate it on-demand
     on the right NUMA node.
+  * `dpdk_iova_mode`: Specifies DPDK IO Virtual Address (IOVA) mode:
+    * `PA`: IOVA as Physical Address (PA) mode, where DPDK IOVA memory layout
+      corresponds directly to the physical memory layout.
+    * `VA`: IOVA as Virtual Address (VA) mode, where DPDK IOVA addresses do not
+      follow the physical memory layout. Uses IOMMU to remap physical memory.
+      Requires kernel support and IOMMU for address translation.
+    * If not specified, default value of "PA" is used (for backwards compabilibity;
+      it was hardcoded to PA in the past). However, we recommend using "VA" mode
+      as it offers several benefits. For a detailed explanation of DPDK IOVA,
+      including the advantages and disadvantages of each mode, refer to
+      [Memory in DPDK](https://www.dpdk.org/memory-in-dpdk-part-2-deep-dive-into-iova/)
   * `owdm_enable`: used for eCPRI One-Way Delay Measurements; it depends if the RU supports it; if not set to 1 (enabled), default value is 0 (disabled)
   * `fh_config`: parameters that need to match RU parameters
     * timing parameters (starting with `T`) depend on the RU: `Tadv_cp_dl` is a
