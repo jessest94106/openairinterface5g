@@ -52,6 +52,7 @@
 #include "PHY_INTERFACE/phy_interface_vars.h"
 #include "NR_IF_Module.h"
 #include "openair1/SIMULATION/TOOLS/sim.h"
+#include "openair2/RRC/NR_UE/L2_interface_ue.h"
 
 #ifdef SMBV
 #include "PHY/TOOLS/smbv.h"
@@ -488,6 +489,12 @@ int main(int argc, char **argv)
                                     get_softmodem_params()->numerology,
                                     nr_band);
         } else {
+	  MessageDef *msg = NULL;
+	  do {
+	    itti_poll_msg(TASK_MAC_UE, &msg);
+	    if (msg)
+	      process_msg_rcc_to_mac(msg);
+	  } while (msg);
           fapi_nr_config_request_t *nrUE_config = &UE[CC_id]->nrUE_config;
           nr_init_frame_parms_ue(&UE[CC_id]->frame_parms, nrUE_config, mac->nr_band);
         }

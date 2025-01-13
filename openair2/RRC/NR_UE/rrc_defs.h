@@ -104,53 +104,59 @@ typedef enum RA_trigger_e {
   BEAM_FAILURE_RECOVERY,
 } RA_trigger_t;
 
+typedef enum {
+  SIB_NOT_VALID,
+  SIB_VALID,
+  SIB_REQUESTED,
+} SIB_validity_t;
+
 typedef struct UE_RRC_SI_INFO_NR_r17_s {
   uint32_t default_otherSI_map_r17;
-  bool sib15_validity;
+  SIB_validity_t sib15_validity;
   NR_timer_t sib15_timer;
-  bool sib16_validity;
+  SIB_validity_t sib16_validity;
   NR_timer_t sib16_timer;
-  bool sib17_validity;
+  SIB_validity_t sib17_validity;
   NR_timer_t sib17_timer;
-  bool sib18_validity;
+  SIB_validity_t sib18_validity;
   NR_timer_t sib18_timer;
-  bool sib19_validity;
+  SIB_validity_t sib19_validity;
   NR_timer_t sib19_timer;
-  bool sib20_validity;
+  SIB_validity_t sib20_validity;
   NR_timer_t sib20_timer;
-  bool sib21_validity;
+  SIB_validity_t sib21_validity;
   NR_timer_t sib21_timer;
 } NR_UE_RRC_SI_INFO_r17;
 
 typedef struct UE_RRC_SI_INFO_NR_s {
   uint32_t default_otherSI_map;
-  bool sib1_validity;
+  SIB_validity_t sib1_validity;
   NR_timer_t sib1_timer;
-  bool sib2_validity;
+  SIB_validity_t sib2_validity;
   NR_timer_t sib2_timer;
-  bool sib3_validity;
+  SIB_validity_t sib3_validity;
   NR_timer_t sib3_timer;
-  bool sib4_validity;
+  SIB_validity_t sib4_validity;
   NR_timer_t sib4_timer;
-  bool sib5_validity;
+  SIB_validity_t sib5_validity;
   NR_timer_t sib5_timer;
-  bool sib6_validity;
+  SIB_validity_t sib6_validity;
   NR_timer_t sib6_timer;
-  bool sib7_validity;
+  SIB_validity_t sib7_validity;
   NR_timer_t sib7_timer;
-  bool sib8_validity;
+  SIB_validity_t sib8_validity;
   NR_timer_t sib8_timer;
-  bool sib9_validity;
+  SIB_validity_t sib9_validity;
   NR_timer_t sib9_timer;
-  bool sib10_validity;
+  SIB_validity_t sib10_validity;
   NR_timer_t sib10_timer;
-  bool sib11_validity;
+  SIB_validity_t sib11_validity;
   NR_timer_t sib11_timer;
-  bool sib12_validity;
+  SIB_validity_t sib12_validity;
   NR_timer_t sib12_timer;
-  bool sib13_validity;
+  SIB_validity_t sib13_validity;
   NR_timer_t sib13_timer;
-  bool sib14_validity;
+  SIB_validity_t sib14_validity;
   NR_timer_t sib14_timer;
   NR_UE_RRC_SI_INFO_r17 SInfo_r17;
 } NR_UE_RRC_SI_INFO;
@@ -196,8 +202,6 @@ typedef struct rrcPerNB {
   NR_RSRP_Range_t s_measure;
 } rrcPerNB_t;
 
-/* forward declaration */
-struct position;
 typedef struct NR_UE_RRC_INST_s {
   instance_t ue_id;
   rrcPerNB_t perNB[NB_CNX_UE];
@@ -237,9 +241,6 @@ typedef struct NR_UE_RRC_INST_s {
   bool reconfig_after_reestab;
   //Sidelink params
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;
-
-  struct position *position_coordinates;
-
 } NR_UE_RRC_INST_t;
 
 #endif
