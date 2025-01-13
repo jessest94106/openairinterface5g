@@ -45,6 +45,7 @@
 #include "PHY/CODING/nrLDPC_decoder/nrLDPC_types.h"
 #include "executables/rt_profiling.h"
 #include "nfapi_nr_interface_scf.h"
+#include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
 
 #define MAX_NUM_RU_PER_gNB 8
 #define MAX_PUCCH0_NID 8
@@ -415,10 +416,6 @@ typedef struct {
   int prach_I0;
 } PHY_MEASUREMENTS_gNB;
 
-
-#define MAX_NUM_NR_RX_RACH_PDUS 4
-#define MAX_UL_PDUS_PER_SLOT 8
-#define MAX_NUM_NR_SRS_PDUS 8
 // the current RRC resource allocation is that each UE gets its
 // "own" PUCCH resource (for F0) in a dedicated PRB in each slot
 // therefore, we can have up to "number of UE" UCI PDUs
@@ -443,22 +440,9 @@ typedef struct PHY_VARS_gNB_s {
   NR_DL_FRAME_PARMS frame_parms;
   PHY_MEASUREMENTS_gNB measurements;
   NR_IF_Module_t *if_inst;
-  NR_UL_IND_t UL_INFO;
-
-  /// NFAPI RX ULSCH information
-  nfapi_nr_rx_data_pdu_t  rx_pdu_list[MAX_UL_PDUS_PER_SLOT];
-  /// NFAPI RX ULSCH CRC information
-  nfapi_nr_crc_t crc_pdu_list[MAX_UL_PDUS_PER_SLOT];
-  /// NFAPI SRS information
-  nfapi_nr_srs_indication_pdu_t srs_pdu_list[MAX_NUM_NR_SRS_PDUS];
-  /// NFAPI UCI information
-  nfapi_nr_uci_t uci_pdu_list[MAX_NUM_NR_UCI_PDUS];
-  /// NFAPI PRACH information
-  nfapi_nr_prach_indication_pdu_t prach_pdu_indication_list[MAX_NUM_NR_RX_RACH_PDUS];
 
   nfapi_nr_ul_tti_request_t UL_tti_req;
-  nfapi_nr_uci_indication_t uci_indication;
-  
+
   int max_nb_pucch;
   int max_nb_srs;
   int max_nb_pdsch;
