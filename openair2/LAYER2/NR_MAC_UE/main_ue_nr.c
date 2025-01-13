@@ -33,7 +33,6 @@
 //#include "defs.h"
 #include "mac_proto.h"
 #include "radio/COMMON/common_lib.h"
-//#undef MALLOC
 #include "assertions.h"
 #include "executables/nr-uesoftmodem.h"
 #include "nr_rlc/nr_rlc_oai_api.h"

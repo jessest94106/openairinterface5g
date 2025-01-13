@@ -20,9 +20,10 @@
  */
 
 /*! \file PHY/CODING/nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_encoder.c
-* \brief Top-level routines for implementing LDPC encoding of transport channels
-*/
+ * \brief Top-level routines for implementing LDPC encoding of transport channels
+ */
 
+#include "nr_rate_matching.h"
 #include "PHY/defs_gNB.h"
 #include "PHY/CODING/coding_extern.h"
 #include "PHY/CODING/coding_defs.h"
@@ -40,8 +41,8 @@
 
 #include <syscall.h>
 
-//#define DEBUG_LDPC_ENCODING
-//#define DEBUG_LDPC_ENCODING_FREE 1
+// #define DEBUG_LDPC_ENCODING
+// #define DEBUG_LDPC_ENCODING_FREE 1
 
 extern ldpc_interface_t ldpc_interface_segment;
 
@@ -61,35 +62,34 @@ static void ldpc8blocks_coding_segment(void *p)
   uint32_t A = nrLDPC_TB_encoding_parameters->A;
 
   unsigned int G = nrLDPC_TB_encoding_parameters->G;
-  LOG_D(PHY,"dlsch coding A %d  Kr %d G %d (nb_rb %d, mod_order %d)\n",
-        A,impp->K,G, nb_rb,(int)mod_order);
+  LOG_D(PHY, "dlsch coding A %d K %d G %d (nb_rb %d, mod_order %d)\n", A, impp->K, G, nb_rb, (int)mod_order);
 
   // nrLDPC_encoder output is in "d"
   // let's make this interface happy!
-  uint8_t tmp[8][68 * 384]__attribute__((aligned(32)));
+  uint8_t tmp[8][68 * 384] __attribute__((aligned(32)));
   uint8_t *d[impp->n_segments];
-  for (int rr=impp->macro_num*8, i=0; rr < impp->n_segments && rr < (impp->macro_num+1)*8; rr++,i++ )
+  for (int rr = impp->macro_num * 8, i = 0; rr < impp->n_segments && rr < (impp->macro_num + 1) * 8; rr++, i++)
     d[rr] = tmp[i];
 
   uint8_t *c[nrLDPC_TB_encoding_parameters->C];
   for (int r = 0; r < nrLDPC_TB_encoding_parameters->C; r++)
-    c[r]=nrLDPC_TB_encoding_parameters->segments[r].c;
-  start_meas(&nrLDPC_TB_encoding_parameters->segments[impp->macro_num*8].ts_ldpc_encode);
+    c[r] = nrLDPC_TB_encoding_parameters->segments[r].c;
+  start_meas(&nrLDPC_TB_encoding_parameters->segments[impp->macro_num * 8].ts_ldpc_encode);
   ldpc_interface_segment.LDPCencoder(c, d, impp);
-  stop_meas(&nrLDPC_TB_encoding_parameters->segments[impp->macro_num*8].ts_ldpc_encode);
+  stop_meas(&nrLDPC_TB_encoding_parameters->segments[impp->macro_num * 8].ts_ldpc_encode);
   // Compute where to place in output buffer that is concatenation of all segments
 
-  uint32_t r_offset=0;
-  for (int i=0; i < impp->macro_num*8; i++ )
-     r_offset+=nrLDPC_TB_encoding_parameters->segments[i].E;
-  for (int rr=impp->macro_num*8; rr < impp->n_segments && rr < (impp->macro_num+1)*8; rr++ ) {
-    if (impp->F>0) {
+  uint32_t r_offset = 0;
+  for (int i = 0; i < impp->macro_num * 8; i++)
+    r_offset += nrLDPC_TB_encoding_parameters->segments[i].E;
+  for (int rr = impp->macro_num * 8; rr < impp->n_segments && rr < (impp->macro_num + 1) * 8; rr++) {
+    if (impp->F > 0) {
       // writing into positions d[r][k-2Zc] as in clause 5.3.2 step 2) in 38.212
       memset(&d[rr][impp->K - impp->F - 2 * impp->Zc], NR_NULL, impp->F);
     }
 
 #ifdef DEBUG_LDPC_ENCODING
-    LOG_D(PHY,"rvidx in encoding = %d\n", rel15->rvIndex[0]);
+    LOG_D(PHY, "rvidx in encoding = %d\n", rel15->rvIndex[0]);
 #endif
     uint32_t E = nrLDPC_TB_encoding_parameters->segments[rr].E;
     LOG_D(NR_PHY,
@@ -108,7 +108,7 @@ static void ldpc8blocks_coding_segment(void *p)
     uint32_t Tbslbrm = nrLDPC_TB_encoding_parameters->tbslbrm;
 
     uint8_t e[E];
-    bzero (e, E);
+    bzero(e, E);
     start_meas(&nrLDPC_TB_encoding_parameters->segments[rr].ts_rate_match);
     nr_rate_matching_ldpc(Tbslbrm,
                           impp->BG,
@@ -122,16 +122,10 @@ static void ldpc8blocks_coding_segment(void *p)
                           E);
     stop_meas(&nrLDPC_TB_encoding_parameters->segments[rr].ts_rate_match);
     if (impp->K - impp->F - 2 * impp->Zc > E) {
-      LOG_E(PHY,
-            "dlsch coding A %d  Kr %d G %d (nb_rb %d, mod_order %d)\n",
-            A,
-            impp->K,
-            G,
-            nb_rb,
-            (int)mod_order);
+      LOG_E(PHY, "dlsch coding A %d K %d G %d (nb_rb %d, mod_order %d)\n", A, impp->K, G, nb_rb, (int)mod_order);
 
       LOG_E(NR_PHY,
-            "Rate Matching, Code segment %d/%d (coded bits (G) %u, E %d, Kr %d, Filler bits %d, Filler offset %d mod_order %d, "
+            "Rate Matching, Code segment %d/%d (coded bits (G) %u, E %d, K %d, Filler bits %d, Filler offset %d mod_order %d, "
             "nb_rb %d)...\n",
             rr,
             impp->n_segments,
@@ -145,23 +139,20 @@ static void ldpc8blocks_coding_segment(void *p)
     }
 #ifdef DEBUG_LDPC_ENCODING
 
-    for (int i =0; i<16; i++)
-      printf("output ratematching e[%d]= %d r_offset %u\n", i,e[i], r_offset);
+    for (int i = 0; i < 16; i++)
+      printf("output ratematching e[%d]= %d r_offset %u\n", i, e[i], r_offset);
 
 #endif
     start_meas(&nrLDPC_TB_encoding_parameters->segments[rr].ts_interleave);
-    nr_interleaving_ldpc(E,
-                         mod_order,
-                         e,
-                         impp->output+r_offset);
+    nr_interleaving_ldpc(E, mod_order, e, impp->output + r_offset);
     stop_meas(&nrLDPC_TB_encoding_parameters->segments[rr].ts_interleave);
 #ifdef DEBUG_LDPC_ENCODING
 
-    for (int i =0; i<16; i++)
-      printf("output interleaving f[%d]= %d r_offset %u\n", i,impp->output[i+r_offset], r_offset);
+    for (int i = 0; i < 16; i++)
+      printf("output interleaving f[%d]= %d r_offset %u\n", i, impp->output[i + r_offset], r_offset);
 
-    if (r==impp->n_segments-1)
-      write_output("enc_output.m","enc",impp->output,G,1,4);
+    if (r == impp->n_segments - 1)
+      write_output("enc_output.m", "enc", impp->output, G, 1, 4);
 
 #endif
     r_offset += E;
@@ -171,7 +162,9 @@ static void ldpc8blocks_coding_segment(void *p)
   completed_task_ans(impp->ans);
 }
 
-static int nrLDPC_prepare_TB_encoding(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters, int dlsch_id, thread_info_tm_t *t_info)
+static int nrLDPC_prepare_TB_encoding(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters,
+                                      int dlsch_id,
+                                      thread_info_tm_t *t_info)
 {
   nrLDPC_TB_encoding_parameters_t *nrLDPC_TB_encoding_parameters = &nrLDPC_slot_encoding_parameters->TBs[dlsch_id];
 
@@ -211,7 +204,6 @@ static int nrLDPC_prepare_TB_encoding(nrLDPC_slot_encoding_parameters_t *nrLDPC_
 
 int nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters)
 {
-
   int nbTasks = 0;
   for (int dlsch_id = 0; dlsch_id < nrLDPC_slot_encoding_parameters->nb_TBs; dlsch_id++) {
     nrLDPC_TB_encoding_parameters_t *nrLDPC_TB_encoding_parameters = &nrLDPC_slot_encoding_parameters->TBs[dlsch_id];
@@ -234,5 +226,4 @@ int nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encodin
   join_task_ans(ans, nbEncode);
 
   return 0;
-
 }

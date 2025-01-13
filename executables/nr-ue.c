@@ -103,10 +103,9 @@
 static void *NRUE_phy_stub_standalone_pnf_task(void *arg);
 
 static void start_process_slot_tx(void* arg) {
-  task_t task;
-  task.args = arg;
-  task.func = processSlotTX;
-  pushTpool(&(get_nrUE_params()->Tpool), task);
+  notifiedFIFO_elt_t *newTx = arg;
+  nr_rxtx_thread_data_t *curMsgTx = NotifiedFifoData(newTx);
+  pushNotifiedFIFO(&curMsgTx->UE->ul_actor.fifo, newTx);
 }
 
 static size_t dump_L1_UE_meas_stats(PHY_VARS_NR_UE *ue, char *output, size_t max_len)
@@ -563,13 +562,7 @@ void processSlotTX(void *arg)
       phy_procedures_nrUE_TX(UE, proc, &phy_data);
     }
   }
-
-  int slots_per_frame = (UE->sl_mode == 2) ? UE->SL_UE_PHY_PARAMS.sl_frame_params.slots_per_frame
-                                           : UE->frame_parms.slots_per_frame;
-  int next_slot_and_frame = proc->nr_slot_tx + 1  + proc->nr_slot_tx_offset + proc->frame_tx * slots_per_frame;
-  dynamic_barrier_join(&UE->process_slot_tx_barriers[next_slot_and_frame % NUM_PROCESS_SLOT_TX_BARRIERS]);
   RU_write(rxtxD, sl_tx_action);
-  free(rxtxD);
   TracyCZoneEnd(ctx);
 }
 
@@ -609,7 +602,7 @@ static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
     for (int i = 0; i < NUM_DL_ACTORS; i++) {
       flush_actor(UE->dl_actors + i);
     }
-    /*TODO: Flush UL jobs */
+    flush_actor(&UE->ul_actor);
 
     clean_UE_harq(UE);
     UE->is_synchronized = 0;
@@ -630,6 +623,14 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
+
+  // process what RRC thread sent to MAC
+  MessageDef *msg = NULL;
+  do {
+    itti_poll_msg(TASK_MAC_UE, &msg);
+    if (msg)
+      process_msg_rcc_to_mac(msg);
+  } while (msg);
 
   if (IS_SOFTMODEM_NOS1 || IS_SA_MODE(get_softmodem_params())) {
     /* send tick to RLC and PDCP every ms */
@@ -875,10 +876,18 @@ void *UE_thread(void *arg)
         syncRunning = false;
         if (UE->is_synchronized) {
           UE->synch_request.received_synch_request = 0;
-          if (UE->sl_mode == 2)
+          if (UE->sl_mode == SL_MODE2_SUPPORTED)
             decoded_frame_rx = UE->SL_UE_PHY_PARAMS.sync_params.DFN;
-          else
+          else {
+            // We must wait the RRC layer decoded the MIB and sent us the frame number
+            MessageDef *msg = NULL;
+            itti_receive_msg(TASK_MAC_UE, &msg);
+            if (msg)
+              process_msg_rcc_to_mac(msg);
+            else
+              LOG_E(PHY, "It seems we arbort while trying to sync\n");
             decoded_frame_rx = mac->mib_frame;
+          }
           LOG_A(PHY,
                 "UE synchronized! decoded_frame_rx=%d UE->init_sync_frame=%d trashed_frames=%d\n",
                 decoded_frame_rx,
@@ -1082,22 +1091,22 @@ void *UE_thread(void *arg)
 
     // Start TX slot processing here. It runs in parallel with RX slot processing
     // in current code, DURATION_RX_TO_TX constant is the limit to get UL data to encode from a RX slot
-    nr_rxtx_thread_data_t *curMsgTx = calloc(1, sizeof(*curMsgTx));
+    notifiedFIFO_elt_t *newTx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), 0, 0, processSlotTX);
+    nr_rxtx_thread_data_t *curMsgTx = NotifiedFifoData(newTx);
+    memset(curMsgTx, 0, sizeof(*curMsgTx));
     curMsgTx->proc = curMsg.proc;
     curMsgTx->writeBlockSize = writeBlockSize;
     curMsgTx->proc.timestamp_tx = writeTimestamp;
     curMsgTx->UE = UE;
-    curMsgTx->stream_status = stream_status;
     curMsgTx->proc.nr_slot_tx_offset = nr_slot_tx_offset;
 
-    int sync_to_previous_thread = stream_status == STREAM_STATUS_SYNCED ? 1 : 0;
     int slot = curMsgTx->proc.nr_slot_tx;
     int slot_and_frame = slot + curMsgTx->proc.frame_tx * UE->frame_parms.slots_per_frame;
 
     dynamic_barrier_update(&UE->process_slot_tx_barriers[slot_and_frame % NUM_PROCESS_SLOT_TX_BARRIERS],
-                           tx_wait_for_dlsch[slot] + sync_to_previous_thread,
+                           tx_wait_for_dlsch[slot],
                            start_process_slot_tx,
-                           curMsgTx);
+                           newTx);
     stream_status = STREAM_STATUS_SYNCED;
     tx_wait_for_dlsch[slot] = 0;
     // apply new duration next run to avoid thread dead lock
@@ -1133,7 +1142,7 @@ void init_NR_UE_threads(PHY_VARS_NR_UE *UE) {
   char thread_name[16];
   sprintf(thread_name, "UEthread_%d", UE->Mod_id);
   threadCreate(&thread, UE_thread, (void *)UE, thread_name, -1, OAI_PRIORITY_RT_MAX);
-  if (!IS_SOFTMODEM_NOSTATS_BIT) {
+  if (!IS_SOFTMODEM_NOSTATS) {
     pthread_t stat_pthread;
     sprintf(thread_name, "L1_UE_stats_%d", UE->Mod_id);
     threadCreate(&stat_pthread, nrL1_UE_stats_thread, UE, thread_name, -1, OAI_PRIORITY_RT_LOW);

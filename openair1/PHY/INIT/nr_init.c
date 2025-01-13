@@ -136,8 +136,6 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   int ret_loader = load_nrLDPC_coding_interface(NULL, &gNB->nrLDPC_coding_interface);
   AssertFatal(ret_loader == 0, "error loading LDPC library\n");
 
-  pthread_mutex_init(&gNB->UL_INFO.crc_rx_mutex, NULL);
-
   gNB->max_nb_pdsch = MAX_MOBILES_PER_GNB;
   init_delay_table(fp->ofdm_symbol_size, MAX_DELAY_COMP, NR_MAX_OFDM_SYMBOL_SIZE, fp->delay_table);
 
@@ -230,8 +228,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
   const int Prx = gNB->gNB_config.carrier_config.num_rx_ant.value;
   const int max_ul_mimo_layers = 4; // taken from phy_init_nr_gNB()
   const int n_buf = Prx * max_ul_mimo_layers;
-
-  pthread_mutex_destroy(&gNB->UL_INFO.crc_rx_mutex);
 
   PHY_MEASUREMENTS_gNB *meas = &gNB->measurements;
   free_and_zero(meas->n0_subband_power);

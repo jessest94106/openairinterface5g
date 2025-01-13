@@ -44,7 +44,6 @@
 #include "common/utils/system.h"
 
 extern RAN_CONTEXT_t RC;
-extern int oai_exit;
 
 void lte_dump_mac_stats(eNB_MAC_INST *mac, FILE *fd)
 {

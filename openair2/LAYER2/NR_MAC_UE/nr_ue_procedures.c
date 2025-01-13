@@ -390,24 +390,6 @@ int8_t nr_ue_process_dci_freq_dom_resource_assignment(nfapi_nr_ue_pusch_pdu_t *p
       const int tmp=(start_DLBWP + n_RB_DLBWP) % P;
       int last_RBG = tmp ? tmp : P;
       writeBit(rb_bitmap, currentBit, last_bit_rbg, last_RBG);
-
-      dlsch_config_pdu->number_rbs = count_bits(dlsch_config_pdu->rb_bitmap, sizeofArray(dlsch_config_pdu->rb_bitmap));
-      // Temporary code to process type0 as type1 when the RB allocation is contiguous
-      int state = 0;
-      for (int i = 0; i < sizeof(dlsch_config_pdu->rb_bitmap) * 8; i++) {
-        int allocated = dlsch_config_pdu->rb_bitmap[i / 8] & (1 << (i % 8));
-        if (allocated) {
-          if (state == 0) {
-            dlsch_config_pdu->start_rb = i;
-            state = 1;
-          } else
-            AssertFatal(state == 1, "non-contiguous RB allocation in RB allocation type 0 not implemented");
-        } else {
-          if (state == 1) {
-            state = 2;
-          }
-        }
-      }
     }
     else if (pdsch_Config &&
              pdsch_Config->resourceAllocation == NR_PDSCH_Config__resourceAllocation_dynamicSwitch)
@@ -615,6 +597,14 @@ static int nr_ue_process_dci_ul_01(NR_UE_MAC_INST_t *mac,
                                 dci_ind->rnti,
                                 dci_ind->ss_type,
                                 NR_UL_DCI_FORMAT_0_1);
+  LOG_D(NR_MAC_DCI,
+      "add ul dci harq %d for %d.%d %d.%d round %d\n",
+        pdu->pusch_config_pdu.pusch_data.harq_process_id,
+        frame,
+        slot,
+        frame_tx,
+        slot_tx,
+        0);
   if (ret != 0)
     remove_ul_config_last_item(pdu);
   release_ul_config(pdu, false);
@@ -3011,10 +3001,10 @@ void nr_ue_send_sdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info, in
 // Fixme: Intel Endianess only procedure
 static inline int readBits(const uint8_t *dci, int *start, int length)
 {
-  const int mask[] = {0, 1, 3, 7, 0xf, 0x1f, 0x3f, 0x7f, 0xff, 0x1ff, 0x3ff, 0x7ff, 0xfff, 0x1fff, 0x3fff, 0x7fff, 0xffff};
+  uint32_t mask = (1U << length) - 1;
   uint64_t *tmp = (uint64_t *)dci;
   *start -= length;
-  return *tmp >> *start & mask[length];
+  return *tmp >> *start & mask;
 }
 
 static void extract_10_ra_rnti(dci_pdu_rel15_t *dci_pdu_rel15, const uint8_t *dci_pdu, int pos, const int N_RB)

@@ -558,23 +558,13 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
 
   const uint32_t Y = is_common ? 0 : get_Y(ss, slot, rnti);
   uint8_t nr_of_candidates;
-  for (int i=0; i<5; i++) {
+  for (int i = 0; i < 5; i++) {
     // for now taking the lowest value among the available aggregation levels
-    find_aggregation_candidates(aggregation_level,
-                                &nr_of_candidates,
-                                ss,
-                                1<<i);
-    if(nr_of_candidates>0)
+    find_aggregation_candidates(aggregation_level, &nr_of_candidates, ss, 1 << i);
+    if(nr_of_candidates > 0)
       break;
   }
-  int CCEIndex = find_pdcch_candidate(nrmac,
-                                      CC_id,
-                                      *aggregation_level,
-                                      nr_of_candidates,
-                                      beam_idx,
-                                      sched_pdcch,
-                                      coreset,
-                                      Y);
+  int CCEIndex = find_pdcch_candidate(nrmac, CC_id, *aggregation_level, nr_of_candidates, beam_idx, sched_pdcch, coreset, Y);
   return CCEIndex;
 }
 
@@ -2703,6 +2693,44 @@ uint8_t nr_get_tpc(int target, uint8_t cqi, int incr, int tx_power)
   return 1; // no change
 }
 
+/**
+ * @brief Limits the power control commands (TPC) in NR by checking the RSSI threshold.
+ *
+ * This function evaluates the received signal strength indicator (RSSI) and adjusts the
+ * transmit power control (TPC) commands accordingly to ensure they remain within acceptable
+ * limits. It helps in maintaining the signal quality and preventing excessive power usage.
+ *
+ * @param rssi The received signal strength indicator value, as defined in FAPI specifications.
+ * @param tpc The transmit power control command to be limited.
+ * @param rssi_threshold RSSI threshold in 0.1 dBm/dBFS, range -1280 to 0
+ * @return The adjusted TPC command after applying the RSSI threshold check.
+ */
+uint8_t nr_limit_tpc(int tpc, int rssi, int rssi_threshold)
+{
+  if (rssi == 0xFFFF) {
+    // RSSI not available, keep tpc
+    return tpc;
+  }
+  // Convert RSSI threshold to FAPI scale
+  const int fapi_rssi_0dBm_or_0dBFS = 1280;
+  int rssi_fapi_threshold = fapi_rssi_0dBm_or_0dBFS + rssi_threshold;
+  // Further limit TPC if above or near RSSI threshold
+  int tpc_to_db[] = {-1, 0, 1, 3};
+  if (rssi > rssi_fapi_threshold) {
+    // RSSI above theshold, reduce power
+    return 0;
+  } else if (rssi + tpc_to_db[tpc] * 10 > rssi_fapi_threshold) {
+    // Cannot apply required TPC, check 1 dB increment
+    if (rssi + 10 > rssi_fapi_threshold) {
+      // Still cannot apply required TPC, keep power
+      return 1;
+    } else {
+      // Can apply 1dB increment, but 3 was requested
+      return 2;
+    }
+  }
+  return tpc;
+}
 
 int get_pdsch_to_harq_feedback(NR_PUCCH_Config_t *pucch_Config,
                                 nr_dci_format_t dci_format,
@@ -3021,7 +3049,7 @@ int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs)
   /* we previously assumed a specific "slot ahead" value for the PHY processing
    * time. However, we cannot always know it (e.g., third-party PHY), so simply
    * assume a tentative worst-case slot processing time */
-  const uint16_t sl_ahead = 10;
+  const int sl_ahead = 10;
   /* 16ms seems to be the most common: See 38.331 Tab 12.1-1 */
   int delay_ms = NR_RRC_RECONFIGURATION_DELAY_MS + NR_RRC_BWP_SWITCHING_DELAY_MS;
   return (delay_ms << scs) + sl_ahead;
@@ -3185,7 +3213,7 @@ void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST 
   }
 }
 
-static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame)
+static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int slot, int slots_per_frame)
 {
   return ((frame * slots_per_frame + slot) / beam_info->beam_duration) % beam_info->beam_allocation_size;
 }
@@ -3196,7 +3224,7 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
   if (!beam_info->beam_allocation)
     return (NR_beam_alloc_t) {.new_beam = false, .idx = 0};
 
-  const int index = get_beam_index(beam_info, frame, slot, beam_index, slots_per_frame);
+  const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     NR_beam_alloc_t beam_struct = {.new_beam = false, .idx = i};
     int *beam = &beam_info->beam_allocation[i][index];
@@ -3204,8 +3232,10 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
       beam_struct.new_beam = true;
       *beam = beam_index;
     }
-    if (*beam == beam_index)
+    if (*beam == beam_index) {
+      LOG_D(NR_MAC, "%d.%d Using beam structure with index %d for beam %d (%s)\n", frame, slot, beam_struct.idx, beam_index, beam_struct.new_beam ? "new beam" : "old beam");
       return beam_struct;
+    }
   }
 
   return (NR_beam_alloc_t) {.new_beam = false, .idx = -1};
@@ -3215,11 +3245,23 @@ void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_
 {
   if(!new_beam) // need to reset only if the beam was allocated specifically for this instance
     return;
-  const int index = get_beam_index(beam_info, frame, slot, beam_index, slots_per_frame);
+  const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     if (beam_info->beam_allocation[i][index] == beam_index)
       beam_info->beam_allocation[i][index] = -1;
   }
+}
+
+void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
+{
+  RSRP_report_t *rsrp_report = &UE->UE_sched_ctrl.CSI_report.ssb_rsrp_report;
+  // simple beam switching algorithm -> we select beam with highest RSRP from CSI report
+  int new_bf_index = get_fapi_beamforming_index(mac, rsrp_report->resource_id[0]);
+  if (UE->UE_beam_index == new_bf_index)
+    return; // no beam change needed
+
+  LOG_I(NR_MAC, "[UE %x] Switching to beam with ID %d (SSB number %d)\n", UE->rnti, new_bf_index, rsrp_report->resource_id[0]);
+  UE->UE_beam_index = new_bf_index;
 }
 
 void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_len, void *data)

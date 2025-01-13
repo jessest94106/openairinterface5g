@@ -45,8 +45,6 @@
 #include <getopt.h>
 #include <sys/sysinfo.h>
 
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "assertions.h"
 #include "PHY/defs_common.h"
 #include "PHY/types.h"
@@ -78,7 +76,6 @@ static int DEFRUTPCORES[] = {2,4,6,8};
 
 #define MBMS_EXPERIMENTAL
 
-extern int oai_exit;
 extern clock_source_t clock_source;
 #include "executables/thread-common.h"
 //extern PARALLEL_CONF_t get_thread_parallel_conf(void);

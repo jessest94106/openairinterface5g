@@ -59,7 +59,6 @@ RAN_CONTEXT_t RC;
 int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
 
-uint64_t get_softmodem_optmask(void) {return 0;}
 static softmodem_params_t softmodem_params;
 softmodem_params_t *get_softmodem_params(void) {
   return &softmodem_params;
@@ -575,7 +574,6 @@ int main(int argc, char **argv)
       printf("\n");
       exit(-1);
 #endif
-
       nr_ulsch_decoding(gNB, frame_parms, frame, subframe, &G, &UE_id, 1);
       bool crc_valid = check_crc(harq_process_gNB->b, lenWithCrc(1, (harq_process_gNB->TBS) << 3), crcType(1, (harq_process_gNB->TBS) << 3));
       if (!crc_valid) {

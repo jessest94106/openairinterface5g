@@ -257,7 +257,7 @@ printf("rxdata in benetel_fh_if4p5_south_in %p\n", &ru->common.rxdataF[antenna][
   //printf("BENETEL: %s (f.sf %d.%d)\n", __FUNCTION__, *frame, *slot);
 
   RU_proc_t *proc = &ru->proc;
-  extern uint16_t sl_ahead;
+  extern int sl_ahead;
   int f = *frame;
   int sl = *slot;
 

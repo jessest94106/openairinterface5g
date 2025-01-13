@@ -173,7 +173,7 @@ typedef struct nrLDPC_segment_encoding_parameters_s{
  * \var G Available radio resource bits
  * \var tbslbrm Transport block size LBRM
  * \var A Transport block size (This is A from 38.212 V15.4.0 section 5.1)
- * \var Kb Code block size divided by lifting size
+ * \var Kb Number of time the lifting size needed to fit the payload of a code block
  * \var K Code block size at input of encoder
  * \var Z lifting size
  * \var F filler bits size

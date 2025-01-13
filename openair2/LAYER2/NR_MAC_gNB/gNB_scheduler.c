@@ -116,6 +116,7 @@ void clear_beam_information(NR_beam_info_t *beam_info, int frame, int slot, int 
   idx_to_clear = (idx_to_clear + beam_info->beam_allocation_size - 1) % beam_info->beam_allocation_size;
   if (slot % beam_info->beam_duration == 0) {
     // resetting previous period allocation
+    LOG_D(NR_MAC, "%d.%d Clear beam information for index %d\n", frame, slot, idx_to_clear);
     for (int i = 0; i < beam_info->beams_per_period; i++)
       beam_info->beam_allocation[i][idx_to_clear] = -1;
   }

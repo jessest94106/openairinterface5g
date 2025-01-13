@@ -287,6 +287,26 @@ static void configure_dlsch(NR_UE_DLSCH_t *dlsch0,
                             NR_UE_MAC_INST_t *mac,
                             int rnti)
 {
+  // Temporary code to process type0 as type1 when the RB allocation is contiguous
+  if (dlsch_config_pdu->resource_alloc == 0) {
+    dlsch_config_pdu->number_rbs = count_bits(dlsch_config_pdu->rb_bitmap, sizeofArray(dlsch_config_pdu->rb_bitmap));
+    int state = 0;
+    for (int i = 0; i < sizeof(dlsch_config_pdu->rb_bitmap) * 8; i++) {
+      int allocated = dlsch_config_pdu->rb_bitmap[i / 8] & (1 << (i % 8));
+      if (allocated) {
+        if (state == 0) {
+          dlsch_config_pdu->start_rb = i;
+          state = 1;
+        } else
+          AssertFatal(state == 1, "non-contiguous RB allocation in RB allocation type 0 not implemented");
+      } else {
+        if (state == 1) {
+          state = 2;
+        }
+      }
+    }
+  }
+
   const uint8_t current_harq_pid = dlsch_config_pdu->harq_process_nbr;
   dlsch0->active = true;
   dlsch0->rnti = rnti;

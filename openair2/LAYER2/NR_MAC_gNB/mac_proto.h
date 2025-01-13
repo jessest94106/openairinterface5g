@@ -82,8 +82,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
                          nfapi_nr_dl_tti_request_t *DL_req,
                          nfapi_nr_tx_data_request_t *TX_req);
 
-/* \brief default FR1 DL preprocessor init routine, returns preprocessor to call */
-nr_pp_impl_dl nr_init_fr1_dlsch_preprocessor(int CC_id);
+/* \brief default DL preprocessor init routine, returns preprocessor to call */
+nr_pp_impl_dl nr_init_dlsch_preprocessor(int CC_id);
 
 void schedule_nr_sib1(module_id_t module_idP,
                       frame_t frameP,
@@ -108,8 +108,8 @@ void schedule_nr_mib(module_id_t module_idP, frame_t frameP, sub_frame_t slotP, 
  * messages, statistics, HARQ handling, ... */
 void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req);
 
-/* \brief default FR1 UL preprocessor init routine, returns preprocessor to call */
-nr_pp_impl_ul nr_init_fr1_ulsch_preprocessor(int CC_id);
+/* \brief default UL preprocessor init routine, returns preprocessor to call */
+nr_pp_impl_ul nr_init_ulsch_preprocessor(int CC_id);
 
 /////// Random Access MAC-PHY interface functions and primitives ///////
 
@@ -120,16 +120,15 @@ void nr_schedule_RA(module_id_t module_idP,
                     nfapi_nr_dl_tti_request_t *DL_req,
                     nfapi_nr_tx_data_request_t *TX_req);
 
-/* \brief Function to indicate a received preamble on PRACH.  It initiates the RA procedure.
-@param module_idP Instance ID of gNB
-@param preamble_index index of the received RA request
-@param slotP Slot number on which to act
-@param timing_offset Offset in samples of the received PRACH w.r.t. eNB timing. This is used to
-@param rnti RA rnti corresponding to this PRACH preamble
-@param rach_resource type (0=non BL/CE,1 CE level 0,2 CE level 1, 3 CE level 2,4 CE level 3)
-*/
-void nr_initiate_ra_proc(module_id_t module_idP, int CC_id, frame_t frameP, sub_frame_t slotP,
-                         uint16_t preamble_index, uint8_t freq_index, uint8_t symbol, int16_t timing_offset);
+void nr_initiate_ra_proc(module_id_t module_idP,
+                         int CC_id,
+                         frame_t frameP,
+                         int slotP,
+                         uint16_t preamble_index,
+                         uint8_t freq_index,
+                         uint8_t symbol,
+                         int16_t timing_offset,
+                         uint32_t preamble_power);
 
 void nr_clear_ra_proc(NR_RA_t *ra);
 
@@ -296,6 +295,7 @@ NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
                                    const int Layers);
 
 uint8_t nr_get_tpc(int target, uint8_t cqi, int incr, int tx_power);
+uint8_t nr_limit_tpc(int tpc, int rssi, int rssi_threshold);
 
 int get_spf(nfapi_nr_config_request_scf_t *cfg);
 
@@ -447,7 +447,7 @@ void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST 
 int get_fapi_beamforming_index(gNB_MAC_INST *mac, int ssb_idx);
 NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame);
 void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame, bool new_beam);
-
+void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE);
 void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t frameP, sub_frame_t slotP);
 
 size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset_rsrp);

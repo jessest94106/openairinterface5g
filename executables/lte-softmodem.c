@@ -33,9 +33,6 @@
 
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
 #include <sched.h>
-
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "assertions.h"
 #include "common/oai_version.h"
 
@@ -45,13 +42,8 @@
 #include "common/ran_context.h"
 #include "common/config/config_userapi.h"
 #include "common/utils/load_module_shlib.h"
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "radio/COMMON/common_lib.h"
 #include "radio/ETHERNET/if_defs.h"
-
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
 #include <openair1/PHY/phy_extern_ue.h>
 
@@ -297,7 +289,8 @@ void exit_function(const char *file, const char *function, const int line, const
 static void get_options(configmodule_interface_t *cfg)
 {
   CONFIG_SETRTFLAG(CONFIG_NOEXITONHELP);
-  get_common_options(cfg, SOFTMODEM_ENB_BIT);
+  IS_SOFTMODEM_ENB = true;
+  get_common_options(cfg);
   CONFIG_CLEARRTFLAG(CONFIG_NOEXITONHELP);
 
   if ( !(CONFIG_ISFLAGSET(CONFIG_ABORT)) ) {

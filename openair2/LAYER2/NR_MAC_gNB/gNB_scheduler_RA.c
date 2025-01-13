@@ -48,7 +48,6 @@
 #include <executables/softmodem-common.h>
 extern RAN_CONTEXT_t RC;
 extern const uint8_t nr_slots_per_frame[5];
-extern uint16_t sl_ahead;
 
 // forward declaration of functions used in this file
 static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
@@ -676,14 +675,25 @@ static NR_RA_t *find_free_nr_RA(NR_RA_t *ra_base, int ra_count, uint16_t preambl
   return NULL;
 }
 
+static uint8_t nr_get_msg3_tpc(uint32_t preamble_power)
+{
+  // TODO not sure how to implement TPC for MSG3 to be sent in RAR
+  //      maybe using preambleReceivedTargetPower as a term of comparison
+  //      in any case OAI L1 sets this as invalid
+  //      and Aerial report doesn't seem to be reliable (not matching preambleReceivedTargetPower)
+  //      so for now we feedback 0dB TPC
+  return 3; // it means 0dB
+}
+
 void nr_initiate_ra_proc(module_id_t module_idP,
                          int CC_id,
                          frame_t frameP,
-                         sub_frame_t slotP,
+                         int slotP,
                          uint16_t preamble_index,
                          uint8_t freq_index,
                          uint8_t symbol,
-                         int16_t timing_offset)
+                         int16_t timing_offset,
+                         uint32_t preamble_power)
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_INITIATE_RA_PROC, 1);
 
@@ -714,6 +724,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
   ra->preamble_slot = slotP;
   ra->preamble_index = preamble_index;
   ra->timing_offset = timing_offset;
+  ra->msg3_TPC = nr_get_msg3_tpc(preamble_power);
   uint8_t ul_carrier_id = 0; // 0 for NUL 1 for SUL
   ra->RA_rnti = nr_get_ra_rnti(symbol, slotP, freq_index, ul_carrier_id);
 
@@ -2336,9 +2347,7 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
   NR_RA_HEADER_BI *rarbi = (NR_RA_HEADER_BI *) dlsch_buffer;
   NR_RA_HEADER_RAPID *rarh = (NR_RA_HEADER_RAPID *) (dlsch_buffer + 1);
   NR_MAC_RAR *rar = (NR_MAC_RAR *) (dlsch_buffer + 2);
-  unsigned char csi_req = 0, tpc_command;
-
-  tpc_command = 3; // This is 0 dB in RAR UL grant
+  unsigned char csi_req = 0;
 
   /// E/T/R/R/BI subheader ///
   // E = 1, MAC PDU includes another MAC sub-PDU (RAPID)
@@ -2370,8 +2379,6 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
 
   // UL grant
 
-  ra->msg3_TPC = 1; // This is 0 dB in UL DCI
-
   if (pusch_pdu->frequency_hopping)
     AssertFatal(1==0,"PUSCH with frequency hopping currently not supported");
 
@@ -2380,7 +2387,7 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
   int valid_bits = 14;
   int f_alloc = prb_alloc & ((1 << valid_bits) - 1);
 
-  uint32_t ul_grant = csi_req | (tpc_command << 1) | (pusch_pdu->mcs_index << 4) | (ra->Msg3_tda_id << 8) | (f_alloc << 12) | (pusch_pdu->frequency_hopping << 26);
+  uint32_t ul_grant = csi_req | (ra->msg3_TPC << 1) | (pusch_pdu->mcs_index << 4) | (ra->Msg3_tda_id << 8) | (f_alloc << 12) | (pusch_pdu->frequency_hopping << 26);
 
   rar->UL_GRANT_1 = (uint8_t) (ul_grant >> 24) & 0x07;
   rar->UL_GRANT_2 = (uint8_t) (ul_grant >> 16) & 0xff;
@@ -2410,9 +2417,12 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_RA_t *ra, uint8_t *dlsch_buffer, nfa
         rar->TA2 + (rar->TA1 << 5),
         rar->UL_GRANT_4 >> 4,
         rar->UL_GRANT_1 >> 2,
-        tpc_command,
+        ra->msg3_TPC,
         csi_req,
         rar->TCRNTI_2 + (rar->TCRNTI_1 << 8));
+
+  // resetting msg3 TPC to 0dB for possible retransmissions
+  ra->msg3_TPC = 1;
 }
 
 void nr_schedule_RA(module_id_t module_idP,

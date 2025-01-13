@@ -43,7 +43,6 @@ Description Defines the messages supported by the Access Stratum sublayer
 
 #include "commonDef.h"
 #include "networkDef.h"
-
 /****************************************************************************/
 /*********************  G L O B A L    C O N S T A N T S  *******************/
 /****************************************************************************/

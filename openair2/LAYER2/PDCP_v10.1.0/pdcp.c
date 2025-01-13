@@ -129,10 +129,6 @@ static sdu_size_t             pdcp_output_sdu_bytes_to_write;
 notifiedFIFO_t         pdcp_sdu_list;
 
 pdcp_enb_t pdcp_enb[MAX_NUM_CCs];
-
-
-extern int oai_exit;
-
 pthread_t pdcp_stats_thread_desc;
 /*! \fn bool pdcp_config_req_asn1 (const protocol_ctxt_t* const ctxt_pP, srb_flag_t srb_flagP, uint32_t  action, rb_id_t rb_id,
  * uint8_t rb_sn, uint8_t rb_report, uint16_t header_compression_profile, uint8_t security_mode) \brief  Function for RRC to

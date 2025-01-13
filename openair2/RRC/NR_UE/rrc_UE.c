@@ -62,7 +62,6 @@
 
 #include "common/utils/LOG/log.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
-#include "executables/position_interface.h"
 
 #ifndef CELLULAR
   #include "RRC/NR/MESSAGES/asn1_msg.h"
@@ -166,7 +165,7 @@ static void set_DRB_status(NR_UE_RRC_INST_t *rrc, NR_DRB_Identity_t drb_id, NR_R
   rrc->status_DRBs[drb_id - 1] = status;
 }
 
-static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, instance_t ue_id, position_t *position)
+static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, instance_t ue_id)
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SI, VCD_FUNCTION_IN);
 
@@ -181,80 +180,80 @@ static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si,
     return;
   }
 
+  NR_SIB19_r17_t *sib19 = NULL;
   for (int i = 0; i < si->criticalExtensions.choice.systemInformation->sib_TypeAndInfo.list.count; i++) {
     SystemInformation_IEs__sib_TypeAndInfo__Member *typeandinfo;
     typeandinfo = si->criticalExtensions.choice.systemInformation->sib_TypeAndInfo.list.array[i];
     LOG_I(NR_RRC, "Found SIB%d\n", typeandinfo->present + 1);
     switch(typeandinfo->present) {
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib2:
-        SI_info->sib2_validity = true;
+        SI_info->sib2_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib2_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib3:
-        SI_info->sib3_validity = true;
+        SI_info->sib3_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib3_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib4:
-        SI_info->sib4_validity = true;
+        SI_info->sib4_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib4_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib5:
-        SI_info->sib5_validity = true;
+        SI_info->sib5_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib5_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib6:
-        SI_info->sib6_validity = true;
+        SI_info->sib6_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib6_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib7:
-        SI_info->sib7_validity = true;
+        SI_info->sib7_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib7_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib8:
-        SI_info->sib8_validity = true;
+        SI_info->sib8_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib8_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib9:
-        SI_info->sib9_validity = true;
+        SI_info->sib9_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib9_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib10_v1610:
-        SI_info->sib10_validity = true;
+        SI_info->sib10_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib10_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib11_v1610:
-        SI_info->sib11_validity = true;
+        SI_info->sib11_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib11_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib12_v1610:
-        SI_info->sib12_validity = true;
+        SI_info->sib12_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib12_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib13_v1610:
-        SI_info->sib13_validity = true;
+        SI_info->sib13_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib13_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib14_v1610:
-        SI_info->sib14_validity = true;
+        SI_info->sib14_validity = SIB_VALID;
         nr_timer_start(&SI_info->sib14_timer);
         break;
       case NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib19_v1700:
-        SI_info->SInfo_r17.sib19_validity = true;
+        SI_info->SInfo_r17.sib19_validity = SIB_VALID;
         if (g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
           xer_fprint(stdout, &asn_DEF_NR_SIB19_r17, (const void *)typeandinfo->choice.sib19_v1700);
-        
-        // allocate memory for position coordinates
-        if (!position)
-          position = CALLOC(1, sizeof(*position));
-        // populate position with position from config file
-        get_position_coordinates(ue_id, position);
-
-        nr_rrc_mac_config_req_sib19_r17(ue_id, position, typeandinfo->choice.sib19_v1700);
+        sib19 = typeandinfo->choice.sib19_v1700;
         nr_timer_start(&SI_info->SInfo_r17.sib19_timer);
         break;
       default:
         break;
     }
+  }
+
+  if (sib19) {
+    MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_OTHER_SIB);
+    asn_copy(&asn_DEF_NR_SIB19_r17, (void **)&NR_MAC_RRC_CONFIG_OTHER_SIB(msg).sib19, sib19);
+    itti_send_msg_to_task(TASK_MAC_UE, ue_id, msg);
   }
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SI, VCD_FUNCTION_OUT);
 }
@@ -315,7 +314,7 @@ static void nr_rrc_process_sib1(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_inf
     xer_fprint(stdout, &asn_DEF_NR_SIB1, (const void *) sib1);
   LOG_A(NR_RRC, "SIB1 decoded\n");
   nr_timer_start(&SI_info->sib1_timer);
-  SI_info->sib1_validity = true;
+  SI_info->sib1_validity = SIB_VALID;
   if (rrc->nrRrcState == RRC_STATE_IDLE_NR) {
     rrc->ra_trigger = RRC_CONNECTION_SETUP;
     // preparing RRC setup request payload in advance
@@ -335,8 +334,9 @@ static void nr_rrc_process_sib1(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_inf
   nr_rrc_set_sib1_timers_and_constants(&rrc->timers_and_constants, sib1);
   // RRC storage of SIB1 timers and constants (eg needed in re-establishment)
   UPDATE_IE(rrc->timers_and_constants.sib1_TimersAndConstants, sib1->ue_TimersAndConstants, NR_UE_TimersAndConstants_t);
-
-  nr_rrc_mac_config_req_sib1(rrc->ue_id, 0, sib1->si_SchedulingInfo, si_SchedInfo_v1700, sib1->servingCellConfigCommon);
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_SIB1);
+  NR_MAC_RRC_CONFIG_SIB1(msg).sib1 = sib1;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
 }
 
 static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530, int gNB_index)
@@ -378,6 +378,7 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
       LOG_E(NR_RRC, "dedicatedSIB1-Delivery decode error\n");
       SEQUENCE_free(&asn_DEF_NR_SIB1, sib1, 1);
     } else {
+      // mac layer will free sib1
       nr_rrc_process_sib1(rrc, SI_info, sib1);
     }
   }
@@ -395,7 +396,7 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
       SEQUENCE_free(&asn_DEF_NR_SystemInformation, si, 1);
     } else {
       LOG_I(NR_RRC, "[UE %ld] Decoding dedicatedSystemInformationDelivery\n", rrc->ue_id);
-      nr_decode_SI(SI_info, si, rrc->ue_id, rrc->position_coordinates);
+      nr_decode_SI(SI_info, si, rrc->ue_id);
     }
   }
   if (rec_1530->otherConfig) {
@@ -474,8 +475,12 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
         nr_rrc_cellgroup_configuration(rrc, cellGroupConfig);
 
         AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
-        nr_rrc_mac_config_req_cg(rrc->ue_id, 0, cellGroupConfig, rrc->UECap.UE_NR_Capability);
-        asn1cFreeStruc(asn_DEF_NR_CellGroupConfig, cellGroupConfig);
+        MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_CG);
+        // cellGroupConfig will be managed by MAC
+        NR_MAC_RRC_CONFIG_CG(msg).cellGroupConfig = cellGroupConfig;
+        // UE_NR_Capability remain a race condition between this rrc thread and mac thread
+        NR_MAC_RRC_CONFIG_CG(msg).UE_NR_Capability = rrc->UECap.UE_NR_Capability;
+        itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
       }
       if (ie->measConfig) {
         LOG_I(NR_RRC, "RRCReconfiguration includes Measurement Configuration\n");
@@ -621,56 +626,82 @@ bool check_si_validity(NR_UE_RRC_SI_INFO *SI_info, int si_type)
 {
   switch (si_type) {
     case NR_SIB_TypeInfo__type_sibType2:
-      if (!SI_info->sib2_validity)
+      if (SI_info->sib2_validity == SIB_NOT_VALID) {
+        SI_info->sib2_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType3:
-      if (!SI_info->sib3_validity)
+      if (SI_info->sib3_validity == SIB_NOT_VALID) {
+        SI_info->sib3_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType4:
-      if (!SI_info->sib4_validity)
+      if (SI_info->sib4_validity == SIB_NOT_VALID) {
+        SI_info->sib4_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType5:
-      if (!SI_info->sib5_validity)
+      if (SI_info->sib5_validity == SIB_NOT_VALID) {
+        SI_info->sib5_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType6:
-      if (!SI_info->sib6_validity)
+      if (SI_info->sib6_validity == SIB_NOT_VALID) {
+        SI_info->sib6_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType7:
-      if (!SI_info->sib7_validity)
+      if (SI_info->sib7_validity == SIB_NOT_VALID) {
+        SI_info->sib7_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType8:
-      if (!SI_info->sib8_validity)
+      if (SI_info->sib8_validity == SIB_NOT_VALID) {
+        SI_info->sib8_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType9:
-      if (!SI_info->sib9_validity)
+      if (SI_info->sib9_validity == SIB_NOT_VALID) {
+        SI_info->sib9_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType10_v1610:
-      if (!SI_info->sib10_validity)
+      if (SI_info->sib10_validity == SIB_NOT_VALID) {
+        SI_info->sib10_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType11_v1610:
-      if (!SI_info->sib11_validity)
+      if (SI_info->sib11_validity == SIB_NOT_VALID) {
+        SI_info->sib11_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType12_v1610:
-      if (!SI_info->sib12_validity)
+      if (SI_info->sib12_validity == SIB_NOT_VALID) {
+        SI_info->sib12_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType13_v1610:
-      if (!SI_info->sib13_validity)
+      if (SI_info->sib13_validity == SIB_NOT_VALID) {
+        SI_info->sib13_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo__type_sibType14_v1610:
-      if (!SI_info->sib14_validity)
+      if (SI_info->sib14_validity == SIB_NOT_VALID) {
+        SI_info->sib14_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     default :
       AssertFatal(false, "Invalid SIB type %d\n", si_type);
@@ -682,32 +713,46 @@ bool check_si_validity_r17(NR_UE_RRC_SI_INFO_r17 *SI_info, int si_type)
 {
   switch (si_type) {
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType15:
-      if (!SI_info->sib15_validity)
+      if (SI_info->sib15_validity == SIB_NOT_VALID) {
+        SI_info->sib15_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType16:
-      if (!SI_info->sib16_validity)
+      if (SI_info->sib16_validity == SIB_NOT_VALID) {
+        SI_info->sib16_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType17:
-      if (!SI_info->sib17_validity)
+      if (SI_info->sib17_validity == SIB_NOT_VALID) {
+        SI_info->sib17_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType18:
-      if (!SI_info->sib18_validity)
+      if (SI_info->sib18_validity == SIB_NOT_VALID) {
+        SI_info->sib18_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType19:
-      if (!SI_info->sib19_validity)
+      if (SI_info->sib19_validity == SIB_NOT_VALID) {
+        SI_info->sib19_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType20:
-      if (!SI_info->sib20_validity)
+      if (SI_info->sib20_validity == SIB_NOT_VALID) {
+        SI_info->sib20_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     case NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType21:
-      if (!SI_info->sib21_validity)
+      if (SI_info->sib21_validity == SIB_NOT_VALID) {
+        SI_info->sib21_validity = SIB_REQUESTED;
         return false;
+      }
       break;
     default :
       AssertFatal(false, "Invalid SIB r17 type %d\n", si_type);
@@ -718,8 +763,10 @@ bool check_si_validity_r17(NR_UE_RRC_SI_INFO_r17 *SI_info, int si_type)
 int check_si_status(NR_UE_RRC_SI_INFO *SI_info)
 {
   // schedule reception of SIB1 if RRC doesn't have it
-  if (!SI_info->sib1_validity)
+  if (SI_info->sib1_validity == SIB_NOT_VALID) {
+    SI_info->sib1_validity = SIB_REQUESTED;
     return 1;
+  }
   else {
     if (SI_info->default_otherSI_map) {
       // Check if RRC has configured default SI
@@ -807,11 +854,16 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
     // to schedule MAC to get SI if required
     get_sib = check_si_status(SI_info);
   }
-  if (bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib)
-    nr_rrc_mac_config_req_mib(rrc->ue_id, 0, bcch_message->message.choice.mib, get_sib);
-  else
+  if (bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib) {
+    MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_MIB);
+    // mac will manage the pointer
+    NR_MAC_RRC_CONFIG_MIB(msg).bcch = bcch_message;
+    NR_MAC_RRC_CONFIG_MIB(msg).get_sib = get_sib;
+    itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+  } else {
     LOG_E(NR_RRC, "RRC-received BCCH message is not a MIB\n");
-  ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, bcch_message);
+    ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, bcch_message);
+  }
   return;
 }
 
@@ -900,11 +952,13 @@ static int8_t nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
     switch (bcch_message->message.choice.c1->present) {
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformationBlockType1:
         nr_rrc_process_sib1(rrc, SI_info, bcch_message->message.choice.c1->choice.systemInformationBlockType1);
+        // mac layer will free after usage the sib1
+        bcch_message->message.choice.c1->choice.systemInformationBlockType1 = NULL;
         break;
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation:
         LOG_I(NR_RRC, "[UE %ld] Decoding SI\n", rrc->ue_id);
         NR_SystemInformation_t *si = bcch_message->message.choice.c1->choice.systemInformation;
-        nr_decode_SI(SI_info, si, rrc->ue_id, rrc->position_coordinates);
+        nr_decode_SI(SI_info, si, rrc->ue_id);
         break;
       case NR_BCCH_DL_SCH_MessageType__c1_PR_NOTHING:
       default:
@@ -1036,9 +1090,11 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
 
   nr_rrc_cellgroup_configuration(rrc, cellGroupConfig);
 
-  LOG_D(RRC,"Sending CellGroupConfig to MAC\n");
-  nr_rrc_mac_config_req_cg(rrc->ue_id, 0, cellGroupConfig, rrc->UECap.UE_NR_Capability);
-  asn1cFreeStruc(asn_DEF_NR_CellGroupConfig, cellGroupConfig);
+  LOG_D(RRC, "Sending CellGroupConfig to MAC the pointer will be managed by mac\n");
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_CG);
+  NR_MAC_RRC_CONFIG_CG(msg).cellGroupConfig = cellGroupConfig;
+  NR_MAC_RRC_CONFIG_CG(msg).UE_NR_Capability = rrc->UECap.UE_NR_Capability;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
 }
 
 static void rrc_ue_generate_RRCSetupComplete(const NR_UE_RRC_INST_t *rrc, const uint8_t Transaction_id)
@@ -2126,7 +2182,9 @@ static void nr_rrc_initiate_rrcReestablishment(NR_UE_RRC_INST_t *rrc, NR_Reestab
   // reset MAC
   // release spCellConfig, if configured
   // perform cell selection in accordance with the cell selection process
-  nr_rrc_mac_config_req_reset(rrc->ue_id, RE_ESTABLISHMENT);
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = RE_ESTABLISHMENT;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
 }
 
 static void nr_rrc_ue_generate_rrcReestablishmentComplete(const NR_UE_RRC_INST_t *rrc,
@@ -2465,27 +2523,27 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
     rrcPerNB_t *nb = &rrc->perNB[i];
     NR_UE_RRC_SI_INFO *SI_info = &nb->SInfo;
     init_SI_timers(SI_info);
-    SI_info->sib1_validity = false;
-    SI_info->sib2_validity = false;
-    SI_info->sib3_validity = false;
-    SI_info->sib4_validity = false;
-    SI_info->sib5_validity = false;
-    SI_info->sib6_validity = false;
-    SI_info->sib7_validity = false;
-    SI_info->sib8_validity = false;
-    SI_info->sib9_validity = false;
-    SI_info->sib10_validity = false;
-    SI_info->sib11_validity = false;
-    SI_info->sib12_validity = false;
-    SI_info->sib13_validity = false;
-    SI_info->sib14_validity = false;
-    SI_info->SInfo_r17.sib15_validity = false;
-    SI_info->SInfo_r17.sib16_validity = false;
-    SI_info->SInfo_r17.sib17_validity = false;
-    SI_info->SInfo_r17.sib18_validity = false;
-    SI_info->SInfo_r17.sib19_validity = false;
-    SI_info->SInfo_r17.sib20_validity = false;
-    SI_info->SInfo_r17.sib21_validity = false;
+    SI_info->sib1_validity = SIB_NOT_VALID;
+    SI_info->sib2_validity = SIB_NOT_VALID;
+    SI_info->sib3_validity = SIB_NOT_VALID;
+    SI_info->sib4_validity = SIB_NOT_VALID;
+    SI_info->sib5_validity = SIB_NOT_VALID;
+    SI_info->sib6_validity = SIB_NOT_VALID;
+    SI_info->sib7_validity = SIB_NOT_VALID;
+    SI_info->sib8_validity = SIB_NOT_VALID;
+    SI_info->sib9_validity = SIB_NOT_VALID;
+    SI_info->sib10_validity = SIB_NOT_VALID;
+    SI_info->sib11_validity = SIB_NOT_VALID;
+    SI_info->sib12_validity = SIB_NOT_VALID;
+    SI_info->sib13_validity = SIB_NOT_VALID;
+    SI_info->sib14_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib15_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib16_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib17_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib18_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib19_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib20_validity = SIB_NOT_VALID;
+    SI_info->SInfo_r17.sib21_validity = SIB_NOT_VALID;
   }
 
   if (rrc->nrRrcState == RRC_STATE_DETACH_NR) {
@@ -2495,7 +2553,9 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
 
   // reset MAC
   NR_UE_MAC_reset_cause_t cause = (rrc->nrRrcState == RRC_STATE_DETACH_NR) ? DETACH : GO_TO_IDLE;
-  nr_rrc_mac_config_req_reset(rrc->ue_id, cause);
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = cause;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
 
   // enter RRC_IDLE
   LOG_I(NR_RRC, "RRC moved into IDLE state\n");
@@ -2517,7 +2577,9 @@ void handle_t300_expiry(NR_UE_RRC_INST_t *rrc)
 
   // reset MAC, release the MAC configuration
   NR_UE_MAC_reset_cause_t cause = T300_EXPIRY;
-  nr_rrc_mac_config_req_reset(rrc->ue_id, cause);
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = cause;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
   // TODO handle connEstFailureControl
   // TODO inform upper layers about the failure to establish the RRC connection
 }

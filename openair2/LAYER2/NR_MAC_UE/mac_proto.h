@@ -85,14 +85,10 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id,
                                NR_MIB_t *mibP,
                                int sched_sib1);
 
-void nr_rrc_mac_config_req_sib1(module_id_t module_id,
-                                int cc_idP,
-                                NR_SI_SchedulingInfo_t *si_SchedulingInfo,
-                                NR_SI_SchedulingInfo_v1700_t *si_SchedulingInfo_v1700,
-                                NR_ServingCellConfigCommonSIB_t *scc);
+void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1);
 
 struct position; /* forward declaration */
-void nr_rrc_mac_config_req_sib19_r17(module_id_t module_id, const struct position *pos, NR_SIB19_r17_t *sib19_r17);
+void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19_r17);
 
 void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t cause);
 

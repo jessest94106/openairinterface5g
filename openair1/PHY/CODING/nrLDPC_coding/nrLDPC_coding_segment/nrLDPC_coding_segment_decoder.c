@@ -20,11 +20,11 @@
  */
 
 /*! \file PHY/CODING/nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_decoder.c
-* \brief Top-level routines for decoding LDPC transport channels
-*/
-
+ * \brief Top-level routines for decoding LDPC transport channels
+ */
 
 // [from gNB coding]
+#include "nr_rate_matching.h"
 #include "PHY/defs_gNB.h"
 #include "PHY/CODING/coding_extern.h"
 #include "PHY/CODING/coding_defs.h"
@@ -45,10 +45,10 @@
 #include <stdint.h>
 #include <syscall.h>
 #include <time.h>
-//#define gNB_DEBUG_TRACE
+// #define gNB_DEBUG_TRACE
 
-#define OAI_LDPC_DECODER_MAX_NUM_LLR 27000 //26112 // NR_LDPC_NCOL_BG1*NR_LDPC_ZMAX = 68*384
-//#define DEBUG_CRC
+#define OAI_LDPC_DECODER_MAX_NUM_LLR 27000 // 26112 // NR_LDPC_NCOL_BG1*NR_LDPC_ZMAX = 68*384
+// #define DEBUG_CRC
 #ifdef DEBUG_CRC
 #define PRINT_CRC_CHECK(a) a
 #else
@@ -64,7 +64,8 @@
  * \brief decoding parameter of transport blocks
  * \var decoderParms decoder parameters
  * \var Qm modulation order
- * \var Kc size of base graph input
+ * \var Kc ratio between the number of columns in the parity check matrix and the lifting size
+ * it is fixed for a given base graph while the lifting size is chosen to have a sufficient number of columns
  * \var rv_index
  * \var max_number_iterations maximum number of LDPC iterations
  * \var abort_decode pointer to decode abort flag
@@ -75,7 +76,7 @@
  * \var F filler bits size
  * \var r segment index in TB
  * \var E input llr segment size
- * \var C number of segments 
+ * \var C number of segments
  * \var llr input llr segment array
  * \var d Pointers to code blocks before LDPC decoding (38.212 V15.4.0 section 5.3.2)
  * \var d_to_be_cleared
@@ -88,8 +89,7 @@
  * \var p_ts_rate_unmatch pointer to rate unmatching time stats
  * \var p_ts_ldpc_decode pointer to decoding time stats
  */
-typedef struct nrLDPC_decoding_parameters_s{
-
+typedef struct nrLDPC_decoding_parameters_s {
   t_nrLDPC_dec_params decoderParms;
 
   uint8_t Qm;
@@ -127,14 +127,13 @@ static void nr_process_decode_segment(void *arg)
 {
   nrLDPC_decoding_parameters_t *rdata = (nrLDPC_decoding_parameters_t *)arg;
   t_nrLDPC_dec_params *p_decoderParms = &rdata->decoderParms;
-  const int Kr = rdata->K;
-  const int Kr_bytes = Kr >> 3;
-  const int K_bits_F = Kr - rdata->F;
+  const int K = rdata->K;
+  const int Kprime = K - rdata->F;
   const int A = rdata->A;
   const int E = rdata->E;
   const int Qm = rdata->Qm;
   const int rv_index = rdata->rv_index;
-  const uint8_t kc = rdata->Kc;
+  const uint8_t Kc = rdata->Kc;
   short *ulsch_llr = rdata->llr;
   int8_t llrProcBuf[OAI_LDPC_DECODER_MAX_NUM_LLR] __attribute__((aligned(32)));
 
@@ -166,7 +165,6 @@ static void nr_process_decode_segment(void *arg)
 
   ///////////////////////// ulsch_harq->e =====> ulsch_harq->d /////////////////////////
 
-
   if (nr_rate_matching_ldpc_rx(rdata->tbslbrm,
                                p_decoderParms->BG,
                                p_decoderParms->Z,
@@ -177,9 +175,8 @@ static void nr_process_decode_segment(void *arg)
                                *rdata->d_to_be_cleared,
                                E,
                                rdata->F,
-                               Kr - rdata->F - 2 * (p_decoderParms->Z))
+                               K - rdata->F - 2 * (p_decoderParms->Z))
       == -1) {
-
     stop_meas(rdata->p_ts_rate_unmatch);
     LOG_E(PHY, "nrLDPC_coding_segment_decoder.c: Problem in rate_matching\n");
 
@@ -191,9 +188,8 @@ static void nr_process_decode_segment(void *arg)
 
   *rdata->d_to_be_cleared = false;
 
-  memset(rdata->c, 0, Kr_bytes);
   p_decoderParms->crc_type = crcType(rdata->C, A);
-  p_decoderParms->E = lenWithCrc(rdata->C, A);
+  p_decoderParms->Kprime = lenWithCrc(rdata->C, A);
 
   // set first 2*Z_c bits to zeros
 
@@ -203,16 +199,16 @@ static void nr_process_decode_segment(void *arg)
 
   memset(z, 0, 2 * rdata->Z * sizeof(*z));
   // set Filler bits
-  memset(z + K_bits_F, 127, rdata->F * sizeof(*z));
+  memset(z + Kprime, 127, rdata->F * sizeof(*z));
   // Move coded bits before filler bits
-  memcpy(z + 2 * rdata->Z, rdata->d, (K_bits_F - 2 * rdata->Z) * sizeof(*z));
+  memcpy(z + 2 * rdata->Z, rdata->d, (Kprime - 2 * rdata->Z) * sizeof(*z));
   // skip filler bits
-  memcpy(z + Kr, rdata->d + (Kr - 2 * rdata->Z), (kc * rdata->Z - Kr) * sizeof(*z));
+  memcpy(z + K, rdata->d + (K - 2 * rdata->Z), (Kc * rdata->Z - K) * sizeof(*z));
   // Saturate coded bits before decoding into 8 bits values
   simde__m128i *pv = (simde__m128i *)&z;
   int8_t l[68 * 384 + 16] __attribute__((aligned(16)));
   simde__m128i *pl = (simde__m128i *)&l;
-  for (int i = 0, j = 0; j < ((kc * rdata->Z) >> 4) + 1; i += 2, j++) {
+  for (int i = 0, j = 0; j < ((Kc * rdata->Z) >> 4) + 1; i += 2, j++) {
     pl[j] = simde_mm_packs_epi16(pv[i], pv[i + 1]);
   }
   //////////////////////////////////////////////////////////////////////////////////////////
@@ -226,9 +222,10 @@ static void nr_process_decode_segment(void *arg)
       ldpc_interface_segment.LDPCdecoder(p_decoderParms, 0, 0, 0, l, llrProcBuf, p_procTime, rdata->abort_decode);
 
   if (decodeIterations <= p_decoderParms->numMaxIter) {
-    memcpy(rdata->c,llrProcBuf,  Kr>>3);
+    memcpy(rdata->c, llrProcBuf, K >> 3);
     *rdata->decodeSuccess = true;
   } else {
+    memset(rdata->c, 0, K >> 3);
     *rdata->decodeSuccess = false;
   }
   stop_meas(rdata->p_ts_ldpc_decode);
@@ -237,9 +234,10 @@ static void nr_process_decode_segment(void *arg)
   completed_task_ans(rdata->ans);
 }
 
-int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters, int pusch_id, thread_info_tm_t *t_info)
+int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters,
+                               int pusch_id,
+                               thread_info_tm_t *t_info)
 {
-
   nrLDPC_TB_decoding_parameters_t *nrLDPC_TB_decoding_parameters = &nrLDPC_slot_decoding_parameters->TBs[pusch_id];
 
   *nrLDPC_TB_decoding_parameters->processedSegments = 0;
@@ -250,14 +248,12 @@ int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_de
   decParams.outMode = 0;
 
   for (int r = 0; r < nrLDPC_TB_decoding_parameters->C; r++) {
-
     nrLDPC_decoding_parameters_t *rdata = &((nrLDPC_decoding_parameters_t *)t_info->buf)[t_info->len];
     DevAssert(t_info->len < t_info->cap);
     rdata->ans = &t_info->ans[t_info->len];
     t_info->len += 1;
 
     decParams.R = nrLDPC_TB_decoding_parameters->segments[r].R;
-    decParams.setCombIn = !nrLDPC_TB_decoding_parameters->segments[r].d_to_be_cleared;
     rdata->decoderParms = decParams;
     rdata->llr = nrLDPC_TB_decoding_parameters->segments[r].llr;
     rdata->Kc = decParams.BG == 2 ? 52 : 68;
@@ -287,29 +283,26 @@ int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_de
   return nrLDPC_TB_decoding_parameters->C;
 }
 
-int32_t nrLDPC_coding_init(void){
-
+int32_t nrLDPC_coding_init(void)
+{
   char *segment_shlibversion = NULL;
   paramdef_t LoaderParams[] = {
-    {"segment_shlibversion", NULL, 0, .strptr = &segment_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL}
-  };
+      {"segment_shlibversion", NULL, 0, .strptr = &segment_shlibversion, .defstrval = "_optim8segmulti", TYPE_STRING, 0, NULL}};
   config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_segment");
   load_LDPClib(segment_shlibversion, &ldpc_interface_segment);
 
   return 0;
-
 }
 
-int32_t nrLDPC_coding_shutdown(void){
-
+int32_t nrLDPC_coding_shutdown(void)
+{
   free_LDPClib(&ldpc_interface_segment);
 
   return 0;
-
 }
 
-int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters){
-
+int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
+{
   int nbSegments = 0;
   for (int pusch_id = 0; pusch_id < nrLDPC_slot_decoding_parameters->nb_TBs; pusch_id++) {
     nrLDPC_TB_decoding_parameters_t *nrLDPC_TB_decoding_parameters = &nrLDPC_slot_decoding_parameters->TBs[pusch_id];
@@ -339,6 +332,4 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
     }
   }
   return 0;
-
 }
-

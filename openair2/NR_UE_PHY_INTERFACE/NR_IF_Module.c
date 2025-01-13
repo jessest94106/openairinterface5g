@@ -844,7 +844,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
     {
         case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
         {
-            nfapi_nr_dl_tti_request_t *dl_tti_request = MALLOC(sizeof(*dl_tti_request));
+            nfapi_nr_dl_tti_request_t *dl_tti_request = malloc16(sizeof(*dl_tti_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, dl_tti_request,
                                             sizeof(*dl_tti_request), NULL) < 0)
             {
@@ -868,7 +868,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 
         case NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST:
         {
-            nfapi_nr_tx_data_request_t *tx_data_request = MALLOC(sizeof(*tx_data_request));
+            nfapi_nr_tx_data_request_t *tx_data_request = malloc16(sizeof(*tx_data_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, tx_data_request,
                                         sizeof(*tx_data_request), NULL) < 0)
             {
@@ -888,7 +888,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 
         case NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST:
         {
-            nfapi_nr_ul_dci_request_t *ul_dci_request = MALLOC(sizeof(*ul_dci_request));
+            nfapi_nr_ul_dci_request_t *ul_dci_request = malloc16(sizeof(*ul_dci_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, ul_dci_request,
                                             sizeof(*ul_dci_request), NULL) < 0)
             {
@@ -908,7 +908,7 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
 
         case NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST:
         {
-            nfapi_nr_ul_tti_request_t *ul_tti_request = MALLOC(sizeof(*ul_tti_request));
+            nfapi_nr_ul_tti_request_t *ul_tti_request = malloc16(sizeof(*ul_tti_request));
             if (nfapi_nr_p7_message_unpack(buffer, len, ul_tti_request,
                                            sizeof(*ul_tti_request), NULL) < 0)
             {
@@ -1206,11 +1206,10 @@ int nr_ue_ul_indication(nr_uplink_indication_t *ul_info)
   return 0;
 }
 
-static uint32_t nr_ue_dl_processing(nr_downlink_indication_t *dl_info)
+static uint32_t nr_ue_dl_processing(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info)
 {
   uint32_t ret_mask = 0x0;
-  DevAssert(dl_info != NULL);
-  NR_UE_MAC_INST_t *mac = get_mac_inst(dl_info->module_id);
+  DevAssert(mac != NULL && dl_info != NULL);
 
   // DL indication after reception of DCI or DL PDU
   if (dl_info->dci_ind && dl_info->dci_ind->number_of_dcis) {
@@ -1322,7 +1321,7 @@ int nr_ue_dl_indication(nr_downlink_indication_t *dl_info)
     nr_ue_dl_scheduler(mac, dl_info);
   else
     // DL indication to process data channels
-    ret2 = nr_ue_dl_processing(dl_info);
+    ret2 = nr_ue_dl_processing(mac, dl_info);
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
   return ret2;

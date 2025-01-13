@@ -38,9 +38,8 @@
 
 extern RAN_CONTEXT_t RC;
 extern UL_RCC_IND_t UL_RCC_INFO;
-extern uint16_t sf_ahead;
-extern uint16_t slot_ahead;
-
+extern int sf_ahead;
+extern int slot_ahead;
 
 void *aerial_vnf_nr_p7_config_init(void *ptr)
 {

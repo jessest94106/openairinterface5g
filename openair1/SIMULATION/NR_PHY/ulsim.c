@@ -106,9 +106,9 @@ RAN_CONTEXT_t RC;
 char *uecap_file;
 int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 
-uint16_t sf_ahead=4 ;
+int sf_ahead = 4;
 int slot_ahead=6 ;
-uint16_t sl_ahead=0;
+int sl_ahead = 0;
 double cpuf;
 //uint8_t nfapi_mode = 0;
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
@@ -602,11 +602,11 @@ int main(int argc, char *argv[])
   gNB->msgDataTx = msgDataTx;
   //gNB_config = &gNB->gNB_config;
 
-  //memset((void *)&gNB->UL_INFO,0,sizeof(gNB->UL_INFO));
-  gNB->UL_INFO.rx_ind.pdu_list = (nfapi_nr_rx_data_pdu_t *)malloc(NB_UE_INST*sizeof(nfapi_nr_rx_data_pdu_t));
-  gNB->UL_INFO.crc_ind.crc_list = (nfapi_nr_crc_t *)malloc(NB_UE_INST*sizeof(nfapi_nr_crc_t));
-  gNB->UL_INFO.rx_ind.number_of_pdus = 0;
-  gNB->UL_INFO.crc_ind.number_crcs = 0;
+  NR_UL_IND_t UL_INFO = {0};
+  UL_INFO.crc_ind.crc_list = UL_INFO.crc_pdu_list;
+  UL_INFO.rx_ind.pdu_list = UL_INFO.rx_pdu_list;
+  UL_INFO.rx_ind.number_of_pdus = 0;
+  UL_INFO.crc_ind.number_crcs = 0;
   gNB->max_ldpc_iterations = max_ldpc_iterations;
   gNB->pusch_thres = -20;
   frame_parms = &gNB->frame_parms; //to be initialized I suppose (maybe not necessary for PBCH)
@@ -1256,9 +1256,9 @@ int main(int argc, char *argv[])
         //----------------------------------------------------------
         //------------------- gNB phy procedures -------------------
         //----------------------------------------------------------
-        gNB->UL_INFO.rx_ind.number_of_pdus = 0;
-        gNB->UL_INFO.crc_ind.number_crcs = 0;
-        gNB->UL_INFO.srs_ind.number_of_pdus = 0;
+        UL_INFO.rx_ind.number_of_pdus = 0;
+        UL_INFO.crc_ind.number_crcs = 0;
+        UL_INFO.srs_ind.number_of_pdus = 0;
 
         for(uint8_t symbol = 0; symbol < (gNB->frame_parms.Ncp == EXTENDED ? 12 : 14); symbol++) {
           for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++)
@@ -1281,7 +1281,7 @@ int main(int argc, char *argv[])
                                gNB->frame_parms.Ncp == EXTENDED ? 12 : 14);
         }
 
-        ul_proc_error = phy_procedures_gNB_uespec_RX(gNB, frame, slot);
+        ul_proc_error = phy_procedures_gNB_uespec_RX(gNB, frame, slot, &UL_INFO);
 
         if (n_trials == 1 && round == 0) {
           LOG_M("rxsig0.m", "rx0", &rxdata[0][slot_offset], slot_length, 1, 1);

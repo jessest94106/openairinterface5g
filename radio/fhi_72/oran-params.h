@@ -37,6 +37,7 @@
 #define ORAN_CONFIG_NETHPERPORT "eth_lines"
 #define ORAN_CONFIG_NETHSPEED "eth_speed"
 #define ORAN_CONFIG_DPDK_MEM_SIZE "dpdk_mem_size"
+#define ORAN_CONFIG_DPDK_IOVA_MODE "dpdk_iova_mode"
 #define ORAN_CONFIG_ECPRI_OWDM "owdm_enable"
 
 // clang-format off
@@ -53,8 +54,28 @@
   {ORAN_CONFIG_NETHPERPORT,     "number of links per port\n",               0,                   .uptr=NULL,       .defuintval=1,       TYPE_UINT,       0}, \
   {ORAN_CONFIG_NETHSPEED,       "ethernet speed link\n",                    0,                   .uptr=NULL,       .defuintval=10,      TYPE_UINT,       0}, \
   {ORAN_CONFIG_DPDK_MEM_SIZE,   "DPDK huge page pre-allocation in MiB\n",   0,                   .uptr=NULL,       .defuintval=8192,    TYPE_UINT,       0}, \
+  {ORAN_CONFIG_DPDK_IOVA_MODE,  "DPDK IOVA mode\n",                         0,                   .strptr=NULL,     .defstrval="PA",     TYPE_STRING,     0}, \
   {ORAN_CONFIG_ECPRI_OWDM,      "eCPRI One-Way Delay Measurements\n",       PARAMFLAG_BOOL,      .uptr=NULL,       .defuintval=0,       TYPE_UINT,       0}, \
 }
+
+// clang-format off
+#define ORAN_GLOBALPARAMS_CHECK_DESC {           \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
+    { .s3a = { config_checkstr_assign_integer,   \
+	       {"PA", "VA"}, {0, 1}, 2} },           \
+    { .s5 = { NULL } },                          \
+}
+
+
 // clang-format on
 
 #define CONFIG_STRING_ORAN_FH "fh_config"

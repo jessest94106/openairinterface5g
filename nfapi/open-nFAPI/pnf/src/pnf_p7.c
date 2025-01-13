@@ -31,9 +31,7 @@
 
 #define FAPI2_IP_DSCP	0
 
-extern uint16_t sf_ahead;
-
-//uint16_t sf_ahead=4;
+extern int sf_ahead;
 
 void add_slot(uint16_t *frameP, uint16_t *slotP, int offset)
 {

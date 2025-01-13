@@ -45,12 +45,7 @@
 
 #include <time.h>
 
-
 // RU OFDM Modulator gNodeB
-
-
-extern int oai_exit;
-
 // OFDM modulation core routine, generates a first_symbol to first_symbol+num_symbols on a particular slot and TX antenna port
 void nr_feptx0(RU_t *ru,int tti_tx,int first_symbol, int num_symbols, int aa)
 {

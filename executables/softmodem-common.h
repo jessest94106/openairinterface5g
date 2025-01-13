@@ -31,12 +31,14 @@
  */
 #ifndef SOFTMODEM_COMMON_H
 #define SOFTMODEM_COMMON_H
-#include "openair1/PHY/defs_common.h"
-#include "softmodem-bits.h"
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+#include <stdint.h>
+#include "common/config/config_load_configmodule.h"
+
 /* help strings definition for command line options, used in CMDLINE_XXX_DESC macros and printed when -h option is used */
 #define CONFIG_HLP_RFCFGF        "Configuration file for front-end (e.g. LMS7002M)\n"
 #define CONFIG_HLP_SPLIT73       "Split 7.3 (below rate matching) option: <cu|du>:<remote ip address>:<remote port>\n"
@@ -268,28 +270,46 @@ extern int usrp_tx_thread;
 
 /***************************************************************************************************************************************/
 
-#define SOFTMODEM_FUNC_BITS (SOFTMODEM_ENB_BIT | SOFTMODEM_GNB_BIT | SOFTMODEM_5GUE_BIT | SOFTMODEM_4GUE_BIT)
-#define MAPPING_SOFTMODEM_FUNCTIONS {{"enb",SOFTMODEM_ENB_BIT},{"gnb",SOFTMODEM_GNB_BIT},{"4Gue",SOFTMODEM_4GUE_BIT},{"5Gue",SOFTMODEM_5GUE_BIT}}
-
-
-#define IS_SOFTMODEM_NOS1            ( get_softmodem_optmask() & SOFTMODEM_NOS1_BIT)
-#define IS_SOFTMODEM_NONBIOT         ( get_softmodem_optmask() & SOFTMODEM_NONBIOT_BIT)
-#define IS_SOFTMODEM_RFSIM           ( get_softmodem_optmask() & SOFTMODEM_RFSIM_BIT)
-#define IS_SOFTMODEM_SIML1           ( get_softmodem_optmask() & SOFTMODEM_SIML1_BIT)
-#define IS_SOFTMODEM_DLSIM           ( get_softmodem_optmask() & SOFTMODEM_DLSIM_BIT)
-#define IS_SOFTMODEM_DOSCOPE         ( get_softmodem_optmask() & SOFTMODEM_DOSCOPE_BIT)
-#define IS_SOFTMODEM_IQPLAYER        ( get_softmodem_optmask() & SOFTMODEM_RECPLAY_BIT)
-#define IS_SOFTMODEM_IQRECORDER      ( get_softmodem_optmask() & SOFTMODEM_RECRECORD_BIT)
-#define IS_SOFTMODEM_TELNETCLT_BIT   ( get_softmodem_optmask() & SOFTMODEM_TELNETCLT_BIT)    
-#define IS_SOFTMODEM_ENB_BIT         ( get_softmodem_optmask() & SOFTMODEM_ENB_BIT)
-#define IS_SOFTMODEM_GNB_BIT         ( get_softmodem_optmask() & SOFTMODEM_GNB_BIT)
-#define IS_SOFTMODEM_4GUE_BIT        ( get_softmodem_optmask() & SOFTMODEM_4GUE_BIT)
-#define IS_SOFTMODEM_5GUE_BIT        ( get_softmodem_optmask() & SOFTMODEM_5GUE_BIT)
-#define IS_SOFTMODEM_NOSTATS_BIT     ( get_softmodem_optmask() & SOFTMODEM_NOSTATS_BIT)
-#define IS_SOFTMODEM_IMSCOPE_ENABLED ( get_softmodem_optmask() & SOFTMODEM_IMSCOPE_BIT)
-
+#define IS_SOFTMODEM_NOS1 (get_softmodem_optmask()->bit.SOFTMODEM_NOS1_BIT)
+#define IS_SOFTMODEM_NONBIOT (get_softmodem_optmask()->bit.SOFTMODEM_NONBIOT_BIT)
+#define IS_SOFTMODEM_RFSIM (get_softmodem_optmask()->bit.SOFTMODEM_RFSIM_BIT)
+#define IS_SOFTMODEM_SIML1 (get_softmodem_optmask()->bit.SOFTMODEM_SIML1_BIT)
+#define IS_SOFTMODEM_DLSIM (get_softmodem_optmask()->bit.SOFTMODEM_DLSIM_BIT)
+#define IS_SOFTMODEM_DOSCOPE (get_softmodem_optmask()->bit.SOFTMODEM_DOSCOPE_BIT)
+#define IS_SOFTMODEM_IQPLAYER (get_softmodem_optmask()->bit.SOFTMODEM_RECPLAY_BIT)
+#define IS_SOFTMODEM_IQRECORDER (get_softmodem_optmask()->bit.SOFTMODEM_RECRECORD_BIT)
+#define IS_SOFTMODEM_TELNETCLT (get_softmodem_optmask()->bit.SOFTMODEM_TELNETCLT_BIT)
+#define IS_SOFTMODEM_ENB (get_softmodem_optmask()->bit.SOFTMODEM_ENB_BIT)
+#define IS_SOFTMODEM_GNB (get_softmodem_optmask()->bit.SOFTMODEM_GNB_BIT)
+#define IS_SOFTMODEM_4GUE (get_softmodem_optmask()->bit.SOFTMODEM_4GUE_BIT)
+#define IS_SOFTMODEM_5GUE (get_softmodem_optmask()->bit.SOFTMODEM_5GUE_BIT)
+#define IS_SOFTMODEM_NOSTATS (get_softmodem_optmask()->bit.SOFTMODEM_NOSTATS_BIT)
+#define IS_SOFTMODEM_IMSCOPE_ENABLED (get_softmodem_optmask()->bit.SOFTMODEM_IMSCOPE_BIT)
+typedef struct optmask_s {
+  union {
+    struct {
+      uint64_t SOFTMODEM_NOS1_BIT: 1;
+      uint64_t SOFTMODEM_NOKRNMOD_BIT: 1;
+      uint64_t SOFTMODEM_NONBIOT_BIT: 1;
+      uint64_t SOFTMODEM_RFSIM_BIT: 1;
+      uint64_t SOFTMODEM_SIML1_BIT: 1;
+      uint64_t SOFTMODEM_DLSIM_BIT: 1;
+      uint64_t SOFTMODEM_DOSCOPE_BIT: 1;
+      uint64_t SOFTMODEM_RECPLAY_BIT: 1;
+      uint64_t SOFTMODEM_TELNETCLT_BIT: 1;
+      uint64_t SOFTMODEM_RECRECORD_BIT: 1;
+      uint64_t SOFTMODEM_ENB_BIT: 1;
+      uint64_t SOFTMODEM_GNB_BIT: 1;
+      uint64_t SOFTMODEM_4GUE_BIT: 1;
+      uint64_t SOFTMODEM_5GUE_BIT: 1;
+      uint64_t SOFTMODEM_NOSTATS_BIT: 1;
+      uint64_t SOFTMODEM_IMSCOPE_BIT: 1;
+    } bit;
+    uint64_t v; // allow to export entire bit set, force to 64 bit processor atomic size
+  };
+} optmask_t;
 typedef struct {
-  uint64_t       optmask;
+  optmask_t optmask;
   //THREAD_STRUCT  thread_struct;
   char           *rf_config_file;
   char *threadPoolConfig;
@@ -323,19 +343,17 @@ typedef struct {
 #define IS_SA_MODE(sM_params) (!(sM_params)->phy_test && !(sM_params)->do_ra && !(sM_params)->nsa)
 void softmodem_verify_mode(const softmodem_params_t *p);
 
-uint64_t get_softmodem_optmask(void);
-uint64_t set_softmodem_optmask(uint64_t bitmask);
-uint64_t clear_softmodem_optmask(uint64_t bitmask);
+#define get_softmodem_optmask() (&(get_softmodem_params()->optmask))
 softmodem_params_t *get_softmodem_params(void);
-void get_common_options(configmodule_interface_t *cfg, uint32_t execmask);
-char *get_softmodem_function(uint64_t *sofmodemfunc_mask_ptr);
+void get_common_options(configmodule_interface_t *cfg);
+char *get_softmodem_function(void);
 #define SOFTMODEM_RTSIGNAL  (SIGRTMIN+1)
 void set_softmodem_sighandler(void);
 extern uint64_t downlink_frequency[MAX_NUM_CCs][4];
 extern int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 extern int usrp_tx_thread;
-extern uint16_t sl_ahead;
-extern uint16_t sf_ahead;
+extern int sl_ahead;
+extern int sf_ahead;
 extern int oai_exit;
 
 void ru_tx_func(void *param);

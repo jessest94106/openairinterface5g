@@ -259,7 +259,7 @@ one_measurement_t test_ldpc(short max_iterations,
   printf("To: %d\n", (Kb + nrows - no_punctured_columns) * Zc - removed_bit);
   printf("number of undecoded bits: %d\n", (Kb + nrows - no_punctured_columns - 2) * Zc - removed_bit);
 
-  encoder_implemparams_t impp = {.Zc = Zc, .Kb = Kb, .BG = BG, .Kr = block_length, .K = block_length};
+  encoder_implemparams_t impp = {.Zc = Zc, .Kb = Kb, .BG = BG, .K = block_length};
   impp.gen_code = 2;
 
   if (ntrials==0)
@@ -323,7 +323,7 @@ one_measurement_t test_ldpc(short max_iterations,
         decParams[j].R = code_rate_vec[R_ind]; // 13;
         decParams[j].numMaxIter = max_iterations;
         decParams[j].outMode = nrLDPC_outMode_BIT;
-        decParams[j].E = block_length;
+        decParams[j].Kprime = block_length;
         ldpc_toCompare.LDPCinit();
     }
     for (int j = 0; j < n_segments; j++) {

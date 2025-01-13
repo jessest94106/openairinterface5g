@@ -33,7 +33,7 @@
 #include "openair1/PHY/defs_nr_UE.h"
 extern "C" {
 #include "openair1/PHY/TOOLS/phy_scope_interface.h"
-uint64_t get_softmodem_optmask(void);
+#include "executables/softmodem-common.h"
 }
 #include <iostream>
 #include <vector>
@@ -42,7 +42,6 @@ uint64_t get_softmodem_optmask(void);
 #include <sstream>
 #include <mutex>
 #include <thread>
-#include "executables/softmodem-bits.h"
 
 #define MAX_OFFSETS 14
 #define NR_MAX_RB 273
@@ -678,7 +677,7 @@ void *imscope_thread(void *data_void_ptr)
   static double last_frame_time = glfwGetTime();
   static int target_fps = 24;
 
-  bool is_ue = (get_softmodem_optmask() & SOFTMODEM_5GUE_BIT) > 0;
+  bool is_ue = IS_SOFTMODEM_5GUE;
   bool close_window = false;
   while (!glfwWindowShouldClose(window) && close_window == false) {
     // Poll and handle events (inputs, window resize, etc.)
@@ -795,8 +794,7 @@ void *imscope_thread(void *data_void_ptr)
 
 extern "C" void imscope_autoinit(void *dataptr)
 {
-  AssertFatal((get_softmodem_optmask() & SOFTMODEM_5GUE_BIT) || (get_softmodem_optmask() & SOFTMODEM_GNB_BIT),
-              "Scope cannot find NRUE or GNB context");
+  AssertFatal(IS_SOFTMODEM_5GUE || IS_SOFTMODEM_GNB, "Scope cannot find NRUE or GNB context");
 
   for (auto i = 0U; i < EXTRA_SCOPE_TYPES; i++) {
     scope_array[i].is_data_ready = false;
@@ -804,7 +802,7 @@ extern "C" void imscope_autoinit(void *dataptr)
     scope_array[i].meta = {-1, -1};
   }
 
-  if (SOFTMODEM_GNB_BIT & get_softmodem_optmask()) {
+  if (IS_SOFTMODEM_GNB) {
     scopeParms_t *scope_params = (scopeParms_t *)dataptr;
     scopeData_t *scope = (scopeData_t *)calloc(1, sizeof(scopeData_t));
     scope->copyData = copyDataThreadSafe;

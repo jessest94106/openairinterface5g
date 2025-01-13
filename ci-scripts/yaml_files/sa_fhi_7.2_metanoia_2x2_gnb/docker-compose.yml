@@ -2,7 +2,6 @@ services:
     oai-gnb:
         image: ${REGISTRY:-oaisoftwarealliance}/oai-gnb-fhi72:${TAG:-develop}
         cap_add:
-            - SYS_ADMIN
             - IPC_LOCK
             - SYS_NICE
         cap_drop:

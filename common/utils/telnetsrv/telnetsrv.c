@@ -54,6 +54,7 @@
 #include "common/utils/load_module_shlib.h"
 #include "common/config/config_userapi.h"
 #include "executables/softmodem-common.h"
+#include "common/utils/threadPool/notified_fifo.h"
 #include <readline/history.h>
 #include "common/oai_version.h"
 
@@ -657,7 +658,7 @@ void run_telnetsrv(void) {
     fprintf(stderr,"[TELNETSRV] Error %s on listen call\n",strerror(errno));
 
   using_history();
-  int plen=sprintf(prompt,"%s_%s> ",TELNET_PROMPT_PREFIX,get_softmodem_function(NULL));
+  int plen = sprintf(prompt, "%s_%s> ", TELNET_PROMPT_PREFIX, get_softmodem_function());
   TELNET_LOG("\nInitializing telnet server...\n");
 
   while( (telnetparams.new_socket = accept(sock, &cli_addr, &cli_len)) ) {
@@ -746,7 +747,7 @@ void run_telnetclt(void) {
   pthread_setname_np(pthread_self(), "telnetclt");
   set_sched(pthread_self(),0,telnetparams.priority);
   char prompt[sizeof(TELNET_PROMPT_PREFIX)+10];
-  sprintf(prompt,"%s_%s> ",TELNET_PROMPT_PREFIX,get_softmodem_function(NULL));
+  sprintf(prompt, "%s_%s> ", TELNET_PROMPT_PREFIX, get_softmodem_function());
   name.sin_family = AF_INET;
   struct in_addr addr;
   inet_aton("127.0.0.1", &addr) ;
@@ -883,7 +884,7 @@ int telnetsrv_autoinit(void) {
   memset(&telnetparams,0,sizeof(telnetparams));
   config_get(config_get_if(), telnetoptions, sizeofArray(telnetoptions), "telnetsrv");
   /* possibly load a exec specific shared lib */
-  char *execfunc=get_softmodem_function(NULL);
+  char *execfunc = get_softmodem_function();
   char libname[64];
   sprintf(libname,"telnetsrv_%s",execfunc);
   load_module_shlib(libname,NULL,0,NULL);

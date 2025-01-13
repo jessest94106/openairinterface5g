@@ -411,6 +411,7 @@ void nr_srs_ri_computation(const nfapi_nr_srs_normalized_channel_iq_matrix_t *nr
 }
 
 static void nr_configure_srs(nfapi_nr_srs_pdu_t *srs_pdu,
+                             int frame,
                              int slot,
                              int module_id,
                              int CC_id,
@@ -469,9 +470,14 @@ static void nr_configure_srs(nfapi_nr_srs_pdu_t *srs_pdu,
     srs_pdu->beamforming.num_prgs = m_SRS[srs_pdu->config_index];
     srs_pdu->beamforming.prg_size = 1;
   }
-
-  // TODO properly use beam allocation
-  uint16_t *vrb_map_UL = &RC.nrmac[module_id]->common_channels[CC_id].vrb_map_UL[0][buffer_index * MAX_BWP_SIZE];
+  srs_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
+  NR_beam_alloc_t beam = beam_allocation_procedure(&RC.nrmac[module_id]->beam_info,
+                                                   frame,
+                                                   slot,
+                                                   UE->UE_beam_index,
+                                                   nr_slots_per_frame[current_BWP->scs]);
+  AssertFatal(beam.idx >= 0, "Cannot allocate SRS in any available beam\n");
+  uint16_t *vrb_map_UL = &RC.nrmac[module_id]->common_channels[CC_id].vrb_map_UL[beam.idx][buffer_index * MAX_BWP_SIZE];
   uint64_t mask = SL_to_bitmap(srs_pdu->time_start_position, srs_pdu->num_symbols);
   for (int i = 0; i < srs_pdu->bwp_size; ++i)
     vrb_map_UL[i + srs_pdu->bwp_start] |= mask;
@@ -497,7 +503,7 @@ static void nr_fill_nfapi_srs(int module_id,
   memset(srs_pdu, 0, sizeof(nfapi_nr_srs_pdu_t));
   future_ul_tti_req->n_pdus += 1;
   index = ul_buffer_index(frame, slot, UE->current_UL_BWP.scs, RC.nrmac[module_id]->vrb_map_UL_size);
-  nr_configure_srs(srs_pdu, slot, module_id, CC_id, UE, srs_resource_set, srs_resource, index);
+  nr_configure_srs(srs_pdu, frame, slot, module_id, CC_id, UE, srs_resource_set, srs_resource, index);
 }
 
 /*******************************************************************

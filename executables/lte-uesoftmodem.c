@@ -33,9 +33,6 @@
 
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
 #include <sched.h>
-
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "assertions.h"
 
 #include "PHY/types.h"
@@ -46,13 +43,8 @@
 #include "common/ran_context.h"
 #include "common/config/config_userapi.h"
 #include "common/utils/load_module_shlib.h"
-#undef MALLOC //there are two conflicting definitions, so we better make sure we don't use it at all
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
-
 #include "radio/COMMON/common_lib.h"
 #include "radio/ETHERNET/if_defs.h"
-
-//#undef FRAME_LENGTH_COMPLEX_SAMPLES //there are two conflicting definitions, so we better make sure we don't use it at all
 
 #include "PHY/phy_vars_ue.h"
 #include "PHY/LTE_TRANSPORT/transport_vars.h"
@@ -81,8 +73,7 @@ pthread_cond_t nfapi_sync_cond;
 pthread_mutex_t nfapi_sync_mutex;
 int nfapi_sync_var=-1; //!< protected by mutex \ref nfapi_sync_mutex
 
-
-uint16_t sf_ahead=4;
+int sf_ahead = 4;
 int tddflag;
 char *emul_iface;
 
@@ -274,7 +265,8 @@ static void get_options(configmodule_interface_t *cfg)
   CONFIG_SETRTFLAG(CONFIG_NOEXITONHELP);
   /* unknown parameters on command line will be checked in main
      after all init have been performed                         */
-  get_common_options(cfg, SOFTMODEM_4GUE_BIT);
+  IS_SOFTMODEM_4GUE = true;
+  get_common_options(cfg);
   paramdef_t cmdline_uemodeparams[] =CMDLINE_UEMODEPARAMS_DESC;
   paramdef_t cmdline_ueparams[] =CMDLINE_UEPARAMS_DESC;
   config_process_cmdline(cfg, cmdline_uemodeparams, sizeofArray(cmdline_uemodeparams), NULL);

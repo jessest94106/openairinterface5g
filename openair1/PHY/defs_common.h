@@ -60,6 +60,7 @@
 //#include <complex.h>
 #include "time_meas.h"
 #include "common/platform_types.h"
+#include "softmodem-common.h"
 #define MAX_NUM_RU_PER_eNB 64
 
 #include <pthread.h>
@@ -1047,8 +1048,6 @@ typedef uint8_t(encoder_if_t)(uint8_t *input,
                               uint16_t input_length_bytes,
                               uint8_t *output,
                               uint8_t F);
-
-extern int oai_exit;
 
 static inline void wait_sync(char *thread_name)
 {
