@@ -2693,6 +2693,44 @@ uint8_t nr_get_tpc(int target, uint8_t cqi, int incr, int tx_power)
   return 1; // no change
 }
 
+/**
+ * @brief Limits the power control commands (TPC) in NR by checking the RSSI threshold.
+ *
+ * This function evaluates the received signal strength indicator (RSSI) and adjusts the
+ * transmit power control (TPC) commands accordingly to ensure they remain within acceptable
+ * limits. It helps in maintaining the signal quality and preventing excessive power usage.
+ *
+ * @param rssi The received signal strength indicator value, as defined in FAPI specifications.
+ * @param tpc The transmit power control command to be limited.
+ * @param rssi_threshold RSSI threshold in 0.1 dBm/dBFS, range -1280 to 0
+ * @return The adjusted TPC command after applying the RSSI threshold check.
+ */
+uint8_t nr_limit_tpc(int tpc, int rssi, int rssi_threshold)
+{
+  if (rssi == 0xFFFF) {
+    // RSSI not available, keep tpc
+    return tpc;
+  }
+  // Convert RSSI threshold to FAPI scale
+  const int fapi_rssi_0dBm_or_0dBFS = 1280;
+  int rssi_fapi_threshold = fapi_rssi_0dBm_or_0dBFS + rssi_threshold;
+  // Further limit TPC if above or near RSSI threshold
+  int tpc_to_db[] = {-1, 0, 1, 3};
+  if (rssi > rssi_fapi_threshold) {
+    // RSSI above theshold, reduce power
+    return 0;
+  } else if (rssi + tpc_to_db[tpc] * 10 > rssi_fapi_threshold) {
+    // Cannot apply required TPC, check 1 dB increment
+    if (rssi + 10 > rssi_fapi_threshold) {
+      // Still cannot apply required TPC, keep power
+      return 1;
+    } else {
+      // Can apply 1dB increment, but 3 was requested
+      return 2;
+    }
+  }
+  return tpc;
+}
 
 int get_pdsch_to_harq_feedback(NR_PUCCH_Config_t *pucch_Config,
                                 nr_dci_format_t dci_format,

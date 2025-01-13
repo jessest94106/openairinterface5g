@@ -761,6 +761,7 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
                              const nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_01)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
+  int rssi_threshold = nrmac->pucch_rssi_threshold;
   NR_SCHED_LOCK(&nrmac->sched_lock);
   NR_UE_info_t * UE = find_nr_UE(&nrmac->UE_info, uci_01->rnti);
   if (!UE) {
@@ -796,6 +797,7 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
       sched_ctrl->tpc1 = nr_get_tpc(nrmac->pucch_target_snrx10, uci_01->ul_cqi, 30, 0);
     } else
       sched_ctrl->tpc1 = 1;
+    sched_ctrl->tpc1 = nr_limit_tpc(sched_ctrl->tpc1, uci_01->rssi, rssi_threshold);
   }
 
   // check scheduling request result, confidence_level == 0 is good
@@ -817,6 +819,7 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   NR_SCHED_LOCK(&nrmac->sched_lock);
+  int rssi_threshold = nrmac->pucch_rssi_threshold;
 
   NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, uci_234->rnti);
   if (!UE) {
@@ -837,6 +840,7 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
   if (uci_234->ul_cqi != 0xff) {
     sched_ctrl->pucch_snrx10 = uci_234->ul_cqi * 5 - 640;
     sched_ctrl->tpc1 = nr_get_tpc(nrmac->pucch_target_snrx10, uci_234->ul_cqi, 30, 0);
+    sched_ctrl->tpc1 = nr_limit_tpc(sched_ctrl->tpc1, uci_234->rssi, rssi_threshold);
   }
 
   // TODO: handle SR

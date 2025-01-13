@@ -833,8 +833,12 @@ typedef struct gNB_MAC_INST_s {
   pthread_t                       stats_thread;
   /// Pusch target SNR
   int                             pusch_target_snrx10;
+  /// RSSI threshold for power control. Limits power control commands when RSSI reaches threshold.
+  int                             pusch_rssi_threshold;
   /// Pucch target SNR
   int                             pucch_target_snrx10;
+  /// RSSI threshold for PUCCH power control. Limits power control commands when RSSI reaches threshold.
+  int                             pucch_rssi_threshold;
   /// SNR threshold needed to put or not a PRB in the black list
   int                             ul_prbblack_SNR_threshold;
   /// PUCCH Failure threshold (compared to consecutive PUCCH DTX)
