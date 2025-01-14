@@ -3416,8 +3416,8 @@ static bool fill_mac_sdu(NR_UE_MAC_INST_t *mac,
     } else {
       *header = (NR_MAC_SUBHEADER_LONG){.R = 0, .F = 1, .LCID = lcid, .L = htons(sdu_length)};
 #ifdef ENABLE_MAC_PAYLOAD_DEBUG
-      LOG_I(NR_MAC, "dumping MAC SDU with length %d: \n", sduL);
-      log_dump(NR_MAC, header, sduL, LOG_DUMP_CHAR, "\n");
+      LOG_I(NR_MAC, "dumping MAC SDU with length %d: \n", sdu_length);
+      log_dump(NR_MAC, header, sdu_length, LOG_DUMP_CHAR, "\n");
 #endif
     }
     mac_ce_p->cur_ptr += header_sz + sdu_length;
@@ -3604,7 +3604,7 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
     }
   }
 #ifdef ENABLE_MAC_PAYLOAD_DEBUG
-  LOG_I(NR_MAC, "MAC PDU %d bytes \n", mac_ce_p->cur_ptr - ulsch_buffer);
+  LOG_I(NR_MAC, "MAC PDU %ld bytes\n", mac_ce_info.cur_ptr - ulsch_buffer);
   log_dump(NR_MAC, ulsch_buffer, buflen, LOG_DUMP_CHAR, "\n");
 #endif
 
