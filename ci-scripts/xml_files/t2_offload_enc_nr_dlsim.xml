@@ -24,12 +24,29 @@
 	<htmlTabName>Test T2 Offload Encoder</htmlTabName>
 	<htmlTabIcon>tasks</htmlTabIcon>
         <TestCaseRequestedList>
+                102040
                 000111 000112 000121 000122 000131 000132
                 000211 000212 000221 000222 000231 000232
                 000311 000312 000321 000322 000331 000332
                 000411 000412 000421 000422 000431 000432
+                040201
         </TestCaseRequestedList>
 	<TestCaseExclusionList></TestCaseExclusionList>
+
+	<testCase id="102040">
+		<class>Custom_Command</class>
+		<desc>Disable Sleep States</desc>
+		<node>caracal</node>
+		<command>sudo cpupower idle-set -D 0</command>
+	</testCase>
+
+	<testCase id="040201">
+		<class>Custom_Command</class>
+		<always_exec>true</always_exec>
+		<desc>Enable Sleep States</desc>
+		<node>caracal</node>
+		<command>sudo cpupower idle-set -E</command>
+	</testCase>
 
 	<testCase id="000111">
 		<class>Run_Physim</class>
