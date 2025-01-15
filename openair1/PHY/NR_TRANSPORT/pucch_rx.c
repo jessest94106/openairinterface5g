@@ -280,6 +280,7 @@ void nr_decode_pucch0(PHY_VARS_gNB *gNB,
     }
   }
   signal_energy /= (pucch_pdu->nr_of_symbols * frame_parms->nb_antennas_rx);
+  signal_energy_ant0 /= pucch_pdu->nr_of_symbols;
   int pucch_power_dBtimes10 = 10 * dB_fixed(signal_energy);
 
   //int32_t no_corr = 0;
@@ -403,7 +404,7 @@ void nr_decode_pucch0(PHY_VARS_gNB *gNB,
   uci_pdu->rnti = pucch_pdu->rnti;
   uci_pdu->ul_cqi = cqi;
   uci_pdu->timing_advance = 0xffff; // currently not valid
-  uci_pdu->rssi = 1280 - (10 * dB_fixed(32767 * 32767)) - dB_fixed_times10(signal_energy_ant0);
+  uci_pdu->rssi = 1280 - (10 * dB_fixed(32767 * 32767) - dB_fixed_times10(signal_energy_ant0));
 
   if (pucch_pdu->bit_len_harq==0) {
     uci_pdu->sr.sr_confidence_level = SNRtimes10 < gNB->pucch0_thres;
