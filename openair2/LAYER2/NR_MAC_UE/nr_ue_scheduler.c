@@ -3416,8 +3416,8 @@ static bool fill_mac_sdu(NR_UE_MAC_INST_t *mac,
     } else {
       *header = (NR_MAC_SUBHEADER_LONG){.R = 0, .F = 1, .LCID = lcid, .L = htons(sdu_length)};
 #ifdef ENABLE_MAC_PAYLOAD_DEBUG
-      LOG_I(NR_MAC, "dumping MAC SDU with length %d: \n", sduL);
-      log_dump(NR_MAC, header, sduL, LOG_DUMP_CHAR, "\n");
+      LOG_I(NR_MAC, "dumping MAC SDU with length %d: \n", sdu_length);
+      log_dump(NR_MAC, header, sdu_length, LOG_DUMP_CHAR, "\n");
 #endif
     }
     mac_ce_p->cur_ptr += header_sz + sdu_length;
@@ -3588,10 +3588,23 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
     LOG_D(NR_MAC, "Filling remainder %d bytes to the UL PDU \n", remain);
     *(NR_MAC_SUBHEADER_FIXED *)mac_ce_info.cur_ptr = (NR_MAC_SUBHEADER_FIXED){.R = 0, .LCID = UL_SCH_LCID_PADDING};
     mac_ce_info.cur_ptr++;
-    memset(mac_ce_info.cur_ptr, 0, mac_ce_info.pdu_end - mac_ce_info.cur_ptr);
+    if (get_softmodem_params()->phy_test || get_softmodem_params()->do_ra) {
+      uint8_t *buf = mac_ce_info.cur_ptr;
+      uint8_t *end = mac_ce_info.pdu_end;
+      for (; buf < end && ((intptr_t)buf) % 4; buf++)
+        *buf = lrand48() & 0xff;
+      for (; buf < end - 3; buf += 4) {
+        uint32_t *buf32 = (uint32_t *)buf;
+        *buf32 = lrand48();
+      }
+      for (; buf < end; buf++)
+        *buf = lrand48() & 0xff;
+    } else {
+      memset(mac_ce_info.cur_ptr, 0, mac_ce_info.pdu_end - mac_ce_info.cur_ptr);
+    }
   }
 #ifdef ENABLE_MAC_PAYLOAD_DEBUG
-  LOG_I(NR_MAC, "MAC PDU %d bytes \n", mac_ce_p->cur_ptr - ulsch_buffer);
+  LOG_I(NR_MAC, "MAC PDU %ld bytes\n", mac_ce_info.cur_ptr - ulsch_buffer);
   log_dump(NR_MAC, ulsch_buffer, buflen, LOG_DUMP_CHAR, "\n");
 #endif
 
