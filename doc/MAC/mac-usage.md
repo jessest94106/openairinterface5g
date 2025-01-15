@@ -43,10 +43,15 @@ The actual scheduler implementation can be found in functions `pf_dl()` and
 PDCCH aggregation level is selected using closed loop controller, where DL HARQ
 feedback is the controller feedback signal. It is used to increment `pdcch_cl_adjust`
 variable if no feedback is detected and decrement the variable when feedback is detected.
-`pdcch_cl_adjust` is later mapped PDCCH aggregation level range.
+`pdcch_cl_adjust` is later mapped to the PDCCH aggregation level range.
 
 The value of `pdcch_cl_adjust` is clamped to range <0,1>, the increment value is 0.05 while
-the decrement value is 0.01.
+the decrement value is 0.01. These values are selected to ensure PDCCH success rate is high.
+See Examples below for futher explaination.
+
+The possible values of aggregation level on UE SS can be configured via `uess_agg_levels` configuration
+option. By default the gNB uses only aggregation level 2 which translates to `uess_agg_levels` set to
+`[0, 1, 0, 0, 0]`. For example, to enable aggregation level 2 and 4 set `uess_agg_levels` to `[0, 1, 1, 0, 0]`.
 
 ### Examples:
 #### Example 1:
