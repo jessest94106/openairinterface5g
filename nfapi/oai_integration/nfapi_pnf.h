@@ -19,6 +19,8 @@
  *      contact@openairinterface.org
  */
 
+#ifndef NFAPI_PNF_H_
+#define NFAPI_PNF_H_
 
 extern nfapi_ue_release_request_body_t release_rntis;
 int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind);
@@ -36,3 +38,4 @@ int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind);
 int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind);
 int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind);
 
+#endif /* NFAPI_PNF_H_ */
