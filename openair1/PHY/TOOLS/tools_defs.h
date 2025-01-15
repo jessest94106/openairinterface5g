@@ -41,7 +41,6 @@
 #include "common/utils/LOG/log.h"
 
 #define simd_q15_t simde__m128i
-#define simdshort_q15_t simde__m64
 #define shiftright_int16(a,shift) simde_mm_srai_epi16(a,shift)
 #define set1_int16(a) simde_mm_set1_epi16(a)
 #define mulhi_int16(a,b) simde_mm_mulhrs_epi16 (a,b)
@@ -726,8 +725,6 @@ int32_t sub_cpx_vector16(int16_t *x,
 \brief Computes the signal energy per subcarrier
 */
 int32_t signal_energy(int32_t *,uint32_t);
-
-int32_t signal_energy_amp_shift(int32_t *input, uint32_t length);
 
 #ifdef LOCALIZATION
 /*!\fn int32_t signal_energy(int *,uint32_t);

@@ -223,8 +223,6 @@ static void nr_ulsch_channel_level(int size_est,
     }
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 static void nr_ulsch_channel_compensation(c16_t *rxFext,
@@ -334,8 +332,6 @@ static void nr_ulsch_channel_compensation(c16_t *rxFext,
     }
   }
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 // Zero Forcing Rx function: nr_det_HhH()
@@ -397,8 +393,6 @@ static void nr_ulsch_det_HhH (int32_t *after_mf_00,//a
     after_mf_10_128+=1;
     after_mf_11_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 /* Zero Forcing Rx function: nr_conjch0_mult_ch1()
@@ -444,8 +438,6 @@ static void nr_ulsch_conjch0_mult_ch1(int *ch0,
     dl_ch1_128+=1;
     ch0conj_ch1_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 static simde__m128i nr_ulsch_comp_muli_sum(simde__m128i input_x,
@@ -507,8 +499,6 @@ static simde__m128i nr_ulsch_comp_muli_sum(simde__m128i input_x,
   //print_ints("unpack hi:",&tmp_z1[0]);
   output = simde_mm_packs_epi32(tmp_z0,tmp_z1);
 
-  simde_mm_empty();
-  simde_m_empty();
   return(output);
 }
 
@@ -625,8 +615,6 @@ static void nr_ulsch_construct_HhH_elements(int *conjch00_ch00,
     after_mf_10_128 += 1;
     after_mf_11_128 += 1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 // MMSE Rx function: nr_ulsch_mmse_2layers()
@@ -1017,8 +1005,6 @@ static uint8_t nr_ulsch_mmse_2layers(NR_DL_FRAME_PARMS *frame_parms,
     after_mf_c_128 += 1;
     after_mf_d_128 += 1;
   }
-  simde_mm_empty();
-  simde_m_empty();
    return(0);
 }
 

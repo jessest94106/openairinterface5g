@@ -493,8 +493,6 @@ void conjch0_mult_ch1(int *ch0,
     dl_ch1_128+=1;
     ch0conj_ch1_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void construct_HhH_elements(int *ch0conj_ch0, //00_00
@@ -567,8 +565,6 @@ void construct_HhH_elements(int *ch0conj_ch0, //00_00
     after_mf_10_128+=1;
     after_mf_11_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 
@@ -595,8 +591,6 @@ void squared_matrix_element(int32_t *Hh_h_00,
     Hh_h_00_sq_128+=1;
     Hh_h_00_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 
@@ -645,8 +639,6 @@ void det_HhH(int32_t *after_mf_00,
     //after_mf_10_128+=1;
     after_mf_11_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void numer(int32_t *Hh_h_00_sq,
@@ -691,8 +683,6 @@ void numer(int32_t *Hh_h_00_sq,
     h_h_10_sq_128+=1;
     h_h_11_sq_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void dlsch_channel_level_TM34_meas(int *ch00,
@@ -768,8 +758,6 @@ void dlsch_channel_level_TM34_meas(int *ch00,
   avg_0[0] = min (avg_0[0], avg_1[0]);
   avg_1[0] = avg_0[0];
 
-  simde_mm_empty();
-  simde_m_empty();
 
 }
 
@@ -1339,8 +1327,6 @@ void lte_ue_measurements(PHY_VARS_UE *ue,
     // printf("in lte_ue_measurements: selected rx_antenna[eNB_id==0]:%u\n", ue->measurements.selected_rx_antennas[eNB_id][i]);
   }  // eNB_id loop
 
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 

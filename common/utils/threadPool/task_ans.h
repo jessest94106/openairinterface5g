@@ -31,7 +31,9 @@ extern "C" {
 #include <stdatomic.h>
 #else
 #include <atomic>
+#ifndef _Atomic
 #define _Atomic(X) std::atomic<X>
+#endif
 #define _Alignas(X) alignas(X)
 #endif
 

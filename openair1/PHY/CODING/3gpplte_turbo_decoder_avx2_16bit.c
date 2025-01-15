@@ -1258,8 +1258,6 @@ unsigned char phy_threegpplte_turbo_decoder16avx2(int16_t *y,
 
   //  fprintf(fdavx2,"crc %x, oldcrc %x\n",crc,oldcrc);
 
-  simde_mm_empty();
-  simde_m_empty();
 
 #ifdef DEBUG_LOGMAP
   fclose(fdavx2);

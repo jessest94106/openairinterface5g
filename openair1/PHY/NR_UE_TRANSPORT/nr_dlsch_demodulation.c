@@ -1304,8 +1304,6 @@ static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
         rho128_0[i] = simde_mm_adds_epi16(simde_mm_srai_epi16(rho128_0[i],1),simde_mm_srai_epi16(rho128_1[i],1));
       }*/
       }
-      simde_mm_empty();
-      simde_m_empty();
   }
 }
 
@@ -1617,8 +1615,6 @@ void nr_conjch0_mult_ch1(int *ch0,
     dl_ch1_128+=1;
     ch0conj_ch1_128+=1;
   }
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 /*

@@ -349,8 +349,6 @@ void threegpplte_turbo_encoder_sse(unsigned char *input,
 #ifdef DEBUG_TURBO_ENCODER
   printf("term: x0 %u, x1 %u, state1 %d\n",x[10],x[11],state1);
 #endif // DEBUG_TURBO_ENCODER
-  simde_mm_empty();
-  simde_m_empty();
 }
 
 void init_encoder_sse (void) {
