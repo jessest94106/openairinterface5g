@@ -64,8 +64,6 @@ void subtract_sf(uint16_t *frameP, uint16_t *subframeP, int offset)
 uint32_t sfnslot_add_slot(uint16_t sfn, uint16_t slot, int offset)
 {
   uint32_t new_sfnslot;
-//   uint16_t sfn = NFAPI_SFNSLOT2SFN(sfnslot);
-//   uint16_t slot  = NFAPI_SFNSLOT2SLOT(sfnslot);
 
   //printf("%s() sfn:%u sf:%u\n", __FUNCTION__, sfn, sf);
   add_slot(&sfn, &slot, offset);
@@ -1443,9 +1441,9 @@ void pnf_handle_ul_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unpack UL_TTI.request\n");
     } else {
       NFAPI_TRACE(NFAPI_TRACE_NOTE,
-                  "[%d] NOT storing ul_tti_req OUTSIDE OF TRANSMIT BUFFER WINDOW SFN/SLOT %d\n",
-                  NFAPI_SFNSLOT2DEC(pnf_p7->sfn, pnf_p7->slot),
-                  NFAPI_SFNSLOT2DEC(frame, slot));
+                  "[%d.%d] NOT storing ul_tti_req OUTSIDE OF TRANSMIT BUFFER WINDOW SFN/SLOT %d.%d\n",
+                  pnf_p7->sfn, pnf_p7->slot,
+                  frame, slot);
       if (pnf_p7->_public.timing_info_mode_aperiodic)
         pnf_p7->timing_info_aperiodic_send = 1;
 
@@ -1679,10 +1677,9 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
       }
     } else {
       NFAPI_TRACE(NFAPI_TRACE_INFO,
-                  "%s() TX_DATA_REQUEST Request is outside of window REQ:SFN_SLOT:%d CURR:SFN_SLOT:%d\n",
-                  __FUNCTION__,
-                  NFAPI_SFNSLOT2DEC(frame, slot),
-                  NFAPI_SFNSLOT2DEC(pnf_p7->sfn, pnf_p7->slot));
+                  "TX_DATA_REQUEST Request is outside of window REQ:SFN_SLOT:%d.%d CURR:SFN_SLOT:%d.%d\n",
+                  frame, slot,
+                  pnf_p7->sfn, pnf_p7->slot);
 
       if (pnf_p7->_public.timing_info_mode_aperiodic) {
         pnf_p7->timing_info_aperiodic_send = 1;
@@ -1969,9 +1966,8 @@ uint32_t calculate_nr_t2(uint32_t now_time_hr, uint16_t sfn,uint16_t slot, uint3
         {
           static uint32_t prev_t2 = 0;
 
-          NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s(now_time_hr:%u sfn to slot:%d slot_start_time_Hr:%u) slot_time_us:%u t2:%u prev_t2:%u diff:%u\n",
-              __FUNCTION__,
-              now_time_hr, NFAPI_SFNSLOT2DEC(sfn, slot), slot_start_time_hr,
+          NFAPI_TRACE(NFAPI_TRACE_ERROR, "(now_time_hr:%u sfn.slot:%d.%d slot_start_time_Hr:%u) slot_time_us:%u t2:%u prev_t2:%u diff:%u\n",
+              now_time_hr, sfn, slot, slot_start_time_hr,
               slot_time_us,
               t2,
               prev_t2,
