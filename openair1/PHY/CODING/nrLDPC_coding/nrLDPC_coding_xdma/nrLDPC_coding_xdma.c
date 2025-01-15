@@ -278,7 +278,7 @@ int decoder_xdma(nrLDPC_TB_decoding_parameters_t *TB_params, int frame_rx, int s
   DevAssert(num_threads_prepare == t_info.len);
 
   // wait for the prepare jobs to complete
-  join_task_ans(t_info.ans, t_info.len);
+  join_task_ans(t_info.ans);
 
   for (uint32_t job = 0; job < num_threads_prepare; job++) {
     args_fpga_decode_prepare_t *args = &arr[job];

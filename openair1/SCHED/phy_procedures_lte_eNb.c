@@ -1329,8 +1329,9 @@ void pusch_procedures(PHY_VARS_eNB *eNB,L1_rxtx_proc_t *proc) {
   uint32_t harq_pid0 = subframe2harq_pid(&eNB->frame_parms,frame,subframe);
 
   turboDecode_t arr[64] = {0};
-  task_ans_t ans[64] = {0};
-  thread_info_tm_t t_info = {.ans = ans, .cap = 64, .len = 0, .buf = (uint8_t *)arr};
+  task_ans_t ans;
+  init_task_ans(&ans, 64);
+  thread_info_tm_t t_info = {.ans = &ans, .cap = 64, .len = 0, .buf = (uint8_t *)arr};
 
   for (i = 0; i < NUMBER_OF_ULSCH_MAX; i++) {
     ulsch = eNB->ulsch[i];
@@ -1420,7 +1421,10 @@ void pusch_procedures(PHY_VARS_eNB *eNB,L1_rxtx_proc_t *proc) {
   const bool decode = proc->nbDecode;
   DevAssert(t_info.len == proc->nbDecode);
   if (proc->nbDecode > 0) {
-    join_task_ans(t_info.ans, t_info.len);
+    if (t_info.len != t_info.cap) {
+      completed_many_task_ans(t_info.ans, t_info.cap - t_info.len);
+    }
+    join_task_ans(t_info.ans);
     for (size_t i = 0; i < t_info.len; ++i) {
       postDecode(proc, &arr[i]);
     }

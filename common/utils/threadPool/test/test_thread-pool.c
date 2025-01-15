@@ -114,18 +114,18 @@ int main()
   int nb_jobs = 4;
   for (int i = 0; i < 1000; i++) {
     int parall = nb_jobs;
-    task_ans_t task_ans[parall];
-    memset(task_ans, 0, sizeof(task_ans));
+    task_ans_t task_ans;
+    init_task_ans(&task_ans, parall);
     struct testData test_data[parall];
     memset(test_data, 0, sizeof(test_data));
     for (int j = 0; j < parall; j++) {
       task_t task = {.args = &test_data[j], .func = processing};
       struct testData *x = (struct testData *)task.args;
       x->id = i;
-      x->task_ans = &task_ans[j];
+      x->task_ans = &task_ans;
       pushTpool(&pool, task);
     }
-    join_task_ans(task_ans, parall);
+    join_task_ans(&task_ans);
     int sleepmax = 0;
     for (int j = 0; j < parall; j++) {
       if (test_data[j].sleepTime > sleepmax) {

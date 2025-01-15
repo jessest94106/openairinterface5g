@@ -189,7 +189,7 @@ static int nrLDPC_prepare_TB_encoding(nrLDPC_slot_encoding_parameters_t *nrLDPC_
   for (int j = 0; j < n_seg; j++) {
     ldpc8blocks_args_t *perJobImpp = &((ldpc8blocks_args_t *)t_info->buf)[t_info->len];
     DevAssert(t_info->len < t_info->cap);
-    impp.ans = &t_info->ans[t_info->len];
+    impp.ans = t_info->ans;
     t_info->len += 1;
 
     impp.macro_num = j;
@@ -211,19 +211,19 @@ int nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encodin
     nbTasks += n_seg;
   }
   ldpc8blocks_args_t arr[nbTasks];
-  task_ans_t ans[nbTasks];
-  memset(ans, 0, nbTasks * sizeof(task_ans_t));
-  thread_info_tm_t t_info = {.buf = (uint8_t *)arr, .len = 0, .cap = nbTasks, .ans = ans};
+  task_ans_t ans;
+  init_task_ans(&ans, nbTasks);
+  thread_info_tm_t t_info = {.buf = (uint8_t *)arr, .len = 0, .cap = nbTasks, .ans = &ans};
 
   int nbEncode = 0;
   for (int dlsch_id = 0; dlsch_id < nrLDPC_slot_encoding_parameters->nb_TBs; dlsch_id++) {
     nbEncode += nrLDPC_prepare_TB_encoding(nrLDPC_slot_encoding_parameters, dlsch_id, &t_info);
   }
-
-  DevAssert(nbEncode == t_info.len);
-
-  // Execute thread poool tasks
-  join_task_ans(ans, nbEncode);
+  if (nbEncode < nbTasks) {
+    completed_many_task_ans(&ans, nbTasks - nbEncode);
+  }
+  // Execute thread pool tasks
+  join_task_ans(&ans);
 
   return 0;
 }

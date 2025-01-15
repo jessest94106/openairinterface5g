@@ -341,7 +341,7 @@ static int ulsch_decoding_data(PHY_VARS_eNB *eNB,
 
     turboDecode_t *rdata = &((turboDecode_t *)t_info->buf)[t_info->len];
     DevAssert(t_info->len < t_info->cap);
-    rdata->ans = &t_info->ans[t_info->len];
+    rdata->ans = t_info->ans;
     t_info->len += 1;
 
     rdata->eNB=eNB;
