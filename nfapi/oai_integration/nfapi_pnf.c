@@ -1702,9 +1702,6 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
     p7_config->timing_info_mode_aperiodic = 1;
   }
 
-	pnf_p7_t* pnf_p7 = (pnf_p7_t*)(p7_config);
-  pnf_p7->mu = 1; /* TODO */
-
   // NR
   p7_config->dl_tti_req_fn = &pnf_phy_dl_tti_req;
   p7_config->ul_tti_req_fn = &pnf_phy_ul_tti_req;
@@ -1758,6 +1755,18 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   l1_north_init_gNB();
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] HACK - Set p7_config global ready for subframe ind%s\n", __FUNCTION__);
   p7_config_g = p7_config;
+
+  // Hack? in the config request (which comes before the start request here),
+  // we receive the SCS/mu. The PNF needs that for calculating frame/slot
+  // offsets. However, the memory for the structure which actually keeps track
+  // of the time, is only allocated here, so "pick" the SCS from memory.
+  PHY_VARS_gNB *gNB = RC.gNB[0];
+  DevAssert(gNB != NULL);
+  // check that SCS has actually been received
+  const nfapi_uint8_tlv_t *scs = &gNB->gNB_config.ssb_config.scs_common;
+  DevAssert(scs->tl.tag == NFAPI_NR_CONFIG_SCS_COMMON_TAG);
+  pnf_p7_t* pnf_p7 = (pnf_p7_t*)(p7_config);
+  pnf_p7->mu = scs->value;
 
   // Need to wait for main thread to create RU structures
   while (config_sync_var < 0) {
