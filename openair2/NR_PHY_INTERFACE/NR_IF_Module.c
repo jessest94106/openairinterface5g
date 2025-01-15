@@ -141,15 +141,19 @@ static void handle_nr_uci(NR_UL_IND_t *UL_info)
 
 }
 
+struct sfn_slot {
+  int sfn;
+  int slot;
+};
 static bool crc_sfn_slot_matcher(void *wanted, void *candidate)
 {
   nfapi_nr_p7_message_header_t *msg = candidate;
-  int sfn_sf = *(int *)wanted;
+  struct sfn_slot *sfn_sf = (struct sfn_slot *)wanted;
 
   switch (msg->message_id) {
     case NFAPI_NR_PHY_MSG_TYPE_CRC_INDICATION: {
       nfapi_nr_crc_indication_t *ind = candidate;
-      return NFAPI_SFNSLOT2SFN(sfn_sf) == ind->sfn && NFAPI_SFNSLOT2SLOT(sfn_sf) == ind->slot;
+      return sfn_sf->sfn == ind->sfn && sfn_sf->slot == ind->slot;
     }
 
     default:
@@ -467,7 +471,7 @@ void NR_UL_indication(NR_UL_IND_t *UL_info) {
       LOG_D(NR_MAC, "gnb_rx_ind_queue size = %zu and gnb_crc_ind_queue size = %zu\n",
             gnb_rx_ind_queue.num_items, gnb_crc_ind_queue.num_items);
       rx_ind = get_queue(&gnb_rx_ind_queue);
-      int sfn_slot = NFAPI_SFNSLOT2HEX(rx_ind->sfn, rx_ind->slot);
+      struct sfn_slot sfn_slot = {.sfn = rx_ind->sfn, .slot = rx_ind->slot};
       crc_ind = unqueue_matching(&gnb_crc_ind_queue,
                                  MAX_QUEUE_SIZE,
                                  crc_sfn_slot_matcher,
