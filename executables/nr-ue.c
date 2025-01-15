@@ -642,8 +642,9 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
     }
   }
 
+  bool dl_slot = false;
   if (proc->rx_slot_type == NR_DOWNLINK_SLOT || proc->rx_slot_type == NR_MIXED_SLOT) {
-
+    dl_slot = true;
     if(UE->if_inst != NULL && UE->if_inst->dl_indication != NULL) {
       nr_downlink_indication_t dl_indication;
       nr_fill_dl_indication(&dl_indication, NULL, NULL, proc, UE, phy_data);
@@ -656,7 +657,8 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
       const int ack_nack_slot = (proc->nr_slot_rx + phy_data->dlsch[0].dlsch_config.k1_feedback) % UE->frame_parms.slots_per_frame;
       tx_wait_for_dlsch[ack_nack_slot]++;
     }
-  } else {
+  }
+  if (fp->frame_type == FDD || !dl_slot) {
     // good time to print statistics, we don't have to spend time  to decode DCI
     if (proc->frame_rx % 128 == 0) {
       if (*stats_printed == false) {
