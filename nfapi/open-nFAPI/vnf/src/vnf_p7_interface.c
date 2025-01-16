@@ -534,7 +534,7 @@ int nfapi_vnf_p7_stop(nfapi_vnf_p7_config_t* config)
 	return 0;
 }
 
-int nfapi_vnf_p7_add_pnf(nfapi_vnf_p7_config_t* config, const char* pnf_p7_addr, int pnf_p7_port, int phy_id)
+int nfapi_vnf_p7_add_pnf(nfapi_vnf_p7_config_t* config, const char* pnf_p7_addr, int pnf_p7_port, int phy_id, int mu)
 {
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "%s(config:%p phy_id:%d pnf_addr:%s pnf_p7_port:%d)\n", __FUNCTION__, config, phy_id,  pnf_p7_addr, pnf_p7_port);
 
@@ -558,7 +558,7 @@ int nfapi_vnf_p7_add_pnf(nfapi_vnf_p7_config_t* config, const char* pnf_p7_addr,
 	node->sfn = 0;
     node->slot = 0;
 	node->min_sync_cycle_count = 8;
-  node->mu = 1; /* TODO */
+  node->mu = mu;
 
 	// save the remote endpoint information
 	node->remote_addr.sin_family = AF_INET;

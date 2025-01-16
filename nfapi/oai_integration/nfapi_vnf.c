@@ -1551,7 +1551,17 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   // for now just 1
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] %d.%d pnf p7 %s:%d timing %u %u %u %u\n", p5_idx, phy->id, phy->remote_addr, phy->remote_port, p7_vnf->timing_window, p7_vnf->periodic_timing_period, p7_vnf->aperiodic_timing_enabled,
          p7_vnf->periodic_timing_period);
-  nfapi_vnf_p7_add_pnf((p7_vnf->config), phy->remote_addr, phy->remote_port, phy->id);
+  // Hack? the VNF might need the subcarrier spacing for some calculations
+  // (that we actually don't use as of now...). We therefore need to save the
+  // mu, for the current PNF connection (together with where we have frame/slot
+  // info). nfapi_vnf_p7_add_pnf() prepends the current P7 connection to the
+  // beginning of the list. Pick it from there, and save the mu.
+  // check that SCS has actually been set
+  const nfapi_uint8_tlv_t *scs = &req->ssb_config.scs_common;
+  DevAssert(scs->tl.tag == NFAPI_NR_CONFIG_SCS_COMMON_TAG);
+  int mu = scs->value;
+  nfapi_vnf_p7_add_pnf((p7_vnf->config), phy->remote_addr, phy->remote_port, phy->id, mu);
+
   req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_CONFIG_REQUEST;
   req->header.phy_id = phy->id;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Send NFAPI_CONFIG_REQUEST\n");
@@ -1684,7 +1694,7 @@ int start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_start_response_t
   pnf_info *pnf = vnf->pnfs;
   phy_info *phy = pnf->phys;
   vnf_p7_info *p7_vnf = vnf->p7_vnfs;
-  nfapi_vnf_p7_add_pnf((p7_vnf->config), phy->remote_addr, htons(phy->remote_port), phy->id);
+  nfapi_vnf_p7_add_pnf((p7_vnf->config), phy->remote_addr, htons(phy->remote_port), phy->id, 0);
   return 0;
 }
 
