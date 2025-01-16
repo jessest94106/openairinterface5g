@@ -44,7 +44,6 @@ int fullread(int fd, void *_buf, int count) {
 
   return ret;
 }
-#define shift 4
 
 void fullwrite(int fd, void *_buf, int count) {
   char *buf = _buf;

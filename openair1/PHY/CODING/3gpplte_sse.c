@@ -47,8 +47,8 @@
 //#define CALLGRIND 1
 
 struct treillis {
-  uint8_t systematic_andp1[24];
-  uint8_t parity2[24];
+  uint8_t systematic_andp1[24] __attribute__((aligned(32)));
+  uint8_t parity2[24] __attribute__((aligned(32)));
   int exit_state;
 }  __attribute__ ((aligned(64)));
 
@@ -292,16 +292,17 @@ void threegpplte_turbo_encoder_sse(unsigned char *input, unsigned short input_le
   unsigned char systematic2[768] __attribute__((aligned(32)));
   interleave_compact_byte(base_interleaver, input, systematic2, input_length_bytes);
   unsigned char *ptr_output = output;
-  unsigned char cur_s1, cur_s2;
   unsigned char state0 = 0, state1 = 0;
   for (int i = 0; i < input_length_bytes; i++) {
-    cur_s1=input[i];
-    cur_s2=systematic2[i];
-    *(simde__m128i *)ptr_output = simde_mm_add_epi8(*(simde__m128i *)all_treillis[state0][cur_s1].systematic_andp1,
-                                                    *(simde__m128i *)all_treillis[state1][cur_s2].parity2);
+    int cur_s1 = input[i];
+    uint8_t *systematic_andp1 = all_treillis[state0][cur_s1].systematic_andp1;
+    int cur_s2 = systematic2[i];
+    uint8_t *parity2 = all_treillis[state1][cur_s2].parity2;
+    simde_mm_storeu_si128((simde__m128i *)ptr_output,
+                          simde_mm_add_epi8(*(simde__m128i *)systematic_andp1, *(simde__m128i *)parity2));
     ptr_output += 16;
     for (int code_rate = 16; code_rate < 24; code_rate++) {
-      *ptr_output++ = all_treillis[state0][cur_s1].systematic_andp1[code_rate] + all_treillis[state1][cur_s2].parity2[code_rate];
+      *ptr_output++ = systematic_andp1[code_rate] + parity2[code_rate];
     }
     state0=all_treillis[state0][cur_s1].exit_state;
     state1=all_treillis[state1][cur_s2].exit_state;
