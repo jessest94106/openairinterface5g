@@ -79,7 +79,7 @@ static uint32_t get_nFpgaToSW_FTH_RxBufferLen(int mu)
   }
 }
 
-static struct xran_prb_map get_xran_prb_map(const struct xran_fh_config *f, const uint8_t dir)
+static struct xran_prb_map get_xran_prb_map(const struct xran_fh_config *f, const uint8_t dir, const int16_t start_sym, const int16_t num_sym)
 {
   struct xran_prb_map prbmap = {
       .dir = dir,
@@ -91,8 +91,8 @@ static struct xran_prb_map get_xran_prb_map(const struct xran_fh_config *f, cons
       .nPrbElm = 1,
   };
   struct xran_prb_elm *e = &prbmap.prbMap[0];
-  e->nStartSymb = 0;
-  e->numSymb = 14;
+  e->nStartSymb = start_sym;
+  e->numSymb = num_sym;
   e->nRBStart = 0;
   e->nRBSize = (dir == XRAN_DIR_DL) ? f->nDLRBs : f->nULRBs;
   e->nBeamIndex = 0;
@@ -240,7 +240,8 @@ static void oran_allocate_cplane_buffers(void *instHandle,
       fb->pCtrl = mb;
 
       struct xran_prb_map *src = &prb_conf->slotMap;
-      if ((j % prb_conf->nTddPeriod) == prb_conf->mixed_slot_index)
+      // get mixed slot map if in TDD and in mixed slot
+      if (prb_conf->nTddPeriod != 0 && (j % prb_conf->nTddPeriod) == prb_conf->mixed_slot_index)
         src = &prb_conf->mixedSlotMap;
 #ifdef E_RELEASE
       /* as per E release sample app, the memory is copied up to size_of_prb_map
@@ -315,28 +316,43 @@ static void oran_allocate_buffers(void *handle,
   printf("-> hInstance %p\n", pi->instanceHandle);
   AssertFatal(status == XRAN_STATUS_SUCCESS, "get sector instance failed for XRAN nInstanceNum %d\n", xran_inst);
 
-  const uint32_t txBufSize = get_nSW_ToFpga_FTH_TxBufferLen(fh_config->frame_conf.nNumerology, fh_config->max_sections_per_slot);
-  oran_allocate_uplane_buffers(pi->instanceHandle, bl->src, bl->bufs.tx, xran_max_antenna_nr, txBufSize);
+  // DL/UL PRB mapping depending on the duplex mode
+  struct xran_prb_map dlPm = get_xran_prb_map(fh_config, XRAN_DIR_DL, 0, 14);
+  struct xran_prb_map ulPm = get_xran_prb_map(fh_config, XRAN_DIR_UL, 0, 14);
+  struct xran_prb_map dlPmMixed = {0};
+  struct xran_prb_map ulPmMixed = {0};
+  uint32_t idx = 0;
+  if (fh_config->frame_conf.nFrameDuplexType == XRAN_TDD) {
+    oran_mixed_slot_t info = get_mixed_slot_info(&fh_config->frame_conf);
+    dlPmMixed = get_xran_prb_map(fh_config, XRAN_DIR_DL, 0, info.num_dlsym);
+    ulPmMixed = get_xran_prb_map(fh_config, XRAN_DIR_UL, info.start_ulsym, info.num_ulsym);
+    idx = info.idx;
+  }
 
-  oran_mixed_slot_t info = get_mixed_slot_info(&fh_config->frame_conf);
-  struct xran_prb_map dlPm = get_xran_prb_map(fh_config, XRAN_DIR_DL);
-  struct xran_prb_map dlPmMixed = dlPm;
-  dlPmMixed.prbMap[0].nStartSymb = 0;
-  dlPmMixed.prbMap[0].numSymb = info.num_dlsym;
   oran_cplane_prb_config dlConf = {
       .nTddPeriod = fh_config->frame_conf.nTddPeriod,
-      .mixed_slot_index = info.idx,
+      .mixed_slot_index = idx,
       .slotMap = dlPm,
       .mixedSlotMap = dlPmMixed,
+  };
+
+  oran_cplane_prb_config ulConf = {
+      .nTddPeriod = fh_config->frame_conf.nTddPeriod,
+      .mixed_slot_index = idx,
+      .slotMap = ulPm,
+      .mixedSlotMap = ulPmMixed,
   };
 
 #ifdef E_RELEASE
   uint32_t size_of_prb_map = sizeof(struct xran_prb_map) + sizeof(struct xran_prb_elm) * (xran_max_sections_per_slot - 1);
 #elif defined F_RELEASE
-  uint32_t numPrbElm = xran_get_num_prb_elm(&dlPmMixed, mtu);
+  uint32_t numPrbElm = xran_get_num_prb_elm(&dlPm, mtu);
   uint32_t size_of_prb_map  = sizeof(struct xran_prb_map) + sizeof(struct xran_prb_elm) * (numPrbElm);
 #endif
 
+  // PDSCH
+  const uint32_t txBufSize = get_nSW_ToFpga_FTH_TxBufferLen(fh_config->frame_conf.nNumerology, fh_config->max_sections_per_slot);
+  oran_allocate_uplane_buffers(pi->instanceHandle, bl->src, bl->bufs.tx, xran_max_antenna_nr, txBufSize);
   oran_allocate_cplane_buffers(pi->instanceHandle,
                                bl->srccp,
                                bl->bufs.tx_prbmap,
@@ -349,19 +365,9 @@ static void oran_allocate_buffers(void *handle,
                                size_of_prb_map,
                                &dlConf);
 
+  // PUSCH
   const uint32_t rxBufSize = get_nFpgaToSW_FTH_RxBufferLen(fh_config->frame_conf.nNumerology);
   oran_allocate_uplane_buffers(pi->instanceHandle, bl->dst, bl->bufs.rx, xran_max_antenna_nr, rxBufSize);
-
-  struct xran_prb_map ulPm = get_xran_prb_map(fh_config, XRAN_DIR_UL);
-  struct xran_prb_map ulPmMixed = ulPm;
-  ulPmMixed.prbMap[0].nStartSymb = info.start_ulsym;
-  ulPmMixed.prbMap[0].numSymb = info.num_ulsym;
-  oran_cplane_prb_config ulConf = {
-      .nTddPeriod = fh_config->frame_conf.nTddPeriod,
-      .mixed_slot_index = info.idx,
-      .slotMap = ulPm,
-      .mixedSlotMap = ulPmMixed,
-  };
   oran_allocate_cplane_buffers(pi->instanceHandle,
                                bl->dstcp,
                                bl->bufs.rx_prbmap,
