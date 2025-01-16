@@ -335,6 +335,9 @@ int32_t write_file_matlab(const char *fname, const char *vname, void *data, int 
  * @{*/
 #define LOG_DUMP_CHAR       0
 #define LOG_DUMP_DOUBLE     1
+#define LOG_DUMP_I16 2
+#define LOG_DUMP_C16 3
+#define LOG_DUMP_C32 4
 // debugging macros
 #define LOG_F  LOG_I           /* because  LOG_F was originaly to dump a message or buffer but is also used as a regular level...., to dump use LOG_DUMPMSG */
 

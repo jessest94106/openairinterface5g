@@ -250,7 +250,7 @@ int nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_de
   for (int r = 0; r < nrLDPC_TB_decoding_parameters->C; r++) {
     nrLDPC_decoding_parameters_t *rdata = &((nrLDPC_decoding_parameters_t *)t_info->buf)[t_info->len];
     DevAssert(t_info->len < t_info->cap);
-    rdata->ans = &t_info->ans[t_info->len];
+    rdata->ans = t_info->ans;
     t_info->len += 1;
 
     decParams.R = nrLDPC_TB_decoding_parameters->segments[r].R;
@@ -309,19 +309,16 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
     nbSegments += nrLDPC_TB_decoding_parameters->C;
   }
   nrLDPC_decoding_parameters_t arr[nbSegments];
-  task_ans_t ans[nbSegments];
-  memset(ans, 0, nbSegments * sizeof(task_ans_t));
-  thread_info_tm_t t_info = {.buf = (uint8_t *)arr, .len = 0, .cap = nbSegments, .ans = ans};
+  task_ans_t ans;
+  init_task_ans(&ans, nbSegments);
+  thread_info_tm_t t_info = {.buf = (uint8_t *)arr, .len = 0, .cap = nbSegments, .ans = &ans};
 
-  int nbDecode = 0;
   for (int pusch_id = 0; pusch_id < nrLDPC_slot_decoding_parameters->nb_TBs; pusch_id++) {
-    nbDecode += nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters, pusch_id, &t_info);
+    (void)nrLDPC_prepare_TB_decoding(nrLDPC_slot_decoding_parameters, pusch_id, &t_info);
   }
 
-  DevAssert(nbDecode == t_info.len);
-
-  // Execute thread poool tasks
-  join_task_ans(t_info.ans, t_info.len);
+  // Execute thread pool tasks
+  join_task_ans(t_info.ans);
 
   for (int pusch_id = 0; pusch_id < nrLDPC_slot_decoding_parameters->nb_TBs; pusch_id++) {
     nrLDPC_TB_decoding_parameters_t *nrLDPC_TB_decoding_parameters = &nrLDPC_slot_decoding_parameters->TBs[pusch_id];

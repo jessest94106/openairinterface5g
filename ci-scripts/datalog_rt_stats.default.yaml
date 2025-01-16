@@ -10,7 +10,7 @@ Ref :
   feprx : 43.0
   feptx_prec : 13.0
   feptx_ofdm : 33.0
-  feptx_total : 55.0
+  feptx_total : 50.0
   L1 Tx processing : 200.0
   DLSCH encoding : 100.0
   L1 Rx processing : 330.0

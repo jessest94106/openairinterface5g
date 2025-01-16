@@ -34,7 +34,9 @@
 
 #ifdef __cplusplus
 #include <atomic>
+#ifndef _Atomic
 #define _Atomic(X) std::atomic< X >
+#endif
 #endif
 
 #include "defs_nr_common.h"

@@ -138,6 +138,7 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
 
   gNB->max_nb_pdsch = MAX_MOBILES_PER_GNB;
   init_delay_table(fp->ofdm_symbol_size, MAX_DELAY_COMP, NR_MAX_OFDM_SYMBOL_SIZE, fp->delay_table);
+  init_delay_table(128, MAX_DELAY_COMP, 128, fp->delay_table128);
 
   gNB->bad_pucch = 0;
   if (gNB->TX_AMP == 0)

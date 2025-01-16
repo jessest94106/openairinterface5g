@@ -26,37 +26,50 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#include "pthread_utils.h"
+#include "errno.h"
+#include <string.h>
 
-void completed_task_ans(task_ans_t* task)
+#define seminit(sem)                                                                           \
+  {                                                                                            \
+    int ret = sem_init(&sem, 0, 0);                                                            \
+    AssertFatal(ret == 0, "sem_init(): ret=%d, errno=%d (%s)\n", ret, errno, strerror(errno)); \
+  }
+#define sempost(sem)                                                                           \
+  {                                                                                            \
+    int ret = sem_post(&sem);                                                                  \
+    AssertFatal(ret == 0, "sem_post(): ret=%d, errno=%d (%s)\n", ret, errno, strerror(errno)); \
+  }
+#define semwait(sem)                                                                           \
+  {                                                                                            \
+    int ret = sem_wait(&sem);                                                                  \
+    AssertFatal(ret == 0, "sem_wait(): ret=%d, errno=%d (%s)\n", ret, errno, strerror(errno)); \
+  }
+#define semdestroy(sem)                                                                           \
+  {                                                                                               \
+    int ret = sem_destroy(&sem);                                                                  \
+    AssertFatal(ret == 0, "sem_destroy(): ret=%d, errno=%d (%s)\n", ret, errno, strerror(errno)); \
+  }
+
+void init_task_ans(task_ans_t* ans, uint num_jobs)
 {
-  DevAssert(task != NULL);
-
-  int status = atomic_load_explicit(&task->status, memory_order_acquire);
-  AssertFatal(status == 0, "Task not expected to be finished here. Status = %d\n", status);
-
-  atomic_store_explicit(&task->status, 1, memory_order_release);
+  ans->counter = num_jobs;
+  seminit(ans->sem);
 }
 
-void join_task_ans(task_ans_t* arr, size_t len)
+void completed_many_task_ans(task_ans_t* ans, uint num_completed_jobs)
 {
-  DevAssert(len < INT_MAX);
-  DevAssert(arr != NULL);
-
-  // Spin lock inspired by:
-  // The Art of Writing Efficient Programs:
-  // An advanced programmer's guide to efficient hardware utilization
-  // and compiler optimizations using C++ examples
-  const struct timespec ns = {0, 1};
-  uint64_t i = 0;
-  int j = len - 1;
-  for (; j != -1; i++) {
-    for (; j != -1; --j) {
-      int const task_completed = 1;
-      if (atomic_load_explicit(&arr[j].status, memory_order_acquire) != task_completed)
-        break;
-    }
-    if (i % 8 == 0) {
-      nanosleep(&ns, NULL);
-    }
+  DevAssert(ans != NULL);
+  // Using atomic counter in contention scenario to avoid locking in producers
+  int num_jobs = atomic_fetch_sub_explicit(&ans->counter, num_completed_jobs, memory_order_relaxed);
+  if (num_jobs == num_completed_jobs) {
+    // Using semaphore to enable blocking call in join_task_ans
+    sempost(ans->sem);
   }
+}
+
+void join_task_ans(task_ans_t* ans)
+{
+  semwait(ans->sem);
+  semdestroy(ans->sem);
 }

@@ -144,6 +144,7 @@ int main(int argc, char **argv)
   int sr_flag = 0;
   int pucch_DTX_thres = 0;
   cpuf = get_cpu_freq_GHz();
+  bool print_perf = false;
 
   if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == 0) {
     exit_fun("[NR_PUCCHSIM] Error, configuration module init failed\n");
@@ -153,8 +154,7 @@ int main(int argc, char **argv)
   logInit();
 
   int c;
-  while ((c = getopt (argc, argv, "--:O:f:hA:f:g:i:I:P:B:b:t:T:m:n:r:o:s:S:x:y:z:N:F:GR:IL:q:cd:")) != -1) {
-
+  while ((c = getopt(argc, argv, "--:O:f:hA:f:g:i:I:P:B:b:t:T:m:n:r:o:s:S:x:y:z:N:F:GR:IL:q:cd:C")) != -1) {
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */
     /* with this opstring getopt returns 1 for non-option arguments, refer to 'man 3 getopt' */
     if (c == 1 || c == '-' || c == 'O')
@@ -349,6 +349,10 @@ int main(int argc, char **argv)
       //nacktoack_flag=(uint8_t)atoi(optarg);
       target_error_rate=0.001;
       break;
+    case 'C':
+      print_perf = 1;
+      cpu_meas_enabled = 1;
+      break;
     default:
     case 'h':
       printf("%s -h(elp) -p(extended_prefix) -N cell_id -f output_filename -F input_filename -g channel_model -n n_frames -t Delayspread -s snr0 -S snr1 -x transmission_mode -y TXant -z RXant -i Intefrence0 -j Interference1 -A interpolation_file -C(alibration offset dB) -N CellId\n", argv[0]);
@@ -381,6 +385,7 @@ int main(int argc, char **argv)
       printf("-x Transmission mode (1,2,6 for the moment)\n");
       printf("-y Number of TX antennas used in eNB\n");
       printf("-z Number of RX antennas used in UE\n");
+      printf("-C print CPU cost\n");
       exit (-1);
       break;
     }
@@ -406,8 +411,8 @@ int main(int argc, char **argv)
   if ((format < 2) && (actual_payload == 4)) do_DTX=1;
 
   if (random_payload) {
-    srand(time(NULL));   // Initialization, should only be called once.
-    actual_payload = rand();      // Returns a pseudo-random integer between 0 and RAND_MAX.
+    double tmp = uniformrandom();
+    memcpy(&actual_payload, &tmp, sizeof(actual_payload));
   }
   actual_payload &= nr_bit < 64 ? (1UL << nr_bit) - 1: 0xffffffffffffffff;
 
@@ -638,6 +643,7 @@ int main(int argc, char **argv)
 
       // noise measurement (all PRBs)
       gNB_I0_measurements(gNB, nr_slot_tx, 0, gNB->frame_parms.symbols_per_slot, rb_mask_ul);
+      start_meas(&gNB->phy_proc_rx);
 
       if (n_trials==1) printf("noise rxlev %d (%d dB), rxlev pucch %d dB sigma2 %f dB, SNR %f, TX %f, I0 (pucch) %d, I0 (avg) %d\n",rxlev,dB_fixed(rxlev),dB_fixed(rxlev_pucch),sigma2_dB,SNR,10*log10((double)txlev*UE->frame_parms.ofdm_symbol_size/12),gNB->measurements.n0_subband_power_tot_dB[startingPRB],gNB->measurements.n0_subband_power_avg_dB);
       if(format==0){
@@ -731,10 +737,21 @@ int main(int argc, char **argv)
         free(uci_pdu.csi_part1.csi_part1_payload);
 
       }
+      stop_meas(&gNB->phy_proc_rx);
+
       n_errors=((actual_payload^payload_received)&1)+(((actual_payload^payload_received)&2)>>1)+(((actual_payload^payload_received)&4)>>2)+n_errors;
     }
     if (sr_flag == 1)
       printf("SR: SNR=%f, n_trials=%d, n_bit_errors=%d\n",SNR,n_trials,sr_errors);
+    if (print_perf) {
+      time_stats_t *ts = &gNB->phy_proc_rx;
+      printf("cpu time for pucch format %d: per block %.2f us; nb blocks %d, max time %.2f;\n",
+             format,
+             ts->diff / ts->trials / cpuf / 1000.0,
+             ts->trials,
+             ts->max / cpuf / 1000.0);
+      reset_meas(ts);
+    }
     if(nr_bit > 0)
       printf("ACK/NACK: SNR=%f, n_trials=%d, n_bit_errors=%d\n",SNR,n_trials,ack_nack_errors);
     if((float)(ack_nack_errors+sr_errors)/(float)(n_trials)<=target_error_rate){

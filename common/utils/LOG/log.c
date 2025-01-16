@@ -651,6 +651,10 @@ void log_dump(int component,
       wbuf=malloc((buffsize * 10)  + 64 + MAX_LOG_TOTAL);
       break;
 
+    case LOG_DUMP_C16:
+      wbuf = malloc((buffsize * 10) + 64 + MAX_LOG_TOTAL);
+      break;
+
     case LOG_DUMP_CHAR:
     default:
       wbuf=malloc((buffsize * 3 ) + 64 + MAX_LOG_TOTAL);
@@ -668,6 +672,21 @@ void log_dump(int component,
         case LOG_DUMP_DOUBLE:
           pos = pos + sprintf(wbuf+pos,"%04.4lf ", (double)((double *)buffer)[i]);
           break;
+
+        case LOG_DUMP_I16: {
+          int16_t *tmp = ((int16_t *)buffer) + i;
+          pos = pos + sprintf(wbuf + pos, "%d, ", *tmp);
+        } break;
+
+        case LOG_DUMP_C16: {
+          int16_t *tmp = ((int16_t *)buffer) + i * 2;
+          pos = pos + sprintf(wbuf + pos, "(%d,%d), ", *tmp, *(tmp + 1));
+        } break;
+
+        case LOG_DUMP_C32: {
+          int32_t *tmp = ((int32_t *)buffer) + i * 2;
+          pos = pos + sprintf(wbuf + pos, "(%d,%d), ", *tmp, *(tmp + 1));
+        } break;
 
         case LOG_DUMP_CHAR:
         default:
