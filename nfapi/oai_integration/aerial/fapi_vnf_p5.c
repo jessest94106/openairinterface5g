@@ -335,12 +335,6 @@ int aerial_nr_config_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_co
 int aerial_nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_start_response_scf_t *resp)
 {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Received NFAPI_START_RESP idx:%d phy_id:%d\n", p5_idx, resp->header.phy_id);
-  vnf_info *vnf = (vnf_info *)(config->user_data);
-  pnf_info *pnf = vnf->pnfs;
-  phy_info *phy = pnf->phys;
-  vnf_p7_info *p7_vnf = vnf->p7_vnfs;
-
-  nfapi_vnf_p7_add_pnf((p7_vnf->config), phy->remote_addr, phy->remote_port, phy->id);
   return 0;
 }
 
