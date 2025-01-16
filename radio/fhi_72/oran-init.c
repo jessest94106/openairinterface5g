@@ -79,10 +79,10 @@ static uint32_t get_nFpgaToSW_FTH_RxBufferLen(int mu)
   }
 }
 
-static struct xran_prb_map get_xran_prb_map_dl(const struct xran_fh_config *f)
+static struct xran_prb_map get_xran_prb_map(const struct xran_fh_config *f, const uint8_t dir)
 {
   struct xran_prb_map prbmap = {
-      .dir = XRAN_DIR_DL,
+      .dir = dir,
       .xran_port = 0,
       .band_id = 0,
       .cc_id = 0,
@@ -94,30 +94,7 @@ static struct xran_prb_map get_xran_prb_map_dl(const struct xran_fh_config *f)
   e->nStartSymb = 0;
   e->numSymb = 14;
   e->nRBStart = 0;
-  e->nRBSize = f->nDLRBs;
-  e->nBeamIndex = 0;
-  e->compMethod = f->ru_conf.compMeth;
-  e->iqWidth = f->ru_conf.iqWidth;
-  return prbmap;
-}
-
-static struct xran_prb_map get_xran_prb_map_ul(const struct xran_fh_config *f)
-{
-  struct xran_prb_map prbmap = {
-      .dir = XRAN_DIR_UL,
-      .xran_port = 0,
-      .band_id = 0,
-      .cc_id = 0,
-      .ru_port_id = 0,
-      .tti_id = 0,
-      .start_sym_id = 0,
-      .nPrbElm = 1,
-  };
-  struct xran_prb_elm *e = &prbmap.prbMap[0];
-  e->nStartSymb = 0;
-  e->numSymb = 14;
-  e->nRBStart = 0;
-  e->nRBSize = f->nULRBs;
+  e->nRBSize = (dir == XRAN_DIR_DL) ? f->nDLRBs : f->nULRBs;
   e->nBeamIndex = 0;
   e->compMethod = f->ru_conf.compMeth;
   e->iqWidth = f->ru_conf.iqWidth;
@@ -342,7 +319,7 @@ static void oran_allocate_buffers(void *handle,
   oran_allocate_uplane_buffers(pi->instanceHandle, bl->src, bl->bufs.tx, xran_max_antenna_nr, txBufSize);
 
   oran_mixed_slot_t info = get_mixed_slot_info(&fh_config->frame_conf);
-  struct xran_prb_map dlPm = get_xran_prb_map_dl(fh_config);
+  struct xran_prb_map dlPm = get_xran_prb_map(fh_config, XRAN_DIR_DL);
   struct xran_prb_map dlPmMixed = dlPm;
   dlPmMixed.prbMap[0].nStartSymb = 0;
   dlPmMixed.prbMap[0].numSymb = info.num_dlsym;
@@ -375,7 +352,7 @@ static void oran_allocate_buffers(void *handle,
   const uint32_t rxBufSize = get_nFpgaToSW_FTH_RxBufferLen(fh_config->frame_conf.nNumerology);
   oran_allocate_uplane_buffers(pi->instanceHandle, bl->dst, bl->bufs.rx, xran_max_antenna_nr, rxBufSize);
 
-  struct xran_prb_map ulPm = get_xran_prb_map_ul(fh_config);
+  struct xran_prb_map ulPm = get_xran_prb_map(fh_config, XRAN_DIR_UL);
   struct xran_prb_map ulPmMixed = ulPm;
   ulPmMixed.prbMap[0].nStartSymb = info.start_ulsym;
   ulPmMixed.prbMap[0].numSymb = info.num_ulsym;
