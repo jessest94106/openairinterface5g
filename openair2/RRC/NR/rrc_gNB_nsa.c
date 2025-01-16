@@ -355,9 +355,9 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p, x2a
   uint32_t du_ue_id = ue_context_p->ue_context.rnti;
   uint32_t rrc_ue_id = ue_context_p->ue_context.rrc_ue_id;
   f1_ue_data_t du_ue_data = {.secondary_ue = rrc_ue_id};
-  du_add_f1_ue_data(du_ue_id, &du_ue_data);
+  du_addmod_f1_ue_data(du_ue_id, &du_ue_data);
   f1_ue_data_t cu_ue_data = {.secondary_ue = du_ue_id};
-  cu_add_f1_ue_data(rrc_ue_id, &cu_ue_data);
+  cu_addmod_f1_ue_data(rrc_ue_id, &cu_ue_data);
   LOG_I(RRC, "Assign CU UE ID %d and DU UE ID %d to UE RNTI %04x\n", rrc_ue_id, du_ue_id, ue_context_p->ue_context.rnti);
 
   // configure MAC and RLC
