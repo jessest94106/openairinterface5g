@@ -37,6 +37,15 @@ static f1_ue_data_t *get_hashtable_data(hash_table_t *ht, uint64_t ue_id)
   return data;
 }
 
+static bool add_hashtable_data(hash_table_t *ht, uint64_t ue_id, const f1_ue_data_t *data)
+{
+  f1_ue_data_t *idata = malloc(sizeof(*idata));
+  AssertFatal(idata, "cannot allocate memory\n");
+  *idata = *data;
+  hashtable_rc_t ret = hashtable_insert(ht, ue_id, idata);
+  return ret == HASH_TABLE_OK;
+}
+
 /* we have separate versions for CU and DU, as both CU&DU might coexist in the
  * same process */
 static hash_table_t *cu2du_ue_mapping;
@@ -60,12 +69,9 @@ bool cu_add_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
     pthread_mutex_unlock(&cu2du_mutex);
     return false;
   }
-  f1_ue_data_t *idata = malloc(sizeof(*idata));
-  AssertFatal(idata, "cannot allocate memory\n");
-  *idata = *data;
-  hashtable_rc_t ret = hashtable_insert(cu2du_ue_mapping, key, idata);
+  bool ret = add_hashtable_data(cu2du_ue_mapping, key, data);
   pthread_mutex_unlock(&cu2du_mutex);
-  return ret == HASH_TABLE_OK;
+  return ret;
 }
 
 bool cu_exists_f1_ue_data(uint32_t ue_id)
@@ -119,12 +125,9 @@ bool du_add_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
     pthread_mutex_unlock(&du2cu_mutex);
     return false;
   }
-  f1_ue_data_t *idata = malloc(sizeof(*idata));
-  AssertFatal(idata, "cannot allocate memory\n");
-  *idata = *data;
-  hashtable_rc_t ret = hashtable_insert(du2cu_ue_mapping, key, idata);
+  bool ret = add_hashtable_data(du2cu_ue_mapping, key, data);
   pthread_mutex_unlock(&du2cu_mutex);
-  return ret == HASH_TABLE_OK;
+  return ret;
 }
 
 bool du_exists_f1_ue_data(uint32_t ue_id)
