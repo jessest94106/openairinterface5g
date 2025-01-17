@@ -2258,8 +2258,8 @@ void oai_subframe_ind(uint16_t sfn, uint16_t sf) {
   }
 }
 
-#define SLOT_DURATION 300  // in microseconds
-static void maybe_slow_down_pnf(void)
+#define SLOT_DURATION 800 // in microseconds
+static void maybe_slow_down_pnf(int mu)
 {
   /* uses a usleep to wait for approximately the same time period (300 us) */
   static struct timespec last_execution = {0};
@@ -2268,41 +2268,43 @@ static void maybe_slow_down_pnf(void)
   // Calculate elapsed time since last execution
   long elapsed_time = (current_execution.tv_sec - last_execution.tv_sec) * 1000000; // Convert seconds to microseconds
   elapsed_time += (current_execution.tv_nsec - last_execution.tv_nsec) / 1000; // Convert nanoseconds to microseconds
-  if (elapsed_time < SLOT_DURATION)
-    usleep(SLOT_DURATION - elapsed_time);
+  int duration = SLOT_DURATION >> mu;
+  if (elapsed_time < duration)
+    usleep(duration - elapsed_time);
   // Update last_execution time
   last_execution = current_execution;
 }
 
 void handle_nr_slot_ind(uint16_t sfn, uint16_t slot)
 {
+  nfapi_pnf_p7_config_t *config = p7_config_g;
+  pnf_p7_t *_this = (pnf_p7_t *)(config);
+  int mu = _this->mu;
+
   if (IS_SOFTMODEM_RFSIM) {
     // RFsim can run faster than realtime. However, we need to give the VNF
     // some time to send an answer, so the PNF can run faster than realtime,
     // but it should not too much. This function will "maybe" slow down, up to
-    // a slot length of SLOT_DURATION us
-    maybe_slow_down_pnf();
+    // a slot length
+    maybe_slow_down_pnf(mu);
   }
-    
-  nfapi_pnf_p7_config_t* config = p7_config_g;
-	pnf_p7_t* _this = (pnf_p7_t*)(config);
+
     //send VNF slot indication, which is aligned with TX thread, so that it can call the scheduler
     //we give four additional slots (2ms) which should be enough time for the VNF to
     //answer
-    int slot_ahead = 4;
-    int mu = _this->mu;
-    uint16_t sfn_tx = sfn;
-    uint16_t slot_tx = slot;
-    sfnslot_add_slot(mu, &sfn_tx, &slot_tx, slot_ahead); // modify: do in place
+  int slot_ahead = 2 << mu;
+  uint16_t sfn_tx = sfn;
+  uint16_t slot_tx = slot;
+  sfnslot_add_slot(mu, &sfn_tx, &slot_tx, slot_ahead); // modify: do in place
 
-    //printf("send slot indication for sfn/slot:%4d.%2d current:%4d.%2d\n", sfn_tx, slot_tx, sfn, slot);
-    nfapi_nr_slot_indication_scf_t ind = { .sfn = sfn_tx, .slot = slot_tx };
-    oai_nfapi_nr_slot_indication(&ind);
+  // printf("send slot indication for sfn/slot:%4d.%2d current:%4d.%2d\n", sfn_tx, slot_tx, sfn, slot);
+  nfapi_nr_slot_indication_scf_t ind = {.sfn = sfn_tx, .slot = slot_tx};
+  oai_nfapi_nr_slot_indication(&ind);
 
-    //copy data from appropriate p7 slot buffers into channel structures for PHY processing
-    nfapi_pnf_p7_slot_ind(config, config->phy_id, sfn, slot); 
+  // copy data from appropriate p7 slot buffers into channel structures for PHY processing
+  nfapi_pnf_p7_slot_ind(config, config->phy_id, sfn, slot);
 
-    return;
+  return;
 }
 
 int oai_nfapi_rach_ind(nfapi_rach_indication_t *rach_ind) {
