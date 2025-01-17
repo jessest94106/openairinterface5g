@@ -766,6 +766,10 @@ static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
       .gNB_cu_cp_ue_id = ue_p->rrc_ue_id,
       .gNB_cu_up_ue_id = ue_p->rrc_ue_id,
   };
+  // Quit re-establishment notification if no CU-UP is associated
+  if (!is_cuup_associated(rrc)) {
+    return;
+  }
   if (!ue_associated_to_cuup(rrc, ue_p))
     return;
   /* loop through active DRBs */
@@ -1900,6 +1904,11 @@ static void f1u_ul_gtp_update(f1u_tunnel_t *f1u, const up_params_t *p)
  * E1 to the CU of this UE. Also updates TEID info internally */
 static void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb_to_be_setup_t *drbs)
 {
+  // Quit bearer updates if no CU-UP is associated
+  if (!is_cuup_associated(rrc)) {
+    return;
+  }
+
   // we assume the same UE ID in CU-UP and CU-CP
   e1ap_bearer_mod_req_t req = {
     .gNB_cu_cp_ue_id = UE->rrc_ue_id,
