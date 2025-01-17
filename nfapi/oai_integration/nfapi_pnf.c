@@ -1702,6 +1702,9 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
     p7_config->timing_info_mode_aperiodic = 1;
   }
 
+	pnf_p7_t* pnf_p7 = (pnf_p7_t*)(p7_config);
+  pnf_p7->mu = 1; /* TODO */
+
   // NR
   p7_config->dl_tti_req_fn = &pnf_phy_dl_tti_req;
   p7_config->ul_tti_req_fn = &pnf_phy_ul_tti_req;
@@ -2281,20 +2284,23 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot)
     maybe_slow_down_pnf();
   }
     
+  nfapi_pnf_p7_config_t* config = p7_config_g;
+	pnf_p7_t* _this = (pnf_p7_t*)(config);
     //send VNF slot indication, which is aligned with TX thread, so that it can call the scheduler
     //we give four additional slots (2ms) which should be enough time for the VNF to
     //answer
     int slot_ahead = 4;
-    uint32_t sfn_slot_tx = sfnslot_add_slot(sfn, slot, slot_ahead);
-    uint16_t sfn_tx = NFAPI_SFNSLOT2SFN(sfn_slot_tx);
-    uint8_t slot_tx = NFAPI_SFNSLOT2SLOT(sfn_slot_tx);
+    int mu = _this->mu;
+    uint16_t sfn_tx = sfn;
+    uint16_t slot_tx = slot;
+    sfnslot_add_slot(mu, &sfn_tx, &slot_tx, slot_ahead); // modify: do in place
 
-    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "send slot indication for sfn/slot:%4d.%2d current:%4d.%2d\n", sfn_tx, slot_tx, sfn, slot);
+    //printf("send slot indication for sfn/slot:%4d.%2d current:%4d.%2d\n", sfn_tx, slot_tx, sfn, slot);
     nfapi_nr_slot_indication_scf_t ind = { .sfn = sfn_tx, .slot = slot_tx };
     oai_nfapi_nr_slot_indication(&ind);
 
     //copy data from appropriate p7 slot buffers into channel structures for PHY processing
-    nfapi_pnf_p7_slot_ind(p7_config_g, p7_config_g->phy_id, sfn, slot); 
+    nfapi_pnf_p7_slot_ind(config, config->phy_id, sfn, slot); 
 
     return;
 }

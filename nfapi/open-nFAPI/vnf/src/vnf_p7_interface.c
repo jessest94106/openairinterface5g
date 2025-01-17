@@ -558,6 +558,7 @@ int nfapi_vnf_p7_add_pnf(nfapi_vnf_p7_config_t* config, const char* pnf_p7_addr,
 	node->sfn = 0;
     node->slot = 0;
 	node->min_sync_cycle_count = 8;
+  node->mu = 1; /* TODO */
 
 	// save the remote endpoint information
 	node->remote_addr.sin_family = AF_INET;

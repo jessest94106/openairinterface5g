@@ -114,6 +114,7 @@ typedef struct {
 	
 	uint16_t sfn;
 	uint16_t slot;
+  int mu;
 	uint16_t sfn_slot;
 	uint32_t slot_start_time_hr;
 	int32_t slot_shift;

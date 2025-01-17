@@ -36,9 +36,9 @@
 
 extern int sf_ahead;
 
-void add_slot(uint16_t *frameP, uint16_t *slotP, int offset)
+static void add_slot(int mu, uint16_t *frameP, uint16_t *slotP, int offset)
 {
-	uint16_t num_slots = 20; // set based on numerlogy (fixing for 1)
+	uint16_t num_slots = NFAPI_SLOTNUM(mu);
 
     *frameP    = (*frameP + ((*slotP + offset) / num_slots))%1024; 
 
@@ -61,18 +61,12 @@ void subtract_sf(uint16_t *frameP, uint16_t *subframeP, int offset)
   *subframeP = (*subframeP+10-offset)%10;
 }
 
-uint32_t sfnslot_add_slot(uint16_t sfn, uint16_t slot, int offset)
+void sfnslot_add_slot(int mu, uint16_t *sfn, uint16_t *slot, int offset)
 {
-  uint32_t new_sfnslot;
-
   //printf("%s() sfn:%u sf:%u\n", __FUNCTION__, sfn, sf);
-  add_slot(&sfn, &slot, offset);
-
-  new_sfnslot = sfn<<6|slot;
+  add_slot(mu, sfn, slot, offset);
 
   //printf("%s() sfn:%u sf:%u offset:%d sfnsf:%d(DEC:%d) new:%d(DEC:%d)\n", __FUNCTION__, sfn, sf, offset, sfnsf, NFAPI_SFNSF2DEC(sfnsf), new_sfnsf, NFAPI_SFNSF2DEC(new_sfnsf));
-
-  return new_sfnslot;
 }
 
 uint16_t sfnsf_add_sf(uint16_t sfnsf, int offset)
@@ -786,8 +780,8 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 	pnf_p7->sfn = sfn;
 	pnf_p7->slot = slot;
 
-	uint32_t tx_slot_dec = NFAPI_SFNSLOT2DEC(sfn,slot);
-	uint8_t buffer_index_tx = tx_slot_dec % 20;
+	uint32_t tx_slot_dec = NFAPI_SFNSLOT2DEC(pnf_p7->mu, sfn,slot);
+	uint8_t buffer_index_tx = tx_slot_dec % NFAPI_SLOTNUM(pnf_p7->mu);
 
 	// If the subframe_buffer has been configured
 	if(pnf_p7->_public.slot_buffer_size!= 0) // for now value is same as sf_buffer_size
@@ -800,9 +794,9 @@ int pnf_p7_slot_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn, uint16_t sl
 
 			// adjust for wrap-around
 			if(shifted_slot < 0)
-				shifted_slot += NFAPI_MAX_SFNSLOTDEC;
-			else if(shifted_slot > NFAPI_MAX_SFNSLOTDEC)
-				shifted_slot -= NFAPI_MAX_SFNSLOTDEC;
+				shifted_slot += NFAPI_MAX_SFNSLOTDEC(pnf_p7->mu);
+			else if(shifted_slot > NFAPI_MAX_SFNSLOTDEC(pnf_p7->mu))
+				shifted_slot -= NFAPI_MAX_SFNSLOTDEC(pnf_p7->mu);
 
 	//		NFAPI_TRACE(NFAPI_TRACE_INFO, "Applying shift %d to sfn/slot (%d -> %d)\n", pnf_p7->sfn_slot_shift, NFAPI_SFNSF2DEC(sfn_slot), shifted_sfn_slot);
 			slot = shifted_slot;
@@ -1187,12 +1181,12 @@ int pnf_p7_subframe_ind(pnf_p7_t* pnf_p7, uint16_t phy_id, uint16_t sfn_sf)
 
 bool is_nr_p7_request_in_window(const uint16_t sfn, const uint16_t slot, const char* name, const pnf_p7_t* phy)
 {
-  const uint32_t recv = NFAPI_SFNSLOT2DEC(sfn, slot); // unpack sfn/slot
-  const uint32_t curr = NFAPI_SFNSLOT2DEC(phy->sfn, phy->slot);
-  const uint8_t timing_window = phy->_public.slot_buffer_size;
+  const uint32_t recv = NFAPI_SFNSLOT2DEC(phy->mu, sfn, slot); // unpack sfn/slot
+  const uint32_t curr = NFAPI_SFNSLOT2DEC(phy->mu, phy->sfn, phy->slot);
+  const uint8_t timing_window = phy->_public.slot_buffer_size; // TODO check
   uint32_t diff = curr < recv ? recv - curr : curr - recv;
-  if (diff > NFAPI_MAX_SFNSLOTDEC / 2)
-    diff = NFAPI_MAX_SFNSLOTDEC - diff;
+  if (diff > NFAPI_MAX_SFNSLOTDEC(phy->mu) / 2)
+    diff = NFAPI_MAX_SFNSLOTDEC(phy->mu) - diff;
   if (diff > timing_window) {
     NFAPI_TRACE(NFAPI_TRACE_WARN, "[%d] %s is out of window %d (delta:%d) [max:%d]\n", curr, name, recv, diff, timing_window);
     return false;
@@ -1289,8 +1283,8 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
     }
     if (check_nr_nfapi_p7_slot_type(frame, slot, "DL_TTI.request", NR_DOWNLINK_SLOT)
         && is_nr_p7_request_in_window(frame, slot, "dl_tti_request", pnf_p7)) {
-      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(frame, slot);
-      uint8_t buffer_index = sfn_slot_dec % 20;
+      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(pnf_p7->mu, frame, slot);
+      uint8_t buffer_index = sfn_slot_dec % NFAPI_SLOTNUM(pnf_p7->mu);
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_dl_tti_request_t *req = &pnf_p7->slot_buffer[buffer_index].dl_tti_req;
@@ -1422,8 +1416,8 @@ void pnf_handle_ul_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
 
     if (check_nr_nfapi_p7_slot_type(frame, slot, "UL_TTI.request", NR_UPLINK_SLOT)
         && is_nr_p7_request_in_window(frame, slot, "ul_tti_request", pnf_p7)) {
-      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(frame, slot);
-      uint8_t buffer_index = (sfn_slot_dec % 20);
+      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(pnf_p7->mu, frame, slot);
+      uint8_t buffer_index = sfn_slot_dec % NFAPI_SLOTNUM(pnf_p7->mu);
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_ul_tti_request_t* req = &pnf_p7->slot_buffer[buffer_index].ul_tti_req;
@@ -1541,8 +1535,8 @@ void pnf_handle_ul_dci_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
     }
     if (check_nr_nfapi_p7_slot_type(frame, slot, "UL_DCI.request", NR_DOWNLINK_SLOT)
         && is_nr_p7_request_in_window(frame, slot, "ul_dci_request", pnf_p7)) {
-      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(frame, slot);
-      uint8_t buffer_index = sfn_slot_dec % 20;
+      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(pnf_p7->mu, frame, slot);
+      uint8_t buffer_index = sfn_slot_dec % NFAPI_SLOTNUM(pnf_p7->mu);
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_ul_dci_request_t *req = &pnf_p7->slot_buffer[buffer_index].ul_dci_req;
@@ -1654,8 +1648,8 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
     }
     if (check_nr_nfapi_p7_slot_type(frame, slot, "TX_DATA.REQUEST", NR_DOWNLINK_SLOT)
         && is_nr_p7_request_in_window(frame, slot, "tx_request", pnf_p7)) {
-      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(frame, slot);
-      uint8_t buffer_index = sfn_slot_dec % 20;
+      uint32_t sfn_slot_dec = NFAPI_SFNSLOT2DEC(pnf_p7->mu, frame, slot);
+      uint8_t buffer_index = sfn_slot_dec % NFAPI_SLOTNUM(pnf_p7->mu); // TODO where is buffer length?
       pnf_p7->slot_buffer[buffer_index].sfn = frame;
       pnf_p7->slot_buffer[buffer_index].slot = slot;
       nfapi_nr_tx_data_request_t *req = &pnf_p7->slot_buffer[buffer_index].tx_data_req;
@@ -1957,10 +1951,10 @@ uint32_t calculate_t2(uint32_t now_time_hr, uint16_t sfn_sf, uint32_t sf_start_t
 	return t2;
 }
 
-uint32_t calculate_nr_t2(uint32_t now_time_hr, uint16_t sfn,uint16_t slot, uint32_t slot_start_time_hr)
+static uint32_t calculate_nr_t2(uint32_t now_time_hr, int mu, uint16_t sfn,uint16_t slot, uint32_t slot_start_time_hr)
 {
 	uint32_t slot_time_us = get_slot_time(now_time_hr, slot_start_time_hr);
-	uint32_t t2 = (NFAPI_SFNSLOT2DEC(sfn, slot) * 500) + slot_time_us;
+	uint32_t t2 = NFAPI_SFNSLOT2DEC(mu, sfn, slot) * NFAPI_SLOTLEN(mu) + slot_time_us;
 	
         if (0)
         {
@@ -1990,13 +1984,13 @@ uint32_t calculate_t3(uint16_t sfn_sf, uint32_t sf_start_time_hr)
 	return t3;
 }
 
-uint32_t calculate_nr_t3(uint16_t sfn, uint16_t slot, uint32_t slot_start_time_hr)
+static uint32_t calculate_nr_t3(int mu, uint16_t sfn, uint16_t slot, uint32_t slot_start_time_hr)
 {
 	uint32_t now_time_hr = pnf_get_current_time_hr();
 
 	uint32_t slot_time_us = get_slot_time(now_time_hr, slot_start_time_hr);
 
-	uint32_t t3 = (NFAPI_SFNSLOT2DEC(sfn, slot) * 500) + slot_time_us;
+	uint32_t t3 = NFAPI_SFNSLOT2DEC(mu, sfn, slot) * NFAPI_SLOTLEN(mu) + slot_time_us;
 	
 	return t3;
 }
@@ -2092,8 +2086,8 @@ void pnf_nr_handle_dl_node_sync(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 	ul_node_sync.header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_NODE_SYNC;
 	ul_node_sync.header.phy_id = dl_node_sync.header.phy_id;
 	ul_node_sync.t1 = dl_node_sync.t1;
-	ul_node_sync.t2 = calculate_nr_t2(rx_hr_time, pnf_p7->sfn,pnf_p7->slot, pnf_p7->slot_start_time_hr);
-	ul_node_sync.t3 = calculate_nr_t3(pnf_p7->sfn,pnf_p7->slot, pnf_p7->slot_start_time_hr);
+	ul_node_sync.t2 = calculate_nr_t2(rx_hr_time, pnf_p7->mu, pnf_p7->sfn,pnf_p7->slot, pnf_p7->slot_start_time_hr);
+	ul_node_sync.t3 = calculate_nr_t3(pnf_p7->mu, pnf_p7->sfn,pnf_p7->slot, pnf_p7->slot_start_time_hr);
 
 	if(pthread_mutex_unlock(&(pnf_p7->mutex)) != 0)
 	{

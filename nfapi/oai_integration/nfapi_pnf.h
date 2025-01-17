@@ -29,7 +29,7 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
 
 void oai_subframe_ind(uint16_t sfn, uint16_t sf);
 void handle_nr_slot_ind(uint16_t sfn, uint16_t slot);
-uint32_t sfnslot_add_slot(uint16_t sfn, uint16_t slot, int offset);
+void sfnslot_add_slot(int mu, uint16_t *sfn, uint16_t *slot, int offset);
 
 int oai_nfapi_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind);
 int oai_nfapi_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind);

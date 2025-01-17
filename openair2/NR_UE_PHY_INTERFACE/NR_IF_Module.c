@@ -1043,11 +1043,13 @@ void *nrue_standalone_pnf_task(void *context)
       // TODO: Update sinr field of slot_rnti_mcs to be array.
       for (int i = 0; i < ch_info->nb_of_csi; ++i)
       {
-        slot_rnti_mcs[NFAPI_SFNSLOT2SLOT(ch_info->sfn_slot)].sinr = ch_info->csi[i].sinr;
-        slot_rnti_mcs[NFAPI_SFNSLOT2SLOT(ch_info->sfn_slot)].area_code = ch_info->csi[i].area_code;
+        int mu = 1; // NR-UE emul-L1 is hardcoded to 30kHZ, see check_and_process_dci()
+        int frame = NFAPI_SFNSLOTDEC2SFN(mu, ch_info->sfn_slot);
+        int slot = NFAPI_SFNSLOTDEC2SLOT(mu, ch_info->sfn_slot);
+        slot_rnti_mcs[slot].sinr = ch_info->csi[i].sinr;
+        slot_rnti_mcs[slot].area_code = ch_info->csi[i].area_code;
 
-        LOG_D(NR_PHY, "Received_SINR[%d] = %f, sfn:slot %d:%d\n",
-              i, ch_info->csi[i].sinr, NFAPI_SFNSLOT2SFN(ch_info->sfn_slot), NFAPI_SFNSLOT2SLOT(ch_info->sfn_slot));
+        LOG_D(NR_PHY, "Received_SINR[%d] = %f, sfn:slot %d:%d\n", i, ch_info->csi[i].sinr, frame, slot);
       }
 
       if (!put_queue(&nr_chan_param_queue, ch_info))
