@@ -87,7 +87,7 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
                               NR_CellGroupConfig_t *cell_group_config,
                               NR_UE_NR_Capability_t *ue_Capability);
 
-void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mibP, int sched_sib1);
+void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mibP, int sched_sib1, bool barred);
 
 void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1, bool can_start_ra);
 

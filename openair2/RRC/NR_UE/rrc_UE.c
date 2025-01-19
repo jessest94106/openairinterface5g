@@ -749,6 +749,7 @@ NR_UE_RRC_INST_t* nr_rrc_init_ue(char* uecap_file, int nb_inst, int num_ant_tx)
     rrc->reconfig_after_reestab = false;
     /* 5G-S-TMSI */
     rrc->fiveG_S_TMSI = UINT64_MAX;
+    rrc->access_barred = false;
 
     FILE *f = NULL;
     if (uecap_file)
@@ -959,11 +960,12 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
   }
 
   NR_UE_RRC_SI_INFO *SI_info = &rrc->perNB[gNB_index].SInfo;
+  bool barred = rrc->access_barred || bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_barred;
   int get_sib = 0;
   if (IS_SA_MODE(get_softmodem_params())
       && !SI_info->sib_pending
       && bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib
-      && bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_notBarred
+      && !barred
       && rrc->nrRrcState != RRC_STATE_DETACH_NR) {
     // to schedule MAC to get SI if required
     get_sib = check_si_status(SI_info);
@@ -975,6 +977,7 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
     // mac will manage the pointer
     NR_MAC_RRC_CONFIG_MIB(msg).bcch = bcch_message;
     NR_MAC_RRC_CONFIG_MIB(msg).get_sib = get_sib;
+    NR_MAC_RRC_CONFIG_MIB(msg).access_barred = barred;
     itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
   } else {
     LOG_E(NR_RRC, "RRC-received BCCH message is not a MIB\n");
@@ -1376,7 +1379,11 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
   nr_timer_stop(&timers->T319);
   nr_timer_stop(&timers->T320);
 
-  // TODO if T390 and T302 are running (not implemented)
+  // if T390 (not implemented) and T302 are running
+  // stop timer
+  // perform the actions as specified in 5.3.14.4
+  nr_timer_stop(&timers->T302);
+  handle_302_expired_stopped(rrc);
 
   // if the RRCSetup is received in response to an RRCResumeRequest, RRCResumeRequest1 or RRCSetupRequest
   // enter RRC_CONNECTED
@@ -1417,6 +1424,7 @@ static void nr_rrc_process_rrcreject(NR_UE_RRC_INST_t *rrc, const NR_RRCReject_t
   if (waitTime) {
     nr_timer_setup(&timers->T302, *waitTime * 1000, 10);
     nr_timer_start(&timers->T302);
+    rrc->access_barred = true;
   } else {
     LOG_W(RRC, "Error: waitTime should be always included in RRCReject message\n");
   }
@@ -1458,7 +1466,7 @@ static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc, const NRRrcMacCcchDat
          break;
 
        case NR_DL_CCCH_MessageType__c1_PR_rrcReject:
-         LOG_I(NR_RRC, "[UE%ld] Logical Channel DL-CCCH (SRB0), Received RRCReject \n", rrc->ue_id);
+         LOG_W(NR_RRC, "[UE%ld] Logical Channel DL-CCCH (SRB0), Received RRCReject \n", rrc->ue_id);
          nr_rrc_process_rrcreject(rrc, dl_ccch_msg->message.choice.c1->choice.rrcReject);
          rval = 0;
          break;
@@ -2777,17 +2785,16 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
         nr_timer_setup(&tac->T302, target, 10);
         nr_timer_start(&tac->T302);
         // TODO inform upper layers that access barring is applicable
-        // for all access categories except categories '0' and '2'.
-        LOG_E(NR_RRC,"Go to IDLE. Handling RRCRelease message including a waitTime not implemented\n");
+        //      for all access categories except categories '0' and '2'.
+        // for now we just set the access barred in RRC
+        rrc->access_barred = true;
       }
     }
   }
   if (!waitTime) {
     if (nr_timer_is_active(&tac->T302)) {
       nr_timer_stop(&tac->T302);
-      // TODO barring alleviation as in 5.3.14.4
-      // not implemented
-      LOG_E(NR_RRC,"Go to IDLE. Barring alleviation not implemented\n");
+      handle_302_expired_stopped(rrc);
     }
   }
   if (nr_timer_is_active(&tac->T390)) {
@@ -2895,6 +2902,13 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NR_NAS_CONN_RELEASE_IND);
   NR_NAS_CONN_RELEASE_IND(msg_p).cause = release_cause;
   itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, msg_p);
+}
+
+void handle_302_expired_stopped(NR_UE_RRC_INST_t *rrc)
+{
+  // for each Access Category for which T390 (TODO not implemented) is not running
+  // consider the barring for this Access Category to be alleviated
+  rrc->access_barred = false;
 }
 
 void handle_t300_expiry(NR_UE_RRC_INST_t *rrc)

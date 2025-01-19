@@ -955,7 +955,7 @@ static void update_mib_conf(NR_MIB_t *target, NR_MIB_t *source)
   target->intraFreqReselection = source->intraFreqReselection;
 }
 
-void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mib, int sched_sib)
+void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mib, int sched_sib, bool barred)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -963,6 +963,13 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mib,
   AssertFatal(mib, "MIB should not be NULL\n");
   if (!mac->mib)
     mac->mib = calloc(1, sizeof(*mac->mib));
+  if (barred)
+    mac->state = UE_BARRED;
+  else if (mac->state == UE_BARRED) {
+    // it is synched as we received MIB
+    // nr_ue_decode_mib is transitionining to the correct state
+    mac->state = UE_NOT_SYNC;
+  }
   update_mib_conf(mac->mib, mib);
   mac->phy_config.Mod_id = module_id;
   mac->phy_config.CC_id = cc_idP;
