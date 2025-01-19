@@ -268,9 +268,6 @@ unsigned short get_N_b_srs(int c_srs, int b_srs);
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
 
-// Align up to a multiple of 16
-#define ALIGN_UP_16(a) ((a + 15) & ~15)
-
 static const char *const duplex_mode_txt[] = {"FDD", "TDD"};
 
 #ifdef __cplusplus
