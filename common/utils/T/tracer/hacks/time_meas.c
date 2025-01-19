@@ -104,6 +104,7 @@ printf("yo %d\n", on_off);
     }
     if (on_off != 0) { printf("fatal!\n"); abort(); }
     if (!start_valid) continue;
+    start_valid = 0;
     stop_time = e.sending_time;
     delta_time = time_sub(stop_time, start_time);
     fprintf(stderr, "%ld\n",
