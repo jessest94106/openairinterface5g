@@ -647,8 +647,9 @@ int fill_srs_channel_matrix(uint8_t *channel_matrix,
                             const uint16_t prg_size,
                             const uint16_t num_prgs,
                             const NR_DL_FRAME_PARMS *frame_parms,
-                            const int32_t srs_estimated_channel_freq[][1<<srs_pdu->num_ant_ports][frame_parms->ofdm_symbol_size*(1<<srs_pdu->num_symbols)]) {
-
+                            const c16_t srs_estimated_channel_freq[][1 << srs_pdu->num_ant_ports]
+                                                                  [frame_parms->ofdm_symbol_size * (1 << srs_pdu->num_symbols)])
+{
   const uint64_t subcarrier_offset = frame_parms->first_carrier_offset + srs_pdu->bwp_start*NR_NB_SC_PER_RB;
   const uint16_t step = prg_size*NR_NB_SC_PER_RB;
 
@@ -664,8 +665,7 @@ int fill_srs_channel_matrix(uint8_t *channel_matrix,
       }
 
       for(int pI = 0; pI < num_prgs; pI++) {
-
-        c16_t *srs_estimated_channel16 = (c16_t *)&srs_estimated_channel_freq[gI][uI][subcarrier];
+        const c16_t *srs_estimated_channel16 = srs_estimated_channel_freq[gI][uI] + subcarrier;
         uint16_t index = uI*num_gnb_antenna_elements*num_prgs + gI*num_prgs + pI;
 
         if (normalized_iq_representation == 0) {

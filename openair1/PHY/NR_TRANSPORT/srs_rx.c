@@ -88,7 +88,7 @@ int nr_get_srs_signal(PHY_VARS_gNB *gNB,
   const uint8_t K_TC = 2 << srs_pdu->comb_size;
   const uint16_t M_sc_b_SRS = get_m_srs(srs_pdu->config_index, srs_pdu->bandwidth_index) * NR_NB_SC_PER_RB / K_TC;
 
-  int32_t *rx_signal;
+  c16_t *rx_signal;
   bool no_srs_signal = true;
   for (int ant = 0; ant < frame_parms->nb_antennas_rx; ant++) {
 
@@ -117,7 +117,7 @@ int nr_get_srs_signal(PHY_VARS_gNB *gNB,
 
           srs_received_signal[ant][l_line_offset+subcarrier] = rx_signal[l_line_offset+subcarrier];
 
-          if (rx_signal[l_line_offset+subcarrier] != 0) {
+          if (rx_signal[l_line_offset + subcarrier].r || rx_signal[l_line_offset + subcarrier].i) {
             no_srs_signal = false;
           }
 
