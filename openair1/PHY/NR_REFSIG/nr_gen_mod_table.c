@@ -21,7 +21,7 @@
 
 #include "nr_refsig.h"
 #include "nr_mod_table.h"
-short nr_qpsk_mod_table[8];
+c16_t nr_qpsk_mod_table[4];
 
 int32_t nr_16qam_mod_table[16];
 simde__m128i nr_qpsk_byte_mod_table[2048];
@@ -43,8 +43,8 @@ void nr_generate_modulation_table() {
 
   // QPSK
   for (i=0; i<4; i++) {
-    nr_qpsk_mod_table[i*2]   = (short)(1-2*(i&1))*val*sqrt2*sqrt2;
-    nr_qpsk_mod_table[i*2+1] = (short)(1-2*((i>>1)&1))*val*sqrt2*sqrt2;
+    nr_qpsk_mod_table[i].r = (short)(1 - 2 * (i & 1)) * val * sqrt2 * sqrt2;
+    nr_qpsk_mod_table[i].i = (short)(1 - 2 * ((i >> 1) & 1)) * val * sqrt2 * sqrt2;
     //printf("%d j%d\n",nr_qpsk_mod_table[i*2],nr_qpsk_mod_table[i*2+1]);
   }
 
