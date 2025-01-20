@@ -161,7 +161,7 @@ static void e1ap_setup_failure(sctp_assoc_t assoc_id, uint64_t transac_id, e1ap_
 /**
  * @brief E1AP Setup Request processing on CU-CP
 */
-int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, e1ap_setup_req_t *req)
+int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, const e1ap_setup_req_t *req)
 {
   AssertFatal(req->supported_plmns <= PLMN_LIST_MAX_SIZE, "Supported PLMNs is more than PLMN_LIST_MAX_SIZE\n");
   gNB_RRC_INST *rrc = RC.nrrrc[0];
@@ -184,7 +184,7 @@ int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, e1ap_setup_req_t *req)
   }
 
   for (int i = 0; i < req->supported_plmns; i++) {
-    PLMN_ID_t *id = &req->plmn[i].id;
+    const PLMN_ID_t *id = &req->plmn[i].id;
     if (rrc->configuration.mcc[i] != id->mcc || rrc->configuration.mnc[i] != id->mnc) {
       LOG_E(NR_RRC,
             "PLMNs received from CUUP (mcc:%d, mnc:%d) did not match with PLMNs in RRC (mcc:%d, mnc:%d)\n",
@@ -199,9 +199,8 @@ int rrc_gNB_process_e1_setup_req(sctp_assoc_t assoc_id, e1ap_setup_req_t *req)
   }
 
   LOG_I(NR_RRC, "Accepting new CU-UP ID %ld name %s (assoc_id %d)\n", req->gNB_cu_up_id, req->gNB_cu_up_name, assoc_id);
-  nr_rrc_cuup_container_t *cuup = malloc(sizeof(*cuup));
-  AssertFatal(cuup, "out of memory\n");
-  cuup->setup_req = malloc(sizeof(*cuup->setup_req));
+  nr_rrc_cuup_container_t *cuup = malloc_or_fail(sizeof(*cuup));
+  cuup->setup_req = malloc_or_fail(sizeof(*cuup->setup_req));
   *cuup->setup_req = cp_e1ap_cuup_setup_request(req);
   cuup->assoc_id = assoc_id;
   RB_INSERT(rrc_cuup_tree, &rrc->cuups, cuup);
