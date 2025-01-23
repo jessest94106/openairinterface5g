@@ -260,7 +260,6 @@ endif()
 
 # Debug related options
 #########################################
-add_boolean_option(DEBUG_ASN1 False "Enable ASN1 debug logs" OFF)
 # asn1c skeletons have hardcoded this flag to make customized debug logs
 # OAI uses this feature to re-use OAI LOG_I(ASN1, ...)
 # see common/utils/config.h
@@ -505,7 +504,7 @@ add_boolean_option(ENABLE_VCD_FIFO         False  "time measurements of proc cal
 ##########################
 # PHY options
 ##########################
-add_integer_option(MAX_NUM_CCs             1     "????" ON)
+add_integer_option(MAX_NUM_CCs             1     "Carrier component data arrays size (oai doesn't support carrier aggreagtion for now)" ON)
 add_boolean_option(SMBV                    False "Rohde&Schwarz SMBV100A vector signal generator" ON)
 add_boolean_option(DEBUG_PHY               False "Enable PHY layer debugging options" ON)
 add_boolean_option(DEBUG_PHY_PROC          False "Enable debugging of PHY layer procedures" ON)
@@ -513,10 +512,7 @@ add_boolean_option(DEBUG_PHY_PROC          False "Enable debugging of PHY layer 
 ##########################
 # NAS LAYER OPTIONS
 ##########################
-add_boolean_option(ENABLE_NAS_UE_LOGGING   True  "????" ON)
 add_boolean_option(NAS_BUILT_IN_UE         True  "UE NAS layer present in this executable" ON)
-add_boolean_option(NAS_UE                  True  "NAS UE INSTANCE (<> NAS_MME)" ON)
-
 
 ##########################
 # RRC LAYER OPTIONS
