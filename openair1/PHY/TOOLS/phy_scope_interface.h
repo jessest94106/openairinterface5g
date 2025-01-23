@@ -158,11 +158,13 @@ void copyData(void *, enum scopeDataType type, void *dataIn, int elementSz, int 
     scope_data->unlockScopeData(type); \
   }
 
-#define gNBdumpScopeData(gnb, slot, frame, cause_string) \
-  scopeData_t *scope_data = (scopeData_t *)gnb->scopeData; \
-  if (scope_data && scope_data->dumpScopeData) { \
-    scope_data->dumpScopeData(slot, frame, cause_string); \
-  }
+#define gNBdumpScopeData(gnb, slot, frame, cause_string)          \
+  do {                                                            \
+    scopeData_t *scope_data = (scopeData_t *)gnb->scopeData;      \
+    if (scope_data && scope_data->dumpScopeData) {                \
+      scope_data->dumpScopeData((slot), (frame), (cause_string)); \
+    }                                                             \
+  } while (0)
 
 #define UEScopeHasTryLock(ue) \
   (ue->scopeData && ((scopeData_t *)ue->scopeData)->tryLockScopeData)
@@ -183,11 +185,13 @@ void copyData(void *, enum scopeDataType type, void *dataIn, int elementSz, int 
     scope_data->unlockScopeData(type); \
   }
 
-#define UEdumpScopeData(ue, slot, frame, cause_string) \
-  scopeData_t *scope_data = (scopeData_t *)ue->scopeData; \
-  if (scope_data && scope_data->dumpScopeData) { \
-    scope_data->dumpScopeData(slot, frame, cause_string); \
-  } \
+#define UEdumpScopeData(ue, slot, frame, cause_string)            \
+  do {                                                            \
+    scopeData_t *scope_data = (scopeData_t *)ue->scopeData;       \
+    if (scope_data && scope_data->dumpScopeData) {                \
+      scope_data->dumpScopeData((slot), (frame), (cause_string)); \
+    }                                                             \
+  } while (0)
 
 #ifdef __cplusplus
 extern "C" {
