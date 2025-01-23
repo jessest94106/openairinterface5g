@@ -506,7 +506,6 @@ add_boolean_option(ENABLE_VCD_FIFO         False  "time measurements of proc cal
 ##########################
 # PHY options
 ##########################
-add_boolean_option(LOCALIZATION            False "???" ON)
 add_integer_option(MAX_NUM_CCs             1     "????" ON)
 add_boolean_option(SMBV                    False "Rohde&Schwarz SMBV100A vector signal generator" ON)
 add_boolean_option(DEBUG_PHY               False "Enable PHY layer debugging options" ON)

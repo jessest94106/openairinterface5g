@@ -663,13 +663,7 @@ typedef struct PHY_VARS_eNB_NB_IoT_s {
   time_stats_t                       ulsch_tc_gamma_stats;
   time_stats_t                       ulsch_tc_ext_stats;
   time_stats_t                       ulsch_tc_intl1_stats;
-  time_stats_t                       ulsch_tc_intl2_stats;
-
-#ifdef LOCALIZATION
-  /// time state for localization
-  time_stats_t                       localization_stats;
-#endif
-
+  time_stats_t ulsch_tc_intl2_stats;
   int32_t                                   pucch1_stats_cnt[NUMBER_OF_UE_MAX_NB_IoT][10];
   int32_t                                   pucch1_stats[NUMBER_OF_UE_MAX_NB_IoT][10*1024];
   int32_t                                   pucch1_stats_thres[NUMBER_OF_UE_MAX_NB_IoT][10*1024];

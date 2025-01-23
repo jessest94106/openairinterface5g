@@ -6301,10 +6301,6 @@ rrc_rx_tx_ue(
 )
 //-----------------------------------------------------------------------------
 {
-#ifdef LOCALIZATION
-  double                         estimated_distance;
-  protocol_ctxt_t                ctxt;
-#endif
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_RX_TX,VCD_FUNCTION_IN);
 
   // check timers
