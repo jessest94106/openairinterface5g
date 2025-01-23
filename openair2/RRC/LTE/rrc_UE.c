@@ -241,18 +241,24 @@ static int rrc_set_sub_state( module_id_t ue_mod_idP, Rrc_Sub_State_t subState )
   if (!IS_SOFTMODEM_NOS1) {
     switch (UE_rrc_inst[ue_mod_idP].RrcState) {
       case RRC_STATE_INACTIVE:
-        AssertFatal ((RRC_SUB_STATE_INACTIVE_FIRST <= subState) && (subState <= RRC_SUB_STATE_INACTIVE_LAST),
-                     "Invalid sub state %d for state %d!\n", subState, UE_rrc_inst[ue_mod_idP].RrcState);
+        AssertFatal(RRC_SUB_STATE_INACTIVE <= subState,
+                    "Invalid sub state %d for state %d!\n",
+                    subState,
+                    UE_rrc_inst[ue_mod_idP].RrcState);
         break;
 
       case RRC_STATE_IDLE:
-        AssertFatal ((RRC_SUB_STATE_IDLE_FIRST <= subState) && (subState <= RRC_SUB_STATE_IDLE_LAST),
-                     "Invalid sub state %d for state %d!\n", subState, UE_rrc_inst[ue_mod_idP].RrcState);
+        AssertFatal((RRC_SUB_STATE_IDLE_SEARCHING <= subState) && (subState <= RRC_SUB_STATE_IDLE),
+                    "Invalid sub state %d for state %d!\n",
+                    subState,
+                    UE_rrc_inst[ue_mod_idP].RrcState);
         break;
 
       case RRC_STATE_CONNECTED:
-        AssertFatal ((RRC_SUB_STATE_CONNECTED_FIRST <= subState) && (subState <= RRC_SUB_STATE_CONNECTED_LAST),
-                     "Invalid sub state %d for state %d!\n", subState, UE_rrc_inst[ue_mod_idP].RrcState);
+        AssertFatal(RRC_SUB_STATE_CONNECTED <= subState,
+                    "Invalid sub state %d for state %d!\n",
+                    subState,
+                    UE_rrc_inst[ue_mod_idP].RrcState);
         break;
     }
   }
