@@ -45,17 +45,13 @@
 #include "defs_eNB.h"
 //#include <complex.h>
 #include "assertions.h"
-#ifdef MEX
-  #define msg mexPrintf
-#else
-    #if ENABLE_RAL
-      #include "collection/hashtable/hashtable.h"
-      #include "COMMON/ral_messages_types.h"
-      #include "UTIL/queue.h"
-    #endif
-    #include "common/utils/LOG/log.h"
-    #define msg(aRGS...) LOG_D(PHY, ##aRGS)
+#if ENABLE_RAL
+#include "collection/hashtable/hashtable.h"
+#include "COMMON/ral_messages_types.h"
+#include "UTIL/queue.h"
 #endif
+#include "common/utils/LOG/log.h"
+#define msg(aRGS...) LOG_D(PHY, ##aRGS)
 //use msg in the real-time thread context
 #define msg_nrt printf
 //use msg_nrt in the non real-time context (for initialization, ...)
