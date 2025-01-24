@@ -256,3 +256,146 @@ Message Length = 0xc3
       isInlineTbCrc = 0
       dlTbCrc = 0
 ```
+
+## 7 - A Valid UL_TTI.request
+
+```
+./nfapi/open-nFAPI/utils/nfapi_hex_parser 0x00 0x01 0x00 0x81 0x00 0x00 0x00 0x98 0x02 0xd0 0x00 0x04 0x02 0x00 0x00 0x01 0x00 0x00 0x03 0x00 0x45 0x30 0x39 0x00 0x00 0x00 0x00 0x01 0x11 0x00 0x00 0x01 0x00 0x00 0x00 0x00 0x0c 0x3d 0x00 0x28 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x00 0x50 0x00 0x04 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x10 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x01 0x00 0x01 0x00 0x01 0x01 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x02 0x00 0x38 0x30 0x39 0x00 0x00 0x00 0x00 0x01 0x11 0x00 0x00 0x01 0x00 0x02 0x00 0x00 0x00 0x00 0x00 0x03 0x0d 0x01 0x00 0x00 0x00 0x00 0x00 0x00 0x28 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x07 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+Parsed 150 bytes:
+00 01 00 81 00 00 00 98   02 d0 00 04 02 00 00 01 
+00 00 03 00 45 30 39 00   00 00 00 01 11 00 00 01 
+00 00 00 00 0c 3d 00 28   00 00 00 00 00 00 00 00 
+00 02 00 50 00 04 00 00   00 00 00 00 01 10 00 00 
+00 00 00 00 00 02 01 00   01 00 01 01 00 00 00 00 
+00 00 00 00 00 00 00 02   00 38 30 39 00 00 00 00 
+01 11 00 00 01 00 02 00   00 00 00 00 03 0d 01 00 
+00 00 00 00 00 28 00 00   00 00 00 00 00 00 00 00 
+00 00 00 00 00 07 00 00   00 00 00 00 00 00 00 00 
+00 00 00 00 00 00 
+Decoded message NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST message length 0x98
+Message ID = 0x81
+Message Length = 0x98
+  SFN = 720
+  Slot = 4
+  nPDUs = 2
+  RachPresent = 0
+  nULSCH = 0
+  nULCCH = 1
+  nGroup = 0
+    PDU #0
+    PDUType = 0x03 (NFAPI_NR_UL_CONFIG_SRS_PDU_TYPE)
+    PDUSize = 0x45
+      RNTI = 3039
+      Handle = 0
+      BWPSize = 273
+      BWPStart = 0
+      SubcarrierSpacing = 1
+      CyclicPrefix = 0
+      numAntPorts = 0
+      numSymbols = 0
+      numRepetitions = 0
+      timeStartPosition = 12
+      configIndex = 61
+      sequenceId = 40
+      bandwidthIndex = 0
+      combSize = 0
+      combOffset = 0
+      cyclicShift = 0
+      frequencyPosition = 0
+      frequencyShift = 0
+      frequencyHopping = 0
+      groupOrSequenceHopping = 0
+      resourceType = 2
+      Tsrs = 80
+      Toffset = 4
+        TRP Scheme = 0
+        numPRGs = 0
+        prgSize = 0
+        digBFInterface = 0
+        srsBandwidthSize = 272
+        Symbol #0
+          srsBandwidthStart = 0
+          sequenceGroup = 0
+          sequenceNumber = 0
+        Usage = 2 (nUsage = 1)
+          ReportType[0] = 1
+        singular Value Representation = 0
+        iq Representation = 1
+        prgSize = 1
+        numTotalUeAntennas = 1
+        ueAntennasInThisSrsResourceSet = 0
+        sampledUeAntennas = 0
+        reportScope = 0
+        NumULSpatialStreamsPorts = 0
+    PDU #1
+    PDUType = 0x02 (NFAPI_NR_UL_CONFIG_PUCCH_PDU_TYPE)
+    PDUSize = 0x38
+      RNTI = 3039
+      Handle = 0
+      BWPSize = 273
+      BWPStart = 0
+      SubcarrierSpacing = 1
+      CyclicPrefix = 0
+      FormatType = 2
+      multiSlotTxIndicator = 0
+      pi2Bpsk = 0
+      prbStart = 0
+      prbSize = 3
+      StartSymbolIndex = 13
+      NrOfSymbols = 1
+      freqHopFlag = 0
+      secondHopPRB = 0
+      groupHopFlag = 0
+      sequenceHopFlag = 0
+      hoppingId = 40
+      InitialCyclicShift = 0
+      dataScramblingId = 0
+      TimeDomainOccIdx = 0
+      PreDftOccIdx = 0
+      PreDftOccLen = 0
+      AddDmrsFlag = 0
+      DmrsScramblingId = 0
+      DMRScyclicshift = 0
+      SRFlag = 0
+      BitLenHarq = 0
+      BitLenCsiPart1 = 7
+      BitLenCsiPart2 = 0
+        TRP Scheme = 0
+        numPRGs = 0
+        prgSize = 0
+        digBFInterface = 0
+
+```
+
+## 8 - A valid UL_TTI.request with a PRACH PDU
+
+```
+./nfapi/open-nFAPI/utils/nfapi_hex_parser  0x00 0x01 0x00 0x81 0x00 0x00 0x00 0x2d 0x02 0xd1 0x00 0x13 0x01 0x01 0x00 0x00 0x00 0x00 0x00 0x00 0x12 0x00 0x00 0x03 0x05 0x00 0x00 0x00 0x1b 0x00 0x00 0x00 0x00 0x00 0x01 0x00 0x00 0x08 0x00 0x01 0x0d 0x01 0x00 
+Parsed 43 bytes:
+00 01 00 81 00 00 00 2d   02 d1 00 13 01 01 00 00 
+00 00 00 00 12 00 00 03   05 00 00 00 1b 00 00 00 
+00 00 01 00 00 08 00 01   0d 01 00 
+Decoded message NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST message length 0x2d
+Message ID = 0x81
+Message Length = 0x2d
+  SFN = 721
+  Slot = 19
+  nPDUs = 1
+  RachPresent = 1
+  nULSCH = 0
+  nULCCH = 0
+  nGroup = 0
+    PDU #0
+    PDUType = 0x00 (NFAPI_NR_UL_CONFIG_PRACH_PDU_TYPE)
+    PDUSize = 0x12
+      physCellID = 0
+      NumPrachOcas = 3
+      prachFormat = 5 (A2)
+      numRa = 0
+      prachStartSymbol = 0
+      numCs = 27
+        TRP Scheme = 0
+        numPRGs = 0
+        prgSize = 0
+        digBFInterface = 1
+```
