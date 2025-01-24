@@ -48,6 +48,7 @@ typedef struct alignas(hardware_destructive_interference_size) ImScopeDumpInstru
 } ImScopeDumpInstruction;
 
 std::atomic<ImScopeDumpInstruction> dump_instruction;
+ImScopeDumpInstruction void_instruction({-1, -1, nullptr});
 
 extern "C" void imscope_record_autoinit(void *dataptr)
 {
@@ -61,7 +62,7 @@ extern "C" void imscope_record_autoinit(void *dataptr)
     scope_array[i].data.meta = {-1, -1};
   }
 
-  dump_instruction.store({-1, -1, nullptr});
+  dump_instruction.exchange(void_instruction);
 
   scopeData_t *scope = (scopeData_t *)calloc(1, sizeof(scopeData_t));
   scope->copyData = copyDataThreadSafe;
@@ -86,8 +87,7 @@ extern "C" void imscope_record_autoinit(void *dataptr)
 void dumpScopeData(int slot, int frame, const char *cause_string)
 {
   ImScopeDumpInstruction to_dump = {slot, frame, cause_string};
-  ImScopeDumpInstruction expected = {-1, -1, nullptr};
-  dump_instruction.compare_exchange_weak(expected, to_dump);
+  dump_instruction.compare_exchange_weak(void_instruction, to_dump);
 }
 
 void *imscope_record_thread(void *data_void_ptr)
@@ -142,7 +142,7 @@ void *imscope_record_thread(void *data_void_ptr)
       kbytes_written += pos / 1000.0f;
       outf.close();
       LOG_D(PHY, "ImScope done writing to %s\n", filename.c_str());
-      dump_instruction.store({-1, -1, nullptr}, std::memory_order::memory_order_relaxed);
+      dump_instruction.exchange(void_instruction);
     }
     for (auto i = 0U; i < EXTRA_SCOPE_TYPES; i++) {
       ImScopeDataWrapper &scope_data = scope_array[i];
