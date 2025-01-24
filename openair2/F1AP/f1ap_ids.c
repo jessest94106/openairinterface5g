@@ -84,6 +84,18 @@ bool cu_exists_f1_ue_data(uint32_t ue_id)
   return ret == HASH_TABLE_OK;
 }
 
+bool cu_update_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
+{
+  pthread_mutex_lock(&cu2du_mutex);
+  DevAssert(cu2du_ue_mapping != NULL);
+  uint64_t key = ue_id;
+  hashtable_rc_t retrm = hashtable_remove(cu2du_ue_mapping, key);
+  AssertFatal(retrm == HASH_TABLE_OK, "could not remove UE %d, ret %d\n", ue_id, retrm);
+  bool ret = add_hashtable_data(cu2du_ue_mapping, key, data);
+  pthread_mutex_unlock(&cu2du_mutex);
+  return ret;
+}
+
 f1_ue_data_t cu_get_f1_ue_data(uint32_t ue_id)
 {
   pthread_mutex_lock(&cu2du_mutex);
