@@ -38,13 +38,13 @@ typedef struct f1_ue_data_t {
 } f1_ue_data_t;
 
 void cu_init_f1_ue_data(void);
-bool cu_addmod_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data);
+bool cu_add_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data);
 bool cu_exists_f1_ue_data(uint32_t ue_id);
 f1_ue_data_t cu_get_f1_ue_data(uint32_t ue_id);
 bool cu_remove_f1_ue_data(uint32_t ue_id);
 
 void du_init_f1_ue_data(void);
-bool du_addmod_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data);
+bool du_add_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data);
 bool du_exists_f1_ue_data(uint32_t ue_id);
 f1_ue_data_t du_get_f1_ue_data(uint32_t ue_id);
 bool du_remove_f1_ue_data(uint32_t ue_id);

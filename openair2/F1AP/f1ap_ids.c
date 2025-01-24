@@ -60,14 +60,14 @@ void cu_init_f1_ue_data(void)
   pthread_mutex_unlock(&cu2du_mutex);
 }
 
-bool cu_addmod_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
+bool cu_add_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
 {
   pthread_mutex_lock(&cu2du_mutex);
   DevAssert(cu2du_ue_mapping != NULL);
   uint64_t key = ue_id;
   if (hashtable_is_key_exists(cu2du_ue_mapping, key) == HASH_TABLE_OK) {
-    hashtable_rc_t ret = hashtable_remove(cu2du_ue_mapping, key);
-    DevAssert(ret == HASH_TABLE_OK);
+    pthread_mutex_unlock(&cu2du_mutex);
+    return false;
   }
   bool ret = add_hashtable_data(cu2du_ue_mapping, key, data);
   pthread_mutex_unlock(&cu2du_mutex);
@@ -116,14 +116,14 @@ void du_init_f1_ue_data(void)
   pthread_mutex_unlock(&du2cu_mutex);
 }
 
-bool du_addmod_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
+bool du_add_f1_ue_data(uint32_t ue_id, const f1_ue_data_t *data)
 {
   pthread_mutex_lock(&du2cu_mutex);
   DevAssert(du2cu_ue_mapping != NULL);
   uint64_t key = ue_id;
   if (hashtable_is_key_exists(du2cu_ue_mapping, key) == HASH_TABLE_OK) {
-    hashtable_rc_t ret = hashtable_remove(du2cu_ue_mapping, key);
-    DevAssert(ret == HASH_TABLE_OK);
+    pthread_mutex_unlock(&du2cu_mutex);
+    return false;
   }
   bool ret = add_hashtable_data(du2cu_ue_mapping, key, data);
   pthread_mutex_unlock(&du2cu_mutex);
