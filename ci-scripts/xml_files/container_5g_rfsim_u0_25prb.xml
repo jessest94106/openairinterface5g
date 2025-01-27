@@ -22,7 +22,7 @@
 -->
 <testCaseList>
         <htmlTabRef>rfsim-5gnr-fdd-u0-25prb</htmlTabRef>
-        <htmlTabName>Monolithic SA FDD u0 25PRB gNB</htmlTabName>
+        <htmlTabName>VNF-PNF nFAPI FDD u0 25PRB gNB</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
         <TestCaseRequestedList>
  111111
