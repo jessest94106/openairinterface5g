@@ -138,9 +138,14 @@ static void tx_func(processingData_L1tx_t *info)
     ru_tx_func((void *)&syncMsgRU);
     stop_meas(&info->gNB->phy_proc_tx);
   }
-  /* this thread is done with the sched_info, decrease the reference counter */
-  LOG_D(NR_PHY, "Calling deref_sched_response for id %d (tx_func) in %d.%d\n", info->sched_response_id, frame_tx, slot_tx);
-  deref_sched_response(info->sched_response_id);
+
+  if (NFAPI_MODE == NFAPI_MONOLITHIC) {
+    /* this thread is done with the sched_info, decrease the reference counter.
+     * This only applies for monolithic; in the PNF, the memory is allocated in
+     * a ring buffer that should never be overwritten (one frame duration). */
+    LOG_D(NR_PHY, "Calling deref_sched_response for id %d (tx_func) in %d.%d\n", info->sched_response_id, frame_tx, slot_tx);
+    deref_sched_response(info->sched_response_id);
+  }
 }
 
 void *L1_rx_thread(void *arg) 
@@ -178,15 +183,6 @@ static void rx_func(processingData_L1_t *info)
   int frame_rx = info->frame_rx;
   int slot_rx = info->slot_rx;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
-
-  // *******************************************************************
-
-  if (NFAPI_MODE == NFAPI_MODE_PNF) {
-    // I am a PNF and I need to let nFAPI know that we have a (sub)frame tick
-    // LOG_D(PHY, "oai_nfapi_slot_ind(frame:%u, slot:%d) ********\n", frame_rx, slot_rx);
-    handle_nr_slot_ind(frame_rx, slot_rx);
-  }
-  // ****************************************
 
   // RX processing
   int rx_slot_type = nr_slot_select(cfg, frame_rx, slot_rx);
@@ -312,7 +308,13 @@ void *nrL1_stats_thread(void *param) {
   return(NULL);
 }
 
-void init_gNB_Tpool(int inst) {
+void init_gNB_Tpool(int inst)
+{
+  AssertFatal(NFAPI_MODE == NFAPI_MODE_PNF || NFAPI_MODE == NFAPI_MONOLITHIC,
+              "illegal NFAPI_MODE %d (%s): it cannot have an L1\n",
+              NFAPI_MODE,
+              nfapi_get_strmode());
+
   PHY_VARS_gNB *gNB;
   gNB = RC.gNB[inst];
   gNB_L1_proc_t *proc = &gNB->proc;
@@ -345,8 +347,7 @@ void init_gNB_Tpool(int inst) {
   // this will be removed when the msgDataTx is not necessary anymore
   gNB->msgDataTx = msgDataTx;
 
-  if ((!get_softmodem_params()->emulate_l1) && (!IS_SOFTMODEM_NOSTATS) && (NFAPI_MODE != NFAPI_MODE_VNF)
-      && (NFAPI_MODE != NFAPI_MODE_AERIAL))
+  if (!IS_SOFTMODEM_NOSTATS)
     threadCreate(&proc->L1_stats_thread, nrL1_stats_thread, (void *)gNB, "L1_stats", -1, OAI_PRIORITY_RT_LOW);
 }
 
@@ -365,8 +366,7 @@ void term_gNB_Tpool(int inst) {
   abortNotifiedFIFO(&gNB->L1_rx_out);
 
   gNB_L1_proc_t *proc = &gNB->proc;
-  if (!get_softmodem_params()->emulate_l1)
-    pthread_join(proc->L1_stats_thread, NULL);
+  pthread_join(proc->L1_stats_thread, NULL);
 }
 
 /// eNB kept in function name for nffapi calls, TO FIX
@@ -374,7 +374,7 @@ void init_eNB_afterRU(void) {
   int inst,ru_id,i,aa;
   PHY_VARS_gNB *gNB;
 
-  for (inst=0; inst<RC.nb_nr_inst; inst++) {
+  for (inst=0; inst<RC.nb_nr_L1_inst; inst++) {
     gNB = RC.gNB[inst];
 
     phy_init_nr_gNB(gNB);
