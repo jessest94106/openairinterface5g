@@ -579,8 +579,8 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
     return -1;
   }
 
-  int len =
-      nfapi_nr_p7_message_pack(header, pnf_p7->tx_message_buffer, sizeof(pnf_p7->tx_message_buffer), &pnf_p7->_public.codec_config);
+  uint8_t tx_buf[131072]; // four times NFAPI_MAX_PACKED_MESSAGE_SIZE as of this commit
+  int len = nfapi_nr_p7_message_pack(header, tx_buf, sizeof(tx_buf), &pnf_p7->_public.codec_config);
 
   if (len < 0) {
     if (pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0) {
@@ -611,7 +611,7 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
       uint16_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
 
       // Update the header with the m and segement
-      memcpy(&buffer[0], pnf_p7->tx_message_buffer, NFAPI_NR_P7_HEADER_LENGTH);
+      memcpy(&buffer[0], tx_buf, NFAPI_NR_P7_HEADER_LENGTH);
 
       // set the segment length
       buffer[6] = (segment_size & 0xFF00) >> 8;
@@ -620,7 +620,7 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
       // set the m & segment number
       buffer[8] = ((!last) << 7) + segment;
 
-      memcpy(&buffer[NFAPI_NR_P7_HEADER_LENGTH], pnf_p7->tx_message_buffer + offset, size);
+      memcpy(&buffer[NFAPI_NR_P7_HEADER_LENGTH], tx_buf + offset, size);
       offset += size;
 
       if (pnf_p7->_public.checksum_enabled) {
@@ -631,11 +631,11 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
     }
   } else {
     if (pnf_p7->_public.checksum_enabled) {
-      nfapi_nr_p7_update_checksum(pnf_p7->tx_message_buffer, len);
+      nfapi_nr_p7_update_checksum(tx_buf, len);
     }
 
     // simple case that the message fits in a single segment
-    pnf_p7_send_message(pnf_p7, pnf_p7->tx_message_buffer, len);
+    pnf_p7_send_message(pnf_p7, tx_buf, len);
   }
 
   pnf_p7->sequence_number++;
