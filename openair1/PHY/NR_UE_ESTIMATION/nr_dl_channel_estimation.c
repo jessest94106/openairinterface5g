@@ -34,10 +34,7 @@
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface.h"
 #include "instrumentation.h"
-
-
-extern openair0_config_t openair0_cfg[];
-
+#include "executables/nr-softmodem-common.h"
 // #define DEBUG_PDSCH
 // #define DEBUG_PDCCH
 // #define DEBUG_PBCH(a...) printf(a)
