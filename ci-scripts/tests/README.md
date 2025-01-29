@@ -10,6 +10,7 @@ directory, i.e., `ci-scripts/`, and run
 
 To run individual unit tests, start them like so:
 
+    python tests/analysis.py -v
     python tests/build.py -v
     python tests/cmd.py -v
     python tests/corenetwork.py -v
