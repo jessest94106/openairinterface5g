@@ -65,6 +65,21 @@ typedef enum {
   NAS_SECURITY_BAD_INPUT
 } security_state_t;
 
+static void servingNetworkName(uint8_t *msg, char *imsiStr, int nmc_size)
+{
+  // SNN-network-identifier in TS 24.501
+  // TS 24.501: If the MNC of the serving PLMN has two digits, then a zero is added at the beginning.
+  const char *format = "5G:mnc000.mcc000.3gppnetwork.org";
+  memcpy(msg, format, strlen(format));
+
+  if (nmc_size == 2)
+    memcpy(msg + 7, imsiStr + 3, 2);
+  else
+    memcpy(msg + 6, imsiStr + 3, 3);
+
+  memcpy(msg + 13, imsiStr, 3);
+}
+
 security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, int pdu_length)
 {
   if (nas->security_container == NULL)
