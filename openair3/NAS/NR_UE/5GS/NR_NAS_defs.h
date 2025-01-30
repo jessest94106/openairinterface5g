@@ -9,8 +9,6 @@
  *
  *      http://www.openairinterface.org/?page_id=698
  *
- * Author and copyright: Laurent Thomas, open-cells.com
- *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,23 +18,12 @@
  * For more information about the OpenAirInterface (OAI) Software Alliance:
  *      contact@openairinterface.org
  */
+
 #ifndef NR_NAS_DEFS_H
 #define NR_NAS_DEFS_H
 
-#include <common/utils/LOG/log.h>
-#include <openair3/UICC/usim_interface.h>
-
-/* TS 24.007 possible L3 formats:
-   Table 11.1: Formats of information elements
-   Format Meaning IEI present LI present Value part present
-   T Type only yes no no
-   V Value only no no yes
-   TV Type and Value yes no yes
-   LV Length and Value no yes yes
-   TLV Type, Length and Value yes yes yes
-   LV-E Length and Value no yes yes
-   TLV-E Type, Length and Value yes yes yes
-*/
+#include <stdint.h>
+#include "openair3/UICC/usim_interface.h"
 
 /* Map task id to printable name. */
 typedef struct {
@@ -44,23 +31,8 @@ typedef struct {
   char text[256];
 } text_info_t;
 
-static inline const char * idToText(const text_info_t* table, int size, int id) {
-  for(int i=0; i<size; i++)
-    if (table[i].id==id)
-      return table[i].text;
-  LOG_E(NAS,"impossible id %x\n", id);
-  return "IMPOSSIBLE";
-}
-#define idStr(TaBle, iD) idToText(TaBle, sizeof(TaBle)/sizeof(text_info_t), iD)
-
 #define TO_TEXT(LabEl, nUmID) {nUmID, #LabEl},
 #define TO_ENUM(LabEl, nUmID ) LabEl = nUmID,
-
-//TS 24.501, chap 9.2 => TS 24.007
-typedef enum {
-  SGSsessionmanagementmessages=0x2e, //LTEbox: 0xC0 ???
-  SGSmobilitymanagementmessages=0x7e,
-} Extendedprotocoldiscriminator_t;
 
 #define FOREACH_TYPE(TYPE_DEF)                               \
   TYPE_DEF(REGISTRATION_REQUEST, 0x41)                       \
@@ -130,17 +102,6 @@ typedef enum {
   INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX = 4,
 } Security_header_t;
 
-typedef enum {
-  SUCI=1,
-  SGGUTI,
-  IMEI,
-  SGSTMSI,
-  IMEISV,
-  MACaddress,
-  EUI64,
-} identitytype_t;
-
-
 // table  9.11.3.2.1
 #define FOREACH_CAUSE(CAUSE_DEF) \
   CAUSE_DEF(Illegal_UE,0x3 )\
@@ -187,7 +148,6 @@ typedef enum {
   CAUSE_DEF(Protocol_error_unspecified,0x67 )
 
 /* Map task id to printable name. */
-
 #define CAUSE_TEXT(LabEl, nUmID) {nUmID, #LabEl},
 
 static const text_info_t cause_text_info[] = {
@@ -249,138 +209,58 @@ typedef enum {
 static const text_info_t cause_secu_text_info[] = {
   FOREACH_CAUSE_SECU(TO_TEXT)
 };
-								
+
 //! Tasks id of each task
 typedef enum {
   FOREACH_CAUSE_SECU(TO_ENUM)
 } cause_secu_id_t;
 								
-// IEI (information element identifier) are spread in each message definition
+// IEIs (Information Element Identifier)
 #define IEI_NULL 0x00
-#define IEI_RAND 0x21
-#define IEI_AUTN 0x20
-#define IEI_EAP  0x78
-#define IEI_AuthenticationResponse 0x2d
 
-//TS 24.501 sub layer states for UE
-// for network side, only 5GMMderegistered, 5GMMderegistered_initiated, 5GMMregistered,  5GMMservice_request_initiated are valid
-typedef enum {
-  SGMMnull,
-  SGMMderegistered,
-  SGMMderegistered_initiated,
-  SGMMregistered,
-  SGMMregistered_initiated,
-  SGMMservice_request_initiated,
-} SGMM_UE_states;
-
+/**
+ * Security protected 5GS NAS message header (9.1.1 of 3GPP TS 24.501)
+ * either 5GMM or 5GSM
+ * Standard L3 message header (11.2.3.1 of 3GPP TS 24.007)
+ */
 typedef struct {
-  Extendedprotocoldiscriminator_t epd:8;
-  Security_header_t sh:8;
-  SGSmobilitymanagementmessages_t mt:8;
-} SGScommonHeader_t;
+  // Extended Protocol Discriminator
+  uint8_t protocol_discriminator;
+  // Security Header Type
+  uint8_t security_header_type;
+  // Message Authentication Code
+  uint32_t message_authentication_code;
+  // Sequence Number
+  uint8_t sequence_number;
+} __attribute__((packed)) fgs_nas_message_security_header_t;
 
+/// 5GMM - 5GS mobility management
+
+/**
+ * Header of a plain 5GMM NAS message (5GS)
+ * Standard L3 message header (11.2.3.1 of 3GPP TS 24.007)
+ */
 typedef struct {
-  Extendedprotocoldiscriminator_t epd:8;
-  Security_header_t sh:8;
-  SGSmobilitymanagementmessages_t mt:8;
-  identitytype_t it:8;
-} Identityrequest_t;
+  uint8_t ex_protocol_discriminator;
+  uint8_t security_header_type;
+  uint8_t message_type;
+} fgmm_msg_header_t;
 
-// the message continues with the identity value, depending on identity type, see TS 14.501, 9.11.3.4
-typedef struct __attribute__((packed)) {
-  Extendedprotocoldiscriminator_t epd:8;
-  Security_header_t sh:8;
-  SGSmobilitymanagementmessages_t mt:8;
-  uint16_t len;
-}
-Identityresponse_t;
+/// 5GSM - 5GS session management
 
-typedef struct __attribute__((packed)) {
-  Identityresponse_t common;
-  identitytype_t mi:8;
-  unsigned int supiFormat:4;
-  unsigned int identityType:4;
-  unsigned int mcc1:4;
-  unsigned int mcc2:4;
-  unsigned int mcc3:4;
-  unsigned int mnc3:4;
-  unsigned int mnc1:4;
-  unsigned int mnc2:4;
-  unsigned int routing1:4;
-  unsigned int routing2:4;
-  unsigned int routing3:4;
-  unsigned int routing4:4;
-  unsigned int protectScheme:4;
-  unsigned int spare:4;
-  uint8_t hplmnId;
-}
-IdentityresponseIMSI_t;
-
-typedef struct  __attribute__((packed)) {
-  Extendedprotocoldiscriminator_t epd:8;
-  Security_header_t sh:8;
-  SGSmobilitymanagementmessages_t mt:8;
-  unsigned int ngKSI:4;
-  unsigned int spare:4;
-  unsigned int ABBALen:8;
-  unsigned int ABBA:16;
-  uint8_t ieiRAND;
-  uint8_t RAND[16];
-  uint8_t ieiAUTN;
-  uint8_t AUTNlen;
-  uint8_t AUTN[16];
-}
-authenticationrequestHeader_t;
-
-typedef struct  __attribute__((packed)) {
-  Extendedprotocoldiscriminator_t epd:8;
-  Security_header_t sh:8;
-  SGSmobilitymanagementmessages_t mt:8;
-  uint8_t iei;
-  uint8_t RESlen;
-  uint8_t RES[16];
-} authenticationresponse_t;
-
-//AUTHENTICATION RESULT
-
-typedef struct  __attribute__((packed)) {
-  Extendedprotocoldiscriminator_t epd:8;
-  Security_header_t sh:8;
-  SGSmobilitymanagementmessages_t mt:8;
-
-  unsigned int selectedNASsecurityalgorithms;
-  unsigned int ngKSI:4; //ngKSI NAS key set identifier 9.11.3.32
-  unsigned int spare:4;
-  // LV 3-9 bytes Replayed UE security capabilities UE security capability 9.11.3.54
-  
-  /* optional
-     TV (E-, 1 byte) Oprional IMEISV request IMEISV request 9.11.3.28
-     TV (57, 2 bytes ) Selected EPS NAS security algorithms  EPS NAS security algorithms 9.11.3.25
-     TLV (36, 3 bytes) Additional 5G security information Additional 5G security information 9.11.3.12
-     TLV-E (78,, 7-1503 bytes) EAP message EAP message 9.11.2.2
-     TLV (38, 4-n)ABBA ABBA 9.11.3.10
-     TLV (19, 4-7) Replayed S1 UE security capabilities S1 UE security capability 9.11.3.48A
-  */
-
-} securityModeCommand_t;
-
-typedef struct __attribute__((packed)) {
-  Extendedprotocoldiscriminator_t epd: 8;
-  Security_header_t sh: 8;
-  SGSmobilitymanagementmessages_t mt: 8;
-} deregistrationRequestUEOriginating_t;
-
+/**
+ * Header of a plain 5GSM NAS message (5GS)
+ * Standard L3 message header (11.2.3.1 of 3GPP TS 24.007)
+ */
 typedef struct {
-  uicc_t *uicc;
-} nr_user_nas_t;
+  // Extended protocol discriminator
+  uint8_t ex_protocol_discriminator;
+  // PDU session identity
+  uint8_t pdu_session_id;
+  // Procedure transaction identity
+  uint8_t pti;
+  // Message type
+  uint8_t message_type;
+} fgsm_msg_header_t;
 
-#define STATIC_ASSERT(test_for_true) _Static_assert((test_for_true), "(" #test_for_true ") failed")
-#define myCalloc(var, type) type * var=(type*)calloc(sizeof(type),1);
-#define arrayCpy(tO, FroM)  STATIC_ASSERT(sizeof(tO) == sizeof(FroM)) ; memcpy(tO, FroM, sizeof(tO))
-int resToresStar(uint8_t *msg, const uicc_t* uicc);
-
-int identityResponse(void **msg, nr_user_nas_t *UE);
-int authenticationResponse(void **msg, nr_user_nas_t *UE);
-void servingNetworkName(uint8_t *msg, char * imsiStr, int nmc_size);
-
-#endif
+#endif // NR_NAS_DEFS_H

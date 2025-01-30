@@ -10,4 +10,4 @@ add_library(fgs_5gmm_lib OBJECT
     FGSDeregistrationRequestUEOriginating.c
 )
 
-target_include_directories(fgs_5gmm_lib PUBLIC . ../IES)
+target_include_directories(fgs_5gmm_lib PUBLIC . ../IES ../../)

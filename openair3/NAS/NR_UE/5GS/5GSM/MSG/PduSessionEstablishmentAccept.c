@@ -61,28 +61,32 @@ static int capture_ipv6_addr(const uint8_t *addr, char *ip, size_t len)
  */
 void capture_pdu_session_establishment_accept_msg(uint8_t *buffer, uint32_t msg_length)
 {
-  security_protected_nas_5gs_msg_t       sec_nas_hdr;
-  security_protected_plain_nas_5gs_msg_t sec_nas_msg;
+  fgs_nas_message_security_header_t sec_nas_hdr;
   pdu_session_establishment_accept_msg_t psea_msg;
   uint8_t *curPtr = buffer;
-  sec_nas_hdr.epd = *curPtr++;
-  sec_nas_hdr.sht = *curPtr++;
+  // Security protected NAS header (7 bytes)
+  sec_nas_hdr.protocol_discriminator = *curPtr++;
+  sec_nas_hdr.security_header_type = *curPtr++;
   uint32_t tmp;
   memcpy(&tmp, buffer, sizeof(tmp));
-  sec_nas_hdr.mac = htonl(tmp);
-  curPtr += sizeof(sec_nas_hdr.mac);
-  sec_nas_hdr.sqn = *curPtr++;
-  sec_nas_msg.epd = *curPtr++;
-  sec_nas_msg.sht = *curPtr++;
-  sec_nas_msg.msg_type = *curPtr++;
-  sec_nas_msg.payload_type = *curPtr++;
-  sec_nas_msg.payload_len = getShort(curPtr);
-  curPtr += sizeof(sec_nas_msg.payload_len);
+  sec_nas_hdr.message_authentication_code = htonl(tmp);
+  curPtr += sizeof(sec_nas_hdr.message_authentication_code);
+  sec_nas_hdr.sequence_number = *curPtr++;
+  // Security protected plain NAS message
+  fgmm_msg_header_t header;
+  header.ex_protocol_discriminator = *curPtr++;
+  header.security_header_type = *curPtr++;
+  header.message_type = *curPtr++;
+  // Payload container type and spare (1 octet)
+  curPtr++;
+  // Payload container length
+  curPtr += sizeof(getShort(curPtr));
   /* Mandatory Presence IEs */
-  psea_msg.epd = *curPtr++;
-  psea_msg.pdu_id = *curPtr++;
-  psea_msg.pti = *curPtr++;
-  psea_msg.msg_type = *curPtr++;
+  fgsm_msg_header_t *sm_header = &psea_msg.header;
+  sm_header->ex_protocol_discriminator = *curPtr++;
+  sm_header->pdu_session_id = *curPtr++;
+  sm_header->pti = *curPtr++;
+  sm_header->message_type = *curPtr++;
   psea_msg.pdu_type = *curPtr & 0x0f;
   psea_msg.ssc_mode = (*curPtr++ & 0xf0) >> 4;
   psea_msg.qos_rules.length = getShort(curPtr);

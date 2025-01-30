@@ -150,12 +150,12 @@ static int nas_protected_security_header_encode(char *buffer, const fgs_nas_mess
   LOG_FUNC_RETURN(size);
 }
 
-static int _nas_mm_msg_encode_header(const mm_msg_header_t *header, uint8_t *buffer, uint32_t len)
+static int _nas_mm_msg_encode_header(const fgmm_msg_header_t *header, uint8_t *buffer, uint32_t len)
 {
   int size = 0;
 
   /* Check the buffer length */
-  if (len < sizeof(mm_msg_header_t)) {
+  if (len < sizeof(fgmm_msg_header_t)) {
     return (TLV_ENCODE_BUFFER_TOO_SHORT);
   }
 
@@ -510,7 +510,7 @@ nr_ue_nas_t *get_ue_nas_info(module_id_t module_id)
 
 void generateRegistrationRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
 {
-  int size = sizeof(mm_msg_header_t);
+  int size = sizeof(fgmm_msg_header_t);
   fgs_nas_message_t nas_msg = {0};
   MM_msg *mm_msg;
 
@@ -590,7 +590,7 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   mm_msg->header.ex_protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
   mm_msg->header.security_header_type = PLAIN_5GS_MSG;
   mm_msg->header.message_type = FGS_SERVICE_REQUEST;
-  size += sizeof(mm_msg_header_t);
+  size += sizeof(mm_msg->header);
 
   // Fill Service Request
   // Service Type
@@ -645,7 +645,7 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
 
 void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype, uicc_t *uicc)
 {
-  int size = sizeof(mm_msg_header_t);
+  int size = sizeof(fgmm_msg_header_t);
   fgs_nas_message_t nas_msg;
   memset(&nas_msg, 0, sizeof(fgs_nas_message_t));
   MM_msg *mm_msg;
@@ -681,7 +681,7 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   res.value = calloc(1, 16);
   memcpy(res.value, nas->security.res, 16);
 
-  int size = sizeof(mm_msg_header_t);
+  int size = sizeof(fgmm_msg_header_t);
   fgs_nas_message_t nas_msg;
   memset(&nas_msg, 0, sizeof(fgs_nas_message_t));
   MM_msg *mm_msg;
@@ -721,7 +721,7 @@ int nas_itti_kgnb_refresh_req(instance_t instance, const uint8_t kgnb[32])
 
 static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg)
 {
-  int size = sizeof(mm_msg_header_t);
+  int size = sizeof(fgmm_msg_header_t);
   fgs_nas_message_t nas_msg;
   memset(&nas_msg, 0, sizeof(fgs_nas_message_t));
 
@@ -964,7 +964,7 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
   sp_msg->header.security_header_type = INTEGRITY_PROTECTED_AND_CIPHERED;
   sp_msg->header.message_authentication_code = 0;
   sp_msg->header.sequence_number = nas->security.nas_count_ul & 0xff;
-  int size = sizeof(fgs_nas_message_security_header_t);
+  int size = sizeof(sp_msg->header);
 
   fgs_deregistration_request_ue_originating_msg *dereg_req = &sp_msg->plain.mm_msg.fgs_deregistration_request_ue_originating;
   dereg_req->protocoldiscriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;

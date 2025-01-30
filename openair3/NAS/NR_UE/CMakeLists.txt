@@ -16,4 +16,5 @@ target_link_libraries(nr_nas PUBLIC
 
 target_include_directories(nr_nas PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/5GS
 )
