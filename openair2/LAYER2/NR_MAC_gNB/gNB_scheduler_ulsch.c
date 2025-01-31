@@ -453,9 +453,9 @@ static int nr_process_mac_pdu(instance_t module_idP,
         if (phr->PH < 55) {
           PH = phr->PH - 32;
         } else if (phr->PH < 63) {
-          PH = 28 + (phr->PH - 55) * 2;
+          PH = 24 + (phr->PH - 55) * 2;
         } else {
-          PH = 42;
+          PH = 38;
         }
         // in sched_ctrl we set normalized PH wrt MCS and PRBs
         long *deltaMCS = ul_bwp->pusch_Config ? ul_bwp->pusch_Config->pusch_PowerControl->deltaMCS : NULL;
