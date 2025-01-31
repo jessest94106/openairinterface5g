@@ -118,6 +118,12 @@ stream_security_container_t *stream_security_container_init(int ciphering_algori
   container->integrity_context = stream_integrity_init(integrity_algorithm, integrity_key);
   container->ciphering_context = stream_ciphering_init(ciphering_algorithm, ciphering_key);
 
+  /* Reject invalid configurations, i.e. ones that set NIA0 */
+  if (container->integrity_context == NULL) {
+    stream_security_container_delete(container);
+    return NULL;
+  }
+
   return container;
 }
 

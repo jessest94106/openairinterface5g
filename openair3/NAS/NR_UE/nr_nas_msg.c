@@ -1134,6 +1134,12 @@ static void handle_security_mode_command(nr_ue_nas_t *nas, as_nas_info_t *initia
   /* todo: stream_security_container_delete() is not called anywhere, deal with that */
   nas->security_container = stream_security_container_init(ciphering_algorithm, integrity_algorithm, knas_enc, knas_int);
 
+  /* Handle the invalid container with a reject message */
+  if(nas->security_container == NULL) {
+    LOG_W(NAS, "Could not create security container!\n");
+    return;
+  }
+
   nas_itti_kgnb_refresh_req(nas->UE_id, nas->security.kgnb);
   generateSecurityModeComplete(nas, initialNasMsg);
 }
