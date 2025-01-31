@@ -580,7 +580,7 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
   }
 
   uint8_t tx_buf[131072]; // four times NFAPI_MAX_PACKED_MESSAGE_SIZE as of this commit
-  int len = nfapi_nr_p7_message_pack(header, tx_buf, sizeof(tx_buf), &pnf_p7->_public.codec_config);
+  int len = pnf_p7->_public.pack_func(header, tx_buf, sizeof(tx_buf), &pnf_p7->_public.codec_config);
 
   if (len < 0) {
     if (pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0) {
@@ -1299,8 +1299,8 @@ void pnf_handle_dl_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
                   frame,
                   slot,
                   buffer_index);
-
-      if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, req, sizeof(*req), &(pnf_p7->_public.codec_config)) != 0)
+      const bool result = pnf_p7->_public.unpack_func(pRecvMsg, recvMsgLen, req, sizeof(*req), &(pnf_p7->_public.codec_config));
+      if (!result)
         NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unpack request\n");
     } else {
       if (pnf_p7->_public.timing_info_mode_aperiodic)
@@ -1432,8 +1432,8 @@ void pnf_handle_ul_tti_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
                   frame,
                   slot,
                   buffer_index);
-
-      if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, req, sizeof(*req), &(pnf_p7->_public.codec_config)) != 0)
+      const bool result = pnf_p7->_public.unpack_func(pRecvMsg, recvMsgLen, req, sizeof(*req), &(pnf_p7->_public.codec_config));
+      if (!result)
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "failed to unpack UL_TTI.request\n");
     } else {
       NFAPI_TRACE(NFAPI_TRACE_NOTE,
@@ -1551,8 +1551,8 @@ void pnf_handle_ul_dci_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7)
                   frame,
                   slot,
                   buffer_index);
-
-      if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, req, sizeof(*req), &pnf_p7->_public.codec_config) != 0)
+      const bool result = pnf_p7->_public.unpack_func(pRecvMsg, recvMsgLen, req, sizeof(*req), &(pnf_p7->_public.codec_config));
+      if (!result)
         NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unpack request\n");
     } else {
       if (pnf_p7->_public.timing_info_mode_aperiodic) {
@@ -1664,8 +1664,8 @@ void pnf_handle_tx_data_request(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
                   frame,
                   slot,
                   buffer_index);
-
-      if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, req, sizeof(*req), &pnf_p7->_public.codec_config) == 0) {
+      const bool result = pnf_p7->_public.unpack_func(pRecvMsg, recvMsgLen, req, sizeof(*req), &(pnf_p7->_public.codec_config));
+      if (result) {
         for (int i = 0; i < req->Number_of_PDUs; ++i)
           pnf_p7->nr_stats.dl.bytes += req->pdu_list[i].PDU_length;
       } else {
@@ -2063,7 +2063,8 @@ void pnf_nr_handle_dl_node_sync(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 	}
 
 	// unpack the message
-	if (nfapi_nr_p7_message_unpack(pRecvMsg, recvMsgLen, &dl_node_sync, sizeof(dl_node_sync), &pnf_p7->_public.codec_config) < 0)
+  const bool result = pnf_p7->_public.unpack_func(pRecvMsg, recvMsgLen, &dl_node_sync, sizeof(dl_node_sync), &pnf_p7->_public.codec_config);
+	if (!result)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: Unpack message failed, ignoring\n", __FUNCTION__);
 		return;
@@ -2182,7 +2183,8 @@ void pnf_nr_dispatch_p7_message(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
   }
 
   // unpack the message header
-  if (nfapi_nr_p7_message_header_unpack(pRecvMsg, recvMsgLen, &header, sizeof(header), &pnf_p7->_public.codec_config) < 0) {
+  const bool result = pnf_p7->_public.hdr_unpack_func(pRecvMsg, recvMsgLen, &header, sizeof(header), &pnf_p7->_public.codec_config);
+  if (!result) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "Unpack message header failed, ignoring\n");
     return;
   }
@@ -2336,12 +2338,9 @@ void pnf_nr_handle_p7_message(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, 
   }
 
   // unpack the message header
-  if (nfapi_nr_p7_message_header_unpack(pRecvMsg,
-                                        recvMsgLen,
-                                        &messageHeader,
-                                        sizeof(nfapi_nr_p7_message_header_t),
-                                        &pnf_p7->_public.codec_config)
-      < 0) {
+  const bool result =
+      pnf_p7->_public.hdr_unpack_func(pRecvMsg, recvMsgLen, &messageHeader, sizeof(messageHeader), &pnf_p7->_public.codec_config);
+  if (!result) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "Unpack message header failed, ignoring\n");
     return;
   }
@@ -2519,7 +2518,7 @@ void pnf_nr_nfapi_p7_read_dispatch_message(pnf_p7_t* pnf_p7, uint32_t now_hr_tim
     if (recvfrom_result > 0) {
       // get the segment size
       nfapi_nr_p7_message_header_t header;
-      nfapi_nr_p7_message_header_unpack(header_buffer, NFAPI_NR_P7_HEADER_LENGTH, &header, 34, 0);
+      pnf_p7->_public.hdr_unpack_func(header_buffer, NFAPI_NR_P7_HEADER_LENGTH, &header, 34, 0);
 
       // resize the buffer if we have a large segment
       if (header.message_length > pnf_p7->rx_message_buffer_size) {

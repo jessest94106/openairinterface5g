@@ -5930,7 +5930,7 @@ int nfapi_p7_message_header_unpack(void *pMessageBuf,
   return 0;
 }
 
-int nfapi_nr_p7_message_header_unpack(void *pMessageBuf,
+bool nfapi_nr_p7_message_header_unpack(void *pMessageBuf,
                                       uint32_t messageBufLen,
                                       void *pUnpackedBuf,
                                       uint32_t unpackedBufLen,
@@ -5941,14 +5941,14 @@ int nfapi_nr_p7_message_header_unpack(void *pMessageBuf,
 
   if (pMessageBuf == NULL || pUnpackedBuf == NULL) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 header unpack supplied pointers are null\n");
-    return -1;
+    return false;
   }
 
   uint8_t *end = (uint8_t *)pMessageBuf + messageBufLen;
 
   if (messageBufLen < NFAPI_NR_P7_HEADER_LENGTH || unpackedBufLen < sizeof(nfapi_nr_p7_message_header_t)) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 header unpack supplied message buffer is too small %d, %d\n", messageBufLen, unpackedBufLen);
-    return -1;
+    return false;
   }
   // process the header
   if (!(pull16(&pReadPackedMessage, &pMessageHeader->phy_id, end) && pull16(&pReadPackedMessage, &pMessageHeader->message_id, end)
@@ -5956,9 +5956,9 @@ int nfapi_nr_p7_message_header_unpack(void *pMessageBuf,
         && pull16(&pReadPackedMessage, &pMessageHeader->m_segment_sequence, end)
         && pull32(&pReadPackedMessage, &pMessageHeader->checksum, end)
         && pull32(&pReadPackedMessage, &pMessageHeader->transmit_timestamp, end)))
-    return -1;
+    return false;
 
-  return 0;
+  return true;
 }
 
 int nfapi_p7_message_unpack(void *pMessageBuf,
@@ -6213,7 +6213,7 @@ bool peek_nr_nfapi_p7_sfn_slot(void *pMessageBuf, uint32_t messageBufLen, uint16
   return true;
 }
 
-int nfapi_nr_p7_message_unpack(void *pMessageBuf,
+bool nfapi_nr_p7_message_unpack(void *pMessageBuf,
                                uint32_t messageBufLen,
                                void *pUnpackedBuf,
                                uint32_t unpackedBufLen,
@@ -6225,14 +6225,14 @@ int nfapi_nr_p7_message_unpack(void *pMessageBuf,
 
   if (pMessageBuf == NULL || pUnpackedBuf == NULL) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack supplied pointers are null\n");
-    return -1;
+    return false;
   }
 
   uint8_t *end = (uint8_t *)pMessageBuf + messageBufLen;
 
   if (messageBufLen < NFAPI_NR_P7_HEADER_LENGTH || unpackedBufLen < sizeof(nfapi_nr_p7_message_header_t)) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack supplied message buffer is too small %d, %d\n", messageBufLen, unpackedBufLen);
-    return -1;
+    return false;
   }
 
   // process the header
@@ -6242,11 +6242,11 @@ int nfapi_nr_p7_message_unpack(void *pMessageBuf,
         && pull32(&pReadPackedMessage, &pMessageHeader->checksum, end)
         && pull32(&pReadPackedMessage, &pMessageHeader->transmit_timestamp, end))) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack header failed\n");
-    return -1;
+    return false;
   }
   if ((uint8_t *)(pMessageBuf + pMessageHeader->message_length) > end) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 unpack message length is greater than the message buffer \n");
-    return -1;
+    return false;
   }
 
   /*
@@ -6356,7 +6356,7 @@ int nfapi_nr_p7_message_unpack(void *pMessageBuf,
 
   if (result == 0) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack failed to pack message\n");
-    return -1;
+    return false;
   }
-  return 0;
+  return true;
 }

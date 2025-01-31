@@ -6582,15 +6582,11 @@ void process_nr_nsa_msg(nsa_msg_t *msg, int msg_len)
             }
 
             nfapi_nr_dl_tti_request_t dl_tti_request;
-            int unpack_len = nfapi_nr_p7_message_unpack((void *)msg_buffer,
-                                                         msg_len,
-                                                         &dl_tti_request,
-                                                         sizeof(nfapi_nr_dl_tti_request_t),
-                                                         NULL);
-            if (unpack_len < 0)
-            {
-                LOG_E(RRC, "%s: SSB PDU unpack failed \n", __FUNCTION__);
-                break;
+            const bool result =
+                nfapi_nr_p7_message_unpack((void *)msg_buffer, msg_len, &dl_tti_request, sizeof(nfapi_nr_dl_tti_request_t), NULL);
+            if (!result) {
+              LOG_E(RRC, "%s: SSB PDU unpack failed \n", __FUNCTION__);
+              break;
             }
             int num_pdus = dl_tti_request.dl_tti_request_body.nPDUs;
             if (num_pdus <= 0)
