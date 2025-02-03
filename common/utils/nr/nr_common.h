@@ -122,6 +122,29 @@ typedef enum frequency_range_e {
   FR2
 } frequency_range_t;
 
+#define MAX_NUM_SLOTS_ALLOWED 80 // up to numerology 3 (120 KHz SCS) is supported
+enum slot_type { TDD_NR_DOWNLINK_SLOT, TDD_NR_UPLINK_SLOT, TDD_NR_MIXED_SLOT };
+
+typedef struct tdd_bitmap {
+  enum slot_type slot_type;
+  uint8_t num_dl_symbols;
+  uint8_t num_ul_symbols;
+} tdd_bitmap_t;
+
+typedef struct tdd_period_config_s {
+  tdd_bitmap_t tdd_slot_bitmap[MAX_NUM_SLOTS_ALLOWED];
+  uint8_t num_dl_slots;
+  uint8_t num_ul_slots;
+} tdd_period_config_t;
+
+typedef struct frame_structure_s {
+  tdd_period_config_t period_cfg;
+  int8_t numb_slots_frame;
+  int8_t numb_slots_period;
+  int8_t numb_period_frame;
+  bool is_tdd;
+} frame_structure_t;
+
 typedef struct {
   /// Time shift in number of samples estimated based on DMRS-PDSCH/PUSCH
   int est_delay;
@@ -183,6 +206,15 @@ uint32_t nr_timer_elapsed_time(const NR_timer_t *timer);
 int set_default_nta_offset(frequency_range_t freq_range, uint32_t samples_per_subframe);
 extern const nr_bandentry_t nr_bandtable[];
 
+extern simde__m128i byte2bit16_lut[256];
+void init_byte2bit16(void);
+void  init_byte2m128i(void);
+
+static inline simde__m128i byte2bit16(uint8_t b)
+{
+  return byte2bit16_lut[b];
+}
+
 static inline int get_num_dmrs(uint16_t dmrs_mask )
 {
   int num_dmrs=0;
@@ -210,7 +242,6 @@ void reverse_bits_u8(uint8_t const* in, size_t sz, uint8_t* out);
 uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t dl_nrarfcn);
 uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw);
 
-int get_first_ul_slot(int nrofDownlinkSlots, int nrofDownlinkSymbols, int nrofUplinkSymbols);
 int cce_to_reg_interleaving(const int R, int k, int n_shift, const int C, int L, const int N_regs);
 int get_SLIV(uint8_t S, uint8_t L);
 void get_coreset_rballoc(uint8_t *FreqDomainResource,int *n_rb,int *rb_offset);
@@ -256,11 +287,12 @@ int get_smallest_supported_bandwidth_index(int scs, frequency_range_t frequency_
 unsigned short get_m_srs(int c_srs, int b_srs);
 unsigned short get_N_b_srs(int c_srs, int b_srs);
 
+int get_slot_idx_in_period(const int slot, const frame_structure_t *fs);
+
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
 
-// Align up to a multiple of 16
-#define ALIGN_UP_16(a) ((a + 15) & ~15)
+static const char *const duplex_mode_txt[] = {"FDD", "TDD"};
 
 #ifdef __cplusplus
 #ifdef min
