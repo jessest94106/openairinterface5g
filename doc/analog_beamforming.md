@@ -20,8 +20,7 @@ In the `MACRLC` section of configuration files, there are three new parameters: 
 - `set_analog_beamforming` can be set to 1 or 0 to activate or desactivate analog beamforming (default value is 0)
 - `beam_duration` is the number of slots (currently minimum duration of a beam) the scheduler is tied to a beam (default value is 1)
 - `beams_per_period` is the number of concurrent beams the RU can handle in the beam duration (default value is 1)
-
-In the `gNBs` section of the configuration file, under the phyisical parameters, a vector field containing the set of beam indices to be provided by the OAI L1 to the RU is also required. This field is called `beam_weights`. In current implementation, the number of beam indices should be equal to the number of SSBs transmitted.
+- `beam_weights` is a vector field containing the set of beam indices to be provided by the OAI L1 to the RU is also required. In current implementation, the number of beam indices should be equal to the number of SSBs transmitted.
 
 # Implementation in OAI scheduler
 

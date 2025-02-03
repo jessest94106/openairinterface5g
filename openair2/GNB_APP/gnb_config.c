@@ -1566,19 +1566,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.timer_config.n311,
         config.timer_config.t319);
 
-  if (config_isparamset(GNBParamList.paramarray[0], GNB_BEAMWEIGHTS_IDX)) {
-    int n = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].numelt;
-    AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
-    // each beam is described by a set of weights (one for each antenna)
-    // on the other hand in case of analog beamforming an index to the RU beam identifier is provided
-    config.nb_bfw[0] = num_tx;  // number of tx antennas
-    config.nb_bfw[1] = n; // number of beams weights/indices
-    config.bw_list = malloc16_clear(n * sizeof(*config.bw_list));
-    for (int b = 0; b < n; b++) {
-      config.bw_list[b] = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].iptr[b];
-    }
-  }
-
   // Construct default aggragation level list or read from config
   int uess_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   uess_num_agg_level_candidates[PDCCH_AGG_LEVEL1] = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
@@ -1710,6 +1697,22 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         beam_info->beam_duration = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAM_DURATION_IDX].u8ptr;
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
+      }
+      if (config_isparamset(MacRLC_ParamList.paramarray[j], MACRLC_BEAMWEIGHTS_IDX)) {
+        int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
+        int num_beam = n;
+        if (!ab) {
+          AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
+          num_beam = n / num_tx;
+        }
+        // each beam is described by a set of weights (one for each antenna)
+        // in case of analog beamforming an index to the RU beam identifier is provided
+        // (one for each beam regardless of the number of antennas per beam)
+        config.nb_bfw[0] = num_tx;  // number of tx antennas
+        config.nb_bfw[1] = num_beam; // number of beams weights/indices
+        config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
+        for (int b = 0; b < n; b++)
+          config.bw_list[b] = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].iptr[b];
       }
       // triggers also PHY initialization in case we have L1 via FAPI
       nr_mac_config_scc(RC.nrmac[j], scc, &config);
