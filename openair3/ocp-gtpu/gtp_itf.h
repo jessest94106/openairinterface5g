@@ -11,7 +11,6 @@
 # define GTPU_HEADER_OVERHEAD_MAX 64
 
 #include "common/platform_types.h"
-#include "common/utils/hashtable/hashtable.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -135,11 +134,6 @@ typedef struct gtpv1u_gnb_delete_tunnel_req_s gtpv1u_gnb_delete_tunnel_req_t;
   instance_t gtpv1Init(openAddr_t context);
   void *gtpv1uTask(void *args);
 
-  // Legacy to fix
-  typedef struct gtpv1u_data_s {
-    /* RB tree of UEs */
-    hash_table_t         *ue_mapping;
-  } gtpv1u_data_t;
 #define GTPV1U_BEARER_OFFSET 3
 #define GTPV1U_MAX_BEARERS_ID     (32 - GTPV1U_BEARER_OFFSET) /* max_val_LTE_DRB_Identity */
   typedef enum {
