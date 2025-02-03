@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "openair3/UTILS/conversions.h"
+#include "e1ap_messages_types.h"
 
 #ifdef ENABLE_TESTS
 #define PRINT_ERROR(...) fprintf(stderr, ##__VA_ARGS__);
@@ -97,5 +98,9 @@
       return false; /* One of the two is not allocated */                \
     }                                                                    \
   } while (0)
+
+struct E1AP_Cause;
+struct E1AP_Cause e1_encode_cause_ie(const e1ap_cause_t *cause);
+e1ap_cause_t e1_decode_cause_ie(const struct E1AP_Cause *ie);
 
 #endif /* E1AP_LIB_COMMON_H_ */
