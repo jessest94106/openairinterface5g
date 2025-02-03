@@ -369,63 +369,6 @@ void gtpv1uSendDirect(instance_t instance,
   }
 }
 
-static void fillDlDeliveryStatusReport(extensionHeader_t *extensionHeader, uint32_t RLC_buffer_availability, uint32_t NR_PDCP_PDU_SN){
-
-  extensionHeader->buffer[0] = (1+sizeof(DlDataDeliveryStatus_flagsT)+(NR_PDCP_PDU_SN>0?3:0)+(NR_PDCP_PDU_SN>0?1:0)+1)/4;
-  DlDataDeliveryStatus_flagsT DlDataDeliveryStatus;
-  DlDataDeliveryStatus.deliveredPdcpSn = 0;
-  DlDataDeliveryStatus.transmittedPdcpSn= NR_PDCP_PDU_SN>0?1:0;
-  DlDataDeliveryStatus.pduType = 1;
-  DlDataDeliveryStatus.drbBufferSize = htonl(RLC_buffer_availability);
-  memcpy(extensionHeader->buffer+1, &DlDataDeliveryStatus, sizeof(DlDataDeliveryStatus_flagsT));
-  uint8_t offset = sizeof(DlDataDeliveryStatus_flagsT)+1;
-
-  if(NR_PDCP_PDU_SN>0){
-    extensionHeader->buffer[offset] =   (NR_PDCP_PDU_SN >> 16) & 0xff;
-    extensionHeader->buffer[offset+1] = (NR_PDCP_PDU_SN >> 8) & 0xff;
-    extensionHeader->buffer[offset+2] = NR_PDCP_PDU_SN & 0xff;
-    LOG_D(GTPU, "Octets reporting NR_PDCP_PDU_SN, extensionHeader->buffer[offset]: %u, extensionHeader->buffer[offset+1]:%u, extensionHeader->buffer[offset+2]:%u \n", extensionHeader->buffer[offset], extensionHeader->buffer[offset+1],extensionHeader->buffer[offset+2]);
-    extensionHeader->buffer[offset+3] = 0x00; //Padding octet
-    offset = offset+3;
-  }
-  extensionHeader->buffer[offset] = 0x00; //No more extension headers
-  /*Total size of DDD_status PDU = size of mandatory part +
-   * 3 octets for highest transmitted/delivered PDCP SN +
-   * 1 octet for padding + 1 octet for next extension header type,
-   * according to TS 38.425: Fig. 5.5.2.2-1 and section 5.5.3.24*/
-  extensionHeader->length  = 1+sizeof(DlDataDeliveryStatus_flagsT)+
-                              (NR_PDCP_PDU_SN>0?3:0)+
-                              (NR_PDCP_PDU_SN>0?1:0)+1;
-}
-
-static void gtpv1uSendDlDeliveryStatus(instance_t instance, gtpv1u_DU_buffer_report_req_t *req){
-  ue_id_t ue_id=req->ue_id;
-  int  bearer_id=req->pdusession_id;
-  pthread_mutex_lock(&globGtp.gtp_lock);
-  getInstRetVoid(compatInst(instance));
-  getUeRetVoid(inst, ue_id);
-
-  auto ptr2=ptrUe->second.bearers.find(bearer_id);
-
-  if ( ptr2 == ptrUe->second.bearers.end() ) {
-    LOG_D(GTPU,"GTP-U instance: %ld sending a packet to a non existant UE ID:RAB: %lu/%x\n", instance, ue_id, bearer_id);
-    pthread_mutex_unlock(&globGtp.gtp_lock);
-    return;
-  }
-
-  extensionHeader_t *extensionHeader;
-  extensionHeader = (extensionHeader_t *) calloc(1, sizeof(extensionHeader_t));
-  fillDlDeliveryStatusReport(extensionHeader, req->buffer_availability,0);
-
-  LOG_I(GTPU,"[%ld] GTP-U sending DL Data Delivery status to UE ID:RAB:teid %lu/%x/%x, oldseq %d, oldnum %d\n",
-        instance, ue_id, bearer_id,ptr2->second.teid_outgoing, ptr2->second.seqNum,ptr2->second.npduNum );
-  // copy to release the mutex
-  gtpv1u_bearer_t tmp=ptr2->second;
-  pthread_mutex_unlock(&globGtp.gtp_lock);
-  gtpv1uCreateAndSendMsg(
-      compatInst(instance), tmp.outgoing_ip_addr, tmp.outgoing_port, GTP_GPDU, tmp.teid_outgoing, NULL, 0, false, false, 0, 0, NR_RAN_CONTAINER, extensionHeader->buffer, extensionHeader->length);
-}
-
 static void gtpv1uEndTunnel(instance_t instance, gtpv1u_enb_end_marker_req_t *req)
 {
   ue_id_t ue_id=req->rnti;
@@ -1311,11 +1254,6 @@ void *gtpv1uTask(void *args)  {
       LOG_D(GTPU, "GTP-U received %s for instance %ld\n", messages_info[msgType].name, myInstance);
       switch (msgType) {
           // DATA TO BE SENT TO UDP
-
-        case GTPV1U_DU_BUFFER_REPORT_REQ:{
-          gtpv1uSendDlDeliveryStatus(compatInst(myInstance), &GTPV1U_DU_BUFFER_REPORT_REQ(message_p));
-        }
-        break;
 
         case TERMINATE_MESSAGE:
           break;
