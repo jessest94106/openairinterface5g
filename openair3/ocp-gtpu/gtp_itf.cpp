@@ -109,7 +109,6 @@ typedef struct gtpv1u_bearer_s {
 
 typedef struct {
   map<ue_id_t, gtpv1u_bearer_t> bearers;
-  teid_t outgoing_teid;
 } teidData_t;
 
 typedef struct {
