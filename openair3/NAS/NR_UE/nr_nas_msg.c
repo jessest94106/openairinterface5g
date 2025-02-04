@@ -855,14 +855,18 @@ static void process_pdu_session_addr(pdu_session_establishment_accept_msg_t *msg
     case PDU_SESSION_TYPE_IPV4: {
       char ip[20];
       capture_ipv4_addr(&addr[0], ip, sizeof(ip));
-      tun_config(1, ip, NULL, "oaitun_ue");
-      setup_ue_ipv4_route(1, ip, "oaitun_ue");
+      char ifname[IFNAMSIZ];
+      tun_generate_ifname(ifname, "oaitun_ue", 0);
+      tun_config(ifname, ip, NULL);
+      setup_ue_ipv4_route(ifname, 0, ip);
     } break;
 
     case PDU_SESSION_TYPE_IPV6: {
       char ipv6[40];
       capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
-      tun_config(1, NULL, ipv6, "oaitun_ue");
+      char ifname[IFNAMSIZ];
+      tun_generate_ifname(ifname, "oaitun_ue", 0);
+      tun_config(ifname, NULL, ipv6);
     } break;
 
     case PDU_SESSION_TYPE_IPV4V6: {
@@ -870,8 +874,10 @@ static void process_pdu_session_addr(pdu_session_establishment_accept_msg_t *msg
       capture_ipv6_addr(addr, ipv6, sizeof(ipv6));
       char ipv4[20];
       capture_ipv4_addr(&addr[IPv6_INTERFACE_ID_LENGTH], ipv4, sizeof(ipv4));
-      tun_config(1, ipv4, ipv6, "oaitun_ue");
-      setup_ue_ipv4_route(1, ipv4, "oaitun_ue");
+      char ifname[IFNAMSIZ];
+      tun_generate_ifname(ifname, "oaitun_ue", 0);
+      tun_config(ifname, ipv4, ipv6);
+      setup_ue_ipv4_route(ifname, 0, ipv4);
     } break;
 
     default:
