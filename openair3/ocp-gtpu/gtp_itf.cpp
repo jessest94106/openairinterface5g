@@ -96,13 +96,12 @@ typedef struct Gtpv1uExtHeader {
 #define GTP_END_MARKER (254)
 #define GTP_GPDU (255)
 
+// GTP bearer context: for sending data
 typedef struct gtpv1u_bearer_s {
-  /* TEID used in dl and ul */
-  teid_t teid_incoming; ///< eNB TEID
-  teid_t teid_outgoing; ///< Remote TEID
-  in_addr_t outgoing_ip_addr;
-  struct in6_addr outgoing_ip6_addr;
-  tcp_udp_port_t outgoing_port;
+  int sock_fd;
+  struct sockaddr_storage ip;
+  teid_t teid_incoming;
+  teid_t teid_outgoing;
   uint16_t seqNum;
   uint8_t npduNum;
   int outgoing_qfi;
@@ -217,22 +216,16 @@ instance_t legacyInstanceMapping = 0;
   }
 
 #define HDR_MAX 256 // 256 is supposed to be larger than any gtp header
-static int gtpv1uCreateAndSendMsg(int h,
-                                  uint32_t peerIp,
-                                  uint16_t peerPort,
+static int gtpv1uCreateAndSendMsg(gtpv1u_bearer_t *bearer,
                                   int msgType,
-                                  teid_t teid,
                                   uint8_t *Msg,
                                   int msgLen,
                                   bool seqNumFlag,
                                   bool npduNumFlag,
-                                  int seqNum,
-                                  int npduNum,
                                   int extHdrType,
                                   uint8_t *extensionHeader_buffer,
                                   uint8_t extensionHeader_length)
 {
-  LOG_D(GTPU, "Peer IP:%u peer port:%u outgoing teid:%u \n", peerIp, peerPort, teid);
 
   DevAssert(msgLen + HDR_MAX < 65536); // maximum size of UDP packet
   uint8_t buffer[msgLen + HDR_MAX];
@@ -247,14 +240,14 @@ static int gtpv1uCreateAndSendMsg(int h,
   msgHdr->PT = 1;
   msgHdr->version = 1;
   msgHdr->msgType = msgType;
-  msgHdr->teid = htonl(teid);
+  msgHdr->teid = htonl(bearer->teid_outgoing);
 
   curPtr += sizeof(Gtpv1uMsgHeaderT);
 
   if (seqNumFlag || (extHdrType != NO_MORE_EXT_HDRS) || npduNumFlag) {
-    *(uint16_t *)curPtr = seqNumFlag ? seqNum : 0x0000;
+    *(uint16_t *)curPtr = seqNumFlag ? bearer->seqNum : 0x0000;
     curPtr += sizeof(uint16_t);
-    *(uint8_t *)curPtr = npduNumFlag ? npduNum : 0x00;
+    *(uint8_t *)curPtr = npduNumFlag ? bearer->npduNum : 0x00;
     curPtr++;
     *(uint8_t *)curPtr = extHdrType;
     curPtr++;
@@ -283,20 +276,20 @@ static int gtpv1uCreateAndSendMsg(int h,
 
   msgHdr->msgLength = htons(curPtr - (buffer + sizeof(Gtpv1uMsgHeaderT)));
   AssertFatal(curPtr - (buffer + msgLen) < HDR_MAX, "fixed max size of all headers too short");
-  // Fix me: add IPv6 support, using flag ipVersion
-  struct sockaddr_in to = {0};
-  to.sin_family = AF_INET;
-  to.sin_port = htons(peerPort);
-  to.sin_addr.s_addr = peerIp;
-  LOG_D(GTPU, "sending packet size: %ld to %s\n", curPtr - buffer, inet_ntoa(to.sin_addr));
-  int ret;
 
-  if ((ret = sendto(h, (void *)buffer, curPtr - buffer, 0, (struct sockaddr *)&to, sizeof(to))) != curPtr - buffer) {
+  // Fix me: add IPv6 support
+  DevAssert(bearer->ip.ss_family == AF_INET);
+  struct sockaddr_in *to = (struct sockaddr_in *)&bearer->ip;
+  LOG_D(GTPU,
+        "Peer IP:" IPV4_ADDR " port:%u outgoing teid:%x\n",
+        IPV4_ADDR_FORMAT(to->sin_addr.s_addr),
+        htons(to->sin_port),
+        bearer->teid_outgoing);
+  int ret = sendto(bearer->sock_fd, buffer, curPtr - buffer, 0, (struct sockaddr *)to, sizeof(*to));
+  if (ret != curPtr - buffer) {
     LOG_E(GTPU,
-          "[SD %d] Failed to send data to " IPV4_ADDR " on port %d, buffer size %lu, ret: %d, errno: %d\n",
-          h,
-          IPV4_ADDR_FORMAT(peerIp),
-          peerPort,
+          "[SD %d] Failed to send data buffer size %lu, ret: %d, errno: %d\n",
+          bearer->sock_fd,
           curPtr - buffer,
           ret,
           errno);
@@ -343,49 +336,33 @@ void gtpv1uSendDirect(instance_t instance,
     ptr2->second.npduNum++;
 
   // copy to release the mutex
-  gtpv1u_bearer_t tmp = ptr2->second;
+  gtpv1u_bearer_t bearer = ptr2->second;
   pthread_mutex_unlock(&globGtp.gtp_lock);
 
-  if (tmp.outgoing_qfi != -1) {
-    Gtpv1uExtHeaderT ext = {0};
+  Gtpv1uExtHeaderT *opt_ext = NULL;
+  Gtpv1uExtHeaderT ext = {0};
+  if (bearer.outgoing_qfi != -1) {
+    opt_ext = &ext;
     ext.ExtHeaderLen = 1; // in quad bytes  EXT_HDR_LNTH_OCTET_UNITS
     ext.pdusession_cntr.spare = 0;
     ext.pdusession_cntr.PDU_type = UL_PDU_SESSION_INFORMATION;
-    ext.pdusession_cntr.QFI = tmp.outgoing_qfi;
+    ext.pdusession_cntr.QFI = bearer.outgoing_qfi;
     ext.pdusession_cntr.Reflective_QoS_activation = false;
     ext.pdusession_cntr.Paging_Policy_Indicator = false;
     ext.NextExtHeaderType = NO_MORE_EXT_HDRS;
 
-    gtpv1uCreateAndSendMsg(compatInst(instance),
-                           tmp.outgoing_ip_addr,
-                           tmp.outgoing_port,
-                           GTP_GPDU,
-                           tmp.teid_outgoing,
-                           buf,
-                           len,
-                           seqNumFlag,
-                           npduNumFlag,
-                           tmp.seqNum,
-                           tmp.npduNum,
-                           PDU_SESSION_CONTAINER,
-                           (uint8_t *)&ext,
-                           sizeof(ext));
-  } else {
-    gtpv1uCreateAndSendMsg(compatInst(instance),
-                           tmp.outgoing_ip_addr,
-                           tmp.outgoing_port,
-                           GTP_GPDU,
-                           tmp.teid_outgoing,
-                           buf,
-                           len,
-                           seqNumFlag,
-                           npduNumFlag,
-                           tmp.seqNum,
-                           tmp.npduNum,
-                           NO_MORE_EXT_HDRS,
-                           NULL,
-                           0);
   }
+
+  DevAssert(compatInst(instance) == bearer.sock_fd);
+  gtpv1uCreateAndSendMsg(&bearer,
+                         GTP_GPDU,
+                         buf,
+                         len,
+                         seqNumFlag,
+                         npduNumFlag,
+                         opt_ext ? PDU_SESSION_CONTAINER : NO_MORE_EXT_HDRS,
+                         (uint8_t *)opt_ext,
+                         sizeof(*opt_ext));
 }
 
 static void gtpv1uEndTunnel(instance_t instance, gtpv1u_enb_end_marker_req_t *req)
@@ -424,22 +401,16 @@ static void gtpv1uEndTunnel(instance_t instance, gtpv1u_enb_end_marker_req_t *re
   msgHdr.msgType = GTP_END_MARKER;
   msgHdr.msgLength = htons(0);
   msgHdr.teid = htonl(tmp.teid_outgoing);
-  // Fix me: add IPv6 support, using flag ipVersion
-  static struct sockaddr_in to = {0};
-  to.sin_family = AF_INET;
-  to.sin_port = htons(tmp.outgoing_port);
-  to.sin_addr.s_addr = tmp.outgoing_ip_addr;
-  char ip4[INET_ADDRSTRLEN];
-  // char ip6[INET6_ADDRSTRLEN];
-  LOG_D(GTPU, "[%ld] sending end packet to %s\n", instance, inet_ntoa(to.sin_addr));
 
-  if (sendto(compatInst(instance), (void *)&msgHdr, sizeof(msgHdr), 0, (struct sockaddr *)&to, sizeof(to)) != sizeof(msgHdr)) {
-    LOG_E(GTPU,
-          "[%ld] Failed to send data to %s on port %d, buffer size %lu\n",
-          compatInst(instance),
-          inet_ntop(AF_INET, &tmp.outgoing_ip_addr, ip4, INET_ADDRSTRLEN),
-          tmp.outgoing_port,
-          sizeof(msgHdr));
+  // Fix me: add IPv6 support
+  DevAssert(instance == tmp.sock_fd);
+  DevAssert(tmp.ip.ss_family == AF_INET);
+  struct sockaddr_in *to = (struct sockaddr_in *)&tmp.ip;
+  LOG_D(GTPU, "[%ld] sending end packet to " IPV4_ADDR " port %d\n", instance, IPV4_ADDR_FORMAT(to->sin_addr.s_addr), htons(to->sin_port));
+
+  ssize_t ret = sendto(tmp.sock_fd, &msgHdr, sizeof(msgHdr), 0, (struct sockaddr *)to, sizeof(*to));
+  if (ret != sizeof(msgHdr)) {
+    LOG_E(GTPU, "[%d] Failed to send data with buffer size %lu: ret %ld errno %d\n", tmp.sock_fd, sizeof(msgHdr), ret, errno);
   }
 }
 
@@ -550,13 +521,17 @@ void GtpuUpdateTunnelOutgoingAddressAndTeid(instance_t instance,
     return;
   }
 
-  ptr2->second.outgoing_ip_addr = newOutgoingAddr;
+  struct sockaddr_in *sockaddr = (struct sockaddr_in *)&ptr2->second.ip;
+  sockaddr->sin_family = AF_INET;
+  memcpy(&sockaddr->sin_addr, &newOutgoingAddr, sizeof(newOutgoingAddr));
+  AssertFatal(ptr2->second.ip.ss_family == AF_INET, "only IPv4 is supported\n");
   ptr2->second.teid_outgoing = newOutgoingTeid;
   LOG_I(GTPU,
-        "[%ld] Tunnel Outgoing TEID updated to %x and address to %x\n",
+        "[%ld] Tunnel Outgoing TEID updated to %x and IPv4 address to " IPV4_ADDR "\n",
         instance,
         ptr2->second.teid_outgoing,
-        ptr2->second.outgoing_ip_addr);
+        IPV4_ADDR_FORMAT(sockaddr->sin_addr.s_addr));
+
   pthread_mutex_unlock(&globGtp.gtp_lock);
   return;
 }
@@ -594,42 +569,48 @@ teid_t newGtpuCreateTunnel(instance_t instance,
   globGtp.te2ue_mapping[incoming_teid].callBackSDAP = callBackSDAP;
   globGtp.te2ue_mapping[incoming_teid].pdusession_id = (uint8_t)outgoing_bearer_id;
 
-  gtpv1u_bearer_t *tmp = &inst->ue2te_mapping[ue_id].bearers[outgoing_bearer_id];
+  gtpv1u_bearer_t bearer = {
+    .sock_fd = (int) compatInst(instance), // avoid warning on narrowing conversion: instance is long, sock_fd is int
+    .teid_incoming = incoming_teid,
+    .teid_outgoing = outgoing_teid,
+    .outgoing_qfi = outgoing_qfi,
+  };
 
   int addrs_length_in_bytes = remoteAddr.length / 8;
-
+  struct sockaddr_in *sa4 = (struct sockaddr_in *)&bearer.ip;
+  struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)&bearer.ip;
   switch (addrs_length_in_bytes) {
     case 4:
-      memcpy(&tmp->outgoing_ip_addr, remoteAddr.buffer, 4);
+      memcpy(&sa4->sin_addr, remoteAddr.buffer, 4);
+      sa4->sin_family = AF_INET;
+      sa4->sin_port = htons(inst->get_dstport());
       break;
 
     case 16:
-      memcpy(tmp->outgoing_ip6_addr.s6_addr, remoteAddr.buffer, 16);
+      AssertFatal(false, "IPv6 not supported\n");
       break;
 
     case 20:
-      memcpy(&tmp->outgoing_ip_addr, remoteAddr.buffer, 4);
-      memcpy(tmp->outgoing_ip6_addr.s6_addr, remoteAddr.buffer + 4, 16);
+      AssertFatal(false, "dual-IPv4/v6 not supported\n");
+      break;
 
     default:
       AssertFatal(false, "SGW Address size impossible");
   }
 
-  tmp->teid_incoming = incoming_teid;
-  tmp->outgoing_port = inst->get_dstport();
-  tmp->teid_outgoing = outgoing_teid;
-  tmp->outgoing_qfi = outgoing_qfi;
+  inst->ue2te_mapping[ue_id].bearers[outgoing_bearer_id] = bearer;
   pthread_mutex_unlock(&globGtp.gtp_lock);
   char ip4[INET_ADDRSTRLEN];
   char ip6[INET6_ADDRSTRLEN];
   LOG_I(GTPU,
-        "[%ld] Created tunnel for UE ID %lu, teid for incoming: %x, teid for outgoing %x to remote IPv4: %s, IPv6 %s\n",
+        "[%ld] Created tunnel for UE ID %lu, teid for incoming: %x, teid for outgoing %x to remote IPv4: %s, IPv6 %s, port %d\n",
         instance,
         ue_id,
-        tmp->teid_incoming,
-        tmp->teid_outgoing,
-        inet_ntop(AF_INET, (void *)&tmp->outgoing_ip_addr, ip4, INET_ADDRSTRLEN),
-        inet_ntop(AF_INET6, (void *)&tmp->outgoing_ip6_addr.s6_addr, ip6, INET6_ADDRSTRLEN));
+        bearer.teid_incoming,
+        bearer.teid_outgoing,
+        inet_ntop(AF_INET, &sa4->sin_addr, ip4, INET_ADDRSTRLEN),
+        inet_ntop(AF_INET6, &sa6->sin6_addr, ip6, INET6_ADDRSTRLEN),
+        ntohs(sa4->sin_port));
   return incoming_teid;
 }
 
@@ -922,6 +903,13 @@ int gtpv1u_delete_ngu_tunnel(const instance_t instance, gtpv1u_gnb_delete_tunnel
   return newGtpuDeleteTunnels(instance, req->ue_id, req->num_pdusession, req->pdusession_id);
 }
 
+static gtpv1u_bearer_t create_bearer(int socket, const struct sockaddr_in *addr, uint32_t teid, uint16_t seq)
+{
+  gtpv1u_bearer_t bearer = {.sock_fd = socket, .teid_outgoing = teid, .seqNum = seq};
+  memcpy(&bearer.ip, addr, sizeof(*addr));
+  return bearer;
+}
+
 static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, const struct sockaddr_in *addr)
 {
   Gtpv1uMsgHeaderT *msgHdr = (Gtpv1uMsgHeaderT *)msgBuf;
@@ -939,17 +927,13 @@ static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, const
   uint16_t seq = ntohs(*(uint16_t *)(msgHdr + 1));
   LOG_D(GTPU, "[%d] Received a echo request, TEID: %d, seq: %hu\n", h, msgHdr->teid, seq);
   uint8_t recovery[2] = {14, 0};
-  return gtpv1uCreateAndSendMsg(h,
-                                addr->sin_addr.s_addr,
-                                htons(addr->sin_port),
+  gtpv1u_bearer_t bearer = create_bearer(h, addr, ntohl(msgHdr->teid), seq);
+  return gtpv1uCreateAndSendMsg(&bearer,
                                 GTP_ECHO_RSP,
-                                ntohl(msgHdr->teid),
                                 recovery,
                                 sizeof recovery,
                                 true,
                                 false,
-                                seq,
-                                0,
                                 NO_MORE_EXT_HDRS,
                                 NULL,
                                 0);
@@ -1185,17 +1169,14 @@ static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, const st
      * 1 octet for padding + 1 octet for next extension header type,
      * according to TS 38.425: Fig. 5.5.2.2-1 and section 5.5.3.24*/
     extensionHeader->length = 1 + sizeof(DlDataDeliveryStatus_flagsT) + 3 + 1 + 1;
-    gtpv1uCreateAndSendMsg(h,
-                           addr->sin_addr.s_addr,
-                           htons(addr->sin_port),
+    uint32_t teid = globGtp.te2ue_mapping[ntohl(msgHdr->teid)].outgoing_teid;
+    gtpv1u_bearer_t bearer = create_bearer(h, addr, teid, 0);
+    gtpv1uCreateAndSendMsg(&bearer,
                            GTP_GPDU,
-                           globGtp.te2ue_mapping[ntohl(msgHdr->teid)].outgoing_teid,
                            NULL,
                            0,
                            false,
                            false,
-                           0,
-                           0,
                            NR_RAN_CONTAINER,
                            extensionHeader->buffer,
                            extensionHeader->length);
