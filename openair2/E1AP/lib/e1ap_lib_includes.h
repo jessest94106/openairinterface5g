@@ -67,5 +67,11 @@
 #include "E1AP_Transport-UP-Layer-Addresses-Info-To-Remove-Item.h"
 #include "E1AP_GTPTLAs.h"
 #include "E1AP_GTPTLA-Item.h"
+// E1 Bearer Context Modification Request
+#include "E1AP_PDU-Session-Resource-To-Modify-Item.h"
+#include "E1AP_DRB-To-Modify-List-NG-RAN.h"
+#include "E1AP_DRB-To-Modify-Item-NG-RAN.h"
+#include "E1AP_PDU-Session-Resource-To-Setup-Mod-Item.h"
+#include "E1AP_DRB-To-Setup-Mod-Item-NG-RAN.h"
 
 #endif /* E1AP_LIB_INCLUDES_H_ */

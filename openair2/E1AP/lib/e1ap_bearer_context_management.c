@@ -179,7 +179,7 @@ static bool eq_pdcp_config(const bearer_context_pdcp_config_t *a, const bearer_c
 /** @brief Encode SDAP Configuration IE */
 static E1AP_SDAP_Configuration_t e1_encode_sdap_config(const bearer_context_sdap_config_t *in)
 {
-  E1AP_SDAP_Configuration_t out;
+  E1AP_SDAP_Configuration_t out = {0};
   out.defaultDRB = in->defaultDRB ? E1AP_DefaultDRB_true : E1AP_DefaultDRB_false;
   out.sDAP_Header_UL = in->sDAP_Header_UL;
   out.sDAP_Header_DL = in->sDAP_Header_DL;
@@ -1049,4 +1049,634 @@ bool eq_bearer_context_setup_response(const e1ap_bearer_setup_resp_t *a, const e
 void free_e1ap_context_setup_response(const e1ap_bearer_setup_resp_t *msg)
 {
   // Do nothing (no dynamic allocation)
+}
+
+/* ============================================
+ *   E1AP Bearer Context Modification Request
+ * ============================================ */
+
+/** @brief Encode PDU Session Item to modify */
+static E1AP_PDU_Session_Resource_To_Modify_Item_t e1_encode_pdu_session_to_mod_item(const pdu_session_to_mod_t *in)
+{
+  E1AP_PDU_Session_Resource_To_Modify_Item_t out = {0};
+  out.pDU_Session_ID = in->sessionId;
+  for (const DRB_nGRAN_to_mod_t *j = in->DRBnGRanModList; j < in->DRBnGRanModList + in->numDRB2Modify; j++) {
+    asn1cCalloc(out.dRB_To_Modify_List_NG_RAN, drb2Mod_List);
+    asn1cSequenceAdd(drb2Mod_List->list, E1AP_DRB_To_Modify_Item_NG_RAN_t, drb2Mod);
+    drb2Mod->dRB_ID = j->id;
+    // PDCP Config (O)
+    if (j->pdcp_config) {
+      asn1cCalloc(drb2Mod->pDCP_Configuration, pDCP_Configuration);
+      *pDCP_Configuration = e1_encode_pdcp_config(j->pdcp_config);
+    }
+    // SDAP Config (O)
+    if (j->sdap_config) {
+      asn1cCalloc(drb2Mod->sDAP_Configuration, sDAP_Configuration);
+      *sDAP_Configuration = e1_encode_sdap_config(j->sdap_config);
+    }
+    // PDCP SN Status Request (O)
+    if (j->pdcp_sn_status_requested) {
+      asn1cCalloc(drb2Mod->pDCP_SN_Status_Request, pDCP_SN_Status_Request);
+      *pDCP_SN_Status_Request = E1AP_PDCP_SN_Status_Request_requested;
+    }
+    // DL UP TNL parameters (O)
+    if (j->numDlUpParam > 0) {
+      asn1cCalloc(drb2Mod->dL_UP_Parameters, DL_UP_Param_List);
+      for (const up_params_t *k = j->DlUpParamList; k < j->DlUpParamList + j->numDlUpParam; k++) {
+        asn1cSequenceAdd(DL_UP_Param_List->list, E1AP_UP_Parameters_Item_t, DL_UP_Param);
+        DL_UP_Param->uP_TNL_Information = e1_encode_up_tnl_info(&k->tl_info);
+        DL_UP_Param->cell_Group_ID = k->cell_group_id;
+      }
+    }
+    // QoS Flows to setup (O)
+    for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlow2Setup; k++) {
+      asn1cCalloc(drb2Mod->flow_Mapping_Information, flow_Mapping_Information);
+      asn1cSequenceAdd(flow_Mapping_Information->list, E1AP_QoS_Flow_QoS_Parameter_Item_t, ie1_2);
+      *ie1_2 = e1_encode_qos_flow_to_setup(k);
+    }
+  }
+  return out;
+}
+
+/** @brief Common encoding for the NG-RAN System IE */
+static E1AP_NG_RAN_BearerContextModificationRequest_t *encode_ng_ran_to_mod(E1AP_BearerContextModificationRequestIEs_t *ie)
+{
+  ie->id = E1AP_ProtocolIE_ID_id_System_BearerContextModificationRequest;
+  ie->criticality = E1AP_Criticality_reject;
+  ie->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_System_BearerContextModificationRequest;
+  E1AP_System_BearerContextModificationRequest_t *reqIE = &ie->value.choice.System_BearerContextModificationRequest;
+  reqIE->present = E1AP_System_BearerContextModificationRequest_PR_nG_RAN_BearerContextModificationRequest;
+  E1AP_ProtocolIE_Container_4932P26_t *msgNGRAN_list = calloc_or_fail(1, sizeof(*msgNGRAN_list));
+  reqIE->choice.nG_RAN_BearerContextModificationRequest = (struct E1AP_ProtocolIE_Container *)msgNGRAN_list;
+  asn1cSequenceAdd(msgNGRAN_list->list, E1AP_NG_RAN_BearerContextModificationRequest_t, msgNGRAN);
+  return msgNGRAN;
+}
+
+/** @brief Encode PDU Session Resource To Setup Modification List item */
+static E1AP_PDU_Session_Resource_To_Setup_Mod_Item_t e1_encode_pdu_session_to_setup_mod_item(const pdu_session_to_setup_t *in)
+{
+  E1AP_PDU_Session_Resource_To_Setup_Mod_Item_t item = {0};
+  // PDU Session ID (M)
+  item.pDU_Session_ID = in->sessionId;
+  // PDU Session Type (M)
+  item.pDU_Session_Type = in->sessionType;
+  // SNSSAI (M)
+  item.sNSSAI = e1_encode_snssai(&in->nssai);
+  // Security indication (M)
+  item.securityIndication = e1_encode_security_indication(&in->securityIndication);
+  // NG UL UP Transport Layer Information (M)
+  item.nG_UL_UP_TNL_Information = e1_encode_up_tnl_info(&in->UP_TL_information);
+  // DRB to setup
+  for (const DRB_nGRAN_to_setup_t *j = in->DRBnGRanList; j < in->DRBnGRanList + in->numDRB2Setup; j++) {
+    asn1cSequenceAdd(item.dRB_To_Setup_Mod_List_NG_RAN.list, E1AP_DRB_To_Setup_Mod_Item_NG_RAN_t, ie1);
+    // DRB ID (M)
+    ie1->dRB_ID = j->id;
+    // SDAP Config (M)
+    ie1->sDAP_Configuration = e1_encode_sdap_config(&j->sdap_config);
+    // PDCP Config (M)
+    ie1->pDCP_Configuration = e1_encode_pdcp_config(&j->pdcp_config);
+    // Cell Group Information (M)
+    for (const cell_group_id_t *k = j->cellGroupList; k < j->cellGroupList + j->numCellGroups; k++) {
+      asn1cSequenceAdd(ie1->cell_Group_Information.list, E1AP_Cell_Group_Information_Item_t, ie1_1);
+      ie1_1->cell_Group_ID = *k;
+    }
+    // QoS Flows Information To Be Setup (M)
+    for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlow2Setup; k++) {
+      asn1cSequenceAdd(ie1->flow_Mapping_Information.list, E1AP_QoS_Flow_QoS_Parameter_Item_t, ie1_2);
+      *ie1_2 = e1_encode_qos_flow_to_setup(k);
+    }
+  }
+  return item;
+}
+
+/**
+ * @brief Encodes the E1 Bearer Modification Request message
+ */
+E1AP_E1AP_PDU_t *encode_E1_bearer_context_mod_request(const e1ap_bearer_mod_req_t *in)
+{
+  E1AP_E1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  // PDU Type
+  pdu->present = E1AP_E1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, msg);
+  msg->procedureCode = E1AP_ProcedureCode_id_bearerContextModification;
+  msg->criticality = E1AP_Criticality_reject;
+  msg->value.present = E1AP_InitiatingMessage__value_PR_BearerContextModificationRequest;
+
+  E1AP_BearerContextModificationRequest_t *out = &msg->value.choice.BearerContextModificationRequest;
+
+  // gNB-CU-CP UE E1AP ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie1);
+  ie1->id = E1AP_ProtocolIE_ID_id_gNB_CU_CP_UE_E1AP_ID;
+  ie1->criticality = E1AP_Criticality_reject;
+  ie1->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_GNB_CU_CP_UE_E1AP_ID;
+  ie1->value.choice.GNB_CU_CP_UE_E1AP_ID = in->gNB_cu_cp_ue_id;
+
+  // gNB-CU-UP UE E1AP ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie2);
+  ie2->id = E1AP_ProtocolIE_ID_id_gNB_CU_UP_UE_E1AP_ID;
+  ie2->criticality = E1AP_Criticality_reject;
+  ie2->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_GNB_CU_UP_UE_E1AP_ID;
+  ie2->value.choice.GNB_CU_UP_UE_E1AP_ID = in->gNB_cu_up_ue_id;
+
+  // Security Information (O)
+  if (in->secInfo) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie3);
+    ie3->id = E1AP_ProtocolIE_ID_id_SecurityInformation;
+    ie3->criticality = E1AP_Criticality_reject;
+    ie3->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_SecurityInformation;
+    ie3->value.choice.SecurityInformation = e1_encode_security_info(in->secInfo);
+  }
+
+  // UE DL Aggregate Maximum Bit Rate (O)
+  if (in->ueDlAggMaxBitRate) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie4);
+    ie4->id = E1AP_ProtocolIE_ID_id_UEDLAggregateMaximumBitRate;
+    ie4->criticality = E1AP_Criticality_reject;
+    ie4->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_BitRate;
+    INT32_TO_OCTET_STRING(*in->ueDlAggMaxBitRate, &ie4->value.choice.BitRate);
+  }
+
+  // UE DL Maximum Integrity Protected Data Rate (O)
+  if (in->ueDlMaxIPBitRate) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie5);
+    ie5->id = E1AP_ProtocolIE_ID_id_UEDLMaximumIntegrityProtectedDataRate;
+    ie5->criticality = E1AP_Criticality_ignore;
+    ie5->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_BitRate;
+    INT32_TO_OCTET_STRING(*in->ueDlMaxIPBitRate, &ie5->value.choice.BitRate);
+  }
+
+  // Bearer Context Status Change (O)
+  if (in->bearerContextStatus && *in->bearerContextStatus == BEARER_SUSPEND) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie6);
+    ie6->id = E1AP_ProtocolIE_ID_id_BearerContextStatusChange;
+    ie6->criticality = E1AP_Criticality_reject;
+    ie6->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_BearerContextStatusChange;
+    ie6->value.choice.BearerContextStatusChange = E1AP_BearerContextStatusChange_suspend;
+  }
+
+  // UE Inactivity Timer (O)
+  if (in->inactivityTimer) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie7);
+    ie7->id = E1AP_ProtocolIE_ID_id_UE_Inactivity_Timer;
+    ie7->criticality = E1AP_Criticality_ignore;
+    ie7->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_Inactivity_Timer;
+    ie7->value.choice.Inactivity_Timer = *in->inactivityTimer;
+  }
+
+  // Data Discard Required (O)
+  if (in->dataDiscardRequired) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, ie9);
+    ie9->id = E1AP_ProtocolIE_ID_id_DataDiscardRequired;
+    ie9->criticality = E1AP_Criticality_ignore;
+    ie9->value.present = E1AP_BearerContextModificationRequestIEs__value_PR_DataDiscardRequired;
+    ie9->value.choice.DataDiscardRequired = in->dataDiscardRequired;
+  }
+
+  // NG-RAN PDU Session Resource To Setup List (O)
+  if (in->numPDUSessions) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, setupList);
+    E1AP_NG_RAN_BearerContextModificationRequest_t *msgNGRAN = encode_ng_ran_to_mod(setupList);
+    msgNGRAN->id = E1AP_ProtocolIE_ID_id_PDU_Session_Resource_To_Setup_Mod_List;
+    msgNGRAN->criticality = E1AP_Criticality_reject;
+    msgNGRAN->value.present = E1AP_NG_RAN_BearerContextModificationRequest__value_PR_PDU_Session_Resource_To_Setup_Mod_List;
+    E1AP_PDU_Session_Resource_To_Setup_Mod_List_t *pdu2Setup = &msgNGRAN->value.choice.PDU_Session_Resource_To_Setup_Mod_List;
+    for (int i = 0; i < in->numPDUSessions; i++) {
+      const pdu_session_to_setup_t *pdu_session = &in->pduSession[i];
+      asn1cSequenceAdd(pdu2Setup->list, E1AP_PDU_Session_Resource_To_Setup_Mod_Item_t, item);
+      *item = e1_encode_pdu_session_to_setup_mod_item(pdu_session);
+    }
+  }
+
+  // NG-RAN PDU Session Resource To Modify List (O)
+  if (in->numPDUSessionsMod) {
+    asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextModificationRequestIEs_t, modList);
+    E1AP_NG_RAN_BearerContextModificationRequest_t *msgNGRAN = encode_ng_ran_to_mod(modList);
+    msgNGRAN->id = E1AP_ProtocolIE_ID_id_PDU_Session_Resource_To_Modify_List;
+    msgNGRAN->criticality = E1AP_Criticality_reject;
+    msgNGRAN->value.present = E1AP_NG_RAN_BearerContextModificationRequest__value_PR_PDU_Session_Resource_To_Modify_List;
+    E1AP_PDU_Session_Resource_To_Modify_List_t *pdu2Setup = &msgNGRAN->value.choice.PDU_Session_Resource_To_Modify_List;
+    for (const pdu_session_to_mod_t *i = in->pduSessionMod; i < in->pduSessionMod + in->numPDUSessionsMod; i++) {
+      asn1cSequenceAdd(pdu2Setup->list, E1AP_PDU_Session_Resource_To_Modify_Item_t, ieC3_1);
+      *ieC3_1 = e1_encode_pdu_session_to_mod_item(i);
+    }
+  }
+  return pdu;
+}
+
+/** @brief Decode PDU Session Item to Setup (Bearer Context Modification Request) */
+static bool e1_decode_pdu_session_to_setup_mod_item(pdu_session_to_setup_t *out,
+                                                    const E1AP_PDU_Session_Resource_To_Setup_Mod_Item_t *item)
+{
+  // PDU Session ID (M)
+  out->sessionId = item->pDU_Session_ID;
+  // PDU Session Type (M)
+  out->sessionType = item->pDU_Session_Type;
+  // S-NSSAI (M)
+  CHECK_E1AP_DEC(e1_decode_snssai(&out->nssai, &item->sNSSAI));
+  // Security Indication (M)
+  CHECK_E1AP_DEC(e1_decode_security_indication(&out->securityIndication, &item->securityIndication));
+  /* NG UL UP Transport Layer Information (M) */
+  _E1_EQ_CHECK_INT(item->nG_UL_UP_TNL_Information.present, E1AP_UP_TNL_Information_PR_gTPTunnel);
+  CHECK_E1AP_DEC(e1_decode_up_tnl_info(&out->UP_TL_information, &item->nG_UL_UP_TNL_Information));
+  /* DRB To Setup List ( > 1 item ) */
+  const E1AP_DRB_To_Setup_Mod_List_NG_RAN_t *drb2SetupList = &item->dRB_To_Setup_Mod_List_NG_RAN;
+  _E1_EQ_CHECK_GENERIC(drb2SetupList->list.count > 0, "%d", drb2SetupList->list.count, 0);
+  out->numDRB2Setup = drb2SetupList->list.count;
+  _E1_EQ_CHECK_INT(out->numDRB2Setup, 1); // can only handle one DRB per PDU session
+  for (int j = 0; j < drb2SetupList->list.count; j++) {
+    DRB_nGRAN_to_setup_t *drb = out->DRBnGRanList + j;
+    const E1AP_DRB_To_Setup_Mod_Item_NG_RAN_t *drb2Setup = drb2SetupList->list.array[j];
+    // DRB ID (M)
+    drb->id = drb2Setup->dRB_ID;
+    // SDAP Configuration (M)
+    CHECK_E1AP_DEC(e1_decode_sdap_config(&drb->sdap_config, &drb2Setup->sDAP_Configuration));
+    // PDCP Configuration (M)
+    CHECK_E1AP_DEC(e1_decode_pdcp_config(&drb->pdcp_config, &drb2Setup->pDCP_Configuration));
+    // Cell Group Information (M)
+    const E1AP_Cell_Group_Information_t *cellGroupList = &drb2Setup->cell_Group_Information;
+    _E1_EQ_CHECK_GENERIC(cellGroupList->list.count > 0, "%d", cellGroupList->list.count, 0);
+    drb->numCellGroups = cellGroupList->list.count;
+    for (int k = 0; k < cellGroupList->list.count; k++) {
+      const E1AP_Cell_Group_Information_Item_t *cg2Setup = cellGroupList->list.array[k];
+      // Cell Group ID
+      drb->cellGroupList[k] = cg2Setup->cell_Group_ID;
+    }
+    // QoS Flows Information To Be Setup (M)
+    const E1AP_QoS_Flow_QoS_Parameter_List_t *qos2SetupList = &drb2Setup->flow_Mapping_Information;
+    drb->numQosFlow2Setup = qos2SetupList->list.count;
+    for (int k = 0; k < qos2SetupList->list.count; k++) {
+      CHECK_E1AP_DEC(e1_decode_qos_flow_to_setup(drb->qosFlows + k, qos2SetupList->list.array[k]));
+    }
+  }
+  return true;
+}
+
+
+/** @brief Decode PDU Session Item to modify (Bearer Context Modification Request) */
+static bool e1_decode_pdu_session_to_mod_item(pdu_session_to_mod_t *out, const E1AP_PDU_Session_Resource_To_Modify_Item_t *in)
+{
+  // PDU Session ID
+  out->sessionId = in->pDU_Session_ID;
+  // DRB to modify list
+  E1AP_DRB_To_Modify_List_NG_RAN_t *drb2ModList = in->dRB_To_Modify_List_NG_RAN;
+  out->numDRB2Modify = drb2ModList->list.count;
+  for (int j = 0; j < drb2ModList->list.count; j++) {
+    DRB_nGRAN_to_mod_t *drb = out->DRBnGRanModList + j;
+    // DRB to modify item
+    E1AP_DRB_To_Modify_Item_NG_RAN_t *drb2Mod = drb2ModList->list.array[j];
+    drb->id = drb2Mod->dRB_ID;
+    // PDCP Config (O)
+    if (drb2Mod->pDCP_Configuration) {
+      drb->pdcp_config = malloc_or_fail(sizeof(*drb->pdcp_config));
+      CHECK_E1AP_DEC(e1_decode_pdcp_config(drb->pdcp_config, drb2Mod->pDCP_Configuration));
+    }
+    // SDAP Config (O)
+    if (drb2Mod->sDAP_Configuration) {
+      drb->sdap_config = malloc_or_fail(sizeof(*drb->sdap_config));
+      CHECK_E1AP_DEC(e1_decode_sdap_config(drb->sdap_config, drb2Mod->sDAP_Configuration));
+    }
+    // PDCP SN Status Request (O)
+    if (drb2Mod->pDCP_SN_Status_Request) {
+      drb->pdcp_sn_status_requested = true;
+    }
+    // DL UP TNL parameters (O)
+    if (drb2Mod->dL_UP_Parameters) {
+      E1AP_UP_Parameters_t *dl_up_paramList = drb2Mod->dL_UP_Parameters;
+      if((drb->numDlUpParam = decode_dl_up_parameters(drb->DlUpParamList, dl_up_paramList)) < 0) {
+        PRINT_ERROR("Failed to decode DL UP TNL parameters\n");
+        return false;
+      }
+    }
+    // QoS Flows Information To Be Setup (O)
+    E1AP_QoS_Flow_QoS_Parameter_List_t *qos2SetupList = drb2Mod->flow_Mapping_Information;
+    drb->numQosFlow2Setup = qos2SetupList->list.count;
+    for (int k = 0; k < qos2SetupList->list.count; k++) {
+      CHECK_E1AP_DEC(e1_decode_qos_flow_to_setup(drb->qosFlows + k, qos2SetupList->list.array[k]));
+    }
+  }
+  return true;
+}
+
+
+/**
+ * @brief E1 Bearer Modification Request message decoding
+ */
+bool decode_E1_bearer_context_mod_request(const E1AP_E1AP_PDU_t *pdu, e1ap_bearer_mod_req_t *out)
+{
+  DevAssert(pdu != NULL);
+  // Validate message type
+  _E1_EQ_CHECK_INT(pdu->present, E1AP_E1AP_PDU_PR_initiatingMessage);
+  const E1AP_InitiatingMessage_t *im = pdu->choice.initiatingMessage;
+  _E1_EQ_CHECK_LONG(im->procedureCode, E1AP_ProcedureCode_id_bearerContextModification);
+  _E1_EQ_CHECK_INT(im->value.present, E1AP_InitiatingMessage__value_PR_BearerContextModificationRequest);
+
+  const E1AP_BearerContextModificationRequest_t *in = &im->value.choice.BearerContextModificationRequest;
+  E1AP_BearerContextModificationRequestIEs_t *ie = NULL;
+
+  // Mandatory IEs
+  // gNB-CU-CP UE E1AP ID (M)
+  E1AP_LIB_FIND_IE(E1AP_BearerContextModificationRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_gNB_CU_CP_UE_E1AP_ID, true);
+  // gNB-CU-UP UE E1AP ID (M)
+  E1AP_LIB_FIND_IE(E1AP_BearerContextModificationRequestIEs_t, ie, in, E1AP_ProtocolIE_ID_id_gNB_CU_UP_UE_E1AP_ID, true);
+
+  // Loop through all IEs and extract
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    ie = in->protocolIEs.list.array[i];
+
+    switch (ie->id) {
+      case E1AP_ProtocolIE_ID_id_gNB_CU_CP_UE_E1AP_ID:
+        _E1_EQ_CHECK_INT(ie->value.present, E1AP_BearerContextModificationRequestIEs__value_PR_GNB_CU_CP_UE_E1AP_ID);
+        out->gNB_cu_cp_ue_id = ie->value.choice.GNB_CU_CP_UE_E1AP_ID;
+        break;
+
+      case E1AP_ProtocolIE_ID_id_gNB_CU_UP_UE_E1AP_ID:
+        _E1_EQ_CHECK_INT(ie->value.present, E1AP_BearerContextModificationRequestIEs__value_PR_GNB_CU_UP_UE_E1AP_ID);
+        out->gNB_cu_up_ue_id = ie->value.choice.GNB_CU_UP_UE_E1AP_ID;
+        break;
+
+      case E1AP_ProtocolIE_ID_id_SecurityInformation:
+        out->secInfo = malloc_or_fail(sizeof(*out->secInfo));
+        CHECK_E1AP_DEC(e1_decode_security_info(out->secInfo, &ie->value.choice.SecurityInformation));
+        break;
+
+      case E1AP_ProtocolIE_ID_id_UEDLAggregateMaximumBitRate:
+        out->ueDlAggMaxBitRate = malloc_or_fail(sizeof(*out->ueDlAggMaxBitRate));
+        OCTET_STRING_TO_UINT32(&ie->value.choice.BitRate, *out->ueDlAggMaxBitRate);
+        break;
+
+      case E1AP_ProtocolIE_ID_id_UEDLMaximumIntegrityProtectedDataRate:
+        out->ueDlMaxIPBitRate = malloc_or_fail(sizeof(*out->ueDlMaxIPBitRate));
+        OCTET_STRING_TO_UINT32(&ie->value.choice.BitRate, *out->ueDlMaxIPBitRate);
+        break;
+
+      case E1AP_ProtocolIE_ID_id_BearerContextStatusChange:
+        _E1_EQ_CHECK_INT(ie->value.present, E1AP_BearerContextModificationRequestIEs__value_PR_BearerContextStatusChange);
+        if (ie->value.choice.BearerContextStatusChange == E1AP_BearerContextStatusChange_suspend) {
+          out->bearerContextStatus = malloc_or_fail(sizeof(*out->bearerContextStatus));
+          *out->bearerContextStatus = BEARER_SUSPEND;
+        }
+        break;
+
+      case E1AP_ProtocolIE_ID_id_UE_Inactivity_Timer:
+        out->inactivityTimer = malloc_or_fail(sizeof(*out->inactivityTimer));
+        *out->inactivityTimer = ie->value.choice.Inactivity_Timer;
+        break;
+
+      case E1AP_ProtocolIE_ID_id_DataDiscardRequired:
+        out->dataDiscardRequired = ie->value.choice.DataDiscardRequired;
+        break;
+
+      case E1AP_ProtocolIE_ID_id_System_BearerContextModificationRequest: {
+        _E1_EQ_CHECK_INT(ie->value.present,
+                         E1AP_BearerContextModificationRequestIEs__value_PR_System_BearerContextModificationRequest);
+        E1AP_System_BearerContextModificationRequest_t *modReq = &ie->value.choice.System_BearerContextModificationRequest;
+        DevAssert(ie->value.choice.System_BearerContextModificationRequest.choice.nG_RAN_BearerContextModificationRequest != NULL);
+        // System IE can contain either UTRAN or NG-RAN
+        switch (modReq->present) {
+          case E1AP_System_BearerContextModificationRequest_PR_NOTHING:
+            PRINT_ERROR("System Bearer Context Setup Request: no choice present\n");
+            break;
+          case E1AP_System_BearerContextModificationRequest_PR_e_UTRAN_BearerContextModificationRequest:
+            PRINT_ERROR("UTRAN in E1 Setup Modification Request not supported\n");
+            return false;
+            break;
+          case E1AP_System_BearerContextModificationRequest_PR_nG_RAN_BearerContextModificationRequest:
+            // NG-RAN
+            AssertFatal(modReq->choice.nG_RAN_BearerContextModificationRequest != NULL,
+                        "System_BearerContextSetupRequest->choice.nG_RAN_BearerContextSetupRequest shall not be null");
+            E1AP_ProtocolIE_Container_4932P26_t *msgNGRAN_list =
+                (E1AP_ProtocolIE_Container_4932P26_t *)modReq->choice.nG_RAN_BearerContextModificationRequest;
+            // loop through all items in the NG-RAN list (to setup, to modify, etc)
+            for (int i = 0; i < msgNGRAN_list->list.count; i++) {
+              E1AP_NG_RAN_BearerContextModificationRequest_t *msgNGRAN = msgNGRAN_list->list.array[i];
+              switch (msgNGRAN->id) {
+                case E1AP_ProtocolIE_ID_id_PDU_Session_Resource_To_Setup_Mod_List:
+                  _E1_EQ_CHECK_LONG(msgNGRAN->id, E1AP_ProtocolIE_ID_id_PDU_Session_Resource_To_Setup_Mod_List);
+                  _E1_EQ_CHECK_INT(msgNGRAN->value.present,
+                                   E1AP_NG_RAN_BearerContextModificationRequest__value_PR_PDU_Session_Resource_To_Setup_Mod_List);
+                  E1AP_PDU_Session_Resource_To_Setup_Mod_List_t *setupList =
+                      &msgNGRAN->value.choice.PDU_Session_Resource_To_Setup_Mod_List;
+                  // PDU Session Resource To Modify List
+                  out->numPDUSessions = setupList->list.count;
+                  // Loop through all PDU sessions
+                  for (int i = 0; i < setupList->list.count; i++) {
+                    pdu_session_to_setup_t *pdu_session = out->pduSession + i;
+                    E1AP_PDU_Session_Resource_To_Setup_Mod_Item_t *pdu2Setup = setupList->list.array[i];
+                    CHECK_E1AP_DEC(e1_decode_pdu_session_to_setup_mod_item(pdu_session, pdu2Setup));
+                  }
+                  break;
+                case E1AP_ProtocolIE_ID_id_PDU_Session_Resource_To_Modify_List:
+                  /* PDU Session Resource To Modify List (see 9.3.3.11 of TS 38.463) */
+                  _E1_EQ_CHECK_INT(msgNGRAN->value.present,
+                                   E1AP_NG_RAN_BearerContextModificationRequest__value_PR_PDU_Session_Resource_To_Modify_List);
+                  E1AP_PDU_Session_Resource_To_Modify_List_t *modList = &msgNGRAN->value.choice.PDU_Session_Resource_To_Modify_List;
+                  out->numPDUSessionsMod = modList->list.count;
+                  // Loop through all PDU sessions
+                  for (int i = 0; i < modList->list.count; i++) {
+                    CHECK_E1AP_DEC(e1_decode_pdu_session_to_mod_item(out->pduSessionMod + i, modList->list.array[i]));
+                  }
+                  break;
+                default:
+                  PRINT_ERROR("Unknown msgNGRAN->id in E1 Setup Modification Request\n");
+                  return false;
+                  break;
+              }
+            }
+
+            break;
+          default:
+            PRINT_ERROR("System Bearer Context Modification Request: No valid choice present.\n");
+            break;
+        }
+
+        break;
+      }
+
+      default:
+        PRINT_ERROR("System Bearer Context Modification Request: this IE is not implemented (or) invalid IE detected\n");
+        return false;
+        break;
+    }
+  }
+
+  return true;
+}
+
+/** @brief Deep copy for DRB Item to modify */
+static DRB_nGRAN_to_mod_t cp_drb_to_mod_item(const DRB_nGRAN_to_mod_t *msg)
+{
+  DRB_nGRAN_to_mod_t cp = {0};
+  // shallow copy
+  cp = *msg;
+  _E1_CP_OPTIONAL_IE(&cp, msg, sdap_config);
+  _E1_CP_OPTIONAL_IE(&cp, msg, pdcp_config);
+  return cp;
+}
+
+/** @brief Deep copy for PDU Session Item to modify */
+static pdu_session_to_mod_t cp_pdu_session_to_mod_item(const pdu_session_to_mod_t *msg)
+{
+  pdu_session_to_mod_t cp = {0};
+  // shallow copy
+  cp = *msg;
+  // DRB to setup list
+  for (int j = 0; j < msg->numDRB2Setup; j++)
+    cp.DRBnGRanList[j] = cp_drb_to_setup_item(&msg->DRBnGRanList[j]);
+  // DRB to modify list
+  for (int j = 0; j < msg->numDRB2Modify; j++)
+    cp.DRBnGRanModList[j] = cp_drb_to_mod_item(&msg->DRBnGRanModList[j]);
+  _E1_CP_OPTIONAL_IE(&cp, msg, securityIndication);
+  _E1_CP_OPTIONAL_IE(&cp, msg, UP_TL_information);
+  return cp;
+}
+
+/** @brief Deep copy for Bearer Context Modification Request */
+e1ap_bearer_mod_req_t cp_bearer_context_mod_request(const e1ap_bearer_mod_req_t *msg)
+{
+  e1ap_bearer_mod_req_t cp = {0};
+  // Shallow copy
+  cp = *msg;
+  // Deep copy for optional fields
+  _E1_CP_OPTIONAL_IE(&cp, msg, secInfo);
+  _E1_CP_OPTIONAL_IE(&cp, msg, bearerContextStatus);
+  _E1_CP_OPTIONAL_IE(&cp, msg, inactivityTimer);
+  // Deep copy PDU sessions
+  for (int i = 0; i < msg->numPDUSessions; i++)
+    cp.pduSession[i] = cp_pdu_session_item(&msg->pduSession[i]);
+  for (int i = 0; i < msg->numPDUSessionsMod; i++)
+    cp.pduSessionMod[i] = cp_pdu_session_to_mod_item(&msg->pduSessionMod[i]);
+  return cp;
+}
+
+/** @brief Equality check for Security Indication IE (3GPP TS 38.463 9.3.1.23) */
+static bool eq_security_ind(security_indication_t *a, security_indication_t *b)
+{
+  _E1_EQ_CHECK_INT(a->confidentialityProtectionIndication, b->confidentialityProtectionIndication);
+  _E1_EQ_CHECK_INT(a->integrityProtectionIndication, b->integrityProtectionIndication);
+  _E1_EQ_CHECK_LONG(a->maxIPrate, b->maxIPrate);
+  return true;
+}
+
+/**
+ * @brief Equality check for DRB_nGRAN_to_mod_t
+ */
+static bool eq_drb_to_mod(const DRB_nGRAN_to_mod_t *a, const DRB_nGRAN_to_mod_t *b)
+{
+  bool result = true;
+  _E1_EQ_CHECK_LONG(a->id, b->id);
+  _E1_EQ_CHECK_INT(a->numQosFlow2Setup, b->numQosFlow2Setup);
+  for (int i = 0; i < a->numQosFlow2Setup; i++) {
+    result &= eq_qos_flow(&a->qosFlows[i], &b->qosFlows[i]);
+  }
+  _E1_EQ_CHECK_INT(a->numDlUpParam, b->numDlUpParam);
+  for (int i = 0; i < a->numDlUpParam; i++) {
+    _E1_EQ_CHECK_INT(a->DlUpParamList[i].cell_group_id, b->DlUpParamList[i].cell_group_id);
+    eq_up_tl_info(&a->DlUpParamList[i].tl_info, &b->DlUpParamList[i].tl_info);
+  }
+  if (a->pdcp_config && b->pdcp_config)
+    result &= eq_pdcp_config(a->pdcp_config, b->pdcp_config);
+  if (a->sdap_config && b->sdap_config)
+    result &= eq_sdap_config(a->sdap_config, b->sdap_config);
+  return result;
+}
+
+/** @brief Equality check for PDU session item to modify */
+static bool eq_pdu_session_to_mod_item(const pdu_session_to_mod_t *a, const pdu_session_to_mod_t *b)
+{
+  _E1_EQ_CHECK_LONG(a->sessionId, b->sessionId);
+  if (a->UP_TL_information && a->UP_TL_information) {
+    if (!eq_up_tl_info(a->UP_TL_information, b->UP_TL_information))
+      return false;
+  }
+  _E1_EQ_CHECK_INT(a->numDRB2Setup, b->numDRB2Setup);
+  for (int i = 0; i < a->numDRB2Setup; i++) {
+    if (!eq_drb_to_setup(&a->DRBnGRanList[i], &b->DRBnGRanList[i]))
+      return false;
+  }
+  _E1_EQ_CHECK_LONG(a->numDRB2Modify, b->numDRB2Modify);
+  for (int i = 0; i < a->numDRB2Modify; i++) {
+    if (!eq_drb_to_mod(&a->DRBnGRanModList[i], &b->DRBnGRanModList[i]))
+      return false;
+  }
+  if (a->securityIndication && b->securityIndication) {
+    eq_security_ind(a->securityIndication, b->securityIndication);
+  }
+  return true;
+}
+
+/**
+ * @brief E1AP Bearer Modification Request equality check
+ */
+bool eq_bearer_context_mod_request(const e1ap_bearer_mod_req_t *a, const e1ap_bearer_mod_req_t *b)
+{
+  // basic members
+  _E1_EQ_CHECK_INT(a->gNB_cu_cp_ue_id, b->gNB_cu_cp_ue_id);
+  _E1_EQ_CHECK_INT(a->gNB_cu_up_ue_id, b->gNB_cu_up_ue_id);
+  _E1_EQ_CHECK_INT(a->numPDUSessions, b->numPDUSessions);
+  _E1_EQ_CHECK_INT(a->numPDUSessionsMod, b->numPDUSessionsMod);
+  // Security Info
+  _E1_EQ_CHECK_OPTIONAL_PTR(a, b, secInfo);
+  if (a->secInfo && b->secInfo) {
+    _E1_EQ_CHECK_LONG(a->secInfo->cipheringAlgorithm, b->secInfo->cipheringAlgorithm);
+    _E1_EQ_CHECK_LONG(a->secInfo->integrityProtectionAlgorithm, b->secInfo->integrityProtectionAlgorithm);
+    _E1_EQ_CHECK_STR(a->secInfo->encryptionKey, b->secInfo->encryptionKey);
+    _E1_EQ_CHECK_STR(a->secInfo->integrityProtectionKey, b->secInfo->integrityProtectionKey);
+  }
+  // Bearer Context Status (O)
+  _E1_EQ_CHECK_OPTIONAL_IE(a, b, bearerContextStatus, _E1_EQ_CHECK_INT);
+  // Inactivity Timer (O)
+  _E1_EQ_CHECK_OPTIONAL_PTR(a, b, inactivityTimer);
+  if (a->inactivityTimer && b->inactivityTimer)
+    _E1_EQ_CHECK_INT(*a->inactivityTimer, *b->inactivityTimer);
+  // Activity Notification Level (O)
+  // PDU Sessions
+  if (a->numPDUSessions != b->numPDUSessions)
+    return false;
+  for (int i = 0; i < a->numPDUSessions; i++) {
+    if (!eq_pdu_session_item(&a->pduSession[i], &b->pduSession[i]))
+      return false;
+  }
+  // Modified PDU Sessions
+  if (a->numPDUSessionsMod != b->numPDUSessionsMod)
+    return false;
+  for (int i = 0; i < a->numPDUSessionsMod; i++) {
+    if (!eq_pdu_session_to_mod_item(&a->pduSessionMod[i], &b->pduSessionMod[i]))
+      return false;
+  }
+  return true;
+}
+
+/* Free DRB to modify item */
+static void free_drb_to_mod_item(const DRB_nGRAN_to_mod_t *msg)
+{
+  free(msg->pdcp_config);
+  free(msg->sdap_config);
+}
+
+/* Free PDU Session to modify item */
+void free_pdu_session_to_mod_item(const pdu_session_to_mod_t *msg)
+{
+  free(msg->securityIndication);
+  free(msg->UP_TL_information);
+  for (int i = 0; i < msg->numDRB2Modify; i++)
+    free_drb_to_mod_item(&msg->DRBnGRanModList[i]);
+  for (int i = 0; i < msg->numDRB2Setup; i++)
+    free_drb_to_setup_item(&msg->DRBnGRanList[i]);
+}
+
+/**
+ * @brief E1AP Bearer Context Modification Request memory management
+ */
+void free_e1ap_context_mod_request(const e1ap_bearer_mod_req_t *msg)
+{
+  free(msg->secInfo);
+  free(msg->ueDlAggMaxBitRate);
+  free(msg->ueDlMaxIPBitRate);
+  free(msg->bearerContextStatus);
+  free(msg->inactivityTimer);
+  for (int i = 0; i < msg->numPDUSessions; i++)
+    free_pdu_session_to_setup_item(&msg->pduSession[i]);
+  for (int i = 0; i < msg->numPDUSessionsMod; i++)
+    free_pdu_session_to_mod_item(&msg->pduSessionMod[i]);
 }
