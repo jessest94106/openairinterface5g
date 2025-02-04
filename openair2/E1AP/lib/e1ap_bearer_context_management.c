@@ -293,6 +293,62 @@ static bool eq_qos_flow(const qos_flow_to_setup_t *a, const qos_flow_to_setup_t 
   return true;
 }
 
+/** @brief S-NSSAI Encoding (3GPP TS 38.463 9.3.1.9) */
+static E1AP_SNSSAI_t e1_encode_snssai(const nssai_t *in)
+{
+  E1AP_SNSSAI_t out = {0};
+  INT8_TO_OCTET_STRING(in->sst, &out.sST);
+  if (in->sd != 0xffffff) {
+    out.sD = malloc_or_fail(sizeof(*out.sD));
+    INT24_TO_OCTET_STRING(in->sd, out.sD);
+  }
+  return out;
+}
+
+/** @brief S-NSSAI Decoding (3GPP TS 38.463 9.3.1.9) */
+static bool e1_decode_snssai(e1ap_nssai_t *out, const E1AP_SNSSAI_t *in)
+{
+  // SST (M)
+  OCTET_STRING_TO_INT8(&in->sST, out->sst);
+  out->sd = 0xffffff;
+  // SD (O)
+  if (in->sD != NULL)
+    OCTET_STRING_TO_INT24(in->sD, out->sd);
+  return true;
+}
+
+/**
+ * @brief Decode E1AP_UP_Parameters_t
+ */
+static int decode_dl_up_parameters(up_params_t *dl_up_param, const E1AP_UP_Parameters_t *dl_up_paramList)
+{
+  for (int k = 0; k < dl_up_paramList->list.count; k++) {
+    dl_up_param = dl_up_param + k;
+    E1AP_UP_Parameters_Item_t *dl_up_param_in = dl_up_paramList->list.array[k];
+    // GTP tunnel
+    if (!e1_decode_up_tnl_info(&dl_up_param->tl_info, &dl_up_param_in->uP_TNL_Information)) {
+      PRINT_ERROR("GTP tunnel decoding failed\n");
+      return -1;
+    }
+    // Cell group ID
+    dl_up_param->cell_group_id = dl_up_param_in->cell_Group_ID;
+  }
+  return dl_up_paramList->list.count;
+}
+
+/**
+ * @brief Encode E1AP_UP_Parameters_t IE
+ */
+static E1AP_UP_Parameters_t encode_dl_up_parameters(const int numUpParam, const up_params_t *in)
+{
+  E1AP_UP_Parameters_t out = {0};
+  for (const up_params_t *k = in; k < in + numUpParam; k++) {
+    asn1cSequenceAdd(out.list, E1AP_UP_Parameters_Item_t, ieC3_1_1_1);
+    ieC3_1_1_1->uP_TNL_Information = e1_encode_up_tnl_info(&k->tl_info);
+  }
+  return out;
+}
+
 /**
  * @brief Equality check for DRB_nGRAN_to_setup_t
  */
@@ -321,14 +377,12 @@ static void free_drb_to_setup_item(const DRB_nGRAN_to_setup_t *msg)
 /** @brief Encode PDU Session Resource To Setup List Item (3GPP TS 38.463 9.3.3.2) */
 static bool e1_encode_pdu_session_to_setup_item(E1AP_PDU_Session_Resource_To_Setup_Item_t *item, const pdu_session_to_setup_t *in)
 {
+  // PDU Session ID (M)
   item->pDU_Session_ID = in->sessionId;
+  // PDU Session Type (M)
   item->pDU_Session_Type = in->sessionType;
-  // SNSSAI
-  INT8_TO_OCTET_STRING(in->nssai.sst, &item->sNSSAI.sST);
-  if (in->nssai.sd != 0xffffff) {
-    item->sNSSAI.sD = malloc_or_fail(sizeof(*item->sNSSAI.sD));
-    INT24_TO_OCTET_STRING(in->nssai.sd, item->sNSSAI.sD);
-  }
+  // S-NSSAI (M)
+  item->sNSSAI = e1_encode_snssai(&in->nssai);
   // Security Indication (M)
   item->securityIndication = e1_encode_security_indication(&in->securityIndication);
   // NG UL UP Transport Layer Information (M)
@@ -336,6 +390,7 @@ static bool e1_encode_pdu_session_to_setup_item(E1AP_PDU_Session_Resource_To_Set
   // DRB To Setup List (M)
   for (const DRB_nGRAN_to_setup_t *j = in->DRBnGRanList; j < in->DRBnGRanList + in->numDRB2Setup; j++) {
     asn1cSequenceAdd(item->dRB_To_Setup_List_NG_RAN.list, E1AP_DRB_To_Setup_Item_NG_RAN_t, ieC6_1_1);
+    // DRB ID (M)
     ieC6_1_1->dRB_ID = j->id;
     // SDAP Configuration (M)
     ieC6_1_1->sDAP_Configuration = e1_encode_sdap_config(&j->sdap_config);
@@ -346,7 +401,7 @@ static bool e1_encode_pdu_session_to_setup_item(E1AP_PDU_Session_Resource_To_Set
       asn1cSequenceAdd(ieC6_1_1->cell_Group_Information.list, E1AP_Cell_Group_Information_Item_t, ieC6_1_1_1);
       ieC6_1_1_1->cell_Group_ID = *k;
     }
-    // QoS Flows
+    // QoS Flows Information To Be Setup (M)
     for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlow2Setup; k++) {
       asn1cSequenceAdd(ieC6_1_1->qos_flow_Information_To_Be_Setup.list, E1AP_QoS_Flow_QoS_Parameter_Item_t, ieC6_1_1_2);
       *ieC6_1_1_2 = e1_encode_qos_flow_to_setup(k);
@@ -362,13 +417,8 @@ static bool e1_decode_pdu_session_to_setup_item(pdu_session_to_setup_t *out, E1A
   out->sessionId = item->pDU_Session_ID;
   // PDU Session Type (M)
   out->sessionType = item->pDU_Session_Type;
-  /* S-NSSAI (M) */
-  // SST (M)
-  OCTET_STRING_TO_INT8(&item->sNSSAI.sST, out->nssai.sst);
-  out->nssai.sd = 0xffffff;
-  // SD (O)
-  if (item->sNSSAI.sD != NULL)
-    OCTET_STRING_TO_INT24(item->sNSSAI.sD, out->nssai.sd);
+  // S-NSSAI (M)
+  CHECK_E1AP_DEC(e1_decode_snssai(&out->nssai, &item->sNSSAI));
   // Security Indication (M)
   CHECK_E1AP_DEC(e1_decode_security_indication(&out->securityIndication, &item->securityIndication));
   /* NG UL UP Transport Layer Information (M) (9.3.2.1 of 3GPP TS 38.463) */
@@ -443,6 +493,14 @@ void free_pdu_session_to_setup_item(const pdu_session_to_setup_t *msg)
     free_drb_to_setup_item(&msg->DRBnGRanList[i]);
 }
 
+/** @brief Equality check for UP Transport Layer Information (3GPP TS 38.463 9.3.2.1)*/
+static bool eq_up_tl_info(const UP_TL_information_t *a, const UP_TL_information_t *b)
+{
+  _E1_EQ_CHECK_INT(a->tlAddress, b->tlAddress);
+  _E1_EQ_CHECK_INT(a->teId, b->teId);
+  return true;
+}
+
 /**
  * @brief Equality check for PDU session item to modify/setup
  */
@@ -450,8 +508,7 @@ static bool eq_pdu_session_item(const pdu_session_to_setup_t *a, const pdu_sessi
 {
   _E1_EQ_CHECK_LONG(a->sessionId, b->sessionId);
   _E1_EQ_CHECK_LONG(a->sessionType, b->sessionType);
-  _E1_EQ_CHECK_INT(a->UP_TL_information.tlAddress, b->UP_TL_information.tlAddress);
-  _E1_EQ_CHECK_INT(a->UP_TL_information.teId, b->UP_TL_information.teId);
+  eq_up_tl_info(&a->UP_TL_information, &b->UP_TL_information);
   _E1_EQ_CHECK_INT(a->numDRB2Setup, b->numDRB2Setup);
   for (int i = 0; i < a->numDRB2Setup; i++)
     if (!eq_drb_to_setup(&a->DRBnGRanList[i], &b->DRBnGRanList[i]))
@@ -516,8 +573,7 @@ E1AP_E1AP_PDU_t *encode_E1_bearer_context_setup_request(const e1ap_bearer_setup_
   ieC5->criticality = E1AP_Criticality_reject;
   ieC5->value.present = E1AP_BearerContextSetupRequestIEs__value_PR_ActivityNotificationLevel;
   ieC5->value.choice.ActivityNotificationLevel = E1AP_ActivityNotificationLevel_pdu_session; // TODO: Remove hard coding
-  /* mandatory */
-  /*  */
+  // System (M)
   asn1cSequenceAdd(out->protocolIEs.list, E1AP_BearerContextSetupRequestIEs_t, ieC6);
   ieC6->id = E1AP_ProtocolIE_ID_id_System_BearerContextSetupRequest;
   ieC6->criticality = E1AP_Criticality_reject;
@@ -535,7 +591,7 @@ E1AP_E1AP_PDU_t *encode_E1_bearer_context_setup_request(const e1ap_bearer_setup_
   for (int i = 0; i < msg->numPDUSessions; i++) {
     const pdu_session_to_setup_t *pdu_session = &msg->pduSession[i];
     asn1cSequenceAdd(pdu2Setup->list, E1AP_PDU_Session_Resource_To_Setup_Item_t, ieC6_1);
-    e1_encode_pdu_session_to_setup_item(ieC6_1, pdu_session);
+    CHECK_E1AP_DEC(e1_encode_pdu_session_to_setup_item(ieC6_1, pdu_session));
   }
   return pdu;
 }
@@ -585,7 +641,7 @@ bool decode_E1_bearer_context_setup_request(const E1AP_E1AP_PDU_t *pdu, e1ap_bea
 
       case E1AP_ProtocolIE_ID_id_SecurityInformation:
         _E1_EQ_CHECK_INT(ie->value.present, E1AP_BearerContextSetupRequestIEs__value_PR_SecurityInformation);
-        e1_decode_security_info(&out->secInfo, &ie->value.choice.SecurityInformation);
+        CHECK_E1AP_DEC(e1_decode_security_info(&out->secInfo, &ie->value.choice.SecurityInformation));
         break;
 
       case E1AP_ProtocolIE_ID_id_UEDLAggregateMaximumBitRate:
@@ -730,12 +786,7 @@ static bool e1_decode_pdu_session_setup_item(pdu_session_setup_t *pduSetup, E1AP
   pduSetup->id = in->pDU_Session_ID;
   pduSetup->numDRBSetup = in->dRB_Setup_List_NG_RAN.list.count;
   // NG DL UP Transport Layer Information (M)
-  E1AP_UP_TNL_Information_t *DL_UP_TNL_Info = &in->nG_DL_UP_TNL_Information;
-  if (DL_UP_TNL_Info->choice.gTPTunnel) {
-    _E1_EQ_CHECK_INT(DL_UP_TNL_Info->present, E1AP_UP_TNL_Information_PR_gTPTunnel);
-    BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&DL_UP_TNL_Info->choice.gTPTunnel->transportLayerAddress, pduSetup->tl_info.tlAddress);
-    OCTET_STRING_TO_INT32(&DL_UP_TNL_Info->choice.gTPTunnel->gTP_TEID, pduSetup->tl_info.teId);
-  }
+  CHECK_E1AP_DEC(e1_decode_up_tnl_info(&pduSetup->tl_info, &in->nG_DL_UP_TNL_Information));
   // DRB Setup List (1..<maxnoofDRBs>)
   for (int j = 0; j < in->dRB_Setup_List_NG_RAN.list.count; j++) {
     DRB_nGRAN_setup_t *drbSetup = pduSetup->DRBnGRanList + j;
@@ -743,23 +794,9 @@ static bool e1_decode_pdu_session_setup_item(pdu_session_setup_t *pduSetup, E1AP
     // DRB ID (M)
     drbSetup->id = drb->dRB_ID;
     // UL UP Parameters (M)
-    drbSetup->numUpParam = drb->uL_UP_Transport_Parameters.list.count;
-    for (int k = 0; k < drb->uL_UP_Transport_Parameters.list.count; k++) {
-      up_params_t *UL_UP_param = drbSetup->UpParamList + k;
-      // UP Parameters List (1..<maxnoofUPParameters>)
-      E1AP_UP_Parameters_Item_t *UL_UP_item = drb->uL_UP_Transport_Parameters.list.array[k];
-      // UP Transport Layer Information (M)
-      DevAssert(UL_UP_item->uP_TNL_Information.present == E1AP_UP_TNL_Information_PR_gTPTunnel);
-      // GTP Tunnel (M)
-      E1AP_GTPTunnel_t *gTPTunnel = UL_UP_item->uP_TNL_Information.choice.gTPTunnel;
-      AssertError(gTPTunnel != NULL, return false, "gTPTunnel information in required in UP Transport Layer Information\n");
-      if (gTPTunnel) {
-        BIT_STRING_TO_TRANSPORT_LAYER_ADDRESS_IPv4(&gTPTunnel->transportLayerAddress, UL_UP_param->tl_info.tlAddress);
-        OCTET_STRING_TO_INT32(&gTPTunnel->gTP_TEID, UL_UP_param->tl_info.teId);
-      } else {
-      }
-      // Cell Group ID (M)
-      UL_UP_param->cell_group_id = UL_UP_item->cell_Group_ID;
+    if ((drbSetup->numUpParam = decode_dl_up_parameters(drbSetup->UpParamList, &drb->uL_UP_Transport_Parameters)) < 0) {
+      PRINT_ERROR("UL UP Parameters decoding failed\n");
+      return false;
     }
     // Flow Setup List (M)
     drbSetup->numQosFlowSetup = drb->flow_Setup_List.list.count;
@@ -767,6 +804,17 @@ static bool e1_decode_pdu_session_setup_item(pdu_session_setup_t *pduSetup, E1AP
       qos_flow_list_t *qosflowSetup = &drbSetup->qosFlows[q];
       E1AP_QoS_Flow_Item_t *in_qosflowSetup = drb->flow_Setup_List.list.array[q];
       qosflowSetup->qfi = in_qosflowSetup->qoS_Flow_Identifier;
+    }
+  }
+  // DRB Failed to Setup List (O)
+  if (in->dRB_Failed_List_NG_RAN) {
+    for (int j = 0; j < in->dRB_Failed_List_NG_RAN->list.count; j++) {
+      DRB_nGRAN_failed_t *drbFailed = pduSetup->DRBnGRanFailedList + j;
+      E1AP_DRB_Failed_Item_NG_RAN_t *item = in->dRB_Failed_List_NG_RAN->list.array[j];
+      // DRB ID (M)
+      drbFailed->id = item->dRB_ID;
+      // Cause (M)
+      drbFailed->cause = e1_decode_cause_ie(&item->cause);
     }
   }
   return true;
@@ -780,23 +828,14 @@ static bool e1_encode_pdu_session_setup_item(E1AP_PDU_Session_Resource_Setup_Ite
   // PDU Session ID (M)
   item->pDU_Session_ID = in->id;
   // NG DL UP Transport Layer Information (M)
-  item->nG_DL_UP_TNL_Information.present = E1AP_UP_TNL_Information_PR_gTPTunnel;
-  asn1cCalloc(item->nG_DL_UP_TNL_Information.choice.gTPTunnel, gTPTunnel);
-  TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(in->tl_info.tlAddress, &gTPTunnel->transportLayerAddress);
-  INT32_TO_OCTET_STRING(in->tl_info.teId, &gTPTunnel->gTP_TEID);
+  item->nG_DL_UP_TNL_Information = e1_encode_up_tnl_info(&in->tl_info);
   // DRB Setup List (1..<maxnoofDRBs>)
   for (const DRB_nGRAN_setup_t *j = in->DRBnGRanList; j < in->DRBnGRanList + in->numDRBSetup; j++) {
     asn1cSequenceAdd(item->dRB_Setup_List_NG_RAN.list, E1AP_DRB_Setup_Item_NG_RAN_t, ieC3_1_1);
     // DRB ID (M)
     ieC3_1_1->dRB_ID = j->id;
     // UL UP Parameters (M)
-    for (const up_params_t *k = j->UpParamList; k < j->UpParamList + j->numUpParam; k++) {
-      asn1cSequenceAdd(ieC3_1_1->uL_UP_Transport_Parameters.list, E1AP_UP_Parameters_Item_t, ieC3_1_1_1);
-      ieC3_1_1_1->uP_TNL_Information.present = E1AP_UP_TNL_Information_PR_gTPTunnel;
-      asn1cCalloc(ieC3_1_1_1->uP_TNL_Information.choice.gTPTunnel, gTPTunnel);
-      TRANSPORT_LAYER_ADDRESS_IPv4_TO_BIT_STRING(k->tl_info.tlAddress, &gTPTunnel->transportLayerAddress);
-      INT32_TO_OCTET_STRING(k->tl_info.teId, &gTPTunnel->gTP_TEID);
-    }
+    ieC3_1_1->uL_UP_Transport_Parameters = encode_dl_up_parameters(j->numUpParam, j->UpParamList);
     // Flow Setup List(M)
     for (const qos_flow_list_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlowSetup; k++) {
       asn1cSequenceAdd(ieC3_1_1->flow_Setup_List.list, E1AP_QoS_Flow_Item_t, ieC3_1_1_1);
@@ -860,7 +899,7 @@ E1AP_E1AP_PDU_t *encode_E1_bearer_context_setup_response(const e1ap_bearer_setup
   E1AP_PDU_Session_Resource_Setup_List_t *pduSetup = &msgNGRAN->value.choice.PDU_Session_Resource_Setup_List;
   for (const pdu_session_setup_t *i = in->pduSession; i < in->pduSession + in->numPDUSessions; i++) {
     asn1cSequenceAdd(pduSetup->list, E1AP_PDU_Session_Resource_Setup_Item_t, ieC3_1);
-    e1_encode_pdu_session_setup_item(ieC3_1, i);
+    CHECK_E1AP_DEC(e1_encode_pdu_session_setup_item(ieC3_1, i));
   }
   return pdu;
 }
@@ -913,7 +952,7 @@ bool decode_E1_bearer_context_setup_response(const E1AP_E1AP_PDU_t *pdu, e1ap_be
             for (int i = 0; i < pduSetupList->list.count; i++) {
               pdu_session_setup_t *pduSetup = out->pduSession + i;
               E1AP_PDU_Session_Resource_Setup_Item_t *pdu_session = pduSetupList->list.array[i];
-              e1_decode_pdu_session_setup_item(pduSetup, pdu_session);
+              CHECK_E1AP_DEC(e1_decode_pdu_session_setup_item(pduSetup, pdu_session));
             }
           } break;
 
@@ -981,8 +1020,7 @@ bool eq_bearer_context_setup_response(const e1ap_bearer_setup_resp_t *a, const e
     const pdu_session_setup_t *ps_a = &a->pduSession[i];
     const pdu_session_setup_t *ps_b = &b->pduSession[i];
     _E1_EQ_CHECK_LONG(ps_a->id, ps_b->id);
-    _E1_EQ_CHECK_INT(ps_a->tl_info.tlAddress, ps_b->tl_info.tlAddress);
-    _E1_EQ_CHECK_LONG(ps_a->tl_info.teId, ps_b->tl_info.teId);
+    eq_up_tl_info(&ps_a->tl_info, &ps_b->tl_info);
     _E1_EQ_CHECK_INT(ps_a->numDRBSetup, ps_b->numDRBSetup);
     _E1_EQ_CHECK_INT(ps_a->numDRBFailed, ps_b->numDRBFailed);
     // Check DRB Setup
