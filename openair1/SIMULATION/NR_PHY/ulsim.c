@@ -626,6 +626,11 @@ int main(int argc, char *argv[])
   fill_scc_sim(scc, &ssb_bitmap, N_RB_DL, N_RB_DL, mu, mu);
   fix_scc(scc,ssb_bitmap);
 
+  frame_structure_t frame_structure = {0};
+  frame_type_t frame_type = TDD;
+  config_frame_structure(mu, scc, get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon), frame_type, &frame_structure);
+  AssertFatal(is_ul_slot(slot, &frame_structure), "The slot selected is not UL. Can't run ULSIM\n");
+
   // TODO do a UECAP for phy-sim
   const nr_mac_config_t conf = {.pdsch_AntennaPorts = {.N1 = 1, .N2 = 1, .XP = 1},
                                 .pusch_AntennaPorts = n_rx,

@@ -537,8 +537,7 @@ int main(int argc, char **argv)
       break;
 
     case 'Y':
-      run_initial_sync=1;
-      //target_error_rate=0.1;
+      run_initial_sync = 1;
       slot = 0;
       break;
 
@@ -552,6 +551,7 @@ int main(int argc, char **argv)
       break;
 
     case 'H':
+      AssertFatal(run_initial_sync == 0, "Cannot use Y and H options at the same time\n");
       slot = atoi(optarg);
       break;
 
@@ -652,6 +652,11 @@ int main(int argc, char **argv)
   uint64_t ssb_bitmap = 1; // Enable only first SSB with index ssb_indx=0
   fill_scc_sim(scc, &ssb_bitmap, N_RB_DL, N_RB_DL, mu, mu);
   fix_scc(scc, ssb_bitmap);
+
+  frame_structure_t frame_structure = {0};
+  frame_type_t frame_type = TDD;
+  config_frame_structure(mu, scc, get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon), frame_type, &frame_structure);
+  AssertFatal(is_dl_slot(slot, &frame_structure), "The slot selected is not DL. Can't run DLSIM\n");
 
   // TODO do a UECAP for phy-sim
   nr_pdsch_AntennaPorts_t pdsch_AntennaPorts = {0};

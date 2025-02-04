@@ -500,34 +500,28 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
  *
  * @param mu numerology
  * @param scc pointer to scc
- * @param cfg pointer to NFAPI config request
+ * @param tdd_period TDD period
+ * @param frame_type type of frame structure (FDD or TDD)
  * @param fs  pointer to the frame structure to update
- *
- * @return Number of periods in frame
  */
-static int config_frame_structure(int mu,
-                                  NR_ServingCellConfigCommon_t *scc,
-                                  nfapi_nr_config_request_scf_t *cfg,
-                                  frame_structure_t *fs)
+void config_frame_structure(int mu,
+                            NR_ServingCellConfigCommon_t *scc,
+                            uint8_t tdd_period,
+                            uint8_t frame_type,
+                            frame_structure_t *fs)
 {
   fs->numb_slots_frame = nr_slots_per_frame[mu];
-  if (cfg->cell_config.frame_duplex_type.value == TDD) {
-    cfg->tdd_table.tdd_period.tl.tag = NFAPI_NR_CONFIG_TDD_PERIOD_TAG;
-    cfg->num_tlv++;
-    cfg->tdd_table.tdd_period.value = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
-    LOG_D(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
-    fs->numb_period_frame = get_nb_periods_per_frame(cfg->tdd_table.tdd_period.value);
+  if (frame_type == TDD) {
+    fs->numb_period_frame = get_nb_periods_per_frame(tdd_period);
     fs->numb_slots_period = fs->numb_slots_frame / fs->numb_period_frame;
     fs->is_tdd = true;
     config_tdd_patterns(scc->tdd_UL_DL_ConfigurationCommon, fs);
-    set_tdd_config_nr(cfg, fs);
   } else { // FDD
     fs->is_tdd = false;
     fs->numb_period_frame = 1;
     fs->numb_slots_period = nr_slots_per_frame[mu];
   }
   AssertFatal(fs->numb_period_frame > 0, "Frame configuration cannot be configured!\n");
-  return fs->numb_period_frame;
 }
 
 static void config_common(gNB_MAC_INST *nrmac,
@@ -819,7 +813,16 @@ static void config_common(gNB_MAC_INST *nrmac,
 
   // Frame structure configuration
   uint8_t mu = frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
-  config_frame_structure(mu, scc, cfg, &nrmac->frame_structure);
+  if (cfg->cell_config.frame_duplex_type.value == TDD) {
+    cfg->tdd_table.tdd_period.tl.tag = NFAPI_NR_CONFIG_TDD_PERIOD_TAG;
+    cfg->num_tlv++;
+    cfg->tdd_table.tdd_period.value = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
+    LOG_D(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
+  }
+  frame_structure_t *fs = &nrmac->frame_structure;
+  config_frame_structure(mu, scc, cfg->tdd_table.tdd_period.value, cfg->cell_config.frame_duplex_type.value, fs);
+  if (cfg->cell_config.frame_duplex_type.value == TDD)
+    set_tdd_config_nr(cfg, fs);
 
   int nb_tx = config->nb_bfw[0]; // number of tx antennas
   int nb_beams = config->nb_bfw[1]; // number of beams
