@@ -544,12 +544,6 @@ bool decode_E1_bearer_context_setup_request(const E1AP_E1AP_PDU_t *pdu, e1ap_bea
                           out->servingPLMNid.mnc_digit_length);
         break;
 
-      case E1AP_ProtocolIE_ID_id_ActivityNotificationLevel:
-        _E1_EQ_CHECK_INT(ie->value.present, E1AP_BearerContextSetupRequestIEs__value_PR_ActivityNotificationLevel);
-        DevAssert(ie->value.present == E1AP_BearerContextSetupRequestIEs__value_PR_ActivityNotificationLevel);
-        out->activityNotificationLevel = ie->value.choice.ActivityNotificationLevel;
-        break;
-
       case E1AP_ProtocolIE_ID_id_System_BearerContextSetupRequest:
         _E1_EQ_CHECK_INT(ie->value.present, E1AP_BearerContextSetupRequestIEs__value_PR_System_BearerContextSetupRequest);
         E1AP_System_BearerContextSetupRequest_t *System_BearerContextSetupRequest =
@@ -629,7 +623,6 @@ bool eq_bearer_context_setup_request(const e1ap_bearer_setup_req_t *a, const e1a
   _E1_EQ_CHECK_LONG(a->cipheringAlgorithm, b->cipheringAlgorithm);
   _E1_EQ_CHECK_LONG(a->integrityProtectionAlgorithm, b->integrityProtectionAlgorithm);
   _E1_EQ_CHECK_LONG(a->ueDlAggMaxBitRate, b->ueDlAggMaxBitRate);
-  _E1_EQ_CHECK_INT(a->activityNotificationLevel, b->activityNotificationLevel);
   _E1_EQ_CHECK_INT(a->numPDUSessions, b->numPDUSessions);
   _E1_EQ_CHECK_INT(a->numPDUSessionsMod, b->numPDUSessionsMod);
   // PLMN

@@ -114,7 +114,6 @@ static void test_bearer_context_setup_request(void)
       .servingPLMNid.mcc = 001,
       .servingPLMNid.mnc = 01,
       .servingPLMNid.mnc_digit_length = 0x02,
-      .activityNotificationLevel = ANL_PDU_SESSION,
       .numPDUSessions = 1,
       .pduSession[0].sessionId = 1,
       .pduSession[0].sessionType = E1AP_PDU_Session_Type_ipv4,

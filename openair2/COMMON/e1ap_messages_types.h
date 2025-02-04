@@ -138,12 +138,6 @@ typedef enum BEARER_CONTEXT_STATUS_e {
   BEARER_RESUME,
 } BEARER_CONTEXT_STATUS_t;
 
-typedef enum activity_notification_level_e {
-  ANL_DRB = 0,
-  ANL_PDU_SESSION,
-  ANL_UE,
-} activity_notification_level_t;
-
 typedef enum cell_group_id_e {
   MCG = 0,
   SCG,
@@ -413,7 +407,6 @@ typedef struct e1ap_bearer_setup_req_s {
   long     ueDlAggMaxBitRate;
   PLMN_ID_t servingPLMNid;
   BEARER_CONTEXT_STATUS_t bearerContextStatus;
-  activity_notification_level_t activityNotificationLevel;
   int numPDUSessions;
   pdu_session_to_setup_t pduSession[E1AP_MAX_NUM_PDU_SESSIONS];
   int numPDUSessionsMod;
