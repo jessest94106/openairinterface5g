@@ -24,7 +24,7 @@
 #define NFAPI_MAX_NUM_GROUPS 8
 #define NFAPI_MAX_NUM_CB 8
 #define NFAPI_MAX_NUM_PRGS 1
-#define NFAPI_MAX_NUM_BG_IF 1
+#define NFAPI_MAX_NUM_BG_IF 6
 #define NFAPI_MAX_NUM_PERIODS 8
 
 // Extension to the generic structures for single tlv values

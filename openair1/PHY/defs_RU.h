@@ -198,7 +198,7 @@ typedef struct {
   int prachStartSymbol;
   int num_prach_ocas;
   int num_slots;
-  int beam;
+  int *beam;
 } RU_PRACH_list_t;
 
 #define NUMBER_OF_NR_RU_PRACH_MAX 8

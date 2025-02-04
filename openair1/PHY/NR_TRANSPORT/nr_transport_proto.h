@@ -278,7 +278,7 @@ void rx_nr_prach_ru(RU_t *ru,
                     int frame,
                     int subframe);
 
-void nr_fill_prach_ru(RU_t *ru,int SFN, int Slot, nfapi_nr_prach_pdu_t *prach_pdum, int beam_id);
+void nr_fill_prach_ru(RU_t *ru,int SFN, int Slot, nfapi_nr_prach_pdu_t *prach_pdu, int *beam_nb);
 
 int16_t find_nr_prach(PHY_VARS_gNB *gNB,int frame,int slot, find_type_t type);
 int16_t find_nr_prach_ru(RU_t *ru,int frame,int slot, find_type_t type);
@@ -304,7 +304,7 @@ int nr_get_srs_signal(PHY_VARS_gNB *gNB,
 void init_prach_list(PHY_VARS_gNB *gNB);
 void init_prach_ru_list(RU_t *ru);
 void free_nr_ru_prach_entry(RU_t *ru, int prach_id);
-uint8_t get_nr_prach_duration(uint8_t prach_format);
+int get_nr_prach_duration(uint8_t prach_format);
 
 void free_nr_prach_entry(PHY_VARS_gNB *gNB, int prach_id);
 
