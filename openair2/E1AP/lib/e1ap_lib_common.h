@@ -34,6 +34,14 @@
 #define PRINT_ERROR(...) // Do nothing
 #endif
 
+#define CHECK_E1AP_DEC(exp)                                                             \
+  do {                                                                                  \
+    if (!(exp)) {                                                                       \
+        PRINT_ERROR("Failed executing " #exp " in %s() line %d\n", __func__, __LINE__); \
+        return false;                                                                   \
+    }                                                                                   \
+  } while (0)
+
 #define _E1_EQ_CHECK_GENERIC(condition, fmt, ...)                                                  \
   do {                                                                                             \
     if (!(condition)) {                                                                            \
