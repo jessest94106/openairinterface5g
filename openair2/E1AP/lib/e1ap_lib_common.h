@@ -28,7 +28,7 @@
 #include "openair3/UTILS/conversions.h"
 #include "e1ap_messages_types.h"
 
-#ifdef ENABLE_TESTS
+#ifdef E1AP_LOG_ERRORS
 #define PRINT_ERROR(...) fprintf(stderr, ##__VA_ARGS__);
 #else
 #define PRINT_ERROR(...) // Do nothing
