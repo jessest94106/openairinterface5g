@@ -330,3 +330,15 @@ void e1_bearer_release_cmd(const e1ap_bearer_release_cmd_t *cmd)
 
   get_e1_if()->bearer_release_complete(&cplt);
 }
+
+void e1_reset(void)
+{
+  /* we get the list of all UEs from the PDCP, which maintains a list */
+  ue_id_t ue_ids[MAX_MOBILES_PER_GNB];
+  int num = nr_pdcp_get_num_ues(ue_ids, MAX_MOBILES_PER_GNB);
+  for (uint32_t i = 0; i < num; ++i) {
+    ue_id_t ue_id = ue_ids[i];
+    LOG_W(E1AP, "releasing UE %ld\n", ue_id);
+    remove_ue_e1(ue_id);
+  }
+}
