@@ -325,7 +325,6 @@ int main(int argc, char **argv)
   gNB_MAC_INST *gNB_mac;
   NR_UE_MAC_INST_t *UE_mac;
   int cyclic_prefix_type = NFAPI_CP_NORMAL;
-  int run_initial_sync=0;
   int loglvl=OAILOG_WARNING;
 
   //float target_error_rate = 0.01;
@@ -536,11 +535,6 @@ int main(int argc, char **argv)
       gNBthreads[sizeof(gNBthreads)-1]=0;
       break;
 
-    case 'Y':
-      run_initial_sync = 1;
-      slot = 0;
-      break;
-
     case 'Z' :
       filename_csv = strdup(optarg);
       AssertFatal(filename_csv != NULL, "strdup() error: errno %d\n", errno);
@@ -551,7 +545,6 @@ int main(int argc, char **argv)
       break;
 
     case 'H':
-      AssertFatal(run_initial_sync == 0, "Cannot use Y and H options at the same time\n");
       slot = atoi(optarg);
       break;
 
@@ -611,13 +604,12 @@ int main(int argc, char **argv)
       printf("-T Enable PTRS, arguments list L_PTRS{0,1,2} K_PTRS{2,4}, e.g. -T 2 0 2 \n");
       printf("-U Change DMRS Config, arguments list DMRS TYPE{0=A,1=B} DMRS AddPos{0:2} DMRS ConfType{1:2}, e.g. -U 3 0 2 1 \n");
       printf("-X gNB thread pool configuration, n => no threads\n");
-      printf("-Y Run initial sync in UE\n");
       printf("-Z Output filename (.csv format) for stats\n");
       exit (-1);
       break;
     }
   }
-
+printf("%d\n", slot);
   logInit();
   set_glog(loglvl);
   /* initialize the sin table */
@@ -854,11 +846,7 @@ int main(int argc, char **argv)
   UE->nrLDPC_coding_interface = gNB->nrLDPC_coding_interface;
   UE->max_ldpc_iterations = max_ldpc_iterations;
   init_nr_ue_phy_cpu_stats(&UE->phy_cpu_stats);
-
-  if (run_initial_sync==1)
-    UE->is_synchronized = 0;
-  else
-    UE->is_synchronized = 1;
+  UE->is_synchronized = 1;
 
   if (init_nr_ue_signal(UE, 1) != 0)
   {
@@ -1059,15 +1047,13 @@ int main(int argc, char **argv)
         msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.bchPayload=0x001234;
         msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.SsbBlockIndex = 0;
         msgDataTx->gNB = gNB;
-        if (run_initial_sync) {
-          nr_common_signal_procedures(gNB,frame,slot,msgDataTx->ssb[0].ssb_pdu);
-        } else {
-          start_meas(&gNB->phy_proc_tx);
-          phy_procedures_gNB_TX(msgDataTx,frame,slot,1);
-          stop_meas(&gNB->phy_proc_tx);
-        }
+
+        start_meas(&gNB->phy_proc_tx);
+        phy_procedures_gNB_TX(msgDataTx,frame,slot,1);
+        stop_meas(&gNB->phy_proc_tx);
+
         int txdataF_offset = slot * frame_parms->samples_per_slot_wCP;
-        
+
         if (n_trials==1) {
           LOG_M("txsigF0.m","txsF0=",
                 &gNB->common_vars.txdataF[0][0][txdataF_offset +2 * frame_parms->ofdm_symbol_size],
