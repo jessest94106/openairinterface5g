@@ -241,6 +241,7 @@ void rrc_gNB_process_e1_lost_connection(gNB_RRC_INST *rrc, e1ap_lost_connection_
   if (cuup->setup_req != NULL) {
     e1ap_setup_req_t *req = cuup->setup_req;
     LOG_I(NR_RRC, "releasing CU-UP %s on assoc_id %d\n", req->gNB_cu_up_name, assoc_id);
+    free_e1ap_cuup_setup_request(cuup->setup_req);
     free(cuup->setup_req);
   }
   nr_rrc_cuup_container_t *removed = RB_REMOVE(rrc_cuup_tree, &rrc->cuups, cuup);
