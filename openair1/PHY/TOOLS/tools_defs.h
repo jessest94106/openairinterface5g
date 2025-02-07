@@ -401,8 +401,8 @@ static __attribute__((always_inline)) inline void mult_complex_vectors(const c16
   int i;
   // do 8 multiplications at a time
   for (i = 0; i < size - 7; i += 8) {
-    const simde__m256i i1 = simde_mm256_loadu_epi32((simde__m256i *)(in1 + i));
-    const simde__m256i i2 = simde_mm256_loadu_epi32((simde__m256i *)(in2 + i));
+    const simde__m256i i1 = simde_mm256_loadu_si256((simde__m256i *)(in1 + i));
+    const simde__m256i i2 = simde_mm256_loadu_si256((simde__m256i *)(in2 + i));
     const simde__m256i i2swap = simde_mm256_shuffle_epi8(i2, complex_shuffle256);
     const simde__m256i i2conj = simde_mm256_sign_epi16(i2, conj256);
     const simde__m256i re = simde_mm256_madd_epi16(i1, i2conj);
@@ -412,8 +412,8 @@ static __attribute__((always_inline)) inline void mult_complex_vectors(const c16
         simde_mm256_blend_epi16(simde_mm256_srai_epi32(re, shift), simde_mm256_slli_epi32(im, 16 - shift), 0xAA));
   }
   if (size - i > 4) {
-    const simde__m128i i1 = simde_mm_loadu_epi32((simde__m128i *)(in1 + i));
-    const simde__m128i i2 = simde_mm_loadu_epi32((simde__m128i *)(in2 + i));
+    const simde__m128i i1 = simde_mm_loadu_si128((simde__m128i *)(in1 + i));
+    const simde__m128i i2 = simde_mm_loadu_si128((simde__m128i *)(in2 + i));
     const simde__m128i i2swap = simde_mm_shuffle_epi8(i2, *(simde__m128i *)&complex_shuffle256);
     const simde__m128i i2conj = simde_mm_sign_epi16(i2, *(simde__m128i *)&conj256);
     const simde__m128i re = simde_mm_madd_epi16(i1, i2conj);
