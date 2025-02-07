@@ -822,6 +822,48 @@ static NR_SetupRelease_SRS_Config_t *get_config_srs(const NR_ServingCellConfigCo
   return setup_release_srs_Config;
 }
 
+static int get_SupportedBandwidth_fr1_bw_index(int bw_index)
+{
+  int val = -1;
+
+  switch (bw_index) {
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz5:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz10:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz15:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz20:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz25:
+      val = bw_index;
+      break;
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz30:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz35:
+      val = NR_SupportedBandwidth__fr1_mhz30;
+      break;
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz40:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz45:
+      val = NR_SupportedBandwidth__fr1_mhz40;
+      break;
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz50:
+      val = NR_SupportedBandwidth__fr1_mhz50;
+      break;
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz60:
+      val = NR_SupportedBandwidth__fr1_mhz60;
+      break;
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz70:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz80:
+      val = NR_SupportedBandwidth__fr1_mhz80;
+      break;
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz90:
+    case NR_SupportedBandwidth_v1700__fr1_r17_mhz100:
+      val = NR_SupportedBandwidth__fr1_mhz100;
+      break;
+    default:
+      AssertFatal(1==0, "Invalid bw index\n");
+  }
+
+  return val;
+}
+
+
 void prepare_sim_uecap(NR_UE_NR_Capability_t *cap,
                        NR_ServingCellConfigCommon_t *scc,
                        int numerology,
@@ -858,26 +900,39 @@ void prepare_sim_uecap(NR_UE_NR_Capability_t *cap,
     fs->featureSetsDownlinkPerCC = calloc(1, sizeof(*fs->featureSetsDownlinkPerCC));
     NR_FeatureSetDownlinkPerCC_t *fs_cc = calloc(1, sizeof(*fs_cc));
     fs_cc->supportedSubcarrierSpacingDL = numerology;
-    int bw = get_supported_band_index(numerology, freq_range, rbsize);
-    if (bw == 10) // 90MHz
+    int bw_index = get_supported_band_index(numerology, freq_range, rbsize);
+    int bw = get_supported_bw_mhz(freq_range, bw_index);
+    if (bw == 90) // 90MHz
       fs_cc->channelBW_90mhz = calloc(1, sizeof(*fs_cc->channelBW_90mhz));
-    if (bw == 11) // 100MHz
-      bw--;
     if(freq_range == FR2) {
       fs_cc->supportedBandwidthDL.present = NR_SupportedBandwidth_PR_fr2;
-      fs_cc->supportedBandwidthDL.choice.fr2 = bw;
+      fs_cc->supportedBandwidthDL.choice.fr2 = bw_index;
     }
     else{
       fs_cc->supportedBandwidthDL.present = NR_SupportedBandwidth_PR_fr1;
-      fs_cc->supportedBandwidthDL.choice.fr1 = bw;
+      fs_cc->supportedBandwidthDL.choice.fr1 = get_SupportedBandwidth_fr1_bw_index(bw_index);
     }
     fs_cc->supportedModulationOrderDL = calloc(1, sizeof(*fs_cc->supportedModulationOrderDL));
     *fs_cc->supportedModulationOrderDL = NR_ModulationOrder_qam256;
     asn1cSeqAdd(&fs->featureSetsDownlinkPerCC->list, fs_cc);
+
+    if (bw == 35 || bw == 45 || bw == 70) {
+      fs->ext6 = calloc(1, sizeof(*fs->ext6));
+      fs->ext6->featureSetsDownlinkPerCC_v1700 = calloc(1, sizeof(*fs->ext6->featureSetsDownlinkPerCC_v1700));
+      NR_FeatureSetDownlinkPerCC_v1700_t *fs_dlcc_v1700 = calloc(1, sizeof(*fs_dlcc_v1700));
+      fs_dlcc_v1700->supportedBandwidthDL_v1710 = calloc(1, sizeof(*fs_dlcc_v1700->supportedBandwidthDL_v1710));
+      fs_dlcc_v1700->supportedBandwidthDL_v1710->present = NR_SupportedBandwidth_v1700_PR_fr1_r17;
+      fs_dlcc_v1700->supportedBandwidthDL_v1710->choice.fr1_r17 = bw_index;
+      asn1cSeqAdd(&fs->ext6->featureSetsDownlinkPerCC_v1700->list, fs_dlcc_v1700);
+    }
   }
 
   phy_Parameters->phy_ParametersFRX_Diff = calloc(1, sizeof(*phy_Parameters->phy_ParametersFRX_Diff));
   phy_Parameters->phy_ParametersFRX_Diff->pucch_F0_2WithoutFH = NULL;
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NR_UE_NR_Capability, cap);
+  }
 }
 
 void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsch_TimeDomainAllocationList,
