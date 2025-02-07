@@ -150,9 +150,7 @@ uint16_t nr_mac_compute_RIV(uint16_t N_RB_DL, uint16_t RBstart, uint16_t Lcrbs);
 
 /* \brief preprocessor for phytest: schedules UE_id 0 with fixed MCS on all
  * freq resources */
-void nr_preprocessor_phytest(module_id_t module_id,
-                             frame_t frame,
-                             sub_frame_t slot);
+void nr_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_t slot);
 /* \brief UL preprocessor for phytest: schedules UE_id 0 with fixed MCS on a
  * fixed set of resources */
 bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_t slot);

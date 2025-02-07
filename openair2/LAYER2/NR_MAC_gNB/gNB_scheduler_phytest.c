@@ -41,27 +41,29 @@
 // #define ENABLE_MAC_PAYLOAD_DEBUG 1
 
 /* This function checks whether the given Dl/UL slot is set
-   in the input bitmap, which is a mask indicating in which
+   in the input bitmap (per period), which is a mask indicating in which
    slot to transmit (among those available in the TDD configuration) */
 static bool is_xlsch_in_slot(uint64_t bitmap, sub_frame_t slot)
 {
-  return (bitmap >> (slot % 64)) & 0x01;
+  AssertFatal(slot < 64, "Unable to handle periods with length larger than 64 slots in phy-test mode\n");
+  return (bitmap >> slot) & 0x01;
 }
 
 uint32_t target_dl_mcs = 9;
 uint32_t target_dl_Nl = 1;
 uint32_t target_dl_bw = 50;
 uint64_t dlsch_slot_bitmap = (1<<1);
+
 /* schedules whole bandwidth for first user, all the time */
-void nr_preprocessor_phytest(module_id_t module_id,
-                             frame_t frame,
-                             sub_frame_t slot)
+void nr_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_t slot)
 {
+  gNB_MAC_INST *mac = RC.nrmac[module_id];
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
-  if (!is_xlsch_in_slot(dlsch_slot_bitmap, slot))
+  int slot_period = slot % mac->frame_structure.numb_slots_period;
+  if (!is_xlsch_in_slot(dlsch_slot_bitmap, slot_period))
     return;
-  NR_UE_info_t *UE = RC.nrmac[module_id]->UE_info.list[0];
-  NR_ServingCellConfigCommon_t *scc = RC.nrmac[module_id]->common_channels[0].ServingCellConfigCommon;
+  NR_UE_info_t *UE = mac->UE_info.list[0];
+  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
   const int CC_id = 0;
@@ -72,7 +74,7 @@ void nr_preprocessor_phytest(module_id_t module_id,
     return;
   }
 
-  const int tda = get_dl_tda(RC.nrmac[module_id], slot);
+  const int tda = get_dl_tda(mac, slot);
   NR_tda_info_t tda_info = get_dl_tda_info(dl_bwp,
                                            sched_ctrl->search_space->searchSpaceType->present,
                                            tda,
@@ -98,7 +100,7 @@ void nr_preprocessor_phytest(module_id_t module_id,
   int rbSize = 0;
   if (target_dl_bw>bwpSize)
     target_dl_bw = bwpSize;
-  uint16_t *vrb_map = RC.nrmac[module_id]->common_channels[CC_id].vrb_map[beam];
+  uint16_t *vrb_map = mac->common_channels[CC_id].vrb_map[beam];
   /* loop ensures that we allocate exactly target_dl_bw, or return */
   while (true) {
     /* advance to first free RB */
@@ -139,7 +141,7 @@ void nr_preprocessor_phytest(module_id_t module_id,
                                                     0);
   sched_ctrl->num_total_bytes += sched_ctrl->rlc_status[lcid].bytes_in_buffer;
 
-  int CCEIndex = get_cce_index(RC.nrmac[module_id],
+  int CCEIndex = get_cce_index(mac,
                                CC_id, slot, UE->rnti,
                                &sched_ctrl->aggregation_level,
                                beam,
@@ -147,10 +149,7 @@ void nr_preprocessor_phytest(module_id_t module_id,
                                sched_ctrl->coreset,
                                &sched_ctrl->sched_pdcch,
                                false);
-  AssertFatal(CCEIndex >= 0,
-              "%s(): could not find CCE for UE %04x\n",
-              __func__,
-              UE->rnti);
+  AssertFatal(CCEIndex >= 0, "Could not find CCE for UE %04x\n", UE->rnti);
 
   NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;
   if (sched_pdsch->dl_harq_pid == -1)
@@ -159,20 +158,16 @@ void nr_preprocessor_phytest(module_id_t module_id,
   int alloc = -1;
   if (!get_FeedbackDisabled(UE->sc_info.downlinkHARQ_FeedbackDisabled_r17, sched_pdsch->dl_harq_pid)) {
     int r_pucch = nr_get_pucch_resource(sched_ctrl->coreset, UE->current_UL_BWP.pucch_Config, CCEIndex);
-    alloc = nr_acknack_scheduling(RC.nrmac[module_id], UE, frame, slot, 0, r_pucch, 0);
+    alloc = nr_acknack_scheduling(mac, UE, frame, slot, 0, r_pucch, 0);
     if (alloc < 0) {
-      LOG_D(MAC,
-            "Could not find PUCCH for UE %04x@%d.%d\n",
-            rnti,
-            frame,
-            slot);
+      LOG_D(NR_MAC, "Could not find PUCCH for UE %04x@%d.%d\n", rnti, frame, slot);
       return;
     }
   }
 
   sched_ctrl->cce_index = CCEIndex;
 
-  fill_pdcch_vrb_map(RC.nrmac[module_id],
+  fill_pdcch_vrb_map(mac,
                      CC_id,
                      &sched_ctrl->sched_pdcch,
                      CCEIndex,
@@ -270,7 +265,8 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, sub_frame_
   /* check if slot is UL, and that slot is 8 (assuming K2=6 because of UE
    * limitations).  Note that if K2 or the TDD configuration is changed, below
    * conditions might exclude each other and never be true */
-  if (!is_xlsch_in_slot(ulsch_slot_bitmap, sched_slot))
+  int slot_period = sched_slot % nr_mac->frame_structure.numb_slots_period;
+  if (!is_xlsch_in_slot(ulsch_slot_bitmap, slot_period))
     return false;
 
   uint16_t rbStart = 0;
