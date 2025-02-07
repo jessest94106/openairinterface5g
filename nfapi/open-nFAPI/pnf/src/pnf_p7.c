@@ -602,18 +602,20 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
     uint8_t buffer[pnf_p7->_public.segment_size];
     for (segment = 0; segment < segment_count; ++segment) {
       uint8_t last = 0;
-      uint16_t size = pnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH;
+      uint32_t size = pnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH;
       if (segment + 1 == segment_count) {
         last = 1;
         size = (msg_body_len) - (seg_body_len * segment);
       }
 
-      uint16_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
+      uint32_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
 
       // Update the header with the m and segement
       memcpy(&buffer[0], tx_buf, NFAPI_NR_P7_HEADER_LENGTH);
 
       // set the segment length
+      buffer[4] = (segment_size & 0xFF000000) >> 24;
+      buffer[5] = (segment_size & 0xFF0000) >> 16;
       buffer[6] = (segment_size & 0xFF00) >> 8;
       buffer[7] = (segment_size & 0xFF);
 
