@@ -2378,7 +2378,7 @@ void pnf_nr_handle_p7_message(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, 
     if (rx_msg->num_segments_received == rx_msg->num_segments_expected) {
       // send the buffer on
       uint16_t i = 0;
-      uint16_t length = 0;
+      uint32_t length = 0;
       for (i = 0; i < rx_msg->num_segments_expected; ++i) {
         length += rx_msg->segments[i].length - (i > 0 ? NFAPI_NR_P7_HEADER_LENGTH : 0);
       }
@@ -2400,7 +2400,7 @@ void pnf_nr_handle_p7_message(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, 
         pnf_p7->reassemby_buffer_size = length;
       }
 
-      uint16_t offset = 0;
+      uint32_t offset = 0;
       for (i = 0; i < rx_msg->num_segments_expected; ++i) {
         if (i == 0) {
           memcpy(pnf_p7->reassemby_buffer, rx_msg->segments[i].buffer, rx_msg->segments[i].length);
