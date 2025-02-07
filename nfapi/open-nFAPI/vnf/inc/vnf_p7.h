@@ -27,7 +27,7 @@
 
 typedef struct {
 	uint8_t* buffer;
-	uint16_t length;
+	uint32_t length;
 } vnf_p7_rx_message_segment_t;
 
 typedef struct vnf_p7_rx_message vnf_p7_rx_message_t;
