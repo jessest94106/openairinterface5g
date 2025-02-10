@@ -846,7 +846,6 @@ void tx_rf(RU_t *ru, int frame,int slot, uint64_t timestamp)
 
 static void fill_rf_config(RU_t *ru, char *rf_config_file)
 {
-  int i;
   NR_DL_FRAME_PARMS *fp   = ru->nr_frame_parms;
   nfapi_nr_config_request_scf_t *config = &ru->config; //tmp index
   openair0_config_t *cfg   = &ru->openair0_cfg;
@@ -872,13 +871,13 @@ static void fill_rf_config(RU_t *ru, char *rf_config_file)
   AssertFatal(ru->nb_rx > 0 && ru->nb_rx <= 8, "openair0 does not support more than 8 antennas\n");
 
   cfg->Mod_id = 0;
-  cfg->num_rb_dl=N_RB;
-  cfg->tx_num_channels=ru->nb_tx;
-  cfg->rx_num_channels=ru->nb_rx;
+  cfg->num_rb_dl = N_RB;
+  cfg->tx_num_channels = ru->nb_tx * ru->num_beams_period;
+  cfg->rx_num_channels = ru->nb_rx * ru->num_beams_period;
   LOG_I(PHY,"Setting RF config for N_RB %d, NB_RX %d, NB_TX %d\n",cfg->num_rb_dl,cfg->rx_num_channels,cfg->tx_num_channels);
   LOG_I(PHY,"tune_offset %.0f Hz, sample_rate %.0f Hz\n",cfg->tune_offset,cfg->sample_rate);
 
-  for (i=0; i<ru->nb_tx; i++) {
+  for (int i = 0; i < ru->nb_tx * ru->num_beams_period; i++) {
     if (ru->if_frequency == 0) {
       cfg->tx_freq[i] = (double)fp->dl_CarrierFreq;
     } else if (ru->if_freq_offset) {
@@ -893,7 +892,7 @@ static void fill_rf_config(RU_t *ru, char *rf_config_file)
           i, cfg->tx_gain[i],cfg->tx_freq[i]);
   }
 
-  for (i=0; i<ru->nb_rx; i++) {
+  for (int i = 0; i < ru->nb_rx * ru->num_beams_period; i++) {
     if (ru->if_frequency == 0) {
       cfg->rx_freq[i] = (double)fp->ul_CarrierFreq;
     } else if (ru->if_freq_offset) {
@@ -939,8 +938,8 @@ static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_
    Each rf chain is is addressed by the card number and the chain on the card. The
    rf_map specifies for each antenna port, on which rf chain the mapping should start. Multiple
    antennas are mapped to successive RF chains on the same card. */
-int setup_RU_buffers(RU_t *ru) {
-  int i,j;
+int setup_RU_buffers(RU_t *ru)
+{
   int card,ant;
   //uint16_t N_TA_offset = 0;
   NR_DL_FRAME_PARMS *fp;
@@ -962,27 +961,27 @@ int setup_RU_buffers(RU_t *ru) {
 
   if (ru->openair0_cfg.mmapped_dma == 1) {
     // replace RX signal buffers with mmaped HW versions
-    for (i=0; i<ru->nb_rx; i++) {
-      card = i/4;
-      ant = i%4;
+    for (int i = 0; i < ru->nb_rx * ru->num_beams_period; i++) {
+      card = i / 4;
+      ant = i % 4;
       LOG_D(PHY, "Mapping RU id %u, rx_ant %d, on card %d, chain %d\n", ru->idx, i, ru->rf_map.card + card, ru->rf_map.chain + ant);
       free(ru->common.rxdata[i]);
       ru->common.rxdata[i] = ru->openair0_cfg.rxbase[ru->rf_map.chain + ant];
 
-      for (j = 0; j < 16; j++) {
-        ru->common.rxdata[i][j] = 16-j;
+      for (int j = 0; j < 16; j++) {
+        ru->common.rxdata[i][j] = 16 - j;
       }
     }
 
-    for (i=0; i<ru->nb_tx; i++) {
-      card = i/4;
-      ant = i%4;
+    for (int i = 0; i < ru->nb_tx * ru->num_beams_period; i++) {
+      card = i / 4;
+      ant = i % 4;
       LOG_D(PHY, "Mapping RU id %u, tx_ant %d, on card %d, chain %d\n", ru->idx, i, ru->rf_map.card + card, ru->rf_map.chain + ant);
       free(ru->common.txdata[i]);
       ru->common.txdata[i] = ru->openair0_cfg.txbase[ru->rf_map.chain + ant];
 
-      for (j = 0; j < 16; j++) {
-        ru->common.txdata[i][j] = 16-j;
+      for (int j = 0; j < 16; j++) {
+        ru->common.txdata[i][j] = 16 - j;
       }
     }
   } else { // not memory-mapped DMA
@@ -1049,7 +1048,7 @@ void ru_tx_func(void *param)
       ru->fh_north_out(ru);
   } else {
     if(frame_tx == print_frame) {
-      for (int i=0; i<ru->nb_tx; i++) {
+      for (int i = 0; i < ru->nb_tx * ru->num_beams_period; i++) {
         if(slot_tx == 0) {
           sprintf(filename,"gNBdataF_frame%d_sl%d.m", print_frame, slot_tx);
           LOG_M(filename,"txdataF_frame",&ru->gNB_list[0]->common_vars.txdataF[i][0],fp->samples_per_frame_wCP, 1, 1);

@@ -1061,6 +1061,7 @@ void RCconfig_NR_L1(void)
       gNB->TX_AMP = min(32767.0 / pow(10.0, .05 * (double)(*L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr)), INT16_MAX);
       gNB->phase_comp = *L1_ParamList.paramarray[j][L1_PHASE_COMP].uptr;
       gNB->dmrs_num_antennas_per_thread = *(L1_ParamList.paramarray[j][NUM_ANTENNAS_PER_THREAD].uptr);
+      gNB->enable_analog_das = *(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr);
       LOG_I(NR_PHY, "TX_AMP = %d (-%d dBFS)\n", gNB->TX_AMP, *L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr);
       AssertFatal(gNB->TX_AMP > 300, "TX_AMP is too small, must be larger than 300 (is %d)\n", gNB->TX_AMP);
       // Midhaul configuration

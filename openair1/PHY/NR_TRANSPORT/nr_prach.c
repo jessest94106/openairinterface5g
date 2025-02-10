@@ -85,7 +85,8 @@ int nr_fill_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_nr_prach_pdu_t *pr
       int fapi_beam_idx = prach_pdu->beamforming.prgs_list[0].dig_bf_interface_list[i].beam_idx;
       int start_symb = prach_pdu->prach_start_symbol + i * n_symb;
       int bitmap = SL_to_bitmap(start_symb, n_symb);
-      prach->beam_nb[i] = beam_index_allocation(fapi_beam_idx,
+      prach->beam_nb[i] = beam_index_allocation(gNB->enable_analog_das,
+                                                fapi_beam_idx,
                                                 &gNB->gNB_config.analog_beamforming_ve,
                                                 &gNB->common_vars,
                                                 Slot,

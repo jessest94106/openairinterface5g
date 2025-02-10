@@ -492,6 +492,8 @@ typedef struct PHY_VARS_gNB_s {
   int num_ulprbbl;
   uint16_t ulprbbl [MAX_BWP_SIZE];
 
+  bool enable_analog_das;
+
   time_stats_t phy_proc_tx;
   time_stats_t phy_proc_rx;
   time_stats_t rx_prach;

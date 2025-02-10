@@ -45,7 +45,8 @@
 //#define DEBUG_RXDATA
 //#define SRS_IND_DEBUG
 
-int beam_index_allocation(int fapi_beam_index,
+int beam_index_allocation(bool das,
+                          int fapi_beam_index,
                           nfapi_nr_analog_beamforming_ve_t *analog_bf,
                           NR_gNB_COMMON *common_vars,
                           int slot,
@@ -55,8 +56,10 @@ int beam_index_allocation(int fapi_beam_index,
   if (!common_vars->beam_id)
     return 0;
 
-  int idx = -1;
   int ru_beam_idx =  analog_bf->analog_beam_list[fapi_beam_index].value;
+  if (das)
+    return ru_beam_idx;
+  int idx = -1;
   for (int j = 0; j < common_vars->num_beams_period; j++) {
     // L2 analog beam implementation is slot based, so we need to verify occupancy for the whole slot
     for (int i = 0; i < symbols_per_slot; i++) {
@@ -136,7 +139,8 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
   int txdataF_offset = slot * fp->samples_per_slot_wCP;
   // beam number in a scenario with multiple concurrent beams
   int bitmap = SL_to_bitmap(ssb_start_symbol, 4); // 4 ssb symbols
-  int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+  int beam_nb = beam_index_allocation(gNB->enable_analog_das,
+                                      pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
                                       &cfg->analog_beamforming_ve,
                                       &gNB->common_vars,
                                       slot,
@@ -278,7 +282,8 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
       int lprime_num = mapping_parms.lprime + 1;
       for (int j = 0; j < mapping_parms.size; j++)
         csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
-      int beam_nb = beam_index_allocation(pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+      int beam_nb = beam_index_allocation(gNB->enable_analog_das,
+                                          pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
                                           &cfg->analog_beamforming_ve,
                                           &gNB->common_vars,
                                           slot,
