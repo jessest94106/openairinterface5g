@@ -992,6 +992,10 @@ int nr_config_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, n
            phy_info->timing_window,
            req->nfapi_config.timing_window.value);
     num_tlv++;
+  }else {
+    // This is a nFAPI TLV, thus not sent when working with FAPI.
+    // When not sent, we still need a default value, otherwise every message from the L2 is treated as late and not processed
+    phy_info->timing_window = 30;
   }
 
   if (req->nfapi_config.timing_info_mode.tl.tag == NFAPI_NR_NFAPI_TIMING_INFO_MODE_TAG) {
