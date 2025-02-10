@@ -30,8 +30,8 @@
 
 static void f1_reset_cu_initiated_direct(sctp_assoc_t assoc_id, const f1ap_reset_t *reset)
 {
-  (void)reset;
-  AssertFatal(false, "%s() not implemented yet\n", __func__);
+  AssertFatal(assoc_id == -1, "illegal assoc_id %d\n", assoc_id);
+  f1_reset_cu_initiated(reset);
 }
 
 static void f1_reset_acknowledge_du_initiated_direct(sctp_assoc_t assoc_id, const f1ap_reset_ack_t *ack)

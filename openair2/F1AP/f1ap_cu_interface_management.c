@@ -47,6 +47,28 @@ int CU_send_RESET_ACKNOWLEDGE(sctp_assoc_t assoc_id, const f1ap_reset_ack_t *ack
   AssertFatal(1 == 0, "Not implemented yet\n");
 }
 
+void CU_send_RESET(sctp_assoc_t assoc_id, const f1ap_reset_t *reset)
+{
+  uint8_t *buffer = NULL;
+  uint32_t len = 0;
+
+  /* Encode F1 Reset */
+  F1AP_F1AP_PDU_t *pdu = encode_f1ap_reset(reset);
+  if (pdu == NULL) {
+    LOG_E(F1AP, "failed to create asn.1 message for f1ap reset\n");
+    return;
+  }
+
+  /* encode ASN.1 PER */
+  int encoded = f1ap_encode_pdu(pdu, &buffer, &len);
+  ASN_STRUCT_FREE(asn_DEF_F1AP_F1AP_PDU, pdu);
+  if (encoded <= 0) {
+    LOG_E(F1AP, "Failed to encode F1 reset\n");
+    return;
+  }
+  f1ap_itti_send_sctp_data_req(assoc_id, buffer, len);
+}
+
 /**
  * @brief F1AP Setup Request decoding (9.2.1.4 of 3GPP TS 38.473) and transfer to RRC
  */
