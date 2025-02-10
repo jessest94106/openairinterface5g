@@ -252,6 +252,121 @@ f1ap_reset_t cp_f1ap_reset(const f1ap_reset_t *orig)
   return cp;
 }
 
+/* @brief encode F1 Reset Ack (9.2.1.2 in TS 38.473) */
+struct F1AP_F1AP_PDU *encode_f1ap_reset_ack(const f1ap_reset_ack_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+  /* Create Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, so);
+  so->procedureCode = F1AP_ProcedureCode_id_Reset;
+  so->criticality = F1AP_Criticality_reject;
+  so->value.present = F1AP_SuccessfulOutcome__value_PR_ResetAcknowledge;
+  F1AP_ResetAcknowledge_t *reset_ack = &so->value.choice.ResetAcknowledge;
+
+  /* (M) Transaction ID */
+  asn1cSequenceAdd(reset_ack->protocolIEs.list, F1AP_ResetAcknowledgeIEs_t, ieC1);
+  ieC1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ieC1->criticality = F1AP_Criticality_reject;
+  ieC1->value.present = F1AP_ResetAcknowledgeIEs__value_PR_TransactionID;
+  ieC1->value.choice.TransactionID = msg->transaction_id;
+
+  /* TODO criticality diagnostics */
+
+  /* 0:N UEs to reset */
+  if (msg->num_ue_to_reset == 0)
+    return pdu; /* no UEs to encode */
+
+  asn1cSequenceAdd(reset_ack->protocolIEs.list, F1AP_ResetAcknowledgeIEs_t, ieC2);
+  ieC2->id = F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionListResAck;
+  ieC2->criticality = F1AP_Criticality_ignore;
+  ieC2->value.present = F1AP_ResetAcknowledgeIEs__value_PR_UE_associatedLogicalF1_ConnectionListResAck;
+  F1AP_UE_associatedLogicalF1_ConnectionListResAck_t *ue_to_reset = &ieC2->value.choice.UE_associatedLogicalF1_ConnectionListResAck;
+  for (int i = 0; i < msg->num_ue_to_reset; ++i) {
+    asn1cSequenceAdd(ue_to_reset->list, F1AP_UE_associatedLogicalF1_ConnectionItemResAck_t, conn_it_res);
+    conn_it_res->id = F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionItem;
+    conn_it_res->criticality = F1AP_Criticality_ignore;
+    conn_it_res->value.present = F1AP_UE_associatedLogicalF1_ConnectionItemResAck__value_PR_UE_associatedLogicalF1_ConnectionItem;
+    conn_it_res->value.choice.UE_associatedLogicalF1_ConnectionItem = encode_f1ap_ue_to_reset(&msg->ue_to_reset[i]);
+  }
+  return pdu;
+}
+
+/* @brief decode F1 Reset Ack (9.2.1.2 in TS 38.473) */
+bool decode_f1ap_reset_ack(const struct F1AP_F1AP_PDU *pdu, f1ap_reset_ack_t *out)
+{
+  _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_successfulOutcome);
+  AssertError(pdu->choice.successfulOutcome != NULL, return false, "pdu->choice.initiatingMessage is NULL");
+  _F1_EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, F1AP_ProcedureCode_id_Reset);
+  _F1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present, F1AP_SuccessfulOutcome__value_PR_ResetAcknowledge);
+
+  /* Check presence of mandatory IEs */
+  F1AP_ResetAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.ResetAcknowledge;
+  F1AP_ResetAcknowledgeIEs_t *ie;
+  F1AP_LIB_FIND_IE(F1AP_ResetAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    AssertError(in->protocolIEs.list.array[i] != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    ie = in->protocolIEs.list.array[i];
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        // (M) Transaction ID
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetAcknowledgeIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionListResAck:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetAcknowledgeIEs__value_PR_UE_associatedLogicalF1_ConnectionListResAck);
+        {
+          const F1AP_UE_associatedLogicalF1_ConnectionListResAck_t *conn_list = &ie->value.choice.UE_associatedLogicalF1_ConnectionListResAck;
+          AssertError(conn_list->list.count > 0, return false, "no UEs for partially reset F1 interface\n");
+          out->num_ue_to_reset = conn_list->list.count;
+          out->ue_to_reset = calloc_or_fail(out->num_ue_to_reset, sizeof(*out->ue_to_reset));
+          for (int i = 0; i < out->num_ue_to_reset; ++i) {
+            const F1AP_UE_associatedLogicalF1_ConnectionItemResAck_t *it_res = (const F1AP_UE_associatedLogicalF1_ConnectionItemResAck_t *)conn_list->list.array[i];
+            _F1_EQ_CHECK_LONG(it_res->id, F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionItem);
+            _F1_EQ_CHECK_INT(it_res->value.present, F1AP_UE_associatedLogicalF1_ConnectionItemResAck__value_PR_UE_associatedLogicalF1_ConnectionItem);
+            out->ue_to_reset[i] = decode_f1ap_ue_to_reset(&it_res->value.choice.UE_associatedLogicalF1_ConnectionItem);
+          }
+        }
+        break;
+      default:
+        AssertError(true, return false, "Reset Acknowledge: ProtocolIE id %ld not implemented, ignoring IE\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+void free_f1ap_reset_ack(f1ap_reset_ack_t *msg)
+{
+  for (int i = 0; i < msg->num_ue_to_reset; ++i)
+    free_f1ap_ue_to_reset(&msg->ue_to_reset[i]);
+  free(msg->ue_to_reset);
+}
+
+bool eq_f1ap_reset_ack(const f1ap_reset_ack_t *a, const f1ap_reset_ack_t *b)
+{
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->num_ue_to_reset, b->num_ue_to_reset);
+  for (int i = 0; i < a->num_ue_to_reset; ++i) {
+    if (!eq_f1ap_ue_to_reset(&a->ue_to_reset[i], &b->ue_to_reset[i]))
+      return false;
+  }
+  return true;
+}
+
+f1ap_reset_ack_t cp_f1ap_reset_ack(const f1ap_reset_ack_t *orig)
+{
+  f1ap_reset_ack_t cp = {.transaction_id = orig->transaction_id, .num_ue_to_reset = orig->num_ue_to_reset};
+  if (cp.num_ue_to_reset > 0) {
+    cp.ue_to_reset = calloc_or_fail(cp.num_ue_to_reset, sizeof(*cp.ue_to_reset));
+    for (int i = 0; i < cp.num_ue_to_reset; ++i)
+      cp.ue_to_reset[i] = cp_f1ap_ue_to_reset(&orig->ue_to_reset[i]);
+  }
+  return cp;
+}
+
 static const int nrb_lut[29] = {11,  18,  24,  25,  31,  32,  38,  51,  52,  65,  66,  78,  79,  93, 106,
                                 107, 121, 132, 133, 135, 160, 162, 189, 216, 217, 245, 264, 270, 273};
 

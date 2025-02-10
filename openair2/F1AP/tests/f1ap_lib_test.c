@@ -448,6 +448,50 @@ static void test_f1ap_reset_part(void)
 }
 
 /**
+ * @brief Test F1 reset ack with differently ack'd UEs ("generic ack" is
+ * special case with no individual UE acked)
+ */
+static void test_f1ap_reset_ack(void)
+{
+  f1ap_reset_ack_t orig = {
+    .transaction_id = 4,
+    .num_ue_to_reset = 4,
+  };
+  orig.ue_to_reset = calloc_or_fail(orig.num_ue_to_reset, sizeof(*orig.ue_to_reset));
+  orig.ue_to_reset[0].gNB_CU_ue_id = malloc_or_fail(sizeof(*orig.ue_to_reset[0].gNB_CU_ue_id));
+  *orig.ue_to_reset[0].gNB_CU_ue_id = 10;
+  orig.ue_to_reset[1].gNB_DU_ue_id = malloc_or_fail(sizeof(*orig.ue_to_reset[1].gNB_DU_ue_id));
+  *orig.ue_to_reset[1].gNB_DU_ue_id = 11;
+  orig.ue_to_reset[2].gNB_CU_ue_id = malloc_or_fail(sizeof(*orig.ue_to_reset[2].gNB_CU_ue_id));
+  *orig.ue_to_reset[2].gNB_CU_ue_id = 12;
+  orig.ue_to_reset[2].gNB_DU_ue_id = malloc_or_fail(sizeof(*orig.ue_to_reset[2].gNB_DU_ue_id));
+  *orig.ue_to_reset[2].gNB_DU_ue_id = 13;
+  // orig.ue_to_reset[3] intentionally empty (because it is allowed, both IDs are optional)
+
+  F1AP_F1AP_PDU_t *f1enc = encode_f1ap_reset_ack(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_reset_ack_t decoded = {0};
+  bool ret = decode_f1ap_reset_ack(f1dec, &decoded);
+  AssertFatal(ret, "decode_f1ap_reset_ack(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_f1ap_reset_ack(&orig, &decoded);
+  AssertFatal(ret, "eq_f1ap_reset_ack(): decoded message doesn't match original\n");
+  free_f1ap_reset_ack(&decoded);
+
+  f1ap_reset_ack_t cp = cp_f1ap_reset_ack(&orig);
+  ret = eq_f1ap_reset_ack(&orig, &cp);
+  AssertFatal(ret, "eq_f1ap_reset_ack(): copied message doesn't match original\n");
+  free_f1ap_reset_ack(&cp);
+
+  printf("f1ap_reset_ack successful\n");
+
+  free_f1ap_reset_ack(&orig);
+}
+
+/**
  * @brief Test F1 gNB-DU Configuration Update
  */
 static void test_f1ap_du_configuration_update(void)
@@ -671,6 +715,7 @@ int main()
   test_f1ap_setup_failure();
   test_f1ap_reset_all();
   test_f1ap_reset_part();
+  test_f1ap_reset_ack();
   test_f1ap_du_configuration_update();
   test_f1ap_cu_configuration_update();
   test_f1ap_cu_configuration_update_acknowledge();
