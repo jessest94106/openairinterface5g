@@ -40,5 +40,6 @@
 #include "F1AP_SuccessfulOutcome.h"
 #include "F1AP_SibtypetobeupdatedListItem.h"
 #include "F1AP_UnsuccessfulOutcome.h"
+#include "F1AP_UE-associatedLogicalF1-ConnectionListRes.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

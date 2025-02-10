@@ -109,3 +109,58 @@ uint8_t *cp_octet_string(const OCTET_STRING_t *os, int *len)
   *len = os->size;
   return buf;
 }
+
+F1AP_Cause_t encode_f1ap_cause(f1ap_Cause_t cause, long cause_value)
+{
+  F1AP_Cause_t f1_cause = {0};
+  switch (cause) {
+    case F1AP_CAUSE_RADIO_NETWORK:
+      f1_cause.present = F1AP_Cause_PR_radioNetwork;
+      f1_cause.choice.radioNetwork = cause_value;
+      break;
+    case F1AP_CAUSE_TRANSPORT:
+      f1_cause.present = F1AP_Cause_PR_transport;
+      f1_cause.choice.transport = cause_value;
+      break;
+    case F1AP_CAUSE_PROTOCOL:
+      f1_cause.present = F1AP_Cause_PR_protocol;
+      f1_cause.choice.protocol = cause_value;
+      break;
+    case F1AP_CAUSE_MISC:
+      f1_cause.present = F1AP_Cause_PR_misc;
+      f1_cause.choice.misc = cause_value;
+      break;
+    case F1AP_CAUSE_NOTHING:
+    default:
+      AssertFatal(false, "unknown cause value %d\n", cause);
+      break;
+  }
+  return f1_cause;
+}
+
+bool decode_f1ap_cause(F1AP_Cause_t f1_cause, f1ap_Cause_t *cause, long *cause_value)
+{
+  switch (f1_cause.present) {
+    case F1AP_Cause_PR_radioNetwork:
+      *cause = F1AP_CAUSE_RADIO_NETWORK;
+      *cause_value = f1_cause.choice.radioNetwork;
+      break;
+    case F1AP_Cause_PR_transport:
+      *cause = F1AP_CAUSE_TRANSPORT;
+      *cause_value = f1_cause.choice.transport;
+      break;
+    case F1AP_Cause_PR_protocol:
+      *cause = F1AP_CAUSE_PROTOCOL;
+      *cause_value = f1_cause.choice.protocol;
+      break;
+    case F1AP_Cause_PR_misc:
+      *cause = F1AP_CAUSE_MISC;
+      *cause_value = f1_cause.choice.radioNetwork;
+      break;
+    case F1AP_Cause_PR_NOTHING:
+    default:
+      PRINT_ERROR("received illegal F1AP cause %d\n", f1_cause.present);
+      return false;
+  }
+  return true;
+}
