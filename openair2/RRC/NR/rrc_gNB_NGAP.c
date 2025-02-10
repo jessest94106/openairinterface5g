@@ -1231,6 +1231,9 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_
     /* UE will be freed after UE context release complete */
   } else {
     // the DU is offline already
+    uint32_t pdu_sessions[NGAP_MAX_PDU_SESSION];
+    get_pduSession_array(UE, pdu_sessions);
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, UE->nb_of_pdusessions, pdu_sessions);
     rrc_remove_ue(rrc, ue_context_p);
   }
 
