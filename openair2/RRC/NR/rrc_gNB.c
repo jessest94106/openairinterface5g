@@ -2607,6 +2607,11 @@ void *rrc_gnb_task(void *args_p) {
         LOG_E(NR_RRC, "Handling of F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE not implemented\n");
         break;
 
+      case F1AP_RESET_ACK:
+        LOG_I(NR_RRC, "received F1AP reset acknowledgement\n");
+        free_f1ap_reset_ack(&F1AP_RESET_ACK(msg_p));
+        break;
+
       /* Messages from X2AP */
       case X2AP_ENDC_SGNB_ADDITION_REQ:
         LOG_I(NR_RRC, "Received ENDC sgNB addition request from X2AP \n");

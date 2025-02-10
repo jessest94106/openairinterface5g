@@ -39,7 +39,21 @@
 
 int CU_handle_RESET_ACKNOWLEDGE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
-  AssertFatal(1 == 0, "Not implemented yet\n");
+  DevAssert(pdu != NULL);
+
+  f1ap_reset_ack_t ack = {0};
+  /* Decode */
+  if (!decode_f1ap_reset_ack(pdu, &ack)) {
+    LOG_E(F1AP, "cannot decode F1AP Reset acknowledgement\n");
+    free_f1ap_reset_ack(&ack);
+    return -1;
+  }
+  /* Send to RRC (ITTI) */
+  MessageDef *message_p = itti_alloc_new_message(TASK_CU_F1, 0, F1AP_RESET_ACK);
+  message_p->ittiMsgHeader.originInstance = assoc_id;
+  F1AP_RESET_ACK(message_p) = ack; /* "move" message into ITTI, RRC thread will free it */
+  itti_send_msg_to_task(TASK_RRC_GNB, GNB_MODULE_ID_TO_INSTANCE(instance), message_p);
+  return 0;
 }
 
 int CU_send_RESET_ACKNOWLEDGE(sctp_assoc_t assoc_id, const f1ap_reset_ack_t *ack)
