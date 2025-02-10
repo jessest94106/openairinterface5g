@@ -35,7 +35,6 @@
 #include "f1ap_itti_messaging.h"
 #include "f1ap_du_interface_management.h"
 #include "lib/f1ap_interface_management.h"
-#include "lib/f1ap_lib_common.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_rrc_dl_handler.h"
 #include "assertions.h"
 
