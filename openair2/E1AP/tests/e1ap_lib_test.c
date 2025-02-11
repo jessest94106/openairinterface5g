@@ -339,6 +339,120 @@ static void test_e1_cuup_setup_failure(void)
   free_e1ap_cuup_setup_failure(&orig);
 }
 
+/**
+ * @brief Test E1AP Bearer Context Modification Request encoding/decoding
+ */
+static void test_bearer_context_modification_request(void)
+{
+  const bearer_context_sdap_config_t dummy_sdap_config = {
+      .defaultDRB = 0,
+      .sDAP_Header_DL = false,
+      .sDAP_Header_UL = false,
+  };
+
+  const bearer_context_pdcp_config_t dummy_pdcp_config = {
+      .discardTimer = E1AP_DiscardTimer_ms100,
+      .pDCP_Reestablishment = true,
+      .pDCP_SN_Size_DL = E1AP_PDCP_SN_Size_s_12,
+      .pDCP_SN_Size_UL = E1AP_PDCP_SN_Size_s_12,
+      .reorderingTimer = 5,
+      .rLC_Mode = E1AP_RLC_Mode_rlc_um_bidirectional,
+  };
+
+  const qos_flow_to_setup_t dummy_qos_flows = {
+      .qfi = 9,
+      .qos_params.alloc_reten_priority.preemption_capability = E1AP_Pre_emptionCapability_may_trigger_pre_emption,
+      .qos_params.alloc_reten_priority.preemption_vulnerability = E1AP_Pre_emptionVulnerability_pre_emptable,
+      .qos_params.alloc_reten_priority.priority_level = E1AP_PriorityLevel_no_priority,
+      .qos_params.qos_characteristics.non_dynamic.fiveqi = 9,
+  };
+
+  DRB_nGRAN_to_mod_t drb_to_mod = {
+    .numDlUpParam = 1,
+    .DlUpParamList[0].cell_group_id = MCG,
+    .DlUpParamList[0].tl_info = create_up_tl_info(),
+    .id = 1,
+    .pdcp_config = malloc_or_fail(sizeof(*drb_to_mod.pdcp_config)),
+    .pdcp_sn_status_requested = true,
+    .numQosFlow2Setup = 1,
+    .qosFlows[0] = dummy_qos_flows,
+  };
+  *drb_to_mod.pdcp_config = dummy_pdcp_config;
+
+  pdu_session_to_mod_t pdusession_mod_item = {
+      .sessionId = 1,
+      .numDRB2Modify = 1,
+      .DRBnGRanModList[0] = drb_to_mod,
+  };
+
+  DRB_nGRAN_to_setup_t drb_to_setup = {
+      .id = 1,
+      .cellGroupList[0] = MCG,
+      .numCellGroups = 1,
+      .pdcp_config = dummy_pdcp_config,
+      .sdap_config = dummy_sdap_config,
+      .numQosFlow2Setup = 1,
+      .qosFlows[0] = dummy_qos_flows,
+      .drb_inactivity_timer = malloc_or_fail(sizeof(*drb_to_setup.drb_inactivity_timer)),
+  };
+  *drb_to_setup.drb_inactivity_timer = 500;
+
+  pdu_session_to_setup_t pdusession_setup_item = {
+      .numDRB2Setup = 1,
+      .nssai.sd = 0x01,
+      .nssai.sst = 0x01,
+      .UP_TL_information.teId = 0x12345,
+      .UP_TL_information.tlAddress = 167772161,
+      .DRBnGRanList[0] = drb_to_setup,
+  };
+
+  // Initialize the Bearer Context Modification Request
+  e1ap_bearer_mod_req_t orig = {
+      .gNB_cu_cp_ue_id = 0x1234,
+      .gNB_cu_up_ue_id = 0x5678,
+      .bearerContextStatus = malloc_or_fail(sizeof(*orig.bearerContextStatus)),
+      .inactivityTimer = malloc_or_fail(sizeof(*orig.inactivityTimer)),
+      .numPDUSessions = 1,
+      .pduSession[0] = pdusession_setup_item,
+      .numPDUSessionsMod = 1,
+      .pduSessionMod[0] = pdusession_mod_item,
+  };
+  *orig.bearerContextStatus = BEARER_SUSPEND;
+  *orig.inactivityTimer = 1000;
+
+  // Encode the original message
+  E1AP_E1AP_PDU_t *enc = encode_E1_bearer_context_mod_request(&orig);
+
+  // Decode the encoded message
+  E1AP_E1AP_PDU_t *dec = e1ap_encode_decode(enc);
+
+  // Free the encoded message
+  e1ap_msg_free(enc);
+
+  // Decode the message into a new struct
+  e1ap_bearer_mod_req_t decoded = {0};
+  AssertFatal(decode_E1_bearer_context_mod_request(dec, &decoded), "decode_E1_bearer_context_mod_request(): could not decode message\n");
+
+  // Free the decoded E1AP message
+  e1ap_msg_free(dec);
+
+  // Compare the original and decoded structs
+  AssertFatal(eq_bearer_context_mod_request(&orig, &decoded), "eq_bearer_context_mod_request(): decoded message doesn't match\n");
+
+  // Free the memory for the decoded message
+  free_e1ap_context_mod_request(&decoded);
+
+  // Deep copy the original message
+  e1ap_bearer_mod_req_t cp = cp_bearer_context_mod_request(&orig);
+
+  // Verify the deep copy matches the original
+  AssertFatal(eq_bearer_context_mod_request(&orig, &cp), "eq_bearer_context_mod_request(): copied message doesn't match\n");
+
+  // Free the copied and original message
+  free_e1ap_context_mod_request(&cp);
+  free_e1ap_context_mod_request(&orig);
+}
+
 int main()
 {
   // E1 Bearer Context Setup
@@ -348,5 +462,7 @@ int main()
   test_e1_cuup_setup_request();
   test_e1_cuup_setup_response();
   test_e1_cuup_setup_failure();
+  // E1 Bearer Context Modification Request
+  test_bearer_context_modification_request();
   return 0;
 }
