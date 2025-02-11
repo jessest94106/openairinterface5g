@@ -85,7 +85,7 @@ static void test_bearer_context_setup_request(void)
 {
   bearer_context_pdcp_config_t pdcp = {
     .discardTimer = E1AP_DiscardTimer_ms10,
-    .pDCP_Reestablishment = E1AP_PDCP_Reestablishment_true,
+    .pDCP_Reestablishment = true,
     .pDCP_SN_Size_DL = E1AP_PDCP_SN_Size_s_12,
     .pDCP_SN_Size_UL = E1AP_PDCP_SN_Size_s_12,
     .reorderingTimer = 10,
