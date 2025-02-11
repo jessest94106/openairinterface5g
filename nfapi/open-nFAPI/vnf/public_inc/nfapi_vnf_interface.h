@@ -669,8 +669,8 @@ typedef struct nfapi_vnf_p7_config
 	uint8_t checksum_enabled;
 
 	/*! The maxium size of a P7 segement. If a message is large that this it
-	 * will be segemented */
-	uint16_t segment_size;
+	 * will be segmented. Note: u32 to cover 4G and 5G. */
+	uint32_t segment_size;
 	uint16_t max_num_segments;
 
 	/*! Configuration option for the p7 pack unpack functions*/

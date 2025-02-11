@@ -501,7 +501,7 @@ int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_
 		
 			// segmenting the transmit
 			int msg_body_len = len - NFAPI_NR_P7_HEADER_LENGTH ;
-			int seg_body_len = vnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH ;
+			uint32_t seg_body_len = vnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH ;
 			int segment_count = (msg_body_len / (seg_body_len)) + ((msg_body_len % seg_body_len) ? 1 : 0); 
 				
 			int segment = 0;
@@ -511,19 +511,21 @@ int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_
 			for(segment = 0; segment < segment_count; ++segment)
 			{
 				uint8_t last = 0;
-				uint16_t size = vnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH;
+				uint32_t size = vnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH;
 				if(segment + 1 == segment_count)
 				{
 					last = 1;
 					size = (msg_body_len) - (seg_body_len * segment);
 				}
 
-				uint16_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
+				uint32_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
 
 				// Update the header with the m and segement 
 				memcpy(&tx_buffer[0], buffer, NFAPI_NR_P7_HEADER_LENGTH);
 
 				// set the segment length
+				tx_buffer[4] = (segment_size & 0xFF000000) >> 24;
+				tx_buffer[5] = (segment_size & 0xFF0000) >> 16;
 				tx_buffer[6] = (segment_size & 0xFF00) >> 8;
 				tx_buffer[7] = (segment_size & 0xFF);
 
