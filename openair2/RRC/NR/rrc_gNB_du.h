@@ -60,4 +60,6 @@ struct nr_rrc_du_container_t *find_target_du(struct gNB_RRC_INST_s *rrc, sctp_as
     }                                                                      \
   }
 
+void trigger_f1_reset(struct gNB_RRC_INST_s *rrc, sctp_assoc_t du_assoc_id);
+
 #endif /* RRC_GNB_DU_H_ */

@@ -35,8 +35,11 @@
 
 static void f1_reset_cu_initiated_f1ap(sctp_assoc_t assoc_id, const f1ap_reset_t *reset)
 {
-  (void)reset;
-  AssertFatal(false, "%s() not implemented yet\n", __func__);
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_GNB, 0, F1AP_RESET);
+  msg->ittiMsgHeader.originInstance = assoc_id;
+  f1ap_reset_t *f1ap_msg = &F1AP_RESET(msg);
+  *f1ap_msg = cp_f1ap_reset(reset);
+  itti_send_msg_to_task(TASK_CU_F1, 0, msg);
 }
 
 static void f1_reset_acknowledge_du_initiated_f1ap(sctp_assoc_t assoc_id, const f1ap_reset_ack_t *ack)

@@ -563,24 +563,25 @@ typedef enum F1AP_ResetType_e {
   F1AP_RESET_PART_OF_F1_INTERFACE
 } f1ap_ResetType_t;
 
+typedef struct f1ap_ue_to_reset_t {
+  uint32_t *gNB_CU_ue_id;
+  uint32_t *gNB_DU_ue_id;
+} f1ap_ue_to_reset_t;
+
 typedef struct f1ap_reset_t {
   uint64_t          transaction_id;
   f1ap_Cause_t      cause;
   long              cause_value;
   f1ap_ResetType_t  reset_type;
-  struct {
-    uint32_t gNB_CU_ue_id;
-    uint32_t gNB_DU_ue_id;
-  } ue_to_reset[F1AP_MAX_NO_OF_INDIVIDUAL_CONNECTIONS_TO_RESET];
+  int num_ue_to_reset;
+  f1ap_ue_to_reset_t *ue_to_reset; // array of num_ue_to_reset elements
 } f1ap_reset_t;
 
 typedef struct f1ap_reset_ack_t {
-  uint64_t          transaction_id;
-  struct {
-    uint32_t gNB_CU_ue_id;
-    uint32_t gNB_DU_ue_id;
-  } ue_to_reset[F1AP_MAX_NO_OF_INDIVIDUAL_CONNECTIONS_TO_RESET];
-  uint16_t criticality_diagnostics;
+  uint64_t transaction_id;
+  int num_ue_to_reset;
+  f1ap_ue_to_reset_t *ue_to_reset; // array of num_ue_to_reset elements
+  //uint16_t criticality_diagnostics; // not implemented as of now
 } f1ap_reset_ack_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */

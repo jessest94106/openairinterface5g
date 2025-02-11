@@ -2074,10 +2074,6 @@ void rrc_remove_ue(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p)
    * are in E1, we also need to free the UE in the CU-CP, so call it twice to
    * cover all cases */
   nr_pdcp_remove_UE(UE->rrc_ue_id);
-  uint32_t pdu_sessions[256];
-  for (int i = 0; i < UE->nb_of_pdusessions && i < 256; ++i)
-    pdu_sessions[i] = UE->pduSession[i].param.pdusession_id;
-  rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, UE->nb_of_pdusessions, pdu_sessions);
   LOG_I(NR_RRC, "removed UE CU UE ID %u/RNTI %04x \n", UE->rrc_ue_id, UE->rnti);
   rrc_delete_ue_data(UE);
   rrc_gNB_remove_ue_context(rrc, ue_context_p);
@@ -2099,6 +2095,9 @@ static void rrc_CU_process_ue_context_release_complete(MessageDef *msg_p)
     /* only trigger release if it has been requested by core
      * otherwise, it might be CU that requested release on a DU during normal
      * operation (i.e, handover) */
+    uint32_t pdu_sessions[NGAP_MAX_PDU_SESSION];
+    get_pduSession_array(UE, pdu_sessions);
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, UE->nb_of_pdusessions, pdu_sessions);
     rrc_remove_ue(RC.nrrrc[0], ue_context_p);
   }
 }
@@ -2605,6 +2604,11 @@ void *rrc_gnb_task(void *args_p) {
         AssertFatal(!NODE_IS_DU(RC.nrrrc[instance]->node_type),
                     "should not receive F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE in DU!\n");
         LOG_E(NR_RRC, "Handling of F1AP_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE not implemented\n");
+        break;
+
+      case F1AP_RESET_ACK:
+        LOG_I(NR_RRC, "received F1AP reset acknowledgement\n");
+        free_f1ap_reset_ack(&F1AP_RESET_ACK(msg_p));
         break;
 
       /* Messages from X2AP */

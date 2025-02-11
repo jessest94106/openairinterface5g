@@ -644,3 +644,14 @@ nr_rrc_du_container_t *find_target_du(gNB_RRC_INST *rrc, sctp_assoc_t source_ass
   }
   return target_du;
 }
+
+void trigger_f1_reset(gNB_RRC_INST *rrc, sctp_assoc_t du_assoc_id)
+{
+  f1ap_reset_t reset = {
+    .transaction_id = F1AP_get_next_transaction_identifier(0, 0),
+    .cause = F1AP_CAUSE_TRANSPORT,
+    .cause_value = 1, // F1AP_CauseTransport_transport_resource_unavailable
+    .reset_type = F1AP_RESET_ALL, // DU does not support partial reset yet
+  };
+  rrc->mac_rrc.f1_reset(du_assoc_id, &reset);
+}

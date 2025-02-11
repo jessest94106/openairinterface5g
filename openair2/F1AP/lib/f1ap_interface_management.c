@@ -32,6 +32,341 @@
 #include "f1ap_messages_types.h"
 #include "f1ap_lib_extern.h"
 
+F1AP_UE_associatedLogicalF1_ConnectionItem_t encode_f1ap_ue_to_reset(const f1ap_ue_to_reset_t *to_reset)
+{
+  F1AP_UE_associatedLogicalF1_ConnectionItem_t conn_it = {0};
+
+  if (to_reset->gNB_CU_ue_id)
+    asn1cCallocOne(conn_it.gNB_CU_UE_F1AP_ID, *to_reset->gNB_CU_ue_id);
+  if (to_reset->gNB_DU_ue_id)
+    asn1cCallocOne(conn_it.gNB_DU_UE_F1AP_ID, *to_reset->gNB_DU_ue_id);
+
+  return conn_it;
+}
+
+f1ap_ue_to_reset_t decode_f1ap_ue_to_reset(const F1AP_UE_associatedLogicalF1_ConnectionItem_t *conn_it)
+{
+  f1ap_ue_to_reset_t to_reset = {0};
+  if (conn_it->gNB_CU_UE_F1AP_ID) {
+    to_reset.gNB_CU_ue_id = malloc_or_fail(sizeof(*to_reset.gNB_CU_ue_id));
+    *to_reset.gNB_CU_ue_id = *conn_it->gNB_CU_UE_F1AP_ID;
+  }
+  if (conn_it->gNB_DU_UE_F1AP_ID) {
+    to_reset.gNB_DU_ue_id = malloc_or_fail(sizeof(*to_reset.gNB_DU_ue_id));
+    *to_reset.gNB_DU_ue_id = *conn_it->gNB_DU_UE_F1AP_ID;
+  }
+  return to_reset;
+}
+
+void free_f1ap_ue_to_reset(const f1ap_ue_to_reset_t *to_reset)
+{
+  free(to_reset->gNB_CU_ue_id);
+  free(to_reset->gNB_DU_ue_id);
+}
+
+bool eq_f1ap_ue_to_reset(const f1ap_ue_to_reset_t *a, const f1ap_ue_to_reset_t *b)
+{
+  if ((!a->gNB_CU_ue_id) ^ (!b->gNB_CU_ue_id))
+    return false;
+  if (a->gNB_CU_ue_id)
+    _F1_EQ_CHECK_INT(*a->gNB_CU_ue_id, *b->gNB_CU_ue_id);
+  if ((!a->gNB_DU_ue_id) ^ (!b->gNB_DU_ue_id))
+    return false;
+  if (a->gNB_DU_ue_id)
+    _F1_EQ_CHECK_INT(*a->gNB_DU_ue_id, *b->gNB_DU_ue_id);
+  return true;
+}
+
+f1ap_ue_to_reset_t cp_f1ap_ue_to_reset(const f1ap_ue_to_reset_t *orig)
+{
+  f1ap_ue_to_reset_t cp = {0};
+  if (orig->gNB_CU_ue_id) {
+    cp.gNB_CU_ue_id = malloc_or_fail(sizeof(*cp.gNB_CU_ue_id));
+    *cp.gNB_CU_ue_id = *orig->gNB_CU_ue_id;
+  }
+  if (orig->gNB_DU_ue_id) {
+    cp.gNB_DU_ue_id = malloc_or_fail(sizeof(*cp.gNB_DU_ue_id));
+    *cp.gNB_DU_ue_id = *orig->gNB_DU_ue_id;
+  }
+  return cp;
+}
+
+/* @brief encode F1 Reset (9.2.1.1 in TS 38.473) */
+F1AP_F1AP_PDU_t *encode_f1ap_reset(const f1ap_reset_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+  /* Create Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, initMsg);
+  initMsg->procedureCode = F1AP_ProcedureCode_id_Reset;
+  initMsg->criticality = F1AP_Criticality_reject;
+  initMsg->value.present = F1AP_InitiatingMessage__value_PR_Reset;
+  F1AP_Reset_t *reset = &initMsg->value.choice.Reset;
+
+  /* (M) Transaction ID */
+  asn1cSequenceAdd(reset->protocolIEs.list, F1AP_ResetIEs_t, ieC1);
+  ieC1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ieC1->criticality = F1AP_Criticality_reject;
+  ieC1->value.present = F1AP_ResetIEs__value_PR_TransactionID;
+  ieC1->value.choice.TransactionID = msg->transaction_id;
+
+  /* (M) Cause */
+  asn1cSequenceAdd(reset->protocolIEs.list, F1AP_ResetIEs_t, ieC2);
+  ieC2->id = F1AP_ProtocolIE_ID_id_Cause;
+  ieC2->criticality = F1AP_Criticality_ignore;
+  ieC2->value.present = F1AP_ResetIEs__value_PR_Cause;
+  ieC2->value.choice.Cause = encode_f1ap_cause(msg->cause, msg->cause_value);
+
+  /* (M) Reset type */
+  asn1cSequenceAdd(reset->protocolIEs.list, F1AP_ResetIEs_t, ieC3);
+  ieC3->id = F1AP_ProtocolIE_ID_id_ResetType;
+  ieC3->criticality = F1AP_Criticality_reject;
+  ieC3->value.present = F1AP_ResetIEs__value_PR_ResetType;
+  if (msg->reset_type == F1AP_RESET_ALL) {
+    ieC3->value.choice.ResetType.present = F1AP_ResetType_PR_f1_Interface;
+    ieC3->value.choice.ResetType.choice.f1_Interface = F1AP_ResetAll_reset_all;
+    AssertFatal(msg->num_ue_to_reset == 0, "cannot have F1AP_RESET_ALL and %d UEs to reset\n", msg->num_ue_to_reset);
+  } else if (msg->reset_type == F1AP_RESET_PART_OF_F1_INTERFACE) {
+    F1AP_UE_associatedLogicalF1_ConnectionListRes_t *con_list = calloc_or_fail(1, sizeof(*con_list));
+    ieC3->value.choice.ResetType.present = F1AP_ResetType_PR_partOfF1_Interface;
+    ieC3->value.choice.ResetType.choice.partOfF1_Interface = con_list;
+    AssertFatal(msg->num_ue_to_reset > 0, "at least one UE to reset required\n");
+    for (int i = 0; i < msg->num_ue_to_reset; ++i) {
+      asn1cSequenceAdd(con_list->list, F1AP_UE_associatedLogicalF1_ConnectionItemRes_t, conn_it_res);
+      conn_it_res->id = F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionItem;
+      conn_it_res->criticality = F1AP_Criticality_reject;
+      conn_it_res->value.present = F1AP_UE_associatedLogicalF1_ConnectionItemRes__value_PR_UE_associatedLogicalF1_ConnectionItem;
+      conn_it_res->value.choice.UE_associatedLogicalF1_ConnectionItem = encode_f1ap_ue_to_reset(&msg->ue_to_reset[i]);
+    }
+  } else {
+    AssertFatal(false, "illegal reset_type %d\n", msg->reset_type);
+  }
+
+  return pdu;
+}
+
+/* @brief decode F1 Reset (9.2.1.1 in TS 38.473) */
+bool decode_f1ap_reset(const F1AP_F1AP_PDU_t *pdu, f1ap_reset_t *out)
+{
+  _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_initiatingMessage);
+  AssertError(pdu->choice.initiatingMessage != NULL, return false, "pdu->choice.initiatingMessage is NULL");
+  _F1_EQ_CHECK_LONG(pdu->choice.initiatingMessage->procedureCode, F1AP_ProcedureCode_id_Reset);
+  _F1_EQ_CHECK_INT(pdu->choice.initiatingMessage->value.present, F1AP_InitiatingMessage__value_PR_Reset);
+
+  /* Check presence of mandatory IEs */
+  F1AP_Reset_t *in = &pdu->choice.initiatingMessage->value.choice.Reset;
+  F1AP_ResetIEs_t *ie;
+  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, in, F1AP_ProtocolIE_ID_id_Cause, true);
+  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, in, F1AP_ProtocolIE_ID_id_ResetType, true);
+
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    AssertError(in->protocolIEs.list.array[i] != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    ie = in->protocolIEs.list.array[i];
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        // (M) Transaction ID
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_Cause:
+        // (M) Cause
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetIEs__value_PR_Cause);
+        if (!decode_f1ap_cause(ie->value.choice.Cause, &out->cause, &out->cause_value)) {
+          PRINT_ERROR("could not decode F1AP Cause\n");
+          return false;
+        }
+        break;
+      case F1AP_ProtocolIE_ID_id_ResetType:
+        // (M) Reset type
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetIEs__value_PR_ResetType);
+        if (ie->value.choice.ResetType.present == F1AP_ResetType_PR_f1_Interface) {
+          out->reset_type = F1AP_RESET_ALL;
+        } else if (ie->value.choice.ResetType.present == F1AP_ResetType_PR_partOfF1_Interface) {
+          out->reset_type = F1AP_RESET_PART_OF_F1_INTERFACE;
+          const F1AP_UE_associatedLogicalF1_ConnectionListRes_t *con_list = ie->value.choice.ResetType.choice.partOfF1_Interface;
+          AssertError(con_list->list.count > 0, return false, "no UEs for partially reset F1 interface\n");
+          out->num_ue_to_reset = con_list->list.count;
+          out->ue_to_reset = calloc_or_fail(out->num_ue_to_reset, sizeof(*out->ue_to_reset));
+          for (int i = 0; i < out->num_ue_to_reset; ++i) {
+            const F1AP_UE_associatedLogicalF1_ConnectionItemRes_t *it_res =
+                (const F1AP_UE_associatedLogicalF1_ConnectionItemRes_t *)con_list->list.array[i];
+            _F1_EQ_CHECK_LONG(it_res->id, F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionItem);
+            _F1_EQ_CHECK_INT(it_res->value.present,
+                             F1AP_UE_associatedLogicalF1_ConnectionItemRes__value_PR_UE_associatedLogicalF1_ConnectionItem);
+            out->ue_to_reset[i] = decode_f1ap_ue_to_reset(&it_res->value.choice.UE_associatedLogicalF1_ConnectionItem);
+          }
+        } else {
+          PRINT_ERROR("unrecognized Reset type %d\n", ie->value.choice.ResetType.present);
+          return false;
+        }
+    }
+  }
+  return true;
+}
+
+void free_f1ap_reset(f1ap_reset_t *msg)
+{
+  DevAssert(msg->reset_type == F1AP_RESET_ALL || msg->reset_type == F1AP_RESET_PART_OF_F1_INTERFACE);
+  if (msg->reset_type == F1AP_RESET_ALL) {
+    DevAssert(msg->ue_to_reset == NULL);
+    return; /* nothing to be freed in this case */
+  }
+  for (int i = 0; i < msg->num_ue_to_reset; ++i)
+    free_f1ap_ue_to_reset(&msg->ue_to_reset[i]);
+  free(msg->ue_to_reset);
+}
+
+bool eq_f1ap_reset(const f1ap_reset_t *a, const f1ap_reset_t *b)
+{
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->cause, b->cause);
+  _F1_EQ_CHECK_LONG(a->cause_value, b->cause_value);
+  _F1_EQ_CHECK_INT(a->reset_type, b->reset_type);
+  if (a->reset_type == F1AP_RESET_PART_OF_F1_INTERFACE) {
+    _F1_EQ_CHECK_INT(a->num_ue_to_reset, b->num_ue_to_reset);
+    for (int i = 0; i < a->num_ue_to_reset; ++i)
+      if (!eq_f1ap_ue_to_reset(&a->ue_to_reset[i], &b->ue_to_reset[i]))
+        return false;
+  }
+  return true;
+}
+
+f1ap_reset_t cp_f1ap_reset(const f1ap_reset_t *orig)
+{
+  DevAssert(orig->reset_type == F1AP_RESET_ALL || orig->reset_type == F1AP_RESET_PART_OF_F1_INTERFACE);
+  f1ap_reset_t cp = {
+      .transaction_id = orig->transaction_id,
+      .cause = orig->cause,
+      .cause_value = orig->cause_value,
+      .reset_type = orig->reset_type,
+  };
+  if (orig->reset_type == F1AP_RESET_PART_OF_F1_INTERFACE) {
+    DevAssert(orig->num_ue_to_reset > 0);
+    cp.num_ue_to_reset = orig->num_ue_to_reset;
+    cp.ue_to_reset = calloc_or_fail(cp.num_ue_to_reset, sizeof(*cp.ue_to_reset));
+    for (int i = 0; i < cp.num_ue_to_reset; ++i)
+      cp.ue_to_reset[i] = cp_f1ap_ue_to_reset(&orig->ue_to_reset[i]);
+  }
+  return cp;
+}
+
+/* @brief encode F1 Reset Ack (9.2.1.2 in TS 38.473) */
+struct F1AP_F1AP_PDU *encode_f1ap_reset_ack(const f1ap_reset_ack_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+  /* Create Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, so);
+  so->procedureCode = F1AP_ProcedureCode_id_Reset;
+  so->criticality = F1AP_Criticality_reject;
+  so->value.present = F1AP_SuccessfulOutcome__value_PR_ResetAcknowledge;
+  F1AP_ResetAcknowledge_t *reset_ack = &so->value.choice.ResetAcknowledge;
+
+  /* (M) Transaction ID */
+  asn1cSequenceAdd(reset_ack->protocolIEs.list, F1AP_ResetAcknowledgeIEs_t, ieC1);
+  ieC1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ieC1->criticality = F1AP_Criticality_reject;
+  ieC1->value.present = F1AP_ResetAcknowledgeIEs__value_PR_TransactionID;
+  ieC1->value.choice.TransactionID = msg->transaction_id;
+
+  /* TODO criticality diagnostics */
+
+  /* 0:N UEs to reset */
+  if (msg->num_ue_to_reset == 0)
+    return pdu; /* no UEs to encode */
+
+  asn1cSequenceAdd(reset_ack->protocolIEs.list, F1AP_ResetAcknowledgeIEs_t, ieC2);
+  ieC2->id = F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionListResAck;
+  ieC2->criticality = F1AP_Criticality_ignore;
+  ieC2->value.present = F1AP_ResetAcknowledgeIEs__value_PR_UE_associatedLogicalF1_ConnectionListResAck;
+  F1AP_UE_associatedLogicalF1_ConnectionListResAck_t *ue_to_reset = &ieC2->value.choice.UE_associatedLogicalF1_ConnectionListResAck;
+  for (int i = 0; i < msg->num_ue_to_reset; ++i) {
+    asn1cSequenceAdd(ue_to_reset->list, F1AP_UE_associatedLogicalF1_ConnectionItemResAck_t, conn_it_res);
+    conn_it_res->id = F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionItem;
+    conn_it_res->criticality = F1AP_Criticality_ignore;
+    conn_it_res->value.present = F1AP_UE_associatedLogicalF1_ConnectionItemResAck__value_PR_UE_associatedLogicalF1_ConnectionItem;
+    conn_it_res->value.choice.UE_associatedLogicalF1_ConnectionItem = encode_f1ap_ue_to_reset(&msg->ue_to_reset[i]);
+  }
+  return pdu;
+}
+
+/* @brief decode F1 Reset Ack (9.2.1.2 in TS 38.473) */
+bool decode_f1ap_reset_ack(const struct F1AP_F1AP_PDU *pdu, f1ap_reset_ack_t *out)
+{
+  _F1_EQ_CHECK_INT(pdu->present, F1AP_F1AP_PDU_PR_successfulOutcome);
+  AssertError(pdu->choice.successfulOutcome != NULL, return false, "pdu->choice.initiatingMessage is NULL");
+  _F1_EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, F1AP_ProcedureCode_id_Reset);
+  _F1_EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present, F1AP_SuccessfulOutcome__value_PR_ResetAcknowledge);
+
+  /* Check presence of mandatory IEs */
+  F1AP_ResetAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.ResetAcknowledge;
+  F1AP_ResetAcknowledgeIEs_t *ie;
+  F1AP_LIB_FIND_IE(F1AP_ResetAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    AssertError(in->protocolIEs.list.array[i] != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    ie = in->protocolIEs.list.array[i];
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        // (M) Transaction ID
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetAcknowledgeIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionListResAck:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_ResetAcknowledgeIEs__value_PR_UE_associatedLogicalF1_ConnectionListResAck);
+        {
+          const F1AP_UE_associatedLogicalF1_ConnectionListResAck_t *conn_list = &ie->value.choice.UE_associatedLogicalF1_ConnectionListResAck;
+          AssertError(conn_list->list.count > 0, return false, "no UEs for partially reset F1 interface\n");
+          out->num_ue_to_reset = conn_list->list.count;
+          out->ue_to_reset = calloc_or_fail(out->num_ue_to_reset, sizeof(*out->ue_to_reset));
+          for (int i = 0; i < out->num_ue_to_reset; ++i) {
+            const F1AP_UE_associatedLogicalF1_ConnectionItemResAck_t *it_res = (const F1AP_UE_associatedLogicalF1_ConnectionItemResAck_t *)conn_list->list.array[i];
+            _F1_EQ_CHECK_LONG(it_res->id, F1AP_ProtocolIE_ID_id_UE_associatedLogicalF1_ConnectionItem);
+            _F1_EQ_CHECK_INT(it_res->value.present, F1AP_UE_associatedLogicalF1_ConnectionItemResAck__value_PR_UE_associatedLogicalF1_ConnectionItem);
+            out->ue_to_reset[i] = decode_f1ap_ue_to_reset(&it_res->value.choice.UE_associatedLogicalF1_ConnectionItem);
+          }
+        }
+        break;
+      default:
+        AssertError(true, return false, "Reset Acknowledge: ProtocolIE id %ld not implemented, ignoring IE\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+void free_f1ap_reset_ack(f1ap_reset_ack_t *msg)
+{
+  for (int i = 0; i < msg->num_ue_to_reset; ++i)
+    free_f1ap_ue_to_reset(&msg->ue_to_reset[i]);
+  free(msg->ue_to_reset);
+}
+
+bool eq_f1ap_reset_ack(const f1ap_reset_ack_t *a, const f1ap_reset_ack_t *b)
+{
+  _F1_EQ_CHECK_LONG(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->num_ue_to_reset, b->num_ue_to_reset);
+  for (int i = 0; i < a->num_ue_to_reset; ++i) {
+    if (!eq_f1ap_ue_to_reset(&a->ue_to_reset[i], &b->ue_to_reset[i]))
+      return false;
+  }
+  return true;
+}
+
+f1ap_reset_ack_t cp_f1ap_reset_ack(const f1ap_reset_ack_t *orig)
+{
+  f1ap_reset_ack_t cp = {.transaction_id = orig->transaction_id, .num_ue_to_reset = orig->num_ue_to_reset};
+  if (cp.num_ue_to_reset > 0) {
+    cp.ue_to_reset = calloc_or_fail(cp.num_ue_to_reset, sizeof(*cp.ue_to_reset));
+    for (int i = 0; i < cp.num_ue_to_reset; ++i)
+      cp.ue_to_reset[i] = cp_f1ap_ue_to_reset(&orig->ue_to_reset[i]);
+  }
+  return cp;
+}
+
 static const int nrb_lut[29] = {11,  18,  24,  25,  31,  32,  38,  51,  52,  65,  66,  78,  79,  93, 106,
                                 107, 121, 132, 133, 135, 160, 162, 189, 216, 217, 245, 264, 270, 273};
 

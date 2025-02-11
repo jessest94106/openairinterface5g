@@ -35,6 +35,7 @@
 #include "f1ap_cu_rrc_message_transfer.h"
 #include "f1ap_cu_ue_context_management.h"
 #include "lib/f1ap_rrc_message_transfer.h"
+#include "lib/f1ap_interface_management.h"
 #include "f1ap_cu_paging.h"
 #include "f1ap_cu_task.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
@@ -149,6 +150,11 @@ void *F1AP_CU_task(void *arg) {
       case SCTP_DATA_IND:
         cu_task_handle_sctp_data_ind(ITTI_MSG_DESTINATION_INSTANCE(received_msg),
                                      &received_msg->ittiMsg.sctp_data_ind);
+        break;
+
+      case F1AP_RESET:
+        CU_send_RESET(assoc_id, &F1AP_RESET(received_msg));
+        free_f1ap_reset(&F1AP_RESET(received_msg));
         break;
 
       case F1AP_RESET_ACK:

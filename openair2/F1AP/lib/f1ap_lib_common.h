@@ -27,6 +27,9 @@
 #include <stdio.h>
 #include "openair3/UTILS/conversions.h"
 
+#include "F1AP_Cause.h"
+#include "f1ap_messages_types.h"
+
 #ifdef ENABLE_TESTS
   #define PRINT_ERROR(...) fprintf(stderr, ##__VA_ARGS__)
 #else
@@ -81,5 +84,8 @@ bool eq_f1ap_tx_bandwidth(const struct f1ap_transmission_bandwidth_t *a, const s
 
 struct OCTET_STRING;
 uint8_t *cp_octet_string(const struct OCTET_STRING *os, int *len);
+
+F1AP_Cause_t encode_f1ap_cause(f1ap_Cause_t cause, long cause_value);
+bool decode_f1ap_cause(F1AP_Cause_t f1_cause, f1ap_Cause_t *cause, long *cause_value);
 
 #endif /* F1AP_LIB_COMMON_H_ */

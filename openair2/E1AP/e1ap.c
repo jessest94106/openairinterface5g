@@ -219,6 +219,8 @@ int e1apCUUP_handle_SETUP_RESPONSE(sctp_assoc_t assoc_id, e1ap_upcp_inst_t *inst
     return -1;
   }
   free_e1ap_cuup_setup_response(&out);
+
+  e1_reset(); // reset all UE contexts, if any: see 38.463 sec 8.2.3
   return 0;
 }
 
