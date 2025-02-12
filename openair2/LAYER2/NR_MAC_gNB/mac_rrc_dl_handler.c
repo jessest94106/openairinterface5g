@@ -125,12 +125,9 @@ void f1_reset_cu_initiated(const f1ap_reset_t *reset)
 {
   LOG_I(MAC, "F1 Reset initiated by CU\n");
 
-  f1ap_reset_ack_t ack = {0};
+  f1ap_reset_ack_t ack = {.transaction_id = reset->transaction_id};
   if(reset->reset_type == F1AP_RESET_ALL) {
     du_clear_all_ue_states();
-    ack = (f1ap_reset_ack_t) {
-      .transaction_id = reset->transaction_id
-    };
   } else {
     // reset->reset_type == F1AP_RESET_PART_OF_F1_INTERFACE
     AssertFatal(1==0, "Not implemented yet\n");

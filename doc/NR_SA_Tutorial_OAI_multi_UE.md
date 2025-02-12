@@ -54,7 +54,7 @@ Important notes:
    sudo ./nr-uesoftmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.conf -r 106 --numerology 1 --band 78 -C 3619200000    --rfsim --uicc0.imsi 001010000000001 --rfsimulator.options chanmod --rfsimulator.serveraddr 10.201.1.100 --telnetsrv    --telnetsrv.listenport 9095
    ```
 
-3. For the second UE, create the namespace ue2 (`-c1`), then execute shell inside (`-o1`, "open"):
+3. For the second UE, create the namespace ue2 (`-c2`), then execute shell inside (`-o2`, "open"):
 
    ```bash
    sudo ./multi-ue.sh -c2

@@ -233,7 +233,7 @@ float nr_get_Pcmax(int p_Max,
 
 float nr_get_Pcmin(int bandwidth_index) {
   const float table_38101_6_3_1_1[] = {
-    -40, -40, -40, -40, -39, -38.2, -37.5, -37, -36.5, -35.2, -34.6, -34, -33.5, -33
+    -40, -40, -40, -40, -39, -38.2, -37.5, -37, -36.5, -36, -35.2, -34.6, -34, -33.5, -33
   };
   return table_38101_6_3_1_1[bandwidth_index];
 }

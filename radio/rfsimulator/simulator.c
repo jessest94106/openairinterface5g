@@ -973,7 +973,7 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
     }
   } else {
     bool have_to_wait;
-
+    int loops = 0;
     do {
       have_to_wait=false;
 
@@ -994,6 +994,12 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
               b->lastReceivedTS,
               t->nextRxTstamp + nsamps);
         flushInput(t, 3, nsamps);
+      }
+      if (loops++ > 10 && t->role == SIMU_ROLE_SERVER) {
+        // Just start producing samples. The clients will catch up.
+        have_to_wait = false;
+        LOG_W(HW,
+              "No longer waiting for clients to catch up, starting to produce samples\n");
       }
     } while (have_to_wait);
   }

@@ -602,18 +602,20 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
     uint8_t buffer[pnf_p7->_public.segment_size];
     for (segment = 0; segment < segment_count; ++segment) {
       uint8_t last = 0;
-      uint16_t size = pnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH;
+      uint32_t size = pnf_p7->_public.segment_size - NFAPI_NR_P7_HEADER_LENGTH;
       if (segment + 1 == segment_count) {
         last = 1;
         size = (msg_body_len) - (seg_body_len * segment);
       }
 
-      uint16_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
+      uint32_t segment_size = size + NFAPI_NR_P7_HEADER_LENGTH;
 
       // Update the header with the m and segement
       memcpy(&buffer[0], tx_buf, NFAPI_NR_P7_HEADER_LENGTH);
 
       // set the segment length
+      buffer[4] = (segment_size & 0xFF000000) >> 24;
+      buffer[5] = (segment_size & 0xFF0000) >> 16;
       buffer[6] = (segment_size & 0xFF00) >> 8;
       buffer[7] = (segment_size & 0xFF);
 
@@ -2378,7 +2380,7 @@ void pnf_nr_handle_p7_message(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, 
     if (rx_msg->num_segments_received == rx_msg->num_segments_expected) {
       // send the buffer on
       uint16_t i = 0;
-      uint16_t length = 0;
+      uint32_t length = 0;
       for (i = 0; i < rx_msg->num_segments_expected; ++i) {
         length += rx_msg->segments[i].length - (i > 0 ? NFAPI_NR_P7_HEADER_LENGTH : 0);
       }
@@ -2400,7 +2402,7 @@ void pnf_nr_handle_p7_message(void* pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7, 
         pnf_p7->reassemby_buffer_size = length;
       }
 
-      uint16_t offset = 0;
+      uint32_t offset = 0;
       for (i = 0; i < rx_msg->num_segments_expected; ++i) {
         if (i == 0) {
           memcpy(pnf_p7->reassemby_buffer, rx_msg->segments[i].buffer, rx_msg->segments[i].length);

@@ -61,8 +61,7 @@ static void f1_reset_du_initiated_f1ap(const f1ap_reset_t *reset)
 static void f1_reset_acknowledge_cu_initiated_f1ap(const f1ap_reset_ack_t *ack)
 {
   MessageDef *msg = itti_alloc_new_message(TASK_MAC_GNB, 0, F1AP_RESET_ACK);
-  f1ap_reset_ack_t *f1ap_msg = &F1AP_RESET_ACK(msg);
-  *f1ap_msg = *ack;
+  F1AP_RESET_ACK(msg) = cp_f1ap_reset_ack(ack);
   itti_send_msg_to_task(TASK_DU_F1, 0, msg);
 }
 

@@ -34,8 +34,10 @@ static void f1_reset_du_initiated_direct(const f1ap_reset_t *reset)
 
 static void f1_reset_acknowledge_cu_initiated_direct(const f1ap_reset_ack_t *ack)
 {
-  (void) ack;
-  AssertFatal(false, "%s() not implemented yet\n", __func__);
+  MessageDef *msg = itti_alloc_new_message(TASK_MAC_GNB, 0, F1AP_RESET_ACK);
+  msg->ittiMsgHeader.originInstance = -1; // means monolithic
+  F1AP_RESET_ACK(msg) = cp_f1ap_reset_ack(ack);
+  itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
 }
 
 static void f1_setup_request_direct(const f1ap_setup_req_t *req)

@@ -517,7 +517,7 @@ void nr_layer_precoder_simd(const int n_layers,
       prec_weight.r = pmi_pdu->weights[nl][ant].precoder_weight_Re;
       prec_weight.i = pmi_pdu->weights[nl][ant].precoder_weight_Im;
 
-      const simde__m256i x = simde_mm256_loadu_epi32(&txdataF_res_mapped[nl][symbol][sc]);
+      const simde__m256i x = simde_mm256_loadu_si256(&txdataF_res_mapped[nl][symbol][sc]);
 
       // Rearrange precoding matrix weight to match complex multiplication and broadcast it to match SIMD size
       const simde__m256i w_c   = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight)));   // broadcast conjugate of w
@@ -561,7 +561,7 @@ void nr_layer_precoder_simd(const int n_layers,
       prec_weight.r = pmi_pdu->weights[nl][ant].precoder_weight_Re;
       prec_weight.i = pmi_pdu->weights[nl][ant].precoder_weight_Im;
 
-      const simde__m128i x = simde_mm_loadu_epi32(&txdataF_res_mapped[nl][symbol][sc]);
+      const simde__m128i x = simde_mm_loadu_si128(&txdataF_res_mapped[nl][symbol][sc]);
 
       // Rearrange precoding matrix weight to match complex multiplication and broadcast it to match SIMD size
       const simde__m128i w_c   = simde_mm_set1_epi32(c16toI32(c16conj(prec_weight)));   // broadcast conjugate of w

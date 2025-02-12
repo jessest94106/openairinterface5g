@@ -10,3 +10,7 @@ target_include_directories(e1ap PUBLIC ${CMAKE_CURRENT_DIR})
 if(ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
+
+if(ENABLE_TESTS)
+  target_compile_definitions(e1ap PRIVATE E1AP_LOG_ERRORS)
+endif()

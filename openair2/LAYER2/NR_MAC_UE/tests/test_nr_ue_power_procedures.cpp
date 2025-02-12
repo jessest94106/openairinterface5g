@@ -178,7 +178,7 @@ TEST(test_pucch_power_state, test_accumulated_delta_pucch)
 
 TEST(pc_min, check_all_bw_indexes)
 {
-  const int bws[] = {5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 100};
+  const int bws[] = {5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100};
   for (auto i = 0U; i < sizeofArray(bws); i++) {
     (void)nr_get_Pcmin(i);
   }
