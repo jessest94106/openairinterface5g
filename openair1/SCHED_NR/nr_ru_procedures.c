@@ -201,7 +201,7 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
     for (int b = 0; b < ru->num_beams_period; b++) {
       for (int i = 0; i < ru->nb_tx; ++i) {
         int tx_idx = i + b * ru->nb_tx;
-        memcpy((void*)&ru->common.txdataF_BF[tx_idx][txdataF_offset],
+        memcpy((void*)ru->common.txdataF_BF[tx_idx],
                (void*)&gNB->common_vars.txdataF[b][i][txdataF_offset],
                fp->samples_per_slot_wCP * sizeof(int32_t));
       }

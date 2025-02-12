@@ -51,7 +51,7 @@ void nr_phy_init_RU(RU_t *ru)
   ru->num_beams_period = analog_config->analog_bf_vendor_ext.value ? analog_config->num_beams_period_vendor_ext.value : 1;
   int nb_tx_streams = ru->nb_tx * ru->num_beams_period;
   int nb_rx_streams = ru->nb_rx * ru->num_beams_period;
-
+  LOG_I(NR_PHY, "nb_tx_streams %d, nb_rx_streams %d, num_Beams_period %d\n", nb_tx_streams, nb_rx_streams, ru->num_beams_period);
   ru->common.beam_id = malloc16_clear(ru->num_beams_period * sizeof(int*));
   for(int i = 0; i < ru->num_beams_period; i++)
     ru->common.beam_id[i] = malloc16_clear(fp->symbols_per_slot * fp->slots_per_frame * sizeof(int));
