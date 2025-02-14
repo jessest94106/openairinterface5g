@@ -647,7 +647,11 @@ printf("%d\n", slot);
 
   frame_structure_t frame_structure = {0};
   frame_type_t frame_type = TDD;
-  config_frame_structure(mu, scc, get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon), frame_type, &frame_structure);
+  config_frame_structure(mu,
+                         scc->tdd_UL_DL_ConfigurationCommon,
+                         get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon),
+                         frame_type,
+                         &frame_structure);
   AssertFatal(is_dl_slot(slot, &frame_structure), "The slot selected is not DL. Can't run DLSIM\n");
 
   // TODO do a UECAP for phy-sim
@@ -859,7 +863,7 @@ printf("%d\n", slot);
 
   nr_l2_init_ue(1);
   UE_mac = get_mac_inst(0);
-  ue_init_config_request(UE_mac, mu);
+  ue_init_config_request(UE_mac, get_slots_per_frame_from_scs(mu));
 
   UE->if_inst = nr_ue_if_module_init(0);
   UE->if_inst->scheduled_response = nr_ue_scheduled_response;
