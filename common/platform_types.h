@@ -150,6 +150,15 @@ typedef enum ip_traffic_type_e {
   TRAFFIC_PC5S_SESSION_INIT = 10
 } ip_traffic_type_t;
 
+typedef enum {
+  PDCCH_AGG_LEVEL1 = 0,
+  PDCCH_AGG_LEVEL2,
+  PDCCH_AGG_LEVEL4,
+  PDCCH_AGG_LEVEL8,
+  PDCCH_AGG_LEVEL16,
+  NUM_PDCCH_AGG_LEVELS
+} Pdcch_Aggregation_Level_t;
+
 typedef struct net_ip_address_s {
   unsigned ipv4: 1;
   unsigned ipv6: 1;

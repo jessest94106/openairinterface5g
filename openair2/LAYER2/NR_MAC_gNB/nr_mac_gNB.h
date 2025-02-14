@@ -172,6 +172,7 @@ typedef struct nr_mac_config_t {
   /// beamforming weight matrix size
   int nb_bfw[2];
   int32_t *bw_list;
+  int num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
 } nr_mac_config_t;
 
 typedef struct NR_preamble_ue {
@@ -675,6 +676,10 @@ typedef struct {
 
   /// per-LC configuration
   seq_arr_t lc_config;
+
+  // pdcch closed loop adjust for PDCCH aggregation level, range <0, 1>
+  // 0 - good channel, 1 - bad channel
+  float pdcch_cl_adjust;
 } NR_UE_sched_ctrl_t;
 
 typedef struct {
