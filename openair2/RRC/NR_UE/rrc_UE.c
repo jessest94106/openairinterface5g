@@ -165,8 +165,9 @@ static void set_DRB_status(NR_UE_RRC_INST_t *rrc, NR_DRB_Identity_t drb_id, NR_R
   rrc->status_DRBs[drb_id - 1] = status;
 }
 
-static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, instance_t ue_id)
+static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, NR_UE_RRC_INST_t *rrc)
 {
+  instance_t ue_id = rrc->ue_id;
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SI, VCD_FUNCTION_IN);
 
   // Dump contents
@@ -253,6 +254,7 @@ static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si,
   if (sib19) {
     MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_OTHER_SIB);
     asn_copy(&asn_DEF_NR_SIB19_r17, (void **)&NR_MAC_RRC_CONFIG_OTHER_SIB(msg).sib19, sib19);
+    NR_MAC_RRC_CONFIG_OTHER_SIB(msg).can_start_ra = rrc->is_NTN_UE;
     itti_send_msg_to_task(TASK_MAC_UE, ue_id, msg);
   }
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SI, VCD_FUNCTION_OUT);
@@ -308,6 +310,22 @@ static void nr_rrc_configure_default_SI(NR_UE_RRC_SI_INFO *SI_info,
   }
 }
 
+static bool verify_NTN_access(const NR_UE_RRC_SI_INFO *SI_info, const NR_SIB1_v1700_IEs_t *sib1_v1700)
+{
+  // SIB1 indicates if NTN access is present in the cell
+  bool ntn_access = false;
+  if (sib1_v1700 && sib1_v1700->cellBarredNTN_r17
+      && *sib1_v1700->cellBarredNTN_r17 == NR_SIB1_v1700_IEs__cellBarredNTN_r17_notBarred)
+    ntn_access = true;
+
+  uint32_t sib19_mask = 1 << NR_SIB_TypeInfo_v1700__sibType_r17__type1_r17_sibType19;
+  int sib19_present = SI_info->SInfo_r17.default_otherSI_map_r17 & sib19_mask;
+
+  AssertFatal(!ntn_access || sib19_present, "NTN cell, but SIB19 not configured.\n");
+
+  return ntn_access && sib19_present;
+}
+
 static void nr_rrc_process_sib1(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_info, NR_SIB1_t *sib1)
 {
   if(g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
@@ -321,21 +339,26 @@ static void nr_rrc_process_sib1(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_inf
     nr_rrc_ue_prepare_RRCSetupRequest(rrc);
   }
 
+  NR_SIB1_v1700_IEs_t *sib1_v1700 = NULL;
   NR_SI_SchedulingInfo_v1700_t *si_SchedInfo_v1700 = NULL;
   if (sib1->nonCriticalExtension
       && sib1->nonCriticalExtension->nonCriticalExtension
       && sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension) {
-    si_SchedInfo_v1700 = sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->si_SchedulingInfo_v1700;
+    sib1_v1700 = sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension;
+    si_SchedInfo_v1700 = sib1_v1700->si_SchedulingInfo_v1700;
   }
 
   // configure default SI
   nr_rrc_configure_default_SI(SI_info, sib1->si_SchedulingInfo, si_SchedInfo_v1700);
+  rrc->is_NTN_UE = verify_NTN_access(SI_info, sib1_v1700);
+
   // configure timers and constant
   nr_rrc_set_sib1_timers_and_constants(&rrc->timers_and_constants, sib1);
   // RRC storage of SIB1 timers and constants (eg needed in re-establishment)
   UPDATE_IE(rrc->timers_and_constants.sib1_TimersAndConstants, sib1->ue_TimersAndConstants, NR_UE_TimersAndConstants_t);
   MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_SIB1);
   NR_MAC_RRC_CONFIG_SIB1(msg).sib1 = sib1;
+  NR_MAC_RRC_CONFIG_SIB1(msg).can_start_ra = !rrc->is_NTN_UE;
   itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
 }
 
@@ -396,7 +419,7 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
       SEQUENCE_free(&asn_DEF_NR_SystemInformation, si, 1);
     } else {
       LOG_I(NR_RRC, "[UE %ld] Decoding dedicatedSystemInformationDelivery\n", rrc->ue_id);
-      nr_decode_SI(SI_info, si, rrc->ue_id);
+      nr_decode_SI(SI_info, si, rrc);
     }
   }
   if (rec_1530->otherConfig) {
@@ -958,7 +981,7 @@ static int8_t nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation:
         LOG_I(NR_RRC, "[UE %ld] Decoding SI\n", rrc->ue_id);
         NR_SystemInformation_t *si = bcch_message->message.choice.c1->choice.systemInformation;
-        nr_decode_SI(SI_info, si, rrc->ue_id);
+        nr_decode_SI(SI_info, si, rrc);
         break;
       case NR_BCCH_DL_SCH_MessageType__c1_PR_NOTHING:
       default:

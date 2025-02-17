@@ -222,7 +222,7 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
 
 }
 
-// computes delay between ue and sat based on SIB19 ephemeris data
+// computes round-trip-time between ue and sat based on SIB19 ephemeris data
 static double calculate_ue_sat_ta(const position_t *position_params, NR_PositionVelocity_r17_t *sat_pos)
 {
   // get UE position coordinates
@@ -235,9 +235,8 @@ static double calculate_ue_sat_ta(const position_t *position_params, NR_Position
   double posy_0 = (double)sat_pos->positionY_r17 * 1.3;
   double posz_0 = (double)sat_pos->positionZ_r17 * 1.3;
 
-  double distance = sqrt(pow(posx - posx_0, 2) + pow(posy - posy_0, 2) + pow(posz - posz_0, 2));
-  // this computation will ensure 3 decimal precision
-  double ta_ms = round(((distance / SPEED_OF_LIGHT) * 1000) * 1000.0) / 1000.0;
+  double distance = 2 * sqrt(pow(posx - posx_0, 2) + pow(posy - posy_0, 2) + pow(posz - posz_0, 2));
+  double ta_ms = (distance / SPEED_OF_LIGHT) * 1000;
 
   return ta_ms;
 }
@@ -1665,7 +1664,7 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
     case T300_EXPIRY:
       reset_ra(mac, false);
       reset_mac_inst(mac);
-      mac->state = UE_SYNC; // still in sync but need to restart RA
+      mac->state = UE_PERFORMING_RA; // still in sync but need to restart RA
       break;
     case RE_ESTABLISHMENT:
       reset_mac_inst(mac);
@@ -1730,7 +1729,7 @@ static void configure_si_schedulingInfo(NR_UE_MAC_INST_t *mac,
   }
 }
 
-void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1)
+void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1, bool can_start_ra)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1766,6 +1765,8 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
     AssertFatal(mac->current_UL_BWP, "Couldn't find DL-BWP0\n");
     configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->timeAlignmentTimerCommon, mac->current_UL_BWP->scs);
   }
+  if (mac->state == UE_RECEIVING_SIB && can_start_ra)
+    mac->state = UE_PERFORMING_RA;
 
   // Setup the SSB to Rach Occasions mapping according to the config
   build_ssb_to_ro_map(mac);
@@ -1776,7 +1777,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
-void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19)
+void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, bool can_start_ra)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1789,6 +1790,8 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19)
 
     configure_ntn_ta(mac->ue_id, &mac->ntn_ta, ntn_Config_r17);
   }
+  if (mac->state == UE_RECEIVING_SIB && can_start_ra)
+    mac->state = UE_PERFORMING_RA;
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
