@@ -64,10 +64,7 @@ void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
                                 nfapi_nr_ul_dci_request_t *UL_dci_req)
 {
   /* called below and in simulators, so we assume a lock but don't require it */
-
-  NR_ServingCellConfigCommon_t *scc = gNB->common_channels->ServingCellConfigCommon;
-  const int num_slots = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
-
+  const int num_slots = gNB->frame_structure.numb_slots_frame;
   UL_tti_req_ahead_initialization(gNB, num_slots, CC_idP, frameP, slotP);
 
   nfapi_nr_dl_tti_pdcch_pdu_rel15_t **pdcch = (nfapi_nr_dl_tti_pdcch_pdu_rel15_t **)gNB->pdcch_pdu_idx[CC_idP];
@@ -103,14 +100,13 @@ void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
   TX_req[CC_idP].Number_of_PDUs = 0;
 }
 
-void clear_beam_information(NR_beam_info_t *beam_info, int frame, int slot, int mu)
+static void clear_beam_information(NR_beam_info_t *beam_info, int frame, int slot, int slots_per_frame)
 {
   // for now we use the same logic of UL_tti_req_ahead
   // reset after 1 frame with the exception of 15kHz
   if(!beam_info->beam_allocation)
     return;
   // initialization done only once
-  const int slots_per_frame = nr_slots_per_frame[mu];
   AssertFatal(beam_info->beam_allocation_size >= 0, "Beam information not initialized\n");
   int idx_to_clear = (frame * slots_per_frame + slot) / beam_info->beam_duration;
   idx_to_clear = (idx_to_clear + beam_info->beam_allocation_size - 1) % beam_info->beam_allocation_size;
@@ -120,51 +116,6 @@ void clear_beam_information(NR_beam_info_t *beam_info, int frame, int slot, int 
     for (int i = 0; i < beam_info->beams_per_period; i++)
       beam_info->beam_allocation[i][idx_to_clear] = -1;
   }
-}
-
-/**
- * @brief Returns true for:
- *        (1) FDD
- *        (2) Mixed slot with UL symbols
- *        (3) Full UL slot
- */
-bool is_ul_slot(const slot_t slot, const frame_structure_t *fs)
-{
-  if (!fs->is_tdd)
-    return true;
-  const tdd_period_config_t *pc = &fs->period_cfg;
-  slot_t s = get_slot_idx_in_period(slot, fs);
-  return ((is_mixed_slot(s, fs) && pc->tdd_slot_bitmap[s].num_ul_symbols)
-          || (pc->tdd_slot_bitmap[s].slot_type == TDD_NR_UPLINK_SLOT));
-}
-
-/**
- * @brief Returns true for:
- *        (1) FDD
- *        (2) Mixed slot with DL symbols
- *        (3) Full DL slot
- */
-bool is_dl_slot(const slot_t slot, const frame_structure_t *fs)
-{
-  if (!fs->is_tdd)
-    return true;
-  const tdd_period_config_t *pc = &fs->period_cfg;
-  slot_t s = get_slot_idx_in_period(slot, fs);
-  return ((is_mixed_slot(s, fs) && pc->tdd_slot_bitmap[s].num_dl_symbols)
-          || (pc->tdd_slot_bitmap[s].slot_type == TDD_NR_DOWNLINK_SLOT));
-}
-
-/**
- * @brief Returns true for:
- *        (1) Mixed slot with DL and/or UL symbols
- */
-bool is_mixed_slot(const slot_t slot, const frame_structure_t *fs)
-{
-  if (!fs->is_tdd)
-    return false;
-  slot_t s = get_slot_idx_in_period(slot, fs);
-  const tdd_period_config_t *pc = &fs->period_cfg;
-  return pc->tdd_slot_bitmap[s].slot_type == TDD_NR_MIXED_SLOT;
 }
 
 /* the structure nfapi_nr_ul_tti_request_t is very big, let's copy only what is necessary */
@@ -215,8 +166,8 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
 
   NR_SCHED_LOCK(&gNB->sched_lock);
-
-  clear_beam_information(&gNB->beam_info, frame, slot, *scc->ssbSubcarrierSpacing);
+  int slots_frame = gNB->frame_structure.numb_slots_frame;
+  clear_beam_information(&gNB->beam_info, frame, slot, slots_frame);
 
   gNB->frame = frame;
   start_meas(&gNB->eNB_scheduler);
@@ -240,9 +191,8 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
     for (int i = 0; i < num_beams; i++)
       memset(cc[CC_id].vrb_map[i], 0, sizeof(uint16_t) * MAX_BWP_SIZE);
     // clear last scheduled slot's content (only)!
-    const int num_slots = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
     const int size = gNB->vrb_map_UL_size;
-    const int prev_slot = frame * num_slots + slot + size - 1;
+    const int prev_slot = frame * slots_frame + slot + size - 1;
     for (int i = 0; i < num_beams; i++) {
       uint16_t *vrb_map_UL = cc[CC_id].vrb_map_UL[i];
       memcpy(&vrb_map_UL[prev_slot % size * MAX_BWP_SIZE], &gNB->ulprbbl, sizeof(uint16_t) * MAX_BWP_SIZE);
@@ -277,14 +227,14 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
        slot, because otherwise we would allocate the current slot in
        UL_tti_req_ahead), but be aware that, e.g., K2 is allowed to be larger
        (schedule_nr_prach will assert if resources are not free). */
-    const sub_frame_t n_slots_ahead = nr_slots_per_frame[*scc->ssbSubcarrierSpacing] - 1 + get_NTN_Koffset(scc);
-    const frame_t f = (frame + (slot + n_slots_ahead) / nr_slots_per_frame[*scc->ssbSubcarrierSpacing]) % 1024;
-    const sub_frame_t s = (slot + n_slots_ahead) % nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+    const sub_frame_t n_slots_ahead = slots_frame - 1 + get_NTN_Koffset(scc);
+    const frame_t f = (frame + (slot + n_slots_ahead) / slots_frame) % 1024;
+    const sub_frame_t s = (slot + n_slots_ahead) % slots_frame;
     schedule_nr_prach(module_idP, f, s);
   }
 
   // Schedule CSI-RS transmission
-  nr_csirs_scheduling(module_idP, frame, slot, nr_slots_per_frame[*scc->ssbSubcarrierSpacing], &sched_info->DL_req);
+  nr_csirs_scheduling(module_idP, frame, slot, &sched_info->DL_req);
 
   // Schedule CSI measurement reporting
   nr_csi_meas_reporting(module_idP, frame, slot);
@@ -313,7 +263,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, sub_frame_
    * is more than 1 CC supported?
    */
   AssertFatal(MAX_NUM_CCs == 1, "only 1 CC supported\n");
-  const int current_index = ul_buffer_index(frame, slot, *scc->ssbSubcarrierSpacing, gNB->UL_tti_req_ahead_size);
+  const int current_index = ul_buffer_index(frame, slot, slots_frame, gNB->UL_tti_req_ahead_size);
   copy_ul_tti_req(&sched_info->UL_tti_req, &gNB->UL_tti_req_ahead[0][current_index]);
 
   stop_meas(&gNB->eNB_scheduler);

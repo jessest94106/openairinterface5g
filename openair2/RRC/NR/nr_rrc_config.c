@@ -72,6 +72,50 @@ static NR_BWP_t clone_generic_parameters(const NR_BWP_t *gp)
   return clone;
 }
 
+/**
+ * @brief Verifies the aggregation level candidates
+ *
+ * This function checks the input aggregation level candidates and translates the value provided
+ * in the config to a valid field in RRC message.
+ *
+ * @param[in] num_cce_in_coreset number of CCE in coreset
+ * @param[in] in_num_agg_level_candidates input array of aggregation level candidates, interpreted as number of candidates.
+ * @param[in] coresetid coreset id
+ * @param[in] searchspaceid searchspace id
+ * @param[out] out_num_agg_level_candidates array of aggregation level candidates, output is a valid 3gpp field value.
+ * 
+ */
+static void verify_agg_levels(int num_cce_in_coreset,
+                              const int in_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS],
+                              int coresetid,
+                              int searchspaceid,
+                              int out_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS])
+{
+  int agg_level_to_n_cces[] = {1, 2, 4, 8, 16};
+  for (int i = 0; i < NUM_PDCCH_AGG_LEVELS; i++) {
+    // 7 is not a valid value, the mapping in 38.331 is from 0-7 mapped to 0-8 candidates and value 7 means 8 candidates instead. If
+    // the user wants 7 candidates round it up to 8.
+    int num_agg_level_candidates = in_num_agg_level_candidates[i];
+    if (num_agg_level_candidates == 7) {
+      num_agg_level_candidates = 8;
+    }
+    if (num_agg_level_candidates * agg_level_to_n_cces[i] > num_cce_in_coreset) {
+      int new_agg_level_candidates = num_cce_in_coreset / agg_level_to_n_cces[i];
+      LOG_E(NR_RRC,
+            "Invalid configuration: Not enough CCEs in coreset %d, searchspace %d, agg_level %d, number of requested "
+            "candidates = %d, number of CCES in coreset %d. Aggregation level candidates limited to %d\n",
+            coresetid,
+            searchspaceid,
+            agg_level_to_n_cces[i],
+            in_num_agg_level_candidates[i],
+            num_cce_in_coreset,
+            new_agg_level_candidates);
+      num_agg_level_candidates = new_agg_level_candidates;
+    }
+    out_num_agg_level_candidates[i] = min(num_agg_level_candidates, 7);
+  }
+}
+
 static NR_SetupRelease_RACH_ConfigCommon_t *clone_rach_configcommon(const NR_SetupRelease_RACH_ConfigCommon_t *rcc)
 {
   if (rcc == NULL || rcc->present == NR_SetupRelease_RACH_ConfigCommon_PR_NOTHING)
@@ -208,9 +252,11 @@ static int get_nb_pucch2_per_slot(const NR_ServingCellConfigCommon_t *scc, int b
   return nb_pucch2;
 }
 
-NR_SearchSpace_t *rrc_searchspace_config(bool is_common, int searchspaceid, int coresetid)
+NR_SearchSpace_t *rrc_searchspace_config(bool is_common,
+                                         int searchspaceid,
+                                         int coresetid,
+                                         const int num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS])
 {
-
   NR_SearchSpace_t *ss = calloc(1,sizeof(*ss));
   ss->searchSpaceId = searchspaceid;
   ss->controlResourceSetId = calloc(1,sizeof(*ss->controlResourceSetId));
@@ -226,23 +272,12 @@ NR_SearchSpace_t *rrc_searchspace_config(bool is_common, int searchspaceid, int 
   ss->monitoringSymbolsWithinSlot->buf[1] = 0x0;
   ss->monitoringSymbolsWithinSlot->bits_unused = 2;
   ss->nrofCandidates = calloc(1,sizeof(*ss->nrofCandidates));
-  // TODO temporary hardcoded implementation
-  ss->nrofCandidates->aggregationLevel1 = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
-  if (get_softmodem_params()->usim_test) {
-    ss->nrofCandidates->aggregationLevel2 = NR_SearchSpace__nrofCandidates__aggregationLevel2_n0;
-    ss->nrofCandidates->aggregationLevel4 = NR_SearchSpace__nrofCandidates__aggregationLevel4_n1;
-    ss->nrofCandidates->aggregationLevel8 = NR_SearchSpace__nrofCandidates__aggregationLevel8_n1;
-  } else {
-    if (is_common) {
-      ss->nrofCandidates->aggregationLevel2 = NR_SearchSpace__nrofCandidates__aggregationLevel2_n0;
-      ss->nrofCandidates->aggregationLevel4 = NR_SearchSpace__nrofCandidates__aggregationLevel4_n1;
-    } else {
-      ss->nrofCandidates->aggregationLevel2 = NR_SearchSpace__nrofCandidates__aggregationLevel2_n2;
-      ss->nrofCandidates->aggregationLevel4 = NR_SearchSpace__nrofCandidates__aggregationLevel4_n0;
-    }
-    ss->nrofCandidates->aggregationLevel8 = NR_SearchSpace__nrofCandidates__aggregationLevel8_n0;
-  }
-  ss->nrofCandidates->aggregationLevel16 = NR_SearchSpace__nrofCandidates__aggregationLevel16_n0;
+  ss->nrofCandidates->aggregationLevel1 = num_agg_level_candidates[PDCCH_AGG_LEVEL1];
+  ss->nrofCandidates->aggregationLevel2 = num_agg_level_candidates[PDCCH_AGG_LEVEL2];
+  ss->nrofCandidates->aggregationLevel4 = num_agg_level_candidates[PDCCH_AGG_LEVEL4];
+  ss->nrofCandidates->aggregationLevel8 = num_agg_level_candidates[PDCCH_AGG_LEVEL8];
+  ss->nrofCandidates->aggregationLevel16 = num_agg_level_candidates[PDCCH_AGG_LEVEL16];
+
   ss->searchSpaceType = calloc(1,sizeof(*ss->searchSpaceType));
   if (is_common) {
     ss->searchSpaceType->present = NR_SearchSpace__searchSpaceType_PR_common;
@@ -983,60 +1018,6 @@ void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsc
   }
 }
 
-const float tdd_ms_period_pattern[] = {0.5, 0.625, 1.0, 1.25, 2.0, 2.5, 5.0, 10.0};
-const float tdd_ms_period_ext[] = {3.0, 4.0};
-
-/**
- * @brief Retrieves the periodicity in milliseconds for the given TDD pattern
- *        depending on the presence of the extension
- * @param pattern Pointer to the NR_TDD_UL_DL_Pattern_t pattern structure
- * @return Periodicity value in milliseconds.
- */
-static float get_tdd_periodicity(NR_TDD_UL_DL_Pattern_t *pattern) {
-  if (!pattern->ext1) {
-    LOG_D(NR_MAC, "Setting TDD configuration period to dl_UL_TransmissionPeriodicity %ld\n", pattern->dl_UL_TransmissionPeriodicity);
-    return tdd_ms_period_pattern[pattern->dl_UL_TransmissionPeriodicity];
-  } else {
-    DevAssert(pattern->ext1->dl_UL_TransmissionPeriodicity_v1530 != NULL);
-    LOG_D(NR_MAC,
-          "Setting TDD configuration period to dl_UL_TransmissionPeriodicity_v1530 %ld\n",
-          *pattern->ext1->dl_UL_TransmissionPeriodicity_v1530);
-    return tdd_ms_period_ext[*pattern->ext1->dl_UL_TransmissionPeriodicity_v1530];
-  }
-}
-
-/**
- * @brief Determines the TDD period index based on pattern periodicities
- * @note  Not applicabile to pattern extension
- * @param tdd Pointer to the NR_TDD_UL_DL_ConfigCommon_t containing patterns
- * @return Index of the TDD period in tdd_ms_period_pattern
- */
-int get_tdd_period_idx(NR_TDD_UL_DL_ConfigCommon_t *tdd)
-{
-  int tdd_period_idx = 0;
-  float pattern1_ms = get_tdd_periodicity(&tdd->pattern1);
-  float pattern2_ms = tdd->pattern2 ? get_tdd_periodicity(tdd->pattern2) : 0.0;
-  bool found_match = false;
-  // Find matching TDD period in the predefined list of periodicities
-  for (int i = 0; i < NFAPI_MAX_NUM_PERIODS; i++) {
-    if ((pattern1_ms + pattern2_ms) == tdd_ms_period_pattern[i]) {
-      tdd_period_idx = i;
-      LOG_I(NR_MAC,
-            "TDD period index = %d, based on the sum of dl_UL_TransmissionPeriodicity "
-            "from Pattern1 (%f ms) and Pattern2 (%f ms): Total = %f ms\n",
-            tdd_period_idx,
-            pattern1_ms,
-            pattern2_ms,
-            pattern1_ms + pattern2_ms);
-      found_match = true;
-      break;
-    }
-  }
-  // Assert if no match was found
-  AssertFatal(found_match, "The sum of pattern1_ms and pattern2_ms does not match any value in tdd_ms_period_pattern");
-  return tdd_period_idx;
-}
-
 static struct NR_PUSCH_TimeDomainResourceAllocation *set_TimeDomainResourceAllocation(const int k2, uint8_t index, int ul_symb)
 {
   struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAlloc = calloc_or_fail(1, sizeof(*puschTdrAlloc));
@@ -1262,7 +1243,7 @@ static void set_SR_periodandoffset(NR_SchedulingRequestResourceConfig_t *schedul
 {
   const frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
   int sr_slot = 1; // in FDD SR in slot 1
-  if (fs->is_tdd)
+  if (fs->frame_type == TDD)
     sr_slot = get_first_ul_slot(fs, true);
 
   schedulingRequestResourceConfig->periodicityAndOffset = calloc(1,sizeof(*schedulingRequestResourceConfig->periodicityAndOffset));
@@ -1545,7 +1526,8 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
                                int dl_antenna_ports,
                                bool force_256qam_off,
                                int bwp_loop,
-                               bool is_SA)
+                               bool is_SA,
+                               const int num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS])
 {
   bwp->bwp_Common = calloc(1,sizeof(*bwp->bwp_Common));
 
@@ -1577,8 +1559,12 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList=NULL;
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList=calloc(1,sizeof(*bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList));
 
-  NR_SearchSpace_t *ss = rrc_searchspace_config(true, 5+bwp->bwp_Id, coreset->controlResourceSetId);
-  asn1cSeqAdd(&bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list,ss);
+  int searchspaceid = 5 + bwp->bwp_Id;
+  int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
+  int num_cces = get_coreset_num_cces(coreset->frequencyDomainResources.buf, coreset->duration);
+  verify_agg_levels(num_cces, num_agg_level_candidates, coreset->controlResourceSetId, searchspaceid, rrc_num_agg_level_candidates);
+  NR_SearchSpace_t *ss = rrc_searchspace_config(true, searchspaceid, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
+  asn1cSeqAdd(&bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list, ss);
 
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->searchSpaceSIB1=NULL;
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->searchSpaceOtherSystemInformation=NULL;
@@ -1613,7 +1599,11 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
   NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, curr_bwp, ssb_bitmap);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset2);
 
-  NR_SearchSpace_t *ss2 = rrc_searchspace_config(false, 10+bwp->bwp_Id, coreset2->controlResourceSetId);
+  searchspaceid = 10 + bwp->bwp_Id;
+  num_cces = get_coreset_num_cces(coreset2->frequencyDomainResources.buf, coreset2->duration);
+  verify_agg_levels(num_cces, num_agg_level_candidates, coreset->controlResourceSetId, searchspaceid, rrc_num_agg_level_candidates);
+  NR_SearchSpace_t *ss2 =
+      rrc_searchspace_config(false, searchspaceid, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss2);
 
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToReleaseList = NULL;
@@ -2359,6 +2349,19 @@ static long get_NR_UE_TimersAndConstants_t319(const nr_mac_timers_t *timer_confi
   }
 }
 
+static bool is_ntn_band(int band)
+{
+  // TS 3GPP 38.101-5 V1807 Section 5.2.2
+  if (band >= 254 && band <= 256) // FR1 NTN
+    return true;
+
+  // TS 3GPP 38.101-5 V1807 Section 5.2.3
+  if (band >= 510 && band <= 512) // FR2 NTN
+    return true;
+
+  return false;
+}
+
 NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
                                       const f1ap_plmn_t *plmn,
                                       uint64_t cellID,
@@ -2457,12 +2460,26 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
 
   asn1cSeqAdd(&sib1->si_SchedulingInfo->schedulingInfoList.list,schedulingInfo);*/
 
-  // sib19 scheduling info
-  // ensure ntn-config is initialized 
-  if (scc->ext2 && scc->ext2->ntn_Config_r17) {
+  const NR_FreqBandIndicatorNR_t band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
+  if (is_ntn_band(band)) {
     sib1->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1610_IEs));
     sib1->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1630_IEs));
     sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1700_IEs));
+    // If cell provides NTN access, set cellBarredNTN to notBarred.
+    struct NR_SIB1_v1700_IEs *sib1_v1700 = sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension;
+    sib1_v1700->cellBarredNTN_r17 = CALLOC(1, sizeof(long));
+    *sib1_v1700->cellBarredNTN_r17 = NR_SIB1_v1700_IEs__cellBarredNTN_r17_notBarred;
+  }
+
+  // sib19 scheduling info
+  // ensure ntn-config is initialized
+  if (scc->ext2 && scc->ext2->ntn_Config_r17) {
+    if (sib1->nonCriticalExtension == NULL)
+      sib1->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1610_IEs));
+    if (sib1->nonCriticalExtension->nonCriticalExtension == NULL)
+      sib1->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1630_IEs));
+    if (sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension == NULL)
+      sib1->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension = CALLOC(1, sizeof(struct NR_SIB1_v1700_IEs));
 
     struct NR_SI_SchedulingInfo_v1700 *sib_v17_scheduling_info = CALLOC(1, sizeof(struct NR_SI_SchedulingInfo_v1700));
 
@@ -2494,7 +2511,6 @@ NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
         frequencyInfoDL->frequencyBandList.list.array[i];
   }
 
-  const NR_FreqBandIndicatorNR_t band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
   frequency_range_t frequency_range = band > 256 ? FR2 : FR1;
   sib1->servingCellConfigCommon->downlinkConfigCommon.frequencyInfoDL.offsetToPointA = get_ssb_offset_to_pointA(*scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB,
                                scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA,
@@ -3069,7 +3085,15 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
 
   asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset);
 
-  NR_SearchSpace_t *ss2 = rrc_searchspace_config(false, 5, coreset->controlResourceSetId);
+  int searchspaceid = 5;
+  int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
+  int num_cces = get_coreset_num_cces(coreset->frequencyDomainResources.buf, coreset->duration);
+  verify_agg_levels(num_cces,
+                    configuration->num_agg_level_candidates,
+                    coreset->controlResourceSetId,
+                    searchspaceid,
+                    rrc_num_agg_level_candidates);
+  NR_SearchSpace_t *ss2 = rrc_searchspace_config(false, searchspaceid, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
   asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss2);
 
   bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts);
@@ -3113,7 +3137,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
         calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList));
     for (int bwp_loop = 0; bwp_loop < n_dl_bwp; bwp_loop++) {
       NR_BWP_Downlink_t *bwp = calloc(1, sizeof(*bwp));
-      config_downlinkBWP(bwp, scc, servingcellconfigdedicated, NULL, 0, false, bwp_loop, true);
+      config_downlinkBWP(bwp, scc, servingcellconfigdedicated, NULL, 0, false, bwp_loop, true, configuration->num_agg_level_candidates);
       asn1cSeqAdd(&SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
     }
     const NR_BWP_Id_t *firstActiveDownlinkBWP_Id = servingcellconfigdedicated->firstActiveDownlinkBWP_Id;
@@ -3575,7 +3599,8 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                          dl_antenna_ports,
                          configuration->force_256qam_off,
                          bwp_loop,
-                         false);
+                         false,
+                         configuration->num_agg_level_candidates);
       asn1cSeqAdd(&secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
     }
     secondaryCellGroup->spCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id =

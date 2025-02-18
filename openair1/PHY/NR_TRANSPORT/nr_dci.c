@@ -99,7 +99,7 @@ static void nr_generate_dci(PHY_VARS_gNB *gNB,
     if (dci_pdu->RNTI != 0xFFFF)
       LOG_D(NR_PHY_DCI,
             "DL_DCI : rb_offset %d, nb_rb %d, DMRS length per symbol %d\t DCI encoded length %d (precoder_granularity %d, "
-            "reg_mapping %d), Scrambling_Id %d, ScramblingRNTI %x, PayloadSizeBits %d\n",
+            "reg_mapping %d), Scrambling_Id %d, ScramblingRNTI %x, PayloadSizeBits %d AggregationLevel %d\n",
             rb_offset,
             n_rb,
             dmrs_length,
@@ -108,7 +108,8 @@ static void nr_generate_dci(PHY_VARS_gNB *gNB,
             pdcch_pdu_rel15->CceRegMappingType,
             dci_pdu->ScramblingId,
             dci_pdu->ScramblingRNTI,
-            dci_pdu->PayloadSizeBits);
+            dci_pdu->PayloadSizeBits,
+            dci_pdu->AggregationLevel);
     dmrs_length += rb_offset*6; // To accommodate more DMRS symbols in case of rb offset
       
     /// DMRS QPSK modulation
@@ -162,7 +163,7 @@ static void nr_generate_dci(PHY_VARS_gNB *gNB,
 	   scrambled_output[6], scrambled_output[7], scrambled_output[8], scrambled_output[9], scrambled_output[10],scrambled_output[11] );
 #endif
     /// QPSK modulation
-    c16_t mod_dci[NR_MAX_DCI_SIZE >> 2] __attribute__((aligned(16)));
+    c16_t mod_dci[NR_MAX_DCI_SIZE / 2] __attribute__((aligned(16)));
     nr_modulation(scrambled_output, encoded_length, DMRS_MOD_ORDER, (int16_t *)mod_dci); // Qm = 2 as DMRS is QPSK modulated
 #ifdef DEBUG_DCI
     
@@ -248,9 +249,11 @@ void nr_generate_dci_top(processingData_L1tx_t *msgTx, int slot, int txdataF_off
 {
   PHY_VARS_gNB *gNB = msgTx->gNB;
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
+  start_meas(&gNB->dci_generation_stats);
   for (int i = 0; i < msgTx->num_ul_pdcch; i++)
     nr_generate_dci(msgTx->gNB, &msgTx->ul_pdcch_pdu[i].pdcch_pdu.pdcch_pdu_rel15, txdataF_offset, frame_parms, slot);
   for (int i = 0; i < msgTx->num_dl_pdcch; i++)
     nr_generate_dci(msgTx->gNB, &msgTx->pdcch_pdu[i].pdcch_pdu_rel15, txdataF_offset, frame_parms, slot);
+  stop_meas(&gNB->dci_generation_stats);
 }
 

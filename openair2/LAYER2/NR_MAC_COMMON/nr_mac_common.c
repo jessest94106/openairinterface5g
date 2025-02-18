@@ -76,8 +76,6 @@ static const uint16_t symbol_ssb_E[64] = {8,   12,  16,  20,  32,  36,  40,  44,
                                           288, 292, 296, 300, 312, 316, 320, 324, 344, 348, 352, 356, 368, 372, 376, 380,
                                           400, 404, 408, 412, 424, 428, 432, 436, 456, 460, 464, 468, 480, 484, 488, 492};
 
-const uint8_t nr_slots_per_frame[5] = {10, 20, 40, 80, 160};
-
 // Table 6.3.3.1-5 (38.211) NCS for preamble formats with delta_f_RA = 1.25 KHz
 static const uint16_t NCS_unrestricted_delta_f_RA_125[16] = {0, 13, 15, 18, 22, 26, 32, 38, 46, 59, 76, 93, 119, 167, 279, 419};
 static const uint16_t NCS_restricted_TypeA_delta_f_RA_125[15] =
@@ -3555,73 +3553,6 @@ int ul_ant_bits(NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig, long transformPrec
   }
 }
 
-static const int tdd_period_to_num[8] = {500, 625, 1000, 1250, 2000, 2500, 5000, 10000};
-
-bool is_nr_DL_slot(NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon, slot_t slot)
-{
-  if (tdd_UL_DL_ConfigurationCommon == NULL)
-    return true;
-
-  int period1, period2 = 0;
-  if (tdd_UL_DL_ConfigurationCommon->pattern1.ext1 &&
-      tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530)
-    period1 = 3000+*tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530;
-  else
-    period1 = tdd_period_to_num[tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity];
-			       
-  if (tdd_UL_DL_ConfigurationCommon->pattern2) {
-    if (tdd_UL_DL_ConfigurationCommon->pattern2->ext1 &&
-        tdd_UL_DL_ConfigurationCommon->pattern2->ext1->dl_UL_TransmissionPeriodicity_v1530)
-      period2 = 3000 + *tdd_UL_DL_ConfigurationCommon->pattern2->ext1->dl_UL_TransmissionPeriodicity_v1530;
-    else
-      period2 = tdd_period_to_num[tdd_UL_DL_ConfigurationCommon->pattern2->dl_UL_TransmissionPeriodicity];
-  }    
-  int period = period1+period2;
-  int scs = tdd_UL_DL_ConfigurationCommon->referenceSubcarrierSpacing;
-  int slots = period * (1 << scs) / 1000;
-  int slots1 = period1 * (1 << scs) / 1000;
-  int slot_in_period = slot % slots;
-  if (slot_in_period < slots1)
-    return slot_in_period <= tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots;
-  else
-    return slot_in_period <= slots1 + tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSlots;
-}
-
-bool is_nr_UL_slot(NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon, slot_t slot, frame_type_t frame_type)
-{
-  // Note: condition on frame_type
-  // goal: the UL scheduler assumes mode is TDD therefore this hack is needed to make FDD work
-  if (frame_type == FDD)
-    return true;
-  if (tdd_UL_DL_ConfigurationCommon == NULL)
-    // before receiving TDD information all slots should be considered to be DL
-    return false;
-
-  int period1, period2 = 0;
-  if (tdd_UL_DL_ConfigurationCommon->pattern1.ext1 &&
-      tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530)
-    period1 = 3000 + *tdd_UL_DL_ConfigurationCommon->pattern1.ext1->dl_UL_TransmissionPeriodicity_v1530;
-  else
-    period1 = tdd_period_to_num[tdd_UL_DL_ConfigurationCommon->pattern1.dl_UL_TransmissionPeriodicity];
-			       
-  if (tdd_UL_DL_ConfigurationCommon->pattern2) {
-    if (tdd_UL_DL_ConfigurationCommon->pattern2->ext1 &&
-	      tdd_UL_DL_ConfigurationCommon->pattern2->ext1->dl_UL_TransmissionPeriodicity_v1530)
-      period2 = 3000 + *tdd_UL_DL_ConfigurationCommon->pattern2->ext1->dl_UL_TransmissionPeriodicity_v1530;
-    else
-      period2 = tdd_period_to_num[tdd_UL_DL_ConfigurationCommon->pattern2->dl_UL_TransmissionPeriodicity];
-  }    
-  int period = period1+period2;
-  int scs = tdd_UL_DL_ConfigurationCommon->referenceSubcarrierSpacing;
-  int slots = period * (1 << scs) / 1000;
-  int slots1 = period1 * (1 << scs) / 1000;
-  int slot_in_period = slot % slots;
-  if (slot_in_period < slots1)
-    return slot_in_period >= tdd_UL_DL_ConfigurationCommon->pattern1.nrofDownlinkSlots;
-  else
-    return slot_in_period >= slots1+tdd_UL_DL_ConfigurationCommon->pattern2->nrofDownlinkSlots;
-}
-
 int16_t fill_dmrs_mask(const NR_PDSCH_Config_t *pdsch_Config,
                        int dci_format,
                        int dmrs_TypeA_Position,
@@ -4198,6 +4129,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
   //  38.213 table 10.1-1
 
   /// MUX PATTERN 1
+  int slots_per_frame = get_slots_per_frame_from_scs(scs_ssb);
   if(type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern == 1 && frequency_range == FR1){
     big_o = table_38213_13_11_c1[index_4lsb];
     big_m = table_38213_13_11_c3[index_4lsb];
@@ -4214,7 +4146,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     //  38.213 chapter 13: over two consecutive slots
     type0_PDCCH_CSS_config->search_space_duration = 2;
     // two frames
-    type0_PDCCH_CSS_config->search_space_frame_period = nr_slots_per_frame[scs_ssb]<<1;
+    type0_PDCCH_CSS_config->search_space_frame_period = slots_per_frame << 1;
   }
 
   if(type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern == 1 && frequency_range == FR2){
@@ -4235,7 +4167,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     //  38.213 chapter 13: over two consecutive slots
     type0_PDCCH_CSS_config->search_space_duration = 2;
     // two frames
-    type0_PDCCH_CSS_config->search_space_frame_period = nr_slots_per_frame[scs_ssb]<<1;
+    type0_PDCCH_CSS_config->search_space_frame_period = slots_per_frame << 1;
   }
 
   /// MUX PATTERN 2
@@ -4302,7 +4234,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     //  38.213 chapter 13: over one slot
     type0_PDCCH_CSS_config->search_space_duration = 1;
     // SSB periodicity in slots
-    type0_PDCCH_CSS_config->search_space_frame_period = ssb_period*nr_slots_per_frame[scs_ssb];
+    type0_PDCCH_CSS_config->search_space_frame_period = ssb_period * slots_per_frame;
   }
 
   /// MUX PATTERN 3
@@ -4332,7 +4264,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     //  38.213 chapter 13: over one slot
     type0_PDCCH_CSS_config->search_space_duration = 1;
     // SSB periodicity in slots
-    type0_PDCCH_CSS_config->search_space_frame_period = ssb_period*nr_slots_per_frame[scs_ssb];
+    type0_PDCCH_CSS_config->search_space_frame_period = ssb_period * slots_per_frame;
   }
 
   AssertFatal(type0_PDCCH_CSS_config->sfn_c >= 0, "");
@@ -4392,9 +4324,7 @@ void fill_coresetZero(NR_ControlResourceSet_t *coreset0, NR_Type0_PDCCH_CSS_conf
   coreset0->pdcch_DMRS_ScramblingID = NULL;
 }
 
-void fill_searchSpaceZero(NR_SearchSpace_t *ss0,
-                          int slots_per_frame,
-                          NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config)
+void fill_searchSpaceZero(NR_SearchSpace_t *ss0, int slots_per_frame, NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config)
 {
   AssertFatal(ss0, "SearchSpace0 should have been allocated outside of this function\n");
   if(ss0->controlResourceSetId == NULL)

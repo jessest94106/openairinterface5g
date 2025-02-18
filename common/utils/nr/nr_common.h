@@ -142,7 +142,7 @@ typedef struct frame_structure_s {
   int8_t numb_slots_frame;
   int8_t numb_slots_period;
   int8_t numb_period_frame;
-  bool is_tdd;
+  frame_type_t frame_type;
 } frame_structure_t;
 
 typedef struct {
@@ -245,6 +245,7 @@ uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, ui
 int cce_to_reg_interleaving(const int R, int k, int n_shift, const int C, int L, const int N_regs);
 int get_SLIV(uint8_t S, uint8_t L);
 void get_coreset_rballoc(uint8_t *FreqDomainResource,int *n_rb,int *rb_offset);
+int get_coreset_num_cces(uint8_t *FreqDomainResource, int duration);
 int get_nr_table_idx(int nr_bandP, uint8_t scs_index);
 int32_t get_delta_duplex(int nr_bandP, uint8_t scs_index);
 frame_type_t get_frame_type(uint16_t nr_bandP, uint8_t scs_index);

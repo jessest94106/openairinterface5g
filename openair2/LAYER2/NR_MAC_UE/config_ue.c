@@ -44,71 +44,44 @@
 #include "oai_asn1.h"
 #include "executables/position_interface.h"
 
-void set_tdd_config_nr_ue(fapi_nr_tdd_table_t *tdd_table,
-                          int mu,
-                          NR_TDD_UL_DL_Pattern_t *pattern)
+static void set_tdd_config_nr_ue(fapi_nr_tdd_table_t *tdd_table, const frame_structure_t *fs)
 {
-  const int nrofDownlinkSlots = pattern->nrofDownlinkSlots;
-  const int nrofDownlinkSymbols = pattern->nrofDownlinkSymbols;
-  const int nrofUplinkSlots = pattern->nrofUplinkSlots;
-  const int nrofUplinkSymbols = pattern->nrofUplinkSymbols;
-  const int nb_periods_per_frame = get_nb_periods_per_frame(pattern->dl_UL_TransmissionPeriodicity);
-  const int nb_slots_per_period = ((1 << mu) * NR_NUMBER_OF_SUBFRAMES_PER_FRAME) / nb_periods_per_frame;
-  tdd_table->tdd_period_in_slots = nb_slots_per_period;
+  tdd_table->tdd_period_in_slots = fs->numb_slots_period;
+  tdd_table->max_tdd_periodicity_list = malloc(fs->numb_slots_period * sizeof(*tdd_table->max_tdd_periodicity_list));
 
-  if ((nrofDownlinkSymbols + nrofUplinkSymbols) == 0)
-    AssertFatal(nb_slots_per_period == (nrofDownlinkSlots + nrofUplinkSlots),
-                "set_tdd_configuration_nr: given period is inconsistent with current tdd configuration, nrofDownlinkSlots %d, nrofUplinkSlots %d, nb_slots_per_period %d \n",
-                nrofDownlinkSlots,nrofUplinkSlots,nb_slots_per_period);
-  else {
-    AssertFatal(nrofDownlinkSymbols + nrofUplinkSymbols < 14,"illegal symbol configuration DL %d, UL %d\n",nrofDownlinkSymbols,nrofUplinkSymbols);
-    AssertFatal(nb_slots_per_period == (nrofDownlinkSlots + nrofUplinkSlots + 1),
-                "set_tdd_configuration_nr: given period is inconsistent with current tdd configuration, nrofDownlinkSlots %d, nrofUplinkSlots %d, nrofMixed slots 1, nb_slots_per_period %d \n",
-                nrofDownlinkSlots,nrofUplinkSlots,nb_slots_per_period);
-  }
-
-  tdd_table->max_tdd_periodicity_list = (fapi_nr_max_tdd_periodicity_t *) malloc(nb_slots_per_period * sizeof(fapi_nr_max_tdd_periodicity_t));
-
-  for(int memory_alloc = 0 ; memory_alloc < nb_slots_per_period; memory_alloc++)
-    tdd_table->max_tdd_periodicity_list[memory_alloc].max_num_of_symbol_per_slot_list =
-      (fapi_nr_max_num_of_symbol_per_slot_t *) malloc(NR_NUMBER_OF_SYMBOLS_PER_SLOT*sizeof(fapi_nr_max_num_of_symbol_per_slot_t));
-
-  int slot_number = 0;
-  while(slot_number != nb_slots_per_period) {
-    if(nrofDownlinkSlots != 0) {
-      for (int number_of_symbol = 0; number_of_symbol < nrofDownlinkSlots * NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
-        tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol % NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config = 0;
-        if((number_of_symbol + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
-          slot_number++;
+  const tdd_period_config_t *pc = &fs->period_cfg;
+  for (int i = 0; i < fs->numb_slots_period; i++) {
+    fapi_nr_max_tdd_periodicity_t *period_list = &tdd_table->max_tdd_periodicity_list[i];
+    period_list->max_num_of_symbol_per_slot_list =
+      malloc(NR_NUMBER_OF_SYMBOLS_PER_SLOT * sizeof(*period_list->max_num_of_symbol_per_slot_list));
+    if (pc->tdd_slot_bitmap[i].slot_type == TDD_NR_DOWNLINK_SLOT) {
+      for (int s = 0; s < NR_NUMBER_OF_SYMBOLS_PER_SLOT; s++) {
+        period_list->max_num_of_symbol_per_slot_list[s].slot_config = 0;
       }
     }
-
-    if (nrofDownlinkSymbols != 0 || nrofUplinkSymbols != 0) {
-      for(int number_of_symbol = 0; number_of_symbol < nrofDownlinkSymbols; number_of_symbol++) {
-        tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config = 0;
+    if (pc->tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
+      for (int s = 0; s < NR_NUMBER_OF_SYMBOLS_PER_SLOT; s++) {
+        period_list->max_num_of_symbol_per_slot_list[s].slot_config = 1;
       }
-      for(int number_of_symbol = nrofDownlinkSymbols; number_of_symbol < NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofUplinkSymbols; number_of_symbol++) {
-        tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config = 2;
-      }
-      for(int number_of_symbol = NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofUplinkSymbols; number_of_symbol < NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
-        tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config = 1;
-      }
-      slot_number++;
     }
-
-    if(nrofUplinkSlots != 0) {
-      for (int number_of_symbol = 0; number_of_symbol < nrofUplinkSlots * NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
-        tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol%NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config = 1;
-        if((number_of_symbol + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
-          slot_number++;
+    if (pc->tdd_slot_bitmap[i].slot_type == TDD_NR_MIXED_SLOT) {
+      int dl_symb = pc->tdd_slot_bitmap[i].num_dl_symbols;
+      int ul_symb = pc->tdd_slot_bitmap[i].num_ul_symbols;
+      int g_symb = NR_NUMBER_OF_SYMBOLS_PER_SLOT - dl_symb - ul_symb;
+      for (int s = 0; s < dl_symb; s++) {
+        period_list->max_num_of_symbol_per_slot_list[s].slot_config = 0;
+      }
+      for (int s = dl_symb; s < dl_symb + g_symb; s++) {
+        period_list->max_num_of_symbol_per_slot_list[s].slot_config = 2;
+      }
+      for (int s = dl_symb + g_symb; s < NR_NUMBER_OF_SYMBOLS_PER_SLOT; s++) {
+        period_list->max_num_of_symbol_per_slot_list[s].slot_config = 1;
       }
     }
   }
 }
 
-static void config_common_ue_sa(NR_UE_MAC_INST_t *mac,
-                                NR_ServingCellConfigCommonSIB_t *scc,
-                                int cc_idP)
+static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommonSIB_t *scc, int cc_idP)
 {
   fapi_nr_config_request_t *cfg = &mac->phy_config.config_req;
   mac->phy_config.Mod_id = mac->ue_id;
@@ -166,10 +139,10 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac,
     }
   }
 
-  mac->frame_type = get_frame_type(mac->nr_band, get_softmodem_params()->numerology);
+  frame_type_t frame_type = get_frame_type(mac->nr_band, get_softmodem_params()->numerology);
   // cell config
   cfg->cell_config.phy_cell_id = mac->physCellId;
-  cfg->cell_config.frame_duplex_type = mac->frame_type;
+  cfg->cell_config.frame_duplex_type = frame_type;
 
   // SSB config
   cfg->ssb_config.ss_pbch_power = scc->ss_PBCH_BlockPower;
@@ -191,17 +164,18 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac,
     }
   }
 
+  int period_idx = mac->tdd_UL_DL_ConfigurationCommon ? get_tdd_period_idx(mac->tdd_UL_DL_ConfigurationCommon) : 0;
+  config_frame_structure(get_softmodem_params()->numerology,
+                         mac->tdd_UL_DL_ConfigurationCommon,
+                         period_idx,
+                         frame_type,
+                         &mac->frame_structure);
+
   // TDD Table Configuration
-  if (cfg->cell_config.frame_duplex_type == TDD){
-    set_tdd_config_nr_ue(&cfg->tdd_table_1, cfg->ssb_config.scs_common, &mac->tdd_UL_DL_ConfigurationCommon->pattern1);
-    if (mac->tdd_UL_DL_ConfigurationCommon->pattern2) {
-      cfg->tdd_table_2 = (fapi_nr_tdd_table_t *) malloc(sizeof(fapi_nr_tdd_table_t));
-      set_tdd_config_nr_ue(cfg->tdd_table_2, cfg->ssb_config.scs_common, mac->tdd_UL_DL_ConfigurationCommon->pattern2);
-    }
-  }
+  if (cfg->cell_config.frame_duplex_type == TDD)
+    set_tdd_config_nr_ue(&cfg->tdd_table, &mac->frame_structure);
 
   // PRACH configuration
-
   uint8_t nb_preambles = 64;
   NR_RACH_ConfigCommon_t *rach_ConfigCommon = scc->uplinkConfigCommon->initialUplinkBWP.rach_ConfigCommon->choice.setup;
   if(rach_ConfigCommon->totalNumberOfRA_Preambles != NULL)
@@ -214,7 +188,7 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac,
   else {
     // If absent, the UE applies the SCS as derived from the prach-ConfigurationIndex (for 839)
     int config_index = rach_ConfigCommon->rach_ConfigGeneric.prach_ConfigurationIndex;
-    const int64_t *prach_config_info_p = get_prach_config_info(mac->frequency_range, config_index, mac->frame_type);
+    const int64_t *prach_config_info_p = get_prach_config_info(mac->frequency_range, config_index, frame_type);
     int format = prach_config_info_p[0];
     cfg->prach_config.prach_sub_c_spacing = format == 3 ? 5 : 4;
   }
@@ -239,14 +213,16 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac,
                                             (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing, frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing ) * i);
     prach_fd_occasion->prach_zero_corr_conf = rach_ConfigCommon->rach_ConfigGeneric.zeroCorrelationZoneConfig;
     prach_fd_occasion->num_root_sequences = compute_nr_root_seq(rach_ConfigCommon,
-                                                                nb_preambles, mac->frame_type, mac->frequency_range);
+                                                                nb_preambles,
+                                                                frame_type,
+                                                                mac->frequency_range);
     //prach_fd_occasion->num_unused_root_sequences = ???
   }
   cfg->prach_config.ssb_per_rach = rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->present-1;
 
 }
 
-// computes delay between ue and sat based on SIB19 ephemeris data
+// computes round-trip-time between ue and sat based on SIB19 ephemeris data
 static double calculate_ue_sat_ta(const position_t *position_params, NR_PositionVelocity_r17_t *sat_pos)
 {
   // get UE position coordinates
@@ -259,9 +235,8 @@ static double calculate_ue_sat_ta(const position_t *position_params, NR_Position
   double posy_0 = (double)sat_pos->positionY_r17 * 1.3;
   double posz_0 = (double)sat_pos->positionZ_r17 * 1.3;
 
-  double distance = sqrt(pow(posx - posx_0, 2) + pow(posy - posy_0, 2) + pow(posz - posz_0, 2));
-  // this computation will ensure 3 decimal precision
-  double ta_ms = round(((distance / SPEED_OF_LIGHT) * 1000) * 1000.0) / 1000.0;
+  double distance = 2 * sqrt(pow(posx - posx_0, 2) + pow(posy - posy_0, 2) + pow(posz - posz_0, 2));
+  double ta_ms = (distance / SPEED_OF_LIGHT) * 1000;
 
   return ta_ms;
 }
@@ -296,24 +271,22 @@ void configure_ntn_ta(module_id_t module_id, ntn_timing_advance_componets_t *ntn
   ntn_ta->ntn_params_changed = true;
 }
 
-static void config_common_ue(NR_UE_MAC_INST_t *mac,
-                             NR_ServingCellConfigCommon_t *scc,
-                             int cc_idP)
+static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP)
 {
   fapi_nr_config_request_t *cfg = &mac->phy_config.config_req;
 
   mac->phy_config.Mod_id = mac->ue_id;
   mac->phy_config.CC_id = cc_idP;
+  frame_type_t frame_type = mac->frame_structure.frame_type;
 
   // carrier config
   LOG_D(MAC, "[UE %d] Entering UE Config Common\n", mac->ue_id);
 
   AssertFatal(scc->downlinkConfigCommon, "Not expecting downlinkConfigCommon to be NULL here\n");
-
   NR_FrequencyInfoDL_t *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
   if (frequencyInfoDL) { // NeedM for inter-freq handover
     mac->nr_band = *frequencyInfoDL->frequencyBandList.list.array[0];
-    mac->frame_type = get_frame_type(mac->nr_band, get_softmodem_params()->numerology);
+    frame_type = get_frame_type(mac->nr_band, get_softmodem_params()->numerology);
     mac->frequency_range = mac->nr_band < 256 ? FR1 : FR2;
 
     int bw_index = get_supported_band_index(frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
@@ -371,7 +344,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac,
 
   // cell config
   cfg->cell_config.phy_cell_id = *scc->physCellId;
-  cfg->cell_config.frame_duplex_type = mac->frame_type;
+  cfg->cell_config.frame_duplex_type = frame_type;
 
   // SSB config
   cfg->ssb_config.ss_pbch_power = scc->ss_PBCH_BlockPower;
@@ -412,14 +385,16 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac,
     AssertFatal(1==0,"SSB bitmap size value %d undefined (allowed values 1,2,3) \n", scc->ssb_PositionsInBurst->present);
   }
 
+  int period_idx = mac->tdd_UL_DL_ConfigurationCommon ? get_tdd_period_idx(mac->tdd_UL_DL_ConfigurationCommon) : 0;
+  config_frame_structure(*scc->ssbSubcarrierSpacing,
+                         mac->tdd_UL_DL_ConfigurationCommon,
+                         period_idx,
+                         frame_type,
+                         &mac->frame_structure);
+
   // TDD Table Configuration
-  if (cfg->cell_config.frame_duplex_type == TDD){
-    set_tdd_config_nr_ue(&cfg->tdd_table_1, cfg->ssb_config.scs_common, &mac->tdd_UL_DL_ConfigurationCommon->pattern1);
-    if (mac->tdd_UL_DL_ConfigurationCommon->pattern2) {
-      cfg->tdd_table_2 = (fapi_nr_tdd_table_t *) malloc(sizeof(fapi_nr_tdd_table_t));
-      set_tdd_config_nr_ue(cfg->tdd_table_2, cfg->ssb_config.scs_common, mac->tdd_UL_DL_ConfigurationCommon->pattern2);
-    }
-  }
+  if (cfg->cell_config.frame_duplex_type == TDD)
+    set_tdd_config_nr_ue(&cfg->tdd_table, &mac->frame_structure);
 
   // PRACH configuration
   uint8_t nb_preambles = 64;
@@ -437,7 +412,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac,
     else {
       // If absent, the UE applies the SCS as derived from the prach-ConfigurationIndex (for 839)
       int config_index = rach_ConfigCommon->rach_ConfigGeneric.prach_ConfigurationIndex;
-      const int64_t *prach_config_info_p = get_prach_config_info(mac->frequency_range, config_index, mac->frame_type);
+      const int64_t *prach_config_info_p = get_prach_config_info(mac->frequency_range, config_index, frame_type);
       int format = prach_config_info_p[0];
       cfg->prach_config.prach_sub_c_spacing = format == 3 ? 5 : 4;
     }
@@ -461,7 +436,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac,
       prach_fd_occasion->k1 = rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart;
       prach_fd_occasion->prach_zero_corr_conf = rach_ConfigCommon->rach_ConfigGeneric.zeroCorrelationZoneConfig;
       prach_fd_occasion->num_root_sequences =
-          compute_nr_root_seq(rach_ConfigCommon, nb_preambles, mac->frame_type, mac->frequency_range);
+          compute_nr_root_seq(rach_ConfigCommon, nb_preambles, frame_type, mac->frequency_range);
 
       cfg->prach_config.ssb_per_rach = rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->present - 1;
       // prach_fd_occasion->num_unused_root_sequences = ???
@@ -893,9 +868,8 @@ static void configure_logicalChannelBearer(NR_UE_MAC_INST_t *mac,
   }
 }
 
-void ue_init_config_request(NR_UE_MAC_INST_t *mac, int scs)
+void ue_init_config_request(NR_UE_MAC_INST_t *mac, int slots_per_frame)
 {
-  int slots_per_frame = nr_slots_per_frame[scs];
   LOG_I(NR_MAC, "Initializing dl and ul config_request. num_slots = %d\n", slots_per_frame);
   mac->dl_config_request = calloc(slots_per_frame, sizeof(*mac->dl_config_request));
   mac->ul_config_request = calloc(slots_per_frame, sizeof(*mac->ul_config_request));
@@ -1690,7 +1664,7 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
     case T300_EXPIRY:
       reset_ra(mac, false);
       reset_mac_inst(mac);
-      mac->state = UE_SYNC; // still in sync but need to restart RA
+      mac->state = UE_PERFORMING_RA; // still in sync but need to restart RA
       break;
     case RE_ESTABLISHMENT:
       reset_mac_inst(mac);
@@ -1755,7 +1729,7 @@ static void configure_si_schedulingInfo(NR_UE_MAC_INST_t *mac,
   }
 }
 
-void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1)
+void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1, bool can_start_ra)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1791,6 +1765,8 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
     AssertFatal(mac->current_UL_BWP, "Couldn't find DL-BWP0\n");
     configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->timeAlignmentTimerCommon, mac->current_UL_BWP->scs);
   }
+  if (mac->state == UE_RECEIVING_SIB && can_start_ra)
+    mac->state = UE_PERFORMING_RA;
 
   // Setup the SSB to Rach Occasions mapping according to the config
   build_ssb_to_ro_map(mac);
@@ -1801,7 +1777,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
-void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19)
+void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, bool can_start_ra)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1814,6 +1790,8 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19)
 
     configure_ntn_ta(mac->ue_id, &mac->ntn_ta, ntn_Config_r17);
   }
+  if (mac->state == UE_RECEIVING_SIB && can_start_ra)
+    mac->state = UE_PERFORMING_RA;
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
@@ -2107,17 +2085,17 @@ static void configure_maccellgroup(NR_UE_MAC_INST_t *mac, const NR_MAC_CellGroup
       }
     }
   }
+  int slots_per_subframe = mac->frame_structure.numb_slots_frame / 10;
   if (mcg->bsr_Config) {
-    int subframes_per_slot = nr_slots_per_frame[scs] / 10;
     uint32_t periodic_sf = nr_get_sf_periodicBSRTimer(mcg->bsr_Config->periodicBSR_Timer);
-    uint32_t target = periodic_sf < UINT_MAX ? periodic_sf * subframes_per_slot : periodic_sf;
+    uint32_t target = periodic_sf < UINT_MAX ? periodic_sf * slots_per_subframe : periodic_sf;
     nr_timer_setup(&si->periodicBSR_Timer, target, 1); // 1 slot update rate
     nr_timer_start(&si->periodicBSR_Timer);
     uint32_t retx_sf = nr_get_sf_retxBSRTimer(mcg->bsr_Config->retxBSR_Timer);
-    nr_timer_setup(&si->retxBSR_Timer, retx_sf * subframes_per_slot, 1); // 1 slot update rate
+    nr_timer_setup(&si->retxBSR_Timer, retx_sf * slots_per_subframe, 1); // 1 slot update rate
     if (mcg->bsr_Config->logicalChannelSR_DelayTimer) {
       uint32_t dt_sf = get_sr_DelayTimer(*mcg->bsr_Config->logicalChannelSR_DelayTimer);
-      nr_timer_setup(&si->sr_DelayTimer, dt_sf * subframes_per_slot, 1); // 1 slot update rate
+      nr_timer_setup(&si->sr_DelayTimer, dt_sf * slots_per_subframe, 1); // 1 slot update rate
     }
   }
   if (mcg->tag_Config) {
@@ -2151,7 +2129,6 @@ static void configure_maccellgroup(NR_UE_MAC_INST_t *mac, const NR_MAC_CellGroup
     nr_phr_info_t *phr_info = &si->phr_info;
     phr_info->is_configured = mcg->phr_Config->choice.setup != NULL;
     if (phr_info->is_configured) {
-      int slots_per_subframe = nr_slots_per_frame[scs] / 10;
       struct NR_PHR_Config *config = mcg->phr_Config->choice.setup;
       AssertFatal(config->multiplePHR == 0, "mulitplePHR not supported");
       phr_info->PathlossChange_db = config->phr_Tx_PowerFactorChange;
@@ -2644,9 +2621,7 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
       configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->TAG_list.array[j]->timeAlignmentTimer, mac->current_UL_BWP->scs);
   }
 
-  configure_logicalChannelBearer(mac,
-                                 cell_group_config->rlc_BearerToAddModList,
-                                 cell_group_config->rlc_BearerToReleaseList);
+  configure_logicalChannelBearer(mac, cell_group_config->rlc_BearerToAddModList, cell_group_config->rlc_BearerToReleaseList);
 
   if (ue_Capability)
     handle_mac_uecap_info(mac, ue_Capability);
@@ -2657,7 +2632,7 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
     build_ssb_to_ro_map(mac);
 
   if (!mac->dl_config_request || !mac->ul_config_request)
-    ue_init_config_request(mac, mac->current_DL_BWP->scs);
+    ue_init_config_request(mac, mac->frame_structure.numb_slots_frame);
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }

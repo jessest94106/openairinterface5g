@@ -55,7 +55,10 @@ void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsc
                           NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,
                           int curr_bwp);
 void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay);
-NR_SearchSpace_t *rrc_searchspace_config(bool is_common, int searchspaceid, int coresetid);
+NR_SearchSpace_t *rrc_searchspace_config(bool is_common,
+                                         int searchspaceid,
+                                         int coresetid,
+                                         const int num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS]);
 
 void prepare_sim_uecap(NR_UE_NR_Capability_t *cap,
                        NR_ServingCellConfigCommon_t *scc,
@@ -112,6 +115,5 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                                                      int uid);
 
 NR_ReconfigurationWithSync_t *get_reconfiguration_with_sync(rnti_t rnti, uid_t uid, const NR_ServingCellConfigCommon_t *scc);
-int get_tdd_period_idx(NR_TDD_UL_DL_ConfigCommon_t *tdd);
 
 #endif

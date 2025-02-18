@@ -556,9 +556,9 @@ typedef struct {
 } fapi_nr_ta_command_pdu;
 
 typedef struct {
-  // N_common_ta_adj represents common propagation delay received in SIB19 (ms)
+  // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
   double N_common_ta_adj;
-  // N_UE_TA_adj calculated propagation delay from UE and SAT (ms)
+  // N_UE_TA_adj calculated round-trip-time between UE and SAT (ms)
   double N_UE_TA_adj;
   // drift rate of common ta in µs/s
   double ntn_ta_commondrift;
@@ -655,21 +655,18 @@ typedef struct
 
 typedef struct 
 {
-  uint8_t slot_config;//For each symbol in each slot a uint8_t value is provided indicating: 0: DL slot 1: UL slot 2: Guard slot
-
+  uint8_t slot_config; //For each symbol in each slot a uint8_t value is provided indicating: 0: DL slot 1: UL slot 2: Guard slot
 } fapi_nr_max_num_of_symbol_per_slot_t;
 
 typedef struct 
 {
   fapi_nr_max_num_of_symbol_per_slot_t *max_num_of_symbol_per_slot_list;
-
 } fapi_nr_max_tdd_periodicity_t;
 
 typedef struct 
 {
   uint8_t tdd_period_in_slots;
   fapi_nr_max_tdd_periodicity_t* max_tdd_periodicity_list;
-
 } fapi_nr_tdd_table_t;
 
 typedef struct 
@@ -709,8 +706,7 @@ typedef struct {
   fapi_nr_cell_config_t cell_config;
   fapi_nr_ssb_config_t ssb_config;
   fapi_nr_ssb_table_t ssb_table;
-  fapi_nr_tdd_table_t tdd_table_1;
-  fapi_nr_tdd_table_t *tdd_table_2;
+  fapi_nr_tdd_table_t tdd_table;
   fapi_nr_prach_config_t prach_config;
 
 } fapi_nr_config_request_t;

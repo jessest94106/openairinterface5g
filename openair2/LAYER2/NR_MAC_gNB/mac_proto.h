@@ -39,11 +39,6 @@ void set_cset_offset(uint16_t);
 void get_K1_K2(int N1, int N2, int *K1, int *K2, int layers);
 int get_NTN_Koffset(const NR_ServingCellConfigCommon_t *scc);
 
-void config_frame_structure(int mu,
-                            NR_ServingCellConfigCommon_t *scc,
-                            uint8_t tdd_period,
-                            uint8_t frame_type,
-                            frame_structure_t *fs);
 int get_first_ul_slot(const frame_structure_t *fs, bool mixed);
 int get_ul_slots_per_period(const frame_structure_t *fs);
 int get_ul_slots_per_frame(const frame_structure_t *fs);
@@ -191,11 +186,9 @@ int get_pucch_resourceid(NR_PUCCH_Config_t *pucch_Config, int O_uci, int pucch_r
 
 void nr_schedule_srs(int module_id, frame_t frame, int slot);
 
-void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, int n_slots_frame, nfapi_nr_dl_tti_request_t *DL_req);
+void nr_csirs_scheduling(int Mod_idP, frame_t frame, sub_frame_t slot, nfapi_nr_dl_tti_request_t *DL_req);
 
-void nr_csi_meas_reporting(int Mod_idP,
-                           frame_t frameP,
-                           sub_frame_t slotP);
+void nr_csi_meas_reporting(int Mod_idP, frame_t frameP, sub_frame_t slotP);
 
 int nr_acknack_scheduling(gNB_MAC_INST *mac,
                           NR_UE_info_t *UE,
@@ -355,10 +348,6 @@ int nr_write_ce_dlsch_pdu(module_id_t module_idP,
 
 int binomial(int n, int k);
 
-bool is_ul_slot(const slot_t slot, const frame_structure_t *fs);
-bool is_dl_slot(const slot_t slot, const frame_structure_t *fs);
-bool is_mixed_slot(const slot_t slot, const frame_structure_t *fs);
-
 /* \brief Function to indicate a received SDU on ULSCH.
 @param Mod_id Instance ID of gNB
 @param CC_id Component carrier index
@@ -433,7 +422,8 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
                   NR_sched_pdcch_t *sched_pdcch,
-                  bool is_common);
+                  bool is_common,
+                  float pdcch_cl_adjust);
 
 bool nr_find_nb_rb(uint16_t Qm,
                    uint16_t R,
@@ -453,7 +443,7 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
                       int max_mcs,
                       frame_t frame);
 
-int ul_buffer_index(int frame, int slot, int scs, int size);
+int ul_buffer_index(int frame, int slot, int slots_per_frame, int size);
 void UL_tti_req_ahead_initialization(gNB_MAC_INST *gNB, int n, int CCid, frame_t frameP, int slotP);
 
 void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST *mac);
@@ -493,5 +483,6 @@ bool nr_mac_add_lcid(NR_UE_sched_ctrl_t *sched_ctrl, const nr_lc_config_t *c);
 bool nr_mac_remove_lcid(NR_UE_sched_ctrl_t *sched_ctrl, long lcid);
 
 bool nr_mac_get_new_rnti(NR_UEs_t *UEs, const NR_RA_t *ra_base, int ra_count, rnti_t *rnti);
+void nr_mac_update_pdcch_closed_loop_adjust(NR_UE_sched_ctrl_t *sched_ctrl, bool feedback_not_detected);
 
 #endif /*__LAYER2_NR_MAC_PROTO_H__*/

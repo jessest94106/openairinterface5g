@@ -280,97 +280,6 @@ nfapi_nr_pm_list_t init_DL_MIMO_codebook(gNB_MAC_INST *gNB, nr_pdsch_AntennaPort
 }
 
 /**
- * @brief Configures the TDD period, including bitmap, in the frame structure
- *
- * This function sets the TDD period configuration for DL, UL, and mixed slots in
- * the specified frame structure instance, according to the given pattern, and
- * updates the bitmap.
- *
- * @param pattern NR_TDD_UL_DL_Pattern_t configuration containing TDD slots and symbols configuration
- * @param fs frame_structure_t pointer
- * @param curr_total_slot current position in the slot bitmap to start from
- *
- * @return Number of slots in the configured TDD period
- */
-static uint8_t set_tdd_bmap_period(NR_TDD_UL_DL_Pattern_t *pattern, tdd_period_config_t *pc, int8_t curr_total_slot)
-{
-  int8_t n_dl_slot = pattern->nrofDownlinkSlots;
-  int8_t n_ul_slot = pattern->nrofUplinkSlots;
-  int8_t n_dl_symbols = pattern->nrofDownlinkSymbols;
-  int8_t n_ul_symbols = pattern->nrofUplinkSymbols;
-
-  // Total slots in the period: if DL/UL symbols are present, is mixed slot
-  const bool has_mixed_slot = (n_ul_symbols + n_dl_symbols) > 0;
-  int8_t total_slot = has_mixed_slot ? n_dl_slot + n_ul_slot + 1 : n_dl_slot + n_ul_slot;
-
-  /** Update TDD period configuration:
-   * mixed slots with DL symbols are counted as DL slots
-   * mixed slots with UL symbols are counted as UL slots */
-  pc->num_dl_slots += (n_dl_slot + (n_dl_symbols > 0));
-  pc->num_ul_slots += (n_ul_slot + (n_ul_symbols > 0));
-
-  // Populate the slot bitmap for each slot in the TDD period
-  for (int i = 0; i < total_slot; i++) {
-    tdd_bitmap_t *bitmap = &pc->tdd_slot_bitmap[i + curr_total_slot];
-    if (i < n_dl_slot)
-      bitmap->slot_type = TDD_NR_DOWNLINK_SLOT;
-    else if ((i == n_dl_slot) && has_mixed_slot) {
-      bitmap->slot_type = TDD_NR_MIXED_SLOT;
-      bitmap->num_dl_symbols = n_dl_symbols;
-      bitmap->num_ul_symbols = n_ul_symbols;
-    } else if (n_ul_slot)
-      bitmap->slot_type = TDD_NR_UPLINK_SLOT;
-  }
-
-  LOG_I(NR_MAC,
-        "Set TDD configuration period to: %d DL slots, %d UL slots, %d slots per period (NR_TDD_UL_DL_Pattern is %d DL slots, %d "
-        "UL slots, %d DL symbols, %d UL symbols)\n",
-        pc->num_dl_slots,
-        pc->num_ul_slots,
-        total_slot,
-        n_dl_slot,
-        n_ul_slot,
-        n_dl_symbols,
-        n_ul_symbols);
-
-  return total_slot;
-}
-
-/**
- * @brief Configures TDD patterns (1 or 2) in the frame structure
- *
- * This function sets up the TDD configuration in the frame structure by applying
- * DL and UL patterns as defined in NR_TDD_UL_DL_ConfigCommon.
- * It handles both TDD pattern1 and pattern2.
- *
- * @param tdd NR_TDD_UL_DL_ConfigCommon_t pointer containing pattern1 and pattern2
- * @param fs  Pointer to the frame structure to update with the configured TDD patterns.
- *
- * @return void
- */
-static void config_tdd_patterns(NR_TDD_UL_DL_ConfigCommon_t *tdd, frame_structure_t *fs)
-{
-  int num_of_patterns = 1;
-  uint8_t nb_slots_p2 = 0;
-  // Reset num dl/ul slots
-  tdd_period_config_t *pc = &fs->period_cfg;
-  pc->num_dl_slots = 0;
-  pc->num_ul_slots = 0;
-  // Pattern1
-  uint8_t nb_slots_p1 = set_tdd_bmap_period(&tdd->pattern1, pc, 0);
-  // Pattern2
-  if (tdd->pattern2) {
-    num_of_patterns++;
-    nb_slots_p2 = set_tdd_bmap_period(tdd->pattern2, pc, nb_slots_p1);
-  }
-  LOG_I(NR_MAC,
-        "Configured %d TDD patterns (total slots: pattern1 = %d, pattern2 = %d)\n",
-        num_of_patterns,
-        nb_slots_p1,
-        nb_slots_p2);
-}
-
-/**
  * @brief Get the first UL slot index in period
  * @param fs frame structure
  * @param mixed indicates whether to include in the count also mixed slot with UL symbols or only full UL slot
@@ -380,7 +289,7 @@ int get_first_ul_slot(const frame_structure_t *fs, bool mixed)
 {
   DevAssert(fs);
 
-  if (fs->is_tdd) {
+  if (fs->frame_type == TDD) {
     for (int i = 0; i < fs->numb_slots_period; i++) {
       if ((mixed && is_ul_slot(i, fs)) || fs->period_cfg.tdd_slot_bitmap[i].slot_type == TDD_NR_UPLINK_SLOT) {
         return i;
@@ -396,7 +305,7 @@ int get_first_ul_slot(const frame_structure_t *fs, bool mixed)
  */
 int get_dl_slots_per_period(const frame_structure_t *fs)
 {
-  return fs->is_tdd ? fs->period_cfg.num_dl_slots : fs->numb_slots_frame;
+  return fs->frame_type == TDD ? fs->period_cfg.num_dl_slots : fs->numb_slots_frame;
 }
 
 /**
@@ -404,7 +313,7 @@ int get_dl_slots_per_period(const frame_structure_t *fs)
  */
 int get_ul_slots_per_period(const frame_structure_t *fs)
 {
-  return fs->is_tdd ? fs->period_cfg.num_ul_slots : fs->numb_slots_frame;
+  return fs->frame_type == TDD ? fs->period_cfg.num_ul_slots : fs->numb_slots_frame;
 }
 
 /**
@@ -416,7 +325,7 @@ int get_full_ul_slots_per_period(const frame_structure_t *fs)
 {
   DevAssert(fs);
 
-  if (!fs->is_tdd)
+  if (fs->frame_type == FDD)
     return fs->numb_slots_frame;
 
   int count = 0;
@@ -438,7 +347,7 @@ int get_full_dl_slots_per_period(const frame_structure_t *fs)
 {
   DevAssert(fs);
 
-  if (!fs->is_tdd)
+  if (fs->frame_type == FDD)
     return fs->numb_slots_frame;
 
   int count = 0;
@@ -456,7 +365,7 @@ int get_full_dl_slots_per_period(const frame_structure_t *fs)
  */
 int get_ul_slots_per_frame(const frame_structure_t *fs)
 {
-  return fs->is_tdd ? fs->numb_period_frame * get_ul_slots_per_period(fs) : fs->numb_slots_frame;
+  return fs->frame_type == TDD ? fs->numb_period_frame * get_ul_slots_per_period(fs) : fs->numb_slots_frame;
 }
 
 /**
@@ -471,7 +380,7 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
   DevAssert(fs);
 
   // FDD
-  if (!fs->is_tdd)
+  if (fs->frame_type == FDD)
     return idx;
 
   // UL slots indexes in period
@@ -491,37 +400,6 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
   int ul_slot_idx_in_period = idx % ul_slot_count; // wrap up the UL slot index within the current TDD period
 
   return ul_slot_idxs[ul_slot_idx_in_period] + period_idx * fs->numb_slots_period;
-}
-
-/**
- * @brief Configures the frame structure and the NFAPI config request
- *        depending on the duplex mode. If TDD, does the TDD patterns
- *        and TDD periods configuration.
- *
- * @param mu numerology
- * @param scc pointer to scc
- * @param tdd_period TDD period
- * @param frame_type type of frame structure (FDD or TDD)
- * @param fs  pointer to the frame structure to update
- */
-void config_frame_structure(int mu,
-                            NR_ServingCellConfigCommon_t *scc,
-                            uint8_t tdd_period,
-                            uint8_t frame_type,
-                            frame_structure_t *fs)
-{
-  fs->numb_slots_frame = nr_slots_per_frame[mu];
-  if (frame_type == TDD) {
-    fs->numb_period_frame = get_nb_periods_per_frame(tdd_period);
-    fs->numb_slots_period = fs->numb_slots_frame / fs->numb_period_frame;
-    fs->is_tdd = true;
-    config_tdd_patterns(scc->tdd_UL_DL_ConfigurationCommon, fs);
-  } else { // FDD
-    fs->is_tdd = false;
-    fs->numb_period_frame = 1;
-    fs->numb_slots_period = nr_slots_per_frame[mu];
-  }
-  AssertFatal(fs->numb_period_frame > 0, "Frame configuration cannot be configured!\n");
 }
 
 static void config_common(gNB_MAC_INST *nrmac,
@@ -820,7 +698,11 @@ static void config_common(gNB_MAC_INST *nrmac,
     LOG_D(NR_MAC, "Setting TDD configuration period to %d\n", cfg->tdd_table.tdd_period.value);
   }
   frame_structure_t *fs = &nrmac->frame_structure;
-  config_frame_structure(mu, scc, cfg->tdd_table.tdd_period.value, cfg->cell_config.frame_duplex_type.value, fs);
+  config_frame_structure(mu,
+                         scc->tdd_UL_DL_ConfigurationCommon,
+                         cfg->tdd_table.tdd_period.value,
+                         cfg->cell_config.frame_duplex_type.value,
+                         fs);
   if (cfg->cell_config.frame_duplex_type.value == TDD)
     set_tdd_config_nr(cfg, fs);
 
@@ -887,7 +769,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
               scc->ssb_PositionsInBurst->present);
 
   const int NTN_gNB_Koffset = get_NTN_Koffset(scc);
-  const int n = nr_slots_per_frame[*scc->ssbSubcarrierSpacing];
+  const int n = get_slots_per_frame_from_scs(*scc->ssbSubcarrierSpacing);
   const int size = n << (int)ceil(log2((NTN_gNB_Koffset + 13) / n + 1)); // 13 is upper limit for max_fb_time
   nrmac->vrb_map_UL_size = size;
 
