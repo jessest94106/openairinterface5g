@@ -149,6 +149,7 @@ void process_msg_rcc_to_mac(MessageDef *msg)
     default:
       LOG_E(NR_MAC, "Unexpected msg from RRC: %d\n", ITTI_MSG_ID(msg));
   }
+  itti_free(ITTI_MSG_ORIGIN_ID(msg), msg);
 }
 
 void nr_mac_rrc_inactivity_timer_ind(const module_id_t mod_id)
