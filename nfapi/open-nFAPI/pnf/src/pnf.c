@@ -1935,7 +1935,20 @@ int pnf_connect(pnf_t* pnf)
 
 			socketConnected = 1;
 		}
-	}
+  } else {
+    int error;
+    socklen_t len = sizeof(error);
+
+    if (getsockopt(pnf->p5_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "After getsockopt errno: %d\n", errno);
+      return -1;
+    } else {
+      // If error is zero, the socket is connected
+      if (error == 0) {
+        socketConnected = 1;
+      }
+    }
+  }
 
 	NFAPI_TRACE(NFAPI_TRACE_NOTE, "Socket %s\n", socketConnected ? "CONNECTED" : "NOT_CONNECTED");
 	return socketConnected;
@@ -2132,15 +2145,23 @@ int pnf_nr_read_dispatch_message(pnf_t* pnf)
 
   {
     int flags = MSG_PEEK;
-    message_size = sctp_recvmsg(pnf->p5_sock,
-                                header_buffer,
-                                header_buffer_size,
-                                /*(struct sockaddr*)&addr, &addr_len*/ 0,
-                                0,
-                                &sndrcvinfo,
-                                &flags);
+    if (pnf->sctp) {
+      message_size = sctp_recvmsg(pnf->p5_sock,
+                                  header_buffer,
+                                  header_buffer_size,
+                                  /*(struct sockaddr*)&addr, &addr_len*/
+                                  0,
+                                  0,
+                                  &sndrcvinfo,
+                                  &flags);
+    } else {
+      message_size = recv(pnf->p5_sock,
+                          header_buffer,
+                          header_buffer_size,
+                          flags);
+    }
 
-    if (message_size == -1) {
+    if (message_size < NFAPI_NR_P5_HEADER_LENGTH) {
       NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF Failed to peek sctp message size errno:%d\n", errno);
       return 0;
     }
@@ -2172,8 +2193,20 @@ int pnf_nr_read_dispatch_message(pnf_t* pnf)
     int flags = 0;
     (void)memset(&sndrcvinfo, 0, sizeof(struct sctp_sndrcvinfo));
 
-    int recvmsg_result =
-        sctp_recvmsg(pnf->p5_sock, read_buffer, message_size, (struct sockaddr*)&addr, &addr_len, &sndrcvinfo, &flags);
+    ssize_t recvmsg_result = 0;
+    if (pnf->sctp) {
+      recvmsg_result = sctp_recvmsg(pnf->p5_sock,
+                                    read_buffer,
+                                    message_size,
+                                    (struct sockaddr *)&addr,
+                                    &addr_len,
+                                    &sndrcvinfo,
+                                    &flags);
+    } else {
+      if ((recvmsg_result = recv(pnf->p5_sock, read_buffer, message_size, flags))<=0) {
+        recvmsg_result = -1;
+      }
+    }
     if (recvmsg_result == -1) {
       NFAPI_TRACE(NFAPI_TRACE_INFO, "Failed to read sctp message size errno:%d\n", errno);
     } else {
@@ -2204,7 +2237,7 @@ int pnf_nr_read_dispatch_message(pnf_t* pnf)
         */
 
         // handle now if complete message in one or more segments
-        if ((flags & 0x80) == 0x80) {
+        if ((flags & 0x80) == 0x80 || !pnf->sctp) {
           pnf_nr_handle_p5_message(pnf, read_buffer, message_size);
         } else {
           NFAPI_TRACE(NFAPI_TRACE_WARN, "sctp_recvmsg: unhandled mode with flags 0x%x\n", flags);

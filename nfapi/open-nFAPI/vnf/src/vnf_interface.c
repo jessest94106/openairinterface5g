@@ -237,7 +237,15 @@ int nfapi_nr_vnf_start(nfapi_vnf_config_t* config)
 			close(p5ListenSock);
 			return -1;
 		}
+  } else {
+    int error;
+    socklen_t len = sizeof(error);
 
+    if (getsockopt(p5ListenSock, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "After getsockopt errno: %d\n", errno);
+			close(p5ListenSock);
+      return -1;
+    }
 	}
 
 
@@ -359,6 +367,7 @@ int nfapi_nr_vnf_start(nfapi_vnf_config_t* config)
 
 					
 					// check the connection status
+				  if (vnf->sctp)
 					{
 						struct sctp_status status;
 						(void)memset(&status, 0, sizeof(struct sctp_status));

@@ -32,6 +32,9 @@
 #include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
 #include "nr_fapi_p5.h"
 #endif
+
+#include <unistd.h>
+
 #include "nfapi/oai_integration/vendor_ext.h"
 
 void* vnf_malloc(nfapi_vnf_config_t* config, size_t size)
@@ -434,22 +437,22 @@ void vnf_nr_handle_param_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_conf
 	  const bool result = config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config);
 		if (result)
 		{
-			
+
 			if (msg.error_code == NFAPI_NR_PARAM_MSG_OK)
 			{
 				nfapi_vnf_phy_info_t* phy_info = nfapi_vnf_phy_info_list_find(config, msg.header.phy_id);
-		
+
 				if(msg.nfapi_config.p7_pnf_address_ipv4.tl.tag)
 				{
 					struct sockaddr_in sockAddr;
-		
+
 					(void)memcpy(&sockAddr.sin_addr.s_addr, msg.nfapi_config.p7_pnf_address_ipv4.address, NFAPI_IPV4_ADDRESS_LENGTH);
 					NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF P7 IPv4 address: %s\n", inet_ntoa(sockAddr.sin_addr));
-		
+
 					// store address
 					phy_info->p7_pnf_address.sin_addr = sockAddr.sin_addr;
 				}
-		
+
 				if(msg.nfapi_config.p7_pnf_address_ipv6.tl.tag)
 				{
 					struct sockaddr_in6 sockAddr6;
@@ -457,11 +460,11 @@ void vnf_nr_handle_param_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_conf
 					(void)memcpy(&sockAddr6.sin6_addr, msg.nfapi_config.p7_pnf_address_ipv6.address, NFAPI_IPV6_ADDRESS_LENGTH);
 					NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF P7 IPv6 address: %s\n", inet_ntop(AF_INET6, &sockAddr6.sin6_addr, addr6, sizeof(addr6)));
 				}
-				
+
 				if (msg.nfapi_config.p7_pnf_port.tl.tag)
 				{
 					NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF P7 Port: %d\n", msg.nfapi_config.p7_pnf_port.value);
-		
+
 					// store port
 					phy_info->p7_pnf_address.sin_port = htons(msg.nfapi_config.p7_pnf_port.value);
 				}
@@ -1268,7 +1271,7 @@ int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_
 {
   if (1) {
       int socket_connected = 1;
-
+      vnf_t *vnf = (vnf_t *)(config);
       // 1. Peek the message header
       // 2. If the message is larger than the stack buffer then create a dynamic buffer
       // 3. Read the buffer
@@ -1293,8 +1296,21 @@ int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_
 
       {
         int flags = MSG_PEEK;
-        message_size =
-            sctp_recvmsg(pnf->p5_sock, header_buffer, header_buffer_size, (struct sockaddr*)&addr, &addr_len, &sndrcvinfo, &flags);
+        if (vnf->sctp) {
+          message_size =
+              sctp_recvmsg(pnf->p5_sock,
+                           header_buffer,
+                           header_buffer_size,
+                           (struct sockaddr *)&addr,
+                           &addr_len,
+                           &sndrcvinfo,
+                           &flags);
+        } else {
+          message_size = recv(pnf->p5_sock,
+                              header_buffer,
+                              header_buffer_size,
+                              flags);
+        }
 
         if (message_size == -1) {
           NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF Failed to peek sctp message size errno:%d\n", errno);
@@ -1328,8 +1344,22 @@ int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_
         int flags = 0;
         (void)memset(&sndrcvinfo, 0, sizeof(struct sctp_sndrcvinfo));
 
-        int recvmsg_result =
-            sctp_recvmsg(pnf->p5_sock, read_buffer, message_size, (struct sockaddr*)&addr, &addr_len, &sndrcvinfo, &flags);
+        ssize_t recvmsg_result = 0;
+        if (vnf->sctp) {
+          recvmsg_result = sctp_recvmsg(pnf->p5_sock,
+                                        read_buffer,
+                                        message_size,
+                                        (struct sockaddr *)&addr,
+                                        &addr_len,
+                                        &sndrcvinfo,
+                                        &flags);
+        } else {
+          recvmsg_result = recv(pnf->p5_sock,
+                                read_buffer,
+                                message_size,
+                                0);
+        }
+
         if (recvmsg_result == -1) {
           NFAPI_TRACE(NFAPI_TRACE_INFO, "Failed to read sctp message size errno:%d\n", errno);
         } else {
@@ -1338,34 +1368,34 @@ int vnf_nr_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_
 
           // todo - handle the events
           } else {
-          /*
-          NFAPI_TRACE(NFAPI_TRACE_INFO, "Received message fd:%d from %s:%u assoc:%d on stream %d, PPID %d, length %d, flags 0x%x\n",
-              pnf->p5_sock,
-              inet_ntoa(addr.sin_addr),
-              ntohs(addr.sin_port),
-              sndrcvinfo.sinfo_assoc_id,
-              sndrcvinfo.sinfo_stream,
-              ntohl(sndrcvinfo.sinfo_ppid),
-              message_size,
-              flags);
-          */
+            /*
+            NFAPI_TRACE(NFAPI_TRACE_INFO, "Received message fd:%d from %s:%u assoc:%d on stream %d, PPID %d, length %d, flags 0x%x\n",
+                pnf->p5_sock,
+                inet_ntoa(addr.sin_addr),
+                ntohs(addr.sin_port),
+                sndrcvinfo.sinfo_assoc_id,
+                sndrcvinfo.sinfo_stream,
+                ntohl(sndrcvinfo.sinfo_ppid),
+                message_size,
+                flags);
+            */
 
-          // handle now if complete message in one or more segments
-          if ((flags & 0x80) == 0x80) {
-            // printf("\nVNF RECEIVES:\n");
-            // for(int i=0; i<message_size; i++){
-            // 	printf("%d", read_buffer[i]);
-            // }
-            // printf("\n");
+            // handle now if complete message in one or more segments
+            if ((flags & 0x80) == 0x80 || !vnf->sctp) {
+              // printf("\nVNF RECEIVES:\n");
+              // for(int i=0; i<message_size; i++){
+              // 	printf("%d", read_buffer[i]);
+              // }
+              // printf("\n");
 
-            vnf_nr_handle_p4_p5_message(read_buffer, message_size, pnf->p5_idx, config);
-          } else {
-            NFAPI_TRACE(NFAPI_TRACE_WARN, "sctp_recvmsg: unhandled mode with flags 0x%x\n", flags);
+              vnf_nr_handle_p4_p5_message(read_buffer, message_size, pnf->p5_idx, config);
+            } else {
+              NFAPI_TRACE(NFAPI_TRACE_WARN, "sctp_recvmsg: unhandled mode with flags 0x%x\n", flags);
 
-            // assume socket disconnected
-            NFAPI_TRACE(NFAPI_TRACE_WARN, "Disconnected socket\n");
-            socket_connected = 0;
-          }
+              // assume socket disconnected
+              NFAPI_TRACE(NFAPI_TRACE_WARN, "Disconnected socket\n");
+              socket_connected = 0;
+            }
           }
         }
       }
@@ -1509,7 +1539,7 @@ int vnf_read_dispatch_message(nfapi_vnf_config_t* config, nfapi_vnf_pnf_info_t* 
 	}
 }
 
-static int vnf_send_p5_msg(nfapi_vnf_pnf_info_t* pnf, const void *msg, int len, uint8_t stream)
+static int vnf_send_p5_msg(vnf_t *vnf, nfapi_vnf_pnf_info_t *pnf, const void *msg, int len, uint8_t stream)
 {
 	// printf("\n MESSAGE SENT: \n");
 	// for(int i=0; i<len; i++){
@@ -1519,7 +1549,21 @@ static int vnf_send_p5_msg(nfapi_vnf_pnf_info_t* pnf, const void *msg, int len, 
 
 	//NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s len:%d stream:%d\n", __FUNCTION__, len, stream);
 
-	int result = sctp_sendmsg(pnf->p5_sock, msg, len, (struct sockaddr*)&pnf->p5_pnf_sockaddr, sizeof(pnf->p5_pnf_sockaddr),1, 0, stream, 0, 4);
+  ssize_t result = -1;
+  if (vnf->sctp) {
+    result = sctp_sendmsg(pnf->p5_sock,
+                          msg,
+                          len,
+                          (struct sockaddr *)&pnf->p5_pnf_sockaddr,
+                          sizeof(pnf->p5_pnf_sockaddr),
+                          1,
+                          0,
+                          stream,
+                          0,
+                          4);
+  } else {
+    result = send(pnf->p5_sock, msg, len,0);
+  }
 
 	if(result != len)
 	{
@@ -1574,7 +1618,7 @@ bool vnf_nr_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_
       //   printf(" msg->msg_buf[%d] = 0x%02x\n", i, ((uint8_t *) vnf->tx_message_buffer)[i]);
       // }
 
-      return vnf_send_p5_msg(pnf, vnf->tx_message_buffer, packedMessageLength, 0);
+      return vnf_send_p5_msg(vnf, pnf, vnf->tx_message_buffer, packedMessageLength, 0);
     }
   } else {
     NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() cannot find pnf info for p5_idx:%d\n", __FUNCTION__, p5_idx);
@@ -1599,7 +1643,7 @@ int vnf_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_p4_p5_messag
 			return -1;
 		}
 
-		return vnf_send_p5_msg(pnf, vnf->tx_message_buffer, packedMessageLength, 0/*msg->phy_id*/);
+    return vnf_send_p5_msg(vnf, pnf, vnf->tx_message_buffer, packedMessageLength, 0/*msg->phy_id*/);
 	}
 	else
 	{
@@ -1624,7 +1668,7 @@ int vnf_pack_and_send_p4_message(vnf_t* vnf, uint16_t p5_idx, nfapi_p4_p5_messag
 			return -1;
 		}
 
-		return vnf_send_p5_msg(pnf, vnf->tx_message_buffer, packedMessageLength, 0/*msg->phy_id*/);
+    return vnf_send_p5_msg(vnf, pnf, vnf->tx_message_buffer, packedMessageLength, 0/*msg->phy_id*/);
 	}
 	else
 	{
