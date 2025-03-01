@@ -101,6 +101,8 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
 #define RFSIM_CONFIG_HELP_OPTIONS     " list of comma separated options to enable rf simulator functionalities. Available options: \n"\
   "        chanmod:   enable channel modelisation\n"\
   "        saviq:     enable saving written iqs to a file\n"
+#define CONFIG_HELP_HANG_WORKAROUND "Enable workaroud for server mode hanging on new client connection.\n"
+
 /*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 /*                                            configuration parameters for the rfsimulator device                                                                              */
 /*   optname                     helpstr                     paramflags           XXXptr                               defXXXval                          type         numelt  */
@@ -117,6 +119,7 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
     {"offset",                 "<channel offset in samps>\n",         simOpt,  .u64ptr=&(rfsimulator->chan_offset),    .defint64val=0,                   TYPE_UINT64,    0 },\
     {"prop_delay",             "<propagation delay in ms>\n",         simOpt,  .dblptr=&(rfsimulator->prop_delay_ms),  .defdblval=0.0,                   TYPE_DOUBLE,    0 },\
     {"wait_timeout",           "<wait timeout if no UE connected>\n", simOpt,  .iptr=&(rfsimulator->wait_timeout),     .defintval=1,                     TYPE_INT,       0 },\
+    {"hanging-workaround",     CONFIG_HELP_HANG_WORKAROUND,           simOpt,  .iptr=&rfsimulator->hanging_workaround, .defintval=0,                     TYPE_INT,       0 },\
   };
 
 static void getset_currentchannels_type(char *buf, int debug, webdatadef_t *tdata, telnet_printfunc_t prnt);
@@ -181,6 +184,7 @@ typedef struct {
   poll_telnetcmdq_func_t poll_telnetcmdq;
   int wait_timeout;
   double prop_delay_ms;
+  int hanging_workaround;
 } rfsimulator_state_t;
 
 
@@ -256,11 +260,17 @@ static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
       tableNor(rand);
       init_done=true;
     }
-    char *modelname = (bridge->role == SIMU_ROLE_SERVER) ? "rfsimu_channel_ue0" : "rfsimu_channel_enB0";
+    char modelname[30];
+    snprintf(modelname, sizeofArray(modelname), "rfsimu_channel_%s%d", (bridge->role == SIMU_ROLE_SERVER) ? "ue" : "enB", nb_ue);
     ptr->channel_model = find_channel_desc_fromname(modelname); // path_loss in dB
     if (!ptr->channel_model) {
-      LOG_E(HW, "Channel model %s not found, check config file\n", modelname);
-      return -1;
+      // Use legacy method to find channel model - this will use the same channel model for all clients
+      char *legacy_model_name = (bridge->role == SIMU_ROLE_SERVER) ? "rfsimu_channel_ue0" : "rfsimu_channel_enB0";
+      ptr->channel_model = find_channel_desc_fromname(legacy_model_name);
+      if (!ptr->channel_model) {
+        LOG_E(HW, "Channel model %s/%s not found, check config file\n", modelname, legacy_model_name);
+        return -1;
+      }
     }
 
     set_channeldesc_owner(ptr->channel_model, RFSIMU_MODULEID);
@@ -994,7 +1004,7 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
               t->nextRxTstamp + nsamps);
         flushInput(t, 3, nsamps);
       }
-      if (loops++ > 10 && t->role == SIMU_ROLE_SERVER) {
+      if (t->hanging_workaround && loops++ > 10 && t->role == SIMU_ROLE_SERVER) {
         // Just start producing samples. The clients will catch up.
         have_to_wait = false;
         LOG_W(HW,
