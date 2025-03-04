@@ -33,11 +33,7 @@
 #include "common/ran_context.h"
 #include "common/utils/nr/nr_common.h"
 #include "nfapi/oai_integration/vendor_ext.h"
-static void nr_fill_nfapi_pucch(gNB_MAC_INST *nrmac,
-                                frame_t frame,
-                                sub_frame_t slot,
-                                const NR_sched_pucch_t *pucch,
-                                NR_UE_info_t* UE)
+static void nr_fill_nfapi_pucch(gNB_MAC_INST *nrmac, frame_t frame, slot_t slot, const NR_sched_pucch_t *pucch, NR_UE_info_t* UE)
 {
 
   const int index = ul_buffer_index(pucch->frame,
@@ -176,7 +172,7 @@ static int get_pucch_index(int frame, int slot, const frame_structure_t *fs, int
   return (frame_start + ul_period_start + ul_period_slot) % sched_pucch_size;
 }
 
-void nr_schedule_pucch(gNB_MAC_INST *nrmac, frame_t frameP, sub_frame_t slotP)
+void nr_schedule_pucch(gNB_MAC_INST *nrmac, frame_t frameP, slot_t slotP)
 {
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
@@ -212,7 +208,7 @@ void nr_schedule_pucch(gNB_MAC_INST *nrmac, frame_t frameP, sub_frame_t slotP)
   }
 }
 
-void nr_csi_meas_reporting(int Mod_idP,frame_t frame, sub_frame_t slot)
+void nr_csi_meas_reporting(int Mod_idP,frame_t frame, slot_t slot)
 {
   const int CC_id = 0;
   gNB_MAC_INST *nrmac = RC.nrmac[Mod_idP];
@@ -721,7 +717,7 @@ static void extract_pucch_csi_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
   }
 }
 
-static NR_UE_harq_t *find_harq(frame_t frame, sub_frame_t slot, NR_UE_info_t * UE, int harq_round_max)
+static NR_UE_harq_t *find_harq(frame_t frame, slot_t slot, NR_UE_info_t * UE, int harq_round_max)
 {
   /* In case of realtime problems: we can only identify a HARQ process by
    * timing. If the HARQ process's feedback_frame/feedback_slot is not the one we
@@ -769,10 +765,7 @@ static NR_UE_harq_t *find_harq(frame_t frame, sub_frame_t slot, NR_UE_info_t * U
   return harq;
 }
 
-void handle_nr_uci_pucch_0_1(module_id_t mod_id,
-                             frame_t frame,
-                             sub_frame_t slot,
-                             const nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_01)
+void handle_nr_uci_pucch_0_1(module_id_t mod_id, frame_t frame, slot_t slot, const nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_01)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   int rssi_threshold = nrmac->pucch_rssi_threshold;
@@ -827,10 +820,7 @@ void handle_nr_uci_pucch_0_1(module_id_t mod_id,
   NR_SCHED_UNLOCK(&nrmac->sched_lock);
 }
 
-void handle_nr_uci_pucch_2_3_4(module_id_t mod_id,
-                               frame_t frame,
-                               sub_frame_t slot,
-                               const nfapi_nr_uci_pucch_pdu_format_2_3_4_t *uci_234)
+void handle_nr_uci_pucch_2_3_4(module_id_t mod_id, frame_t frame, slot_t slot, const nfapi_nr_uci_pucch_pdu_format_2_3_4_t *uci_234)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   NR_SCHED_LOCK(&nrmac->sched_lock);
@@ -1001,7 +991,7 @@ bool check_bits_vs_coderate_limit(NR_PUCCH_Config_t *pucch_Config, int O_uci, in
 int nr_acknack_scheduling(gNB_MAC_INST *mac,
                           NR_UE_info_t *UE,
                           frame_t frame,
-                          sub_frame_t slot,
+                          slot_t slot,
                           int ue_beam,
                           int r_pucch,
                           int is_common)
@@ -1138,7 +1128,7 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
 }
 
 
-void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, sub_frame_t slot)
+void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t SFN, slot_t slot)
 {
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
