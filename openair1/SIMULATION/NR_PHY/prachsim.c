@@ -562,6 +562,7 @@ int main(int argc, char **argv){
   prach_config->num_prach_fd_occasions_list[fd_occasion].k1.value                        = msg1_frequencystart;
   prach_config->restricted_set_config.value                                              = restrictedSetConfig;
   prach_config->prach_sequence_length.value                                              = prach_sequence_length;
+  prach_config->prach_sub_c_spacing.value                                                = mu;
   prach_pdu->num_cs                                                                      = get_NCS(NCS_config, format0, restrictedSetConfig);
   prach_config->num_prach_fd_occasions_list[fd_occasion].num_root_sequences.value        = 1+(64/(N_ZC/prach_pdu->num_cs));
   prach_pdu->prach_format                                                                = prach_format;
@@ -593,7 +594,7 @@ int main(int argc, char **argv){
   ue_prach_config        = &UE->nrUE_config.prach_config;
   txdata = UE->common_vars.txData;
 
-  UE->prach_vars[0]->amp        = AMP;
+  ue_prach_pdu->prach_tx_power = AMP;
   ue_prach_pdu->root_seq_id     = rootSequenceIndex;
   ue_prach_pdu->num_cs          = get_NCS(NCS_config, format0, restrictedSetConfig);
   ue_prach_pdu->restricted_set  = restrictedSetConfig;
@@ -774,7 +775,7 @@ int main(int argc, char **argv){
 	  }
 	}
 	
-        rx_nr_prach_ru(ru, prach_format, numRA, prachStartSymbol, prachOccasion, frame, slot);
+        rx_nr_prach_ru(ru, prach_format, numRA, prachStartSymbol, slot, prachOccasion, frame, slot);
 
         for (int i = 0; i < ru->nb_rx; ++i)
           gNB->prach_vars.rxsigF[i] = ru->prach_rxsigF[prachOccasion][i];
