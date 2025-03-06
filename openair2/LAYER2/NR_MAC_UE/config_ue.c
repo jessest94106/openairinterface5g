@@ -44,6 +44,24 @@
 #include "oai_asn1.h"
 #include "executables/position_interface.h"
 
+static int get_ta_offset(long *n_TimingAdvanceOffset)
+{
+  if (!n_TimingAdvanceOffset)
+    return -1;
+
+  switch (*n_TimingAdvanceOffset) {
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n0 :
+      return 0;
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n25600 :
+      return 25600;
+    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n39936 :
+      return 39936;
+    default :
+      AssertFatal(false, "Invalid n-TimingAdvanceOffset\n");
+  }
+  return -1;
+}
+
 static void set_tdd_config_nr_ue(fapi_nr_tdd_table_t *tdd_table, const frame_structure_t *fs)
 {
   tdd_table->tdd_period_in_slots = fs->numb_slots_period;
@@ -143,6 +161,7 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
   // cell config
   cfg->cell_config.phy_cell_id = mac->physCellId;
   cfg->cell_config.frame_duplex_type = frame_type;
+  cfg->cell_config.N_TA_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
 
   // SSB config
   cfg->ssb_config.ss_pbch_power = scc->ss_PBCH_BlockPower;
@@ -345,6 +364,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   // cell config
   cfg->cell_config.phy_cell_id = *scc->physCellId;
   cfg->cell_config.frame_duplex_type = frame_type;
+  cfg->cell_config.N_TA_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
 
   // SSB config
   cfg->ssb_config.ss_pbch_power = scc->ss_PBCH_BlockPower;
@@ -1685,24 +1705,6 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
-static int get_ta_offset(long *n_TimingAdvanceOffset)
-{
-  if (!n_TimingAdvanceOffset)
-    return -1;
-
-  switch (*n_TimingAdvanceOffset) {
-    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n0 :
-      return 0;
-    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n25600 :
-      return 25600;
-    case NR_ServingCellConfigCommonSIB__n_TimingAdvanceOffset_n39936 :
-      return 39936;
-    default :
-      AssertFatal(false, "Invalid n-TimingAdvanceOffset\n");
-  }
-  return -1;
-}
-
 static void configure_si_schedulingInfo(NR_UE_MAC_INST_t *mac,
                                         NR_SI_SchedulingInfo_t *si_SchedulingInfo,
                                         NR_SI_SchedulingInfo_v1700_t *si_SchedulingInfo_v1700)
@@ -1744,7 +1746,6 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
   AssertFatal(scc, "SIB1 SCC should not be NULL\n");
   UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
   configure_si_schedulingInfo(mac, si_SchedulingInfo, si_SchedulingInfo_v1700);
-  mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
 
   config_common_ue_sa(mac, scc, cc_idP);
   configure_common_BWP_dl(mac,
@@ -1813,7 +1814,6 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
 
   if (reconfWithSync->spCellConfigCommon) {
     NR_ServingCellConfigCommon_t *scc = reconfWithSync->spCellConfigCommon;
-    mac->n_ta_offset = get_ta_offset(scc->n_TimingAdvanceOffset);
     if (scc->physCellId)
       mac->physCellId = *scc->physCellId;
     mac->dmrs_TypeA_Position = scc->dmrs_TypeA_Position;
