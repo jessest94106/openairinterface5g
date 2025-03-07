@@ -1063,7 +1063,15 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_REQ(MessageDef *msg_p, instance_t in
   }
 }
 
-//-----------------------------------------------------------------------------
+/** @brief Sends the NG Handover Failure from the Target NG-RAN to the AMF */
+void rrc_gNB_send_NGAP_HANDOVER_FAILURE(gNB_RRC_INST *rrc, ngap_handover_failure_t *msg)
+{
+  LOG_I(NR_RRC, "Send NG Handover Failure message (amf_ue_ngap_id %ld) with cause %d \n ", msg->amf_ue_ngap_id, msg->cause.value);
+  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_HANDOVER_FAILURE);
+  NGAP_HANDOVER_FAILURE(msg_p) = *msg;
+  itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
+}
+
 /*
 * Process the NG command NGAP_UE_CONTEXT_RELEASE_COMMAND, sent by AMF.
 * The gNB should remove all pdu session, NG context, and other context of the UE.

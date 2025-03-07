@@ -191,3 +191,36 @@ NGAP_NGAP_PDU_t *encode_ng_handover_required(const ngap_handover_required_t *msg
 
   return pdu;
 }
+
+NGAP_NGAP_PDU_t *encode_ng_handover_failure(const ngap_handover_failure_t *msg)
+{
+  NGAP_NGAP_PDU_t *pdu = malloc_or_fail(sizeof(*pdu));
+
+  /* Prepare the NGAP message to encode */
+  pdu->present = NGAP_NGAP_PDU_PR_unsuccessfulOutcome;
+  asn1cCalloc(pdu->choice.unsuccessfulOutcome, head);
+  head->procedureCode = NGAP_ProcedureCode_id_HandoverResourceAllocation;
+  head->criticality = NGAP_Criticality_reject;
+  head->value.present = NGAP_UnsuccessfulOutcome__value_PR_HandoverFailure;
+  NGAP_HandoverFailure_t *out = &head->value.choice.HandoverFailure;
+
+  // AMF_UE_NGAP_ID (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverFailureIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_HandoverFailureIEs__value_PR_AMF_UE_NGAP_ID;
+    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, msg->amf_ue_ngap_id);
+  }
+
+  // Cause (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverFailureIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_Cause;
+    ie->criticality = NGAP_Criticality_ignore;
+    ie->value.present = NGAP_HandoverFailureIEs__value_PR_Cause;
+    encode_ngap_cause(&ie->value.choice.Cause, &msg->cause);
+  }
+
+  return pdu;
+}

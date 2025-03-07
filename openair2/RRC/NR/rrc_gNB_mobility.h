@@ -53,6 +53,7 @@ typedef struct nr_ho_source_cu {
 /* acknowledgement of handover request. buf+len is the RRC Reconfiguration */
 typedef void (*ho_req_ack_t)(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue);
 typedef void (*ho_success_t)(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue);
+
 typedef struct nr_ho_target_cu {
   /// pointer to the (target) DU structure
   const nr_rrc_du_container_t *du;
@@ -78,6 +79,7 @@ nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type);
 
 void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du);
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue);
+void nr_rrc_n2_ho_failure(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handover_failure_t *msg);
 
 void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc,
                           gNB_RRC_UE_t *ue,

@@ -406,6 +406,19 @@ static byte_array_t rrc_gNB_generate_HandoverPreparationInformation(gNB_RRC_INST
   return hoPrepInfo;
 }
 
+/** @brief Callback function to trigger NG Handover Failure on the target gNB, to inform the AMF
+ * that the preparation of resources has failed (e.g. unsatisfied criteria, gNB is already loaded).
+ * This message represents an Unsuccessful Outcome of the Handover Resource Allocation */
+void nr_rrc_n2_ho_failure(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handover_failure_t *msg)
+{
+  LOG_I(NR_RRC, "Triggering N2 Handover Failure\n");
+  rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, msg);
+  LOG_I(NR_RRC, "Send UE Context Release for gnb_ue_id %d\n", gnb_ue_id);
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, gnb_ue_id);
+  rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(rrc->module_id, ue_context_p, msg->cause);
+  return;
+}
+
 /** @brief Trigger N2 handover on source gNB:
  *         1) Prepare RRC Container with HandoverPreparationInformation message
  *         2) send NGAP Handover Required message */

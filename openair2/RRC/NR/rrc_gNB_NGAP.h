@@ -94,4 +94,6 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
                                          const nr_neighbour_cell_t *neighbourCellConfiguration,
                                          const byte_array_t hoPrepInfo);
 
+void rrc_gNB_send_NGAP_HANDOVER_FAILURE(gNB_RRC_INST *rrc, ngap_handover_failure_t *msg);
+
 #endif
