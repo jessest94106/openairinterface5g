@@ -192,7 +192,11 @@ void config_dci_pdu(NR_UE_MAC_INST_t *mac,
                     const NR_SearchSpace_t *ss);
 
 void ue_dci_configuration(NR_UE_MAC_INST_t *mac, fapi_nr_dl_config_request_t *dl_config, const frame_t frame, const int slot);
-
+void set_precoding_information_parameters(nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu,
+                                          int n_antenna_port,
+                                          long transformPrecoder,
+                                          int precoding_information,
+                                          NR_PUSCH_Config_t *pusch_Config);
 void set_harq_status(NR_UE_MAC_INST_t *mac,
                      uint8_t pucch_id,
                      uint8_t harq_id,
@@ -207,7 +211,7 @@ void set_harq_status(NR_UE_MAC_INST_t *mac,
 bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sched_t *pucch);
 initial_pucch_resource_t get_initial_pucch_resource(const int idx);
 void multiplex_pucch_resource(NR_UE_MAC_INST_t *mac, PUCCH_sched_t *pucch, int num_res);
-
+uint32_t get_backoff_indicator(int idx);
 int16_t get_pucch_tx_power_ue(NR_UE_MAC_INST_t *mac,
                               int scs,
                               NR_PUCCH_Config_t *pucch_Config,
@@ -262,11 +266,15 @@ float nr_get_Pcmax(int p_Max,
                    int start_prb);
 
 float nr_get_Pcmin(int bandwidth_index);
-
+void set_antenna_port_parameters(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_pdu, int n_cw, long *max_length, long *dmrs, int ant);
 int get_sum_delta_pucch(NR_UE_MAC_INST_t *mac, int slot, frame_t frame);
+void ul_ports_config(NR_UE_MAC_INST_t *mac,
+                     int *n_front_load_symb,
+                     nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu,
+                     dci_pdu_rel15_t *dci,
+                     nr_dci_format_t dci_format);
 
 /* Random Access */
-
 /* \brief This function schedules the PRACH according to prach_ConfigurationIndex and TS 38.211 tables 6.3.3.2.x
 and fills the PRACH PDU per each FD occasion.
 @param mac pointer to MAC instance

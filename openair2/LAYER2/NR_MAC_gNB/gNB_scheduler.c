@@ -32,7 +32,6 @@
 
 #include "assertions.h"
 
-#include "NR_MAC_COMMON/nr_mac_extern.h"
 #include "NR_MAC_gNB/mac_proto.h"
 
 #include "common/utils/LOG/log.h"
@@ -53,7 +52,12 @@
 #include <errno.h>
 #include <string.h>
 
-const uint8_t nr_rv_round_map[4] = {0, 2, 3, 1};
+uint8_t nr_get_rv(int rel_round)
+{
+  const uint8_t nr_rv_round_map[4] = {0, 2, 3, 1};
+  AssertFatal(rel_round < 4, "Invalid index %d for rv\n", rel_round);
+  return nr_rv_round_map[rel_round];
+}
 
 void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
                                 int CC_idP,

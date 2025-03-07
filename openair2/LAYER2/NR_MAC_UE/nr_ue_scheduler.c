@@ -39,7 +39,6 @@
 #include "NR_MAC_COMMON/nr_mac.h"
 #include "NR_MAC_COMMON/nr_mac_common.h"
 #include "NR_MAC_UE/mac_proto.h"
-#include "NR_MAC_UE/mac_extern.h"
 
 /* utils */
 #include "assertions.h"
@@ -48,8 +47,6 @@
 #include "utils.h"
 
 #include <executables/softmodem-common.h>
-
-#include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
 #include "LAYER2/RLC/rlc.h"
 #include "RRC/NR_UE/L2_interface_ue.h"
 
@@ -305,267 +302,16 @@ void ul_layers_config(NR_UE_MAC_INST_t *mac, nfapi_nr_ue_pusch_pdu_t *pusch_conf
   NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
   NR_SRS_Config_t *srs_config = current_UL_BWP->srs_Config;
   NR_PUSCH_Config_t *pusch_Config = current_UL_BWP->pusch_Config;
-
   long transformPrecoder = pusch_config_pdu->transform_precoding;
 
   /* PRECOD_NBR_LAYERS */
   // 0 bits if the higher layer parameter txConfig = nonCodeBook
-
   if (*pusch_Config->txConfig == NR_PUSCH_Config__txConfig_codebook){
-
     // The UE shall transmit PUSCH using the same antenna port(s) as the SRS port(s) in the SRS resource indicated by the DCI format 0_1
     // 38.214  Section 6.1.1
-
-    uint8_t n_antenna_port = get_pusch_nb_antenna_ports(pusch_Config, srs_config, dci->srs_resource_indicator);
-
-    // 1 antenna port and the higher layer parameter txConfig = codebook 0 bits
-
-    if (n_antenna_port == 4) { // 4 antenna port and the higher layer parameter txConfig = codebook
-
-      // Table 7.3.1.1.2-2: transformPrecoder=disabled and maxRank = 2 or 3 or 4
-      if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled)
-          && ((*pusch_Config->maxRank == 2) || (*pusch_Config->maxRank == 3) || (*pusch_Config->maxRank == 4))) {
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_fullyAndPartialAndNonCoherent) {
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][0];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][1];
-        }
-
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_partialAndNonCoherent){
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][2];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][3];
-        }
-
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent){
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][4];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][5];
-        }
-      }
-
-      // Table 7.3.1.1.2-3: transformPrecoder= enabled, or transformPrecoder=disabled and maxRank = 1
-      if (((transformPrecoder == NR_PUSCH_Config__transformPrecoder_enabled)
-           || (transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled))
-          && (*pusch_Config->maxRank == 1)) {
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_fullyAndPartialAndNonCoherent) {
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][6];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][7];
-        }
-
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_partialAndNonCoherent){
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][8];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][9];
-        }
-
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent){
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][10];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][11];
-        }
-      }
-    }
-
-    if (n_antenna_port == 2) {
-      // 2 antenna port and the higher layer parameter txConfig = codebook
-      // Table 7.3.1.1.2-4: transformPrecoder=disabled and maxRank = 2
-      if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled) && (*pusch_Config->maxRank == 2)) {
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_fullyAndPartialAndNonCoherent) {
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][12];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][13];
-        }
-
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent){
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][14];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][15];
-        }
-
-      }
-
-      // Table 7.3.1.1.2-5: transformPrecoder= enabled, or transformPrecoder= disabled and maxRank = 1
-      if (((transformPrecoder == NR_PUSCH_Config__transformPrecoder_enabled)
-           || (transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled))
-          && (*pusch_Config->maxRank == 1)) {
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_fullyAndPartialAndNonCoherent) {
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][16];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][17];
-        }
-
-        if (*pusch_Config->codebookSubset == NR_PUSCH_Config__codebookSubset_nonCoherent){
-          pusch_config_pdu->nrOfLayers = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][18];
-          pusch_config_pdu->Tpmi = table_7_3_1_1_2_2_3_4_5[dci->precoding_information.val][19];
-        }
-      }
-    }
+    uint8_t n = get_pusch_nb_antenna_ports(pusch_Config, srs_config, dci->srs_resource_indicator);
+    set_precoding_information_parameters(pusch_config_pdu, n, transformPrecoder, dci->precoding_information.val, pusch_Config);
   }
-}
-
-// todo: this function shall be reviewed completely because of the many comments left by the author
-void ul_ports_config(NR_UE_MAC_INST_t *mac, int *n_front_load_symb, nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu, dci_pdu_rel15_t *dci, nr_dci_format_t dci_format)
-{
-  uint8_t rank = pusch_config_pdu->nrOfLayers;
-
-  NR_PUSCH_Config_t *pusch_Config = mac->current_UL_BWP->pusch_Config;
-  AssertFatal(pusch_Config!=NULL,"pusch_Config shouldn't be null\n");
-
-  long transformPrecoder = pusch_config_pdu->transform_precoding;
-  LOG_D(NR_MAC,"transformPrecoder %s\n", transformPrecoder==NR_PUSCH_Config__transformPrecoder_disabled ? "disabled" : "enabled");
-
-  long *max_length = NULL;
-  long *dmrs_type = NULL;
-  if (pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA) {
-    max_length = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA->choice.setup->maxLength;
-    dmrs_type = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA->choice.setup->dmrs_Type;
-  }
-  else {
-    max_length = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->maxLength;
-    dmrs_type = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup->dmrs_Type;
-  }
-
-  LOG_D(NR_MAC,"MappingType%s max_length %s, dmrs_type %s, antenna_ports %d\n",
-        pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA?"A":"B",max_length?"len2":"len1",dmrs_type?"type2":"type1",dci->antenna_ports.val);
-
-  if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_enabled) &&
-      (dmrs_type == NULL) && (max_length == NULL)) { // tables 7.3.1.1.2-6
-    pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2;
-    pusch_config_pdu->dmrs_ports = 1 << dci->antenna_ports.val;
-  }
-
-  if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_enabled) &&
-      (dmrs_type == NULL) && (max_length != NULL)) { // tables 7.3.1.1.2-7
-
-    pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2; //TBC
-    pusch_config_pdu->dmrs_ports = 1<<((dci->antenna_ports.val > 3)?(dci->antenna_ports.val-4):(dci->antenna_ports.val));
-    *n_front_load_symb = (dci->antenna_ports.val > 3)?2:1;
-  }
-
-  if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled) && (dmrs_type == NULL)
-      && (max_length == NULL)) { // tables 7.3.1.1.2-8/9/10/11
-
-    if (rank == 1) {
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 1)?2:1;
-      pusch_config_pdu->dmrs_ports =1<<((dci->antenna_ports.val > 1)?(dci->antenna_ports.val-2):(dci->antenna_ports.val));
-    }
-
-    if (rank == 2){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 0)?2:1;
-      pusch_config_pdu->dmrs_ports = (dci->antenna_ports.val > 1)?((dci->antenna_ports.val> 2)?0x5:0xc):0x3;
-    }
-
-    if (rank == 3){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2;
-      pusch_config_pdu->dmrs_ports = 0x7;  // ports 0-2
-    }
-
-    if (rank == 4){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2;
-      pusch_config_pdu->dmrs_ports = 0xf;  // ports 0-3
-    }
-  }
-
-  if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled) && (dmrs_type == NULL)
-      && (max_length != NULL)) { // tables 7.3.1.1.2-12/13/14/15
-
-    if (rank == 1){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 1)?2:1; //TBC
-      pusch_config_pdu->dmrs_ports = 1<<((dci->antenna_ports.val > 1)?(dci->antenna_ports.val > 5 ?(dci->antenna_ports.val-6):(dci->antenna_ports.val-2)):dci->antenna_ports.val);
-      *n_front_load_symb = (dci->antenna_ports.val > 6)?2:1;
-    }
-
-    if (rank == 2){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 0)?2:1; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_13[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_13[dci->antenna_ports.val][2];
-      //n_front_load_symb = (dci->antenna_ports.val > 3)?2:1; // FIXME
-    }
-
-    if (rank == 3){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_14[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_14[dci->antenna_ports.val][2];
-      //pusch_config_pdu->dmrs_ports[2] = table_7_3_1_1_2_14[dci->antenna_ports.val][3];
-      //n_front_load_symb = (dci->antenna_ports.val > 1)?2:1; //FIXME
-    }
-
-    if (rank == 4){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_15[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_15[dci->antenna_ports.val][2];
-      //pusch_config_pdu->dmrs_ports[2] = table_7_3_1_1_2_15[dci->antenna_ports.val][3];
-      //pusch_config_pdu->dmrs_ports[3] = table_7_3_1_1_2_15[dci->antenna_ports.val][4];
-      //n_front_load_symb = (dci->antenna_ports.val > 1)?2:1; //FIXME
-    }
-  }
-
-  if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled) && (dmrs_type != NULL)
-      && (max_length == NULL)) { // tables 7.3.1.1.2-16/17/18/19
-
-    if (rank == 1){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 1)?((dci->antenna_ports.val > 5)?3:2):1; //TBC
-      pusch_config_pdu->dmrs_ports = (dci->antenna_ports.val > 1)?(dci->antenna_ports.val > 5 ?(dci->antenna_ports.val-6):(dci->antenna_ports.val-2)):dci->antenna_ports.val; //TBC
-    }
-
-    if (rank == 2){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 0)?((dci->antenna_ports.val > 2)?3:2):1; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_17[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_17[dci->antenna_ports.val][2];
-    }
-
-    if (rank == 3){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val > 0)?3:2; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_18[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_18[dci->antenna_ports.val][2];
-      //pusch_config_pdu->dmrs_ports[2] = table_7_3_1_1_2_18[dci->antenna_ports.val][3];
-    }
-
-    if (rank == 4){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = dci->antenna_ports.val + 2; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = 0;
-      //pusch_config_pdu->dmrs_ports[1] = 1;
-      //pusch_config_pdu->dmrs_ports[2] = 2;
-      //pusch_config_pdu->dmrs_ports[3] = 3;
-    }
-  }
-
-  if ((transformPrecoder == NR_PUSCH_Config__transformPrecoder_disabled) && (dmrs_type != NULL)
-      && (max_length != NULL)) { // tables 7.3.1.1.2-20/21/22/23
-
-    if (rank == 1){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = table_7_3_1_1_2_20[dci->antenna_ports.val][0]; //TBC
-      pusch_config_pdu->dmrs_ports = table_7_3_1_1_2_20[dci->antenna_ports.val][1]; //TBC
-      //n_front_load_symb = table_7_3_1_1_2_20[dci->antenna_ports.val][2]; //FIXME
-    }
-
-    if (rank == 2){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = table_7_3_1_1_2_21[dci->antenna_ports.val][0]; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_21[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_21[dci->antenna_ports.val][2];
-      //n_front_load_symb = table_7_3_1_1_2_21[dci->antenna_ports.val][3]; //FIXME
-    }
-
-    if (rank == 3){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = table_7_3_1_1_2_22[dci->antenna_ports.val][0]; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_22[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_22[dci->antenna_ports.val][2];
-      //pusch_config_pdu->dmrs_ports[2] = table_7_3_1_1_2_22[dci->antenna_ports.val][3];
-      //n_front_load_symb = table_7_3_1_1_2_22[dci->antenna_ports.val][4]; //FIXME
-    }
-
-    if (rank == 4){
-      pusch_config_pdu->num_dmrs_cdm_grps_no_data = table_7_3_1_1_2_23[dci->antenna_ports.val][0]; //TBC
-      pusch_config_pdu->dmrs_ports = 0; //FIXME
-      //pusch_config_pdu->dmrs_ports[0] = table_7_3_1_1_2_23[dci->antenna_ports.val][1];
-      //pusch_config_pdu->dmrs_ports[1] = table_7_3_1_1_2_23[dci->antenna_ports.val][2];
-      //pusch_config_pdu->dmrs_ports[2] = table_7_3_1_1_2_23[dci->antenna_ports.val][3];
-      //pusch_config_pdu->dmrs_ports[3] = table_7_3_1_1_2_23[dci->antenna_ports.val][4];
-      //n_front_load_symb = table_7_3_1_1_2_23[dci->antenna_ports.val][5]; //FIXME
-    }
-  }
-  LOG_D(NR_MAC,"num_dmrs_cdm_grps_no_data %d, dmrs_ports %d\n",pusch_config_pdu->num_dmrs_cdm_grps_no_data,pusch_config_pdu->dmrs_ports);
 }
 
 // Configuration of Msg3 PDU according to clauses:
@@ -1701,28 +1447,38 @@ void nr_ue_ul_scheduler(NR_UE_MAC_INST_t *mac, nr_uplink_indication_t *ul_info)
   }
 }
 
-static uint8_t nr_locate_BsrIndexByBufferSize(const uint32_t *table, int size, int value)
+static uint8_t nr_locate_BsrIndexByBufferSize(int size, int value)
 {
   if (value == 0) {
     return 0;   //elseif (value > 150000) return 63;
   }
 
+  uint32_t (*get_bsr_value)(int);
+  if (size == NR_SHORT_BSR_TABLE_SIZE)
+    get_bsr_value = &get_short_bsr_value;
+  else
+    get_bsr_value = &get_long_bsr_value;
+
   int jl = 0; // lower bound
   int ju = size - 1; // upper bound
-  bool ascend = table[ju] >= table[jl] ? 1 : 0; // determine the order of the the table:  1 if ascending order of table, 0 otherwise
+  // determine the order of the the table:  1 if ascending order of table, 0 otherwise
+  bool ascend = (*get_bsr_value)(ju) >= (*get_bsr_value)(jl) ? 1 : 0;
   while (ju - jl > 1) { //If we are not yet done,
     int jm = (ju + jl) / 2; // compute a midpoint,
-    if ((value >= table[jm]) == ascend) {
+    if ((value >= (*get_bsr_value)(jm)) == ascend) {
       jl = jm;    // replace the lower limit
     } else {
       ju = jm;    //replace the upper limit
     }
 
-    LOG_T(NR_MAC, "[UE] searching BSR index %d for (BSR TABLE %d < value %d)\n",
-          jm, table[jm], value);
+    LOG_T(NR_MAC,
+          "[UE] searching BSR index %d for (BSR TABLE %d < value %d)\n",
+          jm,
+          (*get_bsr_value)(jm),
+          value);
   }
 
-  if (value == table[jl]) {
+  if (value == (*get_bsr_value)(jl)) {
     return jl;
   } else {
     return jl + 1;    //equally  ju
@@ -3151,7 +2907,7 @@ static void nr_ue_get_sdu_mac_ce_post(NR_UE_MAC_INST_t *mac,
     mac_ce_p->bsr.type_bsr = b_short;
     mac_ce_p->bsr.bsr.s.LcgID = lcg_id_bsr_max;
     mac_ce_p->bsr.bsr.s.Buffer_size =
-        nr_locate_BsrIndexByBufferSize(NR_SHORT_BSR_TABLE, NR_SHORT_BSR_TABLE_SIZE, LCG_bytes[lcg_id_bsr_max]);
+        nr_locate_BsrIndexByBufferSize(NR_SHORT_BSR_TABLE_SIZE, LCG_bytes[lcg_id_bsr_max]);
     LOG_D(NR_MAC,
           "[UE %d] sfn %d.%d BSR Trigger=0x%x report SHORT BSR with level %d for LCGID %d\n",
           mac->ue_id,
@@ -3166,7 +2922,7 @@ static void nr_ue_get_sdu_mac_ce_post(NR_UE_MAC_INST_t *mac,
     mac_ce_p->bsr.type_bsr = b_long;
     uint8_t *tmp = mac_ce_p->bsr.bsr.lcg_bsr;
     for (int lcg_id = 0; lcg_id < 8; lcg_id++) {
-      tmp[lcg_id] = nr_locate_BsrIndexByBufferSize(NR_LONG_BSR_TABLE, NR_LONG_BSR_TABLE_SIZE, LCG_bytes[lcg_id]);
+      tmp[lcg_id] = nr_locate_BsrIndexByBufferSize(NR_LONG_BSR_TABLE_SIZE, LCG_bytes[lcg_id]);
     }
     LOG_D(NR_MAC,
           "[UE %d] sfn %d.%d BSR Trig=0x%x report LONG BSR (level LCGID %d %d %d %d %d %d %d %d)\n",
@@ -3186,7 +2942,7 @@ static void nr_ue_get_sdu_mac_ce_post(NR_UE_MAC_INST_t *mac,
     mac_ce_p->bsr.type_bsr = b_short_trunc;
     mac_ce_p->bsr.bsr.s.LcgID = lcg_id_bsr_max;
     mac_ce_p->bsr.bsr.s.Buffer_size =
-        nr_locate_BsrIndexByBufferSize(NR_SHORT_BSR_TABLE, NR_SHORT_BSR_TABLE_SIZE, LCG_bytes[lcg_id_bsr_max]);
+        nr_locate_BsrIndexByBufferSize(NR_SHORT_BSR_TABLE_SIZE, LCG_bytes[lcg_id_bsr_max]);
   } else if (padding_len >= sizeof(NR_BSR_LONG) + sizeof(NR_MAC_SUBHEADER_SHORT)) {
     mac_ce_p->bsr.type_bsr = b_long_trunc;
     //  Fixme: this should be sorted by (TS 38.321, 5.4.5)
@@ -3195,7 +2951,7 @@ static void nr_ue_get_sdu_mac_ce_post(NR_UE_MAC_INST_t *mac,
     // available for transmission) in each of these LCG(s), and in case of equal priority, in increasing order of LCGID
     uint8_t *tmp = mac_ce_p->bsr.bsr.lcg_bsr;
     for (int lcg_id = 0; lcg_id < 8; lcg_id++) {
-      tmp[lcg_id] = nr_locate_BsrIndexByBufferSize(NR_LONG_BSR_TABLE, NR_LONG_BSR_TABLE_SIZE, LCG_bytes[lcg_id]);
+      tmp[lcg_id] = nr_locate_BsrIndexByBufferSize(NR_LONG_BSR_TABLE_SIZE, LCG_bytes[lcg_id]);
     }
   } else
     LOG_D(NR_MAC, "Can't add any BSR, not enough padding\n");

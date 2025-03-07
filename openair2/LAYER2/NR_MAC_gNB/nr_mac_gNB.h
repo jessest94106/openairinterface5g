@@ -86,7 +86,6 @@
 #include "mac_rrc_ul.h"
 
 /* MAC */
-#include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
 #include "LAYER2/NR_MAC_COMMON/nr_mac_common.h"
 #include "NR_TAG.h"
 
@@ -103,7 +102,7 @@
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
 #define MIN_NUM_PRBS_TO_SCHEDULE  5
 
-extern const uint8_t nr_rv_round_map[4];
+uint8_t nr_get_rv(int rel_round);
 
 /*! \brief NR_list_t is a "list" (of users, HARQ processes, slices, ...).
  * Especially useful in the scheduler and to keep "classes" of users. */

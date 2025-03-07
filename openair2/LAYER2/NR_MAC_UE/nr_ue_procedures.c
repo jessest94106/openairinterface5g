@@ -43,8 +43,6 @@
 /* MAC */
 #include "NR_MAC_COMMON/nr_mac.h"
 #include "NR_MAC_UE/mac_proto.h"
-#include "NR_MAC_UE/mac_extern.h"
-#include "NR_MAC_COMMON/nr_mac_extern.h"
 #include "common/utils/nr/nr_common.h"
 #include "openair2/NR_UE_PHY_INTERFACE/NR_Packet_Drop.h"
 
@@ -56,6 +54,7 @@
 #include "oai_asn1.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
+#include "openair2/LAYER2/RLC/rlc.h"
 
 // #define DEBUG_MIB
 // #define ENABLE_MAC_PAYLOAD_DEBUG 1
@@ -973,14 +972,6 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
   return 0;
 }
 
-static inline uint16_t packBits(const uint8_t *toPack, const int nb)
-{
-  int res = 0;
-  for (int i = 0; i < nb; i++)
-    res += (*toPack++) << i;
-  return res;
-}
-
 static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
                                    frame_t frame,
                                    int slot,
@@ -1179,53 +1170,9 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
   long *dmrs_type = dl_dmrs_config->dmrs_Type;
 
   dlsch_pdu->n_front_load_symb = 1; // default value
-  const int ant = dci->antenna_ports.val;
+  set_antenna_port_parameters(dlsch_pdu, n_codewords, max_length, dmrs_type, dci->antenna_ports.val);
 
-  if (dmrs_type == NULL) {
-    if (max_length == NULL) {
-      // Table 7.3.1.2.2-1: Antenna port(s) (1000 + DMRS port), dmrs-Type=1, maxLength=1
-      dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_1[ant][0];
-      dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_1[ant][1], 4);
-    } else {
-      // Table 7.3.1.2.2-2: Antenna port(s) (1000 + DMRS port), dmrs-Type=1, maxLength=2
-      if (n_codewords == 1) {
-        dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_2_oneCodeword[ant][0];
-        dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_2_oneCodeword[ant][1], 8);
-        dlsch_pdu->n_front_load_symb = table_7_3_2_3_3_2_oneCodeword[ant][9];
-      }
-      if (n_codewords == 2) {
-        dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_2_twoCodeword[ant][0];
-        dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_2_twoCodeword[ant][1], 8);
-        dlsch_pdu->n_front_load_symb = table_7_3_2_3_3_2_twoCodeword[ant][9];
-      }
-    }
-  } else {
-    if (max_length == NULL) {
-      // Table 7.3.1.2.2-3: Antenna port(s) (1000 + DMRS port), dmrs-Type=2, maxLength=1
-      if (n_codewords == 1) {
-        dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_3_oneCodeword[ant][0];
-        dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_3_oneCodeword[ant][1], 6);
-      }
-      if (n_codewords == 2) {
-        dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_3_twoCodeword[ant][0];
-        dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_3_twoCodeword[ant][1], 6);
-      }
-    } else {
-      // Table 7.3.1.2.2-4: Antenna port(s) (1000 + DMRS port), dmrs-Type=2, maxLength=2
-      if (n_codewords == 1) {
-        dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_4_oneCodeword[ant][0];
-        dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_4_oneCodeword[ant][1], 12);
-        dlsch_pdu->n_front_load_symb = table_7_3_2_3_3_4_oneCodeword[ant][13];
-      }
-      if (n_codewords == 2) {
-        dlsch_pdu->n_dmrs_cdm_groups = table_7_3_2_3_3_4_twoCodeword[ant][0];
-        dlsch_pdu->dmrs_ports = packBits(&table_7_3_2_3_3_4_twoCodeword[ant][1], 12);
-        dlsch_pdu->n_front_load_symb = table_7_3_2_3_3_4_twoCodeword[ant][13];
-      }
-    }
-  }
-
-    /* dmrs symbol positions*/
+  /* dmrs symbol positions*/
   dlsch_pdu->dlDmrsSymbPos = fill_dmrs_mask(pdsch_Config,
                                             NR_DL_DCI_FORMAT_1_1,
                                             mac->dmrs_TypeA_Position,
@@ -3968,7 +3915,7 @@ static void nr_ue_process_rar(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *d
       n_subPDUs++;
       LOG_I(NR_MAC, "[UE %d][RAPROC][RA-RNTI %04x] Got RAPID RAR subPDU\n", mac->ue_id, rnti);
     } else {
-      ra->RA_backoff_indicator = table_7_2_1[((NR_RA_HEADER_BI *)rarh)->BI];
+      ra->RA_backoff_indicator = get_backoff_indicator(((NR_RA_HEADER_BI *)rarh)->BI);
       ra->RA_BI_found = 1;
       LOG_I(NR_MAC, "[UE %d][RAPROC][RA-RNTI %04x] Got BI RAR subPDU %d ms\n", mac->ue_id, ra->RA_backoff_indicator, rnti);
       if ( ((NR_RA_HEADER_BI *)rarh)->E == 1) {
