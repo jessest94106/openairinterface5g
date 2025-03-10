@@ -28,6 +28,8 @@
  * @ingroup _ngap
  */
 
+#include "ds/byte_array.h"
+
 #ifndef NGAP_GNB_MANAGEMENT_PROCEDURES_H_
 #define NGAP_GNB_MANAGEMENT_PROCEDURES_H_
 

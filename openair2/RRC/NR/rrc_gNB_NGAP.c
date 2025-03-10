@@ -166,13 +166,7 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   req->establishment_cause = UE->establishment_cause;
 
   /* Forward NAS message */
-  req->nas_pdu.length = rrcSetupComplete->dedicatedNAS_Message.size;
-  req->nas_pdu.buffer = malloc(req->nas_pdu.length);
-  AssertFatal(req->nas_pdu.buffer != NULL, "out of memory\n");
-  memcpy(req->nas_pdu.buffer, rrcSetupComplete->dedicatedNAS_Message.buf, req->nas_pdu.length);
-  // extract_imsi(NGAP_NAS_FIRST_REQ (message_p).nas_pdu.buffer,
-  //              NGAP_NAS_FIRST_REQ (message_p).nas_pdu.length,
-  //              ue_context_pP);
+  req->nas_pdu = create_byte_array(rrcSetupComplete->dedicatedNAS_Message.size, rrcSetupComplete->dedicatedNAS_Message.buf);
 
   /* selected_plmn_identity: IE is 1-based, convert to 0-based (C array) */
   int selected_plmn_identity = rrcSetupComplete->selectedPLMN_Identity - 1;
@@ -247,8 +241,13 @@ static int decodePDUSessionResourceSetup(pdusession_t *session)
 {
   NGAP_PDUSessionResourceSetupRequestTransfer_t *pdusessionTransfer = NULL;
   asn_codec_ctx_t st = {.max_stack_size = 100 * 1000};
-  asn_dec_rval_t dec_rval =
-      aper_decode(&st, &asn_DEF_NGAP_PDUSessionResourceSetupRequestTransfer, (void **)&pdusessionTransfer, session->pdusessionTransfer.buffer, session->pdusessionTransfer.length, 0, 0);
+  asn_dec_rval_t dec_rval = aper_decode(&st,
+                                        &asn_DEF_NGAP_PDUSessionResourceSetupRequestTransfer,
+                                        (void **)&pdusessionTransfer,
+                                        session->pdusessionTransfer.buf,
+                                        session->pdusessionTransfer.len,
+                                        0,
+                                        0);
 
   if (dec_rval.code != RC_OK) {
     LOG_E(NR_RRC, "can not decode PDUSessionResourceSetupRequestTransfer\n");
@@ -707,8 +706,7 @@ int rrc_gNB_process_NGAP_DOWNLINK_NAS(MessageDef *msg_p, instance_t instance, mu
     msg_fail_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_NAS_NON_DELIVERY_IND);
     ngap_nas_non_delivery_ind_t *msg = &NGAP_NAS_NON_DELIVERY_IND(msg_fail_p);
     msg->gNB_ue_ngap_id = req->gNB_ue_ngap_id;
-    msg->nas_pdu.length = req->nas_pdu.length;
-    msg->nas_pdu.buffer = req->nas_pdu.buffer;
+    msg->nas_pdu = req->nas_pdu;
     // TODO add failure cause when defined!
     itti_send_msg_to_task(TASK_NGAP, instance, msg_fail_p);
     return (-1);
@@ -740,8 +738,8 @@ void rrc_gNB_send_NGAP_UPLINK_NAS(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_
   memcpy(buf, nas->buf, nas->size);
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, rrc->module_id, NGAP_UPLINK_NAS);
   NGAP_UPLINK_NAS(msg_p).gNB_ue_ngap_id = UE->rrc_ue_id;
-  NGAP_UPLINK_NAS(msg_p).nas_pdu.length = nas->size;
-  NGAP_UPLINK_NAS(msg_p).nas_pdu.buffer = buf;
+  NGAP_UPLINK_NAS(msg_p).nas_pdu.len = nas->size;
+  NGAP_UPLINK_NAS(msg_p).nas_pdu.buf = buf;
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
 }
 
@@ -966,10 +964,16 @@ static void fill_qos2(NGAP_QosFlowAddOrModifyRequestList_t *qos, pdusession_t *s
   session->nb_qos = qos->list.count;
 }
 
-static void decodePDUSessionResourceModify(pdusession_t *param, const ngap_pdu_t pdu)
+static void decodePDUSessionResourceModify(pdusession_t *param, const byte_array_t pdu)
 {
   NGAP_PDUSessionResourceModifyRequestTransfer_t *pdusessionTransfer = NULL;
-  asn_dec_rval_t dec_rval = aper_decode(NULL, &asn_DEF_NGAP_PDUSessionResourceModifyRequestTransfer, (void **)&pdusessionTransfer, pdu.buffer, pdu.length, 0, 0);
+  asn_dec_rval_t dec_rval = aper_decode(NULL,
+                                        &asn_DEF_NGAP_PDUSessionResourceModifyRequestTransfer,
+                                        (void **)&pdusessionTransfer,
+                                        pdu.buf,
+                                        pdu.len,
+                                        0,
+                                        0);
 
   if (dec_rval.code != RC_OK) {
     LOG_E(NR_RRC, "could not decode PDUSessionResourceModifyRequestTransfer\n");
@@ -1068,7 +1072,7 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
       sess->status = PDU_SESSION_STATUS_NEW;
       sess->param.pdusession_id = sessMod->pdusession_id;
       sess->cause.type = NGAP_CAUSE_NOTHING;
-      if (sessMod->nas_pdu.buffer != NULL) {
+      if (sessMod->nas_pdu.buf != NULL) {
         UE->pduSession[i].param.nas_pdu = sessMod->nas_pdu;
       }
       // Save new pdu session parameters, qos, upf addr, teid
@@ -1339,8 +1343,8 @@ void rrc_gNB_send_NGAP_UE_CAPABILITIES_IND(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, 
     ngap_ue_cap_info_ind_t *ind = &NGAP_UE_CAPABILITIES_IND(msg_p);
     memset(ind, 0, sizeof(*ind));
     ind->gNB_ue_ngap_id = UE->rrc_ue_id;
-    ind->ue_radio_cap.length = encoded;
-    ind->ue_radio_cap.buffer = buf2;
+    ind->ue_radio_cap.len = encoded;
+    ind->ue_radio_cap.buf = buf2;
     itti_send_msg_to_task (TASK_NGAP, rrc->module_id, msg_p);
     LOG_I(NR_RRC,"Send message to ngap: NGAP_UE_CAPABILITIES_IND\n");
 }
@@ -1419,7 +1423,7 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
   if (found) {
     // TODO RRCReconfiguration To UE
     LOG_I(NR_RRC, "Send RRCReconfiguration To UE \n");
-    rrc_gNB_generate_dedicatedRRCReconfiguration_release(rrc, UE, xid, cmd->nas_pdu.length, cmd->nas_pdu.buffer);
+    rrc_gNB_generate_dedicatedRRCReconfiguration_release(rrc, UE, xid, cmd->nas_pdu.len, cmd->nas_pdu.buf);
   } else {
     // gtp tunnel delete
     LOG_I(NR_RRC, "gtp tunnel delete all tunnels for UE %04x\n", UE->rnti);

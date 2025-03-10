@@ -52,15 +52,6 @@
 #include "oai_asn1.h"
 #include "queue.h"
 
-static void allocCopy(ngap_pdu_t *out, OCTET_STRING_t in)
-{
-  if (in.size) {
-    out->buffer = malloc(in.size);
-    memcpy(out->buffer, in.buf, in.size);
-  }
-  out->length = in.size;
-}
-
 char *ngap_direction2String(int ngap_dir) {
   static char *ngap_direction_String[] = {
     "", /* Nothing */
@@ -772,9 +763,10 @@ static int ngap_gNB_handle_initial_context_request(sctp_assoc_t assoc_id, uint32
       }
 
       if (item_p->nAS_PDU) {
-        allocCopy(&msg->pdusession_param[i].nas_pdu, *item_p->nAS_PDU);
+        msg->pdusession_param[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
       }
-      allocCopy(&msg->pdusession_param[i].pdusessionTransfer, item_p->pDUSessionResourceSetupRequestTransfer);
+      OCTET_STRING_t *transfer = &item_p->pDUSessionResourceSetupRequestTransfer;
+      msg->pdusession_param[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
     }
   }
 
@@ -841,7 +833,7 @@ static int ngap_gNB_handle_initial_context_request(sctp_assoc_t assoc_id, uint32
                                  NGAP_ProtocolIE_ID_id_NAS_PDU, false);
 
   if (ie)
-    allocCopy(&msg->nas_pdu, ie->value.choice.NAS_PDU);
+    msg->nas_pdu = create_byte_array(ie->value.choice.NAS_PDU.size, ie->value.choice.NAS_PDU.buf);
 
   itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);
 
@@ -985,9 +977,9 @@ static int ngap_gNB_handle_pdusession_setup_request(sctp_assoc_t assoc_id, uint3
     } else {
       msg->pdusession_setup_params[i].nssai.sd = 0xffffff;
     }
-
-    allocCopy(&msg->pdusession_setup_params[i].nas_pdu, *item_p->pDUSessionNAS_PDU);
-    allocCopy(&msg->pdusession_setup_params[i].pdusessionTransfer, item_p->pDUSessionResourceSetupRequestTransfer);
+    OCTET_STRING_t *transfer = &item_p->pDUSessionResourceSetupRequestTransfer;
+    msg->pdusession_setup_params[i].nas_pdu = create_byte_array(item_p->pDUSessionNAS_PDU->size, item_p->pDUSessionNAS_PDU->buf);
+    msg->pdusession_setup_params[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
   }
     itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);
 
@@ -1164,8 +1156,9 @@ static int ngap_gNB_handle_pdusession_modify_request(sctp_assoc_t assoc_id, uint
 
     // check for the NAS PDU
     if (item_p->nAS_PDU != NULL && item_p->nAS_PDU->size > 0) {
-      allocCopy(&msg->pdusession_modify_params[i].nas_pdu, *item_p->nAS_PDU);
-      allocCopy(&msg->pdusession_modify_params[i].pdusessionTransfer, item_p->pDUSessionResourceModifyRequestTransfer);
+      msg->pdusession_modify_params[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
+      OCTET_STRING_t *transfer = &item_p->pDUSessionResourceModifyRequestTransfer;
+      msg->pdusession_modify_params[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
     } else {
       LOG_W(NGAP, "received pdu session modify with void content for UE %u, pdu session %lu\n", msg->gNB_ue_ngap_id, item_p->pDUSessionID);
       continue;
@@ -1241,7 +1234,7 @@ static int ngap_gNB_handle_pdusession_release_command(sctp_assoc_t assoc_id, uin
                              NGAP_ProtocolIE_ID_id_NAS_PDU, false);
 
   if (ie)
-    allocCopy(&msg->nas_pdu, ie->value.choice.NAS_PDU);
+    msg->nas_pdu = create_byte_array(ie->value.choice.NAS_PDU.size, ie->value.choice.NAS_PDU.buf);
 
   /* id-PDUSessionResourceToReleaseListRelCmd */
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_PDUSessionResourceReleaseCommandIEs_t, ie, container,
@@ -1252,8 +1245,9 @@ static int ngap_gNB_handle_pdusession_release_command(sctp_assoc_t assoc_id, uin
   for (i = 0; i < ie->value.choice.PDUSessionResourceToReleaseListRelCmd.list.count; i++) {
     NGAP_PDUSessionResourceToReleaseItemRelCmd_t *item_p;
     item_p = ie->value.choice.PDUSessionResourceToReleaseListRelCmd.list.array[i];
-    msg->pdusession_release_params[i].pdusession_id = item_p->pDUSessionID;
-    allocCopy(&msg->pdusession_release_params[i].data, item_p->pDUSessionResourceReleaseCommandTransfer);
+    pdusession_release_t *r = &msg->pdusession_release_params[i];
+    r->pdusession_id = item_p->pDUSessionID;
+    r->data = create_byte_array(item_p->pDUSessionResourceReleaseCommandTransfer.size, item_p->pDUSessionResourceReleaseCommandTransfer.buf);
   }
 
   itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);

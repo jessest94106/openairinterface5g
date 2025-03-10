@@ -58,15 +58,6 @@
 #include "s1ap_messages_types.h"
 #include "xer_encoder.h"
 
-static void allocCopy(OCTET_STRING_t *out, ngap_pdu_t in)
-{
-  if (in.length) {
-    out->buf = malloc(in.length);
-    memcpy(out->buf, in.buffer, in.length);
-  }
-  out->size = in.length;
-}
-
 static void allocAddrCopy(BIT_STRING_t *out, transport_layer_addr_t in)
 {
   if (in.length) {
@@ -203,7 +194,7 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
     ie->id = NGAP_ProtocolIE_ID_id_NAS_PDU;
     ie->criticality = NGAP_Criticality_reject;
     ie->value.present = NGAP_InitialUEMessage_IEs__value_PR_NAS_PDU;
-    allocCopy(&ie->value.choice.NAS_PDU, UEfirstReq->nas_pdu);
+    OCTET_STRING_fromBuf(&ie->value.choice.NAS_PDU, (const char *)UEfirstReq->nas_pdu.buf, UEfirstReq->nas_pdu.len);
   }
 
   /* mandatory */
@@ -436,8 +427,8 @@ int ngap_gNB_nas_uplink(instance_t instance, ngap_uplink_nas_t *ngap_uplink_nas_
     ie->id = NGAP_ProtocolIE_ID_id_NAS_PDU;
     ie->criticality = NGAP_Criticality_reject;
     ie->value.present = NGAP_UplinkNASTransport_IEs__value_PR_NAS_PDU;
-    ie->value.choice.NAS_PDU.buf = ngap_uplink_nas_p->nas_pdu.buffer;
-    ie->value.choice.NAS_PDU.size = ngap_uplink_nas_p->nas_pdu.length;
+    ie->value.choice.NAS_PDU.buf = ngap_uplink_nas_p->nas_pdu.buf;
+    ie->value.choice.NAS_PDU.size = ngap_uplink_nas_p->nas_pdu.len;
   }
   /* mandatory */
   {
@@ -532,8 +523,8 @@ int ngap_gNB_nas_non_delivery_ind(instance_t instance,
     ie->id = NGAP_ProtocolIE_ID_id_NAS_PDU;
     ie->criticality = NGAP_Criticality_ignore;
     ie->value.present = NGAP_NASNonDeliveryIndication_IEs__value_PR_NAS_PDU;
-    ie->value.choice.NAS_PDU.buf = ngap_nas_non_delivery_ind->nas_pdu.buffer;
-    ie->value.choice.NAS_PDU.size = ngap_nas_non_delivery_ind->nas_pdu.length;
+    ie->value.choice.NAS_PDU.buf = ngap_nas_non_delivery_ind->nas_pdu.buf;
+    ie->value.choice.NAS_PDU.size = ngap_nas_non_delivery_ind->nas_pdu.len;
   }
   /* mandatory */
   {
@@ -861,8 +852,8 @@ int ngap_gNB_ue_capabilities(instance_t instance, ngap_ue_cap_info_ind_t *ue_cap
     ie->id = NGAP_ProtocolIE_ID_id_UERadioCapability;
     ie->criticality = NGAP_Criticality_ignore;
     ie->value.present = NGAP_UERadioCapabilityInfoIndicationIEs__value_PR_UERadioCapability;
-    ie->value.choice.UERadioCapability.buf = ue_cap_info_ind_p->ue_radio_cap.buffer;
-    ie->value.choice.UERadioCapability.size = ue_cap_info_ind_p->ue_radio_cap.length;
+    ie->value.choice.UERadioCapability.buf = ue_cap_info_ind_p->ue_radio_cap.buf;
+    ie->value.choice.UERadioCapability.size = ue_cap_info_ind_p->ue_radio_cap.len;
   }
   /* optional */
   //NGAP_UERadioCapabilityForPaging TBD
@@ -1224,8 +1215,9 @@ int ngap_gNB_pdusession_release_resp(instance_t instance, ngap_pdusession_releas
     
     for (i = 0; i < pdusession_release_resp_p->nb_of_pdusessions_released; i++) {
       asn1cSequenceAdd(ie->value.choice.PDUSessionResourceReleasedListRelRes.list, NGAP_PDUSessionResourceReleasedItemRelRes_t, item);
-      item->pDUSessionID = pdusession_release_resp_p->pdusession_release[i].pdusession_id;
-      allocCopy(&item->pDUSessionResourceReleaseResponseTransfer, pdusession_release_resp_p->pdusession_release[i].data);
+      pdusession_release_t *r = &pdusession_release_resp_p->pdusession_release[i];
+      item->pDUSessionID = r->pdusession_id;
+      OCTET_STRING_fromBuf(&item->pDUSessionResourceReleaseResponseTransfer, (const char *)r->data.buf, r->data.len);
       NGAP_DEBUG("pdusession_release_resp: pdusession ID %ld\n", item->pDUSessionID);
     }
   }
