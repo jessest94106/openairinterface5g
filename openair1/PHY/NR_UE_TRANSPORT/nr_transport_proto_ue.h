@@ -112,7 +112,8 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
                       const uint8_t slot,
                       unsigned int *G,
                       int nb_ulsch,
-                      uint8_t *ULSCH_ids);
+                      uint8_t *ULSCH_ids,
+                      uint16_t number_dmrs_symbols);
 
 /*! \brief Perform PUSCH scrambling. TS 38.211 V15.4.0 subclause 6.3.1.1
   @param[in] in Pointer to input bits
