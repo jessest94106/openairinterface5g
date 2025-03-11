@@ -63,6 +63,8 @@ typedef struct nr_ho_target_cu {
   uint32_t du_ue_id;
   /// new (target) RNTI (as for du_ue_id)
   rnti_t new_rnti;
+  /// Handover Preparation Buffer
+  byte_array_t ue_ho_prep_info;
   /// function pointer to announce handover request acknowledgment
   ho_req_ack_t ho_req_ack;
   /// function pointer to announce handover success

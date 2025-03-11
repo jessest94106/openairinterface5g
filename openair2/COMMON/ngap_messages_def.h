@@ -83,6 +83,7 @@ MESSAGE_DEF(NGAP_PDUSESSION_SETUP_REQ            , MESSAGE_PRIORITY_MED, ngap_pd
 MESSAGE_DEF(NGAP_PDUSESSION_MODIFY_REQ           , MESSAGE_PRIORITY_MED, ngap_pdusession_modify_req_t        , ngap_pdusession_modify_req )
 MESSAGE_DEF(NGAP_PDUSESSION_RELEASE_COMMAND     , MESSAGE_PRIORITY_MED, ngap_pdusession_release_command_t     , ngap_pdusession_release_command)
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_COMMAND, MESSAGE_PRIORITY_MED, ngap_ue_release_command_t        , ngap_ue_release_command)
+MESSAGE_DEF(NGAP_HANDOVER_REQUEST, MESSAGE_PRIORITY_MED, ngap_handover_request_t, ngap_handover_request)
 
 /* NGAP <-> RRC messages (can be initiated either by MME or gNB) */
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_REQ    , MESSAGE_PRIORITY_MED, ngap_ue_release_req_t            , ngap_ue_release_req)

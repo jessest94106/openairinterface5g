@@ -30,6 +30,7 @@
 #include "ngap_gNB_management_procedures.h"
 #include "ngap_gNB_encoder.h"
 #include "ngap_gNB_itti_messaging.h"
+#include "conversions.h"
 
 /** @brief UE Mobility Management: encode Handover Required
  *         (9.2.3.1 of 3GPP TS 38.413) NG-RAN node → AMF */
@@ -223,4 +224,161 @@ NGAP_NGAP_PDU_t *encode_ng_handover_failure(const ngap_handover_failure_t *msg)
   }
 
   return pdu;
+}
+
+static void free_ng_handover_request(ngap_handover_request_t *msg)
+{
+  free_byte_array(msg->ue_ho_prep_info);
+  free_byte_array(msg->ue_cap);
+  free(msg->mobility_restriction);
+}
+
+int decode_ng_handover_request(ngap_handover_request_t *out, const NGAP_NGAP_PDU_t *pdu)
+{
+  DevAssert(pdu != NULL);
+  NGAP_HandoverRequest_t *container = &pdu->choice.initiatingMessage->value.choice.HandoverRequest;
+  NGAP_HandoverRequestIEs_t *ie;
+
+  // Handover Type (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_HandoverType, true);
+  out->ho_type = ie->value.choice.HandoverType;
+  if (out->ho_type != HANDOVER_TYPE_INTRA5GS) {
+    NGAP_ERROR("Only Intra5GS Handover is supported at the moment!\n");
+    return -1;
+  }
+
+  // AMF UE NGAP ID (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID, true);
+  asn_INTEGER2ulong(&(ie->value.choice.AMF_UE_NGAP_ID), &out->amf_ue_ngap_id);
+
+  // GUAMI (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_GUAMI, true);
+  out->guami = decode_ngap_guami(&ie->value.choice.GUAMI);
+
+  // UE Aggregate Maximum Bit Rate (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_UEAggregateMaximumBitRate, true);
+  out->ue_ambr = decode_ngap_UEAggregateMaximumBitRate(&ie->value.choice.UEAggregateMaximumBitRate);
+
+  // Allowed NSSAI (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_AllowedNSSAI, true);
+  NGAP_DEBUG("AllowedNSSAI.list.count %d\n", ie->value.choice.AllowedNSSAI.list.count);
+  out->nb_allowed_nssais = ie->value.choice.AllowedNSSAI.list.count;
+  for (int i = 0; i < out->nb_allowed_nssais; i++) {
+    out->allowed_nssai[i] = decode_ngap_nssai(&ie->value.choice.AllowedNSSAI.list.array[i]->s_NSSAI);
+  }
+
+  // UE Security Capabilities (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_UESecurityCapabilities, true);
+  out->security_capabilities = decode_ngap_security_capabilities(&ie->value.choice.UESecurityCapabilities);
+
+  // Security Context (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_SecurityContext, true);
+  NGAP_SecurityContext_t *sc = &ie->value.choice.SecurityContext;
+  memcpy(&out->security_context.next_hop, sc->nextHopNH.buf, sc->nextHopNH.size);
+  out->security_context.next_hop_chain_count = sc->nextHopChainingCount;
+
+  // Mobility Restriction List (O)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_MobilityRestrictionList, false);
+  if (ie != NULL) {
+    out->mobility_restriction = malloc_or_fail(sizeof(*out->mobility_restriction));
+    *out->mobility_restriction = decode_ngap_mobility_restriction(&ie->value.choice.MobilityRestrictionList);
+  }
+
+  // Cause (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_Cause, true);
+  out->cause = decode_ngap_cause(&ie->value.choice.Cause);
+
+  // Source to Target Transparent Container
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t,
+                             ie,
+                             container,
+                             NGAP_ProtocolIE_ID_id_SourceToTarget_TransparentContainer,
+                             true);
+  NGAP_SourceToTarget_TransparentContainer_t *choice = &ie->value.choice.SourceToTarget_TransparentContainer;
+  byte_array_t sourceToTargetTransparentContainer = create_byte_array(choice->size, choice->buf);
+  NGAP_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer_t *source2target = NULL;
+  asn_dec_rval_t dec_rval = aper_decode_complete(NULL,
+                                                 &asn_DEF_NGAP_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer,
+                                                 (void **)&source2target,
+                                                 sourceToTargetTransparentContainer.buf,
+                                                 sourceToTargetTransparentContainer.len);
+
+  free_byte_array(sourceToTargetTransparentContainer);
+  if (dec_rval.code != RC_OK) {
+    free_ng_handover_request(out);
+    NGAP_ERROR("Failed to decode sourceToTargetTransparentContainer\n");
+    return -1;
+  }
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NGAP_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer, source2target);
+
+  // Extract Cell Identity
+  BIT_STRING_TO_NR_CELL_IDENTITY(&source2target->targetCell_ID.choice.nR_CGI->nRCellIdentity, out->nr_cell_id);
+
+  // Handover Preparation Information: store and decode
+  out->ue_ho_prep_info = create_byte_array(source2target->rRCContainer.size, source2target->rRCContainer.buf);
+  NR_HandoverPreparationInformation_t *hoPrepInformation = NULL;
+  asn_dec_rval_t hoPrep_dec_rval = uper_decode_complete(NULL,
+                                                        &asn_DEF_NR_HandoverPreparationInformation,
+                                                        (void **)&hoPrepInformation,
+                                                        source2target->rRCContainer.buf,
+                                                        source2target->rRCContainer.size);
+  AssertFatal(hoPrep_dec_rval.code == RC_OK && hoPrep_dec_rval.consumed > 0, "Handover Prep Info decode error\n");
+  if (hoPrep_dec_rval.code != RC_OK && !hoPrep_dec_rval.consumed) {
+    NGAP_ERROR("Failed to decode HandoverPreparationInformation, abort Handover Request decoding\n");
+    free_ng_handover_request(out);
+    ASN_STRUCT_FREE(asn_DEF_NGAP_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer, source2target);
+    return -1;
+  }
+
+  ASN_STRUCT_FREE(asn_DEF_NGAP_SourceNGRANNode_ToTargetNGRANNode_TransparentContainer, source2target);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_HandoverPreparationInformation, hoPrepInformation);
+
+  // Decode UE capabilities and store
+  NR_HandoverPreparationInformation_IEs_t *hpi =
+      hoPrepInformation->criticalExtensions.choice.c1->choice.handoverPreparationInformation;
+  const NR_UE_CapabilityRAT_ContainerList_t *ue_CapabilityRAT_ContainerList = &hpi->ue_CapabilityRAT_List;
+  out->ue_cap.len = uper_encode_to_new_buffer(&asn_DEF_NR_UE_CapabilityRAT_ContainerList,
+                                              NULL,
+                                              ue_CapabilityRAT_ContainerList,
+                                              (void **)&out->ue_cap.buf);
+
+  ASN_STRUCT_FREE(asn_DEF_NR_HandoverPreparationInformation, hoPrepInformation);
+
+  if (out->ue_cap.len <= 0) {
+    free_ng_handover_request(out);
+    NGAP_ERROR("could not encode UE-CapabilityRAT-ContainerList\n");
+    return -1;
+  }
+
+  // PDU Session Resource Setup List (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverRequestIEs_t,
+                             ie,
+                             container,
+                             NGAP_ProtocolIE_ID_id_PDUSessionResourceSetupListHOReq,
+                             true);
+  out->nb_of_pdusessions = ie->value.choice.PDUSessionResourceSetupListHOReq.list.count;
+  for (int pduSesIdx = 0; pduSesIdx < out->nb_of_pdusessions; ++pduSesIdx) {
+    NGAP_PDUSessionResourceSetupItemHOReq_t *item_p = ie->value.choice.PDUSessionResourceSetupListHOReq.list.array[pduSesIdx];
+    // PDU Session ID (M)
+    ho_request_pdusession_t *setup = &out->pduSessionResourceSetupList[pduSesIdx];
+    setup->pdusession_id = item_p->pDUSessionID;
+    setup->pdu_session_type = PDUSessionType_ipv4;
+    // S-NSSAI (M)
+    setup->nssai = decode_ngap_nssai(&item_p->s_NSSAI);
+    // Handover Request Transfer (M)
+    bool ret = decodePDUSessionResourceSetup(&setup->pdusessionTransfer, item_p->handoverRequestTransfer);
+    if (!ret) {
+      free_ng_handover_request(out);
+      NGAP_ERROR("Failed to decode pDUSessionResourceSetupRequestTransfer in NG Initial Context Setup Request\n");
+      return -1;
+    }
+  }
+
+
+
+  return 0;
 }

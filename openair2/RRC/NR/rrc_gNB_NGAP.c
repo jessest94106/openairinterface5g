@@ -83,6 +83,8 @@
 #include "rrc_messages_types.h"
 #include "s1ap_messages_types.h"
 #include "uper_encoder.h"
+#include "rrc_gNB_mobility.h"
+#include "rrc_gNB_du.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
@@ -163,18 +165,24 @@ static nr_guami_t get_guami(const uint32_t amf_Id, const plmn_id_t plmn)
   return guami;
 }
 
+/** @brief Copy NGAP PDU Session Transfer item to RRC pdusession_t struct */
+static void cp_pdusession_transfer_to_pdusession(pdusession_t *dst, const pdusession_transfer_t *src)
+{
+  dst->nb_qos = src->nb_qos;
+  for (uint8_t i = 0; i < src->nb_qos && i < QOSFLOW_MAX_VALUE; ++i) {
+    dst->qos[i] = src->qos[i];
+  }
+  dst->pdu_session_type = src->pdu_session_type;
+  dst->n3_incoming = src->n3_incoming;
+}
+
 /** @brief Copy NGAP PDU Session Resource item to RRC pdusession_t struct */
 static void cp_pdusession_resource_item_to_pdusession(pdusession_t *dst, const pdusession_resource_item_t *src)
 {
   dst->pdusession_id = src->pdusession_id;
   dst->nas_pdu = src->nas_pdu;
-  dst->nb_qos = src->pdusessionTransfer.nb_qos;
-  for (uint8_t i = 0; i < src->pdusessionTransfer.nb_qos && i < QOSFLOW_MAX_VALUE; ++i) {
-    dst->qos[i] = src->pdusessionTransfer.qos[i];
-  }
-  dst->pdu_session_type = src->pdusessionTransfer.pdu_session_type;
-  dst->n3_incoming = src->pdusessionTransfer.n3_incoming;
   dst->nssai = src->nssai;
+  cp_pdusession_transfer_to_pdusession(dst, &src->pdusessionTransfer);
 }
 
 /**
@@ -1070,6 +1078,87 @@ void rrc_gNB_send_NGAP_HANDOVER_FAILURE(gNB_RRC_INST *rrc, ngap_handover_failure
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_HANDOVER_FAILURE);
   NGAP_HANDOVER_FAILURE(msg_p) = *msg;
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
+}
+
+/** @brief Process NG Handover Request message (8.4.2.2 3GPP TS 38.413) */
+int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, ngap_handover_request_t *msg)
+{
+  LOG_I(NR_RRC, "Received Handover Request (on PCI=%lu) \n", msg->nr_cell_id);
+  struct nr_rrc_du_container_t *du = get_du_by_cell_id(rrc, msg->nr_cell_id);
+  if (du == NULL) {
+    /* Cell Not Found! Return HO Request Failure*/
+    LOG_E(RRC, "Failed to process Handover Request: no DU found with PCI=%lu \n", msg->nr_cell_id);
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_RADIO_RESOURCES_NOT_AVAILABLE,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    return -1;
+  }
+
+  // Create UE context
+  sctp_assoc_t curr_assoc_id = du->assoc_id;
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_create_ue_context(curr_assoc_id, UINT16_MAX, rrc, UINT64_MAX, UINT32_MAX);
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+
+  // allocate context for target
+  if (UE->ho_context != NULL) {
+    LOG_E(NR_RRC, "Ongoing handover for UE %d, cannot trigger new\n", UE->rrc_ue_id);
+    return -1;
+  }
+  UE->ho_context = alloc_ho_ctx(HO_CTX_TARGET);
+
+  // Store IDs in UE context
+  UE->amf_ue_ngap_id = msg->amf_ue_ngap_id;
+  UE->ue_guami = msg->guami;
+  UE->ho_context->target->ue_ho_prep_info = copy_byte_array(msg->ue_ho_prep_info);
+  // store the received UE Security Capabilities in the UE context
+  FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);
+  UE->ue_cap_buffer = copy_byte_array(msg->ue_cap);
+
+  /* store the received Security Context in the UE context
+     and take it into use as defined in TS 33.501 */
+  set_UE_security_algos(rrc, UE, &msg->security_capabilities);
+  UE->nh_ncc = msg->security_context.next_hop_chain_count;
+  memcpy(UE->nh, msg->security_context.next_hop, SECURITY_KEY_LENGTH);
+  // Reset KgNB
+  memset(UE->kgnb, 0, SECURITY_KEY_LENGTH);
+  // Derive KgNB*
+  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
+  uint32_t ssb_arfcn = get_ssb_arfcn(du);
+  nr_derive_key_ng_ran_star(cell_info->nr_pci, ssb_arfcn, UE->nh, UE->kgnb);
+  UE->as_security_active = true;
+  // Activate SRBs
+  activate_srb(UE, SRB1);
+  activate_srb(UE, SRB2);
+  nr_rrc_pdcp_config_security(UE, false);
+
+  // Copy PDU Session Resource Setup item to RRC struct and do PDU Session Resource Setup procedure
+  pdusession_t to_setup = {
+    .nssai = msg->pduSessionResourceSetupList->nssai,
+    .pdu_session_type = msg->pduSessionResourceSetupList->pdu_session_type ,
+    .pdusession_id = msg->pduSessionResourceSetupList->pdusession_id,
+  };
+  cp_pdusession_transfer_to_pdusession(&to_setup, &msg->pduSessionResourceSetupList->pdusessionTransfer);
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_of_pdusessions, &to_setup, msg->ue_ambr.br_dl)) {
+    LOG_E(NR_RRC, "Failed to establish PDU session: handover failed\n");
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+  }
+
+  return 0;
+}
+
+void rrc_gNB_free_Handover_Request(ngap_handover_request_t *msg)
+{
+  free_byte_array(msg->ue_cap);
+  free_byte_array(msg->ue_ho_prep_info);
+  free(msg->mobility_restriction);
 }
 
 /*

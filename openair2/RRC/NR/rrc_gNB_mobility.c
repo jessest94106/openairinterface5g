@@ -57,6 +57,8 @@ nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type)
 static void free_ho_ctx(nr_handover_context_t *ho_ctx)
 {
   free(ho_ctx->source);
+  if (ho_ctx->target)
+    FREE_AND_ZERO_BYTE_ARRAY(ho_ctx->target->ue_ho_prep_info);
   free(ho_ctx->target);
   free(ho_ctx);
 }

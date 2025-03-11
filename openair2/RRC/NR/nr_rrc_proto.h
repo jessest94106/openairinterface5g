@@ -127,5 +127,6 @@ f1ap_qos_flow_param_t get_qos_char_from_qos_flow_param(const pdusession_level_qo
 void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *configuration);
 NR_SRB_ToAddModList_t *createSRBlist(gNB_RRC_UE_t *ue, uint8_t reestablish);
 NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish);
+void activate_srb(gNB_RRC_UE_t *UE, int srb_id);
 
 #endif

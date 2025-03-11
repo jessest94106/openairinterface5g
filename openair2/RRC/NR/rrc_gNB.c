@@ -354,7 +354,7 @@ void freeSRBlist(NR_SRB_ToAddModList_t *l)
   ASN_STRUCT_FREE(asn_DEF_NR_SRB_ToAddModList, l);
 }
 
-static void activate_srb(gNB_RRC_UE_t *UE, int srb_id)
+void activate_srb(gNB_RRC_UE_t *UE, int srb_id)
 {
   AssertFatal(srb_id == 1 || srb_id == 2, "handling only SRB 1 or 2\n");
   if (UE->Srb[srb_id].Active == 1) {
@@ -2942,6 +2942,11 @@ void *rrc_gnb_task(void *args_p) {
 
       case NGAP_PAGING_IND:
         rrc_gNB_process_PAGING_IND(msg_p, instance);
+        break;
+
+      case NGAP_HANDOVER_REQUEST:
+        rrc_gNB_process_Handover_Request(RC.nrrrc[instance], instance, &NGAP_HANDOVER_REQUEST(msg_p));
+        rrc_gNB_free_Handover_Request(&NGAP_HANDOVER_REQUEST(msg_p)); // Free transfered NG message
         break;
 
       default:

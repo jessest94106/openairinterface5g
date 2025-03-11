@@ -67,6 +67,7 @@
 #define NGAP_PAGING_IND(mSGpTR)                 (mSGpTR)->ittiMsg.ngap_paging_ind
 #define NGAP_HANDOVER_REQUIRED(mSGpTR)           (mSGpTR)->ittiMsg.ngap_handover_required
 #define NGAP_HANDOVER_FAILURE(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_failure
+#define NGAP_HANDOVER_REQUEST(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_request
 
 #define NGAP_UE_CONTEXT_RELEASE_REQ(mSGpTR)     (mSGpTR)->ittiMsg.ngap_ue_release_req
 #define NGAP_PDUSESSION_RELEASE_COMMAND(mSGpTR)      (mSGpTR)->ittiMsg.ngap_pdusession_release_command
@@ -228,6 +229,15 @@ typedef struct ngap_ue_identity_s {
 typedef struct ngap_mobility_restriction_s{
   plmn_id_t serving_plmn;
 }ngap_mobility_restriction_t;
+
+/* PDU Session Resource Setup Request Transfer (9.3.4.1 3GPP TS 38.413) */
+typedef struct {
+  uint8_t nb_qos;
+  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  pdu_session_type_t pdu_session_type;
+  // UPF endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_incoming;
+} pdusession_transfer_t;
 
 typedef enum pdusession_qosflow_mapping_ind_e{
   QOSFLOW_MAPPING_INDICATION_UL = 0,
@@ -558,6 +568,55 @@ typedef struct {
   ngap_cause_t cause;
 } ngap_handover_failure_t;
 
+typedef struct {
+  // Next-Hop NH
+  uint8_t next_hop[SECURITY_KEY_LENGTH];
+  // Next Hop Chaining Count
+  uint8_t next_hop_chain_count;
+} ngap_security_context_t;
+
+/* Handover Request (3GPP TS 38.413 9.2.3.4)
+  PDU Session Resource Setup Item */
+typedef struct {
+  // PDU Session ID
+  uint8_t pdusession_id;
+  pdu_session_type_t pdu_session_type;
+  // S-NSSAI
+  nssai_t nssai;
+  // Handover Required Transfer
+  pdusession_transfer_t pdusessionTransfer;
+} ho_request_pdusession_t;
+
+/* 3GPP TS 38.413 9.2.3.4 */
+typedef struct {
+  // AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+  // Handover Type
+  ho_type_t ho_type;
+  // Cause
+  ngap_cause_t cause;
+  // UE Aggregate Maximum Bit Rate
+  ngap_ambr_t ue_ambr;
+  // UE Security Capabilities
+  ngap_security_capabilities_t security_capabilities;
+  // Security Context
+  ngap_security_context_t security_context;
+  // PDU Session Resource Setup List
+  uint8_t nb_of_pdusessions;
+  ho_request_pdusession_t pduSessionResourceSetupList[NGAP_MAX_PDU_SESSION];
+  // Allowed NSSAI
+  uint8_t nb_allowed_nssais;
+  nssai_t allowed_nssai[8];
+  // Source to Target Transparent Container contents
+  uint64_t nr_cell_id;
+  byte_array_t ue_ho_prep_info;
+  byte_array_t ue_cap;
+  // Mobility Restriction List
+  ngap_mobility_restriction_t *mobility_restriction;
+  // GUAMI
+  nr_guami_t guami;
+} ngap_handover_request_t;
+
 typedef struct ngap_ue_cap_info_ind_s {
   uint32_t  gNB_ue_ngap_id;
   byte_array_t ue_radio_cap;
@@ -627,15 +686,6 @@ typedef struct ngap_downlink_nas_s {
   /* NAS pdu */
   byte_array_t nas_pdu;
 } ngap_downlink_nas_t;
-
-/* PDU Session Resource Setup Request Transfer (9.3.4.1 3GPP TS 38.413) */
-typedef struct {
-  uint8_t nb_qos;
-  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
-  pdu_session_type_t pdu_session_type;
-  // UPF endpoint of the NG-U (N3) transport bearer
-  gtpu_tunnel_t n3_incoming;
-} pdusession_transfer_t;
 
 /* PDU Session Resource Setup/Modify Request Item */
 typedef struct {
