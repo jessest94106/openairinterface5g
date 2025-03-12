@@ -73,8 +73,7 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
                                  gNB_RRC_UE_t *ue,
                                  const nr_rrc_du_container_t *source_du,
                                  const nr_rrc_du_container_t *target_du,
-                                 uint8_t *ho_prep_buf,
-                                 uint32_t ho_prep_len,
+                                 byte_array_t *ho_prep_info,
                                  ho_req_ack_t ack,
                                  ho_success_t success,
                                  ho_cancel_t cancel)
@@ -83,7 +82,7 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
   DevAssert(ue != NULL);
   DevAssert(target_du != NULL);
   // source_du might be NULL -> inter-CU handover
-  DevAssert(ho_prep_buf != NULL && ho_prep_len > 0);
+  DevAssert(ho_prep_info->buf != NULL && ho_prep_info->len > 0);
 
   if (ue->ho_context != NULL) {
     LOG_E(NR_RRC, "handover for UE %u ongoing, cannot trigger new\n", ue->rrc_ue_id);
@@ -130,8 +129,8 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
         target_du->setup_req->cell[0].info.nr_pci);
 
   cu_to_du_rrc_information_t cu2du = {
-      .handoverPreparationInfo = ho_prep_buf,
-      .handoverPreparationInfo_length = ho_prep_len,
+      .handoverPreparationInfo = ho_prep_info->buf,
+      .handoverPreparationInfo_length = ho_prep_info->len,
   };
 
   f1ap_drb_to_be_setup_t drbs[MAX_DRBS_PER_UE] = {0};
@@ -327,7 +326,8 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
   ho_req_ack_t ack = nr_rrc_f1_ho_acknowledge;
   ho_success_t success = nr_rrc_f1_ho_complete;
   ho_cancel_t cancel = nr_rrc_cancel_f1_ho;
-  nr_initiate_handover(rrc, ue, source_du, target_du, buf, size, ack, success, cancel);
+  byte_array_t hpi = {.buf = buf, .len = size};
+  nr_initiate_handover(rrc, ue, source_du, target_du, &hpi, ack, success, cancel);
 }
 
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue)
