@@ -165,16 +165,13 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
   head->value.present = NGAP_InitiatingMessage__value_PR_InitialUEMessage;
   NGAP_InitialUEMessage_t *out = &head->value.choice.InitialUEMessage;
 
-  /* Store the UE context in NGAP with:
-   * selected AMF, selected PLMN identity, gNB ID
-   * the unique gNB UE NGAP ID, used for the duration of the connectivity */
-  struct ngap_gNB_ue_context_s *ue_desc_p = calloc_or_fail(1, sizeof(*ue_desc_p));
-  DevAssert(ue_desc_p != NULL);
-  ue_desc_p->amf_ref = amf;
-  ue_desc_p->gNB_ue_ngap_id = UEfirstReq->gNB_ue_ngap_id;
-  ue_desc_p->gNB_instance  = instance_p;
-  ue_desc_p->selected_plmn_identity = UEfirstReq->plmn;
-  ngap_store_ue_context(ue_desc_p);
+  /* Create and store NGAP UE context */
+  ngap_gNB_ue_context_t ue_desc_p = {
+    .amf_ref = amf,
+    .gNB_ue_ngap_id = UEfirstReq->gNB_ue_ngap_id,
+    .gNB_instance = instance_p,
+    .selected_plmn_identity = UEfirstReq->plmn,
+  };
 
   // RAN UE NGAP ID (M)
   {
@@ -182,7 +179,7 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
     ie->id = NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID;
     ie->criticality = NGAP_Criticality_reject;
     ie->value.present = NGAP_InitialUEMessage_IEs__value_PR_RAN_UE_NGAP_ID;
-    ie->value.choice.RAN_UE_NGAP_ID = ue_desc_p->gNB_ue_ngap_id;
+    ie->value.choice.RAN_UE_NGAP_ID = ue_desc_p.gNB_ue_ngap_id;
   }
 
   /* NAS-PDU (M): transferred transparently */
@@ -208,7 +205,7 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
                                   0, // Cell ID
                                   &userinfo_nr_p->nR_CGI.nRCellIdentity);
 
-    plmn_id_t *plmn = &ue_desc_p->selected_plmn_identity;
+    plmn_id_t *plmn = &ue_desc_p.selected_plmn_identity;
     MCC_MNC_TO_TBCD(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->nR_CGI.pLMNIdentity);
 
     /* In case of network sharing,
@@ -255,7 +252,7 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
     DevMessage("Failed to encode initial UE message\n");
 
   /* Update the current NGAP UE state */
-  ue_desc_p->ue_state = NGAP_UE_WAITING_CSR;
+  ue_desc_p.ue_state = NGAP_UE_WAITING_CSR;
   /* Assign a stream for this UE :
    * From 3GPP 38.412 7)Transport layers:
    *  Within the SCTP association established between one AMF and gNB pair:
@@ -272,9 +269,13 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
   if ((amf->nextstream == 0) && (amf->out_streams > 1)) {
     amf->nextstream += 1;
   }
-  ue_desc_p->tx_stream = amf->nextstream;
+  ue_desc_p.tx_stream = amf->nextstream;
+
+  /* Create and store UE context */
+  ngap_store_ue_context(&ue_desc_p);
+
   /* Send encoded message over sctp */
-  ngap_gNB_itti_send_sctp_data_req(instance_p->instance, amf->assoc_id, buffer, length, ue_desc_p->tx_stream);
+  ngap_gNB_itti_send_sctp_data_req(instance_p->instance, amf->assoc_id, buffer, length, ue_desc_p.tx_stream);
 
   return 0;
 }
