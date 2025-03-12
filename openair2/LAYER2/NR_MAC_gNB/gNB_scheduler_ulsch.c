@@ -34,7 +34,6 @@
 #include "common/utils/nr/nr_common.h"
 #include "utils.h"
 #include <openair2/UTIL/OPT/opt.h>
-#include "LAYER2/NR_MAC_COMMON/nr_mac_extern.h"
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "LAYER2/RLC/rlc.h"
 
@@ -112,9 +111,9 @@ static int estimate_ul_buffer_short_bsr(const NR_BSR_SHORT *bsr)
    * differentiate them */
   int rep_idx = bsr->Buffer_size;
   int estim_idx = overestim_bsr_index(rep_idx);
-  int max = sizeofArray(NR_SHORT_BSR_TABLE) - 1;
+  int max = NR_SHORT_BSR_TABLE_SIZE - 1;
   int idx = min(estim_idx, max);
-  int estim_size = NR_SHORT_BSR_TABLE[idx];
+  int estim_size = get_short_bsr_value(idx);
   LOG_D(NR_MAC, "short BSR LCGID %d index %d estim index %d size %d\n", bsr->LcgID, rep_idx, estim_idx, estim_size);
   return estim_size;
 }
@@ -134,7 +133,7 @@ static int estimate_ul_buffer_long_bsr(const NR_BSR_LONG *bsr)
   bool bsr_active[8] = {bsr->LcgID0 != 0, bsr->LcgID1 != 0, bsr->LcgID2 != 0, bsr->LcgID3 != 0, bsr->LcgID4 != 0, bsr->LcgID5 != 0, bsr->LcgID6 != 0, bsr->LcgID7 != 0};
 
   int estim_size = 0;
-  int max = sizeofArray(NR_LONG_BSR_TABLE) - 1;
+  int max = NR_LONG_BSR_TABLE_SIZE - 1;
   uint8_t *payload = ((uint8_t*) bsr) + 1;
   int m = 0;
   const int total_lcgids = 8; /* see 38.321 6.1.3.1 */
@@ -144,7 +143,7 @@ static int estimate_ul_buffer_long_bsr(const NR_BSR_LONG *bsr)
     int rep_idx = payload[m];
     int estim_idx = overestim_bsr_index(rep_idx);
     int idx = min(estim_idx, max);
-    estim_size += NR_LONG_BSR_TABLE[idx];
+    estim_size += get_long_bsr_value(idx);
 
     LOG_D(NR_MAC, "LONG BSR LCGID/m %d/%d Index %d estim index %d size %d", n, m, rep_idx, estim_idx, estim_size);
     m++;
@@ -266,7 +265,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
                               NR_UE_info_t *UE,
                               uint8_t CC_id,
                               frame_t frameP,
-                              sub_frame_t slot,
+                              slot_t slot,
                               uint8_t *pduP,
                               uint32_t pdu_len,
                               const int8_t harq_pid)
@@ -575,7 +574,7 @@ static void abort_nr_ul_harq(NR_UE_info_t *UE, int8_t harq_pid)
 static bool get_UE_waiting_CFRA_msg3(const gNB_MAC_INST *gNB_mac,
                                      const int CC_id,
                                      const frame_t frame,
-                                     const sub_frame_t slot,
+                                     const slot_t slot,
                                      rnti_t rnti)
 {
   bool UE_waiting_CFRA_msg3 = false;
@@ -589,11 +588,7 @@ static bool get_UE_waiting_CFRA_msg3(const gNB_MAC_INST *gNB_mac,
   return UE_waiting_CFRA_msg3;
 }
 
-void handle_nr_ul_harq(const int CC_idP,
-                       module_id_t mod_id,
-                       frame_t frame,
-                       sub_frame_t slot,
-                       const nfapi_nr_crc_t *crc_pdu)
+void handle_nr_ul_harq(const int CC_idP, module_id_t mod_id, frame_t frame, slot_t slot, const nfapi_nr_crc_t *crc_pdu)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   if (nrmac->radio_config.disable_harq) {
@@ -696,7 +691,7 @@ static void handle_msg3_failed_rx(NR_RA_t *ra, int i, int harq_round_max)
 static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
                        const int CC_idP,
                        const frame_t frameP,
-                       const sub_frame_t slotP,
+                       const slot_t slotP,
                        const rnti_t rntiP,
                        uint8_t *sduP,
                        const uint32_t sdu_lenP,
@@ -1006,7 +1001,7 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
 void nr_rx_sdu(const module_id_t gnb_mod_idP,
                const int CC_idP,
                const frame_t frameP,
-               const sub_frame_t slotP,
+               const slot_t slotP,
                const rnti_t rntiP,
                uint8_t *sduP,
                const uint32_t sdu_lenP,
@@ -1237,6 +1232,113 @@ static uint8_t get_max_tpmi(const NR_PUSCH_Config_t *pusch_Config,
   return max_tpmi;
 }
 
+// TS 38.211 - Table 6.3.1.5-1: Precoding matrix W for single-layer transmission using two antenna ports, 'n' = -1 and 'o' = -j
+const char table_38211_6_3_1_5_1[6][2][1] = {
+    {{'1'}, {'0'}}, // tpmi 0
+    {{'0'}, {'1'}}, // tpmi 1
+    {{'1'}, {'1'}}, // tpmi 2
+    {{'1'}, {'n'}}, // tpmi 3
+    {{'1'}, {'j'}}, // tpmi 4
+    {{'1'}, {'o'}}  // tpmi 5
+};
+
+// TS 38.211 - Table 6.3.1.5-2: Precoding matrix W for single-layer transmission using four antenna ports with transform precoding enabled, 'n' = -1 and 'o' = -j
+const char table_38211_6_3_1_5_2[28][4][1] = {
+    {{'1'}, {'0'}, {'0'}, {'0'}}, // tpmi 0
+    {{'0'}, {'1'}, {'0'}, {'0'}}, // tpmi 1
+    {{'0'}, {'0'}, {'1'}, {'0'}}, // tpmi 2
+    {{'0'}, {'0'}, {'0'}, {'1'}}, // tpmi 3
+    {{'1'}, {'0'}, {'1'}, {'0'}}, // tpmi 4
+    {{'1'}, {'0'}, {'n'}, {'0'}}, // tpmi 5
+    {{'1'}, {'0'}, {'j'}, {'0'}}, // tpmi 6
+    {{'1'}, {'0'}, {'o'}, {'0'}}, // tpmi 7
+    {{'0'}, {'1'}, {'0'}, {'1'}}, // tpmi 8
+    {{'0'}, {'1'}, {'0'}, {'n'}}, // tpmi 9
+    {{'0'}, {'1'}, {'0'}, {'j'}}, // tpmi 10
+    {{'0'}, {'1'}, {'0'}, {'o'}}, // tpmi 11
+    {{'1'}, {'1'}, {'1'}, {'n'}}, // tpmi 12
+    {{'1'}, {'1'}, {'j'}, {'j'}}, // tpmi 13
+    {{'1'}, {'1'}, {'n'}, {'1'}}, // tpmi 14
+    {{'1'}, {'1'}, {'o'}, {'o'}}, // tpmi 15
+    {{'1'}, {'j'}, {'1'}, {'j'}}, // tpmi 16
+    {{'1'}, {'j'}, {'j'}, {'1'}}, // tpmi 17
+    {{'1'}, {'j'}, {'n'}, {'o'}}, // tpmi 18
+    {{'1'}, {'j'}, {'o'}, {'n'}}, // tpmi 19
+    {{'1'}, {'n'}, {'1'}, {'1'}}, // tpmi 20
+    {{'1'}, {'n'}, {'j'}, {'o'}}, // tpmi 21
+    {{'1'}, {'n'}, {'n'}, {'n'}}, // tpmi 22
+    {{'1'}, {'n'}, {'o'}, {'j'}}, // tpmi 23
+    {{'1'}, {'o'}, {'1'}, {'o'}}, // tpmi 24
+    {{'1'}, {'o'}, {'j'}, {'n'}}, // tpmi 25
+    {{'1'}, {'o'}, {'n'}, {'j'}}, // tpmi 26
+    {{'1'}, {'o'}, {'o'}, {'1'}}  // tpmi 27
+};
+
+// TS 38.211 - Table 6.3.1.5-3: Precoding matrix W for single-layer transmission using four antenna ports with transform precoding disabled, 'n' = -1 and 'o' = -j
+const char table_38211_6_3_1_5_3[28][4][1] = {
+    {{'1'}, {'0'}, {'0'}, {'0'}}, // tpmi 0
+    {{'0'}, {'1'}, {'0'}, {'0'}}, // tpmi 1
+    {{'0'}, {'0'}, {'1'}, {'0'}}, // tpmi 2
+    {{'0'}, {'0'}, {'0'}, {'1'}}, // tpmi 3
+    {{'1'}, {'0'}, {'1'}, {'0'}}, // tpmi 4
+    {{'1'}, {'0'}, {'n'}, {'0'}}, // tpmi 5
+    {{'1'}, {'0'}, {'j'}, {'0'}}, // tpmi 6
+    {{'1'}, {'0'}, {'o'}, {'0'}}, // tpmi 7
+    {{'0'}, {'1'}, {'0'}, {'1'}}, // tpmi 8
+    {{'0'}, {'1'}, {'0'}, {'n'}}, // tpmi 9
+    {{'0'}, {'1'}, {'0'}, {'j'}}, // tpmi 10
+    {{'0'}, {'1'}, {'0'}, {'o'}}, // tpmi 11
+    {{'1'}, {'1'}, {'1'}, {'1'}}, // tpmi 12
+    {{'1'}, {'1'}, {'j'}, {'j'}}, // tpmi 13
+    {{'1'}, {'1'}, {'n'}, {'n'}}, // tpmi 14
+    {{'1'}, {'1'}, {'o'}, {'o'}}, // tpmi 15
+    {{'1'}, {'j'}, {'1'}, {'j'}}, // tpmi 16
+    {{'1'}, {'j'}, {'j'}, {'n'}}, // tpmi 17
+    {{'1'}, {'j'}, {'n'}, {'o'}}, // tpmi 18
+    {{'1'}, {'j'}, {'o'}, {'1'}}, // tpmi 19
+    {{'1'}, {'n'}, {'1'}, {'n'}}, // tpmi 20
+    {{'1'}, {'n'}, {'j'}, {'o'}}, // tpmi 21
+    {{'1'}, {'n'}, {'n'}, {'1'}}, // tpmi 22
+    {{'1'}, {'n'}, {'o'}, {'j'}}, // tpmi 23
+    {{'1'}, {'o'}, {'1'}, {'o'}}, // tpmi 24
+    {{'1'}, {'o'}, {'j'}, {'1'}}, // tpmi 25
+    {{'1'}, {'o'}, {'n'}, {'j'}}, // tpmi 26
+    {{'1'}, {'o'}, {'o'}, {'n'}}  // tpmi 27
+};
+
+// TS 38.211 - Table 6.3.1.5-4: Precoding matrix W for two-layer transmission using two antenna ports, 'n' = -1 and 'o' = -j
+const char table_38211_6_3_1_5_4[3][2][2] = {
+    {{'1', '0'}, {'0', '1'}}, // tpmi 0
+    {{'1', '1'}, {'1', 'n'}}, // tpmi 1
+    {{'1', '1'}, {'j', 'o'}}  // tpmi 2
+};
+
+// TS 38.211 - Table 6.3.1.5-5: Precoding matrix W for two-layer transmission using four antenna ports, 'n' = -1 and 'o' = -j
+const char table_38211_6_3_1_5_5[22][4][2] = {
+    {{'1', '0'}, {'0', '1'}, {'0', '0'}, {'0', '0'}}, // tpmi 0
+    {{'1', '0'}, {'0', '0'}, {'0', '1'}, {'0', '0'}}, // tpmi 1
+    {{'1', '0'}, {'0', '0'}, {'0', '0'}, {'0', '1'}}, // tpmi 2
+    {{'0', '0'}, {'1', '0'}, {'0', '1'}, {'0', '0'}}, // tpmi 3
+    {{'0', '0'}, {'1', '0'}, {'0', '0'}, {'0', '1'}}, // tpmi 4
+    {{'0', '0'}, {'0', '0'}, {'1', '0'}, {'0', '1'}}, // tpmi 5
+    {{'1', '0'}, {'0', '1'}, {'1', '0'}, {'0', 'o'}}, // tpmi 6
+    {{'1', '0'}, {'0', '1'}, {'1', '0'}, {'0', 'j'}}, // tpmi 7
+    {{'1', '0'}, {'0', '1'}, {'o', '0'}, {'0', '1'}}, // tpmi 8
+    {{'1', '0'}, {'0', '1'}, {'o', '0'}, {'0', 'n'}}, // tpmi 9
+    {{'1', '0'}, {'0', '1'}, {'n', '0'}, {'0', 'o'}}, // tpmi 10
+    {{'1', '0'}, {'0', '1'}, {'n', '0'}, {'0', 'j'}}, // tpmi 11
+    {{'1', '0'}, {'0', '1'}, {'j', '0'}, {'0', '1'}}, // tpmi 12
+    {{'1', '0'}, {'0', '1'}, {'j', '0'}, {'0', 'n'}}, // tpmi 13
+    {{'1', '1'}, {'1', '1'}, {'1', 'n'}, {'1', 'n'}}, // tpmi 14
+    {{'1', '1'}, {'1', '1'}, {'j', 'o'}, {'j', 'o'}}, // tpmi 15
+    {{'1', '1'}, {'j', 'j'}, {'1', 'n'}, {'j', 'o'}}, // tpmi 16
+    {{'1', '1'}, {'j', 'j'}, {'j', 'o'}, {'n', '1'}}, // tpmi 17
+    {{'1', '1'}, {'n', 'n'}, {'1', 'n'}, {'n', '1'}}, // tpmi 18
+    {{'1', '1'}, {'n', 'n'}, {'j', 'o'}, {'o', 'j'}}, // tpmi 19
+    {{'1', '1'}, {'o', 'o'}, {'1', 'n'}, {'o', 'j'}}, // tpmi 20
+    {{'1', '1'}, {'o', 'o'}, {'j', 'o'}, {'1', 'n'}}  // tpmi 21
+};
+
 static void get_precoder_matrix_coef(char *w,
                                      const uint8_t ul_ri,
                                      const uint16_t num_ue_srs_ports,
@@ -1352,7 +1454,7 @@ static int nr_srs_tpmi_estimation(const NR_PUSCH_Config_t *pusch_Config,
 
 void handle_nr_srs_measurements(const module_id_t module_id,
                                 const frame_t frame,
-                                const sub_frame_t slot,
+                                const slot_t slot,
                                 nfapi_nr_srs_indication_pdu_t *srs_ind)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[module_id];
@@ -1524,7 +1626,7 @@ long get_K2(NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList,
 static bool nr_UE_is_to_be_scheduled(const frame_structure_t *fs,
                                      NR_UE_info_t *UE,
                                      frame_t frame,
-                                     sub_frame_t slot,
+                                     slot_t slot,
                                      uint32_t ulsch_max_frame_inactivity)
 {
   const int n = fs->numb_slots_frame;
@@ -1645,7 +1747,7 @@ static void nr_ue_max_mcs_min_rb(int mu,
 
 static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
 				       frame_t frame,
-				       sub_frame_t slot,
+				       slot_t slot,
 				       uint16_t *rballoc_mask,
 				       int *n_rb_sched,
 				       int dci_beam_idx,
@@ -2198,7 +2300,7 @@ static void pf_ul(module_id_t module_id,
   }
 }
 
-static bool nr_ulsch_preprocessor(module_id_t module_id, frame_t frame, sub_frame_t slot)
+static bool nr_ulsch_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
   // no UEs
@@ -2266,7 +2368,7 @@ nr_pp_impl_ul nr_init_ulsch_preprocessor(int CC_id)
   return nr_ulsch_preprocessor;
 }
 
-void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req)
+void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_nr_ul_dci_request_t *ul_dci_req)
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
@@ -2395,7 +2497,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
           sched_pusch->tb_size,
           harq_id,
           cur_harq->round,
-          nr_rv_round_map[cur_harq->round%4],
+          nr_get_rv(cur_harq->round % 4),
           cur_harq->ndi,
           sched_ctrl->estimated_ul_buffer,
           sched_ctrl->sched_ul_bytes,
@@ -2509,8 +2611,10 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, sub_frame_t slot, n
     pusch_pdu->nr_of_symbols = sched_pusch->tda_info.nrOfSymbols;
 
     /* PUSCH PDU */
-    AssertFatal(cur_harq->round < nr_mac->ul_bler.harq_round_max, "Indexing nr_rv_round_map[%d] is out of bounds\n", cur_harq->round%4);
-    pusch_pdu->pusch_data.rv_index = nr_rv_round_map[cur_harq->round%4];
+    AssertFatal(cur_harq->round < nr_mac->ul_bler.harq_round_max,
+                "RV index %d is out of bounds\n",
+                cur_harq->round % 4);
+    pusch_pdu->pusch_data.rv_index = nr_get_rv(cur_harq->round % 4);
     pusch_pdu->pusch_data.harq_process_id = harq_id;
     pusch_pdu->pusch_data.new_data_indicator = (cur_harq->round == 0) ? 1 : 0;  // not NDI but indicator for new transmission
     pusch_pdu->pusch_data.tb_size = sched_pusch->tb_size;

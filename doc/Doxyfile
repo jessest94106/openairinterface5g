@@ -1619,7 +1619,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/NETWORK_DRIVER/MESH/ioctl.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/NETWORK_DRIVER/MESH/constant.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/NETWORK_DRIVER/MESH/rrc_nas_primitives.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_COMMON/nr_mac_extern.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_COMMON/nr_compute_tbs_common.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.h \
@@ -1690,13 +1689,12 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_gNB/gNB_scheduler_bch.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/openair2_proc.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/RLC/rlc.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/mac_vars.c \
+@CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/mac_tables.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/nr_ue_procedures.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/mac_defs.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/mac_proto.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/nr_ue_power_procedures.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/config_ue.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/mac_extern.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/nr_ra_procedures.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/main_ue_nr.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/LAYER2/NR_MAC_UE/nr_ue_scheduler.c \
@@ -1864,7 +1862,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/nr_rrc_config.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_radio_bearers.h \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/nr_rrc_extern.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_reconfig.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/rrc_gNB_NGAP.c \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/NR/mac_rrc_dl_f1ap.c \

@@ -45,6 +45,12 @@ const uint32_t NR_SHORT_BSR_TABLE[NR_SHORT_BSR_TABLE_SIZE] = {
 20516, 28581, 39818, 55474, 77284, 107669, 150000, 300000
 };
 
+uint32_t get_short_bsr_value(int idx)
+{
+  AssertFatal(idx < NR_SHORT_BSR_TABLE_SIZE, "Short BSR table index %d exceeding its size\n", idx);
+  return NR_SHORT_BSR_TABLE[idx];
+}
+
 //38.321 Table 6.1.3.1-2
 const uint32_t NR_LONG_BSR_TABLE[NR_LONG_BSR_TABLE_SIZE] ={
        0,       10,       11,       12,       13,       14,       15,       16,       17,       18,       19,       20,       22,       23,        25,         26,
@@ -64,6 +70,12 @@ const uint32_t NR_LONG_BSR_TABLE[NR_LONG_BSR_TABLE_SIZE] ={
 13128233, 13980403, 14887889, 15854280, 16883401, 17979324, 19146385, 20389201, 21712690, 23122088, 24622972, 26221280, 27923336, 29735875,  31666069,   33721553,
 35910462, 38241455, 40723756, 43367187, 46182206, 49179951, 52372284, 55771835, 59392055, 63247269, 67352729, 71724679, 76380419, 81338368, 162676736, 4294967295
 };
+
+uint32_t get_long_bsr_value(int idx)
+{
+  AssertFatal(idx < NR_LONG_BSR_TABLE_SIZE, "Short BSR table index %d exceeding its size\n", idx);
+  return NR_LONG_BSR_TABLE[idx];
+}
 
 // start symbols for SSB types A,B,C,D,E
 static const uint16_t symbol_ssb_AC[8] = {2, 8, 16, 22, 30, 36, 44, 50};
@@ -303,113 +315,6 @@ const uint8_t table_5_1_2_1_1_5_time_dom_res_alloc_C_dmrs_typeA_pos3[16][4]={
     {1,0,3,11},  // row index 14
     {1,0,0,6},  // row index 15
     {1,0,2,6}   // row index 16
-};
-
-// TS 38.211 - Table 6.3.1.5-1: Precoding matrix W for single-layer transmission using two antenna ports, 'n' = -1 and 'o' = -j
-const char table_38211_6_3_1_5_1[6][2][1] = {
-    {{'1'}, {'0'}}, // tpmi 0
-    {{'0'}, {'1'}}, // tpmi 1
-    {{'1'}, {'1'}}, // tpmi 2
-    {{'1'}, {'n'}}, // tpmi 3
-    {{'1'}, {'j'}}, // tpmi 4
-    {{'1'}, {'o'}}  // tpmi 5
-};
-
-// TS 38.211 - Table 6.3.1.5-2: Precoding matrix W for single-layer transmission using four antenna ports with transform precoding enabled, 'n' = -1 and 'o' = -j
-const char table_38211_6_3_1_5_2[28][4][1] = {
-    {{'1'}, {'0'}, {'0'}, {'0'}}, // tpmi 0
-    {{'0'}, {'1'}, {'0'}, {'0'}}, // tpmi 1
-    {{'0'}, {'0'}, {'1'}, {'0'}}, // tpmi 2
-    {{'0'}, {'0'}, {'0'}, {'1'}}, // tpmi 3
-    {{'1'}, {'0'}, {'1'}, {'0'}}, // tpmi 4
-    {{'1'}, {'0'}, {'n'}, {'0'}}, // tpmi 5
-    {{'1'}, {'0'}, {'j'}, {'0'}}, // tpmi 6
-    {{'1'}, {'0'}, {'o'}, {'0'}}, // tpmi 7
-    {{'0'}, {'1'}, {'0'}, {'1'}}, // tpmi 8
-    {{'0'}, {'1'}, {'0'}, {'n'}}, // tpmi 9
-    {{'0'}, {'1'}, {'0'}, {'j'}}, // tpmi 10
-    {{'0'}, {'1'}, {'0'}, {'o'}}, // tpmi 11
-    {{'1'}, {'1'}, {'1'}, {'n'}}, // tpmi 12
-    {{'1'}, {'1'}, {'j'}, {'j'}}, // tpmi 13
-    {{'1'}, {'1'}, {'n'}, {'1'}}, // tpmi 14
-    {{'1'}, {'1'}, {'o'}, {'o'}}, // tpmi 15
-    {{'1'}, {'j'}, {'1'}, {'j'}}, // tpmi 16
-    {{'1'}, {'j'}, {'j'}, {'1'}}, // tpmi 17
-    {{'1'}, {'j'}, {'n'}, {'o'}}, // tpmi 18
-    {{'1'}, {'j'}, {'o'}, {'n'}}, // tpmi 19
-    {{'1'}, {'n'}, {'1'}, {'1'}}, // tpmi 20
-    {{'1'}, {'n'}, {'j'}, {'o'}}, // tpmi 21
-    {{'1'}, {'n'}, {'n'}, {'n'}}, // tpmi 22
-    {{'1'}, {'n'}, {'o'}, {'j'}}, // tpmi 23
-    {{'1'}, {'o'}, {'1'}, {'o'}}, // tpmi 24
-    {{'1'}, {'o'}, {'j'}, {'n'}}, // tpmi 25
-    {{'1'}, {'o'}, {'n'}, {'j'}}, // tpmi 26
-    {{'1'}, {'o'}, {'o'}, {'1'}}  // tpmi 27
-};
-
-// TS 38.211 - Table 6.3.1.5-3: Precoding matrix W for single-layer transmission using four antenna ports with transform precoding disabled, 'n' = -1 and 'o' = -j
-const char table_38211_6_3_1_5_3[28][4][1] = {
-    {{'1'}, {'0'}, {'0'}, {'0'}}, // tpmi 0
-    {{'0'}, {'1'}, {'0'}, {'0'}}, // tpmi 1
-    {{'0'}, {'0'}, {'1'}, {'0'}}, // tpmi 2
-    {{'0'}, {'0'}, {'0'}, {'1'}}, // tpmi 3
-    {{'1'}, {'0'}, {'1'}, {'0'}}, // tpmi 4
-    {{'1'}, {'0'}, {'n'}, {'0'}}, // tpmi 5
-    {{'1'}, {'0'}, {'j'}, {'0'}}, // tpmi 6
-    {{'1'}, {'0'}, {'o'}, {'0'}}, // tpmi 7
-    {{'0'}, {'1'}, {'0'}, {'1'}}, // tpmi 8
-    {{'0'}, {'1'}, {'0'}, {'n'}}, // tpmi 9
-    {{'0'}, {'1'}, {'0'}, {'j'}}, // tpmi 10
-    {{'0'}, {'1'}, {'0'}, {'o'}}, // tpmi 11
-    {{'1'}, {'1'}, {'1'}, {'1'}}, // tpmi 12
-    {{'1'}, {'1'}, {'j'}, {'j'}}, // tpmi 13
-    {{'1'}, {'1'}, {'n'}, {'n'}}, // tpmi 14
-    {{'1'}, {'1'}, {'o'}, {'o'}}, // tpmi 15
-    {{'1'}, {'j'}, {'1'}, {'j'}}, // tpmi 16
-    {{'1'}, {'j'}, {'j'}, {'n'}}, // tpmi 17
-    {{'1'}, {'j'}, {'n'}, {'o'}}, // tpmi 18
-    {{'1'}, {'j'}, {'o'}, {'1'}}, // tpmi 19
-    {{'1'}, {'n'}, {'1'}, {'n'}}, // tpmi 20
-    {{'1'}, {'n'}, {'j'}, {'o'}}, // tpmi 21
-    {{'1'}, {'n'}, {'n'}, {'1'}}, // tpmi 22
-    {{'1'}, {'n'}, {'o'}, {'j'}}, // tpmi 23
-    {{'1'}, {'o'}, {'1'}, {'o'}}, // tpmi 24
-    {{'1'}, {'o'}, {'j'}, {'1'}}, // tpmi 25
-    {{'1'}, {'o'}, {'n'}, {'j'}}, // tpmi 26
-    {{'1'}, {'o'}, {'o'}, {'n'}}  // tpmi 27
-};
-
-// TS 38.211 - Table 6.3.1.5-4: Precoding matrix W for two-layer transmission using two antenna ports, 'n' = -1 and 'o' = -j
-const char table_38211_6_3_1_5_4[3][2][2] = {
-    {{'1', '0'}, {'0', '1'}}, // tpmi 0
-    {{'1', '1'}, {'1', 'n'}}, // tpmi 1
-    {{'1', '1'}, {'j', 'o'}}  // tpmi 2
-};
-
-// TS 38.211 - Table 6.3.1.5-5: Precoding matrix W for two-layer transmission using four antenna ports, 'n' = -1 and 'o' = -j
-const char table_38211_6_3_1_5_5[22][4][2] = {
-    {{'1', '0'}, {'0', '1'}, {'0', '0'}, {'0', '0'}}, // tpmi 0
-    {{'1', '0'}, {'0', '0'}, {'0', '1'}, {'0', '0'}}, // tpmi 1
-    {{'1', '0'}, {'0', '0'}, {'0', '0'}, {'0', '1'}}, // tpmi 2
-    {{'0', '0'}, {'1', '0'}, {'0', '1'}, {'0', '0'}}, // tpmi 3
-    {{'0', '0'}, {'1', '0'}, {'0', '0'}, {'0', '1'}}, // tpmi 4
-    {{'0', '0'}, {'0', '0'}, {'1', '0'}, {'0', '1'}}, // tpmi 5
-    {{'1', '0'}, {'0', '1'}, {'1', '0'}, {'0', 'o'}}, // tpmi 6
-    {{'1', '0'}, {'0', '1'}, {'1', '0'}, {'0', 'j'}}, // tpmi 7
-    {{'1', '0'}, {'0', '1'}, {'o', '0'}, {'0', '1'}}, // tpmi 8
-    {{'1', '0'}, {'0', '1'}, {'o', '0'}, {'0', 'n'}}, // tpmi 9
-    {{'1', '0'}, {'0', '1'}, {'n', '0'}, {'0', 'o'}}, // tpmi 10
-    {{'1', '0'}, {'0', '1'}, {'n', '0'}, {'0', 'j'}}, // tpmi 11
-    {{'1', '0'}, {'0', '1'}, {'j', '0'}, {'0', '1'}}, // tpmi 12
-    {{'1', '0'}, {'0', '1'}, {'j', '0'}, {'0', 'n'}}, // tpmi 13
-    {{'1', '1'}, {'1', '1'}, {'1', 'n'}, {'1', 'n'}}, // tpmi 14
-    {{'1', '1'}, {'1', '1'}, {'j', 'o'}, {'j', 'o'}}, // tpmi 15
-    {{'1', '1'}, {'j', 'j'}, {'1', 'n'}, {'j', 'o'}}, // tpmi 16
-    {{'1', '1'}, {'j', 'j'}, {'j', 'o'}, {'n', '1'}}, // tpmi 17
-    {{'1', '1'}, {'n', 'n'}, {'1', 'n'}, {'n', '1'}}, // tpmi 18
-    {{'1', '1'}, {'n', 'n'}, {'j', 'o'}, {'o', 'j'}}, // tpmi 19
-    {{'1', '1'}, {'o', 'o'}, {'1', 'n'}, {'o', 'j'}}, // tpmi 20
-    {{'1', '1'}, {'o', 'o'}, {'j', 'o'}, {'1', 'n'}}  // tpmi 21
 };
 
 // Default PUSCH time domain resource allocation tables from 38.214
@@ -1909,10 +1814,13 @@ int get_nr_prach_info_from_index(uint8_t index,
         s_map = table_6_3_3_2_2_prachConfig_Index[index][4];
         if ((s_map>>subframe) & 0x01) {
           *N_RA_slot = table_6_3_3_2_2_prachConfig_Index[index][6]; // Number of RACH slots within a subframe
-          if (mu == 1) {
-            if ((*N_RA_slot <= 1) && (slot % 2 == 0)){
+          if (index >= 87) {
+            if ((mu == 1) && (*N_RA_slot <= 1) && (slot % 2 == 0)) {
               return 0; // no prach in even slots @ 30kHz for 1 prach per subframe
             }
+          } else {
+            if ((slot % 2) && (mu > 0))
+              return 0; // slot does not contain start symbol of this prach time resource
           }
           for(int i = 0; i <= subframe ; i++) {
             if ((s_map >> i) & 0x01) {
@@ -2175,59 +2083,6 @@ static const uint16_t table_7_3_1_1_2_32[3][15] = {
     {0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
-
-void nr_get_tbs_dl(nfapi_nr_dl_tti_pdsch_pdu *pdsch_pdu,
-		   int x_overhead,
-                   uint8_t numdmrscdmgroupnodata,
-                   uint8_t tb_scaling) {
-
-  LOG_D(MAC, "TBS calculation\n");
-
-  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_rel15 = &pdsch_pdu->pdsch_pdu_rel15;
-  uint16_t N_PRB_oh = x_overhead;
-  uint8_t N_PRB_DMRS;
-  if (pdsch_rel15->dmrsConfigType == NFAPI_NR_DMRS_TYPE1) {
-    // if no data in dmrs cdm group is 1 only even REs have no data
-    // if no data in dmrs cdm group is 2 both odd and even REs have no data
-    N_PRB_DMRS = numdmrscdmgroupnodata*6;
-  }
-  else {
-    N_PRB_DMRS = numdmrscdmgroupnodata*4;
-  }
-  uint8_t N_sh_symb = pdsch_rel15->NrOfSymbols;
-  uint8_t Imcs = pdsch_rel15->mcsIndex[0];
-  uint16_t dmrs_length = get_num_dmrs(pdsch_rel15->dlDmrsSymbPos);
-  uint16_t N_RE_prime = NR_NB_SC_PER_RB*N_sh_symb - N_PRB_DMRS*dmrs_length - N_PRB_oh;
-  LOG_D(MAC, "N_RE_prime %d for %d symbols %d DMRS per PRB and %d overhead\n", N_RE_prime, N_sh_symb, N_PRB_DMRS, N_PRB_oh);
-
-  uint32_t TBS=0;
-
-  /*uint8_t mcs_table = config.pdsch_config.mcs_table.value;
-  uint8_t ss_type = params_rel15.search_space_type;
-  uint8_t dci_format = params_rel15.dci_format;
-  get_table_idx(mcs_table, dci_format, rnti_type, ss_type);*/
-  uint8_t table_idx = 0;
-  uint16_t R = nr_get_code_rate_dl(Imcs, table_idx);
-  uint8_t Qm = nr_get_Qm_dl(Imcs, table_idx);
-
-  TBS = nr_compute_tbs(Qm,
-                       R,
-                       pdsch_rel15->rbSize,
-                       N_sh_symb,
-                       N_PRB_DMRS*dmrs_length,
-                       N_PRB_oh,
-                       tb_scaling,
-		       pdsch_rel15->nrOfLayers)>>3;
-
-  pdsch_rel15->targetCodeRate[0] = R;
-  pdsch_rel15->qamModOrder[0] = Qm;
-  pdsch_rel15->TBSize[0] = TBS;
-  //  pdsch_rel15->nb_mod_symbols = N_RE_prime*pdsch_rel15->n_prb*pdsch_rel15->nb_codewords;
-  pdsch_rel15->mcsTable[0] = table_idx;
-
-  LOG_D(MAC, "TBS %d bytes: N_PRB_DMRS %d N_sh_symb %d N_PRB_oh %d R %d Qm %d table %d nb_symbols %d\n",
-  TBS, N_PRB_DMRS, N_sh_symb, N_PRB_oh, R, Qm, table_idx,N_RE_prime*pdsch_rel15->rbSize*pdsch_rel15->NrOfCodewords );
-}
 
 // the following tables contain 10 times the value reported in 214 (in line with SCF specification and to avoid fractional values)
 //Table 5.1.3.1-1 of 38.214

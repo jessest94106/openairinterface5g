@@ -33,7 +33,6 @@
 #include "assertions.h"
 #include "NR_MAC_gNB/nr_mac_gNB.h"
 #include "NR_MAC_gNB/mac_proto.h"
-#include "NR_MAC_COMMON/nr_mac_extern.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #include "UTIL/OPT/opt.h"
@@ -46,7 +45,7 @@
 #include "executables/softmodem-common.h"
 
 static void schedule_ssb(frame_t frame,
-                         sub_frame_t slot,
+                         slot_t slot,
                          NR_ServingCellConfigCommon_t *scc,
                          nfapi_nr_dl_tti_request_body_t *dl_req,
                          int i_ssb,
@@ -115,7 +114,7 @@ static int encode_mib(NR_BCCH_BCH_Message_t *mib, frame_t frame, uint8_t *buffer
   return encode_size;
 }
 
-void schedule_nr_mib(module_id_t module_idP, frame_t frameP, sub_frame_t slotP, nfapi_nr_dl_tti_request_t *DL_req)
+void schedule_nr_mib(module_id_t module_idP, frame_t frameP, slot_t slotP, nfapi_nr_dl_tti_request_t *DL_req)
 {
   gNB_MAC_INST *gNB = RC.nrmac[module_idP];
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
@@ -549,7 +548,7 @@ static void nr_fill_nfapi_dl_SIB_pdu(int Mod_idP,
   pdsch_pdu_rel15->qamModOrder[0] = nr_get_Qm_dl(pdsch->mcs, mcsTableIdx);
   pdsch_pdu_rel15->mcsIndex[0] = pdsch->mcs;
   pdsch_pdu_rel15->mcsTable[0] = mcsTableIdx;
-  pdsch_pdu_rel15->rvIndex[0] = nr_rv_round_map[0];
+  pdsch_pdu_rel15->rvIndex[0] = nr_get_rv(0);
   pdsch_pdu_rel15->dataScramblingId = *scc->physCellId;
   pdsch_pdu_rel15->nrOfLayers = 1;
   pdsch_pdu_rel15->transmissionScheme = 0;
@@ -658,7 +657,7 @@ static void nr_fill_nfapi_dl_SIB_pdu(int Mod_idP,
 
 void schedule_nr_sib1(module_id_t module_idP,
                       frame_t frameP,
-                      sub_frame_t slotP,
+                      slot_t slotP,
                       nfapi_nr_dl_tti_request_t *DL_req,
                       nfapi_nr_tx_data_request_t *TX_req)
 {
@@ -785,7 +784,7 @@ struct NR_SchedulingInfo2_r17 *find_sib19_sched_info(const struct NR_SI_Scheduli
 
 void schedule_nr_sib19(module_id_t module_idP,
                       frame_t frameP,
-                      sub_frame_t slotP,
+                      slot_t slotP,
                       nfapi_nr_dl_tti_request_t *DL_req,
                       nfapi_nr_tx_data_request_t *TX_req,
                       int sib19_bcch_length,
