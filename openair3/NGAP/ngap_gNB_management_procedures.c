@@ -39,6 +39,8 @@
 #include "queue.h"
 #include "tree.h"
 #include "ds/byte_array.h"
+#include "BIT_STRING.h"
+#include "common/utils/utils.h"
 
 static ngap_gNB_internal_data_t ngap_gNB_internal_data;
 
@@ -187,4 +189,14 @@ void ngap_gNB_remove_amf_desc(ngap_gNB_instance_t * instance)
       }
       free(amf);
     }
+}
+
+void tnl_to_bitstring(BIT_STRING_t *out, const transport_layer_addr_t in)
+{
+  if (in.length) {
+    out->buf = malloc_or_fail(in.length);
+    memcpy(out->buf, in.buffer, in.length);
+    out->size = in.length;
+    out->bits_unused = 0;
+  }
 }
