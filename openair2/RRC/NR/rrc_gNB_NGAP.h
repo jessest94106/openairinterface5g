@@ -99,4 +99,6 @@ void rrc_gNB_send_NGAP_HANDOVER_FAILURE(gNB_RRC_INST *rrc, ngap_handover_failure
 int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, ngap_handover_request_t *msg);
 void rrc_gNB_free_Handover_Request(ngap_handover_request_t *msg);
 
+void rrc_gNB_send_NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, byte_array_t ho_command);
+
 #endif

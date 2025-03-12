@@ -68,6 +68,7 @@
 #define NGAP_HANDOVER_REQUIRED(mSGpTR)           (mSGpTR)->ittiMsg.ngap_handover_required
 #define NGAP_HANDOVER_FAILURE(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_failure
 #define NGAP_HANDOVER_REQUEST(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_request
+#define NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_request_ack
 
 #define NGAP_UE_CONTEXT_RELEASE_REQ(mSGpTR)     (mSGpTR)->ittiMsg.ngap_ue_release_req
 #define NGAP_PDUSESSION_RELEASE_COMMAND(mSGpTR)      (mSGpTR)->ittiMsg.ngap_pdusession_release_command
@@ -616,6 +617,36 @@ typedef struct {
   // GUAMI
   nr_guami_t guami;
 } ngap_handover_request_t;
+
+/* 9.3.4.11 3GPP TS 38.413 */
+typedef struct {
+  // QoS Flow Setup Response List
+  uint8_t nb_of_qos_flow;
+  pdusession_associate_qosflow_t qos_setup_list[QOSFLOW_MAX_VALUE];
+  // DL NG-U UP TNL Information
+  uint32_t gtp_teid;
+  transport_layer_addr_t gNB_addr;
+} ho_request_ack_transfer_t;
+
+/* 9.2.3.5 3GPP TS 38.413 */
+typedef struct {
+  // PDU Session ID (M)
+  uint8_t pdu_session_id;
+  // Handover Request Acknowledge Transfer (M)
+  ho_request_ack_transfer_t ack_transfer;
+} pdu_session_resource_admitted_t;
+
+typedef struct {
+  // AMF UE NGAP ID
+  uint32_t gNB_ue_ngap_id;
+  // RAN UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+  // PDU Session Resource Admitted List
+  pdu_session_resource_admitted_t pdusessions[NGAP_MAX_PDU_SESSION];
+  uint8_t nb_of_pdusessions;
+  // Target to Source Transparent Container
+  byte_array_t target2source;
+} ngap_handover_request_ack_t;
 
 typedef struct ngap_ue_cap_info_ind_s {
   uint32_t  gNB_ue_ngap_id;

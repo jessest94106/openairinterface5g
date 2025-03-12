@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "conversions.h"
 #include "ngap_common.h"
 #include "ngap_msg_includes.h"
 #include "ngap_gNB_defs.h"
@@ -377,8 +378,97 @@ int decode_ng_handover_request(ngap_handover_request_t *out, const NGAP_NGAP_PDU
       return -1;
     }
   }
-
-
-
   return 0;
+}
+
+NGAP_NGAP_PDU_t *encode_ng_handover_request_ack(ngap_handover_request_ack_t *msg)
+{
+  NGAP_NGAP_PDU_t *pdu = malloc_or_fail(sizeof(*pdu));
+
+  pdu->present = NGAP_NGAP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, head);
+  head->procedureCode = NGAP_ProcedureCode_id_HandoverResourceAllocation;
+  head->criticality = NGAP_Criticality_reject;
+  head->value.present = NGAP_SuccessfulOutcome__value_PR_HandoverRequestAcknowledge;
+  NGAP_HandoverRequestAcknowledge_t *out = &head->value.choice.HandoverRequestAcknowledge;
+
+  // AMF UE NGAP ID (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverRequestAcknowledgeIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_ignore;
+    ie->value.present = NGAP_HandoverRequestAcknowledgeIEs__value_PR_AMF_UE_NGAP_ID;
+    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, msg->amf_ue_ngap_id);
+  }
+
+  // RAN UE NGAP ID (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverRequestAcknowledgeIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_ignore;
+    ie->value.present = NGAP_HandoverRequestAcknowledgeIEs__value_PR_RAN_UE_NGAP_ID;
+    ie->value.choice.RAN_UE_NGAP_ID = msg->gNB_ue_ngap_id;
+  }
+
+  // Target to Source Transparent Container (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverRequestAcknowledgeIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_TargetToSource_TransparentContainer;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_HandoverRequestAcknowledgeIEs__value_PR_TargetToSource_TransparentContainer;
+    NGAP_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer_t *t2s = calloc_or_fail(1, sizeof(*t2s));
+    // RRC Container (M)
+    {
+      // Encode Handover Command
+      t2s->rRCContainer.size = msg->target2source.len;
+      t2s->rRCContainer.buf = malloc_or_fail(msg->target2source.len);
+      memcpy(t2s->rRCContainer.buf, msg->target2source.buf, msg->target2source.len);
+      byte_array_t ba = { .buf = NULL, .len = 0 };
+      ba.len = aper_encode_to_new_buffer(&asn_DEF_NGAP_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer, NULL, t2s, (void **)&ba.buf);
+      OCTET_STRING_fromBuf(&ie->value.choice.TargetToSource_TransparentContainer, (const char *)ba.buf, ba.len);
+      ASN_STRUCT_FREE(asn_DEF_NGAP_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer, t2s);
+      free_byte_array(ba);
+    }
+  }
+
+  // PDU Session Resource Admitted List (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverRequestAcknowledgeIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_PDUSessionResourceAdmittedList;
+    ie->criticality = NGAP_Criticality_ignore;
+    ie->value.present = NGAP_HandoverRequestAcknowledgeIEs__value_PR_PDUSessionResourceAdmittedList;
+
+    for (int pduSesIdx = 0; pduSesIdx < msg->nb_of_pdusessions; pduSesIdx++) {
+      asn1cSequenceAdd(ie->value.choice.PDUSessionResourceAdmittedList.list, NGAP_PDUSessionResourceAdmittedItem_t, item);
+      item->pDUSessionID = msg->pdusessions[pduSesIdx].pdu_session_id;
+      /* dLQosFlowPerTNLInformation */
+      NGAP_HandoverRequestAcknowledgeTransfer_t transfer = {0};
+      transfer.dL_NGU_UP_TNLInformation.present = NGAP_UPTransportLayerInformation_PR_gTPTunnel;
+      asn1cCalloc(transfer.dL_NGU_UP_TNLInformation.choice.gTPTunnel, tmp);
+      GTP_TEID_TO_ASN1(msg->pdusessions[pduSesIdx].ack_transfer.gtp_teid, &tmp->gTP_TEID);
+      tnl_to_bitstring(&tmp->transportLayerAddress, msg->pdusessions[pduSesIdx].ack_transfer.gNB_addr);
+
+      for (int j = 0; j < msg->pdusessions[pduSesIdx].ack_transfer.nb_of_qos_flow; j++) {
+        asn1cSequenceAdd(transfer.qosFlowSetupResponseList.list, NGAP_QosFlowItemWithDataForwarding_t, qosItem);
+        qosItem->qosFlowIdentifier = msg->pdusessions[pduSesIdx].ack_transfer.qos_setup_list[j].qfi;
+        qosItem->dataForwardingAccepted = malloc_or_fail(sizeof(*qosItem->dataForwardingAccepted));
+        *qosItem->dataForwardingAccepted = NGAP_DataForwardingAccepted_data_forwarding_accepted;
+      }
+
+      void *buf;
+      ssize_t encoded = aper_encode_to_new_buffer(&asn_DEF_NGAP_HandoverRequestAcknowledgeTransfer, NULL, &transfer, &buf);
+      AssertFatal(encoded > 0, "ASN1 message encoding failed !\n");
+      item->handoverRequestAcknowledgeTransfer.buf = buf;
+      item->handoverRequestAcknowledgeTransfer.size = encoded;
+
+      ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_HandoverRequestAcknowledgeTransfer, &transfer);
+    }
+  }
+
+  return pdu;
+}
+
+void free_ng_handover_req_ack(ngap_handover_request_ack_t *msg)
+{
+  free_byte_array(msg->target2source);
 }
