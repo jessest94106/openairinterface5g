@@ -69,6 +69,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   mac->p_Max = INT_MIN;
   mac->p_Max_alt = INT_MIN;
   mac->n_ta_offset = -1;
+  mac->msg3_C_RNTI = false;
   mac->ntn_ta.ntn_params_changed = false;
   reset_mac_inst(mac);
 
@@ -77,8 +78,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
 
   memset(&mac->ssb_measurements, 0, sizeof(mac->ssb_measurements));
   memset(&mac->ul_time_alignment, 0, sizeof(mac->ul_time_alignment));
-  memset(mac->ssb_list, 0, sizeof(mac->ssb_list));
-  memset(mac->prach_assoc_pattern, 0, sizeof(mac->prach_assoc_pattern));
+  memset(&mac->ssb_list, 0, sizeof(mac->ssb_list));
 
   for (int i = 0; i < NR_MAX_SR_ID; i++)
     memset(&mac->scheduling_info.sr_info[i], 0, sizeof(mac->scheduling_info.sr_info[i]));
@@ -115,7 +115,6 @@ void nr_ue_send_synch_request(NR_UE_MAC_INST_t *mac, module_id_t module_id, int 
 void nr_ue_reset_sync_state(NR_UE_MAC_INST_t *mac)
 {
   // reset synchornization status
-  mac->first_sync_frame = -1;
   mac->state = UE_NOT_SYNC;
   mac->ra.ra_state = nrRA_UE_IDLE;
 }
@@ -181,9 +180,11 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
   if (nr_mac->data_inactivity_timer)
     nr_timer_stop(nr_mac->data_inactivity_timer);
   nr_timer_stop(&nr_mac->time_alignment_timer);
-  nr_timer_stop(&nr_mac->ra.contention_resolution_timer);
   nr_timer_stop(&nr_mac->scheduling_info.sr_DelayTimer);
   nr_timer_stop(&nr_mac->scheduling_info.retxBSR_Timer);
+  nr_timer_stop(&nr_mac->ra.response_window_timer);
+  nr_timer_stop(&nr_mac->ra.RA_backoff_timer);
+  nr_timer_stop(&nr_mac->ra.contention_resolution_timer);
   for (int i = 0; i < NR_MAX_SR_ID; i++)
     nr_timer_stop(&nr_mac->scheduling_info.sr_info[i].prohibitTimer);
 
@@ -195,8 +196,10 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
     nr_mac->ul_harq_info[k].last_ndi = -1; // initialize to invalid value
 
   // stop any ongoing RACH procedure
-  if (nr_mac->ra.ra_state < nrRA_SUCCEEDED)
+  if (nr_mac->ra.RA_active) {
     nr_mac->ra.ra_state = nrRA_UE_IDLE;
+    nr_mac->ra.RA_active = false;
+  }
 
   // discard explicitly signalled contention-free Random Access Resources
   // TODO not sure what needs to be done here
