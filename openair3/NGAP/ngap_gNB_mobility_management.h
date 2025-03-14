@@ -33,5 +33,6 @@ NGAP_NGAP_PDU_t *encode_ng_handover_request_ack(ngap_handover_request_ack_t *msg
 void free_ng_handover_req_ack(ngap_handover_request_ack_t *msg);
 int decode_ng_handover_command(ngap_handover_command_t *msg, NGAP_NGAP_PDU_t *pdu);
 void free_ng_handover_command(ngap_handover_command_t *msg);
+NGAP_NGAP_PDU_t *encode_ng_handover_notify(const ngap_handover_notify_t *msg);
 
 #endif /* NGAP_GNB_MOBILITY_MANAGEMENT_H_ */

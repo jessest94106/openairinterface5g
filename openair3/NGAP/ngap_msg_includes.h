@@ -101,5 +101,6 @@
 #include "NGAP_HandoverRequestAcknowledgeTransfer.h"
 #include "NGAP_QosFlowItemWithDataForwarding.h"
 #include "NR_HandoverPreparationInformation.h"
+#include "NGAP_HandoverNotify.h"
 
 #endif // NGAP_MSG_INCLUDES_H

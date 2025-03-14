@@ -476,6 +476,13 @@ static void nr_rrc_n2_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   free_byte_array(hoCommand);
 }
 
+/** @brief This callback is used by the target gNB
+ *         to trigger the Handover Notify towards the AMF */
+static void nr_rrc_n2_ho_complete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
+{
+  rrc_gNB_send_NGAP_HANDOVER_NOTIFY(rrc, UE);
+}
+
 /** @brief Callback function to trigger NG Handover Failure on the target gNB, to inform the AMF
  * that the preparation of resources has failed (e.g. unsatisfied criteria, gNB is already loaded).
  * This message represents an Unsuccessful Outcome of the Handover Resource Allocation */

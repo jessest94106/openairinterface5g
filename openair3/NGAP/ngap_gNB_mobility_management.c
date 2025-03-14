@@ -560,3 +560,60 @@ void free_ng_handover_command(ngap_handover_command_t *msg)
 {
   free_byte_array(msg->handoverCommand);
 }
+
+NGAP_NGAP_PDU_t *encode_ng_handover_notify(const ngap_handover_notify_t *msg)
+{
+  NGAP_NGAP_PDU_t *pdu = malloc_or_fail(sizeof(*pdu));
+
+  // Message Type (M)
+  pdu->present = NGAP_NGAP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, head);
+  head->procedureCode = NGAP_ProcedureCode_id_HandoverNotification;
+  head->criticality = NGAP_Criticality_ignore;
+  head->value.present = NGAP_InitiatingMessage__value_PR_HandoverNotify;
+  NGAP_HandoverNotify_t *out = &head->value.choice.HandoverNotify;
+
+  // AMF UE NGAP ID (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverNotifyIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_HandoverNotifyIEs__value_PR_AMF_UE_NGAP_ID;
+    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, msg->amf_ue_ngap_id);
+  }
+
+  // RAN UE NGAP ID (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverNotifyIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_HandoverNotifyIEs__value_PR_RAN_UE_NGAP_ID;
+    ie->value.choice.RAN_UE_NGAP_ID = msg->gNB_ue_ngap_id;
+  }
+
+  // User Location Information (M)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverNotifyIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_UserLocationInformation;
+    ie->criticality = NGAP_Criticality_ignore;
+    ie->value.present = NGAP_HandoverNotifyIEs__value_PR_UserLocationInformation;
+    ie->value.choice.UserLocationInformation.present = NGAP_UserLocationInformation_PR_userLocationInformationNR;
+    asn1cCalloc(ie->value.choice.UserLocationInformation.choice.userLocationInformationNR, userinfo_nr_p);
+    // NR User Location Information
+    const target_ran_node_id_t *target = &msg->user_info.target_ng_ran;
+    // CGI (M)
+    MACRO_GNB_ID_TO_CELL_IDENTITY(target->targetgNBId, msg->user_info.nrCellIdentity, &userinfo_nr_p->nR_CGI.nRCellIdentity);
+    MCC_MNC_TO_TBCD(target->plmn_identity.mcc,
+                    target->plmn_identity.mnc,
+                    target->plmn_identity.mnc_digit_length,
+                    &userinfo_nr_p->nR_CGI.pLMNIdentity);
+    // TAI (M)
+    INT24_TO_OCTET_STRING(target->tac, &userinfo_nr_p->tAI.tAC);
+    MCC_MNC_TO_PLMNID(target->plmn_identity.mcc,
+                      target->plmn_identity.mnc,
+                      target->plmn_identity.mnc_digit_length,
+                      &userinfo_nr_p->tAI.pLMNIdentity);
+  }
+
+  return pdu;
+}
