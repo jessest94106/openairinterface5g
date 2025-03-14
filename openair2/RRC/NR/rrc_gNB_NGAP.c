@@ -1111,6 +1111,7 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     return -1;
   }
   UE->ho_context = alloc_ho_ctx(HO_CTX_TARGET);
+  UE->ho_context->target->ho_trigger = nr_rrc_trigger_n2_ho_target;
 
   // Store IDs in UE context
   UE->amf_ue_ngap_id = msg->amf_ue_ngap_id;

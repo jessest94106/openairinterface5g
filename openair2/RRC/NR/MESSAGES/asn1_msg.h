@@ -51,6 +51,7 @@
 #include "NR_SRB-ToAddModList.h"
 #include "NR_SecurityConfig.h"
 #include "NR_MeasurementTimingConfiguration.h"
+#include "NR_UE-CapabilityRAT-ContainerList.h"
 #include "ds/seq_arr.h"
 #include "ds/byte_array.h"
 #include "rrc_messages_types.h"
@@ -166,5 +167,8 @@ byte_array_t get_HandoverPreparationInformation(nr_rrc_reconfig_param_t *params,
 byte_array_t get_HandoverCommandMessage(nr_rrc_reconfig_param_t *params);
 void fill_removal_lists_from_source_measConfig(NR_MeasConfig_t *measConfig, byte_array_t prep_info);
 int doRRCReconfiguration_from_HandoverCommand(byte_array_t *ba, byte_array_t handoverCommand);
+
+struct NR_UE_NR_Capability *get_ue_nr_capability(int rnti, uint8_t *buf, uint32_t len);
+NR_UE_NR_Capability_t *decode_nr_ue_capability(int rnti, const NR_UE_CapabilityRAT_ContainerList_t *clist);
 
 #endif  /* __RRC_NR_MESSAGES_ASN1_MSG__H__ */

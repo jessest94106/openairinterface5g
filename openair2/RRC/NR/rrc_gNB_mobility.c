@@ -122,7 +122,8 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
                                  byte_array_t *ho_prep_info,
                                  ho_req_ack_t ack,
                                  ho_success_t success,
-                                 ho_cancel_t cancel)
+                                 ho_cancel_t cancel,
+                                 ho_failure_t failure)
 {
   DevAssert(rrc != NULL);
   DevAssert(ue != NULL);
@@ -145,6 +146,7 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
   // response
   ho_ctx->target->ho_req_ack = ack;
   ho_ctx->target->ho_success = success;
+  ho_ctx->target->ho_failure = failure;
 
   const f1_ue_data_t ue_data = cu_get_f1_ue_data(ue->rrc_ue_id);
   if (source_du != NULL) {
@@ -353,7 +355,7 @@ void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_contain
   ho_success_t success = nr_rrc_f1_ho_complete;
   ho_cancel_t cancel = nr_rrc_cancel_f1_ho;
   byte_array_t hpi = {.buf = buf, .len = size};
-  nr_initiate_handover(rrc, ue, source_du, target_du, &hpi, ack, success, cancel);
+  nr_initiate_handover(rrc, ue, source_du, target_du, &hpi, ack, success, cancel, NULL);
 }
 
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue)
@@ -494,6 +496,26 @@ void nr_rrc_n2_ho_failure(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handover_f
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, gnb_ue_id);
   rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(rrc->module_id, ue_context_p, msg->cause);
   return;
+}
+
+/** @brief Trigger N2 Handover on the target gNB:
+ *         1) set up callbacks
+ *         2) initiate N2 handover on target NG-RAN, which triggers the set up
+ *            of HO context and UE Context Setup procedures */
+void nr_rrc_trigger_n2_ho_target(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue)
+{
+  ho_req_ack_t ack = nr_rrc_n2_ho_acknowledge;
+  ho_success_t success = nr_rrc_n2_ho_complete;
+  ho_failure_t failure = nr_rrc_n2_ho_failure;
+
+  const nr_rrc_du_container_t *target_du = get_du_for_ue(rrc, ue->rrc_ue_id);
+  nr_initiate_handover(rrc, ue, NULL, target_du, &ue->ho_context->target->ue_ho_prep_info, ack, success, NULL, failure);
+  FREE_AND_ZERO_BYTE_ARRAY(ue->ho_context->target->ue_ho_prep_info);
+
+  NR_UE_NR_Capability_t *ue_cap = get_ue_nr_capability(ue->rnti, ue->ue_cap_buffer.buf, ue->ue_cap_buffer.len);
+  ue->UE_Capability_nr = ue_cap;
+  ue->UE_Capability_size = ue->ue_cap_buffer.len;
+
 }
 
 /** @brief Trigger N2 handover on source gNB:

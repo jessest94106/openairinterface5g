@@ -87,6 +87,7 @@
 #include "NR_HandoverPreparationInformation.h"
 #include "NR_HandoverPreparationInformation-IEs.h"
 #include "NR_HandoverCommand.h"
+#include "NR_UE-CapabilityRAT-ContainerList.h"
 #include "common/utils/nr/nr_common.h"
 #if defined(NR_Rel16)
   #include "NR_SCS-SpecificCarrier.h"
@@ -200,6 +201,48 @@ int xer_nr_sprint(char *string, size_t string_size, asn_TYPE_descriptor_t *td, v
   }
 
   return er.encoded;
+}
+
+struct NR_UE_NR_Capability *get_ue_nr_capability(int rnti, uint8_t *buf, uint32_t len)
+{
+  if (!buf || len == 0) return NULL;
+
+  NR_UE_CapabilityRAT_ContainerList_t *clist = NULL;
+  asn_dec_rval_t rval = uper_decode(NULL, &asn_DEF_NR_UE_CapabilityRAT_ContainerList,
+                                    (void **)&clist, buf, len, 0, 0);
+
+  if (rval.code != RC_OK) {
+    LOG_W(NR_MAC, "UE RNTI %04x: Failed to decode container list\n", rnti);
+    return NULL;
+  }
+
+  NR_UE_NR_Capability_t *cap = decode_nr_ue_capability(rnti, clist);
+  ASN_STRUCT_FREE(asn_DEF_NR_UE_CapabilityRAT_ContainerList, clist);
+  return cap;
+}
+
+NR_UE_NR_Capability_t *decode_nr_ue_capability(int rnti, const NR_UE_CapabilityRAT_ContainerList_t *clist)
+{
+  if (!clist) return NULL;
+
+  for (int i = 0; i < clist->list.count; i++) {
+    const NR_UE_CapabilityRAT_Container_t *c = clist->list.array[i];
+    if (c->rat_Type != NR_RAT_Type_nr)
+      continue;
+
+    NR_UE_NR_Capability_t *cap = NULL;
+    asn_dec_rval_t rval = uper_decode(NULL, &asn_DEF_NR_UE_NR_Capability,
+                                      (void **)&cap,
+                                      c->ue_CapabilityRAT_Container.buf,
+                                      c->ue_CapabilityRAT_Container.size,
+                                      0, 0);
+    if (rval.code == RC_OK)
+      return cap;
+
+    LOG_W(NR_MAC, "UE RNTI %04x: Failed to decode NR capability (%zu bytes)\n", rnti, rval.consumed);
+    ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, cap);
+  }
+  return NULL;
 }
 
 //------------------------------------------------------------------------------

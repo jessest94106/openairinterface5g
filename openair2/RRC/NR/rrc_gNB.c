@@ -1607,21 +1607,14 @@ static void handle_ueCapabilityInformation(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, 
           UE->UE_Capability_nr = 0;
         }
 
-        asn_dec_rval_t dec_rval = uper_decode(NULL,
-                                              &asn_DEF_NR_UE_NR_Capability,
-                                              (void **)&UE->UE_Capability_nr,
-                                              ue_cap_container->ue_CapabilityRAT_Container.buf,
-                                              ue_cap_container->ue_CapabilityRAT_Container.size,
-                                              0,
-                                              0);
-        if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
-          xer_fprint(stdout, &asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
+        UE->UE_Capability_nr = decode_nr_ue_capability(UE->rnti, ue_CapabilityRAT_ContainerList);
+        if (!UE->UE_Capability_nr) {
+          LOG_E(NR_RRC, "UE %d: NR capability decoding failed\n", UE->rrc_ue_id);
+          return;
         }
 
-        if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-          LOG_E(NR_RRC, "UE %d: Failed to decode nr UE capabilities (%zu bytes)\n", UE->rrc_ue_id, dec_rval.consumed);
-          ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
-          UE->UE_Capability_nr = 0;
+        if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+          xer_fprint(stdout, &asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
         }
 
         const NR_RedCapParameters_r17_t *redcap_p = get_redcapparam_r17(UE->UE_Capability_nr);
@@ -2555,6 +2548,13 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
       UP_TL_information_t *tl_info = &drb_config->UpParamList[0].tl_info;
       drb->cuup_tunnel_config = f1u_gtp_update(tl_info->teId, tl_info->tlAddress);
     }
+  }
+
+  // If HO Preparation Info is stored, N2 handover is ongoing
+  if (UE->ho_context) {
+    LOG_I(NR_RRC, "Received Bearer Context Setup Response for UE %d with valid HO Context\n", UE->rrc_ue_id);
+    UE->ho_context->target->ho_trigger(rrc, UE);
+    return;
   }
 
   if (!UE->f1_ue_context_active)
