@@ -997,6 +997,60 @@ static int ngap_gNB_handle_pdusession_setup_request(sctp_assoc_t assoc_id, uint3
   return 0;
 }
 
+/** @brief Handler for the NG Handover Command
+ *         AMF -> source NG-RAN */
+static int ngap_gNB_handle_handover_command(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
+{
+  NGAP_INFO("Received NG Handover Command\n");
+  ngap_gNB_amf_data_t *amf_desc_p = NULL;
+  DevAssert(pdu != NULL);
+
+  if ((amf_desc_p = ngap_gNB_get_AMF(NULL, assoc_id, 0)) == NULL) {
+    NGAP_ERROR(
+        "[SCTP %u] Received Handover Command for non "
+        "existing AMF context\n",
+        assoc_id);
+    return -1;
+  }
+
+  MessageDef *message_p = itti_alloc_new_message(TASK_NGAP, 0, NGAP_HANDOVER_COMMAND);
+  ngap_handover_command_t *msg = &NGAP_HANDOVER_COMMAND(message_p);
+  memset(msg, 0, sizeof(*msg));
+  if (decode_ng_handover_command(msg, pdu) < 0) {
+    NGAP_ERROR("Failed to decode NG Handover Command");
+    free_ng_handover_command(msg);
+    itti_free(TASK_NGAP, message_p);
+    return -1;
+  }
+
+  ngap_gNB_ue_context_t *ue_desc_p = ngap_get_ue_context(msg->gNB_ue_ngap_id);
+  if (!ue_desc_p) {
+    NGAP_ERROR(
+        "[SCTP %u] Received HO Command Msg for non existing UE context (gNB_ue_ngap_id %d) \n",
+        assoc_id,
+        msg->gNB_ue_ngap_id);
+    free_ng_handover_command(msg);
+    itti_free(TASK_NGAP, message_p);
+    return -1;
+  }
+
+  ue_desc_p->rx_stream = stream;
+
+  if (ue_desc_p->amf_ue_ngap_id != msg->amf_ue_ngap_id) {
+    NGAP_ERROR("UE context amf_ue_ngap_id is different form that of the message (%ld != %ld)",
+               ue_desc_p->amf_ue_ngap_id,
+               msg->amf_ue_ngap_id);
+    free_ng_handover_command(msg);
+    itti_free(TASK_NGAP, message_p);
+    return -1;
+  }
+
+  NGAP_DEBUG("Handover Command is parsed with a size of: %ld. Sending to RRC GNB!\n", msg->handoverCommand.len);
+  itti_send_msg_to_task(TASK_RRC_GNB, amf_desc_p->ngap_gNB_instance->instance, message_p);
+
+  return 0;
+}
+
 static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
 {
   ngap_gNB_amf_data_t   *amf_desc_p        = NULL;
@@ -1338,7 +1392,7 @@ const ngap_message_decoded_callback ngap_messages_callback[][3] = {
     {ngap_gNB_handle_error_indication, 0, 0}, /* ErrorIndication */
     {0, 0, 0}, /* HandoverCancel */
     {0, 0, 0}, /* HandoverNotification */
-    {0, 0, 0}, /* HandoverPreparation */
+    {0, ngap_gNB_handle_handover_command, 0}, /* HandoverPreparation */
     {ngap_gNB_handle_handover_request, 0, 0}, /* HandoverResourceAllocation */
     {ngap_gNB_handle_initial_context_request, 0, 0}, /* InitialContextSetup */
     {0, 0, 0}, /* InitialUEMessage */

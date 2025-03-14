@@ -472,3 +472,91 @@ void free_ng_handover_req_ack(ngap_handover_request_ack_t *msg)
 {
   free_byte_array(msg->target2source);
 }
+
+/** @brief Decoder for the NG Handover Command */
+int decode_ng_handover_command(ngap_handover_command_t *msg, NGAP_NGAP_PDU_t *pdu)
+{
+  DevAssert(pdu != NULL);
+  NGAP_HandoverCommandIEs_t *ie;
+  NGAP_HandoverCommand_t *container = &pdu->choice.successfulOutcome->value.choice.HandoverCommand;
+
+  // AMF UE NGAP ID (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCommandIEs_t, ie, container, NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID, true);
+  asn_INTEGER2ulong(&(ie->value.choice.AMF_UE_NGAP_ID), &msg->amf_ue_ngap_id);
+
+  // RAN UE NGAP ID (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCommandIEs_t, ie, container, NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID, true);
+  msg->gNB_ue_ngap_id = ie->value.choice.RAN_UE_NGAP_ID;
+
+  // Handover Type (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCommandIEs_t, ie, container, NGAP_ProtocolIE_ID_id_HandoverType, true);
+  if (ie->value.choice.HandoverType != HANDOVER_TYPE_INTRA5GS) {
+    NGAP_ERROR("Only Intra 5GS Handover is supported at the moment!\n");
+    return -1;
+  }
+
+  // PDU Session Resource Handover List (O)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCommandIEs_t, ie, container, NGAP_ProtocolIE_ID_id_HandoverType, false);
+  if (ie != NULL) {
+    msg->nb_of_pdusessions = ie->value.choice.PDUSessionResourceHandoverList.list.count;
+
+    for (int i = 0; i < msg->nb_of_pdusessions; ++i) {
+      NGAP_PDUSessionResourceHandoverItem_t *item = ie->value.choice.PDUSessionResourceHandoverList.list.array[i];
+
+      // PDU Session ID (M)
+      msg->pdu_sessions[i].pdusession_id = item->pDUSessionID;
+
+      // Handover Command Transfer (M)
+      NGAP_HandoverCommandTransfer_t *hoCommandTransfer = NULL;
+      asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
+                                                     &asn_DEF_NGAP_HandoverCommandTransfer,
+                                                     (void **)&hoCommandTransfer,
+                                                     item->handoverCommandTransfer.buf,
+                                                     item->handoverCommandTransfer.size);
+      if (dec_rval.code != RC_OK) {
+        NGAP_ERROR("Failed to decode handoverCommandTransfer\n");
+        continue;
+      }
+
+      // DL Forwarding UP TNL Information (O)
+      if (hoCommandTransfer->dLForwardingUP_TNLInformation) {
+        NGAP_UPTransportLayerInformation_t *up_tnl = hoCommandTransfer->dLForwardingUP_TNLInformation;
+        if (hoCommandTransfer->dLForwardingUP_TNLInformation->present == NGAP_UPTransportLayerInformation_PR_gTPTunnel) {
+          OCTET_STRING_TO_INT32(&(up_tnl->choice.gTPTunnel->gTP_TEID), msg->pdu_sessions[i].ho_command_transfer.gtp_teid);
+          bitstring_to_tnl(&msg->pdu_sessions[i].ho_command_transfer.gNB_addr, up_tnl->choice.gTPTunnel->transportLayerAddress);
+        } else {
+          NGAP_WARN("Missing DL Forwarding UP TNL Information\n");
+        }
+      }
+      ASN_STRUCT_FREE(asn_DEF_NGAP_HandoverCommandTransfer, hoCommandTransfer);
+    }
+  }
+
+  // Target to Source Transparent Container (M)
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCommandIEs_t,
+                             ie,
+                             container,
+                             NGAP_ProtocolIE_ID_id_TargetToSource_TransparentContainer,
+                             true);
+  NGAP_TargetToSource_TransparentContainer_t *target2source = &(ie->value.choice.TargetToSource_TransparentContainer);
+  NGAP_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer_t *transparentContainer = NULL;
+  asn_dec_rval_t dec_rval = aper_decode_complete(NULL,
+                                                 &asn_DEF_NGAP_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer,
+                                                 (void **)&transparentContainer,
+                                                 target2source->buf,
+                                                 target2source->size);
+  if (dec_rval.code != RC_OK) {
+    NGAP_ERROR("Failed to decode TargetToSource_TransparentContainer\n");
+    return -1;
+  }
+
+  msg->handoverCommand = create_byte_array(transparentContainer->rRCContainer.size, transparentContainer->rRCContainer.buf);
+  ASN_STRUCT_FREE(asn_DEF_NGAP_TargetNGRANNode_ToSourceNGRANNode_TransparentContainer, transparentContainer);
+
+  return 0;
+}
+
+void free_ng_handover_command(ngap_handover_command_t *msg)
+{
+  free_byte_array(msg->handoverCommand);
+}

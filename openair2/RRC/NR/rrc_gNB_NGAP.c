@@ -39,6 +39,9 @@
 #include <arpa/inet.h>
 #include "E1AP_ConfidentialityProtectionIndication.h"
 #include "E1AP_IntegrityProtectionIndication.h"
+#include "NR_UE-CapabilityRAT-ContainerList.h"
+#include "NR_HandoverCommand.h"
+#include "NR_HandoverCommand-IEs.h"
 #include "NGAP_CauseRadioNetwork.h"
 #include "NGAP_Dynamic5QIDescriptor.h"
 #include "NGAP_GTPTunnel.h"
@@ -1159,6 +1162,31 @@ void rrc_gNB_free_Handover_Request(ngap_handover_request_t *msg)
   free_byte_array(msg->ue_cap);
   free_byte_array(msg->ue_ho_prep_info);
   free(msg->mobility_restriction);
+}
+
+/** @brief Process NG Handover Command on Source gNB */
+void rrc_gNB_process_HandoverCommand(gNB_RRC_INST *rrc, const ngap_handover_command_t *msg)
+{
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, msg->gNB_ue_ngap_id);
+
+  if (ue_context_p == NULL) {
+    LOG_W(NR_RRC, "Unknown UE context associated to gNB_ue_ngap_id (%u)\n", msg->gNB_ue_ngap_id);
+    return;
+  }
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+
+  uint8_t buffer[NR_RRC_BUF_SIZE];
+  byte_array_t ba = {.buf = buffer, .len = sizeof(buffer)};
+  int enc = doRRCReconfiguration_from_HandoverCommand(&ba, msg->handoverCommand);
+  DevAssert(enc > 0);
+
+  rrc_gNB_trigger_reconfiguration_for_handover(rrc, UE, buffer, enc);
+  LOG_A(NR_RRC, "Send reconfiguration (HO Command) to UE %u/RNTI %04x\n", UE->rrc_ue_id, UE->rnti);
+}
+
+void rrc_gNB_free_Handover_Command(ngap_handover_command_t *msg)
+{
+  free_byte_array(msg->handoverCommand);
 }
 
 /*

@@ -64,6 +64,10 @@
 #include "NR_LogicalChannelConfig.h"
 #include "NR_PDCP-Config.h"
 #include "NR_MAC-CellGroupConfig.h"
+#include "NR_HandoverPreparationInformation.h"
+#include "NR_HandoverCommand.h"
+#include "NR_HandoverCommand-IEs.h"
+#include "NR_AS-Config.h"
 #include "NR_SecurityModeCommand.h"
 #include "NR_CipheringAlgorithm.h"
 #include "NR_RRCReconfiguration-IEs.h"
@@ -1219,6 +1223,41 @@ void fill_removal_lists_from_source_measConfig(NR_MeasConfig_t *currentMC, byte_
       asn1cSeqAdd(&currentMC->measIdToRemoveList->list, measId);
     }
   }
+}
+
+int doRRCReconfiguration_from_HandoverCommand(byte_array_t *ba, const byte_array_t handoverCommand)
+{
+  // Decode Handover Command
+  NR_HandoverCommand_t *hoCommand = NULL;
+  asn_dec_rval_t dec_rval = uper_decode_complete(NULL, &asn_DEF_NR_HandoverCommand, (void **)&hoCommand, handoverCommand.buf, handoverCommand.len);
+
+  if (dec_rval.code != RC_OK && dec_rval.consumed == 0) {
+    LOG_E(NR_RRC, "Can not decode Handover Command!\n");
+    return -1;
+  }
+
+  // Prepare DL DCCH message for RRCReconfiguration
+  NR_DL_DCCH_Message_t dl_dcch_msg = {0};
+  asn_enc_rval_t enc_rval;
+  dl_dcch_msg.message.present = NR_DL_DCCH_MessageType_PR_c1;
+  asn1cCalloc(dl_dcch_msg.message.choice.c1, c1);
+  c1->present = NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration;
+  asn1cCalloc(c1->choice.rrcReconfiguration, rrcReconf);
+
+  // Decode RRCReconfiguration from handoverCommandMessage
+  OCTET_STRING_t *ho = &hoCommand->criticalExtensions.choice.c1->choice.handoverCommand->handoverCommandMessage;
+  uper_decode_complete(NULL, &asn_DEF_NR_RRCReconfiguration, (void **)&rrcReconf, ho->buf, ho->size);
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_DL_DCCH_Message, (void *)&dl_dcch_msg);
+
+  // Encode DL DCCH message in buffer
+  enc_rval = uper_encode_to_buffer(&asn_DEF_NR_DL_DCCH_Message, NULL, &dl_dcch_msg, ba->buf, ba->len);
+  AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
+
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
+  ASN_STRUCT_FREE(asn_DEF_NR_HandoverCommand, hoCommand);
+
+  return ((enc_rval.encoded + 7) / 8);
 }
 
 byte_array_t get_HandoverCommandMessage(nr_rrc_reconfig_param_t *params)
