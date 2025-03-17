@@ -768,14 +768,13 @@ set(NFAPI_USER_SRC
 add_library(NFAPI_USER_LIB ${NFAPI_USER_SRC})
 if(OAI_WLS)
   target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_WLS)
+elseif (OAI_AERIAL)
+  target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_AERIAL)
 else()
   target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_SOCKET)
 endif()
 target_link_libraries(NFAPI_USER_LIB PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs UTIL)
 target_link_libraries(NFAPI_USER_LIB PRIVATE nr_fapi_p7)
-if(OAI_AERIAL)
-  target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_AERIAL)
-endif()
 include_directories(${NFAPI_USER_DIR})
 
 # Layer 1

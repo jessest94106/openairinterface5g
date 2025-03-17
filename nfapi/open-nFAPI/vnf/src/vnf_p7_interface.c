@@ -450,12 +450,12 @@ int nfapi_vnf_p7_add_pnf(nfapi_vnf_p7_config_t* config, const char* pnf_p7_addr,
     node->slot = 0;
 	node->min_sync_cycle_count = 8;
   node->mu = mu;
-
+#ifndef ENABLE_AERIAL
 	// save the remote endpoint information
 	node->remote_addr.sin_family = AF_INET;
 	node->remote_addr.sin_port =  pnf_p7_port;//htons(pnf_p7_port);
 	node->remote_addr.sin_addr.s_addr = inet_addr(pnf_p7_addr);
-
+#endif
 	vnf_p7_connection_info_list_add(vnf_p7, node);
 
 	return 0;

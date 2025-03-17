@@ -293,10 +293,26 @@ int8_t buf[1024];
 
 nv_ipc_config_t nv_ipc_config;
 
-int aerial_send_P5_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p4_p5_message_header_t *header)
+bool aerial_nr_send_p5_message(vnf_t *vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t *msg, uint32_t msg_len)
+{
+  nfapi_vnf_pnf_info_t *pnf = nfapi_vnf_pnf_list_find(&(vnf->_public), p5_idx);
+
+  if (pnf) {
+    uint8_t tx_messagebufferFAPI[sizeof(vnf->tx_message_buffer)];
+    int packedMessageLengthFAPI = -1;
+    packedMessageLengthFAPI =
+        vnf->_public.pack_func(msg, msg_len, tx_messagebufferFAPI, sizeof(tx_messagebufferFAPI), &vnf->_public.codec_config);
+    return aerial_send_P5_msg(tx_messagebufferFAPI, packedMessageLengthFAPI, msg) == 0;
+  } else {
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() cannot find pnf info for p5_idx:%d\n", __FUNCTION__, p5_idx);
+    return false;
+  }
+}
+
+bool aerial_send_P5_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p4_p5_message_header_t *header)
 {
   if (ipc == NULL) {
-    return -1;
+    return false;
   }
   nv_ipc_msg_t send_msg = {0};
   // look for the specific message
@@ -334,7 +350,7 @@ int aerial_send_P5_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p4_p5
   if (alloc_retval != 0) {
     LOG_E(NFAPI_VNF, "%s error: allocate TX buffer failed Error: %d\n", __FUNCTION__, alloc_retval);
     ipc->tx_release(ipc, &send_msg);
-    return alloc_retval;
+    return false;
   }
 
   memcpy(send_msg.msg_buf, packedBuf, send_msg.msg_len);
@@ -350,11 +366,11 @@ int aerial_send_P5_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p4_p5
   if (send_retval < 0) {
     LOG_E(NFAPI_VNF, "%s error: send TX message failed Error: %d\n", __FUNCTION__, send_retval);
     ipc->tx_release(ipc, &send_msg);
-    return send_retval;
+    return false;
   }
 
   ipc->notify(ipc, 1); // notify that there's 1 message in queue
-  return 0;
+  return true;
 }
 
 int aerial_send_P7_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p7_message_header_t *header)
@@ -656,6 +672,7 @@ int nvIPC_Init(nvipc_params_t nvipc_params_s)
   sleep(1);
   create_recv_thread(nvipc_params_s.nvipc_poll_core);
   while(!recv_task_running){usleep(100000);}
-  aerial_pnf_nr_connection_indication_cb(vnf_config, 1);
+  nfapi_nr_param_response_scf_t resp_msg;
+  vnf_config->nr_param_resp(vnf_config, 1, &resp_msg);
   return 0;
 }

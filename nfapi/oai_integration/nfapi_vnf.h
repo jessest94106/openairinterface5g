@@ -21,8 +21,9 @@
 
 #ifndef NFAPI_VNF_H_
 #define NFAPI_VNF_H_
+#include <common_lib.h>
 
 void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port);
-void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port);
+void configure_nr_nfapi_vnf(eth_params_t params);
 
 #endif /* NFAPI_VNF_H_ */
