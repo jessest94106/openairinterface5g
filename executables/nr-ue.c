@@ -147,6 +147,24 @@ static void *nrL1_UE_stats_thread(void *param)
   return NULL;
 }
 
+static int determine_N_TA_offset(PHY_VARS_NR_UE *ue) {
+  if (ue->sl_mode == 2)
+    return 0;
+  else {
+    int N_TA_offset = ue->nrUE_config.cell_config.N_TA_offset;
+    if (N_TA_offset == -1) {
+      return set_default_nta_offset(ue->frame_parms.freq_range, ue->frame_parms.samples_per_subframe);
+    } else {
+      // Return N_TA_offet in samples, as described in 38.211 4.1 and 4.3.1
+      // T_c[s] =  1/(Δf_max x N_f) = 1 / (480 * 1000 * 4096)
+      // N_TA_offset[s] = N_TA_offset x T_c
+      // N_TA_offset[samples] = samples_per_second x N_TA_offset[s]
+      // N_TA_offset[samples] = N_TA_offset x samples_per_subframe x 1000 x T_c
+      return (N_TA_offset * ue->frame_parms.samples_per_subframe) / (4096 * 480);
+    }
+  }
+}
+
 void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
 {
   int nb_connected_gNB = 1;
@@ -165,8 +183,8 @@ void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
   // intialize transport
   init_nr_ue_transport(ue);
 
-  // init N_TA offset
-  init_N_TA_offset(ue);
+  ue->ta_frame = -1;
+  ue->ta_slot = -1;
 }
 
 void init_nrUE_standalone_thread(int ue_idx)
@@ -870,6 +888,7 @@ void *UE_thread(void *arg)
   initNotifiedFIFO_nothreadSafe(&freeBlocks);
 
   int timing_advance = UE->timing_advance;
+  UE->N_TA_offset = determine_N_TA_offset(UE);
   NR_UE_MAC_INST_t *mac = get_mac_inst(UE->Mod_id);
 
   bool syncRunning = false;
@@ -1098,9 +1117,16 @@ void *UE_thread(void *arg)
 
     // but use current UE->timing_advance value to compute writeBlockSize
     int writeBlockSize = fp->get_samples_per_slot((slot_nr + duration_rx_to_tx) % nb_slot_frame, fp) - iq_shift_to_apply;
-    if (UE->timing_advance != timing_advance) {
-      writeBlockSize -= UE->timing_advance - timing_advance;
-      timing_advance = UE->timing_advance;
+    int new_timing_advance = UE->timing_advance;
+    if (new_timing_advance != timing_advance) {
+      writeBlockSize -= new_timing_advance- timing_advance;
+      timing_advance = new_timing_advance;
+    }
+    int new_N_TA_offset = determine_N_TA_offset(UE);
+    if (new_N_TA_offset != UE->N_TA_offset) {
+      LOG_I(PHY, "N_TA_offset changed from %d to %d\n", UE->N_TA_offset, new_N_TA_offset);
+      writeBlockSize -= new_N_TA_offset - UE->N_TA_offset;
+      UE->N_TA_offset = new_N_TA_offset;
     }
 
     if (curMsg.proc.nr_slot_tx == 0)
