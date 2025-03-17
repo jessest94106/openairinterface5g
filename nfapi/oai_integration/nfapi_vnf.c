@@ -36,6 +36,13 @@
 #include "nfapi_vnf.h"
 #include <vnf.h>
 #include <vnf_p7.h>
+
+#ifdef ENABLE_SOCKET
+#include <socket/include/socket_vnf.h>
+#endif
+#include <vnf.h>
+#include <vnf_p7.h>
+
 #include "nfapi.h"
 #include "vendor_ext.h"
 
@@ -1391,16 +1398,9 @@ int vnf_nr_pack_p4_p5_vendor_extension(void *header, uint8_t **ppWritePackedMsg,
   return 0;
 }
 
-static pthread_t vnf_start_pthread;
+static pthread_t vnf_p5_init_and_receive_pthread;
 static pthread_t vnf_p7_start_pthread;
 
-void *vnf_nr_p7_start_thread(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
-  pthread_setname_np(pthread_self(), "VNF_P7");
-  nfapi_vnf_p7_config_t *config = (nfapi_vnf_p7_config_t *)ptr;
-  nfapi_nr_vnf_p7_start(config);
-  return config;
-}
 
 void *vnf_p7_start_thread(void *ptr) {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
@@ -1410,7 +1410,7 @@ void *vnf_p7_start_thread(void *ptr) {
   return config;
 }
 
-void *vnf_nr_p7_thread_start(void *ptr)
+void *configure_nr_p7_vnf(void *ptr)
 {
   init_queue(&gnb_rach_ind_queue);
   init_queue(&gnb_rx_ind_queue);
@@ -1450,9 +1450,15 @@ void *vnf_nr_p7_thread_start(void *ptr)
   p7_vnf->config->unpack_func = &nfapi_nr_p7_message_unpack;
   p7_vnf->config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
   p7_vnf->config->pack_func = &nfapi_nr_p7_message_pack;
+
+#ifdef ENABLE_SOCKET
+  p7_vnf->config->unpack_func = &nfapi_nr_p7_message_unpack;
+  p7_vnf->config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
+  p7_vnf->config->pack_func = &nfapi_nr_p7_message_pack;
   p7_vnf->config->send_p7_msg = &vnf_nr_send_p7_msg;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI P7 start thread %s\n", __FUNCTION__);
-  pthread_create(&vnf_p7_start_pthread, NULL, &vnf_nr_p7_start_thread, p7_vnf->config);
+  threadCreate(&vnf_p7_start_pthread, &vnf_nr_start_p7_thread, p7_vnf->config, "vnf_p7_thread", -1, OAI_PRIORITY_RT);
+#endif
   return 0;
 }
 
@@ -1500,7 +1506,7 @@ int pnf_nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_pnf_st
 
   if(p7_vnf->thread_started == 0) {
     pthread_t vnf_p7_thread;
-    threadCreate(&vnf_p7_thread, &vnf_nr_p7_thread_start, p7_vnf, "vnf_p7_thread", -1, OAI_PRIORITY_RT);
+    threadCreate(&vnf_p7_thread, &configure_nr_p7_vnf, p7_vnf, "vnf_p7_thread", -1, OAI_PRIORITY_RT);
     p7_vnf->thread_started = 1;
   } else {
     // P7 thread already running.
@@ -1510,7 +1516,10 @@ int pnf_nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_pnf_st
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Sending NFAPI_VNF_PARAM_REQUEST phy_id:%d\n", pnf->phys[0].id);
   memset(&req, 0, sizeof(req));
   req.header.message_id = NFAPI_NR_PHY_MSG_TYPE_PARAM_REQUEST;
+
+#ifdef ENABLE_SOCKET
   req.header.phy_id = pnf->phys[0].id;
+#endif
   nfapi_nr_vnf_param_req(config, p5_idx, &req);
   return 0;
 }
@@ -1800,21 +1809,10 @@ void vnf_nr_deallocate_p4_p5_vendor_ext(void *header) {
   free(header);
 }
 
-
-nfapi_vnf_config_t *config = 0;
-
-void vnf_nr_start_thread(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] VNF NFAPI thread - nfapi_vnf_start()%s\n", __FUNCTION__);
-  pthread_setname_np(pthread_self(), "VNF");
-  config = (nfapi_vnf_config_t *)ptr;
-  nfapi_nr_vnf_start(config);
-}
-
 void vnf_start_thread(void *ptr) {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] VNF NFAPI thread - nfapi_vnf_start()%s\n", __FUNCTION__);
   pthread_setname_np(pthread_self(), "VNF");
-  config = (nfapi_vnf_config_t *)ptr;
-  nfapi_vnf_start(config);
+  nfapi_vnf_start((nfapi_vnf_config_t *)ptr);
 }
 
 static vnf_info vnf;
@@ -1868,13 +1866,16 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->codec_config.allocate = &vnf_nr_allocate;
   config->codec_config.deallocate = &vnf_nr_deallocate;
   memset(&UL_RCC_INFO, 0, sizeof(UL_RCC_IND_t));
+
+#ifdef ENABLE_SOCKET
   config->unpack_func = &nfapi_nr_p5_message_unpack;
   config->hdr_unpack_func = &nfapi_nr_p5_message_header_unpack;
   config->pack_func = &nfapi_nr_p5_message_pack;
-  config->send_p5_msg = &vnf_nr_send_p5_message;
+  config->send_p5_msg = &vnf_nr_send_p5_msg;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&vnf_start_pthread, NULL, (void *)&vnf_nr_start_thread, config);
+  pthread_create(&vnf_p5_init_and_receive_pthread, NULL, (void *)&vnf_start_p5_thread, config);
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Created VNF NFAPI start thread %s\n", __FUNCTION__);
+#endif
 }
 
 
@@ -1922,7 +1923,7 @@ void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int
   config->codec_config.deallocate = &vnf_deallocate;
   memset(&UL_RCC_INFO,0,sizeof(UL_RCC_IND_t));
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&vnf_start_pthread, NULL, (void *)&vnf_start_thread, config);
+  pthread_create(&vnf_p5_init_and_receive_pthread, NULL, (void *)&vnf_start_thread, config);
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Created VNF NFAPI start thread %s\n", __FUNCTION__);
 }
 

@@ -529,7 +529,6 @@ void nfapi_vnf_config_destory(nfapi_vnf_config_t* config);
  * 
  * This function will not return untill nfapi_vnf_stop is called
  */
-int nfapi_nr_vnf_start(nfapi_vnf_config_t* config);
 
 int nfapi_vnf_start(nfapi_vnf_config_t* config);
 
@@ -1000,7 +999,7 @@ void nfapi_vnf_p7_config_destory(nfapi_vnf_p7_config_t* config);
  * function is called. 
  */
 int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config);
-int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config);
+
 
 
 /*! Stop the VNF P7 library. 

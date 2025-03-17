@@ -1,5 +1,6 @@
 add_library(nfapi_socket_lib
         socket_pnf.c
+        socket_vnf.c
         socket_common.c
 )
 

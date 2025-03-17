@@ -30,7 +30,7 @@
 #include "common/ran_context.h"
 
 #include "openair1/PHY/defs_gNB.h"
-#define FAPI2_IP_DSCP	0
+
 
 extern RAN_CONTEXT_t RC;
 
@@ -96,115 +96,6 @@ struct timespec timespec_sub(struct timespec lhs, struct timespec rhs)
 
 // monitor the p7 endpoints and the timing loop and
 // send indications to mac
-int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config)
-{	
-	if(config == 0)
-		return -1;
-
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
-
-	vnf_p7_t* vnf_p7 = (vnf_p7_t*)config;
-
-	// Create p7 receive udp port
-	// todo : this needs updating for Ipv6
-
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "Initialising VNF P7 port:%u\n", config->port);
-
-	// open the UDP socket
-	if ((vnf_p7->socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "After P7 socket errno: %d\n", errno);
-		return -1;
-	}
-
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 socket created...\n");
-
-	// configure the UDP socket options
-	int iptos_value = FAPI2_IP_DSCP << 2;
-	if (setsockopt(vnf_p7->socket, IPPROTO_IP, IP_TOS, &iptos_value, sizeof(iptos_value)) < 0)
-	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "After setsockopt (IP_TOS) errno: %d\n", errno);
-		return -1;
-	}
-
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 setsockopt succeeded...\n");
-
-	// Create the address structure
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(config->port);
-	addr.sin_addr.s_addr = INADDR_ANY;
-
-	// bind to the configured port
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 binding too %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-	if (bind(vnf_p7->socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in)) < 0)
-	//if (sctp_bindx(config->socket, (struct sockaddr *)&addr, sizeof(struct sockaddr_in), 0) < 0)
-	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "After bind errno: %d\n", errno);
-		return -1;
-	}
-
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 bind succeeded...\n");
-
-
-	//struct timespec original_pselect_timeout;
-	struct timespec pselect_timeout;
-	pselect_timeout.tv_sec = 100; 
-	pselect_timeout.tv_nsec = 0;
-
-    struct timespec ref_time;
-	clock_gettime(CLOCK_MONOTONIC, &ref_time);
-	while(vnf_p7->terminate == 0)
-	{	
-		fd_set rfds;
-		int maxSock = 0;
-		FD_ZERO(&rfds);
-		int selectRetval = 0;
-
-		// Add the p7 socket
-		FD_SET(vnf_p7->socket, &rfds);
-		maxSock = vnf_p7->socket;
-
-		selectRetval = pselect(maxSock+1, &rfds, NULL, NULL, &pselect_timeout, NULL);
-
-		if(selectRetval == 0)
-		{
-			// pselect timed out, continue
-		}
-		else if(selectRetval > 0)
-		{
-			// have a p7 message
-			if(FD_ISSET(vnf_p7->socket, &rfds))
-			{	
-				vnf_nr_p7_read_dispatch_message(vnf_p7); 				
-			}
-		}
-		else
-		{
-			// pselect error
-			if(selectRetval == -1 && errno == EINTR)
-			{
-				// a sigal was received.
-			}
-			else
-			{
-				//NFAPI_TRACE(NFAPI_TRACE_INFO, "P7 select failed result %d errno %d timeout:%d.%d orginal:%d.%d last_ms:%ld ms:%ld\n", selectRetval, errno, pselect_timeout.tv_sec, pselect_timeout.tv_nsec, pselect_timeout.tv_sec, pselect_timeout.tv_nsec, last_millisecond, millisecond);
-				// should we exit now?
-                                if (selectRetval == -1 && errno == 22) // invalid argument??? not sure about timeout duration
-                                {
-                                  usleep(100000);
-                                }
-			}
-		}
-	}
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "Closing p7 socket\n");
-	close(vnf_p7->socket);
-
-	NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() returning\n", __FUNCTION__);
-
-	return 0;
-}
 
 
 int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config)
@@ -231,7 +122,7 @@ int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config)
 	NFAPI_TRACE(NFAPI_TRACE_INFO, "VNF P7 socket created...\n");
 
 	// configure the UDP socket options
-	int iptos_value = FAPI2_IP_DSCP << 2;
+	int iptos_value = 0;
 	if (setsockopt(vnf_p7->socket, IPPROTO_IP, IP_TOS, &iptos_value, sizeof(iptos_value)) < 0)
 	{
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "After setsockopt (IP_TOS) errno: %d\n", errno);

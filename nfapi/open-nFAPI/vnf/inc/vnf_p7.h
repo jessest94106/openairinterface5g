@@ -19,7 +19,6 @@
 #define _VNF_P7_H_
 
 #include "nfapi_vnf_interface.h"
-
 #define TIMEHR_SEC(_time_hr) ((uint32_t)(_time_hr) >> 20)
 #define TIMEHR_USEC(_time_hr) ((uint32_t)(_time_hr) & 0xFFFFF)
 #define TIME2TIMEHR(_time) (((uint32_t)(_time.tv_sec) & 0xFFF) << 20 | ((uint32_t)(_time.tv_usec) & 0xFFFFF))
@@ -132,15 +131,20 @@ int vnf_nr_sync(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* p7_info);
 int send_mac_subframe_indications(vnf_p7_t* config);
 int send_mac_slot_indications(vnf_p7_t* config);
 int vnf_p7_read_dispatch_message(vnf_p7_t* vnf_p7 );
-int vnf_nr_p7_read_dispatch_message(vnf_p7_t* vnf_p7 );
+void vnf_nr_handle_p7_message(void *pRecvMsg, int recvMsgLen, vnf_p7_t* vnf_p7);
+vnf_p7_rx_message_t* vnf_p7_rx_reassembly_queue_add_segment(vnf_p7_t* vnf_p7, vnf_p7_rx_reassembly_queue_t* queue, uint16_t sequence_number, uint16_t segment_number, uint8_t m, uint8_t* data, uint16_t data_len);
+void* vnf_p7_malloc(vnf_p7_t* vnf_p7, size_t size);
+void vnf_p7_free(vnf_p7_t* vnf_p7, void* ptr);
+void vnf_p7_rx_reassembly_queue_remove_msg(vnf_p7_t* vnf_p7, vnf_p7_rx_reassembly_queue_t* queue, vnf_p7_rx_message_t* msg);
+void vnf_p7_rx_reassembly_queue_remove_old_msgs(vnf_p7_t* vnf_p7, vnf_p7_rx_reassembly_queue_t* queue, uint32_t delta);
+uint32_t calculate_transmit_timestamp(int mu, uint16_t sfn, uint16_t slot, uint32_t slot_start_time_hr);
+
 
 void vnf_p7_connection_info_list_add(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* node);
 nfapi_vnf_p7_connection_info_t* vnf_p7_connection_info_list_find(vnf_p7_t* vnf_p7, uint16_t phy_id);
 nfapi_vnf_p7_connection_info_t* vnf_p7_connection_info_list_delete(vnf_p7_t* vnf_p7, uint16_t phy_id);
 
 int vnf_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_p7_message_header_t* header);
-bool vnf_nr_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header);
-
 void vnf_p7_release_msg(vnf_p7_t* vnf_p7, nfapi_p7_message_header_t* header);
 void vnf_p7_release_pdu(vnf_p7_t* vnf_p7, void* pdu);
 
