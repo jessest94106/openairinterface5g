@@ -419,7 +419,6 @@ int nfapi_pnf_config_destroy(nfapi_pnf_config_t* config);
  * \endcode
  */
 int nfapi_pnf_start(nfapi_pnf_config_t* config);
-int nfapi_nr_pnf_start(nfapi_pnf_config_t* config);
 
 /*! Stop the PNF library. 
  * \param config A pointer to the pnf configuration
@@ -847,7 +846,7 @@ int nfapi_pnf_p7_config_destroy(nfapi_pnf_p7_config_t* config);
  * This function will not return until nfapi_pnf_p7_stop is called.
  */
 int nfapi_pnf_p7_start(nfapi_pnf_p7_config_t* config);
-int nfapi_nr_pnf_p7_start(nfapi_pnf_p7_config_t* config);
+
 
 /*! Stop the PNF P7 library. 
  * \param config A pointer to a PNF P7 config

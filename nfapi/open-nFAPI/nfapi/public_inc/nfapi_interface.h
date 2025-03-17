@@ -115,7 +115,8 @@ typedef struct {
 #define NFAPI_P7_GET_MORE(_mss) ( ((_mss) & 0x8000) >> 15 )
 #define NFAPI_P7_GET_SEGMENT(_mss) ( ((_mss) & 0x7F00) >> 8 )
 #define NFAPI_P7_GET_SEQUENCE(_mss) ( (_mss) & 0x00FF )
-#define NFAPI_P7_SET_MSS(_more, _segm, _sequ) ( (((_more) & 0x1) << 7) | (((_segm) & 0x7) << 4) | ((_sequ) & 0xF) )
+#define NFAPI_NR_P7_SET_MSS(_more, _segm, _sequ) ( (((_more) & 0x1) << 15) | (((_segm) & 0x7F) << 8) | ((_sequ) & 0xFF) )
+#define NFAPI_P7_SET_MSS(_more, _segm, _sequ) ( (((_more) & 0x1) << 7) | (((_segm) & 0x7F) << 4) | ((_sequ) & 0xF) )
 
 #define NFAPI_TAG_LENGTH_PACKED_LEN 4
 

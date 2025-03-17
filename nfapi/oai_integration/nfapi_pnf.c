@@ -63,6 +63,10 @@
 #include "executables/lte-softmodem.h"
 #include "nfapi/open-nFAPI/pnf/inc/pnf_p7.h"
 
+#ifdef ENABLE_SOCKET
+#include <socket/include/socket_pnf.h>
+#endif
+
 #define NUM_P5_PHY 2
 
 #define _GNU_SOURCE
@@ -186,7 +190,7 @@ typedef struct {
 } pnf_phy_user_data_t;
 
 static pnf_info pnf;
-static pthread_t pnf_start_pthread;
+static pthread_t pnf_p5_init_and_receive_pthread;
 
 int nfapitooai_level(int nfapi_level) {
   switch(nfapi_level) {
@@ -220,12 +224,7 @@ void *pnf_p7_thread_start(void *ptr) {
   return 0;
 }
 
-void *pnf_nr_p7_thread_start(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[NR_PNF] NR P7 THREAD %s\n", __FUNCTION__);
-  nfapi_pnf_p7_config_t *config = (nfapi_pnf_p7_config_t *)ptr;
-  nfapi_nr_pnf_p7_start(config);
-  return 0;
-}
+
 
 int pnf_nr_param_request(nfapi_pnf_config_t *config, nfapi_nr_pnf_param_request_t *req)
 {
@@ -1752,6 +1751,8 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   p7_config->codec_config.pack_p7_vendor_extension = &pnf_nr_phy_pack_p7_vendor_extension;
   p7_config->codec_config.unpack_vendor_extension_tlv = &pnf_nr_phy_unpack_vendor_extension_tlv;
   p7_config->codec_config.pack_vendor_extension_tlv = &pnf_nr_phy_pack_vendor_extention_tlv;
+
+#ifdef ENABLE_SOCKET
   p7_config->unpack_func = &nfapi_nr_p7_message_unpack;
   p7_config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
   p7_config->pack_func = &nfapi_nr_p7_message_pack;
@@ -1759,6 +1760,8 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating P7 thread %s\n", __FUNCTION__);
   pthread_t p7_thread;
   threadCreate(&p7_thread, &pnf_nr_p7_thread_start, p7_config, "pnf_p7_thread", -1, OAI_PRIORITY_RT);
+#endif
+
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Calling l1_north_init_eNB() %s\n", __FUNCTION__);
   l1_north_init_gNB();
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] HACK - Set p7_config global ready for subframe ind%s\n", __FUNCTION__);
@@ -2141,15 +2144,6 @@ void *pnf_start_thread(void *ptr) {
   return (void *)0;
 }
 
-void *pnf_nr_start_thread(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] IN PNF NFAPI start thread %s\n", __FUNCTION__);
-  nfapi_pnf_config_t *config = (nfapi_pnf_config_t *)ptr;
-  struct sched_param sp;
-  sp.sched_priority = 20;
-  pthread_setschedparam(pthread_self(),SCHED_FIFO,&sp);
-  nfapi_nr_pnf_start(config);
-  return (void *)0;
-}
 
 void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port)
 {
@@ -2197,13 +2191,18 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
   config->deallocate_p4_p5_vendor_ext = &pnf_nr_sim_deallocate_p4_p5_vendor_ext;
   config->codec_config.unpack_p4_p5_vendor_extension = &pnf_nr_sim_unpack_p4_p5_vendor_extension;
   config->codec_config.pack_p4_p5_vendor_extension = &pnf_nr_sim_pack_p4_p5_vendor_extension;
+
+
+#ifdef ENABLE_SOCKET
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
   config->unpack_func = &nfapi_nr_p5_message_unpack;
   config->hdr_unpack_func = &nfapi_nr_p5_message_header_unpack;
   config->pack_func = &nfapi_nr_p5_message_pack;
   config->send_p5_msg = &pnf_nr_send_p5_message;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&pnf_start_pthread, NULL, &pnf_nr_start_thread, config);
-  pthread_setname_np(pnf_start_pthread, "NFAPI_PNF");
+  pthread_create(&pnf_p5_init_and_receive_pthread, NULL, &pnf_start_p5_thread, config);
+  pthread_setname_np(pnf_p5_init_and_receive_pthread, "NFAPI_PNF");
+#endif
 }
 
 void configure_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port) {
@@ -2253,8 +2252,8 @@ void configure_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->codec_config.unpack_p4_p5_vendor_extension = &pnf_sim_unpack_p4_p5_vendor_extension;
   config->codec_config.pack_p4_p5_vendor_extension = &pnf_sim_pack_p4_p5_vendor_extension;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&pnf_start_pthread, NULL, &pnf_start_thread, config);
-  pthread_setname_np(pnf_start_pthread, "NFAPI_PNF");
+  pthread_create(&pnf_p5_init_and_receive_pthread, NULL, &pnf_start_thread, config);
+  pthread_setname_np(pnf_p5_init_and_receive_pthread, "NFAPI_PNF");
 }
 
 void oai_subframe_ind(uint16_t sfn, uint16_t sf) {

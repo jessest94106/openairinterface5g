@@ -715,6 +715,7 @@ add_library(NFAPI_LIB ${NFAPI_SRC})
 target_link_libraries(NFAPI_LIB PUBLIC nfapi_common)
 target_link_libraries(NFAPI_LIB PUBLIC nr_fapi_p5 nr_fapi_p7)
 
+target_compile_definitions(NFAPI_LIB PRIVATE ENABLE_SOCKET)
 include_directories(${NFAPI_DIR}/nfapi/public_inc)
 include_directories(${NFAPI_DIR}/nfapi/inc)
 
@@ -755,6 +756,7 @@ set(NFAPI_USER_SRC
   ${NFAPI_USER_DIR}/gnb_ind_vars.c
 )
 add_library(NFAPI_USER_LIB ${NFAPI_USER_SRC})
+target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_SOCKET)
 target_link_libraries(NFAPI_USER_LIB PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs UTIL)
 target_link_libraries(NFAPI_USER_LIB PRIVATE nr_fapi_p7)
 if(OAI_AERIAL)
@@ -1839,6 +1841,8 @@ target_link_libraries(nr-softmodem PRIVATE pthread m CONFIG_LIB rt sctp)
 target_link_libraries(nr-softmodem PRIVATE ${T_LIB})
 target_link_libraries(nr-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 target_link_libraries(nr-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+
+target_link_libraries(nr-softmodem PUBLIC nfapi_socket_lib)
 add_boolean_option(OAI_AERIAL OFF "Activate OAI's AERIAL driver" OFF)
 if (OAI_AERIAL)
   target_compile_definitions(nr-softmodem PUBLIC ENABLE_AERIAL)
