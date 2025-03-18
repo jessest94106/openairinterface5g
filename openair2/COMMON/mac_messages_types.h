@@ -72,13 +72,13 @@
 // Messages between RRC and MAC layers
 
 typedef struct NRRrcMacRaInd_s {
-  uint32_t frame;
   bool RA_succeeded;
 } NRRrcMacRaInd;
 
 typedef struct NRRrcMacMsg3Ind_s {
   uint16_t rnti;
   int gnb_id;
+  bool prepare_payload;
 } NRRrcMacMsg3Ind;
 
 typedef struct NRRrcMacInacInd_s {
