@@ -237,8 +237,6 @@ typedef struct {
 
   /// estimated frequency offset (in radians) for all subcarriers
   int32_t freq_offset;
-  /// nid2 is the PSS value, the PCI (physical cell id) will be: 3*NID1 (SSS value) + NID2 (PSS value)
-  int32_t nid2;
 } NR_UE_COMMON;
 
 #define NR_PRS_IDFT_OVERSAMP_FACTOR 1  // IDFT oversampling factor for NR PRS channel estimates in time domain, ALLOWED value 16x, and 1x is default(ie. IDFT size is frame_params->ofdm_symbol_size)
@@ -413,12 +411,6 @@ typedef struct PHY_VARS_NR_UE_s {
   uint32_t              PF;
   uint32_t              PO;
 
-#if defined(UPGRADE_RAT_NR)
-
-  /// demodulation reference signal for NR PBCH
-  uint32_t dmrs_pbch_bitmap_nr[DMRS_PBCH_I_SSB][DMRS_PBCH_N_HF][DMRS_BITMAP_SIZE];
-
-#endif
   // Scrambling IDs used in PUSCH DMRS
   c16_t X_u[64][839];
 
@@ -476,15 +468,6 @@ typedef struct PHY_VARS_NR_UE_s {
   int ta_slot;
   int ta_command;
 
-  /// Flag to tell if UE is secondary user (cognitive mode)
-  unsigned char    is_secondary_ue;
-  /// Flag to tell if secondary gNB has channel estimates to create NULL-beams from.
-  unsigned char    has_valid_precoder;
-  /// hold the precoder for NULL beam to the primary gNB
-  int              **ul_precoder_S_UE;
-  /// holds the maximum channel/precoder coefficient
-  char             log2_maxp;
-
   /// Flag to initialize averaging of PHY measurements
   int init_averaging;
 
@@ -504,17 +487,6 @@ typedef struct PHY_VARS_NR_UE_s {
   /// CSI variables
   nr_csi_info_t *nr_csi_info;
 
-  //#if defined(UPGRADE_RAT_NR)
-#if 1
-  SystemInformationBlockType1_nr_t systemInformationBlockType1_nr;
-#endif
-
-  //#if defined(UPGRADE_RAT_NR)
-#if 1
-  scheduling_request_config_t scheduling_request_config_nr[NUMBER_OF_CONNECTED_gNB_MAX];
-
-#endif
-  uint32_t use_ia_receiver;
   // TODO: move this out of phy
   time_stats_t ue_ul_indication_stats;
   nr_ue_phy_cpu_stat_t phy_cpu_stats;
@@ -522,11 +494,6 @@ typedef struct PHY_VARS_NR_UE_s {
   /// RF and Interface devices per CC
   openair0_device rfdevice;
 
-#if ENABLE_RAL
-  hash_table_t    *ral_thresholds_timed;
-  SLIST_HEAD(ral_thresholds_gen_poll_s, ral_threshold_phy_t) ral_thresholds_gen_polled[RAL_LINK_PARAM_GEN_MAX];
-  SLIST_HEAD(ral_thresholds_lte_poll_s, ral_threshold_phy_t) ral_thresholds_lte_polled[RAL_LINK_PARAM_LTE_MAX];
-#endif
   void* scopeData;
   // Pointers to hold PDSCH data only for phy simulators
   void *phy_sim_rxdataF;
