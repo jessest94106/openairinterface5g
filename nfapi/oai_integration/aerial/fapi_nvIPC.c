@@ -53,7 +53,6 @@
 #include "nfapi_nr_interface_scf.h"
 #include "nfapi/open-nFAPI/vnf/inc/vnf_p7.h"
 
-#include "fapi_vnf_p5.h"
 #include "fapi_vnf_p7.h"
 
 #define MAX_EVENTS 10
@@ -94,59 +93,9 @@ static int ipc_handle_rx_msg(nv_ipc_t *ipc, nv_ipc_msg_t *msg)
     }
 
     switch (fapi_msg.message_id) {
-      case NFAPI_NR_PHY_MSG_TYPE_PARAM_RESPONSE:
-
-        if (vnf_config->nr_param_resp) {
-          nfapi_nr_param_response_scf_t msg_param_resp;
-          aerial_unpack_nr_param_response(&pReadPackedMessage, end, &msg_param_resp, &vnf_config->codec_config);
-          (vnf_config->nr_param_resp)(vnf_config, vnf_config->pnf_list->p5_idx, &msg_param_resp);
-        }
+      case NFAPI_NR_PHY_MSG_TYPE_PARAM_RESPONSE ... NFAPI_NR_PHY_MSG_TYPE_ERROR_INDICATION:
+        vnf_nr_handle_p4_p5_message(msg->msg_buf, msg->msg_len, 1, vnf_config);
         break;
-
-      case NFAPI_NR_PHY_MSG_TYPE_CONFIG_RESPONSE: {
-        // unpack message
-        nfapi_nr_config_response_scf_t msg_config_response;
-        aerial_unpack_nr_config_response(&pReadPackedMessage, end, &msg_config_response, &vnf_config->codec_config);
-        // Check the error code
-        if (msg_config_response.error_code == NFAPI_NR_CONFIG_MSG_OK) {
-          // Invoke the call back
-          if (vnf_config->nr_config_resp) {
-            (vnf_config->nr_config_resp)(vnf_config, vnf_config->pnf_list->p5_idx, &msg_config_response);
-          }
-        } else {
-          // Error code not OK (MSG_INVALID_CONFIG)
-          /* MSG_INVALID_CONFIG.response structure
-           * Error code uint8_t
-           * Number of invalid or unsupported TLVs uint8_t
-           * Number of invalid TLVs that can only be configured in IDLE state uint8_t
-           * Number of invalid TLVs that can only be configured in RUNNING state uint8_t
-           * Number of missing TLVs uint8_t
-           * List of invalid or unsupported TLVs
-           * List of invalid TLVs that can only be configured in IDLE state
-           * List of invalid TLVs that can only be configured in RUNNING state
-           * List of missing TLVs
-           * */
-        }
-        break;
-      }
-
-      case NFAPI_NR_PHY_MSG_TYPE_STOP_INDICATION: {
-        // TODO : ADD Support for NFAPI_NR_PHY_MSG_TYPE_STOP_INDICATION (0x06)
-        LOG_D(NFAPI_VNF,"Received NFAPI_NR_PHY_MSG_TYPE_STOP_INDICATION\n");
-        break;
-      }
-
-      case NFAPI_NR_PHY_MSG_TYPE_ERROR_INDICATION: {
-        // TODO: Add Support for NFAPI_NR_PHY_MSG_TYPE_ERROR_INDICATION (0x07)
-        LOG_D(NFAPI_VNF,"Received NFAPI_NR_PHY_MSG_TYPE_ERROR_INDICATION\n");
-        //for (int i = 0; i < msg->msg_len; i++) {
-        //  printf(" msg->msg_buf[%d] = 0x%02x\n", i, ((uint8_t *) msg->msg_buf)[i]);
-        //}
-        LOG_D(NFAPI_VNF,"old sfn %u\n", old_sfn);
-        LOG_D(NFAPI_VNF,"old slot %u\n", old_slot);
-
-        break;
-      }
       // P7 Messages
       // P7 Message Handlers -> ((vnf_info *)vnf_config->user_data)->p7_vnfs->config->
       case NFAPI_NR_PHY_MSG_TYPE_SLOT_INDICATION: {
@@ -676,3 +625,83 @@ int nvIPC_Init(nvipc_params_t nvipc_params_s)
   vnf_config->nr_param_resp(vnf_config, 1, &resp_msg);
   return 0;
 }
+
+int oai_fapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req)
+{
+  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+
+  ul_tti_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ul_tti_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST;
+
+  // int retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
+  int retval = fapi_nr_pack_and_send_p7_message((vnf_p7_t *)p7_config, &ul_tti_req->header);
+
+  if (retval != 0) {
+    LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
+  } else {
+    // Reset number of PDUs so that it is not resent
+    ul_tti_req->n_pdus = 0;
+    ul_tti_req->n_group = 0;
+    ul_tti_req->n_ulcch = 0;
+    ul_tti_req->n_ulsch = 0;
+  }
+  return retval;
+}
+
+int oai_fapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req)
+{
+  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  ul_dci_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  ul_dci_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST;
+  // int retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
+  int retval = fapi_nr_pack_and_send_p7_message((vnf_p7_t *)p7_config, &ul_dci_req->header);
+  if (retval != 0) {
+    LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
+  } else {
+    ul_dci_req->numPdus = 0;
+  }
+  return retval;
+}
+
+int oai_fapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
+{
+  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  tx_data_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  tx_data_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST;
+  // LOG_D(PHY, "[VNF] %s() TX_REQ sfn_sf:%d number_of_pdus:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(tx_data_req->SFN),
+  // tx_data_req->Number_of_PDUs); int retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
+  int retval = fapi_nr_pack_and_send_p7_message((vnf_p7_t *)p7_config, &tx_data_req->header);
+  if (retval != 0) {
+    LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
+  } else {
+    tx_data_req->Number_of_PDUs = 0;
+  }
+
+  return retval;
+}
+
+int oai_fapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req)
+{
+  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  dl_config_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST;
+  dl_config_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
+  int retval = fapi_nr_pack_and_send_p7_message((vnf_p7_t *)p7_config, &dl_config_req->header);
+  dl_config_req->dl_tti_request_body.nPDUs = 0;
+  dl_config_req->dl_tti_request_body.nGroup = 0;
+
+  if (retval != 0) {
+    LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
+  }
+  return retval;
+}
+
+int oai_fapi_send_end_request(int cell, uint32_t frame, uint32_t slot){
+  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  nfapi_nr_slot_indication_scf_t nr_slot_resp = {.header.message_id = 0x8F, .sfn = frame, .slot = slot};
+  int retval = fapi_nr_pack_and_send_p7_message((vnf_p7_t *)p7_config, &nr_slot_resp.header);
+  if (retval != 0) {
+    LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
+  }
+  return retval;
+}
+

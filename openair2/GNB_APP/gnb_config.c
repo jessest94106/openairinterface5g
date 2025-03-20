@@ -78,9 +78,7 @@
 #include "uper_encoder.h"
 #include "utils.h"
 #include "x2ap_messages_types.h"
-#ifdef ENABLE_AERIAL
-#include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
-#endif
+
 
 static int DEFBANDS[] = {7};
 static int DEFENBS[] = {0};

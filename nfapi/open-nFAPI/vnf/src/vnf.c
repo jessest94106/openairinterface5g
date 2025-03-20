@@ -29,7 +29,6 @@
 #include "nfapi_nr_interface_scf.h"
 #ifdef ENABLE_AERIAL
 #include "nfapi/oai_integration/aerial/fapi_nvIPC.h"
-#include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
 #include "nr_fapi_p5.h"
 #endif
 #ifdef ENABLE_WLS

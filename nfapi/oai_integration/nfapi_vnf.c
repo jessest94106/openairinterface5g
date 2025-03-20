@@ -63,7 +63,7 @@
 #include <NR_MAC_gNB/mac_proto.h>
 
 #ifdef ENABLE_AERIAL
-#include "aerial/fapi_vnf_p5.h"
+#include "aerial/fapi_nvIPC.h"
 #include "nr_fapi_p5.h"
 #endif
 
