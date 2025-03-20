@@ -35,200 +35,6 @@
 #include "nr_fapi_p7.h"
 #include "nr_fapi_p7_utils.h"
 
-#include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h" // for handle_nr_srs_measurements()
-
-extern pthread_cond_t nfapi_sync_cond;
-extern pthread_mutex_t nfapi_sync_mutex;
-extern int nfapi_sync_var;
-
-int aerial_phy_nr_crc_indication(nfapi_nr_crc_indication_t *ind)
-{
-  nfapi_nr_crc_indication_t *crc_ind = CALLOC(1, sizeof(*crc_ind));
-  copy_crc_indication(ind, crc_ind);
-  if (!put_queue(&gnb_crc_ind_queue, crc_ind)) {
-    LOG_E(NR_MAC, "Put_queue failed for crc_ind\n");
-    free_crc_indication(crc_ind);
-    free(crc_ind);
-  }
-  return 1;
-}
-
-int aerial_phy_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind)
-{
-  nfapi_nr_rx_data_indication_t *rx_ind = CALLOC(1, sizeof(*rx_ind));
-  copy_rx_data_indication(ind, rx_ind);
-  if (!put_queue(&gnb_rx_ind_queue, rx_ind)) {
-    LOG_E(NR_MAC, "Put_queue failed for rx_ind\n");
-    free_rx_data_indication(rx_ind);
-    free(rx_ind);
-  }
-  return 1;
-}
-
-int aerial_phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind)
-{
-  nfapi_nr_rach_indication_t *rach_ind = CALLOC(1, sizeof(*rach_ind));
-  copy_rach_indication(ind, rach_ind);
-  if (!put_queue(&gnb_rach_ind_queue, rach_ind)) {
-    LOG_E(NR_MAC, "Put_queue failed for rach_ind\n");
-    free_rach_indication(rach_ind);
-    free(rach_ind);
-  } else {
-    LOG_I(NR_MAC, "RACH.indication put_queue successfull\n");
-  }
-  return 1;
-}
-
-int aerial_phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
-{
-  nfapi_nr_uci_indication_t *uci_ind = CALLOC(1, sizeof(*uci_ind));
-  AssertFatal(uci_ind, "Memory not allocated for uci_ind in phy_nr_uci_indication.");
-  copy_uci_indication(ind, uci_ind);
-  if (!put_queue(&gnb_uci_ind_queue, uci_ind)) {
-    LOG_E(NR_MAC, "Put_queue failed for uci_ind\n");
-    free_uci_indication(uci_ind);
-    free(uci_ind);
-    uci_ind = NULL;
-  }
-  return 1;
-}
-
-void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slot, NR_Sched_Rsp_t* sched_info);
-int oai_fapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req);
-int oai_fapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req);
-int oai_fapi_tx_data_req(nfapi_nr_tx_data_request_t* tx_data_req);
-int oai_fapi_ul_dci_req(nfapi_nr_ul_dci_request_t* ul_dci_req);
-int oai_fapi_send_end_request(int cell, uint32_t frame, uint32_t slot);
-extern int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind);
-
-int aerial_phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
-{
-  LOG_D(MAC, "VNF SFN/Slot %d.%d \n", ind->sfn, ind->slot);
-  trigger_scheduler(ind);
-
-  return 1;
-}
-
-int aerial_phy_nr_srs_indication(nfapi_nr_srs_indication_t *ind)
-{
-  // or queue to decouple, but I think it should be fast (in all likelihood,
-  // the VNF has nothing to do)
-  for (int i = 0; i < ind->number_of_pdus; ++i)
-    handle_nr_srs_measurements(0, ind->sfn, ind->slot, &ind->pdu_list[i]);
-  return 1;
-}
-
-void *aerial_vnf_allocate(size_t size)
-{
-  // return (void*)memory_pool::allocate(size);
-  return (void *)malloc(size);
-}
-
-void aerial_vnf_deallocate(void *ptr)
-{
-  // memory_pool::deallocate((uint8_t*)ptr);
-  free(ptr);
-}
-
-int aerial_phy_vendor_ext(struct nfapi_vnf_p7_config *config, void *msg)
-{
-  if (((nfapi_nr_p7_message_header_t *)msg)->message_id == P7_VENDOR_EXT_IND) {
-    // vendor_ext_p7_ind* ind = (vendor_ext_p7_ind*)msg;
-    // NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] vendor_ext (error_code:%d)\n", ind->error_code);
-  } else {
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] unknown %02x\n", ((nfapi_nr_p7_message_header_t *)msg)->message_id);
-  }
-
-  return 0;
-}
-
-int aerial_phy_unpack_p7_vendor_extension(void *header,
-                                          uint8_t **ppReadPackedMessage,
-                                          uint8_t *end,
-                                          nfapi_p7_codec_config_t *config)
-{
-  // NFAPI_TRACE(NFAPI_TRACE_INFO, "%s\n", __FUNCTION__);
-  if (((nfapi_nr_p7_message_header_t *)header)->message_id == P7_VENDOR_EXT_IND) {
-    vendor_ext_p7_ind *req = (vendor_ext_p7_ind *)(header);
-
-    if (!pull16(ppReadPackedMessage, &req->error_code, end))
-      return 0;
-  }
-
-  return 1;
-}
-
-int aerial_phy_pack_p7_vendor_extension(void *header, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p7_codec_config_t *config)
-{
-  // NFAPI_TRACE(NFAPI_TRACE_INFO, "%s\n", __FUNCTION__);
-  if (((nfapi_nr_p7_message_header_t *)header)->message_id == P7_VENDOR_EXT_REQ) {
-    // NFAPI_TRACE(NFAPI_TRACE_INFO, "%s\n", __FUNCTION__);
-    vendor_ext_p7_req *req = (vendor_ext_p7_req *)(header);
-
-    if (!(push16(req->dummy1, ppWritePackedMsg, end) && push16(req->dummy2, ppWritePackedMsg, end)))
-      return 0;
-  }
-
-  return 1;
-}
-
-int aerial_phy_unpack_vendor_extension_tlv(nfapi_tl_t *tl,
-                                           uint8_t **ppReadPackedMessage,
-                                           uint8_t *end,
-                                           void **ve,
-                                           nfapi_p7_codec_config_t *codec)
-{
-  (void)tl;
-  (void)ppReadPackedMessage;
-  (void)ve;
-  return -1;
-}
-
-int aerial_phy_pack_vendor_extension_tlv(void *ve, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p7_codec_config_t *codec)
-{
-  // NFAPI_TRACE(NFAPI_TRACE_INFO, "phy_pack_vendor_extension_tlv\n");
-  nfapi_tl_t *tlv = (nfapi_tl_t *)ve;
-
-  switch (tlv->tag) {
-    case VENDOR_EXT_TLV_1_TAG: {
-      // NFAPI_TRACE(NFAPI_TRACE_INFO, "Packing VENDOR_EXT_TLV_1\n");
-      vendor_ext_tlv_1 *ve = (vendor_ext_tlv_1 *)tlv;
-
-      if (!push32(ve->dummy, ppWritePackedMsg, end))
-        return 0;
-
-      return 1;
-    } break;
-
-    default:
-      return -1;
-      break;
-  }
-}
-
-void *aerial_phy_allocate_p7_vendor_ext(uint16_t message_id, uint16_t *msg_size)
-{
-  if (message_id == P7_VENDOR_EXT_IND) {
-    *msg_size = sizeof(vendor_ext_p7_ind);
-    return (nfapi_nr_p7_message_header_t *)malloc(sizeof(vendor_ext_p7_ind));
-  }
-
-  return 0;
-}
-
-void aerial_phy_deallocate_p7_vendor_ext(void *header)
-{
-  free(header);
-}
-
-uint8_t aerial_unpack_nr_slot_indication(uint8_t **ppReadPackedMsg,
-                                         uint8_t *end,
-                                         nfapi_nr_slot_indication_scf_t *msg,
-                                         nfapi_p7_codec_config_t *config)
-{
-  return unpack_nr_slot_indication(ppReadPackedMsg, end, msg, config);
-}
-
 static uint8_t aerial_unpack_nr_rx_data_indication_body(nfapi_nr_rx_data_pdu_t *value,
                                                         uint8_t **ppReadPackedMsg,
                                                         uint8_t *end,
@@ -247,6 +53,7 @@ static uint8_t aerial_unpack_nr_rx_data_indication_body(nfapi_nr_rx_data_pdu_t *
 
   return 1;
 }
+
 uint8_t aerial_unpack_nr_rx_data_indication(uint8_t **ppReadPackedMsg,
                                             uint8_t *end,
                                             uint8_t **pDataMsg,
@@ -273,29 +80,16 @@ uint8_t aerial_unpack_nr_rx_data_indication(uint8_t **ppReadPackedMsg,
   }
   // After unpacking the PDU headers, unpack the PDU data from the separate buffer
   for (int i = 0; i < pNfapiMsg->number_of_pdus; i++) {
-    if(!pullarray8(pDataMsg,
-               pNfapiMsg->pdu_list[i].pdu,
-               pNfapiMsg->pdu_list[i].pdu_length,
-               pNfapiMsg->pdu_list[i].pdu_length,
-               data_end)){
+    if (!pullarray8(pDataMsg,
+                    pNfapiMsg->pdu_list[i].pdu,
+                    pNfapiMsg->pdu_list[i].pdu_length,
+                    pNfapiMsg->pdu_list[i].pdu_length,
+                    data_end)) {
       return 0;
     }
   }
 
   return 1;
-}
-
-uint8_t aerial_unpack_nr_crc_indication(uint8_t **ppReadPackedMsg,
-                                        uint8_t *end,
-                                        nfapi_nr_crc_indication_t *msg,
-                                        nfapi_p7_codec_config_t *config)
-{
-  return unpack_nr_crc_indication(ppReadPackedMsg, end, msg, config);
-}
-
-uint8_t aerial_unpack_nr_uci_indication(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg, nfapi_p7_codec_config_t *config)
-{
-  return unpack_nr_uci_indication(ppReadPackedMsg, end, msg, config);
 }
 
 uint8_t aerial_unpack_nr_srs_indication(uint8_t **ppReadPackedMsg,
@@ -316,20 +110,13 @@ uint8_t aerial_unpack_nr_srs_indication(uint8_t **ppReadPackedMsg,
   return retval;
 }
 
-uint8_t aerial_unpack_nr_rach_indication(uint8_t **ppReadPackedMsg,
-                                         uint8_t *end,
-                                         nfapi_nr_rach_indication_t *msg,
-                                         nfapi_p7_codec_config_t *config)
-{
-  return unpack_nr_rach_indication(ppReadPackedMsg, end, msg, config);
-}
-
 static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
                                            void *pPackedBuf,
                                            void *pDataBuf,
                                            uint32_t packedBufLen,
                                            uint32_t dataBufLen,
                                            nfapi_p7_codec_config_t *config,
+                                           nfapi_vnf_p7_config_t *p7_config,
                                            uint32_t *data_len)
 {
   if (pMessageBuf == NULL || pPackedBuf == NULL) {
@@ -386,16 +173,15 @@ static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
   uintptr_t dataEnd = (uintptr_t)pPackedDataField;
   data_len[0] = dataEnd - dataHead;
 
-
-   if (!fapi_nr_p7_message_pack(pMessageBuf, pPackedBuf, packedBufLen, config)) {
-     return -1;
-   }
+  if (!p7_config->pack_func(pMessageBuf, pPackedBuf, packedBufLen, config)) {
+    return -1;
+  }
 
   return (int32_t)(pMessageHeader->message_length);
 }
 
 
-int fapi_nr_pack_and_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *header)
+bool aerial_nr_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *header)
 {
   uint8_t FAPI_buffer[1024 * 64];
   // Check if TX_DATA request, if true, need to pack to data_buf
@@ -414,17 +200,20 @@ int fapi_nr_pack_and_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_heade
                                                    sizeof(FAPI_buffer),
                                                    sizeof(FAPI_data_buffer),
                                                    &vnf_p7->_public.codec_config,
+                                                   ((nfapi_vnf_p7_config_t *)vnf_p7),
                                                    &data_len);
     if (len_FAPI <= 0) {
       LOG_E(NFAPI_VNF, "Problem packing TX_DATA_request\n");
-      return len_FAPI;
+      return false;
     } else {
-      int retval = aerial_send_P7_msg_with_data(FAPI_buffer, len_FAPI, FAPI_data_buffer, data_len, header);
-      return retval;
+      return aerial_send_P7_msg_with_data(FAPI_buffer, len_FAPI, FAPI_data_buffer, data_len, header) == 0;
     }
   } else {
     // Create and send FAPI P7 message
-    int len_FAPI = fapi_nr_p7_message_pack(header, FAPI_buffer, sizeof(FAPI_buffer), &vnf_p7->_public.codec_config);
-    return aerial_send_P7_msg(FAPI_buffer, len_FAPI, header);
+    int len_FAPI = ((nfapi_vnf_p7_config_t *)vnf_p7)->pack_func(header,
+                                                                FAPI_buffer,
+                                                                sizeof(FAPI_buffer),
+                                                                &vnf_p7->_public.codec_config);
+    return aerial_send_P7_msg(FAPI_buffer, len_FAPI, header) == 0;
   }
 }

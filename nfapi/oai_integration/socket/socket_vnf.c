@@ -45,30 +45,16 @@ bool vnf_nr_send_p5_msg(vnf_t *vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_head
   if (pnf) {
     // pack the message for transmission
     int packedMessageLength = 0;
-    if (NFAPI_MODE == NFAPI_MODE_AERIAL) {
-#ifdef ENABLE_AERIAL // TODO: Remove this into the aerial VNF transport module
-      // In case it is a FAPI message, create 2 messages, one with nFAPI header for OAI PNF and one with no nFAPI header for Aerial
-      // L1
-      // create FAPI tx_buffer
-      uint8_t tx_messagebufferFAPI[sizeof(vnf->tx_message_buffer)];
-      int packedMessageLengthFAPI = -1;
-      packedMessageLengthFAPI =
-          fapi_nr_p5_message_pack(msg, msg_len, tx_messagebufferFAPI, sizeof(tx_messagebufferFAPI), &vnf->_public.codec_config);
-      return aerial_send_P5_msg(tx_messagebufferFAPI, packedMessageLengthFAPI, msg);
-#else
-      return 0;
-#endif
-    } else {
-      packedMessageLength =
-          vnf->_public.pack_func(msg, msg_len, vnf->tx_message_buffer, sizeof(vnf->tx_message_buffer), &vnf->_public.codec_config);
+
+    packedMessageLength =
+        vnf->_public.pack_func(msg, msg_len, vnf->tx_message_buffer, sizeof(vnf->tx_message_buffer), &vnf->_public.codec_config);
 
     if (packedMessageLength < 0) {
       NFAPI_TRACE(NFAPI_TRACE_ERROR, "nfapi_nr_p5_message_pack failed with return %d\n", packedMessageLength);
       return false;
     }
 
-      return send_p5_msg(vnf, pnf, vnf->tx_message_buffer, packedMessageLength, 0);
-    }
+    return send_p5_msg(vnf, pnf, vnf->tx_message_buffer, packedMessageLength, 0);
   } else {
     NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() cannot find pnf info for p5_idx:%d\n", __FUNCTION__, p5_idx);
     return false;

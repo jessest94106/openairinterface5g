@@ -36,6 +36,7 @@
 #include "nv_ipc_utils.h"
 #include "nvlog.h"
 #include "nfapi/open-nFAPI/vnf/public_inc/nfapi_vnf_interface.h"
+#include "vnf.h"
 #include "debug.h"
 
 #include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
@@ -49,8 +50,8 @@ typedef struct {
 
 bool aerial_nr_send_p5_message(vnf_t *vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t *msg, uint32_t msg_len);
 bool aerial_send_P5_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p4_p5_message_header_t *header);
-int aerial_send_P7_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p7_message_header_t *header);
-int aerial_send_P7_msg_with_data(void *packedBuf,
+bool aerial_send_P7_msg(void *packedBuf, uint32_t packedMsgLength, nfapi_nr_p7_message_header_t *header);
+bool aerial_send_P7_msg_with_data(void *packedBuf,
                                  uint32_t packedMsgLength,
                                  void *dataBuf,
                                  uint32_t dataLength,
