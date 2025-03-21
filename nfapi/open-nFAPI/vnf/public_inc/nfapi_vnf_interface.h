@@ -294,7 +294,25 @@ typedef struct nfapi_vnf_config
 	 */
 	int (*start_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_start_response_t* resp);
 	int (*nr_start_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_start_response_scf_t* resp);
-	
+
+	/*! A callback for the ERROR.indication
+	 *  \param config A pointer to the vnf configuration
+	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection
+	 *  \param ind A data structure for the decoded ERROR.indication This will
+	 *              have been allocated on the stack.
+	 *  \return not currently used.
+	 *
+	 *  The ERROR.indication contains a reported error from the PNF, often signifying that a message has been sent too late
+	 *
+	 *
+	 *  The ind may contain pointers to dynamically allocated sub structures
+	 *  such as the vendor_extension. The dynamically allocated structure will
+	 *  be deallocated on return. If the client wishes to 'keep' the structures
+	 *  then the substructure pointers should be set to 0 and then the client should
+	 *  use the codec_config.deallocate function to release it at a future point
+	 */
+	int (*nr_error_ind)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_error_indication_scf_t* ind);
+
 	/*! A callback for the STOP.resp
      *  \param config A pointer to the vnf configuration
 	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection

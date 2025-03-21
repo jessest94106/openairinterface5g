@@ -1469,29 +1469,13 @@ void dump_stop_indication(const nfapi_nr_stop_indication_scf_t *msg)
   dump_p5_message_header(&msg->header,depth);
 }
 
-static char *error_code_to_str(uint8_t error_code)
+char* error_ind_code_to_str(nfapi_nr_phy_notifications_errors_e error_code)
 {
   switch (error_code) {
-    case NFAPI_NR_PHY_API_MSG_OK:
-      return "NFAPI_NR_PHY_API_MSG_OK";
-    case NFAPI_NR_PHY_API_MSG_INVALID_STATE:
-      return "NFAPI_NR_PHY_API_MSG_INVALID_STATE";
-    case NFAPI_NR_PHY_API_MSG_INVALID_CONFIG:
-      return "NFAPI_NR_PHY_API_MSG_INVALID_CONFIG";
-    case NFAPI_NR_PHY_API_SFN_OUT_OF_SYNC:
-      return "NFAPI_NR_PHY_API_SFN_OUT_OF_SYNC";
-    case NFAPI_NR_PHY_API_MSG_SLOR_ERR:
-      return "NFAPI_NR_PHY_API_MSG_SLOR_ERR";
-    case NFAPI_NR_PHY_API_MSG_BCH_MISSING:
-      return "NFAPI_NR_PHY_API_MSG_BCH_MISSING";
-    case NFAPI_NR_PHY_API_MSG_INVALID_SFN:
-      return "NFAPI_NR_PHY_API_MSG_INVALID_SFN";
-    case NFAPI_NR_PHY_API_MSG_UL_DCI_ERR:
-      return "NFAPI_NR_PHY_API_MSG_UL_DCI_ERR";
-    case NFAPI_NR_PHY_API_MSG_TX_ERR:
-      return "NFAPI_NR_PHY_API_MSG_TX_ERR";
-    default:
-      return "Unknown Error code";
+#define X(name, value) case name: return #name;
+    NFAPI_PHY_ERROR_LIST
+#undef X
+    default: return "UNKNOWN_ERROR";
   }
 }
 
@@ -1503,6 +1487,6 @@ void dump_error_indication(const nfapi_nr_error_indication_scf_t *msg)
   INDENTED_PRINTF("SFN = 0x%02x (%d)\n", msg->sfn, msg->sfn);
   INDENTED_PRINTF("Slot = 0x%02x (%d)\n", msg->slot, msg->slot);
   INDENTED_PRINTF("Message ID = 0x%02x\n", msg->message_id);
-  INDENTED_PRINTF("Error Code = 0x%02x (%s) \n", msg->error_code, error_code_to_str(msg->error_code));
+  INDENTED_PRINTF("Error Code = 0x%02x (%s) \n", msg->error_code, error_ind_code_to_str(msg->error_code));
   depth--;
 }

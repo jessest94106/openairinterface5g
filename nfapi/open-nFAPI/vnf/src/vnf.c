@@ -633,6 +633,39 @@ void vnf_nr_handle_start_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_conf
 	}
 }
 
+void vnf_nr_handle_error_indication(void *pRecvMsg, int recvMsgLen, nfapi_vnf_config_t* config, int p5_idx)
+{
+
+  // ensure it's valid
+  if (pRecvMsg == NULL || config == NULL)
+  {
+    NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: NULL parameters\n", __FUNCTION__);
+  }
+  else
+  {
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "Received ERROR.indication\n");
+
+    nfapi_nr_error_indication_scf_t msg;
+
+    // unpack the message
+    if (config->unpack_func(pRecvMsg, recvMsgLen, &msg, sizeof(msg), &config->codec_config))
+    {
+      if (config->nr_error_ind){
+        (config->nr_error_ind)(config, p5_idx, &msg);
+      }
+    }
+    else
+    {
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: Unpack message failed, ignoring\n", __FUNCTION__);
+    }
+
+    // make sure to release any dynamic part of the message
+    if(msg.vendor_extension)
+      config->codec_config.deallocate(msg.vendor_extension);
+  }
+}
+
+
 void vnf_handle_stop_response(void *pRecvMsg, int recvMsgLen, nfapi_vnf_config_t* config, int p5_idx)
 {
 
@@ -1125,7 +1158,11 @@ void vnf_nr_handle_p4_p5_message(void *pRecvMsg, int recvMsgLen, int p5_idx, nfa
 
 		case NFAPI_NR_PHY_MSG_TYPE_CONFIG_RESPONSE:
 			vnf_nr_handle_config_response(pRecvMsg, recvMsgLen, config, p5_idx);
-			break;
+	  break;
+
+	  case NFAPI_NR_PHY_MSG_TYPE_ERROR_INDICATION:
+	    vnf_nr_handle_error_indication(pRecvMsg, recvMsgLen, config, p5_idx);
+	  break;
 
 		case NFAPI_NR_PHY_MSG_TYPE_START_RESPONSE:
 			vnf_nr_handle_start_response(pRecvMsg, recvMsgLen, config, p5_idx);
