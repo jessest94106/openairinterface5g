@@ -225,6 +225,8 @@ typedef struct openair0_config {
   int rx_num_channels;
   //! number of TX channels (=TX antennas)
   int tx_num_channels;
+  //! number of distributed radio-units
+  int num_distributed_ru;
   //! rx daughter card
   char* rx_subdev;
   //! tx daughter card

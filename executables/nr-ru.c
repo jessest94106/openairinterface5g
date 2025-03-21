@@ -874,6 +874,7 @@ static void fill_rf_config(RU_t *ru, char *rf_config_file)
   cfg->num_rb_dl = N_RB;
   cfg->tx_num_channels = ru->nb_tx * ru->num_beams_period;
   cfg->rx_num_channels = ru->nb_rx * ru->num_beams_period;
+  cfg->num_distributed_ru = ru->num_beams_period;
   LOG_I(PHY,"Setting RF config for N_RB %d, NB_RX %d, NB_TX %d\n",cfg->num_rb_dl,cfg->rx_num_channels,cfg->tx_num_channels);
   LOG_I(PHY,"tune_offset %.0f Hz, sample_rate %.0f Hz\n",cfg->tune_offset,cfg->sample_rate);
 
