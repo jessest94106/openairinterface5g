@@ -1347,7 +1347,7 @@ uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *
   nfapi_tl_t generic_tl;
   uint8_t numBadTags = 0;
   unsigned long idx = 0;
-  while ((uint8_t *)(*ppReadPackedMsg) < end) {
+  while ((uint8_t *)(*ppReadPackedMsg) + 4 < end) {
     // unpack the tl and process the values accordingly
     if (unpack_tl(ppReadPackedMsg, &generic_tl, end) == 0)
       return 0;
