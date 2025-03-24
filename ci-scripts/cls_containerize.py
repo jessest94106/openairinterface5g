@@ -93,7 +93,7 @@ def CopyLogsToExecutor(cmd, sourcePath, log_name):
 		os.remove(f'./{log_name}.zip')
 	if (os.path.isdir(f'./{log_name}')):
 		shutil.rmtree(f'./{log_name}')
-	cmd.copyin(f'{sourcePath}/cmake_targets/{log_name}.zip', f'./{log_name}.zip')
+	cmd.copyin(src=f'{sourcePath}/cmake_targets/{log_name}.zip', tgt=f'{os.getcwd()}/{log_name}.zip')
 	cmd.run(f'rm -f {log_name}.zip')
 	ZipFile(f'{log_name}.zip').extractall('.')
 
@@ -359,7 +359,7 @@ class Containerize():
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.RemoteCmd(lIpAddr)
+		cmd = cls_cmd.getConnection(lIpAddr)
 	
 		# Checking the hostname to get adapted on cli and dockerfileprefixes
 		cmd.run('hostnamectl')
@@ -407,6 +407,12 @@ class Containerize():
 		result = re.search('build_cross_arm64', self.imageKind)
 		if result is not None:
 			self.dockerfileprefix = '.ubuntu22.cross-arm64'
+		result = re.search('native_arm', self.imageKind)
+		if result is not None:
+			imageNames.append(('oai-gnb', 'gNB', 'oai-gnb', ''))
+			imageNames.append(('oai-nr-cuup', 'nr-cuup', 'oai-nr-cuup', ''))
+			imageNames.append(('oai-nr-ue', 'nrUE', 'oai-nr-ue', ''))
+			imageNames.append(('oai-gnb-aerial', 'gNB.aerial', 'oai-gnb-aerial', ''))
 		
 		self.testCase_id = HTML.testCase_id
 		cmd.cd(lSourcePath)
@@ -491,10 +497,10 @@ class Containerize():
 			elif image != 'ran-build':
 				cmd.run(f'sed -i -e "s#ran-build:latest#ran-build:{imageTag}#" docker/Dockerfile.{pattern}{self.dockerfileprefix}')
 			if image == 'oai-gnb-aerial':
-				cmd.run('cp -f /opt/nvidia-ipc/nvipc_src.2024.05.23.tar.gz .')
+				cmd.run('cp -f /opt/nvidia-ipc/nvipc_src.*.tar.gz .')
 			ret = cmd.run(f'{self.cli} build {self.cliBuildOptions} --target {image} --tag {name}:{imageTag} --file docker/Dockerfile.{pattern}{self.dockerfileprefix} {option} . > cmake_targets/log/{name}.log 2>&1', timeout=1200)
 			if image == 'oai-gnb-aerial':
-				cmd.run('rm -f nvipc_src.2024.05.23.tar.gz')
+				cmd.run('rm -f nvipc_src.*.tar.gz')
 			if image == 'ran-build' and ret.returncode == 0:
 				cmd.run(f"docker run --name test-log -d {name}:{imageTag} /bin/true")
 				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/ cmake_targets/log/{name}/")
@@ -720,9 +726,9 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def Push_Image_to_Local_Registry(self, HTML, svr_id):
+	def Push_Image_to_Local_Registry(self, HTML, svr_id, tag_prefix=""):
 		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug('Pushing images from server: ' + lIpAddr)
+		logging.debug('Pushing images to server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
 		ret = ssh.run(f'docker login -u oaicicd -p oaicicd {imagePrefix}')
@@ -737,7 +743,7 @@ class Containerize():
 		if self.ranAllowMerge:
 			orgTag = 'ci-temp'
 		for image in IMAGES:
-			tagToUse = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
+			tagToUse = tag_prefix + CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
 			imageTag = f"{image}:{tagToUse}"
 			ret = ssh.run(f'docker image tag {image}:{orgTag} {imagePrefix}/{imageTag}')
 			if ret.returncode != 0:
@@ -751,9 +757,10 @@ class Containerize():
 				return False
 			# Creating a develop tag on the local private registry
 			if not self.ranAllowMerge:
-				ssh.run(f'docker image tag {image}:{orgTag} {imagePrefix}/{image}:develop')
-				ssh.run(f'docker push {imagePrefix}/{image}:develop')
-				ssh.run(f'docker rmi {imagePrefix}/{image}:develop')
+				devTag = f"{tag_prefix}develop"
+				ssh.run(f'docker image tag {image}:{orgTag} {imagePrefix}/{image}:{devTag}')
+				ssh.run(f'docker push {imagePrefix}/{image}:{devTag}')
+				ssh.run(f'docker rmi {imagePrefix}/{image}:{devTag}')
 			ssh.run(f'docker rmi {imagePrefix}/{imageTag} {image}:{orgTag}')
 
 		ret = ssh.run(f'docker logout {imagePrefix}')
@@ -768,7 +775,7 @@ class Containerize():
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
 		return True
 
-	def Pull_Image(cmd, images, tag, registry, username, password):
+	def Pull_Image(cmd, images, tag, tag_prefix, registry, username, password):
 		if username is not None and password is not None:
 			logging.info(f"logging into registry {username}@{registry}")
 			response = cmd.run(f'docker login -u {username} -p {password} {registry}', silent=True, reportNonZero=False)
@@ -778,14 +785,15 @@ class Containerize():
 				return False, msg
 		pulled_images = []
 		for image in images:
+			imagePrefTag = f"{image}:{tag_prefix}{tag}"
 			imageTag = f"{image}:{tag}"
-			response = cmd.run(f'docker pull {registry}/{imageTag}')
+			response = cmd.run(f'docker pull {registry}/{imagePrefTag}')
 			if response.returncode != 0:
-				msg = f'Could not pull {image} from local registry: {imageTag}'
+				msg = f'Could not pull {image} from local registry: {imagePrefTag}'
 				logging.error(msg)
 				return False, msg
-			cmd.run(f'docker tag {registry}/{imageTag} oai-ci/{imageTag}')
-			cmd.run(f'docker rmi {registry}/{imageTag}')
+			cmd.run(f'docker tag {registry}/{imagePrefTag} oai-ci/{imageTag}')
+			cmd.run(f'docker rmi {registry}/{imagePrefTag}')
 			pulled_images += [f"oai-ci/{imageTag}"]
 		if username is not None and password is not None:
 			response = cmd.run(f'docker logout {registry}')
@@ -793,13 +801,13 @@ class Containerize():
 		msg = "Pulled Images:\n" + '\n'.join(pulled_images)
 		return True, msg
 
-	def Pull_Image_from_Registry(self, HTML, svr_id, images, tag=None, registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
+	def Pull_Image_from_Registry(self, HTML, svr_id, images, tag=None, tag_prefix="", registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
 		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
 		logging.debug('\u001B[1m Pulling image(s) on server: ' + lIpAddr + '\u001B[0m')
 		if not tag:
 			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
 		with cls_cmd.getConnection(lIpAddr) as cmd:
-			success, msg = Containerize.Pull_Image(cmd, images, tag, registry, username, password)
+			success, msg = Containerize.Pull_Image(cmd, images, tag, tag_prefix, registry, username, password)
 		param = f"on node {lIpAddr}"
 		if success:
 			HTML.CreateHtmlTestRowQueue(param, 'OK', [msg])
