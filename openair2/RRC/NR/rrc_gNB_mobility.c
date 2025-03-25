@@ -215,27 +215,12 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
   free_ue_context_setup_req(&ue_context_setup_req);
 }
 
-/*
-void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc, int nr_cgi, uint8_t *ho_prep_info, uint32_t *ho_prep_len, void *pdu_session)
-{
-  // call from outside (via NGAP message), with the request for handover for a
-  // (any) UE. This handler should, in order:
-  //
-  // 1. look up the target DU =du= via get_du_by_cell_id(nr_cgi)
-  //    (and reject the request if it can't find the DU)
-  // 2. create a context for a new UE =UE=, based on pdu_session information
-  // 3. call nr_initiate_handover(rrc, UE, NULL, du, ho_prep_info, ho_prep_len);
-  //
-  // after success of the DU, send the result via =success_ptr= to the source
-  // CU.
-}
-*/
-
 typedef struct deliver_ue_ctxt_modification_data_t {
   gNB_RRC_INST *rrc;
   f1ap_ue_context_mod_req_t *modification_req;
   sctp_assoc_t assoc_id;
 } deliver_ue_ctxt_modification_data_t;
+
 static void rrc_deliver_ue_ctxt_modif_req(void *deliver_pdu_data, ue_id_t ue_id, int srb_id, char *buf, int size, int sdu_id)
 {
   DevAssert(deliver_pdu_data != NULL);
@@ -398,4 +383,53 @@ void nr_HO_F1_trigger_telnet(gNB_RRC_INST *rrc, uint32_t rrc_ue_id)
   }
 
   nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+}
+
+/** @brief Generate the HandoverPreparationInformation to be carried
+ * in the RRC Container (9.3.1.29 of 3GPP TS 38.413) of the Source
+ * NG-RAN Node to Target NG-RAN Node Transparent Container IE */
+static byte_array_t rrc_gNB_generate_HandoverPreparationInformation(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, int serving_pci)
+{
+  nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, ue, 0, false);
+  params.ue_cap = ue->ue_cap_buffer;
+
+  byte_array_t hoPrepInfo = get_HandoverPreparationInformation(&params, serving_pci);
+  free_RRCReconfiguration_params(params);
+
+  if (hoPrepInfo.len < 0) {
+    LOG_E(NR_RRC, "HandoverPreparationInformation generation failed for UE %d\n", ue->rrc_ue_id);
+    return hoPrepInfo;
+  }
+
+  LOG_D(NR_RRC, "HO LOG: Handover Preparation for UE %lu Encoded (%zd bytes)\n", ue->amf_ue_ngap_id, hoPrepInfo.len);
+
+  return hoPrepInfo;
+}
+
+/** @brief Trigger N2 handover on source gNB:
+ *         1) Prepare RRC Container with HandoverPreparationInformation message
+ *         2) send NGAP Handover Required message */
+void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc,
+                          gNB_RRC_UE_t *ue,
+                          int serving_pci,
+                          const nr_neighbour_cell_t *neighbour_config)
+{
+  byte_array_t hoPrepInfo = rrc_gNB_generate_HandoverPreparationInformation(rrc, ue, serving_pci);
+  if (hoPrepInfo.len < 0) {
+    free_byte_array(hoPrepInfo);
+    LOG_E(NR_RRC, "Failed to trigger N2 handover on source gNB for UE %x\n", ue->rrc_ue_id);
+    return;
+  }
+
+  // allocate context for source
+  if (ue->ho_context != NULL) {
+    LOG_E(NR_RRC, "Ongoing handover for UE %d, cannot trigger new\n", ue->rrc_ue_id);
+    return;
+  }
+
+  ue->ho_context = alloc_ho_ctx(HO_CTX_SOURCE);
+  ue->ho_context->source->du = get_du_for_ue(rrc, ue->rrc_ue_id);
+
+  rrc_gNB_send_NGAP_HANDOVER_REQUIRED(rrc, ue, neighbour_config, hoPrepInfo);
+  free_byte_array(hoPrepInfo);
 }

@@ -69,6 +69,7 @@ typedef struct {
   NR_CellGroupConfig_t *cell_group_config;
   bool masterKeyUpdate;
   int nextHopChainingCount;
+  byte_array_t ue_cap;
 } nr_rrc_reconfig_param_t;
 
 /*
@@ -160,5 +161,7 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 seq_arr_t *neigh_seq);
 void free_MeasConfig(NR_MeasConfig_t *mc);
 int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi);
+
+byte_array_t get_HandoverPreparationInformation(nr_rrc_reconfig_param_t *params, int scell_pci);
 
 #endif  /* __RRC_NR_MESSAGES_ASN1_MSG__H__ */

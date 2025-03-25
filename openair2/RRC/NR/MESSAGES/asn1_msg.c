@@ -564,6 +564,43 @@ static NR_RRCReconfiguration_IEs_t *build_RRCReconfiguration_IEs(const nr_rrc_re
   return ie;
 }
 
+static byte_array_t do_HO_RRCReconfiguration(nr_rrc_reconfig_param_t *params)
+{
+  NR_RRCReconfiguration_IEs_t *ie = build_RRCReconfiguration_IEs(params);
+  byte_array_t msg = {.buf = NULL, .len = 0};
+
+  // Create the standalone RRCReconfiguration message
+  NR_RRCReconfiguration_t rrcReconf = {0};
+  rrcReconf.rrc_TransactionIdentifier = params->transaction_id;
+  rrcReconf.criticalExtensions.present = NR_RRCReconfiguration__criticalExtensions_PR_rrcReconfiguration;
+  rrcReconf.criticalExtensions.choice.rrcReconfiguration = ie;
+
+  // Encode the message
+  int val = uper_encode_to_new_buffer(&asn_DEF_NR_RRCReconfiguration, NULL, &rrcReconf, (void **)&msg.buf);
+  if (val <= 0) {
+    LOG_E(NR_RRC, "ASN1 RRCReconfiguration message encoding failed\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_RRCReconfiguration, &rrcReconf);
+    return msg;
+  }
+  msg.len = val;
+  LOG_D(NR_RRC, "RRCReconfiguration: Encoded (%ld bytes)\n", msg.len);
+
+  // don't free what we did not allocate, so set fields with pointers to NULL
+  // if memory comes from outside
+  ie->measConfig = NULL;
+  if (ie->radioBearerConfig) {
+    ie->radioBearerConfig->srb3_ToRelease = NULL;
+    ie->radioBearerConfig->drb_ToReleaseList = NULL;
+    ie->radioBearerConfig->drb_ToAddModList = NULL;
+    ie->radioBearerConfig->srb_ToAddModList = NULL;
+    ie->radioBearerConfig->securityConfig = NULL;
+  }
+
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_RRCReconfiguration, &rrcReconf);
+
+  return msg;
+}
+
 byte_array_t do_RRCReconfiguration(const nr_rrc_reconfig_param_t *params)
 {
   byte_array_t msg = {.buf = NULL, .len = 0};
@@ -1099,6 +1136,50 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
   asn1cSeqAdd(&mc->quantityConfig->quantityConfigNR_List->list, qcnr);
 
   return mc;
+}
+
+/** @brief HandoverPreparationInformation message (11.2.2 of TS 38.331)
+ *         1) generate RRCReconfiguration to be transferred
+ *         2) encodes UE Capabilities from UE Context
+ *         3) encodes AS context
+ *         4) generates HO Preparation Info */
+byte_array_t get_HandoverPreparationInformation(nr_rrc_reconfig_param_t *params, int scell_pci)
+{
+  // Buffer to return
+  byte_array_t buffer = {.buf = NULL, .len = 0};
+
+  /* Prepare handoverPreparationInformation IEs */
+  NR_HandoverPreparationInformation_t hoPrepInfo = {0};
+  hoPrepInfo.criticalExtensions.present = NR_HandoverPreparationInformation__criticalExtensions_PR_c1;
+  asn1cCalloc(hoPrepInfo.criticalExtensions.choice.c1, c1);
+  c1->present = NR_HandoverPreparationInformation__criticalExtensions__c1_PR_handoverPreparationInformation;
+  asn1cCalloc(c1->choice.handoverPreparationInformation, hpi);
+
+  /* Decode stored NR_UE_CapabilityRAT_ContainerList and add to IEs */
+  NR_UE_CapabilityRAT_ContainerList_t *clist = NULL;
+  asn_dec_rval_t dec_rval =
+      uper_decode(NULL, &asn_DEF_NR_UE_CapabilityRAT_ContainerList, (void **)&clist, params->ue_cap.buf, params->ue_cap.len, 0, 0);
+  if (dec_rval.code != RC_OK) {
+    LOG_W(NR_RRC, "Failed to decode UE capability container list for HandoverPreparationInformation, ignoring capabilities\n");
+    return buffer;
+  }
+  hpi->ue_CapabilityRAT_List = *clist;
+  free(clist);
+
+  /* sourceConfig: Encode RRCReconfiguration as used in the source cell */
+  byte_array_t msg = do_HO_RRCReconfiguration(params);
+  asn1cCalloc(hpi->sourceConfig, sourceConfig);
+  OCTET_STRING_fromBuf(&sourceConfig->rrcReconfiguration, (const char *)msg.buf, msg.len);
+  free_byte_array(msg);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_HandoverPreparationInformation, (void **)&hoPrepInfo);
+
+  /* encode */
+  buffer.len = uper_encode_to_new_buffer(&asn_DEF_NR_HandoverPreparationInformation, NULL, (void *)&hoPrepInfo, (void *)&buffer.buf);
+  AssertFatal(buffer.len > 0, "ASN1 message encoding failed (%ld)!\n", buffer.len);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_HandoverPreparationInformation, &hoPrepInfo);
+  return buffer;
 }
 
 void free_MeasConfig(NR_MeasConfig_t *mc)
