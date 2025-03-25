@@ -55,6 +55,8 @@
 #include "ngap_gNB_management_procedures.h"
 #include "ngap_gNB_nas_procedures.h"
 #include "ngap_messages_types.h"
+#include "ngap_gNB_mobility_management.h"
+#include "ngap_gNB_ue_context.h"
 #include "oai_asn1.h"
 #include "openair3/SECU/kdf.h"
 #include "queue.h"
@@ -275,6 +277,57 @@ void ngap_gNB_handle_sctp_data_ind(sctp_data_ind_t *sctp_data_ind) {
   AssertFatal (result == EXIT_SUCCESS, "Failed to free memory (%d)!\n", result);
 }
 
+ /** @brief UE Mobility Management: callback for Handover Required */
+int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
+{
+  DevAssert(msg != NULL);
+  NGAP_DEBUG("Triggered Handover Required\n");
+  /* Retrieve the NGAP gNB instance associated with Mod_id */
+  ngap_gNB_instance_t *ngap_gNB_instance_p = ngap_gNB_get_instance(instance);
+  DevAssert(ngap_gNB_instance_p != NULL);
+
+  ngap_gNB_ue_context_t *ue_context_p = NULL;
+  if ((ue_context_p = ngap_get_ue_context(msg->gNB_ue_ngap_id)) == NULL) {
+    /* The context for this gNB ue ngap id doesn't exist in the map of gNB UEs */
+    NGAP_WARN("Failed to find ue context associated with gNB ue ngap id: 0x%08x\n", msg->gNB_ue_ngap_id);
+    return -1;
+  }
+
+  if ((ue_context_p->gNB_ue_ngap_id != msg->gNB_ue_ngap_id)) {
+    NGAP_ERROR("ue_context_p->gNB_ue_ngap_id %d does not match msg->gNB_ue_ngap_id %d\n",
+               ue_context_p->gNB_ue_ngap_id,
+               msg->gNB_ue_ngap_id);
+    return -1;
+  }
+
+  NGAP_NGAP_PDU_t *pdu = encode_ng_handover_required(msg);
+  if (!pdu) {
+    NGAP_ERROR("Failed to encode Handover Required\n");
+    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
+    return -1;
+  }
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, &pdu);
+
+  byte_array_t out = { .buf = NULL, .len = 0 };
+  if (ngap_gNB_encode_pdu(pdu, &out.buf, (uint32_t *)&out.len) < 0) {
+    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
+    NGAP_ERROR("Failed to encode Handover Required message\n");
+    return -1;
+  }
+  free(pdu);
+
+  /* UE associated signalling -> use the allocated stream */
+  ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance,
+                                   ue_context_p->amf_ref->assoc_id,
+                                   out.buf,
+                                   out.len,
+                                   ue_context_p->tx_stream);
+
+  return 0;
+}
+
 void ngap_gNB_init(void) {
   NGAP_DEBUG("Starting NGAP layer\n");
   ngap_gNB_prepare_internal_data();
@@ -354,6 +407,12 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
 
       case NGAP_PDUSESSION_RELEASE_RESPONSE:
         ngap_gNB_pdusession_release_resp(instance, &NGAP_PDUSESSION_RELEASE_RESPONSE(received_msg));
+        break;
+
+      case NGAP_HANDOVER_REQUIRED:
+        if (ngap_handover_required(instance, &NGAP_HANDOVER_REQUIRED(received_msg)) < 0) {
+          NGAP_ERROR("Handover Required failure: indication to RRC is not sent!\n");
+        }
         break;
 
       default:

@@ -65,7 +65,7 @@
 #define NGAP_PDUSESSION_SETUP_REQ(mSGpTR)              (mSGpTR)->ittiMsg.ngap_pdusession_setup_req
 #define NGAP_PDUSESSION_MODIFY_REQ(mSGpTR)              (mSGpTR)->ittiMsg.ngap_pdusession_modify_req
 #define NGAP_PAGING_IND(mSGpTR)                 (mSGpTR)->ittiMsg.ngap_paging_ind
-
+#define NGAP_HANDOVER_REQUIRED(mSGpTR)           (mSGpTR)->ittiMsg.ngap_handover_required
 #define NGAP_UE_CONTEXT_RELEASE_REQ(mSGpTR)     (mSGpTR)->ittiMsg.ngap_ue_release_req
 #define NGAP_PDUSESSION_RELEASE_COMMAND(mSGpTR)      (mSGpTR)->ittiMsg.ngap_pdusession_release_command
 #define NGAP_PDUSESSION_RELEASE_RESPONSE(mSGpTR)     (mSGpTR)->ittiMsg.ngap_pdusession_release_resp
@@ -462,6 +462,91 @@ typedef struct ngap_uplink_nas_s {
   /* NAS pdu */
   byte_array_t nas_pdu;
 } ngap_uplink_nas_t;
+
+typedef struct target_cell_id_s {
+  plmn_id_t plmn_identity;
+  uint32_t nrCellIdentity;
+} cell_id_t;
+
+typedef struct target_ran_node_id_s {
+  uint32_t targetgNBId;
+  plmn_id_t plmn_identity;
+  uint32_t tac;
+} target_ran_node_id_t;
+
+/* 3GPP TS 38.413 9.3.1.29 */
+typedef struct {
+  // QoS Flow Identifier
+  uint8_t qfi;
+} qosflow_info_t;
+
+/* 3GPP TS 38.413 9.3.1.29 */
+typedef struct {
+  // PDU Session ID
+  uint8_t pdusession_id;
+  // QoS Flow Information List
+  uint8_t nb_of_qos_flow;
+  qosflow_info_t qos_flow_info[QOSFLOW_MAX_VALUE];
+} pdusession_resource_info_t;
+
+/* 3GPP TS 38.413 9.3.1.97 */
+typedef struct {
+  // Global Cell ID
+  cell_id_t id;
+  // Cell type
+  uint8_t type;
+  // Time UE Stayed in Cell
+  long time_in_cell;
+  // Cause
+  ngap_cause_t *cause;
+} last_visited_ngran_cell_info_t;
+
+/* 3GPP TS 38.413 9.3.1.29 */
+typedef struct {
+  // RRC Container: HandoverPreparationInformation message
+  byte_array_t handoverInfo;
+  // Target Cell ID
+  cell_id_t targetCellId;
+  // PDU Session Resource Information List
+  uint16_t nb_pdu_session_resource;
+  pdusession_resource_info_t pdu_session_resource[NGAP_MAX_PDU_SESSION];
+  // UE History Information
+  last_visited_ngran_cell_info_t ue_history_info;
+} source_to_target_transparent_container_t;
+
+typedef enum {
+  HANDOVER_TYPE_INTRA5GS, // Intra5GS: NG-RAN node to NG-RAN node
+  HANDOVER_TYPE_5GSTOEPS, // 5GStoEPS: NG-RAN node to eNB
+  HANDOVER_TYPE_EPSTO5GS, // EPSto5GS: eNB to NG-RAN node
+  HANDOVER_TYPE_5GSTOUTRA, // 5GStoUTRA: NG-RAN node to UTRA
+} ho_type_t;
+
+/* 3GPP TS 38.413 9.2.3.1 */
+typedef struct {
+  // PDU Session ID
+  uint8_t pdusession_id;
+  // Handover Required Transfer
+  byte_array_t ho_required_transfer;
+} pdusession_resource_t;
+
+/* 3GPP TS 38.413 9.2.3.1 */
+typedef struct {
+  // RAN UE NGAP ID
+  uint32_t gNB_ue_ngap_id;
+  // AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+  // Handover Type
+  ho_type_t handoverType;
+  // Cause
+  ngap_cause_t cause;
+  // Target ID
+  target_ran_node_id_t target_gnb_id;
+  // PDU Session Resource List
+  uint8_t nb_of_pdusessions;
+  pdusession_resource_t pdusessions[NGAP_MAX_PDU_SESSION];
+  // Source to Target Transparent Container
+  source_to_target_transparent_container_t *source2target;
+} ngap_handover_required_t;
 
 typedef struct ngap_ue_cap_info_ind_s {
   uint32_t  gNB_ue_ngap_id;

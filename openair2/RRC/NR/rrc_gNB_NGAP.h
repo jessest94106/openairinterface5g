@@ -89,4 +89,9 @@ void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering);
 
 int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance);
 
+void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
+                                         gNB_RRC_UE_t *UE,
+                                         const nr_neighbour_cell_t *neighbourCellConfiguration,
+                                         const byte_array_t hoPrepInfo);
+
 #endif

@@ -70,6 +70,12 @@ static int ngap_gNB_decode_initiating_message(NGAP_NGAP_PDU_t *pdu) {
       NGAP_INFO("PDUSESSIONSetup initiating message\n");
       break;
 
+    case NGAP_ProcedureCode_id_HandoverPreparation:
+      res = asn_encode_to_new_buffer(NULL, ATS_CANONICAL_XER, &asn_DEF_NGAP_NGAP_PDU, pdu);
+      free(res.buffer);
+      NGAP_INFO("Handover Preparation initiating message\n");
+      break;
+
     case NGAP_ProcedureCode_id_PDUSessionResourceModify:
       res = asn_encode_to_new_buffer(NULL, ATS_CANONICAL_XER, &asn_DEF_NGAP_NGAP_PDU, pdu);
       free(res.buffer);
@@ -119,6 +125,10 @@ static int ngap_gNB_decode_successful_outcome(NGAP_NGAP_PDU_t *pdu) {
       free(res.buffer);
       break;
 
+    case NGAP_ProcedureCode_id_HandoverPreparation:
+      res = asn_encode_to_new_buffer(NULL, ATS_CANONICAL_XER, &asn_DEF_NGAP_NGAP_PDU, pdu);
+      free(res.buffer);
+      break;
 
     default:
       NGAP_ERROR("Unknown procedure ID (%d) for successfull outcome message\n",

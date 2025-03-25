@@ -112,3 +112,32 @@ ngap_mobility_restriction_t decode_ngap_mobility_restriction(const NGAP_Mobility
   TBCD_TO_MCC_MNC(&in->servingPLMN, out.serving_plmn.mcc, out.serving_plmn.mnc, out.serving_plmn.mnc_digit_length);
   return out;
 }
+
+void encode_ngap_target_id(NGAP_HandoverRequiredIEs_t *out, const target_ran_node_id_t *in)
+{
+  out->id = NGAP_ProtocolIE_ID_id_TargetID;
+  out->criticality = NGAP_Criticality_reject;
+  out->value.present = NGAP_HandoverRequiredIEs__value_PR_TargetID;
+  // CHOICE Target ID: NG-RAN (M)
+  out->value.choice.TargetID.present = NGAP_TargetID_PR_targetRANNodeID;
+  asn1cCalloc(out->value.choice.TargetID.choice.targetRANNodeID, targetRan);
+  // Global RAN Node ID (M)
+  targetRan->globalRANNodeID.present = NGAP_GlobalRANNodeID_PR_globalGNB_ID;
+  asn1cCalloc(targetRan->globalRANNodeID.choice.globalGNB_ID, globalGnbId);
+  globalGnbId->gNB_ID.present = NGAP_GNB_ID_PR_gNB_ID;
+  MACRO_GNB_ID_TO_BIT_STRING(in->targetgNBId, &globalGnbId->gNB_ID.choice.gNB_ID);
+  MCC_MNC_TO_PLMNID(in->plmn_identity.mcc, in->plmn_identity.mnc, in->plmn_identity.mnc_digit_length, &globalGnbId->pLMNIdentity);
+  // Selected TAI (M)
+  INT24_TO_OCTET_STRING(in->tac, &targetRan->selectedTAI.tAC);
+  MCC_MNC_TO_PLMNID(in->plmn_identity.mcc,
+                    in->plmn_identity.mnc,
+                    in->plmn_identity.mnc_digit_length,
+                    &targetRan->selectedTAI.pLMNIdentity);
+}
+
+void encode_ngap_nr_cgi(NGAP_NR_CGI_t *out, const plmn_id_t *plmn, const uint32_t cell_id)
+{
+  out->iE_Extensions = NULL;
+  MCC_MNC_TO_PLMNID(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &out->pLMNIdentity);
+  NR_CELL_ID_TO_BIT_STRING(cell_id, &out->nRCellIdentity);
+}
