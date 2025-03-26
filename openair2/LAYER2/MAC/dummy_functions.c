@@ -19,39 +19,43 @@
  *      contact@openairinterface.org
  */
 
-#ifndef _ORAN_ISOLATE_H_
-#define _ORAN_ISOLATE_H_
+#include "openair2/LAYER2/MAC/mac_proto.h"
 
-#include <stdio.h>
+// TODO temporary solution
+//      to be removed once separation between NR and LTE is achieved
 
-#include <pthread.h>
-#include <stdint.h>
+int sf_ahead = 4;
+SCHEDULER_MODES global_scheduler_mode;
 
-#include "xran_fh_o_du.h"
+int rrc_mac_config_req_eNB(const module_id_t Mod_idP, const rrc_mac_config_req_eNB_t *param)
+{
+  return 0;
+}
 
-/*
- * Structure added to bear the information needed from OAI RU
- */
-typedef struct ru_info_s {
-  // Needed for UL
-  int nb_rx;
-  int32_t **rxdataF;
+void mac_top_init_eNB(void)
+{
+}
 
-  // Needed for DL
-  int nb_tx;
-  int32_t **txdataF_BF;
+uint32_t to_earfcn_UL(int eutra_bandP, long long int ul_CarrierFreq, uint32_t bw)
+{
+  return 0;
+}
 
-  // Needed for Prach
-  int16_t **prach_buf;
-} ru_info_t;
+int32_t get_uldl_offset(int nr_bandP) {
+  return 0;
+}
 
-/** @brief Reads RX data (PRACH/PUSCH) of next slot.
- *
- * @param ru pointer to structure keeping pointers to OAI data.
- * @param frame output of the frame which has been read.
- * @param slot output of the slot which has been read. */
-int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot);
-/** @brief Writes TX data (PDSCH) of given slot. */
-int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp);
+IF_Module_t *IF_Module_init(int Mod_id)
+{
+  return NULL;
+}
 
-#endif /* _ORAN_ISOLATE_H_ */
+uint32_t from_earfcn(int eutra_bandP, uint32_t dl_earfcn)
+{
+  return 0;
+}
+
+uint32_t to_earfcn_DL(int eutra_bandP, long long int dl_CarrierFreq, uint32_t bw)
+{
+  return 0;
+}

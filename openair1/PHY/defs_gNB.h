@@ -296,12 +296,7 @@ typedef struct {
   int32_t debugBuff_sample_offset;
 } NR_gNB_COMMON;
 
-
 typedef struct {
-  /// \brief Hold the channel estimates in time domain based on DRS.
-  /// - first index: rx antenna id [0..nb_antennas_rx[
-  /// - second index: ? [0..4*ofdm_symbol_size[
-  int32_t **ul_ch_estimates_time;
   /// \brief Hold the channel estimates in frequency domain based on DRS.
   /// - first index: rx antenna id [0..nb_antennas_rx[
   /// - second index: ? [0..12*N_RB_UL*frame_parms->symbols_per_tti[
@@ -323,10 +318,6 @@ typedef struct {
   /// \brief llr values.
   /// - first index: ? [0..1179743] (hard coded)
   int16_t *llr;
-  /// \brief llr values per layer.
-  /// - first index: ? [0..3] (hard coded)
-  /// - first index: ? [0..1179743] (hard coded)
-  int16_t **llr_layers;
   // PTRS symbol index, to be updated every PTRS symbol within a slot.
   uint8_t ptrs_symbol_index;
   /// bit mask of PT-RS ofdm symbol indicies
@@ -576,28 +567,6 @@ union puschSymbolReqUnion {
   struct puschSymbolReqId s;
   uint64_t p;
 };
-
-typedef struct puschAntennaProc_s {
-  unsigned char Ns;
-  int nl;
-  unsigned short p;
-  unsigned char symbol;
-  unsigned short bwp_start_subcarrier;
-  int aarx;
-  int beam_nb;
-  int numAntennas;
-  nfapi_nr_pusch_pdu_t *pusch_pdu;
-  int *max_ch;
-  c16_t *pilot;
-  int *nest_count;
-  uint64_t *noise_amp2;
-  delay_t *delay;
-  int chest_freq;
-  NR_gNB_PUSCH *pusch_vars;
-  NR_DL_FRAME_PARMS *frame_parms;
-  c16_t ***rxdataF;
-  task_ans_t* ans;
-} puschAntennaProc_t;
 
 struct puschAntennaReqId {
   uint16_t ul_id;

@@ -204,19 +204,14 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
     NR_gNB_PUSCH *pusch = &gNB->pusch_vars[ULSCH_id];
     pusch->ul_ch_estimates = (int32_t **)malloc16(n_buf * sizeof(int32_t *));
     pusch->ptrs_phase_per_slot = (int32_t **)malloc16(n_buf * sizeof(int32_t *));
-    pusch->ul_ch_estimates_time = (int32_t **)malloc16(n_buf * sizeof(int32_t *));
     pusch->rxdataF_comp = (int32_t **)malloc16(n_buf * sizeof(int32_t *));
-    pusch->llr_layers = (int16_t **)malloc16(max_ul_mimo_layers * sizeof(int32_t *));
     for (int i = 0; i < n_buf; i++) {
       pusch->ul_ch_estimates[i] = (int32_t *)malloc16_clear(sizeof(int32_t) * fp->ofdm_symbol_size * fp->symbols_per_slot);
-      pusch->ul_ch_estimates_time[i] = (int32_t *)malloc16_clear(sizeof(int32_t) * fp->ofdm_symbol_size);
       pusch->ptrs_phase_per_slot[i] = (int32_t *)malloc16_clear(sizeof(int32_t) * fp->symbols_per_slot); // symbols per slot
       pusch->rxdataF_comp[i] = (int32_t *)malloc16_clear(sizeof(int32_t) * nb_re_pusch2 * fp->symbols_per_slot);
     }
 
     for (int i = 0; i < max_ul_mimo_layers; i++) {
-      pusch->llr_layers[i] = (int16_t *)malloc16_clear((8 * ((3 * 8 * 6144) + 12))
-                                                       * sizeof(int16_t)); // [hna] 6144 is LTE and (8*((3*8*6144)+12)) is not clear
     }
     pusch->llr = (int16_t *)malloc16_clear((8 * ((3 * 8 * 6144) + 12))
                                            * sizeof(int16_t)); // [hna] 6144 is LTE and (8*((3*8*6144)+12)) is not clear
@@ -275,18 +270,13 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
 
   for (int ULSCH_id = 0; ULSCH_id < gNB->max_nb_pusch; ULSCH_id++) {
     NR_gNB_PUSCH *pusch_vars = &gNB->pusch_vars[ULSCH_id];
-    for (int i=0; i< max_ul_mimo_layers; i++)
-      free_and_zero(pusch_vars->llr_layers[i]);
     for (int i = 0; i < n_buf; i++) {
       free_and_zero(pusch_vars->ul_ch_estimates[i]);
-      free_and_zero(pusch_vars->ul_ch_estimates_time[i]);
       free_and_zero(pusch_vars->ptrs_phase_per_slot[i]);
       free_and_zero(pusch_vars->rxdataF_comp[i]);
     }
-    free_and_zero(pusch_vars->llr_layers);
     free_and_zero(pusch_vars->ul_ch_estimates);
     free_and_zero(pusch_vars->ptrs_phase_per_slot);
-    free_and_zero(pusch_vars->ul_ch_estimates_time);
     free_and_zero(pusch_vars->ul_valid_re_per_slot);
     free_and_zero(pusch_vars->rxdataF_comp);
 
@@ -354,7 +344,7 @@ void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
   }
 
   fp->threequarter_fs = 0;
-  frequency_range_t frequency_range = fp->nr_band > 256 ? FR2 : FR1;
+  frequency_range_t frequency_range = get_freq_range_from_band(fp->nr_band);
   int bw_index = get_supported_band_index(mu, frequency_range, N_RB_DL);
   gNB_config->carrier_config.dl_bandwidth.value = get_supported_bw_mhz(frequency_range, bw_index);
 

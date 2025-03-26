@@ -387,20 +387,22 @@ def ExecuteActionWithParam(action):
 
 	elif action == 'Push_Local_Registry':
 		svr_id = test.findtext('svr_id')
-		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id)
+		tag_prefix = test.findtext('tag_prefix') or ""
+		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id, tag_prefix)
 
 	elif action == 'Pull_Local_Registry' or action == 'Clean_Test_Server_Images':
 		if force_local:
 			# Do not pull or remove images when running locally. User is supposed to handle image creation & cleanup
 			return True
 		svr_id = test.findtext('svr_id')
+		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
 		# hack: for FlexRIC, we need to overwrite the tag to use
 		tag = None
 		if len(images) == 1 and images[0] == "oai-flexric":
 			tag = CONTAINERS.flexricTag
 		if action == "Pull_Local_Registry":
-			success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images, tag=tag)
+			success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images, tag=tag, tag_prefix=tag_prefix)
 		if action == "Clean_Test_Server_Images":
 			success = CONTAINERS.Clean_Test_Server_Images(HTML, svr_id, images, tag=tag)
 
@@ -420,9 +422,10 @@ def ExecuteActionWithParam(action):
 		success = cls_oaicitest.Custom_Script(HTML, node, script, command_fail)
 
 	elif action == 'Pull_Cluster_Image':
+		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
 		node = test.findtext('node')
-		success = CLUSTER.PullClusterImage(HTML, node, images)
+		success = CLUSTER.PullClusterImage(HTML, node, images, tag_prefix=tag_prefix)
 
 	else:
 		logging.warning(f"unknown action {action}, skip step")

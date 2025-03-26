@@ -410,7 +410,7 @@ static void config_common(gNB_MAC_INST *nrmac,
 
   // Carrier configuration
   struct NR_FrequencyInfoDL *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
-  frequency_range_t frequency_range = *frequencyInfoDL->frequencyBandList.list.array[0] > 256 ? FR2 : FR1;
+  frequency_range_t frequency_range = get_freq_range_from_band(*frequencyInfoDL->frequencyBandList.list.array[0]);
   int bw_index = get_supported_band_index(frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
                                           frequency_range,
                                           frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth);
@@ -440,7 +440,7 @@ static void config_common(gNB_MAC_INST *nrmac,
   }
   struct NR_FrequencyInfoUL *frequencyInfoUL = scc->uplinkConfigCommon->frequencyInfoUL;
   int scs = frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
-  frequency_range = *frequencyInfoUL->frequencyBandList->list.array[0] > 256 ? FR2 : FR1;
+  frequency_range = get_freq_range_from_band(*frequencyInfoUL->frequencyBandList->list.array[0]);
   bw_index =
       get_supported_band_index(scs, frequency_range, frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth);
   cfg->carrier_config.uplink_bandwidth.value = get_supported_bw_mhz(frequency_range, bw_index);
@@ -848,7 +848,7 @@ void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const f1ap_plmn_t *plmn, uint64_
 
   NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
-  NR_BCCH_DL_SCH_Message_t *sib1 = get_SIB1_NR(scc, plmn, cellID, tac, &nrmac->radio_config.timer_config);
+  NR_BCCH_DL_SCH_Message_t *sib1 = get_SIB1_NR(scc, plmn, cellID, tac, &nrmac->radio_config);
   cc->sib1 = sib1;
   cc->sib1_bcch_length = encode_SIB1_NR(sib1, cc->sib1_bcch_pdu, sizeof(cc->sib1_bcch_pdu));
   AssertFatal(cc->sib1_bcch_length > 0, "could not encode SIB1\n");
