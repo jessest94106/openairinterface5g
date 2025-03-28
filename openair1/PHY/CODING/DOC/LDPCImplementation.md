@@ -39,7 +39,7 @@ Building C object CMakeFiles/ldpc_t2.dir/openair1/PHY/CODING/nrLDPC_coding/nrLDP
 Linking C shared module libldpc_t2.so
 ```
 
-At runtime, to successfully use the T2 board, you need to install vendor specific drivers and tools.\
+At runtime, to successfully use LDPC accelerators (e.g., Xilinx T2/Intel ACCs), you will need to install the corresponding drivers and tools.
 Please refer to the dedicated documentation at [LDPC_T2_OFFLOAD_SETUP.md](file://../../../../doc/LDPC_T2_OFFLOAD_SETUP.md).
 
 `./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _t2 --nrLDPC_coding_t2.dpdk_dev 01:00.0 --nrLDPC_coding_t2.dpdk_core_list 0-1`
