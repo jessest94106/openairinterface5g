@@ -19,22 +19,16 @@
  *      contact@openairinterface.org
  */
 
-#ifndef ORAN_CONFIG_H
-#define ORAN_CONFIG_H
+#ifndef CONFIGURE_MPLANE_H
+#define CONFIGURE_MPLANE_H
 
-#include "stdbool.h"
-#include "stdint.h"
+#include "ru-mplane-api.h"
+#include "radio/COMMON/common_lib.h"
 
-struct xran_fh_init;
-struct xran_fh_config;
-struct openair0_config;
+bool edit_config_mplane(ru_session_t *ru_session, const char *buffer, const openair0_config_t *oai, const size_t num_rus);
 
-bool get_xran_config(void *mplane_api, const struct openair0_config *openair0_cfg, struct xran_fh_init *fh_init, struct xran_fh_config *fh_config);
+bool validate_config_mplane(ru_session_t *ru_session);
 
-void print_fh_init(const struct xran_fh_init *fh_init);
-void print_fh_config(const struct xran_fh_config *fh_config);
+bool commit_config_mplane(ru_session_t *ru_session);
 
-// hack to workaround LiteOn limitation
-extern int g_kbar;
-
-#endif /* ORAN_CONFIG_H */
+#endif /* CONFIGURE_MPLANE_H */
