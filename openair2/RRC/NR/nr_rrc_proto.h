@@ -40,6 +40,9 @@
 #include "NR_RRCReconfiguration.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
 
+#define SRB1 1
+#define SRB2 2
+
 void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_assoc_t assoc_id);
 void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_context_setup_t *resp);
 void rrc_release_nsa_user(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context);
