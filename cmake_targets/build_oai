@@ -99,7 +99,7 @@ Options:
    USRP, BLADERF, LMSSDR, IRIS, SIMU, AW2SORI, AERIAL, None (Default)
    Adds this RF board support (in external packages installation and in compilation)
 -t | --transport
-   Selects the transport protocol type, options: None, Ethernet, benetel4g, benetel5g, oran_fhlib_5g
+   Selects the transport protocol type, options: None, Ethernet, benetel4g, benetel5g, oran_fhlib_5g, oran_fhlib_5g_mplane
 -P | --phy_simulators
    Makes the unitary tests Layer 1 simulators
 -s | --check
@@ -304,6 +304,10 @@ function main() {
                 TARGET_LIST="$TARGET_LIST $2"
                 CMAKE_CMD="$CMAKE_CMD -DOAI_FHI72=ON"
                 ;;
+              "oran_fhlib_5g_mplane")
+                TARGET_LIST="$TARGET_LIST $2"
+                CMAKE_CMD="$CMAKE_CMD -DOAI_FHI72=ON -DOAI_FHI72_MPLANE=ON"
+                ;;
               "None")
                 ;;
               *)
@@ -485,7 +489,7 @@ function main() {
     # add some default libraries that should always be built
     # for eNB, gNB, UEs, simulators
     if [[ $gNB == 1 || $eNB == 1 || $UE == 1 || $nrUE == 1 || $SIMUS_PHY == 1 || $RU == 1 ]]; then
-      TARGET_LIST="$TARGET_LIST params_libconfig coding rfsimulator dfts params_yaml"
+      TARGET_LIST="$TARGET_LIST params_libconfig coding rfsimulator dfts params_yaml vrtsim"
     fi
 
     mkdir -p $DIR/$BUILD_DIR/build
@@ -502,12 +506,6 @@ function main() {
     ###################
     if [ "$BUILD_DOXYGEN" = "1" ] ; then
 	echo_info "Built Doxygen based documentation. The documentation file is located here: $DIR/$BUILD_DIR/build/doc/html/index.html"
-    fi
-
-    # TODO: once we got the CMakeLists.txt file done for the ORAN files, remove the following lines
-    if [[ $TARGET_LIST =~ "oran_fhlib_5g" ]]; then
-      rm -f liboai_transpro.so
-      ln -s liboran_fhlib_5g.so liboai_transpro.so
     fi
 
     if [ "$UE" = 1 ] ; then

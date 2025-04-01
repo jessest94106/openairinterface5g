@@ -872,18 +872,22 @@ static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
   if (*update_ntn_system_information) {
     *update_ntn_system_information = false;
 
-    *duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
-    UE->timing_advance = fp->samples_per_subframe * UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
-    *timing_advance +=
-        fp->get_samples_slot_timestamp(slot_nr,
-                                       fp,
-                                       UE->ntn_config_message->ntn_config_params.cell_specific_k_offset - *ntn_koffset);
-    *ntn_koffset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
+    double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
+    UE->timing_advance = fp->samples_per_subframe * total_ta_ms;
+
+    int mu = fp->numerology_index;
+    int koffset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
+    if (*ntn_koffset != koffset) {
+      *duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + (koffset << mu);
+      *timing_advance += fp->get_samples_slot_timestamp(slot_nr, fp, (koffset - *ntn_koffset) << mu);
+      *ntn_koffset = koffset;
+    }
 
     LOG_I(PHY,
-          "cell_specific_k_offset = %d ms, ntn_total_time_advance_ms = %f ms (%d samples)\n",
+          "k_offset = %d ms (%d slots), ntn_total_time_advance_ms = %f ms (%d samples)\n",
           *ntn_koffset,
-          UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms,
+          *ntn_koffset << mu,
+          total_ta_ms,
           UE->timing_advance);
   }
 }
@@ -1080,7 +1084,7 @@ void *UE_thread(void *arg)
     if (UE->ntn_config_message->update) {
       UE->ntn_config_message->update = false;
       update_ntn_system_information = true;
-      nr_slot_tx_offset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
+      nr_slot_tx_offset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset << fp->numerology_index;
     }
 
     int slot_nr = absolute_slot % nb_slot_frame;
@@ -1214,7 +1218,7 @@ void init_NR_UE(int nb_inst, char *uecap_file, char *reconfig_file, char *rbconf
     NR_UE_MAC_INST_t *mac = get_mac_inst(i);
     mac->if_module = nr_ue_if_module_init(i);
     AssertFatal(mac->if_module, "can not initialize IF module\n");
-    if (!IS_SA_MODE(get_softmodem_params()) || !get_softmodem_params()->sl_mode) {
+    if (!IS_SA_MODE(get_softmodem_params()) && !get_softmodem_params()->sl_mode) {
       init_nsa_message(&rrc_inst[i], reconfig_file, rbconfig_file);
       nr_rlc_activate_srb0(mac_inst[i].crnti, NULL, send_srb0_rrc);
     }
