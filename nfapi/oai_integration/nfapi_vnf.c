@@ -34,6 +34,8 @@
 #include "nfapi_nr_interface_scf.h"
 #include "nfapi_vnf_interface.h"
 #include "nfapi_vnf.h"
+#include <vnf.h>
+#include <vnf_p7.h>
 #include "nfapi.h"
 #include "vendor_ext.h"
 
@@ -1448,6 +1450,7 @@ void *vnf_nr_p7_thread_start(void *ptr)
   p7_vnf->config->unpack_func = &nfapi_nr_p7_message_unpack;
   p7_vnf->config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
   p7_vnf->config->pack_func = &nfapi_nr_p7_message_pack;
+  p7_vnf->config->send_p7_msg = &vnf_nr_send_p7_msg;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI P7 start thread %s\n", __FUNCTION__);
   pthread_create(&vnf_p7_start_pthread, NULL, &vnf_nr_p7_start_thread, p7_vnf->config);
   return 0;
@@ -1868,6 +1871,7 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->unpack_func = &nfapi_nr_p5_message_unpack;
   config->hdr_unpack_func = &nfapi_nr_p5_message_header_unpack;
   config->pack_func = &nfapi_nr_p5_message_pack;
+  config->send_p5_msg = &vnf_nr_send_p5_message;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI start thread %s\n", __FUNCTION__);
   pthread_create(&vnf_start_pthread, NULL, (void *)&vnf_nr_start_thread, config);
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Created VNF NFAPI start thread %s\n", __FUNCTION__);
@@ -1963,13 +1967,13 @@ int oai_nfapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req)
   dl_config_req->header.message_id= NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST;
   dl_config_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
 
-  int retval = nfapi_vnf_p7_nr_dl_config_req(p7_config, dl_config_req);
+  bool retval = nfapi_vnf_p7_nr_dl_config_req(p7_config, dl_config_req);
 
   dl_config_req->dl_tti_request_body.nPDUs                        = 0;
   dl_config_req->dl_tti_request_body.nGroup                       = 0;
 
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   }
   return retval;
@@ -1982,9 +1986,9 @@ int oai_nfapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
   tx_data_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   tx_data_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST;
   //LOG_D(PHY, "[VNF] %s() TX_REQ sfn_sf:%d number_of_pdus:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(tx_req->sfn_sf), tx_req->tx_request_body.number_of_pdus);
-  int retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
+  bool retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
     tx_data_req->Number_of_PDUs = 0;
@@ -2015,9 +2019,9 @@ int oai_nfapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req) {
   ul_dci_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ul_dci_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST;
   //LOG_D(PHY, "[VNF] %s() HI_DCI0_REQ sfn_sf:%d dci:%d hi:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(hi_dci0_req->sfn_sf), hi_dci0_req->hi_dci0_request_body.number_of_dci, hi_dci0_req->hi_dci0_request_body.number_of_hi);
-  int retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
+  bool retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
     ul_dci_req->numPdus = 0;
@@ -2068,9 +2072,9 @@ int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req) {
   ul_tti_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ul_tti_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST;
 
-  int retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
+  bool retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
     // Reset number of PDUs so that it is not resent

@@ -1537,7 +1537,7 @@ static int vnf_send_p5_msg(nfapi_vnf_pnf_info_t* pnf, const void *msg, int len, 
 	return 0;
 }
 
-int vnf_nr_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t* msg, uint16_t msg_len)
+bool vnf_nr_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len)
 {
 	nfapi_vnf_pnf_info_t* pnf = nfapi_vnf_pnf_list_find(&(vnf->_public), p5_idx);
 	
@@ -1554,9 +1554,9 @@ int vnf_nr_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_
       int packedMessageLengthFAPI = -1;
       packedMessageLengthFAPI =
           fapi_nr_p5_message_pack(msg, msg_len, tx_messagebufferFAPI, sizeof(tx_messagebufferFAPI), &vnf->_public.codec_config);
-      return aerial_send_P5_msg(tx_messagebufferFAPI, packedMessageLengthFAPI, msg);
+      return aerial_send_P5_msg(tx_messagebufferFAPI, packedMessageLengthFAPI, msg) == 0;
 #else
-      return 0;
+      return true;
 #endif
     } else {
       packedMessageLength = nfapi_nr_p5_message_pack(msg,
@@ -1567,7 +1567,7 @@ int vnf_nr_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_
 
       if (packedMessageLength < 0) {
         NFAPI_TRACE(NFAPI_TRACE_ERROR, "nfapi_nr_p5_message_pack failed with return %d\n", packedMessageLength);
-        return -1;
+        return false;
       }
       // printf("msg id = 0x%02x, entire message length: %d\n", msg->message_id, packedMessageLength);
       // for (int i = 0; i < packedMessageLength; i++) {
@@ -1578,7 +1578,7 @@ int vnf_nr_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_
     }
   } else {
     NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() cannot find pnf info for p5_idx:%d\n", __FUNCTION__, p5_idx);
-    return -1;
+    return false;
   }
 
 }

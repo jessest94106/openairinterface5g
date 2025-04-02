@@ -108,7 +108,7 @@ typedef struct nfapi_vnf_p7_connection_info {
 
 } nfapi_vnf_p7_connection_info_t;
 
-typedef struct {
+struct vnf_p7_t{
 
 	nfapi_vnf_p7_config_t _public;
 	
@@ -121,7 +121,7 @@ typedef struct {
 	uint8_t* rx_message_buffer; // would this be better put in the p7 conenction info?
 	uint16_t rx_message_buffer_size;
 	
-} vnf_p7_t;
+};
 
 uint32_t vnf_get_current_time_hr(void);
 
@@ -139,7 +139,7 @@ nfapi_vnf_p7_connection_info_t* vnf_p7_connection_info_list_find(vnf_p7_t* vnf_p
 nfapi_vnf_p7_connection_info_t* vnf_p7_connection_info_list_delete(vnf_p7_t* vnf_p7, uint16_t phy_id);
 
 int vnf_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_p7_message_header_t* header);
-int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header);
+bool vnf_nr_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header);
 
 void vnf_p7_release_msg(vnf_p7_t* vnf_p7, nfapi_p7_message_header_t* header);
 void vnf_p7_release_pdu(vnf_p7_t* vnf_p7, void* pdu);

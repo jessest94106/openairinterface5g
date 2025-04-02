@@ -473,9 +473,8 @@ int vnf_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* p7_info, u
 	return 0;
 }
 
-int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header)
+bool vnf_nr_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header)
 {
-
 	nfapi_vnf_p7_connection_info_t* p7_connection = vnf_p7_connection_info_list_find(vnf_p7, header->phy_id);
 	if(p7_connection)
 	{
@@ -491,7 +490,7 @@ int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_
 		if(len < 0) 
 		{
 			NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() failed to pack p7 message phy_id:%d\n", __FUNCTION__, header->phy_id);
-			return -1;
+			return false;
 		}
 
 		if(len > vnf_p7->_public.segment_size)
@@ -560,12 +559,12 @@ int vnf_nr_p7_pack_and_send_p7_msg(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_
 		}
 
 		p7_connection->sequence_number++;
-		return send_result;
+		return send_result == 0;
 	}
 	else
 	{
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() cannot find p7 connection info for phy_id:%d\n", __FUNCTION__, header->phy_id);
-		return -1;
+		return false;
 	}
 }
 
@@ -676,7 +675,8 @@ int vnf_build_send_dl_node_sync(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t
 }
 
 int vnf_nr_build_send_dl_node_sync(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* p7_info)
-{	
+{
+  nfapi_vnf_p7_config_t* config = (nfapi_vnf_p7_config_t*)vnf_p7;
 	nfapi_nr_dl_node_sync_t dl_node_sync;
 	memset(&dl_node_sync, 0, sizeof(dl_node_sync));
 
@@ -686,7 +686,7 @@ int vnf_nr_build_send_dl_node_sync(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_inf
 	dl_node_sync.t1 = calculate_nr_t1(p7_info->mu, p7_info->sfn,p7_info->slot, vnf_p7->slot_start_time_hr);
 	dl_node_sync.delta_sfn_slot = 0;
 
-	return vnf_nr_p7_pack_and_send_p7_msg(vnf_p7, &dl_node_sync.header);	
+	return config->send_p7_msg(vnf_p7, &dl_node_sync.header);
 }
 
 int vnf_nr_sync(vnf_p7_t* vnf_p7, nfapi_vnf_p7_connection_info_t* p7_info)

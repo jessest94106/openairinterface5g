@@ -30,6 +30,9 @@
 extern "C" {
 #endif
 
+typedef struct vnf_t vnf_t;
+typedef struct vnf_p7_t vnf_p7_t;
+
 #define NFAPI_MAX_PACKED_MESSAGE_SIZE 32768
 
 /*! The nfapi VNF phy configuration information
@@ -491,8 +494,18 @@ typedef struct nfapi_vnf_config
                           uint32_t unpackedBufLen,
                           nfapi_p4_p5_codec_config_t* config);
 
+  /*! \brief Sends a (n)FAPI P5 message
+   *
+   *  This function internally packs the given message into a buffer by calling the previously defined pack_func() function pointer
+   *  Then, having the message buffer populated, sends it to the PNF
+   *  \param vnf A pointer to a vnf_t*
+   *  \param p5_idx The index of the P5 PNF intended to receive the message
+   *  \param msg A pointer to the P5 message
+   *  \param msg_len The size of the encoded P5 message header
+   *  \return true on success, false on failure
+   */
+  bool (*send_p5_msg)(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len);
 
-	
 	
 } nfapi_vnf_config_t;
 
@@ -954,6 +967,16 @@ typedef struct nfapi_vnf_p7_config
 						   void* pUnpackedBuf,
 						   uint32_t unpackedBufLen,
 						   nfapi_p7_codec_config_t* config);
+
+  /*! \brief Sends a (n)FAPI P7 message
+   *
+   *  This function internally packs the given message into a buffer by calling the previously defined pack_func() function pointer
+   *  Then, having the message buffer populated, sends it to the PNF
+   *  \param vnf_p7 A pointer to a vnf_p7_t struct
+   *  \param header A pointer to the P7 message to pack & send
+   *  \return true on success, false on failure
+   */
+  bool (*send_p7_msg)(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header);
 } nfapi_vnf_p7_config_t;
 
 /*! Creates and initializes the nfapi_vnf_p7_config structure before use
@@ -1034,7 +1057,7 @@ int nfapi_vnf_p7_del_pnf(nfapi_vnf_p7_config_t* config, int phy_id);
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_dl_config_request_t* req);
-int nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti_request_t* req);
+bool nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti_request_t* req);
 
 /*! Send the UL_CONFIG.request
  *  \param config A pointer to the vnf p7 configuration
@@ -1045,7 +1068,7 @@ int nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_ul_config_req(nfapi_vnf_p7_config_t* config, nfapi_ul_config_request_t* req);
-int nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_request_t* req);
+bool nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_request_t* req);
 /*! Send the HI_DCI0.request
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded HI_DCI0.request.
@@ -1055,7 +1078,7 @@ int nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_reque
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_hi_dci0_req(nfapi_vnf_p7_config_t* config, nfapi_hi_dci0_request_t* req);
-int nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_request_t* req);
+bool nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_request_t* req);
 /*! Send the TX.req
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded HI_DCI0.request.
@@ -1065,7 +1088,7 @@ int nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_reque
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_tx_req(nfapi_vnf_p7_config_t* config, nfapi_tx_request_t* req);
-int nfapi_vnf_p7_tx_data_req(nfapi_vnf_p7_config_t* config, nfapi_nr_tx_data_request_t* req);
+bool nfapi_vnf_p7_tx_data_req(nfapi_vnf_p7_config_t* config, nfapi_nr_tx_data_request_t* req);
 /*! Send the LBT_DL_CONFIG.requst
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded LBT_DL_CONFIG.request.

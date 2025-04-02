@@ -1,12 +1,12 @@
 /*
  * Copyright 2017 Cisco Systems, Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "assertions.h"
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -894,8 +895,8 @@ int nfapi_nr_vnf_pnf_param_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_
 		return -1;
 
 	vnf_t* _this = (vnf_t*)(config);
-
-	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_param_request_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
+	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_param_request_t));
 }
 
 int nfapi_vnf_pnf_param_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_pnf_param_request_t* req)
@@ -914,8 +915,8 @@ int nfapi_nr_vnf_pnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr
 		return -1;
 
 	vnf_t* _this = (vnf_t*)(config);
-
-	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_config_request_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
+	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_config_request_t));
 }
 
 
@@ -945,8 +946,8 @@ int nfapi_nr_vnf_pnf_start_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_
 		return -1;
 
 	vnf_t* _this = (vnf_t*)(config);
-
-	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_start_request_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
+	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_pnf_start_request_t));
 }
 
 int nfapi_vnf_pnf_stop_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_pnf_stop_request_t* req)
@@ -965,8 +966,8 @@ int nfapi_nr_vnf_param_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_para
 		return -1;
 
 	vnf_t* _this = (vnf_t*)(config);
-
-	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_param_request_scf_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
+	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_param_request_scf_t));
 }
 
 int nfapi_vnf_param_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_param_request_t* req)
@@ -983,7 +984,7 @@ int nfapi_nr_vnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_con
 {
 	if(config == 0 || req == 0)
 		return -1;
-
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
 	vnf_t* _this = (vnf_t*)(config);
 
 	nfapi_vnf_phy_info_t* phy = nfapi_vnf_phy_info_list_find(config, req->header.phy_id);
@@ -1007,7 +1008,7 @@ int nfapi_nr_vnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_con
 	req->nfapi_config.timing_info_period.value = phy->timing_info_period;
 	req->num_tlv++;
 
-	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_config_request_scf_t));
+	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_config_request_scf_t));
 }
 
 int nfapi_vnf_config_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_config_request_t* req)
@@ -1057,8 +1058,8 @@ int nfapi_nr_vnf_start_req(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_star
 		return -1;
 
 	vnf_t* _this = (vnf_t*)(config);
-
-	return vnf_nr_pack_and_send_p5_message(_this, p5_idx, &req->header, sizeof(nfapi_nr_start_request_scf_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured\n");
+	return config->send_p5_msg(_this, p5_idx, &req->header, sizeof(nfapi_nr_start_request_scf_t));
 }
 
 
