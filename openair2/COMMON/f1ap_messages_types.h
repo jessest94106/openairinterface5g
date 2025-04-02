@@ -26,6 +26,7 @@
 #include <netinet/sctp.h>
 #include "common/5g_platform_types.h"
 #include "common/platform_constants.h"
+#include "common/utils/ds/byte_array.h"
 
 //-------------------------------------------------------------------------------------------//
 // Defines to access message fields.
@@ -452,6 +453,13 @@ typedef struct cu_to_du_rrc_information_s {
   uint32_t handoverPreparationInfo_length;
 }cu_to_du_rrc_information_t;
 
+typedef struct f1ap_cu_to_du_rrc_info_s {
+  byte_array_t *cg_configinfo;
+  byte_array_t *ue_cap;
+  byte_array_t *meas_config;
+  byte_array_t *ho_prep_info;
+} f1ap_cu_to_du_rrc_info_t;
+
 typedef struct du_to_cu_rrc_information_s {
   uint8_t * cellGroupConfig;
   uint32_t  cellGroupConfig_length;
@@ -476,6 +484,97 @@ typedef enum TransmActionInd_e {
   TransmActionInd_STOP,
   TransmActionInd_RESTART,
 } TransmActionInd_t;
+
+typedef struct f1ap_srb_to_setup_t {
+  int id;
+} f1ap_srb_to_setup_t;
+
+/// 9.3.1.52 Packet Error Rate
+typedef struct f1ap_per_t {
+  uint8_t scalar;
+  uint8_t exponent;
+} f1ap_per_t;
+
+// 9.3.1.49 Non-Dynamic 5QI Descriptor
+typedef struct f1ap_nondynamic_5qi_t {
+  int fiveQI;
+} f1ap_nondynamic_5qi_t;
+
+// 9.3.1.47 Dynamic 5QI Descriptor
+typedef struct f1ap_dynamic_5qi_t {
+  int prio; /// QoS Priority Level
+  int pdb; /// Packet Delay Budget
+  f1ap_per_t per; /// Packet Error Rate
+  bool *delay_critical; /// Delay Critical
+  int *avg_win; /// Averaging Window
+} f1ap_dynamic_5qi_t;
+
+typedef struct f1ap_arp_t {
+  uint16_t prio;
+  preemption_capability_t preempt_cap;
+  preemption_vulnerability_t preempt_vuln;
+} f1ap_arp_t;
+
+// 9.3.1.45 QoS Flow Level QoS Parameters
+typedef struct f1ap_qos_flow_param_t {
+  fiveQI_t qos_type;
+  union {
+    f1ap_nondynamic_5qi_t nondyn;
+    f1ap_dynamic_5qi_t dyn;
+  };
+  f1ap_arp_t arp;
+} f1ap_qos_flow_param_t;
+
+// in 9.2.2.1 Flows Mapped to DRB Item
+typedef struct f1ap_drb_flows_mapped_t {
+  int qfi;
+  f1ap_qos_flow_param_t param;
+} f1ap_drb_flows_mapped_t;
+
+/// in 9.2.2.1 DRB Info in UE Context Setup Request
+typedef struct f1ap_drb_info_nr_t {
+  f1ap_qos_flow_param_t drb_qos;
+  nssai_t nssai;
+  int flows_len;
+  f1ap_drb_flows_mapped_t *flows;
+} f1ap_drb_info_nr_t;
+
+typedef enum { F1AP_PDCP_SN_12B, F1AP_PDCP_SN_18B } f1ap_pdcp_sn_len_t;
+/// in 9.2.2.1 DRB to Be Setup Item IEs
+typedef struct f1ap_drb_to_setup_t {
+  int id;
+  enum { F1AP_QOS_CHOICE_EUTRAN, F1AP_QOS_CHOICE_NR } qos_choice;
+  union {
+    // eutran not implemented
+    f1ap_drb_info_nr_t nr;
+  };
+  int up_ul_tnl_len;
+  f1ap_up_tnl_t up_ul_tnl[2];
+  f1ap_rlc_mode_t rlc_mode;
+  f1ap_pdcp_sn_len_t *dl_pdcp_sn_len; // in setup mandatory, in setupmod optional
+  f1ap_pdcp_sn_len_t *ul_pdcp_sn_len;
+} f1ap_drb_to_setup_t;
+
+typedef struct f1ap_ue_context_setup_req_s {
+  uint32_t gNB_CU_ue_id;
+  uint32_t *gNB_DU_ue_id;
+
+  plmn_id_t plmn;
+  uint64_t nr_cellid;
+  uint8_t servCellIndex;
+
+  f1ap_cu_to_du_rrc_info_t cu_to_du_rrc_info;
+
+  int srbs_len;
+  f1ap_srb_to_setup_t *srbs;
+
+  int drbs_len;
+  f1ap_drb_to_setup_t *drbs;
+
+  byte_array_t *rrc_container;
+
+  uint64_t *gnb_du_ue_agg_mbr_ul; // C-ifDRBSetup
+} f1ap_ue_context_setup_req_t;
 
 typedef struct f1ap_ue_context_setup_s {
   uint32_t gNB_CU_ue_id;

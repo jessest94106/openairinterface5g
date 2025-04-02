@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 #include "common/utils/assertions.h"
 #include "common/utils/utils.h"
@@ -38,8 +39,10 @@
 #include "f1ap_messages_types.h"
 #include "F1AP_F1AP-PDU.h"
 
+#include "lib/f1ap_lib_common.h"
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
+#include "lib/f1ap_ue_context.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
 {
@@ -718,6 +721,171 @@ static void test_f1ap_cu_configuration_update_acknowledge(void)
   // No free needed
 }
 
+static byte_array_t get_test_ba(const char *s)
+{
+  byte_array_t ba = {
+      .len = strlen(s) + 1, /* binary data: needs to include null-byte of strdup() */
+      .buf = (uint8_t *) strdup(s),
+  };
+  return ba;
+}
+
+static byte_array_t *get_malloced_test_ba(const char *s)
+{
+  byte_array_t *ba = calloc_or_fail(1, sizeof(*ba));
+  *ba = get_test_ba(s);
+  return ba;
+}
+
+static void test_f1ap_ue_context_setup_request()
+{
+  plmn_id_t plmn = { .mcc = 001, .mnc = 01, .mnc_digit_length = 2 };
+  f1ap_ue_context_setup_req_t orig = {
+    .gNB_CU_ue_id = 12,
+    //.gNB_DU_ue_id below
+    .plmn = plmn,
+    .nr_cellid = 132,
+    .servCellIndex = 1,
+    //.cu_to_du_rrc_info below
+    //.srbs below
+    //.drbs below
+    //gnb_du_ue_agg_mbr_ul below
+  };
+  _F1_MALLOC(orig.gNB_DU_ue_id, 13);
+  orig.cu_to_du_rrc_info.cg_configinfo = get_malloced_test_ba("CG-CONFIGINFO");
+  orig.cu_to_du_rrc_info.ue_cap = get_malloced_test_ba("UE CAP");
+  orig.cu_to_du_rrc_info.meas_config = get_malloced_test_ba("UE MEASUREMENT CONFIGURATION");
+  orig.cu_to_du_rrc_info.ho_prep_info = get_malloced_test_ba("PREPARATION DATA FOR HANDOVER");
+  orig.srbs_len = 2;
+  orig.srbs = calloc_or_fail(orig.srbs_len, sizeof(*orig.srbs));
+  for (int i = 0; i < orig.srbs_len; ++i)
+    orig.srbs[i].id = 1 + i;
+
+  orig.drbs_len = 2;
+  orig.drbs = calloc_or_fail(orig.drbs_len, sizeof(*orig.drbs));
+  f1ap_drb_to_setup_t *drb1 = &orig.drbs[0];
+  drb1->id = 4;
+  drb1->qos_choice = F1AP_QOS_CHOICE_NR;
+  f1ap_arp_t arp = { 1, MAY_TRIGGER_PREEMPTION, PREEMPTABLE, };
+  drb1->nr.drb_qos.qos_type = NON_DYNAMIC;
+  drb1->nr.drb_qos.nondyn.fiveQI = 3;
+  drb1->nr.drb_qos.arp = arp;
+  drb1->nr.nssai = (nssai_t) {.sst = 1, .sd = 123};
+  drb1->nr.flows_len = 1;
+  f1ap_drb_flows_mapped_t *flow = drb1->nr.flows = calloc_or_fail(drb1->nr.flows_len, sizeof(*flow));
+  flow->qfi = 2;
+  flow->param.qos_type = NON_DYNAMIC;
+  flow->param.nondyn.fiveQI = 3;
+  flow->param.arp = arp;
+  drb1->up_ul_tnl_len = 1;
+  inet_pton(AF_INET, "192.168.40.23", &drb1->up_ul_tnl[0].tl_address);
+  drb1->up_ul_tnl[0].teid = 0x11223344;
+  drb1->rlc_mode = F1AP_RLC_MODE_UM_BIDIR;
+  _F1_MALLOC(drb1->dl_pdcp_sn_len, F1AP_PDCP_SN_18B);
+  _F1_MALLOC(drb1->ul_pdcp_sn_len, F1AP_PDCP_SN_18B);
+
+  f1ap_drb_to_setup_t *drb2 = &orig.drbs[1];
+  drb2->id = 12;
+  drb2->qos_choice = F1AP_QOS_CHOICE_NR;
+  drb2->nr.drb_qos.qos_type = DYNAMIC;
+  f1ap_dynamic_5qi_t *dyn = &drb2->nr.drb_qos.dyn;
+  dyn->prio = 4;
+  dyn->pdb = 1000;
+  dyn->per.scalar = 4;
+  dyn->per.exponent = 8;
+  _F1_MALLOC(dyn->delay_critical, true);
+  _F1_MALLOC(dyn->avg_win, 3000);
+  f1ap_arp_t arp2 = { 13, SHALL_NOT_TRIGGER_PREEMPTION, NOT_PREEMPTABLE, };
+  drb2->nr.drb_qos.arp = arp2;
+  drb2->nr.nssai = (nssai_t) {.sst = 2, .sd = 0xffffff};
+  drb2->nr.flows_len = 2;
+  f1ap_drb_flows_mapped_t *flow2 = drb2->nr.flows = calloc_or_fail(drb2->nr.flows_len, sizeof(*flow2));
+  flow2[0].qfi = 4;
+  flow2[0].param.qos_type = DYNAMIC;
+  flow2[0].param.dyn.prio = 4;
+  flow2[0].param.dyn.pdb = 999;
+  flow2[0].param.dyn.per.scalar = 4;
+  flow2[0].param.dyn.per.exponent = 8;
+  flow2[0].param.arp = arp2;
+  flow2[1].qfi = 5;
+  flow2[1].param.qos_type = NON_DYNAMIC;
+  flow2[1].param.nondyn.fiveQI = 3;
+  flow2[1].param.arp = arp;
+  drb2->up_ul_tnl_len = 2;
+  inet_pton(AF_INET, "10.0.0.2", &drb2->up_ul_tnl[0].tl_address);
+  drb2->up_ul_tnl[0].teid = 0x1234;
+  inet_pton(AF_INET, "10.0.0.2", &drb2->up_ul_tnl[1].tl_address);
+  drb2->up_ul_tnl[1].teid = 0x1235;
+  drb2->rlc_mode = F1AP_RLC_MODE_AM;
+  _F1_MALLOC(drb2->dl_pdcp_sn_len, F1AP_PDCP_SN_12B);
+  _F1_MALLOC(drb2->ul_pdcp_sn_len, F1AP_PDCP_SN_12B);
+
+  orig.rrc_container = get_malloced_test_ba("RRC container");
+
+  _F1_MALLOC(orig.gnb_du_ue_agg_mbr_ul, 5LL * 1000 * 1000 * 1000);
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_setup_req_t decoded = {0};
+  bool ret = decode_ue_context_setup_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_setup_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_setup_req(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_setup_req(): decoded message doesn't match\n");
+  char ip_ret[100];
+  inet_ntop(AF_INET, &decoded.drbs[0].up_ul_tnl[0].tl_address, ip_ret, sizeof(ip_ret));
+  printf("%s\n", ip_ret);
+  inet_ntop(AF_INET, &decoded.drbs[1].up_ul_tnl[0].tl_address, ip_ret, sizeof(ip_ret));
+  printf("%s\n", ip_ret);
+  free_ue_context_setup_req(&decoded);
+
+  f1ap_ue_context_setup_req_t cp = cp_ue_context_setup_req(&orig);
+  ret = eq_ue_context_setup_req(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_setup_req(): copied message doesn't match\n");
+  free_ue_context_setup_req(&orig);
+  free_ue_context_setup_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
+static void test_f1ap_ue_context_setup_request_simple()
+{
+  plmn_id_t plmn = { .mcc = 001, .mnc = 01, .mnc_digit_length = 2 };
+  f1ap_ue_context_setup_req_t orig = {
+    .gNB_CU_ue_id = 12,
+    .plmn = plmn,
+    .nr_cellid = 132,
+    .servCellIndex = 1,
+    //.cu_to_du_rrc_info: all fields optional, intentionally left empty
+    // rest is optional and intentionally left empty
+    // .gnb_du_ue_agg_mbr_ul is C-ifDRBSetup => no DRB => no IE
+  };
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_setup_req_t decoded = {0};
+  bool ret = decode_ue_context_setup_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_setup_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_setup_req(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_setup_req(): decoded message doesn't match\n");
+  free_ue_context_setup_req(&decoded);
+
+  f1ap_ue_context_setup_req_t cp = cp_ue_context_setup_req(&orig);
+  ret = eq_ue_context_setup_req(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_setup_req(): copied message doesn't match\n");
+  free_ue_context_setup_req(&orig);
+  free_ue_context_setup_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -733,5 +901,7 @@ int main()
   test_f1ap_cu_configuration_update();
   test_f1ap_cu_configuration_update_acknowledge();
   test_f1ap_du_configuration_update_acknowledge();
+  test_f1ap_ue_context_setup_request();
+  test_f1ap_ue_context_setup_request_simple();
   return 0;
 }

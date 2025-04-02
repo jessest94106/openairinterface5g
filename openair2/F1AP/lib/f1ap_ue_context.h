@@ -19,32 +19,18 @@
  *      contact@openairinterface.org
  */
 
-#ifndef F1AP_LIB_INCLUDES_H_
-#define F1AP_LIB_INCLUDES_H_
+#ifndef F1AP_UE_CONTEXT_SETUP_REQ_H_
+#define F1AP_UE_CONTEXT_SETUP_REQ_H_
 
-#include "F1AP_F1AP-PDU.h"
-#include "F1AP_InitialULRRCMessageTransfer.h"
-#include "F1AP_InitiatingMessage.h"
-#include "F1AP_NRCellIdentity.h"
-#include "F1AP_ProtocolIE-Field.h"
-#include "F1AP_ServedPLMNs-Item.h"
-#include "F1AP_ProtocolExtensionContainer.h"
-#include "F1AP_ProtocolExtensionField.h"
-#include "F1AP_ProtocolIE-Field.h"
-#include "F1AP_SliceSupportItem.h"
-#include "F1AP_NR-Mode-Info.h"
-#include "F1AP_GNB-DU-System-Information.h"
-#include "F1AP_FDD-Info.h"
-#include "F1AP_TDD-Info.h"
-#include "F1AP_FreqBandNrItem.h"
-#include "F1AP_SuccessfulOutcome.h"
-#include "F1AP_SibtypetobeupdatedListItem.h"
-#include "F1AP_UnsuccessfulOutcome.h"
-#include "F1AP_UE-associatedLogicalF1-ConnectionListRes.h"
-#include "F1AP_ULUPTNLInformation-ToBeSetup-Item.h"
-#include "F1AP_GTPTunnel.h"
-#include "F1AP_Flows-Mapped-To-DRB-Item.h"
-#include "F1AP_NonDynamic5QIDescriptor.h"
-#include "F1AP_Dynamic5QIDescriptor.h"
+#include <stdbool.h>
+#include "f1ap_messages_types.h"
 
-#endif /* F1AP_LIB_INCLUDES_H_ */
+struct F1AP_F1AP_PDU;
+
+struct F1AP_F1AP_PDU *encode_ue_context_setup_req(const f1ap_ue_context_setup_req_t *msg);
+bool decode_ue_context_setup_req(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context_setup_req_t *out);
+f1ap_ue_context_setup_req_t cp_ue_context_setup_req(const f1ap_ue_context_setup_req_t *orig);
+bool eq_ue_context_setup_req(const f1ap_ue_context_setup_req_t *a, const f1ap_ue_context_setup_req_t *b);
+void free_ue_context_setup_req(f1ap_ue_context_setup_req_t *req);
+
+#endif /* F1AP_UE_CONTEXT_SETUP_REQ_H_ */
