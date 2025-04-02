@@ -532,19 +532,74 @@ static void nr_rrc_process_sib1(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_inf
   nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
 }
 
-static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530, int gNB_index)
+static void nr_rrc_nh_update(NR_UE_RRC_INST_t *rrc, uint8_t *kamf, uint8_t *sync_input)
 {
-  if (rec_1530->fullConfig) {
-    // TODO perform the full configuration procedure as specified in 5.3.5.11 of 331
-    LOG_E(NR_RRC, "RRCReconfiguration includes fullConfig but this is not implemented yet\n");
+  uint8_t nh[SECURITY_KEY_LEN] = {0};
+  nr_derive_nh(kamf, sync_input, nh);
+  log_hex_buffer("Sync input = stored NH", rrc->nh, SECURITY_KEY_LEN);
+  memcpy(rrc->nh, nh, SECURITY_KEY_LEN);
+  rrc->nhcc++; // Increase stored nextHopChainingCount
+}
+
+/** @brief AS security key update procedure (5.3.5.7 3GPP TS 38.331) */
+void as_security_key_update(NR_UE_RRC_INST_t *rrc, NR_MasterKeyUpdate_t *mku)
+{
+  if (mku->nas_Container) {
+    LOG_E(NR_RRC, "forward the nas-Container to the upper layers: not implemented yet\n");
   }
-  if (rec_1530->masterCellGroup)
-    nr_rrc_ue_process_masterCellGroup(rrc, rec_1530->masterCellGroup, rec_1530->fullConfig, gNB_index);
-  if (rec_1530->masterKeyUpdate) {
-    // TODO perform AS security key update procedure as specified in 5.3.5.7
-    LOG_E(NR_RRC, "RRCReconfiguration includes masterKeyUpdate but this is not implemented yet\n");
+  if (mku->keySetChangeIndicator) {
+    LOG_E(NR_RRC, "derive or update the K gNB key based on the K AMF key, as specified in TS 33.501: not implemented yet\n");
+  } else {
+    /* derive or update the K gNB key based on the current K gNB key or the NH, using the nextHopChainingCount
+       value indicated in the received masterKeyUpdate, as specified in 6.9.2.3.3 3GPP TS 33.501 */
+    if (mku->nextHopChainingCount != rrc->nhcc) {
+      // - If the UE received an NCC value that was different from the NCC associated with the currently active
+      // K gNB/K eNB, the UE shall first synchronize the locally kept NH parameter by computing the function defined in
+      // Annex A.10 iteratively (and increasing the NCC value until it matches the NCC value received from the source
+      // ng-eNB/gNB via the HO command message.
+      LOG_A(NR_RRC, "Received masterKeyUpdate (nextHopChainingCount %ld): update security keys\n", mku->nextHopChainingCount);
+      /** @todo: The KAMF should be obtained from NAS. This exchange over ITTI must be synchronized
+       * with the rest of the RRCReconfiguration procedure, in particular, the RadioBearerConfig
+       * processing that triggers bearer modifications. Security configueration of bearers must
+       * complete using the newly derived keys. As a workaround NAS is directly accessed here. */
+      nr_ue_nas_t *nas = get_ue_nas_info(rrc->ue_id);
+      uint8_t *kamf = nas->security.kamf;
+      log_hex_buffer("Stored kamf", kamf, SECURITY_KEY_LEN);
+      if (rrc->nhcc == 0) { // First derivation
+        derive_kgnb(kamf, 0, rrc->kgnb);
+        log_hex_buffer("Sync input = derived kgnb", rrc->kgnb, SECURITY_KEY_LEN);
+        nr_rrc_nh_update(rrc, kamf, rrc->kgnb);
+      }
+      for (int i = rrc->nhcc; i < mku->nextHopChainingCount; i++) { // Following derivations
+        LOG_D(NR_RRC, "Derive keys for ChainingCount = %d\n", i);
+        nr_rrc_nh_update(rrc, kamf, rrc->nh);
+      }
+      nr_derive_key_ng_ran_star(rrc->phyCellID, rrc->arfcn_ssb, rrc->nh, rrc->kgnb);
+      // When the NCC values match, the UE shall compute the K NG-RAN *
+      // from the synchronized NH parameter and the target PCI and its frequency ARFCN-DL/EARFCN-DL using the
+      // function defined in Annex A.11 and A.12.
+      // The UE shall use the KNG-RAN * as the K gNB when communicating with the target gNB and as the KeNB when
+      // communicating with the target ng-eNB.
+    } else {
+      nr_derive_key_ng_ran_star(rrc->phyCellID, rrc->arfcn_ssb, rrc->kgnb, rrc->kgnb);
+    }
+    log_hex_buffer("Derived kgnb", rrc->kgnb, SECURITY_KEY_LEN);
   }
-  /* Check if there is dedicated NAS information to forward to NAS */
+}
+
+static nr_pdcp_entity_security_keys_and_algos_t get_security_rrc_parameters(NR_UE_RRC_INST_t *ue, bool cp)
+{
+  nr_pdcp_entity_security_keys_and_algos_t out = {0};
+  out.ciphering_algorithm = ue->cipheringAlgorithm;
+  out.integrity_algorithm = ue->integrityProtAlgorithm;
+  nr_derive_key(cp ? RRC_ENC_ALG : UP_ENC_ALG, ue->cipheringAlgorithm, ue->kgnb, out.ciphering_key);
+  nr_derive_key(cp ? RRC_INT_ALG : UP_INT_ALG, ue->integrityProtAlgorithm, ue->kgnb, out.integrity_key);
+  return out;
+}
+
+/** @brief Check if there is dedicated NAS information to forward to NAS */
+static void nr_rrc_process_dedicatedNAS_MessageList(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530)
+{
   if (rec_1530->dedicatedNAS_MessageList) {
     struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *tmp = rec_1530->dedicatedNAS_MessageList;
     for (int i = 0; i < tmp->list.count; i++) {
@@ -556,6 +611,21 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
       itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
     }
     tmp->list.count = 0; // to prevent the automatic free by ASN1_FREE
+  }
+}
+
+static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530, int gNB_index)
+{
+  if (rec_1530->fullConfig) {
+    // TODO perform the full configuration procedure as specified in 5.3.5.11 of 331
+    LOG_E(NR_RRC, "RRCReconfiguration includes fullConfig but this is not implemented yet\n");
+  }
+  if (rec_1530->masterCellGroup)
+    nr_rrc_ue_process_masterCellGroup(rrc, rec_1530->masterCellGroup, rec_1530->fullConfig, gNB_index);
+  if (rec_1530->masterKeyUpdate) {
+    as_security_key_update(rrc, rec_1530->masterKeyUpdate);
+    nr_pdcp_entity_security_keys_and_algos_t sp = get_security_rrc_parameters(rrc, true);
+    nr_pdcp_config_set_security(rrc->ue_id, 1, true, &sp);
   }
   NR_UE_RRC_SI_INFO *SI_info = &rrc->perNB[gNB_index].SInfo;
   if (rec_1530->dedicatedSIB1_Delivery) {
@@ -633,6 +703,9 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
     case NR_RRCReconfiguration__criticalExtensions_PR_rrcReconfiguration: {
       NR_RRCReconfiguration_IEs_t *ie = reconfiguration->criticalExtensions.choice.rrcReconfiguration;
 
+      if (ie->nonCriticalExtension)
+        nr_rrc_process_reconfiguration_v1530(rrc, ie->nonCriticalExtension, gNB_index);
+
       if (ie->radioBearerConfig) {
         LOG_I(NR_RRC, "RRCReconfiguration includes radio Bearer Configuration\n");
         nr_rrc_ue_process_RadioBearerConfig(rrc, ie->radioBearerConfig);
@@ -640,8 +713,11 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
           xer_fprint(stdout, &asn_DEF_NR_RadioBearerConfig, (const void *)ie->radioBearerConfig);
       }
 
+      /** @note This triggers PDU Session Establishment Accept which sets up the TUN interface.
+       * SDAP entity is a pre-requisite, therefore the radioBearerConfig has to be processed
+       * (in nr_rrc_ue_process_RadioBearerConfig, add_drb) early enough, or it may cause a race condition in SDAP. */
       if (ie->nonCriticalExtension)
-        nr_rrc_process_reconfiguration_v1530(rrc, ie->nonCriticalExtension, gNB_index);
+        nr_rrc_process_dedicatedNAS_MessageList(rrc, ie->nonCriticalExtension);
 
       if (ie->secondaryCellGroup) {
         NR_CellGroupConfig_t *cellGroupConfig = NULL;
@@ -1940,14 +2016,8 @@ static void nr_rrc_ue_process_RadioBearerConfig(NR_UE_RRC_INST_t *ue_rrc,
         ue_rrc->integrityProtAlgorithm = *radioBearerConfig->securityConfig->securityAlgorithmConfig->integrityProtAlgorithm;
       }
     }
-    security_rrc_parameters.ciphering_algorithm = ue_rrc->cipheringAlgorithm;
-    security_rrc_parameters.integrity_algorithm = ue_rrc->integrityProtAlgorithm;
-    nr_derive_key(RRC_ENC_ALG, ue_rrc->cipheringAlgorithm, ue_rrc->kgnb, security_rrc_parameters.ciphering_key);
-    nr_derive_key(RRC_INT_ALG, ue_rrc->integrityProtAlgorithm, ue_rrc->kgnb, security_rrc_parameters.integrity_key);
-    security_up_parameters.ciphering_algorithm = ue_rrc->cipheringAlgorithm;
-    security_up_parameters.integrity_algorithm = ue_rrc->integrityProtAlgorithm;
-    nr_derive_key(UP_ENC_ALG, ue_rrc->cipheringAlgorithm, ue_rrc->kgnb, security_up_parameters.ciphering_key);
-    nr_derive_key(UP_INT_ALG, ue_rrc->integrityProtAlgorithm, ue_rrc->kgnb, security_up_parameters.integrity_key);
+    security_rrc_parameters = get_security_rrc_parameters(ue_rrc, true);
+    security_up_parameters = get_security_rrc_parameters(ue_rrc, false);
   }
 
   if (radioBearerConfig->srb_ToAddModList != NULL) {
