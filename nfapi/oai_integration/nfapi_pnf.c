@@ -45,6 +45,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
+#include <pnf.h>
 
 #include <vendor_ext.h>
 #include "fapi_stub.h"
@@ -1750,6 +1751,7 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   p7_config->unpack_func = &nfapi_nr_p7_message_unpack;
   p7_config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
   p7_config->pack_func = &nfapi_nr_p7_message_pack;
+  p7_config->send_p7_msg = &pnf_nr_send_p7_message;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating P7 thread %s\n", __FUNCTION__);
   pthread_t p7_thread;
   threadCreate(&p7_thread, &pnf_nr_p7_thread_start, p7_config, "pnf_p7_thread", -1, OAI_PRIORITY_RT);
@@ -2194,6 +2196,7 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
   config->unpack_func = &nfapi_nr_p5_message_unpack;
   config->hdr_unpack_func = &nfapi_nr_p5_message_header_unpack;
   config->pack_func = &nfapi_nr_p5_message_pack;
+  config->send_p5_msg = &pnf_nr_send_p5_message;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
   pthread_create(&pnf_start_pthread, NULL, &pnf_nr_start_thread, config);
   pthread_setname_np(pnf_start_pthread, "NFAPI_PNF");

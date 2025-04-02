@@ -31,8 +31,8 @@ extern "C" {
 #include <sys/types.h>
 #include "openair1/PHY/defs_gNB.h"
 
-
-
+typedef struct pnf_t pnf_t;
+typedef struct pnf_p7_t pnf_p7_t;
 
 /*! This enum is used to describe the states of the pnf 
  */
@@ -320,6 +320,8 @@ typedef struct nfapi_pnf_config
 	void (*deallocate_p4_p5_vendor_ext)(void* header);
 
   /*! \brief Encodes an (n)FAPI P5 message to a buffer
+   *
+   *  This function is called internally in send_p5_msg()
    *  \param pMessageBuf A pointer to a nfapi p5 message structure
    *  \param messageBufLen The size of the p5 message structure
    *  \param pPackedBuf A pointer to the buffer that the p5 message will be packed into
@@ -361,6 +363,16 @@ typedef struct nfapi_pnf_config
                           uint32_t unpackedBufLen,
                           nfapi_p4_p5_codec_config_t* config);
 
+  /*! \brief Sends a (N)FAPI P5 message
+   *
+   *  This function internally packs the given message into a buffer by calling the previously defined pack_func() function pointer
+   *  Then, having the message buffer populated, sends it to the VNF
+   *  \param pnf A pointer to a pnf_t*
+   *  \param msg A pointer to the P5 message
+   *  \param msg_len The size of the encoded P5 message
+   *  \return true on success, false on failure.
+   */
+  bool (*send_p5_msg)(pnf_t* pnf, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len);
 } nfapi_pnf_config_t;
 
 /*! Create a pnf configuration 
@@ -767,6 +779,8 @@ typedef struct nfapi_pnf_p7_config
 	void (*deallocate_p7_vendor_ext)(void* header);
 
   /*! A callback to pack a P7 message
+   *
+   *  This function is called internally in send_p7_msg()
    *  \param pMessageBuf A pointer to a nfapi p7 message structure
    *  \param pPackedBuf A pointer to the buffer that the p7 message will be packed into
    *  \param packedBufLen The size of the buffer
@@ -803,6 +817,16 @@ typedef struct nfapi_pnf_p7_config
                           uint32_t unpackedBufLen,
                           nfapi_p7_codec_config_t* config);
 
+  /*! \brief Sends a (N)FAPI P7 message
+   *
+   *  This function internally packs the given message into a buffer by calling the previously defined pack_func() function pointer
+   *  Then, having the message buffer populated, sends it to the VNF
+   *  \param pnf_p7 A pointer to a pnf_p7_t struct
+   *  \param header A pointer to the P7 message to pack & send
+   *  \param msg_len The P7 message length
+   *  \return true on success, false on failure.
+   */
+  bool (*send_p7_msg)(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_header_t* header, uint32_t msg_len);
 } nfapi_pnf_p7_config_t;
 
 /*! Create and initialise a nfapi_pnf_p7_config structure

@@ -135,8 +135,8 @@ int nfapi_nr_pnf_pnf_param_resp(nfapi_pnf_config_t* config, nfapi_nr_pnf_param_r
 	}
 
 	pnf_t* _this = (pnf_t*)(config);
-
-	return pnf_nr_pack_and_send_p5_message(_this, &(resp->header), sizeof(nfapi_nr_pnf_param_response_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured!");
+	return config->send_p5_msg(_this, &(resp->header), sizeof(nfapi_nr_pnf_param_response_t));
 }
 
 int nfapi_pnf_pnf_param_resp(nfapi_pnf_config_t* config, nfapi_pnf_param_response_t* resp)
@@ -188,8 +188,8 @@ int nfapi_nr_pnf_pnf_config_resp(nfapi_pnf_config_t* config, nfapi_nr_pnf_config
 	}
 
 	pnf_t* _this = (pnf_t*)(config);
-
-	return pnf_nr_pack_and_send_p5_message(_this, &(resp->header), sizeof(nfapi_nr_pnf_config_response_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured|");
+	return config->send_p5_msg(_this, &(resp->header), sizeof(nfapi_nr_pnf_config_response_t));
 }
 
 
@@ -227,8 +227,8 @@ int nfapi_nr_pnf_pnf_start_resp(nfapi_pnf_config_t* config, nfapi_nr_pnf_start_r
 	}
 
 	pnf_t* _this = (pnf_t*)(config);
-
-	return pnf_nr_pack_and_send_p5_message(_this, &(resp->header), sizeof(nfapi_nr_pnf_start_response_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured|");
+	return config->send_p5_msg(_this, &(resp->header), sizeof(nfapi_nr_pnf_start_response_t));
 }
 
 
@@ -273,8 +273,8 @@ int nfapi_nr_pnf_param_resp(nfapi_pnf_config_t* config, nfapi_nr_param_response_
 	}
 
 	pnf_t* _this = (pnf_t*)(config);
-
-	return pnf_nr_pack_and_send_p5_message(_this, &(resp->header), sizeof(nfapi_nr_param_response_scf_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured|");
+	return config->send_p5_msg(_this, &(resp->header), sizeof(nfapi_nr_param_response_scf_t));
 }
 
 int nfapi_pnf_config_resp(nfapi_pnf_config_t* config, nfapi_config_response_t* resp)
@@ -329,8 +329,8 @@ int nfapi_nr_pnf_config_resp(nfapi_pnf_config_t* config, nfapi_nr_config_respons
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: unknow phy id %d\n", __FUNCTION__, resp->header.phy_id);
 		return -1;
 	}
-
-	return pnf_nr_pack_and_send_p5_message(_this, &(resp->header), sizeof(nfapi_nr_config_response_scf_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured|");
+	return config->send_p5_msg(_this, &(resp->header), sizeof(nfapi_nr_config_response_scf_t));
 }
 
 
@@ -384,8 +384,8 @@ int nfapi_nr_pnf_start_resp(nfapi_pnf_config_t* config, nfapi_nr_start_response_
 		NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: unknown phy id %d\n", __FUNCTION__, resp->header.phy_id);
 		return -1;
 	}
-
-	return pnf_nr_pack_and_send_p5_message(_this, &(resp->header), sizeof(nfapi_nr_start_response_scf_t));
+  AssertFatal(config->send_p5_msg, "Function pointer must be configured|");
+	return config->send_p5_msg(_this, &(resp->header), sizeof(nfapi_nr_start_response_scf_t));
 }
 
 

@@ -569,14 +569,14 @@ int pnf_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_p7_message_header_t*
 	return 0;
 }
 
-int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_header_t* header, uint32_t msg_len)
+bool pnf_nr_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_header_t* header, uint32_t msg_len)
 {
   header->m_segment_sequence = NFAPI_P7_SET_MSS(0, 0, pnf_p7->sequence_number);
 
   // Need to guard against different threads calling the encode function at the same time
   if (pthread_mutex_lock(&(pnf_p7->pack_mutex)) != 0) {
     NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to lock mutex\n");
-    return -1;
+    return false;
   }
 
   uint8_t tx_buf[131072]; // four times NFAPI_MAX_PACKED_MESSAGE_SIZE as of this commit
@@ -585,11 +585,11 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
   if (len < 0) {
     if (pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0) {
       NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
-      return -1;
+      return false;
     }
 
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "nfapi_p7_message_pack failed with return %d\n", len);
-    return -1;
+    return false;
   }
 
   if (len > pnf_p7->_public.segment_size) {
@@ -644,10 +644,10 @@ int pnf_nr_p7_pack_and_send_p7_message(pnf_p7_t* pnf_p7, nfapi_nr_p7_message_hea
 
   if (pthread_mutex_unlock(&(pnf_p7->pack_mutex)) != 0) {
     NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
-    return -1;
+    return false;
   }
 
-  return 0;
+  return true;
 }
 
 void pnf_pack_and_send_timing_info(pnf_p7_t* pnf_p7)
@@ -707,9 +707,8 @@ void pnf_nr_pack_and_send_timing_info(pnf_p7_t* pnf_p7)
 	timing_info.tx_data_request_earliest_arrival = 0;
 	timing_info.ul_tti_earliest_arrival = 0;
 	timing_info.ul_dci_earliest_arrival = 0;
-
-
-	pnf_nr_p7_pack_and_send_p7_message(pnf_p7, &(timing_info.header), sizeof(timing_info));
+  AssertFatal(pnf_p7->_public.send_p7_msg, "The function pointer to pack and send P7 messages must be set");
+  pnf_p7->_public.send_p7_msg(pnf_p7, &(timing_info.header), sizeof(timing_info));
 
 	pnf_p7->timing_info_ms_counter = 0;
 }
@@ -2097,8 +2096,8 @@ void pnf_nr_handle_dl_node_sync(void *pRecvMsg, int recvMsgLen, pnf_p7_t* pnf_p7
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "failed to unlock mutex\n");
 		return;
 	}
-
-	pnf_nr_p7_pack_and_send_p7_message(pnf_p7, &(ul_node_sync.header), sizeof(ul_node_sync));
+  AssertFatal(pnf_p7->_public.send_p7_msg, "Function pointer must be configured|");
+	pnf_p7->_public.send_p7_msg(pnf_p7, &(ul_node_sync.header), sizeof(ul_node_sync));
 	//printf("\nSSent UL Node Sync sfn:%d,slot:%d\n",pnf_p7->sfn,pnf_p7->slot);
 }
 
