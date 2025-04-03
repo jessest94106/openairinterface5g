@@ -63,58 +63,87 @@ adb_ue_2:
 
 oc-cn5g:
   Host: avra
-  Namespace: "oaicicd-core-for-ci-ran"
-  CNPath: "/opt/oai-cn5g-fed-develop-2025-jan"
   NetworkScript: echo "inet 172.21.6.102"
   RunIperf3Server: False
+  Deploy: "! scripts/oc-cn5g-deploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-ci-ran"
+  Undeploy: "! scripts/oc-cn5g-undeploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-ci-ran"
+  LogCollect: "! scripts/oc-cn5g-logcollect.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-ci-ran %%log_dir%%"
 
 oc-cn5g-20897:
   Host: cacofonix
-  Namespace: "oaicicd-core-for-fhi72"
-  CNPath: "/opt/oai-cn5g-fed-develop-2025-jan"
   NetworkScript: echo "inet 172.21.6.105"
   RunIperf3Server: False
+  Deploy: "! scripts/oc-cn5g-deploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-fhi72"
+  Undeploy: "! scripts/oc-cn5g-undeploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-fhi72"
+  LogCollect: "! scripts/oc-cn5g-logcollect.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-fhi72 %%log_dir%%"
 
 oc-cn5g-20897-aerial2:
   Host: aerial2
-  Namespace: "oaicicd-core-for-nvidia-aerial"
-  CNPath: "/opt/oai-cn5g-fed-develop-2025-jan"
   NetworkScript: echo "inet 172.21.6.105"
   RunIperf3Server: False
+  Deploy: "! scripts/oc-cn5g-deploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-nvidia-aerial"
+  Undeploy: "! scripts/oc-cn5g-undeploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-nvidia-aerial"
+  LogCollect: "! scripts/oc-cn5g-logcollect.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-nvidia-aerial %%log_dir%%"
 
 matix-cn5g:
   Host: matix
   NetworkScript: docker exec prod-trf-gen ip a show dev eth0
-  CmdPrefix: docker exec prod-trf-gen
   RunIperf3Server: False
+  Deploy: "cd /opt/oai-cn5g-fed-v2/docker-compose && python3 ./core-network.py --type start-basic"
+  Undeploy: "cd /opt/oai-cn5g-fed-v2/docker-compose && python3 ./core-network.py --type stop-basic"
+  LogCollect:
+    - "docker logs oai-smf > %%log_dir%%/oai-smf.log"
+    - "docker logs oai-amf > %%log_dir%%/oai-amf.log"
+    - "docker logs oai-upf > %%log_dir%%/oai-upf.log"
 
 porcepix-cn4g:
   Host: porcepix
   NetworkScript: docker exec prod-trf-gen ip a show dev eth0
   CmdPrefix: docker exec prod-trf-gen
-
-porcepix-cn5g:
-  Host: porcepix
-  NetworkScript: docker exec prod-trf-gen ip a show dev eth0
-  CmdPrefix: docker exec prod-trf-gen
-  RunIperf3Server: False
+  Deploy: "! scripts/magma-epc-deploy.sh /opt/oai-epc-magma/docker-compose.yml"
+  Undeploy: "docker compose -f /opt/oai-epc-magma/docker-compose.yml down"
+  LogCollect: "! scripts/magma-epc-logcollect.sh %%log_dir%%"
 
 nano-cn4g:
   Host: nano
   NetworkScript: docker exec prod-trf-gen ip a show dev eth0
   CmdPrefix: docker exec prod-trf-gen
+  Deploy: "! scripts/magma-epc-deploy.sh /opt/oai-epc-magma/docker-compose.yml"
+  Undeploy: "docker compose -f /opt/oai-epc-magma/docker-compose.yml down"
+  LogCollect: "! scripts/magma-epc-logcollect.sh %%log_dir%%"
 
 ltebox-nano:
   Host: nano
   NetworkScript: ip a show dev tun1
+  Deploy:
+    - "sudo su -c 'screen -dm -S simulated_hss /opt/hss_sim0609/starthss'"
+    - "sleep 1"
+    - "sudo /opt/ltebox/tools/start_mme && sudo /opt/ltebox/tools/start_xGw &"
+    - "sleep 1"
+  Undeploy: "sudo /opt/ltebox/tools/stop_xGw; sudo /opt/ltebox/tools/stop_mme; sudo killall screen"
+  LogCollect: "cp /opt/hss_sim0609/hss.log /opt/ltebox/var/log/{mmeLog.0,s1apcLog.0,s1apsLog.0,s11cLog.0,libLog.0,xGwLog.0} %%log_dir%%"
 
 sabox-nepes:
   Host: nepes
   NetworkScript: ip a show dev tun1
+  Deploy:
+    - "sudo su -c 'screen -dm -S simulated_5g_hss /opt/hss_sim0609/start_5g_hss'"
+    - "sleep 1"
+    - "sudo /opt/ltebox/tools/start_sabox < /dev/null &> /dev/null"
+    - "sleep 1"
+  LogCollect: "cp /opt/hss_sim0609/hss.log /opt/ltebox/var/log/{amfLog.0,ngapcLog.0,ngapcommonLog.0,ngapsLog.0,xGwLog.0,upfLog.0} %%log_dir%%"
+  Undeploy: "sudo /opt/ltebox/tools/stop_sabox; sudo killall screen"
 
 ltebox-nepes:
   Host: nepes
   NetworkScript: ip a show dev tun1
+  Deploy:
+    - "sudo su -c 'screen -dm -S simulated_hss /opt/hss_sim0609/starthss'"
+    - "sleep 1"
+    - "sudo /opt/ltebox/tools/start_mme && sudo /opt/ltebox/tools/start_xGw &"
+    - "sleep 1"
+  Undeploy: "sudo /opt/ltebox/tools/stop_xGw; sudo /opt/ltebox/tools/stop_mme; sudo killall screen"
+  LogCollect: "cp /opt/hss_sim0609/hss.log /opt/ltebox/var/log/{mmeLog.0,s1apcLog.0,s1apsLog.0,s11cLog.0,libLog.0,xGwLog.0} %%log_dir%%"
 
 amarisoft_ue:
   Host: amariue
@@ -357,6 +386,15 @@ rfsim5g_ext_dn:
   NetworkScript: docker exec rfsim5g-oai-ext-dn ip a show dev eth0
   CmdPrefix: docker exec rfsim5g-oai-ext-dn
 
+oai_ext_dn:
+  Host: "%%current_host%%"
+  NetworkScript: docker exec oai-ext-dn ip a show dev eth0
+  CmdPrefix: docker exec oai-ext-dn
+
+rfsim5g_5gc_fixed_ip:
+  Host: "%%current_host%%"
+  NetworkScript: echo "inet 12.1.1.1"
+
 rfsim4g_ue:
   Host: "%%current_host%%"
   NetworkScript: docker exec rfsim4g-oai-lte-ue0 ip a show dev oaitun_ue1
@@ -385,9 +423,9 @@ rfsim4g_enb_fembms:
 
 rfsim4g_ue_fembms:
   Host: "%%current_host%%"
-  NetworkScript: docker exec rfsim4g-oai-lte-ue0 ip a show dev oaitun_uem1
+  NetworkScript: docker exec rfsim4g-oai-lte-ue0 ip a show dev oaitun_uem2
   CmdPrefix: docker exec rfsim4g-oai-lte-ue0
-  IF: oaitun_uem1
+  IF: oaitun_uem2
 
 l2sim4g_ue:
   Host: "%%current_host%%"
@@ -402,7 +440,3 @@ l2sim4g_ext_dn:
   Host: "%%current_host%%"
   NetworkScript: docker exec l2sim4g-trf-gen ip a show dev eth0
   CmdPrefix: docker exec l2sim4g-trf-gen
-
-test:
-  Host: localhost
-  NetworkScript: echo "inet 127.0.0.1 mtu 1500"

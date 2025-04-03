@@ -45,7 +45,6 @@ import cls_physim1		 #class PhySim for physical simulators deploy and run
 import cls_cluster		 # class for building/deploying on cluster
 import cls_native        # class for all native/source-based operations
 
-import epc
 import ran
 import cls_oai_html
 
@@ -94,7 +93,6 @@ def AssignParams(params_dict):
 		setattr(HTML, key, value)
 
 def ExecuteActionWithParam(action):
-	global EPC
 	global RAN
 	global HTML
 	global CONTAINERS
@@ -180,7 +178,7 @@ def ExecuteActionWithParam(action):
 
 		cmd_prefix = test.findtext('cmd_prefix')
 		if cmd_prefix is not None: RAN.cmd_prefix = cmd_prefix
-		success = RAN.InitializeeNB(HTML, EPC)
+		success = RAN.InitializeeNB(HTML)
 
 	elif action == 'Terminate_eNB':
 		eNB_instance=test.findtext('eNB_instance')
@@ -208,7 +206,7 @@ def ExecuteActionWithParam(action):
 			RAN.air_interface[RAN.eNB_instance] = 'lte-softmodem'
 		else:
 			RAN.air_interface[RAN.eNB_instance] = air_interface.lower() +'-softmodem'
-		success = RAN.TerminateeNB(HTML, EPC)
+		success = RAN.TerminateeNB(HTML)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
@@ -242,6 +240,9 @@ def ExecuteActionWithParam(action):
 		CiTestObj.ping_args = test.findtext('ping_args')
 		CiTestObj.ping_packetloss_threshold = test.findtext('ping_packetloss_threshold')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
+		CiTestObj.svr_id = test.findtext('svr_id') or None
+		if test.findtext('svr_node'):
+			CiTestObj.svr_node = test.findtext('svr_node') if not force_local else 'localhost'
 		if force_local:
 			# Change all execution targets to localhost
 			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
@@ -254,7 +255,7 @@ def ExecuteActionWithParam(action):
 			else:
 				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
-		success = CiTestObj.Ping(HTML,EPC,CONTAINERS)
+		success = CiTestObj.Ping(HTML, CONTAINERS)
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
@@ -285,9 +286,9 @@ def ExecuteActionWithParam(action):
 			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
 			CiTestObj.iperf_options = 'check'
 		if action == 'Iperf':
-			success = CiTestObj.Iperf(HTML, EPC, CONTAINERS)
+			success = CiTestObj.Iperf(HTML, CONTAINERS)
 		elif action == 'Iperf2_Unidir':
-			success = CiTestObj.Iperf2_Unidir(HTML, EPC, CONTAINERS)
+			success = CiTestObj.Iperf2_Unidir(HTML, CONTAINERS)
 
 	elif action == 'IdleSleep':
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
@@ -296,47 +297,10 @@ def ExecuteActionWithParam(action):
 	elif action == 'Deploy_Run_PhySim':
 		success = PHYSIM.Deploy_PhySim(HTML)
 
-	elif action == 'Initialize_MME':
-		string_field = test.findtext('option')
-		if (string_field is not None):
-			EPC.mmeConfFile = string_field
-		success = EPC.InitializeMME(HTML)
-
-	elif action == 'Initialize_HSS' or action == 'Initialize_SPGW':
-		if action == 'Initialize_HSS':
-			success = EPC.InitializeHSS(HTML)
-		elif action == 'Initialize_SPGW':
-			success = EPC.InitializeSPGW(HTML)
-	elif action == 'Terminate_HSS' or action == 'Terminate_MME' or action == 'Terminate_SPGW':
-		if action == 'Terminate_HSS':
-			success = EPC.TerminateHSS(HTML)
-		elif action == 'Terminate_MME':
-			success = EPC.TerminateMME(HTML)
-		elif action == 'Terminate_SPGW':
-			success = EPC.TerminateSPGW(HTML)
-
-	elif action == 'Deploy_EPC':
-		string_field = test.findtext('parameters')
-		if (string_field is not None):
-			EPC.yamlPath = string_field
-		success = EPC.DeployEpc(HTML)
-
-	elif action == 'Undeploy_EPC':
-		success = EPC.UndeployEpc(HTML)
-
-	elif action == 'Initialize_5GCN':
-		string_field = test.findtext('args')
-		if (string_field is not None):
-			EPC.cfgDeploy = string_field	
-		EPC.cnID = test.findtext('cn_id')
-		success = EPC.Initialize5GCN(HTML)
-
-	elif action == 'Terminate_5GCN':
-		string_field = test.findtext('args')
-		if (string_field is not None):
-			EPC.cfgUnDeploy = string_field	
-		EPC.cnID = test.findtext('cn_id')
-		success = EPC.Terminate5GCN(HTML)
+	elif action == 'DeployCoreNetwork' or action == 'UndeployCoreNetwork':
+		cn_id = test.findtext('cn_id')
+		core_op = getattr(cls_oaicitest.OaiCiTest, action)
+		success = core_op(cn_id, HTML)
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
 		eNB_instance=test.findtext('eNB_instance')
@@ -474,7 +438,6 @@ mode = ''
 
 CiTestObj = cls_oaicitest.OaiCiTest()
  
-EPC = epc.EPCManagement()
 RAN = ran.RANManagement()
 HTML = cls_oai_html.HTMLManagement()
 CONTAINERS = cls_containerize.Containerize()
@@ -489,7 +452,7 @@ CLUSTER = cls_cluster.Cluster()
 import args_parse
 # Force local execution, move all execution targets to localhost
 force_local = False
-py_param_file_present, py_params, mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,EPC,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER)
+py_param_file_present, py_params, mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,PHYSIM,CLUSTER)
 
 
 
@@ -514,22 +477,13 @@ if re.match('^TerminateeNB$', mode, re.IGNORECASE):
 	RAN.eNB_instance=0
 	RAN.eNB_serverId[0]='0'
 	RAN.eNBSourceCodePath='/tmp/'
-	RAN.TerminateeNB(HTML, EPC)
+	RAN.TerminateeNB(HTML)
 elif re.match('^TerminateHSS$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	EPC.TerminateHSS(HTML)
+	logging.warning("Option TerminateHSS ignored")
 elif re.match('^TerminateMME$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	EPC.TerminateMME(HTML)
+	logging.warning("Option TerminateMME ignored")
 elif re.match('^TerminateSPGW$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath== '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	EPC.TerminateSPGW(HTML)
+	logging.warning("Option TerminateSPGW ignored")
 elif re.match('^LogCollectBuild$', mode, re.IGNORECASE):
 	if (RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '') and (CiTestObj.UEIPAddress == '' or CiTestObj.UEUserName == '' or CiTestObj.UEPassword == '' or CiTestObj.UESourceCodePath == ''):
 		HELP.GenericHelp(CONST.Version)
@@ -552,35 +506,17 @@ elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
 		sys.exit(0)
 	RAN.LogCollecteNB()
 elif re.match('^LogCollectHSS$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	EPC.LogCollectHSS()
+	logging.warning("Option LogCollectHSS ignored")
 elif re.match('^LogCollectMME$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	EPC.LogCollectMME()
+	logging.warning("Option LogCollectMME ignored")
 elif re.match('^LogCollectSPGW$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	EPC.LogCollectSPGW()
+	logging.warning("Option LogCollectSPGW ignored")
 elif re.match('^LogCollectPing$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	CiTestObj.LogCollectPing(EPC)
+	logging.warning("Option LogCollectPing ignored")
 elif re.match('^LogCollectIperf$', mode, re.IGNORECASE):
-	if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	CiTestObj.LogCollectIperf(EPC)
+	logging.warning("Option LogCollectIperf ignored")
 elif re.match('^LogCollectOAIUE$', mode, re.IGNORECASE):
-	if CiTestObj.UEIPAddress == '' or CiTestObj.UEUserName == '' or CiTestObj.UEPassword == '' or CiTestObj.UESourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	CiTestObj.LogCollectOAIUE()
+	logging.warning("Option LogCollectOAIUE ignored")
 elif re.match('^InitiateHtml$', mode, re.IGNORECASE):
 	count = 0
 	foundCount = 0
@@ -613,10 +549,8 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	logging.info('\u001B[1m  Starting Scenario: ' + CiTestObj.testXMLfiles[0] + '\u001B[0m')
 	logging.info('\u001B[1m----------------------------------------\u001B[0m')
 	if re.match('^TesteNB$', mode, re.IGNORECASE):
-		if RAN.eNBIPAddress == '' or RAN.ranRepository == '' or RAN.ranBranch == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '' or EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.Type == '' or EPC.SourceCodePath == '':
+		if RAN.eNBIPAddress == '' or RAN.ranRepository == '' or RAN.ranBranch == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
-			if EPC.IPAddress == '' or EPC.UserName == '' or EPC.Password == '' or EPC.SourceCodePath == '' or EPC.Type == '':
-				HELP.EPCSrvHelp(EPC.IPAddress, EPC.UserName, EPC.Password, EPC.SourceCodePath, EPC.Type)
 			if RAN.ranRepository == '':
 				HELP.GitSrvHelp(RAN.ranRepository, RAN.ranBranch, RAN.ranCommitID, RAN.ranAllowMerge, RAN.ranTargetBranch)
 			if RAN.eNBIPAddress == ''  or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
@@ -667,9 +601,6 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 		else:
 			logging.error('requested test is invalidly formatted: ' + test)
 			sys.exit(1)
-	if (EPC.IPAddress != '') and (EPC.IPAddress != 'none'):
-		EPC.SetMmeIPAddress()
-		EPC.SetAmfIPAddress()
 
 	#get the list of tests to be done
 	todo_tests=[]
@@ -694,12 +625,12 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				continue
 			CiTestObj.testCase_id = id
 			HTML.testCase_id=CiTestObj.testCase_id
-			EPC.testCase_id=CiTestObj.testCase_id
 			CiTestObj.desc = test.findtext('desc')
 			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
 			HTML.desc=CiTestObj.desc
 			action = test.findtext('class')
 			if (CheckClassValidity(xml_class_list, action, id) == False):
+				task_set_succeeded = False
 				continue
 			CiTestObj.ShowTestID()
 			if not task_set_succeeded and not always_exec:
