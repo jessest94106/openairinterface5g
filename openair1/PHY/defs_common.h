@@ -85,7 +85,6 @@
 #define LTE_CE_OFFSET LTE_CE_FILTER_LENGTH
 #define TX_RX_SWITCH_SYMBOL (NUMBER_OF_SYMBOLS_PER_FRAME>>1)
 #define PBCH_PDU_SIZE 3 //bytes
-#define NR_NUMBER_OF_SYMBOLS_PER_SLOT 14
 
 #define PRACH_SYMBOL 3 //position of the UL PSS wrt 2nd slot of special subframe
 
@@ -100,8 +99,6 @@
 #define NB_RX_ANTENNAS_MAX 64
 
 #define TC_NSEC_x32768 16667
-
-typedef enum {TDD=1,FDD=0} frame_type_t;
 
 typedef enum {EXTENDED=1,NORMAL=0} lte_prefix_type_t;
 

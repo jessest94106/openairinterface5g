@@ -34,13 +34,9 @@
 #define __PHY_DEFS_NR_COMMON__H__
 
 #include "PHY/impl_defs_top.h"
-#include "defs_common.h"
 #include "nfapi_nr_interface_scf.h"
 #include "impl_defs_nr.h"
 #include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
-
-#define nr_subframe_t lte_subframe_t
-#define nr_slot_t lte_subframe_t
 
 #define MAX_NUM_SUBCARRIER_SPACING 5
 #define NR_MAX_OFDM_SYMBOL_SIZE 8192

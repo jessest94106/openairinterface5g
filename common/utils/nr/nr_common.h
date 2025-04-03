@@ -36,7 +36,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "assertions.h"
-#include "PHY/defs_common.h"
+#include "common/utils/utils.h"
 
 #define NR_MAX_PDSCH_TBS 3824
 #define MAX_NUM_BEAM_PERIODS 4
@@ -83,7 +83,7 @@ static inline const char *rnti_types(nr_rnti_type_t rr)
 
 #define MU_SCS(m) (15 << m)
 #define MAX_GSCN_BAND 620 // n78 has the highest GSCN range of 619
-
+#define NR_NUMBER_OF_SYMBOLS_PER_SLOT 14
 #define NR_MAX_NB_LAYERS 4 // 8
 
 // Since the IQ samples are represented by SQ15 R+I (see https://en.wikipedia.org/wiki/Q_(number_format)) we need to compensate when
@@ -211,15 +211,6 @@ bool nr_timer_is_active(const NR_timer_t *timer);
 uint32_t nr_timer_elapsed_time(const NR_timer_t *timer);
 
 int set_default_nta_offset(frequency_range_t freq_range, uint32_t samples_per_subframe);
-
-extern simde__m128i byte2bit16_lut[256];
-void init_byte2bit16(void);
-void init_byte2m128i(void);
-
-static inline simde__m128i byte2bit16(uint8_t b)
-{
-  return byte2bit16_lut[b];
-}
 
 static inline int get_num_dmrs(uint16_t dmrs_mask )
 {
