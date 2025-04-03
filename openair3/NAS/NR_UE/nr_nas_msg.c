@@ -1142,7 +1142,12 @@ static void handle_pdu_session_accept(uint8_t *pdu_buffer, uint32_t msg_length)
     LOG_E(NAS, "decode_pdu_session_establishment_accept_msg failure\n");
 
   // process PDU Session
-  process_pdu_session_addr(&msg);
+
+  if (msg.pdu_addr_ie.pdu_length)
+    process_pdu_session_addr(&msg);
+  else
+    LOG_W(NAS, "Optional PDU Address IE was not provided\n");
+  
   set_qfi_pduid(msg.qos_rules.rule->qfi, sm_header.pdu_session_id);
 }
 
