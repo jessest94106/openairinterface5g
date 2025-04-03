@@ -33,8 +33,9 @@
 #include <stdint.h>
 #include "assertions.h"
 #include "common/utils/assertions.h"
+#include "common/utils/LOG/log.h"
 #include "nr_common.h"
-#include <complex.h>
+#include <limits.h>
 
 #define C_SRS_NUMBER (64)
 #define B_SRS_NUMBER (4)
@@ -123,36 +124,6 @@ static const uint8_t bit_reverse_table_256[] = {
     0x13, 0x93, 0x53, 0xD3, 0x33, 0xB3, 0x73, 0xF3, 0x0B, 0x8B, 0x4B, 0xCB, 0x2B, 0xAB, 0x6B, 0xEB, 0x1B, 0x9B, 0x5B, 0xDB,
     0x3B, 0xBB, 0x7B, 0xFB, 0x07, 0x87, 0x47, 0xC7, 0x27, 0xA7, 0x67, 0xE7, 0x17, 0x97, 0x57, 0xD7, 0x37, 0xB7, 0x77, 0xF7,
     0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF};
-
-simde__m128i byte2bit16_lut[256];
-void init_byte2bit16(void)
-{
-  for (int s = 0; s < 256; s++) {
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], s & 1, 0);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 1) & 1, 1);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 2) & 1, 2);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 3) & 1, 3);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 4) & 1, 4);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 5) & 1, 5);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 6) & 1, 6);
-    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 7) & 1, 7);
-  }
-}
-
-simde__m128i byte2m128i[256];
-void init_byte2m128i(void) {
-
-  for (int s=0;s<256;s++) {
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*(s&1)),0);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>1)&1)),1);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>2)&1)),2);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>3)&1)),3);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>4)&1)),4);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>5)&1)),5);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>6)&1)),6);
-    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>7)&1)),7);
-  }
-}
 
 void reverse_bits_u8(uint8_t const* in, size_t sz, uint8_t* out)
 {
@@ -1347,20 +1318,6 @@ int get_delay_idx(int delay, int max_delay_comp)
   // If the measured delay is greater than +MAX_DELAY_COMP, a +MAX_DELAY_COMP delay is compensated.
   delay_idx = min(delay_idx, max_delay_comp << 1);
   return delay_idx;
-}
-
-void init_delay_table(uint16_t ofdm_symbol_size,
-                      int max_delay_comp,
-                      int max_ofdm_symbol_size,
-                      c16_t delay_table[][max_ofdm_symbol_size])
-{
-  for (int delay = -max_delay_comp; delay <= max_delay_comp; delay++) {
-    for (int k = 0; k < ofdm_symbol_size; k++) {
-      double complex delay_cexp = cexp(I * (2.0 * M_PI * k * delay / ofdm_symbol_size));
-      delay_table[max_delay_comp + delay][k].r = (int16_t)round(256 * creal(delay_cexp));
-      delay_table[max_delay_comp + delay][k].i = (int16_t)round(256 * cimag(delay_cexp));
-    }
-  }
 }
 
 int set_default_nta_offset(frequency_range_t freq_range, uint32_t samples_per_subframe)

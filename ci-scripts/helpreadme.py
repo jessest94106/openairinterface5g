@@ -42,7 +42,6 @@ def GenericHelp(vers):
 	print('      TesteNB')
 	print('      InitiateHtml, FinalizeHtml')
 	print('      TerminateeNB, TerminateHSS, TerminateMME, TerminateSPGW')
-	print('      LogCollectBuild, LogCollecteNB, LogCollectHSS, LogCollectMME, LogCollectSPGW, LogCollectPing, LogCollectIperf')
 	print('  --local Force local execution: rewrites the test xml script before running to always execute on localhost. Assumes')
 	print('          images are available locally, will not remove any images and will run inside the current repo directory')
 
@@ -65,13 +64,6 @@ def OAIUESrvHelp(ipaddr, username, password, sourcepath):
 	print('  --UEPassword=[UE\'s Login Password]                      -- ' + password)
 	print('  --UESourceCodePath=[UE\'s Source Code Path]              -- ' + sourcepath)
 		
-def EPCSrvHelp(ipaddr, username, password, sourcepath, epctype):
-	print('  --EPCIPAddress=[EPC\'s IP Address]                       -- ' + ipaddr)
-	print('  --EPCUserName=[EPC\'s Login User Name]                   -- ' + username)
-	print('  --EPCPassword=[EPC\'s Login Password]                    -- ' + password)
-	print('  --EPCSourceCodePath=[EPC\'s Source Code Path]            -- ' + sourcepath)
-	print('  --EPCType=[EPC\'s Type: OAI or ltebox or OC-OAI-CN5G]    -- ' + epctype)
-
 def XmlHelp(filename):
 	print('  --XMLTestFile=[XML Test File to be run]                  -- ' + filename)
 	print('	Note: multiple xml files can be specified (--XMLFile=File1 ... --XMLTestFile=FileN) when HTML headers are created ("InitiateHtml" mode)')

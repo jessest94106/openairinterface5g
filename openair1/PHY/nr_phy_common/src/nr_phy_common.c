@@ -20,11 +20,56 @@
  */
 
 #include "nr_phy_common.h"
+#include <complex.h>
 #ifdef __aarch64__
 #define USE_128BIT
 #endif
 
 #define PEAK_DETECT_THRESHOLD 15
+
+simde__m128i byte2bit16_lut[256];
+void init_byte2bit16(void)
+{
+  for (int s = 0; s < 256; s++) {
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], s & 1, 0);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 1) & 1, 1);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 2) & 1, 2);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 3) & 1, 3);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 4) & 1, 4);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 5) & 1, 5);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 6) & 1, 6);
+    byte2bit16_lut[s] = simde_mm_insert_epi16(byte2bit16_lut[s], (s >> 7) & 1, 7);
+  }
+}
+
+simde__m128i byte2m128i[256];
+void init_byte2m128i(void) {
+
+  for (int s=0;s<256;s++) {
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*(s&1)),0);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>1)&1)),1);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>2)&1)),2);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>3)&1)),3);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>4)&1)),4);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>5)&1)),5);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>6)&1)),6);
+    byte2m128i[s] = simde_mm_insert_epi16(byte2m128i[s],(1-2*((s>>7)&1)),7);
+  }
+}
+
+void init_delay_table(uint16_t ofdm_symbol_size,
+                      int max_delay_comp,
+                      int max_ofdm_symbol_size,
+                      c16_t delay_table[][max_ofdm_symbol_size])
+{
+  for (int delay = -max_delay_comp; delay <= max_delay_comp; delay++) {
+    for (int k = 0; k < ofdm_symbol_size; k++) {
+      double complex delay_cexp = cexp(I * (2.0 * M_PI * k * delay / ofdm_symbol_size));
+      delay_table[max_delay_comp + delay][k].r = (int16_t)round(256 * creal(delay_cexp));
+      delay_table[max_delay_comp + delay][k].i = (int16_t)round(256 * cimag(delay_cexp));
+    }
+  }
+}
 
 int16_t saturating_sub(int16_t a, int16_t b)
 {
