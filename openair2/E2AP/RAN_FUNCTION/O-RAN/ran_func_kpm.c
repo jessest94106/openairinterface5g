@@ -115,7 +115,9 @@ static cudu_ue_info_pair_t fill_ue_related_info(arr_ue_id_t* arr_ue_id, const si
 
   if (arr_ue_id->ue_id[ue_idx].type == GNB_UE_ID_E2SM) {
     ue_info.rrc_ue_id = *arr_ue_id->ue_id[ue_idx].gnb.ran_ue_id;  // rrc_ue_id
-    ue_info.ue = arr_ue_id->ue_info_list[ue_idx];
+    if (arr_ue_id->ue_info_list != NULL) {
+      ue_info.ue = arr_ue_id->ue_info_list[ue_idx];
+    }
   } else if (arr_ue_id->ue_id[ue_idx].type == GNB_CU_UP_UE_ID_E2SM) {
     /* in OAI implementation, CU-UP ue id = CU-CP ue id
                            => CU-UP ue id = rrc_ue_id, but it should not be the case by the spec */
