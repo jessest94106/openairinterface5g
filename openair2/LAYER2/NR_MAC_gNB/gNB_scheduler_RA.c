@@ -42,7 +42,6 @@
 
 /* rlc */
 #include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
-#include "openair2/LAYER2/RLC/rlc.h"
 
 #include <executables/softmodem-common.h>
 
@@ -1880,12 +1879,12 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
     logical_chan_id_t lcid = DL_SCH_LCID_CCCH;
     if (current_harq_pid < 0) {
       // Check for data on SRB0 (RRCSetup)
-      mac_rlc_status_resp_t srb_status = mac_rlc_status_ind(module_idP, ra->rnti, module_idP, frameP, slotP, ENB_FLAG_YES, MBMS_FLAG_NO, lcid, 0, 0);
+      mac_rlc_status_resp_t srb_status = nr_mac_rlc_status_ind(ra->rnti, frameP, lcid);
 
       if (srb_status.bytes_in_buffer == 0) {
         lcid = DL_SCH_LCID_DCCH;
         // Check for data on SRB1 (RRCReestablishment, RRCReconfiguration)
-        srb_status = mac_rlc_status_ind(module_idP, ra->rnti, module_idP, frameP, slotP, ENB_FLAG_YES, MBMS_FLAG_NO, lcid, 0, 0);
+        srb_status = nr_mac_rlc_status_ind(ra->rnti, frameP, lcid);
       }
 
       // Need to wait until data for Msg4 is ready
@@ -2051,17 +2050,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       uint8_t buffer[CCCH_SDU_SIZE];
       uint8_t mac_subheader_len = sizeof(NR_MAC_SUBHEADER_SHORT);
       // Get RLC data on the SRB (RRCSetup, RRCReestablishment)
-      mac_sdu_length = mac_rlc_data_req(module_idP,
-                                        ra->rnti,
-                                        module_idP,
-                                        frameP,
-                                        ENB_FLAG_YES,
-                                        MBMS_FLAG_NO,
-                                        lcid,
-                                        CCCH_SDU_SIZE,
-                                        (char *)buffer,
-                                        0,
-                                        0);
+      mac_sdu_length = nr_mac_rlc_data_req(module_idP, ra->rnti, true, lcid, CCCH_SDU_SIZE, (char *)buffer);
 
       if (mac_sdu_length < 256) {
         ((NR_MAC_SUBHEADER_SHORT *)&buf[mac_pdu_length])->R = 0;

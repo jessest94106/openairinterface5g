@@ -162,26 +162,15 @@ void nr_rlc_release_entity(int ue_id, logical_chan_id_t channel_id)
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
 }
 
-void mac_rlc_data_ind(const module_id_t  module_idP,
-                      const uint16_t ue_id,
-                      const eNB_index_t eNB_index,
-                      const frame_t frameP,
-                      const eNB_flag_t enb_flagP,
-                      const MBMS_flag_t MBMS_flagP,
-                      const logical_chan_id_t channel_idP,
-                      char *buffer_pP,
-                      const tb_size_t tb_sizeP,
-                      num_tb_t num_tbP,
-                      crc_t *crcs_pP)
+void nr_mac_rlc_data_ind(const module_id_t  module_idP,
+                         const uint16_t ue_id,
+                         const bool gnb_flagP,
+                         const logical_chan_id_t channel_idP,
+                         char *buffer_pP,
+                         const tb_size_t tb_sizeP)
 {
-  if (eNB_index != 0 || /*enb_flagP != 1 ||*/ MBMS_flagP != 0) {
-    LOG_E(RLC, "%s:%d:%s: fatal\n", __FILE__, __LINE__, __FUNCTION__);
-    exit(1);
-  }
-
-  if (enb_flagP)
-    T(T_ENB_RLC_MAC_UL, T_INT(module_idP), T_INT(ue_id),
-      T_INT(channel_idP), T_INT(tb_sizeP));
+  if (gnb_flagP)
+    T(T_ENB_RLC_MAC_UL, T_INT(module_idP), T_INT(ue_id), T_INT(channel_idP), T_INT(tb_sizeP));
 
   nr_rlc_manager_lock(nr_rlc_ue_manager);
   nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ue_id);
@@ -203,17 +192,12 @@ void mac_rlc_data_ind(const module_id_t  module_idP,
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
 }
 
-tbs_size_t mac_rlc_data_req(const module_id_t  module_idP,
-                            const uint16_t ue_id,
-                            const eNB_index_t eNB_index,
-                            const frame_t frameP,
-                            const eNB_flag_t enb_flagP,
-                            const MBMS_flag_t MBMS_flagP,
-                            const logical_chan_id_t channel_idP,
-                            const tb_size_t tb_sizeP,
-                            char *buffer_pP,
-                            const uint32_t sourceL2Id,
-                            const uint32_t destinationL2Id)
+tbs_size_t nr_mac_rlc_data_req(const module_id_t  module_idP,
+                               const uint16_t ue_id,
+                               const bool gnb_flagP,
+                               const logical_chan_id_t channel_idP,
+                               const tb_size_t tb_sizeP,
+                               char *buffer_pP)
 {
   int ret;
   int maxsize;
@@ -234,23 +218,14 @@ tbs_size_t mac_rlc_data_req(const module_id_t  module_idP,
 
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
 
-  if (enb_flagP)
+  if (gnb_flagP)
     T(T_ENB_RLC_MAC_DL, T_INT(module_idP), T_INT(ue_id),
       T_INT(channel_idP), T_INT(ret));
 
   return ret;
 }
 
-mac_rlc_status_resp_t mac_rlc_status_ind(const module_id_t module_idP,
-                                         const uint16_t ue_id,
-                                         const eNB_index_t eNB_index,
-                                         const frame_t frameP,
-                                         const sub_frame_t subframeP,
-                                         const eNB_flag_t enb_flagP,
-                                         const MBMS_flag_t MBMS_flagP,
-                                         const logical_chan_id_t channel_idP,
-                                         const uint32_t sourceL2Id,
-                                         const uint32_t destinationL2Id)
+mac_rlc_status_resp_t nr_mac_rlc_status_ind(const uint16_t ue_id, const frame_t frame, const logical_chan_id_t channel_idP)
 {
   mac_rlc_status_resp_t ret;
 
@@ -266,12 +241,10 @@ mac_rlc_status_resp_t mac_rlc_status_ind(const module_id_t module_idP,
      * more than enough.
      */
     // Fix me: temproary reduction meanwhile cpu cost of this computation is optimized
-    buf_stat = rb->buffer_status(rb, 1000*1000);
-    ret.bytes_in_buffer = buf_stat.status_size
-                        + buf_stat.retx_size
-                        + buf_stat.tx_size;
+    buf_stat = rb->buffer_status(rb, 1000 * 1000);
+    ret.bytes_in_buffer = buf_stat.status_size + buf_stat.retx_size + buf_stat.tx_size;
   } else {
-    if (!(frameP%128) || channel_idP == 0) //to suppress this warning message
+    if (!(frame % 128) || channel_idP == 0) //to suppress this warning message
       LOG_W(RLC, "Radio Bearer (channel ID %d) is NULL for UE %d\n", channel_idP, ue_id);
     ret.bytes_in_buffer = 0;
   }
@@ -286,76 +259,18 @@ mac_rlc_status_resp_t mac_rlc_status_ind(const module_id_t module_idP,
   return ret;
 }
 
-rlc_buffer_occupancy_t mac_rlc_get_buffer_occupancy_ind(const module_id_t module_idP,
-                                                        const uint16_t ue_id,
-                                                        const eNB_index_t eNB_index,
-                                                        const frame_t frameP,
-                                                        const sub_frame_t subframeP,
-                                                        const eNB_flag_t enb_flagP,
-                                                        const logical_chan_id_t channel_idP)
-{
-  rlc_buffer_occupancy_t ret;
-
-  if (enb_flagP) {
-    LOG_E(RLC, "Tx mac_rlc_get_buffer_occupancy_ind function is not implemented for eNB LcId=%u\n", channel_idP);
-    exit(1);
-  }
-
-  /* TODO: handle time a bit more properly */
-  lock_nr_rlc_current_time();
-  if (nr_rlc_current_time_last_frame != frameP ||
-      nr_rlc_current_time_last_subframe != subframeP) {
-    nr_rlc_current_time++;
-    nr_rlc_current_time_last_frame = frameP;
-    nr_rlc_current_time_last_subframe = subframeP;
-  }
-  unlock_nr_rlc_current_time();
-
-  nr_rlc_manager_lock(nr_rlc_ue_manager);
-  nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ue_id);
-  nr_rlc_entity_t *rb = get_rlc_entity_from_lcid(ue, channel_idP);
-
-  if (rb != NULL) {
-    nr_rlc_entity_buffer_status_t buf_stat;
-    rb->set_time(rb, get_nr_rlc_current_time());
-    /* 38.321 deals with BSR values up to 81338368 bytes, after what it
-     * reports '> 81338368' (table 6.1.3.1-2). Passing 100000000 is thus
-     * more than enough.
-     */
-    // Fixme : Laurent reduced size for CPU saving
-    // Fix me: temproary reduction meanwhile cpu cost of this computation is optimized
-    buf_stat = rb->buffer_status(rb, 1000*1000);
-    ret = buf_stat.status_size
-        + buf_stat.retx_size
-        + buf_stat.tx_size;
-  } else {
-    if (!(frameP%128)) //to suppress this warning message
-      LOG_W(RLC, "Radio Bearer (channel ID %d) is NULL for UE %d\n", channel_idP, ue_id);
-    ret = 0;
-  }
-
-  nr_rlc_manager_unlock(nr_rlc_ue_manager);
-
-  return ret;
-}
-
-rlc_op_status_t rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
-                             const srb_flag_t srb_flagP,
-                             const MBMS_flag_t MBMS_flagP,
-                             const rb_id_t rb_idP,
-                             const mui_t muiP,
-                             confirm_t confirmP,
-                             sdu_size_t sdu_sizeP,
-                             uint8_t *sdu_pP,
-                             const uint32_t *const sourceL2Id,
-                             const uint32_t *const destinationL2Id)
+rlc_op_status_t nr_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
+                                const srb_flag_t srb_flagP,
+                                const rb_id_t rb_idP,
+                                const mui_t muiP,
+                                sdu_size_t sdu_sizeP,
+                                uint8_t *sdu_pP)
 {
   int ue_id = ctxt_pP->rntiMaybeUEid;
   nr_rlc_ue_t *ue;
   nr_rlc_entity_t *rb;
 
-  LOG_D(RLC, "UE %d srb_flag %d rb_id %ld mui %d confirm %d sdu_size %d MBMS_flag %d\n",
-        ue_id, srb_flagP, rb_idP, muiP, confirmP, sdu_sizeP, MBMS_flagP);
+  LOG_D(RLC, "UE %d srb_flag %d rb_id %ld mui %d sdu_size %d\n", ue_id, srb_flagP, rb_idP, muiP, sdu_sizeP);
 
   if (ctxt_pP->enb_flag)
     T(T_ENB_RLC_DL, T_INT(ctxt_pP->module_id), T_INT(ctxt_pP->rntiMaybeUEid), T_INT(rb_idP), T_INT(sdu_sizeP));
@@ -407,7 +322,7 @@ int nr_rlc_get_available_tx_space(const int ue_id, const logical_chan_id_t chann
   return ret;
 }
 
-int rlc_module_init(int enb_flag)
+int nr_rlc_module_init(int gnb_flag)
 {
   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
   static int inited = 0;
@@ -415,28 +330,26 @@ int rlc_module_init(int enb_flag)
 
   if (pthread_mutex_lock(&lock)) abort();
 
-  if (enb_flag == 1 && inited) {
+  if (gnb_flag == 1 && inited) {
     LOG_E(RLC, "%s:%d:%s: fatal, inited already 1\n", __FILE__, __LINE__, __FUNCTION__);
     exit(1);
   }
 
-  if (enb_flag == 0 && inited_ue) {
+  if (gnb_flag == 0 && inited_ue) {
     LOG_E(RLC, "%s:%d:%s: fatal, inited_ue already 1\n", __FILE__, __LINE__, __FUNCTION__);
     exit(1);
   }
 
-  if (enb_flag == 1) inited = 1;
-  if (enb_flag == 0) inited_ue = 1;
+  if (gnb_flag == 1)
+    inited = 1;
+  if (gnb_flag == 0)
+    inited_ue = 1;
 
-  nr_rlc_ue_manager = new_nr_rlc_ue_manager(enb_flag);
+  nr_rlc_ue_manager = new_nr_rlc_ue_manager(gnb_flag);
 
   if (pthread_mutex_unlock(&lock)) abort();
 
   return 0;
-}
-
-void rlc_util_print_hex_octets(comp_name_t componentP, unsigned char *dataP, const signed long sizeP)
-{
 }
 
 static void deliver_sdu(void *_ue, nr_rlc_entity_t *entity, char *buf, int size)
@@ -447,7 +360,6 @@ static void deliver_sdu(void *_ue, nr_rlc_entity_t *entity, char *buf, int size)
   protocol_ctxt_t ctx;
   uint8_t *memblock;
   int i;
-  int is_enb;
 
   /* is it SRB? */
   for (i = 0; i < sizeofArray(ue->srb); i++) {
@@ -480,21 +392,21 @@ rb_found:
   ctx.eNB_index = 0;
   ctx.brOption = 0;
 
-  is_enb = nr_rlc_manager_get_enb_flag(nr_rlc_ue_manager);
+  int is_gnb = nr_rlc_manager_get_gnb_flag(nr_rlc_ue_manager);
 
   /* used fields? */
   ctx.module_id = 0;
   /* CU (PDCP, RRC, SDAP) use a different ID than RNTI, so below set the CU UE
    * ID if in gNB, else use RNTI normally */
   ctx.rntiMaybeUEid = ue->ue_id;
-  if (is_enb) {
+  if (is_gnb) {
     f1_ue_data_t ue_data = du_get_f1_ue_data(ue->ue_id);
     ctx.rntiMaybeUEid = ue_data.secondary_ue;
   }
 
-  ctx.enb_flag = is_enb;
+  ctx.enb_flag = is_gnb;
 
-  if (is_enb) {
+  if (is_gnb) {
     T(T_ENB_RLC_UL,
       T_INT(0 /*ctxt_pP->module_id*/),
       T_INT(ue->ue_id), T_INT(rb_id), T_INT(size));
@@ -511,22 +423,22 @@ rb_found:
 
     if (NODE_IS_DU(type)) {
       if(is_srb) {
-	MessageDef *msg;
-	msg = itti_alloc_new_message(TASK_RLC_ENB, 0, F1AP_UL_RRC_MESSAGE);
-	uint8_t *message_buffer = itti_malloc (TASK_RLC_ENB, TASK_DU_F1, size);
-	memcpy (message_buffer, buf, size);
+        MessageDef *msg;
+        msg = itti_alloc_new_message(TASK_RLC_ENB, 0, F1AP_UL_RRC_MESSAGE);
+        uint8_t *message_buffer = itti_malloc (TASK_RLC_ENB, TASK_DU_F1, size);
+        memcpy (message_buffer, buf, size);
         F1AP_UL_RRC_MESSAGE(msg).gNB_CU_ue_id = ctx.rntiMaybeUEid;
-	F1AP_UL_RRC_MESSAGE(msg).gNB_DU_ue_id = ue->ue_id;
-	F1AP_UL_RRC_MESSAGE(msg).srb_id = rb_id;
-	F1AP_UL_RRC_MESSAGE(msg).rrc_container = message_buffer;
-	F1AP_UL_RRC_MESSAGE(msg).rrc_container_length = size;
-	itti_send_msg_to_task(TASK_DU_F1, ENB_MODULE_ID_TO_INSTANCE(0 /*ctxt_pP->module_id*/), msg);
-	return;
+        F1AP_UL_RRC_MESSAGE(msg).gNB_DU_ue_id = ue->ue_id;
+        F1AP_UL_RRC_MESSAGE(msg).srb_id = rb_id;
+        F1AP_UL_RRC_MESSAGE(msg).rrc_container = message_buffer;
+        F1AP_UL_RRC_MESSAGE(msg).rrc_container_length = size;
+        itti_send_msg_to_task(TASK_DU_F1, ENB_MODULE_ID_TO_INSTANCE(0 /*ctxt_pP->module_id*/), msg);
+        return;
       } else {
-	LOG_D(RLC, "Received uplink user-plane traffic at RLC-DU to be sent to the CU, size %d \n", size);
-	extern instance_t DUuniqInstance;
+        LOG_D(RLC, "Received uplink user-plane traffic at RLC-DU to be sent to the CU, size %d \n", size);
+        extern instance_t DUuniqInstance;
         gtpv1uSendDirect(DUuniqInstance, ue->ue_id, rb_id, (uint8_t*) buf, size, false, false);
-	return;
+        return;
       }
     }
   }
@@ -539,7 +451,7 @@ rb_found:
   }
   memcpy(memblock, buf, size);
   LOG_D(PDCP, "Calling PDCP layer from RLC in %s\n", __FUNCTION__);
-  if (!nr_pdcp_data_ind(&ctx, is_srb, 0, rb_id, size, memblock, NULL, NULL)) {
+  if (!nr_pdcp_data_ind(&ctx, is_srb, rb_id, size, memblock)) {
     LOG_E(RLC, "%s:%d:%s: ERROR: pdcp_data_ind failed\n", __FILE__, __LINE__, __FUNCTION__);
     /* what to do in case of failure? for the moment: nothing */
   }
@@ -554,7 +466,6 @@ static void successful_delivery(void *_ue, nr_rlc_entity_t *entity, int sdu_id)
 #if 0
   MessageDef *msg;
 #endif
-  int is_enb;
 
   /* is it SRB? */
   for (i = 0; i < 2; i++) {
@@ -587,8 +498,8 @@ rb_found:
   if (is_srb == 0)
     return;
 
-  is_enb = nr_rlc_manager_get_enb_flag(nr_rlc_ue_manager);
-  if (!is_enb)
+  int is_gnb = nr_rlc_manager_get_gnb_flag(nr_rlc_ue_manager);
+  if (!is_gnb)
     return;
 
 #if 0
@@ -944,18 +855,6 @@ void nr_rlc_add_drb(int ue_id, int drb_id, const NR_RLC_BearerConfig_t *rlc_Bear
   LOG_I(RLC, "Added DRB to UE %d\n", ue_id);
 }
 
-/* Dummy function due to dependency from LTE libraries */
-rlc_op_status_t rrc_rlc_config_asn1_req (const protocol_ctxt_t   * const ctxt_pP,
-    const LTE_SRB_ToAddModList_t   * const srb2add_listP,
-    const LTE_DRB_ToAddModList_t   * const drb2add_listP,
-    const LTE_DRB_ToReleaseList_t  * const drb2release_listP,
-    const LTE_PMCH_InfoList_r9_t * const pmch_InfoList_r9_pP,
-    const uint32_t sourceL2Id,
-    const uint32_t destinationL2Id)
-{
-  return 0;
-}
-
 struct srb0_data {
   int ue_id;
   void *data;
@@ -994,61 +893,6 @@ bool nr_rlc_activate_srb0(int ue_id,
   LOG_I(RLC, "Activated srb0 for UE %d\n", ue_id);
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
   return true;
-}
-
-rlc_op_status_t rrc_rlc_config_req(const protocol_ctxt_t* const ctxt_pP,
-                                   const srb_flag_t srb_flagP,
-                                   const MBMS_flag_t mbms_flagP,
-                                   const config_action_t actionP,
-                                   const rb_id_t rb_idP)
-{
-  if (mbms_flagP) {
-    LOG_E(RLC, "%s:%d:%s: todo (MBMS NOT supported)\n", __FILE__, __LINE__, __FUNCTION__);
-    exit(1);
-  }
-  if (actionP != CONFIG_ACTION_REMOVE) {
-    LOG_E(RLC, "%s:%d:%s: todo (only CONFIG_ACTION_REMOVE supported)\n", __FILE__, __LINE__, __FUNCTION__);
-    exit(1);
-  }
-  if (ctxt_pP->module_id) {
-    LOG_E(RLC, "%s:%d:%s: todo (only module_id 0 supported)\n", __FILE__, __LINE__, __FUNCTION__);
-    exit(1);
-  }
-  if ((srb_flagP && !(rb_idP >= 1 && rb_idP <= 2)) ||
-      (!srb_flagP && !(rb_idP >= 1 && rb_idP <= MAX_DRBS_PER_UE))) {
-    LOG_E(RLC, "%s:%d:%s: bad rb_id (%ld) (is_srb %d)\n", __FILE__, __LINE__, __FUNCTION__, rb_idP, srb_flagP);
-    exit(1);
-  }
-  nr_rlc_manager_lock(nr_rlc_ue_manager);
-  LOG_D(RLC, "%s:%d:%s: remove rb %ld (is_srb %d) for UE %lx\n", __FILE__, __LINE__, __FUNCTION__, rb_idP, srb_flagP, ctxt_pP->rntiMaybeUEid);
-  nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ctxt_pP->rntiMaybeUEid);
-  if (srb_flagP) {
-    if (ue->srb[rb_idP-1] != NULL) {
-      ue->srb[rb_idP-1]->delete_entity(ue->srb[rb_idP-1]);
-      ue->srb[rb_idP-1] = NULL;
-    } else
-      LOG_W(RLC, "removing non allocated SRB %ld, do nothing\n", rb_idP);
-  } else {
-    if (ue->drb[rb_idP-1] != NULL) {
-      ue->drb[rb_idP-1]->delete_entity(ue->drb[rb_idP-1]);
-      ue->drb[rb_idP-1] = NULL;
-    } else
-      LOG_W(RLC, "removing non allocated DRB %ld, do nothing\n", rb_idP);
-  }
-  /* remove UE if it has no more RB configured */
-  int i;
-  for (i = 0; i < 2; i++)
-    if (ue->srb[i] != NULL)
-      break;
-  if (i == 2) {
-    for (i = 0; i < MAX_DRBS_PER_UE; i++)
-      if (ue->drb[i] != NULL)
-        break;
-    if (i == MAX_DRBS_PER_UE)
-      nr_rlc_manager_remove_ue(nr_rlc_ue_manager, ctxt_pP->rntiMaybeUEid);
-  }
-  nr_rlc_manager_unlock(nr_rlc_ue_manager);
-  return RLC_OP_STATUS_OK;
 }
 
 void nr_rlc_remove_ue(int ue_id)
@@ -1122,16 +966,6 @@ void nr_rlc_tick(int frame, int subframe)
     nr_rlc_current_time++;
   }
   unlock_nr_rlc_current_time();
-}
-
-/* This is a hack, to compile the gNB.
- * TODO: remove it. The solution is to cleanup CMakeLists.txt
- */
-void rlc_tick(int a, int b)
-{
-  LOG_E(RLC, "%s:%d:%s: this code should not be reached\n",
-        __FILE__, __LINE__, __FUNCTION__);
-  exit(1);
 }
 
 void nr_rlc_activate_avg_time_to_tx(const int ue_id,

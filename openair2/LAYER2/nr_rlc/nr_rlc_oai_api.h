@@ -41,6 +41,27 @@
 struct NR_RLC_Config;
 struct NR_LogicalChannelConfig;
 
+int nr_rlc_module_init(int gnb_flag);
+void nr_mac_rlc_data_ind(const module_id_t  module_idP,
+                         const uint16_t ue_id,
+                         const bool gnb_flagP,
+                         const logical_chan_id_t channel_idP,
+                         char *buffer_pP,
+                         const tb_size_t tb_sizeP);
+tbs_size_t nr_mac_rlc_data_req(const module_id_t  module_idP,
+                               const uint16_t ue_id,
+                               const bool gnb_flagP,
+                               const logical_chan_id_t channel_idP,
+                               const tb_size_t tb_sizeP,
+                               char *buffer_pP);
+rlc_op_status_t nr_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
+                                const srb_flag_t srb_flagP,
+                                const rb_id_t rb_idP,
+                                const mui_t muiP,
+                                sdu_size_t sdu_sizeP,
+                                uint8_t *sdu_pP);
+mac_rlc_status_resp_t nr_mac_rlc_status_ind(const uint16_t ue_id, const frame_t frame, const logical_chan_id_t channel_idP);
+
 void nr_rlc_add_srb(int ue_id, int srb_id, const NR_RLC_BearerConfig_t *rlc_BearerConfig);
 void nr_rlc_add_drb(int ue_id, int drb_id, const NR_RLC_BearerConfig_t *rlc_BearerConfig);
 
