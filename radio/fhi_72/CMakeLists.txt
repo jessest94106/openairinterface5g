@@ -17,12 +17,12 @@ add_library(oran_fhlib_5g MODULE
 )
 
 find_package(xran REQUIRED)
-if(xran_VERSION VERSION_EQUAL 5.1.4)
+if(xran_VERSION VERSION_EQUAL 5.1.5)
   target_compile_definitions(oran_fhlib_5g PRIVATE E_RELEASE)
-elseif(xran_VERSION VERSION_EQUAL 6.1.1)
+elseif(xran_VERSION VERSION_EQUAL 6.1.2)
   target_compile_definitions(oran_fhlib_5g PRIVATE F_RELEASE)
 else()
-  message(FATAL_ERROR "Found xran version ${xran_VERSION} but needed 5.1.4 (E release) or 6.1.1 (F release)")
+  message(FATAL_ERROR "Found xran version ${xran_VERSION} but needed 5.1.5 (E release) or 6.1.2 (F release)")
 endif()
 
 # Ignore xran-specific warning: we don't care/can't change the following warning, so suppress
@@ -32,6 +32,11 @@ add_compile_options(-Wno-packed-not-aligned)
 set_target_properties(oran_fhlib_5g PROPERTIES COMPILE_FLAGS "-fvisibility=hidden -march=native")
 target_link_libraries(oran_fhlib_5g PRIVATE xran::xran ${dpdk_LINK_LIBRARIES} ${T_LIB} pthread dl rt m numa)
 target_include_directories(oran_fhlib_5g PRIVATE ${dpdk_INCLUDE_DIRS})
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+  find_package(armral REQUIRED)
+  target_sources(oran_fhlib_5g PRIVATE armral_bfp_compression.c)
+  target_link_libraries(oran_fhlib_5g PRIVATE armral)
+endif()
 
 add_boolean_option(OAI_FHI72_USE_POLLING OFF "Enable polling in FHI72 driver" ON)
 
