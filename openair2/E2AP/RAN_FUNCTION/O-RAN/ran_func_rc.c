@@ -26,6 +26,7 @@
 #include "../../flexric/src/sm/rc_sm/ie/ir/lst_ran_param.h"
 #include "../../flexric/src/sm/rc_sm/ie/ir/ran_param_list.h"
 #include "../../flexric/src/agent/e2_agent_api.h"
+#include "openair2/E2AP/flexric/src/lib/sm/enc/enc_ue_id.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -53,37 +54,60 @@ static void init_once_rc(void)
   init_rc_subs_data(&rc_subs_data);
 }
 
-static void fill_rc_ev_trig(ran_func_def_ev_trig_t* ev_trig)
+static seq_ev_trg_style_t fill_ev_tr_format_4(const char *ev_style_name)
 {
-  // Sequence of EVENT TRIGGER styles
-  // [1 - 63]
-  ev_trig->sz_seq_ev_trg_style = 1;
-  ev_trig->seq_ev_trg_style = calloc(ev_trig->sz_seq_ev_trg_style, sizeof(seq_ev_trg_style_t));
-  assert(ev_trig->seq_ev_trg_style != NULL && "Memory exhausted");
-
-  seq_ev_trg_style_t* ev_trig_style = &ev_trig->seq_ev_trg_style[0];
+  seq_ev_trg_style_t ev_trig_style = {0};
 
   // RIC Event Trigger Style Type
   // Mandatory
   // 9.3.3
-  // 6.2.2.2.
-  //  INTEGER
-  ev_trig_style->style = 4;
+  ev_trig_style.style = 4;
 
   // RIC Event Trigger Style Name
   // Mandatory
   // 9.3.4
-  // 6.2.2.3
-  //PrintableString(SIZE(1..150,...))
-  const char ev_style_name[] = "UE Information Change";
-  ev_trig_style->name = cp_str_to_ba(ev_style_name);
+  ev_trig_style.name = cp_str_to_ba(ev_style_name);
 
   // RIC Event Trigger Format Type
   // Mandatory
   // 9.3.5
-  // 6.2.2.4.
-  // INTEGER
-  ev_trig_style->format = FORMAT_4_E2SM_RC_EV_TRIGGER_FORMAT;
+  ev_trig_style.format = FORMAT_4_E2SM_RC_EV_TRIGGER_FORMAT;
+
+  return ev_trig_style;
+}
+
+static seq_ev_trg_style_t fill_ev_tr_format_1(const char *ev_style_name)
+{
+  seq_ev_trg_style_t ev_trig_style = {0};
+
+  // RIC Event Trigger Style Type
+  // Mandatory
+  // 9.3.3
+  ev_trig_style.style = 1;
+
+  // RIC Event Trigger Style Name
+  // Mandatory
+  // 9.3.4
+  ev_trig_style.name = cp_str_to_ba(ev_style_name);
+
+  // RIC Event Trigger Format Type
+  // Mandatory
+  // 9.3.5
+  ev_trig_style.format = FORMAT_1_E2SM_RC_EV_TRIGGER_FORMAT;
+
+  return ev_trig_style;
+}
+
+static void fill_rc_ev_trig(ran_func_def_ev_trig_t* ev_trig)
+{
+  // Sequence of EVENT TRIGGER styles
+  // [1 - 63]
+  ev_trig->sz_seq_ev_trg_style = 2;
+  ev_trig->seq_ev_trg_style = calloc(ev_trig->sz_seq_ev_trg_style, sizeof(seq_ev_trg_style_t));
+  assert(ev_trig->seq_ev_trg_style != NULL && "Memory exhausted");
+
+  ev_trig->seq_ev_trg_style[0] = fill_ev_tr_format_1("Message Event");
+  ev_trig->seq_ev_trg_style[1] = fill_ev_tr_format_4("UE Information Change");
 
   // Sequence of RAN Parameters for L2 Variables
   // [0 - 65535]
@@ -106,82 +130,141 @@ static void fill_rc_ev_trig(ran_func_def_ev_trig_t* ev_trig)
   ev_trig->seq_ran_param_id_cell = NULL;
 }
 
-static void fill_rc_report(ran_func_def_report_t* report)
+static seq_report_sty_t fill_report_style_4(const char *report_name)
 {
-  // Sequence of REPORT styles
-  // [1 - 63]
-  report->sz_seq_report_sty = 1;
-  report->seq_report_sty = calloc(report->sz_seq_report_sty, sizeof(seq_report_sty_t));
-  assert(report->seq_report_sty != NULL && "Memory exhausted");
+  seq_report_sty_t report_style = {0};
 
-  seq_report_sty_t* report_style = &report->seq_report_sty[0];
-
-    // RIC Report Style Type
+  // RIC Report Style Type
   // Mandatory
   // 9.3.3
-  // 6.2.2.2.
-  // INTEGER
-  report_style->report_type = 4;
+  report_style.report_type = 4;
 
   // RIC Report Style Name
   // Mandatory
   // 9.3.4
-  // 6.2.2.3.
-  // PrintableString(SIZE(1..150,...)) 
-  const char report_name[] = "UE Information";
-  report_style->name = cp_str_to_ba(report_name);
+  report_style.name = cp_str_to_ba(report_name);
 
   // Supported RIC Event Trigger Style Type 
   // Mandatory
   // 9.3.3
-  // 6.2.2.2.
-  // INTEGER
-  report_style->ev_trig_type = FORMAT_4_E2SM_RC_EV_TRIGGER_FORMAT;
+  report_style.ev_trig_type = FORMAT_4_E2SM_RC_EV_TRIGGER_FORMAT;
 
   // RIC Report Action Format Type
   // Mandatory
   // 9.3.5
-  // 6.2.2.4.
-  // INTEGER
-  report_style->act_frmt_type = FORMAT_1_E2SM_RC_ACT_DEF;
+  report_style.act_frmt_type = FORMAT_1_E2SM_RC_ACT_DEF;
 
   // RIC Indication Header Format Type
   // Mandatory
   // 9.3.5
-  // 6.2.2.4.
-  // INTEGER
-  report_style->ind_hdr_type = FORMAT_1_E2SM_RC_IND_HDR;
+  report_style.ind_hdr_type = FORMAT_1_E2SM_RC_IND_HDR;
 
   // RIC Indication Message Format Type
   // Mandatory
   // 9.3.5
-  // 6.2.2.4.
-  // INTEGER
-  report_style->ind_msg_type = FORMAT_2_E2SM_RC_IND_MSG;
+  report_style.ind_msg_type = FORMAT_2_E2SM_RC_IND_MSG;
 
   // Sequence of RAN Parameters Supported
   // [0 - 65535]
-  report_style->sz_seq_ran_param = 1;
-  report_style->ran_param = calloc(report_style->sz_seq_ran_param, sizeof(seq_ran_param_3_t));
-  assert(report_style->ran_param != NULL && "Memory exhausted");
+  report_style.sz_seq_ran_param = 1;
+  report_style.ran_param = calloc(report_style.sz_seq_ran_param, sizeof(seq_ran_param_3_t));
+  assert(report_style.ran_param != NULL && "Memory exhausted");
 
   // RAN Parameter ID
   // Mandatory
   // 9.3.8
   // [1- 4294967295]
-  report_style->ran_param[0].id = E2SM_RC_RS4_RRC_STATE_CHANGED_TO;
+  report_style.ran_param[0].id = E2SM_RC_RS4_RRC_STATE_CHANGED_TO;
 
   // RAN Parameter Name
   // Mandatory
   // 9.3.9
   // [1-150] 
-  const char ran_param_name[] = "RRC State";
-  report_style->ran_param[0].name = cp_str_to_ba(ran_param_name);
+  const char ran_param_name[] = "RRC State Changed To";
+  report_style.ran_param[0].name = cp_str_to_ba(ran_param_name);
 
   // RAN Parameter Definition
   // Optional
   // 9.3.51
-  report_style->ran_param[0].def = NULL;
+  report_style.ran_param[0].def = NULL;
+
+  return report_style;
+}
+
+static seq_report_sty_t fill_report_style_1(const char *report_name)
+{
+  seq_report_sty_t report_style = {0};
+
+  // RIC Report Style Type
+  // Mandatory
+  // 9.3.3
+  report_style.report_type = 1;
+
+  // RIC Report Style Name
+  // Mandatory
+  // 9.3.4
+  report_style.name = cp_str_to_ba(report_name);
+
+  // Supported RIC Event Trigger Style Type 
+  // Mandatory
+  // 9.3.3
+  report_style.ev_trig_type = FORMAT_1_E2SM_RC_EV_TRIGGER_FORMAT;
+
+  // RIC Report Action Format Type
+  // Mandatory
+  // 9.3.5
+  report_style.act_frmt_type = FORMAT_1_E2SM_RC_ACT_DEF;
+
+  // RIC Indication Header Format Type
+  // Mandatory
+  // 9.3.5
+  report_style.ind_hdr_type = FORMAT_1_E2SM_RC_IND_HDR;
+
+  // RIC Indication Message Format Type
+  // Mandatory
+  // 9.3.5
+  report_style.ind_msg_type = FORMAT_1_E2SM_RC_IND_MSG;
+
+  // Sequence of RAN Parameters Supported
+  // [0 - 65535]
+  report_style.sz_seq_ran_param = 2;
+  report_style.ran_param = calloc_or_fail(report_style.sz_seq_ran_param, sizeof(seq_ran_param_3_t));
+
+  // RAN Parameter ID
+  // Mandatory
+  // 9.3.8
+  // [1- 4294967295]
+  report_style.ran_param[0].id = E2SM_RC_RS1_RRC_MESSAGE;
+  report_style.ran_param[1].id = E2SM_RC_RS1_UE_ID;
+
+  // RAN Parameter Name
+  // Mandatory
+  // 9.3.9
+  // [1-150] 
+  const char ran_param_name_0[] = "RRC Message";
+  report_style.ran_param[0].name = cp_str_to_ba(ran_param_name_0);
+  const char ran_param_name_1[] = "UE ID";
+  report_style.ran_param[1].name = cp_str_to_ba(ran_param_name_1);
+
+  // RAN Parameter Definition
+  // Optional
+  // 9.3.51
+  report_style.ran_param[0].def = NULL;
+  report_style.ran_param[1].def = NULL;
+
+  return report_style;
+}
+
+static void fill_rc_report(ran_func_def_report_t* report)
+{
+  // Sequence of REPORT styles
+  // [1 - 63]
+  report->sz_seq_report_sty = 2;
+  report->seq_report_sty = calloc(report->sz_seq_report_sty, sizeof(seq_report_sty_t));
+  assert(report->seq_report_sty != NULL && "Memory exhausted");
+
+  report->seq_report_sty[0] = fill_report_style_1("Message Copy");
+  report->seq_report_sty[1] = fill_report_style_4("UE Information");
 }
 
 static void fill_rc_control(ran_func_def_ctrl_t* ctrl)
@@ -476,7 +559,7 @@ void read_rc_setup_sm(void* data)
   DevAssert(ret == 0);
 }
 
-static seq_ran_param_t fill_rrc_state_change_seq_ran(const rc_sm_rrc_state_e rrc_state)
+static seq_ran_param_t fill_rrc_state_change_seq_ran(const rrc_state_e2sm_rc_e rrc_state)
 {
   seq_ran_param_t seq_ran_param = {0};
 
@@ -490,14 +573,15 @@ static seq_ran_param_t fill_rrc_state_change_seq_ran(const rc_sm_rrc_state_e rrc
   return seq_ran_param;
 }
 
-static rc_ind_data_t* fill_ue_rrc_state_change(const gNB_RRC_UE_t *rrc_ue_context, const rc_sm_rrc_state_e rrc_state)
+static rc_ind_data_t* fill_ue_rrc_state_change(const gNB_RRC_UE_t *rrc_ue_context, const rrc_state_e2sm_rc_e rrc_state, const uint16_t cond_id)
 {
   rc_ind_data_t* rc_ind = calloc(1, sizeof(rc_ind_data_t));
   assert(rc_ind != NULL && "Memory exhausted");
 
   // Generate Indication Header
   rc_ind->hdr.format = FORMAT_1_E2SM_RC_IND_HDR;
-  rc_ind->hdr.frmt_1.ev_trigger_id = NULL;
+  rc_ind->hdr.frmt_1.ev_trigger_id = malloc_or_fail(sizeof(uint32_t));
+  *rc_ind->hdr.frmt_1.ev_trigger_id = cond_id;
 
   // Generate Indication Message
   rc_ind->msg.format = FORMAT_2_E2SM_RC_IND_MSG;
@@ -531,21 +615,95 @@ static void send_aper_ric_ind(const uint32_t ric_req_id, rc_ind_data_t* rc_ind_d
   printf("[E2 AGENT] Event for RIC request ID %d generated\n", ric_req_id);
 }
 
-static void check_rrc_state(const gNB_RRC_UE_t *rrc_ue_context, const rc_sm_rrc_state_e rrc_state, const uint32_t ric_req_id, const e2sm_rc_ev_trg_frmt_4_t *frmt_4)
+static rc_ind_data_t* fill_ue_id(const gNB_RRC_UE_t *rrc_ue_context, const uint16_t cond_id)
+{
+  rc_ind_data_t* rc_ind = malloc_or_fail(sizeof(rc_ind_data_t));
+
+  // Generate Indication Header
+  rc_ind->hdr.format = FORMAT_1_E2SM_RC_IND_HDR;
+  rc_ind->hdr.frmt_1.ev_trigger_id = malloc_or_fail(sizeof(uint32_t));
+  *rc_ind->hdr.frmt_1.ev_trigger_id = cond_id;
+
+  // Generate Indication Message
+  rc_ind->msg.format = FORMAT_1_E2SM_RC_IND_MSG;
+
+  // Initialize RAN Parameter
+  rc_ind->msg.frmt_1.sz_seq_ran_param = 1;
+  rc_ind->msg.frmt_1.seq_ran_param = calloc_or_fail(rc_ind->msg.frmt_1.sz_seq_ran_param, sizeof(seq_ran_param_t));
+
+  // Fill the RAN Parameter details for UE ID
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_id = E2SM_RC_RS1_UE_ID;
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.type = ELEMENT_KEY_FLAG_FALSE_RAN_PARAMETER_VAL_TYPE;
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.flag_false = malloc_or_fail(sizeof(ran_parameter_value_t));
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.flag_false->type = OCTET_STRING_RAN_PARAMETER_VALUE;
+
+  const ngran_node_t node_type = get_e2_node_type();
+  ue_id_e2sm_t ue_id_data = fill_ue_id_data[node_type](rrc_ue_context, 0, 0);
+
+  UEID_t enc_ue_id_data = enc_ue_id_asn(&ue_id_data);
+
+  const enum asn_transfer_syntax syntax = ATS_ALIGNED_BASIC_PER;
+  asn_encode_to_new_buffer_result_t res = asn_encode_to_new_buffer(NULL, syntax, &asn_DEF_UEID, &enc_ue_id_data);
+  assert(res.buffer != NULL && res.result.encoded > 0 && "[E2 agent] Failed to encode UE ID.");
+  byte_array_t ba = {.buf = res.buffer, .len = res.result.encoded};
+
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.flag_false->octet_str_ran = copy_byte_array(ba);
+
+  // Call Process ID
+  rc_ind->proc_id = NULL;
+
+  free_ue_id_e2sm(&ue_id_data);
+  ASN_STRUCT_RESET(asn_DEF_UEID, &enc_ue_id_data);
+  free(res.buffer);
+
+  return rc_ind;
+}
+
+static void check_ue_id_cond(const gNB_RRC_UE_t *rrc_ue_context, const uint16_t class, const uint32_t msg_id, const uint32_t ric_req_id, const e2sm_rc_ev_trg_frmt_1_t *frmt_1)
+{
+  for (size_t i = 0; i < frmt_1->sz_msg_ev_trg; i++) {
+    msg_ev_trg_t *ev_item = &frmt_1->msg_ev_trg[i];
+    if ((ev_item->msg_type == RRC_MSG_MSG_TYPE_EV_TRG && ev_item->rrc_msg.type == NR_RRC_MESSAGE_ID && ev_item->rrc_msg.nr == class && ev_item->rrc_msg.rrc_msg_id == msg_id)  // rrcSetupComplete
+         || (ev_item->msg_type == NETWORK_INTERFACE_MSG_TYPE_EV_TRG && ev_item->net.ni_type == class)) {  // "F1 UE Context Setup Request", but in the subscription the class (F1) can only be specified which translates to any F1 msg
+      rc_ind_data_t* rc_ind_data = fill_ue_id(rrc_ue_context, ev_item->ev_trigger_cond_id);
+      send_aper_ric_ind(ric_req_id, rc_ind_data);
+    }
+  }
+}
+
+void signal_ue_id(const gNB_RRC_UE_t *rrc_ue_context, const uint16_t class, const uint32_t msg_id)
+{
+  pthread_mutex_lock(&rc_mutex);
+  if (rc_subs_data.rs1_param4.data == NULL) {
+    pthread_mutex_unlock(&rc_mutex);
+    return;
+  }
+
+  const size_t num_subs = seq_arr_size(&rc_subs_data.rs1_param4);
+  for (size_t sub_idx = 0; sub_idx < num_subs; sub_idx++) {
+    const ran_param_data_t data = *(const ran_param_data_t *)seq_arr_at(&rc_subs_data.rs1_param4, sub_idx);
+    check_ue_id_cond(rrc_ue_context, class, msg_id, data.ric_req_id, &data.ev_tr.frmt_1);
+  }
+
+  pthread_mutex_unlock(&rc_mutex);
+}
+
+static void check_rrc_state(const gNB_RRC_UE_t *rrc_ue_context, const rrc_state_e2sm_rc_e rrc_state, const uint32_t ric_req_id, const e2sm_rc_ev_trg_frmt_4_t *frmt_4)
 {
   for (size_t i = 0; i < frmt_4->sz_ue_info_chng; i++) {
+    const uint16_t cond_id = frmt_4->ue_info_chng[i].ev_trig_cond_id;
     const rrc_state_lst_t *rrc_elem = &frmt_4->ue_info_chng[i].rrc_state;
     for (size_t j = 0; j < rrc_elem->sz_rrc_state; j++) {
       const rrc_state_e2sm_rc_e ev_tr_rrc_state = rrc_elem->state_chng_to[j].state_chngd_to;
-      if (ev_tr_rrc_state == (rrc_state_e2sm_rc_e)rrc_state || ev_tr_rrc_state == ANY_RRC_STATE_E2SM_RC) {
-        rc_ind_data_t* rc_ind_data = fill_ue_rrc_state_change(rrc_ue_context, rrc_state);
+      if (ev_tr_rrc_state == rrc_state || ev_tr_rrc_state == ANY_RRC_STATE_E2SM_RC) {
+        rc_ind_data_t* rc_ind_data = fill_ue_rrc_state_change(rrc_ue_context, rrc_state, cond_id);
         send_aper_ric_ind(ric_req_id, rc_ind_data);
       }
     }
   }
 }
 
-void signal_rrc_state_changed_to(const gNB_RRC_UE_t *rrc_ue_context, const rc_sm_rrc_state_e rrc_state)
+void signal_rrc_state_changed_to(const gNB_RRC_UE_t *rrc_ue_context, const rrc_state_e2sm_rc_e rrc_state)
 {
   pthread_mutex_lock(&rc_mutex);
   if (rc_subs_data.rs4_param202.data == NULL) {
@@ -562,6 +720,67 @@ void signal_rrc_state_changed_to(const gNB_RRC_UE_t *rrc_ue_context, const rc_sm
   pthread_mutex_unlock(&rc_mutex);
 }
 
+static rc_ind_data_t* fill_rrc_msg_copy(const byte_array_t rrc_ba, const uint16_t cond_id)
+{
+  rc_ind_data_t* rc_ind = malloc_or_fail(sizeof(rc_ind_data_t));
+
+  // Generate Indication Header
+  rc_ind->hdr.format = FORMAT_1_E2SM_RC_IND_HDR;
+  rc_ind->hdr.frmt_1.ev_trigger_id = malloc_or_fail(sizeof(uint32_t));
+  *rc_ind->hdr.frmt_1.ev_trigger_id = cond_id;
+
+  // Generate Indication Message
+  rc_ind->msg.format = FORMAT_1_E2SM_RC_IND_MSG;
+
+  // Sequence of
+  // RAN Parameter
+  rc_ind->msg.frmt_1.sz_seq_ran_param = 1;
+  rc_ind->msg.frmt_1.seq_ran_param = calloc_or_fail(rc_ind->msg.frmt_1.sz_seq_ran_param, sizeof(seq_ran_param_t));
+
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_id = E2SM_RC_RS1_RRC_MESSAGE;
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.type = ELEMENT_KEY_FLAG_FALSE_RAN_PARAMETER_VAL_TYPE;
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.flag_false = malloc_or_fail(sizeof(ran_parameter_value_t));
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.flag_false->type = OCTET_STRING_RAN_PARAMETER_VALUE;
+  
+  rc_ind->msg.frmt_1.seq_ran_param[0].ran_param_val.flag_false->octet_str_ran = copy_byte_array(rrc_ba);
+
+  // Call Process ID
+  rc_ind->proc_id = NULL;
+
+  return rc_ind;
+}
+
+static void check_rrc_msg_copy(const nr_rrc_class_e nr_channel, const uint32_t rrc_msg_id, const byte_array_t rrc_ba, const uint32_t ric_req_id, const e2sm_rc_ev_trg_frmt_1_t *frmt_1)
+{
+  for (size_t i = 0; i < frmt_1->sz_msg_ev_trg; i++) {
+    if (frmt_1->msg_ev_trg[i].msg_type != RRC_MSG_MSG_TYPE_EV_TRG)
+      continue;
+    if (frmt_1->msg_ev_trg[i].rrc_msg.type != NR_RRC_MESSAGE_ID)
+      continue;
+    if (frmt_1->msg_ev_trg[i].rrc_msg.nr == nr_channel && frmt_1->msg_ev_trg[i].rrc_msg.rrc_msg_id == rrc_msg_id) {
+      rc_ind_data_t* rc_ind_data = fill_rrc_msg_copy(rrc_ba, frmt_1->msg_ev_trg[i].ev_trigger_cond_id);
+      send_aper_ric_ind(ric_req_id, rc_ind_data);
+    }
+  }
+}
+
+void signal_rrc_msg(const nr_rrc_class_e nr_channel, const uint32_t rrc_msg_id, const byte_array_t rrc_ba)
+{
+  pthread_mutex_lock(&rc_mutex);
+  if (rc_subs_data.rs1_param3.data == NULL) {
+    pthread_mutex_unlock(&rc_mutex);
+    return;
+  }
+
+  const size_t num_subs = seq_arr_size(&rc_subs_data.rs1_param3);
+  for (size_t sub_idx = 0; sub_idx < num_subs; sub_idx++) {
+    const ran_param_data_t data = *(const ran_param_data_t *)seq_arr_at(&rc_subs_data.rs1_param3, sub_idx);
+    check_rrc_msg_copy(nr_channel, rrc_msg_id, rrc_ba, data.ric_req_id, &data.ev_tr.frmt_1);
+  }
+
+  pthread_mutex_unlock(&rc_mutex);
+}
+
 static void free_aperiodic_subscription(uint32_t ric_req_id)
 {
   remove_rc_subs_data(&rc_subs_data, ric_req_id);
@@ -572,6 +791,14 @@ static seq_arr_t *get_sa(const e2sm_rc_event_trigger_t *ev_tr, const uint32_t ra
   seq_arr_t *sa = NULL;
 
   switch (ev_tr->format) {
+    case FORMAT_1_E2SM_RC_EV_TRIGGER_FORMAT:
+      if (ran_param_id == E2SM_RC_RS1_RRC_MESSAGE) {
+        sa = &rc_subs_data.rs1_param3;
+      } else if (ran_param_id == E2SM_RC_RS1_UE_ID) {
+        sa = &rc_subs_data.rs1_param4;
+      }
+      break;
+
     case FORMAT_4_E2SM_RC_EV_TRIGGER_FORMAT:
       if (ran_param_id == E2SM_RC_RS4_RRC_STATE_CHANGED_TO) {
         sa = &rc_subs_data.rs4_param202;
