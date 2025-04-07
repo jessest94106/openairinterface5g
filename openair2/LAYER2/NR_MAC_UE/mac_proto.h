@@ -417,4 +417,5 @@ void nr_mac_rrc_sl_mib_ind(const module_id_t module_id,
                            const sdu_size_t pdu_len,
                            const uint16_t rx_slss_id);
 
+NR_SearchSpace_t *get_common_search_space(const NR_UE_MAC_INST_t *mac, const NR_SearchSpaceId_t ss_id);
 #endif
