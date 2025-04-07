@@ -1030,11 +1030,16 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc, NR_Rec
     return;
   }
 
-  if (reconfigurationWithSync->spCellConfigCommon &&
-      reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon &&
-      reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL &&
-      reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB)
-    rrc->arfcn_ssb = *reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencySSB;
+  if (reconfigurationWithSync->spCellConfigCommon) {
+    /* if the frequencyInfoDL is included, consider the target SpCell
+       to be one on the SSB frequency indicated by the frequencyInfoDL */
+    const NR_DownlinkConfigCommon_t *dcc = reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon;
+    if (dcc && dcc->frequencyInfoDL && dcc->frequencyInfoDL->absoluteFrequencySSB)
+      rrc->arfcn_ssb = *dcc->frequencyInfoDL->absoluteFrequencySSB;
+
+    // consider the target SpCell to be one with a physical cell identity indicated by the physCellId
+    rrc->phyCellID = *reconfigurationWithSync->spCellConfigCommon->physCellId;
+  }
 
   NR_UE_Timers_Constants_t *tac = &rrc->timers_and_constants;
   nr_timer_stop(&tac->T310);
