@@ -31,6 +31,7 @@
 
 #include <LTE_DRX-Config.h>
 #include "OCTET_STRING.h"
+#include "NR_MAC_gNB/mac_config.h"
 
 //-------------------------------------------------------------------------------------------//
 // Defines to access message fields.
@@ -60,6 +61,8 @@
 #define NR_RRC_MAC_INAC_IND(mSGpTR)             (mSGpTR)->ittiMsg.nr_rrc_mac_inac_ind
 
 #define RRC_MAC_DRX_CONFIG_REQ(mSGpTR)          (mSGpTR)->ittiMsg.rrc_mac_drx_config_req
+
+#define GNB_SAT_POSITION_UPDATE(mSGpTR)         (mSGpTR)->ittiMsg.gnb_sat_position_update
 
 // Some constants from "LAYER2/MAC/defs.h"
 #define BCCH_SDU_SIZE                           (512)
