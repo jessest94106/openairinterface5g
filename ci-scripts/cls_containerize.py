@@ -410,6 +410,7 @@ class Containerize():
 		result = re.search('native_arm', self.imageKind)
 		if result is not None:
 			imageNames.append(('oai-gnb', 'gNB', 'oai-gnb', ''))
+			imageNames.append(('ran-build-fhi72', 'build.fhi72.native_arm', 'ran-build-fhi72', ''))
 			imageNames.append(('oai-nr-cuup', 'nr-cuup', 'oai-nr-cuup', ''))
 			imageNames.append(('oai-nr-ue', 'nrUE', 'oai-nr-ue', ''))
 			imageNames.append(('oai-gnb-aerial', 'gNB.aerial', 'oai-gnb-aerial', ''))
@@ -889,7 +890,10 @@ class Containerize():
 				if deployed:
 					break
 				elif (attempt < num_attempts - 1):
-					logging.warning(f'Failed to deploy on attempt {attempt}, restart services {services}')
+					warning_msg = f'Restart services {services}'
+					logging.warning(warning_msg)
+					imagesInfo.append(warning_msg)
+					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', ['\n'.join(imagesInfo)])
 					for svc in services.split():
 						CopyinServiceLog(ssh, lSourcePath, yaml_dir, svc, wd_yaml, f'{svc}-{HTML.testCase_id}-attempt{attempt}.log')
 					ssh.run(f'docker compose -f {wd_yaml} down -- {services}')

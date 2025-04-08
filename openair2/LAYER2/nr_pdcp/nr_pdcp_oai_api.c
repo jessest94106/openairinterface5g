@@ -64,7 +64,7 @@
 #include "openair2/SDAP/nr_sdap/nr_sdap.h"
 #include "pdcp.h"
 #include "pdcp_messages_types.h"
-#include "rlc.h"
+#include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "utils.h"
 
 #define TODO do { \
@@ -127,7 +127,6 @@ nr_pdcp_entity_t *nr_pdcp_get_rb(nr_pdcp_ue_t *ue, int rb_id, bool srb_flag)
 typedef struct {
   protocol_ctxt_t ctxt_pP;
   srb_flag_t      srb_flagP;
-  MBMS_flag_t     MBMS_flagP;
   rb_id_t         rb_idP;
   mui_t           muiP;
   confirm_t       confirmP;
@@ -159,16 +158,12 @@ static void *rlc_data_req_thread(void *_)
     i = q.start;
     if (pthread_mutex_unlock(&q.m) != 0) abort();
 
-    rlc_data_req(&q.q[i].ctxt_pP,
-                 q.q[i].srb_flagP,
-                 q.q[i].MBMS_flagP,
-                 q.q[i].rb_idP,
-                 q.q[i].muiP,
-                 q.q[i].confirmP,
-                 q.q[i].sdu_sizeP,
-                 q.q[i].sdu_pP,
-                 NULL,
-                 NULL);
+    nr_rlc_data_req(&q.q[i].ctxt_pP,
+                    q.q[i].srb_flagP,
+                    q.q[i].rb_idP,
+                    q.q[i].muiP,
+                    q.q[i].sdu_sizeP,
+                    q.q[i].sdu_pP);
 
     if (pthread_mutex_lock(&q.m) != 0) abort();
 
@@ -195,7 +190,6 @@ static void init_nr_rlc_data_req_queue(void)
 
 static void enqueue_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
                                  const srb_flag_t srb_flagP,
-                                 const MBMS_flag_t MBMS_flagP,
                                  const rb_id_t rb_idP,
                                  const mui_t muiP,
                                  confirm_t confirmP,
@@ -219,7 +213,6 @@ static void enqueue_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
 
   q.q[i].ctxt_pP    = *ctxt_pP;
   q.q[i].srb_flagP  = srb_flagP;
-  q.q[i].MBMS_flagP = MBMS_flagP;
   q.q[i].rb_idP     = rb_idP;
   q.q[i].muiP       = muiP;
   q.q[i].confirmP   = confirmP;
@@ -232,7 +225,6 @@ static void enqueue_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
 
 void du_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
                      const srb_flag_t srb_flagP,
-                     const MBMS_flag_t MBMS_flagP,
                      const rb_id_t rb_idP,
                      const mui_t muiP,
                      confirm_t confirmP,
@@ -241,7 +233,6 @@ void du_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
 {
   enqueue_rlc_data_req(ctxt_pP,
                        srb_flagP,
-                       MBMS_flagP,
                        rb_idP, muiP,
                        confirmP,
                        sdu_sizeP,
@@ -259,7 +250,6 @@ void du_rlc_data_req(const protocol_ctxt_t *const ctxt_pP,
 typedef struct {
   protocol_ctxt_t ctxt_pP;
   srb_flag_t      srb_flagP;
-  MBMS_flag_t     MBMS_flagP;
   rb_id_t         rb_id;
   sdu_size_t      sdu_buffer_size;
   uint8_t *sdu_buffer;
@@ -279,7 +269,6 @@ static pdcp_data_ind_queue pq;
 
 static void do_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
                              const srb_flag_t srb_flagP,
-                             const MBMS_flag_t MBMS_flagP,
                              const rb_id_t rb_id,
                              const sdu_size_t sdu_buffer_size,
                              uint8_t *const sdu_buffer)
@@ -329,7 +318,6 @@ static void *pdcp_data_ind_thread(void *_)
 
     do_pdcp_data_ind(&pq.q[i].ctxt_pP,
                      pq.q[i].srb_flagP,
-                     pq.q[i].MBMS_flagP,
                      pq.q[i].rb_id,
                      pq.q[i].sdu_buffer_size,
                      pq.q[i].sdu_buffer);
@@ -359,7 +347,6 @@ static void init_nr_pdcp_data_ind_queue(void)
 
 static void enqueue_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
                                   const srb_flag_t srb_flagP,
-                                  const MBMS_flag_t MBMS_flagP,
                                   const rb_id_t rb_id,
                                   const sdu_size_t sdu_buffer_size,
                                   uint8_t *const sdu_buffer)
@@ -381,7 +368,6 @@ static void enqueue_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
 
   pq.q[i].ctxt_pP         = *ctxt_pP;
   pq.q[i].srb_flagP       = srb_flagP;
-  pq.q[i].MBMS_flagP      = MBMS_flagP;
   pq.q[i].rb_id           = rb_id;
   pq.q[i].sdu_buffer_size = sdu_buffer_size;
   pq.q[i].sdu_buffer      = sdu_buffer;
@@ -392,19 +378,11 @@ static void enqueue_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
 
 bool nr_pdcp_data_ind(const protocol_ctxt_t *const ctxt_pP,
                       const srb_flag_t srb_flagP,
-                      const MBMS_flag_t MBMS_flagP,
                       const rb_id_t rb_id,
                       const sdu_size_t sdu_buffer_size,
-                      uint8_t *const sdu_buffer,
-                      const uint32_t *const srcID,
-                      const uint32_t *const dstID)
+                      uint8_t *const sdu_buffer)
 {
-  enqueue_pdcp_data_ind(ctxt_pP,
-                        srb_flagP,
-                        MBMS_flagP,
-                        rb_id,
-                        sdu_buffer_size,
-                        sdu_buffer);
+  enqueue_pdcp_data_ind(ctxt_pP, srb_flagP, rb_id, sdu_buffer_size, sdu_buffer);
   return true;
 }
 
@@ -583,12 +561,6 @@ static void set_node_type() {
   node_type = get_node_type();
 }
 
-/* hack: dummy function needed due to LTE dependencies */
-void pdcp_layer_init(void)
-{
-  abort();
-}
-
 void nr_pdcp_layer_init(void)
 {
   /* hack: be sure to initialize only once */
@@ -717,7 +689,7 @@ static void deliver_pdu_drb_ue(void *deliver_pdu_data, ue_id_t ue_id, int rb_id,
   uint8_t *memblock = malloc16(size);
   memcpy(memblock, buf, size);
   LOG_D(PDCP, "%s(): (drb %d) calling rlc_data_req size %d UE %ld/%04lx\n", __func__, rb_id, size, ctxt.rntiMaybeUEid, ctxt.rntiMaybeUEid);
-  enqueue_rlc_data_req(&ctxt, 0, MBMS_FLAG_NO, rb_id, sdu_id, 0, size, memblock);
+  enqueue_rlc_data_req(&ctxt, 0, rb_id, sdu_id, 0, size, memblock);
 }
 
 static void deliver_pdu_drb_gnb(void *deliver_pdu_data, ue_id_t ue_id, int rb_id,
@@ -735,7 +707,7 @@ static void deliver_pdu_drb_gnb(void *deliver_pdu_data, ue_id_t ue_id, int rb_id
     uint8_t *memblock = malloc16(size);
     memcpy(memblock, buf, size);
     LOG_D(PDCP, "%s(): (drb %d) calling rlc_data_req size %d\n", __func__, rb_id, size);
-    enqueue_rlc_data_req(&ctxt, 0, MBMS_FLAG_NO, rb_id, sdu_id, 0, size, memblock);
+    enqueue_rlc_data_req(&ctxt, 0, rb_id, sdu_id, 0, size, memblock);
   }
 }
 
@@ -794,7 +766,7 @@ void deliver_pdu_srb_rlc(void *deliver_pdu_data, ue_id_t ue_id, int srb_id,
   protocol_ctxt_t ctxt = { .enb_flag = 1, .rntiMaybeUEid = ue_id };
   uint8_t *memblock = malloc16(size);
   memcpy(memblock, buf, size);
-  enqueue_rlc_data_req(&ctxt, 1, MBMS_FLAG_NO, srb_id, sdu_id, 0, size, memblock);
+  enqueue_rlc_data_req(&ctxt, 1, srb_id, sdu_id, 0, size, memblock);
 }
 
 void add_srb(int is_gnb,
@@ -966,30 +938,9 @@ void nr_pdcp_add_drbs(eNB_flag_t enb_flag,
     LOG_W(PDCP, "nr_pdcp_add_drbs() with void list\n");
 }
 
-/* Dummy function due to dependency from LTE libraries */
-bool rrc_pdcp_config_asn1_req(const protocol_ctxt_t *const  ctxt_pP,
-                              LTE_SRB_ToAddModList_t  *const srb2add_list,
-                              LTE_DRB_ToAddModList_t  *const drb2add_list,
-                              LTE_DRB_ToReleaseList_t *const drb2release_list,
-                              const uint8_t                   security_modeP,
-                              uint8_t                  *const kRRCenc,
-                              uint8_t                  *const kRRCint,
-                              uint8_t                  *const kUPenc,
-                              LTE_PMCH_InfoList_r9_t  *pmch_InfoList_r9,
-                              rb_id_t                 *const defaultDRB)
-{
-  return 0;
-}
-
 uint64_t get_pdcp_optmask(void)
 {
   return pdcp_optmask;
-}
-
-/* hack: dummy function needed due to LTE dependencies */
-bool pdcp_remove_UE(const protocol_ctxt_t *const ctxt_pP)
-{
-  abort();
 }
 
 void nr_pdcp_remove_UE(ue_id_t ue_id)
@@ -997,19 +948,6 @@ void nr_pdcp_remove_UE(ue_id_t ue_id)
   nr_pdcp_manager_lock(nr_pdcp_ue_manager);
   nr_pdcp_manager_remove_ue(nr_pdcp_ue_manager, ue_id);
   nr_pdcp_manager_unlock(nr_pdcp_ue_manager);
-}
-
-/* hack: dummy function needed due to LTE dependencies */
-void pdcp_config_set_security(const protocol_ctxt_t *const ctxt_pP,
-                                 pdcp_t *const pdcp_pP,
-                                 const rb_id_t rb_id,
-                                 const uint16_t lc_idP,
-                                 const uint8_t security_modeP,
-                                 uint8_t *const kRRCenc_pP,
-                                 uint8_t *const kRRCint_pP,
-                                 uint8_t *const kUPenc_pP)
-{
-  abort();
 }
 
 void nr_pdcp_config_set_security(ue_id_t ue_id,
@@ -1315,34 +1253,12 @@ bool cu_f1u_data_req(protocol_ctxt_t  *ctxt_pP,
     exit(1);
   }
   memcpy(memblock, sdu_buffer, sdu_buffer_size);
-  int ret = nr_pdcp_data_ind(ctxt_pP, srb_flagP, false, rb_id, sdu_buffer_size, memblock, NULL, NULL);
+  int ret = nr_pdcp_data_ind(ctxt_pP, srb_flagP, rb_id, sdu_buffer_size, memblock);
   if (!ret) {
     LOG_E(RLC, "%s:%d:%s: ERROR: pdcp_data_ind failed\n", __FILE__, __LINE__, __FUNCTION__);
     /* what to do in case of failure? for the moment: nothing */
   }
   return ret;
-}
-
-/* hack: dummy function needed due to LTE dependencies */
-bool pdcp_data_req(protocol_ctxt_t  *ctxt_pP,
-                   const srb_flag_t     srb_flagP,
-                   const rb_id_t        rb_idP,
-                   const mui_t          muiP,
-                   const confirm_t      confirmP,
-                   const sdu_size_t     sdu_buffer_sizeP,
-                   unsigned char *const sdu_buffer_pP,
-                   const pdcp_transmission_mode_t modeP,
-                   const uint32_t *const sourceL2Id,
-                   const uint32_t *const destinationL2Id)
-{
-  abort();
-  return false;
-}
-
-//Dummy function needed due to LTE dependencies
-void
-pdcp_mbms_run ( const protocol_ctxt_t *const  ctxt_pP){
-  /* nothing to do */
 }
 
 void nr_pdcp_tick(int frame, int subframe)

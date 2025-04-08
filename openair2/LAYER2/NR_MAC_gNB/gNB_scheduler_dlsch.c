@@ -34,7 +34,7 @@
 #include "NR_MAC_COMMON/nr_mac.h"
 #include "NR_MAC_gNB/nr_mac_gNB.h"
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
-#include "LAYER2/RLC/rlc.h"
+#include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
 
 /*TAG*/
 #include "NR_TAG-Id.h"
@@ -338,16 +338,7 @@ static void nr_store_dlsch_buffer(module_id_t module_id, frame_t frame, slot_t s
       if (lcid == DL_SCH_LCID_DTCH && nr_timer_is_active(&sched_ctrl->transm_interrupt))
         continue;
       start_meas(&RC.nrmac[module_id]->rlc_status_ind);
-      sched_ctrl->rlc_status[lcid] = mac_rlc_status_ind(module_id,
-                                                        rnti,
-                                                        module_id,
-                                                        frame,
-                                                        slot,
-                                                        ENB_FLAG_YES,
-                                                        MBMS_FLAG_NO,
-                                                        lcid,
-                                                        0,
-                                                        0);
+      sched_ctrl->rlc_status[lcid] = nr_mac_rlc_status_ind(rnti, frame, lcid);
       stop_meas(&RC.nrmac[module_id]->rlc_status_ind);
 
       if (sched_ctrl->rlc_status[lcid].bytes_in_buffer == 0)
@@ -1300,17 +1291,12 @@ void nr_schedule_ue_spec(module_id_t module_id,
              * such that TBS is full */
             const rlc_buffer_occupancy_t ndata = min(sched_ctrl->rlc_status[lcid].bytes_in_buffer,
                                                      bufEnd-buf-sizeof(NR_MAC_SUBHEADER_LONG));
-            tbs_size_t len = mac_rlc_data_req(module_id,
-                                              rnti,
-                                              module_id,
-                                              frame,
-                                              ENB_FLAG_YES,
-                                              MBMS_FLAG_NO,
-                                              lcid,
-                                              ndata,
-                                              (char *)buf+sizeof(NR_MAC_SUBHEADER_LONG),
-                                              0,
-                                              0);
+            tbs_size_t len = nr_mac_rlc_data_req(module_id,
+                                                 rnti,
+                                                 true,
+                                                 lcid,
+                                                 ndata,
+                                                 (char *)buf+sizeof(NR_MAC_SUBHEADER_LONG));
             LOG_D(NR_MAC,
                   "%4d.%2d RNTI %04x: %d bytes from %s %d (ndata %d, remaining size %ld)\n",
                   frame,

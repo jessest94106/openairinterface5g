@@ -32,6 +32,8 @@ The hardware on which we have tried this tutorial:
 - The NIC card should support hardware PTP time stamping. 
 - If you are using Intel servers then use only Ice Lake or newer generations. In case of AMD use only 4th generation, Genoa or newer. 
 - If you try on any other server apart from the above listed, then choose a desktop/server with clock speed higher than 3.0 GHz and `avx512` capabilities. 
+- This tutorial gives few instructions for Arm targets, but DU execution on Arm systems is yet not functional.  
+This feature is intended to enable experiments and future improvements on Arm systems.
 
 NICs we have tested so far:
 
@@ -403,7 +405,10 @@ git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/
 Compile the fronthaul interface library by calling `make` and the option
 `XRAN_LIB_SO=1` to have it build a shared object. Note that we provide two
 environment variables `RTE_SDK` for the path to the source tree of DPDK, and
-`XRAN_DIR` to set the path to the fronthaul library.
+`XRAN_DIR` to set the path to the fronthaul library.  
+For building for a Arm target, set as well the environment variable `TARGET=armv8`.
+DU execution on Arm systems is yet not functional.
+This feature is intended to enable experiments and future improvements on Arm systems.
 
 **Note**: you need at least gcc-11 and g++-11.
 
@@ -419,6 +424,31 @@ WIRELESS_SDK_TOOLCHAIN=gcc RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib
 
 The shared library object `~/phy/fhi_lib/lib/build/libxran.so` must be present
 before proceeding.
+
+## For Arm targets only: Install the Arm RAN Acceleration library
+
+DU execution on Arm systems is yet not functional.
+This feature is intended to enable experiments and future improvements on Arm systems.
+
+Clone, configure and build ArmRAL:
+
+Note: Use option `-DCMAKE_INSTALL_PREFIX=<install-dir>` of cmake to set the installation directory of ArmRAL to `<install-dir>`.
+If you omit this option, ArmRAL is installed into `/usr/local`.
+
+```
+git clone https://git.gitlab.arm.com/networking/ral.git ~/ral
+cd ~/ral
+git checkout armral-25.01
+mkdir build
+cd build
+cmake -GNinja -DBUILD_SHARED_LIBS=On ../
+ninja
+```
+
+Once ArmRAL is configured at your convenience and built, you can install it:
+```
+ninja install
+```
 
 ## Build OAI gNB
 
