@@ -67,13 +67,16 @@ void release_common_ss_cset(NR_BWP_PDCCH_t *pdcch);
    \param gNB_index      gNB index
    \param sibs_mask      sibs mask
    \param pduP           pointer to pdu
-   \param pdu_length     length of pdu */
+   \param pdu_length     length of pdu
+   \param frame,slot     Received TTI*/
 void nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
                               int cc_id,
                               unsigned int gNB_index,
                               uint8_t ack_nack,
                               uint8_t *pduP,
-                              uint32_t pdu_len);
+                              uint32_t pdu_len,
+                              int frame,
+                              int slot);
 
 void release_dl_BWP(NR_UE_MAC_INST_t *mac, int index);
 void release_ul_BWP(NR_UE_MAC_INST_t *mac, int index);
