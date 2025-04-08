@@ -124,6 +124,7 @@
 #define GNB_CONFIG_STRING_NROFUPLINKSYMBOLS2                             "nrofUplinkSymbols2"
 #define GNB_CONFIG_STRING_SSPBCHBLOCKPOWER                               "ssPBCH_BlockPower"
 
+#define GNB_CONFIG_STRING_ULSYNCVALIDITYDURATION                         "ntn-UlSyncValidityDuration-r17"
 #define GNB_CONFIG_STRING_CELLSPECIFICKOFFSET                            "cellSpecificKoffset_r17"
 #define GNB_CONFIG_STRING_EPHEMERIS_POSITION_X                           "positionX-r17"
 #define GNB_CONFIG_STRING_EPHEMERIS_POSITION_Y                           "positionY-r17"
@@ -250,6 +251,7 @@
 {GNB_CONFIG_STRING_NROFUPLINKSLOTS,NULL,0,.i64ptr=&scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,.defint64val=2,TYPE_INT64,0},\
 {GNB_CONFIG_STRING_NROFUPLINKSYMBOLS,NULL,0,.i64ptr=&scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSymbols,.defint64val=4,TYPE_INT64,0},\
 {GNB_CONFIG_STRING_SSPBCHBLOCKPOWER,NULL,0,.i64ptr=&scc->ss_PBCH_BlockPower,.defint64val=20,TYPE_INT64,0}, \
+{GNB_CONFIG_STRING_ULSYNCVALIDITYDURATION,NULL,0,.i64ptr=scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17,.defint64val=0,TYPE_INT64,0}, \
 {GNB_CONFIG_STRING_CELLSPECIFICKOFFSET,NULL,0,.i64ptr=scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17,.defint64val=0,TYPE_INT64,0}, \
 {GNB_CONFIG_STRING_EPHEMERIS_POSITION_X,NULL,0,.i64ptr=&scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionX_r17,.defint64val=LONG_MAX,TYPE_INT64,0}, \
 {GNB_CONFIG_STRING_EPHEMERIS_POSITION_Y,NULL,0,.i64ptr=&scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionY_r17,.defint64val=LONG_MAX,TYPE_INT64,0}, \

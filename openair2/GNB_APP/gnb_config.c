@@ -217,6 +217,7 @@ void prepare_scc(NR_ServingCellConfigCommon_t *scc)
 
   scc->ext2 = calloc_or_fail(1, sizeof(*scc->ext2));
   scc->ext2->ntn_Config_r17 = calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17));
+  scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17 = calloc_or_fail(1, sizeof(long));
   scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 = calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17));
 
   scc->ext2->ntn_Config_r17->ephemerisInfo_r17 = calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17));
@@ -466,6 +467,40 @@ static void fix_tdd_pattern(NR_ServingCellConfigCommon_t *scc)
   }
 }
 
+static int get_ulsyncvalidityduration_enum_value(int val)
+{
+  int retval = -1;
+
+  switch (val) {
+    case 5:
+    case 10:
+    case 15:
+    case 20:
+    case 25:
+    case 30:
+    case 35:
+    case 40:
+    case 45:
+    case 50:
+    case 55:
+      retval = val / 5 - 1;
+      break;
+    case 60:
+    case 120:
+    case 180:
+    case 240:
+      retval = 10 + val / 60;
+      break;
+    case 900:
+      retval = 15;
+      break;
+    default:
+      AssertFatal(1 == 0, "ulsyncvalidityDuration in SIB19 set to invalid value in Conf file\n");
+      break;
+  }
+  return retval;
+}
+
 void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
 {
   scc->ssb_PositionsInBurst->present = get_ssb_len(scc);
@@ -573,6 +608,13 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
   AssertFatal(*scc->uplinkConfigCommon->initialUplinkBWP->pucch_ConfigCommon->choice.setup->pucch_ResourceCommon < 2,
 	      "pucch_ResourceConfig should be 0 or 1 for now\n");
 
+  if (*scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17 == 0) {
+    free(scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17);
+    scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17 = NULL;
+  } else {
+    int val = get_ulsyncvalidityduration_enum_value(*scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17);
+    *scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17 = val;
+  }
   if (*scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 == 0) {
     free(scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17);
     scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 = NULL;
@@ -597,8 +639,10 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
     scc->ext2->ntn_Config_r17->ephemerisInfo_r17 = NULL;
   }
 
-  if (!scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 && !scc->ext2->ntn_Config_r17->ta_Info_r17
-      && !scc->ext2->ntn_Config_r17->ephemerisInfo_r17) {
+  if (!scc->ext2->ntn_Config_r17->ntn_UlSyncValidityDuration_r17 &&
+      !scc->ext2->ntn_Config_r17->cellSpecificKoffset_r17 &&
+      !scc->ext2->ntn_Config_r17->ta_Info_r17 &&
+      !scc->ext2->ntn_Config_r17->ephemerisInfo_r17) {
     free(scc->ext2->ntn_Config_r17);
     free(scc->ext2);
     scc->ext2 = NULL;
