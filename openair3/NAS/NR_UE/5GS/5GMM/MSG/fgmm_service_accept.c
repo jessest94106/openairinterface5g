@@ -133,7 +133,7 @@ int decode_fgs_service_accept(fgs_service_accept_msg_t *msg, const byte_array_t 
         break;
 
       case IEI_EAPMSG:
-        DECODE_NAS_IE(ba, decode_eap_msg_ie(&ba), decoded);
+        DECODE_NAS_IE(ba, decode_eap_msg_ie(&msg->eap_msg, &ba), decoded);
         break;
 
       default:

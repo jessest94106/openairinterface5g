@@ -35,6 +35,8 @@ typedef struct {
   bool has_psi_status;
   // T3448 Value (Optional)
   gprs_timer_t *t3448;
+  // EAP message (optional)
+  byte_array_t *eap_msg;
 } fgs_service_reject_msg_t;
 
 int decode_fgs_service_reject(fgs_service_reject_msg_t *msg, const byte_array_t *buffer);
