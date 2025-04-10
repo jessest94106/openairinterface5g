@@ -1575,7 +1575,7 @@ int nr_ue_pusch_scheduler(const NR_UE_MAC_INST_t *mac,
     *slot_tx = (current_slot + k2 + delta) % slots_per_frame;
     *frame_tx = (current_frame + (current_slot + k2 + delta) / slots_per_frame) % MAX_FRAME_NUMBER;
   } else {
-    AssertFatal(k2 > GET_DURATION_RX_TO_TX(&mac->ntn_ta, mu),
+    AssertFatal(k2 >= GET_DURATION_RX_TO_TX(&mac->ntn_ta, mu),
                 "Slot offset K2 (%ld) needs to be higher than DURATION_RX_TO_TX (%ld). Please set min_rxtxtime at least to %ld in "
                 "gNB config file or gNBs.[0].min_rxtxtime=%ld via command line.\n",
                 k2,
