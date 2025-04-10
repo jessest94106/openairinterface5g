@@ -398,13 +398,10 @@ void free_param_request(nfapi_nr_param_request_scf_t *msg)
 
 void free_param_response(nfapi_nr_param_response_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 
-  if (msg->cell_param.config_tlvs_to_report_list) {
-    free(msg->cell_param.config_tlvs_to_report_list);
-  }
+  free(msg->cell_param.config_tlvs_to_report_list);
+
 }
 
 void free_config_request(nfapi_nr_config_request_scf_t *msg)
@@ -986,11 +983,128 @@ void dump_param_request(const nfapi_nr_param_request_scf_t *msg)
 void dump_param_response(const nfapi_nr_param_response_scf_t *msg)
 {
   int depth = 0;
-  dump_p5_message_header(&msg->header,depth);
+  dump_p5_message_header(&msg->header, depth);
   depth++;
   INDENTED_PRINTF("Error Code = 0x%02x\n", msg->error_code);
   INDENTED_PRINTF("Number of TLVs = 0x%02x\n", msg->num_tlv);
   /* dump all TLVs from each table */
+  /* Cell Param */
+  const nfapi_nr_cell_param_t *cell_param = &msg->cell_param;
+  depth++;
+  INDENTED_TLV_PRINT("Release Capability", cell_param->release_capability);
+  INDENTED_TLV_PRINT("PHY State", cell_param->phy_state);
+  INDENTED_TLV_PRINT("Skip Blank Dl Config", cell_param->skip_blank_dl_config);
+  INDENTED_TLV_PRINT("Skip Blank UL Config", cell_param->skip_blank_ul_config);
+  INDENTED_TLV_PRINT("NumConfigTLVsToReport", cell_param->num_config_tlvs_to_report);
+  depth++;
+  for (int i = 0; i < cell_param->num_config_tlvs_to_report.value; i++) {
+    const nfapi_uint8_tlv_t *reportedTLV = &cell_param->config_tlvs_to_report_list[i];
+    INDENTED_PRINTF("(0x%04x) Reported CONFIG TLV #%d = 0x%02x\n", reportedTLV->tl.tag, i + 1, reportedTLV->value);
+  }
+  depth--;
+  /* Carrier Param */
+  const nfapi_nr_carrier_param_t *carrier_param = &msg->carrier_param;
+  INDENTED_TLV_PRINT("Cyclic Prefix", carrier_param->cyclic_prefix);
+  INDENTED_TLV_PRINT("Supported SCS DL", carrier_param->supported_subcarrier_spacings_dl);
+  INDENTED_TLV_PRINT("Supported BW DL", carrier_param->supported_bandwidth_dl);
+  INDENTED_TLV_PRINT("Supported SCS UL", carrier_param->supported_subcarrier_spacings_ul);
+  INDENTED_TLV_PRINT("Supported BW UL", carrier_param->supported_bandwidth_ul);
+  /* PDCCH Param */
+  const nfapi_nr_pdcch_param_t *pdcch_param = &msg->pdcch_param;
+  INDENTED_TLV_PRINT("CCE Mapping Type", pdcch_param->cce_mapping_type);
+  INDENTED_TLV_PRINT("CSet Outside First 3 OFDM Symbols of Slot", pdcch_param->coreset_outside_first_3_of_ofdm_syms_of_slot);
+  INDENTED_TLV_PRINT("Precoder Granularity Coreset", pdcch_param->coreset_precoder_granularity_coreset);
+  INDENTED_TLV_PRINT("PDCCH Mu MIMO", pdcch_param->pdcch_mu_mimo);
+  INDENTED_TLV_PRINT("PDCCH Precoder Cycling", pdcch_param->pdcch_precoder_cycling);
+  INDENTED_TLV_PRINT("Max PDCCH per Slot", pdcch_param->max_pdcch_per_slot);
+  /* PUCHH Params */
+  const nfapi_nr_pucch_param_t *pucch_param = &msg->pucch_param;
+  INDENTED_TLV_PRINT("PUCCH Formats", pucch_param->pucch_formats);
+  INDENTED_TLV_PRINT("Max PUCCH per Slot", pucch_param->max_pucchs_per_slot);
+  /* PDSCH Params */
+  const nfapi_nr_pdsch_param_t *pdsch_param = &msg->pdsch_param;
+  INDENTED_TLV_PRINT("PDSCH Mapping Type", pdsch_param->pdsch_mapping_type);
+  INDENTED_TLV_PRINT("PDSCH Allocation Types", pdsch_param->pdsch_allocation_types);
+  INDENTED_TLV_PRINT("PDSCH VRB to PRB Mapping", pdsch_param->pdsch_vrb_to_prb_mapping);
+  INDENTED_TLV_PRINT("PDSCH CBG", pdsch_param->pdsch_cbg);
+  INDENTED_TLV_PRINT("PDSCH DMRS Config Types", pdsch_param->pdsch_dmrs_config_types);
+  INDENTED_TLV_PRINT("PDSCH DMRS Max Length", pdsch_param->pdsch_dmrs_max_length);
+  INDENTED_TLV_PRINT("PDSCH DMRS Additional Position", pdsch_param->pdsch_dmrs_additional_pos);
+  INDENTED_TLV_PRINT("Max PDSCH TBs per Slot", pdsch_param->max_pdsch_tbs_per_slot);
+  INDENTED_TLV_PRINT("Max number MIMO Layers PDSCH", pdsch_param->max_number_mimo_layers_pdsch);
+  INDENTED_TLV_PRINT("Supported Max Modulation Order DL", pdsch_param->supported_max_modulation_order_dl);
+  INDENTED_TLV_PRINT("Max Mu MIMO Users DL", pdsch_param->max_mu_mimo_users_dl);
+  INDENTED_TLV_PRINT("PDSCH Data in DMRS Symbols", pdsch_param->pdsch_data_in_dmrs_symbols);
+  INDENTED_TLV_PRINT("Preemption Support", pdsch_param->premption_support);
+  INDENTED_TLV_PRINT("PDSCH Non Slot Support", pdsch_param->pdsch_non_slot_support);
+  /* PUSCH Params */
+  const nfapi_nr_pusch_param_t *pusch_param = &msg->pusch_param;
+  INDENTED_TLV_PRINT("UCI Mux ULSCH in PUSCH", pusch_param->uci_mux_ulsch_in_pusch);
+  INDENTED_TLV_PRINT("UCI Only PUSCH", pusch_param->uci_only_pusch);
+  INDENTED_TLV_PRINT("PUSCH Frequency Hopping", pusch_param->pusch_frequency_hopping);
+  INDENTED_TLV_PRINT("PUSCH DMRS Config Types", pusch_param->pusch_dmrs_config_types);
+  INDENTED_TLV_PRINT("PUSCH DMRS Max Len", pusch_param->pusch_dmrs_max_len);
+  INDENTED_TLV_PRINT("PUSCH DMRS Additional Pos", pusch_param->pusch_dmrs_additional_pos);
+  INDENTED_TLV_PRINT("PUSCH CBG", pusch_param->pusch_cbg);
+  INDENTED_TLV_PRINT("PUSCH Mapping Type", pusch_param->pusch_mapping_type);
+  INDENTED_TLV_PRINT("PUSCH Allocation Types", pusch_param->pusch_allocation_types);
+  INDENTED_TLV_PRINT("PUSCH VRB to PRB Mapping", pusch_param->pusch_vrb_to_prb_mapping);
+  INDENTED_TLV_PRINT("PUSCH Max PTRS Ports", pusch_param->pusch_max_ptrs_ports);
+  INDENTED_TLV_PRINT("Max PUSCH TBs per Slot", pusch_param->max_pduschs_tbs_per_slot);
+  INDENTED_TLV_PRINT("Max Number MIMO Layers non CB PUSCH", pusch_param->max_number_mimo_layers_non_cb_pusch);
+  INDENTED_TLV_PRINT("Supported Modulation Order UL", pusch_param->supported_modulation_order_ul);
+  INDENTED_TLV_PRINT("Max MU MIMO Users UL", pusch_param->max_mu_mimo_users_ul);
+  INDENTED_TLV_PRINT("DTFS OFDM Support", pusch_param->dfts_ofdm_support);
+  INDENTED_TLV_PRINT("PUSCH Aggregation Factor", pusch_param->pusch_aggregation_factor);
+  /* PRACH Params */
+  const nfapi_nr_prach_param_t *prach_param = &msg->prach_param;
+  INDENTED_TLV_PRINT("PRACH Long Formats", prach_param->prach_long_formats);
+  INDENTED_TLV_PRINT("PRACH Short Formats", prach_param->prach_short_formats);
+  INDENTED_TLV_PRINT("PRACH Restricted Sets", prach_param->prach_restricted_sets);
+  INDENTED_TLV_PRINT("Max PRACH Occasions in a Slot", prach_param->max_prach_fd_occasions_in_a_slot);
+  /* Measurement Params */
+  const nfapi_nr_measurement_param_t *measurement_param = &msg->measurement_param;
+  INDENTED_TLV_PRINT("RSSI Measurement Support", measurement_param->rssi_measurement_support);
+  /* nFAPI Config */
+  const nfapi_nr_nfapi_t *nfapi_config = &msg->nfapi_config;
+  if (nfapi_config->p7_vnf_address_ipv4.tl.tag) {
+    char ip_str[INET_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 VNF Address IPv4",
+                           "%s",
+                           nfapi_config->p7_vnf_address_ipv4.tl.tag,
+                           inet_ntop(AF_INET, nfapi_config->p7_vnf_address_ipv4.address, ip_str, sizeof(ip_str)));
+  }
+  if (nfapi_config->p7_vnf_address_ipv6.tl.tag) {
+    char addr6[INET6_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 VNF Address IPv6",
+                           "%s",
+                           nfapi_config->p7_vnf_address_ipv6.tl.tag,
+                           inet_ntop(AF_INET6, nfapi_config->p7_vnf_address_ipv6.address, addr6, sizeof(addr6)));
+  }
+  INDENTED_TLV_FORMAT_PRINT("P7 VNF Port", "%d", nfapi_config->p7_vnf_port);
+
+  if (nfapi_config->p7_pnf_address_ipv4.tl.tag) {
+    char ip_str[INET_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 PNF Address IPv4",
+                           "%s",
+                           nfapi_config->p7_pnf_address_ipv4.tl.tag,
+                           inet_ntop(AF_INET, nfapi_config->p7_pnf_address_ipv4.address, ip_str, sizeof(ip_str)));
+  }
+  if (nfapi_config->p7_pnf_address_ipv6.tl.tag) {
+    char addr6[INET6_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 PNF Address IPv6",
+                           "%s",
+                           nfapi_config->p7_pnf_address_ipv6.tl.tag,
+                           inet_ntop(AF_INET6, nfapi_config->p7_pnf_address_ipv6.address, addr6, sizeof(addr6)));
+  }
+  INDENTED_TLV_FORMAT_PRINT("P7 PNF Port", "%d", nfapi_config->p7_pnf_port);
+  INDENTED_TLV_FORMAT_PRINT("Timing Window", "%d", nfapi_config->timing_window);
+  INDENTED_TLV_FORMAT_PRINT("Timing Info Mode", "%d", nfapi_config->timing_info_mode);
+  INDENTED_TLV_FORMAT_PRINT("Timing Info Period", "%d", nfapi_config->timing_info_period);
+  INDENTED_TLV_FORMAT_PRINT("DL_TTI Timing Offset", "%d", nfapi_config->dl_tti_timing_offset);
+  INDENTED_TLV_FORMAT_PRINT("UL_TTI Timing Offset", "%d", nfapi_config->ul_tti_timing_offset);
+  INDENTED_TLV_FORMAT_PRINT("UL_DCI Timing Offset", "%d", nfapi_config->ul_dci_timing_offset);
+  INDENTED_TLV_FORMAT_PRINT("TX_DATA Timing Offset", "%d", nfapi_config->tx_data_timing_offset);
   depth--;
 }
 
