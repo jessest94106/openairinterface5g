@@ -39,6 +39,7 @@ both PDU Session Status and PDU session Reactivation Result IEs */
 #define MAX_PDU_SESSION_CONTENTS_LEN 32
 #define MAX_NUM_PSI 16
 #define MAX_NUM_PDU_ERRORS 256
+#define MAX_EAP_CONTENTS_LEN 1500
 
 /* This macro updates the local copy of
    a byte_array_t pointer used for enc/dec */

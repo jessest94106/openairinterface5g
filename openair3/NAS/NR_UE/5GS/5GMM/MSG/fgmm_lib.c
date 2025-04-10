@@ -30,7 +30,6 @@
 #define FGS_NAS_CAUSE_LENGTH 1
 #define MIN_EAP_MSG_LEN 7
 #define MIN_EAP_CONTENTS_LEN 4
-#define MAX_EAP_CONTENTS_LEN 1500
 
 /**
  * Encode PDU Session Status and PDU session reactivation result (optional IEs)

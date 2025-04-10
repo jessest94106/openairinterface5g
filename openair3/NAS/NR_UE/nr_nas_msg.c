@@ -70,6 +70,7 @@
 #include "fgs_nas_utils.h"
 #include "fgmm_service_accept.h"
 #include "fgmm_service_reject.h"
+#include "fgmm_authentication_reject.h"
 #include "ds/byte_array.h"
 #include "key_nas_deriver.h"
 
@@ -1060,6 +1061,33 @@ static void handle_fgmm_authentication_request(nr_ue_nas_t *nas, as_nas_info_t *
     return;
   }
   generateAuthenticationResp(nas, initialNasMsg, buffer->buf);
+}
+
+/** @brief Handle authentication not accepted by the network
+ * This function assumes the message is not integrity protected, processes the received
+ * NAS message and logs whether a EAP-failure is enclosed. The UE enters state: 5GMM-DEREGISTERED.
+ * @todo The UE shall performs actions as per 5.4.1.3.5 of 3GPP TS 24.501, including
+ * (1) Abort any ongoing 5GMM procedure (2) Stop all active timers: T3510, T3516, T3517,
+ * T3519, T3520, T3521 (3) Delete stored SUCI. (4) handle EAP-failure message. */
+static void handle_authentication_reject(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, uint8_t *pdu, int pdu_length)
+{
+  LOG_E(NAS, "Received Authentication Reject message from the network\n");
+  uint8_t eap_msg[MAX_EAP_CONTENTS_LEN] = {0};
+  fgmm_auth_reject_msg_t msg = {.eap_msg.buf = eap_msg};
+
+  byte_array_t ba = {.buf = pdu + 3 /* skip header */, .len = pdu_length};
+  if (decode_fgmm_auth_reject(&msg, &ba) < 0) {
+    LOG_E(NAS, "Could not decode Authentication Reject\n");
+    return;
+  }
+
+  if (msg.eap_msg.len > 0) {
+    /** @todo UE handling EAP-failure message (5.4.1.2.2.11 of 3GPP TS 24.501) */
+    LOG_W(NAS, "NAS Authentication Reject contains an EAP message: handling is not implemented\n");
+    log_hex_buffer("EAP-Failure", msg.eap_msg.buf, msg.eap_msg.len);
+  }
+
+  nas->fiveGMM_state = FGS_DEREGISTERED;
 }
 
 int nas_itti_kgnb_refresh_req(instance_t instance, const uint8_t kgnb[32])
@@ -2058,6 +2086,9 @@ void *nas_nrue(void *args_p)
             break;
           case FGS_AUTHENTICATION_REQUEST:
             handle_fgmm_authentication_request(nas, &initialNasMsg, &buffer);
+            break;
+          case FGS_AUTHENTICATION_REJECT:
+            handle_authentication_reject(nas, &initialNasMsg, pdu_buffer, pdu_length);
             break;
           case FGS_SECURITY_MODE_COMMAND:
             handle_security_mode_command(nas, &initialNasMsg, pdu_buffer, pdu_length);
