@@ -2163,7 +2163,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     // TODO N2 38.413 sec 9.3.1.21: admitted PDU sessions (in UE), Target to
     // Source Transparent Container (9.3.1.21) which encodes the RRC
     // reconfiguration above
-    UE->ho_context->target->ho_req_ack(rrc, UE, msg.buf, msg.len);
+    UE->ho_context->target->ho_req_ack(rrc, UE, msg);
   }
 }
 

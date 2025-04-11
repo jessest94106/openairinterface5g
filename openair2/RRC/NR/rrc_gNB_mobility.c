@@ -258,7 +258,7 @@ static void rrc_gNB_trigger_reconfiguration_for_handover(gNB_RRC_INST *rrc, gNB_
 #endif
 }
 
-static void nr_rrc_f1_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t *rrc_reconf_buf, uint32_t rrc_reconf_len)
+static void nr_rrc_f1_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, byte_array_t buffer)
 {
   // N2/Xn HO: fill with UE caps, as-context, rrc reconf, send to source CU
   // also, fill the UE->rnti from the new one (in F1 case, happens after
@@ -266,7 +266,7 @@ static void nr_rrc_f1_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_
 
   // F1 HO: handling of "source CU" information
   DevAssert(UE->ho_context->source != NULL);
-  rrc_gNB_trigger_reconfiguration_for_handover(rrc, UE, rrc_reconf_buf, rrc_reconf_len);
+  rrc_gNB_trigger_reconfiguration_for_handover(rrc, UE, buffer.buf, buffer.len);
   LOG_A(NR_RRC, "HO acknowledged: Send reconfiguration for UE %u/RNTI %04x...\n", UE->rrc_ue_id, UE->rnti);
 
   /* Re-establish SRB2 according to clause 5.3.5.6.3 of 3GPP TS 38.331
