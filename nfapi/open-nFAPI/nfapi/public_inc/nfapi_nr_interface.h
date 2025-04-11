@@ -34,6 +34,7 @@
 #define NFAPI_NR_FAPI_TOTAL_NUM_BEAMS_VENDOR_EXTENSION_TAG 0xA002
 #define NFAPI_NR_FAPI_ANALOG_BEAM_VENDOR_EXTENSION_TAG 0xA003
 
+
 typedef struct {
   uint16_t phy_id;
   uint16_t message_id;

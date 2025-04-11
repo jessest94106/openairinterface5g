@@ -328,6 +328,7 @@ typedef struct
 
 #define NFAPI_NR_CONFIG_RSSI_MEASUREMENT_TAG 0x1028
 #define NFAPI_NR_CONFIG_TDD_TABLE 0x1035
+#define NFAPI_NR_CONFIG_BEAMFORMING_TABLE_TAG 0x1043 // This tag was added in version 5 of the SCF222 standard ( Table 3-50 of SCF222.10.05 )
 
 //table 3-21
 typedef struct 
@@ -472,6 +473,11 @@ typedef struct {
   uint16_t num_txrus;    //0~65535
   nfapi_nr_dig_beam_t *dig_beam_list;
 } nfapi_nr_dbt_pdu_t;
+
+typedef struct {
+  nfapi_tl_t tl;
+  nfapi_nr_dbt_pdu_t value;
+} nfapi_nr_dbt_tlv_ve_t;
 
 // Table 3–62 Precoding matrix (PM) PDU (v.222.10.04)
 typedef struct {

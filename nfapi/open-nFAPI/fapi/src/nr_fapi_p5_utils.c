@@ -259,6 +259,22 @@ bool eq_config_request(const nfapi_nr_config_request_scf_t *unpacked_req, const 
 
   EQ_TLV(unpacked_req->measurement_config.rssi_measurement, req->measurement_config.rssi_measurement);
 
+  EQ(unpacked_req->dbt_config.num_dig_beams, req->dbt_config.num_dig_beams);
+
+  EQ(unpacked_req->dbt_config.num_txrus, req->dbt_config.num_txrus);
+
+  for (int i = 0; i < req->dbt_config.num_dig_beams; i++) {
+    const nfapi_nr_dig_beam_t *unpacked_dig_beam = &unpacked_req->dbt_config.dig_beam_list[i];
+    const nfapi_nr_dig_beam_t *req_dig_beam = &req->dbt_config.dig_beam_list[i];
+    EQ(unpacked_dig_beam->beam_idx, req_dig_beam->beam_idx);
+    for (int k = 0; k < req->dbt_config.num_txrus; ++k) {
+      const nfapi_nr_txru_t *unpacked_tx_ru = &unpacked_dig_beam->txru_list[k];
+      const nfapi_nr_txru_t *req_tx_ru = &req_dig_beam->txru_list[k];
+      EQ(unpacked_tx_ru->dig_beam_weight_Re, req_tx_ru->dig_beam_weight_Re);
+      EQ(unpacked_tx_ru->dig_beam_weight_Im, req_tx_ru->dig_beam_weight_Im);
+    }
+  }
+
   EQ(unpacked_req->nfapi_config.p7_vnf_address_ipv4.tl.tag, req->nfapi_config.p7_vnf_address_ipv4.tl.tag);
   for (int i = 0; i < NFAPI_IPV4_ADDRESS_LENGTH; ++i) {
     EQ(unpacked_req->nfapi_config.p7_vnf_address_ipv4.address[i], req->nfapi_config.p7_vnf_address_ipv4.address[i]);
@@ -406,9 +422,7 @@ void free_param_response(nfapi_nr_param_response_scf_t *msg)
 
 void free_config_request(nfapi_nr_config_request_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 
   if (msg->prach_config.num_prach_fd_occasions_list) {
     for (int i = 0; i < msg->prach_config.num_prach_fd_occasions.value; i++) {
@@ -427,9 +441,13 @@ void free_config_request(nfapi_nr_config_request_scf_t *msg)
     free(msg->tdd_table.max_tdd_periodicity_list);
   }
 
-  if (msg->pmi_list.pmi_pdu) {
-    free(msg->pmi_list.pmi_pdu);
+  for (int i = 0; i < msg->dbt_config.num_dig_beams; i++) {
+    free(msg->dbt_config.dig_beam_list[i].txru_list);
   }
+
+  free(msg->dbt_config.dig_beam_list);
+
+  free(msg->pmi_list.pmi_pdu);
 
   if (msg->analog_beamforming_ve.analog_beam_list) {
     free(msg->analog_beamforming_ve.analog_beam_list);
@@ -806,6 +824,22 @@ void copy_config_request(const nfapi_nr_config_request_scf_t *src, nfapi_nr_conf
   }
 
   COPY_TLV(dst->measurement_config.rssi_measurement, src->measurement_config.rssi_measurement);
+
+  dst->dbt_config.num_dig_beams = src->dbt_config.num_dig_beams;
+  dst->dbt_config.num_txrus = src->dbt_config.num_txrus;
+  dst->dbt_config.dig_beam_list = calloc(dst->dbt_config.num_dig_beams, sizeof(*dst->dbt_config.dig_beam_list));
+  for (int i = 0; i < dst->dbt_config.num_dig_beams; i++) {
+    nfapi_nr_dig_beam_t *dst_dig_beam = &dst->dbt_config.dig_beam_list[i];
+    const nfapi_nr_dig_beam_t *src_dig_beam = &src->dbt_config.dig_beam_list[i];
+    dst_dig_beam->beam_idx = src_dig_beam->beam_idx;
+    dst_dig_beam->txru_list = calloc(dst->dbt_config.num_txrus , sizeof(*dst_dig_beam->txru_list ));
+    for (int k = 0; k < dst->dbt_config.num_txrus; ++k) {
+      nfapi_nr_txru_t *dst_tx_ru = &dst_dig_beam->txru_list[k];
+      const nfapi_nr_txru_t *src_tx_ru = &src_dig_beam->txru_list[k];
+      dst_tx_ru->dig_beam_weight_Re = src_tx_ru->dig_beam_weight_Re;
+      dst_tx_ru->dig_beam_weight_Im = src_tx_ru->dig_beam_weight_Im;
+    }
+  }
 
   COPY_TL(dst->nfapi_config.p7_vnf_address_ipv4.tl, src->nfapi_config.p7_vnf_address_ipv4.tl);
   memcpy(dst->nfapi_config.p7_vnf_address_ipv4.address,
