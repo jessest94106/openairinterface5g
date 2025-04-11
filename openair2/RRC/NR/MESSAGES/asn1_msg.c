@@ -1048,7 +1048,7 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
   if (neigh_seq) {
     int mo_id = 2;
     FOR_EACH_SEQ_ARR(nr_neighbour_cell_t *, neigh_cell, neigh_seq) {
-      NR_MeasObjectToAddMod_t *mo_neighbour = get_MeasObject(ft, band, neigh_cell->absoluteFrequencySSB, mo_id);
+      NR_MeasObjectToAddMod_t *mo_neighbour = get_MeasObject(ft,  neigh_cell->band, neigh_cell->absoluteFrequencySSB, mo_id);
       NR_MeasObjectNR_t *monr = mo_neighbour->measObject.choice.measObjectNR;
       monr->cellsToAddModList = calloc_or_fail(1, sizeof(*monr->cellsToAddModList));
       NR_CellsToAddMod_t *cell = calloc_or_fail(1, sizeof(*cell));

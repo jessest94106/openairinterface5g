@@ -308,6 +308,7 @@ typedef enum {
 #define GNB_CONFIG_STRING_NEIGHBOUR_CELL_PHYSICAL_ID "physical_cellId"
 #define GNB_CONFIG_STRING_NEIGHBOUR_CELL_ABS_FREQ_SSB "absoluteFrequencySSB"
 #define GNB_CONFIG_STRING_NEIGHBOUR_CELL_SCS "subcarrierSpacing"
+#define GNB_CONFIG_STRING_NEIGHBOUR_CELL_BAND "band"
 #define GNB_CONFIG_STRING_NEIGHBOUR_TRACKING_ARE_CODE "tracking_area_code"
 #define GNB_CONFIG_STRING_NEIGHBOUR_PLMN "plmn"
 
@@ -316,7 +317,8 @@ typedef enum {
 #define GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX 2
 #define GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX 3
 #define GNB_CONFIG_N_CELL_SCS_IDX 4
-#define GNB_CONFIG_N_CELL_TAC_IDX 5
+#define GNB_CONFIG_N_CELL_BAND_IDX 5
+#define GNB_CONFIG_N_CELL_TAC_IDX 6
 // clang-format off
 #define GNBNEIGHBOURCELLPARAMS_DESC {                                                                  \
 /*   optname                                                  helpstr                                 paramflags                    XXXptr     def val          type    numelt */ \
@@ -325,6 +327,7 @@ typedef enum {
   {GNB_CONFIG_STRING_NEIGHBOUR_CELL_PHYSICAL_ID,            "neighbour cell physical id",            PARAMFLAG_MANDATORY,           .uptr=NULL,   .defuintval=0,                TYPE_UINT,      0},    \
   {GNB_CONFIG_STRING_NEIGHBOUR_CELL_ABS_FREQ_SSB,           "neighbour cell abs freq ssb",           PARAMFLAG_MANDATORY,           .i64ptr=NULL, .defint64val=0,               TYPE_INT64,     0},    \
   {GNB_CONFIG_STRING_NEIGHBOUR_CELL_SCS,                    "neighbour cell scs",                    PARAMFLAG_MANDATORY,           .uptr=NULL,   .defuintval=0,                TYPE_UINT,      0},    \
+  {GNB_CONFIG_STRING_NEIGHBOUR_CELL_BAND,                   "neighbour cell band",                   PARAMFLAG_MANDATORY,           .uptr=NULL,   .defuintval=78,               TYPE_UINT,      0},    \
   {GNB_CONFIG_STRING_NEIGHBOUR_TRACKING_ARE_CODE,           "neighbour cell tracking area",          PARAMFLAG_MANDATORY,           .uptr=NULL,   .defuintval=0,                TYPE_UINT,      0},    \
 }
 // clang-format on
