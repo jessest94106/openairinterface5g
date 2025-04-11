@@ -221,6 +221,21 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
   FILL_TLV(nfapi_resp->nfapi_config.p7_vnf_port, NFAPI_NR_NFAPI_P7_VNF_PORT_TAG, rand16());
   nfapi_resp->num_tlv++;
 
+  nfapi_resp->nfapi_config.p7_pnf_address_ipv4.tl.tag = NFAPI_NR_NFAPI_P7_PNF_ADDRESS_IPV4_TAG;
+  for (int i = 0; i < NFAPI_IPV4_ADDRESS_LENGTH; ++i) {
+    nfapi_resp->nfapi_config.p7_pnf_address_ipv4.address[i] = rand8();
+  }
+  nfapi_resp->num_tlv++;
+
+  nfapi_resp->nfapi_config.p7_pnf_address_ipv6.tl.tag = NFAPI_NR_NFAPI_P7_PNF_ADDRESS_IPV6_TAG;
+  for (int i = 0; i < NFAPI_IPV6_ADDRESS_LENGTH; ++i) {
+    nfapi_resp->nfapi_config.p7_pnf_address_ipv6.address[i] = rand8();
+  }
+  nfapi_resp->num_tlv++;
+
+  FILL_TLV(nfapi_resp->nfapi_config.p7_pnf_port, NFAPI_NR_NFAPI_P7_PNF_PORT_TAG, rand16());
+  nfapi_resp->num_tlv++;
+
   FILL_TLV(nfapi_resp->nfapi_config.timing_window, NFAPI_NR_NFAPI_TIMING_WINDOW_TAG, rand8());
   nfapi_resp->num_tlv++;
 

@@ -1111,10 +1111,227 @@ void dump_param_response(const nfapi_nr_param_response_scf_t *msg)
 void dump_config_request(const nfapi_nr_config_request_scf_t *msg)
 {
   int depth = 0;
-  dump_p5_message_header(&msg->header,depth);
+  dump_p5_message_header(&msg->header, depth);
   depth++;
   INDENTED_PRINTF("Number of TLVs = 0x%02x\n", msg->num_tlv);
   /* dump all TLVs from each table */
+  /* Carrier Config */
+  const nfapi_nr_carrier_config_t *carrier_config = &msg->carrier_config;
+  INDENTED_TLV_PRINT("DL Bandwidth", carrier_config->dl_bandwidth);
+  INDENTED_TLV_PRINT("DL Frequency", carrier_config->dl_frequency);
+  INDENTED_PRINTF("(0x%04x) DL K0 = ", NFAPI_NR_CONFIG_DL_K0_TAG);
+  for (int i = 0; i < 5; i++) {
+    printf("%d ", carrier_config->dl_k0[i].value);
+  }
+  printf("\n");
+  INDENTED_PRINTF("(0x%04x) DL Grid Size = ", NFAPI_NR_CONFIG_DL_GRID_SIZE_TAG);
+  for (int i = 0; i < 5; i++) {
+    printf("%d ", carrier_config->dl_grid_size[i].value);
+  }
+  printf("\n");
+  INDENTED_TLV_PRINT("Num TX Antennas", carrier_config->num_tx_ant);
+  INDENTED_TLV_PRINT("UL Bandwidth", carrier_config->uplink_bandwidth);
+  INDENTED_TLV_PRINT("UL Frequency", carrier_config->uplink_frequency);
+  INDENTED_PRINTF("(0x%04x) UL K0 = ", NFAPI_NR_CONFIG_UL_K0_TAG);
+  for (int i = 0; i < 5; i++) {
+    printf("%d ", carrier_config->ul_k0[i].value);
+  }
+  printf("\n");
+  INDENTED_PRINTF("(0x%04x) UL Grid Size = ", NFAPI_NR_CONFIG_UL_GRID_SIZE_TAG);
+  for (int i = 0; i < 5; i++) {
+    printf("%d ", carrier_config->ul_grid_size[i].value);
+  }
+  printf("\n");
+  INDENTED_TLV_PRINT("Num RX Antennas", carrier_config->num_rx_ant);
+  INDENTED_TLV_PRINT("Frequency Shift 7p5KHz", carrier_config->frequency_shift_7p5khz);
+  /* Cell Config */
+  const nfapi_nr_cell_config_t *cell_config = &msg->cell_config;
+  INDENTED_TLV_PRINT("Physical Cell ID", cell_config->phy_cell_id);
+  INDENTED_TLV_PRINT("Frame Duplex Type", cell_config->frame_duplex_type);
+  /* SSB Config */
+  const nfapi_nr_ssb_config_t *ssb_config = &msg->ssb_config;
+  INDENTED_TLV_PRINT("SSB Block Power", ssb_config->ss_pbch_power);
+  INDENTED_TLV_PRINT("BCH Payload", ssb_config->bch_payload);
+  INDENTED_TLV_PRINT("SCS Common", ssb_config->scs_common);
+  /* PRACH Config */
+  const nfapi_nr_prach_config_t *prach_config = &msg->prach_config;
+  INDENTED_TLV_PRINT("PRACH Sequence Length", prach_config->prach_sequence_length);
+  INDENTED_TLV_PRINT("PRACH Subcarrier Spacing", prach_config->prach_sub_c_spacing);
+  INDENTED_TLV_PRINT("Restricted Set Config", prach_config->restricted_set_config);
+  INDENTED_TLV_PRINT("Num PRACH FD Occasions", prach_config->num_prach_fd_occasions);
+  INDENTED_TLV_PRINT("PRACH Config Index", prach_config->prach_ConfigurationIndex);
+  depth++;
+  for (int i = 0; i < prach_config->num_prach_fd_occasions.value; i++) {
+    const nfapi_nr_num_prach_fd_occasions_t *prach_fd_occasion = &(prach_config->num_prach_fd_occasions_list[i]);
+    INDENTED_TLV_PRINT("PRACH Root Sequence Index", prach_fd_occasion->prach_root_sequence_index);
+    INDENTED_TLV_PRINT("Num Root Sequences", prach_fd_occasion->num_root_sequences);
+    INDENTED_TLV_PRINT("K1", prach_fd_occasion->k1);
+    INDENTED_TLV_PRINT("PRACH Zero CorrelationZone Config", prach_fd_occasion->prach_zero_corr_conf);
+    INDENTED_TLV_PRINT("Num Unused Root Sequences", prach_fd_occasion->num_unused_root_sequences);
+    depth++;
+    for (int k = 0; k < prach_fd_occasion->num_unused_root_sequences.value; k++) {
+      INDENTED_TLV_PRINT("Unused Root Sequence", prach_fd_occasion->unused_root_sequences_list[k]);
+    }
+    depth--;
+  }
+  depth--;
+  INDENTED_TLV_PRINT("SSB Per RACH", prach_config->ssb_per_rach);
+  INDENTED_TLV_PRINT("PRACH Multiple Carriers in a Band", prach_config->prach_multiple_carriers_in_a_band);
+  /* SSB Table */
+  const nfapi_nr_ssb_table_t *ssb_table = &msg->ssb_table;
+  INDENTED_TLV_PRINT("SSB Offset PointA", ssb_table->ssb_offset_point_a);
+  INDENTED_TLV_PRINT("Beta PSS", ssb_table->beta_pss);
+  INDENTED_TLV_PRINT("SSB Period", ssb_table->ssb_period);
+  INDENTED_TLV_PRINT("SSB Subcarrier Offset", ssb_table->ssb_subcarrier_offset);
+  INDENTED_TLV_PRINT("MIB", ssb_table->MIB);
+
+  INDENTED_PRINTF("SSB Mask:\n");
+  depth++;
+  for (int i = 0; i < 2; i++) {
+    INDENTED_TLV_PRINT("SSB Mask", ssb_table->ssb_mask_list[i].ssb_mask);
+  }
+  depth--;
+  INDENTED_PRINTF("Beam ID:\n");
+  depth++;
+  for (int i = 0; i < 64; i++) {
+    INDENTED_TLV_PRINT("Beam ID", ssb_table->ssb_beam_id_list[i].beam_id);
+  }
+  depth--;
+  INDENTED_TLV_PRINT("ssPBCH Multiple Carriers in a Band", ssb_table->ss_pbch_multiple_carriers_in_a_band);
+  INDENTED_TLV_PRINT("Multiple Cells ssPBCH in a Carrier", ssb_table->multiple_cells_ss_pbch_in_a_carrier);
+  /* TDD Table */
+  const nfapi_nr_tdd_table_t *tdd_table = &msg->tdd_table;
+  if (cell_config->frame_duplex_type.value == 1 /* TDD */) {
+    INDENTED_TLV_PRINT("TDD Period", tdd_table->tdd_period);
+    const uint8_t slotsperframe[5] = {10, 20, 40, 80, 160};
+    // Assuming always CP_Normal, because Cyclic prefix is not included in CONFIG.request 10.02, but is present in 10.04
+    uint8_t cyclicprefix = 1;
+    // 3GPP 38.211 Table 4.3.2.1 & Table 4.3.2.2
+    uint8_t number_of_symbols_per_slot = cyclicprefix ? 14 : 12;
+    INDENTED_PRINTF("Slot Config:\n");
+    depth++;
+    for (int i = 0; i < slotsperframe[ssb_config->scs_common.value]; i++) {
+      for (int k = 0; k < number_of_symbols_per_slot; k++) {
+        const uint8_t slot_type = tdd_table->max_tdd_periodicity_list[i].max_num_of_symbol_per_slot_list[k].slot_config.value;
+        const char *slot_dir = slot_type == 0 ? "DL" : slot_type == 1 ? "UL" : "S";
+        INDENTED_GENERIC_PRINT("(0x%04x) Slot Config",
+                               "%d (%s)",
+                               tdd_table->max_tdd_periodicity_list[i].max_num_of_symbol_per_slot_list[k].slot_config.tl.tag,
+                               slot_type,
+                               slot_dir);
+      }
+    }
+    depth--;
+  }
+  /* Measurement Config */
+  const nfapi_nr_measurement_config_t *measurement_config = &msg->measurement_config;
+  INDENTED_TLV_PRINT("RSSI Measurement", measurement_config->rssi_measurement);
+  /* Beamforming Table */
+  const nfapi_nr_dbt_pdu_t *dbt_config = &msg->dbt_config;
+  INDENTED_PRINTF("Digital Beam Table\n");
+  depth++;
+  INDENTED_GENERIC_PRINT("Num Digital Beams", "%d", dbt_config->num_dig_beams);
+  INDENTED_GENERIC_PRINT("Num TX RUs", "%d", dbt_config->num_txrus);
+  depth++;
+  for (int i = 0; i < dbt_config->num_dig_beams; i++) {
+    const nfapi_nr_dig_beam_t *dig_beam = &dbt_config->dig_beam_list[i];
+    INDENTED_GENERIC_PRINT("Beam IDX", "%d", dig_beam->beam_idx);
+    depth++;
+    for (int k = 0; k < dbt_config->num_txrus; k++) {
+      const nfapi_nr_txru_t *tx_ru = &dig_beam->txru_list[k];
+      INDENTED_GENERIC_PRINT("Dig Beam Weight Real", "0x%02x", tx_ru->dig_beam_weight_Re);
+      INDENTED_GENERIC_PRINT("Dig Beam Weight Imaginary", "0x%02x", tx_ru->dig_beam_weight_Im);
+    }
+    depth--;
+  }
+  depth--;
+  depth--;
+
+  /* Precoding Table */
+  const nfapi_nr_pm_list_t *pmi_list = &msg->pmi_list;
+  INDENTED_PRINTF("Precoding Matrix Table\n");
+  depth++;
+  INDENTED_GENERIC_PRINT("Num Precoding Tables", "%d", pmi_list->num_pm_idx);
+  depth++;
+  for (int i = 0; i < pmi_list->num_pm_idx; i++) {
+    const nfapi_nr_pm_pdu_t *pm_pdu = &pmi_list->pmi_pdu[i];
+
+    INDENTED_GENERIC_PRINT("Precoding Matrix IDX", "0x%02x", pm_pdu->pm_idx);
+    INDENTED_GENERIC_PRINT("Number of Layers", "%d", pm_pdu->numLayers);
+    INDENTED_GENERIC_PRINT("Number of Antenna Ports", "%d", pm_pdu->num_ant_ports);
+    depth++;
+    for (int k = 0; k < pm_pdu->numLayers; k++) {
+      for (int l = 0; l < pm_pdu->num_ant_ports; l++) {
+        const nfapi_nr_pm_weights_t *pm_weights = &pm_pdu->weights[k][l];
+        INDENTED_GENERIC_PRINT("Dig Beam Weight Real", "0x%02x", pm_weights->precoder_weight_Re);
+        INDENTED_GENERIC_PRINT("Dig Beam Weight Imaginary", "0x%02x", pm_weights->precoder_weight_Im);
+      }
+    }
+    depth--;
+  }
+  depth--;
+  depth--;
+  /* nFAPI Config */
+  const nfapi_nr_nfapi_t *nfapi_config = &msg->nfapi_config;
+  if (nfapi_config->p7_vnf_address_ipv4.tl.tag) {
+    char ip_str[INET_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 VNF Address IPv4",
+                           "%s",
+                           nfapi_config->p7_vnf_address_ipv4.tl.tag,
+                           inet_ntop(AF_INET, nfapi_config->p7_vnf_address_ipv4.address, ip_str, sizeof(ip_str)));
+  }
+  if (nfapi_config->p7_vnf_address_ipv6.tl.tag) {
+    char addr6[INET6_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 VNF Address IPv6",
+                           "%s",
+                           nfapi_config->p7_vnf_address_ipv6.tl.tag,
+                           inet_ntop(AF_INET6, nfapi_config->p7_vnf_address_ipv6.address, addr6, sizeof(addr6)));
+  }
+  INDENTED_TLV_FORMAT_PRINT("P7 VNF Port", "%d", nfapi_config->p7_vnf_port);
+
+  if (nfapi_config->p7_pnf_address_ipv4.tl.tag) {
+    char ip_str[INET_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 PNF Address IPv4",
+                           "%s",
+                           nfapi_config->p7_pnf_address_ipv4.tl.tag,
+                           inet_ntop(AF_INET, nfapi_config->p7_pnf_address_ipv4.address, ip_str, sizeof(ip_str)));
+  }
+  if (nfapi_config->p7_pnf_address_ipv6.tl.tag) {
+    char addr6[INET6_ADDRSTRLEN];
+    INDENTED_GENERIC_PRINT("(0x%04x) P7 PNF Address IPv6",
+                           "%s",
+                           nfapi_config->p7_pnf_address_ipv6.tl.tag,
+                           inet_ntop(AF_INET6, nfapi_config->p7_pnf_address_ipv6.address, addr6, sizeof(addr6)));
+  }
+  INDENTED_TLV_FORMAT_PRINT("P7 PNF Port", "%d", nfapi_config->p7_pnf_port);
+  INDENTED_TLV_FORMAT_PRINT("Timing Window", "%d", nfapi_config->timing_window);
+  INDENTED_TLV_FORMAT_PRINT("Timing Info Mode", "%d", nfapi_config->timing_info_mode);
+  INDENTED_TLV_FORMAT_PRINT("Timing Info Period", "%d", nfapi_config->timing_info_period);
+  INDENTED_TLV_FORMAT_PRINT("DL_TTI Timing Offset", "%d", nfapi_config->dl_tti_timing_offset);
+  INDENTED_TLV_FORMAT_PRINT("UL_TTI Timing Offset", "%d", nfapi_config->ul_tti_timing_offset);
+  INDENTED_TLV_FORMAT_PRINT("UL_DCI Timing Offset", "%d", nfapi_config->ul_dci_timing_offset);
+  INDENTED_TLV_FORMAT_PRINT("TX_DATA Timing Offset", "%d", nfapi_config->tx_data_timing_offset);
+  /* Beamforming VE */
+  const nfapi_nr_analog_beamforming_ve_t *analog_beamforming_ve = &msg->analog_beamforming_ve;
+  INDENTED_TLV_FORMAT_PRINT("Num Beams per Period", "%d", analog_beamforming_ve->num_beams_period_vendor_ext);
+  INDENTED_TLV_PRINT("Analog Beamforming VE", analog_beamforming_ve->analog_bf_vendor_ext);
+  /* Vendor Extension */
+  if (msg->vendor_extension) {
+    const nfapi_tl_t *vendor_extension = (nfapi_tl_t *)&msg->vendor_extension;
+    switch (vendor_extension->tag) {
+      case VENDOR_EXT_TLV_1_TAG: {
+        vendor_ext_tlv_1 *ve = (vendor_ext_tlv_1 *)vendor_extension;
+        INDENTED_PRINTF("(0x%04x) Vendor extension = %d 0x%02x\n", ve->tl.tag, ve->tl.length, ve->dummy);
+      } break;
+      case VENDOR_EXT_TLV_2_TAG: {
+        vendor_ext_tlv_2 *ve = (vendor_ext_tlv_2 *)vendor_extension;
+        INDENTED_PRINTF("(0x%04x) Vendor extension = %d 0x%02x\n", ve->tl.tag, ve->tl.length, ve->dummy);
+      } break;
+      default:
+        break;
+    }
+  }
+
   depth--;
 }
 
