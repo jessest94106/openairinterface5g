@@ -2181,7 +2181,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
     UE->ho_context->target->new_rnti = *resp->crnti;
 
-    uint8_t xid = rrc_gNB_get_next_transaction_identifier(0);
+    uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
     UE->xids[xid] = RRC_DEDICATED_RECONF;
     uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
     int size = rrc_gNB_encode_RRCReconfiguration(rrc, UE, xid, NULL, buffer, sizeof(buffer), true);
