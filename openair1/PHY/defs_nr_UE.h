@@ -460,6 +460,11 @@ typedef struct PHY_VARS_NR_UE_s {
   int64_t max_pos_iir; /// Timing offset IIR filter
   int max_pos_acc; /// Timing offset accumuluated error for PI filter
 
+  double initial_fo; /// initial frequency offset provided by the user
+  int cont_fo_comp; /// flag enabling the continuous frequency offset estimation and compensation
+  double freq_offset; /// currently compensated frequency offset
+  double freq_off_acc; /// accumulated frequency error (for PI controller)
+
   /// Timing Advance updates variables
   /// Timing advance update computed from the TA command signalled from gNB
   int timing_advance;
@@ -525,10 +530,6 @@ typedef struct {
   int gNB_id;
   /// NR slot index within frame_tx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_tx;
-  /// NR slot index tx offset to resume
-  /// in case of NTN, tx_offset can be changed dynamically via SIB19
-  /// we need to notify the right tx thread slot based on TX offset change
-  int nr_slot_tx_offset;
   int rx_slot_type;
   /// NR slot index within frame_rx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_rx;

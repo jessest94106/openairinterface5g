@@ -41,6 +41,7 @@
 #include "instrumentation.h"
 #include "common/utils/threadPool/notified_fifo.h"
 #include "position_interface.h"
+#include "nr_phy_common.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -438,9 +439,13 @@ static void UE_synch(void *arg) {
         ((ret.rx_offset << 1) / fp->samples_per_subframe * fp->slots_per_subframe)
         + round((float)((ret.rx_offset << 1) % fp->samples_per_subframe) / fp->samples_per_slot0);
 
-    // rerun with new cell parameters and frequency-offset
-    // todo: the freq_offset computed on DL shall be scaled before being applied to UL
-    nr_rf_card_config_freq(cfg0, ul_carrier, dl_carrier, freq_offset);
+    if (get_nrUE_params()->cont_fo_comp) {
+      UE->freq_offset = freq_offset;
+    } else {
+      // rerun with new cell parameters and frequency-offset
+      nr_rf_card_config_freq(cfg0, ul_carrier, dl_carrier, freq_offset);
+      UE->rfdevice.trx_set_freq_func(&UE->rfdevice, cfg0);
+    }
 
     if (get_nrUE_params()->agc) {
       nr_ue_adjust_rx_gain(UE, cfg0, UE->adjust_rxgain);
@@ -454,7 +459,6 @@ static void UE_synch(void *arg) {
           cfg0->rx_freq[0],
           cfg0->tx_freq[0]);
 
-    UE->rfdevice.trx_set_freq_func(&UE->rfdevice, cfg0);
     UE->is_synchronized = 1;
   } else {
     int gain_change = 0;
@@ -551,6 +555,15 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action)
 
     writeTimestamp += dummyBlockSize;
     writeBlockSize -= dummyBlockSize;
+  }
+
+  // pre-compensate UL frequency offset
+  if (flags != TX_BURST_INVALID && get_nrUE_params()->cont_fo_comp) {
+    double ul_freq_offset = -UE->freq_offset * ((double)fp->ul_CarrierFreq / (double)fp->dl_CarrierFreq);
+    if (get_nrUE_params()->cont_fo_comp == 2) // different from LO frequency error compensation, Doppler UL pre-compensation has to be negative
+      ul_freq_offset = -ul_freq_offset;
+    for (int i = 0; i < fp->nb_antennas_tx; i++)
+      nr_fo_compensation(ul_freq_offset, fp->samples_per_subframe, writeTimestamp, txp[i], writeBlockSize);
   }
 
   int tmp = openair0_write_reorder(&UE->rfdevice, writeTimestamp, txp, writeBlockSize, fp->nb_antennas_tx, flags);
@@ -868,13 +881,12 @@ static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
 static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
                                     NR_DL_FRAME_PARMS *fp,
                                     int slot_nr,
-                                    bool *update_ntn_system_information,
                                     int *duration_rx_to_tx,
                                     int *timing_advance,
                                     int *ntn_koffset)
 {
-  if (*update_ntn_system_information) {
-    *update_ntn_system_information = false;
+  if (UE->ntn_config_message->update) {
+    UE->ntn_config_message->update = false;
 
     double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
     UE->timing_advance = fp->samples_per_subframe * total_ta_ms;
@@ -920,6 +932,8 @@ void *UE_thread(void *arg)
   if (usrp_tx_thread == 1)
     UE->rfdevice.trx_write_init(&UE->rfdevice);
 
+  InitSinLUT();
+
   notifiedFIFO_t nf;
   initNotifiedFIFO(&nf);
 
@@ -954,13 +968,9 @@ void *UE_thread(void *arg)
 
   double ntn_init_time_drift = get_nrUE_params()->ntn_init_time_drift;
   int ntn_koffset = 0;
-
   int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
-  int nr_slot_tx_offset = 0;
-  bool update_ntn_system_information = false;
 
   while (!oai_exit) {
-    nr_slot_tx_offset = 0;
     if (syncRunning) {
       notifiedFIFO_elt_t *res = pollNotifiedFIFO(&nf);
 
@@ -1085,12 +1095,6 @@ void *UE_thread(void *arg)
     absolute_slot++;
     TracyCFrameMark;
 
-    if (UE->ntn_config_message->update) {
-      UE->ntn_config_message->update = false;
-      update_ntn_system_information = true;
-      nr_slot_tx_offset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset << fp->numerology_index;
-    }
-
     int slot_nr = absolute_slot % nb_slot_frame;
     nr_rxtx_thread_data_t curMsg = {0};
     curMsg.UE=UE;
@@ -1180,8 +1184,8 @@ void *UE_thread(void *arg)
       shiftForNextFrame = ret;
     pushNotifiedFIFO(&UE->dl_actors[curMsg.proc.nr_slot_rx % NUM_DL_ACTORS].fifo, newRx);
 
-    // apply new duration next run to avoid thread dead lock
-    apply_ntn_config(UE, fp, slot_nr, &update_ntn_system_information, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
+    // apply new NTN timing information
+    apply_ntn_config(UE, fp, slot_nr, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
 
     // Start TX slot processing here. It runs in parallel with RX slot processing
     // in current code, DURATION_RX_TO_TX constant is the limit to get UL data to encode from a RX slot
@@ -1192,7 +1196,7 @@ void *UE_thread(void *arg)
     curMsgTx->writeBlockSize = writeBlockSize;
     curMsgTx->proc.timestamp_tx = writeTimestamp;
     curMsgTx->UE = UE;
-    curMsgTx->proc.nr_slot_tx_offset = nr_slot_tx_offset;
+
     int slot = curMsgTx->proc.nr_slot_tx;
     int slot_and_frame = slot + curMsgTx->proc.frame_tx * UE->frame_parms.slots_per_frame;
     int next_tx_slot_and_frame = absolute_slot + duration_rx_to_tx + 1;

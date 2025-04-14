@@ -139,6 +139,8 @@ typedef struct {
   float Doppler_phase_inc;
   /// current Doppler phase of each RX antenna (for continuous phase from one block to the next)
   float *Doppler_phase_cur;
+  /// flag indicating if channel direction is UL or DL
+  bool is_uplink;
 } channel_desc_t;
 
 typedef struct {
@@ -358,12 +360,20 @@ void free_channel_desc_scm(channel_desc_t *ch);
 \param module_id identifies the channel model. should be define as a macro in simu.h
 */
 void set_channeldesc_owner(channel_desc_t *cdesc, channelmod_moduleid_t module_id);
+
 /**
 \brief This function set a model name to a model descriptor, can be later used to identify a allocated channel model
 \param cdesc points to the model descriptor
 \param modelname is the C string to use as model name for the channel pointed by cdesc
 */
 void set_channeldesc_name(channel_desc_t *cdesc,char *modelname);
+
+/**
+\brief This function set a channel model direction to either uplink or downlink
+\param cdesc points to the model descriptor
+\param is_uplink indicates if this channel is applied in uplink (not downlink) direction
+*/
+void set_channeldesc_direction(channel_desc_t *cdesc, bool is_uplink);
 
 /** \fn void get_cexp_doppler(struct complexd *cexp_doppler, channel_desc_t *chan_desc, const uint32_t length)
 \brief This routine generates the complex exponential to apply the Doppler shift
@@ -378,32 +388,6 @@ void get_cexp_doppler(struct complexd *cexp_doppler, channel_desc_t *chan_desc, 
 \param desc Pointer to the channel descriptor
 */
 int random_channel(channel_desc_t *desc, uint8_t abstraction_flag);
-
-/**
-\brief Add AWGN noise and phase noise if enabled
-\param rxdata output data with noise
-\param r_re real part of input data without noise
-\param r_im imaginary part of input data without noise
-\param sigma noise power
-\param length number of samples to apply the noise
-\param slot_offset slot offset to start applying the noise
-\param ts sampling time
-\param delay introduce delay in terms of number of samples
-\param pdu_bit_map bitmap indicating presence of optional PDUs
-\param ptrs_bit_map
-\param nb_antennas_rx number of receive antennas
-*/
-void add_noise(c16_t **rxdata,
-               const double **r_re,
-               const double **r_im,
-               const double sigma,
-               const int length,
-               const int slot_offset,
-               const double ts,
-               const int delay,
-               const uint16_t pdu_bit_map,
-               const uint16_t ptrs_bit_map,
-               const uint8_t nb_antennas_rx);
 
 /**\fn void multipath_channel(channel_desc_t *desc,
            double tx_sig_re[NB_ANTENNAS_TX],
@@ -570,16 +554,38 @@ double N_RB2sampling_rate(uint16_t N_RB);
 double N_RB2channel_bandwidth(uint16_t N_RB);
 
 /* Linear phase noise model */
-/*!
+/**
   \brief This function produce phase noise and add to input signal
-  \param ts Sampling time 
+  \param ts Sampling time
   \param *Re *Im Real and Imag part of the signal
 */
-//look-up table for the sine (cosine) function
-#define ResolSinCos 100
-void InitSinLUT( void );
-void phase_noise(double ts, int16_t * InRe, int16_t * InIm);
+void phase_noise(double ts, int16_t *InRe, int16_t *InIm);
 
+/**
+\brief Add AWGN noise and phase noise if enabled
+\param rxdata output data with noise
+\param r_re real part of input data without noise
+\param r_im imaginary part of input data without noise
+\param sigma noise power
+\param length number of samples to apply the noise
+\param slot_offset slot offset to start applying the noise
+\param ts sampling time
+\param delay introduce delay in terms of number of samples
+\param pdu_bit_map bitmap indicating presence of optional PDUs
+\param ptrs_bit_map
+\param nb_antennas_rx number of receive antennas
+*/
+void add_noise(c16_t **rxdata,
+               const double **r_re,
+               const double **r_im,
+               const double sigma,
+               const int length,
+               const int slot_offset,
+               const double ts,
+               const int delay,
+               const uint16_t pdu_bit_map,
+               const uint16_t ptrs_bit_map,
+               const uint8_t nb_antennas_rx);
 
 void do_DL_sig(sim_t *sim,
                uint16_t subframe,
