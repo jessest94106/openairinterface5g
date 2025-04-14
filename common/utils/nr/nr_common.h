@@ -38,6 +38,7 @@
 #include "assertions.h"
 #include "common/utils/utils.h"
 
+#define MAX_SI_GROUPS 3
 #define NR_MAX_PDSCH_TBS 3824
 #define MAX_NUM_BEAM_PERIODS 4
 #define MAX_BWP_SIZE 275
@@ -92,6 +93,12 @@ static inline const char *rnti_types(nr_rnti_type_t rr)
 // calcualted. Signal energy is calculated using RMS^2, where each sample is squared before taking the average of the sum, therefore
 // the total shift is 2 * 15, in dB scale thats 10log10(2^(15*2))
 #define SQ15_SQUARED_NORM_FACTOR_DB 90.3089986992
+
+typedef struct {
+  uint8_t *SIB_buffer;
+  int SIB_size;
+  int SIB_type;
+} nr_SIBs_t;
 
 typedef struct nr_bandentry_s {
   int16_t band;
