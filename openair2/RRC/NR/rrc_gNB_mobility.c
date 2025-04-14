@@ -181,6 +181,19 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
   srbs[0].id = 1;
   srbs[1].id = 2;
 
+  free_MeasConfig(ue->measConfig);
+  ue->measConfig = nr_rrc_get_measconfig(rrc, target_du->setup_req->cell[0].info.nr_cellid);
+  byte_array_t *meas_config = calloc_or_fail(1, sizeof(*meas_config));
+  meas_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
+  meas_config->len = do_NR_MeasConfig(ue->measConfig, meas_config->buf, NR_RRC_BUF_SIZE);
+
+  byte_array_t *meas_timing_config = NULL;
+  if (target_du->mtc) {
+    meas_timing_config = calloc_or_fail(1, sizeof(*meas_timing_config));
+    meas_timing_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
+    meas_timing_config->len = do_NR_MeasurementTimingConfiguration(target_du->mtc, meas_timing_config->buf, NR_RRC_BUF_SIZE);
+  }
+
   byte_array_t *hpi = malloc_or_fail(sizeof(*hpi));
   *hpi = copy_byte_array(*ho_prep_info);
 
@@ -201,6 +214,8 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
       .drbs_len = nb_drb,
       .drbs = drbs,
       .cu_to_du_rrc_info.ho_prep_info = hpi,
+      .cu_to_du_rrc_info.meas_config = meas_config,
+      .cu_to_du_rrc_info.meas_timing_config = meas_timing_config,
       .gnb_du_ue_agg_mbr_ul = ue_agg_mbr,
   };
   rrc->mac_rrc.ue_context_setup_request(target_du->assoc_id, &ue_context_setup_req);
