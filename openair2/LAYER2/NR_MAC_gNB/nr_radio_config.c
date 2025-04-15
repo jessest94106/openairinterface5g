@@ -40,6 +40,7 @@
 #include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair3/UTILS/conversions.h"
+#include "LAYER2/nr_rlc/nr_rlc_asn1_utils.h"
 
 #include "NR_MeasurementTimingConfiguration.h"
 #include "uper_decoder.h"
@@ -3338,7 +3339,10 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   return SpCellConfig;
 }
 
-NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, long bucketSizeDuration)
+NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId,
+                                                long priority,
+                                                long bucketSizeDuration,
+                                                const nr_rlc_configuration_t *default_rlc_config)
 {
   NR_RLC_BearerConfig_t *rlc_BearerConfig = NULL;
   rlc_BearerConfig                                                 = calloc(1, sizeof(NR_RLC_BearerConfig_t));
@@ -3352,15 +3356,15 @@ NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, l
   rlc_Config->present                                              = NR_RLC_Config_PR_am;
   rlc_Config->choice.am                                            = calloc(1, sizeof(*rlc_Config->choice.am));
   rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength                  = calloc(1, sizeof(NR_SN_FieldLengthAM_t));
-  *(rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength)               = NR_SN_FieldLengthAM_size12;
-  rlc_Config->choice.am->dl_AM_RLC.t_Reassembly                    = NR_T_Reassembly_ms35;
-  rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit                = NR_T_StatusProhibit_ms0;
+  *(rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength)               = encode_sn_field_length_am(default_rlc_config->srb.sn_field_length);
+  rlc_Config->choice.am->dl_AM_RLC.t_Reassembly                    = encode_t_reassembly(default_rlc_config->srb.t_reassembly);
+  rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit                = encode_t_status_prohibit(default_rlc_config->srb.t_status_prohibit);
   rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength                  = calloc(1, sizeof(NR_SN_FieldLengthAM_t));
-  *(rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength)               = NR_SN_FieldLengthAM_size12;
-  rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit                = NR_T_PollRetransmit_ms45;
-  rlc_Config->choice.am->ul_AM_RLC.pollPDU                         = NR_PollPDU_infinity;
-  rlc_Config->choice.am->ul_AM_RLC.pollByte                        = NR_PollByte_infinity;
-  rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold                = NR_UL_AM_RLC__maxRetxThreshold_t8;
+  *(rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength)               = encode_sn_field_length_am(default_rlc_config->srb.sn_field_length);
+  rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit                = encode_t_poll_retransmit(default_rlc_config->srb.t_poll_retransmit);
+  rlc_Config->choice.am->ul_AM_RLC.pollPDU                         = encode_poll_pdu(default_rlc_config->srb.poll_pdu);
+  rlc_Config->choice.am->ul_AM_RLC.pollByte                        = encode_poll_byte(default_rlc_config->srb.poll_byte);
+  rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold                = encode_max_retx_threshold(default_rlc_config->srb.max_retx_threshold);
   rlc_BearerConfig->rlc_Config                                     = rlc_Config;
 
   NR_LogicalChannelConfig_t *logicalChannelConfig                  = calloc(1, sizeof(NR_LogicalChannelConfig_t));
@@ -3381,7 +3385,9 @@ NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, l
   return rlc_BearerConfig;
 }
 
-static void nr_drb_config(struct NR_RLC_Config *rlc_Config, NR_RLC_Config_PR rlc_config_pr)
+static void nr_drb_config(struct NR_RLC_Config *rlc_Config,
+                          NR_RLC_Config_PR rlc_config_pr,
+                          const nr_rlc_configuration_t *default_rlc_config)
 {
   switch (rlc_config_pr) {
     case NR_RLC_Config_PR_um_Bi_Directional:
@@ -3390,25 +3396,25 @@ static void nr_drb_config(struct NR_RLC_Config *rlc_Config, NR_RLC_Config_PR rlc
       rlc_Config->choice.um_Bi_Directional = calloc(1, sizeof(*rlc_Config->choice.um_Bi_Directional));
       rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength =
           calloc(1, sizeof(*rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength));
-      *rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength = NR_SN_FieldLengthUM_size12;
+      *rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength = encode_sn_field_length_um(default_rlc_config->drb_um.sn_field_length);
       rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength =
           calloc(1, sizeof(*rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength));
-      *rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength = NR_SN_FieldLengthUM_size12;
-      rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.t_Reassembly = NR_T_Reassembly_ms15;
+      *rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength = encode_sn_field_length_um(default_rlc_config->drb_um.sn_field_length);
+      rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.t_Reassembly = encode_t_reassembly(default_rlc_config->drb_um.t_reassembly);
       break;
     case NR_RLC_Config_PR_am:
       // RLC AM Bearer configuration
       rlc_Config->choice.am = calloc(1, sizeof(*rlc_Config->choice.am));
       rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = calloc(1, sizeof(*rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength));
-      *rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size18;
-      rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit = NR_T_PollRetransmit_ms45;
-      rlc_Config->choice.am->ul_AM_RLC.pollPDU = NR_PollPDU_p64;
-      rlc_Config->choice.am->ul_AM_RLC.pollByte = NR_PollByte_kB500;
-      rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold = NR_UL_AM_RLC__maxRetxThreshold_t32;
+      *rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = encode_sn_field_length_am(default_rlc_config->drb_am.sn_field_length);
+      rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit = encode_t_poll_retransmit(default_rlc_config->drb_am.t_poll_retransmit);
+      rlc_Config->choice.am->ul_AM_RLC.pollPDU = encode_poll_pdu(default_rlc_config->drb_am.poll_pdu);
+      rlc_Config->choice.am->ul_AM_RLC.pollByte = encode_poll_byte(default_rlc_config->drb_am.poll_byte);
+      rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold = encode_max_retx_threshold(default_rlc_config->drb_am.max_retx_threshold);
       rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = calloc(1, sizeof(*rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength));
-      *rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size18;
-      rlc_Config->choice.am->dl_AM_RLC.t_Reassembly = NR_T_Reassembly_ms15;
-      rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit = NR_T_StatusProhibit_ms15;
+      *rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = encode_sn_field_length_am(default_rlc_config->drb_am.sn_field_length);
+      rlc_Config->choice.am->dl_AM_RLC.t_Reassembly = encode_t_reassembly(default_rlc_config->drb_am.t_reassembly);
+      rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit = encode_t_status_prohibit(default_rlc_config->drb_am.t_status_prohibit);
       break;
     default:
       AssertFatal(false, "RLC config type %d not handled\n", rlc_config_pr);
@@ -3417,7 +3423,11 @@ static void nr_drb_config(struct NR_RLC_Config *rlc_Config, NR_RLC_Config_PR rlc
   rlc_Config->present = rlc_config_pr;
 }
 
-NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR_RLC_Config_PR rlc_conf, long priority)
+NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId,
+                                                long drbId,
+                                                NR_RLC_Config_PR rlc_conf,
+                                                long priority,
+                                                const nr_rlc_configuration_t *default_rlc_config)
 {
   NR_RLC_BearerConfig_t *rlc_BearerConfig                  = calloc(1, sizeof(NR_RLC_BearerConfig_t));
   rlc_BearerConfig->logicalChannelIdentity                 = lcChannelId;
@@ -3427,7 +3437,7 @@ NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR
   rlc_BearerConfig->reestablishRLC                         = NULL;
 
   NR_RLC_Config_t *rlc_Config  = calloc(1, sizeof(NR_RLC_Config_t));
-  nr_drb_config(rlc_Config, rlc_conf);
+  nr_drb_config(rlc_Config, rlc_conf, default_rlc_config);
   rlc_BearerConfig->rlc_Config = rlc_Config;
 
   NR_LogicalChannelConfig_t *logicalChannelConfig                 = calloc(1, sizeof(NR_LogicalChannelConfig_t));
@@ -3451,7 +3461,8 @@ NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR
 NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
                                                   const NR_ServingCellConfigCommon_t *scc,
                                                   const NR_ServingCellConfig_t *servingcellconfigdedicated,
-                                                  const nr_mac_config_t *configuration)
+                                                  const nr_mac_config_t *configuration,
+                                                  const nr_rlc_configuration_t *default_rlc_config)
 {
   NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(*cellGroupConfig));
   cellGroupConfig->cellGroupId = 0;
@@ -3460,7 +3471,7 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   /* TS38.331 9.2.1	Default SRB configurations */
   cellGroupConfig->rlc_BearerToAddModList = calloc(1, sizeof(*cellGroupConfig->rlc_BearerToAddModList));
   NR_RLC_BearerConfig_t *rlc_BearerConfig =
-      get_SRB_RLC_BearerConfig(1, 1, NR_LogicalChannelConfig__ul_SpecificParameters__bucketSizeDuration_ms1000);
+      get_SRB_RLC_BearerConfig(1, 1, NR_LogicalChannelConfig__ul_SpecificParameters__bucketSizeDuration_ms1000, default_rlc_config);
   asn1cSeqAdd(&cellGroupConfig->rlc_BearerToAddModList->list, rlc_BearerConfig);
 
   cellGroupConfig->rlc_BearerToReleaseList = NULL;

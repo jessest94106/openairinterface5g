@@ -397,7 +397,8 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
                                  pduSession,
                                  rrc->configuration.enable_sdap,
                                  rrc->security.do_drb_integrity,
-                                 rrc->security.do_drb_ciphering);
+                                 rrc->security.do_drb_ciphering,
+                                 &rrc->pdcp_config);
 
     pdu->numDRB2Setup = 1; // One DRB per PDU Session. TODO: Remove hardcoding
     for (int j=0; j < pdu->numDRB2Setup; j++) {

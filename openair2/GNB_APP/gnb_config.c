@@ -1661,8 +1661,12 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   NR_ServingCellConfig_t *scd = get_scd_config(cfg);
 
   if (MacRLC_ParamList.numelt > 0) {
+    /* NR RLC config is needed by mac_top_init_gNB() */
+    nr_rlc_configuration_t default_rlc_config;
+    config_rlc(cfg, &default_rlc_config);
+
     ngran_node_t node_type = get_node_type();
-    mac_top_init_gNB(node_type, scc, scd, &config);
+    mac_top_init_gNB(node_type, scc, scd, &config, &default_rlc_config);
     RC.nb_nr_mac_CC = (int *)malloc(RC.nb_nr_macrlc_inst * sizeof(int));
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
@@ -2195,6 +2199,9 @@ gNB_RRC_INST *RCconfig_NRRRC()
 
   if (!NODE_IS_DU(rrc->node_type))
     config_security(rrc);
+
+  config_rlc(config_get_if(), &rrc->rlc_config);
+  config_pdcp(config_get_if(), &rrc->pdcp_config);
 
   return rrc;
 }

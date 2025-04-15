@@ -31,6 +31,7 @@
 #include "NR_UL-CCCH-Message.h"
 #include "f1ap_messages_types.h"
 #include "common/platform_types.h"
+#include "openair2/LAYER2/nr_rlc/nr_rlc_configuration.h"
 struct NR_MeasurementTimingConfiguration;
 struct NR_PDSCH_TimeDomainResourceAllocationList;
 
@@ -84,7 +85,8 @@ NR_SIB19_r17_t *get_SIB19_NR(const NR_ServingCellConfigCommon_t *scc);
 NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
                                                   const NR_ServingCellConfigCommon_t *scc,
                                                   const NR_ServingCellConfig_t *servingcellconfigdedicated,
-                                                  const nr_mac_config_t *configuration);
+                                                  const nr_mac_config_t *configuration,
+                                                  const nr_rlc_configuration_t *default_rlc_config);
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const int uid,
                             NR_UE_NR_Capability_t *uecap,
@@ -107,7 +109,14 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
 
 NR_ReconfigurationWithSync_t *get_reconfiguration_with_sync(rnti_t rnti, uid_t uid, const NR_ServingCellConfigCommon_t *scc);
 
-NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, long bucketSizeDuration);
-NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR_RLC_Config_PR rlc_conf, long priority);
+NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId,
+                                                long priority,
+                                                long bucketSizeDuration,
+                                                const nr_rlc_configuration_t *default_rlc_config);
+NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId,
+                                                long drbId,
+                                                NR_RLC_Config_PR rlc_conf,
+                                                long priority,
+                                                const nr_rlc_configuration_t *default_rlc_config);
 
 #endif
