@@ -45,6 +45,7 @@
 #include "common/utils/ds/seq_arr.h"
 #include "common/utils/nr/nr_common.h"
 #include "common/utils/ds/byte_array.h"
+#include "openair2/LAYER2/nr_rlc/nr_rlc_configuration.h"
 
 #define NR_SCHED_LOCK(lock)                                        \
   do {                                                             \
@@ -899,6 +900,7 @@ typedef struct gNB_MAC_INST_s {
   nr_pp_impl_ul pre_processor_ul;
 
   nr_mac_config_t radio_config;
+  nr_rlc_configuration_t rlc_config;
 
   NR_UE_sched_ctrl_t *sched_ctrlCommon;
   NR_sched_pdcch_t *sched_pdcch_otherSI;
