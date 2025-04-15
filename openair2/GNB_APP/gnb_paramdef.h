@@ -848,4 +848,44 @@ typedef enum {
 
 /*----------------------------------------------------------------------*/
 
+#define CONFIG_NR_PDCP_SN_SIZE "sn_size"
+#define CONFIG_NR_PDCP_T_REORDERING "t_reordering"
+#define CONFIG_NR_PDCP_DISCARD_TIMER "discard_timer"
+
+/*----------------------------------------------------------------------*/
+/* nr pdcp drb configuration                                            */
+/*----------------------------------------------------------------------*/
+
+#define CONFIG_STRING_NR_PDCP_DRB "pdcp.drb"
+
+#define CONFIG_NR_PDCP_DRB_SN_SIZE_IDX 0
+#define CONFIG_NR_PDCP_DRB_T_REORDERING_IDX 1
+#define CONFIG_NR_PDCP_DRB_DISCARD_TIMER_IDX 2
+
+#define NR_PDCP_DRB_GLOBALPARAMS_DESC { \
+    { .optname = CONFIG_NR_PDCP_SN_SIZE, \
+      .defstrval = "len18bits", \
+      .helpstr = "SN size", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_PDCP_SN_SIZE_STR }, \
+          .setintval = { VALUES_NR_PDCP_SN_SIZE }, \
+          .num_okstrval = SIZEOF_NR_PDCP_SN_SIZE }}}, \
+    { .optname = CONFIG_NR_PDCP_T_REORDERING, \
+      .defstrval = "ms100", \
+      .helpstr = "reordering timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_PDCP_T_REORDERING_STR }, \
+          .setintval = { VALUES_NR_PDCP_T_REORDERING }, \
+          .num_okstrval = SIZEOF_NR_PDCP_T_REORDERING }}}, \
+    { .optname = CONFIG_NR_PDCP_DISCARD_TIMER, \
+      .defstrval = "infinity", \
+      .helpstr = "discard timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer,  \
+          .okstrval = { VALUES_NR_PDCP_DISCARD_TIMER_STR }, \
+          .setintval = { VALUES_NR_PDCP_DISCARD_TIMER }, \
+          .num_okstrval = SIZEOF_NR_PDCP_DISCARD_TIMER }}} \
+}
+
+/*----------------------------------------------------------------------*/
+
 #endif
