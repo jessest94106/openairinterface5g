@@ -19,6 +19,7 @@
  *      contact@openairinterface.org
  */
 
+#include "PHY/TOOLS/tools_defs.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -50,7 +51,8 @@
 // Simulator role
 typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
 
-#define NUM_CHANMOD_THREADS 1
+#define MAX_NUM_ANTENNAS_TX 4
+#define MAX_CHANNEL_LENGTH (1 << 20)
 
 #define ROLE_CLIENT_STRING "client"
 #define ROLE_SERVER_STRING "server"
@@ -112,6 +114,9 @@ typedef struct {
   Actor_t *channel_modelling_actors;
 } vrtsim_state_t;
 
+// Sample history for channel impulse response
+static c16_t saved_samples[MAX_NUM_ANTENNAS_TX][MAX_CHANNEL_LENGTH] __attribute__((aligned(32))) = {0};
+
 static void histogram_add(histogram_t *histogram, double diff)
 {
   histogram->num_samples++;
@@ -149,6 +154,16 @@ static void load_channel_model(vrtsim_state_t *vrtsim_state)
                    vrtsim_state->tx_bw);
   char *model_name = vrtsim_state->role == ROLE_CLIENT ? "client_tx_channel_model" : "server_tx_channel_model";
   vrtsim_state->channel_desc = find_channel_desc_fromname(model_name);
+  AssertFatal(vrtsim_state->channel_desc != NULL,
+              "Could not find model name %s. Make sure it is present in the config file",
+              model_name);
+  LOG_I(HW,
+        "Channel model %s parameters: path_loss_dB=%.2f, nb_tx=%d, nb_rx=%d, channel_length=%d\n",
+        model_name,
+        vrtsim_state->channel_desc->path_loss_dB,
+        vrtsim_state->channel_desc->nb_tx,
+        vrtsim_state->channel_desc->nb_rx,
+        vrtsim_state->channel_desc->channel_length);
   random_channel(vrtsim_state->channel_desc, 0);
   AssertFatal(vrtsim_state->channel_desc != NULL, "Could not find channel model %s\n", model_name);
 }
@@ -376,7 +391,7 @@ static int vrtsim_write_internal(vrtsim_state_t *vrtsim_state,
 typedef struct {
   vrtsim_state_t *vrtsim_state;
   openair0_timestamp timestamp;
-  c16_t *samples[4];
+  c16_t *samples[MAX_NUM_ANTENNAS_TX];
   int nsamps;
   int nbAnt;
   int flags;
@@ -410,17 +425,16 @@ static void perform_channel_modelling(void *arg)
   }
 
   for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
+    c16_t *previous_samples = saved_samples[aatx];
     for (int i = 0; i < nsamps; i++) {
       cf_t *impulse_response = channel_impulse_response[aatx];
       for (int l = 0; l < channel_desc->channel_length; l++) {
         int idx = i - l;
-        // TODO: Use AVX512 for this
-        // TODO: What are the previously sent samples (for impulse response)
-        if (idx >= 0) {
-          c16_t tx_input = input_samples[aatx][idx];
-          samples[i].r += tx_input.r * impulse_response[l].r - tx_input.i * impulse_response[l].i;
-          samples[i].i += tx_input.i * impulse_response[l].r + tx_input.r * impulse_response[l].i;
-        }
+        // TODO: Use AVX2 for this
+        c16_t tx_input = idx >= 0 ? input_samples[aatx][idx]
+                                  : previous_samples[(channel_modelling_args->timestamp + i + idx) % MAX_CHANNEL_LENGTH];
+        samples[i].r += tx_input.r * impulse_response[l].r - tx_input.i * impulse_response[l].i;
+        samples[i].i += tx_input.i * impulse_response[l].r + tx_input.r * impulse_response[l].i;
       }
     }
   }
@@ -462,6 +476,7 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
                                      int nbAnt,
                                      int flags)
 {
+  AssertFatal(nbAnt < MAX_NUM_ANTENNAS_TX, "Number of antennas %d exceeds maximum %d\n", nbAnt, MAX_NUM_ANTENNAS_TX);
   for (int aarx = 0; aarx < vrtsim_state->peer_info.num_rx_antennas; aarx++) {
     notifiedFIFO_elt_t *task = newNotifiedFIFO_elt(sizeof(channel_modelling_args_t), 0, NULL, perform_channel_modelling);
     channel_modelling_args_t *args = (channel_modelling_args_t *)NotifiedFifoData(task);
@@ -475,6 +490,23 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
       args->samples[i] = samplesVoid[i];
     }
     pushNotifiedFIFO(&vrtsim_state->channel_modelling_actors[aarx].fifo, task);
+  }
+  int start_index = timestamp % MAX_CHANNEL_LENGTH;
+  int end_index = min(start_index + nsamps, MAX_CHANNEL_LENGTH);
+  int cp_nsamps = end_index - start_index;
+  for (int aatx = 0; aatx < nbAnt; aatx++) {
+    c16_t *samples = (c16_t *)samplesVoid[aatx];
+    memcpy(&saved_samples[aatx][start_index], &samples[0], sizeof(c16_t) * cp_nsamps);
+  }
+
+  if (end_index < start_index + nsamps) {
+    // wrap around condition, write at beginning of buffer
+    cp_nsamps = nsamps - cp_nsamps; // remaining samples
+    start_index = 0;
+    for (int aatx = 0; aatx < nbAnt; aatx++) {
+      c16_t *samples = (c16_t *)samplesVoid[aatx];
+      memcpy(&saved_samples[aatx][start_index], &samples[0], sizeof(c16_t) * cp_nsamps);
+    }
   }
   return nsamps;
 }
@@ -506,7 +538,7 @@ static int vrtsim_read(openair0_device *device, openair0_timestamp *ptimestamp, 
 static void vrtsim_end(openair0_device *device)
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
-  if (vrtsim_state->role == ROLE_SERVER) {
+  if (vrtsim_state->role == ROLE_SERVER && vrtsim_state->run_timing_thread) {
     vrtsim_state->run_timing_thread = false;
     int ret = pthread_join(vrtsim_state->timing_thread, NULL);
     AssertFatal(ret == 0, "pthread_join() failed: errno: %d, %s\n", errno, strerror(errno));
@@ -526,6 +558,7 @@ static void vrtsim_end(openair0_device *device)
       tx_timing->tx_samples_total += tx_timing[i].tx_samples_total;
     }
     tx_timing->average_tx_budget /= vrtsim_state->peer_info.num_rx_antennas;
+    free_noise_device();
   }
   // produce 1 second of extra samples so threads can finish
   shm_td_iq_channel_produce_samples(vrtsim_state->channel, vrtsim_state->sample_rate);

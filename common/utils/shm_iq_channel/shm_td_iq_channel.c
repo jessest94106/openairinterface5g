@@ -228,9 +228,6 @@ IQChannelErrorType shm_td_iq_channel_rx(ShmTDIQChannel *channel,
 void shm_td_iq_channel_produce_samples(ShmTDIQChannel *channel, size_t num_samples)
 {
   ShmTDIQChannelData *data = channel->data;
-  if (channel->type != IQ_CHANNEL_TYPE_SERVER) {
-    return;
-  }
   if (data->is_connected == false) {
     return;
   }
