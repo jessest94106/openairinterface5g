@@ -300,18 +300,22 @@ static void configure_ratematching_csi(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsc
   }
 }
 
-int8_t nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
-                                int cc_id,
-                                unsigned int gNB_index,
-                                uint8_t ack_nack,
-                                uint8_t *pduP,
-                                uint32_t pdu_len)
+void nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
+                              int cc_id,
+                              unsigned int gNB_index,
+                              uint8_t ack_nack,
+                              uint8_t *pduP,
+                              uint32_t pdu_len)
 {
   if(ack_nack) {
     LOG_D(NR_MAC, "Decoding NR-BCCH-DL-SCH-Message (SIB1 or SI)\n");
     nr_mac_rrc_data_ind_ue(mac->ue_id, cc_id, gNB_index, 0, 0, 0, mac->physCellId, 0, NR_BCCH_DL_SCH, (uint8_t *) pduP, pdu_len);
-    mac->get_sib1 = false;
-    mac->get_otherSI = false;
+    if (mac->get_sib1)
+      mac->get_sib1 = false;
+    for (int i = 0; i < MAX_SI_GROUPS; i++) {
+      if (mac->get_otherSI[i])
+        mac->get_otherSI[i] = false;
+    }
     T(T_NRUE_MAC_DL_PDU_WITH_DATA,
       T_INT(SI_RNTI),
       T_INT(-1 /* frame, unavailable here */),
@@ -319,9 +323,10 @@ int8_t nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
       T_INT(0 /* harq_pid */),
       T_BUFFER(pduP, pdu_len));
   }
-  else
+  else {
     LOG_E(NR_MAC, "Got NACK on NR-BCCH-DL-SCH-Message (%s)\n", mac->get_sib1 ? "SIB1" : "other SI");
-  return 0;
+    nr_mac_rrc_data_ind_ue(mac->ue_id, cc_id, gNB_index, 0, 0, 0, mac->physCellId, 0, NR_BCCH_DL_SCH, NULL, 0);
+  }
 }
 
 /*
@@ -742,8 +747,10 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
     LOG_W(MAC, "[%d.%d] Invalid frequency_domain_assignment. Possibly due to false DCI. Ignoring DCI!\n", frame, slot);
     return -1;
   }
+
   dlsch_pdu->rb_offset = dlsch_pdu->start_rb + dlsch_pdu->BWPStart;
-  if (mac->get_sib1 || mac->get_otherSI)
+
+  if (mac->get_sib1)
     dlsch_pdu->rb_offset -= dlsch_pdu->BWPStart;
 
   /* TIME_DOM_RESOURCE_ASSIGNMENT */
@@ -2993,7 +3000,7 @@ static void extract_10_ra_rnti(dci_pdu_rel15_t *dci_pdu_rel15, const uint8_t *dc
   EXTRACT_DCI_ITEM(dci_pdu_rel15->tb_scaling, 2);
 }
 
-static void extract_10_si_rnti(dci_pdu_rel15_t *dci_pdu_rel15, const uint8_t *dci_pdu, int pos, const int N_RB)
+static uint8_t extract_10_si_rnti(dci_pdu_rel15_t *dci_pdu_rel15, const uint8_t *dci_pdu, int pos, const int N_RB)
 {
   LOG_D(NR_MAC_DCI, "Received dci 1_0 SI rnti\n");
 
@@ -3009,6 +3016,7 @@ static void extract_10_si_rnti(dci_pdu_rel15_t *dci_pdu_rel15, const uint8_t *dc
   EXTRACT_DCI_ITEM(dci_pdu_rel15->rv, 2);
   // System information indicator 1 bit
   EXTRACT_DCI_ITEM(dci_pdu_rel15->system_info_indicator, 1);
+  return dci_pdu_rel15->system_info_indicator;
 }
 
 static bool extract_10_c_rnti(NR_UE_MAC_INST_t *mac,
@@ -3312,7 +3320,10 @@ static nr_dci_format_t nr_extract_dci_00_10(NR_UE_MAC_INST_t *mac,
       n_RB = get_nrb_for_dci(mac, format, ss_type);
       if (n_RB == 0)
         return NR_DCI_NONE;
-      extract_10_si_rnti(dci_pdu_rel15, dci_pdu, pos, n_RB);
+      uint8_t sys_info = extract_10_si_rnti(dci_pdu_rel15, dci_pdu, pos, n_RB);
+      // sys info = 0 for SIB1 and 1 for other SIB
+      if (mac->get_sib1 == 0 && sys_info == 0)
+        return NR_DCI_NONE;
       break;
     case TYPE_C_RNTI_ :
       // Identifier for DCI formats

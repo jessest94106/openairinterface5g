@@ -290,7 +290,7 @@ void phy_procedures_nrUE_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, n
 
   nr_ue_ulsch_procedures(ue, frame_tx, slot_tx, phy_data, (c16_t **)&txdataF, was_symbol_used);
 
-  ue_srs_procedures_nr(ue, proc, (c16_t **)&txdataF, was_symbol_used);
+  ue_srs_procedures_nr(ue, proc, (c16_t **)&txdataF, phy_data, was_symbol_used);
 
   pucch_procedures_ue_nr(ue, proc, phy_data, (c16_t **)&txdataF, was_symbol_used);
 
@@ -928,6 +928,17 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
               LOG_D(PHY,"start adjust sync slot = %d no timing %d\n", nr_slot_rx, ue->no_timing_correction);
               sampleShift =
                   nr_adjust_synch_ue(fp, ue, gNB_id, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
+            }
+
+            if (get_nrUE_params()->cont_fo_comp && pbchSuccess == 0) {
+              double freq_offset = nr_ue_pbch_freq_offset(fp, estimateSz, dl_ch_estimates);
+              LOG_D(PHY,"compensated frequency offset = %.3f Hz, detected residual frequency offset = %.3f Hz, accumulated frequency offset = %.3f Hz\n", ue->freq_offset, freq_offset, ue->freq_off_acc);
+
+              // PI controller
+              const double PID_P = get_nrUE_params()->freq_sync_P;
+              const double PID_I = get_nrUE_params()->freq_sync_I;
+              ue->freq_offset += freq_offset * PID_P + ue->freq_off_acc * PID_I;
+              ue->freq_off_acc += freq_offset;
             }
           }
           LOG_D(PHY, "Doing N0 measurements in %s\n", __FUNCTION__);

@@ -464,7 +464,7 @@ class OaiCiTest():
 			return (False, f"UE {ue.getName()} has no IP address")
 		svrIP = cn.getIP()
 		if not svrIP:
-			return (False, f"Iperf server {ue.getName()} has no IP address")
+			return (False, f"Iperf server {cn.getName()} has no IP address")
 
 		iperf_opt = self.iperf_args
 		jsonReport = "--json"
@@ -862,7 +862,7 @@ class OaiCiTest():
 		success, output = cn.deploy()
 		logging.info(f"deployment core network {core_name} success {success}, output:\n{output}")
 		if success:
-			msg = f"Started {cn}"
+			msg = f"Started {cn} [{cn.getIP()}]"
 			HTML.CreateHtmlTestRowQueue(core_name, 'OK', [msg])
 		else:
 			msg = f"deployment of core network {core_name} FAILED"

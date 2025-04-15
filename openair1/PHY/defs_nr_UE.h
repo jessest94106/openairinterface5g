@@ -82,6 +82,7 @@
 /// suppress compiler warning for unused arguments
 #define UNUSED(x) (void)x;
 #define NUM_DL_ACTORS 4
+#define NUM_UL_ACTORS 2
 
 // Set the number of barriers for processSlotTX to 512. This value has to be at least 483 for NTN where
 // DL-to-UL offset is up to 483. The selected value is also half of the frame range so that
@@ -401,7 +402,6 @@ typedef struct PHY_VARS_NR_UE_s {
   nr_synch_request_t synch_request;
 
   NR_UE_PRACH     *prach_vars[NUMBER_OF_CONNECTED_gNB_MAX];
-  NR_UE_SRS       *srs_vars[NUMBER_OF_CONNECTED_gNB_MAX];
   NR_UE_PRS       *prs_vars[NR_MAX_PRS_COMB_SIZE];
   uint8_t          prs_active_gNBs;
   NR_DL_UE_HARQ_t  dl_harq_processes[2][NR_MAX_DLSCH_HARQ_PROCESSES];
@@ -460,6 +460,11 @@ typedef struct PHY_VARS_NR_UE_s {
   int64_t max_pos_iir; /// Timing offset IIR filter
   int max_pos_acc; /// Timing offset accumuluated error for PI filter
 
+  double initial_fo; /// initial frequency offset provided by the user
+  int cont_fo_comp; /// flag enabling the continuous frequency offset estimation and compensation
+  double freq_offset; /// currently compensated frequency offset
+  double freq_off_acc; /// accumulated frequency error (for PI controller)
+
   /// Timing Advance updates variables
   /// Timing advance update computed from the TA command signalled from gNB
   int timing_advance;
@@ -514,7 +519,7 @@ typedef struct PHY_VARS_NR_UE_s {
   sl_nr_ue_phy_params_t SL_UE_PHY_PARAMS;
   Actor_t sync_actor;
   Actor_t dl_actors[NUM_DL_ACTORS];
-  Actor_t ul_actor;
+  Actor_t ul_actors[NUM_UL_ACTORS];
   ntn_config_message_t* ntn_config_message;
   pthread_t main_thread;
   pthread_t stat_thread;
@@ -525,10 +530,6 @@ typedef struct {
   int gNB_id;
   /// NR slot index within frame_tx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_tx;
-  /// NR slot index tx offset to resume
-  /// in case of NTN, tx_offset can be changed dynamically via SIB19
-  /// we need to notify the right tx thread slot based on TX offset change
-  int nr_slot_tx_offset;
   int rx_slot_type;
   /// NR slot index within frame_rx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_rx;
@@ -571,6 +572,7 @@ typedef struct {
 typedef struct nr_phy_data_tx_s {
   NR_UE_ULSCH_t ulsch;
   NR_UE_PUCCH pucch_vars;
+  NR_UE_SRS srs_vars;
 
   // Sidelink Rx action decided by MAC
   sl_nr_tx_config_type_enum_t sl_tx_action;
@@ -597,7 +599,7 @@ typedef struct nr_rxtx_thread_data_s {
   PHY_VARS_NR_UE    *UE;
   int writeBlockSize;
   nr_phy_data_t phy_data;
-  dynamic_barrier_t *next_barrier;
+  dynamic_barrier_t* next_barrier;
 } nr_rxtx_thread_data_t;
 
 typedef struct LDPCDecode_ue_s {

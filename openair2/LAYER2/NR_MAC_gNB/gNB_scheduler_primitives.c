@@ -281,8 +281,8 @@ uint8_t get_mcs_from_cqi(int mcs_table, int cqi_table, int cqi_idx)
 NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
                                    const NR_UE_DL_BWP_t *dl_bwp,
                                    const NR_tda_info_t *tda_info,
-                                   const int Layers) {
-
+                                   const int Layers)
+{
   NR_pdsch_dmrs_t dmrs = {0};
   int frontloaded_symb = 1; // default value
   nr_dci_format_t dci_format = dl_bwp ? dl_bwp->dci_format : NR_DL_DCI_FORMAT_1_0;
@@ -732,12 +732,6 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
                       int max_mcs,
                       frame_t frame)
 {
-  /* first call: everything is zero. Initialize to sensible default */
-  if (bler_stats->last_frame == 0 && bler_stats->mcs == 0) {
-    bler_stats->last_frame = frame;
-    bler_stats->mcs = 9;
-    bler_stats->bler = (bler_options->lower + bler_options->upper) / 2.0f;
-  }
   int diff = frame - bler_stats->last_frame;
   if (diff < 0) // wrap around
     diff += 1024;
@@ -756,11 +750,11 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
   int new_mcs = old_mcs;
   if (bler_stats->bler < bler_options->lower && old_mcs < max_mcs && num_dl_sched > 3)
     new_mcs += 1;
-  else if ((bler_stats->bler > bler_options->upper && old_mcs > 6) // above threshold
-      || (num_dl_sched <= 3 && old_mcs > 9))                                // no activity
+  else if (bler_stats->bler > bler_options->upper || num_dl_sched <= 3) // above threshold or no activity
     new_mcs -= 1;
   // else we are within threshold boundaries
 
+  new_mcs = max(new_mcs, bler_options->min_mcs);
   bler_stats->last_frame = frame;
   bler_stats->mcs = new_mcs;
   memcpy(bler_stats->rounds, stats->rounds, sizeof(stats->rounds));
@@ -865,12 +859,8 @@ int nr_get_default_pucch_res(int pucch_ResourceCommon) {
   return(default_pucch_csset[pucch_ResourceCommon]);
 }
 
-void nr_configure_pdcch(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
-                        NR_ControlResourceSet_t *coreset,
-                        NR_sched_pdcch_t *pdcch, 
-                        bool otherSI) {
-
-
+void nr_configure_pdcch(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu, NR_ControlResourceSet_t *coreset, NR_sched_pdcch_t *pdcch)
+{
   pdcch_pdu->BWPSize = pdcch->BWPSize;
   pdcch_pdu->BWPStart = pdcch->BWPStart;
   pdcch_pdu->SubcarrierSpacing = pdcch->SubcarrierSpacing;
@@ -879,19 +869,23 @@ void nr_configure_pdcch(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
 
   pdcch_pdu->DurationSymbols  = coreset->duration;
 
-  for (int i=0;i<6;i++)
+  for (int i = 0; i < 6; i++)
     pdcch_pdu->FreqDomainResource[i] = coreset->frequencyDomainResources.buf[i];
 
-  LOG_D(MAC,"Coreset : BWPstart %d, BWPsize %d, SCS %d, freq %x, , duration %d\n",
-        pdcch_pdu->BWPStart,pdcch_pdu->BWPSize,(int)pdcch_pdu->SubcarrierSpacing,(int)coreset->frequencyDomainResources.buf[0],(int)coreset->duration);
+  LOG_D(NR_MAC,
+        "Coreset : BWPstart %d, BWPsize %d, SCS %d, freq %x, , duration %ld\n",
+        pdcch_pdu->BWPStart,
+        pdcch_pdu->BWPSize,
+        pdcch_pdu->SubcarrierSpacing,
+        coreset->frequencyDomainResources.buf[0],
+        coreset->duration);
 
   pdcch_pdu->CceRegMappingType = pdcch->CceRegMappingType;
   pdcch_pdu->RegBundleSize = pdcch->RegBundleSize;
   pdcch_pdu->InterleaverSize = pdcch->InterleaverSize;
   pdcch_pdu->ShiftIndex = pdcch->ShiftIndex;
 
-  pdcch_pdu->CoreSetType =
-      (otherSI || coreset->controlResourceSetId != 0) ? NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG : NFAPI_NR_CSET_CONFIG_MIB_SIB1;
+  pdcch_pdu->CoreSetType = coreset->controlResourceSetId != 0 ? NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG : NFAPI_NR_CSET_CONFIG_MIB_SIB1;
 
   //precoderGranularity
   pdcch_pdu->precoderGranularity = coreset->precoderGranularity;
@@ -2492,6 +2486,13 @@ void reset_srs_stats(NR_UE_info_t *UE) {
   }
 }
 
+static void init_bler_stats(const NR_bler_options_t *bler_options, NR_bler_stats_t *bler_stats, frame_t frame)
+{
+  bler_stats->last_frame = frame;
+  bler_stats->mcs = bler_options->min_mcs;
+  bler_stats->bler = (float)(bler_options->lower + bler_options->upper) / 2.0f;
+}
+
 //------------------------------------------------------------------------------
 NR_UE_info_t *add_new_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rntiP, NR_CellGroupConfig_t *CellGroup)
 {
@@ -2521,6 +2522,10 @@ NR_UE_info_t *add_new_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rntiP, NR_CellGroupConf
   sched_ctrl->sched_srs.frame = -1;
   sched_ctrl->sched_srs.slot = -1;
   sched_ctrl->pdcch_cl_adjust = 0;
+
+  // Initialize bler_stats
+  init_bler_stats(&nr_mac->dl_bler, &sched_ctrl->dl_bler_stats, nr_mac->frame);
+  init_bler_stats(&nr_mac->ul_bler, &sched_ctrl->ul_bler_stats, nr_mac->frame);
 
   // initialize LCID structure
   seq_arr_init(&sched_ctrl->lc_config, sizeof(nr_lc_config_t));
@@ -3322,7 +3327,7 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   int CC_id = 0;
   int srb_id = 1;
   const NR_ServingCellConfigCommon_t *scc = mac->common_channels[CC_id].ServingCellConfigCommon;
-  const NR_ServingCellConfig_t *sccd = mac->common_channels[CC_id].pre_ServingCellConfig;
+  const NR_ServingCellConfig_t *sccd = UE->is_redcap ? NULL : mac->common_channels[CC_id].pre_ServingCellConfig;
   NR_CellGroupConfig_t *cellGroupConfig = get_initial_cellGroupConfig(UE->uid, scc, sccd, &mac->radio_config);
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = cellGroupConfig;

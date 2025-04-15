@@ -653,11 +653,9 @@ static void encode_cells_to_activate(const served_cells_to_activate_t *cell, F1A
         &cells_to_be_activated_itemExtIEs->extensionValue.choice.GNB_CUSystemInformation;
     const f1ap_sib_msg_t *SI_msg = &cell->SI_msg[n];
     if (SI_msg->SI_container != NULL) {
-      if (SI_msg->SI_type > 6 && SI_msg->SI_type != 9) {
-        asn1cSequenceAdd(gNB_CUSystemInformation->sibtypetobeupdatedlist.list, F1AP_SibtypetobeupdatedListItem_t, sib_item);
-        sib_item->sIBtype = SI_msg->SI_type;
-        OCTET_STRING_fromBuf(&sib_item->sIBmessage, (const char *)SI_msg->SI_container, SI_msg->SI_container_length);
-      }
+      asn1cSequenceAdd(gNB_CUSystemInformation->sibtypetobeupdatedlist.list, F1AP_SibtypetobeupdatedListItem_t, sib_item);
+      sib_item->sIBtype = SI_msg->SI_type;
+      OCTET_STRING_fromBuf(&sib_item->sIBmessage, (const char *)SI_msg->SI_container, SI_msg->SI_container_length);
     }
   }
 }
@@ -1221,7 +1219,7 @@ f1ap_setup_resp_t cp_f1ap_setup_response(const f1ap_setup_resp_t *msg)
       const f1ap_sib_msg_t *b_SI_msg = &msg_cell->SI_msg[j];
       cp_SI_msg->SI_container_length = b_SI_msg->SI_container_length;
       cp_SI_msg->SI_container = malloc_or_fail(cp_SI_msg->SI_container_length);
-      *cp_SI_msg->SI_container = *b_SI_msg->SI_container;
+      memcpy(cp_SI_msg->SI_container, b_SI_msg->SI_container, b_SI_msg->SI_container_length);
       cp_SI_msg->SI_type = b_SI_msg->SI_type;
     }
   }
@@ -2109,8 +2107,12 @@ f1ap_gnb_du_configuration_update_acknowledge_t cp_f1ap_du_configuration_update_a
   for (int i = 0; i < cp.num_cells_to_activate; i++) {
     cp.cells_to_activate[i] = msg->cells_to_activate[i];
     for (int s = 0; s < cp.cells_to_activate[i].num_SI; s++) {
-      cp.cells_to_activate[i].SI_msg[s].SI_container = calloc_or_fail(1, sizeof(*cp.cells_to_activate[i].SI_msg[s].SI_container));
-      *cp.cells_to_activate[i].SI_msg[s].SI_container = *msg->cells_to_activate[i].SI_msg[s].SI_container;
+      f1ap_sib_msg_t *cp_sib = &cp.cells_to_activate[i].SI_msg[s];
+      const f1ap_sib_msg_t *msg_sib = &msg->cells_to_activate[i].SI_msg[s];
+      cp_sib->SI_type = msg_sib->SI_type;
+      cp_sib->SI_container_length = msg_sib->SI_container_length;
+      cp_sib->SI_container = calloc_or_fail(cp_sib->SI_container_length, sizeof(*cp_sib->SI_container));
+      memcpy(cp_sib->SI_container, msg_sib->SI_container, cp_sib->SI_container_length);
     }
   }
   return cp;

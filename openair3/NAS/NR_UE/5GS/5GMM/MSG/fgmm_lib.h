@@ -151,6 +151,8 @@ static const text_info_t sa_iei_s[] = {FOREACH_SA_IEI(TO_TEXT)};
 
 typedef enum { FOREACH_CAUSE(TO_ENUM) } cause_id_t;
 
+static const text_info_t fgmm_cause_s[] = {FOREACH_CAUSE(TO_TEXT)};
+
 /* 10.5.7.3 3GPP TS 24.008 */
 typedef struct {
   uint8_t value;
@@ -161,6 +163,7 @@ int encode_pdu_session_ie(byte_array_t *buffer, nas_service_IEI_t iei, const uin
 int decode_pdu_session_ie(uint8_t *psi, const byte_array_t *buffer);
 int encode_gprs_timer_ie(byte_array_t *buffer, nas_service_IEI_t iei, const gprs_timer_t *timer);
 int decode_gprs_timer_ie(gprs_timer_t *timer, const byte_array_t *buffer);
+bool eq_gprs_timer(const gprs_timer_t *a, const gprs_timer_t *b);
 int decode_eap_msg_ie(const byte_array_t *buffer);
 
 #endif /* FGS_LIB_H */

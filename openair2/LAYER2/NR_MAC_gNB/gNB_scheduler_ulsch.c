@@ -350,6 +350,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
 
         if (lcid == UL_SCH_LCID_CCCH_48_BITS_REDCAP) {
           LOG_I(MAC, "UE with RNTI %04x is RedCap\n", UE->rnti);
+          UE->is_redcap = true;
         }
 
         if (prepare_initial_ul_rrc_message(RC.nrmac[module_idP], UE)) {
@@ -2050,7 +2051,6 @@ static void pf_ul(module_id_t module_id,
       fill_pdcch_vrb_map(nrmac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, dci_beam.idx);
 
       NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
-      sched_pusch->mcs = max(nrmac->min_grant_mcs, sched_pusch->mcs);
       update_ul_ue_R_Qm(sched_pusch->mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched_pusch->R, &sched_pusch->Qm);
       sched_pusch->rbStart = rbStart;
       sched_pusch->rbSize = min_rb;
@@ -2680,7 +2680,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
       ul_dci_request_pdu->PDUSize = (uint8_t)(4+sizeof(nfapi_nr_dl_tti_pdcch_pdu));
       pdcch_pdu = &ul_dci_request_pdu->pdcch_pdu.pdcch_pdu_rel15;
       ul_dci_req->numPdus += 1;
-      nr_configure_pdcch(pdcch_pdu, coreset, &sched_ctrl->sched_pdcch, false);
+      nr_configure_pdcch(pdcch_pdu, coreset, &sched_ctrl->sched_pdcch);
       pdcch_pdu_coreset[coresetid] = pdcch_pdu;
     }
 

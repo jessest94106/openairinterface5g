@@ -215,29 +215,6 @@ static void nr_rrc_transfer_protected_rrc_message(const gNB_RRC_INST *rrc,
 #endif
 }
 
-///---------------------------------------------------------------------------------------------------------------///
-///---------------------------------------------------------------------------------------------------------------///
-
-static void init_NR_SI(gNB_RRC_INST *rrc)
-{
-  if (!NODE_IS_DU(rrc->node_type)) {
-    rrc->carrier.SIB23 = (uint8_t *) malloc16(100);
-    AssertFatal(rrc->carrier.SIB23 != NULL, "cannot allocate memory for SIB");
-    rrc->carrier.sizeof_SIB23 = do_SIB23_NR(&rrc->carrier);
-    LOG_I(NR_RRC, "do_SIB23_NR, size %d\n", rrc->carrier.sizeof_SIB23);
-    AssertFatal(rrc->carrier.sizeof_SIB23 != 255,"FATAL, RC.nrrrc[mod].carrier[CC_id].sizeof_SIB23 == 255");
-  }
-
-  if (get_softmodem_params()->phy_test > 0 || get_softmodem_params()->do_ra > 0) {
-    AssertFatal(NODE_IS_MONOLITHIC(rrc->node_type), "phy_test and do_ra only work in monolithic\n");
-    rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_allocate_new_ue_context(rrc);
-    LOG_I(NR_RRC,"Adding new user (%p)\n",ue_context_p);
-    if (!NODE_IS_CU(rrc->node_type)) {
-      rrc_add_nsa_user(rrc,ue_context_p,NULL);
-    }
-  }
-}
-
 static void rrc_gNB_CU_DU_init(gNB_RRC_INST *rrc)
 {
   switch (rrc->node_type) {
@@ -277,8 +254,15 @@ void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *c
   RB_INIT(&rrc->cuups);
   RB_INIT(&rrc->dus);
   rrc->configuration = *configuration;
-   /// System Information INIT
-  init_NR_SI(rrc);
+
+  if (get_softmodem_params()->phy_test > 0 || get_softmodem_params()->do_ra > 0) {
+    AssertFatal(NODE_IS_MONOLITHIC(rrc->node_type), "phy_test and do_ra only work in monolithic\n");
+    rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_allocate_new_ue_context(rrc);
+    LOG_I(NR_RRC,"Adding new user (%p)\n",ue_context_p);
+    if (!NODE_IS_CU(rrc->node_type)) {
+      rrc_add_nsa_user(rrc,ue_context_p,NULL);
+    }
+  }
 }
 
 static void rrc_gNB_process_AdditionRequestInformation(const module_id_t gnb_mod_idP, x2ap_ENDC_sgnb_addition_req_t *m)
