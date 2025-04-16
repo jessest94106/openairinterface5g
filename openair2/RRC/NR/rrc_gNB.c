@@ -1032,6 +1032,7 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
   uint8_t new_xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   ue_p->xids[new_xid] = RRC_REESTABLISH_COMPLETE;
   nr_rrc_reconfig_param_t params = {.cell_group_config = cellGroupConfig,
+                                    .meas_config = ue_p->measConfig,
                                     .drb_config_list = DRBs,
                                     .srb_config_list = SRBs,
                                     .transaction_id = new_xid};

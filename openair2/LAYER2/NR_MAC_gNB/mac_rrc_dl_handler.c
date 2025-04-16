@@ -961,6 +961,7 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     UE->CellGroup = oldUE->CellGroup;
     oldUE->CellGroup = NULL;
     UE->mac_stats = oldUE->mac_stats;
+    UE->measgap_config = oldUE->measgap_config;
     /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
      * from the current configuration. It will be reapplied when the
      * reconfiguration has succeeded (indicated by the CU) */
