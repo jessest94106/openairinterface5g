@@ -43,6 +43,7 @@
 #include "position_interface.h"
 #include "nr_phy_common.h"
 #include "common/utils/time_manager/time_manager.h"
+#include "log.h"
 
 /*
  *  NR SLOT PROCESSING SEQUENCE
@@ -542,6 +543,28 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action, c16_t **tx
         else
           flags = TX_BURST_MIDDLE;
       }
+    }
+  }
+
+  if (!IS_SOFTMODEM_RFSIM) {
+    uint64_t deadline_us = rxtxD->absolute_deadline_us;
+    struct timespec current_time;
+    if (clock_gettime(CLOCK_REALTIME, &current_time)) {
+      LOG_E(PHY, "clock_gettime failed\n");
+    }
+    uint64_t current_time_us = current_time.tv_sec * 1e6 + current_time.tv_nsec / 1e3;
+    if (current_time_us > deadline_us) {
+      static unsigned int deadline_warning_rate_limit = 0;
+      if (deadline_warning_rate_limit % 1000 == 0) {
+        LOG_W(PHY,
+              "Deadline missed for tx slot %d.%d (current time %lu us, deadline %lu us, missed by %lu)\n",
+              proc->frame_tx,
+              proc->nr_slot_tx,
+              current_time_us,
+              deadline_us,
+              current_time_us - deadline_us);
+      }
+      deadline_warning_rate_limit++;
     }
   }
 
@@ -1140,6 +1163,10 @@ void *UE_thread(void *arg)
     int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, &rx_timestamp, rxp, readBlockSize, fp->nb_antennas_rx);
     UEscopeCopy(UE, ueTimeDomainSamples, rxp[0], sizeof(c16_t), 1, readBlockSize, 0);
     AssertFatal(readBlockSize == tmp, "");
+    struct timespec current_time;
+    if (clock_gettime(CLOCK_REALTIME, &current_time)) {
+      LOG_E(PHY, "clock_gettime failed\n");
+    }
 
     if(slot_nr == (nb_slot_frame - 1)) {
       // read in first symbol of next frame and adjust for timing drift
@@ -1161,6 +1188,11 @@ void *UE_thread(void *arg)
     // use previous timing_advance value to compute writeTimestamp
     const openair0_timestamp writeTimestamp = rx_timestamp + fp->get_samples_slot_timestamp(slot_nr, fp, duration_rx_to_tx)
                                               - firstSymSamp - UE->N_TA_offset - timing_advance;
+
+    // Calculate TX deadline, approximately 1 symbol before the first sample should be written
+    const uint64_t samples_diff = writeTimestamp - rx_timestamp - fp->ofdm_symbol_size;
+    const float deadline_us = samples_diff / UE->rfdevice.openair0_cfg->sample_rate * 1e6;
+    const uint64_t absolute_deadline_us = current_time.tv_sec * 1e6 + current_time.tv_nsec / 1e3 + deadline_us;
 
     // but use current UE->timing_advance value to compute writeBlockSize
     int writeBlockSize = fp->get_samples_per_slot((slot_nr + duration_rx_to_tx) % nb_slot_frame, fp) - iq_shift_to_apply;
@@ -1204,6 +1236,7 @@ void *UE_thread(void *arg)
     curMsgTx->writeBlockSize = writeBlockSize;
     curMsgTx->proc.timestamp_tx = writeTimestamp;
     curMsgTx->UE = UE;
+    curMsgTx->absolute_deadline_us = absolute_deadline_us;
 
     int slot = curMsgTx->proc.nr_slot_tx;
     int slot_and_frame = slot + curMsgTx->proc.frame_tx * UE->frame_parms.slots_per_frame;
