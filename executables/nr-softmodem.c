@@ -518,9 +518,9 @@ static void initialize_agent(ngran_node_t node_type, e2_agent_args_t oai_args)
   const gNB_RRC_INST* rrc = RC.nrrrc[0];
   assert(rrc != NULL && "rrc cannot be NULL");
 
-  const int mcc = rrc->configuration.mcc[0];
-  const int mnc = rrc->configuration.mnc[0];
-  const int mnc_digit_len = rrc->configuration.mnc_digit_length[0];
+  const int mcc = rrc->configuration.plmn[0].mcc;
+  const int mnc = rrc->configuration.plmn[0].mnc;
+  const int mnc_digit_len = rrc->configuration.plmn[0].mnc_digit_length;
   // const ngran_node_t node_type = rrc->node_type;
   int nb_id = 0;
   int cu_du_id = 0;
@@ -597,8 +597,6 @@ int main( int argc, char **argv ) {
   char *pckg = strdup(OAI_PACKAGE_VERSION);
   LOG_I(HW, "Version: %s\n", pckg);
 
-  // don't create if node doesn't connect to RRC/S1/GTP
-  const ngran_node_t node_type = get_node_type();
   // Init RAN context
   if (!(CONFIG_ISFLAGSET(CONFIG_ABORT)))
     NRRCConfig();
@@ -612,6 +610,9 @@ int main( int argc, char **argv ) {
     if(NFAPI_MODE != NFAPI_MODE_PNF && NFAPI_MODE != NFAPI_MODE_AERIAL)
       RCconfig_nr_prs();
   }
+
+  // don't create if node doesn't connect to RRC/S1/GTP
+  const ngran_node_t node_type = get_node_type();
 
   if (NFAPI_MODE != NFAPI_MODE_PNF) {
     int ret = create_gNB_tasks(node_type, uniqCfg);
