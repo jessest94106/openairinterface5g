@@ -1402,11 +1402,14 @@ static void request_default_pdusession(nr_ue_nas_t *nas)
   itti_send_msg_to_task(TASK_NAS_NRUE, nas->UE_id, message_p);
 }
 
-static int get_user_nssai_idx(const nr_nas_msg_snssai_t allowed_nssai[8], const nr_ue_nas_t *nas)
+static int get_user_nssai_idx(const nr_nas_msg_snssai_t allowed_nssai[NAS_MAX_NUMBER_SLICES], const nr_ue_nas_t *nas)
 {
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < NAS_MAX_NUMBER_SLICES; i++) {
     const nr_nas_msg_snssai_t *nssai = allowed_nssai + i;
-    if ((nas->uicc->nssai_sst == nssai->sst) && (nas->uicc->nssai_sd == nssai->sd))
+    /* If it was received in Registration Accept, check the SD
+       in the stored Allowed N-SSAI, else, consider the SD valid */
+    bool sd_match = !nssai->sd || (nas->uicc->nssai_sd == *nssai->sd);
+    if ((nas->uicc->nssai_sst == nssai->sst) && sd_match)
       return i;
   }
   return -1;
@@ -1430,7 +1433,6 @@ static void process_guti(Guti5GSMobileIdentity_t *guti, nr_ue_nas_t *nas)
 
 static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buffer, uint32_t msg_length)
 {
-  LOG_I(NAS, "[UE] Received REGISTRATION ACCEPT message\n");
   registration_accept_msg msg = {0};
   fgs_nas_message_security_header_t sp_header = {0};
   const uint8_t *end = pdu_buffer + msg_length;
@@ -1453,15 +1455,22 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
   }
   pdu_buffer += decoded;
   // plain payload
-  if ((decoded = decode_registration_accept(&msg, pdu_buffer, end - pdu_buffer)) < 0) {
+  const byte_array_t ba = {.buf = (uint8_t *)pdu_buffer, .len = end - pdu_buffer};
+  if ((decoded = decode_registration_accept(&msg, ba)) < 0) {
     LOG_E(NAS, "Failed to decode NAS Registration Accept\n");
     return;
   }
+  LOG_I(NAS,
+        "Received Registration Accept with result %s\n",
+        msg.result == FGS_REGISTRATION_RESULT_3GPP       ? "3GPP"
+        : msg.result == FGS_REGISTRATION_RESULT_NON_3GPP ? "non-3PP"
+                                                         : "3GPP and non-3GPP");
+  LOG_I(NAS, "SMS %s in 5GS Registration Result\n", msg.sms_allowed ? "allowed" : "not allowed");
+
   pdu_buffer += decoded;
   // process GUTI
   if (msg.guti) {
     process_guti(&msg.guti->guti, nas);
-    free(msg.guti);
   } else {
     LOG_W(NAS, "no GUTI in registration accept\n");
   }
@@ -1480,6 +1489,8 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
   } else {
     request_default_pdusession(nas);
   }
+  // Free local message after processing
+  free_fgmm_registration_accept(&msg);
 }
 
 /* 3GPP TS 24.008 10.5.7.3 GPRS Timer */
