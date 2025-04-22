@@ -226,18 +226,21 @@ typedef struct pdusession_setup_s {
   pdusession_associate_qosflow_t associated_qos_flows[MAX_QOS_FLOWS];
 } pdusession_setup_t;
 
+/* QoS Flow Add or Modify Response Item (3GPP TS 38.413 9.2.1.6) */
 typedef struct qos_flow_tobe_modified_s {
-  uint8_t qfi; // 0~63
-} qos_flow_tobe_modified_t;
+  // QoS Flow Identifier
+  uint8_t qfi;
+} qos_flow_addmod_response_item_t;
 
+/* PDU Session Resource Modify Response Item (3GPP TS 38.413 9.2.1.6) */
 typedef struct pdusession_modify_s {
-  /* Unique pdusession_id for the UE. */
+  // PDU Session ID
   uint8_t pdusession_id;
-
+  /* PDU Session Resource Modify Response Transfer */
+  // QoS Flow Add or Modify Response List
   uint8_t nb_of_qos_flow;
-
   // qos_flow_add_or_modify
-  qos_flow_tobe_modified_t qos[MAX_QOS_FLOWS];
+  qos_flow_addmod_response_item_t qos[MAX_QOS_FLOWS];
 } pdusession_modify_t;
 
 /* Cause (9.3.1.2 of 3GPP TS 38.413) */
@@ -889,17 +892,17 @@ typedef struct ngap_pdusession_modify_req_s {
   pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_modify_req_t;
 
+/* 9.2.1.6 of 3GPP TS 38.413 */
 typedef struct ngap_pdusession_modify_resp_s {
+  // RAN UE NGAP ID
   uint32_t  gNB_ue_ngap_id;
-
-  /* Number of pdusession modify-ed in the list */
+  // AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+  // PDU Session Resource Modify Response List (0..256)
   uint16_t nb_of_pdusessions;
-  /* list of pdusession modify-ed by RRC layers */
   pdusession_modify_t pdusessions[NGAP_MAX_PDU_SESSION];
-
-  /* Number of pdusession failed to be modify in list */
+  // PDU Session Resource Failed to Modify List (0..256)
   uint16_t nb_of_pdusessions_failed;
-  /* list of pdusessions that failed to be modify */
   pdusession_failed_t pdusessions_failed[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_modify_resp_t;
 
