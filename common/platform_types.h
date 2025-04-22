@@ -226,7 +226,6 @@ typedef struct transport_layer_addr_s {
 //-----------------------------------------------------------------------------
 typedef uint32_t teid_t; // tunnel endpoint identifier
 typedef uint8_t ebi_t; // eps bearer id
-typedef uint8_t pdusessionid_t;
 
 //-----------------------------------------------------------------------------
 //
