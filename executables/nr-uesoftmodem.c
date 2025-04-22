@@ -60,6 +60,7 @@
 unsigned short config_frames[4] = {2,9,11,13};
 #endif
 #include "common/utils/LOG/log.h"
+#include "common/utils/time_manager/time_manager.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
 
 #include "UTIL/OPT/opt.h"
@@ -301,25 +302,10 @@ void init_openair0()
 
 static void init_pdcp(int ue_id)
 {
-  uint32_t pdcp_initmask = (!IS_SOFTMODEM_NOS1) ? LINK_ENB_PDCP_TO_GTPV1U_BIT : LINK_ENB_PDCP_TO_GTPV1U_BIT;
-
-  /*if (IS_SOFTMODEM_RFSIM || (nfapi_getmode()==NFAPI_UE_STUB_PNF)) {
-    pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
-  }*/
-
-  // previous code was:
-  //   if (IS_SOFTMODEM_NOKRNMOD)
-  //     pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
-  // The kernel module (KRNMOD) has been removed from the project, so the 'if'
-  // was removed but the flag 'pdcp_initmask' was kept, as "no kernel module"
-  // was always set. further refactoring could take it out
-  pdcp_initmask = pdcp_initmask | UE_NAS_USE_TUN_BIT;
-
   if (get_softmodem_params()->nsa && nr_rlc_module_init(0) != 0) {
     LOG_I(RLC, "Problem at RLC initiation \n");
   }
   nr_pdcp_layer_init();
-  nr_pdcp_module_init(pdcp_initmask, ue_id);
 }
 
 // Stupid function addition because UE itti messages queues definition is common with eNB
@@ -449,6 +435,11 @@ int main(int argc, char **argv)
     }
   }
 
+  if (create_tasks_nrue(1) < 0) {
+    printf("cannot create ITTI tasks\n");
+    exit(-1); // need a softer mode
+  }
+
   int mode_offset = get_softmodem_params()->nsa ? NUMBER_OF_UE_MAX : 1;
   uint16_t node_number = get_softmodem_params()->node_number;
   ue_id_g = (node_number == 0) ? 0 : node_number - 2;
@@ -467,9 +458,20 @@ int main(int argc, char **argv)
     get_channel_model_mode(uniqCfg);
   }
 
-  // Delay to allow the convergence of the IIR filter on PRACH noise measurements at gNB side
-  if (IS_SOFTMODEM_RFSIM && !get_softmodem_params()->phy_test)
-    sleep(3);
+  // start time manager with some reasonable default for the running mode
+  // (may be overwritten in configuration file or command line)
+  void nr_pdcp_ms_tick(void);
+  void nr_rlc_ms_tick(void);
+  time_manager_tick_function_t tick_functions[] = {
+    nr_pdcp_ms_tick,
+    nr_rlc_ms_tick
+  };
+  int tick_functions_count = 2;
+  time_manager_start(tick_functions, tick_functions_count,
+                     // iq_samples time source for rfsim,
+                     // realtime time source if not
+                     IS_SOFTMODEM_RFSIM ? TIME_SOURCE_IQ_SAMPLES
+                                        : TIME_SOURCE_REALTIME);
 
   if (!get_softmodem_params()->nsa && get_softmodem_params()->emulate_l1)
     start_oai_nrue_threads();
@@ -557,11 +559,6 @@ int main(int argc, char **argv)
   // wait for end of program
   printf("TYPE <CTRL-C> TO TERMINATE\n");
 
-  if (create_tasks_nrue(1) < 0) {
-    printf("cannot create ITTI tasks\n");
-    exit(-1); // need a softer mode
-  }
-
   // Sleep a while before checking all parameters have been used
   // Some are used directly in external threads, asynchronously
   sleep(2);
@@ -601,6 +598,9 @@ int main(int argc, char **argv)
   }
 
   free_nrLDPC_coding_interface(&nrLDPC_coding_interface);
+
+  time_manager_finish();
+
   free(pckg);
   return 0;
 }

@@ -19,40 +19,20 @@
  *      contact@openairinterface.org
  */
 
-/*! \file FGSRegistrationResult.c
+#ifndef COMMON_UTIL_TIME_MANAGER_TIME_MANAGER
+#define COMMON_UTIL_TIME_MANAGER_TIME_MANAGER
 
-\brief 5GS Registration result for registration request procedures
-\author Yoshio INOUE, Masayuki HARADA
-\email: yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com
-\date 2020
-\version 0.1
-*/
-
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
 
-#include "TLVEncoder.h"
-#include "TLVDecoder.h"
-#include "FGSRegistrationResult.h"
+#include "time_source.h"
 
-int decode_fgs_registration_result(FGSRegistrationResult *fgsregistrationresult, uint8_t iei, uint16_t value, uint32_t len)
-{
-  int decoded = 0;
-  uint16_t *buffer = &value;
-  fgsregistrationresult->registrationresult = *buffer & 0x7;
-  fgsregistrationresult->smsallowed = *buffer & 0x8;
-  decoded = decoded + 2;
-  return decoded;
-}
+typedef void (*time_manager_tick_function_t)(void);
 
-uint16_t encode_fgs_registration_result(const FGSRegistrationResult *fgsregistrationresult)
-{
-  uint16_t bufferReturn;
-  uint16_t *buffer = &bufferReturn;
-  uint8_t encoded = 0;
-  *(buffer + encoded) = 0x00 | (fgsregistrationresult->smsallowed & 0x8) | (fgsregistrationresult->registrationresult & 0x7);
-  encoded = encoded + 2;
+void time_manager_start(time_manager_tick_function_t *tick_functions,
+                        int tick_functions_count,
+                        time_source_type_t time_source);
+void time_manager_iq_samples(uint64_t iq_samples_count,
+                             uint64_t iq_samples_per_second);
+void time_manager_finish(void);
 
-  return bufferReturn;
-}
+#endif /* COMMON_UTIL_TIME_MANAGER_TIME_MANAGER */

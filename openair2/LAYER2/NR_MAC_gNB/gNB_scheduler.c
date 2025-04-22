@@ -177,16 +177,6 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
   start_meas(&gNB->eNB_scheduler);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_IN);
 
-  /* send tick to RLC, PDCP, and X2AP every ms */
-  if ((slot & ((1 << *scc->ssbSubcarrierSpacing) - 1)) == 0) {
-    void nr_rlc_tick(int frame, int subframe);
-    void nr_pdcp_tick(int frame, int subframe);
-    nr_rlc_tick(frame, slot >> *scc->ssbSubcarrierSpacing);
-    nr_pdcp_tick(frame, slot >> *scc->ssbSubcarrierSpacing);
-    if (is_x2ap_enabled())
-      x2ap_trigger();
-  }
-
   for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
     int num_beams = 1;
     if(gNB->beam_info.beam_allocation)
@@ -212,14 +202,16 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
 
   nr_mac_update_timers(module_idP, frame, slot);
 
-  // This schedules MIB
-  schedule_nr_mib(module_idP, frame, slot, &sched_info->DL_req);
+  if (gNB->num_scheduled_prach_rx >= NUM_PRACH_RX_FOR_NOISE_ESTIMATE || get_softmodem_params()->phy_test) {
+    // This schedules MIB
+    schedule_nr_mib(module_idP, frame, slot, &sched_info->DL_req);
 
-  // This schedules SIB1
-  // SIB19 will be scheduled if ntn_Config_r17 is initialized
-  if (IS_SA_MODE(get_softmodem_params())) {
-    schedule_nr_sib1(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req);
-    schedule_nr_other_sib(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req);
+    // This schedules SIB1
+    // SIB19 will be scheduled if ntn_Config_r17 is initialized
+    if (IS_SA_MODE(get_softmodem_params())) {
+      schedule_nr_sib1(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req);
+      schedule_nr_other_sib(module_idP, frame, slot, &sched_info->DL_req, &sched_info->TX_req);
+    }
   }
 
   // This schedule PRACH if we are not in phy_test mode
