@@ -458,10 +458,6 @@ int main(int argc, char **argv)
     get_channel_model_mode(uniqCfg);
   }
 
-  // Delay to allow the convergence of the IIR filter on PRACH noise measurements at gNB side
-  if (IS_SOFTMODEM_RFSIM && !get_softmodem_params()->phy_test)
-    sleep(3);
-
   // start time manager with some reasonable default for the running mode
   // (may be overwritten in configuration file or command line)
   void nr_pdcp_ms_tick(void);
