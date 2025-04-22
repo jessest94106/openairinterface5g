@@ -3262,7 +3262,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case NGAP_PDUSESSION_MODIFY_REQ:
-        rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(msg_p, instance);
+        rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(&NGAP_PDUSESSION_MODIFY_REQ(msg_p), instance);
         break;
 
       case NGAP_PDUSESSION_RELEASE_COMMAND:
