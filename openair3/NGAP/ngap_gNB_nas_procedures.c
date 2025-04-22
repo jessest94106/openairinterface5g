@@ -1084,7 +1084,7 @@ int ngap_gNB_pdusession_modify_resp(instance_t instance, ngap_pdusession_modify_
     ie->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
     ie->criticality = NGAP_Criticality_ignore;
     ie->value.present = NGAP_PDUSessionResourceModifyResponseIEs__value_PR_AMF_UE_NGAP_ID;
-    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, ue_context_p->amf_ue_ngap_id);
+    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, pdusession_modify_resp_p->amf_ue_ngap_id);
     asn1cSeqAdd(&out->protocolIEs.list, ie);
   }
   /* mandatory */

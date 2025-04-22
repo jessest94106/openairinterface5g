@@ -993,6 +993,7 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
   LOG_I(NR_RRC, "send message NGAP_PDUSESSION_MODIFY_RESP \n");
 
   resp->gNB_ue_ngap_id = UE->rrc_ue_id;
+  resp->amf_ue_ngap_id = UE->amf_ue_ngap_id;
 
   FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
     if (xid != session->xid) {
@@ -1015,7 +1016,7 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       p->pdusession_id = session->param.pdusession_id;
       FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos_session, &session->param.qos) {
         DevAssert(p->nb_of_qos_flow < MAX_QOS_FLOWS);
-        qos_flow_tobe_modified_t *q = &p->qos[p->nb_of_qos_flow++];
+        qos_flow_addmod_response_item_t *q = &p->qos[p->nb_of_qos_flow++];
         q->qfi = qos_session->qos.qfi;
       }
       LOG_I(NR_RRC,
