@@ -1700,6 +1700,10 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
       }
       if (config_isparamset(MacRLC_ParamList.paramarray[j], MACRLC_BEAMWEIGHTS_IDX)) {
+        if (NFAPI_MODE == NFAPI_MONOLITHIC) {
+          GET_PARAMS_LIST(L1_ParamList, L1_Params, L1PARAMS_DESC, CONFIG_STRING_L1_LIST, NULL);
+          AssertFatal(*(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr) == 0, "No need to set beam weights in case of DAS\n");
+        }
         int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
         int num_beam = n;
         if (!ab) {
