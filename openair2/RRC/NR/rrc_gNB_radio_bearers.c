@@ -32,6 +32,15 @@
 #include "oai_asn1.h"
 #include "openair2/LAYER2/nr_pdcp/nr_pdcp_asn1_utils.h"
 
+/** @brief Deep copy pdusession_t */
+void cp_pdusession(pdusession_t *dst, const pdusession_t *src)
+{
+  // Shallow copy
+  *dst = *src;
+  // nas_pdu
+  dst->nas_pdu = copy_byte_array(src->nas_pdu);
+}
+
 rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create)
 {
   int j;

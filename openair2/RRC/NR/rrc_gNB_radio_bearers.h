@@ -78,4 +78,7 @@ void get_pduSession_array(gNB_RRC_UE_t *ue, uint32_t pdu_sessions[NGAP_MAX_PDU_S
 /// @brief set PDCP configuration in a bearer context management message
 void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, drb_t *rrc_drb, bool um_on_default_drb);
 
+/// @brief Deep copy an instance of struct pdusession_t
+void cp_pdusession(pdusession_t *dst, const pdusession_t *src);
+
 #endif
