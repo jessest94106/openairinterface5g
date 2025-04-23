@@ -267,59 +267,102 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
 }
 
 // computes round-trip-time between ue and sat based on SIB19 ephemeris data
-static double calculate_ue_sat_ta(const position_t *position_params, NR_PositionVelocity_r17_t *sat_pos)
+static void calculate_ue_sat_ta(const position_t *position_params,
+                                const NR_PositionVelocity_r17_t *sat_pos,
+                                ntn_timing_advance_componets_t *ntn_ta)
 {
   // get UE position coordinates
-  double posx = position_params->positionX;
-  double posy = position_params->positionY;
-  double posz = position_params->positionZ;
+  double pos_ue_x = position_params->positionX;
+  double pos_ue_y = position_params->positionY;
+  double pos_ue_z = position_params->positionZ;
 
   // get sat position coordinates
-  double posx_0 = (double)sat_pos->positionX_r17 * 1.3;
-  double posy_0 = (double)sat_pos->positionY_r17 * 1.3;
-  double posz_0 = (double)sat_pos->positionZ_r17 * 1.3;
+  double pos_sat_x = (double)sat_pos->positionX_r17 * 1.3;
+  double pos_sat_y = (double)sat_pos->positionY_r17 * 1.3;
+  double pos_sat_z = (double)sat_pos->positionZ_r17 * 1.3;
 
-  double distance = 2 * sqrt(pow(posx - posx_0, 2) + pow(posy - posy_0, 2) + pow(posz - posz_0, 2));
-  double ta_ms = (distance / SPEED_OF_LIGHT) * 1000;
+  // calculate directional vector from SAT to UE
+  double dir_sat_ue_x = pos_ue_x - pos_sat_x;
+  double dir_sat_ue_y = pos_ue_y - pos_sat_y;
+  double dir_sat_ue_z = pos_ue_z - pos_sat_z;
 
-  return ta_ms;
+  // calculate distance between SAT and UE
+  double distance = sqrt(dir_sat_ue_x * dir_sat_ue_x + dir_sat_ue_y * dir_sat_ue_y + dir_sat_ue_z * dir_sat_ue_z);
+
+  // get sat velocity vector
+  double vel_sat_x = (double)sat_pos->velocityVX_r17 * 0.06;
+  double vel_sat_y = (double)sat_pos->velocityVY_r17 * 0.06;
+  double vel_sat_z = (double)sat_pos->velocityVZ_r17 * 0.06;
+
+  // calculate SAT velocity towards UE
+  double velocity = (vel_sat_x * dir_sat_ue_x + vel_sat_y * dir_sat_ue_y + vel_sat_z * dir_sat_ue_z) / distance;
+
+  ntn_ta->N_UE_TA_adj = (2 * distance / SPEED_OF_LIGHT) * 1e3; // in ms
+  ntn_ta->N_UE_TA_drift = (2 * -velocity / SPEED_OF_LIGHT) * 1e6; // in µs/s
 }
 
 // populate ntn_ta structure from mac
-void configure_ntn_ta(module_id_t module_id, ntn_timing_advance_componets_t *ntn_ta, NR_NTN_Config_r17_t *ntn_Config_r17)
+static void configure_ntn_ta(module_id_t module_id,
+                             ntn_timing_advance_componets_t *ntn_ta,
+                             const NR_NTN_Config_r17_t *ntn_Config_r17)
 {
   position_t position_params = {0};
   get_position_coordinates(module_id, &position_params);
 
-  // if ephemerisInfo_r17 present in SIB19
-  NR_EphemerisInfo_r17_t *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
+  // epochTime_r17 must be present (this is assured by function `eval_epoch_time()`)
+  const NR_EpochTime_r17_t *epoch_time_r17 = ntn_Config_r17->epochTime_r17;
+  AssertFatal(epoch_time_r17, "epoch_time_r17 should not be NULL here\n");
+  ntn_ta->epoch_sfn = epoch_time_r17->sfn_r17;
+  ntn_ta->epoch_subframe = epoch_time_r17->subFrameNR_r17;
+
+  // handle ephemerisInfo_r17
+  const NR_EphemerisInfo_r17_t *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
   if (ephemeris_info) {
-    NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
-    if (position_velocity
-        && (position_velocity->positionX_r17 != 0 || position_velocity->positionY_r17 != 0
-            || position_velocity->positionZ_r17 != 0)) {
-      ntn_ta->N_UE_TA_adj = calculate_ue_sat_ta(&position_params, position_velocity);
+    if (ephemeris_info->present == NR_EphemerisInfo_r17_PR_positionVelocity_r17) {
+      const NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
+      AssertFatal(position_velocity, "position_velocity should not be NULL here\n");
+      calculate_ue_sat_ta(&position_params, position_velocity, ntn_ta);
+    } else {
+      LOG_W(NR_MAC, "NR UE currently supports only ephemerisInfo_r17 of type positionVelocity_r17\n");
+      ntn_ta->N_UE_TA_adj = 0;
+      ntn_ta->N_UE_TA_drift = 0;
     }
+  } else { // Need R - Release if not present
+    ntn_ta->N_UE_TA_adj = 0;
+    ntn_ta->N_UE_TA_drift = 0;
   }
-  // if cellSpecificKoffset_r17 is present
-  if (ntn_Config_r17->cellSpecificKoffset_r17) {
+
+  // handle cellSpecificKoffset_r17
+  if (ntn_Config_r17->cellSpecificKoffset_r17)
     ntn_ta->cell_specific_k_offset = *ntn_Config_r17->cellSpecificKoffset_r17;
-  }
-  // Check if ta_Info_r17 is present and convert directly ta_Common_r17 (is in units of 4.072e-3 µs)
+  else // Need R - Release if not present
+    ntn_ta->cell_specific_k_offset = 0;
+
+  // Check if ta_Info_r17 is present and convert the time units
   if (ntn_Config_r17->ta_Info_r17) {
+    // ta_Common_r17 (is in units of 4.072e-3 µs)
     ntn_ta->N_common_ta_adj = ntn_Config_r17->ta_Info_r17->ta_Common_r17 * 4.072e-6;
     // ta_CommonDrift_r17 (is in units of 0.2e-3 µs/s)
     if (ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17)
       ntn_ta->ntn_ta_commondrift = *ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17 * 0.2e-3;
+    else // Need R - Release if not present
+      ntn_ta->ntn_ta_commondrift = 0;
+  } else { // Need R - Release if not present
+    ntn_ta->N_common_ta_adj = 0;
+    ntn_ta->ntn_ta_commondrift = 0;
   }
+
   ntn_ta->ntn_params_changed = true;
 
   LOG_D(NR_MAC,
-        "SIB19 Rxd. k_offset:%ld, N_Common_Ta:%f,drift:%f,N_UE_TA:%f \n",
+        "SIB19 Rxd. Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, N_Common_Ta: %fms, drift: %fµs/s, N_UE_TA: %fms, drift: %fµs/s\n",
+        ntn_ta->epoch_sfn,
+        ntn_ta->epoch_subframe,
         ntn_ta->cell_specific_k_offset,
         ntn_ta->N_common_ta_adj,
         ntn_ta->ntn_ta_commondrift,
-        ntn_ta->N_UE_TA_adj);
+        ntn_ta->N_UE_TA_adj,
+        ntn_ta->N_UE_TA_drift);
 }
 
 static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP)
@@ -1863,10 +1906,8 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, b
 
   if (sib19) {
     // update ntn_Config_r17 with received values
-    NR_NTN_Config_r17_t *ntn_Config_r17 = mac->sc_info.ntn_Config_r17;
-    UPDATE_IE(ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
-
-    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, ntn_Config_r17);
+    UPDATE_IE(mac->sc_info.ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
+    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17);
   }
   if (mac->state == UE_RECEIVING_SIB && can_start_ra)
     mac->state = UE_PERFORMING_RA;

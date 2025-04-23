@@ -2843,11 +2843,17 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
 static void schedule_ntn_config_command(fapi_nr_dl_config_request_t *dl_config, NR_UE_MAC_INST_t *mac)
 {
   fapi_nr_dl_ntn_config_command_pdu *ntn_config_command_pdu = &dl_config->dl_config_list[dl_config->number_pdus].ntn_config_command_pdu;
-  ntn_config_command_pdu->cell_specific_k_offset = mac->ntn_ta.cell_specific_k_offset;
-  ntn_config_command_pdu->ntn_ta_commondrift = mac->ntn_ta.ntn_ta_commondrift;
+
+  ntn_config_command_pdu->epoch_sfn = mac->ntn_ta.epoch_sfn;
+  ntn_config_command_pdu->epoch_subframe = mac->ntn_ta.epoch_subframe;
   ntn_config_command_pdu->N_common_ta_adj = mac->ntn_ta.N_common_ta_adj;
+  ntn_config_command_pdu->ntn_ta_commondrift = mac->ntn_ta.ntn_ta_commondrift;
   ntn_config_command_pdu->N_UE_TA_adj = mac->ntn_ta.N_UE_TA_adj;
-  ntn_config_command_pdu->ntn_total_time_advance_ms = mac->ntn_ta.N_common_ta_adj + mac->ntn_ta.N_UE_TA_adj;
+  ntn_config_command_pdu->N_UE_TA_drift = mac->ntn_ta.N_UE_TA_drift;
+  ntn_config_command_pdu->cell_specific_k_offset = mac->ntn_ta.cell_specific_k_offset;
+  ntn_config_command_pdu->ntn_total_time_advance_ms = get_total_TA_ms(&mac->ntn_ta);
+  ntn_config_command_pdu->ntn_total_time_advance_drift = get_total_TA_drift(&mac->ntn_ta);
+
   dl_config->dl_config_list[dl_config->number_pdus].pdu_type = FAPI_NR_DL_NTN_CONFIG_PARAMS;
   dl_config->number_pdus += 1;
 }

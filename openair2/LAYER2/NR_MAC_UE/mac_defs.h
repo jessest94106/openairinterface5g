@@ -526,12 +526,17 @@ typedef struct {
 } si_schedInfo_t;
 
 typedef struct ntn_timing_advance_components {
+  int epoch_sfn;
+  int epoch_subframe;
+
   // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
   double N_common_ta_adj;
-  // N_UE_TA_adj calculated round-trip-time between UE and SAT (ms)
-  double N_UE_TA_adj;
   // drift rate of common ta in µs/s
   double ntn_ta_commondrift;
+  // N_UE_TA_adj calculated round-trip-time between UE and SAT (ms)
+  double N_UE_TA_adj;
+  // drift rate of N_UE_TA in µs/s
+  double N_UE_TA_drift;
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
 
@@ -650,14 +655,19 @@ static inline int GET_NTN_UE_K_OFFSET(const ntn_timing_advance_componets_t *ntn_
   return (int)ntn_ta->cell_specific_k_offset << scs;
 }
 
-static inline double GET_COMPLETE_TIME_ADVANCE_MS(const ntn_timing_advance_componets_t *ntn_ta)
+static inline long GET_DURATION_RX_TO_TX(const ntn_timing_advance_componets_t *ntn_ta, int scs)
+{
+  return NR_UE_CAPABILITY_SLOT_RX_TO_TX + (ntn_ta->cell_specific_k_offset << scs);
+}
+
+static inline double get_total_TA_ms(const ntn_timing_advance_componets_t *ntn_ta)
 {
   return ntn_ta->N_common_ta_adj + ntn_ta->N_UE_TA_adj;
 }
 
-static inline long GET_DURATION_RX_TO_TX(const ntn_timing_advance_componets_t *ntn_ta, int scs)
+static inline double get_total_TA_drift(const ntn_timing_advance_componets_t *ntn_ta)
 {
-  return NR_UE_CAPABILITY_SLOT_RX_TO_TX + (ntn_ta->cell_specific_k_offset << scs);
+  return ntn_ta->ntn_ta_commondrift + ntn_ta->N_UE_TA_drift;
 }
 
 /*@}*/

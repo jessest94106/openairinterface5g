@@ -905,7 +905,8 @@ static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
 
 static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
                                     NR_DL_FRAME_PARMS *fp,
-                                    int slot_nr,
+                                    int frame_rx,
+                                    int slot_rx,
                                     int *duration_rx_to_tx,
                                     int *timing_advance,
                                     int *ntn_koffset)
@@ -913,22 +914,33 @@ static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
   if (UE->ntn_config_message->update) {
     UE->ntn_config_message->update = false;
 
-    double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
-    UE->timing_advance = fp->samples_per_subframe * total_ta_ms;
+    const int mu = fp->numerology_index;
+    const int koffset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
 
-    int mu = fp->numerology_index;
-    int koffset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
-    if (*ntn_koffset != koffset) {
-      *duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + (koffset << mu);
-      *timing_advance += fp->get_samples_slot_timestamp(slot_nr, fp, (koffset - *ntn_koffset) << mu);
-      *ntn_koffset = koffset;
-    }
+    *duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + (koffset << mu);
+    if (koffset > *ntn_koffset)
+      *timing_advance += fp->get_samples_slot_timestamp(slot_rx, fp, (koffset - *ntn_koffset) << mu);
+    else if (koffset < *ntn_koffset)
+      *timing_advance -= fp->get_samples_slot_timestamp(slot_rx, fp, (*ntn_koffset - koffset) << mu);
+    *ntn_koffset = koffset;
+
+    const int abs_subframe_tx = 10 * frame_rx + ((slot_rx + *duration_rx_to_tx) >> mu);
+    const int abs_subframe_epoch =
+        10 * UE->ntn_config_message->ntn_config_params.epoch_sfn + UE->ntn_config_message->ntn_config_params.epoch_subframe;
+    const int ms_since_epoch = (abs_subframe_tx - abs_subframe_epoch + 10240) % 10240;
+
+    const double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
+    const double total_ta_drift = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift; // µs/s
+    UE->timing_advance = fp->samples_per_subframe * (total_ta_ms + (total_ta_drift / 1000.0) * (ms_since_epoch / 1000.0));
 
     LOG_I(PHY,
-          "k_offset = %d ms (%d slots), ntn_total_time_advance_ms = %f ms (%d samples)\n",
+          "k_offset = %d ms (%d slots), total_ta_ms = %f ms, total_ta_drift = %f µs/s, ms_since_epoch = %d ms, computed "
+          "timing_advance = %d samples\n",
           *ntn_koffset,
           *ntn_koffset << mu,
           total_ta_ms,
+          total_ta_drift,
+          ms_since_epoch,
           UE->timing_advance);
   }
 }
@@ -1227,7 +1239,7 @@ void *UE_thread(void *arg)
     }
 
     // apply new NTN timing information
-    apply_ntn_config(UE, fp, slot_nr, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
+    apply_ntn_config(UE, fp, curMsg.proc.frame_rx, curMsg.proc.nr_slot_rx, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
 
     // Start TX slot processing here. It runs in parallel with RX slot processing
     // in current code, DURATION_RX_TO_TX constant is the limit to get UL data to encode from a RX slot

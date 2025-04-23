@@ -352,10 +352,15 @@ static void configure_ntn_params(PHY_VARS_NR_UE *ue, fapi_nr_dl_ntn_config_comma
     ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
   }
 
-  ue->ntn_config_message->ntn_config_params.cell_specific_k_offset = ntn_params_message->cell_specific_k_offset;
+  ue->ntn_config_message->ntn_config_params.epoch_sfn = ntn_params_message->epoch_sfn;
+  ue->ntn_config_message->ntn_config_params.epoch_subframe = ntn_params_message->epoch_subframe;
   ue->ntn_config_message->ntn_config_params.N_common_ta_adj = ntn_params_message->N_common_ta_adj;
   ue->ntn_config_message->ntn_config_params.ntn_ta_commondrift = ntn_params_message->ntn_ta_commondrift;
+  ue->ntn_config_message->ntn_config_params.N_UE_TA_adj = ntn_params_message->N_UE_TA_adj;
+  ue->ntn_config_message->ntn_config_params.N_UE_TA_drift = ntn_params_message->N_UE_TA_drift;
+  ue->ntn_config_message->ntn_config_params.cell_specific_k_offset = ntn_params_message->cell_specific_k_offset;
   ue->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms = ntn_params_message->ntn_total_time_advance_ms;
+  ue->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift = ntn_params_message->ntn_total_time_advance_drift;
   ue->ntn_config_message->update = true;
 }
 
