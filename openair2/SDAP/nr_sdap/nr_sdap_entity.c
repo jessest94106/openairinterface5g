@@ -333,27 +333,45 @@ static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
   }
 }
 
-/**
- * @brief update QFI to DRB mapping rules
-*/
-void nr_sdap_qfi2drb_map_update(nr_sdap_entity_t *entity, uint8_t qfi, rb_id_t drb, bool has_sdap_rx, bool has_sdap_tx)
+/** @brief Update QFI to DRB mapping rules
+ * @param qfi the QoS Flow index, used as unique index of the qfi2drb mapping table
+ * @param drb the DRB ID to be mapped */
+static void nr_sdap_qfi2drb_map_update(nr_sdap_entity_t *entity, const sdap_config_t *sdap)
 {
-  if(qfi < SDAP_MAX_QFI &&
-     qfi > SDAP_MAP_RULE_EMPTY &&
-     drb > 0 &&
-     drb <= AVLBL_DRB){
-    entity->qfi2drb_table[qfi].drb_id = drb;
-    entity->qfi2drb_table[qfi].has_sdap_rx = has_sdap_rx;
-    entity->qfi2drb_table[qfi].has_sdap_tx = has_sdap_tx;
-    LOG_D(SDAP, "Updated mapping: QFI %u -> DRB %ld \n", qfi, entity->qfi2drb_table[qfi].drb_id);
-  } else {
-    LOG_D(SDAP, "Map updated failed, QFI: %u, DRB: %ld\n", qfi, drb);
+  for (int i = 0; i < sdap->mappedQFIs2AddCount; i++) {
+    uint8_t qfi = sdap->mappedQFIs2Add[i];
+    LOG_D(SDAP, "Updating QFI to DRB mapping rules: %d mapped QFIs for DRB %d\n", sdap->mappedQFIs2AddCount, sdap->drb_id);
+    if (qfi < SDAP_MAX_QFI && qfi > SDAP_MAP_RULE_EMPTY && sdap->drb_id > 0 && sdap->drb_id <= MAX_DRBS_PER_UE) {
+      entity->qfi2drb_map_add(entity, qfi, sdap->drb_id, sdap->sdap_rx, sdap->sdap_tx);
+    } else {
+      LOG_E(SDAP, "Failed to update qfi2drb mapping: QFI=%d, DRB=%d\n", qfi, sdap->drb_id);
+    }
+  }
+  for (int i = 0; i < sdap->mappedQFIs2ReleaseCount; i++) {
+    uint8_t qfi = sdap->mappedQFIs2Release[i];
+    LOG_D(SDAP, "Deelting QFI to DRB mapping rules: QFI=%d for DRB=%d\n", qfi, sdap->drb_id);
+    entity->qfi2drb_map_delete(entity, qfi);
   }
 }
 
-void nr_sdap_qfi2drb_map_del(nr_sdap_entity_t *entity, uint8_t qfi){
-  entity->qfi2drb_table[qfi].drb_id = SDAP_NO_MAPPING_RULE;
-  LOG_D(SDAP, "Deleted mapping for QFI: %u \n", qfi);
+static void nr_sdap_qfi2drb_map_add(nr_sdap_entity_t *entity,
+                                    const uint8_t qfi,
+                                    const uint8_t drb_id,
+                                    const uint8_t role_rx,
+                                    const uint8_t role_tx)
+{
+  qfi2drb_t *qfi2drb = &entity->qfi2drb_table[qfi];
+  LOG_D(SDAP, "%s mapping: QFI %u -> DRB %d \n", qfi2drb->drb_id == SDAP_NO_MAPPING_RULE ? "Add" : "Update", qfi, drb_id);
+  qfi2drb->drb_id = drb_id;
+  qfi2drb->has_sdap_rx = role_rx;
+  qfi2drb->has_sdap_tx = role_tx;
+}
+
+static void nr_sdap_qfi2drb_map_del(nr_sdap_entity_t *entity, const uint8_t qfi)
+{
+  qfi2drb_t *qfi2drb = &entity->qfi2drb_table[qfi];
+  qfi2drb->drb_id = SDAP_NO_MAPPING_RULE;
+  LOG_D(SDAP, "Deleted mapping for QFI=%d, DRB=%d\n", qfi, qfi2drb->drb_id);
 }
 
 /**
@@ -448,15 +466,16 @@ static void nr_sdap_ue_qfi2drb_config(nr_sdap_entity_t *entity, const ue_id_t ue
       // submit the end-marker control PDU to the lower layers
       entity->sdap_submit_ctrl_pdu(ue_id, sdap_ctrl_pdu_drb, sdap_ctrl_pdu);
     }
-    // store QFI to DRB mapping rules
-    LOG_D(SDAP, "Storing the configured QoS flow to DRB mapping rule\n");
-    entity->qfi2drb_map_update(entity, qfi, sdap.drb_id, sdap.sdap_rx, sdap.sdap_tx);
   }
 
   // handle QFIs to DRB mapping rule to release
   for (int i = 0; i < sdap.mappedQFIs2ReleaseCount; i++) {
     entity->qfi2drb_map_delete(entity, sdap.mappedQFIs2Release[i]);
   }
+
+  // store QFI to DRB mapping rules
+  LOG_D(SDAP, "Storing the configured QoS flow to DRB mapping rule\n");
+  entity->qfi2drb_map_update(entity, &sdap);
 }
 
 /**
@@ -483,9 +502,7 @@ nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, cons
       nr_sdap_ue_qfi2drb_config(sdap_entity, ue_id, sdap);
     } else {
       // store QFI to DRB mapping rules
-      for (int i = 0; i < sdap.mappedQFIs2AddCount; i++) {
-        sdap_entity->qfi2drb_map_update(sdap_entity, sdap.mappedQFIs2Add[i], sdap.drb_id, sdap.sdap_rx, sdap.sdap_tx);
-      }
+      sdap_entity->qfi2drb_map_update(sdap_entity, &sdap);
     }
     return sdap_entity;
   }
@@ -508,6 +525,7 @@ nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, cons
 
   // QFI to DRB mapping functions pointers
   sdap_entity->qfi2drb_map_update = nr_sdap_qfi2drb_map_update;
+  sdap_entity->qfi2drb_map_add = nr_sdap_qfi2drb_map_add;
   sdap_entity->qfi2drb_map_delete = nr_sdap_qfi2drb_map_del;
   sdap_entity->qfi2drb_map = nr_sdap_qfi2drb;
   sdap_entity->pdusession_sock = -1;
@@ -518,10 +536,8 @@ nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, cons
     LOG_I(SDAP, "Default DRB for the created SDAP entity: DRB %ld \n", sdap_entity->default_drb);
   }
 
-  for (int i = 0; i < sdap.mappedQFIs2AddCount; i++) {
-    // store QFI to DRB mapping rules
-    sdap_entity->qfi2drb_map_update(sdap_entity, sdap.mappedQFIs2Add[i], sdap.drb_id, sdap.sdap_rx, sdap.sdap_tx);
-  }
+  // store QFI to DRB mapping rules
+  sdap_entity->qfi2drb_map_update(sdap_entity, &sdap);
 
   // update SDAP entity list pointers
   sdap_entity->next_entity = sdap_info.sdap_entity_llist;

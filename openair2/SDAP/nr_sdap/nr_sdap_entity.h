@@ -38,7 +38,6 @@
 #define SDAP_HDR_LENGTH             (1)
 #define SDAP_MAX_QFI                (64)
 #define SDAP_MAP_RULE_EMPTY         (0)
-#define AVLBL_DRB                   (5)
 #define SDAP_NO_MAPPING_RULE        (0)
 #define SDAP_REFLECTIVE_MAPPING     (1)
 #define SDAP_RQI_HANDLING           (1)
@@ -103,8 +102,13 @@ typedef struct nr_sdap_entity_s {
 
   qfi2drb_t qfi2drb_table[SDAP_MAX_QFI];
 
-  void (*qfi2drb_map_update)(struct nr_sdap_entity_s *entity, uint8_t qfi, rb_id_t drb, bool has_sdap_rx, bool has_sdap_tx);
-  void (*qfi2drb_map_delete)(struct nr_sdap_entity_s *entity, uint8_t qfi);
+  void (*qfi2drb_map_update)(struct nr_sdap_entity_s *entity, const sdap_config_t *sdap);
+  void (*qfi2drb_map_delete)(struct nr_sdap_entity_s *entity, const uint8_t qfi);
+  void (*qfi2drb_map_add)(struct nr_sdap_entity_s *entity,
+                          const uint8_t qfi,
+                          const uint8_t drb_id,
+                          const uint8_t role_rx,
+                          const uint8_t role_tx);
   int (*qfi2drb_map)(struct nr_sdap_entity_s *entity, uint8_t qfi);
 
   nr_sdap_ul_hdr_t (*sdap_construct_ctrl_pdu)(uint8_t qfi);
@@ -137,12 +141,6 @@ typedef struct nr_sdap_entity_s {
   /* List of entities */
   struct nr_sdap_entity_s *next_entity;
 } nr_sdap_entity_t;
-
-/* QFI to DRB Mapping Related Function */
-void nr_sdap_qfi2drb_map_update(nr_sdap_entity_t *entity, uint8_t qfi, rb_id_t drb, bool has_sdap_rx, bool has_sdap_tx);
-
-/* QFI to DRB Mapping Related Function */
-void nr_sdap_qfi2drb_map_del(nr_sdap_entity_t *entity, uint8_t qfi);
 
 /*
  * TS 37.324 5.3 QoS flow to DRB Mapping 
