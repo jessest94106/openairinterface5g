@@ -129,12 +129,14 @@ void rxAddInput(const c16_t *input_sig,
         LOG_I(HW, "Satellite orbit: time %f s, Position = (%f, %f, %f), Velocity = (%f, %f, %f)\n", t, pos_sat_x, pos_sat_y, pos_sat_z, vel_sat_x, vel_sat_y, vel_sat_z);
         LOG_I(HW, "Uplink delay %f ms, Doppler shift UE->SAT %f kHz\n", prop_delay * 1000, f_Doppler_shift_ue_sat / 1000);
         LOG_I(HW, "Satellite velocity towards gNB: %f m/s, acceleration towards gNB: %f m/s²\n", vel_sat_gnb, acc_sat_gnb);
+      }
 
-        const int samples_per_subframe = channelDesc->sampling_rate / 1000;
-        const int abs_subframe = TS / samples_per_subframe;
+      const int samples_per_subframe = channelDesc->sampling_rate / 1000;
+      const int abs_subframe = TS / samples_per_subframe;
+      if (abs_subframe % 10 == 0) { // update SIB19 information for the next frame
         gnb_sat_position_update_t sat_position = {
-            .sfn = (abs_subframe / 10) % 1024,
-            .subframe = abs_subframe % 10,
+            .sfn = (abs_subframe / 10 + 1) % 1024,
+            .subframe = 0,
             .delay = 2 * dist_sat_gnb / (c * 4.072e-9),
             .drift = 2 * -vel_sat_gnb / (c * 0.2e-9),
             .accel = 2 * acc_sat_gnb / (c * 0.2e-10),
