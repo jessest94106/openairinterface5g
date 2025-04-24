@@ -464,67 +464,65 @@ static void nr_sdap_ue_qfi2drb_config(nr_sdap_entity_t *existing_sdap_entity,
  * @param   mapped_qfi_2_add, list of QoS flows to add/update
  * @param   mappedQFIs2AddCount, number of QoS flows to add/update
  */
-nr_sdap_entity_t *new_nr_sdap_entity(int is_gnb,
-                                     bool has_sdap_rx,
-                                     bool has_sdap_tx,
-                                     ue_id_t ue_id,
-                                     int pdusession_id,
-                                     bool is_defaultDRB,
-                                     uint8_t drb_identity,
-                                     NR_QFI_t *mapped_qfi_2_add,
-                                     uint8_t mappedQFIs2AddCount)
+nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t sdap)
 {
   /* check whether the SDAP entity already exists and
      update QFI to DRB mapping rules in that case */
-  if (nr_sdap_get_entity(ue_id, pdusession_id)) {
-    LOG_E(SDAP, "SDAP Entity for UE already exists with RNTI/UE ID: %lu and PDU SESSION ID: %d\n", ue_id, pdusession_id);
-    nr_sdap_entity_t *existing_sdap_entity = nr_sdap_get_entity(ue_id, pdusession_id);
-    rb_id_t pdcp_entity = existing_sdap_entity->default_drb;
-    if(!is_gnb)
-      nr_sdap_ue_qfi2drb_config(existing_sdap_entity,
-                                pdcp_entity,
+  nr_sdap_entity_t *sdap_entity = nr_sdap_get_entity(ue_id, sdap.pdusession_id);
+  if (sdap_entity) {
+    LOG_E(SDAP, "SDAP Entity for UE already exists with RNTI/UE ID: %lu and PDU SESSION ID: %d\n", ue_id, sdap.pdusession_id);
+    if (!is_gnb) {
+      nr_sdap_ue_qfi2drb_config(sdap_entity,
+                                sdap_entity->default_drb,
                                 ue_id,
-                                mapped_qfi_2_add,
-                                mappedQFIs2AddCount,
-                                drb_identity,
-                                has_sdap_rx,
-                                has_sdap_tx);
-    return existing_sdap_entity;
+                                sdap.mappedQFIs2Add,
+                                sdap.mappedQFIs2AddCount,
+                                sdap.drb_id,
+                                sdap.sdap_rx,
+                                sdap.sdap_tx);
+    } else {
+      // store QFI to DRB mapping rules
+      for (int i = 0; i < sdap.mappedQFIs2AddCount; i++) {
+        sdap_entity->qfi2drb_map_update(sdap_entity, sdap.mappedQFIs2Add[i], sdap.drb_id, sdap.sdap_rx, sdap.sdap_tx);
+      }
+    }
+    return sdap_entity;
   }
 
-  nr_sdap_entity_t *sdap_entity;
-  sdap_entity = calloc(1, sizeof(nr_sdap_entity_t));
+  sdap_entity = calloc_or_fail(1, sizeof(*sdap_entity));
 
-  if(sdap_entity == NULL) {
-    LOG_E(SDAP, "SDAP Entity creation failed, out of memory\n");
-    exit(1);
-  }
-
+  // SDAP entity ids
   sdap_entity->ue_id = ue_id;
-  sdap_entity->pdusession_id = pdusession_id;
+  sdap_entity->pdusession_id = sdap.pdusession_id;
   sdap_entity->is_gnb = is_gnb;
 
+  // rx/tx entities
   sdap_entity->tx_entity = nr_sdap_tx_entity;
   sdap_entity->rx_entity = nr_sdap_rx_entity;
 
+  // control pdu function pointers
   sdap_entity->sdap_construct_ctrl_pdu = nr_sdap_construct_ctrl_pdu;
   sdap_entity->sdap_map_ctrl_pdu = nr_sdap_map_ctrl_pdu;
   sdap_entity->sdap_submit_ctrl_pdu = nr_sdap_submit_ctrl_pdu;
 
+  // QFI to DRB mapping functions pointers
   sdap_entity->qfi2drb_map_update = nr_sdap_qfi2drb_map_update;
   sdap_entity->qfi2drb_map_delete = nr_sdap_qfi2drb_map_del;
   sdap_entity->qfi2drb_map = nr_sdap_qfi2drb_map;
-
   sdap_entity->pdusession_sock = -1;
 
-  if(is_defaultDRB) {
-    sdap_entity->default_drb = drb_identity;
-    LOG_I(SDAP, "Default DRB for the created SDAP entity: %ld \n", sdap_entity->default_drb);
-    LOG_D(SDAP, "RRC updating mapping rules: %d\n", mappedQFIs2AddCount);
-    for (int i = 0; i < mappedQFIs2AddCount; i++)
-      sdap_entity->qfi2drb_map_update(sdap_entity, mapped_qfi_2_add[i], sdap_entity->default_drb, has_sdap_rx, has_sdap_tx);
+  // set default DRB
+  if (sdap.defaultDRB) {
+    sdap_entity->default_drb = sdap.drb_id;
+    LOG_I(SDAP, "Default DRB for the created SDAP entity: DRB %ld \n", sdap_entity->default_drb);
   }
 
+  for (int i = 0; i < sdap.mappedQFIs2AddCount; i++) {
+    // store QFI to DRB mapping rules
+    sdap_entity->qfi2drb_map_update(sdap_entity, sdap.mappedQFIs2Add[i], sdap.drb_id, sdap.sdap_rx, sdap.sdap_tx);
+  }
+
+  // update SDAP entity list pointers
   sdap_entity->next_entity = sdap_info.sdap_entity_llist;
   sdap_info.sdap_entity_llist = sdap_entity;
 

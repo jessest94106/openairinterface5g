@@ -179,15 +179,7 @@ void nr_sdap_submit_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_sdap_u
  * TS 37.324 4.4 5.1.1 SDAP entity establishment
  * Establish an SDAP entity.
  */
-nr_sdap_entity_t *new_nr_sdap_entity(int is_gnb,
-                                     bool has_sdap_rx,
-                                     bool has_sdap_tx,
-                                     ue_id_t ue_id,
-                                     int pdusession_id,
-                                     bool is_defaultDRB,
-                                     uint8_t default_DRB,
-                                     NR_QFI_t *mapped_qfi_2_add,
-                                     uint8_t mappedQFIs2AddCount);
+nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t sdap);
 
 /* Entity Handling Related Functions */
 nr_sdap_entity_t *nr_sdap_get_entity(ue_id_t ue_id, int pdusession_id);
