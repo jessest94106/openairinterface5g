@@ -931,15 +931,17 @@ static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
 
     const double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
     const double total_ta_drift = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift; // µs/s
-    UE->timing_advance = fp->samples_per_subframe * (total_ta_ms + (total_ta_drift / 1000.0) * (ms_since_epoch / 1000.0));
+    const double total_ta_drift_variant = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift_variant; // µs/s²
+    UE->timing_advance = fp->samples_per_subframe * (total_ta_ms + (total_ta_drift / 1000.0) * (ms_since_epoch / 1000.0) + (total_ta_drift_variant / 1000.0) * (ms_since_epoch / 1000.0) * (ms_since_epoch / 1000.0));
 
     LOG_I(PHY,
-          "k_offset = %d ms (%d slots), total_ta_ms = %f ms, total_ta_drift = %f µs/s, ms_since_epoch = %d ms, computed "
+          "k_offset = %d ms (%d slots), total_ta_ms = %f ms, total_ta_drift = %f µs/s, total_ta_drift_variant = %f µs/s², ms_since_epoch = %d ms, computed "
           "timing_advance = %d samples\n",
           *ntn_koffset,
           *ntn_koffset << mu,
           total_ta_ms,
           total_ta_drift,
+          total_ta_drift_variant,
           ms_since_epoch,
           UE->timing_advance);
   }

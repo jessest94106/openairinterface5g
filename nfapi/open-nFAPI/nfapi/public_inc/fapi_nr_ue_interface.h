@@ -563,8 +563,12 @@ typedef struct {
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
 
+  // ntn_total_time_advance_ms represents the complete round-trip-time between gNB and UE via SAT
   double ntn_total_time_advance_ms;
+  // drift rate of ntn_total_time_advance_ms in µs/s
   double ntn_total_time_advance_drift;
+  // change rate of ntn_total_time_advance_ms drift in µs/s²
+  double ntn_total_time_advance_drift_variant;
 } fapi_nr_dl_ntn_config_command_pdu;
 
 typedef struct {

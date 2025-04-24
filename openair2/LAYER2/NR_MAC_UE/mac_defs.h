@@ -533,6 +533,8 @@ typedef struct ntn_timing_advance_components {
   double N_common_ta_adj;
   // drift rate of common ta in µs/s
   double N_common_ta_drift;
+  // change rate of common ta drift in µs/s²
+  double N_common_ta_drift_variant;
   // N_UE_TA_adj calculated round-trip-time between UE and SAT (ms)
   double N_UE_TA_adj;
   // drift rate of N_UE_TA in µs/s

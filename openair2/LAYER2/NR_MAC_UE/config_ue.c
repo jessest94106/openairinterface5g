@@ -339,20 +339,27 @@ static void configure_ntn_ta(module_id_t module_id,
       ntn_ta->N_common_ta_drift = *ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17 * 0.2e-3;
     else // Need R - Release if not present
       ntn_ta->N_common_ta_drift = 0;
+    // ta_CommonDriftVariant_r17 (is in units of 0.2e-4 µs/s²)
+    if (ntn_Config_r17->ta_Info_r17->ta_CommonDriftVariant_r17)
+      ntn_ta->N_common_ta_drift_variant = *ntn_Config_r17->ta_Info_r17->ta_CommonDriftVariant_r17 * 0.2e-4;
+    else // Need R - Release if not present
+      ntn_ta->N_common_ta_drift_variant = 0;
   } else { // Need R - Release if not present
     ntn_ta->N_common_ta_adj = 0;
     ntn_ta->N_common_ta_drift = 0;
+    ntn_ta->N_common_ta_drift_variant = 0;
   }
 
   ntn_ta->ntn_params_changed = true;
 
   LOG_D(NR_MAC,
-        "SIB19 Rxd. Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, N_Common_Ta: %fms, drift: %fµs/s, N_UE_TA: %fms, drift: %fµs/s\n",
+        "SIB19 Rxd. Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s², N_UE_TA: %fms, drift: %fµs/s\n",
         ntn_ta->epoch_sfn,
         ntn_ta->epoch_subframe,
         ntn_ta->cell_specific_k_offset,
         ntn_ta->N_common_ta_adj,
         ntn_ta->N_common_ta_drift,
+        ntn_ta->N_common_ta_drift_variant,
         ntn_ta->N_UE_TA_adj,
         ntn_ta->N_UE_TA_drift);
 }
