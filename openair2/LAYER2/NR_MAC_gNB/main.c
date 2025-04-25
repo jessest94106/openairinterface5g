@@ -79,7 +79,10 @@ void *nrmac_stats_thread(void *arg) {
   char output[MACSTATSSTRLEN] = {0};
   const char *end = output + MACSTATSSTRLEN;
   FILE *file = fopen("nrMAC_stats.log","w");
-  AssertFatal(file!=NULL,"Cannot open nrMAC_stats.log, error %s\n",strerror(errno));
+  if (!file) {
+    LOG_W(NR_MAC, "Cannot open nrMAC_stats.log: %d, %s\n", errno, strerror(errno));
+    return NULL;
+  }
 
   while (oai_exit == 0) {
     char *p = output;
@@ -344,6 +347,19 @@ void mac_top_init_gNB(ngran_node_t node_type,
   du_init_f1_ue_data();
 
   srand48(0);
+}
+
+void mac_top_destroy_gNB(gNB_MAC_INST *mac)
+{
+  NR_COMMON_channels_t *cc = &mac->common_channels[0];
+  ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, cc->mib);
+  ASN_STRUCT_FREE(asn_DEF_NR_BCCH_DL_SCH_Message, cc->sib1);
+  ASN_STRUCT_FREE(asn_DEF_NR_ServingCellConfig, cc->pre_ServingCellConfig);
+  ASN_STRUCT_FREE(asn_DEF_NR_ServingCellConfigCommon, cc->ServingCellConfigCommon);
+  NR_UEs_t *UE_info = &mac->UE_info;
+  for (int i = 0; i < sizeofArray(UE_info->list); ++i)
+    if (UE_info->list[i])
+      delete_nr_ue_data(UE_info->list[i], cc, &UE_info->uid_allocator);
 }
 
 void nr_mac_send_f1_setup_req(void)
