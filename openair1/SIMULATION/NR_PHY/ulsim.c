@@ -32,7 +32,6 @@
 #include "common/utils/var_array.h"
 #define inMicroS(a) (((double)(a))/(get_cpu_freq_GHz()*1000.0))
 #include "SIMULATION/LTE_PHY/common_sim.h"
-#include "openair2/RRC/LTE/rrc_vars.h"
 #include "common/utils/assertions.h"
 #include "executables/softmodem-common.h"
 #include "NR_BCCH-BCH-Message.h"
@@ -160,7 +159,6 @@ uint16_t n_rnti = 0x1234;
 openair0_config_t openair0_cfg[MAX_CARDS];
 
 channel_desc_t *UE2gNB[MAX_MOBILES_PER_GNB][NUMBER_OF_gNB_MAX];
-int NB_UE_INST = 1;
 
 configmodule_interface_t *uniqCfg = NULL;
 int main(int argc, char *argv[])
