@@ -604,6 +604,9 @@ void schedule_nr_sib1(module_id_t module_idP,
        (type0_PDCCH_CSS_config->num_rbs > 0) &&
        (type0_PDCCH_CSS_config->active == true)) {
 
+      AssertFatal(is_dl_slot(slotP, &gNB_mac->frame_structure),
+                  "Trying to schedule SIB1 in slot %d which is not DL. Check searchSpaceZero configuration.\n",
+                  slotP);
       const int n_slots_frame = gNB_mac->frame_structure.numb_slots_frame;
       int beam_index = get_fapi_beamforming_index(gNB_mac, i);
       NR_beam_alloc_t beam = beam_allocation_procedure(&gNB_mac->beam_info, frameP, slotP, beam_index, n_slots_frame);
@@ -705,6 +708,9 @@ static void other_sib_sched_control(module_id_t module_idP,
                                     int payload_idx)
 {
   gNB_MAC_INST *gNB_mac = RC.nrmac[module_idP];
+  AssertFatal(is_dl_slot(slot, &gNB_mac->frame_structure),
+              "Trying to schedule otherSIB in slot %d which is not DL. Wrong Configuration\n",
+              slot);
   NR_ServingCellConfigCommon_t *scc = gNB_mac->common_channels[0].ServingCellConfigCommon;
   int n_slots_frame = gNB_mac->frame_structure.numb_slots_frame;
   NR_beam_alloc_t beam = beam_allocation_procedure(&gNB_mac->beam_info, frame, slot, beam_index, n_slots_frame);
