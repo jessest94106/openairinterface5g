@@ -142,10 +142,12 @@ int main(int n, char **v)
     memcpy(v+vpos, &length, 4);
     vpos += 4;
 #ifdef T_SEND_TIME
+    if (length < sizeof(struct timespec)) goto read_error;
     if (fullread(socket,v+vpos,sizeof(struct timespec))==-1) goto read_error;
     vpos += sizeof(struct timespec);
     length -= sizeof(struct timespec);
 #endif
+    if (length < sizeof(int)) goto read_error;
     if (fullread(socket, &type, sizeof(int)) == -1) goto read_error;
     memcpy(v+vpos, &type, sizeof(int));
     vpos += sizeof(int);
