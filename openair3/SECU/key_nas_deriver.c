@@ -139,6 +139,38 @@ void nr_derive_key(algorithm_type_dist_t alg_type, uint8_t alg_id, const uint8_t
  * NOTE: knas is dynamically allocated by the KDF function
  */
 
+/** @brief KgNB derivation (A.9 3GPP TS 33.501) */
+void derive_kgnb(uint8_t kamf[32], uint32_t count, uint8_t *kgnb)
+{
+  /* Compute the KDF input parameter
+   * S = FC(0x6E) || UL NAS Count || 0x00 0x04 || 0x01 || 0x00 0x01
+   */
+  uint8_t input[32] = {0};
+
+  input[0] = 0x6E;
+  // P0
+  input[1] = count >> 24;
+  input[2] = (uint8_t)(count >> 16);
+  input[3] = (uint8_t)(count >> 8);
+  input[4] = (uint8_t)count;
+  // L0
+  input[5] = 0;
+  input[6] = 4;
+  // P1
+  input[7] = 0x01;
+  // L1
+  input[8] = 0;
+  input[9] = 1;
+
+  byte_array_t data = {.buf = input, .len = 10};
+  kdf(kamf, data, 32, kgnb);
+
+  printf("kgnb : ");
+  for (int pp = 0; pp < 32; pp++)
+    printf("%02x ", kgnb[pp]);
+  printf("\n");
+}
+
 void derive_keNB(const uint8_t kasme[32], const uint32_t nas_count, uint8_t *keNB)
 {
   uint8_t s[7] = {0};
