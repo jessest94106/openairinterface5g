@@ -931,10 +931,11 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
   /* PDSCH_TO_HARQ_FEEDBACK_TIME_IND */
   // according to TS 38.213 9.2.3
   const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, dlsch_pdu->SubcarrierSpacing);
-  const uint16_t feedback_ti = 1 + dci->pdsch_to_harq_feedback_timing_indicator.val + ntn_ue_koffset;
+  uint16_t feedback_ti = 0;
 
   if (rnti_type != TYPE_RA_RNTI_ && rnti_type != TYPE_SI_RNTI_) {
     if (!get_FeedbackDisabled(mac->sc_info.downlinkHARQ_FeedbackDisabled_r17, dci->harq_pid.val)) {
+      feedback_ti = 1 + dci->pdsch_to_harq_feedback_timing_indicator.val + ntn_ue_koffset;
       AssertFatal(feedback_ti > GET_DURATION_RX_TO_TX(&mac->ntn_ta, dlsch_pdu->SubcarrierSpacing),
                   "PDSCH to HARQ feedback time (%d) needs to be higher than DURATION_RX_TO_TX (%ld).\n",
                   feedback_ti,
@@ -1227,9 +1228,10 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
   /* PDSCH_TO_HARQ_FEEDBACK_TIME_IND */
   // according to TS 38.213 Table 9.2.3-1
   const int ntn_ue_koffset = GET_NTN_UE_K_OFFSET(&mac->ntn_ta, dlsch_pdu->SubcarrierSpacing);
-  const uint16_t feedback_ti = pucch_Config->dl_DataToUL_ACK->list.array[dci->pdsch_to_harq_feedback_timing_indicator.val][0] + ntn_ue_koffset;
+  uint16_t feedback_ti = 0;
 
   if (!get_FeedbackDisabled(mac->sc_info.downlinkHARQ_FeedbackDisabled_r17, dci->harq_pid.val)) {
+    feedback_ti = pucch_Config->dl_DataToUL_ACK->list.array[dci->pdsch_to_harq_feedback_timing_indicator.val][0] + ntn_ue_koffset;
     AssertFatal(feedback_ti > GET_DURATION_RX_TO_TX(&mac->ntn_ta, dlsch_pdu->SubcarrierSpacing),
                 "PDSCH to HARQ feedback time (%d) needs to be higher than DURATION_RX_TO_TX (%ld). Min feedback time set in config "
                 "file (min_rxtxtime).\n",
@@ -4002,9 +4004,10 @@ static void handle_rar_reception(NR_UE_MAC_INST_t *mac, NR_MAC_RAR *rar, frame_t
   const NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
   const NR_UE_DL_BWP_t *current_DL_BWP = mac->current_DL_BWP;
   const NR_BWP_PDCCH_t *pdcch_config = &mac->config_BWP_PDCCH[current_DL_BWP->bwp_id];
+  const NR_SearchSpace_t *ra_SS = get_common_search_space(mac, pdcch_config->ra_SS_id);
   NR_tda_info_t tda_info = get_ul_tda_info(current_UL_BWP,
-                                           *pdcch_config->ra_SS->controlResourceSetId,
-                                           pdcch_config->ra_SS->searchSpaceType->present,
+                                           *ra_SS->controlResourceSetId,
+                                           ra_SS->searchSpaceType->present,
                                            TYPE_RA_RNTI_,
                                            rar_grant.Msg3_t_alloc);
   if (!tda_info.valid_tda || tda_info.nrOfSymbols == 0) {

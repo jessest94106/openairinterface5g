@@ -50,7 +50,6 @@
 #include "NR_ReestablishmentCause.h"
 #include "NR_SRB-ToAddModList.h"
 #include "NR_SecurityConfig.h"
-#include "RRC/NR/nr_rrc_defs.h"
 #include "ds/seq_arr.h"
 #include "rrc_messages_types.h"
 struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList;
@@ -86,8 +85,8 @@ void fill_nr_noS1_bearer_config(NR_RadioBearerConfig_t **rbconfig,
 void free_nr_noS1_bearer_config(NR_RadioBearerConfig_t **rbconfig,
                                 NR_RLC_BearerConfig_t **rlc_rbconfig);
 
-int do_RRCSetup(rrc_gNB_ue_context_t *const ue_context_pP,
-                uint8_t *const buffer,
+int do_RRCSetup(uint8_t *const buffer,
+                size_t buffer_size,
                 const uint8_t transaction_id,
                 const uint8_t *masterCellGroup,
                 int masterCellGroup_len,
@@ -103,7 +102,7 @@ int do_NR_SA_UECapabilityEnquiry(uint8_t *const buffer, const uint8_t Transactio
 
 int do_NR_RRCRelease(uint8_t *buffer, size_t buffer_size, uint8_t Transaction_id);
 
-int do_RRCReconfiguration(const gNB_RRC_UE_t *UE,
+int do_RRCReconfiguration(int rrc_ue_id,
                           uint8_t *buffer,
                           size_t buffer_size,
                           uint8_t Transaction_id,
@@ -147,21 +146,17 @@ int do_RRCReestablishmentRequest(uint8_t *buffer,
                                  uint32_t cell_id,
                                  uint16_t c_rnti);
 
-int do_RRCReestablishment(rrc_gNB_ue_context_t *const ue_context_pP,
-                          uint8_t *const buffer,
-                          size_t buffer_size,
-                          const uint8_t Transaction_id,
-                          uint16_t pci,
-                          NR_ARFCN_ValueNR_t absoluteFrequencySSB);
+int do_RRCReestablishment(int8_t nh_ncc, uint8_t *const buffer, size_t buffer_size, const uint8_t Transaction_id);
 
 int do_RRCReestablishmentComplete(uint8_t *buffer, size_t buffer_size, int64_t rrc_TransactionIdentifier);
 
-const nr_a3_event_t *get_a3_configuration(int pci);
 NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 int band,
                                 int scs,
-                                const nr_measurement_configuration_t *const measurementConfiguration,
-                                const seq_arr_t *const neighbourConfiguration);
+                                NR_ReportConfigToAddMod_t *rc_PER,
+                                NR_ReportConfigToAddMod_t *rc_A2,
+                                seq_arr_t *rc_A3_seq,
+                                seq_arr_t *pci_seq);
 void free_MeasConfig(NR_MeasConfig_t *mc);
 int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi);
 

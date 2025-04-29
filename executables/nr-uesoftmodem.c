@@ -49,7 +49,6 @@
 #include "PHY/NR_TRANSPORT/nr_dlsch.h"
 //#include "../../SIMU/USER/init_lte.h"
 
-#include "RRC/LTE/rrc_vars.h"
 #include "PHY_INTERFACE/phy_interface_vars.h"
 #include "NR_IF_Module.h"
 #include "openair1/SIMULATION/TOOLS/sim.h"
@@ -64,7 +63,6 @@ unsigned short config_frames[4] = {2,9,11,13};
 #include "common/utils/LOG/vcd_signal_dumper.h"
 
 #include "UTIL/OPT/opt.h"
-#include "enb_config.h"
 #include "LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
 
 #include "intertask_interface.h"
@@ -90,7 +88,6 @@ unsigned short config_frames[4] = {2,9,11,13};
 #include "nr_nas_msg.h"
 #include <openair1/PHY/MODULATION/nr_modulation.h>
 #include "openair2/GNB_APP/gnb_paramdef.h"
-#include "pdcp.h"
 #include "actor.h"
 
 THREAD_STRUCT thread_struct;
@@ -302,7 +299,7 @@ void init_openair0()
 
 static void init_pdcp(int ue_id)
 {
-  if (get_softmodem_params()->nsa && nr_rlc_module_init(0) != 0) {
+  if (get_softmodem_params()->nsa && nr_rlc_module_init(NR_RLC_OP_MODE_UE) != 0) {
     LOG_I(RLC, "Problem at RLC initiation \n");
   }
   nr_pdcp_layer_init();
