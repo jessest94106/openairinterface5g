@@ -102,12 +102,21 @@ int force_crnti_ra(char *buf, int debug, telnet_printfunc_t prnt)
   return 0;
 }
 
+static int force_deregistration(char *buf, int debug, telnet_printfunc_t prnt)
+{
+  MessageDef *msg = itti_alloc_new_message(TASK_NAS_NRUE, 0, NAS_DEREGISTRATION_REQ);
+  NAS_DEREGISTRATION_REQ(msg).cause = AS_DETACH;
+  itti_send_msg_to_task(TASK_NAS_NRUE, 0, msg);
+  return 0;
+}
+
 /* Telnet shell command definitions */
 static telnetshell_cmddef_t cicmds[] = {
   {"sync_state", "[UE_ID(int,opt)]", get_sync_state},
   {"force_rlf", "", force_rlf},
   {"force_RRC_IDLE", "", force_RRC_IDLE},
   {"force_crnti_ra", "", force_crnti_ra},
+  {"deregistration", "", force_deregistration},
   {"", "", NULL},
 };
 
