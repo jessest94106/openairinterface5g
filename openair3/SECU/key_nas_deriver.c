@@ -41,7 +41,7 @@
 #include <string.h>
 
 #define FC_KENB (0x11)
-#define FC_NH (0x12)
+#define FC_NH (0x6F) // A.10 3GPP TS 33.501
 #define FC_KENB_STAR (0x13)
 /* 33401 #A.7 Algorithm for key derivation function.
  * This FC should be used for:
