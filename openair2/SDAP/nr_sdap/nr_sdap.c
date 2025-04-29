@@ -121,8 +121,21 @@ static void *sdap_tun_read_thread(void *arg)
   while (!entity->stop_thread) {
     len = read(entity->pdusession_sock, &rx_buf, NL_MAX_PAYLOAD);
     if (len == -1) {
-      LOG_E(PDCP, "could not read(): errno %d %s\n", errno, strerror(errno));
-      return NULL;
+      if (errno == EINTR)
+        continue; // interrupted system call
+
+      if (errno == EBADF || errno == EINVAL) {
+        LOG_I(SDAP, "Socket closed, exiting TUN read thread for UE %ld, PDU session %d\n", entity->ue_id, entity->pdusession_id);
+        break;
+      }
+
+      LOG_E(PDCP, "read() failed: errno %d (%s)\n", errno, strerror(errno));
+      break;
+    }
+
+    if (len == 0) {
+      LOG_W(SDAP, "TUN socket returned EOF - exiting thread\n");
+      break;
     }
 
     LOG_D(SDAP, "read data of size %d\n", len);
