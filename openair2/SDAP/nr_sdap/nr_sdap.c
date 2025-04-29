@@ -194,6 +194,10 @@ void remove_ip_if(nr_sdap_entity_t *entity)
   DevAssert(entity != NULL);
   // Stop the read thread
   entity->stop_thread = true;
+
+  // Close the socket: read() will get EBADF and exit
+  close(entity->pdusession_sock);
+
   int ret = pthread_join(entity->pdusession_thread, NULL);
   AssertFatal(ret == 0, "pthread_join() failed, errno: %d, %s\n", errno, strerror(errno));
   // Bring down the IP interface
@@ -205,5 +209,5 @@ void remove_ip_if(nr_sdap_entity_t *entity)
   } else {
     tun_generate_ue_ifname(ifname, entity->ue_id, entity->pdusession_id != default_pdu ? entity->pdusession_id : -1);
   }
-  tun_destroy(ifname, entity->pdusession_sock);
+  tun_destroy(ifname);
 }

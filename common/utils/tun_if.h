@@ -84,8 +84,7 @@ int tun_alloc(const char *dev);
 /*!
  * \brief This function destroys the TUN interface
  * \param[in] dev name of the interface
- * \param[in] fd file descriptor of the allocated interface
  */
-void tun_destroy(const char *dev, int fd);
+void tun_destroy(const char *dev);
 
 #endif /*TUN_IF_H_*/
