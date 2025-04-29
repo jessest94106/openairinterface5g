@@ -133,11 +133,15 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
 {
   if (nas->security_container == NULL)
     return NAS_SECURITY_NO_SECURITY_CONTEXT;
-  /* header is 7 bytes, require at least one byte of payload */
-  if (pdu_length < 8)
-    return NAS_SECURITY_BAD_INPUT;
 
-  switch (pdu_buffer[1]) {
+  if (pdu_length < sizeof(fgmm_msg_header_t)) {
+    LOG_E(NAS, "Invalid buffer length = %d: must hold at least a plain 5GMM header\n", pdu_length);
+    return NAS_SECURITY_BAD_INPUT;
+  }
+  int security_type = pdu_buffer[1];
+  LOG_D(NAS, "Security type is: %s\n", print_info(security_type, security_header_type_s, sizeofArray(security_header_type_s)));
+
+  switch (security_type) {
     case PLAIN_5GS_MSG:
       return NAS_SECURITY_UNPROTECTED;
       break;
@@ -152,6 +156,12 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
       break;
     default:
       break;
+  }
+
+  /* header is 7 bytes, require at least one byte of payload */
+  if (pdu_length < 8) {
+    LOG_E(NAS, "Invalid buffer length = %d\n", pdu_length);
+    return NAS_SECURITY_BAD_INPUT;
   }
 
   /* synchronize NAS SQN, based on 24.501 4.4.3.1 */
