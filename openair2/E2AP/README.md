@@ -199,12 +199,13 @@ e2_agent = {
   ./build/examples/ric/nearRT-RIC
   ```
 
+`XAPP_DURATION` environment variable overwrites the default xApp duration of 20s.
 * Start different xApps
   Important to note: if no RIC INDICATION is received by any of the xApps, either the 
   * start the KPM monitor xApp - measurements stated in [3.1.1 E2SM-KPM](#311-e2sm-kpm) for each UE that matches S-NSSAI `(1, 0xffffff)` common criteria
     ```bash
     cd flexric # or openairinterface5g/openair2/E2AP/flexric
-    ./build/examples/xApp/c/monitor/xapp_kpm_moni
+    XAPP_DURATION=30 ./build/examples/xApp/c/monitor/xapp_kpm_moni
     ```
     Note: we assume that each UE has only 1 DRB; CU-UP does not store the slices, therefore "coarse filtering" is used; **if no RIC INDICATION message received**, please check if:
           (1) UE is connected to the gNB
@@ -214,20 +215,20 @@ e2_agent = {
   * start the RC monitor xApp - aperiodic subscriptions for "UE RRC State Change", "RRC Message" copy (`RRC Reconfiguration`, `Measurement Report`, `Security Mode Complete`, `RRC Setup Complete`), and "UE ID" when `RRC Setup Complete` and/or `F1 UE Context Setup Request` detected
     ```bash
     cd flexric # or openairinterface5g/openair2/E2AP/flexric
-    ./build/examples/xApp/c/monitor/xapp_rc_moni
+    XAPP_DURATION=30 ./build/examples/xApp/c/monitor/xapp_rc_moni
     ```
 
   * start the KPM monitor and RC control xApp - this xApp is only a PoC. It collects the measurements stated in [3.1.1 E2SM-KPM](#311-e2sm-kpm) and sends the RC Control message
     for "QoS flow mapping configuration". However, no control is being done within the RAN itself. Please refer to [3.1.2 E2SM-RC](#312-e2sm-rc) for detailed explanation.
     ```bash
     cd flexric # or openairinterface5g/openair2/E2AP/flexric
-    ./build/examples/xApp/c/kpm_rc/xapp_kpm_rc
+    XAPP_DURATION=30 ./build/examples/xApp/c/kpm_rc/xapp_kpm_rc
     ```
 
   * start the (MAC + RLC + PDCP + GTP) monitor xApp
     ```bash
     cd flexric # or openairinterface5g/openair2/E2AP/flexric
-    ./build/examples/xApp/c/monitor/xapp_gtp_mac_rlc_pdcp_moni
+    XAPP_DURATION=30 ./build/examples/xApp/c/monitor/xapp_gtp_mac_rlc_pdcp_moni
     ```
     Note: GTP is not yet implemented in CU-UP; **if no RIC INDICATION message received**, please check if:
           (1) UE is connected to the gNB
@@ -235,7 +236,7 @@ e2_agent = {
 
     * if `XAPP_MULTILANGUAGE` option is enabled, start the python xApps:
       ```bash
-      python3 build/examples/xApp/python3/xapp_mac_rlc_pdcp_gtp_moni.py # only supported by the gNB-mono
+      XAPP_DURATION=30 python3 build/examples/xApp/python3/xapp_mac_rlc_pdcp_gtp_moni.py # only supported by the gNB-mono
       ```
 
 The latency that you observe in your monitor xApp is the latency from the E2 Agent to the nearRT-RIC and xApp. 
