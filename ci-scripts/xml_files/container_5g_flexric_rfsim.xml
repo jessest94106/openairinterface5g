@@ -32,7 +32,6 @@
  000001
  000002
  000003
- 002001
  010000
  000004
  333333
@@ -40,7 +39,6 @@
  010002
  010003
  020005
- 010013
  002006
  444444
  100002
@@ -49,12 +47,6 @@
  222222
         </TestCaseRequestedList>
         <TestCaseExclusionList></TestCaseExclusionList>
-
-        <testCase id="002001">
-                <class>IdleSleep</class>
-                <desc>Sleep</desc>
-                <idle_sleep_time_in_sec>10</idle_sleep_time_in_sec>
-        </testCase>
 
         <testCase id="111110">
                 <class>Pull_Local_Registry</class>
@@ -202,14 +194,6 @@
                 <node>localhost</node>
                 <command_fail>yes</command_fail>
                 <command>docker exec oai-flexric bash -c "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_gtp_mac_rlc_pdcp_moni" > ../cmake_targets/log/5g_rfsimulator_flexric/sms-moni-010003.log</command>
-        </testCase>
-
-        <testCase id="010013">
-                <class>Custom_Command</class>
-                <desc>Custom SMs monitoring</desc>
-                <node>localhost</node>
-                <command_fail>yes</command_fail>
-                <command>docker exec oai-flexric bash -c "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_gtp_mac_rlc_pdcp_moni" > ../cmake_targets/log/5g_rfsimulator_flexric/sms-moni-010013.log</command>
         </testCase>
 
 </testCaseList>
