@@ -165,35 +165,39 @@
         </testCase>
 
         <testCase id="010000">
-                <class>Custom_Command</class>
+                <class>Deploy_Object</class>
                 <desc>RC monitoring</desc>
-                <node>localhost</node>
-                <command_fail>yes</command_fail>
-                <command>docker exec oai-flexric bash -c "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_rc_moni" > ../cmake_targets/log/5g_rfsimulator_flexric/rc-moni-010000.log</command>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_flexric</yaml_path>
+                <services>xapp-rc-moni</services>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="010001">
-                <class>Custom_Command</class>
+                <class>Deploy_Object</class>
                 <desc>KPM monitoring</desc>
-                <node>localhost</node>
-                <command_fail>yes</command_fail>
-                <command>docker exec oai-flexric bash -c "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_kpm_moni" > ../cmake_targets/log/5g_rfsimulator_flexric/kpm-moni-010001.log</command>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_flexric</yaml_path>
+                <services>xapp-kpm-moni</services>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="010002">
-                <class>Custom_Command</class>
+                <class>Deploy_Object</class>
                 <desc>KPM monitoring and RC control</desc>
-                <node>localhost</node>
-                <command_fail>yes</command_fail>
-                <command>docker exec oai-flexric bash -c "stdbuf -o0 /usr/local/flexric/xApp/c/kpm_rc/xapp_kpm_rc" > ../cmake_targets/log/5g_rfsimulator_flexric/kpm_rc-010002.log</command>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_flexric</yaml_path>
+                <services>xapp-kpm-rc</services>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="010003">
-                <class>Custom_Command</class>
+                <class>Deploy_Object</class>
                 <desc>Custom SMs monitoring</desc>
-                <node>localhost</node>
-                <command_fail>yes</command_fail>
-                <command>docker exec oai-flexric bash -c "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_gtp_mac_rlc_pdcp_moni" > ../cmake_targets/log/5g_rfsimulator_flexric/sms-moni-010003.log</command>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_flexric</yaml_path>
+                <services>xapp-gtp-mac-rlc-pdcp-moni</services>
+                <eNB_instance>0</eNB_instance>
+                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
 </testCaseList>
