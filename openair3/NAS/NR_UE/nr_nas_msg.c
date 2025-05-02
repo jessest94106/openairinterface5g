@@ -1754,14 +1754,7 @@ void *nas_nrue(void *args_p)
       } break;
 
       case NAS_DOWNLINK_DATA_IND: {
-        LOG_I(NAS,
-              "[UE %ld] Received %s: length %u , buffer %p\n",
-              nas->UE_id,
-              ITTI_MSG_NAME(msg_p),
-              NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length,
-              NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.nas_data);
         as_nas_info_t initialNasMsg = {0};
-
         uint8_t *pdu_buffer = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.nas_data;
         int pdu_length = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length;
         int msg_type = get_msg_type(pdu_buffer, pdu_length);
@@ -1778,6 +1771,13 @@ void *nas_nrue(void *args_p)
           LOG_E(NAS, "NAS integrity failed, discard incoming message\n");
           break;
         }
+
+        LOG_I(NAS,
+              "[UE %ld] Received %s type %s with length %u\n",
+              nas->UE_id,
+              ITTI_MSG_NAME(msg_p),
+              print_info(msg_type, message_text_info, sizeofArray(message_text_info)),
+              NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length);
 
         switch (msg_type) {
           case FGS_IDENTITY_REQUEST:
