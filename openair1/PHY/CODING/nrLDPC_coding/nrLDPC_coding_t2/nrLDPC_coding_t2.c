@@ -627,10 +627,8 @@ pmd_lcore_ldpc_dec(void *arg)
   int time_out = 0;
   const uint16_t queue_id = tp->queue_id;
   const uint16_t num_segments = nb_segments_decoding(nrLDPC_slot_decoding_parameters);
-  struct rte_bbdev_dec_op **ops_enq;
-  struct rte_bbdev_dec_op **ops_deq;
-  ops_enq = (struct rte_bbdev_dec_op **)rte_calloc("struct rte_bbdev_dec_op **ops_enq", num_segments, sizeof(struct rte_bbdev_dec_op *), RTE_CACHE_LINE_SIZE);
-  ops_deq = (struct rte_bbdev_dec_op **)rte_calloc("struct rte_bbdev_dec_op **ops_dec", num_segments, sizeof(struct rte_bbdev_dec_op *), RTE_CACHE_LINE_SIZE);
+  struct rte_bbdev_dec_op *ops_enq[num_segments];
+  struct rte_bbdev_dec_op *ops_deq[num_segments];
   struct data_buffers *bufs = tp->data_buffers;
   uint16_t h, i, j;
   struct rte_bbdev_info info;
@@ -698,8 +696,6 @@ pmd_lcore_ldpc_dec(void *arg)
   }
 
   rte_bbdev_dec_op_free_bulk(ops_enq, num_segments);
-  rte_free(ops_enq);
-  rte_free(ops_deq);
   // Return the worst decoding number of iterations for all segments
   return tp->iter_count;
 }
@@ -713,10 +709,8 @@ static int pmd_lcore_ldpc_enc(void *arg)
   int time_out = 0;
   const uint16_t queue_id = tp->queue_id;
   const uint16_t num_segments = nb_segments_encoding(nrLDPC_slot_encoding_parameters);
-  struct rte_bbdev_enc_op **ops_enq;
-  struct rte_bbdev_enc_op **ops_deq;
-  ops_enq = (struct rte_bbdev_enc_op **)rte_calloc("struct rte_bbdev_dec_op **ops_enq", num_segments, sizeof(struct rte_bbdev_enc_op *), RTE_CACHE_LINE_SIZE);
-  ops_deq = (struct rte_bbdev_enc_op **)rte_calloc("struct rte_bbdev_dec_op **ops_dec", num_segments, sizeof(struct rte_bbdev_enc_op *), RTE_CACHE_LINE_SIZE);
+  struct rte_bbdev_enc_op *ops_enq[num_segments];
+  struct rte_bbdev_enc_op *ops_deq[num_segments];
   struct rte_bbdev_info info;
   struct data_buffers *bufs = tp->data_buffers;
   uint16_t num_to_enq;
@@ -758,8 +752,6 @@ static int pmd_lcore_ldpc_enc(void *arg)
   if (nrLDPC_slot_encoding_parameters->toutput != NULL)
     stop_meas(nrLDPC_slot_encoding_parameters->toutput);
   rte_bbdev_enc_op_free_bulk(ops_enq, num_segments);
-  rte_free(ops_enq);
-  rte_free(ops_deq);
   return ret;
 }
 
