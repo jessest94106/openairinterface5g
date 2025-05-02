@@ -53,15 +53,6 @@
 pthread_mutex_t encode_mutex;
 pthread_mutex_t decode_mutex;
 
-const char *typeStr[] = {
-    "RTE_BBDEV_OP_NONE", /**< Dummy operation that does nothing */
-    "RTE_BBDEV_OP_TURBO_DEC", /**< Turbo decode */
-    "RTE_BBDEV_OP_TURBO_ENC", /**< Turbo encode */
-    "RTE_BBDEV_OP_LDPC_DEC", /**< LDPC decode */
-    "RTE_BBDEV_OP_LDPC_ENC", /**< LDPC encode */
-    "RTE_BBDEV_OP_TYPE_COUNT", /**< Count of different op types */
-};
-
 /* Represents tested active devices */
 struct active_device {
   const char *driver_name;
@@ -259,7 +250,7 @@ static int add_dev(uint8_t dev_id, struct rte_bbdev_info *info)
 
   /* Display for debug the capabilities of the card */
   for (int i = 0; info->drv.capabilities[i].type != RTE_BBDEV_OP_NONE; i++) {
-    printf("device: %d, capability[%d]=%s\n", dev_id, i, typeStr[info->drv.capabilities[i].type]);
+    printf("device: %d, capability[%d]=%s\n", dev_id, i, rte_bbdev_op_type_str(info->drv.capabilities[i].type));
     if (info->drv.capabilities[i].type == RTE_BBDEV_OP_LDPC_ENC) {
       const struct rte_bbdev_op_cap_ldpc_enc cap = info->drv.capabilities[i].cap.ldpc_enc;
       printf("    buffers: src = %d, dst = %d\n   capabilites: ", cap.num_buffers_src, cap.num_buffers_dst);
