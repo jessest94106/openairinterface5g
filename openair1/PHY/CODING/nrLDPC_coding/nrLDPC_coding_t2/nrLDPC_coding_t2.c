@@ -87,8 +87,6 @@ struct data_buffers {
 
 /* Operation parameters specific for given test case */
 struct test_op_params {
-  struct rte_mempool *mp_dec;
-  struct rte_mempool *mp_enc;
   struct rte_bbdev_dec_op *ref_dec_op;
   struct rte_bbdev_enc_op *ref_enc_op;
   uint16_t burst_sz;
@@ -113,6 +111,7 @@ struct thread_params {
   struct rte_bbdev_dec_op *dec_ops[MAX_BURST];
   struct rte_bbdev_enc_op *enc_ops[MAX_BURST];
   struct data_buffers *data_buffers;
+  struct rte_mempool *bbdev_op_pool;
 };
 
 static uint16_t nb_segments_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters) {
@@ -675,10 +674,8 @@ static int init_test_op_params(struct test_op_params *op_params,
   int ret = 0;
   if (op_type == RTE_BBDEV_OP_LDPC_DEC) {
     ret = rte_bbdev_dec_op_alloc_bulk(ops_mp, &op_params->ref_dec_op, num_to_process);
-    op_params->mp_dec = ops_mp;
   } else {
     ret = rte_bbdev_enc_op_alloc_bulk(ops_mp, &op_params->ref_enc_op, 1);
-    op_params->mp_enc = ops_mp;
   }
 
   AssertFatal(ret == 0, "rte_bbdev_op_alloc_bulk() failed");
@@ -705,7 +702,6 @@ pmd_lcore_ldpc_dec(void *arg)
   ops_deq = (struct rte_bbdev_dec_op **)rte_calloc("struct rte_bbdev_dec_op **ops_dec", num_segments, sizeof(struct rte_bbdev_dec_op *), RTE_CACHE_LINE_SIZE);
   struct data_buffers *bufs = tp->data_buffers;
   uint16_t h, i, j;
-  int ret;
   struct rte_bbdev_info info;
   uint16_t num_to_enq;
 
@@ -715,7 +711,7 @@ pmd_lcore_ldpc_dec(void *arg)
   while (rte_atomic16_read(&tp->op_params->sync) == SYNC_WAIT)
     rte_pause();
 
-  ret = rte_bbdev_dec_op_alloc_bulk(tp->op_params->mp_dec, ops_enq, num_segments);
+  int ret = rte_bbdev_dec_op_alloc_bulk(tp->bbdev_op_pool, ops_enq, num_segments);
   AssertFatal(ret == 0, "Allocation failed for %d ops", num_segments);
   set_ldpc_dec_op(ops_enq, 0, bufs, nrLDPC_slot_decoding_parameters);
 
@@ -791,7 +787,6 @@ static int pmd_lcore_ldpc_enc(void *arg)
   ops_enq = (struct rte_bbdev_enc_op **)rte_calloc("struct rte_bbdev_dec_op **ops_enq", num_segments, sizeof(struct rte_bbdev_enc_op *), RTE_CACHE_LINE_SIZE);
   ops_deq = (struct rte_bbdev_enc_op **)rte_calloc("struct rte_bbdev_dec_op **ops_dec", num_segments, sizeof(struct rte_bbdev_enc_op *), RTE_CACHE_LINE_SIZE);
   struct rte_bbdev_info info;
-  int ret;
   struct data_buffers *bufs = tp->data_buffers;
   uint16_t num_to_enq;
 
@@ -801,7 +796,8 @@ static int pmd_lcore_ldpc_enc(void *arg)
 
   while (rte_atomic16_read(&tp->op_params->sync) == SYNC_WAIT)
     rte_pause();
-  ret = rte_bbdev_enc_op_alloc_bulk(tp->op_params->mp_enc, ops_enq, num_segments);
+
+  int ret = rte_bbdev_enc_op_alloc_bulk(tp->bbdev_op_pool, ops_enq, num_segments);
   AssertFatal(ret == 0, "Allocation failed for %d ops", num_segments);
 
   set_ldpc_enc_op(ops_enq, 0, bufs->inputs, bufs->hard_outputs, nrLDPC_slot_encoding_parameters);
@@ -858,6 +854,7 @@ int start_pmd_dec(struct active_device *ad,
   t_params[0].lcore_id = rte_lcore_id();
   t_params[0].op_params = op_params;
   t_params[0].data_buffers = data_buffers;
+  t_params[0].bbdev_op_pool = ad->bbdev_dec_op_pool;
   t_params[0].queue_id = ad->dec_queue;
   t_params[0].iter_count = 0;
   t_params[0].nrLDPC_slot_decoding_parameters = nrLDPC_slot_decoding_parameters;
@@ -870,6 +867,7 @@ int start_pmd_dec(struct active_device *ad,
     t_params[used_cores].lcore_id = lcore_id;
     t_params[used_cores].op_params = op_params;
     t_params[used_cores].data_buffers = data_buffers;
+    t_params[used_cores].bbdev_op_pool = ad->bbdev_dec_op_pool;
     t_params[used_cores].queue_id = ad->queue_ids[used_cores];
     t_params[used_cores].iter_count = 0;
     t_params[used_cores].nrLDPC_slot_decoding_parameters = nrLDPC_slot_decoding_parameters;
@@ -900,6 +898,7 @@ int32_t start_pmd_enc(struct active_device *ad,
   t_params[0].lcore_id = rte_lcore_id() + 1;
   t_params[0].op_params = op_params;
   t_params[0].data_buffers = data_buffers;
+  t_params[0].bbdev_op_pool = ad->bbdev_enc_op_pool;
   t_params[0].queue_id = ad->enc_queue;
   t_params[0].iter_count = 0;
   t_params[0].nrLDPC_slot_encoding_parameters = nrLDPC_slot_encoding_parameters;
@@ -912,6 +911,7 @@ int32_t start_pmd_enc(struct active_device *ad,
     t_params[used_cores].lcore_id = lcore_id;
     t_params[used_cores].op_params = op_params;
     t_params[used_cores].data_buffers = data_buffers;
+    t_params[used_cores].bbdev_op_pool = ad->bbdev_enc_op_pool;
     t_params[used_cores].queue_id = ad->queue_ids[1];
     t_params[used_cores].iter_count = 0;
     t_params[used_cores].nrLDPC_slot_encoding_parameters = nrLDPC_slot_encoding_parameters;
