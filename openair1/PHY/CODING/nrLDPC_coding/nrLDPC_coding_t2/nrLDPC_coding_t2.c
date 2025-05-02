@@ -552,7 +552,7 @@ static int retrieve_ldpc_dec_op(struct rte_bbdev_dec_op **ops, nrLDPC_slot_decod
   struct rte_bbdev_op_data *hard_output;
   uint16_t data_len = 0;
   struct rte_mbuf *m;
-  char *data;
+  uint8_t *data;
   unsigned int h;
   unsigned int i;
   unsigned int j = 0;
@@ -561,8 +561,8 @@ static int retrieve_ldpc_dec_op(struct rte_bbdev_dec_op **ops, nrLDPC_slot_decod
       hard_output = &ops[j]->ldpc_dec.hard_output;
       m = hard_output->data;
       data_len = rte_pktmbuf_data_len(m) - hard_output->offset;
-      data = m->buf_addr;
-      memcpy(nrLDPC_slot_decoding_parameters->TBs[h].segments[i].c, data + m->data_off, data_len);
+      data = rte_pktmbuf_mtod_offset(m, uint8_t *, hard_output->offset);
+      memcpy(nrLDPC_slot_decoding_parameters->TBs[h].segments[i].c, data, data_len);
       ++j;
     }
   }
@@ -584,7 +584,7 @@ retrieve_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
       struct rte_bbdev_op_data *output = &ops[j]->ldpc_enc.output;
       struct rte_mbuf *m = output->data;
       uint16_t data_len = rte_pktmbuf_data_len(m) - output->offset;
-      uint8_t *data = m->buf_addr + m->data_off;
+      uint8_t *data = rte_pktmbuf_mtod_offset(m, uint8_t *, output->offset);
       reverse_bits_u8(data, data_len, data);
       if (bit_offset == 0) {
         memcpy(&p_out[byte_offset], data, data_len);
