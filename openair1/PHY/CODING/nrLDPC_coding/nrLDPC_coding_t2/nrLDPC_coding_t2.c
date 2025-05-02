@@ -88,7 +88,6 @@ struct data_buffers {
 /* Operation parameters specific for given test case */
 struct test_op_params {
   uint16_t num_lcores;
-  int vector_mask;
   rte_atomic16_t sync;
 };
 
@@ -583,10 +582,7 @@ set_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
   }
 }
 
-static int
-retrieve_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
-                     const int vector_mask,
-                     nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
+static int retrieve_ldpc_dec_op(struct rte_bbdev_dec_op **ops, nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
 {
   struct rte_bbdev_op_data *hard_output;
   uint16_t data_len = 0;
@@ -701,7 +697,7 @@ pmd_lcore_ldpc_dec(void *arg)
     DevAssert(time_out <= TIME_OUT_POLL);
   }
   if (deq == enq) {
-    ret = retrieve_ldpc_dec_op(ops_deq, tp->op_params->vector_mask, nrLDPC_slot_decoding_parameters);
+    ret = retrieve_ldpc_dec_op(ops_deq, nrLDPC_slot_decoding_parameters);
     AssertFatal(ret == 0, "LDPC offload decoder failed!");
     tp->iter_count = 0;
     /* get the max of iter_count for all dequeued ops */
