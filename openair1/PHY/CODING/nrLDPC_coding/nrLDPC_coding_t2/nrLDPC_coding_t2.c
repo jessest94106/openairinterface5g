@@ -87,7 +87,6 @@ struct data_buffers {
 
 /* Operation parameters specific for given test case */
 struct test_op_params {
-  uint16_t num_to_process;
   uint16_t num_lcores;
   int vector_mask;
   rte_atomic16_t sync;
@@ -665,7 +664,6 @@ static int init_test_op_params(struct test_op_params *op_params,
                                uint16_t num_to_process,
                                uint16_t num_lcores)
 {
-  op_params->num_to_process = num_to_process;
   op_params->num_lcores = num_lcores;
   return 0;
 }
