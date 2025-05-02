@@ -931,8 +931,7 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
       memcpy(z_ol, nrLDPC_slot_decoding_parameters->TBs[h].segments[r].llr, nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E * sizeof(uint16_t));
       simde__m128i *pv_ol128 = (simde__m128i *)z_ol;
       simde__m128i *pl_ol128 = (simde__m128i *)&l_ol[offset];
-      int kc = nrLDPC_slot_decoding_parameters->TBs[h].BG == 2 ? 52 : 68;
-      for (int i = 0, j = 0; j < ((kc * nrLDPC_slot_decoding_parameters->TBs[h].Z) >> 4) + 1; i += 2, j++) {
+      for (int i = 0, j = 0; j < ((nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E + 15) >> 4); i += 2, j++) {
         pl_ol128[j] = simde_mm_packs_epi16(pv_ol128[i], pv_ol128[i + 1]);
       }
       offset += LDPC_MAX_CB_SIZE;
