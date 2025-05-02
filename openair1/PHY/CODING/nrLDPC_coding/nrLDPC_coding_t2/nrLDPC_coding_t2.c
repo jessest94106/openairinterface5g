@@ -45,8 +45,6 @@
 #define SYNC_WAIT 0
 #define SYNC_START 1
 #define TIME_OUT_POLL 1e8
-/* Increment for next code block in external HARQ memory */
-#define HARQ_INCR 32768
 /* Headroom for filler LLRs insertion in HARQ buffer */
 #define FILLER_HEADROOM 1024
 /* Number of segments that could be stored in HARQ combined buffers */
