@@ -618,8 +618,6 @@ retrieve_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
       data_len = rte_pktmbuf_data_len(m) - hard_output->offset;
       data = m->buf_addr;
       memcpy(nrLDPC_slot_decoding_parameters->TBs[h].segments[i].c, data + m->data_off, data_len);
-      rte_pktmbuf_free(ops[j]->ldpc_dec.hard_output.data);
-      rte_pktmbuf_free(ops[j]->ldpc_dec.input.data);
       ++j;
     }
   }
@@ -668,8 +666,6 @@ retrieve_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
       E_sum += nrLDPC_slot_encoding_parameters->TBs[h].segments[r].E;
       byte_offset = (E_sum + 7) / 8;
       bit_offset = E_sum % 8;
-      rte_pktmbuf_free(m);
-      rte_pktmbuf_free(ops[j]->ldpc_enc.input.data);
       ++j;
     }
   }
@@ -1068,6 +1064,11 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
     LOG_E(PHY, "Couldn't start pmd dec\n");
   }
 
+  for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
+    for (int segment = 0; segment < num_segments; ++segment)
+      rte_pktmbuf_free((*queue_ops[type])[segment].data);
+  }
+
   pthread_mutex_unlock(&decode_mutex);
   return 0;
 }
@@ -1104,6 +1105,12 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
     AssertFatal(ret == 0, "Couldn't init rte_bbdev_op_data structs");
   }
   ret = start_pmd_enc(ad, op_params, nrLDPC_slot_encoding_parameters);
+
+  for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
+    for (int segment = 0; segment < num_segments; ++segment)
+      rte_pktmbuf_free((*queue_ops[type])[segment].data);
+  }
+
   pthread_mutex_unlock(&encode_mutex);
   return ret;
 }
