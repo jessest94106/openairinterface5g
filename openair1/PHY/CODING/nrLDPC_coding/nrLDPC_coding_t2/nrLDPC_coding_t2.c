@@ -122,26 +122,6 @@ static uint16_t nb_segments_encoding(nrLDPC_slot_encoding_parameters_t *nrLDPC_s
   return nb_segments;
 }
 
-// DPDK BBDEV copy
-static inline void
-mbuf_reset(struct rte_mbuf *m)
-{
-  m->pkt_len = 0;
-
-  do {
-    m->data_len = 0;
-    m = m->next;
-  } while (m != NULL);
-}
-
-/* Read flag value 0/1 from bitmap */
-// DPDK BBDEV copy
-static inline bool
-check_bit(uint32_t bitmap, uint32_t bitmask)
-{
-  return bitmap & bitmask;
-}
-
 /* calculates optimal mempool size not smaller than the val */
 // DPDK BBDEV copy
 static unsigned int
