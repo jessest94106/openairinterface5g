@@ -87,8 +87,6 @@ struct data_buffers {
 
 /* Operation parameters specific for given test case */
 struct test_op_params {
-  struct rte_bbdev_dec_op *ref_dec_op;
-  struct rte_bbdev_enc_op *ref_enc_op;
   uint16_t burst_sz;
   uint16_t num_to_process;
   uint16_t num_lcores;
@@ -108,8 +106,6 @@ struct thread_params {
   rte_atomic16_t processing_status;
   rte_atomic16_t burst_sz;
   struct test_op_params *op_params;
-  struct rte_bbdev_dec_op *dec_ops[MAX_BURST];
-  struct rte_bbdev_enc_op *enc_ops[MAX_BURST];
   struct data_buffers *data_buffers;
   struct rte_mempool *bbdev_op_pool;
 };
@@ -671,15 +667,6 @@ static int init_test_op_params(struct test_op_params *op_params,
                                uint16_t num_to_process,
                                uint16_t num_lcores)
 {
-  int ret = 0;
-  if (op_type == RTE_BBDEV_OP_LDPC_DEC) {
-    ret = rte_bbdev_dec_op_alloc_bulk(ops_mp, &op_params->ref_dec_op, num_to_process);
-  } else {
-    ret = rte_bbdev_enc_op_alloc_bulk(ops_mp, &op_params->ref_enc_op, 1);
-  }
-
-  AssertFatal(ret == 0, "rte_bbdev_op_alloc_bulk() failed");
-
   op_params->burst_sz = burst_sz;
   op_params->num_to_process = num_to_process;
   op_params->num_lcores = num_lcores;
