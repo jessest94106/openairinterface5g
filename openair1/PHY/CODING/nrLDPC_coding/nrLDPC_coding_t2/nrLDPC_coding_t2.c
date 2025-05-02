@@ -543,17 +543,13 @@ set_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
 
 static int retrieve_ldpc_dec_op(struct rte_bbdev_dec_op **ops, nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
 {
-  struct rte_bbdev_op_data *hard_output;
-  uint16_t data_len = 0;
-  struct rte_mbuf *m;
-  uint8_t *data;
   int j = 0;
   for (int h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h) {
     for (int i = 0; i < nrLDPC_slot_decoding_parameters->TBs[h].C; ++i) {
-      hard_output = &ops[j]->ldpc_dec.hard_output;
-      m = hard_output->data;
-      data_len = rte_pktmbuf_data_len(m) - hard_output->offset;
-      data = rte_pktmbuf_mtod_offset(m, uint8_t *, hard_output->offset);
+      struct rte_bbdev_op_data *hard_output = &ops[j]->ldpc_dec.hard_output;
+      struct rte_mbuf *m = hard_output->data;
+      uint16_t data_len = rte_pktmbuf_data_len(m) - hard_output->offset;
+      uint8_t *data = rte_pktmbuf_mtod_offset(m, uint8_t *, hard_output->offset);
       memcpy(nrLDPC_slot_decoding_parameters->TBs[h].segments[i].c, data, data_len);
       ++j;
     }
@@ -615,17 +611,16 @@ pmd_lcore_ldpc_dec(void *arg)
 {
   struct thread_params *tp = arg;
   nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters = tp->nrLDPC_slot_decoding_parameters;
-  uint16_t enq, deq;
   int time_out = 0;
   const uint16_t queue_id = tp->queue_id;
   const uint16_t num_segments = nb_segments_decoding(nrLDPC_slot_decoding_parameters);
   struct rte_bbdev_dec_op *ops_enq[num_segments];
   struct rte_bbdev_dec_op *ops_deq[num_segments];
   struct data_buffers *bufs = tp->data_buffers;
-  struct rte_bbdev_info info;
-  uint16_t num_to_enq;
 
   AssertFatal((num_segments < MAX_BURST), "BURST_SIZE should be <= %u", MAX_BURST);
+
+  struct rte_bbdev_info info;
   rte_bbdev_info_get(tp->dev_id, &info);
 
   while (rte_atomic16_read(&tp->op_params->sync) == SYNC_WAIT)
@@ -635,21 +630,19 @@ pmd_lcore_ldpc_dec(void *arg)
   AssertFatal(ret == 0, "Allocation failed for %d ops", num_segments);
   set_ldpc_dec_op(ops_enq, bufs->inputs, bufs->hard_outputs, nrLDPC_slot_decoding_parameters);
 
-  for (enq = 0, deq = 0; enq < num_segments;) {
-    num_to_enq = num_segments;
-    if (unlikely(num_segments - enq < num_to_enq))
-      num_to_enq = num_segments - enq;
-
+  uint16_t enq = 0, deq = 0;
+  while (enq < num_segments) {
+    uint16_t num_to_enq = num_segments - enq;
     enq += rte_bbdev_enqueue_ldpc_dec_ops(tp->dev_id, queue_id, &ops_enq[enq], num_to_enq);
     deq += rte_bbdev_dequeue_ldpc_dec_ops(tp->dev_id, queue_id, &ops_deq[deq], enq - deq);
   }
-
   /* dequeue the remaining */
   while (deq < enq) {
     deq += rte_bbdev_dequeue_ldpc_dec_ops(tp->dev_id, queue_id, &ops_deq[deq], enq - deq);
     time_out++;
     DevAssert(time_out <= TIME_OUT_POLL);
   }
+
   if (deq == enq) {
     ret = retrieve_ldpc_dec_op(ops_deq, nrLDPC_slot_decoding_parameters);
     AssertFatal(ret == 0, "LDPC offload decoder failed!");
@@ -696,18 +689,16 @@ static int pmd_lcore_ldpc_enc(void *arg)
 {
   struct thread_params *tp = arg;
   nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters = tp->nrLDPC_slot_encoding_parameters;
-  uint16_t enq, deq;
   int time_out = 0;
   const uint16_t queue_id = tp->queue_id;
   const uint16_t num_segments = nb_segments_encoding(nrLDPC_slot_encoding_parameters);
   struct rte_bbdev_enc_op *ops_enq[num_segments];
   struct rte_bbdev_enc_op *ops_deq[num_segments];
-  struct rte_bbdev_info info;
   struct data_buffers *bufs = tp->data_buffers;
-  uint16_t num_to_enq;
 
   AssertFatal((num_segments < MAX_BURST), "BURST_SIZE should be <= %u", MAX_BURST);
 
+  struct rte_bbdev_info info;
   rte_bbdev_info_get(tp->dev_id, &info);
 
   while (rte_atomic16_read(&tp->op_params->sync) == SYNC_WAIT)
@@ -721,10 +712,10 @@ static int pmd_lcore_ldpc_enc(void *arg)
     stop_meas(nrLDPC_slot_encoding_parameters->tprep);
   if (nrLDPC_slot_encoding_parameters->tparity != NULL)
     start_meas(nrLDPC_slot_encoding_parameters->tparity);
-  for (enq = 0, deq = 0; enq < num_segments;) {
-    num_to_enq = num_segments;
-    if (unlikely(num_segments - enq < num_to_enq))
-      num_to_enq = num_segments - enq;
+
+  uint16_t enq = 0, deq = 0;
+  while (enq < num_segments) {
+    uint16_t num_to_enq = num_segments - enq;
     enq += rte_bbdev_enqueue_ldpc_enc_ops(tp->dev_id, queue_id, &ops_enq[enq], num_to_enq);
     deq += rte_bbdev_dequeue_ldpc_enc_ops(tp->dev_id, queue_id, &ops_deq[deq], enq - deq);
   }
@@ -752,11 +743,9 @@ int start_pmd_dec(struct active_device *ad,
                   struct data_buffers *data_buffers,
                   nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
 {
-  int ret;
   unsigned int lcore_id, used_cores = 0;
-  uint16_t num_lcores;
   /* Set number of lcores */
-  num_lcores = (ad->nb_queues < (op_params->num_lcores)) ? ad->nb_queues : op_params->num_lcores;
+  int num_lcores = (ad->nb_queues < (op_params->num_lcores)) ? ad->nb_queues : op_params->num_lcores;
   /* Allocate memory for thread parameters structure */
   struct thread_params *t_params = rte_zmalloc(NULL, num_lcores * sizeof(struct thread_params), RTE_CACHE_LINE_SIZE);
   AssertFatal(t_params != 0,
@@ -788,7 +777,7 @@ int start_pmd_dec(struct active_device *ad,
     rte_eal_remote_launch(pmd_lcore_ldpc_dec, &t_params[used_cores++], lcore_id);
   }
   rte_atomic16_set(&op_params->sync, SYNC_START);
-  ret = pmd_lcore_ldpc_dec(&t_params[0]);
+  int ret = pmd_lcore_ldpc_dec(&t_params[0]);
   /* Master core is always used */
   // for (used_cores = 1; used_cores < num_lcores; used_cores++)
   //	ret |= rte_eal_wait_lcore(t_params[used_cores].lcore_id);
@@ -912,13 +901,12 @@ int32_t nrLDPC_coding_shutdown()
   return 0;
 }
 
-int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters){
-
+int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
+{
   pthread_mutex_lock(&decode_mutex);
 
   const uint16_t num_segments = nb_segments_decoding(nrLDPC_slot_decoding_parameters);
 
-  uint16_t z_ol[LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
   /* It is not unlikely that l_ol becomes big enough to overflow the stack
    * If you observe this behavior then move it to the heap
    * Then you would better do a persistent allocation to limit the overhead
@@ -939,6 +927,7 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
   int offset = 0;
   for (int h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h) {
     for (int r = 0; r < nrLDPC_slot_decoding_parameters->TBs[h].C; r++) {
+      uint16_t z_ol[LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
       memcpy(z_ol, nrLDPC_slot_decoding_parameters->TBs[h].segments[r].llr, nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E * sizeof(uint16_t));
       simde__m128i *pv_ol128 = (simde__m128i *)z_ol;
       simde__m128i *pl_ol128 = (simde__m128i *)&l_ol[offset];
