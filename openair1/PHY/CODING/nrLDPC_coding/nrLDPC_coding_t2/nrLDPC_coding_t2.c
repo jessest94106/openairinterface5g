@@ -1036,16 +1036,14 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
 
   pthread_mutex_lock(&decode_mutex);
 
-  uint16_t num_blocks = 0;
-  for(uint16_t h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h){
-    num_blocks += nrLDPC_slot_decoding_parameters->TBs[h].C;
-  }
+  const uint16_t num_segments = nb_segments_decoding(nrLDPC_slot_decoding_parameters);
+
   uint16_t z_ol[LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
   /* It is not unlikely that l_ol becomes big enough to overflow the stack
    * If you observe this behavior then move it to the heap
    * Then you would better do a persistent allocation to limit the overhead
    */
-  uint8_t l_ol[num_blocks * LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
+  uint8_t l_ol[num_segments * LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
 
   // hardcoded we use first device
   struct active_device *ad = active_devs;
@@ -1082,7 +1080,7 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
   }
 
   for (enum op_data_type type = DATA_INPUT; type < 3; type += 2) {
-    ret = allocate_buffers_on_socket(queue_ops[type], num_blocks * sizeof(struct rte_bbdev_op_data), socket_id);
+    ret = allocate_buffers_on_socket(queue_ops[type], num_segments * sizeof(struct rte_bbdev_op_data), socket_id);
     AssertFatal(ret == 0, "Couldn't allocate memory for rte_bbdev_op_data structs");
     ret = init_op_data_objs_dec(*queue_ops[type],
                                 l_ol,
@@ -1107,6 +1105,9 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
   pthread_mutex_lock(&encode_mutex);
   if (nrLDPC_slot_encoding_parameters->tprep != NULL)
     start_meas(nrLDPC_slot_encoding_parameters->tprep);
+
+  const uint16_t num_segments = nb_segments_encoding(nrLDPC_slot_encoding_parameters);
+
   // hardcoded to use the first found board
   struct active_device *ad = active_devs;
   int ret;
@@ -1126,12 +1127,8 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
                                                           &op_params->q_bufs[socket_id][queue_id].hard_outputs,
                                                           &op_params->q_bufs[socket_id][queue_id].harq_inputs,
                                                           &op_params->q_bufs[socket_id][queue_id].harq_outputs};
-  uint16_t num_blocks = 0;
-  for(uint16_t h = 0; h < nrLDPC_slot_encoding_parameters->nb_TBs; ++h){
-    num_blocks += nrLDPC_slot_encoding_parameters->TBs[h].C;
-  }
   for (enum op_data_type type = DATA_INPUT; type < 3; type += 2) {
-    ret = allocate_buffers_on_socket(queue_ops[type], num_blocks * sizeof(struct rte_bbdev_op_data), socket_id);
+    ret = allocate_buffers_on_socket(queue_ops[type], num_segments * sizeof(struct rte_bbdev_op_data), socket_id);
     AssertFatal(ret == 0, "Couldn't allocate memory for rte_bbdev_op_data structs");
     ret = init_op_data_objs_enc(*queue_ops[type],
                                 nrLDPC_slot_encoding_parameters,
