@@ -87,7 +87,6 @@ struct data_buffers {
 
 /* Operation parameters specific for given test case */
 struct test_op_params {
-  uint16_t burst_sz;
   uint16_t num_to_process;
   uint16_t num_lcores;
   int vector_mask;
@@ -104,7 +103,6 @@ struct thread_params {
   uint8_t iter_count;
   rte_atomic16_t nb_dequeued;
   rte_atomic16_t processing_status;
-  rte_atomic16_t burst_sz;
   struct test_op_params *op_params;
   struct data_buffers *data_buffers;
   struct rte_mempool *bbdev_op_pool;
@@ -667,7 +665,6 @@ static int init_test_op_params(struct test_op_params *op_params,
                                uint16_t num_to_process,
                                uint16_t num_lcores)
 {
-  op_params->burst_sz = burst_sz;
   op_params->num_to_process = num_to_process;
   op_params->num_lcores = num_lcores;
   return 0;
