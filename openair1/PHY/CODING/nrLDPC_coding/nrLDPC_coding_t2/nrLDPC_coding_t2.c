@@ -496,20 +496,12 @@ static int allocate_buffers_on_socket(struct rte_bbdev_op_data **buffers, const 
 }
 
 // DPDK BBDEV copy
-static void
-free_buffers(struct active_device *ad, struct test_op_params *op_params)
+static void free_mempools(struct active_device *ad)
 {
   rte_mempool_free(ad->bbdev_dec_op_pool);
   rte_mempool_free(ad->bbdev_enc_op_pool);
   rte_mempool_free(ad->in_mbuf_pool);
   rte_mempool_free(ad->hard_out_mbuf_pool);
-
-  for (int i = 2; i < rte_lcore_count(); ++i) {
-    for (int j = 0; j < RTE_MAX_NUMA_NODES; ++j) {
-      rte_free(op_params->q_bufs[j][i].inputs);
-      rte_free(op_params->q_bufs[j][i].hard_outputs);
-    }
-  }
 }
 
 // based on DPDK BBDEV copy_reference_ldpc_dec_op
@@ -998,7 +990,7 @@ int32_t nrLDPC_coding_shutdown()
   struct active_device *ad = active_devs;
   int dev_id = 0;
   struct rte_bbdev_stats stats;
-  free_buffers(ad, op_params);
+  free_mempools(ad);
   rte_free(op_params);
   rte_bbdev_stats_get(dev_id, &stats);
   rte_bbdev_stop(dev_id);
@@ -1067,6 +1059,7 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
   for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     for (int segment = 0; segment < num_segments; ++segment)
       rte_pktmbuf_free((*queue_ops[type])[segment].data);
+    rte_free(*queue_ops[type]);
   }
 
   pthread_mutex_unlock(&decode_mutex);
@@ -1109,6 +1102,7 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
   for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     for (int segment = 0; segment < num_segments; ++segment)
       rte_pktmbuf_free((*queue_ops[type])[segment].data);
+    rte_free(*queue_ops[type]);
   }
 
   pthread_mutex_unlock(&encode_mutex);
