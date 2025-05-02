@@ -412,7 +412,6 @@ static int init_op_data_objs_dec(struct rte_bbdev_op_data *bufs,
 // based on DPDK BBDEV init_op_data_objs
 static int init_op_data_objs_enc(struct rte_bbdev_op_data *bufs,
                                  nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters,
-                                 struct rte_mbuf *m_head,
                                  struct rte_mempool *mbuf_pool,
                                  enum op_data_type op_type,
                                  uint16_t min_alignment)
@@ -891,8 +890,6 @@ int32_t start_pmd_enc(struct active_device *ad,
 
 struct test_op_params *op_params = NULL;
 
-struct rte_mbuf *m_head[DATA_NUM_TYPES];
-
 // OAI CODE
 int32_t nrLDPC_coding_init()
 {
@@ -1053,12 +1050,7 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
   for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     ret = allocate_buffers_on_socket(queue_ops[type], num_segments * sizeof(struct rte_bbdev_op_data), socket_id);
     AssertFatal(ret == 0, "Couldn't allocate memory for rte_bbdev_op_data structs");
-    ret = init_op_data_objs_enc(*queue_ops[type],
-                                nrLDPC_slot_encoding_parameters,
-                                m_head[type],
-                                mbuf_pools[type],
-                                type,
-                                info.drv.min_alignment);
+    ret = init_op_data_objs_enc(*queue_ops[type], nrLDPC_slot_encoding_parameters, mbuf_pools[type], type, info.drv.min_alignment);
     AssertFatal(ret == 0, "Couldn't init rte_bbdev_op_data structs");
   }
 
