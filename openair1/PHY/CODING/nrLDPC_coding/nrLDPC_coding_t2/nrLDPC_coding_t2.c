@@ -473,7 +473,6 @@ static void free_mempools(struct active_device *ad)
 // based on DPDK BBDEV copy_reference_ldpc_dec_op
 static void
 set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
-		            unsigned int start_idx,
 		            struct data_buffers *bufs,
                 nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
 {
@@ -517,8 +516,8 @@ set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
       ops[j]->ldpc_dec.harq_combined_input.offset = harq_combined_offset;
       ops[j]->ldpc_dec.harq_combined_output.offset = harq_combined_offset;
 
-      ops[j]->ldpc_dec.hard_output = bufs->hard_outputs[start_idx + j];
-      ops[j]->ldpc_dec.input = bufs->inputs[start_idx + j];
+      ops[j]->ldpc_dec.hard_output = bufs->hard_outputs[j];
+      ops[j]->ldpc_dec.input = bufs->inputs[j];
       ++j;
     }
   }
@@ -527,7 +526,6 @@ set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
 // based on DPDK BBDEV copy_reference_ldpc_enc_op
 static void
 set_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
-                unsigned int start_idx,
                 struct rte_bbdev_op_data *inputs,
                 struct rte_bbdev_op_data *outputs,
                 nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters)
@@ -550,8 +548,8 @@ set_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
       ops[j]->ldpc_enc.rv_index = nrLDPC_slot_encoding_parameters->TBs[h].rv_index;
       ops[j]->ldpc_enc.op_flags = RTE_BBDEV_LDPC_RATE_MATCH;
       ops[j]->ldpc_enc.code_block_mode = 1;
-      ops[j]->ldpc_enc.output = outputs[start_idx + j];
-      ops[j]->ldpc_enc.input = inputs[start_idx + j];
+      ops[j]->ldpc_enc.output = outputs[j];
+      ops[j]->ldpc_enc.input = inputs[j];
       ++j;
     }
   }
@@ -654,7 +652,7 @@ pmd_lcore_ldpc_dec(void *arg)
 
   int ret = rte_bbdev_dec_op_alloc_bulk(tp->bbdev_op_pool, ops_enq, num_segments);
   AssertFatal(ret == 0, "Allocation failed for %d ops", num_segments);
-  set_ldpc_dec_op(ops_enq, 0, bufs, nrLDPC_slot_decoding_parameters);
+  set_ldpc_dec_op(ops_enq, bufs, nrLDPC_slot_decoding_parameters);
 
   for (enq = 0, deq = 0; enq < num_segments;) {
     num_to_enq = num_segments;
@@ -740,8 +738,8 @@ static int pmd_lcore_ldpc_enc(void *arg)
 
   int ret = rte_bbdev_enc_op_alloc_bulk(tp->bbdev_op_pool, ops_enq, num_segments);
   AssertFatal(ret == 0, "Allocation failed for %d ops", num_segments);
+  set_ldpc_enc_op(ops_enq, bufs->inputs, bufs->hard_outputs, nrLDPC_slot_encoding_parameters);
 
-  set_ldpc_enc_op(ops_enq, 0, bufs->inputs, bufs->hard_outputs, nrLDPC_slot_encoding_parameters);
   if (nrLDPC_slot_encoding_parameters->tprep != NULL)
     stop_meas(nrLDPC_slot_encoding_parameters->tprep);
   if (nrLDPC_slot_encoding_parameters->tparity != NULL)
