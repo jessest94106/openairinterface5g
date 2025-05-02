@@ -96,7 +96,6 @@ struct test_op_params {
   uint16_t num_lcores;
   int vector_mask;
   rte_atomic16_t sync;
-  struct data_buffers q_bufs[RTE_MAX_NUMA_NODES][MAX_QUEUES];
 };
 
 /* Contains per lcore params */
@@ -113,6 +112,7 @@ struct thread_params {
   struct test_op_params *op_params;
   struct rte_bbdev_dec_op *dec_ops[MAX_BURST];
   struct rte_bbdev_enc_op *enc_ops[MAX_BURST];
+  struct data_buffers *data_buffers;
 };
 
 static uint16_t nb_segments_decoding(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters) {
@@ -703,7 +703,7 @@ pmd_lcore_ldpc_dec(void *arg)
   struct rte_bbdev_dec_op **ops_deq;
   ops_enq = (struct rte_bbdev_dec_op **)rte_calloc("struct rte_bbdev_dec_op **ops_enq", num_segments, sizeof(struct rte_bbdev_dec_op *), RTE_CACHE_LINE_SIZE);
   ops_deq = (struct rte_bbdev_dec_op **)rte_calloc("struct rte_bbdev_dec_op **ops_dec", num_segments, sizeof(struct rte_bbdev_dec_op *), RTE_CACHE_LINE_SIZE);
-  struct data_buffers *bufs = NULL;
+  struct data_buffers *bufs = tp->data_buffers;
   uint16_t h, i, j;
   int ret;
   struct rte_bbdev_info info;
@@ -712,7 +712,6 @@ pmd_lcore_ldpc_dec(void *arg)
   AssertFatal((num_segments < MAX_BURST), "BURST_SIZE should be <= %u", MAX_BURST);
   rte_bbdev_info_get(tp->dev_id, &info);
 
-  bufs = &tp->op_params->q_bufs[GET_SOCKET(info.socket_id)][queue_id];
   while (rte_atomic16_read(&tp->op_params->sync) == SYNC_WAIT)
     rte_pause();
 
@@ -793,13 +792,13 @@ static int pmd_lcore_ldpc_enc(void *arg)
   ops_deq = (struct rte_bbdev_enc_op **)rte_calloc("struct rte_bbdev_dec_op **ops_dec", num_segments, sizeof(struct rte_bbdev_enc_op *), RTE_CACHE_LINE_SIZE);
   struct rte_bbdev_info info;
   int ret;
-  struct data_buffers *bufs = NULL;
+  struct data_buffers *bufs = tp->data_buffers;
   uint16_t num_to_enq;
 
   AssertFatal((num_segments < MAX_BURST), "BURST_SIZE should be <= %u", MAX_BURST);
 
   rte_bbdev_info_get(tp->dev_id, &info);
-  bufs = &tp->op_params->q_bufs[GET_SOCKET(info.socket_id)][queue_id];
+
   while (rte_atomic16_read(&tp->op_params->sync) == SYNC_WAIT)
     rte_pause();
   ret = rte_bbdev_enc_op_alloc_bulk(tp->op_params->mp_enc, ops_enq, num_segments);
@@ -840,6 +839,7 @@ static int pmd_lcore_ldpc_enc(void *arg)
 // based on DPDK BBDEV throughput_pmd_lcore_dec
 int start_pmd_dec(struct active_device *ad,
                   struct test_op_params *op_params,
+                  struct data_buffers *data_buffers,
                   nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
 {
   int ret;
@@ -857,6 +857,7 @@ int start_pmd_dec(struct active_device *ad,
   t_params[0].dev_id = ad->dev_id;
   t_params[0].lcore_id = rte_lcore_id();
   t_params[0].op_params = op_params;
+  t_params[0].data_buffers = data_buffers;
   t_params[0].queue_id = ad->dec_queue;
   t_params[0].iter_count = 0;
   t_params[0].nrLDPC_slot_decoding_parameters = nrLDPC_slot_decoding_parameters;
@@ -868,6 +869,7 @@ int start_pmd_dec(struct active_device *ad,
     t_params[used_cores].dev_id = ad->dev_id;
     t_params[used_cores].lcore_id = lcore_id;
     t_params[used_cores].op_params = op_params;
+    t_params[used_cores].data_buffers = data_buffers;
     t_params[used_cores].queue_id = ad->queue_ids[used_cores];
     t_params[used_cores].iter_count = 0;
     t_params[used_cores].nrLDPC_slot_decoding_parameters = nrLDPC_slot_decoding_parameters;
@@ -885,6 +887,7 @@ int start_pmd_dec(struct active_device *ad,
 // based on DPDK BBDEV throughput_pmd_lcore_enc
 int32_t start_pmd_enc(struct active_device *ad,
                       struct test_op_params *op_params,
+                      struct data_buffers *data_buffers,
                       nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters)
 {
   unsigned int lcore_id, used_cores = 0;
@@ -896,6 +899,7 @@ int32_t start_pmd_enc(struct active_device *ad,
   t_params[0].dev_id = ad->dev_id;
   t_params[0].lcore_id = rte_lcore_id() + 1;
   t_params[0].op_params = op_params;
+  t_params[0].data_buffers = data_buffers;
   t_params[0].queue_id = ad->enc_queue;
   t_params[0].iter_count = 0;
   t_params[0].nrLDPC_slot_encoding_parameters = nrLDPC_slot_encoding_parameters;
@@ -907,6 +911,7 @@ int32_t start_pmd_enc(struct active_device *ad,
     t_params[used_cores].dev_id = ad->dev_id;
     t_params[used_cores].lcore_id = lcore_id;
     t_params[used_cores].op_params = op_params;
+    t_params[used_cores].data_buffers = data_buffers;
     t_params[used_cores].queue_id = ad->queue_ids[1];
     t_params[used_cores].iter_count = 0;
     t_params[used_cores].nrLDPC_slot_encoding_parameters = nrLDPC_slot_encoding_parameters;
@@ -1021,9 +1026,8 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
   int socket_id = GET_SOCKET(info.socket_id);
   // fill_queue_buffers -> init_op_data_objs
   struct rte_mempool *mbuf_pools[DATA_NUM_TYPES] = {ad->in_mbuf_pool, ad->hard_out_mbuf_pool};
-  uint8_t queue_id = ad->dec_queue;
-  struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&op_params->q_bufs[socket_id][queue_id].inputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].hard_outputs};
+  struct data_buffers data_buffers;
+  struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&data_buffers.inputs, &data_buffers.hard_outputs};
 
   int offset = 0;
   for(uint16_t h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h){
@@ -1051,7 +1055,7 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
     AssertFatal(ret == 0, "Couldn't init rte_bbdev_op_data structs");
   }
 
-  ret = start_pmd_dec(ad, op_params, nrLDPC_slot_decoding_parameters);
+  ret = start_pmd_dec(ad, op_params, &data_buffers, nrLDPC_slot_decoding_parameters);
   if (ret < 0) {
     LOG_E(PHY, "Couldn't start pmd dec\n");
   }
@@ -1082,9 +1086,8 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
   int socket_id = GET_SOCKET(info.socket_id);
   // fill_queue_buffers -> init_op_data_objs
   struct rte_mempool *mbuf_pools[DATA_NUM_TYPES] = {ad->in_mbuf_pool, ad->hard_out_mbuf_pool};
-  uint8_t queue_id = ad->enc_queue;
-  struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&op_params->q_bufs[socket_id][queue_id].inputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].hard_outputs};
+  struct data_buffers data_buffers;
+  struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&data_buffers.inputs, &data_buffers.hard_outputs};
 
   for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     ret = allocate_buffers_on_socket(queue_ops[type], num_segments * sizeof(struct rte_bbdev_op_data), socket_id);
@@ -1097,7 +1100,8 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
                                 info.drv.min_alignment);
     AssertFatal(ret == 0, "Couldn't init rte_bbdev_op_data structs");
   }
-  ret = start_pmd_enc(ad, op_params, nrLDPC_slot_encoding_parameters);
+
+  ret = start_pmd_enc(ad, op_params, &data_buffers, nrLDPC_slot_encoding_parameters);
 
   for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     for (int segment = 0; segment < num_segments; ++segment)
