@@ -76,9 +76,6 @@ struct active_device {
   struct rte_mempool *bbdev_enc_op_pool;
   struct rte_mempool *in_mbuf_pool;
   struct rte_mempool *hard_out_mbuf_pool;
-  struct rte_mempool *soft_out_mbuf_pool;
-  struct rte_mempool *harq_in_mbuf_pool;
-  struct rte_mempool *harq_out_mbuf_pool;
 } active_devs[RTE_BBDEV_MAX_DEVS];
 static int nb_active_devs;
 
@@ -86,9 +83,6 @@ static int nb_active_devs;
 struct data_buffers {
   struct rte_bbdev_op_data *inputs;
   struct rte_bbdev_op_data *hard_outputs;
-  struct rte_bbdev_op_data *soft_outputs;
-  struct rte_bbdev_op_data *harq_inputs;
-  struct rte_bbdev_op_data *harq_outputs;
 };
 
 /* Operation parameters specific for given test case */
@@ -395,9 +389,9 @@ static int init_op_data_objs_dec(struct rte_bbdev_op_data *bufs,
       bufs[j].data = m_head;
       bufs[j].offset = 0;
       bufs[j].length = 0;
-  
-      if ((op_type == DATA_INPUT) || (op_type == DATA_HARQ_INPUT)) {
-        if ((op_type == DATA_INPUT) && large_input) {
+
+      if (op_type == DATA_INPUT) {
+        if (large_input) {
           /* Allocate a fake overused mbuf */
           data = rte_malloc(NULL, data_len, 0);
           AssertFatal(data != NULL, "rte malloc failed with %u bytes", data_len);
@@ -452,9 +446,9 @@ static int init_op_data_objs_enc(struct rte_bbdev_op_data *bufs,
       bufs[j].data = m_head;
       bufs[j].offset = 0;
       bufs[j].length = 0;
-  
-      if ((op_type == DATA_INPUT) || (op_type == DATA_HARQ_INPUT)) {
-        if ((op_type == DATA_INPUT) && large_input) {
+
+      if (op_type == DATA_INPUT) {
+        if (large_input) {
           /* Allocate a fake overused mbuf */
           data = rte_malloc(NULL, data_len, 0);
           AssertFatal(data != NULL, "rte malloc failed with %u bytes", data_len);
@@ -509,17 +503,11 @@ free_buffers(struct active_device *ad, struct test_op_params *op_params)
   rte_mempool_free(ad->bbdev_enc_op_pool);
   rte_mempool_free(ad->in_mbuf_pool);
   rte_mempool_free(ad->hard_out_mbuf_pool);
-  rte_mempool_free(ad->soft_out_mbuf_pool);
-  rte_mempool_free(ad->harq_in_mbuf_pool);
-  rte_mempool_free(ad->harq_out_mbuf_pool);
 
   for (int i = 2; i < rte_lcore_count(); ++i) {
     for (int j = 0; j < RTE_MAX_NUMA_NODES; ++j) {
       rte_free(op_params->q_bufs[j][i].inputs);
       rte_free(op_params->q_bufs[j][i].hard_outputs);
-      rte_free(op_params->q_bufs[j][i].soft_outputs);
-      rte_free(op_params->q_bufs[j][i].harq_inputs);
-      rte_free(op_params->q_bufs[j][i].harq_outputs);
     }
   }
 }
@@ -571,16 +559,8 @@ set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
       ops[j]->ldpc_dec.harq_combined_input.offset = harq_combined_offset;
       ops[j]->ldpc_dec.harq_combined_output.offset = harq_combined_offset;
 
-      if (bufs->hard_outputs != NULL)
-        ops[j]->ldpc_dec.hard_output = bufs->hard_outputs[start_idx + j];
-      if (bufs->inputs != NULL)
-        ops[j]->ldpc_dec.input = bufs->inputs[start_idx + j];
-      if (bufs->soft_outputs != NULL)
-        ops[j]->ldpc_dec.soft_output = bufs->soft_outputs[start_idx + j];
-      if (bufs->harq_inputs != NULL)
-        ops[j]->ldpc_dec.harq_combined_input = bufs->harq_inputs[start_idx + j];
-      if (bufs->harq_outputs != NULL)
-        ops[j]->ldpc_dec.harq_combined_output = bufs->harq_outputs[start_idx + j];
+      ops[j]->ldpc_dec.hard_output = bufs->hard_outputs[start_idx + j];
+      ops[j]->ldpc_dec.input = bufs->inputs[start_idx + j];
       ++j;
     }
   }
@@ -1052,18 +1032,10 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
   rte_bbdev_info_get(ad->dev_id, &info);
   int socket_id = GET_SOCKET(info.socket_id);
   // fill_queue_buffers -> init_op_data_objs
-  struct rte_mempool *in_mp = ad->in_mbuf_pool;
-  struct rte_mempool *hard_out_mp = ad->hard_out_mbuf_pool;
-  struct rte_mempool *soft_out_mp = ad->soft_out_mbuf_pool;
-  struct rte_mempool *harq_in_mp = ad->harq_in_mbuf_pool;
-  struct rte_mempool *harq_out_mp = ad->harq_out_mbuf_pool;
-  struct rte_mempool *mbuf_pools[DATA_NUM_TYPES] = {in_mp, soft_out_mp, hard_out_mp, harq_in_mp, harq_out_mp};
+  struct rte_mempool *mbuf_pools[DATA_NUM_TYPES] = {ad->in_mbuf_pool, ad->hard_out_mbuf_pool};
   uint8_t queue_id = ad->dec_queue;
   struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&op_params->q_bufs[socket_id][queue_id].inputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].soft_outputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].hard_outputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].harq_inputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].harq_outputs};
+                                                          &op_params->q_bufs[socket_id][queue_id].hard_outputs};
 
   int offset = 0;
   for(uint16_t h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h){
@@ -1079,7 +1051,7 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
     }
   }
 
-  for (enum op_data_type type = DATA_INPUT; type < 3; type += 2) {
+  for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     ret = allocate_buffers_on_socket(queue_ops[type], num_segments * sizeof(struct rte_bbdev_op_data), socket_id);
     AssertFatal(ret == 0, "Couldn't allocate memory for rte_bbdev_op_data structs");
     ret = init_op_data_objs_dec(*queue_ops[type],
@@ -1115,19 +1087,12 @@ int32_t nrLDPC_coding_encoder(nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_enc
   rte_bbdev_info_get(ad->dev_id, &info);
   int socket_id = GET_SOCKET(info.socket_id);
   // fill_queue_buffers -> init_op_data_objs
-  struct rte_mempool *in_mp = ad->in_mbuf_pool;
-  struct rte_mempool *hard_out_mp = ad->hard_out_mbuf_pool;
-  struct rte_mempool *soft_out_mp = ad->soft_out_mbuf_pool;
-  struct rte_mempool *harq_in_mp = ad->harq_in_mbuf_pool;
-  struct rte_mempool *harq_out_mp = ad->harq_out_mbuf_pool;
-  struct rte_mempool *mbuf_pools[DATA_NUM_TYPES] = {in_mp, soft_out_mp, hard_out_mp, harq_in_mp, harq_out_mp};
+  struct rte_mempool *mbuf_pools[DATA_NUM_TYPES] = {ad->in_mbuf_pool, ad->hard_out_mbuf_pool};
   uint8_t queue_id = ad->enc_queue;
   struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&op_params->q_bufs[socket_id][queue_id].inputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].soft_outputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].hard_outputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].harq_inputs,
-                                                          &op_params->q_bufs[socket_id][queue_id].harq_outputs};
-  for (enum op_data_type type = DATA_INPUT; type < 3; type += 2) {
+                                                          &op_params->q_bufs[socket_id][queue_id].hard_outputs};
+
+  for (enum op_data_type type = DATA_INPUT; type < DATA_NUM_TYPES; ++type) {
     ret = allocate_buffers_on_socket(queue_ops[type], num_segments * sizeof(struct rte_bbdev_op_data), socket_id);
     AssertFatal(ret == 0, "Couldn't allocate memory for rte_bbdev_op_data structs");
     ret = init_op_data_objs_enc(*queue_ops[type],
