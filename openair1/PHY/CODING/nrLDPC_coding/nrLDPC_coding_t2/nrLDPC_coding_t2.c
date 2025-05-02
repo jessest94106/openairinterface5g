@@ -99,8 +99,6 @@ struct thread_params {
   nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters;
   nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters;
   uint8_t iter_count;
-  rte_atomic16_t nb_dequeued;
-  rte_atomic16_t processing_status;
   struct test_op_params *op_params;
   struct data_buffers *data_buffers;
   struct rte_mempool *bbdev_op_pool;
