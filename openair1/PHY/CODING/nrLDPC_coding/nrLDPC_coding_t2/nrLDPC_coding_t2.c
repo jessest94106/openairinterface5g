@@ -656,18 +656,6 @@ retrieve_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
   return 0;
 }
 
-// based on DPDK BBDEV init_test_op_params
-static int init_test_op_params(struct test_op_params *op_params,
-                               enum rte_bbdev_op_type op_type,
-                               struct rte_mempool *ops_mp,
-                               uint16_t burst_sz,
-                               uint16_t num_to_process,
-                               uint16_t num_lcores)
-{
-  op_params->num_lcores = num_lcores;
-  return 0;
-}
-
 // based on DPDK BBDEV throughput_pmd_lcore_ldpc_dec
 static int
 pmd_lcore_ldpc_dec(void *arg)
@@ -963,12 +951,7 @@ int32_t nrLDPC_coding_init()
     printf("Couldn't create mempools");
     return -1;
   }
-  f_ret = init_test_op_params(op_params, RTE_BBDEV_OP_LDPC_DEC, ad->bbdev_dec_op_pool, num_queues, num_queues, 1);
-  f_ret = init_test_op_params(op_params, RTE_BBDEV_OP_LDPC_ENC, ad->bbdev_enc_op_pool, num_queues, num_queues, 1);
-  if (f_ret != 0) {
-    printf("Couldn't init test op params");
-    return -1;
-  }
+  op_params->num_lcores = 1;
   return 0;
 }
 
