@@ -78,10 +78,10 @@ static nr_ue_nas_t nr_ue_nas[MAX_NAS_UE] = {0};
 
 #define FOREACH_STATE(TYPE_DEF)                  \
   TYPE_DEF(NAS_SECURITY_NO_SECURITY_CONTEXT, 0)  \
-  TYPE_DEF(NAS_SECURITY_NEW_SECURITY_CONTEXT, 1) \
-  TYPE_DEF(NAS_SECURITY_UNPROTECTED, 2)          \
-  TYPE_DEF(NAS_SECURITY_INTEGRITY_FAILED, 3)     \
-  TYPE_DEF(NAS_SECURITY_INTEGRITY_PASSED, 4)     \
+  TYPE_DEF(NAS_SECURITY_UNPROTECTED, 1)          \
+  TYPE_DEF(NAS_SECURITY_INTEGRITY_PASSED, 2)     \
+  TYPE_DEF(NAS_SECURITY_NEW_SECURITY_CONTEXT, 3) \
+  TYPE_DEF(NAS_SECURITY_INTEGRITY_FAILED, 4)     \
   TYPE_DEF(NAS_SECURITY_BAD_INPUT, 5)
 
 const char *nr_release_cause_desc[] = {"RRC_CONNECTION_FAILURE", "RRC_RESUME_FAILURE", "OTHER"};
@@ -131,7 +131,27 @@ static const char *print_info(uint8_t id, const text_info_t *array, uint8_t arra
   return "N/A";
 }
 
-static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, byte_array_t buffer)
+/** @brief Check whether a message belongs to the list of messages that
+ *  are allowed to be integrity unprotected (4.4.4.2 3GPP TS 24.501) */
+static bool unprotected_allowed(byte_array_t buffer, fgs_nas_msg_t msg_type)
+{
+  switch (msg_type) {
+    case FGS_IDENTITY_REQUEST: // check on SUCI done in the handler
+    case FGS_AUTHENTICATION_REQUEST:
+    case FGS_AUTHENTICATION_RESULT:
+    case FGS_AUTHENTICATION_REJECT:
+    case FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING: // for non switch off: deregistration type IE set to NORMAL_DEREGISTRATION
+      return true;
+    case FGS_REGISTRATION_REJECT:
+    case FGS_SERVICE_REJECT:
+      // unprotected if the 5GMM cause is not #76
+      return buffer.buf[4] != Not_authorized_for_this_CAG_or_authorized_for_CAG_cells_only;
+    default:
+      return false;
+  }
+}
+
+static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, byte_array_t buffer, fgs_nas_msg_t msg_type)
 {
   if (nas->security_container == NULL)
     return NAS_SECURITY_NO_SECURITY_CONTEXT;
@@ -145,7 +165,7 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, byte_array_t b
 
   switch (security_type) {
     case PLAIN_5GS_MSG:
-      return NAS_SECURITY_UNPROTECTED;
+      return unprotected_allowed(buffer, msg_type) ? NAS_SECURITY_UNPROTECTED : NAS_SECURITY_BAD_INPUT;
       break;
     case INTEGRITY_PROTECTED:
     case INTEGRITY_PROTECTED_WITH_NEW_SECU_CTX:
@@ -1272,7 +1292,7 @@ static void generateDeregistrationRequest(nr_ue_nas_t *nas, as_nas_info_t *initi
 
   // Plain 5GMM
   fgs_deregistration_request_ue_originating_msg *mm_msg = &sp_msg.plain.mm_msg.fgs_deregistration_request_ue_originating;
-  mm_msg->deregistrationtype.switchoff = NORMAL_DEREGISTRATION;
+  mm_msg->deregistrationtype.switchoff = NORMAL_DEREGISTRATION; // note: in case this is changed to SWITCH_OFF, handle in unprotected_allowed
   mm_msg->deregistrationtype.reregistration_required = REREGISTRATION_NOT_REQUIRED;
   mm_msg->deregistrationtype.access_type = TGPP_ACCESS;
   mm_msg->naskeysetidentifier.naskeysetidentifier = 1;
@@ -1426,7 +1446,7 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   }
 }
 
-static uint8_t get_msg_type(uint8_t *pdu_buffer, uint32_t length)
+static fgs_nas_msg_t get_msg_type(uint8_t *pdu_buffer, uint32_t length)
 {
   if (pdu_buffer == NULL)
     goto error;
@@ -1722,13 +1742,12 @@ void *nas_nrue(void *args_p)
               NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length);
 
         byte_array_t ba = {.buf = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.nas_data, .len = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length};
-        security_state_t security_state = nas_security_rx_process(nas, ba);
-        if (security_state != NAS_SECURITY_INTEGRITY_PASSED && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
+        fgs_nas_msg_t msg_type = get_msg_type(ba.buf, ba.len);
+        security_state_t security_state = nas_security_rx_process(nas, ba, msg_type);
+        if (security_state > NAS_SECURITY_INTEGRITY_PASSED) {
           LOG_E(NAS, "NAS integrity failed, discard incoming message: security state is %s\n", security_state_info[security_state].text);
           break;
         }
-
-        int msg_type = get_msg_type(ba.buf, ba.len);
 
         if (msg_type == FGS_REGISTRATION_ACCEPT) {
           handle_registration_accept(nas, ba.buf, ba.len);
@@ -1791,17 +1810,9 @@ void *nas_nrue(void *args_p)
         uint8_t *pdu_buffer = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.nas_data;
         int pdu_length = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length;
         byte_array_t buffer = {.buf = pdu_buffer, .len = pdu_length};
-        int msg_type = get_msg_type(pdu_buffer, pdu_length);
-
-        security_state_t security_state = nas_security_rx_process(nas, buffer);
-        /* special cases accepted without protection */
-        if (security_state == NAS_SECURITY_UNPROTECTED) {
-          /* for the moment, only FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING is accepted */
-          if (msg_type == FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING)
-            security_state = NAS_SECURITY_INTEGRITY_PASSED;
-        }
-
-        if (security_state != NAS_SECURITY_INTEGRITY_PASSED && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
+        fgs_nas_msg_t msg_type = get_msg_type(pdu_buffer, pdu_length);
+        security_state_t security_state = nas_security_rx_process(nas, buffer, msg_type);
+        if (security_state > NAS_SECURITY_INTEGRITY_PASSED) {
           LOG_E(NAS, "NAS integrity failed, discard incoming message\n");
           break;
         }
