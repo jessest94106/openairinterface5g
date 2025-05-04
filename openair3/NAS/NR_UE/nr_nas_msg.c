@@ -167,8 +167,13 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, byte_array_t b
     case PLAIN_5GS_MSG:
       return unprotected_allowed(buffer, msg_type) ? NAS_SECURITY_UNPROTECTED : NAS_SECURITY_BAD_INPUT;
       break;
-    case INTEGRITY_PROTECTED:
     case INTEGRITY_PROTECTED_WITH_NEW_SECU_CTX:
+      stream_security_container_delete(nas->security_container);
+      nas->security_container = NULL;
+      nas->security.nas_count_dl = 0;
+      return NAS_SECURITY_NO_SECURITY_CONTEXT;
+      break;
+    case INTEGRITY_PROTECTED:
     case INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX:
       /* only accept "integrity protected and ciphered" messages */
       if (buffer.buf[6] == 0)
