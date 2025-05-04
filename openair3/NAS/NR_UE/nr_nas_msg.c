@@ -50,6 +50,7 @@
 #include "SORTransparentContainer.h"
 #include "FGSIdentityResponse.h"
 #include "fgmm_authentication_request.h"
+#include "fgmm_identity_request.h"
 #include "T.h"
 #include "aka_functions.h"
 #include "assertions.h"
@@ -802,7 +803,7 @@ void generateServiceRequest(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas)
   }
 }
 
-void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype, uicc_t *uicc)
+static void generateIdentityResponse(as_nas_info_t *initialNasMsg, const uint8_t identitytype, uicc_t *uicc)
 {
   int size = sizeof(fgmm_msg_header_t);
   fgmm_nas_message_plain_t plain = {0};
@@ -821,6 +822,39 @@ void generateIdentityResponse(as_nas_info_t *initialNasMsg, uint8_t identitytype
   initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
 
   initialNasMsg->length = mm_msg_encode(&plain, initialNasMsg->nas_data, size);
+}
+
+static void handle_identity_request(as_nas_info_t *initialNasMsg, nr_ue_nas_t *nas, const byte_array_t buffer)
+{
+  fgmm_msg_header_t mm_header = {0};
+  fgs_identity_request_msg_t msg = {0};
+
+  // Decode plain NAS header
+  int decoded = decode_5gmm_msg_header(&mm_header, buffer.buf, buffer.len);
+  if (decoded < 0) {
+    LOG_E(NAS, "Failed to decode NAS Identity Request header\n");
+    return;
+  }
+
+  byte_array_t payload = {.buf = &buffer.buf[decoded], .len = buffer.len - decoded};
+
+  // Decode identity request payload
+  if (decode_fgs_identity_request(&msg, &payload) < 0) {
+    LOG_E(NAS, "Failed to decode Identity Request message\n");
+    return;
+  }
+
+  LOG_I(NAS,
+        "Received IDENTITY REQUEST for identity type: %s\n",
+        print_info(msg.fgsmobileidentity, fgs_identity_type_text, sizeofArray(fgs_identity_type_text)));
+
+  if (mm_header.message_type == NAS_SECURITY_UNPROTECTED && msg.fgsmobileidentity != FGS_MOBILE_IDENTITY_SUCI) {
+    // see 3GPP TS 24.501 4.4.4.2
+    LOG_E(NAS, "Only SUCI mobile identity is expected in a security-unprotected request\n");
+    return;
+  }
+
+  generateIdentityResponse(initialNasMsg, msg.fgsmobileidentity, nas->uicc);
 }
 
 static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, uint8_t *buf)
@@ -1757,6 +1791,7 @@ void *nas_nrue(void *args_p)
         as_nas_info_t initialNasMsg = {0};
         uint8_t *pdu_buffer = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.nas_data;
         int pdu_length = NAS_DOWNLINK_DATA_IND(msg_p).nasMsg.length;
+        byte_array_t buffer = {.buf = pdu_buffer, .len = pdu_length};
         int msg_type = get_msg_type(pdu_buffer, pdu_length);
 
         security_state_t security_state = nas_security_rx_process(nas, pdu_buffer, pdu_length);
@@ -1781,13 +1816,11 @@ void *nas_nrue(void *args_p)
 
         switch (msg_type) {
           case FGS_IDENTITY_REQUEST:
-            generateIdentityResponse(&initialNasMsg, *(pdu_buffer + 3), nas->uicc);
+            handle_identity_request(&initialNasMsg, nas, buffer);
             break;
-          case FGS_AUTHENTICATION_REQUEST: {
-            byte_array_t buffer = {.buf = pdu_buffer, .len = pdu_length};
+          case FGS_AUTHENTICATION_REQUEST:
             handle_fgmm_authentication_request(nas, &initialNasMsg, &buffer);
             break;
-          }
           case FGS_SECURITY_MODE_COMMAND:
             handle_security_mode_command(nas, &initialNasMsg, pdu_buffer, pdu_length);
             break;
@@ -1813,7 +1846,6 @@ void *nas_nrue(void *args_p)
             exit(1);
             break;
           case FGS_SERVICE_ACCEPT: {
-            byte_array_t buffer = {.buf = pdu_buffer, .len = pdu_length};
             handle_service_accept(nas, &buffer);
             break;
           }
