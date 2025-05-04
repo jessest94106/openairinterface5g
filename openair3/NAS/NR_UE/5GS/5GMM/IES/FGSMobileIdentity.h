@@ -30,8 +30,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-
 #include "OctetString.h"
+#include "fgs_nas_utils.h"
 
 #ifndef FGS_MOBILE_IDENTITY_H_
 #define FGS_MOBILE_IDENTITY_H_
@@ -129,15 +129,22 @@ typedef struct {
   uint8_t macaddr;
 } Macaddr5GSMobileIdentity_t;
 
+#define FOREACH_IDENTITY_TYPE(TYPE_DEF)       \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_NOIDENTITY, 0) \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_SUCI, 1)       \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_5G_GUTI, 2)    \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_IMEI, 3)       \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_5GS_TMSI, 4)   \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_IMEISV, 5)     \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_MAC_ADDR, 6)   \
+  TYPE_DEF(FGS_MOBILE_IDENTITY_EUI64, 7)
+
+typedef enum { FOREACH_IDENTITY_TYPE(TO_ENUM) } fgs_identity_type_t;
+
+static const text_info_t fgs_identity_type_text[] = {FOREACH_IDENTITY_TYPE(TO_TEXT)};
+
 // clang-format off
 typedef union FGSMobileIdentity_tag {
-#define FGS_MOBILE_IDENTITY_NOIDENTITY    0b000
-#define FGS_MOBILE_IDENTITY_SUCI          0b001
-#define FGS_MOBILE_IDENTITY_5G_GUTI       0b010
-#define FGS_MOBILE_IDENTITY_IMEI          0b011
-#define FGS_MOBILE_IDENTITY_5GS_TMSI      0b100
-#define FGS_MOBILE_IDENTITY_IMEISV        0b101
-#define FGS_MOBILE_IDENTITY_MAC_ADDR      0b110
   NoIdentity5GSMobileIdentity_t   noidentity;
   Suci5GSMobileIdentity_t         suci;
   Guti5GSMobileIdentity_t         guti;
