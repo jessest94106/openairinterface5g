@@ -322,12 +322,7 @@ static NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish)
 
 static void freeSRBlist(NR_SRB_ToAddModList_t *l)
 {
-  if (l) {
-    for (int i = 0; i < l->list.count; i++)
-      free(l->list.array[i]);
-    free(l);
-  } else
-    LOG_E(NR_RRC, "Call free SRB list on NULL pointer\n");
+  ASN_STRUCT_FREE(asn_DEF_NR_SRB_ToAddModList, l);
 }
 
 static void activate_srb(gNB_RRC_UE_t *UE, int srb_id)
