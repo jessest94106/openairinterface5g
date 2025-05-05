@@ -510,7 +510,7 @@ static void derive_ue_keys(uint8_t *buf, nr_ue_nas_t *nas)
   derive_kausf(ck, ik, sqn, kausf, nas->uicc);
   derive_kseaf(kausf, kseaf, nas->uicc);
   derive_kamf(kseaf, kamf, 0x0000, nas->uicc);
-  derive_kgnb(kamf, 0, kgnb);
+  derive_kgnb(kamf, nas->security.nas_count_ul, kgnb);
 
   printf("kausf:");
   for (int i = 0; i < 32; i++) {
