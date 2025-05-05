@@ -1938,14 +1938,13 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
     AssertFatal(cell->neighbour_cells != NULL, "Memory exhausted!!!");
     seq_arr_init(cell->neighbour_cells, sizeof(nr_neighbour_gnb_configuration_t));
     for (int l = 0; l < NeighbourCellParamList.numelt; ++l) {
-      nr_neighbour_gnb_configuration_t *neighbourCell = calloc(1, sizeof(nr_neighbour_gnb_configuration_t));
-      AssertFatal(neighbourCell != NULL, "out of memory\n");
-      neighbourCell->gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
-      neighbourCell->nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
-      neighbourCell->physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
-      neighbourCell->subcarrierSpacing = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_SCS_IDX].uptr;
-      neighbourCell->absoluteFrequencySSB = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX].i64ptr;
-      neighbourCell->tac = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_TAC_IDX].uptr;
+      nr_neighbour_gnb_configuration_t neighbourCell = {0};
+      neighbourCell.gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
+      neighbourCell.nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
+      neighbourCell.physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
+      neighbourCell.subcarrierSpacing = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_SCS_IDX].uptr;
+      neighbourCell.absoluteFrequencySSB = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX].i64ptr;
+      neighbourCell.tac = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_TAC_IDX].uptr;
 
       char neighbour_plmn_path[CONFIG_MAXOPTLENGTH];
       snprintf(neighbour_plmn_path,
@@ -1957,10 +1956,10 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
                GNB_CONFIG_STRING_NEIGHBOUR_PLMN);
       GET_PARAMS(NeighbourPlmn, GNBPLMNPARAMS_DESC, neighbour_plmn_path);
 
-      neighbourCell->plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
-      neighbourCell->plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
-      neighbourCell->plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
-      seq_arr_push_back(cell->neighbour_cells, neighbourCell, sizeof(nr_neighbour_gnb_configuration_t));
+      neighbourCell.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
+      neighbourCell.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
+      neighbourCell.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
+      seq_arr_push_back(cell->neighbour_cells, &neighbourCell, sizeof(nr_neighbour_gnb_configuration_t));
     }
 
     seq_arr_push_back(rrc->neighbour_cell_configuration, cell, sizeof(neighbour_cell_configuration_t));
