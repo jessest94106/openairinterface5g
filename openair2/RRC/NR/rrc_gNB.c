@@ -255,41 +255,14 @@ void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *c
   RB_INIT(&rrc->cuups);
   RB_INIT(&rrc->dus);
   rrc->configuration = *configuration;
-
-  if (get_softmodem_params()->phy_test > 0 || get_softmodem_params()->do_ra > 0) {
-    AssertFatal(NODE_IS_MONOLITHIC(rrc->node_type), "phy_test and do_ra only work in monolithic\n");
-    rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_allocate_new_ue_context(rrc);
-    LOG_I(NR_RRC,"Adding new user (%p)\n",ue_context_p);
-    if (!NODE_IS_CU(rrc->node_type)) {
-      rrc_add_nsa_user(rrc,ue_context_p,NULL);
-    }
-  }
 }
 
 static void rrc_gNB_process_AdditionRequestInformation(const module_id_t gnb_mod_idP, x2ap_ENDC_sgnb_addition_req_t *m)
 {
-  struct NR_CG_ConfigInfo *cg_configinfo = NULL;
-  asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
-                            &asn_DEF_NR_CG_ConfigInfo,
-                            (void **)&cg_configinfo,
-                            (uint8_t *)m->rrc_buffer,
-                            (int) m->rrc_buffer_size);//m->rrc_buffer_size);
-  gNB_RRC_INST         *rrc=RC.nrrrc[gnb_mod_idP];
-
-  if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-    AssertFatal(1==0,"NR_UL_DCCH_MESSAGE decode error\n");
-    // free the memory
-    SEQUENCE_free(&asn_DEF_NR_CG_ConfigInfo, cg_configinfo, 1);
-    return;
-  }
-
-  xer_fprint(stdout,&asn_DEF_NR_CG_ConfigInfo, cg_configinfo);
-  // recreate enough of X2 EN-DC Container
-  AssertFatal(cg_configinfo->criticalExtensions.choice.c1->present == NR_CG_ConfigInfo__criticalExtensions__c1_PR_cg_ConfigInfo,
-              "ueCapabilityInformation not present\n");
-  parse_CG_ConfigInfo(rrc,cg_configinfo,m);
-  LOG_I(NR_RRC, "Successfully parsed CG_ConfigInfo of size %zu bits. (%zu bytes)\n",
-        dec_rval.consumed, (dec_rval.consumed +7/8));
+  gNB_RRC_INST *rrc = RC.nrrrc[gnb_mod_idP];
+  AssertFatal(NODE_IS_MONOLITHIC(rrc->node_type), "NSA, phy_test, and do_ra only work in monolithic\n");
+  sctp_assoc_t assoc_id = -1; // monolithic gNB
+  rrc_add_nsa_user(rrc, m, assoc_id);
 }
 
 //-----------------------------------------------------------------------------
@@ -1145,6 +1118,7 @@ int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int 
 {
   uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   ue_p->xids[xid] = RRC_DEDICATED_RECONF;
+  ue_p->ongoing_reconfiguration = true;
 
   NR_CellGroupConfig_t *masterCellGroup = ue_p->masterCellGroup;
   if (dl_bwp_id > 0) {
@@ -1237,6 +1211,7 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
   UE->establishment_cause = rrcSetupRequest->establishmentCause;
   UE->nr_cellid = msg->nr_cellid;
   UE->masterCellGroup = cellGroupConfig;
+  UE->ongoing_reconfiguration = false;
   activate_srb(UE, 1);
   rrc_gNB_generate_RRCSetup(0, msg->crnti, ue_context_p, msg->du2cu_rrc_container, msg->du2cu_rrc_container_length);
 }
@@ -1804,6 +1779,7 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
 {
   uint8_t xid = reconfig_complete->rrc_TransactionIdentifier;
   UE->ue_reconfiguration_counter++;
+  UE->ongoing_reconfiguration = false;
 
   switch (UE->xids[xid]) {
     case RRC_PDUSESSION_RELEASE: {
@@ -1854,6 +1830,15 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
     UE->ho_context->target->ho_success(rrc, UE);
     nr_rrc_finalize_ho(UE);
   }
+
+  f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
+  f1ap_ue_context_modif_req_t ue_context_modif_req = {
+      .gNB_CU_ue_id = UE->rrc_ue_id,
+      .gNB_DU_ue_id = ue_data.secondary_ue,
+      .ReconfigComplOutcome = RRCreconf_success,
+  };
+  rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &ue_context_modif_req);
 }
 
 static void rrc_gNB_generate_UECapabilityEnquiry(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue)
@@ -2044,16 +2029,27 @@ void rrc_gNB_process_initial_ul_rrc_message(sctp_assoc_t assoc_id, const f1ap_in
   ASN_STRUCT_FREE(asn_DEF_NR_UL_CCCH_Message, ul_ccch_msg);
 }
 
+static void rrc_gNB_trigger_nsa_release(module_id_t mod_id, int ue_id)
+{
+  gNB_RRC_INST *rrc = RC.nrrrc[mod_id];
+  rrc_gNB_ue_context_t *ue_context = rrc_gNB_get_ue_context(rrc, ue_id);
+  if (!ue_context) {
+    LOG_E(NR_RRC, "could not find UE for ID %d\n", ue_id);
+    return;
+  }
+  rrc_release_nsa_user(rrc, ue_context);
+}
+
 void rrc_gNB_process_release_request(const module_id_t gnb_mod_idP, x2ap_ENDC_sgnb_release_request_t *m)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[gnb_mod_idP];
-  rrc_remove_nsa_user(rrc, m->rnti);
+  /* it's not the RNTI, it's the UE ID ... */
+  rrc_gNB_trigger_nsa_release(gnb_mod_idP, m->rnti);
 }
 
 void rrc_gNB_process_dc_overall_timeout(const module_id_t gnb_mod_idP, x2ap_ENDC_dc_overall_timeout_t *m)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[gnb_mod_idP];
-  rrc_remove_nsa_user(rrc, m->rnti);
+  /* it's not the RNTI, it's the UE ID ... */
+  rrc_gNB_trigger_nsa_release(gnb_mod_idP, m->rnti);
 }
 
 /* \brief fill E1 bearer modification's DRB from F1 DRB
@@ -2170,6 +2166,11 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   UE->masterCellGroup = cellGroupConfig;
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
+
+  if (!IS_SA_MODE(get_softmodem_params())) {
+    rrc_add_nsa_user_resp(rrc, UE, resp);
+    return;
+  }
 
   if (resp->drbs_to_be_setup_length > 0) {
     int num_drb = get_number_active_drbs(UE);
@@ -2417,7 +2418,8 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_
       xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
 
     /* trigger reconfiguration */
-    nr_rrc_reconfiguration_req(rrc, UE, 0, 0);
+    if (!UE->ongoing_reconfiguration)
+      nr_rrc_reconfiguration_req(rrc, UE, 0, 0);
     return;
   }
   LOG_W(RRC,

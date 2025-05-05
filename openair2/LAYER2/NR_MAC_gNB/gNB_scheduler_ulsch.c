@@ -56,7 +56,7 @@ int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
   }
 
   // Avoid slots with the SRS
-  UE_iterator(nrmac->UE_info.list, UE) {
+  UE_iterator(nrmac->UE_info.connected_ue_list, UE) {
     NR_sched_srs_t sched_srs = UE->UE_sched_ctrl.sched_srs;
     if(sched_srs.srs_scheduled && sched_srs.frame == frame && sched_srs.slot == slot)
       return 1;
@@ -461,17 +461,13 @@ static int nr_process_mac_pdu(instance_t module_idP,
         break;
 
       case UL_SCH_LCID_C_RNTI:
-        for (int i = 0; i < NR_NB_RA_PROC_MAX; i++) {
-          NR_RA_t *ra = &RC.nrmac[module_idP]->common_channels[CC_id].ra[i];
-          if (ra->ra_state == nrRA_gNB_IDLE && ra->rnti == UE->rnti) {
-            // Extract C-RNTI value
-            rnti_t crnti = ((pduP[1] & 0xFF) << 8) | (pduP[2] & 0xFF);
-            AssertFatal(false,
-                        "Received MAC CE for C-RNTI %04x without RA running, procedure exists? Or is it a bug while decoding the "
-                        "MAC PDU?\n",
-                        crnti);
-            break;
-          }
+        if (UE->ra && UE->ra->ra_state == nrRA_gNB_IDLE) {
+          // Extract C-RNTI value
+          rnti_t crnti = ((pduP[1] & 0xFF) << 8) | (pduP[2] & 0xFF);
+          AssertFatal(false,
+                      "Received MAC CE for C-RNTI %04x without RA running, procedure exists? Or is it a bug while decoding the "
+                      "MAC PDU?\n",
+                      crnti);
         }
         break;
 
@@ -547,65 +543,31 @@ static void abort_nr_ul_harq(NR_UE_info_t *UE, int8_t harq_pid)
     sched_ctrl->sched_ul_bytes = 0;
 }
 
-static bool get_UE_waiting_CFRA_msg3(const gNB_MAC_INST *gNB_mac,
-                                     const int CC_id,
-                                     const frame_t frame,
-                                     const slot_t slot,
-                                     rnti_t rnti)
+static void handle_nr_ul_harq(gNB_MAC_INST *nrmac,
+                              NR_UE_info_t *UE,
+                              frame_t frame,
+                              slot_t slot,
+                              rnti_t rnti,
+                              int crc_harq_id,
+                              bool crc_status)
 {
-  bool UE_waiting_CFRA_msg3 = false;
-  for (int i = 0; i < NR_NB_RA_PROC_MAX; i++) {
-    const NR_RA_t *ra = &gNB_mac->common_channels[CC_id].ra[i];
-    if (ra->cfra && ra->ra_state == nrRA_WAIT_Msg3 && frame == ra->Msg3_frame && slot == ra->Msg3_slot && rnti == ra->rnti) {
-      UE_waiting_CFRA_msg3 = true;
-      break;
-    }
-  }
-  return UE_waiting_CFRA_msg3;
-}
-
-void handle_nr_ul_harq(const int CC_idP, module_id_t mod_id, frame_t frame, slot_t slot, const nfapi_nr_crc_t *crc_pdu)
-{
-  gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
   if (nrmac->radio_config.disable_harq) {
     LOG_D(NR_MAC, "skipping UL feedback handling as HARQ is disabled\n");
     return;
   }
 
-  NR_SCHED_LOCK(&nrmac->sched_lock);
-  for (int i = 0; i < NR_NB_RA_PROC_MAX; ++i) {
-    NR_RA_t *ra = &nrmac->common_channels[CC_idP].ra[i];
-    // if we find any ongoing RA that has already scheduled MSG3
-    // and it is expecting its reception in current frame and slot with matching RNTI
-    // we can exit the function (no HARQ involved)
-    if (ra->ra_state >= nrRA_WAIT_Msg3 && ra->rnti == crc_pdu->rnti && frame == ra->Msg3_frame && slot == ra->Msg3_slot) {
-      LOG_D(NR_MAC, "UL for rnti %04x in RA (MSG3), no need to process HARQ\n", crc_pdu->rnti);
-      NR_SCHED_UNLOCK(&nrmac->sched_lock);
-      return;
-    }
-  }
-
-  NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, crc_pdu->rnti);
-  if (!UE) {
-    NR_SCHED_UNLOCK(&nrmac->sched_lock);
-    LOG_E(NR_MAC, "Couldn't identify UE connected with current UL HARQ process\n");
-    return;
-  }
-
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   int8_t harq_pid = sched_ctrl->feedback_ul_harq.head;
-  LOG_D(NR_MAC, "Comparing crc_pdu->harq_id vs feedback harq_pid = %d %d\n",crc_pdu->harq_id, harq_pid);
-  while (crc_pdu->harq_id != harq_pid || harq_pid < 0) {
-    LOG_W(NR_MAC, "Unexpected ULSCH HARQ PID %d (have %d) for RNTI 0x%04x\n", crc_pdu->harq_id, harq_pid, crc_pdu->rnti);
-    if (harq_pid < 0) {
-      NR_SCHED_UNLOCK(&nrmac->sched_lock);
+  LOG_D(NR_MAC, "Comparing crc harq_id vs feedback harq_pid = %d %d\n", crc_harq_id, harq_pid);
+  while (crc_harq_id != harq_pid || harq_pid < 0) {
+    LOG_W(NR_MAC, "Unexpected ULSCH HARQ PID %d (have %d) for RNTI 0x%04x\n", crc_harq_id, harq_pid, rnti);
+    if (harq_pid < 0)
       return;
-    }
 
     remove_front_nr_list(&sched_ctrl->feedback_ul_harq);
     sched_ctrl->ul_harq_processes[harq_pid].is_waiting = false;
 
-    if(sched_ctrl->ul_harq_processes[harq_pid].round >= RC.nrmac[mod_id]->ul_bler.harq_round_max - 1) {
+    if(sched_ctrl->ul_harq_processes[harq_pid].round >= nrmac->ul_bler.harq_round_max - 1) {
       abort_nr_ul_harq(UE, harq_pid);
     } else {
       sched_ctrl->ul_harq_processes[harq_pid].round++;
@@ -618,52 +580,211 @@ void handle_nr_ul_harq(const int CC_idP, module_id_t mod_id, frame_t frame, slot
   DevAssert(harq->is_waiting);
   harq->feedback_slot = -1;
   harq->is_waiting = false;
-  if (!crc_pdu->tb_crc_status) {
+  if (!crc_status) {
     finish_nr_ul_harq(sched_ctrl, harq_pid);
     LOG_D(NR_MAC,
           "Ulharq id %d crc passed for RNTI %04x\n",
           harq_pid,
-          crc_pdu->rnti);
-  } else if (harq->round >= RC.nrmac[mod_id]->ul_bler.harq_round_max  - 1) {
+          rnti);
+  } else if (harq->round >= nrmac->ul_bler.harq_round_max  - 1) {
     abort_nr_ul_harq(UE, harq_pid);
     LOG_D(NR_MAC,
           "RNTI %04x: Ulharq id %d crc failed in all rounds\n",
-          crc_pdu->rnti,
+          rnti,
           harq_pid);
   } else {
     harq->round++;
     LOG_D(NR_MAC,
           "Ulharq id %d crc failed for RNTI %04x\n",
           harq_pid,
-          crc_pdu->rnti);
+          rnti);
     add_tail_nr_list(&sched_ctrl->retrans_ul_harq, harq_pid);
   }
-  NR_SCHED_UNLOCK(&nrmac->sched_lock);
 }
 
-static void handle_msg3_failed_rx(NR_RA_t *ra, int i, int harq_round_max)
+static void handle_msg3_failed_rx(gNB_MAC_INST *mac, NR_RA_t *ra, rnti_t rnti, int harq_round_max)
 {
   // for CFRA (NSA) do not schedule retransmission of msg3
   if (ra->cfra) {
-    LOG_D(NR_MAC, "Random Access %i failed at state %s (NSA msg3 reception failed)\n", i, nrra_text[ra->ra_state]);
-    nr_clear_ra_proc(ra);
+    LOG_W(NR_MAC, "UE %04x RA failed at state %s (NSA msg3 reception failed)\n", rnti, nrra_text[ra->ra_state]);
+    nr_release_ra_UE(mac, rnti);
     return;
   }
 
   if (ra->msg3_round >= harq_round_max - 1) {
-    LOG_W(NR_MAC, "Random Access %i failed at state %s (Reached msg3 max harq rounds)\n", i, nrra_text[ra->ra_state]);
-    nr_clear_ra_proc(ra);
+    LOG_W(NR_MAC, "UE %04x RA failed at state %s (Reached msg3 max harq rounds)\n", rnti, nrra_text[ra->ra_state]);
+    nr_release_ra_UE(mac, rnti);
     return;
   }
 
-  LOG_D(NR_MAC, "Random Access %i Msg3 CRC did not pass\n", i);
+  LOG_D(NR_MAC, "UE %04x Msg3 CRC did not pass\n", rnti);
   ra->msg3_round++;
   ra->ra_state = nrRA_Msg3_retransmission;
 }
 
-/*
-* When data are received on PHY and transmitted to MAC
-*/
+static void nr_rx_ra_sdu(const module_id_t mod_id,
+                         const int CC_id,
+                         const frame_t frame,
+                         const sub_frame_t slot,
+                         rnti_t rnti,
+                         uint8_t *sdu,
+                         const uint32_t sdu_len,
+                         const uint16_t timing_advance,
+                         const uint8_t ul_cqi,
+                         const uint16_t rssi)
+{
+  gNB_MAC_INST *mac = RC.nrmac[mod_id];
+  NR_UE_info_t *UE = find_ra_UE(&mac->UE_info, rnti);
+  if (!UE) {
+    LOG_E(NR_MAC, "UL SDU discarded. Couldn't finde UE with RNTI %04x \n", rnti);
+    return;
+  }
+
+  NR_RA_t *ra = UE->ra;
+  if (ra->ra_type == RA_4_STEP && ra->ra_state != nrRA_WAIT_Msg3) {
+    LOG_W(NR_MAC, "UL SDU discarded for RNTI %04x RA state not waiting for PUSCH\n", UE->rnti);
+    return;
+  }
+
+  const int target_snrx10 = mac->pusch_target_snrx10;
+  if (!sdu) { // NACK
+    if (ra->ra_state != nrRA_WAIT_Msg3)
+      return;
+
+    if((frame!=ra->Msg3_frame) || (slot!=ra->Msg3_slot))
+      return;
+
+    if (ul_cqi != 0xff)
+      ra->msg3_TPC = nr_get_tpc(target_snrx10, ul_cqi, 30, 0);
+
+    handle_msg3_failed_rx(mac, ra, rnti, mac->ul_bler.harq_round_max);
+    return;
+  }
+
+
+  bool no_sig = true;
+  for (uint32_t k = 0; k < sdu_len; k++) {
+    if (sdu[k] != 0) {
+      no_sig = false;
+      break;
+    }
+  }
+
+  T(T_GNB_MAC_UL_PDU_WITH_DATA, T_INT(mod_id), T_INT(CC_id),
+    T_INT(rnti), T_INT(frame), T_INT(slot), T_INT(-1) /* harq_pid */,
+    T_BUFFER(sdu, sdu_len));
+
+
+  if (no_sig) {
+    LOG_W(NR_MAC, "MSG3 ULSCH with no signal\n");
+    handle_msg3_failed_rx(mac, ra, rnti, mac->ul_bler.harq_round_max);
+    return;
+  }
+  if (ra->ra_type == RA_2_STEP) {
+    // random access pusch with RA-RNTI
+    if (ra->RA_rnti != rnti) {
+      LOG_E(NR_MAC, "expected TC_RNTI %04x to match current RNTI %04x\n", ra->RA_rnti, rnti);
+      return;
+    }
+  }
+
+  // re-initialize ta update variables after RA procedure completion
+  UE->UE_sched_ctrl.ta_frame = frame;
+
+  LOG_A(NR_MAC, "%4d.%2d PUSCH with TC_RNTI 0x%04x received correctly\n", frame, slot, rnti);
+
+  NR_UE_sched_ctrl_t *UE_scheduling_control = &UE->UE_sched_ctrl;
+  if (ul_cqi != 0xff) {
+    UE_scheduling_control->tpc0 = nr_get_tpc(target_snrx10, ul_cqi, 30, UE_scheduling_control->sched_pusch.phr_txpower_calc);
+    UE_scheduling_control->pusch_snrx10 = ul_cqi * 5 - 640 - UE_scheduling_control->sched_pusch.phr_txpower_calc * 10;
+  }
+  if (timing_advance != 0xffff)
+    UE_scheduling_control->ta_update = timing_advance;
+  UE_scheduling_control->raw_rssi = rssi;
+  LOG_D(NR_MAC, "[UE %04x] PUSCH TPC %d and TA %d\n", UE->rnti, UE_scheduling_control->tpc0, UE_scheduling_control->ta_update);
+  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
+  if (ra->cfra) {
+    LOG_A(NR_MAC, "(rnti 0x%04x) CFRA procedure succeeded!\n", UE->rnti);
+    nr_mac_reset_ul_failure(UE_scheduling_control);
+    reset_dl_harq_list(UE_scheduling_control);
+    reset_ul_harq_list(UE_scheduling_control);
+    process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, UE->CellGroup->rlc_BearerToAddModList);
+    int ss_type;
+    // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration in SA
+    // in NSA (or do-ra) there is no reconfiguration in NR
+    if (IS_SA_MODE(get_softmodem_params()))
+      ss_type = NR_SearchSpace__searchSpaceType_PR_common;
+    else
+      ss_type = NR_SearchSpace__searchSpaceType_PR_ue_Specific;
+    configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
+    if (!transition_ra_connected_nr_ue(mac, UE)) {
+      LOG_E(NR_MAC, "cannot add UE %04x: list is full\n", UE->rnti);
+      delete_nr_ue_data(UE, NULL, &mac->UE_info.uid_allocator);
+      return;
+    }
+  } else {
+    LOG_D(NR_MAC, "[RAPROC] Received %s:\n", ra->ra_type == RA_2_STEP ? "MsgA-PUSCH" : "Msg3");
+    for (uint32_t k = 0; k < sdu_len; k++) {
+      LOG_D(NR_MAC, "(%i): 0x%x\n", k, sdu[k]);
+    }
+
+    // 3GPP TS 38.321 Section 5.4.3 Multiplexing and assembly
+    // Logical channels shall be prioritised in accordance with the following order (highest priority listed first):
+    // - MAC CE for C-RNTI, or data from UL-CCCH;
+    // This way, we need to process MAC CE for C-RNTI if RA is active and it is present in the MAC PDU
+    // Search for MAC CE for C-RNTI
+    rnti_t crnti = lcid_crnti_lookahead(sdu, sdu_len);
+    if (crnti != 0) { // 3GPP TS 38.321 Table 7.1-1: RNTI values, RNTI 0x0000: N/A
+      // Replace the current UE by the UE identified by C-RNTI
+      NR_UE_info_t *old_UE = find_nr_UE(&mac->UE_info, crnti);
+      if (!old_UE) {
+        // The UE identified by C-RNTI no longer exists at the gNB
+        // Let's abort the current RA, so the UE will trigger a new RA later but using RRCSetupRequest instead. A better
+        // solution may be implemented
+        LOG_W(NR_MAC, "No UE found with C-RNTI %04x, ignoring Msg3 to have UE come back with new RA attempt\n", UE->rnti);
+        nr_release_ra_UE(mac, rnti);
+        return;
+      }
+      // in case UE beam has changed
+      old_UE->UE_beam_index = UE->UE_beam_index;
+      // Reset UL failure for old UE
+      nr_mac_reset_ul_failure(&old_UE->UE_sched_ctrl);
+      // Reset HARQ processes
+      reset_dl_harq_list(&old_UE->UE_sched_ctrl);
+      reset_ul_harq_list(&old_UE->UE_sched_ctrl);
+      // Trigger RRC Reconfiguration
+      LOG_I(NR_MAC, "Received UL_SCH_LCID_C_RNTI with C-RNTI 0x%04x, triggering RRC Reconfiguration\n", crnti);
+      nr_mac_trigger_reconfiguration(mac, old_UE);
+      nr_release_ra_UE(mac, rnti);
+      LOG_A(NR_MAC, "%4d.%2d UE %04x: RA with C-RNTI complete\n", frame, slot, crnti);
+      // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
+      configure_UE_BWP(mac, scc, old_UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
+      // TODO do we actually need to still process the PDU?
+      nr_process_mac_pdu(mod_id, old_UE, CC_id, frame, slot, sdu, sdu_len, -1);
+      return;
+    } else {
+      // UE Contention Resolution Identity
+      // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
+      // First byte corresponds to R/LCID MAC sub-header
+      memcpy(ra->cont_res_id, &sdu[1], sizeof(uint8_t) * 6);
+    }
+
+    // Decode MAC PDU for the correct UE, after checking for MAC CE for C-RNTI
+    // harq_pid set a non valid value because it is not used in this call
+    // the function is only called to decode the contention resolution sub-header
+    nr_process_mac_pdu(mod_id, UE, CC_id, frame, slot, sdu, sdu_len, -1);
+
+    LOG_I(NR_MAC,
+          "Activating scheduling %s for TC_RNTI 0x%04x (state %s)\n",
+          ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4",
+          UE->rnti,
+          nrra_text[ra->ra_state]);
+    ra->ra_state = ra->ra_type == RA_2_STEP ? nrRA_MsgB : nrRA_Msg4;
+    LOG_D(NR_MAC, "TC_RNTI 0x%04x next RA state %s\n", UE->rnti, nrra_text[ra->ra_state]);
+    return;
+  }
+}
+
 static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
                        const int CC_idP,
                        const frame_t frameP,
@@ -677,20 +798,14 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
                        const uint16_t rssi)
 {
   gNB_MAC_INST *gNB_mac = RC.nrmac[gnb_mod_idP];
-
   const int current_rnti = rntiP;
   LOG_D(NR_MAC, "rx_sdu for rnti %04x\n", current_rnti);
   const int target_snrx10 = gNB_mac->pusch_target_snrx10;
   const int rssi_threshold = gNB_mac->pusch_rssi_threshold;
   const int pusch_failure_thres = gNB_mac->pusch_failure_thres;
-
   NR_UE_info_t *UE = find_nr_UE(&gNB_mac->UE_info, current_rnti);
-  bool UE_waiting_CFRA_msg3 = get_UE_waiting_CFRA_msg3(gNB_mac, CC_idP, frameP, slotP, current_rnti);
-
-  if (UE && UE_waiting_CFRA_msg3 == false) {
-
+  if (UE) {
     NR_UE_sched_ctrl_t *UE_scheduling_control = &UE->UE_sched_ctrl;
-
     if (sduP)
       T(T_GNB_MAC_UL_PDU_WITH_DATA, T_INT(gnb_mod_idP), T_INT(CC_idP),
         T_INT(rntiP), T_INT(frameP), T_INT(slotP), T_INT(harq_pid),
@@ -729,7 +844,6 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
         UE_scheduling_control->ta_update = timing_advance;
       UE_scheduling_control->raw_rssi = rssi;
       UE_scheduling_control->pusch_snrx10 = ul_cqi * 5 - 640 - (txpower_calc * 10);
-
       if (UE_scheduling_control->tpc0 > 1)
         LOG_D(NR_MAC,
               "[UE %04x] %d.%d. PUSCH TPC %d and TA %d pusch_snrx10 %d rssi %d phrx_tx_power %d PHR (1PRB) %d mcs %d, nb_rb %d\n",
@@ -747,7 +861,7 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
 
       NR_UE_ul_harq_t *cur_harq = &UE_scheduling_control->ul_harq_processes[harq_pid];
       if (cur_harq->round == 0)
-       UE->mac_stats.pusch_snrx10 = UE_scheduling_control->pusch_snrx10;
+        UE->mac_stats.pusch_snrx10 = UE_scheduling_control->pusch_snrx10;
       LOG_D(NR_MAC, "[UE %04x] PUSCH TPC %d and TA %d\n",UE->rnti,UE_scheduling_control->tpc0,UE_scheduling_control->ta_update);
     }
     else{
@@ -769,15 +883,13 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
 
     if (sduP != NULL) {
       LOG_D(NR_MAC, "Received PDU at MAC gNB \n");
-
       UE->UE_sched_ctrl.pusch_consecutive_dtx_cnt = 0;
       UE_scheduling_control->sched_ul_bytes -= sdu_lenP;
       if (UE_scheduling_control->sched_ul_bytes < 0)
         UE_scheduling_control->sched_ul_bytes = 0;
 
       nr_process_mac_pdu(gnb_mod_idP, UE, CC_idP, frameP, slotP, sduP, sdu_lenP, harq_pid);
-    }
-    else {
+    } else {
       if (ul_cqi == 0xff || ul_cqi <= 128) {
         UE->UE_sched_ctrl.pusch_consecutive_dtx_cnt++;
         UE->mac_stats.ulsch_DTX++;
@@ -791,186 +903,9 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
         nr_mac_trigger_ul_failure(&UE->UE_sched_ctrl, UE->current_UL_BWP.scs);
       }
     }
-  } else if (sduP) {
-
-    bool no_sig = true;
-    for (uint32_t k = 0; k < sdu_lenP; k++) {
-      if (sduP[k] != 0) {
-        no_sig = false;
-        break;
-      }
-    }
-
-    T(T_GNB_MAC_UL_PDU_WITH_DATA, T_INT(gnb_mod_idP), T_INT(CC_idP),
-      T_INT(rntiP), T_INT(frameP), T_INT(slotP), T_INT(-1) /* harq_pid */,
-      T_BUFFER(sduP, sdu_lenP));
-    
-    /* we don't know this UE (yet). Check whether there is a ongoing RA (Msg 3)
-     * and check the corresponding UE's RNTI match, in which case we activate
-     * it. */
-    for (int i = 0; i < NR_NB_RA_PROC_MAX; ++i) {
-      NR_RA_t *ra = &gNB_mac->common_channels[CC_idP].ra[i];
-      if (ra->ra_type == RA_4_STEP && ra->ra_state != nrRA_WAIT_Msg3)
-        continue;
-
-      if (no_sig) {
-        LOG_W(NR_MAC, "Random Access %i ULSCH with no signal\n", i);
-        handle_msg3_failed_rx(ra, i, gNB_mac->ul_bler.harq_round_max);
-        continue;
-      }
-      if (ra->ra_type == RA_2_STEP) {
-        // random access pusch with RA-RNTI
-        if (ra->RA_rnti != current_rnti) {
-          LOG_E(NR_MAC, "expected TC_RNTI %04x to match current RNTI %04x\n", ra->RA_rnti, current_rnti);
-          continue;
-        }
-      } else {
-        // random access pusch with TC-RNTI
-        if (ra->rnti != current_rnti) {
-          LOG_E(NR_MAC, "expected TC_RNTI %04x to match current RNTI %04x\n", ra->rnti, current_rnti);
-
-          if ((frameP == ra->Msg3_frame) && (slotP == ra->Msg3_slot)) {
-            LOG_W(NR_MAC,
-                  "Random Access %i failed at state %s (TC_RNTI %04x RNTI %04x)\n",
-                  i,
-                  nrra_text[ra->ra_state],
-                  ra->rnti,
-                  current_rnti);
-            nr_clear_ra_proc(ra);
-          }
-
-          continue;
-        }
-      }
-
-      UE = UE ? UE : add_new_nr_ue(gNB_mac, ra->rnti, ra->CellGroup);
-      if (!UE) {
-        LOG_W(NR_MAC,
-              "Random Access %i discarded at state %s (TC_RNTI %04x RNTI %04x): max number of users achieved!\n",
-              i,
-              nrra_text[ra->ra_state],
-              ra->rnti,
-              current_rnti);
-
-        nr_clear_ra_proc(ra);
-        return;
-      }
-
-      UE->UE_beam_index = ra->beam_id;
-
-      // re-initialize ta update variables after RA procedure completion
-      UE->UE_sched_ctrl.ta_frame = frameP;
-
-      LOG_A(NR_MAC, "%4d.%2d PUSCH with TC_RNTI 0x%04x received correctly\n", frameP, slotP, current_rnti);
-
-      NR_UE_sched_ctrl_t *UE_scheduling_control = &UE->UE_sched_ctrl;
-      if (ul_cqi != 0xff) {
-        UE_scheduling_control->tpc0 = nr_get_tpc(target_snrx10, ul_cqi, 30, UE_scheduling_control->sched_pusch.phr_txpower_calc);
-        UE_scheduling_control->pusch_snrx10 = ul_cqi * 5 - 640 - UE_scheduling_control->sched_pusch.phr_txpower_calc * 10;
-      }
-      if (timing_advance != 0xffff)
-        UE_scheduling_control->ta_update = timing_advance;
-      UE_scheduling_control->raw_rssi = rssi;
-      LOG_D(NR_MAC, "[UE %04x] PUSCH TPC %d and TA %d\n", UE->rnti, UE_scheduling_control->tpc0, UE_scheduling_control->ta_update);
-      if (ra->cfra) {
-        LOG_A(NR_MAC, "(rnti 0x%04x) CFRA procedure succeeded!\n", ra->rnti);
-        nr_mac_reset_ul_failure(UE_scheduling_control);
-        reset_dl_harq_list(UE_scheduling_control);
-        reset_ul_harq_list(UE_scheduling_control);
-        process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, ra->CellGroup->rlc_BearerToAddModList);
-        nr_clear_ra_proc(ra);
-      } else {
-        LOG_D(NR_MAC, "[RAPROC] Received %s:\n", ra->ra_type == RA_2_STEP ? "MsgA-PUSCH" : "Msg3");
-        for (uint32_t k = 0; k < sdu_lenP; k++) {
-          LOG_D(NR_MAC, "(%i): 0x%x\n", k, sduP[k]);
-        }
-
-        // 3GPP TS 38.321 Section 5.4.3 Multiplexing and assembly
-        // Logical channels shall be prioritised in accordance with the following order (highest priority listed first):
-        // - MAC CE for C-RNTI, or data from UL-CCCH;
-        // This way, we need to process MAC CE for C-RNTI if RA is active and it is present in the MAC PDU
-        // Search for MAC CE for C-RNTI
-        rnti_t crnti = lcid_crnti_lookahead(sduP, sdu_lenP);
-        if (crnti != 0) { // 3GPP TS 38.321 Table 7.1-1: RNTI values, RNTI 0x0000: N/A
-          // this UE is the one identified by the RNTI in sduP
-          ra->rnti = crnti;
-          // Remove UE context just created after Msg.3 in some milliseconds as the UE is one already known (not now, as the UE
-          // context is still needed for the moment)
-          nr_mac_trigger_release_timer(&UE->UE_sched_ctrl, UE->current_UL_BWP.scs);
-
-          // Replace the current UE by the UE identified by C-RNTI
-          UE = find_nr_UE(&gNB_mac->UE_info, crnti);
-          if (!UE) {
-            // The UE identified by C-RNTI no longer exists at the gNB
-            // Let's abort the current RA, so the UE will trigger a new RA later but using RRCSetupRequest instead. A better
-            // solution may be implemented
-            LOG_W(NR_MAC, "No UE found with C-RNTI %04x, ignoring Msg3 to have UE come back with new RA attempt\n", ra->rnti);
-            mac_remove_nr_ue(gNB_mac, ra->rnti);
-            nr_clear_ra_proc(ra);
-            return;
-          }
-
-          // The UE identified by C-RNTI still exists at the gNB
-          // Reset Msg4_ACKed to not schedule ULSCH and DLSCH before RRC Reconfiguration
-          UE->Msg4_MsgB_ACKed = false;
-          nr_mac_reset_ul_failure(&UE->UE_sched_ctrl);
-          // Reset HARQ processes
-          reset_dl_harq_list(&UE->UE_sched_ctrl);
-          reset_ul_harq_list(&UE->UE_sched_ctrl);
-
-          // Switch to BWP where RA is configured, typically in the InitialBWP
-          // At this point, UE already switched and triggered RA in that BWP, need to do BWP switching also at gNB for C-RNTI
-          if (ra->DL_BWP.bwp_id != UE->current_DL_BWP.bwp_id || ra->UL_BWP.bwp_id != UE->current_UL_BWP.bwp_id) {
-            LOG_D(NR_MAC, "UE %04x Switch BWP from %ld to BWP id %ld\n", UE->rnti, UE->current_DL_BWP.bwp_id, ra->DL_BWP.bwp_id);
-            NR_ServingCellConfigCommon_t *scc = gNB_mac->common_channels[CC_idP].ServingCellConfigCommon;
-            configure_UE_BWP(gNB_mac, scc, &UE->UE_sched_ctrl, NULL, UE, ra->DL_BWP.bwp_id, ra->UL_BWP.bwp_id);
-          }
-
-          if (UE->reconfigCellGroup) {
-            // Nothing to do
-            // A RRCReconfiguration message should be already pending (for example, an ongoing RRCReestablishment), and it will be
-            // transmitted in Msg4
-          } else {
-            // Trigger RRC Reconfiguration
-            LOG_I(NR_MAC, "Received UL_SCH_LCID_C_RNTI with C-RNTI 0x%04x, triggering RRC Reconfiguration\n", UE->rnti);
-            nr_mac_trigger_reconfiguration(gNB_mac, UE);
-          }
-        } else {
-          // UE Contention Resolution Identity
-          // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
-          // First byte corresponds to R/LCID MAC sub-header
-          memcpy(ra->cont_res_id, &sduP[1], sizeof(uint8_t) * 6);
-        }
-
-        // Decode MAC PDU for the correct UE, after checking for MAC CE for C-RNTI
-        // harq_pid set a non valid value because it is not used in this call
-        // the function is only called to decode the contention resolution sub-header
-        nr_process_mac_pdu(gnb_mod_idP, UE, CC_idP, frameP, slotP, sduP, sdu_lenP, -1);
-
-        LOG_I(NR_MAC,
-              "Activating scheduling %s for TC_RNTI 0x%04x (state %s)\n",
-              ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4",
-              ra->rnti,
-              nrra_text[ra->ra_state]);
-        ra->ra_state = ra->ra_type == RA_2_STEP ? nrRA_MsgB : nrRA_Msg4;
-        LOG_D(NR_MAC, "TC_RNTI 0x%04x next RA state %s\n", ra->rnti, nrra_text[ra->ra_state]);
-        return;
-      }
-    }
-  } else {
-    for (int i = 0; i < NR_NB_RA_PROC_MAX; ++i) {
-      NR_RA_t *ra = &gNB_mac->common_channels[CC_idP].ra[i];
-      if (ra->ra_state != nrRA_WAIT_Msg3)
-        continue;
-
-      if((frameP!=ra->Msg3_frame) || (slotP!=ra->Msg3_slot))
-        continue;
-
-      if (ul_cqi != 0xff)
-        ra->msg3_TPC = nr_get_tpc(target_snrx10, ul_cqi, 30, 0);
-
-      handle_msg3_failed_rx(ra, i, gNB_mac->ul_bler.harq_round_max);
-    }
+    handle_nr_ul_harq(gNB_mac, UE, frameP, slotP, current_rnti, harq_pid, sduP == NULL);
+  } else { 
+    nr_rx_ra_sdu(gnb_mod_idP, CC_idP, frameP, slotP, current_rnti, sduP, sdu_lenP, timing_advance, ul_cqi, rssi);
   }
 }
 
@@ -1891,7 +1826,7 @@ static void pf_ul(module_id_t module_id,
   UE_iterator(UE_list, UE) {
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-    if (!UE->Msg4_MsgB_ACKed || sched_ctrl->ul_failure)
+    if (sched_ctrl->ul_failure)
       continue;
 
     LOG_D(NR_MAC,"pf_ul: preparing UL scheduling for UE %04x\n",UE->rnti);
@@ -2012,7 +1947,7 @@ static void pf_ul(module_id_t module_id,
         continue;
       }
 
-      sched_pusch->nrOfLayers = sched_ctrl->srs_feedback.ul_ri + 1;
+      sched_pusch->nrOfLayers = get_ul_nrOfLayers(sched_ctrl, current_BWP->dci_format);
       sched_pusch->time_domain_allocation = get_ul_tda(nrmac, sched_frame, sched_slot);
       sched_pusch->tda_info = get_ul_tda_info(current_BWP,
                                               sched_ctrl->coreset->controlResourceSetId,
@@ -2162,7 +2097,7 @@ static void pf_ul(module_id_t module_id,
 
 
 
-    sched_pusch->nrOfLayers = sched_ctrl->srs_feedback.ul_ri + 1;
+    sched_pusch->nrOfLayers = get_ul_nrOfLayers(sched_ctrl, current_BWP->dci_format);
     sched_pusch->time_domain_allocation = get_ul_tda(nrmac, sched_frame, sched_slot);
     sched_pusch->tda_info = get_ul_tda_info(current_BWP,
                                             sched_ctrl->coreset->controlResourceSetId,
@@ -2279,7 +2214,7 @@ static bool nr_ulsch_preprocessor(module_id_t module_id, frame_t frame, slot_t s
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
   // no UEs
-  if (nr_mac->UE_info.list[0] == NULL)
+  if (nr_mac->UE_info.connected_ue_list[0] == NULL)
     return false;
 
   NR_COMMON_channels_t *cc = nr_mac->common_channels;
@@ -2308,7 +2243,7 @@ static bool nr_ulsch_preprocessor(module_id_t module_id, frame_t frame, slot_t s
   max_sched_ues = min(max_sched_ues, MAX_DCI_CORESET);
 
   /* proportional fair scheduling algorithm */
-  pf_ul(module_id, frame, slot, sched_frame, sched_slot, nr_mac->UE_info.list, max_sched_ues, num_beams, len);
+  pf_ul(module_id, frame, slot, sched_frame, sched_slot, nr_mac->UE_info.connected_ue_list, max_sched_ues, num_beams, len);
   return true;
 }
 
@@ -2369,7 +2304,7 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
 
   NR_ServingCellConfigCommon_t *scc = nr_mac->common_channels[0].ServingCellConfigCommon;
   NR_UEs_t *UE_info = &nr_mac->UE_info;
-  UE_iterator( UE_info->list, UE) {
+  UE_iterator(UE_info->connected_ue_list, UE) {
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     if (sched_ctrl->ul_failure && !get_softmodem_params()->phy_test)
       continue;
