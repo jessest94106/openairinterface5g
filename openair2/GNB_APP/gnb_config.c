@@ -1919,9 +1919,8 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
   seq_arr_init(rrc->neighbour_cell_configuration, sizeof(neighbour_cell_configuration_t));
 
   for (int elm = 0; elm < neighbour_list_param_list.numelt; ++elm) {
-    neighbour_cell_configuration_t *cell = calloc(1, sizeof(neighbour_cell_configuration_t));
-    AssertFatal(cell != NULL, "out of memory\n");
-    cell->nr_cell_id = (uint64_t)*neighbour_list_param_list.paramarray[elm][0].u64ptr;
+    neighbour_cell_configuration_t cell = {0};
+    cell.nr_cell_id = (uint64_t)*neighbour_list_param_list.paramarray[elm][0].u64ptr;
 
     char neighbourpath[MAX_OPTNAME_SIZE + 8];
     snprintf(neighbourpath, sizeof(neighbourpath), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, gnb_idx, GNB_CONFIG_STRING_NEIGHBOUR_LIST, elm);
@@ -1930,13 +1929,12 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
                     GNBNEIGHBOURCELLPARAMS_DESC,
                     GNB_CONFIG_STRING_NEIGHBOUR_CELL_LIST,
                     neighbourpath);
-    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell->nr_cell_id, NeighbourCellParamList.numelt);
+    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell.nr_cell_id, NeighbourCellParamList.numelt);
     if (NeighbourCellParamList.numelt < 1)
       continue;
 
-    cell->neighbour_cells = malloc(sizeof(seq_arr_t));
-    AssertFatal(cell->neighbour_cells != NULL, "Memory exhausted!!!");
-    seq_arr_init(cell->neighbour_cells, sizeof(nr_neighbour_gnb_configuration_t));
+    cell.neighbour_cells = malloc_or_fail(sizeof(seq_arr_t));
+    seq_arr_init(cell.neighbour_cells, sizeof(nr_neighbour_gnb_configuration_t));
     for (int l = 0; l < NeighbourCellParamList.numelt; ++l) {
       nr_neighbour_gnb_configuration_t neighbourCell = {0};
       neighbourCell.gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
@@ -1959,10 +1957,9 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
       neighbourCell.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
       neighbourCell.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
       neighbourCell.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
-      seq_arr_push_back(cell->neighbour_cells, &neighbourCell, sizeof(nr_neighbour_gnb_configuration_t));
+      seq_arr_push_back(cell.neighbour_cells, &neighbourCell, sizeof(neighbourCell));
     }
-
-    seq_arr_push_back(rrc->neighbour_cell_configuration, cell, sizeof(neighbour_cell_configuration_t));
+    seq_arr_push_back(rrc->neighbour_cell_configuration, &cell, sizeof(cell));
   }
   void *base = seq_arr_front(rrc->neighbour_cell_configuration);
   size_t nmemb = seq_arr_size(rrc->neighbour_cell_configuration);
