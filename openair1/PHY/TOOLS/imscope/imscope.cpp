@@ -248,6 +248,29 @@ class IQHist {
     if (!ss.str().empty()) {
       ImGui::Text("Data for %s", ss.str().c_str());
     }
+    if (ImGui::Button("Save IQ")) {
+      std::stringstream ss;
+      ss << "iq_";
+      if (iq_data->meta.frame != -1) {
+        ss << iq_data->meta.frame << "_";
+      }
+      if (iq_data->meta.slot != -1) {
+        ss << iq_data->meta.slot << "_";
+      }
+      ss << scope_id_to_string(static_cast<enum scopeDataType>(iq_data->scope_id));
+      ss << ".csv";
+      std::ofstream file(ss.str());
+      if (file.is_open()) {
+        file << "real;imag\n";
+        for (int i = 0; i < iq_data->len; i++) {
+          file << iq_data->real[i] << ";" << iq_data->imag[i] << "\n";
+        }
+        file.close();
+        std::cout << "Saved IQ to file: " << ss.str() << std::endl;
+      } else {
+        std::cerr << "Unable to open file";
+      }
+    }
     ImGui::EndGroup();
   }
 };
