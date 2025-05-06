@@ -258,11 +258,20 @@ static void rrc_gNB_trigger_reconfiguration_for_handover(gNB_RRC_INST *rrc, gNB_
 #endif
 }
 
-static void nr_rrc_f1_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, byte_array_t buffer)
+static void nr_rrc_f1_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
 {
-  // N2/Xn HO: fill with UE caps, as-context, rrc reconf, send to source CU
-  // also, fill the UE->rnti from the new one (in F1 case, happens after
-  // confirmation of ue ctxt modif
+  /* 3GPP TS 38.331 specifies that PDCP shall be re-established whenever the security key
+   * used for the radio bearer changes, with some expections for SRB1 (i.e. when resuming
+   * an RRC connection, or at the first reconfiguration after RRC connection reestablishment
+   * in NR, do not re-establish PDCP */
+  nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, UE, (1 << SRB2), true);
+  UE->xids[params.transaction_id] = RRC_DEDICATED_RECONF;
+  byte_array_t buffer = rrc_gNB_encode_RRCReconfiguration(rrc, UE, params);
+  free_RRCReconfiguration_params(params);
+  if (!buffer.len) {
+    LOG_E(NR_RRC, "UE %d: Failed to generate RRCReconfiguration\n", UE->rrc_ue_id);
+    return;
+  }
 
   // F1 HO: handling of "source CU" information
   DevAssert(UE->ho_context->source != NULL);

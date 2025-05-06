@@ -563,10 +563,7 @@ void free_RRCReconfiguration_params(nr_rrc_reconfig_param_t params)
 }
 
 /** @brief Prepare the instance of RRCReconfigurationParams to be pass to RRC encoding */
-static nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc,
-                                                             gNB_RRC_UE_t *UE,
-                                                             uint8_t srb_reest_bitmap,
-                                                             bool drb_reestablish)
+nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t srb_reest_bitmap, bool drb_reestablish)
 {
   uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   nr_rrc_du_container_t *du = get_du_for_ue(rrc, UE->rrc_ue_id);
@@ -656,7 +653,7 @@ static nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc,
   return params;
 }
 
-static byte_array_t rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, nr_rrc_reconfig_param_t params)
+byte_array_t rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, nr_rrc_reconfig_param_t params)
 {
   byte_array_t msg = do_RRCReconfiguration(&params);
   if (msg.len <= 0) {
@@ -2144,26 +2141,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     DevAssert(resp->crnti != NULL);
     UE->ho_context->target->du_ue_id = resp->gNB_DU_ue_id;
     UE->ho_context->target->new_rnti = *resp->crnti;
-
-    uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
-    UE->xids[xid] = RRC_DEDICATED_RECONF;
-    /* 3GPP TS 38.331 specifies that PDCP shall be re-established whenever the security key
-     * used for the radio bearer changes, with some expections for SRB1 (i.e. when resuming
-     * an RRC connection, or at the first reconfiguration after RRC connection reestablishment
-     * in NR, do not re-establish PDCP */
-    nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, UE, (1 << SRB2), true);
-    params.transaction_id = xid;
-
-    byte_array_t msg = rrc_gNB_encode_RRCReconfiguration(rrc, UE, params);
-    if (msg.len <= 0) {
-      LOG_E(NR_RRC, "UE %d: Failed to generate RRCReconfiguration\n", UE->rrc_ue_id);
-      return;
-    }
-
-    // TODO N2 38.413 sec 9.3.1.21: admitted PDU sessions (in UE), Target to
-    // Source Transparent Container (9.3.1.21) which encodes the RRC
-    // reconfiguration above
-    UE->ho_context->target->ho_req_ack(rrc, UE, msg);
+    UE->ho_context->target->ho_req_ack(rrc, UE);
   }
 }
 
