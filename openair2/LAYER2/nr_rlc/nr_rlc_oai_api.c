@@ -899,12 +899,6 @@ void nr_rlc_remove_ue(int ue_id)
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
 }
 
-rlc_op_status_t rrc_rlc_remove_ue (const protocol_ctxt_t* const x)
-{
-  nr_rlc_remove_ue(x->rntiMaybeUEid);
-  return RLC_OP_STATUS_OK;
-}
-
 bool nr_rlc_update_id(int from_id, int to_id)
 {
   nr_rlc_manager_lock(nr_rlc_ue_manager);
@@ -948,7 +942,12 @@ void nr_rlc_test_trigger_reestablishment(int ue_id)
   ent->reestablishment(ent);
   /* Trigger re-establishment on OAI UE */
   nr_rlc_entity_t *drb = ue->drb[0];
-  drb->reestablishment(drb);
+  if (drb) {
+    drb->reestablishment(drb);
+  } else {
+    LOG_W(RLC, "DRB[0] is NULL for UE %04x\n", ue_id);
+  }
+
   nr_rlc_manager_unlock(nr_rlc_ue_manager);
 }
 

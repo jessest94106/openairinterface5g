@@ -50,6 +50,7 @@
 #define E1AP_SETUP_FAIL(mSGpTR)                           (mSGpTR)->ittiMsg.e1ap_setup_fail
 #define E1AP_BEARER_CONTEXT_SETUP_REQ(mSGpTR)             (mSGpTR)->ittiMsg.e1ap_bearer_setup_req
 #define E1AP_BEARER_CONTEXT_SETUP_RESP(mSGpTR)            (mSGpTR)->ittiMsg.e1ap_bearer_setup_resp
+#define E1AP_BEARER_CONTEXT_SETUP_FAILURE(mSGpTR)         (mSGpTR)->ittiMsg.e1ap_bearer_setup_fail
 #define E1AP_BEARER_CONTEXT_MODIFICATION_REQ(mSGpTR)      (mSGpTR)->ittiMsg.e1ap_bearer_mod_req
 #define E1AP_BEARER_CONTEXT_MODIFICATION_RESP(mSGpTR)     (mSGpTR)->ittiMsg.e1ap_bearer_modif_resp
 #define E1AP_BEARER_CONTEXT_RELEASE_CMD(mSGpTR)           (mSGpTR)->ittiMsg.e1ap_bearer_release_cmd
@@ -477,6 +478,16 @@ typedef struct e1ap_bearer_setup_req_s {
   int numPDUSessions;
   pdu_session_to_setup_t pduSession[E1AP_MAX_NUM_PDU_SESSIONS];
 } e1ap_bearer_setup_req_t;
+
+/** Bearer Context Setup Failure (9.2.2.3 3GPP TS 38.463) */
+typedef struct e1ap_bearer_context_setup_failure_s {
+  // gNB-CU-CP UE E1AP ID (M)
+  uint32_t gNB_cu_cp_ue_id;
+  // gNB-CU-UP UE E1AP ID (O)
+  uint32_t *gNB_cu_up_ue_id;
+  // Cause (M)
+  e1ap_cause_t cause;
+} e1ap_bearer_context_setup_failure_t;
 
 /**
  * Bearer Context Modification Request, clause 9.2.2.4 of 3GPP TS 38.463

@@ -858,14 +858,6 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
 
   find_SSB_and_RO_available(nrmac);
 
-  NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
-  NR_SCHED_LOCK(&nrmac->sched_lock);
-  for (int n = 0; n < NR_NB_RA_PROC_MAX; n++) {
-    NR_RA_t *ra = &cc->ra[n];
-    nr_clear_ra_proc(ra);
-  }
-  NR_SCHED_UNLOCK(&nrmac->sched_lock);
-
   if (IS_SA_MODE(get_softmodem_params()))
     config_sched_ctrlCommon(nrmac);
 }
@@ -950,11 +942,17 @@ void prepare_du_configuration_update(gNB_MAC_INST *mac,
   /* send gNB-DU configuration update to RRC */
   f1ap_gnb_du_configuration_update_t update = {
     .transaction_id = 1,
-    .num_cells_to_modify = 1,
+    .num_status = 1,
+    .status[0].plmn = info->plmn,
+    .status[0].nr_cellid = info->nr_cellid,
+    .status[0].service_state = F1AP_STATE_IN_SERVICE,
   };
-  update.cell_to_modify[0].old_nr_cellid = info->nr_cellid;
-  update.cell_to_modify[0].info = *info;
-  update.cell_to_modify[0].sys_info = get_sys_info(mib, sib1, NULL);
+  if (mib && sib1) {
+    update.num_cells_to_modify = 1,
+    update.cell_to_modify[0].old_nr_cellid = info->nr_cellid;
+    update.cell_to_modify[0].info = *info;
+    update.cell_to_modify[0].sys_info = get_sys_info(mib, sib1, NULL);
+  }
   mac->mac_rrc.gnb_du_configuration_update(&update);
 }
 
@@ -979,18 +977,18 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t
   DevAssert(get_softmodem_params()->phy_test);
   NR_SCHED_LOCK(&nrmac->sched_lock);
 
-  NR_UE_info_t *UE = add_new_nr_ue(nrmac, rnti, CellGroup);
-  if (!UE) {
+  NR_UE_info_t *UE = get_new_nr_ue_inst(&nrmac->UE_info.uid_allocator, rnti, CellGroup);
+  DevAssert(UE != NULL); // test-mode: we assume we can always create a UE
+  free_and_zero(UE->ra); // test-mode (sims, phy-test): UE will not do RA
+  bool res = add_connected_nr_ue(nrmac, UE);
+  if (!res) {
     LOG_E(NR_MAC, "Error adding UE %04x\n", rnti);
+    delete_nr_ue_data(UE, NULL, &nrmac->UE_info.uid_allocator);
     NR_SCHED_UNLOCK(&nrmac->sched_lock);
     return false;
   }
-
-  if (CellGroup->spCellConfig && CellGroup->spCellConfig->reconfigurationWithSync
-      && CellGroup->spCellConfig->reconfigurationWithSync->rach_ConfigDedicated
-      && CellGroup->spCellConfig->reconfigurationWithSync->rach_ConfigDedicated->choice.uplink->cfra) {
-    nr_mac_prepare_ra_ue(RC.nrmac[0], UE->rnti, CellGroup);
-  }
+  int ss_type = NR_SearchSpace__searchSpaceType_PR_ue_Specific;
+  configure_UE_BWP(nrmac, nrmac->common_channels[0].ServingCellConfigCommon, UE, false, ss_type, -1, -1);
   process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, CellGroup->rlc_BearerToAddModList);
   AssertFatal(CellGroup->rlc_BearerToReleaseList == NULL, "cannot release bearers while adding new UEs\n");
   NR_SCHED_UNLOCK(&nrmac->sched_lock);
@@ -998,32 +996,18 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t
   return true;
 }
 
-bool nr_mac_prepare_ra_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t *CellGroup)
+void nr_mac_prepare_ra_ue(gNB_MAC_INST *nrmac, NR_UE_info_t *UE)
 {
   DevAssert(nrmac != NULL);
-  DevAssert(CellGroup != NULL);
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
-
-  // NSA case: need to pre-configure CFRA
-  const int CC_id = 0;
-  NR_COMMON_channels_t *cc = &nrmac->common_channels[CC_id];
-  uint8_t ra_index = 0;
-  /* checking for free RA process */
-  for(; ra_index < NR_NB_RA_PROC_MAX; ra_index++) {
-    if ((cc->ra[ra_index].ra_state == nrRA_gNB_IDLE) && (!cc->ra[ra_index].cfra))
-      break;
-  }
-  if (ra_index == NR_NB_RA_PROC_MAX) {
-    LOG_E(NR_MAC, "RA processes are not available for CFRA RNTI %04x\n", rnti);
-    return false;
-  }
-  NR_RA_t *ra = &cc->ra[ra_index];
+  NR_RA_t *ra = UE->ra;
   ra->cfra = true;
-  ra->rnti = rnti;
-  ra->CellGroup = CellGroup;
+  NR_CellGroupConfig_t *CellGroup = UE->CellGroup;
+  DevAssert(CellGroup != NULL);
   struct NR_CFRA *cfra = CellGroup->spCellConfig->reconfigurationWithSync->rach_ConfigDedicated->choice.uplink->cfra;
   uint8_t num_preamble = cfra->resources.choice.ssb->ssb_ResourceList.list.count;
   ra->preambles.num_preambles = num_preamble;
+  NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
   for (int i = 0; i < cc->num_active_ssb; i++) {
     for (int j = 0; j < num_preamble; j++) {
       if (cc->ssb_index[i] == cfra->resources.choice.ssb->ssb_ResourceList.list.array[j]->ssb) {
@@ -1033,27 +1017,5 @@ bool nr_mac_prepare_ra_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig
       }
     }
   }
-  LOG_I(NR_MAC, "Added new %s process for UE RNTI %04x with initial CellGroup\n", ra->cfra ? "CFRA" : "CBRA", rnti);
-  return true;
-}
-
-/* Prepare a new CellGroupConfig to be applied for this UE. We cannot
- * immediatly apply it, as we have to wait for the reconfiguration through RRC.
- * This function sets up everything to apply the reconfiguration. Later, we
- * will trigger the UE inactivity with nr_mac_interrupt_ue_transmission(); upon
- * expiry, nr_mac_apply_cellgroup() will apply the CellGroupConfig (radio
- * config etc). */
-bool nr_mac_prepare_cellgroup_update(gNB_MAC_INST *nrmac, NR_UE_info_t *UE, NR_CellGroupConfig_t *CellGroup)
-{
-  DevAssert(nrmac != NULL);
-  DevAssert(UE != NULL);
-  DevAssert(CellGroup != NULL);
-
-  /* we assume that this function is mutex-protected from outside */
-  NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
-
-  UE->reconfigCellGroup = CellGroup;
-  UE->expect_reconfiguration = true;
-
-  return true;
+  LOG_I(NR_MAC, "Added new %s process for UE RNTI %04x with initial CellGroup\n", ra->cfra ? "CFRA" : "CBRA", UE->rnti);
 }
