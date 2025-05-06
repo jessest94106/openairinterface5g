@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include "openair3/UTILS/conversions.h"
 #include "common/5g_platform_types.h"
+#include "common/utils/ds/byte_array.h"
 
 #include "F1AP_Cause.h"
 #include "f1ap_messages_types.h"
@@ -49,6 +50,21 @@
 #define _F1_EQ_CHECK_INT(A, B) _F1_EQ_CHECK_GENERIC(A == B, "%d", A, B);
 #define _F1_EQ_CHECK_STR(A, B) _F1_EQ_CHECK_GENERIC(strcmp(A, B) == 0, "'%s'", A, B);
 
+#define _F1_CHECK_EXP(EXP)                 \
+  do {                                     \
+    if (!(EXP)) {                          \
+      PRINT_ERROR("Failed at " #EXP "\n"); \
+      return false;                        \
+    }                                      \
+  } while (0)
+
+#define _F1_EQ_CHECK_OPTIONAL_IE(A, B, FIELD, EQ_MACRO)                        \
+  do {                                                                         \
+    _F1_CHECK_EXP(((A)->FIELD && (B)->FIELD) || (!(A)->FIELD && !(B)->FIELD)); \
+    if ((A)->FIELD && (B)->FIELD)                                              \
+      EQ_MACRO(*(A)->FIELD, *(B)->FIELD);                                      \
+  } while (0)
+
 /* macro to look up IE. If mandatory and not found, macro will print
  * descriptive debug message to stderr and force exit in calling function */
 #define F1AP_LIB_FIND_IE(IE_TYPE, ie, container, IE_ID, mandatory)                                   \
@@ -66,6 +82,29 @@
       fprintf(stderr, "%s(): could not find element " #IE_ID " with type " #IE_TYPE "\n", __func__); \
       return false;                                                                                  \
     }                                                                                                \
+  } while (0)
+
+#define CP_OPT_BYTE_ARRAY(dst, src)          \
+  do {                                       \
+    if (src) {                               \
+      dst = calloc_or_fail(1, sizeof(*dst)); \
+      *(dst) = copy_byte_array(*(src));      \
+    }                                        \
+  } while (0)
+
+#define FREE_OPT_BYTE_ARRAY(a) \
+  do {                         \
+    if (a) {                   \
+      free_byte_array(*(a));   \
+    } \
+    free(a);                   \
+  } while (0)
+
+/* similar to asn1cCallocOne(), duplicated to not confuse with asn.1 types */
+#define _F1_MALLOC(VaR, VaLue)          \
+  do {                                  \
+    VaR = malloc_or_fail(sizeof(*VaR)); \
+    *VaR = VaLue;                       \
   } while (0)
 
 bool eq_f1ap_plmn(const plmn_id_t *a, const plmn_id_t *b);
