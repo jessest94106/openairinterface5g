@@ -217,7 +217,6 @@ typedef struct ngap_ue_paging_identity_s {
 } ngap_ue_paging_identity_t;
 
 typedef enum ngap_ue_identities_presenceMask_e {
-  NGAP_UE_IDENTITIES_NONE          = 0,
   NGAP_UE_IDENTITIES_FiveG_s_tmsi  = 1 << 1,
   NGAP_UE_IDENTITIES_guami         = 1 << 2,
 } ngap_ue_identities_presenceMask_t;

@@ -189,19 +189,20 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
 
   /* 5G-S-TMSI */
   if (UE->Initialue_identity_5g_s_TMSI.presence) {
-    // 5G-S-TMSI
-    req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_FiveG_s_tmsi;
+    req->ue_identity.presenceMask |= NGAP_UE_IDENTITIES_FiveG_s_tmsi;
     req->ue_identity.s_tmsi.amf_set_id = UE->Initialue_identity_5g_s_TMSI.amf_set_id;
     req->ue_identity.s_tmsi.amf_pointer = UE->Initialue_identity_5g_s_TMSI.amf_pointer;
     req->ue_identity.s_tmsi.m_tmsi = UE->Initialue_identity_5g_s_TMSI.fiveg_tmsi;
-  } else if (rrcSetupComplete->registeredAMF != NULL) {
-    /**
-     * Fetch the AMF-Identifier from the registeredAMF IE
+  }
+
+  /* Process Registered AMF IE */
+  if (rrcSetupComplete->registeredAMF != NULL) {
+    /* Fetch the AMF-Identifier from the registeredAMF IE
      * The IE AMF-Identifier (AMFI) comprises of an AMF Region ID (8b),
      * an AMF Set ID (10b) and an AMF Pointer (6b)
      * as specified in TS 23.003 [21], clause 2.10.1. */
     NR_RegisteredAMF_t *r_amf = rrcSetupComplete->registeredAMF;
-    req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_guami;
+    req->ue_identity.presenceMask |= NGAP_UE_IDENTITIES_guami;
     uint32_t amf_Id = BIT_STRING_to_uint32(&r_amf->amf_Identifier);
     UE->ue_guami = req->ue_identity.guami = get_guami(amf_Id);
     LOG_I(NGAP,
@@ -210,8 +211,6 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
           req->ue_identity.guami.amf_set_id,
           req->ue_identity.guami.amf_region_id,
           req->ue_identity.guami.amf_pointer);
-  } else {
-    req->ue_identity.presenceMask = NGAP_UE_IDENTITIES_NONE;
   }
 
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, message_p);

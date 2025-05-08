@@ -79,9 +79,15 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
 {
   ngap_gNB_amf_data_t *amf = NULL;
 
-  /* Select the AMF corresponding to the provided GUAMI. */
+  // Select the AMF corresponding to the GUAMI from the RegisteredAMF IE
   if (msg->ue_identity.presenceMask & NGAP_UE_IDENTITIES_guami) {
     const nr_guami_t *guami = &msg->ue_identity.guami;
+    NGAP_DEBUG("GUAMI is present: MCC=%03d MNC=%03d RegionID=%d SetID=%d Pointer=%d\n",
+               guami->mcc,
+               guami->mnc,
+               guami->amf_region_id,
+               guami->amf_set_id,
+               guami->amf_pointer);
     amf = ngap_gNB_nnsf_select_amf_by_guami(instance_p, msg->establishment_cause, *guami);
     if (amf) {
       NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through GUAMI MCC %d MNC %d AMFRI %d AMFSI %d AMFPT %d\n",
@@ -93,12 +99,12 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
                 guami->amf_region_id,
                 guami->amf_set_id,
                 guami->amf_pointer);
+      return amf;
     }
   }
 
+  // Select the AMF corresponding to the provided 5G-S-TMSI
   if (amf == NULL) {
-    /* Select the AMF corresponding to the provided s-TMSI. */
-    //TODO have not be test. it's should be test
     if (msg->ue_identity.presenceMask & NGAP_UE_IDENTITIES_FiveG_s_tmsi) {
       const fiveg_s_tmsi_t *fgs_tmsi = &msg->ue_identity.s_tmsi;
       amf = ngap_gNB_nnsf_select_amf_by_amf_setid(instance_p, msg->establishment_cause, msg->selected_plmn_identity, fgs_tmsi->amf_set_id);
@@ -111,13 +117,14 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
                   msg->selected_plmn_identity,
                   instance_p->plmn[msg->selected_plmn_identity].plmn.mcc,
                   instance_p->plmn[msg->selected_plmn_identity].plmn.mnc);
+        return amf;
       }
     }
   }
 
-  if (amf == NULL) {
-    /* Select AMF based on the selected PLMN identity, received through RRC
-     * Connection Setup Complete */
+  // No UE identity (5G-S-TMSI or GUAMI) is present
+  if (msg->ue_identity.presenceMask == 0) {
+    // Select the AMF based on the selected PLMN identity received through RRCSetupComplete
     amf = ngap_gNB_nnsf_select_amf_by_plmn_id(instance_p, msg->establishment_cause, msg->selected_plmn_identity);
     if (amf) {
       NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN Identity index %d MCC %d MNC %d\n",
@@ -127,17 +134,14 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
                 msg->selected_plmn_identity,
                 instance_p->plmn[msg->selected_plmn_identity].plmn.mcc,
                 instance_p->plmn[msg->selected_plmn_identity].plmn.mnc);
-    }
-  }
-
-  if (amf == NULL) {
-    /*
-     * If no AMF corresponds to the GUAMI, the s-TMSI, or the selected PLMN
-     * identity, selects the AMF with the highest capacity.
-     */
-    amf = ngap_gNB_nnsf_select_amf(instance_p, msg->establishment_cause);
-    if (amf) {
-      NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through highest relative capacity\n", msg->gNB_ue_ngap_id, amf->amf_name, amf->assoc_id);
+      return amf;
+    } else {
+      // Select the AMF with the highest capacity
+      amf = ngap_gNB_nnsf_select_amf(instance_p, msg->establishment_cause);
+      if (amf) {
+        NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through highest relative capacity\n", msg->gNB_ue_ngap_id, amf->amf_name, amf->assoc_id);
+        return amf;
+      }
     }
   }
 
