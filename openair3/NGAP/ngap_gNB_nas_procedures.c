@@ -107,16 +107,15 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
   if (amf == NULL) {
     if (msg->ue_identity.presenceMask & NGAP_UE_IDENTITIES_FiveG_s_tmsi) {
       const fiveg_s_tmsi_t *fgs_tmsi = &msg->ue_identity.s_tmsi;
-      amf = ngap_gNB_nnsf_select_amf_by_amf_setid(instance_p, msg->establishment_cause, msg->selected_plmn_identity, fgs_tmsi->amf_set_id);
+      amf = ngap_gNB_nnsf_select_amf_by_amf_setid(instance_p, msg->establishment_cause, msg->plmn, fgs_tmsi->amf_set_id);
       if (amf) {
-        NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through S-TMSI AMFSI %d and selected PLMN Identity index %d MCC %d MNC %d\n",
+        NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through S-TMSI AMFSI %d and selected PLMN MCC %d MNC %d\n",
                   msg->gNB_ue_ngap_id,
                   amf->amf_name,
                   amf->assoc_id,
                   fgs_tmsi->amf_set_id,
-                  msg->selected_plmn_identity,
-                  instance_p->plmn[msg->selected_plmn_identity].plmn.mcc,
-                  instance_p->plmn[msg->selected_plmn_identity].plmn.mnc);
+                  msg->plmn.mcc,
+                  msg->plmn.mnc);
         return amf;
       }
     }
@@ -125,15 +124,14 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
   // No UE identity (5G-S-TMSI or GUAMI) is present
   if (msg->ue_identity.presenceMask == 0) {
     // Select the AMF based on the selected PLMN identity received through RRCSetupComplete
-    amf = ngap_gNB_nnsf_select_amf_by_plmn_id(instance_p, msg->establishment_cause, msg->selected_plmn_identity);
+    amf = ngap_gNB_nnsf_select_amf_by_plmn_id(instance_p, msg->establishment_cause, msg->plmn);
     if (amf) {
-      NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN Identity index %d MCC %d MNC %d\n",
+      NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN MCC %d MNC %d\n",
                 msg->gNB_ue_ngap_id,
                 amf->amf_name,
                 amf->assoc_id,
-                msg->selected_plmn_identity,
-                instance_p->plmn[msg->selected_plmn_identity].plmn.mcc,
-                instance_p->plmn[msg->selected_plmn_identity].plmn.mnc);
+                msg->plmn.mcc,
+                msg->plmn.mnc);
       return amf;
     } else {
       // Select the AMF with the highest capacity
@@ -185,7 +183,7 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
   ue_desc_p->amf_ref = amf;
   ue_desc_p->gNB_ue_ngap_id = UEfirstReq->gNB_ue_ngap_id;
   ue_desc_p->gNB_instance  = instance_p;
-  ue_desc_p->selected_plmn_identity = UEfirstReq->selected_plmn_identity;
+  ue_desc_p->selected_plmn_identity = UEfirstReq->plmn;
   ngap_store_ue_context(ue_desc_p);
 
   // RAN UE NGAP ID (M)
@@ -220,7 +218,7 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
                                   0, // Cell ID
                                   &userinfo_nr_p->nR_CGI.nRCellIdentity);
 
-    plmn_id_t *plmn = &instance_p->plmn[ue_desc_p->selected_plmn_identity].plmn;
+    plmn_id_t *plmn = &ue_desc_p->selected_plmn_identity;
     MCC_MNC_TO_TBCD(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->nR_CGI.pLMNIdentity);
 
     /* In case of network sharing,
@@ -444,17 +442,12 @@ int ngap_gNB_nas_uplink(instance_t instance, ngap_uplink_nas_t *ngap_uplink_nas_
     MACRO_GNB_ID_TO_CELL_IDENTITY(ngap_gNB_instance_p->gNB_id,
                                   0, // Cell ID
                                   &userinfo_nr_p->nR_CGI.nRCellIdentity);
-    MCC_MNC_TO_TBCD(ngap_gNB_instance_p->plmn[ue_context_p->selected_plmn_identity].plmn.mcc,
-                    ngap_gNB_instance_p->plmn[ue_context_p->selected_plmn_identity].plmn.mnc,
-                    ngap_gNB_instance_p->plmn[ue_context_p->selected_plmn_identity].plmn.mnc_digit_length,
-                    &userinfo_nr_p->nR_CGI.pLMNIdentity);
+    plmn_id_t *plmn = &ue_context_p->selected_plmn_identity;
+    MCC_MNC_TO_TBCD(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->nR_CGI.pLMNIdentity);
 
     /* Set TAI */
     INT24_TO_OCTET_STRING(ngap_gNB_instance_p->tac, &userinfo_nr_p->tAI.tAC);
-    MCC_MNC_TO_PLMNID(ngap_gNB_instance_p->plmn[ue_context_p->selected_plmn_identity].plmn.mcc,
-                      ngap_gNB_instance_p->plmn[ue_context_p->selected_plmn_identity].plmn.mnc,
-                      ngap_gNB_instance_p->plmn[ue_context_p->selected_plmn_identity].plmn.mnc_digit_length,
-                      &userinfo_nr_p->tAI.pLMNIdentity);
+    MCC_MNC_TO_PLMNID(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->tAI.pLMNIdentity);
   }
   if (ngap_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {
     NGAP_ERROR("Failed to encode uplink NAS transport\n");

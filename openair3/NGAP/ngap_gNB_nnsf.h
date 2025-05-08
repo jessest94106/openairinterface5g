@@ -38,11 +38,11 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t *instance_p, c
 
 ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t *instance_p,
                                                          const ngap_rrc_establishment_cause_t cause,
-                                                         const int selected_plmn_identity);
+                                                         const plmn_id_t selected_plmn_identity);
 
 ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t *instance_p,
                                                            const ngap_rrc_establishment_cause_t cause,
-                                                           const int selected_plmn_identity,
+                                                           const plmn_id_t selected_plmn_identity,
                                                            uint8_t amf_setid);
 
 ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *instance_p,

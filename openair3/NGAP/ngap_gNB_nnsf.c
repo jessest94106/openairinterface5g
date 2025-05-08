@@ -86,7 +86,7 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t *instance_p, c
 
 ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t *instance_p,
                                                          const ngap_rrc_establishment_cause_t cause,
-                                                         const int selected_plmn_identity)
+                                                         const plmn_id_t selected_plmn_identity)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;
@@ -132,8 +132,7 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t *in
     /* Looking for served GUAMI PLMN Identity selected matching the one provided by the UE */
     STAILQ_FOREACH(guami_p, &amf_data_p->served_guami, next) {
       STAILQ_FOREACH(served_plmn_p, &guami_p->served_plmns, next) {
-        if ((served_plmn_p->mcc == instance_p->plmn[selected_plmn_identity].plmn.mcc)
-            && (served_plmn_p->mnc == instance_p->plmn[selected_plmn_identity].plmn.mnc)) {
+        if ((served_plmn_p->mcc == selected_plmn_identity.mcc) && (served_plmn_p->mnc == selected_plmn_identity.mnc)) {
           break;
         }
       }
@@ -155,7 +154,7 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t *in
 
 ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t *instance_p,
                                                            const ngap_rrc_establishment_cause_t cause,
-                                                           const int selected_plmn_identity,
+                                                           const plmn_id_t selected_plmn_identity,
                                                            uint8_t amf_setid)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
@@ -203,8 +202,7 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t *
       struct plmn_identity_s   *served_plmn_p = NULL;
 
       STAILQ_FOREACH(served_plmn_p, &guami_p->served_plmns, next) {
-        if ((served_plmn_p->mcc == instance_p->plmn[selected_plmn_identity].plmn.mcc)
-            && (served_plmn_p->mnc == instance_p->plmn[selected_plmn_identity].plmn.mnc)) {
+        if ((served_plmn_p->mcc == selected_plmn_identity.mcc) && (served_plmn_p->mnc == selected_plmn_identity.mnc)) {
           break;
         }
       }

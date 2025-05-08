@@ -149,12 +149,15 @@ void nr_rrc_pdcp_config_security(gNB_RRC_UE_t *UE, bool enable_ciphering)
 }
 
 /** @brief Process AMF Identifier and fill GUAMI struct members */
-static nr_guami_t get_guami(const uint32_t amf_Id)
+static nr_guami_t get_guami(const uint32_t amf_Id, const plmn_id_t plmn)
 {
   nr_guami_t guami = {0};
   guami.amf_region_id = (amf_Id >> 16) & 0xff;
   guami.amf_set_id = (amf_Id >> 6) & 0x3ff;
   guami.amf_pointer = amf_Id & 0x3f;
+  guami.mcc = plmn.mcc;
+  guami.mnc = plmn.mnc;
+  guami.mnc_len = plmn.mnc_digit_length;
   return guami;
 }
 
@@ -179,13 +182,19 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   // NAS-PDU
   req->nas_pdu = create_byte_array(rrcSetupComplete->dedicatedNAS_Message.size, rrcSetupComplete->dedicatedNAS_Message.buf);
 
-  // Selected PLMN Identity: indicates the selected PLMN id for the non-3GPP access
-  /* selected_plmn_identity: IE is 1-based, convert to 0-based (C array) */
-  int selected_plmn_identity = rrcSetupComplete->selectedPLMN_Identity - 1;
-  if (selected_plmn_identity != 0)
-    LOG_E(NGAP, "UE %u: sent selected PLMN identity %ld, but only one PLMN supported\n", req->gNB_ue_ngap_id, rrcSetupComplete->selectedPLMN_Identity);
-
-  req->selected_plmn_identity = 0; /* always zero because we only support one */
+  /* Selected PLMN Identity (Optional)
+   * selectedPLMN-Identity in RRCSetupComplete: Index of the PLMN selected by the UE from the plmn-IdentityInfoList (SIB1)
+   * Selected PLMN Identity in INITIAL UE MESSAGE: Indicates the selected PLMN id for the non-3GPP access.*/
+  if (rrcSetupComplete->selectedPLMN_Identity > rrc->configuration.num_plmn) {
+    LOG_E(NGAP,
+          "Failed to send Initial UE Message: selected PLMN (%ld) identity is out of bounds (%d)\n",
+          rrcSetupComplete->selectedPLMN_Identity,
+          rrc->configuration.num_plmn);
+    return;
+  }
+  int selected_plmn_identity = rrcSetupComplete->selectedPLMN_Identity - 1; // Convert 1-based PLMN Identity IE to 0-based index
+  req->plmn = rrc->configuration.plmn[selected_plmn_identity]; // Select from the stored list
+  LOG_I(NGAP, "Selected PLMN in the NG Initial UE Message: MCC %u, MNC %u\n", req->plmn.mcc, req->plmn.mnc);
 
   /* 5G-S-TMSI */
   if (UE->Initialue_identity_5g_s_TMSI.presence) {
@@ -204,7 +213,7 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
     NR_RegisteredAMF_t *r_amf = rrcSetupComplete->registeredAMF;
     req->ue_identity.presenceMask |= NGAP_UE_IDENTITIES_guami;
     uint32_t amf_Id = BIT_STRING_to_uint32(&r_amf->amf_Identifier);
-    UE->ue_guami = req->ue_identity.guami = get_guami(amf_Id);
+    UE->ue_guami = req->ue_identity.guami = get_guami(amf_Id, req->plmn);
     LOG_I(NGAP,
           "GUAMI in NGAP_NAS_FIRST_REQ (UE %04x): AMF Set ID %u, Region ID %u, Pointer %u\n",
           UE->rnti,

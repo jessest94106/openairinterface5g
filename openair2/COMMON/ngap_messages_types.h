@@ -490,22 +490,16 @@ typedef struct ngap_deregistered_gnb_ind_s {
  * will be the unique identifier used between RRC and NGAP.
  */
 typedef struct ngap_nas_first_req_s {
-  /* UE id for initial connection to NGAP */
+  // RAN UE NGAP ID (mandatory)
   uint32_t gNB_ue_ngap_id;
-
-  /* the chosen PLMN identity as index, see TS 36.331 6.2.2 RRC Connection
-   * Setup Complete. This index here is zero-based, unlike the standard! */
-  int selected_plmn_identity;
-
-  /* Establishment cause as sent by UE */
+  /* PLMN: Selected PLMN Identity (optional)
+   * User Location Information (mandatory) */
+  plmn_id_t plmn;
+  // RRC Establishment Cause (mandatory)
   ngap_rrc_establishment_cause_t establishment_cause;
-
-  /* NAS PDU */
+  // NAS-PDU (mandatory)
   byte_array_t nas_pdu;
-
-  /* If this flag is set NGAP layer is expecting the GUAMI. If = 0,
-   * the temporary s-tmsi is used.
-   */
+  // UE identity: 5G-S-TMSI, GUAMI
   ngap_ue_identity_t ue_identity;
 } ngap_nas_first_req_t;
 
