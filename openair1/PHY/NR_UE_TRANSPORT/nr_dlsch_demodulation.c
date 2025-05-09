@@ -323,7 +323,8 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                 c16_t ptrs_phase_per_slot[][NR_SYMBOLS_PER_SLOT],
                 int32_t ptrs_re_per_slot[][NR_SYMBOLS_PER_SLOT],
                 int G,
-                uint32_t nvar)
+                uint32_t nvar,
+                pdsch_scope_req_t *scope_req)
 {
   const int nl = dlsch[0].Nl;
   const int matrixSz = ue->frame_parms.nb_antennas_rx * nl;
@@ -463,6 +464,12 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                          csi_res_bitmap,
                          ue->chest_time);
     stop_meas_nr_ue_phy(ue, DLSCH_EXTRACT_RBS_STATS);
+    if (scope_req->copy_chanest_to_scope) {
+      size_t size = sizeof(c16_t) * dlsch_config->number_rbs * NR_NB_SC_PER_RB;
+      int copy_index = symbol - dlsch_config->start_symbol;
+      int offset = copy_index * size;
+      UEscopeCopyUnsafe(ue, pdschChanEstimates, dl_ch_estimates_ext[0], size, offset, copy_index);
+    }
     if (meas_enabled) {
       LOG_D(PHY,
             "[AbsSFN %u.%d] Slot%d Symbol %d: Pilot/Data extraction %5.2f \n",
@@ -481,6 +488,12 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
     nb_re_pdsch = (pilots == 1) ? ((config_type == NFAPI_NR_DMRS_TYPE1) ? nb_rb_pdsch * (12 - 6 * dlsch_config->n_dmrs_cdm_groups)
                                                                         : nb_rb_pdsch * (12 - 4 * dlsch_config->n_dmrs_cdm_groups))
                                 : (nb_rb_pdsch * 12);
+    if (scope_req->copy_rxdataF_to_scope) {
+      size_t size = sizeof(c16_t) * nb_re_pdsch;
+      int copy_index = symbol - dlsch_config->start_symbol;
+      UEscopeCopyUnsafe(ue, pdschRxdataF, rxdataF_ext[0], size, scope_req->scope_rxdataF_offset, copy_index);
+      scope_req->scope_rxdataF_offset += size;
+    }
     //----------------------------------------------------------
     //--------------------- Channel Scaling --------------------
     //----------------------------------------------------------

@@ -455,6 +455,29 @@ void ShowUeScope(void *data_void_ptr, float t)
   }
   ImGui::End();
 
+  if (ImGui::Begin("UE PDSCH Chan est")) {
+    static auto iq_data = new IQData();
+    static auto iq_hist = new IQHist("PDSCH Chan est IQ");
+    bool new_data = false;
+    if (iq_hist->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[pdschChanEstimates], t, iq_hist->GetEpsilon(), iq_procedure_timer);
+    }
+    iq_hist->Draw(iq_data, t, new_data);
+  }
+  ImGui::End();
+
+  if (ImGui::Begin("UE PDSCH IQ before compensation")) {
+    static auto iq_data = new IQData();
+    static auto iq_hist = new IQHist("PDSCH IQ before compensation");
+    bool new_data = false;
+    if (iq_hist->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[pdschRxdataF], t, iq_hist->GetEpsilon(), iq_procedure_timer);
+    }
+    iq_hist->Draw(iq_data, t, new_data);
+  }
+  ImGui::End();
+
+
   if (ImGui::Begin("Time domain samples")) {
     static auto iq_data = new IQData();
     // Issue with imgui deferring draw calls until the end of the frame - cases segfault if scatterplot has too many points

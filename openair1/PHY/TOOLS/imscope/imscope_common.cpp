@@ -131,12 +131,9 @@ void unlockScopeData(enum scopeDataType type)
     total_size += scope_data.data.data_copied_per_offset[i];
   }
   if (total_size != (uint64_t)scope_data.data.scope_graph_data->dataSize) {
-    LOG_E(PHY,
-          "Scope is missing data - not all data that was expected was copied - possibly missed copyDataUnsafeWithOffset call. "
-          "scope = %s, total_size = %lu, dataSize = %d\n",
-          scope_id_to_string(type),
-          total_size,
-          scope_data.data.scope_graph_data->dataSize);
+    scope_data.data.scope_graph_data->dataSize = total_size;
+    scope_data.data.scope_graph_data->lineSz =
+        total_size / scope_data.data.scope_graph_data->elementSz / scope_data.data.scope_graph_data->colSz;
   }
   scope_data.data.scope_id = type;
   scope_data.is_data_ready = true;
@@ -179,8 +176,12 @@ const char *scope_id_to_string(scopeDataType type) {
       return "ueTimeDomainSamplesBeforeSync";
     case gNbTimeDomainSamples:
       return "gNbTimeDomainSamples";
+    case pdschChanEstimates:
+      return "pdschChanEstimates";
+    case pdschRxdataF:
+      return "pdschRxdataF";
     default:
-      return "unknown type";
+      return "unknown scope type";
   }
 }
 
