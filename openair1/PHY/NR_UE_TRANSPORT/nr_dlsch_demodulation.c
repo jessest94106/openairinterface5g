@@ -693,7 +693,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
       return -1;
     }
 
-    int16_t layer_llr[dlsch[0].Nl][rx_llr_layer_size];
+    __attribute__((aligned(32))) int16_t layer_llr[dlsch[0].Nl][rx_llr_layer_size];
     for(int i = startSymbIdx; i < startSymbIdx + nbSymb; i++) {
       /* Calculate LLR's for each symbol */
       start_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
