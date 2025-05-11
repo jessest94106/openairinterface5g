@@ -609,6 +609,19 @@ static void ack_reconfig(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
 }
 
+static bool dlsch_to_schedule(const NR_UE_sched_ctrl_t *sched_ctrl, int frame)
+{
+  /* Check DL buffer, TA to be sent and  beam switch needed*/
+  if (sched_ctrl->num_total_bytes > 0)
+    return true;
+  if (sched_ctrl->ta_apply == true)
+    return true;
+  if (sched_ctrl->UE_mac_ce_ctrl.tci_state_ind.is_scheduled)
+    return true;
+  // if none of the condition for dlsch to be scheduled are met
+  return false;
+}
+
 typedef struct UEsched_s {
   float coef;
   NR_UE_info_t * UE;
@@ -705,8 +718,7 @@ static void pf_dl(gNB_MAC_INST *mac,
 
       update_dlsch_buffer(pp_pdsch->frame, pp_pdsch->slot, UE);
 
-      /* Check DL buffer and skip this UE if no bytes and no TA necessary */
-      if (sched_ctrl->num_total_bytes == 0 && sched_ctrl->ta_apply == false)
+      if (!dlsch_to_schedule(sched_ctrl, frame))
         continue;
 
       /* Calculate coeff */
