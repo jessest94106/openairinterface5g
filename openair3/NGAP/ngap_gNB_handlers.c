@@ -136,6 +136,36 @@ static int ngap_gNB_handle_ng_setup_failure(sctp_assoc_t assoc_id, uint32_t stre
   return 0;
 }
 
+static void ngap_dump_served_guami(const ngap_gNB_amf_data_t *amf_desc_p)
+{
+  const struct served_guami_s *guami_p;
+  const struct plmn_identity_s *plmn_p;
+  const struct served_region_id_s *region_p;
+  const struct amf_set_id_s *set_id_p;
+  const struct amf_pointer_s *pointer_p;
+
+  NGAP_DEBUG("Served GUAMIs for AMF %s (assoc_id=%d):\n",
+             amf_desc_p->amf_name ? amf_desc_p->amf_name : "(no name)",
+             amf_desc_p->assoc_id);
+
+  STAILQ_FOREACH(guami_p, &amf_desc_p->served_guami, next)
+  {
+    NGAP_DEBUG(" GUAMI:\n");
+    STAILQ_FOREACH(plmn_p, &guami_p->served_plmns, next) {
+      NGAP_DEBUG("   PLMN: MCC=%03d, MNC=%0*d\n", plmn_p->mcc, plmn_p->mnc_digit_length, plmn_p->mnc);
+    }
+    STAILQ_FOREACH(region_p, &guami_p->served_region_ids, next) {
+      NGAP_DEBUG("   AMF Region ID: %d\n", region_p->amf_region_id);
+    }
+    STAILQ_FOREACH(set_id_p, &guami_p->amf_set_ids, next) {
+      NGAP_DEBUG("   AMF Set ID: %d\n", set_id_p->amf_set_id);
+    }
+    STAILQ_FOREACH(pointer_p, &guami_p->amf_pointers, next) {
+      NGAP_DEBUG("   AMF Pointer: %d\n", pointer_p->amf_pointer);
+    }
+  }
+}
+
 static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
 {
   NGAP_NGSetupResponse_t    *container;
@@ -164,7 +194,6 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
   /* The list of served guami can contain at most 256 elements.
    * NR related guami is the first element in the list, i.e with an id of 0.
    */
-  NGAP_DEBUG("servedGUAMIs.list.count %d\n", ie->value.choice.ServedGUAMIList.list.count);
   DevAssert(ie->value.choice.ServedGUAMIList.list.count > 0);
   DevAssert(ie->value.choice.ServedGUAMIList.list.count <= NGAP_maxnoofServedGUAMIs);
 
@@ -214,6 +243,7 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
 
     STAILQ_INSERT_TAIL(&amf_desc_p->served_guami, new_guami_p, next);
   }
+  ngap_dump_served_guami(amf_desc_p);
 
   /* Set the capacity of this AMF */
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_NGSetupResponseIEs_t, ie, container,
@@ -236,7 +266,6 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_NGSetupResponseIEs_t, ie, container,
                                NGAP_ProtocolIE_ID_id_PLMNSupportList, true);
 
-  NGAP_DEBUG("PLMNSupportList.list.count %d\n", ie->value.choice.PLMNSupportList.list.count);
   DevAssert(ie->value.choice.PLMNSupportList.list.count > 0);
   DevAssert(ie->value.choice.PLMNSupportList.list.count <= NGAP_maxnoofPLMNs);
 
@@ -251,11 +280,10 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
     plmn_support_item_p = ie->value.choice.PLMNSupportList.list.array[i];
 
     new_plmn_support_p = calloc(1, sizeof(struct plmn_support_s));
-    
-    TBCD_TO_MCC_MNC(&plmn_support_item_p->pLMNIdentity, new_plmn_support_p->plmn_identity.mcc,
-                    new_plmn_support_p->plmn_identity.mnc, new_plmn_support_p->plmn_identity.mnc_digit_length);
 
-    NGAP_DEBUG("PLMNSupportList.list.count %d\n", plmn_support_item_p->sliceSupportList.list.count);
+    struct plmn_identity_s *plmn = &new_plmn_support_p->plmn_identity;
+    TBCD_TO_MCC_MNC(&plmn_support_item_p->pLMNIdentity, plmn->mcc, plmn->mnc, plmn->mnc_digit_length);
+    NGAP_INFO("Supported PLMN %d: MCC=%03d MNC=%0*d\n", i, plmn->mcc, plmn->mnc_digit_length, plmn->mnc);
     DevAssert(plmn_support_item_p->sliceSupportList.list.count > 0);
     DevAssert(plmn_support_item_p->sliceSupportList.list.count <= NGAP_maxnoofSliceItems);
 
@@ -273,6 +301,12 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
         new_slice_support_p->sD[1] = slice_support_item_p->s_NSSAI.sD->buf[1];
         new_slice_support_p->sD[2] = slice_support_item_p->s_NSSAI.sD->buf[2];
       }
+      NGAP_INFO("Supported slice (PLMN %d): SST=0x%02x SD=%d%d%d\n",
+                i,
+                new_slice_support_p->sST,
+                new_slice_support_p->sD[0],
+                new_slice_support_p->sD[1],
+                new_slice_support_p->sD[2]);
       STAILQ_INSERT_TAIL(&new_plmn_support_p->slice_supports, new_slice_support_p, next);
     }
 
