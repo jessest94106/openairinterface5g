@@ -217,27 +217,21 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
     STAILQ_INSERT_TAIL(&new_guami_p->served_plmns, new_plmn_identity_p, next);
     new_guami_p->nb_served_plmns++;
     
-    NGAP_AMFRegionID_t        *amf_region_id_p;
     struct served_region_id_s *new_region_id_p;
-    amf_region_id_p = &guami_item_p->gUAMI.aMFRegionID;
     new_region_id_p = calloc(1, sizeof(struct served_region_id_s));
-    OCTET_STRING_TO_INT8(amf_region_id_p, new_region_id_p->amf_region_id);
+    new_region_id_p->amf_region_id = BIT_STRING_to_uint8(&guami_item_p->gUAMI.aMFRegionID);
     STAILQ_INSERT_TAIL(&new_guami_p->served_region_ids, new_region_id_p, next);
     new_guami_p->nb_region_id++;
 
-    NGAP_AMFSetID_t        *amf_set_id_p;
     struct amf_set_id_s    *new_amf_set_id_p;
-    amf_set_id_p = &guami_item_p->gUAMI.aMFSetID;
     new_amf_set_id_p = calloc(1, sizeof(struct amf_set_id_s));
-    OCTET_STRING_TO_INT16(amf_set_id_p, new_amf_set_id_p->amf_set_id);
+    new_amf_set_id_p->amf_set_id = BIT_STRING_to_uint16(&guami_item_p->gUAMI.aMFSetID);
     STAILQ_INSERT_TAIL(&new_guami_p->amf_set_ids, new_amf_set_id_p, next);
     new_guami_p->nb_amf_set_id++;
 
-    NGAP_AMFPointer_t        *amf_pointer_p;
     struct amf_pointer_s     *new_amf_pointer_p;
-    amf_pointer_p = &guami_item_p->gUAMI.aMFPointer;
     new_amf_pointer_p = calloc(1, sizeof(struct amf_pointer_s));
-    OCTET_STRING_TO_INT8(amf_pointer_p, new_amf_pointer_p->amf_pointer);
+    new_amf_pointer_p->amf_pointer = BIT_STRING_to_uint8(&guami_item_p->gUAMI.aMFPointer);
     STAILQ_INSERT_TAIL(&new_guami_p->amf_pointers, new_amf_pointer_p, next);
     new_guami_p->nb_amf_pointer++;
 
