@@ -172,10 +172,10 @@ void nr_rrc_handle_timers(NR_UE_RRC_INST_t *rrc)
 
   bool t430_expired = nr_timer_tick(&rrc->timers_and_constants.T430);
   if (t430_expired && rrc->nrRrcState == RRC_STATE_CONNECTED_NR && rrc->is_NTN_UE) {
-    LOG_W(NR_RRC, "Timer T430 expired! NTN UL SYNC FAILURE\n");
+    LOG_W(NR_RRC, "Timer T430 expired! Indicate UL SYNC LOSS to MAC\n");
     // Upon T430 expiry, the UE shall reacquire SIB19 and re-obtain UL-SYNC
     // Spec 38.331 Section 5.2.2.6
-    AssertFatal(1 == 0, "UL-Sync Lost. Read SIB19, perform RACH and obtain UL-SYNC. NOT YET Implemented.\n");
+    handle_t430_expiry(rrc);
   }
 }
 

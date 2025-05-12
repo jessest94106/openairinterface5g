@@ -2801,6 +2801,22 @@ void handle_t300_expiry(NR_UE_RRC_INST_t *rrc)
   // TODO inform upper layers about the failure to establish the RRC connection
 }
 
+void handle_t430_expiry(NR_UE_RRC_INST_t *rrc)
+{
+  // SPEC 38.331 section 5.2.2.6
+  // Reacquire SIB19 after T430 expiry
+  for (int i = 0; i < NB_CNX_UE; i++) {
+    rrcPerNB_t *nb = &rrc->perNB[i];
+    NR_UE_RRC_SI_INFO *SI_info = &nb->SInfo;
+    SI_info->SInfo_r17.sib19_validity = false;
+  }
+  // Indicate MAC that UL SYNC is LOST
+  NR_UE_MAC_reset_cause_t cause = UL_SYNC_LOST_T430_EXPIRED;
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = cause;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+}
+
 //This calls the sidelink preconf message after RRC, MAC instances are created.
 void start_sidelink(int instance)
 {

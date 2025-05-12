@@ -196,7 +196,8 @@ typedef enum {
   GO_TO_IDLE,
   DETACH,
   T300_EXPIRY,
-  RE_ESTABLISHMENT
+  RE_ESTABLISHMENT,
+  UL_SYNC_LOST_T430_EXPIRED
 } NR_UE_MAC_reset_cause_t;
 
 typedef struct {
