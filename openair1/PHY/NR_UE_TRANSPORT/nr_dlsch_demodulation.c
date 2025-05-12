@@ -480,10 +480,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
             ue->phy_cpu_stats.cpu_time_stats[DLSCH_EXTRACT_RBS_STATS].p_time / (cpuf * 1000.0));
     }
     if (ue->phy_sim_pdsch_rxdataF_ext)
-      for (unsigned char aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
-        int offset = ((void *)rxdataF_ext[aarx] - (void *)rxdataF_ext) + symbol * rx_size_symbol;
-        memcpy(ue->phy_sim_pdsch_rxdataF_ext + offset, rxdataF_ext, rx_size_symbol * sizeof(c16_t));
-      }
+      memcpy(ue->phy_sim_pdsch_rxdataF_ext + symbol * sizeof(rxdataF_ext), rxdataF_ext, sizeof(rxdataF_ext));
 
     nb_re_pdsch = (pilots == 1) ? ((config_type == NFAPI_NR_DMRS_TYPE1) ? nb_rb_pdsch * (12 - 6 * dlsch_config->n_dmrs_cdm_groups)
                                                                         : nb_rb_pdsch * (12 - 4 * dlsch_config->n_dmrs_cdm_groups))
@@ -776,12 +773,16 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
 
   if (ue->phy_sim_pdsch_rxdataF_comp)
     for (int a = 0; a < nbRx; a++) {
-      int offset = (void *)rxdataF_comp[0][a] - (void *)rxdataF_comp[0] + symbol * rx_size_symbol * sizeof(c16_t);
-      memcpy(ue->phy_sim_pdsch_rxdataF_comp + offset, rxdataF_comp[0][a] + symbol * rx_size_symbol, sizeof(c16_t) * rx_size_symbol);
+      for (int l = 0; l < nl; l++) {
+        int offset = (void *)rxdataF_comp[l][a] - (void *)rxdataF_comp[0] + symbol * rx_size_symbol * sizeof(c16_t);
+        memcpy(ue->phy_sim_pdsch_rxdataF_comp + offset,
+               rxdataF_comp[l][a] + symbol * rx_size_symbol,
+               sizeof(c16_t) * rx_size_symbol);
+      }
       memcpy((c16_t *)ue->phy_sim_pdsch_dl_ch_estimates + pdsch_est_size * a, dl_ch_estimates, pdsch_est_size * sizeof(c16_t));
     }
   if (ue->phy_sim_pdsch_dl_ch_estimates_ext)
-    memcpy((c16_t *)ue->phy_sim_pdsch_dl_ch_estimates_ext + symbol * rx_size_symbol,
+    memcpy(ue->phy_sim_pdsch_dl_ch_estimates_ext + symbol * sizeof(dl_ch_estimates_ext),
            dl_ch_estimates_ext,
            sizeof(dl_ch_estimates_ext));
   return (0);

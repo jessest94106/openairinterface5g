@@ -1042,6 +1042,8 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
   phy_pdcch_config->nb_search_space = 0;
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PDCCH, VCD_FUNCTION_OUT);
   TracyCZoneEnd(ctx);
+  if (ue->phy_sim_rxdataF)
+    memcpy(ue->phy_sim_rxdataF, rxdataF[0], sizeof(int32_t) * nb_symb_pdcch * ue->frame_parms.ofdm_symbol_size);
   return sampleShift;
 }
 
@@ -1166,9 +1168,11 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     }
 
     if (ue->phy_sim_rxdataF)
-      memcpy(ue->phy_sim_rxdataF, rxdataF, sizeof(int32_t)*rxdataF_sz*ue->frame_parms.nb_antennas_rx);
+      memcpy(ue->phy_sim_rxdataF + start_symb_sch * ue->frame_parms.ofdm_symbol_size * sizeof(c16_t),
+             &rxdataF[0][start_symb_sch * ue->frame_parms.ofdm_symbol_size],
+             sizeof(int32_t) * nb_symb_sch * ue->frame_parms.ofdm_symbol_size);
     if (ue->phy_sim_pdsch_llr)
-      memcpy(ue->phy_sim_pdsch_llr, llr[0], sizeof(int16_t)*rx_llr_buf_sz);
+      memcpy(ue->phy_sim_pdsch_llr, llr[0], sizeof(int16_t) * rx_llr_buf_sz);
 
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC, VCD_FUNCTION_OUT);
     for (int i=0; i<nb_codewords; i++)
