@@ -216,6 +216,14 @@ typedef struct transport_layer_addr_s {
   uint8_t buffer[20];
 } transport_layer_addr_t;
 
+/** @brief GTP tunnel configuration */
+typedef struct {
+  // Tunnel endpoint identifier
+  uint32_t teid;
+  // Transport layer address
+  transport_layer_addr_t addr;
+} gtpu_tunnel_t;
+
 //-----------------------------------------------------------------------------
 // GTPV1U TYPES
 //-----------------------------------------------------------------------------

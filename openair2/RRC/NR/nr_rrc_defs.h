@@ -106,16 +106,6 @@ typedef struct pdu_session_param_s {
   ngap_cause_t cause;
 } rrc_pdu_session_param_t;
 
-/**
- * @brief F1-U tunnel configuration
-*/
-typedef struct f1u_tunnel_s {
-  /* F1-U Tunnel Endpoint Identifier (on DU side) */
-  uint32_t teid;
-  /* Downlink F1-U Transport Layer (on DU side) */
-  transport_layer_addr_t addr;
-} f1u_tunnel_t;
-
 typedef struct drb_s {
   int status;
   int drb_id;
@@ -145,9 +135,9 @@ typedef struct drb_s {
     } ext1;
   } pdcp_config;
   // F1-U Downlink Tunnel Config (on DU side)
-  f1u_tunnel_t du_tunnel_config;
+  gtpu_tunnel_t du_tunnel_config;
   // F1-U Uplink Tunnel Config (on CU-UP side)
-  f1u_tunnel_t cuup_tunnel_config;
+  gtpu_tunnel_t cuup_tunnel_config;
 } drb_t;
 
 typedef enum {

@@ -2007,7 +2007,7 @@ static void fill_e1_bearer_modif(DRB_nGRAN_to_mod_t *drb_e1, const f1ap_drb_to_b
 /**
  * @brief Store F1-U DL TL and TEID in RRC
 */
-static void f1u_dl_gtp_update(f1u_tunnel_t *f1u, const f1ap_up_tnl_t *p)
+static void f1u_dl_gtp_update(gtpu_tunnel_t *f1u, const f1ap_up_tnl_t *p)
 {
   f1u->teid = p->teid;
   memcpy(&f1u->addr.buffer, &p->tl_address, sizeof(uint8_t) * 4);
@@ -2031,7 +2031,7 @@ static void store_du_f1u_tunnel(const f1ap_drb_to_be_setup_t *drbs, int n, gNB_R
 /*
  * @brief Store F1-U UL TEID and address in RRC
  */
-static void f1u_ul_gtp_update(f1u_tunnel_t *f1u, const up_params_t *p)
+static void f1u_ul_gtp_update(gtpu_tunnel_t *f1u, const up_params_t *p)
 {
   f1u->teid = p->tl_info.teId;
   memcpy(&f1u->addr.buffer, &p->tl_info.tlAddress, sizeof(uint8_t) * 4);
