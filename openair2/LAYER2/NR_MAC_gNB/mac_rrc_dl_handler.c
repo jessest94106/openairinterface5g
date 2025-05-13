@@ -553,7 +553,7 @@ static NR_UE_info_t *create_new_UE(gNB_MAC_INST *mac, uint32_t cu_id, const NR_C
   DevAssert(success);
 
   NR_UE_info_t *UE = get_new_nr_ue_inst(&mac->UE_info.uid_allocator, rnti, NULL);
-  AssertFatal(UE != NULL, "cannot create UE context, UE context setup failure not implemented\n");
+  AssertFatal(UE->uid < MAX_MOBILES_PER_GNB, "cannot create UE context, UE context setup failure not implemented\n");
 
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
   NR_COMMON_channels_t *cc = &mac->common_channels[CC_id];

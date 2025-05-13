@@ -727,11 +727,6 @@ void nr_initiate_ra_proc(module_id_t module_idP,
     }
 
     UE = get_new_nr_ue_inst(&nr_mac->UE_info.uid_allocator, rnti, NULL);
-    if (!UE) {
-      LOG_E(NR_MAC, "FAILURE: %4d.%2d cannot create UE context, ignoring RA because RRC Reject not implemented yet\n", frame, slot);
-      NR_SCHED_UNLOCK(&nr_mac->sched_lock);
-      return;
-    }
     if (!add_new_UE_RA(nr_mac, UE)) {
       LOG_E(NR_MAC, "FAILURE: %4d.%2d initiating RA procedure for preamble index %d: no free RA process\n", frame, slot, preamble_index);
       delete_nr_ue_data(UE, NULL, &nr_mac->UE_info.uid_allocator);

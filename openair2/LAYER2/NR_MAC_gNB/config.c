@@ -971,7 +971,7 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t
   NR_SCHED_LOCK(&nrmac->sched_lock);
 
   NR_UE_info_t *UE = get_new_nr_ue_inst(&nrmac->UE_info.uid_allocator, rnti, CellGroup);
-  DevAssert(UE != NULL); // test-mode: we assume we can always create a UE
+  DevAssert(UE->uid < MAX_MOBILES_PER_GNB); // test-mode: we assume we can always create a UE
   free_and_zero(UE->ra); // test-mode (sims, phy-test): UE will not do RA
   bool res = add_connected_nr_ue(nrmac, UE);
   if (!res) {

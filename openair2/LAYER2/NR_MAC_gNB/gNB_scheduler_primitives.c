@@ -2577,19 +2577,10 @@ static void init_bler_stats(const NR_bler_options_t *bler_options, NR_bler_stats
  * error handling). Remove with delete_nr_ue_data().  */
 NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroupConfig_t *CellGroup)
 {
-  uid_t uid = uid_linear_allocator_new(uia);
-  /* if the UE list is full, we should reject the UE with an RRC reject
-   * message, but we do not have this functionality. To keep it simple, do not
-   * create a UE context here, so we can print an error message. */
-  if (uid >= MAX_MOBILES_PER_GNB) {
-    uid_linear_allocator_free(uia, uid);
-    return NULL;
-  }
-
   NR_UE_info_t *UE = calloc_or_fail(1, sizeof(NR_UE_info_t));
+  UE->uid = uid_linear_allocator_new(uia);
   UE->rnti = rnti;
   UE->CellGroup = CellGroup;
-  UE->uid = uid;
   UE->ra = calloc(1, sizeof(*UE->ra));
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   sched_ctrl->ta_update = 31;
@@ -3324,6 +3315,19 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   if (!nr_rlc_activate_srb0(UE->rnti, UE, send_initial_ul_rrc_message))
     return false;
 
+  if (UE->uid >= MAX_MOBILES_PER_GNB) {
+    // verifying if any UE left in the meantime and it is possible to get a valid UID
+    uid_linear_allocator_free(&mac->UE_info.uid_allocator, UE->uid);
+    UE->uid = uid_linear_allocator_new(&mac->UE_info.uid_allocator);
+    if (UE->uid >= MAX_MOBILES_PER_GNB) {
+      // if the UE list is full, we should reject the UE with an RRC reject message
+      // to signal the upper layers to send a reject we send an empty CellGroup information element
+      UE->CellGroup = NULL;
+      LOG_W(NR_MAC, "Maximum number of UE alllowed at DU reached. Cannot serve UE %04x", UE->rnti);
+      return true;
+    }
+  }
+
   /* create this UE's initial CellGroup */
   int CC_id = 0;
   int srb_id = 1;
@@ -3335,7 +3339,7 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
 
   if (!cellGroupConfig)
     return true;
-    
+
   /* the cellGroup sent to CU specifies there is SRB1, so create it */
   DevAssert(cellGroupConfig->rlc_BearerToAddModList->list.count == 1);
   const NR_RLC_BearerConfig_t *bearer = cellGroupConfig->rlc_BearerToAddModList->list.array[0];
