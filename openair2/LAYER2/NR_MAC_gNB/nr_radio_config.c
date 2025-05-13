@@ -238,6 +238,7 @@ static int get_nb_pucch2_per_slot(const NR_ServingCellConfigCommon_t *scc, int b
   int nb_pucch2 = (max_csi_reports / (available_report_occasions + 1)) + 1;
   // in current implementation we need (nb_pucch2 * PUCCH2_SIZE) prbs for PUCCH2
   // and MAX_MOBILES_PER_GNB prbs for PUCCH1
+  // checked for validity in verify_radio_configuration
   AssertFatal((nb_pucch2 * PUCCH2_SIZE) + MAX_MOBILES_PER_GNB <= bwp_size,
               "Cannot allocate all required PUCCH resources for max number of %d UEs in BWP with %d PRBs\n",
               MAX_MOBILES_PER_GNB, bwp_size);
@@ -402,6 +403,7 @@ static void set_csirs_periodicity(NR_NZP_CSI_RS_Resource_t *nzpcsi0,
   else {
     nzpcsi0->periodicityAndOffset->present = NR_CSI_ResourcePeriodicityAndOffset_PR_slots320;
     const int nb_dl_slots_period = get_full_dl_slots_per_period(fs); // full DL slots
+    // checked for validity in verify_radio_configuration
     AssertFatal(offset / 320 < nb_dl_slots_period, "Cannot allocate CSI-RS for BWP %d. Not enough resources for CSI-RS\n", id);
     nzpcsi0->periodicityAndOffset->choice.slots320 = (offset % 320) + (offset / 320);
   }
@@ -661,7 +663,7 @@ static struct NR_SRS_Resource__resourceType__periodic *configure_periodic_srs(co
 {
   frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
   int offset = get_ul_slot_offset(fs, uid, false); // only full UL slots for SRS
-
+  // checked for validity in verify_radio_configuration
   AssertFatal(offset < 2560, "Cannot allocate SRS configuration for uid %d, not enough resources\n", uid);
   const int ideal_period = set_ideal_period(false);
 
@@ -1169,6 +1171,7 @@ static void config_pucch_resset0(NR_PUCCH_Config_t *pucch_Config,
   NR_PUCCH_Resource_t *pucchres0 = calloc(1,sizeof(*pucchres0));
   pucchres0->pucch_ResourceId = *pucchid;
   pucchres0->startingPRB = (PUCCH2_SIZE * num_pucch2) + uid;
+  // checked for validity in verify_radio_configuration
   AssertFatal(pucchres0->startingPRB < curr_bwp, "Not enough resources in current BWP (size %d) to allocate uid %d\n", curr_bwp, uid);
   pucchres0->intraSlotFrequencyHopping = NULL;
   pucchres0->secondHopPRB = NULL;
@@ -1745,13 +1748,11 @@ static void set_csi_meas_periodicity(const NR_ServingCellConfigCommon_t *scc,
   const int ideal_period = set_ideal_period(true);
   const int num_pucch2 = get_nb_pucch2_per_slot(scc, curr_bwp);
   const int idx = (uid * 2 / num_pucch2) + is_rsrp;
-
   frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
   int offset = get_ul_slot_offset(fs, idx, true);
-
   LOG_D(NR_MAC, "set_csi_meas_periodicity: uid = %d, offset = %d, ideal_period = %d", uid, offset, ideal_period);
+  // checked for validity in verify_radio_configuration
   AssertFatal(offset < 320, "Not enough UL slots to accomodate all possible UEs. Need to rework the implementation\n");
-
   if (check_periodicity(4, ideal_period, fs)) {
     csirep->reportConfigType.choice.periodic->reportSlotConfig.present = NR_CSI_ReportPeriodicityAndOffset_PR_slots4;
     csirep->reportConfigType.choice.periodic->reportSlotConfig.choice.slots4 = offset;
@@ -3492,16 +3493,58 @@ NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId,
   return rlc_BearerConfig;
 }
 
+static bool verify_radio_configuration(int uid, const NR_ServingCellConfigCommon_t *scc, const NR_ServingCellConfig_t *scd)
+{
+  frame_structure_t *fs = &RC.nrmac[0]->frame_structure;
+  int srs_offset = get_ul_slot_offset(fs, uid, false);
+  // see configure_periodic_srs
+  if (srs_offset >= 2560) {
+    LOG_E(NR_RRC, "UID %d, cannot allocate resources for SRS, rejecting UE\n", uid);
+    return false;
+  }
+
+  int n_dl_bwp = scd->downlinkBWP_ToAddModList ? scd->downlinkBWP_ToAddModList->list.count : 1;
+  int csi_offset = fs->numb_slots_period * n_dl_bwp;
+  // see set_csirs_periodicity
+  if (csi_offset / 320 >= get_full_dl_slots_per_period(fs)) {
+    LOG_E(NR_RRC, "UID %d, cannot allocate resources for CSI-RS, rejecting UE\n", uid);
+    return false; // cannot allocate resources for CSI-RS
+  }
+
+  int curr_bwp = NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
+  int num_pucch2 = get_nb_pucch2_per_slot(scc, curr_bwp);
+  int pucchres0_startingPRB = (PUCCH2_SIZE * num_pucch2) + uid;
+  // see config_pucch_resset0
+  if (pucchres0_startingPRB >= curr_bwp) {
+    LOG_E(NR_RRC, "UID %d, cannot allocate resources for PUCCH0, rejecting UE\n", uid);
+    return false; // cannot allocate resources for PUCCH0
+  }
+  // see get_nb_pucch2_per_slot
+  if ((num_pucch2 * PUCCH2_SIZE) + MAX_MOBILES_PER_GNB > curr_bwp) {
+    LOG_E(NR_RRC, "UID %d, cannot allocate resources for PUCCH2, rejecting UE\n", uid);
+    return false; // cannot allocate resources for PUCCH2
+  }
+  const int idx = (uid * 2 / num_pucch2) + 1;
+  int offset = get_ul_slot_offset(fs, idx, true);
+  // see set_csi_meas_periodicity
+  if (offset >= 320) {
+    LOG_E(NR_RRC, "UID %d, cannot allocate resources for CSI reporting, rejecting UE\n", uid);
+    return false; // cannot allocate resources for CSI report
+  }
+
+  return true;
+}
+
 NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
                                                   const NR_ServingCellConfigCommon_t *scc,
                                                   const NR_ServingCellConfig_t *servingcellconfigdedicated,
                                                   const nr_mac_config_t *configuration,
                                                   const nr_rlc_configuration_t *default_rlc_config)
 {
-  NR_SpCellConfig_t *spCellConfig = get_initial_SpCellConfig(uid, scc, servingcellconfigdedicated, configuration);
-  if (!spCellConfig)
+  if (!verify_radio_configuration(uid, scc, servingcellconfigdedicated))
     return NULL;
 
+  NR_SpCellConfig_t *spCellConfig = get_initial_SpCellConfig(uid, scc, servingcellconfigdedicated, configuration);
   NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(*cellGroupConfig));
   cellGroupConfig->cellGroupId = 0;
 
