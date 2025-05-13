@@ -1047,7 +1047,7 @@ static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, fra
   NR_RA_t *ra = UE->ra;
   DevAssert(ra->Msg3_tda_id >= 0 && ra->Msg3_tda_id < 16);
 
-  uint16_t msg3_nb_rb = 8; // sdu has 6 or 8 bytes
+  uint16_t msg3_nb_rb = max(8, mac->min_grant_prb); // sdu has 6 or 8 bytes
 
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
   NR_UE_ServingCell_Info_t *sc_info = &UE->sc_info;
@@ -1057,14 +1057,6 @@ static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, fra
   int startSymbolAndLength = pusch_TimeDomainAllocationList->list.array[ra->Msg3_tda_id]->startSymbolAndLength;
   SLIV2SL(startSymbolAndLength, &ra->msg3_startsymb, &ra->msg3_nbSymb);
 
-  LOG_I(NR_MAC,
-        "UE %04x: Msg3 scheduled at %d.%d (%d.%d TDA %u)\n",
-        UE->rnti,
-        ra->Msg3_frame,
-        ra->Msg3_slot,
-        current_frame,
-        current_slot,
-        ra->Msg3_tda_id);
   const int buffer_index = ul_buffer_index(ra->Msg3_frame,
                                            ra->Msg3_slot,
                                            mac->frame_structure.numb_slots_frame,
@@ -1099,6 +1091,16 @@ static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, fra
   ra->msg3_nb_rb = msg3_nb_rb;
   ra->msg3_first_rb = rbStart;
   ra->msg3_bwp_start = bwpStart;
+  LOG_I(NR_MAC,
+        "UE %04x: Msg3 scheduled at %d.%d (%d.%d TDA %u) start %d RBs %d\n",
+        UE->rnti,
+        ra->Msg3_frame,
+        ra->Msg3_slot,
+        current_frame,
+        current_slot,
+        ra->Msg3_tda_id,
+        ra->msg3_first_rb,
+        ra->msg3_nb_rb);
   return true;
 }
 

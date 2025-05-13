@@ -49,6 +49,7 @@
 #include "RegistrationAccept.h"
 #include "SORTransparentContainer.h"
 #include "FGSIdentityResponse.h"
+#include "fgmm_authentication_request.h"
 #include "T.h"
 #include "aka_functions.h"
 #include "assertions.h"
@@ -837,6 +838,58 @@ static void generateAuthenticationResp(nr_ue_nas_t *nas, as_nas_info_t *initialN
   initialNasMsg->length = mm_msg_encode(&plain, initialNasMsg->nas_data, size);
   // Free res value after encode
   free(res.value);
+}
+
+/** @brief Send Authentication Failure message from the UE to the AMF to
+ * indicate that authentication of the network has failed */
+static void generateAuthenticationFailure(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, cause_id_t cause)
+{
+  int size = sizeof(fgmm_msg_header_t);
+  fgmm_nas_message_plain_t plain = {0};
+
+  // Plain 5GMM header
+  plain.header = set_mm_header(FGS_AUTHENTICATION_FAILURE, PLAIN_5GS_MSG);
+  size += sizeof(plain.header);
+  // 5GMM Cause (Mandatory)
+  fgmm_auth_failure_t *mm_msg = &plain.mm_msg.fgmm_auth_failure;
+  mm_msg->cause = cause;
+  size += 1;
+  initialNasMsg->nas_data = malloc_or_fail(size * sizeof(*initialNasMsg->nas_data));
+  initialNasMsg->length = mm_msg_encode(&plain, initialNasMsg->nas_data, size);
+}
+
+static void handle_fgmm_authentication_request(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, byte_array_t *buffer)
+{
+  LOG_D(NAS, "Received NAS Authentication Request\n");
+  fgs_authentication_request_t msg = {0};
+  int size = 0;
+  int decoded = 0;
+
+  // decode plain 5GMM message header
+  fgmm_msg_header_t mm_header = {0};
+  if ((decoded = decode_5gmm_msg_header(&mm_header, buffer->buf + size, buffer->len - size)) < 0) {
+    LOG_E(NAS, "decode_5gmm_msg_header failure in NAS Authentication Request handling\n");
+    return;
+  }
+  size += decoded;
+  // NAS key set identifier (Mandatory)
+  if ((decoded = decode_nas_key_set_identifier(&msg.ngKSI, 0, buffer->buf[decoded])) < 0) {
+    LOG_E(NAS, "decode_nas_key_set_identifier failure in NAS Authentication Request handling\n");
+    return;
+  }
+  size += decoded;
+  if (!nas->ksi) {
+    nas->ksi = malloc_or_fail(sizeof(*nas->ksi));
+    *nas->ksi = msg.ngKSI.naskeysetidentifier;
+    LOG_D(NAS, "Stored NAS Key Set Identifier %d\n", *nas->ksi);
+  } else if (*nas->ksi == msg.ngKSI.naskeysetidentifier) {
+    /* If the ngKSI value received is already associated with one
+    of the 5G security contexts stored in the UE, send failure message */
+    LOG_E(NAS, "Invalid NAS Key Set Identifier: send Authentication Failure\n");
+    generateAuthenticationFailure(nas, initialNasMsg, ngKSI_already_in_use);
+    return;
+  }
+  generateAuthenticationResp(nas, initialNasMsg, buffer->buf);
 }
 
 int nas_itti_kgnb_refresh_req(instance_t instance, const uint8_t kgnb[32])
@@ -1720,9 +1773,11 @@ void *nas_nrue(void *args_p)
           case FGS_IDENTITY_REQUEST:
             generateIdentityResponse(&initialNasMsg, *(pdu_buffer + 3), nas->uicc);
             break;
-          case FGS_AUTHENTICATION_REQUEST:
-            generateAuthenticationResp(nas, &initialNasMsg, pdu_buffer);
+          case FGS_AUTHENTICATION_REQUEST: {
+            byte_array_t buffer = {.buf = pdu_buffer, .len = pdu_length};
+            handle_fgmm_authentication_request(nas, &initialNasMsg, &buffer);
             break;
+          }
           case FGS_SECURITY_MODE_COMMAND:
             handle_security_mode_command(nas, &initialNasMsg, pdu_buffer, pdu_length);
             break;
