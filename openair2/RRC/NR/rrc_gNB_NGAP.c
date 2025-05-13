@@ -807,10 +807,6 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
     }
     resp->nb_of_pdusessions = pdu_sessions_done;
     resp->nb_of_pdusessions_failed = pdu_sessions_failed;
-    // } else {
-    //   LOG_D(NR_RRC,"xid does not corresponds  (context pdu_sessions index %d, status %d, xid %d/%d) \n ",
-    //         pdusession, UE->pdusession[pdusession].status, xid, UE->pdusession[pdusession].xid);
-    // }
   }
 
   if ((pdu_sessions_done > 0 || pdu_sessions_failed)) {
@@ -1457,16 +1453,6 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
   return 0;
 }
 
-void nr_rrc_rx_tx(void) {
-  // check timers
-
-  // check if UEs are lost, to remove them from upper layers
-
-  //
-
-}
-
-/*------------------------------------------------------------------------------*/
 int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance)
 {
   for (uint16_t tai_size = 0; tai_size < NGAP_PAGING_IND(msg_p).tai_size; tai_size++) {

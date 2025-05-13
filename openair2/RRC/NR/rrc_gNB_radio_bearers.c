@@ -208,11 +208,3 @@ int get_number_active_drbs(gNB_RRC_UE_t *ue)
       n++;
   return n;
 }
-
-bool drb_is_active(gNB_RRC_UE_t *ue, uint8_t drb_id)
-{
-  drb_t *drb = get_drb(ue, drb_id);
-  if (drb == NULL)
-    return DRB_INACTIVE;
-  return drb->status != DRB_INACTIVE;
-}

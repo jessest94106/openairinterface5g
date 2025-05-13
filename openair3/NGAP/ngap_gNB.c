@@ -344,14 +344,6 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
         ngap_gNB_nas_non_delivery_ind(instance, &NGAP_NAS_NON_DELIVERY_IND(received_msg));
         break;
 
-      case NGAP_PATH_SWITCH_REQ:
-        ngap_gNB_path_switch_req(instance, &NGAP_PATH_SWITCH_REQ(received_msg));
-        break;
-
-      case NGAP_PDUSESSION_MODIFICATION_IND:
-        ngap_gNB_generate_PDUSESSION_Modification_Indication(instance, &NGAP_PDUSESSION_MODIFICATION_IND(received_msg));
-        break;
-
       case NGAP_UE_CONTEXT_RELEASE_COMPLETE:
         ngap_ue_context_release_complete(instance, &NGAP_UE_CONTEXT_RELEASE_COMPLETE(received_msg));
         break;

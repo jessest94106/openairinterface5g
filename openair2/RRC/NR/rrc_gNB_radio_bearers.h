@@ -65,9 +65,6 @@ uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue);
 /// @brief returns the number of active DRBs for this UE
 int get_number_active_drbs(gNB_RRC_UE_t *ue);
 
-/// @brief check if DRB with ID drb_id of UE ue is active
-bool drb_is_active(gNB_RRC_UE_t *ue, uint8_t drb_id);
-
 /// @brief retrieve PDU session of UE ue with ID id, optionally creating it if
 /// create is true
 rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create);

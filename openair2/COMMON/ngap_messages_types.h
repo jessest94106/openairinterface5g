@@ -290,18 +290,6 @@ typedef struct pdusession_setup_s {
   pdusession_associate_qosflow_t associated_qos_flows[QOSFLOW_MAX_VALUE];
 } pdusession_setup_t;
 
-typedef struct pdusession_tobeswitched_s {
-  /* Unique pdusession_id for the UE. */
-  uint8_t pdusession_id;
-
-  /* The transport layer address for the IP packets */
-  uint8_t pdu_session_type;
-  transport_layer_addr_t upf_addr;
-
-  /* S-GW Tunnel endpoint identifier */
-  uint32_t gtp_teid;
-} pdusession_tobeswitched_t;
-
 typedef struct qos_flow_tobe_modified_s {
   uint8_t qfi; // 0~63
 } qos_flow_tobe_modified_t;
@@ -640,13 +628,6 @@ typedef struct ngap_paging_ind_s {
   ngap_paging_priority_t paging_priority;
 } ngap_paging_ind_t;
 
-typedef struct {
-  /* Unique pdusession_id for the UE. */
-  int pdusession_id;
-  byte_array_t nas_pdu;
-  byte_array_t pdusessionTransfer;
-} pdusession_setup_req_t;
-
 typedef struct ngap_pdusession_setup_req_s {
   /* UE id for initial connection to NGAP */
   uint32_t gNB_ue_ngap_id;
@@ -681,78 +662,6 @@ typedef struct ngap_pdusession_setup_resp_s {
   /* list of pdusessions that failed to be setup */
   pdusession_failed_t pdusessions_failed[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_setup_resp_t;
-
-typedef struct ngap_path_switch_req_s {
-  uint32_t  gNB_ue_ngap_id;
-
-  /* Number of pdusession setup-ed in the list */
-  uint8_t       nb_of_pdusessions;
-
-  /* list of pdusession setup-ed by RRC layers */
-  pdusession_setup_t pdusessions_tobeswitched[NGAP_MAX_PDU_SESSION];
-
-  /* AMF UE id  */
-  uint64_t amf_ue_ngap_id;
-
-  nr_guami_t ue_guami;
-
-  uint16_t ue_initial_id;
-  /* Security algorithms */
-  ngap_security_capabilities_t security_capabilities;
-
-} ngap_path_switch_req_t;
-
-typedef struct ngap_path_switch_req_ack_s {
-
-  /* UE id for initial connection to NGAP */
-  uint16_t ue_initial_id;
-
-  uint32_t  gNB_ue_ngap_id;
-
-  /* AMF UE id  */
-  uint64_t amf_ue_ngap_id;
-
-  /* UE aggregate maximum bitrate */
-  ngap_ambr_t ue_ambr;
-
-  /* Number of pdusession setup-ed in the list */
-  uint8_t       nb_pdusessions_tobeswitched;
-
-  /* list of pdusession to be switched by RRC layers */
-  pdusession_tobeswitched_t pdusessions_tobeswitched[NGAP_MAX_PDU_SESSION];
-
-  /* Number of pdusessions to be released by RRC */
-  uint8_t        nb_pdusessions_tobereleased;
-
-  /* list of pdusessions to be released */
-  pdusession_failed_t pdusessions_tobereleased[NGAP_MAX_PDU_SESSION];
-
-  /* Security key */
-  int     next_hop_chain_count;
-  uint8_t next_security_key[SECURITY_KEY_LENGTH];
-
-} ngap_path_switch_req_ack_t;
-
-typedef struct ngap_pdusession_modification_ind_s {
-
-  uint32_t  gNB_ue_ngap_id;
-
-  /* AMF UE id  */
-  uint64_t amf_ue_ngap_id;
-
-  /* Number of pdusession setup-ed in the list */
-  uint8_t       nb_of_pdusessions_tobemodified;
-
-  uint8_t       nb_of_pdusessions_nottobemodified;
-
-  /* list of pdusession setup-ed by RRC layers */
-  pdusession_setup_t pdusessions_tobemodified[NGAP_MAX_PDU_SESSION];
-
-  pdusession_setup_t pdusessions_nottobemodified[NGAP_MAX_PDU_SESSION];
-
-  uint16_t ue_initial_id;
-
-} ngap_pdusession_modification_ind_t;
 
 // NGAP --> RRC messages
 typedef struct ngap_ue_release_command_s {

@@ -1225,17 +1225,3 @@ int ngap_gNB_pdusession_release_resp(instance_t instance, ngap_pdusession_releas
   return 0;
 }
 
-int ngap_gNB_path_switch_req(instance_t instance, ngap_path_switch_req_t *path_switch_req_p)
-//------------------------------------------------------------------------------
-{
-  //TODO
-
-  return 0;
-}
-
-int ngap_gNB_generate_PDUSESSION_Modification_Indication(instance_t instance, ngap_pdusession_modification_ind_t *pdusession_modification_ind)
-//-----------------------------------------------------------------------------
-{
-  //TODO
-  return 0;
-}
