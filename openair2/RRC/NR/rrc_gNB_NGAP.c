@@ -266,11 +266,8 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
   for (int i = 0; i < n; i++) {
     rrc_pdu_session_param_t *pduSession = find_pduSession(UE, sessions[i].pdusession_id, true);
     pdusession_t *session = &pduSession->param;
-    session->pdusession_id = sessions[i].pdusession_id;
     LOG_I(NR_RRC, "Adding pdusession %d, total nb of sessions %d\n", session->pdusession_id, UE->nb_of_pdusessions);
-    session->pdu_session_type = sessions[i].pdu_session_type;
-    session->nas_pdu = sessions[i].nas_pdu;
-    session->nssai = sessions[i].nssai;
+    cp_pdusession(session, &sessions[i]);
     bearer_req.gNB_cu_cp_ue_id = UE->rrc_ue_id;
     security_information_t *secInfo = &bearer_req.secInfo;
     secInfo->cipheringAlgorithm = rrc->security.do_drb_ciphering ? UE->ciphering_algorithm : 0;
