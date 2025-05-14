@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 #include "E1AP_ConfidentialityProtectionIndication.h"
 #include "E1AP_IntegrityProtectionIndication.h"
 #include "NGAP_CauseRadioNetwork.h"
@@ -266,7 +267,6 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
   for (int i = 0; i < n; i++) {
     rrc_pdu_session_param_t *pduSession = find_pduSession(UE, sessions[i].pdusession_id, true);
     pdusession_t *session = &pduSession->param;
-    LOG_I(NR_RRC, "Adding pdusession %d, total nb of sessions %d\n", session->pdusession_id, UE->nb_of_pdusessions);
     cp_pdusession(session, &sessions[i]);
     bearer_req.gNB_cu_cp_ue_id = UE->rrc_ue_id;
     security_information_t *secInfo = &bearer_req.secInfo;
@@ -287,8 +287,12 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
                                                                         : SECURITY_NOT_NEEDED;
     sec->confidentialityProtectionIndication = rrc->security.do_drb_ciphering ? SECURITY_REQUIRED
                                                                               : SECURITY_NOT_NEEDED;
-    pdu->UP_TL_information.teId = session->n3_incoming.teid;
-    memcpy(&pdu->UP_TL_information.tlAddress, session->n3_incoming.addr.buffer, sizeof(in_addr_t));
+    gtpu_tunnel_t *n3_incoming = &session->n3_incoming;
+    pdu->UP_TL_information.teId = n3_incoming->teid;
+    memcpy(&pdu->UP_TL_information.tlAddress, n3_incoming->addr.buffer, sizeof(in_addr_t));
+    char ip_str[INET_ADDRSTRLEN] = {0};
+    inet_ntop(AF_INET, n3_incoming->addr.buffer, ip_str, sizeof(ip_str));
+    LOG_I(NR_RRC, "Bearer Context Setup: PDU Session ID=%d, incoming TEID=0x%08x, Addr=%s\n", session->pdusession_id, n3_incoming->teid, ip_str);
 
     /* we assume for the moment one DRB per PDU session. Activate the bearer,
      * and configure in RRC. */
@@ -691,15 +695,9 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       }
 
       session->status = PDU_SESSION_STATUS_ESTABLISHED;
-      LOG_I(NR_RRC,
-            "msg index %d, pdu_sessions index %d, status %d, xid %d): nb_of_pdusessions %d,  pdusession_id %d, teid: %u \n ",
-            pdu_sessions_done,
-            pdusession,
-            session->status,
-            xid,
-            UE->nb_of_pdusessions,
-            tmp->pdusession_id,
-            tmp->n3_outgoing.teid);
+      char ip_str[INET_ADDRSTRLEN] = {0};
+      inet_ntop(AF_INET, tmp->n3_outgoing.addr.buffer, ip_str, sizeof(ip_str));
+      LOG_I(NR_RRC, "PDU Session Setup Response: ID=%d, outgoing TEID=0x%08x, Addr=%s\n", tmp->pdusession_id, tmp->n3_outgoing.teid, ip_str);
       pdu_sessions_done++;
     } else if (session->status != PDU_SESSION_STATUS_ESTABLISHED) {
       session->status = PDU_SESSION_STATUS_FAILED;
