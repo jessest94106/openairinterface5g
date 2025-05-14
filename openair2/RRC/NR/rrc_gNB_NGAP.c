@@ -467,6 +467,15 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   return 0;
 }
 
+static gtpu_tunnel_t cp_gtp_tunnel(const gtpu_tunnel_t in)
+{
+  gtpu_tunnel_t out = {0};
+  out.teid = in.teid;
+  out.addr.length = in.addr.length;
+  memcpy(out.addr.buffer, in.addr.buffer, out.addr.length);
+  return out;
+}
+
 void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
 {
   MessageDef *msg_p = NULL;
@@ -482,11 +491,7 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_
     if (session->status == PDU_SESSION_STATUS_DONE) {
       pdu_sessions_done++;
       resp->pdusessions[pdusession].pdusession_id = session->param.pdusession_id;
-      resp->pdusessions[pdusession].gtp_teid = session->param.n3_outgoing.teid;
-      memcpy(resp->pdusessions[pdusession].gNB_addr.buffer,
-             session->param.n3_outgoing.addr.buffer,
-             sizeof(resp->pdusessions[pdusession].gNB_addr.buffer));
-      resp->pdusessions[pdusession].gNB_addr.length = 4; // Fixme: IPv4 hard coded here
+      resp->pdusessions[pdusession].n3_outgoing = cp_gtp_tunnel(session->param.n3_outgoing);
       resp->pdusessions[pdusession].nb_of_qos_flow = session->param.nb_qos;
       for (int qos_flow_index = 0; qos_flow_index < session->param.nb_qos; qos_flow_index++) {
         resp->pdusessions[pdusession].associated_qos_flows[qos_flow_index].qfi = session->param.qos[qos_flow_index].qfi;
@@ -677,10 +682,9 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       pdusession_setup_t *tmp = &resp->pdusessions[pdu_sessions_done];
       tmp->pdusession_id = session->param.pdusession_id;
       tmp->nb_of_qos_flow = session->param.nb_qos;
-      tmp->gtp_teid = session->param.n3_outgoing.teid;
+      tmp->n3_outgoing = cp_gtp_tunnel(session->param.n3_outgoing);
       tmp->pdu_session_type = session->param.pdu_session_type;
-      tmp->gNB_addr.length = session->param.n3_outgoing.addr.length;
-      memcpy(tmp->gNB_addr.buffer, session->param.n3_outgoing.addr.buffer, tmp->gNB_addr.length);
+
       for (int qos_flow_index = 0; qos_flow_index < tmp->nb_of_qos_flow; qos_flow_index++) {
         tmp->associated_qos_flows[qos_flow_index].qfi = session->param.qos[qos_flow_index].qfi;
         tmp->associated_qos_flows[qos_flow_index].qos_flow_mapping_ind = QOSFLOW_MAPPING_INDICATION_DL;
@@ -695,7 +699,7 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
             xid,
             UE->nb_of_pdusessions,
             tmp->pdusession_id,
-            tmp->gtp_teid);
+            tmp->n3_outgoing.teid);
       pdu_sessions_done++;
     } else if (session->status != PDU_SESSION_STATUS_ESTABLISHED) {
       session->status = PDU_SESSION_STATUS_FAILED;

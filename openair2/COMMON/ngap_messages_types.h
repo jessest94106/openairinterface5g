@@ -248,10 +248,9 @@ typedef struct pdusession_setup_s {
 
   /* The transport layer address for the IP packets */
   uint8_t pdu_session_type;
-  transport_layer_addr_t gNB_addr;
 
-  /* Incoming NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t gtp_teid;
+  // NG-U (N3) Tunnel Endpoint on the RAN side
+  gtpu_tunnel_t n3_outgoing;
 
   /* qos flow list number */
   uint8_t  nb_of_qos_flow;

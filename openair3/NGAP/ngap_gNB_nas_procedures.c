@@ -613,8 +613,8 @@ int ngap_gNB_initial_ctxt_resp(instance_t instance, ngap_initial_context_setup_r
       pdusessionTransfer.dLQosFlowPerTNLInformation.uPTransportLayerInformation.present = NGAP_UPTransportLayerInformation_PR_gTPTunnel;
 
       asn1cCalloc(pdusessionTransfer.dLQosFlowPerTNLInformation.uPTransportLayerInformation.choice.gTPTunnel, tmp);
-      GTP_TEID_TO_ASN1(initial_ctxt_resp_p->pdusessions[i].gtp_teid, &tmp->gTP_TEID);
-      tnl_to_bitstring(&tmp->transportLayerAddress, initial_ctxt_resp_p->pdusessions[i].gNB_addr);
+      GTP_TEID_TO_ASN1(initial_ctxt_resp_p->pdusessions[i].n3_outgoing.teid, &tmp->gTP_TEID);
+      tnl_to_bitstring(&tmp->transportLayerAddress, initial_ctxt_resp_p->pdusessions[i].n3_outgoing.addr);
 
       NGAP_DEBUG("initial_ctxt_resp_p: pdusession ID %ld, gnb_addr %d.%d.%d.%d, SIZE %ld, TEID %u\n",
                  item->pDUSessionID,
@@ -623,7 +623,7 @@ int ngap_gNB_initial_ctxt_resp(instance_t instance, ngap_initial_context_setup_r
                  tmp->transportLayerAddress.buf[2],
                  tmp->transportLayerAddress.buf[3],
                  tmp->transportLayerAddress.size,
-                 initial_ctxt_resp_p->pdusessions[i].gtp_teid);
+                 initial_ctxt_resp_p->pdusessions[i].n3_outgoing.teid);
 
       /* associatedQosFlowList. number of 1? */
       for(int j=0; j < initial_ctxt_resp_p->pdusessions[i].nb_of_qos_flow; j++) {
@@ -928,8 +928,8 @@ int ngap_gNB_pdusession_setup_resp(instance_t instance, ngap_pdusession_setup_re
       NGAP_PDUSessionResourceSetupResponseTransfer_t pdusessionTransfer = {0};
       pdusessionTransfer.dLQosFlowPerTNLInformation.uPTransportLayerInformation.present = NGAP_UPTransportLayerInformation_PR_gTPTunnel;
       asn1cCalloc(pdusessionTransfer.dLQosFlowPerTNLInformation.uPTransportLayerInformation.choice.gTPTunnel, tmp);
-      GTP_TEID_TO_ASN1(pdusession->gtp_teid, &tmp->gTP_TEID);
-      tnl_to_bitstring(&tmp->transportLayerAddress, pdusession->gNB_addr);
+      GTP_TEID_TO_ASN1(pdusession->n3_outgoing.teid, &tmp->gTP_TEID);
+      tnl_to_bitstring(&tmp->transportLayerAddress, pdusession->n3_outgoing.addr);
       NGAP_DEBUG("pdusession_setup_resp_p: pdusession ID %ld, gnb_addr %d.%d.%d.%d, SIZE %ld, TEID %u\n",
                  item->pDUSessionID,
                  tmp->transportLayerAddress.buf[0],
@@ -937,7 +937,7 @@ int ngap_gNB_pdusession_setup_resp(instance_t instance, ngap_pdusession_setup_re
                  tmp->transportLayerAddress.buf[2],
                  tmp->transportLayerAddress.buf[3],
                  tmp->transportLayerAddress.size,
-                 pdusession->gtp_teid);
+                 pdusession->n3_outgoing.teid);
       /* associatedQosFlowList. number of 1? */
       for(int j=0; j < pdusession_setup_resp_p->pdusessions[i].nb_of_qos_flow; j++) {
         asn1cSequenceAdd(pdusessionTransfer.dLQosFlowPerTNLInformation.associatedQosFlowList.list, NGAP_AssociatedQosFlowItem_t, ass_qos_item_p);
