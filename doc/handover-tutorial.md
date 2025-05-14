@@ -54,7 +54,11 @@ Start DU0:
 
     sudo ./nr-softmodem --rfsim -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band78.106prb.rfsim.pci0.conf --rfsimulator.serveraddr 127.0.0.1
 
-Start the UE, and let it connect completely:
+This will show an error `[HW]   connect() to 127.0.0.1:4043 failed,
+errno(111)`. _This is expected_, because the RFsim server is at the UE (to be
+able to serve two RFsim clients, one DU each; see below for more info). Proceed
+by starting the UE, and let it connect completely (this should make the error
+go away):
 
     sudo ./nr-uesoftmodem -C 3450720000 -r 106 --numerology 1 --ssb 516 -O <config>  --rfsim --rfsimulator.serveraddr server
 
