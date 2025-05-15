@@ -459,10 +459,36 @@ bool compare_relative_ul_channel_bw(int nr_band, int scs, int channel_bandwidth,
   return rel_bw > limit;
 }
 
+static bool check_delta_duplex(int index, uint64_t dlfreq_khz, uint64_t ulfreq_khz)
+{
+  int uldl_min_offset = nr_bandtable[index].dl_min - nr_bandtable[index].ul_min;
+  int txrx_offset = dlfreq_khz - ulfreq_khz;
+  LOG_I(NR_PHY, "dlfreq:%ld ulfreq:%ld deltaduplex:%d khz, uldl_min_offset:%d khz\n",
+                              dlfreq_khz, ulfreq_khz, txrx_offset, uldl_min_offset);
+  if (txrx_offset == uldl_min_offset)
+    return true;
+
+  int band = nr_bandtable[index].band;
+
+  // TBD.. Delta duplex is also a range for these bands n26, n91-n94, n109.
+  // TBD .. Add the checks later
+
+  // Refer to section 5.4.4 in spec 38.101-5
+  if (band == 256 && txrx_offset >= 165000 && txrx_offset <= 215000)
+    return true;
+  if (band == 255 && txrx_offset >= -130500 && txrx_offset <= -72500)
+    return true;
+  if (band == 254 && txrx_offset >= 862000 && txrx_offset <= 885000)
+    return true;
+
+  return false;
+}
+
 uint16_t get_band(uint64_t downlink_frequency, int32_t delta_duplex)
 {
   const int64_t dl_freq_khz = downlink_frequency / 1000;
   const int32_t  delta_duplex_khz = delta_duplex / 1000;
+  const int64_t ul_freq_khz = dl_freq_khz + delta_duplex_khz;
 
   uint64_t center_freq_diff_khz = UINT64_MAX; // 2^64
   uint16_t current_band = 0;
@@ -472,9 +498,10 @@ uint16_t get_band(uint64_t downlink_frequency, int32_t delta_duplex)
     if (dl_freq_khz < nr_bandtable[ind].dl_min || dl_freq_khz > nr_bandtable[ind].dl_max)
       continue;
 
-    int32_t current_offset_khz = nr_bandtable[ind].ul_min - nr_bandtable[ind].dl_min;
+    if (ul_freq_khz < nr_bandtable[ind].ul_min || ul_freq_khz > nr_bandtable[ind].ul_max)
+      continue;
 
-    if (current_offset_khz != delta_duplex_khz)
+    if (!check_delta_duplex(ind, dl_freq_khz, ul_freq_khz))
       continue;
 
     int64_t center_frequency_khz = (nr_bandtable[ind].dl_max + nr_bandtable[ind].dl_min) / 2;
