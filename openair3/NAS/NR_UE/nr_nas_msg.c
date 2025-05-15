@@ -70,6 +70,7 @@
 #include "fgs_nas_utils.h"
 #include "fgmm_service_accept.h"
 #include "fgmm_service_reject.h"
+#include "ds/byte_array.h"
 
 #define MAX_NAS_UE 4
 
@@ -130,16 +131,16 @@ static const char *print_info(uint8_t id, const text_info_t *array, uint8_t arra
   return "N/A";
 }
 
-static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_buffer, int pdu_length)
+static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, byte_array_t buffer)
 {
   if (nas->security_container == NULL)
     return NAS_SECURITY_NO_SECURITY_CONTEXT;
 
-  if (pdu_length < sizeof(fgmm_msg_header_t)) {
-    LOG_E(NAS, "Invalid buffer length = %d: must hold at least a plain 5GMM header\n", pdu_length);
+  if (buffer.len < sizeof(fgmm_msg_header_t)) {
+    LOG_E(NAS, "Invalid buffer length = %ld: must hold at least a plain 5GMM header\n", buffer.len);
     return NAS_SECURITY_BAD_INPUT;
   }
-  int security_type = pdu_buffer[1];
+  int security_type = buffer.buf[1];
   LOG_D(NAS, "Security type is: %s\n", print_info(security_type, security_header_type_s, sizeofArray(security_header_type_s)));
 
   switch (security_type) {
@@ -150,9 +151,9 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
     case INTEGRITY_PROTECTED_WITH_NEW_SECU_CTX:
     case INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX:
       /* only accept "integrity protected and ciphered" messages */
-      if (pdu_buffer[6] == 0)
-        LOG_E(NAS, "Received nas_count_dl = %d\n", pdu_buffer[6]);
-      LOG_E(NAS, "todo: unhandled security type %s (pdu_buffer[1] = %d)\n", security_header_type_s[pdu_buffer[1]].text, pdu_buffer[1]);
+      if (buffer.buf[6] == 0)
+        LOG_E(NAS, "Received nas_count_dl = %d\n", buffer.buf[6]);
+      LOG_E(NAS, "todo: unhandled security type %s (buffer.buf[1] = %d)\n", security_header_type_s[buffer.buf[1]].text, buffer.buf[1]);
       return NAS_SECURITY_BAD_INPUT;
       break;
     default:
@@ -160,14 +161,14 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
   }
 
   /* header is 7 bytes, require at least one byte of payload */
-  if (pdu_length < 8) {
-    LOG_E(NAS, "Invalid buffer length = %d\n", pdu_length);
+  if (buffer.len < 8) {
+    LOG_E(NAS, "Invalid buffer length = %ld\n", buffer.len);
     return NAS_SECURITY_BAD_INPUT;
   }
 
   /* synchronize NAS SQN, based on 24.501 4.4.3.1 */
   // Sequence number
-  int nas_sqn = pdu_buffer[6];
+  int nas_sqn = buffer.buf[6];
   int target_sqn = nas->security.nas_count_dl & 0xff;
   if (nas_sqn != target_sqn) {
     if (nas_sqn < target_sqn)
@@ -189,28 +190,28 @@ static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, uint8_t *pdu_b
   stream_cipher.count = nas->security.nas_count_dl;
   stream_cipher.bearer = 1; /* todo: don't hardcode */
   stream_cipher.direction = 1;
-  stream_cipher.message = pdu_buffer + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH - 1;
+  stream_cipher.message = buffer.buf + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH - 1;
   /* length in bits */
-  stream_cipher.blength = (pdu_length - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH + 1) << 3;
+  stream_cipher.blength = (buffer.len - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH + 1) << 3;
   stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, computed_mac);
 
-  uint8_t *received_mac = pdu_buffer + 2;
+  uint8_t *received_mac = buffer.buf + 2;
 
   if (memcmp(received_mac, computed_mac, NAS_INTEGRITY_SIZE) != 0)
     return NAS_SECURITY_INTEGRITY_FAILED;
 
   /* decipher */
-  uint8_t payload_len = pdu_length - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
+  uint8_t payload_len = buffer.len - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
   uint8_t buf[payload_len];
   stream_cipher.context = nas->security_container->ciphering_context;
   stream_cipher.count = nas->security.nas_count_dl;
   stream_cipher.bearer = 1; /* todo: don't hardcode */
   stream_cipher.direction = 1;
-  stream_cipher.message = pdu_buffer + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
+  stream_cipher.message = buffer.buf + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
   /* length in bits */
   stream_cipher.blength = (payload_len) << 3;
   stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
-  memcpy(pdu_buffer + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH, buf, payload_len);
+  memcpy(buffer.buf + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH, buf, payload_len);
 
   nas->security.nas_count_dl++;
 
@@ -1720,25 +1721,23 @@ void *nas_nrue(void *args_p)
               NAS_CONN_ESTABLI_CNF(msg_p).errCode,
               NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length);
 
-        uint8_t *pdu_buffer = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.nas_data;
-        int pdu_length = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length;
-
-        security_state_t security_state = nas_security_rx_process(nas, pdu_buffer, pdu_length);
+        byte_array_t ba = {.buf = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.nas_data, .len = NAS_CONN_ESTABLI_CNF(msg_p).nasMsg.length};
+        security_state_t security_state = nas_security_rx_process(nas, ba);
         if (security_state != NAS_SECURITY_INTEGRITY_PASSED && security_state != NAS_SECURITY_NO_SECURITY_CONTEXT) {
           LOG_E(NAS, "NAS integrity failed, discard incoming message: security state is %s\n", security_state_info[security_state].text);
           break;
         }
 
-        int msg_type = get_msg_type(pdu_buffer, pdu_length);
+        int msg_type = get_msg_type(ba.buf, ba.len);
 
         if (msg_type == FGS_REGISTRATION_ACCEPT) {
-          handle_registration_accept(nas, pdu_buffer, pdu_length);
+          handle_registration_accept(nas, ba.buf, ba.len);
         } else if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
-          handle_pdu_session_accept(pdu_buffer, pdu_length, nas->UE_id);
+          handle_pdu_session_accept(ba.buf, ba.len, nas->UE_id);
         }
 
         // Free NAS buffer memory after use (coming from RRC)
-        free(pdu_buffer);
+        free_byte_array(ba);
         break;
       }
 
@@ -1794,7 +1793,7 @@ void *nas_nrue(void *args_p)
         byte_array_t buffer = {.buf = pdu_buffer, .len = pdu_length};
         int msg_type = get_msg_type(pdu_buffer, pdu_length);
 
-        security_state_t security_state = nas_security_rx_process(nas, pdu_buffer, pdu_length);
+        security_state_t security_state = nas_security_rx_process(nas, buffer);
         /* special cases accepted without protection */
         if (security_state == NAS_SECURITY_UNPROTECTED) {
           /* for the moment, only FGS_DEREGISTRATION_ACCEPT_UE_ORIGINATING is accepted */
