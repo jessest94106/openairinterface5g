@@ -2242,7 +2242,7 @@ void nr_release_ra_UE(gNB_MAC_INST *mac, rnti_t rnti)
   if (UE) {
     delete_nr_ue_data(UE, mac->common_channels, &UE_info->uid_allocator);
   } else {
-    LOG_W(NR_MAC,"Call to del rnti %04x, but not existing\n", rnti);
+    LOG_W(NR_MAC,"Call to release RA UE with rnti %04x, but not existing\n", rnti);
   }
 }
 

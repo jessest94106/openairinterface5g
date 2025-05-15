@@ -2621,6 +2621,8 @@ NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], 
 {
   for (int i = 0; i < list_size; i++) {
     NR_UE_info_t *curr_UE = list[i];
+    if (!curr_UE)
+      break; /* reached the end of the list */
     if (curr_UE->rnti != rnti)
       continue;
 
@@ -2629,7 +2631,6 @@ NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], 
     list[list_size - 1] = NULL;
     return curr_UE;
   }
-  LOG_E(NR_MAC, "UE %04x to be removed not found in list\n", rnti);
   return NULL;
 }
 
@@ -2735,8 +2736,10 @@ void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti)
   NR_SCHED_LOCK(&UE_info->mutex);
   NR_UE_info_t *UE = remove_UE_from_list(MAX_MOBILES_PER_GNB + 1, UE_info->connected_ue_list, rnti);
   NR_SCHED_UNLOCK(&UE_info->mutex);
-
-  delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
+  if (UE)
+    delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
+  else
+    nr_release_ra_UE(nr_mac, rnti);
 }
 
 // all values passed to this function are in dB x10
