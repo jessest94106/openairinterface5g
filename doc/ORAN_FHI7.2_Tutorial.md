@@ -66,15 +66,16 @@ PTP enabled switches and grandmaster clock we have in are lab:
 
 We have only verified LLS-C3 configuration in our lab, i.e.  using an external
 grandmaster, a switch as a boundary clock, and the gNB/DU and RU.  We haven't
-tested any RU without S-plane. Radio units we are testing/integrating:
+tested any RU without S-plane.
+We tested the category A radio units listed below.
 
-|Vendor           |Software Version      |
-|-----------------|----------------------|
-|VVDN LPRU        |03-v3.0.5             |
-|LiteON RU        |01.00.08/02.00.03     |
-|Benetel 650      |RAN650-1v1.0.4-dda1bf5|
-|Benetel 550 CAT-A|RAN550-1v1.0.4-605a25a|
-|Foxconn RPQN     |v3.1.15q.551_rc10     |
+|Vendor           |Software Version                             |
+|-----------------|---------------------------------------------|
+|VVDN LPRU        |03-v3.0.5                                    |
+|LiteON RU        |01.00.08/02.00.03/02.00.10                   |
+|Benetel 650      |RAN650-1v1.0.4-dda1bf5|RAN650-1v1.2.2-2fa04bc|
+|Benetel 550      |RAN550-1v1.0.4-605a25a|RAN550-1v1.2.2-2fa04bc|
+|Foxconn RPQN     |v3.1.15q.551_rc10                            |
 
 Tested libxran releases:
 
@@ -534,8 +535,6 @@ Contact the RU vendor and get the configuration manual to understand the below c
 
 ### Benetel 650
 
-**Valid only for version RAN650-1v1.0.4-dda1bf5**
-
 The OAI configuration file [`gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.4x4-benetel650.conf) corresponds to:
 - TDD pattern `DDDSU`, 2.5ms
 - Bandwidth 100MHz
@@ -561,8 +560,6 @@ dl_ul_tuning_special_slot=0xfd00000
 ```
 
 ### Benetel 550
-
-**Valid only for version RAN550-1v1.0.4-605a25a**
 
 The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf) corresponds to:
 - TDD pattern `DDDDDDDSUU`, 5ms
@@ -590,11 +587,11 @@ dl_tuning_special_slot=0x13b6
 
 ### LITEON
 
-**Verson 01.00.08**
 The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4x4-liteon.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-liteon.conf) corresponds to:
 - TDD pattern `DDDSU`, 2.5ms
 - Bandwidth 100MHz
-- MTU 1500 (the above mentioned LITEON version doesn't support jumbo frames)
+- MTU 1500
+- MTU 9600: v02.00.10
 
 #### RU configuration
 
@@ -614,18 +611,16 @@ Once the RU is PTP synced, and RF state and DPD are `Ready`, write `configure te
 - Bandwidth
 - Compression Bitwidth
 - TX/RX attenuation
+- PRACH eAxC IDs
+- DU MAC address
+...
 
-After each reboot, the PRACH has to be manually configured.
-To do so, please login to RU as user `root` and run below commands:
+The configuration mode example:
 ```bash
-devmem 0x80001014 32 0x00050004
-devmem 0x80001018 32 0x00070006
-devmem 0x8000201C 32 0x00000001
-```
-
-If you have RU version that supports jumbo frames, please enable it as:
-```bash
-devmem 0x8000200C 32 0x00000001
+compression-bit 9 # set IQ bitwidth for PxSCH/PRACH
+eAXC_id 4 5 6 7 # set PRACH eAxC IDs
+jumboframe 1 # enable jumbo frame
+...
 ```
 
 ### VVDN LPRU
@@ -709,7 +704,7 @@ At this stage, RU must be rebooted so the changes apply.
 The OAI configuration file [`gnb.sa.band78.273prb.fhi72.4X4-foxconn.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4X4-foxconn.conf) corresponds to:
 - TDD pattern `DDDSU`, 2.5ms
 - Bandwidth 100MHz
-- MTU 8000
+- MTU 9600
 
 #### RU configuration
 
@@ -750,7 +745,7 @@ In the following, we will use these short hands:
 
 - `IF_NAME`: Physical network interface through which you can access the RU
 - `VLAN`: the VLAN tag as recommended by the RU vendor
-- `MTU`: the MTU as specified by the RU vendor, and supported by the NIC
+- `MTU`: this MTU must be higher than supported by the RU vendor due to additional ethernet header of 14 B and DPDK packet header `RTE_PKTMBUF_HEADROOM` of 128 B
 - `DU_U_PLANE_MAC_ADD`: DU U plane MAC address
 - `U_PLANE_PCI_BUS_ADD`: PCI bus address of the VF for U plane
 - `DU_C_PLANE_MAC_ADD`: DU C plane MAC address
