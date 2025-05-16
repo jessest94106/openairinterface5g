@@ -96,6 +96,7 @@
 #include "E1AP/lib/e1ap_interface_management.h"
 #include "NR_DL-DCCH-Message.h"
 #include "ds/byte_array.h"
+#include "alg/find.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
@@ -130,39 +131,47 @@ static void freeDRBlist(NR_DRB_ToAddModList_t *list)
   return;
 }
 
-const neighbour_cell_configuration_t *get_neighbour_config(int serving_cell_nr_cellid)
+static bool eq_cell_id(const void *vval, const void *vit)
 {
-  const gNB_RRC_INST *rrc = RC.nrrrc[0];
-  seq_arr_t *neighbour_cell_configuration = rrc->neighbour_cell_configuration;
-  if (!neighbour_cell_configuration)
-    return NULL;
+  const int *cell_id = (const int *)vval;
+  const neighbour_cell_configuration_t *cell = (const neighbour_cell_configuration_t *)vit;
+  return cell->nr_cell_id == *cell_id;
+}
 
-  for (int cellIdx = 0; cellIdx < neighbour_cell_configuration->size; cellIdx++) {
-    neighbour_cell_configuration_t *neighbour_config =
-        (neighbour_cell_configuration_t *)seq_arr_at(neighbour_cell_configuration, cellIdx);
-    if (neighbour_config->nr_cell_id == serving_cell_nr_cellid)
-      return neighbour_config;
+const neighbour_cell_configuration_t *get_neighbour_cell_config(const gNB_RRC_INST *rrc, int cell_id)
+{
+  if (!rrc->neighbour_cell_configuration)
+    return NULL;
+  seq_arr_t *head = rrc->neighbour_cell_configuration;
+  LOG_D(NR_RRC, "Number of neighbour cell configurations: %ld\n", head->size);
+  elm_arr_t e = find_if(head, &cell_id, eq_cell_id);
+  if (e.found) {
+    const neighbour_cell_configuration_t *cell = (const neighbour_cell_configuration_t *)e.it;
+    LOG_D(NR_RRC, "Found matching neighbour cell with Cell ID %ld\n", cell->nr_cell_id);
+    return cell;
   }
   return NULL;
 }
 
-const nr_neighbour_gnb_configuration_t *get_neighbour_cell_information(int serving_cell_nr_cellid, int neighbour_cell_phy_id)
+static bool eq_pci(const void *vval, const void *vit)
 {
-  const gNB_RRC_INST *rrc = RC.nrrrc[0];
-  seq_arr_t *neighbour_cell_configuration = rrc->neighbour_cell_configuration;
-  for (int cellIdx = 0; cellIdx < neighbour_cell_configuration->size; cellIdx++) {
-    neighbour_cell_configuration_t *neighbour_config =
-        (neighbour_cell_configuration_t *)seq_arr_at(neighbour_cell_configuration, cellIdx);
-    if (!neighbour_config)
-      continue;
+  const int *pci = (const int *)vval;
+  const nr_neighbour_gnb_configuration_t *neighbour = (const nr_neighbour_gnb_configuration_t *)vit;
+  return neighbour->physicalCellId == *pci;
+}
 
-    for (int neighbourIdx = 0; neighbourIdx < neighbour_config->neighbour_cells->size; neighbourIdx++) {
-      nr_neighbour_gnb_configuration_t *neighbour =
-          (nr_neighbour_gnb_configuration_t *)seq_arr_at(neighbour_config->neighbour_cells, neighbourIdx);
-      if (neighbour != NULL && neighbour->physicalCellId == neighbour_cell_phy_id)
-        return neighbour;
-    }
+const nr_neighbour_gnb_configuration_t *get_neighbour_gnb_by_pci(const neighbour_cell_configuration_t *cell, int pci)
+{
+  seq_arr_t *head = cell->neighbour_cells;
+  DevAssert(head != NULL);
+  LOG_D(NR_RRC, "Number of neighbour cells: %ld\n", head->size);
+  elm_arr_t e = find_if(head, &pci, eq_pci);
+  if (e.found) {
+    const nr_neighbour_gnb_configuration_t *neighbour = (const nr_neighbour_gnb_configuration_t *)e.it;
+    LOG_D(NR_RRC, "Found matching neighbour cell with PCI %d and Cell ID %ld\n", neighbour->physicalCellId, neighbour->nrcell_id);
+    return neighbour;
   }
+  LOG_E(NR_RRC, "No matching neighbour cell found for Physical Cell ID: %d\n", pci);
   return NULL;
 }
 
@@ -564,7 +573,7 @@ static int rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc,
     int band = get_dl_band(cell_info);
     const NR_MeasTimingList_t *mtlist = du->mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
     const NR_MeasTiming_t *mt = mtlist->list.array[0];
-    const neighbour_cell_configuration_t *neighbour_config = get_neighbour_config(cell_info->nr_cellid);
+    const neighbour_cell_configuration_t *neighbour_config = get_neighbour_cell_config(rrc, cell_info->nr_cellid);
     seq_arr_t *neighbour_cells = NULL;
     if (neighbour_config)
       neighbour_cells = neighbour_config->neighbour_cells;
@@ -1391,7 +1400,7 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
 
   int servingCellRSRP = 0;
   int neighbourCellRSRP = 0;
-  int servingCellId = -1;
+  int scell_pci = -1;
 
   switch (event_triggered->eventId.present) {
     case NR_EventTriggerConfig__eventId_PR_eventA2:
@@ -1408,7 +1417,7 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
 
       for (int serving_cell_idx = 0; serving_cell_idx < measResults->measResultServingMOList.list.count; serving_cell_idx++) {
         const NR_MeasResultServMO_t *meas_result_serv_MO = measResults->measResultServingMOList.list.array[serving_cell_idx];
-        servingCellId = *(meas_result_serv_MO->measResultServingCell.physCellId);
+        scell_pci = *(meas_result_serv_MO->measResultServingCell.physCellId);
         if (meas_result_serv_MO->measResultServingCell.measResult.cellResults.resultsSSB_Cell) {
           servingCellRSRP = *(meas_result_serv_MO->measResultServingCell.measResult.cellResults.resultsSSB_Cell->rsrp) - 157;
         } else {
@@ -1426,7 +1435,7 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
       const NR_MeasResultListNR_t *measResultListNR = measResults->measResultNeighCells->choice.measResultListNR;
       for (int neigh_meas_idx = 0; neigh_meas_idx < measResultListNR->list.count; neigh_meas_idx++) {
         const NR_MeasResultNR_t *meas_result_neigh_cell = (measResultListNR->list.array[neigh_meas_idx]);
-        const int neighbourCellId = *(meas_result_neigh_cell->physCellId);
+        const int neighbour_pci = *(meas_result_neigh_cell->physCellId);
 
         // TS 138 133 Table 10.1.6.1-1: SS-RSRP and CSI-RSRP measurement report mapping
         const struct NR_MeasResultNR__measResult__cellResults *cellResults = &(meas_result_neigh_cell->measResult.cellResults);
@@ -1439,13 +1448,13 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
 
         LOG_I(NR_RRC,
               "HO LOG: Measurement Report for the neighbour %d with RSRP: %d\n",
-              neighbourCellId,
+              neighbour_pci,
               neighbourCellRSRP);
 
-        const f1ap_served_cell_info_t *neigh_cell = get_cell_information_by_phycellId(neighbourCellId);
-        const f1ap_served_cell_info_t *serving_cell = get_cell_information_by_phycellId(servingCellId);
-        const nr_neighbour_gnb_configuration_t *neighbour =
-            get_neighbour_cell_information(serving_cell->nr_cellid, neighbourCellId);
+        const f1ap_served_cell_info_t *neigh_cell = get_cell_information_by_phycellId(neighbour_pci);
+        const f1ap_served_cell_info_t *serving_cell = get_cell_information_by_phycellId(scell_pci);
+        const neighbour_cell_configuration_t *cell = get_neighbour_cell_config(rrc, serving_cell->nr_cellid);
+        const nr_neighbour_gnb_configuration_t *neighbour = get_neighbour_gnb_by_pci(cell, neighbour_pci);
         // CU does not have f1 connection with neighbour cell context. So  check does serving cell has this phyCellId as a
         // neighbour.
         if (!neigh_cell && neighbour) {
@@ -1465,7 +1474,7 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
           nr_rrc_du_container_t *target_du = get_du_by_cell_id(rrc, neigh_cell->nr_cellid);
           nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
         } else {
-          LOG_W(NR_RRC, "UE %d: received A3 event for stronger neighbor PCI %d, but no such neighbour in configuration\n", ue->rrc_ue_id, neighbourCellId);
+          LOG_W(NR_RRC, "UE %d: received A3 event for stronger neighbor PCI %d, but no such neighbour in configuration\n", ue->rrc_ue_id, neighbour_pci);
         }
       }
 
