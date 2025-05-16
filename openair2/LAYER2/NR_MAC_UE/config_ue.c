@@ -272,30 +272,22 @@ static void calculate_ue_sat_ta(const position_t *position_params,
                                 ntn_timing_advance_componets_t *ntn_ta)
 {
   // get UE position coordinates
-  double pos_ue_x = position_params->positionX;
-  double pos_ue_y = position_params->positionY;
-  double pos_ue_z = position_params->positionZ;
+  const position_t pos_ue = *position_params;
 
   // get sat position coordinates
-  double pos_sat_x = (double)sat_pos->positionX_r17 * 1.3;
-  double pos_sat_y = (double)sat_pos->positionY_r17 * 1.3;
-  double pos_sat_z = (double)sat_pos->positionZ_r17 * 1.3;
+  const position_t pos_sat = {sat_pos->positionX_r17 * 1.3, sat_pos->positionY_r17 * 1.3, sat_pos->positionZ_r17 * 1.3};
 
   // calculate directional vector from SAT to UE
-  double dir_sat_ue_x = pos_ue_x - pos_sat_x;
-  double dir_sat_ue_y = pos_ue_y - pos_sat_y;
-  double dir_sat_ue_z = pos_ue_z - pos_sat_z;
+  const position_t dir_sat_ue = {pos_ue.X - pos_sat.X, pos_ue.Y - pos_sat.Y, pos_ue.Z - pos_sat.Z};
 
   // calculate distance between SAT and UE
-  double distance = sqrt(dir_sat_ue_x * dir_sat_ue_x + dir_sat_ue_y * dir_sat_ue_y + dir_sat_ue_z * dir_sat_ue_z);
+  double distance = sqrt(dir_sat_ue.X * dir_sat_ue.X + dir_sat_ue.Y * dir_sat_ue.Y + dir_sat_ue.Z * dir_sat_ue.Z);
 
   // get sat velocity vector
-  double vel_sat_x = (double)sat_pos->velocityVX_r17 * 0.06;
-  double vel_sat_y = (double)sat_pos->velocityVY_r17 * 0.06;
-  double vel_sat_z = (double)sat_pos->velocityVZ_r17 * 0.06;
+  const position_t vel_sat = {sat_pos->velocityVX_r17 * 0.06, sat_pos->velocityVY_r17 * 0.06, sat_pos->velocityVZ_r17 * 0.06};
 
   // calculate SAT velocity towards UE
-  double velocity = (vel_sat_x * dir_sat_ue_x + vel_sat_y * dir_sat_ue_y + vel_sat_z * dir_sat_ue_z) / distance;
+  double velocity = (vel_sat.X * dir_sat_ue.X + vel_sat.Y * dir_sat_ue.Y + vel_sat.Z * dir_sat_ue.Z) / distance;
 
   ntn_ta->N_UE_TA_adj = (2 * distance / SPEED_OF_LIGHT) * 1e3; // in ms
   ntn_ta->N_UE_TA_drift = (2 * -velocity / SPEED_OF_LIGHT) * 1e6; // in µs/s
