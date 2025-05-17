@@ -63,6 +63,7 @@
 #include "RRC/NR/nr_rrc_common.h"
 #include "as_message.h"
 #include "common/utils/nr/nr_common.h"
+#include "notified_fifo.h"
 
 #define NB_CNX_UE 2//MAX_MANAGED_RG_PER_MOBILE
 #define MAX_MEAS_OBJ 64
@@ -248,6 +249,7 @@ typedef struct NR_UE_RRC_INST_s {
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;
   // NTN params
   bool is_NTN_UE;
+  notifiedFIFO_t *mac_input_nf;
 } NR_UE_RRC_INST_t;
 
 #endif

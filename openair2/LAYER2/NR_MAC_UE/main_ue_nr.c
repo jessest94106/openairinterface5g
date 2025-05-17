@@ -70,6 +70,7 @@ void nr_ue_init_mac(NR_UE_MAC_INST_t *mac)
   mac->p_Max_alt = INT_MIN;
   mac->msg3_C_RNTI = false;
   mac->ntn_ta.ntn_params_changed = false;
+  initNotifiedFIFO(&mac->input_nf);
   reset_mac_inst(mac);
 
   // need to inizialize because might not been setup (optional timer)

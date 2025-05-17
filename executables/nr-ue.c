@@ -731,12 +731,14 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
   // process what RRC thread sent to MAC
-  MessageDef *msg = NULL;
   do {
-    itti_poll_msg(TASK_MAC_UE, &msg);
-    if (msg)
-      process_msg_rcc_to_mac(msg);
-  } while (msg);
+    notifiedFIFO_elt_t *elt = pollNotifiedFIFO(&get_mac_inst(UE->Mod_id)->input_nf);
+    if (!elt) {
+      break;
+    }
+    process_msg_rcc_to_mac(NotifiedFifoData(elt), UE->Mod_id);
+    delNotifiedFIFO_elt(elt);
+  } while (true);
 
   if (UE->if_inst)
     UE->if_inst->slot_indication(UE->Mod_id, false);
@@ -1032,12 +1034,10 @@ void *UE_thread(void *arg)
             decoded_frame_rx = UE->SL_UE_PHY_PARAMS.sync_params.DFN;
           else {
             // We must wait the RRC layer decoded the MIB and sent us the frame number
-            MessageDef *msg = NULL;
-            itti_receive_msg(TASK_MAC_UE, &msg);
-            if (msg)
-              process_msg_rcc_to_mac(msg);
-            else
-              LOG_E(PHY, "It seems we arbort while trying to sync\n");
+            notifiedFIFO_elt_t *elt = pullNotifiedFIFO(&mac->input_nf);
+            AssertFatal(elt != NULL, "fifo error while waiting for MIB");
+            process_msg_rcc_to_mac(NotifiedFifoData(elt), UE->Mod_id);
+            delNotifiedFIFO_elt(elt);
             decoded_frame_rx = mac->mib_frame;
           }
           LOG_A(PHY,
@@ -1287,6 +1287,8 @@ void init_NR_UE(int nb_inst, char *uecap_file, char *reconfig_file, char *rbconf
   for (int instance_id = 0; instance_id < nb_inst; instance_id++) {
     NR_UE_RRC_INST_t* rrc = nr_rrc_init_ue(uecap_file, instance_id, get_nrUE_params()->nb_antennas_tx);
     NR_UE_MAC_INST_t *mac = nr_l2_init_ue(instance_id);
+
+    nr_rrc_set_mac_queue(instance_id, &mac->input_nf);
     mac->if_module = nr_ue_if_module_init(instance_id);
     AssertFatal(mac->if_module, "can not initialize IF module\n");
     if (!IS_SA_MODE(get_softmodem_params()) && !get_softmodem_params()->sl_mode) {
