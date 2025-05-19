@@ -1066,7 +1066,6 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
   AssertFatal(tda->list.count == 0, "already have pusch_TimeDomainAllocationList members\n");
 
   const int k2 = min_fb_delay;
-  uint8_t DELTA[4]= {2,3,4,6}; // Delta parameter for Msg3
   int mu = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
   struct NR_SetupRelease_PUSCH_ConfigCommon *pusch_ConfigCommon = scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon;
 
@@ -1099,7 +1098,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
     int tdd_period_idx = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
     int nb_periods_per_frame = get_nb_periods_per_frame(tdd_period_idx);
     int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
-    int k2_msg3 = nb_slots_per_period - DELTA[mu];
+    int k2_msg3 = nb_slots_per_period - get_delta_for_k2(mu);
     struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAllocMsg3 = set_TimeDomainResourceAllocation(k2_msg3, 3, ul_symb);
     if (*puschTdrAllocMsg3->k2 < min_fb_delay)
       *puschTdrAllocMsg3->k2 += nb_slots_per_period;
