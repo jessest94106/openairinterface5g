@@ -697,23 +697,20 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
 void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
 {
   int qos_flow_index = 0;
-  uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
-  ue_p->xids[xid] = RRC_PDUSESSION_MODIFY;
-
-  NR_DRB_ToAddModList_t *DRBs = createDRBlist(ue_p, false);
-  nr_rrc_reconfig_param_t params = {.drb_config_list = DRBs, .transaction_id = xid};
+  nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, ue_p, 0, false);
+  ue_p->xids[params.transaction_id] = RRC_PDUSESSION_MODIFY;
 
   for (int i = 0; i < ue_p->nb_of_pdusessions; i++) {
     rrc_pdu_session_param_t *session = &ue_p->pduSession[i];
     // bypass the new and already configured pdu sessions
     if (session->status >= PDU_SESSION_STATUS_DONE) {
-      session->xid = xid;
+      session->xid = params.transaction_id;
       continue;
     }
 
     if (session->cause.type != NGAP_CAUSE_NOTHING) {
       // set xid of failure pdu session
-      session->xid = xid;
+      session->xid = params.transaction_id;
       session->status = PDU_SESSION_STATUS_FAILED;
       continue;
     }
@@ -728,7 +725,7 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
 
     if (j == MAX_DRBS_PER_UE) {
       ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_unspecified};
-      session->xid = xid;
+      session->xid = params.transaction_id;
       session->status = PDU_SESSION_STATUS_FAILED;
       session->cause = cause;
       continue;
@@ -753,7 +750,7 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
           LOG_E(NR_RRC, "not supported 5qi %lu\n", session->param.qos[qos_flow_index].fiveQI);
           ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_not_supported_5QI_value};
           session->status = PDU_SESSION_STATUS_FAILED;
-          session->xid = xid;
+          session->xid = params.transaction_id;
           session->cause = cause;
           continue;
       }
@@ -761,11 +758,7 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
     }
 
     session->status = PDU_SESSION_STATUS_DONE;
-    session->xid = xid;
-
-    if (ue_p->pduSession[i].param.nas_pdu.buf != NULL) {
-      params.dedicated_NAS_msg_list[params.num_nas_msg++] = ue_p->pduSession[i].param.nas_pdu;
-    }
+    session->xid = params.transaction_id;
   }
 
   byte_array_t msg = do_RRCReconfiguration(&params);
@@ -774,11 +767,6 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
     return;
   }
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, msg.buf, msg.len, "[MSG] RRC Reconfiguration\n");
-
-  /* Free all NAS PDUs */
-  for (int i = 0; i < ue_p->nb_of_pdusessions; i++)
-    FREE_AND_ZERO_BYTE_ARRAY(ue_p->pduSession[i].param.nas_pdu);
-
   LOG_I(NR_RRC, "UE %d: Generate RRCReconfiguration (bytes %ld)\n", ue_p->rrc_ue_id, msg.len);
   const uint32_t msg_id = NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration;
   nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, msg_id, msg.buf, msg.len);
