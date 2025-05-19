@@ -497,13 +497,21 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
     pdcch.ShiftIndex = 0;
   }
 
-  int N_rb = 0; // nb of rbs of coreset per symbol
-  for (int i=0;i<6;i++) {
-    for (int t=0;t<8;t++) {
-      N_rb+=((coreset->frequencyDomainResources.buf[i]>>t)&1);
+  uint16_t N_rb = 0; // nb of rbs of coreset per symbol
+  uint16_t rb_start = 0;
+  for (int i = 0; i < 6; i++) {
+    for (int t = 0; t < 8; t++) {
+      if (coreset->frequencyDomainResources.buf[i] >> (7 - t) & 1) {
+        if (N_rb == 0) {
+          rb_start = 48 * i + t * 6;
+        }
+        N_rb++;
+      }
     }
   }
-  pdcch.n_rb = N_rb*=6; // each bit of frequencyDomainResources represents 6 PRBs
+
+  pdcch.rb_start = rb_start;
+  pdcch.n_rb = N_rb *= 6; // each bit of frequencyDomainResources represents 6 PRBs
 
   return pdcch;
 }
@@ -782,13 +790,20 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
                   int time_domain_assignment,
                   uint8_t tpc,
                   uint8_t ndi,
-                  NR_UE_UL_BWP_t *ul_bwp)
+                  NR_UE_UL_BWP_t *ul_bwp,
+                  NR_SearchSpace__searchSpaceType_PR ss_type)
 {
   int bwp_id = ul_bwp->bwp_id;
   nr_dci_format_t dci_format = ul_bwp->dci_format;
 
+  // 3GPP TS 38.214 Section 6.1.2.2.2 Uplink resource allocation type 1
+  uint16_t riv_bwp_size = ul_bwp->BWPSize;
+  if (dci_format == NR_UL_DCI_FORMAT_0_0 && ss_type == NR_SearchSpace__searchSpaceType_PR_common && ul_bwp->pusch_Config
+      && ul_bwp->pusch_Config->resourceAllocation == NR_PUSCH_Config__resourceAllocation_resourceAllocationType1) {
+    riv_bwp_size = sc_info->initial_ul_BWPSize;
+  }
   dci_pdu_rel15->frequency_domain_assignment.val =
-      PRBalloc_to_locationandbandwidth0(pusch_pdu->rb_size, pusch_pdu->rb_start, ul_bwp->BWPSize);
+      PRBalloc_to_locationandbandwidth0(pusch_pdu->rb_size, pusch_pdu->rb_start, riv_bwp_size);
   dci_pdu_rel15->time_domain_assignment.val = time_domain_assignment;
   dci_pdu_rel15->frequency_hopping_flag.val = pusch_pdu->frequency_hopping;
   dci_pdu_rel15->mcs = pusch_pdu->mcs_index;
