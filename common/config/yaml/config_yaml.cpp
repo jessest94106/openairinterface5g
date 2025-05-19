@@ -25,8 +25,7 @@ extern "C" {
 #include "common/config/config_userapi.h"
 void *config_allocate_new(configmodule_interface_t *cfg, int sz, bool autoFree);
 void config_check_valptr(configmodule_interface_t *cfg, paramdef_t *cfgoptions, int elt_sz, int nb_elt);
-#include "../config_userapi.h"
-#include "../config_common.h"
+int config_common_getdefault(configmodule_interface_t *cfg, paramdef_t *cfgoption, char *prefix);
 }
 #include <cstring>
 #include <string>
@@ -43,71 +42,6 @@ class YamlConfig {
     config = YAML::LoadFile(filename);
   }
 };
-
-void SetDefault(configmodule_interface_t *cfg, paramdef_t *param)
-{
-  switch (param->type) {
-    case TYPE_INT:
-      *param->iptr = param->defintval;
-      break;
-    case TYPE_UINT:
-      *param->uptr = param->defuintval;
-      break;
-    case TYPE_STRING:
-      if (param->defstrval != nullptr) {
-        if (param->numelt == 0) {
-          config_check_valptr(cfg, param, 1, strlen(param->defstrval) + 1);
-        }
-        sprintf(*param->strptr, "%s", param->defstrval);
-      }
-      break;
-    case TYPE_INT8:
-      *param->i8ptr = param->defintval;
-      break;
-    case TYPE_UINT8:
-      *param->u8ptr = param->defuintval;
-      break;
-    case TYPE_INT16:
-      *param->i16ptr = param->defintval;
-      break;
-    case TYPE_UINT16:
-      *param->u16ptr = param->defuintval;
-      break;
-    case TYPE_INT64:
-      *param->i64ptr = param->defint64val;
-      break;
-    case TYPE_UINT64:
-      *param->u64ptr = param->defint64val;
-      break;
-    case TYPE_DOUBLE:
-      *param->dblptr = param->defdblval;
-      break;
-    case TYPE_MASK:
-      *param->uptr = param->defuintval;
-      break;
-    case TYPE_STRINGLIST:
-      if (param->defstrlistval != nullptr) {
-        param->strlistptr = param->defstrlistval;
-      }
-      break;
-    case TYPE_INTARRAY:
-      if (param->defintarrayval) {
-        param->iptr = param->defintarrayval;
-      }
-      break;
-    case TYPE_UINTARRAY:
-      if (param->defintarrayval) {
-        param->uptr = (uint32_t *)param->defintarrayval;
-      }
-      break;
-    case TYPE_IPV4ADDR:
-      config_setdefault_ipv4addr(cfg, param, param->defstrval);
-      break;
-    default:
-      AssertFatal(false, "Unhandled type %d", param->type);
-  }
-  param->paramflags |= PARAMFLAG_PARAMSETDEF;
-}
 
 void SetNonDefault(configmodule_interface_t *cfg, const YAML::Node &node, paramdef_t *param)
 {
@@ -213,7 +147,7 @@ void GetParams(configmodule_interface_t *cfg, const YAML::Node &node, paramdef_t
     if (node && node[std::string(params[i].optname)]) {
       SetNonDefault(cfg, node, &params[i]);
     } else {
-      SetDefault(cfg, &params[i]);
+      config_common_getdefault(cfg, &params[i], nullptr);
     }
   }
 }
