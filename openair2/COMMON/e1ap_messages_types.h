@@ -53,6 +53,7 @@
 #define E1AP_BEARER_CONTEXT_SETUP_FAILURE(mSGpTR)         (mSGpTR)->ittiMsg.e1ap_bearer_setup_fail
 #define E1AP_BEARER_CONTEXT_MODIFICATION_REQ(mSGpTR)      (mSGpTR)->ittiMsg.e1ap_bearer_mod_req
 #define E1AP_BEARER_CONTEXT_MODIFICATION_RESP(mSGpTR)     (mSGpTR)->ittiMsg.e1ap_bearer_modif_resp
+#define E1AP_BEARER_CONTEXT_MODIFICATION_FAIL(mSGpTR)     (mSGpTR)->ittiMsg.e1ap_bearer_modif_fail
 #define E1AP_BEARER_CONTEXT_RELEASE_CMD(mSGpTR)           (mSGpTR)->ittiMsg.e1ap_bearer_release_cmd
 #define E1AP_BEARER_CONTEXT_RELEASE_CPLT(mSGpTR)          (mSGpTR)->ittiMsg.e1ap_bearer_release_cplt
 #define E1AP_LOST_CONNECTION(mSGpTR)                      (mSGpTR)->ittiMsg.e1ap_lost_connection
@@ -520,8 +521,7 @@ typedef struct e1ap_bearer_mod_req_s {
 typedef struct e1ap_bearer_release_cmd_s {
   uint32_t gNB_cu_cp_ue_id;
   uint32_t gNB_cu_up_ue_id;
-  long cause_type;
-  long cause;
+  e1ap_cause_t cause;
 } e1ap_bearer_release_cmd_t;
 
 typedef struct e1ap_bearer_release_cplt_s {
@@ -626,5 +626,14 @@ typedef struct e1ap_lost_connection_t {
   int dummy;
 } e1ap_lost_connection_t;
 
+/// @brief 9.2.2.6 BEARER CONTEXT MODIFICATION FAILURE
+typedef struct e1ap_bearer_context_mod_failure_s {
+  // gNB-CU-CP UE E1AP ID (M)
+  uint32_t gNB_cu_cp_ue_id;
+  // gNB-CU-UP UE E1AP ID (M)
+  uint32_t gNB_cu_up_ue_id;
+  // NG-RAN PDU Session Resource Modified List (O)
+  e1ap_cause_t cause;
+} e1ap_bearer_context_mod_failure_t;
 
 #endif /* E1AP_MESSAGES_TYPES_H */

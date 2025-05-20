@@ -265,6 +265,85 @@ static void test_bearer_context_setup_failure(void)
   free_e1_bearer_context_setup_failure(&cp);
 }
 
+/** @brief Test E1AP Bearer Context Release Command encoding/decoding */
+static void test_bearer_context_release_command(void)
+{
+  e1ap_bearer_release_cmd_t orig = {
+      .gNB_cu_cp_ue_id = 0x1234,
+      .gNB_cu_up_ue_id = 0x5678,
+      .cause.type = E1AP_CAUSE_RADIO_NETWORK,
+      .cause.value = E1AP_RADIO_CAUSE_MULTIPLE_QOS_FLOW_ID_INSTANCES,
+  };
+
+  // Encode the original message
+  E1AP_E1AP_PDU_t *enc = encode_e1_bearer_context_release_command(&orig);
+
+  // E1AP decode the encoded message
+  E1AP_E1AP_PDU_t *dec = e1ap_encode_decode(enc);
+
+  // Free the E1AP encoded message
+  e1ap_msg_free(enc);
+
+  // Decode the encoded message
+  e1ap_bearer_release_cmd_t decoded = {0};
+  AssertFatal(decode_e1_bearer_context_release_command(&decoded, dec), "decode_e1_bearer_context_release_command failed");
+
+  // Free the E1AP decoded message
+  e1ap_msg_free(dec);
+
+  // Equality check original/decoded
+  AssertFatal(eq_bearer_context_release_command(&orig, &decoded), "eq_bearer_context_release_command: decoded message does not match original");
+
+  // Free the memory for the decoded message
+  free_e1_bearer_context_release_command(&decoded);
+
+  // Deep copy and equality check of the original message
+  e1ap_bearer_release_cmd_t cp = cp_bearer_context_release_command(&orig);
+  AssertFatal(eq_bearer_context_release_command(&orig, &cp), "eq_bearer_context_release_command(): copied message doesn't match\n");
+
+  // Cleanup
+  free_e1_bearer_context_release_command(&orig);
+  free_e1_bearer_context_release_command(&cp);
+}
+
+/** @brief Test E1AP Bearer Context Release Complete encoding/decoding */
+static void test_bearer_context_release_complete(void)
+{
+  e1ap_bearer_release_cplt_t orig = {
+      .gNB_cu_cp_ue_id = 0x1234,
+      .gNB_cu_up_ue_id = 0x5678,
+  };
+
+  // Encode the original message
+  E1AP_E1AP_PDU_t *enc = encode_e1_bearer_context_release_complete(&orig);
+
+  // E1AP decode the encoded message
+  E1AP_E1AP_PDU_t *dec = e1ap_encode_decode(enc);
+
+  // Free the E1AP encoded message
+  e1ap_msg_free(enc);
+
+  // Decode the encoded message
+  e1ap_bearer_release_cplt_t decoded = {0};
+  AssertFatal(decode_e1_bearer_context_release_complete(&decoded, dec), "decode_e1_bearer_context_release_complete failed");
+
+  // Free the E1AP decoded message
+  e1ap_msg_free(dec);
+
+  // Equality check original/decoded
+  AssertFatal(eq_bearer_context_release_complete(&orig, &decoded), "eq_bearer_context_release_complete: decoded message does not match original");
+
+  // Free the memory for the decoded message
+  free_e1_bearer_context_release_complete(&decoded);
+
+  // Deep copy and equality check of the original message
+  e1ap_bearer_release_cplt_t cp = cp_bearer_context_release_complete(&orig);
+  AssertFatal(eq_bearer_context_release_complete(&orig, &cp), "eq_bearer_context_release_complete(): copied message doesn't match\n");
+
+  // Cleanup
+  free_e1_bearer_context_release_complete(&orig);
+  free_e1_bearer_context_release_complete(&cp);
+}
 
 /**
  * @brief Test CU-UP Setup Request encoding/decoding
@@ -661,6 +740,49 @@ static void test_bearer_context_modification_response_fail(void)
   free_e1ap_context_mod_response(&orig);
 }
 
+/** @brief Test E1AP Bearer Context Modification Failure encoding/decoding */
+static void test_bearer_context_modification_failure(void)
+{
+  // Create the original failure struct
+  e1ap_bearer_context_mod_failure_t orig = {
+      .gNB_cu_cp_ue_id = 0x1111,
+      .gNB_cu_up_ue_id = 0x2222,
+      .cause.type = E1AP_CAUSE_TRANSPORT,
+      .cause.value = E1AP_TRANSPORT_CAUSE_RESOURCE_UNAVAILABLE,
+  };
+
+  // Encode the original message
+  E1AP_E1AP_PDU_t *enc = encode_E1_bearer_context_mod_failure(&orig);
+
+  // Decode the encoded message
+  E1AP_E1AP_PDU_t *dec = e1ap_encode_decode(enc);
+
+  // Free the encoded message
+  e1ap_msg_free(enc);
+
+  // Decode into a new struct
+  e1ap_bearer_context_mod_failure_t decoded = {0};
+  AssertFatal(decode_E1_bearer_context_mod_failure(&decoded, dec),
+              "decode_E1_bearer_context_mod_failure(): could not decode message\n");
+
+  // Free the decoded PDU
+  e1ap_msg_free(dec);
+
+  // Compare original and decoded messages
+  AssertFatal(eq_E1_bearer_context_mod_failure(&orig, &decoded),
+              "eq_E1_bearer_context_mod_failure(): decoded message doesn't match\n");
+
+  // Deep copy the original message
+  e1ap_bearer_context_mod_failure_t cp = cp_E1_bearer_context_mod_failure(&orig);
+
+  // Compare original and copied messages
+  AssertFatal(eq_E1_bearer_context_mod_failure(&orig, &cp), "eq_E1_bearer_context_mod_failure(): copied message doesn't match\n");
+
+  // Free the decoded and copied messages
+  free_E1_bearer_context_mod_failure(&decoded);
+  free_E1_bearer_context_mod_failure(&cp);
+}
+
 int main()
 {
   // E1 Bearer Context Setup
@@ -671,9 +793,13 @@ int main()
   test_e1_cuup_setup_request();
   test_e1_cuup_setup_response();
   test_e1_cuup_setup_failure();
-  // E1 Bearer Context Modification Request
+  // E1 Bearer Context Modification
   test_bearer_context_modification_request();
   test_bearer_context_modification_response();
   test_bearer_context_modification_response_fail();
+  test_bearer_context_modification_failure();
+  // Bearer Context Release
+  test_bearer_context_release_command();
+  test_bearer_context_release_complete();
   return 0;
 }
