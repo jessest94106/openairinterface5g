@@ -97,14 +97,3 @@ When the scheduler wants to encode the answer, it calls registrationComplete()
 
 ## registrationComplete
 To be defined in UE, this NAS message is done after RRC sequence completes
-
-# gNB side
-gNB NGAP thread receives the NAS message from PHY layers
-In normal mode, it send it to the core network with no decoding.
-
-Here after, the gNB mode "noCore" processing in gNB: NGAP calls the entry function: processNAS() instead of forwarding the packet to the 5GC
-
-## RRCModeComplete + Identityrequest
-When the gNB completes RRC attach, it sends a first message to NGAP thread.
-Normal processing sends NGAP initial UE message, in noCore mode, it should call: identityRequest() that encode the NAS identity request inside the gNB.  
-The gNB NGAP thread then should call the piece of code that forward the message to the UE as when it receives a NAS message from 5GC.  
