@@ -59,41 +59,51 @@ The following tables lists implemented NAS messages and whether there is an enco
 [openair3/NAS/NR_UE/5GS/5GSM](../openair3/NAS/NR_UE/5GS/5GSM):
 * encoding and decoding functions for 5GSM NAS messages payloads
 
-# USIM simulation
-A new USIM simulation, that parameters are in regular OAI config files
+# USIM Simulation
 
-## To open the USIM
-init_uicc() takes a parameter: the name of the block in the config file
-In case we run several UEs in one process, the variable section name allows to make several UEs configurations in one config file.
+OAI includes a simulated USIM implementation that reads its parameters from standard configuration files. This allows for rapid prototyping and testing without relying on a physical UICC card. The USIM-related configuration is handled via the `init_uicc()` function.
 
-The NAS implementation uses this possibility.
+## Configuration
 
-## Identityrequest + IdentityResponse
-When the UE receives the request, it stores the 5GC request parameters in the UE context ( UE->uicc pointer)
-It calls "scheduleNAS", that would trigger a answer (seeing general archtecture, it will probly be a itti message to future RRC or NGAP thread).  
+The simulation reads values from a named section in the config file.
 
-When the scheduler wants to encode the answer, it calls identityResponse()
-The UE search for a section in the config file called "uicc"
-it encodes the NAS answer with the IMSI, as a 4G compatible authentication.
-A future release would encode 5G SUPI as native 5G UICC.
+**Config options in the `uicc` section**:
 
-## Authenticationrequest + authenticationResponse
-When the UE receives the request, it stores the 5GC request parameters in the UE context ( UE->uicc pointer)
-It calls "scheduleNAS", that would trigger a answer (seeing general archtecture, it will probly be a itti message to future RRC or NGAP thread).  
+| Parameter     | Description                       | Default value                              |
+|---------------|-----------------------------------|--------------------------------------------|
+| `imsi`        | User IMSI                         | `2089900007487`                            |
+| `nmc_size`    | Number of digits in NMC           | `2`                                        |
+| `key`         | Subscription key (Ki)             | `fec86ba6eb707ed08905757b1bb44b8f`         |
+| `opc`         | OPc value                         | `c42449363bbad02b66d16bc975d77cc1`         |
+| `amf`         | AMF value                         | `8000`                                     |
+| `sqn`         | Sequence number                   | `000000`                                   |
+| `dnn`         | Default DNN (APN)                 | `oai`                                      |
+| `nssai_sst`   | NSSAI slice/service type          | `1`                                        |
+| `nssai_sd`    | NSSAI slice differentiator        | `0xffffff`                                 |
+| `imeisv`      | IMEISV string                     | `6754567890123413`                         |
 
-When the scheduler wants to encode the answer, it calls authenticationResponse()
-The UE search for a section in the config file called "uicc"
-It uses the Milenage parameters of this section to encode a milenage response
-A future release would encode 5G new authentication cyphering functions.
+These are parsed and stored in the `uicc_t` structure.
 
-## SecurityModeCommand + securityModeComplete
-When the UE receives the request it will:
-Selected NAS security algorithms: store it for future encoding
-Replayed UE security capabilities: check if it is equal to UE capabilities it sent to the 5GC
-IMEISV request: to implement
-ngKSI: Key set Indicator, similator to 4G to select a ciphering keys set
+## Initialization
 
-When the scheduler wants to encode the answer, it calls registrationComplete() 
+The UE calls `init_uicc` via `checkUicc` to allocate memory for the `uicc_t` structure member and load parameters using `config_get()` from the selected config section. Then the UICC structure is stored in the NAS context. `nr_ue_nas_t`, to be used to fill identity and security credentials when generating responses to 5GC messages such as `Identity Response`, `Authentication Response`, and `Security Mode Complete`.
 
-## registrationComplete
-To be defined in UE, this NAS message is done after RRC sequence completes
+## Milenage Authentication and Key Derivation
+
+When the UE receives a **5GMM Authentication Request**, the function `generateAuthenticationResp` generates a valid `Authentication Response` with the necessary derived NAS and AS security keys. The function `derive_ue_keys` parses the Authentication Request and performs the entire 5G AKA key hierarchy:
+
+* Extracts the `RAND` and `SQN`
+* Performs Milenage Algorithms f2-f5 using `f2345()` from the UICC input
+* Computes the `RES` using `transferRES()`
+* Derives the keys `KAUSF`, `KSEAF`, `KAMF`, `KNASenc`/`KNASint` via `derive_knas()` and `KGNB` for RRC ciphering (via `derive_kgnb()`)
+
+## Security Mode Complete
+
+When the UE receives a **Security Mode Command** from the 5GC, it responds with a `Security Mode Complete` message. This message is protected with the newly established NAS security context and may carry additional payloads, including the UE’s identity and a nested NAS message (e.g., `Registration Request`) in the `FGSNasMessageContainer`. The function responsible for building and securing this response is `generateSecurityModeComplete`.
+
+### IMEISV
+
+The **IMEISV**, is encoded using the `fill_imeisv()` helper. This function extracts each digit from the configured `imeisvStr` in the UICC context and populates the mobile identity structure.
+
+See TS 24.501 §4.4 for reference.
+
