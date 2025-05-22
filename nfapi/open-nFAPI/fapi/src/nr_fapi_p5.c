@@ -746,6 +746,31 @@ static uint8_t pack_dbt_table_tlv_value(void *tlv, uint8_t **ppWritePackedMsg, u
   return 1;
 }
 
+static uint8_t pack_pm_table_tlv_value(void *tlv, uint8_t **ppWritePackedMsg, uint8_t *end)
+{
+  nfapi_nr_pm_tlv_ve_t *pm_ve = (nfapi_nr_pm_tlv_ve_t *)tlv;
+  nfapi_nr_pm_list_t *pmi_list = &pm_ve->value;
+  if (!( push16(pmi_list->num_pm_idx, ppWritePackedMsg, end) )) {
+    return 0;
+  }
+  for (int i = 0; i< pmi_list->num_pm_idx; i++) {
+    const nfapi_nr_pm_pdu_t *pm_pdu = &pmi_list->pmi_pdu[i];
+    if (!(push16(pm_pdu->pm_idx, ppWritePackedMsg, end) && push16(pm_pdu->numLayers, ppWritePackedMsg, end)
+          && push16(pm_pdu->num_ant_ports, ppWritePackedMsg, end))) {
+      return 0;
+    }
+    for (int k = 0; k < pm_pdu->numLayers; k++) {
+      for (int j = 0; j < pm_pdu->num_ant_ports; j++) {
+        const nfapi_nr_pm_weights_t *pm_weight = &pm_pdu->weights[k][j];
+        if (!(push16(pm_weight->precoder_weight_Re, ppWritePackedMsg, end) && push16(pm_weight->precoder_weight_Im, ppWritePackedMsg, end))) {
+          return 0;
+        }
+      }
+    }
+  }
+  return 1;
+}
+
 uint8_t pack_nr_config_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t *config)
 {
   uint8_t *pNumTLVFields = (uint8_t *)*ppWritePackedMsg;
@@ -1074,7 +1099,11 @@ uint8_t pack_nr_config_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *e
   // END Digital Beam Table (DBT) PDU
 
   // START Precoding Matrix (PM) PDU
-  // Struct in nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface_scf.h nfapi_nr_pm_pdu_t, currently unused, tag to use for AERIAL
+  if (pNfapiMsg->pmi_list.num_pm_idx != 0) {
+    nfapi_nr_pm_tlv_ve_t pm_tlv = {.tl.tag = NFAPI_NR_CONFIG_PRECODING_TABLE_V6_TAG, .value = pNfapiMsg->pmi_list};
+    pack_nr_tlv(NFAPI_NR_CONFIG_PRECODING_TABLE_V6_TAG, &pm_tlv, ppWritePackedMsg, end, &pack_pm_table_tlv_value);
+    numTLVs++;
+  }
   // is 0xA011 END Precoding Matrix (PM) PDU
 #ifndef ENABLE_AERIAL
   // START nFAPI TLVs included in CONFIG.request for IDLE and CONFIGURED states
@@ -1209,6 +1238,35 @@ static uint8_t unpack_dbt_table_tlv_value(void *tlv, uint8_t **ppReadPackedMsg, 
   return 1;
 }
 
+static uint8_t unpack_pm_table_tlv_value(void *tlv, uint8_t **ppReadPackedMsg, uint8_t *end)
+{
+  nfapi_nr_pm_list_t *pm_list = (nfapi_nr_pm_list_t *)tlv;
+  if (!(pull16(ppReadPackedMsg, &pm_list->num_pm_idx, end))) {
+    return 0;
+  }
+  if (pm_list->num_pm_idx > 0) {
+    pm_list->pmi_pdu = calloc(pm_list->num_pm_idx, sizeof(*pm_list->pmi_pdu));
+  }
+  for (int i = 0; i < pm_list->num_pm_idx; i++) {
+    nfapi_nr_pm_pdu_t *pm_pdu = &pm_list->pmi_pdu[i];
+    if (!(pull16(ppReadPackedMsg, &pm_pdu->pm_idx, end) && pull16(ppReadPackedMsg, &pm_pdu->numLayers, end)
+          && pull16(ppReadPackedMsg, &pm_pdu->num_ant_ports, end))) {
+      return 0;
+    }
+    AssertFatal(pm_pdu->numLayers <= 4 && pm_pdu->num_ant_ports <= 4, "Precoding matrix size limited to 4X4 for the time being\n");
+    for (int k = 0; k < pm_pdu->numLayers; k++) {
+      for (int j = 0; j < pm_pdu->num_ant_ports; j++) {
+        nfapi_nr_pm_weights_t *pm_weight = &pm_pdu->weights[k][j];
+        if (!(pulls16(ppReadPackedMsg, &pm_weight->precoder_weight_Re, end)
+              && pulls16(ppReadPackedMsg, &pm_weight->precoder_weight_Im, end))) {
+          return 0;
+        }
+      }
+    }
+  }
+  return 1;
+}
+
 uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *msg, nfapi_p4_p5_codec_config_t *config)
 {
   // Helper vars for indexed TLVs
@@ -1275,6 +1333,7 @@ uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *
       {NFAPI_NR_FAPI_ANALOG_BEAM_VENDOR_EXTENSION_TAG, NULL, &unpack_uint8_tlv_value},
       {NFAPI_NR_CONFIG_RSSI_MEASUREMENT_TAG, &(pNfapiMsg->measurement_config.rssi_measurement), &unpack_uint8_tlv_value},
       {NFAPI_NR_CONFIG_BEAMFORMING_TABLE_TAG, NULL, &unpack_dbt_table_tlv_value},
+      {NFAPI_NR_CONFIG_PRECODING_TABLE_V6_TAG, NULL, &unpack_pm_table_tlv_value},
       {NFAPI_NR_NFAPI_P7_VNF_ADDRESS_IPV4_TAG, &(pNfapiMsg->nfapi_config.p7_vnf_address_ipv4), &unpack_ipv4_address_value},
       {NFAPI_NR_NFAPI_P7_VNF_ADDRESS_IPV6_TAG, &(pNfapiMsg->nfapi_config.p7_vnf_address_ipv6), &unpack_ipv6_address_value},
       {NFAPI_NR_NFAPI_P7_VNF_PORT_TAG, &(pNfapiMsg->nfapi_config.p7_vnf_port), &unpack_uint16_tlv_value},
@@ -1325,6 +1384,10 @@ uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *
           case NFAPI_NR_CONFIG_BEAMFORMING_TABLE_TAG:
             unpack_fns[idx].tlv = &generic_tl;
             result = (*unpack_fns[idx].unpack_func)(&pNfapiMsg->dbt_config, ppReadPackedMsg, end);
+            break;
+          case NFAPI_NR_CONFIG_PRECODING_TABLE_V6_TAG:
+            unpack_fns[idx].tlv = &generic_tl;
+            result = (*unpack_fns[idx].unpack_func)(&pNfapiMsg->pmi_list, ppReadPackedMsg, end);
             break;
           case NFAPI_NR_CONFIG_NUM_PRACH_FD_OCCASIONS_TAG:
             pNfapiMsg->prach_config.num_prach_fd_occasions.tl.tag = generic_tl.tag;

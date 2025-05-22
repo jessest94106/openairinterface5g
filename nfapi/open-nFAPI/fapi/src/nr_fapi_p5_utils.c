@@ -275,6 +275,24 @@ bool eq_config_request(const nfapi_nr_config_request_scf_t *unpacked_req, const 
     }
   }
 
+  EQ(unpacked_req->pmi_list.num_pm_idx, req->pmi_list.num_pm_idx);
+
+  for (int i = 0; i < req->pmi_list.num_pm_idx; i++) {
+    const nfapi_nr_pm_pdu_t *req_pmi_pdu = &req->pmi_list.pmi_pdu[i];
+    const nfapi_nr_pm_pdu_t *unpacked_pmi_pdu = &unpacked_req->pmi_list.pmi_pdu[i];
+    EQ(unpacked_pmi_pdu->pm_idx, req_pmi_pdu->pm_idx);
+    EQ(unpacked_pmi_pdu->numLayers, req_pmi_pdu->numLayers);
+    EQ(unpacked_pmi_pdu->num_ant_ports, req_pmi_pdu->num_ant_ports);
+    for (int j = 0; j < req_pmi_pdu->num_ant_ports; ++j) {
+      for (int k = 0; k < req_pmi_pdu->num_ant_ports; ++k) {
+        const nfapi_nr_pm_weights_t* req_pm_weight = &req_pmi_pdu->weights[j][k];
+        const nfapi_nr_pm_weights_t* unpacked_pm_weight = &unpacked_pmi_pdu->weights[j][k];
+        EQ(unpacked_pm_weight->precoder_weight_Re, req_pm_weight->precoder_weight_Re);
+        EQ(unpacked_pm_weight->precoder_weight_Im, req_pm_weight->precoder_weight_Im);
+      }
+    }
+  }
+
   EQ(unpacked_req->nfapi_config.p7_vnf_address_ipv4.tl.tag, req->nfapi_config.p7_vnf_address_ipv4.tl.tag);
   for (int i = 0; i < NFAPI_IPV4_ADDRESS_LENGTH; ++i) {
     EQ(unpacked_req->nfapi_config.p7_vnf_address_ipv4.address[i], req->nfapi_config.p7_vnf_address_ipv4.address[i]);
@@ -838,6 +856,26 @@ void copy_config_request(const nfapi_nr_config_request_scf_t *src, nfapi_nr_conf
       const nfapi_nr_txru_t *src_tx_ru = &src_dig_beam->txru_list[k];
       dst_tx_ru->dig_beam_weight_Re = src_tx_ru->dig_beam_weight_Re;
       dst_tx_ru->dig_beam_weight_Im = src_tx_ru->dig_beam_weight_Im;
+    }
+  }
+
+  dst->pmi_list.num_pm_idx = src->pmi_list.num_pm_idx;
+  if (dst->pmi_list.num_pm_idx > 0) {
+    dst->pmi_list.pmi_pdu = calloc(dst->pmi_list.num_pm_idx , sizeof(*dst->pmi_list.pmi_pdu));
+    for (int i = 0; i < dst->pmi_list.num_pm_idx; i++) {
+      nfapi_nr_pm_pdu_t * dst_pmi_pdu = &dst->pmi_list.pmi_pdu[i];
+      const nfapi_nr_pm_pdu_t * src_pmi_pdu = &src->pmi_list.pmi_pdu[i];
+      dst_pmi_pdu->pm_idx = src_pmi_pdu->pm_idx;
+      dst_pmi_pdu->numLayers = src_pmi_pdu->numLayers;
+      dst_pmi_pdu->num_ant_ports = src_pmi_pdu->num_ant_ports;
+      for (int j = 0; j < dst_pmi_pdu->numLayers; ++j) {
+        for (int k = 0; k < dst_pmi_pdu->num_ant_ports; ++k) {
+         nfapi_nr_pm_weights_t* dst_pm_weight = &dst_pmi_pdu->weights[j][k];
+         const nfapi_nr_pm_weights_t* src_pm_weight = &src_pmi_pdu->weights[j][k];
+          dst_pm_weight->precoder_weight_Re = src_pm_weight->precoder_weight_Re;
+          dst_pm_weight->precoder_weight_Im = src_pm_weight->precoder_weight_Im;
+        }
+      }
     }
   }
 

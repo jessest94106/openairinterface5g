@@ -225,6 +225,28 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
     nfapi_resp->num_tlv++;
   }
 
+  nfapi_nr_pm_list_t *pm_list = &nfapi_resp->pmi_list;
+  const uint16_t num_layers = rand16_range(1, 4);
+  const uint16_t num_ant_ports = rand16_range(1, 4);
+  pm_list->num_pm_idx = rand16_range(1, 4);
+  if (nfapi_resp->pmi_list.num_pm_idx > 0) {
+    pm_list->pmi_pdu = calloc(pm_list->num_pm_idx, sizeof(*pm_list->pmi_pdu));
+    for (int i = 0; i < pm_list->num_pm_idx; i++) {
+      nfapi_nr_pm_pdu_t *pmi_pdu = &pm_list->pmi_pdu[i];
+      pmi_pdu->pm_idx = i+1;
+      pmi_pdu->numLayers = num_layers;
+      pmi_pdu->num_ant_ports = num_ant_ports;
+      for (int j = 0; j < num_layers; j++) {
+        for (int k = 0; k < num_ant_ports; k++) {
+          nfapi_nr_pm_weights_t* pm_weight = &pmi_pdu->weights[j][k];
+          pm_weight->precoder_weight_Re = (int16_t)rand16_range(1, 0xffff);
+          pm_weight->precoder_weight_Im = (int16_t)rand16_range(1, 0xffff);
+        }
+      }
+    }
+    nfapi_resp->num_tlv++;
+  }
+
   nfapi_resp->nfapi_config.p7_vnf_address_ipv4.tl.tag = NFAPI_NR_NFAPI_P7_VNF_ADDRESS_IPV4_TAG;
   for (int i = 0; i < NFAPI_IPV4_ADDRESS_LENGTH; ++i) {
     nfapi_resp->nfapi_config.p7_vnf_address_ipv4.address[i] = rand8();
