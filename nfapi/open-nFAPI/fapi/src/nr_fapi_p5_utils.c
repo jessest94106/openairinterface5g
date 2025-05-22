@@ -474,25 +474,15 @@ void free_config_request(nfapi_nr_config_request_scf_t *msg)
 
 void free_config_response(nfapi_nr_config_response_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 
-  if (msg->invalid_tlvs_list) {
-    free(msg->invalid_tlvs_list);
-  }
+  free(msg->invalid_tlvs_list);
 
-  if (msg->invalid_tlvs_configured_in_idle_list) {
-    free(msg->invalid_tlvs_configured_in_idle_list);
-  }
+  free(msg->invalid_tlvs_configured_in_idle_list);
 
-  if (msg->invalid_tlvs_configured_in_running_list) {
-    free(msg->invalid_tlvs_configured_in_running_list);
-  }
+  free(msg->invalid_tlvs_configured_in_running_list);
 
-  if (msg->missing_tlvs_list) {
-    free(msg->missing_tlvs_list);
-  }
+  free(msg->missing_tlvs_list);
 }
 
 void free_start_request(nfapi_nr_start_request_scf_t *msg)
@@ -1407,6 +1397,32 @@ void dump_config_request(const nfapi_nr_config_request_scf_t *msg)
   depth--;
 }
 
+static void dump_generic_tlv(const nfapi_nr_generic_tlv_scf_t* tlv, int depth)
+{
+  INDENTED_PRINTF("TLV tag 0x%02x , Length 0x%02x , Value ", tlv->tl.tag, tlv->tl.length);
+  switch (tlv->tl.length) {
+    case UINT_8:
+      printf("0x%x\n", tlv->value.u8);
+      break;
+    case UINT_16:
+      printf("0x%02x\n", tlv->value.u16);
+      break;
+    case UINT_32:
+      printf("0x%04x\n", tlv->value.u32);
+      break;
+    case ARRAY_UINT_16:
+      for (int i = 0; i< 5 ; i++) {
+        printf("0x%04x ", tlv->value.array_u16[i]);
+      }
+      printf("\n");
+      break;
+    default:
+      printf("unknown length %d\n", tlv->tl.length);
+      DevAssert(1 == 0);
+      break;
+  }
+}
+
 void dump_config_response(const nfapi_nr_config_response_scf_t *msg)
 {
   int depth = 0;
@@ -1419,6 +1435,25 @@ void dump_config_response(const nfapi_nr_config_response_scf_t *msg)
                   msg->num_invalid_tlvs_configured_in_running);
   INDENTED_PRINTF("Number of Missing TLVs = 0x%02x\n", msg->num_missing_tlvs);
   /* dump all TLVs from each table */
+  INDENTED_PRINTF("Invalid or Unsupported TLVs (%d) :\n",msg->num_invalid_tlvs);
+  for (int i = 0; i < msg->num_invalid_tlvs; ++i) {
+    dump_generic_tlv(&msg->invalid_tlvs_list[i], depth+1);
+  }
+
+  INDENTED_PRINTF("TLVs that can only be configured in IDLE (%d):\n", msg->num_invalid_tlvs_configured_in_idle);
+  for (int i = 0; i < msg->num_invalid_tlvs; ++i) {
+    dump_generic_tlv(&msg->invalid_tlvs_list[i], depth+1);
+  }
+
+  INDENTED_PRINTF("TLVs that can only be configured in RUNNING (%d):\n",msg->num_invalid_tlvs_configured_in_running);
+  for (int i = 0; i < msg->num_invalid_tlvs; ++i) {
+    dump_generic_tlv(&msg->invalid_tlvs_list[i], depth+1);
+  }
+
+  INDENTED_PRINTF("Missing TLVs (%d):\n",msg->num_missing_tlvs);
+  for (int i = 0; i < msg->num_invalid_tlvs; ++i) {
+    dump_generic_tlv(&msg->invalid_tlvs_list[i], depth+1);
+  }
   depth--;
 }
 
