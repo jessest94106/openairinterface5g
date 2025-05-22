@@ -2586,6 +2586,27 @@ void dump_ul_dci_request(const nfapi_nr_ul_dci_request_t *msg)
   }
 }
 
+static void dump_tx_data_request_tlv(const nfapi_nr_tx_data_request_tlv_t *tlv, int depth)
+{
+  INDENTED_PRINTF("Tag = %d\n", tlv->tag);
+  INDENTED_PRINTF("Length = %d\n", tlv->length);
+  INDENTED_PRINTF("Value = ");
+  switch (tlv->tag) {
+    case 0:
+      for (int i = 0; i < tlv->length; i++) {
+        printf("0x%02x ", ((uint8_t*)tlv->value.direct)[i]);
+      }
+      break;
+    case 1:
+      printf("%p", tlv->value.ptr);
+      break;
+    default:
+      printf( " Unknown tag value %d",tlv->tag);
+      break;
+  }
+  printf("\n");
+}
+
 void dump_tx_data_request(const nfapi_nr_tx_data_request_t *msg)
 {
   int depth = 0;
@@ -2594,15 +2615,18 @@ void dump_tx_data_request(const nfapi_nr_tx_data_request_t *msg)
   INDENTED_PRINTF("SFN = %d\n", msg->SFN);
   INDENTED_PRINTF("Slot = %d\n", msg->Slot);
   INDENTED_PRINTF("Number of PDUs = %d\n", msg->Number_of_PDUs);
+  depth++;
   for (int i = 0; i < msg->Number_of_PDUs; i++) {
-    depth++;
     INDENTED_PRINTF("PDU #%d\n", i);
     const nfapi_nr_pdu_t *pdu = &msg->pdu_list[i];
     INDENTED_PRINTF("PDU Length = 0x%02x\n", pdu->PDU_length);
     INDENTED_PRINTF("PDU Index = 0x%02x\n", pdu->PDU_index);
     INDENTED_PRINTF("numTLV = 0x%02x\n", pdu->num_TLV);
+    for (int tlv_idx = 0; tlv_idx < pdu->num_TLV; tlv_idx++) {
+      const nfapi_nr_tx_data_request_tlv_t *tlv = &pdu->TLVs[tlv_idx];
     /* call to dump_tx_data_request_tlv */
-    depth--;
+      dump_tx_data_request_tlv(tlv, depth + 1);
+    }
   }
 }
 
