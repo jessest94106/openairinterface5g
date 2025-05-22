@@ -927,7 +927,15 @@ static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
     const int abs_subframe_tx = 10 * frame_rx + ((slot_rx + *duration_rx_to_tx) >> mu);
     const int abs_subframe_epoch =
         10 * UE->ntn_config_message->ntn_config_params.epoch_sfn + UE->ntn_config_message->ntn_config_params.epoch_subframe;
-    const int ms_since_epoch = (abs_subframe_tx - abs_subframe_epoch + 10240) % 10240;
+    int ms_since_epoch = abs_subframe_tx - abs_subframe_epoch;
+    // cope with sfn wrap-around
+    //   this currently limits us to epoch times that are not more than 5.12 seconds in the future (allowed are up to 10.24 seconds)
+    //   and ntn-UlSyncValidityDuration < 5.12 seconds (allowed are up to 900 seconds)
+    //   TODO: fix this limitation by introducing the hyper frame number HFN
+    if (ms_since_epoch < -5120)
+      ms_since_epoch += 10240;
+    else if (ms_since_epoch > 5120)
+      ms_since_epoch -= 10240;
 
     const double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
     const double total_ta_drift = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift; // µs/s
