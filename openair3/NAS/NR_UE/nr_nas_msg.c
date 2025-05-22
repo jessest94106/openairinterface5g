@@ -1296,8 +1296,13 @@ static void handle_security_mode_command(nr_ue_nas_t *nas, as_nas_info_t *initia
   }
   printf("\n");
 
-  /* todo: stream_security_container_delete() is not called anywhere, deal with that */
-  nas->security_container = stream_security_container_init(ciphering_algorithm, integrity_algorithm, knas_enc, knas_int);
+  if (integrity_algorithm != EIA0_ALG_ID) {
+    nas->security_container = stream_security_container_init(ciphering_algorithm, integrity_algorithm, knas_enc, knas_int);
+  } else {
+    LOG_E(NAS, "Rejecting Invalid NULL integrity %d for 5G!\n",
+      integrity_algorithm);
+    nas->security_container = NULL;
+  }
 
   /* Handle the invalid container with a reject message */
   if(nas->security_container == NULL) {
