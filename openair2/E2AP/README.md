@@ -260,3 +260,10 @@ The same was shown in the following events:
 * [Joint OSC/OSFG-OAI Workshop](https://openairinterface.org/joint-osc-oai-workshop-end-to-end-open-source-reference-designs-for-o-ran/)
 
 In order to reproduce this testbed, please follow the [O-RAN SC nearRT-RIC installation guide](https://lf-o-ran-sc.atlassian.net/wiki/spaces/GS/overview), and the [kpm-rc-xapp](https://github.com/mirazabal/kpm_rc-xapp) xApp used. Please note that we cannot give support for the O-RAN SC nearRT-RIC.
+
+## 5.2 J release
+The OAI E2 Agent has been successfully integrated with the J release of the O-RAN OSC nearRT-RIC, leveraging the xDevSM framework developed by the MMWG at the University of Bologna and the WIoT at Northeastern University.
+
+xDevSM framework uses KPM SM (`libkpm_sm.so`) and RC SM (`librc_sm.so`) libraries from FlexRIC. Therefore, only E2AP is validated between OAI E2 Agent and OSC nearRT-RIC.
+
+Please follow [the xDevSM framework tutorial](https://openrangym.com/tutorials/xdevsm-tutorial) in order to reproduce this testbed, and try [the example xApps](https://github.com/wineslab/xDevSM-xapps-examples) built using this framework.
