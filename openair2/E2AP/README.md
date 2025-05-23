@@ -246,3 +246,17 @@ Additionally, all the data received in the `xapp_gtp_mac_rlc_pdcp_moni` xApp is 
 Please note:
 * KPM SM database is not been updated, therefore commented in `flexric/src/xApp/db/sqlite3/sqlite3_wrapper.c:1152`
 * RC SM database is not yet implemented.
+
+# 5. O-RAN SC nearRT-RIC interoperability
+
+The E2AP port for OSC nearRT-RIC is 36422, but the default value in E2 agent is 36421. Before proceeding with integration, please set the `e2ap_server_port` to 36422, and recompile the OAI.
+
+## 5.1 H release
+We showcased the QoE use case during the O-RAN F2F meeting Phoenix, October 2023:
+* [recorded presentation](https://zoom.us/rec/play/N5mnAQUcEVRf8HN6qLYa4k7kjNq3bK4hQiYqHGv9KUoLfcR6GHiE-GvnmAudT6xccmZSbkxxYHRwTaxk.Zi7d8Sl1kQ6Sk1SH?canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=https%3A%2F%2Fzoom.us%2Frec%2Fshare%2FwiYXulPlAqIIDY_vLPQSGqYIj-e5Ef_UCxveMjrDNGgXLLvEcDF4v1cmVBe8imb4.WPi-DA_dfPDBQ0FH). This use case is shown after 4 minutes (04:00).
+* [accompanying flyer](https://openairinterface.org/wp-content/uploads/2023/10/demo2-phoenix.pdf)
+
+The same was shown in the following events:
+* [Joint OSC/OSFG-OAI Workshop](https://openairinterface.org/joint-osc-oai-workshop-end-to-end-open-source-reference-designs-for-o-ran/)
+
+In order to reproduce this testbed, please follow the [O-RAN SC nearRT-RIC installation guide](https://lf-o-ran-sc.atlassian.net/wiki/spaces/GS/overview), and the [kpm-rc-xapp](https://github.com/mirazabal/kpm_rc-xapp) xApp used. Please note that we cannot give support for the O-RAN SC nearRT-RIC.
