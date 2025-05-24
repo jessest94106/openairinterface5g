@@ -30,6 +30,7 @@
 #include "common/utils/ds/byte_array.h"
 
 #include "F1AP_Cause.h"
+#include "F1AP_SNSSAI.h"
 #include "f1ap_messages_types.h"
 
 #ifdef ENABLE_TESTS
@@ -119,6 +120,9 @@ bool eq_f1ap_tx_bandwidth(const struct f1ap_transmission_bandwidth_t *a, const s
 
 struct OCTET_STRING;
 uint8_t *cp_octet_string(const struct OCTET_STRING *os, int *len);
+
+F1AP_SNSSAI_t encode_nssai(const nssai_t *nssai);
+nssai_t decode_nssai(const F1AP_SNSSAI_t *nssai);
 
 F1AP_Cause_t encode_f1ap_cause(f1ap_Cause_t cause, long cause_value);
 bool decode_f1ap_cause(F1AP_Cause_t f1_cause, f1ap_Cause_t *cause, long *cause_value);

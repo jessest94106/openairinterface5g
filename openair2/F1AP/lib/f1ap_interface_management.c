@@ -394,11 +394,7 @@ static int read_slice_info(const F1AP_ServedPLMNs_Item_t *plmn, nssai_t *nssai, 
   AssertFatal(ssl->list.count <= max_nssai, "cannot handle more than 16 slices\n");
   for (int s = 0; s < ssl->list.count; ++s) {
     const F1AP_SliceSupportItem_t *sl = ssl->list.array[s];
-    nssai_t *n = &nssai[s];
-    OCTET_STRING_TO_INT8(&sl->sNSSAI.sST, n->sst);
-    n->sd = 0xffffff;
-    if (sl->sNSSAI.sD != NULL)
-      OCTET_STRING_TO_INT24(sl->sNSSAI.sD, n->sd);
+    nssai[s] = decode_nssai(&sl->sNSSAI);
   }
 
   return ssl->list.count;
@@ -418,12 +414,7 @@ static F1AP_ProtocolExtensionContainer_10696P34_t *write_slice_info(int num_ssi,
 
   for (int s = 0; s < num_ssi; s++) {
     asn1cSequenceAdd(slice_support_list->list, F1AP_SliceSupportItem_t, slice);
-    const nssai_t *n = &nssai[s];
-    INT8_TO_OCTET_STRING(n->sst, &slice->sNSSAI.sST);
-    if (n->sd != 0xffffff) {
-      asn1cCalloc(slice->sNSSAI.sD, tmp);
-      INT24_TO_OCTET_STRING(n->sd, tmp);
-    }
+    slice->sNSSAI = encode_nssai(&nssai[s]);
   }
 
   return p;
