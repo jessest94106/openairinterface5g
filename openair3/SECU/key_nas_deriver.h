@@ -34,4 +34,6 @@ void nr_derive_key(algorithm_type_dist_t alg_type, uint8_t alg_id, const uint8_t
 
 void nr_derive_key_ng_ran_star(uint16_t pci, uint64_t nr_arfcn_dl, const uint8_t key[32], uint8_t *key_ng_ran_star);
 
+void nr_derive_nh(const uint8_t k_amf[SECURITY_KEY_LEN], const uint8_t *sync_input, uint8_t *nh);
+
 #endif

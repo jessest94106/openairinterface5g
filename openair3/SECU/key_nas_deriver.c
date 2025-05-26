@@ -293,3 +293,27 @@ void derive_skgNB(const uint8_t *keNB, const uint16_t sk_counter, uint8_t *skgNB
   byte_array_t data = {.buf = s, .len = 5};
   kdf(keNB, data, 32, skgNB);
 }
+
+/** @brief NH derivation function (A.10 3GPP TS 33.501)
+ *  @param k_amf: input key
+ *  @param sync_input: pointer to the newly derived KgNB for the initial NH derivation,
+ *                     and the previous NH for all subsequent derivations
+ *  @param nh: pointer to the derivated NH output */
+void nr_derive_nh(const uint8_t k_amf[SECURITY_KEY_LEN], const uint8_t *sync_input, uint8_t *nh)
+{
+  uint8_t s[SECURITY_KEY_LEN + 3] = {0};
+  // FC
+  s[0] = FC_NH;
+  // P0 = SYNC-input
+  memcpy(&s[1], sync_input, SECURITY_KEY_LEN);
+  // L0 = length of SYNC-input (i.e. 0x00 0x20)
+  s[SECURITY_KEY_LEN + 1] = 0x00;
+  s[SECURITY_KEY_LEN + 2] = 0x20;
+
+  byte_array_t data = {.buf = s, .len = sizeof(s)};
+  kdf(k_amf, data, SECURITY_KEY_LEN, nh);
+
+  log_hex_buffer("KDF input (SYNC string)", s, SECURITY_KEY_LEN + 3);
+  log_hex_buffer("Derived NH", nh, SECURITY_KEY_LEN);
+
+}
