@@ -156,9 +156,9 @@ bool decode_f1ap_reset(const F1AP_F1AP_PDU_t *pdu, f1ap_reset_t *out)
   /* Check presence of mandatory IEs */
   F1AP_Reset_t *in = &pdu->choice.initiatingMessage->value.choice.Reset;
   F1AP_ResetIEs_t *ie;
-  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
-  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, in, F1AP_ProtocolIE_ID_id_Cause, true);
-  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, in, F1AP_ProtocolIE_ID_id_ResetType, true);
+  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_Cause, true);
+  F1AP_LIB_FIND_IE(F1AP_ResetIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_ResetType, true);
 
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
@@ -303,7 +303,7 @@ bool decode_f1ap_reset_ack(const struct F1AP_F1AP_PDU *pdu, f1ap_reset_ack_t *ou
   /* Check presence of mandatory IEs */
   F1AP_ResetAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.ResetAcknowledge;
   F1AP_ResetAcknowledgeIEs_t *ie;
-  F1AP_LIB_FIND_IE(F1AP_ResetAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_ResetAcknowledgeIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
 
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
@@ -813,9 +813,9 @@ bool decode_f1ap_setup_request(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_req_t *out
   /* Check presence of mandatory IEs */
   F1AP_F1SetupRequest_t *in = &pdu->choice.initiatingMessage->value.choice.F1SetupRequest;
   F1AP_F1SetupRequestIEs_t *ie;
-  F1AP_LIB_FIND_IE(F1AP_F1SetupRequestIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
-  F1AP_LIB_FIND_IE(F1AP_F1SetupRequestIEs_t, ie, in, F1AP_ProtocolIE_ID_id_gNB_DU_ID, true);
-  F1AP_LIB_FIND_IE(F1AP_F1SetupRequestIEs_t, ie, in, F1AP_ProtocolIE_ID_id_GNB_DU_RRC_Version, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupRequestIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupRequestIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_DU_ID, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupRequestIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_GNB_DU_RRC_Version, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     AssertError(in->protocolIEs.list.array[i] != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
@@ -1086,8 +1086,8 @@ bool decode_f1ap_setup_response(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_resp_t *o
   /* Check presence of mandatory IEs */
   F1AP_F1SetupResponse_t *in = &pdu->choice.successfulOutcome->value.choice.F1SetupResponse;
   F1AP_F1SetupResponseIEs_t *ie;
-  F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
-  F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, in, F1AP_ProtocolIE_ID_id_GNB_CU_RRC_Version, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_GNB_CU_RRC_Version, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     ie = in->protocolIEs.list.array[i];
@@ -1297,8 +1297,8 @@ bool decode_f1ap_setup_failure(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_failure_t 
   F1AP_F1SetupFailureIEs_t *ie;
   F1AP_F1SetupFailure_t *in = &pdu->choice.unsuccessfulOutcome->value.choice.F1SetupFailure;
   /* Check presence of mandatory IEs */
-  F1AP_LIB_FIND_IE(F1AP_F1SetupFailureIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
-  F1AP_LIB_FIND_IE(F1AP_F1SetupFailureIEs_t, ie, in, F1AP_ProtocolIE_ID_id_Cause, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupFailureIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_F1SetupFailureIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_Cause, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     ie = in->protocolIEs.list.array[i];
@@ -1494,7 +1494,7 @@ bool decode_f1ap_du_configuration_update(const F1AP_F1AP_PDU_t *pdu, f1ap_gnb_du
   F1AP_GNBDUConfigurationUpdate_t *in = &pdu->choice.initiatingMessage->value.choice.GNBDUConfigurationUpdate;
   F1AP_GNBDUConfigurationUpdateIEs_t *ie;
   /* Check mandatory IEs */
-  F1AP_LIB_FIND_IE(F1AP_GNBDUConfigurationUpdateIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_GNBDUConfigurationUpdateIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     AssertError(in->protocolIEs.list.array[i] != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
@@ -1751,7 +1751,7 @@ bool decode_f1ap_cu_configuration_update(const F1AP_F1AP_PDU_t *pdu, f1ap_gnb_cu
   /* Check presence of mandatory IEs */
   F1AP_GNBCUConfigurationUpdate_t *in = &pdu->choice.initiatingMessage->value.choice.GNBCUConfigurationUpdate;
   F1AP_GNBCUConfigurationUpdateIEs_t *ie;
-  F1AP_LIB_FIND_IE(F1AP_GNBCUConfigurationUpdateIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_GNBCUConfigurationUpdateIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     ie = in->protocolIEs.list.array[i];
@@ -1903,7 +1903,7 @@ bool decode_f1ap_cu_configuration_update_acknowledge(const F1AP_F1AP_PDU_t *pdu,
   F1AP_GNBCUConfigurationUpdateAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.GNBCUConfigurationUpdateAcknowledge;
   F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t *ie;
   /* Check mandatory IEs */
-  F1AP_LIB_FIND_IE(F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_GNBCUConfigurationUpdateAcknowledgeIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     ie = in->protocolIEs.list.array[i];
@@ -2079,7 +2079,7 @@ bool decode_f1ap_du_configuration_update_acknowledge(const F1AP_F1AP_PDU_t *pdu,
   F1AP_GNBDUConfigurationUpdateAcknowledge_t *in = &pdu->choice.successfulOutcome->value.choice.GNBDUConfigurationUpdateAcknowledge;
   F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t *ie;
   /* Check mandatory IEs */
-  F1AP_LIB_FIND_IE(F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t, ie, in, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_GNBDUConfigurationUpdateAcknowledgeIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
   /* Loop over all IEs */
   for (int i = 0; i < in->protocolIEs.list.count; i++) {
     ie = in->protocolIEs.list.array[i];
