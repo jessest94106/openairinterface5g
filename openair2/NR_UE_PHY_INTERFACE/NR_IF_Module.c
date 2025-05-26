@@ -1312,7 +1312,7 @@ static uint32_t nr_ue_dl_processing(NR_UE_MAC_INST_t *mac, nr_downlink_indicatio
             // resume RAR response window timer if MSG2 decoding failed
             nr_timer_suspension(&mac->ra.response_window_timer);
           } else {
-            LOG_I(PHY, "RAR-Msg2 decoded\n");
+            LOG_I(PHY, "[UE %d] RAR-Msg2 decoded\n", mac->ue_id);
           }
           ret_mask |= (handle_dlsch(mac, dl_info, i)) << FAPI_NR_RX_PDU_TYPE_RAR;
           break;
