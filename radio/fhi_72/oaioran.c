@@ -67,12 +67,6 @@ volatile oran_sync_info_t oran_sync_info = {0};
 void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
 {
   struct xran_cb_tag *callback_tag = (struct xran_cb_tag *)pCallbackTag;
-  uint64_t second;
-  uint32_t tti;
-  uint32_t frame;
-  uint32_t subframe;
-  uint32_t slot, slot2;
-  uint32_t rx_sym;
 
   static int32_t last_slot = -1;
   static int32_t last_frame = -1;
@@ -87,21 +81,17 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
   const int slots_per_subframe = 1 << xran_ctx->fh_cfg.frame_conf.nNumerology;
 
   static int rx_RU[XRAN_PORTS_NUM][160] = {0};
-  uint32_t rx_tti = callback_tag->slotiId;
+  uint32_t tti = callback_tag->slotiId;
+  uint32_t slotnum = SLOTNUM_PER_SUBFRAME(xran_ctx->interval_us_local);
+  uint32_t frame = XranGetFrameNum(tti, 0, SUBFRAMES_PER_SYSTEMFRAME, slotnum);
+  uint32_t subframe = XranGetSubFrameNum(tti, slotnum, SUBFRAMES_PER_SYSTEMFRAME);
+  uint32_t slot = XranGetSlotNum(tti, slotnum);
 
-  tti = xran_get_slot_idx_from_tti(rx_tti, &frame, &subframe, &slot, &second);
-
-  rx_sym = callback_tag->symbol & 0xFF;
+  uint32_t rx_sym = callback_tag->symbol & 0xFF;
   uint32_t ru_id = callback_tag->oXuId;
 
-  LOG_D(HW,
-        "rx_callback frame %d, subframe %d, slot %d, second %lld, rx_sym %d ru_id %d\n",
-        frame,
-        subframe,
-        slot,
-        (unsigned long long)second,
-        rx_sym,
-        ru_id);
+  LOG_D(HW, "rx_callback at %4d.%3d (subframe %d), rx_sym %d ru_id %d\n", frame, slot, subframe, rx_sym, ru_id);
+
   if (rx_sym == 7) { // in F release this value is defined as XRAN_FULL_CB_SYM (full slot (offset + 7))
 #ifdef F_RELEASE
     for (int ru_idx = 0; ru_idx < num_ports; ru_idx++) {
@@ -127,7 +117,7 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
     // would see periodic output with only "0" in stats counters
     if (!first_call_set)
       return;
-    slot2 = slot + (subframe * slots_per_subframe);
+    uint32_t slot2 = slot + (subframe * slots_per_subframe);
     rx_RU[ru_id][slot2] = 1;
     if (last_frame > 0 && frame > 0
         && ((slot2 > 0 && last_frame != frame) || (slot2 == 0 && last_frame != ((1024 + frame - 1) & 1023))))
