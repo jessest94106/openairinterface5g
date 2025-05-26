@@ -1818,8 +1818,8 @@ rrc_ue_process_ueCapabilityEnquiry(
   ul_dcch_msg.message.choice.c1.choice.ueCapabilityInformation.rrc_TransactionIdentifier = UECapabilityEnquiry->rrc_TransactionIdentifier;
   ue_CapabilityRAT_Container.rat_Type = LTE_RAT_Type_eutra;
   OCTET_STRING_fromBuf(&ue_CapabilityRAT_Container.ueCapabilityRAT_Container,
-                       (const char *)UE_rrc_inst[ctxt_pP->module_id].UECapability,
-                       UE_rrc_inst[ctxt_pP->module_id].UECapability_size);
+                       (const char *)UE_rrc_inst[ctxt_pP->module_id].UECap->sdu,
+                       UE_rrc_inst[ctxt_pP->module_id].UECap->sdu_size);
   //  ue_CapabilityRAT_Container.ueCapabilityRAT_Container.buf  = UE_rrc_inst[ue_mod_idP].UECapability;
   // ue_CapabilityRAT_Container.ueCapabilityRAT_Container.size = UE_rrc_inst[ue_mod_idP].UECapability_size;
   AssertFatal(UECapabilityEnquiry->criticalExtensions.present == LTE_UECapabilityEnquiry__criticalExtensions_PR_c1,
