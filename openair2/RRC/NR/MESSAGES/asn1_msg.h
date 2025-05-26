@@ -163,5 +163,7 @@ void free_MeasConfig(NR_MeasConfig_t *mc);
 int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi);
 
 byte_array_t get_HandoverPreparationInformation(nr_rrc_reconfig_param_t *params, int scell_pci);
+byte_array_t get_HandoverCommandMessage(nr_rrc_reconfig_param_t *params);
+void fill_removal_lists_from_source_measConfig(NR_MeasConfig_t *measConfig, byte_array_t prep_info);
 
 #endif  /* __RRC_NR_MESSAGES_ASN1_MSG__H__ */

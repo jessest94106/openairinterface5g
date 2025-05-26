@@ -82,6 +82,7 @@
 #include "NR_UE-CapabilityRequestFilterNR.h"
 #include "NR_HandoverPreparationInformation.h"
 #include "NR_HandoverPreparationInformation-IEs.h"
+#include "NR_HandoverCommand.h"
 #include "common/utils/nr/nr_common.h"
 #if defined(NR_Rel16)
   #include "NR_SCS-SpecificCarrier.h"
@@ -1136,6 +1137,113 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
   asn1cSeqAdd(&mc->quantityConfig->quantityConfigNR_List->list, qcnr);
 
   return mc;
+}
+
+/** @brief Prepares removal of measurement configurations related to the source gNB.
+ * This function decodes the HandoverPreparationInformation received from the source gNB,
+ * extracts the source MeasConfig, and marks those entries (measurement objects, report
+ * configurations, and measurement IDs) for removal by populating the corresponding
+ * ToRemoveList fields in the UE's current measConfig.
+ * This ensures that obsolete or source-specific measurement configurations are removed
+ * from the UE after handover and allows the target gNB to install its own valid configuration.
+ * @param measConfig Target gNB's current measurement configuration to be updated.
+ * @param prep_info Encoded HandoverPreparationInformation received from the source gNB.*/
+void fill_removal_lists_from_source_measConfig(NR_MeasConfig_t *currentMC, byte_array_t prep_info)
+{
+  if (currentMC == NULL) {
+    LOG_E(NR_RRC, "HO LOG: UE's Measurement Configuration is NULL!\n");
+    return;
+  }
+
+  // Decodes the HandoverPreparationInformation message
+  NR_HandoverPreparationInformation_t *hpi = NULL;
+  asn_dec_rval_t hoPrep_dec_rval = uper_decode_complete(NULL,
+                                                        &asn_DEF_NR_HandoverPreparationInformation,
+                                                        (void **)&hpi,
+                                                        (uint8_t *)prep_info.buf,
+                                                        prep_info.len);
+
+  if (hoPrep_dec_rval.code != RC_OK || hoPrep_dec_rval.consumed < 0) {
+    LOG_E(NR_RRC, "Handover Prep Info decode error while removing source gnb measurement configuration!\n");
+    return;
+  }
+
+  /* Decodes the RRCReconfiguration message within the HandoverPreparationInformation
+     and extract the measConfig provided by the source gNB */
+  if (!hpi->criticalExtensions.choice.c1->choice.handoverPreparationInformation->sourceConfig) {
+    LOG_W(NR_RRC, "Missing sourceConfig: in source gNB rrcReconfiguration\n");
+    return;
+  }
+  NR_RRCReconfiguration_t *rrcReconf = NULL;
+  NR_AS_Config_t *sourceConfig = hpi->criticalExtensions.choice.c1->choice.handoverPreparationInformation->sourceConfig;
+  asn_dec_rval_t rrcReconf_dec_rval = uper_decode_complete(NULL,
+                                                           &asn_DEF_NR_RRCReconfiguration,
+                                                           (void **)&rrcReconf,
+                                                           (uint8_t *)sourceConfig->rrcReconfiguration.buf,
+                                                           sourceConfig->rrcReconfiguration.size);
+  if (rrcReconf_dec_rval.code != RC_OK || rrcReconf_dec_rval.consumed < 0) {
+    LOG_E(NR_RRC, "Failed to decode source gNB rrcReconfiguration!\n");
+    return;
+  }
+
+  if (rrcReconf->criticalExtensions.choice.rrcReconfiguration->measConfig == NULL)
+    return;
+
+  NR_MeasConfig_t *sourceMC = rrcReconf->criticalExtensions.choice.rrcReconfiguration->measConfig;
+
+  /* Add measurement objects, report configurations, and measurement IDs
+     to the UE's measConfig removal lists, and update UE->measConfig */
+  if (sourceMC->measObjectToAddModList->list.count > 0) {
+    currentMC->measObjectToRemoveList = calloc_or_fail(1, sizeof(*currentMC->measObjectToRemoveList));
+    for (int i = 0; i < sourceMC->measObjectToAddModList->list.count; i++) {
+      NR_MeasObjectId_t *measObjId = calloc_or_fail(1, sizeof(NR_MeasObjectId_t));
+      *measObjId = sourceMC->measObjectToAddModList->list.array[i]->measObjectId;
+      asn1cSeqAdd(&currentMC->measObjectToRemoveList->list, measObjId);
+    }
+  }
+
+  if (sourceMC->reportConfigToAddModList->list.count > 0) {
+    currentMC->reportConfigToRemoveList = calloc_or_fail(1, sizeof(*currentMC->reportConfigToRemoveList));
+    for (int i = 0; i < sourceMC->reportConfigToAddModList->list.count; i++) {
+      NR_ReportConfigId_t *reportConfigId = calloc_or_fail(1, sizeof(NR_ReportConfigId_t));
+      *reportConfigId = sourceMC->reportConfigToAddModList->list.array[i]->reportConfigId;
+      asn1cSeqAdd(&currentMC->reportConfigToRemoveList->list, reportConfigId);
+    }
+  }
+
+  if (sourceMC->measIdToAddModList->list.count > 0) {
+    currentMC->measIdToRemoveList = calloc_or_fail(1, sizeof(*currentMC->measIdToRemoveList));
+    for (int i = 0; i < sourceMC->measIdToAddModList->list.count; i++) {
+      NR_MeasId_t *measId = calloc_or_fail(1, sizeof(NR_MeasId_t));
+      *measId = sourceMC->measIdToAddModList->list.array[i]->measId;
+      asn1cSeqAdd(&currentMC->measIdToRemoveList->list, measId);
+    }
+  }
+}
+
+byte_array_t get_HandoverCommandMessage(nr_rrc_reconfig_param_t *params)
+{
+  // Encode RRCReconfiguration to buffer
+  byte_array_t msg = do_HO_RRCReconfiguration(params);
+
+  // Add RRCReconfiguration to handoverCommand
+  NR_HandoverCommand_t HoCommand = {0};
+  HoCommand.criticalExtensions.present = NR_HandoverCommand__criticalExtensions_PR_c1;
+  asn1cCalloc(HoCommand.criticalExtensions.choice.c1, c1);
+  c1->present = NR_HandoverCommand__criticalExtensions__c1_PR_handoverCommand;
+  asn1cCalloc(HoCommand.criticalExtensions.choice.c1->choice.handoverCommand, hc);
+  OCTET_STRING_fromBuf(&hc->handoverCommandMessage, (const char *)msg.buf, msg.len);
+  free_byte_array(msg);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_HandoverCommand, (void *)&HoCommand);
+
+  // Encode handoverCommand to buffer
+  byte_array_t buffer = {.len = -1, .buf = NULL};
+  buffer.len = uper_encode_to_new_buffer(&asn_DEF_NR_HandoverCommand, NULL, (void *)&HoCommand, (void **)&buffer.buf);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_HandoverCommand, &HoCommand);
+
+  return buffer;
 }
 
 /** @brief HandoverPreparationInformation message (11.2.2 of TS 38.331)

@@ -408,6 +408,73 @@ static byte_array_t rrc_gNB_generate_HandoverPreparationInformation(gNB_RRC_INST
   return hoPrepInfo;
 }
 
+static byte_array_t rrc_gNB_encode_HandoverCommand(gNB_RRC_UE_t *UE, gNB_RRC_INST *rrc)
+{
+  DevAssert(UE->ho_context);
+  DevAssert(UE->ho_context->target);
+
+  NR_SecurityConfig_t *sec = calloc_or_fail(1, sizeof(*sec));
+  sec->keyToUse = calloc_or_fail(1, sizeof(*sec->keyToUse));
+  *sec->keyToUse = NR_SecurityConfig__keyToUse_master;
+  sec->securityAlgorithmConfig = calloc_or_fail(1, sizeof(*sec->securityAlgorithmConfig));
+  struct NR_SecurityAlgorithmConfig *alg = sec->securityAlgorithmConfig;
+  alg->cipheringAlgorithm = UE->ciphering_algorithm;
+  alg->integrityProtAlgorithm = calloc_or_fail(1, sizeof(*alg->integrityProtAlgorithm));
+  *alg->integrityProtAlgorithm = UE->integrity_algorithm;
+
+  // Mark source gNB's measurement configuration for removal in UE->measConfig
+  if (UE->ho_context->target->ue_ho_prep_info.len) {
+    fill_removal_lists_from_source_measConfig(UE->measConfig, UE->ho_context->target->ue_ho_prep_info);
+  }
+
+  /* 3GPP TS 38.331 RadioBearerConfig: re-establish PDCP whenever
+  the security key used for this radio bearer changes, e.g. for SRB2
+  when receiving reconfiguration with sync [...]. Similarly, for DRBs
+  PDCP re-establishment is necessary with derivation of new UP keys */
+  nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, UE, (1 << 1) | (1 << 2), true);
+  UE->xids[params.transaction_id] = RRC_DEDICATED_RECONF;
+
+  params.security_config = sec;
+  params.masterKeyUpdate = true;
+  params.nextHopChainingCount = UE->nh_ncc;
+  byte_array_t out = get_HandoverCommandMessage(&params);
+
+  // Free remove lists in UE->measConfig
+  ASN_STRUCT_FREE(asn_DEF_NR_MeasIdToRemoveList, UE->measConfig->measIdToRemoveList);
+  ASN_STRUCT_FREE(asn_DEF_NR_ReportConfigToRemoveList, UE->measConfig->reportConfigToRemoveList);
+  ASN_STRUCT_FREE(asn_DEF_NR_MeasObjectToRemoveList, UE->measConfig->measObjectToRemoveList);
+
+  free_RRCReconfiguration_params(params);
+  return out;
+}
+
+/** @brief This callback is used by the target gNB
+ *         to trigger the Handover Request Acknowledge towards the AMF */
+static void nr_rrc_n2_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
+{
+  AssertFatal(cu_exists_f1_ue_data(UE->rrc_ue_id), "No CU found for rrc_ue_id %d\n", UE->rrc_ue_id);
+
+  f1_ue_data_t previous_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+  /* this is the callback for N2 handover after F1 UE context setup response in
+   * the handover case. Check that there was no associated DU, then set it */
+  AssertFatal(previous_data.secondary_ue == -1, "there was already a DU present\n");
+  previous_data.secondary_ue = UE->ho_context->target->du_ue_id;
+  bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &previous_data);
+  DevAssert(success);
+  LOG_I(NR_RRC, "Updated CU F1AP Context for UE %d, DU Id : %u\n", UE->rrc_ue_id, UE->ho_context->target->du_ue_id);
+
+  byte_array_t hoCommand = rrc_gNB_encode_HandoverCommand(UE, rrc);
+  if (hoCommand.len < 0) {
+    LOG_E(NR_RRC, "ASN1 message encoding failed: failed to generate Handover Command Message\n");
+    return;
+  } else {
+    LOG_D(NR_RRC, "HO LOG: Handover Command for UE %u Encoded (%ld bytes)\n", UE->rrc_ue_id, hoCommand.len);
+  }
+
+  rrc_gNB_send_NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(rrc, UE, hoCommand);
+  free_byte_array(hoCommand);
+}
+
 /** @brief Callback function to trigger NG Handover Failure on the target gNB, to inform the AMF
  * that the preparation of resources has failed (e.g. unsatisfied criteria, gNB is already loaded).
  * This message represents an Unsuccessful Outcome of the Handover Resource Allocation */
