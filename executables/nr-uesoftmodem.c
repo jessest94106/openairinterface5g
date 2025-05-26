@@ -506,11 +506,17 @@ int main(int argc, char **argv)
 
         UE[CC_id]->sl_mode = get_softmodem_params()->sl_mode;
         init_actor(&UE[CC_id]->sync_actor, "SYNC_", -1);
-        for (int i = 0; i < NUM_DL_ACTORS; i++) {
-          init_actor(&UE[CC_id]->dl_actors[i], "DL_", -1);
+        if (get_nrUE_params()->num_dl_actors > 0) {
+          UE[CC_id]->dl_actors = calloc_or_fail(get_nrUE_params()->num_dl_actors, sizeof(*UE[CC_id]->dl_actors));
+          for (int i = 0; i < get_nrUE_params()->num_dl_actors; i++) {
+            init_actor(&UE[CC_id]->dl_actors[i], "DL_", -1);
+          }
         }
-        for (int i = 0; i < NUM_UL_ACTORS; i++) {
-          init_actor(&UE[CC_id]->ul_actors[i], "UL_", -1);
+        if (get_nrUE_params()->num_ul_actors > 0) {
+          UE[CC_id]->ul_actors = calloc_or_fail(get_nrUE_params()->num_ul_actors, sizeof(*UE[CC_id]->ul_actors));
+          for (int i = 0; i < get_nrUE_params()->num_ul_actors; i++) {
+            init_actor(&UE[CC_id]->ul_actors[i], "UL_", -1);
+          }
         }
         init_nr_ue_vars(UE[CC_id], inst);
 
@@ -576,10 +582,10 @@ int main(int argc, char **argv)
     for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
       PHY_VARS_NR_UE *phy_vars = PHY_vars_UE_g[0][CC_id];
       if (phy_vars) {
-        for (int i = 0; i < NUM_UL_ACTORS; i++) {
+        for (int i = 0; i < get_nrUE_params()->num_ul_actors; i++) {
           shutdown_actor(&phy_vars->ul_actors[i]);
         }
-        for (int i = 0; i < NUM_DL_ACTORS; i++) {
+        for (int i = 0; i < get_nrUE_params()->num_dl_actors; i++) {
           shutdown_actor(&phy_vars->dl_actors[i]);
         }
         int ret = pthread_join(phy_vars->main_thread, NULL);

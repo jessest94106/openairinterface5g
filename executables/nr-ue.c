@@ -106,9 +106,12 @@ static void *NRUE_phy_stub_standalone_pnf_task(void *arg);
 static void start_process_slot_tx(void* arg) {
   notifiedFIFO_elt_t *newTx = arg;
   nr_rxtx_thread_data_t *curMsgTx = NotifiedFifoData(newTx);
-  int num_ul_actors_to_use =
-      get_nrUE_params()->num_ul_actors == 0 ? NUM_UL_ACTORS : min(get_nrUE_params()->num_ul_actors, NUM_UL_ACTORS);
-  pushNotifiedFIFO(&curMsgTx->UE->ul_actors[curMsgTx->proc.nr_slot_tx % num_ul_actors_to_use].fifo, newTx);
+  int num_ul_actors = get_nrUE_params()->num_ul_actors;
+  if (num_ul_actors > 0) {
+    pushNotifiedFIFO(&curMsgTx->UE->ul_actors[curMsgTx->proc.nr_slot_tx % num_ul_actors].fifo, newTx);
+  } else {
+    newTx->processingFunc(curMsgTx);
+  }
 }
 
 static size_t dump_L1_UE_meas_stats(PHY_VARS_NR_UE *ue, char *output, size_t max_len)
@@ -677,10 +680,10 @@ static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
 
     /* Clearing UE harq while DL actors are active causes race condition.
         So we let the current execution to complete here.*/
-    for (int i = 0; i < NUM_DL_ACTORS; i++) {
+    for (int i = 0; i < get_nrUE_params()->num_dl_actors; i++) {
       flush_actor(UE->dl_actors + i);
     }
-    for (int i = 0; i < NUM_UL_ACTORS; i++) {
+    for (int i = 0; i < get_nrUE_params()->num_ul_actors; i++) {
       flush_actor(UE->ul_actors + i);
     }
 
@@ -1183,7 +1186,11 @@ void *UE_thread(void *arg)
     int ret = UE_dl_preprocessing(UE, &curMsgRx->proc, tx_wait_for_dlsch, &curMsgRx->phy_data, &stats_printed);
     if (ret != INT_MAX)
       shiftForNextFrame = ret;
-    pushNotifiedFIFO(&UE->dl_actors[curMsg.proc.nr_slot_rx % NUM_DL_ACTORS].fifo, newRx);
+    if (get_nrUE_params()->num_dl_actors > 0) {
+      pushNotifiedFIFO(&UE->dl_actors[curMsg.proc.nr_slot_rx % get_nrUE_params()->num_dl_actors].fifo, newRx);
+    } else {
+      newRx->processingFunc(curMsgRx);
+    }
 
     // apply new NTN timing information
     apply_ntn_config(UE, fp, slot_nr, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
