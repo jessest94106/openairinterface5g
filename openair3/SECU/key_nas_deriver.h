@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define SECURITY_KEY_LEN 32
+
 typedef enum {
   NAS_ENC_ALG = 0x01,
   NAS_INT_ALG = 0x02,
