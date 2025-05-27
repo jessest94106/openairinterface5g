@@ -35,7 +35,6 @@
 #include "xran_sync_api.h"
 #include "oran_isolate.h"
 #include "oran-init.h"
-#include "xran_common.h"
 #include "oaioran.h"
 #include <rte_ethdev.h>
 
