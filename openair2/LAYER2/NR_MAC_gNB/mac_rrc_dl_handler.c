@@ -774,12 +774,19 @@ void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
           "RRC reconfiguration outcome unsuccessful, but no rollback mechanism implemented to come back to old configuration\n");
   } else if (req->ReconfigComplOutcome == RRCreconf_success) {
     LOG_I(NR_MAC, "DU received confirmation of successful RRC Reconfiguration\n");
+    if (UE->reconfigSpCellConfig) {
+      // in case of reestablishment, the spCellConfig had to be released
+      // temporarily. Reapply now before doing the reconfiguration.
+      UE->CellGroup->spCellConfig = UE->reconfigSpCellConfig;
+      UE->reconfigSpCellConfig = NULL;
+    }
     // we re-configure the BWP to apply the CellGroup and to use UE specific Search Space with DCIX1
     nr_mac_clean_cellgroup(UE->CellGroup);
     configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_ue_Specific, -1, -1);
     for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
       nr_lc_config_t *c = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
       c->suspended = false;
+      nr_rlc_reestablish_entity(req->gNB_DU_ue_id, c->lcid);
     }
   }
 
@@ -945,14 +952,6 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     DevAssert(success);
   }
 
-  if (UE->reestablish_rlc && dl_rrc->srb_id == 1) {
-    // we expected a reconfiguration to re-establish RLC, and this is on DCCH. We assume this is the reconfiguration.
-    for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
-      nr_lc_config_t *lc_config = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
-      nr_rlc_reestablish_entity(dl_rrc->gNB_DU_ue_id, lc_config->lcid);
-    }
-    UE->reestablish_rlc = false;
-  }
 
   /* if we get the old-gNB-DU-UE-ID, this means there is a reestablishment
    * ongoing. */
@@ -980,9 +979,9 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     oldUE->CellGroup = NULL;
     UE->mac_stats = oldUE->mac_stats;
     /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
-     * from the current configuration. Also, expect the reconfiguration from
-     * the CU, so save the old UE's CellGroup for the new UE */
-    ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->CellGroup->spCellConfig);
+     * from the current configuration. It will be reapplied when the
+     * reconfiguration has succeeded (indicated by the CU) */
+    UE->reconfigSpCellConfig = UE->CellGroup->spCellConfig;
     UE->CellGroup->spCellConfig = NULL;
     mac_remove_nr_ue(mac, *dl_rrc->old_gNB_DU_ue_id);
     pthread_mutex_unlock(&mac->sched_lock);
@@ -990,9 +989,6 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     nr_rlc_update_id(*dl_rrc->old_gNB_DU_ue_id, dl_rrc->gNB_DU_ue_id);
     /* 38.331 clause 5.3.7.4: apply the specified configuration defined in 9.2.1 for SRB1 */
     nr_rlc_reconfigure_entity(dl_rrc->gNB_DU_ue_id, 1, NULL);
-    /* Set flag to trigger RLC re-establishment
-     * for remaining RBs in next RRCReconfiguration */
-    UE->reestablish_rlc = true;
     instance_t f1inst = get_f1_gtp_instance();
     if (f1inst >= 0) // we actually use F1-U
       gtpv1u_update_ue_id(f1inst, *dl_rrc->old_gNB_DU_ue_id, dl_rrc->gNB_DU_ue_id);
