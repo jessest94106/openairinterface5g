@@ -103,6 +103,11 @@ int trx_oran_set_gains(openair0_device *device, openair0_config_t *openair0_cfg)
 
 int trx_oran_get_stats(openair0_device *device)
 {
+  uint64_t total_time, used_time;
+  uint32_t num_core_used, core_used[64];
+  uint32_t ret = xran_get_time_stats(&total_time, &used_time, &num_core_used, &core_used[0], 0);
+  if (ret == 0)
+    LOG_I(HW, "xran_get_time_stats(): total thread time %ld, total time essential tasks %ld, num cores used %d\n", total_time, used_time, num_core_used);
   printf("ORAN: %s\n", __FUNCTION__);
   return (0);
 }
