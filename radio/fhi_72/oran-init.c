@@ -464,3 +464,8 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
 
   return (void *)gxran_handle;
 }
+
+oran_buf_list_t *get_xran_buffers(uint32_t port_id)
+{
+  return gPortInst[port_id][0].buf_list;
+}

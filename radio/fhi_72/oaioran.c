@@ -97,9 +97,10 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
     for (int ru_idx = 0; ru_idx < num_ports; ru_idx++) {
       struct xran_device_ctx *xran_ctx_per_ru = xran_dev_get_ctx_by_id(ru_idx);
       struct xran_fh_config *fh_config = &xran_ctx_per_ru->fh_cfg;
+      oran_buf_list_t *bufs = get_xran_buffers(ru_idx);
       for (uint16_t cc_id = 0; cc_id < 1 /* fh_config->nCC */; cc_id++) { // OAI does not support multiple CC yet.
         for(uint32_t ant_id = 0; ant_id < fh_config->neAxc; ant_id++) {
-          struct xran_prb_map *pRbMap = (struct xran_prb_map *)xran_ctx_per_ru->sFrontHaulRxPrbMapBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id].sBufferList.pBuffers->pData;
+          struct xran_prb_map *pRbMap = (struct xran_prb_map *)bufs->dstcp[ant_id][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
           AssertFatal(pRbMap != NULL, "(%d:%d:%d)pRbMap == NULL. Aborting.\n", cc_id, tti % XRAN_N_FE_BUF_LEN, ant_id);
 
           for (uint32_t sym_id = 0; sym_id < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_id++) {
@@ -188,12 +189,9 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
       for (int aa = 0; aa < ru->nb_rx; aa++) {
         int16_t *dst, *src;
         int idx = 0;
-        xran_ctx = xran_dev_get_ctx_by_id(aa / nb_rx_per_ru);
+        oran_buf_list_t *bufs = get_xran_buffers(aa / nb_rx_per_ru);
         dst = ru->prach_buf[aa]; // + (sym_idx*576));
-        src = (int16_t *)((uint8_t *)xran_ctx->sFHPrachRxBbuIoBufCtrlDecomp[tti % XRAN_N_FE_BUF_LEN][0][aa % nb_rx_per_ru]
-                              .sBufferList.pBuffers[sym_idx]
-                              .pData);
-
+        src = (int16_t *)bufs->prachdstdecomp[aa % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers[sym_idx].pData;
         /* convert Network order to host order */
         if (ru_conf->compMeth_PRACH == XRAN_COMPMETHOD_NONE) {
           if (sym_idx == 0) {
@@ -351,8 +349,8 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
           continue;
 
         uint8_t *pData;
-        uint8_t *pPrbMapData = xran_ctx->sFrontHaulRxPrbMapBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_rx_per_ru]
-                                   .sBufferList.pBuffers->pData;
+        oran_buf_list_t *bufs = get_xran_buffers(ant_id / nb_rx_per_ru);
+        uint8_t *pPrbMapData = bufs->dstcp[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
         struct xran_prb_map *pPrbMap = (struct xran_prb_map *)pPrbMapData;
 
         struct xran_prb_elm *pRbElm = &pPrbMap->prbMap[0];
@@ -364,8 +362,8 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
         uint32_t one_rb_size =
             (((pRbElm->iqWidth == 0) || (pRbElm->iqWidth == 16)) ? (N_SC_PER_PRB * 2 * 2) : (3 * pRbElm->iqWidth + 1));
         if (fh_init->mtu < pRbElm->nRBSize * one_rb_size)
-          pData = xran_ctx->sFrontHaulRxBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_rx_per_ru]
-                      .sBufferList.pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
+          pData = bufs->dst[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN]
+                      .pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
                       .pData;
         else
           pData = p_sec_desc->pData;
@@ -491,14 +489,12 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
 
   for (uint16_t cc_id = 0; cc_id < 1 /*nSectorNum*/; cc_id++) { // OAI does not support multiple CC yet.
     for (uint8_t ant_id = 0; ant_id < ru->nb_tx; ant_id++) {
-      xran_ctx = xran_dev_get_ctx_by_id(ant_id / nb_tx_per_ru);
+      oran_buf_list_t *bufs = get_xran_buffers(ant_id / nb_tx_per_ru);
       // This loop would better be more inner to avoid confusion and maybe also errors.
       for (int32_t sym_idx = 0; sym_idx < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_idx++) {
-        uint8_t *pData = xran_ctx->sFrontHaulTxBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_tx_per_ru]
-                             .sBufferList.pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
-                             .pData;
-        uint8_t *pPrbMapData = xran_ctx->sFrontHaulTxPrbMapBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_tx_per_ru]
-                                   .sBufferList.pBuffers->pData;
+        uint8_t *pData =
+            bufs->src[ant_id % nb_tx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT].pData;
+        uint8_t *pPrbMapData = bufs->srccp[ant_id % nb_tx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
         struct xran_prb_map *pPrbMap = (struct xran_prb_map *)pPrbMapData;
         ptr = pData;
         pos = &ru->txdataF_BF[ant_id][sym_idx * fftsize];
