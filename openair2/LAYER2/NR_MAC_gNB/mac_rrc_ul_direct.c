@@ -58,11 +58,8 @@ static void gnb_du_configuration_update_direct(const f1ap_gnb_du_configuration_u
   itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
 }
 
-static void ue_context_setup_response_direct(const f1ap_ue_context_setup_t *req, const f1ap_ue_context_setup_t *resp)
+static void ue_context_setup_response_direct(const f1ap_ue_context_setup_t *resp)
 {
-  DevAssert(req->drbs_to_be_setup_length == resp->drbs_to_be_setup_length);
-
-  (void) req; /* we don't need the request -- it is to set up GTP in F1 case */
   MessageDef *msg = itti_alloc_new_message (TASK_MAC_GNB, 0, F1AP_UE_CONTEXT_SETUP_RESP);
   msg->ittiMsgHeader.originInstance = -1; // means monolithic
   f1ap_ue_context_setup_t *f1ap_msg = &F1AP_UE_CONTEXT_SETUP_RESP(msg);

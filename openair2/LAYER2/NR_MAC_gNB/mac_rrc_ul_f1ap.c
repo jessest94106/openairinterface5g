@@ -85,11 +85,8 @@ static void gnb_du_configuration_update_f1ap(const f1ap_gnb_du_configuration_upd
   itti_send_msg_to_task(TASK_DU_F1, 0, msg);
 }
 
-static void ue_context_setup_response_f1ap(const f1ap_ue_context_setup_t *req, const f1ap_ue_context_setup_t *resp)
+static void ue_context_setup_response_f1ap(const f1ap_ue_context_setup_t *resp)
 {
-  DevAssert(req->drbs_to_be_setup_length == resp->drbs_to_be_setup_length);
-
-  DevAssert(req->srbs_to_be_setup_length == resp->srbs_to_be_setup_length);
   MessageDef *msg = itti_alloc_new_message (TASK_MAC_GNB, 0, F1AP_UE_CONTEXT_SETUP_RESP);
   f1ap_ue_context_setup_t *f1ap_msg = &F1AP_UE_CONTEXT_SETUP_RESP(msg);
   /* copy all fields, but reallocate rrc_containers! */
