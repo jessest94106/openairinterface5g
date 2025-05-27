@@ -146,7 +146,7 @@ neighbour relation of the DUs at the CU. To do so, proceed as follows:
    ```
    cat nrRRC_stats.log
    ```
-1. Fill in the `neighbour-config.conf` configuration file as shown below, and
+1. Fill in the [`neighbour-config.conf`](../ci-scripts/conf_files/neighbour-config.conf) configuration file as shown below, and
    `@include` it in the CU file.
 1. Start the CU and both DUs.
 1. Bring the phone close to one cell, and leave flight mode. It should connect
@@ -161,7 +161,7 @@ triggered:
 - Make sure that both DUs use the same hardware.
 - Make sure that the UE sees both cells. For instance, you can switch to flight
   mode, go closer to the other DU, and switch off flight mode -- the UE should
-  connect to that second UE.
+  connect to that second DU.
 - We did not manage handover with every phone yet -- make sure you use one of
   the list provided above.
 
@@ -249,6 +249,15 @@ nr_measurement_configuration = {
     timeToTrigger = 1
   })
 };
+```
+`@include` this configuration file inside the gNB section of CU file as shown below.
+
+```
+    plmn_list = ({ mcc = 222; mnc = 01; mnc_length = 2; snssaiList = ({ sst = 1, sd = 0xffffff })});
+
+
+    @include "neighbour-config.conf"
+
 ```
 
 # Handovers triggers and NTN
