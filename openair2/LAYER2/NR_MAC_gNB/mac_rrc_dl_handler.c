@@ -960,10 +960,6 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     NR_UE_info_t *oldUE = find_nr_UE(&mac->UE_info, *dl_rrc->old_gNB_DU_ue_id);
     AssertFatal(oldUE, "CU claims we should know UE %04x, but we don't\n", *dl_rrc->old_gNB_DU_ue_id);
     pthread_mutex_lock(&mac->sched_lock);
-    /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
-     * from the current configuration. Also, expect the reconfiguration from
-     * the CU, so save the old UE's CellGroup for the new UE */
-    UE->CellGroup->spCellConfig = NULL;
     uid_t temp_uid = UE->uid;
     UE->uid = oldUE->uid;
     oldUE->uid = temp_uid;
@@ -975,6 +971,11 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     UE->CellGroup = oldUE->CellGroup;
     oldUE->CellGroup = NULL;
     UE->mac_stats = oldUE->mac_stats;
+    /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
+     * from the current configuration. Also, expect the reconfiguration from
+     * the CU, so save the old UE's CellGroup for the new UE */
+    ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->CellGroup->spCellConfig);
+    UE->CellGroup->spCellConfig = NULL;
     mac_remove_nr_ue(mac, *dl_rrc->old_gNB_DU_ue_id);
     pthread_mutex_unlock(&mac->sched_lock);
     nr_rlc_remove_ue(dl_rrc->gNB_DU_ue_id);
