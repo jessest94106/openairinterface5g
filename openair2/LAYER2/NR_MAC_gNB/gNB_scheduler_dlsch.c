@@ -399,8 +399,7 @@ static bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *U
   // used if CORESET 0 is configured for the cell and the size of initial DL bandwidth part shall be used if CORESET 0 is not
   // configured for the cell.
   if (dl_bwp->dci_format == NR_DL_DCI_FORMAT_1_0 && sched_ctrl->search_space->searchSpaceType
-      && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common
-      && dl_bwp->pdsch_Config->resourceAllocation == NR_PDSCH_Config__resourceAllocation_resourceAllocationType1) {
+      && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
     if (sched_ctrl->coreset->controlResourceSetId == 0) {
       bwp_info.bwpStart = nr_mac->cset0_bwp_start;
     } else {
@@ -1183,8 +1182,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     // 3GPP TS 38.214 Section 5.1.2.2.2 Downlink resource allocation type 1
     uint16_t riv_bwp_size = pdsch_pdu->BWPSize;
     if (current_BWP->dci_format == NR_DL_DCI_FORMAT_1_0
-        && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common
-        && pdsch_Config->resourceAllocation == NR_PDSCH_Config__resourceAllocation_resourceAllocationType1) {
+        && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
       if (gNB_mac->cset0_bwp_size > 0) {
         riv_bwp_size = gNB_mac->cset0_bwp_size;
       } else {

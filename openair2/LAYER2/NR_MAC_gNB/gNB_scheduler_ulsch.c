@@ -78,8 +78,7 @@ static bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
   // case when DCI format 0_0 is decoded in any common search space in which case the size of the initial UL bandwidth part shall
   // be used.
   if (ul_bwp->dci_format == NR_UL_DCI_FORMAT_0_0 && sched_ctrl->search_space->searchSpaceType
-      && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common
-      && ul_bwp->pusch_Config->resourceAllocation == NR_PUSCH_Config__resourceAllocation_resourceAllocationType1) {
+      && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
     bwp_info.bwpSize = min(ul_bwp->BWPSize, UE->sc_info.initial_ul_BWPSize);
   } else {
     bwp_info.bwpSize = ul_bwp->BWPSize;
