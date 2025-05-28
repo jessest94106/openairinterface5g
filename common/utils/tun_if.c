@@ -168,10 +168,14 @@ static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_
 
   struct ifreq ifr = {0};
   strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name));
+
   /* get flags of this interface: see netdevice(7) */
   bool success = ioctl(sock_fd, SIOCGIFFLAGS, (caddr_t)&ifr) == 0;
-  if (!success)
-    goto fail_interface_state;
+  if (!success && if_action == INTERFACE_DOWN && errno == ENODEV) {
+    LOG_W(OIP, "trying to remove non-existant device %s\n", ifn);
+    return true;
+  }
+  LOG_D(OIP, "Got flags for %s: 0x%x (action: %s)\n", ifn, ifr.ifr_flags, action);
 
   if (if_action == INTERFACE_UP) {
     ifr.ifr_flags |= IFF_UP | IFF_NOARP | IFF_POINTOPOINT;
@@ -183,6 +187,8 @@ static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_
   success = ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == 0;
   if (!success)
     goto fail_interface_state;
+  LOG_D(OIP, "Interface %s successfully set %s\n", ifn, action);
+
   return true;
 
 fail_interface_state:
@@ -201,10 +207,6 @@ bool tun_config(const char* ifname, const char *ipv4, const char *ipv6)
     return false;
   }
 
-  if (!change_interface_state(sock_fd, ifname, INTERFACE_DOWN)) {
-    close(sock_fd);
-    return false;
-  }
   bool success = true;
   if (ipv4 != NULL)
     success = setInterfaceParameter(sock_fd, ifname, AF_INET, ipv4, SIOCSIFADDR);
@@ -272,8 +274,17 @@ int tun_generate_ue_ifname(char *ifname, int instance_id, int pdu_session_id)
   return snprintf(ifname, IFNAMSIZ, "%s%d%s", "oaitun_ue", instance_id + 1, pdu_session_id == -1 ? "" : pdu_session_string);
 }
 
-void tun_destroy(const char *dev, int fd) {
-  if (change_interface_state(fd, dev, INTERFACE_DOWN) == 0) {
+void tun_destroy(const char *dev)
+{
+  // Use a new socket for ioctl operations
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    LOG_E(UTIL, "Failed to create socket for interface teardown: %d, %s\n", errno, strerror(errno));
+    return;
+  }
+
+  bool success = change_interface_state(fd, dev, INTERFACE_DOWN);
+  if (success) {
     LOG_I(UTIL, "Interface %s is now down.\n", dev);
   } else {
     LOG_E(UTIL, "Could not bring interface %s down.\n", dev);

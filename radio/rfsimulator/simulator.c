@@ -50,7 +50,6 @@
 #define CHANNELMOD_DYNAMICLOAD
 #include <openair1/SIMULATION/TOOLS/sim.h>
 #include "rfsimulator.h"
-#include "hashtable.h"
 
 #define PORT 4043 //default TCP port for this simulator
 //
@@ -70,22 +69,6 @@
 #define byteToSample(a,b) ((a)/(sizeof(sample_t)*(b)))
 
 #define GENERATE_CHANNEL 10 // each frame (or slot?) in DL
-
-// This needs to be re-architected in the future
-//
-// File Descriptors management in rfsimulator is not optimized
-// Relying on FD_SETSIZE (actually 1024) is not appropriated
-// Also the use of fd value as returned by Linux as an index for buf[] structure is not appropriated
-// especially for client (UE) side since only 1 fd per connection to a gNB is needed. On the server
-// side the value should be tuned to the maximum number of connections with UE's which corresponds
-// to the maximum number of UEs hosted by a gNB which is unlikely to be in the order of thousands
-// since all I/Q's would flow through the same TCP transport.
-// Until a convenient management is implemented, the MAX_FD_RFSIMU is used everywhere (instead of
-// FD_SETSIE) and reduced to 125. This should allow for around 20 simultaeous UEs.
-//
-// An indirection level via hashtable was added to allow the software to use FDs above MAX_FD_RFSIMU.
-//
-// #define MAX_FD_RFSIMU FD_SETSIZE
 #define MAX_FD_RFSIMU 250
 #define SEND_BUFF_SIZE 100000000 // Socket buffer size
 
@@ -169,8 +152,6 @@ typedef struct {
   int saveIQfile;
   buffer_t buf[MAX_FD_RFSIMU];
   int next_buf;
-  // Hashtable used as an indirection level between file descriptor and the buf array
-  hash_table_t *fd_to_buf_map;
   int rx_num_channels;
   int tx_num_channels;
   double sample_rate;
@@ -187,42 +168,14 @@ typedef struct {
   int hanging_workaround;
 } rfsimulator_state_t;
 
-
-static buffer_t *get_buff_from_socket(rfsimulator_state_t *simulator_state, int socket)
+static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
 {
-  uint64_t buffer_index;
-  if (hashtable_get(simulator_state->fd_to_buf_map, socket, (void **)&buffer_index) == HASH_TABLE_OK) {
-    return &simulator_state->buf[buffer_index];
-  } else {
-    return NULL;
-  }
-}
-
-static void add_buff_to_socket_mapping(rfsimulator_state_t *simulator_state, int socket, uint64_t buff_index)
-{
-  hashtable_rc_t rc = hashtable_insert(simulator_state->fd_to_buf_map, socket, (void *)buff_index);
-  AssertFatal(rc == HASH_TABLE_OK,
-              "%s sock = %d\n",
-              rc == HASH_TABLE_INSERT_OVERWRITTEN_DATA ? "Duplicate entry in hashtable" : "Hashtable is not allocated",
-              socket);
-}
-
-static void remove_buff_to_socket_mapping(rfsimulator_state_t *simulator_state, int socket)
-{
-  // Failure is fine here
-  hashtable_remove(simulator_state->fd_to_buf_map, socket);
-}
-
-static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
-{
-  /* TODO: cleanup code so that this AssertFatal becomes useless */
-  AssertFatal(sock >= 0 && sock < sizeofArray(bridge->buf), "socket %d is not in range\n", sock);
   uint64_t buff_index = bridge->next_buf++ % MAX_FD_RFSIMU;
   buffer_t *ptr=&bridge->buf[buff_index];
   ptr->circularBuf = calloc(1, sampleToByte(CirSize, 1));
   if (ptr->circularBuf == NULL) {
     LOG_E(HW, "malloc(%lu) failed\n", sampleToByte(CirSize, 1));
-    return -1;
+    return NULL;
   }
   ptr->circularBufEnd=((char *)ptr->circularBuf)+sampleToByte(CirSize,1);
   ptr->conn_sock=sock;
@@ -234,14 +187,14 @@ static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
   int sendbuff = SEND_BUFF_SIZE;
   if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &sendbuff, sizeof(sendbuff)) != 0) {
     LOG_E(HW, "setsockopt(SO_SNDBUF) failed\n");
-    return -1;
+    return NULL;
   }
   struct epoll_event ev= {0};
   ev.events = EPOLLIN | EPOLLRDHUP;
-  ev.data.fd = sock;
+  ev.data.ptr = ptr;
   if (epoll_ctl(bridge->epollfd, EPOLL_CTL_ADD, sock, &ev) != 0) {
     LOG_E(HW, "epoll_ctl(EPOLL_CTL_ADD) failed\n");
-    return -1;
+    return NULL;
   }
 
   if ( bridge->channelmod > 0) {
@@ -269,7 +222,7 @@ static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
       ptr->channel_model = find_channel_desc_fromname(legacy_model_name);
       if (!ptr->channel_model) {
         LOG_E(HW, "Channel model %s/%s not found, check config file\n", modelname, legacy_model_name);
-        return -1;
+        return NULL;
       }
     }
 
@@ -278,34 +231,29 @@ static int allocCirBuf(rfsimulator_state_t *bridge, int sock)
     random_channel(ptr->channel_model,false);
     LOG_I(HW, "Random channel %s in rfsimulator activated\n", modelname);
   }
-  add_buff_to_socket_mapping(bridge, sock, buff_index);
-  return 0;
+  return ptr;
 }
 
-static void removeCirBuf(rfsimulator_state_t *bridge, int sock) {
-  if (epoll_ctl(bridge->epollfd, EPOLL_CTL_DEL, sock, NULL) != 0) {
+static void removeCirBuf(rfsimulator_state_t *bridge, buffer_t *buf)
+{
+  if (epoll_ctl(bridge->epollfd, EPOLL_CTL_DEL, buf->conn_sock, NULL) != 0) {
     LOG_E(HW, "epoll_ctl(EPOLL_CTL_DEL) failed\n");
   }
-  close(sock);
-  buffer_t* buf = get_buff_from_socket(bridge, sock);
-  if (buf) {
-    free(buf->circularBuf);
-    // Fixme: no free_channel_desc_scm(bridge->buf[sock].channel_model) implemented
-    // a lot of mem leaks
-    //free(bridge->buf[sock].channel_model);
-    memset(buf, 0, sizeof(buffer_t));
-    buf->conn_sock=-1;
-    remove_buff_to_socket_mapping(bridge, sock);
-    nb_ue--;
-  }
+  close(buf->conn_sock);
+  free(buf->circularBuf);
+  // Fixme: no free_channel_desc_scm(bridge->buf[sock].channel_model) implemented
+  // a lot of mem leaks
+  // free(bridge->buf[sock].channel_model);
+  memset(buf, 0, sizeof(buffer_t));
+  buf->conn_sock = -1;
+  nb_ue--;
 }
 
-static void socketError(rfsimulator_state_t *bridge, int sock) {
-  buffer_t* buf = get_buff_from_socket(bridge, sock);
-  if (!buf) return;
+static void socketError(rfsimulator_state_t *bridge, buffer_t *buf)
+{
   if (buf->conn_sock != -1) {
     LOG_W(HW, "Lost socket\n");
-    removeCirBuf(bridge, sock);
+    removeCirBuf(bridge, buf);
 
     if (bridge->role == SIMU_ROLE_CLIENT)
       exit(1);
@@ -661,7 +609,7 @@ static int startServer(openair0_device *device)
   }
   struct epoll_event ev = {0};
   ev.events = EPOLLIN;
-  ev.data.fd = t->listen_sock;
+  ev.data.ptr = NULL;
   if (epoll_ctl(t->epollfd, EPOLL_CTL_ADD, t->listen_sock, &ev) != 0) {
     LOG_E(HW, "epoll_ctl(EPOLL_CTL_ADD) failed, errno(%d)\n", errno);
     return -1;
@@ -730,7 +678,7 @@ static int startClient(openair0_device *device)
   if (setblocking(sock, notBlocking) == -1) {
     return -1;
   }
-  return allocCirBuf(t, sock);
+  return allocCirBuf(t, sock) == NULL ? -1 : 0;
 }
 
 static int rfsimulator_write_internal(rfsimulator_state_t *t, openair0_timestamp timestamp, void **samplesVoid, int nsamps, int nbAnt, int flags, bool alreadyLocked) {
@@ -815,9 +763,9 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
   }
 
   for (int nbEv = 0; nbEv < nfds; ++nbEv) {
-    int fd=events[nbEv].data.fd;
+    buffer_t *b = events[nbEv].data.ptr;
 
-    if (events[nbEv].events & EPOLLIN && fd == t->listen_sock) {
+    if (events[nbEv].events & EPOLLIN && b == NULL) {
       int conn_sock;
       conn_sock = accept(t->listen_sock, NULL, NULL);
       if (conn_sock == -1) {
@@ -827,7 +775,8 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
       if (setblocking(conn_sock, notBlocking)) {
         return false;
       }
-      if (allocCirBuf(t, conn_sock) == -1) {
+      buffer_t *new_buf = allocCirBuf(t, conn_sock);
+      if (new_buf == NULL) {
         return false;
       }
       LOG_I(HW, "A client connects, sending the current time\n");
@@ -840,17 +789,13 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
 
       rfsimulator_write_internal(t, t->lastWroteTS > 1 ? t->lastWroteTS - 1 : 0, samplesVoid, 1, t->tx_num_channels, 1, false);
 
-      buffer_t *b = get_buff_from_socket(t, conn_sock);
-      if (b->channel_model)
-        b->channel_model->start_TS = t->lastWroteTS;
+      if (new_buf->channel_model)
+        new_buf->channel_model->start_TS = t->lastWroteTS;
     } else {
       if ( events[nbEv].events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP) ) {
-        socketError(t,fd);
+        socketError(t, b);
         continue;
       }
-
-      buffer_t *b = get_buff_from_socket(t, fd);
-      if (!b) continue;
       if ( b->circularBuf == NULL ) {
         LOG_E(HW, "Received data on not connected socket %d\n", events[nbEv].data.fd);
         continue;
@@ -865,7 +810,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
                  b->remainToTransfer :
                  b->circularBufEnd - b->transferPtr ;
 
-      ssize_t sz=recv(fd, b->transferPtr, blockSz, MSG_DONTWAIT);
+      ssize_t sz = recv(b->conn_sock, b->transferPtr, blockSz, MSG_DONTWAIT);
 
       if ( sz < 0 ) {
         if ( errno != EAGAIN ) {
@@ -925,7 +870,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
         pthread_mutex_lock(&Sockmutex);
 
         if (t->lastWroteTS != 0 && (fabs((double)t->lastWroteTS-b->lastReceivedTS) > (double)CirSize))
-          LOG_W(HW, "UEsock(%d) Tx/Rx shift too large Tx:%lu, Rx:%lu\n", fd, t->lastWroteTS, b->lastReceivedTS);
+          LOG_W(HW, "UEsock(%d) Tx/Rx shift too large Tx:%lu, Rx:%lu\n", b->conn_sock, t->lastWroteTS, b->lastReceivedTS);
 
         pthread_mutex_unlock(&Sockmutex);
         b->transferPtr=(char *)&b->circularBuf[(b->lastReceivedTS*b->th.nbAnt)%CirSize];
@@ -935,11 +880,11 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int nsamps_for_initi
       if ( b->headerMode==false ) {
         if ( ! b->trashingPacket ) {
           b->lastReceivedTS=b->th.timestamp+b->th.size-byteToSample(b->remainToTransfer,b->th.nbAnt);
-          LOG_D(HW, "UEsock: %d Set b->lastReceivedTS %ld\n", fd, b->lastReceivedTS);
+          LOG_D(HW, "UEsock: %d Set b->lastReceivedTS %ld\n", b->conn_sock, b->lastReceivedTS);
         }
 
         if ( b->remainToTransfer==0) {
-          LOG_D(HW, "UEsock: %d Completed block reception: %ld\n", fd, b->lastReceivedTS);
+          LOG_D(HW, "UEsock: %d Completed block reception: %ld\n", b->conn_sock, b->lastReceivedTS);
           b->headerMode=true;
           b->transferPtr=(char *)&b->th;
           b->remainToTransfer = sizeof(samplesBlockHeader_t);
@@ -1142,10 +1087,9 @@ static void rfsimulator_end(openair0_device *device) {
   for (int i = 0; i < MAX_FD_RFSIMU; i++) {
     buffer_t *b = &s->buf[i];
     if (b->conn_sock >= 0 )
-      removeCirBuf(s, b->conn_sock);
+      removeCirBuf(s, b);
   }
   close(s->epollfd);
-  hashtable_destroy(&s->fd_to_buf_map);
   free(s);
 }
 static void stopServer(openair0_device *device)
@@ -1169,11 +1113,6 @@ static int rfsimulator_set_gains(openair0_device *device, openair0_config_t *ope
 }
 static int rfsimulator_write_init(openair0_device *device) {
   return 0;
-}
-
-void do_not_free_integer(void *integer)
-{
-  (void)integer;
 }
 
 __attribute__((__visibility__("default")))
@@ -1222,7 +1161,6 @@ int device_init(openair0_device *device, openair0_config_t *openair0_cfg) {
   for (int i = 0; i < MAX_FD_RFSIMU; i++)
     rfsimulator->buf[i].conn_sock=-1;
   rfsimulator->next_buf = 0;
-  rfsimulator->fd_to_buf_map = hashtable_create(MAX_FD_RFSIMU, NULL, do_not_free_integer);
 
   AssertFatal((rfsimulator->epollfd = epoll_create1(0)) != -1, "epoll_create1() failed, errno(%d)", errno);
   // we need to call randominit() for telnet server (use gaussdouble=>uniformrand)

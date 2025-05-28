@@ -81,8 +81,6 @@
 #define bzero(s,n) (memset((s),0,(n)))
 /// suppress compiler warning for unused arguments
 #define UNUSED(x) (void)x;
-#define NUM_DL_ACTORS 4
-#define NUM_UL_ACTORS 2
 
 // Set the number of barriers for processSlotTX to 512. This value has to be at least 483 for NTN where
 // DL-to-UL offset is up to 483. The selected value is also half of the frame range so that
@@ -519,8 +517,8 @@ typedef struct PHY_VARS_NR_UE_s {
   sl_nr_sidelink_mode_t sl_mode;
   sl_nr_ue_phy_params_t SL_UE_PHY_PARAMS;
   Actor_t sync_actor;
-  Actor_t dl_actors[NUM_DL_ACTORS];
-  Actor_t ul_actors[NUM_UL_ACTORS];
+  Actor_t *dl_actors;
+  Actor_t *ul_actors;
   ntn_config_message_t* ntn_config_message;
   pthread_t main_thread;
   pthread_t stat_thread;

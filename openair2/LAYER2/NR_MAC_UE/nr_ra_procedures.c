@@ -336,17 +336,14 @@ static void config_preamble_index(NR_UE_MAC_INST_t *mac)
       nb_of_preambles = preamb_ga;
     }
   }
-  int rand_preamb = (rand_r(&seed) % ra->ssb_ro_config.preambles_per_ssb);
+  int pream_per_ssb = min(ra->ssb_ro_config.preambles_per_ssb, nb_of_preambles);
+  int rand_preamb = rand_r(&seed) % pream_per_ssb;
   if (ra->ssb_ro_config.ssb_per_ro < 1)
     ra->ra_PreambleIndex = groupOffset + rand_preamb;
   else {
     int ssb_pr_idx = mac->ssb_list.nb_ssb_per_index[mac->mib_ssb] % (int)ra->ssb_ro_config.ssb_per_ro;
     ra->ra_PreambleIndex = groupOffset + (ssb_pr_idx * ra->ssb_ro_config.preambles_per_ssb) + rand_preamb;
   }
-  AssertFatal(ra->ra_PreambleIndex < nb_of_preambles,
-              "Error! Selected preamble %d which exceeds number of prambles available %d\n",
-              ra->ra_PreambleIndex,
-              nb_of_preambles);
 }
 
 static void configure_ra_preamble(NR_UE_MAC_INST_t *mac)

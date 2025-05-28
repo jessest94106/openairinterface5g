@@ -115,6 +115,11 @@ typedef struct {
   int max_sib;
   int live;
   int no_bind;
+  /* config to dump to file instead of UDP */
+  /* output_filename != NULL means to output to file */
+  char *output_filename;
+  FILE *output_file;
+
   /* runtime vars */
   int cur_mib;
   int cur_sib;
@@ -130,18 +135,95 @@ typedef struct {
 } ev_data;
 
 /****************************************************************************/
+/* direct output to pcap file                                               */
+/****************************************************************************/
+
+void write_pcap_header(const char *filename, FILE *f)
+{
+  /* see 'man pcap-savefile' for format */
+  uint32_t magic = 0xa1b23c4d;              /* magic for second/nanosecond */
+  uint16_t major = 2;
+  uint16_t minor = 4;
+  uint32_t reserved = 0;
+  uint32_t snapshot_length = 0x7fffffff;    /* let's be generous */
+  uint32_t link_layer_type = 252;           /* DLT_WIRESHARK_UPPER_PDU */
+  if (fwrite(&magic, 4, 1, f) != 1
+      || fwrite(&major, 2, 1, f) != 1
+      || fwrite(&minor, 2, 1, f) != 1
+      || fwrite(&reserved, 4, 1, f) != 1
+      || fwrite(&reserved, 4, 1, f) != 1
+      || fwrite(&snapshot_length, 4, 1, f) != 1
+      || fwrite(&link_layer_type, 4, 1, f) != 1) {
+    printf("fatal: error writing header to %s\n", filename);
+    exit(1);
+  }
+}
+
+const char *pcap_trace_header(int is_lte)
+{
+  static char header_nr[] = {
+    0x00, 12,            /* type = EXP_PDU_TAG_DISSECTOR_NAME */
+    0x00, 16,            /* length */
+    'm', 'a', 'c', '-', 'n', 'r', '-', 'f', 'r', 'a', 'm', 'e', 'd', 0, 0, 0,
+    0x00, 0x00, 0x00, 0x00   /* EXP_PDU_TAG_END_OF_OPT with length 0 */
+  };
+  static char header_lte[] = {
+    0x00, 12,            /* type = EXP_PDU_TAG_DISSECTOR_NAME */
+    0x00, 16,            /* length */
+    'm', 'a', 'c', '-', 'l', 't', 'e', '-', 'f', 'r', 'a', 'm', 'e', 'd', 0, 0,
+    0x00, 0x00, 0x00, 0x00   /* EXP_PDU_TAG_END_OF_OPT with length 0 */
+  };
+  return is_lte ? header_lte : header_nr;
+}
+
+void write_pcap_trace(const char *filename, FILE *f,
+                      struct timespec sending_time,
+                      const char *buf, int size, int is_lte)
+{
+  uint32_t second = sending_time.tv_sec;
+  uint32_t nanosecond = sending_time.tv_nsec;
+  uint32_t length = size + 24;
+  /* untruncated_length == length, we dump everything */
+  uint32_t untruncated_length = length;
+  if (fwrite(&second, 4, 1, f) != 1
+      || fwrite(&nanosecond, 4, 1, f) != 1
+      || fwrite(&length, 4, 1, f) != 1
+      || fwrite(&untruncated_length, 4, 1, f) != 1
+      || fwrite(pcap_trace_header(is_lte), 24, 1, f) != 1
+      || fwrite(buf, size, 1, f) != 1) {
+    printf("fatal: error writing to file %s\n", filename);
+    exit(1);
+  }
+}
+void write_pcap_trace_lte(const char *filename, FILE *f,
+                          struct timespec sending_time,
+                          const char *buf, int size)
+{
+  write_pcap_trace(filename, f, sending_time, buf, size, 1);
+}
+
+void write_pcap_trace_nr(const char *filename, FILE *f,
+                          struct timespec sending_time,
+                          const char *buf, int size)
+{
+  write_pcap_trace(filename, f, sending_time, buf, size, 0);
+}
+
+/****************************************************************************/
 /* LTE                                                                      */
 /****************************************************************************/
 
-void trace_lte(ev_data *d, int direction, int rnti_type, int rnti,
-        int frame, int subframe, void *buf, int bufsize, int preamble,
-        int sr_rnti)
+void trace_lte(struct timespec sending_time, ev_data *d, int direction,
+        int rnti_type, int rnti, int frame, int subframe, void *buf,
+        int bufsize, int preamble, int sr_rnti)
 {
   ssize_t ret;
   int fsf;
   int i;
   d->buf.osize = 0;
-  PUTS(&d->buf, MAC_LTE_START_STRING);
+
+  if (!d->output_filename)
+    PUTS(&d->buf, MAC_LTE_START_STRING);
   PUTC(&d->buf, FDD_RADIO);
   PUTC(&d->buf, direction);
   PUTC(&d->buf, rnti_type);
@@ -202,16 +284,21 @@ void trace_lte(ev_data *d, int direction, int rnti_type, int rnti,
   for (i = 0; i < bufsize; i++)
     PUTC(&d->buf, ((char *)buf)[i]);
 
-  ret = sendto(d->socket, d->buf.obuf, d->buf.osize, 0,
-               (struct sockaddr *)&d->to, sizeof(struct sockaddr_in));
+  if (d->output_filename) {
+    write_pcap_trace_lte(d->output_filename, d->output_file, sending_time,
+                         d->buf.obuf, d->buf.osize);
+  } else {
+    ret = sendto(d->socket, d->buf.obuf, d->buf.osize, 0,
+                 (struct sockaddr *)&d->to, sizeof(struct sockaddr_in));
 
-  if (ret != d->buf.osize) abort();
+    if (ret != d->buf.osize) abort();
+  }
 }
 
 void ul(void *_d, event e)
 {
   ev_data *d = _d;
-  trace_lte(d, DIRECTION_UPLINK, C_RNTI, e.e[d->ul_rnti].i,
+  trace_lte(e.sending_time, d, DIRECTION_UPLINK, C_RNTI, e.e[d->ul_rnti].i,
             e.e[d->ul_frame].i, e.e[d->ul_subframe].i,
             e.e[d->ul_data].b, e.e[d->ul_data].bsize,
             NO_PREAMBLE, NO_SR_RNTI);
@@ -229,7 +316,7 @@ void dl(void *_d, event e)
     d->cur_sib++;
   }
 
-  trace_lte(d, DIRECTION_DOWNLINK,
+  trace_lte(e.sending_time, d, DIRECTION_DOWNLINK,
             e.e[d->dl_rnti].i != 0xffff ? C_RNTI : SI_RNTI, e.e[d->dl_rnti].i,
             e.e[d->dl_frame].i, e.e[d->dl_subframe].i,
             e.e[d->dl_data].b, e.e[d->dl_data].bsize,
@@ -245,7 +332,7 @@ void mib(void *_d, event e)
   if (d->max_mib && d->cur_mib == d->max_mib) return;
 
   d->cur_mib++;
-  trace_lte(d, DIRECTION_DOWNLINK, NO_RNTI, 0,
+  trace_lte(e.sending_time, d, DIRECTION_DOWNLINK, NO_RNTI, 0,
             e.e[d->mib_frame].i, e.e[d->mib_subframe].i,
             e.e[d->mib_data].b, e.e[d->mib_data].bsize,
             NO_PREAMBLE, NO_SR_RNTI);
@@ -254,7 +341,7 @@ void mib(void *_d, event e)
 void preamble(void *_d, event e)
 {
   ev_data *d = _d;
-  trace_lte(d, DIRECTION_UPLINK, NO_RNTI, 0,
+  trace_lte(e.sending_time, d, DIRECTION_UPLINK, NO_RNTI, 0,
             e.e[d->preamble_frame].i, e.e[d->preamble_subframe].i,
             NULL, 0,
             e.e[d->preamble_preamble].i, NO_SR_RNTI);
@@ -263,7 +350,7 @@ void preamble(void *_d, event e)
 void ue_preamble(void *_d, event e)
 {
   ev_data *d = _d;
-  trace_lte(d, DIRECTION_UPLINK, NO_RNTI, 0,
+  trace_lte(e.sending_time, d, DIRECTION_UPLINK, NO_RNTI, 0,
             e.e[d->ue_preamble_frame].i, e.e[d->ue_preamble_subframe].i,
             NULL, 0,
             e.e[d->ue_preamble_preamble].i, NO_SR_RNTI);
@@ -272,7 +359,8 @@ void ue_preamble(void *_d, event e)
 void rar(void *_d, event e)
 {
   ev_data *d = _d;
-  trace_lte(d, DIRECTION_DOWNLINK, RA_RNTI, e.e[d->rar_rnti].i,
+  trace_lte(e.sending_time, d, DIRECTION_DOWNLINK,
+            RA_RNTI, e.e[d->rar_rnti].i,
             e.e[d->rar_frame].i, e.e[d->rar_subframe].i,
             e.e[d->rar_data].b, e.e[d->rar_data].bsize,
             NO_PREAMBLE, NO_SR_RNTI);
@@ -281,7 +369,7 @@ void rar(void *_d, event e)
 void sr(void *_d, event e)
 {
   ev_data *d = _d;
-  trace_lte(d, DIRECTION_UPLINK, NO_RNTI, 0,
+  trace_lte(e.sending_time, d, DIRECTION_UPLINK, NO_RNTI, 0,
             e.e[d->sr_frame].i, e.e[d->sr_subframe].i,
             NULL, 0,
             NO_PREAMBLE, e.e[d->sr_rnti].i);
@@ -310,14 +398,15 @@ void sr(void *_d, event e)
 #define NR_C_RNTI  3
 #define NR_SI_RNTI 4
 
-void trace_nr(ev_data *d, int direction, int rnti_type, int rnti,
-        int frame, int slot, int harq_pid, void *buf, int bufsize,
-        int preamble)
+void trace_nr(struct timespec sending_time, ev_data *d, int direction,
+        int rnti_type, int rnti, int frame, int slot, int harq_pid, void *buf,
+        int bufsize, int preamble)
 {
   ssize_t ret;
   int i;
   d->buf.osize = 0;
-  PUTS(&d->buf, MAC_NR_START_STRING);
+  if (!d->output_filename)
+    PUTS(&d->buf, MAC_NR_START_STRING);
   PUTC(&d->buf, NR_TDD_RADIO);
   PUTC(&d->buf, direction);
   PUTC(&d->buf, rnti_type);
@@ -361,17 +450,23 @@ void trace_nr(ev_data *d, int direction, int rnti_type, int rnti,
   for (i = 0; i < bufsize; i++)
     PUTC(&d->buf, ((char *)buf)[i]);
 
-  ret = sendto(d->socket, d->buf.obuf, d->buf.osize, 0,
-               (struct sockaddr *)&d->to, sizeof(struct sockaddr_in));
+  if (d->output_filename) {
+    write_pcap_trace_nr(d->output_filename, d->output_file, sending_time,
+                        d->buf.obuf, d->buf.osize);
+  } else {
+    ret = sendto(d->socket, d->buf.obuf, d->buf.osize, 0,
+                 (struct sockaddr *)&d->to, sizeof(struct sockaddr_in));
 
-  if (ret != d->buf.osize) abort();
+    if (ret != d->buf.osize) abort();
+  }
 }
 
 void nr_ul(void *_d, event e)
 {
   ev_data *d = _d;
 
-  trace_nr(d, NR_DIRECTION_UPLINK, NR_C_RNTI, e.e[d->nr_ul_rnti].i,
+  trace_nr(e.sending_time, d, NR_DIRECTION_UPLINK,
+           NR_C_RNTI, e.e[d->nr_ul_rnti].i,
            e.e[d->nr_ul_frame].i, e.e[d->nr_ul_slot].i,
            e.e[d->nr_ul_harq_pid].i, e.e[d->nr_ul_data].b,
            e.e[d->nr_ul_data].bsize, NO_PREAMBLE);
@@ -389,7 +484,7 @@ void nr_dl(void *_d, event e)
     d->cur_sib++;
   }
 
-  trace_nr(d, NR_DIRECTION_DOWNLINK,
+  trace_nr(e.sending_time, d, NR_DIRECTION_DOWNLINK,
            e.e[d->nr_dl_rnti].i != 0xffff ? NR_C_RNTI : NR_SI_RNTI,
            e.e[d->nr_dl_rnti].i, e.e[d->nr_dl_frame].i, e.e[d->nr_dl_slot].i,
            e.e[d->nr_dl_harq_pid].i, e.e[d->nr_dl_data].b,
@@ -400,7 +495,8 @@ void nr_dl_retx(void *_d, event e)
 {
   ev_data *d = _d;
 
-  trace_nr(d, NR_DIRECTION_DOWNLINK, NR_C_RNTI, e.e[d->nr_dl_retx_rnti].i,
+  trace_nr(e.sending_time, d, NR_DIRECTION_DOWNLINK,
+           NR_C_RNTI, e.e[d->nr_dl_retx_rnti].i,
            e.e[d->nr_dl_retx_frame].i, e.e[d->nr_dl_retx_slot].i,
            e.e[d->nr_dl_retx_harq_pid].i, e.e[d->nr_dl_retx_data].b,
            e.e[d->nr_dl_retx_data].bsize, NO_PREAMBLE);
@@ -416,7 +512,7 @@ void nr_mib(void *_d, event e)
 
   d->cur_mib++;
 
-  trace_nr(d, NR_DIRECTION_DOWNLINK, NR_NO_RNTI, 0,
+  trace_nr(e.sending_time, d, NR_DIRECTION_DOWNLINK, NR_NO_RNTI, 0,
            e.e[d->nr_mib_frame].i, e.e[d->nr_mib_slot].i, 0 /* harq pid */,
            e.e[d->nr_mib_data].b, e.e[d->nr_mib_data].bsize, NO_PREAMBLE);
 }
@@ -431,7 +527,7 @@ void nr_ue_mib(void *_d, event e)
 
   d->cur_mib++;
 
-  trace_nr(d, NR_DIRECTION_DOWNLINK, NR_NO_RNTI, 0,
+  trace_nr(e.sending_time, d, NR_DIRECTION_DOWNLINK, NR_NO_RNTI, 0,
            e.e[d->nr_ue_mib_frame].i, e.e[d->nr_ue_mib_slot].i, 0 /* harq pid */,
            e.e[d->nr_ue_mib_data].b, e.e[d->nr_ue_mib_data].bsize, NO_PREAMBLE);
 }
@@ -440,7 +536,8 @@ void nr_rar(void *_d, event e)
 {
   ev_data *d = _d;
 
-  trace_nr(d, NR_DIRECTION_DOWNLINK, NR_RA_RNTI, e.e[d->nr_rar_rnti].i,
+  trace_nr(e.sending_time, d, NR_DIRECTION_DOWNLINK,
+           NR_RA_RNTI, e.e[d->nr_rar_rnti].i,
            e.e[d->nr_rar_frame].i, e.e[d->nr_rar_slot].i, 0 /* harq pid */,
            e.e[d->nr_rar_data].b, e.e[d->nr_rar_data].bsize, NO_PREAMBLE);
 }
@@ -449,7 +546,8 @@ void nr_ue_ul(void *_d, event e)
 {
   ev_data *d = _d;
 
-  trace_nr(d, NR_DIRECTION_UPLINK, NR_C_RNTI, e.e[d->nr_ue_ul_rnti].i,
+  trace_nr(e.sending_time, d, NR_DIRECTION_UPLINK,
+           NR_C_RNTI, e.e[d->nr_ue_ul_rnti].i,
            e.e[d->nr_ue_ul_frame].i, e.e[d->nr_ue_ul_slot].i,
            e.e[d->nr_ue_ul_harq_pid].i, e.e[d->nr_ue_ul_data].b,
            e.e[d->nr_ue_ul_data].bsize, NO_PREAMBLE);
@@ -467,7 +565,7 @@ void nr_ue_dl(void *_d, event e)
     d->cur_sib++;
   }
 
-  trace_nr(d, NR_DIRECTION_DOWNLINK,
+  trace_nr(e.sending_time, d, NR_DIRECTION_DOWNLINK,
            e.e[d->nr_ue_dl_rnti].i != 0xffff ? NR_C_RNTI : NR_SI_RNTI,
            e.e[d->nr_ue_dl_rnti].i, e.e[d->nr_ue_dl_frame].i,
            e.e[d->nr_ue_dl_slot].i, e.e[d->nr_ue_dl_harq_pid].i,
@@ -477,7 +575,8 @@ void nr_ue_dl(void *_d, event e)
 void nr_ue_rar(void *_d, event e)
 {
   ev_data *d = _d;
-  trace_nr(d, DIRECTION_DOWNLINK, RA_RNTI, e.e[d->nr_ue_rar_rnti].i,
+  trace_nr(e.sending_time, d, DIRECTION_DOWNLINK,
+           RA_RNTI, e.e[d->nr_ue_rar_rnti].i,
            e.e[d->nr_ue_rar_frame].i, e.e[d->nr_ue_rar_slot].i, 0,
            e.e[d->nr_ue_rar_data].b, e.e[d->nr_ue_rar_data].bsize,
            NO_PREAMBLE);
@@ -833,7 +932,15 @@ void usage(void)
     "    -live-port <port>         tracee's port (default %d)\n"
     "    -no-bind                  don't bind to IP address (for remote logging)\n"
     "-i and -live are mutually exclusive options. One of them must be provided\n"
-    "but not both.\n",
+    "but not both.\n"
+    "\n"
+    "Use the following options to dump to a file instead of sending UDP packets:\n"
+    "    -to-file <filename>       dump to file using the mac framed format\n"
+    "\n"
+    "To use wireshark with files created using the option '-to-file',\n"
+    "you need to configure wireshark:\n"
+    "    in Analyze->Enabled Protocols search for MAC-NR-FRAMED and\n"
+    "    MAC-LTE-FRAMED and enable them.\n",
     DEFAULT_IP,
     DEFAULT_PORT,
     DEFAULT_LIVE_IP,
@@ -881,11 +988,13 @@ int main(int n, char **v)
     if (!strcmp(v[i], "-live-ip"))   { if(i>n-2)usage(); live_ip = v[++i];           continue; }
     if (!strcmp(v[i], "-live-port")) { if(i>n-2)usage(); live_port = atoi(v[++i]);   continue; }
     if (!strcmp(v[i], "-no-bind"))   {                   d.no_bind = 1;              continue; }
+    if (!strcmp(v[i], "-to-file"))   { if(i>n-2)usage(); d.output_filename = v[++i]; continue; }
     usage();
   }
 
   if (database_filename == NULL) {
     printf("ERROR: provide a database file (-d)\n");
+    printf("use -h for help on usage\n");
     exit(1);
   }
 
@@ -992,17 +1101,27 @@ int main(int n, char **v)
   register_handler_function(h, nr_ue_dl_id, nr_ue_dl, &d);
   register_handler_function(h, nr_ue_rar_id, nr_ue_rar, &d);
 
-  d.socket = socket(AF_INET, SOCK_DGRAM, 0);
+  if (d.output_filename) {
+    d.output_file = fopen(d.output_filename, "w");
+    if (d.output_file == NULL) {
+      perror(d.output_filename);
+      exit(1);
+    }
+    write_pcap_header(d.output_filename, d.output_file);
+  } else {
+    d.socket = socket(AF_INET, SOCK_DGRAM, 0);
 
-  if (d.socket == -1) {
-    perror("socket");
-    exit(1);
+    if (d.socket == -1) {
+      perror("socket");
+      exit(1);
+    }
+
+    d.to.sin_family = AF_INET;
+    d.to.sin_port = htons(port);
+    d.to.sin_addr.s_addr = inet_addr(ip);
+    new_thread(receiver, &d);
   }
 
-  d.to.sin_family = AF_INET;
-  d.to.sin_port = htons(port);
-  d.to.sin_addr.s_addr = inet_addr(ip);
-  new_thread(receiver, &d);
   OBUF ebuf = {.osize = 0, .omaxsize = 0, .obuf = NULL};
 
   /* read messages */
@@ -1023,6 +1142,11 @@ int main(int n, char **v)
           e.type == nr_ue_rar_id)) continue;
 
     handle_event(h, e);
+  }
+
+  if (d.output_filename) {
+    if (fclose(d.output_file))
+      perror(d.output_filename);
   }
 
   return 0;

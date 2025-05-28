@@ -391,6 +391,36 @@ TEST(yaml_config, test_read_mapping_as_list) {
   end_configmodule(cfg);
 }
 
+TEST(yaml_config, test_read_ipv4) {
+  configmodule_interface_t *cfg = static_cast<configmodule_interface_t*>(calloc(1, sizeof(*cfg)));
+  cfg->cfgP[0] = strdup("test_ipv4.yaml");
+  EXPECT_EQ(config_yaml_init(cfg), 0);
+
+  paramdef_t p = {};
+  p.type = TYPE_IPV4ADDR;
+  strncpy(p.optname, "ipv4_1", sizeof(p.optname) - 1);
+  uint32_t addr = 0;
+  p.uptr = &addr;
+  p.defstrval = nullptr;
+  char prefix[] = "test";
+  config_yaml_get(cfg, &p, 1, prefix);
+  printf("%x\n", addr);
+
+  strncpy(p.optname, "ipv4_2", sizeof(p.optname) - 1);
+  config_yaml_get(cfg, &p, 1, prefix);
+  printf("%x\n", addr);
+
+  p.defstrval = strdup("10.0.0.1");
+  strncpy(p.optname, "ipv4_3", sizeof(p.optname) - 1);
+  config_yaml_get(cfg, &p, 1, prefix);
+  printf("%x\n", addr);
+
+  config_yaml_end(cfg);
+  free(cfg->cfgP[0]);
+  end_configmodule(cfg);
+  free(p.defstrval);
+}
+
 int main(int argc, char** argv)
 {
   logInit();

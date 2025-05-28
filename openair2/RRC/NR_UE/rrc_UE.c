@@ -2562,6 +2562,9 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
       nr_pdcp_release_drb(rrc->ue_id, i);
     }
   }
+  // stop TUN threads and clean up SDAP entities
+  nr_sdap_delete_ue_entities(rrc->ue_id);
+
   for (int i = 1; i < NR_NUM_SRB; i++) {
     if (rrc->Srb[i] != RB_NOT_PRESENT) {
       rrc->Srb[i] = RB_NOT_PRESENT;

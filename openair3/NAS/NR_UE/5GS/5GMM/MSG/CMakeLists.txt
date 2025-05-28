@@ -5,6 +5,7 @@ add_library(fgs_5gmm_lib OBJECT
     fgmm_service_reject.c
     RegistrationRequest.c
     RegistrationAccept.c
+    fgmm_identity_request.c
     FGSIdentityResponse.c
     FGSAuthenticationResponse.c
     FGSNASSecurityModeComplete.c

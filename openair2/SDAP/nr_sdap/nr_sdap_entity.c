@@ -329,7 +329,7 @@ static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
     LOG_D(SDAP, "RX Entity offset : %d\n", offset);
 
     if (len != size-offset)
-      LOG_E(SDAP, "%s:%d:%s: fatal\n", __FILE__, __LINE__, __FUNCTION__);
+      LOG_E(SDAP, "write failed to fd %d! errno = %s\n", entity->pdusession_sock, strerror(errno));
   }
 }
 

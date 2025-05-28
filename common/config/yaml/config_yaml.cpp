@@ -25,6 +25,8 @@ extern "C" {
 #include "common/config/config_userapi.h"
 void *config_allocate_new(configmodule_interface_t *cfg, int sz, bool autoFree);
 void config_check_valptr(configmodule_interface_t *cfg, paramdef_t *cfgoptions, int elt_sz, int nb_elt);
+#include "../config_userapi.h"
+#include "../config_common.h"
 }
 #include <cstring>
 #include <string>
@@ -97,6 +99,9 @@ void SetDefault(configmodule_interface_t *cfg, paramdef_t *param)
       if (param->defintarrayval) {
         param->uptr = (uint32_t *)param->defintarrayval;
       }
+      break;
+    case TYPE_IPV4ADDR:
+      config_setdefault_ipv4addr(cfg, param, param->defstrval);
       break;
     default:
       AssertFatal(false, "Unhandled type %d", param->type);
@@ -183,6 +188,16 @@ void SetNonDefault(configmodule_interface_t *cfg, const YAML::Node &node, paramd
         }
       } else {
         param->numelt = 0;
+      }
+      break;
+    }
+    case TYPE_IPV4ADDR: {
+      std::string ipv4addr = node[optname].as<std::string>();
+      char* ipv4addr_ptr = strdup(ipv4addr.c_str());
+      int rst = config_assign_ipv4addr(cfg, param, ipv4addr_ptr);
+      free(ipv4addr_ptr);
+      if (rst < 0) {
+        fprintf(stderr,"[LIBCONFIG] %s not valid for %s \n", ipv4addr.c_str(), optname.c_str());
       }
       break;
     }
