@@ -1042,6 +1042,68 @@ static void generateSecurityModeComplete(nr_ue_nas_t *nas, as_nas_info_t *initia
   }
 }
 
+/** @brief Generates the Security Mode Reject message to be sent by the UE to the AMF
+ * to indicate that the corresponding security mode command has been rejected  */
+static void generateSecurityModeReject(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, cause_id_t cause)
+{
+  LOG_I(NAS, "Send Security Mode Reject\n");
+  fgmm_msg_header_t plain_header = set_mm_header(FGS_SECURITY_MODE_REJECT, PLAIN_5GS_MSG);
+  int size = sizeof(plain_header);
+  fgs_security_mode_reject_msg msg = {.cause = cause};
+  size += 1;
+
+  /** The UE shall apply the 5G NAS security context in use
+   * before the initiation of the security mode control procedure,
+   * if any, to protect the SECURITY MODE REJECT message */
+  bool has_security_context = nas->security_container && nas->security_container->integrity_context;
+  if (has_security_context) {
+    fgmm_nas_msg_security_protected_t sp = {0};
+    sp.header.protocol_discriminator = FGS_MOBILITY_MANAGEMENT_MESSAGE;
+    sp.header.security_header_type = INTEGRITY_PROTECTED;
+    sp.header.sequence_number = nas->security.nas_count_ul & 0xff;
+    size += sizeof(sp.header);
+    sp.plain.header = plain_header;
+    sp.plain.mm_msg.fgs_security_mode_reject = msg;
+    // Security protected header encoding
+    int security_header_len = nas_protected_security_header_encode(initialNasMsg->nas_data, &sp.header, size);
+    initialNasMsg->length =
+        security_header_len + mm_msg_encode(&sp.plain, initialNasMsg->nas_data + security_header_len, size - security_header_len);
+    /* ciphering */
+    uint8_t buf[initialNasMsg->length - 7];
+    nas_stream_cipher_t stream_cipher;
+    stream_cipher.context = nas->security_container->ciphering_context;
+    AssertFatal(nas->security.nas_count_ul <= 0xffffff, "fatal: NAS COUNT UL too big (todo: fix that)\n");
+    stream_cipher.count = nas->security.nas_count_ul;
+    stream_cipher.bearer = 1;
+    stream_cipher.direction = 0;
+    stream_cipher.message = (unsigned char *)(initialNasMsg->nas_data + 7);
+    /* length in bits */
+    stream_cipher.blength = (initialNasMsg->length - 7) << 3;
+    stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, buf);
+    memcpy(stream_cipher.message, buf, initialNasMsg->length - 7);
+    /* integrity protection */
+    uint8_t mac[4];
+    stream_cipher.context = nas->security_container->integrity_context;
+    stream_cipher.count = nas->security.nas_count_ul++;
+    stream_cipher.bearer = 1;
+    stream_cipher.direction = 0;
+    stream_cipher.message = (unsigned char *)(initialNasMsg->nas_data + 6);
+    /* length in bits */
+    stream_cipher.blength = (initialNasMsg->length - 6) << 3;
+    stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
+    LOG_D(NAS, "Integrity protected initial NAS message: mac = %x %x %x %x \n", mac[0], mac[1], mac[2], mac[3]);
+    for (int i = 0; i < 4; i++)
+      initialNasMsg->nas_data[2 + i] = mac[i];
+  } else {
+    fgmm_nas_message_plain_t plain = {0};
+    plain.header = plain_header;
+    plain.mm_msg.fgs_security_mode_reject = msg;
+    // encode the message
+    initialNasMsg->nas_data = malloc_or_fail(size);
+    initialNasMsg->length = mm_msg_encode(&plain, initialNasMsg->nas_data, size);
+  }
+}
+
 static void handle_security_mode_command(nr_ue_nas_t *nas, as_nas_info_t *initialNasMsg, uint8_t *pdu, int pdu_length)
 {
   /* retrieve integrity and ciphering algorithms  */
