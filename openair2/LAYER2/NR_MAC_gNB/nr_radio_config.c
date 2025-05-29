@@ -80,7 +80,6 @@ static NR_BWP_t clone_generic_parameters(const NR_BWP_t *gp)
 static void verify_agg_levels(int num_cce_in_coreset,
                               const int in_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS],
                               int coresetid,
-                              int searchspaceid,
                               int out_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS])
 {
   int agg_level_to_n_cces[] = {1, 2, 4, 8, 16};
@@ -94,10 +93,9 @@ static void verify_agg_levels(int num_cce_in_coreset,
     if (num_agg_level_candidates * agg_level_to_n_cces[i] > num_cce_in_coreset) {
       int new_agg_level_candidates = num_cce_in_coreset / agg_level_to_n_cces[i];
       LOG_E(NR_RRC,
-            "Invalid configuration: Not enough CCEs in coreset %d, searchspace %d, agg_level %d, number of requested "
+            "Invalid configuration: Not enough CCEs in coreset %d, agg_level %d, number of requested "
             "candidates = %d, number of CCES in coreset %d. Aggregation level candidates limited to %d\n",
             coresetid,
-            searchspaceid,
             agg_level_to_n_cces[i],
             in_num_agg_level_candidates[i],
             num_cce_in_coreset,
@@ -1594,7 +1592,7 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
   int searchspaceid = 5 + bwp->bwp_Id;
   int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   int num_cces = get_coreset_num_cces(coreset->frequencyDomainResources.buf, coreset->duration);
-  verify_agg_levels(num_cces, num_agg_level_candidates, coreset->controlResourceSetId, searchspaceid, rrc_num_agg_level_candidates);
+  verify_agg_levels(num_cces, num_agg_level_candidates, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
   NR_SearchSpace_t *ss = rrc_searchspace_config(true, searchspaceid, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
   asn1cSeqAdd(&bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list, ss);
 
@@ -1632,7 +1630,7 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset2);
 
   num_cces = get_coreset_num_cces(coreset2->frequencyDomainResources.buf, coreset2->duration);
-  verify_agg_levels(num_cces, num_agg_level_candidates, coreset2->controlResourceSetId, searchspaceid, rrc_num_agg_level_candidates);
+  verify_agg_levels(num_cces, num_agg_level_candidates, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
 
   searchspaceid = 10 + bwp->bwp_Id;
   NR_SearchSpace_t *ss2 = rrc_searchspace_config(true, searchspaceid, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
@@ -3178,7 +3176,6 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   verify_agg_levels(num_cces,
                     configuration->num_agg_level_candidates,
                     coreset->controlResourceSetId,
-                    searchspaceid,
                     rrc_num_agg_level_candidates);
   NR_SearchSpace_t *ss2 = rrc_searchspace_config(false, searchspaceid, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
   asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss);
