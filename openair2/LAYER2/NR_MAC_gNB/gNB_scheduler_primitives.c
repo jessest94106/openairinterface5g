@@ -405,28 +405,31 @@ NR_ControlResourceSet_t *get_coreset(gNB_MAC_INST *nrmac,
 }
 
 static NR_SearchSpace_t *get_searchspace(NR_ServingCellConfigCommon_t *scc,
-                                         NR_BWP_DownlinkDedicated_t *bwp_Dedicated,
+                                         NR_BWP_DownlinkDedicated_t *bwp_dedicated,
                                          NR_SearchSpace__searchSpaceType_PR target_ss)
 {
-  int n = 0;
-  if(bwp_Dedicated)
-    n = bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list.count;
-  else
-    n = scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list.count;
+  if (bwp_dedicated) {
+    const int n = bwp_dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list.count;
+    for (int i = 0; i < n; i++) {
+      NR_SearchSpace_t *ss = bwp_dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list.array[i];
+      if (ss->searchSpaceType->present == target_ss) {
+        AssertFatal(ss->controlResourceSetId, "searchSpaceId %ld has a NULL controlResourceSetId\n", ss->searchSpaceId);
+        return ss;
+      }
+    }
+    AssertFatal(false, "Couldn't find an adequate SearchSpace for target SearchSpace %d in BWP_DownlinkDedicated\n", target_ss);
+  }
 
-  for (int i=0;i<n;i++) {
-    NR_SearchSpace_t *ss = NULL;
-    if(bwp_Dedicated)
-      ss = bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list.array[i];
-    else
-      ss = scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list.array[i];
-    AssertFatal(ss->controlResourceSetId != NULL, "ss->controlResourceSetId is null\n");
-    AssertFatal(ss->searchSpaceType != NULL, "ss->searchSpaceType is null\n");
+  const int n = scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list.count;
+  for (int i = 0; i < n; i++) {
+    NR_SearchSpace_t *ss =
+        scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list.array[i];
     if (ss->searchSpaceType->present == target_ss) {
+      AssertFatal(ss->controlResourceSetId, "searchSpaceId %ld has a NULL controlResourceSetId\n", ss->searchSpaceId);
       return ss;
     }
   }
-  AssertFatal(0, "Couldn't find an adequate searchspace bwp_Dedicated %p\n",bwp_Dedicated);
+  AssertFatal(false, "Couldn't find an adequate SearchSpace for target SearchSpace %d in ServingCellConfigCommon\n", target_ss);
 }
 
 NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
