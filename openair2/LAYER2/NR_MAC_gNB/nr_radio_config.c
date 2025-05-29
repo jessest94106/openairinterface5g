@@ -3276,16 +3276,16 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   }
   asn1cSeqAdd(&csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list, ssbresset0);
 
-  int bwp_loop_end = n_dl_bwp > 0 ? n_dl_bwp : 1;
+  int bwp_loop_end = n_dl_bwp + 1;
   for (int bwp_loop = 0; bwp_loop < bwp_loop_end; bwp_loop++) {
     int curr_bwp, bwp_id;
     struct NR_SetupRelease_PDSCH_Config *pdsch_Config;
-    if (n_dl_bwp == 0) {
+    if (bwp_loop == 0) {
       pdsch_Config = SpCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdsch_Config;
       curr_bwp = NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
       bwp_id = 0;
     } else {
-      NR_BWP_Downlink_t *bwp = SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_loop];
+      NR_BWP_Downlink_t *bwp = SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_loop - 1];
       pdsch_Config = bwp->bwp_Dedicated->pdsch_Config;
       curr_bwp = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
       bwp_id = bwp->bwp_Id;
