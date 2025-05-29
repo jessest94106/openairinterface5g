@@ -1631,12 +1631,17 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
   NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, curr_bwp, ssb_bitmap);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset2);
 
-  searchspaceid = 10 + bwp->bwp_Id;
   num_cces = get_coreset_num_cces(coreset2->frequencyDomainResources.buf, coreset2->duration);
-  verify_agg_levels(num_cces, num_agg_level_candidates, coreset->controlResourceSetId, searchspaceid, rrc_num_agg_level_candidates);
-  NR_SearchSpace_t *ss2 =
-      rrc_searchspace_config(false, searchspaceid, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
+  verify_agg_levels(num_cces, num_agg_level_candidates, coreset2->controlResourceSetId, searchspaceid, rrc_num_agg_level_candidates);
+
+  searchspaceid = 10 + bwp->bwp_Id;
+  NR_SearchSpace_t *ss2 = rrc_searchspace_config(true, searchspaceid, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss2);
+
+  searchspaceid = 20 + bwp->bwp_Id;
+  NR_SearchSpace_t *ss3 =
+      rrc_searchspace_config(false, searchspaceid, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
+  asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss3);
 
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToReleaseList = NULL;
   bwp->bwp_Dedicated->pdsch_Config = config_pdsch(ssb_bitmap, bwp->bwp_Id, dl_antenna_ports);
