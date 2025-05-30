@@ -32,21 +32,17 @@
 #include "f1ap_messages_types.h"
 
 #ifdef ENABLE_TESTS
-  #define PRINT_ERROR(...) fprintf(stderr, ##__VA_ARGS__)
+  #define PRINT_ERROR(fmt, ...) fprintf(stderr, "%s:%d: " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
 #else
   #define PRINT_ERROR(...)  // Do nothing
 #endif
 
-#define _F1_EQ_CHECK_GENERIC(condition, fmt, ...)                                                  \
-  do {                                                                                             \
-    if (!(condition)) {                                                                            \
-      PRINT_ERROR("F1 Equality Check failure: %s:%d: Condition '%s' failed: " fmt " != " fmt "\n", \
-                  __FILE__,                                                                        \
-                  __LINE__,                                                                        \
-                  #condition,                                                                      \
-                  ##__VA_ARGS__);                                                                  \
-      return false;                                                                                \
-    }                                                                                              \
+#define _F1_EQ_CHECK_GENERIC(condition, fmt, ...)                                                                       \
+  do {                                                                                                                  \
+    if (!(condition)) {                                                                                                 \
+      PRINT_ERROR("Equality condition '%s' failed: " fmt " != " fmt "\n", #condition, ##__VA_ARGS__); \
+      return false;                                                                                                     \
+    }                                                                                                                   \
   } while (0)
 
 #define _F1_EQ_CHECK_LONG(A, B) _F1_EQ_CHECK_GENERIC(A == B, "%ld", A, B);
