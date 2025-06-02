@@ -298,7 +298,6 @@ class Containerize():
 		self.yamlPath = ['', '', '']
 		self.services = ['', '', '']
 		self.deploymentTag = ''
-		self.eNB_logFile = ['', '', '']
 
 		self.testCase_id = ''
 
@@ -307,17 +306,6 @@ class Containerize():
 		self.dockerfileprefix = ''
 		self.host = ''
 
-		self.deployedContainers = []
-		self.tsharkStarted = False
-		self.pingContName = ''
-		self.pingOptions = ''
-		self.pingLossThreshold = ''
-		self.svrContName = ''
-		self.svrOptions = ''
-		self.cliContName = ''
-		self.cliOptions = ''
-
-		self.imageToCopy = ''
 		#checkers from xml
 		self.ran_checkers={}
 		self.num_attempts = 1
