@@ -46,5 +46,6 @@
 #include "F1AP_Flows-Mapped-To-DRB-Item.h"
 #include "F1AP_NonDynamic5QIDescriptor.h"
 #include "F1AP_Dynamic5QIDescriptor.h"
+#include "F1AP_DLUPTNLInformation-ToBeSetup-Item.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

@@ -885,6 +885,100 @@ static void test_f1ap_ue_context_setup_request_simple()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_ue_context_setup_response()
+{
+  f1ap_ue_context_setup_resp_t orig = {
+    .gNB_CU_ue_id = 12,
+    .gNB_DU_ue_id = 13,
+    //.du_to_cu_rrc_info below
+    //.crnti below
+    //.drbs below
+    //.srbs below
+  };
+
+  orig.du_to_cu_rrc_info.cell_group_config = get_test_ba("CELL GROUP CONFIG");
+  orig.du_to_cu_rrc_info.meas_gap_config = get_malloced_test_ba("MGC");
+
+  _F1_MALLOC(orig.crnti, 0x1234);
+
+  orig.drbs_len = 2;
+  orig.drbs = calloc_or_fail(orig.drbs_len, sizeof(*orig.drbs));
+  f1ap_drb_setup_t *drb1 = &orig.drbs[0];
+  drb1->id = 12;
+  _F1_MALLOC(drb1->lcid, 12);
+  drb1->up_dl_tnl_len = 2;
+  inet_pton(AF_INET, "192.168.40.23", &drb1->up_dl_tnl[0].tl_address);
+  drb1->up_dl_tnl[0].teid = 0x11223344;
+  inet_pton(AF_INET, "192.168.40.23", &drb1->up_dl_tnl[1].tl_address);
+  drb1->up_dl_tnl[1].teid = 0x11223345;
+  f1ap_drb_setup_t *drb2 = &orig.drbs[1];
+  drb2->id = 13;
+  _F1_MALLOC(drb2->lcid, 13);
+  drb2->up_dl_tnl_len = 2;
+  inet_pton(AF_INET, "192.168.50.23", &drb2->up_dl_tnl[0].tl_address);
+  drb2->up_dl_tnl[0].teid = 0x21223354;
+  inet_pton(AF_INET, "192.168.50.23", &drb2->up_dl_tnl[1].tl_address);
+  drb2->up_dl_tnl[1].teid = 0x21223355;
+
+  orig.srbs_len = 2;
+  orig.srbs = calloc_or_fail(orig.srbs_len, sizeof(*orig.srbs));
+  for (int i = 0; i < orig.srbs_len; ++i) {
+    orig.srbs[i].id = 1 + i;
+    orig.srbs[i].lcid = 1+i+10;
+  }
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_resp(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_setup_resp_t decoded = {0};
+  bool ret = decode_ue_context_setup_resp(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_setup_resp(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_setup_resp(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_setup_resp(): decoded message doesn't match\n");
+  free_ue_context_setup_resp(&decoded);
+
+  f1ap_ue_context_setup_resp_t cp = cp_ue_context_setup_resp(&orig);
+  ret = eq_ue_context_setup_resp(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_setup_resp(): copied message doesn't match\n");
+  free_ue_context_setup_resp(&orig);
+  free_ue_context_setup_resp(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
+static void test_f1ap_ue_context_setup_response_simple()
+{
+  f1ap_ue_context_setup_resp_t orig = {
+    .gNB_CU_ue_id = 12,
+    .gNB_DU_ue_id = 13,
+    .du_to_cu_rrc_info.cell_group_config = get_test_ba("small cg"),
+    // rest is optional and intentionally left empty
+  };
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_setup_resp(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_setup_resp_t decoded = {0};
+  bool ret = decode_ue_context_setup_resp(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_setup_resp(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_setup_resp(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_setup_resp(): decoded message doesn't match\n");
+  free_ue_context_setup_resp(&decoded);
+
+  f1ap_ue_context_setup_resp_t cp = cp_ue_context_setup_resp(&orig);
+  ret = eq_ue_context_setup_resp(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_setup_resp(): copied message doesn't match\n");
+  free_ue_context_setup_resp(&orig);
+  free_ue_context_setup_resp(&cp);
+
+  printf("%s() successful\n", __func__);
+}
 
 static void test_f1ap_ue_context_modification_request()
 {
@@ -1012,6 +1106,8 @@ int main()
   test_f1ap_du_configuration_update_acknowledge();
   test_f1ap_ue_context_setup_request();
   test_f1ap_ue_context_setup_request_simple();
+  test_f1ap_ue_context_setup_response();
+  test_f1ap_ue_context_setup_response_simple();
   test_f1ap_ue_context_modification_request();
   test_f1ap_ue_context_modification_request_simple();
   return 0;

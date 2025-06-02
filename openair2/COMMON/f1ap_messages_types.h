@@ -460,6 +460,11 @@ typedef struct f1ap_cu_to_du_rrc_info_s {
   byte_array_t *ho_prep_info;
 } f1ap_cu_to_du_rrc_info_t;
 
+typedef struct f1ap_du_to_cu_rrc_info_t {
+  byte_array_t cell_group_config;
+  byte_array_t *meas_gap_config;
+} f1ap_du_to_cu_rrc_info_t;
+
 typedef struct du_to_cu_rrc_information_s {
   uint8_t * cellGroupConfig;
   uint32_t  cellGroupConfig_length;
@@ -493,6 +498,11 @@ typedef enum lower_layer_status_e {
 typedef struct f1ap_srb_to_setup_t {
   int id;
 } f1ap_srb_to_setup_t;
+
+typedef struct f1ap_srb_setup_t {
+  int id;
+  int lcid;
+} f1ap_srb_setup_t;
 
 /// 9.3.1.52 Packet Error Rate
 typedef struct f1ap_per_t {
@@ -560,6 +570,13 @@ typedef struct f1ap_drb_to_setup_t {
   f1ap_pdcp_sn_len_t *ul_pdcp_sn_len;
 } f1ap_drb_to_setup_t;
 
+typedef struct f1ap_drb_setup_t {
+  int id;
+  int *lcid;
+  int up_dl_tnl_len;
+  f1ap_up_tnl_t up_dl_tnl[2];
+} f1ap_drb_setup_t;
+
 typedef struct f1ap_drb_to_release_t {
   int id;
 } f1ap_drb_to_release_t;
@@ -584,6 +601,21 @@ typedef struct f1ap_ue_context_setup_req_s {
 
   uint64_t *gnb_du_ue_agg_mbr_ul; // C-ifDRBSetup
 } f1ap_ue_context_setup_req_t;
+
+typedef struct f1ap_ue_context_setup_resp_s {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+
+  f1ap_du_to_cu_rrc_info_t du_to_cu_rrc_info;
+
+  uint16_t *crnti;
+
+  int drbs_len;
+  f1ap_drb_setup_t *drbs;
+
+  int srbs_len;
+  f1ap_srb_setup_t *srbs;
+} f1ap_ue_context_setup_resp_t;
 
 typedef struct f1ap_ue_context_mod_req_t {
   uint32_t gNB_CU_ue_id;

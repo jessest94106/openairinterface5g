@@ -33,6 +33,12 @@ f1ap_ue_context_setup_req_t cp_ue_context_setup_req(const f1ap_ue_context_setup_
 bool eq_ue_context_setup_req(const f1ap_ue_context_setup_req_t *a, const f1ap_ue_context_setup_req_t *b);
 void free_ue_context_setup_req(f1ap_ue_context_setup_req_t *req);
 
+struct F1AP_F1AP_PDU *encode_ue_context_setup_resp(const f1ap_ue_context_setup_resp_t *msg);
+bool decode_ue_context_setup_resp(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context_setup_resp_t *out);
+f1ap_ue_context_setup_resp_t cp_ue_context_setup_resp(const f1ap_ue_context_setup_resp_t *orig);
+bool eq_ue_context_setup_resp(const f1ap_ue_context_setup_resp_t *a, const f1ap_ue_context_setup_resp_t *b);
+void free_ue_context_setup_resp(f1ap_ue_context_setup_resp_t *resp);
+
 struct F1AP_F1AP_PDU *encode_ue_context_mod_req(const f1ap_ue_context_mod_req_t *msg);
 bool decode_ue_context_mod_req(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context_mod_req_t *out);
 f1ap_ue_context_mod_req_t cp_ue_context_mod_req(const f1ap_ue_context_mod_req_t *orig);
