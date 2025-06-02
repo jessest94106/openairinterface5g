@@ -57,6 +57,8 @@
 #include "utils.h"
 #include "xer_encoder.h"
 
+#define NR_MAX_SUPPORTED_DL_LAYERS 4
+
 #define PUCCH2_SIZE 8
 const uint8_t slotsperframe[5] = {10, 20, 40, 80, 160};
 
