@@ -19,16 +19,7 @@
  *      contact@openairinterface.org
  */
 
-/*! \file nr_rrc_config.c
- * \brief rrc config for gNB
- * \author Raymond Knopp, WEI-TAI CHEN
- * \date 2018
- * \version 1.0
- * \company Eurecom, NTUST
- * \email: raymond.knopp@eurecom.fr, kroempa@gmail.com
- */
-
-#include "nr_rrc_config.h"
+#include "nr_radio_config.h"
 
 #include <endian.h>
 #include <stdio.h>
