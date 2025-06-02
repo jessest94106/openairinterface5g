@@ -33,9 +33,7 @@
 #include "queue.h"
 #include "tree.h"
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t       *instance_p,
-                         ngap_rrc_establishment_cause_t  cause)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t *instance_p, const ngap_rrc_establishment_cause_t cause)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;
@@ -86,10 +84,9 @@ ngap_gNB_nnsf_select_amf(ngap_gNB_instance_t       *instance_p,
   return amf_highest_capacity_p;
 }
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t       *instance_p,
-                                    ngap_rrc_establishment_cause_t  cause,
-                                    int                        selected_plmn_identity)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t *instance_p,
+                                                         const ngap_rrc_establishment_cause_t cause,
+                                                         const plmn_id_t selected_plmn_identity)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;
@@ -135,8 +132,7 @@ ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t       *instance_p,
     /* Looking for served GUAMI PLMN Identity selected matching the one provided by the UE */
     STAILQ_FOREACH(guami_p, &amf_data_p->served_guami, next) {
       STAILQ_FOREACH(served_plmn_p, &guami_p->served_plmns, next) {
-        if ((served_plmn_p->mcc == instance_p->plmn[selected_plmn_identity].plmn.mcc)
-            && (served_plmn_p->mnc == instance_p->plmn[selected_plmn_identity].plmn.mnc)) {
+        if ((served_plmn_p->mcc == selected_plmn_identity.mcc) && (served_plmn_p->mnc == selected_plmn_identity.mnc)) {
           break;
         }
       }
@@ -156,11 +152,10 @@ ngap_gNB_nnsf_select_amf_by_plmn_id(ngap_gNB_instance_t       *instance_p,
   return amf_highest_capacity_p;
 }
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t       *instance_p,
-                                     ngap_rrc_establishment_cause_t  cause,
-                                     int                        selected_plmn_identity,
-                                     uint8_t                    amf_setid)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t *instance_p,
+                                                           const ngap_rrc_establishment_cause_t cause,
+                                                           const plmn_id_t selected_plmn_identity,
+                                                           uint8_t amf_setid)
 {
   struct ngap_gNB_amf_data_s *amf_data_p = NULL;
 
@@ -207,8 +202,7 @@ ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t       *instance_p,
       struct plmn_identity_s   *served_plmn_p = NULL;
 
       STAILQ_FOREACH(served_plmn_p, &guami_p->served_plmns, next) {
-        if ((served_plmn_p->mcc == instance_p->plmn[selected_plmn_identity].plmn.mcc)
-            && (served_plmn_p->mnc == instance_p->plmn[selected_plmn_identity].plmn.mnc)) {
+        if ((served_plmn_p->mcc == selected_plmn_identity.mcc) && (served_plmn_p->mnc == selected_plmn_identity.mnc)) {
           break;
         }
       }
@@ -234,10 +228,9 @@ ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t       *instance_p,
   return NULL;
 }
 
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t       *instance_p,
-                                   ngap_rrc_establishment_cause_t  cause,
-                                   ngap_guami_t                   guami)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *instance_p,
+                                                       const ngap_rrc_establishment_cause_t cause,
+                                                       const nr_guami_t guami)
 {
   struct ngap_gNB_amf_data_s *amf_data_p             = NULL;
 
@@ -327,10 +320,7 @@ ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t       *instance_p,
   return NULL;
 }
 
-
-struct ngap_gNB_amf_data_s *
-ngap_gNB_nnsf_select_amf_by_guami_no_cause(ngap_gNB_instance_t       *instance_p,
-                                            ngap_guami_t                   guami)
+ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami_no_cause(ngap_gNB_instance_t *instance_p, const nr_guami_t guami)
 {
   struct ngap_gNB_amf_data_s *amf_data_p             = NULL;
   struct ngap_gNB_amf_data_s *amf_highest_capacity_p = NULL;

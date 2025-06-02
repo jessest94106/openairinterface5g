@@ -86,15 +86,6 @@ typedef struct nr_e_rab_param_s {
   uint8_t xid; // transaction_id
 } __attribute__ ((__packed__)) nr_e_rab_param_t;
 
-typedef struct nr_rrc_guami_s {
-  uint16_t mcc;
-  uint16_t mnc;
-  uint8_t  mnc_len;
-  uint8_t  amf_region_id;
-  uint16_t amf_set_id;
-  uint8_t  amf_pointer;
-} nr_rrc_guami_t;
-
 typedef enum pdu_session_satus_e {
   PDU_SESSION_STATUS_NEW,
   PDU_SESSION_STATUS_DONE,
@@ -217,7 +208,8 @@ typedef struct gNB_RRC_UE_s {
   uint64_t nr_cellid;
   uint32_t                           rrc_ue_id;
   uint64_t amf_ue_ngap_id;
-  nr_rrc_guami_t                     ue_guami;
+  // Globally Unique AMF Identifier
+  nr_guami_t ue_guami;
 
   ngap_security_capabilities_t       security_capabilities;
   //NSA block
@@ -247,7 +239,7 @@ typedef struct gNB_RRC_UE_s {
   pdusession_t *initial_pdus;
 
   /* Nas Pdu */
-  ngap_pdu_t nas_pdu;
+  byte_array_t nas_pdu;
 
   /* hack, see rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ() for more info */
   int max_delays_pdu_session;

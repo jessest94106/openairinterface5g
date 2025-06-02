@@ -23,15 +23,21 @@
 
 #include <assert.h>
 #include <string.h>
+#include "common/utils/utils.h" // for malloc_or_fail
+
+byte_array_t create_byte_array(const size_t len, const uint8_t* buffer)
+{
+  byte_array_t result = {.len = len};
+  if (len) {
+    result.buf = malloc_or_fail(len);
+    memcpy(result.buf, buffer, len);
+  }
+  return result;
+}
 
 byte_array_t copy_byte_array(byte_array_t src)
 {
-  byte_array_t dst = {0};
-  dst.buf = malloc(src.len);
-  assert(dst.buf != NULL && "Memory exhausted");
-  memcpy(dst.buf, src.buf, src.len);
-  dst.len = src.len;
-  return dst;
+  return create_byte_array(src.len, src.buf);
 }
 
 void free_byte_array(byte_array_t ba)

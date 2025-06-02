@@ -72,7 +72,7 @@ typedef struct ngap_gNB_ue_context_s {
   /* Signaled by the UE in RRC Connection Setup Complete and used in NAS Uplink
    * to route NAS messages correctly. 0-based, not 1-based as in TS 36.331
    * 6.2.2 RRC Connection Setup Complete! */
-  int selected_plmn_identity;
+  plmn_id_t selected_plmn_identity;
 
   /* Reference to gNB data this UE is attached to */
   ngap_gNB_instance_t *gNB_instance;

@@ -38,6 +38,7 @@
 #include "ngap_gNB_defs.h"
 #include "queue.h"
 #include "tree.h"
+#include "ds/byte_array.h"
 
 static ngap_gNB_internal_data_t ngap_gNB_internal_data;
 

@@ -95,6 +95,7 @@
 #include "E1AP/lib/e1ap_bearer_context_management.h"
 #include "E1AP/lib/e1ap_interface_management.h"
 #include "NR_DL-DCCH-Message.h"
+#include "ds/byte_array.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
@@ -121,17 +122,6 @@ static void rrc_deliver_ue_ctxt_release_cmd(void *deliver_pdu_data, ue_id_t ue_i
   data->release_cmd->rrc_container = (uint8_t*) buf;
   data->release_cmd->rrc_container_length = size;
   data->rrc->mac_rrc.ue_context_release_command(data->assoc_id, data->release_cmd);
-}
-
-///---------------------------------------------------------------------------------------------------------------///
-///---------------------------------------------------------------------------------------------------------------///
-
-static void clear_nas_pdu(ngap_pdu_t *pdu)
-{
-  DevAssert(pdu != NULL);
-  free(pdu->buffer); // does nothing if NULL
-  pdu->buffer = NULL;
-  pdu->length = 0;
 }
 
 static void freeDRBlist(NR_DRB_ToAddModList_t *list)
@@ -648,13 +638,11 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
   struct NR_RRCReconfiguration_v1530_IEs__dedicatedNAS_MessageList *dedicatedNAS_MessageList = CALLOC(1, sizeof(*dedicatedNAS_MessageList));
 
   for (int i = 0; i < ue_p->nb_of_pdusessions; i++) {
-    if (ue_p->pduSession[i].param.nas_pdu.buffer != NULL) {
+    if (ue_p->pduSession[i].param.nas_pdu.buf != NULL) {
       asn1cSequenceAdd(dedicatedNAS_MessageList->list, NR_DedicatedNAS_Message_t, msg);
-      OCTET_STRING_fromBuf(msg,
-                           (char *)ue_p->pduSession[i].param.nas_pdu.buffer,
-                           ue_p->pduSession[i].param.nas_pdu.length);
+      OCTET_STRING_fromBuf(msg, (char *)ue_p->pduSession[i].param.nas_pdu.buf, ue_p->pduSession[i].param.nas_pdu.len);
 
-      LOG_D(NR_RRC, "add NAS info with size %d (pdusession idx %d)\n", ue_p->pduSession[i].param.nas_pdu.length, i);
+      LOG_D(NR_RRC, "add NAS info with size %ld (pdusession idx %d)\n", ue_p->pduSession[i].param.nas_pdu.len, i);
       ue_p->pduSession[i].xid = xid;
     }
     if (ue_p->pduSession[i].status < PDU_SESSION_STATUS_ESTABLISHED) {
@@ -662,9 +650,9 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
     }
   }
 
-  if (ue_p->nas_pdu.length) {
+  if (ue_p->nas_pdu.len) {
     asn1cSequenceAdd(dedicatedNAS_MessageList->list, NR_DedicatedNAS_Message_t, msg);
-    OCTET_STRING_fromBuf(msg, (char *)ue_p->nas_pdu.buffer, ue_p->nas_pdu.length);
+    OCTET_STRING_fromBuf(msg, (char *)ue_p->nas_pdu.buf, ue_p->nas_pdu.len);
   }
 
   /* If list is empty free the list and reset the address */
@@ -675,7 +663,7 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
 
   /* Free all NAS PDUs */
   for (int i = 0; i < ue_p->nb_of_pdusessions; i++)
-    clear_nas_pdu(&ue_p->pduSession[i].param.nas_pdu);
+    FREE_AND_ZERO_BYTE_ARRAY(ue_p->pduSession[i].param.nas_pdu);
 
   uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
   // TODO refactor dedicatedNAS_MessageList
@@ -697,16 +685,17 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
       CALLOC(1, sizeof(*dedicatedNAS_MessageList));
 
   for (int i = 0; i < ue_p->nb_of_pdusessions; i++) {
+    rrc_pdu_session_param_t *session = &ue_p->pduSession[i];
     // bypass the new and already configured pdu sessions
-    if (ue_p->pduSession[i].status >= PDU_SESSION_STATUS_DONE) {
-      ue_p->pduSession[i].xid = xid;
+    if (session->status >= PDU_SESSION_STATUS_DONE) {
+      session->xid = xid;
       continue;
     }
 
-    if (ue_p->pduSession[i].cause.type != NGAP_CAUSE_NOTHING) {
+    if (session->cause.type != NGAP_CAUSE_NOTHING) {
       // set xid of failure pdu session
-      ue_p->pduSession[i].xid = xid;
-      ue_p->pduSession[i].status = PDU_SESSION_STATUS_FAILED;
+      session->xid = xid;
+      session->status = PDU_SESSION_STATUS_FAILED;
       continue;
     }
 
@@ -714,21 +703,21 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
     int j;
     for (j = 0; i < MAX_DRBS_PER_UE; j++) {
       if (ue_p->established_drbs[j].status != DRB_INACTIVE
-          && ue_p->established_drbs[j].cnAssociation.sdap_config.pdusession_id == ue_p->pduSession[i].param.pdusession_id)
+          && ue_p->established_drbs[j].cnAssociation.sdap_config.pdusession_id == session->param.pdusession_id)
         break;
     }
 
     if (j == MAX_DRBS_PER_UE) {
       ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_unspecified};
-      ue_p->pduSession[i].xid = xid;
-      ue_p->pduSession[i].status = PDU_SESSION_STATUS_FAILED;
-      ue_p->pduSession[i].cause = cause;
+      session->xid = xid;
+      session->status = PDU_SESSION_STATUS_FAILED;
+      session->cause = cause;
       continue;
     }
 
     // Reference TS23501 Table 5.7.4-1: Standardized 5QI to QoS characteristics mapping
-    for (qos_flow_index = 0; qos_flow_index < ue_p->pduSession[i].param.nb_qos; qos_flow_index++) {
-      switch (ue_p->pduSession[i].param.qos[qos_flow_index].fiveQI) {
+    for (qos_flow_index = 0; qos_flow_index < session->param.nb_qos; qos_flow_index++) {
+      switch (session->param.qos[qos_flow_index].fiveQI) {
         case 1: //100ms
         case 2: //150ms
         case 3: //50ms
@@ -742,27 +731,23 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
           break;
 
         default:
-          LOG_E(NR_RRC, "not supported 5qi %lu\n", ue_p->pduSession[i].param.qos[qos_flow_index].fiveQI);
+          LOG_E(NR_RRC, "not supported 5qi %lu\n", session->param.qos[qos_flow_index].fiveQI);
           ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_not_supported_5QI_value};
-          ue_p->pduSession[i].status = PDU_SESSION_STATUS_FAILED;
-          ue_p->pduSession[i].xid = xid;
-          ue_p->pduSession[i].cause = cause;
+          session->status = PDU_SESSION_STATUS_FAILED;
+          session->xid = xid;
+          session->cause = cause;
           continue;
       }
-        LOG_I(NR_RRC,
-              "index %d, QOS flow %d, 5QI %ld \n",
-              i,
-              qos_flow_index,
-              ue_p->pduSession[i].param.qos[qos_flow_index].fiveQI);
+      LOG_I(NR_RRC, "index %d, QOS flow %d, 5QI %ld \n", i, qos_flow_index, session->param.qos[qos_flow_index].fiveQI);
     }
 
-    ue_p->pduSession[i].status = PDU_SESSION_STATUS_DONE;
-    ue_p->pduSession[i].xid = xid;
+    session->status = PDU_SESSION_STATUS_DONE;
+    session->xid = xid;
 
-    if (ue_p->pduSession[i].param.nas_pdu.buffer != NULL) {
+    if (session->param.nas_pdu.buf != NULL) {
       asn1cSequenceAdd(dedicatedNAS_MessageList->list,NR_DedicatedNAS_Message_t, dedicatedNAS_Message);
-      OCTET_STRING_fromBuf(dedicatedNAS_Message, (char *)ue_p->pduSession[i].param.nas_pdu.buffer, ue_p->pduSession[i].param.nas_pdu.length);
-      LOG_I(NR_RRC, "add NAS info with size %d (pdusession id %d)\n", ue_p->pduSession[i].param.nas_pdu.length, ue_p->pduSession[i].param.pdusession_id);
+      OCTET_STRING_fromBuf(dedicatedNAS_Message, (char *)session->param.nas_pdu.buf, session->param.nas_pdu.len);
+      LOG_I(NR_RRC, "add NAS info with size %ld (pdusession id %d)\n", session->param.nas_pdu.len, session->param.pdusession_id);
     }
   }
 
@@ -790,7 +775,7 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
 
   /* Free all NAS PDUs */
   for (int i = 0; i < ue_p->nb_of_pdusessions; i++)
-    clear_nas_pdu(&ue_p->pduSession[i].param.nas_pdu);
+    FREE_AND_ZERO_BYTE_ARRAY(ue_p->pduSession[i].param.nas_pdu);
 
   LOG_I(NR_RRC, "UE %d: Generate RRCReconfiguration (bytes %d)\n", ue_p->rrc_ue_id, size);
   const uint32_t msg_id = NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration;
@@ -1571,21 +1556,21 @@ static int handle_rrcReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
  */
 void rrc_forward_ue_nas_message(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
 {
-  if (UE->nas_pdu.buffer == NULL || UE->nas_pdu.length == 0)
+  if (UE->nas_pdu.buf == NULL || UE->nas_pdu.len == 0)
     return; // no problem: the UE will re-request a NAS PDU
 
-  LOG_UE_DL_EVENT(UE, "Send DL Information Transfer [%d bytes]\n", UE->nas_pdu.length);
+  LOG_UE_DL_EVENT(UE, "Send DL Information Transfer [%ld bytes]\n", UE->nas_pdu.len);
 
   uint8_t buffer[4096];
   unsigned int xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
-  uint32_t length = do_NR_DLInformationTransfer(buffer, sizeof(buffer), xid, UE->nas_pdu.length, UE->nas_pdu.buffer);
+  uint32_t length = do_NR_DLInformationTransfer(buffer, sizeof(buffer), xid, UE->nas_pdu.len, UE->nas_pdu.buf);
   LOG_DUMPMSG(NR_RRC, DEBUG_RRC, buffer, length, "[MSG] RRC DL Information Transfer\n");
   rb_id_t srb_id = UE->Srb[2].Active ? DL_SCH_LCID_DCCH1 : DL_SCH_LCID_DCCH;
   const uint32_t msg_id = NR_DL_DCCH_MessageType__c1_PR_dlInformationTransfer;
   nr_rrc_transfer_protected_rrc_message(rrc, UE, srb_id, msg_id, buffer, length);
-  // no need to free UE->nas_pdu.buffer, do_NR_DLInformationTransfer() did that
-  UE->nas_pdu.buffer = NULL;
-  UE->nas_pdu.length = 0;
+  // no need to free UE->nas_pdu.buf, do_NR_DLInformationTransfer() did that
+  UE->nas_pdu.buf = NULL;
+  UE->nas_pdu.len = 0;
 }
 
 static void handle_ueCapabilityInformation(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_UECapabilityInformation_t *ue_cap_info)
