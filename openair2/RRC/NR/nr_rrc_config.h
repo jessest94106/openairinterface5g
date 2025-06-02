@@ -116,4 +116,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
 
 NR_ReconfigurationWithSync_t *get_reconfiguration_with_sync(rnti_t rnti, uid_t uid, const NR_ServingCellConfigCommon_t *scc);
 
+NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, long bucketSizeDuration);
+NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR_RLC_Config_PR rlc_conf, long priority);
+
 #endif
