@@ -386,10 +386,14 @@ void abort_nr_dl_harq(NR_UE_info_t* UE, int8_t harq_pid)
 
 static bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
 {
+  bwp_info_t bwp_info;
+  if (!UE) {
+    bwp_info.bwpStart = nr_mac->cset0_bwp_start;
+    bwp_info.bwpSize = nr_mac->cset0_bwp_size;
+    return bwp_info;
+  }
   NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  bwp_info_t bwp_info;
-
   // 3GPP TS 38.214 Section 5.1.2.2 Resource allocation in frequency domain
   // For a PDSCH scheduled with a DCI format 1_0 in any type of PDCCH common search space, regardless of which bandwidth part is the
   // active bandwidth part, RB numbering starts from the lowest RB of the CORESET in which the DCI was received; otherwise RB
