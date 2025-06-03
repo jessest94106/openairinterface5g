@@ -22,6 +22,7 @@
 #include "mac_rrc_dl_handler.h"
 
 #include "mac_proto.h"
+#include "nr_radio_config.h"
 #include "openair2/F1AP/f1ap_ids.h"
 #include "openair2/F1AP/f1ap_common.h"
 #include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"

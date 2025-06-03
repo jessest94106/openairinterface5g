@@ -19,17 +19,8 @@
  *      contact@openairinterface.org
  */
 
-/*! \file nr_rrc_config.c
- * \brief rrc config for gNB
- * \author Raymond Knopp, WEI-TAI CHEN
- * \date 2018
- * \version 1.0
- * \company Eurecom, NTUST
- * \email: raymond.knopp@eurecom.fr, kroempa@gmail.com
- */
-
-#ifndef __NR_RRC_CONFIG_H__
-#define __NR_RRC_CONFIG_H__
+#ifndef __NR_MAC_RRC_CONFIG_H__
+#define __NR_MAC_RRC_CONFIG_H__
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -115,5 +106,8 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                                                      int uid);
 
 NR_ReconfigurationWithSync_t *get_reconfiguration_with_sync(rnti_t rnti, uid_t uid, const NR_ServingCellConfigCommon_t *scc);
+
+NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, long bucketSizeDuration);
+NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR_RLC_Config_PR rlc_conf, long priority);
 
 #endif

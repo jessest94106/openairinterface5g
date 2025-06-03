@@ -87,7 +87,7 @@
 #include "openair1/SIMULATION/TOOLS/sim.h"
 #include "openair2/LAYER2/NR_MAC_UE/mac_proto.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
-#include "openair2/RRC/NR/nr_rrc_config.h"
+#include "openair2/LAYER2/NR_MAC_gNB/nr_radio_config.h"
 #include "time_meas.h"
 #include "utils.h"
 
