@@ -77,6 +77,8 @@ enum scopeDataType {
   ueTimeDomainSamples,
   ueTimeDomainSamplesBeforeSync,
   gNbTimeDomainSamples,
+  pdschChanEstimates,
+  pdschRxdataF,
   EXTRA_SCOPE_TYPES
 };
 

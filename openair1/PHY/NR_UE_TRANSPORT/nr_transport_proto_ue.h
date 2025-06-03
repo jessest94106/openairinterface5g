@@ -41,6 +41,13 @@
 #define NR_PUSCH_x 2 // UCI placeholder bit TS 38.212 V15.4.0 subclause 5.3.3.1
 #define NR_PUSCH_y 3 // UCI placeholder bit
 
+// Specifies the data that should be copied to the scope during PDSCH RX
+typedef struct pdsch_scope_req_s {
+  bool copy_chanest_to_scope;
+  bool copy_rxdataF_to_scope;
+  size_t scope_rxdataF_offset;
+} pdsch_scope_req_t;
+
 // Functions below implement 36-211 and 36-212
 
 /** @addtogroup _PHY_TRANSPORT_
@@ -314,7 +321,8 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                 c16_t ptrs_phase_per_slot[][NR_SYMBOLS_PER_SLOT],
                 int32_t ptrs_re_per_slot[][NR_SYMBOLS_PER_SLOT],
                 int G,
-                uint32_t nvar);
+                uint32_t nvar,
+                pdsch_scope_req_t *scope_req);
 
 int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, uint8_t gNB_id, int frame, uint8_t slot, c16_t **txData);
 

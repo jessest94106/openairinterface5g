@@ -1161,7 +1161,8 @@ void *UE_thread(void *arg)
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
     openair0_timestamp rx_timestamp;
     int tmp = UE->rfdevice.trx_read_func(&UE->rfdevice, &rx_timestamp, rxp, readBlockSize, fp->nb_antennas_rx);
-    UEscopeCopy(UE, ueTimeDomainSamples, rxp[0], sizeof(c16_t), 1, readBlockSize, 0);
+    metadata meta = {.slot =  curMsg.proc.nr_slot_rx, .frame =  curMsg.proc.frame_rx};
+    UEscopeCopyWithMetadata(UE, ueTimeDomainSamples, rxp[0] - firstSymSamp * sizeof(c16_t), sizeof(c16_t), 1, readBlockSize, 0, &meta);
     AssertFatal(readBlockSize == tmp, "");
     struct timespec current_time;
     if (clock_gettime(CLOCK_REALTIME, &current_time)) {
