@@ -360,6 +360,8 @@ static uint32_t schedule_control_sib1(gNB_MAC_INST *gNB_mac,
   pdsch->time_domain_allocation = time_domain_allocation;
   pdsch->dmrs_parms = *dmrs_parms;
   pdsch->tda_info = *tda_info;
+  pdsch->nrOfLayers = 1;
+  pdsch->pm_index = 0;
   pdsch->mcs = 0; // starting from mcs 0
   gNB_mac->sched_ctrlCommon->num_total_bytes = num_total_bytes;
 
@@ -386,6 +388,9 @@ static uint32_t schedule_control_sib1(gNB_MAC_INST *gNB_mac,
                              gNB_mac->sched_ctrlCommon->num_total_bytes,
                              vrb_map);
 
+  pdsch->R = nr_get_code_rate_dl(pdsch->mcs, 0);
+  pdsch->Qm = nr_get_Qm_dl(pdsch->mcs, 0);
+
   // Mark the corresponding RBs as used
   fill_pdcch_vrb_map(gNB_mac,
                      CC_id,
@@ -410,14 +415,11 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
                                      int pdu_index,
                                      NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
                                      uint32_t TBS,
-                                     int StartSymbolIndex,
-                                     int NrOfSymbols,
                                      bool is_sib1,
                                      int beam_index)
 {
   NR_COMMON_channels_t *cc = gNB_mac->common_channels;
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
-  int mcsTableIdx = 0;
 
   nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdcch_pdu = &dl_req->dl_tti_pdu_list[dl_req->nPDUs];
   memset(dl_tti_pdcch_pdu, 0, sizeof(*dl_tti_pdcch_pdu));
@@ -453,10 +455,10 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
   pdsch_pdu_rel15->CyclicPrefix = 0;
 
   pdsch_pdu_rel15->NrOfCodewords = 1;
-  pdsch_pdu_rel15->targetCodeRate[0] = nr_get_code_rate_dl(pdsch->mcs, mcsTableIdx);
-  pdsch_pdu_rel15->qamModOrder[0] = nr_get_Qm_dl(pdsch->mcs, mcsTableIdx);
+  pdsch_pdu_rel15->targetCodeRate[0] = pdsch->R;
+  pdsch_pdu_rel15->qamModOrder[0] = pdsch->Qm;
   pdsch_pdu_rel15->mcsIndex[0] = pdsch->mcs;
-  pdsch_pdu_rel15->mcsTable[0] = mcsTableIdx;
+  pdsch_pdu_rel15->mcsTable[0] = 0;
   pdsch_pdu_rel15->rvIndex[0] = nr_get_rv(0);
   pdsch_pdu_rel15->dataScramblingId = *scc->physCellId;
   pdsch_pdu_rel15->nrOfLayers = 1;
@@ -472,8 +474,8 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
   pdsch_pdu_rel15->rbSize = pdsch->rbSize;
   pdsch_pdu_rel15->VRBtoPRBMapping = 0;
   pdsch_pdu_rel15->TBSize[0] = TBS;
-  pdsch_pdu_rel15->StartSymbolIndex = StartSymbolIndex;
-  pdsch_pdu_rel15->NrOfSymbols = NrOfSymbols;
+  pdsch_pdu_rel15->StartSymbolIndex = pdsch->tda_info.startSymbolIndex;
+  pdsch_pdu_rel15->NrOfSymbols = pdsch->tda_info.nrOfSymbols;
   pdsch_pdu_rel15->dlDmrsSymbPos = pdsch->dmrs_parms.dl_dmrs_symb_pos;
 
   LOG_D(NR_MAC,
@@ -657,8 +659,6 @@ void schedule_nr_sib1(module_id_t module_idP,
                                pdu_index,
                                type0_PDCCH_CSS_config,
                                TBS,
-                               tda_info.startSymbolIndex,
-                               tda_info.nrOfSymbols,
                                true,
                                beam_index);
 
@@ -766,12 +766,16 @@ static void other_sib_sched_control(module_id_t module_idP,
   sched_pdsch_otherSI.time_domain_allocation = time_domain_allocation;
   sched_pdsch_otherSI.dmrs_parms = dmrs_parms;
   sched_pdsch_otherSI.tda_info = tda_info;
+  sched_pdsch_otherSI.nrOfLayers = 1;
+  sched_pdsch_otherSI.pm_index = 0;
   sched_pdsch_otherSI.mcs = 0; // starting from mcs 0
 
   uint16_t *vrb_map = cc->vrb_map[beam.idx];
   uint8_t *sib_bcch_pdu = cc->other_sib_bcch_pdu[payload_idx];
   int num_total_bytes = cc->other_sib_bcch_length[payload_idx];
   uint32_t TBS = get_tbs_bch(type0_PDCCH_CSS_config, &sched_pdsch_otherSI, num_total_bytes, vrb_map);
+  sched_pdsch_otherSI.R = nr_get_code_rate_dl(sched_pdsch_otherSI.mcs, 0);
+  sched_pdsch_otherSI.Qm = nr_get_Qm_dl(sched_pdsch_otherSI.mcs, 0);
 
   for (int rb = 0; rb < sched_pdsch_otherSI.rbSize; rb++) {
     vrb_map[rb + type0_PDCCH_CSS_config->cset_start_rb] |= SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
@@ -790,8 +794,6 @@ static void other_sib_sched_control(module_id_t module_idP,
                            pdu_index,
                            type0_PDCCH_CSS_config,
                            TBS,
-                           tda_info.startSymbolIndex,
-                           tda_info.nrOfSymbols,
                            false,
                            beam_index);
 
