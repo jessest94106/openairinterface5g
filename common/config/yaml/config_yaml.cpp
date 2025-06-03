@@ -141,14 +141,12 @@ void SetNonDefault(configmodule_interface_t *cfg, const YAML::Node &node, paramd
   param->paramflags |= PARAMFLAG_PARAMSET;
 }
 
-void GetParams(configmodule_interface_t *cfg, const YAML::Node &node, paramdef_t *params, int num_params)
+void GetParam(configmodule_interface_t *cfg, const YAML::Node &node, paramdef_t *param)
 {
-  for (auto i = 0; i < num_params; i++) {
-    if (node && node[std::string(params[i].optname)]) {
-      SetNonDefault(cfg, node, &params[i]);
-    } else {
-      config_common_getdefault(cfg, &params[i], nullptr);
-    }
+  if (node && node[std::string(param->optname)]) {
+    SetNonDefault(cfg, node, param);
+  } else {
+    config_common_getdefault(cfg, param, nullptr);
   }
 }
 
@@ -163,7 +161,15 @@ extern "C" int config_yaml_init(configmodule_interface_t *cfg)
   pthread_mutex_init(&cfg->memBlocks_mutex, NULL);
   memset(cfg->oneBlock, 0, sizeof(cfg->oneBlock));
 
-  config_yaml::config = new config_yaml::YamlConfig(std::string(cfgP[0]));
+  try {
+    config_yaml::config = new config_yaml::YamlConfig(std::string(cfgP[0]));
+  } catch (const YAML::BadFile &e) {
+    fprintf(stderr, "[CONFIG] Error loading YAML file '%s': %s\n", cfgP[0], e.what());
+    return -1;
+  } catch (const YAML::Exception &e) {
+    fprintf(stderr, "[CONFIG] Error parsing YAML file '%s': %s\n", cfgP[0], e.what());
+    return -1;
+  }
   return 0;
 }
 
@@ -183,14 +189,14 @@ YAML::Node find_node(const std::string &prefix, YAML::Node node)
     if (key.at(0) == '[' && key.back() == ']') {
       // The key is an index to a sequence
       if (!current.IsSequence()) {
-        throw std::invalid_argument("Incorrect yaml file structure");
+        throw std::invalid_argument("Expected a sequence at " + key);
       }
       int index = std::stoi(key.substr(1, key.size() - 2));
       current = current[index];
       continue;
     }
     if (!current.IsMap()) {
-      throw std::invalid_argument("Incorrect yaml file structure");
+      throw std::invalid_argument("Expected a map at " + key);
     }
     if (!current[key]) {
       return config_yaml::invalid_node;
@@ -206,8 +212,14 @@ extern "C" int config_yaml_get(configmodule_interface_t *cfg, paramdef_t *cfgopt
   if (prefix != nullptr) {
     p = std::string(prefix);
   }
-  auto node = find_node(p, YAML::Clone(config_yaml::config->config));
-  if (node == config_yaml::invalid_node) {
+  YAML::Node node;
+  try {
+    node = find_node(p, YAML::Clone(config_yaml::config->config));
+    if (node == config_yaml::invalid_node) {
+      return -1;
+    }
+  } catch (const std::invalid_argument &e) {
+    fprintf(stderr, "[CONFIG] Error finding node '%s': %s\n", p.c_str(), e.what());
     return -1;
   }
   for (auto i = 0; i < numoptions; i++) {
@@ -216,7 +228,14 @@ extern "C" int config_yaml_get(configmodule_interface_t *cfg, paramdef_t *cfgopt
       config_check_valptr(cfg, &cfgoptions[i], sizeof(void *), 1);
     }
   }
-  config_yaml::GetParams(cfg, node, cfgoptions, numoptions);
+  for (int i = 0; i < numoptions; i++) {
+    try {
+      config_yaml::GetParam(cfg, node, &cfgoptions[i]);
+    } catch (const YAML::Exception &e) {
+      fprintf(stderr, "[CONFIG] Config error: prefix: %s, setting: %s, error: %s\n", p.c_str(), cfgoptions[i].optname, e.what());
+      return -1;
+    }
+  }
   return numoptions;
 }
 
@@ -257,7 +276,14 @@ extern "C" int config_yaml_getlist(configmodule_interface_t *cfg,
         }
       }
 
-      config_yaml::GetParams(cfg, node[i], ParamList->paramarray[i], numparams);
+      for (int j = 0; j < numparams; j++) {
+        try {
+          config_yaml::GetParam(cfg, node[i], &ParamList->paramarray[i][j]);
+        } catch (const YAML::Exception &e) {
+          fprintf(stderr, "[CONFIG] Config error: prefix: %s, setting: %s, error: %s\n", path, ParamList->paramarray[i][j].optname, e.what());
+          return -1;
+        }
+      }
     }
   }
 
