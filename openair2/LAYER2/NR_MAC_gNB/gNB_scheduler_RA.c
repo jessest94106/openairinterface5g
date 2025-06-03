@@ -58,8 +58,6 @@ static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
                                 int fh);
 static void nr_fill_rar(uint8_t Mod_idP, NR_UE_info_t *UE, uint8_t *dlsch_buffer, nfapi_nr_pusch_pdu_t *pusch_pdu);
 
-static const uint8_t DELTA[4] = {2, 3, 4, 6};
-
 static const float ssb_per_rach_occasion[8] = {0.125, 0.25, 0.5, 1, 2, 4, 8};
 
 static int16_t ssb_index_from_prach(module_id_t module_idP,
@@ -1566,7 +1564,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
 
   const NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
   bool ret = get_feasible_msg3_tda(scc,
-                                   DELTA[ul_bwp->scs],
+                                   get_delta_for_k2(ul_bwp->scs),
                                    ul_bwp->tdaList_Common,
                                    frameP,
                                    slotP,

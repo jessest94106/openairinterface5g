@@ -1547,22 +1547,7 @@ int nr_ue_pusch_scheduler(const NR_UE_MAC_INST_t *mac,
 
   if (is_Msg3) {
 
-    switch (mu) {
-      case 0:
-        delta = 2;
-        break;
-      case 1:
-        delta = 3;
-        break;
-      case 2:
-        delta = 4;
-        break;
-      case 3:
-        delta = 6;
-        break;
-      default:
-        AssertFatal(1 == 0, "Invalid numerology %i\n", mu);
-    }
+    delta = get_delta_for_k2(mu);
 
     AssertFatal((k2 + delta) > GET_DURATION_RX_TO_TX(&mac->ntn_ta, mu),
                 "Slot offset (%ld) for Msg3 needs to be higher than DURATION_RX_TO_TX (%ld). Please set min_rxtxtime at least to "

@@ -368,8 +368,7 @@ NR_tda_info_t get_ul_tda_info(const NR_UE_UL_BWP_t *ul_bwp,
   NR_PUSCH_TimeDomainResourceAllocationList_t *tdalist = get_ul_tdalist(ul_bwp, controlResourceSetId, ss_type, rnti_type);
   // Definition of value j in Table 6.1.2.1.1-4 of 38.214
   int scs = ul_bwp->scs;
-  AssertFatal(scs >= 0 &&  scs < 5, "Subcarrier spacing indicatior %d invalid value\n", scs);
-  int j = scs == 0 ? 1 : scs;
+  int j = get_j_for_k2(scs);
   if (tdalist) {
     tda_info.valid_tda = tda_index < tdalist->list.count;
     if (!tda_info.valid_tda) {
@@ -5128,4 +5127,20 @@ int nr_get_prach_or_ul_mu(const NR_MsgA_ConfigCommon_r16_t *msgacc,
     mu = ul_mu;
 
   return mu;
+}
+
+int get_delta_for_k2(int mu)
+{
+  // 38.214 Table 6.1.2.1.1-5: Definition of value Δ
+  int delta_table[] = {2, 3, 4, 6, 24, 48};
+  AssertFatal(mu >= 0 && mu < sizeofArray(delta_table), "Invalid numerology %d\n", mu);
+  return delta_table[mu];
+}
+
+int get_j_for_k2(int mu)
+{
+  // 38.214 Table 6.1.2.1.1-4: Definition of value j
+  int j_table[] = {1, 1, 2, 3, 11, 21};
+  AssertFatal(mu >= 0 && mu < sizeofArray(j_table), "Invalid numerology %d\n", mu);
+  return j_table[mu];
 }
