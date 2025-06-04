@@ -1348,7 +1348,6 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
                             nr_rnti_type_t rnti_type,
                             int aggregation_level,
                             int CCEIndex,
-                            int tb_size,
                             int ndi,
                             int tpc,
                             int delta_PRI,
@@ -1384,51 +1383,21 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   dl_tti_pdsch_pdu->PDUType = NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE;
   dl_tti_pdsch_pdu->PDUSize = (uint8_t)(2 + sizeof(nfapi_nr_dl_tti_pdsch_pdu));
   dl_req->nPDUs += 1;
-  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = &dl_tti_pdsch_pdu->pdsch_pdu.pdsch_pdu_rel15;
 
   NR_COMMON_channels_t *cc = &nr_mac->common_channels[CC_id];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
-  int mcsTableIdx = dl_bwp->mcsTableIdx;
-
-  pdsch_pdu_rel15->pduBitmap = 0;
-  pdsch_pdu_rel15->rnti = rnti;
-  pdsch_pdu_rel15->pduIndex = pduindex;
-  pdsch_pdu_rel15->BWPSize  = BWPSize;
-  pdsch_pdu_rel15->BWPStart = BWPStart;
-  pdsch_pdu_rel15->SubcarrierSpacing = dl_bwp->scs;
-  pdsch_pdu_rel15->CyclicPrefix = 0;
-  pdsch_pdu_rel15->NrOfCodewords = 1;
-  pdsch_pdu_rel15->targetCodeRate[0] = sched_pdsch->R;
-  pdsch_pdu_rel15->qamModOrder[0] = sched_pdsch->Qm;
-  pdsch_pdu_rel15->TBSize[0] = tb_size;
-  pdsch_pdu_rel15->mcsIndex[0] = sched_pdsch->mcs;
-  pdsch_pdu_rel15->mcsTable[0] = mcsTableIdx;
-  pdsch_pdu_rel15->rvIndex[0] = nr_get_rv(round % 4);
-  pdsch_pdu_rel15->dataScramblingId = *scc->physCellId;
-  pdsch_pdu_rel15->nrOfLayers = 1;
-  pdsch_pdu_rel15->transmissionScheme = 0;
-  pdsch_pdu_rel15->refPoint = 0;
-  pdsch_pdu_rel15->dmrsConfigType = sched_pdsch->dmrs_parms.dmrsConfigType;
-  pdsch_pdu_rel15->dlDmrsScramblingId = sched_pdsch->dmrs_parms.scrambling_id;
-  pdsch_pdu_rel15->SCID = sched_pdsch->dmrs_parms.n_scid;
-  pdsch_pdu_rel15->numDmrsCdmGrpsNoData = sched_pdsch->dmrs_parms.numDmrsCdmGrpsNoData;
-  pdsch_pdu_rel15->dmrsPorts = 1;
-  pdsch_pdu_rel15->resourceAlloc = 1;
-  pdsch_pdu_rel15->rbStart = sched_pdsch->rbStart;
-  pdsch_pdu_rel15->rbSize = sched_pdsch->rbSize;
-  pdsch_pdu_rel15->VRBtoPRBMapping = 0;
-  pdsch_pdu_rel15->StartSymbolIndex = sched_pdsch->tda_info.startSymbolIndex;
-  pdsch_pdu_rel15->NrOfSymbols = sched_pdsch->tda_info.nrOfSymbols;
-  pdsch_pdu_rel15->dlDmrsSymbPos = sched_pdsch->dmrs_parms.dl_dmrs_symb_pos;
-  pdsch_pdu_rel15->maintenance_parms_v3.tbSizeLbrmBytes = nr_compute_tbslbrm(mcsTableIdx, UE->sc_info.dl_bw_tbslbrm, 1);
-  pdsch_pdu_rel15->maintenance_parms_v3.ldpcBaseGraph = get_BG(tb_size << 3, sched_pdsch->R);
-
-  pdsch_pdu_rel15->precodingAndBeamforming.num_prgs = 1;
-  pdsch_pdu_rel15->precodingAndBeamforming.prg_size = 275;
-  pdsch_pdu_rel15->precodingAndBeamforming.dig_bf_interfaces = 1;
-  pdsch_pdu_rel15->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
-  pdsch_pdu_rel15->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
+  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = prepare_pdsch_pdu(dl_tti_pdsch_pdu,
+                                                                         nr_mac,
+                                                                         UE,
+                                                                         sched_pdsch,
+                                                                         dl_bwp->pdsch_Config,
+                                                                         false,
+                                                                         round,
+                                                                         rnti,
+                                                                         UE->UE_beam_index,
+                                                                         1,
+                                                                         pduindex);
 
   /* Fill PDCCH DL DCI PDU */
   nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu_rel15->dci_pdu[pdcch_pdu_rel15->numDlDci];
@@ -1703,6 +1672,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
     .dmrs_parms = dmrs_parms,
     .tda_info = tda_info,
     .pm_index = 0,
+    .tb_size = TBS,
     .rbStart = rbStart,
     .rbSize = rbSize
   };
@@ -1714,7 +1684,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
                   TYPE_RA_RNTI_,
                   aggregation_level,
                   CCEIndex,
-                  TBS,
                   0,
                   0,
                   0,
@@ -2011,6 +1980,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       .dmrs_parms = dmrs_info,
       .tda_info = msg4_tda,
       .pm_index = 0,
+      .tb_size = tb_size,
       .rbStart = rbStart,
       .rbSize = rbSize
     };
@@ -2023,7 +1993,6 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                     TYPE_TC_RNTI_,
                     aggregation_level,
                     CCEIndex,
-                    tb_size,
                     harq->ndi,
                     sched_ctrl->tpc1,
                     delta_PRI,

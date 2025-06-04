@@ -414,7 +414,6 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
                                      nfapi_nr_dl_tti_request_body_t *dl_req,
                                      int pdu_index,
                                      NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
-                                     uint32_t TBS,
                                      bool is_sib1,
                                      int beam_index)
 {
@@ -434,50 +433,18 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
   dl_tti_pdsch_pdu->PDUType = NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE;
   dl_tti_pdsch_pdu->PDUSize = (uint16_t)(4+sizeof(nfapi_nr_dl_tti_pdsch_pdu));
   dl_req->nPDUs += 1;
-  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = &dl_tti_pdsch_pdu->pdsch_pdu.pdsch_pdu_rel15;
 
-  pdsch_pdu_rel15->precodingAndBeamforming.num_prgs = 0;
-  pdsch_pdu_rel15->precodingAndBeamforming.prg_size = 0;
-  pdsch_pdu_rel15->precodingAndBeamforming.dig_bf_interfaces = 1;
-  pdsch_pdu_rel15->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
-  pdsch_pdu_rel15->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
-
-  pdcch_pdu_rel15->CoreSetType = NFAPI_NR_CSET_CONFIG_MIB_SIB1;
-
-  pdsch_pdu_rel15->pduBitmap = 0;
-  pdsch_pdu_rel15->rnti = SI_RNTI;
-  pdsch_pdu_rel15->pduIndex = pdu_index;
-
-  pdsch_pdu_rel15->BWPSize = type0_PDCCH_CSS_config->num_rbs;
-  pdsch_pdu_rel15->BWPStart = type0_PDCCH_CSS_config->cset_start_rb;
-
-  pdsch_pdu_rel15->SubcarrierSpacing = type0_PDCCH_CSS_config->scs_pdcch;
-  pdsch_pdu_rel15->CyclicPrefix = 0;
-
-  pdsch_pdu_rel15->NrOfCodewords = 1;
-  pdsch_pdu_rel15->targetCodeRate[0] = pdsch->R;
-  pdsch_pdu_rel15->qamModOrder[0] = pdsch->Qm;
-  pdsch_pdu_rel15->mcsIndex[0] = pdsch->mcs;
-  pdsch_pdu_rel15->mcsTable[0] = 0;
-  pdsch_pdu_rel15->rvIndex[0] = nr_get_rv(0);
-  pdsch_pdu_rel15->dataScramblingId = *scc->physCellId;
-  pdsch_pdu_rel15->nrOfLayers = 1;
-  pdsch_pdu_rel15->transmissionScheme = 0;
-  pdsch_pdu_rel15->refPoint = is_sib1;
-  pdsch_pdu_rel15->dmrsConfigType = 0;
-  pdsch_pdu_rel15->dlDmrsScramblingId = pdsch->dmrs_parms.scrambling_id;
-  pdsch_pdu_rel15->SCID = pdsch->dmrs_parms.n_scid;
-  pdsch_pdu_rel15->numDmrsCdmGrpsNoData = pdsch->dmrs_parms.numDmrsCdmGrpsNoData;
-  pdsch_pdu_rel15->dmrsPorts = 1;
-  pdsch_pdu_rel15->resourceAlloc = 1;
-  pdsch_pdu_rel15->rbStart = pdsch->rbStart;
-  pdsch_pdu_rel15->rbSize = pdsch->rbSize;
-  pdsch_pdu_rel15->VRBtoPRBMapping = 0;
-  pdsch_pdu_rel15->TBSize[0] = TBS;
-  pdsch_pdu_rel15->StartSymbolIndex = pdsch->tda_info.startSymbolIndex;
-  pdsch_pdu_rel15->NrOfSymbols = pdsch->tda_info.nrOfSymbols;
-  pdsch_pdu_rel15->dlDmrsSymbPos = pdsch->dmrs_parms.dl_dmrs_symb_pos;
-
+  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = prepare_pdsch_pdu(dl_tti_pdsch_pdu,
+                                                                         gNB_mac,
+                                                                         NULL,
+                                                                         pdsch,
+                                                                         NULL,
+                                                                         is_sib1,
+                                                                         0,
+                                                                         SI_RNTI,
+                                                                         beam_index,
+                                                                         1,
+                                                                         pdu_index);
   LOG_D(NR_MAC,
         "OtherSI:bwpStart %d, bwpSize %d, rbStart %d, rbSize %d, dlDmrsSymbPos = 0x%x\n",
         pdsch_pdu_rel15->BWPStart,
@@ -485,11 +452,6 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
         pdsch_pdu_rel15->rbStart,
         pdsch_pdu_rel15->rbSize,
         pdsch_pdu_rel15->dlDmrsSymbPos);
-
-  pdsch_pdu_rel15->maintenance_parms_v3.tbSizeLbrmBytes = nr_compute_tbslbrm(0,
-                                                                            pdsch_pdu_rel15->BWPSize,
-                                                                            1);
-  pdsch_pdu_rel15->maintenance_parms_v3.ldpcBaseGraph = get_BG(TBS<<3,pdsch_pdu_rel15->targetCodeRate[0]);
 
   /* Fill PDCCH DL DCI PDU */
   nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu_rel15->dci_pdu[pdcch_pdu_rel15->numDlDci];
@@ -646,6 +608,7 @@ void schedule_nr_sib1(module_id_t module_idP,
                                            beam.idx,
                                            cc->sib1_bcch_length);
 
+      gNB_mac->sched_ctrlCommon->sched_pdsch.tb_size = TBS;
       nfapi_nr_dl_tti_request_body_t *dl_req = &DL_req->dl_tti_request_body;
       int pdu_index = gNB_mac->pdu_index[0]++;
       nr_fill_nfapi_dl_SIB_pdu(gNB_mac,
@@ -658,7 +621,6 @@ void schedule_nr_sib1(module_id_t module_idP,
                                dl_req,
                                pdu_index,
                                type0_PDCCH_CSS_config,
-                               TBS,
                                true,
                                beam_index);
 
@@ -773,7 +735,7 @@ static void other_sib_sched_control(module_id_t module_idP,
   uint16_t *vrb_map = cc->vrb_map[beam.idx];
   uint8_t *sib_bcch_pdu = cc->other_sib_bcch_pdu[payload_idx];
   int num_total_bytes = cc->other_sib_bcch_length[payload_idx];
-  uint32_t TBS = get_tbs_bch(type0_PDCCH_CSS_config, &sched_pdsch_otherSI, num_total_bytes, vrb_map);
+  sched_pdsch_otherSI.tb_size = get_tbs_bch(type0_PDCCH_CSS_config, &sched_pdsch_otherSI, num_total_bytes, vrb_map);
   sched_pdsch_otherSI.R = nr_get_code_rate_dl(sched_pdsch_otherSI.mcs, 0);
   sched_pdsch_otherSI.Qm = nr_get_Qm_dl(sched_pdsch_otherSI.mcs, 0);
 
@@ -793,7 +755,6 @@ static void other_sib_sched_control(module_id_t module_idP,
                            dl_req,
                            pdu_index,
                            type0_PDCCH_CSS_config,
-                           TBS,
                            false,
                            beam_index);
 
@@ -801,12 +762,12 @@ static void other_sib_sched_control(module_id_t module_idP,
   nfapi_nr_pdu_t *tx_req = &TX_req->pdu_list[ntx_req];
 
   // Data to be transmitted
-  memcpy(tx_req->TLVs[0].value.direct, sib_bcch_pdu, TBS);
+  memcpy(tx_req->TLVs[0].value.direct, sib_bcch_pdu, sched_pdsch_otherSI.tb_size);
 
-  tx_req->PDU_length = TBS;
+  tx_req->PDU_length = sched_pdsch_otherSI.tb_size;
   tx_req->PDU_index = pdu_index;
   tx_req->num_TLV = 1;
-  tx_req->TLVs[0].length = TBS + 2;
+  tx_req->TLVs[0].length = sched_pdsch_otherSI.tb_size + 2;
   TX_req->Number_of_PDUs++;
   TX_req->SFN = frame;
   TX_req->Slot = slot;

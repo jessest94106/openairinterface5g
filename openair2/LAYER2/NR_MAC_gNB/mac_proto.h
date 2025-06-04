@@ -323,7 +323,17 @@ void nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, N
 void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti);
 NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroupConfig_t *CellGroup);
 int nr_get_default_pucch_res(int pucch_ResourceCommon);
-
+nfapi_nr_dl_tti_pdsch_pdu_rel15_t *prepare_pdsch_pdu(nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdsch_pdu,
+                                                     const gNB_MAC_INST *mac,
+                                                     const NR_UE_info_t *UE,
+                                                     const NR_sched_pdsch_t *sched_pdsch,
+                                                     const NR_PDSCH_Config_t *pdsch_Config,
+                                                     bool is_sib1,
+                                                     int harq_round,
+                                                     int rnti,
+                                                     int beam_index,
+                                                     int nl_tbslbrm,
+                                                     int pdu_index);
 int nr_write_ce_dlsch_pdu(module_id_t module_idP,
                           const NR_UE_sched_ctrl_t *ue_sched_ctl,
                           unsigned char *mac_pdu,
