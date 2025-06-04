@@ -538,12 +538,21 @@ typedef struct ngap_downlink_nas_s {
   byte_array_t nas_pdu;
 } ngap_downlink_nas_t;
 
+/* PDU Session Resource Setup Request Transfer (9.3.4.1 3GPP TS 38.413) */
+typedef struct {
+  uint8_t nb_qos;
+  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  pdu_session_type_t pdu_session_type;
+  // UPF endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_incoming;
+} pdusession_transfer_t;
+
 /* PDU Session Resource Setup/Modify Request Item */
 typedef struct {
   int pdusession_id;
   byte_array_t nas_pdu;
   nssai_t nssai;
-  byte_array_t pdusessionTransfer;
+  pdusession_transfer_t pdusessionTransfer;
 } pdusession_resource_item_t;
 
 typedef struct ngap_initial_context_setup_req_s {

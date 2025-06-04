@@ -103,7 +103,6 @@ typedef struct pdusession_s {
   /* Unique pdusession_id for the UE. */
   int pdusession_id;
   byte_array_t nas_pdu;
-  byte_array_t pdusessionTransfer;
   uint8_t nb_qos;
   /* Quality of service for this pdusession */
   pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];

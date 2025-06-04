@@ -161,6 +161,20 @@ static nr_guami_t get_guami(const uint32_t amf_Id, const plmn_id_t plmn)
   return guami;
 }
 
+/** @brief Copy NGAP PDU Session Resource item to RRC pdusession_t struct */
+static void cp_pdusession_resource_item_to_pdusession(pdusession_t *dst, const pdusession_resource_item_t *src)
+{
+  dst->pdusession_id = src->pdusession_id;
+  dst->nas_pdu = src->nas_pdu;
+  dst->nb_qos = src->pdusessionTransfer.nb_qos;
+  for (uint8_t i = 0; i < src->pdusessionTransfer.nb_qos && i < QOSFLOW_MAX_VALUE; ++i) {
+    dst->qos[i] = src->pdusessionTransfer.qos[i];
+  }
+  dst->pdu_session_type = src->pdusessionTransfer.pdu_session_type;
+  dst->n3_incoming = src->pdusessionTransfer.n3_incoming;
+  dst->nssai = src->nssai;
+}
+
 /**
  * @brief Prepare the Initial UE Message (Uplink NAS) to be forwarded to the AMF over N2
  *        extracts NAS PDU, Selected PLMN and Registered AMF from the RRCSetupComplete
@@ -225,113 +239,6 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, message_p);
 }
 
-static void fill_qos(NGAP_QosFlowSetupRequestList_t *qos, pdusession_t *session)
-{
-  DevAssert(qos->list.count > 0);
-  DevAssert(qos->list.count <= NGAP_maxnoofQosFlows);
-  for (int qosIdx = 0; qosIdx < qos->list.count; qosIdx++) {
-    NGAP_QosFlowSetupRequestItem_t *qosFlowItem_p = qos->list.array[qosIdx];
-    // Set the QOS informations
-    session->qos[qosIdx].qfi = (uint8_t)qosFlowItem_p->qosFlowIdentifier;
-    NGAP_QosCharacteristics_t *qosChar = &qosFlowItem_p->qosFlowLevelQosParameters.qosCharacteristics;
-    AssertFatal(qosChar, "Qos characteristics are not available for qos flow index %d\n", qosIdx);
-    if (qosChar->present == NGAP_QosCharacteristics_PR_nonDynamic5QI) {
-      AssertFatal(qosChar->choice.dynamic5QI, "Non-Dynamic 5QI is NULL\n");
-      session->qos[qosIdx].fiveQI_type = NON_DYNAMIC;
-      session->qos[qosIdx].fiveQI = (uint64_t)qosChar->choice.nonDynamic5QI->fiveQI;
-    } else {
-      AssertFatal(qosChar->choice.dynamic5QI, "Dynamic 5QI is NULL\n");
-      session->qos[qosIdx].fiveQI_type = DYNAMIC;
-      session->qos[qosIdx].fiveQI = (uint64_t)(*qosChar->choice.dynamic5QI->fiveQI);
-    }
-
-    ngap_allocation_retention_priority_t *tmp = &session->qos[qosIdx].allocation_retention_priority;
-    NGAP_AllocationAndRetentionPriority_t *tmp2 = &qosFlowItem_p->qosFlowLevelQosParameters.allocationAndRetentionPriority;
-    tmp->priority_level = tmp2->priorityLevelARP;
-    tmp->pre_emp_capability = tmp2->pre_emptionCapability;
-    tmp->pre_emp_vulnerability = tmp2->pre_emptionVulnerability;
-  }
-  session->nb_qos = qos->list.count;
-}
-
-static int decodePDUSessionResourceSetup(pdusession_t *out, const pdusession_resource_item_t *session)
-{
-  NGAP_PDUSessionResourceSetupRequestTransfer_t *pdusessionTransfer = NULL;
-  asn_codec_ctx_t st = {.max_stack_size = 100 * 1000};
-  asn_dec_rval_t dec_rval = aper_decode(&st,
-                                        &asn_DEF_NGAP_PDUSessionResourceSetupRequestTransfer,
-                                        (void **)&pdusessionTransfer,
-                                        session->pdusessionTransfer.buf,
-                                        session->pdusessionTransfer.len,
-                                        0,
-                                        0);
-
-  if (dec_rval.code != RC_OK) {
-    LOG_E(NR_RRC, "can not decode PDUSessionResourceSetupRequestTransfer\n");
-    return -1;
-  }
-
-  for (int i = 0; i < pdusessionTransfer->protocolIEs.list.count; i++) {
-    NGAP_PDUSessionResourceSetupRequestTransferIEs_t *pdusessionTransfer_ies = pdusessionTransfer->protocolIEs.list.array[i];
-    switch (pdusessionTransfer_ies->id) {
-        /* optional PDUSessionAggregateMaximumBitRate */
-      case NGAP_ProtocolIE_ID_id_PDUSessionAggregateMaximumBitRate:
-        break;
-
-        /* mandatory UL-NGU-UP-TNLInformation */
-      case NGAP_ProtocolIE_ID_id_UL_NGU_UP_TNLInformation: {
-        NGAP_GTPTunnel_t *gTPTunnel_p = pdusessionTransfer_ies->value.choice.UPTransportLayerInformation.choice.gTPTunnel;
-
-        /* Set the transport layer address */
-        memcpy(out->n3_incoming.addr.buffer, gTPTunnel_p->transportLayerAddress.buf, gTPTunnel_p->transportLayerAddress.size);
-        out->n3_incoming.addr.length = gTPTunnel_p->transportLayerAddress.size * 8 - gTPTunnel_p->transportLayerAddress.bits_unused;
-
-        /* GTP tunnel endpoint ID */
-        OCTET_STRING_TO_INT32(&gTPTunnel_p->gTP_TEID, out->n3_incoming.teid);
-      }
-
-      break;
-
-        /* optional AdditionalUL-NGU-UP-TNLInformation */
-      case NGAP_ProtocolIE_ID_id_AdditionalUL_NGU_UP_TNLInformation:
-        break;
-
-        /* optional DataForwardingNotPossible */
-      case NGAP_ProtocolIE_ID_id_DataForwardingNotPossible:
-        break;
-
-        /* mandatory PDUSessionType */
-      case NGAP_ProtocolIE_ID_id_PDUSessionType:
-        out->pdu_session_type = (uint8_t)pdusessionTransfer_ies->value.choice.PDUSessionType;
-        break;
-
-        /* optional SecurityIndication */
-      case NGAP_ProtocolIE_ID_id_SecurityIndication:
-        break;
-
-        /* optional NetworkInstance */
-      case NGAP_ProtocolIE_ID_id_NetworkInstance:
-        break;
-
-        /* mandatory QosFlowSetupRequestList */
-      case NGAP_ProtocolIE_ID_id_QosFlowSetupRequestList:
-        fill_qos(&pdusessionTransfer_ies->value.choice.QosFlowSetupRequestList, out);
-        break;
-
-        /* optional CommonNetworkInstance */
-      case NGAP_ProtocolIE_ID_id_CommonNetworkInstance:
-        break;
-
-      default:
-        LOG_E(NR_RRC, "could not found protocolIEs id %ld\n", pdusessionTransfer_ies->id);
-        return -1;
-    }
-  }
-  ASN_STRUCT_FREE(asn_DEF_NGAP_PDUSessionResourceSetupRequestTransfer, pdusessionTransfer);
-
-  return 0;
-}
-
 /**
  * @brief Triggers bearer setup for the specified UE.
  *
@@ -363,7 +270,6 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
     LOG_I(NR_RRC, "Adding pdusession %d, total nb of sessions %d\n", session->pdusession_id, UE->nb_of_pdusessions);
     session->pdu_session_type = sessions[i].pdu_session_type;
     session->nas_pdu = sessions[i].nas_pdu;
-    session->pdusessionTransfer = sessions[i].pdusessionTransfer;
     session->nssai = sessions[i].nssai;
     bearer_req.gNB_cu_cp_ue_id = UE->rrc_ue_id;
     security_information_t *secInfo = &bearer_req.secInfo;
@@ -519,9 +425,8 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
     UE->n_initial_pdu = req->nb_of_pdusessions;
     UE->initial_pdus = calloc(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
     AssertFatal(UE->initial_pdus != NULL, "out of memory\n");
-    for (int i = 0; i < UE->n_initial_pdu; ++i) {
-      decodePDUSessionResourceSetup(&UE->initial_pdus[i], &req->pdusession[i]);
-    }
+    for (int i = 0; i < UE->n_initial_pdu; ++i)
+      cp_pdusession_resource_item_to_pdusession(&UE->initial_pdus[i], &req->pdusession[i]);
   }
 
   /* security */
@@ -935,9 +840,9 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   }
 
   pdusession_t to_setup[NGAP_MAX_PDU_SESSION] = {0};
-  for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i) {
-    decodePDUSessionResourceSetup(&to_setup[i], &msg->pdusession[i]);
-  }
+  for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i)
+    cp_pdusession_resource_item_to_pdusession(&to_setup[i], &msg->pdusession[i]);
+
   if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, to_setup, msg->ueAggMaxBitRate.br_dl)) {
     // Reject PDU Session Resource setup if there's no CU-UP associated
     LOG_W(NR_RRC, "UE %d: reject PDU Session Setup in PDU Session Resource Setup Response\n", UE->rrc_ue_id);
@@ -947,104 +852,6 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   } else {
     UE->ongoing_pdusession_setup_request = true;
   }
-}
-
-static void fill_qos2(NGAP_QosFlowAddOrModifyRequestList_t *qos, pdusession_t *session)
-{
-  // we need to duplicate the function fill_qos because all data types are slightly different
-  DevAssert(qos->list.count > 0);
-  DevAssert(qos->list.count <= NGAP_maxnoofQosFlows);
-  for (int qosIdx = 0; qosIdx < qos->list.count; qosIdx++) {
-    NGAP_QosFlowAddOrModifyRequestItem_t *qosFlowItem_p = qos->list.array[qosIdx];
-    // Set the QOS informations
-    session->qos[qosIdx].qfi = (uint8_t)qosFlowItem_p->qosFlowIdentifier;
-    NGAP_QosCharacteristics_t *qosChar = &qosFlowItem_p->qosFlowLevelQosParameters->qosCharacteristics;
-    AssertFatal(qosChar, "Qos characteristics are not available for qos flow index %d\n", qosIdx);
-    if (qosChar->present == NGAP_QosCharacteristics_PR_nonDynamic5QI) {
-      AssertFatal(qosChar->choice.dynamic5QI, "Non-Dynamic 5QI is NULL\n");
-      session->qos[qosIdx].fiveQI_type = NON_DYNAMIC;
-      session->qos[qosIdx].fiveQI = (uint64_t)qosChar->choice.nonDynamic5QI->fiveQI;
-    } else {
-      AssertFatal(qosChar->choice.dynamic5QI, "Dynamic 5QI is NULL\n");
-      session->qos[qosIdx].fiveQI_type = DYNAMIC;
-      session->qos[qosIdx].fiveQI = (uint64_t)(*qosChar->choice.dynamic5QI->fiveQI);
-    }
-
-    ngap_allocation_retention_priority_t *tmp = &session->qos[qosIdx].allocation_retention_priority;
-    NGAP_AllocationAndRetentionPriority_t *tmp2 = &qosFlowItem_p->qosFlowLevelQosParameters->allocationAndRetentionPriority;
-    tmp->priority_level = tmp2->priorityLevelARP;
-    tmp->pre_emp_capability = tmp2->pre_emptionCapability;
-    tmp->pre_emp_vulnerability = tmp2->pre_emptionVulnerability;
-  }
-  session->nb_qos = qos->list.count;
-}
-
-static void decodePDUSessionResourceModify(pdusession_t *param, const byte_array_t pdu)
-{
-  NGAP_PDUSessionResourceModifyRequestTransfer_t *pdusessionTransfer = NULL;
-  asn_dec_rval_t dec_rval = aper_decode(NULL,
-                                        &asn_DEF_NGAP_PDUSessionResourceModifyRequestTransfer,
-                                        (void **)&pdusessionTransfer,
-                                        pdu.buf,
-                                        pdu.len,
-                                        0,
-                                        0);
-
-  if (dec_rval.code != RC_OK) {
-    LOG_E(NR_RRC, "could not decode PDUSessionResourceModifyRequestTransfer\n");
-    return;
-  }
-
-  for (int j = 0; j < pdusessionTransfer->protocolIEs.list.count; j++) {
-    NGAP_PDUSessionResourceModifyRequestTransferIEs_t *pdusessionTransfer_ies = pdusessionTransfer->protocolIEs.list.array[j];
-    switch (pdusessionTransfer_ies->id) {
-        /* optional PDUSessionAggregateMaximumBitRate */
-      case NGAP_ProtocolIE_ID_id_PDUSessionAggregateMaximumBitRate:
-        // TODO
-        LOG_E(NR_RRC, "Cant' handle NGAP_ProtocolIE_ID_id_PDUSessionAggregateMaximumBitRate\n");
-        break;
-
-        /* optional UL-NGU-UP-TNLModifyList */
-      case NGAP_ProtocolIE_ID_id_UL_NGU_UP_TNLModifyList:
-        // TODO
-        LOG_E(NR_RRC, "Cant' handle NGAP_ProtocolIE_ID_id_UL_NGU_UP_TNLModifyList\n");
-        break;
-
-        /* optional NetworkInstance */
-      case NGAP_ProtocolIE_ID_id_NetworkInstance:
-        // TODO
-        LOG_E(NR_RRC, "Cant' handle NGAP_ProtocolIE_ID_id_NetworkInstance\n");
-        break;
-
-        /* optional QosFlowAddOrModifyRequestList */
-      case NGAP_ProtocolIE_ID_id_QosFlowAddOrModifyRequestList:
-        fill_qos2(&pdusessionTransfer_ies->value.choice.QosFlowAddOrModifyRequestList, param);
-        break;
-
-        /* optional QosFlowToReleaseList */
-      case NGAP_ProtocolIE_ID_id_QosFlowToReleaseList:
-        // TODO
-        LOG_E(NR_RRC, "Can't handle NGAP_ProtocolIE_ID_id_QosFlowToReleaseList\n");
-        break;
-
-        /* optional AdditionalUL-NGU-UP-TNLInformation */
-      case NGAP_ProtocolIE_ID_id_AdditionalUL_NGU_UP_TNLInformation:
-        // TODO
-        LOG_E(NR_RRC, "Cant' handle NGAP_ProtocolIE_ID_id_AdditionalUL_NGU_UP_TNLInformation\n");
-        break;
-
-        /* optional CommonNetworkInstance */
-      case NGAP_ProtocolIE_ID_id_CommonNetworkInstance:
-        // TODO
-        LOG_E(NR_RRC, "Cant' handle NGAP_ProtocolIE_ID_id_CommonNetworkInstance\n");
-        break;
-
-      default:
-        LOG_E(NR_RRC, "could not found protocolIEs id %ld\n", pdusessionTransfer_ies->id);
-        return;
-    }
-  }
-    ASN_STRUCT_FREE(asn_DEF_NGAP_PDUSessionResourceModifyRequestTransfer,pdusessionTransfer );
 }
 
 //------------------------------------------------------------------------------
@@ -1090,8 +897,8 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
       if (sessMod->nas_pdu.buf != NULL) {
         UE->pduSession[i].param.nas_pdu = sessMod->nas_pdu;
       }
-      // Save new pdu session parameters, qos, upf addr, teid
-      decodePDUSessionResourceModify(&sess->param, UE->pduSession[i].param.pdusessionTransfer);
+      for (int i = 0; i < req->nb_pdusessions_tomodify; ++i)
+        cp_pdusession_resource_item_to_pdusession(&UE->pduSession[i].param, &req->pdusession[i]);
     }
   }
 
