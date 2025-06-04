@@ -435,7 +435,7 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
 void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame, bool new_beam);
 void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE);
 void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t frameP, slot_t slotP);
-
+bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE);
 size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset_rsrp);
 
 long get_lcid_from_drbid(int drb_id);

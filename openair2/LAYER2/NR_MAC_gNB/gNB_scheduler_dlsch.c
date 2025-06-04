@@ -384,7 +384,7 @@ void abort_nr_dl_harq(NR_UE_info_t* UE, int8_t harq_pid)
   UE->mac_stats.dl.errors++;
 }
 
-static bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
+bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
 {
   bwp_info_t bwp_info;
   if (!UE) {
@@ -579,6 +579,7 @@ static bool allocate_dl_retransmission(module_id_t module_id,
   sched_ctrl->sched_pdsch = *retInfo;
   sched_ctrl->sched_pdsch.rbStart = rbStart - bwp_info.bwpStart;
   sched_ctrl->sched_pdsch.pucch_allocation = alloc;
+  sched_ctrl->sched_pdsch.bwp_info = bwp_info;
   /* retransmissions: directly allocate */
   *n_rb_sched -= sched_ctrl->sched_pdsch.rbSize;
 
@@ -768,10 +769,10 @@ static void pf_dl(module_id_t module_id,
     const uint16_t slbitmap = SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
 
     uint16_t *rballoc_mask = mac->common_channels[CC_id].vrb_map[beam.idx];
-    bwp_info_t bwp_info = get_pdsch_bwp_start_size(mac, iterator->UE);
+    sched_pdsch->bwp_info = get_pdsch_bwp_start_size(mac, iterator->UE);
     int rbStart = 0; // WRT BWP start
-    int rbStop = bwp_info.bwpSize - 1;
-    int bwp_start = bwp_info.bwpStart;
+    int rbStop = sched_pdsch->bwp_info.bwpSize - 1;
+    int bwp_start = sched_pdsch->bwp_info.bwpStart;
     // Freq-demain allocation
     while (rbStart < rbStop && (rballoc_mask[rbStart + bwp_start] & slbitmap))
       rbStart++;
@@ -941,9 +942,8 @@ nfapi_nr_dl_tti_pdsch_pdu_rel15_t *prepare_pdsch_pdu(nfapi_nr_dl_tti_request_pdu
   pdsch_pdu->pduBitmap = 0;
   pdsch_pdu->rnti = rnti;
   pdsch_pdu->pduIndex = pdu_index;
-  bwp_info_t bwp_info = get_pdsch_bwp_start_size(mac, UE);
-  pdsch_pdu->BWPSize  = bwp_info.bwpSize;
-  pdsch_pdu->BWPStart = bwp_info.bwpStart;
+  pdsch_pdu->BWPSize  = sched_pdsch->bwp_info.bwpSize;
+  pdsch_pdu->BWPStart = sched_pdsch->bwp_info.bwpStart;
   pdsch_pdu->SubcarrierSpacing = dl_bwp ? dl_bwp->scs : *scc->ssbSubcarrierSpacing;
   pdsch_pdu->CyclicPrefix = dl_bwp && dl_bwp->cyclicprefix ? *dl_bwp->cyclicprefix : 0;
   // Codeword information
@@ -990,7 +990,7 @@ nfapi_nr_dl_tti_pdsch_pdu_rel15_t *prepare_pdsch_pdu(nfapi_nr_dl_tti_request_pdu
     if (valid_ptrs_setup)
       pdsch_pdu->pduBitmap |= 0x1; // Bit 0: pdschPtrs - Indicates PTRS included (FR2)
   }
-  int dl_bw_tbslbrm = UE ? UE->sc_info.dl_bw_tbslbrm : bwp_info.bwpSize;
+  int dl_bw_tbslbrm = UE ? UE->sc_info.dl_bw_tbslbrm : sched_pdsch->bwp_info.bwpSize;
   pdsch_pdu->maintenance_parms_v3.tbSizeLbrmBytes = nr_compute_tbslbrm(pdsch_pdu->mcsTable[0], dl_bw_tbslbrm, nl_tbslbrm);
   pdsch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(sched_pdsch->tb_size << 3, sched_pdsch->R);
   // Precoding and beamforming

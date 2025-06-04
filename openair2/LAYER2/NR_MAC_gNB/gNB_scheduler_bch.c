@@ -274,8 +274,7 @@ void schedule_nr_mib(module_id_t module_idP, frame_t frameP, slot_t slotP, nfapi
   }
 }
 
-static uint32_t get_tbs_bch(NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
-                            NR_sched_pdsch_t *pdsch,
+static uint32_t get_tbs_bch(NR_sched_pdsch_t *pdsch,
                             uint32_t num_total_bytes,
                             uint16_t *vrb_map)
 {
@@ -287,8 +286,8 @@ static uint32_t get_tbs_bch(NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
   int mcsTableIdx = 0;
   uint32_t TBS = 0;
   const uint16_t slbitmap = SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
-  int bwpSize = type0_PDCCH_CSS_config->num_rbs;
-  int bwpStart = type0_PDCCH_CSS_config->cset_start_rb;
+  int bwpSize = pdsch->bwp_info.bwpSize;
+  int bwpStart = pdsch->bwp_info.bwpStart;
   int rbStop = bwpSize - 1;
   int rbStart = 0;
   uint16_t rbSize = 0;
@@ -357,6 +356,7 @@ static uint32_t schedule_control_sib1(gNB_MAC_INST *gNB_mac,
   NR_COMMON_channels_t *cc = &gNB_mac->common_channels[CC_id];
   uint16_t *vrb_map = cc->vrb_map[beam];
   NR_sched_pdsch_t *pdsch = &gNB_mac->sched_ctrlCommon->sched_pdsch;
+  pdsch->bwp_info = get_pdsch_bwp_start_size(gNB_mac, NULL);
   pdsch->time_domain_allocation = time_domain_allocation;
   pdsch->dmrs_parms = *dmrs_parms;
   pdsch->tda_info = *tda_info;
@@ -383,8 +383,7 @@ static uint32_t schedule_control_sib1(gNB_MAC_INST *gNB_mac,
 
   AssertFatal(gNB_mac->sched_ctrlCommon->cce_index >= 0, "Could not find CCE for coreset0\n");
 
-  uint32_t TBS = get_tbs_bch(type0_PDCCH_CSS_config,
-                             &gNB_mac->sched_ctrlCommon->sched_pdsch,
+  uint32_t TBS = get_tbs_bch(&gNB_mac->sched_ctrlCommon->sched_pdsch,
                              gNB_mac->sched_ctrlCommon->num_total_bytes,
                              vrb_map);
 
@@ -726,6 +725,7 @@ static void other_sib_sched_control(module_id_t module_idP,
 
   NR_sched_pdsch_t sched_pdsch_otherSI = {0};
   sched_pdsch_otherSI.time_domain_allocation = time_domain_allocation;
+  sched_pdsch_otherSI.bwp_info = get_pdsch_bwp_start_size(gNB_mac, NULL);
   sched_pdsch_otherSI.dmrs_parms = dmrs_parms;
   sched_pdsch_otherSI.tda_info = tda_info;
   sched_pdsch_otherSI.nrOfLayers = 1;
@@ -735,7 +735,7 @@ static void other_sib_sched_control(module_id_t module_idP,
   uint16_t *vrb_map = cc->vrb_map[beam.idx];
   uint8_t *sib_bcch_pdu = cc->other_sib_bcch_pdu[payload_idx];
   int num_total_bytes = cc->other_sib_bcch_length[payload_idx];
-  sched_pdsch_otherSI.tb_size = get_tbs_bch(type0_PDCCH_CSS_config, &sched_pdsch_otherSI, num_total_bytes, vrb_map);
+  sched_pdsch_otherSI.tb_size = get_tbs_bch(&sched_pdsch_otherSI, num_total_bytes, vrb_map);
   sched_pdsch_otherSI.R = nr_get_code_rate_dl(sched_pdsch_otherSI.mcs, 0);
   sched_pdsch_otherSI.Qm = nr_get_Qm_dl(sched_pdsch_otherSI.mcs, 0);
 

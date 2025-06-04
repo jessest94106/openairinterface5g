@@ -463,7 +463,7 @@ typedef struct NR_sched_pdsch {
 
   uint16_t pm_index;
   uint8_t nrOfLayers;
-
+  bwp_info_t bwp_info;
   NR_pdsch_dmrs_t dmrs_parms;
   // time_domain_allocation is the index of a list of tda
   int time_domain_allocation;

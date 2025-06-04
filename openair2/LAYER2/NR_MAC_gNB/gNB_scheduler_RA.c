@@ -1357,9 +1357,7 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
                             int rnti,
                             int round,
                             int tb_scaling,
-                            int pduindex,
-                            long BWPStart,
-                            long BWPSize)
+                            int pduindex)
 {
   // look up the PDCCH PDU for this CC, BWP, and CORESET. If it does not exist, create it. This is especially
   // important if we have multiple RAs, and the DLSCH has to reuse them, so we need to mark them
@@ -1419,7 +1417,7 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   dci_pdu_rel15_t dci_payload;
   dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(pdsch_pdu_rel15->rbSize,
                                                                                   pdsch_pdu_rel15->rbStart,
-                                                                                  BWPSize);
+                                                                                  pdsch_pdu_rel15->BWPSize);
 
   dci_payload.time_domain_assignment.val = time_domain_assignment;
   dci_payload.vrb_to_prb_mapping.val = 0;
@@ -1507,7 +1505,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
 
   NR_COMMON_channels_t *cc = &nr_mac->common_channels[CC_id];
   NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
-  NR_UE_ServingCell_Info_t *sc_info = &UE->sc_info;
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_RA_t *ra = UE->ra;
   long rrc_ra_ResponseWindow =
@@ -1548,23 +1545,14 @@ static void nr_generate_Msg2(module_id_t module_idP,
   int mcsIndex = -1; // initialization value
   int rbStart = 0;
   int rbSize = 8;
-  long BWPStart = 0;
-  long BWPSize = 0;
-  NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = NULL;
-  if (*ss->controlResourceSetId != 0) {
-    BWPStart = dl_bwp->BWPStart;
-    BWPSize = sc_info->initial_dl_BWPSize;
-  } else {
-    type0_PDCCH_CSS_config = &nr_mac->type0_PDCCH_CSS_config[cc->ssb_index[UE->UE_beam_index]];
-    BWPStart = type0_PDCCH_CSS_config->cset_start_rb;
-    BWPSize = type0_PDCCH_CSS_config->num_rbs;
-  }
-
+  bwp_info_t bwp_info = get_pdsch_bwp_start_size(nr_mac, UE);
   NR_ControlResourceSet_t *coreset = sched_ctrl->coreset;
   AssertFatal(coreset, "Coreset cannot be null for RA-Msg2\n");
   const int coresetid = coreset->controlResourceSetId;
   // Calculate number of symbols
   int time_domain_assignment = get_dl_tda(nr_mac, slotP);
+
+  NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = &nr_mac->type0_PDCCH_CSS_config[cc->ssb_index[UE->UE_beam_index]];
   int mux_pattern = type0_PDCCH_CSS_config ? type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern : 1;
   NR_tda_info_t tda_info = get_dl_tda_info(dl_bwp,
                                            ss->searchSpaceType->present,
@@ -1578,14 +1566,14 @@ static void nr_generate_Msg2(module_id_t module_idP,
     return;
 
   uint16_t *vrb_map = cc[CC_id].vrb_map[beam.idx];
-  for (int i = 0; (i < rbSize) && (rbStart <= (BWPSize - rbSize)); i++) {
-    if (vrb_map[BWPStart + rbStart + i] & SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols)) {
+  for (int i = 0; (i < rbSize) && (rbStart <= (bwp_info.bwpSize - rbSize)); i++) {
+    if (vrb_map[bwp_info.bwpStart + rbStart + i] & SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols)) {
       rbStart += i;
       i = 0;
     }
   }
 
-  if (rbStart > (BWPSize - rbSize)) {
+  if (rbStart > (bwp_info.bwpSize - rbSize)) {
     LOG_W(NR_MAC, "Cannot find free vrb_map for RA RNTI %04x!\n", ra->RA_rnti);
     reset_beam_status(&nr_mac->beam_info, ra->Msg3_frame, ra->Msg3_slot, UE->UE_beam_index, n_slots_frame, ra->Msg3_beam.new_beam);
     reset_beam_status(&nr_mac->beam_info, frameP, slotP, UE->UE_beam_index, n_slots_frame, beam.new_beam);
@@ -1673,6 +1661,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
     .tda_info = tda_info,
     .pm_index = 0,
     .tb_size = TBS,
+    .bwp_info = bwp_info,
     .rbStart = rbStart,
     .rbSize = rbSize
   };
@@ -1693,9 +1682,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
                   ra->RA_rnti,
                   0,
                   tb_scaling,
-                  pduindex,
-                  BWPStart,
-                  BWPSize);
+                  pduindex);
 
   // DL TX request
   nfapi_nr_pdu_t *tx_req = &TX_req->pdu_list[TX_req->Number_of_PDUs];
@@ -1742,7 +1729,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
   // Mark the corresponding symbols RBs as used
   fill_pdcch_vrb_map(nr_mac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, aggregation_level, beam.idx);
   for (int rb = 0; rb < rbSize; rb++) {
-    vrb_map[BWPStart + rb + rbStart] |= SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
+    vrb_map[bwp_info.bwpStart + rb + rbStart] |= SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
   }
 
   ra->ra_state = nrRA_WAIT_Msg3;
@@ -1796,18 +1783,6 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
     if (beam.idx < 0)
       return;
 
-    long BWPStart = 0;
-    long BWPSize = 0;
-    NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = NULL;
-    if(*ss->controlResourceSetId!=0) {
-      BWPStart = dl_bwp->BWPStart;
-      BWPSize  = dl_bwp->BWPSize;
-    } else {
-      type0_PDCCH_CSS_config = &nr_mac->type0_PDCCH_CSS_config[cc->ssb_index[UE->UE_beam_index]];
-      BWPStart = type0_PDCCH_CSS_config->cset_start_rb;
-      BWPSize = type0_PDCCH_CSS_config->num_rbs;
-    }
-
     // get CCEindex, needed also for PUCCH and then later for PDCCH
     uint8_t aggregation_level;
     int CCEIndex = get_cce_index(nr_mac,
@@ -1835,6 +1810,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
     }
 
     uint8_t time_domain_assignment = get_dl_tda(nr_mac, slotP);
+    NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = &nr_mac->type0_PDCCH_CSS_config[cc->ssb_index[UE->UE_beam_index]];
     int mux_pattern = type0_PDCCH_CSS_config ? type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern : 1;
     NR_tda_info_t msg4_tda = get_dl_tda_info(dl_bwp,
                                              ss->searchSpaceType->present,
@@ -1848,7 +1824,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       return;
 
     NR_pdsch_dmrs_t dmrs_info = get_dl_dmrs_params(scc, dl_bwp, &msg4_tda, 1);
-
+    bwp_info_t bwp_info = get_pdsch_bwp_start_size(nr_mac, UE);
     uint8_t mcsTableIdx = dl_bwp->mcsTableIdx;
     uint8_t mcsIndex = 0;
     int rbStart = 0;
@@ -1860,8 +1836,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       NR_UE_harq_t *harq = &sched_ctrl->harq_processes[current_harq_pid];
       DevAssert(!harq->is_waiting);
       pdu_length = harq->tb_size;
-    }
-    else {
+    } else {
       uint8_t subheader_len = (mac_sdu_length < 256) ? sizeof(NR_MAC_SUBHEADER_SHORT) : sizeof(NR_MAC_SUBHEADER_LONG);
       pdu_length = mac_sdu_length + subheader_len + 13; // 13 is contention resolution length of msgB. It is divided into 3 parts:
       // BI MAC subheader (1 Oct) + SuccessRAR MAC subheader (1 Oct) + SuccessRAR (11 Oct)
@@ -1869,7 +1844,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
 
     // increase PRBs until we get to BWPSize or TBS is bigger than MAC PDU size
     do {
-      if(rbSize < BWPSize)
+      if(rbSize < bwp_info.bwpSize)
         rbSize++;
       else
         mcsIndex++;
@@ -1887,8 +1862,8 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
 
     int i = 0;
     uint16_t *vrb_map = cc[CC_id].vrb_map[beam.idx];
-    while ((i < rbSize) && (rbStart + rbSize <= BWPSize)) {
-      if (vrb_map[BWPStart + rbStart + i]&SL_to_bitmap(msg4_tda.startSymbolIndex, msg4_tda.nrOfSymbols)) {
+    while ((i < rbSize) && (rbStart + rbSize <= bwp_info.bwpSize)) {
+      if (vrb_map[bwp_info.bwpStart + rbStart + i]&SL_to_bitmap(msg4_tda.startSymbolIndex, msg4_tda.nrOfSymbols)) {
         rbStart += i+1;
         i = 0;
       } else {
@@ -1896,7 +1871,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       }
     }
 
-    if (rbStart > (BWPSize - rbSize)) {
+    if (rbStart > (bwp_info.bwpSize - rbSize)) {
       LOG_E(NR_MAC, "Cannot find free vrb_map for RNTI %04x!\n", UE->rnti);
       reset_beam_status(&nr_mac->beam_info, frameP, slotP, UE->UE_beam_index, n_slots_frame, beam.new_beam);
       return;
@@ -1981,6 +1956,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       .tda_info = msg4_tda,
       .pm_index = 0,
       .tb_size = tb_size,
+      .bwp_info = bwp_info,
       .rbStart = rbStart,
       .rbSize = rbSize
     };
@@ -2002,9 +1978,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                     rnti,
                     harq->round,
                     tb_scaling,
-                    pduindex,
-                    BWPStart,
-                    BWPSize);
+                    pduindex);
 
     // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
     sched_ctrl->tpc1 = 1;
@@ -2041,7 +2015,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                        aggregation_level,
                        beam.idx);
     for (int rb = 0; rb < rbSize; rb++) {
-      vrb_map[BWPStart + rb + rbStart] |= SL_to_bitmap(msg4_tda.startSymbolIndex, msg4_tda.nrOfSymbols);
+      vrb_map[bwp_info.bwpStart + rb + rbStart] |= SL_to_bitmap(msg4_tda.startSymbolIndex, msg4_tda.nrOfSymbols);
     }
 
     ra->ra_state = nrRA_WAIT_Msg4_MsgB_ACK;
