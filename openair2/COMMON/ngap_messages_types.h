@@ -249,15 +249,10 @@ typedef struct pdusession_s {
   pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
   /* The transport layer address for the IP packets */
   pdu_session_type_t pdu_session_type;
-  transport_layer_addr_t upf_addr;
-  /* Outgoing (UL) NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t gtp_teid;
-  /* Incoming (DL) NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t gNB_teid_N3;
-  transport_layer_addr_t gNB_addr_N3;
-  /* Incoming (DL) NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t UPF_teid_N3;
-  transport_layer_addr_t UPF_addr_N3;
+  // NG-RAN endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_outgoing;
+  // UPF endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_incoming;
   nssai_t nssai;
 } pdusession_t;
 

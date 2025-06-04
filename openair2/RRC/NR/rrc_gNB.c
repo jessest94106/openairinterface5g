@@ -2449,9 +2449,9 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
       LOG_W(RRC, "E1: received setup for PDU session %ld, but has not been requested\n", e1_pdu->id);
       continue;
     }
-    rrc_pdu->param.gNB_teid_N3 = e1_pdu->tl_info.teId;
-    memcpy(&rrc_pdu->param.gNB_addr_N3.buffer, &e1_pdu->tl_info.tlAddress, sizeof(uint8_t) * 4);
-    rrc_pdu->param.gNB_addr_N3.length = sizeof(in_addr_t);
+    rrc_pdu->param.n3_outgoing.teid = e1_pdu->tl_info.teId;
+    memcpy(&rrc_pdu->param.n3_outgoing.addr.buffer, &e1_pdu->tl_info.tlAddress, sizeof(uint8_t) * 4);
+    rrc_pdu->param.n3_outgoing.addr.length = sizeof(in_addr_t);
 
     // save the tunnel address for the DRBs
     for (int i = 0; i < e1_pdu->numDRBSetup; i++) {

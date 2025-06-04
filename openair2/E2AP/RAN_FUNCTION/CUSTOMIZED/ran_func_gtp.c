@@ -65,8 +65,8 @@ bool read_gtp_sm(void * data)
     int nb_pdu_session = ue_context_p->ue_context.nb_of_pdusessions;
     if (nb_pdu_session > 0) {
       int nb_pdu_idx = nb_pdu_session - 1;
-      gtp->msg.ngut[i].teidgnb = ue_context_p->ue_context.pduSession[nb_pdu_idx].param.gNB_teid_N3;
-      gtp->msg.ngut[i].teidupf = ue_context_p->ue_context.pduSession[nb_pdu_idx].param.UPF_teid_N3;
+      gtp->msg.ngut[i].teidgnb = ue_context_p->ue_context.pduSession[nb_pdu_idx].param.n3_outgoing.teid;
+      gtp->msg.ngut[i].teidupf = ue_context_p->ue_context.pduSession[nb_pdu_idx].param.n3_incoming.teid;
       // TODO: one PDU session has multiple QoS Flow
       int nb_qos_flow = ue_context_p->ue_context.pduSession[nb_pdu_idx].param.nb_qos;
       if (nb_qos_flow > 0) {

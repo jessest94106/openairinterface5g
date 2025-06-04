@@ -283,12 +283,11 @@ static int decodePDUSessionResourceSetup(pdusession_t *session)
         NGAP_GTPTunnel_t *gTPTunnel_p = pdusessionTransfer_ies->value.choice.UPTransportLayerInformation.choice.gTPTunnel;
 
         /* Set the transport layer address */
-        memcpy(session->upf_addr.buffer, gTPTunnel_p->transportLayerAddress.buf, gTPTunnel_p->transportLayerAddress.size);
-
-        session->upf_addr.length = gTPTunnel_p->transportLayerAddress.size * 8 - gTPTunnel_p->transportLayerAddress.bits_unused;
+        memcpy(session->n3_incoming.addr.buffer, gTPTunnel_p->transportLayerAddress.buf, gTPTunnel_p->transportLayerAddress.size);
+        session->n3_incoming.addr.length = gTPTunnel_p->transportLayerAddress.size * 8 - gTPTunnel_p->transportLayerAddress.bits_unused;
 
         /* GTP tunnel endpoint ID */
-        OCTET_STRING_TO_INT32(&gTPTunnel_p->gTP_TEID, session->gtp_teid);
+        OCTET_STRING_TO_INT32(&gTPTunnel_p->gTP_TEID, session->n3_incoming.teid);
       }
 
       break;
@@ -386,8 +385,8 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
                                                                         : SECURITY_NOT_NEEDED;
     sec->confidentialityProtectionIndication = rrc->security.do_drb_ciphering ? SECURITY_REQUIRED
                                                                               : SECURITY_NOT_NEEDED;
-    pdu->UP_TL_information.teId = session->gtp_teid;
-    memcpy(&pdu->UP_TL_information.tlAddress, session->upf_addr.buffer, sizeof(in_addr_t));
+    pdu->UP_TL_information.teId = session->n3_incoming.teid;
+    memcpy(&pdu->UP_TL_information.tlAddress, session->n3_incoming.addr.buffer, sizeof(in_addr_t));
 
     /* we assume for the moment one DRB per PDU session. Activate the bearer,
      * and configure in RRC. */
@@ -582,9 +581,9 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_
     if (session->status == PDU_SESSION_STATUS_DONE) {
       pdu_sessions_done++;
       resp->pdusessions[pdusession].pdusession_id = session->param.pdusession_id;
-      resp->pdusessions[pdusession].gtp_teid = session->param.gNB_teid_N3;
+      resp->pdusessions[pdusession].gtp_teid = session->param.n3_outgoing.teid;
       memcpy(resp->pdusessions[pdusession].gNB_addr.buffer,
-             session->param.gNB_addr_N3.buffer,
+             session->param.n3_outgoing.addr.buffer,
              sizeof(resp->pdusessions[pdusession].gNB_addr.buffer));
       resp->pdusessions[pdusession].gNB_addr.length = 4; // Fixme: IPv4 hard coded here
       resp->pdusessions[pdusession].nb_of_qos_flow = session->param.nb_qos;
@@ -777,10 +776,10 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       pdusession_setup_t *tmp = &resp->pdusessions[pdu_sessions_done];
       tmp->pdusession_id = session->param.pdusession_id;
       tmp->nb_of_qos_flow = session->param.nb_qos;
-      tmp->gtp_teid = session->param.gNB_teid_N3;
+      tmp->gtp_teid = session->param.n3_outgoing.teid;
       tmp->pdu_session_type = session->param.pdu_session_type;
-      tmp->gNB_addr.length = session->param.gNB_addr_N3.length;
-      memcpy(tmp->gNB_addr.buffer, session->param.gNB_addr_N3.buffer, tmp->gNB_addr.length);
+      tmp->gNB_addr.length = session->param.n3_outgoing.addr.length;
+      memcpy(tmp->gNB_addr.buffer, session->param.n3_outgoing.addr.buffer, tmp->gNB_addr.length);
       for (int qos_flow_index = 0; qos_flow_index < tmp->nb_of_qos_flow; qos_flow_index++) {
         tmp->associated_qos_flows[qos_flow_index].qfi = session->param.qos[qos_flow_index].qfi;
         tmp->associated_qos_flows[qos_flow_index].qos_flow_mapping_ind = QOSFLOW_MAPPING_INDICATION_DL;
@@ -1091,8 +1090,6 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
       }
       // Save new pdu session parameters, qos, upf addr, teid
       decodePDUSessionResourceModify(&sess->param, UE->pduSession[i].param.pdusessionTransfer);
-      sess->param.UPF_addr_N3 = sessMod->upf_addr;
-      sess->param.UPF_teid_N3 = sessMod->gtp_teid;
     }
   }
 
