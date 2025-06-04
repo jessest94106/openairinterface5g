@@ -99,6 +99,31 @@ typedef enum pdu_session_satus_e {
   PDU_SESSION_STATUS_RELEASED
 } pdu_session_status_t;
 
+typedef enum pdu_session_type_e {
+  PDUSessionType_ipv4 = 0,
+  PDUSessionType_ipv6 = 1,
+  PDUSessionType_ipv4v6 = 2,
+  PDUSessionType_ethernet = 3,
+  PDUSessionType_unstructured = 4
+}pdu_session_type_t;
+
+typedef struct pdusession_s {
+  /* Unique pdusession_id for the UE. */
+  int pdusession_id;
+  byte_array_t nas_pdu;
+  byte_array_t pdusessionTransfer;
+  uint8_t nb_qos;
+  /* Quality of service for this pdusession */
+  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  /* The transport layer address for the IP packets */
+  pdu_session_type_t pdu_session_type;
+  // NG-RAN endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_outgoing;
+  // UPF endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_incoming;
+  nssai_t nssai;
+} pdusession_t;
+
 typedef struct pdu_session_param_s {
   pdusession_t param;
   pdu_session_status_t status;

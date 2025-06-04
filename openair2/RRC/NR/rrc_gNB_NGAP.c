@@ -254,7 +254,7 @@ static void fill_qos(NGAP_QosFlowSetupRequestList_t *qos, pdusession_t *session)
   session->nb_qos = qos->list.count;
 }
 
-static int decodePDUSessionResourceSetup(pdusession_t *session)
+static int decodePDUSessionResourceSetup(pdusession_t *out, const pdusession_resource_item_t *session)
 {
   NGAP_PDUSessionResourceSetupRequestTransfer_t *pdusessionTransfer = NULL;
   asn_codec_ctx_t st = {.max_stack_size = 100 * 1000};
@@ -283,11 +283,11 @@ static int decodePDUSessionResourceSetup(pdusession_t *session)
         NGAP_GTPTunnel_t *gTPTunnel_p = pdusessionTransfer_ies->value.choice.UPTransportLayerInformation.choice.gTPTunnel;
 
         /* Set the transport layer address */
-        memcpy(session->n3_incoming.addr.buffer, gTPTunnel_p->transportLayerAddress.buf, gTPTunnel_p->transportLayerAddress.size);
-        session->n3_incoming.addr.length = gTPTunnel_p->transportLayerAddress.size * 8 - gTPTunnel_p->transportLayerAddress.bits_unused;
+        memcpy(out->n3_incoming.addr.buffer, gTPTunnel_p->transportLayerAddress.buf, gTPTunnel_p->transportLayerAddress.size);
+        out->n3_incoming.addr.length = gTPTunnel_p->transportLayerAddress.size * 8 - gTPTunnel_p->transportLayerAddress.bits_unused;
 
         /* GTP tunnel endpoint ID */
-        OCTET_STRING_TO_INT32(&gTPTunnel_p->gTP_TEID, session->n3_incoming.teid);
+        OCTET_STRING_TO_INT32(&gTPTunnel_p->gTP_TEID, out->n3_incoming.teid);
       }
 
       break;
@@ -302,7 +302,7 @@ static int decodePDUSessionResourceSetup(pdusession_t *session)
 
         /* mandatory PDUSessionType */
       case NGAP_ProtocolIE_ID_id_PDUSessionType:
-        session->pdu_session_type = (uint8_t)pdusessionTransfer_ies->value.choice.PDUSessionType;
+        out->pdu_session_type = (uint8_t)pdusessionTransfer_ies->value.choice.PDUSessionType;
         break;
 
         /* optional SecurityIndication */
@@ -315,7 +315,7 @@ static int decodePDUSessionResourceSetup(pdusession_t *session)
 
         /* mandatory QosFlowSetupRequestList */
       case NGAP_ProtocolIE_ID_id_QosFlowSetupRequestList:
-        fill_qos(&pdusessionTransfer_ies->value.choice.QosFlowSetupRequestList, session);
+        fill_qos(&pdusessionTransfer_ies->value.choice.QosFlowSetupRequestList, out);
         break;
 
         /* optional CommonNetworkInstance */
@@ -365,7 +365,6 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
     session->nas_pdu = sessions[i].nas_pdu;
     session->pdusessionTransfer = sessions[i].pdusessionTransfer;
     session->nssai = sessions[i].nssai;
-    decodePDUSessionResourceSetup(session);
     bearer_req.gNB_cu_cp_ue_id = UE->rrc_ue_id;
     security_information_t *secInfo = &bearer_req.secInfo;
     secInfo->cipheringAlgorithm = rrc->security.do_drb_ciphering ? UE->ciphering_algorithm : 0;
@@ -520,8 +519,9 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
     UE->n_initial_pdu = req->nb_of_pdusessions;
     UE->initial_pdus = calloc(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
     AssertFatal(UE->initial_pdus != NULL, "out of memory\n");
-    for (int i = 0; i < UE->n_initial_pdu; ++i)
-      UE->initial_pdus[i] = req->pdusession[i];
+    for (int i = 0; i < UE->n_initial_pdu; ++i) {
+      decodePDUSessionResourceSetup(&UE->initial_pdus[i], &req->pdusession[i]);
+    }
   }
 
   /* security */
@@ -901,7 +901,7 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   // At least one because marking one as existing, and setting up another, that
   // might be more work than is worth it. See 8.2.1.4 in 38.413
   for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i) {
-    const pdusession_t *p = &msg->pdusession[i];
+    const pdusession_resource_item_t *p = &msg->pdusession[i];
     rrc_pdu_session_param_t *exist = find_pduSession(UE, p->pdusession_id, false /* don't create */);
     if (exist) {
       LOG_E(NR_RRC, "UE %d: already has existing PDU session %d rejecting PDU Session Resource Setup Request\n", UE->rrc_ue_id, p->pdusession_id);
@@ -934,7 +934,11 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
     return;
   }
 
-  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, msg->pdusession, msg->ueAggMaxBitRate.br_dl)) {
+  pdusession_t to_setup[NGAP_MAX_PDU_SESSION] = {0};
+  for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i) {
+    decodePDUSessionResourceSetup(&to_setup[i], &msg->pdusession[i]);
+  }
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, to_setup, msg->ueAggMaxBitRate.br_dl)) {
     // Reject PDU Session Resource setup if there's no CU-UP associated
     LOG_W(NR_RRC, "UE %d: reject PDU Session Setup in PDU Session Resource Setup Response\n", UE->rrc_ue_id);
     ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE};
@@ -1062,7 +1066,7 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
   bool all_failed = true;
   for (int i = 0; i < req->nb_pdusessions_tomodify; i++) {
     rrc_pdu_session_param_t *sess;
-    const pdusession_t *sessMod = req->pdusession + i;
+    const pdusession_resource_item_t *sessMod = req->pdusession + i;
     for (sess = UE->pduSession; sess < UE->pduSession + UE->nb_of_pdusessions; sess++)
       if (sess->param.pdusession_id == sessMod->pdusession_id)
         break;

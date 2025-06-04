@@ -231,31 +231,6 @@ typedef struct ngap_mobility_restriction_s{
   ngap_plmn_identity_t serving_plmn;
 }ngap_mobility_restriction_t;
 
-typedef enum pdu_session_type_e {
-  PDUSessionType_ipv4 = 0,
-  PDUSessionType_ipv6 = 1,
-  PDUSessionType_ipv4v6 = 2,
-  PDUSessionType_ethernet = 3,
-  PDUSessionType_unstructured = 4
-}pdu_session_type_t;
-
-typedef struct pdusession_s {
-  /* Unique pdusession_id for the UE. */
-  int pdusession_id;
-  byte_array_t nas_pdu;
-  byte_array_t pdusessionTransfer;
-  uint8_t nb_qos;
-  /* Quality of service for this pdusession */
-  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
-  /* The transport layer address for the IP packets */
-  pdu_session_type_t pdu_session_type;
-  // NG-RAN endpoint of the NG-U (N3) transport bearer
-  gtpu_tunnel_t n3_outgoing;
-  // UPF endpoint of the NG-U (N3) transport bearer
-  gtpu_tunnel_t n3_incoming;
-  nssai_t nssai;
-} pdusession_t;
-
 typedef enum pdusession_qosflow_mapping_ind_e{
   QOSFLOW_MAPPING_INDICATION_UL = 0,
   QOSFLOW_MAPPING_INDICATION_DL = 1,
@@ -563,6 +538,13 @@ typedef struct ngap_downlink_nas_s {
   byte_array_t nas_pdu;
 } ngap_downlink_nas_t;
 
+/* PDU Session Resource Setup/Modify Request Item */
+typedef struct {
+  int pdusession_id;
+  byte_array_t nas_pdu;
+  nssai_t nssai;
+  byte_array_t pdusessionTransfer;
+} pdusession_resource_item_t;
 
 typedef struct ngap_initial_context_setup_req_s {
   /* UE id for initial connection to NGAP */
@@ -588,8 +570,8 @@ typedef struct ngap_initial_context_setup_req_s {
 
   /* Number of pdusession to be setup in the list */
   uint8_t  nb_of_pdusessions;
-  /* list of pdusession to be setup by RRC layers */
-  pdusession_t pdusession[NGAP_MAX_PDU_SESSION];
+  // PDU Session Resource Setup Request List
+  pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* Mobility Restriction List */
   uint8_t                        mobility_restriction_flag;
@@ -637,8 +619,8 @@ typedef struct ngap_pdusession_setup_req_s {
   /* Number of pdusession to be setup in the list */
   uint8_t nb_pdusessions_tosetup;
 
-  /* E RAB setup request */
-  pdusession_t pdusession[NGAP_MAX_PDU_SESSION];
+  // PDU Session Resource Setup Request List
+  pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* UE Aggregated Max Bitrates */
   ngap_ambr_t ueAggMaxBitRate;
@@ -693,8 +675,8 @@ typedef struct ngap_pdusession_modify_req_s {
   /* Number of pdusession to be modify in the list */
   uint8_t nb_pdusessions_tomodify;
 
-  /* pdu session modify request */
-  pdusession_t pdusession[NGAP_MAX_PDU_SESSION];
+  // PDU Session Resource Modify Request List
+  pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_modify_req_t;
 
 typedef struct ngap_pdusession_modify_resp_s {
