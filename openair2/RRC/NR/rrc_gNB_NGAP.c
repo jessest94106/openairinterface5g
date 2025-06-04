@@ -423,8 +423,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
     /* if there are PDU sessions to setup, store them to be created once
      * security (and UE capabilities) are received */
     UE->n_initial_pdu = req->nb_of_pdusessions;
-    UE->initial_pdus = calloc(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
-    AssertFatal(UE->initial_pdus != NULL, "out of memory\n");
+    UE->initial_pdus = calloc_or_fail(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
     for (int i = 0; i < UE->n_initial_pdu; ++i)
       cp_pdusession_resource_item_to_pdusession(&UE->initial_pdus[i], &req->pdusession[i]);
   }
