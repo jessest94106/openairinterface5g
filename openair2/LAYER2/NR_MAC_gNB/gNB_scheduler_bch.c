@@ -465,8 +465,8 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
   pdsch_pdu_rel15->transmissionScheme = 0;
   pdsch_pdu_rel15->refPoint = is_sib1;
   pdsch_pdu_rel15->dmrsConfigType = 0;
-  pdsch_pdu_rel15->dlDmrsScramblingId = *scc->physCellId;
-  pdsch_pdu_rel15->SCID = 0;
+  pdsch_pdu_rel15->dlDmrsScramblingId = pdsch->dmrs_parms.scrambling_id;
+  pdsch_pdu_rel15->SCID = pdsch->dmrs_parms.n_scid;
   pdsch_pdu_rel15->numDmrsCdmGrpsNoData = pdsch->dmrs_parms.numDmrsCdmGrpsNoData;
   pdsch_pdu_rel15->dmrsPorts = 1;
   pdsch_pdu_rel15->resourceAlloc = 1;

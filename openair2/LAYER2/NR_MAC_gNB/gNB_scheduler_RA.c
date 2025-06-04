@@ -1416,8 +1416,8 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   pdsch_pdu_rel15->transmissionScheme = 0;
   pdsch_pdu_rel15->refPoint = 0;
   pdsch_pdu_rel15->dmrsConfigType = dmrs_info.dmrsConfigType;
-  pdsch_pdu_rel15->dlDmrsScramblingId = *scc->physCellId;
-  pdsch_pdu_rel15->SCID = 0;
+  pdsch_pdu_rel15->dlDmrsScramblingId = dmrs_info.scrambling_id;
+  pdsch_pdu_rel15->SCID = dmrs_info.n_scid;
   pdsch_pdu_rel15->numDmrsCdmGrpsNoData = dmrs_info.numDmrsCdmGrpsNoData;
   pdsch_pdu_rel15->dmrsPorts = 1;
   pdsch_pdu_rel15->resourceAlloc = 1;

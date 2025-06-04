@@ -300,8 +300,7 @@ NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
   if (dci_format == NR_DL_DCI_FORMAT_1_0) {
     dmrs.numDmrsCdmGrpsNoData = tda_info->nrOfSymbols <= 2 ? 1 : 2;
     dmrs.dmrs_ports_id = 0;
-  }
-  else {
+  } else {
     //TODO first basic implementation of dmrs port selection
     //     only vaild for a single codeword
     //     for now it assumes a selection of Nl consecutive dmrs ports
@@ -346,16 +345,21 @@ NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
     }
   }
 
+  dmrs.n_scid = 0;
+  long *scramblingID = NULL;
   NR_PDSCH_Config_t *pdsch_Config = dl_bwp ? dl_bwp->pdsch_Config : NULL;
   if (pdsch_Config) {
-    if (tda_info->mapping_type == typeB)
-      dmrs.dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup->dmrs_Type != NULL;
-    else
-      dmrs.dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->dmrs_Type != NULL;
-  }
-  else
+    NR_DMRS_DownlinkConfig_t *dmrs_Config = tda_info->mapping_type == typeB ?
+                                            pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup :
+                                            pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup;
+    dmrs.phaseTrackingRS = dmrs_Config->phaseTrackingRS ? dmrs_Config->phaseTrackingRS->choice.setup : NULL;
+    dmrs.dmrsConfigType = dmrs_Config->dmrs_Type != NULL;
+    scramblingID = dmrs.n_scid ? dmrs_Config->scramblingID1 : dmrs_Config->scramblingID0;
+  } else {
     dmrs.dmrsConfigType = NFAPI_NR_DMRS_TYPE1;
-
+    dmrs.phaseTrackingRS = NULL;
+  }
+  dmrs.scrambling_id = scramblingID ? *scramblingID : *scc->physCellId;
   dmrs.N_PRB_DMRS = dmrs.numDmrsCdmGrpsNoData * (dmrs.dmrsConfigType == NFAPI_NR_DMRS_TYPE1 ? 6 : 4);
   dmrs.dl_dmrs_symb_pos = fill_dmrs_mask(pdsch_Config, dci_format, scc->dmrs_TypeA_Position, tda_info->nrOfSymbols, tda_info->startSymbolIndex, tda_info->mapping_type, frontloaded_symb);
   dmrs.N_DMRS_SLOT = get_num_dmrs(dmrs.dl_dmrs_symb_pos);

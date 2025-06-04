@@ -1097,8 +1097,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
     // DMRS
     pdsch_pdu->dlDmrsSymbPos = dmrs_parms->dl_dmrs_symb_pos;
     pdsch_pdu->dmrsConfigType = dmrs_parms->dmrsConfigType;
-    pdsch_pdu->dlDmrsScramblingId = *scc->physCellId;
-    pdsch_pdu->SCID = 0;
+    pdsch_pdu->dlDmrsScramblingId = dmrs_parms->scrambling_id;
+    pdsch_pdu->SCID = dmrs_parms->n_scid;
     pdsch_pdu->numDmrsCdmGrpsNoData = dmrs_parms->numDmrsCdmGrpsNoData;
     pdsch_pdu->dmrsPorts = (1<<nrOfLayers)-1;  // FIXME with a better implementation
     // Pdsch Allocation in frequency domain
@@ -1129,11 +1129,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
     NR_PDSCH_Config_t *pdsch_Config = current_BWP->pdsch_Config;
 
     /* Check and validate PTRS values */
-    struct NR_SetupRelease_PTRS_DownlinkConfig *phaseTrackingRS =
-        pdsch_Config ? pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS : NULL;
-
-    if (phaseTrackingRS) {
-      bool valid_ptrs_setup = set_dl_ptrs_values(phaseTrackingRS->choice.setup,
+    if (dmrs_parms->phaseTrackingRS) {
+      bool valid_ptrs_setup = set_dl_ptrs_values(dmrs_parms->phaseTrackingRS,
                                                  pdsch_pdu->rbSize,
                                                  pdsch_pdu->mcsIndex[0],
                                                  pdsch_pdu->mcsTable[0],

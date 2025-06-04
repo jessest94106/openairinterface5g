@@ -436,7 +436,10 @@ typedef struct NR_pdsch_dmrs {
   uint8_t N_DMRS_SLOT;
   uint16_t dl_dmrs_symb_pos;
   uint8_t numDmrsCdmGrpsNoData;
+  uint32_t scrambling_id;
+  int n_scid;
   nfapi_nr_dmrs_type_e dmrsConfigType;
+  NR_PTRS_DownlinkConfig_t *phaseTrackingRS;
 } NR_pdsch_dmrs_t;
 
 typedef struct NR_sched_pdsch {
