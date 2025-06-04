@@ -479,7 +479,7 @@ static void send_ngap_initial_context_setup_resp_fail(instance_t instance,
   resp->gNB_ue_ngap_id = msg->gNB_ue_ngap_id;
 
   for (int i = 0; i < msg->nb_of_pdusessions; i++) {
-    fill_pdu_session_resource_failed_to_setup_item(&resp->pdusessions_failed[i], msg->pdusession_param[i].pdusession_id, cause);
+    fill_pdu_session_resource_failed_to_setup_item(&resp->pdusessions_failed[i], msg->pdusession[i].pdusession_id, cause);
   }
   resp->nb_of_pdusessions = 0;
   resp->nb_of_pdusessions_failed = msg->nb_of_pdusessions;
@@ -521,7 +521,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
     UE->initial_pdus = calloc(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
     AssertFatal(UE->initial_pdus != NULL, "out of memory\n");
     for (int i = 0; i < UE->n_initial_pdu; ++i)
-      UE->initial_pdus[i] = req->pdusession_param[i];
+      UE->initial_pdus[i] = req->pdusession[i];
   }
 
   /* security */
@@ -855,9 +855,7 @@ static void send_ngap_pdu_session_setup_resp_fail(instance_t instance, ngap_pdus
   resp->nb_of_pdusessions_failed = msg->nb_pdusessions_tosetup;
   resp->nb_of_pdusessions = 0;
   for (int i = 0; i < resp->nb_of_pdusessions_failed; ++i) {
-    fill_pdu_session_resource_failed_to_setup_item(&resp->pdusessions_failed[i],
-                                                   msg->pdusession_setup_params[i].pdusession_id,
-                                                   cause);
+    fill_pdu_session_resource_failed_to_setup_item(&resp->pdusessions_failed[i], msg->pdusession[i].pdusession_id, cause);
   }
   itti_send_msg_to_task(TASK_NGAP, instance, msg_resp);
 }
@@ -903,7 +901,7 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   // At least one because marking one as existing, and setting up another, that
   // might be more work than is worth it. See 8.2.1.4 in 38.413
   for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i) {
-    const pdusession_t *p = &msg->pdusession_setup_params[i];
+    const pdusession_t *p = &msg->pdusession[i];
     rrc_pdu_session_param_t *exist = find_pduSession(UE, p->pdusession_id, false /* don't create */);
     if (exist) {
       LOG_E(NR_RRC, "UE %d: already has existing PDU session %d rejecting PDU Session Resource Setup Request\n", UE->rrc_ue_id, p->pdusession_id);
@@ -936,7 +934,7 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
     return;
   }
 
-  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, msg->pdusession_setup_params, msg->ueAggMaxBitRate.br_dl)) {
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, msg->pdusession, msg->ueAggMaxBitRate.br_dl)) {
     // Reject PDU Session Resource setup if there's no CU-UP associated
     LOG_W(NR_RRC, "UE %d: reject PDU Session Setup in PDU Session Resource Setup Response\n", UE->rrc_ue_id);
     ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE};
@@ -1064,7 +1062,7 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
   bool all_failed = true;
   for (int i = 0; i < req->nb_pdusessions_tomodify; i++) {
     rrc_pdu_session_param_t *sess;
-    const pdusession_t *sessMod = req->pdusession_modify_params + i;
+    const pdusession_t *sessMod = req->pdusession + i;
     for (sess = UE->pduSession; sess < UE->pduSession + UE->nb_of_pdusessions; sess++)
       if (sess->param.pdusession_id == sessMod->pdusession_id)
         break;

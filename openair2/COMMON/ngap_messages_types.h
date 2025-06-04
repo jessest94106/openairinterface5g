@@ -589,7 +589,7 @@ typedef struct ngap_initial_context_setup_req_s {
   /* Number of pdusession to be setup in the list */
   uint8_t  nb_of_pdusessions;
   /* list of pdusession to be setup by RRC layers */
-  pdusession_t  pdusession_param[NGAP_MAX_PDU_SESSION];
+  pdusession_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* Mobility Restriction List */
   uint8_t                        mobility_restriction_flag;
@@ -638,7 +638,7 @@ typedef struct ngap_pdusession_setup_req_s {
   uint8_t nb_pdusessions_tosetup;
 
   /* E RAB setup request */
-  pdusession_t pdusession_setup_params[NGAP_MAX_PDU_SESSION];
+  pdusession_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* UE Aggregated Max Bitrates */
   ngap_ambr_t ueAggMaxBitRate;
@@ -694,7 +694,7 @@ typedef struct ngap_pdusession_modify_req_s {
   uint8_t nb_pdusessions_tomodify;
 
   /* pdu session modify request */
-  pdusession_t pdusession_modify_params[NGAP_MAX_PDU_SESSION];
+  pdusession_t pdusession[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_modify_req_t;
 
 typedef struct ngap_pdusession_modify_resp_s {

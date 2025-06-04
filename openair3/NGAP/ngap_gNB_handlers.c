@@ -762,13 +762,13 @@ static int ngap_gNB_handle_initial_context_request(sctp_assoc_t assoc_id, uint32
 
     for (i = 0; i < ie->value.choice.PDUSessionResourceSetupListCxtReq.list.count; i++) {
       NGAP_PDUSessionResourceSetupItemCxtReq_t *item_p = ie->value.choice.PDUSessionResourceSetupListCxtReq.list.array[i];
-      msg->pdusession_param[i].pdusession_id = item_p->pDUSessionID;
-      msg->pdusession_param[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
+      msg->pdusession[i].pdusession_id = item_p->pDUSessionID;
+      msg->pdusession[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
       if (item_p->nAS_PDU) {
-        msg->pdusession_param[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
+        msg->pdusession[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
       }
       OCTET_STRING_t *transfer = &item_p->pDUSessionResourceSetupRequestTransfer;
-      msg->pdusession_param[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
+      msg->pdusession[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
     }
   }
 
@@ -936,14 +936,14 @@ static int ngap_gNB_handle_pdusession_setup_request(sctp_assoc_t assoc_id, uint3
 
   for (int i = 0; i < ie->value.choice.PDUSessionResourceSetupListSUReq.list.count; i++) {
     NGAP_PDUSessionResourceSetupItemSUReq_t *item_p = ie->value.choice.PDUSessionResourceSetupListSUReq.list.array[i];
-    msg->pdusession_setup_params[i].pdusession_id = item_p->pDUSessionID;
+    msg->pdusession[i].pdusession_id = item_p->pDUSessionID;
 
     // S-NSSAI
-    msg->pdusession_setup_params[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
+    msg->pdusession[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
 
     OCTET_STRING_t *transfer = &item_p->pDUSessionResourceSetupRequestTransfer;
-    msg->pdusession_setup_params[i].nas_pdu = create_byte_array(item_p->pDUSessionNAS_PDU->size, item_p->pDUSessionNAS_PDU->buf);
-    msg->pdusession_setup_params[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
+    msg->pdusession[i].nas_pdu = create_byte_array(item_p->pDUSessionNAS_PDU->size, item_p->pDUSessionNAS_PDU->buf);
+    msg->pdusession[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
   }
     itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);
 
@@ -1116,13 +1116,13 @@ static int ngap_gNB_handle_pdusession_modify_request(sctp_assoc_t assoc_id, uint
   for (int i = 0; i < ie->value.choice.PDUSessionResourceModifyListModReq.list.count; i++) {
     NGAP_PDUSessionResourceModifyItemModReq_t *item_p = ie->value.choice.PDUSessionResourceModifyListModReq.list.array[i];
 
-    msg->pdusession_modify_params[i].pdusession_id = item_p->pDUSessionID;
+    msg->pdusession[i].pdusession_id = item_p->pDUSessionID;
 
     // check for the NAS PDU
     if (item_p->nAS_PDU != NULL && item_p->nAS_PDU->size > 0) {
-      msg->pdusession_modify_params[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
+      msg->pdusession[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
       OCTET_STRING_t *transfer = &item_p->pDUSessionResourceModifyRequestTransfer;
-      msg->pdusession_modify_params[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
+      msg->pdusession[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
     } else {
       LOG_W(NGAP, "received pdu session modify with void content for UE %u, pdu session %lu\n", msg->gNB_ue_ngap_id, item_p->pDUSessionID);
       continue;
