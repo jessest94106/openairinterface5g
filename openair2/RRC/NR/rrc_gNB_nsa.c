@@ -40,7 +40,6 @@
 #include <string.h>
 #include "MESSAGES/asn1_msg.h"
 #include "OCTET_STRING.h"
-#include "RRC/NR/nr_rrc_config.h"
 #include "T.h"
 #include "asn_codecs.h"
 #include "asn_internal.h"

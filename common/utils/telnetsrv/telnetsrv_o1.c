@@ -34,7 +34,7 @@
 
 #include "openair2/RRC/NR/nr_rrc_defs.h"
 #include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
-#include "openair2/RRC/NR/nr_rrc_config.h"
+#include "openair2/LAYER2/NR_MAC_gNB/nr_radio_config.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.c"
 #include "common/utils/nr/nr_common.h"

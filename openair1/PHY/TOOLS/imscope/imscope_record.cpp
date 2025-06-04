@@ -35,7 +35,7 @@
     constexpr std::size_t hardware_destructive_interference_size = 64;
 #endif
 
-#define NUM_CACHED_DATA 4
+#define NUM_CACHED_DATA 8
 // Set maximum number of kilobytes written per recording session to 1GB. This is a safeguard against
 // recoding thread writing too many files and exhausting disk space.
 #define MAX_KBYTES_WRITTEN_PER_SESSION (1000 * 1000)

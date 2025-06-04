@@ -42,7 +42,6 @@
 #include "PHY/INIT/nr_phy_init.h"
 #include "PHY/defs_gNB.h"
 #include "PHY/defs_nr_common.h"
-#include "RRC/NR/nr_rrc_config.h"
 #include "RRC_nr_paramsvalues.h"
 #include "T.h"
 #include "asn_SEQUENCE_OF.h"
@@ -885,7 +884,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
     verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
     verify_gnb_param_notset(gnbp, GNB_DRBS, GNB_CONFIG_STRING_DRBS);
 
-    verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
+    verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
   } // else nothing to be checked
 

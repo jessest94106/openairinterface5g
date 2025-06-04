@@ -1147,7 +1147,6 @@ set(L2_NR_SRC
   ${NR_RRC_DIR}/rrc_gNB.c
   ${NR_RRC_DIR}/mac_rrc_dl_direct.c
   ${NR_RRC_DIR}/mac_rrc_dl_f1ap.c
-  ${NR_RRC_DIR}/nr_rrc_config.c
   ${NR_RRC_DIR}/rrc_gNB_nsa.c
   ${NR_RRC_DIR}/rrc_gNB_UE_context.c
   ${NR_RRC_DIR}/rrc_gNB_NGAP.c
@@ -1230,6 +1229,7 @@ set (MAC_NR_SRC
   ${NR_GNB_MAC_DIR}/mac_rrc_dl_handler.c
   ${NR_GNB_MAC_DIR}/mac_rrc_ul_direct.c
   ${NR_GNB_MAC_DIR}/mac_rrc_ul_f1ap.c
+  ${NR_GNB_MAC_DIR}/nr_radio_config.c
  )
 
 

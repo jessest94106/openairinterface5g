@@ -606,6 +606,24 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
 
     int32_t log2_maxh = 0;
     start_meas_nr_ue_phy(ue, RX_PDSCH_STATS);
+    pdsch_scope_req_t scope_req = { .copy_chanest_to_scope = false,
+                                    .copy_rxdataF_to_scope = false,
+                                    .scope_rxdataF_offset = 0 };
+    if (UEScopeHasTryLock(ue)) {
+      metadata mt = {.frame = proc->frame_rx, .slot = proc->nr_slot_rx};
+      scope_req.copy_chanest_to_scope = UETryLockScopeData(ue,
+                                                           pdschChanEstimates,
+                                                           sizeof(c16_t),
+                                                           1,
+                                                           dlschCfg->number_rbs * NR_NB_SC_PER_RB * dlschCfg->number_symbols,
+                                                           &mt);
+      scope_req.copy_rxdataF_to_scope = UETryLockScopeData(ue,
+                                                           pdschRxdataF,
+                                                           sizeof(c16_t),
+                                                           1,
+                                                           dlschCfg->number_rbs * NR_NB_SC_PER_RB * dlschCfg->number_symbols,
+                                                           &mt);
+    }
     for (int m = dlschCfg->start_symbol; m < (dlschCfg->number_symbols + dlschCfg->start_symbol); m++) {
       bool first_symbol_flag = false;
       if (m == first_symbol_with_data)
@@ -632,11 +650,25 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
                       ptrs_phase_per_slot,
                       ptrs_re_per_slot,
                       G,
-                      nvar)
-          < 0)
+                      nvar,
+                      &scope_req)
+          < 0) {
+        if (scope_req.copy_chanest_to_scope) {
+          UEunlockScopeData(ue, pdschChanEstimates);
+        }
+        if (scope_req.copy_rxdataF_to_scope) {
+          UEunlockScopeData(ue, pdschRxdataF);
+        }
         return -1;
+      }
     } // CRNTI active
     stop_meas_nr_ue_phy(ue, RX_PDSCH_STATS);
+    if (scope_req.copy_chanest_to_scope) {
+      UEunlockScopeData(ue, pdschChanEstimates);
+    }
+    if (scope_req.copy_rxdataF_to_scope) {
+      UEunlockScopeData(ue, pdschRxdataF);
+    }
     free(toFree);
     free(toFree2);
   }
@@ -815,7 +847,7 @@ static void nr_ue_dlsch_procedures(PHY_VARS_NR_UE *ue,
   }
 
   // DLSCH decoding finished! don't wait anymore in Tx process, we know if we should answer ACK/NACK PUCCH
-  if (dlsch[0].rnti_type == TYPE_C_RNTI_ && dlsch[0].dlsch_config.k1_feedback) {
+  if ((dlsch[0].rnti_type == TYPE_C_RNTI_ || dlsch[0].rnti_type == TYPE_RA_RNTI_) && dlsch[0].dlsch_config.k1_feedback) {
     const int ack_nack_slot_and_frame =
         (proc->nr_slot_rx + dlsch[0].dlsch_config.k1_feedback) + proc->frame_rx * ue->frame_parms.slots_per_frame;
     dynamic_barrier_join(&ue->process_slot_tx_barriers[ack_nack_slot_and_frame % NUM_PROCESS_SLOT_TX_BARRIERS]);

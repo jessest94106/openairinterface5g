@@ -368,9 +368,6 @@ void start_oai_nrue_threads()
 
 int NB_UE_INST = 1;
 configmodule_interface_t *uniqCfg = NULL;
-
-// A global var to reduce the changes size
-ldpc_interface_t ldpc_interface = {0}, ldpc_interface_offload = {0};
 nrLDPC_coding_interface_t nrLDPC_coding_interface = {0};
 
 int main(int argc, char **argv)
