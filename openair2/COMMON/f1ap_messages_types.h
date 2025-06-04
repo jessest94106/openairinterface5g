@@ -485,6 +485,11 @@ typedef enum TransmActionInd_e {
   TransmActionInd_RESTART,
 } TransmActionInd_t;
 
+typedef enum lower_layer_status_e {
+  LOWER_LAYERS_SUSPEND,
+  LOWER_LAYERS_RESUME,
+} lower_layer_status_t;
+
 typedef struct f1ap_srb_to_setup_t {
   int id;
 } f1ap_srb_to_setup_t;
@@ -555,6 +560,10 @@ typedef struct f1ap_drb_to_setup_t {
   f1ap_pdcp_sn_len_t *ul_pdcp_sn_len;
 } f1ap_drb_to_setup_t;
 
+typedef struct f1ap_drb_to_release_t {
+  int id;
+} f1ap_drb_to_release_t;
+
 typedef struct f1ap_ue_context_setup_req_s {
   uint32_t gNB_CU_ue_id;
   uint32_t *gNB_DU_ue_id;
@@ -575,6 +584,34 @@ typedef struct f1ap_ue_context_setup_req_s {
 
   uint64_t *gnb_du_ue_agg_mbr_ul; // C-ifDRBSetup
 } f1ap_ue_context_setup_req_t;
+
+typedef struct f1ap_ue_context_mod_req_t {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+
+  plmn_id_t *plmn;
+  uint64_t *nr_cellid;
+  uint8_t *servCellIndex;
+
+  f1ap_cu_to_du_rrc_info_t *cu_to_du_rrc_info;
+
+  TransmActionInd_t *transm_action_ind;
+  ReconfigurationCompl_t *reconfig_compl;
+
+  byte_array_t *rrc_container;
+
+  int srbs_len;
+  f1ap_srb_to_setup_t *srbs; // reuse the same type as for setup; there is a
+                             // list for SRB modification
+
+  int drbs_len;
+  f1ap_drb_to_setup_t *drbs; // as for SRBs
+
+  int drbs_rel_len;
+  f1ap_drb_to_release_t *drbs_rel;
+
+  lower_layer_status_t *status;
+} f1ap_ue_context_mod_req_t;
 
 typedef struct f1ap_ue_context_setup_s {
   uint32_t gNB_CU_ue_id;

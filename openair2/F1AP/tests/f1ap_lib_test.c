@@ -886,6 +886,115 @@ static void test_f1ap_ue_context_setup_request_simple()
 }
 
 
+static void test_f1ap_ue_context_modification_request()
+{
+  f1ap_ue_context_mod_req_t orig = {
+    .gNB_CU_ue_id = 1111,
+    .gNB_DU_ue_id = 2222,
+    // rest below
+  };
+  plmn_id_t plmn = { .mcc = 999, .mnc = 101, .mnc_digit_length = 3 };
+  _F1_MALLOC(orig.plmn, plmn);
+  _F1_MALLOC(orig.nr_cellid, 1532);
+  _F1_MALLOC(orig.servCellIndex, 3);
+
+  f1ap_cu_to_du_rrc_info_t cu2du = {
+    .cg_configinfo = get_malloced_test_ba("Modified"),
+    .ue_cap = get_malloced_test_ba("UE forgot to send earlier"),
+    .meas_config = get_malloced_test_ba("with updates from another cell"),
+    .ho_prep_info = get_malloced_test_ba("prepare to ho soon!"),
+  };
+  _F1_MALLOC(orig.cu_to_du_rrc_info, cu2du);
+
+  orig.rrc_container = get_malloced_test_ba("important RRC message!!");
+
+  orig.srbs_len = 1;
+  orig.srbs = calloc_or_fail(orig.srbs_len, sizeof(*orig.srbs));
+  orig.srbs[0].id = 1;
+
+  orig.drbs_len = 1;
+  orig.drbs = calloc_or_fail(orig.drbs_len, sizeof(*orig.drbs));
+  f1ap_drb_to_setup_t *drb1 = &orig.drbs[0];
+  drb1->id = 4;
+  drb1->qos_choice = F1AP_QOS_CHOICE_NR;
+  f1ap_arp_t arp = { 2, SHALL_NOT_TRIGGER_PREEMPTION, NOT_PREEMPTABLE, };
+  drb1->nr.drb_qos.qos_type = NON_DYNAMIC;
+  drb1->nr.drb_qos.nondyn.fiveQI = 8;
+  drb1->nr.drb_qos.arp = arp;
+  drb1->nr.nssai = (nssai_t) {.sst = 2, .sd = 0xffffff};
+  drb1->nr.flows_len = 1;
+  f1ap_drb_flows_mapped_t *flow = drb1->nr.flows = calloc_or_fail(drb1->nr.flows_len, sizeof(*flow));
+  flow->qfi = 2;
+  flow->param.qos_type = NON_DYNAMIC;
+  flow->param.nondyn.fiveQI = 9;
+  flow->param.arp = arp;
+  drb1->up_ul_tnl_len = 1;
+  inet_pton(AF_INET, "8.8.8.8", &drb1->up_ul_tnl[0].tl_address);
+  drb1->up_ul_tnl[0].teid = 0x9876541;
+  drb1->rlc_mode = F1AP_RLC_MODE_AM;
+  _F1_MALLOC(drb1->dl_pdcp_sn_len, F1AP_PDCP_SN_12B);
+  _F1_MALLOC(drb1->ul_pdcp_sn_len, F1AP_PDCP_SN_18B);
+
+  orig.drbs_rel_len = 3;
+  orig.drbs_rel = calloc_or_fail(orig.drbs_rel_len, sizeof(*orig.drbs_rel));
+  orig.drbs_rel[0].id = 13;
+  orig.drbs_rel[1].id = 4;
+  orig.drbs_rel[2].id = 19;
+
+  _F1_MALLOC(orig.status, LOWER_LAYERS_RESUME);
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_mod_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_mod_req_t decoded = {0};
+  bool ret = decode_ue_context_mod_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_mod_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_mod_req(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_mod_req(): decoded message doesn't match\n");
+  free_ue_context_mod_req(&decoded);
+
+  f1ap_ue_context_mod_req_t cp = cp_ue_context_mod_req(&orig);
+  ret = eq_ue_context_mod_req(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_mod_req(): copied message doesn't match\n");
+  free_ue_context_mod_req(&orig);
+  free_ue_context_mod_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
+static void test_f1ap_ue_context_modification_request_simple()
+{
+  f1ap_ue_context_mod_req_t orig = {
+    .gNB_CU_ue_id = 1111,
+    .gNB_DU_ue_id = 2222,
+    // rest is optional and intentionally left out
+  };
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_mod_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_mod_req_t decoded = {0};
+  bool ret = decode_ue_context_mod_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_mod_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_mod_req(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_mod_req(): decoded message doesn't match\n");
+  free_ue_context_mod_req(&decoded);
+
+  f1ap_ue_context_mod_req_t cp = cp_ue_context_mod_req(&orig);
+  ret = eq_ue_context_mod_req(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_mod_req(): copied message doesn't match\n");
+  free_ue_context_mod_req(&orig);
+  free_ue_context_mod_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -903,5 +1012,7 @@ int main()
   test_f1ap_du_configuration_update_acknowledge();
   test_f1ap_ue_context_setup_request();
   test_f1ap_ue_context_setup_request_simple();
+  test_f1ap_ue_context_modification_request();
+  test_f1ap_ue_context_modification_request_simple();
   return 0;
 }
