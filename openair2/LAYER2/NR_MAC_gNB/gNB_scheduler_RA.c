@@ -1342,10 +1342,9 @@ static bool msg2_in_response_window(int rach_frame,
 
 static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
                             NR_UE_info_t *UE,
+                            NR_sched_pdsch_t *sched_pdsch,
                             nfapi_nr_dl_tti_request_body_t *dl_req,
                             NR_sched_pucch_t *pucch,
-                            NR_pdsch_dmrs_t dmrs_info,
-                            NR_tda_info_t tda,
                             nr_rnti_type_t rnti_type,
                             int aggregation_level,
                             int CCEIndex,
@@ -1358,13 +1357,10 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
                             int CC_id,
                             int rnti,
                             int round,
-                            int mcsIndex,
                             int tb_scaling,
                             int pduindex,
                             long BWPStart,
-                            long BWPSize,
-                            int rbStart,
-                            int rbSize)
+                            long BWPSize)
 {
   // look up the PDCCH PDU for this CC, BWP, and CORESET. If it does not exist, create it. This is especially
   // important if we have multiple RAs, and the DLSCH has to reuse them, so we need to mark them
@@ -1403,32 +1399,30 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   pdsch_pdu_rel15->SubcarrierSpacing = dl_bwp->scs;
   pdsch_pdu_rel15->CyclicPrefix = 0;
   pdsch_pdu_rel15->NrOfCodewords = 1;
-  int R = nr_get_code_rate_dl(mcsIndex, mcsTableIdx);
-  pdsch_pdu_rel15->targetCodeRate[0] = R;
-  int Qm = nr_get_Qm_dl(mcsIndex, mcsTableIdx);
-  pdsch_pdu_rel15->qamModOrder[0] = Qm;
+  pdsch_pdu_rel15->targetCodeRate[0] = sched_pdsch->R;
+  pdsch_pdu_rel15->qamModOrder[0] = sched_pdsch->Qm;
   pdsch_pdu_rel15->TBSize[0] = tb_size;
-  pdsch_pdu_rel15->mcsIndex[0] = mcsIndex;
+  pdsch_pdu_rel15->mcsIndex[0] = sched_pdsch->mcs;
   pdsch_pdu_rel15->mcsTable[0] = mcsTableIdx;
   pdsch_pdu_rel15->rvIndex[0] = nr_get_rv(round % 4);
   pdsch_pdu_rel15->dataScramblingId = *scc->physCellId;
   pdsch_pdu_rel15->nrOfLayers = 1;
   pdsch_pdu_rel15->transmissionScheme = 0;
   pdsch_pdu_rel15->refPoint = 0;
-  pdsch_pdu_rel15->dmrsConfigType = dmrs_info.dmrsConfigType;
-  pdsch_pdu_rel15->dlDmrsScramblingId = dmrs_info.scrambling_id;
-  pdsch_pdu_rel15->SCID = dmrs_info.n_scid;
-  pdsch_pdu_rel15->numDmrsCdmGrpsNoData = dmrs_info.numDmrsCdmGrpsNoData;
+  pdsch_pdu_rel15->dmrsConfigType = sched_pdsch->dmrs_parms.dmrsConfigType;
+  pdsch_pdu_rel15->dlDmrsScramblingId = sched_pdsch->dmrs_parms.scrambling_id;
+  pdsch_pdu_rel15->SCID = sched_pdsch->dmrs_parms.n_scid;
+  pdsch_pdu_rel15->numDmrsCdmGrpsNoData = sched_pdsch->dmrs_parms.numDmrsCdmGrpsNoData;
   pdsch_pdu_rel15->dmrsPorts = 1;
   pdsch_pdu_rel15->resourceAlloc = 1;
-  pdsch_pdu_rel15->rbStart = rbStart;
-  pdsch_pdu_rel15->rbSize = rbSize;
+  pdsch_pdu_rel15->rbStart = sched_pdsch->rbStart;
+  pdsch_pdu_rel15->rbSize = sched_pdsch->rbSize;
   pdsch_pdu_rel15->VRBtoPRBMapping = 0;
-  pdsch_pdu_rel15->StartSymbolIndex = tda.startSymbolIndex;
-  pdsch_pdu_rel15->NrOfSymbols = tda.nrOfSymbols;
-  pdsch_pdu_rel15->dlDmrsSymbPos = dmrs_info.dl_dmrs_symb_pos;
+  pdsch_pdu_rel15->StartSymbolIndex = sched_pdsch->tda_info.startSymbolIndex;
+  pdsch_pdu_rel15->NrOfSymbols = sched_pdsch->tda_info.nrOfSymbols;
+  pdsch_pdu_rel15->dlDmrsSymbPos = sched_pdsch->dmrs_parms.dl_dmrs_symb_pos;
   pdsch_pdu_rel15->maintenance_parms_v3.tbSizeLbrmBytes = nr_compute_tbslbrm(mcsTableIdx, UE->sc_info.dl_bw_tbslbrm, 1);
-  pdsch_pdu_rel15->maintenance_parms_v3.ldpcBaseGraph = get_BG(tb_size << 3, R);
+  pdsch_pdu_rel15->maintenance_parms_v3.ldpcBaseGraph = get_BG(tb_size << 3, sched_pdsch->R);
 
   pdsch_pdu_rel15->precodingAndBeamforming.num_prgs = 1;
   pdsch_pdu_rel15->precodingAndBeamforming.prg_size = 275;
@@ -1683,11 +1677,9 @@ static void nr_generate_Msg2(module_id_t module_idP,
 
   NR_pdsch_dmrs_t dmrs_parms = get_dl_dmrs_params(scc, dl_bwp, &tda_info, 1);
 
-
   uint8_t tb_scaling = 0;
   int R, Qm;
   uint32_t TBS = 0;
-
   while (TBS < 9) { // min TBS for RAR is 9 bytes
     mcsIndex++;
     R = nr_get_code_rate_dl(mcsIndex, mcsTableIdx);
@@ -1703,12 +1695,22 @@ static void nr_generate_Msg2(module_id_t module_idP,
           >> 3; // layers
   }
 
+  NR_sched_pdsch_t sched_pdsch = {
+    .R = R,
+    .Qm = Qm,
+    .mcs = mcsIndex,
+    .nrOfLayers = 1,
+    .dmrs_parms = dmrs_parms,
+    .tda_info = tda_info,
+    .pm_index = 0,
+    .rbStart = rbStart,
+    .rbSize = rbSize
+  };
   prepare_dl_pdus(nr_mac,
                   UE,
+                  &sched_pdsch,
                   dl_req,
                   NULL,
-                  dmrs_parms,
-                  tda_info,
                   TYPE_RA_RNTI_,
                   aggregation_level,
                   CCEIndex,
@@ -1721,13 +1723,10 @@ static void nr_generate_Msg2(module_id_t module_idP,
                   CC_id,
                   ra->RA_rnti,
                   0,
-                  mcsIndex,
                   tb_scaling,
                   pduindex,
                   BWPStart,
-                  BWPSize,
-                  rbStart,
-                  rbSize);
+                  BWPSize);
 
   // DL TX request
   nfapi_nr_pdu_t *tx_req = &TX_req->pdu_list[TX_req->Number_of_PDUs];
@@ -1907,8 +1906,12 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
         mcsIndex++;
       LOG_D(NR_MAC,"Calling nr_compute_tbs with N_PRB_DMRS %d, N_DMRS_SLOT %d\n",dmrs_info.N_PRB_DMRS,dmrs_info.N_DMRS_SLOT);
       tb_size = nr_compute_tbs(nr_get_Qm_dl(mcsIndex, mcsTableIdx),
-                                     nr_get_code_rate_dl(mcsIndex, mcsTableIdx),
-                                     rbSize, msg4_tda.nrOfSymbols, dmrs_info.N_PRB_DMRS * dmrs_info.N_DMRS_SLOT, 0, tb_scaling,1) >> 3;
+                               nr_get_code_rate_dl(mcsIndex, mcsTableIdx),
+                               rbSize,
+                               msg4_tda.nrOfSymbols,
+                               dmrs_info.N_PRB_DMRS * dmrs_info.N_DMRS_SLOT,
+                               0,
+                               tb_scaling,1) >> 3;
     } while (tb_size < pdu_length && mcsIndex<=28);
 
     AssertFatal(tb_size >= pdu_length, "Cannot allocate %s\n", ra_type_str);
@@ -2000,14 +2003,23 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
     }
 
     rnti_t rnti = ra->ra_type == RA_4_STEP ? UE->rnti : ra->MsgB_rnti;
-
+    NR_sched_pdsch_t sched_pdsch = {
+      .R = nr_get_code_rate_dl(mcsIndex, mcsTableIdx),
+      .Qm = nr_get_Qm_dl(mcsIndex, mcsTableIdx),
+      .mcs = mcsIndex,
+      .nrOfLayers = 1,
+      .dmrs_parms = dmrs_info,
+      .tda_info = msg4_tda,
+      .pm_index = 0,
+      .rbStart = rbStart,
+      .rbSize = rbSize
+    };
     const int pduindex = nr_mac->pdu_index[CC_id]++;
     prepare_dl_pdus(nr_mac,
                     UE,
+                    &sched_pdsch,
                     dl_req,
                     pucch,
-                    dmrs_info,
-                    msg4_tda,
                     TYPE_TC_RNTI_,
                     aggregation_level,
                     CCEIndex,
@@ -2020,13 +2032,10 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                     CC_id,
                     rnti,
                     harq->round,
-                    mcsIndex,
                     tb_scaling,
                     pduindex,
                     BWPStart,
-                    BWPSize,
-                    rbStart,
-                    rbSize);
+                    BWPSize);
 
     // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
     sched_ctrl->tpc1 = 1;
