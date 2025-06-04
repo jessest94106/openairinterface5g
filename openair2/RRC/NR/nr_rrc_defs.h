@@ -99,14 +99,6 @@ typedef enum pdu_session_satus_e {
   PDU_SESSION_STATUS_RELEASED
 } pdu_session_status_t;
 
-typedef enum pdu_session_type_e {
-  PDUSessionType_ipv4 = 0,
-  PDUSessionType_ipv6 = 1,
-  PDUSessionType_ipv4v6 = 2,
-  PDUSessionType_ethernet = 3,
-  PDUSessionType_unstructured = 4
-}pdu_session_type_t;
-
 typedef struct pdusession_s {
   /* Unique pdusession_id for the UE. */
   int pdusession_id;
