@@ -163,7 +163,7 @@ extern "C" {
   __attribute__((always_inline)) inline c16_t c16conj(const c16_t a) {
     return (c16_t) {
       .r =  a.r,
-      .i = (int16_t)-a.i
+      .i =  (int16_t)-a.i
     };
   }
 
