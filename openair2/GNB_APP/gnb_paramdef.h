@@ -680,6 +680,9 @@ typedef enum {
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
+#define CONFIG_STRING_NR_RLC_LIST "rlc"
+#define CONFIG_STRING_NR_PDCP_LIST "pdcp"
+
 #define CONFIG_NR_RLC_T_POLL_RETRANSMIT "t_poll_retransmit"
 #define CONFIG_NR_RLC_T_REASSEMBLY "t_reassembly"
 #define CONFIG_NR_RLC_T_STATUS_PROHIBIT "t_status_prohibit"

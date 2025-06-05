@@ -883,6 +883,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
     verify_section_notset(cfg, NULL, CONFIG_STRING_L1_LIST);
     verify_section_notset(cfg, NULL, CONFIG_STRING_RU_LIST);
     verify_section_notset(cfg, NULL, CONFIG_STRING_MACRLC_LIST);
+    verify_section_notset(cfg, NULL, CONFIG_STRING_NR_RLC_LIST);
   } else if (NODE_IS_DU(node_type)) {
     // verify that there is no bearer config
     verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
@@ -890,6 +891,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
 
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
+    verify_section_notset(cfg, NULL, CONFIG_STRING_NR_PDCP_LIST);
   } // else nothing to be checked
 
   /* other possible verifications: PNF, VNF, CU-CP, CU-UP, ...? */
