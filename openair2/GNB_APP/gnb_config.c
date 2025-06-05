@@ -846,7 +846,11 @@ static void verify_section_notset(configmodule_interface_t *cfg, char *aprefix, 
   paramlist_def_t pl = {0};
   strncpy(pl.listname, secname, sizeof(pl.listname) - 1);
   config_getlist(cfg, &pl, NULL, 0, aprefix);
-  AssertFatal(pl.numelt == 0, "Section \"%s.%s\" not allowed in this config, please remove it\n", aprefix ? aprefix : "", secname);
+  AssertFatal(pl.numelt == 0,
+              "Section \"%s%s%s\" not allowed in this config, please remove it\n",
+              aprefix ? aprefix : "",
+              aprefix ? "." : "",
+              secname);
 }
 void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
 {
