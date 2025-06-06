@@ -2254,6 +2254,106 @@ static void pf_ul(module_id_t module_id,
   }
 }
 
+nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti_req,
+                                        const NR_UE_info_t *UE,
+                                        const NR_ServingCellConfigCommon_t *scc,
+                                        const NR_sched_pusch_t *sched_pusch,
+                                        int transform_precoding,
+                                        int harq_id,
+                                        int harq_round,
+                                        int fh,
+                                        int rnti)
+{
+  nfapi_nr_pusch_pdu_t *pusch_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pusch_pdu;
+  memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
+  const NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
+
+  pusch_pdu->pdu_bit_map = PUSCH_PDU_BITMAP_PUSCH_DATA;
+  pusch_pdu->rnti = rnti;
+  pusch_pdu->handle = 0; //not yet used
+  pusch_pdu->bwp_size = sched_pusch->bwp_info.bwpSize;
+  pusch_pdu->bwp_start = sched_pusch->bwp_info.bwpStart;
+  pusch_pdu->subcarrier_spacing = ul_bwp->scs;
+  pusch_pdu->cyclic_prefix = 0;
+  pusch_pdu->target_code_rate = sched_pusch->R;
+  pusch_pdu->qam_mod_order = sched_pusch->Qm;
+  pusch_pdu->mcs_index = sched_pusch->mcs;
+  pusch_pdu->mcs_table = ul_bwp->mcs_table;
+  pusch_pdu->transform_precoding = transform_precoding;
+  if (ul_bwp->pusch_Config && ul_bwp->pusch_Config->dataScramblingIdentityPUSCH)
+    pusch_pdu->data_scrambling_id = *ul_bwp->pusch_Config->dataScramblingIdentityPUSCH;
+  else
+    pusch_pdu->data_scrambling_id = *scc->physCellId;
+  pusch_pdu->nrOfLayers = sched_pusch->nrOfLayers;
+  // DMRS
+  pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
+  pusch_pdu->dmrs_ports = ((1 << sched_pusch->nrOfLayers) - 1);
+  pusch_pdu->ul_dmrs_symb_pos = sched_pusch->dmrs_info.ul_dmrs_symb_pos;
+  pusch_pdu->dmrs_config_type = sched_pusch->dmrs_info.dmrs_config_type;
+  pusch_pdu->scid = sched_pusch->dmrs_info.scid; // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]
+  pusch_pdu->pusch_identity = sched_pusch->dmrs_info.pusch_identity;
+  pusch_pdu->ul_dmrs_scrambling_id = sched_pusch->dmrs_info.dmrs_scrambling_id;
+  /* Allocation in frequency domain */
+  pusch_pdu->resource_alloc = 1; //type 1
+  pusch_pdu->rb_start = sched_pusch->rbStart;
+  pusch_pdu->rb_size = sched_pusch->rbSize;
+  pusch_pdu->vrb_to_prb_mapping = 0;
+  pusch_pdu->frequency_hopping = fh;
+  /* Resource Allocation in time domain */
+  pusch_pdu->start_symbol_index = sched_pusch->tda_info.startSymbolIndex;
+  pusch_pdu->nr_of_symbols = sched_pusch->tda_info.nrOfSymbols;
+  /* PUSCH PDU */
+  pusch_pdu->pusch_data.rv_index = nr_get_rv(harq_round % 4);
+  pusch_pdu->pusch_data.harq_process_id = harq_id;
+  pusch_pdu->pusch_data.new_data_indicator = (harq_round == 0) ? 1 : 0; // not NDI but indicator for new transmission
+  pusch_pdu->pusch_data.tb_size = sched_pusch->tb_size;
+  pusch_pdu->pusch_data.num_cb = 0; // CBG not supported
+  // Beamforming
+  pusch_pdu->beamforming.num_prgs = 0;
+  pusch_pdu->beamforming.prg_size = 0; // bwp_size;
+  pusch_pdu->beamforming.dig_bf_interface = 1;
+  pusch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
+  /* TRANSFORM PRECODING --------------------------------------------------------*/
+  if (pusch_pdu->transform_precoding == NR_PUSCH_Config__transformPrecoder_enabled) {
+    // U as specified in section 6.4.1.1.1.2 in 38.211, if sequence hopping and group hopping are disabled
+    pusch_pdu->dfts_ofdm.low_papr_group_number = sched_pusch->dmrs_info.pusch_identity % 30;
+    pusch_pdu->dfts_ofdm.low_papr_sequence_number = sched_pusch->dmrs_info.low_papr_sequence_number;
+  }
+
+
+  pusch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(sched_pusch->tb_size << 3, sched_pusch->R);
+  pusch_pdu->maintenance_parms_v3.tbSizeLbrmBytes = 0;
+  if (UE->sc_info.rateMatching_PUSCH) {
+    // TBS_LBRM according to section 5.4.2.1 of 38.212
+    long *maxMIMO_Layers = UE->sc_info.maxMIMO_Layers_PUSCH;
+    if (!maxMIMO_Layers && ul_bwp && ul_bwp->pusch_Config)
+      maxMIMO_Layers = ul_bwp->pusch_Config->maxRank;
+    AssertFatal (maxMIMO_Layers != NULL,"Option with max MIMO layers not configured is not supported\n");
+    pusch_pdu->maintenance_parms_v3.tbSizeLbrmBytes = nr_compute_tbslbrm(ul_bwp->mcs_table,
+                                                                         UE->sc_info.ul_bw_tbslbrm,
+                                                                         *maxMIMO_Layers);
+  }
+  /* PUSCH PTRS */
+  if (sched_pusch->dmrs_info.ptrsConfig) {
+    bool valid_ptrs_setup = false;
+    pusch_pdu->pusch_ptrs.ptrs_ports_list = calloc_or_fail(2, sizeof(nfapi_nr_ptrs_ports_t));
+    valid_ptrs_setup = set_ul_ptrs_values(sched_pusch->dmrs_info.ptrsConfig,
+                                          pusch_pdu->rb_size,
+                                          pusch_pdu->mcs_index,
+                                          pusch_pdu->mcs_table,
+                                          &pusch_pdu->pusch_ptrs.ptrs_freq_density,
+                                          &pusch_pdu->pusch_ptrs.ptrs_time_density,
+                                          &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset,
+                                          &pusch_pdu->pusch_ptrs.num_ptrs_ports,
+                                          &pusch_pdu->pusch_ptrs.ul_ptrs_power,
+                                          pusch_pdu->nr_of_symbols);
+    if (valid_ptrs_setup == true)
+      pusch_pdu->pdu_bit_map |= PUSCH_PDU_BITMAP_PUSCH_PTRS; // enable PUSCH PTRS
+  } else
+    pusch_pdu->pdu_bit_map &= ~PUSCH_PDU_BITMAP_PUSCH_PTRS; // disable PUSCH PTRS
+  return pusch_pdu;
+}
+
 static bool nr_ulsch_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
@@ -2475,9 +2575,16 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
                 "Invalid future_ul_tti_req->n_pdus %d\n", future_ul_tti_req->n_pdus);
 
     future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_type = NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE;
-    future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_size = sizeof(nfapi_nr_pusch_pdu_t);
-    nfapi_nr_pusch_pdu_t *pusch_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pusch_pdu;
-    memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
+    future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_size = sizeof(nfapi_nr_pusch_pdu_t);  
+    nfapi_nr_pusch_pdu_t *pusch_pdu = prepare_pusch_pdu(future_ul_tti_req,
+                                                        UE,
+                                                        scc,
+                                                        sched_pusch,
+                                                        current_BWP->transform_precoding,
+                                                        harq_id,
+                                                        cur_harq->round,
+                                                        current_BWP->pusch_Config && current_BWP->pusch_Config->frequencyHopping,
+                                                        rnti);
     future_ul_tti_req->n_pdus += 1;
 
     LOG_D(NR_MAC,
@@ -2489,73 +2596,10 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
           future_ul_tti_req->SFN,
           future_ul_tti_req->Slot);
 
-    pusch_pdu->pdu_bit_map = PUSCH_PDU_BITMAP_PUSCH_DATA;
-    pusch_pdu->rnti = rnti;
-    pusch_pdu->handle = 0; //not yet used
-
-    /* FAPI: BWP */
-
-    pusch_pdu->bwp_size = sched_pusch->bwp_info.bwpSize;
-    pusch_pdu->bwp_start = sched_pusch->bwp_info.bwpStart;
-    pusch_pdu->subcarrier_spacing = current_BWP->scs;
-    pusch_pdu->cyclic_prefix = 0;
-
-    /* FAPI: PUSCH information always included */
-    pusch_pdu->target_code_rate = sched_pusch->R;
-    pusch_pdu->qam_mod_order = sched_pusch->Qm;
-    pusch_pdu->mcs_index = sched_pusch->mcs;
-    pusch_pdu->mcs_table = current_BWP->mcs_table;
-    pusch_pdu->transform_precoding = current_BWP->transform_precoding;
-    if (current_BWP->pusch_Config && current_BWP->pusch_Config->dataScramblingIdentityPUSCH)
-      pusch_pdu->data_scrambling_id = *current_BWP->pusch_Config->dataScramblingIdentityPUSCH;
-    else
-      pusch_pdu->data_scrambling_id = *scc->physCellId;
-    pusch_pdu->nrOfLayers = sched_pusch->nrOfLayers;
-
-    /* FAPI: DMRS */
-    pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
-    pusch_pdu->dmrs_ports = ((1 << sched_pusch->nrOfLayers) - 1);
-    pusch_pdu->ul_dmrs_symb_pos = sched_pusch->dmrs_info.ul_dmrs_symb_pos;
-    pusch_pdu->dmrs_config_type = sched_pusch->dmrs_info.dmrs_config_type;
-    pusch_pdu->scid = sched_pusch->dmrs_info.scid; // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]
-    pusch_pdu->pusch_identity = sched_pusch->dmrs_info.pusch_identity;
-    pusch_pdu->ul_dmrs_scrambling_id = sched_pusch->dmrs_info.dmrs_scrambling_id;
-    /* FAPI: Pusch Allocation in frequency domain */
-    pusch_pdu->resource_alloc = 1; //type 1
-    pusch_pdu->rb_start = sched_pusch->rbStart;
-    pusch_pdu->rb_size = sched_pusch->rbSize;
-    pusch_pdu->vrb_to_prb_mapping = 0;
-    if (current_BWP->pusch_Config==NULL || current_BWP->pusch_Config->frequencyHopping==NULL)
-      pusch_pdu->frequency_hopping = 0;
-    else
-      pusch_pdu->frequency_hopping = 1;
-
-    /* FAPI: Resource Allocation in time domain */
-    pusch_pdu->start_symbol_index = sched_pusch->tda_info.startSymbolIndex;
-    pusch_pdu->nr_of_symbols = sched_pusch->tda_info.nrOfSymbols;
-
-    /* PUSCH PDU */
-    AssertFatal(cur_harq->round < nr_mac->ul_bler.harq_round_max,
-                "RV index %d is out of bounds\n",
-                cur_harq->round % 4);
-    pusch_pdu->pusch_data.rv_index = nr_get_rv(cur_harq->round % 4);
-    pusch_pdu->pusch_data.harq_process_id = harq_id;
-    pusch_pdu->pusch_data.new_data_indicator = (cur_harq->round == 0) ? 1 : 0;  // not NDI but indicator for new transmission
-    pusch_pdu->pusch_data.tb_size = sched_pusch->tb_size;
-    pusch_pdu->pusch_data.num_cb = 0; //CBG not supported
-
-    // Beamforming
-    pusch_pdu->beamforming.num_prgs = 0;
-    pusch_pdu->beamforming.prg_size = 0; // bwp_size;
-    pusch_pdu->beamforming.dig_bf_interface = 1;
-    pusch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
-
-    pusch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(sched_pusch->tb_size<<3,sched_pusch->R);
 
     // Calacualte the normalized tx_power for PHR
     long *deltaMCS = current_BWP->pusch_Config ? current_BWP->pusch_Config->pusch_PowerControl->deltaMCS : NULL;
     int tbs_bits = pusch_pdu->pusch_data.tb_size << 3;
-
     sched_pusch->phr_txpower_calc = compute_ph_factor(current_BWP->scs,
                                                       tbs_bits,
                                                       sched_pusch->rbSize,
@@ -2564,48 +2608,6 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
                                                       sched_pusch->dmrs_info.N_PRB_DMRS * sched_pusch->dmrs_info.num_dmrs_symb,
                                                       deltaMCS,
                                                       false);
-
-    NR_UE_ServingCell_Info_t *sc_info = &UE->sc_info;
-    if (sc_info->rateMatching_PUSCH) {
-      // TBS_LBRM according to section 5.4.2.1 of 38.212
-      long *maxMIMO_Layers = sc_info->maxMIMO_Layers_PUSCH;
-      if (!maxMIMO_Layers)
-        maxMIMO_Layers = current_BWP->pusch_Config->maxRank;
-      AssertFatal (maxMIMO_Layers != NULL,"Option with max MIMO layers not configured is not supported\n");
-      pusch_pdu->maintenance_parms_v3.tbSizeLbrmBytes =
-          nr_compute_tbslbrm(current_BWP->mcs_table, sc_info->ul_bw_tbslbrm, *maxMIMO_Layers);
-    } else
-      pusch_pdu->maintenance_parms_v3.tbSizeLbrmBytes = 0;
-
-    LOG_D(NR_MAC,
-          "PUSCH PDU : data_scrambling_identity %x, dmrs_scrambling_id %x\n",
-          pusch_pdu->data_scrambling_id,
-          pusch_pdu->ul_dmrs_scrambling_id);
-    /* TRANSFORM PRECODING --------------------------------------------------------*/
-    if (pusch_pdu->transform_precoding == NR_PUSCH_Config__transformPrecoder_enabled) {
-
-      // U as specified in section 6.4.1.1.1.2 in 38.211, if sequence hopping and group hopping are disabled
-      pusch_pdu->dfts_ofdm.low_papr_group_number = pusch_pdu->pusch_identity % 30;
-      pusch_pdu->dfts_ofdm.low_papr_sequence_number = sched_pusch->dmrs_info.low_papr_sequence_number;
-      LOG_D(NR_MAC,
-            "TRANSFORM PRECODING IS ENABLED. CDM groups: %d, U: %d MCS table: %d\n",
-            pusch_pdu->num_dmrs_cdm_grps_no_data,
-            pusch_pdu->dfts_ofdm.low_papr_group_number,
-            current_BWP->mcs_table);
-    }
-    /* PUSCH PTRS */
-    if (sched_pusch->dmrs_info.ptrsConfig) {
-      bool valid_ptrs_setup = false;
-      pusch_pdu->pusch_ptrs.ptrs_ports_list = calloc_or_fail(2, sizeof(nfapi_nr_ptrs_ports_t));
-      valid_ptrs_setup = set_ul_ptrs_values(sched_pusch->dmrs_info.ptrsConfig,
-                                            pusch_pdu->rb_size, pusch_pdu->mcs_index, pusch_pdu->mcs_table,
-                                            &pusch_pdu->pusch_ptrs.ptrs_freq_density,&pusch_pdu->pusch_ptrs.ptrs_time_density,
-                                            &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset,&pusch_pdu->pusch_ptrs.num_ptrs_ports,
-                                            &pusch_pdu->pusch_ptrs.ul_ptrs_power, pusch_pdu->nr_of_symbols);
-      if (valid_ptrs_setup == true)
-        pusch_pdu->pdu_bit_map |= PUSCH_PDU_BITMAP_PUSCH_PTRS; // enable PUSCH PTRS
-    } else
-      pusch_pdu->pdu_bit_map &= ~PUSCH_PDU_BITMAP_PUSCH_PTRS; // disable PUSCH PTRS
 
     /* look up the PDCCH PDU for this BWP and CORESET. If it does not exist,
      * create it */

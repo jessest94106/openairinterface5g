@@ -46,13 +46,6 @@
 
 #include <executables/softmodem-common.h>
 
-// forward declaration of functions used in this file
-static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
-                                const NR_sched_pusch_t *sched_pusch,
-                                NR_ServingCellConfigCommon_t *scc,
-                                NR_UE_info_t *UE,
-                                int scs,
-                                int fh);
 static void nr_fill_rar(uint8_t Mod_idP, NR_UE_info_t *UE, uint8_t *dlsch_buffer, nfapi_nr_pusch_pdu_t *pusch_pdu);
 
 static const float ssb_per_rach_occasion[8] = {0.125, 0.25, 0.5, 1, 2, 4, 8};
@@ -814,7 +807,6 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                                            TYPE_TC_RNTI_,
                                            ra->Msg3_tda_id);
 
-  int mu = ul_bwp->scs;
   int slots_frame = nr_mac->frame_structure.numb_slots_frame;
   uint16_t K2 = tda_info.k2 + get_NTN_Koffset(scc);
   const int sched_frame = (frame + (slot + K2) / slots_frame) % MAX_FRAME_NUMBER;
@@ -829,7 +821,6 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
       reset_beam_status(&nr_mac->beam_info, sched_frame, sched_slot, UE->UE_beam_index, slots_frame, beam_ul.new_beam);
       return;
     }
-    int fh = 0;
     int buffer_index = ul_buffer_index(sched_frame, sched_slot, slots_frame, nr_mac->vrb_map_UL_size);
     uint16_t *vrb_map_UL = &nr_mac->common_channels[CC_id].vrb_map_UL[beam_ul.idx][buffer_index * MAX_BWP_SIZE];
 
@@ -901,10 +892,15 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                 "Invalid future_ul_tti_req->n_pdus %d\n", future_ul_tti_req->n_pdus);
     future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_type = NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE;
     future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_size = sizeof(nfapi_nr_pusch_pdu_t);
-    nfapi_nr_pusch_pdu_t *pusch_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pusch_pdu;
-    memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
-
-    fill_msg3_pusch_pdu(pusch_pdu, &sched_pusch, scc, UE, mu, fh);
+    nfapi_nr_pusch_pdu_t *pusch_pdu = prepare_pusch_pdu(future_ul_tti_req,
+                                                        UE,
+                                                        scc,
+                                                        &sched_pusch,
+                                                        get_transformPrecoding(ul_bwp, NR_UL_DCI_FORMAT_0_0, 0),
+                                                        0,
+                                                        ra->msg3_round,
+                                                        ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping,
+                                                        UE->rnti);
     future_ul_tti_req->n_pdus += 1;
 
     // generation of DCI 0_0 to schedule msg3 retransmission
@@ -1132,87 +1128,6 @@ static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, fra
   return true;
 }
 
-static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
-                                const NR_sched_pusch_t *sched_pusch,
-                                NR_ServingCellConfigCommon_t *scc,
-                                NR_UE_info_t *UE,
-                                int scs,
-                                int fh)
-{
-  const NR_RA_t *ra = UE->ra;
-  pusch_pdu->pdu_bit_map = PUSCH_PDU_BITMAP_PUSCH_DATA;
-  pusch_pdu->rnti = UE->rnti;
-  pusch_pdu->handle = 0;
-  pusch_pdu->bwp_start = sched_pusch->bwp_info.bwpStart;
-  pusch_pdu->bwp_size = sched_pusch->bwp_info.bwpSize;
-  pusch_pdu->subcarrier_spacing = scs;
-  pusch_pdu->cyclic_prefix = 0;
-  pusch_pdu->mcs_table = 0;
-  if (scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->msg3_transformPrecoder == NULL)
-    pusch_pdu->transform_precoding = 1; // disabled
-  else {
-    pusch_pdu->transform_precoding = 0; // enabled
-    pusch_pdu->dfts_ofdm.low_papr_group_number = *scc->physCellId % 30;
-    pusch_pdu->dfts_ofdm.low_papr_sequence_number = 0;
-    if (scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->groupHoppingEnabledTransformPrecoding)
-      AssertFatal(1==0,"Hopping mode is not supported in transform precoding\n");
-  }
-  pusch_pdu->data_scrambling_id = *scc->physCellId;
-  pusch_pdu->nrOfLayers = 1;
-  pusch_pdu->ul_dmrs_symb_pos = get_l_prime(sched_pusch->tda_info.nrOfSymbols,
-                                            sched_pusch->tda_info.mapping_type,
-                                            pusch_dmrs_pos2,
-                                            pusch_len1,
-                                            sched_pusch->tda_info.startSymbolIndex,
-                                            scc->dmrs_TypeA_Position);
-  LOG_D(NR_MAC,
-        "MSG3 start_sym:%d NR Symb:%d mappingtype:%d, ul_dmrs_symb_pos:%x\n",
-        sched_pusch->tda_info.startSymbolIndex,
-        sched_pusch->tda_info.nrOfSymbols,
-        sched_pusch->tda_info.mapping_type,
-        pusch_pdu->ul_dmrs_symb_pos);
-  pusch_pdu->dmrs_config_type = 0;
-  pusch_pdu->ul_dmrs_scrambling_id = *scc->physCellId; //If provided and the PUSCH is not a msg3 PUSCH, otherwise, L2 should set this to physical cell id.
-  pusch_pdu->pusch_identity = *scc->physCellId; //If provided and the PUSCH is not a msg3 PUSCH, otherwise, L2 should set this to physical cell id.
-  pusch_pdu->scid = 0; //DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]. Should match what is sent in DCI 0_1, otherwise set to 0.
-  pusch_pdu->dmrs_ports = 1;  // 6.2.2 in 38.214 only port 0 to be used
-  // no data in dmrs symbols as in 6.2.2 in 38.214
-  pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->tda_info.nrOfSymbols <= 2 ? 1 : 2;
-  pusch_pdu->resource_alloc = 1; //type 1
-  memset(pusch_pdu->rb_bitmap, 0, sizeof(pusch_pdu->rb_bitmap));
-  pusch_pdu->rb_start = sched_pusch->rbStart;
-  AssertFatal(sched_pusch->rbSize <= pusch_pdu->bwp_size, "MSG3 allocated number of RBs exceed the BWP size\n");
-  pusch_pdu->rb_size = sched_pusch->rbSize;
-  pusch_pdu->vrb_to_prb_mapping = 0;
-
-  pusch_pdu->frequency_hopping = fh;
-  //pusch_pdu->tx_direct_current_location;
-  //The uplink Tx Direct Current location for the carrier. Only values in the value range of this field between 0 and 3299,
-  //which indicate the subcarrier index within the carrier corresponding 1o the numerology of the corresponding uplink BWP and value 3300,
-  //which indicates "Outside the carrier" and value 3301, which indicates "Undetermined position within the carrier" are used. [TS38.331, UplinkTxDirectCurrentBWP IE]
-  pusch_pdu->uplink_frequency_shift_7p5khz = 0;
-  //Resource Allocation in time domain
-  pusch_pdu->start_symbol_index = sched_pusch->tda_info.startSymbolIndex;
-  pusch_pdu->nr_of_symbols = sched_pusch->tda_info.nrOfSymbols;
-  //Optional Data only included if indicated in pduBitmap
-  pusch_pdu->pusch_data.rv_index = nr_get_rv(ra->msg3_round % 4);
-  pusch_pdu->pusch_data.harq_process_id = 0;
-  pusch_pdu->pusch_data.new_data_indicator = (ra->msg3_round == 0) ? 1 : 0;;
-  pusch_pdu->pusch_data.num_cb = 0;
-
-  // Beamforming
-  pusch_pdu->beamforming.num_prgs = 0;
-  pusch_pdu->beamforming.prg_size = 0; // bwp_size;
-  pusch_pdu->beamforming.dig_bf_interface = 1;
-  pusch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
-
-  pusch_pdu->target_code_rate = sched_pusch->R;
-  pusch_pdu->qam_mod_order = sched_pusch->Qm;
-  pusch_pdu->mcs_index = sched_pusch->mcs;
-  pusch_pdu->pusch_data.tb_size = sched_pusch->tb_size;
-  pusch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(sched_pusch->tb_size << 3, sched_pusch->R);
-}
-
 static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_t slotP, NR_UE_info_t *UE, uint8_t *RAR_pdu)
 {
   gNB_MAC_INST *mac = RC.nrmac[module_idP];
@@ -1251,8 +1166,6 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
               ra->Msg3_slot);
   future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_type = NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE;
   future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pdu_size = sizeof(nfapi_nr_pusch_pdu_t);
-  nfapi_nr_pusch_pdu_t *pusch_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pusch_pdu;
-  memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
 
   NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp, 0, NR_SearchSpace__searchSpaceType_PR_common, TYPE_TC_RNTI_, ra->Msg3_tda_id);
   NR_pusch_dmrs_t dmrs_info = get_ul_dmrs_params(scc, ul_bwp, &tda_info, 1);
@@ -1289,7 +1202,6 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
     .dmrs_info = dmrs_info
   };
 
-  const int fh = (ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping) ? 1 : 0;
   LOG_D(NR_MAC,
         "UE %04x: %d.%d Adding Msg3 UL Config Request for (%d,%d) : (%d,%d,%d)\n",
         UE->rnti,
@@ -1301,7 +1213,15 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
         ra->msg3_first_rb,
         ra->msg3_round);
 
-  fill_msg3_pusch_pdu(pusch_pdu, &sched_pusch, scc, UE, ul_bwp->scs, fh);
+  nfapi_nr_pusch_pdu_t *pusch_pdu = prepare_pusch_pdu(future_ul_tti_req,
+                                                      UE,
+                                                      scc,
+                                                      &sched_pusch,
+                                                      get_transformPrecoding(ul_bwp, NR_UL_DCI_FORMAT_0_0, 0),
+                                                      0,
+                                                      0,
+                                                      ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping,
+                                                      UE->rnti);
   future_ul_tti_req->n_pdus += 1;
 
   // calling function to fill rar message

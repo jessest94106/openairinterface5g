@@ -323,6 +323,15 @@ void nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, N
 void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti);
 NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroupConfig_t *CellGroup);
 int nr_get_default_pucch_res(int pucch_ResourceCommon);
+nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti_req,
+                                        const NR_UE_info_t *UE,
+                                        const NR_ServingCellConfigCommon_t *scc,
+                                        const NR_sched_pusch_t *sched_pusch,
+                                        int transform_precoding,
+                                        int harq_id,
+                                        int harq_round,
+                                        int fh,
+                                        int rnti);
 nfapi_nr_dl_tti_pdsch_pdu_rel15_t *prepare_pdsch_pdu(nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdsch_pdu,
                                                      const gNB_MAC_INST *mac,
                                                      const NR_UE_info_t *UE,
