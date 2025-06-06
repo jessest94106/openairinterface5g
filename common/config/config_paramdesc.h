@@ -169,7 +169,6 @@ typedef struct paramlist_def {
 
 /* Macros to get parameters with the config module API */
 #define GET_PARAMS(param_def, param_desc, prefix)                         \
-  printf("Reading '%s' section from the config file\n", #param_def);      \
   paramdef_t param_def[] = param_desc;                                    \
   config_get(config_get_if(), param_def, sizeofArray(param_def), prefix);
 
