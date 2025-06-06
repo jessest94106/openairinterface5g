@@ -224,6 +224,7 @@ static int gtpv1uCreateAndSendMsg(int h,
                                   uint8_t extensionHeader_length) {
   LOG_D(GTPU, "Peer IP:%u peer port:%u outgoing teid:%u \n", peerIp, peerPort, teid);
 
+  DevAssert(msgLen + HDR_MAX < 65536); // maximum size of UDP packet
   uint8_t buffer[msgLen+HDR_MAX]; 
   uint8_t *curPtr=buffer;
   Gtpv1uMsgHeaderT      *msgHdr = (Gtpv1uMsgHeaderT *)buffer ;
