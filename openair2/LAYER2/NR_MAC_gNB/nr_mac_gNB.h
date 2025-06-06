@@ -392,6 +392,11 @@ typedef struct NR_pusch_dmrs {
   uint16_t ul_dmrs_symb_pos;
   uint8_t num_dmrs_cdm_grps_no_data;
   nfapi_nr_dmrs_type_e dmrs_config_type;
+  int dmrs_scrambling_id;
+  int pusch_identity;
+  int scid;
+  int low_papr_sequence_number;
+  NR_PTRS_UplinkConfig_t *ptrsConfig;
 } NR_pusch_dmrs_t;
 
 typedef struct NR_sched_pusch {

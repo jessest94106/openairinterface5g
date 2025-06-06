@@ -706,8 +706,8 @@ const NR_DMRS_UplinkConfig_t *get_DMRS_UplinkConfig(const NR_PUSCH_Config_t *pus
 NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
                                    const NR_UE_UL_BWP_t *ul_bwp,
                                    const NR_tda_info_t *tda_info,
-                                   const int Layers) {
-
+                                   const int Layers)
+{
   NR_pusch_dmrs_t dmrs = {0};
   // TODO setting of cdm groups with no data to be redone for MIMO
   if(NFAPI_MODE == NFAPI_MODE_AERIAL) {
@@ -719,13 +719,36 @@ NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
       dmrs.num_dmrs_cdm_grps_no_data = 2;
   }
 
-  NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = ul_bwp->pusch_Config ?
-                                                 (tda_info->mapping_type == typeA ?
-                                                 ul_bwp->pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA->choice.setup :
-                                                 ul_bwp->pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup) : NULL;
+  const NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = get_DMRS_UplinkConfig(ul_bwp->pusch_Config, tda_info);
+  dmrs.ptrsConfig = NR_DMRS_UplinkConfig
+                    && NR_DMRS_UplinkConfig->phaseTrackingRS ?
+                    NR_DMRS_UplinkConfig->phaseTrackingRS->choice.setup : NULL;
+
+  dmrs.pusch_identity = *scc->physCellId;
+  dmrs.dmrs_scrambling_id = *scc->physCellId;
+  dmrs.scid = 0;
+  if (ul_bwp->transform_precoding) { // transform precoding disabled
+    long *scramblingid = NULL;
+    if (NR_DMRS_UplinkConfig && dmrs.scid == 0)
+      scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID0;
+    else if (NR_DMRS_UplinkConfig)
+      scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID1;
+    if (scramblingid)
+      dmrs.dmrs_scrambling_id = *scramblingid;
+  } else {
+    if (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->transformPrecodingEnabled) {
+      if (NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity)
+        dmrs.pusch_identity = *NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity;
+      if ((!NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceGroupHopping
+          && !NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceHopping)
+          && !scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->groupHoppingEnabledTransformPrecoding)
+        dmrs.low_papr_sequence_number = 0;
+      else
+        AssertFatal(false, "Hopping mode is not supported in transform precoding\n");
+    }
+  }
 
   dmrs.dmrs_config_type = NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->dmrs_Type ? 1 : 0;
-
   const pusch_dmrs_AdditionalPosition_t additional_pos = (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->dmrs_AdditionalPosition) ?
                                                          (*NR_DMRS_UplinkConfig->dmrs_AdditionalPosition ==
                                                          NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos3 ?

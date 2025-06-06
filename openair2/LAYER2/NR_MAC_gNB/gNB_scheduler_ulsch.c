@@ -2514,33 +2514,12 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
 
     /* FAPI: DMRS */
     pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
-    pusch_pdu->dmrs_ports = ((1<<sched_pusch->nrOfLayers) - 1);
+    pusch_pdu->dmrs_ports = ((1 << sched_pusch->nrOfLayers) - 1);
     pusch_pdu->ul_dmrs_symb_pos = sched_pusch->dmrs_info.ul_dmrs_symb_pos;
     pusch_pdu->dmrs_config_type = sched_pusch->dmrs_info.dmrs_config_type;
-    pusch_pdu->scid = 0;      // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]
-    const NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = get_DMRS_UplinkConfig(current_BWP->pusch_Config, &sched_pusch->tda_info);
-    if (pusch_pdu->transform_precoding) { // transform precoding disabled
-      long *scramblingid=NULL;
-      pusch_pdu->pusch_identity = *scc->physCellId;
-      if (NR_DMRS_UplinkConfig && pusch_pdu->scid == 0)
-        scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID0;
-      else if (NR_DMRS_UplinkConfig)
-        scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID1;
-      if (scramblingid == NULL)
-        pusch_pdu->ul_dmrs_scrambling_id = *scc->physCellId;
-      else
-        pusch_pdu->ul_dmrs_scrambling_id = *scramblingid;
-    }
-    else {
-      pusch_pdu->ul_dmrs_scrambling_id = *scc->physCellId;
-      if (NR_DMRS_UplinkConfig &&
-          NR_DMRS_UplinkConfig->transformPrecodingEnabled &&
-          NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity != NULL)
-        pusch_pdu->pusch_identity = *NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity;
-      else if (NR_DMRS_UplinkConfig)
-        pusch_pdu->pusch_identity = *scc->physCellId;
-    }
-
+    pusch_pdu->scid = sched_pusch->dmrs_info.scid; // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]
+    pusch_pdu->pusch_identity = sched_pusch->dmrs_info.pusch_identity;
+    pusch_pdu->ul_dmrs_scrambling_id = sched_pusch->dmrs_info.dmrs_scrambling_id;
     /* FAPI: Pusch Allocation in frequency domain */
     pusch_pdu->resource_alloc = 1; //type 1
     pusch_pdu->rb_start = sched_pusch->rbStart;
@@ -2598,44 +2577,35 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
     } else
       pusch_pdu->maintenance_parms_v3.tbSizeLbrmBytes = 0;
 
-    LOG_D(NR_MAC,"PUSCH PDU : data_scrambling_identity %x, dmrs_scrambling_id %x\n",pusch_pdu->data_scrambling_id,pusch_pdu->ul_dmrs_scrambling_id);
+    LOG_D(NR_MAC,
+          "PUSCH PDU : data_scrambling_identity %x, dmrs_scrambling_id %x\n",
+          pusch_pdu->data_scrambling_id,
+          pusch_pdu->ul_dmrs_scrambling_id);
     /* TRANSFORM PRECODING --------------------------------------------------------*/
-
-    if (pusch_pdu->transform_precoding == NR_PUSCH_Config__transformPrecoder_enabled){
+    if (pusch_pdu->transform_precoding == NR_PUSCH_Config__transformPrecoder_enabled) {
 
       // U as specified in section 6.4.1.1.1.2 in 38.211, if sequence hopping and group hopping are disabled
       pusch_pdu->dfts_ofdm.low_papr_group_number = pusch_pdu->pusch_identity % 30;
-
-      // V as specified in section 6.4.1.1.1.2 in 38.211 V = 0 if sequence hopping and group hopping are disabled
-      if ((!NR_DMRS_UplinkConfig ||
-          !NR_DMRS_UplinkConfig->transformPrecodingEnabled ||
-          (!NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceGroupHopping && !NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceHopping)) &&
-          !scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->groupHoppingEnabledTransformPrecoding)
-        pusch_pdu->dfts_ofdm.low_papr_sequence_number = 0;
-      else
-        AssertFatal(1==0,"Hopping mode is not supported in transform precoding\n");
-
-      LOG_D(NR_MAC,"TRANSFORM PRECODING IS ENABLED. CDM groups: %d, U: %d MCS table: %d\n", pusch_pdu->num_dmrs_cdm_grps_no_data, pusch_pdu->dfts_ofdm.low_papr_group_number, current_BWP->mcs_table);
+      pusch_pdu->dfts_ofdm.low_papr_sequence_number = sched_pusch->dmrs_info.low_papr_sequence_number;
+      LOG_D(NR_MAC,
+            "TRANSFORM PRECODING IS ENABLED. CDM groups: %d, U: %d MCS table: %d\n",
+            pusch_pdu->num_dmrs_cdm_grps_no_data,
+            pusch_pdu->dfts_ofdm.low_papr_group_number,
+            current_BWP->mcs_table);
     }
-
-    /*-----------------------------------------------------------------------------*/
-
     /* PUSCH PTRS */
-    if (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->phaseTrackingRS != NULL) {
+    if (sched_pusch->dmrs_info.ptrsConfig) {
       bool valid_ptrs_setup = false;
-      pusch_pdu->pusch_ptrs.ptrs_ports_list   = (nfapi_nr_ptrs_ports_t *) malloc(2*sizeof(nfapi_nr_ptrs_ports_t));
-      valid_ptrs_setup = set_ul_ptrs_values(NR_DMRS_UplinkConfig->phaseTrackingRS->choice.setup,
+      pusch_pdu->pusch_ptrs.ptrs_ports_list = calloc_or_fail(2, sizeof(nfapi_nr_ptrs_ports_t));
+      valid_ptrs_setup = set_ul_ptrs_values(sched_pusch->dmrs_info.ptrsConfig,
                                             pusch_pdu->rb_size, pusch_pdu->mcs_index, pusch_pdu->mcs_table,
                                             &pusch_pdu->pusch_ptrs.ptrs_freq_density,&pusch_pdu->pusch_ptrs.ptrs_time_density,
                                             &pusch_pdu->pusch_ptrs.ptrs_ports_list->ptrs_re_offset,&pusch_pdu->pusch_ptrs.num_ptrs_ports,
                                             &pusch_pdu->pusch_ptrs.ul_ptrs_power, pusch_pdu->nr_of_symbols);
-      if (valid_ptrs_setup==true) {
+      if (valid_ptrs_setup == true)
         pusch_pdu->pdu_bit_map |= PUSCH_PDU_BITMAP_PUSCH_PTRS; // enable PUSCH PTRS
-      }
-    }
-    else{
+    } else
       pusch_pdu->pdu_bit_map &= ~PUSCH_PDU_BITMAP_PUSCH_PTRS; // disable PUSCH PTRS
-    }
 
     /* look up the PDCCH PDU for this BWP and CORESET. If it does not exist,
      * create it */
