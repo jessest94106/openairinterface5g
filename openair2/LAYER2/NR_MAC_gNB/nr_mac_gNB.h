@@ -413,7 +413,6 @@ typedef struct NR_sched_pusch {
 
   /// UL HARQ PID to use for this UE, or -1 for "any new"
   int8_t ul_harq_pid;
-
   uint8_t nrOfLayers;
   int tpmi;
 
@@ -421,6 +420,7 @@ typedef struct NR_sched_pusch {
   int time_domain_allocation;
   NR_tda_info_t tda_info;
   NR_pusch_dmrs_t dmrs_info;
+  bwp_info_t bwp_info;
   int phr_txpower_calc;
 } NR_sched_pusch_t;
 

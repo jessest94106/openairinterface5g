@@ -48,13 +48,10 @@
 
 // forward declaration of functions used in this file
 static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
+                                const NR_sched_pusch_t *sched_pusch,
                                 NR_ServingCellConfigCommon_t *scc,
                                 NR_UE_info_t *UE,
-                                int startSymbolAndLength,
                                 int scs,
-                                int bwp_size,
-                                int bwp_start,
-                                int mappingtype,
                                 int fh);
 static void nr_fill_rar(uint8_t Mod_idP, NR_UE_info_t *UE, uint8_t *dlsch_buffer, nfapi_nr_pusch_pdu_t *pusch_pdu);
 
@@ -807,11 +804,19 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
   NR_UE_ServingCell_Info_t *sc_info = &UE->sc_info;
+  NR_SearchSpace_t *ss = UE->UE_sched_ctrl.search_space;
+  NR_ControlResourceSet_t *coreset = UE->UE_sched_ctrl.coreset;
+  AssertFatal(coreset, "Coreset cannot be null for RA-Msg3 retransmission\n");
+  const int coresetid = coreset->controlResourceSetId;
+  NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp,
+                                           coresetid,
+                                           NR_SearchSpace__searchSpaceType_PR_common,
+                                           TYPE_TC_RNTI_,
+                                           ra->Msg3_tda_id);
 
-  NR_PUSCH_TimeDomainResourceAllocationList_t *pusch_TimeDomainAllocationList = ul_bwp->tdaList_Common;
   int mu = ul_bwp->scs;
   int slots_frame = nr_mac->frame_structure.numb_slots_frame;
-  uint16_t K2 = *pusch_TimeDomainAllocationList->list.array[ra->Msg3_tda_id]->k2 + get_NTN_Koffset(scc);
+  uint16_t K2 = tda_info.k2 + get_NTN_Koffset(scc);
   const int sched_frame = (frame + (slot + K2) / slots_frame) % MAX_FRAME_NUMBER;
   const int sched_slot = (slot + K2) % slots_frame;
 
@@ -825,29 +830,54 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
       return;
     }
     int fh = 0;
-    int startSymbolAndLength = pusch_TimeDomainAllocationList->list.array[ra->Msg3_tda_id]->startSymbolAndLength;
-    int StartSymbolIndex, NrOfSymbols;
-    SLIV2SL(startSymbolAndLength, &StartSymbolIndex, &NrOfSymbols);
-    int mappingtype = pusch_TimeDomainAllocationList->list.array[ra->Msg3_tda_id]->mappingType;
-
     int buffer_index = ul_buffer_index(sched_frame, sched_slot, slots_frame, nr_mac->vrb_map_UL_size);
     uint16_t *vrb_map_UL = &nr_mac->common_channels[CC_id].vrb_map_UL[beam_ul.idx][buffer_index * MAX_BWP_SIZE];
 
-    const int BWPSize = sc_info->initial_ul_BWPSize;
-    const int BWPStart = sc_info->initial_ul_BWPStart;
+    NR_pusch_dmrs_t dmrs_info = get_ul_dmrs_params(scc, ul_bwp, &tda_info, 1);
+    int num_dmrs_symb = 0;
+    for(int i = tda_info.startSymbolIndex; i < tda_info.startSymbolIndex + tda_info.nrOfSymbols; i++)
+      num_dmrs_symb += (dmrs_info.ul_dmrs_symb_pos >> i) & 1;
+    int TBS = 0, mcsindex = 0, R = 0, Qm = 0;
+    while(TBS < 7) {  // TBS for msg3 is 7 bytes (except for RRCResumeRequest1 currently not implemented)
+      mcsindex++;
+      AssertFatal(mcsindex <= 28, "Exceeding MCS limit for Msg3\n");
+      R = nr_get_code_rate_ul(mcsindex, ul_bwp->mcs_table);
+      Qm = nr_get_Qm_ul(mcsindex, ul_bwp->mcs_table);
+      TBS = nr_compute_tbs(Qm,
+                           R,
+                           ra->msg3_nb_rb,
+                           tda_info.nrOfSymbols,
+                           num_dmrs_symb * 12, // nb dmrs set for no data in dmrs symbol
+                           0, //nb_rb_oh
+                           0, // to verify tb scaling
+                           1) >> 3;
+    }
+
+    NR_sched_pusch_t sched_pusch = {
+      .bwp_info = get_pusch_bwp_start_size(UE),
+      .tb_size = TBS,
+      .rbSize = ra->msg3_nb_rb,
+      .R = R,
+      .Qm = Qm,
+      .mcs = mcsindex,
+      .nrOfLayers = 1,
+      .tda_info = tda_info,
+      .dmrs_info = dmrs_info,
+    };
 
     int rbStart = 0;
-    for (int i = 0; (i < ra->msg3_nb_rb) && (rbStart <= (BWPSize - ra->msg3_nb_rb)); i++) {
-      if (vrb_map_UL[rbStart + BWPStart + i]&SL_to_bitmap(StartSymbolIndex, NrOfSymbols)) {
+    for (int i = 0; (i < ra->msg3_nb_rb) && (rbStart <= (sched_pusch.bwp_info.bwpSize - ra->msg3_nb_rb)); i++) {
+      if (vrb_map_UL[rbStart + sched_pusch.bwp_info.bwpStart + i] & SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols)) {
         rbStart += i;
         i = 0;
       }
     }
-    if (rbStart > (BWPSize - ra->msg3_nb_rb)) {
+    if (rbStart > (sched_pusch.bwp_info.bwpSize - ra->msg3_nb_rb)) {
       // cannot find free vrb_map for msg3 retransmission in this slot
       return;
     }
 
+    sched_pusch.rbStart = rbStart;
     LOG_I(NR_MAC,
           "%4d%2d: RA RNTI %04x CC_id %d Scheduling retransmission of Msg3 in (%d,%d)\n",
           frame,
@@ -874,15 +904,10 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
     nfapi_nr_pusch_pdu_t *pusch_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pusch_pdu;
     memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
 
-    fill_msg3_pusch_pdu(pusch_pdu, scc, UE, startSymbolAndLength, mu, BWPSize, BWPStart, mappingtype, fh);
+    fill_msg3_pusch_pdu(pusch_pdu, &sched_pusch, scc, UE, mu, fh);
     future_ul_tti_req->n_pdus += 1;
 
     // generation of DCI 0_0 to schedule msg3 retransmission
-    NR_SearchSpace_t *ss = UE->UE_sched_ctrl.search_space;
-    NR_ControlResourceSet_t *coreset = UE->UE_sched_ctrl.coreset;
-    AssertFatal(coreset, "Coreset cannot be null for RA-Msg3 retransmission\n");
-
-    const int coresetid = coreset->controlResourceSetId;
     nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15 = nr_mac->pdcch_pdu_idx[CC_id][coresetid];
     if (!pdcch_pdu_rel15) {
       nfapi_nr_ul_dci_request_pdus_t *ul_dci_request_pdu = &ul_dci_req->ul_dci_pdu_list[ul_dci_req->numPdus];
@@ -966,7 +991,7 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                        beam_dci.idx);
 
     for (int rb = 0; rb < ra->msg3_nb_rb; rb++) {
-      vrb_map_UL[rbStart + BWPStart + rb] |= SL_to_bitmap(StartSymbolIndex, NrOfSymbols);
+      vrb_map_UL[rbStart + sched_pusch.bwp_info.bwpStart + rb] |= SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
     }
 
     // Restart RA contention resolution timer in Msg3 retransmission slot (current slot + K2)
@@ -1108,24 +1133,18 @@ static bool nr_get_Msg3alloc(gNB_MAC_INST *mac, int CC_id, int current_slot, fra
 }
 
 static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
+                                const NR_sched_pusch_t *sched_pusch,
                                 NR_ServingCellConfigCommon_t *scc,
                                 NR_UE_info_t *UE,
-                                int startSymbolAndLength,
                                 int scs,
-                                int bwp_size,
-                                int bwp_start,
-                                int mappingtype,
                                 int fh)
 {
-  int start_symbol_index,nr_of_symbols;
-  SLIV2SL(startSymbolAndLength, &start_symbol_index, &nr_of_symbols);
-  int mcsindex = -1; // init value
   const NR_RA_t *ra = UE->ra;
   pusch_pdu->pdu_bit_map = PUSCH_PDU_BITMAP_PUSCH_DATA;
   pusch_pdu->rnti = UE->rnti;
   pusch_pdu->handle = 0;
-  pusch_pdu->bwp_start = bwp_start;
-  pusch_pdu->bwp_size = bwp_size;
+  pusch_pdu->bwp_start = sched_pusch->bwp_info.bwpStart;
+  pusch_pdu->bwp_size = sched_pusch->bwp_info.bwpSize;
   pusch_pdu->subcarrier_spacing = scs;
   pusch_pdu->cyclic_prefix = 0;
   pusch_pdu->mcs_table = 0;
@@ -1140,21 +1159,30 @@ static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
   }
   pusch_pdu->data_scrambling_id = *scc->physCellId;
   pusch_pdu->nrOfLayers = 1;
-  pusch_pdu->ul_dmrs_symb_pos = get_l_prime(nr_of_symbols,mappingtype,pusch_dmrs_pos2,pusch_len1,start_symbol_index, scc->dmrs_TypeA_Position);
-  LOG_D(NR_MAC, "MSG3 start_sym:%d NR Symb:%d mappingtype:%d, ul_dmrs_symb_pos:%x\n", start_symbol_index, nr_of_symbols, mappingtype, pusch_pdu->ul_dmrs_symb_pos);
+  pusch_pdu->ul_dmrs_symb_pos = get_l_prime(sched_pusch->tda_info.nrOfSymbols,
+                                            sched_pusch->tda_info.mapping_type,
+                                            pusch_dmrs_pos2,
+                                            pusch_len1,
+                                            sched_pusch->tda_info.startSymbolIndex,
+                                            scc->dmrs_TypeA_Position);
+  LOG_D(NR_MAC,
+        "MSG3 start_sym:%d NR Symb:%d mappingtype:%d, ul_dmrs_symb_pos:%x\n",
+        sched_pusch->tda_info.startSymbolIndex,
+        sched_pusch->tda_info.nrOfSymbols,
+        sched_pusch->tda_info.mapping_type,
+        pusch_pdu->ul_dmrs_symb_pos);
   pusch_pdu->dmrs_config_type = 0;
   pusch_pdu->ul_dmrs_scrambling_id = *scc->physCellId; //If provided and the PUSCH is not a msg3 PUSCH, otherwise, L2 should set this to physical cell id.
   pusch_pdu->pusch_identity = *scc->physCellId; //If provided and the PUSCH is not a msg3 PUSCH, otherwise, L2 should set this to physical cell id.
   pusch_pdu->scid = 0; //DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]. Should match what is sent in DCI 0_1, otherwise set to 0.
   pusch_pdu->dmrs_ports = 1;  // 6.2.2 in 38.214 only port 0 to be used
-  pusch_pdu->num_dmrs_cdm_grps_no_data = nr_of_symbols <= 2 ? 1 : 2;  // no data in dmrs symbols as in 6.2.2 in 38.214
+  // no data in dmrs symbols as in 6.2.2 in 38.214
+  pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->tda_info.nrOfSymbols <= 2 ? 1 : 2;
   pusch_pdu->resource_alloc = 1; //type 1
   memset(pusch_pdu->rb_bitmap, 0, sizeof(pusch_pdu->rb_bitmap));
-  pusch_pdu->rb_start = ra->msg3_first_rb;
-  if (ra->msg3_nb_rb > pusch_pdu->bwp_size)
-    AssertFatal(false, "MSG3 allocated number of RBs exceed the BWP size\n");
-  else
-    pusch_pdu->rb_size = ra->msg3_nb_rb;
+  pusch_pdu->rb_start = sched_pusch->rbStart;
+  AssertFatal(sched_pusch->rbSize <= pusch_pdu->bwp_size, "MSG3 allocated number of RBs exceed the BWP size\n");
+  pusch_pdu->rb_size = sched_pusch->rbSize;
   pusch_pdu->vrb_to_prb_mapping = 0;
 
   pusch_pdu->frequency_hopping = fh;
@@ -1164,8 +1192,8 @@ static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
   //which indicates "Outside the carrier" and value 3301, which indicates "Undetermined position within the carrier" are used. [TS38.331, UplinkTxDirectCurrentBWP IE]
   pusch_pdu->uplink_frequency_shift_7p5khz = 0;
   //Resource Allocation in time domain
-  pusch_pdu->start_symbol_index = start_symbol_index;
-  pusch_pdu->nr_of_symbols = nr_of_symbols;
+  pusch_pdu->start_symbol_index = sched_pusch->tda_info.startSymbolIndex;
+  pusch_pdu->nr_of_symbols = sched_pusch->tda_info.nrOfSymbols;
   //Optional Data only included if indicated in pduBitmap
   pusch_pdu->pusch_data.rv_index = nr_get_rv(ra->msg3_round % 4);
   pusch_pdu->pusch_data.harq_process_id = 0;
@@ -1178,29 +1206,11 @@ static void fill_msg3_pusch_pdu(nfapi_nr_pusch_pdu_t *pusch_pdu,
   pusch_pdu->beamforming.dig_bf_interface = 1;
   pusch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
 
-  int num_dmrs_symb = 0;
-  for(int i = start_symbol_index; i < start_symbol_index+nr_of_symbols; i++)
-    num_dmrs_symb += (pusch_pdu->ul_dmrs_symb_pos >> i) & 1;
-  int TBS = 0;
-  while(TBS<7) {  // TBS for msg3 is 7 bytes (except for RRCResumeRequest1 currently not implemented)
-    mcsindex++;
-    AssertFatal(mcsindex <= 28, "Exceeding MCS limit for Msg3\n");
-    int R = nr_get_code_rate_ul(mcsindex,pusch_pdu->mcs_table);
-    pusch_pdu->target_code_rate = R;
-    pusch_pdu->qam_mod_order = nr_get_Qm_ul(mcsindex,pusch_pdu->mcs_table);
-    TBS = nr_compute_tbs(pusch_pdu->qam_mod_order,
-                         R,
-                         pusch_pdu->rb_size,
-                         pusch_pdu->nr_of_symbols,
-                         num_dmrs_symb*12, // nb dmrs set for no data in dmrs symbol
-                         0, //nb_rb_oh
-                         0, // to verify tb scaling
-                         pusch_pdu->nrOfLayers)>>3;
-
-    pusch_pdu->mcs_index = mcsindex;
-    pusch_pdu->pusch_data.tb_size = TBS;
-    pusch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(TBS<<3,R);
-  }
+  pusch_pdu->target_code_rate = sched_pusch->R;
+  pusch_pdu->qam_mod_order = sched_pusch->Qm;
+  pusch_pdu->mcs_index = sched_pusch->mcs;
+  pusch_pdu->pusch_data.tb_size = sched_pusch->tb_size;
+  pusch_pdu->maintenance_parms_v3.ldpcBaseGraph = get_BG(sched_pusch->tb_size << 3, sched_pusch->R);
 }
 
 static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_t slotP, NR_UE_info_t *UE, uint8_t *RAR_pdu)
@@ -1244,11 +1254,42 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
   nfapi_nr_pusch_pdu_t *pusch_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].pusch_pdu;
   memset(pusch_pdu, 0, sizeof(nfapi_nr_pusch_pdu_t));
 
-  const int ibwp_size = sc_info->initial_ul_BWPSize;
-  const int fh = (ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping) ? 1 : 0;
-  const int startSymbolAndLength = ul_bwp->tdaList_Common->list.array[ra->Msg3_tda_id]->startSymbolAndLength;
-  const int mappingtype = ul_bwp->tdaList_Common->list.array[ra->Msg3_tda_id]->mappingType;
+  NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp, 0, NR_SearchSpace__searchSpaceType_PR_common, TYPE_TC_RNTI_, ra->Msg3_tda_id);
+  NR_pusch_dmrs_t dmrs_info = get_ul_dmrs_params(scc, ul_bwp, &tda_info, 1);
+  int num_dmrs_symb = 0;
+  for(int i = tda_info.startSymbolIndex; i < tda_info.startSymbolIndex + tda_info.nrOfSymbols; i++)
+    num_dmrs_symb += (dmrs_info.ul_dmrs_symb_pos >> i) & 1;
+  int TBS = 0, mcsindex = 0, R = 0, Qm = 0;
+  while(TBS < 7) {  // TBS for msg3 is 7 bytes (except for RRCResumeRequest1 currently not implemented)
+    mcsindex++;
+    AssertFatal(mcsindex <= 28, "Exceeding MCS limit for Msg3\n");
+    R = nr_get_code_rate_ul(mcsindex, ul_bwp->mcs_table);
+    Qm = nr_get_Qm_ul(mcsindex, ul_bwp->mcs_table);
+    TBS = nr_compute_tbs(Qm,
+                         R,
+                         ra->msg3_nb_rb,
+                         tda_info.nrOfSymbols,
+                         num_dmrs_symb * 12, // nb dmrs set for no data in dmrs symbol
+                         0, //nb_rb_oh
+                         0, // to verify tb scaling
+                         1) >> 3;
+  }
 
+  NR_sched_pusch_t sched_pusch = {
+    .bwp_info.bwpSize = sc_info->initial_ul_BWPSize,
+    .bwp_info.bwpStart = ra->msg3_bwp_start,
+    .rbSize = ra->msg3_nb_rb,
+    .rbStart = ra->msg3_first_rb,
+    .tb_size = TBS,
+    .R = R,
+    .Qm = Qm,
+    .mcs = mcsindex,
+    .nrOfLayers = 1,
+    .tda_info = tda_info,
+    .dmrs_info = dmrs_info
+  };
+
+  const int fh = (ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping) ? 1 : 0;
   LOG_D(NR_MAC,
         "UE %04x: %d.%d Adding Msg3 UL Config Request for (%d,%d) : (%d,%d,%d)\n",
         UE->rnti,
@@ -1260,7 +1301,7 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
         ra->msg3_first_rb,
         ra->msg3_round);
 
-  fill_msg3_pusch_pdu(pusch_pdu, scc, UE, startSymbolAndLength, ul_bwp->scs, ibwp_size, ra->msg3_bwp_start, mappingtype, fh);
+  fill_msg3_pusch_pdu(pusch_pdu, &sched_pusch, scc, UE, ul_bwp->scs, fh);
   future_ul_tti_req->n_pdus += 1;
 
   // calling function to fill rar message

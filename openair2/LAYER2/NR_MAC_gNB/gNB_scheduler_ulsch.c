@@ -65,7 +65,7 @@ int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
   return 0; // if FDD or not mixed slot in TDD, for now use default TDA (TODO handle CSI-RS slots)
 }
 
-static bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
+bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
 {
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
@@ -1819,6 +1819,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
         sched_pusch->slot,
         sched_pusch->rbSize);
 
+  sched_pusch->bwp_info = bwp_info;
   sched_pusch->rbStart = rbStart;
   /* no need to recompute the TBS, it will be the same */
 
@@ -2029,6 +2030,7 @@ static void pf_ul(module_id_t module_id,
       update_ul_ue_R_Qm(sched_pusch->mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched_pusch->R, &sched_pusch->Qm);
       sched_pusch->rbStart = rbStart;
       sched_pusch->rbSize = min_rb;
+      sched_pusch->bwp_info = bwp_info;
       sched_pusch->frame = sched_frame;
       sched_pusch->slot = sched_slot;
       sched_pusch->tb_size = nr_compute_tbs(sched_pusch->Qm,
@@ -2222,6 +2224,7 @@ static void pf_ul(module_id_t module_id,
 
     sched_pusch->rbSize = rbSize;
     sched_pusch->tb_size = TBS;
+    sched_pusch->bwp_info = bwp_info;
     sched_pusch->frame = sched_frame;
     sched_pusch->slot = sched_slot;
     LOG_D(NR_MAC,
@@ -2364,8 +2367,6 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
 
     uint16_t rnti = UE->rnti;
     sched_ctrl->SR = false;
-    int *tpmi = NULL;
-
     int8_t harq_id = sched_pusch->ul_harq_pid;
     if (harq_id < 0) {
       /* PP has not selected a specific HARQ Process, get a new one */
@@ -2494,8 +2495,8 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
 
     /* FAPI: BWP */
 
-    pusch_pdu->bwp_size  = current_BWP->BWPSize;
-    pusch_pdu->bwp_start = current_BWP->BWPStart;
+    pusch_pdu->bwp_size = sched_pusch->bwp_info.bwpSize;
+    pusch_pdu->bwp_start = sched_pusch->bwp_info.bwpStart;
     pusch_pdu->subcarrier_spacing = current_BWP->scs;
     pusch_pdu->cyclic_prefix = 0;
 
@@ -2510,11 +2511,6 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
     else
       pusch_pdu->data_scrambling_id = *scc->physCellId;
     pusch_pdu->nrOfLayers = sched_pusch->nrOfLayers;
-    // If nrOfLayers is the same as in srs_feedback, we use the best TPMI, i.e. the one in srs_feedback.
-    // Otherwise, we use the valid TPMI that we saved in the first transmission.
-    if (pusch_pdu->nrOfLayers != (sched_ctrl->srs_feedback.ul_ri + 1))
-      tpmi = &sched_pusch->tpmi;
-    pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
 
     /* FAPI: DMRS */
     pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
@@ -2544,8 +2540,6 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
       else if (NR_DMRS_UplinkConfig)
         pusch_pdu->pusch_identity = *scc->physCellId;
     }
-    pusch_pdu->scid = 0;      // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]
-    pusch_pdu->dmrs_ports = ((1<<sched_pusch->nrOfLayers) - 1);
 
     /* FAPI: Pusch Allocation in frequency domain */
     pusch_pdu->resource_alloc = 1; //type 1
@@ -2695,6 +2689,12 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
             sched_pusch->frame,
             sched_pusch->slot,
             sched_ctrl->ul_harq_processes[harq_id].round);
+
+    // If nrOfLayers is the same as in srs_feedback, we use the best TPMI, i.e. the one in srs_feedback.
+    // Otherwise, we use the valid TPMI that we saved in the first transmission.
+    int *tpmi = NULL;
+    if (pusch_pdu->nrOfLayers != (sched_ctrl->srs_feedback.ul_ri + 1))
+      tpmi = &sched_pusch->tpmi;
     config_uldci(&UE->sc_info,
                  pusch_pdu,
                  &uldci_payload,
