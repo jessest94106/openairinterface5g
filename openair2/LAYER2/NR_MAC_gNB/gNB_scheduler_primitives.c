@@ -3477,6 +3477,16 @@ static int cmp_lc_config(const void *va, const void *vb)
   return 1;
 }
 
+nr_lc_config_t *nr_mac_get_lc_config(NR_UE_sched_ctrl_t* sched_ctrl, int lcid)
+{
+  nr_lc_config_t c = {.lcid = lcid};
+  elm_arr_t elm = find_if(&sched_ctrl->lc_config, &c, eq_lcid_config);
+  if (elm.found)
+    return elm.it;
+  else
+    return NULL;
+}
+
 bool nr_mac_add_lcid(NR_UE_sched_ctrl_t* sched_ctrl, const nr_lc_config_t *c)
 {
   elm_arr_t elm = find_if(&sched_ctrl->lc_config, (void *) c, eq_lcid_config);

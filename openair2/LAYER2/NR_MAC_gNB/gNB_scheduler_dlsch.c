@@ -335,6 +335,9 @@ static void nr_store_dlsch_buffer(module_id_t module_id, frame_t frame, slot_t s
       const int lcid = c->lcid;
       const uint16_t rnti = UE->rnti;
       LOG_D(NR_MAC, "In %s: UE %x: LCID %d\n", __FUNCTION__, rnti, lcid);
+      memset(&sched_ctrl->rlc_status[lcid], 0, sizeof(sched_ctrl->rlc_status[lcid]));
+      if (c->suspended)
+        continue;
       if (lcid == DL_SCH_LCID_DTCH && nr_timer_is_active(&sched_ctrl->transm_interrupt))
         continue;
       start_meas(&RC.nrmac[module_id]->rlc_status_ind);

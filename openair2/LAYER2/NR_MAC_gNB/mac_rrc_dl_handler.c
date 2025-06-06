@@ -777,6 +777,10 @@ void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
     // we re-configure the BWP to apply the CellGroup and to use UE specific Search Space with DCIX1
     nr_mac_clean_cellgroup(UE->CellGroup);
     configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_ue_Specific, -1, -1);
+    for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
+      nr_lc_config_t *c = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
+      c->suspended = false;
+    }
   }
 
   if (ue_cap != NULL) {
@@ -965,7 +969,9 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     oldUE->uid = temp_uid;
     for (int i = 1; i < seq_arr_size(&oldUE->UE_sched_ctrl.lc_config); ++i) {
       const nr_lc_config_t *c = seq_arr_at(&oldUE->UE_sched_ctrl.lc_config, i);
-      nr_mac_add_lcid(&UE->UE_sched_ctrl, c);
+      nr_lc_config_t new = *c;
+      new.suspended = true;
+      nr_mac_add_lcid(&UE->UE_sched_ctrl, &new);
     }
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
     UE->CellGroup = oldUE->CellGroup;
