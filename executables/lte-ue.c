@@ -1740,8 +1740,6 @@ void *UE_thread(void *arg) {
     oai_exit=1;
   }
 
-  log_scheduler(__func__);
-
   while (!oai_exit) {
     AssertFatal ( 0== pthread_mutex_lock(&UE->proc.mutex_synch), "");
     int instance_cnt_synch = UE->proc.instance_cnt_synch;
