@@ -2,6 +2,7 @@ services:
     mysql:
         container_name: "rfsim5g-mysql"
         image: mysql:8.0
+        init: true
         volumes:
             - ../5g_rfsimulator/oai_db.sql:/docker-entrypoint-initdb.d/oai_db.sql
             - ../5g_rfsimulator/mysql-healthcheck.sh:/tmp/mysql-healthcheck.sh
@@ -15,6 +16,8 @@ services:
             test: /bin/bash -c "/tmp/mysql-healthcheck.sh"
             interval: 10s
             timeout: 5s
+            start_period: 10s
+            start_interval: 500ms
             retries: 30
         networks:
             public_net:
@@ -46,6 +49,7 @@ services:
     oai-upf:
         container_name: "rfsim5g-oai-upf"
         image: oaisoftwarealliance/oai-upf:v2.1.9
+        init: true
         environment:
             - TZ=Europe/Paris
         volumes:
@@ -67,6 +71,7 @@ services:
         privileged: true
         container_name: rfsim5g-oai-ext-dn
         image: oaisoftwarealliance/trf-gen-cn5g:focal
+        init: true
         entrypoint: /bin/bash -c \
               "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE;"\
               "ip route add 12.1.1.0/24 via 192.168.72.134 dev eth0; sleep infinity"
@@ -80,6 +85,8 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
+            start_period: 10s
+            start_interval: 500ms
     oai-gnb:
         image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}
         container_name: rfsim5g-oai-gnb
@@ -99,6 +106,8 @@ services:
             test: /bin/bash -c "pgrep nr-softmodem"
             interval: 10s
             timeout: 5s
+            start_period: 10s
+            start_interval: 500ms
             retries: 5
         ipc: host
     oai-nr-ue:
@@ -126,6 +135,8 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
+            start_period: 10s
+            start_interval: 500ms
         ipc: host
 
 networks:

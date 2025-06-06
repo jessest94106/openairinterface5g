@@ -2,6 +2,7 @@ services:
     mysql:
         container_name: "rfsim5g-mysql"
         image: mysql:8.0
+        init: true
         volumes:
             - ../5g_rfsimulator/oai_db.sql:/docker-entrypoint-initdb.d/oai_db.sql
             - ../5g_rfsimulator/mysql-healthcheck.sh:/tmp/mysql-healthcheck.sh
@@ -13,6 +14,8 @@ services:
             - MYSQL_ROOT_PASSWORD=linux
         healthcheck:
             test: /bin/bash -c "/tmp/mysql-healthcheck.sh"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 30
@@ -46,6 +49,7 @@ services:
     oai-upf:
         container_name: "rfsim5g-oai-upf"
         image: oaisoftwarealliance/oai-upf:v2.1.9
+        init: true
         environment:
             - TZ=Europe/Paris
         volumes:
@@ -87,6 +91,8 @@ services:
             - ../../conf_files/gnb-cucp.sa.f1.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -116,6 +122,8 @@ services:
             - ../../conf_files/gnb-cuup.sa.f1.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-cuup"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -148,6 +156,8 @@ services:
             - ../../conf_files/gnb-cuup.sa.f1.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-cuup"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -180,6 +190,8 @@ services:
             - ../../conf_files/gnb-cuup.sa.f1.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-cuup"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -209,6 +221,8 @@ services:
             - ../../conf_files/gnb-du.sa.band78.106prb.rfsim.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -241,6 +255,8 @@ services:
             - ../../conf_files/gnb-du.sa.band78.106prb.rfsim.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -273,6 +289,8 @@ services:
             - ../../conf_files/gnb-du.sa.band78.106prb.rfsim.conf:/opt/oai-gnb/etc/gnb.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -301,6 +319,8 @@ services:
             - ../../conf_files/nrue.uicc.conf:/opt/oai-nr-ue/etc/nr-ue.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-uesoftmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -329,6 +349,8 @@ services:
             - ../../conf_files/nrue.uicc.conf:/opt/oai-nr-ue/etc/nr-ue.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-uesoftmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
@@ -358,6 +380,8 @@ services:
             - ../../conf_files/nrue.uicc.conf:/opt/oai-nr-ue/etc/nr-ue.conf
         healthcheck:
             test: /bin/bash -c "pgrep nr-uesoftmodem"
+            start_period: 10s
+            start_interval: 500ms
             interval: 10s
             timeout: 5s
             retries: 5
