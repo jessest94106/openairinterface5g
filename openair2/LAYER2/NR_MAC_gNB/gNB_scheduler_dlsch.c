@@ -1189,44 +1189,25 @@ void nr_schedule_ue_spec(module_id_t module_id,
     dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
 
     /* DCI payload */
-    dci_pdu_rel15_t dci_payload;
-    memset(&dci_payload, 0, sizeof(dci_pdu_rel15_t));
-    // bwp indicator
-    // as per table 7.3.1.1.2-1 in 38.212
-    dci_payload.bwp_indicator.val = UE->sc_info.n_dl_bwp < 4 ? bwp_id : bwp_id - 1;
+    const int rnti_type = TYPE_C_RNTI_;
+    dci_pdu_rel15_t dci_payload = prepare_dci_dl_payload(gNB_mac,
+                                                         UE,
+                                                         rnti_type,
+                                                         sched_ctrl->search_space->searchSpaceType->present,
+                                                         pdsch_pdu,
+                                                         sched_pdsch,
+                                                         pucch,
+                                                         current_harq_pid,
+                                                         0,
+                                                         false);
 
+    // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
+    sched_ctrl->tpc1 = 1;
     NR_PDSCH_Config_t *pdsch_Config = current_BWP->pdsch_Config;
     AssertFatal(pdsch_Config == NULL
                 || pdsch_Config->resourceAllocation == NR_PDSCH_Config__resourceAllocation_resourceAllocationType1,
                 "Only frequency resource allocation type 1 is currently supported\n");
 
-    // 3GPP TS 38.214 Section 5.1.2.2.2 Downlink resource allocation type 1
-    uint16_t riv_bwp_size = pdsch_pdu->BWPSize;
-    if (current_BWP->dci_format == NR_DL_DCI_FORMAT_1_0
-        && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
-      if (gNB_mac->cset0_bwp_size > 0) {
-        riv_bwp_size = gNB_mac->cset0_bwp_size;
-      } else {
-        riv_bwp_size = UE->sc_info.initial_dl_BWPSize;
-      }
-    }
-    dci_payload.frequency_domain_assignment.val =
-        PRBalloc_to_locationandbandwidth0(pdsch_pdu->rbSize, pdsch_pdu->rbStart, riv_bwp_size);
-
-    dci_payload.format_indicator = 1;
-    dci_payload.time_domain_assignment.val = sched_pdsch->time_domain_allocation;
-    dci_payload.mcs = sched_pdsch->mcs;
-    dci_payload.rv = pdsch_pdu->rvIndex[0];
-    dci_payload.harq_pid.val = current_harq_pid;
-    dci_payload.ndi = harq->ndi;
-    dci_payload.dai[0].val = pucch ? (pucch->dai_c-1)&3 : 0;
-    dci_payload.tpc = sched_ctrl->tpc1; // TPC for PUCCH: table 7.2.1-1 in 38.213
-    // Reset TPC to 0 dB to not request new gain multiple times before computing new value for SNR
-    sched_ctrl->tpc1 = 1;
-    dci_payload.pucch_resource_indicator = pucch ? pucch->resource_indicator : 0;
-    dci_payload.pdsch_to_harq_feedback_timing_indicator.val = pucch ? pucch->timing_indicator : 0; // PDSCH to HARQ TI
-    dci_payload.antenna_ports.val = dmrs_parms->dmrs_ports_id;
-    dci_payload.dmrs_sequence_initialization.val = pdsch_pdu->SCID;
     LOG_D(NR_MAC,
           "%4d.%2d DCI type 1 payload: freq_alloc %d (%d,%d,%d), "
           "nrOfLayers %d, time_alloc %d, vrb to prb %d, mcs %d tb_scaling %d ndi %d rv %d tpc %d ti %d\n",
@@ -1246,7 +1227,6 @@ void nr_schedule_ue_spec(module_id_t module_id,
           dci_payload.tpc,
           pucch ? pucch->timing_indicator : 0);
 
-    const int rnti_type = TYPE_C_RNTI_;
     fill_dci_pdu_rel15(&UE->sc_info,
                        current_BWP,
                        &UE->current_UL_BWP,

@@ -809,6 +809,61 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
   return new_mcs;
 }
 
+dci_pdu_rel15_t prepare_dci_dl_payload(const gNB_MAC_INST *gNB_mac,
+                                       const NR_UE_info_t *UE,
+                                       nr_rnti_type_t rnti_type,
+                                       NR_SearchSpace__searchSpaceType_PR ss_type,
+                                       const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu,
+                                       const NR_sched_pdsch_t *sched_pdsch,
+                                       const NR_sched_pucch_t *pucch,
+                                       int harq_pid,
+                                       int tb_scaling,
+                                       bool is_sib1)
+{
+  const NR_UE_DL_BWP_t *dl_BWP = UE ? &UE->current_DL_BWP : NULL;
+  dci_pdu_rel15_t dci_payload = {0};
+  dci_payload.format_indicator = 1;
+  dci_payload.time_domain_assignment.val = sched_pdsch->time_domain_allocation;
+  dci_payload.mcs = sched_pdsch->mcs;
+  dci_payload.rv = pdsch_pdu->rvIndex[0];
+  dci_payload.vrb_to_prb_mapping.val = 0;
+  int riv_bwp = pdsch_pdu->BWPSize;
+  if (!UE)
+    riv_bwp = gNB_mac->cset0_bwp_size;
+  else if (dl_BWP->dci_format == NR_DL_DCI_FORMAT_1_0 && ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
+    if (gNB_mac->cset0_bwp_size > 0)
+      riv_bwp = gNB_mac->cset0_bwp_size;
+    else
+      riv_bwp = UE->sc_info.initial_dl_BWPSize;
+  }
+  dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(pdsch_pdu->rbSize, pdsch_pdu->rbStart, riv_bwp);
+  if (rnti_type == TYPE_SI_RNTI_) {
+    dci_payload.system_info_indicator = !is_sib1;
+    return dci_payload;
+  }
+  if (rnti_type == TYPE_RA_RNTI_) {
+    dci_payload.tb_scaling = tb_scaling;
+    return dci_payload;
+  }
+
+  const NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+  dci_payload.dmrs_sequence_initialization.val = pdsch_pdu->SCID;
+  dci_payload.antenna_ports.val = sched_pdsch->dmrs_parms.dmrs_ports_id;
+  dci_payload.tpc = sched_ctrl->tpc1;
+  const NR_UE_harq_t *harq = &sched_ctrl->harq_processes[harq_pid];
+  AssertFatal(harq, "HARQ process should be available for DCI with RNTI %s\n", rnti_types(rnti_type));
+  dci_payload.harq_pid.val = harq_pid;
+  dci_payload.ndi = harq->ndi;
+  dci_payload.pucch_resource_indicator = pucch ? pucch->resource_indicator : 0;
+  dci_payload.pdsch_to_harq_feedback_timing_indicator.val = pucch ? pucch->timing_indicator : 0; // PDSCH to HARQ TI
+  dci_payload.dai[0].val = pucch ? (pucch->dai_c - 1) & 3 : 0;
+  // bwp indicator
+  // as per table 7.3.1.1.2-1 in 38.212
+  if (dl_BWP)
+    dci_payload.bwp_indicator.val = UE->sc_info.n_dl_bwp < 4 ? dl_BWP->bwp_id : dl_BWP->bwp_id - 1;
+  return dci_payload;
+}
+
 void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
                   const nfapi_nr_pusch_pdu_t *pusch_pdu,
                   dci_pdu_rel15_t *dci_pdu_rel15,
@@ -1202,11 +1257,11 @@ void set_r_pucch_parms(int rsetindex,
   *start_symbol_index = default_pucch_firstsymb[rsetindex];
 }
 
-void prepare_dci(const NR_UE_ServingCell_Info_t *servingCellInfo,
-                 const NR_UE_DL_BWP_t *current_BWP,
-                 const NR_ControlResourceSet_t *coreset,
-                 dci_pdu_rel15_t *dci_pdu_rel15,
-                 nr_dci_format_t format)
+static void prepare_dci_X1(const NR_UE_ServingCell_Info_t *servingCellInfo,
+                           const NR_UE_DL_BWP_t *current_BWP,
+                           const NR_ControlResourceSet_t *coreset,
+                           dci_pdu_rel15_t *dci_pdu_rel15,
+                           nr_dci_format_t format)
 {
   const NR_PDSCH_Config_t *pdsch_Config = current_BWP ? current_BWP->pdsch_Config : NULL;
 
@@ -1353,7 +1408,7 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
   pdcch_dci_pdu->PayloadSizeBits = dci_size;
   AssertFatal(dci_size <= 64, "DCI sizes above 64 bits not yet supported");
   if (dci_format == NR_DL_DCI_FORMAT_1_1 || dci_format == NR_UL_DCI_FORMAT_0_1)
-    prepare_dci(servingCellInfo, current_DL_BWP, coreset, dci_pdu_rel15, dci_format);
+    prepare_dci_X1(servingCellInfo, current_DL_BWP, coreset, dci_pdu_rel15, dci_format);
 
   /// Payload generation
   switch (dci_format) {

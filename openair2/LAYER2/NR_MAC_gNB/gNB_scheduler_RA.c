@@ -1310,10 +1310,7 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
                             int aggregation_level,
                             int CCEIndex,
                             int ndi,
-                            int tpc,
-                            int delta_PRI,
                             int current_harq_pid,
-                            int time_domain_assignment,
                             int CC_id,
                             int rnti,
                             int round,
@@ -1375,25 +1372,16 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
   dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
 
-  dci_pdu_rel15_t dci_payload;
-  dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(pdsch_pdu_rel15->rbSize,
-                                                                                  pdsch_pdu_rel15->rbStart,
-                                                                                  pdsch_pdu_rel15->BWPSize);
-
-  dci_payload.time_domain_assignment.val = time_domain_assignment;
-  dci_payload.vrb_to_prb_mapping.val = 0;
-  dci_payload.mcs = pdsch_pdu_rel15->mcsIndex[0];
-  dci_payload.tb_scaling = tb_scaling;
-  if (rnti_type == TYPE_TC_RNTI_) {
-    dci_payload.format_indicator = 1;
-    dci_payload.rv = pdsch_pdu_rel15->rvIndex[0];
-    dci_payload.harq_pid.val = current_harq_pid;
-    dci_payload.ndi = ndi;
-    dci_payload.dai[0].val = pucch ? (pucch->dai_c-1) & 3 : 0;
-    dci_payload.tpc = tpc; // TPC for PUCCH: table 7.2.1-1 in 38.213
-    dci_payload.pucch_resource_indicator = delta_PRI; // This is delta_PRI from 9.2.1 in 38.213
-    dci_payload.pdsch_to_harq_feedback_timing_indicator.val = pucch ? pucch->timing_indicator : 0;
-  }
+  dci_pdu_rel15_t dci_payload = prepare_dci_dl_payload(nr_mac,
+                                                       UE,
+                                                       rnti_type,
+                                                       sched_ctrl->search_space->searchSpaceType->present,
+                                                       pdsch_pdu_rel15,
+                                                       sched_pdsch,
+                                                       pucch,
+                                                       current_harq_pid,
+                                                       tb_scaling,
+                                                       false);
 
   LOG_D(NR_MAC,
         "DCI 1_0 payload: freq_alloc %d (%d,%d,%d), time_alloc %d, vrb to prb %d, mcs %d tb_scaling %d pucchres %d harqtiming %d\n",
@@ -1617,6 +1605,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
     .R = R,
     .Qm = Qm,
     .mcs = mcsIndex,
+    .time_domain_allocation = time_domain_assignment,
     .nrOfLayers = 1,
     .dmrs_parms = dmrs_parms,
     .tda_info = tda_info,
@@ -1636,9 +1625,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
                   CCEIndex,
                   0,
                   0,
-                  0,
-                  0,
-                  time_domain_assignment,
                   CC_id,
                   ra->RA_rnti,
                   0,
@@ -1838,9 +1824,8 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       return;
     }
 
-    const int delta_PRI = 0;
     int r_pucch = nr_get_pucch_resource(coreset, UE->current_UL_BWP.pucch_Config, CCEIndex);
-    LOG_D(NR_MAC, "Msg4 r_pucch %d (CCEIndex %d, delta_PRI %d)\n", r_pucch, CCEIndex, delta_PRI);
+    LOG_D(NR_MAC, "Msg4 r_pucch %d CCEIndex %d\n", r_pucch, CCEIndex);
     int alloc = nr_acknack_scheduling(nr_mac, UE, frameP, slotP, UE->UE_beam_index, r_pucch, 1);
     if (alloc < 0) {
       LOG_D(NR_MAC,"Couldn't find a pucch allocation for ack nack (msg4) in frame %d slot %d\n", frameP, slotP);
@@ -1912,6 +1897,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       .R = nr_get_code_rate_dl(mcsIndex, mcsTableIdx),
       .Qm = nr_get_Qm_dl(mcsIndex, mcsTableIdx),
       .mcs = mcsIndex,
+      .time_domain_allocation = time_domain_assignment,
       .nrOfLayers = 1,
       .dmrs_parms = dmrs_info,
       .tda_info = msg4_tda,
@@ -1931,10 +1917,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                     aggregation_level,
                     CCEIndex,
                     harq->ndi,
-                    sched_ctrl->tpc1,
-                    delta_PRI,
                     current_harq_pid,
-                    time_domain_assignment,
                     CC_id,
                     rnti,
                     harq->round,

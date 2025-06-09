@@ -216,6 +216,7 @@ void nr_dlsim_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
   NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;
   sched_pdsch->rbStart = g_rbStart;
   sched_pdsch->rbSize = g_rbSize;
+  sched_pdsch->bwp_info = get_pdsch_bwp_start_size(RC.nrmac[module_id], UE_info);
   sched_pdsch->mcs = g_mcsIndex;
   sched_pdsch->nrOfLayers = g_nrOfLayers;
   sched_pdsch->pm_index = g_pmi;

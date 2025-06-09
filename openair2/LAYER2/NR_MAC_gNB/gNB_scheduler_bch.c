@@ -470,30 +470,18 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
   dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
 
   /* DCI payload */
-  dci_pdu_rel15_t dci_payload;
-  memset(&dci_payload, 0, sizeof(dci_pdu_rel15_t));
-
-  dci_payload.bwp_indicator.val = 0;
-
-  // frequency domain assignment
-  dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(
-      pdsch_pdu_rel15->rbSize, pdsch_pdu_rel15->rbStart, type0_PDCCH_CSS_config->num_rbs);
-
-  dci_payload.time_domain_assignment.val = pdsch->time_domain_allocation;
-  dci_payload.mcs = pdsch->mcs;
-  dci_payload.rv = pdsch_pdu_rel15->rvIndex[0];
-  dci_payload.harq_pid.val = 0;
-  dci_payload.ndi = 0;
-  dci_payload.dai[0].val = 0;
-  dci_payload.tpc = 0; // table 7.2.1-1 in 38.213
-  dci_payload.pucch_resource_indicator = 0;
-  dci_payload.pdsch_to_harq_feedback_timing_indicator.val = 0;
-  dci_payload.antenna_ports.val = 0;
-  dci_payload.dmrs_sequence_initialization.val = pdsch_pdu_rel15->SCID;
-  dci_payload.system_info_indicator = is_sib1 ? 0 : 1;
-
   int dci_format = NR_DL_DCI_FORMAT_1_0;
   int rnti_type = TYPE_SI_RNTI_;
+  dci_pdu_rel15_t dci_payload = prepare_dci_dl_payload(gNB_mac,
+                                                       NULL,
+                                                       rnti_type,
+                                                       NR_SearchSpace__searchSpaceType_PR_common,
+                                                       pdsch_pdu_rel15,
+                                                       pdsch,
+                                                       NULL,
+                                                       0,
+                                                       0,
+                                                       is_sib1);
 
   fill_dci_pdu_rel15(NULL,
                      NULL,
