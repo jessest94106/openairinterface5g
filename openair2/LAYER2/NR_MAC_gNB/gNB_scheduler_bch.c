@@ -453,21 +453,15 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
         pdsch_pdu_rel15->dlDmrsSymbPos);
 
   /* Fill PDCCH DL DCI PDU */
-  nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu_rel15->dci_pdu[pdcch_pdu_rel15->numDlDci];
+  nfapi_nr_dl_dci_pdu_t *dci_pdu = prepare_dci_pdu(pdcch_pdu_rel15,
+                                                   scc,
+                                                   search_space,
+                                                   coreset,
+                                                   aggregation_level,
+                                                   cce_index,
+                                                   beam_index,
+                                                   SI_RNTI);
   pdcch_pdu_rel15->numDlDci++;
-  dci_pdu->RNTI = SI_RNTI;
-  dci_pdu->ScramblingId = *scc->physCellId;
-  dci_pdu->ScramblingRNTI = 0;
-  dci_pdu->AggregationLevel = aggregation_level;
-  dci_pdu->CceIndex = cce_index;
-  dci_pdu->beta_PDCCH_1_0 = 0;
-  dci_pdu->powerControlOffsetSS = 1;
-
-  dci_pdu->precodingAndBeamforming.num_prgs = 0;
-  dci_pdu->precodingAndBeamforming.prg_size = 0;
-  dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
-  dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
-  dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
 
   /* DCI payload */
   int dci_format = NR_DL_DCI_FORMAT_1_0;
@@ -486,7 +480,7 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
   fill_dci_pdu_rel15(NULL,
                      NULL,
                      NULL,
-                     &pdcch_pdu_rel15->dci_pdu[pdcch_pdu_rel15->numDlDci - 1],
+                     dci_pdu,
                      &dci_payload,
                      dci_format,
                      rnti_type,

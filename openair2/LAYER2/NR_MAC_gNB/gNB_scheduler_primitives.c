@@ -809,6 +809,37 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
   return new_mcs;
 }
 
+nfapi_nr_dl_dci_pdu_t *prepare_dci_pdu(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
+                                       const NR_ServingCellConfigCommon_t *scc,
+                                       const NR_SearchSpace_t *ss,
+                                       const NR_ControlResourceSet_t *coreset,
+                                       int aggregation_level,
+                                       int cce_index,
+                                       int beam_index,
+                                       int rnti)
+{
+  nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu->dci_pdu[pdcch_pdu->numDlDci];
+  dci_pdu->RNTI = rnti;
+  dci_pdu->AggregationLevel = aggregation_level;
+  dci_pdu->CceIndex = cce_index;
+  if (coreset->pdcch_DMRS_ScramblingID &&
+      ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific) {
+    dci_pdu->ScramblingId = *coreset->pdcch_DMRS_ScramblingID;
+    dci_pdu->ScramblingRNTI = rnti;
+  } else {
+    dci_pdu->ScramblingId = *scc->physCellId;
+    dci_pdu->ScramblingRNTI = 0;
+  }
+  dci_pdu->beta_PDCCH_1_0 = 0;
+  dci_pdu->powerControlOffsetSS = 1;
+  dci_pdu->precodingAndBeamforming.num_prgs = 0;
+  dci_pdu->precodingAndBeamforming.prg_size = 0;
+  dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
+  dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
+  dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
+  return dci_pdu;
+}
+
 dci_pdu_rel15_t prepare_dci_dl_payload(const gNB_MAC_INST *gNB_mac,
                                        const NR_UE_info_t *UE,
                                        nr_rnti_type_t rnti_type,

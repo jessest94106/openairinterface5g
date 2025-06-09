@@ -2629,26 +2629,15 @@ void nr_schedule_ulsch(module_id_t module_id, frame_t frame, slot_t slot, nfapi_
     LOG_D(NR_MAC,"Configuring ULDCI/PDCCH in %d.%d at CCE %d, rnti %04x\n", frame,slot,sched_ctrl->cce_index,rnti);
 
     /* Fill PDCCH DL DCI PDU */
-    nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu->dci_pdu[pdcch_pdu->numDlDci];
+    nfapi_nr_dl_dci_pdu_t *dci_pdu = prepare_dci_pdu(pdcch_pdu,
+                                                     scc,
+                                                     ss,
+                                                     coreset,
+                                                     sched_ctrl->aggregation_level,
+                                                     sched_ctrl->cce_index,
+                                                     UE->UE_beam_index,
+                                                     rnti);
     pdcch_pdu->numDlDci++;
-    dci_pdu->RNTI = rnti;
-    if (coreset->pdcch_DMRS_ScramblingID &&
-        ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific) {
-      dci_pdu->ScramblingId = *coreset->pdcch_DMRS_ScramblingID;
-      dci_pdu->ScramblingRNTI = rnti;
-    } else {
-      dci_pdu->ScramblingId = *scc->physCellId;
-      dci_pdu->ScramblingRNTI = 0;
-    }
-    dci_pdu->AggregationLevel = sched_ctrl->aggregation_level;
-    dci_pdu->CceIndex = sched_ctrl->cce_index;
-    dci_pdu->beta_PDCCH_1_0 = 0;
-    dci_pdu->powerControlOffsetSS = 1;
-    dci_pdu->precodingAndBeamforming.num_prgs = 0;
-    dci_pdu->precodingAndBeamforming.prg_size = 0;
-    dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
-    dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
-    dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
 
     dci_pdu_rel15_t uldci_payload;
     memset(&uldci_payload, 0, sizeof(uldci_payload));

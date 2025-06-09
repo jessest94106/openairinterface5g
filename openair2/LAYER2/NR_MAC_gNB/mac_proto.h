@@ -180,6 +180,15 @@ dci_pdu_rel15_t prepare_dci_dl_payload(const gNB_MAC_INST *gNB_mac,
                                        int harq_pid,
                                        int tb_scaling,
                                        bool is_sib1);
+nfapi_nr_dl_dci_pdu_t *prepare_dci_pdu(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
+                                       const NR_ServingCellConfigCommon_t *scc,
+                                       const NR_SearchSpace_t *ss,
+                                       const NR_ControlResourceSet_t *coreset,
+                                       int aggregation_level,
+                                       int cce_index,
+                                       int beam_index,
+                                       int rnti);
+
 void nr_schedule_pucch(gNB_MAC_INST *nrmac, frame_t frameP, slot_t slotP);
 
 void nr_srs_ri_computation(const nfapi_nr_srs_normalized_channel_iq_matrix_t *nr_srs_normalized_channel_iq_matrix,
