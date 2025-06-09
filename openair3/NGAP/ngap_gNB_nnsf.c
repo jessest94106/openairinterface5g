@@ -30,6 +30,7 @@
 #include "ngap_gNB_nnsf.h"
 #include <stdio.h>
 #include "ngap_gNB_defs.h"
+#include "ngap_common.h"
 #include "queue.h"
 #include "tree.h"
 
@@ -222,6 +223,12 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_amf_setid(ngap_gNB_instance_t *
     }
   }
 
+  NGAP_WARN("No matching AMF found for PLMN (MCC=%03d MNC=%0*d) and AMF SetID=%u\n",
+            selected_plmn_identity.mcc,
+            selected_plmn_identity.mnc_digit_length,
+            selected_plmn_identity.mnc,
+            amf_setid);
+
   /* At this point no AMF matches the selected PLMN and AMF code. In this case,
    * return NULL. That way the RRC layer should know about it and reject RRC
    * connectivity. */
@@ -313,6 +320,14 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *inst
       }
     }
   }
+
+  NGAP_WARN("No matching AMF found for GUAMI (MCC=%03d MNC=%0*d RegionID=%d SetID=%d Pointer=%d)\n",
+            guami.mcc,
+            guami.mnc_len,
+            guami.mnc,
+            guami.amf_region_id,
+            guami.amf_set_id,
+            guami.amf_pointer);
 
   /* At this point no AMF matches the provided GUAMI. In this case, return
    * NULL. That way the RRC layer should know about it and reject RRC
