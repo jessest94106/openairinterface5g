@@ -710,7 +710,7 @@ static void fill_ul_rb_mask(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, uint32
 int fill_srs_reported_symbol(nfapi_nr_srs_reported_symbol_t *reported_symbol,
                              const nfapi_nr_srs_pdu_t *srs_pdu,
                                   const int N_RB_UL,
-                                  const int8_t *snr_per_rb,
+                                  const int16_t *snr_per_rb,
                                   const int srs_est) {
   reported_symbol->num_prgs = srs_pdu->beamforming.num_prgs;
   for (int prg_idx = 0; prg_idx < reported_symbol->num_prgs; prg_idx++) {
@@ -1052,7 +1052,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
             __attribute__((aligned(32)));
         c16_t srs_estimated_channel_time_shifted[frame_parms->nb_antennas_rx][1 << srs_pdu->num_ant_ports]
                                                 [frame_parms->ofdm_symbol_size];
-        int8_t snr_per_rb[srs_pdu->bwp_size];
+        int16_t snr_per_rb[srs_pdu->bwp_size];
 
         start_meas(&gNB->generate_srs_stats);
 
@@ -1109,6 +1109,14 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
           T_INT(0),
           T_INT(0),
           T_BUFFER(srs_estimated_channel_time_shifted[0][0], frame_parms->ofdm_symbol_size * sizeof(int32_t)));
+
+        T(T_GNB_PHY_UL_SNR_ESTIMATE,
+          T_INT(0),
+          T_INT(srs_pdu->rnti),
+          T_INT(frame_rx),
+          T_INT(0),
+          T_INT(0),
+          T_BUFFER(snr_per_rb, srs_pdu->bwp_size * sizeof(int16_t)));
 
         UL_INFO->srs_ind.sfn = frame_rx;
         UL_INFO->srs_ind.slot = slot_rx;
