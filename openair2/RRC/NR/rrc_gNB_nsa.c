@@ -141,7 +141,7 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
   uint32_t cgci_len = 0;
   if (get_softmodem_params()->phy_test == 1 || get_softmodem_params()->do_ra == 1) {
     DevAssert(m == NULL);
-    UE->rb_config = get_default_rbconfig(10 /* EPS bearer ID */, 1 /* drb ID */, NR_CipheringAlgorithm_nea0, NR_SecurityConfig__keyToUse_master);
+    UE->rb_config = get_default_rbconfig(10 /* EPS bearer ID */, 1 /* drb ID */, NR_CipheringAlgorithm_nea0, NR_SecurityConfig__keyToUse_master, &rrc->pdcp_config);
     cgci_len = cg_config_info_from_ue_cap_file(sizeof tmp, tmp);
     DevAssert(cgci_len > 0);
     cgci_buf = tmp;
@@ -223,7 +223,7 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
         exit(1);
     }
 
-    UE->rb_config = get_default_rbconfig(m->e_rabs_tobeadded[0].e_rab_id, m->e_rabs_tobeadded[0].drb_ID, cipher_algo, NR_SecurityConfig__keyToUse_secondary);
+    UE->rb_config = get_default_rbconfig(m->e_rabs_tobeadded[0].e_rab_id, m->e_rabs_tobeadded[0].drb_ID, cipher_algo, NR_SecurityConfig__keyToUse_secondary, &rrc->pdcp_config);
   }
 
   if(m!=NULL) {

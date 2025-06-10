@@ -49,13 +49,15 @@ drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id);
 /// @param enable_sdap If true the SDAP header will be added to the packet, else it will not add or search for SDAP header.
 /// @param do_drb_integrity
 /// @param do_drb_ciphering
+/// @param pdcp_config
 /// @return returns a pointer to the generated DRB structure
 drb_t *generateDRB(gNB_RRC_UE_t *ue,
                    uint8_t drb_id,
                    const rrc_pdu_session_param_t *pduSession,
                    bool enable_sdap,
                    int do_drb_integrity,
-                   int do_drb_ciphering);
+                   int do_drb_ciphering,
+                   const nr_pdcp_configuration_t *pdcp_config);
 
 /// @brief return the next available (inactive) DRB ID of UE ue
 uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue);

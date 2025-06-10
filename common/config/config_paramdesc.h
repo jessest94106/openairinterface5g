@@ -53,7 +53,7 @@
 #define PARAMFLAG_PARAMSETDEF             (1 << 17)        // parameter has been set to default value in get functions
 
 /* checkedparam_t is possibly used in paramdef_t for specific parameter value validation */
-#define CONFIG_MAX_NUMCHECKVAL            20
+#define CONFIG_MAX_NUMCHECKVAL            64
 typedef struct paramdef paramdef_t;
 typedef struct configmodule_interface configmodule_interface_t;
 typedef union checkedparam {

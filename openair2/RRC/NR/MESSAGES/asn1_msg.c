@@ -46,6 +46,7 @@
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 #include "asn1_msg.h"
 #include "../nr_rrc_proto.h"
+#include "LAYER2/nr_pdcp/nr_pdcp_asn1_utils.h"
 
 #include "openair3/SECU/key_nas_deriver.h"
 
@@ -274,7 +275,8 @@ int do_RRCReject(uint8_t *const buffer)
 NR_RadioBearerConfig_t *get_default_rbconfig(int eps_bearer_id,
                                              int rb_id,
                                              e_NR_CipheringAlgorithm ciphering_algorithm,
-                                             e_NR_SecurityConfig__keyToUse key_to_use)
+                                             e_NR_SecurityConfig__keyToUse key_to_use,
+                                             const nr_pdcp_configuration_t *pdcp_config)
 {
   NR_RadioBearerConfig_t *rbconfig = calloc(1, sizeof(*rbconfig));
   rbconfig->srb_ToAddModList = NULL;
@@ -289,9 +291,9 @@ NR_RadioBearerConfig_t *get_default_rbconfig(int eps_bearer_id,
   drb_ToAddMod->recoverPDCP = NULL;
   drb_ToAddMod->pdcp_Config = calloc(1,sizeof(*drb_ToAddMod->pdcp_Config));
   asn1cCalloc(drb_ToAddMod->pdcp_Config->drb, drb);
-  asn1cCallocOne(drb->discardTimer, NR_PDCP_Config__drb__discardTimer_infinity);
-  asn1cCallocOne(drb->pdcp_SN_SizeUL, NR_PDCP_Config__drb__pdcp_SN_SizeUL_len18bits);
-  asn1cCallocOne(drb->pdcp_SN_SizeDL, NR_PDCP_Config__drb__pdcp_SN_SizeDL_len18bits);
+  asn1cCallocOne(drb->discardTimer, encode_discard_timer(pdcp_config->drb.discard_timer));
+  asn1cCallocOne(drb->pdcp_SN_SizeUL, encode_sn_size_ul(pdcp_config->drb.sn_size));
+  asn1cCallocOne(drb->pdcp_SN_SizeDL, encode_sn_size_dl(pdcp_config->drb.sn_size));
   drb->headerCompression.present = NR_PDCP_Config__drb__headerCompression_PR_notUsed;
   drb->headerCompression.choice.notUsed = 0;
   drb->integrityProtection = NULL;
@@ -299,7 +301,7 @@ NR_RadioBearerConfig_t *get_default_rbconfig(int eps_bearer_id,
   drb->outOfOrderDelivery = NULL;
 
   drb_ToAddMod->pdcp_Config->moreThanOneRLC = NULL;
-  asn1cCallocOne(drb_ToAddMod->pdcp_Config->t_Reordering, NR_PDCP_Config__t_Reordering_ms100);
+  asn1cCallocOne(drb_ToAddMod->pdcp_Config->t_Reordering, encode_t_reordering(pdcp_config->drb.t_reordering));
   drb_ToAddMod->pdcp_Config->ext1 = NULL;
 
   asn1cSeqAdd(&rbconfig->drb_ToAddModList->list,drb_ToAddMod);

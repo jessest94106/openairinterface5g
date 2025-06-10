@@ -846,7 +846,11 @@ static void verify_section_notset(configmodule_interface_t *cfg, char *aprefix, 
   paramlist_def_t pl = {0};
   strncpy(pl.listname, secname, sizeof(pl.listname) - 1);
   config_getlist(cfg, &pl, NULL, 0, aprefix);
-  AssertFatal(pl.numelt == 0, "Section \"%s.%s\" not allowed in this config, please remove it\n", aprefix ? aprefix : "", secname);
+  AssertFatal(pl.numelt == 0,
+              "Section \"%s%s%s\" not allowed in this config, please remove it\n",
+              aprefix ? aprefix : "",
+              aprefix ? "." : "",
+              secname);
 }
 void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
 {
@@ -879,6 +883,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
     verify_section_notset(cfg, NULL, CONFIG_STRING_L1_LIST);
     verify_section_notset(cfg, NULL, CONFIG_STRING_RU_LIST);
     verify_section_notset(cfg, NULL, CONFIG_STRING_MACRLC_LIST);
+    verify_section_notset(cfg, NULL, CONFIG_STRING_NR_RLC_LIST);
   } else if (NODE_IS_DU(node_type)) {
     // verify that there is no bearer config
     verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
@@ -886,6 +891,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
 
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
+    verify_section_notset(cfg, NULL, CONFIG_STRING_NR_PDCP_LIST);
   } // else nothing to be checked
 
   /* other possible verifications: PNF, VNF, CU-CP, CU-UP, ...? */
@@ -1467,6 +1473,55 @@ static seq_arr_t *fill_du_sibs(paramdef_t *GNBparamarray)
   return du_SIBs;
 }
 
+void config_rlc(configmodule_interface_t *cfg, nr_rlc_configuration_t *rlc_config)
+{
+  /* SRB configuration */
+  paramdef_t rlc_srb_params[] = NR_RLC_SRB_GLOBALPARAMS_DESC;
+  int ret = config_get(cfg, rlc_srb_params, sizeofArray(rlc_srb_params), CONFIG_STRING_NR_RLC_SRB);
+  AssertFatal(ret >= 0, "problem reading NR RLC configuration from configuration file\n");
+
+  rlc_config->srb.t_poll_retransmit = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_T_POLL_RETRANSMIT_IDX]);
+  rlc_config->srb.t_reassembly = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_T_REASSEMBLY_IDX]);
+  rlc_config->srb.t_status_prohibit = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_T_STATUS_PROHIBIT_IDX]);
+  rlc_config->srb.poll_pdu = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_POLL_PDU_IDX]);
+  rlc_config->srb.poll_byte = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_POLL_BYTE_IDX]);
+  rlc_config->srb.max_retx_threshold = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_MAX_RETX_THRESHOLD_IDX]);
+  rlc_config->srb.sn_field_length = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_SN_FIELD_LENGTH_IDX]);
+
+  /* DRB AM configuration */
+  paramdef_t rlc_drb_am_params[] = NR_RLC_DRB_AM_GLOBALPARAMS_DESC;
+  ret = config_get(cfg, rlc_drb_am_params, sizeofArray(rlc_drb_am_params), CONFIG_STRING_NR_RLC_DRB_AM);
+  AssertFatal(ret >= 0, "problem reading NR RLC configuration from configuration file\n");
+
+  rlc_config->drb_am.t_poll_retransmit = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_T_POLL_RETRANSMIT_IDX]);
+  rlc_config->drb_am.t_reassembly = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_T_REASSEMBLY_IDX]);
+  rlc_config->drb_am.t_status_prohibit = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_T_STATUS_PROHIBIT_IDX]);
+  rlc_config->drb_am.poll_pdu = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_POLL_PDU_IDX]);
+  rlc_config->drb_am.poll_byte = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_POLL_BYTE_IDX]);
+  rlc_config->drb_am.max_retx_threshold = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_MAX_RETX_THRESHOLD_IDX]);
+  rlc_config->drb_am.sn_field_length = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_SN_FIELD_LENGTH_IDX]);
+
+  /* DRB UM configuration */
+  paramdef_t rlc_drb_um_params[] = NR_RLC_DRB_UM_GLOBALPARAMS_DESC;
+  ret = config_get(cfg, rlc_drb_um_params, sizeofArray(rlc_drb_um_params), CONFIG_STRING_NR_RLC_DRB_UM);
+  AssertFatal(ret >= 0, "problem reading NR RLC configuration from configuration file\n");
+
+  rlc_config->drb_um.t_reassembly = config_get_processedint(cfg, &rlc_drb_um_params[CONFIG_NR_RLC_DRB_UM_T_REASSEMBLY_IDX]);
+  rlc_config->drb_um.sn_field_length = config_get_processedint(cfg, &rlc_drb_um_params[CONFIG_NR_RLC_DRB_UM_SN_FIELD_LENGTH_IDX]);
+}
+
+void config_pdcp(configmodule_interface_t *cfg, nr_pdcp_configuration_t *pdcp_config)
+{
+  /* DRB configuration */
+  paramdef_t pdcp_params[] = NR_PDCP_DRB_GLOBALPARAMS_DESC;
+  int ret = config_get(cfg, pdcp_params, sizeofArray(pdcp_params), CONFIG_STRING_NR_PDCP_DRB);
+  AssertFatal(ret >= 0, "problem reading NR PDCP configuration from configuration file\n");
+
+  pdcp_config->drb.sn_size = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_SN_SIZE_IDX]);
+  pdcp_config->drb.t_reordering = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_T_REORDERING_IDX]);
+  pdcp_config->drb.discard_timer = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_DISCARD_TIMER_IDX]);
+}
+
 void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 {
   int j = 0;
@@ -1612,8 +1667,12 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   NR_ServingCellConfig_t *scd = get_scd_config(cfg);
 
   if (MacRLC_ParamList.numelt > 0) {
+    /* NR RLC config is needed by mac_top_init_gNB() */
+    nr_rlc_configuration_t default_rlc_config;
+    config_rlc(cfg, &default_rlc_config);
+
     ngran_node_t node_type = get_node_type();
-    mac_top_init_gNB(node_type, scc, scd, &config);
+    mac_top_init_gNB(node_type, scc, scd, &config, &default_rlc_config);
     RC.nb_nr_mac_CC = (int *)malloc(RC.nb_nr_macrlc_inst * sizeof(int));
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
@@ -2141,6 +2200,9 @@ gNB_RRC_INST *RCconfig_NRRRC()
 
   if (!NODE_IS_DU(rrc->node_type))
     config_security(rrc);
+
+  config_rlc(config_get_if(), &rrc->rlc_config);
+  config_pdcp(config_get_if(), &rrc->pdcp_config);
 
   return rrc;
 }

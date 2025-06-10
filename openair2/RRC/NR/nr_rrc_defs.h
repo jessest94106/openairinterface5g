@@ -54,6 +54,8 @@
 #include "NR_UE-MRDC-Capability.h"
 #include "NR_UE-NR-Capability.h"
 #include "intertask_interface.h"
+#include "openair2/LAYER2/nr_pdcp/nr_pdcp_configuration.h"
+#include "openair2/LAYER2/nr_rlc/nr_rlc_configuration.h"
 
 typedef enum {
   NR_RRC_OK=0,
@@ -383,6 +385,8 @@ typedef struct gNB_RRC_INST_s {
   RB_HEAD(rrc_cuup_tree, nr_rrc_cuup_container_t) cuups; // CU-UPs, indexed by assoc_id
   size_t num_cuups;
 
+  nr_pdcp_configuration_t pdcp_config;
+  nr_rlc_configuration_t rlc_config;
 } gNB_RRC_INST;
 
 #define UE_LOG_FMT "(cellID %lx, UE ID %d RNTI %04x)"
