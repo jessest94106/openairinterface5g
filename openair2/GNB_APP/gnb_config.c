@@ -1919,9 +1919,8 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
   seq_arr_init(rrc->neighbour_cell_configuration, sizeof(neighbour_cell_configuration_t));
 
   for (int elm = 0; elm < neighbour_list_param_list.numelt; ++elm) {
-    neighbour_cell_configuration_t *cell = calloc(1, sizeof(neighbour_cell_configuration_t));
-    AssertFatal(cell != NULL, "out of memory\n");
-    cell->nr_cell_id = (uint64_t)*neighbour_list_param_list.paramarray[elm][0].u64ptr;
+    neighbour_cell_configuration_t cell = {0};
+    cell.nr_cell_id = (uint64_t)*neighbour_list_param_list.paramarray[elm][0].u64ptr;
 
     char neighbourpath[MAX_OPTNAME_SIZE + 8];
     snprintf(neighbourpath, sizeof(neighbourpath), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, gnb_idx, GNB_CONFIG_STRING_NEIGHBOUR_LIST, elm);
@@ -1930,22 +1929,20 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
                     GNBNEIGHBOURCELLPARAMS_DESC,
                     GNB_CONFIG_STRING_NEIGHBOUR_CELL_LIST,
                     neighbourpath);
-    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell->nr_cell_id, NeighbourCellParamList.numelt);
+    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell.nr_cell_id, NeighbourCellParamList.numelt);
     if (NeighbourCellParamList.numelt < 1)
       continue;
 
-    cell->neighbour_cells = malloc(sizeof(seq_arr_t));
-    AssertFatal(cell->neighbour_cells != NULL, "Memory exhausted!!!");
-    seq_arr_init(cell->neighbour_cells, sizeof(nr_neighbour_gnb_configuration_t));
+    cell.neighbour_cells = malloc_or_fail(sizeof(seq_arr_t));
+    seq_arr_init(cell.neighbour_cells, sizeof(nr_neighbour_cell_t));
     for (int l = 0; l < NeighbourCellParamList.numelt; ++l) {
-      nr_neighbour_gnb_configuration_t *neighbourCell = calloc(1, sizeof(nr_neighbour_gnb_configuration_t));
-      AssertFatal(neighbourCell != NULL, "out of memory\n");
-      neighbourCell->gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
-      neighbourCell->nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
-      neighbourCell->physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
-      neighbourCell->subcarrierSpacing = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_SCS_IDX].uptr;
-      neighbourCell->absoluteFrequencySSB = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX].i64ptr;
-      neighbourCell->tac = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_TAC_IDX].uptr;
+      nr_neighbour_cell_t neighbourCell = {0};
+      neighbourCell.gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
+      neighbourCell.nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
+      neighbourCell.physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
+      neighbourCell.subcarrierSpacing = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_SCS_IDX].uptr;
+      neighbourCell.absoluteFrequencySSB = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX].i64ptr;
+      neighbourCell.tac = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_TAC_IDX].uptr;
 
       char neighbour_plmn_path[CONFIG_MAXOPTLENGTH];
       snprintf(neighbour_plmn_path,
@@ -1957,13 +1954,12 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
                GNB_CONFIG_STRING_NEIGHBOUR_PLMN);
       GET_PARAMS(NeighbourPlmn, GNBPLMNPARAMS_DESC, neighbour_plmn_path);
 
-      neighbourCell->plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
-      neighbourCell->plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
-      neighbourCell->plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
-      seq_arr_push_back(cell->neighbour_cells, neighbourCell, sizeof(nr_neighbour_gnb_configuration_t));
+      neighbourCell.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
+      neighbourCell.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
+      neighbourCell.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
+      seq_arr_push_back(cell.neighbour_cells, &neighbourCell, sizeof(neighbourCell));
     }
-
-    seq_arr_push_back(rrc->neighbour_cell_configuration, cell, sizeof(neighbour_cell_configuration_t));
+    seq_arr_push_back(rrc->neighbour_cell_configuration, &cell, sizeof(cell));
   }
   void *base = seq_arr_front(rrc->neighbour_cell_configuration);
   size_t nmemb = seq_arr_size(rrc->neighbour_cell_configuration);
@@ -2020,22 +2016,21 @@ static void fill_measurement_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
   measurementConfig->a3_event_list = malloc(sizeof(seq_arr_t));
   seq_arr_init(measurementConfig->a3_event_list, sizeof(nr_a3_event_t));
   for (int i = 0; i < A3_EventList.numelt; i++) {
-    nr_a3_event_t *a3_event = (nr_a3_event_t *)calloc(1, sizeof(nr_a3_event_t));
-    AssertFatal(a3_event != NULL, "out of memory\n");
-    a3_event->pci = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_PCI_ID_IDX].i64ptr;
-    AssertFatal(a3_event->pci >= -1 && a3_event->pci < 1024,
+    nr_a3_event_t a3_event = {0};
+    a3_event.pci = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_PCI_ID_IDX].i64ptr;
+    AssertFatal(a3_event.pci >= -1 && a3_event.pci < 1024,
                 "entry %s.%s must be -1<=PCI<1024, but is %d\n",
                 measurement_path,
                 MEASUREMENT_EVENTS_PCI_ID,
-                a3_event->pci);
-    a3_event->timeToTrigger = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX].i64ptr;
-    a3_event->a3_offset = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_OFFSET_IDX].i64ptr;
-    a3_event->hysteresis = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_HYSTERESIS_IDX].i64ptr;
+                a3_event.pci);
+    a3_event.timeToTrigger = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX].i64ptr;
+    a3_event.a3_offset = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_OFFSET_IDX].i64ptr;
+    a3_event.hysteresis = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_HYSTERESIS_IDX].i64ptr;
 
-    if (a3_event->pci == -1)
+    if (a3_event.pci == -1)
       measurementConfig->is_default_a3_configuration_exists = true;
 
-    seq_arr_push_back(measurementConfig->a3_event_list, a3_event, sizeof(nr_a3_event_t));
+    seq_arr_push_back(measurementConfig->a3_event_list, &a3_event, sizeof(nr_a3_event_t));
   }
 }
 

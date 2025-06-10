@@ -301,7 +301,7 @@ typedef struct {
   plmn_identity_t plmn;
   uint32_t tac;
   bool isIntraFrequencyNeighbour;
-} nr_neighbour_gnb_configuration_t;
+} nr_neighbour_cell_t;
 
 typedef struct neighbour_cell_configuration_s {
   uint64_t nr_cell_id;

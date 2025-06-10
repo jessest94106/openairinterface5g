@@ -313,6 +313,7 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
 
       case NGAP_NAS_FIRST_REQ:
         ngap_gNB_handle_nas_first_req(instance, &NGAP_NAS_FIRST_REQ(received_msg));
+        free_byte_array(NGAP_NAS_FIRST_REQ(received_msg).nas_pdu);
         break;
 
       case NGAP_UPLINK_NAS:

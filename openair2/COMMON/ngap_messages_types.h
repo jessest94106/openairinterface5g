@@ -664,11 +664,8 @@ typedef struct ngap_pdusession_setup_req_s {
   /* E RAB setup request */
   pdusession_t pdusession_setup_params[NGAP_MAX_PDU_SESSION];
 
-  /* UE Uplink Aggregated Max Bitrates */
-  uint64_t ueAggMaxBitRateUplink;
-
-  /* UE Downlink Aggregated Max Bitrates */
-  uint64_t ueAggMaxBitRateDownlink;
+  /* UE Aggregated Max Bitrates */
+  ngap_ambr_t ueAggMaxBitRate;
 
 } ngap_pdusession_setup_req_t;
 
