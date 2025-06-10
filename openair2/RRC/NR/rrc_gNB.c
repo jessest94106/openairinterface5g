@@ -150,18 +150,18 @@ const neighbour_cell_configuration_t *get_neighbour_cell_config(const gNB_RRC_IN
 static bool eq_pci(const void *vval, const void *vit)
 {
   const int *pci = (const int *)vval;
-  const nr_neighbour_gnb_configuration_t *neighbour = (const nr_neighbour_gnb_configuration_t *)vit;
+  const nr_neighbour_cell_t *neighbour = (const nr_neighbour_cell_t *)vit;
   return neighbour->physicalCellId == *pci;
 }
 
-const nr_neighbour_gnb_configuration_t *get_neighbour_gnb_by_pci(const neighbour_cell_configuration_t *cell, int pci)
+const nr_neighbour_cell_t *get_neighbour_cell_by_pci(const neighbour_cell_configuration_t *cell, int pci)
 {
   seq_arr_t *head = cell->neighbour_cells;
   DevAssert(head != NULL);
   LOG_D(NR_RRC, "Number of neighbour cells: %ld\n", head->size);
   elm_arr_t e = find_if(head, &pci, eq_pci);
   if (e.found) {
-    const nr_neighbour_gnb_configuration_t *neighbour = (const nr_neighbour_gnb_configuration_t *)e.it;
+    const nr_neighbour_cell_t *neighbour = (const nr_neighbour_cell_t *)e.it;
     LOG_D(NR_RRC, "Found matching neighbour cell with PCI %d and Cell ID %ld\n", neighbour->physicalCellId, neighbour->nrcell_id);
     return neighbour;
   }
@@ -593,7 +593,7 @@ nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC
       LOG_D(NR_RRC, "HO LOG: Preparing A3 Event Measurement Configuration!\n");
       bool is_default_a3_added = false;
       for (int i = 0; i < neighbour_cells->size; i++) {
-        nr_neighbour_gnb_configuration_t *neighbourCell = (nr_neighbour_gnb_configuration_t *)seq_arr_at(neighbour_cells, i);
+        nr_neighbour_cell_t *neighbourCell = (nr_neighbour_cell_t *)seq_arr_at(neighbour_cells, i);
         if (!neighbourCell->isIntraFrequencyNeighbour)
           continue;
         seq_arr_push_back(pci_seq, &neighbourCell->physicalCellId, sizeof(int));
@@ -1401,7 +1401,7 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
         const f1ap_served_cell_info_t *neigh_cell = get_cell_information_by_phycellId(neighbour_pci);
         const f1ap_served_cell_info_t *serving_cell = get_cell_information_by_phycellId(scell_pci);
         const neighbour_cell_configuration_t *cell = get_neighbour_cell_config(rrc, serving_cell->nr_cellid);
-        const nr_neighbour_gnb_configuration_t *neighbour = get_neighbour_gnb_by_pci(cell, neighbour_pci);
+        const nr_neighbour_cell_t *neighbour = get_neighbour_cell_by_pci(cell, neighbour_pci);
         // CU does not have f1 connection with neighbour cell context. So  check does serving cell has this phyCellId as a
         // neighbour.
         if (!neigh_cell && neighbour) {

@@ -1934,9 +1934,9 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
       continue;
 
     cell.neighbour_cells = malloc_or_fail(sizeof(seq_arr_t));
-    seq_arr_init(cell.neighbour_cells, sizeof(nr_neighbour_gnb_configuration_t));
+    seq_arr_init(cell.neighbour_cells, sizeof(nr_neighbour_cell_t));
     for (int l = 0; l < NeighbourCellParamList.numelt; ++l) {
-      nr_neighbour_gnb_configuration_t neighbourCell = {0};
+      nr_neighbour_cell_t neighbourCell = {0};
       neighbourCell.gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
       neighbourCell.nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
       neighbourCell.physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
