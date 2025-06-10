@@ -151,6 +151,153 @@ static bool unprotected_allowed(byte_array_t buffer, fgs_nas_msg_t msg_type)
   }
 }
 
+/**
+ * @brief Get the MAC of a Security Protected NAS message
+ * @param[in] pdu_buffer The buffer containing the NAS message
+ * @param[in] pdu_length The length of the NAS message
+ * @param[out] mac The MAC of the NAS message
+ * @return true if the MAC was successfully extracted, false otherwise
+ */
+bool nas_security_get_mac(uint8_t *pdu_buffer, int pdu_length, uint8_t *mac)
+{
+  /* Check for Security Protected Header */
+  /* at least 8 bytes for Security Protected MM Message */
+  if (pdu_length < 8)
+    return false;
+
+  /* Only message type, that is not protected (c.f.
+     TS 24.501 9.3 Security Header Type) */
+  if ((Security_header_t)pdu_buffer[1] == PLAIN_5GS_MSG)
+    return false;
+
+  /* Get the MAC [EPD][SecHdr][MAC0]..[MAC3] - success */
+  for (int i = 0; i < 4; i++)
+    mac[i] = pdu_buffer[2 + i];
+  return true;
+}
+
+/*
+ * @brief Get the Security Header of a NAS message
+ * @param[in] msg The buffer containing the NAS message
+ * @param[in] msg_length The length of the NAS message
+ * @param[out] sec_hdr The Security Header of the NAS message
+ * @return true if the Security Header was successfully extracted, false otherwise
+ */
+bool nas_security_get_sec_hdr(uint8_t *msg, int msg_length, Security_header_t *sec_hdr)
+{
+  /* Shortest message is [EPD][SecHdrType][Payl]*/
+  if (msg_length < 3) {
+    LOG_E(NAS, "Invalid NAS message length %d\n", msg_length);
+    return false;
+  }
+
+  /* Get the SecHdr and check for validity */
+  uint8_t sec_hdr_type = msg[1] & 0x0f;
+  if (sec_hdr_type > INTEGRITY_PROTECTED_AND_CIPHERED_WITH_NEW_SECU_CTX) {
+    LOG_E(NAS, "Invalid Security Header Type %d\n", sec_hdr_type);
+    return false;
+  }
+
+  /* Check ok. */
+  *sec_hdr = (Security_header_t)sec_hdr_type;
+  return true;
+}
+
+/*
+ * @brief Compute the MAC of a NAS message
+ * @param[in] nas The NAS context
+ * @param[in] pdu_buffer The buffer containing the NAS message
+ * @param[in] is_uplink True if the message is uplink, false Downlink
+ * @param[in] is3gpp_access True if the message is 3GPP access, false otherwise
+ * @param[in] pdu_length The length of the NAS message
+ * @param[out] mac The MAC of the NAS message
+ */
+static void nas_security_compute_mac(nr_ue_nas_t *nas,
+                                     byte_array_t buffer,
+                                     const bool is_uplink,
+                                     const bool is3gpp_access,
+                                     uint8_t *mac)
+{
+  uint8_t *buf = buffer.buf + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH - 1;
+  int len = buffer.len - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH + 1;
+
+  /* Compute the MAC */
+  nas_stream_cipher_t stream_cipher;
+  stream_cipher.context = nas->security_container->integrity_context;
+
+  /* Select the right count in the context */
+  if (is_uplink)
+    stream_cipher.count = nas->security.nas_count_ul;
+  else
+    stream_cipher.count = nas->security.nas_count_dl;
+
+  /* 3GPP access is 1, non-3GPP access is 2 - see 3GPP TS 33.501 6.4.2.2 */
+  stream_cipher.bearer = is3gpp_access ? 1 : 2;
+
+  /* Configure Direction for MAC protection */
+  stream_cipher.direction = is_uplink ? 0 : 1;
+
+  /* Possibly encrypted message  */
+  stream_cipher.message = buf;
+
+  /* length in bits */
+  stream_cipher.blength = len << 3;
+
+  stream_compute_integrity(nas->security_container->integrity_algorithm, &stream_cipher, mac);
+}
+
+/*
+ * @brief: Decrypt the payload of a NAS message. The buffer is modified in place
+ * @param[in] nas The NAS context
+ * @param[in] pdu_buffer The buffer containing the full (header + payload) NAS message
+ * @param[in] is_uplink True if the message is uplink, false Downlink
+ * @param[in] is3gpp_access True if the message is 3GPP access, false otherwise
+ * @param[in] pdu_length The length of the NAS message
+ */
+static void nas_security_decrypt_payload(nr_ue_nas_t *nas, byte_array_t buffer, const bool is_uplink, const bool is3gpp_access)
+{
+  Security_header_t sec_hdr;
+
+  if (!nas_security_get_sec_hdr(buffer.buf, buffer.len, &sec_hdr)) {
+    LOG_E(NAS, "Failed to get Security Header\n");
+    return;
+  }
+
+  /* Nothing to do for unencrypted msgs */
+  if (sec_hdr == PLAIN_5GS_MSG || sec_hdr == INTEGRITY_PROTECTED) {
+    return;
+  }
+
+  /* Get integrity keys, and algorithms */
+  nas_stream_cipher_t stream_cipher;
+  stream_cipher.context = nas->security_container->ciphering_context;
+
+  /* Use the estimated count the right count in the context */
+  stream_cipher.count = nas->security.nas_count_dl;
+  /* 3GPP access is 1, non-3GPP access is 2 - see 3GPP TS 33.501 6.4.2.2 */
+  stream_cipher.bearer = is3gpp_access ? 1 : 2;
+
+  /* Decryption only in downlink direction */
+  stream_cipher.direction = 1;
+
+  /* [EPD][SHR][MAC0]..[MAC3][PDU...]*/
+  uint8_t *plain_payload = buffer.buf + SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
+  stream_cipher.message = plain_payload;
+
+  /* length in bits */
+  int plain_length = buffer.len - SECURITY_PROTECTED_5GS_NAS_MESSAGE_HEADER_LENGTH;
+  stream_cipher.blength = plain_length << 3;
+
+  /* Allocate output buffer for body only */
+  uint8_t *decrypted = malloc_or_fail(plain_length);
+
+  stream_compute_encrypt(nas->security_container->ciphering_algorithm, &stream_cipher, decrypted);
+
+  /* Override and free the decrypted payload */
+  memcpy(plain_payload, decrypted, plain_length);
+  free(decrypted);
+}
+
 static security_state_t nas_security_rx_process(nr_ue_nas_t *nas, byte_array_t buffer, fgs_nas_msg_t msg_type)
 {
   if (nas->security_container == NULL)
