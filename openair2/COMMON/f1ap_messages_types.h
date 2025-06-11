@@ -649,6 +649,13 @@ typedef struct f1ap_ue_context_modif_refuse_t {
   long cause_value;
 } f1ap_ue_context_modif_refuse_t;
 
+typedef struct f1ap_ue_context_rel_req_t {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+  f1ap_Cause_t cause;
+  long cause_value;
+} f1ap_ue_context_rel_req_t;
+
 typedef struct f1ap_ue_context_release_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
