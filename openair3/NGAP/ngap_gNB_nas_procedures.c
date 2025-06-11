@@ -112,24 +112,26 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
   }
 
   // No UE identity (5G-S-TMSI or GUAMI) is present
-  if (msg->ue_identity.presenceMask == 0) {
-    // Select the AMF based on the selected PLMN identity received through RRCSetupComplete
-    amf = ngap_gNB_nnsf_select_amf_by_plmn_id(instance_p, msg->establishment_cause, msg->plmn);
+  // Select the AMF based on the selected PLMN identity received through RRCSetupComplete
+  amf = ngap_gNB_nnsf_select_amf_by_plmn_id(instance_p, msg->establishment_cause, msg->plmn);
+  if (amf) {
+    NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN MCC=%03d MNC=%0*d\n",
+              msg->gNB_ue_ngap_id,
+              amf->amf_name,
+              amf->assoc_id,
+              msg->plmn.mcc,
+              msg->plmn.mnc_digit_length,
+              msg->plmn.mnc);
+    return amf;
+  } else {
+    // Select the AMF with the highest capacity
+    amf = ngap_gNB_nnsf_select_amf(instance_p, msg->establishment_cause);
     if (amf) {
-      NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN MCC %d MNC %d\n",
+      NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through highest relative capacity\n",
                 msg->gNB_ue_ngap_id,
                 amf->amf_name,
-                amf->assoc_id,
-                msg->plmn.mcc,
-                msg->plmn.mnc);
+                amf->assoc_id);
       return amf;
-    } else {
-      // Select the AMF with the highest capacity
-      amf = ngap_gNB_nnsf_select_amf(instance_p, msg->establishment_cause);
-      if (amf) {
-        NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through highest relative capacity\n", msg->gNB_ue_ngap_id, amf->amf_name, amf->assoc_id);
-        return amf;
-      }
     }
   }
 
