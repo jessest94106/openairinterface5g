@@ -90,9 +90,6 @@
 #include "LAYER2/NR_MAC_COMMON/nr_mac_common.h"
 #include "NR_TAG.h"
 
-#include <openair3/UICC/usim_interface.h>
-
-
 /* Defs */
 #define MAX_NUM_BWP 5
 #define MAX_NUM_CORESET 12
@@ -101,7 +98,6 @@
 #define NR_NB_RA_PROC_MAX 4
 #define MAX_NUM_OF_SSB 64
 #define MAX_NUM_NR_PRACH_PREAMBLES 64
-#define MIN_NUM_PRBS_TO_SCHEDULE  5
 
 uint8_t nr_get_rv(int rel_round);
 
@@ -677,10 +673,6 @@ typedef struct {
   // 0 - good channel, 1 - bad channel
   float pdcch_cl_adjust;
 } NR_UE_sched_ctrl_t;
-
-typedef struct {
-  uicc_t *uicc;
-} NRUEcontext_t;
 
 typedef struct NR_mac_dir_stats {
   uint64_t lc_bytes[64];

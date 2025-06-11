@@ -23,6 +23,7 @@
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
 
 #include "common/config/config_userapi.h"
+#include "common/utils/load_module_shlib.h"
 #include "RRC/LTE/rrc_vars.h"
 #ifdef SMBV
 #include "PHY/TOOLS/smbv.h"
