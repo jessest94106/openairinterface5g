@@ -1067,6 +1067,7 @@ void RCconfig_NR_L1(void)
       gNB->TX_AMP = min(32767.0 / pow(10.0, .05 * (double)(*L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr)), INT16_MAX);
       gNB->phase_comp = *L1_ParamList.paramarray[j][L1_PHASE_COMP].uptr;
       gNB->dmrs_num_antennas_per_thread = *(L1_ParamList.paramarray[j][NUM_ANTENNAS_PER_THREAD].uptr);
+      gNB->enable_analog_das = *(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr);
       LOG_I(NR_PHY, "TX_AMP = %d (-%d dBFS)\n", gNB->TX_AMP, *L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr);
       AssertFatal(gNB->TX_AMP > 300, "TX_AMP is too small, must be larger than 300 (is %d)\n", gNB->TX_AMP);
       // Midhaul configuration
@@ -1621,19 +1622,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.timer_config.n311,
         config.timer_config.t319);
 
-  if (config_isparamset(GNBParamList.paramarray[0], GNB_BEAMWEIGHTS_IDX)) {
-    int n = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].numelt;
-    AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
-    // each beam is described by a set of weights (one for each antenna)
-    // on the other hand in case of analog beamforming an index to the RU beam identifier is provided
-    config.nb_bfw[0] = num_tx;  // number of tx antennas
-    config.nb_bfw[1] = n / num_tx; // number of beams
-    config.bw_list = malloc16_clear(n * sizeof(*config.bw_list));
-    for (int b = 0; b < n; b++) {
-      config.bw_list[b] = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].iptr[b];
-    }
-  }
-
   // Construct default aggragation level list or read from config
   int uess_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   uess_num_agg_level_candidates[PDCCH_AGG_LEVEL1] = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
@@ -1763,12 +1751,33 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       }
       bool ab = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMFORMING_IDX].u8ptr;
       if (ab) {
+        AssertFatal(NFAPI_MODE == NFAPI_MONOLITHIC, "Analog beamforming only supported for monolithic scenario\n");
         NR_beam_info_t *beam_info = &RC.nrmac[j]->beam_info;
         int beams_per_period = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMS_PERIOD_IDX].u8ptr;
         beam_info->beam_allocation = malloc16(beams_per_period * sizeof(int *));
         beam_info->beam_duration = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAM_DURATION_IDX].u8ptr;
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
+      }
+      if (config_isparamset(MacRLC_ParamList.paramarray[j], MACRLC_BEAMWEIGHTS_IDX)) {
+        if (NFAPI_MODE == NFAPI_MONOLITHIC) {
+          GET_PARAMS_LIST(L1_ParamList, L1_Params, L1PARAMS_DESC, CONFIG_STRING_L1_LIST, NULL);
+          AssertFatal(*(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr) == 0, "No need to set beam weights in case of DAS\n");
+        }
+        int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
+        int num_beam = n;
+        if (!ab) {
+          AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
+          num_beam = n / num_tx;
+        }
+        // each beam is described by a set of weights (one for each antenna)
+        // in case of analog beamforming an index to the RU beam identifier is provided
+        // (one for each beam regardless of the number of antennas per beam)
+        config.nb_bfw[0] = num_tx;  // number of tx antennas
+        config.nb_bfw[1] = num_beam; // number of beams weights/indices
+        config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
+        for (int b = 0; b < n; b++)
+          config.bw_list[b] = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].iptr[b];
       }
       // triggers also PHY initialization in case we have L1 via FAPI
       nr_mac_config_scc(RC.nrmac[j], scc, &config);

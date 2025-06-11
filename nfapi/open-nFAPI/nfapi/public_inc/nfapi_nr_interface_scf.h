@@ -24,7 +24,7 @@
 #define NFAPI_MAX_NUM_GROUPS 8
 #define NFAPI_MAX_NUM_CB 8
 #define NFAPI_MAX_NUM_PRGS 1
-#define NFAPI_MAX_NUM_BG_IF 1
+#define NFAPI_MAX_NUM_BG_IF 6
 #define NFAPI_MAX_NUM_PERIODS 8
 
 // Extension to the generic structures for single tlv values
@@ -496,6 +496,8 @@ typedef struct {
 typedef struct {
   nfapi_uint8_tlv_t num_beams_period_vendor_ext;
   nfapi_uint8_tlv_t analog_bf_vendor_ext;
+  nfapi_uint8_tlv_t total_num_beams_vendor_ext;
+  nfapi_uint8_tlv_t *analog_beam_list;
 } nfapi_nr_analog_beamforming_ve_t;
 
 // ERROR enums
