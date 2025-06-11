@@ -2199,3 +2199,174 @@ void free_ue_context_rel_req(f1ap_ue_context_rel_req_t *req)
 {
   // nothing to free
 }
+
+/*
+ * @brief Encode F1 UE context release command to ASN.1
+ */
+struct F1AP_F1AP_PDU *encode_ue_context_rel_cmd(const f1ap_ue_context_rel_cmd_t *cmd)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_UEContextRelease;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_UEContextReleaseCommand;
+  F1AP_UEContextReleaseCommand_t *out = &tmp->value.choice.UEContextReleaseCommand;
+
+  /* mandatory: GNB_CU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_GNB_CU_UE_F1AP_ID;
+  ie1->value.choice.GNB_CU_UE_F1AP_ID = cmd->gNB_CU_ue_id;
+
+  /* mandatory: GNB_DU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_GNB_DU_UE_F1AP_ID;
+  ie2->value.choice.GNB_DU_UE_F1AP_ID = cmd->gNB_DU_ue_id;
+
+  /* mandatory: Cause */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_Cause;
+  ie3->criticality = F1AP_Criticality_ignore;
+  ie3->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_Cause;
+  ie3->value.choice.Cause = encode_f1ap_cause(cmd->cause, cmd->cause_value);
+
+  /* optional: RRC Container */
+  if (cmd->rrc_container != NULL) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie4);
+    ie4->id = F1AP_ProtocolIE_ID_id_RRCContainer;
+    ie4->criticality = F1AP_Criticality_ignore;
+    ie4->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_RRCContainer;
+    const byte_array_t *ba = cmd->rrc_container;
+    OCTET_STRING_fromBuf(&ie4->value.choice.RRCContainer, (const char *)ba->buf, ba->len);
+
+    // conditionally have SRBID if RRC Container
+    AssertFatal(cmd->srb_id != NULL, "UEContextReleaseCommand SRB-ID C-ifRRCContainer violated\n");
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie5);
+    ie5->id = F1AP_ProtocolIE_ID_id_SRBID;
+    ie5->criticality = F1AP_Criticality_ignore;
+    ie5->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_SRBID;
+    ie5->value.choice.SRBID = *cmd->srb_id;
+  }
+
+  if (cmd->old_gNB_DU_ue_id != NULL) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie5);
+    ie5->id = F1AP_ProtocolIE_ID_id_oldgNB_DU_UE_F1AP_ID;
+    ie5->criticality = F1AP_Criticality_ignore;
+    ie5->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_GNB_DU_UE_F1AP_ID_1;
+    ie5->value.choice.GNB_DU_UE_F1AP_ID_1 = *cmd->old_gNB_DU_ue_id;
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 UE Context Release Command
+ */
+bool decode_ue_context_rel_cmd(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context_rel_cmd_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_UEContextReleaseCommand_t *in = &pdu->choice.initiatingMessage->value.choice.UEContextReleaseCommand;
+  F1AP_UEContextReleaseCommandIEs_t *ie;
+  F1AP_LIB_FIND_IE(F1AP_UEContextReleaseCommandIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID, true);
+  F1AP_LIB_FIND_IE(F1AP_UEContextReleaseCommandIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID, true);
+  F1AP_LIB_FIND_IE(F1AP_UEContextReleaseCommandIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_Cause, true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCommandIEs__value_PR_GNB_CU_UE_F1AP_ID);
+        out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCommandIEs__value_PR_GNB_DU_UE_F1AP_ID);
+        out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_Cause:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCommandIEs__value_PR_Cause);
+        _F1_CHECK_EXP(decode_f1ap_cause(ie->value.choice.Cause, &out->cause, &out->cause_value));
+        break;
+      case F1AP_ProtocolIE_ID_id_RRCContainer:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCommandIEs__value_PR_RRCContainer);
+                out->rrc_container = malloc_or_fail(sizeof(*out->rrc_container));
+        {
+          OCTET_STRING_t *os = &ie->value.choice.RRCContainer;
+          *out->rrc_container = create_byte_array(os->size, os->buf);
+        }
+        break;
+      case F1AP_ProtocolIE_ID_id_SRBID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCommandIEs__value_PR_SRBID);
+        {
+          // SRB-ID
+          F1AP_UEContextReleaseCommandIEs_t *check_ie;
+          F1AP_LIB_FIND_IE(F1AP_UEContextReleaseCommandIEs_t, check_ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_RRCContainer, true);
+        }
+        _F1_MALLOC(out->srb_id, ie->value.choice.SRBID);
+        break;
+      case F1AP_ProtocolIE_ID_id_oldgNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_UEContextReleaseCommandIEs__value_PR_GNB_DU_UE_F1AP_ID_1);
+        _F1_MALLOC(out->old_gNB_DU_ue_id, ie->value.choice.GNB_DU_UE_F1AP_ID_1);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 UE Context Release Command deep copy
+ */
+f1ap_ue_context_rel_cmd_t cp_ue_context_rel_cmd(const f1ap_ue_context_rel_cmd_t *orig)
+{
+  f1ap_ue_context_rel_cmd_t cp = {
+    .gNB_CU_ue_id = orig->gNB_CU_ue_id,
+    .gNB_DU_ue_id = orig->gNB_DU_ue_id,
+    .cause = orig->cause,
+    .cause_value = orig->cause_value,
+  };
+  CP_OPT_BYTE_ARRAY(cp.rrc_container, orig->rrc_container);
+  if (orig->rrc_container) {
+    AssertFatal(orig->srb_id != NULL, "UEContextReleaseCommand SRB-ID C-ifRRCContainer violated\n");
+    _F1_MALLOC(cp.srb_id, *orig->srb_id);
+  }
+  if (orig->old_gNB_DU_ue_id)
+    _F1_MALLOC(cp.old_gNB_DU_ue_id, *orig->old_gNB_DU_ue_id);
+  return cp;
+}
+
+/**
+ * @brief F1 UE Context Release Command equality check
+ */
+bool eq_ue_context_rel_cmd(const f1ap_ue_context_rel_cmd_t *a, const f1ap_ue_context_rel_cmd_t *b)
+{
+  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _F1_EQ_CHECK_INT(a->cause, b->cause);
+  _F1_EQ_CHECK_LONG(a->cause_value, b->cause_value);
+  _F1_EQ_CHECK_OPTIONAL_IE(a, b, rrc_container, eq_ba);
+  _F1_EQ_CHECK_OPTIONAL_IE(a, b, srb_id, _F1_EQ_CHECK_INT);
+  _F1_EQ_CHECK_OPTIONAL_IE(a, b, old_gNB_DU_ue_id, _F1_EQ_CHECK_INT);
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 UE Context Release Command
+ */
+void free_ue_context_rel_cmd(f1ap_ue_context_rel_cmd_t *cmd)
+{
+  FREE_OPT_BYTE_ARRAY(cmd->rrc_container);
+  free(cmd->srb_id);
+  free(cmd->old_gNB_DU_ue_id);
+}

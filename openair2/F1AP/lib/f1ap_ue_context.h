@@ -57,4 +57,10 @@ f1ap_ue_context_rel_req_t cp_ue_context_rel_req(const f1ap_ue_context_rel_req_t 
 bool eq_ue_context_rel_req(const f1ap_ue_context_rel_req_t *a, const f1ap_ue_context_rel_req_t *b);
 void free_ue_context_rel_req(f1ap_ue_context_rel_req_t *req);
 
+struct F1AP_F1AP_PDU *encode_ue_context_rel_cmd(const f1ap_ue_context_rel_cmd_t *msg);
+bool decode_ue_context_rel_cmd(const struct F1AP_F1AP_PDU *pdu, f1ap_ue_context_rel_cmd_t *out);
+f1ap_ue_context_rel_cmd_t cp_ue_context_rel_cmd(const f1ap_ue_context_rel_cmd_t *orig);
+bool eq_ue_context_rel_cmd(const f1ap_ue_context_rel_cmd_t *a, const f1ap_ue_context_rel_cmd_t *b);
+void free_ue_context_rel_cmd(f1ap_ue_context_rel_cmd_t *cmd);
+
 #endif /* F1AP_UE_CONTEXT_SETUP_REQ_H_ */

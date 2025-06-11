@@ -1202,6 +1202,41 @@ static void test_f1ap_ue_context_release_request()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_ue_context_release_command()
+{
+  f1ap_ue_context_rel_cmd_t orig = {
+    .gNB_CU_ue_id = 1111,
+    .gNB_DU_ue_id = 2222,
+    .cause = F1AP_CAUSE_RADIO_NETWORK,
+    .cause_value = 2,
+  };
+
+  orig.rrc_container = get_malloced_test_ba("some reject message");
+  _F1_MALLOC(orig.srb_id, 1);
+  _F1_MALLOC(orig.old_gNB_DU_ue_id, 3333);
+
+  F1AP_F1AP_PDU_t *f1enc = encode_ue_context_rel_cmd(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_ue_context_rel_cmd_t decoded = {0};
+  bool ret = decode_ue_context_rel_cmd(f1dec, &decoded);
+  AssertFatal(ret, "decode_ue_context_rel_cmd(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_ue_context_rel_cmd(&orig, &decoded);
+  AssertFatal(ret, "eq_ue_context_rel_cmd(): decoded message doesn't match\n");
+  free_ue_context_rel_cmd(&decoded);
+
+  f1ap_ue_context_rel_cmd_t cp = cp_ue_context_rel_cmd(&orig);
+  ret = eq_ue_context_rel_cmd(&orig, &cp);
+  AssertFatal(ret, "eq_ue_context_rel_cmd(): copied message doesn't match\n");
+  free_ue_context_rel_cmd(&orig);
+  free_ue_context_rel_cmd(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1226,5 +1261,6 @@ int main()
   test_f1ap_ue_context_modification_response();
   test_f1ap_ue_context_modification_response_simple();
   test_f1ap_ue_context_release_request();
+  test_f1ap_ue_context_release_command();
   return 0;
 }

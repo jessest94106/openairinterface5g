@@ -656,6 +656,18 @@ typedef struct f1ap_ue_context_rel_req_t {
   long cause_value;
 } f1ap_ue_context_rel_req_t;
 
+typedef struct f1ap_ue_context_rel_cmd_t {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+  f1ap_Cause_t cause;
+  long cause_value;
+
+  byte_array_t *rrc_container;
+  int *srb_id; // C-ifRRCContainer
+
+  uint32_t *old_gNB_DU_ue_id; // if after reestablishment request
+} f1ap_ue_context_rel_cmd_t;
+
 typedef struct f1ap_ue_context_release_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
