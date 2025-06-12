@@ -859,9 +859,7 @@ bool eq_rach_indication(const nfapi_nr_rach_indication_t *a, const nfapi_nr_rach
 
 void free_dl_tti_request(nfapi_nr_dl_tti_request_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_ul_tti_request(nfapi_nr_ul_tti_request_t *msg)
@@ -907,9 +905,7 @@ void free_rx_data_indication(nfapi_nr_rx_data_indication_t *msg)
   if (msg->number_of_pdus > 0) {
     for (int pdu_idx = 0; pdu_idx < msg->number_of_pdus; ++pdu_idx) {
       nfapi_nr_rx_data_pdu_t *rx_pdu = &msg->pdu_list[pdu_idx];
-      if (rx_pdu->pdu) {
-        free(rx_pdu->pdu);
-      }
+      free(rx_pdu->pdu);
     }
     free(msg->pdu_list);
   }
@@ -917,15 +913,11 @@ void free_rx_data_indication(nfapi_nr_rx_data_indication_t *msg)
 
 void free_crc_indication(nfapi_nr_crc_indication_t *msg)
 {
-  if (msg->crc_list) {
-    for (int crc_idx = 0; crc_idx < msg->number_crcs; ++crc_idx) {
-      nfapi_nr_crc_t *crc = &msg->crc_list[crc_idx];
-      if (crc->cb_crc_status) {
-        free(crc->cb_crc_status);
-      }
-    }
-    free(msg->crc_list);
+  for (int crc_idx = 0; crc_idx < msg->number_crcs; ++crc_idx) {
+    nfapi_nr_crc_t *crc = &msg->crc_list[crc_idx];
+    free(crc->cb_crc_status);
   }
+  free(msg->crc_list);
 }
 
 void free_uci_indication(nfapi_nr_uci_indication_t *msg)
@@ -984,16 +976,12 @@ void free_uci_indication(nfapi_nr_uci_indication_t *msg)
 
 void free_srs_indication(nfapi_nr_srs_indication_t *msg)
 {
-  if (msg->pdu_list) {
-    free(msg->pdu_list);
-  }
+  free(msg->pdu_list);
 }
 
 void free_rach_indication(nfapi_nr_rach_indication_t *msg)
 {
-  if (msg->pdu_list) {
-    free(msg->pdu_list);
-  }
+  free(msg->pdu_list);
 }
 
 static void copy_dl_tti_beamforming(const nfapi_nr_tx_precoding_and_beamforming_t *src,
