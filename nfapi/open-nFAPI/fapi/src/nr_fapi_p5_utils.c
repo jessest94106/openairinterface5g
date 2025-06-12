@@ -425,9 +425,7 @@ bool eq_error_indication(const nfapi_nr_error_indication_scf_t *unpacked_req, co
 
 void free_param_request(nfapi_nr_param_request_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_param_response(nfapi_nr_param_response_scf_t *msg)
@@ -487,37 +485,27 @@ void free_config_response(nfapi_nr_config_response_scf_t *msg)
 
 void free_start_request(nfapi_nr_start_request_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_start_response(nfapi_nr_start_response_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_stop_request(nfapi_nr_stop_request_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_stop_indication(nfapi_nr_stop_indication_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_error_indication(nfapi_nr_error_indication_scf_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void copy_param_request(const nfapi_nr_param_request_scf_t *src, nfapi_nr_param_request_scf_t *dst)
