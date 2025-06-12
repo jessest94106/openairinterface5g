@@ -9,6 +9,7 @@ add_library(fgs_5gmm_lib OBJECT
     FGSIdentityResponse.c
     FGSAuthenticationResponse.c
     FGSNASSecurityModeComplete.c
+    FGSNASSecurityModeReject.c
     RegistrationComplete.c
     FGSUplinkNasTransport.c
     FGSDeregistrationRequestUEOriginating.c

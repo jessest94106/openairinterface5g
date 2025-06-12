@@ -81,6 +81,11 @@ int mm_msg_encode(const fgmm_nas_message_plain_t *p, uint8_t *buffer, uint32_t l
     case FGS_SECURITY_MODE_COMPLETE:
       enc_msg = encode_fgs_security_mode_complete(&p->mm_msg.fgs_security_mode_complete, buffer, len);
       break;
+    case FGS_SECURITY_MODE_REJECT: {
+      byte_array_t ba = {.buf = buffer, .len = len};
+      enc_msg = encode_fgs_security_mode_reject(&ba, &p->mm_msg.fgs_security_mode_reject);
+      break;
+    }
     case FGS_UPLINK_NAS_TRANSPORT:
       enc_msg = encode_fgs_uplink_nas_transport(&p->mm_msg.uplink_nas_transport, buffer, len);
       break;
