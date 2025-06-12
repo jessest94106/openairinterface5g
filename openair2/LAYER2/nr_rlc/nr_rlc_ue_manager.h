@@ -34,16 +34,6 @@ typedef enum {
   NR_RLC_OP_MODE_UE,
 } nr_rlc_op_mode_t;
 
-typedef enum nr_lcid_rb_type { NR_LCID_NONE = 0, NR_LCID_SRB = 1, NR_LCID_DRB = 2 } nr_lcid_rb_type;
-
-typedef struct nr_lcid_rb_t {
-  nr_lcid_rb_type type;
-  union {
-    int srb_id;
-    int drb_id;
-  } choice;
-} nr_lcid_rb_t;
-
 typedef void (*rlf_handler_t)(int rnti);
 
 typedef struct nr_rlc_ue_t {

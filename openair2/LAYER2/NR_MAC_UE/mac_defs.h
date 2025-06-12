@@ -450,6 +450,7 @@ typedef struct nr_lcordered_info_s {
   uint32_t bucket_size;
   bool sr_DelayTimerApplied;
   bool lc_SRMask;
+  nr_lcid_rb_t rb;
 } nr_lcordered_info_t;
 
 typedef struct {

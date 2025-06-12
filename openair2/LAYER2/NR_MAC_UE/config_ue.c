@@ -811,7 +811,7 @@ static uint32_t get_lc_bucket_size(long prioritisedBitRate, long bucketSizeDurat
 }
 
 // default configuration as per 38.331 section 9.2.1
-static void set_default_logicalchannelconfig(nr_lcordered_info_t *lc_info, NR_SRB_Identity_t srb_id)
+static void set_default_logicalchannelconfig(nr_lcordered_info_t *lc_info, int srb_id)
 {
   lc_info->lcid = srb_id;
   lc_info->priority = srb_id == 2 ? 3 : 1;
@@ -822,12 +822,13 @@ static void set_default_logicalchannelconfig(nr_lcordered_info_t *lc_info, NR_SR
 static void nr_configure_lc_config(NR_UE_MAC_INST_t *mac,
                                    nr_lcordered_info_t *lc_info,
                                    NR_LogicalChannelConfig_t *mac_lc_config,
-                                   NR_SRB_Identity_t srb_id)
+                                   nr_lcid_rb_t rb)
 {
   NR_LC_SCHEDULING_INFO *lc_sched_info = get_scheduling_info_from_lcid(mac, lc_info->lcid);
-  if (srb_id > 0 && !mac_lc_config->ul_SpecificParameters) {
+  lc_info->rb = rb;
+  if (rb.type == NR_LCID_SRB && !mac_lc_config->ul_SpecificParameters) {
     // release configuration and reset to default
-    set_default_logicalchannelconfig(lc_info, srb_id);
+    set_default_logicalchannelconfig(lc_info, rb.choice.srb_id);
     // invalid LCGID to signal it is absent in the configuration
     lc_sched_info->LCGID = NR_INVALID_LCGID;
     return;
@@ -846,6 +847,25 @@ static void nr_configure_lc_config(NR_UE_MAC_INST_t *mac,
   NR_timer_t *bjt = &lc_sched_info->Bj_timer;
   nr_timer_setup(bjt, UINT_MAX, 1);  // this timer never expires in principle, counter incremented by number of slots
   nr_timer_start(bjt);
+}
+
+static nr_lcid_rb_t configure_lcid_rb(NR_RLC_BearerConfig_t *rlc_bearer)
+{
+  nr_lcid_rb_t rb;
+  if (rlc_bearer->servedRadioBearer->present == NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity) {
+    rb.type = NR_LCID_SRB;
+    rb.choice.srb_id = rlc_bearer->servedRadioBearer->choice.srb_Identity;
+    return rb;
+  }
+
+  if (rlc_bearer->servedRadioBearer->present == NR_RLC_BearerConfig__servedRadioBearer_PR_drb_Identity) {
+    rb.type = NR_LCID_DRB;
+    rb.choice.drb_id = rlc_bearer->servedRadioBearer->choice.drb_Identity;
+    return rb;
+  }
+  LOG_E(NR_MAC, "Error. RLC should be linked to either DRB or SRB.\n");
+  rb.type = NR_LCID_NONE;
+  return rb;
 }
 
 static void configure_logicalChannelBearer(NR_UE_MAC_INST_t *mac,
@@ -870,6 +890,9 @@ static void configure_logicalChannelBearer(NR_UE_MAC_INST_t *mac,
   if (rlc_toadd_list) {
     for (int i = 0; i < rlc_toadd_list->list.count; i++) {
       NR_RLC_BearerConfig_t *rlc_bearer = rlc_toadd_list->list.array[i];
+      nr_lcid_rb_t rb = configure_lcid_rb(rlc_bearer);
+      if (rb.type == NR_LCID_NONE)
+        continue;
       int lc_identity = rlc_bearer->logicalChannelIdentity;
       NR_LogicalChannelConfig_t *mac_lc_config = rlc_bearer->mac_LogicalChannelConfig;
       int j;
@@ -879,14 +902,9 @@ static void configure_logicalChannelBearer(NR_UE_MAC_INST_t *mac,
       }
       if (j < mac->lc_ordered_list.count) {
         LOG_D(NR_MAC, "Logical channel %d is already established, Reconfiguring now\n", lc_identity);
-        if (mac_lc_config != NULL) {
-          NR_SRB_Identity_t srb_id = 0;
-          if (rlc_bearer->servedRadioBearer->present == NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity)
-            srb_id = rlc_bearer->servedRadioBearer->choice.srb_Identity;
-          nr_configure_lc_config(mac, mac->lc_ordered_list.array[j], mac_lc_config, srb_id);
-        }
-      }
-      else {
+        if (mac_lc_config != NULL)
+          nr_configure_lc_config(mac, mac->lc_ordered_list.array[j], mac_lc_config, rb);
+      } else {
         /* setup of new LCID*/
         nr_lcordered_info_t *lc_info = calloc(1, sizeof(*lc_info));
         lc_info->lcid = lc_identity;
@@ -895,12 +913,12 @@ static void configure_logicalChannelBearer(NR_UE_MAC_INST_t *mac,
         if (rlc_bearer->servedRadioBearer->present == NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity) { /* SRB */
           NR_SRB_Identity_t srb_id = rlc_bearer->servedRadioBearer->choice.srb_Identity;
           if (mac_lc_config != NULL)
-            nr_configure_lc_config(mac, lc_info, mac_lc_config, srb_id);
+            nr_configure_lc_config(mac, lc_info, mac_lc_config, rb);
           else
             set_default_logicalchannelconfig(lc_info, srb_id);
         } else { /* DRB */
           AssertFatal(mac_lc_config, "When establishing a DRB, LogicalChannelConfig should be mandatorily present\n");
-          nr_configure_lc_config(mac, lc_info, mac_lc_config, 0);
+          nr_configure_lc_config(mac, lc_info, mac_lc_config, rb);
         }
         ASN_SEQUENCE_ADD(&mac->lc_ordered_list, lc_info);
       }
