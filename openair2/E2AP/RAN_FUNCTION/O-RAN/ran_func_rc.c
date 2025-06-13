@@ -27,6 +27,7 @@
 #include "../../flexric/src/sm/rc_sm/ie/ir/ran_param_list.h"
 #include "../../flexric/src/agent/e2_agent_api.h"
 #include "openair2/E2AP/flexric/src/lib/sm/enc/enc_ue_id.h"
+#include "openair2/E2AP/flexric/src/sm/rc_sm/rc_sm_id.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -379,9 +380,25 @@ static void fill_rc_control(ran_func_def_ctrl_t* ctrl)
   ctrl_style->ran_param_ctrl_out = NULL;
 }
 
+static ran_function_name_t fill_rc_ran_func_name(void)
+{
+  ran_function_name_t dst = {
+    .name = cp_str_to_ba(SM_RAN_CTRL_SHORT_NAME),
+    .oid = cp_str_to_ba(SM_RAN_CTRL_OID),
+    .description = cp_str_to_ba(SM_RAN_CTRL_DESCRIPTION),
+    .instance = NULL
+  };
+  return dst;
+}
+
 e2sm_rc_func_def_t fill_rc_ran_def_gnb(void)
 {
   e2sm_rc_func_def_t def = {0};
+
+  // RAN Function Name
+  // Mandatory
+  // 9.3.2
+  def.name = fill_rc_ran_func_name();
 
   // RAN Function Definition for EVENT TRIGGER
   // Optional
@@ -421,6 +438,11 @@ static e2sm_rc_func_def_t fill_rc_ran_def_cu(void)
 {
   e2sm_rc_func_def_t def = {0};
 
+  // RAN Function Name
+  // Mandatory
+  // 9.3.2
+  def.name = fill_rc_ran_func_name();
+
   // RAN Function Definition for EVENT TRIGGER
   // Optional
   // 9.2.2.2
@@ -459,6 +481,11 @@ static e2sm_rc_func_def_t fill_rc_ran_def_null(void)
 {
   e2sm_rc_func_def_t def = {0};
 
+  // RAN Function Name
+  // Mandatory
+  // 9.3.2
+  def.name = fill_rc_ran_func_name();
+
   // RAN Function Definition for EVENT TRIGGER
   // Optional
   // 9.2.2.2
@@ -490,6 +517,11 @@ static e2sm_rc_func_def_t fill_rc_ran_def_null(void)
 static e2sm_rc_func_def_t fill_rc_ran_def_cucp(void)
 {
   e2sm_rc_func_def_t def = {0};
+
+  // RAN Function Name
+  // Mandatory
+  // 9.3.2
+  def.name = fill_rc_ran_func_name();
 
   // RAN Function Definition for EVENT TRIGGER
   // Optional
@@ -547,9 +579,6 @@ void read_rc_setup_sm(void* data)
   rc_e2_setup_t* rc = (rc_e2_setup_t*)data;
 
   /* Fill the RAN Function Definition with currently supported measurements */
-  
-  // RAN Function Name is already filled in fill_ran_function_name() in rc_sm_agent.c
-
   const ngran_node_t node_type = get_e2_node_type();
   rc->ran_func_def = ran_def_rc[node_type]();
 

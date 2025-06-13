@@ -7,9 +7,76 @@ services:
                 ipv4_address: 192.168.70.150
         volumes:
             - ./conf/flexric.conf:/usr/local/etc/flexric/flexric.conf
-            - sharedXappLibs:/usr/local/lib/flexric/
         healthcheck:
             test: /bin/bash -c "pgrep nearRT-RIC"
+            interval: 10s
+            timeout: 5s
+
+    xapp-rc-moni:
+        image: ${REGISTRY:-oaisoftwarealliance}/oai-flexric:${FLEXRIC_TAG:-develop}
+        command: "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_rc_moni"
+        container_name: xapp-rc-moni
+        depends_on:
+            - oai-flexric
+            - oai-gnb
+        networks:
+            public_net:
+                ipv4_address: 192.168.70.154
+        volumes:
+            - ./conf/flexric.conf:/usr/local/etc/flexric/flexric.conf
+        healthcheck:
+            test: /bin/bash -c "pgrep xapp_rc_moni"
+            interval: 10s
+            timeout: 5s
+
+    xapp-kpm-moni:
+        image: ${REGISTRY:-oaisoftwarealliance}/oai-flexric:${FLEXRIC_TAG:-develop}
+        command: "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_kpm_moni"
+        container_name: xapp-kpm-moni
+        depends_on:
+            - oai-flexric
+            - oai-gnb
+        networks:
+            public_net:
+                ipv4_address: 192.168.70.155
+        volumes:
+            - ./conf/flexric.conf:/usr/local/etc/flexric/flexric.conf
+        healthcheck:
+            test: /bin/bash -c "pgrep xapp_kpm_moni"
+            interval: 10s
+            timeout: 5s
+
+    xapp-kpm-rc:
+        image: ${REGISTRY:-oaisoftwarealliance}/oai-flexric:${FLEXRIC_TAG:-develop}
+        command: "stdbuf -o0 /usr/local/flexric/xApp/c/kpm_rc/xapp_kpm_rc"
+        container_name: xapp-kpm-rc
+        depends_on:
+            - oai-flexric
+            - oai-gnb
+        networks:
+            public_net:
+                ipv4_address: 192.168.70.156
+        volumes:
+            - ./conf/flexric.conf:/usr/local/etc/flexric/flexric.conf
+        healthcheck:
+            test: /bin/bash -c "pgrep xapp_kpm_rc"
+            interval: 10s
+            timeout: 5s
+
+    xapp-gtp-mac-rlc-pdcp-moni:
+        image: ${REGISTRY:-oaisoftwarealliance}/oai-flexric:${FLEXRIC_TAG:-develop}
+        command: "stdbuf -o0 /usr/local/flexric/xApp/c/monitor/xapp_gtp_mac_rlc_pdcp_moni"
+        container_name: xapp-gtp-mac-rlc-pdcp-moni
+        depends_on:
+            - oai-flexric
+            - oai-gnb
+        networks:
+            public_net:
+                ipv4_address: 192.168.70.157
+        volumes:
+            - ./conf/flexric.conf:/usr/local/etc/flexric/flexric.conf
+        healthcheck:
+            test: /bin/bash -c "pgrep -f xapp_gtp_mac_rlc_pdcp_moni"
             interval: 10s
             timeout: 5s
 
@@ -27,7 +94,6 @@ services:
                 ipv4_address: 192.168.70.151
         volumes:
             - ../../conf_files/gnb.sa.band78.106prb.rfsim.flexric.conf:/opt/oai-gnb/etc/gnb.conf
-            - sharedXappLibs:/usr/local/lib/flexric/
         healthcheck:
             test: /bin/bash -c "pgrep nr-softmodem"
             interval: 10s
@@ -71,9 +137,6 @@ services:
             interval: 10s
             timeout: 5s
             retries: 5
-
-volumes:
-    sharedXappLibs:
 
 networks:
     public_net:
