@@ -293,7 +293,7 @@ void configure_csi_resource_mapping(fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_c
                                     uint32_t bwp_size,
                                     uint32_t bwp_start);
 
-
+bool is_lcid_suspended(NR_UE_MAC_INST_t *mac, int lcid);
 void nr_ra_contention_resolution_failed(NR_UE_MAC_INST_t *mac);
 void nr_ra_succeeded(NR_UE_MAC_INST_t *mac, const uint8_t gNB_index, const frame_t frame, const int slot);
 void nr_ra_backoff_setting(RA_config_t *ra);

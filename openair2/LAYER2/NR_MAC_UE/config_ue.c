@@ -1751,6 +1751,17 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
+bool is_lcid_suspended(NR_UE_MAC_INST_t *mac, int lcid)
+{
+  for (int j = 0; j < mac->lc_ordered_list.count; j++) {
+    nr_lcordered_info_t *lc = mac->lc_ordered_list.array[j];
+    if (lc->lcid == lcid)
+      return lc->rb_suspended;
+  }
+  LOG_E(NR_MAC, "LCID %d not found in the MAC list\n", lcid);
+  return false;
+}
+
 void nr_rrc_mac_resume_rb(module_id_t module_id, bool is_srb, int rb_id)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
