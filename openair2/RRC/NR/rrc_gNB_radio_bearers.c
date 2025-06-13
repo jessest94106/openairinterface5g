@@ -30,6 +30,7 @@
 #include "common/utils/T/T.h"
 #include "ngap_messages_types.h"
 #include "oai_asn1.h"
+#include "openair2/LAYER2/nr_pdcp/nr_pdcp_asn1_utils.h"
 
 rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create)
 {
@@ -71,13 +72,16 @@ drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id)
   return &ue->established_drbs[drb_id - 1];
 }
 
-void set_default_drb_pdcp_config(struct pdcp_config_s *pdcp_config, int do_drb_integrity, int do_drb_ciphering)
+void set_default_drb_pdcp_config(struct pdcp_config_s *pdcp_config,
+                                 int do_drb_integrity,
+                                 int do_drb_ciphering,
+                                 const nr_pdcp_configuration_t *default_pdcp_config)
 {
   AssertError(pdcp_config != NULL, return, "Failed to set default PDCP configuration for DRB!\n");
-  pdcp_config->discardTimer = NR_PDCP_Config__drb__discardTimer_infinity;
-  pdcp_config->pdcp_SN_SizeDL = NR_PDCP_Config__drb__pdcp_SN_SizeDL_len18bits;
-  pdcp_config->pdcp_SN_SizeUL = NR_PDCP_Config__drb__pdcp_SN_SizeUL_len18bits;
-  pdcp_config->t_Reordering = NR_PDCP_Config__t_Reordering_ms100;
+  pdcp_config->discardTimer = encode_discard_timer(default_pdcp_config->drb.discard_timer);
+  pdcp_config->pdcp_SN_SizeDL = encode_sn_size_dl(default_pdcp_config->drb.sn_size);
+  pdcp_config->pdcp_SN_SizeUL = encode_sn_size_ul(default_pdcp_config->drb.sn_size);
+  pdcp_config->t_Reordering = encode_t_reordering(default_pdcp_config->drb.t_reordering);
   pdcp_config->headerCompression.present = NR_PDCP_Config__drb__headerCompression_PR_notUsed;
   pdcp_config->headerCompression.NotUsed = 0;
   pdcp_config->integrityProtection = do_drb_integrity ? NR_PDCP_Config__drb__integrityProtection_enabled : 1;
@@ -99,7 +103,8 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
                    const rrc_pdu_session_param_t *pduSession,
                    bool enable_sdap,
                    int do_drb_integrity,
-                   int do_drb_ciphering)
+                   int do_drb_ciphering,
+                   const nr_pdcp_configuration_t *pdcp_config)
 {
   DevAssert(ue != NULL);
 
@@ -130,7 +135,7 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
       est_drb->status = DRB_ACTIVE;
   }
   /* PDCP Configuration */
-  set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering);
+  set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering, pdcp_config);
 
   drb_t *rrc_drb = get_drb(ue, drb_id);
   DevAssert(rrc_drb == est_drb); /* to double check that we create the same which we would retrieve */

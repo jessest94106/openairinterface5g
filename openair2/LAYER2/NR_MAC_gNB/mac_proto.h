@@ -34,6 +34,7 @@
 #include "LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
 #include "NR_TAG-Id.h"
 #include "common/ngran_types.h"
+#include "openair2/LAYER2/nr_pdcp/nr_pdcp_configuration.h"
 
 void set_cset_offset(uint16_t);
 void get_K1_K2(int N1, int N2, int *K1, int *K2, int layers);
@@ -52,7 +53,8 @@ void delete_nr_ue_data(NR_UE_info_t *UE, NR_COMMON_channels_t *ccPtr, uid_alloca
 void mac_top_init_gNB(ngran_node_t node_type,
                       NR_ServingCellConfigCommon_t *scc,
                       NR_ServingCellConfig_t *scd,
-                      const nr_mac_config_t *conf);
+                      const nr_mac_config_t *conf,
+                      const nr_rlc_configuration_t *default_rlc_config);
 void mac_top_destroy_gNB(gNB_MAC_INST *mac);
 void nr_mac_send_f1_setup_req(void);
 
@@ -451,6 +453,7 @@ void process_addmod_bearers_cellGroupConfig(NR_UE_sched_ctrl_t *sched_ctrl,
                                             const struct NR_CellGroupConfig__rlc_BearerToAddModList *addmod);
 
 bool nr_mac_add_lcid(NR_UE_sched_ctrl_t *sched_ctrl, const nr_lc_config_t *c);
+nr_lc_config_t *nr_mac_get_lc_config(NR_UE_sched_ctrl_t* sched_ctrl, int lcid);
 bool nr_mac_remove_lcid(NR_UE_sched_ctrl_t *sched_ctrl, long lcid);
 
 bool nr_mac_get_new_rnti(NR_UEs_t *UEs, rnti_t *rnti);

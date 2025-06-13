@@ -224,6 +224,7 @@ static int gtpv1uCreateAndSendMsg(int h,
                                   uint8_t extensionHeader_length) {
   LOG_D(GTPU, "Peer IP:%u peer port:%u outgoing teid:%u \n", peerIp, peerPort, teid);
 
+  DevAssert(msgLen + HDR_MAX < 65536); // maximum size of UDP packet
   uint8_t buffer[msgLen+HDR_MAX]; 
   uint8_t *curPtr=buffer;
   Gtpv1uMsgHeaderT      *msgHdr = (Gtpv1uMsgHeaderT *)buffer ;
@@ -525,13 +526,13 @@ static  int udpServerSocket(openAddr_s addr) {
     break; // if we get here, we must have connected successfully
   }
 
+  freeaddrinfo(servinfo); // all done with this structure
+
   if (p == NULL) {
     // looped off the end of the list with no successful bind
     LOG_E(GTPU,"failed to bind socket: %s %s \n", addr.originHost, addr.originService);
     return -1;
   }
-
-  freeaddrinfo(servinfo); // all done with this structure
 
   int sendbuff = 1000*1000*10;
   AssertFatal(0==setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sendbuff, sizeof(sendbuff)),"");

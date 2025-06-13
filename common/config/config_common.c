@@ -308,3 +308,63 @@ void config_assign_int(configmodule_interface_t *cfg, paramdef_t *cfgoptions, ch
       break;
   }
 }
+
+/**
+ * @brief Assigns the default value to a configuration parameter if available.
+ *
+ * This function checks the type of the parameter and assigns its default value
+ * if it is defined. It handles various parameter types, including strings, integers,
+ * arrays, doubles, IPv4 addresses, and lists. If the parameter is marked with
+ * PARAMFLAG_DONOTREAD, it is ignored.
+ *
+ * @param[in]  cfg       Pointer to the configuration module interface.
+ * @param[in]  cfgoption Pointer to the parameter definition structure.
+ * @param[in]  prefix    Optional prefix for the parameter name (can be NULL).
+ * @return 1 if the default value was set, 0 if ignored, or -1 on error/unsupported type.
+ */
+int config_common_getdefault(configmodule_interface_t *cfg, paramdef_t *cfgoption, char *prefix)
+{
+  if( (cfgoption->paramflags & PARAMFLAG_DONOTREAD) != 0) {
+    return 0;
+  }
+
+  switch(cfgoption->type) {
+    case TYPE_STRING:
+      return config_setdefault_string(cfg, cfgoption, prefix);
+
+    case TYPE_STRINGLIST:
+      return config_setdefault_stringlist(cfg, cfgoption, prefix);
+
+    case TYPE_UINT8:
+    case TYPE_INT8:
+    case TYPE_UINT16:
+    case TYPE_INT16:
+    case TYPE_UINT32:
+    case TYPE_INT32:
+    case TYPE_MASK:
+      return config_setdefault_int(cfg, cfgoption, prefix);
+
+    case TYPE_UINT64:
+    case TYPE_INT64:
+      return config_setdefault_int64(cfg, cfgoption, prefix);
+
+    case TYPE_UINTARRAY:
+    case TYPE_INTARRAY:
+      return config_setdefault_intlist(cfg, cfgoption, prefix);
+
+    case TYPE_DOUBLE:
+      return config_setdefault_double(cfg, cfgoption, prefix);
+
+    case TYPE_IPV4ADDR:
+      return config_setdefault_ipv4addr(cfg, cfgoption, prefix);
+
+    case TYPE_LIST:
+      // No default value for list type
+      fprintf(stderr,"[CONFIG] %s.%s TYPE_LIST has no default value\n", prefix, cfgoption->optname);
+      return -1;
+
+    default:
+      fprintf(stderr,"[CONFIG] %s.%s type %i  not supported\n", prefix, cfgoption->optname, cfgoption->type);
+      return -1;
+  } /* switch on param type */
+}

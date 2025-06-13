@@ -2703,6 +2703,10 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
         mac->lc_ordered_list.count);
 
   // variable used to build the lcids with positive Bj
+  if (!mac->lc_ordered_list.count) {
+    LOG_E(NR_MAC, "Failed to init lcids_bj_pos: mac->lc_ordered_list.count = 0\n");
+    return 0;
+  }
   nr_lcordered_info_t lcids_bj_pos[mac->lc_ordered_list.count];
   int avail_lcids_count = select_logical_channels(mac, lcids_bj_pos);
 

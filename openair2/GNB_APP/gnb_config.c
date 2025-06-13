@@ -846,7 +846,11 @@ static void verify_section_notset(configmodule_interface_t *cfg, char *aprefix, 
   paramlist_def_t pl = {0};
   strncpy(pl.listname, secname, sizeof(pl.listname) - 1);
   config_getlist(cfg, &pl, NULL, 0, aprefix);
-  AssertFatal(pl.numelt == 0, "Section \"%s.%s\" not allowed in this config, please remove it\n", aprefix ? aprefix : "", secname);
+  AssertFatal(pl.numelt == 0,
+              "Section \"%s%s%s\" not allowed in this config, please remove it\n",
+              aprefix ? aprefix : "",
+              aprefix ? "." : "",
+              secname);
 }
 void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
 {
@@ -879,6 +883,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
     verify_section_notset(cfg, NULL, CONFIG_STRING_L1_LIST);
     verify_section_notset(cfg, NULL, CONFIG_STRING_RU_LIST);
     verify_section_notset(cfg, NULL, CONFIG_STRING_MACRLC_LIST);
+    verify_section_notset(cfg, NULL, CONFIG_STRING_NR_RLC_LIST);
   } else if (NODE_IS_DU(node_type)) {
     // verify that there is no bearer config
     verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
@@ -886,6 +891,7 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
 
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
+    verify_section_notset(cfg, NULL, CONFIG_STRING_NR_PDCP_LIST);
   } // else nothing to be checked
 
   /* other possible verifications: PNF, VNF, CU-CP, CU-UP, ...? */
@@ -1061,6 +1067,7 @@ void RCconfig_NR_L1(void)
       gNB->TX_AMP = min(32767.0 / pow(10.0, .05 * (double)(*L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr)), INT16_MAX);
       gNB->phase_comp = *L1_ParamList.paramarray[j][L1_PHASE_COMP].uptr;
       gNB->dmrs_num_antennas_per_thread = *(L1_ParamList.paramarray[j][NUM_ANTENNAS_PER_THREAD].uptr);
+      gNB->enable_analog_das = *(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr);
       LOG_I(NR_PHY, "TX_AMP = %d (-%d dBFS)\n", gNB->TX_AMP, *L1_ParamList.paramarray[j][L1_TX_AMP_BACKOFF_dB].uptr);
       AssertFatal(gNB->TX_AMP > 300, "TX_AMP is too small, must be larger than 300 (is %d)\n", gNB->TX_AMP);
       // Midhaul configuration
@@ -1467,6 +1474,55 @@ static seq_arr_t *fill_du_sibs(paramdef_t *GNBparamarray)
   return du_SIBs;
 }
 
+void config_rlc(configmodule_interface_t *cfg, nr_rlc_configuration_t *rlc_config)
+{
+  /* SRB configuration */
+  paramdef_t rlc_srb_params[] = NR_RLC_SRB_GLOBALPARAMS_DESC;
+  int ret = config_get(cfg, rlc_srb_params, sizeofArray(rlc_srb_params), CONFIG_STRING_NR_RLC_SRB);
+  AssertFatal(ret >= 0, "problem reading NR RLC configuration from configuration file\n");
+
+  rlc_config->srb.t_poll_retransmit = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_T_POLL_RETRANSMIT_IDX]);
+  rlc_config->srb.t_reassembly = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_T_REASSEMBLY_IDX]);
+  rlc_config->srb.t_status_prohibit = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_T_STATUS_PROHIBIT_IDX]);
+  rlc_config->srb.poll_pdu = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_POLL_PDU_IDX]);
+  rlc_config->srb.poll_byte = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_POLL_BYTE_IDX]);
+  rlc_config->srb.max_retx_threshold = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_MAX_RETX_THRESHOLD_IDX]);
+  rlc_config->srb.sn_field_length = config_get_processedint(cfg, &rlc_srb_params[CONFIG_NR_RLC_SRB_SN_FIELD_LENGTH_IDX]);
+
+  /* DRB AM configuration */
+  paramdef_t rlc_drb_am_params[] = NR_RLC_DRB_AM_GLOBALPARAMS_DESC;
+  ret = config_get(cfg, rlc_drb_am_params, sizeofArray(rlc_drb_am_params), CONFIG_STRING_NR_RLC_DRB_AM);
+  AssertFatal(ret >= 0, "problem reading NR RLC configuration from configuration file\n");
+
+  rlc_config->drb_am.t_poll_retransmit = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_T_POLL_RETRANSMIT_IDX]);
+  rlc_config->drb_am.t_reassembly = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_T_REASSEMBLY_IDX]);
+  rlc_config->drb_am.t_status_prohibit = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_T_STATUS_PROHIBIT_IDX]);
+  rlc_config->drb_am.poll_pdu = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_POLL_PDU_IDX]);
+  rlc_config->drb_am.poll_byte = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_POLL_BYTE_IDX]);
+  rlc_config->drb_am.max_retx_threshold = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_MAX_RETX_THRESHOLD_IDX]);
+  rlc_config->drb_am.sn_field_length = config_get_processedint(cfg, &rlc_drb_am_params[CONFIG_NR_RLC_DRB_AM_SN_FIELD_LENGTH_IDX]);
+
+  /* DRB UM configuration */
+  paramdef_t rlc_drb_um_params[] = NR_RLC_DRB_UM_GLOBALPARAMS_DESC;
+  ret = config_get(cfg, rlc_drb_um_params, sizeofArray(rlc_drb_um_params), CONFIG_STRING_NR_RLC_DRB_UM);
+  AssertFatal(ret >= 0, "problem reading NR RLC configuration from configuration file\n");
+
+  rlc_config->drb_um.t_reassembly = config_get_processedint(cfg, &rlc_drb_um_params[CONFIG_NR_RLC_DRB_UM_T_REASSEMBLY_IDX]);
+  rlc_config->drb_um.sn_field_length = config_get_processedint(cfg, &rlc_drb_um_params[CONFIG_NR_RLC_DRB_UM_SN_FIELD_LENGTH_IDX]);
+}
+
+void config_pdcp(configmodule_interface_t *cfg, nr_pdcp_configuration_t *pdcp_config)
+{
+  /* DRB configuration */
+  paramdef_t pdcp_params[] = NR_PDCP_DRB_GLOBALPARAMS_DESC;
+  int ret = config_get(cfg, pdcp_params, sizeofArray(pdcp_params), CONFIG_STRING_NR_PDCP_DRB);
+  AssertFatal(ret >= 0, "problem reading NR PDCP configuration from configuration file\n");
+
+  pdcp_config->drb.sn_size = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_SN_SIZE_IDX]);
+  pdcp_config->drb.t_reordering = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_T_REORDERING_IDX]);
+  pdcp_config->drb.discard_timer = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_DISCARD_TIMER_IDX]);
+}
+
 void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 {
   int j = 0;
@@ -1566,19 +1622,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.timer_config.n311,
         config.timer_config.t319);
 
-  if (config_isparamset(GNBParamList.paramarray[0], GNB_BEAMWEIGHTS_IDX)) {
-    int n = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].numelt;
-    AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
-    // each beam is described by a set of weights (one for each antenna)
-    // on the other hand in case of analog beamforming an index to the RU beam identifier is provided
-    config.nb_bfw[0] = num_tx;  // number of tx antennas
-    config.nb_bfw[1] = n / num_tx; // number of beams
-    config.bw_list = malloc16_clear(n * sizeof(*config.bw_list));
-    for (int b = 0; b < n; b++) {
-      config.bw_list[b] = GNBParamList.paramarray[0][GNB_BEAMWEIGHTS_IDX].iptr[b];
-    }
-  }
-
   // Construct default aggragation level list or read from config
   int uess_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   uess_num_agg_level_candidates[PDCCH_AGG_LEVEL1] = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
@@ -1612,8 +1655,12 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   NR_ServingCellConfig_t *scd = get_scd_config(cfg);
 
   if (MacRLC_ParamList.numelt > 0) {
+    /* NR RLC config is needed by mac_top_init_gNB() */
+    nr_rlc_configuration_t default_rlc_config;
+    config_rlc(cfg, &default_rlc_config);
+
     ngran_node_t node_type = get_node_type();
-    mac_top_init_gNB(node_type, scc, scd, &config);
+    mac_top_init_gNB(node_type, scc, scd, &config, &default_rlc_config);
     RC.nb_nr_mac_CC = (int *)malloc(RC.nb_nr_macrlc_inst * sizeof(int));
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
@@ -1704,12 +1751,33 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       }
       bool ab = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMFORMING_IDX].u8ptr;
       if (ab) {
+        AssertFatal(NFAPI_MODE == NFAPI_MONOLITHIC, "Analog beamforming only supported for monolithic scenario\n");
         NR_beam_info_t *beam_info = &RC.nrmac[j]->beam_info;
         int beams_per_period = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMS_PERIOD_IDX].u8ptr;
         beam_info->beam_allocation = malloc16(beams_per_period * sizeof(int *));
         beam_info->beam_duration = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAM_DURATION_IDX].u8ptr;
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
+      }
+      if (config_isparamset(MacRLC_ParamList.paramarray[j], MACRLC_BEAMWEIGHTS_IDX)) {
+        if (NFAPI_MODE == NFAPI_MONOLITHIC) {
+          GET_PARAMS_LIST(L1_ParamList, L1_Params, L1PARAMS_DESC, CONFIG_STRING_L1_LIST, NULL);
+          AssertFatal(*(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr) == 0, "No need to set beam weights in case of DAS\n");
+        }
+        int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
+        int num_beam = n;
+        if (!ab) {
+          AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
+          num_beam = n / num_tx;
+        }
+        // each beam is described by a set of weights (one for each antenna)
+        // in case of analog beamforming an index to the RU beam identifier is provided
+        // (one for each beam regardless of the number of antennas per beam)
+        config.nb_bfw[0] = num_tx;  // number of tx antennas
+        config.nb_bfw[1] = num_beam; // number of beams weights/indices
+        config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
+        for (int b = 0; b < n; b++)
+          config.bw_list[b] = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].iptr[b];
       }
       // triggers also PHY initialization in case we have L1 via FAPI
       nr_mac_config_scc(RC.nrmac[j], scc, &config);
@@ -1919,9 +1987,8 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
   seq_arr_init(rrc->neighbour_cell_configuration, sizeof(neighbour_cell_configuration_t));
 
   for (int elm = 0; elm < neighbour_list_param_list.numelt; ++elm) {
-    neighbour_cell_configuration_t *cell = calloc(1, sizeof(neighbour_cell_configuration_t));
-    AssertFatal(cell != NULL, "out of memory\n");
-    cell->nr_cell_id = (uint64_t)*neighbour_list_param_list.paramarray[elm][0].u64ptr;
+    neighbour_cell_configuration_t cell = {0};
+    cell.nr_cell_id = (uint64_t)*neighbour_list_param_list.paramarray[elm][0].u64ptr;
 
     char neighbourpath[MAX_OPTNAME_SIZE + 8];
     snprintf(neighbourpath, sizeof(neighbourpath), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, gnb_idx, GNB_CONFIG_STRING_NEIGHBOUR_LIST, elm);
@@ -1930,22 +1997,20 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
                     GNBNEIGHBOURCELLPARAMS_DESC,
                     GNB_CONFIG_STRING_NEIGHBOUR_CELL_LIST,
                     neighbourpath);
-    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell->nr_cell_id, NeighbourCellParamList.numelt);
+    LOG_D(GNB_APP, "HO LOG: For the Cell: %ld Neighbour Cell ELM NUM: %d\n", cell.nr_cell_id, NeighbourCellParamList.numelt);
     if (NeighbourCellParamList.numelt < 1)
       continue;
 
-    cell->neighbour_cells = malloc(sizeof(seq_arr_t));
-    AssertFatal(cell->neighbour_cells != NULL, "Memory exhausted!!!");
-    seq_arr_init(cell->neighbour_cells, sizeof(nr_neighbour_gnb_configuration_t));
+    cell.neighbour_cells = malloc_or_fail(sizeof(seq_arr_t));
+    seq_arr_init(cell.neighbour_cells, sizeof(nr_neighbour_cell_t));
     for (int l = 0; l < NeighbourCellParamList.numelt; ++l) {
-      nr_neighbour_gnb_configuration_t *neighbourCell = calloc(1, sizeof(nr_neighbour_gnb_configuration_t));
-      AssertFatal(neighbourCell != NULL, "out of memory\n");
-      neighbourCell->gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
-      neighbourCell->nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
-      neighbourCell->physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
-      neighbourCell->subcarrierSpacing = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_SCS_IDX].uptr;
-      neighbourCell->absoluteFrequencySSB = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX].i64ptr;
-      neighbourCell->tac = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_TAC_IDX].uptr;
+      nr_neighbour_cell_t neighbourCell = {0};
+      neighbourCell.gNB_ID = *(NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_GNB_ID_IDX].uptr);
+      neighbourCell.nrcell_id = (uint64_t) * (NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_NR_CELLID_IDX].u64ptr);
+      neighbourCell.physicalCellId = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_PHYSICAL_ID_IDX].uptr;
+      neighbourCell.subcarrierSpacing = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_SCS_IDX].uptr;
+      neighbourCell.absoluteFrequencySSB = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_ABS_FREQ_SSB_IDX].i64ptr;
+      neighbourCell.tac = *NeighbourCellParamList.paramarray[l][GNB_CONFIG_N_CELL_TAC_IDX].uptr;
 
       char neighbour_plmn_path[CONFIG_MAXOPTLENGTH];
       snprintf(neighbour_plmn_path,
@@ -1957,13 +2022,12 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
                GNB_CONFIG_STRING_NEIGHBOUR_PLMN);
       GET_PARAMS(NeighbourPlmn, GNBPLMNPARAMS_DESC, neighbour_plmn_path);
 
-      neighbourCell->plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
-      neighbourCell->plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
-      neighbourCell->plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
-      seq_arr_push_back(cell->neighbour_cells, neighbourCell, sizeof(nr_neighbour_gnb_configuration_t));
+      neighbourCell.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
+      neighbourCell.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
+      neighbourCell.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
+      seq_arr_push_back(cell.neighbour_cells, &neighbourCell, sizeof(neighbourCell));
     }
-
-    seq_arr_push_back(rrc->neighbour_cell_configuration, cell, sizeof(neighbour_cell_configuration_t));
+    seq_arr_push_back(rrc->neighbour_cell_configuration, &cell, sizeof(cell));
   }
   void *base = seq_arr_front(rrc->neighbour_cell_configuration);
   size_t nmemb = seq_arr_size(rrc->neighbour_cell_configuration);
@@ -2020,22 +2084,21 @@ static void fill_measurement_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
   measurementConfig->a3_event_list = malloc(sizeof(seq_arr_t));
   seq_arr_init(measurementConfig->a3_event_list, sizeof(nr_a3_event_t));
   for (int i = 0; i < A3_EventList.numelt; i++) {
-    nr_a3_event_t *a3_event = (nr_a3_event_t *)calloc(1, sizeof(nr_a3_event_t));
-    AssertFatal(a3_event != NULL, "out of memory\n");
-    a3_event->pci = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_PCI_ID_IDX].i64ptr;
-    AssertFatal(a3_event->pci >= -1 && a3_event->pci < 1024,
+    nr_a3_event_t a3_event = {0};
+    a3_event.pci = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_PCI_ID_IDX].i64ptr;
+    AssertFatal(a3_event.pci >= -1 && a3_event.pci < 1024,
                 "entry %s.%s must be -1<=PCI<1024, but is %d\n",
                 measurement_path,
                 MEASUREMENT_EVENTS_PCI_ID,
-                a3_event->pci);
-    a3_event->timeToTrigger = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX].i64ptr;
-    a3_event->a3_offset = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_OFFSET_IDX].i64ptr;
-    a3_event->hysteresis = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_HYSTERESIS_IDX].i64ptr;
+                a3_event.pci);
+    a3_event.timeToTrigger = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_TIMETOTRIGGER_IDX].i64ptr;
+    a3_event.a3_offset = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_OFFSET_IDX].i64ptr;
+    a3_event.hysteresis = *A3_EventList.paramarray[i][MEASUREMENT_EVENTS_HYSTERESIS_IDX].i64ptr;
 
-    if (a3_event->pci == -1)
+    if (a3_event.pci == -1)
       measurementConfig->is_default_a3_configuration_exists = true;
 
-    seq_arr_push_back(measurementConfig->a3_event_list, a3_event, sizeof(nr_a3_event_t));
+    seq_arr_push_back(measurementConfig->a3_event_list, &a3_event, sizeof(nr_a3_event_t));
   }
 }
 
@@ -2146,6 +2209,9 @@ gNB_RRC_INST *RCconfig_NRRRC()
 
   if (!NODE_IS_DU(rrc->node_type))
     config_security(rrc);
+
+  config_rlc(config_get_if(), &rrc->rlc_config);
+  config_pdcp(config_get_if(), &rrc->pdcp_config);
 
   return rrc;
 }

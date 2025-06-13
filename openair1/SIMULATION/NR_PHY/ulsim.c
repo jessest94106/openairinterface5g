@@ -668,12 +668,36 @@ int main(int argc, char *argv[])
                                 .timer_config.t311 = 3000,
                                 .timer_config.n311 = 1,
                                 .timer_config.t319 = 400};
+  const nr_rlc_configuration_t rlc_config = {
+    .srb = {
+      .t_poll_retransmit = 45,
+      .t_reassembly = 35,
+      .t_status_prohibit = 0,
+      .poll_pdu = -1,
+      .poll_byte = -1,
+      .max_retx_threshold = 8,
+      .sn_field_length = 12,
+    },
+    .drb_am = {
+      .t_poll_retransmit = 45,
+      .t_reassembly = 15,
+      .t_status_prohibit = 15,
+      .poll_pdu = 64,
+      .poll_byte = 1024 * 500,
+      .max_retx_threshold = 32,
+      .sn_field_length = 18,
+    },
+    .drb_um = {
+      .t_reassembly = 15,
+      .sn_field_length = 12,
+    }
+  };
 
   RC.nb_nr_macrlc_inst = 1;
   RC.nb_nr_mac_CC = (int*)malloc(RC.nb_nr_macrlc_inst*sizeof(int));
   for (i = 0; i < RC.nb_nr_macrlc_inst; i++)
     RC.nb_nr_mac_CC[i] = 1;
-  mac_top_init_gNB(ngran_gNB, scc, NULL /* scd will be updated further below */, &conf);
+  mac_top_init_gNB(ngran_gNB, scc, NULL /* scd will be updated further below */, &conf, &rlc_config);
   nr_mac_config_scc(RC.nrmac[0], scc, &conf);
 
   NR_ServingCellConfig_t *scd = calloc(1,sizeof(NR_ServingCellConfig_t));

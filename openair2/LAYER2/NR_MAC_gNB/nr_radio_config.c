@@ -40,6 +40,7 @@
 #include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair3/UTILS/conversions.h"
+#include "LAYER2/nr_rlc/nr_rlc_asn1_utils.h"
 
 #include "NR_MeasurementTimingConfiguration.h"
 #include "uper_decoder.h"
@@ -728,64 +729,58 @@ static struct NR_SRS_Resource__resourceType__periodic *configure_periodic_srs(co
   return periodic_srs;
 }
 
-static NR_SetupRelease_SRS_Config_t *get_config_srs(const NR_ServingCellConfigCommon_t *scc,
-                                                    const NR_UE_NR_Capability_t *uecap,
-                                                    const int curr_bwp,
-                                                    const int uid,
-                                                    const int res_id,
-                                                    const long maxMIMO_Layers,
-                                                    const int minRXTXTIME,
-                                                    int do_srs)
+static NR_SRS_ResourceSet_t *get_srs_resourceset(const int resset_id,
+                                                 const int res_id,
+                                                 const long usage,
+                                                 const int minRXTXTIME,
+                                                 int do_srs)
 {
-  NR_SetupRelease_SRS_Config_t *setup_release_srs_Config = calloc(1,sizeof(*setup_release_srs_Config));
-  setup_release_srs_Config->present = NR_SetupRelease_SRS_Config_PR_setup;
-  setup_release_srs_Config->choice.setup = calloc(1,sizeof(*setup_release_srs_Config->choice.setup));
-  NR_SRS_Config_t *srs_Config = setup_release_srs_Config->choice.setup;
-
-  srs_Config->srs_ResourceSetToReleaseList = NULL;
-
-  srs_Config->srs_ResourceSetToAddModList = calloc(1,sizeof(*srs_Config->srs_ResourceSetToAddModList));
-  NR_SRS_ResourceSet_t *srs_resset0 = calloc(1,sizeof(*srs_resset0));
-  srs_resset0->srs_ResourceSetId = res_id;
-  srs_resset0->srs_ResourceIdList = calloc(1,sizeof(*srs_resset0->srs_ResourceIdList));
-  NR_SRS_ResourceId_t *srs_resset0_id = calloc(1,sizeof(*srs_resset0_id));
-  *srs_resset0_id = res_id;
-  asn1cSeqAdd(&srs_resset0->srs_ResourceIdList->list, srs_resset0_id);
-  srs_Config->srs_ResourceToReleaseList=NULL;
+  NR_SRS_ResourceSet_t *srs_resset = calloc_or_fail(1, sizeof(*srs_resset));
+  srs_resset->srs_ResourceSetId = resset_id;
+  srs_resset->srs_ResourceIdList = calloc_or_fail(1, sizeof(*srs_resset->srs_ResourceIdList));
+  NR_SRS_ResourceId_t *srs_resset_id = calloc_or_fail(1, sizeof(*srs_resset_id));
+  *srs_resset_id = res_id;
+  asn1cSeqAdd(&srs_resset->srs_ResourceIdList->list, srs_resset_id);
   if (do_srs) {
-    srs_resset0->resourceType.present =  NR_SRS_ResourceSet__resourceType_PR_periodic;
-    srs_resset0->resourceType.choice.periodic = calloc(1,sizeof(*srs_resset0->resourceType.choice.periodic));
-    srs_resset0->resourceType.choice.periodic->associatedCSI_RS = NULL;
+    srs_resset->resourceType.present = NR_SRS_ResourceSet__resourceType_PR_periodic;
+    srs_resset->resourceType.choice.periodic = calloc_or_fail(1, sizeof(*srs_resset->resourceType.choice.periodic));
+    srs_resset->resourceType.choice.periodic->associatedCSI_RS = NULL;
   } else {
-    srs_resset0->resourceType.present =  NR_SRS_ResourceSet__resourceType_PR_aperiodic;
-    srs_resset0->resourceType.choice.aperiodic = calloc(1,sizeof(*srs_resset0->resourceType.choice.aperiodic));
-    srs_resset0->resourceType.choice.aperiodic->aperiodicSRS_ResourceTrigger = 1;
-    srs_resset0->resourceType.choice.aperiodic->csi_RS = NULL;
-    srs_resset0->resourceType.choice.aperiodic->slotOffset = calloc(1,sizeof(*srs_resset0->resourceType.choice.aperiodic->slotOffset));
-    *srs_resset0->resourceType.choice.aperiodic->slotOffset = minRXTXTIME;
-    srs_resset0->resourceType.choice.aperiodic->ext1 = NULL;
+    srs_resset->resourceType.present = NR_SRS_ResourceSet__resourceType_PR_aperiodic;
+    srs_resset->resourceType.choice.aperiodic = calloc_or_fail(1, sizeof(*srs_resset->resourceType.choice.aperiodic));
+    srs_resset->resourceType.choice.aperiodic->aperiodicSRS_ResourceTrigger = 1;
+    srs_resset->resourceType.choice.aperiodic->csi_RS = NULL;
+    srs_resset->resourceType.choice.aperiodic->slotOffset =
+        calloc_or_fail(1, sizeof(*srs_resset->resourceType.choice.aperiodic->slotOffset));
+    *srs_resset->resourceType.choice.aperiodic->slotOffset = minRXTXTIME;
+    srs_resset->resourceType.choice.aperiodic->ext1 = NULL;
   }
-  srs_resset0->usage=NR_SRS_ResourceSet__usage_codebook;
-  srs_resset0->alpha = calloc(1,sizeof(*srs_resset0->alpha));
-  *srs_resset0->alpha = NR_Alpha_alpha1;
-  srs_resset0->p0 = calloc(1,sizeof(*srs_resset0->p0));
-  *srs_resset0->p0 =-80;
-  srs_resset0->pathlossReferenceRS = NULL;
-  srs_resset0->srs_PowerControlAdjustmentStates = NULL;
-  asn1cSeqAdd(&srs_Config->srs_ResourceSetToAddModList->list,srs_resset0);
+  srs_resset->usage = usage;
+  srs_resset->alpha = calloc_or_fail(1, sizeof(*srs_resset->alpha));
+  *srs_resset->alpha = NR_Alpha_alpha1;
+  srs_resset->p0 = calloc_or_fail(1, sizeof(*srs_resset->p0));
+  *srs_resset->p0 = -80;
+  srs_resset->pathlossReferenceRS = NULL;
+  srs_resset->srs_PowerControlAdjustmentStates = NULL;
+  return srs_resset;
+}
 
-  srs_Config->srs_ResourceToReleaseList = NULL;
-
-  srs_Config->srs_ResourceToAddModList = calloc(1,sizeof(*srs_Config->srs_ResourceToAddModList));
-  NR_SRS_Resource_t *srs_res0=calloc(1,sizeof(*srs_res0));
-  srs_res0->srs_ResourceId = res_id;
-  srs_res0->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_port1;
+static NR_SRS_Resource_t *get_srs_resource(const NR_ServingCellConfigCommon_t *scc,
+                                           const NR_UE_NR_Capability_t *uecap,
+                                           const int curr_bwp,
+                                           const int uid,
+                                           const int res_id,
+                                           const long maxMIMO_Layers,
+                                           const NR_SRS_Resource__transmissionComb_PR tx_comb,
+                                           int do_srs)
+{
+  NR_SRS_Resource_t *srs_res = calloc_or_fail(1, sizeof(*srs_res));
+  srs_res->srs_ResourceId = res_id;
+  srs_res->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_port1;
   if (do_srs) {
     long nrofSRS_Ports = 1;
-    if (uecap &&
-        uecap->featureSets &&
-        uecap->featureSets->featureSetsUplink &&
-        uecap->featureSets->featureSetsUplink->list.count > 0) {
+    if (uecap && uecap->featureSets && uecap->featureSets->featureSetsUplink
+        && uecap->featureSets->featureSetsUplink->list.count > 0) {
       NR_FeatureSetUplink_t *ul_feature_setup = uecap->featureSets->featureSetsUplink->list.array[0];
       switch (ul_feature_setup->supportedSRS_Resources->maxNumberSRS_Ports_PerResource) {
         case NR_SRS_Resources__maxNumberSRS_Ports_PerResource_n1:
@@ -798,55 +793,95 @@ static NR_SetupRelease_SRS_Config_t *get_config_srs(const NR_ServingCellConfigCo
           nrofSRS_Ports = 4;
           break;
         default:
-          LOG_E(NR_RRC, "Max Number of SRS Ports Per Resource %ld is invalid!\n",
+          LOG_E(NR_RRC,
+                "Max Number of SRS Ports Per Resource %ld is invalid!\n",
                 ul_feature_setup->supportedSRS_Resources->maxNumberSRS_Ports_PerResource);
       }
       nrofSRS_Ports = min(nrofSRS_Ports, maxMIMO_Layers);
       switch (nrofSRS_Ports) {
         case 1:
-          srs_res0->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_port1;
+          srs_res->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_port1;
           break;
         case 2:
-          srs_res0->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_ports2;
+          srs_res->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_ports2;
           break;
         case 4:
-          srs_res0->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_ports4;
+          srs_res->nrofSRS_Ports = NR_SRS_Resource__nrofSRS_Ports_ports4;
           break;
         default:
-          LOG_E(NR_RRC, "Number of SRS Ports Per Resource %ld is invalid!\n",
+          LOG_E(NR_RRC,
+                "Number of SRS Ports Per Resource %ld is invalid!\n",
                 ul_feature_setup->supportedSRS_Resources->maxNumberSRS_Ports_PerResource);
       }
     }
-    LOG_I(NR_RRC, "SRS configured with %d ports\n", 1<<srs_res0->nrofSRS_Ports);
+    LOG_I(NR_RRC, "SRS configured with %d ports\n", 1 << srs_res->nrofSRS_Ports);
   }
-  srs_res0->ptrs_PortIndex = NULL;
-  srs_res0->transmissionComb.present = NR_SRS_Resource__transmissionComb_PR_n2;
-  srs_res0->transmissionComb.choice.n2 = calloc(1,sizeof(*srs_res0->transmissionComb.choice.n2));
-  srs_res0->transmissionComb.choice.n2->combOffset_n2 = 0;
-  srs_res0->transmissionComb.choice.n2->cyclicShift_n2 = 0;
-  srs_res0->resourceMapping.startPosition = 1;
-  srs_res0->resourceMapping.nrofSymbols = NR_SRS_Resource__resourceMapping__nrofSymbols_n1;
-  srs_res0->resourceMapping.repetitionFactor = NR_SRS_Resource__resourceMapping__repetitionFactor_n1;
-  srs_res0->freqDomainPosition = 0;
-  srs_res0->freqDomainShift = 0;
-  srs_res0->freqHopping.b_SRS = 0;
-  srs_res0->freqHopping.b_hop = 0;
-  srs_res0->freqHopping.c_SRS = rrc_get_max_nr_csrs(curr_bwp, srs_res0->freqHopping.b_SRS);
-  srs_res0->groupOrSequenceHopping = NR_SRS_Resource__groupOrSequenceHopping_neither;
+  srs_res->ptrs_PortIndex = NULL;
+  srs_res->transmissionComb.present = tx_comb;
+  switch (tx_comb) {
+    case NR_SRS_Resource__transmissionComb_PR_n2:
+      srs_res->transmissionComb.choice.n2 = calloc_or_fail(1, sizeof(*srs_res->transmissionComb.choice.n2));
+      srs_res->transmissionComb.choice.n2->combOffset_n2 = 0;
+      srs_res->transmissionComb.choice.n2->cyclicShift_n2 = 0;
+      break;
+    case NR_SRS_Resource__transmissionComb_PR_n4:
+      srs_res->transmissionComb.choice.n4 = calloc_or_fail(1, sizeof(*srs_res->transmissionComb.choice.n4));
+      srs_res->transmissionComb.choice.n4->combOffset_n4 = 0;
+      srs_res->transmissionComb.choice.n4->cyclicShift_n4 = 0;
+      break;
+    default:
+      AssertFatal(1 == 0, "Invalid transmission comb %d\n", tx_comb);
+  }
+  srs_res->resourceMapping.startPosition = 1;
+  srs_res->resourceMapping.nrofSymbols = NR_SRS_Resource__resourceMapping__nrofSymbols_n1;
+  srs_res->resourceMapping.repetitionFactor = NR_SRS_Resource__resourceMapping__repetitionFactor_n1;
+  srs_res->freqDomainPosition = 0;
+  srs_res->freqDomainShift = 0;
+  srs_res->freqHopping.b_SRS = 0;
+  srs_res->freqHopping.b_hop = 0;
+  srs_res->freqHopping.c_SRS = rrc_get_max_nr_csrs(curr_bwp, srs_res->freqHopping.b_SRS);
+  srs_res->groupOrSequenceHopping = NR_SRS_Resource__groupOrSequenceHopping_neither;
   if (do_srs) {
-    srs_res0->resourceType.present = NR_SRS_Resource__resourceType_PR_periodic;
-    srs_res0->resourceType.choice.periodic = configure_periodic_srs(scc, uid);
+    srs_res->resourceType.present = NR_SRS_Resource__resourceType_PR_periodic;
+    srs_res->resourceType.choice.periodic = configure_periodic_srs(scc, uid);
   } else {
-    srs_res0->resourceType.present = NR_SRS_Resource__resourceType_PR_aperiodic;
-    srs_res0->resourceType.choice.aperiodic = calloc(1,sizeof(*srs_res0->resourceType.choice.aperiodic));
+    srs_res->resourceType.present = NR_SRS_Resource__resourceType_PR_aperiodic;
+    srs_res->resourceType.choice.aperiodic = calloc_or_fail(1, sizeof(*srs_res->resourceType.choice.aperiodic));
   }
-  srs_res0->sequenceId = 40;
-  srs_res0->spatialRelationInfo = calloc(1,sizeof(*srs_res0->spatialRelationInfo));
-  srs_res0->spatialRelationInfo->servingCellId = NULL;
+  srs_res->sequenceId = 40;
+  srs_res->spatialRelationInfo = calloc_or_fail(1, sizeof(*srs_res->spatialRelationInfo));
+  srs_res->spatialRelationInfo->servingCellId = NULL;
   // TODO include CSI as reference signal when BWPs are handled properly
-  srs_res0->spatialRelationInfo->referenceSignal.present = NR_SRS_SpatialRelationInfo__referenceSignal_PR_ssb_Index;
-  srs_res0->spatialRelationInfo->referenceSignal.choice.ssb_Index = 0;
-  asn1cSeqAdd(&srs_Config->srs_ResourceToAddModList->list,srs_res0);
+  srs_res->spatialRelationInfo->referenceSignal.present = NR_SRS_SpatialRelationInfo__referenceSignal_PR_ssb_Index;
+  srs_res->spatialRelationInfo->referenceSignal.choice.ssb_Index = 0;
+  return srs_res;
+}
+
+static NR_SetupRelease_SRS_Config_t *get_config_srs(const NR_ServingCellConfigCommon_t *scc,
+                                                    const NR_UE_NR_Capability_t *uecap,
+                                                    const int curr_bwp,
+                                                    const int uid,
+                                                    const int res_id,
+                                                    const long maxMIMO_Layers,
+                                                    const int minRXTXTIME,
+                                                    int do_srs)
+{
+  NR_SetupRelease_SRS_Config_t *setup_release_srs_Config = calloc_or_fail(1, sizeof(*setup_release_srs_Config));
+  setup_release_srs_Config->present = NR_SetupRelease_SRS_Config_PR_setup;
+  setup_release_srs_Config->choice.setup = calloc_or_fail(1, sizeof(*setup_release_srs_Config->choice.setup));
+  NR_SRS_Config_t *srs_Config = setup_release_srs_Config->choice.setup;
+
+  srs_Config->srs_ResourceToAddModList = calloc_or_fail(1, sizeof(*srs_Config->srs_ResourceToAddModList));
+  NR_SRS_Resource_t *srs_res0 =
+      get_srs_resource(scc, uecap, curr_bwp, uid, res_id, maxMIMO_Layers, NR_SRS_Resource__transmissionComb_PR_n2, do_srs);
+  asn1cSeqAdd(&srs_Config->srs_ResourceToAddModList->list, srs_res0);
+
+  srs_Config->srs_ResourceSetToAddModList = calloc_or_fail(1, sizeof(*srs_Config->srs_ResourceSetToAddModList));
+  NR_SRS_ResourceSet_t *srs_resset0 = get_srs_resourceset(res_id, res_id, NR_SRS_ResourceSet__usage_codebook, minRXTXTIME, do_srs);
+  asn1cSeqAdd(&srs_Config->srs_ResourceSetToAddModList->list, srs_resset0);
+
+  srs_Config->srs_ResourceSetToReleaseList = NULL;
+  srs_Config->srs_ResourceToReleaseList = NULL;
 
   return setup_release_srs_Config;
 }
@@ -3338,7 +3373,10 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   return SpCellConfig;
 }
 
-NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, long bucketSizeDuration)
+NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId,
+                                                long priority,
+                                                long bucketSizeDuration,
+                                                const nr_rlc_configuration_t *default_rlc_config)
 {
   NR_RLC_BearerConfig_t *rlc_BearerConfig = NULL;
   rlc_BearerConfig                                                 = calloc(1, sizeof(NR_RLC_BearerConfig_t));
@@ -3352,15 +3390,15 @@ NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, l
   rlc_Config->present                                              = NR_RLC_Config_PR_am;
   rlc_Config->choice.am                                            = calloc(1, sizeof(*rlc_Config->choice.am));
   rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength                  = calloc(1, sizeof(NR_SN_FieldLengthAM_t));
-  *(rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength)               = NR_SN_FieldLengthAM_size12;
-  rlc_Config->choice.am->dl_AM_RLC.t_Reassembly                    = NR_T_Reassembly_ms35;
-  rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit                = NR_T_StatusProhibit_ms0;
+  *(rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength)               = encode_sn_field_length_am(default_rlc_config->srb.sn_field_length);
+  rlc_Config->choice.am->dl_AM_RLC.t_Reassembly                    = encode_t_reassembly(default_rlc_config->srb.t_reassembly);
+  rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit                = encode_t_status_prohibit(default_rlc_config->srb.t_status_prohibit);
   rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength                  = calloc(1, sizeof(NR_SN_FieldLengthAM_t));
-  *(rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength)               = NR_SN_FieldLengthAM_size12;
-  rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit                = NR_T_PollRetransmit_ms45;
-  rlc_Config->choice.am->ul_AM_RLC.pollPDU                         = NR_PollPDU_infinity;
-  rlc_Config->choice.am->ul_AM_RLC.pollByte                        = NR_PollByte_infinity;
-  rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold                = NR_UL_AM_RLC__maxRetxThreshold_t8;
+  *(rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength)               = encode_sn_field_length_am(default_rlc_config->srb.sn_field_length);
+  rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit                = encode_t_poll_retransmit(default_rlc_config->srb.t_poll_retransmit);
+  rlc_Config->choice.am->ul_AM_RLC.pollPDU                         = encode_poll_pdu(default_rlc_config->srb.poll_pdu);
+  rlc_Config->choice.am->ul_AM_RLC.pollByte                        = encode_poll_byte(default_rlc_config->srb.poll_byte);
+  rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold                = encode_max_retx_threshold(default_rlc_config->srb.max_retx_threshold);
   rlc_BearerConfig->rlc_Config                                     = rlc_Config;
 
   NR_LogicalChannelConfig_t *logicalChannelConfig                  = calloc(1, sizeof(NR_LogicalChannelConfig_t));
@@ -3381,7 +3419,9 @@ NR_RLC_BearerConfig_t *get_SRB_RLC_BearerConfig(long channelId, long priority, l
   return rlc_BearerConfig;
 }
 
-static void nr_drb_config(struct NR_RLC_Config *rlc_Config, NR_RLC_Config_PR rlc_config_pr)
+static void nr_drb_config(struct NR_RLC_Config *rlc_Config,
+                          NR_RLC_Config_PR rlc_config_pr,
+                          const nr_rlc_configuration_t *default_rlc_config)
 {
   switch (rlc_config_pr) {
     case NR_RLC_Config_PR_um_Bi_Directional:
@@ -3390,25 +3430,25 @@ static void nr_drb_config(struct NR_RLC_Config *rlc_Config, NR_RLC_Config_PR rlc
       rlc_Config->choice.um_Bi_Directional = calloc(1, sizeof(*rlc_Config->choice.um_Bi_Directional));
       rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength =
           calloc(1, sizeof(*rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength));
-      *rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength = NR_SN_FieldLengthUM_size12;
+      *rlc_Config->choice.um_Bi_Directional->ul_UM_RLC.sn_FieldLength = encode_sn_field_length_um(default_rlc_config->drb_um.sn_field_length);
       rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength =
           calloc(1, sizeof(*rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength));
-      *rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength = NR_SN_FieldLengthUM_size12;
-      rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.t_Reassembly = NR_T_Reassembly_ms15;
+      *rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.sn_FieldLength = encode_sn_field_length_um(default_rlc_config->drb_um.sn_field_length);
+      rlc_Config->choice.um_Bi_Directional->dl_UM_RLC.t_Reassembly = encode_t_reassembly(default_rlc_config->drb_um.t_reassembly);
       break;
     case NR_RLC_Config_PR_am:
       // RLC AM Bearer configuration
       rlc_Config->choice.am = calloc(1, sizeof(*rlc_Config->choice.am));
       rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = calloc(1, sizeof(*rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength));
-      *rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size18;
-      rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit = NR_T_PollRetransmit_ms45;
-      rlc_Config->choice.am->ul_AM_RLC.pollPDU = NR_PollPDU_p64;
-      rlc_Config->choice.am->ul_AM_RLC.pollByte = NR_PollByte_kB500;
-      rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold = NR_UL_AM_RLC__maxRetxThreshold_t32;
+      *rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = encode_sn_field_length_am(default_rlc_config->drb_am.sn_field_length);
+      rlc_Config->choice.am->ul_AM_RLC.t_PollRetransmit = encode_t_poll_retransmit(default_rlc_config->drb_am.t_poll_retransmit);
+      rlc_Config->choice.am->ul_AM_RLC.pollPDU = encode_poll_pdu(default_rlc_config->drb_am.poll_pdu);
+      rlc_Config->choice.am->ul_AM_RLC.pollByte = encode_poll_byte(default_rlc_config->drb_am.poll_byte);
+      rlc_Config->choice.am->ul_AM_RLC.maxRetxThreshold = encode_max_retx_threshold(default_rlc_config->drb_am.max_retx_threshold);
       rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = calloc(1, sizeof(*rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength));
-      *rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size18;
-      rlc_Config->choice.am->dl_AM_RLC.t_Reassembly = NR_T_Reassembly_ms15;
-      rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit = NR_T_StatusProhibit_ms15;
+      *rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = encode_sn_field_length_am(default_rlc_config->drb_am.sn_field_length);
+      rlc_Config->choice.am->dl_AM_RLC.t_Reassembly = encode_t_reassembly(default_rlc_config->drb_am.t_reassembly);
+      rlc_Config->choice.am->dl_AM_RLC.t_StatusProhibit = encode_t_status_prohibit(default_rlc_config->drb_am.t_status_prohibit);
       break;
     default:
       AssertFatal(false, "RLC config type %d not handled\n", rlc_config_pr);
@@ -3417,7 +3457,11 @@ static void nr_drb_config(struct NR_RLC_Config *rlc_Config, NR_RLC_Config_PR rlc
   rlc_Config->present = rlc_config_pr;
 }
 
-NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR_RLC_Config_PR rlc_conf, long priority)
+NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId,
+                                                long drbId,
+                                                NR_RLC_Config_PR rlc_conf,
+                                                long priority,
+                                                const nr_rlc_configuration_t *default_rlc_config)
 {
   NR_RLC_BearerConfig_t *rlc_BearerConfig                  = calloc(1, sizeof(NR_RLC_BearerConfig_t));
   rlc_BearerConfig->logicalChannelIdentity                 = lcChannelId;
@@ -3427,7 +3471,7 @@ NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR
   rlc_BearerConfig->reestablishRLC                         = NULL;
 
   NR_RLC_Config_t *rlc_Config  = calloc(1, sizeof(NR_RLC_Config_t));
-  nr_drb_config(rlc_Config, rlc_conf);
+  nr_drb_config(rlc_Config, rlc_conf, default_rlc_config);
   rlc_BearerConfig->rlc_Config = rlc_Config;
 
   NR_LogicalChannelConfig_t *logicalChannelConfig                 = calloc(1, sizeof(NR_LogicalChannelConfig_t));
@@ -3451,7 +3495,8 @@ NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId, long drbId, NR
 NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
                                                   const NR_ServingCellConfigCommon_t *scc,
                                                   const NR_ServingCellConfig_t *servingcellconfigdedicated,
-                                                  const nr_mac_config_t *configuration)
+                                                  const nr_mac_config_t *configuration,
+                                                  const nr_rlc_configuration_t *default_rlc_config)
 {
   NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(*cellGroupConfig));
   cellGroupConfig->cellGroupId = 0;
@@ -3460,7 +3505,7 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   /* TS38.331 9.2.1	Default SRB configurations */
   cellGroupConfig->rlc_BearerToAddModList = calloc(1, sizeof(*cellGroupConfig->rlc_BearerToAddModList));
   NR_RLC_BearerConfig_t *rlc_BearerConfig =
-      get_SRB_RLC_BearerConfig(1, 1, NR_LogicalChannelConfig__ul_SpecificParameters__bucketSizeDuration_ms1000);
+      get_SRB_RLC_BearerConfig(1, 1, NR_LogicalChannelConfig__ul_SpecificParameters__bucketSizeDuration_ms1000, default_rlc_config);
   asn1cSeqAdd(&cellGroupConfig->rlc_BearerToAddModList->list, rlc_BearerConfig);
 
   cellGroupConfig->rlc_BearerToReleaseList = NULL;

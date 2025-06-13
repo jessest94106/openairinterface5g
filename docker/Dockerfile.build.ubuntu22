@@ -43,7 +43,7 @@ RUN /bin/sh oaienv && \
       --eNB --gNB --RU --UE --nrUE \
       --build-lib "telnetsrv enbscope uescope nrscope" \
       -w USRP -t Ethernet \
-      --build-e2 --cmake-opt -DXAPP_MULTILANGUAGE=OFF --cmake-opt -DKPM_VERSION=$KPM_VERSION --cmake-opt -DE2AP_VERSION=$E2AP_VERSION \
+      --build-e2 --cmake-opt -DKPM_VERSION=$KPM_VERSION --cmake-opt -DE2AP_VERSION=$E2AP_VERSION \
       --noavx512 \
       --build-tool-opt -k10 \
       --cmake-opt -DCMAKE_C_FLAGS="-Werror" --cmake-opt -DCMAKE_CXX_FLAGS="-Werror" $BUILD_OPTION && \
@@ -57,7 +57,6 @@ RUN /bin/sh oaienv && \
 RUN mkdir -p openair2/E2AP/flexric/build && \
     cd openair2/E2AP/flexric/build && \
     cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
-          -DXAPP_MULTILANGUAGE=OFF \
           -DKPM_VERSION=$KPM_VERSION \
           -DE2AP_VERSION=$E2AP_VERSION \
           -DCMAKE_C_COMPILER=gcc-12 \

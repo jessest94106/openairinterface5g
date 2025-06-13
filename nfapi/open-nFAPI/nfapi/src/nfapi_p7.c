@@ -4455,8 +4455,7 @@ int unpack_nr_srs_beamforming_report(void *pMessageBuf, uint32_t messageBufLen, 
         && pull8(&pReadPackedMessage, &nr_srs_beamforming_report->num_reported_symbols, end))) {
     return -1;
   }
-  nr_srs_beamforming_report->reported_symbol_list =
-      calloc(nr_srs_beamforming_report->num_reported_symbols, sizeof(*nr_srs_beamforming_report->reported_symbol_list));
+
   for (int reported_symbol = 0; reported_symbol < nr_srs_beamforming_report->num_reported_symbols; ++reported_symbol) {
     if (!unpack_nr_srs_reported_symbol(&nr_srs_beamforming_report->reported_symbol_list[reported_symbol],
                                        &pReadPackedMessage,

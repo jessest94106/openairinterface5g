@@ -137,7 +137,6 @@ typedef enum {
 #define GNB_CONFIG_STRING_GNB_CU_UP_ID                  "gNB_CU_UP_ID"
 #define GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES          "num_dlharq"
 #define GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES          "num_ulharq"
-#define GNB_CONFIG_STRING_BEAM_WEIGHTS_LIST             "beam_weights"
 #define GNB_CONFIG_STRING_UESS_AGG_LEVEL_LIST           "uess_agg_levels"
 #define GNB_CONFIG_STRING_CU_SIB_LIST                   "cu_sibs"
 #define GNB_CONFIG_STRING_DU_SIB_LIST                   "du_sibs"
@@ -198,7 +197,6 @@ typedef enum {
 {GNB_CONFIG_STRING_DISABLE_HARQ, GNB_CONFIG_HLP_DISABLE_HARQ, PARAMFLAG_BOOL, .iptr=NULL, .defintval=0,           TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES, GNB_CONFIG_HLP_NUM_DL_HARQ, 0, .iptr=NULL, .defintval=16,                TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES, GNB_CONFIG_HLP_NUM_UL_HARQ, 0, .iptr=NULL, .defintval=16,                TYPE_INT,       0},  \
-{GNB_CONFIG_STRING_BEAM_WEIGHTS_LIST,            NULL,   0,       .iptr=NULL,       .defintarrayval=0,            TYPE_INTARRAY,  0},  \
 {GNB_CONFIG_STRING_UESS_AGG_LEVEL_LIST, \
                     GNB_CONFIG_HLP_UESS_AGG_LEVEL_LIST,  0,       .iptr=NULL,       .defintarrayval=NULL,         TYPE_INTARRAY,  0},  \
 {GNB_CONFIG_STRING_CU_SIB_LIST,                  GNB_CONFIG_HLP_CU_SIBS, 0, .iptr=NULL, .defintarrayval=0,        TYPE_INTARRAY,  0},  \
@@ -243,11 +241,10 @@ typedef enum {
 #define GNB_DISABLE_HARQ_IDX            32
 #define GNB_NUM_DL_HARQ_IDX             33
 #define GNB_NUM_UL_HARQ_IDX             34
-#define GNB_BEAMWEIGHTS_IDX             35
-#define GNB_UESS_AGG_LEVEL_LIST_IDX     36
-#define GNB_CU_SIBS_IDX                 37
-#define GNB_DU_SIBS_IDX                 38
-#define GNB_DO_SINR_IDX                 39
+#define GNB_UESS_AGG_LEVEL_LIST_IDX     35
+#define GNB_CU_SIBS_IDX                 36
+#define GNB_DU_SIBS_IDX                 37
+#define GNB_DO_SINR_IDX                 38
 
 #define TRACKING_AREA_CODE_OKRANGE {0x0001,0xFFFD}
 #define NUM_DL_HARQ_OKVALUES {2,4,6,8,10,12,16,32}
@@ -289,7 +286,6 @@ typedef enum {
   { .s5 = { NULL } },                                             \
   { .s1 =  { config_check_intval, NUM_DL_HARQ_OKVALUES,8 } },     \
   { .s1 =  { config_check_intval, NUM_UL_HARQ_OKVALUES,2 } },     \
-  { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
@@ -680,5 +676,215 @@ typedef enum {
 
 /*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
-#endif
+#define CONFIG_STRING_NR_RLC_LIST "rlc"
+#define CONFIG_STRING_NR_PDCP_LIST "pdcp"
 
+#define CONFIG_NR_RLC_T_POLL_RETRANSMIT "t_poll_retransmit"
+#define CONFIG_NR_RLC_T_REASSEMBLY "t_reassembly"
+#define CONFIG_NR_RLC_T_STATUS_PROHIBIT "t_status_prohibit"
+#define CONFIG_NR_RLC_POLL_PDU "poll_pdu"
+#define CONFIG_NR_RLC_POLL_BYTE "poll_byte"
+#define CONFIG_NR_RLC_MAX_RETX_THRESHOLD "max_retx_threshold"
+#define CONFIG_NR_RLC_SN_FIELD_LENGTH "sn_field_length"
+
+/*----------------------------------------------------------------------*/
+/* nr rlc srb configuration                                             */
+/*----------------------------------------------------------------------*/
+
+#define CONFIG_STRING_NR_RLC_SRB "rlc.srb"
+
+#define CONFIG_NR_RLC_SRB_T_POLL_RETRANSMIT_IDX 0
+#define CONFIG_NR_RLC_SRB_T_REASSEMBLY_IDX 1
+#define CONFIG_NR_RLC_SRB_T_STATUS_PROHIBIT_IDX 2
+#define CONFIG_NR_RLC_SRB_POLL_PDU_IDX 3
+#define CONFIG_NR_RLC_SRB_POLL_BYTE_IDX 4
+#define CONFIG_NR_RLC_SRB_MAX_RETX_THRESHOLD_IDX 5
+#define CONFIG_NR_RLC_SRB_SN_FIELD_LENGTH_IDX 6
+
+#define NR_RLC_SRB_GLOBALPARAMS_DESC { \
+    { .optname = CONFIG_NR_RLC_T_POLL_RETRANSMIT, \
+      .defstrval = "ms45", \
+      .helpstr = "poll retransmit timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_POLL_RETRANSMIT_STR }, \
+          .setintval = { VALUES_NR_RLC_T_POLL_RETRANSMIT }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_POLL_RETRANSMIT }}}, \
+    { .optname = CONFIG_NR_RLC_T_REASSEMBLY, \
+      .defstrval = "ms35", \
+      .helpstr = "reassembly timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_REASSEMBLY_STR }, \
+          .setintval = { VALUES_NR_RLC_T_REASSEMBLY }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_REASSEMBLY }}}, \
+    { .optname = CONFIG_NR_RLC_T_STATUS_PROHIBIT, \
+      .defstrval = "ms0", \
+      .helpstr = "status prohibit timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_STATUS_PROHIBIT_STR }, \
+          .setintval = { VALUES_NR_RLC_T_STATUS_PROHIBIT }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_STATUS_PROHIBIT }}}, \
+    { .optname = CONFIG_NR_RLC_POLL_PDU, \
+      .defstrval = "infinity", \
+      .helpstr = "pollPDU", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_POLL_PDU_STR }, \
+          .setintval = { VALUES_NR_RLC_POLL_PDU }, \
+          .num_okstrval = SIZEOF_NR_RLC_POLL_PDU }}}, \
+    { .optname = CONFIG_NR_RLC_POLL_BYTE, \
+      .defstrval = "infinity", \
+      .helpstr = "pollByte", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_POLL_BYTE_STR }, \
+          .setintval = { VALUES_NR_RLC_POLL_BYTE }, \
+          .num_okstrval = SIZEOF_NR_RLC_POLL_BYTE }}}, \
+    { .optname = CONFIG_NR_RLC_MAX_RETX_THRESHOLD, \
+      .defstrval = "t8", \
+      .helpstr = "max reTX threshold", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_MAX_RETX_THRESHOLD_STR }, \
+          .setintval = { VALUES_NR_RLC_MAX_RETX_THRESHOLD }, \
+          .num_okstrval = SIZEOF_NR_RLC_MAX_RETX_THRESHOLD }}}, \
+    { .optname = CONFIG_NR_RLC_SN_FIELD_LENGTH, \
+      .defstrval = "size12", \
+      .helpstr = "SN size", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_SN_FIELD_LENGTH_AM_STR }, \
+          .setintval = { VALUES_NR_RLC_SN_FIELD_LENGTH_AM }, \
+          .num_okstrval = SIZEOF_NR_RLC_SN_FIELD_LENGTH_AM }}}, \
+}
+
+/*----------------------------------------------------------------------*/
+/* nr rlc drb am configuration                                          */
+/*----------------------------------------------------------------------*/
+
+#define CONFIG_STRING_NR_RLC_DRB_AM "rlc.drb_am"
+
+#define CONFIG_NR_RLC_DRB_AM_T_POLL_RETRANSMIT_IDX 0
+#define CONFIG_NR_RLC_DRB_AM_T_REASSEMBLY_IDX 1
+#define CONFIG_NR_RLC_DRB_AM_T_STATUS_PROHIBIT_IDX 2
+#define CONFIG_NR_RLC_DRB_AM_POLL_PDU_IDX 3
+#define CONFIG_NR_RLC_DRB_AM_POLL_BYTE_IDX 4
+#define CONFIG_NR_RLC_DRB_AM_MAX_RETX_THRESHOLD_IDX 5
+#define CONFIG_NR_RLC_DRB_AM_SN_FIELD_LENGTH_IDX 6
+
+#define NR_RLC_DRB_AM_GLOBALPARAMS_DESC { \
+    { .optname = CONFIG_NR_RLC_T_POLL_RETRANSMIT, \
+      .defstrval = "ms45", \
+      .helpstr = "poll retransmit timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_POLL_RETRANSMIT_STR }, \
+          .setintval = { VALUES_NR_RLC_T_POLL_RETRANSMIT }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_POLL_RETRANSMIT }}}, \
+    { .optname = CONFIG_NR_RLC_T_REASSEMBLY, \
+      .defstrval = "ms15", \
+      .helpstr = "reassembly timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_REASSEMBLY_STR }, \
+          .setintval = { VALUES_NR_RLC_T_REASSEMBLY }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_REASSEMBLY }}}, \
+    { .optname = CONFIG_NR_RLC_T_STATUS_PROHIBIT, \
+      .defstrval = "ms15", \
+      .helpstr = "status prohibit timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_STATUS_PROHIBIT_STR }, \
+          .setintval = { VALUES_NR_RLC_T_STATUS_PROHIBIT }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_STATUS_PROHIBIT }}}, \
+    { .optname = CONFIG_NR_RLC_POLL_PDU, \
+      .defstrval = "p64", \
+      .helpstr = "pollPDU", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_POLL_PDU_STR }, \
+          .setintval = { VALUES_NR_RLC_POLL_PDU }, \
+          .num_okstrval = SIZEOF_NR_RLC_POLL_PDU }}}, \
+    { .optname = CONFIG_NR_RLC_POLL_BYTE, \
+      .defstrval = "kB500", \
+      .helpstr = "pollByte", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_POLL_BYTE_STR }, \
+          .setintval = { VALUES_NR_RLC_POLL_BYTE }, \
+          .num_okstrval = SIZEOF_NR_RLC_POLL_BYTE }}}, \
+    { .optname = CONFIG_NR_RLC_MAX_RETX_THRESHOLD, \
+      .defstrval = "t32", \
+      .helpstr = "max reTX threshold", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_MAX_RETX_THRESHOLD_STR }, \
+          .setintval = { VALUES_NR_RLC_MAX_RETX_THRESHOLD }, \
+          .num_okstrval = SIZEOF_NR_RLC_MAX_RETX_THRESHOLD }}}, \
+    { .optname = CONFIG_NR_RLC_SN_FIELD_LENGTH, \
+      .defstrval = "size18", \
+      .helpstr = "SN size", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_SN_FIELD_LENGTH_AM_STR }, \
+          .setintval = { VALUES_NR_RLC_SN_FIELD_LENGTH_AM }, \
+          .num_okstrval = SIZEOF_NR_RLC_SN_FIELD_LENGTH_AM }}}, \
+}
+
+/*----------------------------------------------------------------------*/
+/* nr rlc drb um configuration                                          */
+/*----------------------------------------------------------------------*/
+
+#define CONFIG_STRING_NR_RLC_DRB_UM "rlc.drb_um"
+
+#define CONFIG_NR_RLC_DRB_UM_T_REASSEMBLY_IDX 0
+#define CONFIG_NR_RLC_DRB_UM_SN_FIELD_LENGTH_IDX 1
+
+#define NR_RLC_DRB_UM_GLOBALPARAMS_DESC { \
+    { .optname = CONFIG_NR_RLC_T_REASSEMBLY, \
+      .defstrval = "ms15", \
+      .helpstr = "reassembly timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_T_REASSEMBLY_STR }, \
+          .setintval = { VALUES_NR_RLC_T_REASSEMBLY }, \
+          .num_okstrval = SIZEOF_NR_RLC_T_REASSEMBLY }}}, \
+    { .optname = CONFIG_NR_RLC_SN_FIELD_LENGTH, \
+      .defstrval = "size12", \
+      .helpstr = "SN size", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_RLC_SN_FIELD_LENGTH_UM_STR }, \
+          .setintval = { VALUES_NR_RLC_SN_FIELD_LENGTH_UM }, \
+          .num_okstrval = SIZEOF_NR_RLC_SN_FIELD_LENGTH_UM }}}, \
+}
+
+/*----------------------------------------------------------------------*/
+
+#define CONFIG_NR_PDCP_SN_SIZE "sn_size"
+#define CONFIG_NR_PDCP_T_REORDERING "t_reordering"
+#define CONFIG_NR_PDCP_DISCARD_TIMER "discard_timer"
+
+/*----------------------------------------------------------------------*/
+/* nr pdcp drb configuration                                            */
+/*----------------------------------------------------------------------*/
+
+#define CONFIG_STRING_NR_PDCP_DRB "pdcp.drb"
+
+#define CONFIG_NR_PDCP_DRB_SN_SIZE_IDX 0
+#define CONFIG_NR_PDCP_DRB_T_REORDERING_IDX 1
+#define CONFIG_NR_PDCP_DRB_DISCARD_TIMER_IDX 2
+
+#define NR_PDCP_DRB_GLOBALPARAMS_DESC { \
+    { .optname = CONFIG_NR_PDCP_SN_SIZE, \
+      .defstrval = "len18bits", \
+      .helpstr = "SN size", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_PDCP_SN_SIZE_STR }, \
+          .setintval = { VALUES_NR_PDCP_SN_SIZE }, \
+          .num_okstrval = SIZEOF_NR_PDCP_SN_SIZE }}}, \
+    { .optname = CONFIG_NR_PDCP_T_REORDERING, \
+      .defstrval = "ms100", \
+      .helpstr = "reordering timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer, \
+          .okstrval = { VALUES_NR_PDCP_T_REORDERING_STR }, \
+          .setintval = { VALUES_NR_PDCP_T_REORDERING }, \
+          .num_okstrval = SIZEOF_NR_PDCP_T_REORDERING }}}, \
+    { .optname = CONFIG_NR_PDCP_DISCARD_TIMER, \
+      .defstrval = "infinity", \
+      .helpstr = "discard timer", .paramflags = 0, .strptr = NULL, .type = TYPE_STRING, .numelt = 0, \
+      .chkPptr = &(checkedparam_t){ .s3a = { .f3a = config_checkstr_assign_integer,  \
+          .okstrval = { VALUES_NR_PDCP_DISCARD_TIMER_STR }, \
+          .setintval = { VALUES_NR_PDCP_DISCARD_TIMER }, \
+          .num_okstrval = SIZEOF_NR_PDCP_DISCARD_TIMER }}} \
+}
+
+/*----------------------------------------------------------------------*/
+
+#endif

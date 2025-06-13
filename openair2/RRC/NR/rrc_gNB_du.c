@@ -202,7 +202,7 @@ const struct f1ap_served_cell_info_t *get_cell_information_by_phycellId(int phyC
 static void is_intra_frequency_neighbour(void *ssb_arfcn, void *neighbour_cell)
 {
   uint32_t *ssb_arfcn_ptr = (uint32_t *)ssb_arfcn;
-  nr_neighbour_gnb_configuration_t *neighbour_cell_ptr = (nr_neighbour_gnb_configuration_t *)neighbour_cell;
+  nr_neighbour_cell_t *neighbour_cell_ptr = (nr_neighbour_cell_t *)neighbour_cell;
 
   if (*ssb_arfcn_ptr == neighbour_cell_ptr->absoluteFrequencySSB) {
     LOG_D(NR_RRC, "HO LOG: found intra frequency neighbour %lu!\n", neighbour_cell_ptr->nrcell_id);
@@ -237,7 +237,7 @@ static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_config
   for (int c = 0; c < neighbour_cell_configuration->size; c++) {
     const neighbour_cell_configuration_t *neighbour_config = seq_arr_at(neighbour_cell_configuration, c);
     for (int ni = 0; ni < neighbour_config->neighbour_cells->size; ni++) {
-      const nr_neighbour_gnb_configuration_t *nc = seq_arr_at(neighbour_config->neighbour_cells, ni);
+      const nr_neighbour_cell_t *nc = seq_arr_at(neighbour_config->neighbour_cells, ni);
       if (nc->nrcell_id != cell->nr_cellid)
         continue;
       // current cell is in the nc config, check that config matches
