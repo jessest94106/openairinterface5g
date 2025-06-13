@@ -894,6 +894,10 @@ static void nr_rrc_handle_msg3_indication(NR_UE_RRC_INST_t *rrc, rnti_t rnti)
       nr_rlc_reconfigure_entity(rrc->ue_id, lc_id, NULL);
       // resume SRB1
       rrc->Srb[srb_id] = RB_ESTABLISHED;
+      MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_RESUME_RB);
+      NR_MAC_RRC_RESUME_RB(msg).is_srb = true;
+      NR_MAC_RRC_RESUME_RB(msg).rb_id = 1;
+      itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
       break;
     case DURING_HANDOVER:
       AssertFatal(1==0, "ra_trigger not implemented yet!\n");
@@ -1868,11 +1872,21 @@ static int nr_rrc_ue_decode_dcch(NR_UE_RRC_INST_t *rrc,
           if (rrc->reconfig_after_reestab) {
             // if this is the first RRCReconfiguration message after successful completion of the RRC re-establishment procedure
             // resume SRB2 and DRBs that are suspended
-            if (rrc->Srb[2] == RB_SUSPENDED)
+            if (rrc->Srb[2] == RB_SUSPENDED) {
               rrc->Srb[2] = RB_ESTABLISHED;
+              MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_RESUME_RB);
+              NR_MAC_RRC_RESUME_RB(msg).is_srb = true;
+              NR_MAC_RRC_RESUME_RB(msg).rb_id = 2;
+              itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+            }
             for (int i = 1; i <= MAX_DRBS_PER_UE; i++) {
-              if (get_DRB_status(rrc, i) == RB_SUSPENDED)
+              if (get_DRB_status(rrc, i) == RB_SUSPENDED) {
                 set_DRB_status(rrc, i, RB_ESTABLISHED);
+                MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_RESUME_RB);
+                NR_MAC_RRC_RESUME_RB(msg).is_srb = false;
+                NR_MAC_RRC_RESUME_RB(msg).rb_id = i;
+                itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+              }
             }
             rrc->reconfig_after_reestab = false;
           }

@@ -826,6 +826,7 @@ static void nr_configure_lc_config(NR_UE_MAC_INST_t *mac,
 {
   NR_LC_SCHEDULING_INFO *lc_sched_info = get_scheduling_info_from_lcid(mac, lc_info->lcid);
   lc_info->rb = rb;
+  lc_info->rb_suspended = false;
   if (rb.type == NR_LCID_SRB && !mac_lc_config->ul_SpecificParameters) {
     // release configuration and reset to default
     set_default_logicalchannelconfig(lc_info, rb.choice.srb_id);
@@ -1729,6 +1730,13 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
       nr_ue_mac_default_configs(mac);
       nr_ue_reset_sync_state(mac);
       release_mac_configuration(mac, cause);
+      // suspend all RBs except SRB0
+      for (int j = 0; j < mac->lc_ordered_list.count; j++) {
+        nr_lcordered_info_t *lc = mac->lc_ordered_list.array[j];
+        if (lc->rb.type == NR_LCID_SRB && lc->rb.choice.srb_id == 0)
+          continue;
+        lc->rb_suspended = true;
+      }
       // apply the timeAlignmentTimerCommon included in SIB1
       configure_timeAlignmentTimer(&mac->time_alignment_timer, mac->timeAlignmentTimerCommon, mac->current_UL_BWP->scs);
       // new sync with old cell ID (re-establishment on the same cell)
@@ -1741,6 +1749,18 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
   }
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
+}
+
+void nr_rrc_mac_resume_rb(module_id_t module_id, bool is_srb, int rb_id)
+{
+  NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
+  for (int j = 0; j < mac->lc_ordered_list.count; j++) {
+    nr_lcordered_info_t *lc = mac->lc_ordered_list.array[j];
+    if (is_srb && lc->rb.type == NR_LCID_SRB && lc->rb.choice.srb_id == rb_id)
+      lc->rb_suspended = false;
+    if (!is_srb && lc->rb.type == NR_LCID_DRB && lc->rb.choice.drb_id == rb_id)
+      lc->rb_suspended = false;
+  }
 }
 
 static void configure_si_schedulingInfo(NR_UE_MAC_INST_t *mac,

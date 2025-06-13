@@ -107,6 +107,7 @@
 #define NAS_PDU_SESSION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nas_pdu_session_req
 #define NR_MAC_RRC_CONFIG_RESET(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_reset
 #define NR_MAC_RRC_CONFIG_CG(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_cg
+#define NR_MAC_RRC_RESUME_RB(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_resume_rb
 #define NR_MAC_RRC_CONFIG_MIB(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_mib
 #define NR_MAC_RRC_CONFIG_SIB1(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_sib1
 #define NR_MAC_RRC_CONFIG_OTHER_SIB(mSGpTR) (mSGpTR)->ittiMsg.nr_mac_rrc_config_other_sib
@@ -469,6 +470,11 @@ typedef struct rlc_sdu_indication_s {
 typedef struct {
   int ue_id;
 } RlcMaxRtxIndication;
+
+typedef struct {
+  bool is_srb;
+  int rb_id;
+} nr_mac_rrc_resume_rb_t;
 
 typedef struct {
   NR_ReestablishmentCause_t cause;
