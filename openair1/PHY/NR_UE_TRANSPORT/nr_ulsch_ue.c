@@ -1034,8 +1034,11 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
   LOG_D(PHY, "nr_ue_ulsch_procedures_slot hard_id %d %d.%d prepare for coding\n", harq_pid, frame, slot);
 
   NR_UE_ULSCH_t *ulsch_ue = &phy_data->ulsch;
+  NR_UE_PUCCH *pucch_ue = &phy_data->pucch_vars;
   NR_UL_UE_HARQ_t *harq_process_ul_ue = &UE->ul_harq_processes[harq_pid];
   const nfapi_nr_ue_pusch_pdu_t *pusch_pdu = &ulsch_ue->pusch_pdu;
+  const fapi_nr_ul_config_pucch_pdu *pucch_pdu = &pucch_ue->pucch_pdu[0];
+  uci_on_pusch_bit_type_t *uci_mapping_template = NULL;
 
   uint16_t number_dmrs_symbols = 0;
 
@@ -1076,6 +1079,11 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 
   G[pusch_id] = nr_get_G(nb_rb, number_of_symbols, nb_dmrs_re_per_rb, number_dmrs_symbols, unav_res, mod_order, Nl);
 
+  // Capture the initial total PUSCH bits. This is the total_codeword_length for mapping.
+  unsigned int G_initial_total_pusch_bits = G[pusch_id];
+
+  uci_on_pusch_bit_type_t template_buffer[G_initial_total_pusch_bits];
+
   ws_trace_t tmp = {.nr = true,
                     .direction = DIRECTION_UPLINK,
                     .pdu_buffer = harq_process_ul_ue->payload_AB,
@@ -1092,9 +1100,18 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 
   /////////////////////////ULSCH coding/////////////////////////
 
-  int enc_ret = nr_ulsch_pre_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids);
-  enc_ret += nr_ulsch_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids, number_dmrs_symbols);
-  if (enc_ret != 0) {
+  rate_match_info_uci_t rm_info = {0};
+  const uint8_t nl_qm = Nl * mod_order; // product of number of layers and modulation order
+  if(nr_ulsch_pre_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids) != 0) {
+    LOG_E(PHY, "Error pre-encoding\n");
+    return;
+  }
+
+  if (pusch_pdu->pusch_uci.harq_ack_bit_length != 0) {
+    rm_info = calc_rate_match_info_uci(pusch_pdu, harq_process_ul_ue, nl_qm, &G[pusch_id]);
+  }
+
+  if (nr_ulsch_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids, number_dmrs_symbols) == -1) {
     stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
     return;
   }
@@ -1107,9 +1124,51 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 
   int N_PRB_oh = 0; // higher layer (RRC) parameter xOverhead in PUSCH-ServingCellConfig
 
-  AssertFatal(pusch_pdu->pusch_uci.harq_ack_bit_length == 0 && pusch_pdu->pusch_uci.csi_part1_bit_length == 0
-                  && pusch_pdu->pusch_uci.csi_part2_bit_length == 0,
-              "UCI on PUSCH not supported at PHY\n");
+  if (pusch_pdu->pusch_uci.harq_ack_bit_length != 0) {
+    LOG_D(PHY, "[UCI_ON_PUSCH] Original HARQ-ACK bit length: %u\n", pusch_pdu->pusch_uci.harq_ack_bit_length);
+    LOG_D(PHY, "[UCI_ON_PUSCH] Initial G: %u\n", G_initial_total_pusch_bits);
+    // b is the block of bits transmitted on the physical channel after payload coding
+    uint64_t b[16] = {0}; // limit to 1024-bit encoded length
+
+    if (pucch_pdu == NULL) {
+      LOG_E(PHY, "nr_ue_ulsch_procedures: pucch_pdu is NULL but HARQ-ACK is present. Cannot proceed with UCI encoding.\n");
+      stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
+      return;
+    }
+
+    nr_uci_encoding(pusch_pdu->pusch_uci.harq_payload,
+                    pusch_pdu->pusch_uci.harq_ack_bit_length,
+                    pucch_pdu->prb_size,
+                    true,
+                    rm_info.E_uci_ACK,
+                    mod_order,
+                    &b[0]);
+
+    LOG_D(PHY,
+          "[UCI_ON_PUSCH] G_ulsch=%u (updated G[pusch_id]), G_ack=%u (M_bit), G_ack_rvd=%u, total_len=%u "
+          "(G_initial_total_pusch_bits).\n",
+          G[pusch_id],
+          rm_info.E_uci_ACK,
+          rm_info.E_uci_ACK_rvd,
+          G_initial_total_pusch_bits);
+
+    uint8_t temp_codeword[G_initial_total_pusch_bits];
+    nr_data_control_mapping(pusch_pdu,
+                            template_buffer,
+                            G[pusch_id],
+                            rm_info.E_uci_ACK,
+                            rm_info.E_uci_ACK_rvd,
+                            temp_codeword,
+                            G_initial_total_pusch_bits,
+                            harq_process_ul_ue->f,
+                            b);
+
+    memcpy(harq_process_ul_ue->f, temp_codeword, G_initial_total_pusch_bits);
+    uci_mapping_template = template_buffer;
+  }
+
+  AssertFatal(pusch_pdu->pusch_uci.csi_part1_bit_length == 0 && pusch_pdu->pusch_uci.csi_part2_bit_length == 0,
+              "UCI (CSI) on PUSCH not supported at PHY\n");
 
   uint16_t start_rb = pusch_pdu->rb_start;
   uint16_t start_sc = frame_parms->first_carrier_offset + (start_rb + pusch_pdu->bwp_start) * NR_NB_SC_PER_RB;
