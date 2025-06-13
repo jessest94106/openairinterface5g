@@ -38,6 +38,8 @@
 
 //#define SRS_IND_DEBUG
 
+/* \brief Get the UL TDA for given frame and slot. It identifies the index of
+ * TDA in the TDA list, as hardcoded in nr_rrc_config_ul_tda(). */
 int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
 {
   /* we assume that this function is mutex-protected from outside */
@@ -51,7 +53,7 @@ int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
     int s = get_slot_idx_in_period(slot, fs);
     tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
     if ((tdd_slot_bitmap[s].num_ul_symbols > 1) && is_mixed_slot(s, fs)) {
-      return 2;
+      return 2; // mixed slot, all symbols of mixed minus last
     }
   }
 
@@ -59,10 +61,10 @@ int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
   UE_iterator(nrmac->UE_info.connected_ue_list, UE) {
     NR_sched_srs_t sched_srs = UE->UE_sched_ctrl.sched_srs;
     if(sched_srs.srs_scheduled && sched_srs.frame == frame && sched_srs.slot == slot)
-      return 1;
+      return 1; // symbols 0--12
   }
 
-  return 0; // if FDD or not mixed slot in TDD, for now use default TDA (TODO handle CSI-RS slots)
+  return 0; // symbols 0--13, // if FDD or not mixed slot in TDD, for now use default TDA (TODO handle CSI-RS slots)
 }
 
 bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
