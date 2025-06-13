@@ -78,8 +78,7 @@ static bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
   // case when DCI format 0_0 is decoded in any common search space in which case the size of the initial UL bandwidth part shall
   // be used.
   if (ul_bwp->dci_format == NR_UL_DCI_FORMAT_0_0 && sched_ctrl->search_space->searchSpaceType
-      && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common
-      && ul_bwp->pusch_Config->resourceAllocation == NR_PUSCH_Config__resourceAllocation_resourceAllocationType1) {
+      && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
     bwp_info.bwpSize = min(ul_bwp->BWPSize, UE->sc_info.initial_ul_BWPSize);
   } else {
     bwp_info.bwpSize = ul_bwp->BWPSize;
@@ -391,10 +390,15 @@ static int nr_process_mac_pdu(instance_t module_idP,
                     slot,
                     lcid);
 
-        nr_mac_rlc_data_ind(module_idP, UE->rnti, true, lcid, (char *)(pduP + mac_subheader_len), mac_len);
+        const nr_lc_config_t *srbc = nr_mac_get_lc_config(sched_ctrl, lcid);
+        if (!srbc || srbc->suspended) {
+          LOG_I(NR_MAC, "RNTI %04x LCID %d: ignoring %d bytes\n", UE->rnti, lcid, mac_len);
+        } else {
+          nr_mac_rlc_data_ind(module_idP, UE->rnti, true, lcid, (char *)(pduP + mac_subheader_len), mac_len);
 
-        UE->mac_stats.ul.total_sdu_bytes += mac_len;
-        UE->mac_stats.ul.lc_bytes[lcid] += mac_len;
+          UE->mac_stats.ul.total_sdu_bytes += mac_len;
+          UE->mac_stats.ul.lc_bytes[lcid] += mac_len;
+        }
         break;
 
       case UL_SCH_LCID_DTCH ...(UL_SCH_LCID_DTCH + 28):
@@ -407,16 +411,21 @@ static int nr_process_mac_pdu(instance_t module_idP,
               lcid,
               module_idP,
               mac_len);
-        UE->mac_stats.ul.lc_bytes[lcid] += mac_len;
+        const nr_lc_config_t *c = nr_mac_get_lc_config(sched_ctrl, lcid);
+        if (!c || c->suspended) {
+          LOG_I(NR_MAC, "RNTI %04x LCID %d: ignoring %d bytes\n", UE->rnti, lcid, mac_len);
+        } else {
+          UE->mac_stats.ul.lc_bytes[lcid] += mac_len;
 
-        nr_mac_rlc_data_ind(module_idP, UE->rnti, true, lcid, (char *)(pduP + mac_subheader_len), mac_len);
+          nr_mac_rlc_data_ind(module_idP, UE->rnti, true, lcid, (char *)(pduP + mac_subheader_len), mac_len);
 
-        sdus += 1;
-        /* Updated estimated buffer when receiving data */
-        if (sched_ctrl->estimated_ul_buffer >= mac_len)
-          sched_ctrl->estimated_ul_buffer -= mac_len;
-        else
-          sched_ctrl->estimated_ul_buffer = 0;
+          sdus += 1;
+          /* Updated estimated buffer when receiving data */
+          if (sched_ctrl->estimated_ul_buffer >= mac_len)
+            sched_ctrl->estimated_ul_buffer -= mac_len;
+          else
+            sched_ctrl->estimated_ul_buffer = 0;
+        }
         break;
 
       case UL_SCH_LCID_RECOMMENDED_BITRATE_QUERY:

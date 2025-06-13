@@ -561,6 +561,8 @@ typedef struct NR_QoS_config_s {
 
 typedef struct nr_lc_config {
   uint8_t lcid;
+  /// flag if corresponding RB is suspended
+  bool suspended;
   /// priority as specified in 38.321
   int priority;
   /// associated NSSAI for DRB
@@ -737,8 +739,9 @@ typedef struct {
   NR_mac_stats_t mac_stats;
   /// currently active CellGroupConfig
   NR_CellGroupConfig_t *CellGroup;
-  /// reestablishRLC has to be signaled in RRCreconfiguration
-  bool reestablish_rlc;
+  /// in case of reestablishment, old spCellConfig to apply after
+  /// reconfiguration
+  NR_SpCellConfig_t *reconfigSpCellConfig;
   interrupt_followup_action_t interrupt_action;
   NR_UE_NR_Capability_t *capability;
   // UE selected beam index
