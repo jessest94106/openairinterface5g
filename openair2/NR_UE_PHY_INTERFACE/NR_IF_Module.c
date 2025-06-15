@@ -90,7 +90,14 @@ void print_ue_mac_stats(const module_id_t mod, const int frame_rx, const int slo
   if (nbdl < 1)
     nbdl = 1;
 
-  cur += snprintf(cur, end - cur, "UE %d stats sfn: %d.%d, cumulated bad DCI %d\n", mod, frame_rx, slot_rx, mac->stats.bad_dci);
+  cur += snprintf(cur,
+                  end - cur,
+                  "UE %d RNTI %04x stats sfn: %d.%d, cumulated bad DCI %d\n",
+                  mod,
+                  mac->crnti,
+                  frame_rx,
+                  slot_rx,
+                  mac->stats.bad_dci);
 
   cur += snprintf(cur, end - cur, "    DL harq: %lu", mac->stats.dl.rounds[0]);
   int nb;
