@@ -91,7 +91,7 @@
 
   <testCase id="100010">
     <class>Iperf</class>
-    <desc>iperf (DL/570Mbps/UDP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (DL/570Mbps/UDP)(30 sec)</desc>
     <iperf_args>-u -b 570M -t 30 -R</iperf_args>
     <id>up2-fhi72</id>
     <iperf_packetloss_threshold>20</iperf_packetloss_threshold>
@@ -102,7 +102,7 @@
 
   <testCase id="100030">
     <class>Iperf</class>
-    <desc>iperf (DL/TCP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (DL/TCP)(30 sec)</desc>
     <iperf_args>-t 30 -R</iperf_args>
     <id>up2-fhi72</id>
     <iperf_tcp_rate_target>80</iperf_tcp_rate_target>
@@ -111,7 +111,7 @@
 
   <testCase id="100020">
     <class>Iperf</class>
-    <desc>iperf (UL/100Mbps/UDP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (UL/100Mbps/UDP)(30 sec)</desc>
     <iperf_args>-u -b 100M -t 30</iperf_args>
     <id>up2-fhi72</id>
     <iperf_packetloss_threshold>20</iperf_packetloss_threshold>
@@ -122,7 +122,7 @@
 
   <testCase id="100040">
     <class>Iperf</class>
-    <desc>iperf (UL/TCP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (UL/TCP)(30 sec)</desc>
     <iperf_args>-t 30</iperf_args>
     <id>up2-fhi72</id>
     <iperf_tcp_rate_target>80</iperf_tcp_rate_target>
