@@ -242,7 +242,7 @@
 
         <testCase id="444445">
                 <class>Detach_UE</class>
-                <desc>Detach OAI UE 2 to 10</desc>
+                <desc>Detach OAI UE 3 to 10</desc>
                 <id>rfsim5g_ue3 rfsim5g_ue4 rfsim5g_ue5 rfsim5g_ue6 rfsim5g_ue7 rfsim5g_ue8 rfsim5g_ue9 rfsim5g_ue10</id>
                 <nodes>cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix</nodes>
         </testCase>
