@@ -165,6 +165,8 @@ typedef struct {
   double prop_delay_ms;
 } rfsimulator_state_t;
 
+static bool flushInput(rfsimulator_state_t *t, int timeout, bool first_time);
+
 static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
 {
   uint64_t buff_index = bridge->next_buf++ % MAX_FD_RFSIMU;
@@ -658,7 +660,24 @@ static int startClient(openair0_device *device)
   if (setblocking(sock, notBlocking) == -1) {
     return -1;
   }
-  return allocCirBuf(t, sock) == NULL ? -1 : 0;
+  buffer_t *b = allocCirBuf(t, sock);
+  if (!b)
+    return -1;
+  // read a 1 sample block to initialize the current time
+  bool have_to_wait;
+  do {
+    have_to_wait = true;
+    flushInput(t, 3, true);
+    if (b->lastReceivedTS)
+      have_to_wait = false;
+  } while (have_to_wait);
+  if (b->lastReceivedTS > 0)
+    b->lastReceivedTS--;
+  t->nextRxTstamp = b->lastReceivedTS;
+  LOG_D(HW, "Client got first timestamp: starting at %lu\n", t->nextRxTstamp);
+  if (b->channel_model)
+    b->channel_model->start_TS = t->nextRxTstamp;
+  return 0;
 }
 
 static int rfsimulator_write_internal(rfsimulator_state_t *t,
@@ -765,76 +784,71 @@ static bool add_client(rfsimulator_state_t *t)
   return true;
 }
 
-static void process_recv(rfsimulator_state_t *t, buffer_t *b, int size_for_first_pack)
+static void process_recv_header(rfsimulator_state_t *t, buffer_t *b, bool first_time)
+{
+  // check the header and start block transfer
+  if (b->remainToTransfer != 0)
+    return;
+
+  b->headerMode = false; // We got the header
+
+  if (first_time) {
+    b->lastReceivedTS = b->th.timestamp;
+    b->trashingPacket = true;
+  } else {
+    if (b->lastReceivedTS < b->th.timestamp) {
+      // We have a transmission hole to fill, like TDD
+      // we create no signal samples up to the beginning of this reception
+      int nbAnt = b->th.nbAnt;
+      if (b->th.timestamp - b->lastReceivedTS < CirSize) {
+        // case we wrap at circular buffer end
+        for (uint64_t index = b->lastReceivedTS; index < b->th.timestamp; index++) {
+          for (int a = 0; a < nbAnt; a++) {
+            b->circularBuf[(index * nbAnt + a) % CirSize] = (c16_t){0};
+          }
+        }
+      } else {
+        // case no circular buffer wrap
+        memset(b->circularBuf, 0, sampleToByte(CirSize, 1));
+      }
+      b->lastReceivedTS = b->th.timestamp;
+    } else if (b->lastReceivedTS > b->th.timestamp) {
+      LOG_W(HW, "Received data in past: current is %lu, new reception: %lu!\n", b->lastReceivedTS, b->th.timestamp);
+      b->trashingPacket = true;
+    }
+    // verify the time gap is not too large
+    mutexlock(t->Sockmutex);
+    if (t->lastWroteTS != 0 && (fabs((double)t->lastWroteTS - b->lastReceivedTS) > (double)CirSize))
+      LOG_W(HW, "UEsock(%d) Tx/Rx shift too large Tx:%lu, Rx:%lu\n", b->conn_sock, t->lastWroteTS, b->lastReceivedTS);
+    mutexunlock(t->Sockmutex);
+  }
+  // move back the pointer to overwrite the header, we don't need it anymore
+  b->transferPtr = (char *)&b->circularBuf[(b->lastReceivedTS * b->th.nbAnt) % CirSize];
+  // we now need to read the samples
+  b->remainToTransfer = sampleToByte(b->th.size, b->th.nbAnt);
+  return;
+}
+
+static void process_recv(rfsimulator_state_t *t, buffer_t *b, bool first_time)
 {
   if (b->transferPtr == b->circularBufEnd)
     b->transferPtr = (char *)b->circularBuf;
 
-  // check the header and start block transfer
-  if (b->headerMode == true) {
-    if (b->remainToTransfer == 0) {
-      b->headerMode = false; // We got the header
-      if (t->nextRxTstamp == 0) { // First block in a client, resync with the server current TS
-        t->nextRxTstamp = b->th.timestamp;
-        // we need to bootstrap from one side, else each side will wait forever
-        b->lastReceivedTS = b->th.timestamp + size_for_first_pack;
-        LOG_D(HW, "Client got first timestamp: starting at %lu\n", t->nextRxTstamp);
-        b->trashingPacket = true;
-        if (b->channel_model)
-          b->channel_model->start_TS = t->nextRxTstamp;
-      } else if (b->lastReceivedTS < b->th.timestamp) {
-        // We have a transmission hole to fill, like TDD
-        // we create no signal samples up to the beginning of this reception
-        int nbAnt = b->th.nbAnt;
-        if (b->th.timestamp - b->lastReceivedTS < CirSize) {
-          for (uint64_t index = b->lastReceivedTS; index < b->th.timestamp; index++) {
-            for (int a = 0; a < nbAnt; a++) {
-              b->circularBuf[(index * nbAnt + a) % CirSize].r = 0;
-              b->circularBuf[(index * nbAnt + a) % CirSize].i = 0;
-            }
-          }
-        } else {
-          memset(b->circularBuf, 0, sampleToByte(CirSize, 1));
-        }
-        b->lastReceivedTS = b->th.timestamp;
-      } else if (b->lastReceivedTS > b->th.timestamp) {
-        if (b->th.size == 1)
-          LOG_W(HW, "Received Rx/Tx synchro out of order\n");
-        else
-          LOG_W(HW, "Received data in past: current is %lu, new reception: %lu!\n", b->lastReceivedTS, b->th.timestamp);
-        b->trashingPacket = true;
-      }
-      // normal case, we have the header
-      // verify the time gap is not too large
-      mutexlock(t->Sockmutex);
-      if (t->lastWroteTS != 0 && (fabs((double)t->lastWroteTS - b->lastReceivedTS) > (double)CirSize))
-        LOG_W(HW, "UEsock(%d) Tx/Rx shift too large Tx:%lu, Rx:%lu\n", b->conn_sock, t->lastWroteTS, b->lastReceivedTS);
-      mutexunlock(t->Sockmutex);
-
-      // move back the pointer to overwrite the header, we don't need it anymore
-      b->transferPtr = (char *)&b->circularBuf[(b->lastReceivedTS * b->th.nbAnt) % CirSize];
-      // we now need to read the samples
-      b->remainToTransfer = sampleToByte(b->th.size, b->th.nbAnt);
-    }
-    return;
+  if (!b->trashingPacket) {
+    b->lastReceivedTS = b->th.timestamp + b->th.size - byteToSample(b->remainToTransfer, b->th.nbAnt);
+    LOG_D(HW, "UEsock: %d Set b->lastReceivedTS %ld\n", b->conn_sock, b->lastReceivedTS);
   }
 
-  if (b->headerMode == false) {
-    if (!b->trashingPacket) {
-      b->lastReceivedTS = b->th.timestamp + b->th.size - byteToSample(b->remainToTransfer, b->th.nbAnt);
-      LOG_D(HW, "UEsock: %d Set b->lastReceivedTS %ld\n", b->conn_sock, b->lastReceivedTS);
-    }
-    if (b->remainToTransfer == 0) {
-      LOG_D(HW, "UEsock: %d Completed block reception: %ld\n", b->conn_sock, b->lastReceivedTS);
-      b->headerMode = true;
-      b->transferPtr = (char *)&b->th;
-      b->remainToTransfer = sizeof(samplesBlockHeader_t);
-      b->trashingPacket = false;
-    }
+  if (b->remainToTransfer == 0) {
+    LOG_D(HW, "UEsock: %d Completed block reception: %ld\n", b->conn_sock, b->lastReceivedTS);
+    b->headerMode = true;
+    b->transferPtr = (char *)&b->th;
+    b->remainToTransfer = sizeof(samplesBlockHeader_t);
+    b->trashingPacket = false;
   }
 }
 
-static bool flushInput(rfsimulator_state_t *t, int timeout, int first_time_sz)
+static bool flushInput(rfsimulator_state_t *t, int timeout, bool first_time)
 {
   // Process all incoming events on sockets
   // store the data in lists
@@ -883,7 +897,10 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, int first_time_sz)
     LOG_D(HW, "Socket rcv %zd bytes\n", sz);
     b->remainToTransfer -= sz;
     b->transferPtr += sz;
-    process_recv(t, b, first_time_sz);
+    if (b->headerMode)
+      process_recv_header(t, b, first_time);
+    else
+      process_recv(t, b, first_time);
   }
   return nfds > 0;
 }
@@ -910,7 +927,7 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
     if (t->nextRxTstamp == 0)
       LOG_I(HW, "No connected device, generating void samples...\n");
 
-    if (!flushInput(t, t->wait_timeout, nsamps)) {
+    if (!flushInput(t, t->wait_timeout, false)) {
       for (int x = 0; x < nbAnt; x++)
         memset(samplesVoid[x], 0, sampleToByte(nsamps, 1));
 
@@ -940,7 +957,7 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
               "Waiting on socket, current last ts: %ld, expected at least : %ld\n",
               b->lastReceivedTS,
               t->nextRxTstamp + nsamps);
-        flushInput(t, 3, nsamps);
+        flushInput(t, 3, false);
       }
     } while (have_to_wait);
   }
