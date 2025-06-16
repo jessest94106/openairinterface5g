@@ -49,7 +49,6 @@
     <desc>Setup sriov and network interfaces VVDN</desc>
     <node>cacofonix</node>
     <script>yaml_files/sa_fhi_7.2_vvdn_gnb/setup_sriov_vvdn.sh</script>
-    <command_fail>yes</command_fail>
   </testCase>
 
   <testCase id="110000">
@@ -164,7 +163,6 @@
     <desc>Set CPU to idle state, set kernel parameters to default values</desc>
     <node>cacofonix</node>
     <script>yaml_files/sa_fhi_7.2_vvdn_gnb/setup_cleanup.sh</script>
-    <command_fail>yes</command_fail>
   </testCase>
 
 

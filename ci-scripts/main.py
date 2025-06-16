@@ -376,14 +376,12 @@ def ExecuteActionWithParam(action):
 			# Change all execution targets to localhost
 			node = 'localhost'
 		command = test.findtext('command')
-		command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
-		success = cls_oaicitest.Custom_Command(HTML, node, command, command_fail)
+		success = cls_oaicitest.Custom_Command(HTML, node, command)
 
 	elif action == 'Custom_Script':
 		node = test.findtext('node')
 		script = test.findtext('script')
-		command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
-		success = cls_oaicitest.Custom_Script(HTML, node, script, command_fail)
+		success = cls_oaicitest.Custom_Script(HTML, node, script)
 
 	elif action == 'Pull_Cluster_Image':
 		tag_prefix = test.findtext('tag_prefix') or ""

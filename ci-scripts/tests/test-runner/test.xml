@@ -40,7 +40,6 @@
                 <desc>This should succeed</desc>
                 <node>localhost</node>
                 <command>true</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="000011">
@@ -49,7 +48,6 @@
                 <may_fail>true</may_fail>
                 <node>localhost</node>
                 <command>false</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="000012">
@@ -57,7 +55,6 @@
                 <desc>This is still executed</desc>
                 <node>localhost</node>
                 <command>true</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="000002">
@@ -65,7 +62,6 @@
                 <desc>This should fail</desc>
                 <node>localhost</node>
                 <command>false</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="000003">
@@ -73,7 +69,6 @@
                 <desc>This should be skipped</desc>
                 <node>localhost</node>
                 <command>true</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="000004">
@@ -82,6 +77,5 @@
                 <always_exec>true</always_exec>
                 <node>localhost</node>
                 <command>true</command>
-                <command_fail>yes</command_fail>
         </testCase>
 </testCaseList>
