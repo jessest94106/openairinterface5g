@@ -36,6 +36,7 @@
     100020
     100030
     100040
+    100011
     103000
     100002
     130000
@@ -95,6 +96,17 @@
     <iperf_packetloss_threshold>20</iperf_packetloss_threshold>
     <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
     <iperf_profile>balanced</iperf_profile>
+    <svr_id>oc-cn5g-20897</svr_id>
+  </testCase>
+
+  <testCase id="100011">
+    <class>Iperf</class>
+    <desc>Optional iperf (DL/700Mbps/UDP)(30 sec)</desc>
+    <may_fail>true</may_fail>
+    <iperf_args>-u -b 700M -t 30 -R</iperf_args>
+    <id>up2-fhi72</id>
+    <iperf_packetloss_threshold>10</iperf_packetloss_threshold>
+    <iperf_bitrate_threshold>95</iperf_bitrate_threshold>
     <svr_id>oc-cn5g-20897</svr_id>
   </testCase>
 
