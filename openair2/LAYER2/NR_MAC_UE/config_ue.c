@@ -1718,6 +1718,10 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
       sync_req.ssb_bw_scan = false;
       nr_ue_send_synch_request(mac, module_id, 0, &sync_req);
       break;
+    case RRC_SETUP_REESTAB_RESUME:
+      release_mac_configuration(mac, cause);
+      nr_ue_mac_default_configs(mac);
+      break;
     default:
       AssertFatal(false, "Invalid MAC reset cause %d\n", cause);
   }
