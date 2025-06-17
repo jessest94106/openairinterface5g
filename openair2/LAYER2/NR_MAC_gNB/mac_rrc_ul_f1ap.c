@@ -123,7 +123,7 @@ static void ue_context_setup_response_f1ap(const f1ap_ue_context_setup_t *resp)
   itti_send_msg_to_task(TASK_DU_F1, 0, msg);
 }
 
-static void ue_context_modification_response_f1ap(const f1ap_ue_context_modif_req_t *req, const f1ap_ue_context_modif_resp_t *resp)
+static void ue_context_modification_response_f1ap(const f1ap_ue_context_modif_resp_t *resp)
 {
   MessageDef *msg = itti_alloc_new_message(TASK_MAC_GNB, 0, F1AP_UE_CONTEXT_MODIFICATION_RESP);
   f1ap_ue_context_modif_resp_t *f1ap_msg = &F1AP_UE_CONTEXT_MODIFICATION_RESP(msg);

@@ -838,7 +838,7 @@ void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
   // resp.du_to_cu_rrc_information can be either NULL or not
   DevAssert(resp.rrc_container == NULL && resp.rrc_container_length == 0);
 
-  mac->mac_rrc.ue_context_modification_response(req, &resp);
+  mac->mac_rrc.ue_context_modification_response(&resp);
 
   /* free the memory we allocated above */
   free(resp.srbs_to_be_setup);
