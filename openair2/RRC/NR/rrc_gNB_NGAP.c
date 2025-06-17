@@ -1562,31 +1562,33 @@ void rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(gNB_RRC_INST *rrc, gNB_RRC_UE
         DevAssert(resp->nb_of_pdusessions_released < NGAP_MAX_PDU_SESSION);
         resp->pdusession_release[resp->nb_of_pdusessions_released++].pdusession_id = pdusession->pdusession_id;
       }
-      session->status = PDU_SESSION_STATUS_RELEASED;
     }
+  }
+
+  for (int i = 0; i < resp->nb_of_pdusessions_released; ++i) {
+    rm_pduSession(&UE->pduSessions, &UE->drbs, resp->pdusession_release[i].pdusession_id);
   }
 
   LOG_I(NR_RRC, "NGAP PDUSESSION RELEASE RESPONSE: rrc_ue_id %u release_pdu_sessions %d\n", resp->gNB_ue_ngap_id, resp->nb_of_pdusessions_released);
   itti_send_msg_to_task (TASK_NGAP, rrc->module_id, msg_p);
 }
 
-//------------------------------------------------------------------------------
-int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_t instance)
-//------------------------------------------------------------------------------
+/** @brief Process NG PDU Session Resource Release command (8.2.2 of 3GPP TS 38.413)
+ * upon reception the NG-RAN node shall execute the release of the requested PDU sessions.
+ * For each PDU session to be released the NG-RAN node shall release the corresponding
+ * resources over Uu and over NG, if any. */
+int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(ngap_pdusession_release_command_t *cmd, gNB_RRC_INST *rrc)
 {
-  uint32_t gNB_ue_ngap_id;
-  ngap_pdusession_release_command_t *cmd = &NGAP_PDUSESSION_RELEASE_COMMAND(msg_p);
-  gNB_ue_ngap_id = cmd->gNB_ue_ngap_id;
-  gNB_RRC_INST *rrc = RC.nrrrc[instance];
+  uint32_t gNB_ue_ngap_id = cmd->gNB_ue_ngap_id;
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, gNB_ue_ngap_id);
 
   if (!ue_context_p) {
-    LOG_E(NR_RRC, "[gNB %ld] not found ue context gNB_ue_ngap_id %u \n", instance, gNB_ue_ngap_id);
+    LOG_E(NR_RRC, "[gNB %d] UE context not found for gNB_ue_ngap_id %u \n", rrc->module_id, gNB_ue_ngap_id);
     return -1;
   }
 
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-  LOG_I(NR_RRC, "PDU Session Release: AMF_UE_NGAP_ID %lu  rrc_ue_id %u release_pdusessions %d \n",
+  LOG_I(NR_RRC, "NG PDU Session Release command: AMF_UE_NGAP_ID=%lu, rrc_ue_id=%u, nb_pdusessions_torelease=%d \n",
         cmd->amf_ue_ngap_id,
         gNB_ue_ngap_id,
         cmd->nb_pdusessions_torelease);
@@ -1597,17 +1599,17 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
       LOG_E(NR_RRC, "Failed to release non-existing PDU Session %d\n", cmd->pdusession_release_params[pdusession].pdusession_id);
       continue;
     }
-    if (pduSession->status == PDU_SESSION_STATUS_FAILED) {
+    if (pduSession->status == PDU_SESSION_STATUS_TORELEASE) {
+      LOG_W(NR_RRC, "PDU Session %d already set to be released\n", pduSession->param.pdusession_id);
       continue;
     }
-    if (pduSession->status == PDU_SESSION_STATUS_ESTABLISHED) {
-      LOG_I(NR_RRC, "NG Release PDU Session %d \n", pduSession->param.pdusession_id);
-      pdu_session_to_remove_t *release = &req.pduSessionRem[req.numPDUSessionsRem++];
-      release->sessionId = pduSession->param.pdusession_id;
-      release->cause.type = E1AP_CAUSE_RADIO_NETWORK;
-      release->cause.value = E1AP_RADIO_CAUSE_NORMAL_RELEASE;
-      pduSession->status = PDU_SESSION_STATUS_TORELEASE;
-    }
+    // Set PDU session to release, regardless of the status
+    LOG_I(NR_RRC, "Set PDU Session %d to release\n", pduSession->param.pdusession_id);
+    pdu_session_to_remove_t *release = &req.pduSessionRem[req.numPDUSessionsRem++];
+    release->sessionId = pduSession->param.pdusession_id;
+    release->cause.type = E1AP_CAUSE_RADIO_NETWORK;
+    release->cause.value = E1AP_RADIO_CAUSE_NORMAL_RELEASE;
+    pduSession->status = PDU_SESSION_STATUS_TORELEASE;
   }
 
   if (req.numPDUSessionsRem == 0) {

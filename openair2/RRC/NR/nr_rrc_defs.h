@@ -97,7 +97,6 @@ typedef enum pdu_session_satus_e {
   PDU_SESSION_STATUS_TOMODIFY, // ENDC NSA
   PDU_SESSION_STATUS_FAILED,
   PDU_SESSION_STATUS_TORELEASE, // to release DRB between eNB and UE
-  PDU_SESSION_STATUS_RELEASED
 } pdu_session_status_t;
 
 typedef struct pdusession_s {
