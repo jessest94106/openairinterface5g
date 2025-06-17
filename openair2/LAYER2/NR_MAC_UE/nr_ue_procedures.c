@@ -3734,7 +3734,7 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
 
     LOG_D(MAC, "[UE] LCID %d, PDU length %d\n", rx_lcid, pdu_len);
     bool ret;
-    switch(rx_lcid){
+    switch (rx_lcid) {
       //  MAC CE
       case DL_SCH_LCID_CCCH:
         //  MSG4 RRC Setup 38.331
@@ -3871,6 +3871,11 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
       case 1 ... 32:
         if (!get_mac_len(pduP, pdu_len, &mac_len, &mac_subheader_len))
           return;
+        // discard the received subPDU if RB is suspended
+        if (is_lcid_suspended(mac, rx_lcid)) {
+          LOG_W(NR_MAC, "Received PDU for a suspended RB, corresponding to LCID %d. Dropping it.\n", rx_lcid);
+          break;
+        }
         LOG_D(NR_MAC, "%4d.%2d : DLSCH -> LCID %d %d bytes\n", frameP, slot, rx_lcid, mac_len);
         nr_mac_rlc_data_ind(mac->ue_id, mac->ue_id, false, rx_lcid, (char *)(pduP + mac_subheader_len), mac_len);
         break;
@@ -3878,8 +3883,8 @@ void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_i
         LOG_W(MAC, "unknown lcid %02x\n", rx_lcid);
         break;
     }
-    pduP += ( mac_subheader_len + mac_len );
-    pdu_len -= ( mac_subheader_len + mac_len );
+    pduP += (mac_subheader_len + mac_len);
+    pdu_len -= (mac_subheader_len + mac_len);
     if (pdu_len < 0)
       LOG_E(MAC, "[UE %d][%d.%d] nr_ue_process_mac_pdu, residual mac pdu length %d < 0!\n", mac->ue_id, frameP, slot, pdu_len);
   }

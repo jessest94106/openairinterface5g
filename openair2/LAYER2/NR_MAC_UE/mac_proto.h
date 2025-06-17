@@ -93,7 +93,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
 
 struct position; /* forward declaration */
 void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19_r17, bool can_start_ra);
-
+void nr_rrc_mac_resume_rb(module_id_t module_id, bool is_srb, int rb_id);
 void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t cause);
 
 /**\brief initialization NR UE MAC instance(s)*/
@@ -293,7 +293,7 @@ void configure_csi_resource_mapping(fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_c
                                     uint32_t bwp_size,
                                     uint32_t bwp_start);
 
-
+bool is_lcid_suspended(NR_UE_MAC_INST_t *mac, int lcid);
 void nr_ra_contention_resolution_failed(NR_UE_MAC_INST_t *mac);
 void nr_ra_succeeded(NR_UE_MAC_INST_t *mac, const uint8_t gNB_index, const frame_t frame, const int slot);
 void nr_ra_backoff_setting(RA_config_t *ra);

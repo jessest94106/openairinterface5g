@@ -1266,10 +1266,11 @@ static void nr_update_rlc_buffers_status(NR_UE_MAC_INST_t *mac, frame_t frameP, 
 {
   for (int i = 0; i < mac->lc_ordered_list.count; i++) {
     nr_lcordered_info_t *lc_info = mac->lc_ordered_list.array[i];
+    if (lc_info->rb_suspended)
+      continue;
     int lcid = lc_info->lcid;
     NR_LC_SCHEDULING_INFO *lc_sched_info = get_scheduling_info_from_lcid(mac, lcid);
     mac_rlc_status_resp_t rlc_status = nr_mac_rlc_status_ind(mac->ue_id, frameP, lcid);
-
     if (rlc_status.bytes_in_buffer > 0) {
       LOG_D(NR_MAC,
             "[UE %d] LCID %d has %d bytes to transmit at sfn %d.%d\n",
@@ -2553,6 +2554,8 @@ static bool fill_mac_sdu(NR_UE_MAC_INST_t *mac,
         lcid_remain_buffer,
         lcid);
 
+  if (is_lcid_suspended(mac, lcid))
+    return false;
   if (mac_ce_p->end_for_tailer - mac_ce_p->cur_ptr < sizeof(NR_MAC_SUBHEADER_LONG))
     // We can't add one byte after the header
     return false;
