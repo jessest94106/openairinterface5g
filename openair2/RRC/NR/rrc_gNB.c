@@ -2542,6 +2542,34 @@ void rrc_gNB_process_e1_bearer_context_release_cplt(const e1ap_bearer_release_cp
   LOG_I(RRC, "UE %d: received bearer release complete\n", cplt->gNB_cu_cp_ue_id);
 }
 
+static void print_meas_result_quantity(FILE *f, const NR_MeasQuantityResults_t *mqr)
+{
+  fprintf(f, "      resultSSB:");
+  if (!mqr) {
+    fprintf(f, " NOT PROVIDED\n");
+    return;
+  }
+  if (mqr->rsrp) {
+    const long rrsrp = *mqr->rsrp - 156;
+    fprintf(f, " RSRP %ld dBm", rrsrp);
+  } else {
+    fprintf(f, " RSRP not provided");
+  }
+  if (mqr->rsrq) {
+    const float rrsrq = (float) (*mqr->rsrq - 87) / 2.0f;
+    fprintf(f, " RSRQ %.1f dB", rrsrq);
+  } else {
+    fprintf(f, " RSRQ not provided");
+  }
+  if (mqr->sinr) {
+    const float rsinr = (float) (*mqr->sinr - 46) / 2.0f;
+    fprintf(f, " SINR %.1f dB", rsinr);
+  } else {
+    fprintf(f, " SINR not provided");
+  }
+  fprintf(f, "\n");
+}
+
 static void print_rrc_meas(FILE *f, const NR_MeasResults_t *measresults)
 {
   DevAssert(measresults->measResultServingMOList.list.count >= 1);
@@ -2550,37 +2578,21 @@ static void print_rrc_meas(FILE *f, const NR_MeasResults_t *measresults)
 
   NR_MeasResultServMO_t *measresultservmo = measresults->measResultServingMOList.list.array[0];
   NR_MeasResultNR_t *measresultnr = &measresultservmo->measResultServingCell;
-  NR_MeasQuantityResults_t *mqr = measresultnr->measResult.cellResults.resultsSSB_Cell;
   if (measresultnr->physCellId)
     fprintf(f,
-            "    servingCellId %ld MeasResultNR for phyCellId %ld:\n      resultSSB:",
+            "    servingCellId %ld MeasResultNR for phyCellId %ld:\n",
             measresultservmo->servCellId,
             *measresultnr->physCellId);
-  if (mqr != NULL) {
-    const long rrsrp = *mqr->rsrp - 156;
-    const float rrsrq = (float) (*mqr->rsrq - 87) / 2.0f;
-    const float rsinr = (float) (*mqr->sinr - 46) / 2.0f;
-    fprintf(f, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
-  } else {
-    fprintf(f, "NOT PROVIDED\n");
-  }
+  print_meas_result_quantity(f, measresultnr->measResult.cellResults.resultsSSB_Cell);
 
   if (measresults->measResultNeighCells
       && measresults->measResultNeighCells->present == NR_MeasResults__measResultNeighCells_PR_measResultListNR) {
     NR_MeasResultListNR_t *meas_neigh = measresults->measResultNeighCells->choice.measResultListNR;
     for (int i = 0; i < meas_neigh->list.count; ++i) {
       NR_MeasResultNR_t *measresultneigh = meas_neigh->list.array[i];
-      NR_MeasQuantityResults_t *neigh_mqr = measresultneigh->measResult.cellResults.resultsSSB_Cell;
       if (measresultneigh->physCellId)
-        fprintf(f, "    neighboring cell for phyCellId %ld:\n      resultSSB:", *measresultneigh->physCellId);
-      if (mqr != NULL) {
-        const long rrsrp = *neigh_mqr->rsrp - 156;
-        const float rrsrq = (float)(*neigh_mqr->rsrq - 87) / 2.0f;
-        const float rsinr = (float)(*neigh_mqr->sinr - 46) / 2.0f;
-        fprintf(f, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
-      } else {
-        fprintf(f, "NOT PROVIDED\n");
-      }
+        fprintf(f, "    neighboring cell for phyCellId %ld:\n", *measresultneigh->physCellId);
+      print_meas_result_quantity(f, measresultneigh->measResult.cellResults.resultsSSB_Cell);
     }
   }
 }
