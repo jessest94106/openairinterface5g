@@ -905,7 +905,7 @@ int newGtpuDeleteOneTunnel(instance_t instance, ue_id_t ue_id, int rb_id)
   }
   map<ue_id_t, gtpv1u_bearer_t>::iterator rb_it = ue_it->second.bearers.find(rb_id);
   if (rb_it == ue_it->second.bearers.end()) {
-    LOG_E(GTPU, "%s() UE %ld has no bearer %d, available\n", __func__, ue_id, rb_id);
+    LOG_E(GTPU, "%s() UE %ld has no tunnel for bearer %d\n", __func__, ue_id, rb_id);
     pthread_mutex_unlock(&globGtp.gtp_lock);
     return !GTPNOK;
   }
@@ -913,9 +913,9 @@ int newGtpuDeleteOneTunnel(instance_t instance, ue_id_t ue_id, int rb_id)
   globGtp.te2ue_mapping.erase(teid);
   ue_it->second.bearers.erase(rb_id);
   pthread_mutex_unlock(&globGtp.gtp_lock);
-  LOG_I(GTPU, "Deleted tunnel TEID %d (RB %d) for ue id %ld, remaining bearers:\n", teid, rb_id, ue_id);
+  LOG_I(GTPU, "Deleted tunnel TEID 0x%x for bearer %d of UE %ld, remaining tunnels:\n", teid, rb_id, ue_id);
   for (auto b : ue_it->second.bearers)
-    LOG_I(GTPU, "bearer %ld\n", b.first);
+    LOG_I(GTPU, "Bearer %ld\n", b.first);
   return !GTPNOK;
 }
 

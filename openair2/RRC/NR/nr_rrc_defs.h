@@ -167,8 +167,6 @@ typedef struct nr_handover_context_s nr_handover_context_t;
 typedef struct gNB_RRC_UE_s {
   time_t last_seen; // last time this UE has been accessed
 
-  NR_DRB_ToReleaseList_t            *DRB_ReleaseList;
-
   NR_SRB_INFO_TABLE_ENTRY Srb[NR_NUM_SRB];
   NR_MeasConfig_t                   *measConfig;
   nr_handover_context_t *ho_context;

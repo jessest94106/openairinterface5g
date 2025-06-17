@@ -519,7 +519,13 @@ static NR_RRCReconfiguration_IEs_t *build_RRCReconfiguration_IEs(const nr_rrc_re
     cfg->drb_ToAddModList = params->drb_config_list;
     cfg->securityConfig = params->security_config;
     cfg->srb3_ToRelease = NULL;
-    cfg->drb_ToReleaseList = params->drb_release_list;
+    if (params->n_drb_rel) {
+      asn1cCalloc(cfg->drb_ToReleaseList, to_release);
+      for (int i = 0; i < params->n_drb_rel; i++) {
+        asn1cSequenceAdd(to_release->list, NR_DRB_Identity_t, DRB_release);
+        *DRB_release = params->drb_rel[i];
+      }
+    }
   }
 
   /* measConfig */

@@ -1585,13 +1585,12 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
     return -1;
   }
 
-  LOG_I(NR_RRC, "[gNB %ld] gNB_ue_ngap_id %u \n", instance, gNB_ue_ngap_id);
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-  LOG_I(
-      NR_RRC, "PDU Session Release Command: AMF_UE_NGAP_ID %lu  rrc_ue_id %u release_pdusessions %d \n", cmd->amf_ue_ngap_id, gNB_ue_ngap_id, cmd->nb_pdusessions_torelease);
-  bool found = false;
-  uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
-  UE->xids[xid] = RRC_PDUSESSION_RELEASE;
+  LOG_I(NR_RRC, "PDU Session Release: AMF_UE_NGAP_ID %lu  rrc_ue_id %u release_pdusessions %d \n",
+        cmd->amf_ue_ngap_id,
+        gNB_ue_ngap_id,
+        cmd->nb_pdusessions_torelease);
+  e1ap_bearer_mod_req_t req = {0};
   for (int pdusession = 0; pdusession < cmd->nb_pdusessions_torelease; pdusession++) {
     rrc_pdu_session_param_t *pduSession = find_pduSession(&UE->pduSessions, cmd->pdusession_release_params[pdusession].pdusession_id);
     if (!pduSession) {
@@ -1599,30 +1598,35 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
       continue;
     }
     if (pduSession->status == PDU_SESSION_STATUS_FAILED) {
-      pduSession->xid = xid;
       continue;
     }
     if (pduSession->status == PDU_SESSION_STATUS_ESTABLISHED) {
-      found = true;
-      LOG_I(NR_RRC, "RELEASE pdusession %d \n", pduSession->param.pdusession_id);
+      LOG_I(NR_RRC, "NG Release PDU Session %d \n", pduSession->param.pdusession_id);
+      pdu_session_to_remove_t *release = &req.pduSessionRem[req.numPDUSessionsRem++];
+      release->sessionId = pduSession->param.pdusession_id;
+      release->cause.type = E1AP_CAUSE_RADIO_NETWORK;
+      release->cause.value = E1AP_RADIO_CAUSE_NORMAL_RELEASE;
       pduSession->status = PDU_SESSION_STATUS_TORELEASE;
-      pduSession->xid = xid;
     }
   }
 
-  if (found) {
-    // TODO RRCReconfiguration To UE
-    LOG_I(NR_RRC, "Send RRCReconfiguration To UE \n");
-    rrc_gNB_generate_dedicatedRRCReconfiguration_release(rrc, UE, xid, cmd->nas_pdu.len, cmd->nas_pdu.buf);
+  if (req.numPDUSessionsRem == 0) {
+    LOG_E(NR_RRC, "Received NG PDU Session Release Command but no PDU Sessions to release\n");
+    return -1;
+  } else if (!ue_associated_to_cuup(rrc, UE)) {
+    LOG_E(NR_RRC, "UE %d is not associated to CU-UP\n", UE->rrc_ue_id);
+    // TODO handle, e.g., only trigger F1 release
+    return 0;
   } else {
-    // gtp tunnel delete
-    LOG_I(NR_RRC, "gtp tunnel delete all tunnels for UE %04x\n", UE->rnti);
-    gtpv1u_gnb_delete_tunnel_req_t req = {0};
-    req.ue_id = UE->rnti;
-    gtpv1u_delete_ngu_tunnel(rrc->module_id, &req);
-    // NGAP_PDUSESSION_RELEASE_RESPONSE
-    rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(rrc, UE, xid);
-    LOG_I(NR_RRC, "Send PDU Session Release Response \n");
+    /* If present, store NAS-PDU in the UE context for later inclusion in RRCReconfiguration */
+    if (cmd->nas_pdu.len > 0) {
+      UE->nas_pdu = copy_byte_array(cmd->nas_pdu);
+    }
+    LOG_I(NR_RRC, "Send F1 Bearer Context Modification Request with PDU Session release \n");
+    req.gNB_cu_cp_ue_id = UE->rrc_ue_id;
+    req.gNB_cu_up_ue_id = UE->rrc_ue_id;
+    sctp_assoc_t assoc_id = get_existing_cuup_for_ue(rrc, UE);
+    rrc->cucp_cuup.bearer_context_mod(assoc_id, &req);
   }
   return 0;
 }

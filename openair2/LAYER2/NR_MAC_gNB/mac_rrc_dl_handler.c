@@ -381,12 +381,9 @@ static int handle_ue_context_drbs_release(NR_UE_info_t *UE,
 {
   DevAssert(req_drbs != NULL && cellGroupConfig != NULL);
   instance_t f1inst = get_f1_gtp_instance();
-
   cellGroupConfig->rlc_BearerToReleaseList = calloc(1, sizeof(*cellGroupConfig->rlc_BearerToReleaseList));
   AssertFatal(cellGroupConfig->rlc_BearerToReleaseList != NULL, "out of memory\n");
 
-  /* Note: the actual GTP tunnels are already removed in the F1AP message
-   * decoding */
   for (int i = 0; i < drbs_len; i++) {
     const f1ap_drb_to_release_t *drb = &req_drbs[i];
 
@@ -401,7 +398,7 @@ static int handle_ue_context_drbs_release(NR_UE_info_t *UE,
     if (idx < cellGroupConfig->rlc_BearerToAddModList->list.count) {
       nr_mac_remove_lcid(&UE->UE_sched_ctrl, lcid);
       nr_rlc_release_entity(UE->rnti, lcid);
-      if (f1inst >= 0)
+      if (f1inst >= 0) /* Delete F1 tunnel */
         newGtpuDeleteOneTunnel(f1inst, UE->rnti, drb->id);
       asn_sequence_del(&cellGroupConfig->rlc_BearerToAddModList->list, idx, 1);
       long *plcid = malloc(sizeof(*plcid));

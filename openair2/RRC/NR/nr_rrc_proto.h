@@ -66,12 +66,6 @@ void *rrc_gnb_task(void *args_p);
 
 int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int dl_bwp_id, const int ul_bwp_id);
 
-void rrc_gNB_generate_dedicatedRRCReconfiguration_release(gNB_RRC_INST *rrc,
-                                                          gNB_RRC_UE_t *ue_p,
-                                                          uint8_t xid,
-                                                          uint32_t nas_length,
-                                                          uint8_t *nas_buffer);
-
 NR_MeasConfig_t *nr_rrc_get_measconfig(const gNB_RRC_INST *rrc, uint64_t nr_cellid);
 
 bool ue_associated_to_cuup(const gNB_RRC_INST *rrc, const gNB_RRC_UE_t *ue);
