@@ -33,7 +33,7 @@ services:
       timeout: 5s
       retries: 5
   oai-gnb-aerial:
-    cpuset: "13-20"
+    cpuset: "13-14"
     image: ${REGISTRY:-oaisoftwarealliance}/oai-gnb-aerial:${TAG:-develop}
     depends_on:
       nv-cubb:
