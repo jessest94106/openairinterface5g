@@ -1907,22 +1907,22 @@ static int nr_rrc_ue_decode_dcch(NR_UE_RRC_INST_t *rrc,
           break;
 
         case NR_DL_DCCH_MessageType__c1_PR_dlInformationTransfer: {
-          NR_DLInformationTransfer_t *dlInformationTransfer = c1->choice.dlInformationTransfer;
+          NR_DLInformationTransfer_t *dlInfo = c1->choice.dlInformationTransfer;
 
-          if (dlInformationTransfer->criticalExtensions.present
-              == NR_DLInformationTransfer__criticalExtensions_PR_dlInformationTransfer) {
+          if (dlInfo->criticalExtensions.present == NR_DLInformationTransfer__criticalExtensions_PR_dlInformationTransfer) {
+            NR_DLInformationTransfer_IEs_t *dlInfo_IE = dlInfo->criticalExtensions.choice.dlInformationTransfer;
             /* This message hold a dedicated info NAS payload, forward it to NAS */
-            NR_DedicatedNAS_Message_t *dedicatedNAS_Message =
-                dlInformationTransfer->criticalExtensions.choice.dlInformationTransfer->dedicatedNAS_Message;
-
-            MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_DOWNLINK_DATA_IND);
-            dl_info_transfer_ind_t *msg = &NAS_DOWNLINK_DATA_IND(ittiMsg);
-            msg->UEid = rrc->ue_id;
-            msg->nasMsg.length = dedicatedNAS_Message->size;
-            msg->nasMsg.nas_data = malloc(msg->nasMsg.length);
-            memcpy(msg->nasMsg.nas_data, dedicatedNAS_Message->buf, msg->nasMsg.length);
-            itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
-            dedicatedNAS_Message->buf = NULL; // to keep the buffer, up to NAS to free it
+            NR_DedicatedNAS_Message_t *dedicatedNAS_Message = dlInfo_IE->dedicatedNAS_Message;
+            if (dedicatedNAS_Message) {
+              MessageDef *ittiMsg = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NAS_DOWNLINK_DATA_IND);
+              dl_info_transfer_ind_t *msg = &NAS_DOWNLINK_DATA_IND(ittiMsg);
+              msg->UEid = rrc->ue_id;
+              msg->nasMsg.length = dedicatedNAS_Message->size;
+              msg->nasMsg.nas_data = malloc(msg->nasMsg.length);
+              memcpy(msg->nasMsg.nas_data, dedicatedNAS_Message->buf, msg->nasMsg.length);
+              itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
+              dedicatedNAS_Message->buf = NULL; // to keep the buffer, up to NAS to free it
+            }
           }
         } break;
         case NR_DL_DCCH_MessageType__c1_PR_mobilityFromNRCommand:
