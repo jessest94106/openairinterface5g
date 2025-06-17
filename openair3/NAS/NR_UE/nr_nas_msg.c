@@ -1495,6 +1495,10 @@ static void handle_pdu_session_accept(uint8_t *pdu_buffer, uint32_t msg_length, 
  */
 void handleDownlinkNASTransport(uint8_t * pdu_buffer, int pdu_length, int instance)
 {
+  if (pdu_length < 17) {
+    LOG_E(NAS, "Received DL NAS Transport message too short (%d)\n", pdu_length);
+    return;
+  }
   uint8_t msg_type = *(pdu_buffer + 16);
   if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
     LOG_A(NAS, "Received PDU Session Establishment Accept in DL NAS Transport\n");
