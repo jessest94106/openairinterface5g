@@ -113,7 +113,7 @@ typedef struct {
   /// Component Carrier index
   uint8_t              CC_id;
   /// Last RX timestamp
-  openair0_timestamp timestamp_rx;
+  openair0_timestamp_t timestamp_rx;
 } UE_nr_proc_t;
 
 typedef enum {
@@ -350,7 +350,7 @@ typedef struct PHY_VARS_NR_UE_s {
   /// \brief Component carrier ID for this PHY instance
   uint8_t CC_id;
   /// \brief Mapping of CC_id antennas to cards
-  openair0_rf_map      rf_map;
+  openair0_rf_map_t rf_map;
   /// \brief Indicator that UE should perform band scanning
   int UE_scan;
   /// \brief Indicator that UE should perform coarse scanning around carrier
@@ -508,7 +508,7 @@ typedef struct PHY_VARS_NR_UE_s {
   nr_ue_phy_cpu_stat_t phy_cpu_stats;
 
   /// RF and Interface devices per CC
-  openair0_device rfdevice;
+  openair0_device_t rfdevice;
 
   /// Phase precompensation flag
   bool no_phase_pre_comp;
@@ -540,7 +540,7 @@ typedef struct PHY_VARS_NR_UE_s {
 } PHY_VARS_NR_UE;
 
 typedef struct {
-  openair0_timestamp timestamp_tx;
+  openair0_timestamp_t timestamp_tx;
   int gNB_id;
   /// NR slot index within frame_tx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_tx;

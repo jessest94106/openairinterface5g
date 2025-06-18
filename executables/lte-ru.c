@@ -390,7 +390,7 @@ void fh_if5_north_asynch_in(RU_t *ru,
   LTE_DL_FRAME_PARMS *fp = ru->frame_parms;
   RU_proc_t *proc        = &ru->proc;
   int tti_tx,frame_tx;
-  openair0_timestamp timestamp_tx=0;
+  openair0_timestamp_t timestamp_tx = 0;
   //recv_IF5(ru, &timestamp_tx, *subframe, IF5_RRH_GW_DL);
   //      LOG_I(PHY,"Received subframe %d (TS %llu) from RCC\n",tti_tx,timestamp_tx);
   tti_tx = (timestamp_tx/fp->samples_per_tti)%10;
@@ -540,7 +540,7 @@ void rx_rf(RU_t *ru,
   unsigned int rxs;
   int i;
   int resynch=0;
-  openair0_timestamp ts=0,old_ts=0;
+  openair0_timestamp_t ts = 0, old_ts = 0;
 
   for (i=0; i<ru->nb_rx; i++)
     rxp[i] = (void *)&ru->common.rxdata[i][*subframe*fp->samples_per_tti];

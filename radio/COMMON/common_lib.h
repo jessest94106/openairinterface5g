@@ -58,12 +58,11 @@
 #define MAX_WRITE_THREAD_BUFFER_SIZE 8
 #define MAX_CARDS 8
 
-typedef int64_t openair0_timestamp;
-typedef volatile int64_t openair0_vtimestamp;
-
+typedef int64_t openair0_timestamp_t;
+typedef volatile int64_t openair0_vtimestamp_t;
 
 /*!\brief structure holds the parameters to configure USRP devices*/
-typedef struct openair0_device_t openair0_device;
+typedef struct openair0_device openair0_device_t;
 
 //#define USRP_GAIN_OFFSET (56.0)  // 86 calibrated for USRP B210 @ 2.6 GHz to get equivalent RS EPRE in OAI to SMBV100 output
 
@@ -167,7 +166,7 @@ typedef enum {
 
 /*! \brief Structure used for initializing UDP read threads */
 typedef struct {
-  openair0_device *device;
+  openair0_device_t *device;
   int thread_id;
   pthread_t pthread;
   notifiedFIFO_t *resp;
@@ -317,8 +316,7 @@ typedef struct {
   int card;
   //! rf chain id
   int chain;
-} openair0_rf_map;
-
+} openair0_rf_map_t;
 
 typedef struct {
   char *remote_addr;
@@ -350,7 +348,7 @@ typedef struct {
 } if_buffer_t;
 
 typedef struct {
-  openair0_timestamp timestamp;
+  openair0_timestamp_t timestamp;
   void *buff[MAX_WRITE_THREAD_BUFFER_SIZE];// buffer to be write;
   int nsamps;
   int cc;
@@ -378,11 +376,11 @@ typedef struct {
 } openair0_thread_t;
 
 typedef struct fhstate_s {
-  openair0_timestamp TS[8]; 
-  openair0_timestamp TS0;
-  openair0_timestamp olddeltaTS[8];
-  openair0_timestamp oldTS[8];
-  openair0_timestamp TS_read;
+  openair0_timestamp_t TS[8];
+  openair0_timestamp_t TS0;
+  openair0_timestamp_t olddeltaTS[8];
+  openair0_timestamp_t oldTS[8];
+  openair0_timestamp_t TS_read;
   int first_read;
   uint32_t *buff[8];
   uint32_t buff_size;
@@ -395,10 +393,10 @@ typedef struct {
   bool initDone;
   pthread_mutex_t mutex_write;
   pthread_mutex_t mutex_store;
-  openair0_timestamp nextTS;
+  openair0_timestamp_t nextTS;
   struct {
     bool active;
-    openair0_timestamp timestamp;
+    openair0_timestamp_t timestamp;
     void *txp[NB_ANTENNAS_TX];
     int nsamps;
     int nbAnt;
@@ -407,7 +405,7 @@ typedef struct {
 } re_order_t;
 
 /*!\brief structure holds the parameters to configure USRP devices */
-struct openair0_device_t {
+struct openair0_device {
   /*!tx write thread*/
   openair0_thread_t write_thread;
 
@@ -463,28 +461,27 @@ struct openair0_device_t {
   /*! \brief Called to start the transceiver. Return 0 if OK, < 0 if error
       @param device pointer to the device structure specific to the RF hardware target
   */
-  int (*trx_start_func)(openair0_device *device);
+  int (*trx_start_func)(openair0_device_t *device);
 
- /*! \brief Called to configure the device
-      @param device pointer to the device structure specific to the RF hardware target  
-  */
+  /*! \brief Called to configure the device
+       @param device pointer to the device structure specific to the RF hardware target
+   */
 
-
-  int (*trx_config_func)(openair0_device* device, openair0_config_t *openair0_cfg);
+  int (*trx_config_func)(openair0_device_t *device, openair0_config_t *openair0_cfg);
 
   /*! \brief Called to send a request message between RAU-RRU on control port
       @param device pointer to the device structure specific to the RF hardware target
       @param msg pointer to the message structure passed between RAU-RRU
       @param msg_len length of the message
   */
-  int (*trx_ctlsend_func)(openair0_device *device, void *msg, ssize_t msg_len);
+  int (*trx_ctlsend_func)(openair0_device_t *device, void *msg, ssize_t msg_len);
 
   /*! \brief Called to receive a reply  message between RAU-RRU on control port
       @param device pointer to the device structure specific to the RF hardware target
       @param msg pointer to the message structure passed between RAU-RRU
       @param msg_len length of the message
   */
-  int (*trx_ctlrecv_func)(openair0_device *device, void *msg, ssize_t msg_len);
+  int (*trx_ctlrecv_func)(openair0_device_t *device, void *msg, ssize_t msg_len);
 
   /*! \brief Called to send samples to the RF target
       @param device pointer to the device structure specific to the RF hardware target
@@ -495,8 +492,8 @@ struct openair0_device_t {
       @param num_beams number of beams
       @param flags flags must be set to true if timestamp parameter needs to be applied
   */
-  int (*trx_write_beams_func)(openair0_device *device,
-                              openair0_timestamp timestamp,
+  int (*trx_write_beams_func)(openair0_device_t *device,
+                              openair0_timestamp_t timestamp,
                               void ***buff,
                               int nsamps,
                               int nb_antennas_tx,
@@ -511,7 +508,12 @@ struct openair0_device_t {
       @param nb_antennas_tx number of antennas
       @param flags flags must be set to true if timestamp parameter needs to be applied
   */
-  int (*trx_write_func)(openair0_device *device, openair0_timestamp timestamp, void **buff, int nsamps, int nb_antennas_tx, int flags);
+  int (*trx_write_func)(openair0_device_t *device,
+                        openair0_timestamp_t timestamp,
+                        void **buff,
+                        int nsamps,
+                        int nb_antennas_tx,
+                        int flags);
 
   /*! \brief Called to send samples to the RF target
       @param device pointer to the device structure specific to the RF hardware target
@@ -520,7 +522,13 @@ struct openair0_device_t {
       @param nsamps number of samples to be sent
       @param flags flags must be set to true if timestamp parameter needs to be applied
   */
-  int (*trx_write_func2)(openair0_device *device, openair0_timestamp timestamp, void **buff, int fd_ind,int nsamps, int flags,int nant);
+  int (*trx_write_func2)(openair0_device_t *device,
+                         openair0_timestamp_t timestamp,
+                         void **buff,
+                         int fd_ind,
+                         int nsamps,
+                         int flags,
+                         int nant);
 
   /*! \brief Receive samples from hardware.
    * Read nsamps samples from each channel to buffers. buff[0] is the array for
@@ -533,7 +541,7 @@ struct openair0_device_t {
    * antennas from which to receive samples \returns the number of sample read
    */
 
-  int (*trx_read_func)(openair0_device *device, openair0_timestamp *ptimestamp, void **buff, int nsamps, int num_antennas);
+  int (*trx_read_func)(openair0_device_t *device, openair0_timestamp_t *ptimestamp, void **buff, int nsamps, int num_antennas);
 
   /*! \brief Receive samples from hardware.
    * Read nsamps samples from each channel to buffers. buff[0] is the array for
@@ -548,8 +556,8 @@ struct openair0_device_t {
    * \param num_beams number of beams from which to receive samples
    * \returns the number of sample read
    */
-  int (*trx_read_beams_func)(openair0_device *device,
-                             openair0_timestamp *ptimestamp,
+  int (*trx_read_beams_func)(openair0_device_t *device,
+                             openair0_timestamp_t *ptimestamp,
                              void ***buff,
                              int nsamps,
                              int num_antennas,
@@ -567,28 +575,28 @@ struct openair0_device_t {
    * \param antenna_id Index of antenna from which samples were received
    * \returns the number of sample read
    */
-  int (*trx_read_func2)(openair0_device *device, openair0_timestamp *ptimestamp, uint32_t **buff, int nsamps);
+  int (*trx_read_func2)(openair0_device_t *device, openair0_timestamp_t *ptimestamp, uint32_t **buff, int nsamps);
 
   /*! \brief print the device statistics
    * \param device the hardware to use
    * \returns  0 on success
    */
-  int (*trx_get_stats_func)(openair0_device *device);
+  int (*trx_get_stats_func)(openair0_device_t *device);
 
   /*! \brief Reset device statistics
    * \param device the hardware to use
    * \returns 0 in success
    */
-  int (*trx_reset_stats_func)(openair0_device *device);
+  int (*trx_reset_stats_func)(openair0_device_t *device);
 
   /*! \brief Terminate operation of the transceiver -- free all associated resources
    * \param device the hardware to use
    */
-  void (*trx_end_func)(openair0_device *device);
+  void (*trx_end_func)(openair0_device_t *device);
 
   /*! \brief Stop operation of the transceiver
    */
-  int (*trx_stop_func)(openair0_device *device);
+  int (*trx_stop_func)(openair0_device_t *device);
 
   /* Functions API related to UE*/
 
@@ -597,14 +605,14 @@ struct openair0_device_t {
    * \param openair0_cfg RF frontend parameters set by application
    * \returns 0 in success
    */
-  int (*trx_set_freq_func)(openair0_device *device, openair0_config_t *openair0_cfg);
+  int (*trx_set_freq_func)(openair0_device_t *device, openair0_config_t *openair0_cfg);
 
   /*! \brief Set gains
    * \param device the hardware to use
    * \param openair0_cfg RF frontend parameters set by application
    * \returns 0 in success
    */
-  int (*trx_set_gains_func)(openair0_device *device, openair0_config_t *openair0_cfg);
+  int (*trx_set_gains_func)(openair0_device_t *device, openair0_config_t *openair0_cfg);
 
   /*! \brief Set tx/rx beams
    *
@@ -619,9 +627,9 @@ struct openair0_device_t {
    * \param beam_map the beams to receive
    * \return 0 on success
    */
-  int (*trx_set_beams)(openair0_device *device, uint64_t beam_map, openair0_timestamp timestamp);
+  int (*trx_set_beams)(openair0_device_t *device, uint64_t beam_map, openair0_timestamp_t timestamp);
 
-    /*! \brief Set tx/rx beams
+  /*! \brief Set tx/rx beams
    *
    * Set the tx/rx beams. This has to be done in advance of the reception in order to
    * allow the underlying device to change receiver configuration. The exact time depends
@@ -635,7 +643,7 @@ struct openair0_device_t {
    * \param num_beams number of beams
    * \return 0 on success
    */
-  int (*trx_set_beams2)(openair0_device *device, int* beams, int num_beams, openair0_timestamp timestamp);
+  int (*trx_set_beams2)(openair0_device_t *device, int *beams, int num_beams, openair0_timestamp_t timestamp);
 
   /*! \brief RRU Configuration callback
    * \param idx RU index
@@ -651,22 +659,22 @@ struct openair0_device_t {
   /*! \brief Callback for Third-party RRU Initialization routine
      \param device the hardware configuration to use
    */
-  int (*thirdparty_init)(openair0_device *device);
+  int (*thirdparty_init)(openair0_device_t *device);
   /*! \brief Callback for Third-party RRU Cleanup routine
      \param device the hardware configuration to use
    */
-  int (*thirdparty_cleanup)(openair0_device *device);
+  int (*thirdparty_cleanup)(openair0_device_t *device);
 
   /*! \brief Callback for Third-party start streaming routine
      \param device the hardware configuration to use
    */
-  int (*thirdparty_startstreaming)(openair0_device *device);
+  int (*thirdparty_startstreaming)(openair0_device_t *device);
 
   /*! \brief RRU Configuration callback
    * \param idx RU index
    * \param arg pointer to capabilities or configuration
    */
-  int (*trx_write_init)(openair0_device *device);
+  int (*trx_write_init)(openair0_device_t *device);
   /* \brief Get internal parameter
    * \param id parameter to get
    * \return a pointer to the parameter
@@ -679,9 +687,9 @@ struct openair0_device_t {
 };
 
 /* type of device init function, implemented in shared lib */
-typedef int(*oai_device_initfunc_t)(openair0_device *device, openair0_config_t *openair0_cfg);
+typedef int (*oai_device_initfunc_t)(openair0_device_t *device, openair0_config_t *openair0_cfg);
 /* type of transport init function, implemented in shared lib */
-typedef int(*oai_transport_initfunc_t)(openair0_device *device, openair0_config_t *openair0_cfg, eth_params_t *eth_params);
+typedef int (*oai_transport_initfunc_t)(openair0_device_t *device, openair0_config_t *openair0_cfg, eth_params_t *eth_params);
 
 #define OPTION_LZ4  0x00000001          // LZ4 compression (option_value is set to compressed size)
 
@@ -723,30 +731,29 @@ extern "C"
 /*! \brief get device name from device type */
 const char *get_devname(int devtype);
 /*! \brief Initialize openair RF target. It returns 0 if OK */
-int openair0_device_load(openair0_device *device, openair0_config_t *openair0_cfg);
+int openair0_device_load(openair0_device_t *device, openair0_config_t *openair0_cfg);
 /*! \brief Initialize transport protocol . It returns 0 if OK */
-int openair0_transport_load(openair0_device *device, openair0_config_t *openair0_cfg, eth_params_t *eth_params);
-
+int openair0_transport_load(openair0_device_t *device, openair0_config_t *openair0_cfg, eth_params_t *eth_params);
 
 /*! \brief Get current timestamp of USRP
  * \param device the hardware to use
  */
-openair0_timestamp get_usrp_time(openair0_device *device);
+openair0_timestamp_t get_usrp_time(openair0_device_t *device);
 
 /*! \brief Set RX frequencies
  * \param device the hardware to use
  * \param openair0_cfg RF frontend parameters set by application
  * \returns 0 in success
  */
-int openair0_set_rx_frequencies(openair0_device *device, openair0_config_t *openair0_cfg);
+int openair0_set_rx_frequencies(openair0_device_t *device, openair0_config_t *openair0_cfg);
 /*! \brief read the iq record-player configuration */
 extern int read_recplayconfig(recplay_conf_t **recplay_conf, recplay_state_t **recplay_state);
 
 /*! \brief store recorded iqs from memory to file. */
-extern void iqrecorder_end(openair0_device *device);
+extern void iqrecorder_end(openair0_device_t *device);
 
-int openair0_write_reorder(openair0_device *device, openair0_timestamp timestamp, void **txp, int nsamps, int nbAnt, int flags);
-void openair0_write_reorder_clear_context(openair0_device *device);
+int openair0_write_reorder(openair0_device_t *device, openair0_timestamp_t timestamp, void **txp, int nsamps, int nbAnt, int flags);
+void openair0_write_reorder_clear_context(openair0_device_t *device);
 #include <unistd.h>
 #ifndef gettid
 #define gettid() syscall(__NR_gettid)

@@ -570,10 +570,10 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
     rxp[i] = (void *)&ru->common.rxdata[i][get_samples_slot_timestamp(fp, *slot)];
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_READ, 1);
-  openair0_timestamp old_ts = proc->timestamp_rx;
+  openair0_timestamp_t old_ts = proc->timestamp_rx;
   LOG_D(PHY,"Reading %d samples for slot %d (%p)\n", samples_per_slot, *slot, rxp[0]);
 
-  openair0_timestamp ts;
+  openair0_timestamp_t ts;
   unsigned int rxs;
   rxs = ru->rfdevice.trx_read_func(&ru->rfdevice, &ts, rxp, samples_per_slot, nb);
 

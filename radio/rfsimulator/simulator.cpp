@@ -141,7 +141,7 @@ typedef c16_t sample_t; // 2*16 bits complex number
 
 typedef struct beam_switch_command_t {
   std::vector<int> beams;
-  openair0_timestamp timestamp;
+  openair0_timestamp_t timestamp;
 } beam_switch_command_t;
 
 typedef struct {
@@ -157,7 +157,7 @@ typedef struct {
 
 typedef struct buffer_s {
   int conn_sock;
-  openair0_timestamp lastReceivedTS;
+  openair0_timestamp_t lastReceivedTS;
   bool headerMode;
   bool trashingPacket;
   samplesBlockHeader_t th;
@@ -183,8 +183,8 @@ typedef struct {
   int listen_sock, epollfd;
   pthread_mutex_t Sockmutex;
   unsigned int nb_cnx;
-  openair0_timestamp nextRxTstamp;
-  openair0_timestamp lastWroteTS;
+  openair0_timestamp_t nextRxTstamp;
+  openair0_timestamp_t lastWroteTS;
   simuRole role;
   char *ip;
   uint16_t port;
@@ -218,7 +218,7 @@ typedef struct {
  * @param nsamps_out output pointer to receive the number of samples until the next beam switch.
  * @return The beam map (uint64_t) valid for the given timestamp.
  */
-static std::vector<int> get_beams(beam_state_t *beam_state, openair0_timestamp timestamp, uint32_t nsamps, uint32_t *nsamps_out)
+static std::vector<int> get_beams(beam_state_t *beam_state, openair0_timestamp_t timestamp, uint32_t nsamps, uint32_t *nsamps_out)
 {
   std::lock_guard<std::mutex> lock(beam_state->mutex);
   std::vector<int> current_beams = beam_state->beams;
@@ -284,7 +284,7 @@ static uint64_t beams_to_beam_map(const std::vector<int> &beam_ids)
  * @param beam_state Pointer to the beam_state_t structure containing the command queue and current beam map.
  * @param timestamp The timestamp up to which commands should be processed and removed.
  */
-static void clear_beam_queue(beam_state_t *beam_state, openair0_timestamp timestamp)
+static void clear_beam_queue(beam_state_t *beam_state, openair0_timestamp_t timestamp)
 {
   std::lock_guard<std::mutex> lock(beam_state->mutex);
   while (!beam_state->cmd_queue.empty()) {
@@ -472,7 +472,7 @@ static float get_rx_gain_db(rfsimulator_state_t *rfsimulator, uint rx_beam, uint
   return rfsimulator->beam_ctrl->beam_gains[rx_beam][tx_beam];
 }
 
-static int rfsimulator_set_beams(openair0_device *device, uint64_t beam_map, openair0_timestamp timestamp)
+static int rfsimulator_set_beams(openair0_device_t *device, uint64_t beam_map, openair0_timestamp_t timestamp)
 {
   rfsimulator_state_t *s = static_cast<rfsimulator_state_t *>(device->priv);
   rfsim_beam_ctrl_t *beam_ctrl = s->beam_ctrl;
@@ -484,7 +484,7 @@ static int rfsimulator_set_beams(openair0_device *device, uint64_t beam_map, ope
   return 0;
 }
 
-static int rfsimulator_set_beams_vector(openair0_device *device, int* beams, int num_beams, openair0_timestamp timestamp)
+static int rfsimulator_set_beams_vector(openair0_device_t *device, int *beams, int num_beams, openair0_timestamp_t timestamp)
 {
   rfsimulator_state_t *s = static_cast<rfsimulator_state_t *>(device->priv);
   rfsim_beam_ctrl_t *beam_ctrl = s->beam_ctrl;
@@ -769,13 +769,13 @@ static int rfsimu_getdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt
 static int rfsimu_vtime_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg)
 {
   rfsimulator_state_t *t = (rfsimulator_state_t *)arg;
-  const openair0_timestamp ts = t->nextRxTstamp;
+  const openair0_timestamp_t ts = t->nextRxTstamp;
   const double sample_rate = t->sample_rate;
   prnt("%s: vtime measurement: TS %llu sample_rate %.3f\n", __func__, ts, sample_rate);
   return CMDSTATUS_FOUND;
 }
 
-static int startServer(openair0_device *device)
+static int startServer(openair0_device_t *device)
 {
   int sock = -1;
   struct addrinfo *results = NULL;
@@ -885,7 +885,7 @@ static int client_try_connect(const char *host, uint16_t port)
   return sock;
 }
 
-static int startClient(openair0_device *device)
+static int startClient(openair0_device_t *device)
 {
   rfsimulator_state_t *t = static_cast<rfsimulator_state_t *>(device->priv);
   t->role = SIMU_ROLE_CLIENT;
@@ -928,7 +928,7 @@ static int startClient(openair0_device *device)
 }
 
 static int rfsimulator_write_internal(rfsimulator_state_t *t,
-                                      openair0_timestamp timestamp,
+                                      openair0_timestamp_t timestamp,
                                       void ***samplesVoid,
                                       int nsamps,
                                       int nbAnt,
@@ -986,8 +986,8 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
   return nsamps;
 }
 
-static int rfsimulator_write_beams(openair0_device *device,
-                                   openair0_timestamp timestamp,
+static int rfsimulator_write_beams(openair0_device_t *device,
+                                   openair0_timestamp_t timestamp,
                                    void ***samplesVoid,
                                    int nsamps,
                                    int nbAnt,
@@ -1022,7 +1022,7 @@ static int rfsimulator_write_beams(openair0_device *device,
   return nsamps_initial;
 }
 
-static int rfsimulator_write(openair0_device *device, openair0_timestamp timestamp, void **buff, int nsamps, int cc, int flags)
+static int rfsimulator_write(openair0_device_t *device, openair0_timestamp_t timestamp, void **buff, int nsamps, int cc, int flags)
 {
   void **tmp = buff;
   return rfsimulator_write_beams(device, timestamp, &tmp, nsamps, cc, 1, flags);
@@ -1253,7 +1253,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, bool first_time)
 
 static void rfsimulator_read_internal(rfsimulator_state_t *t,
                                       c16_t **samples,
-                                      openair0_timestamp timestamp,
+                                      openair0_timestamp_t timestamp,
                                       int nsamps,
                                       int nbAnt,
                                       int rx_beam_id,
@@ -1355,8 +1355,8 @@ static void rfsimulator_read_internal(rfsimulator_state_t *t,
   }
 }
 
-static int rfsimulator_read_beams(openair0_device *device,
-                                  openair0_timestamp *ptimestamp,
+static int rfsimulator_read_beams(openair0_device_t *device,
+                                  openair0_timestamp_t *ptimestamp,
                                   void ***samplesVoid,
                                   int nsamps,
                                   int nbAnt,
@@ -1438,7 +1438,7 @@ static int rfsimulator_read_beams(openair0_device *device,
     for (int a = 0; a < nbAnt; a++)
       memset(samplesVoid[beam][a], 0, sampleToByte(nsamps, 1));
 
-  openair0_timestamp timestamp = t->nextRxTstamp;
+  openair0_timestamp_t timestamp = t->nextRxTstamp;
   int nsamps_to_process = nsamps;
   while (nsamps_to_process > 0) {
     uint32_t nsamps_beam_map;
@@ -1488,7 +1488,7 @@ static int rfsimulator_read_beams(openair0_device *device,
     buffer_t *ptr = &t->buf[sock];
 
     if (ptr->conn_sock != -1 && !ptr->received_packets.empty()) {
-      openair0_timestamp timestamp_to_free = t->nextRxTstamp - 1;
+      openair0_timestamp_t timestamp_to_free = t->nextRxTstamp - 1;
       if (ptr->channel_model) {
         timestamp_to_free -=
             (ptr->channel_model->channel_length - 1) + std::max(ptr->channel_model->channel_offset, t->chan_offset);
@@ -1502,20 +1502,20 @@ static int rfsimulator_read_beams(openair0_device *device,
   return nsamps;
 }
 
-static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimestamp, void **samplesVoid, int nsamps, int nbAnt)
+static int rfsimulator_read(openair0_device_t *device, openair0_timestamp_t *ptimestamp, void **samplesVoid, int nsamps, int nbAnt)
 {
   return rfsimulator_read_beams(device, ptimestamp, &samplesVoid, nsamps, nbAnt, 1);
 }
 
-static int rfsimulator_get_stats(openair0_device *device)
+static int rfsimulator_get_stats(openair0_device_t *device)
 {
   return 0;
 }
-static int rfsimulator_reset_stats(openair0_device *device)
+static int rfsimulator_reset_stats(openair0_device_t *device)
 {
   return 0;
 }
-static void rfsimulator_end(openair0_device *device)
+static void rfsimulator_end(openair0_device_t *device)
 {
   rfsimulator_state_t *s = static_cast<rfsimulator_state_t *>(device->priv);
   for (int i = 0; i < MAX_FD_RFSIMU; i++) {
@@ -1529,7 +1529,8 @@ static void rfsimulator_end(openair0_device *device)
   close(s->epollfd);
   free(s);
 }
-static void stopServer(openair0_device *device)
+
+static void stopServer(openair0_device_t *device)
 {
   rfsimulator_state_t *t = (rfsimulator_state_t *)device->priv;
   DevAssert(t != NULL);
@@ -1537,26 +1538,26 @@ static void stopServer(openair0_device *device)
   rfsimulator_end(device);
 }
 
-static int rfsimulator_stop(openair0_device *device)
+static int rfsimulator_stop(openair0_device_t *device)
 {
   return 0;
 }
-static int rfsimulator_set_freq(openair0_device *device, openair0_config_t *openair0_cfg)
+static int rfsimulator_set_freq(openair0_device_t *device, openair0_config_t *openair0_cfg)
 {
   rfsimulator_state_t *s = static_cast<rfsimulator_state_t *>(device->priv);
   s->rx_freq = openair0_cfg->rx_freq[0];
   return 0;
 }
-static int rfsimulator_set_gains(openair0_device *device, openair0_config_t *openair0_cfg)
+static int rfsimulator_set_gains(openair0_device_t *device, openair0_config_t *openair0_cfg)
 {
   return 0;
 }
-static int rfsimulator_write_init(openair0_device *device)
+static int rfsimulator_write_init(openair0_device_t *device)
 {
   return 0;
 }
 
-extern "C" __attribute__((__visibility__("default"))) int device_init(openair0_device *device, openair0_config_t *openair0_cfg)
+extern "C" __attribute__((__visibility__("default"))) int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
 {
   // to change the log level, use this on command line
   // --log_config.hw_log_level debug

@@ -320,7 +320,7 @@ uint32_t get_samples_symbol_timestamp(const NR_DL_FRAME_PARMS *fp, int slot, int
   return get_samples_symbol_duration(fp, slot, 0, symbol);
 }
 
-uint32_t get_slot_from_timestamp(openair0_timestamp timestamp_rx, const NR_DL_FRAME_PARMS *fp)
+uint32_t get_slot_from_timestamp(openair0_timestamp_t timestamp_rx, const NR_DL_FRAME_PARMS *fp)
 {
   timestamp_rx = timestamp_rx % fp->samples_per_frame;
   if (timestamp_rx < fp->samples_per_slot0)
