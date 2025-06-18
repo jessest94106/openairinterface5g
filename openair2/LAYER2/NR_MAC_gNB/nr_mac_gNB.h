@@ -848,10 +848,6 @@ typedef struct gNB_MAC_INST_s {
 
   NR_UEs_t UE_info;
 
-  /// UL handle
-  uint32_t ul_handle;
-  //UE_info_t UE_info;
-
   // MAC function execution peformance profiler
   /// processing time of eNB scheduler
   time_stats_t eNB_scheduler;

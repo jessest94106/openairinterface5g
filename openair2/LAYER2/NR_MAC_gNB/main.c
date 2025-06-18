@@ -269,8 +269,6 @@ void mac_top_init_gNB(ngran_node_t node_type,
       RC.nrmac[i]->tag = (NR_TAG_t*)malloc(sizeof(NR_TAG_t));
       memset((void*)RC.nrmac[i]->tag,0,sizeof(NR_TAG_t));
         
-      RC.nrmac[i]->ul_handle = 0;
-
       RC.nrmac[i]->common_channels[0].ServingCellConfigCommon = scc;
       RC.nrmac[i]->radio_config = *config;
       RC.nrmac[i]->rlc_config = *default_rlc_config;
