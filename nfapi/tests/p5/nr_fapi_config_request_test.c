@@ -206,6 +206,47 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
   FILL_TLV(nfapi_resp->measurement_config.rssi_measurement, NFAPI_NR_CONFIG_RSSI_MEASUREMENT_TAG, rand8());
   nfapi_resp->num_tlv++;
 
+  uint16_t nb_beams = rand16_range(1, 15);
+  uint16_t nb_tx = rand16_range(1, 15);
+  nfapi_resp->dbt_config.num_dig_beams = nb_beams;
+  if (nfapi_resp->dbt_config.num_dig_beams > 0) {
+    nfapi_resp->dbt_config.num_txrus = nb_tx;
+    nfapi_resp->dbt_config.dig_beam_list = calloc(nb_beams , sizeof(*nfapi_resp->dbt_config.dig_beam_list));
+    for (int i = 0; i < nb_beams; i++) {
+      nfapi_nr_dig_beam_t *beam = &nfapi_resp->dbt_config.dig_beam_list[i];
+      beam->beam_idx = i;
+      beam->txru_list = calloc(nb_tx , sizeof(*beam->txru_list));
+      for (int j = 0; j < nb_tx; j++) {
+        nfapi_nr_txru_t *txru = &beam->txru_list[j];
+        txru->dig_beam_weight_Re = rand16_range(1, 0xffff);
+        txru->dig_beam_weight_Im = rand16_range(1, 0xffff);
+      }
+    }
+    nfapi_resp->num_tlv++;
+  }
+
+  nfapi_nr_pm_list_t *pm_list = &nfapi_resp->pmi_list;
+  const uint16_t num_layers = rand16_range(1, 4);
+  const uint16_t num_ant_ports = rand16_range(1, 4);
+  pm_list->num_pm_idx = rand16_range(1, 4);
+  if (nfapi_resp->pmi_list.num_pm_idx > 0) {
+    pm_list->pmi_pdu = calloc(pm_list->num_pm_idx, sizeof(*pm_list->pmi_pdu));
+    for (int i = 0; i < pm_list->num_pm_idx; i++) {
+      nfapi_nr_pm_pdu_t *pmi_pdu = &pm_list->pmi_pdu[i];
+      pmi_pdu->pm_idx = i+1;
+      pmi_pdu->numLayers = num_layers;
+      pmi_pdu->num_ant_ports = num_ant_ports;
+      for (int j = 0; j < num_layers; j++) {
+        for (int k = 0; k < num_ant_ports; k++) {
+          nfapi_nr_pm_weights_t* pm_weight = &pmi_pdu->weights[j][k];
+          pm_weight->precoder_weight_Re = (int16_t)rand16_range(1, 0xffff);
+          pm_weight->precoder_weight_Im = (int16_t)rand16_range(1, 0xffff);
+        }
+      }
+    }
+    nfapi_resp->num_tlv++;
+  }
+
   nfapi_resp->nfapi_config.p7_vnf_address_ipv4.tl.tag = NFAPI_NR_NFAPI_P7_VNF_ADDRESS_IPV4_TAG;
   for (int i = 0; i < NFAPI_IPV4_ADDRESS_LENGTH; ++i) {
     nfapi_resp->nfapi_config.p7_vnf_address_ipv4.address[i] = rand8();
@@ -219,6 +260,21 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
   nfapi_resp->num_tlv++;
 
   FILL_TLV(nfapi_resp->nfapi_config.p7_vnf_port, NFAPI_NR_NFAPI_P7_VNF_PORT_TAG, rand16());
+  nfapi_resp->num_tlv++;
+
+  nfapi_resp->nfapi_config.p7_pnf_address_ipv4.tl.tag = NFAPI_NR_NFAPI_P7_PNF_ADDRESS_IPV4_TAG;
+  for (int i = 0; i < NFAPI_IPV4_ADDRESS_LENGTH; ++i) {
+    nfapi_resp->nfapi_config.p7_pnf_address_ipv4.address[i] = rand8();
+  }
+  nfapi_resp->num_tlv++;
+
+  nfapi_resp->nfapi_config.p7_pnf_address_ipv6.tl.tag = NFAPI_NR_NFAPI_P7_PNF_ADDRESS_IPV6_TAG;
+  for (int i = 0; i < NFAPI_IPV6_ADDRESS_LENGTH; ++i) {
+    nfapi_resp->nfapi_config.p7_pnf_address_ipv6.address[i] = rand8();
+  }
+  nfapi_resp->num_tlv++;
+
+  FILL_TLV(nfapi_resp->nfapi_config.p7_pnf_port, NFAPI_NR_NFAPI_P7_PNF_PORT_TAG, rand16());
   nfapi_resp->num_tlv++;
 
   FILL_TLV(nfapi_resp->nfapi_config.timing_window, NFAPI_NR_NFAPI_TIMING_WINDOW_TAG, rand8());

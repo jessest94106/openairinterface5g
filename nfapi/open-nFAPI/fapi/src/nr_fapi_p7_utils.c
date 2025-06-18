@@ -859,9 +859,7 @@ bool eq_rach_indication(const nfapi_nr_rach_indication_t *a, const nfapi_nr_rach
 
 void free_dl_tti_request(nfapi_nr_dl_tti_request_t *msg)
 {
-  if (msg->vendor_extension) {
-    free(msg->vendor_extension);
-  }
+  free(msg->vendor_extension);
 }
 
 void free_ul_tti_request(nfapi_nr_ul_tti_request_t *msg)
@@ -907,9 +905,7 @@ void free_rx_data_indication(nfapi_nr_rx_data_indication_t *msg)
   if (msg->number_of_pdus > 0) {
     for (int pdu_idx = 0; pdu_idx < msg->number_of_pdus; ++pdu_idx) {
       nfapi_nr_rx_data_pdu_t *rx_pdu = &msg->pdu_list[pdu_idx];
-      if (rx_pdu->pdu) {
-        free(rx_pdu->pdu);
-      }
+      free(rx_pdu->pdu);
     }
     free(msg->pdu_list);
   }
@@ -917,99 +913,75 @@ void free_rx_data_indication(nfapi_nr_rx_data_indication_t *msg)
 
 void free_crc_indication(nfapi_nr_crc_indication_t *msg)
 {
-  if (msg->crc_list) {
-    for (int crc_idx = 0; crc_idx < msg->number_crcs; ++crc_idx) {
-      nfapi_nr_crc_t *crc = &msg->crc_list[crc_idx];
-      if (crc->cb_crc_status) {
-        free(crc->cb_crc_status);
-      }
-    }
-    free(msg->crc_list);
+  for (int crc_idx = 0; crc_idx < msg->number_crcs; ++crc_idx) {
+    nfapi_nr_crc_t *crc = &msg->crc_list[crc_idx];
+    free(crc->cb_crc_status);
   }
+  free(msg->crc_list);
 }
 
 void free_uci_indication(nfapi_nr_uci_indication_t *msg)
 {
-  if (msg->uci_list) {
-    for (int pdu_idx = 0; pdu_idx < msg->num_ucis; ++pdu_idx) {
-      nfapi_nr_uci_t *uci_pdu = &msg->uci_list[pdu_idx];
-      switch (uci_pdu->pdu_type) {
-        case NFAPI_NR_UCI_PUSCH_PDU_TYPE: {
-          nfapi_nr_uci_pusch_pdu_t *pdu = &uci_pdu->pusch_pdu;
-          // Bit 0 not used in PUSCH PDU
-          // HARQ
-          if ((pdu->pduBitmap >> 1) & 0x01) {
-            if (pdu->harq.harq_payload) {
-              free(pdu->harq.harq_payload);
-            }
-          }
-          // CSI Part 1
-          if ((pdu->pduBitmap >> 2) & 0x01) {
-            if (pdu->csi_part1.csi_part1_payload) {
-              free(pdu->csi_part1.csi_part1_payload);
-            }
-          }
-          // CSI Part 2
-          if ((pdu->pduBitmap >> 3) & 0x01) {
-            if (pdu->csi_part2.csi_part2_payload) {
-              free(pdu->csi_part2.csi_part2_payload);
-            }
-          }
-          break;
+  for (int pdu_idx = 0; pdu_idx < msg->num_ucis; ++pdu_idx) {
+    nfapi_nr_uci_t *uci_pdu = &msg->uci_list[pdu_idx];
+    switch (uci_pdu->pdu_type) {
+      case NFAPI_NR_UCI_PUSCH_PDU_TYPE: {
+        nfapi_nr_uci_pusch_pdu_t *pdu = &uci_pdu->pusch_pdu;
+        // Bit 0 not used in PUSCH PDU
+        // HARQ
+        if ((pdu->pduBitmap >> 1) & 0x01) {
+          free(pdu->harq.harq_payload);
         }
-        case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {
-          // Nothing to free
-          break;
+        // CSI Part 1
+        if ((pdu->pduBitmap >> 2) & 0x01) {
+          free(pdu->csi_part1.csi_part1_payload);
         }
-        case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE: {
-          nfapi_nr_uci_pucch_pdu_format_2_3_4_t *pdu = &uci_pdu->pucch_pdu_format_2_3_4;
-          // SR
-          if (pdu->pduBitmap & 0x01) {
-            if (pdu->sr.sr_payload) {
-              free(pdu->sr.sr_payload);
-            }
-          }
-          // HARQ
-          if ((pdu->pduBitmap >> 1) & 0x01) {
-            if (pdu->harq.harq_payload) {
-              free(pdu->harq.harq_payload);
-            }
-          }
-          // CSI Part 1
-          if ((pdu->pduBitmap >> 2) & 0x01) {
-            if (pdu->csi_part1.csi_part1_payload) {
-              free(pdu->csi_part1.csi_part1_payload);
-            }
-          }
-          // CSI Part 2
-          if ((pdu->pduBitmap >> 3) & 0x01) {
-            if (pdu->csi_part2.csi_part2_payload) {
-              free(pdu->csi_part2.csi_part2_payload);
-            }
-          }
-          break;
+        // CSI Part 2
+        if ((pdu->pduBitmap >> 3) & 0x01) {
+          free(pdu->csi_part2.csi_part2_payload);
         }
-        default:
-          AssertFatal(1 == 0, "Unknown UCI.indication PDU Type %d\n", uci_pdu->pdu_type);
-          break;
+        break;
       }
+      case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE: {
+        // Nothing to free
+        break;
+      }
+      case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE: {
+        nfapi_nr_uci_pucch_pdu_format_2_3_4_t *pdu = &uci_pdu->pucch_pdu_format_2_3_4;
+        // SR
+        if (pdu->pduBitmap & 0x01) {
+          free(pdu->sr.sr_payload);
+        }
+        // HARQ
+        if ((pdu->pduBitmap >> 1) & 0x01) {
+          free(pdu->harq.harq_payload);
+        }
+        // CSI Part 1
+        if ((pdu->pduBitmap >> 2) & 0x01) {
+          free(pdu->csi_part1.csi_part1_payload);
+        }
+        // CSI Part 2
+        if ((pdu->pduBitmap >> 3) & 0x01) {
+          free(pdu->csi_part2.csi_part2_payload);
+        }
+        break;
+      }
+      default:
+        AssertFatal(1 == 0, "Unknown UCI.indication PDU Type %d\n", uci_pdu->pdu_type);
+        break;
     }
-    free(msg->uci_list);
   }
+  free(msg->uci_list);
 }
 
 void free_srs_indication(nfapi_nr_srs_indication_t *msg)
 {
-  if (msg->pdu_list) {
-    free(msg->pdu_list);
-  }
+  free(msg->pdu_list);
 }
 
 void free_rach_indication(nfapi_nr_rach_indication_t *msg)
 {
-  if (msg->pdu_list) {
-    free(msg->pdu_list);
-  }
+  free(msg->pdu_list);
 }
 
 static void copy_dl_tti_beamforming(const nfapi_nr_tx_precoding_and_beamforming_t *src,
@@ -2586,6 +2558,27 @@ void dump_ul_dci_request(const nfapi_nr_ul_dci_request_t *msg)
   }
 }
 
+static void dump_tx_data_request_tlv(const nfapi_nr_tx_data_request_tlv_t *tlv, int depth)
+{
+  INDENTED_PRINTF("Tag = %d\n", tlv->tag);
+  INDENTED_PRINTF("Length = %d\n", tlv->length);
+  INDENTED_PRINTF("Value = ");
+  switch (tlv->tag) {
+    case 0:
+      for (int i = 0; i < tlv->length; i++) {
+        printf("0x%02x ", ((uint8_t*)tlv->value.direct)[i]);
+      }
+      break;
+    case 1:
+      printf("%p", tlv->value.ptr);
+      break;
+    default:
+      printf( " Unknown tag value %d",tlv->tag);
+      break;
+  }
+  printf("\n");
+}
+
 void dump_tx_data_request(const nfapi_nr_tx_data_request_t *msg)
 {
   int depth = 0;
@@ -2594,15 +2587,18 @@ void dump_tx_data_request(const nfapi_nr_tx_data_request_t *msg)
   INDENTED_PRINTF("SFN = %d\n", msg->SFN);
   INDENTED_PRINTF("Slot = %d\n", msg->Slot);
   INDENTED_PRINTF("Number of PDUs = %d\n", msg->Number_of_PDUs);
+  depth++;
   for (int i = 0; i < msg->Number_of_PDUs; i++) {
-    depth++;
     INDENTED_PRINTF("PDU #%d\n", i);
     const nfapi_nr_pdu_t *pdu = &msg->pdu_list[i];
     INDENTED_PRINTF("PDU Length = 0x%02x\n", pdu->PDU_length);
     INDENTED_PRINTF("PDU Index = 0x%02x\n", pdu->PDU_index);
     INDENTED_PRINTF("numTLV = 0x%02x\n", pdu->num_TLV);
+    for (int tlv_idx = 0; tlv_idx < pdu->num_TLV; tlv_idx++) {
+      const nfapi_nr_tx_data_request_tlv_t *tlv = &pdu->TLVs[tlv_idx];
     /* call to dump_tx_data_request_tlv */
-    depth--;
+      dump_tx_data_request_tlv(tlv, depth + 1);
+    }
   }
 }
 
@@ -2664,6 +2660,134 @@ void dump_crc_indication(const nfapi_nr_crc_indication_t *msg)
   }
 }
 
+static void dump_harq_2_3_4(const nfapi_nr_harq_pdu_2_3_4_t *harq, int depth)
+{
+  INDENTED_PRINTF("HARQ CRC = %01x\n", harq->harq_crc);
+  INDENTED_PRINTF("HARQ Bit Length = %d\n", harq->harq_bit_len);
+  INDENTED_PRINTF("HARQ Payload = ");
+  for (int i = 0; i < harq->harq_bit_len / 8 + 1; i++) {
+    printf("%x ", harq->harq_payload[i]);
+  }
+  printf("\n");
+}
+
+static void dump_csi_part_1(const nfapi_nr_csi_part1_pdu_t *csi, int depth)
+{
+  INDENTED_PRINTF("CSI Part 1 CRC = %01x\n", csi->csi_part1_crc);
+  INDENTED_PRINTF("CSI Part 1 Bit Length = %d\n", csi->csi_part1_bit_len);
+  INDENTED_PRINTF("CSI Part 1 Payload = ");
+  for (int i = 0; i < csi->csi_part1_bit_len / 8 + 1; i++) {
+    printf("%x ", csi->csi_part1_payload[i]);
+  }
+  printf("\n");
+}
+
+static void dump_csi_part_2(const nfapi_nr_csi_part2_pdu_t *csi, int depth)
+{
+  INDENTED_PRINTF("CSI Part 1 CRC = %01x\n", csi->csi_part2_crc);
+  INDENTED_PRINTF("CSI Part 1 Bit Length = %d\n", csi->csi_part2_bit_len);
+  INDENTED_PRINTF("CSI Part 1 Payload = ");
+  for (int i = 0; i < csi->csi_part2_bit_len / 8 + 1; i++) {
+    printf("%x ", csi->csi_part2_payload[i]);
+  }
+  printf("\n");
+}
+
+static void dump_uci_PUSCH_PDU(const nfapi_nr_uci_pusch_pdu_t *pdu, int depth)
+{
+  INDENTED_PRINTF("PDU Bitmap = 0x%01x\n", pdu->pduBitmap);
+  INDENTED_PRINTF("Handle = 0x%04x\n", pdu->handle);
+  INDENTED_PRINTF("RNTI = 0x%02x\n", pdu->rnti);
+  INDENTED_PRINTF("UL_CQI = 0x%02x\n", pdu->ul_cqi);
+  INDENTED_PRINTF("Timing Advance = 0x%02x\n", pdu->timing_advance);
+  INDENTED_PRINTF("RSSI = 0x%02x\n", pdu->rssi);
+  // HARQ payload, CSI Part 1 and 2 are conditionally allocated
+  if ((pdu->pduBitmap >> 1) & 0x01) {
+    INDENTED_PRINTF("HARQ Information\n");
+    dump_harq_2_3_4(&pdu->harq, depth + 1);
+  }
+  if ((pdu->pduBitmap >> 2) & 0x01) {
+    INDENTED_PRINTF("CSI Part 1\n");
+    dump_csi_part_1(&pdu->csi_part1, depth + 1);
+  }
+  if ((pdu->pduBitmap >> 3) & 0x01) {
+    INDENTED_PRINTF("CSI Part 1\n");
+    dump_csi_part_2(&pdu->csi_part2, depth + 1);
+  }
+}
+
+static void dump_sr_0_1(const nfapi_nr_sr_pdu_0_1_t *sr, int depth)
+{
+  INDENTED_PRINTF("SR Indication = 0x%02x\n", sr->sr_indication);
+  INDENTED_PRINTF("SR Confidence Level = 0x%02x\n", sr->sr_confidence_level);
+}
+
+static void dump_harq_0_1(const nfapi_nr_harq_pdu_0_1_t *harq, int depth)
+{
+  INDENTED_PRINTF("Num HARQ = 0x%02x\n", harq->num_harq);
+  INDENTED_PRINTF("HARQ Confidence Level = 0x%02x\n", harq->harq_confidence_level);
+  depth++;
+  for (int i = 0; i < harq->num_harq; i++) {
+    INDENTED_PRINTF("HARQ Value[%d] : 0x%02x \n", i, harq->harq_list[i].harq_value);
+  }
+}
+
+static void dump_uci_PUCCH_0_1(const nfapi_nr_uci_pucch_pdu_format_0_1_t *pdu, int depth)
+{
+  INDENTED_PRINTF("PDU Bitmap = 0x%01x\n", pdu->pduBitmap);
+  INDENTED_PRINTF("Handle = 0x%04x\n", pdu->handle);
+  INDENTED_PRINTF("RNTI = 0x%02x\n", pdu->rnti);
+  INDENTED_PRINTF("PUCCH Format = 0x%02x\n", pdu->pucch_format);
+  INDENTED_PRINTF("UL_CQI = 0x%02x\n", pdu->ul_cqi);
+  INDENTED_PRINTF("Timing Advance = 0x%02x\n", pdu->timing_advance);
+  INDENTED_PRINTF("RSSI = 0x%02x\n", pdu->rssi);
+  if ((pdu->pduBitmap) & 0x01) {
+    INDENTED_PRINTF("SR Information\n");
+    dump_sr_0_1(&pdu->sr, depth + 1);
+  }
+  if ((pdu->pduBitmap >> 1) & 0x01) {
+    INDENTED_PRINTF("HARQ Information\n");
+    dump_harq_0_1(&pdu->harq, depth + 1);
+  }
+}
+
+static void dump_sr_2_3_4(const nfapi_nr_sr_pdu_2_3_4_t *sr, int depth)
+{
+  INDENTED_PRINTF("SR Bit Length = %d\n", sr->sr_bit_len);
+  INDENTED_PRINTF("SR Payload ");
+  for (int i = 0; i < sr->sr_bit_len / 8 + 1; i++) {
+    printf("%x ", sr->sr_payload[i]);
+  }
+  printf("\n");
+}
+
+static void dump_uci_PUCCH_2_3_4(const nfapi_nr_uci_pucch_pdu_format_2_3_4_t *pdu, int depth)
+{
+  INDENTED_PRINTF("PDU Bitmap = 0x%01x\n", pdu->pduBitmap);
+  INDENTED_PRINTF("Handle = 0x%04x\n", pdu->handle);
+  INDENTED_PRINTF("RNTI = 0x%02x\n", pdu->rnti);
+  INDENTED_PRINTF("PUCCH Format = 0x%02x\n", pdu->pucch_format);
+  INDENTED_PRINTF("UL_CQI = 0x%02x\n", pdu->ul_cqi);
+  INDENTED_PRINTF("Timing Advance = 0x%02x\n", pdu->timing_advance);
+  INDENTED_PRINTF("RSSI = 0x%02x\n", pdu->rssi);
+  // SR
+  if (pdu->pduBitmap & 0x01) {
+    dump_sr_2_3_4(&pdu->sr, depth + 1);
+  }
+  // HARQ
+  if ((pdu->pduBitmap >> 1) & 0x01) {
+    dump_harq_2_3_4(&pdu->harq, depth + 1);
+  }
+  // CSI Part 1
+  if ((pdu->pduBitmap >> 2) & 0x01) {
+    dump_csi_part_1(&pdu->csi_part1, depth + 1);
+  }
+  // CSI Part 2
+  if ((pdu->pduBitmap >> 3) & 0x01) {
+    dump_csi_part_2(&pdu->csi_part2, depth + 1);
+  }
+}
+
 void dump_uci_indication(const nfapi_nr_uci_indication_t *msg)
 {
   int depth = 0;
@@ -2680,6 +2804,20 @@ void dump_uci_indication(const nfapi_nr_uci_indication_t *msg)
     INDENTED_PRINTF("PDUType = 0x%02x\n", uci->pdu_type);
     INDENTED_PRINTF("PDUSize = 0x%02x\n", uci->pdu_size);
     /* call to dump_uci_indication_<PDU_Type>_pdu */
+    switch (uci->pdu_type) {
+      case NFAPI_NR_UCI_PUSCH_PDU_TYPE:
+        dump_uci_PUSCH_PDU(&uci->pusch_pdu, depth + 1);
+        break;
+      case NFAPI_NR_UCI_FORMAT_0_1_PDU_TYPE:
+        dump_uci_PUCCH_0_1(&uci->pucch_pdu_format_0_1, depth + 1);
+        break;
+      case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE:
+        dump_uci_PUCCH_2_3_4(&uci->pucch_pdu_format_2_3_4, depth + 1);
+        break;
+      default:
+        INDENTED_PRINTF("Unknown PDU type 0x%02x\n", uci->pdu_type);
+        break;
+    }
     depth--;
   }
 }

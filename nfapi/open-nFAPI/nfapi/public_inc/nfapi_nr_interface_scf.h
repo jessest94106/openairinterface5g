@@ -328,6 +328,8 @@ typedef struct
 
 #define NFAPI_NR_CONFIG_RSSI_MEASUREMENT_TAG 0x1028
 #define NFAPI_NR_CONFIG_TDD_TABLE 0x1035
+#define NFAPI_NR_CONFIG_BEAMFORMING_TABLE_TAG 0x1043 // This tag was added in version 5 of the SCF222 standard ( Table 3-50 of SCF222.10.05 )
+#define NFAPI_NR_CONFIG_PRECODING_TABLE_V6_TAG 0x104B // This tag was added in version 6 of the SCF222 standard ( Table 3-52 of SCF222.10.06 )
 
 //table 3-21
 typedef struct 
@@ -473,6 +475,11 @@ typedef struct {
   nfapi_nr_dig_beam_t *dig_beam_list;
 } nfapi_nr_dbt_pdu_t;
 
+typedef struct {
+  nfapi_tl_t tl;
+  nfapi_nr_dbt_pdu_t value;
+} nfapi_nr_dbt_tlv_ve_t;
+
 // Table 3–62 Precoding matrix (PM) PDU (v.222.10.04)
 typedef struct {
   int16_t precoder_weight_Re;
@@ -491,7 +498,12 @@ typedef struct {
 typedef struct {
   uint16_t num_pm_idx;
   nfapi_nr_pm_pdu_t *pmi_pdu;
-} nfapi_nr_pm_list_t;
+} nfapi_nr_pm_list_t; // This corresponds to Table 3-69 of SCF222.10.06, which introduces the num_pm_idx parameter
+
+typedef struct {
+  nfapi_tl_t tl;
+  nfapi_nr_pm_list_t value;
+} nfapi_nr_pm_tlv_ve_t;
 
 typedef struct {
   nfapi_uint8_tlv_t num_beams_period_vendor_ext;

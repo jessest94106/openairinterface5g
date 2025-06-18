@@ -35,6 +35,9 @@
 #include "debug.h"
 
 #define INDENTED_PRINTF(format, ...) printf("%*s" format, depth * 2, "", ##__VA_ARGS__)
+#define INDENTED_GENERIC_PRINT(string, format, ...) INDENTED_PRINTF(string " = " format "\n", ##__VA_ARGS__)
+#define INDENTED_TLV_PRINT(tlv_name, tlv) INDENTED_GENERIC_PRINT("(0x%04x) " tlv_name, "0x%02x", tlv.tl.tag, tlv.value)
+#define INDENTED_TLV_FORMAT_PRINT(tlv_name, format, tlv) INDENTED_GENERIC_PRINT("(0x%04x) " tlv_name, format, tlv.tl.tag, tlv.value)
 
 #define EQ_TLV(_tlv_a, _tlv_b)        \
   do {                                \
