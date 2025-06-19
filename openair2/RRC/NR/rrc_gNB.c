@@ -2483,14 +2483,10 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
     }
   }
 
-  /* Instruction towards the DU for DRB configuration and tunnel creation */
-  f1ap_drb_to_setup_t drbs[32]; // maximum DRB can be 32
-  int nb_drb = fill_drb_to_be_setup_from_e1_resp(rrc, UE, resp->pduSession, resp->numPDUSessions, drbs);
-
   if (!UE->f1_ue_context_active)
-    rrc_gNB_generate_UeContextSetupRequest(rrc, ue_context_p, nb_drb, drbs);
+    rrc_gNB_generate_UeContextSetupRequest(rrc, ue_context_p, resp);
   else
-    rrc_gNB_generate_UeContextModificationRequest(rrc, ue_context_p, nb_drb, drbs, 0, NULL);
+    rrc_gNB_generate_UeContextModificationRequest(rrc, ue_context_p, resp, 0, NULL);
 }
 
 /** @brief E1AP Bearer Context Setup Failure processing on CU-CP */
@@ -3023,8 +3019,7 @@ int rrc_gNB_generate_pcch_msg(sctp_assoc_t assoc_id, const NR_SIB1_t *sib1, uint
 //-----------------------------------------------------------------------------
 void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
                                             rrc_gNB_ue_context_t *const ue_context_pP,
-                                            int n_drbs,
-                                            const f1ap_drb_to_setup_t *drbs)
+                                            const e1ap_bearer_setup_resp_t *resp)
 //-----------------------------------------------------------------------------
 {
   gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
@@ -3033,25 +3028,31 @@ void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
   AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
 
   f1ap_cu_to_du_rrc_info_t cu2du = {0};
-  if (ue_p->ue_cap_buffer.len > 0 && ue_p->ue_cap_buffer.buf != NULL) {
-    cu2du.ue_cap = &ue_p->ue_cap_buffer;
+  if (ue_p->ue_cap_buffer.len > 0) {
+    cu2du.ue_cap = malloc_or_fail(sizeof(byte_array_t));
+    *cu2du.ue_cap = copy_byte_array(ue_p->ue_cap_buffer);
   }
 
   int nb_srb = 1;
-  f1ap_srb_to_setup_t srbs[1] = {{.id = 2, }};
-  activate_srb(ue_p, 2);
+  f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
+  srbs[0].id = 2;
+  activate_srb(ue_p, srbs[0].id);
+
+  /* Instruction towards the DU for DRB configuration and tunnel creation */
+  f1ap_drb_to_setup_t *drbs = calloc_or_fail(32, sizeof(*drbs)); // maximum DRB can be 32
+  int n_drbs = fill_drb_to_be_setup_from_e1_resp(rrc, ue_p, resp->pduSession, resp->numPDUSessions, drbs);
 
   /* gNB-DU UE Aggregate Maximum Bit Rate Uplink is C- ifDRBSetup */
-  uint64_t agg_mbr = 1000000000 /* bps */, *agg_mbr_p = NULL;
-  if (n_drbs > 0)
-    agg_mbr_p = &agg_mbr;
+  uint64_t *agg_mbr = malloc_or_fail(sizeof(*agg_mbr));
+  *agg_mbr = 1000000000 /* bps */;
 
-  /* the callback will fill the UE context setup request and forward it */
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
+  uint32_t *du_ue_id = malloc_or_fail(sizeof(*du_ue_id));
+  *du_ue_id = ue_data.secondary_ue;
   f1ap_ue_context_setup_req_t ue_context_setup_req = {
       .gNB_CU_ue_id = ue_p->rrc_ue_id,
-      .gNB_DU_ue_id = &ue_data.secondary_ue,
+      .gNB_DU_ue_id = du_ue_id,
       .plmn.mcc = rrc->configuration.plmn[0].mcc,
       .plmn.mnc = rrc->configuration.plmn[0].mnc,
       .plmn.mnc_digit_length = rrc->configuration.plmn[0].mnc_digit_length,
@@ -3060,21 +3061,20 @@ void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
       .srbs_len = nb_srb,
       .srbs = srbs,
       .drbs_len = n_drbs,
-      .drbs = (f1ap_drb_to_setup_t *) drbs, // cast to avoid warning on const
+      .drbs = drbs,
       .cu_to_du_rrc_info = cu2du,
-      .gnb_du_ue_agg_mbr_ul = agg_mbr_p,
+      .gnb_du_ue_agg_mbr_ul = agg_mbr,
   };
 
   rrc->mac_rrc.ue_context_setup_request(ue_data.du_assoc_id, &ue_context_setup_req);
+  free_ue_context_setup_req(&ue_context_setup_req);
   LOG_I(RRC, "UE %d trigger UE context setup request with %d DRBs\n", ue_p->rrc_ue_id, n_drbs);
-  // nothing to free for ue_context_setup_req
 }
 
 //-----------------------------------------------------------------------------
 void rrc_gNB_generate_UeContextModificationRequest(const gNB_RRC_INST *rrc,
                                                    rrc_gNB_ue_context_t *const ue_context_pP,
-                                                   int n_drbs,
-                                                   const f1ap_drb_to_setup_t *drbs,
+                                                   const e1ap_bearer_setup_resp_t *resp,
                                                    int n_rel_drbs,
                                                    const f1ap_drb_to_release_t *rel_drbs)
 //-----------------------------------------------------------------------------
@@ -3085,10 +3085,16 @@ void rrc_gNB_generate_UeContextModificationRequest(const gNB_RRC_INST *rrc,
 
   AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
 
-  f1ap_cu_to_du_rrc_info_t cu2du = {0};
-  if (ue_p->ue_cap_buffer.len > 0 && ue_p->ue_cap_buffer.buf != NULL) {
-    cu2du.ue_cap = &ue_p->ue_cap_buffer;
+  f1ap_cu_to_du_rrc_info_t *cu2du = NULL;
+  if (ue_p->ue_cap_buffer.len > 0) {
+    cu2du = calloc_or_fail(1, sizeof(*cu2du));
+    cu2du->ue_cap = calloc_or_fail(1, sizeof(*cu2du->ue_cap));
+    *cu2du->ue_cap = copy_byte_array(ue_p->ue_cap_buffer);
   }
+
+  /* Instruction towards the DU for DRB configuration and tunnel creation */
+  f1ap_drb_to_setup_t *drbs = calloc_or_fail(32, sizeof(*drbs)); // maximum DRB can be 32
+  int n_drbs = fill_drb_to_be_setup_from_e1_resp(rrc, ue_p, resp->pduSession, resp->numPDUSessions, drbs);
 
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
@@ -3096,12 +3102,15 @@ void rrc_gNB_generate_UeContextModificationRequest(const gNB_RRC_INST *rrc,
       .gNB_CU_ue_id = ue_p->rrc_ue_id,
       .gNB_DU_ue_id = ue_data.secondary_ue,
       .drbs_len = n_drbs,
-      .drbs = (f1ap_drb_to_setup_t *)drbs,
+      .drbs = drbs,
       .drbs_rel_len = n_rel_drbs,
       .drbs_rel = (f1ap_drb_to_release_t *)rel_drbs,
-      .cu_to_du_rrc_info = &cu2du,
+      .cu_to_du_rrc_info = cu2du,
   };
   rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &ue_context_modif_req);
+  // avoid attempt to release rel_drbs
+  ue_context_modif_req.drbs_rel_len = 0;
+  ue_context_modif_req.drbs_rel = NULL;
+  free_ue_context_mod_req(&ue_context_modif_req);
   LOG_I(RRC, "UE %d trigger UE context modification request with %d DRBs\n", ue_p->rrc_ue_id, n_drbs);
-  // nothing to free
 }
