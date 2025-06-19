@@ -101,12 +101,11 @@ static void ue_context_modification_required_direct(const f1ap_ue_context_modif_
   itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
 }
 
-static void ue_context_release_request_direct(const f1ap_ue_context_release_req_t* req)
+static void ue_context_release_request_direct(const f1ap_ue_context_rel_req_t* req)
 {
   MessageDef *msg = itti_alloc_new_message(TASK_MAC_GNB, 0, F1AP_UE_CONTEXT_RELEASE_REQ);
   msg->ittiMsgHeader.originInstance = -1; // means monolithic
-  f1ap_ue_context_release_req_t *f1ap_msg = &F1AP_UE_CONTEXT_RELEASE_REQ(msg);
-  *f1ap_msg = *req;
+  F1AP_UE_CONTEXT_RELEASE_REQ(msg) = cp_ue_context_rel_req(req);
   itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
 }
 

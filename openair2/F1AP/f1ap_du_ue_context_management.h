@@ -45,9 +45,7 @@ int DU_send_UE_CONTEXT_SETUP_FAILURE(sctp_assoc_t assoc_id);
 /*
  * UE Context Release Request (gNB-DU initiated)
  */
-int DU_send_UE_CONTEXT_RELEASE_REQUEST(sctp_assoc_t assoc_id,
-                                       f1ap_ue_context_release_req_t *req);
-
+int DU_send_UE_CONTEXT_RELEASE_REQUEST(sctp_assoc_t assoc_id, f1ap_ue_context_rel_req_t *req);
 
 /*
  * UE Context Release Command (gNB-CU initiated)

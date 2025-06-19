@@ -90,58 +90,17 @@ int CU_handle_UE_CONTEXT_SETUP_FAILURE(instance_t instance, sctp_assoc_t assoc_i
 
 int CU_handle_UE_CONTEXT_RELEASE_REQUEST(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
+  f1ap_ue_context_rel_req_t req = {0};
+  if (!decode_ue_context_rel_req(pdu, &req)) {
+    LOG_E(F1AP, "cannot decode F1 UE Context Release Request\n");
+    free_ue_context_rel_req(&req);
+    return -1;
+  }
+
   MessageDef *msg = itti_alloc_new_message(TASK_CU_F1, 0,  F1AP_UE_CONTEXT_RELEASE_REQ);
   msg->ittiMsgHeader.originInstance = assoc_id;
-  f1ap_ue_context_release_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg);
-  F1AP_UEContextReleaseRequest_t    *container;
-  F1AP_UEContextReleaseRequestIEs_t *ie;
-  DevAssert(pdu);
-  container = &pdu->choice.initiatingMessage->value.choice.UEContextReleaseRequest;
-  /* GNB_CU_UE_F1AP_ID */
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseRequestIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID, true);
-  req->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
-
-  /* GNB_DU_UE_F1AP_ID */
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseRequestIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID, true);
-  req->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
-
-  /* Cause */
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseRequestIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_Cause, true);
-
-  switch(ie->value.choice.Cause.present)
-  {
-    case F1AP_Cause_PR_radioNetwork:
-      req->cause = F1AP_CAUSE_RADIO_NETWORK;
-      req->cause_value = ie->value.choice.Cause.choice.radioNetwork;
-      break;
-    case F1AP_Cause_PR_transport:
-      req->cause = F1AP_CAUSE_TRANSPORT;
-      req->cause_value = ie->value.choice.Cause.choice.transport;
-      break;
-    case F1AP_Cause_PR_protocol:
-      req->cause = F1AP_CAUSE_PROTOCOL;
-      req->cause_value = ie->value.choice.Cause.choice.protocol;
-      break;
-    case F1AP_Cause_PR_misc:
-      req->cause = F1AP_CAUSE_MISC;
-      req->cause_value = ie->value.choice.Cause.choice.misc;
-      break;
-    case F1AP_Cause_PR_NOTHING:
-    default:
-      req->cause = F1AP_CAUSE_NOTHING;
-      break;
-  }
-
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseRequestIEs_t, ie, container, F1AP_ProtocolIE_ID_id_targetCellsToCancel, false);
-  if (ie != NULL) {
-    LOG_W(F1AP, "ignoring list of target cells to cancel in UE Context Release Request: implementation missing\n");
-  }
-
+  F1AP_UE_CONTEXT_RELEASE_REQ(msg) = req;
   itti_send_msg_to_task(TASK_RRC_GNB, instance, msg);
-
   return 0;
 }
 

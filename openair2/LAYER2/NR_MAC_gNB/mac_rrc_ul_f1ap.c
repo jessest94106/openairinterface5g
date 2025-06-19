@@ -125,11 +125,10 @@ static void ue_context_modification_required_f1ap(const f1ap_ue_context_modif_re
   itti_send_msg_to_task(TASK_DU_F1, 0, msg);
 }
 
-static void ue_context_release_request_f1ap(const f1ap_ue_context_release_req_t* req)
+static void ue_context_release_request_f1ap(const f1ap_ue_context_rel_req_t* req)
 {
   MessageDef *msg = itti_alloc_new_message(TASK_MAC_GNB, 0, F1AP_UE_CONTEXT_RELEASE_REQ);
-  f1ap_ue_context_release_req_t *f1ap_msg = &F1AP_UE_CONTEXT_RELEASE_REQ(msg);
-  *f1ap_msg = *req;
+  F1AP_UE_CONTEXT_RELEASE_REQ(msg) = cp_ue_context_rel_req(req);
   itti_send_msg_to_task(TASK_DU_F1, 0, msg);
 }
 

@@ -2133,7 +2133,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
 static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_assoc_t assoc_id)
 {
   const int instance = 0;
-  f1ap_ue_context_release_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg_p);
+  f1ap_ue_context_rel_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg_p);
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, req->gNB_CU_ue_id);
   // TODO what happens if no AMF connected? should also handle, set an_release true
@@ -2775,6 +2775,7 @@ void *rrc_gnb_task(void *args_p) {
 
       case F1AP_UE_CONTEXT_RELEASE_REQ:
         rrc_CU_process_ue_context_release_request(msg_p, msg_p->ittiMsgHeader.originInstance);
+        free_ue_context_rel_req(&F1AP_UE_CONTEXT_RELEASE_REQ(msg_p));
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_COMPLETE:

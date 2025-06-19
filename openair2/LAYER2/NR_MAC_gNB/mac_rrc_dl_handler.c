@@ -852,7 +852,7 @@ void ue_context_modification_refuse(const f1ap_ue_context_modif_refuse_t *refuse
 
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
-  f1ap_ue_context_release_req_t request = {
+  f1ap_ue_context_rel_req_t request = {
     .gNB_CU_ue_id = refuse->gNB_CU_ue_id,
     .gNB_DU_ue_id = refuse->gNB_DU_ue_id,
     .cause = F1AP_CAUSE_RADIO_NETWORK,
