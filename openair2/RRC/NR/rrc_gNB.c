@@ -1547,7 +1547,7 @@ static void handle_ueCapabilityInformation(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, 
         ue_cap_info->criticalExtensions.choice.ueCapabilityInformation->ue_CapabilityRAT_ContainerList;
 
     /* Encode UE-CapabilityRAT-ContainerList for sending to the DU */
-    free(UE->ue_cap_buffer.buf);
+    FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);
     UE->ue_cap_buffer.len = uper_encode_to_new_buffer(&asn_DEF_NR_UE_CapabilityRAT_ContainerList,
                                                       NULL,
                                                       ue_CapabilityRAT_ContainerList,
@@ -2189,6 +2189,7 @@ static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
   ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
   ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, UE->measResults);
+  FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);
   free_MeasConfig(UE->measConfig);
 }
 
