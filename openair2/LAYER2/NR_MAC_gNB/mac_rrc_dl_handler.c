@@ -31,6 +31,7 @@
 #include "NR_CG-ConfigInfo.h"
 #include "openair3/ocp-gtpu/gtp_itf.h"
 #include "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
+#include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 
 #include "executables/softmodem-common.h"

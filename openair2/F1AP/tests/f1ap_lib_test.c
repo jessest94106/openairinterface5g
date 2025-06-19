@@ -38,7 +38,7 @@
 #include "f1ap_messages_types.h"
 #include "F1AP_F1AP-PDU.h"
 
-#include "f1ap_lib_extern.h"
+#include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)

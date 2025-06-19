@@ -23,7 +23,7 @@
 #include "intertask_interface.h"
 
 #include "mac_rrc_ul.h"
-#include "f1ap_lib_extern.h"
+#include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 
 static void f1_reset_du_initiated_direct(const f1ap_reset_t *reset)

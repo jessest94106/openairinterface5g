@@ -29,7 +29,7 @@
 
 #include "mac_rrc_ul.h"
 
-#include "f1ap_lib_extern.h"
+#include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 
 static f1ap_net_config_t read_DU_IP_config(const eth_params_t* f1_params, const char *f1u_ip_addr)

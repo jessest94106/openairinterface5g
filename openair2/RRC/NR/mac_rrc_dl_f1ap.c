@@ -30,8 +30,8 @@
 #include "intertask_interface.h"
 #include "mac_rrc_dl.h"
 #include "nr_rrc_defs.h"
-#include "openair2/F1AP/lib/f1ap_rrc_message_transfer.h"
-#include "openair2/F1AP/lib/f1ap_interface_management.h"
+#include "lib/f1ap_rrc_message_transfer.h"
+#include "lib/f1ap_interface_management.h"
 
 static void f1_reset_cu_initiated_f1ap(sctp_assoc_t assoc_id, const f1ap_reset_t *reset)
 {
