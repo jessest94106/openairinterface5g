@@ -1113,9 +1113,11 @@ static int handle_bcch_dlsch(NR_UE_MAC_INST_t *mac,
                              unsigned int gNB_index,
                              uint8_t ack_nack,
                              uint8_t *pduP,
-                             uint32_t pdu_len)
+                             uint32_t pdu_len,
+                             int frame,
+                             int slot)
 {
-  nr_ue_decode_BCCH_DL_SCH(mac, cc_id, gNB_index, ack_nack, pduP, pdu_len);
+  nr_ue_decode_BCCH_DL_SCH(mac, cc_id, gNB_index, ack_nack, pduP, pdu_len, frame, slot);
   return 0;
 }
 
@@ -1297,10 +1299,13 @@ static uint32_t nr_ue_dl_processing(NR_UE_MAC_INST_t *mac, nr_downlink_indicatio
           break;
         case FAPI_NR_RX_PDU_TYPE_SIB:
           ret_mask |= (handle_bcch_dlsch(mac,
-                                         dl_info->cc_id, dl_info->gNB_index,
+                                         dl_info->cc_id,
+                                         dl_info->gNB_index,
                                          rx_indication_body.pdsch_pdu.ack_nack,
                                          rx_indication_body.pdsch_pdu.pdu,
-                                         rx_indication_body.pdsch_pdu.pdu_length)) << FAPI_NR_RX_PDU_TYPE_SIB;
+                                         rx_indication_body.pdsch_pdu.pdu_length,
+                                         dl_info->frame,
+                                         dl_info->slot)) << FAPI_NR_RX_PDU_TYPE_SIB;
           break;
         case FAPI_NR_RX_PDU_TYPE_DLSCH:
           ret_mask |= (handle_dlsch(mac, dl_info, i)) << FAPI_NR_RX_PDU_TYPE_DLSCH;

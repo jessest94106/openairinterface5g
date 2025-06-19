@@ -1748,6 +1748,11 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
       release_mac_configuration(mac, cause);
       nr_ue_mac_default_configs(mac);
       break;
+    case UL_SYNC_LOST_T430_EXPIRED:
+      // TS 38.331 Section 5.2.2.6, TS 38.321 Section 5.2a
+      // Flush all HARQ buffers and Stop UL transmissions
+      handle_ulsync_loss(mac);
+      break;
     default:
       AssertFatal(false, "Invalid MAC reset cause %d\n", cause);
   }

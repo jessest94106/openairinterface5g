@@ -182,6 +182,27 @@ void handle_time_alignment_timer_expired(NR_UE_MAC_INST_t *mac)
   // TODO not sure what to do here
 }
 
+void handle_ulsync_loss(NR_UE_MAC_INST_t *mac)
+{
+  // flush all HARQ buffers for all Serving Cells
+  for (int k = 0; k < NR_MAX_HARQ_PROCESSES; k++) {
+    memset(&mac->dl_harq_info[k], 0, sizeof(*mac->dl_harq_info));
+    memset(&mac->ul_harq_info[k], 0, sizeof(*mac->ul_harq_info));
+    mac->dl_harq_info[k].last_ndi = -1; // initialize to invalid value
+    mac->ul_harq_info[k].last_ndi = -1; // initialize to invalid value
+  }
+  // clear any configured downlink assignments and uplink grants;
+  if (mac->dl_config_request)
+    memset(mac->dl_config_request, 0, sizeof(*mac->dl_config_request));
+  if (mac->ul_config_request)
+    clear_ul_config_request(mac);
+
+  // Need to receive SIB19 again after loosing UL SYNC
+  mac->state = UE_RECEIVING_SIB;
+  // gNB needs to send PDCCH ORDER triggering RA after detecting ULSYNC LOSS
+  LOG_W(NR_MAC, "Wait for PDCCH ORDER, RACH needs to performed to obtain ULSYNC.\n");
+}
+
 void update_mac_dl_timers(NR_UE_MAC_INST_t *mac)
 {
   bool ra_window_expired = nr_timer_tick(&mac->ra.response_window_timer);
