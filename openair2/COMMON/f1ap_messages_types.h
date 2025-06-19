@@ -645,6 +645,19 @@ typedef struct f1ap_ue_context_mod_req_t {
   lower_layer_status_t *status;
 } f1ap_ue_context_mod_req_t;
 
+typedef struct f1ap_ue_context_mod_resp {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+
+  f1ap_du_to_cu_rrc_info_t *du_to_cu_rrc_info;
+
+  int drbs_len;
+  f1ap_drb_setup_t *drbs;
+
+  int srbs_len;
+  f1ap_srb_setup_t *srbs;
+} f1ap_ue_context_mod_resp_t;
+
 typedef struct f1ap_ue_context_setup_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
