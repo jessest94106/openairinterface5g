@@ -464,7 +464,7 @@ void rrc_release_nsa_user(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context)
   gNB_RRC_UE_t *UE = &ue_context->ue_context;
   f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
-  f1ap_ue_context_release_cmd_t cmd = {
+  f1ap_ue_context_rel_cmd_t cmd = {
       .gNB_CU_ue_id = UE->rrc_ue_id,
       .gNB_DU_ue_id = ue_data.secondary_ue,
       .cause = F1AP_CAUSE_RADIO_NETWORK,

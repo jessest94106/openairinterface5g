@@ -94,61 +94,15 @@ int DU_send_UE_CONTEXT_RELEASE_REQUEST(sctp_assoc_t assoc_id, f1ap_ue_context_re
 
 int DU_handle_UE_CONTEXT_RELEASE_COMMAND(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
-  F1AP_UEContextReleaseCommand_t *container;
-  F1AP_UEContextReleaseCommandIEs_t *ie;
-
-  f1ap_ue_context_release_cmd_t ue_context_release = {0};
-  f1ap_ue_context_release_cmd_t *f1ap_ue_context_release_cmd = &ue_context_release;
-
-  DevAssert(pdu);
-  container = &pdu->choice.initiatingMessage->value.choice.UEContextReleaseCommand;
-  // GNB_CU_UE_F1AP_ID
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCommandIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID, true);
-  f1ap_ue_context_release_cmd->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
-  // GNB_DU_UE_F1AP_ID
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCommandIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID, true);
-  f1ap_ue_context_release_cmd->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
-
-  // We don't need the Cause
-  // Optional RRC Container: if present, send to UE
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCommandIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_RRCContainer, false);
-
-  if (ie != NULL) {
-    f1ap_ue_context_release_cmd->rrc_container = malloc(ie->value.choice.RRCContainer.size);
-    AssertFatal(f1ap_ue_context_release_cmd->rrc_container != NULL, "out of memory\n");
-    memcpy(f1ap_ue_context_release_cmd->rrc_container, ie->value.choice.RRCContainer.buf, ie->value.choice.RRCContainer.size);
-    f1ap_ue_context_release_cmd->rrc_container_length = ie->value.choice.RRCContainer.size;
-
-    // conditionally have SRB ID if there is RRC container
-    F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCommandIEs_t, ie, container, F1AP_ProtocolIE_ID_id_SRBID, true);
-    f1ap_ue_context_release_cmd->srb_id = ie->value.choice.SRBID;
+  f1ap_ue_context_rel_cmd_t cmd = {0};
+  if (!decode_ue_context_rel_cmd(pdu, &cmd)) {
+    LOG_E(F1AP, "cannot decode F1 UE Context Release Command\n");
+    free_ue_context_rel_cmd(&cmd);
+    return -1;
   }
 
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCommandIEs_t, ie, container,
-      F1AP_ProtocolIE_ID_id_Cause, true);
-  switch (ie->value.choice.Cause.present){
-  case  F1AP_Cause_PR_radioNetwork:
-    f1ap_ue_context_release_cmd->cause = F1AP_CAUSE_RADIO_NETWORK;
-    break;
-  case F1AP_Cause_PR_transport:
-    f1ap_ue_context_release_cmd->cause = F1AP_CAUSE_TRANSPORT;
-    break;
-  case F1AP_Cause_PR_protocol:
-    f1ap_ue_context_release_cmd->cause = F1AP_CAUSE_PROTOCOL;
-    break;
-  case F1AP_Cause_PR_misc:
-    f1ap_ue_context_release_cmd->cause = F1AP_CAUSE_MISC;
-    break;
-  default:
-    LOG_W(F1AP, "Unknown cause for UE context release command\n");
-    break;
-
-  }
-
-  ue_context_release_command(f1ap_ue_context_release_cmd);
+  ue_context_release_command(&cmd);
+  free_ue_context_rel_cmd(&cmd);
   return 0;
 }
 

@@ -199,6 +199,7 @@ void *F1AP_CU_task(void *arg) {
       case F1AP_UE_CONTEXT_RELEASE_CMD: // from rrc
         CU_send_UE_CONTEXT_RELEASE_COMMAND(assoc_id,
                                            &F1AP_UE_CONTEXT_RELEASE_CMD(received_msg));
+        free_ue_context_rel_cmd(&F1AP_UE_CONTEXT_RELEASE_CMD(received_msg));
         break;
 
       case F1AP_PAGING_IND:

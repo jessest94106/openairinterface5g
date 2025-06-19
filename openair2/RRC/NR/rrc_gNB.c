@@ -113,7 +113,7 @@ mui_t rrc_gNB_mui = 0;
 
 typedef struct deliver_ue_ctxt_release_data_t {
   gNB_RRC_INST *rrc;
-  f1ap_ue_context_release_cmd_t *release_cmd;
+  f1ap_ue_context_rel_cmd_t *release_cmd;
   sctp_assoc_t assoc_id;
 } deliver_ue_ctxt_release_data_t;
 
@@ -121,8 +121,8 @@ static void rrc_deliver_ue_ctxt_release_cmd(void *deliver_pdu_data, ue_id_t ue_i
 {
   DevAssert(deliver_pdu_data != NULL);
   deliver_ue_ctxt_release_data_t *data = deliver_pdu_data;
-  data->release_cmd->rrc_container = (uint8_t*) buf;
-  data->release_cmd->rrc_container_length = size;
+  byte_array_t rrc_cont = {.buf = (uint8_t *)buf, .len = size};
+  data->release_cmd->rrc_container = &rrc_cont;
   data->rrc->mac_rrc.ue_context_release_command(data->assoc_id, data->release_cmd);
 }
 
@@ -2142,12 +2142,12 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
     LOG_W(RRC, "could not find UE context for CU UE ID %u: auto-generate release command\n", req->gNB_CU_ue_id);
     uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
     int size = do_NR_RRCRelease(buffer, NR_RRC_BUF_SIZE, rrc_gNB_get_next_transaction_identifier(0));
-    f1ap_ue_context_release_cmd_t ue_context_release_cmd = {
+    f1ap_ue_context_rel_cmd_t ue_context_release_cmd = {
         .gNB_CU_ue_id = req->gNB_CU_ue_id,
         .gNB_DU_ue_id = req->gNB_DU_ue_id,
         .cause = F1AP_CAUSE_RADIO_NETWORK,
         .cause_value = 10, // 10 = F1AP_CauseRadioNetwork_normal_release
-        .srb_id = srbid,
+        .srb_id = &srbid, // C-ifRRCContainer => is added below
     };
     deliver_ue_ctxt_release_data_t data = {.rrc = rrc, .release_cmd = &ue_context_release_cmd};
     nr_pdcp_data_req_srb(req->gNB_CU_ue_id, srbid, rrc_gNB_mui++, size, buffer, rrc_deliver_ue_ctxt_release_cmd, &data);
@@ -2163,12 +2163,11 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
       // ongoing; free the UE, and remove the HO context.
       LOG_W(NR_RRC, "UE %d: release request from source DU ID %ld during HO, marking HO as complete\n", UE->rrc_ue_id, source_ctx->du->setup_req->gNB_DU_id);
       RETURN_IF_INVALID_ASSOC_ID(source_ctx->du->assoc_id);
-      f1ap_ue_context_release_cmd_t cmd = {
+      f1ap_ue_context_rel_cmd_t cmd = {
           .gNB_CU_ue_id = UE->rrc_ue_id,
           .gNB_DU_ue_id = source_ctx->du_ue_id,
           .cause = F1AP_CAUSE_RADIO_NETWORK,
           .cause_value = 5, // 5 = F1AP_CauseRadioNetwork_interaction_with_other_procedure
-          .srb_id = DL_SCH_LCID_DCCH,
       };
       rrc->mac_rrc.ue_context_release_command(assoc_id, &cmd);
       nr_rrc_finalize_ho(UE);
@@ -2914,12 +2913,13 @@ void rrc_gNB_generate_RRCRelease(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   LOG_UE_DL_EVENT(UE, "Send RRC Release\n");
   f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
-  f1ap_ue_context_release_cmd_t ue_context_release_cmd = {
+  int srbid = 1;
+  f1ap_ue_context_rel_cmd_t ue_context_release_cmd = {
     .gNB_CU_ue_id = UE->rrc_ue_id,
     .gNB_DU_ue_id = ue_data.secondary_ue,
     .cause = F1AP_CAUSE_RADIO_NETWORK,
     .cause_value = 10, // 10 = F1AP_CauseRadioNetwork_normal_release
-    .srb_id = DL_SCH_LCID_DCCH,
+    .srb_id = &srbid, // C-ifRRCContainer => is added below
   };
   deliver_ue_ctxt_release_data_t data = {.rrc = rrc, .release_cmd = &ue_context_release_cmd, .assoc_id = ue_data.du_assoc_id};
   nr_pdcp_data_req_srb(UE->rrc_ue_id, DL_SCH_LCID_DCCH, rrc_gNB_mui++, size, buffer, rrc_deliver_ue_ctxt_release_cmd, &data);

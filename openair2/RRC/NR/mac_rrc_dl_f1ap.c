@@ -119,18 +119,11 @@ static void ue_context_modification_refuse_f1ap(sctp_assoc_t assoc_id, const f1a
   itti_send_msg_to_task(TASK_CU_F1, 0, msg);
 }
 
-static void ue_context_release_command_f1ap(sctp_assoc_t assoc_id, const f1ap_ue_context_release_cmd_t *cmd)
+static void ue_context_release_command_f1ap(sctp_assoc_t assoc_id, const f1ap_ue_context_rel_cmd_t *cmd)
 {
   MessageDef *message_p = itti_alloc_new_message (TASK_RRC_GNB, 0, F1AP_UE_CONTEXT_RELEASE_CMD);
   message_p->ittiMsgHeader.originInstance = assoc_id;
-  f1ap_ue_context_release_cmd_t *msg = &F1AP_UE_CONTEXT_RELEASE_CMD(message_p);
-  *msg = *cmd;
-  if (cmd->rrc_container_length > 0) {
-    msg->rrc_container = calloc(cmd->rrc_container_length, sizeof(*msg->rrc_container));
-    AssertFatal(msg->rrc_container != NULL, "out of memory\n");
-    msg->rrc_container_length = cmd->rrc_container_length;
-    memcpy(msg->rrc_container, cmd->rrc_container, cmd->rrc_container_length);
-  }
+  F1AP_UE_CONTEXT_RELEASE_CMD(message_p) = cp_ue_context_rel_cmd(cmd);
   itti_send_msg_to_task (TASK_CU_F1, 0, message_p);
 }
 

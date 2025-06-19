@@ -50,8 +50,7 @@ int CU_handle_UE_CONTEXT_RELEASE_REQUEST(instance_t instance, sctp_assoc_t assoc
 /*
  * UE Context Release (gNB-CU initiated)
  */
-int CU_send_UE_CONTEXT_RELEASE_COMMAND(sctp_assoc_t assoc_id,
-                                       f1ap_ue_context_release_cmd_t *cmd);
+int CU_send_UE_CONTEXT_RELEASE_COMMAND(sctp_assoc_t assoc_id, f1ap_ue_context_rel_cmd_t *cmd);
 
 int CU_handle_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu);
 

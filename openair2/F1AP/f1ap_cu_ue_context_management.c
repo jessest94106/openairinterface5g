@@ -104,93 +104,19 @@ int CU_handle_UE_CONTEXT_RELEASE_REQUEST(instance_t instance, sctp_assoc_t assoc
   return 0;
 }
 
-int CU_send_UE_CONTEXT_RELEASE_COMMAND(sctp_assoc_t assoc_id, f1ap_ue_context_release_cmd_t *cmd)
+int CU_send_UE_CONTEXT_RELEASE_COMMAND(sctp_assoc_t assoc_id, f1ap_ue_context_rel_cmd_t *cmd)
 {
-  F1AP_F1AP_PDU_t                   pdu= {0};
-  F1AP_UEContextReleaseCommand_t    *out;
-  uint8_t  *buffer=NULL;
-  uint32_t  len=0;
-  /* Create */
-  /* 0. Message Type */
-  pdu.present = F1AP_F1AP_PDU_PR_initiatingMessage;
-  asn1cCalloc(pdu.choice.initiatingMessage, tmp);
-  tmp->procedureCode = F1AP_ProcedureCode_id_UEContextRelease;
-  tmp->criticality   = F1AP_Criticality_reject;
-  tmp->value.present = F1AP_InitiatingMessage__value_PR_UEContextReleaseCommand;
-  out = &tmp->value.choice.UEContextReleaseCommand;
-  /* mandatory */
-  /* c1. GNB_CU_UE_F1AP_ID */
-  asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie1);
-  ie1->id                             = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
-  ie1->criticality                    = F1AP_Criticality_reject;
-  ie1->value.present                  = F1AP_UEContextReleaseCommandIEs__value_PR_GNB_CU_UE_F1AP_ID;
-  ie1->value.choice.GNB_CU_UE_F1AP_ID = cmd->gNB_CU_ue_id;
-  /* mandatory */
-  /* c2. GNB_DU_UE_F1AP_ID */
-  asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie2);
-  ie2->id                             = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
-  ie2->criticality                    = F1AP_Criticality_reject;
-  ie2->value.present                  = F1AP_UEContextReleaseCommandIEs__value_PR_GNB_DU_UE_F1AP_ID;
-  ie2->value.choice.GNB_DU_UE_F1AP_ID = cmd->gNB_DU_ue_id;
-  /* mandatory */
-  /* c3. Cause */
-  asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie3);
-  ie3->id                             = F1AP_ProtocolIE_ID_id_Cause;
-  ie3->criticality                    = F1AP_Criticality_ignore;
-  ie3->value.present                  = F1AP_UEContextReleaseCommandIEs__value_PR_Cause;
+  F1AP_F1AP_PDU_t *pdu = encode_ue_context_rel_cmd(cmd);
 
-  switch (cmd->cause) {
-    case F1AP_CAUSE_RADIO_NETWORK:
-      ie3->value.choice.Cause.present = F1AP_Cause_PR_radioNetwork;
-      ie3->value.choice.Cause.choice.radioNetwork = cmd->cause_value;
-      break;
-
-    case F1AP_CAUSE_TRANSPORT:
-      ie3->value.choice.Cause.present = F1AP_Cause_PR_transport;
-      ie3->value.choice.Cause.choice.transport = cmd->cause_value;
-      break;
-
-    case F1AP_CAUSE_PROTOCOL:
-      ie3->value.choice.Cause.present = F1AP_Cause_PR_protocol;
-      ie3->value.choice.Cause.choice.protocol = cmd->cause_value;
-      break;
-
-    case F1AP_CAUSE_MISC:
-      ie3->value.choice.Cause.present = F1AP_Cause_PR_misc;
-      ie3->value.choice.Cause.choice.misc = cmd->cause_value;
-      break;
-
-    case F1AP_CAUSE_NOTHING:
-    default:
-      ie3->value.choice.Cause.present = F1AP_Cause_PR_NOTHING;
-      break;
-  }
-
-  /* optional */
-  /* c4. RRCContainer */
-  if(cmd->rrc_container!=NULL){
-    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie4);
-    ie4->id                             = F1AP_ProtocolIE_ID_id_RRCContainer;
-    ie4->criticality                    = F1AP_Criticality_ignore;
-    ie4->value.present                  = F1AP_UEContextReleaseCommandIEs__value_PR_RRCContainer;
-    OCTET_STRING_fromBuf(&ie4->value.choice.RRCContainer, (const char *)cmd->rrc_container,
-                       cmd->rrc_container_length);
-
-    // conditionally have SRBID if RRC Container
-    asn1cSequenceAdd(out->protocolIEs.list, F1AP_UEContextReleaseCommandIEs_t, ie5);
-    ie5->id = F1AP_ProtocolIE_ID_id_SRBID;
-    ie5->criticality = F1AP_Criticality_ignore;
-    ie5->value.present = F1AP_UEContextReleaseCommandIEs__value_PR_SRBID;
-    ie5->value.choice.SRBID = cmd->srb_id;
-  }
-
-  /* encode */
-  if (f1ap_encode_pdu(&pdu, &buffer, &len) < 0) {
+  uint8_t *buffer = NULL;
+  uint32_t len = 0;
+  if (f1ap_encode_pdu(pdu, &buffer, &len) < 0) {
     LOG_E(F1AP, "Failed to encode F1 context release command\n");
     return -1;
   }
 
   f1ap_itti_send_sctp_data_req(assoc_id, buffer, len);
+  ASN_STRUCT_FREE(asn_DEF_F1AP_F1AP_PDU, pdu);
   return 0;
 }
 

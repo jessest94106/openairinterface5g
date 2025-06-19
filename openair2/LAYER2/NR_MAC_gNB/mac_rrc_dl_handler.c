@@ -861,7 +861,7 @@ void ue_context_modification_refuse(const f1ap_ue_context_modif_refuse_t *refuse
   mac->mac_rrc.ue_context_release_request(&request);
 }
 
-void ue_context_release_command(const f1ap_ue_context_release_cmd_t *cmd)
+void ue_context_release_command(const f1ap_ue_context_rel_cmd_t *cmd)
 {
   /* mark UE as to be deleted after PUSCH failure */
   gNB_MAC_INST *mac = RC.nrmac[0];
@@ -881,14 +881,15 @@ void ue_context_release_command(const f1ap_ue_context_release_cmd_t *cmd)
   if (f1inst >= 0)
     newGtpuDeleteAllTunnels(f1inst, cmd->gNB_DU_ue_id);
 
-  if (UE->UE_sched_ctrl.ul_failure || cmd->rrc_container_length == 0) {
+  if (UE->UE_sched_ctrl.ul_failure || !cmd->rrc_container) {
     /* The UE is already not connected anymore or we have nothing to forward*/
     nr_mac_release_ue(mac, cmd->gNB_DU_ue_id);
     nr_mac_trigger_release_complete(mac, cmd->gNB_DU_ue_id);
-  } else {
+  } else if (cmd->rrc_container && cmd->srb_id){
     /* UE is in sync: forward release message and mark to be deleted
      * after UL failure */
-    nr_rlc_srb_recv_sdu(cmd->gNB_DU_ue_id, cmd->srb_id, cmd->rrc_container, cmd->rrc_container_length);
+    byte_array_t *rrc_cont = cmd->rrc_container;
+    nr_rlc_srb_recv_sdu(cmd->gNB_DU_ue_id, *cmd->srb_id, (char *)rrc_cont->buf, rrc_cont->len);
     nr_mac_trigger_release_timer(&UE->UE_sched_ctrl, UE->current_UL_BWP.scs);
   }
   NR_SCHED_UNLOCK(&mac->sched_lock);
