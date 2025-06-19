@@ -1202,9 +1202,9 @@ extern "C" {
 	}
     }
     else {
-	if (openair0_cfg[0].clock_source != unset) {
-	  LOG_W(HW,"Time source set in both usrp_args and in time_source, ingnoring the latter!\n");
-	}
+      if (openair0_cfg[0].time_source != unset) {
+        LOG_W(HW, "Time source set in both usrp_args and in openair0_cfg[0].time_source, ignoring the latter!\n");
+      }
   }
 
 

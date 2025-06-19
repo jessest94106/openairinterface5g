@@ -231,6 +231,9 @@ Or by providing this the the command line parameters:
 
 The main parameters to cope with the large NTN propagation delay are cellSpecificKoffset, ta-Common, ta-CommonDrift and the ephemeris data (satellite position and velocity vectors).
 
+The parameter `ntn-UlSyncValidityDuration-r17` indicates the maximum time duration from epochtime during which the UE can apply assistance information without having acquired new assistance information. i.e this enables UE to re-read SIB19 before timer with value ulSyncValidityDuration expires. The unit of the field is in seconds. Example values for GEO: 240s, MEO: 20s, LEO: 5s.
+As epochtime is not implemented yet, UE starts the timer from the TTI where SIB19 is received with ntn-UlSyncValidityDuration-r17 IE.
+
 The parameter `cellSpecificKoffset_r17` is the scheduling offset used for the timing relationships that are modified for NTN (see TS 38.213).
 The unit of the field Koffset is number of slots for a given subcarrier spacing of 15 kHz.
 

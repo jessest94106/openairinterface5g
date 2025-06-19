@@ -32,6 +32,7 @@
 #include "nr_nas_msg.h"
 #include <netinet/in.h>
 #include "NR_NAS_defs.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1495,6 +1496,10 @@ static void handle_pdu_session_accept(uint8_t *pdu_buffer, uint32_t msg_length, 
  */
 void handleDownlinkNASTransport(uint8_t * pdu_buffer, int pdu_length, int instance)
 {
+  if (pdu_length < 17) {
+    LOG_E(NAS, "Received DL NAS Transport message too short (%d)\n", pdu_length);
+    return;
+  }
   uint8_t msg_type = *(pdu_buffer + 16);
   if (msg_type == FGS_PDU_SESSION_ESTABLISHMENT_ACC) {
     LOG_A(NAS, "Received PDU Session Establishment Accept in DL NAS Transport\n");
@@ -2079,10 +2084,23 @@ void *nas_nrue(void *args_p)
           case FGS_PDU_SESSION_ESTABLISHMENT_REJ:
             LOG_E(NAS, "Received PDU Session Establishment reject\n");
             break;
-          case FGS_REGISTRATION_REJECT:
-            LOG_E(NAS, "Received Registration reject cause: %s\n", cause_text_info[pdu_buffer[17]].text);
+          case FGS_REGISTRATION_REJECT: {
+
+            if (pdu_length < 18) {
+              LOG_E(NAS, "Received Registration reject message too short\n");
+              break;
+            }
+
+            uint8_t cause = pdu_buffer[17];
+            if (cause >= sizeof(cause_text_info) / sizeof(cause_text_info[0])) {
+              LOG_E(NAS, "Received Registration reject cause %d unknown\n", cause);
+              break;
+            }
+
+            LOG_E(NAS, "Received Registration reject cause: %s\n", cause_text_info[cause].text);
             exit(1);
             break;
+          }
           case FGS_SERVICE_ACCEPT: {
             handle_service_accept(nas, &buffer);
             break;

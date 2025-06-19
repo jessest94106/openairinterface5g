@@ -67,13 +67,16 @@ void release_common_ss_cset(NR_BWP_PDCCH_t *pdcch);
    \param gNB_index      gNB index
    \param sibs_mask      sibs mask
    \param pduP           pointer to pdu
-   \param pdu_length     length of pdu */
+   \param pdu_length     length of pdu
+   \param frame,slot     Received TTI*/
 void nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
                               int cc_id,
                               unsigned int gNB_index,
                               uint8_t ack_nack,
                               uint8_t *pduP,
-                              uint32_t pdu_len);
+                              uint32_t pdu_len,
+                              int frame,
+                              int slot);
 
 void release_dl_BWP(NR_UE_MAC_INST_t *mac, int index);
 void release_ul_BWP(NR_UE_MAC_INST_t *mac, int index);
@@ -93,7 +96,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
 
 struct position; /* forward declaration */
 void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19_r17, bool can_start_ra);
-
+void nr_rrc_mac_resume_rb(module_id_t module_id, bool is_srb, int rb_id);
 void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t cause);
 
 /**\brief initialization NR UE MAC instance(s)*/
@@ -293,7 +296,7 @@ void configure_csi_resource_mapping(fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_c
                                     uint32_t bwp_size,
                                     uint32_t bwp_start);
 
-
+bool is_lcid_suspended(NR_UE_MAC_INST_t *mac, int lcid);
 void nr_ra_contention_resolution_failed(NR_UE_MAC_INST_t *mac);
 void nr_ra_succeeded(NR_UE_MAC_INST_t *mac, const uint8_t gNB_index, const frame_t frame, const int slot);
 void nr_ra_backoff_setting(RA_config_t *ra);
@@ -320,6 +323,7 @@ void nr_Msg3_transmitted(NR_UE_MAC_INST_t *mac, uint8_t CC_id, frame_t frameP, s
 void trigger_MAC_UE_RA(NR_UE_MAC_INST_t *mac, dci_pdu_rel15_t *pdcch_order);
 void nr_get_Msg3_MsgA_PUSCH_payload(NR_UE_MAC_INST_t *mac, uint8_t *buf, int TBS_max);
 void handle_time_alignment_timer_expired(NR_UE_MAC_INST_t *mac);
+void handle_ulsync_loss(NR_UE_MAC_INST_t *mac);
 int8_t nr_ue_process_dci_freq_dom_resource_assignment(nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu,
                                                       fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_config_pdu,
                                                       NR_PDSCH_Config_t *pdsch_Config,

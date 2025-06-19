@@ -77,10 +77,10 @@ static uint64_t get_nr_rlc_current_time(void)
 static void release_rlc_entity_from_lcid(nr_rlc_ue_t *ue, logical_chan_id_t channel_id)
 {
   AssertFatal(channel_id != 0, "LCID = 0 shouldn't be handled here\n");
-  nr_rlc_rb_t *rb = &ue->lcid2rb[channel_id - 1];
-  if (rb->type == NR_RLC_NONE)
+  nr_lcid_rb_t *rb = &ue->lcid2rb[channel_id - 1];
+  if (rb->type == NR_LCID_NONE)
     return;
-  if (rb->type == NR_RLC_SRB) {
+  if (rb->type == NR_LCID_SRB) {
     int id = rb->choice.srb_id - 1;
     AssertFatal(id >= 0, "logic bug: impossible to have srb0 here\n");
     if (ue->srb[id]) {
@@ -91,7 +91,7 @@ static void release_rlc_entity_from_lcid(nr_rlc_ue_t *ue, logical_chan_id_t chan
       LOG_E(RLC, "Trying to release a non-established enity with LCID %d\n", channel_id);
   }
   else {
-    AssertFatal(rb->type == NR_RLC_DRB,
+    AssertFatal(rb->type == NR_LCID_DRB,
                 "Invalid RB type\n");
     int id = rb->choice.drb_id - 1;
     if (ue->drb[id]) {
@@ -108,14 +108,14 @@ logical_chan_id_t nr_rlc_get_lcid_from_rb(int ue_id, bool is_srb, int rb_id)
   nr_rlc_manager_lock(nr_rlc_ue_manager);
   nr_rlc_ue_t *ue = nr_rlc_manager_get_ue(nr_rlc_ue_manager, ue_id);
   for (logical_chan_id_t id = 1; id <= 32; id++) {
-    nr_rlc_rb_t *rb = &ue->lcid2rb[id - 1];
+    nr_lcid_rb_t *rb = &ue->lcid2rb[id - 1];
     if (is_srb) {
-      if (rb->type == NR_RLC_SRB && rb->choice.srb_id == rb_id) {
+      if (rb->type == NR_LCID_SRB && rb->choice.srb_id == rb_id) {
         nr_rlc_manager_unlock(nr_rlc_ue_manager);
         return id;
       }
     } else {
-      if (rb->type == NR_RLC_DRB && rb->choice.drb_id == rb_id) {
+      if (rb->type == NR_LCID_DRB && rb->choice.drb_id == rb_id) {
         nr_rlc_manager_unlock(nr_rlc_ue_manager);
         return id;
       }
@@ -130,14 +130,14 @@ static nr_rlc_entity_t *get_rlc_entity_from_lcid(nr_rlc_ue_t *ue, logical_chan_i
 {
   if (channel_id == 0)
     return ue->srb0;
-  nr_rlc_rb_t *rb = &ue->lcid2rb[channel_id - 1];
-  if (rb->type == NR_RLC_NONE)
+  nr_lcid_rb_t *rb = &ue->lcid2rb[channel_id - 1];
+  if (rb->type == NR_LCID_NONE)
     return NULL;
-  if (rb->type == NR_RLC_SRB) {
+  if (rb->type == NR_LCID_SRB) {
     AssertFatal(rb->choice.srb_id > 0, "logic bug: impossible to have srb0 here\n");
     return ue->srb[rb->choice.srb_id - 1];
   } else {
-    AssertFatal(rb->type == NR_RLC_DRB,
+    AssertFatal(rb->type == NR_LCID_DRB,
                 "Invalid RB type\n");
     return ue->drb[rb->choice.drb_id - 1];
   }
@@ -698,7 +698,7 @@ void nr_rlc_add_srb(int ue_id, int srb_id, const NR_RLC_BearerConfig_t *rlc_Bear
               NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity),
               "servedRadioBearer for SRB mandatory present when setting up an SRB RLC entity\n");
   int local_id = rlc_BearerConfig->logicalChannelIdentity - 1; // LCID 0 for SRB 0 not mapped
-  ue->lcid2rb[local_id].type = NR_RLC_SRB;
+  ue->lcid2rb[local_id].type = NR_LCID_SRB;
   ue->lcid2rb[local_id].choice.srb_id = rlc_BearerConfig->servedRadioBearer->choice.srb_Identity;
   if (ue->srb[srb_id-1] != NULL) {
     LOG_E(RLC, "SRB %d already exists for UE %d, do nothing\n", srb_id, ue_id);
@@ -763,7 +763,7 @@ static void add_drb_am(int ue_id, int drb_id, const NR_RLC_BearerConfig_t *rlc_B
               NR_RLC_BearerConfig__servedRadioBearer_PR_drb_Identity),
               "servedRadioBearer for DRB mandatory present when setting up an SRB RLC entity\n");
   int local_id = rlc_BearerConfig->logicalChannelIdentity - 1; // LCID 0 for SRB 0 not mapped
-  ue->lcid2rb[local_id].type = NR_RLC_DRB;
+  ue->lcid2rb[local_id].type = NR_LCID_DRB;
   ue->lcid2rb[local_id].choice.drb_id = rlc_BearerConfig->servedRadioBearer->choice.drb_Identity;
   if (ue->drb[drb_id-1] != NULL) {
     LOG_E(RLC, "DRB %d already exists for UE %d, do nothing\n", drb_id, ue_id);
@@ -818,7 +818,7 @@ static void add_drb_um(int ue_id, int drb_id, const NR_RLC_BearerConfig_t *rlc_B
               NR_RLC_BearerConfig__servedRadioBearer_PR_drb_Identity),
               "servedRadioBearer for DRB mandatory present when setting up an SRB RLC entity\n");
   int local_id = rlc_BearerConfig->logicalChannelIdentity - 1; // LCID 0 for SRB 0 not mapped
-  ue->lcid2rb[local_id].type = NR_RLC_DRB;
+  ue->lcid2rb[local_id].type = NR_LCID_DRB;
   ue->lcid2rb[local_id].choice.drb_id = rlc_BearerConfig->servedRadioBearer->choice.drb_Identity;
   if (ue->drb[drb_id-1] != NULL) {
     LOG_E(RLC, "DEBUG add_drb_um: warning DRB %d already exist for ue %d, do nothing\n", drb_id, ue_id);

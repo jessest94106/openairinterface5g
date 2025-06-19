@@ -94,6 +94,7 @@ typedef enum RA_trigger_e {
   RA_NOT_RUNNING,
   RRC_CONNECTION_SETUP,
   RRC_CONNECTION_REESTABLISHMENT,
+  RRC_RESUME_REQUEST,
   DURING_HANDOVER,
   NON_SYNCHRONISED,
   TRANSITION_FROM_RRC_INACTIVE,
@@ -151,6 +152,11 @@ typedef struct UE_RRC_SI_INFO_NR_s {
   bool sib14_validity;
   NR_timer_t sib14_timer;
   NR_UE_RRC_SI_INFO_r17 SInfo_r17;
+  // Extracted from SIB1
+  int scs;
+  int sib19_periodicity;
+  int sib19_windowposition;
+  int si_windowlength;
 } NR_UE_RRC_SI_INFO;
 
 typedef struct NR_UE_Timers_Constants_s {
@@ -167,6 +173,8 @@ typedef struct NR_UE_Timers_Constants_s {
   NR_timer_t T325;
   NR_timer_t T380;
   NR_timer_t T390;
+  // NTN timer T430 which guards UL SYNC
+  NR_timer_t T430;
   // counters
   uint32_t N310_cnt;
   uint32_t N311_cnt;
@@ -233,6 +241,8 @@ typedef struct NR_UE_RRC_INST_s {
   bool reconfig_after_reestab;
   // 5G-S-TMSI
   uint64_t fiveG_S_TMSI;
+  // Frame timing received from MAC
+  int current_frame;
 
   //Sidelink params
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;

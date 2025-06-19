@@ -196,7 +196,9 @@ typedef enum {
   GO_TO_IDLE,
   DETACH,
   T300_EXPIRY,
-  RE_ESTABLISHMENT
+  RE_ESTABLISHMENT,
+  RRC_SETUP_REESTAB_RESUME,
+  UL_SYNC_LOST_T430_EXPIRED,
 } NR_UE_MAC_reset_cause_t;
 
 typedef struct {
@@ -450,6 +452,8 @@ typedef struct nr_lcordered_info_s {
   uint32_t bucket_size;
   bool sr_DelayTimerApplied;
   bool lc_SRMask;
+  nr_lcid_rb_t rb;
+  bool rb_suspended;
 } nr_lcordered_info_t;
 
 typedef struct {

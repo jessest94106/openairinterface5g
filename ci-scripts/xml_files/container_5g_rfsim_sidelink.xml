@@ -79,7 +79,6 @@
                 <desc>Check that UE synched</desc>
                 <node>cacofonix</node>
                 <command>docker logs rfsim5g-oai-nr-ue-2 | grep -m 1 "PSBCH RX:OK"</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="100001">

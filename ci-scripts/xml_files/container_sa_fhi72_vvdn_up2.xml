@@ -36,6 +36,7 @@
     100020
     100030
     100040
+    100011
     103000
     100002
     130000
@@ -49,7 +50,6 @@
     <desc>Setup sriov and network interfaces VVDN</desc>
     <node>cacofonix</node>
     <script>yaml_files/sa_fhi_7.2_vvdn_gnb/setup_sriov_vvdn.sh</script>
-    <command_fail>yes</command_fail>
   </testCase>
 
   <testCase id="110000">
@@ -90,7 +90,7 @@
 
   <testCase id="100010">
     <class>Iperf</class>
-    <desc>iperf (DL/600Mbps/UDP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (DL/600Mbps/UDP)(30 sec)</desc>
     <iperf_args>-u -b 600M -t 30 -R</iperf_args>
     <id>up2-fhi72</id>
     <iperf_packetloss_threshold>20</iperf_packetloss_threshold>
@@ -99,9 +99,20 @@
     <svr_id>oc-cn5g-20897</svr_id>
   </testCase>
 
+  <testCase id="100011">
+    <class>Iperf</class>
+    <desc>Optional iperf (DL/700Mbps/UDP)(30 sec)</desc>
+    <may_fail>true</may_fail>
+    <iperf_args>-u -b 700M -t 30 -R</iperf_args>
+    <id>up2-fhi72</id>
+    <iperf_packetloss_threshold>10</iperf_packetloss_threshold>
+    <iperf_bitrate_threshold>95</iperf_bitrate_threshold>
+    <svr_id>oc-cn5g-20897</svr_id>
+  </testCase>
+
   <testCase id="100030">
     <class>Iperf</class>
-    <desc>iperf (DL/TCP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (DL/TCP)(30 sec)</desc>
     <iperf_args>-t 30 -R</iperf_args>
     <id>up2-fhi72</id>
     <iperf_tcp_rate_target>40</iperf_tcp_rate_target>
@@ -110,7 +121,7 @@
 
   <testCase id="100020">
     <class>Iperf</class>
-    <desc>iperf (UL/80Mbps/UDP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (UL/80Mbps/UDP)(30 sec)</desc>
     <iperf_args>-u -b 80M -t 30</iperf_args>
     <id>up2-fhi72</id>
     <iperf_packetloss_threshold>20</iperf_packetloss_threshold>
@@ -121,7 +132,7 @@
 
   <testCase id="100040">
     <class>Iperf</class>
-    <desc>iperf (UL/TCP)(30 sec)(multi-ue profile)</desc>
+    <desc>iperf (UL/TCP)(30 sec)</desc>
     <iperf_args>-t 30</iperf_args>
     <id>up2-fhi72</id>
     <iperf_tcp_rate_target>10</iperf_tcp_rate_target>
@@ -164,7 +175,6 @@
     <desc>Set CPU to idle state, set kernel parameters to default values</desc>
     <node>cacofonix</node>
     <script>yaml_files/sa_fhi_7.2_vvdn_gnb/setup_cleanup.sh</script>
-    <command_fail>yes</command_fail>
   </testCase>
 
 

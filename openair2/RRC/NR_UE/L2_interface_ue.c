@@ -146,6 +146,9 @@ void process_msg_rcc_to_mac(MessageDef *msg)
       bool can_start_ra = NR_MAC_RRC_CONFIG_OTHER_SIB(msg).can_start_ra;
       nr_rrc_mac_config_other_sib(ue_id, NR_MAC_RRC_CONFIG_OTHER_SIB(msg).sib19, can_start_ra);
     } break;
+    case NR_MAC_RRC_RESUME_RB:
+      nr_rrc_mac_resume_rb(ue_id, NR_MAC_RRC_RESUME_RB(msg).is_srb, NR_MAC_RRC_RESUME_RB(msg).rb_id);
+      break;
     default:
       LOG_E(NR_MAC, "Unexpected msg from RRC: %d\n", ITTI_MSG_ID(msg));
   }

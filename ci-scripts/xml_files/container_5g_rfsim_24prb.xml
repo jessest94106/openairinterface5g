@@ -151,7 +151,6 @@
                 <desc>Force Msg3 C-RNTI RA</desc>
                 <node>cacofonix</node>
                 <command>echo ciUE force_crnti_ra | nc 192.168.71.150 8091</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="040002">
@@ -159,7 +158,6 @@
                 <desc>Force RRC_IDLE (UE ID 0)</desc>
                 <node>cacofonix</node>
                 <command>echo ciUE force_RRC_IDLE | nc 192.168.71.150 8091</command>
-                <command_fail>yes</command_fail>
         </testCase>
 
         <testCase id="100001">
