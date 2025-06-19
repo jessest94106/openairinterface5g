@@ -31,6 +31,7 @@
 #include "rrc_gNB_UE_context.h"
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_mac.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "openair2/F1AP/lib/f1ap_ue_context.h"
 #include "MESSAGES/asn1_msg.h"
 #include "nr_pdcp/nr_pdcp_oai_api.h"
 #include "openair3/SECU/key_nas_deriver.h"
@@ -61,7 +62,7 @@ static void free_ho_ctx(nr_handover_context_t *ho_ctx)
   free(ho_ctx);
 }
 
-static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_drb_to_be_setup_t drbs[MAX_DRBS_PER_UE])
+static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_drb_to_setup_t drbs[MAX_DRBS_PER_UE])
 {
   int nb_drb = 0;
   for (int i = 0; i < MAX_DRBS_PER_UE; ++i) {
@@ -69,34 +70,38 @@ static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_
     if (rrc_drb->status == DRB_INACTIVE)
       continue;
 
-    f1ap_drb_to_be_setup_t *drb = &drbs[nb_drb];
+    f1ap_drb_to_setup_t *drb = &drbs[nb_drb];
     nb_drb++;
-    drb->drb_id = rrc_drb->drb_id;
-    drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
-    memcpy(&drb->up_ul_tnl[0].tl_address, &rrc_drb->cuup_tunnel_config.addr.buffer, sizeof(uint8_t) * 4);
-    drb->up_ul_tnl[0].port = rrc->eth_params_s.my_portd;
-    drb->up_ul_tnl[0].teid = rrc_drb->cuup_tunnel_config.teid;
-    drb->up_ul_tnl_length = 1;
-
     /* fetch an existing PDU session for this DRB */
-    rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId(ue, drb->drb_id);
-    AssertFatal(pdu != NULL, "no PDU session for DRB ID %ld\n", drb->drb_id);
-    drb->nssai = pdu->param.nssai;
-
+    rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId(ue, rrc_drb->drb_id);
+    AssertFatal(pdu != NULL, "no PDU session for DRB ID %d\n", rrc_drb->drb_id);
     // for the moment, we only support one QoS flow. Put a reminder in case
     // this changes
     AssertFatal(pdu->param.nb_qos == 1, "only 1 Qos flow supported\n");
-    drb->drb_info.flows_to_be_setup_length = 1;
-    drb->drb_info.flows_mapped_to_drb = calloc_or_fail(1, sizeof(drb->drb_info.flows_mapped_to_drb[0]));
-    AssertFatal(drb->drb_info.flows_mapped_to_drb, "could not allocate memory\n");
     int qfi = rrc_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[0];
-    DevAssert(qfi > 0);
-    drb->drb_info.flows_mapped_to_drb[0].qfi = qfi;
-    pdusession_level_qos_parameter_t *in_qos_char = get_qos_characteristics(qfi, pdu);
-    drb->drb_info.flows_mapped_to_drb[0].qos_params.qos_characteristics = get_qos_char_from_qos_flow_param(in_qos_char);
+    pdusession_level_qos_parameter_t *qos_param = get_qos_characteristics(qfi, pdu);
 
+    drb->id = rrc_drb->drb_id;
+
+    drb->qos_choice = F1AP_QOS_CHOICE_NR;
+    drb->nr.nssai = pdu->param.nssai;
+    drb->nr.flows_len = 1;
+    drb->nr.flows = calloc_or_fail(1, sizeof(*drb->nr.flows));
+    DevAssert(qfi > 0);
+    drb->nr.flows[0].qfi = qfi;
+    drb->nr.flows[0].param = get_qos_char_from_qos_flow_param(qos_param);
     /* the DRB QoS parameters: we just reuse the ones from the first flow */
-    drb->drb_info.drb_qos = drb->drb_info.flows_mapped_to_drb[0].qos_params;
+    drb->nr.drb_qos = drb->nr.flows[0].param;
+
+    memcpy(&drb->up_ul_tnl[0].tl_address, &rrc_drb->cuup_tunnel_config.addr.buffer, sizeof(uint8_t) * 4);
+    drb->up_ul_tnl[0].teid = rrc_drb->cuup_tunnel_config.teid;
+    drb->up_ul_tnl_len = 1;
+
+    drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
+    drb->dl_pdcp_sn_len = malloc_or_fail(sizeof(*drb->dl_pdcp_sn_len));
+    *drb->dl_pdcp_sn_len = rrc_drb->pdcp_config.pdcp_SN_SizeDL == 1 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+    drb->ul_pdcp_sn_len = malloc_or_fail(sizeof(*drb->ul_pdcp_sn_len));
+    *drb->ul_pdcp_sn_len = rrc_drb->pdcp_config.pdcp_SN_SizeUL == 1 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;;
   }
   return nb_drb;
 }
@@ -168,32 +173,38 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
         target_du->assoc_id,
         target_du->setup_req->cell[0].info.nr_pci);
 
-  cu_to_du_rrc_information_t cu2du = {
-      .handoverPreparationInfo = ho_prep_info->buf,
-      .handoverPreparationInfo_length = ho_prep_info->len,
-  };
-
-  f1ap_drb_to_be_setup_t drbs[MAX_DRBS_PER_UE] = {0};
+  f1ap_drb_to_setup_t *drbs = calloc_or_fail(MAX_DRBS_PER_UE, sizeof(*drbs));
   int nb_drb = fill_drb_to_be_setup(rrc, ue, drbs);
 
-  f1ap_srb_to_be_setup_t srbs[2] = {{.srb_id = 1, .lcid = 1}, {.srb_id = 2, .lcid = 2}};
+  int nb_srb = 2;
+  f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
+  srbs[0].id = 1;
+  srbs[1].id = 2;
+
+  byte_array_t *hpi = malloc_or_fail(sizeof(*hpi));
+  *hpi = copy_byte_array(*ho_prep_info);
+
+  uint64_t *ue_agg_mbr = malloc_or_fail(sizeof(*ue_agg_mbr));
+  *ue_agg_mbr = 1000000000 /*bps*/;
+
   f1ap_served_cell_info_t *cell_info = &target_du->setup_req->cell[0].info;
   RETURN_IF_INVALID_ASSOC_ID(target_du->assoc_id);
-  f1ap_ue_context_setup_t ue_context_setup_req = {
+  f1ap_ue_context_setup_req_t ue_context_setup_req = {
       .gNB_CU_ue_id = ue->rrc_ue_id,
-      .gNB_DU_ue_id = 0, /* TODO: this should be optional! */
       .plmn.mcc = cell_info->plmn.mcc,
       .plmn.mnc = cell_info->plmn.mnc,
       .plmn.mnc_digit_length = cell_info->plmn.mnc_digit_length,
       .nr_cellid = cell_info->nr_cellid,
-      .servCellId = 0, // TODO: correct value?
-      .srbs_to_be_setup_length = 2,
-      .srbs_to_be_setup = srbs,
-      .drbs_to_be_setup_length = nb_drb,
-      .drbs_to_be_setup = drbs,
-      .cu_to_du_rrc_information = &cu2du,
+      .servCellIndex = 0, // TODO: correct value?
+      .srbs_len = nb_srb,
+      .srbs = srbs,
+      .drbs_len = nb_drb,
+      .drbs = drbs,
+      .cu_to_du_rrc_info.ho_prep_info = hpi,
+      .gnb_du_ue_agg_mbr_ul = ue_agg_mbr,
   };
   rrc->mac_rrc.ue_context_setup_request(target_du->assoc_id, &ue_context_setup_req);
+  free_ue_context_setup_req(&ue_context_setup_req);
 }
 
 /*
@@ -214,15 +225,15 @@ void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc, int nr_cgi, uint8_t *ho_prep_info, 
 
 typedef struct deliver_ue_ctxt_modification_data_t {
   gNB_RRC_INST *rrc;
-  f1ap_ue_context_modif_req_t *modification_req;
+  f1ap_ue_context_mod_req_t *modification_req;
   sctp_assoc_t assoc_id;
 } deliver_ue_ctxt_modification_data_t;
 static void rrc_deliver_ue_ctxt_modif_req(void *deliver_pdu_data, ue_id_t ue_id, int srb_id, char *buf, int size, int sdu_id)
 {
   DevAssert(deliver_pdu_data != NULL);
   deliver_ue_ctxt_modification_data_t *data = deliver_pdu_data;
-  data->modification_req->rrc_container = (uint8_t*)buf;
-  data->modification_req->rrc_container_length = size;
+  byte_array_t ba = {.buf = (uint8_t *) buf, .len = size};
+  data->modification_req->rrc_container = &ba;
   data->rrc->mac_rrc.ue_context_modification_request(data->assoc_id, data->modification_req);
 }
 static void rrc_gNB_trigger_reconfiguration_for_handover(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, uint8_t *rrc_reconf, int rrc_reconf_len)
@@ -231,12 +242,9 @@ static void rrc_gNB_trigger_reconfiguration_for_handover(gNB_RRC_INST *rrc, gNB_
 
   TransmActionInd_t transmission_action_indicator = TransmActionInd_STOP;
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
-  f1ap_ue_context_modif_req_t ue_context_modif_req = {
+  f1ap_ue_context_mod_req_t ue_context_modif_req = {
       .gNB_CU_ue_id = ue->rrc_ue_id,
       .gNB_DU_ue_id = ue_data.secondary_ue,
-      .plmn = rrc->configuration.plmn[0],
-      .nr_cellid = rrc->nr_cellid, // TODO target cell ID
-      .servCellId = 0, // TODO: correct value?
       .transm_action_ind = &transmission_action_indicator,
   };
   deliver_ue_ctxt_modification_data_t data = {.rrc = rrc,

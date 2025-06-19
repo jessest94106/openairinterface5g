@@ -71,6 +71,7 @@
 #include "xer_decoder.h"
 #include "xer_encoder.h"
 #include "f1ap_common.h"
+#include "lib/f1ap_ue_context.h"
 
 // In case of phy-test and do-ra mode, read UE capabilities directly from file
 // and put it into a CG-ConfigInfo field
@@ -137,18 +138,16 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
   nr_pdcp_entity_security_keys_and_algos_t security_parameters = {0};
 
   uint8_t tmp[1024];
-  uint8_t *cgci_buf = NULL;
-  uint32_t cgci_len = 0;
+  byte_array_t cgci = {0};
   if (get_softmodem_params()->phy_test == 1 || get_softmodem_params()->do_ra == 1) {
     DevAssert(m == NULL);
     UE->rb_config = get_default_rbconfig(10 /* EPS bearer ID */, 1 /* drb ID */, NR_CipheringAlgorithm_nea0, NR_SecurityConfig__keyToUse_master, &rrc->pdcp_config);
-    cgci_len = cg_config_info_from_ue_cap_file(sizeof tmp, tmp);
-    DevAssert(cgci_len > 0);
-    cgci_buf = tmp;
+    int len = cg_config_info_from_ue_cap_file(sizeof tmp, tmp);
+    DevAssert(len > 0);
+    cgci = create_byte_array(len, tmp);
   } else {
     DevAssert(m != NULL);
-    cgci_buf = m->rrc_buffer;
-    cgci_len = m->rrc_buffer_size;
+    cgci = create_byte_array(m->rrc_buffer_size, m->rrc_buffer);
 
     /* TODO: handle more than one bearer */
     if (m->nb_e_rabs_tobeadded != 1) {
@@ -272,25 +271,24 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
                    UE->rb_config->drb_ToAddModList,
                    &security_parameters);
 
-  cu_to_du_rrc_information_t cu2du = {
-      .cG_ConfigInfo = cgci_buf,
-      .cG_ConfigInfo_length = cgci_len,
-  };
   /* assumption: only a single bearer, see above */
   NR_DRB_ToAddModList_t *rb_list = UE->rb_config->drb_ToAddModList;
   AssertFatal(rb_list->list.count == 1, "can only handle one bearer for NSA/phy-test/do-ra, but has %d\n", rb_list->list.count);
   int drb_id = rb_list->list.array[0]->drb_Identity;
-  f1ap_flows_mapped_to_drb_t *flow = calloc(1, sizeof(f1ap_flows_mapped_to_drb_t));
-  flow->qos_params.qos_characteristics.qos_type = NON_DYNAMIC;
-  flow->qfi = flow->qos_params.qos_characteristics.non_dynamic.fiveqi = 9;
-  f1ap_drb_to_be_setup_t drbs = {
-      .drb_id = drb_id,
-      .rlc_mode = F1AP_RLC_MODE_UM_BIDIR, // hardcoded keep it backwards compatible for now
-      // rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM,
-      .up_ul_tnl_length = 1,
-      .drb_info.flows_to_be_setup_length = 1,
-      .drb_info.flows_mapped_to_drb = flow,
-  };
+  f1ap_drb_to_setup_t *drb = calloc_or_fail(1, sizeof(*drb));
+  drb->id = drb_id;
+  // hardcoded keep it backwards compatible for now
+  // rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM,
+  drb->rlc_mode = F1AP_RLC_MODE_UM_BIDIR;
+  drb->up_ul_tnl_len = 1;
+  drb->qos_choice = F1AP_QOS_CHOICE_NR; // we don't have EUTRAN yet, "approximate" it
+  drb->nr.flows_len = 1;
+  f1ap_drb_flows_mapped_t *flow = drb->nr.flows = calloc_or_fail(drb->nr.flows_len, sizeof(*flow));
+  flow->qfi = 9;
+  flow->param.qos_type = NON_DYNAMIC;
+  flow->param.nondyn.fiveQI = 9;
+  flow->param.arp.prio = 5;
+
   // Note: E1 support for NSA/phy-test/do-ra not implemented yet
   instance_t f1inst = get_f1_gtp_instance();
   if (f1inst >= 0) {
@@ -305,25 +303,30 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
       gtpv1u_gnb_create_tunnel_resp_t resp = {0};
       int ret = gtpv1u_create_ngu_tunnel(f1inst, &req, &resp, NULL, NULL);
       AssertFatal(ret == 0, "gtpv1u_create_ngu_tunnel failed: ret %d\n", ret);
-      drbs.up_ul_tnl[0].port = rrc->eth_params_s.my_portd;
-      memcpy(&drbs.up_ul_tnl[0].tl_address, &resp.gnb_addr.buffer, 4);
-      drbs.up_ul_tnl[0].teid = resp.gnb_NGu_teid[0];
+      memcpy(&drb->up_ul_tnl[0].tl_address, &resp.gnb_addr.buffer, 4);
+      drb->up_ul_tnl[0].teid = resp.gnb_NGu_teid[0];
+      drb->up_ul_tnl_len = 1;
   }
-  f1ap_ue_context_setup_t req = {
+  uint64_t *ue_agg_mbr_ul = malloc_or_fail(sizeof(*ue_agg_mbr_ul));
+  *ue_agg_mbr_ul = 1000000000;
+  byte_array_t *cg_configinfo = malloc_or_fail(sizeof(*cg_configinfo));
+  *cg_configinfo = cgci;
+  f1ap_ue_context_setup_req_t req = {
       .gNB_CU_ue_id = UE->rrc_ue_id,
-      .gNB_DU_ue_id = 0xffffffff, /* not known yet */
       .plmn.mcc = rrc->configuration.plmn[0].mcc,
       .plmn.mnc = rrc->configuration.plmn[0].mnc,
       .plmn.mnc_digit_length = rrc->configuration.plmn[0].mnc_digit_length,
       .nr_cellid = rrc->nr_cellid,
-      .servCellId = 0,
-      .drbs_to_be_setup_length = 1,
-      .drbs_to_be_setup = &drbs,
-      .cu_to_du_rrc_information = &cu2du,
+      .servCellIndex = 0,
+      .drbs_len = 1,
+      .drbs = drb,
+      .cu_to_du_rrc_info.cg_configinfo = cg_configinfo,
+      .gnb_du_ue_agg_mbr_ul = ue_agg_mbr_ul,
   };
   f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   rrc->mac_rrc.ue_context_setup_request(ue_data.du_assoc_id, &req);
+  free_ue_context_setup_req(&req);
 }
 
 static NR_RRCReconfiguration_IEs_t *get_default_reconfig(const NR_CellGroupConfig_t *secondaryCellGroup)

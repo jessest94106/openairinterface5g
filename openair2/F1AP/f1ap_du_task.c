@@ -36,6 +36,7 @@
 #include "f1ap_du_rrc_message_transfer.h"
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
+#include "lib/f1ap_ue_context.h"
 #include "f1ap_du_task.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
 

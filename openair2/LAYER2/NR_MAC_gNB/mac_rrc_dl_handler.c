@@ -33,6 +33,7 @@
 #include "openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
+#include "lib/f1ap_ue_context.h"
 
 #include "executables/softmodem-common.h"
 
@@ -222,18 +223,18 @@ void gnb_du_configuration_update_acknowledge(const f1ap_gnb_du_configuration_upd
   LOG_I(MAC, "received gNB-DU configuration update acknowledge\n");
 }
 
-static NR_RLC_BearerConfig_t *get_bearerconfig_from_srb(const f1ap_srb_to_be_setup_t *srb,
+static NR_RLC_BearerConfig_t *get_bearerconfig_from_srb(const f1ap_srb_to_setup_t *srb,
                                                         const nr_rlc_configuration_t *rlc_config)
 {
-  long priority = srb->srb_id == 2 ? 3 : 1; // see 38.331 sec 9.2.1
+  long priority = srb->id == 2 ? 3 : 1; // see 38.331 sec 9.2.1
   e_NR_LogicalChannelConfig__ul_SpecificParameters__bucketSizeDuration bucket =
       NR_LogicalChannelConfig__ul_SpecificParameters__bucketSizeDuration_ms5;
-  return get_SRB_RLC_BearerConfig(get_lcid_from_srbid(srb->srb_id), priority, bucket, rlc_config);
+  return get_SRB_RLC_BearerConfig(get_lcid_from_srbid(srb->id), priority, bucket, rlc_config);
 }
 
 static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
                                         int srbs_len,
-                                        const f1ap_srb_to_be_setup_t *req_srbs,
+                                        const f1ap_srb_to_setup_t *req_srbs,
                                         f1ap_srb_to_be_setup_t **resp_srbs,
                                         NR_CellGroupConfig_t *cellGroupConfig,
                                         const nr_rlc_configuration_t *rlc_config)
@@ -243,15 +244,15 @@ static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
   *resp_srbs = calloc(srbs_len, sizeof(**resp_srbs));
   AssertFatal(*resp_srbs != NULL, "out of memory\n");
   for (int i = 0; i < srbs_len; i++) {
-    const f1ap_srb_to_be_setup_t *srb = &req_srbs[i];
+    const f1ap_srb_to_setup_t *srb = &req_srbs[i];
     NR_RLC_BearerConfig_t *rlc_BearerConfig = get_bearerconfig_from_srb(srb, rlc_config);
-    nr_rlc_add_srb(UE->rnti, srb->srb_id, rlc_BearerConfig);
+    nr_rlc_add_srb(UE->rnti, srb->id, rlc_BearerConfig);
 
     int priority = rlc_BearerConfig->mac_LogicalChannelConfig->ul_SpecificParameters->priority;
     nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .priority = priority};
     nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
 
-    (*resp_srbs)[i].srb_id = srb->srb_id;
+    (*resp_srbs)[i].srb_id = srb->id;
     (*resp_srbs)[i].lcid = c.lcid;
 
     if (rlc_BearerConfig->logicalChannelIdentity == 1) {
@@ -268,12 +269,12 @@ static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
   return srbs_len;
 }
 
-static NR_RLC_BearerConfig_t *get_bearerconfig_from_drb(const f1ap_drb_to_be_setup_t *drb,
+static NR_RLC_BearerConfig_t *get_bearerconfig_from_drb(const f1ap_drb_to_setup_t *drb,
                                                         const nr_rlc_configuration_t *rlc_config)
 {
   const NR_RLC_Config_PR rlc_conf = drb->rlc_mode == F1AP_RLC_MODE_AM ? NR_RLC_Config_PR_am : NR_RLC_Config_PR_um_Bi_Directional;
   long priority = 13; // hardcoded for the moment
-  return get_DRB_RLC_BearerConfig(get_lcid_from_drbid(drb->drb_id), drb->drb_id, rlc_conf, priority, rlc_config);
+  return get_DRB_RLC_BearerConfig(get_lcid_from_drbid(drb->id), drb->id, rlc_conf, priority, rlc_config);
 }
 
 static int get_non_dynamic_priority(int fiveqi)
@@ -285,20 +286,20 @@ static int get_non_dynamic_priority(int fiveqi)
   return 0;
 }
 
-static NR_QoS_config_t get_qos_config(const f1ap_qos_characteristics_t *qos_char)
+static NR_QoS_config_t get_qos_config(const f1ap_qos_flow_param_t *qos)
 {
   NR_QoS_config_t qos_c = {0};
-  switch (qos_char->qos_type) {
+  switch (qos->qos_type) {
     case DYNAMIC:
-      qos_c.priority = qos_char->dynamic.qos_priority_level;
-      qos_c.fiveQI = qos_char->dynamic.fiveqi > 0 ? qos_char->dynamic.fiveqi : 0;
+      qos_c.priority = qos->dyn.prio;
+      qos_c.fiveQI = 0; // does not exist for non-dynamic
       break;
     case NON_DYNAMIC:
-      qos_c.fiveQI = qos_char->non_dynamic.fiveqi;
-      qos_c.priority = get_non_dynamic_priority(qos_char->non_dynamic.fiveqi);
+      qos_c.fiveQI = qos->nondyn.fiveQI;
+      qos_c.priority = get_non_dynamic_priority(qos_c.fiveQI);
       break;
     default:
-      AssertFatal(false, "illegal QoS type %d\n", qos_char->qos_type);
+      AssertFatal(false, "illegal QoS type %d\n", qos->qos_type);
       break;
   }
   return qos_c;
@@ -306,7 +307,7 @@ static NR_QoS_config_t get_qos_config(const f1ap_qos_characteristics_t *qos_char
 
 static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
                                         int drbs_len,
-                                        const f1ap_drb_to_be_setup_t *req_drbs,
+                                        const f1ap_drb_to_setup_t *req_drbs,
                                         f1ap_drb_to_be_setup_t **resp_drbs,
                                         NR_CellGroupConfig_t *cellGroupConfig,
                                         const nr_rlc_configuration_t *rlc_config)
@@ -319,32 +320,34 @@ static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
   *resp_drbs = calloc(drbs_len, sizeof(**resp_drbs));
   AssertFatal(*resp_drbs != NULL, "out of memory\n");
   for (int i = 0; i < drbs_len; i++) {
-    const f1ap_drb_to_be_setup_t *drb = &req_drbs[i];
+    const f1ap_drb_to_setup_t *drb = &req_drbs[i];
+    AssertFatal(drb->qos_choice == F1AP_QOS_CHOICE_NR, "only NR QoS supported\n");
     f1ap_drb_to_be_setup_t *resp_drb = &(*resp_drbs)[i];
     NR_RLC_BearerConfig_t *rlc_BearerConfig = get_bearerconfig_from_drb(drb, rlc_config);
-    nr_rlc_add_drb(UE->rnti, drb->drb_id, rlc_BearerConfig);
+    nr_rlc_add_drb(UE->rnti, drb->id, rlc_BearerConfig);
 
-    nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .nssai = drb->nssai};
+    nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .nssai = drb->nr.nssai};
     int prio = 100;
-    for (int q = 0; q < drb->drb_info.flows_to_be_setup_length; ++q) {
-      c.qos_config[q] = get_qos_config(&drb->drb_info.flows_mapped_to_drb[q].qos_params.qos_characteristics);
+    for (int q = 0; q < drb->nr.flows_len; ++q) {
+      c.qos_config[q] = get_qos_config(&drb->nr.flows[q].param);
       prio = min(prio, c.qos_config[q].priority);
     }
     c.priority = prio;
     nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
 
-    *resp_drb = *drb;
+    resp_drb->drb_id = drb->id;
+    // TODO lcid
     // just put same number of tunnels in DL as in UL
-    DevAssert(drb->up_ul_tnl_length == 1);
-    resp_drb->up_dl_tnl_length = drb->up_ul_tnl_length;
+    DevAssert(drb->up_ul_tnl_len == 1);
+    resp_drb->up_dl_tnl_length = drb->up_ul_tnl_len;
 
     if (f1inst >= 0) { // we actually use F1-U
       int qfi = -1; // don't put PDU session marker in GTP
       gtpv1u_gnb_create_tunnel_resp_t resp_f1 = {0};
       int ret = drb_gtpu_create(f1inst,
                                 UE->rnti,
-                                drb->drb_id,
-                                drb->drb_id,
+                                drb->id,
+                                drb->id,
                                 qfi,
                                 drb->up_ul_tnl[0].tl_address,
                                 drb->up_ul_tnl[0].teid,
@@ -366,7 +369,7 @@ static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
 
 static int handle_ue_context_drbs_release(NR_UE_info_t *UE,
                                           int drbs_len,
-                                          const f1ap_drb_to_be_released_t *req_drbs,
+                                          const f1ap_drb_to_release_t *req_drbs,
                                           NR_CellGroupConfig_t *cellGroupConfig)
 {
   DevAssert(req_drbs != NULL && cellGroupConfig != NULL);
@@ -378,9 +381,9 @@ static int handle_ue_context_drbs_release(NR_UE_info_t *UE,
   /* Note: the actual GTP tunnels are already removed in the F1AP message
    * decoding */
   for (int i = 0; i < drbs_len; i++) {
-    const f1ap_drb_to_be_released_t *drb = &req_drbs[i];
+    const f1ap_drb_to_release_t *drb = &req_drbs[i];
 
-    long lcid = get_lcid_from_drbid(drb->rb_id);
+    long lcid = get_lcid_from_drbid(drb->id);
     int idx = 0;
     while (idx < cellGroupConfig->rlc_BearerToAddModList->list.count) {
       const NR_RLC_BearerConfig_t *bc = cellGroupConfig->rlc_BearerToAddModList->list.array[idx];
@@ -392,7 +395,7 @@ static int handle_ue_context_drbs_release(NR_UE_info_t *UE,
       nr_mac_remove_lcid(&UE->UE_sched_ctrl, lcid);
       nr_rlc_release_entity(UE->rnti, lcid);
       if (f1inst >= 0)
-        newGtpuDeleteOneTunnel(f1inst, UE->rnti, drb->rb_id);
+        newGtpuDeleteOneTunnel(f1inst, UE->rnti, drb->id);
       asn_sequence_del(&cellGroupConfig->rlc_BearerToAddModList->list, idx, 1);
       long *plcid = malloc(sizeof(*plcid));
       AssertFatal(plcid, "out of memory\n");
@@ -600,34 +603,30 @@ static NR_UE_info_t *create_new_UE(gNB_MAC_INST *mac, uint32_t cu_id, const NR_C
   return UE;
 }
 
-void ue_context_setup_request(const f1ap_ue_context_setup_t *req)
+void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 {
   const bool is_SA = IS_SA_MODE(get_softmodem_params());
   gNB_MAC_INST *mac = RC.nrmac[0];
-  /* response has same type as request... */
+
+  /* TODO: update response */
   f1ap_ue_context_setup_t resp = {
     .gNB_CU_ue_id = req->gNB_CU_ue_id,
-    .gNB_DU_ue_id = req->gNB_DU_ue_id,
   };
 
-  /* gNB-DU UE ID is optional. As of now, the F1AP module fills -1 (on uint, so
-   * 0xffffffff), but the DU uses the RNTI, so check if it's a legal RNTI in
-   * which case we consider; if not, assume no DU UE ID given */
-  bool ue_id_provided = resp.gNB_DU_ue_id > 0 && resp.gNB_DU_ue_id < 0xffff;
+  bool ue_id_provided = req->gNB_DU_ue_id != NULL;
 
-  NR_UE_NR_Capability_t *ue_cap = NULL;
+  const f1ap_cu_to_du_rrc_info_t *cu2du = &req->cu_to_du_rrc_info;
   NR_CG_ConfigInfo_t *cg_configinfo = NULL;
-  if (req->cu_to_du_rrc_information != NULL) {
-    const cu_to_du_rrc_information_t *cu2du = req->cu_to_du_rrc_information;
-    if (cu2du->cG_ConfigInfo != NULL)
-      cg_configinfo = get_cg_config_info(cu2du->cG_ConfigInfo, cu2du->cG_ConfigInfo_length);
-    if (cu2du->handoverPreparationInfo != NULL) {
-      ue_cap = get_ue_nr_cap_from_ho_prep_info(cu2du->handoverPreparationInfo, cu2du->handoverPreparationInfo_length);
-    } else if (cu2du->uE_CapabilityRAT_ContainerList != NULL) {
-      ue_cap = get_ue_nr_cap(req->gNB_DU_ue_id, cu2du->uE_CapabilityRAT_ContainerList, cu2du->uE_CapabilityRAT_ContainerList_length);
-    }
-    AssertFatal(cu2du->measConfig == NULL, "MeasConfig not handled\n");
+  if (cu2du->cg_configinfo != NULL)
+    cg_configinfo = get_cg_config_info(cu2du->cg_configinfo->buf, cu2du->cg_configinfo->len);
+  NR_UE_NR_Capability_t *ue_cap = NULL;
+  if (cu2du->ho_prep_info != NULL) {
+    ue_cap = get_ue_nr_cap_from_ho_prep_info(cu2du->ho_prep_info->buf, cu2du->ho_prep_info->len);
+  } else if (cu2du->ue_cap != NULL) {
+    ue_cap = get_ue_nr_cap(*req->gNB_DU_ue_id, cu2du->ue_cap->buf, cu2du->ue_cap->len);
   }
+  AssertFatal(cu2du->meas_config == NULL, "MeasConfig not handled\n");
+
   /* 38.473: "For DC operation, the CG-ConfigInfo IE shall be included in the CU
    * to DU RRC Information IE at the gNB acting as secondary node" As of now,
    * we only handle NSA => we check we have CG-ConfigInfo if not SA or have SA
@@ -643,25 +642,26 @@ void ue_context_setup_request(const f1ap_ue_context_setup_t *req)
     resp.crnti = &UE->rnti;
   } else {
     DevAssert(is_SA);
-    UE = find_nr_UE(&mac->UE_info, req->gNB_DU_ue_id);
+    UE = find_nr_UE(&mac->UE_info, *req->gNB_DU_ue_id);
   }
   AssertFatal(UE, "no UE found or could not be created, but UE Context Setup Failed not implemented\n");
+  resp.gNB_DU_ue_id = UE->rnti;
 
   NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
 
-  if (req->srbs_to_be_setup_length > 0) {
+  if (req->srbs_len > 0) {
     resp.srbs_to_be_setup_length = handle_ue_context_srbs_setup(UE,
-                                                                req->srbs_to_be_setup_length,
-                                                                req->srbs_to_be_setup,
+                                                                req->srbs_len,
+                                                                req->srbs,
                                                                 &resp.srbs_to_be_setup,
                                                                 new_CellGroup,
                                                                 &mac->rlc_config);
   }
 
-  if (req->drbs_to_be_setup_length > 0) {
+  if (req->drbs_len > 0) {
     resp.drbs_to_be_setup_length = handle_ue_context_drbs_setup(UE,
-                                                                req->drbs_to_be_setup_length,
-                                                                req->drbs_to_be_setup,
+                                                                req->drbs_len,
+                                                                req->drbs,
                                                                 &resp.drbs_to_be_setup,
                                                                 new_CellGroup,
                                                                 &mac->rlc_config);
@@ -669,7 +669,7 @@ void ue_context_setup_request(const f1ap_ue_context_setup_t *req)
 
   if (req->rrc_container != NULL) {
     logical_chan_id_t id = 1;
-    nr_rlc_srb_recv_sdu(req->gNB_DU_ue_id, id, req->rrc_container, req->rrc_container_length);
+    nr_rlc_srb_recv_sdu(UE->rnti, id, req->rrc_container->buf, req->rrc_container->len);
   }
 
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
@@ -722,7 +722,7 @@ void ue_context_setup_request(const f1ap_ue_context_setup_t *req)
   free(resp.du_to_cu_rrc_information);
 }
 
-void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
+void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
 {
   gNB_MAC_INST *mac = RC.nrmac[0];
   f1ap_ue_context_modif_resp_t resp = {
@@ -731,12 +731,13 @@ void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
   };
 
   NR_UE_NR_Capability_t *ue_cap = NULL;
-  if (req->cu_to_du_rrc_information != NULL) {
-    AssertFatal(req->cu_to_du_rrc_information->cG_ConfigInfo == NULL, "CG-ConfigInfo not handled\n");
-    ue_cap = get_ue_nr_cap(req->gNB_DU_ue_id,
-                           req->cu_to_du_rrc_information->uE_CapabilityRAT_ContainerList,
-                           req->cu_to_du_rrc_information->uE_CapabilityRAT_ContainerList_length);
-    AssertFatal(req->cu_to_du_rrc_information->measConfig == NULL, "MeasConfig not handled\n");
+  if (req->cu_to_du_rrc_info != NULL) {
+    AssertFatal(req->cu_to_du_rrc_info->cg_configinfo == NULL, "CG-ConfigInfo not handled\n");
+    if (req->cu_to_du_rrc_info->ue_cap) {
+      byte_array_t *b = req->cu_to_du_rrc_info->ue_cap;
+      ue_cap = get_ue_nr_cap(req->gNB_DU_ue_id, b->buf, b->len);
+    }
+    AssertFatal(req->cu_to_du_rrc_info->meas_config == NULL, "MeasConfig not handled\n");
   }
 
   NR_SCHED_LOCK(&mac->sched_lock);
@@ -749,39 +750,38 @@ void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
 
   NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
 
-  if (req->srbs_to_be_setup_length > 0) {
+  if (req->srbs_len > 0) {
     resp.srbs_to_be_setup_length = handle_ue_context_srbs_setup(UE,
-                                                                req->srbs_to_be_setup_length,
-                                                                req->srbs_to_be_setup,
+                                                                req->srbs_len,
+                                                                req->srbs,
                                                                 &resp.srbs_to_be_setup,
                                                                 new_CellGroup,
                                                                 &mac->rlc_config);
   }
 
-  if (req->drbs_to_be_setup_length > 0) {
+  if (req->drbs_len > 0) {
     resp.drbs_to_be_setup_length = handle_ue_context_drbs_setup(UE,
-                                                                req->drbs_to_be_setup_length,
-                                                                req->drbs_to_be_setup,
+                                                                req->drbs_len,
+                                                                req->drbs,
                                                                 &resp.drbs_to_be_setup,
                                                                 new_CellGroup,
                                                                 &mac->rlc_config);
   }
 
-  if (req->drbs_to_be_released_length > 0) {
-    resp.drbs_to_be_released_length =
-        handle_ue_context_drbs_release(UE, req->drbs_to_be_released_length, req->drbs_to_be_released, new_CellGroup);
+  if (req->drbs_rel_len > 0) {
+    resp.drbs_to_be_released_length = handle_ue_context_drbs_release(UE, req->drbs_rel_len, req->drbs_rel, new_CellGroup);
   }
 
   if (req->rrc_container != NULL) {
     logical_chan_id_t id = 1;
-    nr_rlc_srb_recv_sdu(req->gNB_DU_ue_id, id, req->rrc_container, req->rrc_container_length);
+    nr_rlc_srb_recv_sdu(req->gNB_DU_ue_id, id, req->rrc_container->buf, req->rrc_container->len);
   }
 
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
-  if (req->ReconfigComplOutcome != RRCreconf_info_not_present && req->ReconfigComplOutcome != RRCreconf_success) {
+  if (req->reconfig_compl && *req->reconfig_compl != RRCreconf_success) {
     LOG_E(NR_MAC,
           "RRC reconfiguration outcome unsuccessful, but no rollback mechanism implemented to come back to old configuration\n");
-  } else if (req->ReconfigComplOutcome == RRCreconf_success) {
+  } else if (req->reconfig_compl) {
     LOG_I(NR_MAC, "DU received confirmation of successful RRC Reconfiguration\n");
     if (UE->reconfigSpCellConfig) {
       // in case of reestablishment, the spCellConfig had to be released
@@ -807,8 +807,7 @@ void ue_context_modification_request(const f1ap_ue_context_modif_req_t *req)
     update_cellGroupConfig(new_CellGroup, UE->uid, UE->capability, &mac->radio_config, scc);
   }
 
-  if (req->srbs_to_be_setup_length > 0 || req->drbs_to_be_setup_length > 0 || req->drbs_to_be_released_length > 0
-      || ue_cap != NULL) {
+  if (req->srbs_len > 0 || req->drbs_len > 0 || req->drbs_rel_len > 0 || ue_cap != NULL) {
     resp.du_to_cu_rrc_information = calloc(1, sizeof(du_to_cu_rrc_information_t));
     AssertFatal(resp.du_to_cu_rrc_information != NULL, "out of memory\n");
     resp.du_to_cu_rrc_information->cellGroupConfig = calloc(1, 1024);
