@@ -437,6 +437,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   if (rrc->node_name != NULL)
     resp.gNB_CU_name = strdup(rrc->node_name);
   rrc->mac_rrc.f1_setup_response(assoc_id, &resp);
+  free_f1ap_setup_response(&resp);
 
   /* we need to setup one default UE for phy-test and do-ra modes in the MAC */
   if (get_softmodem_params()->phy_test > 0 || get_softmodem_params()->do_ra > 0)
