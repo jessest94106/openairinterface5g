@@ -213,7 +213,7 @@ def Iperf_analyzeV2UDP(server_filename, iperf_bitrate_threshold, iperf_packetlos
 			pal_msg += f' (too high! >{iperf_packetloss_threshold}%)'
 		return (result, f'{req_msg}\n{bir_msg}\n{brl_msg}\n{jit_msg}\n{pal_msg}')
 
-def Custom_Command(HTML, node, command, command_fail):
+def Custom_Command(HTML, node, command):
     logging.info(f"Executing custom command on {node}")
     cmd = cls_cmd.getConnection(node)
     ret = cmd.run(command)
@@ -221,26 +221,20 @@ def Custom_Command(HTML, node, command, command_fail):
     logging.debug(f"Custom_Command: {command} on node: {node} - {'OK, command succeeded' if ret.returncode == 0 else f'Error, return code: {ret.returncode}'}")
     status = 'OK'
     message = []
-    if ret.returncode != 0 and not command_fail:
-        message = [ret.stdout]
-        logging.warning(f'Custom_Command output: {message}')
-        status = 'Warning'
-    if ret.returncode != 0 and command_fail:
+    if ret.returncode != 0:
         message = [ret.stdout]
         logging.error(f'Custom_Command failed: output: {message}')
         status = 'KO'
     HTML.CreateHtmlTestRowQueue(command, status, message)
     return status == 'OK' or status == 'Warning'
 
-def Custom_Script(HTML, node, script, command_fail):
+def Custom_Script(HTML, node, script):
 	logging.info(f"Executing custom script on {node}")
 	ret = cls_cmd.runScript(node, script, 90)
 	logging.debug(f"Custom_Script: {script} on node: {node} - return code {ret.returncode}, output:\n{ret.stdout}")
 	status = 'OK'
 	message = [ret.stdout]
-	if ret.returncode != 0 and not command_fail:
-		status = 'Warning'
-	if ret.returncode != 0 and command_fail:
+	if ret.returncode != 0:
 		status = 'KO'
 	HTML.CreateHtmlTestRowQueue(script, status, message)
 	return status == 'OK' or status == 'Warning'

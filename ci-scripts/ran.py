@@ -95,7 +95,6 @@ class RANManagement():
 		self.cmd_prefix = '' # prefix before {lte,nr}-softmodem
 		self.node = ''
 		self.command = ''
-		self.command_fail = False
 
 
 #-----------------------------------------------------------

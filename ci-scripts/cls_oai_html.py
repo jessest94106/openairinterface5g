@@ -224,7 +224,6 @@ class HTMLManagement():
 			self.htmlFile.write('  </table>\n')
 			self.htmlFile.write('  </div>\n')
 			self.htmlFile.close()
-			time.sleep(1)
 			if passStatus:
 				cmd = "sed -i -e 's/__STATE_" + self.htmlTabNames[0] + "__//' test_results.html"
 				subprocess.run(cmd, shell=True)

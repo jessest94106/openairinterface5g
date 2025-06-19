@@ -108,14 +108,6 @@
                 <eNB_serverId>0</eNB_serverId>
         </testCase>
 
-        <testCase id="004000">
-                <class>Custom_Command</class>
-                <always_exec>true</always_exec>
-                <desc>Clean-Up any residual volume</desc>
-                <node>cacofonix</node>
-                <command>docker volume rm 5g_rfsimulator_tdd_dora_rrc.config</command>
-        </testCase>
-
         <testCase id="222222">
                 <class>Clean_Test_Server_Images</class>
                 <always_exec>true</always_exec>

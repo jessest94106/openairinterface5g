@@ -376,14 +376,12 @@ def ExecuteActionWithParam(action):
 			# Change all execution targets to localhost
 			node = 'localhost'
 		command = test.findtext('command')
-		command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
-		success = cls_oaicitest.Custom_Command(HTML, node, command, command_fail)
+		success = cls_oaicitest.Custom_Command(HTML, node, command)
 
 	elif action == 'Custom_Script':
 		node = test.findtext('node')
 		script = test.findtext('script')
-		command_fail = test.findtext('command_fail') in ['True', 'true', 'Yes', 'yes']
-		success = cls_oaicitest.Custom_Script(HTML, node, script, command_fail)
+		success = cls_oaicitest.Custom_Script(HTML, node, script)
 
 	elif action == 'Pull_Cluster_Image':
 		tag_prefix = test.findtext('tag_prefix') or ""
@@ -626,6 +624,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 			HTML.testCase_id=CiTestObj.testCase_id
 			CiTestObj.desc = test.findtext('desc')
 			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
+			may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
 			HTML.desc=CiTestObj.desc
 			action = test.findtext('class')
 			if (CheckClassValidity(xml_class_list, action, id) == False):
@@ -639,7 +638,9 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				break
 			try:
 				test_succeeded = ExecuteActionWithParam(action)
-				if not test_succeeded:
+				if not test_succeeded and may_fail:
+					logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
+				elif not test_succeeded:
 					logging.error(f"test ID {test_case_id} action {action} failed ({test_succeeded}), skipping next tests")
 					task_set_succeeded = False
 			except Exception as e:
