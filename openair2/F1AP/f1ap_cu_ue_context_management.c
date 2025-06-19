@@ -122,37 +122,17 @@ int CU_send_UE_CONTEXT_RELEASE_COMMAND(sctp_assoc_t assoc_id, f1ap_ue_context_re
 
 int CU_handle_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu)
 {
-  F1AP_UEContextReleaseComplete_t    *container;
-  F1AP_UEContextReleaseCompleteIEs_t *ie;
-  DevAssert(pdu);
-  MessageDef *msg_p = itti_alloc_new_message(TASK_DU_F1, 0,  F1AP_UE_CONTEXT_RELEASE_COMPLETE);
-  msg_p->ittiMsgHeader.originInstance = assoc_id;
-  f1ap_ue_context_release_complete_t *complete = &F1AP_UE_CONTEXT_RELEASE_COMPLETE(msg_p);
-  container = &pdu->choice.successfulOutcome->value.choice.UEContextReleaseComplete;
-  /* GNB_CU_UE_F1AP_ID */
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCompleteIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID, true);
-  complete->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
-  /* GNB_DU_UE_F1AP_ID */
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCompleteIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID, true);
-  complete->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
-
-  /* Optional*/
-  /* CriticalityDiagnostics */
-  F1AP_FIND_PROTOCOLIE_BY_ID(F1AP_UEContextReleaseCompleteIEs_t, ie, container,
-                             F1AP_ProtocolIE_ID_id_CriticalityDiagnostics, false);
-
-  if (ie) {
-    // ie->value.choice.CriticalityDiagnostics.procedureCode
-    // ie->value.choice.CriticalityDiagnostics.triggeringMessage
-    // ie->value.choice.CriticalityDiagnostics.procedureCriticality
-    // ie->value.choice.CriticalityDiagnostics.transactionID
-    // F1AP_CriticalityDiagnostics_IE_List
+  f1ap_ue_context_rel_cplt_t cplt = {0};
+  if (!decode_ue_context_rel_cplt(pdu, &cplt)) {
+    LOG_E(F1AP, "cannot decode F1 UE Context Release Complete\n");
+    free_ue_context_rel_cplt(&cplt);
+    return -1;
   }
 
+  MessageDef *msg_p = itti_alloc_new_message(TASK_DU_F1, 0,  F1AP_UE_CONTEXT_RELEASE_COMPLETE);
+  msg_p->ittiMsgHeader.originInstance = assoc_id;
+  F1AP_UE_CONTEXT_RELEASE_COMPLETE(msg_p) = cplt;
   itti_send_msg_to_task(TASK_RRC_GNB, instance, msg_p);
-
   return 0;
 }
 

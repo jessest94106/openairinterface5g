@@ -55,7 +55,7 @@ int DU_handle_UE_CONTEXT_RELEASE_COMMAND(instance_t instance, sctp_assoc_t assoc
 /*
  * UE Context Release Complete (gNB-DU initiated)
  */
-int DU_send_UE_CONTEXT_RELEASE_COMPLETE(sctp_assoc_t assoc_id, f1ap_ue_context_release_complete_t *complete);
+int DU_send_UE_CONTEXT_RELEASE_COMPLETE(sctp_assoc_t assoc_id, f1ap_ue_context_rel_cplt_t *cplt);
 
 /*
  * UE Context Modification (gNB-CU initiated)

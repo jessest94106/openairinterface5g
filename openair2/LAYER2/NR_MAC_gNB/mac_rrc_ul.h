@@ -35,7 +35,7 @@ typedef void (*ue_context_setup_response_func_t)(const f1ap_ue_context_setup_res
 typedef void (*ue_context_modification_response_func_t)(const f1ap_ue_context_mod_resp_t *resp);
 typedef void (*ue_context_modification_required_func_t)(const f1ap_ue_context_modif_required_t *t);
 typedef void (*ue_context_release_request_func_t)(const f1ap_ue_context_rel_req_t* req);
-typedef void (*ue_context_release_complete_func_t)(const f1ap_ue_context_release_complete_t *complete);
+typedef void (*ue_context_release_complete_func_t)(const f1ap_ue_context_rel_cplt_t *complete);
 
 typedef void (*initial_ul_rrc_message_transfer_func_t)(module_id_t module_id, const f1ap_initial_ul_rrc_message_t *ul_rrc);
 

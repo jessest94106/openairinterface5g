@@ -869,7 +869,7 @@ void ue_context_release_command(const f1ap_ue_context_rel_cmd_t *cmd)
   NR_UE_info_t *UE = find_nr_UE(&mac->UE_info, cmd->gNB_DU_ue_id);
   if (UE == NULL) {
     NR_SCHED_UNLOCK(&mac->sched_lock);
-    f1ap_ue_context_release_complete_t complete = {
+    f1ap_ue_context_rel_cplt_t complete = {
         .gNB_CU_ue_id = cmd->gNB_CU_ue_id,
         .gNB_DU_ue_id = cmd->gNB_DU_ue_id,
     };
@@ -889,7 +889,7 @@ void ue_context_release_command(const f1ap_ue_context_rel_cmd_t *cmd)
     /* UE is in sync: forward release message and mark to be deleted
      * after UL failure */
     byte_array_t *rrc_cont = cmd->rrc_container;
-    nr_rlc_srb_recv_sdu(cmd->gNB_DU_ue_id, *cmd->srb_id, (char *)rrc_cont->buf, rrc_cont->len);
+    nr_rlc_srb_recv_sdu(cmd->gNB_DU_ue_id, *cmd->srb_id, rrc_cont->buf, rrc_cont->len);
     nr_mac_trigger_release_timer(&UE->UE_sched_ctrl, UE->current_UL_BWP.scs);
   }
   NR_SCHED_UNLOCK(&mac->sched_lock);

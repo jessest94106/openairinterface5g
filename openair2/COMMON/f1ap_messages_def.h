@@ -50,7 +50,7 @@ MESSAGE_DEF(F1AP_UL_RRC_MESSAGE                , MESSAGE_PRIORITY_MED, f1ap_ul_r
 //MESSAGE_DEF(F1AP_INITIAL_CONTEXT_SETUP_FAILURE, MESSAGE_PRIORITY_MED, f1ap_initial_context_setup_failure_t, f1ap_initial_context_setup_failure)
 MESSAGE_DEF(F1AP_UE_CONTEXT_RELEASE_REQ, MESSAGE_PRIORITY_MED, f1ap_ue_context_rel_req_t, f1ap_ue_context_release_req)
 MESSAGE_DEF(F1AP_UE_CONTEXT_RELEASE_CMD, MESSAGE_PRIORITY_MED, f1ap_ue_context_rel_cmd_t, f1ap_ue_context_release_cmd)
-MESSAGE_DEF(F1AP_UE_CONTEXT_RELEASE_COMPLETE, MESSAGE_PRIORITY_MED, f1ap_ue_context_release_complete_t, f1ap_ue_context_release_complete)
+MESSAGE_DEF(F1AP_UE_CONTEXT_RELEASE_COMPLETE, MESSAGE_PRIORITY_MED, f1ap_ue_context_rel_cplt_t, f1ap_ue_context_release_complete)
 MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_REQUIRED, MESSAGE_PRIORITY_MED, f1ap_ue_context_modif_required_t, f1ap_ue_context_modification_required)
 
 /* RRC -> F1AP  messages */

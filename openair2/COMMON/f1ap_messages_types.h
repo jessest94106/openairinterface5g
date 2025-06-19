@@ -673,16 +673,6 @@ typedef struct f1ap_ue_context_rel_cplt_t {
   uint32_t gNB_DU_ue_id;
 } f1ap_ue_context_rel_cplt_t;
 
-typedef struct f1ap_ue_context_release_s {
-  uint32_t gNB_CU_ue_id;
-  uint32_t gNB_DU_ue_id;
-  f1ap_Cause_t  cause;
-  long          cause_value;
-  uint8_t      *rrc_container;
-  int           rrc_container_length;
-  int           srb_id;
-} f1ap_ue_context_release_complete_t;
-
 typedef struct f1ap_paging_ind_s {
   uint16_t ueidentityindexvalue;
   uint64_t fiveg_s_tmsi;
