@@ -88,10 +88,12 @@ void *nrmac_stats_thread(void *arg) {
     p += dump_mac_stats(gNB, p, end - p, false);
     NR_SCHED_UNLOCK(&gNB->sched_lock);
     p += snprintf(p, end - p, "\n");
-    p += print_meas_log(&gNB->eNB_scheduler, "DL & UL scheduling timing", NULL, NULL, p, end - p);
+    p += print_meas_log(&gNB->gNB_scheduler, "gNB_scheduler", NULL, NULL, p, end - p);
+    p += print_meas_log(&gNB->rx_ulsch_sdu, "rx_ulsch_sdu", NULL, NULL, p, end - p);
     p += print_meas_log(&gNB->schedule_dlsch, "dlsch scheduler", NULL, NULL, p, end - p);
+    p += print_meas_log(&gNB->schedule_ulsch, "ulsch scheduler", NULL, NULL, p, end - p);
+    p += print_meas_log(&gNB->schedule_ra, "RA scheduler", NULL, NULL, p, end - p);
     p += print_meas_log(&gNB->rlc_data_req, "rlc_data_req", NULL, NULL, p, end - p);
-    p += print_meas_log(&gNB->rlc_status_ind, "rlc_status_ind", NULL, NULL, p, end - p);
     p += print_meas_log(&gNB->nr_srs_ri_computation_timer, "UL-RI computation time", NULL, NULL, p, end - p);
     p += print_meas_log(&gNB->nr_srs_tpmi_computation_timer, "UL-TPMI computation time", NULL, NULL, p, end - p);
     fwrite(output, p - output, 1, file);
