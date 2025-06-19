@@ -601,9 +601,12 @@ void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t
   ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
   ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
   ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, du->mtc);
-  /* TODO: free setup request */
+  if (du->setup_req)
+    free_f1ap_setup_request(du->setup_req);
+  free(du->setup_req);
   nr_rrc_du_container_t *removed = RB_REMOVE(rrc_du_tree, &rrc->dus, du);
   DevAssert(removed != NULL);
+  free(du);
   rrc->num_dus--;
 
   int num = invalidate_du_connections(rrc, assoc_id);
