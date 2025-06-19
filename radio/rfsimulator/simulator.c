@@ -738,6 +738,10 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t, openair0_timestamp
         timestamp,
         timestamp + nsamps,
         signal_energy(samplesVoid[0], nsamps));
+
+  /* trace only first antenna */
+  T(T_USRP_TX_ANT0, T_INT(timestamp), T_BUFFER(samplesVoid[0], sampleToByte(nsamps, 1)));
+
   return nsamps;
 }
 
