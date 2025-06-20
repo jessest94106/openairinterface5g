@@ -195,7 +195,7 @@ static void get_epochtime_from_sib19scheduling(NR_UE_RRC_SI_INFO *SI_info, int *
   int slot = slot_end_sib19_window % N;
   *subframe = ceil(slot / slots_per_subframe);
 
-  LOG_D(NR_RRC,
+  LOG_I(NR_RRC,
         "Get EPOCHTIME: x:%d, N:%d, slot_endw:%d, frame:%d, subframe:%d , slot:%d\n",
         x,
         N,
@@ -228,7 +228,7 @@ static int eval_epoch_time(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntnc
   // after the frame where the message indicating the epochTime is received
   // i.e. Epochframe can be present or future SFN
   diff_frames = (epoch_frame - frame + 1024) % 1024;    // According to 38.331 Epochtime is defined for serving cell like this
-  LOG_D(NR_RRC, "Epoch frame %d, ahead by %d frames\n", epoch_frame, diff_frames);
+  LOG_I(NR_RRC, "Epoch frame %d, ahead by %d frames\n", epoch_frame, diff_frames);
   return diff_frames;
 }
 
@@ -248,7 +248,7 @@ static int get_ntn_timervalues(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *
   int expire_before_ms = ((val430 >= 120) ? 10000 : 2000);
   int diff = *val430_ms - expire_before_ms;
   int sib19_timer_ms = (diff > 0) ? diff : ((*val430_ms - sib19_periodicity_ms) > 0) ? (*val430_ms - sib19_periodicity_ms) : 0;
-  LOG_D(NR_RRC, "val430:%d s, T430:%d ms, sib19_timer:%d ms\n", val430, *val430_ms, sib19_timer_ms);
+  LOG_I(NR_RRC, "val430:%d s, T430:%d ms, sib19_timer:%d ms\n", val430, *val430_ms, sib19_timer_ms);
   return sib19_timer_ms;
 }
 
