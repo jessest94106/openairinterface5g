@@ -1229,8 +1229,8 @@ void *UE_thread(void *arg)
       UE->N_TA_offset = new_N_TA_offset;
     }
 
-    if (curMsg.proc.nr_slot_tx == 0)
-      nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.frame_tx, curMsg.proc.gNB_id);
+    if (curMsg.proc.nr_slot_rx == 0)
+      nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.frame_rx, curMsg.proc.gNB_id);
 
     // RX slot processing. We launch and forget.
     notifiedFIFO_elt_t *newRx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_tx, NULL, UE_dl_processing);
