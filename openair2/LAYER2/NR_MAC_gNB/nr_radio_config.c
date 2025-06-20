@@ -3524,7 +3524,7 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
 
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const int uid,
-                            NR_UE_NR_Capability_t *uecap,
+                            const NR_UE_NR_Capability_t *uecap,
                             const nr_mac_config_t *configuration,
                             const NR_ServingCellConfigCommon_t *scc)
 {
