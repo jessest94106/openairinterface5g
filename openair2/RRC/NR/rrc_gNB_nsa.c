@@ -112,6 +112,7 @@ static int cg_config_info_from_ue_cap_file(uint32_t maxlen, uint8_t buf[maxlen])
   //xer_fprint(stdout, &asn_DEF_NR_CG_ConfigInfo, cgci);
   asn_enc_rval_t rval = uper_encode_to_buffer(&asn_DEF_NR_CG_ConfigInfo, NULL, cgci, buf, maxlen);
   DevAssert(rval.encoded > 0);
+  ASN_STRUCT_FREE(asn_DEF_NR_CG_ConfigInfo, cgci);
   return (rval.encoded + 7) >> 3;
 }
 
