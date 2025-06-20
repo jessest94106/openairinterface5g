@@ -344,7 +344,6 @@ typedef struct UE_NR_SCAN_INFO_s {
 
 /// Top-level PHY Data Structure for UE
 typedef struct PHY_VARS_NR_UE_s {
-  openair0_config_t openair0_cfg[MAX_CARDS];
   /// \brief Module ID indicator for this instance
   uint8_t Mod_id;
   /// \brief Component carrier ID for this PHY instance
@@ -506,9 +505,6 @@ typedef struct PHY_VARS_NR_UE_s {
   // TODO: move this out of phy
   time_stats_t ue_ul_indication_stats;
   nr_ue_phy_cpu_stat_t phy_cpu_stats;
-
-  /// RF and Interface devices per CC
-  openair0_device_t rfdevice;
 
   /// Phase precompensation flag
   bool no_phase_pre_comp;

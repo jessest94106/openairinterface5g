@@ -111,6 +111,8 @@ int32_t         uplink_frequency_offset[MAX_NUM_CCs][4];
 uint64_t        sidelink_frequency[MAX_NUM_CCs][4];
 
 // UE and OAI config variables
+openair0_config_t openair0_cfg[MAX_CARDS];
+openair0_device_t openair0_dev[MAX_CARDS];
 double            cpuf;
 
 int create_tasks_nrue(uint32_t ue_nb) {
@@ -138,19 +140,16 @@ int create_tasks_nrue(uint32_t ue_nb) {
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
 {
-  int CC_id;
   LOG_W(NR_PHY, "called by: %s:%d %s() Exiting OAI softmodem: %s\n", file, line, function, s ? s : "no msg");
 
   oai_exit = 1;
 
-  if (PHY_vars_UE_g && PHY_vars_UE_g[0]) {
-    for(CC_id=0; CC_id<MAX_NUM_CCs; CC_id++) {
-      if (PHY_vars_UE_g[0][CC_id] && PHY_vars_UE_g[0][CC_id]->rfdevice.trx_end_func) {
-        if (PHY_vars_UE_g[0][CC_id]->rfdevice.trx_get_stats_func) {
-          PHY_vars_UE_g[0][CC_id]->rfdevice.trx_get_stats_func(&PHY_vars_UE_g[0][CC_id]->rfdevice);
-        }
-        PHY_vars_UE_g[0][CC_id]->rfdevice.trx_end_func(&PHY_vars_UE_g[0][CC_id]->rfdevice);
+  for (int card = 0; card < MAX_CARDS; card++) {
+    if (openair0_dev[card].trx_end_func) {
+      if (openair0_dev[card].trx_get_stats_func) {
+        openair0_dev[card].trx_get_stats_func(&openair0_dev[card]);
       }
+      openair0_dev[card].trx_end_func(&openair0_dev[card]);
     }
   }
 
@@ -226,15 +225,14 @@ void set_options(int CC_id, PHY_VARS_NR_UE *UE){
 
 void init_openair0(PHY_VARS_NR_UE *ue)
 {
-  int card;
   int freq_off = 0;
   NR_DL_FRAME_PARMS *frame_parms = &ue->frame_parms;
   bool is_sidelink = (get_softmodem_params()->sl_mode) ? true : false;
   if (is_sidelink)
     frame_parms = &ue->SL_UE_PHY_PARAMS.sl_frame_params;
 
-  for (card=0; card<MAX_CARDS; card++) {
-    openair0_config_t *cfg = &ue->openair0_cfg[card];
+  for (int card = 0; card < MAX_CARDS; card++) {
+    openair0_config_t *cfg = &openair0_cfg[card];
     uint64_t dl_carrier, ul_carrier;
     cfg->configFilename    = NULL;
     cfg->sample_rate       = frame_parms->samples_per_subframe * 1e3;
@@ -324,7 +322,9 @@ int main(int argc, char **argv)
   }
   //set_softmodem_sighandler();
   CONFIG_SETRTFLAG(CONFIG_NOEXITONHELP);
-  memset(tx_max_power,0,sizeof(int)*MAX_NUM_CCs);
+  memset(openair0_cfg, 0, sizeof(openair0_config_t) * MAX_CARDS);
+  memset(openair0_dev, 0, sizeof(openair0_device_t) * MAX_CARDS);
+  memset(tx_max_power, 0, sizeof(int) * MAX_NUM_CCs);
   // initialize logging
   logInit();
   // get options and fill parameters from configuration file
@@ -514,12 +514,15 @@ int main(int argc, char **argv)
           ret = pthread_join(phy_vars->stat_thread, NULL);
           AssertFatal(ret == 0, "pthread_join error %d, errno %d (%s)\n", ret, errno, strerror(errno));
         }
-        if (phy_vars->rfdevice.trx_get_stats_func)
-          phy_vars->rfdevice.trx_get_stats_func(&phy_vars->rfdevice);
-        if (phy_vars->rfdevice.trx_end_func)
-          phy_vars->rfdevice.trx_end_func(&phy_vars->rfdevice);
       }
     }
+  }
+
+  for (int card = 0; card < MAX_CARDS; card++) {
+    if (openair0_dev[card].trx_get_stats_func)
+      openair0_dev[card].trx_get_stats_func(&openair0_dev[card]);
+    if (openair0_dev[card].trx_end_func)
+      openair0_dev[card].trx_end_func(&openair0_dev[card]);
   }
 
   free_nrLDPC_coding_interface(&nrLDPC_coding_interface);
