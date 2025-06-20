@@ -58,6 +58,7 @@ rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create)
 
 rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id)
 {
+  DevAssert(drb_id > 0 && drb_id <= 32);
   const drb_t *drb = &ue->established_drbs[drb_id - 1];
   if (drb->status == DRB_INACTIVE) {
     LOG_E(NR_RRC, "UE %d: DRB %d inactive\n", ue->rrc_ue_id, drb_id);
