@@ -298,6 +298,9 @@ static void configure_ntn_ta(module_id_t module_id,
                              ntn_timing_advance_componets_t *ntn_ta,
                              const NR_NTN_Config_r17_t *ntn_Config_r17)
 {
+  if (!ntn_Config_r17)
+    return;
+
   position_t position_params = {0};
   get_position_coordinates(module_id, &position_params);
 
