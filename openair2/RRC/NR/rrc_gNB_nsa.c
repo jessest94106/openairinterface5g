@@ -416,6 +416,7 @@ void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_co
   reconfig->criticalExtensions.choice.rrcReconfiguration = get_default_reconfig(UE->masterCellGroup);
 
   NR_CG_Config_t *CG_Config = generate_CG_Config(reconfig, UE->rb_config);
+  ASN_STRUCT_FREE(asn_DEF_NR_RRCReconfiguration, reconfig);
 
   if (get_softmodem_params()->phy_test > 0 || get_softmodem_params()->do_ra > 0) {
     /* we are done, no X2 answer necessary */
