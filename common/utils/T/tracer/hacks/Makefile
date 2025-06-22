@@ -3,7 +3,7 @@ CFLAGS=-Wall -g -pthread -DT_TRACER -I. -I..
 
 LIBS=-lX11 -lm -lpng -lXft
 
-all: dump_nack_signal time_meas timeplot multi-rru-clean ant0
+all: dump_nack_signal time_meas timeplot multi-rru-clean ant0 plot-ofdm
 
 dump_nack_signal: ../utils.o ../database.o ../configuration.o ../event.o \
                   dump_nack_signal.o
@@ -26,6 +26,13 @@ ant0: ant0.o ../utils.o ../database.o ../configuration.o ../event.o
 ant0.o: ant0.c
 	$(CC) $(CFLAGS) -c -o $@ $< -march=native -ffast-math -O3
 
+plot-ofdm: plot-ofdm.o ../utils.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) -lfftw3f
+
+#plot-ofdm needs good compilation
+plot-ofdm.o: plot-ofdm.c
+	$(CC) $(CFLAGS) -c -o $@ $< -march=native -ffast-math -O3
+
 .PHONY: all
 
 %.o: %.c
@@ -33,4 +40,4 @@ ant0.o: ant0.c
 
 clean:
 	rm -f *.o core dump_nack_signal time_meas timeplot multi-rru-clean \
-              ant0
+              ant0 plot-ofdm
