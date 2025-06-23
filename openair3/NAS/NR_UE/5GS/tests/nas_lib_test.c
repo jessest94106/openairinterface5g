@@ -9,6 +9,7 @@
 #include "fgmm_service_reject.h"
 #include "fgmm_authentication_failure.h"
 #include "FGSNASSecurityModeReject.h"
+#include "fgmm_authentication_reject.h"
 #include "nr_nas_msg.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
@@ -298,6 +299,44 @@ static void test_security_mode_reject(void)
   AssertFatal(eq_sec_mode_reject(&orig, &dec), "test_sec_mode_reject() failed: original and decoded messages do not match\n");
 }
 
+/**
+ * @brief Test NAS Authentication Reject enc/dec
+ */
+static void test_auth_reject(void)
+{
+  // Dummy NAS Authentication Reject message
+  uint8_t dummy_eap_msg[] = {0x12, 0x34, 0x56, 0x78, 0x91, 0x01, 0x23}; // Example EAP message
+  fgmm_auth_reject_msg_t orig = {
+      .eap_msg.len = sizeof(dummy_eap_msg),
+  };
+  orig.eap_msg.buf = dummy_eap_msg;
+
+  // Expected encoded data
+  uint8_t expected_enc[] = {0x78, 0x00, 0x07, 0x12, 0x34, 0x56, 0x78, 0x91, 0x01, 0x23};
+
+  // Buffer
+  uint8_t buf[10] = {0};
+  byte_array_t buffer = {.buf = buf, .len = sizeof(buf)};
+
+  // Encode
+  int encoded_length = encode_fgmm_auth_reject(&buffer, &orig);
+  AssertFatal(encoded_length >= 0, "encode_fgmm_auth_reject() failed\n");
+
+  // Compare the raw encoded buffer with expected encoded data
+  AssertFatal(encoded_length == sizeof(expected_enc), "Encoded length mismatch %d != %ld \n", encoded_length, sizeof(expected_enc));
+  AssertFatal(memcmp(buffer.buf, expected_enc, encoded_length) == 0, "Encoding mismatch!\n");
+
+  // Decode
+  fgmm_auth_reject_msg_t dec = {0};
+  uint8_t eap_msg[1500] = {0};
+  dec.eap_msg.buf = eap_msg;
+  int decoded_length = decode_fgmm_auth_reject(&dec, &buffer);
+  AssertFatal(decoded_length >= 0, "decode_fgmm_auth_reject() failed\n");
+
+  // Compare original and decoded messages
+  AssertFatal(eq_auth_reject(&orig, &dec), "test_auth_reject() failed: original and decoded messages do not match\n");
+}
+
 int main()
 {
   test_regression_registration_accept();
@@ -305,6 +344,7 @@ int main()
   test_service_accept();
   test_service_reject();
   test_auth_failure();
+  test_auth_reject();
   test_security_mode_reject();
   return 0;
 }

@@ -36,4 +36,6 @@ void nr_derive_key_ng_ran_star(uint16_t pci, uint64_t nr_arfcn_dl, const uint8_t
 
 void nr_derive_nh(const uint8_t k_amf[SECURITY_KEY_LEN], const uint8_t *sync_input, uint8_t *nh);
 
+void log_hex_buffer(const char *label, const uint8_t *buf, const int len);
+
 #endif

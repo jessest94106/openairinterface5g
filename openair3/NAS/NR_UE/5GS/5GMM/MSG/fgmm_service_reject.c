@@ -59,6 +59,11 @@ int encode_fgs_service_reject(byte_array_t *buffer, const fgs_service_reject_msg
     ENCODE_NAS_IE(ba, encode_gprs_timer_ie(&ba, IEI_T3448_VALUE, msg->t3448), encoded);
   }
 
+  // EAP message (Optional)
+  if (msg->eap_msg) {
+    ENCODE_NAS_IE(ba, encode_eap_msg_ie(&ba, msg->eap_msg), encoded);
+  }
+
   return encoded;
 }
 
@@ -99,7 +104,7 @@ int decode_fgs_service_reject(fgs_service_reject_msg_t *msg, const byte_array_t 
         break;
 
       case IEI_EAPMSG:
-        DECODE_NAS_IE(ba, decode_eap_msg_ie((const byte_array_t *)&ba), decoded);
+        DECODE_NAS_IE(ba, decode_eap_msg_ie(msg->eap_msg, &ba), decoded);
         break;
 
       case IEI_CAG_INFO_LIST: {
