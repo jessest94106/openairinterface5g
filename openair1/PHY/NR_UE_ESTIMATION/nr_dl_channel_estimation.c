@@ -1287,7 +1287,7 @@ void nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
 
   // generate pilot for gNB port number 1000+p
   int config_type = dlsch->dmrsConfigType;
-  int rb_offset = dlsch->rb_offset;
+  int rb_offset = dlsch->start_rb + (dlsch->refPoint ? 0 : dlsch->BWPStart);
   int nb_rb_pdsch = dlsch->number_rbs;
   int8_t delta = get_delta(p, config_type);
   c16_t pilot[3280] __attribute__((aligned(16)));
