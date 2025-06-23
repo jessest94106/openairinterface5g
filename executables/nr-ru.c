@@ -759,7 +759,7 @@ void tx_rf(RU_t *ru, int frame,int slot, uint64_t timestamp)
   radio_tx_burst_flag_t flags_burst = TX_BURST_INVALID;
   radio_tx_gpio_flag_t flags_gpio = 0;
 
-  if (cfg->cell_config.frame_duplex_type.value == TDD && !get_softmodem_params()->continuous_tx) {
+  if (cfg->cell_config.frame_duplex_type.value == TDD && !get_softmodem_params()->continuous_tx && !IS_SOFTMODEM_RFSIM) {
     int slot_type = nr_slot_select(cfg,frame,slot%fp->slots_per_frame);
     if(slot_type == NR_MIXED_SLOT) {
       int txsymb = 0;
