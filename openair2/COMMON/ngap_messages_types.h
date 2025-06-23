@@ -231,36 +231,6 @@ typedef struct ngap_mobility_restriction_s{
   ngap_plmn_identity_t serving_plmn;
 }ngap_mobility_restriction_t;
 
-typedef enum pdu_session_type_e {
-  PDUSessionType_ipv4 = 0,
-  PDUSessionType_ipv6 = 1,
-  PDUSessionType_ipv4v6 = 2,
-  PDUSessionType_ethernet = 3,
-  PDUSessionType_unstructured = 4
-}pdu_session_type_t;
-
-typedef struct pdusession_s {
-  /* Unique pdusession_id for the UE. */
-  int pdusession_id;
-  byte_array_t nas_pdu;
-  byte_array_t pdusessionTransfer;
-  uint8_t nb_qos;
-  /* Quality of service for this pdusession */
-  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
-  /* The transport layer address for the IP packets */
-  pdu_session_type_t pdu_session_type;
-  transport_layer_addr_t upf_addr;
-  /* Outgoing (UL) NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t gtp_teid;
-  /* Incoming (DL) NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t gNB_teid_N3;
-  transport_layer_addr_t gNB_addr_N3;
-  /* Incoming (DL) NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t UPF_teid_N3;
-  transport_layer_addr_t UPF_addr_N3;
-  nssai_t nssai;
-} pdusession_t;
-
 typedef enum pdusession_qosflow_mapping_ind_e{
   QOSFLOW_MAPPING_INDICATION_UL = 0,
   QOSFLOW_MAPPING_INDICATION_DL = 1,
@@ -278,10 +248,9 @@ typedef struct pdusession_setup_s {
 
   /* The transport layer address for the IP packets */
   uint8_t pdu_session_type;
-  transport_layer_addr_t gNB_addr;
 
-  /* Incoming NG-U Tunnel Endpoint Identifier (S-GW/UPF) */
-  uint32_t gtp_teid;
+  // NG-U (N3) Tunnel Endpoint on the RAN side
+  gtpu_tunnel_t n3_outgoing;
 
   /* qos flow list number */
   uint8_t  nb_of_qos_flow;
@@ -289,18 +258,6 @@ typedef struct pdusession_setup_s {
   /* qos flow list(1 ~ 64) */
   pdusession_associate_qosflow_t associated_qos_flows[QOSFLOW_MAX_VALUE];
 } pdusession_setup_t;
-
-typedef struct pdusession_tobeswitched_s {
-  /* Unique pdusession_id for the UE. */
-  uint8_t pdusession_id;
-
-  /* The transport layer address for the IP packets */
-  uint8_t pdu_session_type;
-  transport_layer_addr_t upf_addr;
-
-  /* S-GW Tunnel endpoint identifier */
-  uint32_t gtp_teid;
-} pdusession_tobeswitched_t;
 
 typedef struct qos_flow_tobe_modified_s {
   uint8_t qfi; // 0~63
@@ -580,6 +537,22 @@ typedef struct ngap_downlink_nas_s {
   byte_array_t nas_pdu;
 } ngap_downlink_nas_t;
 
+/* PDU Session Resource Setup Request Transfer (9.3.4.1 3GPP TS 38.413) */
+typedef struct {
+  uint8_t nb_qos;
+  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  pdu_session_type_t pdu_session_type;
+  // UPF endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_incoming;
+} pdusession_transfer_t;
+
+/* PDU Session Resource Setup/Modify Request Item */
+typedef struct {
+  int pdusession_id;
+  byte_array_t nas_pdu;
+  nssai_t nssai;
+  pdusession_transfer_t pdusessionTransfer;
+} pdusession_resource_item_t;
 
 typedef struct ngap_initial_context_setup_req_s {
   /* UE id for initial connection to NGAP */
@@ -605,8 +578,8 @@ typedef struct ngap_initial_context_setup_req_s {
 
   /* Number of pdusession to be setup in the list */
   uint8_t  nb_of_pdusessions;
-  /* list of pdusession to be setup by RRC layers */
-  pdusession_t  pdusession_param[NGAP_MAX_PDU_SESSION];
+  // PDU Session Resource Setup Request List
+  pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* Mobility Restriction List */
   uint8_t                        mobility_restriction_flag;
@@ -640,13 +613,6 @@ typedef struct ngap_paging_ind_s {
   ngap_paging_priority_t paging_priority;
 } ngap_paging_ind_t;
 
-typedef struct {
-  /* Unique pdusession_id for the UE. */
-  int pdusession_id;
-  byte_array_t nas_pdu;
-  byte_array_t pdusessionTransfer;
-} pdusession_setup_req_t;
-
 typedef struct ngap_pdusession_setup_req_s {
   /* UE id for initial connection to NGAP */
   uint32_t gNB_ue_ngap_id;
@@ -661,8 +627,8 @@ typedef struct ngap_pdusession_setup_req_s {
   /* Number of pdusession to be setup in the list */
   uint8_t nb_pdusessions_tosetup;
 
-  /* E RAB setup request */
-  pdusession_t pdusession_setup_params[NGAP_MAX_PDU_SESSION];
+  // PDU Session Resource Setup Request List
+  pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* UE Aggregated Max Bitrates */
   ngap_ambr_t ueAggMaxBitRate;
@@ -681,78 +647,6 @@ typedef struct ngap_pdusession_setup_resp_s {
   /* list of pdusessions that failed to be setup */
   pdusession_failed_t pdusessions_failed[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_setup_resp_t;
-
-typedef struct ngap_path_switch_req_s {
-  uint32_t  gNB_ue_ngap_id;
-
-  /* Number of pdusession setup-ed in the list */
-  uint8_t       nb_of_pdusessions;
-
-  /* list of pdusession setup-ed by RRC layers */
-  pdusession_setup_t pdusessions_tobeswitched[NGAP_MAX_PDU_SESSION];
-
-  /* AMF UE id  */
-  uint64_t amf_ue_ngap_id;
-
-  nr_guami_t ue_guami;
-
-  uint16_t ue_initial_id;
-  /* Security algorithms */
-  ngap_security_capabilities_t security_capabilities;
-
-} ngap_path_switch_req_t;
-
-typedef struct ngap_path_switch_req_ack_s {
-
-  /* UE id for initial connection to NGAP */
-  uint16_t ue_initial_id;
-
-  uint32_t  gNB_ue_ngap_id;
-
-  /* AMF UE id  */
-  uint64_t amf_ue_ngap_id;
-
-  /* UE aggregate maximum bitrate */
-  ngap_ambr_t ue_ambr;
-
-  /* Number of pdusession setup-ed in the list */
-  uint8_t       nb_pdusessions_tobeswitched;
-
-  /* list of pdusession to be switched by RRC layers */
-  pdusession_tobeswitched_t pdusessions_tobeswitched[NGAP_MAX_PDU_SESSION];
-
-  /* Number of pdusessions to be released by RRC */
-  uint8_t        nb_pdusessions_tobereleased;
-
-  /* list of pdusessions to be released */
-  pdusession_failed_t pdusessions_tobereleased[NGAP_MAX_PDU_SESSION];
-
-  /* Security key */
-  int     next_hop_chain_count;
-  uint8_t next_security_key[SECURITY_KEY_LENGTH];
-
-} ngap_path_switch_req_ack_t;
-
-typedef struct ngap_pdusession_modification_ind_s {
-
-  uint32_t  gNB_ue_ngap_id;
-
-  /* AMF UE id  */
-  uint64_t amf_ue_ngap_id;
-
-  /* Number of pdusession setup-ed in the list */
-  uint8_t       nb_of_pdusessions_tobemodified;
-
-  uint8_t       nb_of_pdusessions_nottobemodified;
-
-  /* list of pdusession setup-ed by RRC layers */
-  pdusession_setup_t pdusessions_tobemodified[NGAP_MAX_PDU_SESSION];
-
-  pdusession_setup_t pdusessions_nottobemodified[NGAP_MAX_PDU_SESSION];
-
-  uint16_t ue_initial_id;
-
-} ngap_pdusession_modification_ind_t;
 
 // NGAP --> RRC messages
 typedef struct ngap_ue_release_command_s {
@@ -789,8 +683,8 @@ typedef struct ngap_pdusession_modify_req_s {
   /* Number of pdusession to be modify in the list */
   uint8_t nb_pdusessions_tomodify;
 
-  /* pdu session modify request */
-  pdusession_t pdusession_modify_params[NGAP_MAX_PDU_SESSION];
+  // PDU Session Resource Modify Request List
+  pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_modify_req_t;
 
 typedef struct ngap_pdusession_modify_resp_s {

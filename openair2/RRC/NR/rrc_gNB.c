@@ -2004,14 +2004,13 @@ static void fill_e1_bearer_modif(DRB_nGRAN_to_mod_t *drb_e1, const f1ap_drb_to_b
   drb_e1->DlUpParamList[0].tl_info.teId = drb_f1->up_dl_tnl[0].teid;
 }
 
-/**
- * @brief Store F1-U DL TL and TEID in RRC
-*/
-static void f1u_dl_gtp_update(f1u_tunnel_t *f1u, const f1ap_up_tnl_t *p)
+static gtpu_tunnel_t f1u_gtp_update(uint32_t teid, const in_addr_t addr)
 {
-  f1u->teid = p->teid;
-  memcpy(&f1u->addr.buffer, &p->tl_address, sizeof(uint8_t) * 4);
-  f1u->addr.length = sizeof(in_addr_t);
+  gtpu_tunnel_t out = {0};
+  out.teid = teid;
+  memcpy(&out.addr.buffer, &addr, 4);
+  out.addr.length = sizeof(addr);
+  return out;
 }
 
 /**
@@ -2024,18 +2023,8 @@ static void store_du_f1u_tunnel(const f1ap_drb_to_be_setup_t *drbs, int n, gNB_R
     AssertFatal(drb_f1->up_dl_tnl_length == 1, "can handle only one UP param\n");
     AssertFatal(drb_f1->drb_id < MAX_DRBS_PER_UE, "illegal DRB ID %ld\n", drb_f1->drb_id);
     drb_t *drb = get_drb(ue, drb_f1->drb_id);
-    f1u_dl_gtp_update(&drb->du_tunnel_config, &drb_f1->up_dl_tnl[0]);
+    drb->du_tunnel_config = f1u_gtp_update(drb_f1->up_dl_tnl[0].teid, drb_f1->up_dl_tnl[0].tl_address);
   }
-}
-
-/*
- * @brief Store F1-U UL TEID and address in RRC
- */
-static void f1u_ul_gtp_update(f1u_tunnel_t *f1u, const up_params_t *p)
-{
-  f1u->teid = p->tl_info.teId;
-  memcpy(&f1u->addr.buffer, &p->tl_info.tlAddress, sizeof(uint8_t) * 4);
-  f1u->addr.length = sizeof(in_addr_t);
 }
 
 /* \brief use list of DRBs and send the corresponding bearer update message via
@@ -2460,9 +2449,7 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
       LOG_W(RRC, "E1: received setup for PDU session %ld, but has not been requested\n", e1_pdu->id);
       continue;
     }
-    rrc_pdu->param.gNB_teid_N3 = e1_pdu->tl_info.teId;
-    memcpy(&rrc_pdu->param.gNB_addr_N3.buffer, &e1_pdu->tl_info.tlAddress, sizeof(uint8_t) * 4);
-    rrc_pdu->param.gNB_addr_N3.length = sizeof(in_addr_t);
+    rrc_pdu->param.n3_outgoing = f1u_gtp_update(e1_pdu->tl_info.teId, e1_pdu->tl_info.tlAddress);
 
     // save the tunnel address for the DRBs
     for (int i = 0; i < e1_pdu->numDRBSetup; i++) {
@@ -2470,7 +2457,8 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
       // numUpParam only relevant in F1, but not monolithic
       AssertFatal(drb_config->numUpParam <= 1, "can only up to one UP param\n");
       drb_t *drb = get_drb(UE, drb_config->id);
-      f1u_ul_gtp_update(&drb->cuup_tunnel_config, &drb_config->UpParamList[0]);
+      UP_TL_information_t *tl_info = &drb_config->UpParamList[0].tl_info;
+      drb->cuup_tunnel_config = f1u_gtp_update(tl_info->teId, tl_info->tlAddress);
     }
   }
 

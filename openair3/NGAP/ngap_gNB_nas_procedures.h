@@ -63,10 +63,4 @@ int ngap_gNB_pdusession_modify_resp(instance_t instance,
 int ngap_gNB_pdusession_release_resp(instance_t instance,
                                 ngap_pdusession_release_resp_t *pdusession_release_resp_p);
 
-int ngap_gNB_path_switch_req(instance_t instance,
-                             ngap_path_switch_req_t *path_switch_req_p);
-
-int ngap_gNB_generate_PDUSESSION_Modification_Indication(
-		instance_t instance, ngap_pdusession_modification_ind_t *pdusession_modification_ind);
-
 #endif /* NGAP_GNB_NAS_PROCEDURES_H_ */

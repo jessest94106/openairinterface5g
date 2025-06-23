@@ -45,6 +45,14 @@ typedef struct nr_guami_s {
   uint8_t amf_pointer;
 } nr_guami_t;
 
+typedef enum {
+  PDUSessionType_ipv4 = 0,
+  PDUSessionType_ipv6 = 1,
+  PDUSessionType_ipv4v6 = 2,
+  PDUSessionType_ethernet = 3,
+  PDUSessionType_unstructured = 4
+} pdu_session_type_t;
+
 typedef enum { NON_DYNAMIC, DYNAMIC } fiveQI_t;
 
 #endif

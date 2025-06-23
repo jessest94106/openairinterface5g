@@ -218,25 +218,27 @@ typedef struct nr_lcid_rb_t {
 } nr_lcid_rb_t;
 
 typedef struct transport_layer_addr_s {
-  /**
-   * Transport Layer Address as a bitstring:
-   * - 32 bits for IPv4 (RFC 791),
-   * - 128 bits for IPv6 (RFC 2460),
-   * - 160 bits for both IPv4 and IPv6, with IPv4 in the first 32 bits.
-   * The S1AP/NGAP layer forwards this address (bitstring<1..160>)
-   * to S1-U/NG-U without interpreting it.
-   */
+  /** Transport Layer Address in bytes:
+   * - 4 bytes for IPv4 (RFC 791), 16 bytes for IPv6 (RFC 2460),
+   * - 20 bytes for both IPv4 and IPv6, with IPv4 in the first 4 bytes. */
   uint8_t length;
   /// Buffer: address in network byte order
   uint8_t buffer[20];
 } transport_layer_addr_t;
+
+/** @brief GTP tunnel configuration */
+typedef struct {
+  // Tunnel endpoint identifier
+  uint32_t teid;
+  // Transport layer address
+  transport_layer_addr_t addr;
+} gtpu_tunnel_t;
 
 //-----------------------------------------------------------------------------
 // GTPV1U TYPES
 //-----------------------------------------------------------------------------
 typedef uint32_t teid_t; // tunnel endpoint identifier
 typedef uint8_t ebi_t; // eps bearer id
-typedef uint8_t pdusessionid_t;
 
 //-----------------------------------------------------------------------------
 //
