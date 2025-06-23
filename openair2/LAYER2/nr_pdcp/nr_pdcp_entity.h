@@ -156,6 +156,9 @@ typedef struct nr_pdcp_entity_t {
   void (*cipher)(stream_security_context_t *security_context,
                  unsigned char *buffer, int length,
                  int bearer, uint32_t count, int direction);
+  void (*decipher)(stream_security_context_t *security_context,
+                   unsigned char *buffer, int length,
+                   int bearer, uint32_t count, int direction);
   void (*free_security)(stream_security_context_t *security_context);
   stream_security_context_t *integrity_context;
   void (*integrity)(stream_security_context_t *integrity_context,
