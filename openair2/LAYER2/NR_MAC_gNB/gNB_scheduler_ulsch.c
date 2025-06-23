@@ -269,7 +269,7 @@ static rnti_t lcid_crnti_lookahead(uint8_t *pdu, uint32_t pdu_len)
     if (lcid == UL_SCH_LCID_C_RNTI) {
       // Extract C-RNTI value
       rnti_t crnti = ((pdu[1] & 0xFF) << 8) | (pdu[2] & 0xFF);
-      LOG_D(NR_MAC, "Received a MAC CE for C-RNTI with %04x\n", crnti);
+      LOG_A(NR_MAC, "Received a MAC CE for C-RNTI with %04x\n", crnti);
       return crnti;
     } else if (lcid == UL_SCH_LCID_PADDING) {
       // End of MAC PDU, can ignore the remaining bytes
@@ -783,26 +783,33 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
       // Reset HARQ processes
       reset_dl_harq_list(&old_UE->UE_sched_ctrl);
       reset_ul_harq_list(&old_UE->UE_sched_ctrl);
-      // Trigger RRC Reconfiguration
-      LOG_I(NR_MAC, "Received UL_SCH_LCID_C_RNTI with C-RNTI 0x%04x, triggering RRC Reconfiguration\n", crnti);
-      nr_mac_trigger_reconfiguration(mac, old_UE);
+
+      // Only trigger RRCReconfiguration if UE is not performing RRCReestablishment
+      // The RRCReconfiguration will be triggered by the RRCReestablishmentComplete
+      if (!old_UE->reconfigSpCellConfig) {
+        LOG_I(NR_MAC, "Received UL_SCH_LCID_C_RNTI with C-RNTI 0x%04x, triggering RRC Reconfiguration\n", crnti);
+        // Trigger RRCReconfiguration
+        nr_mac_trigger_reconfiguration(mac, old_UE);
+        // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
+        configure_UE_BWP(mac, scc, old_UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
+      }
       nr_release_ra_UE(mac, rnti);
-      LOG_A(NR_MAC, "%4d.%2d UE %04x: RA with C-RNTI complete\n", frame, slot, crnti);
-      // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
-      configure_UE_BWP(mac, scc, old_UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
-      // TODO do we actually need to still process the PDU?
+      LOG_A(NR_MAC, "%4d.%2d RA with C-RNTI %04x complete\n", frame, slot, crnti);
+
+      // Decode the entire MAC PDU
+      // It may have multiple MAC subPDUs, for example, a MAC subPDU with LCID 1 caring a RRCReestablishmentComplete
       nr_process_mac_pdu(mod_id, old_UE, CC_id, frame, slot, sdu, sdu_len, -1);
       return;
-    } else {
-      // UE Contention Resolution Identity
-      // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
-      // First byte corresponds to R/LCID MAC sub-header
-      memcpy(ra->cont_res_id, &sdu[1], sizeof(uint8_t) * 6);
     }
 
-    // Decode MAC PDU for the correct UE, after checking for MAC CE for C-RNTI
-    // harq_pid set a non valid value because it is not used in this call
+    // UE Contention Resolution Identity
+    // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
+    // First byte corresponds to R/LCID MAC sub-header
+    memcpy(ra->cont_res_id, &sdu[1], sizeof(uint8_t) * 6);
+
+    // Decode MAC PDU
     // the function is only called to decode the contention resolution sub-header
+    // harq_pid set a non-valid value because it is not used in this call
     nr_process_mac_pdu(mod_id, UE, CC_id, frame, slot, sdu, sdu_len, -1);
 
     LOG_I(NR_MAC,
