@@ -171,6 +171,7 @@ static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
 {
   uint64_t buff_index = bridge->next_buf++ % MAX_FD_RFSIMU;
   buffer_t *ptr = &bridge->buf[buff_index];
+  bridge->nb_cnx++;
   ptr->circularBuf = calloc(1, sampleToByte(CirSize, 1));
   if (ptr->circularBuf == NULL) {
     LOG_E(HW, "malloc(%lu) failed\n", sampleToByte(CirSize, 1));
@@ -764,7 +765,6 @@ static bool add_client(rfsimulator_state_t *t)
     mutexunlock(t->Sockmutex);
     return false;
   }
-  t->nb_cnx++;
   new_buf->lastReceivedTS = t->lastWroteTS;
   char ip[INET6_ADDRSTRLEN];
   getnameinfo((struct sockaddr *)&sa, socklen, ip, sizeof(ip), NULL, 0, NI_NUMERICHOST);
