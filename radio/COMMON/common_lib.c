@@ -276,7 +276,7 @@ void openair0_write_reorder_clear_context(openair0_device *device)
   re_order_t *ctx = &device->reOrder;
   if (!ctx->initDone)
     return;
-  if (pthread_mutex_trylock(&ctx->mutex_write) == 0)
+  if (pthread_mutex_trylock(&ctx->mutex_write) != 0)
     LOG_E(HW, "write_reorder_clear_context call while still writing on the device\n");
   pthread_mutex_destroy(&ctx->mutex_write);
   pthread_mutex_lock(&ctx->mutex_store);
