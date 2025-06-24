@@ -2466,13 +2466,13 @@ static void nr_ue_get_sdu_mac_ce_post(NR_UE_MAC_INST_t *mac,
   mac_ce_p->cur_ptr += size;
 }
 
-uint32_t get_count_lcids_same_priority(uint8_t start, uint8_t total_active_lcids, nr_lcordered_info_t *lcid_ordered_array)
+static uint32_t get_count_lcids_same_priority(uint8_t start, uint8_t total_active_lcids, nr_lcordered_info_t *lcid_ordered_array[])
 {
   // count number of logical channels with same priority as curr_lcid
   uint8_t same_priority_count = 0;
-  uint8_t curr_lcid = lcid_ordered_array[start].lcid;
+  uint8_t curr_lcid = lcid_ordered_array[start]->lcid;
   for (uint8_t index = start; index < total_active_lcids; index++) {
-    if (lcid_ordered_array[start].priority == lcid_ordered_array[index].priority) {
+    if (lcid_ordered_array[start]->priority == lcid_ordered_array[index]->priority) {
       same_priority_count++;
     }
   }
@@ -2520,11 +2520,13 @@ static long get_num_bytes_to_reqlc(NR_UE_MAC_INST_t *mac,
   return num_bytes_requested;
 }
 
-bool get_dataavailability_buffers(uint8_t total_active_lcids, nr_lcordered_info_t *lcid_ordered_array, bool *data_status_lcbuffers)
+static bool get_dataavailability_buffers(uint8_t total_active_lcids,
+                                         nr_lcordered_info_t *lcid_ordered_array[],
+                                         bool *data_status_lcbuffers)
 {
   // check whether there is any data in the rlc buffer corresponding to active lcs
   for (uint8_t id = 0; id < total_active_lcids; id++) {
-    int lcid = lcid_ordered_array[id].lcid;
+    int lcid = lcid_ordered_array[id]->lcid;
     if (data_status_lcbuffers[lcid_buffer_index(lcid)]) {
       return true;
     }
@@ -2532,7 +2534,7 @@ bool get_dataavailability_buffers(uint8_t total_active_lcids, nr_lcordered_info_
   return false;
 }
 
-static uint select_logical_channels(NR_UE_MAC_INST_t *mac, nr_lcordered_info_t *active_lcids)
+static uint select_logical_channels(NR_UE_MAC_INST_t *mac, nr_lcordered_info_t *active_lcids[])
 {
   // (TODO: selection of logical channels for logical channel prioritization procedure as per 5.4.3.1.2 Selection of logical
   // channels, TS38.321)
@@ -2545,7 +2547,7 @@ static uint select_logical_channels(NR_UE_MAC_INST_t *mac, nr_lcordered_info_t *
     int lcid = lc_info->lcid;
     NR_LC_SCHEDULING_INFO *sched_info = get_scheduling_info_from_lcid(mac, lcid);
     if (sched_info->Bj > 0) {
-      active_lcids[nb++] = *lc_info;
+      active_lcids[nb++] = lc_info;
       LOG_D(NR_MAC, "The available lcid is %d with total active channels count = %d\n", lcid, nb);
     }
   }
@@ -2734,7 +2736,7 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
     LOG_E(NR_MAC, "Failed to init lcids_bj_pos: mac->lc_ordered_list.count = 0\n");
     return 0;
   }
-  nr_lcordered_info_t lcids_bj_pos[mac->lc_ordered_list.count];
+  nr_lcordered_info_t *lcids_bj_pos[mac->lc_ordered_list.count];
   int avail_lcids_count = select_logical_channels(mac, lcids_bj_pos);
 
   // multiplex in the order of highest priority
@@ -2755,7 +2757,7 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
   still space availble in the MAC PDU, then from the next run all the remaining data from the higher priority logical channel
   is placed in the MAC PDU before going on to next high priority logical channel
       */
-      int lcid = lcids_bj_pos[id].lcid;
+      int lcid = lcids_bj_pos[id]->lcid;
       int idx = lcid_buffer_index(lcid);
       // skip the logical channel if no data in the buffer initially or the data in the buffer was zero because it was written in to
       // MAC PDU
