@@ -577,6 +577,43 @@ int nr_ue_pdcch_procedures(PHY_VARS_NR_UE *ue,
   return (dci_ind.number_of_dcis);
 }
 
+static freq_alloc_bitmap_t set_start_end_from_bitmap(int size, int alloc_size, const uint8_t bitmap[alloc_size])
+{
+  freq_alloc_bitmap_t alloc = {
+    .start = size,
+    .end = 0
+  };
+
+  for (int start = 0; start < size; start++) {
+    if ((bitmap[start / 8] >> start % 8) & 0x1) {
+      alloc.start = start;
+      break;
+    }
+  }
+  AssertFatal(alloc.start < size, "Frequency allocation bitmap empty\n");
+  for (int end = size - 1; end > 0; end--) {
+    if ((bitmap[end / 8] >> end % 8) & 0x1) {
+      alloc.end = end;
+      break;
+    }
+  }
+  AssertFatal(alloc.end > 0, "Frequency allocation bitmap empty\n");
+  memcpy(alloc.bitmap, bitmap, alloc_size * sizeof(uint8_t));
+  return alloc;
+}
+
+static freq_alloc_bitmap_t set_bitmap_from_start_size(int start, int size)
+{
+  freq_alloc_bitmap_t alloc = {
+    .start = start,
+    .end = start + size - 1
+  };
+  memset(alloc.bitmap, 0, 36 * sizeof(uint8_t));
+  for (int i = start; i < size + start; i++)
+    alloc.bitmap[i / 8] += 1 << (i % 8);
+  return alloc;
+}
+
 static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
                                   const UE_nr_rxtx_proc_t *proc,
                                   NR_UE_DLSCH_t dlsch[2],
@@ -595,8 +632,15 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
     // dlsch0_harq contains the previous transmissions data for this harq pid
     NR_DL_UE_HARQ_t *dlsch0_harq = &ue->dl_harq_processes[0][harq_pid];
 
+    freq_alloc_bitmap_t freq_alloc = {0};
+    if (dlschCfg->resource_alloc == 0) {
+      int alloc_size = (dlschCfg->BWPSize / 8) + (dlschCfg->BWPSize % 8 > 0);
+      freq_alloc = set_start_end_from_bitmap(dlschCfg->BWPSize, alloc_size, dlschCfg->rb_bitmap);
+    } else
+      freq_alloc = set_bitmap_from_start_size(dlschCfg->start_rb, dlschCfg->number_rbs);
+
     LOG_D(PHY,
-          "[UE %d] frame_rx %d, nr_slot_rx %d, harq_pid %d (%d), BWP start %d, rb_start %d, nb_rb %d, symbol_start %d, nb_symbols %d, DMRS mask "
+          "[UE %d] frame_rx %d, nr_slot_rx %d, harq_pid %d (%d), BWP start %d, start RB %d, end RB %d, symbol_start %d, nb_symbols %d, DMRS mask "
           "%x, Nl %d\n",
           ue->Mod_id,
           frame_rx,
@@ -604,8 +648,8 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
           harq_pid,
           dlsch0_harq->status,
           dlschCfg->BWPStart,
-          dlschCfg->start_rb,
-          dlschCfg->number_rbs,
+          freq_alloc.start,
+          freq_alloc.end,
           dlschCfg->start_symbol,
           dlschCfg->number_symbols,
           dlschCfg->dlDmrsSymbPos,
@@ -642,6 +686,7 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
           nr_pdsch_channel_estimation(ue,
                                       proc,
                                       dlschCfg,
+                                      &freq_alloc,
                                       nl,
                                       get_dmrs_port(nl, dlschCfg->dmrs_ports),
                                       m,

@@ -39,6 +39,12 @@
 #include "../NR_TRANSPORT/nr_transport_common_proto.h"
 
 typedef struct {
+  int start;
+  int end;
+  uint8_t bitmap[36];
+} freq_alloc_bitmap_t;
+
+typedef struct {
   /// Index of current HARQ round for this ULSCH
   uint8_t round;
   /// pointer to pdu from MAC interface (TS 36.212 V15.4.0, Sec 5.1 p. 8)
