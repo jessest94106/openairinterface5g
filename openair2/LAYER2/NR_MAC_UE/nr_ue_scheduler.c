@@ -2539,10 +2539,13 @@ static uint select_logical_channels(NR_UE_MAC_INST_t *mac, nr_lcordered_info_t *
   int nb = 0;
   // selection of logical channels with Bj > 0
   for (int i = 0; i < mac->lc_ordered_list.count; i++) {
-    int lcid = mac->lc_ordered_list.array[i]->lcid;
+    nr_lcordered_info_t *lc_info = mac->lc_ordered_list.array[i];
+    if (lc_info->rb_suspended)
+      continue;
+    int lcid = lc_info->lcid;
     NR_LC_SCHEDULING_INFO *sched_info = get_scheduling_info_from_lcid(mac, lcid);
     if (sched_info->Bj > 0) {
-      active_lcids[nb++] = *mac->lc_ordered_list.array[i];
+      active_lcids[nb++] = *lc_info;
       LOG_D(NR_MAC, "The available lcid is %d with total active channels count = %d\n", lcid, nb);
     }
   }
