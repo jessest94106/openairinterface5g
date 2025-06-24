@@ -578,19 +578,29 @@ static freq_alloc_bitmap_t set_start_end_from_bitmap(int size, int alloc_size, c
 {
   freq_alloc_bitmap_t alloc = {
     .num_rbs = 0,
-    .start = size,
-    .end = 0
+    .num_blocks = 0
   };
 
+  bool pos_bit = false;
   for (int i = 0; i < size; i++) {
     if ((bitmap[i / 8] >> i % 8) & 0x1) {
-      if (alloc.start == size)
-        alloc.start = i;
-      alloc.end = i;
+      if (!pos_bit) {
+        pos_bit = true;
+        alloc.start[alloc.num_blocks] = i;
+        AssertFatal(alloc.num_blocks < MAX_FA_BLOCKS, "Number of type0 PDSCH RBG exceeting %d\n", MAX_FA_BLOCKS);
+        alloc.num_blocks++;
+      }
       alloc.num_rbs++;
+    } else {
+      if (pos_bit) {
+        pos_bit = false;
+        alloc.end[alloc.num_blocks - 1] = i - 1;
+      }
     }
   }
-  AssertFatal(alloc.end > 0, "Frequency allocation bitmap empty\n");
+  if (pos_bit)
+    alloc.end[alloc.num_blocks - 1] = size - 1;
+  AssertFatal(alloc.num_blocks > 0, "Frequency allocation bitmap empty\n");
   memcpy(alloc.bitmap, bitmap, alloc_size * sizeof(uint8_t));
   return alloc;
 }
@@ -599,8 +609,9 @@ static freq_alloc_bitmap_t set_bitmap_from_start_size(int start, int size)
 {
   freq_alloc_bitmap_t alloc = {
     .num_rbs = size,
-    .start = start,
-    .end = start + size - 1
+    .num_blocks = 1,
+    .start[0] = start,
+    .end[0] = start + size - 1
   };
   memset(alloc.bitmap, 0, 36 * sizeof(uint8_t));
   for (int i = start; i < size + start; i++)
@@ -642,8 +653,8 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
           harq_pid,
           dlsch0_harq->status,
           dlschCfg->BWPStart,
-          freq_alloc.start,
-          freq_alloc.end,
+          freq_alloc.start[0],
+          freq_alloc.end[freq_alloc.num_blocks - 1],
           dlschCfg->start_symbol,
           dlschCfg->number_symbols,
           dlschCfg->dlDmrsSymbPos,
@@ -769,6 +780,7 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
       if (nr_rx_pdsch(ue,
                       proc,
                       dlsch,
+                      &freq_alloc,
                       m,
                       first_symbol_flag,
                       harq_pid,

@@ -141,8 +141,8 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
                                  unsigned char symbol,
                                  uint8_t pilots,
                                  uint8_t config_type,
-                                 unsigned short start_rb,
-                                 unsigned short nb_rb_pdsch,
+                                 int startBWP,
+                                 const freq_alloc_bitmap_t *freq_alloc,
                                  uint8_t n_dmrs_cdm_groups,
                                  uint8_t Nl,
                                  NR_DL_FRAME_PARMS *frame_parms,
@@ -293,6 +293,7 @@ static uint32_t build_csi_overlap_bitmap(fapi_nr_dl_config_dlsch_pdu_rel15_t *dl
 int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                 const UE_nr_rxtx_proc_t *proc,
                 NR_UE_DLSCH_t dlsch[2],
+                const freq_alloc_bitmap_t *freq_alloc,
                 unsigned char symbol,
                 bool first_symbol_flag,
                 unsigned char harq_pid,
@@ -393,13 +394,10 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
 
   DEBUG_HARQ("[DEMOD] cw for TB0 = %d, cw for TB1 = %d\n", codeword_TB0, codeword_TB1);
   fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_config = &dlsch[0].dlsch_config;
-  int start_rb = dlsch_config->start_rb;
-  int nb_rb_pdsch = dlsch_config->number_rbs;
-
   DevAssert(dlsch0_harq);
 
   if (gNB_id > 2) {
-    LOG_E(PHY, "In %s: Illegal gNB_id %d\n", __FUNCTION__, gNB_id);
+    LOG_E(PHY, "Illegal gNB_id %d\n", gNB_id);
     return(-1);
   }
 
@@ -423,7 +421,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
   //----------------------------------------------------------
   const int n_rx = frame_parms->nb_antennas_rx;
   const bool meas_enabled = cpumeas(CPUMEAS_GETSTATE);
-
+  int nb_rb_pdsch = freq_alloc->num_rbs;
   {
     start_meas_nr_ue_phy(ue, DLSCH_EXTRACT_RBS_STATS);
     __attribute__((aligned(32))) c16_t rxdataF_ext[nbRx][rx_size_symbol];
@@ -443,8 +441,8 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                          symbol,
                          pilots,
                          config_type,
-                         start_rb + dlsch_config->BWPStart,
-                         nb_rb_pdsch,
+                         dlsch_config->BWPStart,
+                         freq_alloc,
                          dlsch_config->n_dmrs_cdm_groups,
                          nl,
                          frame_parms,
@@ -453,7 +451,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                          ue->chest_time);
     stop_meas_nr_ue_phy(ue, DLSCH_EXTRACT_RBS_STATS);
     if (scope_req->copy_chanest_to_scope) {
-      size_t size = sizeof(c16_t) * dlsch_config->number_rbs * NR_NB_SC_PER_RB;
+      size_t size = sizeof(c16_t) * nb_rb_pdsch * NR_NB_SC_PER_RB;
       int copy_index = symbol - dlsch_config->start_symbol;
       int offset = copy_index * size;
       UEscopeCopyUnsafe(ue, pdschChanEstimates, dl_ch_estimates_ext[0], size, offset, copy_index);
@@ -478,14 +476,15 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
       uint32_t csi_re_count = 0;
       uint32_t csi_res_even = csi_res_bitmap & 0xfff;
       uint32_t csi_res_odd = (csi_res_bitmap >> 16) & 0xfff;
-      int start = start_rb + dlsch_config->BWPStart;
-      for (int rb = start; rb < start + nb_rb_pdsch; rb++) {
-        uint32_t rb_csi_pattern = (rb % 2 == 0) ? csi_res_even : csi_res_odd;
-        csi_re_count += __builtin_popcount(rb_csi_pattern);
+      int start = freq_alloc->start[0] + dlsch_config->BWPStart;
+      int end = freq_alloc->end[freq_alloc->num_blocks - 1] + 1;
+      for (int rb = start; rb < end; rb++) {
+        if ((freq_alloc->bitmap[rb / 8] >> (rb % 8)) & 0x01) {
+          uint32_t rb_csi_pattern = (rb % 2 == 0) ? csi_res_even : csi_res_odd;
+          csi_re_count += __builtin_popcount(rb_csi_pattern);
+        }
       }
-
       nb_re_pdsch = (nb_re_pdsch > csi_re_count) ? (nb_re_pdsch - csi_re_count) : 0;
-
       if (csi_re_count > 0) {
         LOG_D(NR_PHY,
               "[CSI OVERLAP] Frame/Slot %d.%d Symbol %d: CSI-RS overlapping PDSCH - %d CSI-RS REs skipped, %d data REs extracted\n",
@@ -778,7 +777,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
     memcpy(ue->phy_sim_pdsch_dl_ch_estimates_ext + symbol * sizeof(dl_ch_estimates_ext),
            dl_ch_estimates_ext,
            sizeof(dl_ch_estimates_ext));
-  return (0);
+  return 0;
 }
 
 //==============================================================================================
@@ -1019,8 +1018,8 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
                                  unsigned char symbol,
                                  uint8_t pilots,
                                  uint8_t config_type,
-                                 unsigned short start_rb,
-                                 unsigned short nb_rb_pdsch,
+                                 int startBWP,
+                                 const freq_alloc_bitmap_t *freq_alloc,
                                  uint8_t n_dmrs_cdm_groups,
                                  uint8_t Nl,
                                  NR_DL_FRAME_PARMS *frame_parms,
@@ -1029,7 +1028,7 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
                                  int chest_time_type)
 {
   if (config_type == NFAPI_NR_DMRS_TYPE1)
-    AssertFatal(n_dmrs_cdm_groups == 1 || n_dmrs_cdm_groups == 2, "n_dmrs_cdm_groups %d is illegal\n",n_dmrs_cdm_groups);
+    AssertFatal(n_dmrs_cdm_groups == 1 || n_dmrs_cdm_groups == 2, "n_dmrs_cdm_groups %d is illegal\n", n_dmrs_cdm_groups);
   else
     AssertFatal(n_dmrs_cdm_groups == 1 || n_dmrs_cdm_groups == 2 || n_dmrs_cdm_groups == 3,
                 "n_dmrs_cdm_groups %d is illegal\n",n_dmrs_cdm_groups);
@@ -1052,60 +1051,59 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
   AssertFatal((dmrs_rb_bitmap & csi_res_odd) == 0, "DMRS RE overlapping with CSI RE, it shouldn't happen\n");
   uint32_t dmrs_csi_overlap_even = csi_res_even + dmrs_rb_bitmap;
   uint32_t dmrs_csi_overlap_odd = csi_res_odd + dmrs_rb_bitmap;
-
-  const unsigned short start_re = (frame_parms->first_carrier_offset + start_rb * NR_NB_SC_PER_RB) % frame_parms->ofdm_symbol_size;
   int8_t validDmrsEst;
-
   if (chest_time_type == 0)
-    validDmrsEst = get_valid_dmrs_idx_for_channel_est(dlDmrsSymbPos,symbol);
+    validDmrsEst = get_valid_dmrs_idx_for_channel_est(dlDmrsSymbPos, symbol);
   else
-    validDmrsEst = get_next_dmrs_symbol_in_slot(dlDmrsSymbPos,0,14); // get first dmrs symbol index
+    validDmrsEst = get_next_dmrs_symbol_in_slot(dlDmrsSymbPos, 0, 14); // get first dmrs symbol index
 
-  for (unsigned char aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
-    c16_t *rxF_ext = rxdataF_ext[aarx];
-    c16_t *rxF = &rxdataF[aarx][symbol * frame_parms->ofdm_symbol_size];
-
-    for (unsigned char l = 0; l < Nl; l++) {
-
-      int32_t *dl_ch0 = &dl_ch_estimates[(l * frame_parms->nb_antennas_rx) + aarx][validDmrsEst * frame_parms->ofdm_symbol_size];
-      int32_t *dl_ch0_ext = dl_ch_estimates_ext[(l * frame_parms->nb_antennas_rx) + aarx];
-
-      if (pilots == 0 && csi_res_bitmap == 0) { // data symbol only
-        if (l == 0) {
-          if (start_re + nb_rb_pdsch * NR_NB_SC_PER_RB <= frame_parms->ofdm_symbol_size) {
-            memcpy(rxF_ext, &rxF[start_re], nb_rb_pdsch * NR_NB_SC_PER_RB * sizeof(int32_t));
-          } else {
-            int neg_length = frame_parms->ofdm_symbol_size - start_re;
-            int pos_length = nb_rb_pdsch * NR_NB_SC_PER_RB - neg_length;
-            memcpy(rxF_ext, &rxF[start_re], neg_length * sizeof(int32_t));
-            memcpy(&rxF_ext[neg_length], rxF, pos_length * sizeof(int32_t));
-          }
-        }
-        memcpy(dl_ch0_ext, dl_ch0, nb_rb_pdsch * NR_NB_SC_PER_RB * sizeof(int32_t));
-      }
-      else {
-        int j = 0;
-        int k = start_re;
-        for (int rb = 0; rb < nb_rb_pdsch; rb++) {
-          uint32_t overlap_map = rb % 2 ?  dmrs_csi_overlap_odd : dmrs_csi_overlap_even;
-          for (int re = 0; re < 12; re++) {
-            if (((overlap_map >> re) & 0x01) == 0) {
-              // DATA RE
-              if (l == 0)
-                rxF_ext[j] = rxF[k];
-              dl_ch0_ext[j] = dl_ch0[re];
-              j++;
+  for (int b = 0; b < freq_alloc->num_blocks; b++) {
+    int start_rb = freq_alloc->start[b] + startBWP;
+    int nb_rb = freq_alloc->end[b] - freq_alloc->start[b] + 1;
+    const int start_re = (frame_parms->first_carrier_offset + start_rb * NR_NB_SC_PER_RB) % frame_parms->ofdm_symbol_size;
+    for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
+      c16_t *rxF_ext = rxdataF_ext[aarx];
+      c16_t *rxF = &rxdataF[aarx][symbol * frame_parms->ofdm_symbol_size];
+      for (int l = 0; l < Nl; l++) {
+        int32_t *dl_ch0 = &dl_ch_estimates[(l * frame_parms->nb_antennas_rx) + aarx][validDmrsEst * frame_parms->ofdm_symbol_size];
+        int32_t *dl_ch0_ext = dl_ch_estimates_ext[(l * frame_parms->nb_antennas_rx) + aarx];
+        if (pilots == 0 && csi_res_bitmap == 0) { // data symbol only
+          if (l == 0) {
+            if (start_re + nb_rb * NR_NB_SC_PER_RB <= frame_parms->ofdm_symbol_size) {
+              memcpy(rxF_ext, &rxF[start_re], nb_rb * NR_NB_SC_PER_RB * sizeof(int32_t));
+            } else {
+              int neg_length = frame_parms->ofdm_symbol_size - start_re;
+              int pos_length = nb_rb * NR_NB_SC_PER_RB - neg_length;
+              memcpy(rxF_ext, &rxF[start_re], neg_length * sizeof(int32_t));
+              memcpy(&rxF_ext[neg_length], rxF, pos_length * sizeof(int32_t));
             }
-            k++;
-            if (k >= frame_parms->ofdm_symbol_size)
-              k -= frame_parms->ofdm_symbol_size;
           }
-          dl_ch0 += 12;
+          memcpy(dl_ch0_ext, dl_ch0, nb_rb * NR_NB_SC_PER_RB * sizeof(int32_t));
+        } else {
+          int j = 0;
+          int k = start_re;
+          for (int rb = start_rb; rb < start_rb + nb_rb; rb++) {
+            uint32_t overlap_map = rb % 2 ?  dmrs_csi_overlap_odd : dmrs_csi_overlap_even;
+            for (int re = 0; re < NR_NB_SC_PER_RB; re++) {
+              if (((overlap_map >> re) & 0x01) == 0) {
+                // DATA RE
+                if (l == 0)
+                  rxF_ext[j] = rxF[k];
+                dl_ch0_ext[j] = dl_ch0[re];
+                j++;
+              }
+              k++;
+              if (k >= frame_parms->ofdm_symbol_size)
+                k -= frame_parms->ofdm_symbol_size;
+            }
+            dl_ch0 += 12;
+          }
         }
       }
     }
   }
 }
+
 
 static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
                                    short nl,

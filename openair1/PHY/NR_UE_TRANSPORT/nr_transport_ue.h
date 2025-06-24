@@ -38,10 +38,12 @@
 #include "nfapi/open-nFAPI/nfapi/public_inc/fapi_nr_ue_interface.h"
 #include "../NR_TRANSPORT/nr_transport_common_proto.h"
 
+#define MAX_FA_BLOCKS 10
 typedef struct {
-  int start;
-  int end;
+  int start[MAX_FA_BLOCKS];
+  int end[MAX_FA_BLOCKS];
   int num_rbs;
+  int num_blocks;
   uint8_t bitmap[36];
 } freq_alloc_bitmap_t;
 
