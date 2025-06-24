@@ -689,7 +689,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                              gNB_id,
                              nr_slot_rx,
                              symbol,
-                             (nb_rb_pdsch * 12),
                              dlsch[0].rnti,
                              dlsch);
     dl_valid_re[symbol] -= ptrs_re_per_slot[0][symbol];
@@ -1182,13 +1181,8 @@ void nr_a_sum_b(c16_t *input_x, c16_t *input_y, unsigned short nb_rb)
 }
 
 /* Zero Forcing Rx function: nr_element_sign()
- * Compute b=sign*a
- *
- * */
-static inline void nr_element_sign(c16_t *a, // a
-                                   c16_t *b, // b
-                                   unsigned short nb_rb,
-                                   int32_t sign)
+ * Compute b=sign*a */
+static inline void nr_element_sign(c16_t *a, c16_t *b, unsigned short nb_rb, int32_t sign)
 {
   const int16_t nr_sign[8] __attribute__((aligned(16))) = {-1, -1, -1, -1, -1, -1, -1, -1};
   simde__m128i *a_128,*b_128;

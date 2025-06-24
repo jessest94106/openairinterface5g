@@ -1388,7 +1388,6 @@ void nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
  *                uint8_t           : gNB_id,
  *                uint8_t           : nr_slot_rx,
  *                unsigned char     : symbol,
- *                uint32_t          : nb_re_pdsch,
  *                uint16_t          : rnti
  *                RX_type_t         : rx_type
  * RETURN : Nothing
@@ -1411,7 +1410,6 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
                               uint8_t gNB_id,
                               uint8_t nr_slot_rx,
                               unsigned char symbol,
-                              uint32_t nb_re_pdsch,
                               uint16_t rnti,
                               NR_UE_DLSCH_t dlsch[2])
 {
