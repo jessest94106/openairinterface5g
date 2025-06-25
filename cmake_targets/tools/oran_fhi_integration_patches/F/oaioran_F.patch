@@ -259,7 +259,7 @@ index 46e0e1d..409ef4b 100644
  int xran_prepare_iq_symbol_portion(
                          struct rte_mbuf *mbuf,
 diff --git a/fhi_lib/lib/ethernet/ethdi.c b/fhi_lib/lib/ethernet/ethdi.c
-index f5b2fd6..144a65e 100644
+index f5b2fd6..2eccc6e 100644
 --- a/fhi_lib/lib/ethernet/ethdi.c
 +++ b/fhi_lib/lib/ethernet/ethdi.c
 @@ -37,7 +37,10 @@
@@ -273,7 +273,33 @@ index f5b2fd6..144a65e 100644
  #include <numa.h>
  #include <rte_config.h>
  #include <rte_common.h>
-@@ -325,8 +328,8 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -185,14 +188,24 @@ static void check_port_link_status(uint8_t portid)
+                 printf("Port %d Link Up - speed %u "
+                         "Mbps - %s\n", (uint8_t)portid,
+                         (unsigned)link.link_speed,
++#if (RTE_VER_YEAR >= 21)
++                        (link.link_duplex == RTE_ETH_LINK_FULL_DUPLEX) ?
++                        ("full-duplex") : ("half-duplex\n")
++#else
+                         (link.link_duplex == ETH_LINK_FULL_DUPLEX) ?
+-                        ("full-duplex") : ("half-duplex\n"));
++                        ("full-duplex") : ("half-duplex\n")
++#endif
++                      );
+             else
+                 printf("Port %d Link Down\n",
+                         (uint8_t)portid);
+         }
+         /* clear all_ports_up flag if any link down */
++#if (RTE_VER_YEAR >= 21)
++        if (link.link_status == RTE_ETH_LINK_DOWN) {
++#else
+         if (link.link_status == ETH_LINK_DOWN) {
++#endif
+             all_ports_up = 0;
+             break;
+         }
+@@ -325,8 +338,8 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
      char bbdev_wdev[32]   = "";
      char bbdev_vdev[32]   = "";
      char iova_mode[32]    = "--iova-mode=pa";
@@ -284,7 +310,7 @@ index f5b2fd6..144a65e 100644
      char ring_name[32]    = "";
      int32_t xran_port = -1;
      queueid_t qi = 0;
-@@ -336,7 +339,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -336,7 +349,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
      cpu = sched_getcpu();
      node = numa_node_of_cpu(cpu);
  
@@ -293,7 +319,7 @@ index f5b2fd6..144a65e 100644
          "--file-prefix", name, "-a0000:00:00.0", bbdev_wdev, bbdev_vdev};
  
      if (io_cfg == NULL)
-@@ -481,11 +484,13 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -481,11 +494,13 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
                      ctx->tx_ring[i] = rte_ring_create(ring_name, NUM_MBUFS_RING_TRX,
                      rte_lcore_to_socket_id(*lcore_id), RING_F_SC_DEQ);
                      PANIC_ON(ctx->tx_ring[i] == NULL, "failed to allocate rx ring");
@@ -307,7 +333,7 @@ index f5b2fd6..144a65e 100644
                      }
                  }
              } else {
-@@ -555,7 +560,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -555,7 +570,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
          ctx->up_dl_pkt_gen_ring[i] = rte_ring_create(ring_name, NUM_MBUFS_RING,
          rte_lcore_to_socket_id(*lcore_id), /*RING_F_SC_DEQ*/0);
          PANIC_ON(ctx->up_dl_pkt_gen_ring[i] == NULL, "failed to allocate dl gen ring");
@@ -317,7 +343,7 @@ index f5b2fd6..144a65e 100644
  
      return 1;
 diff --git a/fhi_lib/lib/ethernet/ethernet.c b/fhi_lib/lib/ethernet/ethernet.c
-index edda598..791256c 100644
+index edda598..77e5ca7 100644
 --- a/fhi_lib/lib/ethernet/ethernet.c
 +++ b/fhi_lib/lib/ethernet/ethernet.c
 @@ -37,7 +37,10 @@
@@ -331,6 +357,78 @@ index edda598..791256c 100644
  #include <rte_config.h>
  #include <rte_common.h>
  #include <rte_log.h>
+@@ -149,13 +152,22 @@ void xran_init_port(int p_id, uint16_t num_rxq, uint32_t mtu)
+     static uint16_t nb_txd = BURST_SIZE;
+     struct rte_ether_addr addr;
+     struct rte_eth_rxmode rxmode = {
++#if (RTE_VER_YEAR >= 21)
++            .mtu = MAX_RX_LEN,
++#else
+             .split_hdr_size = 0,
+               .max_rx_pkt_len = MAX_RX_LEN,
+             .offloads       = DEV_RX_OFFLOAD_JUMBO_FRAME
++#endif
+             };
+     struct rte_eth_txmode txmode = {
++#if (RTE_VER_YEAR >= 21)
++            .mq_mode        = RTE_ETH_MQ_TX_NONE,
++            .offloads       = RTE_ETH_TX_OFFLOAD_MULTI_SEGS
++#else
+             .mq_mode        = ETH_MQ_TX_NONE,
+             .offloads       = DEV_TX_OFFLOAD_MULTI_SEGS
++#endif
+             };
+     struct rte_eth_conf port_conf = {
+             .rxmode = rxmode,
+@@ -174,8 +186,13 @@ void xran_init_port(int p_id, uint16_t num_rxq, uint32_t mtu)
+     uint32_t num_mbufs = 0;
+ 
+     if (mtu <= 1500) {
++#if (RTE_VER_YEAR >= 21)
++        rxmode.offloads &= ~RTE_ETH_TX_OFFLOAD_IPIP_TNL_TSO;
++        rxmode.mtu = RTE_ETHER_MAX_LEN;
++#else
+         rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
+         rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
++#endif
+         data_room_size = MBUF_POOL_ELM_SMALL;
+     }
+ 
+@@ -184,10 +201,19 @@ void xran_init_port(int p_id, uint16_t num_rxq, uint32_t mtu)
+         drv_name = dev_info.driver_name;
+     printf("initializing port %d for TX, drv=%s\n", p_id, drv_name);
+ 
+-    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE){
++#if (RTE_VER_YEAR >= 21)
++    if (dev_info.tx_offload_capa & RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE)
++#else
++    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
++#endif
++    {
+         printf("set DEV_TX_OFFLOAD_MBUF_FAST_FREE\n");
+         port_conf.txmode.offloads |=
++#if (RTE_VER_YEAR >= 21)
++            RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE;
++#else
+             DEV_TX_OFFLOAD_MBUF_FAST_FREE;
++#endif
+     }
+ 
+     rte_eth_macaddr_get(p_id, &addr);
+@@ -293,8 +319,13 @@ void xran_add_eth_hdr_vlan(struct rte_ether_addr *dst, uint16_t ethertype, struc
+     PANIC_ON(h == NULL, "mbuf prepend of ether_hdr failed");
+ 
+     /* Fill in the ethernet header. */
++#if (RTE_VER_YEAR >= 21)
++    rte_eth_macaddr_get(mb->port, &h->src_addr);          /* set source addr */
++    h->dst_addr = *dst;                                   /* set dst addr */
++#else
+     rte_eth_macaddr_get(mb->port, &h->s_addr);          /* set source addr */
+     h->d_addr = *dst;                                   /* set dst addr */
++#endif
+     h->ether_type = rte_cpu_to_be_16(ethertype);        /* ethertype too */
+ #if 0
+     struct rte_ether_addr *s = &h->s_addr;
 diff --git a/fhi_lib/lib/src/xran_bfp_ref.cpp b/fhi_lib/lib/src/xran_bfp_ref.cpp
 index e6d3067..8e0abee 100644
 --- a/fhi_lib/lib/src/xran_bfp_ref.cpp
@@ -565,7 +663,7 @@ index 789c6fd..a768efb 100644
  #include <rte_common.h>
  #include <rte_eal.h>
 diff --git a/fhi_lib/lib/src/xran_delay_measurement.c b/fhi_lib/lib/src/xran_delay_measurement.c
-index 4c943c8..d9e7983 100644
+index 4c943c8..7db51a8 100644
 --- a/fhi_lib/lib/src/xran_delay_measurement.c
 +++ b/fhi_lib/lib/src/xran_delay_measurement.c
 @@ -23,7 +23,10 @@
@@ -579,6 +677,155 @@ index 4c943c8..d9e7983 100644
  #include <assert.h>
  #include <err.h>
  #include <arpa/inet.h>
+@@ -572,16 +575,28 @@ int xran_generate_delay_meas(uint16_t port_id, void* handle, uint8_t actionType,
+     PANIC_ON(h == NULL, "mbuf prepend of ether_hdr failed");
+ 
+     /* Fill in the ethernet header. */
++#if (RTE_VER_YEAR >= 21)
++    rte_eth_macaddr_get(port_id, &h->src_addr);          /* set source addr */
++#else
+     rte_eth_macaddr_get(port_id, &h->s_addr);          /* set source addr */
++#endif
+ 
+     if (p_xran_dev_ctx->fh_init.io_cfg.id)
+     {
+ //        rte_ether_addr_copy( (struct rte_ether_addr *)p_xran_dev_ctx->fh_init.p_o_du_addr[port_id],&h->d_addr);
++#if (RTE_VER_YEAR >= 21)
++        h->dst_addr = ctx->entities[port_id][ID_O_DU];   /* set dst addr */
++#else
+         h->d_addr = ctx->entities[port_id][ID_O_DU];   /* set dst addr */
++#endif
+     }
+     else
+     {
++#if (RTE_VER_YEAR >= 21)
++        h->dst_addr = ctx->entities[port_id][ID_O_RU];   /* set dst addr */
++#else
+         h->d_addr = ctx->entities[port_id][ID_O_RU];   /* set dst addr */
++#endif
+ //        rte_ether_addr_copy( (struct rte_ether_addr *)p_xran_dev_ctx->fh_init.p_o_ru_addr[port_id],&h->d_addr);
+     }
+ 
+@@ -752,7 +767,11 @@ int xran_generate_delay_meas(uint16_t port_id, void* handle, uint8_t actionType,
+         int8_t *pa = &p_xran_dev_ctx->fh_init.p_o_du_addr[0];
+         printf("DST_MAC: %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n", pa[0],pa[1],pa[2],pa[3],pa[4],pa[5]);
+ #endif
++#if (RTE_VER_YEAR >= 21)
++        rte_ether_addr_copy((struct rte_ether_addr *)&p_xran_dev_ctx->fh_init.p_o_du_addr[0], (struct rte_ether_addr *)&h->dst_addr.addr_bytes[0]);
++#else
+         rte_ether_addr_copy((struct rte_ether_addr *)&p_xran_dev_ctx->fh_init.p_o_du_addr[0], (struct rte_ether_addr *)&h->d_addr.addr_bytes[0]);
++#endif
+ 
+     }
+     else
+@@ -761,13 +780,25 @@ int xran_generate_delay_meas(uint16_t port_id, void* handle, uint8_t actionType,
+         int8_t *pb = &p_xran_dev_ctx->fh_init.p_o_ru_addr[0];
+         printf("DST_MAC: %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n", pb[0],pb[1],pb[2],pb[3],pb[4],pb[5]);
+ #endif
++#if (RTE_VER_YEAR >= 21)
++        rte_ether_addr_copy((struct rte_ether_addr *)&p_xran_dev_ctx->fh_init.p_o_ru_addr[0], (struct rte_ether_addr *)&h->dst_addr.addr_bytes[0]);
++#else
+         rte_ether_addr_copy((struct rte_ether_addr *)&p_xran_dev_ctx->fh_init.p_o_ru_addr[0], (struct rte_ether_addr *)&h->d_addr.addr_bytes[0]);
++#endif
+ 
+     }
+ #ifdef XRAN_OWD_DEBUG_PKTS
++#if (RTE_VER_YEAR >= 21)
++    uint8_t *pc = &h->src_addr.addr_bytes[0];
++#else
+     uint8_t *pc = &h->s_addr.addr_bytes[0];
++#endif
+     printf(" Src MAC from packet: %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n", pc[0],pc[1],pc[2],pc[3],pc[4],pc[5]);
++#if (RTE_VER_YEAR >= 21)
++    uint8_t *pd = &h->dst_addr.addr_bytes[0];
++#else
+     uint8_t *pd = &h->d_addr.addr_bytes[0];
++#endif
+     printf(" Dst MAC from packet: %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n", pd[0],pd[1],pd[2],pd[3],pd[4],pd[5]);
+ #endif
+     // Copy dest address from above
+@@ -862,9 +893,15 @@ int xran_process_delmeas_request(struct rte_mbuf *pkt, void* handle, struct xran
+     // 11) Fill the ethernet header properly by swapping src and dest addressed from the copied frame
+     eth_hdr = rte_pktmbuf_mtod(pkt1, struct rte_ether_hdr *);
+     /* Swap dest and src mac addresses. */
++#if (RTE_VER_YEAR >= 21)
++    rte_ether_addr_copy(&eth_hdr->dst_addr, &addr);
++    rte_ether_addr_copy(&eth_hdr->src_addr, &eth_hdr->dst_addr);
++    rte_ether_addr_copy(&addr, &eth_hdr->src_addr);
++#else
+     rte_ether_addr_copy(&eth_hdr->d_addr, &addr);
+     rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
+     rte_ether_addr_copy(&addr, &eth_hdr->s_addr);
++#endif
+     // Still need to check ol_flags state and update if necessary
+     // Compute the delay td12 and save
+     // Still need to define the DB to save the info and run averages
+@@ -872,9 +909,17 @@ int xran_process_delmeas_request(struct rte_mbuf *pkt, void* handle, struct xran
+     // 12) Send the response right away
+ #ifdef XRAN_OWD_DEBUG_PKTS
+     struct rte_ether_hdr *h = (struct rte_ether_hdr *)rte_pktmbuf_mtod(pkt1, struct rte_ether_hdr*);
++#if (RTE_VER_YEAR >= 21)
++    uint8_t *pc = &h->src_addr.addr_bytes[0];
++#else
+     uint8_t *pc = &h->s_addr.addr_bytes[0];
++#endif
+     printf(" Src MAC from packet: %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n", pc[0],pc[1],pc[2],pc[3],pc[4],pc[5]);
++#if (RTE_VER_YEAR >= 21)
++    uint8_t *pd = &h->dst_addr.addr_bytes[0];
++#else
+     uint8_t *pd = &h->d_addr.addr_bytes[0];
++#endif
+     printf(" Dst MAC from packet: %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n", pd[0],pd[1],pd[2],pd[3],pd[4],pd[5]);
+ //    printf("EtherType: %04"PRIx16" \n",&h->ether_type);
+ #endif
+@@ -1100,9 +1145,15 @@ int xran_process_delmeas_rem_request(struct rte_mbuf *pkt, void* handle, struct
+     // 9) Fill the ethernet header properly by swapping src and dest addressed from the copied frame
+     eth_hdr = rte_pktmbuf_mtod(pkt1, struct rte_ether_hdr *);
+     /* Swap dest and src mac addresses. */
++#if (RTE_VER_YEAR >= 21)
++    rte_ether_addr_copy(&eth_hdr->dst_addr, &addr);
++    rte_ether_addr_copy(&eth_hdr->src_addr, &eth_hdr->dst_addr);
++    rte_ether_addr_copy(&addr, &eth_hdr->src_addr);
++#else
+     rte_ether_addr_copy(&eth_hdr->d_addr, &addr);
+     rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
+     rte_ether_addr_copy(&addr, &eth_hdr->s_addr);
++#endif
+     // 10) Send the response right away
+     pdm  = (struct xran_ecpri_del_meas_pkt*)rte_pktmbuf_mtod_offset(pkt1, struct xran_ecpri_del_meas_pkt *, sizeof(struct rte_ether_hdr) );
+     pdm->cmnhdr.bits.ecpri_payl_size	 = 10 + powdc->owdm_PlLength; // 10 correponds to the xran_ecpri_delay_meas_pl minus the dummy_bytes field which now allows the user to select the length for this field to be sent
+@@ -1177,9 +1228,15 @@ int xran_process_delmeas_rem_request_w_fup(struct rte_mbuf* pkt, void* handle, s
+     // 7) Fill the ethernet header properly by swapping src and dest addressed from the copied frame
+     eth_hdr = rte_pktmbuf_mtod(pkt1, struct rte_ether_hdr *);
+     /* Swap dest and src mac addresses. */
++#if (RTE_VER_YEAR >= 21)
++    rte_ether_addr_copy(&eth_hdr->dst_addr, &addr);
++    rte_ether_addr_copy(&eth_hdr->src_addr, &eth_hdr->dst_addr);
++    rte_ether_addr_copy(&addr, &eth_hdr->src_addr);
++#else
+     rte_ether_addr_copy(&eth_hdr->d_addr, &addr);
+     rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
+     rte_ether_addr_copy(&addr, &eth_hdr->s_addr);
++#endif
+     // 8) Duplicate packet to be used for the follow up packet
+     pkt2 = rte_pktmbuf_copy(pkt1, _eth_mbuf_pool, 0, UINT32_MAX);
+     // 9) Record the current timestamp when the request with follow up is being sent
+@@ -1283,9 +1340,15 @@ int xran_process_delmeas_follow_up(struct rte_mbuf *pkt, void* handle, struct xr
+     // 9) Fill the ethernet header properly by swapping src and dest addressed from the copied frame
+     eth_hdr = rte_pktmbuf_mtod(pkt1, struct rte_ether_hdr *);
+     /* Swap dest and src mac addresses. */
++#if (RTE_VER_YEAR >= 21)
++    rte_ether_addr_copy(&eth_hdr->dst_addr, &addr);
++    rte_ether_addr_copy(&eth_hdr->src_addr, &eth_hdr->dst_addr);
++    rte_ether_addr_copy(&addr, &eth_hdr->src_addr);
++#else
+     rte_ether_addr_copy(&eth_hdr->d_addr, &addr);
+     rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
+     rte_ether_addr_copy(&addr, &eth_hdr->s_addr);
++#endif
+     pdm  = (struct xran_ecpri_del_meas_pkt*)rte_pktmbuf_mtod_offset(pkt1, struct xran_ecpri_del_meas_pkt *, sizeof(struct rte_ether_hdr) );
+     pdm->cmnhdr.bits.ecpri_payl_size	 = 10 + powdc->owdm_PlLength; // 10 correponds to the xran_ecpri_delay_meas_pl minus the dummy_bytes field which now allows the user to select the length for this field to be sent
+     pdm->cmnhdr.bits.ecpri_payl_size    = rte_cpu_to_be_16(pdm->cmnhdr.bits.ecpri_payl_size);
 diff --git a/fhi_lib/lib/src/xran_dev.c b/fhi_lib/lib/src/xran_dev.c
 index 4acade1..c939edc 100644
 --- a/fhi_lib/lib/src/xran_dev.c
@@ -1377,7 +1624,7 @@ index 72249bc..6b30084 100644
  #include <rte_config.h>
  
 diff --git a/fhi_lib/lib/src/xran_tx_proc.c b/fhi_lib/lib/src/xran_tx_proc.c
-index 45a17a8..28c5568 100644
+index 45a17a8..85ce6fa 100644
 --- a/fhi_lib/lib/src/xran_tx_proc.c
 +++ b/fhi_lib/lib/src/xran_tx_proc.c
 @@ -35,7 +35,11 @@
@@ -1392,6 +1639,58 @@ index 45a17a8..28c5568 100644
  
  #include <rte_common.h>
  #include <rte_eal.h>
+@@ -1514,7 +1518,11 @@ xran_process_tx_sym_cp_on_opt(void* pHandle, uint8_t ctx_id, uint32_t tti, int32
+                         mb_oran_hdr_ext->buf_addr = ext_buff;
+                         mb_oran_hdr_ext->buf_iova = ((struct rte_mempool_objhdr*)RTE_PTR_SUB(mb_base, rte_mempool_objhdr_size))->iova + RTE_PTR_DIFF(ext_buff, mb_base);
+                         mb_oran_hdr_ext->buf_len = ext_buff_len;
++#if (RTE_VER_YEAR >= 21)
++                        mb_oran_hdr_ext->ol_flags |= RTE_MBUF_F_EXTERNAL;
++#else
+                         mb_oran_hdr_ext->ol_flags |= EXT_ATTACHED_MBUF;
++#endif
+                         mb_oran_hdr_ext->shinfo = p_share_data;
+                         mb_oran_hdr_ext->data_off = (uint16_t)RTE_MIN((uint16_t)RTE_PKTMBUF_HEADROOM, (uint16_t)mb_oran_hdr_ext->buf_len) - rte_ether_hdr_size;
+                         mb_oran_hdr_ext->data_len = (uint16_t)(mb_oran_hdr_ext->data_len + rte_ether_hdr_size);
+@@ -1532,8 +1540,13 @@ xran_process_tx_sym_cp_on_opt(void* pHandle, uint8_t ctx_id, uint32_t tti, int32
+ 
+                         /* Fill in the ethernet header. */
+ #ifndef TRANSMIT_BURST
++#if (RTE_VER_YEAR >= 21)
++                        rte_eth_macaddr_get(mb_oran_hdr_ext->port, &((struct rte_ether_hdr*)pStart)->src_addr);         /* set source addr */
++                        ((struct rte_ether_hdr*)pStart)->dst_addr = eth_ctx->entities[vf_id][ID_O_RU];                  /* set dst addr */
++#else
+                         rte_eth_macaddr_get(mb_oran_hdr_ext->port, &((struct rte_ether_hdr*)pStart)->s_addr);         /* set source addr */
+                         ((struct rte_ether_hdr*)pStart)->d_addr = eth_ctx->entities[vf_id][ID_O_RU];                  /* set dst addr */
++#endif
+                         ((struct rte_ether_hdr*)pStart)->ether_type = ETHER_TYPE_ECPRI_BE;                            /* ethertype */
+ #endif
+                         nPktSize = sizeof(struct rte_ether_hdr)
+@@ -1878,7 +1891,11 @@ xran_process_tx_srs_cp_on(void* pHandle, uint8_t ctx_id, uint32_t tti, int32_t s
+                         mb_oran_hdr_ext->buf_addr = ext_buff;
+                         mb_oran_hdr_ext->buf_iova = ((struct rte_mempool_objhdr*)RTE_PTR_SUB(mb_base, rte_mempool_objhdr_size))->iova + RTE_PTR_DIFF(ext_buff, mb_base);
+                         mb_oran_hdr_ext->buf_len = ext_buff_len;
++#if (RTE_VER_YEAR >= 21)
++                        mb_oran_hdr_ext->ol_flags |= RTE_MBUF_F_EXTERNAL;
++#else
+                         mb_oran_hdr_ext->ol_flags |= EXT_ATTACHED_MBUF;
++#endif
+                         mb_oran_hdr_ext->shinfo = p_share_data;
+                         mb_oran_hdr_ext->data_off = (uint16_t)RTE_MIN((uint16_t)RTE_PKTMBUF_HEADROOM, (uint16_t)mb_oran_hdr_ext->buf_len) - rte_ether_hdr_size;
+                         mb_oran_hdr_ext->data_len = (uint16_t)(mb_oran_hdr_ext->data_len + rte_ether_hdr_size);
+@@ -1887,8 +1904,13 @@ xran_process_tx_srs_cp_on(void* pHandle, uint8_t ctx_id, uint32_t tti, int32_t s
+                         pStart = (char*)((char*)mb_oran_hdr_ext->buf_addr + mb_oran_hdr_ext->data_off);
+ 
+                         /* Fill in the ethernet header. */
++#if (RTE_VER_YEAR >= 21)
++                        rte_eth_macaddr_get(mb_oran_hdr_ext->port, &((struct rte_ether_hdr*)pStart)->src_addr);         /* set source addr */
++                        ((struct rte_ether_hdr*)pStart)->dst_addr = eth_ctx->entities[vf_id][ID_O_RU];                  /* set dst addr */
++#else
+                         rte_eth_macaddr_get(mb_oran_hdr_ext->port, &((struct rte_ether_hdr*)pStart)->s_addr);         /* set source addr */
+                         ((struct rte_ether_hdr*)pStart)->d_addr = eth_ctx->entities[vf_id][ID_O_RU];                  /* set dst addr */
++#endif
+                         ((struct rte_ether_hdr*)pStart)->ether_type = ETHER_TYPE_ECPRI_BE;                            /* ethertype */
+ 
+                         nPktSize = sizeof(struct rte_ether_hdr)
 diff --git a/fhi_lib/lib/src/xran_up_api.c b/fhi_lib/lib/src/xran_up_api.c
 index fe22a1f..3fd369b 100644
 --- a/fhi_lib/lib/src/xran_up_api.c
