@@ -123,7 +123,7 @@ You can do handover across DUs with a COTS UE. Note that these DUs should be
 separated by at least multiple meters to ensure that the UE will receive
 different signal strengths when moving between cells.
 
-We only support intra-frequency handovers yet. We have verified with USRPs
+We support both intra-frequency and inter-frequency handovers. We have verified with USRPs
 only, although other radios should work as well.
 
 For UEs, we verified Quectel modules and iPhones. Note, though, that not all
