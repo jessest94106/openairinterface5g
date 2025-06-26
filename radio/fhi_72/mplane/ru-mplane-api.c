@@ -61,7 +61,7 @@ bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_
   xran_mplane->ru_mac_addr = get_ru_xml_node(buffer, "mac-address"); // TODO: support for VVDN, as it defines multiple MAC addresses
 
   // MTU
-  const uint32_t interface_mtu = (uint32_t)atoi(get_ru_xml_node(buffer, "interface-mtu"));
+  const uint32_t interface_mtu = (uint32_t)atoi(get_ru_xml_node(buffer, "l2-mtu"));
 
   // IQ bitwidth
   char **match_list = NULL;
