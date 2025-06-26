@@ -49,7 +49,7 @@
         <testCase id="004000">
             <class>Custom_Command</class>
             <desc>Clean-Up any residual volume</desc>
-            <node>cacofonix</node>
+            <node>acamas</node>
             <command>docker volume rm 5g_rfsimulator_fdd_phytest_rrc.config -f</command>
         </testCase>
         <testCase id="800813">
@@ -80,9 +80,9 @@
                 <class>Ping</class>
                 <desc>Ping gNB from NR-UE</desc>
                 <id>rfsim5g_ue</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_gnb_nos1</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c20 -i0.2</ping_args>
                 <ping_packetloss_threshold>0</ping_packetloss_threshold>
         </testCase>
@@ -91,9 +91,9 @@
                 <class>Ping</class>
                 <desc>Ping NR-UE from gNB</desc>
                 <id>rfsim5g_gnb_nos1</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_ue</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c20 -i0.2</ping_args>
                 <ping_packetloss_threshold>0</ping_packetloss_threshold>
         </testCase>
@@ -103,9 +103,9 @@
                 <desc>Iperf (DL/30kbps/UDP)(30 sec)</desc>
                 <iperf_args>-u -b 0.03M -t 20 -R -c 10.0.1.1</iperf_args>
                 <id>rfsim5g_ue</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_gnb_nos1</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>90</iperf_bitrate_threshold>
         </testCase>
@@ -115,9 +115,9 @@
                 <desc>Iperf (UL/30kbps/UDP)(30 sec)</desc>
                 <iperf_args>-u -b 0.03M -t 20 -c 10.0.1.1</iperf_args>
                 <id>rfsim5g_ue</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_gnb_nos1</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>90</iperf_bitrate_threshold>
         </testCase>
