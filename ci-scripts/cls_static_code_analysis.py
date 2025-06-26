@@ -212,7 +212,7 @@ class StaticCodeAnalysis():
 		logDir = f'{lSourcePath}/cmake_targets/log/'
 		cmd.run(f'mkdir -p {logDir}')
 		cmd.run('docker image rm oai-formatting-check:latest')
-		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.bionic {lSourcePath} > {logDir}/oai-formatting-check.txt 2>&1')
+		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.ubuntu {lSourcePath} > {logDir}/oai-formatting-check.txt 2>&1')
 
 		cmd.run('docker image rm oai-formatting-check:latest')
 		cmd.run('docker image prune --force')

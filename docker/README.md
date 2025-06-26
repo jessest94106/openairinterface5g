@@ -78,7 +78,7 @@ Targets can be:
 The currently-supported OS are:
 
 - `rhel9` for Red Hat Enterprise Linux and Openshift Universal Base Image
-- `ubuntu22` for Ubuntu 22.04 LTS
+- `ubuntu` for Ubuntu 24.04 LTS
 - `rocky` for Rocky-Linux 9
 
 For more details regarding the build on an Openshift Cluster, see [OpenShift README](../openshift/README.md).
@@ -99,11 +99,11 @@ There are two shared images: one that has all dependencies, and a second that co
 git clone https://gitlab.eurecom.fr/oai/openairinterface5g.git
 cd openairinterface5g
 # default branch is develop, to change use git checkout <BRANCH>
-docker build --target ran-base --tag ran-base:latest --file docker/Dockerfile.base.ubuntu22 .
+docker build --target ran-base --tag ran-base:latest --file docker/Dockerfile.base.ubuntu .
 # if you want use USRP, AW2S and RFSimulator radios
-docker build --target ran-build --tag ran-build:latest --file docker/Dockerfile.build.ubuntu22 .
+docker build --target ran-build --tag ran-build:latest --file docker/Dockerfile.build.ubuntu .
 # if you want to use front-haul 7.2 and RFSimulator radios
-docker build --tag ran-build-fhi72:latest --file docker/Dockerfile.build.fhi72.ubuntu22 .
+docker build --tag ran-build-fhi72:latest --file docker/Dockerfile.build.fhi72.ubuntu .
 ```
 
 After building:
@@ -126,7 +126,7 @@ This is only available for the Ubuntu version of Dockerfiles.
 You can, for example, create a `sanitizer` version of the ran-build image.
 
 ```bash
-docker build --target ran-build --tag ran-build:latest --file docker/Dockerfile.build.ubuntu22 --build-arg "BUILD_OPTION=--sanitize" .
+docker build --target ran-build --tag ran-build:latest --file docker/Dockerfile.build.ubuntu --build-arg "BUILD_OPTION=--sanitize" .
 ```
 
 Currently the `--sanitize` option for `build_oai` enables:
@@ -152,13 +152,13 @@ You can also use this docker build arguments to pass any available option(s) on 
 For example, the eNB:
 
 ```bash
-docker build --target oai-enb --tag oai-enb:latest --file docker/Dockerfile.eNB.ubuntu22 .
+docker build --target oai-enb --tag oai-enb:latest --file docker/Dockerfile.eNB.ubuntu .
 ```
 
 To build gNB/DU with 7.2 fronthaul support:
 
 ```bash
-docker build --target oai-gnb-fhi72 --tag oai-gnb-fhi72:latest --file docker/Dockerfile.gNB.fhi72.ubuntu22  .
+docker build --target oai-gnb-fhi72 --tag oai-gnb-fhi72:latest --file docker/Dockerfile.gNB.fhi72.ubuntu  .
 ```
 
 After a while:
@@ -182,7 +182,7 @@ Note that the steps are identical for `rocky-linux`.
 If you have used the sanitizer option, then you should also pass it when building the target image:
 
 ```bash
-docker build --target oai-gnb --tag oai-gnb:latest --file docker/Dockerfile.gNB.ubuntu22 --build-arg "BUILD_OPTION=--sanitize" .
+docker build --target oai-gnb --tag oai-gnb:latest --file docker/Dockerfile.gNB.ubuntu --build-arg "BUILD_OPTION=--sanitize" .
 ```
 
 Normally the target image will be around 200 Mbytes bigger.

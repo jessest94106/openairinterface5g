@@ -298,7 +298,7 @@ class Containerize():
 		self.host = result.group(0)
 		if self.host == 'Ubuntu':
 			self.cli = 'docker'
-			self.dockerfileprefix = '.ubuntu24'
+			self.dockerfileprefix = '.ubuntu'
 			self.cliBuildOptions = ''
 		elif self.host == 'Red Hat':
 			self.cli = 'sudo podman'
@@ -337,7 +337,7 @@ class Containerize():
 				imageNames.append(('oai-gnb', 'gNB.fhi72', 'oai-gnb-fhi72', ''))
 		result = re.search('build_cross_arm64', self.imageKind)
 		if result is not None:
-			self.dockerfileprefix = '.ubuntu22.cross-arm64'
+			self.dockerfileprefix = '.ubuntu.cross-arm64'
 		result = re.search('native_arm', self.imageKind)
 		if result is not None:
 			imageNames.append(('oai-gnb', 'gNB', 'oai-gnb', ''))
@@ -625,7 +625,7 @@ class Containerize():
 			return False
 
 		# build ran-unittests image
-		dockerfile = "ci-scripts/docker/Dockerfile.unittest.ubuntu24"
+		dockerfile = "ci-scripts/docker/Dockerfile.unittest.ubuntu"
 		logfile = f'{lSourcePath}/cmake_targets/log/unittest-build.log'
 		ret = cmd.run(f'docker build --progress=plain --tag ran-unittests:{baseTag} --file {dockerfile} . &> {logfile}')
 		archiveArtifact(cmd, ctx, logfile)

@@ -97,5 +97,5 @@ ninja params_libconfig coding rfsimulator
 # Further information
 
 You can do the above steps using docker, see dockerfiles
-`docker/Dockerfile.base.ubuntu22.cross-arm64` and
-`docker/Dockerfile.build.ubuntu22.cross-arm64` for more information.
+`docker/Dockerfile.base.ubuntu.cross-arm64` and
+`docker/Dockerfile.build.ubuntu.cross-arm64` for more information.
