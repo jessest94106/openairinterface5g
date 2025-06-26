@@ -99,22 +99,28 @@ typedef enum pdu_session_satus_e {
   PDU_SESSION_STATUS_RELEASED
 } pdu_session_status_t;
 
+typedef struct pdusession_s {
+  /* Unique pdusession_id for the UE. */
+  int pdusession_id;
+  byte_array_t nas_pdu;
+  uint8_t nb_qos;
+  /* Quality of service for this pdusession */
+  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  /* The transport layer address for the IP packets */
+  pdu_session_type_t pdu_session_type;
+  // NG-RAN endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_outgoing;
+  // UPF endpoint of the NG-U (N3) transport bearer
+  gtpu_tunnel_t n3_incoming;
+  nssai_t nssai;
+} pdusession_t;
+
 typedef struct pdu_session_param_s {
   pdusession_t param;
   pdu_session_status_t status;
   uint8_t xid; // transaction_id
   ngap_cause_t cause;
 } rrc_pdu_session_param_t;
-
-/**
- * @brief F1-U tunnel configuration
-*/
-typedef struct f1u_tunnel_s {
-  /* F1-U Tunnel Endpoint Identifier (on DU side) */
-  uint32_t teid;
-  /* Downlink F1-U Transport Layer (on DU side) */
-  transport_layer_addr_t addr;
-} f1u_tunnel_t;
 
 typedef struct drb_s {
   int status;
@@ -145,9 +151,9 @@ typedef struct drb_s {
     } ext1;
   } pdcp_config;
   // F1-U Downlink Tunnel Config (on DU side)
-  f1u_tunnel_t du_tunnel_config;
+  gtpu_tunnel_t du_tunnel_config;
   // F1-U Uplink Tunnel Config (on CU-UP side)
-  f1u_tunnel_t cuup_tunnel_config;
+  gtpu_tunnel_t cuup_tunnel_config;
 } drb_t;
 
 typedef enum {

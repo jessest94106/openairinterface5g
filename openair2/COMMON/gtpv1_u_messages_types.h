@@ -163,7 +163,7 @@ typedef struct gtpv1u_gnb_create_tunnel_req_s {
   int                    num_tunnels;
   teid_t                 outgoing_teid[NR_GTPV1U_MAX_BEARERS_PER_UE];
   int outgoing_qfi[NR_GTPV1U_MAX_BEARERS_PER_UE];
-  pdusessionid_t         pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
+  int pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
   ebi_t                  incoming_rb_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
   transport_layer_addr_t dst_addr[NR_GTPV1U_MAX_BEARERS_PER_UE];
 } gtpv1u_gnb_create_tunnel_req_t;
@@ -173,13 +173,13 @@ typedef struct gtpv1u_gnb_create_tunnel_resp_s {
   ue_id_t                ue_id;
   int                    num_tunnels;
   teid_t                 gnb_NGu_teid[NR_GTPV1U_MAX_BEARERS_PER_UE];  ///< Tunnel Endpoint Identifier
-  pdusessionid_t         pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
+  int pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
   transport_layer_addr_t gnb_addr;
 } gtpv1u_gnb_create_tunnel_resp_t;
 typedef struct gtpv1u_gnb_delete_tunnel_req_s {
   ue_id_t                ue_id;
   uint8_t                num_pdusession;
-  pdusessionid_t         pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
+  int pdusession_id[NR_GTPV1U_MAX_BEARERS_PER_UE];
 } gtpv1u_gnb_delete_tunnel_req_t;
 
 typedef struct gtpv1u_gnb_delete_tunnel_resp_s {
@@ -192,7 +192,7 @@ typedef struct gtpv1u_gnb_delete_tunnel_resp_s {
 typedef struct gtpv1u_DU_buffer_report_req_s {
   uint32_t               buffer_availability;
   ue_id_t                ue_id;
-  pdusessionid_t         pdusession_id;
+  int         pdusession_id;
 } gtpv1u_DU_buffer_report_req_t;
 
 #endif /* GTPV1_U_MESSAGES_TYPES_H_ */

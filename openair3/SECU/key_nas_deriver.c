@@ -57,7 +57,7 @@
 #define NR_FC_ALG_KEY_DER (0x69)
 #define NR_FC_ALG_KEY_NG_RAN_STAR_DER (0x70)
 
-static void log_hex_buffer(const char *label, const uint8_t *buf, const int len)
+void log_hex_buffer(const char *label, const uint8_t *buf, const int len)
 {
   char hex_str[len * 2 + 1];
   for (int i = 0; i < len; i++) {

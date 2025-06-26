@@ -65,9 +65,6 @@ uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue);
 /// @brief returns the number of active DRBs for this UE
 int get_number_active_drbs(gNB_RRC_UE_t *ue);
 
-/// @brief check if DRB with ID drb_id of UE ue is active
-bool drb_is_active(gNB_RRC_UE_t *ue, uint8_t drb_id);
-
 /// @brief retrieve PDU session of UE ue with ID id, optionally creating it if
 /// create is true
 rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create);
@@ -80,5 +77,8 @@ void get_pduSession_array(gNB_RRC_UE_t *ue, uint32_t pdu_sessions[NGAP_MAX_PDU_S
 
 /// @brief set PDCP configuration in a bearer context management message
 void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, drb_t *rrc_drb, bool um_on_default_drb);
+
+/// @brief Deep copy an instance of struct pdusession_t
+void cp_pdusession(pdusession_t *dst, const pdusession_t *src);
 
 #endif

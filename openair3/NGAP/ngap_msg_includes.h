@@ -71,5 +71,12 @@
 #include "NGAP_UnsuccessfulOutcome.h"
 #include "NGAP_UserLocationInformationNR.h"
 #include "NGAP_asn_constant.h"
+#include "NGAP_PDUSessionResourceSetupRequestTransfer.h"
+#include "NGAP_QosFlowSetupRequestItem.h"
+#include "NGAP_QosCharacteristics.h"
+#include "NGAP_NonDynamic5QIDescriptor.h"
+#include "NGAP_Dynamic5QIDescriptor.h"
+#include "NGAP_PDUSessionResourceModifyRequestTransfer.h"
+#include "NGAP_QosFlowAddOrModifyRequestItem.h"
 
 #endif // NGAP_MSG_INCLUDES_H

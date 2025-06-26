@@ -25,8 +25,11 @@
 #include <stdlib.h> // For malloc and free
 #include "common/utils/ds/byte_array.h"
 
+#define IEI_LEN 1
 #define GPRS_TIMER_LENGTH 3 // octets
 #define FGS_NAS_CAUSE_LENGTH 1
+#define MIN_EAP_MSG_LEN 7
+#define MIN_EAP_CONTENTS_LEN 4
 
 /**
  * Encode PDU Session Status and PDU session reactivation result (optional IEs)
@@ -152,12 +155,72 @@ bool eq_gprs_timer(const gprs_timer_t *a, const gprs_timer_t *b)
   return true;
 }
 
-/* Decode EAP Message (todo) */
-int decode_eap_msg_ie(const byte_array_t *buffer)
+/** @brief Encode EAP message IE (3GPP TS 24.501 9.11.2.2) */
+int encode_eap_msg_ie(byte_array_t *buffer, const byte_array_t *msg)
 {
-  int eap_msg_len = (buffer->buf[0] << 8) | buffer->buf[1];
-  PRINT_NAS_ERROR("EAP message IE in NAS Service Reject is not handled\n");
-  return eap_msg_len + 2; // content length + 2 octets for the length IE
+  int encoded = 0;
+
+  // Sanity check on buffer length
+  if (buffer->len < MIN_EAP_MSG_LEN) {
+    PRINT_NAS_ERROR("Invalid buffer length %ld", buffer->len);
+    return -1;
+  }
+
+  // Sanity check on input length
+  if (msg->len < MIN_EAP_CONTENTS_LEN || msg->len > MAX_EAP_CONTENTS_LEN) {
+    PRINT_NAS_ERROR("Invalid EAP message length %ld", msg->len);
+    return -1;
+  }
+
+  // Encode IEI
+  buffer->buf[encoded++] = IEI_EAPMSG;
+
+  // Encode length of EAP message content
+  uint16_t len = htons(msg->len);
+  memcpy(&buffer->buf[encoded], &len, sizeof(len));
+  encoded += sizeof(len);
+
+  // Encode EAP message content
+  memcpy(&buffer->buf[encoded], msg->buf, msg->len);
+  encoded += msg->len;
+
+  return encoded;
+}
+
+/** @brief Decode EAP message IE (3GPP TS 24.501 9.11.2.2):
+    length of contents and message payload */
+int decode_eap_msg_ie(byte_array_t *eap_msg, const byte_array_t *buffer)
+{
+  int decoded = 0;
+  int min_len_to_decode = MIN_EAP_MSG_LEN - IEI_LEN;
+
+  // Check buffer length validity
+  if (buffer->len < min_len_to_decode) {
+    PRINT_NAS_ERROR("Invalid buffer for decoding EAP message IE");
+    return -1;
+  }
+
+  // Decode length IE
+  eap_msg->len = (buffer->buf[decoded] << 8) | buffer->buf[decoded + 1];
+  decoded += 2;
+
+  // Check payload length validity
+  if (eap_msg->len < MIN_EAP_CONTENTS_LEN || eap_msg->len > MAX_EAP_CONTENTS_LEN) {
+    PRINT_NAS_ERROR("Invalid EAP message length %ld", eap_msg->len);
+    return -1;
+  }
+
+  // Check for buffer overflow
+  if (buffer->len < decoded + eap_msg->len) {
+    PRINT_NAS_ERROR("Buffer too short for EAP message: %ld < %ld", buffer->len, decoded + eap_msg->len);
+    return -1;
+  }
+
+  // Copy EAP payload
+  memcpy(eap_msg->buf, &buffer->buf[decoded], eap_msg->len);
+  decoded += eap_msg->len;
+
+  return decoded;
 }
 
 int encode_fgs_nas_cause(byte_array_t *buffer, const cause_id_t *cause)

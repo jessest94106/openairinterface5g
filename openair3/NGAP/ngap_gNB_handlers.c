@@ -694,6 +694,99 @@ static int ngap_gNB_handle_error_indication(sctp_assoc_t assoc_id, uint32_t stre
   return 0;
 }
 
+static void *decode_pdusession_transfer(const asn_TYPE_descriptor_t *td, const OCTET_STRING_t buf)
+{
+  void *decoded = NULL;
+  asn_codec_ctx_t ctx = {.max_stack_size = 100 * 1000};
+  asn_dec_rval_t rval = aper_decode(&ctx, td, &decoded, buf.buf, buf.size, 0, 0);
+  if (rval.code != RC_OK) {
+    NGAP_ERROR("Decoding failed for %s\n", td->name);
+    return NULL;
+  }
+  return decoded;
+}
+
+static pdusession_level_qos_parameter_t fill_qos(uint8_t qfi, const NGAP_QosFlowLevelQosParameters_t *params)
+{
+  pdusession_level_qos_parameter_t out = {0};
+  // QFI
+  out.qfi = qfi;
+  AssertFatal(params != NULL, "QoS parameters are NULL\n");
+  // QosCharacteristics
+  const NGAP_QosCharacteristics_t *qosChar = &params->qosCharacteristics;
+  AssertFatal(qosChar != NULL, "QoS characteristics are NULL\n");
+  if (qosChar->present == NGAP_QosCharacteristics_PR_nonDynamic5QI) {
+    AssertFatal(qosChar->choice.nonDynamic5QI != NULL, "nonDynamic5QI is NULL\n");
+    out.fiveQI_type = NON_DYNAMIC;
+    out.fiveQI = qosChar->choice.nonDynamic5QI->fiveQI;
+  } else if (qosChar->present == NGAP_QosCharacteristics_PR_dynamic5QI) {
+    AssertFatal(qosChar->choice.dynamic5QI != NULL, "dynamic5QI is NULL\n");
+    out.fiveQI_type = DYNAMIC;
+    out.fiveQI = *qosChar->choice.dynamic5QI->fiveQI;
+  } else {
+    AssertFatal(0, "Unsupported QoS Characteristics present value: %d\n", qosChar->present);
+  }
+  // Allocation and Retention Priority
+  const NGAP_AllocationAndRetentionPriority_t *arp = &params->allocationAndRetentionPriority;
+  out.allocation_retention_priority.priority_level = arp->priorityLevelARP;
+  out.allocation_retention_priority.pre_emp_capability = arp->pre_emptionCapability;
+  out.allocation_retention_priority.pre_emp_vulnerability = arp->pre_emptionVulnerability;
+
+  return out;
+}
+
+static gtpu_tunnel_t decode_TNLInformation(const NGAP_GTPTunnel_t *gTPTunnel_p)
+{
+  gtpu_tunnel_t out = {0};
+  // Transport layer address
+  memcpy(out.addr.buffer, gTPTunnel_p->transportLayerAddress.buf, gTPTunnel_p->transportLayerAddress.size);
+  out.addr.length = gTPTunnel_p->transportLayerAddress.size - gTPTunnel_p->transportLayerAddress.bits_unused;
+  // GTP tunnel endpoint ID
+  OCTET_STRING_TO_INT32(&gTPTunnel_p->gTP_TEID, out.teid);
+  return out;
+}
+
+/** @brief Decode PDU Session Resource Setup Request Transfer (9.3.4.1 3GPP TS 38.413) */
+static bool decodePDUSessionResourceSetup(pdusession_transfer_t *out, const OCTET_STRING_t in)
+{
+  void *decoded = decode_pdusession_transfer(&asn_DEF_NGAP_PDUSessionResourceSetupRequestTransfer, in);
+  if (!decoded) {
+    LOG_E(NR_RRC, "Failed to decode PDUSessionResourceSetupRequestTransfer\n");
+    return false;
+  }
+
+  NGAP_PDUSessionResourceSetupRequestTransfer_t *pdusessionTransfer = (NGAP_PDUSessionResourceSetupRequestTransfer_t *)decoded;
+  for (int i = 0; i < pdusessionTransfer->protocolIEs.list.count; i++) {
+    NGAP_PDUSessionResourceSetupRequestTransferIEs_t *pdusessionTransfer_ies = pdusessionTransfer->protocolIEs.list.array[i];
+    switch (pdusessionTransfer_ies->id) {
+      // UL NG-U UP TNL Information (Mandatory)
+      case NGAP_ProtocolIE_ID_id_UL_NGU_UP_TNLInformation:
+        out->n3_incoming = decode_TNLInformation(pdusessionTransfer_ies->value.choice.UPTransportLayerInformation.choice.gTPTunnel);
+        break;
+
+      // PDU Session Type (Mandatory)
+      case NGAP_ProtocolIE_ID_id_PDUSessionType:
+        out->pdu_session_type = pdusessionTransfer_ies->value.choice.PDUSessionType;
+        break;
+
+      // QoS Flow Setup Request List (Mandatory)
+      case NGAP_ProtocolIE_ID_id_QosFlowSetupRequestList:
+        out->nb_qos = pdusessionTransfer_ies->value.choice.QosFlowSetupRequestList.list.count;
+        for (int i = 0; i < out->nb_qos; i++) {
+          NGAP_QosFlowSetupRequestItem_t *item = pdusessionTransfer_ies->value.choice.QosFlowSetupRequestList.list.array[i];
+          out->qos[i] = fill_qos(item->qosFlowIdentifier, &item->qosFlowLevelQosParameters);
+        }
+        break;
+
+      default:
+        LOG_D(NR_RRC, "Unhandled optional IE %ld\n", pdusessionTransfer_ies->id);
+    }
+  }
+  ASN_STRUCT_FREE(asn_DEF_NGAP_PDUSessionResourceSetupRequestTransfer, pdusessionTransfer);
+
+  return true;
+}
+
 static int ngap_gNB_handle_initial_context_request(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
 {
   int i;
@@ -762,13 +855,16 @@ static int ngap_gNB_handle_initial_context_request(sctp_assoc_t assoc_id, uint32
 
     for (i = 0; i < ie->value.choice.PDUSessionResourceSetupListCxtReq.list.count; i++) {
       NGAP_PDUSessionResourceSetupItemCxtReq_t *item_p = ie->value.choice.PDUSessionResourceSetupListCxtReq.list.array[i];
-      msg->pdusession_param[i].pdusession_id = item_p->pDUSessionID;
-      msg->pdusession_param[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
+      msg->pdusession[i].pdusession_id = item_p->pDUSessionID;
+      msg->pdusession[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
       if (item_p->nAS_PDU) {
-        msg->pdusession_param[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
+        msg->pdusession[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
       }
-      OCTET_STRING_t *transfer = &item_p->pDUSessionResourceSetupRequestTransfer;
-      msg->pdusession_param[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
+      bool ret = decodePDUSessionResourceSetup(&msg->pdusession[i].pdusessionTransfer, item_p->pDUSessionResourceSetupRequestTransfer);
+      if (!ret) {
+        NGAP_ERROR("Failed to decode pDUSessionResourceSetupRequestTransfer in NG Initial Context Setup Request\n");
+        return -1;
+      }
     }
   }
 
@@ -936,16 +1032,19 @@ static int ngap_gNB_handle_pdusession_setup_request(sctp_assoc_t assoc_id, uint3
 
   for (int i = 0; i < ie->value.choice.PDUSessionResourceSetupListSUReq.list.count; i++) {
     NGAP_PDUSessionResourceSetupItemSUReq_t *item_p = ie->value.choice.PDUSessionResourceSetupListSUReq.list.array[i];
-    msg->pdusession_setup_params[i].pdusession_id = item_p->pDUSessionID;
+    msg->pdusession[i].pdusession_id = item_p->pDUSessionID;
 
     // S-NSSAI
-    msg->pdusession_setup_params[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
+    msg->pdusession[i].nssai = decode_ngap_nssai(&item_p->s_NSSAI);
 
-    OCTET_STRING_t *transfer = &item_p->pDUSessionResourceSetupRequestTransfer;
-    msg->pdusession_setup_params[i].nas_pdu = create_byte_array(item_p->pDUSessionNAS_PDU->size, item_p->pDUSessionNAS_PDU->buf);
-    msg->pdusession_setup_params[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
+    msg->pdusession[i].nas_pdu = create_byte_array(item_p->pDUSessionNAS_PDU->size, item_p->pDUSessionNAS_PDU->buf);
+    bool ret = decodePDUSessionResourceSetup(&msg->pdusession[i].pdusessionTransfer, item_p->pDUSessionResourceSetupRequestTransfer);
+    if (!ret) {
+      NGAP_ERROR("Failed to decode pDUSessionResourceSetupRequestTransfer in NG Setup Request\n");
+      return -1;
+    }
   }
-    itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);
+  itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);
 
   return 0;
 }
@@ -1039,6 +1138,37 @@ static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_N
   return 0;
 }
 
+static bool decodePDUSessionResourceModify(pdusession_transfer_t *out, const OCTET_STRING_t in)
+{
+  void *decoded = decode_pdusession_transfer(&asn_DEF_NGAP_PDUSessionResourceModifyRequestTransfer, in);
+  if (!decoded) {
+    LOG_E(NR_RRC, "Failed to decode PDUSessionResourceModifyRequestTransfer\n");
+    return false;
+  }
+
+  NGAP_PDUSessionResourceModifyRequestTransfer_t *pdusessionTransfer = (NGAP_PDUSessionResourceModifyRequestTransfer_t *)decoded;
+  for (int j = 0; j < pdusessionTransfer->protocolIEs.list.count; j++) {
+    NGAP_PDUSessionResourceModifyRequestTransferIEs_t *pdusessionTransfer_ies = pdusessionTransfer->protocolIEs.list.array[j];
+    switch (pdusessionTransfer_ies->id) {
+        /* optional QosFlowAddOrModifyRequestList */
+      case NGAP_ProtocolIE_ID_id_QosFlowAddOrModifyRequestList:
+        out->nb_qos = pdusessionTransfer_ies->value.choice.QosFlowAddOrModifyRequestList.list.count;
+        for (int i = 0; i < out->nb_qos; i++) {
+          NGAP_QosFlowAddOrModifyRequestItem_t *item =
+              pdusessionTransfer_ies->value.choice.QosFlowAddOrModifyRequestList.list.array[i];
+          out->qos[i] = fill_qos(item->qosFlowIdentifier, item->qosFlowLevelQosParameters);
+        }
+        break;
+
+      default:
+        LOG_E(NR_RRC, "Unhandled optional IE %ld\n", pdusessionTransfer_ies->id);
+        return false;
+    }
+  }
+  ASN_STRUCT_FREE(asn_DEF_NGAP_PDUSessionResourceModifyRequestTransfer, pdusessionTransfer);
+  return true;
+}
+
 static int ngap_gNB_handle_pdusession_modify_request(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
 {
   ngap_gNB_amf_data_t *amf_desc_p = NULL;
@@ -1116,13 +1246,15 @@ static int ngap_gNB_handle_pdusession_modify_request(sctp_assoc_t assoc_id, uint
   for (int i = 0; i < ie->value.choice.PDUSessionResourceModifyListModReq.list.count; i++) {
     NGAP_PDUSessionResourceModifyItemModReq_t *item_p = ie->value.choice.PDUSessionResourceModifyListModReq.list.array[i];
 
-    msg->pdusession_modify_params[i].pdusession_id = item_p->pDUSessionID;
+    msg->pdusession[i].pdusession_id = item_p->pDUSessionID;
 
     // check for the NAS PDU
     if (item_p->nAS_PDU != NULL && item_p->nAS_PDU->size > 0) {
-      msg->pdusession_modify_params[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
-      OCTET_STRING_t *transfer = &item_p->pDUSessionResourceModifyRequestTransfer;
-      msg->pdusession_modify_params[i].pdusessionTransfer = create_byte_array(transfer->size, transfer->buf);
+      msg->pdusession[i].nas_pdu = create_byte_array(item_p->nAS_PDU->size, item_p->nAS_PDU->buf);
+      if (!decodePDUSessionResourceModify(&msg->pdusession[i].pdusessionTransfer, item_p->pDUSessionResourceModifyRequestTransfer)) {
+        NGAP_ERROR("Failed to decode pDUSessionResourceModifyRequestTransfer\n");
+        return -1;
+      }
     } else {
       LOG_W(NGAP, "received pdu session modify with void content for UE %u, pdu session %lu\n", msg->gNB_ue_ngap_id, item_p->pDUSessionID);
       continue;

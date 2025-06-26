@@ -897,7 +897,8 @@ int gtpv1u_delete_all_s1u_tunnel(const instance_t instance, const rnti_t rnti)
   return newGtpuDeleteAllTunnels(instance, rnti);
 }
 
-int newGtpuDeleteTunnels(instance_t instance, ue_id_t ue_id, int nbTunnels, pdusessionid_t *pdusession_id) {
+int newGtpuDeleteTunnels(instance_t instance, ue_id_t ue_id, int nbTunnels, int *pdusession_id)
+{
   LOG_D(GTPU, "[%ld] Start delete tunnels for ue id %lu\n",
         instance, ue_id);
   pthread_mutex_lock(&globGtp.gtp_lock);

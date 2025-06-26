@@ -47,6 +47,9 @@ typedef struct {
 
   // T3448 Value (Optional)
   gprs_timer_t *t3448;
+
+  // EAP Message (Optional)
+  byte_array_t eap_msg;
 } fgs_service_accept_msg_t;
 
 int decode_fgs_service_accept(fgs_service_accept_msg_t *msg, const byte_array_t *buffer);
