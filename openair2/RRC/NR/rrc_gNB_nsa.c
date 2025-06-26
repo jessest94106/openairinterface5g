@@ -77,13 +77,7 @@
 // and put it into a CG-ConfigInfo field
 static int cg_config_info_from_ue_cap_file(uint32_t maxlen, uint8_t buf[maxlen])
 {
-  NR_CG_ConfigInfo_t *cgci = calloc_or_fail(1, sizeof(*cgci));
-  cgci->criticalExtensions.present = NR_CG_ConfigInfo__criticalExtensions_PR_c1;
-  cgci->criticalExtensions.choice.c1 = calloc_or_fail(1, sizeof(*cgci->criticalExtensions.choice.c1));
-  cgci->criticalExtensions.choice.c1->present = NR_CG_ConfigInfo__criticalExtensions__c1_PR_cg_ConfigInfo;
-  NR_CG_ConfigInfo_IEs_t *cgci_ies = calloc_or_fail(1, sizeof(*cgci_ies));
-  cgci->criticalExtensions.choice.c1->choice.cg_ConfigInfo = cgci_ies;
-
+  OCTET_STRING_t *os_cap = NULL;
   if (uecap_file != NULL) {
     LOG_I(NR_RRC, "creating CG-ConfigInfo from UE capability file %s\n", uecap_file);
 
@@ -104,10 +98,17 @@ static int cg_config_info_from_ue_cap_file(uint32_t maxlen, uint8_t buf[maxlen])
     DevAssert(dec_rval.code == RC_OK);
     //xer_fprint(stdout, &asn_DEF_NR_UE_NR_Capability, cap);
 
-    OCTET_STRING_t *os_cap = calloc_or_fail(1, sizeof(*os_cap));
+    os_cap = calloc_or_fail(1, sizeof(*os_cap));
     os_cap->size = uper_encode_to_new_buffer(&asn_DEF_NR_UE_NR_Capability, NULL, cap, (void **)&os_cap->buf);
-    cgci_ies->ue_CapabilityInfo = os_cap;
   }
+
+  NR_CG_ConfigInfo_t *cgci = calloc_or_fail(1, sizeof(*cgci));
+  cgci->criticalExtensions.present = NR_CG_ConfigInfo__criticalExtensions_PR_c1;
+  cgci->criticalExtensions.choice.c1 = calloc_or_fail(1, sizeof(*cgci->criticalExtensions.choice.c1));
+  cgci->criticalExtensions.choice.c1->present = NR_CG_ConfigInfo__criticalExtensions__c1_PR_cg_ConfigInfo;
+  NR_CG_ConfigInfo_IEs_t *cgci_ies = calloc_or_fail(1, sizeof(*cgci_ies));
+  cgci->criticalExtensions.choice.c1->choice.cg_ConfigInfo = cgci_ies;
+  cgci_ies->ue_CapabilityInfo = os_cap;
 
   //xer_fprint(stdout, &asn_DEF_NR_CG_ConfigInfo, cgci);
   asn_enc_rval_t rval = uper_encode_to_buffer(&asn_DEF_NR_CG_ConfigInfo, NULL, cgci, buf, maxlen);
