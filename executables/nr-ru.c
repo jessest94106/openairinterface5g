@@ -992,36 +992,6 @@ int setup_RU_buffers(RU_t *ru)
   return(0);
 }
 
-void *ru_stats_thread(void *param) {
-  RU_t               *ru      = (RU_t *)param;
-  wait_sync("ru_stats_thread");
-
-  while (!oai_exit) {
-    sleep(1);
-
-    if (cpu_meas_enabled) {
-      if (ru->feprx) print_meas(&ru->ofdm_demod_stats,"feprx (all ports)",NULL,NULL);
-
-      if (ru->feptx_ofdm) {
-        print_meas(&ru->precoding_stats,(ru->half_slot_parallelization==0)?"feptx_prec (per port)":"feptx_prec (per port, half_slot)",NULL,NULL);
-        print_meas(&ru->ofdm_mod_stats,(ru->half_slot_parallelization==0)?"feptx_ofdm (per port)":"feptx_ofdm (per port, half_slot)",NULL,NULL);
-        print_meas(&ru->txdataF_copy_stats,"txdataF_copy",NULL,NULL);
-        print_meas(&ru->ofdm_total_stats,"feptx_total",NULL,NULL);
-      }
-      print_meas(&ru->rx_fhaul,"rx_fhaul",NULL,NULL);
-      if (ru->if_south == REMOTE_IF5) print_meas(&ru->ifdevice.tx_fhaul,"tx_fhaul (IF5)",NULL,NULL); 
-      else print_meas(&ru->tx_fhaul,"tx_fhaul",NULL,NULL);
-
-      if (ru->fh_north_out) {
-        print_meas(&ru->compression,"compression",NULL,NULL);
-        print_meas(&ru->transport,"transport",NULL,NULL);
-      }
-    }
-  }
-
-  return(NULL);
-}
-
 void ru_tx_func(void *param)
 {
   processingData_RU_t *info = (processingData_RU_t *) param;
@@ -1399,8 +1369,6 @@ void init_RU_proc(RU_t *ru) {
 
   if(emulate_rf)
     threadCreate( &proc->pthread_emulateRF, emulatedRF_thread, (void *)proc, "emulateRF", -1, OAI_PRIORITY_RT );
-  if (cpu_meas_enabled)
-    threadCreate(&ru->ru_stats_thread, ru_stats_thread, (void *)ru, "ru_stats", -1, OAI_PRIORITY_RT);
   LOG_I(PHY, "Initialized RU proc %d (%s,%s),\n", ru->idx, NB_functions[ru->function], NB_timing[ru->if_timing]);
 }
 
@@ -1429,11 +1397,6 @@ void kill_NR_RU_proc(int inst) {
   pthread_cond_broadcast(&proc->cond_fep[0]);
   pthread_mutex_unlock( &proc->mutex_fep[0] );
   pthread_join(proc->pthread_FH, NULL);
-
-  if (cpu_meas_enabled) {
-    LOG_D(PHY, "Joining ru_stats_thread\n");
-    pthread_join(ru->ru_stats_thread, NULL);
-  }
 
   // everything should be stopped now, we can safely stop the RF device
   if (ru->stop_rf == NULL) {

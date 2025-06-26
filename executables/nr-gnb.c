@@ -239,14 +239,26 @@ static size_t dump_L1_meas_stats(PHY_VARS_gNB *gNB, RU_t *ru, char *output, size
   if (ru->feprx)
     output += print_meas_log(&ru->ofdm_demod_stats, "feprx", NULL, NULL, output, end - output);
 
+  bool full_slot = ru->half_slot_parallelization == 0;
   if (ru->feptx_prec) {
-    output += print_meas_log(&ru->precoding_stats,"feptx_prec",NULL,NULL, output, end - output);
+    output += print_meas_log(&ru->precoding_stats,
+                             full_slot ? "feptx_prec (per port)" : "feptx_prec (per port, half_slot)",
+                             NULL,
+                             NULL,
+                             output,
+                             end - output);
   }
 
   if (ru->feptx_ofdm) {
     output += print_meas_log(&ru->txdataF_copy_stats,"txdataF_copy",NULL,NULL, output, end - output);
-    output += print_meas_log(&ru->ofdm_mod_stats,"feptx_ofdm",NULL,NULL, output, end - output);
+    output += print_meas_log(&ru->ofdm_mod_stats,
+                             full_slot ? "feptx_ofdm (per port)" : "feptx_ofdm (per port, half_slot)",
+                             NULL,
+                             NULL,
+                             output,
+                             end - output);
     output += print_meas_log(&ru->ofdm_total_stats,"feptx_total",NULL,NULL, output, end - output);
+    output += print_meas_log(&ru->txdataF_copy_stats, "txdataF_copy", NULL, NULL, output, end - output);
   }
 
   if (ru->fh_north_asynch_in)
