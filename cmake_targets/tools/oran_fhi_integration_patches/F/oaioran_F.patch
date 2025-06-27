@@ -1,5 +1,5 @@
 diff --git a/fhi_lib/app/src/common.h b/fhi_lib/app/src/common.h
-index ac5f471..9ebbcab 100644
+index ac5f471..5efcce3 100644
 --- a/fhi_lib/app/src/common.h
 +++ b/fhi_lib/app/src/common.h
 @@ -28,7 +28,7 @@
@@ -7,12 +7,12 @@ index ac5f471..9ebbcab 100644
  #include <rte_mbuf.h>
  
 -#define VERSIONX                "oran_f_release_v1.0"
-+#define VERSIONX                "oran_f_release_v1.3"
++#define VERSIONX                "oran_f_release_v1.4"
  
  #define APP_O_DU  0
  #define APP_O_RU  1
 diff --git a/fhi_lib/lib/Makefile b/fhi_lib/lib/Makefile
-index eccc4ae..b1b8f4b 100644
+index eccc4ae..a97fdc6 100644
 --- a/fhi_lib/lib/Makefile
 +++ b/fhi_lib/lib/Makefile
 @@ -23,24 +23,46 @@ MYCUSTOMSPACE1='------------------------------------------------------------'
@@ -83,9 +83,9 @@ index eccc4ae..b1b8f4b 100644
  RTE_TARGET ?= x86_64-native-linux-icc
 -RTE_INC := $(shell PKG_CONFIG_PATH=/usr/lib64/pkgconfig:$(RTE_SDK)/build/meson-uninstalled pkgconf --cflags-only-I libdpdk)
 +ifeq ($(TARGET), x86)
-+RTE_INC := $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):/usr/lib64/pkgconfig:$(RTE_SDK)/build/meson-uninstalled pkgconf --cflags-only-I libdpdk)
++RTE_INC := $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):/usr/lib64/pkgconfig:$(RTE_SDK)/build/meson-uninstalled pkg-config --cflags-only-I libdpdk)
 +else ifeq ($(TARGET), armv8)
-+RTE_INC := $(pkgconf --cflags-only-I libdpdk)
++RTE_INC := $(shell pkg-config --cflags-only-I libdpdk)
 +endif
  
  API_DIR := $(PROJECT_DIR)/api
@@ -147,6 +147,15 @@ index eccc4ae..b1b8f4b 100644
  
  ifeq ($(WIRELESS_SDK_TOOLCHAIN),icc)
  CPP_FLAGS +=  -fp-model fast=2 -no-prec-div -no-prec-sqrt -fast-transcendentals -restrict
+@@ -150,7 +187,7 @@ CPP_FLAGS +=  -fp-model fast -march=icelake-server -mintrinsic-promote -Wno-unus
+ endif
+ 
+ 
+-INC :=  -I$(API_DIR) -I$(ETH_DIR) -I$(SRC_DIR) -I$(RTE_INC)
++INC :=  -I$(API_DIR) -I$(ETH_DIR) -I$(SRC_DIR) $(RTE_INC)
+ DEF :=
+ ifeq ($(MLOG),1)
+ 	INC  += -I$(MLOG_DIR)/source
 @@ -186,8 +223,13 @@ CPP_SNC_OBJTARGETS := $(addprefix $(PROJECT_OBJ_DIR)/,$(CPP_OBJS_SNC))
  
  AS_OBJTARGETS := $(addprefix $(PROJECT_OBJ_DIR)/,$(AS_OBJS))
@@ -164,7 +173,7 @@ index eccc4ae..b1b8f4b 100644
  CPP_FLAGS_FULL := $(CPP_FLAGS) $(CPP_COMP) $(INC) $(DEF)
  CPP_FLAGS_FULL_SNC := $(CPP_FLAGS) $(CPP_COMP_SNC) $(INC) $(DEF)
 diff --git a/fhi_lib/lib/api/xran_fh_o_du.h b/fhi_lib/lib/api/xran_fh_o_du.h
-index bacf597..8bd7c66 100644
+index bacf597..1dd6d66 100644
 --- a/fhi_lib/lib/api/xran_fh_o_du.h
 +++ b/fhi_lib/lib/api/xran_fh_o_du.h
 @@ -141,7 +141,7 @@ extern "C" {
@@ -176,7 +185,15 @@ index bacf597..8bd7c66 100644
  #define XRAN_MAX_SET_BFWS            (64)  /**< Assumed 64Ant, BFP 9bit with 9K jumbo frame */
  
  #define XRAN_MAX_PKT_BURST (448+4) /**< 4x14x8 symbols per ms */
-@@ -1193,6 +1193,31 @@ int32_t xran_reg_physide_cb_by_dev_id(void *pHandle, xran_fh_tti_callback_fn Cb,
+@@ -419,6 +419,7 @@ struct xran_io_cfg {
+     uint16_t num_rxq;             /**< number of RX queues per VF */
+     char *dpdk_dev[XRAN_VF_MAX]; /**< VFs devices  */
+     char *bbdev_dev[1];      /**< BBDev dev name */
++    char *bbdev_vfio_vf_token[1];      /**< BBDev dev token */
+     int32_t bbdev_mode;      /**< DPDK for BBDev */
+     uint32_t dpdkIoVaMode;   /**< IOVA Mode */
+     uint32_t dpdkMemorySize; /**< DPDK max memory allocation */
+@@ -1193,6 +1194,31 @@ int32_t xran_reg_physide_cb_by_dev_id(void *pHandle, xran_fh_tti_callback_fn Cb,
   */
  int32_t xran_get_slot_idx (uint32_t PortId, uint32_t *nFrameIdx, uint32_t *nSubframeIdx,  uint32_t *nSlotIdx, uint64_t *nSecond);
  
@@ -259,7 +276,7 @@ index 46e0e1d..409ef4b 100644
  int xran_prepare_iq_symbol_portion(
                          struct rte_mbuf *mbuf,
 diff --git a/fhi_lib/lib/ethernet/ethdi.c b/fhi_lib/lib/ethernet/ethdi.c
-index f5b2fd6..2eccc6e 100644
+index f5b2fd6..8fb0ec2 100644
 --- a/fhi_lib/lib/ethernet/ethdi.c
 +++ b/fhi_lib/lib/ethernet/ethdi.c
 @@ -37,7 +37,10 @@
@@ -299,8 +316,11 @@ index f5b2fd6..2eccc6e 100644
              all_ports_up = 0;
              break;
          }
-@@ -325,8 +338,8 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -323,10 +336,11 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+     uint64_t nWorkerCore = 1;
+     uint32_t coreNum = sysconf(_SC_NPROCESSORS_CONF);
      char bbdev_wdev[32]   = "";
++    char bbdev_vfio_vf_token[64] = "";
      char bbdev_vdev[32]   = "";
      char iova_mode[32]    = "--iova-mode=pa";
 -    char socket_mem[32]   = "--socket-mem=8192";
@@ -310,16 +330,36 @@ index f5b2fd6..2eccc6e 100644
      char ring_name[32]    = "";
      int32_t xran_port = -1;
      queueid_t qi = 0;
-@@ -336,7 +349,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -336,8 +350,8 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
      cpu = sched_getcpu();
      node = numa_node_of_cpu(cpu);
  
 -    char *argv[] = { name, core_mask, "-n2", iova_mode, socket_mem, socket_limit, "--proc-type=auto",
+-        "--file-prefix", name, "-a0000:00:00.0", bbdev_wdev, bbdev_vdev};
 +    char *argv[] = { name, core_mask, "-n2", iova_mode, socket_mem, socket_limit, "--proc-type=auto", "--no-telemetry",
-         "--file-prefix", name, "-a0000:00:00.0", bbdev_wdev, bbdev_vdev};
++        "--file-prefix", name, "-a0000:00:00.0", bbdev_wdev, bbdev_vdev, bbdev_vfio_vf_token};
  
      if (io_cfg == NULL)
-@@ -481,11 +494,13 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+         return 0;
+@@ -347,11 +361,17 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+             // hw-accelerated bbdev
+             printf("hw-accelerated bbdev %s\n", io_cfg->bbdev_dev[0]);
+             snprintf(bbdev_wdev, RTE_DIM(bbdev_wdev), "-a%s", io_cfg->bbdev_dev[0]);
++	    if (io_cfg->bbdev_vfio_vf_token[0] != NULL) {
++                snprintf(bbdev_vfio_vf_token, RTE_DIM(bbdev_vfio_vf_token), "--vfio-vf-token=%s", io_cfg->bbdev_vfio_vf_token[0]);
++	    }
+         } else if (io_cfg->bbdev_mode == XRAN_BBDEV_MODE_HW_OFF){
+             snprintf(bbdev_wdev, RTE_DIM(bbdev_wdev), "%s", "--vdev=baseband_turbo_sw");
+         } else if (io_cfg->bbdev_mode == XRAN_BBDEV_MODE_HW_SW){
+             printf("software and hw-accelerated bbdev %s\n", io_cfg->bbdev_dev[0]);
+             snprintf(bbdev_wdev, RTE_DIM(bbdev_wdev), "-a%s", io_cfg->bbdev_dev[0]);
++	    if (io_cfg->bbdev_vfio_vf_token[0] != NULL) {
++                snprintf(bbdev_vfio_vf_token, RTE_DIM(bbdev_vfio_vf_token), "--vfio-vf-token=%s", io_cfg->bbdev_vfio_vf_token[0]);
++	    }
+             snprintf(bbdev_vdev, RTE_DIM(bbdev_vdev), "%s", "--vdev=baseband_turbo_sw");
+         } else {
+             rte_panic("Cannot init DPDK incorrect [bbdev_mode %d]\n", io_cfg->bbdev_mode);
+@@ -481,11 +501,13 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
                      ctx->tx_ring[i] = rte_ring_create(ring_name, NUM_MBUFS_RING_TRX,
                      rte_lcore_to_socket_id(*lcore_id), RING_F_SC_DEQ);
                      PANIC_ON(ctx->tx_ring[i] == NULL, "failed to allocate rx ring");
@@ -333,7 +373,7 @@ index f5b2fd6..2eccc6e 100644
                      }
                  }
              } else {
-@@ -555,7 +570,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
+@@ -555,7 +577,7 @@ xran_ethdi_init_dpdk_io(char *name, const struct xran_io_cfg *io_cfg,
          ctx->up_dl_pkt_gen_ring[i] = rte_ring_create(ring_name, NUM_MBUFS_RING,
          rte_lcore_to_socket_id(*lcore_id), /*RING_F_SC_DEQ*/0);
          PANIC_ON(ctx->up_dl_pkt_gen_ring[i] == NULL, "failed to allocate dl gen ring");
