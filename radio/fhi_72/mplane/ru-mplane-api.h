@@ -58,6 +58,7 @@ typedef struct {
   uint8_t ccid;
   uint8_t ru_port;
   int16_t frame_str; // might be needed in the future xran releases
+  bool managed_delay;
 
 } xran_mplane_t;
 

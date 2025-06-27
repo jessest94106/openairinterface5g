@@ -197,6 +197,10 @@ static bool fill_uplane_ch_rx_v2(const xran_mplane_t *xran_mplane, const openair
   ret = fill_uplane_ch_common_v2(UP_CH_RX, xran_mplane, oai, idx, root);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create common nodes.\n");
 
+  const char *managed_delay = xran_mplane->managed_delay ? "true" : "false";
+  ret = lyd_new_term(*root, NULL, "non-time-managed-delay-enabled", managed_delay, 0, NULL);
+  VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"non-time-managed-delay-enabled\" node.\n");
+
   struct lyd_node *fft_offset = NULL;
   ret = lyd_new_list(*root, NULL, "ul-fft-sampling-offsets", 0, &fft_offset, scs_name[oai->nr_scs_for_raster]);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"ul-fft-sampling-offsets\" node.\n");
