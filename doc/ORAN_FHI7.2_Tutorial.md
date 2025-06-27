@@ -1393,7 +1393,7 @@ The reference gNB configuration file for one Benetel RAN550:
 The reference DU configuration file for two Benetel RAN650:
 [gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650-mplane.conf](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650-mplane.conf)
 
-In order to run gNB/DU with M-plane, we need to modify the `fhi_72` section in the configuration file.
+In order to run gNB/DU with M-plane, we need to modify Tx gain `att_tx` in RU section, as well as the `fhi_72` section in the configuration file.
 Example for one RU:
 ```bash
 fhi_72 = {

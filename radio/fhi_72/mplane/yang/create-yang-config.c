@@ -292,8 +292,12 @@ static bool create_uplane_conf_v2(struct ly_ctx **ctx, const ru_session_t *ru_se
   ret = lyd_new_term(tx_carrier_node, NULL, "channel-bandwidth", tx_bw, 0, NULL);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"channel-bandwidth\" node.\n");
 
-  // oai->tx_gain to be tested
-  ret = lyd_new_term(tx_carrier_node, NULL, "gain", "0", 0, NULL);
+  // oai->tx_gain takes the value of att_tx from the RU section of gNB config file
+  // we assume the same gain is applied to all channels; same as above for the frequency
+  const double tx_gain_value = ((oai->tx_gain[0] * 10000) < ru_session->xran_mplane.max_tx_gain) ? (oai->tx_gain[0] * 10000) : ru_session->xran_mplane.max_tx_gain;
+  char tx_gain_str[8];
+  snprintf(tx_gain_str, sizeof(tx_gain_str), "%.f", tx_gain_value);
+  ret = lyd_new_term(tx_carrier_node, NULL, "gain", tx_gain_str, 0, NULL);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"gain\" node.\n");
   
   ret = lyd_new_term(tx_carrier_node, NULL, "downlink-radio-frame-offset", "0", 0, NULL);

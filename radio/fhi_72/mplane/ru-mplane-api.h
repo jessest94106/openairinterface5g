@@ -60,6 +60,8 @@ typedef struct {
   int16_t frame_str; // might be needed in the future xran releases
   bool managed_delay;
 
+  double max_tx_gain;
+
 } xran_mplane_t;
 
 typedef struct {

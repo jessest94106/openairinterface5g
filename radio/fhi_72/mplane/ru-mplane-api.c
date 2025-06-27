@@ -33,7 +33,7 @@ static void free_match_list(char **match_list, size_t count)
   free(match_list);
 }
 
-static void fix_benetel_setting(xran_mplane_t *xran_mplane, const uint32_t interface_mtu, const int16_t first_iq_width, const int max_num_ant)
+static void fix_benetel_setting(xran_mplane_t *xran_mplane, const uint32_t interface_mtu, const int16_t first_iq_width, const int max_num_ant, const char *model_name)
 {
   if (interface_mtu == 1500) {
     MP_LOG_I("Interface MTU %d unreliable/not correctly reported by Benetel O-RU, hardcoding to 9600.\n", interface_mtu);
@@ -50,6 +50,14 @@ static void fix_benetel_setting(xran_mplane_t *xran_mplane, const uint32_t inter
   }
 
   xran_mplane->prach_offset = max_num_ant;
+
+  if (strcasecmp(model_name, "RAN550") == 0) {
+    xran_mplane->max_tx_gain = 24.0;
+  } else if (strcasecmp(model_name, "RAN650") == 0) {
+    xran_mplane->max_tx_gain = 35.0;
+  } else {
+    assert(false && "[MPLANE] Unknown Benetel model name.\n");
+  }
 }
 
 bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_t *xran_mplane)
@@ -102,8 +110,14 @@ bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_
   const char *managed_delay = get_ru_xml_node(buffer, "managed-delay-support");
   xran_mplane->managed_delay = (strcasecmp(managed_delay, "NON_MANAGED") == 0) ? false : true;
 
+  // Store the max gain
+  xran_mplane->max_tx_gain = (double)atof(get_ru_xml_node(buffer, "max-gain"));
+
+  // Model name
+  const char *model_name = get_ru_xml_node(buffer, "model-name");
+
   if (strcasecmp(ru_vendor, "BENETEL") == 0 /* || strcmp(ru_vendor, "VVDN-LPRU") == 0 || strcmp(ru_vendor, "Metanoia") == 0 */) {
-    fix_benetel_setting(xran_mplane, interface_mtu, first_iq_width, max_num_ant);
+    fix_benetel_setting(xran_mplane, interface_mtu, first_iq_width, max_num_ant, model_name);
   } else {
     AssertError(false, return false, "[MPLANE] %s RU currently not supported.\n", ru_vendor);
   }
@@ -120,7 +134,8 @@ bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_
     DU port ID %d\n\
     Band sector ID %d\n\
     CC ID %d\n\
-    RU port ID %d\n",
+    RU port ID %d\n\
+    max Tx gain %.1f\n",
       xran_mplane->ru_mac_addr,
       xran_mplane->mtu,
       xran_mplane->iq_width,
@@ -132,7 +147,8 @@ bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_
       xran_mplane->du_port,
       xran_mplane->band_sector,
       xran_mplane->ccid,
-      xran_mplane->ru_port);
+      xran_mplane->ru_port,
+      xran_mplane->max_tx_gain);
 
   return true;
 }
