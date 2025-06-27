@@ -883,6 +883,7 @@ static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_
   const nfapi_nr_prach_config_t *prach_config = &config->prach_config;
   const nfapi_nr_tdd_table_t *tdd_table = &config->tdd_table;
   const nfapi_nr_cell_config_t *cell_config = &config->cell_config;
+  const nfapi_nr_carrier_config_t *carrier_config = &config->carrier_config;
 
   DevAssert(prach_config->prach_ConfigurationIndex.tl.tag == NFAPI_NR_CONFIG_PRACH_CONFIG_INDEX_TAG);
   split7->prach_index = prach_config->prach_ConfigurationIndex.value;
@@ -902,6 +903,12 @@ static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_
   }
 
   split7->fftSize = log2(ofdm_symbol_size);
+
+  // M-plane related parameters
+  for (size_t i = 0; i < 5 ; i++) {
+    split7->dl_k0[i] = carrier_config->dl_k0[i].value;
+    split7->ul_k0[i] = carrier_config->ul_k0[i].value;
+  }
 }
 
 /* this function maps the RU tx and rx buffers to the available rf chains.
