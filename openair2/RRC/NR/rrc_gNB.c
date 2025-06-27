@@ -2146,12 +2146,14 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
   f1ap_ue_context_release_req_t *req = &F1AP_UE_CONTEXT_RELEASE_REQ(msg_p);
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, req->gNB_CU_ue_id);
-  // TODO what happens if no AMF connected? should also handle, set an_release true
   int srbid = 1;
-  if (!ue_context_p) {
-    LOG_W(RRC, "could not find UE context for CU UE ID %u: auto-generate release command\n", req->gNB_CU_ue_id);
+  // valid AMF UE NGAP ID range is 0..2^40-1
+  if (!ue_context_p || ue_context_p->ue_context.amf_ue_ngap_id >= (1LL << 40)) {
+    const char *reason = !ue_context_p ? "could not find UE context" : "no AMF";
+    LOG_W(RRC, "%s for CU UE ID %u: auto-generate release command\n", reason, req->gNB_CU_ue_id);
     uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
     int size = do_NR_RRCRelease(buffer, NR_RRC_BUF_SIZE, rrc_gNB_get_next_transaction_identifier(0));
+    RETURN_IF_INVALID_ASSOC_ID(assoc_id);
     f1ap_ue_context_release_cmd_t ue_context_release_cmd = {
         .gNB_CU_ue_id = req->gNB_CU_ue_id,
         .gNB_DU_ue_id = req->gNB_DU_ue_id,
@@ -2159,7 +2161,7 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
         .cause_value = 10, // 10 = F1AP_CauseRadioNetwork_normal_release
         .srb_id = srbid,
     };
-    deliver_ue_ctxt_release_data_t data = {.rrc = rrc, .release_cmd = &ue_context_release_cmd};
+    deliver_ue_ctxt_release_data_t data = {.rrc = rrc, .release_cmd = &ue_context_release_cmd, .assoc_id = assoc_id};
     nr_pdcp_data_req_srb(req->gNB_CU_ue_id, srbid, rrc_gNB_mui++, size, buffer, rrc_deliver_ue_ctxt_release_cmd, &data);
     return;
   }
