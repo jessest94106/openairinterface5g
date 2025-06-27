@@ -4480,7 +4480,7 @@ static uint8_t compute_ri_bitlen(const NR_CSI_ReportConfig_t *csi_reportconfig, 
 
   if (codebookConfig == NULL) {
     csi_report->csi_meas_bitlen.ri_bitlen = 0;
-    return 0;
+    return 1;
   }
 
   struct NR_CodebookConfig__codebookType__type1__subType__typeI_SinglePanel *type1single = NULL;
