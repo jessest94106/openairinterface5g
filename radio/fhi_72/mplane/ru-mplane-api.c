@@ -91,6 +91,13 @@ bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_
   // RU port ID
   xran_mplane->ru_port = 0;
 
+  // Frame structure
+  match_list = NULL;
+  count = 0;
+  get_ru_xml_list(buffer, "supported-frame-structures", &match_list, &count);
+  xran_mplane->frame_str = (int16_t)atoi((char *)match_list[0]);
+  free_match_list(match_list, count);
+
   if (strcasecmp(ru_vendor, "BENETEL") == 0 /* || strcmp(ru_vendor, "VVDN-LPRU") == 0 || strcmp(ru_vendor, "Metanoia") == 0 */) {
     fix_benetel_setting(xran_mplane, interface_mtu, first_iq_width, max_num_ant);
   } else {
