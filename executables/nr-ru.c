@@ -878,7 +878,7 @@ static void fill_rf_config(RU_t *ru, char *rf_config_file)
   }
 }
 
-static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_request_scf_t *config, int slots_per_frame, uint16_t ofdm_symbol_size)
+static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_request_scf_t *config, const NR_DL_FRAME_PARMS *fp)
 {
   const nfapi_nr_prach_config_t *prach_config = &config->prach_config;
   const nfapi_nr_tdd_table_t *tdd_table = &config->tdd_table;
@@ -894,7 +894,7 @@ static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_
   if (cell_config->frame_duplex_type.value == 1 /* TDD */) {
     DevAssert(tdd_table->tdd_period.tl.tag == NFAPI_NR_CONFIG_TDD_PERIOD_TAG);
     int nb_periods_per_frame = get_nb_periods_per_frame(tdd_table->tdd_period.value);
-    split7->n_tdd_period = slots_per_frame / nb_periods_per_frame;
+    split7->n_tdd_period = fp->slots_per_frame / nb_periods_per_frame;
     for (int slot = 0; slot < split7->n_tdd_period; ++slot) {
       for (int sym = 0; sym < 14; ++sym) {
         split7->slot_dirs[slot].sym_dir[sym] = tdd_table->max_tdd_periodicity_list[slot].max_num_of_symbol_per_slot_list[sym].slot_config.value;
@@ -902,13 +902,15 @@ static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_
     }
   }
 
-  split7->fftSize = log2(ofdm_symbol_size);
+  split7->fftSize = log2(fp->ofdm_symbol_size);
 
   // M-plane related parameters
   for (size_t i = 0; i < 5 ; i++) {
     split7->dl_k0[i] = carrier_config->dl_k0[i].value;
     split7->ul_k0[i] = carrier_config->ul_k0[i].value;
   }
+  split7->cp_prefix0 = fp->nb_prefix_samples0;
+  split7->cp_prefix_other = fp->nb_prefix_samples;
 }
 
 /* this function maps the RU tx and rx buffers to the available rf chains.
@@ -1051,7 +1053,7 @@ void *ru_thread(void *param)
   nr_dump_frame_parms(fp);
   nr_phy_init_RU(ru);
   fill_rf_config(ru, ru->rf_config_file);
-  fill_split7_2_config(&ru->openair0_cfg.split7, &ru->config, fp->slots_per_frame, fp->ofdm_symbol_size);
+  fill_split7_2_config(&ru->openair0_cfg.split7, &ru->config, fp);
 
   // Start IF device if any
   if (ru->nr_start_if) {
