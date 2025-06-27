@@ -558,7 +558,15 @@ static int vrtsim_write(openair0_device *device, openair0_timestamp timestamp, v
 static int vrtsim_read(openair0_device *device, openair0_timestamp *ptimestamp, void **samplesVoid, int nsamps, int nbAnt)
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
-  shm_td_iq_channel_wait(vrtsim_state->channel, vrtsim_state->last_received_sample + nsamps);
+  if (shm_td_iq_channel_is_aborted(vrtsim_state->channel)) {
+    LOG_E(HW, "Channel is aborted, returning void samples\n");
+    for (int i = 0; i < nbAnt; i++) {
+      memset(samplesVoid[i], 0, sizeof(c16_t) * nsamps);
+    }
+    return nsamps;
+  }
+  uint64_t timeout_uS = 2 * 1000 * 1000 / vrtsim_state->timescale; // 2 seconds in uS
+  shm_td_iq_channel_wait(vrtsim_state->channel, vrtsim_state->last_received_sample + nsamps, timeout_uS);
   int ret = shm_td_iq_channel_rx(vrtsim_state->channel, vrtsim_state->last_received_sample, nsamps, 0, samplesVoid[0]);
   if (ret == CHANNEL_ERROR_TOO_LATE) {
     vrtsim_state->rx_samples_late += nsamps;
@@ -599,8 +607,7 @@ static void vrtsim_end(openair0_device *device)
       taps_client_stop();
     }
   }
-  // produce 1 second of extra samples so threads can finish
-  shm_td_iq_channel_produce_samples(vrtsim_state->channel, vrtsim_state->sample_rate);
+  shm_td_iq_channel_abort(vrtsim_state->channel);
   sleep(1);
   shm_td_iq_channel_destroy(vrtsim_state->channel);
 

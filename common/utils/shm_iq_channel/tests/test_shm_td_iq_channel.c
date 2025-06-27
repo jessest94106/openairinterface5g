@@ -104,7 +104,7 @@ void server(void)
   uint64_t timestamp = 0;
   int iq_contents = 0;
   while (timestamp < num_samples_per_update * num_updates) {
-    shm_td_iq_channel_wait(channel, timestamp + num_samples_per_update);
+    shm_td_iq_channel_wait(channel, timestamp + num_samples_per_update, 0);
     uint64_t target_timestamp = timestamp + num_samples_per_update;
     timestamp += num_samples_per_update;
     uint32_t iq_data[num_samples_per_update];
@@ -141,7 +141,7 @@ int client(void)
   int iq_contents = 0;
 
   while (timestamp < num_samples_per_update * num_updates) {
-    shm_td_iq_channel_wait(channel, timestamp + num_samples_per_update);
+    shm_td_iq_channel_wait(channel, timestamp + num_samples_per_update, 0);
     // Server starts producing from second slot
     if (timestamp > num_samples_per_update) {
       uint64_t target_timestamp = timestamp - num_samples_per_update;

@@ -52,6 +52,7 @@ typedef struct ShmTDIQChannel_s {
   char name[256];
   sample_t *tx_iq_data;
   sample_t *rx_iq_data;
+  bool abort;
 } ShmTDIQChannel;
 
 ShmTDIQChannel *shm_td_iq_channel_create(const char *name, int num_tx_ant, int num_rx_ant)
@@ -237,10 +238,11 @@ void shm_td_iq_channel_produce_samples(ShmTDIQChannel *channel, size_t num_sampl
   mutexunlock(data->mutex);
 }
 
-void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp)
+void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_t timeout_uS)
 {
   ShmTDIQChannelData *data = channel->data;
   if (data->is_connected == false) {
+    fprintf(stderr, "Error: Channel is not connected.\n");
     abort();
     return;
   }
@@ -249,13 +251,41 @@ void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp)
   if (current_timestamp >= timestamp) {
     return;
   }
-  mutexlock(data->mutex);
-  while (current_timestamp < timestamp) {
-    condwait(data->cond, data->mutex);
-    current_timestamp = data->timestamp;
+  if (timeout_uS == 0) {
+    mutexlock(data->mutex);
+    while (current_timestamp < timestamp && !channel->abort) {
+      condwait(data->cond, data->mutex);
+      current_timestamp = data->timestamp;
+    }
+    mutexunlock(data->mutex);
+  } else {
+    struct timespec ts = {.tv_sec = 0, .tv_nsec = 0};
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+      fprintf(stderr, "Error: clock_gettime failed: %s\n", strerror(errno));
+      channel->abort = true;
+      return;
+    }
+    
+    ts.tv_sec += timeout_uS / 1000000; // Convert microseconds to seconds
+    ts.tv_nsec += (timeout_uS % 1000000) * 1000; // Convert remaining microseconds to nanoseconds
+
+    mutexlock(data->mutex);
+    while (current_timestamp < timestamp && !channel->abort) {
+      int ret = pthread_cond_timedwait(&data->cond, &data->mutex, &ts);
+      if (ret == ETIMEDOUT) {
+        channel->abort = true;
+        fprintf(stderr, "Error: Timed out waiting for samples. Aborting vrtsim\n");\
+        break;
+      } else if (ret != 0) {
+        channel->abort = true;
+        fprintf(stderr, "Error: pthread_cond_timedwait failed: %s\n", strerror(ret));
+        break;
+      } else {
+        current_timestamp = data->timestamp;
+      }
+    }
+    mutexunlock(data->mutex);
   }
-  mutexunlock(data->mutex);
-  return;
 }
 
 uint64_t shm_td_iq_channel_get_current_sample(const ShmTDIQChannel *channel)
@@ -269,15 +299,32 @@ bool shm_td_iq_channel_is_connected(const ShmTDIQChannel *channel)
   return channel->data->is_connected;
 }
 
+void shm_td_iq_channel_abort(ShmTDIQChannel *channel)
+{
+  ShmTDIQChannelData *data = channel->data;
+  mutexlock(data->mutex);
+  channel->abort = true;
+  condbroadcast(data->cond);
+  mutexunlock(data->mutex);
+}
+
+bool shm_td_iq_channel_is_aborted(const ShmTDIQChannel *channel)
+{
+  return channel->abort;
+}
+
 void shm_td_iq_channel_destroy(ShmTDIQChannel *channel)
 {
   ShmTDIQChannelData *data = channel->data;
   size_t tx_buffer_size = CIRCULAR_BUFFER_SIZE * sizeof(sample_t) * data->num_antennas_tx;
   size_t rx_buffer_size = CIRCULAR_BUFFER_SIZE * sizeof(sample_t) * data->num_antennas_rx;
   size_t total_size = sizeof(ShmTDIQChannelData) + tx_buffer_size + rx_buffer_size;
-  munmap(data, total_size);
   if (channel->type == IQ_CHANNEL_TYPE_SERVER) {
+    data->is_connected = false;
+    munmap(data, total_size);
     shm_unlink(channel->name);
+  } else {
+    munmap(data, total_size);
   }
   free(channel);
 }
