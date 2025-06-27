@@ -1999,10 +1999,10 @@ void rrc_gNB_process_dc_overall_timeout(const module_id_t gnb_mod_idP, x2ap_ENDC
 /* \brief fill E1 bearer modification's DRB from F1 DRB
  * \param drb_e1 pointer to a DRB inside an E1 bearer modification message
  * \param drb_f1 pointer to a DRB inside an F1 UE Ctxt modification Response */
-static void fill_e1_bearer_modif(DRB_nGRAN_to_mod_t *drb_e1, const f1ap_drb_to_be_setup_t *drb_f1)
+static void fill_e1_bearer_modif(DRB_nGRAN_to_mod_t *drb_e1, const f1ap_drb_setup_t *drb_f1)
 {
-  drb_e1->id = drb_f1->drb_id;
-  drb_e1->numDlUpParam = drb_f1->up_dl_tnl_length;
+  drb_e1->id = drb_f1->id;
+  drb_e1->numDlUpParam = drb_f1->up_dl_tnl_len;
   drb_e1->DlUpParamList[0].tl_info.tlAddress = drb_f1->up_dl_tnl[0].tl_address;
   drb_e1->DlUpParamList[0].tl_info.teId = drb_f1->up_dl_tnl[0].teid;
 }
@@ -2019,20 +2019,20 @@ static gtpu_tunnel_t f1u_gtp_update(uint32_t teid, const in_addr_t addr)
 /**
  * @brief Update DRB TEID information in RRC storage from received DRB list
  */
-static void store_du_f1u_tunnel(const f1ap_drb_to_be_setup_t *drbs, int n, gNB_RRC_UE_t *ue)
+static void store_du_f1u_tunnel(const f1ap_drb_setup_t *drbs, int n, gNB_RRC_UE_t *ue)
 {
   for (int i = 0; i < n; i++) {
-    const f1ap_drb_to_be_setup_t *drb_f1 = &drbs[i];
-    AssertFatal(drb_f1->up_dl_tnl_length == 1, "can handle only one UP param\n");
-    AssertFatal(drb_f1->drb_id < MAX_DRBS_PER_UE, "illegal DRB ID %ld\n", drb_f1->drb_id);
-    drb_t *drb = get_drb(ue, drb_f1->drb_id);
+    const f1ap_drb_setup_t *drb_f1 = &drbs[i];
+    AssertFatal(drb_f1->up_dl_tnl_len == 1, "can handle only one UP param\n");
+    AssertFatal(drb_f1->id < MAX_DRBS_PER_UE, "illegal DRB ID %d\n", drb_f1->id);
+    drb_t *drb = get_drb(ue, drb_f1->id);
     drb->du_tunnel_config = f1u_gtp_update(drb_f1->up_dl_tnl[0].teid, drb_f1->up_dl_tnl[0].tl_address);
   }
 }
 
 /* \brief use list of DRBs and send the corresponding bearer update message via
  * E1 to the CU of this UE. Also updates TEID info internally */
-static void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb_to_be_setup_t *drbs)
+static void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb_setup_t *drbs)
 {
   // Quit bearer updates if no CU-UP is associated
   if (!is_cuup_associated(rrc)) {
@@ -2046,10 +2046,10 @@ static void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f
   };
 
   for (int i = 0; i < n; i++) {
-    const f1ap_drb_to_be_setup_t *drb_f1 = &drbs[i];
-    rrc_pdu_session_param_t *pdu_ue = find_pduSession_from_drbId(UE, drb_f1->drb_id);
+    const f1ap_drb_setup_t *drb_f1 = &drbs[i];
+    rrc_pdu_session_param_t *pdu_ue = find_pduSession_from_drbId(UE, drb_f1->id);
     if (pdu_ue == NULL) {
-      LOG_E(RRC, "UE %d: UE Context Modif Response: no PDU session for DRB ID %ld\n", UE->rrc_ue_id, drb_f1->drb_id);
+      LOG_E(RRC, "UE %d: UE Context Modif Response: no PDU session for DRB ID %d\n", UE->rrc_ue_id, drb_f1->id);
       continue;
     }
     pdu_session_to_mod_t *pdu_e1 = find_or_next_pdu_session(&req, pdu_ue->param.pdusession_id);
@@ -2074,7 +2074,7 @@ static void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f
 
 static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance_t instance)
 {
-  f1ap_ue_context_setup_t *resp = &F1AP_UE_CONTEXT_SETUP_RESP(msg_p);
+  f1ap_ue_context_setup_resp_t *resp = &F1AP_UE_CONTEXT_SETUP_RESP(msg_p);
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, resp->gNB_CU_ue_id);
   if (!ue_context_p) {
@@ -2085,11 +2085,9 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   UE->f1_ue_context_active = true;
 
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
-  asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
-                                                 &asn_DEF_NR_CellGroupConfig,
-                                                 (void **)&cellGroupConfig,
-                                                 (uint8_t *)resp->du_to_cu_rrc_information->cellGroupConfig,
-                                                 resp->du_to_cu_rrc_information->cellGroupConfig_length);
+  byte_array_t *cgc = &resp->du_to_cu_rrc_info.cell_group_config;
+  asn_dec_rval_t dec_rval =
+      uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, (uint8_t *)cgc->buf, cgc->len);
   AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
 
   if (UE->masterCellGroup) {
@@ -2105,16 +2103,16 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
     return;
   }
 
-  if (resp->drbs_to_be_setup_length > 0) {
+  if (resp->drbs_len > 0) {
     int num_drb = get_number_active_drbs(UE);
-    DevAssert(num_drb == 0 || num_drb == resp->drbs_to_be_setup_length);
+    DevAssert(num_drb == 0 || num_drb == resp->drbs_len);
 
     /* Note: we would ideally check that SRB2 is acked, but at least LiteOn DU
      * seems buggy and does not ack, so simply check that locally we activated */
     AssertFatal(UE->Srb[1].Active && UE->Srb[2].Active, "SRBs 1 and 2 must be active during DRB Establishment");
-    store_du_f1u_tunnel(resp->drbs_to_be_setup, resp->drbs_to_be_setup_length, UE);
+    store_du_f1u_tunnel(resp->drbs, resp->drbs_len, UE);
     if (num_drb == 0)
-      e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
+      e1_send_bearer_updates(rrc, UE, resp->drbs_len, resp->drbs);
     else
       cuup_notify_reestablishment(rrc, UE);
   }
@@ -2232,7 +2230,7 @@ static void rrc_CU_process_ue_context_release_complete(MessageDef *msg_p)
 
 static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, instance_t instance)
 {
-  f1ap_ue_context_modif_resp_t *resp = &F1AP_UE_CONTEXT_MODIFICATION_RESP(msg_p);
+  f1ap_ue_context_mod_resp_t *resp = &F1AP_UE_CONTEXT_MODIFICATION_RESP(msg_p);
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, resp->gNB_CU_ue_id);
   if (!ue_context_p) {
@@ -2241,18 +2239,16 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
-  if (resp->drbs_to_be_setup_length > 0) {
-    store_du_f1u_tunnel(resp->drbs_to_be_setup, resp->drbs_to_be_setup_length, UE);
-    e1_send_bearer_updates(rrc, UE, resp->drbs_to_be_setup_length, resp->drbs_to_be_setup);
+  if (resp->drbs_len > 0) {
+    store_du_f1u_tunnel(resp->drbs, resp->drbs_len, UE);
+    e1_send_bearer_updates(rrc, UE, resp->drbs_len, resp->drbs);
   }
 
-  if (resp->du_to_cu_rrc_information != NULL && resp->du_to_cu_rrc_information->cellGroupConfig != NULL) {
+  if (resp->du_to_cu_rrc_info) {
     NR_CellGroupConfig_t *cellGroupConfig = NULL;
-    asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
-                                                   &asn_DEF_NR_CellGroupConfig,
-                                                   (void **)&cellGroupConfig,
-                                                   (uint8_t *)resp->du_to_cu_rrc_information->cellGroupConfig,
-                                                   resp->du_to_cu_rrc_information->cellGroupConfig_length);
+    byte_array_t *cgc = &resp->du_to_cu_rrc_info->cell_group_config;
+    asn_dec_rval_t dec_rval =
+        uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, (uint8_t *)cgc->buf, cgc->len);
     AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
 
     if (UE->masterCellGroup) {
@@ -2769,10 +2765,12 @@ void *rrc_gnb_task(void *args_p) {
 
       case F1AP_UE_CONTEXT_SETUP_RESP:
         rrc_CU_process_ue_context_setup_response(msg_p, instance);
+        free_ue_context_setup_resp(&F1AP_UE_CONTEXT_SETUP_RESP(msg_p));
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_RESP:
         rrc_CU_process_ue_context_modification_response(msg_p, instance);
+        free_ue_context_mod_resp(&F1AP_UE_CONTEXT_MODIFICATION_RESP(msg_p));
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_REQUIRED:

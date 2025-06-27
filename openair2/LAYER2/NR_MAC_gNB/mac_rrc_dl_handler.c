@@ -235,7 +235,7 @@ static NR_RLC_BearerConfig_t *get_bearerconfig_from_srb(const f1ap_srb_to_setup_
 static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
                                         int srbs_len,
                                         const f1ap_srb_to_setup_t *req_srbs,
-                                        f1ap_srb_to_be_setup_t **resp_srbs,
+                                        f1ap_srb_setup_t **resp_srbs,
                                         NR_CellGroupConfig_t *cellGroupConfig,
                                         const nr_rlc_configuration_t *rlc_config)
 {
@@ -252,7 +252,7 @@ static int handle_ue_context_srbs_setup(NR_UE_info_t *UE,
     nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .priority = priority};
     nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
 
-    (*resp_srbs)[i].srb_id = srb->id;
+    (*resp_srbs)[i].id = srb->id;
     (*resp_srbs)[i].lcid = c.lcid;
 
     if (rlc_BearerConfig->logicalChannelIdentity == 1) {
@@ -308,7 +308,7 @@ static NR_QoS_config_t get_qos_config(const f1ap_qos_flow_param_t *qos)
 static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
                                         int drbs_len,
                                         const f1ap_drb_to_setup_t *req_drbs,
-                                        f1ap_drb_to_be_setup_t **resp_drbs,
+                                        f1ap_drb_setup_t **resp_drbs,
                                         NR_CellGroupConfig_t *cellGroupConfig,
                                         const nr_rlc_configuration_t *rlc_config)
 {
@@ -322,7 +322,7 @@ static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
   for (int i = 0; i < drbs_len; i++) {
     const f1ap_drb_to_setup_t *drb = &req_drbs[i];
     AssertFatal(drb->qos_choice == F1AP_QOS_CHOICE_NR, "only NR QoS supported\n");
-    f1ap_drb_to_be_setup_t *resp_drb = &(*resp_drbs)[i];
+    f1ap_drb_setup_t *resp_drb = &(*resp_drbs)[i];
     NR_RLC_BearerConfig_t *rlc_BearerConfig = get_bearerconfig_from_drb(drb, rlc_config);
     nr_rlc_add_drb(UE->rnti, drb->id, rlc_BearerConfig);
 
@@ -335,11 +335,12 @@ static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
     c.priority = prio;
     nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
 
-    resp_drb->drb_id = drb->id;
-    // TODO lcid
+    resp_drb->id = drb->id;
+    resp_drb->lcid = malloc_or_fail(sizeof(*resp_drb->lcid));
+    *resp_drb->lcid = c.lcid;
     // just put same number of tunnels in DL as in UL
     DevAssert(drb->up_ul_tnl_len == 1);
-    resp_drb->up_dl_tnl_length = drb->up_ul_tnl_len;
+    resp_drb->up_dl_tnl_len = drb->up_ul_tnl_len;
 
     if (f1inst >= 0) { // we actually use F1-U
       int qfi = -1; // don't put PDU session marker in GTP
@@ -608,8 +609,7 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   const bool is_SA = IS_SA_MODE(get_softmodem_params());
   gNB_MAC_INST *mac = RC.nrmac[0];
 
-  /* TODO: update response */
-  f1ap_ue_context_setup_t resp = {
+  f1ap_ue_context_setup_resp_t resp = {
     .gNB_CU_ue_id = req->gNB_CU_ue_id,
   };
 
@@ -639,7 +639,8 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   if (!ue_id_provided) {
     UE = create_new_UE(mac, req->gNB_CU_ue_id, cg_configinfo);
     resp.gNB_DU_ue_id = UE->rnti;
-    resp.crnti = &UE->rnti;
+    resp.crnti = malloc_or_fail(sizeof(*resp.crnti));
+    *resp.crnti = UE->rnti;
   } else {
     DevAssert(is_SA);
     UE = find_nr_UE(&mac->UE_info, *req->gNB_DU_ue_id);
@@ -650,21 +651,12 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
 
   if (req->srbs_len > 0) {
-    resp.srbs_to_be_setup_length = handle_ue_context_srbs_setup(UE,
-                                                                req->srbs_len,
-                                                                req->srbs,
-                                                                &resp.srbs_to_be_setup,
-                                                                new_CellGroup,
-                                                                &mac->rlc_config);
+    resp.srbs_len = handle_ue_context_srbs_setup(UE, req->srbs_len, req->srbs, &resp.srbs, new_CellGroup, &mac->rlc_config);
   }
 
   if (req->drbs_len > 0) {
-    resp.drbs_to_be_setup_length = handle_ue_context_drbs_setup(UE,
-                                                                req->drbs_len,
-                                                                req->drbs,
-                                                                &resp.drbs_to_be_setup,
-                                                                new_CellGroup,
-                                                                &mac->rlc_config);
+    resp.drbs_len =
+        handle_ue_context_drbs_setup(UE, req->drbs_len, req->drbs, &resp.drbs, new_CellGroup, &mac->rlc_config);
   }
 
   if (req->rrc_container != NULL) {
@@ -692,14 +684,12 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     }
   }
 
-  resp.du_to_cu_rrc_information = calloc(1, sizeof(du_to_cu_rrc_information_t));
-  AssertFatal(resp.du_to_cu_rrc_information != NULL, "out of memory\n");
-  resp.du_to_cu_rrc_information->cellGroupConfig = calloc(1,1024);
-  AssertFatal(resp.du_to_cu_rrc_information->cellGroupConfig != NULL, "out of memory\n");
+  byte_array_t cgc = { .buf = calloc_or_fail(1,1024) };
   asn_enc_rval_t enc_rval =
-      uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, new_CellGroup, resp.du_to_cu_rrc_information->cellGroupConfig, 1024);
+      uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, new_CellGroup, cgc.buf, 1024);
   AssertFatal(enc_rval.encoded > 0, "Could not encode CellGroup, failed element %s\n", enc_rval.failed_type->name);
-  resp.du_to_cu_rrc_information->cellGroupConfig_length = (enc_rval.encoded + 7) >> 3;
+  cgc.len = (enc_rval.encoded + 7) >> 3;
+  resp.du_to_cu_rrc_info.cell_group_config = cgc;
 
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = new_CellGroup;
@@ -708,24 +698,16 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
-  /* some sanity checks, since we use the same type for request and response */
-  DevAssert(resp.cu_to_du_rrc_information == NULL);
-  DevAssert(resp.du_to_cu_rrc_information != NULL);
-  DevAssert(resp.rrc_container == NULL && resp.rrc_container_length == 0);
-
   mac->mac_rrc.ue_context_setup_response(&resp);
 
   /* free the memory we allocated above */
-  free(resp.srbs_to_be_setup);
-  free(resp.drbs_to_be_setup);
-  free(resp.du_to_cu_rrc_information->cellGroupConfig);
-  free(resp.du_to_cu_rrc_information);
+  free_ue_context_setup_resp(&resp);
 }
 
 void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
 {
   gNB_MAC_INST *mac = RC.nrmac[0];
-  f1ap_ue_context_modif_resp_t resp = {
+  f1ap_ue_context_mod_resp_t resp = {
     .gNB_CU_ue_id = req->gNB_CU_ue_id,
     .gNB_DU_ue_id = req->gNB_DU_ue_id,
   };
@@ -751,25 +733,15 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
   NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
 
   if (req->srbs_len > 0) {
-    resp.srbs_to_be_setup_length = handle_ue_context_srbs_setup(UE,
-                                                                req->srbs_len,
-                                                                req->srbs,
-                                                                &resp.srbs_to_be_setup,
-                                                                new_CellGroup,
-                                                                &mac->rlc_config);
+    resp.srbs_len = handle_ue_context_srbs_setup(UE, req->srbs_len, req->srbs, &resp.srbs, new_CellGroup, &mac->rlc_config);
   }
 
   if (req->drbs_len > 0) {
-    resp.drbs_to_be_setup_length = handle_ue_context_drbs_setup(UE,
-                                                                req->drbs_len,
-                                                                req->drbs,
-                                                                &resp.drbs_to_be_setup,
-                                                                new_CellGroup,
-                                                                &mac->rlc_config);
+    resp.drbs_len = handle_ue_context_drbs_setup(UE, req->drbs_len, req->drbs, &resp.drbs, new_CellGroup, &mac->rlc_config);
   }
 
   if (req->drbs_rel_len > 0) {
-    resp.drbs_to_be_released_length = handle_ue_context_drbs_release(UE, req->drbs_rel_len, req->drbs_rel, new_CellGroup);
+    handle_ue_context_drbs_release(UE, req->drbs_rel_len, req->drbs_rel, new_CellGroup);
   }
 
   if (req->rrc_container != NULL) {
@@ -808,17 +780,16 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
   }
 
   if (req->srbs_len > 0 || req->drbs_len > 0 || req->drbs_rel_len > 0 || ue_cap != NULL) {
-    resp.du_to_cu_rrc_information = calloc(1, sizeof(du_to_cu_rrc_information_t));
-    AssertFatal(resp.du_to_cu_rrc_information != NULL, "out of memory\n");
-    resp.du_to_cu_rrc_information->cellGroupConfig = calloc(1, 1024);
-    AssertFatal(resp.du_to_cu_rrc_information->cellGroupConfig != NULL, "out of memory\n");
+    resp.du_to_cu_rrc_info = calloc_or_fail(1, sizeof(du_to_cu_rrc_information_t));
+    byte_array_t cgc = { .buf = calloc_or_fail(1, 1024) };
     asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
                                                     NULL,
                                                     new_CellGroup,
-                                                    resp.du_to_cu_rrc_information->cellGroupConfig,
+                                                    cgc.buf,
                                                     1024);
     AssertFatal(enc_rval.encoded > 0, "Could not encode CellGroup, failed element %s\n", enc_rval.failed_type->name);
-    resp.du_to_cu_rrc_information->cellGroupConfig_length = (enc_rval.encoded + 7) >> 3;
+    cgc.len = (enc_rval.encoded + 7) >> 3;
+    resp.du_to_cu_rrc_info->cell_group_config = cgc;
 
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
     UE->CellGroup = new_CellGroup;
@@ -833,20 +804,10 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
   }
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
-  /* some sanity checks, since we use the same type for request and response */
-  DevAssert(resp.cu_to_du_rrc_information == NULL);
-  // resp.du_to_cu_rrc_information can be either NULL or not
-  DevAssert(resp.rrc_container == NULL && resp.rrc_container_length == 0);
-
   mac->mac_rrc.ue_context_modification_response(&resp);
 
   /* free the memory we allocated above */
-  free(resp.srbs_to_be_setup);
-  free(resp.drbs_to_be_setup);
-  if (resp.du_to_cu_rrc_information != NULL) {
-    free(resp.du_to_cu_rrc_information->cellGroupConfig);
-    free(resp.du_to_cu_rrc_information);
-  }
+  free_ue_context_mod_resp(&resp);
 }
 
 void ue_context_modification_confirm(const f1ap_ue_context_modif_confirm_t *confirm)

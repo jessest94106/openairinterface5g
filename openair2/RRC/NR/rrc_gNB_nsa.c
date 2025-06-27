@@ -385,7 +385,7 @@ static NR_CG_Config_t *generate_CG_Config(const NR_RRCReconfiguration_t *reconfi
   return cg_Config;
 }
 
-void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_context_setup_t *resp)
+void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_context_setup_resp_t *resp)
 {
   DevAssert(resp->crnti != NULL);
   /* we did not fill any DU-related ID info in rrc_add_nsa_user() */
@@ -400,12 +400,12 @@ void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_co
   if (f1inst >= 0) {
     // Note: E1 support for NSA/phy-test/do-ra not implemented yet
     // so set up GTP from here
-    for (int i = 0; i < resp->drbs_to_be_setup_length; ++i) {
-      f1ap_drb_to_be_setup_t *drb = &resp->drbs_to_be_setup[i];
-      DevAssert(drb->up_dl_tnl_length == 1);
+    for (int i = 0; i < resp->drbs_len; ++i) {
+      f1ap_drb_setup_t *drb = &resp->drbs[i];
+      DevAssert(drb->up_dl_tnl_len == 1);
       in_addr_t addr = drb->up_dl_tnl[0].tl_address;
       uint32_t teid = drb->up_dl_tnl[0].teid;
-      GtpuUpdateTunnelOutgoingAddressAndTeid(f1inst, UE->rrc_ue_id, drb->drb_id, addr, teid);
+      GtpuUpdateTunnelOutgoingAddressAndTeid(f1inst, UE->rrc_ue_id, drb->id, addr, teid);
     }
   }
 

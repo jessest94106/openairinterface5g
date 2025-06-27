@@ -57,9 +57,9 @@ MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_REQUIRED, MESSAGE_PRIORITY_MED, f1ap_ue
 MESSAGE_DEF(F1AP_DL_RRC_MESSAGE              , MESSAGE_PRIORITY_MED, f1ap_dl_rrc_message_t              , f1ap_dl_rrc_message )
 //MESSAGE_DEF(F1AP_INITIAL_CONTEXT_SETUP_REQ , MESSAGE_PRIORITY_MED, f1ap_initial_context_setup_req_t , f1ap_initial_context_setup_req )
 MESSAGE_DEF(F1AP_UE_CONTEXT_SETUP_REQ,  MESSAGE_PRIORITY_MED, f1ap_ue_context_setup_req_t, f1ap_ue_context_setup_req)
-MESSAGE_DEF(F1AP_UE_CONTEXT_SETUP_RESP, MESSAGE_PRIORITY_MED, f1ap_ue_context_setup_t, f1ap_ue_context_setup_resp)
+MESSAGE_DEF(F1AP_UE_CONTEXT_SETUP_RESP, MESSAGE_PRIORITY_MED, f1ap_ue_context_setup_resp_t, f1ap_ue_context_setup_resp)
 MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_REQ, MESSAGE_PRIORITY_MED, f1ap_ue_context_mod_req_t, f1ap_ue_context_mod_req)
-MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_RESP, MESSAGE_PRIORITY_MED, f1ap_ue_context_modif_resp_t, f1ap_ue_context_modification_resp)
+MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_RESP, MESSAGE_PRIORITY_MED, f1ap_ue_context_mod_resp_t, f1ap_ue_context_modification_resp)
 MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_CONFIRM, MESSAGE_PRIORITY_MED, f1ap_ue_context_modif_confirm_t, f1ap_ue_context_modification_confirm)
 MESSAGE_DEF(F1AP_UE_CONTEXT_MODIFICATION_REFUSE, MESSAGE_PRIORITY_MED, f1ap_ue_context_modif_refuse_t, f1ap_ue_context_modification_refuse)
 

@@ -189,6 +189,7 @@ void *F1AP_DU_task(void *arg) {
 
       case F1AP_UE_CONTEXT_SETUP_RESP:
         DU_send_UE_CONTEXT_SETUP_RESPONSE(assoc_id, &F1AP_UE_CONTEXT_SETUP_RESP(msg));
+        free_ue_context_setup_resp(&F1AP_UE_CONTEXT_SETUP_RESP(msg));
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_RESP:
