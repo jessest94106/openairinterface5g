@@ -797,6 +797,17 @@ typedef struct {
 
 #define UE_iterator(BaSe, VaR) NR_UE_info_t ** VaR##pptr=BaSe, *VaR; while ((VaR=*(VaR##pptr++)))
 
+typedef struct {
+  /// current frame for DCI
+  frame_t frame;
+  /// current slot for DCI
+  slot_t slot;
+  /// FAPI UL_DCI.request in which allocations are to be made
+  nfapi_nr_ul_dci_request_t *ul_dci_req;
+  /// group PDCCH PDU per CORESET
+  nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_coreset[MAX_NUM_CORESET];
+} post_process_pusch_t;
+
 typedef void (*nr_pp_impl_dl)(module_id_t mod_id, frame_t frame, slot_t slot);
 typedef bool (*nr_pp_impl_ul)(module_id_t mod_id, frame_t frame, slot_t slot);
 
