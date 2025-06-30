@@ -1879,7 +1879,6 @@ static void pf_ul(module_id_t module_id,
     LOG_D(NR_MAC,"pf_ul: preparing UL scheduling for UE %04x\n",UE->rnti);
     NR_UE_UL_BWP_t *current_BWP = &UE->current_UL_BWP;
 
-    NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
     const NR_mac_dir_stats_t *stats = &UE->mac_stats.ul;
 
     /* Calculate throughput */
@@ -1995,29 +1994,21 @@ static void pf_ul(module_id_t module_id,
         continue;
       }
 
-      sched_pusch->nrOfLayers = get_ul_nrOfLayers(sched_ctrl, current_BWP->dci_format);
-      sched_pusch->time_domain_allocation = get_ul_tda(nrmac, sched_frame, sched_slot);
-      sched_pusch->tda_info = get_ul_tda_info(current_BWP,
+      int tda = get_ul_tda(nrmac, sched_frame, sched_slot);
+      NR_tda_info_t tda_info = get_ul_tda_info(current_BWP,
                                               sched_ctrl->coreset->controlResourceSetId,
                                               sched_ctrl->search_space->searchSpaceType->present,
                                               TYPE_C_RNTI_,
-                                              sched_pusch->time_domain_allocation);
-      AssertFatal(sched_pusch->tda_info.valid_tda, "Invalid TDA from get_ul_tda_info\n");
-      sched_pusch->dmrs_info = get_ul_dmrs_params(scc, current_BWP, &sched_pusch->tda_info, sched_pusch->nrOfLayers);
+                                              tda);
+      AssertFatal(tda_info.valid_tda, "Invalid TDA from get_ul_tda_info\n");
 
       int rbStart = 0; // wrt BWP start
-      LOG_D(NR_MAC,
-            "Looking for min_rb %d RBs, starting at %d num_dmrs_cdm_grps_no_data %d\n",
-            min_rb,
-            rbStart,
-            sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data);
-      bwp_info_t bwp_info = get_pusch_bwp_start_size(UE);
-      const uint32_t bwpStart = bwp_info.bwpStart;
-      const uint32_t bwpSize = bwp_info.bwpSize;
-      const uint16_t slbitmap = SL_to_bitmap(sched_pusch->tda_info.startSymbolIndex, sched_pusch->tda_info.nrOfSymbols);
-      while (rbStart < bwpSize && (rballoc_mask[rbStart + bwpStart] & slbitmap))
+      LOG_D(NR_MAC, "Looking for min_rb %d RBs, starting at %d\n", min_rb, rbStart);
+      bwp_info_t bi = get_pusch_bwp_start_size(UE);
+      const uint16_t slbitmap = SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
+      while (rbStart < bi.bwpSize && (rballoc_mask[rbStart + bi.bwpStart] & slbitmap))
         rbStart++;
-      if (rbStart + min_rb > bwpSize) {
+      if (rbStart + min_rb > bi.bwpSize) {
         LOG_D(NR_MAC,
               "[UE %04x][%4d.%2d] could not allocate continuous UL data: no resources (rbStart %d, min_rb %d, bwpSize %d)\n",
               UE->rnti,
@@ -2025,7 +2016,7 @@ static void pf_ul(module_id_t module_id,
               slot,
               rbStart,
               min_rb,
-              bwpSize);
+              bi.bwpSize);
         reset_beam_status(&nrmac->beam_info, sched_frame, sched_slot, UE->UE_beam_index, slots_per_frame, beam.new_beam);
         reset_beam_status(&nrmac->beam_info, frame, slot, UE->UE_beam_index, slots_per_frame, dci_beam.new_beam);
         continue;
@@ -2034,47 +2025,58 @@ static void pf_ul(module_id_t module_id,
       sched_ctrl->cce_index = CCEIndex;
       fill_pdcch_vrb_map(nrmac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, dci_beam.idx);
 
-      NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
-      sched_pusch->mcs = selected_mcs;
-      update_ul_ue_R_Qm(sched_pusch->mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched_pusch->R, &sched_pusch->Qm);
-      sched_pusch->rbStart = rbStart;
-      sched_pusch->rbSize = min_rb;
-      sched_pusch->bwp_info = bwp_info;
-      sched_pusch->frame = sched_frame;
-      sched_pusch->slot = sched_slot;
-      sched_pusch->ul_harq_pid = -1; // new transmission
-      sched_pusch->tb_size = nr_compute_tbs(sched_pusch->Qm,
-                                            sched_pusch->R,
-                                            sched_pusch->rbSize,
-                                            sched_pusch->tda_info.nrOfSymbols,
-                                            sched_pusch->dmrs_info.N_PRB_DMRS * sched_pusch->dmrs_info.num_dmrs_symb,
-                                            0, // nb_rb_oh
-                                            0,
-                                            sched_pusch->nrOfLayers) >> 3;
+      int nrOfLayers = get_ul_nrOfLayers(sched_ctrl, current_BWP->dci_format);
+      NR_sched_pusch_t sched = {
+          .frame = sched_frame,
+          .slot = sched_slot,
+          .rbSize = min_rb,
+          .rbStart = rbStart,
+          .mcs = selected_mcs,
+          // R, Qm, tb_size below
+          .ul_harq_pid = -1, // new transmission
+          .nrOfLayers = nrOfLayers,
+          // tpmi in post-process
+          .time_domain_allocation = tda,
+          .tda_info = tda_info,
+          .dmrs_info = get_ul_dmrs_params(scc, current_BWP, &tda_info, nrOfLayers),
+          .bwp_info = bi,
+          // phr_txpower_calc below
+      };
+      update_ul_ue_R_Qm(sched.mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched.R, &sched.Qm);
+      sched.tb_size = nr_compute_tbs(sched.Qm,
+                                     sched.R,
+                                     sched.rbSize,
+                                     sched.tda_info.nrOfSymbols,
+                                     sched.dmrs_info.N_PRB_DMRS * sched.dmrs_info.num_dmrs_symb,
+                                     0, // nb_rb_oh
+                                     0,
+                                     sched.nrOfLayers)
+                      >> 3;
       long *deltaMCS = current_BWP->pusch_Config ? current_BWP->pusch_Config->pusch_PowerControl->deltaMCS : NULL;
 
-      sched_pusch->phr_txpower_calc = compute_ph_factor(current_BWP->scs,
-                                                        sched_pusch->tb_size << 3,
-                                                        sched_pusch->rbSize,
-                                                        sched_pusch->nrOfLayers,
-                                                        sched_pusch->tda_info.nrOfSymbols,
-                                                        sched_pusch->dmrs_info.N_PRB_DMRS * sched_pusch->dmrs_info.num_dmrs_symb,
-                                                        deltaMCS,
-                                                        false);
+      sched.phr_txpower_calc = compute_ph_factor(current_BWP->scs,
+                                                 sched.tb_size << 3,
+                                                 sched.rbSize,
+                                                 sched.nrOfLayers,
+                                                 sched.tda_info.nrOfSymbols,
+                                                 sched.dmrs_info.N_PRB_DMRS * sched.dmrs_info.num_dmrs_symb,
+                                                 deltaMCS,
+                                                 false);
+      sched_ctrl->sched_pusch = sched;
       LOG_D(NR_MAC,
             "pf_ul %d.%d UE %x Scheduling PUSCH (no data) nrb %d mcs %d tbs %d bits phr_txpower %d\n",
             frame,
             slot,
             UE->rnti,
-            sched_pusch->rbSize,
-            sched_pusch->mcs,
-            sched_pusch->tb_size << 3,
-            sched_pusch->phr_txpower_calc);
+            sched.rbSize,
+            sched.mcs,
+            sched.tb_size << 3,
+            sched.phr_txpower_calc);
 
       /* Mark the corresponding RBs as used */
-      n_rb_sched[beam.idx] -= sched_pusch->rbSize;
-      for (int rb = bwpStart; rb < sched_ctrl->sched_pusch.rbSize; rb++)
-        rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] |= slbitmap;
+      n_rb_sched[beam.idx] -= sched.rbSize;
+      for (int rb = bi.bwpStart; rb < sched.rbSize; rb++)
+        rballoc_mask[rb + sched.rbStart] |= slbitmap;
 
       remainUEs[beam.idx]--;
       continue;
