@@ -825,7 +825,8 @@ void dummyWrite(PHY_VARS_NR_UE *UE,openair0_timestamp timestamp, int writeBlockS
   AssertFatal(writeBlockSize == tmp, "");
 }
 
-void readFrame(PHY_VARS_NR_UE *UE,  openair0_timestamp *timestamp, bool toTrash) {
+void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int duration_rx_to_tx, bool toTrash)
+{
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   // two frames for initial sync
   int num_frames = 2;
@@ -853,7 +854,8 @@ void readFrame(PHY_VARS_NR_UE *UE,  openair0_timestamp *timestamp, bool toTrash)
       AssertFatal(read_block_size == tmp, "");
 
       if (IS_SOFTMODEM_RFSIM) {
-        const openair0_timestamp writeTimestamp = *timestamp + fp->get_samples_slot_timestamp(slot, fp, NR_UE_CAPABILITY_SLOT_RX_TO_TX) - UE->N_TA_offset;
+        const openair0_timestamp writeTimestamp =
+            *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx) - UE->N_TA_offset - UE->timing_advance;
         dummyWrite(UE, writeTimestamp, fp->get_samples_per_slot(slot, fp));
       }
     }
@@ -864,7 +866,7 @@ void readFrame(PHY_VARS_NR_UE *UE,  openair0_timestamp *timestamp, bool toTrash)
       free(rxp[i]);
 }
 
-static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, openair0_timestamp rx_offset)
+static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int duration_rx_to_tx, openair0_timestamp rx_offset)
 {
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
@@ -879,7 +881,8 @@ static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, opena
     const int res = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, (void **)UE->common_vars.rxdata, unitTransfer, fp->nb_antennas_rx);
     DevAssert(unitTransfer == res);
     if (IS_SOFTMODEM_RFSIM) {
-      const openair0_timestamp writeTimestamp = *timestamp + fp->get_samples_slot_timestamp(slot, fp, NR_UE_CAPABILITY_SLOT_RX_TO_TX) - UE->N_TA_offset;
+      const openair0_timestamp writeTimestamp =
+          *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx) - UE->N_TA_offset - UE->timing_advance;
       dummyWrite(UE, writeTimestamp, unitTransfer);
     }
     slot = (slot + 1) % fp->slots_per_subframe;
@@ -965,6 +968,10 @@ void *UE_thread(void *arg)
   notifiedFIFO_t freeBlocks;
   initNotifiedFIFO_nothreadSafe(&freeBlocks);
 
+  double ntn_init_time_drift = get_nrUE_params()->ntn_init_time_drift;
+  int ntn_koffset = 0;
+
+  int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
   int timing_advance = UE->timing_advance;
   UE->N_TA_offset = determine_N_TA_offset(UE);
   NR_UE_MAC_INST_t *mac = get_mac_inst(UE->Mod_id);
@@ -988,12 +995,8 @@ void *UE_thread(void *arg)
     //warm up the RF board
     int64_t tmp;
     for (int i = 0; i < 50; i++)
-      readFrame(UE, &tmp, true);
+      readFrame(UE, &tmp, duration_rx_to_tx, true);
   }
-
-  double ntn_init_time_drift = get_nrUE_params()->ntn_init_time_drift;
-  int ntn_koffset = 0;
-  int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
 
   while (!oai_exit) {
     if (syncRunning) {
@@ -1034,11 +1037,11 @@ void *UE_thread(void *arg)
           */
           const unsigned int sync_in_frames = UE->rfdevice.openair0_cfg->recplay_conf->u_f_sync;
           while (trashed_frames != sync_in_frames) {
-            readFrame(UE, &sync_timestamp, true);
+            readFrame(UE, &sync_timestamp, duration_rx_to_tx, true);
             trashed_frames += 2;
           }
         } else {
-          readFrame(UE, &sync_timestamp, true);
+          readFrame(UE, &sync_timestamp, duration_rx_to_tx, true);
           trashed_frames += ((UE->sl_mode == 2) ? SL_NR_PSBCH_REPETITION_IN_FRAMES : 2);
         }
         continue;
@@ -1048,7 +1051,7 @@ void *UE_thread(void *arg)
     AssertFatal(!syncRunning, "At this point synchronization can't be running\n");
 
     if (!UE->is_synchronized) {
-      readFrame(UE, &sync_timestamp, false);
+      readFrame(UE, &sync_timestamp, duration_rx_to_tx, false);
       notifiedFIFO_elt_t *Msg = newNotifiedFIFO_elt(sizeof(syncData_t), 0, &nf, UE_synch);
       syncData_t *syncMsg = (syncData_t *)NotifiedFifoData(Msg);
       *syncMsg = (syncData_t){0};
@@ -1065,8 +1068,10 @@ void *UE_thread(void *arg)
       syncMsg->UE = UE;
       memset(&syncMsg->proc, 0, sizeof(syncMsg->proc));
       pushNotifiedFIFO(&UE->sync_actor.fifo, Msg);
-      timing_advance = 0;
-      UE->timing_advance = 0;
+      if (ntn_koffset == 0) { // reset timing_advance for TN
+        timing_advance = 0;
+        UE->timing_advance = 0;
+      }
       trashed_frames = 0;
       syncRunning = true;
       continue;
@@ -1074,7 +1079,7 @@ void *UE_thread(void *arg)
 
     if (stream_status == STREAM_STATUS_UNSYNC) {
       stream_status = STREAM_STATUS_SYNCING;
-      syncInFrame(UE, &sync_timestamp, intialSyncOffset);
+      syncInFrame(UE, &sync_timestamp, duration_rx_to_tx, intialSyncOffset);
       openair0_write_reorder_clear_context(&UE->rfdevice);
       if (get_nrUE_params()->time_sync_I)
         // ntn_init_time_drift is in µs/s, max_pos_acc * time_sync_I is in samples/frame
@@ -1200,7 +1205,7 @@ void *UE_thread(void *arg)
     int writeBlockSize = fp->get_samples_per_slot((slot_nr + duration_rx_to_tx) % nb_slot_frame, fp) - iq_shift_to_apply;
     int new_timing_advance = UE->timing_advance;
     if (new_timing_advance != timing_advance) {
-      writeBlockSize -= new_timing_advance- timing_advance;
+      writeBlockSize -= new_timing_advance - timing_advance;
       timing_advance = new_timing_advance;
     }
     int new_N_TA_offset = determine_N_TA_offset(UE);
