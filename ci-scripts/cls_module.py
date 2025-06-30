@@ -107,7 +107,7 @@ class Module_UE:
 			return self._logCollect()
 		return None
 
-	def attach(self, attach_tries = 4, attach_timeout = 60):
+	def attach(self, attach_tries = 2, attach_timeout = 60):
 		ip = None
 		while attach_tries > 0:
 			self._command(self.cmd_dict["attach"])
