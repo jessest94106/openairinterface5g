@@ -1839,6 +1839,7 @@ static uint32_t ul_pf_tbs[5][29]; // pre-computed, approximate TBS values for PF
 typedef struct UEsched_s {
   float coef;
   NR_UE_info_t * UE;
+  int selected_mcs;
 } UEsched_t;
 
 static int comparator(const void *p, const void *q) {
@@ -1964,12 +1965,12 @@ static void pf_ul(module_id_t module_id,
     const NR_bler_options_t *bo = &nrmac->ul_bler;
     const int max_mcs_table = (current_BWP->mcs_table == 0 || current_BWP->mcs_table == 2) ? 28 : 27;
     const int max_mcs = min(bo->max_mcs, max_mcs_table); /* no per-user maximum MCS yet */
+    int selected_mcs;
     if (bo->harq_round_max == 1) {
-      sched_pusch->mcs = max_mcs;
-      sched_ctrl->ul_bler_stats.mcs = sched_pusch->mcs;
+      selected_mcs = sched_ctrl->ul_bler_stats.mcs = max_mcs;
     } else {
-      sched_pusch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->ul_bler_stats, max_mcs, frame);
-      LOG_D(NR_MAC, "%d.%d starting mcs %d bler %f\n", frame, slot, sched_pusch->mcs, sched_ctrl->ul_bler_stats.bler);
+      selected_mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->ul_bler_stats, max_mcs, frame);
+      LOG_D(NR_MAC, "%d.%d starting mcs %d bler %f\n", frame, slot, selected_mcs, sched_ctrl->ul_bler_stats.bler);
     }
     /* Schedule UE on SR or UL inactivity and no data (otherwise, will be scheduled
      * based on data to transmit) */
@@ -2032,6 +2033,7 @@ static void pf_ul(module_id_t module_id,
       fill_pdcch_vrb_map(nrmac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, dci_beam.idx);
 
       NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
+      sched_pusch->mcs = selected_mcs;
       update_ul_ue_R_Qm(sched_pusch->mcs, current_BWP->mcs_table, current_BWP->pusch_Config, &sched_pusch->R, &sched_pusch->Qm);
       sched_pusch->rbStart = rbStart;
       sched_pusch->rbSize = min_rb;
@@ -2077,7 +2079,7 @@ static void pf_ul(module_id_t module_id,
 
     /* Create UE_sched for UEs eligibale for new data transmission*/
     /* Calculate coefficient*/
-    const uint32_t tbs = ul_pf_tbs[current_BWP->mcs_table][sched_pusch->mcs];
+    const uint32_t tbs = ul_pf_tbs[current_BWP->mcs_table][selected_mcs];
     float coeff_ue = (float) tbs / UE->ul_thr_ue;
     LOG_D(NR_MAC, "[UE %04x][%4d.%2d] b %d, ul_thr_ue %f, tbs %d, coeff_ue %f\n",
           UE->rnti,
@@ -2089,6 +2091,7 @@ static void pf_ul(module_id_t module_id,
           coeff_ue);
     UE_sched[curUE].coef = coeff_ue;
     UE_sched[curUE].UE = UE;
+    UE_sched[curUE].selected_mcs = selected_mcs;
     curUE++;
   }
 
@@ -2192,6 +2195,7 @@ static void pf_ul(module_id_t module_id,
 
     /* Calculate the current scheduling bytes */
     const int B = cmax(sched_ctrl->estimated_ul_buffer - sched_ctrl->sched_ul_bytes, 0);
+    sched_pusch->mcs = iterator->selected_mcs;
     /* adjust rbSize and MCS according to PHR and BPRE */
     if(sched_ctrl->pcmax != 0 || sched_ctrl->ph != 0) // verify if the PHR related parameter have been initialized
       nr_ue_max_mcs_min_rb(current_BWP->scs, sched_ctrl->ph, sched_pusch, current_BWP, min_rb, B, &max_rbSize, &sched_pusch->mcs);
