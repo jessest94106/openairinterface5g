@@ -660,6 +660,7 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
                          rnti_t rnti,
                          uint8_t *sdu,
                          const uint32_t sdu_len,
+                         uint8_t harq_pid,
                          const uint16_t timing_advance,
                          const uint8_t ul_cqi,
                          const uint16_t rssi)
@@ -725,9 +726,11 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
   LOG_A(NR_MAC, "%4d.%2d PUSCH with TC_RNTI 0x%04x received correctly\n", frame, slot, rnti);
 
   NR_UE_sched_ctrl_t *UE_scheduling_control = &UE->UE_sched_ctrl;
+  DevAssert(harq_pid >= 0 && harq_pid < 8);
   if (ul_cqi != 0xff) {
-    UE_scheduling_control->tpc0 = nr_get_tpc(target_snrx10, ul_cqi, 30, UE_scheduling_control->sched_pusch.phr_txpower_calc);
-    UE_scheduling_control->pusch_snrx10 = ul_cqi * 5 - 640 - UE_scheduling_control->sched_pusch.phr_txpower_calc * 10;
+    NR_UE_ul_harq_t *harq = &UE_scheduling_control->ul_harq_processes[harq_pid];
+    UE_scheduling_control->tpc0 = nr_get_tpc(target_snrx10, ul_cqi, 30, harq->sched_pusch.phr_txpower_calc);
+    UE_scheduling_control->pusch_snrx10 = ul_cqi * 5 - 640 - harq->sched_pusch.phr_txpower_calc * 10;
   }
   if (timing_advance != 0xffff)
     UE_scheduling_control->ta_update = timing_advance;
@@ -943,7 +946,7 @@ static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
     }
     handle_nr_ul_harq(gNB_mac, UE, frameP, slotP, current_rnti, harq_pid, sduP == NULL);
   } else { 
-    nr_rx_ra_sdu(gnb_mod_idP, CC_idP, frameP, slotP, current_rnti, sduP, sdu_lenP, timing_advance, ul_cqi, rssi);
+    nr_rx_ra_sdu(gnb_mod_idP, CC_idP, frameP, slotP, current_rnti, sduP, sdu_lenP, harq_pid, timing_advance, ul_cqi, rssi);
   }
 }
 
