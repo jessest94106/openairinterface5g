@@ -262,7 +262,8 @@ static bool create_uplane_conf_v2(struct ly_ctx **ctx, const ru_session_t *ru_se
   ret = lyd_new_term(rx_carrier_node, NULL, "downlink-sfn-offset", "0", 0, NULL);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"downlink-sfn-offset\" node.\n");
 
-  // oai->rx_gain_offset is this the correction? if yes, test it later
+  // gain offset applied uniformly across all array elements or layers
+  // needs to be within <gain-correction-range>
   ret = lyd_new_term(rx_carrier_node, NULL, "gain-correction", "0", 0, NULL);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"gain-correction\" node.\n");
 
