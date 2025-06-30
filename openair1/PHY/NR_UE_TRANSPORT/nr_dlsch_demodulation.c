@@ -1122,13 +1122,16 @@ static void nr_dlsch_extract_rbs(uint32_t rxdataF_sz,
     AssertFatal(n_dmrs_cdm_groups == 1 || n_dmrs_cdm_groups == 2 || n_dmrs_cdm_groups == 3,
                 "n_dmrs_cdm_groups %d is illegal\n",n_dmrs_cdm_groups);
 
-  uint32_t dmrs_rb_bitmap = 0xfff; // all REs taken by dmrs
-  if (config_type == NFAPI_NR_DMRS_TYPE1 && n_dmrs_cdm_groups == 1)
-    dmrs_rb_bitmap = 0x555; // alternating REs starting from 0
-  if (config_type == NFAPI_NR_DMRS_TYPE2 && n_dmrs_cdm_groups == 1)
-    dmrs_rb_bitmap = 0xc3;  // REs 0,1 and 6,7
-  if (config_type == NFAPI_NR_DMRS_TYPE2 && n_dmrs_cdm_groups == 2)
-    dmrs_rb_bitmap = 0x3cf;  // REs 0,1,2,3 and 6,7,8,9
+  uint32_t dmrs_rb_bitmap = 0;
+  if (pilots) {
+    dmrs_rb_bitmap = 0xfff; // all REs taken by dmrs
+    if (config_type == NFAPI_NR_DMRS_TYPE1 && n_dmrs_cdm_groups == 1)
+      dmrs_rb_bitmap = 0x555; // alternating REs starting from 0
+    if (config_type == NFAPI_NR_DMRS_TYPE2 && n_dmrs_cdm_groups == 1)
+      dmrs_rb_bitmap = 0xc3;  // REs 0,1 and 6,7
+    if (config_type == NFAPI_NR_DMRS_TYPE2 && n_dmrs_cdm_groups == 2)
+      dmrs_rb_bitmap = 0x3cf;  // REs 0,1,2,3 and 6,7,8,9
+  }
 
   // csi_res_bitmap LS 16 bits for even RBs, MS 16 bits for odd RBs
   uint32_t csi_res_even = csi_res_bitmap & 0xfff;
