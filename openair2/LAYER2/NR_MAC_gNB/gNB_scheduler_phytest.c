@@ -208,9 +208,11 @@ uint32_t target_ul_mcs = 9;
 uint32_t target_ul_bw = 50;
 uint32_t target_ul_Nl = 1;
 uint64_t ulsch_slot_bitmap = (1 << 8);
-bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slot)
+void nr_ul_preprocessor_phytest(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_pusch)
 {
-  gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
+  int frame = pp_pusch->frame;
+  int slot = pp_pusch->slot;
+
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_COMMON_channels_t *cc = nr_mac->common_channels;
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
@@ -219,7 +221,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
   AssertFatal(nr_mac->UE_info.connected_ue_list[1] == NULL,
               "cannot handle more than one UE\n");
   if (UE == NULL)
-    return false;
+    return;
 
   const int CC_id = 0;
 
@@ -229,7 +231,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
   /* return if all UL HARQ processes wait for feedback */
   if (sched_ctrl->retrans_ul_harq.head == -1 && sched_ctrl->available_ul_harq.head == -1) {
     LOG_D(NR_MAC, "[UE %04x][%4d.%2d] UE has no free UL HARQ process, skipping\n", UE->rnti, frame, slot);
-    return false;
+    return;
   }
 
   const int bw = ul_bwp->BWPSize;
@@ -243,7 +245,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
                                                                         TYPE_C_RNTI_);
   const int temp_tda = get_ul_tda(nr_mac, frame, slot);
   if (temp_tda < 0)
-    return false;
+    return;
   AssertFatal(temp_tda < tdaList->list.count, "time domain assignment %d >= %d\n", temp_tda, tdaList->list.count);
   const int mu = ul_bwp->scs;
   int K2 = get_K2(tdaList, temp_tda, mu, scc);
@@ -252,17 +254,18 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
   const int sched_slot = (slot + K2) % slots_frame;
   const int tda = get_ul_tda(nr_mac, sched_frame, sched_slot);
   if (tda < 0)
-    return false;
+    return;
   AssertFatal(tda < tdaList->list.count,
               "time domain assignment %d >= %d\n",
               tda,
               tdaList->list.count);
+
   /* check if slot is UL, and that slot is 8 (assuming K2=6 because of UE
    * limitations).  Note that if K2 or the TDD configuration is changed, below
    * conditions might exclude each other and never be true */
   int slot_period = sched_slot % nr_mac->frame_structure.numb_slots_period;
   if (!is_xlsch_in_slot(ulsch_slot_bitmap, slot_period))
-    return false;
+    return;
 
   NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp,
                                            sched_ctrl->coreset->controlResourceSetId,
@@ -270,7 +273,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
                                            TYPE_C_RNTI_,
                                            tda);
   if (!tda_info.valid_tda)
-    return false;
+    return;
 
   // TODO implement beam procedures for phy-test mode
   int beam = 0;
@@ -280,7 +283,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
   for (int i = rbStart; i < rbStart + rbSize; ++i) {
     if ((vrb_map_UL[i+BWPStart] & SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols)) != 0) {
       LOG_E(MAC, "%4d.%2d RB %d is already reserved, cannot schedule UE\n", frame, slot, i);
-      return false;
+      return;
     }
   }
 
@@ -295,7 +298,7 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
                                0);
   if (CCEIndex < 0) {
     LOG_E(MAC, "%s(): CCE list not empty, couldn't schedule PUSCH\n", __func__);
-    return false;
+    return;
   }
 
   sched_ctrl->cce_index = CCEIndex;
@@ -337,7 +340,8 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
                                  sched.nrOfLayers /* NrOfLayers */)
                   >> 3;
 
-  sched_ctrl->sched_pusch = sched;
+  /* save allocation to FAPI structures */
+  post_process_ulsch(nr_mac, pp_pusch, UE, &sched);
 
   /* mark the corresponding RBs as used */
   fill_pdcch_vrb_map(nr_mac,
@@ -349,5 +353,4 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
 
   for (int rb = rbStart; rb < rbStart + rbSize; rb++)
     vrb_map_UL[rb+BWPStart] |= SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
-  return true;
 }
