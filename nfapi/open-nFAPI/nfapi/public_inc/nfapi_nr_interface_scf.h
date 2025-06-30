@@ -743,31 +743,31 @@ typedef struct {
 
 // 3.4.2
 
-//for pdcch_pdu:
+typedef struct {
+  // Index of the digital beam weight vector pre-stored at cell configuration.
+  // The vector maps this input port to output TXRUs. Value: 0->65535
+  uint16_t beam_idx;
+} nfapi_nr_dig_bf_interface_t;
 
-typedef struct
-{
-  uint16_t beam_idx;//Index of the digital beam weight vector pre-stored at cell configuration. The vector maps this input port to output TXRUs. Value: 0->65535
-
-}nfapi_nr_dig_bf_interface_t;
-
-typedef struct
-{
-  uint16_t pm_idx;//Index to precoding matrix (PM) pre-stored at cell configuration. Note: If precoding is not used this parameter should be set to 0. Value: 0->65535.
-  nfapi_nr_dig_bf_interface_t dig_bf_interface_list[NFAPI_MAX_NUM_BG_IF];//max dig_bf_interfaces
-
-}nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t;
+typedef struct {
+  // Index to precoding matrix (PM) pre-stored at cell configuration.
+  // Note: If precoding is not used this parameter should be set to 0. Value: 0->65535.
+  uint16_t pm_idx;
+  nfapi_nr_dig_bf_interface_t dig_bf_interface_list[NFAPI_MAX_NUM_BG_IF]; // max dig_bf_interfaces
+} nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t;
 
 //table 3-43
-typedef struct 
-{
-  uint16_t num_prgs;//Number of PRGs spanning this allocation. Value : 1->275 
-  uint16_t prg_size;//Size in RBs of a precoding resource block group (PRG) – to which same precoding and digital beamforming gets applied. Value: 1->275
-  //watchout: dig_bf_interfaces here, in table 3-53 it's dig_bf_interface
-  uint8_t  dig_bf_interfaces;//Number of STD ant ports (parallel streams) feeding into the digBF Value: 0->255
-  nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t prgs_list[NFAPI_MAX_NUM_PRGS];//max prg_size
-
-}nfapi_nr_tx_precoding_and_beamforming_t;
+typedef struct {
+  // Number of PRGs spanning this allocation. Value : 1->275
+  uint16_t num_prgs;
+  // Size in RBs of a precoding resource block group (PRG) to which same precoding and digital beamforming gets applied.
+  // Value: 1->275
+  uint16_t prg_size;
+  // watchout: dig_bf_interfaces here, in table 3-53 it's dig_bf_interface
+  uint8_t  dig_bf_interfaces;
+  // Number of STD ant ports (parallel streams) feeding into the digBF Value: 0->255
+  nfapi_nr_tx_precoding_and_beamforming_number_of_prgs_t prgs_list[NFAPI_MAX_NUM_PRGS]; // max prg_size
+} nfapi_nr_tx_precoding_and_beamforming_t;
 
 
 //table 3-37 
