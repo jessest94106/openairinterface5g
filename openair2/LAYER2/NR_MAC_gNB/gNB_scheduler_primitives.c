@@ -2422,7 +2422,7 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
       NRRIV2PRBOFFSET(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
 
   sc_info->dl_bw_tbslbrm = get_dlbw_tbslbrm(sc_info->initial_dl_BWPSize, servingCellConfig);
-  sc_info->dl_bw_tbslbrm = get_ulbw_tbslbrm(sc_info->initial_ul_BWPSize, servingCellConfig);
+  sc_info->ul_bw_tbslbrm = get_ulbw_tbslbrm(sc_info->initial_ul_BWPSize, servingCellConfig);
 
   if (UL_BWP->bwp_id > 0) {
     UL_BWP->pucch_ConfigCommon = ul_bwp->bwp_Common->pucch_ConfigCommon ? ul_bwp->bwp_Common->pucch_ConfigCommon->choice.setup : NULL;
