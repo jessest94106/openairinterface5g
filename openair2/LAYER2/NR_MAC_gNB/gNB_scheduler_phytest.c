@@ -232,6 +232,11 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
     return false;
   }
 
+  const int bw = ul_bwp->BWPSize;
+  const int BWPStart = ul_bwp->BWPStart;
+  uint16_t rbStart = 0;
+  uint16_t rbSize = min(bw, target_ul_bw);
+
   NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList = get_ul_tdalist(ul_bwp,
                                                                         sched_ctrl->coreset->controlResourceSetId,
                                                                         sched_ctrl->search_space->searchSpaceType->present,
@@ -259,17 +264,6 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
   if (!is_xlsch_in_slot(ulsch_slot_bitmap, slot_period))
     return false;
 
-  uint16_t rbStart = 0;
-  uint16_t rbSize;
-
-  const int bw = ul_bwp->BWPSize;
-  const int BWPStart = ul_bwp->BWPStart;
-
-  if (target_ul_bw>bw)
-    rbSize = bw;
-  else
-    rbSize = target_ul_bw;
-
   NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp,
                                            sched_ctrl->coreset->controlResourceSetId,
                                            sched_ctrl->search_space->searchSpaceType->present,
@@ -277,8 +271,6 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
                                            tda);
   if (!tda_info.valid_tda)
     return false;
-  sched_ctrl->sched_pusch.tda_info = tda_info;
-  sched_ctrl->sched_pusch.time_domain_allocation = tda;
 
   // TODO implement beam procedures for phy-test mode
   int beam = 0;
@@ -291,9 +283,6 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
       return false;
     }
   }
-
-  sched_ctrl->sched_pusch.slot = sched_slot;
-  sched_ctrl->sched_pusch.frame = sched_frame;
 
   int CCEIndex = get_cce_index(nr_mac,
                                CC_id, slot, UE->rnti,
@@ -311,40 +300,44 @@ bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slo
 
   sched_ctrl->cce_index = CCEIndex;
 
-  const int mcs = target_ul_mcs;
-  NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
-  sched_pusch->mcs = mcs;
-  sched_ctrl->ul_bler_stats.mcs = mcs; /* for logging output */
-  sched_pusch->rbStart = rbStart;
-  sched_pusch->rbSize = rbSize;
-  /* get the PID of a HARQ process awaiting retransmission, or -1 for "any new" */
-  sched_pusch->ul_harq_pid = sched_ctrl->retrans_ul_harq.head;
+  NR_sched_pusch_t sched = {
+      .frame = sched_frame,
+      .slot = sched_slot,
+      .rbSize = rbSize,
+      .rbStart = rbStart,
+      .mcs = target_ul_mcs,
+      // R, Qm, tb_size set further below
+      // PID of a HARQ process awaiting retransmission, or -1 for "any new"
+      .ul_harq_pid = sched_ctrl->retrans_ul_harq.head,
+      .nrOfLayers = target_ul_Nl,
+      // tpmi in post-process
+      .time_domain_allocation = tda,
+      .tda_info = tda_info,
+      .dmrs_info = get_ul_dmrs_params(scc, ul_bwp, &tda_info, target_ul_Nl),
+      .bwp_info = get_pusch_bwp_start_size(UE),
+  };
+  sched_ctrl->ul_bler_stats.mcs = sched.mcs; /* for logging output */
 
   /* Calculate TBS from MCS */
-  sched_pusch->nrOfLayers = target_ul_Nl;
-  sched_pusch->R = nr_get_code_rate_ul(mcs, ul_bwp->mcs_table);
-  sched_pusch->Qm = nr_get_Qm_ul(mcs, ul_bwp->mcs_table);
+  sched.R = nr_get_code_rate_ul(sched.mcs, ul_bwp->mcs_table);
+  sched.Qm = nr_get_Qm_ul(sched.mcs, ul_bwp->mcs_table);
   if (ul_bwp->pusch_Config->tp_pi2BPSK
-      && ((ul_bwp->mcs_table == 3 && mcs < 2) || (ul_bwp->mcs_table == 4 && mcs < 6))) {
-    sched_pusch->R >>= 1;
-    sched_pusch->Qm <<= 1;
+      && ((ul_bwp->mcs_table == 3 && sched.mcs < 2) || (ul_bwp->mcs_table == 4 && sched.mcs < 6))) {
+    sched.R >>= 1;
+    sched.Qm <<= 1;
   }
 
-  NR_pusch_dmrs_t dmrs = get_ul_dmrs_params(scc,
-                                            ul_bwp,
-                                            &tda_info,
-                                            sched_pusch->nrOfLayers);
-  sched_ctrl->sched_pusch.dmrs_info = dmrs;
+  sched.tb_size = nr_compute_tbs(sched.Qm,
+                                 sched.R,
+                                 sched.rbSize,
+                                 tda_info.nrOfSymbols,
+                                 sched.dmrs_info.N_PRB_DMRS * sched.dmrs_info.num_dmrs_symb,
+                                 0, // nb_rb_oh
+                                 0,
+                                 sched.nrOfLayers /* NrOfLayers */)
+                  >> 3;
 
-  sched_pusch->tb_size = nr_compute_tbs(sched_pusch->Qm,
-                                        sched_pusch->R,
-                                        sched_pusch->rbSize,
-                                        tda_info.nrOfSymbols,
-                                        dmrs.N_PRB_DMRS * dmrs.num_dmrs_symb,
-                                        0, // nb_rb_oh
-                                        0,
-                                        sched_pusch->nrOfLayers /* NrOfLayers */)
-                         >> 3;
+  sched_ctrl->sched_pusch = sched;
 
   /* mark the corresponding RBs as used */
   fill_pdcch_vrb_map(nr_mac,
