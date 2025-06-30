@@ -403,7 +403,6 @@ typedef struct NR_pusch_dmrs {
 typedef struct NR_sched_pusch {
   int frame;
   int slot;
-  int mu;
 
   /// RB allocation within active uBWP
   uint16_t rbSize;
