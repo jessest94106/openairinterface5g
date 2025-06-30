@@ -248,7 +248,7 @@ int do_RRCReject(uint8_t *const buffer)
 
     rrcReject->criticalExtensions.choice.rrcReject           = CALLOC(1, sizeof(struct NR_RRCReject_IEs));
     rrcReject->criticalExtensions.choice.rrcReject->waitTime = CALLOC(1, sizeof(NR_RejectWaitTime_t));
-    *rrcReject->criticalExtensions.choice.rrcReject->waitTime = 1;
+    *rrcReject->criticalExtensions.choice.rrcReject->waitTime = 10;
 
     rrcReject->criticalExtensions.present = NR_RRCReject__criticalExtensions_PR_rrcReject;
 
