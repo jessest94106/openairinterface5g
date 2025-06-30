@@ -1826,6 +1826,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
 
   sched_pusch->bwp_info = bwp_info;
   sched_pusch->rbStart = rbStart;
+  sched_pusch->ul_harq_pid = harq_pid;
   /* no need to recompute the TBS, it will be the same */
 
   /* Mark the corresponding RBs as used */
@@ -1908,9 +1909,9 @@ static void pf_ul(module_id_t module_id,
     uint16_t *rballoc_mask = &nrmac->common_channels[CC_id].vrb_map_UL[beam.idx][index * MAX_BWP_SIZE];
 
     /* Check if retransmission is necessary */
-    sched_pusch->ul_harq_pid = sched_ctrl->retrans_ul_harq.head;
-    LOG_D(NR_MAC,"pf_ul: UE %04x harq_pid %d\n", UE->rnti, sched_pusch->ul_harq_pid);
-    if (sched_pusch->ul_harq_pid >= 0) {
+    int ul_harq_pid = sched_ctrl->retrans_ul_harq.head;
+    LOG_D(NR_MAC,"pf_ul: UE %04x harq_pid %d\n", UE->rnti, ul_harq_pid);
+    if (ul_harq_pid >= 0) {
       /* Allocate retransmission*/
       const int tda = get_ul_tda(nrmac, sched_frame, sched_slot);
       bool r = allocate_ul_retransmission(nrmac,
@@ -1920,7 +1921,7 @@ static void pf_ul(module_id_t module_id,
                                           &n_rb_sched[beam.idx],
                                           dci_beam.idx,
                                           UE,
-                                          sched_pusch->ul_harq_pid,
+                                          ul_harq_pid,
                                           scc,
                                           tda);
       if (!r) {
@@ -1936,6 +1937,7 @@ static void pf_ul(module_id_t module_id,
       remainUEs[beam.idx]--;
       continue;
     }
+    DevAssert(ul_harq_pid == -1); // all other allocations must be new ones
 
     /* skip this UE if there are no free HARQ processes. This can happen e.g.
      * if the UE disconnected in L2sim, in which case the gNB is not notified
@@ -2040,6 +2042,7 @@ static void pf_ul(module_id_t module_id,
       sched_pusch->bwp_info = bwp_info;
       sched_pusch->frame = sched_frame;
       sched_pusch->slot = sched_slot;
+      sched_pusch->ul_harq_pid = -1; // new transmission
       sched_pusch->tb_size = nr_compute_tbs(sched_pusch->Qm,
                                             sched_pusch->R,
                                             sched_pusch->rbSize,
@@ -2236,6 +2239,7 @@ static void pf_ul(module_id_t module_id,
     sched_pusch->bwp_info = bwp_info;
     sched_pusch->frame = sched_frame;
     sched_pusch->slot = sched_slot;
+    sched_pusch->ul_harq_pid = -1; // new transmission
     LOG_D(NR_MAC,
           "rbSize %d (max_rbSize %d), TBS %d, est buf %d, sched_ul %d, B %d, CCE %d, num_dmrs_symb %d, N_PRB_DMRS %d\n",
           rbSize,
