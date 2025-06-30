@@ -36,6 +36,7 @@
 #include "f1ap_cu_ue_context_management.h"
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
+#include "lib/f1ap_ue_context.h"
 #include "f1ap_cu_paging.h"
 #include "f1ap_cu_task.h"
 #include "openair2/RRC/NR/nr_rrc_defs.h"
@@ -186,18 +187,19 @@ void *F1AP_CU_task(void *arg) {
         break;
 
       case F1AP_UE_CONTEXT_SETUP_REQ: // from rrc
-        CU_send_UE_CONTEXT_SETUP_REQUEST(assoc_id,
-                                         &F1AP_UE_CONTEXT_SETUP_REQ(received_msg));
+        CU_send_UE_CONTEXT_SETUP_REQUEST(assoc_id, &F1AP_UE_CONTEXT_SETUP_REQ(received_msg));
+        free_ue_context_setup_req(&F1AP_UE_CONTEXT_SETUP_REQ(received_msg));
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_REQ:
-        CU_send_UE_CONTEXT_MODIFICATION_REQUEST(assoc_id,
-                                                &F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg));
+        CU_send_UE_CONTEXT_MODIFICATION_REQUEST(assoc_id, &F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg));
+        free_ue_context_mod_req(&F1AP_UE_CONTEXT_MODIFICATION_REQ(received_msg));
         break;
 
       case F1AP_UE_CONTEXT_RELEASE_CMD: // from rrc
         CU_send_UE_CONTEXT_RELEASE_COMMAND(assoc_id,
                                            &F1AP_UE_CONTEXT_RELEASE_CMD(received_msg));
+        free_ue_context_rel_cmd(&F1AP_UE_CONTEXT_RELEASE_CMD(received_msg));
         break;
 
       case F1AP_PAGING_IND:

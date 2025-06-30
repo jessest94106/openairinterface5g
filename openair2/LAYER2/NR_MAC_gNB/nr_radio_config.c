@@ -3524,7 +3524,7 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
 
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const int uid,
-                            NR_UE_NR_Capability_t *uecap,
+                            const NR_UE_NR_Capability_t *uecap,
                             const nr_mac_config_t *configuration,
                             const NR_ServingCellConfigCommon_t *scc)
 {
@@ -3969,7 +3969,6 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
     NR_PUCCH_CSI_Resource_t *pucchcsires1 = calloc(1, sizeof(*pucchcsires1));
     pucchcsires1->uplinkBandwidthPartId = bwp->bwp_Id;
     pucchcsires1->pucch_Resource = 2;
-
     config_csi_meas_report(csi_MeasConfig,
                            servingcellconfigcommon,
                            pucchcsires1,
@@ -3979,9 +3978,14 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                            bwp->bwp_Id,
                            uid,
                            curr_bwp);
+    // this is the same resource as pucchcsires1, but duplicated to avoid
+    // double free when releasing the CellGroupConfig
+    NR_PUCCH_CSI_Resource_t *pucchcsires2 = calloc(1, sizeof(*pucchcsires2));
+    pucchcsires2->uplinkBandwidthPartId = bwp->bwp_Id;
+    pucchcsires2->pucch_Resource = 2;
     config_rsrp_meas_report(csi_MeasConfig,
                             servingcellconfigcommon,
-                            pucchcsires1,
+                            pucchcsires2,
                             do_csirs,
                             bwp->bwp_Id + 10,
                             uid,

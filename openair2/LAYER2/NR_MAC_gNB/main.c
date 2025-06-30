@@ -63,6 +63,7 @@
 #include "nr_pdcp/nr_pdcp_oai_api.h"
 #include "nr_rlc/nr_rlc_oai_api.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "openair2/F1AP/lib/f1ap_interface_management.h"
 #include "seq_arr.h"
 #include "system.h"
 #include "time_meas.h"
@@ -342,6 +343,9 @@ void mac_top_destroy_gNB(gNB_MAC_INST *mac)
   for (int i = 0; i < sizeofArray(UE_info->access_ue_list); ++i)
     if (UE_info->access_ue_list[i])
       delete_nr_ue_data(UE_info->access_ue_list[i], cc, &UE_info->uid_allocator);
+  if (mac->f1_config.setup_resp)
+    free_f1ap_setup_response(mac->f1_config.setup_resp);
+  free(mac->f1_config.setup_resp);
 }
 
 void nr_mac_send_f1_setup_req(void)

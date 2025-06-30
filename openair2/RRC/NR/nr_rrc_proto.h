@@ -44,7 +44,7 @@
 #define SRB2 2
 
 void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_assoc_t assoc_id);
-void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_context_setup_t *resp);
+void rrc_add_nsa_user_resp(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const f1ap_ue_context_setup_resp_t *resp);
 void rrc_release_nsa_user(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context);
 void rrc_remove_nsa_user_context(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context);
 
@@ -106,15 +106,13 @@ int rrc_gNB_generate_pcch_msg(sctp_assoc_t assoc_id, const NR_SIB1_t *sib, uint3
 
 void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
                                             rrc_gNB_ue_context_t *const ue_context_pP,
-                                            int n_drbs,
-                                            const f1ap_drb_to_be_setup_t *drbs);
+                                            const e1ap_bearer_setup_resp_t *resp);
 
 void rrc_gNB_generate_UeContextModificationRequest(const gNB_RRC_INST *rrc,
                                                    rrc_gNB_ue_context_t *const ue_context_pP,
-                                                   int n_drbs,
-                                                   const f1ap_drb_to_be_setup_t *drbs,
+                                                   const e1ap_bearer_setup_resp_t *resp,
                                                    int n_rel_drbs,
-                                                   const f1ap_drb_to_be_released_t *rel_drbs);
+                                                   const f1ap_drb_to_release_t *rel_drbs);
 
 void free_RRCReconfiguration_params(nr_rrc_reconfig_param_t params);
 
@@ -123,6 +121,6 @@ byte_array_t rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *
 nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t srb_reest_bitmap, bool drb_reestablish);
 
 pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, rrc_pdu_session_param_t *pduSession);
-f1ap_qos_characteristics_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param);
+f1ap_qos_flow_param_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param);
 void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *configuration);
 #endif

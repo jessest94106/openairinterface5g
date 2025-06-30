@@ -3124,7 +3124,7 @@ void nr_mac_trigger_release_complete(gNB_MAC_INST *mac, int rnti)
   // du_remove_f1_ue_data() (and also while sending the message to RRC)
   NR_SCHED_UNLOCK(&mac->sched_lock);
   f1_ue_data_t ue_data = du_get_f1_ue_data(rnti);
-  f1ap_ue_context_release_complete_t complete = {
+  f1ap_ue_context_rel_cplt_t complete = {
     .gNB_CU_ue_id = ue_data.secondary_ue,
     .gNB_DU_ue_id = rnti,
   };
@@ -3385,7 +3385,7 @@ bool nr_mac_request_release_ue(const gNB_MAC_INST *nrmac, int rnti)
     return false;
   }
   f1_ue_data_t ue_data = du_get_f1_ue_data(rnti);
-  f1ap_ue_context_release_req_t request = {
+  f1ap_ue_context_rel_req_t request = {
     .gNB_CU_ue_id = ue_data.secondary_ue,
     .gNB_DU_ue_id = rnti,
     .cause = F1AP_CAUSE_RADIO_NETWORK,
