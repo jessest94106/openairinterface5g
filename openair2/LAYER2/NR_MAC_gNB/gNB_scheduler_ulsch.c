@@ -1712,7 +1712,9 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
 {
   const int CC_id = 0;
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  NR_sched_pusch_t *retInfo = &sched_ctrl->ul_harq_processes[harq_pid].sched_pusch;
+  /* Get previous PUSCH field info */
+  const NR_sched_pusch_t *retInfo = &sched_ctrl->ul_harq_processes[harq_pid].sched_pusch;
+  NR_sched_pusch_t new_sched = *retInfo; // potential new allocation
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
 
   int rbStart = 0; // wrt BWP start
@@ -1721,7 +1723,6 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   const uint32_t bwpStart = bwp_info.bwpStart;
   const uint8_t nrOfLayers = retInfo->nrOfLayers;
   LOG_D(NR_MAC,"retInfo->time_domain_allocation = %d, tda = %d\n", retInfo->time_domain_allocation, tda);
-  LOG_D(NR_MAC,"tbs %d\n",retInfo->tb_size);
   NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp,
                                            sched_ctrl->coreset->controlResourceSetId,
                                            sched_ctrl->search_space->searchSpaceType->present,
@@ -1729,6 +1730,13 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
                                            tda);
   if (!tda_info.valid_tda)
     return false;
+
+  /* mark when retransmission will happen */
+  int slots_frame = nrmac->frame_structure.numb_slots_frame;
+  new_sched.frame = (frame + (slot + tda_info.k2 + get_NTN_Koffset(scc)) / slots_frame) % MAX_FRAME_NUMBER;
+  new_sched.slot = (slot + tda_info.k2 + get_NTN_Koffset(scc)) % slots_frame;
+  new_sched.bwp_info = bwp_info;
+  DevAssert(new_sched.ul_harq_pid == harq_pid);
 
   bool reuse_old_tda = (retInfo->tda_info.startSymbolIndex == tda_info.startSymbolIndex) && (retInfo->tda_info.nrOfSymbols <= tda_info.nrOfSymbols);
   if (reuse_old_tda && nrOfLayers == retInfo->nrOfLayers) {
@@ -1746,6 +1754,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
             bwpSize);
       return false;
     }
+    new_sched.rbStart = rbStart;
     LOG_D(NR_MAC, "Retransmission keeping TDA %d and TBS %d\n", tda, retInfo->tb_size);
   } else {
     NR_pusch_dmrs_t dmrs_info = get_ul_dmrs_params(scc, ul_bwp, &tda_info, nrOfLayers);
@@ -1782,11 +1791,12 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
     LOG_D(NR_MAC, "Retransmission with TDA %d->%d and TBS %d -> %d\n", retInfo->time_domain_allocation, tda, retInfo->tb_size, new_tbs);
     /* we can allocate it. Overwrite the time_domain_allocation, the number
      * of RBs, and the new TB size. The rest is done below */
-    retInfo->tb_size = new_tbs;
-    retInfo->rbSize = new_rbSize;
-    retInfo->time_domain_allocation = tda;
-    retInfo->dmrs_info = dmrs_info;
-    retInfo->tda_info = tda_info;
+    new_sched.rbSize = new_rbSize;
+    new_sched.rbStart = rbStart;
+    new_sched.tb_size = new_tbs;
+    new_sched.time_domain_allocation = tda;
+    new_sched.tda_info = tda_info;
+    new_sched.dmrs_info = dmrs_info;
   }
 
   /* Find a free CCE */
@@ -1808,31 +1818,22 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
 
   sched_ctrl->cce_index = CCEIndex;
   fill_pdcch_vrb_map(nrmac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, dci_beam_idx);
-  int slots_frame = nrmac->frame_structure.numb_slots_frame;
-  retInfo->frame = (frame + (slot + tda_info.k2 + get_NTN_Koffset(scc)) / slots_frame) % MAX_FRAME_NUMBER;
-  retInfo->slot = (slot + tda_info.k2 + get_NTN_Koffset(scc)) % slots_frame;
-  /* Get previous PSUCH field info */
-  sched_ctrl->sched_pusch = *retInfo;
-  NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
 
+  // signal new allocation
+  sched_ctrl->sched_pusch = new_sched;
   LOG_D(NR_MAC,
         "%4d.%2d Allocate UL retransmission RNTI %04x sched %4d.%2d (%d RBs)\n",
         frame,
         slot,
         UE->rnti,
-        sched_pusch->frame,
-        sched_pusch->slot,
-        sched_pusch->rbSize);
-
-  sched_pusch->bwp_info = bwp_info;
-  sched_pusch->rbStart = rbStart;
-  sched_pusch->ul_harq_pid = harq_pid;
-  /* no need to recompute the TBS, it will be the same */
+        new_sched.frame,
+        new_sched.slot,
+        new_sched.rbSize);
 
   /* Mark the corresponding RBs as used */
-  n_rb_sched -= sched_pusch->rbSize;
-  for (int rb = bwpStart; rb < sched_ctrl->sched_pusch.rbSize; rb++)
-    rballoc_mask[rb + sched_ctrl->sched_pusch.rbStart] |= SL_to_bitmap(sched_pusch->tda_info.startSymbolIndex, sched_pusch->tda_info.nrOfSymbols);
+  n_rb_sched -= new_sched.rbSize;
+  for (int rb = bwpStart; rb < new_sched.rbSize; rb++)
+    rballoc_mask[rb + new_sched.rbStart] |= SL_to_bitmap(new_sched.tda_info.startSymbolIndex, new_sched.tda_info.nrOfSymbols);
   return true;
 }
 
