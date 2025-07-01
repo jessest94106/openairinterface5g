@@ -76,7 +76,7 @@ bool is_dl_slot(const slot_t slot, const frame_structure_t *fs);
 bool is_mixed_slot(const slot_t slot, const frame_structure_t *fs);
 int get_tdd_period_idx(NR_TDD_UL_DL_ConfigCommon_t *tdd);
 void config_frame_structure(int mu,
-                            NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,
+                            const NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,
                             uint8_t tdd_period,
                             uint8_t frame_type,
                             frame_structure_t *fs);
