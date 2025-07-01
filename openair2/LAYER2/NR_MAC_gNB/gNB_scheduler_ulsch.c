@@ -1804,8 +1804,8 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   sched_ctrl->cce_index = CCEIndex;
   fill_pdcch_vrb_map(nrmac, CC_id, &sched_ctrl->sched_pdcch, CCEIndex, sched_ctrl->aggregation_level, dci_beam_idx);
   int slots_frame = nrmac->frame_structure.numb_slots_frame;
-  retInfo->frame = (frame + (slot + tda_info.k2) / slots_frame) % MAX_FRAME_NUMBER;
-  retInfo->slot = (slot + tda_info.k2) % slots_frame;
+  retInfo->frame = (frame + (slot + tda_info.k2 + get_NTN_Koffset(scc)) / slots_frame) % MAX_FRAME_NUMBER;
+  retInfo->slot = (slot + tda_info.k2 + get_NTN_Koffset(scc)) % slots_frame;
   /* Get previous PSUCH field info */
   sched_ctrl->sched_pusch = *retInfo;
   NR_sched_pusch_t *sched_pusch = &sched_ctrl->sched_pusch;
