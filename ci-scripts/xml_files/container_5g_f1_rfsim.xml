@@ -133,7 +133,7 @@
                 <class>Custom_Command</class>
                 <desc>Simulate a DL radio channel with noise (3 dB)</desc>
                 <node>acamas</node>
-                <command>echo channelmod modify 0 noise_power_dB 3 | nc --send-only 192.168.71.181 8091</command>
+                <command>echo channelmod modify 0 noise_power_dB 3 | ncat --send-only 192.168.71.181 8091</command>
         </testCase>
 
         <testCase id="030021">
@@ -164,7 +164,7 @@
                 <class>Custom_Command</class>
                 <desc>Trigger Reestablishment</desc>
                 <node>acamas</node>
-                <command>echo ci force_reestab | nc 192.168.71.171 9090 | grep -E 'Reset RLC counters of UE RNTI [0-9a-f]{4} to trigger reestablishment'</command>
+                <command>echo ci force_reestab | ncat 192.168.71.171 9090 | grep -E 'Reset RLC counters of UE RNTI [0-9a-f]{4} to trigger reestablishment'</command>
         </testCase>
 
         <testCase id="020022">
@@ -182,56 +182,56 @@
                 <class>Custom_Command</class>
                 <desc>Verify Reestablishment</desc>
                 <node>acamas</node>
-                <command>echo ci get_reestab_count | nc 192.168.71.150 9090 | grep -E 'UE RNTI [0-9a-f]{4} reestab 1'</command>
+                <command>echo ci get_reestab_count | ncat 192.168.71.150 9090 | grep -E 'UE RNTI [0-9a-f]{4} reestab 1'</command>
         </testCase>
 
         <testCase id="040021">
                 <class>Custom_Command</class>
                 <desc>Simulate a disruption of DL radio channel (ploss 55)</desc>
                 <node>acamas</node>
-                <command>echo channelmod modify 0 ploss 55 | nc 192.168.71.181 8091</command>
+                <command>echo channelmod modify 0 ploss 55 | ncat 192.168.71.181 8091</command>
         </testCase>
 
         <testCase id="040022">
                 <class>Custom_Command</class>
                 <desc>Get UE sync state (UE ID 0)</desc>
                 <node>acamas</node>
-                <command>echo ciUE sync_state 0 | nc 192.168.71.181 8091 | grep -E UE_NOT_SYNC</command>
+                <command>echo ciUE sync_state 0 | ncat 192.168.71.181 8091 | grep -E UE_NOT_SYNC</command>
         </testCase>
 
         <testCase id="040023">
                 <class>Custom_Command</class>
                 <desc>Restoration of the original DL channel conditions (ploss 20)</desc>
                 <node>acamas</node>
-                <command>echo channelmod modify 0 ploss 20 | nc 192.168.71.181 8091</command>
+                <command>echo channelmod modify 0 ploss 20 | ncat 192.168.71.181 8091</command>
         </testCase>
 
         <testCase id="040024">
                 <class>Custom_Command</class>
                 <desc>Get UE sync state (UE ID 0)</desc>
                 <node>acamas</node>
-                <command>echo ciUE sync_state 0 | nc 192.168.71.181 8091 | grep -E UE_CONNECTED</command>
+                <command>echo ciUE sync_state 0 | ncat 192.168.71.181 8091 | grep -E UE_CONNECTED</command>
         </testCase>
 
         <testCase id="040025">
                 <class>Custom_Command</class>
                 <desc>Trigger Handover</desc>
                 <node>acamas</node>
-                <command>echo ci trigger_f1_ho | nc 192.168.71.150 9090</command>
+                <command>echo ci trigger_f1_ho | ncat 192.168.71.150 9090</command>
         </testCase>
 
         <testCase id="040026">
                 <class>Custom_Command</class>
                 <desc>UE (1) connected to DU-PCI 0?</desc>
                 <node>acamas</node>
-                <command>echo ci fetch_du_by_ue_id 1 | nc 192.168.71.150 9090 | grep "3584"</command>
+                <command>echo ci fetch_du_by_ue_id 1 | ncat 192.168.71.150 9090 | grep "3584"</command>
         </testCase>
 
         <testCase id="040027">
                 <class>Custom_Command</class>
                 <desc>UE (1) connected to DU-PCI 1?</desc>
                 <node>acamas</node>
-                <command>echo ci fetch_du_by_ue_id 1 | nc 192.168.71.150 9090 | grep "3585"</command>
+                <command>echo ci fetch_du_by_ue_id 1 | ncat 192.168.71.150 9090 | grep "3585"</command>
         </testCase>
 
         <testCase id="100021">
