@@ -929,6 +929,10 @@ typedef struct gNB_MAC_INST_s {
   bool identity_pm;
   int precoding_matrix_size[NR_MAX_NB_LAYERS];
   int fapi_beam_index[MAX_NUM_OF_SSB];
+
+  /// dedicate UL TDA, common for all UEs
+  seq_arr_t ul_tda;
+
   nr_mac_rrc_ul_if_t mac_rrc;
   f1_config_t f1_config;
   int16_t frame;
