@@ -39,9 +39,9 @@
 #endif
 
 void nr_ulsch_compute_llr(int32_t *rxdataF_comp,
-                          int32_t *ul_ch_mag,
-                          int32_t *ul_ch_magb,
-                          int32_t *ul_ch_magc,
+                          c16_t *ul_ch_mag,
+                          c16_t *ul_ch_magb,
+                          c16_t *ul_ch_magc,
                           int16_t *ulsch_llr,
                           uint32_t nb_re,
                           uint8_t symbol,
