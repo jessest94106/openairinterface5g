@@ -392,6 +392,11 @@ typedef struct NR_pusch_dmrs {
   uint16_t ul_dmrs_symb_pos;
   uint8_t num_dmrs_cdm_grps_no_data;
   nfapi_nr_dmrs_type_e dmrs_config_type;
+  int dmrs_scrambling_id;
+  int pusch_identity;
+  int scid;
+  int low_papr_sequence_number;
+  NR_PTRS_UplinkConfig_t *ptrsConfig;
 } NR_pusch_dmrs_t;
 
 typedef struct NR_sched_pusch {
@@ -413,7 +418,6 @@ typedef struct NR_sched_pusch {
 
   /// UL HARQ PID to use for this UE, or -1 for "any new"
   int8_t ul_harq_pid;
-
   uint8_t nrOfLayers;
   int tpmi;
 
@@ -421,6 +425,7 @@ typedef struct NR_sched_pusch {
   int time_domain_allocation;
   NR_tda_info_t tda_info;
   NR_pusch_dmrs_t dmrs_info;
+  bwp_info_t bwp_info;
   int phr_txpower_calc;
 } NR_sched_pusch_t;
 
@@ -436,7 +441,10 @@ typedef struct NR_pdsch_dmrs {
   uint8_t N_DMRS_SLOT;
   uint16_t dl_dmrs_symb_pos;
   uint8_t numDmrsCdmGrpsNoData;
+  uint32_t scrambling_id;
+  int n_scid;
   nfapi_nr_dmrs_type_e dmrsConfigType;
+  NR_PTRS_DownlinkConfig_t *phaseTrackingRS;
 } NR_pdsch_dmrs_t;
 
 typedef struct NR_sched_pdsch {
@@ -460,7 +468,7 @@ typedef struct NR_sched_pdsch {
 
   uint16_t pm_index;
   uint8_t nrOfLayers;
-
+  bwp_info_t bwp_info;
   NR_pdsch_dmrs_t dmrs_parms;
   // time_domain_allocation is the index of a list of tda
   int time_domain_allocation;

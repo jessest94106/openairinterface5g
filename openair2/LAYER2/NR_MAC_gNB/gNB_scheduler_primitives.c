@@ -300,8 +300,7 @@ NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
   if (dci_format == NR_DL_DCI_FORMAT_1_0) {
     dmrs.numDmrsCdmGrpsNoData = tda_info->nrOfSymbols <= 2 ? 1 : 2;
     dmrs.dmrs_ports_id = 0;
-  }
-  else {
+  } else {
     //TODO first basic implementation of dmrs port selection
     //     only vaild for a single codeword
     //     for now it assumes a selection of Nl consecutive dmrs ports
@@ -346,16 +345,21 @@ NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
     }
   }
 
+  dmrs.n_scid = 0;
+  long *scramblingID = NULL;
   NR_PDSCH_Config_t *pdsch_Config = dl_bwp ? dl_bwp->pdsch_Config : NULL;
   if (pdsch_Config) {
-    if (tda_info->mapping_type == typeB)
-      dmrs.dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup->dmrs_Type != NULL;
-    else
-      dmrs.dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->dmrs_Type != NULL;
-  }
-  else
+    NR_DMRS_DownlinkConfig_t *dmrs_Config = tda_info->mapping_type == typeB ?
+                                            pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup :
+                                            pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup;
+    dmrs.phaseTrackingRS = dmrs_Config->phaseTrackingRS ? dmrs_Config->phaseTrackingRS->choice.setup : NULL;
+    dmrs.dmrsConfigType = dmrs_Config->dmrs_Type != NULL;
+    scramblingID = dmrs.n_scid ? dmrs_Config->scramblingID1 : dmrs_Config->scramblingID0;
+  } else {
     dmrs.dmrsConfigType = NFAPI_NR_DMRS_TYPE1;
-
+    dmrs.phaseTrackingRS = NULL;
+  }
+  dmrs.scrambling_id = scramblingID ? *scramblingID : *scc->physCellId;
   dmrs.N_PRB_DMRS = dmrs.numDmrsCdmGrpsNoData * (dmrs.dmrsConfigType == NFAPI_NR_DMRS_TYPE1 ? 6 : 4);
   dmrs.dl_dmrs_symb_pos = fill_dmrs_mask(pdsch_Config, dci_format, scc->dmrs_TypeA_Position, tda_info->nrOfSymbols, tda_info->startSymbolIndex, tda_info->mapping_type, frontloaded_symb);
   dmrs.N_DMRS_SLOT = get_num_dmrs(dmrs.dl_dmrs_symb_pos);
@@ -702,8 +706,8 @@ const NR_DMRS_UplinkConfig_t *get_DMRS_UplinkConfig(const NR_PUSCH_Config_t *pus
 NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
                                    const NR_UE_UL_BWP_t *ul_bwp,
                                    const NR_tda_info_t *tda_info,
-                                   const int Layers) {
-
+                                   const int Layers)
+{
   NR_pusch_dmrs_t dmrs = {0};
   // TODO setting of cdm groups with no data to be redone for MIMO
   if(NFAPI_MODE == NFAPI_MODE_AERIAL) {
@@ -715,13 +719,36 @@ NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
       dmrs.num_dmrs_cdm_grps_no_data = 2;
   }
 
-  NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = ul_bwp->pusch_Config ?
-                                                 (tda_info->mapping_type == typeA ?
-                                                 ul_bwp->pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA->choice.setup :
-                                                 ul_bwp->pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup) : NULL;
+  const NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = get_DMRS_UplinkConfig(ul_bwp->pusch_Config, tda_info);
+  dmrs.ptrsConfig = NR_DMRS_UplinkConfig
+                    && NR_DMRS_UplinkConfig->phaseTrackingRS ?
+                    NR_DMRS_UplinkConfig->phaseTrackingRS->choice.setup : NULL;
+
+  dmrs.pusch_identity = *scc->physCellId;
+  dmrs.dmrs_scrambling_id = *scc->physCellId;
+  dmrs.scid = 0;
+  if (ul_bwp->transform_precoding) { // transform precoding disabled
+    long *scramblingid = NULL;
+    if (NR_DMRS_UplinkConfig && dmrs.scid == 0)
+      scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID0;
+    else if (NR_DMRS_UplinkConfig)
+      scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID1;
+    if (scramblingid)
+      dmrs.dmrs_scrambling_id = *scramblingid;
+  } else {
+    if (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->transformPrecodingEnabled) {
+      if (NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity)
+        dmrs.pusch_identity = *NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity;
+      if ((!NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceGroupHopping
+          && !NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceHopping)
+          && !scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->groupHoppingEnabledTransformPrecoding)
+        dmrs.low_papr_sequence_number = 0;
+      else
+        AssertFatal(false, "Hopping mode is not supported in transform precoding\n");
+    }
+  }
 
   dmrs.dmrs_config_type = NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->dmrs_Type ? 1 : 0;
-
   const pusch_dmrs_AdditionalPosition_t additional_pos = (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->dmrs_AdditionalPosition) ?
                                                          (*NR_DMRS_UplinkConfig->dmrs_AdditionalPosition ==
                                                          NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos3 ?
@@ -780,6 +807,92 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
   LOG_D(MAC, "frame %4d MCS %d -> %d (num_dl_sched %d, num_dl_retx %d, BLER wnd %.3f avg %.6f)\n",
         frame, old_mcs, new_mcs, num_dl_sched, num_dl_retx, bler_window, bler_stats->bler);
   return new_mcs;
+}
+
+nfapi_nr_dl_dci_pdu_t *prepare_dci_pdu(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
+                                       const NR_ServingCellConfigCommon_t *scc,
+                                       const NR_SearchSpace_t *ss,
+                                       const NR_ControlResourceSet_t *coreset,
+                                       int aggregation_level,
+                                       int cce_index,
+                                       int beam_index,
+                                       int rnti)
+{
+  nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu->dci_pdu[pdcch_pdu->numDlDci];
+  dci_pdu->RNTI = rnti;
+  dci_pdu->AggregationLevel = aggregation_level;
+  dci_pdu->CceIndex = cce_index;
+  if (coreset->pdcch_DMRS_ScramblingID &&
+      ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific) {
+    dci_pdu->ScramblingId = *coreset->pdcch_DMRS_ScramblingID;
+    dci_pdu->ScramblingRNTI = rnti;
+  } else {
+    dci_pdu->ScramblingId = *scc->physCellId;
+    dci_pdu->ScramblingRNTI = 0;
+  }
+  dci_pdu->beta_PDCCH_1_0 = 0;
+  dci_pdu->powerControlOffsetSS = 1;
+  dci_pdu->precodingAndBeamforming.num_prgs = 0;
+  dci_pdu->precodingAndBeamforming.prg_size = 0;
+  dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
+  dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
+  dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
+  return dci_pdu;
+}
+
+dci_pdu_rel15_t prepare_dci_dl_payload(const gNB_MAC_INST *gNB_mac,
+                                       const NR_UE_info_t *UE,
+                                       nr_rnti_type_t rnti_type,
+                                       NR_SearchSpace__searchSpaceType_PR ss_type,
+                                       const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu,
+                                       const NR_sched_pdsch_t *sched_pdsch,
+                                       const NR_sched_pucch_t *pucch,
+                                       int harq_pid,
+                                       int tb_scaling,
+                                       bool is_sib1)
+{
+  const NR_UE_DL_BWP_t *dl_BWP = UE ? &UE->current_DL_BWP : NULL;
+  dci_pdu_rel15_t dci_payload = {0};
+  dci_payload.format_indicator = 1;
+  dci_payload.time_domain_assignment.val = sched_pdsch->time_domain_allocation;
+  dci_payload.mcs = sched_pdsch->mcs;
+  dci_payload.rv = pdsch_pdu->rvIndex[0];
+  dci_payload.vrb_to_prb_mapping.val = 0;
+  int riv_bwp = pdsch_pdu->BWPSize;
+  if (!UE)
+    riv_bwp = gNB_mac->cset0_bwp_size;
+  else if (dl_BWP->dci_format == NR_DL_DCI_FORMAT_1_0 && ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
+    if (gNB_mac->cset0_bwp_size > 0)
+      riv_bwp = gNB_mac->cset0_bwp_size;
+    else
+      riv_bwp = UE->sc_info.initial_dl_BWPSize;
+  }
+  dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(pdsch_pdu->rbSize, pdsch_pdu->rbStart, riv_bwp);
+  if (rnti_type == TYPE_SI_RNTI_) {
+    dci_payload.system_info_indicator = !is_sib1;
+    return dci_payload;
+  }
+  if (rnti_type == TYPE_RA_RNTI_) {
+    dci_payload.tb_scaling = tb_scaling;
+    return dci_payload;
+  }
+
+  const NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+  dci_payload.dmrs_sequence_initialization.val = pdsch_pdu->SCID;
+  dci_payload.antenna_ports.val = sched_pdsch->dmrs_parms.dmrs_ports_id;
+  dci_payload.tpc = sched_ctrl->tpc1;
+  const NR_UE_harq_t *harq = &sched_ctrl->harq_processes[harq_pid];
+  AssertFatal(harq, "HARQ process should be available for DCI with RNTI %s\n", rnti_types(rnti_type));
+  dci_payload.harq_pid.val = harq_pid;
+  dci_payload.ndi = harq->ndi;
+  dci_payload.pucch_resource_indicator = pucch ? pucch->resource_indicator : 0;
+  dci_payload.pdsch_to_harq_feedback_timing_indicator.val = pucch ? pucch->timing_indicator : 0; // PDSCH to HARQ TI
+  dci_payload.dai[0].val = pucch ? (pucch->dai_c - 1) & 3 : 0;
+  // bwp indicator
+  // as per table 7.3.1.1.2-1 in 38.212
+  if (dl_BWP)
+    dci_payload.bwp_indicator.val = UE->sc_info.n_dl_bwp < 4 ? dl_BWP->bwp_id : dl_BWP->bwp_id - 1;
+  return dci_payload;
 }
 
 void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
@@ -1175,11 +1288,11 @@ void set_r_pucch_parms(int rsetindex,
   *start_symbol_index = default_pucch_firstsymb[rsetindex];
 }
 
-void prepare_dci(const NR_UE_ServingCell_Info_t *servingCellInfo,
-                 const NR_UE_DL_BWP_t *current_BWP,
-                 const NR_ControlResourceSet_t *coreset,
-                 dci_pdu_rel15_t *dci_pdu_rel15,
-                 nr_dci_format_t format)
+static void prepare_dci_X1(const NR_UE_ServingCell_Info_t *servingCellInfo,
+                           const NR_UE_DL_BWP_t *current_BWP,
+                           const NR_ControlResourceSet_t *coreset,
+                           dci_pdu_rel15_t *dci_pdu_rel15,
+                           nr_dci_format_t format)
 {
   const NR_PDSCH_Config_t *pdsch_Config = current_BWP ? current_BWP->pdsch_Config : NULL;
 
@@ -1326,7 +1439,7 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
   pdcch_dci_pdu->PayloadSizeBits = dci_size;
   AssertFatal(dci_size <= 64, "DCI sizes above 64 bits not yet supported");
   if (dci_format == NR_DL_DCI_FORMAT_1_1 || dci_format == NR_UL_DCI_FORMAT_0_1)
-    prepare_dci(servingCellInfo, current_DL_BWP, coreset, dci_pdu_rel15, dci_format);
+    prepare_dci_X1(servingCellInfo, current_DL_BWP, coreset, dci_pdu_rel15, dci_format);
 
   /// Payload generation
   switch (dci_format) {

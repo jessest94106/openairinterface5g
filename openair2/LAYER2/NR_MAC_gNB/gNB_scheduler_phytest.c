@@ -173,7 +173,7 @@ void nr_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slot)
   sched_pdsch->pucch_allocation = alloc;
   sched_pdsch->rbStart = rbStart;
   sched_pdsch->rbSize = rbSize;
-
+  sched_pdsch->bwp_info = get_pdsch_bwp_start_size(mac, UE);
   sched_pdsch->dmrs_parms = get_dl_dmrs_params(scc,
                                                dl_bwp,
                                                &tda_info,
