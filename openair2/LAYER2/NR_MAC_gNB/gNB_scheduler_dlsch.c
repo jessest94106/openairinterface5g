@@ -340,9 +340,7 @@ static void nr_store_dlsch_buffer(module_id_t module_id, frame_t frame, slot_t s
         continue;
       if (lcid == DL_SCH_LCID_DTCH && nr_timer_is_active(&sched_ctrl->transm_interrupt))
         continue;
-      start_meas(&RC.nrmac[module_id]->rlc_status_ind);
       sched_ctrl->rlc_status[lcid] = nr_mac_rlc_status_ind(rnti, frame, lcid);
-      stop_meas(&RC.nrmac[module_id]->rlc_status_ind);
 
       if (sched_ctrl->rlc_status[lcid].bytes_in_buffer == 0)
         continue;

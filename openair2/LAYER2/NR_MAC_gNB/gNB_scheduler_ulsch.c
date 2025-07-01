@@ -961,7 +961,9 @@ void nr_rx_sdu(const module_id_t gnb_mod_idP,
 {
   gNB_MAC_INST *gNB_mac = RC.nrmac[gnb_mod_idP];
   NR_SCHED_LOCK(&gNB_mac->sched_lock);
+  start_meas(&gNB_mac->rx_ulsch_sdu);
   _nr_rx_sdu(gnb_mod_idP, CC_idP, frameP, slotP, rntiP, sduP, sdu_lenP, harq_pid, timing_advance, ul_cqi, rssi);
+  stop_meas(&gNB_mac->rx_ulsch_sdu);
   NR_SCHED_UNLOCK(&gNB_mac->sched_lock);
 }
 
