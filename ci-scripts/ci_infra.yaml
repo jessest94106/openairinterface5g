@@ -65,9 +65,9 @@ oc-cn5g:
   Host: avra
   NetworkScript: echo "inet 172.21.6.102"
   RunIperf3Server: False
-  Deploy: "! scripts/oc-cn5g-deploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-ci-ran"
-  Undeploy: "! scripts/oc-cn5g-undeploy.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-ci-ran"
-  LogCollect: "! scripts/oc-cn5g-logcollect.sh /opt/oai-cn5g-fed-develop-2025-jan oaicicd-core-for-ci-ran %%log_dir%%"
+  Deploy: "! scripts/oc-cn5g-deploy.sh /opt/oai-cn5g-fed-develop-2025-jun oaicicd-core-for-ci-ran"
+  Undeploy: "! scripts/oc-cn5g-undeploy.sh /opt/oai-cn5g-fed-develop-2025-jun oaicicd-core-for-ci-ran"
+  LogCollect: "! scripts/oc-cn5g-logcollect.sh /opt/oai-cn5g-fed-develop-2025-jun oaicicd-core-for-ci-ran %%log_dir%%"
 
 oc-cn5g-20897:
   Host: cacofonix
@@ -89,8 +89,8 @@ matix-cn5g:
   Host: matix
   NetworkScript: docker exec prod-trf-gen ip a show dev eth0
   RunIperf3Server: False
-  Deploy: "cd /opt/oai-cn5g-fed-v2/docker-compose && python3 ./core-network.py --type start-basic"
-  Undeploy: "cd /opt/oai-cn5g-fed-v2/docker-compose && python3 ./core-network.py --type stop-basic"
+  Deploy: "cd /opt/oai-cn5g-fed-v2-jun-2025/docker-compose && python3 ./core-network.py --type start-basic"
+  Undeploy: "cd /opt/oai-cn5g-fed-v2-jun-2025/docker-compose && python3 ./core-network.py --type stop-basic"
   LogCollect:
     - "docker logs oai-smf > %%log_dir%%/oai-smf.log"
     - "docker logs oai-amf > %%log_dir%%/oai-amf.log"
