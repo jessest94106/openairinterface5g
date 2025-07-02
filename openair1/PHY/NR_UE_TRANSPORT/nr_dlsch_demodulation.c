@@ -488,6 +488,30 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
     nb_re_pdsch = (pilots == 1) ? ((config_type == NFAPI_NR_DMRS_TYPE1) ? nb_rb_pdsch * (12 - 6 * dlsch_config->n_dmrs_cdm_groups)
                                                                         : nb_rb_pdsch * (12 - 4 * dlsch_config->n_dmrs_cdm_groups))
                                 : (nb_rb_pdsch * 12);
+    // Subtract CSI-RS REs from PDSCH RE count
+    if (csi_res_bitmap != 0) {
+      uint32_t csi_re_count = 0;
+      uint32_t csi_res_even = csi_res_bitmap & 0xfff;
+      uint32_t csi_res_odd = (csi_res_bitmap >> 16) & 0xfff;
+
+      for (int rb = 0; rb < nb_rb_pdsch; rb++) {
+        uint32_t rb_csi_pattern = (rb % 2 == 0) ? csi_res_even : csi_res_odd;
+        csi_re_count += __builtin_popcount(rb_csi_pattern);
+      }
+
+      nb_re_pdsch = (nb_re_pdsch > csi_re_count) ? (nb_re_pdsch - csi_re_count) : 0;
+
+      if (csi_re_count > 0) {
+        LOG_D(NR_PHY,
+              "[CSI OVERLAP] Frame/Slot %d.%d Symbol %d: CSI-RS overlapping PDSCH - %d CSI-RS REs skipped, %d data REs extracted\n",
+              frame,
+              nr_slot_rx,
+              symbol,
+              csi_re_count,
+              nb_re_pdsch);
+      }
+    }
+
     if (scope_req->copy_rxdataF_to_scope) {
       size_t size = sizeof(c16_t) * nb_re_pdsch;
       int copy_index = symbol - dlsch_config->start_symbol;
