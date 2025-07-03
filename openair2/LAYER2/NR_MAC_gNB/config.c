@@ -804,9 +804,9 @@ static void config_sched_ctrlCommon(gNB_MAC_INST *nr_mac)
 /**
  * \brief Initializes the UL TDA information at the scheduler, as used for
  * every UE in UL. This just copies the information from the SCC into a smaller
- * list. Note that this list should not be modified, as get_ul_tda() and
- * nr_rrc_config_ul_tda() are designed to work in sync (get_ul_tda() assumes an
- * ordering, output by nr_rrc_config_ul_tda()).
+ * list. Note that this list should not be modified, as get_num_ul_tda() and
+ * nr_rrc_config_ul_tda() are designed to work in sync (get_num_ul_tda()
+ * assumes an ordering, output by nr_rrc_config_ul_tda()).
  */
 static void init_ul_tda_info(const NR_PUSCH_TimeDomainResourceAllocationList_t *l, seq_arr_t *sa_tda)
 {

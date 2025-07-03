@@ -239,40 +239,25 @@ void nr_ul_preprocessor_phytest(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_p
   uint16_t rbStart = 0;
   uint16_t rbSize = min(bw, target_ul_bw);
 
-  NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList = get_ul_tdalist(ul_bwp,
-                                                                        sched_ctrl->coreset->controlResourceSetId,
-                                                                        sched_ctrl->search_space->searchSpaceType->present,
-                                                                        TYPE_C_RNTI_);
-  const int temp_tda = get_ul_tda(nr_mac, frame, slot);
-  if (temp_tda < 0)
-    return;
-  AssertFatal(temp_tda < tdaList->list.count, "time domain assignment %d >= %d\n", temp_tda, tdaList->list.count);
-  const int mu = ul_bwp->scs;
-  int K2 = get_K2(tdaList, temp_tda, mu, scc);
+  DevAssert(seq_arr_size(&nr_mac->ul_tda) > 0);
+  const int tda = 0;
+  NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp,
+                                           sched_ctrl->coreset->controlResourceSetId,
+                                           sched_ctrl->search_space->searchSpaceType->present,
+                                           TYPE_C_RNTI_,
+                                           tda);
+  DevAssert(tda_info.valid_tda);
+
+  int K2 = tda_info.k2 + get_NTN_Koffset(scc);
   int slots_frame = nr_mac->frame_structure.numb_slots_frame;
   const int sched_frame = (frame + (slot + K2) / slots_frame) % MAX_FRAME_NUMBER;
   const int sched_slot = (slot + K2) % slots_frame;
-  const int tda = get_ul_tda(nr_mac, sched_frame, sched_slot);
-  if (tda < 0)
-    return;
-  AssertFatal(tda < tdaList->list.count,
-              "time domain assignment %d >= %d\n",
-              tda,
-              tdaList->list.count);
 
   /* check if slot is UL, and that slot is 8 (assuming K2=6 because of UE
    * limitations).  Note that if K2 or the TDD configuration is changed, below
    * conditions might exclude each other and never be true */
   int slot_period = sched_slot % nr_mac->frame_structure.numb_slots_period;
   if (!is_xlsch_in_slot(ulsch_slot_bitmap, slot_period))
-    return;
-
-  NR_tda_info_t tda_info = get_ul_tda_info(ul_bwp,
-                                           sched_ctrl->coreset->controlResourceSetId,
-                                           sched_ctrl->search_space->searchSpaceType->present,
-                                           TYPE_C_RNTI_,
-                                           tda);
-  if (!tda_info.valid_tda)
     return;
 
   // TODO implement beam procedures for phy-test mode

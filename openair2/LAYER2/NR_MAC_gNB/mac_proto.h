@@ -417,7 +417,7 @@ void free_sched_pucch_list(NR_UE_sched_ctrl_t *sched_ctrl);
 bool add_UE_to_list(int list_size, NR_UE_info_t *list[list_size], NR_UE_info_t *UE);
 NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], rnti_t rnti);
 int get_dl_tda(const gNB_MAC_INST *nrmac, int slot);
-int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot);
+int get_num_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot, int k2, const NR_tda_info_t **first_idx);
 
 int get_cce_index(const gNB_MAC_INST *nrmac,
                   const int CC_id,

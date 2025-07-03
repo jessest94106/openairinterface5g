@@ -38,9 +38,10 @@
 
 //#define SRS_IND_DEBUG
 
-/* \brief Get the UL TDA for given frame and slot. It identifies the index of
- * TDA in the TDA list, as hardcoded in nr_rrc_config_ul_tda(). */
-int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
+/* \brief Get the number of UL TDAs that could be used in frame and slot, reachable
+ * via specific k2. The output parameter first_idx is a pointer to the first
+ * suitable TDA, and the function returns the number of suitable TDAs, or 0. */
+int get_num_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot, int k2, const NR_tda_info_t **first_idx)
 {
   /* we assume that this function is mutex-protected from outside */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
@@ -48,23 +49,34 @@ int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot)
   /* there is a mixed slot only when in TDD */
   frame_structure_t *fs = &nrmac->frame_structure;
 
+  /* TODO: we assume currently that all UL TDA have same k2, check below */
+  NR_tda_info_t *tda_info = seq_arr_at(&nrmac->ul_tda, 0);
+  if (!tda_info->valid_tda || tda_info->k2 != k2)
+    return 0;
+
   if (fs->frame_type == TDD) {
     // if there is uplink symbols in mixed slot
     int s = get_slot_idx_in_period(slot, fs);
     tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
     if ((tdd_slot_bitmap[s].num_ul_symbols > 1) && is_mixed_slot(s, fs)) {
-      return 2; // mixed slot, all symbols of mixed minus last
+      *first_idx = seq_arr_at(&nrmac->ul_tda, 2); // mixed slot, all symbols of mixed minus last
+      return 1;
     }
   }
 
   // Avoid slots with the SRS
   UE_iterator(nrmac->UE_info.connected_ue_list, UE) {
     NR_sched_srs_t sched_srs = UE->UE_sched_ctrl.sched_srs;
-    if(sched_srs.srs_scheduled && sched_srs.frame == frame && sched_srs.slot == slot)
-      return 1; // symbols 0--12
+    if(sched_srs.srs_scheduled && sched_srs.frame == frame && sched_srs.slot == slot) {
+      *first_idx = seq_arr_at(&nrmac->ul_tda, 1); // symbols 0--12
+      return 1;
+    }
   }
 
-  return 0; // symbols 0--13, // if FDD or not mixed slot in TDD, for now use default TDA (TODO handle CSI-RS slots)
+  // symbols 0--13, if FDD or not mixed slot in TDD, for now use default TDA
+  // (TODO handle CSI-RS slots)
+  *first_idx = seq_arr_at(&nrmac->ul_tda, 0);
+  return 1;
 }
 
 bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
@@ -2552,10 +2564,13 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
   // FAPI cannot handle more than MAX_DCI_CORESET DCIs
   max_sched_ues = min(max_sched_ues, MAX_DCI_CORESET);
 
-  int tda = get_ul_tda(nr_mac, sched_frame, sched_slot);
+  const NR_tda_info_t *tda_info = NULL;
+  int n_tda = get_num_ul_tda(nr_mac, sched_frame, sched_slot, nr_mac->radio_config.minRXTXTIME, &tda_info);
+  DevAssert(n_tda == 1);
+  int tda = seq_arr_dist(&nr_mac->ul_tda, seq_arr_front(&nr_mac->ul_tda), tda_info);
+  AssertFatal(tda >= 0 && tda < 16, "illegal TDA index %d\n", tda);
   /* TODO: iterate over all available UL slots if there are more than DL */
   /* the following supposes that the TDA is the same across all BWPs */
-  NR_tda_info_t *tda_info = seq_arr_at(&nr_mac->ul_tda, tda);
 
   int len[num_beams];
   for (int i = 0; i < num_beams; i++)
