@@ -828,6 +828,14 @@ typedef struct {
   uint64_t used_prb_aggregate;
 } mac_stats_t;
 
+/// helper type to encapsulate a frame/slot combination in a single type.
+/// Currently only used in the UL preprocessor. Note: if you use this type
+/// further, please refactor it into a common type first.
+typedef struct fsn {
+  frame_t f;
+  slot_t s;
+} fsn_t;
+
 /*! \brief top level eNB MAC structure */
 typedef struct gNB_MAC_INST_s {
   /// Ethernet parameters for northbound midhaul interface
@@ -932,6 +940,8 @@ typedef struct gNB_MAC_INST_s {
 
   /// dedicate UL TDA, common for all UEs
   seq_arr_t ul_tda;
+  /// next UL slot to schedule
+  fsn_t ul_next;
 
   nr_mac_rrc_ul_if_t mac_rrc;
   f1_config_t f1_config;
