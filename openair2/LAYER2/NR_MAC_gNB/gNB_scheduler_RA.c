@@ -717,11 +717,6 @@ void nr_initiate_ra_proc(module_id_t module_idP,
     }
 
     UE = get_new_nr_ue_inst(&nr_mac->UE_info.uid_allocator, rnti, NULL);
-    if (!UE) {
-      LOG_E(NR_MAC, "FAILURE: %4d.%2d cannot create UE context, ignoring RA because RRC Reject not implemented yet\n", frame, slot);
-      NR_SCHED_UNLOCK(&nr_mac->sched_lock);
-      return;
-    }
     if (!add_new_UE_RA(nr_mac, UE)) {
       LOG_E(NR_MAC, "FAILURE: %4d.%2d initiating RA procedure for preamble index %d: no free RA process\n", frame, slot, preamble_index);
       delete_nr_ue_data(UE, NULL, &nr_mac->UE_info.uid_allocator);
@@ -1960,7 +1955,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
   }
 }
 
-void nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, NR_UE_info_t *UE, bool success)
+bool nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, NR_UE_info_t *UE, bool success)
 {
   NR_RA_t *ra = UE->ra;
   const char *ra_type_str = ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4";
@@ -1975,10 +1970,21 @@ void nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, N
     if (success) {
       gNB_MAC_INST *nr_mac = RC.nrmac[module_id];
       NR_ServingCellConfigCommon_t *scc = nr_mac->common_channels[0].ServingCellConfigCommon;
-      // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
-      configure_UE_BWP(nr_mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
-      transition_ra_connected_nr_ue(nr_mac, UE);
-      LOG_A(NR_MAC, "%4d.%2d UE %04x: Received Ack of %s. CBRA procedure succeeded!\n", frame, slot, UE->rnti, ra_type_str);
+      LOG_A(NR_MAC,
+            "%4d.%2d UE %04x: Received Ack of %s. CBRA procedure succeeded (%s)\n",
+            frame,
+            slot,
+            UE->rnti,
+            ra_type_str,
+            UE->CellGroup ? "UE Connected" : "UE Rejected");
+      if (UE->CellGroup) {
+        // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
+        configure_UE_BWP(nr_mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
+        transition_ra_connected_nr_ue(nr_mac, UE);
+      } else {  // in case of  UE reject
+        nr_release_ra_UE(nr_mac, UE->rnti);
+        return true;
+      }
     } else {
       LOG_I(NR_MAC, "%4d.%2d UE %04x: RA Procedure failed at %s!\n", frame, slot, UE->rnti, ra_type_str);
       nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
@@ -1991,6 +1997,7 @@ void nr_check_Msg4_MsgB_Ack(module_id_t module_id, frame_t frame, slot_t slot, N
     LOG_I(NR_MAC, "(UE %04x) Received Nack in %s, preparing retransmission!\n", UE->rnti, ra_type_str);
     ra->ra_state = ra->ra_type == RA_4_STEP ? nrRA_Msg4 : nrRA_MsgB;
   }
+  return false;
 }
 
 /////////////////////////////////////
@@ -2125,7 +2132,7 @@ void nr_release_ra_UE(gNB_MAC_INST *mac, rnti_t rnti)
   if (UE) {
     delete_nr_ue_data(UE, mac->common_channels, &UE_info->uid_allocator);
   } else {
-    LOG_W(NR_MAC,"Call to del rnti %04x, but not existing\n", rnti);
+    LOG_W(NR_MAC,"Call to release RA UE with rnti %04x, but not existing\n", rnti);
   }
 }
 
@@ -2152,7 +2159,9 @@ void nr_schedule_RA(module_id_t module_idP,
         ra->contention_resolution_timer--;
         if (ra->contention_resolution_timer == 0) {
           LOG_W(NR_MAC, "(%d.%d) RA Contention Resolution timer expired for UE 0x%04x, RA procedure failed...\n", frameP, slotP, UE->rnti);
-          bool requested = nr_mac_request_release_ue(mac, UE->rnti);
+          bool requested = false;
+          if (UE->CellGroup) // request if we did not reject the UE
+            requested = nr_mac_request_release_ue(mac, UE->rnti);
           if (!requested)
             nr_release_ra_UE(mac, UE->rnti);
           continue;

@@ -2690,19 +2690,10 @@ static void init_bler_stats(const NR_bler_options_t *bler_options, NR_bler_stats
  * error handling). Remove with delete_nr_ue_data().  */
 NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroupConfig_t *CellGroup)
 {
-  uid_t uid = uid_linear_allocator_new(uia);
-  /* if the UE list is full, we should reject the UE with an RRC reject
-   * message, but we do not have this functionality. To keep it simple, do not
-   * create a UE context here, so we can print an error message. */
-  if (uid >= MAX_MOBILES_PER_GNB) {
-    uid_linear_allocator_free(uia, uid);
-    return NULL;
-  }
-
   NR_UE_info_t *UE = calloc_or_fail(1, sizeof(NR_UE_info_t));
+  UE->uid = uid_linear_allocator_new(uia);
   UE->rnti = rnti;
   UE->CellGroup = CellGroup;
-  UE->uid = uid;
   UE->ra = calloc(1, sizeof(*UE->ra));
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   sched_ctrl->ta_update = 31;
@@ -2734,6 +2725,8 @@ NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], 
 {
   for (int i = 0; i < list_size; i++) {
     NR_UE_info_t *curr_UE = list[i];
+    if (!curr_UE)
+      break; /* reached the end of the list */
     if (curr_UE->rnti != rnti)
       continue;
 
@@ -2742,7 +2735,6 @@ NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], 
     list[list_size - 1] = NULL;
     return curr_UE;
   }
-  LOG_E(NR_MAC, "UE %04x to be removed not found in list\n", rnti);
   return NULL;
 }
 
@@ -2848,8 +2840,10 @@ void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti)
   NR_SCHED_LOCK(&UE_info->mutex);
   NR_UE_info_t *UE = remove_UE_from_list(MAX_MOBILES_PER_GNB + 1, UE_info->connected_ue_list, rnti);
   NR_SCHED_UNLOCK(&UE_info->mutex);
-
-  delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
+  if (UE)
+    delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
+  else
+    nr_release_ra_UE(nr_mac, rnti);
 }
 
 // all values passed to this function are in dB x10
@@ -3410,7 +3404,9 @@ void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_le
   NR_SCHED_ENSURE_LOCKED(&mac->sched_lock);
 
   uint8_t du2cu[1024];
-  int encoded = encode_cellGroupConfig(UE->CellGroup, du2cu, sizeof(du2cu));
+  int encoded_len = 0;
+  if (UE->CellGroup)
+    encoded_len = encode_cellGroupConfig(UE->CellGroup, du2cu, sizeof(du2cu));
 
   DevAssert(mac->f1_config.setup_req != NULL);
   AssertFatal(mac->f1_config.setup_req->num_cells_available == 1, "can handle only one cell\n");
@@ -3421,8 +3417,8 @@ void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_le
     .crnti = rnti,
     .rrc_container = (uint8_t *) sdu,
     .rrc_container_length = sdu_len,
-    .du2cu_rrc_container = (uint8_t *) du2cu,
-    .du2cu_rrc_container_length = encoded
+    .du2cu_rrc_container = encoded_len ? (uint8_t *) du2cu : NULL,
+    .du2cu_rrc_container_length = encoded_len
   };
   mac->mac_rrc.initial_ul_rrc_message_transfer(0, &ul_rrc_msg);
 }
@@ -3435,6 +3431,19 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   if (!nr_rlc_activate_srb0(UE->rnti, UE, send_initial_ul_rrc_message))
     return false;
 
+  if (UE->uid >= MAX_MOBILES_PER_GNB) {
+    // verifying if any UE left in the meantime and it is possible to get a valid UID
+    uid_linear_allocator_free(&mac->UE_info.uid_allocator, UE->uid);
+    UE->uid = uid_linear_allocator_new(&mac->UE_info.uid_allocator);
+    if (UE->uid >= MAX_MOBILES_PER_GNB) {
+      // if the UE list is full, we should reject the UE with an RRC reject message
+      // to signal the upper layers to send a reject we send an empty CellGroup information element
+      UE->CellGroup = NULL;
+      LOG_W(NR_MAC, "Maximum number of UE alllowed at DU reached. Cannot serve UE %04x", UE->rnti);
+      return true;
+    }
+  }
+
   /* create this UE's initial CellGroup */
   int CC_id = 0;
   int srb_id = 1;
@@ -3444,12 +3453,14 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = cellGroupConfig;
 
+  if (!cellGroupConfig)
+    return true;
+
   /* the cellGroup sent to CU specifies there is SRB1, so create it */
   DevAssert(cellGroupConfig->rlc_BearerToAddModList->list.count == 1);
   const NR_RLC_BearerConfig_t *bearer = cellGroupConfig->rlc_BearerToAddModList->list.array[0];
   DevAssert(bearer->servedRadioBearer->choice.srb_Identity == srb_id);
   nr_rlc_add_srb(UE->rnti, bearer->servedRadioBearer->choice.srb_Identity, bearer);
-
   int priority = bearer->mac_LogicalChannelConfig->ul_SpecificParameters->priority;
   nr_lc_config_t c = {.lcid = bearer->logicalChannelIdentity, .priority = priority};
   nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);

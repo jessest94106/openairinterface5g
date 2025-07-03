@@ -394,10 +394,9 @@ static void rrc_gNB_generate_RRCSetup(instance_t instance,
   rrc->mac_rrc.dl_rrc_message_transfer(ue_data.du_assoc_id, &dl_rrc);
 }
 
-static void rrc_gNB_generate_RRCReject(module_id_t module_id, rrc_gNB_ue_context_t *const ue_context_pP)
+static void rrc_gNB_generate_RRCReject(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *const ue_context_pP)
 //-----------------------------------------------------------------------------
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[module_id];
   gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
   LOG_A(NR_RRC, "Send RRCReject to RNTI %04x\n", ue_p->rnti);
 
@@ -421,10 +420,10 @@ static void rrc_gNB_generate_RRCReject(module_id_t module_id, rrc_gNB_ue_context
     .rrc_container = buf,
     .rrc_container_length = size,
     .srb_id = srbid,
-    .execute_duplication  = 1,
-    .RAT_frequency_priority_information.en_dc = 0
   };
   rrc->mac_rrc.dl_rrc_message_transfer(ue_data.du_assoc_id, &dl_rrc);
+  /* release the created UE context, we rejected the UE */
+  rrc_remove_ue(rrc, ue_context_pP);
 }
 
 //-----------------------------------------------------------------------------
@@ -1137,10 +1136,17 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
 
     ue_context_p = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
     LOG_E(NR_RRC, "RRCSetupRequest without random UE identity or S-TMSI not supported, let's reject the UE %04x\n", msg->crnti);
-    rrc_gNB_generate_RRCReject(0, ue_context_p);
+    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
     return;
   }
 
+  // If the DU to CU RRC Container IE is not included in the INITIAL UL RRC MESSAGE TRANSFER,
+  // the gNB-CU should reject the UE under the assumption that the gNB-DU is not able to serve such UE
+  if (msg->du2cu_rrc_container == NULL) {
+    // this will remove the UE context
+    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
+    return;
+  }
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
   asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
                                                  &asn_DEF_NR_CellGroupConfig,
