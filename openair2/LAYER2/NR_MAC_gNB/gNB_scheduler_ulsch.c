@@ -1866,7 +1866,7 @@ static int comparator(const void *p, const void *q)
   return 0;
 }
 
-static void pf_ul(gNB_MAC_INST *nrmac,
+static int  pf_ul(gNB_MAC_INST *nrmac,
                   post_process_pusch_t *pp_pusch,
                   frame_t sched_frame,
                   int sched_slot,
@@ -1887,6 +1887,7 @@ static void pf_ul(gNB_MAC_INST *nrmac,
   for (int i = 0; i < num_beams; i++)
     remainUEs[i] = max_num_ue;
   int numUE = 0;
+  bool scheduled_something = false;
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
@@ -1955,6 +1956,7 @@ static void pf_ul(gNB_MAC_INST *nrmac,
 
       /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
       remainUEs[beam.idx]--;
+      scheduled_something = true;
       continue;
     }
     DevAssert(ul_harq_pid == -1); // all other allocations must be new ones
@@ -2207,7 +2209,13 @@ static void pf_ul(gNB_MAC_INST *nrmac,
     /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
     remainUEs[beam.idx]--;
     iterator++;
+    scheduled_something = true;
   }
+  int num_ue_sched = num_beams * max_num_ue;
+  for (int i = 0; i < num_beams; i++)
+    num_ue_sched -= remainUEs[i];
+  DevAssert((num_ue_sched == 0 && !scheduled_something) || (num_ue_sched > 0 && scheduled_something));
+  return num_ue_sched;
 }
 
 nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti_req,
