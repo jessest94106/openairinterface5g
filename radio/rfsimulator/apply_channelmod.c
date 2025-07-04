@@ -25,6 +25,7 @@
 #include <complex.h>
 #include <common/utils/LOG/log.h>
 #include <openair1/SIMULATION/TOOLS/sim.h>
+#include "openair2/LAYER2/NR_MAC_gNB/mac_config.h"
 #include "rfsimulator.h"
 
 /*
@@ -95,7 +96,13 @@ void rxAddInput(const c16_t *input_sig,
       const double vel_ue_sat = (vel_sat_x * dir_ue_sat_x + vel_sat_y * dir_ue_sat_y + vel_sat_z * dir_ue_sat_z) / dist_ue_sat;
 
       double dist_sat_gnb = 0;
+      double vel_sat_gnb = 0;
+      double acc_sat_gnb = 0;
       if (channelDesc->modelid == SAT_LEO_TRANS) {
+        const double acc_sat_x = 0;
+        const double acc_sat_y = -w_sat * w_sat * radius_sat * sin(w_sat * t);
+        const double acc_sat_z = -w_sat * w_sat * radius_sat * cos(w_sat * t);
+
         const double pos_gnb_x = 0;
         const double pos_gnb_y = 0;
         const double pos_gnb_z = radius_earth;
@@ -105,6 +112,8 @@ void rxAddInput(const c16_t *input_sig,
         const double dir_sat_gnb_z = pos_gnb_z - pos_sat_z;
 
         dist_sat_gnb = sqrt(dir_sat_gnb_x * dir_sat_gnb_x + dir_sat_gnb_y * dir_sat_gnb_y + dir_sat_gnb_z * dir_sat_gnb_z);
+        vel_sat_gnb = (vel_sat_x * dir_sat_gnb_x + vel_sat_y * dir_sat_gnb_y + vel_sat_z * dir_sat_gnb_z) / dist_sat_gnb;
+        acc_sat_gnb = (acc_sat_x * dir_sat_gnb_x + acc_sat_y * dir_sat_gnb_y + acc_sat_z * dir_sat_gnb_z) / dist_sat_gnb;
       }
 
       const double prop_delay = (dist_ue_sat + dist_sat_gnb) / c;
@@ -117,8 +126,33 @@ void rxAddInput(const c16_t *input_sig,
 
       if(TS - last_TS >= channelDesc->sampling_rate) {
         last_TS = TS;
-        LOG_D(HW, "Satellite orbit: time %f s, Position = (%f, %f, %f), Velocity = (%f, %f, %f)\n", t, pos_sat_x, pos_sat_y, pos_sat_z, vel_sat_x, vel_sat_y, vel_sat_z);
-        LOG_D(HW, "Uplink delay %f ms, Doppler shift UE->SAT %f kHz\n", prop_delay * 1000, f_Doppler_shift_ue_sat / 1000);
+        LOG_I(HW, "Satellite orbit: time %f s, Position = (%f, %f, %f), Velocity = (%f, %f, %f)\n", t, pos_sat_x, pos_sat_y, pos_sat_z, vel_sat_x, vel_sat_y, vel_sat_z);
+        LOG_I(HW, "Uplink delay %f ms, Doppler shift UE->SAT %f kHz\n", prop_delay * 1000, f_Doppler_shift_ue_sat / 1000);
+        LOG_I(HW, "Satellite velocity towards gNB: %f m/s, acceleration towards gNB: %f m/s²\n", vel_sat_gnb, acc_sat_gnb);
+      }
+
+      const int samples_per_subframe = channelDesc->sampling_rate / 1000;
+      const int abs_subframe = TS / samples_per_subframe;
+      if (abs_subframe % 10 == 0) { // update SIB19 information for the next frame
+        gnb_sat_position_update_t sat_position = {
+            .sfn = (abs_subframe / 10 + 1) % 1024,
+            .subframe = 0,
+            .delay = 2 * dist_sat_gnb / (c * 4.072e-9),
+            .drift = 2 * -vel_sat_gnb / (c * 0.2e-9),
+            .accel = 2 * acc_sat_gnb / (c * 0.2e-10),
+            .position.X = pos_sat_x / 1.3,
+            .position.Y = pos_sat_y / 1.3,
+            .position.Z = pos_sat_z / 1.3,
+            .velocity.X = vel_sat_x / 0.06,
+            .velocity.Y = vel_sat_y / 0.06,
+            .velocity.Z = vel_sat_z / 0.06,
+        };
+        // Here we update the SIB19 information directly in the gNB MAC layer.
+        // Without rf-simulaor, in a real system or with an external channel emulator, the SIB19 updates would
+        // be provided via an external interface (e.g. O-RAN E2 interface) to the MAC layer (in the O-DU).
+        // We do it directly here, because we can, and an E2 Interface implementation (e.g using FlexRIC)
+        // would pull too many dependencies into rf-simulator, just for updating SIB19.
+        nr_update_sib19(&sat_position);
       }
     } else {
       const double dir_sat_ue_x = pos_ue_x - pos_sat_x;
@@ -151,8 +185,8 @@ void rxAddInput(const c16_t *input_sig,
 
       if(TS - last_TS >= channelDesc->sampling_rate) {
         last_TS = TS;
-        LOG_D(HW, "Satellite orbit: time %f s, Position = (%f, %f, %f), Velocity = (%f, %f, %f)\n", t, pos_sat_x, pos_sat_y, pos_sat_z, vel_sat_x, vel_sat_y, vel_sat_z);
-        LOG_D(HW, "Downlink delay %f ms, Doppler shift SAT->UE %f kHz\n", prop_delay * 1000, f_Doppler_shift_sat_ue / 1000);
+        LOG_I(HW, "Satellite orbit: time %f s, Position = (%f, %f, %f), Velocity = (%f, %f, %f)\n", t, pos_sat_x, pos_sat_y, pos_sat_z, vel_sat_x, vel_sat_y, vel_sat_z);
+        LOG_I(HW, "Downlink delay %f ms, Doppler shift SAT->UE %f kHz\n", prop_delay * 1000, f_Doppler_shift_sat_ue / 1000);
       }
     }
   }

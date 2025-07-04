@@ -221,11 +221,18 @@ void prepare_scc(NR_ServingCellConfigCommon_t *scc)
 
   scc->ext2->ntn_Config_r17->ephemerisInfo_r17 = calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17));
   scc->ext2->ntn_Config_r17->ta_Info_r17 = calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->ta_Info_r17));
+  scc->ext2->ntn_Config_r17->ta_Info_r17->ta_Common_r17 = -1;
   scc->ext2->ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17 = calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->ta_Info_r17->ta_CommonDrift_r17));
 
   scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present = NR_EphemerisInfo_r17_PR_positionVelocity_r17;
   scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17 =
       calloc_or_fail(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17));
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionX_r17 = LONG_MAX;
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionY_r17 = LONG_MAX;
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->positionZ_r17 = LONG_MAX;
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->velocityVX_r17 = LONG_MAX;
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->velocityVY_r17 = LONG_MAX;
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17->velocityVZ_r17 = LONG_MAX;
 }
 void prepare_msgA_scc(NR_ServingCellConfigCommon_t *scc) {
   NR_BWP_UplinkCommon_t *initialUplinkBWP = scc->uplinkConfigCommon->initialUplinkBWP;

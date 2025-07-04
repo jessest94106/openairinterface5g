@@ -557,16 +557,18 @@ typedef struct {
 } fapi_nr_ta_command_pdu;
 
 typedef struct {
-  // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
-  double N_common_ta_adj;
-  // N_UE_TA_adj calculated round-trip-time between UE and SAT (ms)
-  double N_UE_TA_adj;
-  // drift rate of common ta in µs/s
-  double ntn_ta_commondrift;
+  int epoch_sfn;
+  int epoch_subframe;
+
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
 
+  // ntn_total_time_advance_ms represents the complete round-trip-time between gNB and UE via SAT
   double ntn_total_time_advance_ms;
+  // drift rate of ntn_total_time_advance_ms in µs/s
+  double ntn_total_time_advance_drift;
+  // change rate of ntn_total_time_advance_ms drift in µs/s²
+  double ntn_total_time_advance_drift_variant;
 } fapi_nr_dl_ntn_config_command_pdu;
 
 typedef struct {
