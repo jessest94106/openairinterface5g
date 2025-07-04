@@ -3271,7 +3271,12 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
     }
 
     /* check if UL failure and trigger release request if necessary */
-    nr_mac_check_ul_failure(mac, UE->rnti, sched_ctrl);
+    bool released = nr_mac_check_ul_failure(mac, UE->rnti, sched_ctrl);
+    if (released) {
+      // go back to examine the next UE, which is at the position the current UE was
+      UE--;
+      continue;
+    }
 
     if (nr_timer_tick(&sched_ctrl->transm_interrupt)) {
       /* expired */
@@ -3481,6 +3486,8 @@ bool nr_mac_check_release(NR_UE_sched_ctrl_t *sched_ctrl, int rnti)
   return sched_ctrl->release_timer == 0;
 }
 
+#define UL_FAILURE_REQ_GRACE 10000
+#define UL_FAILURE_TIMEOUT 30000
 void nr_mac_trigger_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl, NR_SubcarrierSpacing_t subcarrier_spacing)
 {
   if (sched_ctrl->ul_failure) {
@@ -3488,8 +3495,9 @@ void nr_mac_trigger_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl, NR_SubcarrierSpac
     return;
   }
   sched_ctrl->ul_failure = true;
-  // 30 seconds till triggering release request
-  sched_ctrl->ul_failure_timer = 30000 << subcarrier_spacing;
+  // UL_FAILURE_TIMEOUT ms till triggering release request
+  // UL_FAILURE_REQ_GRACE ms till automatically released after request
+  sched_ctrl->ul_failure_timer = (UL_FAILURE_REQ_GRACE + UL_FAILURE_TIMEOUT) << subcarrier_spacing;
 }
 
 void nr_mac_reset_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl)
@@ -3519,20 +3527,27 @@ bool nr_mac_request_release_ue(const gNB_MAC_INST *nrmac, int rnti)
   return true;
 }
 
-void nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl)
+bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl)
 {
   if (!sched_ctrl->ul_failure)
-    return;
+    return false;
   if (sched_ctrl->ul_failure_timer > 0)
     sched_ctrl->ul_failure_timer--;
-  /* to trigger only once: trigger when ul_failure_timer == 1, but timer will
-   * stop at 0 and we wait for a UE release command from upper layers */
-  if (sched_ctrl->ul_failure_timer == 1) {
+  /* trigger once: trigger when ul_failure_timer == UL_FAILURE_REQ_GRACE( we
+   * wait for a UE release command from upper layers), and UE is automatically
+   * released when no answer after UL_FAILURE_REQ_GRACE */
+  if (sched_ctrl->ul_failure_timer == UL_FAILURE_REQ_GRACE) {
     LOG_W(MAC, "UE %04x: request release after UL failure timer expiry\n", rnti);
     bool requested = nr_mac_request_release_ue(nrmac, rnti);
     if (!requested)
-      nr_mac_release_ue(nrmac, rnti);
+      sched_ctrl->ul_failure_timer = 0; /* force expiry */
   }
+  if (sched_ctrl->ul_failure_timer == 0) {
+    LOG_W(NR_MAC, "UE %04x: no answer for release request, dropping UE\n", rnti);
+    nr_mac_release_ue(nrmac, rnti);
+    return true;
+  }
+  return false;
 }
 
 void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_t *UE)

@@ -200,6 +200,8 @@ rrc_gNB_ue_context_t *rrc_gNB_create_ue_context(sctp_assoc_t assoc_id,
   gNB_RRC_UE_t *ue = &ue_context_p->ue_context;
   ue->rnti = rnti;
   ue->random_ue_identity = ue_identityP;
+  // signal "no AMF UE NGAP ID" because valid range is 0..2^40-1
+  ue->amf_ue_ngap_id = INT64_MAX;
   f1_ue_data_t ue_data = {.secondary_ue = du_ue_id, .du_assoc_id = assoc_id};
   AssertFatal(!cu_exists_f1_ue_data(ue->rrc_ue_id),
               "UE F1 Context for ID %d already exists, logic bug\n",

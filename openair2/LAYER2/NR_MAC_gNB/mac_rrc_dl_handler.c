@@ -868,6 +868,7 @@ void ue_context_release_command(const f1ap_ue_context_rel_cmd_t *cmd)
   gNB_MAC_INST *mac = RC.nrmac[0];
   NR_SCHED_LOCK(&mac->sched_lock);
   NR_UE_info_t *UE = find_nr_UE(&mac->UE_info, cmd->gNB_DU_ue_id);
+  UE = UE ? UE : find_ra_UE(&mac->UE_info, cmd->gNB_DU_ue_id);
   if (UE == NULL) {
     NR_SCHED_UNLOCK(&mac->sched_lock);
     f1ap_ue_context_rel_cplt_t complete = {
