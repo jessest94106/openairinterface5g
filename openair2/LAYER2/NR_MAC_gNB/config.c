@@ -927,6 +927,96 @@ bool nr_mac_configure_other_sib(gNB_MAC_INST *nrmac, int num_cu_sib, const f1ap_
   return true;
 }
 
+bool nr_update_sib19(const gnb_sat_position_update_t *sat_position)
+{
+  gNB_MAC_INST *nrmac = RC.nrmac[0];
+  NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
+  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+
+  if (!scc || !scc->ext2 || !scc->ext2->ntn_Config_r17)
+    return false;
+
+  const vector_t *pos = &sat_position->position;
+  const vector_t *vel = &sat_position->velocity;
+
+  LOG_D(NR_MAC, "SFN = %d, SubFrame = %d\n", sat_position->sfn, sat_position->subframe);
+  LOG_D(NR_MAC, "TA_Common: value %d, %f msec\n", sat_position->delay, sat_position->delay * 4.072e-6);
+  LOG_D(NR_MAC, "TA_CommonDrift: value %d, = %f µsec/sec\n", sat_position->drift, sat_position->drift * 0.2e-3);
+  LOG_D(NR_MAC, "TA_CommonDriftVariant: value %d, %f µsec/sec^2\n", sat_position->accel, sat_position->accel * 0.2e-4);
+  LOG_D(NR_MAC, "SAT Position: values %d/%d/%d, %.3f/%3f/%3f metres in X/Y/Z\n", pos->X, pos->Y, pos->Z, pos->X * 1.3, pos->Y * 1.3, pos->Z * 1.3);
+  LOG_D(NR_MAC, "SAT Velocity: values %d/%d/%d, %.3f/%3f/%3f m/s in X/Y/Z\n", vel->X, vel->Y, vel->Z, vel->X * 0.06, vel->Y * 0.06, vel->Z * 0.06);
+
+  NR_SCHED_LOCK(&nrmac->sched_lock);
+
+  if (!scc->ext2->ntn_Config_r17->epochTime_r17)
+    scc->ext2->ntn_Config_r17->epochTime_r17 = calloc (1, sizeof(*scc->ext2->ntn_Config_r17->epochTime_r17));
+
+  NR_EpochTime_r17_t *epoch_time_r17 = scc->ext2->ntn_Config_r17->epochTime_r17;
+  epoch_time_r17->sfn_r17 = sat_position->sfn;
+  epoch_time_r17->subFrameNR_r17 = sat_position->subframe;
+
+  if (!scc->ext2->ntn_Config_r17->ta_Info_r17)
+    scc->ext2->ntn_Config_r17->ta_Info_r17 = calloc(1, sizeof(*scc->ext2->ntn_Config_r17->ta_Info_r17));
+
+  NR_TA_Info_r17_t *sib19_ta_info = scc->ext2->ntn_Config_r17->ta_Info_r17;
+
+  // SIB19 provides Round trip delay on feeder link (between gNB and SAT).
+  sib19_ta_info->ta_Common_r17 = sat_position->delay;
+
+  if (sat_position->drift) {
+    if (!sib19_ta_info->ta_CommonDrift_r17)
+      sib19_ta_info->ta_CommonDrift_r17 = calloc(1, sizeof(*sib19_ta_info->ta_CommonDrift_r17));
+    *sib19_ta_info->ta_CommonDrift_r17 = sat_position->drift;
+  } else
+    free_and_zero(sib19_ta_info->ta_CommonDrift_r17);
+
+  if (sat_position->accel) {
+    if (!sib19_ta_info->ta_CommonDriftVariant_r17)
+      sib19_ta_info->ta_CommonDriftVariant_r17 = calloc(1, sizeof(*sib19_ta_info->ta_CommonDriftVariant_r17));
+    *sib19_ta_info->ta_CommonDriftVariant_r17 = sat_position->accel;
+  } else
+    free_and_zero(sib19_ta_info->ta_CommonDriftVariant_r17);
+
+  // Currently PositionVelocity is supported and not yet the OrbitalParams
+  if (!scc->ext2->ntn_Config_r17->ephemerisInfo_r17) {
+    scc->ext2->ntn_Config_r17->ephemerisInfo_r17 = calloc(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17));
+    scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present = NR_EphemerisInfo_r17_PR_NOTHING;
+  }
+  if (scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present == NR_EphemerisInfo_r17_PR_orbital_r17) {
+    ASN_STRUCT_FREE(asn_DEF_NR_Orbital_r17, scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.orbital_r17);
+    scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.orbital_r17 = NULL;
+    scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present = NR_EphemerisInfo_r17_PR_NOTHING;
+  }
+  if (!scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17)
+    scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17 =
+        calloc(1, sizeof(*scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17));
+
+  scc->ext2->ntn_Config_r17->ephemerisInfo_r17->present = NR_EphemerisInfo_r17_PR_positionVelocity_r17;
+  NR_PositionVelocity_r17_t *sib19_PosVel = scc->ext2->ntn_Config_r17->ephemerisInfo_r17->choice.positionVelocity_r17;
+
+  sib19_PosVel->positionX_r17 = pos->X;
+  sib19_PosVel->positionY_r17 = pos->Y;
+  sib19_PosVel->positionZ_r17 = pos->Z;
+  sib19_PosVel->velocityVX_r17 = vel->X;
+  sib19_PosVel->velocityVY_r17 = vel->Y;
+  sib19_PosVel->velocityVZ_r17 = vel->Z;
+
+  NR_SystemInformation_IEs_t *sysInfov17 = calloc(1, sizeof(*sysInfov17)); // for othersibs
+  struct NR_SystemInformation_IEs__sib_TypeAndInfo__Member *type_du = calloc(1, sizeof(*type_du));
+  type_du->present = NR_SystemInformation_IEs__sib_TypeAndInfo__Member_PR_sib19_v1700;
+  NR_SIB19_r17_t *sib19 = get_SIB19_NR(cc->ServingCellConfigCommon);
+  type_du->choice.sib19_v1700 = sib19;
+  add_sib_to_systeminformation(sysInfov17, type_du);
+
+  cc->other_sib_bcch_length[1] = encode_sysinfo_ie(sysInfov17, cc->other_sib_bcch_pdu[1], sizeof(cc->other_sib_bcch_pdu[1]));
+  AssertFatal(cc->other_sib_bcch_length[1] > 0, "could not encode SIB19\n");
+  ASN_STRUCT_FREE(asn_DEF_NR_SystemInformation_IEs, sysInfov17);
+
+  NR_SCHED_UNLOCK(&nrmac->sched_lock);
+
+  return true;
+}
+
 void prepare_du_configuration_update(gNB_MAC_INST *mac,
                                      f1ap_served_cell_info_t *info,
                                      NR_BCCH_BCH_Message_t *mib,
@@ -971,7 +1061,7 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t
   NR_SCHED_LOCK(&nrmac->sched_lock);
 
   NR_UE_info_t *UE = get_new_nr_ue_inst(&nrmac->UE_info.uid_allocator, rnti, CellGroup);
-  DevAssert(UE != NULL); // test-mode: we assume we can always create a UE
+  DevAssert(UE->uid < MAX_MOBILES_PER_GNB); // test-mode: we assume we can always create a UE
   free_and_zero(UE->ra); // test-mode (sims, phy-test): UE will not do RA
   bool res = add_connected_nr_ue(nrmac, UE);
   if (!res) {

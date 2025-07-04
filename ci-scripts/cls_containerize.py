@@ -152,19 +152,6 @@ def GetImageName(ssh, svcName, file):
 	else:
 		return ret.stdout.strip()
 
-def GetServiceHealth(ssh, svcName, file):
-	if svcName is None:
-		return False, f"Service {svcName} not found in {file}"
-	image = GetImageName(ssh, svcName, file)
-	if 'db_init' in svcName or 'db-init' in svcName: # exits with 0, there cannot be healthy
-		return True, f"Service {svcName} healthy, image {image}"
-	for _ in range(8):
-		result = ssh.run(f"docker compose -f {file} ps --format json {svcName}  | jq -r 'if type==\"array\" then .[0].Health else .Health end'", silent=True)
-		if result.stdout == 'healthy':
-			return True, f"Service {svcName} healthy, image {image}"
-		time.sleep(5)
-	return False, f"Failed to deploy: service {svcName}"
-
 def ExistEnvFilePrint(ssh, wd, prompt='env vars in existing'):
 	ret = ssh.run(f'cat {wd}/.env', silent=True, reportNonZero=False)
 	if ret.returncode != 0:
@@ -311,7 +298,6 @@ class Containerize():
 		self.yamlPath = ['', '', '']
 		self.services = ['', '', '']
 		self.deploymentTag = ''
-		self.eNB_logFile = ['', '', '']
 
 		self.testCase_id = ''
 
@@ -320,17 +306,6 @@ class Containerize():
 		self.dockerfileprefix = ''
 		self.host = ''
 
-		self.deployedContainers = []
-		self.tsharkStarted = False
-		self.pingContName = ''
-		self.pingOptions = ''
-		self.pingLossThreshold = ''
-		self.svrContName = ''
-		self.svrOptions = ''
-		self.cliContName = ''
-		self.cliOptions = ''
-
-		self.imageToCopy = ''
 		#checkers from xml
 		self.ran_checkers={}
 		self.num_attempts = 1
@@ -712,7 +687,7 @@ class Containerize():
 		HTML.CreateHtmlTestRowQueue("Build unit tests", 'OK', [dockerfile])
 
 		# it worked, build and execute tests, and close connection
-		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --rm ran-unittests:{baseTag} ctest --output-on-failure --no-label-summary -j$(nproc)')
+		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --rm ran-unittests:{baseTag} ctest --no-label-summary -j$(nproc)')
 		cmd.run(f'docker rmi ran-unittests:{baseTag}')
 		build_log_name = f'build_log_{self.testCase_id}'
 		CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
@@ -872,31 +847,24 @@ class Containerize():
 			if num_attempts <= 0:
 				raise ValueError(f'Invalid value for num_attempts: {num_attempts}, must be greater than 0')
 			for attempt in range(num_attempts):
-				imagesInfo = []
-				healthInfo = []
 				logging.info(f'will start services {services}')
-				status = ssh.run(f'docker compose -f {wd_yaml} up -d -- {services}')
-				if status.returncode != 0:
+				status = ssh.run(f'docker compose -f {wd_yaml} up -d --wait --wait-timeout 60 -- {services}')
+				info = ssh.run(f"docker compose -f {wd_yaml} ps --all --format=\'table {{{{.Service}}}} [{{{{.Image}}}}] {{{{.Status}}}}\' -- {services} | column -t")
+				deployed = status.returncode == 0
+				if not deployed:
 					msg = f'cannot deploy services {services}: {status.stdout}'
 					logging.error(msg)
-					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', [msg])
-					return False
-				for svc in services.split():
-					health, msg = GetServiceHealth(ssh, svc, f'{wd_yaml}')
-					logging.info(msg)
-					imagesInfo.append(msg)
-					healthInfo.append(health)
-				deployed = all(healthInfo)
-				if deployed:
+				else:
 					break
-				elif (attempt < num_attempts - 1):
-					warning_msg = f'Restart services {services}'
+				if (attempt < num_attempts - 1):
+					warning_msg = (f'Failed to deploy on attempt {attempt}, restart services {services}')
 					logging.warning(warning_msg)
-					imagesInfo.append(warning_msg)
-					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', ['\n'.join(imagesInfo)])
+					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', [warning_msg])
 					for svc in services.split():
 						CopyinServiceLog(ssh, lSourcePath, yaml_dir, svc, wd_yaml, f'{svc}-{HTML.testCase_id}-attempt{attempt}.log')
 					ssh.run(f'docker compose -f {wd_yaml} down -- {services}')
+		imagesInfo = info.stdout.splitlines()[1:]
+		logging.debug(f'{info.stdout.splitlines()[1:]}')
 		if deployed:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['\n'.join(imagesInfo)])
 		else:

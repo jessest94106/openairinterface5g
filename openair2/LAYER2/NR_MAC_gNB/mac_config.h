@@ -19,9 +19,28 @@
  *      contact@openairinterface.org
  */
 
-#ifndef F1AP_LIB_EXTERN_H_
-#define F1AP_LIB_EXTERN_H_
+#ifndef __LAYER2_NR_MAC_CONFIG_H__
+#define __LAYER2_NR_MAC_CONFIG_H__
 
-#include "f1ap_rrc_message_transfer.h"
+#include <stdint.h>
 
-#endif /* F1AP_LIB_EXTERN_H_ */
+typedef struct vector_s {
+  int X;
+  int Y;
+  int Z;
+} vector_t;
+
+// Format similar to values sent in SIB19
+typedef struct gnb_sat_position_update_s {
+  int sfn;
+  int subframe;
+  uint32_t delay;
+  int drift;
+  uint32_t accel;
+  vector_t position;
+  vector_t velocity;
+} gnb_sat_position_update_t;
+
+bool nr_update_sib19(const gnb_sat_position_update_t *sat_position);
+
+#endif /*__LAYER2_NR_MAC_CONFIG_H__*/

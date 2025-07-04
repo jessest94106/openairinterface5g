@@ -25,7 +25,7 @@
 #include "OCTET_STRING.h"
 #include "common/utils/utils.h"
 #include "common/utils/assertions.h"
-#include "common/utils/utils.h"
+#include "common/utils/oai_asn1.h"
 
 bool eq_f1ap_plmn(const plmn_id_t *a, const plmn_id_t *b)
 {
@@ -113,6 +113,28 @@ uint8_t *cp_octet_string(const OCTET_STRING_t *os, int *len)
   memcpy(buf, os->buf, os->size);
   *len = os->size;
   return buf;
+}
+
+F1AP_SNSSAI_t encode_nssai(const nssai_t *nssai)
+{
+  F1AP_SNSSAI_t enc = {0};
+  INT8_TO_OCTET_STRING(nssai->sst, &enc.sST);
+  // see 23.003 sec. 28.4.2: 0xffffff means "no SD"
+  if (nssai->sd != 0xffffff) {
+    asn1cCalloc(enc.sD, tmp);
+    INT24_TO_OCTET_STRING(nssai->sd, tmp);
+  }
+  return enc;
+}
+
+nssai_t decode_nssai(const F1AP_SNSSAI_t *nssai)
+{
+  // see 23.003 sec. 28.4.2: 0xffffff means "no SD"
+  nssai_t dec = { .sd = 0xffffff, };
+  OCTET_STRING_TO_INT8(&nssai->sST, dec.sst);
+  if (nssai->sD != NULL)
+    OCTET_STRING_TO_INT24(nssai->sD, dec.sd);
+  return dec;
 }
 
 F1AP_Cause_t encode_f1ap_cause(f1ap_Cause_t cause, long cause_value)

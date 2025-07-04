@@ -195,7 +195,7 @@ static void get_epochtime_from_sib19scheduling(NR_UE_RRC_SI_INFO *SI_info, int *
   int slot = slot_end_sib19_window % N;
   *subframe = ceil(slot / slots_per_subframe);
 
-  LOG_D(NR_RRC,
+  LOG_I(NR_RRC,
         "Get EPOCHTIME: x:%d, N:%d, slot_endw:%d, frame:%d, subframe:%d , slot:%d\n",
         x,
         N,
@@ -228,7 +228,7 @@ static int eval_epoch_time(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntnc
   // after the frame where the message indicating the epochTime is received
   // i.e. Epochframe can be present or future SFN
   diff_frames = (epoch_frame - frame + 1024) % 1024;    // According to 38.331 Epochtime is defined for serving cell like this
-  LOG_D(NR_RRC, "Epoch frame %d, ahead by %d frames\n", epoch_frame, diff_frames);
+  LOG_I(NR_RRC, "Epoch frame %d, ahead by %d frames\n", epoch_frame, diff_frames);
   return diff_frames;
 }
 
@@ -248,7 +248,7 @@ static int get_ntn_timervalues(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *
   int expire_before_ms = ((val430 >= 120) ? 10000 : 2000);
   int diff = *val430_ms - expire_before_ms;
   int sib19_timer_ms = (diff > 0) ? diff : ((*val430_ms - sib19_periodicity_ms) > 0) ? (*val430_ms - sib19_periodicity_ms) : 0;
-  LOG_D(NR_RRC, "val430:%d s, T430:%d ms, sib19_timer:%d ms\n", val430, *val430_ms, sib19_timer_ms);
+  LOG_I(NR_RRC, "val430:%d s, T430:%d ms, sib19_timer:%d ms\n", val430, *val430_ms, sib19_timer_ms);
   return sib19_timer_ms;
 }
 
@@ -749,6 +749,7 @@ NR_UE_RRC_INST_t* nr_rrc_init_ue(char* uecap_file, int nb_inst, int num_ant_tx)
     rrc->reconfig_after_reestab = false;
     /* 5G-S-TMSI */
     rrc->fiveG_S_TMSI = UINT64_MAX;
+    rrc->access_barred = false;
 
     FILE *f = NULL;
     if (uecap_file)
@@ -959,11 +960,12 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
   }
 
   NR_UE_RRC_SI_INFO *SI_info = &rrc->perNB[gNB_index].SInfo;
+  bool barred = rrc->access_barred || bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_barred;
   int get_sib = 0;
   if (IS_SA_MODE(get_softmodem_params())
       && !SI_info->sib_pending
       && bcch_message->message.present == NR_BCCH_BCH_MessageType_PR_mib
-      && bcch_message->message.choice.mib->cellBarred == NR_MIB__cellBarred_notBarred
+      && !barred
       && rrc->nrRrcState != RRC_STATE_DETACH_NR) {
     // to schedule MAC to get SI if required
     get_sib = check_si_status(SI_info);
@@ -975,6 +977,7 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
     // mac will manage the pointer
     NR_MAC_RRC_CONFIG_MIB(msg).bcch = bcch_message;
     NR_MAC_RRC_CONFIG_MIB(msg).get_sib = get_sib;
+    NR_MAC_RRC_CONFIG_MIB(msg).access_barred = barred;
     itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
   } else {
     LOG_E(NR_RRC, "RRC-received BCCH message is not a MIB\n");
@@ -1376,7 +1379,11 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
   nr_timer_stop(&timers->T319);
   nr_timer_stop(&timers->T320);
 
-  // TODO if T390 and T302 are running (not implemented)
+  // if T390 (not implemented) and T302 are running
+  // stop timer
+  // perform the actions as specified in 5.3.14.4
+  nr_timer_stop(&timers->T302);
+  handle_302_expired_stopped(rrc);
 
   // if the RRCSetup is received in response to an RRCResumeRequest, RRCResumeRequest1 or RRCSetupRequest
   // enter RRC_CONNECTED
@@ -1394,8 +1401,45 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
   rrc_ue_generate_RRCSetupComplete(rrc, rrcSetup->rrc_TransactionIdentifier);
 }
 
-static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc,
-                                    const NRRrcMacCcchDataInd *ind)
+static void nr_rrc_process_rrcreject(NR_UE_RRC_INST_t *rrc, const NR_RRCReject_t *rrcReject)
+{
+  // stop timer T300, T302, T319 if running;
+  NR_UE_Timers_Constants_t *timers = &rrc->timers_and_constants;
+  nr_timer_stop(&timers->T300);
+  nr_timer_stop(&timers->T302);
+  nr_timer_stop(&timers->T319);
+
+  // reset MAC and release the default MAC Cell Group configuration
+  NR_UE_MAC_reset_cause_t cause = REJECT;
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_NRUE, 0, NR_MAC_RRC_CONFIG_RESET);
+  NR_MAC_RRC_CONFIG_RESET(msg).cause = cause;
+  itti_send_msg_to_task(TASK_MAC_UE, rrc->ue_id, msg);
+
+  // if waitTime is configured in the RRCReject: start timer T302, with the timer value set to the waitTime
+  NR_RejectWaitTime_t *waitTime = NULL;
+  if (rrcReject->criticalExtensions.present == NR_RRCReject__criticalExtensions_PR_rrcReject) {
+    NR_RRCReject_IEs_t *ies = rrcReject->criticalExtensions.choice.rrcReject;
+    waitTime = ies->waitTime; // Wait time value in seconds
+  }
+  if (waitTime) {
+    nr_timer_setup(&timers->T302, *waitTime * 1000, 10);
+    nr_timer_start(&timers->T302);
+    rrc->access_barred = true;
+  } else {
+    LOG_W(RRC, "Error: waitTime should be always included in RRCReject message\n");
+  }
+
+  // TODO if RRCReject is received in response to a request from upper layers
+  //      inform the upper layer that access barring is applicable for all access categories except categories '0' and '2'
+
+  // TODO if RRCReject is received in response to an RRCSetupRequest
+  //      inform upper layers about the failure to setup the RRC connection, upon which the procedure ends
+
+  // TODO else if RRCReject is received in response to an RRCResumeRequest or an RRCResumeRequest1
+  //      Resume not implemented yet
+}
+
+static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc, const NRRrcMacCcchDataInd *ind)
 {
   NR_DL_CCCH_Message_t *dl_ccch_msg = NULL;
   asn_dec_rval_t dec_rval;
@@ -1422,7 +1466,8 @@ static int8_t nr_rrc_ue_decode_ccch(NR_UE_RRC_INST_t *rrc,
          break;
 
        case NR_DL_CCCH_MessageType__c1_PR_rrcReject:
-         LOG_I(NR_RRC, "[UE%ld] Logical Channel DL-CCCH (SRB0), Received RRCReject \n", rrc->ue_id);
+         LOG_W(NR_RRC, "[UE%ld] Logical Channel DL-CCCH (SRB0), Received RRCReject \n", rrc->ue_id);
+         nr_rrc_process_rrcreject(rrc, dl_ccch_msg->message.choice.c1->choice.rrcReject);
          rval = 0;
          break;
 
@@ -2740,17 +2785,16 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
         nr_timer_setup(&tac->T302, target, 10);
         nr_timer_start(&tac->T302);
         // TODO inform upper layers that access barring is applicable
-        // for all access categories except categories '0' and '2'.
-        LOG_E(NR_RRC,"Go to IDLE. Handling RRCRelease message including a waitTime not implemented\n");
+        //      for all access categories except categories '0' and '2'.
+        // for now we just set the access barred in RRC
+        rrc->access_barred = true;
       }
     }
   }
   if (!waitTime) {
     if (nr_timer_is_active(&tac->T302)) {
       nr_timer_stop(&tac->T302);
-      // TODO barring alleviation as in 5.3.14.4
-      // not implemented
-      LOG_E(NR_RRC,"Go to IDLE. Barring alleviation not implemented\n");
+      handle_302_expired_stopped(rrc);
     }
   }
   if (nr_timer_is_active(&tac->T390)) {
@@ -2858,6 +2902,13 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_NRUE, rrc->ue_id, NR_NAS_CONN_RELEASE_IND);
   NR_NAS_CONN_RELEASE_IND(msg_p).cause = release_cause;
   itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, msg_p);
+}
+
+void handle_302_expired_stopped(NR_UE_RRC_INST_t *rrc)
+{
+  // for each Access Category for which T390 (TODO not implemented) is not running
+  // consider the barring for this Access Category to be alleviated
+  rrc->access_barred = false;
 }
 
 void handle_t300_expiry(NR_UE_RRC_INST_t *rrc)

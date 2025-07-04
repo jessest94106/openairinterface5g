@@ -300,8 +300,7 @@ NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
   if (dci_format == NR_DL_DCI_FORMAT_1_0) {
     dmrs.numDmrsCdmGrpsNoData = tda_info->nrOfSymbols <= 2 ? 1 : 2;
     dmrs.dmrs_ports_id = 0;
-  }
-  else {
+  } else {
     //TODO first basic implementation of dmrs port selection
     //     only vaild for a single codeword
     //     for now it assumes a selection of Nl consecutive dmrs ports
@@ -346,16 +345,21 @@ NR_pdsch_dmrs_t get_dl_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
     }
   }
 
+  dmrs.n_scid = 0;
+  long *scramblingID = NULL;
   NR_PDSCH_Config_t *pdsch_Config = dl_bwp ? dl_bwp->pdsch_Config : NULL;
   if (pdsch_Config) {
-    if (tda_info->mapping_type == typeB)
-      dmrs.dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup->dmrs_Type != NULL;
-    else
-      dmrs.dmrsConfigType = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->dmrs_Type != NULL;
-  }
-  else
+    NR_DMRS_DownlinkConfig_t *dmrs_Config = tda_info->mapping_type == typeB ?
+                                            pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup :
+                                            pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup;
+    dmrs.phaseTrackingRS = dmrs_Config->phaseTrackingRS ? dmrs_Config->phaseTrackingRS->choice.setup : NULL;
+    dmrs.dmrsConfigType = dmrs_Config->dmrs_Type != NULL;
+    scramblingID = dmrs.n_scid ? dmrs_Config->scramblingID1 : dmrs_Config->scramblingID0;
+  } else {
     dmrs.dmrsConfigType = NFAPI_NR_DMRS_TYPE1;
-
+    dmrs.phaseTrackingRS = NULL;
+  }
+  dmrs.scrambling_id = scramblingID ? *scramblingID : *scc->physCellId;
   dmrs.N_PRB_DMRS = dmrs.numDmrsCdmGrpsNoData * (dmrs.dmrsConfigType == NFAPI_NR_DMRS_TYPE1 ? 6 : 4);
   dmrs.dl_dmrs_symb_pos = fill_dmrs_mask(pdsch_Config, dci_format, scc->dmrs_TypeA_Position, tda_info->nrOfSymbols, tda_info->startSymbolIndex, tda_info->mapping_type, frontloaded_symb);
   dmrs.N_DMRS_SLOT = get_num_dmrs(dmrs.dl_dmrs_symb_pos);
@@ -702,8 +706,8 @@ const NR_DMRS_UplinkConfig_t *get_DMRS_UplinkConfig(const NR_PUSCH_Config_t *pus
 NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
                                    const NR_UE_UL_BWP_t *ul_bwp,
                                    const NR_tda_info_t *tda_info,
-                                   const int Layers) {
-
+                                   const int Layers)
+{
   NR_pusch_dmrs_t dmrs = {0};
   // TODO setting of cdm groups with no data to be redone for MIMO
   if(NFAPI_MODE == NFAPI_MODE_AERIAL) {
@@ -715,13 +719,36 @@ NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
       dmrs.num_dmrs_cdm_grps_no_data = 2;
   }
 
-  NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = ul_bwp->pusch_Config ?
-                                                 (tda_info->mapping_type == typeA ?
-                                                 ul_bwp->pusch_Config->dmrs_UplinkForPUSCH_MappingTypeA->choice.setup :
-                                                 ul_bwp->pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup) : NULL;
+  const NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = get_DMRS_UplinkConfig(ul_bwp->pusch_Config, tda_info);
+  dmrs.ptrsConfig = NR_DMRS_UplinkConfig
+                    && NR_DMRS_UplinkConfig->phaseTrackingRS ?
+                    NR_DMRS_UplinkConfig->phaseTrackingRS->choice.setup : NULL;
+
+  dmrs.pusch_identity = *scc->physCellId;
+  dmrs.dmrs_scrambling_id = *scc->physCellId;
+  dmrs.scid = 0;
+  if (ul_bwp->transform_precoding) { // transform precoding disabled
+    long *scramblingid = NULL;
+    if (NR_DMRS_UplinkConfig && dmrs.scid == 0)
+      scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID0;
+    else if (NR_DMRS_UplinkConfig)
+      scramblingid = NR_DMRS_UplinkConfig->transformPrecodingDisabled->scramblingID1;
+    if (scramblingid)
+      dmrs.dmrs_scrambling_id = *scramblingid;
+  } else {
+    if (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->transformPrecodingEnabled) {
+      if (NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity)
+        dmrs.pusch_identity = *NR_DMRS_UplinkConfig->transformPrecodingEnabled->nPUSCH_Identity;
+      if ((!NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceGroupHopping
+          && !NR_DMRS_UplinkConfig->transformPrecodingEnabled->sequenceHopping)
+          && !scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->groupHoppingEnabledTransformPrecoding)
+        dmrs.low_papr_sequence_number = 0;
+      else
+        AssertFatal(false, "Hopping mode is not supported in transform precoding\n");
+    }
+  }
 
   dmrs.dmrs_config_type = NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->dmrs_Type ? 1 : 0;
-
   const pusch_dmrs_AdditionalPosition_t additional_pos = (NR_DMRS_UplinkConfig && NR_DMRS_UplinkConfig->dmrs_AdditionalPosition) ?
                                                          (*NR_DMRS_UplinkConfig->dmrs_AdditionalPosition ==
                                                          NR_DMRS_UplinkConfig__dmrs_AdditionalPosition_pos3 ?
@@ -780,6 +807,92 @@ int get_mcs_from_bler(const NR_bler_options_t *bler_options,
   LOG_D(MAC, "frame %4d MCS %d -> %d (num_dl_sched %d, num_dl_retx %d, BLER wnd %.3f avg %.6f)\n",
         frame, old_mcs, new_mcs, num_dl_sched, num_dl_retx, bler_window, bler_stats->bler);
   return new_mcs;
+}
+
+nfapi_nr_dl_dci_pdu_t *prepare_dci_pdu(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu,
+                                       const NR_ServingCellConfigCommon_t *scc,
+                                       const NR_SearchSpace_t *ss,
+                                       const NR_ControlResourceSet_t *coreset,
+                                       int aggregation_level,
+                                       int cce_index,
+                                       int beam_index,
+                                       int rnti)
+{
+  nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu->dci_pdu[pdcch_pdu->numDlDci];
+  dci_pdu->RNTI = rnti;
+  dci_pdu->AggregationLevel = aggregation_level;
+  dci_pdu->CceIndex = cce_index;
+  if (coreset->pdcch_DMRS_ScramblingID &&
+      ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific) {
+    dci_pdu->ScramblingId = *coreset->pdcch_DMRS_ScramblingID;
+    dci_pdu->ScramblingRNTI = rnti;
+  } else {
+    dci_pdu->ScramblingId = *scc->physCellId;
+    dci_pdu->ScramblingRNTI = 0;
+  }
+  dci_pdu->beta_PDCCH_1_0 = 0;
+  dci_pdu->powerControlOffsetSS = 1;
+  dci_pdu->precodingAndBeamforming.num_prgs = 0;
+  dci_pdu->precodingAndBeamforming.prg_size = 0;
+  dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
+  dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
+  dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
+  return dci_pdu;
+}
+
+dci_pdu_rel15_t prepare_dci_dl_payload(const gNB_MAC_INST *gNB_mac,
+                                       const NR_UE_info_t *UE,
+                                       nr_rnti_type_t rnti_type,
+                                       NR_SearchSpace__searchSpaceType_PR ss_type,
+                                       const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu,
+                                       const NR_sched_pdsch_t *sched_pdsch,
+                                       const NR_sched_pucch_t *pucch,
+                                       int harq_pid,
+                                       int tb_scaling,
+                                       bool is_sib1)
+{
+  const NR_UE_DL_BWP_t *dl_BWP = UE ? &UE->current_DL_BWP : NULL;
+  dci_pdu_rel15_t dci_payload = {0};
+  dci_payload.format_indicator = 1;
+  dci_payload.time_domain_assignment.val = sched_pdsch->time_domain_allocation;
+  dci_payload.mcs = sched_pdsch->mcs;
+  dci_payload.rv = pdsch_pdu->rvIndex[0];
+  dci_payload.vrb_to_prb_mapping.val = 0;
+  int riv_bwp = pdsch_pdu->BWPSize;
+  if (!UE)
+    riv_bwp = gNB_mac->cset0_bwp_size;
+  else if (dl_BWP->dci_format == NR_DL_DCI_FORMAT_1_0 && ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
+    if (gNB_mac->cset0_bwp_size > 0)
+      riv_bwp = gNB_mac->cset0_bwp_size;
+    else
+      riv_bwp = UE->sc_info.initial_dl_BWPSize;
+  }
+  dci_payload.frequency_domain_assignment.val = PRBalloc_to_locationandbandwidth0(pdsch_pdu->rbSize, pdsch_pdu->rbStart, riv_bwp);
+  if (rnti_type == TYPE_SI_RNTI_) {
+    dci_payload.system_info_indicator = !is_sib1;
+    return dci_payload;
+  }
+  if (rnti_type == TYPE_RA_RNTI_) {
+    dci_payload.tb_scaling = tb_scaling;
+    return dci_payload;
+  }
+
+  const NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+  dci_payload.dmrs_sequence_initialization.val = pdsch_pdu->SCID;
+  dci_payload.antenna_ports.val = sched_pdsch->dmrs_parms.dmrs_ports_id;
+  dci_payload.tpc = sched_ctrl->tpc1;
+  const NR_UE_harq_t *harq = &sched_ctrl->harq_processes[harq_pid];
+  AssertFatal(harq, "HARQ process should be available for DCI with RNTI %s\n", rnti_types(rnti_type));
+  dci_payload.harq_pid.val = harq_pid;
+  dci_payload.ndi = harq->ndi;
+  dci_payload.pucch_resource_indicator = pucch ? pucch->resource_indicator : 0;
+  dci_payload.pdsch_to_harq_feedback_timing_indicator.val = pucch ? pucch->timing_indicator : 0; // PDSCH to HARQ TI
+  dci_payload.dai[0].val = pucch ? (pucch->dai_c - 1) & 3 : 0;
+  // bwp indicator
+  // as per table 7.3.1.1.2-1 in 38.212
+  if (dl_BWP)
+    dci_payload.bwp_indicator.val = UE->sc_info.n_dl_bwp < 4 ? dl_BWP->bwp_id : dl_BWP->bwp_id - 1;
+  return dci_payload;
 }
 
 void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
@@ -1175,11 +1288,11 @@ void set_r_pucch_parms(int rsetindex,
   *start_symbol_index = default_pucch_firstsymb[rsetindex];
 }
 
-void prepare_dci(const NR_UE_ServingCell_Info_t *servingCellInfo,
-                 const NR_UE_DL_BWP_t *current_BWP,
-                 const NR_ControlResourceSet_t *coreset,
-                 dci_pdu_rel15_t *dci_pdu_rel15,
-                 nr_dci_format_t format)
+static void prepare_dci_X1(const NR_UE_ServingCell_Info_t *servingCellInfo,
+                           const NR_UE_DL_BWP_t *current_BWP,
+                           const NR_ControlResourceSet_t *coreset,
+                           dci_pdu_rel15_t *dci_pdu_rel15,
+                           nr_dci_format_t format)
 {
   const NR_PDSCH_Config_t *pdsch_Config = current_BWP ? current_BWP->pdsch_Config : NULL;
 
@@ -1326,7 +1439,7 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
   pdcch_dci_pdu->PayloadSizeBits = dci_size;
   AssertFatal(dci_size <= 64, "DCI sizes above 64 bits not yet supported");
   if (dci_format == NR_DL_DCI_FORMAT_1_1 || dci_format == NR_UL_DCI_FORMAT_0_1)
-    prepare_dci(servingCellInfo, current_DL_BWP, coreset, dci_pdu_rel15, dci_format);
+    prepare_dci_X1(servingCellInfo, current_DL_BWP, coreset, dci_pdu_rel15, dci_format);
 
   /// Payload generation
   switch (dci_format) {
@@ -2422,7 +2535,7 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
       NRRIV2PRBOFFSET(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
 
   sc_info->dl_bw_tbslbrm = get_dlbw_tbslbrm(sc_info->initial_dl_BWPSize, servingCellConfig);
-  sc_info->dl_bw_tbslbrm = get_ulbw_tbslbrm(sc_info->initial_ul_BWPSize, servingCellConfig);
+  sc_info->ul_bw_tbslbrm = get_ulbw_tbslbrm(sc_info->initial_ul_BWPSize, servingCellConfig);
 
   if (UL_BWP->bwp_id > 0) {
     UL_BWP->pucch_ConfigCommon = ul_bwp->bwp_Common->pucch_ConfigCommon ? ul_bwp->bwp_Common->pucch_ConfigCommon->choice.setup : NULL;
@@ -2577,19 +2690,10 @@ static void init_bler_stats(const NR_bler_options_t *bler_options, NR_bler_stats
  * error handling). Remove with delete_nr_ue_data().  */
 NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroupConfig_t *CellGroup)
 {
-  uid_t uid = uid_linear_allocator_new(uia);
-  /* if the UE list is full, we should reject the UE with an RRC reject
-   * message, but we do not have this functionality. To keep it simple, do not
-   * create a UE context here, so we can print an error message. */
-  if (uid >= MAX_MOBILES_PER_GNB) {
-    uid_linear_allocator_free(uia, uid);
-    return NULL;
-  }
-
   NR_UE_info_t *UE = calloc_or_fail(1, sizeof(NR_UE_info_t));
+  UE->uid = uid_linear_allocator_new(uia);
   UE->rnti = rnti;
   UE->CellGroup = CellGroup;
-  UE->uid = uid;
   UE->ra = calloc(1, sizeof(*UE->ra));
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   sched_ctrl->ta_update = 31;
@@ -2621,6 +2725,8 @@ NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], 
 {
   for (int i = 0; i < list_size; i++) {
     NR_UE_info_t *curr_UE = list[i];
+    if (!curr_UE)
+      break; /* reached the end of the list */
     if (curr_UE->rnti != rnti)
       continue;
 
@@ -2629,7 +2735,6 @@ NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], 
     list[list_size - 1] = NULL;
     return curr_UE;
   }
-  LOG_E(NR_MAC, "UE %04x to be removed not found in list\n", rnti);
   return NULL;
 }
 
@@ -2735,8 +2840,10 @@ void mac_remove_nr_ue(gNB_MAC_INST *nr_mac, rnti_t rnti)
   NR_SCHED_LOCK(&UE_info->mutex);
   NR_UE_info_t *UE = remove_UE_from_list(MAX_MOBILES_PER_GNB + 1, UE_info->connected_ue_list, rnti);
   NR_SCHED_UNLOCK(&UE_info->mutex);
-
-  delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
+  if (UE)
+    delete_nr_ue_data(UE, nr_mac->common_channels, &UE_info->uid_allocator);
+  else
+    nr_release_ra_UE(nr_mac, rnti);
 }
 
 // all values passed to this function are in dB x10
@@ -3124,7 +3231,7 @@ void nr_mac_trigger_release_complete(gNB_MAC_INST *mac, int rnti)
   // du_remove_f1_ue_data() (and also while sending the message to RRC)
   NR_SCHED_UNLOCK(&mac->sched_lock);
   f1_ue_data_t ue_data = du_get_f1_ue_data(rnti);
-  f1ap_ue_context_release_complete_t complete = {
+  f1ap_ue_context_rel_cplt_t complete = {
     .gNB_CU_ue_id = ue_data.secondary_ue,
     .gNB_DU_ue_id = rnti,
   };
@@ -3164,7 +3271,12 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
     }
 
     /* check if UL failure and trigger release request if necessary */
-    nr_mac_check_ul_failure(mac, UE->rnti, sched_ctrl);
+    bool released = nr_mac_check_ul_failure(mac, UE->rnti, sched_ctrl);
+    if (released) {
+      // go back to examine the next UE, which is at the position the current UE was
+      UE--;
+      continue;
+    }
 
     if (nr_timer_tick(&sched_ctrl->transm_interrupt)) {
       /* expired */
@@ -3297,7 +3409,9 @@ void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_le
   NR_SCHED_ENSURE_LOCKED(&mac->sched_lock);
 
   uint8_t du2cu[1024];
-  int encoded = encode_cellGroupConfig(UE->CellGroup, du2cu, sizeof(du2cu));
+  int encoded_len = 0;
+  if (UE->CellGroup)
+    encoded_len = encode_cellGroupConfig(UE->CellGroup, du2cu, sizeof(du2cu));
 
   DevAssert(mac->f1_config.setup_req != NULL);
   AssertFatal(mac->f1_config.setup_req->num_cells_available == 1, "can handle only one cell\n");
@@ -3308,8 +3422,8 @@ void send_initial_ul_rrc_message(int rnti, const uint8_t *sdu, sdu_size_t sdu_le
     .crnti = rnti,
     .rrc_container = (uint8_t *) sdu,
     .rrc_container_length = sdu_len,
-    .du2cu_rrc_container = (uint8_t *) du2cu,
-    .du2cu_rrc_container_length = encoded
+    .du2cu_rrc_container = encoded_len ? (uint8_t *) du2cu : NULL,
+    .du2cu_rrc_container_length = encoded_len
   };
   mac->mac_rrc.initial_ul_rrc_message_transfer(0, &ul_rrc_msg);
 }
@@ -3322,6 +3436,19 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   if (!nr_rlc_activate_srb0(UE->rnti, UE, send_initial_ul_rrc_message))
     return false;
 
+  if (UE->uid >= MAX_MOBILES_PER_GNB) {
+    // verifying if any UE left in the meantime and it is possible to get a valid UID
+    uid_linear_allocator_free(&mac->UE_info.uid_allocator, UE->uid);
+    UE->uid = uid_linear_allocator_new(&mac->UE_info.uid_allocator);
+    if (UE->uid >= MAX_MOBILES_PER_GNB) {
+      // if the UE list is full, we should reject the UE with an RRC reject message
+      // to signal the upper layers to send a reject we send an empty CellGroup information element
+      UE->CellGroup = NULL;
+      LOG_W(NR_MAC, "Maximum number of UE alllowed at DU reached. Cannot serve UE %04x", UE->rnti);
+      return true;
+    }
+  }
+
   /* create this UE's initial CellGroup */
   int CC_id = 0;
   int srb_id = 1;
@@ -3331,12 +3458,14 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = cellGroupConfig;
 
+  if (!cellGroupConfig)
+    return true;
+
   /* the cellGroup sent to CU specifies there is SRB1, so create it */
   DevAssert(cellGroupConfig->rlc_BearerToAddModList->list.count == 1);
   const NR_RLC_BearerConfig_t *bearer = cellGroupConfig->rlc_BearerToAddModList->list.array[0];
   DevAssert(bearer->servedRadioBearer->choice.srb_Identity == srb_id);
   nr_rlc_add_srb(UE->rnti, bearer->servedRadioBearer->choice.srb_Identity, bearer);
-
   int priority = bearer->mac_LogicalChannelConfig->ul_SpecificParameters->priority;
   nr_lc_config_t c = {.lcid = bearer->logicalChannelIdentity, .priority = priority};
   nr_mac_add_lcid(&UE->UE_sched_ctrl, &c);
@@ -3357,6 +3486,8 @@ bool nr_mac_check_release(NR_UE_sched_ctrl_t *sched_ctrl, int rnti)
   return sched_ctrl->release_timer == 0;
 }
 
+#define UL_FAILURE_REQ_GRACE 10000
+#define UL_FAILURE_TIMEOUT 30000
 void nr_mac_trigger_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl, NR_SubcarrierSpacing_t subcarrier_spacing)
 {
   if (sched_ctrl->ul_failure) {
@@ -3364,8 +3495,9 @@ void nr_mac_trigger_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl, NR_SubcarrierSpac
     return;
   }
   sched_ctrl->ul_failure = true;
-  // 30 seconds till triggering release request
-  sched_ctrl->ul_failure_timer = 30000 << subcarrier_spacing;
+  // UL_FAILURE_TIMEOUT ms till triggering release request
+  // UL_FAILURE_REQ_GRACE ms till automatically released after request
+  sched_ctrl->ul_failure_timer = (UL_FAILURE_REQ_GRACE + UL_FAILURE_TIMEOUT) << subcarrier_spacing;
 }
 
 void nr_mac_reset_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl)
@@ -3385,7 +3517,7 @@ bool nr_mac_request_release_ue(const gNB_MAC_INST *nrmac, int rnti)
     return false;
   }
   f1_ue_data_t ue_data = du_get_f1_ue_data(rnti);
-  f1ap_ue_context_release_req_t request = {
+  f1ap_ue_context_rel_req_t request = {
     .gNB_CU_ue_id = ue_data.secondary_ue,
     .gNB_DU_ue_id = rnti,
     .cause = F1AP_CAUSE_RADIO_NETWORK,
@@ -3395,20 +3527,27 @@ bool nr_mac_request_release_ue(const gNB_MAC_INST *nrmac, int rnti)
   return true;
 }
 
-void nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl)
+bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl)
 {
   if (!sched_ctrl->ul_failure)
-    return;
+    return false;
   if (sched_ctrl->ul_failure_timer > 0)
     sched_ctrl->ul_failure_timer--;
-  /* to trigger only once: trigger when ul_failure_timer == 1, but timer will
-   * stop at 0 and we wait for a UE release command from upper layers */
-  if (sched_ctrl->ul_failure_timer == 1) {
+  /* trigger once: trigger when ul_failure_timer == UL_FAILURE_REQ_GRACE( we
+   * wait for a UE release command from upper layers), and UE is automatically
+   * released when no answer after UL_FAILURE_REQ_GRACE */
+  if (sched_ctrl->ul_failure_timer == UL_FAILURE_REQ_GRACE) {
     LOG_W(MAC, "UE %04x: request release after UL failure timer expiry\n", rnti);
     bool requested = nr_mac_request_release_ue(nrmac, rnti);
     if (!requested)
-      nr_mac_release_ue(nrmac, rnti);
+      sched_ctrl->ul_failure_timer = 0; /* force expiry */
   }
+  if (sched_ctrl->ul_failure_timer == 0) {
+    LOG_W(NR_MAC, "UE %04x: no answer for release request, dropping UE\n", rnti);
+    nr_mac_release_ue(nrmac, rnti);
+    return true;
+  }
+  return false;
 }
 
 void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_t *UE)

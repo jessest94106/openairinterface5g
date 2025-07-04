@@ -26,6 +26,7 @@
 #include <netinet/sctp.h>
 #include "common/5g_platform_types.h"
 #include "common/platform_constants.h"
+#include "common/utils/ds/byte_array.h"
 
 //-------------------------------------------------------------------------------------------//
 // Defines to access message fields.
@@ -54,7 +55,7 @@
 #define F1AP_UL_RRC_MESSAGE(mSGpTR)                (mSGpTR)->ittiMsg.f1ap_ul_rrc_message
 #define F1AP_UE_CONTEXT_SETUP_REQ(mSGpTR)          (mSGpTR)->ittiMsg.f1ap_ue_context_setup_req
 #define F1AP_UE_CONTEXT_SETUP_RESP(mSGpTR)         (mSGpTR)->ittiMsg.f1ap_ue_context_setup_resp
-#define F1AP_UE_CONTEXT_MODIFICATION_REQ(mSGpTR)   (mSGpTR)->ittiMsg.f1ap_ue_context_modification_req
+#define F1AP_UE_CONTEXT_MODIFICATION_REQ(mSGpTR)   (mSGpTR)->ittiMsg.f1ap_ue_context_mod_req
 #define F1AP_UE_CONTEXT_MODIFICATION_RESP(mSGpTR)  (mSGpTR)->ittiMsg.f1ap_ue_context_modification_resp
 #define F1AP_UE_CONTEXT_MODIFICATION_FAIL(mSGpTR)  (mSGpTR)->ittiMsg.f1ap_ue_context_modification_fail
 #define F1AP_UE_CONTEXT_MODIFICATION_REQUIRED(mSGpTR)   (mSGpTR)->ittiMsg.f1ap_ue_context_modification_required
@@ -362,7 +363,6 @@ typedef struct f1ap_ul_rrc_message_s {
 typedef struct f1ap_up_tnl_s {
   in_addr_t tl_address; // currently only IPv4 supported
   uint32_t teid;
-  uint16_t port;
 } f1ap_up_tnl_t;
 
 typedef enum preemption_capability_e {
@@ -375,82 +375,19 @@ typedef enum preemption_vulnerability_e {
   PREEMPTABLE,
 } preemption_vulnerability_t;
 
-typedef struct f1ap_qos_characteristics_s {
-  union {
-    struct {
-      long fiveqi;
-      long qos_priority_level;
-    } non_dynamic;
-    struct {
-      long fiveqi; // -1 -> optional
-      long qos_priority_level;
-      long packet_delay_budget;
-      struct {
-        long per_scalar;
-        long per_exponent;
-      } packet_error_rate;
-    } dynamic;
-  };
-  fiveQI_t qos_type;
-} f1ap_qos_characteristics_t;
-
-typedef struct f1ap_ngran_allocation_retention_priority_s {
-  uint16_t priority_level;
-  preemption_capability_t preemption_capability;
-  preemption_vulnerability_t preemption_vulnerability;
-} f1ap_ngran_allocation_retention_priority_t;
-
-typedef struct f1ap_qos_flow_level_qos_parameters_s {
-  f1ap_qos_characteristics_t qos_characteristics;
-  f1ap_ngran_allocation_retention_priority_t alloc_reten_priority;
-} f1ap_qos_flow_level_qos_parameters_t;
-
-typedef struct f1ap_flows_mapped_to_drb_s {
-  long qfi; // qos flow identifier
-  f1ap_qos_flow_level_qos_parameters_t qos_params;
-} f1ap_flows_mapped_to_drb_t;
-
-typedef struct f1ap_drb_information_s {
-  f1ap_qos_flow_level_qos_parameters_t drb_qos;
-  f1ap_flows_mapped_to_drb_t *flows_mapped_to_drb;
-  uint8_t flows_to_be_setup_length;
-} f1ap_drb_information_t;
-
 typedef enum f1ap_rlc_mode_t { F1AP_RLC_MODE_AM, F1AP_RLC_MODE_UM_BIDIR, F1AP_RLC_UM_UNI_UL, F1AP_RLC_UM_UNI_DL } f1ap_rlc_mode_t;
-typedef struct f1ap_drb_to_be_setup_s {
-  long           drb_id;
-  f1ap_up_tnl_t  up_ul_tnl[2];
-  uint8_t        up_ul_tnl_length;
-  f1ap_up_tnl_t  up_dl_tnl[2];
-  uint8_t        up_dl_tnl_length;
-  f1ap_drb_information_t drb_info;
-  f1ap_rlc_mode_t rlc_mode;
-  nssai_t nssai;
-} f1ap_drb_to_be_setup_t;
 
-typedef struct f1ap_srb_to_be_setup_s {
-  long           srb_id;
-  uint8_t        lcid;
-} f1ap_srb_to_be_setup_t;
+typedef struct f1ap_cu_to_du_rrc_info_s {
+  byte_array_t *cg_configinfo;
+  byte_array_t *ue_cap;
+  byte_array_t *meas_config;
+  byte_array_t *ho_prep_info;
+} f1ap_cu_to_du_rrc_info_t;
 
-typedef struct f1ap_rb_failed_to_be_setup_s {
-  long           rb_id;
-} f1ap_rb_failed_to_be_setup_t;
-
-typedef struct f1ap_drb_to_be_released_t {
-  long rb_id;
-} f1ap_drb_to_be_released_t;
-
-typedef struct cu_to_du_rrc_information_s {
-  uint8_t * cG_ConfigInfo;
-  uint32_t   cG_ConfigInfo_length;
-  uint8_t * uE_CapabilityRAT_ContainerList;
-  uint32_t   uE_CapabilityRAT_ContainerList_length;
-  uint8_t * measConfig;
-  uint32_t   measConfig_length;
-  uint8_t *handoverPreparationInfo;
-  uint32_t handoverPreparationInfo_length;
-}cu_to_du_rrc_information_t;
+typedef struct f1ap_du_to_cu_rrc_info_t {
+  byte_array_t cell_group_config;
+  byte_array_t *meas_gap_config;
+} f1ap_du_to_cu_rrc_info_t;
 
 typedef struct du_to_cu_rrc_information_s {
   uint8_t * cellGroupConfig;
@@ -460,11 +397,6 @@ typedef struct du_to_cu_rrc_information_s {
   uint8_t * requestedP_MaxFR1;
   uint32_t  requestedP_MaxFR1_length;
 }du_to_cu_rrc_information_t;
-
-typedef enum QoS_information_e {
-  NG_RAN_QoS    = 0,
-  EUTRAN_QoS    = 1,
-} QoS_information_t;
 
 typedef enum ReconfigurationCompl_e {
   RRCreconf_info_not_present = 0,
@@ -477,39 +409,173 @@ typedef enum TransmActionInd_e {
   TransmActionInd_RESTART,
 } TransmActionInd_t;
 
-typedef struct f1ap_ue_context_setup_s {
+typedef enum lower_layer_status_e {
+  LOWER_LAYERS_SUSPEND,
+  LOWER_LAYERS_RESUME,
+} lower_layer_status_t;
+
+typedef struct f1ap_srb_to_setup_t {
+  int id;
+} f1ap_srb_to_setup_t;
+
+typedef struct f1ap_srb_setup_t {
+  int id;
+  int lcid;
+} f1ap_srb_setup_t;
+
+/// 9.3.1.52 Packet Error Rate
+typedef struct f1ap_per_t {
+  uint8_t scalar;
+  uint8_t exponent;
+} f1ap_per_t;
+
+// 9.3.1.49 Non-Dynamic 5QI Descriptor
+typedef struct f1ap_nondynamic_5qi_t {
+  int fiveQI;
+} f1ap_nondynamic_5qi_t;
+
+// 9.3.1.47 Dynamic 5QI Descriptor
+typedef struct f1ap_dynamic_5qi_t {
+  int prio; /// QoS Priority Level
+  int pdb; /// Packet Delay Budget
+  f1ap_per_t per; /// Packet Error Rate
+  bool *delay_critical; /// Delay Critical
+  int *avg_win; /// Averaging Window
+} f1ap_dynamic_5qi_t;
+
+typedef struct f1ap_arp_t {
+  uint16_t prio;
+  preemption_capability_t preempt_cap;
+  preemption_vulnerability_t preempt_vuln;
+} f1ap_arp_t;
+
+// 9.3.1.45 QoS Flow Level QoS Parameters
+typedef struct f1ap_qos_flow_param_t {
+  fiveQI_t qos_type;
+  union {
+    f1ap_nondynamic_5qi_t nondyn;
+    f1ap_dynamic_5qi_t dyn;
+  };
+  f1ap_arp_t arp;
+} f1ap_qos_flow_param_t;
+
+// in 9.2.2.1 Flows Mapped to DRB Item
+typedef struct f1ap_drb_flows_mapped_t {
+  int qfi;
+  f1ap_qos_flow_param_t param;
+} f1ap_drb_flows_mapped_t;
+
+/// in 9.2.2.1 DRB Info in UE Context Setup Request
+typedef struct f1ap_drb_info_nr_t {
+  f1ap_qos_flow_param_t drb_qos;
+  nssai_t nssai;
+  int flows_len;
+  f1ap_drb_flows_mapped_t *flows;
+} f1ap_drb_info_nr_t;
+
+typedef enum { F1AP_PDCP_SN_12B, F1AP_PDCP_SN_18B } f1ap_pdcp_sn_len_t;
+/// in 9.2.2.1 DRB to Be Setup Item IEs
+typedef struct f1ap_drb_to_setup_t {
+  int id;
+  enum { F1AP_QOS_CHOICE_EUTRAN, F1AP_QOS_CHOICE_NR } qos_choice;
+  union {
+    // eutran not implemented
+    f1ap_drb_info_nr_t nr;
+  };
+  int up_ul_tnl_len;
+  f1ap_up_tnl_t up_ul_tnl[2];
+  f1ap_rlc_mode_t rlc_mode;
+  f1ap_pdcp_sn_len_t *dl_pdcp_sn_len; // in setup mandatory, in setupmod optional
+  f1ap_pdcp_sn_len_t *ul_pdcp_sn_len;
+} f1ap_drb_to_setup_t;
+
+typedef struct f1ap_drb_setup_t {
+  int id;
+  int *lcid;
+  int up_dl_tnl_len;
+  f1ap_up_tnl_t up_dl_tnl[2];
+} f1ap_drb_setup_t;
+
+typedef struct f1ap_drb_to_release_t {
+  int id;
+} f1ap_drb_to_release_t;
+
+typedef struct f1ap_ue_context_setup_req_s {
   uint32_t gNB_CU_ue_id;
-  uint32_t gNB_DU_ue_id;
-  // SpCell Info
+  uint32_t *gNB_DU_ue_id;
+
   plmn_id_t plmn;
   uint64_t nr_cellid;
   uint8_t servCellIndex;
-  uint8_t *cellULConfigured;
-  uint32_t servCellId;
-  cu_to_du_rrc_information_t *cu_to_du_rrc_information;
-  uint8_t  cu_to_du_rrc_information_length;
-  //uint8_t *du_to_cu_rrc_information;
-  du_to_cu_rrc_information_t *du_to_cu_rrc_information;
-  uint32_t  du_to_cu_rrc_information_length;
+
+  f1ap_cu_to_du_rrc_info_t cu_to_du_rrc_info;
+
+  int srbs_len;
+  f1ap_srb_to_setup_t *srbs;
+
+  int drbs_len;
+  f1ap_drb_to_setup_t *drbs;
+
+  byte_array_t *rrc_container;
+
+  uint64_t *gnb_du_ue_agg_mbr_ul; // C-ifDRBSetup
+} f1ap_ue_context_setup_req_t;
+
+typedef struct f1ap_ue_context_setup_resp_s {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+
+  f1ap_du_to_cu_rrc_info_t du_to_cu_rrc_info;
+
   uint16_t *crnti;
-  f1ap_drb_to_be_setup_t *drbs_to_be_setup;
-  uint8_t  drbs_to_be_setup_length;
-  f1ap_drb_to_be_setup_t *drbs_to_be_modified;
-    uint8_t  drbs_to_be_modified_length;
-  QoS_information_t QoS_information_type;
-  uint8_t  drbs_failed_to_be_setup_length;
-  f1ap_rb_failed_to_be_setup_t *drbs_failed_to_be_setup;
-  f1ap_srb_to_be_setup_t *srbs_to_be_setup;
-  uint8_t  srbs_to_be_setup_length;
-  uint8_t  srbs_failed_to_be_setup_length;
-  uint8_t drbs_to_be_released_length;
-  f1ap_drb_to_be_released_t *drbs_to_be_released;
-  f1ap_rb_failed_to_be_setup_t *srbs_failed_to_be_setup;
-  ReconfigurationCompl_t ReconfigComplOutcome;
-  uint8_t *rrc_container;
-  int      rrc_container_length;
+
+  int drbs_len;
+  f1ap_drb_setup_t *drbs;
+
+  int srbs_len;
+  f1ap_srb_setup_t *srbs;
+} f1ap_ue_context_setup_resp_t;
+
+typedef struct f1ap_ue_context_mod_req_t {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+
+  plmn_id_t *plmn;
+  uint64_t *nr_cellid;
+  uint8_t *servCellIndex;
+
+  f1ap_cu_to_du_rrc_info_t *cu_to_du_rrc_info;
+
   TransmActionInd_t *transm_action_ind;
-} f1ap_ue_context_setup_t, f1ap_ue_context_modif_req_t, f1ap_ue_context_modif_resp_t;
+  ReconfigurationCompl_t *reconfig_compl;
+
+  byte_array_t *rrc_container;
+
+  int srbs_len;
+  f1ap_srb_to_setup_t *srbs; // reuse the same type as for setup; there is a
+                             // list for SRB modification
+
+  int drbs_len;
+  f1ap_drb_to_setup_t *drbs; // as for SRBs
+
+  int drbs_rel_len;
+  f1ap_drb_to_release_t *drbs_rel;
+
+  lower_layer_status_t *status;
+} f1ap_ue_context_mod_req_t;
+
+typedef struct f1ap_ue_context_mod_resp {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+
+  f1ap_du_to_cu_rrc_info_t *du_to_cu_rrc_info;
+
+  int drbs_len;
+  f1ap_drb_setup_t *drbs;
+
+  int srbs_len;
+  f1ap_srb_setup_t *srbs;
+} f1ap_ue_context_mod_resp_t;
 
 typedef enum F1ap_Cause_e {
   F1AP_CAUSE_NOTHING,  /* No components present */
@@ -541,15 +607,29 @@ typedef struct f1ap_ue_context_modif_refuse_t {
   long cause_value;
 } f1ap_ue_context_modif_refuse_t;
 
-typedef struct f1ap_ue_context_release_s {
+typedef struct f1ap_ue_context_rel_req_t {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
-  f1ap_Cause_t  cause;
-  long          cause_value;
-  uint8_t      *rrc_container;
-  int           rrc_container_length;
-  int           srb_id;
-} f1ap_ue_context_release_req_t, f1ap_ue_context_release_cmd_t, f1ap_ue_context_release_complete_t;
+  f1ap_Cause_t cause;
+  long cause_value;
+} f1ap_ue_context_rel_req_t;
+
+typedef struct f1ap_ue_context_rel_cmd_t {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+  f1ap_Cause_t cause;
+  long cause_value;
+
+  byte_array_t *rrc_container;
+  int *srb_id; // C-ifRRCContainer
+
+  uint32_t *old_gNB_DU_ue_id; // if after reestablishment request
+} f1ap_ue_context_rel_cmd_t;
+
+typedef struct f1ap_ue_context_rel_cplt_t {
+  uint32_t gNB_CU_ue_id;
+  uint32_t gNB_DU_ue_id;
+} f1ap_ue_context_rel_cplt_t;
 
 typedef struct f1ap_paging_ind_s {
   uint16_t ueidentityindexvalue;

@@ -212,6 +212,11 @@ void *gNB_app_task(void *args_p)
       LOG_I(GNB_APP, " Received %s: timer_id %ld\n", msg_name, TIMER_HAS_EXPIRED(msg_p).timer_id);
       break;
 
+    case GNB_SAT_POSITION_UPDATE:
+      LOG_I(GNB_APP, " Received GNB_SAT_POSITION_UPDATE message\n");
+      nr_update_sib19(&GNB_SAT_POSITION_UPDATE(msg_p));
+      break;
+
     default:
       LOG_E(GNB_APP, "Received unexpected message %s\n", msg_name);
       break;

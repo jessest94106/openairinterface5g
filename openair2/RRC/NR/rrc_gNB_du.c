@@ -437,6 +437,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   if (rrc->node_name != NULL)
     resp.gNB_CU_name = strdup(rrc->node_name);
   rrc->mac_rrc.f1_setup_response(assoc_id, &resp);
+  free_f1ap_setup_response(&resp);
 
   /* we need to setup one default UE for phy-test and do-ra modes in the MAC */
   if (get_softmodem_params()->phy_test > 0 || get_softmodem_params()->do_ra > 0)
@@ -457,7 +458,9 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
       nr_rrc_finalize_ho(UE);
     }
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
-    if (ue_data.du_assoc_id == assoc_id && IS_SA_MODE(get_softmodem_params())) {
+    if (ue_data.du_assoc_id != assoc_id)
+      continue; /* this UE is on another DU */
+    if (IS_SA_MODE(get_softmodem_params())) {
       /* this UE belongs to the DU that disconnected, set du_assoc_id to 0,
        * meaning DU is offline, then trigger release request */
       ue_data.du_assoc_id = 0;
@@ -600,9 +603,12 @@ void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t
   ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
   ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
   ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, du->mtc);
-  /* TODO: free setup request */
+  if (du->setup_req)
+    free_f1ap_setup_request(du->setup_req);
+  free(du->setup_req);
   nr_rrc_du_container_t *removed = RB_REMOVE(rrc_du_tree, &rrc->dus, du);
   DevAssert(removed != NULL);
+  free(du);
   rrc->num_dus--;
 
   int num = invalidate_du_connections(rrc, assoc_id);

@@ -174,7 +174,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
   clear_beam_information(&gNB->beam_info, frame, slot, slots_frame);
 
   gNB->frame = frame;
-  start_meas(&gNB->eNB_scheduler);
+  start_meas(&gNB->gNB_scheduler);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_IN);
 
   for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
@@ -195,7 +195,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
   }
 
   bool wait_prach_completed = gNB->num_scheduled_prach_rx >= NUM_PRACH_RX_FOR_NOISE_ESTIMATE;
-  if (wait_prach_completed && (slot == 0) && (frame & 127) == 0) {
+  if ((wait_prach_completed || get_softmodem_params()->phy_test) && (slot == 0) && (frame & 127) == 0) {
     char stats_output[32656] = {0};
     dump_mac_stats(gNB, stats_output, sizeof(stats_output), true);
     LOG_I(NR_MAC, "Frame.Slot %d.%d\n%s\n", frame, slot, stats_output);
@@ -244,7 +244,9 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
   }
 
   // This schedules the DCI for Uplink and subsequently PUSCH
+  start_meas(&gNB->schedule_ulsch);
   nr_schedule_ulsch(module_idP, frame, slot, &sched_info->UL_dci_req);
+  stop_meas(&gNB->schedule_ulsch);
 
   // This schedules the DCI for Downlink and PDSCH
   start_meas(&gNB->schedule_dlsch);
@@ -262,7 +264,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
   const int current_index = ul_buffer_index(frame, slot, slots_frame, gNB->UL_tti_req_ahead_size);
   copy_ul_tti_req(&sched_info->UL_tti_req, &gNB->UL_tti_req_ahead[0][current_index]);
 
-  stop_meas(&gNB->eNB_scheduler);
+  stop_meas(&gNB->gNB_scheduler);
   NR_SCHED_UNLOCK(&gNB->sched_lock);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_OUT);
 }
