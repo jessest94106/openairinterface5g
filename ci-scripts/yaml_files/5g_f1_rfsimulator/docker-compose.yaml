@@ -96,6 +96,8 @@ services:
         container_name: rfsim5g-oai-cu
         cap_drop:
             - ALL
+        cap_add:
+            - SYS_NICE
         environment: 
             USE_ADDITIONAL_OPTIONS: --log_config.global_log_options level,nocolor,time
                                     --rfsimulator.options chanmod
@@ -123,6 +125,8 @@ services:
         container_name: rfsim5g-oai-du-pci0
         cap_drop:
             - ALL
+        cap_add:
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: --rfsim
                                     --log_config.global_log_options level,nocolor,time
@@ -152,6 +156,8 @@ services:
         container_name: rfsim5g-oai-du-pci1
         cap_drop:
             - ALL
+        cap_add:
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: --rfsim
                                     --log_config.global_log_options level,nocolor,time
@@ -188,6 +194,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: --rfsim --log_config.global_log_options level,nocolor,time
                                     -r 106 --numerology 1 -C 3619200000
