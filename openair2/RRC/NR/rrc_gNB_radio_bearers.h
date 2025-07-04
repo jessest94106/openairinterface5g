@@ -28,19 +28,13 @@
 #include "e1ap_messages_types.h"
 #include "nr_rrc_defs.h"
 
-#define DRB_ACTIVE_NONGBR       (2)   /* DRB is used for Non-GBR Flows */
-#define DRB_ACTIVE              (1)
-#define DRB_INACTIVE            (0)
-#define GBR_FLOW                (1)
-#define NONGBR_FLOW             (0)
-
 /// @brief Generates an ASN1 DRB-ToAddMod, from the established_drbs in gNB_RRC_UE_t.
 /// @param drb_t drb_asn1
 /// @return Returns the ASN1 DRB-ToAddMod structs.
 NR_DRB_ToAddMod_t *generateDRB_ASN1(const drb_t *drb_asn1);
 
 /// @brief retrieve the data structure representing DRB with ID drb_id of UE ue
-drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id);
+drb_t *get_drb(seq_arr_t *seq, int id);
 
 /// @brief Creates and stores a DRB in the gNB_RRC_UE_t struct
 /// @param ue The gNB_RRC_UE_t struct that holds information for the UEs
@@ -52,18 +46,11 @@ drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id);
 /// @param pdcp_config
 /// @return returns a pointer to the generated DRB structure
 drb_t *generateDRB(gNB_RRC_UE_t *ue,
-                   uint8_t drb_id,
                    const pdusession_t *pduSession,
                    bool enable_sdap,
                    int do_drb_integrity,
                    int do_drb_ciphering,
                    const nr_pdcp_configuration_t *pdcp_config);
-
-/// @brief return the next available (inactive) DRB ID of UE ue
-uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue);
-
-/// @brief returns the number of active DRBs for this UE
-int get_number_active_drbs(gNB_RRC_UE_t *ue);
 
 /// @brief retrieve PDU session of UE ue with ID id
 rrc_pdu_session_param_t *find_pduSession(seq_arr_t *seq, int id);
@@ -78,5 +65,11 @@ rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id
 void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, drb_t *rrc_drb, bool um_on_default_drb);
 
 void free_pdusession(void *ptr);
+
+/// @brief Add DRB to RRC list
+drb_t *nr_rrc_add_drb(seq_arr_t *drb_ptr, int pdusession_id);
+
+/// @brief Function to free DRB in RRC
+void free_drb(void *ptr);
 
 #endif

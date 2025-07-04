@@ -63,14 +63,14 @@ static void free_ho_ctx(nr_handover_context_t *ho_ctx)
   free(ho_ctx);
 }
 
+/** @brief Fill DRB to Be Setup List in F1 UE Context Setup Request (optional list)
+ * @return 0 if list is empty, list size otherwise */
 static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_drb_to_setup_t drbs[MAX_DRBS_PER_UE])
 {
   int nb_drb = 0;
-  for (int i = 0; i < MAX_DRBS_PER_UE; ++i) {
-    drb_t *rrc_drb = &ue->established_drbs[i];
-    if (rrc_drb->status == DRB_INACTIVE)
-      continue;
 
+  FOR_EACH_SEQ_ARR(drb_t *, rrc_drb, &ue->drbs) {
+    DevAssert(nb_drb < MAX_DRBS_PER_UE);
     f1ap_drb_to_setup_t *drb = &drbs[nb_drb];
     nb_drb++;
     /* fetch an existing PDU session for this DRB */

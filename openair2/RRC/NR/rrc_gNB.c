@@ -334,14 +334,12 @@ NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish)
   NR_DRB_ToAddMod_t *DRB_config = NULL;
   NR_DRB_ToAddModList_t *DRB_configList = CALLOC(sizeof(*DRB_configList), 1);
 
-  for (int i = 0; i < MAX_DRBS_PER_UE; i++) {
-    if (ue->established_drbs[i].status != DRB_INACTIVE) {
-      DRB_config = generateDRB_ASN1(&ue->established_drbs[i]);
-      if (reestablish) {
-        asn1cCallocOne(DRB_config->reestablishPDCP, NR_DRB_ToAddMod__reestablishPDCP_true);
-      }
-      asn1cSeqAdd(&DRB_configList->list, DRB_config);
+  FOR_EACH_SEQ_ARR(drb_t *, drb, &ue->drbs) {
+    DRB_config = generateDRB_ASN1(drb);
+    if (reestablish) {
+      asn1cCallocOne(DRB_config->reestablishPDCP, NR_DRB_ToAddMod__reestablishPDCP_true);
     }
+    asn1cSeqAdd(&DRB_configList->list, DRB_config);
   }
   if (DRB_configList->list.count == 0) {
     free(DRB_configList);
@@ -734,22 +732,6 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
       continue;
     }
 
-    // search exist DRB_config
-    int j;
-    for (j = 0; j < MAX_DRBS_PER_UE; j++) {
-      if (ue_p->established_drbs[j].status != DRB_INACTIVE
-          && ue_p->established_drbs[j].cnAssociation.sdap_config.pdusession_id == session->pdusession_id)
-        break;
-    }
-
-    if (j == MAX_DRBS_PER_UE) {
-      ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_unspecified};
-      item->xid = params.transaction_id;
-      item->status = PDU_SESSION_STATUS_FAILED;
-      item->cause = cause;
-      continue;
-    }
-
     // Reference TS23501 Table 5.7.4-1: Standardized 5QI to QoS characteristics mapping
     for (qos_flow_index = 0; qos_flow_index < session->nb_qos; qos_flow_index++) {
       pdusession_level_qos_parameter_t *qos = &session->qos[qos_flow_index];
@@ -873,8 +855,8 @@ static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
     return;
   /* loop through active DRBs */
   for (int drb_id = 1; drb_id <= MAX_DRBS_PER_UE; drb_id++) {
-    drb_t *drb = get_drb(ue_p, drb_id);
-    if (drb->status == DRB_INACTIVE)
+    drb_t *drb = get_drb(&ue_p->drbs, drb_id);
+    if (!drb)
       continue;
     /* fetch an existing PDU session for this DRB */
     rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId(ue_p, drb_id);
@@ -2078,7 +2060,8 @@ static void store_du_f1u_tunnel(const f1ap_drb_setup_t *drbs, int n, gNB_RRC_UE_
     const f1ap_drb_setup_t *drb_f1 = &drbs[i];
     AssertFatal(drb_f1->up_dl_tnl_len == 1, "can handle only one UP param\n");
     AssertFatal(drb_f1->id < MAX_DRBS_PER_UE, "illegal DRB ID %d\n", drb_f1->id);
-    drb_t *drb = get_drb(ue, drb_f1->id);
+    drb_t *drb = get_drb(&ue->drbs, drb_f1->id);
+    DevAssert(drb);
     drb->du_tunnel_config = f1u_gtp_update(drb_f1->up_dl_tnl[0].teid, drb_f1->up_dl_tnl[0].tl_address);
   }
 }
@@ -2094,7 +2077,7 @@ static void fill_e1_bearer_modif_pdcp_status(gNB_RRC_UE_t *UE,
   drb_to_mod->pdcp_sn_status_requested = false;
   // PDCP SN Status Information
   drb_to_mod->pdcp_config = calloc_or_fail(1, sizeof(*drb_to_mod->pdcp_config));
-  set_bearer_context_pdcp_config(drb_to_mod->pdcp_config, get_drb(UE, drb_id), um_on_default_drb);
+  set_bearer_context_pdcp_config(drb_to_mod->pdcp_config, get_drb(&UE->drbs, drb_id), um_on_default_drb);
   drb_to_mod->pdcp_status = calloc_or_fail(1, sizeof(*drb_to_mod->pdcp_status));
   drb_to_mod->pdcp_status->dl_count.hfn = drb_status->dl_count.hfn;
   drb_to_mod->pdcp_status->dl_count.sn = drb_status->dl_count.pdcp_sn;
@@ -2130,8 +2113,11 @@ void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb
       fill_e1_bearer_modif(&drb_to_mod, drb_f1);
     } else if (is_inter_cu_ho) {
       /* On-going handover: send PDCP Status Request */
-      if (UE->established_drbs[i].status == DRB_INACTIVE)
+      drb_t *drb = get_drb(&UE->drbs, drb_id);
+      if (!drb) {
+        LOG_E(NR_RRC, "Failed to send PDCP Status Request: DRB %d not found\n", drb_id);
         continue;
+      }
       drb_to_mod.id = drb_id;
       // PDCP SN Status Request
       drb_to_mod.pdcp_sn_status_requested = true;
@@ -2204,7 +2190,7 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   }
 
   if (resp->drbs_len > 0) {
-    int num_drb = get_number_active_drbs(UE);
+    int num_drb = seq_arr_size(&UE->drbs);
     DevAssert(num_drb == 0 || num_drb == resp->drbs_len);
 
     /* Note: we would ideally check that SRB2 is acked, but at least LiteOn DU
@@ -2296,6 +2282,7 @@ static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
   free(UE->redcap_cap);
   UE->redcap_cap = NULL;
   seq_arr_free(&UE->pduSessions, free_pdusession);
+  seq_arr_free(&UE->drbs, free_drb);
 }
 
 void rrc_remove_ue(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p)
@@ -2510,9 +2497,10 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
     DevAssert(pdu);
     for (int i = 0; i < pduSession[p].numDRBSetup; i++) {
       const DRB_nGRAN_setup_t *drb_config = &pduSession[p].DRBnGRanList[i];
-      drb_t *rrc_drb = get_drb(UE, pduSession[p].DRBnGRanList[i].id);
+      drb_t *rrc_drb = get_drb(&UE->drbs, pduSession[p].DRBnGRanList[i].id);
       DevAssert(rrc_drb);
 
+      DevAssert(nb_drb < MAX_DRBS_PER_UE);
       f1ap_drb_to_setup_t *drb = &drbs[nb_drb];
       drb->id = rrc_drb->drb_id;
 
@@ -2587,7 +2575,11 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
       DRB_nGRAN_setup_t *drb_config = &e1_pdu->DRBnGRanList[j];
       // numUpParam only relevant in F1, but not monolithic
       AssertFatal(drb_config->numUpParam <= 1, "can only up to one UP param\n");
-      drb_t *drb = get_drb(UE, drb_config->id);
+      drb_t *drb = get_drb(&UE->drbs, drb_config->id);
+      if (!drb) {
+        LOG_E(RRC, "E1: DRB %ld not found for PDU session %ld\n", drb_config->id, e1_pdu->id);
+        continue;
+      }
       UP_TL_information_t *tl_info = &drb_config->UpParamList[0].tl_info;
       drb->cuup_tunnel_config = f1u_gtp_update(tl_info->teId, tl_info->tlAddress);
     }
@@ -2629,6 +2621,7 @@ void rrc_gNB_process_e1_bearer_context_modif_resp(const e1ap_bearer_modif_resp_t
   }
 
   int n_drb_mod = 0;
+  int drb_ids[MAX_DRBS_PER_UE] = {0};
   e1_pdcp_status_info_t pdcp_status[MAX_DRBS_PER_UE] = {0};
   for (int i = 0; i < resp->numPDUSessionsMod; ++i) {
     const pdu_session_modif_t *pdu = &resp->pduSessionMod[i];
@@ -2636,6 +2629,8 @@ void rrc_gNB_process_e1_bearer_context_modif_resp(const e1ap_bearer_modif_resp_t
     for (int  j = 0; j < pdu->numDRBModified; j++) {
       // Trigger UL RAN Status Transfer
       if (pdu->DRBnGRanModList[j].pdcp_status) {
+        DevAssert(n_drb_mod < MAX_DRBS_PER_UE);
+        drb_ids[n_drb_mod] = pdu->DRBnGRanModList[j].id;
         pdcp_status[n_drb_mod++] = *pdu->DRBnGRanModList[j].pdcp_status;
       }
     }
@@ -2644,7 +2639,7 @@ void rrc_gNB_process_e1_bearer_context_modif_resp(const e1ap_bearer_modif_resp_t
     LOG_I(NR_RRC, "UE %d: received PDU Status Info - send UL RAN Status Transfer\n", resp->gNB_cu_cp_ue_id);
     gNB_RRC_UE_t *ue = &ue_context_p->ue_context;
     if (ue->ho_context && ue->ho_context->source)
-      ue->ho_context->source->ho_status_transfer(rrc, ue, n_drb_mod, pdcp_status);
+      ue->ho_context->source->ho_status_transfer(rrc, ue, n_drb_mod, drb_ids, pdcp_status);
   }
 }
 

@@ -85,24 +85,68 @@ rrc_pdu_session_param_t *add_pduSession(seq_arr_t *sessions_ptr, const pdusessio
   return added;
 }
 
+/** @brief Add drb_t item in the UE context list for @param pdusession_id */
+drb_t *nr_rrc_add_drb(seq_arr_t *drb_ptr, int pdusession_id)
+{
+  DevAssert(drb_ptr);
+
+  // Get next available DRB ID
+  int drb_id = 0;
+
+  // First, try to find the lowest available ID (prefer smaller IDs)
+  for (drb_id = 1; drb_id <= MAX_DRBS_PER_UE; drb_id++) {
+    if (get_drb(drb_ptr, drb_id) == NULL) {
+      break; // Found available ID
+    }
+  }
+
+  if (drb_id > MAX_DRBS_PER_UE) {
+    LOG_E(NR_RRC, "Cannot set up new DRB for pdusession_id=%d - reached maximum capacity\n", pdusession_id);
+    return NULL;
+  }
+
+  // Add item to the list
+  drb_t in = {.drb_id = drb_id, .cnAssociation.sdap_config.pdusession_id = pdusession_id};
+  seq_arr_push_back(drb_ptr, &in, sizeof(drb_t));
+  drb_t *out = get_drb(drb_ptr, drb_id);
+  DevAssert(out);
+  LOG_I(NR_RRC, "Added DRB %d to established list (PDU Session ID=%d, total DRBs = %ld)\n", out->drb_id, pdusession_id, seq_arr_size(drb_ptr));
+  return out;
+}
+
+static bool eq_drb_id(const void *vval, const void *vit)
+{
+  const int id = *(const int *)vval;
+  const drb_t *elem = (const drb_t *)vit;
+  return elem->drb_id == id;
+}
+
+/** @brief Retrieves DRB for the input ID
+ *  @return pointer to the found DRB, NULL if not found */
+drb_t *get_drb(seq_arr_t *seq, int id)
+{
+  DevAssert(id > 0 && id <= MAX_DRBS_PER_UE);
+  elm_arr_t elm = find_if(seq, &id, eq_drb_id);
+  if (elm.found)
+    return (drb_t *)elm.it;
+  return NULL;
+}
+
+/** @brief Free pdusession_t */
+void free_drb(void *ptr)
+{
+  // do nothing
+}
+
 rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id)
 {
-  DevAssert(drb_id > 0 && drb_id <= 32);
-  const drb_t *drb = &ue->established_drbs[drb_id - 1];
-  if (drb->status == DRB_INACTIVE) {
-    LOG_E(NR_RRC, "UE %d: DRB %d inactive\n", ue->rrc_ue_id, drb_id);
+  const drb_t *drb = get_drb(&ue->drbs, drb_id);
+  if (!drb) {
+    LOG_E(NR_RRC, "UE %d: DRB %d not found\n", ue->rrc_ue_id, drb_id);
     return NULL;
   }
   int id = drb->cnAssociation.sdap_config.pdusession_id;
   return find_pduSession(&ue->pduSessions, id);
-}
-
-drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id)
-{
-  DevAssert(drb_id > 0 && drb_id <= 32);
-  DevAssert(ue != NULL);
-
-  return &ue->established_drbs[drb_id - 1];
 }
 
 void set_default_drb_pdcp_config(struct pdcp_config_s *pdcp_config,
@@ -139,7 +183,6 @@ void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, d
 }
 
 drb_t *generateDRB(gNB_RRC_UE_t *ue,
-                   uint8_t drb_id,
                    const pdusession_t *pduSession,
                    bool enable_sdap,
                    int do_drb_integrity,
@@ -148,13 +191,13 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
 {
   DevAssert(ue != NULL);
 
-  LOG_I(NR_RRC, "UE %d: configure DRB ID %d for PDU session ID %d\n", ue->rrc_ue_id, drb_id, pduSession->pdusession_id);
+  drb_t *est_drb = nr_rrc_add_drb(&ue->drbs, pduSession->pdusession_id);
+  if (!est_drb) {
+    LOG_E(NR_RRC, "UE %d: failed to add DRB for PDU session ID %d\n", ue->rrc_ue_id, pduSession->pdusession_id);
+    return NULL;
+  }
+  LOG_I(NR_RRC, "UE %d: configure DRB ID %d for PDU session ID %d\n", ue->rrc_ue_id, est_drb->drb_id, pduSession->pdusession_id);
 
-  drb_t *est_drb = &ue->established_drbs[drb_id - 1];
-  DevAssert(est_drb->status == DRB_INACTIVE);
-
-  est_drb->status = DRB_ACTIVE;
-  est_drb->drb_id = drb_id;
   est_drb->cnAssociation.sdap_config.defaultDRB = true;
 
   /* SDAP Configuration */
@@ -169,16 +212,12 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
   }
   for (int qos_flow_index = 0; qos_flow_index < pduSession->nb_qos; qos_flow_index++) {
     est_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index] = pduSession->qos[qos_flow_index].qfi;
-    if (pduSession->qos[qos_flow_index].fiveQI > 5)
-      est_drb->status = DRB_ACTIVE_NONGBR;
-    else
-      est_drb->status = DRB_ACTIVE;
   }
   /* PDCP Configuration */
   set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering, pdcp_config, ue->redcap_cap);
 
-  drb_t *rrc_drb = get_drb(ue, drb_id);
-  DevAssert(rrc_drb == est_drb); /* to double check that we create the same which we would retrieve */
+  drb_t *rrc_drb = get_drb(&ue->drbs, est_drb->drb_id);
+  DevAssert(rrc_drb);
   return rrc_drb;
 }
 
@@ -228,23 +267,4 @@ NR_DRB_ToAddMod_t *generateDRB_ASN1(const drb_t *drb_asn1)
   }
 
   return DRB_config;
-}
-
-uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue)
-{
-  for (uint8_t drb_id = 0; drb_id < MAX_DRBS_PER_UE; drb_id++)
-    if (ue->established_drbs[drb_id].status == DRB_INACTIVE)
-      return drb_id + 1;
-  /* From this point, we need to handle the case that all DRBs are already used by the UE. */
-  LOG_E(RRC, "Error - All the DRBs are used - Handle this\n");
-  return DRB_INACTIVE;
-}
-
-int get_number_active_drbs(gNB_RRC_UE_t *ue)
-{
-  int n = 0;
-  for (int i = 0; i < MAX_DRBS_PER_UE; ++i)
-    if (ue->established_drbs[i].status != DRB_INACTIVE)
-      n++;
-  return n;
 }

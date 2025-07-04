@@ -315,9 +315,7 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
 
     /* we assume for the moment one DRB per PDU session. Activate the bearer,
      * and configure in RRC. */
-    int drb_id = get_next_available_drb_id(UE);
     drb_t *rrc_drb = generateDRB(UE,
-                                 drb_id,
                                  session,
                                  rrc->configuration.enable_sdap,
                                  rrc->security.do_drb_integrity,
@@ -1162,9 +1160,15 @@ void rrc_gNB_free_Handover_Request(ngap_handover_request_t *msg)
 
 /** @brief Send NG Uplink RAN Status Transfer message (8.4.6 3GPP TS 38.413)
  * Direction: source NG-RAN node -> AMF */
-int rrc_gNB_send_NGAP_ul_ran_status_transfer(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const int n_to_mod, const e1_pdcp_status_info_t *pdcp_status)
+int rrc_gNB_send_NGAP_ul_ran_status_transfer(gNB_RRC_INST *rrc,
+                                             gNB_RRC_UE_t *UE,
+                                             const int n_to_mod,
+                                             const int *drb_ids,
+                                             const e1_pdcp_status_info_t *pdcp_status)
 {
   AssertFatal(UE != NULL, "UE context is NULL\n");
+  DevAssert(n_to_mod <= MAX_DRBS_PER_UE);
+  DevAssert(drb_ids);
 
   LOG_I(NR_RRC,
         "Sending NGAP Uplink RAN Status Transfer (AMF_UE_NGAP_ID=%" PRIu64 ", GNB_UE_NGAP_ID=%u)\n",
@@ -1178,14 +1182,20 @@ int rrc_gNB_send_NGAP_ul_ran_status_transfer(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
 
   // Loop through DRBs and extract COUNT values
   for (int i = 0; i < n_to_mod; ++i) {
-    drb_t *drb = &UE->established_drbs[i];
-    if (!drb->status)
+    int drb_id = drb_ids[i];
+
+    // Find the DRB in the UE's DRB list
+    drb_t *drb = get_drb(&UE->drbs, drb_id);
+    if (!drb) {
+      LOG_E(NR_RRC, "Failed to send UL RAN Status Transfer: DRB %d not found\n", drb_id);
       continue;
+    }
 
-    bool sn_length_18 = rrc->pdcp_config.drb.sn_size == 18;
+    bool sn_length_18 = drb->pdcp_config.pdcp_SN_SizeDL == NR_PDCP_Config__drb__pdcp_SN_SizeUL_len18bits;
 
+    DevAssert(msg.ran_status.nb_drb < MAX_DRBS_PER_UE);
     ngap_drb_status_t *item = &msg.ran_status.drb_status_list[msg.ran_status.nb_drb++];
-    item->drb_id = drb->drb_id;
+    item->drb_id = drb_id;
 
     const e1_pdcp_count_t *ul_pdcp = &pdcp_status[i].ul_count;
     const e1_pdcp_count_t *dl_pdcp = &pdcp_status[i].dl_count;
