@@ -20,6 +20,7 @@
  */
 
 #include "connect-mplane.h"
+#include "init-mplane.h"
 #include "common/utils/assertions.h"
 
 #include <libyang/libyang.h>
@@ -63,6 +64,10 @@ void disconnect_mplane(void *rus_disconnect)
     ru_session_t *ru_session = &ru_session_list->ru_session[i];
     if (ru_session->session == NULL)
       continue;
+    MP_LOG_I("Sending PM de-activation request for RU \"%s\".\n", ru_session->ru_ip_add);
+    bool success = pm_conf(ru_session, "false");
+    if (success)
+      MP_LOG_I("Successfully de-activated PM for RU \"%s\".\n", ru_session->ru_ip_add);
     MP_LOG_I("Disconnecting from RU \"%s\".\n", ru_session->ru_ip_add);
     nc_session_free(ru_session->session, NULL);
     ru_session->session = NULL;

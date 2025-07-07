@@ -29,4 +29,6 @@
 
 bool configure_ru_from_yang(const ru_session_t *ru_session, const openair0_config_t *oai, const size_t num_rus, char **result);
 
+char *get_pm_content(const ru_session_t *ru_session, const char *active);
+
 #endif /* CREATE_MPLANE_YANG_CONFIG_H */

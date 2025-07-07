@@ -182,6 +182,10 @@ bool manage_ru(ru_session_t *ru_session, const openair0_config_t *oai, const siz
   success = get_uplane_info(operational_ds, &ru_session->ru_mplane_config);
   AssertError(success, return false, "[MPLANE] Unable to get U-plane info from RU operational datastore.\n");
 
+  // Performance Management
+  success = get_pm_object_list(operational_ds, &ru_session->pm_stats);
+  AssertError(success, return false, "[MPLANE] Unable to retrieve performance measurement names from RU \"%s\".\n", ru_session->ru_ip_add);
+
   success = load_yang_models(ru_session, operational_ds);
   AssertError(success, return false, "[MPLANE] Unable to load yang models.\n");
 
@@ -209,6 +213,18 @@ bool manage_ru(ru_session_t *ru_session, const openair0_config_t *oai, const siz
 
   free(operational_ds);
   free(watchdog_answer);
+
+  return true;
+}
+
+bool pm_conf(ru_session_t *ru_session, const char *active)
+{
+  char *content = get_pm_content(ru_session, active);
+
+  bool success = edit_val_commmit_rpc(ru_session, content);
+  AssertError(success, return false, "[MPLANE] Cannot continue.\n");
+
+  free(content);
 
   return true;
 }

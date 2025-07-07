@@ -396,6 +396,56 @@ static bool create_uplane_conf_v2(const ru_session_t *ru_session, const openair0
 
   return true;
 }
+
+static
+bool create_pm_conf_v2(const ru_session_t *ru_session, const char *active, struct lyd_node **root)
+{
+  LY_ERR ret = LY_SUCCESS;
+
+  ret = lyd_new_path(NULL, (struct ly_ctx *)ru_session->ctx, "/o-ran-performance-management:performance-measurement-objects", NULL, 0, root);
+  VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create root \"performance-measurement-objects\" node.\n");
+
+  ret = lyd_new_term(*root, NULL, "notification-interval", "10", 0, NULL);
+  VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"notification-interval\" node.\n");
+
+  ret = lyd_new_term(*root, NULL, "rx-window-measurement-interval", "10", 0, NULL);
+  VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"rx-window-measurement-interval\" node.\n");
+
+  ret = lyd_new_term(*root, NULL, "tx-measurement-interval", "10", 0, NULL);
+  VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"tx-measurement-interval\" node.\n");
+
+  for (size_t i = 0; i < ru_session->pm_stats.rx_num; i++) {
+    struct lyd_node *rx_window_meas_objects = NULL;
+    ret = lyd_new_list(*root, NULL, "rx-window-measurement-objects", 0, &rx_window_meas_objects, ru_session->pm_stats.rx_window_meas[i]);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"rx-window-measurement-objects\" node.\n");
+
+    ret = lyd_new_term(rx_window_meas_objects, NULL, "active", active, 0, NULL);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"active\" node.\n");
+
+    ret = lyd_new_term(rx_window_meas_objects, NULL, "object-unit", "RU", 0, NULL);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"object-unit\" node.\n");
+
+    ret = lyd_new_term(rx_window_meas_objects, NULL, "report-info", "COUNT", 0, NULL);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"report-info\" node.\n");
+  }
+
+  for (size_t i = 0; i < ru_session->pm_stats.tx_num; i++) {
+    struct lyd_node *tx_meas_objects = NULL;
+    ret = lyd_new_list(*root, NULL, "tx-measurement-objects", 0, &tx_meas_objects, ru_session->pm_stats.tx_meas[i]);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"tx-measurement-objects\" node.\n");
+
+    ret = lyd_new_term(tx_meas_objects, NULL, "active", active, 0, NULL);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"active\" node.\n");
+
+    ret = lyd_new_term(tx_meas_objects, NULL, "object-unit", "RU", 0, NULL);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"object-unit\" node.\n");
+
+    ret = lyd_new_term(tx_meas_objects, NULL, "report-info", "COUNT", 0, NULL);
+    VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"report-info\" node.\n");
+  }
+
+  return true;
+}
 #endif
 
 bool configure_ru_from_yang(const ru_session_t *ru_session, const openair0_config_t *oai, const size_t num_rus, char **result)
@@ -445,11 +495,43 @@ bool configure_ru_from_yang(const ru_session_t *ru_session, const openair0_confi
   ret = lyd_merge_siblings(&all_merge, uplane_conf, 0);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Cannot merge CU-plane interface, processing element and U-plane configuration.\n");
 
+  // <o-ran-pm>
+  struct lyd_node *pm_conf = NULL;
+  if (ru_session->pm_stats.start_up_timing) {
+    success = create_pm_conf_v2(ru_session, "true", &pm_conf);
+    VERIFY_SUCCESS(success, "[MPLANE] Cannot create PM activation.\n");
+  } else {
+    success = create_pm_conf_v2(ru_session, "false", &pm_conf);
+    VERIFY_SUCCESS(success, "[MPLANE] Cannot create PM deactivation.\n");
+  }
+
+  ret = lyd_merge_siblings(&all_merge, pm_conf, 0);
+  VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Cannot merge CU-plane interface, processing element, U-plane configuration and PM configuration.\n");
+
   lyd_print_mem(result, all_merge, LYD_XML, LYD_PRINT_WITHSIBLINGS);
 
   lyd_free_siblings(all_merge);
   lyd_free_siblings(uplane_conf);
+  lyd_free_siblings(pm_conf);
 #endif
 
   return true;
+}
+
+char *get_pm_content(const ru_session_t *ru_session, const char *active)
+{
+  bool success = false;
+  char *content = NULL;
+
+#ifdef MPLANE_V1
+  VERIFY_SUCCESS(success, "[MPLANE] To be implemented and tested.\n");
+#elif defined MPLANE_V2
+  struct lyd_node *pm_conf = NULL;
+  success = create_pm_conf_v2(ru_session, active, &pm_conf);
+  AssertError(success, return false, "[MPLANE] Cannot create PM configuration.\n");
+  lyd_print_mem(&content, pm_conf, LYD_XML, LYD_PRINT_WITHSIBLINGS);
+  lyd_free_siblings(pm_conf);
+#endif
+
+  return content;
 }

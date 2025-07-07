@@ -182,3 +182,23 @@ bool get_uplane_info(const char *buffer, ru_mplane_config_t *ru_mplane_config)
 
   return true;
 }
+
+bool get_pm_object_list(const char *buffer, pm_stats_t *pm_stats)
+{
+  const char *ru_vendor = get_ru_xml_node(buffer, "mfg-name");
+  if (strcasecmp(ru_vendor, "BENETEL") == 0) {
+    pm_stats->start_up_timing = false;
+  } else {
+    pm_stats->start_up_timing = true;
+  }
+
+  // Rx window
+  get_ru_xml_list(buffer, "rx-window-objects", &pm_stats->rx_window_meas, &pm_stats->rx_num);
+
+  // Tx
+  get_ru_xml_list(buffer, "tx-stats-objects", &pm_stats->tx_meas, &pm_stats->tx_num);
+
+  MP_LOG_I("Successfully retreived all performance measurement names.\n");
+
+  return true;
+}

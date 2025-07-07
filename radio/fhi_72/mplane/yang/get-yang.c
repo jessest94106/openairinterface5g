@@ -116,7 +116,7 @@ bool load_yang_models(ru_session_t *ru_session, const char *buffer)
     1) the yang models order is not good - the dependancy models have to be loaded first
     2) earlier O-RAN yang versions (e.g. v4) is not properly defined (i.e. optional parameters should not be included by default) */
   const char *yang_dir = YANG_MODELS;
-  const char *yang_models[] = {"ietf-interfaces", "iana-if-type", "ietf-ip", "iana-hardware", "ietf-hardware", "o-ran-interfaces", "o-ran-module-cap", "o-ran-compression-factors", "o-ran-processing-element", "o-ran-uplane-conf"};
+  const char *yang_models[] = {"ietf-interfaces", "iana-if-type", "ietf-ip", "iana-hardware", "ietf-hardware", "o-ran-interfaces", "o-ran-module-cap", "o-ran-compression-factors", "o-ran-processing-element", "o-ran-uplane-conf", "ietf-netconf-acm", "ietf-crypto-types", "o-ran-file-management", "o-ran-performance-management"};
 
 #ifdef MPLANE_V1
   *ctx = ly_ctx_new(yang_dir, 0);
