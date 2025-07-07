@@ -67,6 +67,11 @@ void disconnect_mplane(void *rus_disconnect)
     MP_LOG_I("Disconnecting from RU \"%s\".\n", ru_session->ru_ip_add);
     nc_session_free(ru_session->session, NULL);
     ru_session->session = NULL;
+#ifdef MPLANE_V1
+    ly_ctx_destroy((struct ly_ctx *)ru_session->ctx, NULL);
+#elif defined MPLANE_V2
+    ly_ctx_destroy((struct ly_ctx *)ru_session->ctx);
+#endif
   }
 
   nc_client_destroy();

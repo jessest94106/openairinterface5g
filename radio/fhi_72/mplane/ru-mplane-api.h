@@ -85,6 +85,7 @@ typedef struct {
   char *ru_ip_add;
   ru_mplane_config_t ru_mplane_config;
   void *session;
+  void *ctx;
   xran_mplane_t xran_mplane;
   ru_notif_t ru_notif;
 

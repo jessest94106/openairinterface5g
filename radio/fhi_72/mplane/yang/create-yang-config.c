@@ -26,11 +26,11 @@
 const char *scs_name[] = {"KHZ_15", "KHZ_30", "KHZ_60", "KHZ_120", "KHZ_240", NULL};
 
 #ifdef MPLANE_V2
-static bool create_cu_interface_v2(struct ly_ctx **ctx, const ru_session_t *ru_session, const size_t idx, const char *int_name, struct lyd_node **root)
+static bool create_cu_interface_v2(const ru_session_t *ru_session, const size_t idx, const char *int_name, struct lyd_node **root)
 {
   LY_ERR ret = LY_SUCCESS;
 
-  ret = lyd_new_path(NULL, *ctx, "/ietf-interfaces:interfaces", NULL, 0, root);
+  ret = lyd_new_path(NULL, (struct ly_ctx *)ru_session->ctx, "/ietf-interfaces:interfaces", NULL, 0, root);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create root \"interfaces\" node.\n");
 
   struct lyd_node *interface_node = NULL;
@@ -44,7 +44,7 @@ static bool create_cu_interface_v2(struct ly_ctx **ctx, const ru_session_t *ru_s
   ret = lyd_new_term(interface_node, NULL, "enabled", "true", 0, NULL);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"enabled\" node.\n");
 
-  const struct lys_module *oran_int_mod = ly_ctx_get_module_implemented(*ctx, "o-ran-interfaces");
+  const struct lys_module *oran_int_mod = ly_ctx_get_module_implemented((struct ly_ctx *)ru_session->ctx, "o-ran-interfaces");
   VERIFY_SUCCESS(oran_int_mod != NULL, "[MPLANE] Failed to get \"o-ran-interfaces\" module.\n");
 
   struct lyd_node *base_int = NULL;
@@ -64,11 +64,11 @@ static bool create_cu_interface_v2(struct ly_ctx **ctx, const ru_session_t *ru_s
   return true;
 }
 
-static bool create_proc_elem_v2(struct ly_ctx **ctx, const ru_session_t *ru_session, const size_t idx, const char *int_name, struct lyd_node **root)
+static bool create_proc_elem_v2(const ru_session_t *ru_session, const size_t idx, const char *int_name, struct lyd_node **root)
 {
   LY_ERR ret = LY_SUCCESS;
 
-  ret = lyd_new_path(NULL, *ctx, "/o-ran-processing-element:processing-elements", NULL, 0, root);
+  ret = lyd_new_path(NULL, (struct ly_ctx *)ru_session->ctx, "/o-ran-processing-element:processing-elements", NULL, 0, root);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create root \"processing-elements\" node.\n");
 
   ret = lyd_new_term(*root, NULL, "transport-session-type", "ETH-INTERFACE", 0, NULL);
@@ -225,12 +225,12 @@ static bool fill_uplane_ch_tx_v2(const xran_mplane_t *xran_mplane, const openair
   return true;
 }
 
-static bool create_uplane_conf_v2(struct ly_ctx **ctx, const ru_session_t *ru_session, const openair0_config_t *oai, const size_t num_rus, const char *u_proc_elem, struct lyd_node **root)
+static bool create_uplane_conf_v2(const ru_session_t *ru_session, const openair0_config_t *oai, const size_t num_rus, const char *u_proc_elem, struct lyd_node **root)
 {
   LY_ERR ret = LY_SUCCESS;
   bool success = true;
 
-  ret = lyd_new_path(NULL, *ctx, "/o-ran-uplane-conf:user-plane-configuration", NULL, 0, root);
+  ret = lyd_new_path(NULL, (struct ly_ctx *)ru_session->ctx, "/o-ran-uplane-conf:user-plane-configuration", NULL, 0, root);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create root \"user-plane-configuration\" node.\n");
 
   if (ru_session->ru_mplane_config.rx_carriers.num != 1 || ru_session->ru_mplane_config.tx_carriers.num !=1)
@@ -398,7 +398,7 @@ static bool create_uplane_conf_v2(struct ly_ctx **ctx, const ru_session_t *ru_se
 }
 #endif
 
-bool configure_ru_from_yang(struct ly_ctx **ctx, const ru_session_t *ru_session, const openair0_config_t *oai, const size_t num_rus, char **result)
+bool configure_ru_from_yang(const ru_session_t *ru_session, const openair0_config_t *oai, const size_t num_rus, char **result)
 {
   bool success = false;
 
@@ -420,12 +420,12 @@ bool configure_ru_from_yang(struct ly_ctx **ctx, const ru_session_t *ru_session,
     struct lyd_node *cu_interface = NULL;
     char int_name[12];
     snprintf(int_name, sizeof(int_name), "INTERFACE_%ld", i);
-    success = create_cu_interface_v2(ctx, ru_session, i, int_name, &cu_interface);
+    success = create_cu_interface_v2(ru_session, i, int_name, &cu_interface);
     VERIFY_SUCCESS(success, "[MPLANE] Cannot create CU-plane interface.\n");
 
     // <o-ran-processing-element>
     struct lyd_node *proc_elem = NULL;
-    success = create_proc_elem_v2(ctx, ru_session, i, int_name, &proc_elem);
+    success = create_proc_elem_v2(ru_session, i, int_name, &proc_elem);
     VERIFY_SUCCESS(success, "[MPLANE] Cannot create CU-plane processing element.\n");
 
     ret = lyd_merge_siblings(&all_merge, cu_interface, 0);
@@ -439,13 +439,13 @@ bool configure_ru_from_yang(struct ly_ctx **ctx, const ru_session_t *ru_session,
 
   // <o-ran-uplane-conf>
   struct lyd_node *uplane_conf = NULL;
-  success = create_uplane_conf_v2(ctx, ru_session, oai, num_rus, "PLANE_0", &uplane_conf);
+  success = create_uplane_conf_v2(ru_session, oai, num_rus, "PLANE_0", &uplane_conf);
   VERIFY_SUCCESS(success, "[MPLANE] Cannot create U-plane configuration.\n");
-
-  ret = lyd_merge_siblings(&uplane_conf, all_merge, 0);
+ 
+  ret = lyd_merge_siblings(&all_merge, uplane_conf, 0);
   VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Cannot merge CU-plane interface, processing element and U-plane configuration.\n");
 
-  lyd_print_mem(result, uplane_conf, LYD_XML, LYD_PRINT_WITHSIBLINGS);
+  lyd_print_mem(result, all_merge, LYD_XML, LYD_PRINT_WITHSIBLINGS);
 
   lyd_free_siblings(all_merge);
   lyd_free_siblings(uplane_conf);

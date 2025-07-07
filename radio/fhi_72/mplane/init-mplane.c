@@ -25,6 +25,8 @@
 #include "subscribe-mplane.h"
 #include "config-mplane.h"
 #include "xml/get-xml.h"
+#include "yang/get-yang.h"
+#include "yang/create-yang-config.h"
 
 #include <libyang/libyang.h>
 #include <nc_client.h>
@@ -175,15 +177,17 @@ bool manage_ru(ru_session_t *ru_session, const openair0_config_t *oai, const siz
   success = get_uplane_info(operational_ds, &ru_session->ru_mplane_config);
   AssertError(success, return false, "[MPLANE] Unable to get U-plane info from RU operational datastore.\n");
 
+  success = load_yang_models(ru_session, operational_ds);
+  AssertError(success, return false, "[MPLANE] Unable to load yang models.\n");
+
   if (ru_session->ru_notif.ptp_state) {
-    success = edit_config_mplane(ru_session, operational_ds, oai, num_rus);
-    AssertError(success, return false, "[MPLANE] Unable to edit the RU configuration.\n");
+    char *content = NULL;
+    success = configure_ru_from_yang(ru_session, oai, num_rus, &content);
+    AssertError(success, return false, "[MPLANE] Unable to create content for <edit-config> RPC for start-up procedure.\n");
 
-    success = validate_config_mplane(ru_session);
-    AssertError(success, return false, "[MPLANE] Unable to validate the RU configuration.\n");
-
-    success = commit_config_mplane(ru_session);
-    AssertError(success, return false, "[MPLANE] Unable to commit the RU configuration.\n");
+    success = edit_val_commmit_rpc(ru_session, content);
+    AssertError(success, return false, "[MPLANE] Unable to continue.\n");
+    free(content);
   }
 
   const char *usage_state = get_ru_xml_node(operational_ds, "usage-state");
