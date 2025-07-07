@@ -324,6 +324,12 @@ static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
     AssertFatal(drb->qos_choice == F1AP_QOS_CHOICE_NR, "only NR QoS supported\n");
     f1ap_drb_setup_t *resp_drb = &(*resp_drbs)[i];
     NR_RLC_BearerConfig_t *rlc_BearerConfig = get_bearerconfig_from_drb(drb, rlc_config);
+    if (UE->capability && UE->capability->rlc_Parameters && UE->capability->rlc_Parameters->ext2
+        && UE->capability->rlc_Parameters->ext2->am_WithLongSN_RedCap_r17 == NULL) {
+      *rlc_BearerConfig->rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size12;
+      *rlc_BearerConfig->rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size12;
+    }
+
     nr_rlc_add_drb(UE->rnti, drb->id, rlc_BearerConfig);
 
     nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .nssai = drb->nr.nssai};
@@ -649,6 +655,8 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   resp.gNB_DU_ue_id = UE->rnti;
 
   NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
+  // Needed for DRB Setup (e.g., RLC might reduce SN size)
+  UE->capability = ue_cap;
 
   if (req->srbs_len > 0) {
     resp.srbs_len = handle_ue_context_srbs_setup(UE, req->srbs_len, req->srbs, &resp.srbs, new_CellGroup, &mac->rlc_config);
@@ -665,7 +673,6 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   }
 
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
-  UE->capability = ue_cap;
   if (ue_cap != NULL && cg_configinfo == NULL) {
     // store the new UE capabilities, and update the cellGroupConfig
     // only to be done if we did not already update through the cg_configinfo

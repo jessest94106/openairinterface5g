@@ -169,6 +169,13 @@ typedef enum {
   RRC_UECAPABILITY_ENQUIRY,
 } rrc_action_t;
 
+typedef struct nr_redcap_ue_cap {
+  bool support_of_redcap_r17;
+  bool support_of_16drb_redcap_r17;
+  bool pdcp_drb_long_sn_redcap_r17;
+  bool rlc_am_drb_long_sn_redcap_r17;
+} nr_redcap_ue_cap_t;
+
 /* forward declaration */
 typedef struct nr_handover_context_s nr_handover_context_t;
 
@@ -253,6 +260,7 @@ typedef struct gNB_RRC_UE_s {
   int max_delays_pdu_session;
   bool ongoing_pdusession_setup_request;
 
+  nr_redcap_ue_cap_t *redcap_cap;
 } gNB_RRC_UE_t;
 
 typedef struct rrc_gNB_ue_context_s {

@@ -117,6 +117,34 @@ typedef struct deliver_ue_ctxt_release_data_t {
   sctp_assoc_t assoc_id;
 } deliver_ue_ctxt_release_data_t;
 
+const NR_RedCapParameters_r17_t *get_redcapparam_r17(NR_UE_NR_Capability_t *UE_Capability_nr)
+{
+  if (UE_Capability_nr && UE_Capability_nr->nonCriticalExtension && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension
+      && UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+             ->nonCriticalExtension->redCapParameters_r17) {
+    return UE_Capability_nr->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+        ->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension->nonCriticalExtension
+        ->nonCriticalExtension->redCapParameters_r17;
+  } else
+    return NULL;
+}
+
 static void rrc_deliver_ue_ctxt_release_cmd(void *deliver_pdu_data, ue_id_t ue_id, int srb_id, char *buf, int size, int sdu_id)
 {
   DevAssert(deliver_pdu_data != NULL);
@@ -1590,6 +1618,18 @@ static void handle_ueCapabilityInformation(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, 
           UE->UE_Capability_nr = 0;
         }
 
+        const NR_RedCapParameters_r17_t *redcap_p = get_redcapparam_r17(UE->UE_Capability_nr);
+        if (redcap_p) {
+          UE->redcap_cap = calloc_or_fail(1, sizeof(*UE->redcap_cap));
+          UE->redcap_cap->support_of_redcap_r17 = redcap_p->supportOfRedCap_r17 != NULL;
+          UE->redcap_cap->support_of_16drb_redcap_r17 = redcap_p->supportOf16DRB_RedCap_r17 != NULL;
+          if (UE->UE_Capability_nr->pdcp_Parameters.ext2)
+            UE->redcap_cap->pdcp_drb_long_sn_redcap_r17 = UE->UE_Capability_nr->pdcp_Parameters.ext2->longSN_RedCap_r17 != NULL;
+          if (UE->UE_Capability_nr->rlc_Parameters && UE->UE_Capability_nr->rlc_Parameters->ext2)
+            UE->redcap_cap->rlc_am_drb_long_sn_redcap_r17 =
+                UE->UE_Capability_nr->rlc_Parameters->ext2->am_WithLongSN_RedCap_r17 != NULL;
+        }
+
         UE->UE_Capability_size = ue_cap_container->ue_CapabilityRAT_Container.size;
         if (eutra_index != -1) {
           LOG_E(NR_RRC, "fatal: more than 1 eutra capability\n");
@@ -2200,6 +2240,8 @@ static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
   ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, UE->measResults);
   FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);
   free_MeasConfig(UE->measConfig);
+  free(UE->redcap_cap);
+  UE->redcap_cap = NULL;
 }
 
 void rrc_remove_ue(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p)
