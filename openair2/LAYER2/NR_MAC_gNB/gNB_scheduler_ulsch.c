@@ -1869,7 +1869,7 @@ static void pf_ul(gNB_MAC_INST *nrmac,
   int remainUEs[num_beams];
   for (int i = 0; i < num_beams; i++)
     remainUEs[i] = max_num_ue;
-  int curUE = 0;
+  int numUE = 0;
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
@@ -2099,13 +2099,13 @@ static void pf_ul(gNB_MAC_INST *nrmac,
           UE->ul_thr_ue,
           tbs,
           coeff_ue);
-    UE_sched[curUE].coef = coeff_ue;
-    UE_sched[curUE].UE = UE;
-    UE_sched[curUE].selected_mcs = selected_mcs;
-    curUE++;
+    UE_sched[numUE].coef = coeff_ue;
+    UE_sched[numUE].UE = UE;
+    UE_sched[numUE].selected_mcs = selected_mcs;
+    numUE++;
   }
 
-  qsort(UE_sched, sizeofArray(UE_sched), sizeof(UEsched_t), comparator);
+  qsort(UE_sched, numUE, sizeof(UEsched_t), comparator);
   UEsched_t *iterator=UE_sched;
 
   /* Loop UE_sched to find max coeff and allocate transmission */
