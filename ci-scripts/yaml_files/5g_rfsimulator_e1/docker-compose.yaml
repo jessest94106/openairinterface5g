@@ -65,8 +65,10 @@ services:
         networks:
             core_net:
                 ipv4_address: 192.168.71.134
+                interface_name: eth0
             traffic_net:
                 ipv4_address: 192.168.72.134
+                interface_name: eth1
 
     oai-cucp:
         image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}

@@ -60,11 +60,3 @@ networks:
                 - subnet: 192.168.71.128/26
         driver_opts:
             com.docker.network.bridge.name: "rfsim5g-public"
-    traffic_net:
-        driver: bridge
-        name: rfsim5g-oai-traffic-net
-        ipam:
-            config:
-                - subnet: 192.168.72.128/26
-        driver_opts:
-            com.docker.network.bridge.name: "rfsim5g-traffic"
