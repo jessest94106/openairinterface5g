@@ -505,8 +505,8 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
             }
           }
           prach_pdu->num_prach_ocas = num_td_occ;
-          prach_pdu->beamforming.num_prgs = 0;
-          prach_pdu->beamforming.prg_size = 0;
+          prach_pdu->beamforming.num_prgs = 1;
+          prach_pdu->beamforming.prg_size = 273; //n_ra_rb This value doesn't work with Aerial as it bugs
           prach_pdu->beamforming.dig_bf_interface = num_td_occ;
           prach_pdu->beamforming.prgs_list[0].dig_bf_interface_list[num_td_occ - 1].beam_idx = beam_index;
 

@@ -824,8 +824,8 @@ nfapi_nr_dl_dci_pdu_t *prepare_dci_pdu(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_
   }
   dci_pdu->beta_PDCCH_1_0 = 0;
   dci_pdu->powerControlOffsetSS = 1;
-  dci_pdu->precodingAndBeamforming.num_prgs = 0;
-  dci_pdu->precodingAndBeamforming.prg_size = 0;
+  dci_pdu->precodingAndBeamforming.num_prgs = 1;
+  dci_pdu->precodingAndBeamforming.prg_size = 273;
   dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
   dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
   dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
@@ -1249,9 +1249,9 @@ void nr_configure_pucch(nfapi_nr_pucch_pdu_t *pucch_pdu,
     pucch_pdu->prb_size=1;
   }
   // Beamforming
-  pucch_pdu->beamforming.num_prgs = 0;
-  pucch_pdu->beamforming.prg_size = 0; // pucch_pdu->prb_size;
-  pucch_pdu->beamforming.dig_bf_interface = 0;
+  pucch_pdu->beamforming.num_prgs = 1;
+  pucch_pdu->beamforming.prg_size = pucch_pdu->prb_size;
+  pucch_pdu->beamforming.dig_bf_interface = 1;
   pucch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
 }
 
