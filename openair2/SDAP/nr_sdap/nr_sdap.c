@@ -47,7 +47,7 @@ static void reblock_tun_socket(int fd)
 bool sdap_data_req(protocol_ctxt_t *ctxt_p,
                    const ue_id_t ue_id,
                    const srb_flag_t srb_flag,
-                   const rb_id_t rb_id,
+                   const int rb_id,
                    const mui_t mui,
                    const confirm_t confirm,
                    const sdu_size_t sdu_buffer_size,
@@ -82,7 +82,7 @@ bool sdap_data_req(protocol_ctxt_t *ctxt_p,
   return ret;
 }
 
-void sdap_data_ind(rb_id_t pdcp_entity,
+void sdap_data_ind(int pdcp_entity,
                    int is_gnb,
                    bool has_sdap_rx,
                    int pdusession_id,

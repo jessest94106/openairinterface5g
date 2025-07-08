@@ -76,11 +76,11 @@ typedef enum {
 } sdap_role_t;
 
 typedef struct qfi2drb_s {
-  rb_id_t drb_id;
+  int drb_id;
   int entity_role;
 } qfi2drb_t;
 
-void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
+void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
 
 typedef struct sdap_configuration_s {
   int pdusession_id;
@@ -95,7 +95,7 @@ typedef struct sdap_configuration_s {
 
 typedef struct nr_sdap_entity_s {
   ue_id_t ue_id;
-  rb_id_t default_drb;
+  int default_drb;
   /// sdap_tun_read_thread needs to know if we are gNB/UE, so for noS1 mode,
   /// store which one we are
   bool is_gnb;
@@ -117,12 +117,12 @@ typedef struct nr_sdap_entity_s {
 
   nr_sdap_ul_hdr_t (*sdap_construct_ctrl_pdu)(uint8_t qfi);
   int (*sdap_map_ctrl_pdu)(struct nr_sdap_entity_s *entity, int map_type, uint8_t dl_qfi);
-  void (*sdap_submit_ctrl_pdu)(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
+  void (*sdap_submit_ctrl_pdu)(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
 
   bool (*tx_entity)(struct nr_sdap_entity_s *entity,
                     protocol_ctxt_t *ctxt_p,
                     const srb_flag_t srb_flag,
-                    const rb_id_t rb_id,
+                    const int rb_id,
                     const mui_t mui,
                     const confirm_t confirm,
                     const sdu_size_t sdu_buffer_size,
@@ -134,7 +134,7 @@ typedef struct nr_sdap_entity_s {
                     const bool rqi);
 
   void (*rx_entity)(struct nr_sdap_entity_s *entity,
-                    rb_id_t pdcp_entity,
+                    int pdcp_entity,
                     int is_gnb,
                     int pdusession_id,
                     ue_id_t ue_id,
@@ -163,7 +163,7 @@ int nr_sdap_map_ctrl_pdu(nr_sdap_entity_t *entity, int map_type, uint8_t dl_qfi)
  * TS 37.324 5.3 QoS flow to DRB Mapping 
  * Submit the end-marker control PDU to the lower layer.
  */
-void nr_sdap_submit_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
+void nr_sdap_submit_ctrl_pdu(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
 
 /*
  * TS 37.324 4.4 5.1.1 SDAP entity establishment

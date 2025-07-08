@@ -58,7 +58,7 @@ static int get_sdap_role(bool is_gnb, const NR_SDAP_Config_t *sdap_config)
   return role;
 }
 
-void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu)
+void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu)
 {
 
   protocol_ctxt_t ctxt = { .rntiMaybeUEid = ue_id };
@@ -72,7 +72,7 @@ void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_s
                        PDCP_TRANSMISSION_MODE_UNKNOWN,
                        NULL,
                        NULL);
-  LOG_D(SDAP, "Control PDU - Submitting Control PDU to DRB ID:  %ld\n", sdap_ctrl_pdu_drb);
+  LOG_D(SDAP, "Control PDU - Submitting Control PDU to DRB ID: %d\n", sdap_ctrl_pdu_drb);
   LOG_D(SDAP, "QFI: %u\n R: %u\n D/C: %u\n", ctrl_pdu.QFI, ctrl_pdu.R, ctrl_pdu.DC);
   return;
 }
@@ -80,7 +80,7 @@ void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_s
 static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
                               protocol_ctxt_t *ctxt_p,
                               const srb_flag_t srb_flag,
-                              const rb_id_t rb_id,
+                              const int rb_id,
                               const mui_t mui,
                               const confirm_t confirm,
                               const sdu_size_t sdu_buffer_size,
@@ -94,7 +94,7 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
   int offset=0;
   bool ret = false;
   /*Hardcode DRB ID given from upper layer (ue/gnb_tun_read_thread rb_id), it will change if we have SDAP*/
-  rb_id_t sdap_drb_id = rb_id;
+  int sdap_drb_id = rb_id;
   bool sdap_ul_tx = false;
   bool sdap_dl_tx = false;
 
@@ -104,17 +104,17 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
   }
 
   uint8_t sdap_buf[SDAP_MAX_PDU];
-  rb_id_t pdcp_entity = entity->qfi2drb_map(entity, qfi);
+  int pdcp_entity = entity->qfi2drb_map(entity, qfi);
 
   if(pdcp_entity){
     sdap_drb_id = pdcp_entity;
     sdap_ul_tx = entity->qfi2drb_table[qfi].entity_role & SDAP_UL_TX; // UE TX entity
     sdap_dl_tx = entity->qfi2drb_table[qfi].entity_role & SDAP_DL_TX; // gNB TX entity
-    LOG_D(SDAP, "TX - QFI: %u is mapped to DRB ID: %ld\n", qfi, entity->qfi2drb_table[qfi].drb_id);
+    LOG_D(SDAP, "TX - QFI: %u is mapped to DRB ID: %d\n", qfi, entity->qfi2drb_table[qfi].drb_id);
   }
 
   if (!sdap_ul_tx && !sdap_dl_tx) {
-    LOG_D(SDAP, "TX - DRB ID: %ld does not have SDAP header\n", entity->qfi2drb_table[qfi].drb_id);
+    LOG_D(SDAP, "TX - DRB ID: %d does not have SDAP header\n", entity->qfi2drb_table[qfi].drb_id);
     ret = nr_pdcp_data_req_drb(ctxt_p,
                                srb_flag,
                                sdap_drb_id,
@@ -201,7 +201,7 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
 }
 
 static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
-                              rb_id_t pdcp_entity,
+                              int pdcp_entity,
                               int is_gnb,
                               int pdusession_id,
                               ue_id_t ue_id,
@@ -390,7 +390,7 @@ static int nr_sdap_qfi2drb(nr_sdap_entity_t *entity, uint8_t qfi)
     return drb_id;
   } else if (entity->default_drb) {
     /* QoS flow to DRB mapping rule does not exist, map SDAP SDU to default DRB, e.g. return default DRB of the SDAP entity */
-    LOG_D(SDAP, "QoS flow to DRB mapping rule does not exists! mapping SDU to Default DRB: %ld\n", entity->default_drb);
+    LOG_D(SDAP, "QoS flow to DRB mapping rule does not exists! mapping SDU to Default DRB: %d\n", entity->default_drb);
     return entity->default_drb;
   } else {
     /* Note: UE undefined behaviour when neither a default DRB
@@ -428,7 +428,7 @@ int nr_sdap_map_ctrl_pdu(nr_sdap_entity_t *entity, int map_type, uint8_t dl_qfi)
 /**
  * @brief Submit the end-marker control PDU to PDCP according to TS 37.324, clause 5.3
  */
-void nr_sdap_submit_ctrl_pdu(ue_id_t ue_id, rb_id_t sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu)
+void nr_sdap_submit_ctrl_pdu(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu)
 {
   if(sdap_ctrl_pdu_drb){
     nr_pdcp_submit_sdap_ctrl_pdu(ue_id, sdap_ctrl_pdu_drb, ctrl_pdu);
@@ -530,7 +530,7 @@ nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, cons
   // set default DRB
   if (sdap.defaultDRB) {
     sdap_entity->default_drb = sdap.drb_id;
-    LOG_I(SDAP, "Default DRB for the created SDAP entity: DRB %ld \n", sdap_entity->default_drb);
+    LOG_I(SDAP, "Default DRB for the created SDAP entity: DRB %d \n", sdap_entity->default_drb);
   }
 
   // store QFI to DRB mapping rules
