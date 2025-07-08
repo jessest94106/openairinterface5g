@@ -1066,8 +1066,6 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
 
   const int k2 = min_fb_delay;
 
-  int mu = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
-
   // UL TDA index 0 is basic slot configuration starting in symbol 0 til the last but one symbol
   NR_PUSCH_TimeDomainResourceAllocation_t *tda;
   tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 13));
@@ -1097,20 +1095,6 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
       tda = set_TimeDomainResourceAllocation(k2, sliv);
       asn1cSeqAdd(&tda_list->list, tda);
     }
-    // UL TDA index 3 for msg3 in the mixed slot (TDD)
-    int tdd_period_idx = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
-    int nb_periods_per_frame = get_nb_periods_per_frame(tdd_period_idx);
-    int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
-    int k2_msg3 = nb_slots_per_period - get_delta_for_k2(mu);
-    bool no_mix_slot = ul_symb < 3; // we need at least 2 symbols for scheduling Msg3
-    long sliv = no_mix_slot ? get_SLIV(0, 13) : get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1);
-    struct NR_PUSCH_TimeDomainResourceAllocation *puschTdrAllocMsg3 = set_TimeDomainResourceAllocation(k2_msg3, sliv);
-    if (*puschTdrAllocMsg3->k2 < min_fb_delay)
-      *puschTdrAllocMsg3->k2 += nb_slots_per_period;
-    AssertFatal(*puschTdrAllocMsg3->k2 < 33,
-                "Computed k2 for msg3 %ld is larger than the range allowed by RRC (0..32)\n",
-                *puschTdrAllocMsg3->k2);
-    asn1cSeqAdd(&tda_list->list, puschTdrAllocMsg3);
   }
 }
 
