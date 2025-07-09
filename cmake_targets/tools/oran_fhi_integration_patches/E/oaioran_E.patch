@@ -1,5 +1,5 @@
 diff --git a/fhi_lib/app/src/common.h b/fhi_lib/app/src/common.h
-index 7508117..ce17ebd 100644
+index 7508117..318508b 100644
 --- a/fhi_lib/app/src/common.h
 +++ b/fhi_lib/app/src/common.h
 @@ -28,7 +28,7 @@
@@ -7,12 +7,12 @@ index 7508117..ce17ebd 100644
  #include <rte_mbuf.h>
  
 -#define VERSIONX                "oran_e_maintenance_release_v1.0"
-+#define VERSIONX                "oran_e_maintenance_release_v1.5"
++#define VERSIONX                "oran_e_maintenance_release_v1.6"
  
  #define APP_O_DU  0
  #define APP_O_RU  1
 diff --git a/fhi_lib/lib/Makefile b/fhi_lib/lib/Makefile
-index de141bf..fa2923f 100644
+index de141bf..c2a448d 100644
 --- a/fhi_lib/lib/Makefile
 +++ b/fhi_lib/lib/Makefile
 @@ -23,12 +23,25 @@ MYCUSTOMSPACE1='------------------------------------------------------------'
@@ -50,9 +50,9 @@ index de141bf..fa2923f 100644
  
 -RTE_INC := $(shell PKG_CONFIG_PATH=/usr/lib64/pkgconfig:$(RTE_SDK)/build/meson-uninstalled pkgconf --cflags-only-I libdpdk)
 +ifeq ($(TARGET), x86)
-+RTE_INC := $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):/usr/lib64/pkgconfig:$(RTE_SDK)/build/meson-uninstalled pkgconf --cflags-only-I libdpdk)
++RTE_INC := $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH):/usr/lib64/pkgconfig:$(RTE_SDK)/build/meson-uninstalled pkg-config --cflags-only-I libdpdk)
 +else ifeq ($(TARGET), armv8)
-+RTE_INC := $(pkgconf --cflags-only-I libdpdk)
++RTE_INC := $(shell pkg-config --cflags-only-I libdpdk)
 +endif
  API_DIR := $(PROJECT_DIR)/api
  SRC_DIR := $(PROJECT_DIR)/src
@@ -85,7 +85,7 @@ index de141bf..fa2923f 100644
  
  CC_FLAGS += -std=gnu11 -Wall -Wno-deprecated-declarations  \
  	-fdata-sections \
-@@ -112,12 +132,21 @@ CC_FLAGS += -std=gnu11 -Wall -Wno-deprecated-declarations  \
+@@ -112,14 +132,23 @@ CC_FLAGS += -std=gnu11 -Wall -Wno-deprecated-declarations  \
          -fPIC \
  	-Wall \
  	-Wimplicit-function-declaration \
@@ -110,8 +110,11 @@ index de141bf..fa2923f 100644
 +        -Werror -Wno-unused-variable -std=c++14
 +endif
  
- INC :=  -I$(API_DIR) -I$(ETH_DIR) -I$(SRC_DIR) -I$(RTE_INC)
+-INC :=  -I$(API_DIR) -I$(ETH_DIR) -I$(SRC_DIR) -I$(RTE_INC)
++INC :=  -I$(API_DIR) -I$(ETH_DIR) -I$(SRC_DIR) $(RTE_INC)
  DEF :=
+ ifeq ($(MLOG),1)
+ 	INC  += -I$(MLOG_DIR)/source
 @@ -150,8 +179,13 @@ CPP_SNC_OBJTARGETS := $(addprefix $(PROJECT_OBJ_DIR)/,$(CPP_OBJS_SNC))
  
  AS_OBJTARGETS := $(addprefix $(PROJECT_OBJ_DIR)/,$(AS_OBJS))

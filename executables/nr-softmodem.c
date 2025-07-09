@@ -207,11 +207,19 @@ void exit_function(const char *file, const char *function, const int line, const
 
   for (ru_id=0; ru_id<RC.nb_RU; ru_id++) {
     if (RC.ru[ru_id] && RC.ru[ru_id]->rfdevice.trx_end_func) {
+      if (RC.ru[ru_id]->rfdevice.trx_get_stats_func) {
+        RC.ru[ru_id]->rfdevice.trx_get_stats_func(&RC.ru[ru_id]->rfdevice);
+        RC.ru[ru_id]->rfdevice.trx_get_stats_func = NULL;
+      }
       RC.ru[ru_id]->rfdevice.trx_end_func(&RC.ru[ru_id]->rfdevice);
       RC.ru[ru_id]->rfdevice.trx_end_func = NULL;
     }
 
     if (RC.ru[ru_id] && RC.ru[ru_id]->ifdevice.trx_end_func) {
+      if (RC.ru[ru_id]->ifdevice.trx_get_stats_func) {
+        RC.ru[ru_id]->ifdevice.trx_get_stats_func(&RC.ru[ru_id]->ifdevice);
+        RC.ru[ru_id]->ifdevice.trx_get_stats_func = NULL;
+      }
       RC.ru[ru_id]->ifdevice.trx_end_func(&RC.ru[ru_id]->ifdevice);
       RC.ru[ru_id]->ifdevice.trx_end_func = NULL;
     }
@@ -423,11 +431,17 @@ int stop_L1(module_id_t gnb_id)
     stop_RU(RC.nb_RU);
 
   /* stop trx devices, multiple carrier currently not supported by RU */
+  if (ru->rfdevice.trx_get_stats_func) {
+    ru->rfdevice.trx_get_stats_func(&ru->rfdevice);
+  }
   if (ru->rfdevice.trx_stop_func) {
     ru->rfdevice.trx_stop_func(&ru->rfdevice);
     LOG_I(GNB_APP, "turned off RU rfdevice\n");
   }
 
+  if (ru->ifdevice.trx_get_stats_func) {
+    ru->ifdevice.trx_get_stats_func(&ru->rfdevice);
+  }
   if (ru->ifdevice.trx_stop_func) {
     ru->ifdevice.trx_stop_func(&ru->ifdevice);
     LOG_I(GNB_APP, "turned off RU ifdevice\n");

@@ -97,11 +97,19 @@ void exit_function(const char *file, const char *function, const int line, const
   oai_exit = 1;
 
   if (ru_m.rfdevice.trx_end_func) {
+    if (ru_m.rfdevice.trx_get_stats_func) {
+      ru_m.rfdevice.trx_get_stats_func(&ru_m.rfdevice);
+      ru_m.rfdevice.trx_get_stats_func = NULL;
+    }
     ru_m.rfdevice.trx_end_func(&ru_m.rfdevice);
     ru_m.rfdevice.trx_end_func = NULL;
   }
 
   if (ru_m.ifdevice.trx_end_func) {
+    if (ru_m.ifdevice.trx_get_stats_func) {
+      ru_m.ifdevice.trx_get_stats_func(&ru_m.ifdevice);
+      ru_m.ifdevice.trx_get_stats_func = NULL;
+    }
     ru_m.ifdevice.trx_end_func(&ru_m.ifdevice);
     ru_m.ifdevice.trx_end_func = NULL;
   }
@@ -363,11 +371,19 @@ int main ( int argc, char **argv )
   end_configmodule(uniqCfg);
 
   if (ru->rfdevice.trx_end_func) {
+    if (ru->rfdevice.trx_get_stats_func) {
+      ru->rfdevice.trx_get_stats_func(&ru->rfdevice);
+      ru->rfdevice.trx_get_stats_func = NULL;
+    }
     ru->rfdevice.trx_end_func(&ru->rfdevice);
     ru->rfdevice.trx_end_func = NULL;
   }
       
   if (ru->ifdevice.trx_end_func) {
+    if (ru->ifdevice.trx_get_stats_func) {
+      ru->ifdevice.trx_get_stats_func(&ru->ifdevice);
+      ru->ifdevice.trx_get_stats_func = NULL;
+    }
     ru->ifdevice.trx_end_func(&ru->ifdevice);
     ru->ifdevice.trx_end_func = NULL;
   }
