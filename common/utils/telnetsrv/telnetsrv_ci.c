@@ -215,6 +215,19 @@ int force_ue_release(char *buf, int debug, telnet_printfunc_t prnt)
   return 0;
 }
 
+static int get_current_bwp(char *buf, int debug, telnet_printfunc_t prnt)
+{
+  int rnti = fetch_rnti(buf, prnt);
+  NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[0]->UE_info, rnti);
+  int dl_bwp = UE->current_DL_BWP.bwp_id;
+  const char *dl_bwp_text = dl_bwp > 0 ? "dedicated" : "initial";
+  int ul_bwp = UE->current_UL_BWP.bwp_id;
+  const char *ul_bwp_text = ul_bwp > 0 ? "dedicated" : "initial";
+
+  prnt("UE %04x DL BWP ID %d (%s) UL BWP ID %d (%s)\n", UE->rnti, dl_bwp, dl_bwp_text, ul_bwp, ul_bwp_text);
+  return 0;
+}
+
 static telnetshell_cmddef_t cicmds[] = {
     {"get_single_rnti", "", get_single_rnti},
     {"force_reestab", "[rnti(hex,opt)]", trigger_reestab},
@@ -223,6 +236,7 @@ static telnetshell_cmddef_t cicmds[] = {
     {"force_ul_failure", "[rnti(hex,opt)]", force_ul_failure},
     {"trigger_f1_ho", "[rrc_ue_id(int,opt)]", rrc_gNB_trigger_f1_ho},
     {"fetch_du_by_ue_id", "[rrc_ue_id(int,opt)]", fetch_du_by_ue_id},
+    {"get_current_bwp", "[rnti(hex,opt)]", get_current_bwp},
     {"", "", NULL},
 };
 
