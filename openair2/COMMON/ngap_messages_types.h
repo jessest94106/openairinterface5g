@@ -561,6 +561,7 @@ typedef struct ngap_initial_context_setup_req_s {
   uint64_t amf_ue_ngap_id;
 
   /* UE aggregate maximum bitrate */
+  bool has_ue_ambr;
   ngap_ambr_t ue_ambr;
 
   /* guami */
@@ -631,6 +632,7 @@ typedef struct ngap_pdusession_setup_req_s {
   pdusession_resource_item_t pdusession[NGAP_MAX_PDU_SESSION];
 
   /* UE Aggregated Max Bitrates */
+  bool has_ue_ambr;
   ngap_ambr_t ueAggMaxBitRate;
 
 } ngap_pdusession_setup_req_t;

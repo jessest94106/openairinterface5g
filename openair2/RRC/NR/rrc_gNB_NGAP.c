@@ -841,7 +841,9 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i)
     cp_pdusession_resource_item_to_pdusession(&to_setup[i], &msg->pdusession[i]);
 
-  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, to_setup, msg->ueAggMaxBitRate.br_dl)) {
+  uint64_t dl_ambr = msg->has_ue_ambr ? msg->ueAggMaxBitRate.br_dl : 0;
+
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, to_setup, dl_ambr)) {
     // Reject PDU Session Resource setup if there's no CU-UP associated
     LOG_W(NR_RRC, "UE %d: reject PDU Session Setup in PDU Session Resource Setup Response\n", UE->rrc_ue_id);
     ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE};
