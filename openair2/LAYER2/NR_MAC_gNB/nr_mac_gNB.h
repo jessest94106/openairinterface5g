@@ -766,6 +766,7 @@ typedef struct {
   NR_SpCellConfig_t *reconfigSpCellConfig;
   interrupt_followup_action_t interrupt_action;
   NR_UE_NR_Capability_t *capability;
+  measgap_config_t measgap_config;
   // UE selected beam index
   uint8_t UE_beam_index;
   float ul_thr_ue;
