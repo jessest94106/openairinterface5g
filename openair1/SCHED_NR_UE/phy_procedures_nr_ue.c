@@ -605,6 +605,15 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
     uint32_t llr_offset[NR_SYMBOLS_PER_SLOT] = {0};
 
     int32_t log2_maxh = 0;
+
+    const uint32_t rx_llr_layer_size = (G + dlsch[0].Nl - 1) / dlsch[0].Nl;
+
+    if (dlsch[0].Nl == 0 || rx_llr_layer_size == 0 || rx_llr_layer_size > 10 * 1000 * 1000) {
+      LOG_E(PHY, "rx_llr_layer_size %d, G %d, Nl, %d, discarding this pdsch\n", rx_llr_layer_size, G, dlsch[0].Nl);
+      return -1;
+    }
+    __attribute__((aligned(32))) int16_t layer_llr[dlsch[0].Nl][rx_llr_layer_size];
+
     start_meas_nr_ue_phy(ue, RX_PDSCH_STATS);
     pdsch_scope_req_t scope_req = { .copy_chanest_to_scope = false,
                                     .copy_rxdataF_to_scope = false,
@@ -639,6 +648,8 @@ static int nr_ue_pdsch_procedures(PHY_VARS_NR_UE *ue,
                       harq_pid,
                       pdsch_est_size,
                       pdsch_dl_ch_estimates,
+                      rx_llr_layer_size,
+                      layer_llr,
                       llr,
                       dl_valid_re,
                       rxdataF,

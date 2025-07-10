@@ -312,6 +312,8 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                 unsigned char harq_pid,
                 uint32_t pdsch_est_size,
                 int32_t dl_ch_estimates[][pdsch_est_size],
+                int layer_llr_size,
+                int16_t layer_llr[][layer_llr_size],
                 int16_t *llr[2],
                 uint32_t dl_valid_re[NR_SYMBOLS_PER_SLOT],
                 c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP],
@@ -681,47 +683,28 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                              dlsch);
     dl_valid_re[symbol] -= ptrs_re_per_slot[0][symbol];
   }
+  start_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
+  nr_dlsch_llr(rx_size_symbol,
+               nbRx,
+               layer_llr_size,
+               layer_llr,
+               rxdataF_comp,
+               dl_ch_mag[0][0],
+               dl_ch_magb[0][0],
+               dl_ch_magr[0][0],
+               dlsch0_harq,
+               dlsch1_harq,
+               symbol,
+               dl_valid_re[symbol],
+               dlsch,
+               llr_offset[symbol]);
+  if (symbol < startSymbIdx + nbSymb - 1) // up to the penultimate symbol
+    llr_offset[symbol + 1] = dl_valid_re[symbol] * dlsch_config->qamModOrder + llr_offset[symbol];
+  stop_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
   /* at last symbol in a slot calculate LLR's for whole slot */
-  if(symbol == (startSymbIdx + nbSymb - 1)) {
-    const uint32_t rx_llr_layer_size = (G + dlsch[0].Nl - 1) / dlsch[0].Nl;
-
-    if (dlsch[0].Nl == 0 || rx_llr_layer_size == 0 || rx_llr_layer_size > 10 * 1000 * 1000) {
-      LOG_E(PHY, "rx_llr_layer_size %d, G %d, Nl, %d, discarding this pdsch\n", rx_llr_layer_size, G, dlsch[0].Nl);
-      return -1;
-    }
-
-    __attribute__((aligned(32))) int16_t layer_llr[dlsch[0].Nl][rx_llr_layer_size];
-    for(int i = startSymbIdx; i < startSymbIdx + nbSymb; i++) {
-      /* Calculate LLR's for each symbol */
-      start_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
-      nr_dlsch_llr(rx_size_symbol,
-                   nbRx,
-                   rx_llr_layer_size,
-                   layer_llr,
-                   rxdataF_comp,
-                   dl_ch_mag[0][0],
-                   dl_ch_magb[0][0],
-                   dl_ch_magr[0][0],
-                   dlsch0_harq,
-                   dlsch1_harq,
-                   i,
-                   dl_valid_re[i],
-                   dlsch,
-                   llr_offset[i]);
-      if (i < startSymbIdx + nbSymb - 1) // up to the penultimate symbol
-        llr_offset[i + 1] = dl_valid_re[i] * dlsch_config->qamModOrder + llr_offset[i];
-      stop_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
-    }
-
+  if (symbol == (startSymbIdx + nbSymb - 1)) {
     start_meas_nr_ue_phy(ue, DLSCH_LAYER_DEMAPPING);
-    nr_dlsch_layer_demapping(llr,
-                             dlsch[0].Nl,
-                             dlsch_config->qamModOrder,
-                             G,
-                             codeword_TB0,
-                             codeword_TB1,
-                             rx_llr_layer_size,
-                             layer_llr);
+    nr_dlsch_layer_demapping(llr, dlsch[0].Nl, dlsch_config->qamModOrder, G, codeword_TB0, codeword_TB1, layer_llr_size, layer_llr);
     stop_meas_nr_ue_phy(ue, DLSCH_LAYER_DEMAPPING);
   /*
     for (int i=0; i < 2; i++){
