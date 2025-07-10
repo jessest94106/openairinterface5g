@@ -3283,6 +3283,7 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
       nr_timer_stop(&sched_ctrl->transm_interrupt);
       if (UE->interrupt_action == FOLLOW_OUTOFSYNC)
         nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
+      /* else: default FOLLOW_INSYNC: nothing to do (UE is now active again) */
     }
   }
 }
