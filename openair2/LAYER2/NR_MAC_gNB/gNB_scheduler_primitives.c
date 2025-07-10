@@ -3158,6 +3158,37 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, slot_t slot, nfapi_nr_dl_tt
   }
 }
 
+void nr_measgap_scheduling(gNB_MAC_INST *nr_mac, frame_t frame, sub_frame_t slot)
+{
+  NR_SCHED_ENSURE_LOCKED(&nr_mac->sched_lock);
+
+  NR_UEs_t *UE_info = &nr_mac->UE_info;
+  UE_iterator(UE_info->connected_ue_list, UE) {
+    measgap_config_t *mgc = &UE->measgap_config;
+    if (!mgc->enable)
+      continue;
+
+    const int slots_frame = nr_mac->frame_structure.numb_slots_frame;
+    const frame_t f = (frame + (slot + mgc->n_slots_advance) / slots_frame) % 1024;
+    const slot_t s = (slot + mgc->n_slots_advance) % slots_frame;
+
+    // TS 38 331 - Section 5.5.2.9 Measurement gap configuration
+    if (!(((f % (mgc->mgrp_ms / 10)) == (mgc->gapOffset / 10)) && (s == mgc->gapOffset % 10)))
+      continue;
+
+    NR_timer_t *t = &UE->UE_sched_ctrl.transm_interrupt;
+    interrupt_followup_action_t a = nr_timer_is_active(t) ? UE->interrupt_action : FOLLOW_INSYNC;
+    // start a timer to stop scheduling UE during MeasGap, or extend timer for
+    // duration of measGap with existing follow-up action
+    // TODO: if the timer is running, it might be to stop scheduling of the UE afterwards, but then it does not make sense to stop
+    //  scheduling the UE now, we should maybe just skip it?
+    if (!nr_timer_is_active(t) || nr_timer_remaining_time(t) < mgc->mgl_slots) {
+      nr_mac_trigger_ul_failure(&UE->UE_sched_ctrl, UE->current_DL_BWP.scs); /* set the UE to "not active" */
+      nr_mac_interrupt_ue_transmission(nr_mac, UE, a, mgc->mgl_slots);
+    }
+  }
+}
+
 void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
 {
   DevAssert(cell_group != NULL);
@@ -3281,9 +3312,12 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
     if (nr_timer_tick(&sched_ctrl->transm_interrupt)) {
       /* expired */
       nr_timer_stop(&sched_ctrl->transm_interrupt);
-      if (UE->interrupt_action == FOLLOW_OUTOFSYNC)
+      if (UE->interrupt_action == FOLLOW_OUTOFSYNC) {
         nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
-      /* else: default FOLLOW_INSYNC: nothing to do (UE is now active again) */
+      } else {
+        DevAssert(UE->interrupt_action == FOLLOW_INSYNC);
+        nr_mac_reset_ul_failure(sched_ctrl);
+      }
     }
   }
 }
