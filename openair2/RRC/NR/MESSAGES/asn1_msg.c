@@ -998,7 +998,7 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 NR_ReportConfigToAddMod_t *rc_PER,
                                 NR_ReportConfigToAddMod_t *rc_A2,
                                 seq_arr_t *rc_A3_seq,
-                                seq_arr_t *pci_seq)
+                                seq_arr_t *neigh_seq)
 {
   NR_MeasConfig_t *mc = calloc_or_fail(1, sizeof(*mc));
   mc->measObjectToAddModList = calloc_or_fail(1, sizeof(*mc->measObjectToAddModList));
@@ -1024,28 +1024,42 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
   // Measurement Objects: Specifies what is to be measured. For NR and inter-RAT E-UTRA measurements, this may include
   // cell-specific offsets, blacklisted cells to be ignored and whitelisted cells to consider for measurements.
   NR_MeasObjectToAddMod_t *mo1 = get_MeasObject(ft, band, ft->carrierFreq, 1);
-
-  if (pci_seq) {
+  if (neigh_seq) {
     NR_MeasObjectNR_t *monr1 = mo1->measObject.choice.measObjectNR;
-    for (int i = 0; i < pci_seq->size; i++) {
-      if (monr1->cellsToAddModList == NULL) {
-        monr1->cellsToAddModList = calloc(1, sizeof(*monr1->cellsToAddModList));
-      }
-
-      NR_CellsToAddMod_t *cell = calloc(1, sizeof(*cell));
-      int *pci = (int *)seq_arr_at(pci_seq, i);
-      cell->physCellId = *pci;
+    if (monr1->cellsToAddModList == NULL)
+      monr1->cellsToAddModList = calloc_or_fail(1, sizeof(*monr1->cellsToAddModList));
+    FOR_EACH_SEQ_ARR(nr_neighbour_cell_t *, n, neigh_seq) {
+      NR_CellsToAddMod_t *cell = calloc_or_fail(1, sizeof(*cell));
+      cell->physCellId = n->physicalCellId;
       ASN_SEQUENCE_ADD(&monr1->cellsToAddModList->list, cell);
     }
   }
-
   asn1cSeqAdd(&mc->measObjectToAddModList->list, mo1);
 
   // Preparation of measId
-  for (uint8_t reportIdx = 0; reportIdx < mc->reportConfigToAddModList->list.count; reportIdx++) {
+  uint8_t reportIdx = 0;
+  for (; reportIdx < mc->reportConfigToAddModList->list.count; reportIdx++) {
     const NR_ReportConfigId_t reportId = mc->reportConfigToAddModList->list.array[reportIdx]->reportConfigId;
     NR_MeasIdToAddMod_t *measid = get_MeasId(reportIdx + 1, reportId, 1);
     asn1cSeqAdd(&mc->measIdToAddModList->list, measid);
+  }
+
+  // Preparation of measId for neighbour cells for periodic report
+  if (neigh_seq) {
+    int mo_id = 2;
+    FOR_EACH_SEQ_ARR(nr_neighbour_cell_t *, neigh_cell, neigh_seq) {
+      NR_MeasObjectToAddMod_t *mo_neighbour = get_MeasObject(ft, band, neigh_cell->absoluteFrequencySSB, mo_id);
+      NR_MeasObjectNR_t *monr = mo_neighbour->measObject.choice.measObjectNR;
+      monr->cellsToAddModList = calloc_or_fail(1, sizeof(*monr->cellsToAddModList));
+      NR_CellsToAddMod_t *cell = calloc_or_fail(1, sizeof(*cell));
+      cell->physCellId = neigh_cell->physicalCellId;
+      ASN_SEQUENCE_ADD(&monr->cellsToAddModList->list, cell);
+      asn1cSeqAdd(&mc->measObjectToAddModList->list, mo_neighbour);
+      NR_MeasIdToAddMod_t *measid = get_MeasId(reportIdx + 1, rc_PER->reportConfigId, mo_id);
+      asn1cSeqAdd(&mc->measIdToAddModList->list, measid);
+      reportIdx++;
+      mo_id++;
+    }
   }
 
   mc->quantityConfig = calloc_or_fail(1, sizeof(*mc->quantityConfig));

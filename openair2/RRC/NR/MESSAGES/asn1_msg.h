@@ -151,7 +151,7 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 NR_ReportConfigToAddMod_t *rc_PER,
                                 NR_ReportConfigToAddMod_t *rc_A2,
                                 seq_arr_t *rc_A3_seq,
-                                seq_arr_t *pci_seq);
+                                seq_arr_t *neigh_seq);
 void free_MeasConfig(NR_MeasConfig_t *mc);
 int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi);
 
