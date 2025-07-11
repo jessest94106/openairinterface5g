@@ -93,7 +93,7 @@
         <testCase id="000030">
                 <class>IdleSleep</class>
                 <desc>Sleep</desc>
-                <idle_sleep_time_in_sec>5</idle_sleep_time_in_sec>
+                <idle_sleep_time_in_sec>15</idle_sleep_time_in_sec>
         </testCase>
 
         <testCase id="000031">
