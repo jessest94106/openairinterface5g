@@ -1253,9 +1253,8 @@ printf("%d\n", slot);
         }
 
         for (i = 0; i < available_bits; i++) {
-          if(((gNB_dlsch->harq_process.f[i] == 0) && (UE_llr[i] <= 0)) ||
-             ((gNB_dlsch->harq_process.f[i] == 1) && (UE_llr[i] >= 0)))
-          {
+          const uint8_t current_bit = (gNB_dlsch->harq_process.f[i / 8] & (1 << (i & 7))) >> (i & 7);
+          if (((current_bit == 0) && (UE_llr[i] <= 0)) || ((current_bit == 1) && (UE_llr[i] >= 0))) {
             if (errors_scrambling[round] == 0) {
               LOG_D(PHY,"First bit in error in unscrambling = %d\n",i);
             }
