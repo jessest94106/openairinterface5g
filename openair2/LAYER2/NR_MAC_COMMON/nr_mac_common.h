@@ -35,6 +35,7 @@
 #include "NR_CellGroupConfig.h"
 #include "NR_UE-NR-Capability.h"
 #include "nr_mac.h"
+#include "nr_prach_config.h"
 #include "common/utils/nr/nr_common.h"
 
 #define NB_SRS_PERIOD         (18)
@@ -51,20 +52,6 @@ typedef enum {
   pusch_len1 = 1,
   pusch_len2 = 2
 } pusch_maxLength_t;
-
-typedef struct {
-  uint32_t format;
-  uint32_t start_symbol;
-  uint32_t N_t_slot;
-  uint32_t N_dur;
-  uint32_t N_RA_slot;
-  uint32_t N_RA_sfn;
-  uint32_t max_association_period;
-  int x;
-  int y;
-  int y2;
-  uint64_t s_map;
-} nr_prach_info_t;
 
 typedef struct {
   uint16_t bwpStart;
@@ -161,8 +148,6 @@ void find_aggregation_candidates(uint8_t *aggregation_level,
                                  const NR_SearchSpace_t *ss,
                                  int maxL);
 
-uint16_t get_nr_prach_format_from_index(uint8_t index, uint32_t pointa, uint8_t unpaired);
-
 bool get_nr_prach_sched_from_info(nr_prach_info_t info,
                                   int config_index,
                                   int frame,
@@ -171,8 +156,6 @@ bool get_nr_prach_sched_from_info(nr_prach_info_t info,
                                   frequency_range_t freq_range,
                                   uint16_t *RA_sfn_index,
                                   uint8_t unpaired);
-
-nr_prach_info_t get_nr_prach_occasion_info_from_index(uint8_t index, frequency_range_t freq_range, uint8_t unpaired);
 
 uint8_t get_pusch_mcs_table(long *mcs_Table,
                             int is_tp,
@@ -189,8 +172,6 @@ uint8_t compute_nr_root_seq(NR_RACH_ConfigCommon_t *rach_config,
 int ul_ant_bits(NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig, long transformPrecoder);
 
 uint8_t get_pdsch_mcs_table(long *mcs_Table, int dci_format, int rnti_type, int ss_type);
-
-int get_format0(uint8_t index, uint8_t unpaired, frequency_range_t frequency_range);
 
 uint16_t get_NCS(uint8_t index, uint16_t format, uint8_t restricted_set_config);
 int compute_pucch_crc_size(int O_uci);

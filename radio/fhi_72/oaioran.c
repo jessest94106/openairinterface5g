@@ -35,13 +35,14 @@
 #include "xran_sync_api.h"
 #include "oran_isolate.h"
 #include "oran-init.h"
-#include "xran_common.h"
 #include "oaioran.h"
 #include <rte_ethdev.h>
 
 #include "oran-config.h" // for g_kbar
 
 #include "common/utils/threadPool/notified_fifo.h"
+
+#define N_SC_PER_PRB 12
 
 #if OAI_FHI72_USE_POLLING
 #define USE_POLLING
@@ -67,49 +68,37 @@ volatile oran_sync_info_t oran_sync_info = {0};
 void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
 {
   struct xran_cb_tag *callback_tag = (struct xran_cb_tag *)pCallbackTag;
-  uint64_t second;
-  uint32_t tti;
-  uint32_t frame;
-  uint32_t subframe;
-  uint32_t slot, slot2;
-  uint32_t rx_sym;
 
   static int32_t last_slot = -1;
   static int32_t last_frame = -1;
 
-  /* xran context contains the same xran_fh_init struct info,
-    but xran_fh_config struct info is RU specific only */
-  struct xran_device_ctx *xran_ctx = xran_dev_get_ctx();
-  const struct xran_fh_init *fh_init = &xran_ctx->fh_init;
+  const struct xran_fh_init *fh_init = get_xran_fh_init();
   int num_ports = fh_init->xran_ports;
 
   /* assuming all RUs have the same numerology */
-  const int slots_per_subframe = 1 << xran_ctx->fh_cfg.frame_conf.nNumerology;
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
+  const int slots_in_sf = 1 << fh_cfg->frame_conf.nNumerology;
+  const int sf_in_frame = 10;
 
   static int rx_RU[XRAN_PORTS_NUM][160] = {0};
-  uint32_t rx_tti = callback_tag->slotiId;
+  uint32_t tti = callback_tag->slotiId;
+  uint32_t frame = XranGetFrameNum(tti, 0, sf_in_frame, slots_in_sf);
+  uint32_t subframe = XranGetSubFrameNum(tti, slots_in_sf, sf_in_frame);
+  uint32_t slot = XranGetSlotNum(tti, slots_in_sf);
 
-  tti = xran_get_slot_idx_from_tti(rx_tti, &frame, &subframe, &slot, &second);
-
-  rx_sym = callback_tag->symbol & 0xFF;
+  uint32_t rx_sym = callback_tag->symbol & 0xFF;
   uint32_t ru_id = callback_tag->oXuId;
 
-  LOG_D(HW,
-        "rx_callback frame %d, subframe %d, slot %d, second %lld, rx_sym %d ru_id %d\n",
-        frame,
-        subframe,
-        slot,
-        (unsigned long long)second,
-        rx_sym,
-        ru_id);
+  LOG_D(HW, "rx_callback at %4d.%3d (subframe %d), rx_sym %d ru_id %d\n", frame, slot, subframe, rx_sym, ru_id);
+
   if (rx_sym == 7) { // in F release this value is defined as XRAN_FULL_CB_SYM (full slot (offset + 7))
 #ifdef F_RELEASE
     for (int ru_idx = 0; ru_idx < num_ports; ru_idx++) {
-      struct xran_device_ctx *xran_ctx_per_ru = xran_dev_get_ctx_by_id(ru_idx);
-      struct xran_fh_config *fh_config = &xran_ctx_per_ru->fh_cfg;
+      struct xran_fh_config *fh_config = get_xran_fh_config(ru_idx);
+      oran_buf_list_t *bufs = get_xran_buffers(ru_idx);
       for (uint16_t cc_id = 0; cc_id < 1 /* fh_config->nCC */; cc_id++) { // OAI does not support multiple CC yet.
         for(uint32_t ant_id = 0; ant_id < fh_config->neAxc; ant_id++) {
-          struct xran_prb_map *pRbMap = (struct xran_prb_map *)xran_ctx_per_ru->sFrontHaulRxPrbMapBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id].sBufferList.pBuffers->pData;
+          struct xran_prb_map *pRbMap = (struct xran_prb_map *)bufs->dstcp[ant_id][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
           AssertFatal(pRbMap != NULL, "(%d:%d:%d)pRbMap == NULL. Aborting.\n", cc_id, tti % XRAN_N_FE_BUF_LEN, ant_id);
 
           for (uint32_t sym_id = 0; sym_id < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_id++) {
@@ -127,7 +116,7 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
     // would see periodic output with only "0" in stats counters
     if (!first_call_set)
       return;
-    slot2 = slot + (subframe * slots_per_subframe);
+    uint32_t slot2 = slot + (subframe * slots_in_sf);
     rx_RU[ru_id][slot2] = 1;
     if (last_frame > 0 && frame > 0
         && ((slot2 > 0 && last_frame != frame) || (slot2 == 0 && last_frame != ((1024 + frame - 1) & 1023))))
@@ -181,29 +170,27 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
   /* calculate tti and subframe_id from frame, slot num */
   int sym_idx = 0;
 
-  struct xran_device_ctx *xran_ctx = xran_dev_get_ctx();
-  struct xran_prach_cp_config *pPrachCPConfig = &(xran_ctx->PrachCPConfig);
-  struct xran_ru_config *ru_conf = &(xran_ctx->fh_cfg.ru_conf);
-  int slots_per_frame = 10 << xran_ctx->fh_cfg.frame_conf.nNumerology;
-  int slots_per_subframe = 1 << xran_ctx->fh_cfg.frame_conf.nNumerology;
+  struct xran_fh_init *fh_init = get_xran_fh_init();
+  struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
+  int prach_sym = get_prach_conf_duration(0);
+  struct xran_ru_config *ru_conf = &fh_cfg->ru_conf;
+  int slots_per_frame = 10 << fh_cfg->frame_conf.nNumerology;
+  int slots_per_subframe = 1 << fh_cfg->frame_conf.nNumerology;
 
   int tti = slots_per_frame * (frame) + (slot);
   uint32_t subframe = slot / slots_per_subframe;
   uint32_t is_prach_slot = xran_is_prach_slot(0, subframe, (slot % slots_per_subframe));
 
-  int nb_rx_per_ru = ru->nb_rx / xran_ctx->fh_init.xran_ports;
+  int nb_rx_per_ru = ru->nb_rx / fh_init->xran_ports;
   /* If it is PRACH slot, copy prach IQ from XRAN PRACH buffer to OAI PRACH buffer */
   if (is_prach_slot) {
-    for (sym_idx = 0; sym_idx < pPrachCPConfig->numSymbol; sym_idx++) {
+    for (sym_idx = 0; sym_idx < prach_sym; sym_idx++) {
       for (int aa = 0; aa < ru->nb_rx; aa++) {
         int16_t *dst, *src;
         int idx = 0;
-        xran_ctx = xran_dev_get_ctx_by_id(aa / nb_rx_per_ru);
+        oran_buf_list_t *bufs = get_xran_buffers(aa / nb_rx_per_ru);
         dst = ru->prach_buf[aa]; // + (sym_idx*576));
-        src = (int16_t *)((uint8_t *)xran_ctx->sFHPrachRxBbuIoBufCtrlDecomp[tti % XRAN_N_FE_BUF_LEN][0][aa % nb_rx_per_ru]
-                              .sBufferList.pBuffers[sym_idx]
-                              .pData);
-
+        src = (int16_t *)bufs->prachdstdecomp[aa % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers[sym_idx].pData;
         /* convert Network order to host order */
         if (ru_conf->compMeth_PRACH == XRAN_COMPMETHOD_NONE) {
           if (sym_idx == 0) {
@@ -328,16 +315,16 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
 #endif
   // return(0);
 
-  struct xran_device_ctx *xran_ctx = xran_dev_get_ctx();
-  int slots_per_frame = 10 << xran_ctx->fh_cfg.frame_conf.nNumerology;
+  struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
+  int slots_per_frame = 10 << fh_cfg->frame_conf.nNumerology;
 
   int tti = slots_per_frame * (*frame) + (*slot);
 
   read_prach_data(ru, *frame, *slot);
 
-  const struct xran_fh_init *fh_init = &xran_ctx->fh_init;
-  int nPRBs = xran_ctx->fh_cfg.nULRBs;
-  int fftsize = 1 << xran_ctx->fh_cfg.ru_conf.fftSize;
+  const struct xran_fh_init *fh_init = get_xran_fh_init();
+  int nPRBs = fh_cfg->nULRBs;
+  int fftsize = 1 << fh_cfg->ru_conf.fftSize;
 
   int slot_offset_rxdata = 3 & (*slot);
   uint32_t slot_size = 4 * 14 * fftsize;
@@ -348,8 +335,7 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
     for (uint8_t ant_id = 0; ant_id < ru->nb_rx; ant_id++) {
       rx_data = (uint8_t *)ru->rxdataF[ant_id];
       start_ptr = rx_data + (slot_size * slot_offset_rxdata);
-      xran_ctx = xran_dev_get_ctx_by_id(ant_id / nb_rx_per_ru);
-      const struct xran_frame_config *frame_conf = &xran_ctx->fh_cfg.frame_conf;
+      const struct xran_frame_config *frame_conf = &get_xran_fh_config(ant_id / nb_rx_per_ru)->frame_conf;
       // skip processing this slot is TX (no RX in this slot)
       if (is_tdd_dl_guard_slot(frame_conf, *slot))
         continue;
@@ -361,8 +347,8 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
           continue;
 
         uint8_t *pData;
-        uint8_t *pPrbMapData = xran_ctx->sFrontHaulRxPrbMapBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_rx_per_ru]
-                                   .sBufferList.pBuffers->pData;
+        oran_buf_list_t *bufs = get_xran_buffers(ant_id / nb_rx_per_ru);
+        uint8_t *pPrbMapData = bufs->dstcp[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
         struct xran_prb_map *pPrbMap = (struct xran_prb_map *)pPrbMapData;
 
         struct xran_prb_elm *pRbElm = &pPrbMap->prbMap[0];
@@ -374,8 +360,8 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
         uint32_t one_rb_size =
             (((pRbElm->iqWidth == 0) || (pRbElm->iqWidth == 16)) ? (N_SC_PER_PRB * 2 * 2) : (3 * pRbElm->iqWidth + 1));
         if (fh_init->mtu < pRbElm->nRBSize * one_rb_size)
-          pData = xran_ctx->sFrontHaulRxBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_rx_per_ru]
-                      .sBufferList.pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
+          pData = bufs->dst[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN]
+                      .pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
                       .pData;
         else
           pData = p_sec_desc->pData;
@@ -493,22 +479,20 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
   int32_t *pos = NULL;
   int idx = 0;
 
-  struct xran_device_ctx *xran_ctx = xran_dev_get_ctx();
-  const struct xran_fh_init *fh_init = &xran_ctx->fh_init;
-  int nPRBs = xran_ctx->fh_cfg.nDLRBs;
-  int fftsize = 1 << xran_ctx->fh_cfg.ru_conf.fftSize;
+  const struct xran_fh_init *fh_init = get_xran_fh_init();
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
+  int nPRBs = fh_cfg->nDLRBs;
+  int fftsize = 1 << fh_cfg->ru_conf.fftSize;
   int nb_tx_per_ru = ru->nb_tx / fh_init->xran_ports;
 
   for (uint16_t cc_id = 0; cc_id < 1 /*nSectorNum*/; cc_id++) { // OAI does not support multiple CC yet.
     for (uint8_t ant_id = 0; ant_id < ru->nb_tx; ant_id++) {
-      xran_ctx = xran_dev_get_ctx_by_id(ant_id / nb_tx_per_ru);
+      oran_buf_list_t *bufs = get_xran_buffers(ant_id / nb_tx_per_ru);
       // This loop would better be more inner to avoid confusion and maybe also errors.
       for (int32_t sym_idx = 0; sym_idx < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_idx++) {
-        uint8_t *pData = xran_ctx->sFrontHaulTxBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_tx_per_ru]
-                             .sBufferList.pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
-                             .pData;
-        uint8_t *pPrbMapData = xran_ctx->sFrontHaulTxPrbMapBbuIoBufCtrl[tti % XRAN_N_FE_BUF_LEN][cc_id][ant_id % nb_tx_per_ru]
-                                   .sBufferList.pBuffers->pData;
+        uint8_t *pData =
+            bufs->src[ant_id % nb_tx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT].pData;
+        uint8_t *pPrbMapData = bufs->srccp[ant_id % nb_tx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
         struct xran_prb_map *pPrbMap = (struct xran_prb_map *)pPrbMapData;
         ptr = pData;
         pos = &ru->txdataF_BF[ant_id][sym_idx * fftsize];

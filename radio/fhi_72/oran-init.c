@@ -30,7 +30,9 @@
 
 #include "common/utils/assertions.h"
 #include "common/utils/LOG/log.h"
+#include "common/utils/nr/nr_common.h"
 #include "common_lib.h"
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_prach_config.h"
 
 /* PRACH data samples are 32 bits wide (16bits for I/Q). Each packet contains
  * 840 samples for long sequence or 144 for short sequence. The payload length
@@ -45,6 +47,10 @@
 // (multiple CCs)
 static oran_port_instance_t gPortInst[XRAN_PORTS_NUM][XRAN_MAX_SECTOR_NR];
 void *gxran_handle;
+
+static struct xran_fh_init g_fh_init = {0};
+static struct xran_fh_config g_fh_config[XRAN_PORTS_NUM] = {0};
+static uint32_t g_prach_conf_duration[XRAN_PORTS_NUM] = {0};
 
 static uint32_t get_nSW_ToFpga_FTH_TxBufferLen(int mu, int sections)
 {
@@ -460,7 +466,47 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
       printf("xran_reg_physide_cb failed %d\n", xret);
       exit(-1);
     }
+
+    // retrieve and store prach duration
+    uint8_t idx = xran_fh_config[o_xu_id].prach_conf.nPrachConfIdx;
+    const struct xran_frame_config *fc = &xran_fh_config[o_xu_id].frame_conf;
+    g_prach_conf_duration[o_xu_id] =
+        get_nr_prach_occasion_info_from_index(idx,
+                                              fc->nNumerology > 2 ? FR2 : FR1,
+                                              fc->nFrameDuplexType == XRAN_FDD ? duplex_mode_FDD : duplex_mode_TDD)
+            .N_dur;
   }
 
+  // store config after xran initialization -- xran makes modifications to
+  // these structs during initialization
+  memcpy(&g_fh_init, xran_fh_init, sizeof(*xran_fh_init));
+  memcpy(&g_fh_config, xran_fh_config, sizeof(*xran_fh_config) * xran_fh_init->xran_ports);
+
   return (void *)gxran_handle;
+}
+
+oran_buf_list_t *get_xran_buffers(uint32_t port_id)
+{
+  struct xran_fh_init *fh_init = get_xran_fh_init();
+  DevAssert(port_id < fh_init->xran_ports);
+  return gPortInst[port_id][0].buf_list;
+}
+
+struct xran_fh_init *get_xran_fh_init(void)
+{
+  return &g_fh_init;
+}
+
+struct xran_fh_config *get_xran_fh_config(uint32_t port_id)
+{
+  struct xran_fh_init *fh_init = get_xran_fh_init();
+  DevAssert(port_id < fh_init->xran_ports);
+  return &g_fh_config[port_id];
+}
+
+uint32_t get_prach_conf_duration(uint32_t port_id)
+{
+  struct xran_fh_init *fh_init = get_xran_fh_init();
+  DevAssert(port_id < fh_init->xran_ports);
+  return g_prach_conf_duration[port_id];
 }

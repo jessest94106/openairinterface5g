@@ -843,6 +843,7 @@ static int ngap_gNB_handle_initial_context_request(sctp_assoc_t assoc_id, uint32
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_InitialContextSetupRequestIEs_t, ie, container, NGAP_ProtocolIE_ID_id_UEAggregateMaximumBitRate, false);
   if (ie != NULL) {
     msg->ue_ambr = decode_ngap_UEAggregateMaximumBitRate(&ie->value.choice.UEAggregateMaximumBitRate);
+    msg->has_ue_ambr = true;
   }
 
   /* id-GUAMI */
@@ -1022,8 +1023,11 @@ static int ngap_gNB_handle_pdusession_setup_request(sctp_assoc_t assoc_id, uint3
 
   /* UE Aggregated Maximum Bitrate */
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_PDUSessionResourceSetupRequestIEs_t, ie, container,
-                         NGAP_ProtocolIE_ID_id_UEAggregateMaximumBitRate, true);
-  msg->ueAggMaxBitRate = decode_ngap_UEAggregateMaximumBitRate(&ie->value.choice.UEAggregateMaximumBitRate);
+                         NGAP_ProtocolIE_ID_id_UEAggregateMaximumBitRate, false);
+  if (ie != NULL) {
+    msg->ueAggMaxBitRate = decode_ngap_UEAggregateMaximumBitRate(&ie->value.choice.UEAggregateMaximumBitRate);
+    msg->has_ue_ambr = true;
+  }
 
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_PDUSessionResourceSetupRequestIEs_t, ie, container,
                          NGAP_ProtocolIE_ID_id_PDUSessionResourceSetupListSUReq, true);

@@ -170,8 +170,12 @@ void exit_function(const char *file, const char *function, const int line, const
 
   if (PHY_vars_UE_g && PHY_vars_UE_g[0]) {
     for(CC_id=0; CC_id<MAX_NUM_CCs; CC_id++) {
-      if (PHY_vars_UE_g[0][CC_id] && PHY_vars_UE_g[0][CC_id]->rfdevice.trx_end_func)
+      if (PHY_vars_UE_g[0][CC_id] && PHY_vars_UE_g[0][CC_id]->rfdevice.trx_end_func) {
+        if (PHY_vars_UE_g[0][CC_id]->rfdevice.trx_get_stats_func) {
+          PHY_vars_UE_g[0][CC_id]->rfdevice.trx_get_stats_func(&PHY_vars_UE_g[0][CC_id]->rfdevice);
+        }
         PHY_vars_UE_g[0][CC_id]->rfdevice.trx_end_func(&PHY_vars_UE_g[0][CC_id]->rfdevice);
+      }
     }
   }
 
@@ -591,6 +595,8 @@ int main(int argc, char **argv)
           ret = pthread_join(phy_vars->stat_thread, NULL);
           AssertFatal(ret == 0, "pthread_join error %d, errno %d (%s)\n", ret, errno, strerror(errno));
         }
+        if (phy_vars->rfdevice.trx_get_stats_func)
+          phy_vars->rfdevice.trx_get_stats_func(&phy_vars->rfdevice);
         if (phy_vars->rfdevice.trx_end_func)
           phy_vars->rfdevice.trx_end_func(&phy_vars->rfdevice);
       }
