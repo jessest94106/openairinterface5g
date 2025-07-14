@@ -260,17 +260,7 @@ bool nr_search_ssb_common(nr_ssb_search_params_t *params);
   @param dl_Carrier Pointer to DL carrier to be set
   @param ul_Carrier Pointer to UL carrier to be set
 */
-void nr_get_carrier_frequencies(PHY_VARS_NR_UE *ue,
-                                uint64_t *dl_Carrier,
-                                uint64_t *ul_Carrier);
-
-/*!
-  \brief This function gets the carrier frequencies either from FP or command-line-set global variables, depending on the availability of the latter
-  @param ue         Pointer to PHY UE
-  @param sl_Carrier Pointer to SL carrier to be set
-*/
-void nr_get_carrier_frequencies_sl(PHY_VARS_NR_UE *ue,
-                                   uint64_t *sl_Carrier);
+void nr_get_carrier_frequencies(const PHY_VARS_NR_UE *ue, uint64_t *dl_Carrier, uint64_t *ul_Carrier);
 
 /*!
   \brief This function sets the OAI RF card rx/tx params
