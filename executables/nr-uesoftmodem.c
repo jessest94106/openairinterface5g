@@ -104,8 +104,6 @@ int oai_exit = 0;
 
 static int      tx_max_power[MAX_NUM_CCs] = {0};
 
-double          rx_gain_off = 0.0;
-
 uint64_t        downlink_frequency[MAX_NUM_CCs][4];
 int32_t         uplink_frequency_offset[MAX_NUM_CCs][4];
 uint64_t        sidelink_frequency[MAX_NUM_CCs][4];
@@ -191,7 +189,7 @@ void set_options(int CC_id, PHY_VARS_NR_UE *UE){
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
 
   // Set UE variables
-  UE->rx_total_gain_dB     = (int)nrUE_params.rx_gain + rx_gain_off;
+  UE->rx_total_gain_dB     = (int)nrUE_params.rx_gain;
   UE->tx_total_gain_dB     = (int)nrUE_params.tx_gain;
   UE->tx_power_max_dBm     = nrUE_params.tx_max_power;
   UE->rf_map.card          = 0;
@@ -266,8 +264,7 @@ void init_openair0(PHY_VARS_NR_UE *ue)
       nr_get_carrier_frequencies(PHY_vars_UE_g[0][0], &dl_carrier, &ul_carrier);
 
     nr_rf_card_config_freq(cfg, ul_carrier, dl_carrier, freq_off);
-
-    nr_rf_card_config_gain(cfg, rx_gain_off);
+    nr_rf_card_config_gain(cfg);
 
     cfg->configFilename = get_softmodem_params()->rf_config_file;
 

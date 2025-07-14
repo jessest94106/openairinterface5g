@@ -275,10 +275,8 @@ void nr_get_carrier_frequencies_sl(PHY_VARS_NR_UE *ue,
 /*!
   \brief This function sets the OAI RF card rx/tx params
   @param openair0_cfg   Pointer OAI config for a specific card
-  @param rx_gain_off    Rx gain offset
 */
-void nr_rf_card_config_gain(openair0_config_t *openair0_cfg,
-                            double rx_gain_off);
+void nr_rf_card_config_gain(openair0_config_t *openair0_cfg);
 
 void nr_rf_card_config_freq(openair0_config_t *openair0_cfg,
                             uint64_t ul_Carrier,

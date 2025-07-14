@@ -38,7 +38,6 @@
 #define CONFIG_HLP_CALPRACH      "UE run normal prach with maximum power, but don't continue random-access\n"
 #define CONFIG_HLP_NOL2CN        "bypass L2 and upper layers\n"
 #define CONFIG_HLP_UERXG         "set UE RX gain\n"
-#define CONFIG_HLP_UERXGOFF      "external UE amplifier offset\n"
 #define CONFIG_HLP_UETXG         "set UE TX gain\n"
 #define CONFIG_HLP_UENANTR       "set UE number of rx antennas\n"
 #define CONFIG_HLP_UENANTT       "set UE number of tx antennas\n"
