@@ -767,8 +767,6 @@ void *UE_thread(void *arg)
   void *rxp[NB_ANTENNAS_RX];
   enum stream_status_e stream_status = STREAM_STATUS_UNSYNC;
   fapi_nr_config_request_t *cfg = &UE->nrUE_config;
-  int tmp = openair0_device_load(dev0, cfg0);
-  AssertFatal(tmp == 0, "Could not load the device\n");
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   sl_nr_phy_config_request_t *sl_cfg = NULL;
   if (UE->sl_mode == 2) {
@@ -776,13 +774,7 @@ void *UE_thread(void *arg)
     sl_cfg = &UE->SL_UE_PHY_PARAMS.sl_config;
   }
 
-  dev0->host_type = RAU_HOST;
   UE->is_synchronized = 0;
-  int tmp2 = dev0->trx_start_func(dev0);
-  AssertFatal(tmp2 == 0, "Could not start the device\n");
-  if (usrp_tx_thread == 1)
-    dev0->trx_write_init(dev0);
-
   InitSinLUT();
 
   notifiedFIFO_t nf;
