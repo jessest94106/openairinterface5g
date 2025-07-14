@@ -102,8 +102,6 @@ int get_node_type() {return -1;}
 RAN_CONTEXT_t RC;
 int oai_exit = 0;
 
-static int      tx_max_power[MAX_NUM_CCs] = {0};
-
 uint64_t        downlink_frequency[MAX_NUM_CCs][4];
 int32_t         uplink_frequency_offset[MAX_NUM_CCs][4];
 uint64_t        sidelink_frequency[MAX_NUM_CCs][4];
@@ -321,7 +319,6 @@ int main(int argc, char **argv)
   CONFIG_SETRTFLAG(CONFIG_NOEXITONHELP);
   memset(openair0_cfg, 0, sizeof(openair0_config_t) * MAX_CARDS);
   memset(openair0_dev, 0, sizeof(openair0_device_t) * MAX_CARDS);
-  memset(tx_max_power, 0, sizeof(int) * MAX_NUM_CCs);
   // initialize logging
   logInit();
   // get options and fill parameters from configuration file
