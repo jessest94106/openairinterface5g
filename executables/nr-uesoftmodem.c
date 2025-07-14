@@ -328,18 +328,17 @@ int main(int argc, char **argv)
 
   int ru_id = 0; // initialize all UEs to RU 0 for now
   for (int inst = 0; inst < NB_UE_INST; inst++) {
-    PHY_VARS_NR_UE *UE[MAX_NUM_CCs];
     for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
-      UE[CC_id] = PHY_vars_UE_g[inst][CC_id];
-      set_options(CC_id, UE[CC_id], ru_id);
+      PHY_VARS_NR_UE *UE_CC = PHY_vars_UE_g[inst][CC_id];
+      set_options(CC_id, UE_CC, ru_id);
       NR_UE_MAC_INST_t *mac = get_mac_inst(inst);
-      init_nr_ue_phy_cpu_stats(&UE[CC_id]->phy_cpu_stats);
+      init_nr_ue_phy_cpu_stats(&UE_CC->phy_cpu_stats);
       // set frame config to initial values from command line and assume that the SSB is centered on the grid
       if (IS_SA_MODE(get_softmodem_params()) || get_softmodem_params()->sl_mode) {
         uint16_t nr_band = get_softmodem_params()->band;
         mac->nr_band = nr_band;
-        mac->ssb_start_subcarrier = UE[CC_id]->frame_parms.ssb_start_subcarrier;
-        nr_init_frame_parms_ue_sa(&UE[CC_id]->frame_parms,
+        mac->ssb_start_subcarrier = UE_CC->frame_parms.ssb_start_subcarrier;
+        nr_init_frame_parms_ue_sa(&UE_CC->frame_parms,
                                   downlink_frequency[CC_id][0],
                                   uplink_frequency_offset[CC_id][0],
                                   get_softmodem_params()->numerology,
@@ -355,41 +354,41 @@ int main(int argc, char **argv)
           process_msg_rcc_to_mac(NotifiedFifoData(elt), inst);
           delNotifiedFIFO_elt(elt);
         } while (true);
-        fapi_nr_config_request_t *nrUE_config = &UE[CC_id]->nrUE_config;
-        nr_init_frame_parms_ue(&UE[CC_id]->frame_parms, nrUE_config, mac->nr_band);
+        fapi_nr_config_request_t *nrUE_config = &UE_CC->nrUE_config;
+        nr_init_frame_parms_ue(&UE_CC->frame_parms, nrUE_config, mac->nr_band);
       }
 
-      UE[CC_id]->sl_mode = get_softmodem_params()->sl_mode;
-      init_actor(&UE[CC_id]->sync_actor, "SYNC_", -1);
+      UE_CC->sl_mode = get_softmodem_params()->sl_mode;
+      init_actor(&UE_CC->sync_actor, "SYNC_", -1);
       if (get_nrUE_params()->num_dl_actors > 0) {
-        UE[CC_id]->dl_actors = calloc_or_fail(get_nrUE_params()->num_dl_actors, sizeof(*UE[CC_id]->dl_actors));
+        UE_CC->dl_actors = calloc_or_fail(get_nrUE_params()->num_dl_actors, sizeof(*UE_CC->dl_actors));
         for (int i = 0; i < get_nrUE_params()->num_dl_actors; i++) {
-          init_actor(&UE[CC_id]->dl_actors[i], "DL_", -1);
+          init_actor(&UE_CC->dl_actors[i], "DL_", -1);
         }
       }
       if (get_nrUE_params()->num_ul_actors > 0) {
-        UE[CC_id]->ul_actors = calloc_or_fail(get_nrUE_params()->num_ul_actors, sizeof(*UE[CC_id]->ul_actors));
+        UE_CC->ul_actors = calloc_or_fail(get_nrUE_params()->num_ul_actors, sizeof(*UE_CC->ul_actors));
         for (int i = 0; i < get_nrUE_params()->num_ul_actors; i++) {
-          init_actor(&UE[CC_id]->ul_actors[i], "UL_", -1);
+          init_actor(&UE_CC->ul_actors[i], "UL_", -1);
         }
       }
-      init_nr_ue_vars(UE[CC_id], inst);
+      init_nr_ue_vars(UE_CC, inst);
 
-      if (UE[CC_id]->sl_mode) {
-        AssertFatal(UE[CC_id]->sl_mode == 2, "Only Sidelink mode 2 supported. Mode 1 not yet supported\n");
+      if (UE_CC->sl_mode) {
+        AssertFatal(UE_CC->sl_mode == 2, "Only Sidelink mode 2 supported. Mode 1 not yet supported\n");
         DevAssert(mac->if_module != NULL && mac->if_module->sl_phy_config_request != NULL);
         nr_sl_phy_config_t *phycfg = &mac->SL_MAC_PARAMS->sl_phy_config;
         phycfg->sl_config_req.sl_carrier_config.sl_num_rx_ant = get_nrUE_params()->nb_antennas_rx;
         phycfg->sl_config_req.sl_carrier_config.sl_num_tx_ant = get_nrUE_params()->nb_antennas_tx;
         mac->if_module->sl_phy_config_request(phycfg);
-        sl_nr_ue_phy_params_t *sl_phy = &UE[CC_id]->SL_UE_PHY_PARAMS;
+        sl_nr_ue_phy_params_t *sl_phy = &UE_CC->SL_UE_PHY_PARAMS;
         nr_init_frame_parms_ue_sl(&sl_phy->sl_frame_params,
                                   &sl_phy->sl_config,
                                   get_softmodem_params()->threequarter_fs,
                                   get_nrUE_params()->ofdm_offset_divisor);
-        sl_ue_phy_init(UE[CC_id]);
+        sl_ue_phy_init(UE_CC);
       }
-      nrue_init_openair0(UE[CC_id]);
+      nrue_init_openair0(UE_CC);
     }
   }
 
