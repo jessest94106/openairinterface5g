@@ -211,12 +211,9 @@ void set_options(int CC_id, PHY_VARS_NR_UE *UE){
   fp->nb_antennas_rx       = nrUE_params.nb_antennas_rx;
   fp->nb_antennas_tx       = nrUE_params.nb_antennas_tx;
   fp->threequarter_fs = get_softmodem_params()->threequarter_fs;
-  fp->N_RB_DL              = nrUE_params.N_RB_DL;
-  fp->ssb_start_subcarrier = nrUE_params.ssb_start_subcarrier;
   fp->ofdm_offset_divisor  = nrUE_params.ofdm_offset_divisor;
 
-  LOG_I(PHY, "Set UE nb_rx_antenna %d, nb_tx_antenna %d, threequarter_fs %d, ssb_start_subcarrier %d\n", fp->nb_antennas_rx, fp->nb_antennas_tx, fp->threequarter_fs, fp->ssb_start_subcarrier);
-
+  LOG_I(PHY, "Set UE nb_rx_antenna %d, nb_tx_antenna %d, threequarter_fs %d, ofdm_offset_divisor %d\n", fp->nb_antennas_rx, fp->nb_antennas_tx, fp->threequarter_fs, fp->ofdm_offset_divisor);
 }
 
 void init_openair0(PHY_VARS_NR_UE *ue)
@@ -406,6 +403,8 @@ int main(int argc, char **argv)
                                   downlink_frequency[CC_id][0],
                                   uplink_frequency_offset[CC_id][0],
                                   get_softmodem_params()->numerology,
+                                  nrUE_params.N_RB_DL,
+                                  nrUE_params.ssb_start_subcarrier,
                                   nr_band);
       } else {
         do {
