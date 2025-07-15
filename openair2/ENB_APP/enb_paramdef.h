@@ -202,7 +202,7 @@ typedef enum {
   {CONFIG_STRING_RU_END_OF_BURST_DELAY,        NULL,                              0,       .uptr=NULL,       .defuintval=400,              TYPE_UINT,        0}, \
   {CONFIG_STRING_RU_OTA_SYNC_ENABLE,           NULL,                              0,       .strptr=NULL,     .defstrval="no",              TYPE_STRING,      0}, \
   {CONFIG_STRING_RU_BF_WEIGHTS_LIST,           NULL,                              0,       .iptr=NULL,       .defintarrayval=DEFBFW,       TYPE_INTARRAY,    0}, \
-  {CONFIG_STRING_RU_IF_FREQUENCY,              NULL,                              0,       .u64ptr=NULL,     .defuintval=0,                TYPE_UINT64,      0}, \
+  {CONFIG_STRING_RU_IF_FREQUENCY,              NULL,                              0,       .u64ptr=NULL,     .defint64val=0,               TYPE_UINT64,      0}, \
   {CONFIG_STRING_RU_IF_FREQ_OFFSET,            NULL,                              0,       .iptr=NULL,       .defintval=0,                 TYPE_INT,         0}, \
   {CONFIG_STRING_RU_DO_PRECODING,              NULL,                              0,       .iptr=NULL,       .defintval=0,                 TYPE_INT,         0}, \
   {CONFIG_STRING_RU_SF_AHEAD,                  HLP_RU_SF_AHEAD,                   0,       .iptr=NULL,       .defintval=4,                 TYPE_INT,         0}, \
