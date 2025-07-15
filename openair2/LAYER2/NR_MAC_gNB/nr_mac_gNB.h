@@ -429,12 +429,6 @@ typedef struct NR_sched_pusch {
   int phr_txpower_calc;
 } NR_sched_pusch_t;
 
-typedef struct NR_sched_srs {
-  int frame;
-  int slot;
-  bool srs_scheduled;
-} NR_sched_srs_t;
-
 typedef struct NR_pdsch_dmrs {
   uint8_t dmrs_ports_id;
   uint8_t N_PRB_DMRS;
@@ -598,9 +592,6 @@ typedef struct {
   /// There will be a structure for each UL slot in the active period determined by the size
   NR_sched_pucch_t *sched_pucch;
   int sched_pucch_size;
-
-  /// Sched SRS: scheduling decisions
-  NR_sched_srs_t sched_srs;
 
   /// uplink bytes that are currently scheduled
   int sched_ul_bytes;

@@ -1585,25 +1585,6 @@ void handle_nr_srs_measurements(const module_id_t module_id,
   NR_SCHED_UNLOCK(&nrmac->sched_lock);
 }
 
-long get_K2(NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList,
-            int time_domain_assignment,
-            int mu,
-            const NR_ServingCellConfigCommon_t *scc)
-{
-  /* we assume that this function is mutex-protected from outside */
-  NR_PUSCH_TimeDomainResourceAllocation_t *tda = tdaList->list.array[time_domain_assignment];
-  const int NTN_gNB_Koffset = get_NTN_Koffset(scc);
-
-  if (tda->k2)
-    return *tda->k2 + NTN_gNB_Koffset;
-  else if (mu < 2)
-    return 1 + NTN_gNB_Koffset;
-  else if (mu == 2)
-    return 2 + NTN_gNB_Koffset;
-  else
-    return 3 + NTN_gNB_Koffset;
-}
-
 static bool nr_UE_is_to_be_scheduled(const frame_structure_t *fs,
                                      NR_UE_info_t *UE,
                                      frame_t frame,

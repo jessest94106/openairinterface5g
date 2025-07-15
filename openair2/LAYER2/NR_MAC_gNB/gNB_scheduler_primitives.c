@@ -2766,8 +2766,6 @@ bool add_connected_nr_ue(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
 
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   sched_ctrl->dl_max_mcs = 28; /* do not limit MCS for individual UEs */
-  sched_ctrl->sched_srs.frame = -1;
-  sched_ctrl->sched_srs.slot = -1;
   sched_ctrl->pdcch_cl_adjust = 0;
   reset_srs_stats(UE);
 
