@@ -281,10 +281,9 @@ int main(int argc, char *argv[])
   printf("\n");
   AssertFatal(byte_count >= sizeof(fapi_message_header_t), "Read byte amount not enough to encode the header. Should have a minimum of %lu bytes, aborting...", sizeof(fapi_message_header_t));
   uint8_t *ptr = hex_values; // Points to the first element of the array
-  uint8_t **msg_ptr = &ptr; // Pointer to the pointer
 
   fapi_message_header_t hdr = {.num_msg = 0, .opaque_handle = 0, .message_id = 0, .message_length = 0};
-  fapi_nr_message_header_unpack(msg_ptr, NFAPI_HEADER_LENGTH, &hdr, sizeof(fapi_message_header_t), 0);
+  fapi_nr_message_header_unpack(ptr, NFAPI_HEADER_LENGTH, &hdr, sizeof(fapi_message_header_t), 0);
 
   printf("Decoded message %s message length 0x%02x\n", message_id_to_str(hdr.message_id), hdr.message_length);
   // Unpack the message

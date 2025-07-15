@@ -54,7 +54,6 @@ bool isFAPIMessageIDValid(const uint16_t id)
 int check_nr_fapi_unpack_length(nfapi_nr_phy_msg_type_e msgId, uint32_t unpackedBufLen)
 {
   int retLen = 0;
-
   // check for size of nFAPI struct without the nFAPI specific parameters
   switch (msgId) {
     case NFAPI_NR_PHY_MSG_TYPE_PARAM_REQUEST:
@@ -165,24 +164,37 @@ int check_nr_fapi_unpack_length(nfapi_nr_phy_msg_type_e msgId, uint32_t unpacked
   return retLen;
 }
 
-int fapi_nr_message_header_unpack(uint8_t **pMessageBuf,
+bool fapi_nr_p7_message_header_unpack(void *pMessageBuf,
+                                     uint32_t messageBufLen,
+                                     void *pUnpackedBuf,
+                                     uint32_t unpackedBufLen,
+                                     nfapi_p7_codec_config_t *config)
+{
+  return fapi_nr_message_header_unpack(pMessageBuf,
+                                       messageBufLen,
+                                       pUnpackedBuf,
+                                       unpackedBufLen,
+                                       NULL);
+}
+
+bool fapi_nr_message_header_unpack(void *pMessageBuf,
                                   uint32_t messageBufLen,
                                   void *pUnpackedBuf,
                                   uint32_t unpackedBufLen,
                                   nfapi_p4_p5_codec_config_t *config)
 {
-  uint8_t **pReadPackedMessage = pMessageBuf;
+  uint8_t *pReadPackedMessage = pMessageBuf;
   nfapi_nr_p4_p5_message_header_t *header = pUnpackedBuf;
   fapi_message_header_t fapi_msg = {0};
 
   if (pMessageBuf == NULL || pUnpackedBuf == NULL || messageBufLen < NFAPI_HEADER_LENGTH
       || unpackedBufLen < sizeof(fapi_message_header_t)) {
-    return -1;
+    return false;
   }
-  uint8_t *end = *pMessageBuf + messageBufLen;
+  uint8_t *end = pMessageBuf + messageBufLen;
   // process the header
   int result =
-      (pull8(pReadPackedMessage, &fapi_msg.num_msg, end) && pull8(pReadPackedMessage, &fapi_msg.opaque_handle, end)
-       && pull16(pReadPackedMessage, &header->message_id, end) && pull32(pReadPackedMessage, &header->message_length, end));
-  return (result);
+      (pull8(&pReadPackedMessage, &fapi_msg.num_msg, end) && pull8(&pReadPackedMessage, &fapi_msg.opaque_handle, end)
+       && pull16(&pReadPackedMessage, &header->message_id, end) && pull32(&pReadPackedMessage, &header->message_length, end));
+  return result != 0;
 }

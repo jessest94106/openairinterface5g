@@ -32,8 +32,19 @@
 #include <arpa/inet.h>
 
 #include "nfapi_nr_interface_scf.h"
-#include "nfapi_vnf_interface.h"
 #include "nfapi_vnf.h"
+#include <vnf.h>
+#include <vnf_p7.h>
+#ifdef ENABLE_WLS
+#include <wls_integration/include/wls_vnf.h>
+#include "nr_fapi_p5.h"
+#include "nr_fapi_p7.h"
+#endif
+
+#ifdef ENABLE_SOCKET
+#include <socket/include/socket_vnf.h>
+#endif
+
 #include "nfapi.h"
 #include "vendor_ext.h"
 
@@ -48,138 +59,20 @@
 #include "openair2/PHY_INTERFACE/queue_t.h"
 #include "gnb_ind_vars.h"
 #include "nr_fapi_p7_utils.h"
+#include "nr_fapi_p5_utils.h"
 #include <NR_MAC_gNB/mac_proto.h>
 
 #ifdef ENABLE_AERIAL
-#include "aerial/fapi_vnf_p5.h"
+#include "aerial/fapi_nvIPC.h"
+#include "aerial/fapi_vnf_p7.h"
+#include "nr_fapi_p5.h"
+#include "nr_fapi_p7.h"
 #endif
 
 #define TEST
 
 extern RAN_CONTEXT_t RC;
 extern UL_RCC_IND_t  UL_RCC_INFO;
-
-typedef struct {
-  uint8_t enabled;
-  uint32_t rx_port;
-  uint32_t tx_port;
-  char tx_addr[80];
-} udp_data;
-
-typedef struct {
-  uint16_t index;
-  uint16_t id;
-  uint8_t rfs[2];
-  uint8_t excluded_rfs[2];
-
-  udp_data udp;
-
-  char local_addr[80];
-  int local_port;
-
-  char *remote_addr;
-  int remote_port;
-
-  uint8_t duplex_mode;
-  uint16_t dl_channel_bw_support;
-  uint16_t ul_channel_bw_support;
-  uint8_t num_dl_layers_supported;
-  uint8_t num_ul_layers_supported;
-  uint16_t release_supported;
-  uint8_t nmm_modes_supported;
-
-  uint8_t dl_ues_per_subframe;
-  uint8_t ul_ues_per_subframe;
-
-  uint8_t first_subframe_ind;
-
-  // timing information recevied from the vnf
-  uint8_t timing_window;
-  uint8_t timing_info_mode;
-  uint8_t timing_info_period;
-
-} phy_info;
-
-typedef struct {
-  uint16_t index;
-  uint16_t band;
-  int16_t max_transmit_power;
-  int16_t min_transmit_power;
-  uint8_t num_antennas_supported;
-  uint32_t min_downlink_frequency;
-  uint32_t max_downlink_frequency;
-  uint32_t max_uplink_frequency;
-  uint32_t min_uplink_frequency;
-} rf_info;
-
-typedef struct {
-
-  int release;
-  phy_info phys[2];
-  rf_info rfs[2];
-
-  uint8_t sync_mode;
-  uint8_t location_mode;
-  uint8_t location_coordinates[6];
-  uint32_t dl_config_timing;
-  uint32_t ul_config_timing;
-  uint32_t tx_timing;
-  uint32_t hi_dci0_timing;
-
-  uint16_t max_phys;
-  uint16_t max_total_bw;
-  uint16_t max_total_dl_layers;
-  uint16_t max_total_ul_layers;
-  uint8_t shared_bands;
-  uint8_t shared_pa;
-  int16_t max_total_power;
-  uint8_t oui;
-
-  uint8_t wireshark_test_mode;
-
-} pnf_info;
-
-typedef struct mac mac_t;
-
-typedef struct mac {
-
-  void *user_data;
-
-  void (*dl_config_req)(mac_t *mac, nfapi_dl_config_request_t *req);
-  void (*ul_config_req)(mac_t *mac, nfapi_ul_config_request_t *req);
-  void (*hi_dci0_req)(mac_t *mac, nfapi_hi_dci0_request_t *req);
-  void (*tx_req)(mac_t *mac, nfapi_tx_request_t *req);
-} mac_t;
-
-typedef struct {
-
-  int local_port;
-  char local_addr[80];
-
-  unsigned timing_window;
-  unsigned periodic_timing_enabled;
-  unsigned aperiodic_timing_enabled;
-  unsigned periodic_timing_period;
-
-  // This is not really the right place if we have multiple PHY,
-  // should be part of the phy struct
-  udp_data udp;
-
-  uint8_t thread_started;
-
-  nfapi_vnf_p7_config_t *config;
-
-  mac_t *mac;
-
-} vnf_p7_info;
-
-typedef struct {
-
-  uint8_t wireshark_test_mode;
-  pnf_info pnfs[2];
-  vnf_p7_info p7_vnfs[2];
-
-} vnf_info;
 
 int vnf_pack_vendor_extension_tlv(void *ve, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t *codec) {
   //NFAPI_TRACE(NFAPI_TRACE_INFO, "vnf_pack_vendor_extension_tlv\n");
@@ -707,7 +600,7 @@ int phy_rach_indication(struct nfapi_vnf_p7_config *config, nfapi_rach_indicatio
 
 int phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind)
 {
-  if (NFAPI_MODE == NFAPI_MODE_VNF) {
+  if (NFAPI_MODE == NFAPI_MODE_VNF || NFAPI_MODE == NFAPI_MODE_AERIAL) {
     nfapi_nr_rach_indication_t *rach_ind = CALLOC(1, sizeof(*rach_ind));
     copy_rach_indication(ind, rach_ind);
     if (!put_queue(&gnb_rach_ind_queue, rach_ind)) {
@@ -724,7 +617,7 @@ int phy_nr_rach_indication(nfapi_nr_rach_indication_t *ind)
 int phy_nr_uci_indication(nfapi_nr_uci_indication_t *ind)
 {
   LOG_D(NR_MAC, "In %s() NFAPI SFN/SF: %d/%d number_of_pdus :%u\n", __FUNCTION__, ind->sfn, ind->slot, ind->num_ucis);
-  if (NFAPI_MODE == NFAPI_MODE_VNF) {
+  if (NFAPI_MODE == NFAPI_MODE_VNF || NFAPI_MODE == NFAPI_MODE_AERIAL) {
     nfapi_nr_uci_indication_t *uci_ind = CALLOC(1, sizeof(*uci_ind));
     AssertFatal(uci_ind, "Memory not allocated for uci_ind in phy_nr_uci_indication.");
     copy_uci_indication(ind, uci_ind);
@@ -829,7 +722,7 @@ int phy_nr_crc_indication(nfapi_nr_crc_indication_t *ind)
 {
   LOG_D(NR_MAC, "In %s() NFAPI SFN/SF: %d/%d number_of_pdus :%u\n", __FUNCTION__, ind->sfn, ind->slot, ind->number_crcs);
 
-  if (NFAPI_MODE == NFAPI_MODE_VNF) {
+  if (NFAPI_MODE == NFAPI_MODE_VNF || NFAPI_MODE == NFAPI_MODE_AERIAL) {
     nfapi_nr_crc_indication_t *crc_ind = CALLOC(1, sizeof(*crc_ind));
     copy_crc_indication(ind, crc_ind);
     if (!put_queue(&gnb_crc_ind_queue, crc_ind)) {
@@ -930,7 +823,7 @@ int phy_nr_rx_data_indication(nfapi_nr_rx_data_indication_t *ind)
         ind->number_of_pdus,
         ind->pdu_list[0].pdu);
 
-  if (NFAPI_MODE == NFAPI_MODE_VNF) {
+  if (NFAPI_MODE == NFAPI_MODE_VNF || NFAPI_MODE == NFAPI_MODE_AERIAL) {
     nfapi_nr_rx_data_indication_t *rx_ind = CALLOC(1, sizeof(*rx_ind));
     copy_rx_data_indication(ind, rx_ind);
     if (!put_queue(&gnb_rx_ind_queue, rx_ind)) {
@@ -1389,16 +1282,9 @@ int vnf_nr_pack_p4_p5_vendor_extension(void *header, uint8_t **ppWritePackedMsg,
   return 0;
 }
 
-static pthread_t vnf_start_pthread;
+static pthread_t vnf_p5_init_and_receive_pthread;
 static pthread_t vnf_p7_start_pthread;
 
-void *vnf_nr_p7_start_thread(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
-  pthread_setname_np(pthread_self(), "VNF_P7");
-  nfapi_vnf_p7_config_t *config = (nfapi_vnf_p7_config_t *)ptr;
-  nfapi_nr_vnf_p7_start(config);
-  return config;
-}
 
 void *vnf_p7_start_thread(void *ptr) {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
@@ -1408,7 +1294,7 @@ void *vnf_p7_start_thread(void *ptr) {
   return config;
 }
 
-void *vnf_nr_p7_thread_start(void *ptr)
+void *configure_nr_p7_vnf(void *ptr)
 {
   init_queue(&gnb_rach_ind_queue);
   init_queue(&gnb_rx_ind_queue);
@@ -1417,19 +1303,23 @@ void *vnf_nr_p7_thread_start(void *ptr)
 
   vnf_p7_info *p7_vnf = (vnf_p7_info *)ptr;
   p7_vnf->config->port = p7_vnf->local_port;
+#ifndef ENABLE_AERIAL
   p7_vnf->config->sync_indication = &phy_sync_indication;
   p7_vnf->config->slot_indication = &phy_slot_indication;
   p7_vnf->config->harq_indication = &phy_harq_indication;
+#endif
   p7_vnf->config->nr_crc_indication = &phy_nr_crc_indication;
   p7_vnf->config->nr_rx_data_indication = &phy_nr_rx_data_indication;
   p7_vnf->config->nr_rach_indication = &phy_nr_rach_indication;
   p7_vnf->config->nr_uci_indication = &phy_nr_uci_indication;
+#ifndef ENABLE_AERIAL
   p7_vnf->config->srs_indication = &phy_srs_indication;
   p7_vnf->config->sr_indication = &phy_sr_indication;
   p7_vnf->config->cqi_indication = &phy_cqi_indication;
   p7_vnf->config->lbt_dl_indication = &phy_lbt_dl_indication;
   p7_vnf->config->nb_harq_indication = &phy_nb_harq_indication;
   p7_vnf->config->nrach_indication = &phy_nrach_indication;
+#endif
   p7_vnf->config->nr_slot_indication = &phy_nr_slot_indication;
   p7_vnf->config->nr_srs_indication = &phy_nr_srs_indication;
   p7_vnf->config->malloc = &vnf_allocate;
@@ -1445,8 +1335,30 @@ void *vnf_nr_p7_thread_start(void *ptr)
   p7_vnf->config->codec_config.deallocate = &vnf_deallocate;
   p7_vnf->config->allocate_p7_vendor_ext = &phy_nr_allocate_p7_vendor_ext;
   p7_vnf->config->deallocate_p7_vendor_ext = &phy_nr_deallocate_p7_vendor_ext;
+
+#ifdef ENABLE_WLS
+  p7_vnf->config->unpack_func = &fapi_nr_p7_message_unpack;
+  p7_vnf->config->hdr_unpack_func = &fapi_nr_p7_message_header_unpack;
+  p7_vnf->config->pack_func = &fapi_nr_p7_message_pack;
+  p7_vnf->config->send_p7_msg = &wls_vnf_nr_send_p7_message;
+  wls_vnf_set_p7_config(p7_vnf->config);
+#endif
+
+#ifdef ENABLE_SOCKET
+  p7_vnf->config->unpack_func = &nfapi_nr_p7_message_unpack;
+  p7_vnf->config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
+  p7_vnf->config->pack_func = &nfapi_nr_p7_message_pack;
+  p7_vnf->config->send_p7_msg = &vnf_nr_send_p7_msg;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI P7 start thread %s\n", __FUNCTION__);
-  pthread_create(&vnf_p7_start_pthread, NULL, &vnf_nr_p7_start_thread, p7_vnf->config);
+  threadCreate(&vnf_p7_start_pthread, &vnf_nr_start_p7_thread, p7_vnf->config, "vnf_p7_thread", -1, OAI_PRIORITY_RT);
+#endif
+
+#ifdef ENABLE_AERIAL
+  p7_vnf->config->unpack_func = &fapi_nr_p7_message_unpack;
+  p7_vnf->config->hdr_unpack_func = &fapi_nr_p7_message_header_unpack;
+  p7_vnf->config->pack_func = &fapi_nr_p7_message_pack;
+  p7_vnf->config->send_p7_msg = &aerial_nr_send_p7_message;
+#endif
   return 0;
 }
 
@@ -1494,7 +1406,7 @@ int pnf_nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_pnf_st
 
   if(p7_vnf->thread_started == 0) {
     pthread_t vnf_p7_thread;
-    threadCreate(&vnf_p7_thread, &vnf_nr_p7_thread_start, p7_vnf, "vnf_p7_thread", -1, OAI_PRIORITY_RT);
+    threadCreate(&vnf_p7_thread, &configure_nr_p7_vnf, p7_vnf, "vnf_p7_thread", -1, OAI_PRIORITY_RT);
     p7_vnf->thread_started = 1;
   } else {
     // P7 thread already running.
@@ -1504,7 +1416,12 @@ int pnf_nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_pnf_st
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Sending NFAPI_VNF_PARAM_REQUEST phy_id:%d\n", pnf->phys[0].id);
   memset(&req, 0, sizeof(req));
   req.header.message_id = NFAPI_NR_PHY_MSG_TYPE_PARAM_REQUEST;
+#ifdef ENABLE_WLS
+  req.header.phy_id = 0;
+#endif
+#ifdef ENABLE_SOCKET
   req.header.phy_id = pnf->phys[0].id;
+#endif
   nfapi_nr_vnf_param_req(config, p5_idx, &req);
   return 0;
 }
@@ -1542,8 +1459,9 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   vnf_p7_info *p7_vnf = vnf->p7_vnfs;
   pnf_info *pnf = vnf->pnfs;
   phy_info *phy = pnf->phys;
-  struct sockaddr_in pnf_p7_sockaddr;
   nfapi_nr_config_request_scf_t *req = &RC.nrmac[0]->config[0]; // check
+#ifndef ENABLE_AERIAL
+  struct sockaddr_in pnf_p7_sockaddr;
   phy->remote_port = resp->nfapi_config.p7_pnf_port.value;
   //phy->remote_port = 32123;//resp->nfapi_config.p7_pnf_port.value;
   memcpy(&pnf_p7_sockaddr.sin_addr.s_addr, &(resp->nfapi_config.p7_pnf_address_ipv4.address[0]), 4);
@@ -1551,6 +1469,7 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   // for now just 1
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] %d.%d pnf p7 %s:%d timing %u %u %u %u\n", p5_idx, phy->id, phy->remote_addr, phy->remote_port, p7_vnf->timing_window, p7_vnf->periodic_timing_period, p7_vnf->aperiodic_timing_enabled,
          p7_vnf->periodic_timing_period);
+#endif
   // Hack? the VNF might need the subcarrier spacing for some calculations
   // (that we actually don't use as of now...). We therefore need to save the
   // mu, for the current PNF connection (together with where we have frame/slot
@@ -1566,7 +1485,7 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   req->header.phy_id = phy->id;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Send NFAPI_CONFIG_REQUEST\n");
   //NFAPI_TRACE(NFAPI_TRACE_INFO, "\n NR bandP =%d\n",req->nfapi_config.rf_bands.rf_band[0]);
-
+#ifndef ENABLE_AERIAL
   req->nfapi_config.p7_vnf_port.tl.tag = NFAPI_NR_NFAPI_P7_VNF_PORT_TAG;
   req->nfapi_config.p7_vnf_port.value = p7_vnf->local_port;
   req->num_tlv++;
@@ -1604,6 +1523,7 @@ req->nfapi_config.tx_data_timing_offset.tl.tag = NFAPI_NR_NFAPI_TX_DATA_TIMING_O
   ve2.tl.tag = VENDOR_EXT_TLV_2_TAG;
   ve2.dummy = 2016;
   req->vendor_extension = &ve2.tl;
+#endif
   nfapi_nr_vnf_config_req(config, p5_idx, req);
   printf("[VNF] Sent NFAPI_VNF_CONFIG_REQ num_tlv:%u\n",req->num_tlv);
   return 0;
@@ -1703,6 +1623,21 @@ int nr_start_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_start_resp
   return 0;
 }
 
+int nr_error_ind_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_error_indication_scf_t *resp)
+{
+  NFAPI_TRACE(NFAPI_TRACE_WARN,
+              "[VNF] Received NFAPI_NR_PHY_MSG_TYPE_ERROR_INDICATION idx:%d phy_id:%d\n",
+              p5_idx,
+              resp->header.phy_id);
+  NFAPI_TRACE(NFAPI_TRACE_WARN, "[VNF] Previous message 0x%02x resulted in an error on the PNF \n", resp->message_id);
+  NFAPI_TRACE(NFAPI_TRACE_WARN,
+              "[VNF] Received error code 0x%02x (%s)\n",
+              resp->error_code,
+              error_ind_code_to_str(resp->error_code));
+  // TODO: add error handling to the VNF instead of only reporting the received error
+  return 0;
+}
+
 int vendor_ext_cb(nfapi_vnf_config_t *config, int p5_idx, void *msg)
 {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] %s\n", __FUNCTION__);
@@ -1794,28 +1729,19 @@ void vnf_nr_deallocate_p4_p5_vendor_ext(void *header) {
   free(header);
 }
 
-
-nfapi_vnf_config_t *config = 0;
-
-void vnf_nr_start_thread(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] VNF NFAPI thread - nfapi_vnf_start()%s\n", __FUNCTION__);
-  pthread_setname_np(pthread_self(), "VNF");
-  config = (nfapi_vnf_config_t *)ptr;
-  nfapi_nr_vnf_start(config);
-}
-
 void vnf_start_thread(void *ptr) {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] VNF NFAPI thread - nfapi_vnf_start()%s\n", __FUNCTION__);
   pthread_setname_np(pthread_self(), "VNF");
-  config = (nfapi_vnf_config_t *)ptr;
-  nfapi_vnf_start(config);
+  nfapi_vnf_start((nfapi_vnf_config_t *)ptr);
 }
 
 static vnf_info vnf;
 
-void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port)
+void configure_nr_nfapi_vnf(eth_params_t params)
 {
+#ifndef ENABLE_AERIAL
   nfapi_setmode(NFAPI_MODE_VNF);
+#endif
   memset(&vnf, 0, sizeof(vnf));
   memset(vnf.p7_vnfs, 0, sizeof(vnf.p7_vnfs));
   vnf.p7_vnfs[0].timing_window = 30;
@@ -1823,19 +1749,21 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, 
   vnf.p7_vnfs[0].aperiodic_timing_enabled = 0;
   vnf.p7_vnfs[0].periodic_timing_period = 1;
   vnf.p7_vnfs[0].config = nfapi_vnf_p7_config_create();
+#ifndef ENABLE_AERIAL
   NFAPI_TRACE(NFAPI_TRACE_INFO,
               "[VNF] %s() vnf.p7_vnfs[0].config:%p VNF ADDRESS:%s:%d\n",
               __FUNCTION__,
               vnf.p7_vnfs[0].config,
-              vnf_addr,
-              vnf_p5_port);
-  strcpy(vnf.p7_vnfs[0].local_addr, vnf_addr);
-  vnf.p7_vnfs[0].local_port = vnf_p7_port;
+              params.my_addr,
+              params.my_portc);
+  strcpy(vnf.p7_vnfs[0].local_addr, params.my_addr);
+  vnf.p7_vnfs[0].local_port = params.my_portd;
+#endif
   vnf.p7_vnfs[0].mac = (mac_t *)malloc(sizeof(mac_t));
   nfapi_vnf_config_t *config = nfapi_vnf_config_create();
   config->malloc = malloc;
   config->free = free;
-  config->vnf_p5_port = vnf_p5_port;
+  config->vnf_p5_port = params.my_portc;
   config->vnf_ipv4 = 1;
   config->vnf_ipv6 = 0;
   config->pnf_list = 0;
@@ -1850,6 +1778,7 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->nr_param_resp = &nr_param_resp_cb;
   config->nr_config_resp = &nr_config_resp_cb;
   config->nr_start_resp = &nr_start_resp_cb;
+  config->nr_error_ind = &nr_error_ind_cb;
   config->vendor_ext = &vendor_nr_ext_cb;
   config->user_data = &vnf;
   // To allow custom vendor extentions to be added to nfapi
@@ -1862,9 +1791,73 @@ void configure_nr_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->codec_config.allocate = &vnf_nr_allocate;
   config->codec_config.deallocate = &vnf_nr_deallocate;
   memset(&UL_RCC_INFO, 0, sizeof(UL_RCC_IND_t));
+
+#ifdef ENABLE_WLS
+  config->unpack_func = &fapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &fapi_nr_message_header_unpack;
+  config->pack_func = &fapi_nr_p5_message_pack;
+  config->send_p5_msg = &wls_vnf_nr_send_p5_message;
+  printf("WLS MODE PNF\n");
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating WLS VNF NFAPI start thread %s\n", __FUNCTION__);
+  //wls_fapi_pnf_nr_start_thread(config);
+  threadCreate(&vnf_p5_init_and_receive_pthread, wls_fapi_vnf_nr_start_thread, config, "NFAPI_WLS_VNF", -1, OAI_PRIORITY_RT_MAX);
+#endif
+
+#ifdef ENABLE_SOCKET
+  config->unpack_func = &nfapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &nfapi_nr_p5_message_header_unpack;
+  config->pack_func = &nfapi_nr_p5_message_pack;
+  config->send_p5_msg = &vnf_nr_send_p5_msg;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&vnf_start_pthread, NULL, (void *)&vnf_nr_start_thread, config);
+  pthread_create(&vnf_p5_init_and_receive_pthread, NULL, (void *)&vnf_start_p5_thread, config);
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Created VNF NFAPI start thread %s\n", __FUNCTION__);
+#endif
+#ifdef ENABLE_AERIAL
+  config->unpack_func = &fapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &fapi_nr_message_header_unpack;
+  config->pack_func = &fapi_nr_p5_message_pack;
+  config->send_p5_msg = &aerial_nr_send_p5_message;
+  set_config(config);
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Created VNF NFAPI start thread %s\n", __FUNCTION__);
+  nfapi_vnf_pnf_info_t *pnf = (nfapi_vnf_pnf_info_t *)malloc(sizeof(nfapi_vnf_pnf_info_t));
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "MALLOC nfapi_vnf_pnf_info_t for pnf_list pnf:%p\n", pnf);
+  memset(pnf, 0, sizeof(nfapi_vnf_pnf_info_t));
+  pnf->p5_idx = 1;
+  pnf->connected = 1;
+  // Add needed parameters
+
+  vnf_info *vnf = (vnf_info *)(config->user_data);
+  pnf_info *pnf_info = vnf->pnfs;
+
+  for (int i = 0; i < 1; ++i) {
+    phy_info phy;
+    memset(&phy, 0, sizeof(phy));
+    phy.index = 0;
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] (PHY:%d) phy_config_idx:%d\n", i, 0);
+    nfapi_vnf_allocate_phy(config, 1, &(phy.id));
+
+    for (int j = 0; j < 1; ++j) {
+      NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] (PHY:%d) (RF%d) %d\n", i, j, 0);
+      phy.rfs[0] = 0;
+    }
+
+    pnf_info->phys[0] = phy;
+  }
+
+
+  nfapi_vnf_pnf_list_add(config, pnf);
+
+  vnf_p7_info *p7_vnf = vnf->p7_vnfs;
+
+  NFAPI_TRACE(NFAPI_TRACE_INFO,
+              "[VNF] pnf start response idx:%d config:%p user_data:%p p7_vnf[config:%p thread_started:%d]\n",
+              1,
+              config,
+              config->user_data,
+              vnf->p7_vnfs[0].config,
+              vnf->p7_vnfs[0].thread_started);
+  configure_nr_p7_vnf(p7_vnf);
+#endif
 }
 
 
@@ -1912,7 +1905,7 @@ void configure_nfapi_vnf(char *vnf_addr, int vnf_p5_port, char *pnf_ip_addr, int
   config->codec_config.deallocate = &vnf_deallocate;
   memset(&UL_RCC_INFO,0,sizeof(UL_RCC_IND_t));
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Creating VNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&vnf_start_pthread, NULL, (void *)&vnf_start_thread, config);
+  pthread_create(&vnf_p5_init_and_receive_pthread, NULL, (void *)&vnf_start_thread, config);
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] Created VNF NFAPI start thread %s\n", __FUNCTION__);
 }
 
@@ -1957,13 +1950,13 @@ int oai_nfapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req)
   dl_config_req->header.message_id= NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST;
   dl_config_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
 
-  int retval = nfapi_vnf_p7_nr_dl_config_req(p7_config, dl_config_req);
+  bool retval = nfapi_vnf_p7_nr_dl_config_req(p7_config, dl_config_req);
 
   dl_config_req->dl_tti_request_body.nPDUs                        = 0;
   dl_config_req->dl_tti_request_body.nGroup                       = 0;
 
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   }
   return retval;
@@ -1976,9 +1969,9 @@ int oai_nfapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
   tx_data_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   tx_data_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST;
   //LOG_D(PHY, "[VNF] %s() TX_REQ sfn_sf:%d number_of_pdus:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(tx_req->sfn_sf), tx_req->tx_request_body.number_of_pdus);
-  int retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
+  bool retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
     tx_data_req->Number_of_PDUs = 0;
@@ -2009,9 +2002,9 @@ int oai_nfapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req) {
   ul_dci_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ul_dci_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST;
   //LOG_D(PHY, "[VNF] %s() HI_DCI0_REQ sfn_sf:%d dci:%d hi:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(hi_dci0_req->sfn_sf), hi_dci0_req->hi_dci0_request_body.number_of_dci, hi_dci0_req->hi_dci0_request_body.number_of_hi);
-  int retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
+  bool retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
     ul_dci_req->numPdus = 0;
@@ -2062,9 +2055,9 @@ int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req) {
   ul_tti_req->header.phy_id = 1; // HACK TODO FIXME - need to pass this around!!!!
   ul_tti_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST;
 
-  int retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
+  bool retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
 
-  if (retval!=0) {
+  if (!retval) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
     // Reset number of PDUs so that it is not resent

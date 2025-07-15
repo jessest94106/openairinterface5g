@@ -889,8 +889,8 @@ int unpack_nr_tlv_list(unpack_tlv_t unpack_fns[],
   nfapi_tl_t generic_tl;
   uint8_t numBadTags = 0;
   uint16_t idx = 0;
-
-  while ((uint8_t *)(*ppReadPackedMsg) < end) {
+  if (size == 0) { return 1; }
+  while ((uint8_t *)(*ppReadPackedMsg) + 4 < end) {
     // unpack the tl and process the values accordingly
     if (unpack_tl(ppReadPackedMsg, &generic_tl, end) == 0)
       return 0;

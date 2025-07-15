@@ -28,8 +28,11 @@
 #define NFAPI_PNF_PARAM_GENERAL_OUI_LENGTH 3
 #define NFAPI_MAX_NUM_RF_BANDS 16
 
+#ifdef ENABLE_WLS
+#define NFAPI_MAX_PACKED_MESSAGE_SIZE 1024*1024*2
+#else
 #define NFAPI_MAX_PACKED_MESSAGE_SIZE 32768
-
+#endif
 // The following definition control the size of arrays used in the interface.
 // These may be changed if desired. They are used in the encoder to make sure 
 // that the user has not specified a 'count' larger than the max array, and also
@@ -115,7 +118,8 @@ typedef struct {
 #define NFAPI_P7_GET_MORE(_mss) ( ((_mss) & 0x8000) >> 15 )
 #define NFAPI_P7_GET_SEGMENT(_mss) ( ((_mss) & 0x7F00) >> 8 )
 #define NFAPI_P7_GET_SEQUENCE(_mss) ( (_mss) & 0x00FF )
-#define NFAPI_P7_SET_MSS(_more, _segm, _sequ) ( (((_more) & 0x1) << 7) | (((_segm) & 0x7) << 4) | ((_sequ) & 0xF) )
+#define NFAPI_NR_P7_SET_MSS(_more, _segm, _sequ) ( (((_more) & 0x1) << 15) | (((_segm) & 0x7F) << 8) | ((_sequ) & 0xFF) )
+#define NFAPI_P7_SET_MSS(_more, _segm, _sequ) ( (((_more) & 0x1) << 7) | (((_segm) & 0x7F) << 4) | ((_sequ) & 0xF) )
 
 #define NFAPI_TAG_LENGTH_PACKED_LEN 4
 

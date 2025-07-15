@@ -23,7 +23,7 @@
 #define OPENAIRINTERFACE_NR_FAPI_P5_UTILS_H
 #include "stdio.h"
 #include "stdint.h"
-#include "nr_fapi.h"
+#include "nfapi/open-nFAPI/fapi/inc/nr_fapi.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 
 bool eq_param_request(const nfapi_nr_param_request_scf_t *unpacked_req, const nfapi_nr_param_request_scf_t *req);
@@ -64,6 +64,7 @@ void dump_start_request(const nfapi_nr_start_request_scf_t *msg);
 void dump_start_response(const nfapi_nr_start_response_scf_t *msg);
 void dump_stop_request(const nfapi_nr_stop_request_scf_t *msg);
 void dump_stop_indication(const nfapi_nr_stop_indication_scf_t *msg);
+char* error_ind_code_to_str(nfapi_nr_phy_notifications_errors_e error_code);
 void dump_error_indication(const nfapi_nr_error_indication_scf_t *msg);
 
 

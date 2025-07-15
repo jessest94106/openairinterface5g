@@ -45,6 +45,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
+#include <pnf.h>
 
 #include <vendor_ext.h>
 #include "fapi_stub.h"
@@ -61,6 +62,16 @@
 #include <openair1/PHY/NR_TRANSPORT/nr_transport_proto.h>
 #include "executables/lte-softmodem.h"
 #include "nfapi/open-nFAPI/pnf/inc/pnf_p7.h"
+
+#ifdef ENABLE_WLS
+#include <nr_fapi_p5.h>
+#include <nr_fapi_p7.h>
+#include "nfapi/oai_integration/wls_integration/include/wls_pnf.h"
+#endif
+
+#ifdef ENABLE_SOCKET
+#include <socket/include/socket_pnf.h>
+#endif
 
 #define NUM_P5_PHY 2
 
@@ -185,7 +196,7 @@ typedef struct {
 } pnf_phy_user_data_t;
 
 static pnf_info pnf;
-static pthread_t pnf_start_pthread;
+static pthread_t pnf_p5_init_and_receive_pthread;
 
 int nfapitooai_level(int nfapi_level) {
   switch(nfapi_level) {
@@ -219,12 +230,7 @@ void *pnf_p7_thread_start(void *ptr) {
   return 0;
 }
 
-void *pnf_nr_p7_thread_start(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[NR_PNF] NR P7 THREAD %s\n", __FUNCTION__);
-  nfapi_pnf_p7_config_t *config = (nfapi_pnf_p7_config_t *)ptr;
-  nfapi_nr_pnf_p7_start(config);
-  return 0;
-}
+
 
 int pnf_nr_param_request(nfapi_pnf_config_t *config, nfapi_nr_pnf_param_request_t *req)
 {
@@ -991,6 +997,10 @@ int nr_config_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, n
            phy_info->timing_window,
            req->nfapi_config.timing_window.value);
     num_tlv++;
+  }else {
+    // This is a nFAPI TLV, thus not sent when working with FAPI.
+    // When not sent, we still need a default value, otherwise every message from the L2 is treated as late and not processed
+    phy_info->timing_window = 30;
   }
 
   if (req->nfapi_config.timing_info_mode.tl.tag == NFAPI_NR_NFAPI_TIMING_INFO_MODE_TAG) {
@@ -1747,9 +1757,26 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   p7_config->codec_config.pack_p7_vendor_extension = &pnf_nr_phy_pack_p7_vendor_extension;
   p7_config->codec_config.unpack_vendor_extension_tlv = &pnf_nr_phy_unpack_vendor_extension_tlv;
   p7_config->codec_config.pack_vendor_extension_tlv = &pnf_nr_phy_pack_vendor_extention_tlv;
+
+#ifdef ENABLE_WLS
+  p7_config->unpack_func = &fapi_nr_p7_message_unpack;
+  p7_config->hdr_unpack_func = &fapi_nr_p7_message_header_unpack;
+  p7_config->pack_func = &fapi_nr_p7_message_pack;
+  p7_config->send_p7_msg = &wls_pnf_nr_send_p7_message;
+  // pass p7_config to WLS handler
+  wls_pnf_set_p7_config(p7_config);
+#endif
+
+#ifdef ENABLE_SOCKET
+  p7_config->unpack_func = &nfapi_nr_p7_message_unpack;
+  p7_config->hdr_unpack_func = &nfapi_nr_p7_message_header_unpack;
+  p7_config->pack_func = &nfapi_nr_p7_message_pack;
+  p7_config->send_p7_msg = &pnf_nr_send_p7_message;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating P7 thread %s\n", __FUNCTION__);
   pthread_t p7_thread;
   threadCreate(&p7_thread, &pnf_nr_p7_thread_start, p7_config, "pnf_p7_thread", -1, OAI_PRIORITY_RT);
+#endif
+
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Calling l1_north_init_eNB() %s\n", __FUNCTION__);
   l1_north_init_gNB();
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] HACK - Set p7_config global ready for subframe ind%s\n", __FUNCTION__);
@@ -1794,10 +1821,11 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
     usleep(50000);
     printf("[PNF] waiting for OAI to be started\n");
   }
-
+#ifndef ENABLE_WLS
   printf("[PNF] Sending PNF_START_RESP\n");
   nfapi_nr_send_pnf_start_resp(config, p7_config->phy_id);
   printf("[PNF] Sending first P7 slot indication\n");
+#endif
 #if 1
   nfapi_pnf_p7_slot_ind(p7_config, p7_config->phy_id, 0, 0);
   printf("[PNF] Sent first P7 slot ind\n");
@@ -2132,15 +2160,6 @@ void *pnf_start_thread(void *ptr) {
   return (void *)0;
 }
 
-void *pnf_nr_start_thread(void *ptr) {
-  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] IN PNF NFAPI start thread %s\n", __FUNCTION__);
-  nfapi_pnf_config_t *config = (nfapi_pnf_config_t *)ptr;
-  struct sched_param sp;
-  sp.sched_priority = 20;
-  pthread_setschedparam(pthread_self(),SCHED_FIFO,&sp);
-  nfapi_nr_pnf_start(config);
-  return (void *)0;
-}
 
 void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port)
 {
@@ -2188,9 +2207,29 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
   config->deallocate_p4_p5_vendor_ext = &pnf_nr_sim_deallocate_p4_p5_vendor_ext;
   config->codec_config.unpack_p4_p5_vendor_extension = &pnf_nr_sim_unpack_p4_p5_vendor_extension;
   config->codec_config.pack_p4_p5_vendor_extension = &pnf_nr_sim_pack_p4_p5_vendor_extension;
+
+#ifdef ENABLE_WLS
+  printf("WLS MODE PNF\n");
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating WLS PNF NFAPI start thread %s\n", __FUNCTION__);
+  // Assume it's the FAPI handler, change from within the PNF if it's not the case
+  config->unpack_func = &fapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &fapi_nr_message_header_unpack;
+  config->pack_func = &fapi_nr_p5_message_pack;
+  config->send_p5_msg = &wls_pnf_nr_send_p5_message;
+  //wls_fapi_pnf_nr_start_thread(config);
+  threadCreate(&pnf_p5_init_and_receive_pthread, wls_fapi_pnf_nr_start_thread, config, "NFAPI_WLS_PNF", -1, OAI_PRIORITY_RT_MAX);
+#endif
+
+#ifdef ENABLE_SOCKET
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&pnf_start_pthread, NULL, &pnf_nr_start_thread, config);
-  pthread_setname_np(pnf_start_pthread, "NFAPI_PNF");
+  config->unpack_func = &nfapi_nr_p5_message_unpack;
+  config->hdr_unpack_func = &nfapi_nr_p5_message_header_unpack;
+  config->pack_func = &nfapi_nr_p5_message_pack;
+  config->send_p5_msg = &pnf_nr_send_p5_message;
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
+  pthread_create(&pnf_p5_init_and_receive_pthread, NULL, &pnf_start_p5_thread, config);
+  pthread_setname_np(pnf_p5_init_and_receive_pthread, "NFAPI_PNF");
+#endif
 }
 
 void configure_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, int pnf_p7_port, int vnf_p7_port) {
@@ -2240,8 +2279,8 @@ void configure_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_addr, 
   config->codec_config.unpack_p4_p5_vendor_extension = &pnf_sim_unpack_p4_p5_vendor_extension;
   config->codec_config.pack_p4_p5_vendor_extension = &pnf_sim_pack_p4_p5_vendor_extension;
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[PNF] Creating PNF NFAPI start thread %s\n", __FUNCTION__);
-  pthread_create(&pnf_start_pthread, NULL, &pnf_start_thread, config);
-  pthread_setname_np(pnf_start_pthread, "NFAPI_PNF");
+  pthread_create(&pnf_p5_init_and_receive_pthread, NULL, &pnf_start_thread, config);
+  pthread_setname_np(pnf_p5_init_and_receive_pthread, "NFAPI_PNF");
 }
 
 void oai_subframe_ind(uint16_t sfn, uint16_t sf) {
@@ -2300,7 +2339,11 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot)
     //send VNF slot indication, which is aligned with TX thread, so that it can call the scheduler
     //we give four additional slots (2ms) which should be enough time for the VNF to
     //answer
+#ifndef ENABLE_WLS
   int slot_ahead = 2 << mu;
+#else
+  int slot_ahead = 1;
+#endif
   uint16_t sfn_tx = sfn;
   uint16_t slot_tx = slot;
   sfnslot_add_slot(mu, &sfn_tx, &slot_tx, slot_ahead); // modify: do in place

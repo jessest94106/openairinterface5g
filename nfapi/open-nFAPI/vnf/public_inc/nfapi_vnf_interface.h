@@ -30,7 +30,9 @@
 extern "C" {
 #endif
 
-#define NFAPI_MAX_PACKED_MESSAGE_SIZE 32768
+typedef struct vnf_t vnf_t;
+typedef struct vnf_p7_t vnf_p7_t;
+
 
 /*! The nfapi VNF phy configuration information
  */
@@ -292,7 +294,25 @@ typedef struct nfapi_vnf_config
 	 */
 	int (*start_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_start_response_t* resp);
 	int (*nr_start_resp)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_start_response_scf_t* resp);
-	
+
+	/*! A callback for the ERROR.indication
+	 *  \param config A pointer to the vnf configuration
+	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection
+	 *  \param ind A data structure for the decoded ERROR.indication This will
+	 *              have been allocated on the stack.
+	 *  \return not currently used.
+	 *
+	 *  The ERROR.indication contains a reported error from the PNF, often signifying that a message has been sent too late
+	 *
+	 *
+	 *  The ind may contain pointers to dynamically allocated sub structures
+	 *  such as the vendor_extension. The dynamically allocated structure will
+	 *  be deallocated on return. If the client wishes to 'keep' the structures
+	 *  then the substructure pointers should be set to 0 and then the client should
+	 *  use the codec_config.deallocate function to release it at a future point
+	 */
+	int (*nr_error_ind)(nfapi_vnf_config_t* config, int p5_idx, nfapi_nr_error_indication_scf_t* ind);
+
 	/*! A callback for the STOP.resp
      *  \param config A pointer to the vnf configuration
 	 *  \param p5_idx The p5 index used to indicate a particular pnf p5 connection
@@ -449,10 +469,60 @@ typedef struct nfapi_vnf_config
 	 */
 	void (*deallocate_p4_p5_vendor_ext)(void* header);
 
+  /*! \brief Encodes a (n)FAPI P5 message to a buffer
+   *  \param pMessageBuf A pointer to a (n)fapi p5 message structure
+   *  \param messageBufLen The size of the p5 message structure
+   *  \param pPackedBuf A pointer to the buffer that the p5 message will be packed into
+   *  \param packedBufLen The size of the buffer
+   *  \param config A pointer to the nfapi configuration structure
+   *  \return != 0 means success, -1 means failure.
+   */
+  int (*pack_func)(void* pMessageBuf,
+                   uint32_t messageBufLen,
+                   void* pPackedBuf,
+                   uint32_t packedBufLen,
+                   nfapi_p4_p5_codec_config_t* config);
 
+  /*! \brief Decodes an (n)FAPI P5 message
+   *  \param pMessageBuf A pointer to an encoded P5 message
+   *  \param messageBufLen The size of the encoded P5 message
+   *  \param pUnpackedBuf A pointer to the nfapi_message_header
+   *  \param unpackedBufLen The size of nfapi_message_header structure.
+   *  \param config A pointer to the nfapi configuration structure
+   *  \return true on success, false on failure
+   */
+  bool (*unpack_func)(void* pMessageBuf,
+                      uint32_t messageBufLen,
+                      void* pUnpackedBuf,
+                      uint32_t unpackedBufLen,
+                      nfapi_p4_p5_codec_config_t* config);
 
+  /*! \brief Decodes an (n)FAPI P5 message header
+   *  \param pMessageBuf A pointer to an encoded P5 message header
+   *  \param messageBufLen The size of the encoded P5 message header
+   *  \param pUnpackedBuf A pointer to the nfapi_message_header
+   *  \param unpackedBufLen The size of nfapi_message_header structure.
+   *  \param config A pointer to the nfapi configuration structure
+   *  \return true on success, false on failure
+   */
+  bool (*hdr_unpack_func)(void* pMessageBuf,
+                          uint32_t messageBufLen,
+                          void* pUnpackedBuf,
+                          uint32_t unpackedBufLen,
+                          nfapi_p4_p5_codec_config_t* config);
 
-	
+  /*! \brief Sends a (n)FAPI P5 message
+   *
+   *  This function internally packs the given message into a buffer by calling the previously defined pack_func() function pointer
+   *  Then, having the message buffer populated, sends it to the PNF
+   *  \param vnf A pointer to a vnf_t*
+   *  \param p5_idx The index of the P5 PNF intended to receive the message
+   *  \param msg A pointer to the P5 message
+   *  \param msg_len The size of the encoded P5 message header
+   *  \return true on success, false on failure
+   */
+  bool (*send_p5_msg)(vnf_t* vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len);
+
 	
 } nfapi_vnf_config_t;
 
@@ -476,7 +546,6 @@ void nfapi_vnf_config_destory(nfapi_vnf_config_t* config);
  * 
  * This function will not return untill nfapi_vnf_stop is called
  */
-int nfapi_nr_vnf_start(nfapi_vnf_config_t* config);
 
 int nfapi_vnf_start(nfapi_vnf_config_t* config);
 
@@ -878,7 +947,52 @@ typedef struct nfapi_vnf_p7_config
 	 */
 	void (*deallocate_p7_vendor_ext)(void* header);
 
+	/*! A callback to pack a P7 message
+*  \param pMessageBuf A pointer to a nfapi p7 message structure
+*  \param pPackedBuf A pointer to the buffer that the p7 message will be packed into
+*  \param packedBufLen The size of the buffer
+*  \param config A pointer to the nfapi configuration structure
+*  \return != -1 means success, -1 means failure.
+*/
+	int (*pack_func)(void* pMessageBuf, void* pPackedBuf, uint32_t packedBufLen, nfapi_p7_codec_config_t* config);
 
+	/*! A callback to unpack a P7 message
+	*  \param pMessageBuf A pointer to an encoded P7 message header
+  *  \param messageBufLen The size of the encoded P7 message header
+  *  \param pUnpackedBuf A pointer to the nfapi_message_header
+  *  \param unpackedBufLen The size of nfapi_message_header structure.
+  *  \param config A pointer to the nfapi configuration structure
+  *  \return true on success, false on failure
+  */
+	bool (*unpack_func)(void* pMessageBuf,
+					   uint32_t messageBufLen,
+					   void* pUnpackedBuf,
+					   uint32_t unpackedBufLen,
+					   nfapi_p7_codec_config_t* config);
+
+	/*! \brief Decodes an NFAPI P7 message header
+	 *  \param pMessageBuf A pointer to an encoded P5 message header
+	 *  \param messageBufLen The size of the encoded P5 message header
+	 *  \param pUnpackedBuf A pointer to the nfapi_message_header
+	 *  \param unpackedBufLen The size of nfapi_message_header structure.
+	 *  \param config A pointer to the nfapi configuration structure
+	 *  \return true on success, false on failure
+	 */
+	bool (*hdr_unpack_func)(void* pMessageBuf,
+						   uint32_t messageBufLen,
+						   void* pUnpackedBuf,
+						   uint32_t unpackedBufLen,
+						   nfapi_p7_codec_config_t* config);
+
+  /*! \brief Sends a (n)FAPI P7 message
+   *
+   *  This function internally packs the given message into a buffer by calling the previously defined pack_func() function pointer
+   *  Then, having the message buffer populated, sends it to the PNF
+   *  \param vnf_p7 A pointer to a vnf_p7_t struct
+   *  \param header A pointer to the P7 message to pack & send
+   *  \return true on success, false on failure
+   */
+  bool (*send_p7_msg)(vnf_p7_t* vnf_p7, nfapi_nr_p7_message_header_t* header);
 } nfapi_vnf_p7_config_t;
 
 /*! Creates and initializes the nfapi_vnf_p7_config structure before use
@@ -902,7 +1016,7 @@ void nfapi_vnf_p7_config_destory(nfapi_vnf_p7_config_t* config);
  * function is called. 
  */
 int nfapi_vnf_p7_start(nfapi_vnf_p7_config_t* config);
-int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t* config);
+
 
 
 /*! Stop the VNF P7 library. 
@@ -959,7 +1073,7 @@ int nfapi_vnf_p7_del_pnf(nfapi_vnf_p7_config_t* config, int phy_id);
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_dl_config_request_t* req);
-int nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti_request_t* req);
+bool nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti_request_t* req);
 
 /*! Send the UL_CONFIG.request
  *  \param config A pointer to the vnf p7 configuration
@@ -970,7 +1084,7 @@ int nfapi_vnf_p7_nr_dl_config_req(nfapi_vnf_p7_config_t* config, nfapi_nr_dl_tti
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_ul_config_req(nfapi_vnf_p7_config_t* config, nfapi_ul_config_request_t* req);
-int nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_request_t* req);
+bool nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_request_t* req);
 /*! Send the HI_DCI0.request
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded HI_DCI0.request.
@@ -980,7 +1094,7 @@ int nfapi_vnf_p7_ul_tti_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_tti_reque
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_hi_dci0_req(nfapi_vnf_p7_config_t* config, nfapi_hi_dci0_request_t* req);
-int nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_request_t* req);
+bool nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_request_t* req);
 /*! Send the TX.req
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded HI_DCI0.request.
@@ -990,7 +1104,7 @@ int nfapi_vnf_p7_ul_dci_req(nfapi_vnf_p7_config_t* config, nfapi_nr_ul_dci_reque
  *  may be released after this function call has returned or at a later pointer
  */
 int nfapi_vnf_p7_tx_req(nfapi_vnf_p7_config_t* config, nfapi_tx_request_t* req);
-int nfapi_vnf_p7_tx_data_req(nfapi_vnf_p7_config_t* config, nfapi_nr_tx_data_request_t* req);
+bool nfapi_vnf_p7_tx_data_req(nfapi_vnf_p7_config_t* config, nfapi_nr_tx_data_request_t* req);
 /*! Send the LBT_DL_CONFIG.requst
  *  \param config A pointer to the vnf p7 configuration
  *  \param req A data structure for the decoded LBT_DL_CONFIG.request.
