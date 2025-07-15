@@ -105,7 +105,7 @@ int generate_ue_ulsch_params_from_rar(PHY_VARS_UE *ue,
   cqireq=rar[3]&1;
 
   if (rballoc>RIV_max) {
-    LOG_D(PHY,"rar_tools.c: ERROR: rb_alloc (%x) > RIV_max\n",rballoc);
+    LOG_W(PHY,"rar_tools.c: ERROR: rb_alloc (%x) > RIV_max\n",rballoc);
     return(-1);
   }
 

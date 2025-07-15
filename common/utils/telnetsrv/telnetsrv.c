@@ -692,8 +692,8 @@ void run_telnetsrv(void) {
         break;
       }
 
-      if (telnetparams.telnetdbg > 0)
-        TELNET_LOG("Command received: readc %i filled %i \"%s\"\n", readc, filled, buf);
+      //if (telnetparams.telnetdbg > 0)
+      TELNET_LOG("Command received: readc %i filled %i \"%s\"\n", readc, filled, buf);
 
       if (buf[0] == '!') {
         if (buf[1] == '!') {

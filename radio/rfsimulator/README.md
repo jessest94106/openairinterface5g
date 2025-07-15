@@ -79,7 +79,6 @@ The RF simulator is using the configuration module, and its parameters are defin
 |`--rfsimulator.IQfile <file>`     | path to a file to store the IQ samples to (only with `saviq`)                  | `/tmp/rfsimulator.iqs` |
 |`--rfsimulator.prop_delay`        | simulated receive-path (gNB: UL, UE: DL) propagation delay in ms               | 0                      |
 |`--rfsimulator.wait_timeout`      | wait timeout when no UE is connected                                           | 1                      |
-|`--rfismulator.hanging-workaround`| Enable workaround to de-block potentially hanging server on new client connection.  | 0                 |
 
 Please refer to this document [`SIMULATION/TOOLS/DOC/channel_simulation.md`](../../openair1/SIMULATION/TOOLS/DOC/channel_simulation.md) for information about using the RFSimulator options to run the simulator with a channel model.
 
