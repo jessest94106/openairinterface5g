@@ -301,6 +301,12 @@ rfsim5g_ue:
   AttachScript: docker start rfsim5g-oai-nr-ue
   DetachScript: docker stop rfsim5g-oai-nr-ue
   MTU: 1500
+# for tests with second PDU session ID 2, needs to match requested PDU session name
+rfsim5g_ue_pdu_2:
+  Host: "%%current_host%%"
+  NetworkScript: docker exec rfsim5g-oai-nr-ue ip a show dev oaitun_ue1p2
+  CmdPrefix: docker exec rfsim5g-oai-nr-ue
+  IF: oaitun_ue1p2
 
 rfsim5g_ue2:
   Host: "%%current_host%%"
