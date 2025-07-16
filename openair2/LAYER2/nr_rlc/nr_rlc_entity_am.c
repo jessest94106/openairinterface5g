@@ -1841,6 +1841,8 @@ void nr_rlc_entity_am_recv_sdu(nr_rlc_entity_t *_entity,
 
   if (entity->tx_size + size > entity->tx_maxsize) {
     entity->sdu_rejected++;
+    entity->common.stats.txpdu_dd_pkts++;
+    entity->common.stats.txpdu_dd_bytes += size;
     return;
   }
 
