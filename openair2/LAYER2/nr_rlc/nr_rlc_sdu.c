@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "LOG/log.h"
+#include "common/utils/assertions.h"
 
 nr_rlc_sdu_segment_t *nr_rlc_new_sdu(
     char *buffer, int size,
