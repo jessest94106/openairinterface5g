@@ -715,6 +715,11 @@ add_library(NFAPI_LIB ${NFAPI_SRC})
 target_link_libraries(NFAPI_LIB PUBLIC nfapi_common)
 target_link_libraries(NFAPI_LIB PUBLIC nr_fapi_p5 nr_fapi_p7)
 
+if(OAI_WLS)
+  target_compile_definitions(NFAPI_LIB PRIVATE ENABLE_WLS)
+else()
+  target_compile_definitions(NFAPI_LIB PRIVATE ENABLE_SOCKET)
+endif()
 include_directories(${NFAPI_DIR}/nfapi/public_inc)
 include_directories(${NFAPI_DIR}/nfapi/inc)
 
@@ -728,6 +733,9 @@ add_library(NFAPI_PNF_LIB ${NFAPI_PNF_SRC})
 target_link_libraries(NFAPI_PNF_LIB PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 target_link_libraries(NFAPI_PNF_LIB PUBLIC nr_fapi_p7)
 
+if(OAI_WLS)
+  target_compile_definitions(NFAPI_PNF_LIB PRIVATE ENABLE_WLS)
+endif()
 include_directories(${NFAPI_DIR}/pnf/public_inc)
 include_directories(${NFAPI_DIR}/pnf/inc)
 
@@ -746,6 +754,9 @@ endif()
 include_directories(${NFAPI_DIR}/vnf/public_inc)
 include_directories(${NFAPI_DIR}/vnf/inc)
 
+if(OAI_WLS)
+  target_compile_definitions(NFAPI_VNF_LIB PRIVATE ENABLE_WLS)
+endif()
 # nFAPI user defined code
 #############################
 set(NFAPI_USER_SRC
@@ -755,11 +766,15 @@ set(NFAPI_USER_SRC
   ${NFAPI_USER_DIR}/gnb_ind_vars.c
 )
 add_library(NFAPI_USER_LIB ${NFAPI_USER_SRC})
+if(OAI_WLS)
+  target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_WLS)
+elseif (OAI_AERIAL)
+  target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_AERIAL)
+else()
+  target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_SOCKET)
+endif()
 target_link_libraries(NFAPI_USER_LIB PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs UTIL)
 target_link_libraries(NFAPI_USER_LIB PRIVATE nr_fapi_p7)
-if(OAI_AERIAL)
-  target_compile_definitions(NFAPI_USER_LIB PRIVATE ENABLE_AERIAL)
-endif()
 include_directories(${NFAPI_USER_DIR})
 
 # Layer 1
@@ -1047,7 +1062,7 @@ add_library(PHY_NR_COMMON ${PHY_NR_SRC_COMMON})
 target_link_libraries(PHY_NR_COMMON PUBLIC UTIL)
 
 add_library(PHY_NR ${PHY_NR_SRC})
-target_link_libraries(PHY_NR nr_phy_common nr_common)
+target_link_libraries(PHY_NR nr_phy_common nr_common nr_fapi_p5)
 
 add_library(PHY_NR_NO_AVX_256 ${PHY_NR_SRC})
 target_link_libraries(PHY_NR_NO_AVX_256 nr_phy_common nr_common)
@@ -1839,6 +1854,12 @@ target_link_libraries(nr-softmodem PRIVATE pthread m CONFIG_LIB rt sctp)
 target_link_libraries(nr-softmodem PRIVATE ${T_LIB})
 target_link_libraries(nr-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 target_link_libraries(nr-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
+add_boolean_option(OAI_WLS OFF "Activate OAI's WLS driver" OFF)
+if (OAI_WLS)
+    target_link_libraries(nr-softmodem PUBLIC wls_integration_lib)
+else()
+    target_link_libraries(nr-softmodem PUBLIC nfapi_socket_lib)
+endif()
 add_boolean_option(OAI_AERIAL OFF "Activate OAI's AERIAL driver" OFF)
 if (OAI_AERIAL)
   target_compile_definitions(nr-softmodem PUBLIC ENABLE_AERIAL)

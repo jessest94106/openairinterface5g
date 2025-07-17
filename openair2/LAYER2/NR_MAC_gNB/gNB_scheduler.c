@@ -201,6 +201,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
     LOG_I(NR_MAC, "Frame.Slot %d.%d\n%s\n", frame, slot, stats_output);
   }
 
+  nr_measgap_scheduling(gNB, frame, slot);
   nr_mac_update_timers(module_idP, frame, slot);
 
   if (wait_prach_completed || get_softmodem_params()->phy_test) {

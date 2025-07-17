@@ -78,9 +78,7 @@
 #include "uper_encoder.h"
 #include "utils.h"
 #include "x2ap_messages_types.h"
-#ifdef ENABLE_AERIAL
-#include "nfapi/oai_integration/aerial/fapi_vnf_p5.h"
-#endif
+
 
 static int DEFBANDS[] = {7};
 static int DEFENBS[] = {0};
@@ -1759,15 +1757,15 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         RC.nrmac[j]->eth_params_s.remote_portd = *(MacRLC_ParamList.paramarray[j][MACRLC_REMOTE_S_PORTD_IDX].iptr);
         RC.nrmac[j]->eth_params_s.transp_preference = ETH_UDP_MODE;
 
-        configure_nr_nfapi_vnf(
-            RC.nrmac[j]->eth_params_s.my_addr, RC.nrmac[j]->eth_params_s.my_portc, RC.nrmac[j]->eth_params_s.remote_addr, RC.nrmac[j]->eth_params_s.remote_portd, RC.nrmac[j]->eth_params_s.my_portd);
+        configure_nr_nfapi_vnf(RC.nrmac[j]->eth_params_s);
       } else if(strcmp(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_PREFERENCE_IDX].strptr), "aerial") == 0){
 #ifdef ENABLE_AERIAL
         RC.nrmac[j]->nvipc_params_s.nvipc_shm_prefix =
             strdup(*(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_SHM_PREFIX].strptr));
         RC.nrmac[j]->nvipc_params_s.nvipc_poll_core = *(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_POLL_CORE].i8ptr);
         LOG_I(GNB_APP, "Configuring VNF for Aerial connection with prefix %s\n", RC.nrmac[j]->eth_params_s.local_if_name);
-        aerial_configure_nr_fapi_vnf();
+        configure_nr_nfapi_vnf(RC.nrmac[j]->eth_params_s);
+
 #endif
       } else { // other midhaul
         AssertFatal(1 == 0, "MACRLC %d: %s unknown southbound midhaul\n", j, *(MacRLC_ParamList.paramarray[j][MACRLC_TRANSPORT_S_PREFERENCE_IDX].strptr));

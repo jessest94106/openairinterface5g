@@ -2514,7 +2514,10 @@ static long get_num_bytes_to_reqlc(NR_UE_MAC_INST_t *mac,
     }
   }
   AssertFatal(num_remaining_bytes >= 0 && num_bytes_requested <= buflen_remain,
-              "the total number of bytes allocated until target length is greater than expected\n");
+              "the total number of bytes allocated until target length is greater than expected: num_bytes_requested %ld, "
+              "buflen_remain %d\n",
+              num_bytes_requested,
+              buflen_remain);
   LOG_D(NR_MAC, "number of bytes requested for lcid %d is %li\n", lc_num, num_bytes_requested);
 
   return num_bytes_requested;
@@ -2780,11 +2783,9 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
             remain);
 
       if (num_lcids_same_priority == count_same_priority_lcids) {
-        buflen_ep = (remain - (count_same_priority_lcids * sizeof(NR_MAC_SUBHEADER_LONG))) / count_same_priority_lcids;
-        /* after serving equal priority LCIDs in the first round, buflen_remain could be > 0 and < (count_same_priority_lcids * sh_size)
-           if above division yeilds a remainder. hence the following sets buflen_ep to 0 if there is not enough buffer left for subsequent rounds
-        */
-        buflen_ep = buflen_ep < 0 ? 0 : buflen_ep;
+        buflen_ep = remain < count_same_priority_lcids * sizeof(NR_MAC_SUBHEADER_LONG)
+                        ? 0
+                        : (remain - (count_same_priority_lcids * sizeof(NR_MAC_SUBHEADER_LONG))) / count_same_priority_lcids;
       }
 
       while (mac_ce_info.end_for_tailer - mac_ce_info.cur_ptr > 0) {

@@ -139,6 +139,10 @@ These modes of operation are supported:
   - evaluation of CQI report
 - MAC scheduling of SR reception
 - Intra-frequency handover
+- Inter-frequency handover
+    - Measurement gaps are automatically computed at the DU if the CU has neighbor information and the configured
+      neighbors include cells operating on different frequencies
+    - DUs must be synchronized with each other for the measurements to be properly performed
 - Initial support for RedCap
 - Scheduling of SIBs (2, 19)
 

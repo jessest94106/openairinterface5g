@@ -94,6 +94,8 @@ services:
         container_name: rfsim5g-oai-gnb
         cap_drop:
             - ALL
+        cap_add:
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: --rfsim --log_config.global_log_options level,nocolor,time
             ASAN_OPTIONS: detect_leaks=0
@@ -120,6 +122,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: --rfsim -r 273 --numerology 1 --band 78 -C 3450720000 --ssb 1518 --ue-nb-ant-tx 2 --uicc0.imsi 208990100001100 --ue-nb-ant-rx 2 --uecap_file /opt/oai-nr-ue/etc/uecap.xml --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:

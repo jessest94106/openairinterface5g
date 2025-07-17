@@ -30,7 +30,7 @@ int fapi_nr_p5_message_pack(void *pMessageBuf,
                             uint32_t packedBufLen,
                             nfapi_p4_p5_codec_config_t *config);
 
-int fapi_nr_p5_message_unpack(void *pMessageBuf,
+bool fapi_nr_p5_message_unpack(void *pMessageBuf,
                               uint32_t messageBufLen,
                               void *pUnpackedBuf,
                               uint32_t unpackedBufLen,

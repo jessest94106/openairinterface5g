@@ -201,11 +201,15 @@ nrUE_params_t *get_nrUE_params(void) {
 }
 static void get_options(configmodule_interface_t *cfg)
 {
-  paramdef_t cmdline_params[] =CMDLINE_NRUEPARAMS_DESC ;
+  paramdef_t cmdline_params[] = CMDLINE_NRUEPARAMS_DESC;
   int numparams = sizeofArray(cmdline_params);
   config_get(cfg, cmdline_params, numparams, NULL);
   if (nrUE_params.vcdflag > 0)
     ouput_vcd = 1;
+  AssertFatal(nrUE_params.extra_pdu_id != get_softmodem_params()->default_pdu_session_id,
+              "Default PDU ID (%d) and Extra PDU ID (%d) must be different!\n",
+              get_softmodem_params()->default_pdu_session_id,
+              nrUE_params.extra_pdu_id);
 }
 
 // set PHY vars from command line

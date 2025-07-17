@@ -1,11 +1,14 @@
 This document describes the SmallCellForum (SCF) (n)FAPI split in 5G, i.e.,
-between the MAC/L2 and PHY/L1.
+between the MAC/L2 and PHY/L1. It also describes how to make use of the 
+multiple transport mechanisms between the 2.
 
 The interested reader is recommended to read a copy of the SCF 222.10
 specification ("FAPI"). This includes information on what is P5, P7, and how
 FAPI works. The currently used version is SCF 222.10.02, with some messages
 upgraded to SCF 222.10.04 due to bugfixes in the spec. Further information
 about nFAPI can be found in SCF 225.2.0.
+
+[[_TOC_]]
 
 # Quickstart
 
@@ -107,6 +110,125 @@ can proceed as follows:
 
 Note: all L1-specific options have to be passed to the PNF, and remaining
 options to the VNF.
+
+## Transport mechanisms between VNF and PNF
+
+Currently, the VNF/PNF split supports three transport mechanisms between each
+other:
+
+1. Socket communication (either regular, or SCTP), this is the default
+
+   The socket type may be changed by editing `nfapi_pnf_config_create()` and
+   `nfapi_vnf_config_create()`, in both of which `_this->sctp = <value, 0 or
+   1>;` indicate whether SCTP or regular sockets are to be used.  Note: The
+   value of `_this->sctp` **must** be the same on the VNF and PNF.
+2. Intel WLS Lib, which uses DPDK to achieve a shared memory communication between components.
+3. nvIPC, which is used exclusively for the NVIDIA Aerial L1. Thus, it is only
+   applicable for the VNF.
+
+The change between transport mechanisms is done at compilation time:
+- No changes to the `build_oai` call are required in order to select socket communication, as it is the default.
+- In order to select WLS as the transport mechanism between VNF and PNF, first install the WLS library, and afterwards use `-t WLS` as a parameter of `build_oai`:
+
+### How to use nFAPI
+
+nFAPI is used by default. Compile and configure as indicated above.
+
+### How to use Aerial
+
+Refer to [this document](./Aerial_FAPI_Split_Tutorial.md) for more information.
+
+### How to use WLS lib
+
+Before the first compilation with WLS support, the [WLS
+library](https://docs.o-ran-sc.org/projects/o-ran-sc-o-du-phy/en/latest/wls-lib.html)
+must first be compiled and installed to the system.
+
+The WLS library has a few dependencies:
+  - [DPDK](https://doc.dpdk.org/guides/prog_guide/build-sdk-meson.html), specifically version [20.11.3](https://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz).
+  - libelf-dev
+  - libhugetlbfs-dev
+
+Additionally, a patch needs to be applied to the WLS lib Makefile in order for
+the shared library and headers to be installed into the system, the necessary
+patch is available [here](../cmake_targets/tools/install_wls_lib.patch)
+
+Clone the code and apply the patch
+
+    git clone -b oran_f_release https://gerrit.o-ran-sc.org/r/o-du/phy.git
+    cd phy/wls_lib/
+    git apply ~/openairinterface5g/cmake_targets/tools/install_wls_lib.patch
+
+Then compile and install the library
+
+    WIRELESS_SDK_TOOLCHAIN=gcc WIRELESS_SDK_TARGET_ISA=avx2 make
+    sudo WIRELESS_SDK_TOOLCHAIN=gcc WIRELESS_SDK_TARGET_ISA=avx2 make install
+
+After installing WLS, you can run the build command as shown below:
+
+    ./build_oai -t WLS -w USRP --gNB --nrUE --ninja -C
+
+#### How to run OAI PNF with OAI VNF
+
+Refer to the above steps in [Quickstart](.#quickstart), but run the PNF first as it is the WLS "master".
+
+#### How to run OAI PNF with OSC/Radisys O-DU
+
+Set up the hugepages for DPDK (1GB page size, 6 pages; this only needs to be
+done once):
+
+    sudo nano /etc/default/grub
+          GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} default_hugepagesz=1G hugepagesz=1G hugepages=6"
+
+Then rewrite the bootloader and reboot
+
+    sudo update-grub
+    sudo reboot 
+
+Install dependencies:
+
+    sudo apt-get install libstdc++-14-dev libnsl-dev libpcap-dev libxml2-dev
+
+Clone the Radisys repository (We're currently using the `oai_integration` branch):
+
+    git clone https://gerrit.o-ran-sc.org/r/o-du/l2 -b oai-integration
+
+Build the O-DU
+
+    cd ~/l2/build/odu
+    make clean_all;make odu PHY=INTEL_L1 MACHINE=BIT64 MODE=TDD;make cu_stub NODE=TEST_STUB MACHINE=BIT64 MODE=TDD;make ric_stub NODE=TEST_STUB MACHINE=BIT64 MODE=TDD
+
+Setup local interfaces for the cu_stub, ric_stub and o_du
+
+    sudo ifconfig enp7s0:ODU "192.168.130.81" && sudo ifconfig enp7s0:CU_STUB "192.168.130.82" && sudo ifconfig enp7s0:RIC_STUB "192.168.130.80"
+
+Run cu_stu and ric_stub in separate terminals
+
+    cd ~/l2/bin/
+    ./cu_stub/cu_stub 
+    clear && ./ric_stub/ric_stub
+
+Run the OAI PNF first, as it is the WLS memory master
+
+    sudo NFAPI_TRACE_LEVEL=info ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-pnf.band78.rfsim.2x2.conf --nfapi PNF --rfsim --rfsimulator.serveraddr server
+
+Run the O-DU over GDB
+
+    sudo -E gdb -ex run --readnever --args  ./odu/odu
+
+Note: If you see the following prompt in GDB
+
+    This GDB supports auto-downloading debuginfo from the following URLs:
+      <https://debuginfod.ubuntu.com>
+    Enable debuginfod for this session? (y or [n]) 
+
+You can run the following command one time before executing gdb to disable it: 
+
+    export DEBUGINFOD_URLS=
+
+Run the OAI-UE
+
+    sudo ./nr-uesoftmodem -r 273 --numerology 1 --band 78 -C 3400140000 --ssb 1518 --uicc0.imsi 001010000000001 --rfsim
 
 # nFAPI logging system
 

@@ -50,6 +50,7 @@
 #include "NR_ReestablishmentCause.h"
 #include "NR_SRB-ToAddModList.h"
 #include "NR_SecurityConfig.h"
+#include "NR_MeasurementTimingConfiguration.h"
 #include "ds/seq_arr.h"
 #include "ds/byte_array.h"
 #include "rrc_messages_types.h"
@@ -120,6 +121,10 @@ int do_RRCSetupComplete(uint8_t *buffer,
 
 int do_NR_HandoverPreparationInformation(const uint8_t *uecap_buf, int uecap_buf_size, uint8_t *buf, int buf_size);
 
+int do_NR_MeasConfig(const NR_MeasConfig_t *measconfig, uint8_t *buf, int buf_size);
+
+int do_NR_MeasurementTimingConfiguration(const NR_MeasurementTimingConfiguration_t *mtc, uint8_t *buf, int buf_size);
+
 int do_RRCSetupRequest(uint8_t *buffer, size_t buffer_size, uint8_t *rv, uint64_t fiveG_S_TMSI_part1);
 
 int do_NR_RRCReconfigurationComplete_for_nsa(uint8_t *buffer, size_t buffer_size, NR_RRC_TransactionIdentifier_t Transaction_id);
@@ -151,7 +156,7 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 NR_ReportConfigToAddMod_t *rc_PER,
                                 NR_ReportConfigToAddMod_t *rc_A2,
                                 seq_arr_t *rc_A3_seq,
-                                seq_arr_t *pci_seq);
+                                seq_arr_t *neigh_seq);
 void free_MeasConfig(NR_MeasConfig_t *mc);
 int do_NR_Paging(uint8_t Mod_id, uint8_t *buffer, uint32_t tmsi);
 

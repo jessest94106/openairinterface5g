@@ -701,16 +701,22 @@ typedef enum {
 } nfapi_nr_stop_errors_e;
 
 //3.3.5 PHY Notifications
+
+#define NFAPI_PHY_ERROR_LIST \
+X(NFAPI_NR_PHY_API_MSG_OK              ,0x0)\
+X(NFAPI_NR_PHY_API_MSG_INVALID_STATE   ,0x1)\
+X(NFAPI_NR_PHY_API_MSG_INVALID_CONFIG  ,0x2)\
+X(NFAPI_NR_PHY_API_SFN_OUT_OF_SYNC     ,0X3)\
+X(NFAPI_NR_PHY_API_MSG_SLOR_ERR        ,0X4)\
+X(NFAPI_NR_PHY_API_MSG_BCH_MISSING     ,0X5)\
+X(NFAPI_NR_PHY_API_MSG_INVALID_SFN     ,0X6)\
+X(NFAPI_NR_PHY_API_MSG_UL_DCI_ERR      ,0X7)\
+X(NFAPI_NR_PHY_API_MSG_TX_ERR          ,0X8)
+
 typedef enum {
-  NFAPI_NR_PHY_API_MSG_OK              =0x0,
-  NFAPI_NR_PHY_API_MSG_INVALID_STATE   =0x1,
-  NFAPI_NR_PHY_API_MSG_INVALID_CONFIG  =0x2,
-  NFAPI_NR_PHY_API_SFN_OUT_OF_SYNC     =0X3,
-  NFAPI_NR_PHY_API_MSG_SLOR_ERR        =0X4,
-  NFAPI_NR_PHY_API_MSG_BCH_MISSING     =0X5,
-  NFAPI_NR_PHY_API_MSG_INVALID_SFN     =0X6,
-  NFAPI_NR_PHY_API_MSG_UL_DCI_ERR      =0X7,
-  NFAPI_NR_PHY_API_MSG_TX_ERR          =0X8
+#define X(name, value) name = value,
+  NFAPI_PHY_ERROR_LIST
+#undef X
 } nfapi_nr_phy_notifications_errors_e;
 
 typedef struct {

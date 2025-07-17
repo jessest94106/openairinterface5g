@@ -92,6 +92,8 @@ services:
     oai-gnb:
         image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}
         container_name: rfsim5g-oai-gnb
+        cap_add:
+            - SYS_NICE
         cap_drop:
             - ALL
         environment:
@@ -119,6 +121,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001100 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -145,6 +148,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001101 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -171,6 +175,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001102 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -197,6 +202,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001103 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -223,6 +229,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001104 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -249,6 +256,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001105 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -275,6 +283,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001106 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -301,6 +310,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001107 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -327,6 +337,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001108 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:
@@ -353,6 +364,7 @@ services:
         cap_add:
             - NET_ADMIN  # for interface bringup
             - NET_RAW    # for ping
+            - SYS_NICE
         environment:
             USE_ADDITIONAL_OPTIONS: -E --rfsim -r 106 --numerology 1 --uicc0.imsi 208990100001109 -C 3319680000 --rfsimulator.serveraddr 192.168.71.140 --log_config.global_log_options level,nocolor,time
         depends_on:

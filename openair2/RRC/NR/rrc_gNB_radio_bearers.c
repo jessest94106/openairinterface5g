@@ -85,12 +85,19 @@ drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id)
 void set_default_drb_pdcp_config(struct pdcp_config_s *pdcp_config,
                                  int do_drb_integrity,
                                  int do_drb_ciphering,
-                                 const nr_pdcp_configuration_t *default_pdcp_config)
+                                 const nr_pdcp_configuration_t *default_pdcp_config,
+                                 const nr_redcap_ue_cap_t *redcap_cap)
 {
   AssertError(pdcp_config != NULL, return, "Failed to set default PDCP configuration for DRB!\n");
   pdcp_config->discardTimer = encode_discard_timer(default_pdcp_config->drb.discard_timer);
-  pdcp_config->pdcp_SN_SizeDL = encode_sn_size_dl(default_pdcp_config->drb.sn_size);
-  pdcp_config->pdcp_SN_SizeUL = encode_sn_size_ul(default_pdcp_config->drb.sn_size);
+  if (redcap_cap && redcap_cap->support_of_redcap_r17 && !redcap_cap->pdcp_drb_long_sn_redcap_r17) {
+    LOG_I(NR_RRC, "UE is RedCap without long PDCP SN support: overriding PDCP SN size to 12\n");
+    pdcp_config->pdcp_SN_SizeDL = NR_PDCP_Config__drb__pdcp_SN_SizeDL_len12bits;
+    pdcp_config->pdcp_SN_SizeUL = NR_PDCP_Config__drb__pdcp_SN_SizeUL_len12bits;
+  } else {
+    pdcp_config->pdcp_SN_SizeDL = encode_sn_size_dl(default_pdcp_config->drb.sn_size);
+    pdcp_config->pdcp_SN_SizeUL = encode_sn_size_ul(default_pdcp_config->drb.sn_size);
+  }
   pdcp_config->t_Reordering = encode_t_reordering(default_pdcp_config->drb.t_reordering);
   pdcp_config->headerCompression.present = NR_PDCP_Config__drb__headerCompression_PR_notUsed;
   pdcp_config->headerCompression.NotUsed = 0;
@@ -145,7 +152,7 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
       est_drb->status = DRB_ACTIVE;
   }
   /* PDCP Configuration */
-  set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering, pdcp_config);
+  set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering, pdcp_config, ue->redcap_cap);
 
   drb_t *rrc_drb = get_drb(ue, drb_id);
   DevAssert(rrc_drb == est_drb); /* to double check that we create the same which we would retrieve */

@@ -30,6 +30,10 @@
 #include "nfapi_nr_interface_scf.h"
 #include "pnf.h"
 
+#include <socket/include/socket_common.h>
+
+#include "nfapi/open-nFAPI/fapi/inc/nr_fapi.h"
+
 # if 1 // for hard-code (remove later)
 #include "common/platform_types.h"
 #include "common/platform_constants.h"
@@ -45,7 +49,9 @@
 
 #include "NR_MIB.h"
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.h"
-
+#ifdef ENABLE_WLS
+#include "wls_integration/include/wls_pnf.h"
+#endif
 #endif
 
 #define MAX_SCTP_STREAMS 16
@@ -95,8 +101,9 @@ void pnf_nr_handle_pnf_param_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF_PARAM.request received\n");
 
-		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(nfapi_nr_pnf_param_request_t), &pnf->_public.codec_config) >= 0)
+	  /// The unpack() function pointer is not called here due to the only possibility of entering being on a nFAPI message
+	  const bool result = nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(nfapi_nr_pnf_param_request_t), &pnf->_public.codec_config);
+		if (result)
 		{
 			if(pnf->_public.state == NFAPI_PNF_IDLE)
 			{
@@ -251,8 +258,9 @@ void pnf_nr_handle_pnf_config_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen
 
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF_CONFIG.request received\n");
 
-		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &pnf->_public.codec_config) >= 0)
+	  /// The unpack() function pointer is not called here due to the only possibility of entering being on a nFAPI message
+	  const bool result = nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &pnf->_public.codec_config);
+		if (result)
 		{
 			// ensure correct state
 			if(pnf->_public.state != NFAPI_PNF_RUNNING)
@@ -357,8 +365,9 @@ void pnf_nr_handle_pnf_start_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF_START.request Received\n");
 
-		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &pnf->_public.codec_config) >= 0)
+	  /// The unpack() function pointer is not called here due to the only possibility of entering being on a nFAPI message
+	  const bool result = nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &pnf->_public.codec_config);
+		if (result)
 		{
 			if(pnf->_public.state == NFAPI_PNF_CONFIGURED)
 			{
@@ -517,7 +526,8 @@ void pnf_nr_handle_param_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "PARAM.request received\n");
 
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config) >= 0)
+	  const bool result = pnf->_public.unpack_func(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config);
+		if (result)
 		{
 			if(config->state == NFAPI_PNF_RUNNING)
 			{
@@ -662,7 +672,8 @@ void pnf_nr_handle_config_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 		nfapi_pnf_config_t* config = &(pnf->_public);
 
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config) >= 0)
+	  const bool result = pnf->_public.unpack_func(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config);
+		if (result)
 		{
 			if(config->state == NFAPI_PNF_RUNNING)
 			{
@@ -806,7 +817,8 @@ void pnf_nr_handle_start_request(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 		NFAPI_TRACE(NFAPI_TRACE_INFO, "%s() START.request received state:%d\n", __FUNCTION__, config->state);
 
 		// unpack the message
-		if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config) >= 0)
+	  const bool result = pnf->_public.unpack_func(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config);
+		if (result)
 		{
 			if(config->state == NFAPI_PNF_RUNNING)
 			{
@@ -945,7 +957,8 @@ void pnf_nr_handle_stop_request(pnf_t* pnf, void* pRecvMsg, int recvMsgLen)
     nfapi_pnf_config_t* config = &(pnf->_public);
 
     // unpack the message
-    if (nfapi_nr_p5_message_unpack(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config) >= 0) {
+    const bool result = pnf->_public.unpack_func(pRecvMsg, recvMsgLen, &req, sizeof(req), &config->codec_config);
+    if (result) {
       if (config->state == NFAPI_PNF_RUNNING) {
         nfapi_pnf_phy_config_t* phy = nfapi_pnf_phy_config_find(config, req.header.phy_id);
         if (phy) {
@@ -1525,12 +1538,8 @@ void pnf_nr_handle_p5_message(pnf_t* pnf, void* pRecvMsg, int recvMsgLen)
   }
 
   // unpack the message header
-  if (nfapi_nr_p5_message_header_unpack(pRecvMsg,
-                                        recvMsgLen,
-                                        &messageHeader,
-                                        sizeof(nfapi_nr_p4_p5_message_header_t),
-                                        &pnf->_public.codec_config)
-      < 0) {
+  const bool result = pnf->_public.hdr_unpack_func(pRecvMsg, recvMsgLen, &messageHeader, sizeof(messageHeader), &pnf->_public.codec_config);
+  if (!result) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "Unpack message header failed, ignoring\n");
     return;
   }
@@ -1702,20 +1711,6 @@ void pnf_handle_p5_message(pnf_t* pnf, void *pRecvMsg, int recvMsgLen)
 	}
 }
 
-int pnf_nr_pack_and_send_p5_message(pnf_t* pnf, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len)
-{
-  int packed_len =
-      nfapi_nr_p5_message_pack(msg, msg_len, pnf->tx_message_buffer, sizeof(pnf->tx_message_buffer), &pnf->_public.codec_config);
-
-  if (packed_len < 0) {
-    NFAPI_TRACE(NFAPI_TRACE_ERROR, "nfapi_nr_p5_message_pack failed (%d)\n", packed_len);
-    return -1;
-  }
-
-  return pnf_send_message(pnf, pnf->tx_message_buffer, packed_len, 0 /*msg->stream_id*/);
-}
-
-
 int pnf_pack_and_send_p5_message(pnf_t* pnf, nfapi_p4_p5_message_header_t* msg, uint32_t msg_len)
 {
 	int packed_len = nfapi_p5_message_pack(msg, msg_len,
@@ -1747,8 +1742,6 @@ int pnf_pack_and_send_p4_message(pnf_t* pnf, nfapi_p4_p5_message_header_t* msg, 
 
 	return pnf_send_message(pnf, pnf->tx_message_buffer, packed_len, 0/*msg->stream_id*/);
 }
-
-
 
 int pnf_connect(pnf_t* pnf)
 {
@@ -1932,7 +1925,20 @@ int pnf_connect(pnf_t* pnf)
 
 			socketConnected = 1;
 		}
-	}
+  } else {
+    int error;
+    socklen_t len = sizeof(error);
+
+    if (getsockopt(pnf->p5_sock, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "After getsockopt errno: %d\n", errno);
+      return -1;
+    } else {
+      // If error is zero, the socket is connected
+      if (error == 0) {
+        socketConnected = 1;
+      }
+    }
+  }
 
 	NFAPI_TRACE(NFAPI_TRACE_NOTE, "Socket %s\n", socketConnected ? "CONNECTED" : "NOT_CONNECTED");
 	return socketConnected;
@@ -1941,30 +1947,30 @@ int pnf_connect(pnf_t* pnf)
 int pnf_send_message(pnf_t* pnf, uint8_t *msg, uint32_t len, uint16_t stream)
 {
 
-	if (pnf->sctp)
-	{
+  if (pnf->sctp)
+  {
 #if 0
-		printf("\nPNF SENDS: \n");
-		for(int i=0; i<len; i++){
-			printf("%d", msg[i]);
-		}
-		printf("\n");
+    printf("\nPNF SENDS: \n");
+    for(int i=0; i<len; i++){
+      printf("%d", msg[i]);
+    }
+    printf("\n");
 #endif
 
-		if (sctp_sendmsg(pnf->p5_sock, msg, len, NULL, 0, 42/*config->sctp_stream_number*/, 0, stream/*P5_STREAM_ID*/, 0, 0) < 0)
-		{
-			NFAPI_TRACE(NFAPI_TRACE_ERROR, "sctp_sendmsg failed errno: %d\n", errno);
-			return -1;
-		}
-	}
-	else
-	{
-		if (write(pnf->p5_sock, msg, len) != len)
-		{
-			NFAPI_TRACE(NFAPI_TRACE_ERROR, "read failed errno: %d\n", errno);
-			return -1;
-		}
-	}
+    if (sctp_sendmsg(pnf->p5_sock, msg, len, NULL, 0, 42/*config->sctp_stream_number*/, 0, stream/*P5_STREAM_ID*/, 0, 0) < 0)
+    {
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "sctp_sendmsg failed errno: %d\n", errno);
+      return -1;
+    }
+  }
+  else
+  {
+    if (write(pnf->p5_sock, msg, len) != len)
+    {
+      NFAPI_TRACE(NFAPI_TRACE_ERROR, "read failed errno: %d\n", errno);
+      return -1;
+    }
+  }
 	return 0;
 }
 
@@ -2101,126 +2107,6 @@ int pnf_read_dispatch_message(pnf_t* pnf)
 
 }
 
-int pnf_nr_read_dispatch_message(pnf_t* pnf)
-{
-  int socket_connected = 1;
-
-  // 1. Peek the message header
-  // 2. If the message is larger than the stack buffer then create a dynamic buffer
-  // 3. Read the buffer
-  // 4. Handle the p5 message
-
-  uint32_t header_buffer_size = NFAPI_NR_P5_HEADER_LENGTH;
-  uint8_t header_buffer[header_buffer_size];
-
-  uint32_t stack_buffer_size = 32; // should it be the size of then sctp_notificatoin structure
-  uint8_t stack_buffer[stack_buffer_size];
-
-  uint8_t* dynamic_buffer = 0;
-
-  uint8_t* read_buffer = &stack_buffer[0];
-  uint32_t message_size = 0;
-
-  struct sockaddr_in addr;
-  socklen_t addr_len = sizeof(addr);
-
-  struct sctp_sndrcvinfo sndrcvinfo;
-  (void)memset(&sndrcvinfo, 0, sizeof(struct sctp_sndrcvinfo));
-
-  {
-    int flags = MSG_PEEK;
-    message_size = sctp_recvmsg(pnf->p5_sock,
-                                header_buffer,
-                                header_buffer_size,
-                                /*(struct sockaddr*)&addr, &addr_len*/ 0,
-                                0,
-                                &sndrcvinfo,
-                                &flags);
-
-    if (message_size == -1) {
-      NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF Failed to peek sctp message size errno:%d\n", errno);
-      return 0;
-    }
-
-    nfapi_nr_p4_p5_message_header_t header;
-    int unpack_result = nfapi_nr_p5_message_header_unpack(header_buffer, header_buffer_size, &header, sizeof(header), 0);
-    if (unpack_result < 0) {
-      NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF Failed to unpack p5 message header\n");
-      return 0;
-    }
-    message_size = header.message_length + header_buffer_size;
-
-    // now have the size of the mesage
-  }
-
-  if (message_size > stack_buffer_size) {
-    dynamic_buffer = (uint8_t*)malloc(message_size);
-
-    if (dynamic_buffer == NULL) {
-      // todo : add error mesage
-      NFAPI_TRACE(NFAPI_TRACE_INFO, "PNF Failed to allocate dynamic buffer for sctp_recvmsg size:%d\n", message_size);
-      return -1;
-    }
-
-    read_buffer = dynamic_buffer;
-  }
-
-  {
-    int flags = 0;
-    (void)memset(&sndrcvinfo, 0, sizeof(struct sctp_sndrcvinfo));
-
-    int recvmsg_result =
-        sctp_recvmsg(pnf->p5_sock, read_buffer, message_size, (struct sockaddr*)&addr, &addr_len, &sndrcvinfo, &flags);
-    if (recvmsg_result == -1) {
-      NFAPI_TRACE(NFAPI_TRACE_INFO, "Failed to read sctp message size errno:%d\n", errno);
-    } else {
-#if 0
-			// print the received message
-			printf("\n MESSAGE RECEIVED: \n");
-			for(int i=0; i<message_size; i++){
-				printf("read_buffer[%d] = 0x%02x\n",i, read_buffer[i]);
-			}
-			printf("\n");
-#endif
-
-      if (flags & MSG_NOTIFICATION) {
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "Notification received from %s:%u\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-
-        // todo - handle the events
-      } else {
-        /*
-        NFAPI_TRACE(NFAPI_TRACE_INFO, "Received message fd:%d from %s:%u assoc:%d on stream %d, PPID %d, length %d, flags 0x%x\n",
-            pnf->p5_sock,
-            inet_ntoa(addr.sin_addr),
-            ntohs(addr.sin_port),
-            sndrcvinfo.sinfo_assoc_id,
-            sndrcvinfo.sinfo_stream,
-            ntohl(sndrcvinfo.sinfo_ppid),
-            message_size,
-            flags);
-        */
-
-        // handle now if complete message in one or more segments
-        if ((flags & 0x80) == 0x80) {
-          pnf_nr_handle_p5_message(pnf, read_buffer, message_size);
-        } else {
-          NFAPI_TRACE(NFAPI_TRACE_WARN, "sctp_recvmsg: unhandled mode with flags 0x%x\n", flags);
-
-          // assume socket disconnected
-          NFAPI_TRACE(NFAPI_TRACE_WARN, "Disconnected socket\n");
-          socket_connected = 0;
-        }
-      }
-    }
-  }
-
-  if (dynamic_buffer) {
-    free(dynamic_buffer);
-  }
-
-  return socket_connected;
-}
-
 int pnf_message_pump(pnf_t* pnf)
 {
 	uint8_t socketConnected = 1;
@@ -2261,67 +2147,6 @@ int pnf_message_pump(pnf_t* pnf)
 		if(FD_ISSET(pnf->p5_sock, &rfds))
 		{
 			socketConnected = pnf_read_dispatch_message(pnf);
-		}
-		else
-		{
-			NFAPI_TRACE(NFAPI_TRACE_WARN, "Why are we here\n");
-		}
-	}
-
-	// Drop back to idle if we have lost connection
-	pnf->_public.state = NFAPI_PNF_IDLE;
-
-
-	// close the connection and socket
-	if (close(pnf->p5_sock) < 0)
-	{
-		NFAPI_TRACE(NFAPI_TRACE_ERROR, "close(sctpSock) failed errno: %d\n", errno);
-	}
-
-	return 0;
-
-}
-
-int pnf_nr_message_pump(pnf_t* pnf)
-{
-	uint8_t socketConnected = 1;
-
-	while(socketConnected && pnf->terminate == 0)
-	{
-		fd_set rfds;
-		int selectRetval = 0;
-
-		// select on a timeout and then get the message
-		FD_ZERO(&rfds);
-		FD_SET(pnf->p5_sock, &rfds);
-
-		struct timeval timeout;
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
-
-		selectRetval = select(pnf->p5_sock+1, &rfds, NULL, NULL, &timeout);
-
-		if(selectRetval == 0)
-		{
-			// timeout
-			continue;
-		}
-		else if (selectRetval == -1 && (errno == EINTR))
-		{
-			// interrupted by signal
-			NFAPI_TRACE(NFAPI_TRACE_WARN, "P5 Signal Interrupt %d\n", errno);
-			continue;
-		}
-		else if (selectRetval == -1)
-		{
-			NFAPI_TRACE(NFAPI_TRACE_WARN, "P5 select() failed\n");
-			sleep(1);
-			continue;
-		}
-
-		if(FD_ISSET(pnf->p5_sock, &rfds))
-		{
-			socketConnected = pnf_nr_read_dispatch_message(pnf);
 		}
 		else
 		{

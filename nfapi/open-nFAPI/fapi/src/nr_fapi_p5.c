@@ -128,41 +128,39 @@ int fapi_nr_p5_message_pack(void *pMessageBuf,
   return packedMsgLen;
 }
 
-int fapi_nr_p5_message_unpack(void *pMessageBuf,
+bool fapi_nr_p5_message_unpack(void *pMessageBuf,
                               const uint32_t messageBufLen,
                               void *pUnpackedBuf,
                               const uint32_t unpackedBufLen,
                               nfapi_p4_p5_codec_config_t *config)
 {
   fapi_message_header_t *pMessageHeader = pUnpackedBuf;
-  uint8_t *pReadPackedMessage = pMessageBuf;
 
   AssertFatal(pMessageBuf != NULL && pUnpackedBuf != NULL, "P5 unpack supplied pointers are null");
-  uint8_t *end = (uint8_t *)pMessageBuf + messageBufLen;
   AssertFatal(messageBufLen >= NFAPI_HEADER_LENGTH && unpackedBufLen >= sizeof(fapi_message_header_t),
               "P5 unpack supplied message buffer is too small %d, %d\n",
               messageBufLen,
               unpackedBufLen);
   // clean the supplied buffer for - tag value blanking
   (void)memset(pUnpackedBuf, 0, unpackedBufLen);
-  if (fapi_nr_message_header_unpack(&pReadPackedMessage, NFAPI_HEADER_LENGTH, pMessageHeader, sizeof(fapi_message_header_t), 0)
-      < 0) {
+  if (!fapi_nr_message_header_unpack(pMessageBuf, NFAPI_HEADER_LENGTH, pMessageHeader, sizeof(fapi_message_header_t), 0)) {
     // failed to read the header
-    return -1;
+    return false;
   }
-
+  uint8_t *pReadPackedMessage = pMessageBuf + NFAPI_HEADER_LENGTH;
+  uint8_t *end = (uint8_t *)pMessageBuf + messageBufLen;
   int result = -1;
 
   if (check_nr_fapi_unpack_length(pMessageHeader->message_id, unpackedBufLen) == 0) {
     // the unpack buffer is not big enough for the struct
-    return -1;
+    return false;
   }
 
   // look for the specific message
   switch (pMessageHeader->message_id) {
     case NFAPI_NR_PHY_MSG_TYPE_PARAM_REQUEST:
       // PARAM request has no body;
-      result = 0;
+      result = 1;
       break;
 
     case NFAPI_NR_PHY_MSG_TYPE_PARAM_RESPONSE:
@@ -210,7 +208,7 @@ int fapi_nr_p5_message_unpack(void *pMessageBuf,
       break;
   }
 
-  return result;
+  return result != 0;
 }
 
 uint8_t pack_nr_param_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *end, nfapi_p4_p5_codec_config_t *config)
@@ -1349,7 +1347,7 @@ uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *
   nfapi_tl_t generic_tl;
   uint8_t numBadTags = 0;
   unsigned long idx = 0;
-  while ((uint8_t *)(*ppReadPackedMsg) < end) {
+  while ((uint8_t *)(*ppReadPackedMsg) + 4 < end) {
     // unpack the tl and process the values accordingly
     if (unpack_tl(ppReadPackedMsg, &generic_tl, end) == 0)
       return 0;

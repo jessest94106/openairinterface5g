@@ -291,7 +291,7 @@ Note that while 38.331 requires only one RRC transaction to happen at a time,
 the 5G RRC does not actually ensure this; it only tries to prevent it by
 chaining of transactions and some checks. For instance, the Security Mode
 procedure is followed by a UE capability procedure, and some procedures are not
-executed if others are ongoing (ex.: handover if there is reconfiguratio).
+executed if others are ongoing (ex.: handover if there is reconfiguration).
 However, it might be possible to trigger a procedure while another is ongoing.
 
 As of now, no queueing mechanims exists to ensure only one operation is
@@ -303,7 +303,7 @@ Handover-related data is stored in a per-UE structure of type
 `nr_handover_context_t`. It is a pointer and only set during handover
 operation. This data structure has in turn two pointers, one to the source CU
 (`nr_ho_source_cu_t`), and one to the target CU (`nr_ho_target_cu_t`). In F1,
-both are present. In N2 and Xn, only one pointer is supposed to be set a the
+both are present. In N2 and Xn, only one pointer is supposed to be set at the
 corresponding CU.
 
 `nr_ho_source_cu_t` contains notably a function pointer `ho_cancel` for

@@ -3,7 +3,6 @@ if (OAI_AERIAL)
     add_library(aerial_lib
             fapi_nvIPC.c
             fapi_vnf_p7.c
-            fapi_vnf_p5.c
     )
 
     find_library(NVIPC_LIB nvipc REQUIRED)

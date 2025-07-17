@@ -853,12 +853,11 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
         case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST:
         {
             nfapi_nr_dl_tti_request_t *dl_tti_request = malloc16(sizeof(*dl_tti_request));
-            if (nfapi_nr_p7_message_unpack(buffer, len, dl_tti_request,
-                                            sizeof(*dl_tti_request), NULL) < 0)
-            {
-                LOG_E(NR_PHY, "Message dl_tti_request failed to unpack\n");
-                break;
-            }
+          const bool result = nfapi_nr_p7_message_unpack(buffer, len, dl_tti_request, sizeof(*dl_tti_request), NULL);
+          if (!result) {
+            LOG_E(NR_PHY, "Message dl_tti_request failed to unpack\n");
+            break;
+          }
             LOG_D(NR_PHY, "Received an NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST message in sfn/slot %d %d. \n",
                     dl_tti_request->SFN, dl_tti_request->Slot);
 
@@ -877,12 +876,11 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
         case NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST:
         {
             nfapi_nr_tx_data_request_t *tx_data_request = malloc16(sizeof(*tx_data_request));
-            if (nfapi_nr_p7_message_unpack(buffer, len, tx_data_request,
-                                        sizeof(*tx_data_request), NULL) < 0)
-            {
-                LOG_E(NR_PHY, "Message tx_data_request failed to unpack\n");
-                break;
-            }
+          const bool result = nfapi_nr_p7_message_unpack(buffer, len, tx_data_request, sizeof(*tx_data_request), NULL);
+          if (!result) {
+            LOG_E(NR_PHY, "Message tx_data_request failed to unpack\n");
+            break;
+          }
             LOG_D(NR_PHY, "Received an NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST message in SFN/slot %d %d. \n",
                     tx_data_request->SFN, tx_data_request->Slot);
             if (!put_queue(&nr_tx_req_queue, tx_data_request))
@@ -897,12 +895,11 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
         case NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST:
         {
             nfapi_nr_ul_dci_request_t *ul_dci_request = malloc16(sizeof(*ul_dci_request));
-            if (nfapi_nr_p7_message_unpack(buffer, len, ul_dci_request,
-                                            sizeof(*ul_dci_request), NULL) < 0)
-            {
-                LOG_E(NR_PHY, "Message ul_dci_request failed to unpack\n");
-                break;
-            }
+          const bool result = nfapi_nr_p7_message_unpack(buffer, len, ul_dci_request, sizeof(*ul_dci_request), NULL);
+          if (!result) {
+            LOG_E(NR_PHY, "Message ul_dci_request failed to unpack\n");
+            break;
+          }
             LOG_D(NR_PHY, "Received an NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST message in SFN/slot %d %d. \n",
                     ul_dci_request->SFN, ul_dci_request->Slot);
             if (!put_queue(&nr_ul_dci_req_queue, ul_dci_request))
@@ -917,12 +914,11 @@ static void enqueue_nr_nfapi_msg(void *buffer, ssize_t len, nfapi_p7_message_hea
         case NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST:
         {
             nfapi_nr_ul_tti_request_t *ul_tti_request = malloc16(sizeof(*ul_tti_request));
-            if (nfapi_nr_p7_message_unpack(buffer, len, ul_tti_request,
-                                           sizeof(*ul_tti_request), NULL) < 0)
-            {
-                LOG_E(NR_PHY, "Message ul_tti_request failed to unpack\n");
-                break;
-            }
+          const bool result = nfapi_nr_p7_message_unpack(buffer, len, ul_tti_request, sizeof(*ul_tti_request), NULL);
+          if (!result) {
+            LOG_E(NR_PHY, "Message ul_tti_request failed to unpack\n");
+            break;
+          }
             /* We are filtering UL_TTI_REQs below. We only care about UL_TTI_REQs that
                will trigger sending a ul_harq (CRC/RX pair). This UL_TTI_REQ will have
                NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE. If we have not yet completed the CBRA/
