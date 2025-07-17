@@ -307,6 +307,9 @@ rfsim5g_ue_pdu_2:
   NetworkScript: docker exec rfsim5g-oai-nr-ue ip a show dev oaitun_ue1p2
   CmdPrefix: docker exec rfsim5g-oai-nr-ue
   IF: oaitun_ue1p2
+  AttachScript: docker start rfsim5g-oai-nr-ue
+  DetachScript: docker stop rfsim5g-oai-nr-ue
+  MTU: 1500
 
 rfsim5g_ue2:
   Host: "%%current_host%%"

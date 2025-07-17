@@ -32,6 +32,7 @@
  000003
  020001
  020002
+ 000004
  020003
  030001
  030002
@@ -97,6 +98,13 @@
                 <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
+        </testCase>
+
+        <testCase id="000004">
+                <class>Attach_UE</class>
+                <desc>Verify 2nd PDU session is up</desc>
+                <id>rfsim5g_ue_pdu_2</id>
+                <nodes>acamas</nodes>
         </testCase>
 
         <testCase id="020003">
