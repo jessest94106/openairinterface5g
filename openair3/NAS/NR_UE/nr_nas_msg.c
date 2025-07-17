@@ -74,6 +74,7 @@
 #include "fgmm_authentication_reject.h"
 #include "ds/byte_array.h"
 #include "key_nas_deriver.h"
+#include "nr-uesoftmodem.h"
 
 #define MAX_NAS_UE 4
 
@@ -1773,10 +1774,10 @@ static void send_nas_5gmm_ind(instance_t instance, const Guti5GSMobileIdentity_t
   itti_send_msg_to_task(TASK_RRC_NRUE, instance, msg);
 }
 
-static void request_default_pdusession(nr_ue_nas_t *nas)
+static void request_pdusession(nr_ue_nas_t *nas, int pdusession_id)
 {
   MessageDef *message_p = itti_alloc_new_message(TASK_NAS_NRUE, nas->UE_id, NAS_PDU_SESSION_REQ);
-  NAS_PDU_SESSION_REQ(message_p).pdusession_id = get_softmodem_params()->default_pdu_session_id;
+  NAS_PDU_SESSION_REQ(message_p).pdusession_id = pdusession_id;
   NAS_PDU_SESSION_REQ(message_p).pdusession_type = 0x91; // 0x91 = IPv4, 0x92 = IPv6, 0x93 = IPv4v6
   NAS_PDU_SESSION_REQ(message_p).sst = nas->uicc->nssai_sst;
   NAS_PDU_SESSION_REQ(message_p).sd = nas->uicc->nssai_sd;
@@ -1868,7 +1869,10 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
   if (get_user_nssai_idx(msg.nas_allowed_nssai, nas) < 0) {
     LOG_E(NAS, "NSSAI parameters not match with allowed NSSAI. Couldn't request PDU session.\n");
   } else {
-    request_default_pdusession(nas);
+    request_pdusession(nas, get_softmodem_params()->default_pdu_session_id);
+    if (get_nrUE_params()->extra_pdu_id != -1) {
+      request_pdusession(nas, get_nrUE_params()->extra_pdu_id);
+    }
   }
   // Free local message after processing
   free_fgmm_registration_accept(&msg);
