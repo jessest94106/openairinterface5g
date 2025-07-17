@@ -57,8 +57,9 @@ static F1AP_CUtoDURRCInformation_t encode_cu_to_du_rrc_info(const f1ap_cu_to_du_
   }
 
   /* optional: HandoverPreparationInformation */
+  F1AP_ProtocolExtensionContainer_10696P60_t *p = NULL;
   if (cu2du->ho_prep_info) {
-    F1AP_ProtocolExtensionContainer_10696P60_t *p = calloc_or_fail(1, sizeof(*p));
+    p = calloc_or_fail(1, sizeof(*p));
     enc.iE_Extensions = (struct F1AP_ProtocolExtensionContainer *)p;
     asn1cSequenceAdd(p->list, F1AP_CUtoDURRCInformation_ExtIEs_t, ie_ext);
     ie_ext->id = F1AP_ProtocolIE_ID_id_HandoverPreparationInformation;
@@ -67,6 +68,20 @@ static F1AP_CUtoDURRCInformation_t encode_cu_to_du_rrc_info(const f1ap_cu_to_du_
     const byte_array_t *ba = cu2du->ho_prep_info;
     F1AP_HandoverPreparationInformation_t *hpi = &ie_ext->extensionValue.choice.HandoverPreparationInformation;
     OCTET_STRING_fromBuf(hpi, (const char *)ba->buf, ba->len);
+  }
+
+  /* optional: iE_Extensions */
+  if (cu2du->meas_timing_config) {
+    if (!p)
+      p = calloc_or_fail(1, sizeof(*p));
+    enc.iE_Extensions = (struct F1AP_ProtocolExtensionContainer *)p;
+    asn1cSequenceAdd(p->list, F1AP_CUtoDURRCInformation_ExtIEs_t, ie_ext);
+    ie_ext->id = F1AP_ProtocolIE_ID_id_MeasurementTimingConfiguration;
+    ie_ext->criticality = F1AP_Criticality_ignore;
+    ie_ext->extensionValue.present = F1AP_CUtoDURRCInformation_ExtIEs__extensionValue_PR_MeasurementTimingConfiguration;
+    const byte_array_t *ba = cu2du->meas_timing_config;
+    F1AP_MeasurementTimingConfiguration_t *mtc = &ie_ext->extensionValue.choice.MeasurementTimingConfiguration;
+    OCTET_STRING_fromBuf(mtc, (const char *)ba->buf, ba->len);
   }
   return enc;
 }
@@ -98,6 +113,11 @@ static bool decode_cu_to_du_rrc_info(f1ap_cu_to_du_rrc_info_t *dec, const F1AP_C
           const F1AP_HandoverPreparationInformation_t *hopi = &cu2du_info_ext->extensionValue.choice.HandoverPreparationInformation;
           *dec->ho_prep_info = create_byte_array(hopi->size, (uint8_t*) hopi->buf);
           break;
+        case F1AP_ProtocolIE_ID_id_MeasurementTimingConfiguration:
+          dec->meas_timing_config = calloc_or_fail(1, sizeof(*dec->meas_timing_config));
+          const F1AP_MeasurementTimingConfiguration_t *mtc = &cu2du_info_ext->extensionValue.choice.MeasurementTimingConfiguration;
+          *dec->meas_timing_config = create_byte_array(mtc->size, (uint8_t *)mtc->buf);
+          break;
         default:
           PRINT_ERROR("received unsupported F1AP CUtoDURRCInfo extension container %ld\n", cu2du_info_ext->id);
       }
@@ -112,6 +132,7 @@ static f1ap_cu_to_du_rrc_info_t cp_cu_to_du_rrc_info(const f1ap_cu_to_du_rrc_inf
   CP_OPT_BYTE_ARRAY(dst.cg_configinfo, src->cg_configinfo);
   CP_OPT_BYTE_ARRAY(dst.ue_cap, src->ue_cap);
   CP_OPT_BYTE_ARRAY(dst.meas_config, src->meas_config);
+  CP_OPT_BYTE_ARRAY(dst.meas_timing_config, src->meas_timing_config);
   CP_OPT_BYTE_ARRAY(dst.ho_prep_info, src->ho_prep_info);
   return dst;
 }
@@ -126,6 +147,7 @@ static bool eq_cu_to_du_rrc_info(const f1ap_cu_to_du_rrc_info_t *a, const f1ap_c
   _F1_EQ_CHECK_OPTIONAL_IE(a, b, cg_configinfo, eq_ba);
   _F1_EQ_CHECK_OPTIONAL_IE(a, b, ue_cap, eq_ba);
   _F1_EQ_CHECK_OPTIONAL_IE(a, b, meas_config, eq_ba);
+  _F1_EQ_CHECK_OPTIONAL_IE(a, b, meas_timing_config, eq_ba);
   _F1_EQ_CHECK_OPTIONAL_IE(a, b, ho_prep_info, eq_ba);
   return true;
 }
@@ -135,6 +157,7 @@ static void free_cu_to_du_rrc_info(f1ap_cu_to_du_rrc_info_t *cu2du)
   FREE_OPT_BYTE_ARRAY(cu2du->cg_configinfo);
   FREE_OPT_BYTE_ARRAY(cu2du->ue_cap);
   FREE_OPT_BYTE_ARRAY(cu2du->meas_config);
+  FREE_OPT_BYTE_ARRAY(cu2du->meas_timing_config);
   FREE_OPT_BYTE_ARRAY(cu2du->ho_prep_info);
 }
 

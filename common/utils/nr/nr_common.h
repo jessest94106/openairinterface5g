@@ -222,6 +222,12 @@ bool nr_timer_is_active(const NR_timer_t *timer);
  * @return Time passed since start of timer
  */
 uint32_t nr_timer_elapsed_time(const NR_timer_t *timer);
+/**
+ * @brief To return how much time is left until the timer expires
+ * @param timer Timer to be checked
+ * @return Time left until the timer expires
+ */
+uint32_t nr_timer_remaining_time(const NR_timer_t *timer);
 
 int set_default_nta_offset(frequency_range_t freq_range, uint32_t samples_per_subframe);
 

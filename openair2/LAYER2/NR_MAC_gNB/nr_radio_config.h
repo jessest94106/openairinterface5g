@@ -28,6 +28,8 @@
 #include "NR_BCCH-DL-SCH-Message.h"
 #include "NR_CellGroupConfig.h"
 #include "NR_UE-NR-Capability.h"
+#include "NR_MeasConfig.h"
+#include "NR_MeasurementTimingConfiguration.h"
 #include "NR_UL-CCCH-Message.h"
 #include "f1ap_messages_types.h"
 #include "common/platform_types.h"
@@ -41,6 +43,9 @@ typedef struct nr_mac_config_t nr_mac_config_t;
 
 struct nr_mac_timers;
 typedef struct nr_mac_timers nr_mac_timers_t;
+
+struct measgap_config;
+typedef struct measgap_config measgap_config_t;
 
 void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsch_TimeDomainAllocationList,
                           frame_type_t frame_type,
@@ -118,5 +123,9 @@ NR_RLC_BearerConfig_t *get_DRB_RLC_BearerConfig(long lcChannelId,
                                                 NR_RLC_Config_PR rlc_conf,
                                                 long priority,
                                                 const nr_rlc_configuration_t *default_rlc_config);
+
+NR_MeasurementTimingConfiguration_t *get_nr_mtc(uint8_t *buf, uint32_t len);
+measgap_config_t create_measgap_config(const NR_MeasurementTimingConfiguration_t *mtc, int scs, int min_rxtxtime);
+int encode_measgap_config(const measgap_config_t *c, uint8_t *buf);
 
 #endif

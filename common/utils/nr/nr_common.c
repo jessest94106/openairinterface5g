@@ -1415,6 +1415,11 @@ uint32_t nr_timer_elapsed_time(const NR_timer_t *timer)
   return timer->counter;
 }
 
+uint32_t nr_timer_remaining_time(const NR_timer_t *timer)
+{
+  return timer->target - timer->counter;
+}
+
 void nr_timer_setup(NR_timer_t *timer, const uint32_t target, const uint32_t step)
 {
   timer->target = target;

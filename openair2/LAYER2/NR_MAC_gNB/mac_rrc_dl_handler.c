@@ -631,7 +631,9 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   } else if (cu2du->ue_cap != NULL) {
     ue_cap = get_ue_nr_cap(*req->gNB_DU_ue_id, cu2du->ue_cap->buf, cu2du->ue_cap->len);
   }
-  AssertFatal(cu2du->meas_config == NULL, "MeasConfig not handled\n");
+  NR_MeasurementTimingConfiguration_t *mtc = NULL;
+  if (cu2du->meas_timing_config != NULL)
+    mtc = get_nr_mtc(cu2du->meas_timing_config->buf, cu2du->meas_timing_config->len);
 
   /* 38.473: "For DC operation, the CG-ConfigInfo IE shall be included in the CU
    * to DU RRC Information IE at the gNB acting as secondary node" As of now,
@@ -703,6 +705,16 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   int ss_type = cg_configinfo ? NR_SearchSpace__searchSpaceType_PR_ue_Specific: NR_SearchSpace__searchSpaceType_PR_common;
   configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
 
+  if (mtc) {
+    /* creates a suitable measGap config to be used in the gNB */
+    UE->measgap_config = create_measgap_config(mtc, UE->current_DL_BWP.scs, mac->radio_config.minRXTXTIME);
+    /* encodes the measGapConfig created, if useful (or not!) */
+    byte_array_t *mgc = calloc_or_fail(1, sizeof(*mgc));
+    mgc->buf = calloc_or_fail(1, 1024);
+    mgc->len = encode_measgap_config(&UE->measgap_config, mgc->buf);
+    resp.du_to_cu_rrc_info.meas_gap_config = mgc;
+  }
+
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
   mac->mac_rrc.ue_context_setup_response(&resp);
@@ -727,7 +739,6 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
       byte_array_t *b = req->cu_to_du_rrc_info->ue_cap;
       ue_cap = get_ue_nr_cap(req->gNB_DU_ue_id, b->buf, b->len);
     }
-    AssertFatal(req->cu_to_du_rrc_info->meas_config == NULL, "MeasConfig not handled\n");
   }
 
   NR_SCHED_LOCK(&mac->sched_lock);
@@ -957,6 +968,7 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     UE->CellGroup = oldUE->CellGroup;
     oldUE->CellGroup = NULL;
     UE->mac_stats = oldUE->mac_stats;
+    UE->measgap_config = oldUE->measgap_config;
     /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
      * from the current configuration. It will be reapplied when the
      * reconfiguration has succeeded (indicated by the CU) */

@@ -755,6 +755,7 @@ static void test_f1ap_ue_context_setup_request()
   orig.cu_to_du_rrc_info.cg_configinfo = get_malloced_test_ba("CG-CONFIGINFO");
   orig.cu_to_du_rrc_info.ue_cap = get_malloced_test_ba("UE CAP");
   orig.cu_to_du_rrc_info.meas_config = get_malloced_test_ba("UE MEASUREMENT CONFIGURATION");
+  orig.cu_to_du_rrc_info.meas_timing_config = get_malloced_test_ba("MEASUREMENT TIMING CONFIGURATION");
   orig.cu_to_du_rrc_info.ho_prep_info = get_malloced_test_ba("PREPARATION DATA FOR HANDOVER");
   orig.srbs_len = 2;
   orig.srbs = calloc_or_fail(orig.srbs_len, sizeof(*orig.srbs));
@@ -996,6 +997,7 @@ static void test_f1ap_ue_context_modification_request()
     .cg_configinfo = get_malloced_test_ba("Modified"),
     .ue_cap = get_malloced_test_ba("UE forgot to send earlier"),
     .meas_config = get_malloced_test_ba("with updates from another cell"),
+    .meas_timing_config = get_malloced_test_ba("measurement timing configuration"),
     .ho_prep_info = get_malloced_test_ba("prepare to ho soon!"),
   };
   _F1_MALLOC(orig.cu_to_du_rrc_info, cu2du);
