@@ -77,7 +77,7 @@
         <testCase id="000005">
                 <class>Custom_Command</class>
                 <desc>Check that UE synched</desc>
-                <node>cacofonix</node>
+                <node>acamas</node>
                 <command>docker logs rfsim5g-oai-nr-ue-2 | grep -m 1 "PSBCH RX:OK"</command>
         </testCase>
 
