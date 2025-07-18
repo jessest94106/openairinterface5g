@@ -338,6 +338,7 @@ int main(int argc, char **argv)
         uint16_t nr_band = get_softmodem_params()->band;
         mac->nr_band = nr_band;
         mac->ssb_start_subcarrier = UE_CC->frame_parms.ssb_start_subcarrier;
+        mac->dl_frequency = downlink_frequency[CC_id][0];
         nr_init_frame_parms_ue_sa(&UE_CC->frame_parms,
                                   downlink_frequency[CC_id][0],
                                   uplink_frequency_offset[CC_id][0],

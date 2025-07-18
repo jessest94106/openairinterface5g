@@ -150,7 +150,7 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
     // Initial cell selection: derive from command-line parameter
     uint64_t dl_bw_khz = (12 * frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth) *
                          (15 << frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing);
-    cfg->carrier_config.dl_frequency = (downlink_frequency[cc_idP][0]/1000) - (dl_bw_khz>>1);
+    cfg->carrier_config.dl_frequency = mac->dl_frequency / 1000 - (dl_bw_khz >> 1);
     LOG_I(NR_MAC,
           "[UE %d] Initial cell selection: dl_frequency=%u kHz (from command-line, band=%d, scs=%ld)\n",
           mac->ue_id,
@@ -180,19 +180,28 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
   cfg->carrier_config.uplink_bandwidth = get_supported_bw_mhz(mac->frequency_range, bw_index);
 
   /** Only set UL frequency if not already initialized (e.g., from handover reconfigurationWithSync)
-  * MAC maintains its own frequency state, don't overwrite it with command-line parameter which
-  * is related to the initial cell selection. */
+   * MAC maintains its own frequency state, don't overwrite it with command-line parameter which
+   * is related to the initial cell selection. */
   if (cfg->carrier_config.uplink_frequency == 0) {
-    // Initial cell selection: derive from DL frequency
-    LOG_I(NR_MAC,
-          "Initial cell selection: uplink_frequency=%u kHz (from dl_frequency=%u kHz, uplink_frequency_offset=%u kHz)\n",
-          cfg->carrier_config.uplink_frequency,
-          cfg->carrier_config.dl_frequency,
-          uplink_frequency_offset[cc_idP][0]);
-    if (frequencyInfoUL->absoluteFrequencyPointA == NULL)
+    // Initial cell selection: derive from DL frequency or frequencyInfoUL->absoluteFrequencyPointA
+    if (frequencyInfoUL->absoluteFrequencyPointA == NULL) {
       cfg->carrier_config.uplink_frequency = cfg->carrier_config.dl_frequency;
-    else
-      cfg->carrier_config.uplink_frequency = cfg->carrier_config.dl_frequency + (uplink_frequency_offset[cc_idP][0] / 1000);
+      LOG_I(NR_MAC,
+            "Initial cell selection: uplink_frequency=%u kHz (from dl_frequency=%u kHz)\n",
+            cfg->carrier_config.uplink_frequency,
+            cfg->carrier_config.dl_frequency);
+    } else {
+      cfg->carrier_config.uplink_frequency = from_nrarfcn(*frequencyInfoUL->frequencyBandList->list.array[0]->freqBandIndicatorNR,
+                                                          frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
+                                                          *frequencyInfoUL->absoluteFrequencyPointA)
+                                             / 1000; // freq in kHz
+      LOG_I(NR_MAC,
+            "Initial cell selection: uplink_frequency=%u kHz (from absoluteFrequencyPointA=%ld, band=%ld, scs=%ld)\n",
+            cfg->carrier_config.uplink_frequency,
+            *frequencyInfoUL->absoluteFrequencyPointA,
+            *frequencyInfoUL->frequencyBandList->list.array[0]->freqBandIndicatorNR,
+            frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing);
+    }
   }
 
   for (int i = 0; i < 5; i++) {
