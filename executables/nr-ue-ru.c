@@ -68,11 +68,115 @@
 }
 // clang-format on
 
+/* NR UE cell configuration section name */
+#define CONFIG_STRING_NRUE_CELL_LIST "cells"
+
+#define NRUE_CELL_RU_ID "ru_id"
+#define NRUE_CELL_BAND "band"
+#define NRUE_CELL_RF_FREQUENCY "rf_freq"
+#define NRUE_CELL_RF_FREQ_OFFSET "rf_offset"
+#define NRUE_CELL_NUMEROLOGY "numerology"
+#define NRUE_CELL_N_RB_DL "N_RB_DL"
+#define NRUE_CELL_SSB_START "ssb_start"
+
+/*------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*                                                      NR UE cell configuration parameters                                                       */
+/* optname                   helpstr                    paramflags  XXXptr        defXXXval              type         numelt  chkPptr             */
+/*------------------------------------------------------------------------------------------------------------------------------------------------*/
+// clang-format off
+#define NRUE_CELL_PARAMS_DESC { \
+  {NRUE_CELL_RU_ID,          NULL,                      0,         .iptr=NULL,   .defintval=0,           TYPE_INT,    0,      NULL              }, \
+  {NRUE_CELL_BAND,           CONFIG_HLP_BAND,           0,         .iptr=NULL,   .defintval=78,          TYPE_INT,    0,      NULL              }, \
+  {NRUE_CELL_RF_FREQUENCY,   CONFIG_HLP_DLF,            0,         .u64ptr=NULL, .defint64val=0,         TYPE_UINT64, 0,      NULL              }, \
+  {NRUE_CELL_RF_FREQ_OFFSET, CONFIG_HLP_ULF,            0,         .i64ptr=NULL, .defint64val=0,         TYPE_INT64,  0,      NULL              }, \
+  {NRUE_CELL_NUMEROLOGY,     CONFIG_HLP_NUMEROLOGY,     0,         .iptr=NULL,   .defintval=1,           TYPE_INT,    0,      NULL              }, \
+  {NRUE_CELL_N_RB_DL,        CONFIG_HLP_PRB_SA,         0,         .iptr=NULL,   .defintval=106,         TYPE_INT,    0,      NULL              }, \
+  {NRUE_CELL_SSB_START,      CONFIG_HLP_SSC,            0,         .iptr=NULL,   .defintval=516,         TYPE_INT,    0,      NULL              }, \
+}
+// clang-format on
+
+static int nrue_cell_count;
+static nrUE_cell_params_t *nrue_cells;
+static NR_DL_FRAME_PARMS *nrue_cell_fp;
+
 static int nrue_ru_count;
 static nrUE_RU_params_t *nrue_rus;
 
 openair0_config_t openair0_cfg[MAX_CARDS];
 openair0_device_t openair0_dev[MAX_CARDS];
+
+int nrue_get_cell_count(void)
+{
+  return nrue_cell_count;
+}
+
+const nrUE_cell_params_t *nrue_get_cell(int cell_id)
+{
+  AssertFatal(cell_id >= 0 && cell_id < nrue_cell_count, "Invalid cell ID %d! Cell count = %d\n", cell_id, nrue_cell_count);
+  return &nrue_cells[cell_id];
+}
+
+NR_DL_FRAME_PARMS *nrue_get_cell_fp(int cell_id)
+{
+  AssertFatal(cell_id >= 0 && cell_id < nrue_cell_count, "Invalid cell ID %d! Cell count = %d\n", cell_id, nrue_cell_count);
+  return &nrue_cell_fp[cell_id];
+}
+
+void nrue_set_cell(int cell_id, const nrUE_cell_params_t *cell)
+{
+  AssertFatal(cell_id >= 0 && cell_id < nrue_cell_count, "Invalid cell ID %d! Cell count = %d\n", cell_id, nrue_cell_count);
+  nrue_cells[cell_id] = *cell;
+}
+
+void nrue_set_cell_params(configmodule_interface_t *cfg)
+{
+  paramdef_t cellParams[] = NRUE_CELL_PARAMS_DESC;
+  paramlist_def_t cellParamList = {CONFIG_STRING_NRUE_CELL_LIST, NULL, 0};
+  config_getlist(cfg, &cellParamList, cellParams, sizeofArray(cellParams), NULL);
+
+  if (cellParamList.numelt <= 0) {
+    nrue_cell_count = 1;
+    nrue_cell_fp = calloc_or_fail(nrue_cell_count, sizeof(NR_DL_FRAME_PARMS));
+    nrue_cells = calloc_or_fail(nrue_cell_count, sizeof(nrUE_cell_params_t));
+    nrue_cells[0] = (nrUE_cell_params_t){.ru_id = 0,
+                                         .band = get_softmodem_params()->band,
+                                         .rf_frequency = downlink_frequency[0][0],
+                                         .rf_freq_offset = uplink_frequency_offset[0][0],
+                                         .numerology = get_softmodem_params()->numerology,
+                                         .N_RB_DL = get_nrUE_params()->N_RB_DL,
+                                         .ssb_start = get_nrUE_params()->ssb_start_subcarrier,
+                                         .used_by_ue = -1};
+    return;
+  }
+
+  nrue_cell_count = cellParamList.numelt;
+  nrue_cell_fp = calloc_or_fail(nrue_cell_count, sizeof(NR_DL_FRAME_PARMS));
+  nrue_cells = calloc_or_fail(nrue_cell_count, sizeof(nrUE_cell_params_t));
+
+  LOG_W(NR_PHY, "Ignoring command line cell parameters, using the following instead:\n");
+
+  for (int cell_id = 0; cell_id < nrue_cell_count; cell_id++) {
+    nrue_cells[cell_id].ru_id          = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_RU_ID)->iptr);
+    nrue_cells[cell_id].band           = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_BAND)->iptr);
+    nrue_cells[cell_id].rf_frequency   = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_RF_FREQUENCY)->u64ptr);
+    nrue_cells[cell_id].rf_freq_offset = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_RF_FREQ_OFFSET)->i64ptr);
+    nrue_cells[cell_id].numerology     = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_NUMEROLOGY)->iptr);
+    nrue_cells[cell_id].N_RB_DL        = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_N_RB_DL)->iptr);
+    nrue_cells[cell_id].ssb_start      = *(gpd(cellParamList.paramarray[cell_id], sizeofArray(cellParams), NRUE_CELL_SSB_START)->iptr);
+    nrue_cells[cell_id].used_by_ue     = -1;
+
+    LOG_I(NR_PHY,
+          "cell %d: ru_id %d, band %d, DL freq %lu, UL freq_offset %ld, numerology %d, N_RB_DL %d, ssb_start %d\n",
+          cell_id,
+          nrue_cells[cell_id].ru_id,
+          nrue_cells[cell_id].band,
+          nrue_cells[cell_id].rf_frequency,
+          nrue_cells[cell_id].rf_freq_offset,
+          nrue_cells[cell_id].numerology,
+          nrue_cells[cell_id].N_RB_DL,
+          nrue_cells[cell_id].ssb_start);
+  }
+}
 
 int nrue_get_ru_count(void)
 {
@@ -83,6 +187,13 @@ const nrUE_RU_params_t *nrue_get_ru(int ru_id)
 {
   AssertFatal(ru_id >= 0 && ru_id < nrue_ru_count, "Invalid RU ID %d! RU count = %d\n", ru_id, nrue_ru_count);
   return &nrue_rus[ru_id];
+}
+
+void nrue_set_ru_cell_id(int ru_id, int cell_id)
+{
+  AssertFatal(ru_id >= 0 && ru_id < nrue_ru_count, "Invalid RU ID %d! RU count = %d\n", ru_id, nrue_ru_count);
+  AssertFatal(cell_id >= 0 && cell_id < nrue_cell_count, "Invalid cell ID %d! Cell count = %d\n", cell_id, nrue_cell_count);
+  nrue_rus[ru_id].used_by_cell = cell_id;
 }
 
 void nrue_set_ru_params(configmodule_interface_t *cfg)
@@ -106,7 +217,8 @@ void nrue_set_ru_params(configmodule_interface_t *cfg)
                                      .time_source = get_softmodem_params()->timing_source,
                                      .tune_offset = get_softmodem_params()->tune_offset,
                                      .if_frequency = get_nrUE_params()->if_freq,
-                                     .if_freq_offset = get_nrUE_params()->if_freq_off};
+                                     .if_freq_offset = get_nrUE_params()->if_freq_off,
+                                     .used_by_cell = -1};
     return;
   }
 
@@ -124,6 +236,7 @@ void nrue_set_ru_params(configmodule_interface_t *cfg)
     nrue_rus[ru_id].tune_offset      = *(gpd(RUParamList.paramarray[ru_id], sizeofArray(RUParams), NRUE_RU_TUNE_OFFSET)->dblptr);
     nrue_rus[ru_id].if_frequency     = *(gpd(RUParamList.paramarray[ru_id], sizeofArray(RUParams), NRUE_RU_IF_FREQUENCY)->u64ptr);
     nrue_rus[ru_id].if_freq_offset   = *(gpd(RUParamList.paramarray[ru_id], sizeofArray(RUParams), NRUE_RU_IF_FREQ_OFFSET)->iptr);
+    nrue_rus[ru_id].used_by_cell     = -1;
 
     nrue_rus[ru_id].sdr_addrs = strdup(*(gpd(RUParamList.paramarray[ru_id], sizeofArray(RUParams), NRUE_RU_SDR_ADDRS)->strptr));
     nrue_rus[ru_id].tx_subdev = strdup(*(gpd(RUParamList.paramarray[ru_id], sizeofArray(RUParams), NRUE_RU_TX_SUBDEV)->strptr));
@@ -157,7 +270,7 @@ void nrue_set_ru_params(configmodule_interface_t *cfg)
   }
 }
 
-void nrue_init_openair0(const PHY_VARS_NR_UE *ue)
+void nrue_init_openair0(void)
 {
   int freq_off = 0;
   bool is_sidelink = (get_softmodem_params()->sl_mode) ? true : false;
@@ -170,11 +283,23 @@ void nrue_init_openair0(const PHY_VARS_NR_UE *ue)
               nrue_ru_count,
               MAX_CARDS);
 
-  const NR_DL_FRAME_PARMS *frame_parms = &ue->frame_parms;
-  if (is_sidelink)
-    frame_parms = &ue->SL_UE_PHY_PARAMS.sl_frame_params;
-
   for (int ru_id = 0; ru_id < nrue_ru_count; ru_id++) {
+    int cell_id = nrue_rus[ru_id].used_by_cell;
+    if (cell_id < 0) {
+      LOG_W(PHY, "Skipping initialization of RU %d because it is not used by any cell!\n", ru_id);
+      continue;
+    }
+    NR_DL_FRAME_PARMS *frame_parms = &nrue_cell_fp[cell_id];
+    if (is_sidelink) {
+      int UE_id = nrue_cells[cell_id].used_by_ue;
+      if (UE_id < 0) {
+        LOG_W(PHY, "Skipping initialization of RU %d because it is not used by any UE!\n", ru_id);
+        continue;
+      }
+      extern PHY_VARS_NR_UE ***PHY_vars_UE_g;
+      frame_parms = &PHY_vars_UE_g[UE_id][0]->SL_UE_PHY_PARAMS.sl_frame_params;
+    }
+
     openair0_config_t *cfg = &openair0_cfg[ru_id];
     cfg->configFilename    = NULL;
     cfg->sample_rate       = frame_parms->samples_per_subframe * 1e3;

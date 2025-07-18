@@ -356,7 +356,19 @@ typedef struct {
   double tune_offset;
   uint64_t if_frequency;
   int if_freq_offset;
+  int used_by_cell;
 } nrUE_RU_params_t;
+
+typedef struct {
+  int ru_id;
+  int band;
+  uint64_t rf_frequency;
+  int64_t rf_freq_offset;
+  int numerology;
+  int N_RB_DL;
+  int ssb_start;
+  int used_by_ue;
+} nrUE_cell_params_t;
 
 /// Top-level PHY Data Structure for UE
 typedef struct PHY_VARS_NR_UE_s {

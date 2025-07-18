@@ -525,9 +525,16 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
   return 0;
 }
 
-void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, uint64_t downlink_frequency, int32_t delta_duplex, uint8_t mu, int N_RB_DL, int ssb_start_subcarrier, uint16_t nr_band)
+void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, const nrUE_cell_params_t *cell)
 {
-  LOG_I(PHY,"SA init parameters. DL freq %lu UL offset %d SSB numerology %d N_RB_DL %d\n",
+  const uint64_t downlink_frequency = cell->rf_frequency;
+  const int64_t delta_duplex = cell->rf_freq_offset;
+  const uint8_t mu = cell->numerology;
+  const int N_RB_DL = cell->N_RB_DL;
+  const int ssb_start_subcarrier = cell->ssb_start;
+  const uint16_t nr_band = cell->band;
+
+  LOG_I(PHY,"SA init parameters. DL freq %lu UL offset %ld SSB numerology %d N_RB_DL %d\n",
         downlink_frequency,
         delta_duplex,
         mu,

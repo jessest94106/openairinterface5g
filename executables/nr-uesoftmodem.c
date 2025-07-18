@@ -175,9 +175,8 @@ static void get_options(configmodule_interface_t *cfg)
 }
 
 // set PHY vars from command line
-static void set_options(int CC_id, PHY_VARS_NR_UE *UE, int ru_id)
+static void set_UE_options(int CC_id, PHY_VARS_NR_UE *UE, int ru_id)
 {
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   const nrUE_RU_params_t *RU = nrue_get_ru(ru_id);
 
   // Set UE variables
@@ -200,6 +199,12 @@ static void set_options(int CC_id, PHY_VARS_NR_UE *UE, int ru_id)
 
   LOG_I(PHY,"Set UE_fo_compensation %d, UE_scan_carrier %d, UE_no_timing_correction %d \n, chest-freq %d, chest-time %d\n",
         UE->UE_fo_compensation, UE->UE_scan_carrier, UE->no_timing_correction, UE->chest_freq, UE->chest_time);
+}
+
+static void set_fp_options(int cell_id, int ru_id)
+{
+  NR_DL_FRAME_PARMS *fp = nrue_get_cell_fp(cell_id);
+  const nrUE_RU_params_t *RU = nrue_get_ru(ru_id);
 
   // Set FP variables
   fp->nb_antennas_rx = RU->nb_rx;
@@ -307,7 +312,14 @@ int main(int argc, char **argv)
   nr_pdcp_layer_init();
   nas_init_nrue(NB_UE_INST);
 
-  init_NR_UE(NB_UE_INST, get_nrUE_params()->uecap_file, get_nrUE_params()->reconfig_file, get_nrUE_params()->rbconfig_file, get_softmodem_params()->numerology);
+  nrue_set_ru_params(uniqCfg);
+  nrue_set_cell_params(uniqCfg);
+
+  init_NR_UE(NB_UE_INST,
+             get_nrUE_params()->uecap_file,
+             get_nrUE_params()->reconfig_file,
+             get_nrUE_params()->rbconfig_file,
+             nrue_get_cell(0)->numerology);
 
   // start time manager with some reasonable default for the running mode
   // (may be overwritten in configuration file or command line)
@@ -324,29 +336,52 @@ int main(int argc, char **argv)
                      IS_SOFTMODEM_RFSIM ? TIME_SOURCE_IQ_SAMPLES
                                         : TIME_SOURCE_REALTIME);
 
-  nrue_set_ru_params(uniqCfg);
+  // initialize per-cell frame parameters
+  for (int cell_id = 0; cell_id < nrue_get_cell_count(); cell_id++) {
+    int ru_id = nrue_get_cell(cell_id)->ru_id;
+    AssertFatal(ru_id >= 0 && ru_id < nrue_get_ru_count(),
+                "Invalid ru_id (%d) for cell %d. Should be >= 0 and < %d\n",
+                ru_id,
+                cell_id,
+                nrue_get_ru_count());
+    AssertFatal(nrue_get_ru(ru_id)->used_by_cell == -1,
+                "RU %d is already used by cell %d and therefore cannot also be used by cell %d\n",
+                ru_id,
+                nrue_get_ru(ru_id)->used_by_cell,
+                cell_id);
+    nrue_set_ru_cell_id(ru_id, cell_id);
 
-  int ru_id = 0; // initialize all UEs to RU 0 for now
+    set_fp_options(cell_id, ru_id);
+    if (IS_SA_MODE(get_softmodem_params()) || get_softmodem_params()->sl_mode)
+      nr_init_frame_parms_ue_sa(nrue_get_cell_fp(cell_id), nrue_get_cell(cell_id));
+  }
+
+  int cell_id = 0;
   for (int inst = 0; inst < NB_UE_INST; inst++) {
+    NR_UE_MAC_INST_t *mac = get_mac_inst(inst);
+
     for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
       PHY_VARS_NR_UE *UE_CC = PHY_vars_UE_g[inst][CC_id];
-      set_options(CC_id, UE_CC, ru_id);
-      NR_UE_MAC_INST_t *mac = get_mac_inst(inst);
+
+      AssertFatal(cell_id >= 0 && cell_id < nrue_get_cell_count(),
+                  "There are not enough cell definitions for all UEs! NB_UE_INST = %d, MAX_NUM_CCs = %d, nrue_cell_count = %d\n",
+                  NB_UE_INST,
+                  MAX_NUM_CCs,
+                  nrue_get_cell_count());
+      nrUE_cell_params_t cell = *nrue_get_cell(cell_id);
+
+      AssertFatal(cell.used_by_ue == -1,
+                  "Cell %d is already used by UE %d and cannot also be used by UE %d as cells map 1:1 to RUs and RU sharing is not implemented\n",
+                  cell_id,
+                  cell.used_by_ue,
+                  inst);
+      cell.used_by_ue = inst;
+
+      set_UE_options(CC_id, UE_CC, cell.ru_id);
       init_nr_ue_phy_cpu_stats(&UE_CC->phy_cpu_stats);
-      // set frame config to initial values from command line and assume that the SSB is centered on the grid
-      if (IS_SA_MODE(get_softmodem_params()) || get_softmodem_params()->sl_mode) {
-        uint16_t nr_band = get_softmodem_params()->band;
-        mac->nr_band = nr_band;
-        mac->ssb_start_subcarrier = UE_CC->frame_parms.ssb_start_subcarrier;
-        mac->dl_frequency = downlink_frequency[CC_id][0];
-        nr_init_frame_parms_ue_sa(&UE_CC->frame_parms,
-                                  downlink_frequency[CC_id][0],
-                                  uplink_frequency_offset[CC_id][0],
-                                  get_softmodem_params()->numerology,
-                                  nrUE_params.N_RB_DL,
-                                  nrUE_params.ssb_start_subcarrier,
-                                  nr_band);
-      } else {
+
+      NR_DL_FRAME_PARMS *fp = nrue_get_cell_fp(cell_id);
+      if (!IS_SA_MODE(get_softmodem_params()) && !get_softmodem_params()->sl_mode) {
         do {
           notifiedFIFO_elt_t *elt = pollNotifiedFIFO(&mac->input_nf);
           if (!elt) {
@@ -356,8 +391,21 @@ int main(int argc, char **argv)
           delNotifiedFIFO_elt(elt);
         } while (true);
         fapi_nr_config_request_t *nrUE_config = &UE_CC->nrUE_config;
-        nr_init_frame_parms_ue(&UE_CC->frame_parms, nrUE_config, mac->nr_band);
+        nr_init_frame_parms_ue(fp, nrUE_config, mac->nr_band);
+
+        cell.band = fp->nr_band;
+        cell.rf_frequency = fp->dl_CarrierFreq;
+        cell.rf_freq_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
+        cell.numerology = fp->numerology_index;
+        cell.N_RB_DL = fp->N_RB_DL;
+        cell.ssb_start = fp->ssb_start_subcarrier;
       }
+      nrue_set_cell(cell_id, &cell);
+
+      UE_CC->frame_parms = *fp;
+      mac->nr_band = cell.band;
+      mac->ssb_start_subcarrier = cell.ssb_start;
+      mac->dl_frequency = cell.rf_frequency;
 
       UE_CC->sl_mode = get_softmodem_params()->sl_mode;
       init_actor(&UE_CC->sync_actor, "SYNC_", -1);
@@ -389,9 +437,12 @@ int main(int argc, char **argv)
                                   get_nrUE_params()->ofdm_offset_divisor);
         sl_ue_phy_init(UE_CC);
       }
-      nrue_init_openair0(UE_CC);
+
+      cell_id++; // initially connect each UE and carrier to its own cell
     }
   }
+
+  nrue_init_openair0();
 
   lock_memory_to_ram();
 
