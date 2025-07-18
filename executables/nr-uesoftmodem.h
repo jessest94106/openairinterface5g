@@ -133,7 +133,7 @@ extern nrUE_params_t *get_nrUE_params(void);
 // In nr-ue.c
 extern int setup_nr_ue_buffers(PHY_VARS_NR_UE **phy_vars_ue, openair0_config_t *openair0_cfg);
 extern void fill_ue_band_info(void);
-extern void init_NR_UE(int, char *, char *, char *);
+extern void init_NR_UE(int, char *, char *, char *, int);
 extern void init_NR_UE_threads(PHY_VARS_NR_UE *ue);
 void *UE_thread(void *arg);
 void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id);

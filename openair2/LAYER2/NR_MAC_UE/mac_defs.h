@@ -615,6 +615,7 @@ typedef struct NR_UE_MAC_INST_s {
   uint16_t nr_band;
   uint8_t ssb_subcarrier_offset;
   int ssb_start_subcarrier;
+  int numerology;
 
   NR_SSB_meas_t ssb_measurements[MAX_NB_SSB];
   NR_CSIRS_meas_t csirs_measurements;

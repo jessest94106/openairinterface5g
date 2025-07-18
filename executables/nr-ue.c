@@ -1111,11 +1111,11 @@ void *UE_thread(void *arg)
   return NULL;
 }
 
-void init_NR_UE(int nb_inst, char *uecap_file, char *reconfig_file, char *rbconfig_file)
+void init_NR_UE(int nb_inst, char *uecap_file, char *reconfig_file, char *rbconfig_file, int numerology)
 {
   for (int instance_id = 0; instance_id < nb_inst; instance_id++) {
     NR_UE_RRC_INST_t* rrc = nr_rrc_init_ue(uecap_file, instance_id, get_nrUE_params()->nb_antennas_tx);
-    NR_UE_MAC_INST_t *mac = nr_l2_init_ue(instance_id);
+    NR_UE_MAC_INST_t *mac = nr_l2_init_ue(instance_id, numerology);
 
     nr_rrc_set_mac_queue(instance_id, &mac->input_nf);
     mac->if_module = nr_ue_if_module_init(instance_id);

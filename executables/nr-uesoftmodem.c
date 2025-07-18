@@ -307,7 +307,7 @@ int main(int argc, char **argv)
   nr_pdcp_layer_init();
   nas_init_nrue(NB_UE_INST);
 
-  init_NR_UE(NB_UE_INST, get_nrUE_params()->uecap_file, get_nrUE_params()->reconfig_file, get_nrUE_params()->rbconfig_file);
+  init_NR_UE(NB_UE_INST, get_nrUE_params()->uecap_file, get_nrUE_params()->reconfig_file, get_nrUE_params()->rbconfig_file, get_softmodem_params()->numerology);
 
   // start time manager with some reasonable default for the running mode
   // (may be overwritten in configuration file or command line)
