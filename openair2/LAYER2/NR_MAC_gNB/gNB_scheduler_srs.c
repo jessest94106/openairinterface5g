@@ -471,7 +471,9 @@ static void nr_configure_srs(gNB_MAC_INST *nrmac,
   NR_beam_alloc_t beam = beam_allocation_procedure(&nrmac->beam_info, frame, slot, UE->UE_beam_index, slots_per_frame);
   AssertFatal(beam.idx >= 0, "Cannot allocate SRS in any available beam\n");
   uint16_t *vrb_map_UL = &nrmac->common_channels[CC_id].vrb_map_UL[beam.idx][buffer_index * MAX_BWP_SIZE];
-  uint16_t mask = SL_to_bitmap(srs_pdu->time_start_position, srs_pdu->num_symbols);
+  uint16_t num = 1 << srs_pdu->num_symbols; // 0,1,2 means 1,2,4 symbols, see 222.10.04 table 3-105
+  uint16_t mask = SL_to_bitmap(srs_pdu->time_start_position, num);
+  DevAssert(mask != 0);
   for (int i = 0; i < srs_pdu->bwp_size; ++i) {
     int rb = i + srs_pdu->bwp_start;
     uint16_t alloc = vrb_map_UL[rb] & mask;
