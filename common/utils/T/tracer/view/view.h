@@ -27,5 +27,6 @@ view *new_subview_time(view *time, int line, int color, int size);
 view *new_view_ticktime(float refresh_rate, gui *g, widget *w);
 view *new_subview_ticktime(view *ticktime, int line, int color, int size);
 void ticktime_set_tick(view *ticktime, void *logger);
+void view_tti_enable_automax(view *tti, widget *w2);
 
 #endif /* _VIEW_H_ */

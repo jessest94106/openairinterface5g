@@ -63,8 +63,8 @@ if(T_TRACER_GUI)
   target_link_libraries(gnb PRIVATE png)
 
   add_executable(ue ue.c)
-  target_link_libraries(ue PRIVATE tracer_utils tracer_filter tracer_gui
-                        tracer_logger tracer_view tracer_events)
+  target_link_libraries(ue PRIVATE tracer_utils tracer_view tracer_gui
+                        tracer_logger tracer_filter tracer_events)
   target_link_libraries(ue PRIVATE png)
 
   add_executable(vcd vcd.c)

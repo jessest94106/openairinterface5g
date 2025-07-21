@@ -5,11 +5,14 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <string.h>
+#include <math.h>
 
 struct tti {
   view common;
   gui *g;
   widget *w;
+  int automax;
+  widget *w2;
   int plot;
   float refresh_rate;
   pthread_mutex_t lock;
@@ -48,6 +51,7 @@ static void *tti_thread(void *_this)
     if (pthread_mutex_lock(&this->lock)) abort();
     xy_plot_get_dimensions(this->g, this->w, &plot_width, &plot_height);
     length = 0;
+    double max = 0;
     /* TODO: optimize */
     for (i = 0; i < 1024*10; i++)
       /* do not take points too close after last insertion point */
@@ -55,8 +59,22 @@ static void *tti_thread(void *_this)
           far_enough(i, this->last_insert_point, plot_width)) {
         this->xout[length] = i;
         this->yout[length] = this->data[i];
+        if (this->data[i] > max) max = this->data[i];
         length++;
       }
+    if (this->automax) {
+      char o[128];
+      sprintf(o, "%d", (int)max);
+      textarea_set_text(this->g, this->w2, o);
+      /* for Y range we want 10, 20, 50, 100, 200, 500, etc. */
+      if (max < 10) max = 10;
+      double mlog = pow(10, floor(log10(max)));
+      static int tolog[11] = { -1, 1, 2, 5, 5, 5, 10, 10, 10, 10, 10 };
+      max = tolog[(int)ceil(max/mlog)] * mlog;
+      float xmin, xmax, ymin, ymax;
+      xy_plot_get_range(this->g, this->w, &xmin, &xmax, &ymin, &ymax);
+      xy_plot_set_range(this->g, this->w, xmin, xmax, 0, max);
+    }
     xy_plot_set_points(this->g, this->w, this->plot,
         length, this->xout, this->yout);
     if (pthread_mutex_unlock(&this->lock)) abort();
@@ -118,4 +136,11 @@ view *new_view_tti(float refresh_rate, gui *g, widget *w, int color)
   new_thread(tti_thread, ret);
 
   return (view *)ret;
+}
+
+void view_tti_enable_automax(view *_tti, widget *w2)
+{
+  struct tti *tti = (struct tti *)_tti;
+  tti->automax = 1;
+  tti->w2 = w2;
 }
