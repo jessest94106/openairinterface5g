@@ -20,6 +20,8 @@ struct scrolltti {
   float xout[1000];
   float yout[1000];
   int insert_point;
+  int next_tick_frame;
+  int next_tick_subframe;
 };
 
 /* this array is used to get Y range 1000, 2000, 5000, 10000, ... */
@@ -65,15 +67,35 @@ static void clear(view *this)
   /* TODO */
 }
 
+static void insert(struct scrolltti *this, double value)
+{
+  this->total -= this->data[this->insert_point];
+  this->data[this->insert_point] = value;
+  this->total += this->data[this->insert_point];
+  this->insert_point = (this->insert_point + 1) % 1000;
+}
+
+static void next_subframe(struct scrolltti *this)
+{
+  this->next_tick_subframe++;
+  if (this->next_tick_subframe == 10) {
+    this->next_tick_subframe = 0;
+    this->next_tick_frame++;
+    this->next_tick_frame %= 1024;
+  }
+}
+
 static void append(view *_this, int frame, int subframe, double value)
 {
   struct scrolltti *this = (struct scrolltti *)_this;
 
   if (pthread_mutex_lock(&this->lock)) abort();
-  this->total -= this->data[this->insert_point];
-  this->data[this->insert_point] = value;
-  this->total += this->data[this->insert_point];
-  this->insert_point = (this->insert_point + 1) % 1000;
+  while (this->next_tick_frame != frame || this->next_tick_subframe != subframe) {
+    insert(this, 0);
+    next_subframe(this);
+  }
+  insert(this, value);
+  next_subframe(this);
   if (pthread_mutex_unlock(&this->lock)) abort();
 }
 
