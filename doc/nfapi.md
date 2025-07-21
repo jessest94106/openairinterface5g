@@ -95,8 +95,9 @@ can proceed as follows:
 - in `vnf.conf`
   * modify `MACRLCs` section to configure south-bound nFAPI transport
   * delete `L1s`, `RUs`, and radio-specific sections.
-  * in `gNBs` section, increase the `ra_ResponseWindow` by one to extend the RA
-    window: this is necessary because the PNF triggers the scheduler in the VNF
+  * in `gNBs` section, select a sufficiently large `ra_ResponseWindow` if a UE
+    does not connect with a message that the response window timed out:
+    this is necessary because the PNF triggers the scheduler in the VNF
     in advance, which might make the RA window more likely to run out
 - copy `monolithic.conf`, which will be your PNF file (`pnf.conf`)
 - in `pnf.conf`
