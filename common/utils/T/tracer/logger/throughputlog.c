@@ -73,12 +73,18 @@ static void _tick_event(void *p, event e)
   for (i = 0; i < l->common.vsize; i++)
     l->common.v[i]->append(l->common.v[i], frame, subframe, (double)l->total);
 
-  l->insert_point = (l->insert_point + 1) % 1000;
-  l->total -= l->bits[l->insert_point];
-  l->bits[l->insert_point] = 0;
+  while (l->last_tick_frame != frame || l->last_tick_subframe != subframe) {
+    l->insert_point = (l->insert_point + 1) % 1000;
+    l->total -= l->bits[l->insert_point];
+    l->bits[l->insert_point] = 0;
+    l->last_tick_subframe++;
+    if (l->last_tick_subframe == 10) {
+      l->last_tick_subframe = 0;
+      l->last_tick_frame++;
+      l->last_tick_frame %= 1024;
+    }
+  }
 
-  l->last_tick_frame = frame;
-  l->last_tick_subframe = subframe;
 }
 
 logger *new_throughputlog(event_handler *h, void *database,
