@@ -654,7 +654,6 @@ printf("%d\n", slot);
   InitSinLUT();
 
   get_softmodem_params()->phy_test = 1;
-  get_softmodem_params()->usim_test = 1;
   get_softmodem_params()->do_ra = 0;
   IS_SOFTMODEM_DLSIM = true;
 
