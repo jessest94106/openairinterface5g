@@ -575,6 +575,14 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
     rach_ConfigCommon->msg3_transformPrecoder = NULL;
   }
 
+  // by default, select ra_ResponseWindow automatically
+  if (rach_ConfigCommon->rach_ConfigGeneric.ra_ResponseWindow < 0) {
+    int mu = *scc->ssbSubcarrierSpacing;
+    // will select: mu=0 => 4 (10 slots), mu=1 => 5 (20 slots), mu>=3 => 7 (80 slots)
+    rach_ConfigCommon->rach_ConfigGeneric.ra_ResponseWindow = min(NR_RACH_ConfigGeneric__ra_ResponseWindow_sl80, NR_RACH_ConfigGeneric__ra_ResponseWindow_sl10 + mu);
+  }
+  DevAssert(rach_ConfigCommon->rach_ConfigGeneric.ra_ResponseWindow >= 0);
+
   // prepare DL Allocation lists
   nr_rrc_config_dl_tda(dlcc->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList,
                        frame_type,
