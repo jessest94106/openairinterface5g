@@ -15,10 +15,11 @@ struct scrolltti {
   int plot;
   float refresh_rate;
   pthread_mutex_t lock;
-  unsigned long data[1000];
-  unsigned long total;  /* sum data[0..999] to have smoother value printed */
-  float xout[1000];
-  float yout[1000];
+  int subframes_per_frame;
+  unsigned long *data;
+  unsigned long total;  /* sum data[0..n] to have smoother value printed */
+  float *xout;
+  float *yout;
   int insert_point;
   int next_tick_frame;
   int next_tick_subframe;
@@ -40,21 +41,21 @@ static void *scrolltti_thread(void *_this)
     /* TODO: optimize */
     p = this->insert_point;
     max = 0;
-    for (i = 0; i < 1000; i++) {
+    for (i = 0; i < this->subframes_per_frame * 100; i++) {
       this->xout[i] = i;
       this->yout[i] = this->data[p];
       if (this->data[p] > max) max = this->data[p];
-      p = (p + 1) % 1000;
+      p = (p + 1) % (this->subframes_per_frame * 100);
     }
-    bps(o, this->total/1000., "b/s");
+    bps(o, this->total/(this->subframes_per_frame * 100.), "b/s");
     textarea_set_text(this->g, this->throughput_textarea, o);
     /* for Y range we want 1000, 2000, 5000, 10000, 20000, 50000, etc. */
     if (max < 1000) max = 1000;
     mlog = pow(10, floor(log10(max)));
     max = tolog[(int)ceil(max/mlog)] * mlog;
-    xy_plot_set_range(this->g, this->w, 0, 1000, 0, max);
+    xy_plot_set_range(this->g, this->w, 0, this->subframes_per_frame * 100, 0, max);
     xy_plot_set_points(this->g, this->w, this->plot,
-        1000, this->xout, this->yout);
+        this->subframes_per_frame * 100, this->xout, this->yout);
     if (pthread_mutex_unlock(&this->lock)) abort();
     sleepms(1000/this->refresh_rate);
   }
@@ -72,13 +73,13 @@ static void insert(struct scrolltti *this, double value)
   this->total -= this->data[this->insert_point];
   this->data[this->insert_point] = value;
   this->total += this->data[this->insert_point];
-  this->insert_point = (this->insert_point + 1) % 1000;
+  this->insert_point = (this->insert_point + 1) % (this->subframes_per_frame * 100);
 }
 
 static void next_subframe(struct scrolltti *this)
 {
   this->next_tick_subframe++;
-  if (this->next_tick_subframe == 10) {
+  if (this->next_tick_subframe == this->subframes_per_frame) {
     this->next_tick_subframe = 0;
     this->next_tick_frame++;
     this->next_tick_frame %= 1024;
@@ -100,7 +101,7 @@ static void append(view *_this, int frame, int subframe, double value)
 }
 
 view *new_view_scrolltti(float refresh_rate, gui *g, widget *w, int color,
-    widget *throughput_textarea)
+    widget *throughput_textarea, int subframes_per_frame)
 {
   struct scrolltti *ret = calloc(1, sizeof(struct scrolltti));
   if (ret == NULL) abort();
@@ -113,6 +114,14 @@ view *new_view_scrolltti(float refresh_rate, gui *g, widget *w, int color,
   ret->w = w;
   ret->throughput_textarea = throughput_textarea;
   ret->plot = xy_plot_new_plot(g, w, color);
+
+  ret->subframes_per_frame = subframes_per_frame;
+  ret->data = calloc(subframes_per_frame * 100, sizeof(unsigned long));
+  if (ret->data == NULL) abort();
+  ret->xout = calloc(subframes_per_frame * 100, sizeof(float));
+  if (ret->xout == NULL) abort();
+  ret->yout = calloc(subframes_per_frame * 100, sizeof(float));
+  if (ret->yout == NULL) abort();
 
   if (pthread_mutex_init(&ret->lock, NULL)) abort();
 

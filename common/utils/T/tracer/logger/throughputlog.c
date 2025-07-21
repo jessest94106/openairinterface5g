@@ -19,7 +19,8 @@ struct throughputlog {
   int data_arg;
   int last_tick_frame;
   int last_tick_subframe;
-  unsigned long bits[1000];
+  int subframes_per_frame;
+  unsigned long *bits;
   unsigned long total;
   int insert_point;
   char *tick_event_name;
@@ -74,11 +75,11 @@ static void _tick_event(void *p, event e)
     l->common.v[i]->append(l->common.v[i], frame, subframe, (double)l->total);
 
   while (l->last_tick_frame != frame || l->last_tick_subframe != subframe) {
-    l->insert_point = (l->insert_point + 1) % 1000;
+    l->insert_point = (l->insert_point + 1) % (100 * l->subframes_per_frame);
     l->total -= l->bits[l->insert_point];
     l->bits[l->insert_point] = 0;
     l->last_tick_subframe++;
-    if (l->last_tick_subframe == 10) {
+    if (l->last_tick_subframe == l->subframes_per_frame) {
       l->last_tick_subframe = 0;
       l->last_tick_frame++;
       l->last_tick_frame %= 1024;
@@ -89,7 +90,7 @@ static void _tick_event(void *p, event e)
 
 logger *new_throughputlog(event_handler *h, void *database,
     char *tick_event_name, char *frame_varname, char *subframe_varname,
-    char *event_name, char *data_varname)
+    char *event_name, char *data_varname, int subframes_per_frame)
 {
   struct throughputlog *ret;
   int event_id;
@@ -188,6 +189,10 @@ logger *new_throughputlog(event_handler *h, void *database,
         __FILE__, __LINE__, data_varname);
     abort();
   }
+
+  ret->subframes_per_frame = subframes_per_frame;
+  ret->bits = calloc(100 * subframes_per_frame, sizeof(unsigned long));
+  if (ret->bits == NULL) abort();
 
   return ret;
 }

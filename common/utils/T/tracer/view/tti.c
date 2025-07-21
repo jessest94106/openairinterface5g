@@ -16,23 +16,25 @@ struct tti {
   int plot;
   float refresh_rate;
   pthread_mutex_t lock;
-  float data[1024*10];
-  int valid[1024*10];
-  float xout[1024*10];
-  float yout[1024*10];
+  float *data;
+  int *valid;
+  float *xout;
+  float *yout;
   int last_insert_point;
+  int subframes_per_frame;
 };
 
-static int far_enough(int i, int last_insert, int plot_width)
+static int far_enough(int i, int last_insert, int plot_width,
+    int subframes_per_frame)
 {
   int p1;
   int p2;
   int hole_size_px;
   int hole_size_tti;
   hole_size_px = 10;
-  hole_size_tti = 10240 * hole_size_px / plot_width;
+  hole_size_tti = 1024 * subframes_per_frame * hole_size_px / plot_width;
   p1 = last_insert;
-  p2 = (last_insert + hole_size_tti) % (1024*10);
+  p2 = (last_insert + hole_size_tti) % (1024 * subframes_per_frame);
   if (p1 < p2) {
     return !(i > p1 && i < p2);
   }
@@ -53,10 +55,11 @@ static void *tti_thread(void *_this)
     length = 0;
     double max = 0;
     /* TODO: optimize */
-    for (i = 0; i < 1024*10; i++)
+    for (i = 0; i < 1024 * this->subframes_per_frame; i++)
       /* do not take points too close after last insertion point */
       if (this->valid[i] &&
-          far_enough(i, this->last_insert_point, plot_width)) {
+          far_enough(i, this->last_insert_point, plot_width,
+                     this->subframes_per_frame)) {
         this->xout[length] = i;
         this->yout[length] = this->data[i];
         if (this->data[i] > max) max = this->data[i];
@@ -93,7 +96,7 @@ static void append(view *_this, int frame, int subframe, double value)
 {
   struct tti *this = (struct tti *)_this;
   int i;
-  int index = frame * 10 + subframe;
+  int index = frame * this->subframes_per_frame + subframe;
 
   if (pthread_mutex_lock(&this->lock)) abort();
 
@@ -102,10 +105,10 @@ static void append(view *_this, int frame, int subframe, double value)
    * this may be wrong if delay between two append is
    * greater than 1024 frames (something like that)
    */
-  i = (this->last_insert_point + 1) % (1024*10);
+  i = (this->last_insert_point + 1) % (1024 * this->subframes_per_frame);
   while (i != index) {
     this->valid[i] = 0;
-    i = (i + 1) % (1024*10);
+    i = (i + 1) % (1024 * this->subframes_per_frame);
   }
 
   this->data[index] = value;
@@ -116,7 +119,8 @@ static void append(view *_this, int frame, int subframe, double value)
   if (pthread_mutex_unlock(&this->lock)) abort();
 }
 
-view *new_view_tti(float refresh_rate, gui *g, widget *w, int color)
+view *new_view_tti(float refresh_rate, gui *g, widget *w, int color,
+    int subframes_per_frame)
 {
   struct tti *ret = calloc(1, sizeof(struct tti));
   if (ret == NULL) abort();
@@ -132,6 +136,16 @@ view *new_view_tti(float refresh_rate, gui *g, widget *w, int color)
   ret->last_insert_point = 0;
 
   if (pthread_mutex_init(&ret->lock, NULL)) abort();
+
+  ret->subframes_per_frame = subframes_per_frame;
+  ret->data = calloc(subframes_per_frame * 1024, sizeof(float));
+  if (ret->data == NULL) abort();
+  ret->valid = calloc(subframes_per_frame * 1024, sizeof(int));
+  if (ret->valid == NULL) abort();
+  ret->xout = calloc(subframes_per_frame * 1024, sizeof(float));
+  if (ret->xout == NULL) abort();
+  ret->yout = calloc(subframes_per_frame * 1024, sizeof(float));
+  if (ret->yout == NULL) abort();
 
   new_thread(tti_thread, ret);
 
