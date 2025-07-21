@@ -174,6 +174,8 @@ static void rx_func(processingData_L1_t *info)
   int slot_rx = info->slot_rx;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
 
+  T(T_GNB_PHY_UL_TICK, T_INT(gNB->Mod_id), T_INT(frame_rx), T_INT(slot_rx));
+
   // RX processing
   int rx_slot_type = nr_slot_select(cfg, frame_rx, slot_rx);
   if (rx_slot_type == NR_UPLINK_SLOT || rx_slot_type == NR_MIXED_SLOT) {

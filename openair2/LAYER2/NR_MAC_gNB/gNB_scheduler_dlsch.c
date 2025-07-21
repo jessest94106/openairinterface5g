@@ -1307,6 +1307,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
             if (len == 0)
               break;
 
+            T(T_GNB_MAC_LCID_DL, T_INT(rnti), T_INT(frame), T_INT(slot), T_INT(lcid), T_INT(len * 8), T_INT(nr_rlc_tx_list_occupancy(rnti, lcid)));
             header->R = 0;
             header->F = 1;
             header->LCID = lcid;
@@ -1380,6 +1381,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
       T(T_GNB_MAC_DL_PDU_WITH_DATA, T_INT(module_id), T_INT(CC_id), T_INT(rnti),
         T_INT(frame), T_INT(slot), T_INT(current_harq_pid), T_BUFFER(harq->transportBlock.buf, TBS));
+      T(T_GNB_MAC_DL, T_INT(rnti), T_INT(frame), T_INT(slot), T_INT(sched_pdsch->mcs), T_INT(TBS));
     }
 
     const int ntx_req = TX_req->Number_of_PDUs;
