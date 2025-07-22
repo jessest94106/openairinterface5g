@@ -85,7 +85,7 @@ TEST(NrLayerPrecoderTest, Basic)
   // Create and populate the pmi_pdu structure
   nfapi_nr_pm_pdu_t pmi_pdu = {0};
   for (int layer = 0; layer < n_layers; ++layer) {
-    pmi_pdu.weights[layer][ant].precoder_weight_Re = 1 << 14; // e.g., Q15 representation of ~0.5
+    pmi_pdu.weights[layer][ant].precoder_weight_Re = -SHRT_MAX; // Q15 representation of (~-1.0) -0.999969482421875 (-1+2^-15)
     pmi_pdu.weights[layer][ant].precoder_weight_Im = 0;
   }
 
@@ -95,14 +95,13 @@ TEST(NrLayerPrecoderTest, Basic)
 
   // You can calculate the expected value manually or test rough correctness
   for (int symbol = 0; symbol < re_cnt; symbol++) {
-    int result_real = 14 + (symbol - 1) & ~1;
-    int result_imag = 14 + (symbol) & ~1;
+    int result_real = -26 - (symbol<<1);
+    int result_imag = -24 - (symbol<<1);
+
     EXPECT_EQ(dataF_out[ant][symbol].r, result_real)
         << " at [" << ant << "][" << symbol << "] got real part: " << dataF_out[ant][symbol].r;
-    ;
     EXPECT_EQ(dataF_out[ant][symbol].i, -result_imag)
         << " at [" << ant << "][" << symbol << "] got imag part: " << dataF_out[ant][symbol].i;
-    ;
   }
 }
 
@@ -132,7 +131,7 @@ TEST(NrLayerPrecoderTest, SIMD)
   // Create and populate the pmi_pdu structure
   nfapi_nr_pm_pdu_t pmi_pdu = {0};
   for (int layer = 0; layer < n_layers; ++layer) {
-    pmi_pdu.weights[layer][ant].precoder_weight_Re = 1 << 14; // e.g., Q15 representation of ~0.5
+    pmi_pdu.weights[layer][ant].precoder_weight_Re = -SHRT_MAX; // Q15 representation of (~-1.0) -0.999969482421875 (-1+2^-15)
     pmi_pdu.weights[layer][ant].precoder_weight_Im = 0;
   }
 
@@ -141,14 +140,13 @@ TEST(NrLayerPrecoderTest, SIMD)
 
   // You can calculate the expected value manually or test rough correctness
   for (int symbol = 0; symbol < re_cnt; symbol++) {
-    int result_real = 14 + (symbol - 1) & ~1;
-    int result_imag = 14 + (symbol) & ~1;
+    int result_real = -26 - (symbol<<1);
+    int result_imag = -24 - (symbol<<1);
+
     EXPECT_EQ(dataF_out[ant][symbol].r, result_real)
         << " at [" << ant << "][" << symbol << "] got real part: " << dataF_out[ant][symbol].r;
-    ;
     EXPECT_EQ(dataF_out[ant][symbol].i, -result_imag)
         << " at [" << ant << "][" << symbol << "] got imag part: " << dataF_out[ant][symbol].i;
-    ;
   }
 }
 
@@ -161,21 +159,21 @@ TEST(NrLayerPrecoderTest, Compare_CM_SIMD)
 
   // Initialize the 2D input data buffer
   std::vector<c16_t> buffer_in(n_layers * symbol_size);
-  std::vector<c16_t> buffer_out(n_ants * symbol_size);
-  std::vector<c16_t> buffer_out2(n_ants * symbol_size);
+  std::vector<c16_t> buffer_out_cm(n_ants * symbol_size);
+  std::vector<c16_t> buffer_out_simd(n_ants * symbol_size);
 
   for (int i = 0; i < n_layers * symbol_size; ++i) {
-	buffer_in[i] = {static_cast<int16_t>(i + 1), static_cast<int16_t>(-i - 1)};
+	buffer_in[i] = {static_cast<int16_t>((rand() % (2 * SHRT_MAX + 1)) - SHRT_MAX), static_cast<int16_t>((rand() % (2 * SHRT_MAX + 1)) - SHRT_MAX)};
   }
   for (int i = 0; i < n_ants * symbol_size; ++i) {
-    buffer_out[i] = {static_cast<int16_t>(0), static_cast<int16_t>(0)};
-    buffer_out2[i] = {static_cast<int16_t>(0), static_cast<int16_t>(0)};
+    buffer_out_cm[i] = {static_cast<int16_t>(0), static_cast<int16_t>(0)};
+    buffer_out_simd[i] = {static_cast<int16_t>(0), static_cast<int16_t>(0)};
   }
 
   // Cast flat buffer to the required 2D Variable-Length Array (VLA) style pointer
   c16_t(*dataF_in)[symbol_size] = reinterpret_cast<c16_t(*)[symbol_size]>(buffer_in.data());
-  c16_t(*dataF_out)[symbol_size] = reinterpret_cast<c16_t(*)[symbol_size]>(buffer_out.data());
-  c16_t(*dataF_out2)[symbol_size] = reinterpret_cast<c16_t(*)[symbol_size]>(buffer_out2.data());
+  c16_t(*dataF_out_cm)[symbol_size] = reinterpret_cast<c16_t(*)[symbol_size]>(buffer_out_cm.data());
+  c16_t(*dataF_out_simd)[symbol_size] = reinterpret_cast<c16_t(*)[symbol_size]>(buffer_out_simd.data());
 
   // Create and populate the pmi_pdu structure
   nfapi_nr_pm_pdu_t pmi_pdu = {0};
@@ -184,10 +182,10 @@ TEST(NrLayerPrecoderTest, Compare_CM_SIMD)
     // Could not use convert_precoder_weight() as complex.h could not be used in googletest
     // Use the logic in convert_precoder_weight()
     // precoder [−1,−j]
-    pmi_pdu.weights[layer][0].precoder_weight_Re = round(-32767 * 1.0);
-    pmi_pdu.weights[layer][0].precoder_weight_Im = 0x0000;  // Q15 representation of 0
-    pmi_pdu.weights[layer][1].precoder_weight_Re = 0x0000;  // Q15 representation of 0
-    pmi_pdu.weights[layer][1].precoder_weight_Im = round(-32767 * 1.0);
+    pmi_pdu.weights[layer][0].precoder_weight_Re = -SHRT_MAX; // Q15 representation of (~-1.0) -0.999969482421875 (-1+2^-15)
+    pmi_pdu.weights[layer][0].precoder_weight_Im = 0x0000;    // Q15 representation of 0
+    pmi_pdu.weights[layer][1].precoder_weight_Re = 0x0000;    // Q15 representation of 0
+    pmi_pdu.weights[layer][1].precoder_weight_Im = -SHRT_MAX; // Q15 representation of (~-1.0) -0.999969482421875 (-1+2^-15)
   }
 
   // Get the results for all the antenna 
@@ -195,10 +193,10 @@ TEST(NrLayerPrecoderTest, Compare_CM_SIMD)
 
     // Call the C function
     for (int symbol = 0; symbol < re_cnt; symbol++)
-      dataF_out[ant][symbol] = nr_layer_precoder_cm(n_layers, symbol_size, dataF_in, ant, &pmi_pdu, symbol);
+      dataF_out_cm[ant][symbol] = nr_layer_precoder_cm(n_layers, symbol_size, dataF_in, ant, &pmi_pdu, symbol);
 
     // Call the C function
-    nr_layer_precoder_simd(n_layers, symbol_size, dataF_in, ant, &pmi_pdu, 0, re_cnt, dataF_out2[ant]);
+    nr_layer_precoder_simd(n_layers, symbol_size, dataF_in, ant, &pmi_pdu, 0, re_cnt, dataF_out_simd[ant]);
 
     // Compare the result from both C function
     for (int symbol = 0; symbol < re_cnt; symbol++) {
@@ -212,6 +210,9 @@ TEST(NrLayerPrecoderTest, Compare_CM_SIMD)
 
 int main(int argc, char **argv)
 {
+  // Initialize random seed
+  srand(time(0));
+
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

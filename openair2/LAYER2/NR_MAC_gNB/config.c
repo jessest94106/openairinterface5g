@@ -61,7 +61,7 @@
 
 c16_t convert_precoder_weight(double complex c_in)
 {
-  return (c16_t) {.r = round(32767*creal(c_in)), .i = round(32767*cimag(c_in))};
+  return (c16_t) {.r = round(SHRT_MAX*creal(c_in)), .i = round(SHRT_MAX*cimag(c_in))};
 }
 
 void get_K1_K2(int N1, int N2, int *K1, int *K2, int layers)
