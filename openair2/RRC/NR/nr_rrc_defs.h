@@ -238,8 +238,8 @@ typedef struct gNB_RRC_UE_s {
   rb_id_t                            nsa_gtp_psi[S1AP_MAX_E_RAB];
 
   //SA block
-  int nb_of_pdusessions;
-  rrc_pdu_session_param_t pduSession[NGAP_MAX_PDU_SESSION];
+  seq_arr_t pduSessions;
+
   rrc_action_t xids[NR_RRC_TRANSACTION_IDENTIFIER_NUMBER];
   uint8_t e_rab_release_command_flag;
   uint32_t ue_rrc_inactivity_timer;

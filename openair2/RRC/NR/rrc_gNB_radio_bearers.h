@@ -53,7 +53,7 @@ drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id);
 /// @return returns a pointer to the generated DRB structure
 drb_t *generateDRB(gNB_RRC_UE_t *ue,
                    uint8_t drb_id,
-                   const rrc_pdu_session_param_t *pduSession,
+                   const pdusession_t *pduSession,
                    bool enable_sdap,
                    int do_drb_integrity,
                    int do_drb_ciphering,
@@ -65,20 +65,21 @@ uint8_t get_next_available_drb_id(gNB_RRC_UE_t *ue);
 /// @brief returns the number of active DRBs for this UE
 int get_number_active_drbs(gNB_RRC_UE_t *ue);
 
-/// @brief retrieve PDU session of UE ue with ID id, optionally creating it if
-/// create is true
-rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create);
+/// @brief retrieve PDU session of UE ue with ID id
+rrc_pdu_session_param_t *find_pduSession(seq_arr_t *seq, int id);
+
+/// @brief Add a new PDU session for UE @param ue and configuration @param in
+rrc_pdu_session_param_t *add_pduSession(seq_arr_t *sessions_ptr, const pdusession_t *in);
 
 /// @brief get PDU session of UE ue through the DRB drb_id
 rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id);
-
-/// @brief get the PDU sessions of this UE in a single array
-void get_pduSession_array(gNB_RRC_UE_t *ue, uint32_t pdu_sessions[NGAP_MAX_PDU_SESSION]);
 
 /// @brief set PDCP configuration in a bearer context management message
 void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, drb_t *rrc_drb, bool um_on_default_drb);
 
 /// @brief Deep copy an instance of struct pdusession_t
 void cp_pdusession(pdusession_t *dst, const pdusession_t *src);
+
+void free_pdusession(void *ptr);
 
 #endif

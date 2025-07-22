@@ -76,6 +76,7 @@ static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_
     /* fetch an existing PDU session for this DRB */
     rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId(ue, rrc_drb->drb_id);
     AssertFatal(pdu != NULL, "no PDU session for DRB ID %d\n", rrc_drb->drb_id);
+
     // for the moment, we only support one QoS flow. Put a reminder in case
     // this changes
     AssertFatal(pdu->param.nb_qos == 1, "only 1 Qos flow supported\n");

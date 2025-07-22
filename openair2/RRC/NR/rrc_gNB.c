@@ -656,14 +656,16 @@ nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC
                                     .srb_config_list = SRBs};
   UE->DRB_ReleaseList = NULL; // pointer transferred to params
 
-  for (int i = 0; i < UE->nb_of_pdusessions; i++) {
-    if (UE->pduSession[i].param.nas_pdu.len > 0) {
-      params.dedicated_NAS_msg_list[params.num_nas_msg++] = UE->pduSession[i].param.nas_pdu;
-      UE->pduSession[i].param.nas_pdu.buf = NULL;
-      UE->pduSession[i].param.nas_pdu.len = 0;
-      LOG_D(NR_RRC, "Transfer NAS info with size %ld (pdusession idx %d) to RRCReconfiguration params\n", UE->pduSession[i].param.nas_pdu.len, i);
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, item, &UE->pduSessions) {
+    pdusession_t *session = &item->param;
+    if (session->nas_pdu.len > 0) {
+      params.dedicated_NAS_msg_list[params.num_nas_msg++] = session->nas_pdu;
+      session->nas_pdu.buf = NULL;
+      session->nas_pdu.len = 0;
+      LOG_D(NR_RRC, "Transfer NAS info with size %ld to RRCReconfiguration params\n", session->nas_pdu.len);
     }
   }
+
   if (UE->nas_pdu.len > 0) {
     params.dedicated_NAS_msg_list[params.num_nas_msg++] = UE->nas_pdu;
     UE->nas_pdu.buf = NULL;
@@ -696,12 +698,11 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
     return;
   }
 
-  for (int i = 0; i < ue_p->nb_of_pdusessions; i++) {
-    if (ue_p->pduSession[i].param.nas_pdu.buf != NULL) {
-      ue_p->pduSession[i].xid = params.transaction_id;
-    }
-    if (ue_p->pduSession[i].status < PDU_SESSION_STATUS_ESTABLISHED) {
-      ue_p->pduSession[i].status = PDU_SESSION_STATUS_DONE;
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, item, &ue_p->pduSessions) {
+    if (item->param.nas_pdu.buf)
+      item->xid = params.transaction_id;
+    if (item->status < PDU_SESSION_STATUS_ESTABLISHED) {
+      item->status = PDU_SESSION_STATUS_DONE;
     }
   }
 
@@ -718,40 +719,41 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
   nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, ue_p, 0, false);
   ue_p->xids[params.transaction_id] = RRC_PDUSESSION_MODIFY;
 
-  for (int i = 0; i < ue_p->nb_of_pdusessions; i++) {
-    rrc_pdu_session_param_t *session = &ue_p->pduSession[i];
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, item, &ue_p->pduSessions) {
+    pdusession_t *session = &item->param;
     // bypass the new and already configured pdu sessions
-    if (session->status >= PDU_SESSION_STATUS_DONE) {
-      session->xid = params.transaction_id;
+    if (item->status >= PDU_SESSION_STATUS_DONE) {
+      item->xid = params.transaction_id;
       continue;
     }
 
-    if (session->cause.type != NGAP_CAUSE_NOTHING) {
+    if (item->cause.type != NGAP_CAUSE_NOTHING) {
       // set xid of failure pdu session
-      session->xid = params.transaction_id;
-      session->status = PDU_SESSION_STATUS_FAILED;
+      item->xid = params.transaction_id;
+      item->status = PDU_SESSION_STATUS_FAILED;
       continue;
     }
 
     // search exist DRB_config
     int j;
-    for (j = 0; i < MAX_DRBS_PER_UE; j++) {
+    for (j = 0; j < MAX_DRBS_PER_UE; j++) {
       if (ue_p->established_drbs[j].status != DRB_INACTIVE
-          && ue_p->established_drbs[j].cnAssociation.sdap_config.pdusession_id == session->param.pdusession_id)
+          && ue_p->established_drbs[j].cnAssociation.sdap_config.pdusession_id == session->pdusession_id)
         break;
     }
 
     if (j == MAX_DRBS_PER_UE) {
       ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_unspecified};
-      session->xid = params.transaction_id;
-      session->status = PDU_SESSION_STATUS_FAILED;
-      session->cause = cause;
+      item->xid = params.transaction_id;
+      item->status = PDU_SESSION_STATUS_FAILED;
+      item->cause = cause;
       continue;
     }
 
     // Reference TS23501 Table 5.7.4-1: Standardized 5QI to QoS characteristics mapping
-    for (qos_flow_index = 0; qos_flow_index < session->param.nb_qos; qos_flow_index++) {
-      switch (session->param.qos[qos_flow_index].fiveQI) {
+    for (qos_flow_index = 0; qos_flow_index < session->nb_qos; qos_flow_index++) {
+      pdusession_level_qos_parameter_t *qos = &session->qos[qos_flow_index];
+      switch (qos->fiveQI) {
         case 1: //100ms
         case 2: //150ms
         case 3: //50ms
@@ -765,18 +767,17 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
           break;
 
         default:
-          LOG_E(NR_RRC, "not supported 5qi %lu\n", session->param.qos[qos_flow_index].fiveQI);
+          LOG_E(NR_RRC, "not supported 5qi %lu\n", qos->fiveQI);
           ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_not_supported_5QI_value};
-          session->status = PDU_SESSION_STATUS_FAILED;
-          session->xid = params.transaction_id;
-          session->cause = cause;
+          item->status = PDU_SESSION_STATUS_FAILED;
+          item->xid = params.transaction_id;
+          item->cause = cause;
           continue;
       }
-      LOG_I(NR_RRC, "index %d, QOS flow %d, 5QI %ld \n", i, qos_flow_index, session->param.qos[qos_flow_index].fiveQI);
+      LOG_I(NR_RRC, "PDU Session ID %d, QOS flow %d, 5QI %ld \n", session->pdusession_id, qos_flow_index, qos->fiveQI);
     }
-
-    session->status = PDU_SESSION_STATUS_DONE;
-    session->xid = params.transaction_id;
+    item->status = PDU_SESSION_STATUS_DONE;
+    item->xid = params.transaction_id;
   }
 
   byte_array_t msg = do_RRCReconfiguration(&params);
@@ -800,16 +801,18 @@ void rrc_gNB_generate_dedicatedRRCReconfiguration_release(gNB_RRC_INST *rrc,
                                                           uint8_t *nas_buffer)
 //-----------------------------------------------------------------------------
 {
-  NR_DRB_ToReleaseList_t *DRB_Release_configList2 = CALLOC(sizeof(*DRB_Release_configList2), 1);
+  nr_rrc_reconfig_param_t params = {.transaction_id = xid};
 
-  for (int i = 0; i < NB_RB_MAX; i++) {
-    if ((ue_p->pduSession[i].status == PDU_SESSION_STATUS_TORELEASE) && ue_p->pduSession[i].xid == xid) {
-      asn1cSequenceAdd(DRB_Release_configList2->list, NR_DRB_Identity_t, DRB_release);
-      *DRB_release = i + 1;
+  NR_DRB_ToReleaseList_t *to_release = CALLOC(sizeof(*to_release), 1);
+  int i = 0;
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, item, &ue_p->pduSessions) {
+    if ((item->status == PDU_SESSION_STATUS_TORELEASE) && item->xid == xid) {
+      asn1cSequenceAdd(to_release->list, NR_DRB_Identity_t, DRB_release);
+      *DRB_release = ++i; // DRB ID
     }
   }
+  params.drb_release_list = to_release;
 
-  nr_rrc_reconfig_param_t params = {.drb_release_list = DRB_Release_configList2, .transaction_id = xid};
   if (nas_length > 0) {
     params.dedicated_NAS_msg_list[params.num_nas_msg].buf = nas_buffer;
     params.dedicated_NAS_msg_list[params.num_nas_msg++].len = nas_length;
@@ -1783,8 +1786,12 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
         UE->n_initial_pdu = 0;
         free(UE->initial_pdus);
         UE->initial_pdus = NULL;
-      } else if (UE->nb_of_pdusessions > 0)
+      } else if (seq_arr_size(&UE->pduSessions) > 0)
         rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(rrc, UE, xid);
+      else
+        LOG_W(NR_RRC,
+              "UE %d: RRC Reconfiguration Complete for PDU session establishment, but no PDU sessions were setup\n",
+              UE->rrc_ue_id);
       break;
     case RRC_PDUSESSION_MODIFY:
       rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(rrc, UE, xid);
@@ -2288,6 +2295,7 @@ static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
   free_MeasConfig(UE->measConfig);
   free(UE->redcap_cap);
   UE->redcap_cap = NULL;
+  seq_arr_free(&UE->pduSessions, free_pdusession);
 }
 
 void rrc_remove_ue(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p)
@@ -2318,9 +2326,7 @@ static void rrc_CU_process_ue_context_release_complete(MessageDef *msg_p)
     /* only trigger release if it has been requested by core
      * otherwise, it might be CU that requested release on a DU during normal
      * operation (i.e, handover) */
-    uint32_t pdu_sessions[NGAP_MAX_PDU_SESSION];
-    get_pduSession_array(UE, pdu_sessions);
-    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, UE->nb_of_pdusessions, pdu_sessions);
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, &UE->pduSessions);
     rrc_remove_ue(RC.nrrrc[0], ue_context_p);
   }
 }
@@ -2500,7 +2506,7 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
 {
   int nb_drb = 0;
   for (int p = 0; p < numPduSession; ++p) {
-    rrc_pdu_session_param_t *pdu = find_pduSession(UE, pduSession[p].id, false);
+    rrc_pdu_session_param_t *pdu = find_pduSession(&UE->pduSessions, pduSession[p].id);
     DevAssert(pdu);
     for (int i = 0; i < pduSession[p].numDRBSetup; i++) {
       const DRB_nGRAN_setup_t *drb_config = &pduSession[p].DRBnGRanList[i];
@@ -2569,7 +2575,7 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
   // save the tunnel address for the PDU sessions
   for (int i = 0; i < resp->numPDUSessions; i++) {
     pdu_session_setup_t *e1_pdu = &resp->pduSession[i];
-    rrc_pdu_session_param_t *rrc_pdu = find_pduSession(UE, e1_pdu->id, false);
+    rrc_pdu_session_param_t *rrc_pdu = find_pduSession(&UE->pduSessions, e1_pdu->id);
     if (rrc_pdu == NULL) {
       LOG_W(RRC, "E1: received setup for PDU session %ld, but has not been requested\n", e1_pdu->id);
       continue;
@@ -2774,11 +2780,8 @@ static bool write_rrc_stats(const gNB_RRC_INST *rrc)
     time_t last_seen = now - ue_ctxt->last_seen;
     fprintf(f, "    last RRC activity: %ld seconds ago\n", last_seen);
 
-    if (ue_ctxt->nb_of_pdusessions == 0)
-      fprintf(f, "    (no PDU sessions)\n");
-    for (int nb_pdu = 0; nb_pdu < ue_ctxt->nb_of_pdusessions; ++nb_pdu) {
-      const rrc_pdu_session_param_t *pdu = &ue_ctxt->pduSession[nb_pdu];
-      fprintf(f, "    PDU session %d ID %d status %s\n", nb_pdu, pdu->param.pdusession_id, get_pdusession_status_text(pdu->status));
+    FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, pdu, &ue_ctxt->pduSessions) {
+      fprintf(f, "    PDU session ID %d status %s\n", pdu->param.pdusession_id, get_pdusession_status_text(pdu->status));
     }
 
     fprintf(f, "    associated DU: ");

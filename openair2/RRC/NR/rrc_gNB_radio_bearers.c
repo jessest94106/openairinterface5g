@@ -31,6 +31,14 @@
 #include "ngap_messages_types.h"
 #include "oai_asn1.h"
 #include "openair2/LAYER2/nr_pdcp/nr_pdcp_asn1_utils.h"
+#include "common/utils/alg/find.h"
+
+static bool eq_pdu_session_id(const void *vval, const void *vit)
+{
+  const int id = *(const int *)vval;
+  const rrc_pdu_session_param_t *elem = vit;
+  return elem->param.pdusession_id == id;
+}
 
 /** @brief Deep copy pdusession_t */
 void cp_pdusession(pdusession_t *dst, const pdusession_t *src)
@@ -41,19 +49,49 @@ void cp_pdusession(pdusession_t *dst, const pdusession_t *src)
   dst->nas_pdu = copy_byte_array(src->nas_pdu);
 }
 
-rrc_pdu_session_param_t *find_pduSession(gNB_RRC_UE_t *ue, int id, bool create)
+/** @brief Free pdusession_t */
+void free_pdusession(void *ptr)
 {
-  int j;
-  for (j = 0; j < ue->nb_of_pdusessions; j++)
-    if (id == ue->pduSession[j].param.pdusession_id)
-      break;
-  if (j == ue->nb_of_pdusessions) {
-    if (create)
-      ue->nb_of_pdusessions++;
-    else
-      return NULL;
+  rrc_pdu_session_param_t *elem = ptr;
+  free_byte_array(elem->param.nas_pdu);
+}
+
+/** @brief Retrieves PDU Session for the input ID
+ *  @return pointer to the found PDU Session, NULL if not found */
+rrc_pdu_session_param_t *find_pduSession(seq_arr_t *seq, int id)
+{
+  DevAssert(seq);
+  elm_arr_t elm = find_if(seq, &id, eq_pdu_session_id);
+  if (elm.found)
+    return (rrc_pdu_session_param_t *)elm.it;
+  return NULL;
+}
+
+/** @brief Adds a new PDU Session to the list
+ *  @return pointer to the new PDU Session */
+rrc_pdu_session_param_t *add_pduSession(seq_arr_t *sessions_ptr, const pdusession_t *in)
+{
+  DevAssert(sessions_ptr);
+  DevAssert(in);
+
+  if (seq_arr_size(sessions_ptr) == NGAP_MAX_PDU_SESSION) {
+    LOG_W(NR_RRC, "Reached maximum number of PDU Session = %ld\n", seq_arr_size(sessions_ptr));
+    return NULL;
   }
-  return ue->pduSession + j;
+
+  rrc_pdu_session_param_t *exists = find_pduSession(sessions_ptr, in->pdusession_id);
+  if (exists) {
+    LOG_E(NR_RRC, "Trying to add an already existing PDU Session with ID=%d\n", in->pdusession_id);
+    return NULL;
+  }
+
+  rrc_pdu_session_param_t new = {.param = *in, .status = PDU_SESSION_STATUS_NEW, .xid = -1};
+  seq_arr_push_back(sessions_ptr, &new, sizeof(rrc_pdu_session_param_t));
+  rrc_pdu_session_param_t *added = find_pduSession(sessions_ptr, in->pdusession_id);
+  DevAssert(added);
+  LOG_I(NR_RRC, "Added PDU Session %d, (total nb of sessions = %ld)\n", in->pdusession_id, seq_arr_size(sessions_ptr));
+
+  return added;
 }
 
 rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id)
@@ -65,13 +103,7 @@ rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id
     return NULL;
   }
   int id = drb->cnAssociation.sdap_config.pdusession_id;
-  return find_pduSession(ue, id, false);
-}
-
-void get_pduSession_array(gNB_RRC_UE_t *ue, uint32_t pdu_sessions[NGAP_MAX_PDU_SESSION])
-{
-  for (int i = 0; i < ue->nb_of_pdusessions && i < NGAP_MAX_PDU_SESSION; ++i)
-    pdu_sessions[i] = ue->pduSession[i].param.pdusession_id;
+  return find_pduSession(&ue->pduSessions, id);
 }
 
 drb_t *get_drb(gNB_RRC_UE_t *ue, uint8_t drb_id)
@@ -117,7 +149,7 @@ void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, d
 
 drb_t *generateDRB(gNB_RRC_UE_t *ue,
                    uint8_t drb_id,
-                   const rrc_pdu_session_param_t *pduSession,
+                   const pdusession_t *pduSession,
                    bool enable_sdap,
                    int do_drb_integrity,
                    int do_drb_ciphering,
@@ -125,7 +157,7 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
 {
   DevAssert(ue != NULL);
 
-  LOG_I(NR_RRC, "UE %d: configure DRB ID %d for PDU session ID %d\n", ue->rrc_ue_id, drb_id, pduSession->param.pdusession_id);
+  LOG_I(NR_RRC, "UE %d: configure DRB ID %d for PDU session ID %d\n", ue->rrc_ue_id, drb_id, pduSession->pdusession_id);
 
   drb_t *est_drb = &ue->established_drbs[drb_id - 1];
   DevAssert(est_drb->status == DRB_INACTIVE);
@@ -136,7 +168,7 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
 
   /* SDAP Configuration */
   est_drb->cnAssociation.present = NR_DRB_ToAddMod__cnAssociation_PR_sdap_Config;
-  est_drb->cnAssociation.sdap_config.pdusession_id = pduSession->param.pdusession_id;
+  est_drb->cnAssociation.sdap_config.pdusession_id = pduSession->pdusession_id;
   if (enable_sdap) {
     est_drb->cnAssociation.sdap_config.sdap_HeaderDL = NR_SDAP_Config__sdap_HeaderDL_present;
     est_drb->cnAssociation.sdap_config.sdap_HeaderUL = NR_SDAP_Config__sdap_HeaderUL_present;
@@ -144,9 +176,9 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
     est_drb->cnAssociation.sdap_config.sdap_HeaderDL = NR_SDAP_Config__sdap_HeaderDL_absent;
     est_drb->cnAssociation.sdap_config.sdap_HeaderUL = NR_SDAP_Config__sdap_HeaderUL_absent;
   }
-  for (int qos_flow_index = 0; qos_flow_index < pduSession->param.nb_qos; qos_flow_index++) {
-    est_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index] = pduSession->param.qos[qos_flow_index].qfi;
-    if (pduSession->param.qos[qos_flow_index].fiveQI > 5)
+  for (int qos_flow_index = 0; qos_flow_index < pduSession->nb_qos; qos_flow_index++) {
+    est_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index] = pduSession->qos[qos_flow_index].qfi;
+    if (pduSession->qos[qos_flow_index].fiveQI > 5)
       est_drb->status = DRB_ACTIVE_NONGBR;
     else
       est_drb->status = DRB_ACTIVE;

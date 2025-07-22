@@ -88,6 +88,7 @@
 #include "uper_encoder.h"
 #include "rrc_gNB_mobility.h"
 #include "rrc_gNB_du.h"
+#include "common/utils/alg/find.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
@@ -278,9 +279,14 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
 
   e1ap_nssai_t cuup_nssai = {0};
   for (int i = 0; i < n; i++) {
-    rrc_pdu_session_param_t *pduSession = find_pduSession(UE, sessions[i].pdusession_id, true);
+    rrc_pdu_session_param_t *pduSession = add_pduSession(&UE->pduSessions, &sessions[i]);
+    if (!pduSession) {
+      LOG_E(NR_RRC, "Could not add PDU Session %d for UE %d\n", sessions[i].pdusession_id, UE->rrc_ue_id);
+      continue;
+    }
     pdusession_t *session = &pduSession->param;
-    cp_pdusession(session, &sessions[i]);
+    LOG_I(NR_RRC, "Add PDU Session %d (total nb of sessions = %ld)\n", session->pdusession_id, seq_arr_size(&UE->pduSessions));
+    // Fill E1 Bearer Context Modification Request
     bearer_req.gNB_cu_cp_ue_id = UE->rrc_ue_id;
     security_information_t *secInfo = &bearer_req.secInfo;
     secInfo->cipheringAlgorithm = rrc->security.do_drb_ciphering ? UE->ciphering_algorithm : 0;
@@ -312,7 +318,7 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
     int drb_id = get_next_available_drb_id(UE);
     drb_t *rrc_drb = generateDRB(UE,
                                  drb_id,
-                                 pduSession,
+                                 session,
                                  rrc->configuration.enable_sdap,
                                  rrc->security.do_drb_integrity,
                                  rrc->security.do_drb_ciphering,
@@ -522,8 +528,8 @@ void rrc_gNB_send_NGAP_INITIAL_CONTEXT_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_
 
   resp->gNB_ue_ngap_id = UE->rrc_ue_id;
 
-  for (int pdusession = 0; pdusession < UE->nb_of_pdusessions; pdusession++) {
-    rrc_pdu_session_param_t *session = &UE->pduSession[pdusession];
+  // Optional: PDU Sessions to Setup
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
     if (session->status == PDU_SESSION_STATUS_DONE) {
       resp->pdusessions[pdu_sessions_done++] = fill_ngap_pdusession_setup(&session->param);
     } else if (session->status != PDU_SESSION_STATUS_ESTABLISHED) {
@@ -705,8 +711,7 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
   ngap_pdusession_setup_resp_t *resp = &NGAP_PDUSESSION_SETUP_RESP(msg_p);
   resp->gNB_ue_ngap_id = UE->rrc_ue_id;
 
-  for (int pdusession = 0; pdusession < UE->nb_of_pdusessions; pdusession++) {
-    rrc_pdu_session_param_t *session = &UE->pduSession[pdusession];
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
     if (session->status == PDU_SESSION_STATUS_DONE) {
       resp->pdusessions[pdu_sessions_done++] = fill_ngap_pdusession_setup(&session->param);
       session->status = PDU_SESSION_STATUS_ESTABLISHED;
@@ -727,8 +732,8 @@ void rrc_gNB_send_NGAP_PDUSESSION_SETUP_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
     itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
   }
 
-  for(int i = 0; i < NB_RB_MAX; i++) {
-    UE->pduSession[i].xid = -1;
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
+    session->xid = -1;
   }
 
   return;
@@ -816,7 +821,7 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   // might be more work than is worth it. See 8.2.1.4 in 38.413
   for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i) {
     const pdusession_resource_item_t *p = &msg->pdusession[i];
-    rrc_pdu_session_param_t *exist = find_pduSession(UE, p->pdusession_id, false /* don't create */);
+    rrc_pdu_session_param_t *exist = find_pduSession(&UE->pduSessions, p->pdusession_id);
     if (exist) {
       LOG_E(NR_RRC, "UE %d: already has existing PDU session %d rejecting PDU Session Resource Setup Request\n", UE->rrc_ue_id, p->pdusession_id);
       ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_PDU_SESSION_ID_INSTANCES};
@@ -883,33 +888,21 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   bool all_failed = true;
   for (int i = 0; i < req->nb_pdusessions_tomodify; i++) {
-    rrc_pdu_session_param_t *sess;
-    const pdusession_resource_item_t *sessMod = req->pdusession + i;
-    for (sess = UE->pduSession; sess < UE->pduSession + UE->nb_of_pdusessions; sess++)
-      if (sess->param.pdusession_id == sessMod->pdusession_id)
-        break;
-    if (sess == UE->pduSession + UE->nb_of_pdusessions) {
+    const pdusession_resource_item_t *sessMod = &req->pdusession[i];
+    rrc_pdu_session_param_t *session = find_pduSession(&UE->pduSessions, sessMod->pdusession_id);
+    if (!session) {
       LOG_W(NR_RRC, "Requested modification of non-existing PDU session, refusing modification\n");
-      UE->nb_of_pdusessions++;
-      sess->status = PDU_SESSION_STATUS_FAILED;
-      sess->param.pdusession_id = sessMod->pdusession_id;
-      sess->cause.type = NGAP_CAUSE_RADIO_NETWORK;
-      UE->pduSession[i].cause.type = NGAP_CAUSE_RADIO_NETWORK;
-      UE->pduSession[i].cause.value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID;
+      rrc_pdu_session_param_t to_add = {0};
+      to_add.status = PDU_SESSION_STATUS_FAILED;
+      to_add.param.pdusession_id = sessMod->pdusession_id;
+      to_add.cause.type = NGAP_CAUSE_RADIO_NETWORK;
+      to_add.cause.value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID;
+      seq_arr_push_back(&UE->pduSessions, &to_add, sizeof(to_add));
     } else {
       all_failed = false;
-      sess->status = PDU_SESSION_STATUS_NEW;
-      sess->param.pdusession_id = sessMod->pdusession_id;
-      sess->cause.type = NGAP_CAUSE_RADIO_NETWORK;
-      sess->cause.value = NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_PDU_SESSION_ID_INSTANCES;
-      sess->status = PDU_SESSION_STATUS_NEW;
-      sess->param.pdusession_id = sessMod->pdusession_id;
-      sess->cause.type = NGAP_CAUSE_NOTHING;
-      if (sessMod->nas_pdu.buf != NULL) {
-        UE->pduSession[i].param.nas_pdu = sessMod->nas_pdu;
-      }
-      for (int i = 0; i < req->nb_pdusessions_tomodify; ++i)
-        cp_pdusession_resource_item_to_pdusession(&UE->pduSession[i].param, &req->pdusession[i]);
+      session->status = PDU_SESSION_STATUS_NEW;
+      session->cause.type = NGAP_CAUSE_NOTHING;
+      cp_pdusession_resource_item_to_pdusession(&session->param, sessMod);
     }
   }
 
@@ -927,11 +920,12 @@ int rrc_gNB_process_NGAP_PDUSESSION_MODIFY_REQ(MessageDef *msg_p, instance_t ins
     msg->gNB_ue_ngap_id = req->gNB_ue_ngap_id;
     msg->nb_of_pdusessions = 0;
 
-    for (int i = 0; i < UE->nb_of_pdusessions; i++) {
-      if (UE->pduSession[i].status == PDU_SESSION_STATUS_FAILED) {
-        msg->pdusessions_failed[i].pdusession_id = UE->pduSession[i].param.pdusession_id;
-        msg->pdusessions_failed[i].cause.type = UE->pduSession[i].cause.type;
-        msg->pdusessions_failed[i].cause.value = UE->pduSession[i].cause.value;
+    FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
+      if (session->status == PDU_SESSION_STATUS_FAILED) {
+        msg->pdusessions_failed[msg->nb_of_pdusessions_failed].pdusession_id = session->param.pdusession_id;
+        msg->pdusessions_failed[msg->nb_of_pdusessions_failed].cause.type = session->cause.type;
+        msg->pdusessions_failed[msg->nb_of_pdusessions_failed].cause.value = session->cause.value;
+        msg->nb_of_pdusessions_failed++;
       }
     }
     itti_send_msg_to_task(TASK_NGAP, instance, msg_fail_p);
@@ -945,6 +939,11 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
   uint16_t pdu_sessions_failed = 0;
   uint16_t pdu_sessions_done = 0;
 
+  if (!seq_arr_size(&UE->pduSessions)) {
+    LOG_W(NR_RRC, "UE %d: No PDU sessions in the list, don't send NG PDU Session Modify Response\n", UE->rrc_ue_id);
+    return -1;
+  }
+
   msg_p = itti_alloc_new_message (TASK_RRC_GNB, rrc->module_id, NGAP_PDUSESSION_MODIFY_RESP);
   if (msg_p == NULL) {
     LOG_E(NR_RRC, "itti_alloc_new_message failed, msg_p is NULL \n");
@@ -955,63 +954,54 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
 
   resp->gNB_ue_ngap_id = UE->rrc_ue_id;
 
-  for (int i = 0; i < UE->nb_of_pdusessions; i++) {
-    if (xid != UE->pduSession[i].xid) {
-      LOG_W(NR_RRC, "xid does not correspond (context pdu session index %d, status %d, xid %d/%d) \n ", i, UE->pduSession[i].status, xid, UE->pduSession[i].xid);
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
+    if (xid != session->xid) {
+      LOG_W(NR_RRC,
+            "xid does not correspond (PDU Session %d, status %d, xid %d/%d) \n ",
+            session->param.pdusession_id,
+            session->status,
+            xid,
+            session->xid);
       continue;
     }
-    if (UE->pduSession[i].status == PDU_SESSION_STATUS_DONE) {
-      rrc_pdu_session_param_t *pduSession = find_pduSession(UE, UE->pduSession[i].param.pdusession_id, false);
-      if (pduSession) {
-        LOG_I(NR_RRC, "update pdu session %d \n", pduSession->param.pdusession_id);
-        // Update UE->pduSession
-        pduSession->status = PDU_SESSION_STATUS_ESTABLISHED;
-        pduSession->cause.type = NGAP_CAUSE_NOTHING;
-        for (int qos_flow_index = 0; qos_flow_index < UE->pduSession[i].param.nb_qos; qos_flow_index++) {
-          pduSession->param.qos[qos_flow_index] = UE->pduSession[i].param.qos[qos_flow_index];
-        }
-        resp->pdusessions[pdu_sessions_done].pdusession_id = UE->pduSession[i].param.pdusession_id;
-        for (int qos_flow_index = 0; qos_flow_index < UE->pduSession[i].param.nb_qos; qos_flow_index++) {
-          resp->pdusessions[pdu_sessions_done].qos[qos_flow_index].qfi = UE->pduSession[i].param.qos[qos_flow_index].qfi;
-        }
-        resp->pdusessions[pdu_sessions_done].pdusession_id = UE->pduSession[i].param.pdusession_id;
-        resp->pdusessions[pdu_sessions_done].nb_of_qos_flow = UE->pduSession[i].param.nb_qos;
-        LOG_I(NR_RRC,
-              "Modify Resp (msg index %d, pdu session index %d, status %d, xid %d): nb_of_pduSessions %d,  pdusession_id %d \n ",
-              pdu_sessions_done,
-              i,
-              UE->pduSession[i].status,
-              xid,
-              UE->nb_of_pdusessions,
-              resp->pdusessions[pdu_sessions_done].pdusession_id);
-        pdu_sessions_done++;
-      } else {
-        LOG_W(NR_RRC, "PDU SESSION modify of a not existing pdu session %d \n", UE->pduSession[i].param.pdusession_id);
-        resp->pdusessions_failed[pdu_sessions_failed].pdusession_id = UE->pduSession[i].param.pdusession_id;
-        ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID};
-        resp->pdusessions_failed[pdu_sessions_failed].cause = cause;
-        pdu_sessions_failed++;
+    if (session->status == PDU_SESSION_STATUS_DONE) {
+      LOG_I(NR_RRC, "Successfully modified PDU Session %d \n", session->param.pdusession_id);
+      // Update status
+      session->status = PDU_SESSION_STATUS_ESTABLISHED;
+      session->cause.type = NGAP_CAUSE_NOTHING;
+      // Fill response
+      DevAssert(pdu_sessions_done < NGAP_MAX_PDU_SESSION);
+      resp->pdusessions[pdu_sessions_done].pdusession_id = session->param.pdusession_id;
+      for (int qos_flow_index = 0; qos_flow_index < session->param.nb_qos; qos_flow_index++) {
+        resp->pdusessions[pdu_sessions_done].qos[qos_flow_index].qfi = session->param.qos[qos_flow_index].qfi;
       }
-    } else if ((UE->pduSession[i].status == PDU_SESSION_STATUS_NEW) || (UE->pduSession[i].status == PDU_SESSION_STATUS_ESTABLISHED)) {
+      resp->pdusessions[pdu_sessions_done].pdusession_id = session->param.pdusession_id;
+      resp->pdusessions[pdu_sessions_done].nb_of_qos_flow = session->param.nb_qos;
+      LOG_I(NR_RRC,
+            "Modify Resp (msg index %d, status %d, xid %d): nb_of_pduSessions %ld, pdusession_id %d \n ",
+            pdu_sessions_done,
+            session->status,
+            xid,
+            seq_arr_size(&UE->pduSessions),
+            resp->pdusessions[pdu_sessions_done].pdusession_id);
+      pdu_sessions_done++;
+    } else if ((session->status == PDU_SESSION_STATUS_NEW) || (session->status == PDU_SESSION_STATUS_ESTABLISHED)) {
       LOG_D(NR_RRC, "PDU SESSION is NEW or already ESTABLISHED\n");
-    } else if (UE->pduSession[i].status == PDU_SESSION_STATUS_FAILED) {
-      resp->pdusessions_failed[pdu_sessions_failed].pdusession_id = UE->pduSession[i].param.pdusession_id;
-      resp->pdusessions_failed[pdu_sessions_failed].cause.type = UE->pduSession[i].cause.type;
-      resp->pdusessions_failed[pdu_sessions_failed].cause.value = UE->pduSession[i].cause.value;
+    } else if (session->status == PDU_SESSION_STATUS_FAILED) {
+      DevAssert(pdu_sessions_failed < NGAP_MAX_PDU_SESSION);
+      resp->pdusessions_failed[pdu_sessions_failed].pdusession_id = session->param.pdusession_id;
+      resp->pdusessions_failed[pdu_sessions_failed].cause.type = session->cause.type;
+      resp->pdusessions_failed[pdu_sessions_failed].cause.value = session->cause.value;
       pdu_sessions_failed++;
-    }
-    else
-      LOG_W(NR_RRC,
-            "Modify pdu session %d, unknown state %d \n ",
-            UE->pduSession[i].param.pdusession_id,
-            UE->pduSession[i].status);
+    } else
+      LOG_W(NR_RRC, "Modify pdu session %d, unknown state %d \n ", session->param.pdusession_id, session->status);
   }
 
   resp->nb_of_pdusessions = pdu_sessions_done;
   resp->nb_of_pdusessions_failed = pdu_sessions_failed;
 
   if (pdu_sessions_done > 0 || pdu_sessions_failed > 0) {
-    LOG_D(NR_RRC, "NGAP_PDUSESSION_MODIFY_RESP: sending the message (total pdu session %d)\n", UE->nb_of_pdusessions);
+    LOG_D(NR_RRC, "NGAP_PDUSESSION_MODIFY_RESP: sending the message (total pdu session %ld)\n", seq_arr_size(&UE->pduSessions));
     itti_send_msg_to_task (TASK_NGAP, rrc->module_id, msg_p);
   } else {
     itti_free (ITTI_MSG_ORIGIN_ID(msg_p), msg_p);
@@ -1036,8 +1026,10 @@ void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(const module_id_t gnb_mod_idP,
     req->gNB_ue_ngap_id = UE->rrc_ue_id;
     req->cause.type = causeP.type;
     req->cause.value = causeP.value;
-    for (int i = 0; i < UE->nb_of_pdusessions; i++) {
-      req->pdusessions[i].pdusession_id = UE->pduSession[i].param.pdusession_id;
+    // PDU Session Resource List (optional)
+    FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
+      DevAssert(req->nb_of_pdusessions < NGAP_MAX_PDU_SESSION);
+      req->pdusessions[req->nb_of_pdusessions].pdusession_id = session->param.pdusession_id;
       req->nb_of_pdusessions++;
     }
     itti_send_msg_to_task(TASK_NGAP, GNB_MODULE_ID_TO_INSTANCE(gnb_mod_idP), msg);
@@ -1255,7 +1247,7 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_
     LOG_W(NR_RRC, "[gNB %ld] In NGAP_UE_CONTEXT_RELEASE_COMMAND: unknown UE from gNB_ue_ngap_id (%u)\n",
           instance,
           gNB_ue_ngap_id);
-    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(instance, gNB_ue_ngap_id, 0, NULL);
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(instance, gNB_ue_ngap_id, NULL);
     return -1;
   }
 
@@ -1286,25 +1278,24 @@ int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_
     /* UE will be freed after UE context release complete */
   } else {
     // the DU is offline already
-    uint32_t pdu_sessions[NGAP_MAX_PDU_SESSION];
-    get_pduSession_array(UE, pdu_sessions);
-    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, UE->nb_of_pdusessions, pdu_sessions);
+    rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(0, UE->rrc_ue_id, &UE->pduSessions);
     rrc_remove_ue(rrc, ue_context_p);
   }
 
   return 0;
 }
 
-void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance,
-                                                   uint32_t gNB_ue_ngap_id,
-                                                   int num_pdu,
-                                                   uint32_t pdu_session_id[256])
+void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_COMPLETE(instance_t instance, uint32_t gNB_ue_ngap_id, seq_arr_t *pdusessions)
 {
   MessageDef *msg = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_UE_CONTEXT_RELEASE_COMPLETE);
-  NGAP_UE_CONTEXT_RELEASE_COMPLETE(msg).gNB_ue_ngap_id = gNB_ue_ngap_id;
-  NGAP_UE_CONTEXT_RELEASE_COMPLETE(msg).num_pdu_sessions = num_pdu;
-  for (int i = 0; i < num_pdu; ++i)
-    NGAP_UE_CONTEXT_RELEASE_COMPLETE(msg).pdu_session_id[i] = pdu_session_id[i];
+  ngap_ue_release_complete_t *complete = &NGAP_UE_CONTEXT_RELEASE_COMPLETE(msg);
+  complete->gNB_ue_ngap_id = gNB_ue_ngap_id;
+  // PDU Session Resource List (Optional)
+  if (pdusessions && seq_arr_size(pdusessions)) {
+    FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, pdusessions) {
+      complete->pdu_session_id[complete->num_pdu_sessions++] = session->param.pdusession_id;
+    }
+  }
   itti_send_msg_to_task(TASK_NGAP, instance, msg);
 }
 
@@ -1361,14 +1352,14 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(gNB_RRC_INST *rrc, gNB_RRC_U
   // AMF UE NGAP ID
   msg->amf_ue_ngap_id = UE->amf_ue_ngap_id;
   // PDU Session Resource Admitted List
-  msg->nb_of_pdusessions = UE->nb_of_pdusessions;
-  for (int i = 0; i < UE->nb_of_pdusessions; i++) {
-    rrc_pdu_session_param_t *session = &UE->pduSession[i];
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t*, session, &UE->pduSessions) {
     session->status = PDU_SESSION_STATUS_ESTABLISHED;
     // PDU Session ID
-    msg->pdusessions[i].pdu_session_id = session->param.pdusession_id;
+    DevAssert(msg->nb_of_pdusessions < NGAP_MAX_PDU_SESSION);
+    pdu_session_resource_admitted_t *pdu = &msg->pdusessions[msg->nb_of_pdusessions++];
+    pdu->pdu_session_id = session->param.pdusession_id;
     // Handover Request Acknowledge Transfer
-    ho_request_ack_transfer_t *transfer = &msg->pdusessions[i].ack_transfer;
+    ho_request_ack_transfer_t *transfer = &pdu->ack_transfer;
     transfer->gtp_teid = session->param.n3_outgoing.teid;
     memcpy(transfer->gNB_addr.buffer, session->param.n3_outgoing.addr.buffer, session->param.n3_outgoing.addr.length);
     transfer->gNB_addr.length = session->param.n3_outgoing.addr.length;
@@ -1439,19 +1430,19 @@ void rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(gNB_RRC_INST *rrc, gNB_RRC_UE
   memset(resp, 0, sizeof(*resp));
   resp->gNB_ue_ngap_id = UE->rrc_ue_id;
 
-  for (int i = 0; i < UE->nb_of_pdusessions; i++) {
-    if (xid == UE->pduSession[i].xid) {
-      resp->pdusession_release[pdu_sessions_released].pdusession_id = UE->pduSession[i].param.pdusession_id;
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
+    if (xid == session->xid) {
+      const pdusession_t *pdusession = &session->param;
+      resp->pdusession_release[pdu_sessions_released].pdusession_id = pdusession->pdusession_id;
+      session->status = PDU_SESSION_STATUS_RELEASED;
       pdu_sessions_released++;
-      //clear
-      memset(&UE->pduSession[i], 0, sizeof(*UE->pduSession));
-      UE->pduSession[i].status = PDU_SESSION_STATUS_RELEASED;
-      LOG_W(NR_RRC, "Released pdu session, but code to finish to free memory\n");
     }
   }
 
   resp->nb_of_pdusessions_released = pdu_sessions_released;
   resp->nb_of_pdusessions_failed = 0;
+  DevAssert(resp->nb_of_pdusessions_released < NGAP_MAX_PDU_SESSION);
+
   LOG_I(NR_RRC, "NGAP PDUSESSION RELEASE RESPONSE: rrc_ue_id %u release_pdu_sessions %d\n", resp->gNB_ue_ngap_id, pdu_sessions_released);
   itti_send_msg_to_task (TASK_NGAP, rrc->module_id, msg_p);
 }
@@ -1479,14 +1470,15 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(MessageDef *msg_p, instance_
   uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   UE->xids[xid] = RRC_PDUSESSION_RELEASE;
   for (int pdusession = 0; pdusession < cmd->nb_pdusessions_torelease; pdusession++) {
-    rrc_pdu_session_param_t *pduSession = find_pduSession(UE, cmd->pdusession_release_params[pdusession].pdusession_id, false);
+    rrc_pdu_session_param_t *pduSession = find_pduSession(&UE->pduSessions, cmd->pdusession_release_params[pdusession].pdusession_id);
     if (!pduSession) {
       LOG_I(NR_RRC, "no pdusession_id, AMF requested to close it id=%d\n", cmd->pdusession_release_params[pdusession].pdusession_id);
-      int j=UE->nb_of_pdusessions++;
-      UE->pduSession[j].status = PDU_SESSION_STATUS_FAILED;
-      UE->pduSession[j].param.pdusession_id = cmd->pdusession_release_params[pdusession].pdusession_id;
+      rrc_pdu_session_param_t item = {0};
+      item.status = PDU_SESSION_STATUS_FAILED;
+      item.param.pdusession_id = cmd->pdusession_release_params[pdusession].pdusession_id;
       ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID};
-      UE->pduSession[j].cause = cause;
+      item.cause = cause;
+      seq_arr_push_back(&UE->pduSessions, &item, sizeof(item));
       continue;
     }
     if (pduSession->status == PDU_SESSION_STATUS_FAILED) {
@@ -1578,7 +1570,6 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
   ngap_handover_required_t msg = {
       .amf_ue_ngap_id = UE->amf_ue_ngap_id,
       .gNB_ue_ngap_id = UE->rrc_ue_id,
-      .nb_of_pdusessions = UE->nb_of_pdusessions,
       .cause.type = NGAP_CAUSE_RADIO_NETWORK,
       .cause.value = NGAP_CAUSE_RADIO_NETWORK_HANDOVER_DESIRABLE_FOR_RADIO_REASON,
       .handoverType = HANDOVER_TYPE_INTRA5GS,
@@ -1607,22 +1598,21 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
   /* Fill both PDU Session Resource List IE (M) in Handover Required
      and PDU Session Resource Information List IE (O) in the Source NG-RAN
      Node to Target NG-RAN Node Transparent Container */
-  for (int i = 0; i < UE->nb_of_pdusessions; ++i) {
-    if (UE->pduSession[i].status == PDU_SESSION_STATUS_DONE || UE->pduSession[i].status == PDU_SESSION_STATUS_ESTABLISHED) {
-      rrc_pdu_session_param_t *pduSession = find_pduSession(UE, UE->pduSession[i].param.pdusession_id, false);
-      if (!pduSession)
-        continue;
-      pdusession_t *session = &pduSession->param;
-      // PDU Session ID
-      msg.pdusessions[i].pdusession_id = session->pdusession_id;
-      // PDU Session Resource Information List (O)
-      pdusession_resource_info_t *pdu_info = &msg.source2target->pdu_session_resource[msg.source2target->nb_pdu_session_resource++];
-      pdu_info->pdusession_id = session->pdusession_id;
-      pdu_info->nb_of_qos_flow = session->nb_qos;
-      for (int j = 0; j < session->nb_qos; ++j) {
-        pdu_info->qos_flow_info[j].qfi = session->qos[j].qfi;
-      }
-      msg.source2target->nb_pdu_session_resource++;
+  FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t*, pduSession, &UE->pduSessions) {
+    if (pduSession->status != PDU_SESSION_STATUS_DONE && pduSession->status != PDU_SESSION_STATUS_ESTABLISHED)
+      continue;
+    pdusession_t *session = &pduSession->param;
+    DevAssert(msg.nb_of_pdusessions < NGAP_MAX_PDU_SESSION);
+    pdusession_resource_t *pdu = &msg.pdusessions[msg.nb_of_pdusessions++];
+    // PDU Session ID
+    pdu->pdusession_id = session->pdusession_id;
+    // PDU Session Resource Information List (O)
+    DevAssert(msg.source2target->nb_pdu_session_resource < NGAP_MAX_PDU_SESSION);
+    pdusession_resource_info_t *pdu_info = &msg.source2target->pdu_session_resource[msg.source2target->nb_pdu_session_resource++];
+    pdu_info->pdusession_id = session->pdusession_id;
+    pdu_info->nb_of_qos_flow = session->nb_qos;
+    for (int j = 0; j < pdu_info->nb_of_qos_flow; ++j) {
+      pdu_info->qos_flow_info[j].qfi = session->qos[j].qfi;
     }
   }
 
