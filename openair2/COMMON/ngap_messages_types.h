@@ -918,19 +918,13 @@ typedef struct ngap_pdusession_release_command_s {
 } ngap_pdusession_release_command_t;
 
 typedef struct ngap_pdusession_release_resp_s {
-  /* AMF UE id  */
+  // AMF UE NGAP ID
   uint64_t amf_ue_ngap_id;
   // RAN UE NGAP ID
   uint32_t gNB_ue_ngap_id;
   // PDU Session Resource Released List
   uint16_t nb_of_pdusessions_released;
   pdusession_release_t pdusession_release[NGAP_MAX_PDU_SESSION];
-
-  /* Number of pdusession failed to be released in list */
-  uint8_t              nb_of_pdusessions_failed;
-  /* list of pdusessions that failed to be released */
-  pdusession_failed_t  pdusessions_failed[NGAP_MAX_PDU_SESSION];
-
 } ngap_pdusession_release_resp_t;
 
 /** 9.2.3.14 Uplink RAN Status Transfer (3GPP TS 38.413)
