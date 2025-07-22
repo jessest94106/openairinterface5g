@@ -78,6 +78,10 @@ static uint8_t nr_ue_get_sdu(NR_UE_MAC_INST_t *mac,
                              int P_MAX,
                              bool *BSRsent);
 
+static void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frameP, int slotP);
+static void nr_schedule_csirs_reception(NR_UE_MAC_INST_t *mac, int frame, int slot);
+static void nr_schedule_csi_for_im(NR_UE_MAC_INST_t *mac, int frame, int slot);
+
 static void clear_ul_config_request(NR_UE_MAC_INST_t *mac)
 {
   int slots = mac->frame_structure.numb_slots_frame;
@@ -1709,7 +1713,7 @@ static bool schedule_uci_on_pusch(NR_UE_MAC_INST_t *mac,
   return mux_done;
 }
 
-void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frameP, int slotP)
+static void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frameP, int slotP)
 {
   PUCCH_sched_t pucch[3] = {0}; // TODO the size might change in the future in case of multiple SR or multiple CSI in a slot
 
@@ -1784,7 +1788,7 @@ void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frameP, int slotP)
   }
 }
 
-void nr_schedule_csi_for_im(NR_UE_MAC_INST_t *mac, int frame, int slot)
+static void nr_schedule_csi_for_im(NR_UE_MAC_INST_t *mac, int frame, int slot)
 {
   if (!mac->sc_info.csi_MeasConfig)
     return;
@@ -2025,7 +2029,7 @@ void configure_csi_resource_mapping(fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_c
   }
 }
 
-void nr_schedule_csirs_reception(NR_UE_MAC_INST_t *mac, int frame, int slot)
+static void nr_schedule_csirs_reception(NR_UE_MAC_INST_t *mac, int frame, int slot)
 {
   if (!mac->sc_info.csi_MeasConfig)
     return;

@@ -104,11 +104,11 @@ NR_ControlResourceSet_t *ue_get_coreset(const NR_BWP_PDCCH_t *config, const int 
   return coreset;
 }
 
-void config_dci_pdu(NR_UE_MAC_INST_t *mac,
-                    fapi_nr_dl_config_request_t *dl_config,
-                    const int rnti_type,
-                    const int slot,
-                    const NR_SearchSpace_t *ss)
+static void config_dci_pdu(NR_UE_MAC_INST_t *mac,
+                           fapi_nr_dl_config_request_t *dl_config,
+                           const int rnti_type,
+                           const int slot,
+                           const NR_SearchSpace_t *ss)
 {
   const NR_UE_DL_BWP_t *current_DL_BWP = mac->current_DL_BWP;
   const NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
