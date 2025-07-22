@@ -72,7 +72,7 @@
 #include "nr_nas_msg.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
 
-static NR_UE_RRC_INST_t *NR_UE_rrc_inst;
+static NR_UE_RRC_INST_t *NR_UE_rrc_inst[MAX_NUM_NR_UE_INST] = {0};
 /* NAS Attach request with IMSI */
 static const char nr_nas_attach_req_imsi_dummy_NSA_case[] = {
     0x07,
@@ -149,9 +149,14 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
 
 static void nr_rrc_ue_process_measConfig(rrcPerNB_t *rrc, NR_MeasConfig_t *const measConfig, NR_UE_Timers_Constants_t *timers);
 
-NR_UE_RRC_INST_t* get_NR_UE_rrc_inst(int instance)
+NR_UE_RRC_INST_t *get_NR_UE_rrc_inst(int instance)
 {
-  return &NR_UE_rrc_inst[instance];
+  AssertFatal(instance >= 0 && instance < MAX_NUM_NR_UE_INST, "RRC instance %d out of bounds\n", instance);
+  NR_UE_RRC_INST_t *rrc = NR_UE_rrc_inst[instance];
+  if (rrc == NULL)
+    return NULL;
+  AssertFatal(rrc->ue_id == instance, "RRC ID %d doesn't match with input %d\n", (int)rrc->ue_id, instance);
+  return rrc;
 }
 
 static NR_RB_status_t get_DRB_status(const NR_UE_RRC_INST_t *rrc, NR_DRB_Identity_t drb_id)
@@ -731,67 +736,63 @@ static bool verify_ue_cap(NR_UE_NR_Capability_t *UE_NR_Capability, int nb_antenn
   return true;
 }
 
-NR_UE_RRC_INST_t* nr_rrc_init_ue(char* uecap_file, int nb_inst, int num_ant_tx)
+NR_UE_RRC_INST_t* nr_rrc_init_ue(char* uecap_file, int instance_id, int num_ant_tx)
 {
-  NR_UE_rrc_inst = (NR_UE_RRC_INST_t *)calloc(nb_inst, sizeof(NR_UE_RRC_INST_t));
-  AssertFatal(NR_UE_rrc_inst, "Couldn't allocate %d instances of RRC module\n", nb_inst);
+  AssertFatal(instance_id < MAX_NUM_NR_UE_INST, "RRC instance %d out of bounds\n", instance_id);
+  AssertFatal(NR_UE_rrc_inst[instance_id] == NULL, "RRC instance %d already initialized\n", instance_id);
+  NR_UE_rrc_inst[instance_id] = calloc_or_fail(1, sizeof(NR_UE_RRC_INST_t));
+  NR_UE_RRC_INST_t *rrc = NR_UE_rrc_inst[instance_id];
+  rrc->ue_id = instance_id;
+  // fill UE-NR-Capability @ UE-CapabilityRAT-Container here.
+  rrc->selected_plmn_identity = 1;
+  rrc->ra_trigger = RA_NOT_RUNNING;
+  rrc->dl_bwp_id = 0;
+  rrc->ul_bwp_id = 0;
+  rrc->as_security_activated = false;
+  rrc->detach_after_release = false;
+  rrc->reconfig_after_reestab = false;
+  /* 5G-S-TMSI */
+  rrc->fiveG_S_TMSI = UINT64_MAX;
+  rrc->access_barred = false;
 
-  for(int nr_ue = 0; nr_ue < nb_inst; nr_ue++) {
-    NR_UE_RRC_INST_t *rrc = &NR_UE_rrc_inst[nr_ue];
-    rrc->ue_id = nr_ue;
-    // fill UE-NR-Capability @ UE-CapabilityRAT-Container here.
-    rrc->selected_plmn_identity = 1;
-    rrc->ra_trigger = RA_NOT_RUNNING;
-    rrc->dl_bwp_id = 0;
-    rrc->ul_bwp_id = 0;
-    rrc->as_security_activated = false;
-    rrc->detach_after_release = false;
-    rrc->reconfig_after_reestab = false;
-    /* 5G-S-TMSI */
-    rrc->fiveG_S_TMSI = UINT64_MAX;
-    rrc->access_barred = false;
-
-    FILE *f = NULL;
-    if (uecap_file)
-      f = fopen(uecap_file, "r");
-    if (f) {
-      char UE_NR_Capability_xer[65536];
-      size_t size = fread(UE_NR_Capability_xer, 1, sizeof UE_NR_Capability_xer, f);
-      if (size == 0 || size == sizeof UE_NR_Capability_xer) {
-        LOG_E(NR_RRC, "UE Capabilities XER file %s is too large (%ld)\n", uecap_file, size);
-      }
-      else {
-        asn_dec_rval_t dec_rval =
-            xer_decode(0, &asn_DEF_NR_UE_NR_Capability, (void *)&rrc->UECap.UE_NR_Capability, UE_NR_Capability_xer, size);
-        assert(dec_rval.code == RC_OK);
-      }
-      fclose(f);
-      /* Verify consistency of num PHY antennas vs UE Capabilities */
-      verify_ue_cap(rrc->UECap.UE_NR_Capability, num_ant_tx);
+  FILE *f = NULL;
+  if (uecap_file)
+    f = fopen(uecap_file, "r");
+  if (f) {
+    char UE_NR_Capability_xer[65536];
+    size_t size = fread(UE_NR_Capability_xer, 1, sizeof UE_NR_Capability_xer, f);
+    if (size == 0 || size == sizeof UE_NR_Capability_xer) {
+      LOG_E(NR_RRC, "UE Capabilities XER file %s is too large (%ld)\n", uecap_file, size);
+    } else {
+      asn_dec_rval_t dec_rval =
+          xer_decode(0, &asn_DEF_NR_UE_NR_Capability, (void *)&rrc->UECap.UE_NR_Capability, UE_NR_Capability_xer, size);
+      assert(dec_rval.code == RC_OK);
     }
-
-    memset(&rrc->timers_and_constants, 0, sizeof(rrc->timers_and_constants));
-    set_default_timers_and_constants(&rrc->timers_and_constants);
-
-    for (int j = 0; j < NR_NUM_SRB; j++)
-      rrc->Srb[j] = RB_NOT_PRESENT;
-    for (int j = 1; j <= MAX_DRBS_PER_UE; j++)
-      set_DRB_status(rrc, j, RB_NOT_PRESENT);
-    // SRB0 activated by default
-    rrc->Srb[0] = RB_ESTABLISHED;
-    for (int j = 0; j < NR_MAX_NUM_LCID; j++)
-      rrc->active_RLC_entity[j] = false;
-
-    for (int i = 0; i < NB_CNX_UE; i++) {
-      rrcPerNB_t *ptr = &rrc->perNB[i];
-      ptr->SInfo = (NR_UE_RRC_SI_INFO){0};
-      init_SI_timers(&ptr->SInfo);
-    }
-
-    init_sidelink(rrc);
+    fclose(f);
+    /* Verify consistency of num PHY antennas vs UE Capabilities */
+    verify_ue_cap(rrc->UECap.UE_NR_Capability, num_ant_tx);
   }
 
-  return NR_UE_rrc_inst;
+  memset(&rrc->timers_and_constants, 0, sizeof(rrc->timers_and_constants));
+  set_default_timers_and_constants(&rrc->timers_and_constants);
+
+  for (int j = 0; j < NR_NUM_SRB; j++)
+    rrc->Srb[j] = RB_NOT_PRESENT;
+  for (int j = 1; j <= MAX_DRBS_PER_UE; j++)
+    set_DRB_status(rrc, j, RB_NOT_PRESENT);
+  // SRB0 activated by default
+  rrc->Srb[0] = RB_ESTABLISHED;
+  for (int j = 0; j < NR_MAX_NUM_LCID; j++)
+    rrc->active_RLC_entity[j] = false;
+
+  for (int i = 0; i < NB_CNX_UE; i++) {
+    rrcPerNB_t *ptr = &rrc->perNB[i];
+    ptr->SInfo = (NR_UE_RRC_SI_INFO){0};
+    init_SI_timers(&ptr->SInfo);
+  }
+
+  init_sidelink(rrc);
+  return rrc;
 }
 
 bool check_si_validity(NR_UE_RRC_SI_INFO *SI_info, int si_type)
@@ -2246,7 +2247,7 @@ void *rrc_nrue(void *notUsed)
   instance_t instance = ITTI_MSG_DESTINATION_INSTANCE(msg_p);
   LOG_D(NR_RRC, "[UE %ld] Received %s\n", instance, ITTI_MSG_NAME(msg_p));
 
-  NR_UE_RRC_INST_t *rrc = &NR_UE_rrc_inst[instance];
+  NR_UE_RRC_INST_t *rrc = get_NR_UE_rrc_inst(instance);
   AssertFatal(instance == rrc->ue_id, "Instance %ld received from ITTI doesn't matach with UE-ID %ld\n", instance, rrc->ue_id);
 
   switch (ITTI_MSG_ID(msg_p)) {
@@ -2541,7 +2542,7 @@ void *recv_msgs_from_lte_ue(void *args_p)
       LOG_E(NR_RRC, "%s: Received truncated message %d\n", __func__, recvLen);
       continue;
     }
-    process_lte_nsa_msg(NR_UE_rrc_inst, &msg, recvLen);
+    process_lte_nsa_msg(get_NR_UE_rrc_inst(0), &msg, recvLen);
   }
   return NULL;
 }
@@ -2679,8 +2680,8 @@ static void process_lte_nsa_msg(NR_UE_RRC_INST_t *rrc, nsa_msg_t *msg, int msg_l
 
       uint8_t *nr_RadioBearer_buffer = msg_buffer + offsetof(struct msg, buffer);
       uint8_t *nr_SecondaryCellGroup_buffer = nr_RadioBearer_buffer + nr_RadioBearer_size;
-      process_nsa_message(NR_UE_rrc_inst, nr_SecondaryCellGroupConfig_r15, nr_SecondaryCellGroup_buffer, nr_SecondaryCellGroup_size);
-      process_nsa_message(NR_UE_rrc_inst, nr_RadioBearerConfigX_r15, nr_RadioBearer_buffer, nr_RadioBearer_size);
+      process_nsa_message(get_NR_UE_rrc_inst(0), nr_SecondaryCellGroupConfig_r15, nr_SecondaryCellGroup_buffer, nr_SecondaryCellGroup_size);
+      process_nsa_message(get_NR_UE_rrc_inst(0), nr_RadioBearerConfigX_r15, nr_RadioBearer_buffer, nr_RadioBearer_size);
       LOG_I(NR_RRC, "Calling do_NR_RRCReconfigurationComplete. t_id %ld \n", t_id);
       uint8_t buffer[NR_RRC_BUF_SIZE];
       size_t size = do_NR_RRCReconfigurationComplete_for_nsa(buffer, sizeof(buffer), t_id);
@@ -2944,7 +2945,7 @@ void handle_t430_expiry(NR_UE_RRC_INST_t *rrc)
 void start_sidelink(int instance)
 {
 
-  NR_UE_RRC_INST_t *rrc = &NR_UE_rrc_inst[instance];
+  NR_UE_RRC_INST_t *rrc = get_NR_UE_rrc_inst(instance);
 
   if (get_softmodem_params()->sl_mode == 2) {
 

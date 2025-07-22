@@ -1284,20 +1284,20 @@ void *UE_thread(void *arg)
 
 void init_NR_UE(int nb_inst, char *uecap_file, char *reconfig_file, char *rbconfig_file)
 {
-  NR_UE_RRC_INST_t *rrc_inst = nr_rrc_init_ue(uecap_file, nb_inst, get_nrUE_params()->nb_antennas_tx);
   NR_UE_MAC_INST_t *mac_inst = nr_l2_init_ue(nb_inst);
   AssertFatal(mac_inst, "Couldn't allocate MAC module\n");
 
-  for (int i = 0; i < nb_inst; i++) {
-    NR_UE_MAC_INST_t *mac = get_mac_inst(i);
-    mac->if_module = nr_ue_if_module_init(i);
+  for (int instance_id = 0; instance_id < nb_inst; instance_id++) {
+    NR_UE_MAC_INST_t *mac = get_mac_inst(instance_id);
+    NR_UE_RRC_INST_t *rrc = nr_rrc_init_ue(uecap_file, instance_id, get_nrUE_params()->nb_antennas_tx);
+    mac->if_module = nr_ue_if_module_init(instance_id);
     AssertFatal(mac->if_module, "can not initialize IF module\n");
     if (!IS_SA_MODE(get_softmodem_params()) && !get_softmodem_params()->sl_mode) {
-      init_nsa_message(&rrc_inst[i], reconfig_file, rbconfig_file);
-      nr_rlc_activate_srb0(mac_inst[i].crnti, NULL, send_srb0_rrc);
+      init_nsa_message(rrc, reconfig_file, rbconfig_file);
+      nr_rlc_activate_srb0(mac_inst[instance_id].crnti, NULL, send_srb0_rrc);
     }
     //TODO: Move this call to RRC
-    start_sidelink((&rrc_inst[i])->ue_id);
+    start_sidelink(instance_id);
   }
 }
 
