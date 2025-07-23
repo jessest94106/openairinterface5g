@@ -269,9 +269,9 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
     LOG_DDD("dl_ch0 = &dl_ch_estimates[aarx = (%d)][0]\n", aarx);
 
     const int offset = symbol * coreset_nbr_rb * NBR_RE_PER_RB_WITH_DMRS;
-    c16_t *dl_ch0_ext = &dl_ch_estimates_ext[aarx][offset];
+    c16_t *dl_ch0_ext = dl_ch_estimates_ext[aarx] + offset;
     LOG_DDD("dl_ch0_ext = &dl_ch_estimates_ext[aarx = (%d)][symbol * (frame_parms->N_RB_DL * 9) = (%d)]\n", aarx, offset);
-    c16_t *rxF_ext = &rxdataF_ext[aarx][offset];
+    c16_t *rxF_ext = rxdataF_ext[aarx] + offset;
     LOG_DDD("rxF_ext = &rxdataF_ext[aarx = (%d)][symbol * (frame_parms->N_RB_DL * 9) = (%d)]\n", aarx, offset);
 
     /*
@@ -301,81 +301,40 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
         c_rb += 6;
         c_rb_by6 = c_rb / 6;
       }
-
-      // first we set initial conditions for pointer to rxdataF depending on the situation of the first RB within the CORESET
-      // (c_rb = n_BWP_start)
-      if ((frame_parms->N_RB_DL & 1) == 1 && (c_rb + n_BWP_start) == (frame_parms->N_RB_DL >> 1)) {
-        // treatment of RB containing the DC
-        // if odd number RBs in system bandwidth and first RB to be treated is higher than middle system bandwidth (around DC)
-        // we have to treat the RB in two parts: first part from i=0 to 5, the data is at the end of rxdataF (pointing at the
-        // end of the table)
-        c16_t *rxF = rxFbase + frame_parms->first_carrier_offset + 12 * (c_rb + n_BWP_start);
-
-        int i = 0, j = 0;
-        for (; i < 6; i++) { // treating first part of the RB note that i=5 would correspond to DC. We treat it in NR
-          if ((i != 1) && (i != 5)) {
-            dl_ch0_ext[j] = dl_ch0[i];
-            rxF_ext[j] = rxF[i];
-            LOG_DSYMB("");
-            j++;
-          } else {
-            LOG_DSYMB("\t\t <==> DM-RS PDCCH, this is a pilot symbol\n");
-          }
-        }
-
-        // then we point at the begining of the symbol part of rxdataF do process second part of RB
-        for (; i < 12; i++) {
-          if ((i != 9)) {
-            dl_ch0_ext[j] = dl_ch0[i];
-            rxF_ext[j] = rxFbase[i - 6];
-            LOG_DSYMB("");
-            j++;
-          } else {
-            LOG_DSYMB("\t\t <==> DM-RS PDCCH, this is a pilot symbol\n");
-          }
-        }
-
-      } else { // treatment of any RB that does not contain the DC
-        c16_t *rxF=NULL;
-        if ((frame_parms->N_RB_DL & 1) == 0) {
-          if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
-            // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
-            // at (offset + c_br + symbol * ofdm_symbol_size): even case
-            rxF = rxFbase + (frame_parms->first_carrier_offset + 12 * c_rb) + n_BWP_start * 12;
-          else
-            // number of RBs is even  and c_rb is higher than half system bandwidth (we don't skip DC)
-            // if these conditions are true the pointer has to be situated at the 1st part of the rxdataF
-            // we point at the 1st part of the rxdataF in symbol
-            rxF = rxFbase + 12 * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1));
-        } else {
-          if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
-            // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
-            //  at (offset + c_br + symbol * ofdm_symbol_size): odd case
-            rxF = rxFbase + frame_parms->first_carrier_offset + 12 * (c_rb + n_BWP_start);
-          else if ((c_rb + n_BWP_start) > (frame_parms->N_RB_DL >> 1))
-            // number of RBs is odd  and   c_rb is higher than half system bandwidth + 1
-            // if these conditions are true the pointer has to be situated at the 1st part of
-            // the rxdataF just after the first IQ symbols of the RB containing DC
-            // we point at the 1st part of the rxdataF in symbol
-            rxF = rxFbase + 12 * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1)) - 6;
-        }
-	AssertFatal(rxF, "bug");
-        int j = 0;
-
-        for (int i = 0; i < 12; i++) {
-          if ((i != 1) && (i != 5) && (i != 9)) {
-            rxF_ext[j] = rxF[i];
-            dl_ch0_ext[j] = dl_ch0[i];
-            LOG_DSYMB("");
-            j++;
-          } else {
-            LOG_DSYMB("\t\t <==> DM-RS PDCCH, this is a pilot symbol\n");
-          }
-        }
+      c16_t *rxF = NULL;
+      if ((frame_parms->N_RB_DL & 1) == 0) {
+        if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
+          // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
+          // at (offset + c_br + symbol * ofdm_symbol_size): even case
+          rxF = rxFbase + (frame_parms->first_carrier_offset + 12 * c_rb) + n_BWP_start * 12;
+        else
+          // number of RBs is even  and c_rb is higher than half system bandwidth (we don't skip DC)
+          // if these conditions are true the pointer has to be situated at the 1st part of the rxdataF
+          // we point at the 1st part of the rxdataF in symbol
+          rxF = rxFbase + 12 * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1));
+      } else {
+        if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
+          // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
+          //  at (offset + c_br + symbol * ofdm_symbol_size): odd case
+          rxF = rxFbase + frame_parms->first_carrier_offset + 12 * (c_rb + n_BWP_start);
+        else if ((c_rb + n_BWP_start) > (frame_parms->N_RB_DL >> 1))
+          // number of RBs is odd  and   c_rb is higher than half system bandwidth + 1
+          // if these conditions are true the pointer has to be situated at the 1st part of
+          // the rxdataF just after the first IQ symbols of the RB containing DC
+          // we point at the 1st part of the rxdataF in symbol
+          rxF = rxFbase + 12 * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1)) - 6;
+        else
+          rxF = rxFbase + frame_parms->first_carrier_offset + 12 * (c_rb + n_BWP_start);
+      }
+      const int valid_re[NBR_RE_PER_RB_WITHOUT_DMRS] = {0, 2, 3, 4, 6, 7, 8, 10, 11};
+      for (int i = 0; i < sizeofArray(valid_re); i++) {
+        rxF_ext[i] = rxF[valid_re[i]];
+        dl_ch0_ext[i] = dl_ch0[valid_re[i]];
+        LOG_DSYMB("");
       }
       dl_ch0_ext += NBR_RE_PER_RB_WITHOUT_DMRS;
       rxF_ext += NBR_RE_PER_RB_WITHOUT_DMRS;
-      dl_ch0 += 12;
+      dl_ch0 += NBR_RE_PER_RB_WITH_DMRS;
     }
   }
 }
