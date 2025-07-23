@@ -821,10 +821,8 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     AssertFatal(ulsch_harq != NULL, "harq_pid %d is not allocated\n", ulsch->harq_pid);
     if ((ulsch->active == true) && (ulsch->frame == frame_rx) && (ulsch->slot == slot_rx) && (ulsch->handled == 0)) {
       LOG_D(PHY, "PUSCH ID %d with RNTI %x detection started in frame %d slot %d\n", ULSCH_id, ulsch->rnti, frame_rx, slot_rx);
-  
-      int num_dmrs = 0;
-      for (int s = 0; s < NR_NUMBER_OF_SYMBOLS_PER_SLOT; s++)
-        num_dmrs += (ulsch_harq->ulsch_pdu.ul_dmrs_symb_pos >> s) & 1;
+      nfapi_nr_pusch_pdu_t *pdu = &ulsch_harq->ulsch_pdu;
+      int num_dmrs = count_bits64_with_mask(pdu->ul_dmrs_symb_pos, 0, NR_NUMBER_OF_SYMBOLS_PER_SLOT);
 
 #ifdef DEBUG_RXDATA
       NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
@@ -832,7 +830,6 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
       int slot_offset = frame_parms->get_samples_slot_timestamp(slot_rx, frame_parms, 0);
       slot_offset -= ru->N_TA_offset;
       int32_t sample_offset = gNB->common_vars.debugBuff_sample_offset;
-      nfapi_nr_pusch_pdu_t *pdu = &ulsch_harq->ulsch_pdu;
       int16_t *buf = (int16_t *)&gNB->common_vars.debugBuff[offset];
       buf[0] = (int16_t)ulsch->rnti;
       buf[1] = (int16_t)pdu->rb_size;

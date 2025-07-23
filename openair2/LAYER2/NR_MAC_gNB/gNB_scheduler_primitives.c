@@ -762,10 +762,7 @@ NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
                                        tda_info->startSymbolIndex,
                                        scc->dmrs_TypeA_Position);
 
-  uint8_t num_dmrs_symb = 0;
-  for(int i = tda_info->startSymbolIndex; i < tda_info->startSymbolIndex + tda_info->nrOfSymbols; i++)
-    num_dmrs_symb += (dmrs.ul_dmrs_symb_pos >> i) & 1;
-  dmrs.num_dmrs_symb = num_dmrs_symb;
+  dmrs.num_dmrs_symb = count_bits64_with_mask(dmrs.ul_dmrs_symb_pos, tda_info->startSymbolIndex, tda_info->nrOfSymbols);
   dmrs.N_PRB_DMRS = dmrs.num_dmrs_cdm_grps_no_data * (dmrs.dmrs_config_type == 0 ? 6 : 4);
   return dmrs;
 }
