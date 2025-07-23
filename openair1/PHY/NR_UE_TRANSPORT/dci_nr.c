@@ -185,7 +185,6 @@ static void nr_pdcch_demapping_deinterleaving(c16_t *llr,
 }
 
 static void nr_pdcch_llr(NR_DL_FRAME_PARMS *frame_parms,
-                         int32_t rx_size,
                          uint32_t coreset_nbr_rb,
                          c16_t rxdataF_comp[coreset_nbr_rb * RE_PER_RB],
                          c16_t *pdcch_llr,
@@ -288,13 +287,13 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
       int c_rb_by6 = c_rb / 6;
 
       // skip zeros in frequency domain bitmap
-      while ((coreset_freq_dom[c_rb_by6 >> 3] & (1 << (7 - (c_rb_by6 & 7)))) == 0) {
+      while ((coreset_freq_dom[c_rb_by6 / 8] & (1 << (7 - (c_rb_by6 & 7)))) == 0) {
         c_rb += 6;
         c_rb_by6 = c_rb / 6;
       }
       c16_t *rxF = NULL;
       if ((frame_parms->N_RB_DL & 1) == 0) {
-        if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
+        if ((c_rb + n_BWP_start) < frame_parms->N_RB_DL / 2)
           // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
           // at (offset + c_br + symbol * ofdm_symbol_size): even case
           rxF = rxFbase + (frame_parms->first_carrier_offset + RE_PER_RB * c_rb) + n_BWP_start * RE_PER_RB;
@@ -302,18 +301,18 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
           // number of RBs is even  and c_rb is higher than half system bandwidth (we don't skip DC)
           // if these conditions are true the pointer has to be situated at the 1st part of the rxdataF
           // we point at the 1st part of the rxdataF in symbol
-          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1));
+          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - frame_parms->N_RB_DL / 2);
       } else {
-        if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
+        if ((c_rb + n_BWP_start) < frame_parms->N_RB_DL / 2)
           // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
           //  at (offset + c_br + symbol * ofdm_symbol_size): odd case
           rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
-        else if ((c_rb + n_BWP_start) > (frame_parms->N_RB_DL >> 1))
+        else if ((c_rb + n_BWP_start) > frame_parms->N_RB_DL / 2)
           // number of RBs is odd  and   c_rb is higher than half system bandwidth + 1
           // if these conditions are true the pointer has to be situated at the 1st part of
           // the rxdataF just after the first IQ symbols of the RB containing DC
           // we point at the 1st part of the rxdataF in symbol
-          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1)) - 6;
+          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - frame_parms->N_RB_DL / 2) - 6;
         else
           rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
       }
@@ -360,14 +359,17 @@ static void nr_pdcch_detection_mrc(int n_rb, c16_t rxdataF_comp[][n_rb * RE_PER_
   LOG_D(NR_PHY_DCI, "we enter nr_pdcch_detection_mrc (hard coded 2 antennas)\n");
   const int sz = n_rb * RE_PER_RB_OUT_DMRS;
 
-  simde__m128i *rxdataF_comp128_0 = (simde__m128i *)rxdataF_comp[0];
-  simde__m128i *rxdataF_comp128_1 = (simde__m128i *)rxdataF_comp[1];
+  c16_t *rx0 = rxdataF_comp[0];
+  c16_t *rx1 = rxdataF_comp[1];
 
   // MRC on each re of rb
-  for (int i = 0; i < sz >> 2; i++) {
-    rxdataF_comp128_0[i] =
-        simde_mm_adds_epi16(simde_mm_srai_epi16(rxdataF_comp128_0[i], 1), simde_mm_srai_epi16(rxdataF_comp128_1[i], 1));
+  int i = 0;
+  for (; i < (sz & ~3); i += 4) {
+    *(simde__m128i *)(rx0 + i) =
+        simde_mm_adds_epi16(simde_mm_srai_epi16(*(simde__m128i *)(rx0 + i), 1), simde_mm_srai_epi16(*(simde__m128i *)(rx1 + i), 1));
   }
+  for (; i < sz; i++)
+    rx0[i] = (c16_t){(rx0[i].r + rx1[i].r) / 2, (rx0[i].i + rx1[i].i) / 2};
 }
 
 void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
@@ -384,8 +386,6 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
   get_coreset_rballoc(rel15->coreset.frequency_domain_resource,&n_rb,&rb_offset);
   const int antRx = frame_parms->nb_antennas_rx;
 
-  // Pointers to extracted PDCCH symbols in frequency-domain.
-  int32_t rx_size = ((4 * frame_parms->N_RB_DL * RE_PER_RB + 31) >> 5) << 5;
   // Pointer to llrs, 4-bit resolution.
   int32_t llr_size = 4 * n_rb * RE_PER_RB_OUT_DMRS;
   c16_t llr[llr_size];
@@ -442,7 +442,7 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
 
     LOG_D(NR_PHY_DCI, "we enter nr_pdcch_llr(for symbol %d), pdcch_vars[eNB_id]->rxdataF_comp ---> pdcch_vars[eNB_id]->llr \n", s);
     LOG_D(NR_PHY_DCI, "in nr_pdcch_llr(rxdataF_comp -> llr)\n");
-    nr_pdcch_llr(frame_parms, rx_size, n_rb, rxdataF_comp[0], llr, s);
+    nr_pdcch_llr(frame_parms, n_rb, rxdataF_comp[0], llr, s);
 
     UEscopeCopy(ue, pdcchLlr, llr, sizeof(c16_t), 1, llr_size, 0);
   }
