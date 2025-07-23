@@ -38,45 +38,58 @@
 
 //#define SRS_IND_DEBUG
 
-/* \brief Get the number of UL TDAs that could be used in frame and slot, reachable
+/* \brief Get the number of UL TDAs that could be used in slot, reachable
  * via specific k2. The output parameter first_idx is a pointer to the first
  * suitable TDA, and the function returns the number of suitable TDAs, or 0. */
-int get_num_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot, int k2, const NR_tda_info_t **first_idx)
+int get_num_ul_tda(gNB_MAC_INST *nrmac, int slot, int k2, const NR_tda_info_t **first_idx)
 {
   /* we assume that this function is mutex-protected from outside */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
 
-  /* there is a mixed slot only when in TDD */
-  frame_structure_t *fs = &nrmac->frame_structure;
+  const frame_structure_t *fs = &nrmac->frame_structure;
+  const int slot_period = slot % fs->numb_slots_period;
+  const tdd_bitmap_t *bm = &fs->period_cfg.tdd_slot_bitmap[slot_period];
+  /* For some reason, we only store the number of symbols if it's mixed */
+  const int num_ul_symbols = bm->slot_type == TDD_NR_MIXED_SLOT ? bm->num_ul_symbols : 14;
+  const uint16_t ul_bitmap = SL_to_bitmap(14 - num_ul_symbols, num_ul_symbols);
 
-  /* TODO: we assume currently that all UL TDA have same k2, check below */
-  NR_tda_info_t *tda_info = seq_arr_at(&nrmac->ul_tda, 0);
-  if (!tda_info->valid_tda || tda_info->k2 != k2)
+  *first_idx = NULL;
+  FOR_EACH_SEQ_ARR(NR_tda_info_t *, tda, &nrmac->ul_tda) {
+    DevAssert(tda->valid_tda);
+    // nr_rrc_config_ul_tda() orders by k2, so skip smaller and return for
+    // bigger ones
+    if (tda->k2 < k2)
+      continue;
+    if (tda->k2 > k2)
+      break; // there won't be a suitable k2 anymore
+
+    uint16_t tda_bitmap = SL_to_bitmap(tda->startSymbolIndex, tda->nrOfSymbols);
+    // nr_rrc_config_ul_tda() assures TDAs are from largest to smallest symbol number.
+    // check that this TDA fits entirely into this slot's mask (slot might be
+    // smaller in mixed slots)., A mixed slot TDA would be checked last, so a
+    // full slot TDA will be used for a full UL slot.
+    if ((tda_bitmap & ul_bitmap) == tda_bitmap) { // if TDA fits entiry
+      *first_idx = tda;
+      break;
+    }
+  }
+  if (*first_idx == NULL) /* nothing fit */
     return 0;
 
-  if (fs->frame_type == TDD) {
-    // if there is uplink symbols in mixed slot
-    int s = get_slot_idx_in_period(slot, fs);
-    tdd_bitmap_t *tdd_slot_bitmap = fs->period_cfg.tdd_slot_bitmap;
-    if ((tdd_slot_bitmap[s].num_ul_symbols > 1) && is_mixed_slot(s, fs)) {
-      *first_idx = seq_arr_at(&nrmac->ul_tda, 2); // mixed slot, all symbols of mixed minus last
-      return 1;
-    }
+  NR_tda_info_t *end_it = seq_arr_next(&nrmac->ul_tda, *first_idx);
+  while (end_it != seq_arr_end(&nrmac->ul_tda) && end_it->k2 == k2) {
+    /* the following TDAs should all fit as long as the k2 is the same */
+    uint16_t tda_bitmap = SL_to_bitmap(end_it->startSymbolIndex, end_it->nrOfSymbols);
+    AssertFatal((tda_bitmap & ul_bitmap) == tda_bitmap,
+                "TDA should fit inside slot, but is not the case for k2 %ld bitmap 0x%04x\n",
+                end_it->k2,
+                tda_bitmap);
+    end_it = seq_arr_next(&nrmac->ul_tda, end_it);
   }
 
-  // Avoid slots with the SRS
-  UE_iterator(nrmac->UE_info.connected_ue_list, UE) {
-    NR_sched_srs_t sched_srs = UE->UE_sched_ctrl.sched_srs;
-    if(sched_srs.srs_scheduled && sched_srs.frame == frame && sched_srs.slot == slot) {
-      *first_idx = seq_arr_at(&nrmac->ul_tda, 1); // symbols 0--12
-      return 1;
-    }
-  }
-
-  // symbols 0--13, if FDD or not mixed slot in TDD, for now use default TDA
-  // (TODO handle CSI-RS slots)
-  *first_idx = seq_arr_at(&nrmac->ul_tda, 0);
-  return 1;
+  ptrdiff_t diff = seq_arr_dist(&nrmac->ul_tda, *first_idx, end_it);
+  AssertFatal(diff > 0 && diff <= seq_arr_size(&nrmac->ul_tda), "dist %ld\n", diff);
+  return diff;
 }
 
 bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
@@ -2607,7 +2620,7 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
     int k2 = fs_get_diff(fs, *next, current) - koffset;
     DevAssert(k2 > 0);
     const NR_tda_info_t *tda_info = NULL;
-    int n_tda = get_num_ul_tda(nr_mac, next->f, next->s, k2, &tda_info);
+    int n_tda = get_num_ul_tda(nr_mac, next->s, k2, &tda_info);
     if (n_tda == 0) /* no TDA fulfills this */
       break;
     /* TODO: get_num_ul_tda() might indicate multiple TDAs to use (e.g., one

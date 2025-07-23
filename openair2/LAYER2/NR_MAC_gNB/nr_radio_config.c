@@ -1058,6 +1058,29 @@ static struct NR_PUSCH_TimeDomainResourceAllocation *set_TimeDomainResourceAlloc
   return puschTdrAlloc;
 }
 
+static int tda_cmp(const void *tda_a, const void *tda_b)
+{
+  const NR_PUSCH_TimeDomainResourceAllocation_t *a = *(const NR_PUSCH_TimeDomainResourceAllocation_t **)tda_a;
+  const NR_PUSCH_TimeDomainResourceAllocation_t *b = *(const NR_PUSCH_TimeDomainResourceAllocation_t **)tda_b;
+  DevAssert(a->k2 && b->k2);
+  if (*a->k2 < *b->k2)
+    return -1; // smaller first
+  if (*a->k2 > *b->k2)
+    return 1;
+  // same k2: order from big to small TDA number
+  int as, al, bs, bl;
+  SLIV2SL(a->startSymbolAndLength, &as, &al);
+  SLIV2SL(b->startSymbolAndLength, &bs, &bl);
+  if (al < bl)
+    return 1; // bigger first
+  if (al > bl)
+    return -1;
+  return 0;
+}
+
+/* \brief Set up a list of time domain allocations as suitable for the TDD
+ * pattern. This will be used by get_num_ul_tda(), which requires a specific
+ * ordering, hence we qsort() the list at the end according to tda_cmp(). */
 void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
 {
   NR_PUSCH_TimeDomainResourceAllocationList_t *tda_list =
@@ -1065,6 +1088,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
   AssertFatal(tda_list->list.count == 0, "already have pusch_TimeDomainAllocationList members\n");
 
   const int k2 = min_fb_delay;
+  const int mu = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
 
   // UL TDA index 0 is basic slot configuration starting in symbol 0 til the last but one symbol
   NR_PUSCH_TimeDomainResourceAllocation_t *tda;
@@ -1089,13 +1113,40 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
     } else if (p2) {
       ul_symb = p1->nrofUplinkSymbols;
     }
-    if (ul_symb>1) {
+
+    DevAssert(p2 == NULL);
+    int N_dl = p1->nrofDownlinkSlots;
+    int N_ul = p1->nrofUplinkSlots;
+    int tdd_period_idx = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
+    int nb_periods_per_frame = get_nb_periods_per_frame(tdd_period_idx);
+    int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
+
+    // make TDA for the mixed slot
+    if (ul_symb > 1 && k2 <= N_dl) {
       // UL TDA index 2 for mixed slot (TDD)
       long sliv = get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1);
-      tda = set_TimeDomainResourceAllocation(k2, sliv);
+      tda = set_TimeDomainResourceAllocation(k2, sliv); // to be reached from suitable DL slot
+      asn1cSeqAdd(&tda_list->list, tda);
+    } else if (ul_symb > 1) { // k2 > N_Dl
+      long sliv = get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1);
+      tda = set_TimeDomainResourceAllocation(nb_slots_per_period, sliv); // to be reached from last DL (mixed) slot, if any
       asn1cSeqAdd(&tda_list->list, tda);
     }
+
+    // make TDA for UL slots that are not reachable within k2/min_rxtxtime
+    if (N_ul > k2) {
+      // enforce that with k2, we could reach all but one slot (which is mixed
+      // and taken into account above
+      AssertFatal(N_dl >= k2 - 1, "cannot fulfil TDD pattern: N_dl %d, k2 %d\n", N_dl, k2);
+      for (int i = k2 + 1; i <= N_ul; ++i) {
+        tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 13));
+        asn1cSeqAdd(&tda_list->list, tda);
+      }
+    }
   }
+
+  AssertFatal(tda_list->list.count <= 16, "cannot reach all UL slots with current TDD configuration\n");
+  qsort(tda_list->list.array, tda_list->list.count, sizeof(tda_list->list.array), tda_cmp);
 }
 
 static void set_dl_DataToUL_ACK(NR_PUCCH_Config_t *pucch_Config, int min_feedback_time, NR_SubcarrierSpacing_t subcarrierSpacing)
