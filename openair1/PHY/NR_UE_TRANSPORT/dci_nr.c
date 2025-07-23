@@ -352,29 +352,23 @@ void nr_pdcch_channel_compensation(int32_t rx_size,
                                    uint32_t coreset_nbr_rb)
 {
   for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
-    simde__m128i *dl_ch128 = (simde__m128i *)&dl_ch_estimates_ext[aarx][symbol * coreset_nbr_rb * 12];
-    simde__m128i *rxdataF128 = (simde__m128i *)&rxdataF_ext[aarx][symbol * coreset_nbr_rb * 12];
-    simde__m128i *rxdataF_comp128 = (simde__m128i *)&rxdataF_comp[aarx][symbol * coreset_nbr_rb * 12];
-    //printf("ch compensation dl_ch ext addr %p \n", &dl_ch_estimates_ext[(aatx<<1)+aarx][symbol*20*12]);
-    //printf("rxdataf ext addr %p symbol %d\n", &rxdataF_ext[aarx][symbol*20*12], symbol);
-    //printf("rxdataf_comp addr %p\n",&rxdataF_comp[(aatx<<1)+aarx][symbol*20*12]);
-    
+    const int sz = coreset_nbr_rb * 12;
+    c16_t *dl_ch = dl_ch_estimates_ext[aarx] + symbol * sz;
+    c16_t *rxdataF = rxdataF_ext[aarx] + symbol * sz;
+    c16_t *rxdataF_c = rxdataF_comp[aarx] + symbol * sz;
     // multiply by conjugated channel
-    mult_cpx_conj_vector((c16_t *)dl_ch128, (c16_t *)rxdataF128, (c16_t *)rxdataF_comp128, 12 * coreset_nbr_rb, output_shift);
-
-    for (int rb = 0; rb < 12 * coreset_nbr_rb; rb++) {
-        LOG_DDD("rxdataF128[%d]=(%d,%d) X dlch[%d]=(%d,%d) rxdataF_comp128[%d]=(%d,%d)\n",
-                rb,
-                ((c16_t *)rxdataF128)[rb].r,
-                ((c16_t *)rxdataF128)[rb].i,
-                rb,
-                ((c16_t *)dl_ch128)[rb].r,
-                ((c16_t *)dl_ch128)[rb].i,
-                rb,
-                ((c16_t *)rxdataF_comp128)[rb].r,
-                ((c16_t *)rxdataF_comp128)[rb].i);
-
-    }
+    mult_cpx_conj_vector(dl_ch, rxdataF, rxdataF_c, sz, output_shift);
+    for (int rb = 0; rb < sz; rb++)
+      LOG_DDD("rxdataF[%d]=(%d,%d) X dlch[%d]=(%d,%d) rxdataF_comp[%d]=(%d,%d)\n",
+              rb,
+              rxdataF[rb].r,
+              rxdataF[rb].i,
+              rb,
+              dl_ch[rb].r,
+              dl_ch[rb].i,
+              rb,
+              rxdataF_c[rb].r,
+              rxdataF_c[rb].i);
   }
 }
 
