@@ -61,14 +61,14 @@
 #define LOG_DDD(a...)
 #define LOG_DSYMB(a...)
 #endif
+
 #define NR_NBR_CORESET_ACT_BWP 3 // The number of CoreSets per BWP is limited to 3 (including initial CORESET: ControlResourceId 0)
 #define NR_NBR_SEARCHSPACE_ACT_BWP \
   10 // The number of SearSpaces per BWP is limited to 10 (including initial SEARCHSPACE: SearchSpaceId 0)
 
-#ifdef LOG_I
-#undef LOG_I
-#define LOG_I(A, B...) printf(B)
-#endif
+#define RE_PER_RB 12
+// after removing the 3 DMRS RE, the RB contains 9 RE with PDCCH
+#define RE_PER_RB_OUT_DMRS 9
 
 static void nr_pdcch_demapping_deinterleaving(c16_t *llr,
                                               c16_t *e_rx,
@@ -168,7 +168,7 @@ static void nr_pdcch_demapping_deinterleaving(c16_t *llr,
   }
 
   int rb_count = 0;
-  const int data_sc = 9; // 9 sub-carriers with data per PRB
+  const int data_sc = RE_PER_RB_OUT_DMRS; // 9 sub-carriers with data per PRB
   for (int c_id = 0; c_id < number_of_candidates; c_id++) {
     for (int symbol_idx = start_symbol; symbol_idx < start_symbol + coreset_time_dur; symbol_idx++) {
       for (int cce_count = 0; cce_count < L[c_id]; cce_count++) {
@@ -187,12 +187,12 @@ static void nr_pdcch_demapping_deinterleaving(c16_t *llr,
 static void nr_pdcch_llr(NR_DL_FRAME_PARMS *frame_parms,
                          int32_t rx_size,
                          uint32_t coreset_nbr_rb,
-                         c16_t rxdataF_comp[coreset_nbr_rb * 12],
+                         c16_t rxdataF_comp[coreset_nbr_rb * RE_PER_RB],
                          c16_t *pdcch_llr,
                          uint8_t symbol)
 {
   c16_t *rxF = rxdataF_comp;
-  c16_t *llr = pdcch_llr + symbol * coreset_nbr_rb * 9;
+  c16_t *llr = pdcch_llr + symbol * coreset_nbr_rb * RE_PER_RB_OUT_DMRS;
 
   if (!llr) {
     LOG_E(NR_PHY_DCI, "pdcch_qpsk_llr: llr is null, symbol %d\n", symbol);
@@ -201,10 +201,10 @@ static void nr_pdcch_llr(NR_DL_FRAME_PARMS *frame_parms,
 
   LOG_DDD("llr logs: pdcch qpsk llr for symbol %d (pos %d), llr offset %ld\n",
           symbol,
-          symbol * frame_parms->N_RB_DL * 12,
+          symbol * frame_parms->N_RB_DL * RE_PER_RB,
           llr - pdcch_llr);
 
-  for (int i = 0; i < coreset_nbr_rb * 9; i++) {
+  for (int i = 0; i < coreset_nbr_rb * RE_PER_RB_OUT_DMRS; i++) {
     // We clip the signal
     c16_t res;
     res.r = min(rxF->r, 31);
@@ -218,13 +218,16 @@ static void nr_pdcch_llr(NR_DL_FRAME_PARMS *frame_parms,
 }
 
 //compute average channel_level on each (TX,RX) antenna pair
-static int32_t nr_pdcch_channel_level(int nb_rb, c16_t dl_ch_estimates_ext[][nb_rb * 9], int nb_antennas_rx, int symbol)
+static int32_t nr_pdcch_channel_level(int nb_rb,
+                                      c16_t dl_ch_estimates_ext[][nb_rb * RE_PER_RB_OUT_DMRS],
+                                      int nb_antennas_rx,
+                                      int symbol)
 {
   int32_t avgs = 0;
   for (int aarx = 0; aarx < nb_antennas_rx; aarx++) {
     simde__m128i *dl_ch128 = (simde__m128i *)&dl_ch_estimates_ext[aarx];
     //compute average level
-    int32_t tmp = simde_mm_average(dl_ch128, nb_rb * 9, 0, nb_rb * 9);
+    int32_t tmp = simde_mm_average(dl_ch128, nb_rb * RE_PER_RB_OUT_DMRS, 0, nb_rb * RE_PER_RB_OUT_DMRS);
     avgs = cmax(avgs, tmp);
   }
   return avgs;
@@ -236,8 +239,8 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
                                         c16_t rxdataF[][rxdataF_sz],
                                         int32_t est_size,
                                         c16_t dl_ch_estimates[][est_size],
-                                        c16_t rxdataF_ext[][coreset_nbr_rb * 9],
-                                        c16_t dl_ch_estimates_ext[][coreset_nbr_rb * 9],
+                                        c16_t rxdataF_ext[][coreset_nbr_rb * RE_PER_RB_OUT_DMRS],
+                                        c16_t dl_ch_estimates_ext[][coreset_nbr_rb * RE_PER_RB_OUT_DMRS],
                                         int symbol,
                                         NR_DL_FRAME_PARMS *frame_parms,
                                         uint8_t *coreset_freq_dom,
@@ -254,9 +257,6 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
    *
    */
 
-#define NBR_RE_PER_RB_WITH_DMRS 12
-  // after removing the 3 DMRS RE, the RB contains 9 RE with PDCCH
-#define NBR_RE_PER_RB_WITHOUT_DMRS 9
   for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
     const c16_t *dl_ch0 = dl_ch_estimates[aarx] + frame_parms->ofdm_symbol_size * symbol;
     c16_t *rxFbase = rxdataF[aarx] + frame_parms->ofdm_symbol_size * symbol;
@@ -297,47 +297,45 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
         if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
           // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
           // at (offset + c_br + symbol * ofdm_symbol_size): even case
-          rxF = rxFbase + (frame_parms->first_carrier_offset + 12 * c_rb) + n_BWP_start * 12;
+          rxF = rxFbase + (frame_parms->first_carrier_offset + RE_PER_RB * c_rb) + n_BWP_start * RE_PER_RB;
         else
           // number of RBs is even  and c_rb is higher than half system bandwidth (we don't skip DC)
           // if these conditions are true the pointer has to be situated at the 1st part of the rxdataF
           // we point at the 1st part of the rxdataF in symbol
-          rxF = rxFbase + 12 * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1));
+          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1));
       } else {
         if ((c_rb + n_BWP_start) < (frame_parms->N_RB_DL >> 1))
           // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
           //  at (offset + c_br + symbol * ofdm_symbol_size): odd case
-          rxF = rxFbase + frame_parms->first_carrier_offset + 12 * (c_rb + n_BWP_start);
+          rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
         else if ((c_rb + n_BWP_start) > (frame_parms->N_RB_DL >> 1))
           // number of RBs is odd  and   c_rb is higher than half system bandwidth + 1
           // if these conditions are true the pointer has to be situated at the 1st part of
           // the rxdataF just after the first IQ symbols of the RB containing DC
           // we point at the 1st part of the rxdataF in symbol
-          rxF = rxFbase + 12 * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1)) - 6;
+          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - (frame_parms->N_RB_DL >> 1)) - 6;
         else
-          rxF = rxFbase + frame_parms->first_carrier_offset + 12 * (c_rb + n_BWP_start);
+          rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
       }
-      const int valid_re[NBR_RE_PER_RB_WITHOUT_DMRS] = {0, 2, 3, 4, 6, 7, 8, 10, 11};
+      const int valid_re[RE_PER_RB_OUT_DMRS] = {0, 2, 3, 4, 6, 7, 8, 10, 11};
       for (int i = 0; i < sizeofArray(valid_re); i++) {
-        rxF_ext[i] = rxF[valid_re[i]];
-        dl_ch0_ext[i] = dl_ch0[valid_re[i]];
+        *rxF_ext++ = rxF[valid_re[i]];
+        *dl_ch0_ext++ = dl_ch0[valid_re[i]];
       }
-      dl_ch0_ext += NBR_RE_PER_RB_WITHOUT_DMRS;
-      rxF_ext += NBR_RE_PER_RB_WITHOUT_DMRS;
-      dl_ch0 += NBR_RE_PER_RB_WITH_DMRS;
+      dl_ch0 += RE_PER_RB;
     }
   }
 }
 
 static void nr_pdcch_channel_compensation(uint32_t coreset_nbr_rb,
-                                          c16_t rxdataF_ext[][coreset_nbr_rb * 9],
-                                          c16_t dl_ch_estimates_ext[][coreset_nbr_rb * 9],
-                                          c16_t rxdataF_comp[][coreset_nbr_rb * 12],
+                                          c16_t rxdataF_ext[][coreset_nbr_rb * RE_PER_RB_OUT_DMRS],
+                                          c16_t dl_ch_estimates_ext[][coreset_nbr_rb * RE_PER_RB_OUT_DMRS],
+                                          c16_t rxdataF_comp[][coreset_nbr_rb * RE_PER_RB],
                                           int antRx,
                                           uint8_t output_shift)
 {
   for (int aarx = 0; aarx < antRx; aarx++) {
-    const int sz = coreset_nbr_rb * 9;
+    const int sz = coreset_nbr_rb * RE_PER_RB_OUT_DMRS;
     c16_t *dl_ch = dl_ch_estimates_ext[aarx];
     c16_t *rxdataF = rxdataF_ext[aarx];
     c16_t *rxdataF_c = rxdataF_comp[aarx];
@@ -357,10 +355,10 @@ static void nr_pdcch_channel_compensation(uint32_t coreset_nbr_rb,
   }
 }
 
-static void nr_pdcch_detection_mrc(int n_rb, c16_t rxdataF_comp[][n_rb * 9])
+static void nr_pdcch_detection_mrc(int n_rb, c16_t rxdataF_comp[][n_rb * RE_PER_RB_OUT_DMRS])
 {
   LOG_D(NR_PHY_DCI, "we enter nr_pdcch_detection_mrc (hard coded 2 antennas)\n");
-  const int sz = n_rb * 9;
+  const int sz = n_rb * RE_PER_RB_OUT_DMRS;
 
   simde__m128i *rxdataF_comp128_0 = (simde__m128i *)rxdataF_comp[0];
   simde__m128i *rxdataF_comp128_1 = (simde__m128i *)rxdataF_comp[1];
@@ -387,9 +385,9 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
   const int antRx = frame_parms->nb_antennas_rx;
 
   // Pointers to extracted PDCCH symbols in frequency-domain.
-  int32_t rx_size = ((4 * frame_parms->N_RB_DL * 12 + 31) >> 5) << 5;
+  int32_t rx_size = ((4 * frame_parms->N_RB_DL * RE_PER_RB + 31) >> 5) << 5;
   // Pointer to llrs, 4-bit resolution.
-  int32_t llr_size = 4 * n_rb * 9;
+  int32_t llr_size = 4 * n_rb * RE_PER_RB_OUT_DMRS;
   c16_t llr[llr_size];
   memset(llr, 0, sizeof(llr));
 
@@ -401,8 +399,8 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
   for (int s=rel15->coreset.StartSymbolIndex; s<(rel15->coreset.StartSymbolIndex+rel15->coreset.duration); s++) {
     LOG_D(NR_PHY_DCI, "in nr_pdcch_extract_rbs_single(rxdataF -> rxdataF_ext || dl_ch_estimates -> dl_ch_estimates_ext)\n");
 
-    __attribute__((aligned(32))) c16_t rxdataF_ext[antRx][n_rb * 9];
-    __attribute__((aligned(32))) c16_t pdcch_dl_ch_estimates_ext[antRx][n_rb * 9];
+    __attribute__((aligned(32))) c16_t rxdataF_ext[antRx][n_rb * RE_PER_RB_OUT_DMRS];
+    __attribute__((aligned(32))) c16_t pdcch_dl_ch_estimates_ext[antRx][n_rb * RE_PER_RB_OUT_DMRS];
     nr_pdcch_extract_rbs_single(ue->frame_parms.samples_per_slot_wCP,
                                 n_rb,
                                 rxdataF,
@@ -429,7 +427,7 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
     LOG_D(NR_PHY_DCI, "we enter nr_pdcch_channel_compensation(log2_maxh=%d)\n", log2_maxh);
     LOG_D(NR_PHY_DCI, "in nr_pdcch_channel_compensation(rxdataF_ext x dl_ch_estimates_ext -> rxdataF_comp)\n");
     // compute LLRs for ofdm symbol 0 only
-    __attribute__((aligned(32))) c16_t rxdataF_comp[antRx][n_rb * 12];
+    __attribute__((aligned(32))) c16_t rxdataF_comp[antRx][n_rb * RE_PER_RB];
     nr_pdcch_channel_compensation(n_rb,
                                   rxdataF_ext,
                                   pdcch_dl_ch_estimates_ext,
@@ -437,10 +435,10 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
                                   antRx,
                                   log2_maxh); // log2_maxh+I0_shift
 
-    UEscopeCopy(ue, pdcchRxdataF_comp, rxdataF_comp, sizeof(struct complex16), antRx, n_rb * 12, 0);
+    UEscopeCopy(ue, pdcchRxdataF_comp, rxdataF_comp, sizeof(struct complex16), antRx, n_rb * RE_PER_RB, 0);
 
     if (antRx > 1)
-      nr_pdcch_detection_mrc(n_rb * 12, rxdataF_comp);
+      nr_pdcch_detection_mrc(n_rb * RE_PER_RB, rxdataF_comp);
 
     LOG_D(NR_PHY_DCI, "we enter nr_pdcch_llr(for symbol %d), pdcch_vars[eNB_id]->rxdataF_comp ---> pdcch_vars[eNB_id]->llr \n", s);
     LOG_D(NR_PHY_DCI, "in nr_pdcch_llr(rxdataF_comp -> llr)\n");
@@ -572,6 +570,6 @@ void nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
               rel15->dci_format_options[k]);
       }
     }
-    e_rx_cand_idx += 9 * L * 6; // e_rx index for next candidate (L CCEs, 6 REGs per CCE and 9 REs per REG )
+    e_rx_cand_idx += RE_PER_RB_OUT_DMRS * L * 6; // e_rx index for next candidate (L CCEs, 6 REGs per CCE and 9 REs per REG )
   }
 }
