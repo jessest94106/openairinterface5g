@@ -168,12 +168,13 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
 
     output += snprintf(output,
                        end - output,
-                       ", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS (%d) %d\n",
+                       ", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS (%d) %d CCE fail %d\n",
                        stats->dl.errors,
                        stats->pucch0_DTX,
                        sched_ctrl->dl_bler_stats.bler,
                        UE->current_DL_BWP.mcsTableIdx,
-                       sched_ctrl->dl_bler_stats.mcs);
+                       sched_ctrl->dl_bler_stats.mcs,
+                       sched_ctrl->dl_cce_fail);
     if (reset_rsrp) {
       stats->num_rsrp_meas = 0;
       stats->cumul_rsrp = 0;
@@ -187,7 +188,7 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
 
     output += snprintf(output,
                        end - output,
-                       ", ulsch_errors %"PRIu64", ulsch_DTX %d, BLER %.5f MCS (%d) %d (Qm %d deltaMCS %d dB) NPRB %d  SNR %d.%d dB\n",
+                       ", ulsch_errors %"PRIu64", ulsch_DTX %d, BLER %.5f MCS (%d) %d (Qm %d deltaMCS %d dB) NPRB %d  SNR %d.%d dB CCE fail %d\n",
                        stats->ul.errors,
                        stats->ulsch_DTX,
                        sched_ctrl->ul_bler_stats.bler,
@@ -197,7 +198,8 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
                        UE->mac_stats.deltaMCS,
                        UE->mac_stats.NPRB,
                        sched_ctrl->pusch_snrx10 / 10,
-                       sched_ctrl->pusch_snrx10 % 10);
+                       sched_ctrl->pusch_snrx10 % 10,
+                       sched_ctrl->ul_cce_fail);
     output += snprintf(output,
                        end - output,
                        "UE %04x: MAC:    TX %14"PRIu64" RX %14"PRIu64" bytes\n",

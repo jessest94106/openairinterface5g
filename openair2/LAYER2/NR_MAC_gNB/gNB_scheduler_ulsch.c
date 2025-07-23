@@ -1816,6 +1816,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
                                sched_ctrl->pdcch_cl_adjust);
   if (CCEIndex<0) {
     LOG_D(NR_MAC, "[UE %04x][%4d.%2d] no free CCE for retransmission UL DCI UE\n", UE->rnti, frame, slot);
+    sched_ctrl->ul_cce_fail++;
     return false;
   }
 
@@ -2058,6 +2059,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                                  sched_ctrl->pdcch_cl_adjust);
 
     if (CCEIndex < 0) {
+      sched_ctrl->ul_cce_fail++;
       reset_beam_status(&nrmac->beam_info, frame, slot, iterator->UE->UE_beam_index, slots_per_frame, dci_beam.new_beam);
       reset_beam_status(&nrmac->beam_info, sched_frame, sched_slot, iterator->UE->UE_beam_index, slots_per_frame, beam.new_beam);
       LOG_D(NR_MAC, "[UE %04x][%4d.%2d] no free CCE for UL DCI\n", iterator->UE->rnti, frame, slot);

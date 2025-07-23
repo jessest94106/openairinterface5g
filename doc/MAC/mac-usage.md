@@ -79,8 +79,8 @@ Example:
 UE RNTI 2460 CU-UE-ID 2 in-sync PH 28 dB PCMAX 24 dBm, average RSRP -74 (8 meas)
 UE 2460: CQI 15, RI 2, PMI (14,1)
 UE 2460: UL-RI 2 TPMI 0
-UE 2460: dlsch_rounds 32917/5113/1504/560, dlsch_errors 211, pucch0_DTX 1385, BLER 0.19557 MCS (1) 23
-UE 2460: ulsch_rounds 3756/353/182/179, ulsch_errors 170, ulsch_DTX 285, BLER 0.33021 MCS (1) 27 (Qm 8  dB) NPRB 5  SNR 31.0 dB
+UE 2460: dlsch_rounds 32917/5113/1504/560, dlsch_errors 211, pucch0_DTX 1385, BLER 0.19557 MCS (1) 23 CCE fail 3
+UE 2460: ulsch_rounds 3756/353/182/179, ulsch_errors 170, ulsch_DTX 285, BLER 0.33021 MCS (1) 27 (Qm 8  dB) NPRB 5  SNR 31.0 dB CCE fail 0
 UE 2460: MAC:    TX     1530943191 RX         194148 bytes
 UE 2460: LCID 1: TX            651 RX           3031 bytes
 UE 2460: LCID 2: TX              0 RX              0 bytes
@@ -159,6 +159,9 @@ The fourth and fifth line show HARQ-related information:
   should be close to the target in the gNB configuration file,
   `pusch_TargetSNRx10`, which should be around 10 times the value shown in the
   log
+* Both ULSCH/DLSCH `CCE fail`: lists the number of failed CCE attempts. If this
+  number gets high, it signifies that the scheduler tried to scheduled this UE,
+  but could not allocate the DCI.
 
 In the last lines:
 * `MAC` shows the amount of MAC PDU bytes scheduled in transmit (`TX`,
