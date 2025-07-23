@@ -1206,10 +1206,6 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
       struct NR_TDD_UL_DL_ConfigCommon *tdd = scc->tdd_UL_DL_ConfigurationCommon;
       tdd->pattern2 = calloc_or_fail(1, sizeof(*tdd->pattern2));
       *scc->tdd_UL_DL_ConfigurationCommon->pattern2 = p2;
-      AssertFatal(p2.nrofUplinkSlots ^ scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                  "UL slots in pattern1 (%ld) and pattern2 (%ld) are mutually exclusive (e.g. DDDFUU DDDD, DDDD DDDFUU)\n",
-                  scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                  p2.nrofUplinkSlots);
     }
     struct NR_FrequencyInfoDL *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
     LOG_I(RRC,
