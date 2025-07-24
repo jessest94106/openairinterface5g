@@ -76,7 +76,6 @@ typedef struct gtpv1u_gnb_delete_tunnel_req_s gtpv1u_gnb_delete_tunnel_req_t;
 
   // the init function create a gtp instance and return the gtp instance id
   // the parameter originInstance will be sent back in each message from gtp to the creator
-  void gtpv1uReceiver(int h);
   void gtpv1uProcessTimeout(int handle,void *arg);
   int gtpv1u_create_s1u_tunnel(const instance_t instance,
                                const gtpv1u_enb_create_tunnel_req_t *create_tunnel_req,

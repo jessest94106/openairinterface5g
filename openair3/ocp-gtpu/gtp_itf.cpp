@@ -11,6 +11,7 @@ extern "C" {
 #include <netdb.h>
 
 #include "common/platform_types.h"
+#include "common/utils/system.h"
 #include <openair3/UTILS/conversions.h>
 #include "common/utils/LOG/log.h"
 #include <common/utils/ocp_itti/intertask_interface.h>
@@ -120,12 +121,18 @@ typedef struct {
   int pdusession_id;
 } ueidData_t;
 
+typedef struct {
+  int h;
+  pthread_t t;
+} gtpThread_t;
+
 class gtpEndPoint {
  public:
   openAddr_t addr;
   uint8_t foundAddr[20];
   int foundAddrLen;
   int ipVersion;
+  gtpThread_t thrData;
   map<uint64_t, teidData_t> ue2te_mapping;
   // we use the same port number for source and destination address
   // this allow using non standard gtp port number (different from 2152)
@@ -505,18 +512,23 @@ static int udpServerSocket(openAddr_s addr)
   return sockfd;
 }
 
+static void* gtpv1uReceiver(void *thr);
 instance_t gtpv1Init(openAddr_t context)
 {
   pthread_mutex_lock(&globGtp.gtp_lock);
   int id = udpServerSocket(context);
 
   if (id >= 0) {
-    itti_subscribe_event_fd(TASK_GTPV1_U, id);
+    LOG_I(GTPU, "Created gtpu instance id: %d\n", id);
+    getInstRetInt(compatInst(id));
+    inst->thrData.h = id;
+    char name[32];
+    snprintf(name, sizeof(name), "GTPrx_%d", id);
+    threadCreate(&inst->thrData.t, gtpv1uReceiver, &inst->thrData, name, -1, OAI_PRIORITY_RT);
   } else
     LOG_E(GTPU, "can't create GTP-U instance\n");
 
   pthread_mutex_unlock(&globGtp.gtp_lock);
-  LOG_I(GTPU, "Created gtpu instance id: %d\n", id);
   return id;
 }
 
@@ -1198,7 +1210,7 @@ static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t
   return !GTPNOK;
 }
 
-void gtpv1uReceiver(int h)
+static void gtpv1uReceiveHandleMessage(int h)
 {
   uint8_t udpData[65536];
   int udpDataLen;
@@ -1252,6 +1264,16 @@ void gtpv1uReceiver(int h)
         break;
     }
   }
+}
+
+static void* gtpv1uReceiver(void *thr)
+{
+  gtpThread_t *gt = (gtpThread_t *)thr;
+  while (true) {
+    gtpv1uReceiveHandleMessage(gt->h);
+  }
+  LOG_W(GTPU, "exiting thread\n");
+  return NULL;
 }
 
 #include <openair2/ENB_APP/enb_paramdef.h>
@@ -1309,13 +1331,6 @@ void *gtpv1uTask(void *args)
 
       AssertFatal(EXIT_SUCCESS == itti_free(TASK_GTPV1_U, message_p), "Failed to free memory!\n");
     }
-
-    struct epoll_event events[20];
-    int nb_events = itti_get_events(TASK_GTPV1_U, events, 20);
-
-    for (int i = 0; i < nb_events; i++)
-      if ((events[i].events & EPOLLIN))
-        gtpv1uReceiver(events[i].data.fd);
   }
 
   return NULL;
