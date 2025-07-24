@@ -221,23 +221,27 @@ The selection of the library to compile is done using `--build-lib ldpc_aal`.
 # O-RAN AAL DPDK EAL parameters
 To configure O-RAN AAL/DPDK BBDEV, you can set the following parameters via the command line of PHY simulators or nr-softmodem:
 
-- `nrLDPC_coding_t2.dpdk_dev` - **mandatory** parameter, specifies the PCI address of our accelerator. It must follow the format `WWWW:XX:YY.Z`.
+> Note: the group parameter name has been renamed from `nrLDPC_coding_t2` to
+> `nrLDPC_coding_aal` to better reflect that it is a generic AAL accelerator
+> card.
 
-- `nrLDPC_coding_t2.dpdk_core_list` - **mandatory** parameter, specifies the CPU cores assigned to DPDK . 
-Ensure that the CPU cores specified in `nrLDPC_coding_t2.dpdk_core_list` are available and not used by other processes to avoid conflicts.
+- `nrLDPC_coding_aal.dpdk_dev` - **mandatory** parameter, specifies the PCI address of our accelerator. It must follow the format `WWWW:XX:YY.Z`.
 
-- `nrLDPC_coding_t2.dpdk_prefix` - optional parameter, DPDK shared data file prefix, by default set to *b6*.
+- `nrLDPC_coding_aal.dpdk_core_list` - **mandatory** parameter, specifies the CPU cores assigned to DPDK . 
+Ensure that the CPU cores specified in `nrLDPC_coding_aal.dpdk_core_list` are available and not used by other processes to avoid conflicts.
 
-- `nrLDPC_coding_t2.vfio_vf_token` - optional parameter, VFIO token set for the VF, if applicable.
+- `nrLDPC_coding_aal.dpdk_prefix` - optional parameter, DPDK shared data file prefix, by default set to *b6*.
 
-- `nrLDPC_coding_t2.num_harq_codeblock` - optional parameter, size of the HARQ buffer in terms of the number of 32kB blocks, by default set to *512* (maximum for the T2; as for the ACCs, this can be further increased).
+- `nrLDPC_coding_aal.vfio_vf_token` - optional parameter, VFIO token set for the VF, if applicable.
 
-- `nrLDPC_coding_t2.eal_init_bbdev` - optional parameter, set this to 1 when using with FHI72 with the Intel ACCs. For the T2, this is not required.
+- `nrLDPC_coding_aal.num_harq_codeblock` - optional parameter, size of the HARQ buffer in terms of the number of 32kB blocks, by default set to *512* (maximum for the T2; as for the ACCs, this can be further increased).
+
+- `nrLDPC_coding_aal.eal_init_bbdev` - optional parameter, set this to 1 when using with FHI72 with the Intel ACCs. For the T2, this is not required.
 
 **Note:** These parameters can also be provided in a configuration file.
 Example for the ACC200:
 ```
-nrLDPC_coding_t2 : {
+nrLDPC_coding_aal : {
   dpdk_dev : "0000:f7:00.1";
   dpdk_core_list : "14-15";
   vfio_vf_token: "00112233-4455-6677-8899-aabbccddeeff";
@@ -263,7 +267,7 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr_ulsim -n100 -s20 -m20 -r273 -R273 --loader.ldpc.shlibversion _aal --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 0-1 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
+sudo ./nr_ulsim -n100 -s20 -m20 -r273 -R273 --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_aal.dpdk_core_list 0-1 --nrLDPC_coding_aal.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
 ```
 ### nr_dlsim
 
@@ -272,7 +276,7 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr_dlsim -n300 -s30 -R 106 -e 27 --loader.ldpc.shlibversion _aal --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 0-1 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
+sudo ./nr_dlsim -n300 -s30 -R 106 -e 27 --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_aal.dpdk_core_list 0-1 --nrLDPC_coding_aal.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
 ```
 
 ## OTA test
@@ -284,14 +288,14 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _aal --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 14-15 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff --nrLDPC_coding_t2.eal_init_bbdev 1
+sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_aal.dpdk_core_list 14-15 --nrLDPC_coding_aal.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff --nrLDPC_coding_aal.eal_init_bbdev 1
 ```
 
 # Known Issue(s)
 
 ## BBDEV CPU Usage
 
-When running the E2E setup (this applies to both USRP and FHI72), BBDEV may not be using the list of CPU cores as specified by `nrLDPC_coding_t2.dpdk_core_list` accordingly.
+When running the E2E setup (this applies to both USRP and FHI72), BBDEV may not be using the list of CPU cores as specified by `nrLDPC_coding_aal.dpdk_core_list` accordingly.
 This is an issue under investigation, and subject for future fixes.
 In the meantime, we recommend allocating idle, and isolated CPU cores in the configuration for BBDEV.
 

@@ -494,10 +494,10 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
       {"dpdk_dev", NULL, 0, .strptr = &dpdk_dev, .defstrval = NULL, TYPE_STRING, 0, NULL},
       {"vfio_vf_token", NULL, 0, .strptr = &vfio_vf_token, .defstrval = NULL, TYPE_STRING, 0, NULL}
     };
-    config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_t2");
+    config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_aal");
 
     if (eal_init_bbdev != 0) {
-      AssertFatal(dpdk_dev!=NULL, "nrLDPC_coding_t2.dpdk_dev was not provided");
+      AssertFatal(dpdk_dev!=NULL, "nrLDPC_coding_aal.dpdk_dev was not provided");
       snprintf(&bbdev_dev[0], sizeof(bbdev_dev), "%s", dpdk_dev);
       io_cfg->bbdev_dev[0] = &bbdev_dev[0]; // BBDev dev name; max devices = 1
       if(vfio_vf_token != NULL) {

@@ -1070,9 +1070,11 @@ int32_t nrLDPC_coding_init()
       {"vfio_vf_token", NULL, 0, .strptr = &vfio_vf_token, .defstrval = NULL, TYPE_STRING, 0, NULL},
       {"num_harq_codeblock", NULL, 0, .uptr = &num_harq_codeblock, .defintval = 512, TYPE_UINT32, 0, NULL},
   };
-  config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_t2");
-  AssertFatal(dpdk_dev != NULL, "nrLDPC_coding_t2.dpdk_dev was not provided");
-  AssertFatal(dpdk_core_list != NULL, "nrLDPC_coding_t2.dpdk_core_list was not provided");
+  config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_aal");
+  if (dpdk_dev == NULL)
+    LOG_E(NR_PHY, "could not find mandatory --nrLDPC_coding_aal.dpdk_dev. If you used --nrLDPC_coding_t2.*, please rename all options to --nrLDPC_coding_aal.*\n");
+  AssertFatal(dpdk_dev != NULL, "nrLDPC_coding_aal.dpdk_dev was not provided");
+  AssertFatal(dpdk_core_list != NULL, "nrLDPC_coding_aal.dpdk_core_list was not provided");
 
   char dpdk_dev_full[32];
   if (normalize_dpdk_dev(dpdk_dev, dpdk_dev_full, sizeof(dpdk_dev_full)) != 0) {
