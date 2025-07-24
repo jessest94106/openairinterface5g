@@ -83,6 +83,29 @@ def Iperf_ComputeTime(args):
 		raise Exception('Iperf time not found!')
 	return int(result.group('iperf_time'))
 
+def convert_to_mbps(value, magnitude):
+	value = float(value)
+	if magnitude == 'K' or magnitude == 'k':
+		return value / 1000
+	elif magnitude == 'M':
+		return value
+	elif magnitude == 'G':
+		return value * 1000
+	else:
+		return value
+
+def extract_iperf_data(res):
+	if not res:
+		return None
+	bitrate_val = res.group('bitrate')
+	magnitude = res.group('magnitude')
+	return {
+		'bitrate_mbps': convert_to_mbps(bitrate_val, magnitude),
+		'jitter': res.group('jitter'),
+		'packetloss': res.group('packetloss'),
+		'bitrate_disp': f'{float(bitrate_val):.2f} {magnitude}bps'
+	}
+
 def Iperf_analyzeV3TCPJson(filename, iperf_tcp_rate_target):
 	try:
 		with open(filename) as f:
@@ -130,53 +153,36 @@ def Iperf_analyzeV3BIDIRJson(filename):
 	return (True, msg)
 
 def Iperf_analyzeV3UDP(filename, iperf_bitrate_threshold, iperf_packetloss_threshold, target_bitrate):
-	if (not os.path.isfile(filename)):
+	if not os.path.isfile(filename):
 		return (False, 'Iperf3 UDP: Log file not present')
-	if (os.path.getsize(filename)==0):
+	if os.path.getsize(filename) == 0:
 		return (False, 'Iperf3 UDP: Log file is empty')
-	sender_bitrate = None
-	receiver_bitrate = None
-	with open(filename, 'r') as server_file:
-		for line in server_file.readlines():
-			res_sender = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]?bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<sentPack>-?\d+) \((?P<lost>[0-9\.]+).*?\s+(sender)', line)
-			res_receiver = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<unit>[KMG]?bits\/sec)\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<receivedPack>-?\d+)\s+\((?P<lost>[0-9\.]+)%\).*?(receiver)', line)
-			if res_sender is not None:
-				sender_bitrate = res_sender.group('bitrate')
-				sender_unit = res_sender.group('unit')
-				sender_jitter = res_sender.group('jitter')
-				sender_lostPack = res_sender.group('lostPack')
-				sender_sentPack = res_sender.group('sentPack')
-				sender_packetloss = res_sender.group('lost')
-			if res_receiver is not None:
-				receiver_bitrate = res_receiver.group('bitrate')
-				receiver_unit = res_receiver.group('unit')
-				receiver_jitter = res_receiver.group('jitter')
-				receiver_lostPack = res_receiver.group('lostPack')
-				receiver_receivedPack = res_receiver.group('receivedPack')
-				receiver_packetloss = res_receiver.group('lost')
 
-	if receiver_bitrate is not None and sender_bitrate is not None:
-		if sender_unit == 'Kbits/sec':
-			sender_bitrate = float(sender_bitrate) / 1000
-		if receiver_unit == 'Kbits/sec':
-			receiver_bitrate = float(receiver_bitrate) / 1000
-		br_perf = 100 * float(receiver_bitrate) / float(target_bitrate)
-		br_perf = '%.2f ' % br_perf
-		sender_bitrate = '%.2f ' % float(sender_bitrate)
-		receiver_bitrate = '%.2f ' % float(receiver_bitrate)
-		req_msg = f'Sender Bitrate  : {sender_bitrate} Mbps'
-		bir_msg = f'Receiver Bitrate: {receiver_bitrate} Mbps'
-		brl_msg = f'{br_perf}%'
-		jit_msg = f'Jitter          : {receiver_jitter}'
-		pal_msg = f'Packet Loss     : {receiver_packetloss} %'
-		if float(br_perf) < float(iperf_bitrate_threshold):
-			brl_msg = f'too low! < {iperf_bitrate_threshold}%'
-		if float(receiver_packetloss) > float(iperf_packetloss_threshold):
-			pal_msg += f' (too high! > {iperf_packetloss_threshold}%)'
-		result = float(br_perf) >= float(iperf_bitrate_threshold) and float(receiver_packetloss) <= float(iperf_packetloss_threshold)
-		return (result, f'{req_msg}\n{bir_msg} ({brl_msg})\n{jit_msg}\n{pal_msg}')
-	else:
+	sender_data = None
+	receiver_data = None
+	with open(filename, 'r') as server_file:
+		for line in server_file:
+			res_sender = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<magnitude>[kKMG]?)bits\/sec\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<sentPack>-?\d+)\s+\((?P<packetloss>[0-9\.eE\-\+]+).*?\s+(sender)', line)
+			res_receiver = re.search(r'(?P<bitrate>[0-9\.]+)\s+(?P<magnitude>[kKMG]?)bits\/sec\s+(?P<jitter>[0-9\.]+\s+ms)\s+(?P<lostPack>-?\d+)/(?P<receivedPack>-?\d+)\s+\((?P<packetloss>[0-9\.eE\-\+]+)%\).*?(receiver)', line)
+			if res_sender:
+				sender_data = extract_iperf_data(res_sender)
+			if res_receiver:
+				receiver_data = extract_iperf_data(res_receiver)
+	if not sender_data or not receiver_data:
 		return (False, 'Could not analyze iperf report')
+
+	br_perf = 100 * receiver_data['bitrate_mbps'] / float(target_bitrate)
+	br_perf_str = f'{br_perf:.2f}%'
+	req_msg = f"Sender Bitrate  : {sender_data['bitrate_disp']}"
+	bir_msg = f"Receiver Bitrate: {receiver_data['bitrate_disp']} ({br_perf_str})"
+	jit_msg = f"Jitter          : {receiver_data['jitter']}"
+	pal_msg = f"Packet Loss     : {receiver_data['packetloss']}%"
+	if br_perf < float(iperf_bitrate_threshold):
+		bir_msg += f' (too low! < {iperf_bitrate_threshold}%)'
+	if float(receiver_data['packetloss']) > float(iperf_packetloss_threshold):
+		pal_msg += f' (too high! > {iperf_packetloss_threshold}%)'
+	result = br_perf >= float(iperf_bitrate_threshold) and float(receiver_data['packetloss']) <= float(iperf_packetloss_threshold)
+	return (result, f'{req_msg}\n{bir_msg}\n{jit_msg}\n{pal_msg}')
 
 def Iperf_analyzeV2UDP(server_filename, iperf_bitrate_threshold, iperf_packetloss_threshold, target_bitrate):
 		result = None
@@ -190,12 +196,9 @@ def Iperf_analyzeV2UDP(server_filename, iperf_bitrate_threshold, iperf_packetlos
 				result = re.search(statusTemplate, str(line)) or result
 		if result is None:
 			return (False, 'Could not parse server report!')
-		bitrate = float(result.group('bitrate'))
-		magn = result.group('magnitude')
-		if magn == "k" or magn == "K":
-			bitrate /= 1000
-		elif magn == "G": # we assume bitrate in Mbps, therefore it must be G now
-			bitrate *= 1000
+		bitrate_val = float(result.group('bitrate'))
+		magnitude = result.group('magnitude')
+		bitrate = convert_to_mbps(bitrate_val, magnitude)
 		jitter = float(result.group('jitter'))
 		packetloss = float(result.group('packetloss'))
 		br_perf = float(bitrate)/float(target_bitrate) * 100
