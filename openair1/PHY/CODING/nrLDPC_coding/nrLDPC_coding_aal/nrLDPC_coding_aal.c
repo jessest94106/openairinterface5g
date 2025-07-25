@@ -52,6 +52,7 @@ struct active_device {
   const char *driver_name;
   uint8_t dev_id;
   struct rte_bbdev_info info;
+  bool is_t2;
   uint32_t num_harq_codeblock;
   /* Persistent data structure to keep track of HARQ-related information */
   // Note: This is used to store/keep track of the combined output information across iterations
@@ -352,7 +353,7 @@ bool check_internal_harq_memory_capabilities(struct rte_bbdev_info *info)
 }
 
 // based on DPDK BBDEV add_bbdev_dev
-static int add_dev(uint8_t dev_id, uint32_t num_harq_codeblock)
+static int add_dev(uint8_t dev_id, bool is_t2, uint32_t num_harq_codeblock)
 {
   int ret;
   unsigned int nb_queues;
@@ -379,6 +380,9 @@ static int add_dev(uint8_t dev_id, uint32_t num_harq_codeblock)
   // setup harq buffers
   active_dev.num_harq_codeblock = num_harq_codeblock;
   active_dev.harq_buffers = malloc(sizeof(struct rte_bbdev_op_data) * active_dev.num_harq_codeblock);
+
+  // is device T2?
+  active_dev.is_t2 = is_t2;
 
   // device setup
   ret = rte_bbdev_setup_queues(dev_id, nb_queues, active_dev.info.socket_id);
@@ -588,13 +592,9 @@ static void set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
                             nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_decoding_parameters)
 {
   int j = 0;
-#ifdef LDPC_T2
   // The T2 only supports CB mode, and does not TB mode special case handling.
-  bool special_case_tb_mode = false;
-#else
-  bool special_case_tb_mode =
-      (nrLDPC_slot_decoding_parameters->nb_TBs == 1) && (nb_segments_decoding(nrLDPC_slot_decoding_parameters) == 1);
-#endif
+  bool special_case_tb_mode = !active_dev.is_t2 && (nrLDPC_slot_decoding_parameters->nb_TBs == 1)
+                              && (nb_segments_decoding(nrLDPC_slot_decoding_parameters) == 1);
   for (int h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h) {
     for (int i = 0; i < nrLDPC_slot_decoding_parameters->TBs[h].C; ++i) {
       ops[j]->ldpc_dec.basegraph = nrLDPC_slot_decoding_parameters->TBs[h].BG;
@@ -608,6 +608,8 @@ static void set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
       ops[j]->ldpc_dec.op_flags = RTE_BBDEV_LDPC_ITERATION_STOP_ENABLE | RTE_BBDEV_LDPC_HQ_COMBINE_OUT_ENABLE;
       if (*nrLDPC_slot_decoding_parameters->TBs[h].segments[i].d_to_be_cleared) {
         *nrLDPC_slot_decoding_parameters->TBs[h].segments[i].d_to_be_cleared = false;
+        if (active_dev.is_t2)
+          *nrLDPC_slot_decoding_parameters->TBs[h].processedSegments = 0;
       } else {
         ops[j]->ldpc_dec.op_flags |= RTE_BBDEV_LDPC_HQ_COMBINE_IN_ENABLE;
         if (active_dev.support_internal_harq_memory) {
@@ -615,15 +617,10 @@ static void set_ldpc_dec_op(struct rte_bbdev_dec_op **ops,
           ops[j]->ldpc_dec.op_flags |= RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_OUT_ENABLE;
         }
       }
-      
-#ifdef LDPC_T2
-      // Note: For the T2, we do not reset the processedSegments in case of HARQ.
-      // This is because if T2 is asked to decode a segment that as already successfully
-      // decoded in the previous round, the T2 reports a failure.
-      if (*nrLDPC_slot_decoding_parameters->TBs[h].segments[i].d_to_be_cleared) *nrLDPC_slot_decoding_parameters->TBs[h].processedSegments = 0;
-#else
-      *nrLDPC_slot_decoding_parameters->TBs[h].processedSegments = 0;
-#endif
+
+      if (!active_dev.is_t2)
+        *nrLDPC_slot_decoding_parameters->TBs[h].processedSegments = 0;
+
       if (!special_case_tb_mode) {
         ops[j]->ldpc_dec.code_block_mode = 1;
         ops[j]->ldpc_dec.cb_params.e = nrLDPC_slot_decoding_parameters->TBs[h].segments[i].E;
@@ -680,13 +677,9 @@ static void set_ldpc_enc_op(struct rte_bbdev_enc_op **ops,
                             nrLDPC_slot_encoding_parameters_t *nrLDPC_slot_encoding_parameters)
 {
   int j = 0;
-#ifdef LDPC_T2
   // The T2 only supports CB mode, and does not TB mode special case handling.
-  bool special_case_tb_mode = false;
-#else
-  bool special_case_tb_mode =
-      (nrLDPC_slot_encoding_parameters->nb_TBs == 1) && (nb_segments_encoding(nrLDPC_slot_encoding_parameters) == 1);
-#endif
+  bool special_case_tb_mode = !active_dev.is_t2 && (nrLDPC_slot_encoding_parameters->nb_TBs == 1)
+                              && (nb_segments_encoding(nrLDPC_slot_encoding_parameters) == 1);
   for (int h = 0; h < nrLDPC_slot_encoding_parameters->nb_TBs; ++h) {
     for (int i = 0; i < nrLDPC_slot_encoding_parameters->TBs[h].C; ++i) {
       ops[j]->ldpc_enc.basegraph = nrLDPC_slot_encoding_parameters->TBs[h].BG;
@@ -1063,16 +1056,20 @@ int32_t nrLDPC_coding_init()
   char *dpdk_file_prefix = NULL;
   char *vfio_vf_token = NULL; // vfio token for the bbdev card
   uint32_t num_harq_codeblock = 0; // size of the HARQ buffer in terms of the number of 32K blocks
+  uint32_t is_t2 = 0;
   paramdef_t LoaderParams[] = {
       {"dpdk_dev", NULL, 0, .strptr = &dpdk_dev, .defstrval = NULL, TYPE_STRING, 0, NULL},
       {"dpdk_core_list", NULL, 0, .strptr = &dpdk_core_list, .defstrval = NULL, TYPE_STRING, 0, NULL},
       {"dpdk_file_prefix", NULL, 0, .strptr = &dpdk_file_prefix, .defstrval = "b6", TYPE_STRING, 0, NULL},
       {"vfio_vf_token", NULL, 0, .strptr = &vfio_vf_token, .defstrval = NULL, TYPE_STRING, 0, NULL},
       {"num_harq_codeblock", NULL, 0, .uptr = &num_harq_codeblock, .defintval = 512, TYPE_UINT32, 0, NULL},
+      {"is_t2", NULL, 0, .uptr = &is_t2, .defintval = 0, TYPE_UINT8, 0, NULL},
   };
   config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_aal");
   if (dpdk_dev == NULL)
-    LOG_E(NR_PHY, "could not find mandatory --nrLDPC_coding_aal.dpdk_dev. If you used --nrLDPC_coding_t2.*, please rename all options to --nrLDPC_coding_aal.*\n");
+    LOG_E(NR_PHY,
+          "could not find mandatory --nrLDPC_coding_aal.dpdk_dev. If you used --nrLDPC_coding_t2.*, please rename all options to "
+          "--nrLDPC_coding_aal.*\n");
   AssertFatal(dpdk_dev != NULL, "nrLDPC_coding_aal.dpdk_dev was not provided");
   AssertFatal(dpdk_core_list != NULL, "nrLDPC_coding_aal.dpdk_core_list was not provided");
 
@@ -1114,7 +1111,7 @@ int32_t nrLDPC_coding_init()
   }
   AssertFatal(dev_id != -1, "bbdev %s not found.", dpdk_dev_full);
 
-  AssertFatal(add_dev(dev_id, num_harq_codeblock) == 0, "Failed to setup bbdev");
+  AssertFatal(add_dev(dev_id, is_t2, num_harq_codeblock) == 0, "Failed to setup bbdev");
   AssertFatal(rte_bbdev_stats_reset(dev_id) == 0, "Failed to reset stats of bbdev %u", dev_id);
   AssertFatal(rte_bbdev_start(dev_id) == 0, "Failed to start bbdev %u", dev_id);
 
@@ -1156,7 +1153,8 @@ int32_t nrLDPC_coding_shutdown()
   return 0;
 }
 
-static void llr_scaling(int16_t *llr, int llr_len, uint8_t *llr_scaled, int8_t llr_size, int8_t llr_decimal, int8_t nb_layers, int8_t Qm)
+static void
+llr_scaling(int16_t *llr, int llr_len, uint8_t *llr_scaled, int8_t llr_size, int8_t llr_decimal, int8_t nb_layers, int8_t Qm)
 {
   const int16_t llr_max = (1 << (llr_size - 1)) - 1;
   const int16_t llr_min = -llr_max;
@@ -1258,33 +1256,31 @@ int32_t nrLDPC_coding_decoder(nrLDPC_slot_decoding_parameters_t *nrLDPC_slot_dec
   struct rte_bbdev_op_data **queue_ops[DATA_NUM_TYPES] = {&data_buffers.inputs,
                                                           &data_buffers.hard_outputs,
                                                           &data_buffers.harq_outputs};
-#ifndef LDPC_T2
   int8_t llr_size = (active_dev.info.drv.capabilities)[RTE_BBDEV_OP_LDPC_DEC].cap.ldpc_dec.llr_size;
   int8_t llr_decimal = (active_dev.info.drv.capabilities)[RTE_BBDEV_OP_LDPC_DEC].cap.ldpc_dec.llr_decimals;
-#endif
   int offset = 0;
   for (int h = 0; h < nrLDPC_slot_decoding_parameters->nb_TBs; ++h) {
     for (int r = 0; r < nrLDPC_slot_decoding_parameters->TBs[h].C; r++) {
-#ifdef LDPC_T2
-      // For the T2, we simply saturate the LLRs.
-      uint16_t z_ol[LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
-      memcpy(z_ol,
-             nrLDPC_slot_decoding_parameters->TBs[h].segments[r].llr,
-             nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E * sizeof(uint16_t));
-      simde__m128i *pv_ol128 = (simde__m128i *)z_ol;
-      simde__m128i *pl_ol128 = (simde__m128i *)&l_ol[offset];
-      for (int i = 0, j = 0; j < ((nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E + 15) >> 4); i += 2, j++) {
-        pl_ol128[j] = simde_mm_packs_epi16(pv_ol128[i], pv_ol128[i + 1]);
+      if (active_dev.is_t2) {
+        // For the T2, we simply saturate the LLRs.
+        uint16_t z_ol[LDPC_MAX_CB_SIZE] __attribute__((aligned(16)));
+        memcpy(z_ol,
+               nrLDPC_slot_decoding_parameters->TBs[h].segments[r].llr,
+               nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E * sizeof(uint16_t));
+        simde__m128i *pv_ol128 = (simde__m128i *)z_ol;
+        simde__m128i *pl_ol128 = (simde__m128i *)&l_ol[offset];
+        for (int i = 0, j = 0; j < ((nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E + 15) >> 4); i += 2, j++) {
+          pl_ol128[j] = simde_mm_packs_epi16(pv_ol128[i], pv_ol128[i + 1]);
+        }
+      } else {
+        llr_scaling(nrLDPC_slot_decoding_parameters->TBs[h].segments[r].llr,
+                    nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E,
+                    &l_ol[offset],
+                    llr_size,
+                    llr_decimal,
+                    nrLDPC_slot_decoding_parameters->TBs[h].nb_layers,
+                    nrLDPC_slot_decoding_parameters->TBs[h].Qm);
       }
-#else
-      llr_scaling(nrLDPC_slot_decoding_parameters->TBs[h].segments[r].llr,
-                  nrLDPC_slot_decoding_parameters->TBs[h].segments[r].E,
-                  &l_ol[offset],
-                  llr_size,
-                  llr_decimal,
-                  nrLDPC_slot_decoding_parameters->TBs[h].nb_layers,
-                  nrLDPC_slot_decoding_parameters->TBs[h].Qm);
-#endif
       offset += LDPC_MAX_CB_SIZE;
     }
   }

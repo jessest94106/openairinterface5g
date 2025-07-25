@@ -9,7 +9,6 @@ if (ENABLE_LDPC_AAL)
 
   find_library(PMD_T2 NAMES rte_baseband_accl_ldpc HINTS ${LIBDPDK_AAL_LIBRARY_DIRS})
   if (PMD_T2)
-    add_compile_definitions(LDPC_T2)
     message(STATUS "found poll-mode driver for AccelerComm T2 LDPC Offload (rte_baseband_accl_ldpc.so)")
   else()
     if (LIBDPDK_AAL_VERSION VERSION_LESS "22.11")

@@ -236,7 +236,7 @@ Ensure that the CPU cores specified in `nrLDPC_coding_aal.dpdk_core_list` are av
 
 - `nrLDPC_coding_aal.num_harq_codeblock` - optional parameter, size of the HARQ buffer in terms of the number of 32kB blocks, by default set to *512* (maximum for the T2; as for the ACCs, this can be further increased).
 
-- `nrLDPC_coding_aal.eal_init_bbdev` - optional parameter, set this to 1 when using with FHI72 with the Intel ACCs. For the T2, this is not required.
+- `nrLDPC_coding_aal.is_t2` - optional parameter, set this to 1 when using the Xilinx T2 card.
 
 **Note:** These parameters can also be provided in a configuration file.
 Example for the ACC200:
@@ -257,6 +257,7 @@ loader : {
 # Running OAI with O-RAN AAL
 
 In general, to offload of the channel coding to the LDPC accelerator, we use use the `--loader.ldpc.shlibversion _aal` option.
+Reminder, if you are using the Xilinx T2 card, make sure to set `--nrLDPC_coding_aal.is_t2 1`.
 
 ## 5G PHY simulators
 
@@ -288,7 +289,7 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_aal.dpdk_core_list 14-15 --nrLDPC_coding_aal.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff --nrLDPC_coding_aal.eal_init_bbdev 1
+sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_aal.dpdk_core_list 14-15 --nrLDPC_coding_aal.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
 ```
 
 # Known Issue(s)

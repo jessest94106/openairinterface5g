@@ -485,18 +485,18 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   char *shlibversion = NULL; // version of the LDPC coding library
   paramdef_t LoaderParams_shlibversion[] = {{"shlibversion", NULL, 0, .strptr = &shlibversion, .defstrval = NULL, TYPE_STRING, 0, NULL}};
   config_get(config_get_if(), LoaderParams_shlibversion, sizeofArray(LoaderParams_shlibversion), "loader.ldpc");
-  if (shlibversion != NULL && strncmp(shlibversion, "_t2", 3) == 0) {
-    uint32_t eal_init_bbdev = 0;    // If not 0 then include the BBDEV device in the EAL init for FHI
+  if (shlibversion != NULL && strncmp(shlibversion, "_aal", 4) == 0) {
+    uint32_t is_t2 = 0;    // If not 0 then include the BBDEV device in the EAL init for FHI
     char *dpdk_dev = NULL;          // PCI address of the card
     char *vfio_vf_token = NULL;     // vfio token for the bbdev card
     paramdef_t LoaderParams[] = {
-      {"eal_init_bbdev", NULL, 0, .uptr = &eal_init_bbdev, .defuintval = 0, TYPE_UINT, 0, NULL},
+      {"is_t2", NULL, 0, .uptr = &is_t2, .defuintval = 0, TYPE_UINT, 0, NULL},
       {"dpdk_dev", NULL, 0, .strptr = &dpdk_dev, .defstrval = NULL, TYPE_STRING, 0, NULL},
       {"vfio_vf_token", NULL, 0, .strptr = &vfio_vf_token, .defstrval = NULL, TYPE_STRING, 0, NULL}
     };
     config_get(config_get_if(), LoaderParams, sizeofArray(LoaderParams), "nrLDPC_coding_aal");
 
-    if (eal_init_bbdev != 0) {
+    if (!is_t2) {
       AssertFatal(dpdk_dev!=NULL, "nrLDPC_coding_aal.dpdk_dev was not provided");
       snprintf(&bbdev_dev[0], sizeof(bbdev_dev), "%s", dpdk_dev);
       io_cfg->bbdev_dev[0] = &bbdev_dev[0]; // BBDev dev name; max devices = 1
