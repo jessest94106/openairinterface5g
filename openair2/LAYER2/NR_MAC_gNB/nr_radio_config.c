@@ -2418,9 +2418,7 @@ void update_SIB1_NR_SI(NR_BCCH_DL_SCH_Message_t *sib1_bcch, int num_sibs, int si
   schedulingInfo->si_BroadcastStatus = NR_SchedulingInfo__si_BroadcastStatus_broadcasting;
   schedulingInfo->si_Periodicity = NR_SchedulingInfo__si_Periodicity_rf16;
   bool reg_sib = false;
-  NR_SI_SchedulingInfo_v1700_t *si_schedulingInfo_v17 = NULL;
   NR_SchedulingInfo2_r17_t *schedulingInfo2_r17 = NULL;
-  bool v17_sib = false;
   for (int i = 0; i < num_sibs; i++) {
     int sib_num = sibs[i];
     AssertFatal(sib_num > 1 && sib_num < 21, "other SIB invalid type\n");
@@ -2438,8 +2436,7 @@ void update_SIB1_NR_SI(NR_BCCH_DL_SCH_Message_t *sib1_bcch, int num_sibs, int si
       }
       asn1cSeqAdd(&schedulingInfo->sib_MappingInfo.list, mapping);
     } else {
-      if (v17_sib == false) {
-        si_schedulingInfo_v17 = calloc(1, sizeof(*si_schedulingInfo_v17));
+      if (schedulingInfo2_r17 == NULL) {
         schedulingInfo2_r17 = calloc(1, sizeof(*schedulingInfo2_r17));
         schedulingInfo2_r17->si_BroadcastStatus_r17 = NR_SchedulingInfo2_r17__si_BroadcastStatus_r17_broadcasting;
         schedulingInfo2_r17->si_Periodicity_r17 = NR_SchedulingInfo2_r17__si_Periodicity_r17_rf16;
@@ -2458,7 +2455,8 @@ void update_SIB1_NR_SI(NR_BCCH_DL_SCH_Message_t *sib1_bcch, int num_sibs, int si
   AssertFatal(reg_sib, "At least 1 SIB from SchedulingInfo (SIB2 to SIB14 included) needs to be present\n");
   asn1cSeqAdd(&info->schedulingInfoList.list, schedulingInfo);
   sib1->si_SchedulingInfo = info;
-  if (si_schedulingInfo_v17) {
+  if (schedulingInfo2_r17) {
+    NR_SI_SchedulingInfo_v1700_t *si_schedulingInfo_v17 = calloc_or_fail(1, sizeof(*si_schedulingInfo_v17));
     asn1cSeqAdd(&si_schedulingInfo_v17->schedulingInfoList2_r17.list, schedulingInfo2_r17);
     NR_SIB1_v1610_IEs_t *sib1_v1610 = NULL;
     if (sib1->nonCriticalExtension)
