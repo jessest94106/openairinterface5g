@@ -40,6 +40,7 @@ int serialize_gtpu_extension_type(gtpu_extension_header_type_t type)
     case GTPU_EXT_UL_PDU_SESSION_INFORMATION:
       return PDU_SESSION_CONTAINER;
     case GTPU_EXT_DL_DATA_DELIVERY_STATUS:
+    case GTPU_EXT_DL_USER_DATA:
       return NR_RAN_CONTAINER;
     default:
       AssertFatal(0, "unknown GTPU extension type %d\n", type);
@@ -92,6 +93,31 @@ static int serialize_dl_data_delivery_status(byte_array_producer_t *b, dl_data_d
   return 1;
 }
 
+/* returns 0 on error, 1 on success */
+static int serialize_dl_user_data(byte_array_producer_t *b, dl_user_data_t *ext)
+{
+  /* see 38.425 5.5.2.1 */
+  AssertFatal(!ext->dl_discard_blocks && !ext->dl_flush && !ext->report_polling
+              && !ext->request_out_of_seq_report && !ext->report_delivered
+              && !ext->user_data_existence_flag && !ext->assistance_info_report_polling_flag
+              && !ext->retransmission_flag,
+              "todo\n");
+
+  uint8_t b1 = (0 << 4) | (ext->dl_discard_blocks << 2) | (ext->dl_flush << 1) | ext->report_polling;
+  uint8_t b2 = (ext->request_out_of_seq_report << 4)
+             | (ext->report_delivered << 3)
+             | (ext->user_data_existence_flag << 2)
+             | (ext->assistance_info_report_polling_flag << 1)
+             | ext->retransmission_flag;
+  if (!byte_array_producer_put_byte(b, b1) || !byte_array_producer_put_byte(b, b2))
+    return 0;
+
+  if (!byte_array_producer_put_u24_be(b, ext->nru_sequence_number))
+    return 0;
+
+  return 1;
+}
+
 /* returns -1 on error, number of serialized bytes on success */
 int serialize_extension(gtpu_extension_header_t *ext, gtpu_extension_header_type_t next, uint8_t *out_buf, int out_len)
 {
@@ -109,6 +135,10 @@ int serialize_extension(gtpu_extension_header_t *ext, gtpu_extension_header_type
       break;
     case GTPU_EXT_DL_DATA_DELIVERY_STATUS:
       if (!serialize_dl_data_delivery_status(&b, &ext->dl_data_delivery_status))
+        goto error;
+      break;
+    case GTPU_EXT_DL_USER_DATA:
+      if (!serialize_dl_user_data(&b, &ext->dl_user_data))
         goto error;
       break;
     default:
