@@ -88,16 +88,16 @@
                 <class>Attach_UE</class>
                 <desc>Attach OAI UE (Wait for IP)</desc>
                 <id>rfsim5g_multiue1 rfsim5g_multiue2 rfsim5g_multiue3 rfsim5g_multiue4 rfsim5g_multiue5 rfsim5g_multiue6 rfsim5g_multiue7 rfsim5g_multiue8 rfsim5g_multiue9 rfsim5g_multiue10</id>
-                <nodes>cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix</nodes>
+                <nodes>acamas acamas acamas acamas acamas acamas acamas acamas acamas acamas</nodes>
         </testCase>
 
         <testCase id="020001">
                 <class>Ping</class>
                 <desc>Ping ext-dn from NR-UE</desc>
                 <id>rfsim5g_multiue1</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_ext_dn</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -106,9 +106,9 @@
                 <class>Ping</class>
                 <desc>Ping NR-UE from ext-dn</desc>
                 <id>rfsim5g_ext_dn</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_multiue1</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -117,9 +117,9 @@
                 <class>Ping</class>
                 <desc>Ping ext-dn from Second NR-UE</desc>
                 <id>rfsim5g_multiue2</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_ext_dn</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -128,9 +128,9 @@
                 <class>Ping</class>
                 <desc>Ping Second NR-UE from ext-dn</desc>
                 <id>rfsim5g_ext_dn</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_multiue2</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -139,9 +139,9 @@
                 <class>Ping</class>
                 <desc>Ping ext-dn from both UEs</desc>
                 <id>rfsim5g_multiue1 rfsim5g_multiue2</id>
-                <nodes>cacofonix cacofonix</nodes>
+                <nodes>acamas acamas</nodes>
                 <svr_id>rfsim5g_ext_dn</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -150,9 +150,9 @@
                 <class>Ping</class>
                 <desc>Ping ext-dn from all UEs</desc>
                 <id>rfsim5g_multiue1 rfsim5g_multiue2 rfsim5g_multiue3 rfsim5g_multiue4 rfsim5g_multiue5 rfsim5g_multiue6 rfsim5g_multiue7 rfsim5g_multiue8 rfsim5g_multiue9 rfsim5g_multiue10</id>
-                <nodes>cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix cacofonix</nodes>
+                <nodes>acamas acamas acamas acamas acamas acamas acamas acamas acamas acamas</nodes>
                 <svr_id>rfsim5g_ext_dn</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <ping_args>-c 20 -i 0.25 -s 1016</ping_args>
                 <ping_packetloss_threshold>5</ping_packetloss_threshold>
         </testCase>
@@ -162,9 +162,9 @@
                 <desc>Iperf (DL/3Mbps/UDP)(30 sec)</desc>
                 <iperf_args>-u -b 3M -t 20 -R</iperf_args>
                 <id>rfsim5g_multiue1</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_ext_dn</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>90</iperf_bitrate_threshold>
         </testCase>
@@ -174,9 +174,9 @@
                 <desc>Iperf (UL/1Mbps/UDP)(30 sec)</desc>
                 <iperf_args>-u -b 1M -t 20</iperf_args>
                 <id>rfsim5g_multiue1</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
                 <svr_id>rfsim5g_ext_dn</svr_id>
-                <svr_node>cacofonix</svr_node>
+                <svr_node>acamas</svr_node>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>90</iperf_bitrate_threshold>
         </testCase>
@@ -185,7 +185,7 @@
                 <class>Detach_UE</class>
                 <desc>Detach OAI UEs</desc>
                 <id>rfsim5g_multiue1</id>
-                <nodes>cacofonix</nodes>
+                <nodes>acamas</nodes>
         </testCase>
 
         <testCase id="100001">
