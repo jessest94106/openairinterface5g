@@ -113,6 +113,7 @@ typedef struct gtpv1u_bearer_s {
   teid_t teid_outgoing;
   uint16_t seqNum;
   uint8_t npduNum;
+  int32_t nru_sequence_number;
   int outgoing_qfi;
 } gtpv1u_bearer_t;
 
@@ -306,13 +307,14 @@ static int gtpv1uCreateAndSendMsg(gtpv1u_bearer_t *bearer,
   return !GTPNOK;
 }
 
-void gtpv1uSendDirect(instance_t instance,
-                      ue_id_t ue_id,
-                      int bearer_id,
-                      uint8_t *buf,
-                      size_t len,
-                      bool seqNumFlag,
-                      bool npduNumFlag)
+static void _gtpv1uSendDirect(instance_t instance,
+                              ue_id_t ue_id,
+                              int bearer_id,
+                              uint8_t *buf,
+                              size_t len,
+                              bool seqNumFlag,
+                              bool npduNumFlag,
+                              int32_t nru_seqnum)
 {
   pthread_mutex_lock(&globGtp.gtp_lock);
   getInstRetVoid(compatInst(instance));
@@ -347,9 +349,13 @@ void gtpv1uSendDirect(instance_t instance,
   pthread_mutex_unlock(&globGtp.gtp_lock);
 
   int extension_count = 0;
-  gtpu_extension_header_t ext = {};
+  gtpu_extension_header_t ext[2];
   if (bearer.outgoing_qfi != -1) {
-    ext = {
+    /* 29.281 Figure 5.2.1-3 note 4 says PDU Session Container must come first.
+     * GTPU_EXT_UL_PDU_SESSION_INFORMATION is within a PDU Session Container
+     * so it must be put before any other extension.
+     */
+    ext[extension_count] = {
       .type = GTPU_EXT_UL_PDU_SESSION_INFORMATION,
       .ul_pdu_session_information = {
         .qmp = false,
@@ -364,6 +370,24 @@ void gtpv1uSendDirect(instance_t instance,
     extension_count++;
   }
 
+  if (nru_seqnum != -1) {
+    ext[extension_count] = {
+      .type = GTPU_EXT_DL_USER_DATA,
+      .dl_user_data = {
+        .dl_discard_blocks = false,
+        .dl_flush = false,
+        .report_polling = false,
+        .request_out_of_seq_report = false,
+        .report_delivered = false,
+        .user_data_existence_flag = false,
+        .assistance_info_report_polling_flag = false,
+        .retransmission_flag = false,
+        .nru_sequence_number = (uint32_t)nru_seqnum
+      }
+    };
+    extension_count++;
+  }
+
   DevAssert(compatInst(instance) == bearer.sock_fd);
   gtpv1uCreateAndSendMsg(&bearer,
                          GTP_GPDU,
@@ -371,8 +395,59 @@ void gtpv1uSendDirect(instance_t instance,
                          len,
                          seqNumFlag,
                          npduNumFlag,
-                         &ext,
+                         ext,
                          extension_count);
+}
+
+void gtpv1uSendDirect(instance_t instance,
+                      ue_id_t ue_id,
+                      int bearer_id,
+                      uint8_t *buf,
+                      size_t len,
+                      bool seqNumFlag,
+                      bool npduNumFlag)
+{
+  _gtpv1uSendDirect(instance,
+                    ue_id,
+                    bearer_id,
+                    buf,
+                    len,
+                    seqNumFlag,
+                    npduNumFlag,
+                    -1);
+}
+
+void gtpv1uSendDirectWithNRUSeqNum(instance_t instance,
+                                   ue_id_t ue_id,
+                                   int bearer_id,
+                                   uint8_t *buf,
+                                   size_t len)
+{
+  pthread_mutex_lock(&globGtp.gtp_lock);
+  getInstRetVoid(compatInst(instance));
+  getUeRetVoid(inst, ue_id);
+  auto ptr2 = ptrUe->second.bearers.find(bearer_id);
+
+  if (ptr2 == ptrUe->second.bearers.end()) {
+    LOG_E(GTPU, "[%ld] GTP-U instance: sending a packet to a non existant UE:RAB: %lx/%x\n", instance, ue_id, bearer_id);
+    pthread_mutex_unlock(&globGtp.gtp_lock);
+    return;
+  }
+
+  int32_t nru_seqnum = ptr2->second.nru_sequence_number;
+  ptr2->second.nru_sequence_number++;
+  ptr2->second.nru_sequence_number &= (1 << 24) - 1;
+
+  pthread_mutex_unlock(&globGtp.gtp_lock);
+
+  _gtpv1uSendDirect(instance,
+                    ue_id,
+                    bearer_id,
+                    buf,
+                    len,
+                    false,
+                    false,
+                    nru_seqnum);
 }
 
 static void fillDlDeliveryStatusReport(gtpu_extension_header_t *ext, uint32_t RLC_buffer_availability, uint32_t NR_PDCP_PDU_SN)
