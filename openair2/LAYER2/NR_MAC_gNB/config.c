@@ -393,9 +393,7 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
   return ul_slot_idxs[ul_slot_idx_in_period] + period_idx * fs->numb_slots_period;
 }
 
-static void config_common(gNB_MAC_INST *nrmac,
-                          const nr_mac_config_t *config,
-                          NR_ServingCellConfigCommon_t *scc)
+static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR_ServingCellConfigCommon_t *scc)
 {
   nfapi_nr_config_request_scf_t *cfg = &nrmac->config[0];
   nrmac->common_channels[0].ServingCellConfigCommon = scc;
@@ -713,7 +711,7 @@ static void config_common(gNB_MAC_INST *nrmac,
   cfg->pmi_list = init_DL_MIMO_codebook(nrmac, pdsch_AntennaPorts);
 
   int nb_beams = config->nb_bfw[1]; // number of beams
-  if (nrmac->beam_info.beam_allocation) {
+  if (nrmac->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX) {
     LOG_I(NR_MAC, "Configuring analog beamforming in config_request message\n");
     cfg->analog_beamforming_ve.num_beams_period_vendor_ext.tl.tag = NFAPI_NR_FAPI_NUM_BEAMS_PERIOD_VENDOR_EXTENSION_TAG;
     cfg->analog_beamforming_ve.num_beams_period_vendor_ext.value = nrmac->beam_info.beams_per_period;
@@ -740,7 +738,7 @@ static void config_common(gNB_MAC_INST *nrmac,
 
 static void initialize_beam_information(NR_beam_info_t *beam_info, int mu, int slots_per_frame)
 {
-  if (!beam_info->beam_allocation)
+  if (beam_info->beam_mode == NO_BEAM_MODE)
     return;
 
   int size = mu == 0 ? slots_per_frame << 1 : slots_per_frame;
@@ -817,7 +815,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
   nrmac->vrb_map_UL_size = size;
 
   int num_beams = 1;
-  if(nrmac->beam_info.beam_allocation)
+  if(nrmac->beam_info.beam_mode != NO_BEAM_MODE)
     num_beams = nrmac->beam_info.beams_per_period;
   for (int i = 0; i < num_beams; i++) {
     nrmac->common_channels[0].vrb_map_UL[i] = calloc(size * MAX_BWP_SIZE, sizeof(uint16_t));
@@ -834,7 +832,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
   LOG_D(NR_MAC, "Configuring common parameters from NR ServingCellConfig\n");
 
   config_common(nrmac, config, scc);
-  fapi_beam_index_allocation(scc, nrmac);
+  fapi_beam_index_allocation(scc, config, nrmac);
 
   if (NFAPI_MODE == NFAPI_MONOLITHIC) {
     // nothing to be sent in the other cases
