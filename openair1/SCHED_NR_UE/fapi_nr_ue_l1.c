@@ -230,6 +230,88 @@ static void nr_ue_scheduled_response_dl(NR_UE_MAC_INST_t *mac,
   dl_config->number_pdus = 0;
 }
 
+static void dump_pusch_pdu(int instance, int frame, int slot, nfapi_nr_ue_pusch_pdu_t *pusch_pdu)
+{
+  LOG_D(PHY,
+        "[UE %d] %d.%d ULSCH PDU pdu_bit_map %u "
+        "rnti %u "
+        "handle %u "
+        "bwp_size %u "
+        "bwp_start %u "
+        "subcarrier_spacing %u "
+        "cyclic_prefix %u "
+        "target_code_rate %u "
+        "qam_mod_order %u "
+        "mcs_index %u "
+        "mcs_table %u "
+        "transform_precoding %u "
+        "data_scrambling_id %u "
+        "nrOfLayers %u "
+        "Tpmi %u "
+        "ul_dmrs_symb_pos %u "
+        "dmrs_config_type %u "
+        "ul_dmrs_scrambling_id %u "
+        "scid %u "
+        "num_dmrs_cdm_grps_no_data %u "
+        "dmrs_ports %u "
+        "resource_alloc %u "
+        "rb_start %u "
+        "rb_size %u "
+        "vrb_to_prb_mapping %u "
+        "frequency_hopping %u "
+        "tx_direct_current_location %u "
+        "uplink_frequency_shift_7p5khz %u "
+        "start_symbol_index %u "
+        "nr_of_symbols %u "
+        "tbslbrm %u "
+        "ldpcBaseGraph %u "
+        "ulsch_indicator %u "
+        "pusch_data->rv_index %u "
+        "pusch_data->harq_process_id %u "
+        "pusch_data->new_data_indicator %u "
+        "pusch_data->num_cb %u\n",
+        instance,
+        frame,
+        slot,
+        pusch_pdu->pdu_bit_map,
+        pusch_pdu->rnti,
+        pusch_pdu->handle,
+        pusch_pdu->bwp_size,
+        pusch_pdu->bwp_start,
+        pusch_pdu->subcarrier_spacing,
+        pusch_pdu->cyclic_prefix,
+        pusch_pdu->target_code_rate,
+        pusch_pdu->qam_mod_order,
+        pusch_pdu->mcs_index,
+        pusch_pdu->mcs_table,
+        pusch_pdu->transform_precoding,
+        pusch_pdu->data_scrambling_id,
+        pusch_pdu->nrOfLayers,
+        pusch_pdu->Tpmi,
+        pusch_pdu->ul_dmrs_symb_pos,
+        pusch_pdu->dmrs_config_type,
+        pusch_pdu->ul_dmrs_scrambling_id,
+        pusch_pdu->scid,
+        pusch_pdu->num_dmrs_cdm_grps_no_data,
+        pusch_pdu->dmrs_ports,
+        pusch_pdu->resource_alloc,
+        pusch_pdu->rb_start,
+        pusch_pdu->rb_size,
+        pusch_pdu->vrb_to_prb_mapping,
+        pusch_pdu->frequency_hopping,
+        pusch_pdu->tx_direct_current_location,
+        pusch_pdu->uplink_frequency_shift_7p5khz,
+        pusch_pdu->start_symbol_index,
+        pusch_pdu->nr_of_symbols,
+        pusch_pdu->tbslbrm,
+        pusch_pdu->ldpcBaseGraph,
+        pusch_pdu->ulsch_indicator,
+        pusch_pdu->pusch_data.rv_index,
+        pusch_pdu->pusch_data.harq_process_id,
+        pusch_pdu->pusch_data.new_data_indicator,
+        pusch_pdu->pusch_data.num_cb);
+}
+
 static void nr_ue_scheduled_response_ul(PHY_VARS_NR_UE *phy, fapi_nr_ul_config_request_t *ul_config, nr_phy_data_tx_t *phy_data)
 {
   fapi_nr_ul_config_request_pdu_t *pdu = fapiLockIterator(ul_config, ul_config->frame, ul_config->slot);
@@ -251,6 +333,7 @@ static void nr_ue_scheduled_response_ul(PHY_VARS_NR_UE *phy, fapi_nr_ul_config_r
               pdu->pusch_config_pdu.num_dmrs_cdm_grps_no_data);
 
         memcpy(pusch_pdu, &pdu->pusch_config_pdu, sizeof(*pusch_pdu));
+        dump_pusch_pdu(phy->Mod_id, ul_config->frame, ul_config->slot, pusch_pdu);
         if (pdu->pusch_config_pdu.tx_request_body.fapiTxPdu) {
           LOG_D(PHY,
                 "%d.%d Copying %d bytes to harq_process_ul_ue->a (harq_pid %d)\n",
