@@ -555,6 +555,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
     pusch_config_pdu->tbslbrm = 0;
 
   } else if (dci) {
+    pusch_config_pdu->subcarrier_spacing = scs;
     pusch_config_pdu->ulsch_indicator = dci->ulsch_indicator;
     if (dci->csi_request.nbits > 0 && dci->csi_request.val > 0) {
       AssertFatal(csi_report, "CSI report needs to be present in case of CSI request\n");
