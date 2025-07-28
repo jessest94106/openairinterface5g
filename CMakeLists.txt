@@ -848,6 +848,7 @@ set(PHY_SRC_COMMON
   ${OPENAIR1_DIR}/PHY/TOOLS/sqrt.c
   ${OPENAIR1_DIR}/PHY/TOOLS/get_sin_cos.c
   ${OPENAIR1_DIR}/PHY/TOOLS/oai_arith_operations.c
+  ${OPENAIR1_DIR}/PHY/log_tools.c
   )
 
 set(PHY_SRC
