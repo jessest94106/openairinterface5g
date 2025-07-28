@@ -493,8 +493,8 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
       uint32_t csi_re_count = 0;
       uint32_t csi_res_even = csi_res_bitmap & 0xfff;
       uint32_t csi_res_odd = (csi_res_bitmap >> 16) & 0xfff;
-
-      for (int rb = 0; rb < nb_rb_pdsch; rb++) {
+      int start = start_rb + dlsch_config->BWPStart;
+      for (int rb = start; rb < start + nb_rb_pdsch; rb++) {
         uint32_t rb_csi_pattern = (rb % 2 == 0) ? csi_res_even : csi_res_odd;
         csi_re_count += __builtin_popcount(rb_csi_pattern);
       }
