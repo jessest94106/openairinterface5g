@@ -312,6 +312,8 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                 unsigned char harq_pid,
                 uint32_t pdsch_est_size,
                 int32_t dl_ch_estimates[][pdsch_est_size],
+                int layer_llr_size,
+                int16_t layer_llr[][layer_llr_size],
                 int16_t *llr[2],
                 uint32_t dl_valid_re[NR_SYMBOLS_PER_SLOT],
                 c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP],
@@ -480,10 +482,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
             ue->phy_cpu_stats.cpu_time_stats[DLSCH_EXTRACT_RBS_STATS].p_time / (cpuf * 1000.0));
     }
     if (ue->phy_sim_pdsch_rxdataF_ext)
-      for (unsigned char aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
-        int offset = ((void *)rxdataF_ext[aarx] - (void *)rxdataF_ext) + symbol * rx_size_symbol;
-        memcpy(ue->phy_sim_pdsch_rxdataF_ext + offset, rxdataF_ext, rx_size_symbol * sizeof(c16_t));
-      }
+      memcpy(ue->phy_sim_pdsch_rxdataF_ext + symbol * sizeof(rxdataF_ext), rxdataF_ext, sizeof(rxdataF_ext));
 
     nb_re_pdsch = (pilots == 1) ? ((config_type == NFAPI_NR_DMRS_TYPE1) ? nb_rb_pdsch * (12 - 6 * dlsch_config->n_dmrs_cdm_groups)
                                                                         : nb_rb_pdsch * (12 - 4 * dlsch_config->n_dmrs_cdm_groups))
@@ -708,47 +707,28 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                              dlsch);
     dl_valid_re[symbol] -= ptrs_re_per_slot[0][symbol];
   }
+  start_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
+  nr_dlsch_llr(rx_size_symbol,
+               nbRx,
+               layer_llr_size,
+               layer_llr,
+               rxdataF_comp,
+               dl_ch_mag[0][0],
+               dl_ch_magb[0][0],
+               dl_ch_magr[0][0],
+               dlsch0_harq,
+               dlsch1_harq,
+               symbol,
+               dl_valid_re[symbol],
+               dlsch,
+               llr_offset[symbol]);
+  if (symbol < startSymbIdx + nbSymb - 1) // up to the penultimate symbol
+    llr_offset[symbol + 1] = dl_valid_re[symbol] * dlsch_config->qamModOrder + llr_offset[symbol];
+  stop_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
   /* at last symbol in a slot calculate LLR's for whole slot */
-  if(symbol == (startSymbIdx + nbSymb - 1)) {
-    const uint32_t rx_llr_layer_size = (G + dlsch[0].Nl - 1) / dlsch[0].Nl;
-
-    if (dlsch[0].Nl == 0 || rx_llr_layer_size == 0 || rx_llr_layer_size > 10 * 1000 * 1000) {
-      LOG_E(PHY, "rx_llr_layer_size %d, G %d, Nl, %d, discarding this pdsch\n", rx_llr_layer_size, G, dlsch[0].Nl);
-      return -1;
-    }
-
-    int16_t layer_llr[dlsch[0].Nl][rx_llr_layer_size];
-    for(int i = startSymbIdx; i < startSymbIdx + nbSymb; i++) {
-      /* Calculate LLR's for each symbol */
-      start_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
-      nr_dlsch_llr(rx_size_symbol,
-                   nbRx,
-                   rx_llr_layer_size,
-                   layer_llr,
-                   rxdataF_comp,
-                   dl_ch_mag[0][0],
-                   dl_ch_magb[0][0],
-                   dl_ch_magr[0][0],
-                   dlsch0_harq,
-                   dlsch1_harq,
-                   i,
-                   dl_valid_re[i],
-                   dlsch,
-                   llr_offset[i]);
-      if (i < startSymbIdx + nbSymb - 1) // up to the penultimate symbol
-        llr_offset[i + 1] = dl_valid_re[i] * dlsch_config->qamModOrder + llr_offset[i];
-      stop_meas_nr_ue_phy(ue, DLSCH_LLR_STATS);
-    }
-
+  if (symbol == (startSymbIdx + nbSymb - 1)) {
     start_meas_nr_ue_phy(ue, DLSCH_LAYER_DEMAPPING);
-    nr_dlsch_layer_demapping(llr,
-                             dlsch[0].Nl,
-                             dlsch_config->qamModOrder,
-                             G,
-                             codeword_TB0,
-                             codeword_TB1,
-                             rx_llr_layer_size,
-                             layer_llr);
+    nr_dlsch_layer_demapping(llr, dlsch[0].Nl, dlsch_config->qamModOrder, G, codeword_TB0, codeword_TB1, layer_llr_size, layer_llr);
     stop_meas_nr_ue_phy(ue, DLSCH_LAYER_DEMAPPING);
   /*
     for (int i=0; i < 2; i++){
@@ -800,12 +780,16 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
 
   if (ue->phy_sim_pdsch_rxdataF_comp)
     for (int a = 0; a < nbRx; a++) {
-      int offset = (void *)rxdataF_comp[0][a] - (void *)rxdataF_comp[0] + symbol * rx_size_symbol * sizeof(c16_t);
-      memcpy(ue->phy_sim_pdsch_rxdataF_comp + offset, rxdataF_comp[0][a] + symbol * rx_size_symbol, sizeof(c16_t) * rx_size_symbol);
+      for (int l = 0; l < nl; l++) {
+        int offset = (void *)rxdataF_comp[l][a] - (void *)rxdataF_comp[0] + symbol * rx_size_symbol * sizeof(c16_t);
+        memcpy(ue->phy_sim_pdsch_rxdataF_comp + offset,
+               rxdataF_comp[l][a] + symbol * rx_size_symbol,
+               sizeof(c16_t) * rx_size_symbol);
+      }
       memcpy((c16_t *)ue->phy_sim_pdsch_dl_ch_estimates + pdsch_est_size * a, dl_ch_estimates, pdsch_est_size * sizeof(c16_t));
     }
   if (ue->phy_sim_pdsch_dl_ch_estimates_ext)
-    memcpy((c16_t *)ue->phy_sim_pdsch_dl_ch_estimates_ext + symbol * rx_size_symbol,
+    memcpy(ue->phy_sim_pdsch_dl_ch_estimates_ext + symbol * sizeof(dl_ch_estimates_ext),
            dl_ch_estimates_ext,
            sizeof(dl_ch_estimates_ext));
   return (0);
