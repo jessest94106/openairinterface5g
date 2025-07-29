@@ -237,6 +237,8 @@ int main(int argc, char *argv[])
   int max_ldpc_iterations = 5;
   int num_antennas_per_thread = 1;
   uint32_t log_format = 0;
+  int threequarter_fs = 0;
+
   if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == 0) {
     exit_fun("[NR_ULSIM] Error, configuration module init failed\n");
   }
@@ -351,7 +353,7 @@ int main(int argc, char *argv[])
 
     case 'k':
       printf("Setting threequarter_fs_flag\n");
-      openair0_cfg[0].threequarter_fs= 1;
+      threequarter_fs = 1;
       break;
 
     case 'm':
@@ -584,7 +586,7 @@ int main(int argc, char *argv[])
   uint32_t samples;
   get_samplerate_and_bw(mu,
                         N_RB_DL,
-                        openair0_cfg[0].threequarter_fs,
+                        threequarter_fs,
                         &sampling_frequency,
                         &samples,
                         &tx_bandwidth,

@@ -384,7 +384,8 @@ void set_default_frame_parms(LTE_DL_FRAME_PARMS *frame_parms[MAX_NUM_CCs]) {
   }
 }
 
-void init_openair0(LTE_DL_FRAME_PARMS *frame_parms,int rxgain) {
+static void init_openair0(LTE_DL_FRAME_PARMS *frame_parms, int rxgain)
+{
   int card;
   int i;
 

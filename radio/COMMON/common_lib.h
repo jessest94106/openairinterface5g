@@ -204,8 +204,6 @@ typedef struct split7_config {
 typedef struct openair0_config {
   //! Module ID for this configuration
   int Mod_id;
-  //! device log level
-  int log_level;
   //! duplexing mode
   duplex_mode_t duplex_mode;
   //! number of downlink resource blocks
@@ -292,8 +290,6 @@ typedef struct openair0_config {
   double rx_sample_rate;
   //! the sample rate for transmit.
   double tx_sample_rate;
-  //! check for threequarter sampling rate
-  int8_t threequarter_fs;
   //! Flag to indicate this configuration is for NR
   int nr_flag;
   //! NR band number
