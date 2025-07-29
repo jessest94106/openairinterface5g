@@ -24,7 +24,6 @@
 
 #include "common/config/config_userapi.h"
 #include "common/utils/load_module_shlib.h"
-#include "RRC/LTE/rrc_vars.h"
 #ifdef SMBV
 #include "PHY/TOOLS/smbv.h"
 unsigned short config_frames[4] = {2,9,11,13};
