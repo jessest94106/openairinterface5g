@@ -285,7 +285,9 @@ add_boolean_option(UE_TIMING_TRACE     False "Activate UE timing trace" ON)
 
 add_boolean_option(TRACY_ENABLE OFF "Enable tracy instrumentation" ON)
 if (TRACY_ENABLE)
-  CPMAddPackage("gh:wolfpld/tracy#v0.11.1")
+  # the tracy version here should match the tracy server version
+  # below is latest release as of this commit
+  CPMAddPackage("gh:wolfpld/tracy#0.12.2")
 endif()
 
 set (OCP_ITTI ${OPENAIR_DIR}/common/utils/ocp_itti)
