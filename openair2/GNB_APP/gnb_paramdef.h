@@ -49,9 +49,6 @@
 #define GNB_CONF_STRING_OTG_APP_TYPE              "app_type"
 #define GNB_CONF_STRING_OTG_BG_TRAFFIC            "bg_traffic"
 
-extern int asn_debug;
-extern int asn1_xer_print;
-
 #ifdef LIBCONFIG_LONG
 #define libconfig_int long
 #else
