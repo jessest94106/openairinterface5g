@@ -277,14 +277,6 @@ typedef struct openair0_config {
   int autocal[8];
   //! Configuration file for LMS7002M
   char *configFilename;
-  //! remote IP/MAC addr for Ethernet interface
-  char *remote_addr;
-  //! remote port number for Ethernet interface
-  unsigned int remote_port;
-  //! local IP/MAC addr for Ethernet interface (eNB/BBU, UE)
-  char *my_addr;
-  //! local port number for Ethernet interface (eNB/BBU, UE)
-  unsigned int my_port;
   //! record player configuration, definition in record_player.h
   uint32_t       recplay_mode;
   recplay_conf_t *recplay_conf;

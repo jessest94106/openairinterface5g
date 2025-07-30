@@ -110,14 +110,6 @@ int main(int argc, char **argv) {
     .autocal={0},
     //! Configuration file for LMS7002M
     .configFilename="",
-    //! remote IP/MAC addr for Ethernet interface
-    .remote_addr="",
-    //! remote port number for Ethernet interface
-    .remote_port=0,
-    //! local IP/MAC addr for Ethernet interface (eNB/BBU, UE)
-    .my_addr=0,
-    //! local port number for Ethernet interface (eNB/BBU, UE)
-    .my_port=0,
     //! record player configuration, definition in record_player.h
     .recplay_mode=0,
     .recplay_conf=NULL,
