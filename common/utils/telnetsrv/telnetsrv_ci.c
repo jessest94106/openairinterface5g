@@ -42,7 +42,7 @@
 #define TELNETSERVERCODE
 #include "telnetsrv.h"
 
-#define ERROR_MSG_RET(mSG, aRGS...) do { prnt(mSG, ##aRGS); return 1; } while (0)
+#define ERROR_MSG_RET(mSG, aRGS...) do { prnt(mSG, ##aRGS); return -1; } while (0)
 
 static int get_single_ue_rnti_mac(void)
 {
