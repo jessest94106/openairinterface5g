@@ -922,7 +922,7 @@ int gtpv1u_delete_ngu_tunnel(const instance_t instance, gtpv1u_gnb_delete_tunnel
   return newGtpuDeleteTunnels(instance, req->ue_id, req->num_pdusession, req->pdusession_id);
 }
 
-static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t peerPort, uint32_t peerIp)
+static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, const struct sockaddr_in *addr)
 {
   Gtpv1uMsgHeaderT *msgHdr = (Gtpv1uMsgHeaderT *)msgBuf;
 
@@ -940,8 +940,8 @@ static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint1
   LOG_D(GTPU, "[%d] Received a echo request, TEID: %d, seq: %hu\n", h, msgHdr->teid, seq);
   uint8_t recovery[2] = {14, 0};
   return gtpv1uCreateAndSendMsg(h,
-                                peerIp,
-                                peerPort,
+                                addr->sin_addr.s_addr,
+                                htons(addr->sin_port),
                                 GTP_ECHO_RSP,
                                 ntohl(msgHdr->teid),
                                 recovery,
@@ -955,14 +955,14 @@ static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint1
                                 0);
 }
 
-static int Gtpv1uHandleError(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t peerPort, uint32_t peerIp)
+static int Gtpv1uHandleError(int h, uint8_t *msgBuf, uint32_t msgBufLen, const struct sockaddr_in *addr)
 {
   LOG_E(GTPU, "Received GTP error indication (error handling is missing/not implemented)\n");
   int rc = GTPNOK;
   return rc;
 }
 
-static int Gtpv1uHandleSupportedExt(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t peerPort, uint32_t peerIp)
+static int Gtpv1uHandleSupportedExt(int h, uint8_t *msgBuf, uint32_t msgBufLen, const sockaddr_in *addr)
 {
   LOG_E(GTPU, "Supported extensions to be dev\n");
   int rc = GTPNOK;
@@ -972,7 +972,7 @@ static int Gtpv1uHandleSupportedExt(int h, uint8_t *msgBuf, uint32_t msgBufLen, 
 // When end marker arrives, we notify the client with buffer size = 0
 // The client will likely call "delete tunnel"
 // nevertheless we don't take the initiative
-static int Gtpv1uHandleEndMarker(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t peerPort, uint32_t peerIp)
+static int Gtpv1uHandleEndMarker(int h, uint8_t *msgBuf, uint32_t msgBufLen, const sockaddr_in *addr)
 {
   Gtpv1uMsgHeaderT *msgHdr = (Gtpv1uMsgHeaderT *)msgBuf;
 
@@ -1021,7 +1021,7 @@ static int Gtpv1uHandleEndMarker(int h, uint8_t *msgBuf, uint32_t msgBufLen, uin
   return !GTPNOK;
 }
 
-static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t peerPort, uint32_t peerIp)
+static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, const struct sockaddr_in *addr)
 {
   Gtpv1uMsgHeaderT *msgHdr = (Gtpv1uMsgHeaderT *)msgBuf;
 
@@ -1186,8 +1186,8 @@ static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, uint16_t
      * according to TS 38.425: Fig. 5.5.2.2-1 and section 5.5.3.24*/
     extensionHeader->length = 1 + sizeof(DlDataDeliveryStatus_flagsT) + 3 + 1 + 1;
     gtpv1uCreateAndSendMsg(h,
-                           peerIp,
-                           peerPort,
+                           addr->sin_addr.s_addr,
+                           htons(addr->sin_port),
                            GTP_GPDU,
                            globGtp.te2ue_mapping[ntohl(msgHdr->teid)].outgoing_teid,
                            NULL,
@@ -1235,23 +1235,23 @@ static void gtpv1uReceiveHandleMessage(int h)
         break;
 
       case GTP_ECHO_REQ:
-        Gtpv1uHandleEchoReq(h, udpData, udpDataLen, htons(addr.sin_port), addr.sin_addr.s_addr);
+        Gtpv1uHandleEchoReq(h, udpData, udpDataLen, &addr);
         break;
 
       case GTP_ERROR_INDICATION:
-        Gtpv1uHandleError(h, udpData, udpDataLen, htons(addr.sin_port), addr.sin_addr.s_addr);
+        Gtpv1uHandleError(h, udpData, udpDataLen, &addr);
         break;
 
       case GTP_SUPPORTED_EXTENSION_HEADER_INDICATION:
-        Gtpv1uHandleSupportedExt(h, udpData, udpDataLen, htons(addr.sin_port), addr.sin_addr.s_addr);
+        Gtpv1uHandleSupportedExt(h, udpData, udpDataLen, &addr);
         break;
 
       case GTP_END_MARKER:
-        Gtpv1uHandleEndMarker(h, udpData, udpDataLen, htons(addr.sin_port), addr.sin_addr.s_addr);
+        Gtpv1uHandleEndMarker(h, udpData, udpDataLen, &addr);
         break;
 
       case GTP_GPDU:
-        Gtpv1uHandleGpdu(h, udpData, udpDataLen, htons(addr.sin_port), addr.sin_addr.s_addr);
+        Gtpv1uHandleGpdu(h, udpData, udpDataLen, &addr);
         break;
 
       default:
