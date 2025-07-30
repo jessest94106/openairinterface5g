@@ -1919,7 +1919,7 @@ uint8_t set_csirs_measurement_bitmap(NR_CSI_MeasConfig_t *csi_measconfig, NR_CSI
 }
 
 void configure_csi_resource_mapping(fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_config_pdu,
-                                    NR_CSI_RS_ResourceMapping_t  *resourceMapping,
+                                    const NR_CSI_RS_ResourceMapping_t *resourceMapping,
                                     uint32_t bwp_size,
                                     uint32_t bwp_start)
 {

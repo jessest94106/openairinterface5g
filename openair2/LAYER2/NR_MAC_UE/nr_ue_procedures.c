@@ -249,26 +249,27 @@ void nr_ue_decode_mib(NR_UE_MAC_INST_t *mac, int cc_id)
 }
 
 static void configure_ratematching_csi(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_pdu,
-                                       fapi_nr_dl_config_request_t *dl_config,
+                                       const fapi_nr_dl_config_request_t *dl_config,
                                        int rnti_type,
                                        int frame,
                                        int slot,
                                        int mu,
                                        int slots_per_frame,
-                                       NR_PDSCH_Config_t *pdsch_config)
+                                       const NR_PDSCH_Config_t *pdsch_config)
 {
   // only for C-RNTI, MCS-C-RNTI, CS-RNTI (and only C-RNTI is supported for now)
   if (rnti_type != TYPE_C_RNTI_)
     return;
 
   if (pdsch_config && pdsch_config->zp_CSI_RS_ResourceToAddModList) {
-    for (int i = 0; i < pdsch_config->zp_CSI_RS_ResourceToAddModList->list.count; i++) {
-      NR_ZP_CSI_RS_Resource_t *zp_res = pdsch_config->zp_CSI_RS_ResourceToAddModList->list.array[i];
-      NR_ZP_CSI_RS_ResourceId_t id = zp_res->zp_CSI_RS_ResourceId;
-      NR_SetupRelease_ZP_CSI_RS_ResourceSet_t *zp_set = pdsch_config->p_ZP_CSI_RS_ResourceSet;
-      AssertFatal(zp_set && zp_set->choice.setup, "Only periodic ZP resource set is implemented\n");
-      bool found = false;
-      for (int j = 0; j < zp_set->choice.setup->zp_CSI_RS_ResourceIdList.list.count; j++) {
+    bool found = false;
+    const NR_SetupRelease_ZP_CSI_RS_ResourceSet_t *zp_set = pdsch_config->p_ZP_CSI_RS_ResourceSet;
+    AssertFatal(zp_set && zp_set->choice.setup, "Only periodic ZP resource set is implemented\n");
+    const NR_ZP_CSI_RS_Resource_t *zp_res = NULL;
+    for (int j = 0; j < zp_set->choice.setup->zp_CSI_RS_ResourceIdList.list.count; j++) {
+      for (int i = 0; i < pdsch_config->zp_CSI_RS_ResourceToAddModList->list.count; i++) {
+        zp_res = pdsch_config->zp_CSI_RS_ResourceToAddModList->list.array[i];
+        NR_ZP_CSI_RS_ResourceId_t id = zp_res->zp_CSI_RS_ResourceId;
         if (*zp_set->choice.setup->zp_CSI_RS_ResourceIdList.list.array[j] == id) {
           found = true;
           break;
@@ -291,7 +292,7 @@ static void configure_ratematching_csi(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsc
 
   for (int i = 0; i < dl_config->number_pdus; i++) {
     // This assumes that CSI-RS are scheduled before this moment which is true in current implementation
-    fapi_nr_dl_config_request_pdu_t *csi_req = &dl_config->dl_config_list[i];
+    const fapi_nr_dl_config_request_pdu_t *csi_req = &dl_config->dl_config_list[i];
     if (csi_req->pdu_type == FAPI_NR_DL_CONFIG_TYPE_CSI_RS) {
       AssertFatal(dlsch_pdu->numCsiRsForRateMatching < NFAPI_MAX_NUM_CSI_RATEMATCH, "csiRsForRateMatching out of bounds\n");
       dlsch_pdu->csiRsForRateMatching[dlsch_pdu->numCsiRsForRateMatching] = csi_req->csirs_config_pdu.csirs_config_rel15;
