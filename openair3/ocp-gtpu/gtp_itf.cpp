@@ -526,11 +526,19 @@ void GtpuUpdateTunnelOutgoingAddressAndTeid(instance_t instance,
   memcpy(&sockaddr->sin_addr, &newOutgoingAddr, sizeof(newOutgoingAddr));
   AssertFatal(ptr2->second.ip.ss_family == AF_INET, "only IPv4 is supported\n");
   ptr2->second.teid_outgoing = newOutgoingTeid;
+  char ip4[INET_ADDRSTRLEN];
+  char ip6[INET6_ADDRSTRLEN];
+  struct sockaddr_in *sa4 = (struct sockaddr_in *)sockaddr;
+  struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sockaddr;
   LOG_I(GTPU,
-        "[%ld] Tunnel Outgoing TEID updated to %x and IPv4 address to " IPV4_ADDR "\n",
+        "[%ld] UE ID %ld: Update tunnel TEID incoming %x outgoing %x to remote IPv4 %s, IPv6 %s, port %d\n",
         instance,
+        ue_id,
+        ptr2->second.teid_incoming,
         ptr2->second.teid_outgoing,
-        IPV4_ADDR_FORMAT(sockaddr->sin_addr.s_addr));
+        inet_ntop(AF_INET, &sa4->sin_addr, ip4, INET_ADDRSTRLEN),
+        inet_ntop(AF_INET6, &sa6->sin6_addr, ip6, INET6_ADDRSTRLEN),
+        ntohs(sa4->sin_port));
 
   pthread_mutex_unlock(&globGtp.gtp_lock);
   return;
@@ -603,7 +611,7 @@ teid_t newGtpuCreateTunnel(instance_t instance,
   char ip4[INET_ADDRSTRLEN];
   char ip6[INET6_ADDRSTRLEN];
   LOG_I(GTPU,
-        "[%ld] Created tunnel for UE ID %lu, teid for incoming: %x, teid for outgoing %x to remote IPv4: %s, IPv6 %s, port %d\n",
+        "[%ld] UE ID %ld: Create tunnel TEID incoming %x outgoing %x to remote IPv4 %s, IPv6 %s, port %d\n",
         instance,
         ue_id,
         bearer.teid_incoming,
@@ -817,7 +825,7 @@ int newGtpuDeleteAllTunnels(instance_t instance, ue_id_t ue_id)
 
   inst->ue2te_mapping.erase(ptrUe);
   pthread_mutex_unlock(&globGtp.gtp_lock);
-  LOG_I(GTPU, "[%ld] Deleted all tunnels for ue id %ld (%d tunnels deleted)\n", instance, ue_id, nb);
+  LOG_I(GTPU, "[%ld] UE ID %ld: Delete all tunnels (%d tunnels)\n", instance, ue_id, nb);
   return !GTPNOK;
 }
 
