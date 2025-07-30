@@ -114,7 +114,6 @@ typedef struct gtpv1u_gnb_delete_tunnel_req_s gtpv1u_gnb_delete_tunnel_req_t;
                              teid_t teid,
                              int outgoing_qfi,
                              transport_layer_addr_t remoteAddr,
-                             int port,
                              gtpCallback callBack,
                              gtpCallbackSDAP callBackSDAP);
 

@@ -187,7 +187,7 @@ static bool recv_ng(protocol_ctxt_t *ctxt,
 }
 
 /* @brief Set up the NG-U (north-bound) GTP tunnel, and inform CU-UP via E1 */
-static up_params_t setup_cuup_ue_ng(sctp_assoc_t assoc_id, const e1ap_nssai_t *nssai, uint32_t ue_id, instance_t gtp_inst, const char *ip, uint16_t port)
+static up_params_t setup_cuup_ue_ng(sctp_assoc_t assoc_id, const e1ap_nssai_t *nssai, uint32_t ue_id, instance_t gtp_inst, const char *ip)
 {
   long pdu_id = 1;
   long drb_id = pdu_id + 3;
@@ -196,7 +196,7 @@ static up_params_t setup_cuup_ue_ng(sctp_assoc_t assoc_id, const e1ap_nssai_t *n
 
   /* create the local tunnel (i.e., as if we were UPF) */
   transport_layer_addr_t null_addr = {.length = 32};
-  teid_t teid_lo = newGtpuCreateTunnel(gtp_inst, ue_id, pdu_id, pdu_id, -1, -1, null_addr, port, NULL, recv_ng);
+  teid_t teid_lo = newGtpuCreateTunnel(gtp_inst, ue_id, pdu_id, pdu_id, -1, -1, null_addr, NULL, recv_ng);
   UP_TL_information_t tnl = {.teId = teid_lo};
   memcpy(&tnl.tlAddress, &addr_lo, 4);
 
@@ -233,7 +233,7 @@ static up_params_t setup_cuup_ue_ng(sctp_assoc_t assoc_id, const e1ap_nssai_t *n
   char ip_rm[32] = {0};
   inet_ntop(AF_INET, &addr_rm, ip_rm, sizeof(ip_rm));
   GtpuUpdateTunnelOutgoingAddressAndTeid(gtp_inst, ue_id, pdu_id, addr_rm, teid_rm);
-  LOG_I(GNB_APP, "CU-UP created NG-U, local %s/%x remote %s/%x (port %d)\n", ip_lo, teid_lo, ip_rm, teid_rm, port);
+  LOG_I(GNB_APP, "CU-UP created NG-U, local %s/%x remote %s/%x\n", ip_lo, teid_lo, ip_rm, teid_rm);
 
   inet_ntop(AF_INET, &f1_up.tl_info.tlAddress, ip_rm, sizeof(ip_rm));
   LOG_I(GNB_APP, "CU-UP created F1-U, remove %s/%x\n", ip_rm, f1_up.tl_info.teId);
@@ -286,7 +286,7 @@ static bool recv_f1(protocol_ctxt_t *ctxt,
 }
 
 /* @brief Set up the F1-U (south-bound) GTP tunnel, and inform CU-UP via E1 */
-static void setup_cuup_ue_f1(sctp_assoc_t assoc_id, uint32_t ue_id, instance_t gtp_inst, const char *ip, uint16_t port, up_params_t rm)
+static void setup_cuup_ue_f1(sctp_assoc_t assoc_id, uint32_t ue_id, instance_t gtp_inst, const char *ip, up_params_t rm)
 {
   int pdu_id = 1;
   int drb_id = pdu_id + 3;
@@ -294,7 +294,7 @@ static void setup_cuup_ue_f1(sctp_assoc_t assoc_id, uint32_t ue_id, instance_t g
   /* create tunnel (i.e., as if we were DU) */
   transport_layer_addr_t addr = {.length = 32};
   memcpy(addr.buffer, &rm.tl_info.tlAddress, 4);
-  teid_t teid_lo = newGtpuCreateTunnel(gtp_inst, ue_id, drb_id, drb_id, rm.tl_info.teId, -1, addr, port, recv_f1, NULL);
+  teid_t teid_lo = newGtpuCreateTunnel(gtp_inst, ue_id, drb_id, drb_id, rm.tl_info.teId, -1, addr, recv_f1, NULL);
 
   up_params_t lo = {.tl_info.teId = teid_lo, .cell_group_id = rm.cell_group_id};
   inet_pton(AF_INET, ip, &lo.tl_info.tlAddress);
@@ -319,7 +319,7 @@ static void setup_cuup_ue_f1(sctp_assoc_t assoc_id, uint32_t ue_id, instance_t g
   inet_ntop(AF_INET, &lo.tl_info.tlAddress, ip_lo, sizeof(ip_lo));
   char ip_rm[32] = {0};
   inet_ntop(AF_INET, &rm.tl_info.tlAddress, ip_rm, sizeof(ip_rm));
-  LOG_I(GNB_APP, "CU-UP created F1-U, local %s/%x remote %s/%x (port %d)\n", ip_lo, lo.tl_info.teId, ip_rm, rm.tl_info.teId, port);
+  LOG_I(GNB_APP, "CU-UP created F1-U, local %s/%x remote %s/%x\n", ip_lo, lo.tl_info.teId, ip_rm, rm.tl_info.teId);
 }
 
 /* @brief release the UE over E1, and delete corresponding GTP tunnels */
@@ -609,8 +609,8 @@ int main(int argc, char *argv[])
    * - setup_cuup_ue_f1(): E1 bearer context modification <=> send TEID for
    *   F1-U DL (as if we had talked to the DU in the middle) */
   for (int ue = 0; ue < n_ue; ++ue) {
-    up_params_t f1_up = setup_cuup_ue_ng(assoc_id, &nssai, ue, ng_inst, ng_ip, ng_port);
-    setup_cuup_ue_f1(assoc_id, ue, f1_inst, f1_ip, f1_port, f1_up);
+    up_params_t f1_up = setup_cuup_ue_ng(assoc_id, &nssai, ue, ng_inst, ng_ip);
+    setup_cuup_ue_f1(assoc_id, ue, f1_inst, f1_ip, f1_up);
   }
 
   usleep(1000);

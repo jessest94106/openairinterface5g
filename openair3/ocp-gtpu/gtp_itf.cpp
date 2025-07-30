@@ -568,7 +568,6 @@ teid_t newGtpuCreateTunnel(instance_t instance,
                            teid_t outgoing_teid,
                            int outgoing_qfi,
                            transport_layer_addr_t remoteAddr,
-                           int port,
                            gtpCallback callBack,
                            gtpCallbackSDAP callBackSDAP)
 {
@@ -617,7 +616,7 @@ teid_t newGtpuCreateTunnel(instance_t instance,
   }
 
   tmp->teid_incoming = incoming_teid;
-  tmp->outgoing_port = port;
+  tmp->outgoing_port = inst->get_dstport();
   tmp->teid_outgoing = outgoing_teid;
   tmp->outgoing_qfi = outgoing_qfi;
   pthread_mutex_unlock(&globGtp.gtp_lock);
@@ -648,7 +647,6 @@ int gtpv1u_create_s1u_tunnel(instance_t instance,
   pthread_mutex_lock(&globGtp.gtp_lock);
   getInstRetInt(compatInst(instance));
 
-  tcp_udp_port_t dstport = inst->get_dstport();
   uint8_t addr[inst->foundAddrLen];
   memcpy(addr, inst->foundAddr, inst->foundAddrLen);
   pthread_mutex_unlock(&globGtp.gtp_lock);
@@ -665,7 +663,6 @@ int gtpv1u_create_s1u_tunnel(instance_t instance,
                                       create_tunnel_req->sgw_S1u_teid[i],
                                       -1, // no pdu session in 4G
                                       create_tunnel_req->sgw_addr[i],
-                                      dstport,
                                       callBack,
                                       NULL);
     create_tunnel_resp->status = 0;
@@ -737,7 +734,6 @@ int gtpv1u_create_ngu_tunnel(const instance_t instance,
   pthread_mutex_lock(&globGtp.gtp_lock);
   getInstRetInt(compatInst(instance));
 
-  tcp_udp_port_t dstport = inst->get_dstport();
   uint8_t addr[inst->foundAddrLen];
   memcpy(addr, inst->foundAddr, inst->foundAddrLen);
   pthread_mutex_unlock(&globGtp.gtp_lock);
@@ -749,7 +745,6 @@ int gtpv1u_create_ngu_tunnel(const instance_t instance,
                                       create_tunnel_req->outgoing_teid[i],
                                       create_tunnel_req->outgoing_qfi[i],
                                       create_tunnel_req->dst_addr[i],
-                                      dstport,
                                       callBack,
                                       callBackSDAP);
     create_tunnel_resp->status = 0;
