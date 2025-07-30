@@ -36,6 +36,8 @@ if(NOT DEFINED ENV{CPM_SOURCE_CACHE})
 endif()
 include("cmake_targets/CPM.cmake")
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_targets/tools/MODULES" "${CMAKE_MODULE_PATH}")
+
 ##############################
 ### CCache: reduce compilation time
 ##############################
@@ -1710,7 +1712,6 @@ include_directories("${NFAPI_DIR}/pnf_sim/inc")
 add_library(oai_iqplayer MODULE
 	${OPENAIR_DIR}/radio/iqplayer/iqplayer_lib.c
 	)
-set(CMAKE_MODULE_PATH "${OPENAIR_DIR}/cmake_targets/tools/MODULES" "${CMAKE_MODULE_PATH}")
 
 #################################
 # add executables for operation
