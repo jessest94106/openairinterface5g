@@ -59,10 +59,19 @@ class Module_UE:
 			}
 			self.interface = m.get('IF')
 			self.MTU = m.get('MTU')
-			self.trace = m.get('trace') == True
-			self.logStore = m.get('LogStore')
 			self.cmd_prefix = m.get('CmdPrefix')
 			logging.info(f'initialized UE {self} from {filename}')
+
+			t = m.get('Tracing')
+			self.trace = t is not None
+			if self.trace:
+				if t.get('Start') is None or t.get('Stop') is None or t.get('Collect')is None :
+					raise ValueError("need to have Start/Stop/Collect for tracing")
+				self.cmd_dict["traceStart"] = t.get('Start')
+				self.cmd_dict["traceStop"] = t.get('Stop')
+				self._logCollect = t.get('Collect')
+				if "%%log_dir%%" not in self._logCollect:
+					raise ValueError(f"(At least one) LogCollect expression for {module_name} must contain \"%%log_dir%%\"")
 
 	def __str__(self):
 		return f"{self.module_name}@{self.host}"
@@ -82,25 +91,23 @@ class Module_UE:
 #-----------------$
 
 	def initialize(self):
-		if self.trace:
-			raise Exception("UE tracing not implemented yet")
-			self._enableTrace()
 		# we first terminate to make sure the UE has been stopped
 		if self.cmd_dict["detach"]:
 			self._command(self.cmd_dict["detach"], silent=True)
 		self._command(self.cmd_dict["terminate"], silent=True)
 		ret = self._command(self.cmd_dict["initialize"])
 		logging.info(f'For command: {ret.args} | return output: {ret.stdout} | Code: {ret.returncode}')
+		if self.trace:
+			self._enableTrace()
 		# Here each UE returns differently for the successful initialization, requires check based on UE
 		return ret.returncode == 0
 
 
-	def terminate(self):
+	def terminate(self, log_dir=None):
 		self._command(self.cmd_dict["terminate"])
-		if self.trace:
-			raise Exception("UE tracing not implemented yet")
+		if self.trace and log_dir is not None:
 			self._disableTrace()
-			return self._logCollect()
+			return self._collectTrace(log_dir)
 		return None
 
 	def attach(self, attach_tries = 4, attach_timeout = 60):
@@ -188,10 +195,35 @@ class Module_UE:
 		return self.cmd_prefix if self.cmd_prefix else ""
 
 	def _enableTrace(self):
-		raise Exception("not implemented")
+		logging.info(f'UE {self}: start UE tracing')
+		self._command(self.cmd_dict["traceStart"])
 
 	def _disableTrace(self):
-		raise Exception("not implemented")
+		logging.info(f'UE {self}: stop UE tracing')
+		self._command(self.cmd_dict["traceStop"])
 
-	def _logCollect(self):
-		raise Exception("not implemented")
+	def _collectTrace(self, log_dir):
+		logging.info(f'collecting logs into (local) {log_dir}')
+		remote_dir = "/tmp/ue-trace-logs"
+		with cls_cmd.getConnection(self.host) as c:
+			# create a directory for log collection
+			c.run(f'rm -rf {remote_dir}')
+			ret = c.run(f'mkdir {remote_dir}')
+			if ret.returncode != 0:
+				logging.error("cannot create directory for log collection")
+				return []
+			log_cmd = self._logCollect.replace('%%log_dir%%', remote_dir)
+			self._command(log_cmd)
+			# enumerate collected files
+			ret = c.run(f'ls {remote_dir}/*')
+			if ret.returncode != 0:
+				logging.error("cannot enumerate log files")
+				return []
+			log_files = []
+			# copy them to the executor one by one, and store in log_dir
+			for f in ret.stdout.split("\n"):
+				l = f.replace(remote_dir, log_dir)
+				c.copyin(f, l)
+				log_files.append(l)
+			c.run(f'rm -rf {remote_dir}')
+			return log_files
