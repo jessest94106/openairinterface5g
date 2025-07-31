@@ -1503,7 +1503,8 @@ static seq_arr_t *fill_du_sibs(paramdef_t *GNBparamarray)
   if (NODE_IS_DU(get_node_type()))
     AssertFatal(GNBparamarray[GNB_CU_SIBS_IDX].numelt == 0, "This is DU, do not input CU SIBs\n");
 
-  if (!config_isparamset(GNBparamarray, GNB_DU_SIBS_IDX))
+  // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
+  if (GNBparamarray[GNB_DU_SIBS_IDX].numelt == 0)
     return NULL;
 
   seq_arr_t *du_SIBs = malloc(sizeof(seq_arr_t));
@@ -1808,12 +1809,13 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
       }
-      if (config_isparamset(MacRLC_ParamList.paramarray[j], MACRLC_BEAMWEIGHTS_IDX)) {
+      // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
+      int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
+      if (n > 0) {
         if (NFAPI_MODE == NFAPI_MONOLITHIC) {
           GET_PARAMS_LIST(L1_ParamList, L1_Params, L1PARAMS_DESC, CONFIG_STRING_L1_LIST, NULL);
           AssertFatal(*(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr) == 0, "No need to set beam weights in case of DAS\n");
         }
-        int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
         int num_beam = n;
         if (!ab) {
           AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
@@ -1998,7 +2000,8 @@ static seq_arr_t *fill_cu_sibs(paramdef_t *GNBparamarray)
   if (NODE_IS_CU(get_node_type()))
     AssertFatal(GNBparamarray[GNB_DU_SIBS_IDX].numelt == 0, "This is CU, do not input DU SIBs\n");
 
-  if (!config_isparamset(GNBparamarray, GNB_CU_SIBS_IDX))
+  // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
+  if (GNBparamarray[GNB_CU_SIBS_IDX].numelt == 0)
     return NULL;
 
   seq_arr_t *SIBs = malloc(sizeof(seq_arr_t));
