@@ -36,6 +36,7 @@ typedef struct {
   uint64_t timestamp;
   pthread_mutex_t mutex;
   pthread_cond_t cond;
+  uint64_t late_reads;
 } emulator_timestamp_t;
 
 typedef struct {
@@ -62,6 +63,15 @@ static void *emulator_timing_job(void *arg)
       LOG_E(UTIL, "clock_gettime failed\n");
       exit(1);
     }
+
+    emulator_timestamp_t *emulator_timestamp = &emulator_state->emulator_timestamp;
+    if (current_time.tv_sec != timestamp.tv_sec) {
+      if (emulator_timestamp->late_reads != 0) {
+        LOG_W(HW, "%ld RF reads were late\n", emulator_timestamp->late_reads);
+      }
+      emulator_timestamp->late_reads = 0;
+    }
+
     uint64_t diff = (current_time.tv_sec - timestamp.tv_sec) * 1000000000 + (current_time.tv_nsec - timestamp.tv_nsec);
     timestamp = current_time;
     double samples_to_produce = emulator_state->sample_rate * emulator_state->timescale * diff / 1e9;
@@ -73,7 +83,6 @@ static void *emulator_timing_job(void *arg)
       leftover_samples -= 1;
     }
 
-    emulator_timestamp_t *emulator_timestamp = &emulator_state->emulator_timestamp;
     mutexlock(emulator_timestamp->mutex);
     emulator_timestamp->timestamp += samples_to_produce;
     condbroadcast(emulator_timestamp->cond);
@@ -227,7 +236,9 @@ static int emulator_read(openair0_device *device, openair0_timestamp *ptimestamp
     }
     mutexunlock(emulator_timestamp->mutex);
   } else {
-    LOG_W(HW, "RF read is late!\n");
+    mutexlock(emulator_timestamp->mutex);
+    emulator_timestamp->late_reads++;
+    mutexunlock(emulator_timestamp->mutex);
   }
   *ptimestamp = emulator_state->last_received_sample;
   emulator_state->last_received_sample += nsamps;
