@@ -7,8 +7,6 @@ idefix:
   NetworkScript: ip a show dev wwan0
   IF: wwan0
   MTU: 1500
-  Trace: True
-  LogStore: /media/usb-drive/ci_qlogs
 
 up2:
   Host: up2
@@ -46,7 +44,6 @@ adb_ue_1:
   NetworkScript: adb -s R3CM40LZPHT shell "ip address show | grep rmnet_data0"
   CmdPrefix: adb -s R3CM40LZPHT shell
   MTU: 1500
-  LogStore: /media/usb-drive/ci_adb_1-logs
 adb_ue_2:
   Host: nano
   InitScript: /home/oaicicd/ci_ctl_adb.sh initialize 5200c00db4413517
@@ -59,7 +56,6 @@ adb_ue_2:
   NetworkScript: adb -s 5200c00db4413517 shell "ip address show | grep rmnet"
   CmdPrefix: adb -s 5200c00db4413517 shell
   MTU: 1500
-  LogStore: /media/usb-drive/ci_adb_2-logs
 
 oc-cn5g:
   Host: avra
