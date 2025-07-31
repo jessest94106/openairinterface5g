@@ -70,11 +70,11 @@ class Module_UE:
 	def __repr__(self):
 		return self.__str__()
 
-	def _command(self, cmd, silent = False):
+	def _command(self, cmd, silent=False, reportNonZero=True):
 		if cmd is None:
 			raise Exception("no command provided")
 		with cls_cmd.getConnection(self.host) as c:
-			response = c.run(cmd, silent=silent)
+			response = c.run(cmd, silent=silent, reportNonZero=reportNonZero)
 		return response
 
 #-----------------$
@@ -109,10 +109,11 @@ class Module_UE:
 			self._command(self.cmd_dict["attach"])
 			timeout = attach_timeout
 			logging.debug("Waiting for IP address to be assigned")
+			ip = self.getIP(silent=False, reportNonZero=True)
 			while timeout > 0 and not ip:
-				time.sleep(5)
-				timeout -= 5
-				ip = self.getIP()
+				time.sleep(1)
+				timeout -= 1
+				ip = self.getIP(silent=True, reportNonZero=False)
 			if ip:
 				break
 			logging.warning(f"UE did not receive IP address after {attach_timeout} s, detaching")
@@ -156,8 +157,8 @@ class Module_UE:
 			logging.error(message)
 			return False
 
-	def getIP(self):
-		output = self._command(self.cmd_dict["getNetwork"], silent=True)
+	def getIP(self, silent=True, reportNonZero=True):
+		output = self._command(self.cmd_dict["getNetwork"], silent=silent, reportNonZero=reportNonZero)
 		result = re.search(r'inet (?P<ip>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)', output.stdout)
 		if result and result.group('ip'):
 			ip = result.group('ip')
