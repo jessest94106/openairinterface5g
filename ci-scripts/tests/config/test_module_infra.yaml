@@ -1,0 +1,19 @@
+test:
+  Host: localhost
+  InitScript: ""
+  TermScript: ""
+  AttachScript: "true"
+  DetachScript: "true"
+  NetworkScript: ip a show dev lo
+  IF: lo
+  MTU: 65536
+
+test-fail:
+  Host: localhost
+  InitScript: ""
+  TermScript: ""
+  AttachScript: "false"
+  DetachScript: "true"
+  NetworkScript: ip a show dev TESTDEVICEDOESNOTEXIST
+  IF: TESTDEVICEDOESNOTEXIST
+  MTU: 123
