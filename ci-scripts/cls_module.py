@@ -73,12 +73,8 @@ class Module_UE:
 	def _command(self, cmd, silent = False):
 		if cmd is None:
 			raise Exception("no command provided")
-		if self.host == "" or self.host == "localhost":
-			c = cls_cmd.LocalCmd()
-		else:
-			c = cls_cmd.RemoteCmd(self.host)
-		response = c.run(cmd, silent=silent)
-		c.close()
+		with cls_cmd.getConnection(self.host) as c:
+			response = c.run(cmd, silent=silent)
 		return response
 
 #-----------------$
