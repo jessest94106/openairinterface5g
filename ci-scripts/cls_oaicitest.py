@@ -835,10 +835,10 @@ class OaiCiTest():
 				global_status = CONST.OAI_UE_PROCESS_COULD_NOT_SYNC
 		return global_status
 
-	def TerminateUE(self, HTML):
+	def TerminateUE(self, HTML, logPath):
 		ues = [cls_module.Module_UE(n.strip()) for n in self.ue_ids]
 		with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
-			futures = [executor.submit(ue.terminate) for ue in ues]
+			futures = [executor.submit(ue.terminate, logPath) for ue in ues]
 			archives = [f.result() for f in futures]
 		archive_info = [f'Log at: {a}' if a else 'No log available' for a in archives]
 		messages = [f"UE {ue.getName()}: {log}" for (ue, log) in zip(ues, archive_info)]

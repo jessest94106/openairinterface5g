@@ -226,7 +226,7 @@ def ExecuteActionWithParam(action):
 		elif action == 'Detach_UE':
 			success = CiTestObj.DetachUE(HTML)
 		elif action == 'Terminate_UE':
-			success = CiTestObj.TerminateUE(HTML)
+			success = CiTestObj.TerminateUE(HTML, logPath)
 		elif action == 'CheckStatusUE':
 			success = CiTestObj.CheckStatusUE(HTML)
 		elif action == 'DataEnable_UE':
