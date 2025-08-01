@@ -124,7 +124,6 @@ class RANManagement():
 
 		self.testCase_id = HTML.testCase_id
 		mySSH = SSH.SSHConnection()
-		cwd = os.getcwd()
 		
 		mySSH.open(lIpAddr, lUserName, lPassWord)
 		mySSH.command('cd ' + lSourcePath, '\$', 5)
