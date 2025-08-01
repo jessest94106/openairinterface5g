@@ -30,6 +30,8 @@
 #include <common/utils/LOG/log.h>
 #include "common/utils/threadPool/pthread_utils.h"
 #include "common_lib.h"
+#include "radio/vrtsim/noise_device.h"
+#include "simde/x86/avx512.h"
 
 // structures and timing thread job for timing
 typedef struct {
@@ -98,9 +100,11 @@ static void *emulator_timing_job(void *arg)
  */
 static int emulator_start(openair0_device *device)
 {
-  // Start the timing thread
+  // Start the timing thread and the noise device
   emulator_state_t *emulator_state = (emulator_state_t *)device->priv;
   if (!emulator_state->run_timing_thread) {
+    init_noise_device(0); // TODO configure noise level
+
     emulator_timestamp_t *emulator_timestamp = &emulator_state->emulator_timestamp;
     memset(emulator_timestamp, 0, sizeof(emulator_timestamp_t));
 
@@ -155,12 +159,13 @@ int emulator_reset_stats(openair0_device *device)
  */
 static void emulator_end(openair0_device *device)
 {
-  // Stop the timing thread
+  // Stop the timing thread and the noise device
   emulator_state_t *emulator_state = (emulator_state_t *)device->priv;
   if (emulator_state->run_timing_thread) {
     emulator_state->run_timing_thread = false;
     int ret = pthread_join(emulator_state->timing_thread, NULL);
     AssertFatal(ret == 0, "pthread_join() failed: errno: %d, %s\n", errno, strerror(errno));
+    free_noise_device();
   }
 }
 
@@ -210,6 +215,41 @@ static int emulator_write(openair0_device *device, openair0_timestamp timestamp,
   return 0;
 }
 
+/*! \brief Store noise in the buffer buff
+ * \param[out] buff A buffer for received samples.
+ * The buffers must be large enough to hold the number of samples \ref nsamps.
+ * \param nsamps Number of samples. One sample is 2 byte I + 2 byte Q => 4 byte.
+ */
+static void read_noise(void *buff, int nsamps)
+{
+  int aligned_nsamps = ceil_mod(nsamps, (512 / 8) / sizeof(cf_t));
+  cf_t samples[aligned_nsamps] __attribute__((aligned(64)));
+  // Apply noise from global settings
+  get_noise_vector((float *)samples, nsamps * 2);
+
+  // Convert to c16_t
+  c16_t samples_out[aligned_nsamps] __attribute__((aligned(64)));
+#if defined(__AVX512F__)
+  for (int i = 0; i < aligned_nsamps / 8; i++) {
+    simde__m512 *in = (simde__m512 *)&samples[i * 8];
+    simde__m256i *out = (simde__m256i *)&samples_out[i * 8];
+    *out = simde_mm512_cvtsepi32_epi16(simde_mm512_cvtps_epi32(*in));
+  }
+#elif defined(__AVX2__)
+  for (int i = 0; i < aligned_nsamps / 4; i++) {
+    simde__m256 *in = (simde__m256 *)&samples[i * 4];
+    simde__m128i *out = (simde__m128i *)&samples_out[i * 4];
+    *out = simde_mm256_cvtsepi32_epi16(simde_mm256_cvtps_epi32(*in));
+  }
+#else
+  for (int i = 0; i < nsamps; i++) {
+    samples_out[i].r = lroundf(samples[i].r);
+    samples_out[i].i = lroundf(samples[i].i);
+  }
+#endif
+  memcpy(buff, samples_out, nsamps * sizeof(c16_t));
+}
+
 /*! \brief Receive samples from hardware.
  * Read \ref nsamps samples from each channel to buffers. buff[0] is the array for
  * the first channel.
@@ -244,7 +284,7 @@ static int emulator_read(openair0_device *device, openair0_timestamp *ptimestamp
   emulator_state->last_received_sample += nsamps;
 
   for (int i = 0; i < nbAnt; i++) {
-    memset(buff[i], 0, nsamps * sizeof(uint32_t)); // TODO Play random data
+    read_noise(buff[i], nsamps);
   }
 
   return nsamps;
