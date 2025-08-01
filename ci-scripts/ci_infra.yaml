@@ -5,6 +5,10 @@ idefix:
   AttachScript: sudo python3 ci_ctl_qtel.py /dev/ttyUSB2 wup
   DetachScript: sudo python3 ci_ctl_qtel.py /dev/ttyUSB2 detach
   NetworkScript: ip a show dev wwan0
+  #Tracing:
+  #  Start: 'sudo rm -f ci_qlog/*; nohup sudo -b QLog/QLog -s ci_qlog -f NR5G.cfg &'
+  #  Stop: 'sudo killall QLog'
+  #  Collect: 'sudo mv ci_qlog/* %%log_dir%%/'
   IF: wwan0
   MTU: 1500
 
