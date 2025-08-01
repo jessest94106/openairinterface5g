@@ -310,6 +310,7 @@ void nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
       if (mac->get_otherSI[i])
         mac->get_otherSI[i] = false;
     }
+    mac->si_SchedInfo.si_window_start = -1;
     T(T_NRUE_MAC_DL_PDU_WITH_DATA,
       T_INT(SI_RNTI),
       T_INT(-1 /* frame, unavailable here */),
