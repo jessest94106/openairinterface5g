@@ -368,6 +368,8 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
     // prach is scheduled according to configuration index and tables 6.3.3.2.2 to 6.3.3.2.4
     uint16_t RA_sfn_index = -1;
     frequency_range_t freq_range = get_freq_range_from_arfcn(scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA);
+    const int mu_pusch = scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+    const int16_t n_ra_rb = get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value, mu_pusch);
     if (get_nr_prach_sched_from_info(cc->prach_info, config_index, frameP, slotP, mu, freq_range, &RA_sfn_index, cc->frame_type)) {
       uint16_t format0 = cc->prach_info.format & 0xff; // first column of format from table
       uint16_t format1 = (cc->prach_info.format >> 8) & 0xff; // second column of format from table
@@ -506,7 +508,7 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
           }
           prach_pdu->num_prach_ocas = num_td_occ;
           prach_pdu->beamforming.num_prgs = 1;
-          prach_pdu->beamforming.prg_size = 273; //n_ra_rb This value doesn't work with Aerial as it bugs
+          prach_pdu->beamforming.prg_size = n_ra_rb;
           prach_pdu->beamforming.dig_bf_interface = num_td_occ;
           prach_pdu->beamforming.prgs_list[0].dig_bf_interface_list[num_td_occ - 1].beam_idx = beam_index;
 
@@ -527,8 +529,6 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
       }
 
       // block resources in vrb_map_UL
-      const int mu_pusch = scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
-      const int16_t n_ra_rb = get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing.value, mu_pusch);
       // mark PRBs as occupied for current and future slots if prach extends beyond current slot
       int total_prach_slots;
       uint32_t N_dur = cc->prach_info.N_dur;
