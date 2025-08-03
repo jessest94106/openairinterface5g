@@ -782,6 +782,8 @@ static void nr_csi_im_power_estimation(const PHY_VARS_NR_UE *ue,
           LOG_I(NR_PHY, "(ant_rx %i, sc %i) real %i, imag %i\n", ant_rx, sc, rx_signal[sc].r, rx_signal[sc].i);
 #endif
 
+          if (sc == 0) // skip DC for noise power estimation
+            continue;
           sum_re += rx_signal[sc].r;
           sum_im += rx_signal[sc].i;
           sum2_re += rx_signal[sc].r * rx_signal[sc].r;
