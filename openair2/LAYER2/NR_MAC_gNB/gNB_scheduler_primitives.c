@@ -429,32 +429,28 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
                                      NR_ControlResourceSet_t *coreset,
                                      NR_ServingCellConfigCommon_t *scc,
                                      NR_BWP_t *bwp,
-                                     NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config) {
-
-  int sps;
-  NR_sched_pdcch_t pdcch;
-
+                                     NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config)
+{
   AssertFatal(*ss->controlResourceSetId == coreset->controlResourceSetId,
               "coreset id in SS %ld does not correspond to the one in coreset %ld",
               *ss->controlResourceSetId, coreset->controlResourceSetId);
 
+  int sps;
+  NR_sched_pdcch_t pdcch;
   if (bwp) { // This is not for SIB1
-    if(coreset->controlResourceSetId == 0){
-      pdcch.BWPSize  = gNB_mac->cset0_bwp_size;
+    if(coreset->controlResourceSetId == 0) {
+      pdcch.BWPSize = gNB_mac->cset0_bwp_size;
       pdcch.BWPStart = gNB_mac->cset0_bwp_start;
-    }
-    else {
-      pdcch.BWPSize  = NRRIV2BW(bwp->locationAndBandwidth, MAX_BWP_SIZE);
+    } else {
+      pdcch.BWPSize = NRRIV2BW(bwp->locationAndBandwidth, MAX_BWP_SIZE);
       pdcch.BWPStart = NRRIV2PRBOFFSET(bwp->locationAndBandwidth, MAX_BWP_SIZE);
     }
     pdcch.SubcarrierSpacing = bwp->subcarrierSpacing;
-    pdcch.CyclicPrefix = (bwp->cyclicPrefix==NULL) ? 0 : *bwp->cyclicPrefix;
-
+    pdcch.CyclicPrefix = (bwp->cyclicPrefix == NULL) ? 0 : *bwp->cyclicPrefix;
     //AssertFatal(pdcch_scs==kHz15, "PDCCH SCS above 15kHz not allowed if a symbol above 2 is monitored");
     sps = bwp->cyclicPrefix == NULL ? 14 : 12;
-  }
-  else {
-    AssertFatal(type0_PDCCH_CSS_config!=NULL,"type0_PDCCH_CSS_config is null,bwp %p\n",bwp);
+  } else {
+    AssertFatal(type0_PDCCH_CSS_config != NULL, "type0_PDCCH_CSS_config is null,bwp %p\n", bwp);
     pdcch.BWPSize = type0_PDCCH_CSS_config->num_rbs;
     pdcch.BWPStart = type0_PDCCH_CSS_config->cset_start_rb;
     pdcch.SubcarrierSpacing = type0_PDCCH_CSS_config->scs_pdcch;
@@ -462,15 +458,15 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
     sps = 14;
   }
 
-  AssertFatal(ss->monitoringSymbolsWithinSlot!=NULL,"ss->monitoringSymbolsWithinSlot is null\n");
-  AssertFatal(ss->monitoringSymbolsWithinSlot->buf!=NULL,"ss->monitoringSymbolsWithinSlot->buf is null\n");
+  AssertFatal(ss->monitoringSymbolsWithinSlot != NULL, "ss->monitoringSymbolsWithinSlot is null\n");
+  BIT_STRING_t *symbolsInSlot = ss->monitoringSymbolsWithinSlot;
+  AssertFatal(symbolsInSlot->buf != NULL, "ss->monitoringSymbolsWithinSlot->buf is null\n");
 
   // for SPS=14 8 MSBs in positions 13 downto 6
-  uint16_t monitoringSymbolsWithinSlot = (ss->monitoringSymbolsWithinSlot->buf[0]<<(sps-8)) |
-                                         (ss->monitoringSymbolsWithinSlot->buf[1]>>(16-sps));
+  int monitoringSymbolsWithinSlot = (symbolsInSlot->buf[0] << (sps - 8)) | (symbolsInSlot->buf[1] >> (16 - sps));
 
-  for (int i=0; i<sps; i++) {
-    if ((monitoringSymbolsWithinSlot>>(sps-1-i))&1) {
+  for (int i = 0; i < sps; i++) {
+    if ((monitoringSymbolsWithinSlot >> (sps - 1 - i)) & 1) {
       pdcch.StartSymbolIndex=i;
       break;
     }
