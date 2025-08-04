@@ -1081,7 +1081,7 @@ static int tda_cmp(const void *tda_a, const void *tda_b)
 /* \brief Set up a list of time domain allocations as suitable for the TDD
  * pattern. This will be used by get_num_ul_tda(), which requires a specific
  * ordering, hence we qsort() the list at the end according to tda_cmp(). */
-void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
+void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, int do_SRS)
 {
   NR_PUSCH_TimeDomainResourceAllocationList_t *tda_list =
       scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList;
@@ -1096,8 +1096,10 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
   asn1cSeqAdd(&tda_list->list, tda);
 
   // UL TDA index 1 in case of SRS
-  tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 12));
-  asn1cSeqAdd(&tda_list->list, tda);
+  if (do_SRS) {
+    tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 12));
+    asn1cSeqAdd(&tda_list->list, tda);
+  }
 
   if (scc->tdd_UL_DL_ConfigurationCommon) {
     int ul_symb = 0;
@@ -1141,6 +1143,10 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay)
       for (int i = k2 + 1; i <= N_ul; ++i) {
         tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 13));
         asn1cSeqAdd(&tda_list->list, tda);
+        if (do_SRS) {
+          tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 12));
+          asn1cSeqAdd(&tda_list->list, tda);
+        }
       }
     }
   }
