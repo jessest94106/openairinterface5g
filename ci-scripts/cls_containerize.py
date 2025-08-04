@@ -136,7 +136,7 @@ def AnalyzeBuildLogs(buildRoot, images, globalStatus):
 					lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
 					tagged = tagged or lineHasTag or lineHasTag2
 					# the OpenShift Cluster builder prepends image registry URL
-					lineHasCommit = re.search(f'COMMIT [a-zA-Z0-9\.:/\-]*{image}', str(line)) is not None
+					lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
 					committed = committed or lineHasCommit
 			errorandwarnings['errors'] = 0 if committed or tagged else 1
 			errorandwarnings['warnings'] = 0
@@ -441,7 +441,7 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 		else:
-			result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
+			result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
 			if result is not None:
 				size = float(result.group("size")) / 1000000
 				imageSizeStr = f'{size:.1f}'
@@ -493,7 +493,7 @@ class Containerize():
 				allImagesSize[name] = 'N/A -- Build Failed'
 				break
 			else:
-				result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
+				result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
 				if result is not None:
 					size = float(result.group("size")) / 1000000 # convert to MB
 					imageSizeStr = f'{size:.1f}'
@@ -616,7 +616,7 @@ class Containerize():
 		collectInfo = {}
 		collectInfo['proxy'] = files
 		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
-		result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
+		result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
 		# Cleaning any created tmp volume
 		ssh.run('docker volume prune --force')
 		ssh.close()
