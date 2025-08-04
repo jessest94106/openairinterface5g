@@ -733,6 +733,10 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
         timestamp,
         timestamp + nsamps,
         signal_energy(samplesVoid[0], nsamps));
+
+  /* trace only first antenna */
+  T(T_USRP_TX_ANT0, T_INT(timestamp), T_BUFFER(samplesVoid[0], sampleToByte(nsamps, 1)));
+
   return nsamps;
 }
 
@@ -1073,6 +1077,10 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
         *ptimestamp,
         t->nextRxTstamp,
         signal_energy(samplesVoid[0], nsamps));
+
+  /* trace only first antenna */
+  T(T_USRP_RX_ANT0, T_INT(t->nextRxTstamp), T_BUFFER(samplesVoid[0], sampleToByte(nsamps, 1)));
+
   return nsamps;
 }
 
