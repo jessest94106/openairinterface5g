@@ -385,12 +385,14 @@ bool search_space_monitoring_ocasion_other_si(NR_UE_MAC_INST_t *mac,
   return false;
 }
 
-bool is_window_valid(NR_UE_MAC_INST_t *mac, int window_slots, int abs_slot)
+static bool is_window_valid(NR_UE_MAC_INST_t *mac, int window_slots, int abs_slot, int slots_per_frame)
 {
   if (mac->si_SchedInfo.si_window_start == -1) {
     // out of window
     return false;
-  } else if (abs_slot > mac->si_SchedInfo.si_window_start + window_slots) {
+  } else if ((abs_slot - mac->si_SchedInfo.si_window_start + MAX_FRAME_NUMBER * slots_per_frame)
+                 % (MAX_FRAME_NUMBER * slots_per_frame)
+             >= window_slots) {
     // window expired
     mac->si_SchedInfo.si_window_start = -1;
     return false;
@@ -407,33 +409,18 @@ static bool monitor_dci_for_other_SI(NR_UE_MAC_INST_t *mac,
 {
   // according to 5.2.2.3.2 in 331
   const int abs_slot = frame * slots_per_frame + slot;
+  const si_schedinfo_config_t *config = mac->si_SchedInfo.si_SchedInfo_list.array[si_idx];
+  const int window_slots = 5 << mac->si_SchedInfo.si_WindowLength;
+  const int x = (config->si_WindowPosition - 1) * window_slots;
+  const int T = 8 << config->si_Periodicity; // radio frame periodicity
 
-  si_schedinfo_config_t *config = mac->si_SchedInfo.si_SchedInfo_list.array[si_idx];
-  int window_slots = 5 << mac->si_SchedInfo.si_WindowLength;
-  int x = (config->si_WindowPosition - 1) * window_slots;
-  int T = 8 << config->si_Periodicity; // radio frame periodicity
-  bool check_valid;
-  switch (config->type) {
-    case NR_SI_INFO :
-      if (mac->si_SchedInfo.si_window_start == -1) {
-        if ((frame % T) == (x / slots_per_frame) && (x % slots_per_frame == 0))
-          mac->si_SchedInfo.si_window_start = abs_slot; // in terms of absolute slot number
-      }
-      check_valid = is_window_valid(mac, window_slots, abs_slot);
-      if (check_valid && search_space_monitoring_ocasion_other_si(mac, ss, abs_slot, frame, slot, slots_per_frame))
-        return true;
-      break;
-    case NR_SI_INFO_v1700 :
-      if (mac->si_SchedInfo.si_window_start == -1) {
-        if ((frame % T == floor(x / slots_per_frame)) && (slot == x % slots_per_frame))
-          mac->si_SchedInfo.si_window_start = abs_slot;
-      }
-      if (is_window_valid(mac, window_slots, abs_slot))
-        return search_space_monitoring_ocasion_other_si(mac, ss, abs_slot, frame, slot, slots_per_frame);
-      break;
-    default :
-      AssertFatal(false, "Invalid SI-SchedulingInfo case\n");
+  if (mac->si_SchedInfo.si_window_start == -1) {
+    if ((frame % T) == (x / slots_per_frame) && (slot == x % slots_per_frame))
+      mac->si_SchedInfo.si_window_start = abs_slot; // in terms of absolute slot number
   }
+  if (is_window_valid(mac, window_slots, abs_slot, slots_per_frame))
+    return search_space_monitoring_ocasion_other_si(mac, ss, abs_slot, frame, slot, slots_per_frame);
+
   return false;
 }
 
