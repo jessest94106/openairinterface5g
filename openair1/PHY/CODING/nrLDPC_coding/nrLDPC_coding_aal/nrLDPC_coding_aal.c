@@ -2,13 +2,8 @@
  * Copyright(c) 2017 Intel Corporation
  */
 
-/*! \file PHY/CODING/nrLDPC_coding/nrLDPC_coding_t2/nrLDPC_coding_t2.c
- * \note: based on testbbdev test_bbdev_perf.c functions. Harq buffer offset added.
- * \mbuf and mempool allocated at the init step, LDPC parameters updated from OAI.
- */
-
-#include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
-#include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_t2/nrLDPC_coding_t2.h"
+#include "../nrLDPC_coding_interface.h"
+#include "nrLDPC_coding_aal.h"
 #include "PHY/sse_intrin.h"
 #include <common/utils/LOG/log.h>
 #define NR_LDPC_ENABLE_PARITY_CHECK

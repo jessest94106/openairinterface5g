@@ -1,4 +1,4 @@
-This document highlights some of the key aspects of the implementation for O-RAN AAL/DPDK BBDEV; for user documentation, please consult the [setup guide](../../../../../doc/LDPC_T2_OFFLOAD_SETUP.md) instead.
+This document highlights some of the key aspects of the implementation for O-RAN AAL/DPDK BBDEV; for user documentation, please consult the [setup guide](../../../../../doc/LDPC_OFFLOAD_SETUP.md) instead.
 
 ## Overview
 

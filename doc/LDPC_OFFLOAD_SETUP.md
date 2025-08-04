@@ -17,7 +17,7 @@
 [[_TOC_]]
 
 This documentation describes the integration of LDPC coding for lookaside acceleration using O-RAN AAL/DPDK BBDEV in OAI, along with its usage.
-For details on the implementation, please consult the [developer notes](../openair1/PHY/CODING/nrLDPC_coding/nrLDPC_coding_t2/README.md).
+For details on the implementation, please consult the [developer notes](../openair1/PHY/CODING/nrLDPC_coding/nrLDPC_coding_aal/README.md).
 
 # Requirements
 
@@ -209,12 +209,12 @@ cd ~/openairinterface5g/cmake_targets
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets
-./build_oai -w USRP --ninja --gNB -P --build-lib "ldpc_t2" -C
+./build_oai -w USRP --ninja --gNB -P --build-lib "ldpc_aal" -C
 ```
 
-A shared object file `libldpc_t2.so` will be created during the compilation.
+A shared object file `libldpc_aal.so` will be created during the compilation.
 This object is conditionally compiled. 
-The selection of the library to compile is done using `--build-lib ldpc_t2`.
+The selection of the library to compile is done using `--build-lib ldpc_aal`.
 
 > Note: The required DPDK poll mode driver has to be present on the host machine and required DPDK version has to be installed on the host, prior to building OAI.
 
@@ -245,14 +245,14 @@ nrLDPC_coding_t2 : {
 
 loader : {
   ldpc : {
-    shlibversion : "_t2";
+    shlibversion : "_aal";
   };
 };
 ```
 
 # Running OAI with O-RAN AAL
 
-In general, to offload of the channel coding to the LDPC accelerator, we use use the `--loader.ldpc.shlibversion _t2` option. 
+In general, to offload of the channel coding to the LDPC accelerator, we use use the `--loader.ldpc.shlibversion _aal` option.
 
 ## 5G PHY simulators
 
@@ -263,7 +263,7 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr_ulsim -n100 -s20 -m20 -r273 -R273 --loader.ldpc.shlibversion _t2 --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 0-1 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
+sudo ./nr_ulsim -n100 -s20 -m20 -r273 -R273 --loader.ldpc.shlibversion _aal --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 0-1 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
 ```
 ### nr_dlsim
 
@@ -272,7 +272,7 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr_dlsim -n300 -s30 -R 106 -e 27 --loader.ldpc.shlibversion _t2 --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 0-1 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
+sudo ./nr_dlsim -n300 -s30 -R 106 -e 27 --loader.ldpc.shlibversion _aal --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 0-1 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff
 ```
 
 ## OTA test
@@ -284,7 +284,7 @@ Example command:
 cd ~/openairinterface5g
 source oaienv
 cd cmake_targets/ran_build/build
-sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _t2 --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 14-15 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff --nrLDPC_coding_t2.eal_init_bbdev 1
+sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _aal --nrLDPC_coding_t2.dpdk_dev 0000:f7:00.1 --nrLDPC_coding_t2.dpdk_core_list 14-15 --nrLDPC_coding_t2.vfio_vf_token 00112233-4455-6677-8899-aabbccddeeff --nrLDPC_coding_t2.eal_init_bbdev 1
 ```
 
 # Known Issue(s)
