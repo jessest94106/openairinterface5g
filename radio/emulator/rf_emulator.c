@@ -39,6 +39,7 @@ typedef struct {
   pthread_mutex_t mutex;
   pthread_cond_t cond;
   uint64_t late_reads;
+  uint64_t late_writes;
 } emulator_timestamp_t;
 
 typedef struct {
@@ -72,6 +73,10 @@ static void *emulator_timing_job(void *arg)
         LOG_W(HW, "%ld RF reads were late\n", emulator_timestamp->late_reads);
       }
       emulator_timestamp->late_reads = 0;
+      if (emulator_timestamp->late_writes != 0) {
+        LOG_W(HW, "%ld RF writes were late\n", emulator_timestamp->late_writes);
+      }
+      emulator_timestamp->late_writes = 0;
     }
 
     uint64_t diff = (current_time.tv_sec - timestamp.tv_sec) * 1000000000 + (current_time.tv_nsec - timestamp.tv_nsec);
@@ -212,6 +217,17 @@ int emulator_write_init(openair0_device *device)
  */
 static int emulator_write(openair0_device *device, openair0_timestamp timestamp, void **buff, int nsamps, int nbAnt, int flags)
 {
+  emulator_state_t *emulator_state = (emulator_state_t *)device->priv;
+
+  // timestamp in the past
+  emulator_timestamp_t *emulator_timestamp = &emulator_state->emulator_timestamp;
+  uint64_t current_timestamp = emulator_timestamp->timestamp;
+  if (timestamp < current_timestamp) {
+    mutexlock(emulator_timestamp->mutex);
+    emulator_timestamp->late_writes++;
+    mutexunlock(emulator_timestamp->mutex);
+  }
+
   return 0;
 }
 
