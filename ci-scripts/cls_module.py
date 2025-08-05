@@ -32,6 +32,7 @@ import re
 import yaml
 
 import cls_cmd
+from cls_ci_helper import archiveArtifact
 
 class Module_UE:
 
@@ -103,11 +104,11 @@ class Module_UE:
 		return ret.returncode == 0
 
 
-	def terminate(self, log_dir=None):
+	def terminate(self, ctx=None):
 		self._command(self.cmd_dict["terminate"])
-		if self.trace and log_dir is not None:
+		if self.trace and ctx is not None:
 			self._disableTrace()
-			return self._collectTrace(log_dir)
+			return self._collectTrace(ctx)
 		return None
 
 	def attach(self, attach_tries = 4, attach_timeout = 60):
@@ -202,8 +203,7 @@ class Module_UE:
 		logging.info(f'UE {self}: stop UE tracing')
 		self._command(self.cmd_dict["traceStop"])
 
-	def _collectTrace(self, log_dir):
-		logging.info(f'collecting logs into (local) {log_dir}')
+	def _collectTrace(self, ctx):
 		remote_dir = "/tmp/ue-trace-logs"
 		with cls_cmd.getConnection(self.host) as c:
 			# create a directory for log collection
@@ -222,8 +222,7 @@ class Module_UE:
 			log_files = []
 			# copy them to the executor one by one, and store in log_dir
 			for f in ret.stdout.split("\n"):
-				l = f.replace(remote_dir, log_dir)
-				c.copyin(f, l)
-				log_files.append(l)
+				name = archiveArtifact(c, ctx, f)
+				log_files.append(name)
 			c.run(f'rm -rf {remote_dir}')
 			return log_files

@@ -12,9 +12,16 @@ import unittest
 
 sys.path.append('./') # to find OAI imports below
 import cls_module
+from cls_ci_helper import TestCaseCtx
 import cls_cmd
 
 class TestModule(unittest.TestCase):
+    def setUp(self):
+        self.ctx = TestCaseCtx.Default(tempfile.mkdtemp())
+    def tearDown(self):
+        with cls_cmd.LocalCmd() as c:
+            c.run(f'rm -rf {self.ctx.logPath}')
+
     def test_simple_module(self):
         c = cls_module.Module_UE("test", filename="tests/config/test_module_infra.yaml")
         self.assertFalse(c.trace)
@@ -49,10 +56,9 @@ class TestModule(unittest.TestCase):
         self.assertTrue(c.checkMTU())
         c.detach()
         tmp = tempfile.mkdtemp()
-        log_file = c.terminate(log_dir=tmp)
-        with cls_cmd.LocalCmd() as c:
-            c.run(f'rm -rf {tmp}')
-        self.assertEqual(log_file, [f"{tmp}/tttf"]) # matches test-trace UE collection file
+        log_file = c.terminate(self.ctx)
+        # undeploy uses archiveArtifact(), which writes to {prefix}-logs
+        self.assertEqual(log_file, [f"{self.ctx.baseFilename()}-tttf"]) # matches test-trace UE collection file
 
 if __name__ == '__main__':
     unittest.main()
