@@ -6,6 +6,7 @@ logging.basicConfig(
 	format="[%(asctime)s] %(levelname)8s: %(message)s"
 )
 import os
+import tempfile
 os.system(f'rm -rf cmake_targets')
 os.system(f'mkdir -p cmake_targets/log')
 import unittest
@@ -14,6 +15,7 @@ sys.path.append('./') # to find OAI imports below
 import cls_oai_html
 import cls_oaicitest
 import cls_containerize
+from cls_ci_helper import TestCaseCtx
 import ran
 import cls_cmd
 
@@ -48,12 +50,16 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.eNBPassword = None
 		self.cont.eNBSourceCodePath = os.getcwd()
 		self.cont.num_attempts = 3
+		self.ctx = TestCaseCtx.Default(tempfile.mkdtemp())
+	def tearDown(self):
+		with cls_cmd.LocalCmd() as c:
+			c.run(f'rm -rf {self.ctx.logPath}')
 
 	def test_deploy(self):
 		self.cont.yamlPath[0] = 'tests/simple-dep/'
 		self.cont.deploymentTag = "noble"
-		deploy = self.cont.DeployObject(self.html)
-		undeploy = self.cont.UndeployObject(self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
 		self.assertTrue(deploy)
 		self.assertTrue(undeploy)
 
@@ -61,8 +67,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		# fails reliably
 		old = self.cont.yamlPath
 		self.cont.yamlPath[0] = 'tests/simple-fail/'
-		deploy = self.cont.DeployObject(self.html)
-		self.cont.UndeployObject(self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.html)
+		self.cont.UndeployObject(self.ctx, self.html, self.ran)
 		self.assertFalse(deploy)
 		self.cont.yamlPath = old
 
@@ -70,8 +76,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		# fails reliably
 		old = self.cont.yamlPath
 		self.cont.yamlPath[0] = 'tests/simple-fail-2svc/'
-		deploy = self.cont.DeployObject(self.html)
-		self.cont.UndeployObject(self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.html)
+		self.cont.UndeployObject(self.ctx, self.html, self.ran)
 		self.assertFalse(deploy)
 		self.cont.yamlPath = old
 
@@ -79,8 +85,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb"
 		self.cont.deploymentTag = 'develop-12345678'
-		deploy = self.cont.DeployObject(self.html)
-		undeploy = self.cont.UndeployObject(self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
 		self.assertTrue(deploy)
 		self.assertTrue(undeploy)
 
@@ -88,8 +94,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb oai-nr-ue"
 		self.cont.deploymentTag = 'develop-12345678'
-		deploy = self.cont.DeployObject(self.html)
-		undeploy = self.cont.UndeployObject(self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
 		self.assertTrue(deploy)
 		self.assertTrue(undeploy)
 
@@ -97,10 +103,10 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb"
 		self.cont.deploymentTag = 'develop-12345678'
-		deploy1 = self.cont.DeployObject(self.html)
+		deploy1 = self.cont.DeployObject(self.ctx, self.html)
 		self.cont.services[0] = "oai-nr-ue"
-		deploy2 = self.cont.DeployObject(self.html)
-		undeploy = self.cont.UndeployObject(self.html, self.ran)
+		deploy2 = self.cont.DeployObject(self.ctx, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
 		self.assertTrue(deploy1)
 		self.assertTrue(deploy2)
 		self.assertTrue(undeploy)

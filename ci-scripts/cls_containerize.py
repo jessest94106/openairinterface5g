@@ -46,6 +46,7 @@ import cls_cmd
 import helpreadme as HELP
 import constants as CONST
 import cls_oaicitest
+from cls_ci_helper import archiveArtifact
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes
@@ -202,12 +203,10 @@ def GetServices(ssh, requested, file):
     else:
         return requested
 
-def CopyinServiceLog(ssh, lSourcePath, yaml, svcName, wd_yaml, filename):
-	remote_filename = f"{lSourcePath}/cmake_targets/log/{filename}"
+def CopyinServiceLog(ssh, lSourcePath, svcName, wd_yaml, ctx):
+	remote_filename = f"{lSourcePath}/cmake_targets/log/{svcName}.logs"
 	ssh.run(f'docker compose -f {wd_yaml} logs {svcName} --no-log-prefix &> {remote_filename}')
-	local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml}"
-	local_filename = f"{local_dir}/{filename}"
-	return ssh.copyin(remote_filename, local_filename)
+	return archiveArtifact(ssh, ctx, remote_filename)
 
 def GetRunningServices(ssh, file):
 	ret = ssh.run(f'docker compose -f {file} config --services')
@@ -229,14 +228,13 @@ def GetRunningServices(ssh, file):
 	logging.info(f'stopping services: {running_services}')
 	return running_services
 
-def CheckLogs(self, yaml, service_name, HTML, RAN):
-	logPath = f'{os.getcwd()}/../cmake_targets/log/{yaml}'
-	filename = f'{logPath}/{service_name}-{HTML.testCase_id}.log'
+def CheckLogs(self, filename, HTML, RAN):
 	success = True
-	if (any(sub in service_name for sub in ['oai_ue','oai-nr-ue','lte_ue'])):
+	name = os.path.basename(filename)
+	if (any(sub in name for sub in ['oai_ue','oai-nr-ue','lte_ue'])):
 		logging.debug(f'\u001B[1m Analyzing UE logfile {filename} \u001B[0m')
 		logStatus = cls_oaicitest.OaiCiTest().AnalyzeLogFile_UE(filename, HTML, RAN)
-		opt = f"UE log analysis for service {service_name}"
+		opt = f"UE log analysis ({name})"
 		# usage of htmlUEFailureMsg/htmleNBFailureMsg is because Analyze log files
 		# abuse HTML to store their reports, and we here want to put custom options,
 		# which is not possible with CreateHtmlTestRow
@@ -247,13 +245,13 @@ def CheckLogs(self, yaml, service_name, HTML, RAN):
 		else:
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmlUEFailureMsg])
 		HTML.htmlUEFailureMsg = ""
-	elif service_name == 'nv-cubb':
+	elif 'nv-cubb' in name:
 		msg = 'Undeploy PNF/Nvidia CUBB'
 		HTML.CreateHtmlTestRow(msg, 'OK', CONST.ALL_PROCESSES_OK)
-	elif (any(sub in service_name for sub in ['enb','rru','rcc','cu','du','gnb'])):
+	elif (any(sub in name for sub in ['enb','rru','rcc','cu','du','gnb'])):
 		logging.debug(f'\u001B[1m Analyzing XnB logfile {filename}\u001B[0m')
 		logStatus = RAN.AnalyzeLogFile_eNB(filename, HTML, self.ran_checkers)
-		opt = f"xNB log analysis for service {service_name}"
+		opt = f"xNB log analysis ({name})"
 		if (logStatus < 0):
 			HTML.CreateHtmlTestRowQueue(opt, 'KO', [HTML.htmleNBFailureMsg])
 			success = False
@@ -261,9 +259,9 @@ def CheckLogs(self, yaml, service_name, HTML, RAN):
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
 		HTML.htmleNBFailureMsg = ""
 	else:
-		logging.info(f'Skipping to analyze log for service name {service_name}')
-		HTML.CreateHtmlTestRowQueue(f"service {service_name}", 'OK', ["no analysis function"])
-	logging.debug(f"log check: service {service_name} passed analysis {success}")
+		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
+		HTML.CreateHtmlTestRowQueue(f"file {name}", 'OK', ["no analysis function"])
+	logging.debug(f"log check: file {filename} passed analysis {success}")
 	return success
 
 #-----------------------------------------------------------
@@ -823,18 +821,14 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["cannot create workspace"])
 		return success
 
-	def DeployObject(self, HTML):
+	def DeployObject(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		num_attempts = self.num_attempts
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug(f'Deploying OAI Object on server: {lIpAddr}')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
-		# creating the log folder by default
-		local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml.split('/')[-1]}"
-		os.system(f'mkdir -p {local_dir}')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
-		yaml_dir = yaml.split('/')[-1]
 		with cls_cmd.getConnection(lIpAddr) as ssh:
 			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
 			if services == [] or services == ' ' or services == None:
@@ -861,7 +855,7 @@ class Containerize():
 					logging.warning(warning_msg)
 					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', [warning_msg])
 					for svc in services.split():
-						CopyinServiceLog(ssh, lSourcePath, yaml_dir, svc, wd_yaml, f'{svc}-{HTML.testCase_id}-attempt{attempt}.log')
+						CopyinServiceLog(ssh, lSourcePath, svc, wd_yaml, ctx)
 					ssh.run(f'docker compose -f {wd_yaml} down -- {services}')
 		imagesInfo = info.stdout.splitlines()[1:]
 		logging.debug(f'{info.stdout.splitlines()[1:]}')
@@ -871,13 +865,12 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
 		return deployed
 
-	def UndeployObject(self, HTML, RAN):
+	def UndeployObject(self, ctx, HTML, RAN):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {lIpAddr}\u001B[0m')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		wd = f'{lSourcePath}/{yaml}'
-		yaml_dir = yaml.split('/')[-1]
 		with cls_cmd.getConnection(lIpAddr) as ssh:
 			ExistEnvFilePrint(ssh, wd)
 			services = GetRunningServices(ssh, f"{wd}/docker-compose.y*ml")
@@ -885,7 +878,7 @@ class Containerize():
 			if services is not None:
 				all_serv = " ".join([s for s, _ in services])
 				ssh.run(f'docker compose -f {wd}/docker-compose.y*ml stop -- {all_serv}')
-				copyin_res = all(CopyinServiceLog(ssh, lSourcePath, yaml_dir, s, f"{wd}/docker-compose.y*ml", f'{s}-{HTML.testCase_id}.log') for s, c in services)
+				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, f"{wd}/docker-compose.y*ml", ctx) for s, _ in services]
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd}/docker-compose.y*ml down -v')
@@ -894,7 +887,7 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
 			return False
 		else:
-			log_results = [CheckLogs(self, yaml_dir, s, HTML, RAN) for s, _ in services]
+			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
 			success = all(log_results)
 		if success:
 			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m')

@@ -330,9 +330,9 @@ def ExecuteActionWithParam(action, ctx):
 		CONTAINERS.num_attempts = int(test.findtext('num_attempts') or 1)
 		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
 		if action == 'Deploy_Object':
-			success = CONTAINERS.DeployObject(HTML)
+			success = CONTAINERS.DeployObject(ctx, HTML)
 		elif action == 'Undeploy_Object':
-			success = CONTAINERS.UndeployObject(HTML, RAN)
+			success = CONTAINERS.UndeployObject(ctx, HTML, RAN)
 		elif action == 'Create_Workspace':
 			if force_local:
 				# Do not create a working directory when running locally. Current repo directory will be used
