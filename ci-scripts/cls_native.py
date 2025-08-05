@@ -65,15 +65,14 @@ class Native():
 			HTML.CreateHtmlTestRow(options, 'KO', CONST.ALL_PROCESSES_OK)
 		return success
 
-	def Run_Physim(HTML, host, directory, options, physim_test, threshold):
+	def Run_Physim(ctx, HTML, host, directory, options, physim_test, threshold):
 		logging.debug(f'Runnin {physim_test} on server: {host}')
 		workSpacePath = f'{directory}/cmake_targets'
-		os.system(f'mkdir -p ./{LOG_PATH_PHYSIM}')
-		runLogFile=f'physim_{HTML.testCase_id}.log'
+		runLogFile=f'{workSpacePath}/physim.log'
 		with cls_cmd.getConnection(host) as cmd:
-			cmd.run(f'sudo LD_LIBRARY_PATH=.:{DPDK_PATH}/lib64/ {workSpacePath}/ran_build/build/{physim_test} {options} >> {workSpacePath}/{runLogFile}')
-			cmd.copyin(src=f'{workSpacePath}/{runLogFile}', tgt=f'{LOG_PATH_PHYSIM}/{runLogFile}')
-		success, msg = cls_analysis.Analysis.analyze_physim(f'{LOG_PATH_PHYSIM}/{runLogFile}', physim_test, options, threshold)
+			cmd.run(f'sudo LD_LIBRARY_PATH=.:{DPDK_PATH}/lib64/ {workSpacePath}/ran_build/build/{physim_test} {options} >> {runLogFile}')
+			physim_file = archiveArtifact(cmd, ctx, runLogFile)
+		success, msg = cls_analysis.Analysis.analyze_physim(physim_file, physim_test, options, threshold)
 		if success:
 			HTML.CreateHtmlTestRowQueue(options, 'OK', [msg])
 		else:

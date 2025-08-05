@@ -343,7 +343,7 @@ def ExecuteActionWithParam(action, ctx):
 		physim_options = test.findtext('physim_run_args')
 		physim_test = test.findtext('physim_test')
 		physim_threshold = test.findtext('physim_time_threshold') or 'inf'
-		success = cls_native.Native.Run_Physim(HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
+		success = cls_native.Native.Run_Physim(ctx, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
 
 	elif action == 'LicenceAndFormattingCheck':
 		success = SCA.LicenceAndFormattingCheck(HTML)
