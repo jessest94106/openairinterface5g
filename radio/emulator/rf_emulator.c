@@ -32,6 +32,16 @@
 #include "common_lib.h"
 #include "radio/vrtsim/noise_device.h"
 #include "simde/x86/avx512.h"
+#include "SIMULATION/TOOLS/sim.h"
+
+#define RF_EMULATOR_SECTION "rf_emulator"
+// clang-format off
+#define RF_EMULATOR_PARAMS_DESC \
+  { \
+     {"enable_noise",     "Enable noise injection", 0, .iptr = &emulator_state->enable_noise,     .defintval = 1,                  TYPE_INT, 0},\
+     {"noise_level_dBFS", "Noise level",            0, .iptr = &emulator_state->noise_level_dBFS, .defintval = INVALID_DBFS_VALUE, TYPE_INT, 0},\
+  };
+// clang-format on
 
 // structures and timing thread job for timing
 typedef struct {
@@ -49,6 +59,8 @@ typedef struct {
   emulator_timestamp_t emulator_timestamp;
   pthread_t timing_thread;
   bool run_timing_thread;
+  int enable_noise;
+  int noise_level_dBFS;
 } emulator_state_t;
 
 static void *emulator_timing_job(void *arg)
@@ -108,7 +120,13 @@ static int emulator_start(openair0_device *device)
   // Start the timing thread and the noise device
   emulator_state_t *emulator_state = (emulator_state_t *)device->priv;
   if (!emulator_state->run_timing_thread) {
-    init_noise_device(0); // TODO configure noise level
+    if (emulator_state->enable_noise > 0) {
+      float noise_level = emulator_state->noise_level_dBFS == INVALID_DBFS_VALUE
+                                ? 0.0f
+                                : (32767.0 / powf(10.0, .05 * -(emulator_state->noise_level_dBFS)));
+      init_noise_device(noise_level);
+      LOG_I(HW, "Using noise level with %d dBFS/%f\n", emulator_state->noise_level_dBFS, noise_level);
+    }
 
     emulator_timestamp_t *emulator_timestamp = &emulator_state->emulator_timestamp;
     memset(emulator_timestamp, 0, sizeof(emulator_timestamp_t));
@@ -170,7 +188,9 @@ static void emulator_end(openair0_device *device)
     emulator_state->run_timing_thread = false;
     int ret = pthread_join(emulator_state->timing_thread, NULL);
     AssertFatal(ret == 0, "pthread_join() failed: errno: %d, %s\n", errno, strerror(errno));
-    free_noise_device();
+    if (emulator_state->enable_noise > 0) {
+      free_noise_device();
+    }
   }
 }
 
@@ -299,11 +319,24 @@ static int emulator_read(openair0_device *device, openair0_timestamp *ptimestamp
   *ptimestamp = emulator_state->last_received_sample;
   emulator_state->last_received_sample += nsamps;
 
-  for (int i = 0; i < nbAnt; i++) {
-    read_noise(buff[i], nsamps);
+  if (emulator_state->enable_noise > 0) {
+    for (int i = 0; i < nbAnt; i++) {
+      read_noise(buff[i], nsamps);
+    }
+  } else {
+    for (int i = 0; i < nbAnt; i++) {
+      memset(buff[i], 0, nsamps * sizeof(c16_t));
+    }
   }
 
   return nsamps;
+}
+
+static void emulator_readconfig(emulator_state_t *emulator_state)
+{
+  paramdef_t emulator_params[] = RF_EMULATOR_PARAMS_DESC;
+  int ret = config_get(config_get_if(), emulator_params, sizeofArray(emulator_params), RF_EMULATOR_SECTION);
+  AssertFatal(ret >= 0, "configuration couldn't be performed\n");
 }
 
 int device_init(openair0_device *device, openair0_config_t *openair0_cfg)
@@ -329,6 +362,8 @@ int device_init(openair0_device *device, openair0_config_t *openair0_cfg)
   device->type = RFSIMULATOR;
   device->trx_write_func = emulator_write;
   device->trx_read_func = emulator_read;
+
+  emulator_readconfig(emulator_state);
 
   return 0;
 }
