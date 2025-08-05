@@ -255,7 +255,7 @@ def ExecuteActionWithParam(action, ctx):
 			else:
 				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
-		success = CiTestObj.Ping(HTML, CONTAINERS)
+		success = CiTestObj.Ping(ctx, HTML)
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
@@ -286,9 +286,9 @@ def ExecuteActionWithParam(action, ctx):
 			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
 			CiTestObj.iperf_options = 'check'
 		if action == 'Iperf':
-			success = CiTestObj.Iperf(HTML, CONTAINERS)
+			success = CiTestObj.Iperf(ctx, HTML)
 		elif action == 'Iperf2_Unidir':
-			success = CiTestObj.Iperf2_Unidir(HTML, CONTAINERS)
+			success = CiTestObj.Iperf2_Unidir(ctx, HTML)
 
 	elif action == 'IdleSleep':
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
