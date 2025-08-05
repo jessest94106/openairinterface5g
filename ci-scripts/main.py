@@ -469,15 +469,7 @@ if py_param_file_present == True:
 cwd = os.getcwd()
 
 if re.match('^TerminateeNB$', mode, re.IGNORECASE):
-	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	if RAN.eNBIPAddress == 'none':
-		sys.exit(0)
-	RAN.eNB_instance=0
-	RAN.eNB_serverId[0]='0'
-	RAN.eNBSourceCodePath='/tmp/'
-	RAN.TerminateeNB(HTML)
+	logging.warning("Option TerminateeNB ignored")
 elif re.match('^TerminateHSS$', mode, re.IGNORECASE):
 	logging.warning("Option TerminateHSS ignored")
 elif re.match('^TerminateMME$', mode, re.IGNORECASE):
