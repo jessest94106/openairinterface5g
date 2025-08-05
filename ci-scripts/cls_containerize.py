@@ -377,7 +377,7 @@ class Containerize():
 		# Let's remove any previous run artifacts if still there
 		cmd.run(f"{self.cli} image prune --force")
 		for image,pattern,name,option in imageNames:
-			cmd.run(f"{self.cli} image rm {name}:{imageTag}")
+			cmd.run(f"{self.cli} image rm {name}:{imageTag}", reportNonZero=False)
 
 		# Build the base image only on Push Events (not on Merge Requests)
 		# On when the base image docker file is being modified.
