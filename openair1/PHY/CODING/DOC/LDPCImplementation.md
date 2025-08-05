@@ -17,12 +17,6 @@ loading default `libldpc.so`:
 
 ```
 ./nr-softmodem -O libconfig:gnb.band78.tm1.106PRB.usrpx300.conf:dbgl5
-.......................
-[CONFIG] loader.ldpc.shlibversion set to default value ""
-[LIBCONFIG] loader.ldpc: 2/2 parameters successfully set, (2 to default value)
-shlib_path libldpc.so
-[LOADER] library libldpc.so successfully loaded
-........................
 ```
 
 `libldpc.so` has its decoder implemented in [nrLDPC_coding_segment_decoder.c](file://../nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_decoder.c).\
@@ -42,18 +36,9 @@ Linking C shared module libldpc_aal.so
 At runtime, to successfully use LDPC accelerators (e.g., Xilinx T2/Intel ACCs), you will need to install the corresponding drivers and tools.
 Please refer to the dedicated documentation at [LDPC_OFFLOAD_SETUP.md](file://../../../../doc/LDPC_OFFLOAD_SETUP.md).
 
-`./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 01:00.0 --nrLDPC_coding_aal.dpdk_core_list 0-1`
-
-``` 
-
-.......................
-[CONFIG] loader.ldpc.shlibversion set to default value ""
-[LIBCONFIG] loader.ldpc: 2/2 parameters successfully set, (1 to default value)
-[CONFIG] shlibversion set to  _aal from command line
-[CONFIG] loader.ldpc 1 options set from command line
-shlib_path libldpc_aal.so
-[LOADER] library libldpc_aal.so successfully loaded
-........................
+<<<<<<< HEAD
+```
+./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 01:00.0 --nrLDPC_coding_aal.dpdk_core_list 0-1
 ```
 
 `libldpc_aal.so` has its decoder and its encoder implemented in [nrLDPC_coding_aal.c](file://../nrLDPC_coding/nrLDPC_coding_aal/nrLDPC_coding_aal.c).
@@ -72,18 +57,9 @@ ninja ldpc_xdma
 At runtime, to successfully use the xdma, you need to install vendor specific drivers and tools.\
 Please refer to the dedicated documentation at [LDPC_XDMA_OFFLOAD_SETUP.md](file://../../../../doc/LDPC_XDMA_OFFLOAD_SETUP.md).
 
-`./nr-softmodem -O libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server --log_config.gtpu_log_level info --loader.ldpc.shlibversion _xdma --nrLDPC_coding_xdma.num_threads_prepare 2`
-
-``` 
-.......................
-[CONFIG] loader.ldpc.shlibversion set to default value ""
-[LIBCONFIG] loader.ldpc: 2/2 parameters successfully set, (1 to default value)
-[CONFIG] shlibversion set to  _xdma from command line
-[CONFIG] loader.ldpc 1 options set from command line
-shlib_path libldpc_xdma.so
-[LOADER] library libldpc_xdma.so successfully loaded
-........................
-``` 
+```
+./nr-softmodem -O libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server --log_config.gtpu_log_level info --loader.ldpc.shlibversion _xdma --nrLDPC_coding_xdma.num_threads_prepare 2
+```
 
 `libldpc_xdma.so` has its decoder implemented in [nrLDPC_coding_xdma.c](file://../nrLDPC_coding/nrLDPC_coding_xdma/nrLDPC_coding_xdma.c).\
 Its encoder is implemented in [nrLDPC_coding_segment_encoder.c](file://../nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_encoder.c).
@@ -125,13 +101,6 @@ loading `libldpc_orig.so` instead of `libldpc.so`:
 
 ```
 ./nr-softmodem -O libconfig:gnb.band78.tm1.106PRB.usrpx300.conf:dbgl5  --loader.ldpc.shlibversion _orig
-.......................
-[CONFIG] loader.ldpc.shlibversion set to default value ""
-[LIBCONFIG] loader.ldpc: 2/2 parameters successfully set, (1 to default value)
-[CONFIG] shlibversion set to  _orig from command line
-[CONFIG] loader.ldpc 1 options set from command line
-[LOADER] library libldpc_orig.so successfully loaded
-........................
 ```
 
 loading `libldpc_cl.so` instead of `libldpc.so`:
@@ -160,11 +129,12 @@ Built target ldpc_cl
 
 At runtime, to successfully use hardware acceleration via OpenCL, you need to install vendor specific packages which deliver the required drivers and tools to make use of their GPU (Nvidia, Intel...) , fpga (Xilinx, Intel) or CPU (Intel, AMD, ARM...) through OpenCL. 
 
-`./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _cl`
+```
+./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _cl
+```
 
 ``` 
 ------------------------------------------------
-[LOADER] library libldpc_cl.so successfully loaded
 [HW]   Platform 0, OpenCL profile FULL_PROFILE
 [HW]   Platform 0, OpenCL version OpenCL 2.1 LINUX
 [HW]   Device 0 is  available
@@ -195,13 +165,12 @@ At runtime, to successfully use hardware acceleration via OpenCL, you need to in
 -----------------------------------------------------------------
 ```
 
-`./nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 --rfsim -O libconfig:/usr/local/oai/conf/nrue_sim.conf:dbgl5 --loader.ldpc.shlibversion _cl --log_config.hw_log_level info`
+```
+./nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 --rfsim -O libconfig:/usr/local/oai/conf/nrue_sim.conf:dbgl5 --loader.ldpc.shlibversion _cl --log_config.hw_log_level inf
+```
 
 ```
 ............................................................
-[CONFIG] segment_shlibversion set to  _cl from command line
-[CONFIG] loader.ldpc 1 options set from command line
-[LOADER] library libldpc_cl.so successfully loaded
 [HW]   Platform 0, OpenCL profile FULL_PROFILE
 [HW]   Platform 0, OpenCL version OpenCL 2.1 LINUX
 [HW]   Device 0 is  available
@@ -240,22 +209,6 @@ Loading libldpc_cuda.so, the cuda implementation of the ldpc decoder:
 
 ```
 $ ./ldpctest -v _cuda
-ldpctest -v _cuda
-Initializing random number generator, seed 0
-block length 8448: 
-n_trials 1: 
-SNR0 -2.000000: 
-[CONFIG] get parameters from cmdline , debug flags: 0x00400000
-[CONFIG] log_config: 2/3 parameters successfully set 
-[CONFIG] log_config: 53/53 parameters successfully set 
-[CONFIG] log_config: 53/53 parameters successfully set 
-[CONFIG] log_config: 16/16 parameters successfully set 
-[CONFIG] log_config: 16/16 parameters successfully set 
-log init done
-[CONFIG] loader: 2/2 parameters successfully set 
-[CONFIG] loader.ldpc: 2/2 parameters successfully set 
-[LOADER] library libldpc_cuda.so successfully loaded
-...................................
 ```
 
 
@@ -266,20 +219,7 @@ Loading libldpc_cl.so, the opencl implementation of the ldpc decoder:
 
 ```
 $ ./ldpctest -v _cl
-Initializing random number generator, seed 0
-block length 8448: 
-n_trials 1: 
-SNR0 -2.000000: 
-[CONFIG] get parameters from cmdline , debug flags: 0x00400000
-[CONFIG] log_config: 2/3 parameters successfully set 
-[CONFIG] log_config: 53/53 parameters successfully set 
-[CONFIG] log_config: 53/53 parameters successfully set 
-[CONFIG] log_config: 16/16 parameters successfully set 
-[CONFIG] log_config: 16/16 parameters successfully set 
-log init done
-[CONFIG] loader: 2/2 parameters successfully set 
-[CONFIG] loader.ldpc: 1/2 parameters successfully set 
-[LOADER] library libldpc_cl.so successfully loaded
+................................
 [HW]   Platform 0, OpenCL profile FULL_PROFILE
 [HW]   Platform 0, OpenCL version OpenCL 2.1 LINUX
 [HW]   Device 0 is  available
