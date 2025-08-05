@@ -346,7 +346,7 @@ def ExecuteActionWithParam(action, ctx):
 		success = cls_native.Native.Run_Physim(ctx, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
 
 	elif action == 'LicenceAndFormattingCheck':
-		success = SCA.LicenceAndFormattingCheck(HTML)
+		success = SCA.LicenceAndFormattingCheck(ctx, HTML)
 
 	elif action == 'Cppcheck_Analysis':
 		success = SCA.CppCheckAnalysis(HTML)

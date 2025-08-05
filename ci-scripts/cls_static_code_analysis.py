@@ -43,6 +43,7 @@ from pathlib import Path
 import helpreadme as HELP
 import constants as CONST
 import cls_cmd
+from cls_ci_helper import archiveArtifact
 
 #-----------------------------------------------------------
 # Class Declaration
@@ -213,7 +214,7 @@ class StaticCodeAnalysis():
 
 		return True
 
-	def LicenceAndFormattingCheck(self, HTML):
+	def LicenceAndFormattingCheck(self, ctx, HTML):
 		# Workspace is no longer recreated from scratch.
 		# It implies that this method shall be called last within a build pipeline
 		# where workspace is already created
@@ -238,7 +239,7 @@ class StaticCodeAnalysis():
 			else:
 				check_options += f' --build-arg TARGET_BRANCH={self.ranTargetBranch}'
 
-		logDir = f'{lSourcePath}/cmake_targets/build_log_{self.testCase_id}'
+		logDir = f'{lSourcePath}/cmake_targets/log/'
 		cmd.run(f'mkdir -p {logDir}')
 		cmd.run('docker image rm oai-formatting-check:latest')
 		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.bionic {lSourcePath} > {logDir}/oai-formatting-check.txt 2>&1')
@@ -247,12 +248,11 @@ class StaticCodeAnalysis():
 		cmd.run('docker image prune --force')
 		cmd.run('docker volume prune --force')
 
-		# Analyzing the logs
-		cmd.copyin(f'{logDir}/oai-formatting-check.txt', 'oai-formatting-check.txt')
+		file = archiveArtifact(cmd, ctx, f'{logDir}/oai-formatting-check.txt')
 		cmd.close()
 
 		finalStatus = 0
-		if (os.path.isfile('./oai-formatting-check.txt')):
+		if (os.path.isfile(file)):
 			analyzed = False
 			nbFilesNotFormatted = 0
 			listFiles = False
@@ -263,7 +263,7 @@ class StaticCodeAnalysis():
 			gnuGplLicenceFiles = []
 			suspectLicence = False
 			suspectLicenceFiles = []
-			with open('./oai-formatting-check.txt', 'r') as logfile:
+			with open(file, 'r') as logfile:
 				for line in logfile:
 					ret = re.search('./ci-scripts/checkCodingFormattingRules.sh', str(line))
 					if ret is not None:
