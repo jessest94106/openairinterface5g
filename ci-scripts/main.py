@@ -477,12 +477,7 @@ elif re.match('^TerminateMME$', mode, re.IGNORECASE):
 elif re.match('^TerminateSPGW$', mode, re.IGNORECASE):
 	logging.warning("Option TerminateSPGW ignored")
 elif re.match('^LogCollectBuild$', mode, re.IGNORECASE):
-	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
-		logging.warning("nothing to collect (eNBIPAddress/eNBUserName/eNBPassword/eNBSourceCodePath is '')")
-		sys.exit(0)
-	if RAN.eNBIPAddress == 'none':
-		sys.exit(0)
-	CiTestObj.LogCollectBuild(RAN)
+	logging.warning("Option LogCollectBuild ignored")
 elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
 	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
 		HELP.GenericHelp(CONST.Version)

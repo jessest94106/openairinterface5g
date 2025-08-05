@@ -845,21 +845,3 @@ class OaiCiTest():
 		message = "Log files:\n" + "\n".join([os.path.basename(l) for l in logs])
 		HTML.CreateHtmlTestRowQueue(core_name, 'OK', [message])
 		return True
-
-	def LogCollectBuild(self,RAN):
-		# Some pipelines are using "none" IP / Credentials
-		# In that case, just forget about it
-		if RAN.eNBIPAddress == 'none':
-			sys.exit(0)
-
-		if (RAN.eNBIPAddress != '' and RAN.eNBUserName != '' and RAN.eNBPassword != ''):
-			IPAddress = RAN.eNBIPAddress
-			UserName = RAN.eNBUserName
-			Password = RAN.eNBPassword
-			SourceCodePath = RAN.eNBSourceCodePath
-		else:
-			sys.exit('Insufficient Parameter')
-		with cls_cmd.getConnection(IPAddress) as cmd:
-			d = f'{SourceCodePath}/cmake_targets'
-			cmd.run(f'rm -f {d}/build.log.zip')
-			cmd.run(f'cd {d} && zip -r build.log.zip build_log_*/*')
