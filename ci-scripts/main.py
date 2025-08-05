@@ -140,7 +140,7 @@ def ExecuteActionWithParam(action, ctx):
 		elif action == 'Build_Image':
 			success = CONTAINERS.BuildImage(HTML)
 		elif action == 'Build_Proxy':
-			success = CONTAINERS.BuildProxy(HTML)
+			success = CONTAINERS.BuildProxy(ctx, HTML)
 		elif action == 'Build_Cluster_Image':
 			success = CLUSTER.BuildClusterImage(HTML)
 		elif action == 'Build_Run_Tests':

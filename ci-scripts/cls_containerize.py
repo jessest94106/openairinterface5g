@@ -534,7 +534,7 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def BuildProxy(self, HTML):
+	def BuildProxy(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
@@ -566,15 +566,10 @@ class Containerize():
 			if not success:
 				raise Exception("could not clone proxy repository")
 
-			filename = f'build_log_{self.testCase_id}'
-			fullpath = f'{lSourcePath}/{filename}'
+			fullpath = f'{lSourcePath}/proxy_build.log'
 
 			ssh.run(f'docker build --target oai-lte-multi-ue-proxy --tag proxy:{tag} --file {lSourcePath}/docker/Dockerfile.ubuntu18.04 {lSourcePath} > {fullpath} 2>&1')
-			ssh.run(f'zip -r -qq {fullpath}.zip {fullpath}')
-			local_file = f"{os.getcwd()}/../cmake_targets/log/{filename}.zip"
-			ssh.copyin(f'{fullpath}.zip', local_file)
-			# don't delete such that we might recover the zips
-			#ssh.run(f'rm -f {fullpath}.zip')
+			archiveArtifact(ssh, ctx, fullpath)
 
 			ssh.run('docker image prune --force')
 			ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
