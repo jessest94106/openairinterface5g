@@ -409,10 +409,11 @@ def test_in_list(test, list):
 def receive_signal(signum, frame):
 	sys.exit(1)
 
-
-
-
-
+def ShowTestID(ctx, desc):
+    logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
+    logging.info(f'\u001B[1m Test ID: {ctx.test_id} (#{ctx.count}) \u001B[0m')
+    logging.info(f'\u001B[1m {desc} \u001B[0m')
+    logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
 
 #-----------------------------------------------------------
 # MAIN PART
@@ -637,15 +638,15 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 			CiTestObj.testCase_id = id
 			ctx = TestCaseCtx(i, int(id), logPath)
 			HTML.testCase_id=CiTestObj.testCase_id
-			CiTestObj.desc = test.findtext('desc')
+			desc = test.findtext('desc')
 			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
 			may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
-			HTML.desc=CiTestObj.desc
+			HTML.desc = desc
 			action = test.findtext('class')
 			if (CheckClassValidity(xml_class_list, action, id) == False):
 				task_set_succeeded = False
 				continue
-			CiTestObj.ShowTestID()
+			ShowTestID(ctx, desc)
 			if not task_set_succeeded and not always_exec:
 				msg = f"skipping test due to prior error"
 				logging.warning(msg)

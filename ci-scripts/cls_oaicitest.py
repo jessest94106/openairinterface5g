@@ -258,7 +258,6 @@ class OaiCiTest():
 
 		self.testCase_id = ''
 		self.testXMLfiles = []
-		self.desc = ''
 		self.ping_args = ''
 		self.ping_packetloss_threshold = ''
 		self.ping_rttavg_threshold =''
@@ -891,9 +890,3 @@ class OaiCiTest():
 			d = f'{SourceCodePath}/cmake_targets'
 			cmd.run(f'rm -f {d}/build.log.zip')
 			cmd.run(f'cd {d} && zip -r build.log.zip build_log_*/*')
-
-	def ShowTestID(self):
-		logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
-		logging.info(f'\u001B[1m Test ID: {self.testCase_id} \u001B[0m')
-		logging.info(f'\u001B[1m {self.desc} \u001B[0m')
-		logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
