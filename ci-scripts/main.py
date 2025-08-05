@@ -302,7 +302,7 @@ def ExecuteActionWithParam(action, ctx):
 	elif action == 'DeployCoreNetwork' or action == 'UndeployCoreNetwork':
 		cn_id = test.findtext('cn_id')
 		core_op = getattr(cls_oaicitest.OaiCiTest, action)
-		success = core_op(cn_id, HTML)
+		success = core_op(cn_id, ctx, HTML)
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
 		eNB_instance=test.findtext('eNB_instance')
