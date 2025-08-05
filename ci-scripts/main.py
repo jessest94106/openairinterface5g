@@ -43,8 +43,10 @@ import cls_containerize	 #class Containerize for all container-based operations 
 import cls_static_code_analysis  #class for static code analysis
 import cls_cluster		 # class for building/deploying on cluster
 import cls_native        # class for all native/source-based operations
+from cls_ci_helper import TestCaseCtx
 
 import ran
+import cls_cmd
 import cls_oai_html
 
 
@@ -91,7 +93,7 @@ def AssignParams(params_dict):
 		setattr(RAN, key, value)
 		setattr(HTML, key, value)
 
-def ExecuteActionWithParam(action):
+def ExecuteActionWithParam(action, ctx):
 	global RAN
 	global HTML
 	global CONTAINERS
@@ -565,6 +567,16 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	else:
 		xml_test_file = cwd + "/" + CiTestObj.testXMLfiles[0]
 
+	# directory where all log artifacts will be placed
+	logPath = f"{cwd}/../cmake_targets/log/{CiTestObj.testXMLfiles[0].split('/')[-1]}.d"
+	# we run from within ci-scripts, but the logPath is absolute, so replace
+	# the ci-scripts/..; if it does not exist, nothing will happen
+	logPath = logPath.replace(r'/ci-scripts/..', '')
+	logging.info(f"placing all artifacts for this run in {logPath}/")
+	with cls_cmd.LocalCmd() as c:
+		c.run(f"rm -rf {logPath}")
+		c.run(f"mkdir -p {logPath}")
+
 	xmlTree = ET.parse(xml_test_file)
 	xmlRoot = xmlTree.getroot()
 
@@ -615,12 +627,15 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	task_set_succeeded = True
 	HTML.startTime=int(round(time.time() * 1000))
 
+	i = 0
 	for test_case_id in todo_tests:
 		for test in all_tests:
 			id = test.get('id')
 			if test_case_id != id:
 				continue
+			i += 1
 			CiTestObj.testCase_id = id
+			ctx = TestCaseCtx(i, int(id), logPath)
 			HTML.testCase_id=CiTestObj.testCase_id
 			CiTestObj.desc = test.findtext('desc')
 			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
@@ -637,7 +652,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				HTML.CreateHtmlTestRowQueue(msg, "SKIP", [])
 				break
 			try:
-				test_succeeded = ExecuteActionWithParam(action)
+				test_succeeded = ExecuteActionWithParam(action, ctx)
 				if not test_succeeded and may_fail:
 					logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
 				elif not test_succeeded:
