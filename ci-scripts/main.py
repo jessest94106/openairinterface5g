@@ -138,11 +138,11 @@ def ExecuteActionWithParam(action, ctx):
 		if action == 'Build_eNB':
 			success = cls_native.Native.Build(ctx, HTML.testCase_id, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
 		elif action == 'Build_Image':
-			success = CONTAINERS.BuildImage(HTML)
+			success = CONTAINERS.BuildImage(ctx, HTML)
 		elif action == 'Build_Proxy':
 			success = CONTAINERS.BuildProxy(ctx, HTML)
 		elif action == 'Build_Cluster_Image':
-			success = CLUSTER.BuildClusterImage(HTML)
+			success = CLUSTER.BuildClusterImage(ctx, HTML)
 		elif action == 'Build_Run_Tests':
 			success = CONTAINERS.BuildRunTests(ctx, HTML)
 

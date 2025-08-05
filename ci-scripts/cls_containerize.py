@@ -82,67 +82,25 @@ def CreateTag(ranCommitID, ranBranch, ranAllowMerge):
 		tagToUse = f'develop-{shortCommit}'
 	return tagToUse
 
-def CopyLogsToExecutor(cmd, sourcePath, log_name):
-	cmd.cd(f'{sourcePath}/cmake_targets')
-	cmd.run(f'rm -f {log_name}.zip')
-	cmd.run(f'mkdir -p {log_name}')
-	cmd.run(f'mv log/* {log_name}')
-	cmd.run(f'zip -r -qq {log_name}.zip {log_name}')
-
-	# copy zip to executor for analysis
-	if (os.path.isfile(f'./{log_name}.zip')):
-		os.remove(f'./{log_name}.zip')
-	if (os.path.isdir(f'./{log_name}')):
-		shutil.rmtree(f'./{log_name}')
-	cmd.copyin(src=f'{sourcePath}/cmake_targets/{log_name}.zip', tgt=f'{os.getcwd()}/{log_name}.zip')
-	cmd.run(f'rm -f {log_name}.zip')
-	ZipFile(f'{log_name}.zip').extractall('.')
-
-def AnalyzeBuildLogs(buildRoot, images, globalStatus):
+def AnalyzeBuildLogs(logfiles, globalStatus):
 	collectInfo = {}
-	for image in images:
+	for image, lf in logfiles:
 		files = {}
-		file_list = [f for f in os.listdir(f'{buildRoot}/{image}') if os.path.isfile(os.path.join(f'{buildRoot}/{image}', f)) and f.endswith('.txt')]
-		# Analyze the "sub-logs" of every target image
-		for fil in file_list:
-			errorandwarnings = {}
-			warningsNo = 0
-			errorsNo = 0
-			with open(f'{buildRoot}/{image}/{fil}', mode='r') as inputfile:
-				for line in inputfile:
-					result = re.search(' ERROR ', str(line))
-					if result is not None:
-						errorsNo += 1
-					result = re.search(' error:', str(line))
-					if result is not None:
-						errorsNo += 1
-					result = re.search(' WARNING ', str(line))
-					if result is not None:
-						warningsNo += 1
-					result = re.search(' warning:', str(line))
-					if result is not None:
-						warningsNo += 1
-				errorandwarnings['errors'] = errorsNo
-				errorandwarnings['warnings'] = warningsNo
-				errorandwarnings['status'] = globalStatus
-			files[fil] = errorandwarnings
-		# Analyze the target image
-		if os.path.isfile(f'{buildRoot}/{image}.log'):
-			errorandwarnings = {}
-			committed = False
-			tagged = False
-			with open(f'{buildRoot}/{image}.log', mode='r') as inputfile:
-				for line in inputfile:
-					lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
-					lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
-					tagged = tagged or lineHasTag or lineHasTag2
-					# the OpenShift Cluster builder prepends image registry URL
-					lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
-					committed = committed or lineHasCommit
-			errorandwarnings['errors'] = 0 if committed or tagged else 1
-			errorandwarnings['warnings'] = 0
-			errorandwarnings['status'] = committed or tagged
-			files['Target Image Creation'] = errorandwarnings
+		errorandwarnings = {}
+		committed = False
+		tagged = False
+		with open(lf, mode='r') as inputfile:
+			for line in inputfile:
+				lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
+				lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
+				tagged = tagged or lineHasTag or lineHasTag2
+				# the OpenShift Cluster builder prepends image registry URL
+				lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
+				committed = committed or lineHasCommit
+		errorandwarnings['errors'] = 0 if committed or tagged else 1
+		errorandwarnings['warnings'] = 0
+		errorandwarnings['status'] = committed or tagged
+		files['Target Image Creation'] = errorandwarnings
 		collectInfo[image] = files
 	return collectInfo
 
@@ -328,11 +286,12 @@ class Containerize():
 			raise ValueError(f'Insufficient Parameter: IP/node {ip}, path {path}')
 		return (ip, path)
 
-	def BuildImage(self, HTML):
+	def BuildImage(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
 		cmd = cls_cmd.getConnection(lIpAddr)
+		log_files = []
 	
 		# Checking the hostname to get adapted on cli and dockerfileprefixes
 		cmd.run('hostnamectl')
@@ -424,7 +383,18 @@ class Containerize():
 		# On when the base image docker file is being modified.
 		if forceBaseImageBuild:
 			cmd.run(f"{self.cli} image rm {baseImage}:{baseTag}")
-			cmd.run(f"{self.cli} build {self.cliBuildOptions} --target {baseImage} --tag {baseImage}:{baseTag} --file docker/Dockerfile.base{self.dockerfileprefix} . &> cmake_targets/log/ran-base.log", timeout=1600)
+			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.docker.log'
+			cmd.run(f"{self.cli} build {self.cliBuildOptions} --target {baseImage} --tag {baseImage}:{baseTag} --file docker/Dockerfile.base{self.dockerfileprefix} . &> {logfile}", timeout=1600)
+			t = ("ran-base", archiveArtifact(cmd, ctx, logfile))
+			log_files.append(t)
+
+			# Recover build logs, for the moment only possible when build is successful
+			cmd.run(f"{self.cli} create --name test {baseImage}:{baseTag}")
+			cmd.run("mkdir -p cmake_targets/log/ran-base")
+			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.log'
+			cmd.run(f"{self.cli} cp test:/oai-ran/cmake_targets/log/all.txt {logfile}")
+			cmd.run(f"{self.cli} rm -f test")
+			archiveArtifact(cmd, ctx, logfile)
 		# First verify if the base image was properly created.
 		ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {baseImage}:{baseTag}")
 		allImagesSize = {}
@@ -448,17 +418,9 @@ class Containerize():
 			else:
 				logging.debug('ran-base size is unknown')
 
-		# Recover build logs, for the moment only possible when build is successful
-		cmd.run(f"{self.cli} create --name test {baseImage}:{baseTag}")
-		cmd.run("mkdir -p cmake_targets/log/ran-base")
-		cmd.run(f"{self.cli} cp test:/oai-ran/cmake_targets/log/. cmake_targets/log/ran-base")
-		cmd.run(f"{self.cli} rm -f test")
-
 		# Build the target image(s)
 		status = True
-		attemptedImages = ['ran-base']
 		for image,pattern,name,option in imageNames:
-			attemptedImages += [name]
 			# the archived Dockerfiles have "ran-base:latest" as base image
 			# we need to update them with proper tag
 			cmd.run(f'git checkout -- docker/Dockerfile.{pattern}{self.dockerfileprefix}')
@@ -472,15 +434,18 @@ class Containerize():
 				cmd.run(f'sed -i -e "s#ran-build:latest#ran-build:{imageTag}#" docker/Dockerfile.{pattern}{self.dockerfileprefix}')
 			if image == 'oai-gnb-aerial':
 				cmd.run('cp -f /opt/nvidia-ipc/nvipc.src.2025.05.20.tar.gz .')
-			ret = cmd.run(f'{self.cli} build {self.cliBuildOptions} --target {image} --tag {name}:{imageTag} --file docker/Dockerfile.{pattern}{self.dockerfileprefix} {option} . > cmake_targets/log/{name}.log 2>&1', timeout=1200)
+			logfile = f'{lSourcePath}/cmake_targets/log/{name}.docker.log'
+			ret = cmd.run(f'{self.cli} build {self.cliBuildOptions} --target {image} --tag {name}:{imageTag} --file docker/Dockerfile.{pattern}{self.dockerfileprefix} {option} . > {logfile} 2>&1', timeout=1200)
+			t = (name, archiveArtifact(cmd, ctx, logfile))
+			log_files.append(t)
 			if image == 'oai-gnb-aerial':
 				cmd.run('rm -f nvipc.src.2025.05.20.tar.gz')
 			if image == 'ran-build' and ret.returncode == 0:
 				cmd.run(f"docker run --name test-log -d {name}:{imageTag} /bin/true")
-				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/ cmake_targets/log/{name}/")
+				logfile = f'{lSourcePath}/{image}.log'
+				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/all.txt {logfile}")
 				cmd.run(f"docker rm -f test-log")
-			else:
-				cmd.run(f"mkdir -p cmake_targets/log/{name}")
+				archiveArtifact(cmd, ctx, logfile)
 			# check the status of the build
 			ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {name}:{imageTag}")
 			if ret.returncode != 0:
@@ -514,13 +479,10 @@ class Containerize():
 		logging.debug(cmd.run("df -h").stdout)
 		logging.debug(cmd.run("docker system df").stdout)
 
-		# create a zip with all logs
-		build_log_name = f'build_log_{self.testCase_id}'
-		CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
 		cmd.close()
 
 		# Analyze the logs
-		collectInfo = AnalyzeBuildLogs(build_log_name, attemptedImages, status)
+		collectInfo = AnalyzeBuildLogs(log_files, status)
 		
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')
