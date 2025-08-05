@@ -122,19 +122,6 @@ class StaticCodeAnalysis():
 		CCR_ref = CppCheckResults()
 		vId = 0
 		for variant in CCR.variants:
-			refAvailable = False
-			if self.ranAllowMerge:
-				refFolder = str(Path.home()) + '/cppcheck-references'
-				if (os.path.isfile(refFolder + '/cppcheck-'+ variant + '.txt')):
-					refAvailable = True
-					with open(refFolder + '/cppcheck-'+ variant + '.txt', 'r') as refFile:
-						for line in refFile:
-							ret = re.search(' (?P<nb_errors>[0-9\.]+) errors', str(line))
-							if ret is not None:
-								CCR_ref.nbErrors[vId] = int(ret.group('nb_errors'))
-							ret = re.search(' (?P<nb_warnings>[0-9\.]+) warnings', str(line))
-							if ret is not None:
-								CCR_ref.nbWarnings[vId] = int(ret.group('nb_warnings'))
 			if (os.path.isfile('./cppcheck-'+ variant + '.txt')):
 				xmlStart = False
 				with open('./cppcheck-'+ variant + '.txt', 'r') as logfile:
@@ -186,26 +173,6 @@ class StaticCodeAnalysis():
 			vMsg += '   Wrong Scanf Nb Args:             ' + str(CCR.nbWrongScanfArg[vId]) + '\n'
 			for vLine in vMsg.split('\n'):
 				logging.debug(vLine)
-			if self.ranAllowMerge and refAvailable:
-				if CCR_ref.nbErrors[vId] == CCR.nbErrors[vId]:
-					logging.debug('   No change in number of errors')
-				elif CCR_ref.nbErrors[vId] > CCR.nbErrors[vId]:
-					logging.debug('   Good! Decrease in number of errors')
-				else:
-					logging.debug('   Bad! increase in number of errors')
-				if CCR_ref.nbWarnings[vId] == CCR.nbWarnings[vId]:
-					logging.debug('   No change in number of warnings')
-				elif CCR_ref.nbWarnings[vId] > CCR.nbWarnings[vId]:
-					logging.debug('   Good! Decrease in number of warnings')
-				else:
-					logging.debug('   Bad! increase in number of warnings')
-			# Create new reference file
-			if not self.ranAllowMerge:
-				refFolder = str(Path.home()) + '/cppcheck-references'
-				if not os.path.isdir(refFolder):
-					os.mkdir(refFolder)
-				with open(refFolder + '/cppcheck-'+ variant + '.txt', 'w') as refFile:
-					refFile.write(vMsg)
 			vId += 1
 
 		HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
