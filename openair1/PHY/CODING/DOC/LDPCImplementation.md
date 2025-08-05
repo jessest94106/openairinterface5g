@@ -133,72 +133,8 @@ At runtime, to successfully use hardware acceleration via OpenCL, you need to in
 ./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _cl
 ```
 
-``` 
-------------------------------------------------
-[HW]   Platform 0, OpenCL profile FULL_PROFILE
-[HW]   Platform 0, OpenCL version OpenCL 2.1 LINUX
-[HW]   Device 0 is  available
-[HW]   Device 0, type 2 = 0x00000002: cpu 
-[HW]   Device 0, number of Compute Units: 8
-[HW]   Device 0, max Work Items dimension: 3
-[HW]   Device 0, max Work Items size for dimension: 0 8192
-[HW]   Device 0, max Work Items size for dimension: 1 8192
-[HW]   Device 0, max Work Items size for dimension: 2 8192
-[New Thread 0x7fffcc258700 (LWP 3945123)]
-[New Thread 0x7fffc3e57700 (LWP 3945124)]
-[New Thread 0x7fffcbe57700 (LWP 3945125)]
-[New Thread 0x7fffcba56700 (LWP 3945126)]
-[New Thread 0x7fffcb254700 (LWP 3945128)]
-[New Thread 0x7fffcb655700 (LWP 3945127)]
-[New Thread 0x7fffcae53700 (LWP 3945129)]
-[HW]   Platform 1, OpenCL profile FULL_PROFILE
-[HW]   Platform 1, OpenCL version OpenCL 2.0 beignet 1.3
-[New Thread 0x7fffc965a700 (LWP 3945130)]
-[Thread 0x7fffc965a700 (LWP 3945130) exited]
-[HW]   Device 0 is  available
-[HW]   Device 0, type 4 = 0x00000004: gpu 
-[HW]   Device 0, number of Compute Units: 20
-[HW]   Device 0, max Work Items dimension: 3
-[HW]   Device 0, max Work Items size for dimension: 0 512
-[HW]   Device 0, max Work Items size for dimension: 1 512
-[HW]   Device 0, max Work Items size for dimension: 2 512
------------------------------------------------------------------
-```
-
 ```
 ./nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 --rfsim -O libconfig:/usr/local/oai/conf/nrue_sim.conf:dbgl5 --loader.ldpc.shlibversion _cl --log_config.hw_log_level inf
-```
-
-```
-............................................................
-[HW]   Platform 0, OpenCL profile FULL_PROFILE
-[HW]   Platform 0, OpenCL version OpenCL 2.1 LINUX
-[HW]   Device 0 is  available
-[HW]   Device 0, type 2 = 0x00000002: cpu 
-[HW]   Device 0, number of Compute Units: 8
-[HW]   Device 0, max Work Items dimension: 3
-[HW]   Device 0, max Work Items size for dimension: 0 8192
-[HW]   Device 0, max Work Items size for dimension: 1 8192
-[HW]   Device 0, max Work Items size for dimension: 2 8192
-[New Thread 0x7fffecccc700 (LWP 3945413)]
-[New Thread 0x7fffec8cb700 (LWP 3945415)]
-[New Thread 0x7fffec4ca700 (LWP 3945414)]
-[New Thread 0x7fffdf7fd700 (LWP 3945417)]
-[New Thread 0x7fffdfbfe700 (LWP 3945418)]
-[New Thread 0x7fffdffff700 (LWP 3945416)]
-[New Thread 0x7fffd73fc700 (LWP 3945419)]
-[HW]   Platform 1, OpenCL profile FULL_PROFILE
-[HW]   Platform 1, OpenCL version OpenCL 2.0 beignet 1.3
-[New Thread 0x7fffde105700 (LWP 3945420)]
-[Thread 0x7fffde105700 (LWP 3945420) exited]
-[HW]   Device 0 is  available
-[HW]   Device 0, type 4 = 0x00000004: gpu 
-[HW]   Device 0, number of Compute Units: 20
-[HW]   Device 0, max Work Items dimension: 3
-[HW]   Device 0, max Work Items size for dimension: 0 512
-[HW]   Device 0, max Work Items size for dimension: 1 512
-[HW]   Device 0, max Work Items size for dimension: 2 512 
-------------------------------------------------------------
 ```
 
 A mechanism to select ldpc implementation is also available in the `ldpctest` phy simulator via the `-v` option, which can be used to specify the version of the ldpc shared library to be used.
@@ -211,37 +147,13 @@ Loading libldpc_cuda.so, the cuda implementation of the ldpc decoder:
 $ ./ldpctest -v _cuda
 ```
 
-
 Loading libldpc_cl.so, the opencl implementation of the ldpc decoder:
 
 `make ldpc_cl`
 
-
 ```
 $ ./ldpctest -v _cl
-................................
-[HW]   Platform 0, OpenCL profile FULL_PROFILE
-[HW]   Platform 0, OpenCL version OpenCL 2.1 LINUX
-[HW]   Device 0 is  available
-[HW]   Device 0, type 2 = 0x00000002: cpu 
-[HW]   Device 0, number of Compute Units: 8
-[HW]   Device 0, max Work Items dimension: 3
-[HW]   Device 0, max Work Items size for dimension: 0 8192
-[HW]   Device 0, max Work Items size for dimension: 1 8192
-[HW]   Device 0, max Work Items size for dimension: 2 8192
-[HW]   Platform 1, OpenCL profile FULL_PROFILE
-[HW]   Platform 1, OpenCL version OpenCL 2.0 beignet 1.3
-[HW]   Device 0 is  available
-[HW]   Device 0, type 4 = 0x00000004: gpu 
-[HW]   Device 0, number of Compute Units: 20
-[HW]   Device 0, max Work Items dimension: 3
-[HW]   Device 0, max Work Items size for dimension: 0 512
-[HW]   Device 0, max Work Items size for dimension: 1 512
-[HW]   Device 0, max Work Items size for dimension: 2 512
-................................
 ```
-
-
 
 ### LDPC libraries
 The prototypes for the functions of the interface are defined in [nrLDPC_defs.h](file://nrLDPC_defs.h) as typedefs.
