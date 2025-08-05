@@ -297,7 +297,7 @@ def ExecuteActionWithParam(action, ctx):
 	elif action == 'Deploy_Run_PhySim':
 		oc_release = test.findtext('oc_release')
 		svr_id = test.findtext('svr_id') or None
-		success = CLUSTER.deploy_oc_physim(HTML, oc_release, svr_id)
+		success = CLUSTER.deploy_oc_physim(ctx, HTML, oc_release, svr_id)
 
 	elif action == 'DeployCoreNetwork' or action == 'UndeployCoreNetwork':
 		cn_id = test.findtext('cn_id')

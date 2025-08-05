@@ -460,7 +460,7 @@ class Cluster:
 
 		return status
 
-	def deploy_oc_physim(self, HTML, oc_release, svr_id):
+	def deploy_oc_physim(self, ctx, HTML, oc_release, svr_id):
 		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
 			HELP.GenericHelp(CONST.Version)
 			raise ValueError(f'Insufficient Parameter: ranRepository {self.ranRepository} ranBranch {self.ranBranch} ranCommitID {self.ranCommitID}')
@@ -470,17 +470,13 @@ class Cluster:
 		options = f"oaicicd-core-for-ci-ran {oc_release} {image_tag} {self.eNBSourceCodePath}"
 		ret = cls_cmd.runScript(svr_id, script, 600, options)
 		logging.debug(f'"{script}" finished with code {ret.returncode}, output:\n{ret.stdout}')
-		log_dir = f'{os.getcwd()}/../cmake_targets/log'
-		os.makedirs(log_dir, exist_ok=True)
-		result_junit = f'{oc_release}-run.xml'
-		details_json = f'{oc_release}-tests.json'
 		with cls_cmd.getConnection(svr_id) as ssh:
-			ssh.copyin(src=f'{self.eNBSourceCodePath}/ci-scripts/{details_json}', tgt=f'{log_dir}/{details_json}')
-			ssh.copyin(src=f'{self.eNBSourceCodePath}/ci-scripts/{result_junit}', tgt=f'{log_dir}/{result_junit}')
-			ssh.copyin(src=f'{self.eNBSourceCodePath}/ci-scripts/physim_log.txt', tgt=f'{log_dir}/physim_log.txt')
-			ssh.copyin(src=f'{self.eNBSourceCodePath}/ci-scripts/physim_pods_summary.txt', tgt=f'{log_dir}/physim_pods_summary.txt')
-			ssh.copyin(src=f'{self.eNBSourceCodePath}/ci-scripts/LastTestsFailed.log', tgt=f'{log_dir}/LastTestsFailed.log')
-		test_status, test_summary, test_result = cls_analysis.Analysis.analyze_oc_physim(f'{log_dir}/{result_junit}', f'{log_dir}/{details_json}')
+			details_json = archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/{oc_release}-tests.json')
+			result_junit = archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/{oc_release}-run.xml')
+			archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/physim_log.txt')
+			archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/physim_pods_summary.txt')
+			archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/LastTestsFailed.log')
+		test_status, test_summary, test_result = cls_analysis.Analysis.analyze_oc_physim(result_junit, details_json, ctx.logPath)
 		if test_summary:
 			if test_status:
 				HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
