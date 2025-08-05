@@ -440,9 +440,9 @@ class Containerize():
 			log_files.append(t)
 			if image == 'oai-gnb-aerial':
 				cmd.run('rm -f nvipc.src.2025.05.20.tar.gz')
-			if image == 'ran-build' and ret.returncode == 0:
+			if image == 'ran-build' or image == 'ran-build-asan' or image == 'ran-build-fhi72':
 				cmd.run(f"docker run --name test-log -d {name}:{imageTag} /bin/true")
-				logfile = f'{lSourcePath}/{image}.log'
+				logfile = f'{lSourcePath}/{image}.ninja.log'
 				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/all.txt {logfile}")
 				cmd.run(f"docker rm -f test-log")
 				archiveArtifact(cmd, ctx, logfile)
