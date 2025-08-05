@@ -206,7 +206,7 @@ def ExecuteActionWithParam(action, ctx):
 			RAN.air_interface[RAN.eNB_instance] = 'lte-softmodem'
 		else:
 			RAN.air_interface[RAN.eNB_instance] = air_interface.lower() +'-softmodem'
-		success = RAN.TerminateeNB(HTML)
+		success = RAN.TerminateeNB(ctx, HTML)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
