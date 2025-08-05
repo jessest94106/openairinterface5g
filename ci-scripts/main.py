@@ -144,7 +144,7 @@ def ExecuteActionWithParam(action, ctx):
 		elif action == 'Build_Cluster_Image':
 			success = CLUSTER.BuildClusterImage(HTML)
 		elif action == 'Build_Run_Tests':
-			success = CONTAINERS.BuildRunTests(HTML)
+			success = CONTAINERS.BuildRunTests(ctx, HTML)
 
 	elif action == 'Initialize_eNB':
 		datalog_rt_stats_file=test.findtext('rt_stats_cfg')

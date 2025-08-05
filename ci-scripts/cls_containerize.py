@@ -636,7 +636,7 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def BuildRunTests(self, HTML):
+	def BuildRunTests(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
@@ -653,7 +653,6 @@ class Containerize():
 
 		if self.forcedWorkspaceCleanup:
 			cmd.run(f'sudo -S rm -Rf {lSourcePath}')
-		self.testCase_id = HTML.testCase_id
 	
 		# check that ran-base image exists as we expect it
 		baseImage = 'ran-base'
@@ -673,10 +672,10 @@ class Containerize():
 
 		# build ran-unittests image
 		dockerfile = "ci-scripts/docker/Dockerfile.unittest.ubuntu22"
-		ret = cmd.run(f'docker build --progress=plain --tag ran-unittests:{baseTag} --file {dockerfile} . &> {lSourcePath}/cmake_targets/log/unittest-build.log')
+		logfile = f'{lSourcePath}/cmake_targets/log/unittest-build.log'
+		ret = cmd.run(f'docker build --progress=plain --tag ran-unittests:{baseTag} --file {dockerfile} . &> {logfile}')
+		archiveArtifact(cmd, ctx, logfile)
 		if ret.returncode != 0:
-			build_log_name = f'build_log_{self.testCase_id}'
-			CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
 			logging.error(f'Cannot build unit tests')
 			HTML.CreateHtmlTestRow("Unit test build failed", 'KO', [dockerfile])
 			HTML.CreateHtmlTabFooter(False)
@@ -685,10 +684,15 @@ class Containerize():
 		HTML.CreateHtmlTestRowQueue("Build unit tests", 'OK', [dockerfile])
 
 		# it worked, build and execute tests, and close connection
-		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --rm ran-unittests:{baseTag} ctest --no-label-summary -j$(nproc)')
-		cmd.run(f'docker rmi ran-unittests:{baseTag}')
-		build_log_name = f'build_log_{self.testCase_id}'
-		CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
+		# I would like to run it with --rm and mount the ctest result directory to avoid 'docker cp'
+		# below, but then permissions are messed up and we can't remove the directory without sudo
+		# making the next pipeline fail
+		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --name ran-unittests ran-unittests:{baseTag} ctest --no-label-summary -j$(nproc)')
+		cmd.run('docker cp ran-unittests:/oai-ran/build/Testing/Temporary/LastTest.log .')
+		archiveArtifact(cmd, ctx, f'{lSourcePath}/LastTest.log')
+		cmd.run('docker cp ran-unittests:/oai-ran/build/Testing/Temporary/LastTestsFailed.log .')
+		archiveArtifact(cmd, ctx, f'{lSourcePath}/LastTestsFailed.log')
+		cmd.run('docker rm ran-unittests')
 		cmd.close()
 
 		if ret.returncode == 0:
