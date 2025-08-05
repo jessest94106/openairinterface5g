@@ -81,7 +81,7 @@ class StaticCodeAnalysis():
 		self.eNBPassword = ''
 		self.eNBSourceCodePath = ''
 
-	def CppCheckAnalysis(self, HTML):
+	def CppCheckAnalysis(self, ctx, HTML):
 		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
@@ -104,7 +104,7 @@ class StaticCodeAnalysis():
 			full_ran_repo_name = self.ranRepository + '.git'
 
 		cmd.cd(lSourcePath)
-		logDir = f'{lSourcePath}/cmake_targets/build_log_{self.testCase_id}'
+		logDir = f'{lSourcePath}/cmake_targets/log'
 		cmd.run(f'mkdir -p {logDir}')
 		cmd.run('docker image rm oai-cppcheck:bionic oai-cppcheck:focal')
 		cmd.run(f'sed -e "s@xenial@bionic@" {lSourcePath}/ci-scripts/docker/Dockerfile.cppcheck.xenial > {lSourcePath}/ci-scripts/docker/Dockerfile.cppcheck.bionic')
@@ -113,18 +113,21 @@ class StaticCodeAnalysis():
 		cmd.run(f'docker build --tag oai-cppcheck:focal --file {lSourcePath}/ci-scripts/docker/Dockerfile.cppcheck.focal . > {logDir}/cppcheck-focal.txt 2>&1')
 		cmd.run('docker image rm oai-cppcheck:bionic oai-cppcheck:focal')
 
-		# Analyzing the logs
-		cmd.copyin(f'{logDir}/cppcheck-bionic.txt', 'cppcheck-bionic.txt')
-		cmd.copyin(f'{logDir}/cppcheck-focal.txt', 'cppcheck-focal.txt')
+		bionic = archiveArtifact(cmd, ctx, f'{logDir}/cppcheck-bionic.txt')
+		focal = archiveArtifact(cmd, ctx, f'{logDir}/cppcheck-focal.txt')
 		cmd.close()
 
 		CCR = CppCheckResults()
 		CCR_ref = CppCheckResults()
 		vId = 0
 		for variant in CCR.variants:
-			if (os.path.isfile('./cppcheck-'+ variant + '.txt')):
+			filename = ctx.baseFilename() + '-cppcheck-'+ variant + '.txt'
+			logging.info(f"will check file '{filename}'")
+			if not os.path.isfile(filename):
+				raise FileNotFoundError(f"{filename} is not a file")
+			else:
 				xmlStart = False
-				with open('./cppcheck-'+ variant + '.txt', 'r') as logfile:
+				with open(filename, 'r') as logfile:
 					for line in logfile:
 						ret = re.search('cppcheck version="(?P<version>[0-9\.]+)"', str(line))
 						if ret is not None:

@@ -349,7 +349,7 @@ def ExecuteActionWithParam(action, ctx):
 		success = SCA.LicenceAndFormattingCheck(ctx, HTML)
 
 	elif action == 'Cppcheck_Analysis':
-		success = SCA.CppCheckAnalysis(HTML)
+		success = SCA.CppCheckAnalysis(ctx, HTML)
 
 	elif action == 'Push_Local_Registry':
 		svr_id = test.findtext('svr_id')
