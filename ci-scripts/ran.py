@@ -248,41 +248,6 @@ class RANManagement():
 		logging.debug('\u001B[1m Initialize eNB/gNB Completed\u001B[0m')
 		return enbDidSync
 
-	def CheckeNBProcess(self, status_queue):
-		# At least the instance 0 SHALL be on!
-		if self.eNBstatuses[0] == 0:
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-		elif self.eNBstatuses[0] == 1:
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-		elif self.eNBstatuses[0] == 2:
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-		else:
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-		mySSH = SSH.SSHConnection()
-		mySSH.open(lIpAddr, lUserName, lPassWord)
-		if self.air_interface[self.eNB_instance] == '':
-			pattern = 'softmodem'
-		else:
-			pattern = self.air_interface[self.eNB_instance]
-		mySSH.command('stdbuf -o0 ps -aux | grep --color=never ' + pattern + ' | grep -v grep', '\$', 5)
-		result = re.search(pattern, mySSH.getBefore())
-		success = result is not None
-		if not success:
-			logging.debug('\u001B[1;37;41m eNB Process Not Found! \u001B[0m')
-			status_queue.put(CONST.ENB_PROCESS_FAILED)
-		else:
-			status_queue.put(CONST.ENB_PROCESS_OK)
-		mySSH.close()
-		return success
-
 	def TerminateeNB(self, HTML):
 		if self.eNB_serverId[self.eNB_instance] == '0':
 			lIpAddr = self.eNBIPAddress
