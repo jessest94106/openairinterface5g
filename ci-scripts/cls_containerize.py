@@ -255,8 +255,6 @@ class Containerize():
 		self.services = ['', '', '']
 		self.deploymentTag = ''
 
-		self.testCase_id = ''
-
 		self.cli = ''
 		self.cliBuildOptions = ''
 		self.dockerfileprefix = ''
@@ -347,7 +345,6 @@ class Containerize():
 			imageNames.append(('oai-nr-ue', 'nrUE', 'oai-nr-ue', ''))
 			imageNames.append(('oai-gnb-aerial', 'gNB.aerial', 'oai-gnb-aerial', ''))
 		
-		self.testCase_id = HTML.testCase_id
 		cmd.cd(lSourcePath)
 		# if asterix, copy the entitlement and subscription manager configurations
 		if self.host == 'Red Hat':
@@ -502,7 +499,6 @@ class Containerize():
 		logging.debug('Building on server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 
-		self.testCase_id = HTML.testCase_id
 		oldRanCommidID = self.ranCommitID
 		oldRanRepository = self.ranRepository
 		oldRanAllowMerge = self.ranAllowMerge
