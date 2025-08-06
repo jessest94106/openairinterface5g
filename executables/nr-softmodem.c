@@ -119,7 +119,6 @@ double rx_gain_off = 0.0;
 
 static int tx_max_power[MAX_NUM_CCs]; /* =  {0,0}*/;
 int chain_offset = 0;
-int emulate_rf = 0;
 int numerology = 0;
 double cpuf;
 

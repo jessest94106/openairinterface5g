@@ -567,25 +567,6 @@ void fh_if4p5_north_out(RU_t *ru) {
   stop_meas(&ru->tx_fhaul);
 }
 
-void *emulatedRF_thread(void *param) {
-  RU_proc_t *proc = (RU_proc_t *) param;
-  int microsec = 500; // length of time to sleep, in miliseconds
-  struct timespec req = {0};
-  req.tv_sec = 0;
-  req.tv_nsec = (numerology>0)? ((microsec * 1000L)/numerology):(microsec * 1000L)*2;
-  wait_sync("emulatedRF_thread");
-
-  while(!oai_exit) {
-    nanosleep(&req, (struct timespec *)NULL);
-    pthread_mutex_lock(&proc->mutex_emulateRF);
-    ++proc->instance_cnt_emulateRF;
-    pthread_mutex_unlock(&proc->mutex_emulateRF);
-    pthread_cond_signal(&proc->cond_emulateRF);
-  }
-
-  return 0;
-}
-
 static void rx_rf(RU_t *ru, int *frame, int *slot)
 {
   RU_proc_t *proc = &ru->proc;
@@ -606,14 +587,7 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
 
   openair0_timestamp ts;
   unsigned int rxs;
-  if(emulate_rf) {
-    wait_on_condition(&proc->mutex_emulateRF,&proc->cond_emulateRF,&proc->instance_cnt_emulateRF,"emulatedRF_thread");
-    release_thread(&proc->mutex_emulateRF,&proc->instance_cnt_emulateRF,"emulatedRF_thread");
-    rxs = samples_per_slot;
-    ts = old_ts + rxs;
-  } else {
-    rxs = ru->rfdevice.trx_read_func(&ru->rfdevice, &ts, rxp, samples_per_slot, nb);
-  }
+  rxs = ru->rfdevice.trx_read_func(&ru->rfdevice, &ts, rxp, samples_per_slot, nb);
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_READ, 0 );
   proc->timestamp_rx = ts-ru->ts_offset;
@@ -683,10 +657,8 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
     *slot  = proc->tti_rx;
   }
 
-  if (!emulate_rf) {
-    metadata mt = {.slot = *slot, .frame = *frame};
-    gNBscopeCopyWithMetadata(ru, gNbTimeDomainSamples, rxp[0], sizeof(c16_t), 1, samples_per_slot, 0, &mt);
-  }
+  metadata mt = {.slot = *slot, .frame = *frame};
+  gNBscopeCopyWithMetadata(ru, gNbTimeDomainSamples, rxp[0], sizeof(c16_t), 1, samples_per_slot, 0, &mt);
 
   VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TRX_TS, (proc->timestamp_rx+ru->ts_offset)&0xffffffff );
 
@@ -996,11 +968,8 @@ void ru_tx_func(void *param)
 {
   processingData_RU_t *info = (processingData_RU_t *) param;
   RU_t *ru = info->ru;
-  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   int frame_tx = info->frame_tx;
   int slot_tx = info->slot_tx;
-  int print_frame = 8;
-  char filename[40];
 
   // do TX front-end processing if needed (precoding and/or IDFTs)
   if (ru->feptx_prec)
@@ -1010,44 +979,12 @@ void ru_tx_func(void *param)
   if ((ru->fh_north_asynch_in == NULL) && (ru->feptx_ofdm))
     ru->feptx_ofdm(ru, frame_tx, slot_tx);
 
-  if(!emulate_rf) {
-    // do outgoing fronthaul (south) if needed
-    if ((ru->fh_north_asynch_in == NULL) && (ru->fh_south_out))
-      ru->fh_south_out(ru, frame_tx, slot_tx, info->timestamp_tx);
+  // do outgoing fronthaul (south) if needed
+  if ((ru->fh_north_asynch_in == NULL) && (ru->fh_south_out))
+    ru->fh_south_out(ru, frame_tx, slot_tx, info->timestamp_tx);
 
-    if (ru->fh_north_out)
-      ru->fh_north_out(ru);
-  } else {
-    if(frame_tx == print_frame) {
-      for (int i = 0; i < ru->nb_tx * ru->num_beams_period; i++) {
-        if(slot_tx == 0) {
-          sprintf(filename,"gNBdataF_frame%d_sl%d.m", print_frame, slot_tx);
-          LOG_M(filename,"txdataF_frame",&ru->gNB_list[0]->common_vars.txdataF[i][0],fp->samples_per_frame_wCP, 1, 1);
-          sprintf(filename,"tx%ddataF_frame%d_sl%d.m", i, print_frame, slot_tx);
-          LOG_M(filename,"txdataF_frame",&ru->common.txdataF[i][0],fp->samples_per_frame_wCP, 1, 1);
-          sprintf(filename,"tx%ddataF_BF_frame%d_sl%d.m", i, print_frame, slot_tx);
-          LOG_M(filename,"txdataF_BF_frame",&ru->common.txdataF_BF[i][0],fp->samples_per_subframe_wCP, 1, 1);
-        }
-
-        if(slot_tx == 9) {
-          sprintf(filename,"tx%ddata_frame%d.m", i, print_frame);
-          LOG_M(filename,"txdata_frame",&ru->common.txdata[i][0],fp->samples_per_frame, 1, 1);
-          sprintf(filename,"tx%ddata_frame%d.dat", i, print_frame);
-          FILE *output_fd = fopen(filename,"w");
-
-          if (output_fd) {
-            fwrite(&ru->common.txdata[i][0],
-                   sizeof(int32_t),
-                   fp->samples_per_frame,
-                   output_fd);
-            fclose(output_fd);
-          } else {
-            LOG_E(PHY,"Cannot write to file %s\n",filename);
-          }
-        }//if(slot_tx == 9)
-      }//for (i=0; i<ru->nb_tx; i++)
-    }//if(frame_tx == print_frame)
-  }//else  emulate_rf
+  if (ru->fh_north_out)
+    ru->fh_north_out(ru);
 }
 
 /* @brief wait for the next RX TTI to be free
@@ -1119,54 +1056,50 @@ void *ru_thread(void *param)
   fill_rf_config(ru, ru->rf_config_file);
   fill_split7_2_config(&ru->openair0_cfg.split7, &ru->config, fp->slots_per_frame, fp->ofdm_symbol_size);
 
-  if(!emulate_rf) {
-    // Start IF device if any
-    if (ru->nr_start_if) {
-      LOG_I(PHY, "starting transport\n");
-      ret = openair0_transport_load(&ru->ifdevice, &ru->openair0_cfg, &ru->eth_params);
-      AssertFatal(ret == 0, "RU %u: openair0_transport_init() ret %d: cannot initialize transport protocol\n", ru->idx, ret);
+  // Start IF device if any
+  if (ru->nr_start_if) {
+    LOG_I(PHY, "starting transport\n");
+    ret = openair0_transport_load(&ru->ifdevice, &ru->openair0_cfg, &ru->eth_params);
+    AssertFatal(ret == 0, "RU %u: openair0_transport_init() ret %d: cannot initialize transport protocol\n", ru->idx, ret);
 
-      if (ru->ifdevice.get_internal_parameter != NULL) {
-        /* it seems the device can "overwrite" (request?) to set the callbacks
-         * for fh_south_in()/fh_south_out() differently */
-        void *t = ru->ifdevice.get_internal_parameter("fh_if4p5_south_in");
-        if (t != NULL)
-          ru->fh_south_in = t;
-        t = ru->ifdevice.get_internal_parameter("fh_if4p5_south_out");
-        if (t != NULL)
-          ru->fh_south_out = t;
-      } else {
-
-        malloc_IF4p5_buffer(ru);
-      }
-
-      int cpu = sched_getcpu();
-      if (ru->ru_thread_core > -1 && cpu != ru->ru_thread_core) {
-        /* we start the ru_thread using threadCreate(), which already sets CPU
-         * affinity; let's force it here again as per feature request #732 */
-        cpu_set_t cpuset;
-        CPU_ZERO(&cpuset);
-        CPU_SET(ru->ru_thread_core, &cpuset);
-        int ret = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-        AssertFatal(ret == 0, "Error in pthread_getaffinity_np(): ret: %d, errno: %d", ret, errno);
-        LOG_I(PHY, "RU %d: manually set CPU affinity to CPU %d\n", ru->idx, ru->ru_thread_core);
-      }
-
-      LOG_I(PHY,"Starting IF interface for RU %d, nb_rx %d\n",ru->idx,ru->nb_rx);
-      AssertFatal(ru->nr_start_if(ru,NULL) == 0, "Could not start the IF device\n");
-
-      if (ru->has_ctrl_prt > 0) {
-        if (ru->if_south == LOCAL_RF) ret = connect_rau(ru);
-        else ret = attach_rru(ru);
-  
-        AssertFatal(ret==0,"Cannot connect to remote radio\n");
-      }
-
+    if (ru->ifdevice.get_internal_parameter != NULL) {
+      /* it seems the device can "overwrite" (request?) to set the callbacks
+       * for fh_south_in()/fh_south_out() differently */
+      void *t = ru->ifdevice.get_internal_parameter("fh_if4p5_south_in");
+      if (t != NULL)
+        ru->fh_south_in = t;
+      t = ru->ifdevice.get_internal_parameter("fh_if4p5_south_out");
+      if (t != NULL)
+        ru->fh_south_out = t;
+    } else {
+      malloc_IF4p5_buffer(ru);
     }
-    else if (ru->if_south == LOCAL_RF) { // configure RF parameters only
-      ret = openair0_device_load(&ru->rfdevice,&ru->openair0_cfg);
-      AssertFatal(ret==0,"Cannot connect to local radio\n");
+
+    int cpu = sched_getcpu();
+    if (ru->ru_thread_core > -1 && cpu != ru->ru_thread_core) {
+      /* we start the ru_thread using threadCreate(), which already sets CPU
+       * affinity; let's force it here again as per feature request #732 */
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(ru->ru_thread_core, &cpuset);
+      int ret = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+      AssertFatal(ret == 0, "Error in pthread_getaffinity_np(): ret: %d, errno: %d", ret, errno);
+      LOG_I(PHY, "RU %d: manually set CPU affinity to CPU %d\n", ru->idx, ru->ru_thread_core);
     }
+
+    LOG_I(PHY,"Starting IF interface for RU %d, nb_rx %d\n",ru->idx,ru->nb_rx);
+    AssertFatal(ru->nr_start_if(ru,NULL) == 0, "Could not start the IF device\n");
+
+    if (ru->has_ctrl_prt > 0) {
+      if (ru->if_south == LOCAL_RF) ret = connect_rau(ru);
+      else ret = attach_rru(ru);
+
+      AssertFatal(ret==0,"Cannot connect to remote radio\n");
+    }
+
+  } else if (ru->if_south == LOCAL_RF) { // configure RF parameters only
+    ret = openair0_device_load(&ru->rfdevice,&ru->openair0_cfg);
+    AssertFatal(ret==0,"Cannot connect to local radio\n");
   }
 
   if (setup_RU_buffers(ru)!=0) {
@@ -1181,23 +1114,23 @@ void *ru_thread(void *param)
   pthread_mutex_unlock(&RC.ru_mutex);
   wait_sync("ru_thread");
 
-  if(!emulate_rf) {
-    // Start RF device if any
-    if (ru->start_rf) {
-      if (ru->start_rf(ru) != 0)
-        LOG_E(HW,"Could not start the RF device\n");
-      else LOG_I(PHY,"RU %d rf device ready\n",ru->idx);
-    } else LOG_I(PHY,"RU %d no rf device\n",ru->idx);
+  // Start RF device if any
+  if (ru->start_rf) {
+    if (ru->start_rf(ru) != 0)
+      LOG_E(HW, "Could not start the RF device\n");
+    else
+      LOG_I(PHY, "RU %d rf device ready\n", ru->idx);
+  } else
+    LOG_I(PHY, "RU %d no rf device\n", ru->idx);
 
-    LOG_I(PHY, "RU %d RF started cpu_meas_enabled %d\n", ru->idx, cpu_meas_enabled);
-    // start trx write thread
-    if(usrp_tx_thread == 1) {
-      if (ru->start_write_thread) {
-        if(ru->start_write_thread(ru) != 0) {
-          LOG_E(HW,"Could not start tx write thread\n");
-        } else {
-          LOG_I(PHY,"tx write thread ready\n");
-        }
+  LOG_I(PHY, "RU %d RF started cpu_meas_enabled %d\n", ru->idx, cpu_meas_enabled);
+  // start trx write thread
+  if (usrp_tx_thread == 1) {
+    if (ru->start_write_thread) {
+      if (ru->start_write_thread(ru) != 0) {
+        LOG_E(HW, "Could not start tx write thread\n");
+      } else {
+        LOG_I(PHY, "tx write thread ready\n");
       }
     }
   }
@@ -1358,7 +1291,6 @@ void init_RU_proc(RU_t *ru) {
   proc = &ru->proc;
   memset((void *)proc,0,sizeof(RU_proc_t));
   proc->ru = ru;
-  proc->instance_cnt_emulateRF   = -1;
   proc->first_rx                 = 1;
   proc->first_tx                 = 1;
   proc->frame_offset             = 0;
@@ -1367,11 +1299,6 @@ void init_RU_proc(RU_t *ru) {
 
   for (i=0; i<10; i++) proc->symbol_mask[i]=0;
 
-  pthread_mutex_init( &proc->mutex_emulateRF,NULL);
-  pthread_cond_init( &proc->cond_emulateRF, NULL);
-
-  if(emulate_rf)
-    threadCreate( &proc->pthread_emulateRF, emulatedRF_thread, (void *)proc, "emulateRF", -1, OAI_PRIORITY_RT );
   LOG_I(PHY, "Initialized RU proc %d (%s,%s),\n", ru->idx, NB_functions[ru->function], NB_timing[ru->if_timing]);
 }
 

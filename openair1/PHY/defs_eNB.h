@@ -255,11 +255,6 @@ typedef struct {
   tpool_t *threadPool;
   int nbDecode;
   notifiedFIFO_t *respDecode;
-  pthread_mutex_t mutex_emulateRF;
-  int instance_cnt_emulateRF;
-  pthread_t pthread_emulateRF;
-  pthread_attr_t attr_emulateRF;
-  pthread_cond_t cond_emulateRF;
   int first_rx;
 } L1_rxtx_proc_t;
 
