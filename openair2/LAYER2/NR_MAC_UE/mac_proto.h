@@ -242,7 +242,7 @@ and fills the PRACH PDU per each FD occasion.
 */
 
 void configure_csi_resource_mapping(fapi_nr_dl_config_csirs_pdu_rel15_t *csirs_config_pdu,
-                                    NR_CSI_RS_ResourceMapping_t  *resourceMapping,
+                                    const NR_CSI_RS_ResourceMapping_t *resourceMapping,
                                     uint32_t bwp_size,
                                     uint32_t bwp_start);
 
