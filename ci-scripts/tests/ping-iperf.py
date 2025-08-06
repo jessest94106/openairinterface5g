@@ -60,5 +60,20 @@ class TestPingIperf(unittest.TestCase):
 		success = self.ci.Iperf2_Unidir(self.html, self.cont, infra_file=infra_file)
 		self.assertTrue(success)
 
+	def test_iperf_highrate(self):
+		# note: needs to be five seconds because Iperf() adds -O 3, so if it is
+		# too short, the server is terminated before the client loaded
+		# everything
+		self.ci.iperf_args = "-u -t 5 -b 1000M -R -O 0"
+		self.ci.svr_id = "test"
+		self.ci.svr_node = "localhost"
+		self.ci.iperf_packetloss_threshold = "0"
+		self.ci.iperf_bitrate_threshold = "0"
+		self.ci.iperf_profile = "balanced"
+		infra_file = "tests/config/infra_ping_iperf.yaml"
+		# TODO Should need nothing but options and UE(s) to use
+		success = self.ci.Iperf(self.html, self.cont, infra_file=infra_file)
+		self.assertTrue(success)
+
 if __name__ == '__main__':
 	unittest.main()
