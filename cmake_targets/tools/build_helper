@@ -231,7 +231,7 @@ install_usrp_uhd_driver_from_source(){
     git diff
     mkdir -p host/build
     cd host/build || true
-    $CMAKE ../ -GNinja -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF
+    $CMAKE ../ -GNinja -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_B100=OFF -DENABLE_DOXYGEN=OFF -DENABLE_MANUAL=OFF -DENABLE_MAN_PAGES=OFF -DENABLE_MAN_PAGE_COMPRESSION=OFF -DENABLE_OCTOCLOCK=ON -DENABLE_USRP1=OFF -DENABLE_USRP2=OFF
     echo "Compiling UHD"
     ninja
     $SUDO ninja install
