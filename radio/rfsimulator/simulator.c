@@ -181,7 +181,7 @@ static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
   ptr->conn_sock = sock;
   ptr->lastReceivedTS = 0;
   ptr->headerMode = true;
-  ptr->trashingPacket = false;
+  ptr->trashingPacket = true;
   ptr->transferPtr = (char *)&ptr->th;
   ptr->remainToTransfer = sizeof(samplesBlockHeader_t);
   int sendbuff = SEND_BUFF_SIZE;
@@ -980,7 +980,7 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
   for (int sock = 0; sock < MAX_FD_RFSIMU; sock++) {
     buffer_t *ptr = &t->buf[sock];
 
-    if (ptr->circularBuf) {
+    if (ptr->circularBuf && !ptr->trashingPacket) {
       bool reGenerateChannel = false;
 
       // fixme: when do we regenerate
