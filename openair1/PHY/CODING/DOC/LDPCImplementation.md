@@ -28,35 +28,35 @@ shlib_path libldpc.so
 `libldpc.so` has its decoder implemented in [nrLDPC_coding_segment_decoder.c](file://../nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_decoder.c).\
 Its encoder is implemented in [nrLDPC_coding_segment_encoder.c](file://../nrLDPC_coding/nrLDPC_coding_segment/nrLDPC_coding_segment_encoder.c).
 
-loading `libldpc_t2.so` instead of `libldpc.so`:
+loading `libldpc_aal.so` instead of `libldpc.so`:
 
-`make ldpc_t2`
+`make ldpc_aal`
 
-This command creates the `libldpc_t2.so` shared library.
+This command creates the `libldpc_aal.so` shared library.
 
 ```
-Building C object CMakeFiles/ldpc_t2.dir/openair1/PHY/CODING/nrLDPC_coding/nrLDPC_coding_t2/nrLDPC_coding_t2.c.o
-Linking C shared module libldpc_t2.so
+Building C object CMakeFiles/ldpc_aal.dir/openair1/PHY/CODING/nrLDPC_coding/nrLDPC_coding_aal/nrLDPC_coding_aal.c.o
+Linking C shared module libldpc_aal.so
 ```
 
-At runtime, to successfully use the T2 board, you need to install vendor specific drivers and tools.\
-Please refer to the dedicated documentation at [LDPC_T2_OFFLOAD_SETUP.md](file://../../../../doc/LDPC_T2_OFFLOAD_SETUP.md).
+At runtime, to successfully use LDPC accelerators (e.g., Xilinx T2/Intel ACCs), you will need to install the corresponding drivers and tools.
+Please refer to the dedicated documentation at [LDPC_OFFLOAD_SETUP.md](file://../../../../doc/LDPC_OFFLOAD_SETUP.md).
 
-`./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _t2 --nrLDPC_coding_t2.dpdk_dev 01:00.0 --nrLDPC_coding_t2.dpdk_core_list 0-1`
+`./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev 01:00.0 --nrLDPC_coding_aal.dpdk_core_list 0-1`
 
 ``` 
 
 .......................
 [CONFIG] loader.ldpc.shlibversion set to default value ""
 [LIBCONFIG] loader.ldpc: 2/2 parameters successfully set, (1 to default value)
-[CONFIG] shlibversion set to  _t2 from command line
+[CONFIG] shlibversion set to  _aal from command line
 [CONFIG] loader.ldpc 1 options set from command line
-shlib_path libldpc_t2.so
-[LOADER] library libldpc_t2.so successfully loaded
+shlib_path libldpc_aal.so
+[LOADER] library libldpc_aal.so successfully loaded
 ........................
 ```
 
-`libldpc_t2.so` has its decoder and its encoder implemented in [nrLDPC_coding_t2.c](file://../nrLDPC_coding/nrLDPC_coding_t2/nrLDPC_coding_t2.c).
+`libldpc_aal.so` has its decoder and its encoder implemented in [nrLDPC_coding_aal.c](file://../nrLDPC_coding/nrLDPC_coding_aal/nrLDPC_coding_aal.c).
 
 loading `libldpc_xdma.so` instead of `libldpc.so`:
 
@@ -103,7 +103,7 @@ Libraries implementing the slotwise LDPC coding must be named `libldpc<_version>
 
 `libldpc.so` is completed.
 
-`libldpc_t2.so` is completed.
+`libldpc_aal.so` is completed.
 
 `libldpc_xdma.so` is completed.
 
