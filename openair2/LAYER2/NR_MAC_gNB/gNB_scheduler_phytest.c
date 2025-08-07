@@ -262,6 +262,13 @@ void nr_ul_preprocessor_phytest(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_p
 
   // TODO implement beam procedures for phy-test mode
   int beam = 0;
+  const NR_tda_info_t *tda_p;
+  const int n_tda = get_num_ul_tda(nr_mac, sched_slot, tda_info.k2, &tda_p);
+  DevAssert(n_tda > 0);
+  /* check only the first TDA: we are only interested in finding out if this TDA fits completely */
+  int rb_s = rbStart, rb_l = rbSize;
+  get_best_ul_tda(nr_mac, beam, tda_p, 1, sched_frame, sched_slot, &rb_s, &rb_l);
+  DevAssert(rb_s == rbStart && rb_l == rbSize);
 
   const int buffer_index = ul_buffer_index(sched_frame, sched_slot, slots_frame, nr_mac->vrb_map_UL_size);
   uint16_t *vrb_map_UL = &nr_mac->common_channels[CC_id].vrb_map_UL[beam][buffer_index * MAX_BWP_SIZE];

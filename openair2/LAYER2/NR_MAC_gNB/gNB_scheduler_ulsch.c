@@ -92,6 +92,65 @@ int get_num_ul_tda(gNB_MAC_INST *nrmac, int slot, int k2, const NR_tda_info_t **
   return diff;
 }
 
+static void get_max_rb_range(const uint16_t *vrb_map_ul, const uint16_t *ulprbbl, uint16_t mask, int *rb_start, int *rb_len)
+{
+  int best_start = *rb_start;
+  int best_len = 0;
+  int current_start = *rb_start;
+  int current_len = 0;
+  for (int rb = *rb_start; rb < *rb_len; ++rb) {
+    if (ulprbbl[rb] == 0 && (mask & vrb_map_ul[rb]) == 0) {
+      current_len++;
+      continue;
+    }
+
+    /* this RB is blocked for UL, or already in use */
+    if (current_len > best_len) {
+      best_start = current_start;
+      best_len = current_len;
+    }
+    current_start = rb + 1; /* will start in next RB, or updated later */
+    current_len = 0;
+  }
+  if (current_len > best_len) {
+    best_start = current_start;
+    best_len = current_len;
+  }
+  *rb_start = best_start;
+  *rb_len = best_len;
+}
+
+const NR_tda_info_t *get_best_ul_tda(const gNB_MAC_INST *nrmac, int beam, const NR_tda_info_t *tdas, int n_tda, int frame, int slot, int *rb_start, int *rb_len)
+{
+  /* there is a mixed slot only when in TDD */
+  const frame_structure_t *fs = &nrmac->frame_structure;
+  const int index = ul_buffer_index(frame, slot, fs->numb_slots_frame, nrmac->vrb_map_UL_size);
+  uint16_t *vrb_map_UL = &nrmac->common_channels[0].vrb_map_UL[beam][index * MAX_BWP_SIZE];
+
+  DevAssert(n_tda <= 16);
+  const NR_tda_info_t *best_tda = tdas;
+  uint64_t score = 0;
+  int check_rb_start = *rb_start;
+  int check_rb_len = *rb_len;
+
+  for (int i = 0; i < n_tda; ++i, tdas++) {
+    int start = check_rb_start;
+    int len = check_rb_len;
+    uint16_t tda_mask = SL_to_bitmap(tdas->startSymbolIndex, tdas->nrOfSymbols);
+    get_max_rb_range(vrb_map_UL, nrmac->ulprbbl, tda_mask, &start, &len);
+    uint64_t s = (uint64_t)tdas->nrOfSymbols * len;
+    if (s > score) {
+      best_tda = tdas;
+      score = s;
+      *rb_start = start;
+      *rb_len = len;
+    }
+    LOG_D(NR_MAC, "%4d.%2d tda k2 %ld mask 0x%04x has PRB start/len %d/%d score %ld\n", frame, slot, tdas->k2, tda_mask, start, len, s);
+  }
+
+  return best_tda;
+}
+
 bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
 {
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
@@ -2600,19 +2659,26 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
      * "cell-specific", i.e., the UE will add it on the computation. */
     int k2 = fs_get_diff(fs, *next, current) - koffset;
     DevAssert(k2 > 0);
+    // we assume that all beams have the same symbol utilization in all RBs for
+    // simplification (but this might not be true). Otherwise, we would need to
+    // check it separately for all beams and give a list of TDAs (one for each
+    // beam) in pf_ul(), which is complex. We should rewrite pf_ul() to
+    // schedule for one beam only instead (and for one BWP).
+    int beam = 0;
     const NR_tda_info_t *tda_info = NULL;
     int n_tda = get_num_ul_tda(nr_mac, next->s, k2, &tda_info);
     if (n_tda == 0) /* no TDA fulfills this */
       break;
-    /* TODO: get_num_ul_tda() might indicate multiple TDAs to use (e.g., one
-     * handling SRS), this will be fixed in a follow-up commit. */
+    int rb_start = 0;
+    int rb_len = bw;
+    tda_info = get_best_ul_tda(nr_mac, beam, tda_info, n_tda, next->f, next->s, &rb_start, &rb_len);
     DevAssert(tda_info->valid_tda);
     int tda = seq_arr_dist(&nr_mac->ul_tda, seq_arr_front(&nr_mac->ul_tda), tda_info);
     AssertFatal(tda >= 0 && tda < 16, "illegal TDA index %d\n", tda);
 
     int len[num_beams];
     for (int i = 0; i < num_beams; i++)
-      len[i] = bw;
+      len[i] = rb_len;
     /* proportional fair scheduling algorithm */
     int sched = pf_ul(nr_mac, pp_pusch, tda, tda_info, nr_mac->UE_info.connected_ue_list, max_dci, num_beams, len);
     LOG_D(NR_MAC, "run pf_ul() at %4d.%2d with tda %d k2 %d (ULSCH at %4d.%2d) scheduled %d last_dl %d\n", frame, slot, tda, k2, next->f, next->s, sched, last_dl);
