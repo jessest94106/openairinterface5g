@@ -46,6 +46,7 @@ import cls_cmd
 import sshconnection as SSH
 import helpreadme as HELP
 import constants as CONST
+from cls_ci_helper import archiveArtifact
 
 #-----------------------------------------------------------
 # Class Declaration
@@ -124,7 +125,6 @@ class RANManagement():
 
 		self.testCase_id = HTML.testCase_id
 		mySSH = SSH.SSHConnection()
-		cwd = os.getcwd()
 		
 		mySSH.open(lIpAddr, lUserName, lPassWord)
 		mySSH.command('cd ' + lSourcePath, '\$', 5)
@@ -249,42 +249,7 @@ class RANManagement():
 		logging.debug('\u001B[1m Initialize eNB/gNB Completed\u001B[0m')
 		return enbDidSync
 
-	def CheckeNBProcess(self, status_queue):
-		# At least the instance 0 SHALL be on!
-		if self.eNBstatuses[0] == 0:
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-		elif self.eNBstatuses[0] == 1:
-			lIpAddr = self.eNB1IPAddress
-			lUserName = self.eNB1UserName
-			lPassWord = self.eNB1Password
-		elif self.eNBstatuses[0] == 2:
-			lIpAddr = self.eNB2IPAddress
-			lUserName = self.eNB2UserName
-			lPassWord = self.eNB2Password
-		else:
-			lIpAddr = self.eNBIPAddress
-			lUserName = self.eNBUserName
-			lPassWord = self.eNBPassword
-		mySSH = SSH.SSHConnection()
-		mySSH.open(lIpAddr, lUserName, lPassWord)
-		if self.air_interface[self.eNB_instance] == '':
-			pattern = 'softmodem'
-		else:
-			pattern = self.air_interface[self.eNB_instance]
-		mySSH.command('stdbuf -o0 ps -aux | grep --color=never ' + pattern + ' | grep -v grep', '\$', 5)
-		result = re.search(pattern, mySSH.getBefore())
-		success = result is not None
-		if not success:
-			logging.debug('\u001B[1;37;41m eNB Process Not Found! \u001B[0m')
-			status_queue.put(CONST.ENB_PROCESS_FAILED)
-		else:
-			status_queue.put(CONST.ENB_PROCESS_OK)
-		mySSH.close()
-		return success
-
-	def TerminateeNB(self, HTML):
+	def TerminateeNB(self, ctx, HTML):
 		if self.eNB_serverId[self.eNB_instance] == '0':
 			lIpAddr = self.eNBIPAddress
 			lUserName = self.eNBUserName
@@ -356,13 +321,11 @@ class RANManagement():
 				fileToAnalyze = self.eNBLogFiles[int(self.eNB_instance)]
 				self.eNBLogFiles[int(self.eNB_instance)] = ''
 			if analyzeFile:
-				#*stats.log files + pickle + png
-				mySSH.copyin(lIpAddr, lUserName, lPassWord, lSourcePath + '/cmake_targets/*stats.log', '.')
-				mySSH.copyin(lIpAddr, lUserName, lPassWord, lSourcePath + '/cmake_targets/*.pickle', '.')
-				mySSH.copyin(lIpAddr, lUserName, lPassWord, lSourcePath + '/cmake_targets/*.png', '.')
-				#
-				copyin_res = mySSH.copyin(lIpAddr, lUserName, lPassWord, lSourcePath + '/cmake_targets/' + fileToAnalyze, '.')
-				if (copyin_res == -1):
+				with cls_cmd.getConnection(lIpAddr) as cmd:
+					file = archiveArtifact(cmd, ctx, lSourcePath + '/cmake_targets/' + fileToAnalyze)
+					archiveArtifact(cmd, ctx, lSourcePath + '/cmake_targets/nrL1_stats.log')
+					archiveArtifact(cmd, ctx, lSourcePath + '/cmake_targets/nrMAC_stats.log')
+				if file is None:
 					logging.debug('\u001B[1;37;41m Could not copy ' + nodeB_prefix + 'NB logfile to analyze it! \u001B[0m')
 					HTML.htmleNBFailureMsg='Could not copy ' + nodeB_prefix + 'NB logfile to analyze it!'
 					HTML.CreateHtmlTestRow('N/A', 'KO', CONST.ENB_PROCESS_NOLOGFILE_TO_ANALYZE)
@@ -375,8 +338,8 @@ class RANManagement():
 					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './nrL1_stats.log', self.eNBSourceCodePath + '/cmake_targets/')
 					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './nrMAC_stats.log', self.eNBSourceCodePath + '/cmake_targets/')
 					mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, './' + fileToAnalyze, self.eNBSourceCodePath + '/cmake_targets/')
-				logging.debug('\u001B[1m Analyzing ' + nodeB_prefix + 'NB logfile \u001B[0m ' + fileToAnalyze)
-				logStatus = self.AnalyzeLogFile_eNB(fileToAnalyze, HTML, self.ran_checkers)
+				logging.debug('\u001B[1m Analyzing ' + nodeB_prefix + 'NB logfile \u001B[0m ' + file)
+				logStatus = self.AnalyzeLogFile_eNB(file, HTML, self.ran_checkers)
 				if (logStatus < 0):
 					HTML.CreateHtmlTestRow('N/A', 'KO', logStatus)
 					#display rt stats for gNB only
@@ -734,11 +697,16 @@ class RANManagement():
 			datalog_rt_stats = yaml.load(f,Loader=yaml.FullLoader)
 		rt_keys = datalog_rt_stats['Ref'] #we use the keys from the Ref field  
 
-		if os.path.isfile('./nrL1_stats.log') and os.path.isfile('./nrMAC_stats.log'):
+		# nrL1_stats.log/nrMAC_stats.log should be in the same directory as main log file
+		# currently the link is only implicit as below based on pattern matching
+		# I will rework this to give the file explicitly
+		l1_stats_fn = re.sub(r'enb_[0-9]+', 'nrL1_stats', eNBlogFile)
+		mac_stats_fn = re.sub(r'enb_[0-9]+', 'nrMAC_stats', eNBlogFile)
+		if os.path.isfile(l1_stats_fn) and os.path.isfile(mac_stats_fn):
 			# don't use CI-nrL1_stats.log, as this will increase the processing time for
 			# no reason, we just need the last occurence
-			nrL1_stats = open('./nrL1_stats.log', 'r')
-			nrMAC_stats = open('./nrMAC_stats.log', 'r')
+			nrL1_stats = open(l1_stats_fn, 'r')
+			nrMAC_stats = open(mac_stats_fn, 'r')
 			for line in nrL1_stats.readlines():
 				for k in rt_keys:
 					result = re.search(k, line)     
@@ -758,7 +726,7 @@ class RANManagement():
 			nrL1_stats.close()
 			nrMAC_stats.close()
 		else:
-			logging.debug("NR Stats files for RT analysis not found")
+			logging.debug(f"NR Stats files for RT analysis not found: {l1_stats_fn}, {mac_stats_fn}")
 
 		#stdout log file and stat log files analysis completed
 		logging.debug('   File analysis (stdout, stats) completed')

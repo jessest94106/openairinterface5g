@@ -5,10 +5,12 @@ idefix:
   AttachScript: sudo python3 ci_ctl_qtel.py /dev/ttyUSB2 wup
   DetachScript: sudo python3 ci_ctl_qtel.py /dev/ttyUSB2 detach
   NetworkScript: ip a show dev wwan0
+  #Tracing:
+  #  Start: 'sudo rm -f ci_qlog/*; nohup sudo -b QLog/QLog -s ci_qlog -f NR5G.cfg &'
+  #  Stop: 'sudo killall QLog'
+  #  Collect: 'sudo mv ci_qlog/* %%log_dir%%/'
   IF: wwan0
   MTU: 1500
-  Trace: True
-  LogStore: /media/usb-drive/ci_qlogs
 
 up2:
   Host: up2
@@ -46,7 +48,6 @@ adb_ue_1:
   NetworkScript: adb -s R3CM40LZPHT shell "ip address show | grep rmnet_data0"
   CmdPrefix: adb -s R3CM40LZPHT shell
   MTU: 1500
-  LogStore: /media/usb-drive/ci_adb_1-logs
 adb_ue_2:
   Host: nano
   InitScript: /home/oaicicd/ci_ctl_adb.sh initialize 5200c00db4413517
@@ -59,7 +60,6 @@ adb_ue_2:
   NetworkScript: adb -s 5200c00db4413517 shell "ip address show | grep rmnet"
   CmdPrefix: adb -s 5200c00db4413517 shell
   MTU: 1500
-  LogStore: /media/usb-drive/ci_adb_2-logs
 
 oc-cn5g:
   Host: avra
@@ -150,6 +150,10 @@ amarisoft_ue:
   InitScript: /root/lteue-linux-2025-03-15/lteue /root/oaicicd/ran_sa_aw2s_asue_20MHz/aw2s-multi-00102-20.cfg &
   TermScript: /root/lteue-linux-2025-03-15/ws.js -t 10 127.0.0.1:9002 '{"message":"quit"}' || killall -KILL lteue-avx2
   NetworkScript: ip netns exec ue1 ip a show dev pdn0
+  #Tracing:
+  #  Start: '' # nothing to be done
+  #  Stop: '' # nothing to be done
+  #  Collect: 'cp /tmp/ue.log %%log_dir%%'
 amarisoft_ue_2x2:
   Host: amariue
   InitScript: /root/lteue-linux-2025-03-15/lteue /root/oaicicd/ran_sa_aw2s_asue_20MHz_2x2/aw2s-multi-00102-2x2-v2.cfg &

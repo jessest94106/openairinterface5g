@@ -84,7 +84,7 @@ class Analysis():
 
 		return success,msg
 
-	def analyze_oc_physim(result_junit, details_json):
+	def analyze_oc_physim(result_junit, details_json, logPath):
 		try:
 			tree = ET.parse(result_junit)
 			root = tree.getroot()
@@ -124,7 +124,7 @@ class Analysis():
 			output = test.findtext("system-out")
 			output_check = "exceeds the threshold" not in output
 			# collect logs
-			log_dir = f'../cmake_targets/log/{test_exec}'
+			log_dir = f'{logPath}/{test_exec}'
 			os.makedirs(log_dir, exist_ok=True)
 			with open(f'{log_dir}/{test_name}.log', 'w') as f:
 				f.write(output)
