@@ -555,7 +555,6 @@ static int vrtsim_read(openair0_device *device, openair0_timestamp *ptimestamp, 
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
   if (shm_td_iq_channel_is_aborted(vrtsim_state->channel)) {
-    LOG_E(HW, "Channel is aborted, returning void samples\n");
     for (int i = 0; i < nbAnt; i++) {
       memset(samplesVoid[i], 0, sizeof(c16_t) * nsamps);
     }
@@ -615,7 +614,7 @@ static void vrtsim_end(openair0_device *device)
         "VRTSIM: Read/write too early (suspected radio implementaton error) TX: %lu, RX: %lu\n",
         tx_timing->tx_early,
         vrtsim_state->rx_early);
-  LOG_I(HW, "VRTSIM: Average TX budget %.3lf uS\n", tx_timing->average_tx_budget);
+  LOG_I(HW, "VRTSIM: Average TX budget %.3lf uS (more is better)\n", tx_timing->average_tx_budget);
   histogram_print(&tx_timing->tx_histogram);
   free(vrtsim_state->tx_timing);
 }
