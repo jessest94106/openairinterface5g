@@ -87,15 +87,6 @@ void server(void)
   int num_ant_tx = 1;
   int num_ant_rx = 1;
   ShmTDIQChannel *channel = shm_td_iq_channel_create(SHM_CHANNEL_NAME, num_ant_tx, num_ant_rx);
-  for (int i = 0; i < 10; i++) {
-    if (shm_td_iq_channel_is_connected(channel)) {
-      printf("Server connected\n");
-      break;
-    }
-    printf("Waiting for client\n");
-    sleep(1);
-  }
-  AssertFatal(shm_td_iq_channel_is_connected(channel), "Server failed to connect\n");
 
   pthread_t producer_thread;
   int ret = pthread_create(&producer_thread, NULL, produce_symbols, channel);
@@ -127,15 +118,6 @@ int client(void)
 {
   int total_errors = 0;
   ShmTDIQChannel *channel = shm_td_iq_channel_connect(SHM_CHANNEL_NAME, 10);
-  for (int i = 0; i < 10; i++) {
-    if (shm_td_iq_channel_is_connected(channel)) {
-      printf("Client connected\n");
-      break;
-    }
-    printf("Waiting for server\n");
-    sleep(1);
-  }
-  AssertFatal(shm_td_iq_channel_is_connected(channel), "Client failed to connect\n");
 
   uint64_t timestamp = 0;
   int iq_contents = 0;

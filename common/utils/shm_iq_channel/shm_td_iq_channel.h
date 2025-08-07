@@ -124,14 +124,6 @@ void shm_td_iq_channel_produce_samples(ShmTDIQChannel *channel, uint64_t num_sam
 void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_t timeout_uS);
 
 /**
- * @brief Checks if the IQ channel is connected.
- *
- * @param channel The ShmTDIQChannel structure.
- * @return True if the channel is connected, false otherwise.
- */
-bool shm_td_iq_channel_is_connected(const ShmTDIQChannel *channel);
-
-/**
  * @brief Aborts the IQ channel causing the wait to return immediately
  *
  * @param channel The ShmTDIQChannel structure.

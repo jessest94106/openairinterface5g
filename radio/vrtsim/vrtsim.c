@@ -368,10 +368,6 @@ static int vrtsim_connect(openair0_device *device)
                                                      vrtsim_state->peer_info.num_rx_antennas,
                                                      device->openair0_cfg[0].rx_num_channels);
     vrtsim_state->run_timing_thread = true;
-    while (!shm_td_iq_channel_is_connected(vrtsim_state->channel)) {
-      LOG_I(HW, "Waiting for client\n");
-      sleep(1);
-    }
     int ret = pthread_create(&vrtsim_state->timing_thread, NULL, vrtsim_timing_job, vrtsim_state);
     AssertFatal(ret == 0, "pthread_create() failed: errno: %d, %s\n", errno, strerror(errno));
   } else {
