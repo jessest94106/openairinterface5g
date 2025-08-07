@@ -38,8 +38,6 @@ conf_nvram_path=$OPENAIR_DIR/openair3/NAS/TOOLS/ue_eurecom_test_sfr.conf
 
 HW=""
 VERBOSE_COMPILE=0
-RUN_GROUP=0
-TEST_CASE_GROUP=""
 BUILD_DIR=ran_build
 BUILD_DOXYGEN=0
 DISABLE_HARDWARE_DEPENDENCY="False"
@@ -99,10 +97,6 @@ Options:
    Selects the transport protocol type, options: None, Ethernet, benetel4g, benetel5g, oran_fhlib_5g, oran_fhlib_5g_mplane, WLS
 -P | --phy_simulators
    Makes the unitary tests Layer 1 simulators
--s | --check
-   runs a set of auto-tests based on simulators and several compilation tests
---run-group 
-   runs only specified test cases specified here. This flag is only valid with -s
 -V | --vcd
    Adds a debgging facility to the binary files: GUI with major internal synchronization events
 --verbose-compile
@@ -319,15 +313,6 @@ function main() {
             TARGET_LIST="$TARGET_LIST dlsim ulsim ldpctest polartest smallblocktest nr_pbchsim nr_dlschsim nr_ulschsim nr_dlsim nr_ulsim nr_pucchsim nr_prachsim nr_psbchsim"
             echo_info "Will compile dlsim, ulsim, ..."
             shift;;
-       -s | --check)
-            OAI_TEST=1
-            echo_info "Will run auto-tests"
-            shift;;
-       --run-group)
-            RUN_GROUP=1
-            TEST_CASE_GROUP=$2
-            echo_info "executing test cases only in group: $TEST_CASE_GROUP"
-            shift 2;;
        -V | --vcd)
             echo_info "Setting gtk-wave output"
             CMAKE_CMD="$CMAKE_CMD -DENABLE_VCD_FIFO=True"
@@ -517,26 +502,7 @@ function main() {
     fi
   fi
 
-
-  ##############
-  # Auto-tests #
-  ##############
-  if [ "$OAI_TEST" = "1" ] ; then
-    echo_info "The log file for the autotest script for debugging is located here: $OPENAIR_DIR/cmake_targets/autotests/log/autotests.log "
-    echo_info "The results of autotests results is located here: $OPENAIR_DIR/cmake_targets/autotests/log/results_autotests.xml "
-    echo_info "You can hit CTRL-C at any time to terminate the autotests..."
-    rm -fr $OPENAIR_DIR/cmake_targets/autotests/log
-    mkdir -p $OPENAIR_DIR/cmake_targets/autotests/log
-    if [ "$RUN_GROUP" -eq "1" ]; then
-        $OPENAIR_DIR/cmake_targets/autotests/run_exec_autotests.bash -g "$TEST_CASE_GROUP" >& $OPENAIR_DIR/cmake_targets/autotests/log/autotests.log
-    else
-        $OPENAIR_DIR/cmake_targets/autotests/run_exec_autotests.bash >& $OPENAIR_DIR/cmake_targets/autotests/log/autotests.log
-    fi
-    wait
-  else
-    echo_success "BUILD SHOULD BE SUCCESSFUL"
-  fi
-
+  echo_success "BUILD SHOULD BE SUCCESSFUL"
 }
 
 main "$@"
