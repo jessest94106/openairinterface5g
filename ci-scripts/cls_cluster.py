@@ -165,24 +165,6 @@ class Cluster:
 			return -1
 		return int(result.group("size"))
 
-	def _deploy_pod(self, filename, timeout = 120):
-		ret = self.cmd.run(f'oc create -f {filename}')
-		result = re.search(r'pod/(?P<pod>[a-zA-Z0-9_\-]+) created', ret.stdout)
-		if result is None:
-			logging.error(f'could not deploy pod: {ret.stdout}')
-			return None
-		pod = result.group("pod")
-		logging.debug(f'checking if pod {pod} is in Running state')
-		ret = self.cmd.run(f'oc wait --for=condition=ready pod {pod} --timeout={timeout}s', silent=True)
-		if ret.returncode == 0:
-			return pod
-		logging.error(f'pod {pod} did not reach Running state')
-		self._undeploy_pod(filename)
-		return None
-
-	def _undeploy_pod(self, filename):
-		self.cmd.run(f'oc delete -f {filename}')
-
 	def PullClusterImage(self, HTML, node, images, tag_prefix):
 		logging.debug(f'Pull OC image {images} to server {node}')
 		self.testCase_id = HTML.testCase_id
@@ -295,20 +277,6 @@ class Cluster:
 			status = ranbase_job is not None and self._wait_build_end([ranbase_job], 1000)
 			if not status: logging.error('failure during build of ran-base')
 			log_files.append(self._retrieveOCLog(ctx, ranbase_job, lSourcePath, 'ran-base'))
-
-			# recover logs by mounting image
-			self._retag_image_statement('ran-base', 'ran-base', baseTag, 'openshift/ran-base-log-retrieval.yaml')
-			pod = self._deploy_pod('openshift/ran-base-log-retrieval.yaml')
-			if pod is not None:
-				logdir = f'{lSourcePath}/cmake_targets/log/ran-base'
-				self.cmd.run(f'mkdir -p {logdir}')
-				self.cmd.run(f'oc rsync {pod}:/oai-ran/cmake_targets/log/ {logdir}')
-				self._undeploy_pod('openshift/ran-base-log-retrieval.yaml')
-				ret = self.cmd.run(f'ls {logdir}')
-				for f in ret.stdout.splitlines():
-					archiveArtifact(self.cmd, ctx, f"{logdir}/{f}")
-			else:
-				status = False
 
 		if status:
 			self._recreate_is_tag('oai-physim', imageTag, 'openshift/oai-physim-is.yaml')

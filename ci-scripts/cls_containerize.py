@@ -386,13 +386,6 @@ class Containerize():
 			t = ("ran-base", archiveArtifact(cmd, ctx, logfile))
 			log_files.append(t)
 
-			# Recover build logs, for the moment only possible when build is successful
-			cmd.run(f"{self.cli} create --name test {baseImage}:{baseTag}")
-			cmd.run("mkdir -p cmake_targets/log/ran-base")
-			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.log'
-			cmd.run(f"{self.cli} cp test:/oai-ran/cmake_targets/log/all.txt {logfile}")
-			cmd.run(f"{self.cli} rm -f test")
-			archiveArtifact(cmd, ctx, logfile)
 		# First verify if the base image was properly created.
 		ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {baseImage}:{baseTag}")
 		allImagesSize = {}
@@ -438,12 +431,6 @@ class Containerize():
 			log_files.append(t)
 			if image == 'oai-gnb-aerial':
 				cmd.run('rm -f nvipc.src.2025.05.20.tar.gz')
-			if image == 'ran-build' or image == 'ran-build-asan' or image == 'ran-build-fhi72':
-				cmd.run(f"docker run --name test-log -d {name}:{imageTag} /bin/true")
-				logfile = f'{lSourcePath}/{image}.ninja.log'
-				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/all.txt {logfile}")
-				cmd.run(f"docker rm -f test-log")
-				archiveArtifact(cmd, ctx, logfile)
 			# check the status of the build
 			ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {name}:{imageTag}")
 			if ret.returncode != 0:
