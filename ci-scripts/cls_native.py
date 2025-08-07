@@ -43,7 +43,7 @@ class Native():
 			ret = ssh.run(f"C_INCLUDE_PATH={DPDK_PATH}/include/ PKG_CONFIG_PATH={DPDK_PATH}/lib64/pkgconfig/ {base}/build_oai {options} > {base}/build_oai.log", timeout=900)
 			success = ret.returncode == 0
 			logs = ssh.run(f"cat {base}/build_oai.log", silent=True)
-			logging.debug(f"build finished with code {ret.returncode}, output:\n{logs.stdout}")
+			logging.debug(f"build finished with code {ret.returncode}")
 
 			archiveArtifact(ssh, ctx, f'{base}/build_oai.log')
 

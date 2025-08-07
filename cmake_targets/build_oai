@@ -37,7 +37,6 @@ set_openair_env
 conf_nvram_path=$OPENAIR_DIR/openair3/NAS/TOOLS/ue_eurecom_test_sfr.conf
 
 HW=""
-VERBOSE_COMPILE=0
 BUILD_DIR=ran_build
 DISABLE_HARDWARE_DEPENDENCY="False"
 CMAKE_BUILD_TYPE="RelWithDebInfo"
@@ -98,8 +97,6 @@ Options:
    Makes the unitary tests Layer 1 simulators
 -V | --vcd
    Adds a debgging facility to the binary files: GUI with major internal synchronization events
---verbose-compile
-   Shows detailed compilation instructions in makefile
 --build-doxygen
    Builds doxygen based documentation.
 --trace-asn1c-enc-dec
@@ -314,10 +311,6 @@ function main() {
             echo_info "Setting gtk-wave output"
             CMAKE_CMD="$CMAKE_CMD -DENABLE_VCD_FIFO=True"
             shift;;
-       --verbose-compile)
-            VERBOSE_COMPILE=1
-            echo_info "Will compile with verbose instructions"
-            shift;;
        --build-doxygen)
            CMAKE_CMD="$CMAKE_CMD -DGENERATE_DOXYGEN=ON"
            TARGET_LIST="$TARGET_LIST doc"
@@ -475,7 +468,10 @@ function main() {
     CMAKE_CMD="$CMAKE_CMD ../../.."
     echo_info "Running \"$CMAKE_CMD\""
     eval $CMAKE_CMD
-    compilations $BUILD_DIR all.txt "$TARGET_LIST" "${BUILD_TOOL_OPT}"
+    cmd="$CMAKE --build . --target ${TARGET_LIST} -- ${BUILD_TOOL_OPT}"
+    echo_info "Running \"${cmd}\"" $green
+    eval $cmd
+    ret=$?
 
     if [ "$UE" = 1 ] ; then
       echo_info "Generate LTE USIM default sim content UE specific part"
