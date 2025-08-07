@@ -1,4 +1,8 @@
 # LDPC coding implementation
+This document gives an overview of the different LDPC coding implementations (functional or not) available with Open Air Interface.
+
+[[_TOC_]]
+
 The LDPC encoder and decoder are implemented in a shared library, dynamically loaded at run-time using the [oai shared library loader](file://../../../../common/utils/DOC/loader.md).
 Two types of library are available with two different interfaces. There are libraries implementing the encoder and decoder of slots and libraries implementing the encoder and decoder of code segments.
 
