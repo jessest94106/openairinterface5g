@@ -186,9 +186,7 @@ clean_all_files() {
 ############################################
 
 install_usrp_uhd_driver_from_source(){
-    uhd_install_log=$OPENAIR_DIR/cmake_targets/log/uhd_install_log.txt
-    echo_info "\nInstalling UHD driver from sources. The log file for UHD driver installation is here: $uhd_install_log "
-    (
+    echo_info "\nInstalling UHD driver from sources."
     pushd /tmp
     echo "Cloning UHD driver repository"
     rm -rf /tmp/uhd
@@ -248,7 +246,6 @@ install_usrp_uhd_driver_from_source(){
     fi
     popd
     rm -rf /tmp/uhd
-    ) >& $uhd_install_log
 }
 
 check_install_usrp_uhd_driver(){
@@ -345,9 +342,7 @@ install_usrp_uhd_driver() {
 }
 
 install_bladerf_driver_from_source(){
-    bladerf_install_log=$OPENAIR_DIR/cmake_targets/log/bladerf_install_log.txt
-    echo_info "\nInstalling BladeRF driver from sources. The log file for BladeRF driver installation is here: $bladerf_install_log "
-    (
+    echo_info "\nInstalling BladeRF driver from sources."
     cd /tmp
     echo "Downloading BladeRF driver"
     rm -rf /tmp/bladeRF
@@ -370,7 +365,6 @@ install_bladerf_driver_from_source(){
     sudo mkdir -p /usr/share/Nuand/bladeRF
     sudo mv bladeRF_fw_latest.img /usr/share/Nuand/bladeRF/bladeRF_fw.img
     sudo mv hostedx40-latest.rbf /usr/share/Nuand/bladeRF/hostedx40.rbf
-    ) >& $bladerf_install_log
 }
 
 check_install_bladerf_driver(){
@@ -405,9 +399,7 @@ check_install_lmssdr_driver(){
 }
 
 install_soapy_from_source(){
-    soapy_install_log=$OPENAIR_DIR/cmake_targets/log/soapy_install_log.txt
-    echo_info "\nInstalling Soapy EcoSystem from source. The log file for Soapy installation is here: $soapy_install_log "
-    (
+    echo_info "\nInstalling Soapy EcoSystem from source."
     cd /tmp
     echo "Downloading SoapySDR"
     rm -rf /tmp/SoapySDR
@@ -434,13 +426,10 @@ install_soapy_from_source(){
     make -j`nproc`
     $SUDO make install
     $SUDO ldconfig
-    ) >& $soapy_install_log
 }
 
 install_soapy_iris_from_source(){
-    iris_install_log=$OPENAIR_DIR/cmake_targets/log/iris_install_log.txt
-    echo_info "\nInstalling Iris driver from source. The log file for Iris driver installation is here: $iris_install_log "
-    (
+    echo_info "\nInstalling Iris driver from source."
     cd /tmp
     echo "Downloading SoapyIris"
     rm -rf /tmp/sklk-soapyiris
@@ -453,7 +442,6 @@ install_soapy_iris_from_source(){
     make -j`nproc`
     $SUDO make install
     $SUDO ldconfig
-    ) >& $iris_install_log
 }
 
 check_install_soapy () {
@@ -585,10 +573,7 @@ check_install_oai_software() {
 }
 
 install_asn1c_from_source(){
-    mkdir -p $OPENAIR_DIR/cmake_targets/log
-    asn1_install_log=$OPENAIR_DIR/cmake_targets/log/asn1c_install_log.txt
-    echo_info "\nInstalling ASN1. The log file for ASN1 installation is here: $asn1_install_log "
-    (
+    echo_info "\nInstalling ASN1."
     $SUDO $INSTALLER -y install bison flex
     $SUDO rm -rf /tmp/asn1c
     # GIT_SSL_NO_VERIFY=true git clone https://gitlab.eurecom.fr/oai/asn1c.git /tmp/asn1c
@@ -609,7 +594,6 @@ install_asn1c_from_source(){
     if [[ -v CI_ENV ]]; then
         $SUDO rm -rf /tmp/asn1c
     fi
-    ) > $asn1_install_log 2>&1
 }
 
 install_simde_from_source(){
