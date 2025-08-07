@@ -252,18 +252,7 @@ check_install_usrp_uhd_driver(){
     if [[ "$OS_BASEDISTRO" == "debian" ]]; then
         boost_libs_ubuntu="libboost-chrono-dev libboost-date-time-dev libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev libboost-test-dev libboost-regex-dev"
         #first we remove old installation
-        $SUDO apt-get remove uhd -y || true
-        $SUDO apt-get remove uhd-host -y || true
-        $SUDO apt-get remove libuhd-dev -y || true
-        $SUDO apt-get remove libuhd003 -y || true
-        $SUDO apt-get remove libuhd3.13.1 -y || true
-        $SUDO apt-get remove libuhd3.14.0 -y || true
-        $SUDO apt-get remove libuhd3.14.1 -y || true
-        $SUDO apt-get remove libuhd3.15.0 -y || true
-        local distribution=$(get_distribution_release)
-        if [[ "$distribution" == "ubuntu20.04" || "$distribution" == "ubuntu22.04" ]]; then
-            $SUDO apt-get remove libuhd4.?.? -y || true
-        fi
+        $SUDO apt-get remove uhd* libuhd* -y || true
         v=$(lsb_release -cs)
         $SUDO apt-add-repository --remove "deb http://files.ettus.com/binaries/uhd/repo/uhd/ubuntu/$v $v main"
         if [[ -v BUILD_UHD_FROM_SOURCE ]] || [[ "$OS_DISTRO" == "debian" ]]; then
