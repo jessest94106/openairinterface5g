@@ -39,7 +39,6 @@ conf_nvram_path=$OPENAIR_DIR/openair3/NAS/TOOLS/ue_eurecom_test_sfr.conf
 HW=""
 VERBOSE_COMPILE=0
 BUILD_DIR=ran_build
-BUILD_DOXYGEN=0
 DISABLE_HARDWARE_DEPENDENCY="False"
 CMAKE_BUILD_TYPE="RelWithDebInfo"
 CMAKE_CMD="$CMAKE"
@@ -323,9 +322,8 @@ function main() {
             shift;;
        --build-doxygen)
            CMAKE_CMD="$CMAKE_CMD -DGENERATE_DOXYGEN=ON"
-	   TARGET_LIST="$TARGET_LIST doc"
-           BUILD_DOXYGEN=1
-           echo_info "Will build doxygen support"
+           TARGET_LIST="$TARGET_LIST doc"
+           echo_info "Will build Doxygen documentation: $DIR/$BUILD_DIR/build/doc/html/index.html"
            shift;;     
        --enable-LTTNG)
             CMAKE_CMD="$CMAKE_CMD -DENABLE_LTTNG=ON -DT_TRACER=OFF"
@@ -484,12 +482,6 @@ function main() {
     echo_info "Running \"$CMAKE_CMD\""
     eval $CMAKE_CMD
     compilations $BUILD_DIR all.txt "$TARGET_LIST" "${BUILD_TOOL_OPT}"
-    ###################
-    # Doxygen Support #
-    ###################
-    if [ "$BUILD_DOXYGEN" = "1" ] ; then
-	echo_info "Built Doxygen based documentation. The documentation file is located here: $DIR/$BUILD_DIR/build/doc/html/index.html"
-    fi
 
     if [ "$UE" = 1 ] ; then
       echo_info "Generate LTE USIM default sim content UE specific part"
