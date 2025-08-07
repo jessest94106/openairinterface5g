@@ -460,7 +460,7 @@ class Cluster:
 				HTML.CreateHtmlTestRowPhySimTestResult(test_summary, test_result)
 				logging.info('\u001B[1m Physical Simulator Pass\u001B[0m')
 			else:
-				HTML.CreateHtmlTestRow('Some test(s) failed!', 'KO', CONST.OC_PHYSIM_DEPLOY_FAIL)
+				HTML.CreateHtmlTestRowQueue('At least one physical simulator test failed!', 'KO', ["See below for details"])
 				HTML.CreateHtmlTestRowPhySimTestResult(test_summary, test_result)
 				logging.error('\u001B[1m Physical Simulator Fail\u001B[0m')
 		else:
