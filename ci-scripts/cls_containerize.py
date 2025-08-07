@@ -100,6 +100,7 @@ def AnalyzeBuildLogs(logfiles, globalStatus):
 		errorandwarnings['errors'] = 0 if committed or tagged else 1
 		errorandwarnings['warnings'] = 0
 		errorandwarnings['status'] = committed or tagged
+		logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
 		files['Target Image Creation'] = errorandwarnings
 		collectInfo[image] = files
 	return collectInfo
