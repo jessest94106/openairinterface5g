@@ -36,8 +36,8 @@ sudo cp /etc/apt/sources.list "/etc/apt/sources.list.`date`.backup"
 sudo sed -i -E "s/(deb)\ (http:.+)/\1\ [arch=amd64]\ \2/" /etc/apt/sources.list
 
 sudo apt update
-sudo apt install -y gcc-11-aarch64-linux-gnu \
-                    g++-11-aarch64-linux-gnu
+sudo apt install -y gcc-aarch64-linux-gnu \
+                    g++-aarch64-linux-gnu
 
 sudo apt-get install -y \
     libblas-dev:arm64 \

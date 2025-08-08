@@ -323,7 +323,7 @@ check_install_usrp_uhd_driver(){
         $SUDO apt-get remove libuhd3.14.1 -y || true
         $SUDO apt-get remove libuhd3.15.0 -y || true
         local distribution=$(get_distribution_release)
-        if [[ "$distribution" == "ubuntu20.04" || "$distribution" == "ubuntu22.04" ]]; then
+        if [[ "$distribution" == "ubuntu20.04" || "$distribution" == "ubuntu22.04" || "$distribution" == "ubuntu24.04" ]]; then
             $SUDO apt-get remove libuhd4.?.? -y || true
         fi
         v=$(lsb_release -cs)

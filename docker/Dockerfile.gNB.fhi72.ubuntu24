@@ -20,17 +20,18 @@
 # */
 #---------------------------------------------------------------------
 #
-# Dockerfile for the Open-Air-Interface BUILD service
-#   Valid for Ubuntu20.04
+# Dockerfile for the Open-Air-Interface 7.2 Fronthaul 
+#      Valid for Ubuntu24.04
 #
 #---------------------------------------------------------------------
 
 FROM ran-base:latest AS gnb-base
 
-FROM ran-build:latest AS gnb-build
+FROM ran-build-fhi72:latest AS gnb-build
 
 
-FROM ubuntu:jammy AS oai-nr-cuup
+#start from scratch for target executable
+FROM ubuntu:noble AS oai-gnb
 ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
@@ -38,53 +39,78 @@ ENV TZ=Europe
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+        software-properties-common \
+        procps \
+        pkg-config \
         libsctp1 \
+        tzdata \
+        libblas3 \
         libconfig9 \
-        iproute2 \
+        openssl \
         net-tools \
-        openssl && \
+        iperf \
+        iproute2 \
+        iputils-ping \
+        gdb \
+        pciutils \
+        libpcap-dev \
+        xz-utils \ 
+        libnuma-dev \
+        python3 \
+        python3-six \
+        python3-requests \
+        libyaml-cpp-dev && \
 # if the --sanitize option was used to build, additional packages are required
     /bin/bash -c 'if [[ "$BUILD_OPTION" = "--sanitize" ]]; then DEBIAN_FRONTEND=noninteractive apt-get install --yes \
-        #libasan5 \ see below
+        libasan8 \
         libubsan1 \
         liblapacke; fi' && \
     rm -rf /var/lib/apt/lists/*
 
-# we select another compile (gcc-12) for compilation, requiring another libasan
-# library version. Installing it above would install the wrong version. Hence,
-# copy the right version from ran-build. When upgrading to Ubuntu24, install
-# the correct one above!
-# note: this dockerfile should work for both x86 and arm, hence the glob below
-# which should either match "x86_64" (x86) or "aarch64" (ARM); since the target
-# directory needs to be also one of those two, but globs don't work in target
-# directories, work around this with mv
-COPY --from=gnb-build /usr/lib/*-linux-gnu/libasan.so.8.0.0 /usr/lib/
-ARG TARGETPLATFORM
-RUN case "${TARGETPLATFORM}" in \
-         "linux/amd64")  TARGET_DIR=x86_64-linux-gnu  ;; \
-         "linux/arm64")  TARGET_DIR=aarch64-linux-gnu  ;; \
-         *) exit 1 ;; \
-    esac; \
-    mv /usr/lib/libasan.so.8.0.0 /usr/lib/$TARGET_DIR/libasan.so.8.0.0
+WORKDIR /opt/oai-gnb/bin
+COPY --from=gnb-build \
+    /oai-ran/cmake_targets/ran_build/build/nr-softmodem ./
+COPY ./docker/scripts/gnb_entrypoint.sh ./entrypoint.sh
+COPY ./docker/scripts/check-prach-io.sh ./check-prach-io.sh
+
+COPY --from=gnb-build \
+    /oai-ran/cmake_targets/ran_build/build/librfsimulator.so \
+    /oai-ran/cmake_targets/ran_build/build/liboai_transpro.so \
+    /oai-ran/cmake_targets/ran_build/build/libcoding.so \
+    /oai-ran/cmake_targets/ran_build/build/libparams_libconfig.so \
+    /oai-ran/cmake_targets/ran_build/build/libdfts.so \
+    /oai-ran/cmake_targets/ran_build/build/libldpc*.so \
+    /oai-ran/cmake_targets/ran_build/build/libtelnetsrv.so \
+    /oai-ran/cmake_targets/ran_build/build/libtelnetsrv_ci.so \
+    /oai-ran/cmake_targets/ran_build/build/libparams_yaml.so \
+    /usr/local/lib/
+
+## Libxran library
+COPY --from=gnb-build \
+    /opt/phy/fhi_lib/lib/build/libxran.so \
+    /opt/phy/fhi_lib/lib/build/
+
+## Copy all DPDK libraries as liboran_fhlib_5g.so require most of them
+COPY --from=gnb-build /usr/local/lib/x86_64-linux-gnu /usr/local/lib/x86_64-linux-gnu/
+
 ## Copy E2 SM models
 COPY --from=gnb-build /usr/local/lib/flexric /usr/local/lib/flexric
 
-WORKDIR /opt/oai-gnb/bin
-COPY --from=gnb-build \
-    /oai-ran/cmake_targets/ran_build/build/nr-cuup \
-    ./
-COPY ./docker/scripts/gnb_entrypoint.sh ./entrypoint.sh
-COPY --from=gnb-build \
-    /oai-ran/cmake_targets/ran_build/build/libparams_libconfig.so \
-    /oai-ran/cmake_targets/ran_build/build/libtelnetsrv.so \
-    /usr/local/lib/
-
-RUN ldconfig && ldd /opt/oai-gnb/bin/nr-cuup
-
-# Create directory for configuration files
-WORKDIR /opt/oai-gnb/etc
+RUN ldconfig && \
+    echo "---- ldd on nr-softmodem ----" && \
+    ldd /opt/oai-gnb/bin/nr-softmodem && \
+    echo "---- ldd on shared libraries ----" && \
+    ldd /usr/local/lib/librfsimulator.so \
+        /usr/local/lib/liboai_transpro.so \
+        /usr/local/lib/libcoding.so \
+        /usr/local/lib/libparams_libconfig.so \
+        /usr/local/lib/libdfts.so \
+        /usr/local/lib/libldpc*.so \
+        /usr/local/lib/libtelnetsrv.so \
+        /usr/local/lib/libtelnetsrv_ci.so \
+        /opt/phy/fhi_lib/lib/build/libxran.so
 
 WORKDIR /opt/oai-gnb
 COPY --from=gnb-base /tini /tini
 ENTRYPOINT ["/tini", "-v", "--", "/opt/oai-gnb/bin/entrypoint.sh"]
-CMD ["/opt/oai-gnb/bin/nr-cuup", "-O", "/opt/oai-gnb/etc/gnb.conf"]
+CMD ["/opt/oai-gnb/bin/nr-softmodem"]
