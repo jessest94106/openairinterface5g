@@ -82,28 +82,23 @@ def CreateTag(ranCommitID, ranBranch, ranAllowMerge):
 		tagToUse = f'develop-{shortCommit}'
 	return tagToUse
 
-def AnalyzeBuildLogs(logfiles, globalStatus):
-	collectInfo = {}
-	for image, lf in logfiles:
-		files = {}
-		errorandwarnings = {}
-		committed = False
-		tagged = False
-		with open(lf, mode='r') as inputfile:
-			for line in inputfile:
-				lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
-				lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
-				tagged = tagged or lineHasTag or lineHasTag2
-				# the OpenShift Cluster builder prepends image registry URL
-				lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
-				committed = committed or lineHasCommit
-		errorandwarnings['errors'] = 0 if committed or tagged else 1
-		errorandwarnings['warnings'] = 0
-		errorandwarnings['status'] = committed or tagged
-		logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
-		files['Target Image Creation'] = errorandwarnings
-		collectInfo[image] = files
-	return collectInfo
+def AnalyzeBuildLogs(image, lf):
+	errorandwarnings = {}
+	committed = False
+	tagged = False
+	with open(lf, mode='r') as inputfile:
+		for line in inputfile:
+			lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
+			lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
+			tagged = tagged or lineHasTag or lineHasTag2
+			# the OpenShift Cluster builder prepends image registry URL
+			lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
+			committed = committed or lineHasCommit
+	errorandwarnings['errors'] = 0 if committed or tagged else 1
+	errorandwarnings['warnings'] = 0
+	errorandwarnings['status'] = committed or tagged
+	logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
+	return errorandwarnings
 
 def GetImageName(ssh, svcName, file):
 	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".image'", silent=True)
@@ -467,7 +462,13 @@ class Containerize():
 		cmd.close()
 
 		# Analyze the logs
-		collectInfo = AnalyzeBuildLogs(log_files, status)
+		collectInfo = {}
+		for name, lf in log_files:
+			files = {}
+			idx = 'Target Image Creation'
+			files[idx] = AnalyzeBuildLogs(name, lf)
+			status = status and files[idx]['status']
+			collectInfo[name] = files
 		
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')

@@ -412,12 +412,13 @@ class Cluster:
 		self.cmd.close()
 
 		# Analyze the logs
-		collectInfo = cls_containerize.AnalyzeBuildLogs(log_files, status)
-		for img in collectInfo:
-			for f in collectInfo[img]:
-				status = status and collectInfo[img][f]['status']
-		if not status:
-			logging.debug(collectInfo)
+		collectInfo = {}
+		for image, lf in log_files:
+			files = {}
+			idx = 'Target Image Creation'
+			files[idx] = cls_containerize.AnalyzeBuildLogs(image, lf)
+			status = status and files[idx]['status']
+			collectInfo[image] = files
 
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')
