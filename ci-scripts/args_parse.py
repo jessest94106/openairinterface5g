@@ -59,17 +59,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
             force_local = True
 
 
-	    #--apply=<filename> as parameters file, to replace inline parameters
-        elif re.match(r'^\-\-Apply=(.+)$', myArgv, re.IGNORECASE):
-            matchReg = re.match(r'^\-\-Apply=(.+)$', myArgv, re.IGNORECASE)
-            py_params_file = matchReg.group(1)
-            with open(py_params_file,'r') as file:
-          	# The FullLoader parameter handles the conversion from YAML
-        	# scalar values to Python dictionary format
-                py_params = yaml.load(file,Loader=yaml.FullLoader)
-                py_param_file_present = True #to be removed once validated
-	    		#AssignParams(py_params) #to be uncommented once validated
-
 	    #consider inline parameters
         elif re.match(r'^\-\-mode=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-mode=(.+)$', myArgv, re.IGNORECASE)
@@ -196,14 +185,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
             CiTestObj.testXMLfiles.append(matchReg.group(1))
             HTML.testXMLfiles.append(matchReg.group(1))
             HTML.nbTestXMLfiles=HTML.nbTestXMLfiles+1
-        elif re.match(r'^\-\-UEIPAddress=(.+)$', myArgv, re.IGNORECASE): # cleanup
-            print("parameter --UEIPAddress ignored")
-        elif re.match(r'^\-\-UEUserName=(.+)$', myArgv, re.IGNORECASE):
-            print("parameter --UEUserName ignored")
-        elif re.match(r'^\-\-UEPassword=(.+)$', myArgv, re.IGNORECASE):
-            print("parameter --UEPassword ignored")
-        elif re.match(r'^\-\-UESourceCodePath=(.+)$', myArgv, re.IGNORECASE):
-            print("parameter --UESourceCodePath ignored")
         elif re.match(r'^\-\-finalStatus=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-finalStatus=(.+)$', myArgv, re.IGNORECASE)
             finalStatus = matchReg.group(1)
