@@ -30,6 +30,7 @@
  500000
  111110
  111111
+ 000100
  010000
  800833
  030101
@@ -47,6 +48,7 @@
  010002
  030202
  030201
+ 060000
  300000
  600000
  222220
@@ -100,6 +102,12 @@
 		<desc>Enable Sleep States (ofqot)</desc>
 		<node>ofqot</node>
 		<command>sudo cpupower idle-set -E</command>
+	</testCase>
+
+	<testCase id="000100">
+		<class>DeployCoreNetwork</class>
+		<desc>Start EPC</desc>
+		<cn_id>ltebox-nepes</cn_id>
 	</testCase>
 
 	<testCase id="010000">
@@ -239,6 +247,12 @@
 		<yaml_path>ci-scripts/yaml_files/nsa_b200_enb</yaml_path>
         <eNB_instance>0</eNB_instance>
         <eNB_serverId>0</eNB_serverId>
+    </testCase>
+
+    <testCase id="060000">
+      <class>UndeployCoreNetwork</class>
+      <desc>Terminate EPC</desc>
+      <cn_id>ltebox-nepes</cn_id>
     </testCase>
 
     <testCase id="030202">
