@@ -43,8 +43,10 @@ import cls_containerize	 #class Containerize for all container-based operations 
 import cls_static_code_analysis  #class for static code analysis
 import cls_cluster		 # class for building/deploying on cluster
 import cls_native        # class for all native/source-based operations
+from cls_ci_helper import TestCaseCtx
 
 import ran
+import cls_cmd
 import cls_oai_html
 
 
@@ -91,7 +93,7 @@ def AssignParams(params_dict):
 		setattr(RAN, key, value)
 		setattr(HTML, key, value)
 
-def ExecuteActionWithParam(action):
+def ExecuteActionWithParam(action, ctx):
 	global RAN
 	global HTML
 	global CONTAINERS
@@ -134,15 +136,15 @@ def ExecuteActionWithParam(action):
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
 		if action == 'Build_eNB':
-			success = cls_native.Native.Build(HTML.testCase_id, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
+			success = cls_native.Native.Build(ctx, HTML.testCase_id, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
 		elif action == 'Build_Image':
-			success = CONTAINERS.BuildImage(HTML)
+			success = CONTAINERS.BuildImage(ctx, HTML)
 		elif action == 'Build_Proxy':
-			success = CONTAINERS.BuildProxy(HTML)
+			success = CONTAINERS.BuildProxy(ctx, HTML)
 		elif action == 'Build_Cluster_Image':
-			success = CLUSTER.BuildClusterImage(HTML)
+			success = CLUSTER.BuildClusterImage(ctx, HTML)
 		elif action == 'Build_Run_Tests':
-			success = CONTAINERS.BuildRunTests(HTML)
+			success = CONTAINERS.BuildRunTests(ctx, HTML)
 
 	elif action == 'Initialize_eNB':
 		datalog_rt_stats_file=test.findtext('rt_stats_cfg')
@@ -204,7 +206,7 @@ def ExecuteActionWithParam(action):
 			RAN.air_interface[RAN.eNB_instance] = 'lte-softmodem'
 		else:
 			RAN.air_interface[RAN.eNB_instance] = air_interface.lower() +'-softmodem'
-		success = RAN.TerminateeNB(HTML)
+		success = RAN.TerminateeNB(ctx, HTML)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
@@ -226,7 +228,7 @@ def ExecuteActionWithParam(action):
 		elif action == 'Detach_UE':
 			success = CiTestObj.DetachUE(HTML)
 		elif action == 'Terminate_UE':
-			success = CiTestObj.TerminateUE(HTML)
+			success = CiTestObj.TerminateUE(ctx, HTML)
 		elif action == 'CheckStatusUE':
 			success = CiTestObj.CheckStatusUE(HTML)
 		elif action == 'DataEnable_UE':
@@ -253,7 +255,7 @@ def ExecuteActionWithParam(action):
 			else:
 				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
-		success = CiTestObj.Ping(HTML, CONTAINERS)
+		success = CiTestObj.Ping(ctx, HTML)
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
@@ -284,9 +286,9 @@ def ExecuteActionWithParam(action):
 			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
 			CiTestObj.iperf_options = 'check'
 		if action == 'Iperf':
-			success = CiTestObj.Iperf(HTML, CONTAINERS)
+			success = CiTestObj.Iperf(ctx, HTML)
 		elif action == 'Iperf2_Unidir':
-			success = CiTestObj.Iperf2_Unidir(HTML, CONTAINERS)
+			success = CiTestObj.Iperf2_Unidir(ctx, HTML)
 
 	elif action == 'IdleSleep':
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
@@ -295,12 +297,12 @@ def ExecuteActionWithParam(action):
 	elif action == 'Deploy_Run_PhySim':
 		oc_release = test.findtext('oc_release')
 		svr_id = test.findtext('svr_id') or None
-		success = CLUSTER.deploy_oc_physim(HTML, oc_release, svr_id)
+		success = CLUSTER.deploy_oc_physim(ctx, HTML, oc_release, svr_id)
 
 	elif action == 'DeployCoreNetwork' or action == 'UndeployCoreNetwork':
 		cn_id = test.findtext('cn_id')
 		core_op = getattr(cls_oaicitest.OaiCiTest, action)
-		success = core_op(cn_id, HTML)
+		success = core_op(cn_id, ctx, HTML)
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
 		eNB_instance=test.findtext('eNB_instance')
@@ -328,9 +330,9 @@ def ExecuteActionWithParam(action):
 		CONTAINERS.num_attempts = int(test.findtext('num_attempts') or 1)
 		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
 		if action == 'Deploy_Object':
-			success = CONTAINERS.DeployObject(HTML)
+			success = CONTAINERS.DeployObject(ctx, HTML)
 		elif action == 'Undeploy_Object':
-			success = CONTAINERS.UndeployObject(HTML, RAN)
+			success = CONTAINERS.UndeployObject(ctx, HTML, RAN)
 		elif action == 'Create_Workspace':
 			if force_local:
 				# Do not create a working directory when running locally. Current repo directory will be used
@@ -341,13 +343,13 @@ def ExecuteActionWithParam(action):
 		physim_options = test.findtext('physim_run_args')
 		physim_test = test.findtext('physim_test')
 		physim_threshold = test.findtext('physim_time_threshold') or 'inf'
-		success = cls_native.Native.Run_Physim(HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
+		success = cls_native.Native.Run_Physim(ctx, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
 
 	elif action == 'LicenceAndFormattingCheck':
-		success = SCA.LicenceAndFormattingCheck(HTML)
+		success = SCA.LicenceAndFormattingCheck(ctx, HTML)
 
 	elif action == 'Cppcheck_Analysis':
-		success = SCA.CppCheckAnalysis(HTML)
+		success = SCA.CppCheckAnalysis(ctx, HTML)
 
 	elif action == 'Push_Local_Registry':
 		svr_id = test.findtext('svr_id')
@@ -407,10 +409,11 @@ def test_in_list(test, list):
 def receive_signal(signum, frame):
 	sys.exit(1)
 
-
-
-
-
+def ShowTestID(ctx, desc):
+    logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
+    logging.info(f'\u001B[1m Test ID: {ctx.test_id} (#{ctx.count}) \u001B[0m')
+    logging.info(f'\u001B[1m {desc} \u001B[0m')
+    logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
 
 #-----------------------------------------------------------
 # MAIN PART
@@ -466,15 +469,7 @@ if py_param_file_present == True:
 cwd = os.getcwd()
 
 if re.match('^TerminateeNB$', mode, re.IGNORECASE):
-	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	if RAN.eNBIPAddress == 'none':
-		sys.exit(0)
-	RAN.eNB_instance=0
-	RAN.eNB_serverId[0]='0'
-	RAN.eNBSourceCodePath='/tmp/'
-	RAN.TerminateeNB(HTML)
+	logging.warning("Option TerminateeNB ignored")
 elif re.match('^TerminateHSS$', mode, re.IGNORECASE):
 	logging.warning("Option TerminateHSS ignored")
 elif re.match('^TerminateMME$', mode, re.IGNORECASE):
@@ -482,12 +477,7 @@ elif re.match('^TerminateMME$', mode, re.IGNORECASE):
 elif re.match('^TerminateSPGW$', mode, re.IGNORECASE):
 	logging.warning("Option TerminateSPGW ignored")
 elif re.match('^LogCollectBuild$', mode, re.IGNORECASE):
-	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
-		logging.warning("nothing to collect (eNBIPAddress/eNBUserName/eNBPassword/eNBSourceCodePath is '')")
-		sys.exit(0)
-	if RAN.eNBIPAddress == 'none':
-		sys.exit(0)
-	CiTestObj.LogCollectBuild(RAN)
+	logging.warning("Option LogCollectBuild ignored")
 elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
 	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
 		HELP.GenericHelp(CONST.Version)
@@ -565,6 +555,16 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	else:
 		xml_test_file = cwd + "/" + CiTestObj.testXMLfiles[0]
 
+	# directory where all log artifacts will be placed
+	logPath = f"{cwd}/../cmake_targets/log/{CiTestObj.testXMLfiles[0].split('/')[-1]}.d"
+	# we run from within ci-scripts, but the logPath is absolute, so replace
+	# the ci-scripts/..; if it does not exist, nothing will happen
+	logPath = logPath.replace(r'/ci-scripts/..', '')
+	logging.info(f"placing all artifacts for this run in {logPath}/")
+	with cls_cmd.LocalCmd() as c:
+		c.run(f"rm -rf {logPath}")
+		c.run(f"mkdir -p {logPath}")
+
 	xmlTree = ET.parse(xml_test_file)
 	xmlRoot = xmlTree.getroot()
 
@@ -615,29 +615,32 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	task_set_succeeded = True
 	HTML.startTime=int(round(time.time() * 1000))
 
+	i = 0
 	for test_case_id in todo_tests:
 		for test in all_tests:
 			id = test.get('id')
 			if test_case_id != id:
 				continue
+			i += 1
 			CiTestObj.testCase_id = id
+			ctx = TestCaseCtx(i, int(id), logPath)
 			HTML.testCase_id=CiTestObj.testCase_id
-			CiTestObj.desc = test.findtext('desc')
+			desc = test.findtext('desc')
 			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
 			may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
-			HTML.desc=CiTestObj.desc
+			HTML.desc = desc
 			action = test.findtext('class')
 			if (CheckClassValidity(xml_class_list, action, id) == False):
 				task_set_succeeded = False
 				continue
-			CiTestObj.ShowTestID()
+			ShowTestID(ctx, desc)
 			if not task_set_succeeded and not always_exec:
 				msg = f"skipping test due to prior error"
 				logging.warning(msg)
 				HTML.CreateHtmlTestRowQueue(msg, "SKIP", [])
 				break
 			try:
-				test_succeeded = ExecuteActionWithParam(action)
+				test_succeeded = ExecuteActionWithParam(action, ctx)
 				if not test_succeeded and may_fail:
 					logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
 				elif not test_succeeded:

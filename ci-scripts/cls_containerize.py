@@ -46,6 +46,7 @@ import cls_cmd
 import helpreadme as HELP
 import constants as CONST
 import cls_oaicitest
+from cls_ci_helper import archiveArtifact
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes
@@ -81,67 +82,26 @@ def CreateTag(ranCommitID, ranBranch, ranAllowMerge):
 		tagToUse = f'develop-{shortCommit}'
 	return tagToUse
 
-def CopyLogsToExecutor(cmd, sourcePath, log_name):
-	cmd.cd(f'{sourcePath}/cmake_targets')
-	cmd.run(f'rm -f {log_name}.zip')
-	cmd.run(f'mkdir -p {log_name}')
-	cmd.run(f'mv log/* {log_name}')
-	cmd.run(f'zip -r -qq {log_name}.zip {log_name}')
-
-	# copy zip to executor for analysis
-	if (os.path.isfile(f'./{log_name}.zip')):
-		os.remove(f'./{log_name}.zip')
-	if (os.path.isdir(f'./{log_name}')):
-		shutil.rmtree(f'./{log_name}')
-	cmd.copyin(src=f'{sourcePath}/cmake_targets/{log_name}.zip', tgt=f'{os.getcwd()}/{log_name}.zip')
-	cmd.run(f'rm -f {log_name}.zip')
-	ZipFile(f'{log_name}.zip').extractall('.')
-
-def AnalyzeBuildLogs(buildRoot, images, globalStatus):
+def AnalyzeBuildLogs(logfiles, globalStatus):
 	collectInfo = {}
-	for image in images:
+	for image, lf in logfiles:
 		files = {}
-		file_list = [f for f in os.listdir(f'{buildRoot}/{image}') if os.path.isfile(os.path.join(f'{buildRoot}/{image}', f)) and f.endswith('.txt')]
-		# Analyze the "sub-logs" of every target image
-		for fil in file_list:
-			errorandwarnings = {}
-			warningsNo = 0
-			errorsNo = 0
-			with open(f'{buildRoot}/{image}/{fil}', mode='r') as inputfile:
-				for line in inputfile:
-					result = re.search(' ERROR ', str(line))
-					if result is not None:
-						errorsNo += 1
-					result = re.search(' error:', str(line))
-					if result is not None:
-						errorsNo += 1
-					result = re.search(' WARNING ', str(line))
-					if result is not None:
-						warningsNo += 1
-					result = re.search(' warning:', str(line))
-					if result is not None:
-						warningsNo += 1
-				errorandwarnings['errors'] = errorsNo
-				errorandwarnings['warnings'] = warningsNo
-				errorandwarnings['status'] = globalStatus
-			files[fil] = errorandwarnings
-		# Analyze the target image
-		if os.path.isfile(f'{buildRoot}/{image}.log'):
-			errorandwarnings = {}
-			committed = False
-			tagged = False
-			with open(f'{buildRoot}/{image}.log', mode='r') as inputfile:
-				for line in inputfile:
-					lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
-					lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
-					tagged = tagged or lineHasTag or lineHasTag2
-					# the OpenShift Cluster builder prepends image registry URL
-					lineHasCommit = re.search(f'COMMIT [a-zA-Z0-9\.:/\-]*{image}', str(line)) is not None
-					committed = committed or lineHasCommit
-			errorandwarnings['errors'] = 0 if committed or tagged else 1
-			errorandwarnings['warnings'] = 0
-			errorandwarnings['status'] = committed or tagged
-			files['Target Image Creation'] = errorandwarnings
+		errorandwarnings = {}
+		committed = False
+		tagged = False
+		with open(lf, mode='r') as inputfile:
+			for line in inputfile:
+				lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
+				lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
+				tagged = tagged or lineHasTag or lineHasTag2
+				# the OpenShift Cluster builder prepends image registry URL
+				lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
+				committed = committed or lineHasCommit
+		errorandwarnings['errors'] = 0 if committed or tagged else 1
+		errorandwarnings['warnings'] = 0
+		errorandwarnings['status'] = committed or tagged
+		logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
+		files['Target Image Creation'] = errorandwarnings
 		collectInfo[image] = files
 	return collectInfo
 
@@ -202,12 +162,10 @@ def GetServices(ssh, requested, file):
     else:
         return requested
 
-def CopyinServiceLog(ssh, lSourcePath, yaml, svcName, wd_yaml, filename):
-	remote_filename = f"{lSourcePath}/cmake_targets/log/{filename}"
+def CopyinServiceLog(ssh, lSourcePath, svcName, wd_yaml, ctx):
+	remote_filename = f"{lSourcePath}/cmake_targets/log/{svcName}.logs"
 	ssh.run(f'docker compose -f {wd_yaml} logs {svcName} --no-log-prefix &> {remote_filename}')
-	local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml}"
-	local_filename = f"{local_dir}/{filename}"
-	return ssh.copyin(remote_filename, local_filename)
+	return archiveArtifact(ssh, ctx, remote_filename)
 
 def GetRunningServices(ssh, file):
 	ret = ssh.run(f'docker compose -f {file} config --services')
@@ -229,14 +187,13 @@ def GetRunningServices(ssh, file):
 	logging.info(f'stopping services: {running_services}')
 	return running_services
 
-def CheckLogs(self, yaml, service_name, HTML, RAN):
-	logPath = f'{os.getcwd()}/../cmake_targets/log/{yaml}'
-	filename = f'{logPath}/{service_name}-{HTML.testCase_id}.log'
+def CheckLogs(self, filename, HTML, RAN):
 	success = True
-	if (any(sub in service_name for sub in ['oai_ue','oai-nr-ue','lte_ue'])):
+	name = os.path.basename(filename)
+	if (any(sub in name for sub in ['oai_ue','oai-nr-ue','lte_ue'])):
 		logging.debug(f'\u001B[1m Analyzing UE logfile {filename} \u001B[0m')
 		logStatus = cls_oaicitest.OaiCiTest().AnalyzeLogFile_UE(filename, HTML, RAN)
-		opt = f"UE log analysis for service {service_name}"
+		opt = f"UE log analysis ({name})"
 		# usage of htmlUEFailureMsg/htmleNBFailureMsg is because Analyze log files
 		# abuse HTML to store their reports, and we here want to put custom options,
 		# which is not possible with CreateHtmlTestRow
@@ -247,13 +204,13 @@ def CheckLogs(self, yaml, service_name, HTML, RAN):
 		else:
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmlUEFailureMsg])
 		HTML.htmlUEFailureMsg = ""
-	elif service_name == 'nv-cubb':
+	elif 'nv-cubb' in name:
 		msg = 'Undeploy PNF/Nvidia CUBB'
 		HTML.CreateHtmlTestRow(msg, 'OK', CONST.ALL_PROCESSES_OK)
-	elif (any(sub in service_name for sub in ['enb','rru','rcc','cu','du','gnb'])):
+	elif (any(sub in name for sub in ['enb','rru','rcc','cu','du','gnb'])):
 		logging.debug(f'\u001B[1m Analyzing XnB logfile {filename}\u001B[0m')
 		logStatus = RAN.AnalyzeLogFile_eNB(filename, HTML, self.ran_checkers)
-		opt = f"xNB log analysis for service {service_name}"
+		opt = f"xNB log analysis ({name})"
 		if (logStatus < 0):
 			HTML.CreateHtmlTestRowQueue(opt, 'KO', [HTML.htmleNBFailureMsg])
 			success = False
@@ -261,9 +218,9 @@ def CheckLogs(self, yaml, service_name, HTML, RAN):
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
 		HTML.htmleNBFailureMsg = ""
 	else:
-		logging.info(f'Skipping to analyze log for service name {service_name}')
-		HTML.CreateHtmlTestRowQueue(f"service {service_name}", 'OK', ["no analysis function"])
-	logging.debug(f"log check: service {service_name} passed analysis {success}")
+		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
+		HTML.CreateHtmlTestRowQueue(f"file {name}", 'OK', ["no analysis function"])
+	logging.debug(f"log check: file {filename} passed analysis {success}")
 	return success
 
 #-----------------------------------------------------------
@@ -299,8 +256,6 @@ class Containerize():
 		self.services = ['', '', '']
 		self.deploymentTag = ''
 
-		self.testCase_id = ''
-
 		self.cli = ''
 		self.cliBuildOptions = ''
 		self.dockerfileprefix = ''
@@ -330,11 +285,12 @@ class Containerize():
 			raise ValueError(f'Insufficient Parameter: IP/node {ip}, path {path}')
 		return (ip, path)
 
-	def BuildImage(self, HTML):
+	def BuildImage(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
 		cmd = cls_cmd.getConnection(lIpAddr)
+		log_files = []
 	
 		# Checking the hostname to get adapted on cli and dockerfileprefixes
 		cmd.run('hostnamectl')
@@ -390,7 +346,6 @@ class Containerize():
 			imageNames.append(('oai-nr-ue', 'nrUE', 'oai-nr-ue', ''))
 			imageNames.append(('oai-gnb-aerial', 'gNB.aerial', 'oai-gnb-aerial', ''))
 		
-		self.testCase_id = HTML.testCase_id
 		cmd.cd(lSourcePath)
 		# if asterix, copy the entitlement and subscription manager configurations
 		if self.host == 'Red Hat':
@@ -420,13 +375,24 @@ class Containerize():
 		# Let's remove any previous run artifacts if still there
 		cmd.run(f"{self.cli} image prune --force")
 		for image,pattern,name,option in imageNames:
-			cmd.run(f"{self.cli} image rm {name}:{imageTag}")
+			cmd.run(f"{self.cli} image rm {name}:{imageTag}", reportNonZero=False)
 
 		# Build the base image only on Push Events (not on Merge Requests)
 		# On when the base image docker file is being modified.
 		if forceBaseImageBuild:
 			cmd.run(f"{self.cli} image rm {baseImage}:{baseTag}")
-			cmd.run(f"{self.cli} build {self.cliBuildOptions} --target {baseImage} --tag {baseImage}:{baseTag} --file docker/Dockerfile.base{self.dockerfileprefix} . &> cmake_targets/log/ran-base.log", timeout=1600)
+			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.docker.log'
+			cmd.run(f"{self.cli} build {self.cliBuildOptions} --target {baseImage} --tag {baseImage}:{baseTag} --file docker/Dockerfile.base{self.dockerfileprefix} . &> {logfile}", timeout=1600)
+			t = ("ran-base", archiveArtifact(cmd, ctx, logfile))
+			log_files.append(t)
+
+			# Recover build logs, for the moment only possible when build is successful
+			cmd.run(f"{self.cli} create --name test {baseImage}:{baseTag}")
+			cmd.run("mkdir -p cmake_targets/log/ran-base")
+			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.log'
+			cmd.run(f"{self.cli} cp test:/oai-ran/cmake_targets/log/all.txt {logfile}")
+			cmd.run(f"{self.cli} rm -f test")
+			archiveArtifact(cmd, ctx, logfile)
 		# First verify if the base image was properly created.
 		ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {baseImage}:{baseTag}")
 		allImagesSize = {}
@@ -441,7 +407,7 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 		else:
-			result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
+			result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
 			if result is not None:
 				size = float(result.group("size")) / 1000000
 				imageSizeStr = f'{size:.1f}'
@@ -450,17 +416,9 @@ class Containerize():
 			else:
 				logging.debug('ran-base size is unknown')
 
-		# Recover build logs, for the moment only possible when build is successful
-		cmd.run(f"{self.cli} create --name test {baseImage}:{baseTag}")
-		cmd.run("mkdir -p cmake_targets/log/ran-base")
-		cmd.run(f"{self.cli} cp test:/oai-ran/cmake_targets/log/. cmake_targets/log/ran-base")
-		cmd.run(f"{self.cli} rm -f test")
-
 		# Build the target image(s)
 		status = True
-		attemptedImages = ['ran-base']
 		for image,pattern,name,option in imageNames:
-			attemptedImages += [name]
 			# the archived Dockerfiles have "ran-base:latest" as base image
 			# we need to update them with proper tag
 			cmd.run(f'git checkout -- docker/Dockerfile.{pattern}{self.dockerfileprefix}')
@@ -474,15 +432,18 @@ class Containerize():
 				cmd.run(f'sed -i -e "s#ran-build:latest#ran-build:{imageTag}#" docker/Dockerfile.{pattern}{self.dockerfileprefix}')
 			if image == 'oai-gnb-aerial':
 				cmd.run('cp -f /opt/nvidia-ipc/nvipc.src.2025.05.20.tar.gz .')
-			ret = cmd.run(f'{self.cli} build {self.cliBuildOptions} --target {image} --tag {name}:{imageTag} --file docker/Dockerfile.{pattern}{self.dockerfileprefix} {option} . > cmake_targets/log/{name}.log 2>&1', timeout=1200)
+			logfile = f'{lSourcePath}/cmake_targets/log/{name}.docker.log'
+			ret = cmd.run(f'{self.cli} build {self.cliBuildOptions} --target {image} --tag {name}:{imageTag} --file docker/Dockerfile.{pattern}{self.dockerfileprefix} {option} . > {logfile} 2>&1', timeout=1200)
+			t = (name, archiveArtifact(cmd, ctx, logfile))
+			log_files.append(t)
 			if image == 'oai-gnb-aerial':
 				cmd.run('rm -f nvipc.src.2025.05.20.tar.gz')
-			if image == 'ran-build' and ret.returncode == 0:
+			if image == 'ran-build' or image == 'ran-build-asan' or image == 'ran-build-fhi72':
 				cmd.run(f"docker run --name test-log -d {name}:{imageTag} /bin/true")
-				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/ cmake_targets/log/{name}/")
+				logfile = f'{lSourcePath}/{image}.ninja.log'
+				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/all.txt {logfile}")
 				cmd.run(f"docker rm -f test-log")
-			else:
-				cmd.run(f"mkdir -p cmake_targets/log/{name}")
+				archiveArtifact(cmd, ctx, logfile)
 			# check the status of the build
 			ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {name}:{imageTag}")
 			if ret.returncode != 0:
@@ -493,7 +454,7 @@ class Containerize():
 				allImagesSize[name] = 'N/A -- Build Failed'
 				break
 			else:
-				result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
+				result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
 				if result is not None:
 					size = float(result.group("size")) / 1000000 # convert to MB
 					imageSizeStr = f'{size:.1f}'
@@ -516,13 +477,10 @@ class Containerize():
 		logging.debug(cmd.run("df -h").stdout)
 		logging.debug(cmd.run("docker system df").stdout)
 
-		# create a zip with all logs
-		build_log_name = f'build_log_{self.testCase_id}'
-		CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
 		cmd.close()
 
 		# Analyze the logs
-		collectInfo = AnalyzeBuildLogs(build_log_name, attemptedImages, status)
+		collectInfo = AnalyzeBuildLogs(log_files, status)
 		
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')
@@ -536,13 +494,12 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def BuildProxy(self, HTML):
+	def BuildProxy(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
 		ssh = cls_cmd.getConnection(lIpAddr)
 
-		self.testCase_id = HTML.testCase_id
 		oldRanCommidID = self.ranCommitID
 		oldRanRepository = self.ranRepository
 		oldRanAllowMerge = self.ranAllowMerge
@@ -568,15 +525,10 @@ class Containerize():
 			if not success:
 				raise Exception("could not clone proxy repository")
 
-			filename = f'build_log_{self.testCase_id}'
-			fullpath = f'{lSourcePath}/{filename}'
+			fullpath = f'{lSourcePath}/proxy_build.log'
 
 			ssh.run(f'docker build --target oai-lte-multi-ue-proxy --tag proxy:{tag} --file {lSourcePath}/docker/Dockerfile.ubuntu18.04 {lSourcePath} > {fullpath} 2>&1')
-			ssh.run(f'zip -r -qq {fullpath}.zip {fullpath}')
-			local_file = f"{os.getcwd()}/../cmake_targets/log/{filename}.zip"
-			ssh.copyin(f'{fullpath}.zip', local_file)
-			# don't delete such that we might recover the zips
-			#ssh.run(f'rm -f {fullpath}.zip')
+			archiveArtifact(ssh, ctx, fullpath)
 
 			ssh.run('docker image prune --force')
 			ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
@@ -616,7 +568,7 @@ class Containerize():
 		collectInfo = {}
 		collectInfo['proxy'] = files
 		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
-		result = re.search('Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
+		result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
 		# Cleaning any created tmp volume
 		ssh.run('docker volume prune --force')
 		ssh.close()
@@ -638,7 +590,7 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def BuildRunTests(self, HTML):
+	def BuildRunTests(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug('Building on server: ' + lIpAddr)
@@ -655,7 +607,6 @@ class Containerize():
 
 		if self.forcedWorkspaceCleanup:
 			cmd.run(f'sudo -S rm -Rf {lSourcePath}')
-		self.testCase_id = HTML.testCase_id
 	
 		# check that ran-base image exists as we expect it
 		baseImage = 'ran-base'
@@ -675,10 +626,10 @@ class Containerize():
 
 		# build ran-unittests image
 		dockerfile = "ci-scripts/docker/Dockerfile.unittest.ubuntu22"
-		ret = cmd.run(f'docker build --progress=plain --tag ran-unittests:{baseTag} --file {dockerfile} . &> {lSourcePath}/cmake_targets/log/unittest-build.log')
+		logfile = f'{lSourcePath}/cmake_targets/log/unittest-build.log'
+		ret = cmd.run(f'docker build --progress=plain --tag ran-unittests:{baseTag} --file {dockerfile} . &> {logfile}')
+		archiveArtifact(cmd, ctx, logfile)
 		if ret.returncode != 0:
-			build_log_name = f'build_log_{self.testCase_id}'
-			CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
 			logging.error(f'Cannot build unit tests')
 			HTML.CreateHtmlTestRow("Unit test build failed", 'KO', [dockerfile])
 			HTML.CreateHtmlTabFooter(False)
@@ -687,10 +638,15 @@ class Containerize():
 		HTML.CreateHtmlTestRowQueue("Build unit tests", 'OK', [dockerfile])
 
 		# it worked, build and execute tests, and close connection
-		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --rm ran-unittests:{baseTag} ctest --no-label-summary -j$(nproc)')
-		cmd.run(f'docker rmi ran-unittests:{baseTag}')
-		build_log_name = f'build_log_{self.testCase_id}'
-		CopyLogsToExecutor(cmd, lSourcePath, build_log_name)
+		# I would like to run it with --rm and mount the ctest result directory to avoid 'docker cp'
+		# below, but then permissions are messed up and we can't remove the directory without sudo
+		# making the next pipeline fail
+		ret = cmd.run(f'docker run -a STDOUT --workdir /oai-ran/build/ --env LD_LIBRARY_PATH=/oai-ran/build/ --name ran-unittests ran-unittests:{baseTag} ctest --no-label-summary -j$(nproc)')
+		cmd.run('docker cp ran-unittests:/oai-ran/build/Testing/Temporary/LastTest.log .')
+		archiveArtifact(cmd, ctx, f'{lSourcePath}/LastTest.log')
+		cmd.run('docker cp ran-unittests:/oai-ran/build/Testing/Temporary/LastTestsFailed.log .')
+		archiveArtifact(cmd, ctx, f'{lSourcePath}/LastTestsFailed.log')
+		cmd.run('docker rm ran-unittests')
 		cmd.close()
 
 		if ret.returncode == 0:
@@ -823,18 +779,14 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["cannot create workspace"])
 		return success
 
-	def DeployObject(self, HTML):
+	def DeployObject(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
 		num_attempts = self.num_attempts
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug(f'Deploying OAI Object on server: {lIpAddr}')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
-		# creating the log folder by default
-		local_dir = f"{os.getcwd()}/../cmake_targets/log/{yaml.split('/')[-1]}"
-		os.system(f'mkdir -p {local_dir}')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
-		yaml_dir = yaml.split('/')[-1]
 		with cls_cmd.getConnection(lIpAddr) as ssh:
 			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
 			if services == [] or services == ' ' or services == None:
@@ -861,7 +813,7 @@ class Containerize():
 					logging.warning(warning_msg)
 					HTML.CreateHtmlTestRowQueue('N/A', 'NOK', [warning_msg])
 					for svc in services.split():
-						CopyinServiceLog(ssh, lSourcePath, yaml_dir, svc, wd_yaml, f'{svc}-{HTML.testCase_id}-attempt{attempt}.log')
+						CopyinServiceLog(ssh, lSourcePath, svc, wd_yaml, ctx)
 					ssh.run(f'docker compose -f {wd_yaml} down -- {services}')
 		imagesInfo = info.stdout.splitlines()[1:]
 		logging.debug(f'{info.stdout.splitlines()[1:]}')
@@ -871,13 +823,12 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
 		return deployed
 
-	def UndeployObject(self, HTML, RAN):
+	def UndeployObject(self, ctx, HTML, RAN):
 		svr = self.eNB_serverId[self.eNB_instance]
 		lIpAddr, lSourcePath = self.GetCredentials(svr)
 		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {lIpAddr}\u001B[0m')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		wd = f'{lSourcePath}/{yaml}'
-		yaml_dir = yaml.split('/')[-1]
 		with cls_cmd.getConnection(lIpAddr) as ssh:
 			ExistEnvFilePrint(ssh, wd)
 			services = GetRunningServices(ssh, f"{wd}/docker-compose.y*ml")
@@ -885,7 +836,7 @@ class Containerize():
 			if services is not None:
 				all_serv = " ".join([s for s, _ in services])
 				ssh.run(f'docker compose -f {wd}/docker-compose.y*ml stop -- {all_serv}')
-				copyin_res = all(CopyinServiceLog(ssh, lSourcePath, yaml_dir, s, f"{wd}/docker-compose.y*ml", f'{s}-{HTML.testCase_id}.log') for s, c in services)
+				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, f"{wd}/docker-compose.y*ml", ctx) for s, _ in services]
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd}/docker-compose.y*ml down -v')
@@ -894,7 +845,7 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
 			return False
 		else:
-			log_results = [CheckLogs(self, yaml_dir, s, HTML, RAN) for s, _ in services]
+			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
 			success = all(log_results)
 		if success:
 			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m')

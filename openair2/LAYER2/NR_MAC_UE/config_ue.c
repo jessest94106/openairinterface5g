@@ -548,7 +548,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   }
 }
 
-void release_common_ss_cset(NR_BWP_PDCCH_t *pdcch)
+static void release_common_ss_cset(NR_BWP_PDCCH_t *pdcch)
 {
   pdcch->otherSI_SS_id = -1;
   pdcch->ra_SS_id = -1;
