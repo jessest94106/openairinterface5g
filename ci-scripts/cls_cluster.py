@@ -279,6 +279,11 @@ class Cluster:
 			log_files.append(self._retrieveOCLog(ctx, ranbase_job, lSourcePath, 'ran-base'))
 
 		if status:
+			self._recreate_is_tag('ran-build-fhi72', imageTag, 'openshift/ran-build-fhi72-is.yaml')
+			self._recreate_bc('ran-build-fhi72', imageTag, 'openshift/ran-build-fhi72-bc.yaml')
+			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.build.fhi72.rhel9')
+			ranbuildfhi72_job = self._start_build('ran-build-fhi72')
+
 			self._recreate_is_tag('oai-physim', imageTag, 'openshift/oai-physim-is.yaml')
 			self._recreate_bc('oai-physim', imageTag, 'openshift/oai-physim-bc.yaml')
 			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.phySim.rhel9')
@@ -294,15 +299,22 @@ class Cluster:
 			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.clang.rhel9')
 			clang_job = self._start_build('oai-clang')
 
-			wait = ranbuild_job is not None and physim_job is not None and clang_job is not None and self._wait_build_end([ranbuild_job, physim_job, clang_job], 1200)
-			if not wait: logging.error('error during build of ranbuild_job or physim_job or clang_job')
+			wait = ranbuildfhi72_job is not None and ranbuild_job is not None and physim_job is not None and clang_job is not None and self._wait_build_end([ranbuildfhi72_job, ranbuild_job, physim_job, clang_job], 1200)
+			if not wait: logging.error('error during build of ranbuildfhi72_job or ranbuild_job or physim_job or clang_job')
 			status = status and wait
+			log_files.append(self._retrieveOCLog(ctx, ranbuildfhi72_job, lSourcePath, 'ran-build-fhi72'))
 			log_files.append(self._retrieveOCLog(ctx, ranbuild_job, lSourcePath, 'ran-build'))
 			log_files.append(self._retrieveOCLog(ctx, physim_job, lSourcePath, 'oai-physim'))
 			log_files.append(self._retrieveOCLog(ctx, clang_job, lSourcePath, 'oai-clang'))
 			self.cmd.run(f'oc get pods.metrics.k8s.io &>> {build_metrics}')
 
 		if status:
+			self._recreate_is_tag('oai-gnb-fhi72', imageTag, 'openshift/oai-gnb-fhi72-is.yaml')
+			self._recreate_bc('oai-gnb-fhi72', imageTag, 'openshift/oai-gnb-fhi72-bc.yaml')
+			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.gNB.fhi72.rhel9')
+			self._retag_image_statement('ran-build-fhi72', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-build-fhi72', imageTag, 'docker/Dockerfile.gNB.fhi72.rhel9')
+			gnb_fhi72_job = self._start_build('oai-gnb-fhi72')
+
 			self._recreate_is_tag('oai-enb', imageTag, 'openshift/oai-enb-is.yaml')
 			self._recreate_bc('oai-enb', imageTag, 'openshift/oai-enb-bc.yaml')
 			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.eNB.rhel9')
@@ -321,10 +333,11 @@ class Cluster:
 			self._retag_image_statement('ran-build', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-build', imageTag, 'docker/Dockerfile.gNB.aw2s.rhel9')
 			gnb_aw2s_job = self._start_build('oai-gnb-aw2s')
 
-			wait = enb_job is not None and gnb_job is not None and gnb_aw2s_job is not None and self._wait_build_end([enb_job, gnb_job, gnb_aw2s_job], 800)
+			wait = gnb_fhi72_job is not None and enb_job is not None and gnb_job is not None and gnb_aw2s_job is not None and self._wait_build_end([gnb_fhi72_job, enb_job, gnb_job, gnb_aw2s_job], 800)
 			if not wait: logging.error('error during build of eNB/gNB')
 			status = status and wait
 			# recover logs
+			log_files.append(self._retrieveOCLog(ctx, gnb_fhi72_job, lSourcePath, 'oai-gnb-fhi72'))
 			log_files.append(self._retrieveOCLog(ctx, enb_job, lSourcePath, 'oai-enb'))
 			log_files.append(self._retrieveOCLog(ctx, gnb_job, lSourcePath, 'oai-gnb'))
 			log_files.append(self._retrieveOCLog(ctx, gnb_aw2s_job, lSourcePath, 'oai-gnb-aw2s'))
@@ -355,32 +368,6 @@ class Cluster:
 			log_files.append(self._retrieveOCLog(ctx, nr_cuup_job, lSourcePath, 'oai-nr-cuup'))
 			log_files.append(self._retrieveOCLog(ctx, lteue_job, lSourcePath, 'oai-lte-ue'))
 			log_files.append(self._retrieveOCLog(ctx, nrue_job, lSourcePath, 'oai-nr-ue'))
-			self.cmd.run(f'oc get pods.metrics.k8s.io &>> {build_metrics}')
-
-		if status:
-			self._recreate_is_tag('ran-build-fhi72', imageTag, 'openshift/ran-build-fhi72-is.yaml')
-			self._recreate_bc('ran-build-fhi72', imageTag, 'openshift/ran-build-fhi72-bc.yaml')
-			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.build.fhi72.rhel9')
-			ranbuildfhi72_job = self._start_build('ran-build-fhi72')
-
-			wait = ranbuildfhi72_job is not None and self._wait_build_end([ranbuildfhi72_job], 1200)
-			if not wait: logging.error('error during build of ranbuildfhi72_job')
-			status = status and wait
-			log_files.append(self._retrieveOCLog(ctx, ranbuildfhi72_job, lSourcePath, 'ran-build-fhi72'))
-			self.cmd.run(f'oc get pods.metrics.k8s.io &>> {build_metrics}')
-
-		if status:
-			self._recreate_is_tag('oai-gnb-fhi72', imageTag, 'openshift/oai-gnb-fhi72-is.yaml')
-			self._recreate_bc('oai-gnb-fhi72', imageTag, 'openshift/oai-gnb-fhi72-bc.yaml')
-			self._retag_image_statement('ran-base', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-base', baseTag, 'docker/Dockerfile.gNB.fhi72.rhel9')
-			self._retag_image_statement('ran-build-fhi72', 'image-registry.openshift-image-registry.svc:5000/oaicicd-ran/ran-build-fhi72', imageTag, 'docker/Dockerfile.gNB.fhi72.rhel9')
-			gnb_fhi72_job = self._start_build('oai-gnb-fhi72')
-
-			wait = gnb_fhi72_job is not None and self._wait_build_end([gnb_fhi72_job], 600)
-			if not wait: logging.error('error during build of gNB-fhi72')
-			status = status and wait
-			# recover logs
-			log_files.append(self._retrieveOCLog(ctx, gnb_fhi72_job, lSourcePath, 'oai-gnb-fhi72'))
 			self.cmd.run(f'oc get pods.metrics.k8s.io &>> {build_metrics}')
 
 		# split and analyze logs
