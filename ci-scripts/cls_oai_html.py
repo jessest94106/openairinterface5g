@@ -70,16 +70,6 @@ class HTMLManagement():
 		self.testCase_id = ''
 		self.desc = ''
 
-		self.OsVersion = ['', '']
-		self.KernelVersion = ['', '']
-		self.UhdVersion = ['', '']
-		self.UsrpBoard = ['', '']
-		self.CpuNb = ['', '']
-		self.CpuModel = ['', '']
-		self.CpuMHz = ['', '']
-
-
-
 #-----------------------------------------------------------
 # HTML structure creation functions
 #-----------------------------------------------------------
