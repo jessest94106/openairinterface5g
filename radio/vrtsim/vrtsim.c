@@ -223,6 +223,7 @@ static void *vrtsim_timing_job(void *arg)
       samples_to_produce += 1;
       leftover_samples -= 1;
     }
+    AssertFatal(samples_to_produce >= 0, "Negative samples to produce: %f\n", samples_to_produce);
     shm_td_iq_channel_produce_samples(vrtsim_state->channel, samples_to_produce);
     usleep(1);
   }
@@ -544,6 +545,12 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
 
 static int vrtsim_write(openair0_device *device, openair0_timestamp timestamp, void **samplesVoid, int nsamps, int nbAnt, int flags)
 {
+  AssertFatal(nsamps > 0, "Number of samples must be greater than 0\n");
+  AssertFatal(nbAnt > 0 && nbAnt <= MAX_NUM_ANTENNAS_TX,
+              "Number of antennas %d must be between 1 and %d\n",
+              nbAnt,
+              MAX_NUM_ANTENNAS_TX);
+  AssertFatal(timestamp >= 0, "Timestamp must be non-negative, got %ld\n", timestamp);
   timestamp -= device->openair0_cfg->command_line_sample_advance;
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
   bool channel_modelling = vrtsim_state->chanmod || vrtsim_state->taps_socket;
@@ -555,13 +562,29 @@ static int vrtsim_read(openair0_device *device, openair0_timestamp *ptimestamp, 
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
   if (shm_td_iq_channel_is_aborted(vrtsim_state->channel)) {
-    for (int i = 0; i < nbAnt; i++) {
-      memset(samplesVoid[i], 0, sizeof(c16_t) * nsamps);
-    }
-    return nsamps;
+    return 0;
   }
-  uint64_t timeout_uS = 2 * 1000 * 1000 / vrtsim_state->timescale; // 2 seconds in uS
-  shm_td_iq_channel_wait(vrtsim_state->channel, vrtsim_state->last_received_sample + nsamps, timeout_uS);
+  if (vrtsim_state->role == ROLE_SERVER) {
+    uint64_t timeout_uS = 0; // 0 means no timeout
+    shm_td_iq_channel_wait(vrtsim_state->channel, vrtsim_state->last_received_sample + nsamps, timeout_uS);
+  } else {
+    uint64_t start_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+    uint64_t timeout_uS = 2 * 1000 * 1000; // 2 seconds timeout waiting for sample number to change
+    //
+    while (shm_td_iq_channel_wait(vrtsim_state->channel, vrtsim_state->last_received_sample + nsamps, timeout_uS) == 1) {
+      uint64_t sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+      if (sample == start_sample) {
+        LOG_E(HW,
+              "VRTSIM: Read timeout waiting for sample %lu to change, aborting channel\n",
+              vrtsim_state->last_received_sample + nsamps);
+        shm_td_iq_channel_abort(vrtsim_state->channel);
+        break;
+      } else {
+        start_sample = sample;
+      }
+    }
+  }
+
   int ret = shm_td_iq_channel_rx(vrtsim_state->channel, vrtsim_state->last_received_sample, nsamps, 0, samplesVoid[0]);
   if (ret == CHANNEL_ERROR_TOO_LATE) {
     vrtsim_state->rx_samples_late += nsamps;

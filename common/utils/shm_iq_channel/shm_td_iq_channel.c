@@ -223,12 +223,12 @@ void shm_td_iq_channel_produce_samples(ShmTDIQChannel *channel, size_t num_sampl
   mutexunlock(data->mutex);
 }
 
-void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_t timeout_uS)
+int shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_t timeout_uS)
 {
   ShmTDIQChannelData *data = channel->data;
   size_t current_timestamp = data->timestamp;
   if (current_timestamp >= timestamp) {
-    return;
+    return 0;
   }
   if (timeout_uS == 0) {
     mutexlock(data->mutex);
@@ -241,8 +241,7 @@ void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_
     struct timespec ts = {.tv_sec = 0, .tv_nsec = 0};
     if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
       fprintf(stderr, "Error: clock_gettime failed: %s\n", strerror(errno));
-      channel->abort = true;
-      return;
+      return 1;
     }
     
     ts.tv_sec += timeout_uS / 1000000; // Convert microseconds to seconds
@@ -252,19 +251,20 @@ void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_
     while (current_timestamp < timestamp && !channel->abort) {
       int ret = pthread_cond_timedwait(&data->cond, &data->mutex, &ts);
       if (ret == ETIMEDOUT) {
-        channel->abort = true;
-        fprintf(stderr, "Error: Timed out waiting for samples. Aborting vrtsim\n");\
-        break;
+        fprintf(stderr, "Error: Timed out waiting for samples.\n");
+        mutexunlock(data->mutex);
+        return 1;
       } else if (ret != 0) {
-        channel->abort = true;
         fprintf(stderr, "Error: pthread_cond_timedwait failed: %s\n", strerror(ret));
-        break;
+        mutexunlock(data->mutex);
+        return 1;
       } else {
         current_timestamp = data->timestamp;
       }
     }
     mutexunlock(data->mutex);
   }
+  return 0;
 }
 
 uint64_t shm_td_iq_channel_get_current_sample(const ShmTDIQChannel *channel)

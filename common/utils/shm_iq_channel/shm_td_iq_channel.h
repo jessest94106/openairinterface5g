@@ -120,8 +120,10 @@ void shm_td_iq_channel_produce_samples(ShmTDIQChannel *channel, uint64_t num_sam
  * @param channel The ShmTDIQChannel structure.
  * @param timestamp The timestamp for which to wait.
  * @param timeout_uS The timeout in microseconds to wait for the sample. 0 means wait indefinitely.
+ *
+ * @return 0 if the sample is available, 1 if timed out
  */
-void shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_t timeout_uS);
+int shm_td_iq_channel_wait(ShmTDIQChannel *channel, uint64_t timestamp, uint64_t timeout_uS);
 
 /**
  * @brief Aborts the IQ channel causing the wait to return immediately
