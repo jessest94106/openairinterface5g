@@ -34,7 +34,7 @@ ENV SIMDE_VERSION=389f360a66d4a3bec62b7d71ad8be877487809ba
 
 #install developers pkg/repo
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
+    apt-get upgrade --yes && \
     #enabling arm64 architecture
     dpkg --add-architecture arm64 && \
     echo "deb [arch=arm64] http://ports.ubuntu.com/ noble main restricted\n" \
@@ -49,8 +49,8 @@ RUN apt-get update && \
     sed -i -E "s/(deb)\ (http:.+)/\1\ [arch=amd64]\ \2/" /etc/apt/sources.list && \
     sed -i '/^Components:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+    apt-get upgrade --yes && \
+    apt-get install --yes \
       build-essential \
       psmisc \
       git \

@@ -64,8 +64,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+    apt-get upgrade --yes && \
+    apt-get install --yes \
         software-properties-common \
         procps \
         libsctp1 \
