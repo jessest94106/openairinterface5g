@@ -414,20 +414,16 @@ class Cluster:
 		# Analyze the logs
 		collectInfo = {}
 		for image, lf in log_files:
-			files = {}
-			idx = 'Target Image Creation'
-			files[idx] = cls_containerize.AnalyzeBuildLogs(image, lf)
-			status = status and files[idx]['status']
-			collectInfo[image] = files
+			ret = cls_containerize.AnalyzeBuildLogs(image, lf)
+			imgStatus = ret['status']
+			msg = f"size {imageSize[image]}, analysis of {os.path.basename(lf)}: {ret['errors']} errors, {ret['warnings']} warnings"
+			HTML.CreateHtmlTestRowQueue(image, 'OK' if imgStatus else 'KO', [msg])
+			status = status and imgStatus
 
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')
-			HTML.CreateHtmlTestRow('all', 'OK', CONST.ALL_PROCESSES_OK)
 		else:
 			logging.error('\u001B[1m Building OAI Images Failed\u001B[0m')
-			HTML.CreateHtmlTestRow('all', 'KO', CONST.ALL_PROCESSES_OK)
-
-		HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, imageSize)
 
 		# TODO fix groovy script, remove the following.
 		# the groovy scripts expects all logs in

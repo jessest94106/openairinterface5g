@@ -332,58 +332,6 @@ class HTMLManagement():
 		self.htmlFile.write('      </tr>\n')
 		self.htmlFile.close()
 
-
-	def CreateHtmlNextTabHeaderTestRow(self, collectInfo, allImagesSize, machine='eNB'):
-		if (self.htmlFooterCreated or (not self.htmlHeaderCreated)):
-			return
-		self.htmlFile = open('test_results.html', 'a')
-		if bool(collectInfo) == False:
-			self.htmlFile.write('      <tr bgcolor = "red" >\n')
-			self.htmlFile.write('        <td colspan="6"><b> ----IMAGES BUILDING FAILED - Unable to recover the image logs ---- </b></td>\n')
-			self.htmlFile.write('      </tr>\n')
-		else:
-			for image in collectInfo:
-				files = collectInfo[image]
-        		# TabHeader for image logs on built shared and target images
-				if allImagesSize[image].count('unknown') > 0:
-					self.htmlFile.write('      <tr bgcolor = "orange" >\n')
-				elif allImagesSize[image].count('Build Failed') > 0:
-					self.htmlFile.write('      <tr bgcolor = "red" >\n')
-				else:
-					self.htmlFile.write('      <tr bgcolor = "#F0F0F0" >\n')
-				self.htmlFile.write('        <td colspan="6"><b> ---- ' + image  + ' IMAGE STATUS ----> Size ' + allImagesSize[image] + ' </b></td>\n')
-				self.htmlFile.write('      </tr>\n')
-				self.htmlFile.write('      <tr bgcolor = "#33CCFF" >\n')
-				self.htmlFile.write('        <th colspan="2">Element</th>\n')
-				self.htmlFile.write('        <th>Nb Errors</th>\n')
-				self.htmlFile.write('        <th>Nb Warnings</th>\n')
-				self.htmlFile.write('        <th colspan="2">Status</th>\n')
-				self.htmlFile.write('      </tr>\n')
-
-				for fil in files:
-					parameters = files[fil]
-					# TestRow for image logs on built shared and target images
-					self.htmlFile.write('      <tr>\n')
-					self.htmlFile.write('        <td colspan="2" bgcolor = "lightcyan" >' + fil  + ' </td>\n')
-					if (parameters['errors'] == 0):
-						self.htmlFile.write('        <td bgcolor = "green" >' + str(parameters['errors'])  + '</td>\n')
-					else:
-						self.htmlFile.write('        <td bgcolor = "red" >' + str(parameters['errors'])  + '</td>\n')
-					if (parameters['errors'] > 0):
-						self.htmlFile.write('        <td bgcolor = "red" >' + str(parameters['warnings'])  + '</td>\n')
-					elif (parameters['warnings'] == 0):
-						self.htmlFile.write('        <td bgcolor = "green" >' + str(parameters['warnings'])  + '</td>\n')
-					else:
-						self.htmlFile.write('        <td bgcolor = "orange" >' + str(parameters['warnings'])  + '</td>\n')
-					if (parameters['errors'] == 0) and (parameters['warnings'] == 0):
-						self.htmlFile.write('        <th colspan="2" bgcolor = "green" ><font color="white">OK </font></th>\n')
-					elif (parameters['errors'] == 0):
-						self.htmlFile.write('        <th colspan="2" bgcolor = "orange" ><font color="white">OK </font></th>\n')
-					else:
-						self.htmlFile.write('        <th colspan="2" bgcolor = "red" > NOT OK  </th>\n')
-					self.htmlFile.write('      </tr>\n')
-		self.htmlFile.close()
-
 	#for the moment it is limited to 4 columns, to be made generic later
 	def CreateHtmlDataLogTable(self, DataLog):
 		if (self.htmlFooterCreated or (not self.htmlHeaderCreated)):

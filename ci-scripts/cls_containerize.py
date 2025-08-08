@@ -462,25 +462,18 @@ class Containerize():
 		cmd.close()
 
 		# Analyze the logs
-		collectInfo = {}
 		for name, lf in log_files:
-			files = {}
-			idx = 'Target Image Creation'
-			files[idx] = AnalyzeBuildLogs(name, lf)
-			status = status and files[idx]['status']
-			collectInfo[name] = files
+			ret = AnalyzeBuildLogs(name, lf)
+			imgStatus = ret['status']
+			msg = f"size {allImagesSize[name]}, analysis of {os.path.basename(lf)}: {ret['errors']} errors, {ret['warnings']} warnings"
+			HTML.CreateHtmlTestRowQueue(name, 'OK' if imgStatus else 'KO', [msg])
+			status = status and imgStatus
 		
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')
-			HTML.CreateHtmlTestRow(self.imageKind, 'OK', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, allImagesSize)
-			return True
 		else:
 			logging.error('\u001B[1m Building OAI Images Failed\u001B[0m')
-			HTML.CreateHtmlTestRow(self.imageKind, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, allImagesSize)
-			HTML.CreateHtmlTabFooter(False)
-			return False
+		return status
 
 	def BuildProxy(self, ctx, HTML):
 		svr = self.eNB_serverId[self.eNB_instance]
@@ -545,16 +538,6 @@ class Containerize():
 		self.ranAllowMerge = oldRanAllowMerge
 		self.ranTargetBranch = oldRanTargetBranch
 
-		# we do not analyze the logs (we assume the proxy builds fine at this stage),
-		# but need to have the following information to correctly display the HTML
-		files = {}
-		errorandwarnings = {}
-		errorandwarnings['errors'] = 0
-		errorandwarnings['warnings'] = 0
-		errorandwarnings['status'] = True
-		files['Target Image Creation'] = errorandwarnings
-		collectInfo = {}
-		collectInfo['proxy'] = files
 		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
 		result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
 		# Cleaning any created tmp volume
@@ -568,14 +551,12 @@ class Containerize():
 			allImagesSize['proxy'] = str(round(imageSize,1)) + ' Mbytes'
 			logging.info('\u001B[1m Building L2sim Proxy Image Pass\u001B[0m')
 			HTML.CreateHtmlTestRow('commit ' + tag, 'OK', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, allImagesSize)
 			return True
 		else:
 			logging.error('proxy size is unknown')
 			allImagesSize['proxy'] = 'unknown'
 			logging.error('\u001B[1m Build of L2sim proxy failed\u001B[0m')
 			HTML.CreateHtmlTestRow('commit ' + tag, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlTabFooter(False)
 			return False
 
 	def BuildRunTests(self, ctx, HTML):
