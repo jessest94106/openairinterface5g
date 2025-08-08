@@ -348,7 +348,7 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
   const int antRx = frame_parms->nb_antennas_rx;
 
   // Pointer to llrs, 4-bit resolution.
-  int32_t llr_size = (rel15->coreset.duration-rel15->coreset.StartSymbolIndex)  * n_rb * RE_PER_RB_OUT_DMRS;
+  int32_t llr_size = (rel15->coreset.duration + rel15->coreset.StartSymbolIndex) * n_rb * RE_PER_RB_OUT_DMRS;
   c16_t llr[llr_size];
 
   LOG_D(NR_PHY_DCI,
