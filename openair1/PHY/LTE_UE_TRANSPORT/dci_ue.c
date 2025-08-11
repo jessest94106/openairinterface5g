@@ -1593,19 +1593,19 @@ void dci_decoding_procedure0(LTE_UE_PDCCH **pdcch_vars,
 
     switch (L2) {
     case 1:
-      CCEmap_mask = (1<<(CCEind&0x1f));
+      CCEmap_mask = (1U << (CCEind & 0x1f));
       break;
 
     case 2:
-      CCEmap_mask = (3<<(CCEind&0x1f));
+      CCEmap_mask = (3U << (CCEind & 0x1f));
       break;
 
     case 4:
-      CCEmap_mask = (0xf<<(CCEind&0x1f));
+      CCEmap_mask = (0xfU << (CCEind & 0x1f));
       break;
 
     case 8:
-      CCEmap_mask = (0xff<<(CCEind&0x1f));
+      CCEmap_mask = (0xffU << (CCEind & 0x1f));
       break;
 
     default:
