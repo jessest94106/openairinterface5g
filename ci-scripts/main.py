@@ -110,33 +110,20 @@ def ExecuteActionWithParam(action, ctx):
 			RAN.Build_eNB_forced_workspace_cleanup = True
 			CONTAINERS.forcedWorkspaceCleanup = True
 			CLUSTER.forcedWorkspaceCleanup = True
-		eNB_instance=test.findtext('eNB_instance')
-		if (eNB_instance is None):
-			RAN.eNB_instance=0
-			CONTAINERS.eNB_instance=0
-		else:
-			RAN.eNB_instance=int(eNB_instance)
-			CONTAINERS.eNB_instance=int(eNB_instance)
-		eNB_serverId=test.findtext('eNB_serverId')
-		if (eNB_serverId is None):
-			RAN.eNB_serverId[RAN.eNB_instance]='0'
-			CONTAINERS.eNB_serverId[RAN.eNB_instance]='0'
-		else:
-			RAN.eNB_serverId[RAN.eNB_instance]=eNB_serverId
-			CONTAINERS.eNB_serverId[CONTAINERS.eNB_instance]=eNB_serverId
+		node = test.findtext('node')
 		proxy_commit = test.findtext('proxy_commit')
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
 		if action == 'Build_eNB':
-			success = cls_native.Native.Build(ctx, HTML.testCase_id, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
+			success = cls_native.Native.Build(ctx, node, HTML.testCase_id, HTML, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
 		elif action == 'Build_Image':
-			success = CONTAINERS.BuildImage(ctx, HTML)
+			success = CONTAINERS.BuildImage(ctx, node, HTML)
 		elif action == 'Build_Proxy':
-			success = CONTAINERS.BuildProxy(ctx, HTML)
+			success = CONTAINERS.BuildProxy(ctx, node, HTML)
 		elif action == 'Build_Cluster_Image':
-			success = CLUSTER.BuildClusterImage(ctx, HTML)
+			success = CLUSTER.BuildClusterImage(ctx, node, HTML)
 		elif action == 'Build_Run_Tests':
-			success = CONTAINERS.BuildRunTests(ctx, HTML)
+			success = CONTAINERS.BuildRunTests(ctx, node, HTML)
 
 	elif action == 'Initialize_eNB':
 		datalog_rt_stats_file=test.findtext('rt_stats_cfg')

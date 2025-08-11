@@ -69,7 +69,6 @@ def OC_logout(cmd):
 
 class Cluster:
 	def __init__(self):
-		self.eNBIPAddress = ""
 		self.eNBSourceCodePath = ""
 		self.forcedWorkspaceCleanup = False
 		self.OCUserName = ""
@@ -195,13 +194,12 @@ class Cluster:
 		self.cmd.run(f'oc logs {job} &> {fn}')
 		return (image, archiveArtifact(self.cmd, ctx, fn))
 
-	def BuildClusterImage(self, ctx, HTML):
+	def BuildClusterImage(self, ctx, node, HTML):
 		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
 			HELP.GenericHelp(CONST.Version)
 			raise ValueError(f'Insufficient Parameter: ranRepository {self.ranRepository} ranBranch {ranBranch} ranCommitID {self.ranCommitID}')
-		lIpAddr = self.eNBIPAddress
 		lSourcePath = self.eNBSourceCodePath
-		if lIpAddr == '' or lSourcePath == '':
+		if node == '' or lSourcePath == '':
 			raise ValueError('Insufficient Parameter: eNBSourceCodePath missing')
 		ocUserName = self.OCUserName
 		ocPassword = self.OCPassword
@@ -212,8 +210,8 @@ class Cluster:
 		if self.OCRegistry.startswith("http") or self.OCRegistry.endswith("/"):
 			raise ValueError(f'ocRegistry {self.OCRegistry} should not start with http:// or https:// and not end on a slash /')
 
-		logging.debug(f'Building on cluster triggered from server: {lIpAddr}')
-		self.cmd = cls_cmd.RemoteCmd(lIpAddr)
+		logging.debug(f'Building on cluster triggered from server: {node}')
+		self.cmd = cls_cmd.RemoteCmd(node)
 
 		self.testCase_id = HTML.testCase_id
 

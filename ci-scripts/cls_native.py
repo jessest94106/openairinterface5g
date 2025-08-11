@@ -34,11 +34,11 @@ DPDK_PATH = '/opt/dpdk-t2-22.11.0'
 
 class Native():
 
-	def Build(ctx, test_case, HTML, host, directory, options):
-		logging.debug(f'Building on server: {host}')
+	def Build(ctx, node, test_case, HTML, directory, options):
+		logging.debug(f'Building on server: {node}')
 		HTML.testCase_id = test_case
 
-		with cls_cmd.getConnection(host) as ssh:
+		with cls_cmd.getConnection(node) as ssh:
 			base = f"{directory}/cmake_targets"
 			ret = ssh.run(f"C_INCLUDE_PATH={DPDK_PATH}/include/ PKG_CONFIG_PATH={DPDK_PATH}/lib64/pkgconfig/ {base}/build_oai {options} > {base}/build_oai.log", timeout=900)
 			success = ret.returncode == 0

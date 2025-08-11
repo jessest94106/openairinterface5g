@@ -280,11 +280,10 @@ class Containerize():
 			raise ValueError(f'Insufficient Parameter: IP/node {ip}, path {path}')
 		return (ip, path)
 
-	def BuildImage(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.getConnection(lIpAddr)
+	def BuildImage(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Building on server: ' + node)
+		cmd = cls_cmd.getConnection(node)
 		log_files = []
 	
 		# Checking the hostname to get adapted on cli and dockerfileprefixes
@@ -475,11 +474,10 @@ class Containerize():
 			logging.error('\u001B[1m Building OAI Images Failed\u001B[0m')
 		return status
 
-	def BuildProxy(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('Building on server: ' + lIpAddr)
-		ssh = cls_cmd.getConnection(lIpAddr)
+	def BuildProxy(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Building on server: ' + node)
+		ssh = cls_cmd.getConnection(node)
 
 		oldRanCommidID = self.ranCommitID
 		oldRanRepository = self.ranRepository
@@ -502,7 +500,7 @@ class Containerize():
 		buildProxy = ret.returncode != 0 # if no image, build new proxy
 		if buildProxy:
 			ssh.run(f'rm -Rf {lSourcePath}')
-			success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+			success = CreateWorkspace(node, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 			if not success:
 				raise Exception("could not clone proxy repository")
 
@@ -559,11 +557,10 @@ class Containerize():
 			HTML.CreateHtmlTestRow('commit ' + tag, 'KO', CONST.ALL_PROCESSES_OK)
 			return False
 
-	def BuildRunTests(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.RemoteCmd(lIpAddr)
+	def BuildRunTests(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Building on server: ' + node)
+		cmd = cls_cmd.RemoteCmd(node)
 		cmd.cd(lSourcePath)
 
 		ret = cmd.run('hostnamectl')

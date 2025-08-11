@@ -37,6 +37,7 @@
 	<testCase id="000001">
 		<class>Build_Cluster_Image</class>
 		<desc>Build Images on OpenShift Cluster</desc>
+		<node>poseidon</node>
 	</testCase>
 
 </testCaseList>
