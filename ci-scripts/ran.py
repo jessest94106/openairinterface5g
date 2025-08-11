@@ -187,31 +187,6 @@ class RANManagement():
 
 		return logStatus >= 0
 
-	def LogCollecteNB(self):
-		mySSH = SSH.SSHConnection()
-		# Copying back to xNB server any log from all the runs.
-		# Should also contains ping and iperf logs
-		absPath = os.path.abspath('.')
-		if absPath.count('ci-scripts') == 0:
-			os.chdir('./ci-scripts')
-
-		for x in os.listdir():
-			if x.endswith('.log') or x.endswith('.log.png'):
-				mySSH.copyout(self.eNBIPAddress, self.eNBUserName, self.eNBPassword, x, self.eNBSourceCodePath + '/cmake_targets/', silent=True, ignorePermDenied=True)
-		# Back to normal
-		mySSH.open(self.eNBIPAddress, self.eNBUserName, self.eNBPassword)
-		mySSH.command('cd ' + self.eNBSourceCodePath, '\$', 5)
-		mySSH.command('cd cmake_targets', '\$', 5)
-		mySSH.command('echo ' + self.eNBPassword + ' | sudo -S mv /tmp/enb_*.pcap .','\$',20)
-		mySSH.command('echo ' + self.eNBPassword + ' | sudo -S mv /tmp/gnb_*.pcap .','\$',20)
-		mySSH.command('echo ' + self.eNBPassword + ' | sudo -S rm -f enb.log.zip', '\$', 5)
-		mySSH.command('echo ' + self.eNBPassword + ' | sudo -S zip enb.log.zip *.log enb_*record.raw enb_*.pcap gnb_*.pcap enb_*txt physim_*.log *stats.log *monitor.pickle *monitor*.png ping*.log* iperf*.log log/*/*.log log/*/*.pcap', '\$', 60)
-		result = re.search('core.\d+', mySSH.getBefore())
-		if result is not None:
-			mySSH.command('echo ' + self.eNBPassword + ' | sudo -S zip enb.log.zip core* ran_build/build/{lte,nr}-softmodem', '\$', 60) # add core and executable to zip
-		mySSH.command('echo ' + self.eNBPassword + ' | sudo -S rm enb*.log core* enb_*record.raw enb_*.pcap gnb_*.pcap enb_*txt physim_*.log *stats.log *monitor.pickle *monitor*.png ping*.log* iperf*.log log/*/*.log log/*/*.pcap', '\$', 15)
-		mySSH.close()
-
 	def _analyzeUeRetx(self, rounds, checkers, regex):
 		if len(rounds) == 0 or len(checkers) == 0:
 			logging.warning(f'warning: rounds={rounds} checkers={checkers}')

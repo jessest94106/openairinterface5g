@@ -437,7 +437,6 @@ elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
 			logging.error("Command '{}' returned non-zero exit status {}.".format(e.cmd, e.returncode))
 			logging.error("Error output:\n{}".format(e.output))
 		sys.exit(0)
-	RAN.LogCollecteNB()
 elif re.match('^LogCollectHSS$', mode, re.IGNORECASE):
 	logging.warning("Option LogCollectHSS ignored")
 elif re.match('^LogCollectMME$', mode, re.IGNORECASE):
