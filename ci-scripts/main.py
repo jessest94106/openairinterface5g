@@ -124,14 +124,6 @@ def ExecuteActionWithParam(action, ctx):
 		else:
 			RAN.eNB_serverId[RAN.eNB_instance]=eNB_serverId
 			CONTAINERS.eNB_serverId[CONTAINERS.eNB_instance]=eNB_serverId
-		xmlBgBuildField = test.findtext('backgroundBuild')
-		if (xmlBgBuildField is None):
-			RAN.backgroundBuild=False
-		else:
-			if re.match('true', xmlBgBuildField, re.IGNORECASE):
-				RAN.backgroundBuild=True
-			else:
-				RAN.backgroundBuild=False
 		proxy_commit = test.findtext('proxy_commit')
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
