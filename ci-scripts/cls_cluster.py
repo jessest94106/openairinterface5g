@@ -70,7 +70,6 @@ def OC_logout(cmd):
 class Cluster:
 	def __init__(self):
 		self.eNBSourceCodePath = ""
-		self.forcedWorkspaceCleanup = False
 		self.OCUserName = ""
 		self.OCPassword = ""
 		self.OCProjectName = ""

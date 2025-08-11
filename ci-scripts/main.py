@@ -102,14 +102,6 @@ def ExecuteActionWithParam(action, ctx):
 	if action == 'Build_eNB' or action == 'Build_Image' or action == 'Build_Proxy' or action == "Build_Cluster_Image" or action == "Build_Run_Tests":
 		RAN.Build_eNB_args=test.findtext('Build_eNB_args')
 		CONTAINERS.imageKind=test.findtext('kind')
-		forced_workspace_cleanup = test.findtext('forced_workspace_cleanup')
-		RAN.Build_eNB_forced_workspace_cleanup=False
-		CONTAINERS.forcedWorkspaceCleanup=False
-		CLUSTER.forcedWorkspaceCleanup = False
-		if forced_workspace_cleanup is not None and re.match('true', forced_workspace_cleanup, re.IGNORECASE):
-			RAN.Build_eNB_forced_workspace_cleanup = True
-			CONTAINERS.forcedWorkspaceCleanup = True
-			CLUSTER.forcedWorkspaceCleanup = True
 		node = test.findtext('node')
 		proxy_commit = test.findtext('proxy_commit')
 		if proxy_commit is not None:

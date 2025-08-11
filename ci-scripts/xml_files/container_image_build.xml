@@ -41,7 +41,6 @@
 		<desc>Build all Images</desc>
 		<node>obelix</node>
 		<kind>all</kind>
-		<forced_workspace_cleanup>True</forced_workspace_cleanup>
 	</testCase>
 
 	<testCase id="000010">

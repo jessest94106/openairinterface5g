@@ -231,7 +231,6 @@ class Containerize():
 		self.ranCommitID = ''
 		self.ranTargetBranch = ''
 		self.eNBSourceCodePath = ''
-		self.forcedWorkspaceCleanup = False
 		self.imageKind = ''
 		self.proxyCommit = None
 		self.yamlPath = ''
@@ -544,9 +543,6 @@ class Containerize():
 			raise Exception("Can build unit tests only on Ubuntu server")
 		logging.debug('running on Ubuntu as expected')
 
-		if self.forcedWorkspaceCleanup:
-			cmd.run(f'sudo -S rm -Rf {lSourcePath}')
-	
 		# check that ran-base image exists as we expect it
 		baseImage = 'ran-base'
 		baseTag = 'develop'

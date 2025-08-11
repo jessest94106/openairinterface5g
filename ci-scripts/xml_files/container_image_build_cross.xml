@@ -39,7 +39,6 @@
 		<desc>Cross-Compile for ARM64</desc>
 		<kind>build_cross_arm64</kind>
 		<node>alambix</node>
-		<forced_workspace_cleanup>True</forced_workspace_cleanup>
 	</testCase>
 
 </testCaseList>
