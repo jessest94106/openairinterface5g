@@ -47,7 +47,7 @@
         <testCase id="000010">
                 <class>Push_Local_Registry</class>
                 <desc>Push Images to Local Registry</desc>
-                <svr_id>0</svr_id>
+                <node>gracehopper3-oai</node>
                 <tag_prefix>arm_</tag_prefix>
         </testCase>
 

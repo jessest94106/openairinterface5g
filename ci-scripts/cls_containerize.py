@@ -627,10 +627,10 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def Push_Image_to_Local_Registry(self, HTML, svr_id, tag_prefix=""):
-		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug('Pushing images to server: ' + lIpAddr)
-		ssh = cls_cmd.getConnection(lIpAddr)
+	def Push_Image_to_Local_Registry(self, node, HTML, tag_prefix=""):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Pushing images to server: ' + node)
+		ssh = cls_cmd.getConnection(node)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
 		ret = ssh.run(f'docker login -u oaicicd -p oaicicd {imagePrefix}')
 		if ret.returncode != 0:

@@ -343,9 +343,9 @@ def ExecuteActionWithParam(action, ctx):
 		success = SCA.CppCheckAnalysis(ctx, HTML)
 
 	elif action == 'Push_Local_Registry':
-		svr_id = test.findtext('svr_id')
+		node = test.findtext('node')
 		tag_prefix = test.findtext('tag_prefix') or ""
-		success = CONTAINERS.Push_Image_to_Local_Registry(HTML, svr_id, tag_prefix)
+		success = CONTAINERS.Push_Image_to_Local_Registry(node, HTML, tag_prefix)
 
 	elif action == 'Pull_Local_Registry' or action == 'Clean_Test_Server_Images':
 		if force_local:
