@@ -142,7 +142,7 @@ int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCC
 csi_payload_t nr_get_csi_payload(NR_UE_MAC_INST_t *mac,
                                  int csi_report_id,
                                  CSI_mapping_t mapping_type,
-                                 NR_CSI_MeasConfig_t *csi_MeasConfig);
+                                 const NR_CSI_MeasConfig_t *csi_MeasConfig);
 
 /* \brief Get payload (MAC PDU) from UE PHY
 @param dl_info            pointer to dl indication

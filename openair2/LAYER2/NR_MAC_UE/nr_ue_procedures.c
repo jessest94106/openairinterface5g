@@ -2697,9 +2697,9 @@ static int compare_ssb_sinr(const void *a, const void *b)
 }
 
 static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
-                                          struct NR_CSI_ReportConfig *csi_reportconfig,
-                                          NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
-                                          NR_CSI_MeasConfig_t *csi_MeasConfig)
+                                          const struct NR_CSI_ReportConfig *csi_reportconfig,
+                                          const NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
+                                          const NR_CSI_MeasConfig_t *csi_MeasConfig)
 {
   int nb_ssb = 0; // nb of ssb in the resource
   int nb_meas = 0; // nb of ssb to report measurements on
@@ -2717,7 +2717,7 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       } else
         nb_meas = 2;
 
-      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
+      const struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
       for (int csi_ssb_idx = 0; csi_ssb_idx < csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.count; csi_ssb_idx++) {
         if (csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceSetId
             == *(csi_resourceconfig->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->csi_SSB_ResourceSetList->list.array[0])) {
@@ -2796,9 +2796,9 @@ static uint8_t get_rsrp_diff_index(int best_rsrp, int current_rsrp)
 }
 
 static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
-                                          struct NR_CSI_ReportConfig *csi_reportconfig,
-                                          NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
-                                          NR_CSI_MeasConfig_t *csi_MeasConfig)
+                                          const struct NR_CSI_ReportConfig *csi_reportconfig,
+                                          const NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
+                                          const NR_CSI_MeasConfig_t *csi_MeasConfig)
 {
   int nb_ssb = 0;  // nb of ssb in the resource
   int nb_meas = 0; // nb of ssb to report measurements on
@@ -2817,7 +2817,7 @@ static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
       } else
         nb_meas = 2;
 
-      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
+      const struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
       for (int csi_ssb_idx = 0; csi_ssb_idx < csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.count; csi_ssb_idx++) {
         if (csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceSetId ==
             *(csi_resourceconfig->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->csi_SSB_ResourceSetList->list.array[0])){
@@ -2878,10 +2878,10 @@ static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
 }
 
 static csi_payload_t get_csirs_RI_PMI_CQI_payload(NR_UE_MAC_INST_t *mac,
-                                                  struct NR_CSI_ReportConfig *csi_reportconfig,
-                                                  NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
-                                                  NR_CSI_MeasConfig_t *csi_MeasConfig,
-                                                  CSI_mapping_t mapping_type)
+                                                  const struct NR_CSI_ReportConfig *csi_reportconfig,
+                                                  const NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
+                                                  const NR_CSI_MeasConfig_t *csi_MeasConfig,
+                                                  const CSI_mapping_t mapping_type)
 {
   int p1_bits = 0;
   int p2_bits = 0;
@@ -2954,8 +2954,8 @@ static csi_payload_t get_csirs_RI_PMI_CQI_payload(NR_UE_MAC_INST_t *mac,
 }
 
 static csi_payload_t get_csirs_RSRP_payload(NR_UE_MAC_INST_t *mac,
-                                            struct NR_CSI_ReportConfig *csi_reportconfig,
-                                            NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
+                                            const struct NR_CSI_ReportConfig *csi_reportconfig,
+                                            const NR_CSI_ResourceConfigId_t csi_ResourceConfigId,
                                             const NR_CSI_MeasConfig_t *csi_MeasConfig)
 {
   int n_bits = 0;
@@ -3009,7 +3009,7 @@ static csi_payload_t get_csirs_RSRP_payload(NR_UE_MAC_INST_t *mac,
 csi_payload_t nr_get_csi_payload(NR_UE_MAC_INST_t *mac,
                                  int csi_report_id,
                                  CSI_mapping_t mapping_type,
-                                 NR_CSI_MeasConfig_t *csi_MeasConfig)
+                                 const NR_CSI_MeasConfig_t *csi_MeasConfig)
 {
   AssertFatal(csi_MeasConfig->csi_ReportConfigToAddModList->list.count > 0,"No CSI Report configuration available\n");
   csi_payload_t csi = {0};
