@@ -313,7 +313,8 @@ def ExecuteActionWithParam(action, ctx):
 		physim_options = test.findtext('physim_run_args')
 		physim_test = test.findtext('physim_test')
 		physim_threshold = test.findtext('physim_time_threshold') or 'inf'
-		success = cls_native.Native.Run_Physim(ctx, HTML, RAN.eNBIPAddress, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
+		node = test.findtext('node')
+		success = cls_native.Native.Run_Physim(ctx, HTML, node, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
 
 	elif action == 'LicenceAndFormattingCheck':
 		node = test.findtext('node')
