@@ -40,7 +40,7 @@
 		<class>Deploy_Run_PhySim</class>
                 <desc>Deploy and run physical simulator on openshift</desc>
                 <oc_release>physims-5g</oc_release>
-                <svr_id>avra</svr_id>
+                <node>avra</node>
 	</testCase>
 
 </testCaseList>

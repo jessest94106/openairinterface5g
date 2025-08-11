@@ -421,17 +421,17 @@ class Cluster:
 
 		return status
 
-	def deploy_oc_physim(self, ctx, HTML, oc_release, svr_id):
+	def deploy_oc_physim(self, ctx, HTML, oc_release, node):
 		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
 			HELP.GenericHelp(CONST.Version)
 			raise ValueError(f'Insufficient Parameter: ranRepository {self.ranRepository} ranBranch {self.ranBranch} ranCommitID {self.ranCommitID}')
 		image_tag = cls_containerize.CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
-		logging.debug(f'Running physims from server: {svr_id}')
+		logging.debug(f'Running physims from server: {node}')
 		script = "scripts/oc-deploy-physims.sh"
 		options = f"oaicicd-core-for-ci-ran {oc_release} {image_tag} {self.eNBSourceCodePath}"
-		ret = cls_cmd.runScript(svr_id, script, 600, options)
+		ret = cls_cmd.runScript(node, script, 600, options)
 		logging.debug(f'"{script}" finished with code {ret.returncode}, output:\n{ret.stdout}')
-		with cls_cmd.getConnection(svr_id) as ssh:
+		with cls_cmd.getConnection(node) as ssh:
 			details_json = archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/{oc_release}-tests.json')
 			result_junit = archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/{oc_release}-run.xml')
 			archiveArtifact(ssh, ctx, f'{self.eNBSourceCodePath}/ci-scripts/physim_log.txt')
