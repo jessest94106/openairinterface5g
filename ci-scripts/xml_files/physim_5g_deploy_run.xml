@@ -33,8 +33,7 @@
         <testCase id="800813">
                 <class>Create_Workspace</class>
                 <desc>Create new Workspace</desc>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
+                <node>avra</node>
         </testCase>
 
         <testCase id="010201">

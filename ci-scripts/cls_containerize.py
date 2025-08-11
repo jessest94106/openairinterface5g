@@ -736,25 +736,23 @@ class Containerize():
 		HTML.CreateHtmlTestRowQueue(param, s, [msg])
 		return status
 
-	def Create_Workspace(self,HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+	def Create_Workspace(self, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		success = CreateWorkspace(node, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 		if success:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [f"created workspace {lSourcePath}"])
 		else:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["cannot create workspace"])
 		return success
 
-	def DeployObject(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
+	def DeployObject(self, ctx, node, HTML):
 		num_attempts = self.num_attempts
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug(f'Deploying OAI Object on server: {lIpAddr}')
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug(f'Deploying OAI Object on server: {node}')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
-		with cls_cmd.getConnection(lIpAddr) as ssh:
+		with cls_cmd.getConnection(node) as ssh:
 			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
 			if services == [] or services == ' ' or services == None:
 				msg = 'Cannot determine services to start'
@@ -790,13 +788,12 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
 		return deployed
 
-	def UndeployObject(self, ctx, HTML, RAN):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {lIpAddr}\u001B[0m')
+	def UndeployObject(self, ctx, node, HTML, RAN):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {node}\u001B[0m')
 		yaml = self.yamlPath[self.eNB_instance].strip('/')
 		wd = f'{lSourcePath}/{yaml}'
-		with cls_cmd.getConnection(lIpAddr) as ssh:
+		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
 			services = GetRunningServices(ssh, f"{wd}/docker-compose.y*ml")
 			copyin_res = None

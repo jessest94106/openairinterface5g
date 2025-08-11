@@ -305,16 +305,7 @@ def ExecuteActionWithParam(action, ctx):
 		success = core_op(cn_id, ctx, HTML)
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
-		eNB_instance=test.findtext('eNB_instance')
-		if (eNB_instance is None):
-			CONTAINERS.eNB_instance=0
-		else:
-			CONTAINERS.eNB_instance=int(eNB_instance)
-		eNB_serverId=test.findtext('eNB_serverId')
-		if (eNB_serverId is None):
-			CONTAINERS.eNB_serverId[CONTAINERS.eNB_instance]='0'
-		else:
-			CONTAINERS.eNB_serverId[CONTAINERS.eNB_instance]=eNB_serverId
+		node = test.findtext('node')
 		string_field = test.findtext('yaml_path')
 		if (string_field is not None):
 			CONTAINERS.yamlPath[CONTAINERS.eNB_instance] = string_field
@@ -330,14 +321,14 @@ def ExecuteActionWithParam(action, ctx):
 		CONTAINERS.num_attempts = int(test.findtext('num_attempts') or 1)
 		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
 		if action == 'Deploy_Object':
-			success = CONTAINERS.DeployObject(ctx, HTML)
+			success = CONTAINERS.DeployObject(ctx, node, HTML)
 		elif action == 'Undeploy_Object':
-			success = CONTAINERS.UndeployObject(ctx, HTML, RAN)
+			success = CONTAINERS.UndeployObject(ctx, node, HTML, RAN)
 		elif action == 'Create_Workspace':
 			if force_local:
 				# Do not create a working directory when running locally. Current repo directory will be used
 				return True
-			success = CONTAINERS.Create_Workspace(HTML)
+			success = CONTAINERS.Create_Workspace(node, HTML)
 
 	elif action == 'Run_Physim':
 		physim_options = test.findtext('physim_run_args')
@@ -360,7 +351,7 @@ def ExecuteActionWithParam(action, ctx):
 		if force_local:
 			# Do not pull or remove images when running locally. User is supposed to handle image creation & cleanup
 			return True
-		node = test.findtext('node') or 'localhost'
+		node = test.findtext('node')
 		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
 		# hack: for FlexRIC, we need to overwrite the tag to use

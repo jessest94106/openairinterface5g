@@ -32,8 +32,7 @@
 	<testCase id="100001">
 		<class>Create_Workspace</class>
 		<desc>Create new Workspace</desc>
-		<eNB_instance>0</eNB_instance>
-		<eNB_serverId>0</eNB_serverId>
+		<node>alambix</node>
 	</testCase>
 	<testCase id="000001">
 		<class>Build_Image</class>

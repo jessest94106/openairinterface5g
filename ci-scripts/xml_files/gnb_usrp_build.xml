@@ -34,6 +34,7 @@
 	<testCase id="000000">
 		<class>Create_Workspace</class>
 		<desc>Create new Workspace</desc>
+		<node>caracal</node>
 	</testCase>
 
 	<testCase id="010101">

@@ -46,8 +46,7 @@
         <testCase id="800813">
                 <class>Create_Workspace</class>
                 <desc>Create new Workspace</desc>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
+                <node>localhost</node>
         </testCase>
         <testCase id="111111">
                 <class>Pull_Local_Registry</class>
@@ -59,10 +58,9 @@
         <testCase id="000011">
                 <class>Deploy_Object</class>
                 <desc>Deploy Cassandra Database</desc>
+                <node>localhost</node>
                 <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fdd_05MHz</yaml_path>
                 <services>cassandra db_init</services>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="000001">
@@ -80,28 +78,25 @@
         <testCase id="000012">
                 <class>Deploy_Object</class>
                 <desc>Deploy OAI 4G CoreNetwork</desc>
+                <node>localhost</node>
                 <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fdd_05MHz</yaml_path>
                 <services>oai_hss redis magma_mme oai_spgwc oai_spgwu trf_gen</services>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="000013">
                 <class>Deploy_Object</class>
                 <desc>Deploy OAI 4G eNB RF sim (FDD 05MHz)</desc>
+                <node>localhost</node>
                 <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fdd_05MHz</yaml_path>
                 <services>oai_enb0</services>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="000014">
                 <class>Deploy_Object</class>
                 <desc>Deploy OAI 4G LTE-UE RF sim (FDD 05MHz)</desc>
+                <node>localhost</node>
                 <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fdd_05MHz</yaml_path>
                 <services>oai_ue0</services>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="000015">
@@ -161,9 +156,8 @@
                 <class>Undeploy_Object</class>
                 <always_exec>true</always_exec>
                 <desc>Undeploy all OAI 4G stack</desc>
+                <node>localhost</node>
                 <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fdd_05MHz</yaml_path>
-                <eNB_instance>0</eNB_instance>
-                <eNB_serverId>0</eNB_serverId>
         </testCase>
 
         <testCase id="222222">

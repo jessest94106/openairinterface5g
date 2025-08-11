@@ -44,12 +44,9 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.ranAllowMerge = True
 		self.cont.ranBranch = ''
 		self.cont.ranCommitID = ''
-		self.cont.eNB_serverId[0] = '0'
-		self.cont.eNBIPAddress = 'localhost'
-		self.cont.eNBUserName = None
-		self.cont.eNBPassword = None
 		self.cont.eNBSourceCodePath = os.getcwd()
 		self.cont.num_attempts = 3
+		self.node = 'localhost'
 		self.ctx = TestCaseCtx.Default(tempfile.mkdtemp())
 	def tearDown(self):
 		with cls_cmd.LocalCmd() as c:
@@ -58,8 +55,8 @@ class TestDeploymentMethods(unittest.TestCase):
 	def test_deploy(self):
 		self.cont.yamlPath[0] = 'tests/simple-dep/'
 		self.cont.deploymentTag = "noble"
-		deploy = self.cont.DeployObject(self.ctx, self.html)
-		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertTrue(deploy)
 		self.assertTrue(undeploy)
 
@@ -67,8 +64,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		# fails reliably
 		old = self.cont.yamlPath
 		self.cont.yamlPath[0] = 'tests/simple-fail/'
-		deploy = self.cont.DeployObject(self.ctx, self.html)
-		self.cont.UndeployObject(self.ctx, self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
+		self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertFalse(deploy)
 		self.cont.yamlPath = old
 
@@ -76,8 +73,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		# fails reliably
 		old = self.cont.yamlPath
 		self.cont.yamlPath[0] = 'tests/simple-fail-2svc/'
-		deploy = self.cont.DeployObject(self.ctx, self.html)
-		self.cont.UndeployObject(self.ctx, self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
+		self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertFalse(deploy)
 		self.cont.yamlPath = old
 
@@ -85,8 +82,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb"
 		self.cont.deploymentTag = 'develop-12345678'
-		deploy = self.cont.DeployObject(self.ctx, self.html)
-		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertTrue(deploy)
 		self.assertTrue(undeploy)
 
@@ -94,8 +91,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb oai-nr-ue"
 		self.cont.deploymentTag = 'develop-12345678'
-		deploy = self.cont.DeployObject(self.ctx, self.html)
-		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
+		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertTrue(deploy)
 		self.assertTrue(undeploy)
 
@@ -103,13 +100,23 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
 		self.cont.services[0] = "oai-gnb"
 		self.cont.deploymentTag = 'develop-12345678'
-		deploy1 = self.cont.DeployObject(self.ctx, self.html)
+		deploy1 = self.cont.DeployObject(self.ctx, self.node, self.html)
 		self.cont.services[0] = "oai-nr-ue"
-		deploy2 = self.cont.DeployObject(self.ctx, self.html)
-		undeploy = self.cont.UndeployObject(self.ctx, self.html, self.ran)
+		deploy2 = self.cont.DeployObject(self.ctx, self.node, self.html)
+		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertTrue(deploy1)
 		self.assertTrue(deploy2)
 		self.assertTrue(undeploy)
+
+	def test_create_workspace(self):
+		self.cont.eNBSourceCodePath = tempfile.mkdtemp()
+		self.cont.ranRepository = "https://gitlab.eurecom.fr/oai/openairinterface5g.git"
+		self.cont.ranCommitID = "05f9c975eeecbca1bdff5940affad44465f1301f"
+		self.cont.ranBranch = "develop"
+		ws = self.cont.Create_Workspace(self.node, self.html)
+		with cls_cmd.LocalCmd() as cmd:
+			cmd.run(f"rm -rf {self.cont.eNBSourceCodePath}")
+		self.assertTrue(ws)
 
 if __name__ == '__main__':
 	unittest.main()
