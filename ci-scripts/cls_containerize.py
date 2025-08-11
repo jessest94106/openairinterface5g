@@ -230,23 +230,10 @@ class Containerize():
 		self.ranAllowMerge = False
 		self.ranCommitID = ''
 		self.ranTargetBranch = ''
-		self.eNBIPAddress = ''
-		self.eNBUserName = ''
-		self.eNBPassword = ''
 		self.eNBSourceCodePath = ''
-		self.eNB1IPAddress = ''
-		self.eNB1UserName = ''
-		self.eNB1Password = ''
-		self.eNB1SourceCodePath = ''
-		self.eNB2IPAddress = ''
-		self.eNB2UserName = ''
-		self.eNB2Password = ''
-		self.eNB2SourceCodePath = ''
 		self.forcedWorkspaceCleanup = False
 		self.imageKind = ''
 		self.proxyCommit = None
-		self.eNB_instance = 0
-		self.eNB_serverId = ['', '', '']
 		self.yamlPath = ''
 		self.services = ''
 		self.deploymentTag = ''
@@ -265,20 +252,6 @@ class Containerize():
 #-----------------------------------------------------------
 # Container management functions
 #-----------------------------------------------------------
-
-	def GetCredentials(self, server_id):
-		if server_id == '0':
-			ip, path = self.eNBIPAddress, self.eNBSourceCodePath
-		elif server_id == '1':
-			ip, path = self.eNB1IPAddress, self.eNB1SourceCodePath
-		elif server_id == '2':
-			ip, path = self.eNB2IPAddress, self.eNB2SourceCodePath
-		else:
-			raise ValueError(f"unknown server ID '{server_id}'")
-		if ip == '' or path == '':
-			HELP.GenericHelp(CONST.Version)
-			raise ValueError(f'Insufficient Parameter: IP/node {ip}, path {path}')
-		return (ip, path)
 
 	def BuildImage(self, ctx, node, HTML):
 		lSourcePath = self.eNBSourceCodePath

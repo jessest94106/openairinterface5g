@@ -425,7 +425,7 @@ elif re.match('^TerminateSPGW$', mode, re.IGNORECASE):
 elif re.match('^LogCollectBuild$', mode, re.IGNORECASE):
 	logging.warning("Option LogCollectBuild ignored")
 elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
-	if RAN.eNBIPAddress == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
+	if RAN.eNBSourceCodePath == '':
 		HELP.GenericHelp(CONST.Version)
 		sys.exit('Insufficient Parameter')
 	if os.path.isdir('cmake_targets/log'):
@@ -481,12 +481,12 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	logging.info('\u001B[1m  Starting Scenario: ' + CiTestObj.testXMLfiles[0] + '\u001B[0m')
 	logging.info('\u001B[1m----------------------------------------\u001B[0m')
 	if re.match('^TesteNB$', mode, re.IGNORECASE):
-		if RAN.eNBIPAddress == '' or RAN.ranRepository == '' or RAN.ranBranch == '' or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
+		if RAN.ranRepository == '' or RAN.ranBranch == '' or RAN.eNBSourceCodePath == '':
 			HELP.GenericHelp(CONST.Version)
 			if RAN.ranRepository == '':
 				HELP.GitSrvHelp(RAN.ranRepository, RAN.ranBranch, RAN.ranCommitID, RAN.ranAllowMerge, RAN.ranTargetBranch)
-			if RAN.eNBIPAddress == ''  or RAN.eNBUserName == '' or RAN.eNBPassword == '' or RAN.eNBSourceCodePath == '':
-				HELP.eNBSrvHelp(RAN.eNBIPAddress, RAN.eNBUserName, RAN.eNBPassword, RAN.eNBSourceCodePath)
+			if RAN.eNBSourceCodePath == '':
+				HELP.eNBSrvHelp(RAN.eNBSourceCodePath)
 			sys.exit('Insufficient Parameter')
 	else:
 		if CiTestObj.ranRepository == '' or CiTestObj.ranBranch == '':

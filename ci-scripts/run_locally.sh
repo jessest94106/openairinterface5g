@@ -33,13 +33,11 @@ python3 main.py --mode=InitiateHtml --ranRepository=NONE --ranBranch=${CURRENT_B
 
 python3 main.py --mode=TesteNB --ranRepository=NONE --ranBranch=${CURRENT_BRANCH} \
     --ranCommitID=${COMMIT_SHA} --ranAllowMerge=false \
-    --ranTargetBranch=NONE --eNBIPAddress=NONE --eNBUserName=NONE --eNBPassword=NONE \
+    --ranTargetBranch=NONE \
     --eNBSourceCodePath=${REPO_PATH} \
     --XMLTestFile=${TESTCASE} --local
 RET=$?
 
-python3 main.py --mode=FinalizeHtml \
-  --local \
-  --eNBIPAddress=NONE --eNBUserName=NONE --eNBPassword=NONE
+python3 main.py --mode=FinalizeHtml --local
 
 exit ${RET}
