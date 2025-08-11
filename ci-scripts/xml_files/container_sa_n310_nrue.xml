@@ -25,6 +25,7 @@
   <htmlTabName>40 MHz TDD SA</htmlTabName>
   <htmlTabIcon>tasks</htmlTabIcon>
   <TestCaseRequestedList>
+    060000
     010000 010001
     800813
     020000
@@ -38,8 +39,15 @@
     040001 040000
     333333
     444444
+    060001
   </TestCaseRequestedList>
   <TestCaseExclusionList></TestCaseExclusionList>
+
+  <testCase id="060000">
+    <class>DeployCoreNetwork</class>
+    <desc>Initialize 5G Core</desc>
+    <cn_id>oc-cn5g</cn_id>
+  </testCase>
 
   <testCase id="010000">
     <class>Pull_Cluster_Image</class>
@@ -177,6 +185,13 @@
     <desc>Clean Test Images on Test Server</desc>
     <svr_id>1</svr_id>
     <images>oai-nr-ue</images>
+  </testCase>
+
+  <testCase id="060001">
+    <class>UndeployCoreNetwork</class>
+    <desc>Terminate 5G Core</desc>
+    <always_exec>true</always_exec>
+    <cn_id>oc-cn5g</cn_id>
   </testCase>
 
 </testCaseList>
