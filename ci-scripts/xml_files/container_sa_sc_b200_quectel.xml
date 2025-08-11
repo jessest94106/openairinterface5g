@@ -53,7 +53,7 @@
   <testCase id="311111">
     <class>Pull_Local_Registry</class>
     <desc>Pull Images from Local Registry</desc>
-    <svr_id>0</svr_id>
+    <node>ofqot</node>
     <images>oai-gnb</images>
   </testCase>
 
@@ -217,7 +217,7 @@
     <class>Clean_Test_Server_Images</class>
     <always_exec>true</always_exec>
     <desc>Clean Test Images on Test Server</desc>
-    <svr_id>0</svr_id>
+    <node>ofqot</node>
     <images>oai-gnb</images>
   </testCase>
 

@@ -360,7 +360,7 @@ def ExecuteActionWithParam(action, ctx):
 		if force_local:
 			# Do not pull or remove images when running locally. User is supposed to handle image creation & cleanup
 			return True
-		svr_id = test.findtext('svr_id')
+		node = test.findtext('node') or 'localhost'
 		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
 		# hack: for FlexRIC, we need to overwrite the tag to use
@@ -368,9 +368,9 @@ def ExecuteActionWithParam(action, ctx):
 		if len(images) == 1 and images[0] == "oai-flexric":
 			tag = CONTAINERS.flexricTag
 		if action == "Pull_Local_Registry":
-			success = CONTAINERS.Pull_Image_from_Registry(HTML, svr_id, images, tag=tag, tag_prefix=tag_prefix)
+			success = CONTAINERS.Pull_Image_from_Registry(HTML, node, images, tag=tag, tag_prefix=tag_prefix)
 		if action == "Clean_Test_Server_Images":
-			success = CONTAINERS.Clean_Test_Server_Images(HTML, svr_id, images, tag=tag)
+			success = CONTAINERS.Clean_Test_Server_Images(HTML, node, images, tag=tag)
 
 	elif action == 'Custom_Command':
 		node = test.findtext('node')

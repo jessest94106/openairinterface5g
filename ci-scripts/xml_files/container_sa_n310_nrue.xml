@@ -175,7 +175,7 @@
     <class>Clean_Test_Server_Images</class>
     <always_exec>true</always_exec>
     <desc>Clean Test Images on Test Server</desc>
-    <svr_id>0</svr_id>
+    <node>avra</node>
     <images>oai-gnb</images>
   </testCase>
 
@@ -183,7 +183,7 @@
     <class>Clean_Test_Server_Images</class>
     <always_exec>true</always_exec>
     <desc>Clean Test Images on Test Server</desc>
-    <svr_id>1</svr_id>
+    <node>caracal</node>
     <images>oai-nr-ue</images>
   </testCase>
 

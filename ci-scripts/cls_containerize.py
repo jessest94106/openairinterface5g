@@ -702,28 +702,26 @@ class Containerize():
 		msg = "Pulled Images:\n" + '\n'.join(pulled_images)
 		return True, msg
 
-	def Pull_Image_from_Registry(self, HTML, svr_id, images, tag=None, tag_prefix="", registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
-		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug('\u001B[1m Pulling image(s) on server: ' + lIpAddr + '\u001B[0m')
+	def Pull_Image_from_Registry(self, HTML, node, images, tag=None, tag_prefix="", registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
+		logging.debug(f'\u001B[1m Pulling image(s) on server: {node}\u001B[0m')
 		if not tag:
 			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
-		with cls_cmd.getConnection(lIpAddr) as cmd:
+		with cls_cmd.getConnection(node) as cmd:
 			success, msg = Containerize.Pull_Image(cmd, images, tag, tag_prefix, registry, username, password)
-		param = f"on node {lIpAddr}"
+		param = f"on node {node}"
 		if success:
 			HTML.CreateHtmlTestRowQueue(param, 'OK', [msg])
 		else:
 			HTML.CreateHtmlTestRowQueue(param, 'KO', [msg])
 		return success
 
-	def Clean_Test_Server_Images(self, HTML, svr_id, images, tag=None):
-		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug(f'\u001B[1m Cleaning image(s) from server: {lIpAddr}\u001B[0m')
+	def Clean_Test_Server_Images(self, HTML, node, images, tag=None):
+		logging.debug(f'\u001B[1m Cleaning image(s) from server: {node}\u001B[0m')
 		if not tag:
 			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
 
 		status = True
-		with cls_cmd.getConnection(lIpAddr) as myCmd:
+		with cls_cmd.getConnection(node) as myCmd:
 			removed_images = []
 			for image in images:
 				fullImage = f"oai-ci/{image}:{tag}"
@@ -734,7 +732,7 @@ class Containerize():
 
 		msg = "Removed Images:\n" + '\n'.join(removed_images)
 		s = 'OK' if status else 'KO'
-		param = f"on node {lIpAddr}"
+		param = f"on node {node}"
 		HTML.CreateHtmlTestRowQueue(param, s, [msg])
 		return status
 
