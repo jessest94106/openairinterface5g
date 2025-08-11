@@ -126,53 +126,30 @@ def ExecuteActionWithParam(action, ctx):
 			success = CONTAINERS.BuildRunTests(ctx, node, HTML)
 
 	elif action == 'Initialize_eNB':
+		node = test.findtext('node')
 		datalog_rt_stats_file=test.findtext('rt_stats_cfg')
 		if datalog_rt_stats_file is None:
 			RAN.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
 		else:
 			RAN.datalog_rt_stats_file=datalog_rt_stats_file
 		RAN.Initialize_eNB_args=test.findtext('Initialize_eNB_args')
-		eNB_instance=test.findtext('eNB_instance')
-		USRPIPAddress=test.findtext('USRP_IPAddress')
-		if USRPIPAddress is None:
-			RAN.USRPIPAddress=''
-		else:
-			RAN.USRPIPAddress=USRPIPAddress
-		if (eNB_instance is None):
-			RAN.eNB_instance=0
-		else:
-			RAN.eNB_instance=int(eNB_instance)
-		eNB_serverId=test.findtext('eNB_serverId')
-		if (eNB_serverId is None):
-			RAN.eNB_serverId[RAN.eNB_instance]='0'
-		else:
-			RAN.eNB_serverId[RAN.eNB_instance]=eNB_serverId
-			
+		USRPIPAddress = test.findtext('USRP_IPAddress') or ''
+
 		#local variable air_interface
 		air_interface = test.findtext('air_interface')		
 		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			RAN.air_interface[RAN.eNB_instance] = 'lte-softmodem'
+			RAN.air_interface = 'lte-softmodem'
 		else:
-			RAN.air_interface[RAN.eNB_instance] = air_interface.lower() +'-softmodem'
+			RAN.air_interface = air_interface.lower() +'-softmodem'
 
 		cmd_prefix = test.findtext('cmd_prefix')
 		if cmd_prefix is not None: RAN.cmd_prefix = cmd_prefix
-		success = RAN.InitializeeNB(HTML)
+		success = RAN.InitializeeNB(ctx, node, HTML)
 
 	elif action == 'Terminate_eNB':
-		eNB_instance=test.findtext('eNB_instance')
-		if (eNB_instance is None):
-			RAN.eNB_instance=0
-		else:
-			RAN.eNB_instance=int(eNB_instance)
-		eNB_serverId=test.findtext('eNB_serverId')
-		if (eNB_serverId is None):
-			RAN.eNB_serverId[RAN.eNB_instance]='0'
-		else:
-			RAN.eNB_serverId[RAN.eNB_instance]=eNB_serverId
-
+		node = test.findtext('node')
 		#retx checkers
-		string_field=test.findtext('d_retx_th')
+		string_field = test.findtext('d_retx_th')
 		if (string_field is not None):
 			RAN.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
 		string_field=test.findtext('u_retx_th')
@@ -182,10 +159,10 @@ def ExecuteActionWithParam(action, ctx):
 		#local variable air_interface
 		air_interface = test.findtext('air_interface')		
 		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			RAN.air_interface[RAN.eNB_instance] = 'lte-softmodem'
+			RAN.air_interface = 'lte-softmodem'
 		else:
-			RAN.air_interface[RAN.eNB_instance] = air_interface.lower() +'-softmodem'
-		success = RAN.TerminateeNB(ctx, HTML)
+			RAN.air_interface = air_interface.lower() +'-softmodem'
+		success = RAN.TerminateeNB(ctx, node, HTML)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
