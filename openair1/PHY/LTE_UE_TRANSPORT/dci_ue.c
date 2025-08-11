@@ -1626,7 +1626,7 @@ void dci_decoding_procedure0(LTE_UE_PDCCH **pdcch_vars,
       printf("crc =>%x\n",crc);
 #endif
       uint8_t *ptr = dci_decoded_output;
-      if (( (L>1) && (crc == si_rnti||crc == p_rnti||crc == ra_rnti))||          (crc == pdcch_vars[eNB_id]->crnti))   {
+      if ((do_common && (L > 1) && (crc == si_rnti || crc == p_rnti || crc == ra_rnti)) || (crc == pdcch_vars[eNB_id]->crnti)) {
         dci_alloc[*dci_cnt].dci_length = sizeof_bits;
         dci_alloc[*dci_cnt].rnti       = crc;
         dci_alloc[*dci_cnt].L          = L;
@@ -1743,8 +1743,7 @@ uint16_t dci_CRNTI_decoding_procedure(PHY_VARS_UE *ue,
                                 int16_t eNB_id,
                                 uint8_t subframe)
 {
-
-  uint8_t  dci_cnt=0,old_dci_cnt=0;
+  uint8_t dci_cnt = 0;
   uint32_t CCEmap0=0,CCEmap1=0,CCEmap2=0;
   LTE_UE_PDCCH **pdcch_vars = ue->pdcch_vars[ue->current_thread_id[subframe]];
   LTE_DL_FRAME_PARMS *frame_parms  = &ue->frame_parms;
@@ -1850,8 +1849,7 @@ uint16_t dci_CRNTI_decoding_procedure(PHY_VARS_UE *ue,
                           &CCEmap1,
                           &CCEmap2);
 
-  if ((CCEmap0==0xffff)||
-      ((format0_found==1)&&(format_c_found==1)))
+  if ((CCEmap0 == 0xffff) || ((format0_found == 1) && (format_c_found == 1)))
     return(dci_cnt);
 
   if (DCIFormat == format1)
@@ -1863,7 +1861,7 @@ uint16_t dci_CRNTI_decoding_procedure(PHY_VARS_UE *ue,
 
            //printf("[DCI search] Format 1/1A aggregation 1\n");
 
-          old_dci_cnt=dci_cnt;
+          int old_dci_cnt = dci_cnt;
           dci_decoding_procedure0(pdcch_vars,0,mode,subframe,
                                   dci_alloc,
                                   eNB_id,
@@ -1887,14 +1885,11 @@ uint16_t dci_CRNTI_decoding_procedure(PHY_VARS_UE *ue,
                                   &CCEmap1,
                                   &CCEmap2);
 
-          if ((CCEmap0==0xffff) ||
-              (format_c_found==1))
+          if ((CCEmap0 == 0xffff) || (format_c_found == 1))
             return(dci_cnt);
 
           if (dci_cnt>old_dci_cnt)
             return(dci_cnt);
-
-          //printf("Crnti 1 decoding frame param agregation %d DCI %d \n",agregationLevel,DCIFormat);
 
       }
       else if (DCIFormat == format1A)
