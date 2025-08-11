@@ -125,7 +125,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
                 matchReg = re.match(r'^\-\-eNBIPAddress=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBIPAddress=matchReg.group(1)
                 CONTAINERS.eNBIPAddress=matchReg.group(1)
-                SCA.eNBIPAddress=matchReg.group(1)
                 CLUSTER.eNBIPAddress=matchReg.group(1)
             elif re.match(r'^\-\-eNB1IPAddress=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match(r'^\-\-eNB1IPAddress=(.+)$', myArgv, re.IGNORECASE)
@@ -140,7 +139,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
                 matchReg = re.match(r'^\-\-eNBUserName=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBUserName=matchReg.group(1)
                 CONTAINERS.eNBUserName=matchReg.group(1)
-                SCA.eNBUserName=matchReg.group(1)
                 CLUSTER.eNBUserName=matchReg.group(1)
             elif re.match(r'^\-\-eNB1UserName=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match(r'^\-\-eNB1UserName=(.+)$', myArgv, re.IGNORECASE)
@@ -155,7 +153,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
                 matchReg = re.match(r'^\-\-eNBPassword=(.+)$', myArgv, re.IGNORECASE)
                 RAN.eNBPassword=matchReg.group(1)
                 CONTAINERS.eNBPassword=matchReg.group(1)
-                SCA.eNBPassword=matchReg.group(1)
                 CLUSTER.eNBPassword=matchReg.group(1)
             elif re.match(r'^\-\-eNB1Password=(.+)$', myArgv, re.IGNORECASE):
                 matchReg = re.match(r'^\-\-eNB1Password=(.+)$', myArgv, re.IGNORECASE)

@@ -37,6 +37,7 @@
 	<testCase id="000001">
 		<class>Cppcheck_Analysis</class>
 		<desc>Static Code Analysis with cppcheck</desc>
+		<node>carabe</node>
 	</testCase>
 
 </testCaseList>
