@@ -247,8 +247,8 @@ class Containerize():
 		self.proxyCommit = None
 		self.eNB_instance = 0
 		self.eNB_serverId = ['', '', '']
-		self.yamlPath = ['', '', '']
-		self.services = ['', '', '']
+		self.yamlPath = ''
+		self.services = ''
 		self.deploymentTag = ''
 
 		self.cli = ''
@@ -746,11 +746,11 @@ class Containerize():
 		num_attempts = self.num_attempts
 		lSourcePath = self.eNBSourceCodePath
 		logging.debug(f'Deploying OAI Object on server: {node}')
-		yaml = self.yamlPath[self.eNB_instance].strip('/')
+		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
 		with cls_cmd.getConnection(node) as ssh:
-			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
+			services = GetServices(ssh, self.services, wd_yaml)
 			if services == [] or services == ' ' or services == None:
 				msg = 'Cannot determine services to start'
 				logging.error(msg)
@@ -788,7 +788,7 @@ class Containerize():
 	def UndeployObject(self, ctx, node, HTML, RAN):
 		lSourcePath = self.eNBSourceCodePath
 		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {node}\u001B[0m')
-		yaml = self.yamlPath[self.eNB_instance].strip('/')
+		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)

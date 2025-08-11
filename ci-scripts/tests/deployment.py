@@ -40,7 +40,7 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.ci = cls_oaicitest.OaiCiTest()
 		self.cont = cls_containerize.Containerize()
 		self.ran = ran.RANManagement()
-		self.cont.yamlPath[0] = ''
+		self.cont.yamlPath = ''
 		self.cont.ranAllowMerge = True
 		self.cont.ranBranch = ''
 		self.cont.ranCommitID = ''
@@ -53,7 +53,7 @@ class TestDeploymentMethods(unittest.TestCase):
 			c.run(f'rm -rf {self.ctx.logPath}')
 
 	def test_deploy(self):
-		self.cont.yamlPath[0] = 'tests/simple-dep/'
+		self.cont.yamlPath = 'tests/simple-dep/'
 		self.cont.deploymentTag = "noble"
 		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
 		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
@@ -63,7 +63,7 @@ class TestDeploymentMethods(unittest.TestCase):
 	def test_deployfails(self):
 		# fails reliably
 		old = self.cont.yamlPath
-		self.cont.yamlPath[0] = 'tests/simple-fail/'
+		self.cont.yamlPath = 'tests/simple-fail/'
 		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
 		self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertFalse(deploy)
@@ -72,15 +72,15 @@ class TestDeploymentMethods(unittest.TestCase):
 	def test_deployfails_2svc(self):
 		# fails reliably
 		old = self.cont.yamlPath
-		self.cont.yamlPath[0] = 'tests/simple-fail-2svc/'
+		self.cont.yamlPath = 'tests/simple-fail-2svc/'
 		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
 		self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertFalse(deploy)
 		self.cont.yamlPath = old
 
 	def test_deploy_ran(self):
-		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
-		self.cont.services[0] = "oai-gnb"
+		self.cont.yamlPath = 'yaml_files/5g_rfsimulator_tdd_dora'
+		self.cont.services = "oai-gnb"
 		self.cont.deploymentTag = 'develop-12345678'
 		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
 		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
@@ -88,8 +88,8 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.assertTrue(undeploy)
 
 	def test_deploy_multiran(self):
-		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
-		self.cont.services[0] = "oai-gnb oai-nr-ue"
+		self.cont.yamlPath = 'yaml_files/5g_rfsimulator_tdd_dora'
+		self.cont.services = "oai-gnb oai-nr-ue"
 		self.cont.deploymentTag = 'develop-12345678'
 		deploy = self.cont.DeployObject(self.ctx, self.node, self.html)
 		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
@@ -97,11 +97,11 @@ class TestDeploymentMethods(unittest.TestCase):
 		self.assertTrue(undeploy)
 
 	def test_deploy_staged(self):
-		self.cont.yamlPath[0] = 'yaml_files/5g_rfsimulator_tdd_dora'
-		self.cont.services[0] = "oai-gnb"
+		self.cont.yamlPath = 'yaml_files/5g_rfsimulator_tdd_dora'
+		self.cont.services = "oai-gnb"
 		self.cont.deploymentTag = 'develop-12345678'
 		deploy1 = self.cont.DeployObject(self.ctx, self.node, self.html)
-		self.cont.services[0] = "oai-nr-ue"
+		self.cont.services = "oai-nr-ue"
 		deploy2 = self.cont.DeployObject(self.ctx, self.node, self.html)
 		undeploy = self.cont.UndeployObject(self.ctx, self.node, self.html, self.ran)
 		self.assertTrue(deploy1)
