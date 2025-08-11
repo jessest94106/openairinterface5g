@@ -107,40 +107,6 @@ loading `libldpc_orig.so` instead of `libldpc.so`:
 ./nr-softmodem -O libconfig:gnb.band78.tm1.106PRB.usrpx300.conf:dbgl5  --loader.ldpc.shlibversion _orig
 ```
 
-loading `libldpc_cl.so` instead of `libldpc.so`:
-
-`make ldpc_cl`
-
-This command creates the `libldpc_cl.so` shared library. To perform this build successfully, only the OpenCL header `/usr/include/CL/opencl.h` and library `/usr/lib/x86_64-linux-gnu/libOpenCL.so` are required, they implement OpenCL API support which is not hardware dependent.
-
-```
-Scanning dependencies of target nrLDPC_decoder_kernels_CL
-Built target nrLDPC_decoder_kernels_CL
-Scanning dependencies of target ldpc_cl
-Building C object CMakeFiles/ldpc_cl.dir/usr/local/oai/oai-develop/openairinterface5g/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_CL.c.o
-In file included from /usr/include/CL/cl.h:32,
-                 from /usr/include/CL/opencl.h:38,
-                 from /usr/local/oai/oai-develop/openairinterface5g/openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_decoder_CL.c:49:
-/usr/include/CL/cl_version.h:34:9: note: #pragma message: cl_version.h: CL_TARGET_OPENCL_VERSION is not defined. Defaulting to 220 (OpenCL 2.2)
- #pragma message("cl_version.h: CL_TARGET_OPENCL_VERSION is not defined. Defaulting to 220 (OpenCL 2.2)")
-         ^~~~~~~
-
-Building C object CMakeFiles/ldpc_cl.dir/usr/local/oai/oai-develop/openairinterface5g/openair1/PHY/CODING/nrLDPC_encoder/ldpc_encoder_optim8segmulti.c.o
-Linking C shared module libldpc_cl.so
-Built target ldpc_cl
-
-```
-
-At runtime, to successfully use hardware acceleration via OpenCL, you need to install vendor specific packages which deliver the required drivers and tools to make use of their GPU (Nvidia, Intel...) , fpga (Xilinx, Intel) or CPU (Intel, AMD, ARM...) through OpenCL. 
-
-```
-./nr-softmodem -O  libconfig:gnb.band78.sa.fr1.106PRB.usrpb210.conf:dbgl5 --rfsim --rfsimulator.serveraddr server  --log_config.gtpu_log_level info  --loader.ldpc.shlibversion _cl
-```
-
-```
-./nr-uesoftmodem -r 106 --numerology 1 --band 78 -C 3619200000 --rfsim -O libconfig:/usr/local/oai/conf/nrue_sim.conf:dbgl5 --loader.ldpc.shlibversion _cl --log_config.hw_log_level inf
-```
-
 A mechanism to select ldpc implementation is also available in the `ldpctest` phy simulator via the `-v` option, which can be used to specify the version of the ldpc shared library to be used.
 
 #### Examples of ldpc shared lib selection when running ldpctest:
@@ -149,14 +115,6 @@ Loading libldpc_cuda.so, the cuda implementation of the ldpc decoder:
 
 ```
 $ ./ldpctest -v _cuda
-```
-
-Loading libldpc_cl.so, the opencl implementation of the ldpc decoder:
-
-`make ldpc_cl`
-
-```
-$ ./ldpctest -v _cl
 ```
 
 ### LDPC libraries
@@ -168,7 +126,5 @@ Libraries implementing the LDPC algorithms must be named `libldpc<_version>.so`,
 * `LDPCencoder` implementing type `LDPC_encoderfunc_t *`
 
 `libldpc_cuda.so` has been tested with the `ldpctest` executable, usage from the softmodem's has to be tested.
-
-`libldpc_cl.so` is under development.
 
 [oai Wikis home](https://gitlab.eurecom.fr/oai/openairinterface5g/wikis/home)
