@@ -77,6 +77,14 @@ typedef struct Gtpv1uExtHeader {
   uint8_t NextExtHeaderType;
 } __attribute__((packed)) Gtpv1uExtHeaderT;
 
+  typedef struct Gtpv1Error {
+    Gtpv1uMsgHeaderT h;
+    uint8_t teid_data_i;
+    teid_t teid;
+    uint8_t addr_data_i;
+    uint16_t addr_len;
+  } __attribute__((packed)) Gtpv1uError;
+
 #pragma pack()
 
 // TS 29.281, fig 5.2.1-3
@@ -949,7 +957,21 @@ static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, const
 
 static int Gtpv1uHandleError(int h, uint8_t *msgBuf, uint32_t msgBufLen, const struct sockaddr_in *addr)
 {
-  LOG_E(GTPU, "Received GTP error indication (error handling is missing/not implemented)\n");
+  if (msgBufLen < sizeof(Gtpv1uError))
+    LOG_E(GTPU, "Received GTP error indication with truncated size %u (mini size: %lu)\n", msgBufLen,sizeof(Gtpv1uError)+4);
+  Gtpv1uError *msg = ( Gtpv1uError *)msgBuf;
+  LOG_E(GTPU, "Received GTP error indication: \n"
+        "   TEID %u (must be 0 from TS 29.281)\n"
+        "   TV id for TEID %u (must be 16)\n"
+        "   TEID in error %u (should be a TEID we sent)\n"
+        "   TV id for GTP addr %u (should be 133)\n"
+        "   len for addr of UPF %u (should be IPv4 or IPv6 len)"
+        "   (TS 29.281 Sec 7.3.1 Error Handling not implemented)\n",
+        msg->h.teid,
+        msg->teid_data_i,
+        msg->teid,
+        msg->addr_data_i,
+        msg->addr_len);
   int rc = GTPNOK;
   return rc;
 }
