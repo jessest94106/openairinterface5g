@@ -70,7 +70,7 @@ class Native():
 		workSpacePath = f'{directory}/cmake_targets'
 		runLogFile=f'{workSpacePath}/physim.log'
 		with cls_cmd.getConnection(host) as cmd:
-			cmd.run(f'sudo LD_LIBRARY_PATH=.:{DPDK_PATH}/lib64/ {workSpacePath}/ran_build/build/{physim_test} {options} >> {runLogFile}')
+			cmd.run(f'sudo LD_LIBRARY_PATH=.:{DPDK_PATH}/lib64/ {workSpacePath}/ran_build/build/{physim_test} {options} > {runLogFile} 2>&1')
 			physim_file = archiveArtifact(cmd, ctx, runLogFile)
 		success, msg = cls_analysis.Analysis.analyze_physim(physim_file, physim_test, options, threshold)
 		if success:
