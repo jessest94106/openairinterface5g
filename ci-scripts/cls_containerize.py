@@ -214,7 +214,6 @@ def CheckLogs(self, filename, HTML, RAN):
 		HTML.htmleNBFailureMsg = ""
 	else:
 		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
-		HTML.CreateHtmlTestRowQueue(f"file {name}", 'OK', ["no analysis function"])
 	logging.debug(f"log check: file {filename} passed analysis {success}")
 	return success
 
