@@ -493,8 +493,8 @@ class RANManagement():
 		# nrL1_stats.log/nrMAC_stats.log should be in the same directory as main log file
 		# currently the link is only implicit as below based on pattern matching
 		# I will rework this to give the file explicitly
-		l1_stats_fn = re.sub(r'enb_[0-9]+', 'nrL1_stats', eNBlogFile)
-		mac_stats_fn = re.sub(r'enb_[0-9]+', 'nrMAC_stats', eNBlogFile)
+		l1_stats_fn = re.sub(r'-enb.log$', '-nrL1_stats.log', eNBlogFile)
+		mac_stats_fn = re.sub(r'-enb.log$', '-nrMAC_stats.log', eNBlogFile)
 		if os.path.isfile(l1_stats_fn) and os.path.isfile(mac_stats_fn):
 			# don't use CI-nrL1_stats.log, as this will increase the processing time for
 			# no reason, we just need the last occurence
