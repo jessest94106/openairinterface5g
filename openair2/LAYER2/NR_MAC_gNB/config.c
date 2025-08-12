@@ -393,9 +393,7 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
   return ul_slot_idxs[ul_slot_idx_in_period] + period_idx * fs->numb_slots_period;
 }
 
-static void config_common(gNB_MAC_INST *nrmac,
-                          const nr_mac_config_t *config,
-                          NR_ServingCellConfigCommon_t *scc)
+static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR_ServingCellConfigCommon_t *scc)
 {
   nfapi_nr_config_request_scf_t *cfg = &nrmac->config[0];
   nrmac->common_channels[0].ServingCellConfigCommon = scc;
@@ -734,6 +732,39 @@ static void config_common(gNB_MAC_INST *nrmac,
     if (NFAPI_MODE == NFAPI_MONOLITHIC) {
       cfg->analog_beamforming_ve.analog_bf_vendor_ext.tl.tag = NFAPI_NR_FAPI_ANALOG_BF_VENDOR_EXTENSION_TAG;
       cfg->num_tlv++;
+    }
+  }
+
+  if (IS_SA_MODE(get_softmodem_params())) {
+    int bw = frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
+    uint64_t bw_khz = (12 * bw) * (15 << mu);
+    uint64_t carr_dl = (cfg->carrier_config.dl_frequency.value + bw_khz / 2) * 1000;
+    uint64_t carr_ul = (cfg->carrier_config.uplink_frequency.value + bw_khz / 2) * 1000;
+    int prb_offset = (frequency_range == FR1) ?
+                     cfg->ssb_table.ssb_offset_point_a.value >> scs :
+                     cfg->ssb_table.ssb_offset_point_a.value >> (scs - 2);
+    int sc_offset = (frequency_range == FR1) ?
+                    cfg->ssb_table.ssb_subcarrier_offset.value >> scs :
+                    cfg->ssb_table.ssb_subcarrier_offset.value;
+    if (cfg->carrier_config.dl_frequency.value != cfg->carrier_config.uplink_frequency.value) {
+      LOG_I(NR_MAC,
+            "Command line parameters for OAI UE: -C %lu --CO %ld -r %d --numerology %d --band %ld --ssb %d %s\n",
+            carr_dl,
+            carr_ul - carr_dl,
+            bw,
+            mu,
+            band,
+            12 * prb_offset + sc_offset,
+            get_softmodem_params()->threequarter_fs ? "-E" : "");
+    } else {
+      LOG_I(NR_MAC,
+            "Command line parameters for OAI UE: -C %lu -r %d --numerology %d --band %ld --ssb %d %s\n",
+            carr_dl,
+            bw,
+            mu,
+            band,
+            12 * prb_offset + sc_offset,
+            get_softmodem_params()->threequarter_fs ? "-E" : "");
     }
   }
 }
