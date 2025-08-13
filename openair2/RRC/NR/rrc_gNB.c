@@ -366,6 +366,10 @@ NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish, bool do
       LOG_D(NR_RRC, "PDU Session %d not found, skip\n", drb->pdusession_id);
       continue;
     }
+    if (pduSession->status > PDU_SESSION_STATUS_TOMODIFY) {
+      LOG_D(NR_RRC, "PDU Session %d is not to add/mod\n", drb->pdusession_id);
+      continue;
+    }
     pdusession_t *session = &pduSession->param;
     NR_DRB_ToAddMod_t *drb_ToAddMod = calloc_or_fail(1, sizeof(*drb_ToAddMod));
     drb_ToAddMod->drb_Identity = drb->drb_id;
