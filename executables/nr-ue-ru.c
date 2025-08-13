@@ -371,3 +371,155 @@ void nrue_ru_end(void)
       openair0_dev[ru_id].trx_end_func(&openair0_dev[ru_id]);
   }
 }
+
+void nrue_ru_set_freq(PHY_VARS_NR_UE *UE, uint64_t ul_carrier, uint64_t dl_carrier, int freq_offset)
+{
+  int current_cell_id = nrue_rus[UE->rf_map.card].used_by_cell;
+  NR_DL_FRAME_PARMS *fp0 = &nrue_cell_fp[current_cell_id];
+  uint64_t dl_carrier_distance =
+      fp0->dl_CarrierFreq > dl_carrier ? fp0->dl_CarrierFreq - dl_carrier : dl_carrier - fp0->dl_CarrierFreq;
+  uint64_t ul_carrier_distance =
+      fp0->ul_CarrierFreq > ul_carrier ? fp0->ul_CarrierFreq - ul_carrier : ul_carrier - fp0->ul_CarrierFreq;
+  uint64_t carrier_distance = dl_carrier_distance + ul_carrier_distance;
+
+  for (int ru_id = 0; carrier_distance != 0 && ru_id < nrue_ru_count; ru_id++) {
+    int cell_id = nrue_rus[ru_id].used_by_cell;
+    if (cell_id < 0) // skip RUs that have no cell definition
+      continue;
+    if (nrue_cells[cell_id].used_by_ue >= 0) // skip cells that are already used by an UE
+      continue;
+
+    fp0 = &nrue_cell_fp[cell_id];
+    uint64_t this_dl_carrier_distance =
+        fp0->dl_CarrierFreq > dl_carrier ? fp0->dl_CarrierFreq - dl_carrier : dl_carrier - fp0->dl_CarrierFreq;
+    uint64_t this_ul_carrier_distance =
+        fp0->ul_CarrierFreq > ul_carrier ? fp0->ul_CarrierFreq - ul_carrier : ul_carrier - fp0->ul_CarrierFreq;
+    uint64_t this_carrier_distance = this_dl_carrier_distance + this_ul_carrier_distance;
+    if (this_carrier_distance < carrier_distance) {
+      UE->rf_map.card = ru_id;
+      carrier_distance = this_carrier_distance;
+    }
+  }
+
+  nrue_cells[current_cell_id].used_by_ue = -1;
+  current_cell_id = nrue_rus[UE->rf_map.card].used_by_cell;
+  nrue_cells[current_cell_id].used_by_ue = UE->Mod_id;
+
+  openair0_config_t *cfg0 = &openair0_cfg[UE->rf_map.card];
+  openair0_device_t *dev0 = &openair0_dev[UE->rf_map.card];
+  nr_rf_card_config_freq(cfg0, ul_carrier, dl_carrier, freq_offset);
+  dev0->trx_set_freq_func(dev0, cfg0);
+}
+
+int nrue_ru_adjust_rx_gain(PHY_VARS_NR_UE *UE, int gain_change)
+{
+  openair0_config_t *cfg0 = &openair0_cfg[UE->rf_map.card];
+  openair0_device_t *dev0 = &openair0_dev[UE->rf_map.card];
+
+  // Increase the RX gain by the value determined by adjust_rxgain
+  cfg0->rx_gain[0] += gain_change;
+
+  // Set new RX gain.
+  int ret_gain = dev0->trx_set_gains_func(dev0, cfg0);
+  // APPLY RX gain again if crossed the MAX RX gain threshold
+  if (ret_gain < 0) {
+    gain_change += ret_gain;
+    cfg0->rx_gain[0] += ret_gain;
+    ret_gain = dev0->trx_set_gains_func(dev0, cfg0);
+  }
+
+  int applied_rxgain = cfg0->rx_gain[0] - cfg0->rx_gain_offset[0];
+  LOG_I(HW, "Rxgain adjusted by %d dB, RX gain: %d dB \n", gain_change, applied_rxgain);
+
+  return gain_change;
+}
+
+int nrue_ru_read(PHY_VARS_NR_UE *UE, openair0_timestamp_t *ptimestamp, void **buff, int nsamps, int num_antennas)
+{
+  openair0_device_t *dev0 = &openair0_dev[UE->rf_map.card];
+  openair0_timestamp_t tmp_timestamp;
+  int ret = dev0->trx_read_func(dev0, &tmp_timestamp, buff, nsamps, num_antennas);
+  if (!dev0->firstTS_initialized) {
+    dev0->firstTS = tmp_timestamp;
+    dev0->firstTS_initialized = true;
+  }
+  *ptimestamp = tmp_timestamp - dev0->firstTS;
+
+  if (UE->Mod_id != 0)
+    return ret;
+
+  // UE 0 needs to read from all RUs that are not used by any other UE
+
+  void *tmp_buf[num_antennas];
+  uint32_t tmp_samples[nsamps];
+  for (int ant = 0; ant < num_antennas; ant++)
+    tmp_buf[ant] = tmp_samples;
+
+  for (int ru_id = 0; ru_id < nrue_ru_count; ru_id++) {
+    int cell_id = nrue_rus[ru_id].used_by_cell;
+    if (cell_id < 0) // skip RUs that have no cell definition
+      continue;
+    int ue_id = nrue_cells[cell_id].used_by_ue;
+    if (ue_id >= 0) // skip cells that are already used by an UE
+      continue;
+
+    dev0 = &openair0_dev[ru_id];
+    dev0->trx_read_func(dev0, &tmp_timestamp, tmp_buf, nsamps, num_antennas);
+    if (!dev0->firstTS_initialized) {
+      dev0->firstTS = tmp_timestamp;
+      dev0->firstTS_initialized = true;
+    }
+  }
+
+  return ret;
+}
+
+int nrue_ru_write(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, void **buff, int nsamps, int num_antennas, int flags)
+{
+  openair0_device_t *dev0 = &openair0_dev[UE->rf_map.card];
+  int ret = dev0->trx_write_func(dev0, timestamp + dev0->firstTS, buff, nsamps, num_antennas, flags);
+
+  if (UE->Mod_id != 0)
+    return ret;
+
+  // UE 0 needs to write to all RUs that are not used by any other UE
+
+  void *tmp_buf[num_antennas];
+  uint32_t tmp_samples[nsamps];
+  memset(tmp_samples, 0, sizeof(tmp_samples));
+  for (int ant = 0; ant < num_antennas; ant++)
+    tmp_buf[ant] = tmp_samples;
+
+  for (int ru_id = 0; ru_id < nrue_ru_count; ru_id++) {
+    int cell_id = nrue_rus[ru_id].used_by_cell;
+    if (cell_id < 0) // skip RUs that have no cell definition
+      continue;
+    int ue_id = nrue_cells[cell_id].used_by_ue;
+    if (ue_id >= 0) // skip cells that are already used by an UE
+      continue;
+
+    dev0 = &openair0_dev[ru_id];
+    dev0->trx_write_func(dev0, timestamp + dev0->firstTS, tmp_buf, nsamps, num_antennas, flags);
+  }
+  return ret;
+}
+
+int openair0_write_reorder_common(PHY_VARS_NR_UE *UE,
+                                  openair0_device_t *device,
+                                  openair0_timestamp_t timestamp,
+                                  void **txp,
+                                  int nsamps,
+                                  int nbAnt,
+                                  int flags);
+
+int nrue_ru_write_reorder(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, void **txp, int nsamps, int nbAnt, int flags)
+{
+  openair0_device_t *device = &openair0_dev[UE->rf_map.card];
+  return openair0_write_reorder_common(UE, device, timestamp, txp, nsamps, nbAnt, flags);
+}
+
+void nrue_ru_write_reorder_clear_context(PHY_VARS_NR_UE *UE)
+{
+  openair0_device_t *device = &openair0_dev[UE->rf_map.card];
+  openair0_write_reorder_clear_context(device);
+}

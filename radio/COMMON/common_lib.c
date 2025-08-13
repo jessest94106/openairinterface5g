@@ -187,7 +187,19 @@ static void writerEnqueue(re_order_t *ctx, openair0_timestamp_t timestamp, void 
   pthread_mutex_unlock(&ctx->mutex_store);
 }
 
-static void writerProcessWaitingQueue(openair0_device_t *device)
+typedef struct PHY_VARS_NR_UE_s PHY_VARS_NR_UE;
+__attribute__((weak)) int nrue_ru_write(PHY_VARS_NR_UE *UE,
+                                        openair0_timestamp_t timestamp,
+                                        void **txp,
+                                        int nsamps,
+                                        int nbAnt,
+                                        int flags)
+{
+  AssertFatal(0, "this weak function implementation should never be called!\n");
+  return 0;
+}
+
+static void writerProcessWaitingQueue(PHY_VARS_NR_UE *UE, openair0_device_t *device)
 {
   bool found = false;
   re_order_t *ctx = &device->reOrder;
@@ -209,7 +221,11 @@ static void writerProcessWaitingQueue(openair0_device_t *device)
         pthread_mutex_unlock(&ctx->mutex_store);
         found = true;
         if (flags || IS_SOFTMODEM_RFSIM) {
-          int wroteSamples = device->trx_write_func(device, timestamp, txp, nsamps, nbAnt, flags);
+          int wroteSamples;
+          if (UE)
+            wroteSamples = nrue_ru_write(UE, timestamp, txp, nsamps, nbAnt, flags);
+          else
+            wroteSamples = device->trx_write_func(device, timestamp, txp, nsamps, nbAnt, flags);
           if (wroteSamples != nsamps)
             LOG_E(HW, "Failed to write to rf\n");
         }
@@ -226,7 +242,13 @@ static void writerProcessWaitingQueue(openair0_device_t *device)
 // but to make zerocopy and agnostic design, we need to make a proper ring buffer with mutex protection
 // mutex (or atomic flags) will be mandatory because this out order system root cause is there are several writer threads
 
-int openair0_write_reorder(openair0_device_t *device, openair0_timestamp_t timestamp, void **txp, int nsamps, int nbAnt, int flags)
+int openair0_write_reorder_common(PHY_VARS_NR_UE *UE,
+                                  openair0_device_t *device,
+                                  openair0_timestamp_t timestamp,
+                                  void **txp,
+                                  int nsamps,
+                                  int nbAnt,
+                                  int flags)
 {
   int wroteSamples = 0;
   re_order_t *ctx = &device->reOrder;
@@ -240,25 +262,33 @@ int openair0_write_reorder(openair0_device_t *device, openair0_timestamp_t times
   if (pthread_mutex_trylock(&ctx->mutex_write) == 0) {
     // We have the write exclusivity
     if (llabs(timestamp - ctx->nextTS) < MAX_GAP) { // We are writing in sequence of the previous write
-      if (flags || IS_SOFTMODEM_RFSIM)
-        wroteSamples = device->trx_write_func(device, timestamp, txp, nsamps, nbAnt, flags);
-      else
+      if (flags || IS_SOFTMODEM_RFSIM) {
+        if (UE)
+          wroteSamples = nrue_ru_write(UE, timestamp, txp, nsamps, nbAnt, flags);
+        else
+          wroteSamples = device->trx_write_func(device, timestamp, txp, nsamps, nbAnt, flags);
+      } else
         wroteSamples = nsamps;
       ctx->nextTS = timestamp + nsamps;
 
     } else {
       writerEnqueue(ctx, timestamp, txp, nsamps, nbAnt, flags);
     }
-    writerProcessWaitingQueue(device);
+    writerProcessWaitingQueue(UE, device);
     pthread_mutex_unlock(&ctx->mutex_write);
     return wroteSamples ? wroteSamples : nsamps;
   }
   writerEnqueue(ctx, timestamp, txp, nsamps, nbAnt, flags);
   if (pthread_mutex_trylock(&ctx->mutex_write) == 0) {
-    writerProcessWaitingQueue(device);
+    writerProcessWaitingQueue(UE, device);
     pthread_mutex_unlock(&ctx->mutex_write);
   }
   return nsamps;
+}
+
+int openair0_write_reorder(openair0_device_t *device, openair0_timestamp_t timestamp, void **txp, int nsamps, int nbAnt, int flags)
+{
+  return openair0_write_reorder_common(NULL, device, timestamp, txp, nsamps, nbAnt, flags);
 }
 
 void openair0_write_reorder_clear_context(openair0_device_t *device)

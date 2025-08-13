@@ -419,6 +419,12 @@ struct openair0_device {
   /* !brief RF frontend parameters set by application */
   openair0_config_t *openair0_cfg;
 
+  /* !brief timestamp of first read */
+  openair0_timestamp_t firstTS;
+
+  /* !brief flag indicating that firstTS was initialized */
+  bool firstTS_initialized;
+
   /* !brief ETH params set by application */
   eth_params_t *eth_params;
   //! record player data, definition in record_player.h
