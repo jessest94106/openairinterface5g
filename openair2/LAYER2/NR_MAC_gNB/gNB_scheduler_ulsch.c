@@ -2311,8 +2311,8 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
   pusch_pdu->pusch_data.tb_size = sched_pusch->tb_size;
   pusch_pdu->pusch_data.num_cb = 0; // CBG not supported
   // Beamforming
-  pusch_pdu->beamforming.num_prgs = 0;
-  pusch_pdu->beamforming.prg_size = 0; // bwp_size;
+  pusch_pdu->beamforming.num_prgs = 1;
+  pusch_pdu->beamforming.prg_size = pusch_pdu->bwp_size;
   pusch_pdu->beamforming.dig_bf_interface = 1;
   pusch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
   /* TRANSFORM PRECODING --------------------------------------------------------*/

@@ -787,12 +787,19 @@ typedef struct {
   uid_allocator_t uid_allocator;
 } NR_UEs_t;
 
+typedef enum {
+  NO_BEAM_MODE,
+  PRECONFIGURED_BEAM_IDX,
+  LOPHY_BEAM_IDX,
+} nr_beam_mode_t;
+
 typedef struct {
   /// list of allocated beams per period
   int **beam_allocation;
   int beam_duration; // in slots
   int beams_per_period;
   int beam_allocation_size;
+  nr_beam_mode_t beam_mode;
 } NR_beam_info_t;
 
 #define UE_iterator(BaSe, VaR) NR_UE_info_t ** VaR##pptr=BaSe, *VaR; while ((VaR=*(VaR##pptr++)))
