@@ -213,8 +213,8 @@ With the nvIPC sources in the project directory, the docker image can be built.
 In order to build the target image (`oai-gnb-aerial`), first you should build a common shared image (`ran-base`)
 ```bash
 ~$ cd ~/openairinterface5g/
-~/openairinterface5g$ docker build . -f docker/Dockerfile.base.ubuntu22 --tag ran-base:latest
-~/openairinterface5g$ docker build . -f docker/Dockerfile.gNB.aerial.ubuntu22 --tag oai-gnb-aerial:latest
+~/openairinterface5g$ docker build . -f docker/Dockerfile.base.ubuntu --tag ran-base:latest
+~/openairinterface5g$ docker build . -f docker/Dockerfile.gNB.aerial.ubuntu --tag oai-gnb-aerial:latest
 ```
 
 

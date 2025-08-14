@@ -21,7 +21,7 @@
 #---------------------------------------------------------------------
 #
 # Dockerfile for the Open-Air-Interface BUILD service
-#   Valid for Ubuntu 22.04
+#   Valid for Ubuntu 24.04
 #
 #---------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ WORKDIR /oai-ran
 COPY . .
 
 RUN /bin/sh oaienv && \
-    tar -xvzf nvipc*  && \
+    tar -xvzf nvipc* && \
     cd nvipc_src.* && \
     rm -rf build && mkdir build && cd build && \
     cmake .. -DNVIPC_DPDK_ENABLE=OFF -DNVIPC_DOCA_ENABLE=OFF -DNVIPC_CUDA_ENABLE=OFF -DENABLE_SLT_RSP=ON && \
@@ -54,18 +54,17 @@ RUN /bin/sh oaienv && \
 RUN /bin/sh oaienv && \
     cd cmake_targets && \
     mkdir -p log && \
-    ./build_oai -c -w AERIAL --gNB --ninja --build-tool-opt -k10 \
-      --cmake-opt -DCMAKE_C_FLAGS="-Werror" --cmake-opt -DCMAKE_CXX_FLAGS="-Werror"
+    ./build_oai -w AERIAL --gNB --ninja --sanitize-address
 
 
 #start from scratch for target executable
-FROM ubuntu:jammy AS oai-gnb-aerial
+FROM ubuntu:noble AS oai-gnb-aerial
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+    apt-get upgrade --yes && \
+    apt-get install --yes \
         software-properties-common \
         procps \
         libsctp1 \
@@ -89,9 +88,13 @@ COPY --from=ran-build \
 COPY ./docker/scripts/gnb_entrypoint.sh ./entrypoint.sh
 
 COPY --from=ran-build \
-  /oai-ran/cmake_targets/ran_build/build/libparams_libconfig.so \
-  /oai-ran/cmake_targets/ran_build/build/libparams_yaml.so \
-  /usr/local/lib/
+    /oai-ran/cmake_targets/ran_build/build/libcoding.so \
+    /oai-ran/cmake_targets/ran_build/build/librfsimulator.so \
+    /oai-ran/cmake_targets/ran_build/build/libparams_libconfig.so \
+    /oai-ran/cmake_targets/ran_build/build/libdfts.so \
+    /oai-ran/cmake_targets/ran_build/build/libldpc*.so \
+    /oai-ran/cmake_targets/ran_build/build/libparams_yaml.so \
+    /usr/local/lib/
 
 #copy files from nvIPC
 COPY --from=ran-build \

@@ -21,7 +21,7 @@
 #---------------------------------------------------------------------
 #
 # Dockerfile for the Open-Air-Interface RAN Build for FHI 7.2
-#               Valid for UBUNTU 22.04
+#               Valid for UBUNTU 24.04
 #
 #---------------------------------------------------------------------
 
@@ -32,8 +32,8 @@ ARG KPM_VERSION=KPM_V3_00
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get upgrade --yes && \
-    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+    apt-get upgrade --yes && \
+    apt-get install --yes \
         meson \
         wget \
         xz-utils \
@@ -94,8 +94,6 @@ RUN mkdir -p openair2/E2AP/flexric/build && \
     cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
           -DXAPP_MULTILANGUAGE=OFF \
           -DKPM_VERSION=$KPM_VERSION \
-          -DE2AP_VERSION=$E2AP_VERSION \
-          -DCMAKE_C_COMPILER=gcc-12 \
-          -DCMAKE_CXX_COMPILER=g++-12 .. && \
+          -DE2AP_VERSION=$E2AP_VERSION .. && \
     ninja && \
     ninja install
