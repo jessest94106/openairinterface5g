@@ -403,7 +403,6 @@ typedef struct NR_pusch_dmrs {
 typedef struct NR_sched_pusch {
   int frame;
   int slot;
-  int mu;
 
   /// RB allocation within active uBWP
   uint16_t rbSize;
@@ -429,12 +428,6 @@ typedef struct NR_sched_pusch {
   bwp_info_t bwp_info;
   int phr_txpower_calc;
 } NR_sched_pusch_t;
-
-typedef struct NR_sched_srs {
-  int frame;
-  int slot;
-  bool srs_scheduled;
-} NR_sched_srs_t;
 
 typedef struct NR_pdsch_dmrs {
   uint8_t dmrs_ports_id;
@@ -592,18 +585,13 @@ typedef struct {
   /// corresponding to the sched_pusch/sched_pdsch structures below
   int cce_index;
   uint8_t aggregation_level;
+  uint32_t dl_cce_fail, ul_cce_fail;
 
   /// Array of PUCCH scheduling information
   /// Its size depends on TDD configuration and max feedback time
   /// There will be a structure for each UL slot in the active period determined by the size
   NR_sched_pucch_t *sched_pucch;
   int sched_pucch_size;
-
-  /// Sched PUSCH: scheduling decisions, copied into HARQ and cleared every TTI
-  NR_sched_pusch_t sched_pusch;
-
-  /// Sched SRS: scheduling decisions
-  NR_sched_srs_t sched_srs;
 
   /// uplink bytes that are currently scheduled
   int sched_ul_bytes;
@@ -787,18 +775,40 @@ typedef struct {
   uid_allocator_t uid_allocator;
 } NR_UEs_t;
 
+typedef enum {
+  NO_BEAM_MODE,
+  PRECONFIGURED_BEAM_IDX,
+  LOPHY_BEAM_IDX,
+} nr_beam_mode_t;
+
 typedef struct {
   /// list of allocated beams per period
   int **beam_allocation;
   int beam_duration; // in slots
   int beams_per_period;
   int beam_allocation_size;
+  nr_beam_mode_t beam_mode;
 } NR_beam_info_t;
 
 #define UE_iterator(BaSe, VaR) NR_UE_info_t ** VaR##pptr=BaSe, *VaR; while ((VaR=*(VaR##pptr++)))
 
+typedef struct {
+  /// current frame for DCI
+  frame_t frame;
+  /// current slot for DCI
+  slot_t slot;
+  /// FAPI UL_DCI.request in which allocations are to be made
+  nfapi_nr_ul_dci_request_t *ul_dci_req;
+  /// group PDCCH PDU per CORESET
+  nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_coreset[MAX_NUM_CORESET];
+} post_process_pusch_t;
+
+/* forward declaration to use in nr_pp_impl_dl */
+struct gNB_MAC_INST_s;
+typedef struct gNB_MAC_INST_s gNB_MAC_INST;
+
 typedef void (*nr_pp_impl_dl)(module_id_t mod_id, frame_t frame, slot_t slot);
-typedef bool (*nr_pp_impl_ul)(module_id_t mod_id, frame_t frame, slot_t slot);
+typedef void (*nr_pp_impl_ul)(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_pusch);
 
 typedef struct f1_config_t {
   f1ap_setup_req_t *setup_req;
@@ -815,6 +825,14 @@ typedef struct {
   uint64_t total_prb_aggregate;
   uint64_t used_prb_aggregate;
 } mac_stats_t;
+
+/// helper type to encapsulate a frame/slot combination in a single type.
+/// Currently only used in the UL preprocessor. Note: if you use this type
+/// further, please refactor it into a common type first.
+typedef struct fsn {
+  frame_t f;
+  slot_t s;
+} fsn_t;
 
 /*! \brief top level eNB MAC structure */
 typedef struct gNB_MAC_INST_s {
@@ -917,6 +935,12 @@ typedef struct gNB_MAC_INST_s {
   bool identity_pm;
   int precoding_matrix_size[NR_MAX_NB_LAYERS];
   int fapi_beam_index[MAX_NUM_OF_SSB];
+
+  /// dedicate UL TDA, common for all UEs
+  seq_arr_t ul_tda;
+  /// next UL slot to schedule
+  fsn_t ul_next;
+
   nr_mac_rrc_ul_if_t mac_rrc;
   f1_config_t f1_config;
   int16_t frame;

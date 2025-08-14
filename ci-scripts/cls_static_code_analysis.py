@@ -76,25 +76,18 @@ class StaticCodeAnalysis():
 		self.ranAllowMerge = False
 		self.ranCommitID = ''
 		self.ranTargetBranch = ''
-		self.eNBIPAddress = ''
-		self.eNBUserName = ''
-		self.eNBPassword = ''
 		self.eNBSourceCodePath = ''
 
-	def CppCheckAnalysis(self, ctx, HTML):
+	def CppCheckAnalysis(self, ctx, node, HTML):
 		if self.ranRepository == '' or self.ranBranch == '' or self.ranCommitID == '':
 			HELP.GenericHelp(CONST.Version)
 			sys.exit('Insufficient Parameter')
-		lIpAddr = self.eNBIPAddress
-		lUserName = self.eNBUserName
-		lPassWord = self.eNBPassword
 		lSourcePath = self.eNBSourceCodePath
 
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.getConnection(lIpAddr)
+		if not lSourcePath or not node:
+			raise ValueError(f"{lSourcePath=} {node=}")
+		logging.debug('Building on server: ' + node)
+		cmd = cls_cmd.getConnection(node)
 		self.testCase_id = HTML.testCase_id
 		# on RedHat/CentOS .git extension is mandatory
 		result = re.search('([a-zA-Z0-9\:\-\.\/])+\.git', self.ranRepository)
@@ -184,20 +177,16 @@ class StaticCodeAnalysis():
 
 		return True
 
-	def LicenceAndFormattingCheck(self, ctx, HTML):
+	def LicenceAndFormattingCheck(self, ctx, node, HTML):
 		# Workspace is no longer recreated from scratch.
 		# It implies that this method shall be called last within a build pipeline
 		# where workspace is already created
-		lIpAddr = self.eNBIPAddress
-		lUserName = self.eNBUserName
-		lPassWord = self.eNBPassword
 		lSourcePath = self.eNBSourceCodePath
 
-		if lIpAddr == '' or lUserName == '' or lPassWord == '' or lSourcePath == '':
-			HELP.GenericHelp(CONST.Version)
-			sys.exit('Insufficient Parameter')
-		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.getConnection(lIpAddr)
+		if not node or not lSourcePath:
+			raise ValueError(f"{lSourcePath=} {node=}")
+		logging.debug('Building on server: ' + node)
+		cmd = cls_cmd.getConnection(node)
 		self.testCase_id = HTML.testCase_id
 
 		check_options = ''
@@ -212,7 +201,7 @@ class StaticCodeAnalysis():
 		logDir = f'{lSourcePath}/cmake_targets/log/'
 		cmd.run(f'mkdir -p {logDir}')
 		cmd.run('docker image rm oai-formatting-check:latest')
-		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.bionic {lSourcePath} > {logDir}/oai-formatting-check.txt 2>&1')
+		cmd.run(f'docker build --target oai-formatting-check --tag oai-formatting-check:latest {check_options} --file {lSourcePath}/ci-scripts/docker/Dockerfile.formatting.ubuntu {lSourcePath} > {logDir}/oai-formatting-check.txt 2>&1')
 
 		cmd.run('docker image rm oai-formatting-check:latest')
 		cmd.run('docker image prune --force')

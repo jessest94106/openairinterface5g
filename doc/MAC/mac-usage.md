@@ -49,9 +49,11 @@ The value of `pdcch_cl_adjust` is clamped to range <0,1>, the increment value is
 the decrement value is 0.01. These values are selected to ensure PDCCH success rate is high.
 See Examples below for futher explaination.
 
-The possible values of aggregation level on UE SS can be configured via `uess_agg_levels` configuration
-option. By default the gNB uses only aggregation level 2 which translates to `uess_agg_levels` set to
-`[0, 1, 0, 0, 0]`. For example, to enable aggregation level 2 and 4 set `uess_agg_levels` to `[0, 1, 1, 0, 0]`.
+The possible values of aggregation level on UE SS can be configured via
+`uess_agg_levels` configuration option. By default the gNB uses two candidates
+in aggregation level 2 which translates to `uess_agg_levels` set to `[0, 2, 0,
+0, 0]`. For example, to enable one candidate on aggregation levels 2 and 4 set
+`uess_agg_levels` to `[0, 1, 1, 0, 0]`.
 
 ### Examples:
 #### Example 1:
@@ -79,8 +81,8 @@ Example:
 UE RNTI 2460 CU-UE-ID 2 in-sync PH 28 dB PCMAX 24 dBm, average RSRP -74 (8 meas)
 UE 2460: CQI 15, RI 2, PMI (14,1)
 UE 2460: UL-RI 2 TPMI 0
-UE 2460: dlsch_rounds 32917/5113/1504/560, dlsch_errors 211, pucch0_DTX 1385, BLER 0.19557 MCS (1) 23
-UE 2460: ulsch_rounds 3756/353/182/179, ulsch_errors 170, ulsch_DTX 285, BLER 0.33021 MCS (1) 27 (Qm 8  dB) NPRB 5  SNR 31.0 dB
+UE 2460: dlsch_rounds 32917/5113/1504/560, dlsch_errors 211, pucch0_DTX 1385, BLER 0.19557 MCS (1) 23 CCE fail 3
+UE 2460: ulsch_rounds 3756/353/182/179, ulsch_errors 170, ulsch_DTX 285, BLER 0.33021 MCS (1) 27 (Qm 8  dB) NPRB 5  SNR 31.0 dB CCE fail 0
 UE 2460: MAC:    TX     1530943191 RX         194148 bytes
 UE 2460: LCID 1: TX            651 RX           3031 bytes
 UE 2460: LCID 2: TX              0 RX              0 bytes
@@ -159,6 +161,9 @@ The fourth and fifth line show HARQ-related information:
   should be close to the target in the gNB configuration file,
   `pusch_TargetSNRx10`, which should be around 10 times the value shown in the
   log
+* Both ULSCH/DLSCH `CCE fail`: lists the number of failed CCE attempts. If this
+  number gets high, it signifies that the scheduler tried to scheduled this UE,
+  but could not allocate the DCI.
 
 In the last lines:
 * `MAC` shows the amount of MAC PDU bytes scheduled in transmit (`TX`,
@@ -205,17 +210,17 @@ In the `MACRLCs` section of the gNB/DU configuration file:
   retransmission over initial transmission) to decrease MCS by 1
 * `dl_bler_target_lower` (default 0.05): lower threshold of BLER (first round
   retransmission over initial transmission) to increase MCS by 1
-* `dl_max_mcs` (default 28): maximum MCS to use
+* `dl_min_mcs` (default 0): minimum MCS to use for any UE
+* `dl_max_mcs` (default 28): maximum MCS to use for any UE
 * `ul_bler_target_upper` (default 0.15): as `dl_bler_target_upper`
 * `ul_bler_target_lower` (default 0.05): as `dl_bler_target_lower`
+* `ul_min_mcs` (default 0): as `dl_min_mcs`
 * `ul_max_mcs` (default 28): as `dl_max_mcs`
 * `dl_harq_round_max` (default 4): maximum number of HARQ rounds, i.e.,
   retransmissions to perform, in DL
 * `ul_harq_round_max` (default 4): as `dl_harq_round_max`
 * `min_grant_prb` (default 5): number of PRBs to schedule for UE after activity
   (see `ulsch_max_frame_inactivity`) or after scheduling request (SR)
-* `min_grant_mcs` (default 9): MCS to use for UE after activity (see
-  `ulsch_max_frame_inactivity`) or after scheduling request (SR)
 * `identity_precoding_matrix` (default 0=false): flag to enable to use only
   the identity precoding matrix in DL precoding
 * `set_analog_beamforming` (default 0=false): flag to enable analog

@@ -168,12 +168,13 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
 
     output += snprintf(output,
                        end - output,
-                       ", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS (%d) %d\n",
+                       ", dlsch_errors %"PRIu64", pucch0_DTX %d, BLER %.5f MCS (%d) %d CCE fail %d\n",
                        stats->dl.errors,
                        stats->pucch0_DTX,
                        sched_ctrl->dl_bler_stats.bler,
                        UE->current_DL_BWP.mcsTableIdx,
-                       sched_ctrl->dl_bler_stats.mcs);
+                       sched_ctrl->dl_bler_stats.mcs,
+                       sched_ctrl->dl_cce_fail);
     if (reset_rsrp) {
       stats->num_rsrp_meas = 0;
       stats->cumul_rsrp = 0;
@@ -187,7 +188,7 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
 
     output += snprintf(output,
                        end - output,
-                       ", ulsch_errors %"PRIu64", ulsch_DTX %d, BLER %.5f MCS (%d) %d (Qm %d deltaMCS %d dB) NPRB %d  SNR %d.%d dB\n",
+                       ", ulsch_errors %"PRIu64", ulsch_DTX %d, BLER %.5f MCS (%d) %d (Qm %d deltaMCS %d dB) NPRB %d  SNR %d.%d dB CCE fail %d\n",
                        stats->ul.errors,
                        stats->ulsch_DTX,
                        sched_ctrl->ul_bler_stats.bler,
@@ -197,7 +198,8 @@ size_t dump_mac_stats(gNB_MAC_INST *gNB, char *output, size_t strlen, bool reset
                        UE->mac_stats.deltaMCS,
                        UE->mac_stats.NPRB,
                        sched_ctrl->pusch_snrx10 / 10,
-                       sched_ctrl->pusch_snrx10 % 10);
+                       sched_ctrl->pusch_snrx10 % 10,
+                       sched_ctrl->ul_cce_fail);
     output += snprintf(output,
                        end - output,
                        "UE %04x: MAC:    TX %14"PRIu64" RX %14"PRIu64" bytes\n",
@@ -242,9 +244,6 @@ void mac_top_init_gNB(ngran_node_t node_type,
                       const nr_mac_config_t *config,
                       const nr_rlc_configuration_t *default_rlc_config)
 {
-  module_id_t     i;
-  gNB_MAC_INST    *nrmac;
-
   AssertFatal(RC.nb_nr_macrlc_inst == 1, "what is the point of calling %s() if you don't need exactly one MAC?\n", __func__);
 
   if (RC.nb_nr_macrlc_inst > 0) {
@@ -255,7 +254,7 @@ void mac_top_init_gNB(ngran_node_t node_type,
                 RC.nb_nr_macrlc_inst * sizeof(gNB_MAC_INST *),
                 RC.nb_nr_macrlc_inst, sizeof(gNB_MAC_INST));
 
-    for (i = 0; i < RC.nb_nr_macrlc_inst; i++) {
+    for (module_id_t i = 0; i < RC.nb_nr_macrlc_inst; i++) {
 
       RC.nrmac[i] = (gNB_MAC_INST *) malloc16(sizeof(gNB_MAC_INST));
       
@@ -315,8 +314,8 @@ void mac_top_init_gNB(ngran_node_t node_type,
   }
 
   // Initialize Linked-List for Active UEs
-  for (i = 0; i < RC.nb_nr_macrlc_inst; i++) {
-    nrmac = RC.nrmac[i];
+  for (module_id_t i = 0; i < RC.nb_nr_macrlc_inst; i++) {
+    gNB_MAC_INST *nrmac = RC.nrmac[i];
     nrmac->if_inst = NR_IF_Module_init(i);
     memset(&nrmac->UE_info, 0, sizeof(nrmac->UE_info));
   }

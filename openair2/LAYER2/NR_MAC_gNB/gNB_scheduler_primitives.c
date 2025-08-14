@@ -424,37 +424,54 @@ static NR_SearchSpace_t *get_searchspace(NR_ServingCellConfigCommon_t *scc,
   AssertFatal(false, "Couldn't find an adequate SearchSpace for target SearchSpace %d in ServingCellConfigCommon\n", target_ss);
 }
 
+/// @brief Get CORESET resource block parameters from frequency domain resources bitmap.
+/// @param coreset Pointer to the CORESET configuratio
+/// @param n_rb Output parameter for total # of RBs in the CORESET
+/// @param rb_start Output parameter for the starting resource block index of the CORESET
+static void get_coreset_rb_params(const NR_ControlResourceSet_t *coreset, uint16_t *n_rb, uint16_t *rb_start)
+{
+  *n_rb = 0;
+  *rb_start = 0;
+  
+  for (int i = 0; i < 6; i++) {
+    for (int t = 0; t < 8; t++) {
+      if ((coreset->frequencyDomainResources.buf[i] >> (7 - t)) & 1) {
+        if (*n_rb == 0) {
+            *rb_start = 48 * i + t * 6;
+        }
+        *n_rb += 6;  // Each bit represents 6 RBs
+      }
+    }
+  }
+}
+
 NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
                                      NR_SearchSpace_t *ss,
                                      NR_ControlResourceSet_t *coreset,
                                      NR_ServingCellConfigCommon_t *scc,
                                      NR_BWP_t *bwp,
-                                     NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config) {
-
-  int sps;
-  NR_sched_pdcch_t pdcch;
-
+                                     NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config)
+{
   AssertFatal(*ss->controlResourceSetId == coreset->controlResourceSetId,
               "coreset id in SS %ld does not correspond to the one in coreset %ld",
               *ss->controlResourceSetId, coreset->controlResourceSetId);
 
+  int sps;
+  NR_sched_pdcch_t pdcch;
   if (bwp) { // This is not for SIB1
-    if(coreset->controlResourceSetId == 0){
-      pdcch.BWPSize  = gNB_mac->cset0_bwp_size;
+    if(coreset->controlResourceSetId == 0) {
+      pdcch.BWPSize = gNB_mac->cset0_bwp_size;
       pdcch.BWPStart = gNB_mac->cset0_bwp_start;
-    }
-    else {
-      pdcch.BWPSize  = NRRIV2BW(bwp->locationAndBandwidth, MAX_BWP_SIZE);
+    } else {
+      pdcch.BWPSize = NRRIV2BW(bwp->locationAndBandwidth, MAX_BWP_SIZE);
       pdcch.BWPStart = NRRIV2PRBOFFSET(bwp->locationAndBandwidth, MAX_BWP_SIZE);
     }
     pdcch.SubcarrierSpacing = bwp->subcarrierSpacing;
-    pdcch.CyclicPrefix = (bwp->cyclicPrefix==NULL) ? 0 : *bwp->cyclicPrefix;
-
+    pdcch.CyclicPrefix = (bwp->cyclicPrefix == NULL) ? 0 : *bwp->cyclicPrefix;
     //AssertFatal(pdcch_scs==kHz15, "PDCCH SCS above 15kHz not allowed if a symbol above 2 is monitored");
     sps = bwp->cyclicPrefix == NULL ? 14 : 12;
-  }
-  else {
-    AssertFatal(type0_PDCCH_CSS_config!=NULL,"type0_PDCCH_CSS_config is null,bwp %p\n",bwp);
+  } else {
+    AssertFatal(type0_PDCCH_CSS_config != NULL, "type0_PDCCH_CSS_config is null,bwp %p\n", bwp);
     pdcch.BWPSize = type0_PDCCH_CSS_config->num_rbs;
     pdcch.BWPStart = type0_PDCCH_CSS_config->cset_start_rb;
     pdcch.SubcarrierSpacing = type0_PDCCH_CSS_config->scs_pdcch;
@@ -462,16 +479,16 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
     sps = 14;
   }
 
-  AssertFatal(ss->monitoringSymbolsWithinSlot!=NULL,"ss->monitoringSymbolsWithinSlot is null\n");
-  AssertFatal(ss->monitoringSymbolsWithinSlot->buf!=NULL,"ss->monitoringSymbolsWithinSlot->buf is null\n");
+  AssertFatal(ss->monitoringSymbolsWithinSlot != NULL, "ss->monitoringSymbolsWithinSlot is null\n");
+  BIT_STRING_t *symbolsInSlot = ss->monitoringSymbolsWithinSlot;
+  AssertFatal(symbolsInSlot->buf != NULL, "ss->monitoringSymbolsWithinSlot->buf is null\n");
 
   // for SPS=14 8 MSBs in positions 13 downto 6
-  uint16_t monitoringSymbolsWithinSlot = (ss->monitoringSymbolsWithinSlot->buf[0]<<(sps-8)) |
-                                         (ss->monitoringSymbolsWithinSlot->buf[1]>>(16-sps));
+  int monitoringSymbolsWithinSlot = (symbolsInSlot->buf[0] << (sps - 8)) | (symbolsInSlot->buf[1] >> (16 - sps));
 
-  for (int i=0; i<sps; i++) {
-    if ((monitoringSymbolsWithinSlot>>(sps-1-i))&1) {
-      pdcch.StartSymbolIndex=i;
+  for (int i = 0; i < sps; i++) {
+    if ((monitoringSymbolsWithinSlot >> (sps - 1 - i)) & 1) {
+      pdcch.StartSymbolIndex = ss->searchSpaceId == 0 ? i + type0_PDCCH_CSS_config->first_symbol_index : i;
       break;
     }
   }
@@ -496,21 +513,7 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
     pdcch.ShiftIndex = 0;
   }
 
-  uint16_t N_rb = 0; // nb of rbs of coreset per symbol
-  uint16_t rb_start = 0;
-  for (int i = 0; i < 6; i++) {
-    for (int t = 0; t < 8; t++) {
-      if (coreset->frequencyDomainResources.buf[i] >> (7 - t) & 1) {
-        if (N_rb == 0) {
-          rb_start = 48 * i + t * 6;
-        }
-        N_rb++;
-      }
-    }
-  }
-
-  pdcch.rb_start = rb_start;
-  pdcch.n_rb = N_rb *= 6; // each bit of frequencyDomainResources represents 6 PRBs
+  get_coreset_rb_params(coreset, &pdcch.n_rb, &pdcch.rb_start);
 
   return pdcch;
 }
@@ -822,10 +825,15 @@ nfapi_nr_dl_dci_pdu_t *prepare_dci_pdu(nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_
     dci_pdu->ScramblingId = *scc->physCellId;
     dci_pdu->ScramblingRNTI = 0;
   }
+
+  uint16_t N_rb = 0;
+  uint16_t rb_start = 0;
+  get_coreset_rb_params(coreset, &N_rb, &rb_start);
+
   dci_pdu->beta_PDCCH_1_0 = 0;
   dci_pdu->powerControlOffsetSS = 1;
-  dci_pdu->precodingAndBeamforming.num_prgs = 0;
-  dci_pdu->precodingAndBeamforming.prg_size = 0;
+  dci_pdu->precodingAndBeamforming.num_prgs = 1;
+  dci_pdu->precodingAndBeamforming.prg_size = N_rb;
   dci_pdu->precodingAndBeamforming.dig_bf_interfaces = 1;
   dci_pdu->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
   dci_pdu->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
@@ -1249,9 +1257,9 @@ void nr_configure_pucch(nfapi_nr_pucch_pdu_t *pucch_pdu,
     pucch_pdu->prb_size=1;
   }
   // Beamforming
-  pucch_pdu->beamforming.num_prgs = 0;
-  pucch_pdu->beamforming.prg_size = 0; // pucch_pdu->prb_size;
-  pucch_pdu->beamforming.dig_bf_interface = 0;
+  pucch_pdu->beamforming.num_prgs = 1;
+  pucch_pdu->beamforming.prg_size = pucch_pdu->prb_size;
+  pucch_pdu->beamforming.dig_bf_interface = 1;
   pucch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
 }
 
@@ -2692,7 +2700,6 @@ NR_UE_info_t *get_new_nr_ue_inst(uid_allocator_t *uia, rnti_t rnti, NR_CellGroup
 
   /* set illegal time domain allocation to force recomputation of all fields */
   sched_ctrl->sched_pdsch.time_domain_allocation = -1;
-  sched_ctrl->sched_pusch.time_domain_allocation = -1;
 
   /* Set default BWPs */
   AssertFatal(UE->sc_info.n_ul_bwp <= NR_MAX_NUM_BWP, "uplinkBWP_ToAddModList has %d BWP!\n", UE->sc_info.n_ul_bwp);
@@ -2767,8 +2774,6 @@ bool add_connected_nr_ue(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
 
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   sched_ctrl->dl_max_mcs = 28; /* do not limit MCS for individual UEs */
-  sched_ctrl->sched_srs.frame = -1;
-  sched_ctrl->sched_srs.slot = -1;
   sched_ctrl->pdcch_cl_adjust = 0;
   reset_srs_stats(UE);
 
@@ -3346,8 +3351,10 @@ int get_fapi_beamforming_index(gNB_MAC_INST *mac, int ssb_idx)
 
 // TODO this is a placeholder for a possibly more complex function
 // for now the fapi beam index is the number of SSBs transmitted before ssb_index i
-void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST *mac)
+void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, const nr_mac_config_t *config, gNB_MAC_INST *mac)
 {
+  if (mac->beam_info.beam_mode == NO_BEAM_MODE)
+    return;
   int len = 0;
   uint8_t* buf = NULL;
   switch (scc->ssb_PositionsInBurst->present) {
@@ -3366,11 +3373,13 @@ void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, gNB_MAC_INST 
     default :
       AssertFatal(false, "Invalid configuration\n");
   }
-  int fapi_index = 0;
+  int index = 0;
   for (int i = 0; i < len; ++i) {
-    if ((buf[i / 8] >> (7 - i % 8)) & 0x1)
-      mac->fapi_beam_index[i] = fapi_index++;
-    else
+    if ((buf[i / 8] >> (7 - i % 8)) & 0x1) {
+      int fapi_index = mac->beam_info.beam_mode == LOPHY_BEAM_IDX ? config->bw_list[index] : index;
+      mac->fapi_beam_index[i] = fapi_index;
+      index++;
+    } else
       mac->fapi_beam_index[i] = -1;
   }
 }
@@ -3383,7 +3392,7 @@ static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int
 NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame)
 {
   // if no beam allocation for analog beamforming we always return beam index 0 (no multiple beams)
-  if (!beam_info->beam_allocation)
+  if (beam_info->beam_mode == NO_BEAM_MODE)
     return (NR_beam_alloc_t) {.new_beam = false, .idx = 0};
 
   const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
@@ -3417,7 +3426,7 @@ void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_
 void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
 {
   // do not perform beam procedures if there is no beam information
-  if (!mac->beam_info.beam_allocation)
+  if (mac->beam_info.beam_mode == NO_BEAM_MODE)
     return;
   RSRP_report_t *rsrp_report = &UE->UE_sched_ctrl.CSI_report.ssb_rsrp_report;
   // simple beam switching algorithm -> we select beam with highest RSRP from CSI report

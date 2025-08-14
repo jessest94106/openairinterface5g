@@ -70,11 +70,10 @@
 // after removing the 3 DMRS RE, the RB contains 9 RE with PDCCH
 #define RE_PER_RB_OUT_DMRS 9
 
-static void nr_pdcch_demapping_deinterleaving(c16_t *llr,
+static void nr_pdcch_demapping_deinterleaving(uint32_t coreset_nbr_rb,
+                                              c16_t llr[][coreset_nbr_rb * RE_PER_RB_OUT_DMRS],
                                               c16_t *e_rx,
                                               uint8_t coreset_time_dur,
-                                              uint8_t start_symbol,
-                                              uint32_t coreset_nbr_rb,
                                               uint8_t reg_bundle_size_L,
                                               uint8_t coreset_interleaver_size_R,
                                               uint8_t n_shift,
@@ -168,15 +167,14 @@ static void nr_pdcch_demapping_deinterleaving(c16_t *llr,
   }
 
   int rb_count = 0;
-  const int data_sc = RE_PER_RB_OUT_DMRS; // 9 sub-carriers with data per PRB
   for (int c_id = 0; c_id < number_of_candidates; c_id++) {
-    for (int symbol_idx = start_symbol; symbol_idx < start_symbol + coreset_time_dur; symbol_idx++) {
+    for (int symbol_idx = 0; symbol_idx < coreset_time_dur; symbol_idx++) {
       for (int cce_count = 0; cce_count < L[c_id]; cce_count++) {
         for (int k = 0; k < NR_NB_REG_PER_CCE / reg_bundle_size_L; k++) { // loop over REG bundles
           int f = f_bundle_j_list_ord[c_id][k + NR_NB_REG_PER_CCE * cce_count / reg_bundle_size_L];
-          c16_t *in = llr + (f * B_rb + symbol_idx * coreset_nbr_rb) * data_sc;
+          c16_t *in = llr[symbol_idx] + f * B_rb * RE_PER_RB_OUT_DMRS;
           // loop over the RBs of the bundle
-          memcpy(e_rx + data_sc * rb_count, in, B_rb * data_sc * sizeof(*e_rx));
+          memcpy(e_rx + RE_PER_RB_OUT_DMRS * rb_count, in, B_rb * RE_PER_RB_OUT_DMRS * sizeof(*e_rx));
           rb_count += B_rb;
         }
       }
@@ -347,18 +345,18 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
   get_coreset_rballoc(rel15->coreset.frequency_domain_resource,&n_rb,&rb_offset);
   const int antRx = frame_parms->nb_antennas_rx;
 
-  // Pointer to llrs, 4-bit resolution.
-  int32_t llr_size = (rel15->coreset.duration-rel15->coreset.StartSymbolIndex)  * n_rb * RE_PER_RB_OUT_DMRS;
-  c16_t llr[llr_size];
+  // Pointer to llrs
+  const int symb_size = n_rb * RE_PER_RB_OUT_DMRS;
+  c16_t llr[rel15->coreset.duration][symb_size];
 
   LOG_D(NR_PHY_DCI,
         "pdcch coreset: freq %x, n_rb %d, rb_offset %d\n",
         rel15->coreset.frequency_domain_resource[0],
         n_rb,
         rb_offset);
-  for (int s = rel15->coreset.StartSymbolIndex; s < rel15->coreset.StartSymbolIndex + rel15->coreset.duration; s++) {
+  for (int s = 0; s < rel15->coreset.duration; s++) {
     LOG_D(NR_PHY_DCI, "in nr_pdcch_extract_rbs_single(rxdataF -> rxdataF_ext || dl_ch_estimates -> dl_ch_estimates_ext)\n");
-    const int arraySz = ceil_mod(n_rb * RE_PER_RB_OUT_DMRS, 32);
+    const int arraySz = ceil_mod(symb_size, 32);
     __attribute__((aligned(32))) c16_t rxdataF_ext[antRx][arraySz];
     __attribute__((aligned(32))) c16_t pdcch_dl_ch_estimates_ext[antRx][arraySz];
     nr_pdcch_extract_rbs_single(ue->frame_parms.samples_per_slot_wCP,
@@ -369,7 +367,7 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
                                 arraySz,
                                 rxdataF_ext,
                                 pdcch_dl_ch_estimates_ext,
-                                s,
+                                rel15->coreset.StartSymbolIndex + s,
                                 frame_parms,
                                 rel15->coreset.frequency_domain_resource,
                                 rel15->BWPStart);
@@ -396,20 +394,19 @@ void nr_rx_pdcch(PHY_VARS_NR_UE *ue,
                                   antRx,
                                   log2_maxh); // log2_maxh+I0_shift
 
-    UEscopeCopy(ue, pdcchRxdataF_comp, rxdataF_comp, sizeof(struct complex16), antRx, n_rb * RE_PER_RB_OUT_DMRS, 0);
+    UEscopeCopy(ue, pdcchRxdataF_comp, rxdataF_comp, sizeof(struct complex16), antRx, symb_size, 0);
 
     if (antRx > 1)
       nr_pdcch_detection_mrc(arraySz, rxdataF_comp);
 
-    nr_pdcch_llr(n_rb * RE_PER_RB_OUT_DMRS, rxdataF_comp[0], llr + s * n_rb * RE_PER_RB_OUT_DMRS);
+    nr_pdcch_llr(symb_size, rxdataF_comp[0], llr[s]);
   }
-  UEscopeCopy(ue, pdcchLlr, llr, sizeof(c16_t), 1, llr_size, 0);
+  UEscopeCopy(ue, pdcchLlr, llr, sizeof(c16_t), 1, rel15->coreset.duration * symb_size, 0);
 
-  nr_pdcch_demapping_deinterleaving(llr,
+  nr_pdcch_demapping_deinterleaving(n_rb,
+                                    llr,
                                     pdcch_e_rx,
                                     rel15->coreset.duration,
-                                    rel15->coreset.StartSymbolIndex,
-                                    n_rb,
                                     rel15->coreset.RegBundleSize,
                                     rel15->coreset.InterleaverSize,
                                     rel15->coreset.ShiftIndex,

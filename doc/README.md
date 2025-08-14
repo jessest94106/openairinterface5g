@@ -133,9 +133,11 @@ The other SDRs (AW2S, LimeSDR, ...) have no READMEs.
 - Component tests are under `tests/`. Currently, there is a simple CU-UP
   tester, see the corresponding [README.md](../tests/nr-cuup/README.md).
 - [TESTBenches.md](./TESTBenches.md) lists the CI setup and links to pipelines
+- The CI setup uses a [custom framework](../ci-scripts/README.md) to run
+  end-to-end tests.
 
 # Developer tools
 
 - [formatting](../tools/formatting/README.md) is a clang-format error detection tool
 - [iwyu](../tools/iwyu/README.md) is a tool to detect `#include` errors
-- [docker-dev-env](../tools/docker-dev-env/README.md) is a ubuntu22 docker development environment
+- [docker-dev-env](../tools/docker-dev-env/README.md) is a ubuntu24 docker development environment

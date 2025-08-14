@@ -21,7 +21,7 @@
 #---------------------------------------------------------------------
 #
 # Dockerfile for the Open-Air-Interface BUILD service
-#   Valid for Ubuntu 22.04
+#   Valid for Ubuntu 24.04
 #
 #---------------------------------------------------------------------
 
@@ -66,8 +66,6 @@ RUN \
     cd openair2/E2AP/flexric/build && \
     cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
           -DKPM_VERSION=$KPM_VERSION \
-          -DE2AP_VERSION=$E2AP_VERSION \
-          -DCMAKE_C_COMPILER=gcc-12 \
-          -DCMAKE_CXX_COMPILER=g++-12 .. && \
+          -DE2AP_VERSION=$E2AP_VERSION .. && \
     ninja && \
     ninja install

@@ -98,7 +98,7 @@ int get_tdd_period_idx(NR_TDD_UL_DL_ConfigCommon_t *tdd)
  *
  * @return Number of slots in the configured TDD period
  */
-static uint8_t set_tdd_bmap_period(NR_TDD_UL_DL_Pattern_t *pattern, tdd_period_config_t *pc, int8_t curr_total_slot)
+static uint8_t set_tdd_bmap_period(const NR_TDD_UL_DL_Pattern_t *pattern, tdd_period_config_t *pc, int8_t curr_total_slot)
 {
   int8_t n_dl_slot = pattern->nrofDownlinkSlots;
   int8_t n_ul_slot = pattern->nrofUplinkSlots;
@@ -154,7 +154,7 @@ static uint8_t set_tdd_bmap_period(NR_TDD_UL_DL_Pattern_t *pattern, tdd_period_c
  *
  * @return void
  */
-static void config_tdd_patterns(NR_TDD_UL_DL_ConfigCommon_t *tdd, frame_structure_t *fs)
+static void config_tdd_patterns(const NR_TDD_UL_DL_ConfigCommon_t *tdd, frame_structure_t *fs)
 {
   int num_of_patterns = 1;
   uint8_t nb_slots_p2 = 0;
@@ -188,7 +188,7 @@ static void config_tdd_patterns(NR_TDD_UL_DL_ConfigCommon_t *tdd, frame_structur
  * @param fs  pointer to the frame structure to update
  */
 void config_frame_structure(int mu,
-                            NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,
+                            const NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,
                             uint8_t tdd_period,
                             uint8_t frame_type,
                             frame_structure_t *fs)

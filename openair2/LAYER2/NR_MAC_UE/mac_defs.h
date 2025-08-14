@@ -541,6 +541,8 @@ typedef struct ntn_timing_advance_components {
   double N_UE_TA_adj;
   // drift rate of N_UE_TA in µs/s
   double N_UE_TA_drift;
+  // change rate of N_UE_TA drift in µs/s²
+  double N_UE_TA_drift_variant;
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
 
@@ -672,6 +674,11 @@ static inline double get_total_TA_ms(const ntn_timing_advance_componets_t *ntn_t
 static inline double get_total_TA_drift(const ntn_timing_advance_componets_t *ntn_ta)
 {
   return ntn_ta->N_common_ta_drift + ntn_ta->N_UE_TA_drift;
+}
+
+static inline double get_total_TA_drift_variant(const ntn_timing_advance_componets_t *ntn_ta)
+{
+  return ntn_ta->N_common_ta_drift_variant + ntn_ta->N_UE_TA_drift_variant;
 }
 
 /*@}*/
