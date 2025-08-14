@@ -965,31 +965,38 @@ int pbch_pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_
           nr_ue_ssb_rsrp_measurements(ue, ssb_index, proc, rxdataF);
 
           // resetting ssb index for PBCH detection if there is a stronger SSB index
-          if(ue->measurements.ssb_rsrp_dBm[ssb_index] > ue->measurements.ssb_rsrp_dBm[fp->ssb_index])
+          if(ue->measurements.ssb_rsrp_dBm[ssb_index] > ue->measurements.ssb_rsrp_dBm[fp->ssb_index]) {
             fp->ssb_index = ssb_index;
-
-          if(ssb_index == fp->ssb_index) {
-
-            LOG_D(PHY," ------  Decode MIB: frame.slot %d.%d ------  \n", frame_rx%1024, nr_slot_rx);
-            const int pbchSuccess = nr_ue_pbch_procedures(ue, proc, estimateSz, dl_ch_estimates, rxdataF);
-
-            if (ue->no_timing_correction==0 && pbchSuccess == 0) {
-              LOG_D(PHY,"start adjust sync slot = %d no timing %d\n", nr_slot_rx, ue->no_timing_correction);
-              sampleShift =
-                  nr_adjust_synch_ue(fp, ue, gNB_id, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
-            }
-
-            if (get_nrUE_params()->cont_fo_comp && pbchSuccess == 0) {
-              double freq_offset = nr_ue_pbch_freq_offset(fp, estimateSz, dl_ch_estimates);
-              LOG_D(PHY,"compensated frequency offset = %.3f Hz, detected residual frequency offset = %.3f Hz, accumulated frequency offset = %.3f Hz\n", ue->freq_offset, freq_offset, ue->freq_off_acc);
-
-              // PI controller
-              const double PID_P = get_nrUE_params()->freq_sync_P;
-              const double PID_I = get_nrUE_params()->freq_sync_I;
-              ue->freq_offset += freq_offset * PID_P + ue->freq_off_acc * PID_I;
-              ue->freq_off_acc += freq_offset;
-            }
+            LOG_D(PHY, "New best SSB: index %d RSRP %d\n", ssb_index, ue->measurements.ssb_rsrp_dBm[ssb_index]);
           }
+
+          if(ssb_index != fp->ssb_index)
+            continue;
+
+          LOG_D(PHY, " ------  Decode MIB: frame.slot %d.%d ------  \n", frame_rx % 1024, nr_slot_rx);
+          const int pbchSuccess = nr_ue_pbch_procedures(ue, proc, estimateSz, dl_ch_estimates, rxdataF);
+
+          if (ue->no_timing_correction == 0 && pbchSuccess == 0) {
+            LOG_D(PHY,"start adjust sync slot = %d no timing %d\n", nr_slot_rx, ue->no_timing_correction);
+            sampleShift =
+                nr_adjust_synch_ue(fp, ue, gNB_id, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
+          }
+
+          if (get_nrUE_params()->cont_fo_comp && pbchSuccess == 0) {
+            double freq_offset = nr_ue_pbch_freq_offset(fp, estimateSz, dl_ch_estimates);
+            LOG_D(PHY,
+                  "compensated freq offset = %.3f Hz, detected residual freq offset = %.3f Hz, accumulated freq offset = %.3f Hz\n",
+                  ue->freq_offset,
+                  freq_offset,
+                  ue->freq_off_acc);
+
+            // PI controller
+            const double PID_P = get_nrUE_params()->freq_sync_P;
+            const double PID_I = get_nrUE_params()->freq_sync_I;
+            ue->freq_offset += freq_offset * PID_P + ue->freq_off_acc * PID_I;
+            ue->freq_off_acc += freq_offset;
+          }
+
           LOG_D(PHY, "Doing N0 measurements in %s\n", __FUNCTION__);
           nr_ue_rrc_measurements(ue, proc, rxdataF);
           VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PBCH, VCD_FUNCTION_OUT);
