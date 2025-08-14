@@ -575,6 +575,14 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
     rach_ConfigCommon->msg3_transformPrecoder = NULL;
   }
 
+  // by default, select ra_ResponseWindow automatically
+  if (rach_ConfigCommon->rach_ConfigGeneric.ra_ResponseWindow < 0) {
+    int mu = *scc->ssbSubcarrierSpacing;
+    // will select: mu=0 => 4 (10 slots), mu=1 => 5 (20 slots), mu>=3 => 7 (80 slots)
+    rach_ConfigCommon->rach_ConfigGeneric.ra_ResponseWindow = min(NR_RACH_ConfigGeneric__ra_ResponseWindow_sl80, NR_RACH_ConfigGeneric__ra_ResponseWindow_sl10 + mu);
+  }
+  DevAssert(rach_ConfigCommon->rach_ConfigGeneric.ra_ResponseWindow >= 0);
+
   // prepare DL Allocation lists
   nr_rrc_config_dl_tda(dlcc->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList,
                        frame_type,
@@ -1157,7 +1165,7 @@ bool is_pattern2_config(paramdef_t *param)
   return true;
 }
 
-static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cfg, int minRXTXTIME)
+static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cfg, int minRXTXTIME, int do_SRS)
 {
   NR_ServingCellConfigCommon_t *scc = calloc_or_fail(1, sizeof(*scc));
   uint64_t ssb_bitmap=0xff;
@@ -1198,10 +1206,6 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
       struct NR_TDD_UL_DL_ConfigCommon *tdd = scc->tdd_UL_DL_ConfigurationCommon;
       tdd->pattern2 = calloc_or_fail(1, sizeof(*tdd->pattern2));
       *scc->tdd_UL_DL_ConfigurationCommon->pattern2 = p2;
-      AssertFatal(p2.nrofUplinkSlots ^ scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                  "UL slots in pattern1 (%ld) and pattern2 (%ld) are mutually exclusive (e.g. DDDFUU DDDD, DDDD DDDFUU)\n",
-                  scc->tdd_UL_DL_ConfigurationCommon->pattern1.nrofUplinkSlots,
-                  p2.nrofUplinkSlots);
     }
     struct NR_FrequencyInfoDL *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
     LOG_I(RRC,
@@ -1223,7 +1227,7 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
       check_ssb_raster(ssb_freq, *frequencyInfoDL->frequencyBandList.list.array[0], *scc->ssbSubcarrierSpacing);
     fix_scc(scc, ssb_bitmap);
   }
-  nr_rrc_config_ul_tda(scc, minRXTXTIME);
+  nr_rrc_config_ul_tda(scc, minRXTXTIME, do_SRS);
 
   // the gNB uses the servingCellConfigCommon everywhere, even when it should use the servingCellConfigCommonSIB.
   // previously (before this commit), the following fields were indirectly populated through get_SIB1_NR().
@@ -1688,7 +1692,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.num_agg_level_candidates[PDCCH_AGG_LEVEL8],
         config.num_agg_level_candidates[PDCCH_AGG_LEVEL16]);
 
-  NR_ServingCellConfigCommon_t *scc = get_scc_config(cfg, config.minRXTXTIME);
+  NR_ServingCellConfigCommon_t *scc = get_scc_config(cfg, config.minRXTXTIME, config.do_SRS);
   //xer_fprint(stdout, &asn_DEF_NR_ServingCellConfigCommon, scc);
   NR_ServingCellConfig_t *scd = get_scd_config(cfg);
 

@@ -149,7 +149,7 @@ uint16_t nr_mac_compute_RIV(uint16_t N_RB_DL, uint16_t RBstart, uint16_t Lcrbs);
 void nr_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slot);
 /* \brief UL preprocessor for phytest: schedules UE_id 0 with fixed MCS on a
  * fixed set of resources */
-bool nr_ul_preprocessor_phytest(module_id_t module_id, frame_t frame, slot_t slot);
+void nr_ul_preprocessor_phytest(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_pusch);
 
 void handle_nr_uci_pucch_0_1(module_id_t mod_id,
                              frame_t frame,
@@ -286,11 +286,6 @@ NR_ControlResourceSet_t *get_coreset(gNB_MAC_INST *nrmac,
                                      NR_BWP_DownlinkDedicated_t *bwp_dedicated,
                                      NR_ControlResourceSetId_t coreset_id);
 
-long get_K2(NR_PUSCH_TimeDomainResourceAllocationList_t *tdaList,
-            int time_domain_assignment,
-            int mu,
-            const NR_ServingCellConfigCommon_t *scc);
-
 const NR_DMRS_UplinkConfig_t *get_DMRS_UplinkConfig(const NR_PUSCH_Config_t *pusch_Config, const NR_tda_info_t *tda_info);
 
 NR_pusch_dmrs_t get_ul_dmrs_params(const NR_ServingCellConfigCommon_t *scc,
@@ -417,7 +412,15 @@ void free_sched_pucch_list(NR_UE_sched_ctrl_t *sched_ctrl);
 bool add_UE_to_list(int list_size, NR_UE_info_t *list[list_size], NR_UE_info_t *UE);
 NR_UE_info_t *remove_UE_from_list(int list_size, NR_UE_info_t *list[list_size], rnti_t rnti);
 int get_dl_tda(const gNB_MAC_INST *nrmac, int slot);
-int get_ul_tda(gNB_MAC_INST *nrmac, int frame, int slot);
+int get_num_ul_tda(gNB_MAC_INST *nrmac, int slot, int k2, const NR_tda_info_t **first_idx);
+const NR_tda_info_t *get_best_ul_tda(const gNB_MAC_INST *nrmac,
+                                     int beam,
+                                     const NR_tda_info_t *tdas,
+                                     int n_tda,
+                                     int frame,
+                                     int slot,
+                                     int *rb_start,
+                                     int *rb_len);
 
 int get_cce_index(const gNB_MAC_INST *nrmac,
                   const int CC_id,
@@ -498,4 +501,6 @@ void prepare_du_configuration_update(gNB_MAC_INST *mac,
                                      const NR_BCCH_DL_SCH_Message_t *sib1);
 
 void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group);
+
+void post_process_ulsch(gNB_MAC_INST *nr_mac, post_process_pusch_t *pusch, NR_UE_info_t *UE, NR_sched_pusch_t *sched_pusch);
 #endif /*__LAYER2_NR_MAC_PROTO_H__*/

@@ -447,6 +447,13 @@ typedef struct
 
 } nfapi_nr_tdd_table_t;
 
+typedef struct {
+  nfapi_tl_t tl;
+  nfapi_nr_tdd_table_t *value;
+  uint8_t slots_per_frame;
+  uint8_t symbols_per_slot;
+} nfapi_nr_tdd_table_tlv_t;
+
 //table 3-27
 typedef struct 
 {

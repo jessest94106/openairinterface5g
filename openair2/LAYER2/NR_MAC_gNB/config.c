@@ -832,6 +832,28 @@ static void config_sched_ctrlCommon(gNB_MAC_INST *nr_mac)
   nr_mac->cset0_bwp_size = type0_PDCCH_CSS_config.num_rbs;
 }
 
+/**
+ * \brief Initializes the UL TDA information at the scheduler, as used for
+ * every UE in UL. This just copies the information from the SCC into a smaller
+ * list. Note that this list should not be modified, as get_num_ul_tda() and
+ * nr_rrc_config_ul_tda() are designed to work in sync (get_num_ul_tda()
+ * assumes an ordering, output by nr_rrc_config_ul_tda()).
+ */
+static void init_ul_tda_info(const NR_PUSCH_TimeDomainResourceAllocationList_t *l, seq_arr_t *sa_tda)
+{
+  DevAssert(l->list.count > 0 && l->list.count <= 16);
+  DevAssert(seq_arr_size(sa_tda) == 0);
+
+  for (int i = 0; i < l->list.count; ++i) {
+    NR_PUSCH_TimeDomainResourceAllocation_t *t = l->list.array[i];
+    DevAssert(t->k2);
+    NR_tda_info_t tda = { .mapping_type = typeB, .k2 = *t->k2, .valid_tda = true };
+    SLIV2SL(t->startSymbolAndLength, &tda.startSymbolIndex, &tda.nrOfSymbols);
+    LOG_I(NR_MAC, "TDA index %d: start %d length %d k2 %ld\n", i, tda.startSymbolIndex, tda.nrOfSymbols, tda.k2);
+    seq_arr_push_back(sa_tda, &tda, sizeof(tda));
+  }
+}
+
 void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, const nr_mac_config_t *config)
 {
   DevAssert(nrmac != NULL);
@@ -878,6 +900,9 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
 
   if (IS_SA_MODE(get_softmodem_params()))
     config_sched_ctrlCommon(nrmac);
+
+  seq_arr_init(&nrmac->ul_tda, sizeof(NR_tda_info_t));
+  init_ul_tda_info(scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList, &nrmac->ul_tda);
 }
 
 bool nr_mac_configure_other_sib(gNB_MAC_INST *nrmac, int num_cu_sib, const f1ap_sib_msg_t cu_sib[num_cu_sib])

@@ -554,6 +554,7 @@ static bool allocate_dl_retransmission(module_id_t module_id,
                                false,
                                sched_ctrl->pdcch_cl_adjust);
   if (CCEIndex<0) {
+    sched_ctrl->dl_cce_fail++;
     LOG_D(NR_MAC, "[UE %04x][%4d.%2d] could not find free CCE for DL DCI retransmission\n", UE->rnti, frame, slot);
     return false;
   }
@@ -806,6 +807,7 @@ static void pf_dl(module_id_t module_id,
                                  false,
                                  sched_ctrl->pdcch_cl_adjust);
     if (CCEIndex < 0) {
+      sched_ctrl->dl_cce_fail++;
       LOG_D(NR_MAC, "[UE %04x][%4d.%2d] could not find free CCE for DL DCI\n", rnti, frame, slot);
       reset_beam_status(&mac->beam_info, frame, slot, iterator->UE->UE_beam_index, slots_per_frame, beam.new_beam);
       iterator++;
