@@ -49,9 +49,11 @@ The value of `pdcch_cl_adjust` is clamped to range <0,1>, the increment value is
 the decrement value is 0.01. These values are selected to ensure PDCCH success rate is high.
 See Examples below for futher explaination.
 
-The possible values of aggregation level on UE SS can be configured via `uess_agg_levels` configuration
-option. By default the gNB uses only aggregation level 2 which translates to `uess_agg_levels` set to
-`[0, 1, 0, 0, 0]`. For example, to enable aggregation level 2 and 4 set `uess_agg_levels` to `[0, 1, 1, 0, 0]`.
+The possible values of aggregation level on UE SS can be configured via
+`uess_agg_levels` configuration option. By default the gNB uses two candidates
+in aggregation level 2 which translates to `uess_agg_levels` set to `[0, 2, 0,
+0, 0]`. For example, to enable one candidate on aggregation levels 2 and 4 set
+`uess_agg_levels` to `[0, 1, 1, 0, 0]`.
 
 ### Examples:
 #### Example 1:
