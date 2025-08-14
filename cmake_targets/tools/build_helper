@@ -202,7 +202,7 @@ install_usrp_uhd_driver_from_source(){
             # - 3.15.0.0
             git apply $OPENAIR_DIR/cmake_targets/tools/uhd-3.15-tdd-patch.diff
             ret=$?;[[ $ret -ne 0 ]] && echo_fatal "Could not apply the TDD patch"
-        elif [[ "$UHD_VERSION" == "4.7.0.0" || "$UHD_VERSION" == "4.6.0.0" || "$UHD_VERSION" == "4.5.0.0" ]]; then
+        elif [[ "$UHD_VERSION" == "4.8.0.0" || "$UHD_VERSION" == "4.7.0.0" || "$UHD_VERSION" == "4.6.0.0" || "$UHD_VERSION" == "4.5.0.0" ]]; then
             # Tested that patch for the following versions:
             # - 4.7.0.0
             cp $OPENAIR_DIR/cmake_targets/tools/uhd-4.x-tdd-patch.diff $OPENAIR_DIR/cmake_targets/tools/uhd-4.5plus-tdd-patch.diff

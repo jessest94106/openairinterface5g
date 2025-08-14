@@ -91,6 +91,24 @@ For more details regarding the build on an Openshift Cluster, see [OpenShift REA
 * `docker-ce` installed
 * Pulling `ubuntu:jammy` from DockerHub
 
+The docker files in this directory rely on [automatic Docker platform
+arguments](https://docs.docker.com/reference/dockerfile/#automatic-platform-args-in-the-global-scope)
+`TARGETARCH` and `TARGETPLATFORM` to be defined. This is the case when using
+[BuildKit](https://docs.docker.com/build/buildkit/), which is automatically
+enabled in newer (v23.0+) docker versions.
+
+If you are running an older version of docker that does not have BuildKit
+enabled and do not wish to upgrade to a newer docker version, you have two
+possibilities:
+
+1. [Enable BuildKit](https://docs.docker.com/build/buildkit/#getting-started)
+   when building: `DOCKER_BUILDKIT=1 docker build ...`
+2. You should be able to define these variables manually.
+   - x86: `docker build --build-arg TARGETARCH=amd64 --build-arg
+     TARGETPLATFORM=linux/amd64 ...`
+   - arm: `docker build --build-arg TARGETARCH=arm64 --build-arg
+     TARGETPLATFORM=linux/arm64 ...`
+
 ## 3.2. Building the shared images ##
 
 There are two shared images: one that has all dependencies, and a second that compiles all targets (eNB, gNB, [nr]UE).
