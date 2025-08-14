@@ -205,17 +205,17 @@ In the `MACRLCs` section of the gNB/DU configuration file:
   retransmission over initial transmission) to decrease MCS by 1
 * `dl_bler_target_lower` (default 0.05): lower threshold of BLER (first round
   retransmission over initial transmission) to increase MCS by 1
-* `dl_max_mcs` (default 28): maximum MCS to use
+* `dl_min_mcs` (default 0): minimum MCS to use for any UE
+* `dl_max_mcs` (default 28): maximum MCS to use for any UE
 * `ul_bler_target_upper` (default 0.15): as `dl_bler_target_upper`
 * `ul_bler_target_lower` (default 0.05): as `dl_bler_target_lower`
+* `ul_min_mcs` (default 0): as `dl_min_mcs`
 * `ul_max_mcs` (default 28): as `dl_max_mcs`
 * `dl_harq_round_max` (default 4): maximum number of HARQ rounds, i.e.,
   retransmissions to perform, in DL
 * `ul_harq_round_max` (default 4): as `dl_harq_round_max`
 * `min_grant_prb` (default 5): number of PRBs to schedule for UE after activity
   (see `ulsch_max_frame_inactivity`) or after scheduling request (SR)
-* `min_grant_mcs` (default 9): MCS to use for UE after activity (see
-  `ulsch_max_frame_inactivity`) or after scheduling request (SR)
 * `identity_precoding_matrix` (default 0=false): flag to enable to use only
   the identity precoding matrix in DL precoding
 * `set_analog_beamforming` (default 0=false): flag to enable analog
