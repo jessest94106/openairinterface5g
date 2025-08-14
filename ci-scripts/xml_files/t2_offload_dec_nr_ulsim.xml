@@ -51,6 +51,7 @@
 		<class>Run_Physim</class>
 		<desc>Run nr_ulsim with CPU: SNR = 30, MCS = 5, 106 PRBs, 1 layer</desc>
 		<always_exec>true</always_exec>
+		<node>caracal</node>
 	        <physim_test>nr_ulsim</physim_test>
 	        <physim_time_threshold>300</physim_time_threshold>
 		<physim_run_args>-n1000 -s30 -S30.2 -m5 -r106 -R106 -C10 -P</physim_run_args>
@@ -60,6 +61,7 @@
 		<class>Run_Physim</class>
 		<desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 5, 106 PRBs, 1 layer</desc>
 		<always_exec>true</always_exec>
+		<node>caracal</node>
 		<physim_test>nr_ulsim</physim_test>
 		<physim_time_threshold>100</physim_time_threshold>
 		<physim_run_args>-n1000 -s30 -S30.2 -m5 -r106 -R106 -C10 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -69,6 +71,7 @@
 		<class>Run_Physim</class>
 		<desc>Run nr_ulsim with CPU: SNR = 30, MCS = 15, 106 PRBs, 1 layer</desc>
 		<always_exec>true</always_exec>
+		<node>caracal</node>
 		<physim_test>nr_ulsim</physim_test>
 		<physim_time_threshold>300</physim_time_threshold>
 		<physim_run_args>-n1000 -s30 -S30.2 -m15 -r106 -R106 -C10 -P</physim_run_args>
@@ -78,6 +81,7 @@
 		<class>Run_Physim</class>
 		<desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 15, 106 PRBs, 1 layer</desc>
 		<always_exec>true</always_exec>
+		<node>caracal</node>
 		<physim_test>nr_ulsim</physim_test>
 		<physim_time_threshold>150</physim_time_threshold>
 		<physim_run_args>-n1000 -s30 -S30.2 -m15 -r106 -R106 -C10 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -87,6 +91,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 25, 106 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+				<node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>250</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m25 -r106 -R106 -C10 -P</physim_run_args>
@@ -96,6 +101,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 25, 106 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+				<node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>250</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m25 -r106 -R106 -C10 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -105,6 +111,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 5, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+				<node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>300</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m5 -r273 -R273 -C10 -P</physim_run_args>
@@ -114,6 +121,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 5, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+				<node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>150</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m5 -r273 -R273 -C10 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -123,6 +131,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 15, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>400</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m15 -r273 -R273 -C10 -P</physim_run_args>
@@ -132,6 +141,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 15, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>350</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m15 -r273 -R273 -C10 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -141,6 +151,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 25, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>400</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m25 -r273 -R273 -C10 -P</physim_run_args>
@@ -150,6 +161,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 25, 273 PRBs, 1 layer</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>550</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m25 -r273 -R273 -C10 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -159,6 +171,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 5, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>300</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m5 -r273 -R273 -C10 -W2 -z2 -y2 -P</physim_run_args>
@@ -168,6 +181,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 5, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>250</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m5 -r273 -R273 -C10 -W2 -z2 -y2 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -177,6 +191,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 15, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>600</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m15 -r273 -R273 -C10 -W2 -z2 -y2 -P</physim_run_args>
@@ -186,6 +201,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 15, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>650</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m15 -r273 -R273 -C10 -W2 -z2 -y2 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>
@@ -195,6 +211,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with CPU: SNR = 30, MCS = 25, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>650</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m25 -r273 -R273 -C10 -W2 -z2 -y2 -P</physim_run_args>
@@ -204,6 +221,7 @@
                 <class>Run_Physim</class>
                 <desc>Run nr_ulsim with T2 LDPC offload: SNR = 30, MCS = 25, 273 PRBs, 2 layers</desc>
                 <always_exec>true</always_exec>
+                <node>caracal</node>
                 <physim_test>nr_ulsim</physim_test>
                 <physim_time_threshold>1100</physim_time_threshold>
                 <physim_run_args>-n1000 -s30 -S30.2 -m25 -r273 -R273 -C10 -W2 -z2 -y2 -P --loader.ldpc.shlibversion _aal --nrLDPC_coding_aal.dpdk_dev af:00.0 --nrLDPC_coding_aal.dpdk_core_list 11-12 --nrLDPC_coding_aal.is_t2 1</physim_run_args>

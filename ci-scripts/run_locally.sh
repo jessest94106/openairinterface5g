@@ -26,8 +26,18 @@ fi
 docker tag oai-nr-ue oai-ci/oai-nr-ue:develop-${SHORT_COMMIT_SHA}
 docker tag oai-gnb oai-ci/oai-gnb:develop-${SHORT_COMMIT_SHA}
 
+python3 main.py --mode=InitiateHtml --ranRepository=NONE --ranBranch=${CURRENT_BRANCH} \
+    --ranCommitID=${COMMIT_SHA} --ranAllowMerge=false \
+    --ranTargetBranch=NONE \
+    --XMLTestFile=xml_files/${TESTCASE} --local
+
 python3 main.py --mode=TesteNB --ranRepository=NONE --ranBranch=${CURRENT_BRANCH} \
     --ranCommitID=${COMMIT_SHA} --ranAllowMerge=false \
-    --ranTargetBranch=NONE --eNBIPAddress=NONE --eNBUserName=NONE --eNBPassword=NONE \
+    --ranTargetBranch=NONE \
     --eNBSourceCodePath=${REPO_PATH} \
-    --XMLTestFile=xml_files/${TESTCASE} --local
+    --XMLTestFile=${TESTCASE} --local
+RET=$?
+
+python3 main.py --mode=FinalizeHtml --local
+
+exit ${RET}

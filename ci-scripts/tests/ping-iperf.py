@@ -77,7 +77,7 @@ class TestPingIperf(unittest.TestCase):
 		self.ci.iperf_profile = "balanced"
 		infra_file = "tests/config/infra_ping_iperf.yaml"
 		# TODO Should need nothing but options and UE(s) to use
-		success = self.ci.Iperf(self.html, self.cont, infra_file=infra_file)
+		success = self.ci.Iperf(self.ctx, self.html, infra_file=infra_file)
 		self.assertTrue(success)
 
 if __name__ == '__main__':

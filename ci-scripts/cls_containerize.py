@@ -82,28 +82,23 @@ def CreateTag(ranCommitID, ranBranch, ranAllowMerge):
 		tagToUse = f'develop-{shortCommit}'
 	return tagToUse
 
-def AnalyzeBuildLogs(logfiles, globalStatus):
-	collectInfo = {}
-	for image, lf in logfiles:
-		files = {}
-		errorandwarnings = {}
-		committed = False
-		tagged = False
-		with open(lf, mode='r') as inputfile:
-			for line in inputfile:
-				lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
-				lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
-				tagged = tagged or lineHasTag or lineHasTag2
-				# the OpenShift Cluster builder prepends image registry URL
-				lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
-				committed = committed or lineHasCommit
-		errorandwarnings['errors'] = 0 if committed or tagged else 1
-		errorandwarnings['warnings'] = 0
-		errorandwarnings['status'] = committed or tagged
-		logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
-		files['Target Image Creation'] = errorandwarnings
-		collectInfo[image] = files
-	return collectInfo
+def AnalyzeBuildLogs(image, lf):
+	errorandwarnings = {}
+	committed = False
+	tagged = False
+	with open(lf, mode='r') as inputfile:
+		for line in inputfile:
+			lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
+			lineHasTag2 = re.search(f'naming to docker.io/library/{image}:', str(line)) is not None
+			tagged = tagged or lineHasTag or lineHasTag2
+			# the OpenShift Cluster builder prepends image registry URL
+			lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
+			committed = committed or lineHasCommit
+	errorandwarnings['errors'] = 0 if committed or tagged else 1
+	errorandwarnings['warnings'] = 0
+	errorandwarnings['status'] = committed or tagged
+	logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
+	return errorandwarnings
 
 def GetImageName(ssh, svcName, file):
 	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".image'", silent=True)
@@ -219,7 +214,6 @@ def CheckLogs(self, filename, HTML, RAN):
 		HTML.htmleNBFailureMsg = ""
 	else:
 		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
-		HTML.CreateHtmlTestRowQueue(f"file {name}", 'OK', ["no analysis function"])
 	logging.debug(f"log check: file {filename} passed analysis {success}")
 	return success
 
@@ -235,25 +229,11 @@ class Containerize():
 		self.ranAllowMerge = False
 		self.ranCommitID = ''
 		self.ranTargetBranch = ''
-		self.eNBIPAddress = ''
-		self.eNBUserName = ''
-		self.eNBPassword = ''
 		self.eNBSourceCodePath = ''
-		self.eNB1IPAddress = ''
-		self.eNB1UserName = ''
-		self.eNB1Password = ''
-		self.eNB1SourceCodePath = ''
-		self.eNB2IPAddress = ''
-		self.eNB2UserName = ''
-		self.eNB2Password = ''
-		self.eNB2SourceCodePath = ''
-		self.forcedWorkspaceCleanup = False
 		self.imageKind = ''
 		self.proxyCommit = None
-		self.eNB_instance = 0
-		self.eNB_serverId = ['', '', '']
-		self.yamlPath = ['', '', '']
-		self.services = ['', '', '']
+		self.yamlPath = ''
+		self.services = ''
 		self.deploymentTag = ''
 
 		self.cli = ''
@@ -271,25 +251,10 @@ class Containerize():
 # Container management functions
 #-----------------------------------------------------------
 
-	def GetCredentials(self, server_id):
-		if server_id == '0':
-			ip, path = self.eNBIPAddress, self.eNBSourceCodePath
-		elif server_id == '1':
-			ip, path = self.eNB1IPAddress, self.eNB1SourceCodePath
-		elif server_id == '2':
-			ip, path = self.eNB2IPAddress, self.eNB2SourceCodePath
-		else:
-			raise ValueError(f"unknown server ID '{server_id}'")
-		if ip == '' or path == '':
-			HELP.GenericHelp(CONST.Version)
-			raise ValueError(f'Insufficient Parameter: IP/node {ip}, path {path}')
-		return (ip, path)
-
-	def BuildImage(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.getConnection(lIpAddr)
+	def BuildImage(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Building on server: ' + node)
+		cmd = cls_cmd.getConnection(node)
 		log_files = []
 	
 		# Checking the hostname to get adapted on cli and dockerfileprefixes
@@ -386,13 +351,6 @@ class Containerize():
 			t = ("ran-base", archiveArtifact(cmd, ctx, logfile))
 			log_files.append(t)
 
-			# Recover build logs, for the moment only possible when build is successful
-			cmd.run(f"{self.cli} create --name test {baseImage}:{baseTag}")
-			cmd.run("mkdir -p cmake_targets/log/ran-base")
-			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.log'
-			cmd.run(f"{self.cli} cp test:/oai-ran/cmake_targets/log/all.txt {logfile}")
-			cmd.run(f"{self.cli} rm -f test")
-			archiveArtifact(cmd, ctx, logfile)
 		# First verify if the base image was properly created.
 		ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {baseImage}:{baseTag}")
 		allImagesSize = {}
@@ -438,12 +396,6 @@ class Containerize():
 			log_files.append(t)
 			if image == 'oai-gnb-aerial':
 				cmd.run('rm -f nvipc.src.2025.05.20.tar.gz')
-			if image == 'ran-build' or image == 'ran-build-asan' or image == 'ran-build-fhi72':
-				cmd.run(f"docker run --name test-log -d {name}:{imageTag} /bin/true")
-				logfile = f'{lSourcePath}/{image}.ninja.log'
-				cmd.run(f"docker cp test-log:/oai-ran/cmake_targets/log/all.txt {logfile}")
-				cmd.run(f"docker rm -f test-log")
-				archiveArtifact(cmd, ctx, logfile)
 			# check the status of the build
 			ret = cmd.run(f"{self.cli} image inspect --format=\'Size = {{{{.Size}}}} bytes\' {name}:{imageTag}")
 			if ret.returncode != 0:
@@ -480,25 +432,23 @@ class Containerize():
 		cmd.close()
 
 		# Analyze the logs
-		collectInfo = AnalyzeBuildLogs(log_files, status)
+		for name, lf in log_files:
+			ret = AnalyzeBuildLogs(name, lf)
+			imgStatus = ret['status']
+			msg = f"size {allImagesSize[name]}, analysis of {os.path.basename(lf)}: {ret['errors']} errors, {ret['warnings']} warnings"
+			HTML.CreateHtmlTestRowQueue(name, 'OK' if imgStatus else 'KO', [msg])
+			status = status and imgStatus
 		
 		if status:
 			logging.info('\u001B[1m Building OAI Image(s) Pass\u001B[0m')
-			HTML.CreateHtmlTestRow(self.imageKind, 'OK', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, allImagesSize)
-			return True
 		else:
 			logging.error('\u001B[1m Building OAI Images Failed\u001B[0m')
-			HTML.CreateHtmlTestRow(self.imageKind, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, allImagesSize)
-			HTML.CreateHtmlTabFooter(False)
-			return False
+		return status
 
-	def BuildProxy(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('Building on server: ' + lIpAddr)
-		ssh = cls_cmd.getConnection(lIpAddr)
+	def BuildProxy(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Building on server: ' + node)
+		ssh = cls_cmd.getConnection(node)
 
 		oldRanCommidID = self.ranCommitID
 		oldRanRepository = self.ranRepository
@@ -521,7 +471,7 @@ class Containerize():
 		buildProxy = ret.returncode != 0 # if no image, build new proxy
 		if buildProxy:
 			ssh.run(f'rm -Rf {lSourcePath}')
-			success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+			success = CreateWorkspace(node, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 			if not success:
 				raise Exception("could not clone proxy repository")
 
@@ -557,16 +507,6 @@ class Containerize():
 		self.ranAllowMerge = oldRanAllowMerge
 		self.ranTargetBranch = oldRanTargetBranch
 
-		# we do not analyze the logs (we assume the proxy builds fine at this stage),
-		# but need to have the following information to correctly display the HTML
-		files = {}
-		errorandwarnings = {}
-		errorandwarnings['errors'] = 0
-		errorandwarnings['warnings'] = 0
-		errorandwarnings['status'] = True
-		files['Target Image Creation'] = errorandwarnings
-		collectInfo = {}
-		collectInfo['proxy'] = files
 		ret = ssh.run(f'docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' proxy:{tag}')
 		result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', ret.stdout)
 		# Cleaning any created tmp volume
@@ -580,21 +520,18 @@ class Containerize():
 			allImagesSize['proxy'] = str(round(imageSize,1)) + ' Mbytes'
 			logging.info('\u001B[1m Building L2sim Proxy Image Pass\u001B[0m')
 			HTML.CreateHtmlTestRow('commit ' + tag, 'OK', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlNextTabHeaderTestRow(collectInfo, allImagesSize)
 			return True
 		else:
 			logging.error('proxy size is unknown')
 			allImagesSize['proxy'] = 'unknown'
 			logging.error('\u001B[1m Build of L2sim proxy failed\u001B[0m')
 			HTML.CreateHtmlTestRow('commit ' + tag, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def BuildRunTests(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug('Building on server: ' + lIpAddr)
-		cmd = cls_cmd.RemoteCmd(lIpAddr)
+	def BuildRunTests(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Building on server: ' + node)
+		cmd = cls_cmd.RemoteCmd(node)
 		cmd.cd(lSourcePath)
 
 		ret = cmd.run('hostnamectl')
@@ -605,9 +542,6 @@ class Containerize():
 			raise Exception("Can build unit tests only on Ubuntu server")
 		logging.debug('running on Ubuntu as expected')
 
-		if self.forcedWorkspaceCleanup:
-			cmd.run(f'sudo -S rm -Rf {lSourcePath}')
-	
 		# check that ran-base image exists as we expect it
 		baseImage = 'ran-base'
 		baseTag = 'develop'
@@ -658,10 +592,10 @@ class Containerize():
 			HTML.CreateHtmlTabFooter(False)
 			return False
 
-	def Push_Image_to_Local_Registry(self, HTML, svr_id, tag_prefix=""):
-		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug('Pushing images to server: ' + lIpAddr)
-		ssh = cls_cmd.getConnection(lIpAddr)
+	def Push_Image_to_Local_Registry(self, node, HTML, tag_prefix=""):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug('Pushing images to server: ' + node)
+		ssh = cls_cmd.getConnection(node)
 		imagePrefix = 'porcepix.sboai.cs.eurecom.fr'
 		ret = ssh.run(f'docker login -u oaicicd -p oaicicd {imagePrefix}')
 		if ret.returncode != 0:
@@ -733,28 +667,26 @@ class Containerize():
 		msg = "Pulled Images:\n" + '\n'.join(pulled_images)
 		return True, msg
 
-	def Pull_Image_from_Registry(self, HTML, svr_id, images, tag=None, tag_prefix="", registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
-		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug('\u001B[1m Pulling image(s) on server: ' + lIpAddr + '\u001B[0m')
+	def Pull_Image_from_Registry(self, HTML, node, images, tag=None, tag_prefix="", registry="porcepix.sboai.cs.eurecom.fr", username="oaicicd", password="oaicicd"):
+		logging.debug(f'\u001B[1m Pulling image(s) on server: {node}\u001B[0m')
 		if not tag:
 			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
-		with cls_cmd.getConnection(lIpAddr) as cmd:
+		with cls_cmd.getConnection(node) as cmd:
 			success, msg = Containerize.Pull_Image(cmd, images, tag, tag_prefix, registry, username, password)
-		param = f"on node {lIpAddr}"
+		param = f"on node {node}"
 		if success:
 			HTML.CreateHtmlTestRowQueue(param, 'OK', [msg])
 		else:
 			HTML.CreateHtmlTestRowQueue(param, 'KO', [msg])
 		return success
 
-	def Clean_Test_Server_Images(self, HTML, svr_id, images, tag=None):
-		lIpAddr, lSourcePath = self.GetCredentials(svr_id)
-		logging.debug(f'\u001B[1m Cleaning image(s) from server: {lIpAddr}\u001B[0m')
+	def Clean_Test_Server_Images(self, HTML, node, images, tag=None):
+		logging.debug(f'\u001B[1m Cleaning image(s) from server: {node}\u001B[0m')
 		if not tag:
 			tag = CreateTag(self.ranCommitID, self.ranBranch, self.ranAllowMerge)
 
 		status = True
-		with cls_cmd.getConnection(lIpAddr) as myCmd:
+		with cls_cmd.getConnection(node) as myCmd:
 			removed_images = []
 			for image in images:
 				fullImage = f"oai-ci/{image}:{tag}"
@@ -765,30 +697,28 @@ class Containerize():
 
 		msg = "Removed Images:\n" + '\n'.join(removed_images)
 		s = 'OK' if status else 'KO'
-		param = f"on node {lIpAddr}"
+		param = f"on node {node}"
 		HTML.CreateHtmlTestRowQueue(param, s, [msg])
 		return status
 
-	def Create_Workspace(self,HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		success = CreateWorkspace(lIpAddr, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
+	def Create_Workspace(self, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		success = CreateWorkspace(node, lSourcePath, self.ranRepository, self.ranCommitID, self.ranTargetBranch, self.ranAllowMerge)
 		if success:
 			HTML.CreateHtmlTestRowQueue('N/A', 'OK', [f"created workspace {lSourcePath}"])
 		else:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ["cannot create workspace"])
 		return success
 
-	def DeployObject(self, ctx, HTML):
-		svr = self.eNB_serverId[self.eNB_instance]
+	def DeployObject(self, ctx, node, HTML):
 		num_attempts = self.num_attempts
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug(f'Deploying OAI Object on server: {lIpAddr}')
-		yaml = self.yamlPath[self.eNB_instance].strip('/')
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug(f'Deploying OAI Object on server: {node}')
+		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
-		with cls_cmd.getConnection(lIpAddr) as ssh:
-			services = GetServices(ssh, self.services[self.eNB_instance], wd_yaml)
+		with cls_cmd.getConnection(node) as ssh:
+			services = GetServices(ssh, self.services, wd_yaml)
 			if services == [] or services == ' ' or services == None:
 				msg = 'Cannot determine services to start'
 				logging.error(msg)
@@ -823,13 +753,12 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
 		return deployed
 
-	def UndeployObject(self, ctx, HTML, RAN):
-		svr = self.eNB_serverId[self.eNB_instance]
-		lIpAddr, lSourcePath = self.GetCredentials(svr)
-		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {lIpAddr}\u001B[0m')
-		yaml = self.yamlPath[self.eNB_instance].strip('/')
+	def UndeployObject(self, ctx, node, HTML, RAN):
+		lSourcePath = self.eNBSourceCodePath
+		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {node}\u001B[0m')
+		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
-		with cls_cmd.getConnection(lIpAddr) as ssh:
+		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
 			services = GetRunningServices(ssh, f"{wd}/docker-compose.y*ml")
 			copyin_res = None

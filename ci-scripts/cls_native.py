@@ -34,16 +34,16 @@ DPDK_PATH = '/opt/dpdk-t2-22.11.0'
 
 class Native():
 
-	def Build(ctx, test_case, HTML, host, directory, options):
-		logging.debug(f'Building on server: {host}')
+	def Build(ctx, node, test_case, HTML, directory, options):
+		logging.debug(f'Building on server: {node}')
 		HTML.testCase_id = test_case
 
-		with cls_cmd.getConnection(host) as ssh:
+		with cls_cmd.getConnection(node) as ssh:
 			base = f"{directory}/cmake_targets"
 			ret = ssh.run(f"C_INCLUDE_PATH={DPDK_PATH}/include/ PKG_CONFIG_PATH={DPDK_PATH}/lib64/pkgconfig/ {base}/build_oai {options} > {base}/build_oai.log", timeout=900)
 			success = ret.returncode == 0
 			logs = ssh.run(f"cat {base}/build_oai.log", silent=True)
-			logging.debug(f"build finished with code {ret.returncode}, output:\n{logs.stdout}")
+			logging.debug(f"build finished with code {ret.returncode}")
 
 			archiveArtifact(ssh, ctx, f'{base}/build_oai.log')
 
@@ -70,7 +70,7 @@ class Native():
 		workSpacePath = f'{directory}/cmake_targets'
 		runLogFile=f'{workSpacePath}/physim.log'
 		with cls_cmd.getConnection(host) as cmd:
-			cmd.run(f'sudo LD_LIBRARY_PATH=.:{DPDK_PATH}/lib64/ {workSpacePath}/ran_build/build/{physim_test} {options} >> {runLogFile}')
+			cmd.run(f'sudo LD_LIBRARY_PATH=.:{DPDK_PATH}/lib64/ {workSpacePath}/ran_build/build/{physim_test} {options} > {runLogFile} 2>&1')
 			physim_file = archiveArtifact(cmd, ctx, runLogFile)
 		success, msg = cls_analysis.Analysis.analyze_physim(physim_file, physim_test, options, threshold)
 		if success:

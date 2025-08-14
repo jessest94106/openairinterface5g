@@ -244,6 +244,7 @@ def Custom_Script(HTML, node, script):
 	return status == 'OK' or status == 'Warning'
 
 def IdleSleep(HTML, idle_sleep_time):
+	logging.debug(f"sleep for {idle_sleep_time} seconds")
 	time.sleep(idle_sleep_time)
 	HTML.CreateHtmlTestRow(f"{idle_sleep_time} sec", 'OK', CONST.ALL_PROCESSES_OK)
 	return True

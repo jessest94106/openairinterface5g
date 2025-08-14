@@ -280,7 +280,6 @@ endif()
 add_boolean_option(TRACE_ASN1C_ENC_DEC OFF "Enable ASN1 encoder/decoder debug traces via OAI logging system" ON)
 add_boolean_option(T_TRACER            True  "Activate the T tracer, a debugging/monitoring framework" ON)
 add_boolean_option(ENABLE_LTTNG        False "Activate the LTTNG tracer, a debugging/monitoring framework" ON)
-add_boolean_option(UE_AUTOTEST_TRACE   False "Activate UE autotest specific logs" ON)
 add_boolean_option(UE_DEBUG_TRACE      False "Activate UE debug trace" ON)
 add_boolean_option(UE_TIMING_TRACE     False "Activate UE timing trace" ON)
 
