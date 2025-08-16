@@ -89,28 +89,17 @@ static void nr_pusch_codeword_scrambling_uci(uint8_t *in,
     out[i] = in_words[i] ^ seq[i];
   }
 
+  // According to 38.211 6.3.1.1
   for (uint32_t i = 0; i < size; i++) {
-    if (template[i] == BIT_TYPE_ACK) {
-      // Step 2: Overwrite/Correct positions for ACK-only bits when O_ACK > 2
+    if (template[i] == BIT_TYPE_ACK_ULSCH) {
+      // Step 2: Overwrite/Correct positions for UCI bits including placeholders X, Y when O_ACK <= 2
       uint32_t pos = i;
       uint32_t idx = pos / 32;
       uint32_t b_idx = pos % 32;
-
-      // Clear the bit that was set by the initial general scrambling
-      out[idx] &= ~(1U << b_idx);
-
-      uint32_t ack_bit_value = in[pos] & 1;
-      uint32_t scrambling_bit_for_ack = (seq[idx] >> b_idx) & 1;
-      out[idx] |= ((ack_bit_value ^ scrambling_bit_for_ack) << b_idx);
-    } else if (template[i] == BIT_TYPE_ACK_ULSCH) {
-      // Step 3: Overwrite/Correct positions for UCI bits including placeholders X, Y when O_ACK <= 2
-      uint32_t pos = i;
-      uint32_t idx = pos / 32;
-      uint32_t b_idx = pos % 32;
-
-      out[idx] &= ~(1U << b_idx);
 
       if (in[pos] == NR_PUSCH_y) {
+        // Clear bit
+        out[idx] &= ~(1U << b_idx);
         if (b_idx > 0) {
           // Y depends on the final value of the previous bit in the same word.
           // This previous bit could be an ACK (already corrected) or ULSCH (from initial scramble).
@@ -121,10 +110,6 @@ static void nr_pusch_codeword_scrambling_uci(uint8_t *in,
         }
       } else if (in[pos] == NR_PUSCH_x) {
         out[idx] |= (1U << b_idx);
-      } else {
-        uint32_t ack_bit_value = in[pos] & 1;
-        uint32_t scrambling_bit_for_ack = (seq[idx] >> b_idx) & 1;
-        out[idx] |= ((ack_bit_value ^ scrambling_bit_for_ack) << b_idx);
       }
     }
   }
@@ -139,8 +124,10 @@ void nr_pusch_codeword_scrambling(uint8_t *in,
                                   uint32_t *out)
 {
   if (uci_on_pusch)
+    // in buffer is in byte-packed format
     nr_pusch_codeword_scrambling_uci(in, size, Nid, n_RNTI, template, out);
   else
+    // in buffer is in bit-packed format
     nr_codeword_scrambling(in, size, 0, Nid, n_RNTI, out);
 }
 
@@ -701,62 +688,31 @@ static rate_match_info_uci_t calc_rate_match_info_uci(const nfapi_nr_ue_pusch_pd
 
 static int initialize_mapping_resources(const nfapi_nr_ue_pusch_pdu_t *pusch_pdu,
                                         uint32_t *m_ulsch_initial,
-                                        uint32_t *m_ulsch_current,
-                                        uint32_t *m_uci_current,
-                                        bool *is_dmrs_symbol_flags,
-                                        uint8_t *dmrs_symbol_set_relative,
-                                        uint8_t *num_dmrs_symbols_in_set_relative)
+                                        uint32_t *m_uci_current)
 {
-  if (!pusch_pdu || !m_ulsch_initial || !m_ulsch_current || !m_uci_current || !is_dmrs_symbol_flags || !dmrs_symbol_set_relative
-      || !num_dmrs_symbols_in_set_relative)
+  if (!pusch_pdu || !m_ulsch_initial || !m_uci_current)
     return -1;
 
-  uint8_t n_pusch_sym_all = pusch_pdu->nr_of_symbols;
-  uint16_t ul_dmrs_symb_pos = pusch_pdu->ul_dmrs_symb_pos;
-  uint8_t dmrs_type = pusch_pdu->dmrs_config_type;
-  uint8_t cdm_grps_no_data = pusch_pdu->num_dmrs_cdm_grps_no_data;
-  uint32_t res_per_symbol_non_dmrs = pusch_pdu->rb_size * 12;
-
-  *num_dmrs_symbols_in_set_relative = 0;
+  const uint8_t n_pusch_sym_all = pusch_pdu->nr_of_symbols;
+  const uint16_t ul_dmrs_symb_pos = pusch_pdu->ul_dmrs_symb_pos;
+  const uint8_t dmrs_type = pusch_pdu->dmrs_config_type;
+  const uint8_t cdm_grps_no_data = pusch_pdu->num_dmrs_cdm_grps_no_data;
+  const uint32_t res_per_symbol_non_dmrs = pusch_pdu->rb_size * NR_NB_SC_PER_RB;
+  const uint32_t data_re_on_dmrs_sym_per_prb = NR_NB_SC_PER_RB - get_num_dmrs_re_per_rb(dmrs_type, cdm_grps_no_data);
 
   // Initialize resources per symbol for ULSCH and UCI
   for (uint8_t i = 0; i < n_pusch_sym_all; i++) {
     uint8_t absolute_symbol_idx = pusch_pdu->start_symbol_index + i;
 
     if ((ul_dmrs_symb_pos >> absolute_symbol_idx) & 0x01) {
-      is_dmrs_symbol_flags[i] = true;
-      if (*num_dmrs_symbols_in_set_relative < 14) {
-        dmrs_symbol_set_relative[(*num_dmrs_symbols_in_set_relative)++] = i;
-      }
-
       // Calculate available data REs on DMRS symbols based on DMRS configuration
-      uint32_t data_re_on_dmrs_sym_per_prb = 0;
-
-      if (dmrs_type == 0) { // Type 1
-        if (cdm_grps_no_data == 1) {
-          data_re_on_dmrs_sym_per_prb = 6;
-        } else {
-          data_re_on_dmrs_sym_per_prb = 0;
-        }
-      } else { // Type 2
-        if (cdm_grps_no_data == 1) {
-          data_re_on_dmrs_sym_per_prb = 4;
-        } else if (cdm_grps_no_data == 2) {
-          data_re_on_dmrs_sym_per_prb = 2;
-        } else {
-          data_re_on_dmrs_sym_per_prb = 0;
-        }
-      }
 
       m_ulsch_initial[i] = pusch_pdu->rb_size * data_re_on_dmrs_sym_per_prb;
-      m_ulsch_current[i] = m_ulsch_initial[i];
       m_uci_current[i] = 0; // UCI is not mapped on DMRS symbols
 
     } else { // Not a DMRS symbol
-      is_dmrs_symbol_flags[i] = false;
 
       m_ulsch_initial[i] = res_per_symbol_non_dmrs;
-      m_ulsch_current[i] = res_per_symbol_non_dmrs;
       m_uci_current[i] = res_per_symbol_non_dmrs;
     }
   }
@@ -764,35 +720,31 @@ static int initialize_mapping_resources(const nfapi_nr_ue_pusch_pdu_t *pusch_pdu
   return 0;
 }
 
-static uint8_t find_first_uci_symbol(uint8_t n_pusch_sym_all,
-                                     const bool *is_dmrs_symbol_flags,
-                                     uint8_t *dmrs_symbol_set_relative,
-                                     uint32_t num_dmrs_symbols_in_set_relative)
+static void get_first_uci_symbol(const uint8_t start_symbol,
+                                 const uint8_t num_symbols,
+                                 const uint16_t dmrs_map,
+                                 uint8_t *first_non_dmrs_sym,
+                                 uint8_t *dmrs_p1)
 {
-  uint8_t l1_c = 0;
-
-  // Find first non-DMRS symbol
-  for (uint8_t i = 0; i < n_pusch_sym_all; i++) {
-    if (!is_dmrs_symbol_flags[i]) {
-      l1_c = i;
+  // First non-DMRS symbol
+  const uint16_t last_sym = start_symbol + num_symbols;
+  for (uint_fast8_t s = start_symbol; s < last_sym; s++) {
+    if (!is_dmrs_symbol(s, dmrs_map)) {
+      *first_non_dmrs_sym = s;
       break;
     }
   }
 
-  // If there are DMRS symbols, try to find a symbol after the first DMRS
-  if (num_dmrs_symbols_in_set_relative > 0) {
-    uint8_t first_dmrs_idx = dmrs_symbol_set_relative[0];
-    if (l1_c <= first_dmrs_idx) {
-      for (uint8_t i = first_dmrs_idx + 1; i < n_pusch_sym_all; i++) {
-        if (!is_dmrs_symbol_flags[i]) {
-          l1_c = i;
-          break;
-        }
-      }
-    }
+  // Symbol after first consequtive DMRS symbol
+  const uint8_t first_dmrs_sym = get_next_dmrs_symbol_in_slot(dmrs_map, start_symbol, last_sym);
+  *dmrs_p1 = first_dmrs_sym + 1;
+  while (is_dmrs_symbol(*dmrs_p1, dmrs_map) && *dmrs_p1 < last_sym) {
+    (*dmrs_p1)++;
   }
 
-  return l1_c;
+  // Return relative symbol idx
+  *first_non_dmrs_sym -= start_symbol;
+  *dmrs_p1 -= start_symbol;
 }
 
 /*
@@ -1013,34 +965,29 @@ static uci_on_pusch_bit_type_t *nr_data_control_mapping(const nfapi_nr_ue_pusch_
   if (!pusch_pdu || !codeword || codeword_len == 0 || !template)
     return NULL;
   const uint8_t n_symbols = pusch_pdu->nr_of_symbols;
-  if (n_symbols == 0 || n_symbols > 14)
+  if (n_symbols == 0 || n_symbols > NR_NUMBER_OF_SYMBOLS_PER_SLOT)
     return NULL;
 
-  uint32_t m_ulsch_initial[14] = {0};
-  uint32_t m_ulsch_current[14] = {0};
-  uint32_t m_uci_current[14] = {0}; // This holds RE counts, not bit counts
-  bool is_dmrs_symbol_flags[14] = {0};
-  uint8_t dmrs_symbol_set_relative[14] = {0};
-  uint8_t num_dmrs_symbols_in_set_relative = 0;
+  uint32_t m_ulsch_initial[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
+  uint32_t m_uci_current[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0}; // This holds RE counts, not bit counts
 
-  if (initialize_mapping_resources(pusch_pdu,
-                                   m_ulsch_initial,
-                                   m_ulsch_current,
-                                   m_uci_current,
-                                   is_dmrs_symbol_flags,
-                                   dmrs_symbol_set_relative,
-                                   &num_dmrs_symbols_in_set_relative)
-      != 0) {
+  if (initialize_mapping_resources(pusch_pdu, m_ulsch_initial, m_uci_current) != 0) {
     LOG_E(PHY, "Failed to initialize mapping resources\n");
     return NULL;
   }
 
-  uint8_t l1_c = find_first_uci_symbol(n_symbols, is_dmrs_symbol_flags, dmrs_symbol_set_relative, num_dmrs_symbols_in_set_relative);
+  uint8_t first_non_dmrs_sym = 0;
+  uint8_t l1_c = 0;
+  get_first_uci_symbol(pusch_pdu->start_symbol_index,
+                       pusch_pdu->nr_of_symbols,
+                       pusch_pdu->ul_dmrs_symb_pos,
+                       &first_non_dmrs_sym,
+                       &l1_c);
 
   memset(template, 0, codeword_len * sizeof(uci_on_pusch_bit_type_t));
 
-  uint32_t positions_by_sym[14][MAX_UCI_CODED_BITS] = {0};
-  uint32_t count_by_sym[14] = {0};
+  uint32_t positions_by_sym[NR_NUMBER_OF_SYMBOLS_PER_SLOT][MAX_UCI_CODED_BITS] = {0};
+  uint32_t count_by_sym[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
 
   if (G_ack_rvd > 0) {
     build_template_reserve_ack(template,
