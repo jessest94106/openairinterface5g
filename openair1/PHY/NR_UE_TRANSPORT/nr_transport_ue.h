@@ -55,6 +55,8 @@ typedef struct {
   uint32_t C;
   /// Number of bits in code segments
   uint32_t K;
+  ///
+  uint32_t Kb;
   /// Number of "Filler" bits
   uint32_t F;
   /// Number of soft channel bits

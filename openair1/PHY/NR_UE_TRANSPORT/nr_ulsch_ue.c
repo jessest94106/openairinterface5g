@@ -1092,7 +1092,9 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 
   /////////////////////////ULSCH coding/////////////////////////
 
-  if (nr_ulsch_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids, number_dmrs_symbols) == -1) {
+  int enc_ret = nr_ulsch_pre_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids);
+  enc_ret += nr_ulsch_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids, number_dmrs_symbols);
+  if (enc_ret != 0) {
     stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
     return;
   }
