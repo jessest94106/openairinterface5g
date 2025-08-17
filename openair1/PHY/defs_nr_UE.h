@@ -511,6 +511,7 @@ typedef struct PHY_VARS_NR_UE_s {
   void *phy_sim_pdsch_dl_ch_estimates;
   void *phy_sim_pdsch_dl_ch_estimates_ext;
   uint8_t *phy_sim_dlsch_b;
+  uint8_t *phy_sim_test_buf;
 
   dynamic_barrier_t process_slot_tx_barriers[NUM_PROCESS_SLOT_TX_BARRIERS];
 

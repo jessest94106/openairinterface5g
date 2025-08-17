@@ -1224,6 +1224,9 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                                is_uci_on_pusch,
                                uci_mapping_template,
                                scrambled_output);
+  if (UE->phy_sim_test_buf) {
+    memcpy(UE->phy_sim_test_buf, scrambled_output, (available_bits + 7) / 8);
+  }
 #if T_TRACER
   if (T_ACTIVE(T_UE_PHY_UL_SCRAMBLED_TX_BITS)) {
     // Get Time Stamp for T-tracer messages
