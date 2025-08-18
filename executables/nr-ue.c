@@ -627,10 +627,10 @@ void dummyWrite(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, int writeBlo
 
   void *dummy_tx[fp->nb_antennas_tx];
   // 2 because the function we call use pairs of int16_t implicitly as complex numbers
-  int16_t dummy_tx_data[fp->nb_antennas_tx][2 * writeBlockSize];
+  int16_t dummy_tx_data[2 * writeBlockSize];
   memset(dummy_tx_data, 0, sizeof(dummy_tx_data));
   for (int i = 0; i < fp->nb_antennas_tx; i++)
-    dummy_tx[i]=dummy_tx_data[i];
+    dummy_tx[i] = dummy_tx_data;
 
   int tmp = nrue_ru_write(UE, timestamp, dummy_tx, writeBlockSize, fp->nb_antennas_tx, 4);
   AssertFatal(writeBlockSize == tmp, "");
@@ -648,9 +648,11 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration
   }
 
   void *rxp[NB_ANTENNAS_RX];
-  if (toTrash)
-    for (int i = 0; i < fp->nb_antennas_rx; i++)
-      rxp[i] = malloc16(get_samples_per_slot(0, fp) * 4);
+  if (toTrash) {
+    rxp[0] = malloc16(get_samples_per_slot(0, fp) * 4);
+    for (int i = 1; i < fp->nb_antennas_rx; i++)
+      rxp[i] = rxp[0];
+  }
 
   for (int x = 0; x < num_frames * NR_NUMBER_OF_SUBFRAMES_PER_FRAME; x++) { // two frames for initial sync
     for (int slot = 0; slot < fp->slots_per_subframe; slot++) {
@@ -674,8 +676,7 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration
   }
 
   if (toTrash)
-    for (int i = 0; i < fp->nb_antennas_rx; i++)
-      free(rxp[i]);
+    free(rxp[0]);
 }
 
 static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration_rx_to_tx, openair0_timestamp_t rx_offset)
