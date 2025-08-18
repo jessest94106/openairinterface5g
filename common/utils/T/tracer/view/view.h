@@ -18,9 +18,9 @@ view *new_view_textlist(int maxsize, float refresh_rate, gui *g, widget *w);
 view *new_view_xy(int length, float refresh_rate, gui *g, widget *w,
     int color, enum xy_mode mode);
 view *new_view_tti(float refresh_rate, gui *g, widget *w, int color,
-    int subframes_per_frame);
+    int ticks_per_frame);
 view *new_view_scrolltti(float refresh_rate, gui *g, widget *w,
-    int color, widget *throughput_label, int subframes_per_frame);
+    int color, widget *throughput_label, int ticks_per_frame);
 view *new_view_time(int number_of_seconds, float refresh_rate,
     gui *g, widget *w);
 view *new_subview_time(view *time, int line, int color, int size);

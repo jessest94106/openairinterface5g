@@ -15,14 +15,14 @@ struct scrolltti {
   int plot;
   float refresh_rate;
   pthread_mutex_t lock;
-  int subframes_per_frame;
+  int ticks_per_frame;
   unsigned long *data;
   unsigned long total;  /* sum data[0..n] to have smoother value printed */
   float *xout;
   float *yout;
   int insert_point;
   int next_tick_frame;
-  int next_tick_subframe;
+  int next_tick_tick;
 };
 
 /* this array is used to get Y range 1000, 2000, 5000, 10000, ... */
@@ -41,21 +41,21 @@ static void *scrolltti_thread(void *_this)
     /* TODO: optimize */
     p = this->insert_point;
     max = 0;
-    for (i = 0; i < this->subframes_per_frame * 100; i++) {
+    for (i = 0; i < this->ticks_per_frame * 100; i++) {
       this->xout[i] = i;
       this->yout[i] = this->data[p];
       if (this->data[p] > max) max = this->data[p];
-      p = (p + 1) % (this->subframes_per_frame * 100);
+      p = (p + 1) % (this->ticks_per_frame * 100);
     }
-    bps(o, this->total/(this->subframes_per_frame * 100.), "b/s");
+    bps(o, this->total/(this->ticks_per_frame * 100.), "b/s");
     textarea_set_text(this->g, this->throughput_textarea, o);
     /* for Y range we want 1000, 2000, 5000, 10000, 20000, 50000, etc. */
     if (max < 1000) max = 1000;
     mlog = pow(10, floor(log10(max)));
     max = tolog[(int)ceil(max/mlog)] * mlog;
-    xy_plot_set_range(this->g, this->w, 0, this->subframes_per_frame * 100, 0, max);
+    xy_plot_set_range(this->g, this->w, 0, this->ticks_per_frame * 100, 0, max);
     xy_plot_set_points(this->g, this->w, this->plot,
-        this->subframes_per_frame * 100, this->xout, this->yout);
+        this->ticks_per_frame * 100, this->xout, this->yout);
     if (pthread_mutex_unlock(&this->lock)) abort();
     sleepms(1000/this->refresh_rate);
   }
@@ -73,35 +73,35 @@ static void insert(struct scrolltti *this, double value)
   this->total -= this->data[this->insert_point];
   this->data[this->insert_point] = value;
   this->total += this->data[this->insert_point];
-  this->insert_point = (this->insert_point + 1) % (this->subframes_per_frame * 100);
+  this->insert_point = (this->insert_point + 1) % (this->ticks_per_frame * 100);
 }
 
-static void next_subframe(struct scrolltti *this)
+static void next_tick(struct scrolltti *this)
 {
-  this->next_tick_subframe++;
-  if (this->next_tick_subframe == this->subframes_per_frame) {
-    this->next_tick_subframe = 0;
+  this->next_tick_tick++;
+  if (this->next_tick_tick == this->ticks_per_frame) {
+    this->next_tick_tick = 0;
     this->next_tick_frame++;
     this->next_tick_frame %= 1024;
   }
 }
 
-static void append(view *_this, int frame, int subframe, double value)
+static void append(view *_this, int frame, int tick, double value)
 {
   struct scrolltti *this = (struct scrolltti *)_this;
 
   if (pthread_mutex_lock(&this->lock)) abort();
-  while (this->next_tick_frame != frame || this->next_tick_subframe != subframe) {
+  while (this->next_tick_frame != frame || this->next_tick_tick != tick) {
     insert(this, 0);
-    next_subframe(this);
+    next_tick(this);
   }
   insert(this, value);
-  next_subframe(this);
+  next_tick(this);
   if (pthread_mutex_unlock(&this->lock)) abort();
 }
 
 view *new_view_scrolltti(float refresh_rate, gui *g, widget *w, int color,
-    widget *throughput_textarea, int subframes_per_frame)
+    widget *throughput_textarea, int ticks_per_frame)
 {
   struct scrolltti *ret = calloc(1, sizeof(struct scrolltti));
   if (ret == NULL) abort();
@@ -115,12 +115,12 @@ view *new_view_scrolltti(float refresh_rate, gui *g, widget *w, int color,
   ret->throughput_textarea = throughput_textarea;
   ret->plot = xy_plot_new_plot(g, w, color);
 
-  ret->subframes_per_frame = subframes_per_frame;
-  ret->data = calloc(subframes_per_frame * 100, sizeof(unsigned long));
+  ret->ticks_per_frame = ticks_per_frame;
+  ret->data = calloc(ticks_per_frame * 100, sizeof(unsigned long));
   if (ret->data == NULL) abort();
-  ret->xout = calloc(subframes_per_frame * 100, sizeof(float));
+  ret->xout = calloc(ticks_per_frame * 100, sizeof(float));
   if (ret->xout == NULL) abort();
-  ret->yout = calloc(subframes_per_frame * 100, sizeof(float));
+  ret->yout = calloc(ticks_per_frame * 100, sizeof(float));
   if (ret->yout == NULL) abort();
 
   if (pthread_mutex_init(&ret->lock, NULL)) abort();
