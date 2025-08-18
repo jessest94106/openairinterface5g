@@ -1426,7 +1426,7 @@ static int rfsimulator_read_beams(openair0_device_t *device,
     buffer_t *ptr = &t->buf[sock];
 
     if (ptr->conn_sock != -1 && ptr->channel_model != NULL) {
-      update_channel_model(ptr->channel_model, t->nextRxTstamp);
+      update_channel_model(ptr->channel_model, nsamps, t->nextRxTstamp);
     }
   }
 
