@@ -108,8 +108,13 @@ void *client_thread_func(void *args)
   while (should_run) {
     int next_buffer = (taps_storage.current_buffer + 1) % NUM_TAPS_BUFFERS;
     taps_buffer_t *taps_buffer = &taps_storage.taps_buffers[next_buffer];
-    int ret = nn_recv(client_thread_args->sock, taps_buffer->taps_msg, MAX_TAPS_MSG_SIZE, 0);
+    int ret = nn_recv(client_thread_args->sock, taps_buffer->taps_msg, MAX_TAPS_MSG_SIZE, NN_DONTWAIT);
     if (ret < 0) {
+      if (errno == EAGAIN) {
+      // Timeout: no message available, sleep briefly and continue
+      usleep(100);
+      continue;
+      }
       LOG_E(HW, "nn_recv() failed: errno: %d, %s\n", errno, strerror(errno));
       continue;
     }
