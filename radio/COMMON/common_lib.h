@@ -282,10 +282,6 @@ typedef struct openair0_config {
   recplay_conf_t *recplay_conf;
   //! number of samples per tti
   unsigned int  samples_per_tti;
-  //! the sample rate for receive.
-  double rx_sample_rate;
-  //! the sample rate for transmit.
-  double tx_sample_rate;
   //! Flag to indicate this configuration is for NR
   int nr_flag;
   //! NR band number
