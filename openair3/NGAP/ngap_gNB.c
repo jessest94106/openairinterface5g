@@ -463,6 +463,36 @@ static int ngap_gNB_handover_notify(instance_t instance, const ngap_handover_not
   return 0;
 }
 
+int ngap_gNB_handle_ul_ran_status_transfer(instance_t instance, const ngap_ran_status_transfer_t *msg)
+{
+  NGAP_DEBUG("Triggered UL RAN Status Transfer\n");
+
+  ngap_gNB_instance_t *ngap_gNB_instance_p = ngap_gNB_get_instance(instance);
+  DevAssert(ngap_gNB_instance_p != NULL);
+
+  ngap_gNB_ue_context_t *ue_context_p = ngap_get_ue_context(msg->gnb_ue_ngap_id);
+  if (!ue_context_p || ue_context_p->gNB_ue_ngap_id != msg->gnb_ue_ngap_id) {
+    NGAP_ERROR("Could not find UE context for gNB_ue_ngap_id %d\n", msg->gnb_ue_ngap_id);
+    return -1;
+  }
+
+  NGAP_NGAP_PDU_t *pdu = encode_ng_ul_ran_status_transfer(msg);
+  if (!pdu) {
+    NGAP_ERROR("Failed to encode UL RAN Status Transfer\n");
+    return -1;
+  }
+
+  byte_array_t out = {.buf = NULL, .len = 0};
+  if (ngap_gNB_encode_pdu(pdu, &out.buf, (uint32_t *)&out.len) < 0) {
+    NGAP_ERROR("UL RAN Status Transfer encoding failure\n");
+    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
+    return -1;
+  }
+
+  ngap_gNB_itti_send_sctp_data_req(instance, ue_context_p->amf_ref->assoc_id, out.buf, out.len, ue_context_p->tx_stream);
+  return 0;
+}
+
 void *ngap_gNB_process_itti_msg(void *notUsed) {
   MessageDef *received_msg = NULL;
   int         result;
@@ -555,6 +585,10 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
 
       case NGAP_HANDOVER_NOTIFY:
         ngap_gNB_handover_notify(instance, &NGAP_HANDOVER_NOTIFY(received_msg));
+        break;
+
+      case NGAP_UL_RAN_STATUS_TRANSFER:
+        ngap_gNB_handle_ul_ran_status_transfer(instance, &NGAP_UL_RAN_STATUS_TRANSFER(received_msg));
         break;
 
       default:

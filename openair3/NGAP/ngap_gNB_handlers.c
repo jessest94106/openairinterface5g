@@ -1378,6 +1378,100 @@ static int ngap_gNB_handle_ng_ENDC_pdusession_modification_confirm(sctp_assoc_t 
 	return 0;
 }
 
+static int ngap_gNB_handle_dl_ran_status_transfer(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
+{
+  DevAssert(pdu != NULL);
+
+  NGAP_DownlinkRANStatusTransfer_t *container = &pdu->choice.initiatingMessage->value.choice.DownlinkRANStatusTransfer;
+  NGAP_DownlinkRANStatusTransferIEs_t *ie = NULL;
+
+  ngap_gNB_amf_data_t *amf_desc_p = ngap_gNB_get_AMF(NULL, assoc_id, 0);
+  if (!amf_desc_p) {
+    NGAP_ERROR("[SCTP %u] Received DL RAN Status Transfer for unknown AMF\n", assoc_id);
+    return -1;
+  }
+
+  // AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id = 0;
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkRANStatusTransferIEs_t, ie, container, NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID, true);
+  asn_INTEGER2ulong(&ie->value.choice.AMF_UE_NGAP_ID, &amf_ue_ngap_id);
+
+  // RAN UE NGAP ID
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkRANStatusTransferIEs_t, ie, container, NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID, true);
+  NGAP_RAN_UE_NGAP_ID_t gnb_ue_ngap_id = ie->value.choice.RAN_UE_NGAP_ID;
+
+  ngap_gNB_ue_context_t *ue_desc_p = ngap_get_ue_context(gnb_ue_ngap_id);
+  if (!ue_desc_p) {
+    NGAP_ERROR("No UE context for gNB_ue_ngap_id %lu\n", gnb_ue_ngap_id);
+    return -1;
+  }
+
+  ue_desc_p->rx_stream = stream;
+  if (ue_desc_p->amf_ue_ngap_id != amf_ue_ngap_id)
+    NGAP_WARN("UE context mismatch: amf_ue_ngap_id (%lu != %lu)\n", ue_desc_p->amf_ue_ngap_id, amf_ue_ngap_id);
+
+  // Transparent container
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkRANStatusTransferIEs_t,
+                             ie,
+                             container,
+                             NGAP_ProtocolIE_ID_id_RANStatusTransfer_TransparentContainer,
+                             true);
+  NGAP_RANStatusTransfer_TransparentContainer_t *tcont = &ie->value.choice.RANStatusTransfer_TransparentContainer;
+
+  MessageDef *message_p = itti_alloc_new_message(TASK_NGAP, 0, NGAP_DL_RAN_STATUS_TRANSFER);
+  ngap_ran_status_transfer_t *msg = &NGAP_DL_RAN_STATUS_TRANSFER(message_p);
+  memset(msg, 0, sizeof(*msg));
+
+  msg->amf_ue_ngap_id = amf_ue_ngap_id;
+  msg->gnb_ue_ngap_id = gnb_ue_ngap_id;
+
+  int nb = tcont->dRBsSubjectToStatusTransferList.list.count;
+  for (int i = 0; i < nb; ++i) {
+    NGAP_DRBsSubjectToStatusTransferItem_t *item = tcont->dRBsSubjectToStatusTransferList.list.array[i];
+    ngap_drb_status_t *s = &msg->ran_status.drb_status_list[i];
+    s->drb_id = item->dRB_ID;
+
+    // UL COUNT
+    switch (item->dRBStatusUL.present) {
+      case NGAP_DRBStatusUL_PR_dRBStatusUL18:
+        s->ul_count.sn_len = NGAP_SN_LENGTH_18;
+        s->ul_count.pdcp_sn = item->dRBStatusUL.choice.dRBStatusUL18->uL_COUNTValue.pDCP_SN18;
+        s->ul_count.hfn = item->dRBStatusUL.choice.dRBStatusUL18->uL_COUNTValue.hFN_PDCP_SN18;
+        break;
+      case NGAP_DRBStatusUL_PR_dRBStatusUL12:
+        s->ul_count.sn_len = NGAP_SN_LENGTH_12;
+        s->ul_count.pdcp_sn = item->dRBStatusUL.choice.dRBStatusUL12->uL_COUNTValue.pDCP_SN12;
+        s->ul_count.hfn = item->dRBStatusUL.choice.dRBStatusUL12->uL_COUNTValue.hFN_PDCP_SN12;
+        break;
+      default:
+        NGAP_ERROR("Unknown dRBStatusUL.present=%d\n", item->dRBStatusUL.present);
+        break;
+    }
+
+    // DL COUNT
+    switch (item->dRBStatusDL.present) {
+      case NGAP_DRBStatusDL_PR_dRBStatusDL18:
+        s->dl_count.sn_len = NGAP_SN_LENGTH_18;
+        s->dl_count.pdcp_sn = item->dRBStatusDL.choice.dRBStatusDL18->dL_COUNTValue.pDCP_SN18;
+        s->dl_count.hfn = item->dRBStatusDL.choice.dRBStatusDL18->dL_COUNTValue.hFN_PDCP_SN18;
+        break;
+      case NGAP_DRBStatusDL_PR_dRBStatusDL12:
+        s->dl_count.sn_len = NGAP_SN_LENGTH_12;
+        s->dl_count.pdcp_sn = item->dRBStatusDL.choice.dRBStatusDL12->dL_COUNTValue.pDCP_SN12;
+        s->dl_count.hfn = item->dRBStatusDL.choice.dRBStatusDL12->dL_COUNTValue.hFN_PDCP_SN12;
+        break;
+      default:
+        NGAP_ERROR("Unknown dRBStatusDL.present=%d\n", item->dRBStatusDL.present);
+        break;
+    }
+
+    msg->ran_status.nb_drb++;
+  }
+
+  itti_send_msg_to_task(TASK_RRC_GNB, ue_desc_p->gNB_instance->instance, message_p);
+  return 0;
+}
+
 /* Handlers matrix. Only gNB related procedure present here */
 const ngap_message_decoded_callback ngap_messages_callback[][3] = {
     {0, 0, 0}, /* AMFConfigurationUpdate */
@@ -1387,7 +1481,7 @@ const ngap_message_decoded_callback ngap_messages_callback[][3] = {
     {ngap_gNB_handle_nas_downlink, 0, 0}, /* DownlinkNASTransport */
     {0, 0, 0}, /* DownlinkNonUEAssociatedNRPPaTransport */
     {0, 0, 0}, /* DownlinkRANConfigurationTransfer */
-    {0, 0, 0}, /* DownlinkRANStatusTransfer */
+    {ngap_gNB_handle_dl_ran_status_transfer, 0, 0}, /* DownlinkRANStatusTransfer */
     {0, 0, 0}, /* DownlinkUEAssociatedNRPPaTransport */
     {ngap_gNB_handle_error_indication, 0, 0}, /* ErrorIndication */
     {0, 0, 0}, /* HandoverCancel */

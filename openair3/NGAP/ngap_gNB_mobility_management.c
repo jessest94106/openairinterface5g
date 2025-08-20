@@ -617,3 +617,73 @@ NGAP_NGAP_PDU_t *encode_ng_handover_notify(const ngap_handover_notify_t *msg)
 
   return pdu;
 }
+
+/** @brief Encode NGAP UL RAN Status Transfer (9.2.3.14 of 3GPP TS 38.413) */
+NGAP_NGAP_PDU_t *encode_ng_ul_ran_status_transfer(const ngap_ran_status_transfer_t *msg)
+{
+  NGAP_NGAP_PDU_t *pdu = malloc_or_fail(sizeof(*pdu));
+  pdu->present = NGAP_NGAP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, head);
+  head->procedureCode = NGAP_ProcedureCode_id_UplinkRANStatusTransfer;
+  head->criticality = NGAP_Criticality_ignore;
+  head->value.present = NGAP_InitiatingMessage__value_PR_UplinkRANStatusTransfer;
+  NGAP_UplinkRANStatusTransfer_t *out = &head->value.choice.UplinkRANStatusTransfer;
+
+  // AMF UE NGAP ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkRANStatusTransferIEs_t, ie1);
+  ie1->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
+  ie1->criticality = NGAP_Criticality_reject;
+  ie1->value.present = NGAP_UplinkRANStatusTransferIEs__value_PR_AMF_UE_NGAP_ID;
+  asn_uint642INTEGER(&ie1->value.choice.AMF_UE_NGAP_ID, msg->amf_ue_ngap_id);
+
+  // RAN UE NGAP ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkRANStatusTransferIEs_t, ie2);
+  ie2->id = NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID;
+  ie2->criticality = NGAP_Criticality_reject;
+  ie2->value.present = NGAP_UplinkRANStatusTransferIEs__value_PR_RAN_UE_NGAP_ID;
+  ie2->value.choice.RAN_UE_NGAP_ID = msg->gnb_ue_ngap_id;
+
+  // RAN Status Transfer Transparent Container (M)
+  asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkRANStatusTransferIEs_t, ie3);
+  ie3->id = NGAP_ProtocolIE_ID_id_RANStatusTransfer_TransparentContainer;
+  ie3->criticality = NGAP_Criticality_reject;
+  ie3->value.present = NGAP_UplinkRANStatusTransferIEs__value_PR_RANStatusTransfer_TransparentContainer;
+  NGAP_RANStatusTransfer_TransparentContainer_t *container = &ie3->value.choice.RANStatusTransfer_TransparentContainer;
+
+  for (int i = 0; i < msg->ran_status.nb_drb; ++i) {
+    const ngap_drb_status_t *s = &msg->ran_status.drb_status_list[i];
+    asn1cSequenceAdd(container->dRBsSubjectToStatusTransferList.list, NGAP_DRBsSubjectToStatusTransferItem_t, drb_item);
+    drb_item->dRB_ID = s->drb_id;
+
+    // UL COUNT
+    if (s->ul_count.sn_len == NGAP_SN_LENGTH_18) {
+      drb_item->dRBStatusUL.present = NGAP_DRBStatusUL_PR_dRBStatusUL18;
+      asn1cCalloc(drb_item->dRBStatusUL.choice.dRBStatusUL18, ul18);
+      ul18->uL_COUNTValue.pDCP_SN18 = s->ul_count.pdcp_sn;
+      ul18->uL_COUNTValue.hFN_PDCP_SN18 = s->ul_count.hfn;
+    } else {
+      drb_item->dRBStatusUL.present = NGAP_DRBStatusUL_PR_dRBStatusUL12;
+      asn1cCalloc(drb_item->dRBStatusUL.choice.dRBStatusUL12, ul12);
+      ul12->uL_COUNTValue.pDCP_SN12 = s->ul_count.pdcp_sn;
+      ul12->uL_COUNTValue.hFN_PDCP_SN12 = s->ul_count.hfn;
+    }
+
+    // DL COUNT
+    if (s->dl_count.sn_len == NGAP_SN_LENGTH_18) {
+      drb_item->dRBStatusDL.present = NGAP_DRBStatusDL_PR_dRBStatusDL18;
+      asn1cCalloc(drb_item->dRBStatusDL.choice.dRBStatusDL18, dl18);
+      dl18->dL_COUNTValue.pDCP_SN18 = s->dl_count.pdcp_sn;
+      dl18->dL_COUNTValue.hFN_PDCP_SN18 = s->dl_count.hfn;
+    } else {
+      drb_item->dRBStatusDL.present = NGAP_DRBStatusDL_PR_dRBStatusDL12;
+      asn1cCalloc(drb_item->dRBStatusDL.choice.dRBStatusDL12, dl12);
+      dl12->dL_COUNTValue.pDCP_SN12 = s->dl_count.pdcp_sn;
+      dl12->dL_COUNTValue.hFN_PDCP_SN12 = s->dl_count.hfn;
+    }
+  }
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NGAP_RANStatusTransfer_TransparentContainer, &container);
+
+  return pdu;
+}

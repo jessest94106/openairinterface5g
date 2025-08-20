@@ -75,6 +75,8 @@ MESSAGE_DEF(NGAP_HANDOVER_REQUIRED, MESSAGE_PRIORITY_MED, ngap_handover_required
 MESSAGE_DEF(NGAP_HANDOVER_FAILURE, MESSAGE_PRIORITY_MED, ngap_handover_failure_t, ngap_handover_failure)
 MESSAGE_DEF(NGAP_HANDOVER_REQUEST_ACKNOWLEDGE, MESSAGE_PRIORITY_MED, ngap_handover_request_ack_t, ngap_handover_request_ack)
 MESSAGE_DEF(NGAP_HANDOVER_NOTIFY, MESSAGE_PRIORITY_MED, ngap_handover_notify_t, ngap_handover_notify)
+MESSAGE_DEF(NGAP_UL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_transfer_t, ngap_ul_ran_status_transfer)
+MESSAGE_DEF(NGAP_DL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_transfer_t, ngap_dl_ran_status_transfer)
 
 /* NGAP -> RRC messages */
 MESSAGE_DEF(NGAP_DOWNLINK_NAS              , MESSAGE_PRIORITY_MED, ngap_downlink_nas_t              , ngap_downlink_nas )

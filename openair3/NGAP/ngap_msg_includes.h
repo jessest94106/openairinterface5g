@@ -102,5 +102,12 @@
 #include "NGAP_QosFlowItemWithDataForwarding.h"
 #include "NR_HandoverPreparationInformation.h"
 #include "NGAP_HandoverNotify.h"
+#include "NGAP_DRBsSubjectToStatusTransferItem.h"
+#include "NGAP_DRBStatusUL.h"
+#include "NGAP_DRBStatusUL18.h"
+#include "NGAP_DRBStatusUL12.h"
+#include "NGAP_DRBStatusDL.h"
+#include "NGAP_DRBStatusDL18.h"
+#include "NGAP_DRBStatusDL12.h"
 
 #endif // NGAP_MSG_INCLUDES_H

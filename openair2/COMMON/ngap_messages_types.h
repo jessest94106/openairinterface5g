@@ -76,6 +76,9 @@
 #define NGAP_PDUSESSION_RELEASE_COMMAND(mSGpTR)      (mSGpTR)->ittiMsg.ngap_pdusession_release_command
 #define NGAP_PDUSESSION_RELEASE_RESPONSE(mSGpTR)     (mSGpTR)->ittiMsg.ngap_pdusession_release_resp
 
+#define NGAP_UL_RAN_STATUS_TRANSFER(mSGpTR) (mSGpTR)->ittiMsg.ngap_ul_ran_status_transfer
+#define NGAP_DL_RAN_STATUS_TRANSFER(mSGpTR) (mSGpTR)->ittiMsg.ngap_dl_ran_status_transfer
+
 //-------------------------------------------------------------------------------------------//
 
 /* Length of the transport layer address string
@@ -962,5 +965,48 @@ typedef struct ngap_pdusession_release_resp_s {
   pdusession_failed_t  pdusessions_failed[NGAP_MAX_PDU_SESSION];
 
 } ngap_pdusession_release_resp_t;
+
+/** 9.2.3.14 Uplink RAN Status Transfer (3GPP TS 38.413)
+ * COUNT value used for both UL and DL PDCP SN + HFN (12-bit or 18-bit SN) */
+
+// Indicates PDCP SN length
+typedef enum { NGAP_SN_LENGTH_12 = 0, NGAP_SN_LENGTH_18 = 1 } ngap_sn_length_t;
+
+typedef struct {
+  // PDCP Sequence Number
+  uint32_t pdcp_sn;
+  // Hyper Frame Number
+  uint32_t hfn;
+  // SN length
+  ngap_sn_length_t sn_len;
+} ngap_drb_count_value_t;
+
+// DRBs Subject to Status Transfer Item
+typedef struct {
+  // DRB ID
+  uint8_t drb_id;
+  // UL COUNT value
+  ngap_drb_count_value_t ul_count;
+  // DL COUNT value
+  ngap_drb_count_value_t dl_count;
+} ngap_drb_status_t;
+
+// RAN Status Transfer Transparent Container (9.3.1.108)
+typedef struct {
+  // Number of DRBs in the list
+  uint8_t nb_drb;
+  // DRB Status List
+  ngap_drb_status_t drb_status_list[MAX_DRBS_PER_UE];
+} ngap_ran_status_container_t;
+
+// Uplink RAN Status Transfer message (9.2.3.14)
+typedef struct {
+  // AMF UE NGAP ID (Mandatory)
+  uint64_t amf_ue_ngap_id;
+  // RAN UE NGAP ID (Mandatory)
+  uint32_t gnb_ue_ngap_id;
+  // RAN Status Transfer Transparent Container (Mandatory)
+  ngap_ran_status_container_t ran_status;
+} ngap_ran_status_transfer_t;
 
 #endif /* NGAP_MESSAGES_TYPES_H_ */
