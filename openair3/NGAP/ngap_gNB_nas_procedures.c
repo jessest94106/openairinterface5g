@@ -690,7 +690,7 @@ int ngap_gNB_initial_ctxt_resp(instance_t instance, ngap_initial_context_setup_r
     // ie->value.choice.CriticalityDiagnostics =;
   }
 
-  if (asn1_xer_print) {
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, &pdu);
   }
 
@@ -772,7 +772,7 @@ int ngap_gNB_initial_ctxt_fail(instance_t instance, ngap_initial_context_setup_f
     ie->value.present = NGAP_InitialContextSetupFailureIEs__value_PR_Cause;
     encode_ngap_cause(&ie->value.choice.Cause, &initial_ctxt_fail->cause);
   }
-  if (asn1_xer_print) {
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, &pdu);
   }
   if (ngap_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {

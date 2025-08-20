@@ -24,7 +24,6 @@
 
 #include "common/config/config_userapi.h"
 #include "common/utils/load_module_shlib.h"
-#include "RRC/LTE/rrc_vars.h"
 #ifdef SMBV
 #include "PHY/TOOLS/smbv.h"
 unsigned short config_frames[4] = {2,9,11,13};
@@ -128,52 +127,6 @@ double cpuf;
 void pdcp_run(const protocol_ctxt_t *const ctxt_pP)
 {
   abort();
-}
-
-/*---------------------BMC: timespec helpers -----------------------------*/
-
-struct timespec min_diff_time = { .tv_sec = 0, .tv_nsec = 0 };
-struct timespec max_diff_time = { .tv_sec = 0, .tv_nsec = 0 };
-
-struct timespec clock_difftime(struct timespec start, struct timespec end) {
-  struct timespec temp;
-
-  if ((end.tv_nsec-start.tv_nsec)<0) {
-    temp.tv_sec = end.tv_sec-start.tv_sec-1;
-    temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-  } else {
-    temp.tv_sec = end.tv_sec-start.tv_sec;
-    temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-  }
-
-  return temp;
-}
-
-void print_difftimes(void)
-{
-  LOG_I(HW, "difftimes min = %lu ns ; max = %lu ns\n", min_diff_time.tv_nsec, max_diff_time.tv_nsec);
-}
-
-void update_difftimes(struct timespec start, struct timespec end) {
-  struct timespec diff_time = { .tv_sec = 0, .tv_nsec = 0 };
-  int             changed = 0;
-  diff_time = clock_difftime(start, end);
-
-  if ((min_diff_time.tv_nsec == 0) || (diff_time.tv_nsec < min_diff_time.tv_nsec)) {
-    min_diff_time.tv_nsec = diff_time.tv_nsec;
-    changed = 1;
-  }
-
-  if ((max_diff_time.tv_nsec == 0) || (diff_time.tv_nsec > max_diff_time.tv_nsec)) {
-    max_diff_time.tv_nsec = diff_time.tv_nsec;
-    changed = 1;
-  }
-
-#if 1
-
-  if (changed) print_difftimes();
-
-#endif
 }
 
 /*------------------------------------------------------------------------*/

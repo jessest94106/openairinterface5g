@@ -249,7 +249,7 @@ void set_options(int CC_id, PHY_VARS_NR_UE *UE){
 
 }
 
-void init_openair0()
+static void init_openair0()
 {
   int card;
   int freq_off = 0;
@@ -261,7 +261,6 @@ void init_openair0()
   for (card=0; card<MAX_CARDS; card++) {
     uint64_t dl_carrier, ul_carrier;
     openair0_cfg[card].configFilename    = NULL;
-    openair0_cfg[card].threequarter_fs   = frame_parms->threequarter_fs;
     openair0_cfg[card].sample_rate       = frame_parms->samples_per_subframe * 1e3;
     openair0_cfg[card].samples_per_frame = frame_parms->samples_per_frame;
 
