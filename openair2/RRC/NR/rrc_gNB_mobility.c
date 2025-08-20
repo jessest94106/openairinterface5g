@@ -545,6 +545,7 @@ void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc,
 
   ue->ho_context = alloc_ho_ctx(HO_CTX_SOURCE);
   ue->ho_context->source->du = get_du_for_ue(rrc, ue->rrc_ue_id);
+  ue->ho_context->source->ho_status_transfer = rrc_gNB_send_NGAP_ul_ran_status_transfer;
 
   rrc_gNB_send_NGAP_HANDOVER_REQUIRED(rrc, ue, neighbour_config, hoPrepInfo);
   free_byte_array(hoPrepInfo);

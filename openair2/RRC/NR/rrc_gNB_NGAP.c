@@ -1165,6 +1165,52 @@ void rrc_gNB_free_Handover_Request(ngap_handover_request_t *msg)
   free(msg->mobility_restriction);
 }
 
+/** @brief Send NG Uplink RAN Status Transfer message (8.4.6 3GPP TS 38.413)
+ * Direction: source NG-RAN node -> AMF */
+int rrc_gNB_send_NGAP_ul_ran_status_transfer(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const int n_to_mod, const e1_pdcp_status_info_t *pdcp_status)
+{
+  AssertFatal(UE != NULL, "UE context is NULL\n");
+
+  LOG_I(NR_RRC,
+        "Sending NGAP Uplink RAN Status Transfer (AMF_UE_NGAP_ID=%" PRIu64 ", GNB_UE_NGAP_ID=%u)\n",
+        UE->amf_ue_ngap_id,
+        UE->rrc_ue_id);
+
+  ngap_ran_status_transfer_t msg = {
+      .amf_ue_ngap_id = UE->amf_ue_ngap_id,
+      .gnb_ue_ngap_id = UE->rrc_ue_id,
+  };
+
+  // Loop through DRBs and extract COUNT values
+  for (int i = 0; i < n_to_mod; ++i) {
+    drb_t *drb = &UE->established_drbs[i];
+    if (!drb->status)
+      continue;
+
+    bool sn_length_18 = rrc->pdcp_config.drb.sn_size == 18;
+
+    ngap_drb_status_t *item = &msg.ran_status.drb_status_list[msg.ran_status.nb_drb++];
+    item->drb_id = drb->drb_id;
+
+    const e1_pdcp_count_t *ul_pdcp = &pdcp_status[i].ul_count;
+    const e1_pdcp_count_t *dl_pdcp = &pdcp_status[i].dl_count;
+
+    item->ul_count.pdcp_sn = ul_pdcp->sn;
+    item->ul_count.hfn = ul_pdcp->hfn;
+    item->ul_count.sn_len = sn_length_18 ? NGAP_SN_LENGTH_18 : NGAP_SN_LENGTH_12;
+
+    item->dl_count.pdcp_sn = dl_pdcp->sn;
+    item->dl_count.hfn = dl_pdcp->hfn;
+    item->dl_count.sn_len = sn_length_18 ? NGAP_SN_LENGTH_18 : NGAP_SN_LENGTH_12;
+  }
+
+  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_UL_RAN_STATUS_TRANSFER);
+  NGAP_UL_RAN_STATUS_TRANSFER(msg_p) = msg;
+  itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
+
+  return 0;
+}
+
 /** @brief Process NG Handover Command on Source gNB */
 void rrc_gNB_process_HandoverCommand(gNB_RRC_INST *rrc, const ngap_handover_command_t *msg)
 {
