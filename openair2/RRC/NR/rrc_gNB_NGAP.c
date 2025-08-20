@@ -1639,16 +1639,7 @@ int rrc_gNB_process_NGAP_DL_RAN_STATUS_TRANSFER(MessageDef *msg_p, instance_t in
           s->dl_count.sn_len == NGAP_SN_LENGTH_18 ? "18-bit" : "12-bit");
 
     // Send to PDCP layer
-    for (int j = 0; j < MAX_DRBS_PER_UE; j++) {
-      if (UE->established_drbs[j].drb_id == s->drb_id)
-        nr_pdcp_update_ran_status(UE->rrc_ue_id,
-                                  s->drb_id,
-                                  s->ul_count.pdcp_sn,
-                                  s->ul_count.hfn,
-                                  s->dl_count.pdcp_sn,
-                                  s->dl_count.hfn,
-                                  s->dl_count.sn_len == NGAP_SN_LENGTH_18);
-    }
+    e1_send_bearer_updates(rrc, UE, 0, NULL, s);
   }
 
   return 0;
