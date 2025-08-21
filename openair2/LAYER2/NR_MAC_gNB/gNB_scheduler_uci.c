@@ -534,6 +534,11 @@ static void evaluate_sinr_report(gNB_MAC_INST *nrmac,
     *cumul_bits += 4;
   }
 
+  NR_mac_stats_t *stats = &UE->mac_stats;
+  // including ssb SINR in mac stats
+  stats->cumul_sinrx10 += sinr_report->SINRx10[0];
+  stats->num_sinr_meas++;
+
   LOG_D(MAC, "Reported SSB-SINR = %d.%d\n", sinr_report->SINRx10[0] / 10, sinr_report->SINRx10[0] % 10);
 }
 
