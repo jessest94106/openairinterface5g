@@ -240,7 +240,6 @@ static void mac_rrc_init(gNB_MAC_INST *mac, ngran_node_t node_type)
 
 void mac_top_init_gNB(ngran_node_t node_type,
                       NR_ServingCellConfigCommon_t *scc,
-                      NR_ServingCellConfig_t *scd,
                       const nr_mac_config_t *config,
                       const nr_rlc_configuration_t *default_rlc_config)
 {
@@ -274,8 +273,6 @@ void mac_top_init_gNB(ngran_node_t node_type,
       RC.nrmac[i]->common_channels[0].ServingCellConfigCommon = scc;
       RC.nrmac[i]->radio_config = *config;
       RC.nrmac[i]->rlc_config = *default_rlc_config;
-
-      RC.nrmac[i]->common_channels[0].pre_ServingCellConfig = scd;
 
       RC.nrmac[i]->first_MIB = true;
       RC.nrmac[i]->num_scheduled_prach_rx = 0;
@@ -330,7 +327,6 @@ void mac_top_destroy_gNB(gNB_MAC_INST *mac)
   NR_COMMON_channels_t *cc = &mac->common_channels[0];
   ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, cc->mib);
   ASN_STRUCT_FREE(asn_DEF_NR_BCCH_DL_SCH_Message, cc->sib1);
-  ASN_STRUCT_FREE(asn_DEF_NR_ServingCellConfig, cc->pre_ServingCellConfig);
   ASN_STRUCT_FREE(asn_DEF_NR_ServingCellConfigCommon, cc->ServingCellConfigCommon);
   NR_UEs_t *UE_info = &mac->UE_info;
   for (int i = 0; i < sizeofArray(UE_info->connected_ue_list); ++i)

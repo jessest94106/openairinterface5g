@@ -569,14 +569,13 @@ static NR_UE_info_t *create_new_UE(gNB_MAC_INST *mac, uint32_t cu_id, const NR_C
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
   NR_COMMON_channels_t *cc = &mac->common_channels[CC_id];
   const NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
-  const NR_ServingCellConfig_t *sccd = cc->pre_ServingCellConfig;
   const nr_mac_config_t *configuration = &mac->radio_config;
   if (is_SA) {
-    cellGroupConfig = get_initial_cellGroupConfig(UE->uid, scc, sccd, &mac->radio_config, &mac->rlc_config);
+    cellGroupConfig = get_initial_cellGroupConfig(UE->uid, scc, &mac->radio_config, &mac->rlc_config);
     cellGroupConfig->spCellConfig->reconfigurationWithSync = get_reconfiguration_with_sync(UE->rnti, UE->uid, scc);
   } else {
     NR_UE_NR_Capability_t *cap = get_ue_nr_cap_from_cg_config_info(cgci);
-    cellGroupConfig = get_default_secondaryCellGroup(scc, sccd, cap, 1, 1, configuration, UE->uid);
+    cellGroupConfig = get_default_secondaryCellGroup(scc, cap, 1, 1, configuration, UE->uid);
     cellGroupConfig->spCellConfig->reconfigurationWithSync = get_reconfiguration_with_sync(UE->rnti, UE->uid, scc);
     // TODO: in NSA we assign capabilities here, otherwise outside => not logic
     UE->capability = cap;

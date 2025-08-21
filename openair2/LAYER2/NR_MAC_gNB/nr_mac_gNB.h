@@ -173,6 +173,12 @@ int ul_MaxPorts_0;
 int ul_Power_0;
 } nr_ptrs_config_t;
 
+typedef struct {
+  int id;
+  int scs;
+  int location_and_bw;
+} nr_bwp_config_t;
+
 typedef struct nr_mac_config_t {
   int sib1_tda;
   nr_pdsch_AntennaPorts_t pdsch_AntennaPorts;
@@ -190,6 +196,10 @@ typedef struct nr_mac_config_t {
   nr_mac_timers_t timer_config;
   int num_dlharq;
   int num_ulharq;
+  // BWP information
+  int num_additional_bwps;
+  int first_active_bwp;
+  nr_bwp_config_t bwp_config[4];
   /// beamforming weight matrix size
   int nb_bfw[2];
   int32_t *bw_list;
@@ -282,8 +292,6 @@ typedef struct {
   NR_BCCH_DL_SCH_Message_t *sib1;
   seq_arr_t *du_SIBs;
   NR_ServingCellConfigCommon_t *ServingCellConfigCommon;
-  /// pre-configured ServingCellConfig that is default for every UE
-  NR_ServingCellConfig_t *pre_ServingCellConfig;
   /// Outgoing MIB PDU for PHY
   uint8_t MIB_pdu[3];
   /// Outgoing BCCH pdu for PHY

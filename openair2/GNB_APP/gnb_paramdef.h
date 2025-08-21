@@ -138,6 +138,7 @@ typedef enum {
 #define GNB_CONFIG_STRING_CU_SIB_LIST                   "cu_sibs"
 #define GNB_CONFIG_STRING_DU_SIB_LIST                   "du_sibs"
 #define GNB_CONFIG_STRING_DOSINR                        "do_SINR"
+#define GNB_CONFIG_STRING_1ST_ACTIVE_BWP                "first_active_bwp"
 
 #define GNB_CONFIG_HLP_STRING_ENABLE_SDAP               "enable the SDAP layer\n"
 #define GNB_CONFIG_HLP_FORCE256QAMOFF                   "suppress activation of 256 QAM despite UE support"
@@ -152,6 +153,7 @@ typedef enum {
 #define GNB_CONFIG_HLP_CU_SIBS                          "List of CU generated SIBs to be transmitted"
 #define GNB_CONFIG_HLP_DU_SIBS                          "List of DU generated SIBs to be transmitted"
 #define GNB_CONFIG_HLP_DOSINR                           "Enable CSI feedback using SINR measurements on SSB"
+
 
 /*-----------------------------------------------------------------------------------------------------------------------------------------*/
 /*                                            cell configuration parameters                                                                */
@@ -199,6 +201,7 @@ typedef enum {
 {GNB_CONFIG_STRING_CU_SIB_LIST,                  GNB_CONFIG_HLP_CU_SIBS, 0, .iptr=NULL, .defintarrayval=0,        TYPE_INTARRAY,  0},  \
 {GNB_CONFIG_STRING_DU_SIB_LIST,                  GNB_CONFIG_HLP_DU_SIBS, 0, .iptr=NULL, .defintarrayval=0,        TYPE_INTARRAY,  0},  \
 {GNB_CONFIG_STRING_DOSINR,      GNB_CONFIG_HLP_DOSINR,   0,            .iptr=NULL,  .defintval=0,                 TYPE_INT,       0},  \
+{GNB_CONFIG_STRING_1ST_ACTIVE_BWP,               NULL,   0,            .iptr=NULL,  .defintval=0,                 TYPE_INT,       0},  \
 }
 // clang-format on
 
@@ -242,6 +245,7 @@ typedef enum {
 #define GNB_CU_SIBS_IDX                 36
 #define GNB_DU_SIBS_IDX                 37
 #define GNB_DO_SINR_IDX                 38
+#define GNB_1ST_ACTIVE_BWP_IDX          39
 
 #define TRACKING_AREA_CODE_OKRANGE {0x0001,0xFFFD}
 #define NUM_DL_HARQ_OKVALUES {2,4,6,8,10,12,16,32}
@@ -287,9 +291,33 @@ typedef enum {
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
+  { .s5 = { NULL } },                                             \
 }
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+#define GNB_CONFIG_STRING_BWP_LIST                      "bwp_list"
+
+#define GNB_CONFIG_STRING_BWP_SCS     "scs"
+#define GNB_CONFIG_STRING_BWP_START   "bwpStart"
+#define GNB_CONFIG_STRING_BWP_SIZE    "bwpSize"
+
+#define GNB_BWP_SCS_IDX       0
+#define GNB_BWP_START_IDX     1
+#define GNB_BWP_SIZE_IDX      2
+
+#define GNBBWPPARAMS_DESC {                                                                  \
+ {GNB_CONFIG_STRING_BWP_SCS,            NULL,   0,            .iptr=NULL,  .defintarrayval=0,            TYPE_INT,  0},  \
+ {GNB_CONFIG_STRING_BWP_START,          NULL,   0,            .iptr=NULL,  .defintarrayval=0,            TYPE_INT,  0},  \
+ {GNB_CONFIG_STRING_BWP_SIZE,           NULL,   0,            .iptr=NULL,  .defintarrayval=0,            TYPE_INT,  0},  \
+}
+
+#define BWPPARAMS_CHECK {                                         \
+  { .s5 = { NULL } },                                             \
+  { .s5 = { NULL } },                                             \
+  { .s5 = { NULL } },                                             \
+}
+
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 /* Neighbour Cell Configurations*/

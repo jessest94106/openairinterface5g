@@ -661,79 +661,6 @@ void fix_scc(NR_ServingCellConfigCommon_t *scc, uint64_t ssbmap)
   }
 }
 
-/* Function to allocate dedicated serving cell config strutures */
-void prepare_scd(NR_ServingCellConfig_t *scd) {
-  // Allocate downlink structures
-  scd->downlinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*scd->downlinkBWP_ToAddModList));
-  scd->uplinkConfig = calloc_or_fail(1, sizeof(*scd->uplinkConfig));
-  scd->uplinkConfig->uplinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*scd->uplinkConfig->uplinkBWP_ToAddModList));
-  scd->bwp_InactivityTimer = calloc_or_fail(1, sizeof(*scd->bwp_InactivityTimer));
-  scd->uplinkConfig->firstActiveUplinkBWP_Id = calloc_or_fail(1, sizeof(*scd->uplinkConfig->firstActiveUplinkBWP_Id));
-  scd->firstActiveDownlinkBWP_Id = calloc_or_fail(1, sizeof(*scd->firstActiveDownlinkBWP_Id));
-  *scd->firstActiveDownlinkBWP_Id = 1;
-  *scd->uplinkConfig->firstActiveUplinkBWP_Id = 1;
-  scd->defaultDownlinkBWP_Id = calloc_or_fail(1, sizeof(*scd->defaultDownlinkBWP_Id));
-  *scd->defaultDownlinkBWP_Id = 0;
-
-  for (int j = 0; j < NR_MAX_NUM_BWP; j++) {
-
-    // Downlink bandwidth part
-    NR_BWP_Downlink_t *bwp = calloc_or_fail(1, sizeof(*bwp));
-    bwp->bwp_Id = j+1;
-
-    // Allocate downlink dedicated bandwidth part and PDSCH structures
-    bwp->bwp_Common = calloc_or_fail(1, sizeof(*bwp->bwp_Common));
-    bwp->bwp_Common->pdcch_ConfigCommon = calloc_or_fail(1, sizeof(*bwp->bwp_Common->pdcch_ConfigCommon));
-    bwp->bwp_Common->pdsch_ConfigCommon = calloc_or_fail(1, sizeof(*bwp->bwp_Common->pdsch_ConfigCommon));
-    bwp->bwp_Dedicated = calloc_or_fail(1, sizeof(*bwp->bwp_Dedicated));
-    asn1cSeqAdd(&scd->downlinkBWP_ToAddModList->list,bwp);
-
-    // UL bandwidth part
-    NR_BWP_Uplink_t *ubwp = calloc_or_fail(1, sizeof(*ubwp));
-    ubwp->bwp_Id = j+1;
-    ubwp->bwp_Common = calloc_or_fail(1, sizeof(*ubwp->bwp_Common));
-    ubwp->bwp_Dedicated = calloc_or_fail(1, sizeof(*ubwp->bwp_Dedicated));
-    asn1cSeqAdd(&scd->uplinkConfig->uplinkBWP_ToAddModList->list,ubwp);
-  }
-}
-
-/* This function checks dedicated serving cell configuration and performs fixes as needed */
-void fix_scd(NR_ServingCellConfig_t *scd) {
-
-  // Remove unused BWPs
-  int b = 0;
-  while (b<scd->downlinkBWP_ToAddModList->list.count) {
-    if (scd->downlinkBWP_ToAddModList->list.array[b]->bwp_Common->genericParameters.locationAndBandwidth == 0) {
-      ASN_STRUCT_FREE(asn_DEF_NR_BWP_Downlink, scd->downlinkBWP_ToAddModList->list.array[b]);
-      asn_sequence_del(&scd->downlinkBWP_ToAddModList->list,b,1);
-    } else {
-      b++;
-    }
-  }
-
-  b = 0;
-  while (b<scd->uplinkConfig->uplinkBWP_ToAddModList->list.count) {
-    if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[b]->bwp_Common->genericParameters.locationAndBandwidth == 0) {
-      ASN_STRUCT_FREE(asn_DEF_NR_BWP_Uplink, scd->uplinkConfig->uplinkBWP_ToAddModList->list.array[b]);
-      asn_sequence_del(&scd->uplinkConfig->uplinkBWP_ToAddModList->list,b,1);
-    } else {
-      b++;
-    }
-  }
-
-  if (scd->downlinkBWP_ToAddModList->list.count == 0) {
-    free(scd->downlinkBWP_ToAddModList->list.array);
-    free(scd->downlinkBWP_ToAddModList);
-    scd->downlinkBWP_ToAddModList = NULL;
-  }
-
-  if (scd->uplinkConfig->uplinkBWP_ToAddModList->list.count == 0) {
-    free(scd->uplinkConfig->uplinkBWP_ToAddModList->list.array);
-    free(scd->uplinkConfig->uplinkBWP_ToAddModList);
-    scd->uplinkConfig->uplinkBWP_ToAddModList = NULL;
-  }
-}
-
 static void verify_gnb_param_notset(paramdef_t *params, int paramidx, const char *paramname)
 {
   char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
@@ -1107,24 +1034,6 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
   return scc;
 }
 
-static NR_ServingCellConfig_t *get_scd_config(configmodule_interface_t *cfg)
-{
-  NR_ServingCellConfig_t *scd = calloc(1, sizeof(*scd));
-  prepare_scd(scd);
-
-  char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(aprefix, sizeof(aprefix), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
-  GET_PARAMS_LIST(SCDsParamList, SCDsParams, SCDPARAMS_DESC(scd), GNB_CONFIG_STRING_SERVINGCELLCONFIGDEDICATED, aprefix);
-
-  if (SCDsParamList.numelt > 0) {
-    snprintf(aprefix, sizeof(aprefix), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_SERVINGCELLCONFIGDEDICATED, 0);
-    GET_PARAMS(SCDsParams, SCDPARAMS_DESC(scd), aprefix);
-  }
-  fix_scd(scd);
-
-  return scd;
-}
-
 static int read_du_cell_info(configmodule_interface_t *cfg,
                              bool separate_du,
                              uint32_t *gnb_id,
@@ -1445,6 +1354,31 @@ void config_pdcp(configmodule_interface_t *cfg, nr_pdcp_configuration_t *pdcp_co
   pdcp_config->drb.discard_timer = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_DISCARD_TIMER_IDX]);
 }
 
+static void get_bwp_config(nr_mac_config_t *configuration)
+{
+  char path[MAX_OPTNAME_SIZE * 2 + 8];
+  snprintf(path, sizeof(path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  GET_PARAMS_LIST(BWPParamList, BWPParams, GNBBWPPARAMS_DESC, GNB_CONFIG_STRING_BWP_LIST, path, BWPPARAMS_CHECK);
+  configuration->num_additional_bwps = BWPParamList.numelt;
+  AssertFatal(configuration->num_additional_bwps >= 0 && configuration->num_additional_bwps <= 4,
+              "Invalid number of additional BWPs %d\n",
+              configuration->num_additional_bwps);
+  for (int i = 0; i < configuration->num_additional_bwps; i++) {
+    configuration->bwp_config[i].id = i + 1;
+    int bwp_start = *BWPParamList.paramarray[i][GNB_BWP_START_IDX].iptr;
+    int bwp_size = *BWPParamList.paramarray[i][GNB_BWP_SIZE_IDX].iptr;
+    configuration->bwp_config[i].location_and_bw = PRBalloc_to_locationandbandwidth(bwp_size, bwp_start);
+    configuration->bwp_config[i].scs = *BWPParamList.paramarray[i][GNB_BWP_SCS_IDX].iptr;
+    LOG_I(GNB_APP,
+          "BWP %d, start PRB %d size %d locationandbandwidth %d, scs %d\n",
+          configuration->bwp_config[i].id,
+          bwp_start,
+          bwp_size,
+          configuration->bwp_config[i].location_and_bw,
+          configuration->bwp_config[i].scs);
+  }
+}
+
 void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 {
   int j = 0;
@@ -1470,6 +1404,12 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.pdsch_AntennaPorts.XP,
         config.pusch_AntennaPorts);
 
+  // BWP
+  get_bwp_config(&config);
+  AssertFatal(config.num_additional_bwps <= 4, "Impossible to configure more than 4 additional BWPs\n");
+  config.first_active_bwp = *GNBParamList.paramarray[0][GNB_1ST_ACTIVE_BWP_IDX].iptr;
+  AssertFatal(config.first_active_bwp <= config.num_additional_bwps, "1st active BWP does not belog to the configured BWPs\n");
+
   // RU
   GET_PARAMS_LIST(RUParamList, RUParams, RUPARAMS_DESC, CONFIG_STRING_RU_LIST, NULL);
   int num_tx = 0;
@@ -1478,8 +1418,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       num_tx += *(RUParamList.paramarray[i][RU_NB_TX_IDX].uptr);
     AssertFatal(num_tx >= config.pdsch_AntennaPorts.XP * config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2,
                 "Number of logical antenna ports (set in config file with pdsch_AntennaPorts) cannot be larger than physical antennas (nb_tx)\n");
-  }
-  else {
+  } else {
     // TODO temporary solution for 3rd party RU or nFAPI, in which case we don't have RU section present in the config file
     num_tx = config.pdsch_AntennaPorts.XP * config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2;
     LOG_E(GNB_APP, "RU information not present in config file. Assuming physical antenna ports equal to logical antenna ports %d\n", num_tx);
@@ -1569,7 +1508,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 
   NR_ServingCellConfigCommon_t *scc = get_scc_config(cfg, config.minRXTXTIME, config.do_SRS);
   //xer_fprint(stdout, &asn_DEF_NR_ServingCellConfigCommon, scc);
-  NR_ServingCellConfig_t *scd = get_scd_config(cfg);
 
   if (MacRLC_ParamList.numelt > 0) {
     /* NR RLC config is needed by mac_top_init_gNB() */
@@ -1577,7 +1515,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     config_rlc(cfg, &default_rlc_config);
 
     ngran_node_t node_type = get_node_type();
-    mac_top_init_gNB(node_type, scc, scd, &config, &default_rlc_config);
+    mac_top_init_gNB(node_type, scc, &config, &default_rlc_config);
     RC.nb_nr_mac_CC = (int *)malloc(RC.nb_nr_macrlc_inst * sizeof(int));
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
