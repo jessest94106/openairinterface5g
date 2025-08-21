@@ -42,3 +42,8 @@ add_boolean_option(OAI_VRTSIM ON "Activate OAI's shared memory radio driver" OFF
 if(OAI_VRTSIM)
   add_subdirectory(vrtsim)
 endif()
+
+add_boolean_option(OAI_RF_EMULATOR ON "Activate OAI's RF emulator" OFF)
+if(OAI_RF_EMULATOR)
+  add_subdirectory(emulator)
+endif()

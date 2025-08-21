@@ -1341,7 +1341,7 @@ printf("%d\n", slot);
       printStatIndent3(&gNB->tprep,"DLSCH LDPC input preparation time");
       printStatIndent3(&gNB->tparity,"DLSCH LDPC parity generation time");
       printStatIndent3(&gNB->toutput,"DLSCH LDPC output generation time");
-      printStatIndent3(&gNB->dlsch_rate_matching_stats,"DLSCH Rate Mataching time");
+      printStatIndent3(&gNB->dlsch_rate_matching_stats,"DLSCH Rate Matching time");
       printStatIndent3(&gNB->dlsch_interleaving_stats,  "DLSCH Interleaving time");
       printStatIndent2(&gNB->dlsch_modulation_stats,"DLSCH modulation time");
       printStatIndent2(&gNB->dlsch_scrambling_stats, "DLSCH scrambling time");
