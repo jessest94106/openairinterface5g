@@ -539,7 +539,11 @@ static void evaluate_sinr_report(gNB_MAC_INST *nrmac,
   stats->cumul_sinrx10 += sinr_report->SINRx10[0];
   stats->num_sinr_meas++;
 
-  LOG_D(MAC, "Reported SSB-SINR = %d.%d\n", sinr_report->SINRx10[0] / 10, sinr_report->SINRx10[0] % 10);
+  const int mcs_table = UE->current_DL_BWP.mcsTableIdx;
+  const int nrOfLayers = get_dl_nrOfLayers(sched_ctrl, UE->current_DL_BWP.dci_format);
+  sched_ctrl->dl_max_mcs = get_mcs_from_SINRx10(mcs_table, sinr_report->SINRx10[0], nrOfLayers);
+
+  LOG_D(MAC, "Reported SSB-SINR = %d.%d, dl_max_mcs %d\n", sinr_report->SINRx10[0] / 10, sinr_report->SINRx10[0] % 10, sched_ctrl->dl_max_mcs);
 }
 
 static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
