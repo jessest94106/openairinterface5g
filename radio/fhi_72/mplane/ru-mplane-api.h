@@ -82,6 +82,7 @@ typedef struct {
 } ru_mplane_config_t;
 
 typedef struct {
+  char *username;
   char *ru_ip_add;
   ru_mplane_config_t ru_mplane_config;
   void *session;

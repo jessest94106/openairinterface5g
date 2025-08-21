@@ -37,9 +37,8 @@ static int my_auth_hostkey_check(const char *hostname, ssh_session session, void
 bool connect_mplane(ru_session_t *ru_session)
 {
   int port = NC_PORT_SSH;
-  char *user = "oranbenetel";
 
-  nc_client_ssh_set_username(user);
+  nc_client_ssh_set_username(ru_session->username);
 
   nc_client_ssh_set_auth_pref(NC_SSH_AUTH_PUBLICKEY, 1);  // ssh-key identification
   nc_client_ssh_set_auth_pref(NC_SSH_AUTH_PASSWORD, -1);
@@ -47,11 +46,11 @@ bool connect_mplane(ru_session_t *ru_session)
 
   nc_client_ssh_set_auth_hostkey_check_clb(my_auth_hostkey_check, "DATA");  // host-key identification
 
-  MP_LOG_I("RPC request to RU \"%s\" = <connect> with username \"%s\" and port ID \"%d\".\n", ru_session->ru_ip_add, user, port);
+  MP_LOG_I("RPC request to RU \"%s\" = <connect> with username \"%s\" and port ID \"%d\".\n", ru_session->ru_ip_add, ru_session->username, port);
   ru_session->session = nc_connect_ssh(ru_session->ru_ip_add, port, NULL);
   AssertError(ru_session->session != NULL, return false, "[MPLANE] RU IP address %s unreachable. Maybe M-plane is disabled on the RU?\n", ru_session->ru_ip_add);
 
-  MP_LOG_I("Successfuly connected to RU \"%s\" with username \"%s\" and port ID \"%d\".\n", ru_session->ru_ip_add, user, port);
+  MP_LOG_I("Successfuly connected to RU \"%s\" with username \"%s\" and port ID \"%d\".\n", ru_session->ru_ip_add, ru_session->username, port);
 
   return true;
 }

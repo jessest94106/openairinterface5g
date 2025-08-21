@@ -1375,7 +1375,7 @@ Once the mplane service is successfully enabled on the RU, two new users are bei
 oranbenetel:x:1000:1000::/home/oranbenetel:/bin/sh
 oranext:x:1001:1001::/home/oranext:/bin/sh
 ```
-Create `oranbenetel` home directory:
+OAI gNB requires the `sudo` access group for NETCONF session. In the case of Benetel O-RUs, the corresponding user is `oranbenetel`. Therefore, please create its home directory:
 ```bash
 mkdir /home/oranbenetel && chown oranbenetel:oranbenetel /home/oranbenetel
 ```
@@ -1404,6 +1404,7 @@ fhi_72 = {
   du_key_pair = ("<path-to>/.ssh/id_rsa.pub", "<path-to>/.ssh/id_rsa");
   du_addr = ("00:11:22:33:44:66", "00:11:22:33:44:67"); # only one needed if one VF configured
   vlan_tag = (9, 9); # only one needed if one VF configured
+  ru_username = ("oranbenetel");
   ru_ip_addr = ("192.168.80.9");
   fh_config = ({
     T1a_cp_dl = (419, 470);
@@ -1423,6 +1424,7 @@ fhi_72 = {
   du_key_pair = ("/home/oaicicd/.ssh/id_rsa.pub", "/home/oaicicd/.ssh/id_rsa");
   du_addr = ("00:11:22:33:44:66", "00:11:22:33:44:67", "00:11:22:33:44:68", "00:11:22:33:44:69"); # only two needed if two VFs configured
   vlan_tag = (9, 9, 11, 11); # only two needed if two VFs configured
+  ru_username = ("oranbenetel", "oranbenetel");
   ru_ip_addr = ("192.168.80.9", "192.168.80.10");
   fh_config = (
 # RAN550 #1
@@ -1451,6 +1453,7 @@ fhi_72 = {
   * `du_key_pair`: ssh public and private keys to authenticate RU with NETCONF
   * `du_addr`: DU MAC address(es) to create CU-plane interface(s) in the RU
   * `vlan_tag`: VLAN U and C plane tags to create CU-plane interface(s) in the RU
+  * `ru_username`: Username with `sudo` access to connect to the RU via M-plane
   * `ru_ip_addr`: RU IP address to connect to the RU via M-plane
   * `dpdk_mem_size`: [*]
   * `dpdk_iova_mode`: [*]

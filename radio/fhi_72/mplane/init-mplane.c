@@ -96,11 +96,14 @@ bool init_mplane(ru_session_list_t *ru_session_list)
 
   char **ru_ip_addrs = gpd(fhip, nump, ORAN_CONFIG_RU_IP_ADDR)->strlistptr;
   int num_rus = gpd(fhip, nump, ORAN_CONFIG_RU_IP_ADDR)->numelt;
+  char **ru_usernames = gpd(fhip, nump, ORAN_CONFIG_RU_USERNAME)->strlistptr;
+  int num_ru_users = gpd(fhip, nump, ORAN_CONFIG_RU_USERNAME)->numelt;
   char **du_mac_addr = gpd(fhip, nump, ORAN_CONFIG_DU_ADDR)->strlistptr;
   int num_dus = gpd(fhip, nump, ORAN_CONFIG_DU_ADDR)->numelt;
   int32_t *vlan_tag = gpd(fhip, nump, ORAN_CONFIG_VLAN_TAG)->iptr;
   int num_vlan_tags = gpd(fhip, nump, ORAN_CONFIG_VLAN_TAG)->numelt;
 
+  AssertError(num_rus == num_ru_users, return false, "[MPLANE] Number of RUs should be equal to the number of users, one for each.\n");
   AssertError(num_dus == num_vlan_tags, return false, "[MPLANE] Number of DU MAC addresses should be equal to the number of VLAN tags.\n");
  
   int num_cu_planes = num_dus / num_rus;
@@ -112,6 +115,8 @@ bool init_mplane(ru_session_list_t *ru_session_list)
     ru_session->session = NULL;
     ru_session->ru_ip_add = calloc(strlen(ru_ip_addrs[i]) + 1, sizeof(char));
     memcpy(ru_session->ru_ip_add, ru_ip_addrs[i], strlen(ru_ip_addrs[i]) + 1);
+    ru_session->username = calloc(strlen(ru_usernames[i]) + 1, sizeof(char));
+    memcpy(ru_session->username, ru_usernames[i], strlen(ru_usernames[i]) + 1);
 
     // store DU MAC addresses and VLAN tags
     ru_session->ru_mplane_config.num_cu_planes = num_cu_planes;
