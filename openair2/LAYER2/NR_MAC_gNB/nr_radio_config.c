@@ -3253,9 +3253,9 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   SpCellConfig->rlmInSyncOutOfSyncThreshold = NULL;
   SpCellConfig->rlf_TimersAndConstants = NULL;
 
-  SpCellConfig->spCellConfigDedicated = calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated));
-  SpCellConfig->spCellConfigDedicated->uplinkConfig = calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->uplinkConfig));
-  NR_UplinkConfig_t *uplinkConfig = SpCellConfig->spCellConfigDedicated->uplinkConfig;
+  NR_ServingCellConfig_t *configDedicated = calloc(1, sizeof(*configDedicated));
+  configDedicated->uplinkConfig = calloc(1, sizeof(*configDedicated->uplinkConfig));
+  NR_UplinkConfig_t *uplinkConfig = configDedicated->uplinkConfig;
 
   NR_BWP_UplinkDedicated_t *initialUplinkBWP = calloc(1, sizeof(*initialUplinkBWP));
   uplinkConfig->initialUplinkBWP = initialUplinkBWP;
@@ -3289,9 +3289,8 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
                       configuration->minRXTXTIME,
                       scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing);
 
-  SpCellConfig->spCellConfigDedicated->initialDownlinkBWP =
-      calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->initialDownlinkBWP));
-  NR_BWP_DownlinkDedicated_t *bwp_Dedicated = SpCellConfig->spCellConfigDedicated->initialDownlinkBWP;
+  configDedicated->initialDownlinkBWP = calloc(1, sizeof(*configDedicated->initialDownlinkBWP));
+  NR_BWP_DownlinkDedicated_t *bwp_Dedicated = configDedicated->initialDownlinkBWP;
   bwp_Dedicated->pdcch_Config = calloc(1, sizeof(*bwp_Dedicated->pdcch_Config));
   bwp_Dedicated->pdcch_Config->present = NR_SetupRelease_PDCCH_Config_PR_setup;
   bwp_Dedicated->pdcch_Config->choice.setup = calloc(1, sizeof(*bwp_Dedicated->pdcch_Config->choice.setup));
@@ -3328,12 +3327,11 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
 
   bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts, configuration->ptrs);
 
-  SpCellConfig->spCellConfigDedicated->tag_Id = 0;
-  SpCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig =
-      calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig));
+  configDedicated->tag_Id = 0;
+  configDedicated->pdsch_ServingCellConfig = calloc(1, sizeof(*configDedicated->pdsch_ServingCellConfig));
   NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig = calloc(1, sizeof(*pdsch_servingcellconfig));
-  SpCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig->present = NR_SetupRelease_PDSCH_ServingCellConfig_PR_setup;
-  SpCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig->choice.setup = pdsch_servingcellconfig;
+  configDedicated->pdsch_ServingCellConfig->present = NR_SetupRelease_PDSCH_ServingCellConfig_PR_setup;
+  configDedicated->pdsch_ServingCellConfig->choice.setup = pdsch_servingcellconfig;
 
   pdsch_servingcellconfig->codeBlockGroupTransmission = NULL;
   pdsch_servingcellconfig->xOverhead = NULL;
@@ -3363,8 +3361,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   int default_dl_bwp = 0;
   int first_active_dl_bwp = 0;
   if (n_dl_bwp > 0) {
-    SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList =
-        calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList));
+    configDedicated->downlinkBWP_ToAddModList = calloc(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
     for (int bwp_loop = 0; bwp_loop < n_dl_bwp; bwp_loop++) {
       NR_BWP_Downlink_t *bwp = calloc(1, sizeof(*bwp));
       config_downlinkBWP(bwp,
@@ -3377,15 +3374,15 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
                          true,
                          configuration->ptrs,
                          configuration->num_agg_level_candidates);
-      asn1cSeqAdd(&SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
+      asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, bwp);
     }
     const NR_BWP_Id_t *firstActiveDownlinkBWP_Id = servingcellconfigdedicated->firstActiveDownlinkBWP_Id;
     first_active_dl_bwp = firstActiveDownlinkBWP_Id ? *firstActiveDownlinkBWP_Id : 1;
     const NR_BWP_Id_t	*defaultDownlinkBWP_Id = servingcellconfigdedicated->defaultDownlinkBWP_Id;
     default_dl_bwp = defaultDownlinkBWP_Id ? *defaultDownlinkBWP_Id : 1;
   }
-  asn1cCallocOne(SpCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id, first_active_dl_bwp);
-  asn1cCallocOne(SpCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id, default_dl_bwp);
+  asn1cCallocOne(configDedicated->firstActiveDownlinkBWP_Id, first_active_dl_bwp);
+  asn1cCallocOne(configDedicated->defaultDownlinkBWP_Id, default_dl_bwp);
 
   // Uplink BWPs
   int n_ul_bwp = 0;
@@ -3407,11 +3404,11 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   }
   asn1cCallocOne(uplinkConfig->firstActiveUplinkBWP_Id, first_active_ul_bwp);
 
-  SpCellConfig->spCellConfigDedicated->csi_MeasConfig = calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->csi_MeasConfig));
-  SpCellConfig->spCellConfigDedicated->csi_MeasConfig->present = NR_SetupRelease_CSI_MeasConfig_PR_setup;
+  configDedicated->csi_MeasConfig = calloc(1, sizeof(*configDedicated->csi_MeasConfig));
+  configDedicated->csi_MeasConfig->present = NR_SetupRelease_CSI_MeasConfig_PR_setup;
 
   NR_CSI_MeasConfig_t *csi_MeasConfig = calloc(1, sizeof(*csi_MeasConfig));
-  SpCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup = csi_MeasConfig;
+  configDedicated->csi_MeasConfig->choice.setup = csi_MeasConfig;
 
   csi_MeasConfig->csi_SSB_ResourceSetToAddModList = calloc(1, sizeof(*csi_MeasConfig->csi_SSB_ResourceSetToAddModList));
   csi_MeasConfig->csi_SSB_ResourceSetToReleaseList = NULL;
@@ -3437,11 +3434,11 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
     int curr_bwp, bwp_id;
     struct NR_SetupRelease_PDSCH_Config *pdsch_Config;
     if (bwp_loop == 0) {
-      pdsch_Config = SpCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdsch_Config;
+      pdsch_Config = configDedicated->initialDownlinkBWP->pdsch_Config;
       curr_bwp = NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
       bwp_id = 0;
     } else {
-      NR_BWP_Downlink_t *bwp = SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_loop - 1];
+      NR_BWP_Downlink_t *bwp = configDedicated->downlinkBWP_ToAddModList->list.array[bwp_loop - 1];
       pdsch_Config = bwp->bwp_Dedicated->pdsch_Config;
       curr_bwp = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
       bwp_id = bwp->bwp_Id;
@@ -3522,7 +3519,8 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
                             configuration->do_SINR);
   }
 
-  fill_harq_IEs(SpCellConfig->spCellConfigDedicated, configuration->num_dlharq, configuration->num_ulharq);
+  fill_harq_IEs(configDedicated, configuration->num_dlharq, configuration->num_ulharq);
+  SpCellConfig->spCellConfigDedicated = configDedicated;
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NR_SpCellConfig, SpCellConfig);
@@ -3938,30 +3936,27 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
       NR_RLF_TimersAndConstants__ext1__t311_ms30000;
   secondaryCellGroup->spCellConfig->rlmInSyncOutOfSyncThreshold = NULL;
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated =
-      calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->tdd_UL_DL_ConfigurationDedicated = NULL;
+  NR_ServingCellConfig_t *configDedicated = calloc(1, sizeof(*configDedicated));
+  configDedicated->tdd_UL_DL_ConfigurationDedicated = NULL;
 
   /// initialDownlinkBWP
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP =
-      calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdcch_Config = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdsch_Config =
+  configDedicated->initialDownlinkBWP = calloc(1, sizeof(*configDedicated->initialDownlinkBWP));
+  configDedicated->initialDownlinkBWP->pdcch_Config = NULL;
+  configDedicated->initialDownlinkBWP->pdsch_Config =
       config_pdsch(bitmap, 0, dl_antenna_ports, configuration->ptrs);
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->sps_Config =
-      NULL; // calloc(1,sizeof(struct NR_SetupRelease_SPS_Config));
+  configDedicated->initialDownlinkBWP->sps_Config = NULL; // calloc(1,sizeof(struct NR_SetupRelease_SPS_Config));
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->radioLinkMonitoringConfig = NULL;
+  configDedicated->initialDownlinkBWP->radioLinkMonitoringConfig = NULL;
 
   /// initialUplinkBWP
-  if (!secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig) {
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig));
+  if (!configDedicated->uplinkConfig) {
+    configDedicated->uplinkConfig = calloc(1, sizeof(*configDedicated->uplinkConfig));
   }
+  NR_UplinkConfig_t *ulConfig = configDedicated->uplinkConfig;
 
   NR_BWP_UplinkDedicated_t *initialUplinkBWP = calloc(1, sizeof(*initialUplinkBWP));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->initialUplinkBWP = initialUplinkBWP;
+  ulConfig->initialUplinkBWP = initialUplinkBWP;
   initialUplinkBWP->pucch_Config = NULL;
 
   NR_PUSCH_Config_t *pusch_Config = NULL;
@@ -3993,8 +3988,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
     n_dl_bwp = servingcellconfigdedicated->downlinkBWP_ToAddModList->list.count;
   }
   if (n_dl_bwp > 0) {
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList));
+    configDedicated->downlinkBWP_ToAddModList = calloc(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
     for (int bwp_loop = 0; bwp_loop < n_dl_bwp; bwp_loop++) {
       NR_BWP_Downlink_t *bwp = calloc(1, sizeof(*bwp));
       config_downlinkBWP(bwp,
@@ -4007,15 +4001,13 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                          false,
                          configuration->ptrs,
                          configuration->num_agg_level_candidates);
-      asn1cSeqAdd(&secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
+      asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, bwp);
     }
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id));
-    *secondaryCellGroup->spCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id =
+    configDedicated->firstActiveDownlinkBWP_Id = calloc(1, sizeof(*configDedicated->firstActiveDownlinkBWP_Id));
+    *configDedicated->firstActiveDownlinkBWP_Id =
         servingcellconfigdedicated->firstActiveDownlinkBWP_Id ? *servingcellconfigdedicated->firstActiveDownlinkBWP_Id : 1;
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id));
-    *secondaryCellGroup->spCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id =
+    configDedicated->defaultDownlinkBWP_Id = calloc(1, sizeof(*configDedicated->defaultDownlinkBWP_Id));
+    *configDedicated->defaultDownlinkBWP_Id =
         servingcellconfigdedicated->defaultDownlinkBWP_Id ? *servingcellconfigdedicated->defaultDownlinkBWP_Id : 1;
   }
 
@@ -4025,36 +4017,29 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
     n_ul_bwp = servingcellconfigdedicated->uplinkConfig->uplinkBWP_ToAddModList->list.count;
   }
   if (n_ul_bwp > 0) {
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList));
+    ulConfig->uplinkBWP_ToAddModList = calloc(1, sizeof(*ulConfig->uplinkBWP_ToAddModList));
     for (int bwp_loop = 0; bwp_loop < n_ul_bwp; bwp_loop++) {
       NR_BWP_Uplink_t *ubwp = calloc(1, sizeof(*ubwp));
       config_uplinkBWP(ubwp, bwp_loop, false, uid, configuration, servingcellconfigdedicated, servingcellconfigcommon, uecap);
-      asn1cSeqAdd(&secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList->list, ubwp);
+      asn1cSeqAdd(&ulConfig->uplinkBWP_ToAddModList->list, ubwp);
     }
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id));
-    *secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id =
+    ulConfig->firstActiveUplinkBWP_Id = calloc(1, sizeof(*ulConfig->firstActiveUplinkBWP_Id));
+    *ulConfig->firstActiveUplinkBWP_Id =
         servingcellconfigdedicated->uplinkConfig->firstActiveUplinkBWP_Id
             ? *servingcellconfigdedicated->uplinkConfig->firstActiveUplinkBWP_Id
             : 1;
   }
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->bwp_InactivityTimer = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToReleaseList = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList = NULL;
+  configDedicated->bwp_InactivityTimer = NULL;
+  configDedicated->downlinkBWP_ToReleaseList = NULL;
+  ulConfig->uplinkBWP_ToReleaseList = NULL;
 
-  if (!secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig)
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig =
-        calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig->present =
-      NR_SetupRelease_PUSCH_ServingCellConfig_PR_setup;
-  if (!secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup)
-    secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup = calloc(
-        1,
-        sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup));
-  NR_PUSCH_ServingCellConfig_t *pusch_scc =
-      secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup;
+  if (!ulConfig->pusch_ServingCellConfig)
+    ulConfig->pusch_ServingCellConfig = calloc(1, sizeof(*ulConfig->pusch_ServingCellConfig));
+  ulConfig->pusch_ServingCellConfig->present = NR_SetupRelease_PUSCH_ServingCellConfig_PR_setup;
+  if (!ulConfig->pusch_ServingCellConfig->choice.setup)
+    ulConfig->pusch_ServingCellConfig->choice.setup = calloc(1, sizeof(*ulConfig->pusch_ServingCellConfig->choice.setup));
+  NR_PUSCH_ServingCellConfig_t *pusch_scc = ulConfig->pusch_ServingCellConfig->choice.setup;
   pusch_scc->codeBlockGroupTransmission = NULL;
   pusch_scc->rateMatching = NULL;
   pusch_scc->xOverhead = NULL;
@@ -4063,16 +4048,14 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
   asn1cCallocOne(pusch_scc->ext1->maxMIMO_Layers, maxMIMO_Layers);
   pusch_scc->ext1->processingType2Enabled = NULL;
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->carrierSwitching = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->supplementaryUplink = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->pdcch_ServingCellConfig = NULL;
+  ulConfig->carrierSwitching = NULL;
+  configDedicated->supplementaryUplink = NULL;
+  configDedicated->pdcch_ServingCellConfig = NULL;
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig =
-      calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig));
+  configDedicated->pdsch_ServingCellConfig = calloc(1, sizeof(*configDedicated->pdsch_ServingCellConfig));
   NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig = calloc(1, sizeof(*pdsch_servingcellconfig));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig->present =
-      NR_SetupRelease_PDSCH_ServingCellConfig_PR_setup;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig->choice.setup = pdsch_servingcellconfig;
+  configDedicated->pdsch_ServingCellConfig->present = NR_SetupRelease_PDSCH_ServingCellConfig_PR_setup;
+  configDedicated->pdsch_ServingCellConfig->choice.setup = pdsch_servingcellconfig;
   pdsch_servingcellconfig->codeBlockGroupTransmission = NULL;
   pdsch_servingcellconfig->xOverhead = NULL;
   asn1cCallocOne(pdsch_servingcellconfig->nrofHARQ_ProcessesForPDSCH, NR_PDSCH_ServingCellConfig__nrofHARQ_ProcessesForPDSCH_n16);
@@ -4093,13 +4076,12 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
     pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[3] = 0xFF;
   }
 
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig =
-      calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->present = NR_SetupRelease_CSI_MeasConfig_PR_setup;
+  configDedicated->csi_MeasConfig = NULL;
+  configDedicated->csi_MeasConfig = calloc(1, sizeof(*configDedicated->csi_MeasConfig));
+  configDedicated->csi_MeasConfig->present = NR_SetupRelease_CSI_MeasConfig_PR_setup;
 
   NR_CSI_MeasConfig_t *csi_MeasConfig = calloc(1, sizeof(*csi_MeasConfig));
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup = csi_MeasConfig;
+  configDedicated->csi_MeasConfig->choice.setup = csi_MeasConfig;
 
   csi_MeasConfig->csi_ResourceConfigToAddModList = calloc(1, sizeof(*csi_MeasConfig->csi_ResourceConfigToAddModList));
   csi_MeasConfig->csi_ResourceConfigToReleaseList = NULL;
@@ -4123,8 +4105,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
   asn1cSeqAdd(&csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list, ssbresset0);
 
   for (int bwp_loop = 0; bwp_loop < n_dl_bwp; bwp_loop++) {
-    NR_BWP_Downlink_t *bwp =
-        secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list.array[bwp_loop];
+    NR_BWP_Downlink_t *bwp = configDedicated->downlinkBWP_ToAddModList->list.array[bwp_loop];
     int curr_bwp = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
 
     config_csirs(servingcellconfigcommon, csi_MeasConfig, dl_antenna_ports, curr_bwp, do_csirs, bwp_loop);
@@ -4198,14 +4179,15 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                             dl_antenna_ports,
                             configuration->do_SINR);
   }
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->sCellDeactivationTimer = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->crossCarrierSchedulingConfig = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->tag_Id = 0;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->dummy1 = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->pathlossReferenceLinking = NULL;
-  secondaryCellGroup->spCellConfig->spCellConfigDedicated->servingCellMO = NULL;
+  configDedicated->sCellDeactivationTimer = NULL;
+  configDedicated->crossCarrierSchedulingConfig = NULL;
+  configDedicated->tag_Id = 0;
+  configDedicated->dummy1 = NULL;
+  configDedicated->pathlossReferenceLinking = NULL;
+  configDedicated->servingCellMO = NULL;
 
-  fill_harq_IEs(secondaryCellGroup->spCellConfig->spCellConfigDedicated, configuration->num_dlharq, configuration->num_ulharq);
+  fill_harq_IEs(configDedicated, configuration->num_dlharq, configuration->num_ulharq);
+  secondaryCellGroup->spCellConfig->spCellConfigDedicated = configDedicated;
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NR_SpCellConfig, (void *)secondaryCellGroup->spCellConfig);
