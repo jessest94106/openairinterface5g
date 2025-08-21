@@ -1445,12 +1445,60 @@ static void set_dl_mcs_table(int scs,
     bwp_Dedicated->pdsch_Config->choice.setup->mcs_Table = NULL;
 }
 
-static struct NR_SetupRelease_PUSCH_Config *config_pusch(NR_PUSCH_Config_t *pusch_Config,
-							 const bool use_deltaMCS,
-                                                         const NR_ServingCellConfigCommon_t *scc,
-                                                         const NR_UE_NR_Capability_t *uecap)
+static NR_PTRS_UplinkConfig_t *config_ulptrs(const nr_ptrs_config_t *ptrs)
 {
-  struct NR_SetupRelease_PUSCH_Config *setup_puschconfig = calloc(1, sizeof(*setup_puschconfig));
+  struct NR_PTRS_UplinkConfig__transformPrecoderDisabled *ptrs_config = calloc_or_fail(1, sizeof(*ptrs_config));
+  AssertFatal(ptrs->ul_FreqDensity0_0 < 277, "Invalid ul_FreqDensity0_0 %d\n", ptrs->ul_FreqDensity0_0);
+  if (ptrs->ul_FreqDensity0_0 > 0) {
+    ptrs_config->frequencyDensity = calloc_or_fail(1, sizeof(*ptrs_config->frequencyDensity));
+    asn1cSequenceAdd(ptrs_config->frequencyDensity->list, long, f0);
+    *f0 = ptrs->ul_FreqDensity0_0;
+    AssertFatal(ptrs->ul_FreqDensity1_0 < 277, "Invalid ul_FreqDensity1_0 %d\n", ptrs->ul_FreqDensity1_0);
+    if (ptrs->ul_FreqDensity1_0 > 0) {
+      asn1cSequenceAdd(ptrs_config->frequencyDensity->list, long, f1);
+      *f1 = ptrs->ul_FreqDensity1_0;
+    }
+  }
+
+  AssertFatal(ptrs->ul_TimeDensity0_0 < 30, "Invalid ul_TimeDensity0_0 %d\n", ptrs->ul_TimeDensity0_0);
+  if (ptrs->ul_TimeDensity0_0 >= 0) {
+    ptrs_config->timeDensity = calloc_or_fail(1, sizeof(*ptrs_config->timeDensity));
+    asn1cSequenceAdd(ptrs_config->timeDensity->list, long, t0);
+    *t0 = ptrs->ul_TimeDensity0_0;
+    AssertFatal(ptrs->ul_TimeDensity1_0 < 30, "Invalid ul_TimeDensity1_0 %d\n", ptrs->ul_TimeDensity1_0);
+    if (ptrs->ul_TimeDensity1_0 >= 0) {
+      asn1cSequenceAdd(ptrs_config->timeDensity->list, long, t1);
+      *t1 = ptrs->ul_TimeDensity1_0;
+    }
+    AssertFatal(ptrs->ul_TimeDensity2_0 < 30, "Invalid ul_TimeDensity2_0 %d\n", ptrs->ul_TimeDensity2_0);
+    if (ptrs->ul_TimeDensity2_0 >= 0) {
+      asn1cSequenceAdd(ptrs_config->timeDensity->list, long, t2);
+      *t2 = ptrs->ul_TimeDensity2_0;
+    }
+  }
+
+  AssertFatal(ptrs->ul_ReOffset_0 < 3, "Invalid ul_ReOffset_0 %d\n", ptrs->ul_ReOffset_0);
+  if (ptrs->ul_ReOffset_0 >= 0) {
+    ptrs_config->resourceElementOffset = calloc_or_fail(1, sizeof(*ptrs_config->resourceElementOffset));
+    *ptrs_config->resourceElementOffset = ptrs->ul_ReOffset_0;
+  }
+  AssertFatal(ptrs->ul_MaxPorts_0 == 0 || ptrs->ul_MaxPorts_0 == 1, "Invalid ul_MaxPorts_0 %d\n", ptrs->ul_MaxPorts_0);
+  ptrs_config->maxNrofPorts = ptrs->ul_MaxPorts_0;
+  AssertFatal(ptrs->ul_Power_0 >= 0 || ptrs->ul_Power_0 < 4, "Invalid ul_Power_0 %d\n", ptrs->ul_Power_0);
+  ptrs_config->ptrs_Power = ptrs->ul_Power_0;
+
+  NR_PTRS_UplinkConfig_t *ulptrs = calloc_or_fail(1, sizeof(*ptrs_config));
+  ulptrs->transformPrecoderDisabled = ptrs_config;
+  return ulptrs;
+}
+
+static NR_SetupRelease_PUSCH_Config_t *config_pusch(NR_PUSCH_Config_t *pusch_Config,
+                                                    const bool use_deltaMCS,
+                                                    const NR_ServingCellConfigCommon_t *scc,
+                                                    const NR_UE_NR_Capability_t *uecap,
+                                                    const nr_ptrs_config_t *ptrs)
+{
+  NR_SetupRelease_PUSCH_Config_t *setup_puschconfig = calloc(1, sizeof(*setup_puschconfig));
   setup_puschconfig->present = NR_SetupRelease_PUSCH_Config_PR_setup;
   if (!pusch_Config)
     pusch_Config = calloc(1, sizeof(*pusch_Config));
@@ -1467,6 +1515,13 @@ static struct NR_SetupRelease_PUSCH_Config *config_pusch(NR_PUSCH_Config_t *pusc
   if (!pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup)
     pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup = calloc(1, sizeof(*pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup));
   NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup;
+  if (ptrs) {
+    NR_PTRS_UplinkConfig_t *ptrs_config = config_ulptrs(ptrs);
+    NR_SetupRelease_PTRS_UplinkConfig_t *phaseTrackingRS = calloc(1, sizeof(*phaseTrackingRS));
+    phaseTrackingRS->present = NR_SetupRelease_PTRS_UplinkConfig_PR_setup;
+    phaseTrackingRS->choice.setup = ptrs_config;
+    NR_DMRS_UplinkConfig->phaseTrackingRS = phaseTrackingRS;
+  }
   NR_DMRS_UplinkConfig->dmrs_Type = NULL;
   NR_DMRS_UplinkConfig->dmrs_AdditionalPosition = NULL;
   NR_DMRS_UplinkConfig->phaseTrackingRS = NULL;
@@ -1531,9 +1586,54 @@ static struct NR_SetupRelease_PUSCH_Config *config_pusch(NR_PUSCH_Config_t *pusc
   return setup_puschconfig;
 }
 
-static struct NR_SetupRelease_PDSCH_Config *config_pdsch(uint64_t ssb_bitmap, int bwp_Id, int dl_antenna_ports)
+static NR_PTRS_DownlinkConfig_t *config_dlptrs(const nr_ptrs_config_t *ptrs)
 {
-  struct NR_SetupRelease_PDSCH_Config *setup_pdsch_Config = calloc(1,sizeof(*setup_pdsch_Config));
+  NR_PTRS_DownlinkConfig_t *ptrs_config = calloc_or_fail(1, sizeof(*ptrs_config));
+  AssertFatal(ptrs->dl_FreqDensity0_0 < 277, "Invalid dl_FreqDensity0_0 %d\n", ptrs->dl_FreqDensity0_0);
+  if (ptrs->dl_FreqDensity0_0 > 0) {
+    ptrs_config->frequencyDensity = calloc_or_fail(1, sizeof(*ptrs_config->frequencyDensity));
+    asn1cSequenceAdd(ptrs_config->frequencyDensity->list, long, f0);
+    *f0 = ptrs->dl_FreqDensity0_0;
+    AssertFatal(ptrs->dl_FreqDensity1_0 < 277, "Invalid dl_FreqDensity1_0 %d\n", ptrs->dl_FreqDensity1_0);
+    if (ptrs->dl_FreqDensity1_0 > 0) {
+      asn1cSequenceAdd(ptrs_config->frequencyDensity->list, long, f1);
+      *f1 = ptrs->dl_FreqDensity1_0;
+    }
+  }
+
+  AssertFatal(ptrs->dl_TimeDensity0_0 < 30, "Invalid dl_TimeDensity0_0 %d\n", ptrs->dl_TimeDensity0_0);
+  if (ptrs->dl_TimeDensity0_0 >= 0) {
+    ptrs_config->timeDensity = calloc_or_fail(1, sizeof(*ptrs_config->timeDensity));
+    asn1cSequenceAdd(ptrs_config->timeDensity->list, long, t0);
+    *t0 = ptrs->dl_TimeDensity0_0;
+    AssertFatal(ptrs->dl_TimeDensity1_0 < 30, "Invalid dl_TimeDensity1_0 %d\n", ptrs->dl_TimeDensity1_0);
+    if (ptrs->dl_TimeDensity1_0 >= 0) {
+      asn1cSequenceAdd(ptrs_config->timeDensity->list, long, t1);
+      *t1 = ptrs->dl_TimeDensity1_0;
+    }
+    AssertFatal(ptrs->dl_TimeDensity2_0 < 30, "Invalid dl_TimeDensity2_0 %d\n", ptrs->dl_TimeDensity2_0);
+    if (ptrs->dl_TimeDensity2_0 >= 0) {
+      asn1cSequenceAdd(ptrs_config->timeDensity->list, long, t2);
+      *t2 = ptrs->dl_TimeDensity2_0;
+    }
+  }
+
+  AssertFatal(ptrs->dl_EpreRatio_0 < 4, "Invalid dl_EpreRatio_0 %d\n", ptrs->dl_EpreRatio_0);
+  if (ptrs->dl_EpreRatio_0 >= 0) {
+    ptrs_config->epre_Ratio = calloc_or_fail(1, sizeof(*ptrs_config->epre_Ratio));
+    *ptrs_config->epre_Ratio = ptrs->dl_EpreRatio_0;
+  }
+  AssertFatal(ptrs->dl_ReOffset_0 < 3, "Invalid dl_ReOffset_0 %d\n", ptrs->dl_ReOffset_0);
+  if (ptrs->dl_ReOffset_0 >= 0) {
+    ptrs_config->resourceElementOffset = calloc_or_fail(1, sizeof(*ptrs_config->resourceElementOffset));
+    *ptrs_config->resourceElementOffset = ptrs->dl_ReOffset_0;
+  }
+  return ptrs_config;
+}
+
+static NR_SetupRelease_PDSCH_Config_t *config_pdsch(uint64_t ssb_bitmap, int bwp_Id, int dl_antenna_ports, nr_ptrs_config_t *ptrs)
+{
+  NR_SetupRelease_PDSCH_Config_t *setup_pdsch_Config = calloc(1,sizeof(*setup_pdsch_Config));
   setup_pdsch_Config->present = NR_SetupRelease_PDSCH_Config_PR_setup;
   NR_PDSCH_Config_t *pdsch_Config = calloc(1, sizeof(*pdsch_Config));
   setup_pdsch_Config->choice.setup = pdsch_Config;
@@ -1541,6 +1641,13 @@ static struct NR_SetupRelease_PDSCH_Config *config_pdsch(uint64_t ssb_bitmap, in
   pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->present = NR_SetupRelease_DMRS_DownlinkConfig_PR_setup;
   pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup = calloc(1, sizeof(*pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup));
   NR_DMRS_DownlinkConfig_t *dmrs_DownlinkForPDSCH_MappingTypeA = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup;
+  if (ptrs) {
+    NR_PTRS_DownlinkConfig_t *ptrs_config = config_dlptrs(ptrs);
+    NR_SetupRelease_PTRS_DownlinkConfig_t *phaseTrackingRS = calloc(1, sizeof(*phaseTrackingRS));
+    phaseTrackingRS->present = NR_SetupRelease_PTRS_DownlinkConfig_PR_setup;
+    phaseTrackingRS->choice.setup = ptrs_config;
+    dmrs_DownlinkForPDSCH_MappingTypeA->phaseTrackingRS = phaseTrackingRS;
+  }
   dmrs_DownlinkForPDSCH_MappingTypeA->dmrs_Type = NULL;
   dmrs_DownlinkForPDSCH_MappingTypeA->maxLength = NULL;
   dmrs_DownlinkForPDSCH_MappingTypeA->scramblingID0 = NULL;
@@ -1582,6 +1689,7 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
                                bool force_256qam_off,
                                int bwp_loop,
                                bool is_SA,
+                               nr_ptrs_config_t *ptrs,
                                const int num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS])
 {
   bwp->bwp_Common = calloc(1,sizeof(*bwp->bwp_Common));
@@ -1677,7 +1785,7 @@ static void config_downlinkBWP(NR_BWP_Downlink_t *bwp,
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss3);
 
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToReleaseList = NULL;
-  bwp->bwp_Dedicated->pdsch_Config = config_pdsch(ssb_bitmap, bwp->bwp_Id, dl_antenna_ports);
+  bwp->bwp_Dedicated->pdsch_Config = config_pdsch(ssb_bitmap, bwp->bwp_Id, dl_antenna_ports, ptrs);
 
   set_dl_mcs_table(bwp->bwp_Common->genericParameters.subcarrierSpacing,
                    force_256qam_off ? NULL : uecap,
@@ -1745,7 +1853,11 @@ static void config_uplinkBWP(NR_BWP_Uplink_t *ubwp,
     pusch_Config = clone_pusch_config(servingcellconfigdedicated->uplinkConfig->uplinkBWP_ToAddModList->list.array[bwp_loop]
                                          ->bwp_Dedicated->pusch_Config->choice.setup);
   }
-  ubwp->bwp_Dedicated->pusch_Config = config_pusch(pusch_Config, configuration->use_deltaMCS, scc, configuration->force_UL256qam_off ? NULL : uecap);
+  ubwp->bwp_Dedicated->pusch_Config = config_pusch(pusch_Config,
+                                                   configuration->use_deltaMCS,
+                                                   scc,
+                                                   configuration->force_UL256qam_off ? NULL : uecap,
+                                                   configuration->ptrs);
 
   long maxMIMO_Layers = servingcellconfigdedicated &&
                                 servingcellconfigdedicated->uplinkConfig
@@ -3160,7 +3272,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   config_pucch_resset1(pucch_Config, uid, num_pucch2, NULL);
   set_pucch_power_config(pucch_Config, configuration->do_CSIRS);
 
-  initialUplinkBWP->pusch_Config = config_pusch(NULL, configuration->use_deltaMCS, scc, NULL);
+  initialUplinkBWP->pusch_Config = config_pusch(NULL, configuration->use_deltaMCS, scc, NULL, configuration->ptrs);
 
   long maxMIMO_Layers = uplinkConfig && uplinkConfig->pusch_ServingCellConfig
                                 && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1
@@ -3214,7 +3326,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss);
   asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss2);
 
-  bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts);
+  bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts, configuration->ptrs);
 
   SpCellConfig->spCellConfigDedicated->tag_Id = 0;
   SpCellConfig->spCellConfigDedicated->pdsch_ServingCellConfig =
@@ -3255,7 +3367,16 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
         calloc(1, sizeof(*SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList));
     for (int bwp_loop = 0; bwp_loop < n_dl_bwp; bwp_loop++) {
       NR_BWP_Downlink_t *bwp = calloc(1, sizeof(*bwp));
-      config_downlinkBWP(bwp, scc, servingcellconfigdedicated, NULL, 0, false, bwp_loop, true, configuration->num_agg_level_candidates);
+      config_downlinkBWP(bwp,
+                         scc,
+                         servingcellconfigdedicated,
+                         NULL,
+                         0,
+                         false,
+                         bwp_loop,
+                         true,
+                         configuration->ptrs,
+                         configuration->num_agg_level_candidates);
       asn1cSeqAdd(&SpCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
     }
     const NR_BWP_Id_t *firstActiveDownlinkBWP_Id = servingcellconfigdedicated->firstActiveDownlinkBWP_Id;
@@ -3825,7 +3946,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
       calloc(1, sizeof(*secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP));
   secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdcch_Config = NULL;
   secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->pdsch_Config =
-      config_pdsch(bitmap, 0, dl_antenna_ports);
+      config_pdsch(bitmap, 0, dl_antenna_ports, configuration->ptrs);
   secondaryCellGroup->spCellConfig->spCellConfigDedicated->initialDownlinkBWP->sps_Config =
       NULL; // calloc(1,sizeof(struct NR_SetupRelease_SPS_Config));
 
@@ -3846,7 +3967,11 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
     pusch_Config = clone_pusch_config(
         servingcellconfigdedicated->uplinkConfig->uplinkBWP_ToAddModList->list.array[0]->bwp_Dedicated->pusch_Config->choice.setup);
   }
-  initialUplinkBWP->pusch_Config = config_pusch(pusch_Config, configuration->use_deltaMCS,servingcellconfigcommon, uecap);
+  initialUplinkBWP->pusch_Config = config_pusch(pusch_Config,
+                                                configuration->use_deltaMCS,
+                                                servingcellconfigcommon,
+                                                uecap,
+                                                configuration->ptrs);
 
   long maxMIMO_Layers =
       servingcellconfigdedicated->uplinkConfig && servingcellconfigdedicated->uplinkConfig->pusch_ServingCellConfig
@@ -3884,6 +4009,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                          configuration->force_256qam_off,
                          bwp_loop,
                          false,
+                         configuration->ptrs,
                          configuration->num_agg_level_candidates);
       asn1cSeqAdd(&secondaryCellGroup->spCellConfig->spCellConfigDedicated->downlinkBWP_ToAddModList->list, bwp);
     }

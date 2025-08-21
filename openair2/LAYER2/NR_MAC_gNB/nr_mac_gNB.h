@@ -155,6 +155,24 @@ typedef struct nr_redcap_config {
   uint8_t intraFreqReselectionRedCap_r17;
 } nr_redcap_config_t;
 
+typedef struct {
+int dl_FreqDensity0_0;
+int dl_FreqDensity1_0;
+int dl_TimeDensity0_0;
+int dl_TimeDensity1_0;
+int dl_TimeDensity2_0;
+int dl_EpreRatio_0;
+int dl_ReOffset_0;
+int ul_FreqDensity0_0;
+int ul_FreqDensity1_0;
+int ul_TimeDensity0_0;
+int ul_TimeDensity1_0;
+int ul_TimeDensity2_0;
+int ul_ReOffset_0;
+int ul_MaxPorts_0;
+int ul_Power_0;
+} nr_ptrs_config_t;
+
 typedef struct nr_mac_config_t {
   int sib1_tda;
   nr_pdsch_AntennaPorts_t pdsch_AntennaPorts;
@@ -177,6 +195,7 @@ typedef struct nr_mac_config_t {
   int32_t *bw_list;
   int num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   nr_redcap_config_t *redcap;
+  nr_ptrs_config_t *ptrs;
   bool do_SINR;
 } nr_mac_config_t;
 
