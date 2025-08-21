@@ -3726,6 +3726,30 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   return cellGroupConfig;
 }
 
+static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
+{
+  long ul_max_layers = 1;
+  if (uecap && uecap->featureSets
+      && uecap->featureSets->featureSetsUplinkPerCC
+      && uecap->featureSets->featureSetsUplinkPerCC->list.count > 0) {
+    NR_FeatureSetUplinkPerCC_t *ul_feature_setup_per_cc = uecap->featureSets->featureSetsUplinkPerCC->list.array[0];
+    if (ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
+      switch (*ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
+        case NR_MIMO_LayersUL_twoLayers:
+          ul_max_layers = 2;
+          break;
+        case NR_MIMO_LayersUL_fourLayers:
+          ul_max_layers = 4;
+          break;
+        default:
+          ul_max_layers = 1;
+      }
+    }
+    ul_max_layers = min(ul_max_layers, configuration->pusch_AntennaPorts);
+  }
+  return ul_max_layers;
+}
+
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const int uid,
                             const NR_UE_NR_Capability_t *uecap,
@@ -3753,46 +3777,24 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
   NR_UplinkConfig_t *uplinkConfig =
       SpCellConfig && SpCellConfig->spCellConfigDedicated ? SpCellConfig->spCellConfigDedicated->uplinkConfig : NULL;
 
-  uint8_t ul_max_layers = 1;
-  if (uecap && uecap->featureSets && uecap->featureSets->featureSetsUplinkPerCC
-      && uecap->featureSets->featureSetsUplinkPerCC->list.count > 0) {
-    NR_FeatureSetUplinkPerCC_t *ul_feature_setup_per_cc = uecap->featureSets->featureSetsUplinkPerCC->list.array[0];
-    if (ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
-      switch (*ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
-        case NR_MIMO_LayersUL_twoLayers:
-          ul_max_layers = 2;
-          break;
-        case NR_MIMO_LayersUL_fourLayers:
-          ul_max_layers = 4;
-          break;
-        default:
-          ul_max_layers = 1;
-      }
+  long maxMIMO_Layers = set_ul_max_layers(configuration, uecap);
+  if (uplinkConfig->initialUplinkBWP->pusch_Config) {
+    NR_PUSCH_Config_t *pusch_Config = uplinkConfig->initialUplinkBWP->pusch_Config->choice.setup;
+    if (pusch_Config->maxRank == NULL) {
+      pusch_Config->maxRank = calloc(1, sizeof(*pusch_Config->maxRank));
     }
-    ul_max_layers = min(ul_max_layers, configuration->pusch_AntennaPorts);
-    if (uplinkConfig->initialUplinkBWP->pusch_Config) {
-      NR_PUSCH_Config_t *pusch_Config = uplinkConfig->initialUplinkBWP->pusch_Config->choice.setup;
-      if (pusch_Config->maxRank == NULL) {
-        pusch_Config->maxRank = calloc(1, sizeof(*pusch_Config->maxRank));
-      }
-      *pusch_Config->maxRank = ul_max_layers;
-    }
-    if (!uplinkConfig->pusch_ServingCellConfig)
-      uplinkConfig->pusch_ServingCellConfig = calloc(1, sizeof(*uplinkConfig->pusch_ServingCellConfig));
-    uplinkConfig->pusch_ServingCellConfig->present = NR_SetupRelease_PUSCH_ServingCellConfig_PR_setup;
-    if (!uplinkConfig->pusch_ServingCellConfig->choice.setup)
-      uplinkConfig->pusch_ServingCellConfig->choice.setup = calloc(1, sizeof(*uplinkConfig->pusch_ServingCellConfig->choice.setup));
-    if (!uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1)
-      uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1 =
-          calloc(1, sizeof(*uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1));
-    asn1cCallocOne(uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers, ul_max_layers);
+    *pusch_Config->maxRank = maxMIMO_Layers;
   }
+  if (!uplinkConfig->pusch_ServingCellConfig)
+    uplinkConfig->pusch_ServingCellConfig = calloc(1, sizeof(*uplinkConfig->pusch_ServingCellConfig));
+  uplinkConfig->pusch_ServingCellConfig->present = NR_SetupRelease_PUSCH_ServingCellConfig_PR_setup;
+  if (!uplinkConfig->pusch_ServingCellConfig->choice.setup)
+    uplinkConfig->pusch_ServingCellConfig->choice.setup = calloc(1, sizeof(*uplinkConfig->pusch_ServingCellConfig->choice.setup));
+  if (!uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1)
+    uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1 =
+        calloc(1, sizeof(*uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1));
+  asn1cCallocOne(uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers, maxMIMO_Layers);
 
-  long maxMIMO_Layers = uplinkConfig && uplinkConfig->pusch_ServingCellConfig
-                                && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1
-                                && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
-                            ? *uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
-                            : 1;
 
   // UL and SRS configuration
   if (configuration->do_SRS && uplinkConfig && uplinkConfig->initialUplinkBWP) {
@@ -3837,7 +3839,7 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
         if (pusch_Config->maxRank == NULL) {
           pusch_Config->maxRank = calloc(1, sizeof(*pusch_Config->maxRank));
         }
-        *pusch_Config->maxRank = ul_max_layers;
+        *pusch_Config->maxRank = maxMIMO_Layers;
       }
 
       ASN_STRUCT_FREE(asn_DEF_NR_SetupRelease_SRS_Config, ul_bwp->bwp_Dedicated->srs_Config);
@@ -3973,13 +3975,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                                                 uecap,
                                                 configuration->ptrs);
 
-  long maxMIMO_Layers =
-      servingcellconfigdedicated->uplinkConfig && servingcellconfigdedicated->uplinkConfig->pusch_ServingCellConfig
-              && servingcellconfigdedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1
-              && servingcellconfigdedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
-          ? *servingcellconfigdedicated->uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
-          : 1;
-
+  long maxMIMO_Layers = set_ul_max_layers(configuration, uecap);
   int curr_bwp = NRRIV2BW(servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth,
                           MAX_BWP_SIZE);
   initialUplinkBWP->srs_Config = get_config_srs(servingcellconfigcommon,
@@ -4064,7 +4060,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
   pusch_scc->xOverhead = NULL;
   if (!pusch_scc->ext1)
     pusch_scc->ext1 = calloc(1, sizeof(*pusch_scc->ext1));
-  asn1cCallocOne(pusch_scc->ext1->maxMIMO_Layers, 1);
+  asn1cCallocOne(pusch_scc->ext1->maxMIMO_Layers, maxMIMO_Layers);
   pusch_scc->ext1->processingType2Enabled = NULL;
 
   secondaryCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->carrierSwitching = NULL;
