@@ -1396,9 +1396,10 @@ include_directories("${OPENAIR1_DIR}/SCHED_NR_UE")
 add_library (GTPV1U
   ${RRC_DIR}/rrc_eNB_GTPV1U.c
   ${OPENAIR3_DIR}/ocp-gtpu/gtp_itf.cpp
+  ${OPENAIR3_DIR}/ocp-gtpu/gtpu_extensions.c
   )
 target_link_libraries(GTPV1U PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
-target_link_libraries(GTPV1U PRIVATE SIMU)
+target_link_libraries(GTPV1U PRIVATE SIMU ds)
 include_directories(${OPENAIR3_DIR}/ocp-gtp)
 
 set (MME_APP_SRC
