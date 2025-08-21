@@ -2847,7 +2847,7 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       // from the second SSB, differential report
       for (int i = 1; i < nb_meas; i++) {
         ssbi = sorted_sinr_measurements[i].ssb_index;
-        temp_payload = reverse_bits(ssbi, ssbri_bits);
+        temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
         bits += ssbri_bits;
 
         sinr_idx = get_sinr_diff_index(sorted_sinr_measurements[0].ssb_sinr_dB, sorted_sinr_measurements[i].ssb_sinr_dB);
