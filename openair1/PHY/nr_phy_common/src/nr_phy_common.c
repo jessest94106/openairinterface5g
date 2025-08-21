@@ -404,6 +404,28 @@ unsigned int nr_get_tx_amp(int power_dBm, int power_max_dBm, int total_nb_rb, in
   return (0);
 }
 
+// compute average channel_level on each antenna
+void nr_channel_level(const int symbol,
+                      const int size_est,
+                      const c16_t ch_estimates_ext[][size_est],
+                      const int nb_rx,
+                      const int Nl,
+                      int32_t avg[nb_rx * Nl],
+                      const uint32_t len)
+{
+  int16_t x = factor2(len);
+  int16_t y = len >> x;
+  for (int aarx = 0; aarx < nb_rx; aarx++) {
+    for (int l = 0; l < Nl; l++) {
+      simde__m128i *ch128 = (simde__m128i *)&ch_estimates_ext[l * nb_rx + aarx][symbol * len];
+      //compute average level
+      avg[l * nb_rx + aarx] = simde_mm_average(ch128, len, x, y);
+      LOG_D(PHY, "Channel level: %d\n", avg[l * nb_rx + aarx]);
+    }
+  }
+}
+
+
 void nr_fo_compensation(double fo_Hz, int samples_per_ms, int sample_offset, const c16_t *rxdata_in, c16_t *rxdata_out, int size)
 {
   const double phase_inc = -fo_Hz / (samples_per_ms * 1000);
