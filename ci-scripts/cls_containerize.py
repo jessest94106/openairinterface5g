@@ -362,7 +362,6 @@ class Containerize():
 			cmd.close()
 			logging.error('\u001B[1m Building OAI Images Failed\u001B[0m')
 			HTML.CreateHtmlTestRow(self.imageKind, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlTabFooter(False)
 			return False
 		else:
 			result = re.search(r'Size *= *(?P<size>[0-9\-]+) *bytes', cmd.getBefore())
@@ -486,7 +485,6 @@ class Containerize():
 				logging.error('\u001B[1m Build of L2sim proxy failed\u001B[0m')
 				ssh.close()
 				HTML.CreateHtmlTestRow('commit ' + tag, 'KO', CONST.ALL_PROCESSES_OK)
-				HTML.CreateHtmlTabFooter(False)
 				return False
 		else:
 			logging.debug('L2sim proxy image for tag ' + tag + ' already exists, skipping build')
@@ -555,7 +553,6 @@ class Containerize():
 		if ret.returncode != 0:
 			logging.error(f'No {baseImage} image present, cannot build tests')
 			HTML.CreateHtmlTestRow(self.imageKind, 'KO', CONST.ALL_PROCESSES_OK)
-			HTML.CreateHtmlTabFooter(False)
 			return False
 
 		# build ran-unittests image
@@ -566,7 +563,6 @@ class Containerize():
 		if ret.returncode != 0:
 			logging.error(f'Cannot build unit tests')
 			HTML.CreateHtmlTestRow("Unit test build failed", 'KO', [dockerfile])
-			HTML.CreateHtmlTabFooter(False)
 			return False
 
 		HTML.CreateHtmlTestRowQueue("Build unit tests", 'OK', [dockerfile])
@@ -585,11 +581,9 @@ class Containerize():
 
 		if ret.returncode == 0:
 			HTML.CreateHtmlTestRowQueue('Unit tests succeeded', 'OK', [ret.stdout])
-			HTML.CreateHtmlTabFooter(True)
 			return True
 		else:
 			HTML.CreateHtmlTestRowQueue('Unit tests failed (see also doc/UnitTests.md)', 'KO', [ret.stdout])
-			HTML.CreateHtmlTabFooter(False)
 			return False
 
 	def Push_Image_to_Local_Registry(self, node, HTML, tag_prefix=""):
