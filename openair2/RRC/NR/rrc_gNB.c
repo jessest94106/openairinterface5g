@@ -2305,13 +2305,19 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
         uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, (uint8_t *)cgc->buf, cgc->len);
     AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
 
-    if (UE->masterCellGroup) {
-      ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
-      LOG_I(RRC, "UE %04x replacing existing CellGroupConfig with new one received from DU\n", UE->rnti);
+    /* hack for interoperability with srsRAN: ignore cell group config if empty */
+    /* cell group config is empty if buffer length is 2 and content is all 0 */
+    bool cgc_is_empty = cgc->len == 2 && cgc->buf[0] == 0 && cgc->buf[1] == 0;
+    if (!cgc_is_empty) {
+      if (UE->masterCellGroup) {
+        ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
+        LOG_I(RRC, "UE %04x replacing existing CellGroupConfig with new one received from DU\n", UE->rnti);
+      }
+      UE->masterCellGroup = cellGroupConfig;
+      rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+    } else {
+      LOG_W(NR_RRC, "hack: UE %d: ignore empty CellGroupConfig in UEContextModificationResponse\n", UE->rrc_ue_id);
     }
-    UE->masterCellGroup = cellGroupConfig;
-
-    rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
   }
 
   // Reconfiguration should have been sent to the UE, so it will attempt the

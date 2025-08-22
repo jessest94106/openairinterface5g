@@ -237,6 +237,8 @@ int main(int argc, char *argv[])
   int max_ldpc_iterations = 5;
   int num_antennas_per_thread = 1;
   uint32_t log_format = 0;
+  int threequarter_fs = 0;
+
   if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == 0) {
     exit_fun("[NR_ULSIM] Error, configuration module init failed\n");
   }
@@ -351,7 +353,7 @@ int main(int argc, char *argv[])
 
     case 'k':
       printf("Setting threequarter_fs_flag\n");
-      openair0_cfg[0].threequarter_fs= 1;
+      threequarter_fs = 1;
       break;
 
     case 'm':
@@ -584,7 +586,7 @@ int main(int argc, char *argv[])
   uint32_t samples;
   get_samplerate_and_bw(mu,
                         N_RB_DL,
-                        openair0_cfg[0].threequarter_fs,
+                        threequarter_fs,
                         &sampling_frequency,
                         &samples,
                         &tx_bandwidth,
@@ -1026,6 +1028,9 @@ int main(int argc, char *argv[])
     reset_meas(&gNB->rx_pusch_init_stats);
     reset_meas(&gNB->rx_pusch_symbol_processing_stats);
     reset_meas(&gNB->ulsch_decoding_stats);
+    reset_meas(&gNB->ts_deinterleave);
+    reset_meas(&gNB->ts_rate_unmatch);
+    reset_meas(&gNB->ts_ldpc_decode);
     reset_meas(&gNB->ulsch_channel_estimation_stats);
     reset_meas(&gNB->pusch_channel_estimation_antenna_processing_stats);
     reset_meas(&gNB->rx_srs_stats);
@@ -1587,6 +1592,9 @@ int main(int argc, char *argv[])
       printStatIndent2(&gNB->rx_pusch_init_stats, "RX PUSCH Initialization time");
       printStatIndent2(&gNB->rx_pusch_symbol_processing_stats, "RX PUSCH Symbol Processing time");
       printStatIndent(&gNB->ulsch_decoding_stats,"ULSCH total decoding time");
+      printStatIndent2(&gNB->ts_deinterleave, "ULSCH segment deinterleaving time");
+      printStatIndent2(&gNB->ts_rate_unmatch, "ULSCH segment rate recovery time");
+      printStatIndent2(&gNB->ts_ldpc_decode, "ULSCH segments decoding time");
 
       printf("\nUE TX\n");
       for (int i = PHY_PROC_TX; i <= OFDM_MOD_STATS; i++) {

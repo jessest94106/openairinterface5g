@@ -815,6 +815,10 @@ static int pmd_lcore_ldpc_dec(void *arg)
   AssertFatal(ret == 0, "Allocation failed for %d ops", num_segments);
   set_ldpc_dec_op(ops_enq, bufs->inputs, bufs->hard_outputs, bufs->harq_outputs, nrLDPC_slot_decoding_parameters);
 
+  // Start timer
+  // We report timing only once in (0,0) since the timers are merged at the end
+  start_meas(&nrLDPC_slot_decoding_parameters->TBs[0].segments[0].ts_ldpc_decode);
+
   uint16_t enq = 0, deq = 0;
   while (enq < num_segments) {
     uint16_t num_to_enq = num_segments - enq;
@@ -827,6 +831,10 @@ static int pmd_lcore_ldpc_dec(void *arg)
     time_out++;
     DevAssert(time_out <= TIME_OUT_POLL);
   }
+
+  // Stop timer
+  // We report timing only once in (0,0) since the timers are merged at the end
+  stop_meas(&nrLDPC_slot_decoding_parameters->TBs[0].segments[0].ts_ldpc_decode);
 
   if (deq == enq) {
     ret = retrieve_ldpc_dec_op(ops_deq, nrLDPC_slot_decoding_parameters);

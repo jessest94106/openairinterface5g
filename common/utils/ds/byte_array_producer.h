@@ -19,23 +19,22 @@
  *      contact@openairinterface.org
  */
 
-/*! \file s1ap_common.c
- * \brief s1ap procedures for both eNB and MME
- * \author Sebastien ROUX and Navid Nikaein
- * \email navid.nikaein@eurecom.fr
- * \date 2012-2015
- * \version 0.1
- */
+#ifndef BYTE_ARRAY_PRODUCER_H
+#define BYTE_ARRAY_PRODUCER_H
 
 #include <stdint.h>
 
-#include "s1ap_common.h"
-#include "S1AP_S1AP-PDU.h"
+#include "byte_array.h"
 
+typedef struct {
+  byte_array_t b;
+  size_t pos;
+} byte_array_producer_t;
 
-int asn1_xer_print = 0;
+byte_array_producer_t byte_array_producer_from_buffer(uint8_t *buffer, int len);
 
+int byte_array_producer_put_byte(byte_array_producer_t *b, uint8_t v);
+int byte_array_producer_put_u32_be(byte_array_producer_t *b, uint32_t v);
+int byte_array_producer_put_u24_be(byte_array_producer_t *b, uint32_t v);
 
-void s1ap_handle_criticality(S1AP_Criticality_t criticality)
-{
-}
+#endif

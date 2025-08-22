@@ -594,8 +594,15 @@ typedef struct UEsched_s {
   NR_UE_info_t * UE;
 } UEsched_t;
 
-static int comparator(const void *p, const void *q) {
-  return ((UEsched_t*)p)->coef < ((UEsched_t*)q)->coef;
+static int comparator(const void *p, const void *q)
+{
+  const UEsched_t *pp = p;
+  const UEsched_t *qq = q;
+  if (pp->coef < qq->coef)
+    return 1;
+  else if (pp->coef > qq->coef)
+    return -1;
+  return 0;
 }
 
 static void pf_dl(module_id_t module_id,
@@ -613,7 +620,7 @@ static void pf_dl(module_id_t module_id,
   int remainUEs[num_beams];
   for (int i = 0; i < num_beams; i++)
     remainUEs[i] = max_num_ue;
-  int curUE = 0;
+  int numUE = 0;
   int CC_id = 0;
   int slots_per_frame = mac->frame_structure.numb_slots_frame;
 
@@ -704,13 +711,13 @@ static void pf_dl(module_id_t module_id,
             tbs,
             coeff_ue);
       /* Create UE_sched list for UEs eligible for new transmission*/
-      UE_sched[curUE].coef=coeff_ue;
-      UE_sched[curUE].UE=UE;
-      curUE++;
+      UE_sched[numUE].coef = coeff_ue;
+      UE_sched[numUE].UE = UE;
+      numUE++;
     }
   }
 
-  qsort(UE_sched, sizeofArray(UE_sched), sizeof(UEsched_t), comparator);
+  qsort(UE_sched, numUE, sizeof(UEsched_t), comparator);
   UEsched_t *iterator = UE_sched;
 
   const int min_rbSize = 5;

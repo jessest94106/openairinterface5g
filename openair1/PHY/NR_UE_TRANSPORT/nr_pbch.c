@@ -38,6 +38,7 @@
 #include <openair1/PHY/NR_UE_TRANSPORT/nr_transport_proto_ue.h>
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
 #include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
+#include "PHY/nr_phy_common/inc/nr_phy_common.h"
 #include "instrumentation.h"
 //#define DEBUG_PBCH
 //#define DEBUG_PBCH_ENCODING
@@ -201,31 +202,6 @@ static uint16_t nr_pbch_extract(uint32_t rxdataF_sz,
   return(0);
 }
 
-//__m128i avg128;
-
-//compute average channel_level on each (TX,RX) antenna pair
-int nr_pbch_channel_level(struct complex16 dl_ch_estimates_ext[][PBCH_MAX_RE_PER_SYMBOL],
-                          const NR_DL_FRAME_PARMS *frame_parms,
-                          int nb_re)
-{
-  int32_t avg2 = 0;
-
-  for (int aarx=0; aarx<frame_parms->nb_antennas_rx; aarx++) {
-
-    simde__m128i *dl_ch128 = (simde__m128i *)dl_ch_estimates_ext[aarx];
-
-    //compute average level
-    int32_t avg1 = simde_mm_average(dl_ch128, nb_re, 0, nb_re);
-
-    if (avg1>avg2)
-      avg2 = avg1;
-
-    //LOG_I(PHY,"Channel level : %d, %d\n",avg1, avg2);
-  }
-
-  return(avg2);
-}
-
 void nr_pbch_channel_compensation(struct complex16 rxdataF_ext[][PBCH_MAX_RE_PER_SYMBOL],
                                   struct complex16 dl_ch_estimates_ext[][PBCH_MAX_RE_PER_SYMBOL],
                                   int nb_re,
@@ -346,7 +322,6 @@ int nr_rx_pbch(PHY_VARS_NR_UE *ue,
                const struct complex16 rxdataF[][rxdataFSize])
 {
   TracyCZone(ctx, true);
-  int max_h=0;
   int symbol;
   uint8_t Lmax=frame_parms->Lmax;
   int M = NR_POLAR_PBCH_E;
@@ -390,11 +365,14 @@ int nr_rx_pbch(PHY_VARS_NR_UE *ue,
     LOG_I(PHY,"[PHY] PBCH starting channel_level\n");
 #endif
 
+    int max_h = 0;
     if (symbol == 1) {
-      max_h = nr_pbch_channel_level(dl_ch_estimates_ext,
-                                    frame_parms,
-                                    nb_re);
-      log2_maxh = 3+(log2_approx(max_h)/2);
+      int avg[frame_parms->nb_antennas_rx];
+      nr_channel_level(0, PBCH_MAX_RE_PER_SYMBOL, dl_ch_estimates_ext, frame_parms->nb_antennas_rx, 1, avg, nb_re);
+      max_h = avg[0];
+      for (int i = 1; i < frame_parms->nb_antennas_rx; i++)
+        max_h = cmax(avg[i], max_h);
+      log2_maxh = 3 + (log2_approx(max_h) / 2);
     }
 
 #ifdef DEBUG_PBCH
