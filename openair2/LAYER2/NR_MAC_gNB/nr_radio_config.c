@@ -3683,6 +3683,76 @@ static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_
   return ul_max_layers;
 }
 
+void update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
+                                           const nr_mac_config_t *configuration,
+                                           const NR_UE_NR_Capability_t *uecap,
+                                           const NR_ServingCellConfigCommon_t *scc,
+                                           int uid,
+                                           int old_bwp,
+                                           int new_bwp)
+{
+  NR_SpCellConfig_t *spCellConfig = cellGroupConfig->spCellConfig;
+  NR_ServingCellConfig_t *configDedicated = spCellConfig->spCellConfigDedicated;
+  *configDedicated->firstActiveDownlinkBWP_Id = new_bwp;
+  NR_UplinkConfig_t *uplinkConfig = configDedicated->uplinkConfig;
+  *uplinkConfig->firstActiveUplinkBWP_Id = new_bwp;
+  long ul_maxMIMO_Layers = set_ul_max_layers(configuration, uecap);
+
+  // release old BWP
+  struct NR_ServingCellConfig__downlinkBWP_ToAddModList *dl_BWP_list = configDedicated->downlinkBWP_ToAddModList;
+  struct NR_UplinkConfig__uplinkBWP_ToAddModList *ul_BWP_list = uplinkConfig->uplinkBWP_ToAddModList;
+  if (old_bwp > 0) {   // we need to remove old BWP only if it is not the initial
+    AssertFatal(dl_BWP_list, "Source BWP %d should be present in the list\n", old_bwp);
+    AssertFatal(ul_BWP_list, "Source BWP %d should be present in the list\n", old_bwp);
+    NR_BWP_Id_t id = dl_BWP_list->list.array[0]->bwp_Id;
+    if (!configDedicated->downlinkBWP_ToReleaseList)
+      configDedicated->downlinkBWP_ToReleaseList = calloc_or_fail(1, sizeof(*configDedicated->downlinkBWP_ToReleaseList));
+    asn1cSequenceAdd(configDedicated->downlinkBWP_ToReleaseList->list, NR_BWP_Id_t, rel_id);
+    *rel_id = id;
+    AssertFatal(configDedicated->downlinkBWP_ToReleaseList->list.count == 1,
+                "logic error: there shouldn't be more than 1 BWP to release, but downlinkBWP_ToReleaseList has %d\n",
+                configDedicated->downlinkBWP_ToReleaseList->list.count);
+
+    id = ul_BWP_list->list.array[0]->bwp_Id;
+    if (!uplinkConfig->uplinkBWP_ToReleaseList)
+      uplinkConfig->uplinkBWP_ToReleaseList = calloc_or_fail(1, sizeof(*uplinkConfig->uplinkBWP_ToReleaseList));
+    asn1cSequenceAdd(uplinkConfig->uplinkBWP_ToReleaseList->list, NR_BWP_Id_t, ul_rel_id);
+    *ul_rel_id = id;
+    AssertFatal(uplinkConfig->uplinkBWP_ToReleaseList->list.count == 1,
+                "logic error: there shouldn't be more than 1 BWP to release, but uplinkBWP_ToReleaseList has %d\n",
+                uplinkConfig->uplinkBWP_ToReleaseList->list.count);
+  }
+
+  const int pdsch_AntennaPorts =
+    configuration->pdsch_AntennaPorts.N1 * configuration->pdsch_AntennaPorts.N2 * configuration->pdsch_AntennaPorts.XP;
+  // add new BWP
+  if (new_bwp == 0) {
+    uint64_t bitmap = get_ssb_bitmap(scc);
+    if (!configDedicated->initialDownlinkBWP)
+      configDedicated->initialDownlinkBWP = calloc_or_fail(1, sizeof(*configDedicated->initialDownlinkBWP));
+    if (!uplinkConfig->initialUplinkBWP)
+      uplinkConfig->initialUplinkBWP = calloc_or_fail(1, sizeof(*uplinkConfig->initialUplinkBWP));
+    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, ul_maxMIMO_Layers, uid);
+    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, configuration);
+  } else {
+    if (!configDedicated->downlinkBWP_ToAddModList)
+      configDedicated->downlinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
+    NR_BWP_Downlink_t *dl_bwp = config_downlinkBWP(scc,
+                                                   uecap,
+                                                   pdsch_AntennaPorts,
+                                                   configuration->force_256qam_off,
+                                                   new_bwp - 1,
+                                                   true,
+                                                   configuration);
+    asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, dl_bwp);
+
+    if (!uplinkConfig->uplinkBWP_ToAddModList)
+      uplinkConfig->uplinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*uplinkConfig->uplinkBWP_ToAddModList));
+    NR_BWP_Uplink_t *ul_bwp = config_uplinkBWP(new_bwp - 1, true, uid, ul_maxMIMO_Layers, configuration, scc, uecap);
+    asn1cSeqAdd(&uplinkConfig->uplinkBWP_ToAddModList->list, ul_bwp);
+  }
+}
+
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const int uid,
                             const NR_UE_NR_Capability_t *uecap,

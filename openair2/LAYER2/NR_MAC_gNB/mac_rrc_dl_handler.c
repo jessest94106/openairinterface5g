@@ -785,8 +785,8 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
       }
     }
     // we re-configure the BWP to apply the CellGroup and to use UE specific Search Space with DCIX1
-    nr_mac_clean_cellgroup(UE->CellGroup);
     configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_ue_Specific, -1, -1);
+    nr_mac_clean_cellgroup(UE->CellGroup);
   }
 
   if (ue_cap != NULL) {
