@@ -3205,25 +3205,14 @@ static void fill_harq_IEs(NR_ServingCellConfig_t *scc, int num_dlharq, int num_u
   }
 }
 
-static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
-                                                   const NR_ServingCellConfigCommon_t *scc,
-                                                   const nr_mac_config_t *configuration)
+static NR_BWP_UplinkDedicated_t *configure_initial_ul_bwp(const NR_ServingCellConfigCommon_t *scc,
+                                                          const nr_mac_config_t *configuration,
+                                                          int maxMIMO_Layers,
+                                                          int id)
 {
-  const int pdsch_AntennaPorts =
-      configuration->pdsch_AntennaPorts.N1 * configuration->pdsch_AntennaPorts.N2 * configuration->pdsch_AntennaPorts.XP;
-  int curr_bwp = NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
-  NR_SpCellConfig_t *SpCellConfig = calloc(1, sizeof(*SpCellConfig));
-  SpCellConfig->servCellIndex = NULL;
-  SpCellConfig->reconfigurationWithSync = NULL;
-  SpCellConfig->rlmInSyncOutOfSyncThreshold = NULL;
-  SpCellConfig->rlf_TimersAndConstants = NULL;
-
-  NR_ServingCellConfig_t *configDedicated = calloc(1, sizeof(*configDedicated));
-  configDedicated->uplinkConfig = calloc(1, sizeof(*configDedicated->uplinkConfig));
-  NR_UplinkConfig_t *uplinkConfig = configDedicated->uplinkConfig;
-
   NR_BWP_UplinkDedicated_t *initialUplinkBWP = calloc(1, sizeof(*initialUplinkBWP));
-  uplinkConfig->initialUplinkBWP = initialUplinkBWP;
+  NR_BWP_t *genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
+  int curr_bwp = NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
   initialUplinkBWP->pucch_Config = calloc(1, sizeof(*initialUplinkBWP->pucch_Config));
   initialUplinkBWP->pucch_Config->present = NR_SetupRelease_PUCCH_Config_PR_setup;
   NR_PUCCH_Config_t *pucch_Config = calloc(1, sizeof(*pucch_Config));
@@ -3233,43 +3222,35 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   pucch_Config->resourceToAddModList = calloc(1, sizeof(*pucch_Config->resourceToAddModList));
   pucch_Config->resourceToReleaseList = NULL;
   int num_pucch2 = get_nb_pucch2_per_slot(scc, curr_bwp);
-  config_pucch_resset0(pucch_Config, uid, curr_bwp, num_pucch2, NULL);
-  config_pucch_resset1(pucch_Config, uid, num_pucch2, NULL);
+  config_pucch_resset0(pucch_Config, id, curr_bwp, num_pucch2, NULL);
+  config_pucch_resset1(pucch_Config, id, num_pucch2, NULL);
   set_pucch_power_config(pucch_Config, configuration->do_CSIRS);
 
   initialUplinkBWP->pusch_Config = config_pusch(configuration->use_deltaMCS, scc, NULL, configuration->ptrs);
 
-  long maxMIMO_Layers = uplinkConfig && uplinkConfig->pusch_ServingCellConfig
-                                && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1
-                                && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
-                            ? *uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
-                            : 1;
-
   // We are using do_srs = 0 here because the periodic SRS will only be enabled in update_cellGroupConfig() if do_srs == 1
-  initialUplinkBWP->srs_Config = get_config_srs(scc, NULL, curr_bwp, uid, 0, maxMIMO_Layers, configuration->minRXTXTIME, 0);
+  initialUplinkBWP->srs_Config = get_config_srs(scc, NULL, curr_bwp, id, 0, maxMIMO_Layers, configuration->minRXTXTIME, 0);
 
   scheduling_request_config(scc, pucch_Config, scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing);
+  set_dl_DataToUL_ACK(pucch_Config, configuration->minRXTXTIME, genericParameters->subcarrierSpacing);
+  return initialUplinkBWP;
+}
 
-  set_dl_DataToUL_ACK(pucch_Config,
-                      configuration->minRXTXTIME,
-                      scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing);
-
-  configDedicated->initialDownlinkBWP = calloc(1, sizeof(*configDedicated->initialDownlinkBWP));
-  NR_BWP_DownlinkDedicated_t *bwp_Dedicated = configDedicated->initialDownlinkBWP;
+static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCellConfigCommon_t *scc,
+                                                            const int pdsch_AntennaPorts,
+                                                            uint64_t bitmap,
+                                                            const nr_mac_config_t *configuration)
+{
+  NR_BWP_DownlinkDedicated_t *bwp_Dedicated = calloc(1, sizeof(*bwp_Dedicated));
   bwp_Dedicated->pdcch_Config = calloc(1, sizeof(*bwp_Dedicated->pdcch_Config));
   bwp_Dedicated->pdcch_Config->present = NR_SetupRelease_PDCCH_Config_PR_setup;
-  bwp_Dedicated->pdcch_Config->choice.setup = calloc(1, sizeof(*bwp_Dedicated->pdcch_Config->choice.setup));
-
-  bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList =
-      calloc(1, sizeof(*bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList));
-
-  bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList =
-      calloc(1, sizeof(*bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList));
-
-  uint64_t bitmap = get_ssb_bitmap(scc);
+  NR_PDCCH_Config_t *pdcch_Config = calloc(1, sizeof(*pdcch_Config));
+  pdcch_Config->searchSpacesToAddModList = calloc(1, sizeof(*pdcch_Config->searchSpacesToAddModList));
+  pdcch_Config->controlResourceSetToAddModList = calloc(1, sizeof(*pdcch_Config->controlResourceSetToAddModList));
+  NR_BWP_t *genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
+  int curr_bwp = NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
   NR_ControlResourceSet_t *coreset = get_coreset_config(0, curr_bwp, bitmap);
-
-  asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset);
+  asn1cSeqAdd(&pdcch_Config->controlResourceSetToAddModList->list, coreset);
 
   int css_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   css_num_agg_level_candidates[PDCCH_AGG_LEVEL1] = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
@@ -3282,15 +3263,37 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   searchspaceid = 5;
   int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   int num_cces = get_coreset_num_cces(coreset->frequencyDomainResources.buf, coreset->duration);
-  verify_agg_levels(num_cces,
-                    configuration->num_agg_level_candidates,
-                    coreset->controlResourceSetId,
-                    rrc_num_agg_level_candidates);
+  verify_agg_levels(num_cces, configuration->num_agg_level_candidates, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
   NR_SearchSpace_t *ss2 = rrc_searchspace_config(false, searchspaceid, coreset->controlResourceSetId, rrc_num_agg_level_candidates);
-  asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss);
-  asn1cSeqAdd(&bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss2);
+  asn1cSeqAdd(&pdcch_Config->searchSpacesToAddModList->list, ss);
+  asn1cSeqAdd(&pdcch_Config->searchSpacesToAddModList->list, ss2);
+  bwp_Dedicated->pdcch_Config->choice.setup = pdcch_Config;
 
   bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts, configuration->ptrs);
+  return bwp_Dedicated;
+}
+
+static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
+                                                   const NR_ServingCellConfigCommon_t *scc,
+                                                   const nr_mac_config_t *configuration)
+{
+  const int pdsch_AntennaPorts =
+      configuration->pdsch_AntennaPorts.N1 * configuration->pdsch_AntennaPorts.N2 * configuration->pdsch_AntennaPorts.XP;
+  NR_SpCellConfig_t *SpCellConfig = calloc(1, sizeof(*SpCellConfig));
+  SpCellConfig->servCellIndex = NULL;
+  SpCellConfig->reconfigurationWithSync = NULL;
+  SpCellConfig->rlmInSyncOutOfSyncThreshold = NULL;
+  SpCellConfig->rlf_TimersAndConstants = NULL;
+
+  NR_ServingCellConfig_t *configDedicated = calloc(1, sizeof(*configDedicated));
+  configDedicated->uplinkConfig = calloc(1, sizeof(*configDedicated->uplinkConfig));
+  NR_UplinkConfig_t *uplinkConfig = configDedicated->uplinkConfig;
+  long maxMIMO_Layers = uplinkConfig
+                        && uplinkConfig->pusch_ServingCellConfig
+                        && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1
+                        && uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
+                        ? *uplinkConfig->pusch_ServingCellConfig->choice.setup->ext1->maxMIMO_Layers
+                        : 1;
 
   configDedicated->tag_Id = 0;
   configDedicated->pdsch_ServingCellConfig = calloc(1, sizeof(*configDedicated->pdsch_ServingCellConfig));
@@ -3316,6 +3319,10 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
     pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[2] = 0xFF;
     pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[3] = 0xFF;
   }
+
+  uint64_t bitmap = get_ssb_bitmap(scc);
+  uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, maxMIMO_Layers, uid);
+  configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, configuration);
 
   // Downlink BWPs
   int n_dl_bwp = configuration->num_additional_bwps;
