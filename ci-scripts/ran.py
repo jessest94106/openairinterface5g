@@ -420,7 +420,7 @@ class RANManagement():
 				if result is not None:
 					mbmsRequestMsg += 1
 			#FR1 NSA test : add new markers to make sure gNB is used
-			result = re.search('\[gNB [0-9]+\]\[RAPROC\] PUSCH with TC_RNTI 0x[0-9a-fA-F]+ received correctly, adding UE MAC Context RNTI 0x[0-9a-fA-F]+', str(line))
+			result = re.search(r'\[gNB [0-9]+\]\[RAPROC\] PUSCH with TC_RNTI 0x[0-9a-fA-F]+ received correctly, adding UE MAC Context RNTI 0x[0-9a-fA-F]+', str(line))
 			if result is not None:
 				NSA_RAPROC_PUSCH_check = 1
 
@@ -449,11 +449,11 @@ class RANManagement():
 
 
 			#count "problem receiving samples" msg
-			result = re.search('\[PHY\]\s+problem receiving samples', str(line))
+			result = re.search(r'\[PHY\]\s+problem receiving samples', str(line))
 			if result is not None:
 				pb_receiving_samples_cnt += 1
 			#count "Removing UE" msg
-			result = re.search('\[MAC\]\s+Removing UE', str(line))
+			result = re.search(r'\[MAC\]\s+Removing UE', str(line))
 			if result is not None:
 				removing_ue += 1
 			#count "X2AP-PDU"

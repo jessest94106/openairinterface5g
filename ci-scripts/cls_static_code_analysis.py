@@ -89,7 +89,7 @@ class StaticCodeAnalysis():
 		logging.debug('Building on server: ' + node)
 		cmd = cls_cmd.getConnection(node)
 		# on RedHat/CentOS .git extension is mandatory
-		result = re.search('([a-zA-Z0-9\:\-\.\/])+\.git', self.ranRepository)
+		result = re.search(r'([a-zA-Z0-9\:\-\.\/])+\.git', self.ranRepository)
 		if result is not None:
 			full_ran_repo_name = self.ranRepository.replace('git/', 'git')
 		else:
@@ -121,7 +121,7 @@ class StaticCodeAnalysis():
 				xmlStart = False
 				with open(filename, 'r') as logfile:
 					for line in logfile:
-						ret = re.search('cppcheck version="(?P<version>[0-9\.]+)"', str(line))
+						ret = re.search(r'cppcheck version="(?P<version>[0-9\.]+)"', str(line))
 						if ret is not None:
 						   CCR.versions[vId] = ret.group('version')
 						if re.search('RUN cat cmake_targets/log/cppcheck.xml', str(line)) is not None:
