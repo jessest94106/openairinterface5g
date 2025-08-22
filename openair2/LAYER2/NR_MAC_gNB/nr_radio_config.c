@@ -1115,7 +1115,6 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
 
     int N_dl1 = p1->nrofDownlinkSlots;
     int N_ul1 = p1->nrofUplinkSlots;
-    int N_dl2 = p2 ? p2->nrofDownlinkSlots : 0;
     int N_ul2 = p2 ? p2->nrofUplinkSlots : 0;
     int tdd_period_idx = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
     int nb_periods_per_frame = get_nb_periods_per_frame(tdd_period_idx);
@@ -1123,20 +1122,22 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
 
     // make TDA for the mixed slot
     long mixed_sliv = get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1);
-    if (ul_symb > 1 && (k2 <= N_dl1 || (p2 && N_ul2 == 0))) {
+    int mixed_min_ul_symb = 3; // need at least two symbols PUSCH + PUCCH
+    bool has_ul_mixed = ul_symb >= mixed_min_ul_symb;
+    if (has_ul_mixed && (k2 <= N_dl1 || (p2 && N_ul2 == 0))) {
       // UL TDA index 2 for mixed slot (TDD) (no pattern 2 and enough DL slots, or pattern2 only DL)
       tda = set_TimeDomainResourceAllocation(k2, mixed_sliv); // to be reached from suitable DL slot
       asn1cSeqAdd(&tda_list->list, tda);
-    } else if (ul_symb > 1 && !p2 && k2 > N_dl1) { // k2 > N_Dl1
+    } else if (has_ul_mixed && !p2 && k2 > N_dl1) { // k2 > N_Dl1
       // UL TDA for mixed slot without pattern 2 and less DL slots than k2
       tda = set_TimeDomainResourceAllocation(nb_slots_per_period, mixed_sliv); // to be reached from last DL (mixed) slot, if any
       asn1cSeqAdd(&tda_list->list, tda);
-    } else if (ul_symb > 1 && N_ul2 > 0 && k2 > N_dl1) {
+    } else if (has_ul_mixed && N_ul2 > 0 && k2 > N_dl1) {
       // we have pattern 2 with UL, and less p1 DL slots than k2
       tda = set_TimeDomainResourceAllocation(N_dl1 + N_ul2 + 1, mixed_sliv);
       asn1cSeqAdd(&tda_list->list, tda);
     } else {
-      AssertFatal(ul_symb == 0, "unhandled case of mixed slot: N_dl1 %d N_ul1 %d N_dl2 %d N_ul2 %d\n", N_dl1, N_ul1, N_dl2, N_ul2);
+      LOG_I(NR_RRC, "mixed slot has %d UL symbols, cannot create mixed slot TDA\n", ul_symb);
     }
 
     // make TDA for UL slots that are not reachable within k2/min_rxtxtime
