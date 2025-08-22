@@ -1115,6 +1115,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
 
     int N_dl1 = p1->nrofDownlinkSlots;
     int N_ul1 = p1->nrofUplinkSlots;
+    int N_dl2 = p2 ? p2->nrofDownlinkSlots : 0;
     int N_ul2 = p2 ? p2->nrofUplinkSlots : 0;
     int tdd_period_idx = get_tdd_period_idx(scc->tdd_UL_DL_ConfigurationCommon);
     int nb_periods_per_frame = get_nb_periods_per_frame(tdd_period_idx);
@@ -1154,6 +1155,22 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
           asn1cSeqAdd(&tda_list->list, tda);
         }
       }
+    }
+
+    // for Msg3, an additional get_delta_for_k2(mu) is added to k2.
+    // check that any UL slot is reachable under this condition
+    // the below is designed to only hit specific (known) cases
+    // examples: DDDSU (no TDA in S),
+    int N_dl = max(N_dl1, N_dl2);
+    int delta = get_delta_for_k2(mu);
+    int k2_msg3 = k2 + delta;
+    if (nb_slots_per_period % k2_msg3 == 0 /* see example above */
+        && k2_msg3 > N_dl /* otherwise, can always have a D that reaches U */
+        && k2_msg3 > N_ul /* otherwise, can always have a D that reaches U */
+        && !has_ul_mixed /* if mixed slot, even for DDDSU would reach */) {
+      /* reach next UL from mixed slot in previous period */
+      tda = set_TimeDomainResourceAllocation(k2_msg3, get_SLIV(0, 13));
+      asn1cSeqAdd(&tda_list->list, tda);
     }
   }
 
