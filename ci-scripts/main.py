@@ -242,7 +242,7 @@ def ExecuteActionWithParam(action, ctx):
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
 		success = cls_oaicitest.IdleSleep(HTML, int(st))
 
-	elif action == 'Deploy_Run_PhySim':
+	elif action == 'Deploy_Run_OC_PhySim':
 		oc_release = test.findtext('oc_release')
 		node = test.findtext('node') or None
 		script = "scripts/oc-deploy-physims.sh"
