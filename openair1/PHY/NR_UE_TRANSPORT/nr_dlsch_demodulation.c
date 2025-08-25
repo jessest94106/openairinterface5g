@@ -193,15 +193,6 @@ static void nr_dlsch_channel_compensation(uint32_t rx_size_symbol,
                                           unsigned char output_shift,
                                           PHY_NR_MEASUREMENTS *measurements);
 
-void nr_dlsch_scale_channel(uint32_t rx_size_symbol,
-                            int32_t dl_ch_estimates_ext[][rx_size_symbol],
-                            NR_DL_FRAME_PARMS *frame_parms,
-                            uint8_t n_tx,
-                            uint8_t n_rx,
-                            uint8_t symbol,
-                            uint8_t pilots,
-                            uint32_t len,
-                            unsigned short nb_rb);
 static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
                                    short nl,
                                    short n_rx,
@@ -507,7 +498,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
     //--------------------- Channel Scaling --------------------
     //----------------------------------------------------------
     start_meas_nr_ue_phy(ue, DLSCH_CHANNEL_SCALE_STATS);
-    nr_dlsch_scale_channel(rx_size_symbol, dl_ch_estimates_ext, frame_parms, nl, n_rx, symbol, pilots, nb_re_pdsch, nb_rb_pdsch);
+    nr_scale_channel(rx_size_symbol, dl_ch_estimates_ext, 0, nb_re_pdsch, nl, n_rx, 0);
     stop_meas_nr_ue_phy(ue, DLSCH_CHANNEL_SCALE_STATS);
     if (meas_enabled) {
       LOG_D(PHY,
@@ -916,56 +907,6 @@ static void nr_dlsch_channel_compensation(uint32_t rx_size_symbol,
           // measurements->rx_correlation[0][aarx][l*n_layers+atx]);
         }
         }
-      }
-    }
-  }
-}
-
-void nr_dlsch_scale_channel(uint32_t rx_size_symbol,
-                            int32_t dl_ch_estimates_ext[][rx_size_symbol],
-                            NR_DL_FRAME_PARMS *frame_parms,
-                            uint8_t n_tx,
-                            uint8_t n_rx,
-                            uint8_t symbol,
-                            uint8_t pilots,
-                            uint32_t len,
-                            unsigned short nb_rb)
-
-{
-
-
-  short rb, ch_amp;
-  unsigned char aatx,aarx;
-  simde__m128i *dl_ch128, ch_amp128;
-
-  uint32_t nb_rb_0 = len/12 + ((len%12)?1:0);
-
-  // Determine scaling amplitude based the symbol
-
-  ch_amp = 1024*8; //((pilots) ? (dlsch_ue[0]->sqrt_rho_b) : (dlsch_ue[0]->sqrt_rho_a));
-
-  LOG_D(PHY,"Scaling PDSCH Chest in OFDM symbol %d by %d, pilots %d nb_rb %d NCP %d symbol %d\n",symbol,ch_amp,pilots,nb_rb,frame_parms->Ncp,symbol);
-  // printf("Scaling PDSCH Chest in OFDM symbol %d by %d\n",symbol_mod,ch_amp);
-
-  ch_amp128 = simde_mm_set1_epi16(ch_amp); // Q3.13
-
-  for (aatx=0; aatx<n_tx; aatx++) {
-    for (aarx=0; aarx<n_rx; aarx++) {
-
-      dl_ch128=(simde__m128i *)dl_ch_estimates_ext[(aatx*n_rx)+aarx];
-
-      for (rb=0;rb<nb_rb_0;rb++) {
-
-        dl_ch128[0] = simde_mm_mulhi_epi16(dl_ch128[0], ch_amp128);
-        dl_ch128[0] = simde_mm_slli_epi16(dl_ch128[0], 3);
-
-        dl_ch128[1] = simde_mm_mulhi_epi16(dl_ch128[1], ch_amp128);
-        dl_ch128[1] = simde_mm_slli_epi16(dl_ch128[1], 3);
-
-        dl_ch128[2] = simde_mm_mulhi_epi16(dl_ch128[2], ch_amp128);
-        dl_ch128[2] = simde_mm_slli_epi16(dl_ch128[2], 3);
-        dl_ch128+=3;
-
       }
     }
   }

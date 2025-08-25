@@ -151,7 +151,7 @@ populates UL_INFO.uci_ind, actual uci data is in gNB->pucch
 {: .func4}
     * nr_ulsch_extract_rbs_single()
 {: .func4}
-    * nr_ulsch_scale_channel()
+    * nr_scale_channel()
 {: .func4}
     * nr_ulsch_channel_level()
 {: .func4}

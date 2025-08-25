@@ -425,6 +425,33 @@ void nr_channel_level(const int symbol,
   }
 }
 
+void nr_scale_channel(int size, int ch_estimates_ext[][size], int symb, uint32_t len, int nrOfLayers, int nb_rx, int shift_ch_ext)
+{
+  // Determine scaling amplitude based the symbol
+  int b = 3;
+  short ch_amp = 1024 * 8;
+  if (shift_ch_ext > 3) {
+    b = 0;
+    ch_amp >>= (shift_ch_ext - 3);
+    if (ch_amp == 0) {
+      ch_amp = 1;
+    }
+  } else {
+    b -= shift_ch_ext;
+  }
+  simde__m128i ch_amp128 = simde_mm_set1_epi16(ch_amp); // Q3.13
+  LOG_D(PHY, "Scaling channel est in OFDM symbol %d by %d\n", symb, ch_amp);
+
+  for (int l = 0; l < nrOfLayers; l++) {
+    for (int aarx = 0; aarx < nb_rx; aarx++) {
+      simde__m128i *ul_ch128 = (simde__m128i *)&ch_estimates_ext[l * nb_rx + aarx][symb * len];
+      for (int i = 0; i < len >> 2; i++) {
+        ul_ch128[i] = simde_mm_mulhi_epi16(ul_ch128[i], ch_amp128);
+        ul_ch128[i] = simde_mm_slli_epi16(ul_ch128[i], b);
+      }
+    }
+  }
+}
 
 void nr_fo_compensation(double fo_Hz, int samples_per_ms, int sample_offset, const c16_t *rxdata_in, c16_t *rxdata_out, int size)
 {
