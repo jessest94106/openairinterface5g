@@ -80,7 +80,7 @@ unsigned char offset_mumimo_llr_drange[29][3]={{8,8,8},{7,7,7},{7,7,7},{7,7,7},{
 /* compute the MMSE up to 4x4 matrices */
 static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                           unsigned char n_rx,
-                          unsigned char n_tx, // number of layer
+                          unsigned char nl, // number of layer
                           int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
                           c16_t dl_ch_mag[][n_rx][rx_size_symbol],
                           c16_t dl_ch_magb[][n_rx][rx_size_symbol],
@@ -203,7 +203,7 @@ void nr_dlsch_scale_channel(uint32_t rx_size_symbol,
                             uint32_t len,
                             unsigned short nb_rb);
 static void nr_dlsch_detection_mrc(uint32_t rx_size_symbol,
-                                   short n_tx,
+                                   short nl,
                                    short n_rx,
                                    int32_t rxdataF_comp[][n_rx][rx_size_symbol * NR_SYMBOLS_PER_SLOT],
                                    int ***rho,
@@ -1456,7 +1456,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                           int length,
                           uint32_t noise_var)
 {
-  uint32_t nb_rb_0 = length / 12 + ((length % 12) ? 1 : 0);
+  uint32_t nb_rb_0 = (length + 11) / 12;
   c16_t determ_fin[12 * nb_rb_0] __attribute__((aligned(32)));
 
   ///Allocate H^*H matrix elements and sub elements
@@ -1513,7 +1513,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                     determ_fin, // determin
                     nb_rb_0,
                     fp_flag, // fixed point flag
-                    shift - (fp_flag == 1 ? 2 : 0)); // the out put is Q15
+                    shift - (fp_flag == 1 ? 1 : 0)); // the out put is Q15
 
   // multiply Matrix inversion pf H_h_H by the rx signal vector
   c16_t outtemp[12 * nb_rb_0] __attribute__((aligned(32)));
@@ -1531,7 +1531,7 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                            (c16_t *)(rxdataF_comp[ctx][0] + symbol * rx_size_symbol),
                            outtemp,
                            sizeofArray(outtemp),
-                           shift - (fp_flag == 1 ? 2 : 0));
+                           shift - (fp_flag == 1 ? 1 : 0));
       nr_a_sum_b(rxdataF_zforcing[rtx], outtemp, nb_rb_0); // a = a + b
     }
 #ifdef DEBUG_DLSCH_DEMOD
@@ -1582,13 +1582,9 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
       dl_ch_mag128b_0[0] = mmtmpD2;
       dl_ch_mag128r_0[0] = mmtmpD2;
 
-      dl_ch_mag128_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128_0[0],QAM_amp128);
-      dl_ch_mag128_0[0] = simde_mm_slli_epi16(dl_ch_mag128_0[0],1);
-
-      dl_ch_mag128b_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128b_0[0],QAM_amp128b);
-      dl_ch_mag128b_0[0] = simde_mm_slli_epi16(dl_ch_mag128b_0[0],1);
-      dl_ch_mag128r_0[0] = simde_mm_mulhi_epi16(dl_ch_mag128r_0[0],QAM_amp128r);
-      dl_ch_mag128r_0[0] = simde_mm_slli_epi16(dl_ch_mag128r_0[0],1);
+      dl_ch_mag128_0[0] = simde_mm_mulhrs_epi16(dl_ch_mag128_0[0], QAM_amp128);
+      dl_ch_mag128b_0[0] = simde_mm_mulhrs_epi16(dl_ch_mag128b_0[0],QAM_amp128b);
+      dl_ch_mag128r_0[0] = simde_mm_mulhrs_epi16(dl_ch_mag128r_0[0],QAM_amp128r);
 
       determ_fin_128 += 1;
       dl_ch_mag128_0 += 1;
