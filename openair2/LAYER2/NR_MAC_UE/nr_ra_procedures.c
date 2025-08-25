@@ -879,23 +879,23 @@ bool init_RA(NR_UE_MAC_INST_t *mac, int frame)
   // set POWER_OFFSET_2STEP_RA to 0 dB
   prach_resources->power_offset_2step = 0;
 
-  const NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
   // perform the BWP operation as specified in clause 5.15
   // if PRACH occasions are not configured for the active UL BWP
-  if (!current_UL_BWP->rach_ConfigCommon) {
+  if (!mac->current_UL_BWP->rach_ConfigCommon) {
     // switch the active UL BWP to BWP indicated by initialUplinkBWP
-    current_UL_BWP = get_ul_bwp_structure(mac, 0, false);
+    mac->current_UL_BWP = get_ul_bwp_structure(mac, 0, false);
     // if the Serving Cell is an SpCell
     // switch the active DL BWP to BWP indicated by initialDownlinkBWP
     mac->current_DL_BWP = get_dl_bwp_structure(mac, 0, false);
   } else {
     // if the active DL BWP does not have the same bwp-Id as the active UL BWP
-    if (current_UL_BWP->bwp_id != mac->current_DL_BWP->bwp_id) {
+    if (mac->current_UL_BWP->bwp_id != mac->current_DL_BWP->bwp_id) {
       // switch the active DL BWP to the DL BWP with the same bwp-Id as the active UL BWP
       mac->current_DL_BWP = get_dl_bwp_structure(mac, 0, false);
     }
   }
 
+  const NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
   NR_RACH_ConfigCommon_t *nr_rach_ConfigCommon = current_UL_BWP->rach_ConfigCommon;
   AssertFatal(nr_rach_ConfigCommon, "rach-ConfigCommon should be configured here\n");
   // stop the bwp-InactivityTimer associated with the active DL BWP of this Serving Cell, if running
