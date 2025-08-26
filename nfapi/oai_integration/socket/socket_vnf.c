@@ -20,10 +20,25 @@
  */
 #include "socket_vnf.h"
 
+#include "common/utils/LOG/log.h"
 #include "nfapi.h"
 #include "nfapi_vnf.h"
 #include <common/platform_constants.h>
 #include "nfapi/oai_integration/vendor_ext.h" //TODO: Remove this include when removing the Aerial transport stuff
+
+
+void socket_stop_nfapi_p5_p7()
+{
+  get_p7_vnf()->terminate = 1;
+  get_config()->pnf_disconnect_indication = NULL;
+}
+
+void socket_nfapi_send_stop_request(vnf_t *vnf)
+{
+  nfapi_nr_stop_request_scf_t req = {.header.message_id = NFAPI_NR_PHY_MSG_TYPE_STOP_REQUEST, .header.phy_id = 0};
+  nfapi_nr_vnf_stop_req(&vnf->_public, 0, &req);
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "Sent NFAPI STOP.request\n");
+}
 
 static bool send_p5_msg(vnf_t *vnf, nfapi_vnf_pnf_info_t *pnf, const void *msg, int len, uint8_t stream)
 {

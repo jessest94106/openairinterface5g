@@ -37,5 +37,5 @@ int oai_nfapi_nr_crc_indication(nfapi_nr_crc_indication_t *ind);
 int oai_nfapi_nr_srs_indication(nfapi_nr_srs_indication_t *ind);
 int oai_nfapi_nr_uci_indication(nfapi_nr_uci_indication_t *ind);
 int oai_nfapi_nr_rach_indication(nfapi_nr_rach_indication_t *ind);
-
+void stop_nr_nfapi_pnf();
 #endif /* NFAPI_PNF_H_ */

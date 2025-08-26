@@ -63,4 +63,6 @@ int oai_fapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req);
 int oai_fapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req);
 int oai_fapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req);
 int oai_fapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req);
+void nvIPC_Stop();
+void nvIPC_send_stop_request();
 #endif // OPENAIRINTERFACE_FAPI_NVIPC_H

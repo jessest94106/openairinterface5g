@@ -716,6 +716,8 @@ int main( int argc, char **argv ) {
   itti_wait_tasks_end(NULL);
   printf("Returned from ITTI signal handler\n");
 
+  nfapi_stop_l1();
+
   if (RC.nb_nr_L1_inst > 0 || RC.nb_RU > 0)
     stop_L1(0);
 

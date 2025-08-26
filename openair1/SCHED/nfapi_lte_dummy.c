@@ -130,3 +130,27 @@ void wls_pnf_set_p7_config(void *p7_config)
 {
 
 }
+
+void wls_fapi_nr_pnf_stop()
+{
+}
+
+void wls_pnf_close(pthread_t p5_thread)
+{
+}
+
+void wls_vnf_send_stop_request()
+{
+}
+
+void wls_vnf_stop()
+{
+}
+
+void socket_nfapi_nr_pnf_stop()
+{
+}
+
+void socket_nfapi_send_stop_request(vnf_t *vnf)
+{
+}

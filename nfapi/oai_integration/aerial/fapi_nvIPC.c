@@ -63,6 +63,18 @@ char cpu_buf_recv[RECV_BUF_LEN];
 
 uint16_t sfn = 0, slot = 0;
 nv_ipc_t *ipc;
+void nvIPC_Stop()
+{
+  LOG_I(NR_MAC, "Received STOP.indication\n");
+  ((vnf_t *)get_config())->terminate = true;
+}
+
+void nvIPC_send_stop_request()
+{
+  nfapi_nr_stop_request_scf_t req = {.header.message_id = NFAPI_NR_PHY_MSG_TYPE_STOP_REQUEST, .header.phy_id = 0};
+  LOG_I(NR_MAC, "Sending NFAPI STOP.request\n");
+  nfapi_nr_vnf_stop_req(get_config(), get_config()->pnf_list->p5_idx, &req);
+}
 
 
 static uint16_t old_sfn = 0;
@@ -476,7 +488,6 @@ static int aerial_recv_msg(nv_ipc_t *ipc, nv_ipc_msg_t *recv_msg)
   return 0;
 }
 
-bool recv_task_running = false;
 void *epoll_recv_task(void *arg)
 {
   struct epoll_event ev, events[MAX_EVENTS];
@@ -494,11 +505,12 @@ void *epoll_recv_task(void *arg)
   if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, ev.data.fd, &ev) == -1) {
     LOG_E(NFAPI_VNF, "%s epoll_ctl failed\n", __func__);
   }
-
-  while (1) {
-    if (!recv_task_running) {
-      recv_task_running = true;
-    }
+  // From here on out the thread is ready to receive data, simulate the reception
+  // of a PARAM.response to get the VNF to send a CONFIG.request
+  nfapi_nr_param_response_scf_t resp_msg = {.header.message_id = NFAPI_NR_PHY_MSG_TYPE_PARAM_RESPONSE};
+  nfapi_vnf_config_t * vnf_config = get_config();
+  vnf_config->nr_param_resp(vnf_config, 1, &resp_msg);
+  while (((vnf_t *)vnf_config)->terminate == false) {
     LOG_D(NFAPI_VNF, "%s: epoll_wait fd_rx=%d ...\n", __func__, ipc_rx_event_fd);
 
     int nfds;
@@ -521,6 +533,7 @@ void *epoll_recv_task(void *arg)
     }
   }
   close(epoll_fd);
+  ipc->ipc_destroy(ipc);
   return NULL;
 }
 
@@ -565,9 +578,6 @@ int nvIPC_Init(nvipc_params_t nvipc_params_s)
   LOG_I(NFAPI_VNF, "%s: create IPC interface successful\n", __func__);
   sleep(1);
   create_recv_thread(nvipc_params_s.nvipc_poll_core);
-  while(!recv_task_running){usleep(100000);}
-  nfapi_nr_param_response_scf_t resp_msg;
-  vnf_config->nr_param_resp(vnf_config, 1, &resp_msg);
   return 0;
 }
 

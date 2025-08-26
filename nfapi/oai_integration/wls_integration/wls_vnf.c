@@ -21,7 +21,8 @@
 #include "wls_vnf.h"
 
 #include "vnf_p7.h"
-
+#include "common/utils/LOG/log.h"
+#include "wls_lib.h"
 #include <rte_eal.h>
 #include <rte_string_fns.h>
 #include <rte_common.h>
@@ -31,8 +32,9 @@
 #include <rte_errno.h>
 #include <unistd.h>
 #include <common/platform_constants.h>
+#include <sys/wait.h>
+#include "nfapi_vnf.h"
 
-static nfapi_vnf_config_t *config;
 static WLS_MAC_CTX wls_mac_iface;
 vnf_t *_vnf = NULL;
 
@@ -306,6 +308,33 @@ static int vnf_wls_init()
   return 1;
 }
 
+void wls_vnf_stop()
+{
+  vnf_p7_t *p7_vnf = get_p7_vnf();
+  _vnf->terminate = 1;
+  p7_vnf->terminate = 1;
+  rte_eal_cleanup();
+}
+
+void wls_vnf_send_stop_request()
+{
+  PWLS_MAC_CTX pWls = wls_mac_get_ctx();
+  nfapi_nr_stop_request_scf_t req = {.header.message_id = NFAPI_NR_PHY_MSG_TYPE_STOP_REQUEST, .header.phy_id = 0};
+  vnf_p7_t *p7_vnf = get_p7_vnf();
+  nfapi_vnf_config_t * config = get_config();
+  if (p7_vnf == NULL || pWls->hWls == NULL) {
+    nfapi_nr_stop_indication_scf_t msg;
+    msg.header.message_id = NFAPI_NR_PHY_MSG_TYPE_STOP_INDICATION;
+    msg.header.phy_id = 0;
+    config->nr_stop_ind(config, 0, &msg);
+    return;
+  }
+
+  if (pWls->hWls != NULL) {
+    nfapi_nr_vnf_stop_req(config, 0, &req);
+  }
+}
+
 void *wls_fapi_vnf_nr_start_thread(void *ptr)
 {
   NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] IN WLS PNF NFAPI start thread %s\n", __FUNCTION__);
@@ -366,7 +395,7 @@ int wls_fapi_nr_vnf_start(nfapi_vnf_config_t *cfg)
   PWLS_MAC_CTX pWls = wls_mac_get_ctx();
   while (_vnf->terminate == 0) {
     int numMsgToGet = WLS_Wait(pWls->hWls);
-    if (numMsgToGet == 0) {
+    if (numMsgToGet == 0 || _vnf->terminate) {
       continue;
     }
 
@@ -383,6 +412,9 @@ int wls_fapi_nr_vnf_start(nfapi_vnf_config_t *cfg)
         uint32_t len = msgt[7] | (msgt[6] << 8) | (msgt[5] << 16) | (msgt[4] << 24);
         procPhyMessages(len, (void *)(msg + 1), msg->msg_type);
       }
+    }
+    if (_vnf->terminate) {
+      break;
     }
     for (int i = 0; i < pa_idx; i++) {
       if (WLS_EnqueueBlock(pWls->hWls, PAs[i]) == -1) {
