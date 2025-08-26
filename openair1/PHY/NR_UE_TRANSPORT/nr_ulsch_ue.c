@@ -396,7 +396,7 @@ static void dmrs_amp_mult(const uint32_t dmrs_port,
                           const pusch_dmrs_type_t dmrs_type,
                           const unsigned int num_cdm_groups_no_data)
 {
-  float beta_dmrs_pusch = get_beta_dmrs_pusch(num_cdm_groups_no_data, dmrs_type);
+  float beta_dmrs_pusch = get_beta_dmrs(num_cdm_groups_no_data, dmrs_type == pusch_dmrs_type2);
   /* short array that hold amplitude for k_prime = 0 and k_prime = 1 */
   int32_t alpha_dmrs[2] __attribute((aligned(16)));
   for (int_fast8_t i = 0; i < sizeofArray(alpha_dmrs); i++) {
