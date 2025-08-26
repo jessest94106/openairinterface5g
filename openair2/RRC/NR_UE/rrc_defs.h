@@ -199,7 +199,11 @@ typedef struct l3_measurements_s {
   long trigger_to_measid;
   long trigger_quantity;
   long rs_type;
+  int reports_sent;
+  int max_reports;
+  long report_interval_ms;
   NR_timer_t TA2;
+  NR_timer_t periodic_report_timer;
 } l3_measurements_t;
 
 typedef struct rrcPerNB {

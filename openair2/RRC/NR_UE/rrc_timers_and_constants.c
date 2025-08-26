@@ -131,6 +131,23 @@ void handle_meas_timers(NR_UE_RRC_INST_t *rrc)
     bool ta2_expired = nr_timer_tick(&l3_measurements->TA2);
     if (ta2_expired && l3_measurements->trigger_quantity > 0) {
       rrc_ue_generate_measurementReport(nb, rrc->ue_id);
+      l3_measurements->reports_sent = 1;
+
+      if (l3_measurements->reports_sent < l3_measurements->max_reports) {
+        nr_timer_setup(&l3_measurements->periodic_report_timer, l3_measurements->report_interval_ms, 10);
+        nr_timer_start(&l3_measurements->periodic_report_timer);
+      }
+    }
+
+    bool periodic_expired = nr_timer_tick(&l3_measurements->periodic_report_timer);
+    if (periodic_expired && l3_measurements->reports_sent < l3_measurements->max_reports) {
+      rrc_ue_generate_measurementReport(nb, rrc->ue_id);
+      l3_measurements->reports_sent++;
+
+      if (l3_measurements->reports_sent < l3_measurements->max_reports) {
+        nr_timer_setup(&l3_measurements->periodic_report_timer, l3_measurements->report_interval_ms, 10);
+        nr_timer_start(&l3_measurements->periodic_report_timer);
+      }
     }
   }
 }

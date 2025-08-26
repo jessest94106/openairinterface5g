@@ -1666,6 +1666,14 @@ static void handle_meas_reporting_remove(rrcPerNB_t *rrc, int id, NR_UE_Timers_C
   // TODO stop the periodical reporting timer or timer T321, whichever is running,
   // and reset the associated information (e.g. timeToTrigger) for this measId
   nr_timer_stop(&timers->T321);
+
+  l3_measurements_t *l3_measurements = &rrc->l3_measurements;
+  nr_timer_stop(&l3_measurements->TA2);
+  nr_timer_stop(&l3_measurements->periodic_report_timer);
+
+  l3_measurements->reports_sent = 0;
+  l3_measurements->max_reports = 0;
+  l3_measurements->report_interval_ms = 0;
 }
 
 static void handle_measobj_remove(rrcPerNB_t *rrc, struct NR_MeasObjectToRemoveList *remove_list, NR_UE_Timers_Constants_t *timers)
@@ -2277,6 +2285,38 @@ void nr_ue_meas_filtering(rrcPerNB_t *rrc, bool is_neighboring_cell, uint16_t Ni
     apply_ema(&meas_cell->ss_rsrp_dBm, l3_measurements->ssb_filter_coeff_rsrp, rsrp_dBm);
 }
 
+static long get_measurement_report_interval_ms(NR_ReportInterval_t interval)
+{
+  switch (interval) {
+    case NR_ReportInterval_ms120:
+      return 120;
+    case NR_ReportInterval_ms240:
+      return 240;
+    case NR_ReportInterval_ms480:
+      return 480;
+    case NR_ReportInterval_ms640:
+      return 640;
+    case NR_ReportInterval_ms1024:
+      return 1024;
+    case NR_ReportInterval_ms2048:
+      return 2048;
+    case NR_ReportInterval_ms5120:
+      return 5120;
+    case NR_ReportInterval_ms10240:
+      return 10240;
+    case NR_ReportInterval_min1:
+      return 60000;
+    case NR_ReportInterval_min6:
+      return 360000;
+    case NR_ReportInterval_min12:
+      return 720000;
+    case NR_ReportInterval_min30:
+      return 1800000;
+    default:
+      return 1024;
+  }
+}
+
 static void nr_ue_check_meas_report(NR_UE_RRC_INST_t *rrc, const uint8_t gnb_index)
 {
   rrcPerNB_t *rrcNB = rrc->perNB + gnb_index;
@@ -2318,7 +2358,7 @@ static void nr_ue_check_meas_report(NR_UE_RRC_INST_t *rrc, const uint8_t gnb_ind
 
     // TS 38.331 - 5.5.4.3 Event A2 (Serving becomes worse than threshold)
     if (serving_cell_rsrp + rsrp_hysteresis < rsrp_threshold) {
-      if (!nr_timer_is_active(&l3_measurements->TA2)) {
+      if (!nr_timer_is_active(&l3_measurements->TA2) && (l3_measurements->reports_sent == 0)) {
         nr_timer_setup(&l3_measurements->TA2, get_A2_event_time_to_trigger(event_A2->timeToTrigger), 10);
         nr_timer_start(&l3_measurements->TA2);
         int report_config_id = report_config->reportConfigId;
@@ -2337,6 +2377,11 @@ static void nr_ue_check_meas_report(NR_UE_RRC_INST_t *rrc, const uint8_t gnb_ind
         l3_measurements->trigger_to_measid = meas_id;
         l3_measurements->trigger_quantity = event_A2->a2_Threshold.present;
         l3_measurements->rs_type = event_trigger_config->rsType;
+        l3_measurements->reports_sent = 0;
+        l3_measurements->max_reports = (event_trigger_config->reportAmount == NR_EventTriggerConfig__reportAmount_infinity)
+                                           ? INT_MAX
+                                           : (1 << event_trigger_config->reportAmount);
+        l3_measurements->report_interval_ms = get_measurement_report_interval_ms(event_trigger_config->reportInterval);
 
         LOG_W(NR_RRC,
               "(active_cell_rsrp) %i + (rsrp_hysteresis) %i < (rsrp_threshold) %i\n",
@@ -2346,6 +2391,8 @@ static void nr_ue_check_meas_report(NR_UE_RRC_INST_t *rrc, const uint8_t gnb_ind
       }
     } else if (nr_timer_is_active(&l3_measurements->TA2) && (serving_cell_rsrp - rsrp_hysteresis > rsrp_threshold)) {
       nr_timer_stop(&l3_measurements->TA2);
+      nr_timer_stop(&l3_measurements->periodic_report_timer);
+      l3_measurements->reports_sent = 0;
     }
   }
 }
