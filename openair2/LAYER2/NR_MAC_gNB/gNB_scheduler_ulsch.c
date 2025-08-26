@@ -1498,8 +1498,17 @@ void handle_nr_srs_measurements(const module_id_t module_id,
                                 nfapi_nr_srs_indication_pdu_t *srs_ind)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[module_id];
-  NR_SCHED_LOCK(&nrmac->sched_lock);
   LOG_D(NR_MAC, "(%d.%d) Received SRS indication for UE %04x\n", frame, slot, srs_ind->rnti);
+  if (srs_ind->report_type == 0) {
+    //SCF 222.10.04 Table 3-129 Report type = 0 means a null report, we can skip unpacking it
+    return;
+  }
+
+  if (srs_ind->timing_advance_offset == 0xFFFF) {
+    LOG_W(NR_MAC, "Invalid timing advance offset for RNTI %04x\n", srs_ind->rnti);
+    return;
+  }
+  NR_SCHED_LOCK(&nrmac->sched_lock);
 
 #ifdef SRS_IND_DEBUG
   LOG_I(NR_MAC, "frame = %i\n", frame);
@@ -1514,12 +1523,6 @@ void handle_nr_srs_measurements(const module_id_t module_id,
   NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[module_id]->UE_info, srs_ind->rnti);
   if (!UE) {
     LOG_W(NR_MAC, "Could not find UE for RNTI %04x\n", srs_ind->rnti);
-    NR_SCHED_UNLOCK(&nrmac->sched_lock);
-    return;
-  }
-
-  if (srs_ind->timing_advance_offset == 0xFFFF) {
-    LOG_W(NR_MAC, "Invalid timing advance offset for RNTI %04x\n", srs_ind->rnti);
     NR_SCHED_UNLOCK(&nrmac->sched_lock);
     return;
   }
