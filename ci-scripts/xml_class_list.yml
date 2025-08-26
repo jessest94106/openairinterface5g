@@ -1,7 +1,6 @@
   - Build_Proxy
   - Build_Cluster_Image
   - Pull_Cluster_Image
-  - Run_Physim
   - Build_eNB
   - Initialize_eNB
   - Terminate_eNB

@@ -286,13 +286,6 @@ def ExecuteActionWithParam(action, ctx):
 				return True
 			success = CONTAINERS.Create_Workspace(node, HTML)
 
-	elif action == 'Run_Physim':
-		physim_options = test.findtext('physim_run_args')
-		physim_test = test.findtext('physim_test')
-		physim_threshold = test.findtext('physim_time_threshold') or 'inf'
-		node = test.findtext('node')
-		success = cls_native.Native.Run_Physim(ctx, HTML, node, RAN.eNBSourceCodePath, physim_options, physim_test, physim_threshold)
-
 	elif action == 'LicenceAndFormattingCheck':
 		node = test.findtext('node')
 		success = SCA.LicenceAndFormattingCheck(ctx, node, HTML)
