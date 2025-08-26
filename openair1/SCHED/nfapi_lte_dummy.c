@@ -100,9 +100,6 @@ bool wls_vnf_nr_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *
   return false;
 }
 
-void wls_vnf_set_p7_config(void *p7_config)
-{
-}
 
 bool wls_vnf_nr_send_p5_message(vnf_t *vnf,uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len)
 {

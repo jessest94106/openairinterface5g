@@ -63,12 +63,8 @@ char cpu_buf_recv[RECV_BUF_LEN];
 
 uint16_t sfn = 0, slot = 0;
 nv_ipc_t *ipc;
-nfapi_vnf_config_t *vnf_config = 0;
 
-void set_config(nfapi_vnf_config_t *conf)
-{
-  vnf_config = conf;
-}
+
 static uint16_t old_sfn = 0;
 static uint16_t old_slot = 0;
 ////////////////////////////////////////////////////////////////////////
@@ -84,6 +80,7 @@ static int ipc_handle_rx_msg(nv_ipc_t *ipc, nv_ipc_msg_t *msg)
   uint8_t *end = msg->msg_buf + msg->msg_len;
 
   // unpack FAPI messages and handle them
+  nfapi_vnf_config_t * vnf_config = get_config();
   if (vnf_config != 0) {
     // first, unpack the header
     fapi_phy_api_msg fapi_msg;
@@ -576,13 +573,13 @@ int nvIPC_Init(nvipc_params_t nvipc_params_s)
 
 int oai_fapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req)
 {
-  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  nfapi_vnf_p7_config_t *p7_config = get_p7_vnf_config();
 
   ul_tti_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ul_tti_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_TTI_REQUEST;
 
   // int retval = nfapi_vnf_p7_ul_tti_req(p7_config, ul_tti_req);
-  int retval = p7_config->send_p7_msg((vnf_p7_t *)p7_config, &ul_tti_req->header);
+  int retval = p7_config->send_p7_msg(get_p7_vnf(), &ul_tti_req->header);
 
   if (retval != 0) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
@@ -598,11 +595,11 @@ int oai_fapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req)
 
 int oai_fapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req)
 {
-  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  nfapi_vnf_p7_config_t *p7_config = get_p7_vnf_config();
   ul_dci_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   ul_dci_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_UL_DCI_REQUEST;
   // int retval = nfapi_vnf_p7_ul_dci_req(p7_config, ul_dci_req);
-  int retval = p7_config->send_p7_msg((vnf_p7_t *)p7_config, &ul_dci_req->header);
+  int retval = p7_config->send_p7_msg(get_p7_vnf(), &ul_dci_req->header);
   if (retval != 0) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
@@ -613,12 +610,12 @@ int oai_fapi_ul_dci_req(nfapi_nr_ul_dci_request_t *ul_dci_req)
 
 int oai_fapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
 {
-  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  nfapi_vnf_p7_config_t *p7_config = get_p7_vnf_config();
   tx_data_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
   tx_data_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_TX_DATA_REQUEST;
   // LOG_D(PHY, "[VNF] %s() TX_REQ sfn_sf:%d number_of_pdus:%d\n", __FUNCTION__, NFAPI_SFNSF2DEC(tx_data_req->SFN),
   // tx_data_req->Number_of_PDUs); int retval = nfapi_vnf_p7_tx_data_req(p7_config, tx_data_req);
-  int retval = p7_config->send_p7_msg((vnf_p7_t *)p7_config, &tx_data_req->header);
+  int retval = p7_config->send_p7_msg(get_p7_vnf(), &tx_data_req->header);
   if (retval != 0) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   } else {
@@ -630,10 +627,10 @@ int oai_fapi_tx_data_req(nfapi_nr_tx_data_request_t *tx_data_req)
 
 int oai_fapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req)
 {
-  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  nfapi_vnf_p7_config_t *p7_config = get_p7_vnf_config();
   dl_config_req->header.message_id = NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST;
   dl_config_req->header.phy_id = 1; // DJP HACK TODO FIXME - need to pass this around!!!!
-  int retval = p7_config->send_p7_msg((vnf_p7_t *)p7_config, &dl_config_req->header);
+  int retval = p7_config->send_p7_msg(get_p7_vnf(), &dl_config_req->header);
   dl_config_req->dl_tti_request_body.nPDUs = 0;
   dl_config_req->dl_tti_request_body.nGroup = 0;
 
@@ -644,9 +641,9 @@ int oai_fapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req)
 }
 
 int oai_fapi_send_end_request(int cell, uint32_t frame, uint32_t slot){
-  nfapi_vnf_p7_config_t *p7_config = (((vnf_info *)vnf_config->user_data)->p7_vnfs[0].config);
+  nfapi_vnf_p7_config_t *p7_config = get_p7_vnf_config();
   nfapi_nr_slot_indication_scf_t nr_slot_resp = {.header.message_id = 0x8F, .sfn = frame, .slot = slot};
-  int retval = p7_config->send_p7_msg((vnf_p7_t *)p7_config, &nr_slot_resp.header);
+  int retval = p7_config->send_p7_msg(get_p7_vnf(), &nr_slot_resp.header);
   if (retval != 0) {
     LOG_E(PHY, "%s() Problem sending retval:%d\n", __FUNCTION__, retval);
   }

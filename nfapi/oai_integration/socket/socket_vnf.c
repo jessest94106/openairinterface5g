@@ -21,6 +21,8 @@
 #include "socket_vnf.h"
 
 #include "nfapi.h"
+#include "nfapi_vnf.h"
+#include <common/platform_constants.h>
 #include "nfapi/oai_integration/vendor_ext.h" //TODO: Remove this include when removing the Aerial transport stuff
 
 static bool send_p5_msg(vnf_t *vnf, nfapi_vnf_pnf_info_t *pnf, const void *msg, int len, uint8_t stream)
@@ -279,7 +281,6 @@ static int nfapi_nr_vnf_p5_start(nfapi_vnf_config_t *config)
   // Verify that config is not null
   if (config == 0)
     return -1;
-
   NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
 
   int p5ListenSock, p5Sock;
@@ -293,7 +294,7 @@ static int nfapi_nr_vnf_p5_start(nfapi_vnf_config_t *config)
   struct sctp_initmsg initMsg = {0};
   int noDelay;
 
-  vnf_t *vnf = (vnf_t *)(config);
+  vnf_t *vnf = (vnf_t *)(get_config());
 
   NFAPI_TRACE(NFAPI_TRACE_INFO, "Starting P5 VNF connection on port %u\n", config->vnf_p5_port);
 
@@ -747,8 +748,8 @@ static int nfapi_nr_vnf_p7_start(nfapi_vnf_p7_config_t *config)
     return -1;
 
   NFAPI_TRACE(NFAPI_TRACE_INFO, "%s()\n", __FUNCTION__);
-
-  vnf_p7_t *vnf_p7 = (vnf_p7_t *)config;
+  vnf_p7_t *vnf_p7 = get_p7_vnf();
+  vnf_p7 = (vnf_p7_t *)config;
 
   // Create p7 receive udp port
   // todo : this needs updating for Ipv6

@@ -33,14 +33,7 @@
 static nfapi_vnf_config_t *config;
 static WLS_MAC_CTX wls_mac_iface;
 vnf_t *_vnf = NULL;
-// A copy of the VNF P7 config is needed for the message processing thread, in other transport mechanisms where P7 is handled in a
-// different thread, the config is passed to it upon the thread creation
-nfapi_vnf_p7_config_t *wls_vnf_p7_config = NULL;
 
-void wls_vnf_set_p7_config(void *p7_config)
-{
-  wls_vnf_p7_config = (nfapi_vnf_p7_config_t *)p7_config;
-}
 
 static PWLS_MAC_CTX wls_mac_get_ctx(void)
 {
@@ -258,7 +251,7 @@ for(int i = 0 ; i< pWls->nTotalBlocks; i++){
   void* pMsg =  wls_mac_alloc_buffer(pWls, 0, i);
    /* Enqueue all blocks */
   nBlocks += WLS_EnqueueBlock(pWls->hWls, WLS_VA2PA(pWls->hWls, pMsg));
-}  
+}
   NFAPI_TRACE(NFAPI_TRACE_INFO, "\nAllocated %d Blocks \n", nBlocks);
   return true;
 }
@@ -294,11 +287,11 @@ static void procPhyMessages(uint32_t msg_size, void *msg_buf, uint16_t msg_id)
     case NFAPI_NR_PHY_MSG_TYPE_CONFIG_RESPONSE:
     case NFAPI_NR_PHY_MSG_TYPE_START_RESPONSE:
     case NFAPI_NR_PHY_MSG_TYPE_STOP_INDICATION:
-      vnf_nr_handle_p4_p5_message(msg_buf, msg_size, 0, config);
+      vnf_nr_handle_p4_p5_message(msg_buf, msg_size, 0, get_config());
       break;
 
     case NFAPI_NR_PHY_MSG_TYPE_DL_TTI_REQUEST ... NFAPI_NR_PHY_MSG_TYPE_RACH_INDICATION: {
-      vnf_nr_handle_p7_message(msg_buf, msg_size + NFAPI_NR_P7_HEADER_LENGTH, (vnf_p7_t *)wls_vnf_p7_config);
+      vnf_nr_handle_p7_message(msg_buf, msg_size + NFAPI_NR_P7_HEADER_LENGTH, get_p7_vnf());
       break;
     }
     default:
@@ -308,6 +301,7 @@ static void procPhyMessages(uint32_t msg_size, void *msg_buf, uint16_t msg_id)
 
 int wls_fapi_nr_vnf_start(nfapi_vnf_config_t *cfg)
 {
+  nfapi_vnf_config_t * config = get_config();
   config = cfg;
 
   if (config == 0) {
@@ -403,7 +397,7 @@ bool wls_vnf_nr_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *
   AssertFatal(fapiMsgElem, "WLS_PA2VA failed for fapiMsgElem\n");
   //memcpy((uint8_t *)(fapiMsgElem + 1), message, packed_len + NFAPI_HEADER_LENGTH);
   const uint8_t wls_header[] = {1, 0}; // num_messages ,  opaque_handle
- 
+
   fill_fapi_list_elem(headerElem, fapiMsgElem, FAPI_VENDOR_MSG_HEADER_IND, 1, 2);
   memcpy((uint8_t *)(headerElem + 1), wls_header, 2);
   int packed_len = ((nfapi_vnf_p7_config_t *)vnf_p7)->pack_func(msg, (fapiMsgElem + 1), NFAPI_MAX_PACKED_MESSAGE_SIZE, NULL);
