@@ -11,6 +11,7 @@ pkg_check_modules(numa REQUIRED numa)
 
 add_library(oran_fhlib_5g MODULE
             oran_isolate.c
+            oaioran_ru.c
             oaioran.c
             oran-config.c
             oran-init.c
@@ -33,7 +34,7 @@ add_compile_options(-Wno-packed-not-aligned)
 
 set_target_properties(oran_fhlib_5g PROPERTIES COMPILE_FLAGS "-fvisibility=hidden -march=native")
 target_link_libraries(oran_fhlib_5g PRIVATE xran::xran ${dpdk_LINK_LIBRARIES} pthread dl rt m numa)
-target_link_libraries(oran_fhlib_5g PRIVATE log_headers)
+target_link_libraries(oran_fhlib_5g PRIVATE log_headers MAC_NR_COMMON)
 target_include_directories(oran_fhlib_5g PRIVATE ${dpdk_INCLUDE_DIRS})
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   find_package(armral REQUIRED)

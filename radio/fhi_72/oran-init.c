@@ -19,6 +19,7 @@
  *      contact@openairinterface.org
  */
 
+#include "oaioran_ru.h"
 #include "xran_fh_o_du.h"
 #include "xran_pkt.h"
 #include "xran_pkt_up.h"
@@ -404,6 +405,7 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
     exit(-1);
   }
 
+  bool is_du = xran_fh_init->io_cfg.id == 0;
   /** process all the O-RU|O-DU for use case */
   for (int32_t o_xu_id = 0; o_xu_id < xran_fh_init->xran_ports; o_xu_id++) {
     print_fh_config(&xran_fh_config[o_xu_id]);
@@ -440,6 +442,12 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
   // these structs during initialization
   memcpy(&g_fh_init, xran_fh_init, sizeof(*xran_fh_init));
   memcpy(&g_fh_config, xran_fh_config, sizeof(*xran_fh_config) * xran_fh_init->xran_ports);
+
+  if (!is_du) {
+    // Use half-slot parallelization
+    const int callback_per_slot = 2;
+    init_oru_packet_processor(gxran_handle, callback_per_slot);
+  }
 
   return (void *)gxran_handle;
 }
