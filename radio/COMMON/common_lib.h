@@ -382,6 +382,14 @@ typedef struct {
   } queue[WRITE_QUEUE_SZ];
 } re_order_t;
 
+/*! \brief Provides a way to map between a symbol and a timespec */
+typedef struct {
+  int frame;
+  int slot;
+  int symbol;
+  struct timespec ts;
+} sense_of_time_t;
+
 /*!\brief structure holds the parameters to configure RF devices */
 struct openair0_device {
   /*!tx write thread*/
@@ -657,6 +665,18 @@ struct openair0_device {
    */
   time_stats_t tx_fhaul;
   re_order_t reOrder;
+
+  // Function pointers used for oran
+  struct {
+    /*! \brief O-RU only: reads DL FD IQ. Data is put into the beginning of txdataF buffer regardless
+     *  of the returned start_symbol. maximum number of symbols returned is 7
+     * \param txdataF An array of nb_tx buffers to write the samples to
+     * \param nb_tx number of TX antennas and number of buffer in txDataF_BF
+     * \param sense_of_time frame, slot and symbol with mapping to clock_gettime result
+     * \param num_symbols number of symbols
+     */
+    void (*north_in_func)(uint32_t **txdataF, int nb_tx, sense_of_time_t* sense_of_time, int *num_symbols);
+  } xran_api;
 };
 
 typedef struct {
