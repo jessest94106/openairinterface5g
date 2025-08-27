@@ -254,8 +254,10 @@ def IdleSleep(HTML, idle_sleep_time):
 def Deploy_Physim(ctx, HTML, node, workdir, script, options):
 	logging.debug(f'Running physims on server {node} workdir {workdir}')
 	with cls_cmd.getConnection(node) as c:
+		sys_info = c.exec_script("scripts/sys-info.sh", 5)
 		ret = c.exec_script(script, 600, options)
 	logging.debug(f'"{script}" finished with code {ret.returncode}, output:\n{ret.stdout}')
+	HTML.CreateHtmlTestRowQueue('Query system info', 'OK', [sys_info.stdout])
 	with cls_cmd.getConnection(node) as ssh:
 		details_json = archiveArtifact(ssh, ctx, f'{workdir}/desc-tests.json')
 		result_junit = archiveArtifact(ssh, ctx, f'{workdir}/results-run.xml')
