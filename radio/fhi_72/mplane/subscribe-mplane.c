@@ -30,13 +30,8 @@
 static void recv_notif_v1(const struct nc_notif *notif, ru_notif_t *answer)
 {
   const char *node_name = notif->tree->child->attr->name;
-  const char *value = notif->tree->child->attr->value_str;
   if (strcmp(node_name, "sync-state")) {
-    if (strcmp(value, "LOCKED") == 0) {
-      answer->ptp_state = true;
-    } else {
-      answer->ptp_state = false;
-    }
+    answer->ptp_state = str_to_enum_ptp(notif->tree->child->attr->value_str);
   }
 
   // carriers state - to be filled
@@ -90,26 +85,11 @@ static void recv_notif_v2(struct lyd_node_inner *op, ru_notif_t *answer)
   const char *notif = op->schema->name;
 
   if (strcmp(notif, "synchronization-state-change") == 0) {
-    const char *value = lyd_get_value(op->child);
-    if (strcmp(value, "LOCKED") == 0) {
-      answer->ptp_state = true;
-    } else { // "FREERUN" or "HOLDOVER"
-      answer->ptp_state = false;
-    }
+    answer->ptp_state = str_to_enum_ptp(lyd_get_value(op->child));
   } else if (strcmp(notif, "rx-array-carriers-state-change") == 0) {
-    const char *value = lyd_get_value(lyd_child(op->child)->next);
-    if (strcmp(value, "READY") == 0) {
-      answer->rx_carrier_state = true;
-    } else { // "DISABLED" or "BUSY"
-      answer->rx_carrier_state = false;
-    }
+    answer->rx_carrier_state = str_to_enum_carrier(lyd_get_value(lyd_child(op->child)->next));
   } else if (strcmp(notif, "tx-array-carriers-state-change") == 0) {
-    const char *value = lyd_get_value(lyd_child(op->child)->next);
-    if (strcmp(value, "READY") == 0) {
-      answer->tx_carrier_state = true;
-    } else { // "DISABLED" or "BUSY"
-      answer->tx_carrier_state = false;
-    }
+    answer->tx_carrier_state = str_to_enum_carrier(lyd_get_value(lyd_child(op->child)->next));
   } else if (strcmp(notif, "netconf-config-change") == 0) {
     answer->config_change = true;
   }

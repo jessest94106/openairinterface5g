@@ -25,6 +25,20 @@
 
 #include <string.h>
 
+ptp_state_e str_to_enum_ptp(const char* value) {
+#define X(name, str) if (value != NULL && strcmp(value, str) == 0) return name;
+    PTP_STATE
+#undef X
+    return PTP_COUNT;
+};
+
+carrier_state_e str_to_enum_carrier(const char* value) {
+#define X(name, str) if (value != NULL && strcmp(value, str) == 0) return name;
+    CARRIER_STATE
+#undef X
+    return CARRIER_COUNT;
+};
+
 static void free_match_list(char **match_list, size_t count)
 {
   for (size_t i = 0; i < count; i++) {

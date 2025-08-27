@@ -31,10 +31,38 @@
 #define MP_LOG_I(x, args...) LOG_I(HW, "[MPLANE] " x, ##args)
 #define MP_LOG_W(x, args...) LOG_W(HW, "[MPLANE] " x, ##args)
 
+#define PTP_STATE \
+        X(LOCKED_PTP,  "LOCKED") \
+        X(FREERUN_PTP, "FREERUN") \
+        X(HOLDOVER_PTP, "HOLDOVER")
+
+typedef enum {
+#define X(name, str) name,
+        PTP_STATE
+#undef X
+        PTP_COUNT
+} ptp_state_e;
+
+ptp_state_e str_to_enum_ptp(const char* value);
+
+#define CARRIER_STATE \
+        X(READY_CARRIER, "READY") \
+        X(DISABLED_CARRIER, "DISABLED") \
+        X(BUSY_CARRIER, "BUSY")
+
+typedef enum {
+#define X(name, str) name,
+        CARRIER_STATE
+#undef X
+        CARRIER_COUNT
+} carrier_state_e;
+
+carrier_state_e str_to_enum_carrier(const char* value);
+
 typedef struct {
-  bool ptp_state;
-  bool rx_carrier_state;
-  bool tx_carrier_state;
+  ptp_state_e ptp_state; //  "LOCKED", "FREERUN", "HOLDOVER"
+  carrier_state_e rx_carrier_state; // "READY", "DISABLED", "BUSY"
+  carrier_state_e tx_carrier_state; // "READY", "DISABLED", "BUSY"
   bool config_change;
   // to be extended with any notification callback
 
