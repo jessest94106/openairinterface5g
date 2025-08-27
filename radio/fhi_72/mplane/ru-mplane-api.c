@@ -25,6 +25,27 @@
 
 #include <string.h>
 
+oper_state_e str_to_enum_oper(const char* value) {
+#define X(name, str) if (value != NULL && strcmp(value, str) == 0) return name;
+    OPER_STATE
+#undef X
+    return OPER_COUNT;
+};
+
+admin_state_e str_to_enum_admin(const char* value) {
+#define X(name, str) if (value != NULL && strcmp(value, str) == 0) return name;
+    ADMIN_STATE
+#undef X
+    return ADMIN_COUNT;
+};
+
+avail_state_e str_to_enum_avail(const char* value) {
+#define X(name, str) if (value != NULL && strcmp(value, str) == 0) return name;
+    AVAIL_STATE
+#undef X
+    return AVAIL_COUNT;
+};
+
 ptp_state_e str_to_enum_ptp(const char* value) {
 #define X(name, str) if (value != NULL && strcmp(value, str) == 0) return name;
     PTP_STATE

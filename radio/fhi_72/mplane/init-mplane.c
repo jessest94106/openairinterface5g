@@ -158,11 +158,23 @@ static void init_ru_notif(ru_session_t *ru_session, const char* buffer)
     ru_session->ru_notif.config_change = false;
   }
 
+  char *oper_state = get_ru_xml_node(buffer, "oper-state");
+  ru_session->ru_notif.hardware.oper_state = (str_to_enum_oper(oper_state) != OPER_COUNT) ? str_to_enum_oper(oper_state) : ENABLED_OPER;
+
+  char *admin_state = get_ru_xml_node(buffer, "admin-state");
+  ru_session->ru_notif.hardware.admin_state = (str_to_enum_admin(admin_state) != ADMIN_COUNT) ? str_to_enum_admin(admin_state) : UNLOCKED_ADMIN;
+
+  char *avail_state = get_ru_xml_node(buffer, "availability-state");
+  ru_session->ru_notif.hardware.avail_state = (str_to_enum_avail(avail_state) != AVAIL_COUNT) ? str_to_enum_avail(avail_state) : NORMAL_AVAIL;
+
   char *ptp_state = get_ru_xml_node(buffer, "sync-state");
   ru_session->ru_notif.ptp_state = str_to_enum_ptp(ptp_state);
   MP_LOG_I("RU is in \"%s\" sync state.\n", ptp_state);
 
   free(usage_state);
+  free(oper_state);
+  free(admin_state);
+  free(avail_state);
   free(ptp_state);
 }
 
@@ -211,7 +223,7 @@ bool manage_ru(ru_session_t *ru_session, const openair0_config_t *oai, const siz
 
   while (1) {
     sleep(5);
-    if (!ru_session->ru_notif.ptp_state) {
+    if (!ru_session->ru_notif.ptp_state && !ru_session->ru_notif.hardware.oper_state && !ru_session->ru_notif.hardware.admin_state && !ru_session->ru_notif.hardware.avail_state) {
       char *content = NULL;
       success = configure_ru_from_yang(ru_session, oai, num_rus, &content);
       AssertError(success, return false, "[MPLANE] Unable to create content for <edit-config> RPC for start-up procedure.\n");
