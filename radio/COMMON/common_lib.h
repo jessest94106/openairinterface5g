@@ -198,6 +198,13 @@ typedef struct split7_config {
   } slot_dirs[160];
   /*! this is the exponent in 2^X for the FFT size */
   uint16_t fftSize;
+
+  // M-plane related parameters
+  uint16_t dl_k0[5];
+  uint16_t ul_k0[5];
+  uint16_t cp_prefix0;
+  uint16_t cp_prefix_other;
+
 } split7_config_t;
 
 /*! \brief RF frontend parameters set by application */
