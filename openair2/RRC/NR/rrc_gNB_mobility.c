@@ -77,11 +77,8 @@ static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_
     rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId(ue, rrc_drb->drb_id);
     AssertFatal(pdu != NULL, "no PDU session for DRB ID %d\n", rrc_drb->drb_id);
 
-    // for the moment, we only support one QoS flow. Put a reminder in case
-    // this changes
-    AssertFatal(pdu->param.nb_qos == 1, "only 1 Qos flow supported\n");
     int qfi = rrc_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[0];
-    pdusession_level_qos_parameter_t *qos_param = get_qos_characteristics(qfi, pdu);
+    nr_rrc_qos_t *qos_param = find_qos(&pdu->param.qos, qfi);
 
     drb->id = rrc_drb->drb_id;
 
@@ -91,7 +88,7 @@ static int fill_drb_to_be_setup(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, f1ap_
     drb->nr.flows = calloc_or_fail(1, sizeof(*drb->nr.flows));
     DevAssert(qfi > 0);
     drb->nr.flows[0].qfi = qfi;
-    drb->nr.flows[0].param = get_qos_char_from_qos_flow_param(qos_param);
+    drb->nr.flows[0].param = get_qos_char_from_qos_flow_param(&qos_param->qos);
     /* the DRB QoS parameters: we just reuse the ones from the first flow */
     drb->nr.drb_qos = drb->nr.flows[0].param;
 

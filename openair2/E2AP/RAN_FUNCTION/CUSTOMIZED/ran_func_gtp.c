@@ -67,9 +67,9 @@ bool read_gtp_sm(void * data)
       gtp->msg.ngut[i].teidgnb = session->param.n3_outgoing.teid;
       gtp->msg.ngut[i].teidupf = session->param.n3_incoming.teid;
       // TODO: one PDU session has multiple QoS Flow
-      int nb_qos_flow = session->param.nb_qos;
-      if (nb_qos_flow > 0) {
-        gtp->msg.ngut[i].qfi = session->param.qos[nb_qos_flow - 1].qfi;
+      DevAssert(seq_arr_size(&session->param.qos) == 1);
+      FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos, &session->param.qos) {
+        gtp->msg.ngut[i].qfi = qos->qos.qfi;
       }
       break;
     }

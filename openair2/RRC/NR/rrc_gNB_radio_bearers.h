@@ -72,4 +72,10 @@ drb_t *nr_rrc_add_drb(seq_arr_t *drb_ptr, int pdusession_id);
 /// @brief Function to free DRB in RRC
 void free_drb(void *ptr);
 
+/// @brief retrieve QoS flow associated to @param qfi
+nr_rrc_qos_t *find_qos(seq_arr_t *seq, int qfi);
+
+/// @brief Add a new QoS to the list
+nr_rrc_qos_t *add_qos(seq_arr_t *qos, const pdusession_level_qos_parameter_t *in);
+
 #endif

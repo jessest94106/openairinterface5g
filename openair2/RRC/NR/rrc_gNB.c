@@ -733,9 +733,8 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
     }
 
     // Reference TS23501 Table 5.7.4-1: Standardized 5QI to QoS characteristics mapping
-    for (qos_flow_index = 0; qos_flow_index < session->nb_qos; qos_flow_index++) {
-      pdusession_level_qos_parameter_t *qos = &session->qos[qos_flow_index];
-      switch (qos->fiveQI) {
+    FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos, &session->qos) {
+      switch (qos->qos.fiveQI) {
         case 1: //100ms
         case 2: //150ms
         case 3: //50ms
@@ -749,14 +748,14 @@ void rrc_gNB_modify_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
           break;
 
         default:
-          LOG_E(NR_RRC, "not supported 5qi %lu\n", qos->fiveQI);
+          LOG_E(NR_RRC, "not supported 5qi %lu\n", qos->qos.fiveQI);
           ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CauseRadioNetwork_not_supported_5QI_value};
           item->status = PDU_SESSION_STATUS_FAILED;
           item->xid = params.transaction_id;
           item->cause = cause;
           continue;
       }
-      LOG_I(NR_RRC, "PDU Session ID %d, QOS flow %d, 5QI %ld \n", session->pdusession_id, qos_flow_index, qos->fiveQI);
+      LOG_I(NR_RRC, "PDU Session ID %d, QOS flow %d, 5QI %ld \n", session->pdusession_id, qos_flow_index, qos->qos.fiveQI);
     }
     item->status = PDU_SESSION_STATUS_DONE;
     item->xid = params.transaction_id;
@@ -2101,14 +2100,15 @@ void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb
   };
 
   bool is_inter_cu_ho = UE->ho_context && UE->ho_context->source && !UE->ho_context->target;
-  for (int i = 0; i < MAX_DRBS_PER_UE; i++) {
-    int drb_id = i + 1;
+  int drb_index = 0;
+  FOR_EACH_SEQ_ARR(drb_t *, drb, &UE->drbs) {
+    int drb_id = drb->drb_id;
     DRB_nGRAN_to_mod_t drb_to_mod = {0};
     if (n > 0) {
       /* DRBs to Setup in F1 UE Context Modifcation Response */
-      if (i == n)
+      if (drb_index == n)
         break;
-      const f1ap_drb_setup_t *drb_f1 = &drbs[i];
+      const f1ap_drb_setup_t *drb_f1 = &drbs[drb_index];
       drb_id = drb_f1->id;
       fill_e1_bearer_modif(&drb_to_mod, drb_f1);
     } else if (is_inter_cu_ho) {
@@ -2134,6 +2134,8 @@ void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb
     to_mod->sessionId = pdu->param.pdusession_id;
     // Fill E1 DRB to Modify item
     to_mod->DRBnGRanModList[to_mod->numDRB2Modify++] = drb_to_mod;
+
+    drb_index++;
   }
   DevAssert(req.numPDUSessionsMod > 0);
   DevAssert(req.numPDUSessions == 0);
@@ -2448,17 +2450,6 @@ unsigned int mask_flip(unsigned int x) {
   return((((x>>8) + (x<<8))&0xffff)>>6);
 }
 
-pdusession_level_qos_parameter_t *get_qos_characteristics(const int qfi, rrc_pdu_session_param_t *pduSession)
-{
-  pdusession_t *pdu = &pduSession->param;
-  for (int i = 0; i < pdu->nb_qos; i++) {
-    if (qfi == pdu->qos[i].qfi)
-      return &pdu->qos[i];
-  }
-  AssertFatal(1 == 0, "The pdu session %d does not contain a qos flow with qfi = %d\n", pdu->pdusession_id, qfi);
-  return NULL;
-}
-
 /* \bref return F1AP QoS characteristics based on Qos flow parameters */
 f1ap_qos_flow_param_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param)
 {
@@ -2516,11 +2507,11 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
         /* find the QoS characteristics stored at RRC based on QFI returned
          * from E1. We expect this to correspond to a QFI we passed to E1
          * previously, so we expect it to exist. */
-        pdusession_level_qos_parameter_t *qos_param = get_qos_characteristics(qfi, pdu);
+        nr_rrc_qos_t *qos_param = find_qos(&pdu->param.qos, qfi);
         DevAssert(qos_param);
         f1ap_drb_flows_mapped_t *flow = &drb->nr.flows[j];
         flow->qfi = qfi;
-        flow->param = get_qos_char_from_qos_flow_param(qos_param);
+        flow->param = get_qos_char_from_qos_flow_param(&qos_param->qos);
       }
       /* the DRB QoS parameters: we just reuse the ones from the first flow */
       drb->nr.drb_qos = drb->nr.flows[0].param;

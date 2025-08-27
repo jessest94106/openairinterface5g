@@ -103,9 +103,8 @@ typedef struct pdusession_s {
   /* Unique pdusession_id for the UE. */
   int pdusession_id;
   byte_array_t nas_pdu;
-  uint8_t nb_qos;
   /* Quality of service for this pdusession */
-  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  seq_arr_t qos;
   /* The transport layer address for the IP packets */
   pdu_session_type_t pdu_session_type;
   // NG-RAN endpoint of the NG-U (N3) transport bearer
@@ -175,6 +174,11 @@ typedef struct nr_redcap_ue_cap {
   bool pdcp_drb_long_sn_redcap_r17;
   bool rlc_am_drb_long_sn_redcap_r17;
 } nr_redcap_ue_cap_t;
+
+typedef struct {
+  int drb_id;
+  pdusession_level_qos_parameter_t qos;
+} nr_rrc_qos_t;
 
 /* forward declaration */
 typedef struct nr_handover_context_s nr_handover_context_t;
