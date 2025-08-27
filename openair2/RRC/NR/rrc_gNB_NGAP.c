@@ -289,6 +289,31 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, message_p);
 }
 
+/// @brief set QoS Flows to Setup in E1 DRB To Setup List
+static qos_flow_to_setup_t fill_e1_qos_flow_to_setup(const pdusession_level_qos_parameter_t *qos)
+{
+  qos_flow_to_setup_t qos_flow = { .qfi = qos->qfi };
+  // ARP
+  ngran_allocation_retention_priority_t *arp_out = &qos_flow.qos_params.alloc_reten_priority;
+  const qos_arp_t *arp_in = &qos->arp;
+  arp_out->priority_level = arp_in->priority_level;
+  arp_out->preemption_capability = arp_in->pre_emp_capability;
+  arp_out->preemption_vulnerability = arp_in->pre_emp_vulnerability;
+  // QoS Characteristics
+  qos_characteristics_t *qos_characteristics = &qos_flow.qos_params.qos_characteristics;
+  if (qos->fiveQI_type == NON_DYNAMIC) {
+    qos_characteristics->non_dynamic.fiveqi = qos->fiveQI;
+    qos_characteristics->non_dynamic.qos_priority_level = qos->qos_priority;
+  } else {
+    qos_characteristics->dynamic.fiveqi = qos->fiveQI;
+    qos_characteristics->dynamic.qos_priority_level = qos->qos_priority;
+    // NOTE: missing packet error rate and delay budget
+  }
+  qos_characteristics->qos_type = qos->fiveQI_type;
+
+  return qos_flow;
+}
+
 /** @brief Returns an instance of E1AP DRB To Setup List */
 static DRB_nGRAN_to_setup_t fill_e1_drb_to_setup(const drb_t *rrc_drb,
                                                  const pdusession_t *session,
@@ -310,26 +335,13 @@ static DRB_nGRAN_to_setup_t fill_e1_drb_to_setup(const drb_t *rrc_drb,
   }
 
   FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos, &session->qos) {
-    pdusession_level_qos_parameter_t *qos_session = &qos->qos;
+    if (qos->drb_id != drb_ngran.id)
+      continue;
+    const pdusession_level_qos_parameter_t *qos_session = &qos->qos;
     DevAssert(drb_ngran.numQosFlow2Setup < MAX_QOS_FLOWS);
-    qos_flow_to_setup_t *qos_flow = &drb_ngran.qosFlows[drb_ngran.numQosFlow2Setup++];
-    qos_characteristics_t *qos_char = &qos_flow->qos_params.qos_characteristics;
-    qos_flow->qfi = qos_session->qfi;
-    qos_char->qos_type = qos_session->fiveQI_type;
-    if (qos_char->qos_type == DYNAMIC) {
-      qos_char->dynamic.fiveqi = qos_session->fiveQI;
-      qos_char->dynamic.qos_priority_level = qos_session->qos_priority;
-    } else {
-      qos_char->non_dynamic.fiveqi = qos_session->fiveQI;
-      qos_char->non_dynamic.qos_priority_level = qos_session->qos_priority;
-    }
-
-    ngran_allocation_retention_priority_t *arp_out = &qos_flow->qos_params.alloc_reten_priority;
-    qos_arp_t *arp_in = &qos_session->arp;
-    arp_out->priority_level = arp_in->priority_level;
-    arp_out->preemption_capability = arp_in->pre_emp_capability;
-    arp_out->preemption_vulnerability = arp_in->pre_emp_vulnerability;
+    drb_ngran.qosFlows[drb_ngran.numQosFlow2Setup++] = fill_e1_qos_flow_to_setup(qos_session);
   }
+  DevAssert(drb_ngran.numQosFlow2Setup > 0);
 
   return drb_ngran;
 }
