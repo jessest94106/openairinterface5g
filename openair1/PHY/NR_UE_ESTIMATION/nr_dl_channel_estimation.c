@@ -449,12 +449,15 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
     peak_estimator(&chT_interpol[rxAnt][0], NR_PRS_IDFT_OVERSAMP_FACTOR * frame_params->ofdm_symbol_size, &prs_toa, &ch_pwr, mean_val);
 
     // adjusting the rx_gains for channel peak power
-    ch_pwr_dbm = 10 * log10(ch_pwr) + 30 - SQ15_SQUARED_NORM_FACTOR_DB - ((int)openair0_cfg[0].rx_gain[0] - (int)openair0_cfg[0].rx_gain_offset[0]) - dB_fixed(frame_params->ofdm_symbol_size);
+    ch_pwr_dbm = 10 * log10(ch_pwr) + 30 - SQ15_SQUARED_NORM_FACTOR_DB
+                 - ((int)ue->openair0_cfg[0].rx_gain[0] - (int)ue->openair0_cfg[0].rx_gain_offset[0])
+                 - dB_fixed(frame_params->ofdm_symbol_size);
 
-    prs_meas[rxAnt]->rsrp_dBm =
-        10 * log10(prs_meas[rxAnt]->rsrp) + 30 - SQ15_SQUARED_NORM_FACTOR_DB - ((int)openair0_cfg[0].rx_gain[0] - (int)openair0_cfg[0].rx_gain_offset[0]) - dB_fixed(ue->frame_parms.ofdm_symbol_size);
+    prs_meas[rxAnt]->rsrp_dBm = 10 * log10(prs_meas[rxAnt]->rsrp) + 30 - SQ15_SQUARED_NORM_FACTOR_DB
+                                - ((int)ue->openair0_cfg[0].rx_gain[0] - (int)ue->openair0_cfg[0].rx_gain_offset[0])
+                                - dB_fixed(ue->frame_parms.ofdm_symbol_size);
 
-    //prs measurements
+    // prs measurements
     prs_meas[rxAnt]->gNB_id     = gNB_id;
     prs_meas[rxAnt]->sfn        = proc->frame_rx;
     prs_meas[rxAnt]->slot       = proc->nr_slot_rx;

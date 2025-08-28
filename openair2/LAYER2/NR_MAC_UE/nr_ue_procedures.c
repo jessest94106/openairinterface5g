@@ -755,8 +755,13 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
       dlsch_pdu->SubcarrierSpacing = mac->mib->subCarrierSpacingCommon + 2;
   } else {
     dlsch_pdu->SubcarrierSpacing = current_DL_BWP->scs;
-    if (nr_timer_is_active(&mac->ra.response_window_timer) && rnti_type == TYPE_RA_RNTI_) {
-      dl_conf_req->pdu_type = FAPI_NR_DL_CONFIG_TYPE_RA_DLSCH;
+    if (rnti_type == TYPE_RA_RNTI_) {
+      if (nr_timer_is_active(&mac->ra.response_window_timer)) {
+        dl_conf_req->pdu_type = FAPI_NR_DL_CONFIG_TYPE_RA_DLSCH;
+      } else {
+        // Discard the DCI
+        return -1;
+      }
     } else {
       dl_conf_req->pdu_type = FAPI_NR_DL_CONFIG_TYPE_DLSCH;
     }
