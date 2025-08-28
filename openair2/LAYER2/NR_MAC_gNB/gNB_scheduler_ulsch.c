@@ -2442,7 +2442,7 @@ void post_process_ulsch(gNB_MAC_INST *nr_mac, post_process_pusch_t *pusch, NR_UE
   sched_ctrl->last_ul_slot = sched_pusch->slot;
 
   LOG_D(NR_MAC,
-        "ULSCH/PUSCH: %4d.%2d RNTI %04x UL sched %4d.%2d DCI L %d start %2d RBS %3d startSymbol %2d nb_symbol %2d dmrs_pos %x MCS "
+        "ULSCH/PUSCH: %4d.%2d RNTI %04x UL sched %4d.%2d DCI L %d start %2d RBS %3d TDA %2d dmrs_pos %x MCS "
         "Table %2d MCS %2d nrOfLayers %2d num_dmrs_cdm_grps_no_data %2d TBS %4d HARQ PID %2d round %d RV %d NDI %d est %6d sched "
         "%6d est BSR %6d TPC %d\n",
         frame,
@@ -2453,8 +2453,7 @@ void post_process_ulsch(gNB_MAC_INST *nr_mac, post_process_pusch_t *pusch, NR_UE
         sched_ctrl->aggregation_level,
         sched_pusch->rbStart,
         sched_pusch->rbSize,
-        sched_pusch->tda_info.startSymbolIndex,
-        sched_pusch->tda_info.nrOfSymbols,
+        sched_pusch->time_domain_allocation,
         sched_pusch->dmrs_info.ul_dmrs_symb_pos,
         current_BWP->mcs_table,
         sched_pusch->mcs,
