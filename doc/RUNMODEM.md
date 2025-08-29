@@ -174,7 +174,7 @@ Therefore either SDR boards and a dedicated NTN channel emulator are required, o
 As shown on the [rfsimulator page](../radio/rfsimulator/README.md), RFsimulator provides different possibilities.
 E.g. to perform a simple simulation of a satellite in geostationary orbit (GEO), these parameters should be added to both gNB and UE command lines:
 ```
---rfsimulator.prop_delay 238.74
+--rfsimulator.[0].prop_delay 238.74
 ```
 
 For simulation of a satellite in low earth orbit (LEO), two channel models have been added to rfsimulator:
@@ -210,7 +210,7 @@ This can be done by either providing this line in the conf file in section `rfsi
 ```
 Or by providing this the the command line parameters:
 ```
---rfsimulator.options chanmod
+--rfsimulator.[0].options chanmod
 ```
 
 #### gNB
@@ -338,7 +338,7 @@ position0 = {
 So an example NR UE command for FDD, 5MHz BW, 15 kHz SCS, transparent GEO satellite 5G NR NTN is this:
 ```
 cd cmake_targets
-sudo ./ran_build/build/nr-uesoftmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.conf --band 254 -C 2488400000 --CO -873500000 -r 25 --numerology 0 --ssb 60 --rfsim --rfsimulator.prop_delay 238.74
+sudo ./ran_build/build/nr-uesoftmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.conf --band 254 -C 2488400000 --CO -873500000 -r 25 --numerology 0 --ssb 60 --rfsim --rfsimulator.[0].prop_delay 238.74
 ```
 
 For LEO satellite scenarios, the parameter `--ntn-initial-time-drift` must be provided via command line, as the UE needs this value to compensate for the time drift during initial sync, before SIB19 was received.
@@ -356,7 +356,7 @@ For other information on optional NR UE command line options, please refer [here
 So an example NR UE command for FDD, 5MHz BW, 15 kHz SCS, transparent LEO satellite 5G NR NTN is this:
 ```
 cd cmake_targets
-sudo ./ran_build/build/nr-uesoftmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.conf --band 254 -C 2488400000 --CO -873500000 -r 25 --numerology 0 --ssb 60 --rfsim --rfsimulator.prop_delay 20 --rfsimulator.options chanmod --time-sync-I 0.1 --ntn-initial-time-drift -46 --initial-fo 57340 --cont-fo-comp 2
+sudo ./ran_build/build/nr-uesoftmodem -O ../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.conf --band 254 -C 2488400000 --CO -873500000 -r 25 --numerology 0 --ssb 60 --rfsim --rfsimulator.[0].prop_delay 20 --rfsimulator.[0].options chanmod --time-sync-I 0.1 --ntn-initial-time-drift -46 --initial-fo 57340 --cont-fo-comp 2
 ```
 
 ## Specific OAI modes
@@ -381,7 +381,7 @@ sudo ./nr-uesoftmodem --phy-test [--reconfig-file ../../../ci-scripts/rrc-files/
 In summary:
 - If you are running on the same machine and launched the 2 executables (`nr-softmodem` and `nr-uesoftmodem`) from the same directory, nothing has to be done.
 - If you launched the 2 executables from 2 different folders, just point to the location where you launched the `nr-softmodem`:
-  * `sudo ./nr-uesoftmodem --rfsim --phy-test --reconfig-file /the/path/where/you/launched/nr-softmodem/reconfig-file --rbconfig-file /the/path/where/you/launched/nr-softmodem/rbconfig-file --rfsimulator.serveraddr <TARGET_GNB_INTERFACE_ADDRESS>`
+  * `sudo ./nr-uesoftmodem --rfsim --phy-test --reconfig-file /the/path/where/you/launched/nr-softmodem/reconfig-file --rbconfig-file /the/path/where/you/launched/nr-softmodem/rbconfig-file --rfsimulator.[0].serveraddr <TARGET_GNB_INTERFACE_ADDRESS>`
 - If you are not running on the same machine, you need to **COPY** the two raw files
   * `scp usera@machineA:/the/path/where/you/launched/nr-softmodem/r*config.raw userb@machineB:/the/path/where/you/will/launch/nr-uesoftmodem/`
   * Obviously this operation should be done before launching the `nr-uesoftmodem` executable.
@@ -428,7 +428,7 @@ To run using the RFsimulator:
 
 ```bash
 sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-LTE-EPC/CONF/gnb.band78.tm1.106PRB.usrpn300.conf --do-ra --rfsim
-sudo ./nr-uesoftmodem --do-ra --rfsim --rfsimulator.serveraddr 127.0.0.1
+sudo ./nr-uesoftmodem --do-ra --rfsim --rfsimulator.[0].serveraddr 127.0.0.1
 ```
 
 Using USRPs:

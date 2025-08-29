@@ -56,7 +56,7 @@
 #define RAU_REMOTE_THIRDPARTY_RADIO_HEAD 2
 #define MAX_WRITE_THREAD_PACKAGE     10
 #define MAX_WRITE_THREAD_BUFFER_SIZE 8
-#define MAX_CARDS 8
+#define MAX_CARDS 10
 
 typedef int64_t openair0_timestamp_t;
 typedef volatile int64_t openair0_vtimestamp_t;
