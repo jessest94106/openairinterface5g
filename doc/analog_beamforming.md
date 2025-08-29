@@ -24,7 +24,7 @@ In the `MACRLC` section of configuration files, there are three new parameters: 
 
 Setting analog beamforming to 1 or 2 changes the way FAPI beam index is treated. By setting 1, we instruct L1 to look up in Hi-PHY preconfigured DBM beam index. By setting 2, we instruct L2 to directly signal to Lo-PHY the beam index (e.g. over 7.2x fronthaul).
 
-DAS is enabled by setting to 1 the parameter `enable_das` in the L1 section of the configuration file. In case of DAS enabled, the field `beam_weights` in `MACRLC` section can be omitted.
+DAS is enabled by setting to 1 the parameter `enable_das` in the L1 section of the configuration file. In case of DAS enabled, the field `beam_weights` in `MACRLC` section can be omitted and the number of beams per period equals the total number of beams.
 
 # Implementation in OAI scheduler
 
