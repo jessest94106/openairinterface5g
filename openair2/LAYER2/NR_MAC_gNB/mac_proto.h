@@ -431,7 +431,6 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
                   NR_sched_pdcch_t *sched_pdcch,
-                  bool is_common,
                   float pdcch_cl_adjust);
 
 bool nr_find_nb_rb(uint16_t Qm,

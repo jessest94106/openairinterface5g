@@ -915,7 +915,6 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                                  ss,
                                  coreset,
                                  &UE->UE_sched_ctrl.sched_pdcch,
-                                 true,
                                  0);
     if (CCEIndex < 0) {
       LOG_E(NR_MAC, "UE %04x cannot find free CCE!\n", UE->rnti);
@@ -1507,7 +1506,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
   }
 
   uint8_t aggregation_level;
-  int CCEIndex = get_cce_index(nr_mac, CC_id, slotP, 0, &aggregation_level, beam.idx, ss, coreset, &sched_ctrl->sched_pdcch, true, 0);
+  int CCEIndex = get_cce_index(nr_mac, CC_id, slotP, 0, &aggregation_level, beam.idx, ss, coreset, &sched_ctrl->sched_pdcch, 0);
 
   if (CCEIndex < 0) {
     LOG_W(NR_MAC, "UE %04x: %d.%d cannot find free CCE for Msg2!\n", UE->rnti, frameP, slotP);
@@ -1707,7 +1706,6 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
                                  ss,
                                  coreset,
                                  &sched_ctrl->sched_pdcch,
-                                 true,
                                  0);
 
     if (CCEIndex < 0) {

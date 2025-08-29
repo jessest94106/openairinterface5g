@@ -572,10 +572,9 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
                   NR_sched_pdcch_t *sched_pdcch,
-                  bool is_common,
                   float pdcch_cl_adjust)
 {
-  const uint32_t Y = is_common ? 0 : get_Y(ss, slot, rnti);
+  const uint32_t Y = get_Y(ss, slot, rnti);
   uint8_t nr_of_candidates;
 
   int agg_level_search_order[NUM_PDCCH_AGG_LEVELS];
