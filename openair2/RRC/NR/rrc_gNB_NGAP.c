@@ -367,6 +367,10 @@ static nr_sdap_configuration_t get_sdap_config(const bool enable_sdap)
  */
 bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession_t *sessions, uint64_t ueAggMaxBitRateDownlink)
 {
+  if (ueAggMaxBitRateDownlink == UINT64_MAX) {
+    LOG_E(NR_RRC, "UE %d: UE aggregate maximum bitrate must be known by the NG-RAN node\n", UE->rrc_ue_id);
+    return false;
+  }
   AssertFatal(UE->as_security_active, "logic bug: security should be active when activating DRBs\n");
   e1ap_bearer_setup_req_t bearer_req = {0};
 
@@ -497,12 +501,15 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
   UE->nas_pdu = req->nas_pdu;
 
   if (req->nb_of_pdusessions > 0) {
+    AssertFatal(req->has_ue_ambr, "UE aggregate maximum bitrate is required when there are PDU sessions to setup");
     /* if there are PDU sessions to setup, store them to be created once
      * security (and UE capabilities) are received */
     UE->n_initial_pdu = req->nb_of_pdusessions;
     UE->initial_pdus = calloc_or_fail(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
     for (int i = 0; i < UE->n_initial_pdu; ++i)
       cp_pdusession_resource_item_to_pdusession(&UE->initial_pdus[i], &req->pdusession[i]);
+    UE->ambr.dl_br = req->ue_ambr.br_dl;
+    UE->ambr.ul_br = req->ue_ambr.br_ul;
   }
 
   /* security */
@@ -525,7 +532,7 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
       // do not remove the above allocation which is reused here: this is used
       // in handle_rrcReconfigurationComplete() to know that we need to send a
       // Initial context setup response message
-      if (!trigger_bearer_setup(rrc, UE, UE->n_initial_pdu, UE->initial_pdus, 0)) {
+      if (!trigger_bearer_setup(rrc, UE, UE->n_initial_pdu, UE->initial_pdus, UE->ambr.dl_br)) {
         LOG_W(NR_RRC, "UE %d: reject PDU Session Setup in Initial Context Setup Response\n", UE->rrc_ue_id);
         ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE};
         send_ngap_initial_context_setup_resp_fail(rrc->module_id, req, cause);
@@ -878,9 +885,13 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
   for (int i = 0; i < msg->nb_pdusessions_tosetup; ++i)
     cp_pdusession_resource_item_to_pdusession(&to_setup[i], &msg->pdusession[i]);
 
-  uint64_t dl_ambr = msg->has_ue_ambr ? msg->ueAggMaxBitRate.br_dl : 0;
+  /** Set AMBR if provided (optional) */
+  if (msg->has_ue_ambr) {
+    UE->ambr.dl_br = msg->ueAggMaxBitRate.br_dl;
+    UE->ambr.ul_br = msg->ueAggMaxBitRate.br_ul;
+  }
 
-  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, to_setup, dl_ambr)) {
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_pdusessions_tosetup, to_setup, UE->ambr.dl_br)) {
     // Reject PDU Session Resource setup if there's no CU-UP associated
     LOG_W(NR_RRC, "UE %d: reject PDU Session Setup in PDU Session Resource Setup Response\n", UE->rrc_ue_id);
     ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE};
@@ -1199,7 +1210,11 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     cp_pdusession_transfer_to_pdusession(pdu, &ho_pdu->pdusessionTransfer);
   }
 
-  if (!trigger_bearer_setup(rrc, UE, msg->nb_of_pdusessions, to_setup, msg->ue_ambr.br_dl)) {
+  // Store UE aggregate maximum bitrate
+  UE->ambr.dl_br = msg->ue_ambr.br_dl;
+  UE->ambr.ul_br = msg->ue_ambr.br_ul;
+
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_of_pdusessions, to_setup, UE->ambr.dl_br)) {
     LOG_E(NR_RRC, "Failed to establish PDU session: handover failed\n");
 
     ngap_handover_failure_t fail = {
@@ -1211,7 +1226,6 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     rrc_remove_ue(rrc, ue_context_p);
     return -1;
   }
-
   return 0;
 }
 
