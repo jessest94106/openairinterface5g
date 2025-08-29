@@ -746,6 +746,34 @@ static inline __attribute__((always_inline)) __m512i cmac_prec512(__m512i y, __m
       return _mm512_adds_epi16(y, produ);
 }
 #endif
+#ifdef __AVX2__
+static inline __attribute__((always_inline)) __m256i cmac0_prec256(__m256i x, __m256i w_c, __m256i w_s) {
+
+      // Multiplication and shift
+      const __m256i reals =
+          _mm256_srai_epi32(_mm256_madd_epi16(x, w_c), 15); // (int32_t) .r = (x.r * w.r - x.i * w.i) >> 15
+      const __m256i imags =
+          _mm256_slli_epi32(_mm256_madd_epi16(x, w_s),  1); // (int32_t) .i = (x.r * w.i + x.i * w.r) << 1, since higher 16 bit of each 32 bit is taken by blend_epi16
+
+      // Re-arrange to match c16_t format
+      return _mm256_blend_epi16(reals, imags,0xAA);
+
+}
+static inline __attribute__((always_inline)) __m256i cmac_prec256(__m256i y, __m256i x, __m256i w_c, __m256i w_s) {
+
+      // Multiplication and shift
+      const __m256i reals =
+          _mm256_srai_epi32(_mm256_madd_epi16(x, w_c), 15); // (int32_t) .r = (x.r * w.r - x.i * w.i) >> 15
+      const __m256i imags =
+          _mm256_slli_epi32(_mm256_madd_epi16(x, w_s),  1); // (int32_t) .i = (x.r * w.i + x.i * w.r) << 1, since higher 16 bit of each 32 bit is taken by blend_epi16
+
+      // Re-arrange to match c16_t format
+      const __m256i produ = _mm256_blend_epi16(reals, imags,0xAA);
+
+      // Accumulate the product
+      return _mm256_adds_epi16(y, produ);
+}
+#endif
 void nr_layer_precoder_simd(const int n_layers,
                             const int symSz,
                             const c16_t txdataF_res_mapped[n_layers][symSz],
@@ -841,70 +869,92 @@ void nr_layer_precoder_simd(const int n_layers,
       _mm512_storeu_si512(&txdataF_precoded[sc],y); 
     }
   }
-  /*
-  const uint32_t re_cnt_align16 = re_cnt & ~15;
-  for (; sc < sc_offset + (re_cnt_align16); sc += sizeof(simde__m256i) / sizeof(prec_weight)) {
-    // Matrix multiplication for 4 elements of the result (sizeof(simde__m256i) / sizeof(*prec_matrix) = 8)
- 
-    __m512i y = _mm512_set1_epi16(0); // Y = W[0]*X[0] + W[1]*X[1] + ... + W[nrOfLayers-1]*X[nrOfLayers-1]
-    for (int nl = 0; nl < n_layers; nl++) {
-      prec_weight.r = pmi_pdu->weights[nl][ant].precoder_weight_Re;
-      prec_weight.i = pmi_pdu->weights[nl][ant].precoder_weight_Im;
-
-      const __m512i x = _mm512_loadu_si512(&txdataF_res_mapped[nl][sc]);
-
-      // Rearrange precoding matrix weight to match complex multiplication and broadcast it to match SIMD size
-      const __m512i w_c = _mm512_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
-      const __m512i w_s = _mm512_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
-
-      // Multiplication and shift
-      const __m512i reals =
-          _mm512_srai_epi32(_mm512_madd_epi16(x, w_c), 15); // (int32_t) .r = (x.r * w.r - x.i * w.i) >> 15
-      const __m512i imags =
-          _mm512_slli_epi32(_mm512_madd_epi16(x, w_s),  1); // (int32_t) .i = (x.r * w.i + x.i * w.r) << 1, since higher 16 bit of each 32 bit is taken by blend_epi16
-
-      // Re-arrange to match c16_t format
-      const __m512i produ = _mm512_mask_blend_epi16(0xAAAAAAAA,reals, imags);
-
-      // Accumulate the product
-      y = _mm512_adds_epi16(y, produ);
-    }
-    // Store the result to txdataF
-    _mm512_storeu_si512(&txdataF_precoded[sc], y);
-  }
-  */
+  else AssertFatal(1==0,"Shouldn't get here, n_layers %d\n",n_layers);
 #endif
 #ifdef __AVX2__
   const uint32_t re_cnt_align8 = re_cnt & ~7;
-  for (; sc < sc_offset + (re_cnt_align8); sc += sizeof(simde__m256i) / sizeof(prec_weight)) {
-    // Matrix multiplication for 4 elements of the result (sizeof(simde__m256i) / sizeof(*prec_matrix) = 8)
+  if (n_layers==2) {
  
     simde__m256i y = simde_mm256_set1_epi16(0); // Y = W[0]*X[0] + W[1]*X[1] + ... + W[nrOfLayers-1]*X[nrOfLayers-1]
-    for (int nl = 0; nl < n_layers; nl++) {
-      prec_weight.r = pmi_pdu->weights[nl][ant].precoder_weight_Re;
-      prec_weight.i = pmi_pdu->weights[nl][ant].precoder_weight_Im;
+    prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
+    const simde__m256i w_c0 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s0 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    prec_weight.r = pmi_pdu->weights[1][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[1][ant].precoder_weight_Im;
+    const simde__m256i w_c1 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s1 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
 
-      const simde__m256i x = simde_mm256_loadu_si256(&txdataF_res_mapped[nl][sc]);
+    for (; sc < sc_offset + (re_cnt_align8); sc += sizeof(simde__m256i) / sizeof(prec_weight)) {
+      const simde__m256i x0 = simde_mm256_loadu_si256(&txdataF_res_mapped[0][sc]);
 
-      // Rearrange precoding matrix weight to match complex multiplication and broadcast it to match SIMD size
-      const simde__m256i w_c = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
-      const simde__m256i w_s = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
-
-      // Multiplication and shift
-      const simde__m256i reals =
-          simde_mm256_srai_epi32(simde_mm256_madd_epi16(x, w_c), 15); // (int32_t) .r = (x.r * w.r - x.i * w.i) >> 15
-      const simde__m256i imags =
-          simde_mm256_slli_epi32(simde_mm256_madd_epi16(x, w_s),  1); // (int32_t) .i = (x.r * w.i + x.i * w.r) << 1, since higher 16 bit of each 32 bit is taken by blend_epi16
-
-      // Re-arrange to match c16_t format
-      const simde__m256i produ = simde_mm256_blend_epi16(reals, imags, 0xAA);
-
+      const simde__m256i x1 = simde_mm256_loadu_si256(&txdataF_res_mapped[1][sc]);
       // Accumulate the product
-      y = simde_mm256_adds_epi16(y, produ);
+      y = cmac0_prec256(x0,w_c0,w_s0);
+      y = cmac_prec256(y,x1,w_c1,w_s1);
+      // Store the result to txdataF
+      simde_mm256_storeu_si256(&txdataF_precoded[sc], y);
     }
-    // Store the result to txdataF
-    simde_mm256_storeu_si256(&txdataF_precoded[sc], y);
   }
+  else if (n_layers==3) {
+    simde__m256i y = simde_mm256_set1_epi16(0); // Y = W[0]*X[0] + W[1]*X[1] + ... + W[nrOfLayers-1]*X[nrOfLayers-1]
+    prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
+    const simde__m256i w_c0 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s0 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    prec_weight.r = pmi_pdu->weights[1][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[1][ant].precoder_weight_Im;
+    const simde__m256i w_c1 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s1 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    prec_weight.r = pmi_pdu->weights[2][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[2][ant].precoder_weight_Im;
+    const simde__m256i w_c2 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s2 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+
+    for (; sc < sc_offset + (re_cnt_align8); sc += sizeof(simde__m256i) / sizeof(prec_weight)) {
+      const simde__m256i x0 = simde_mm256_loadu_si256(&txdataF_res_mapped[0][sc]);
+      const simde__m256i x1 = simde_mm256_loadu_si256(&txdataF_res_mapped[1][sc]);
+      const simde__m256i x2 = simde_mm256_loadu_si256(&txdataF_res_mapped[2][sc]);
+      y = cmac0_prec256(x0,w_c0,w_s0);
+      y = cmac_prec256(y,x1,w_c1,w_s1);
+      y = cmac_prec256(y,x2,w_c2,w_s2);
+      // Store the result to txdataF
+      simde_mm256_storeu_si256(&txdataF_precoded[sc], y);
+    }
+  }
+  else if (n_layers==4) {
+    simde__m256i y = simde_mm256_set1_epi16(0); // Y = W[0]*X[0] + W[1]*X[1] + ... + W[nrOfLayers-1]*X[nrOfLayers-1]
+    prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
+    const simde__m256i w_c0 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s0 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    prec_weight.r = pmi_pdu->weights[1][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[1][ant].precoder_weight_Im;
+    const simde__m256i w_c1 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s1 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    prec_weight.r = pmi_pdu->weights[2][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[2][ant].precoder_weight_Im;
+    const simde__m256i w_c2 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s2 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+
+    prec_weight.r = pmi_pdu->weights[3][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[3][ant].precoder_weight_Im;
+    const simde__m256i w_c3 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s3 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    for (; sc < sc_offset + (re_cnt_align8); sc += sizeof(simde__m256i) / sizeof(prec_weight)) {
+      const simde__m256i x0 = simde_mm256_loadu_si256(&txdataF_res_mapped[0][sc]);
+      const simde__m256i x1 = simde_mm256_loadu_si256(&txdataF_res_mapped[1][sc]);
+      const simde__m256i x2 = simde_mm256_loadu_si256(&txdataF_res_mapped[2][sc]);
+      const simde__m256i x3 = simde_mm256_loadu_si256(&txdataF_res_mapped[3][sc]);
+      y = cmac0_prec256(x0,w_c0,w_s0);
+      y = cmac_prec256(y,x1,w_c1,w_s1);
+      y = cmac_prec256(y,x2,w_c2,w_s2);
+      y = cmac_prec256(y,x3,w_c3,w_s3);
+      // Store the result to txdataF
+      simde_mm256_storeu_si256(&txdataF_precoded[sc], y);
+    }
+  }
+  else AssertFatal(1==0,"Shouldn't get here, n_layers %d\n",n_layers);
 #endif
   // 128 SIMD: Do 4 RE in one iteration, 3 iterations for 1 RB
   const uint32_t re_cnt_align4 = re_cnt & ~3;
