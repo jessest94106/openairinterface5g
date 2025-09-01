@@ -42,8 +42,7 @@
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
 #endif
 
-typedef enum { HO_CTX_BOTH, HO_CTX_SOURCE, HO_CTX_TARGET } ho_ctx_type_t;
-static nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type)
+nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type)
 {
   nr_handover_context_t *ho_ctx = calloc_or_fail(1, sizeof(*ho_ctx));
   if (type == HO_CTX_SOURCE || type == HO_CTX_BOTH) {

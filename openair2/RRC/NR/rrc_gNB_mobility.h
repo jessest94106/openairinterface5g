@@ -72,6 +72,9 @@ typedef struct nr_handover_context_s {
   nr_ho_target_cu_t *target;
 } nr_handover_context_t;
 
+typedef enum { HO_CTX_BOTH, HO_CTX_SOURCE, HO_CTX_TARGET } ho_ctx_type_t;
+nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type);
+
 void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du);
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue);
 
