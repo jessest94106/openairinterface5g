@@ -797,6 +797,7 @@ static void pf_dl(module_id_t module_id,
             rbStart,
             max_rbSize,
             rbStop);
+      reset_beam_status(&mac->beam_info, frame, slot, iterator->UE->UE_beam_index, slots_per_frame, beam.new_beam);
       iterator++;
       continue;
     }
