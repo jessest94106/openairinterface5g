@@ -140,6 +140,104 @@ You can view all available options by typing:
 ```shell
 ./nr-uesoftmodem --help
 ```
+
+### NR UE: Configure multiple RF-frontends (RUs)
+
+Multiple RF-frontends (also called RUs) can be defined for the nr-uesoftmodem.
+Therefore, two sections in the NR UE configuration file are used:
+- `RUs`
+- `cells`
+
+The `RUs` section in the NR UE configuration file contains an array of elements, where each element has these properies:
+
+| Property name    | Type           | Default value | Description                          |
+| ---------------- | -------------- | ------------- | ------------------------------------ |
+| nb_tx            | integer        | 1             | Number of TX Antennas                |
+| nb_rx            | integer        | 1             | Number of RX Antennas                |
+| att_tx           | integer        | 0             | TX Attenuation in dB                 |
+| att_rx           | integer        | 0             | RX Attenuation in dB                 |
+| max_rxgain       | integer        | 120           | Maximum RX Gain at 0 dB Attenuation  |
+| sdr_addrs        | string         | type=b200     | SDR Parameter String                 |
+| tx_subdev        | string         |               | SDR TX Subdevice                     |
+| rx_subdev        | string         |               | SDR RX Subdevice                     |
+| clock_src        | string         | internal      | SDR Clock Source                     |
+| time_src         | string         | internal      | SDR Time Source                      |
+| tune_offset      | floating point | 0.0           | SDR Tune Offset in Hz                |
+| if_freq          | integer        | 0             | DL Intermediate Frequency in Hz      |
+| if_offset        | integer        | 0             | UL Intermediate Frequency Offset in Hz |
+
+The `cells` section in the NR UE configuration file contains an array of elements, where each element has these properies:
+
+| Property name    | Type    | Default value | Description                              |
+| ---------------- | ------- | ------------- | ---------------------------------------- |
+| ru_id            | integer | 0             | ID of the associated RU from the `RUs` section |
+| band             | integer | 78            | 5G NR Band                               |
+| rf_freq          | integer | 0             | DL Carrier Centre Frequency in Hz        |
+| rf_offset        | integer | 0             | DL Carrier Centre Frequency Offset in Hz |
+| numerology       | integer | 1             | 5G NR Numerology (µ)                     |
+| N_RB_DL          | integer | 106           | Number of DL Carrier Ressource Blocks    |
+| ssb_start        | integer | 516           | Ressource Element where the SSB Starts   |
+
+There are different scenarios where multiple RF-frontends (also called RUs) are beneficial for the NR UE:
+
+1. RF-Simulator Inter-Frequency Handover between multiple cells
+2. Multiple UEs in one instance, each using their own RF-frontend (RF-Simulator connection)
+3. Different Antennas connected to different RF-ports
+4. Concurrent connection to multiple carriers (carrier aggregation CA)
+
+This would be and example configuration for the 1. scenario:
+
+```
+rfsimulator = (
+    {
+        serveraddr = "127.0.0.2";
+        serverport = 4043;
+    }, {
+        serveraddr = "127.0.0.3";
+        serverport = 4044;
+    }
+);
+
+RUs = (
+    {
+        nb_tx = 1;
+        nb_rx = 1;
+    }, {
+        nb_tx = 1;
+        nb_rx = 1;
+    }
+);
+
+cells = (
+    {
+        ru_id      = 0;
+        band       = 78;
+        rf_freq    = 3619200000L;
+        numerology = 1;
+        N_RB_DL    = 106;
+        ssb_start  = 516;
+    }, {
+        ru_id      = 1;
+        band       = 78;
+        rf_freq    = 3649440000L;
+        numerology = 1;
+        N_RB_DL    = 106;
+        ssb_start  = 516;
+    }
+);
+```
+
+An example for the 2. scenario can be found in the file [ci-scripts/yaml_files/5g_rfsimulator_multiue/nrue.uicc.conf](../ci-scripts/yaml_files/5g_rfsimulator_multiue/nrue.uicc.conf).
+
+The 3. scenario is similar to 1., but instead of providing RF-Simulator parameters, actual SDR parameters have to be provided.
+
+The 4. scenario is not supported, as the NR UE does not implement CA, yet.
+
+Current Limitations:
+- Each RU can be used by only one cell.
+- Each RU and cell can be used by only one UE (no RU sharing implemented, yet).
+- The sampling rates of all RUs must be the same.
+
 ### Common gNB and NR UE command line options
 
 #### Three-quarter sampling
