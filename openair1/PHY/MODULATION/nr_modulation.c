@@ -827,7 +827,21 @@ void nr_layer_precoder_simd(const int n_layers,
   // 512/256 SIMD: Do 16/8 RE in one iteration, 3 iterations for 2 RB
 #if defined(__AVX512F__) && defined(__AVX512BW__)	    
   const uint32_t re_cnt_align16 = re_cnt & ~15;
-  if (n_layers==2) {
+  if (n_layers==1) {
+    prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
+    const __m512i w_c = _mm512_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const __m512i w_s = _mm512_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+    __m512i y  = _mm512_set1_epi16(0);
+    for (; sc < sc_offset + (re_cnt_align16); sc += sizeof(__m512i) / sizeof(prec_weight)) {
+
+      const __m512i x = _mm512_loadu_si512(&txdataF_res_mapped[0][sc]);
+    // Matrix multiplication for 4 elements of the result (sizeof(simde__m256i) / sizeof(*prec_matrix) = 8)
+      y=cmac0_prec512(x,w_c,w_s);	
+      _mm512_storeu_si512(&txdataF_precoded[sc],y); 
+    }
+  }
+  else if (n_layers==2) {
     prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
     prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
     const __m512i w_c = _mm512_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
@@ -909,7 +923,23 @@ void nr_layer_precoder_simd(const int n_layers,
 #endif
 #ifdef __AVX2__
   const uint32_t re_cnt_align8 = re_cnt & ~7;
-  if (n_layers==2) {
+  if (n_layers==1) {
+ 
+    simde__m256i y = simde_mm256_set1_epi16(0); // Y = W[0]*X[0] + W[1]*X[1] + ... + W[nrOfLayers-1]*X[nrOfLayers-1]
+    prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
+    const simde__m256i w_c0 = simde_mm256_set1_epi32(c16toI32(c16conj(prec_weight))); // broadcast conjugate of w
+    const simde__m256i w_s0 = simde_mm256_set1_epi32(c16toI32(c16swap(prec_weight))); // broadcast swapped real and img of w
+
+    for (; sc < sc_offset + (re_cnt_align8); sc += sizeof(simde__m256i) / sizeof(prec_weight)) {
+      const simde__m256i x0 = simde_mm256_loadu_si256(&txdataF_res_mapped[0][sc]);
+      // Accumulate the product
+      y = cmac0_prec256(x0,w_c0,w_s0);
+      // Store the result to txdataF
+      simde_mm256_storeu_si256(&txdataF_precoded[sc], y);
+    }
+  }
+  else if (n_layers==2) {
  
     simde__m256i y = simde_mm256_set1_epi16(0); // Y = W[0]*X[0] + W[1]*X[1] + ... + W[nrOfLayers-1]*X[nrOfLayers-1]
     prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
@@ -1004,6 +1034,22 @@ void nr_layer_precoder_simd(const int n_layers,
 #ifdef __aarch64__
 
   const uint32_t re_cnt_align8 = re_cnt & ~3;
+  if (n_layers==1) {
+ 
+    prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
+    prec_weight.i = pmi_pdu->weights[0][ant].precoder_weight_Im;
+    const int16x8_t wr0 = vdupq_n_s16(prec_weight.r); 
+    const int16x8_t wi0 = vdupq_n_s16(prec_weight.i); 
+    int16x8_t y;
+
+    for (; sc < sc_offset + (re_cnt_align8); sc += sizeof(int16x8_t) / sizeof(prec_weight)) {
+      const int16x8_t x0 = vld1q_s16((const int16_t*)&txdataF_res_mapped[0][sc]);
+      // Accumulate the product
+      y = cmac0_prec128(x0,wr0,wi0);
+      // Store the result to txdataF
+      *((int16x8_t*)&txdataF_precoded[sc])= y;
+    }
+  }
   if (n_layers==2) {
  
     prec_weight.r = pmi_pdu->weights[0][ant].precoder_weight_Re;
