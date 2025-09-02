@@ -230,10 +230,10 @@ After preparing the L1 software, the container needs to be committed to create a
 In this file the RU MAC address needs to be specified before commiting the image.
 
 ```bash
-~$ docker commit nv-cubb cubb-build:25-1
+~$ docker commit nv-cubb cubb-build:25-2
 ~$ docker image ls
 ..
-cubb-build                                    25-1                                           824156e0334c   2 weeks ago    23.9GB
+cubb-build                                    25-2                                           824156e0334c   2 weeks ago    23.9GB
 -..
 ```
 
