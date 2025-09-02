@@ -3683,13 +3683,13 @@ static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_
   return ul_max_layers;
 }
 
-void update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
-                                           const nr_mac_config_t *configuration,
-                                           const NR_UE_NR_Capability_t *uecap,
-                                           const NR_ServingCellConfigCommon_t *scc,
-                                           int uid,
-                                           int old_bwp,
-                                           int new_bwp)
+NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
+                                                             const nr_mac_config_t *configuration,
+                                                             const NR_UE_NR_Capability_t *uecap,
+                                                             const NR_ServingCellConfigCommon_t *scc,
+                                                             int uid,
+                                                             int old_bwp,
+                                                             int new_bwp)
 {
   NR_SpCellConfig_t *spCellConfig = cellGroupConfig->spCellConfig;
   NR_ServingCellConfig_t *configDedicated = spCellConfig->spCellConfigDedicated;
@@ -3751,6 +3751,17 @@ void update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig
     NR_BWP_Uplink_t *ul_bwp = config_uplinkBWP(new_bwp - 1, true, uid, ul_maxMIMO_Layers, configuration, scc, uecap);
     asn1cSeqAdd(&uplinkConfig->uplinkBWP_ToAddModList->list, ul_bwp);
   }
+
+  // we temporarily need to keep both the old and the new BWP in the CG used by the gNB
+  // while removing the old from the CG sent to the UE
+  if (old_bwp > 0) {
+    NR_CellGroupConfig_t *clone_cg = NULL;
+    const int copy_result = asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&clone_cg, cellGroupConfig);
+    AssertFatal(copy_result == 0, "unable to copy NR_CellGroupConfig for cloning\n");
+    clean_bwp_structures(clone_cg->spCellConfig);
+    return clone_cg;
+  }
+  return NULL;
 }
 
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
