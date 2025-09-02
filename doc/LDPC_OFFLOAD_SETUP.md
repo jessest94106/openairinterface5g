@@ -301,10 +301,12 @@ sudo ./nr-softmodem -O ~/gnb.conf --loader.ldpc.shlibversion _aal --nrLDPC_codin
 ## Potential Low Throughput
 
 The current implementation has been tested to work in an end-to-end setup and is functional. 
-However, there are still opportunities for optimization, particularly in LDPC decoding performance, which is an area of ongoing improvement. 
+However, depending on the accelerator in use,
+there are still opportunities for optimization, particularly in LDPC decoding performance, which is an area of ongoing improvement. 
 As such, downlink/uplink throughput may be suboptimal with the default configurations, but enhancements are actively being explored.
 
-To achieve better E2E performance with the current implementation, we recommend the following adjustments:
+For example, to achieve better E2E performance with the current implementation with Intel ACC 100 and 200 (vRAN Boost),
+we recommend the following adjustments:
 1. Increasing the number of LDPC decoding iterations of the L1, e.g., `max_ldpc_iterations` to 200.
 2. Increasing the BLER targets of the MAC scheduler. 
 
