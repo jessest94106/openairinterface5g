@@ -551,7 +551,6 @@ static bool allocate_dl_retransmission(module_id_t module_id,
                                sched_ctrl->search_space,
                                sched_ctrl->coreset,
                                &sched_ctrl->sched_pdcch,
-                               false,
                                sched_ctrl->pdcch_cl_adjust);
   if (CCEIndex<0) {
     sched_ctrl->dl_cce_fail++;
@@ -798,6 +797,7 @@ static void pf_dl(module_id_t module_id,
             rbStart,
             max_rbSize,
             rbStop);
+      reset_beam_status(&mac->beam_info, frame, slot, iterator->UE->UE_beam_index, slots_per_frame, beam.new_beam);
       iterator++;
       continue;
     }
@@ -811,7 +811,6 @@ static void pf_dl(module_id_t module_id,
                                  sched_ctrl->search_space,
                                  sched_ctrl->coreset,
                                  &sched_ctrl->sched_pdcch,
-                                 false,
                                  sched_ctrl->pdcch_cl_adjust);
     if (CCEIndex < 0) {
       sched_ctrl->dl_cce_fail++;
