@@ -12,7 +12,7 @@ The RRC layer controls the basic connection setup of UEs as well as additional
 procedures. It is the fundamental building block of OAI's CU-CP, and interacts
 with lower layers (DU, basically MAC and RLC) through F1AP messages, and with
 the CU-UP through E1AP messages. More information can be found in the
-respective [F1AP page](../F1-design.md) and [E1AP page](../E1AP/E1-design.md).
+respective [F1AP page](../F1AP/F1-design.md) and [E1AP page](../E1AP/E1-design.md).
 
 # Periodic output and interpretation
 
@@ -57,7 +57,7 @@ As of now, it does not print information about connected CU-UPs or AMFs.
 
 ## Split-related options (when running in a CU or CU-CP)
 
-See [F1 documentation](../F1-design.md) for information about the F1 split.
+See [F1 documentation](../F1AP/F1-design.md) for information about the F1 split.
 See [E1 documentation](../E1AP/E1-design.md) for information about the E1 split.
 
 ## RRC-specific configuration options
