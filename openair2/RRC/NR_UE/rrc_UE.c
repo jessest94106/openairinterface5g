@@ -1673,7 +1673,7 @@ static void nr_rrc_manage_rlc_bearers(NR_UE_RRC_INST_t *rrc, const NR_CellGroupC
     for (int i = 0; i < cellGroupConfig->rlc_BearerToReleaseList->list.count; i++) {
       NR_LogicalChannelIdentity_t *lcid = cellGroupConfig->rlc_BearerToReleaseList->list.array[i];
       AssertFatal(lcid, "LogicalChannelIdentity shouldn't be null here\n");
-      nr_rlc_release_entity(rrc->ue_id, *lcid);
+      nr_rrc_release_rlc_entity(rrc, *lcid);
     }
   }
 
