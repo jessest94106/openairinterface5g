@@ -982,43 +982,10 @@ int gtpv1u_delete_all_s1u_tunnel(const instance_t instance, const rnti_t rnti)
   return newGtpuDeleteAllTunnels(instance, rnti);
 }
 
-int newGtpuDeleteTunnels(instance_t instance, ue_id_t ue_id, int nbTunnels, int *pdusession_id)
-{
-  LOG_D(GTPU, "[%ld] Start delete tunnels for ue id %lu\n", instance, ue_id);
-  pthread_mutex_lock(&globGtp.gtp_lock);
-  getInstRetInt(compatInst(instance));
-  getUeRetInt(inst, ue_id);
-  int nb = 0;
-
-  for (int i = 0; i < nbTunnels; i++) {
-    auto ptr2 = ptrUe->second.bearers.find(pdusession_id[i]);
-
-    if (ptr2 == ptrUe->second.bearers.end()) {
-      LOG_E(GTPU, "[%ld] GTP-U instance: delete of not existing tunnel UE ID:RAB: %ld/%x\n", instance, ue_id, pdusession_id[i]);
-    } else {
-      globGtp.te2ue_mapping.erase(ptr2->second.teid_incoming);
-      nb++;
-    }
-  }
-
-  if (ptrUe->second.bearers.size() == 0)
-    // no tunnels on this ue id, erase the ue entry
-    inst->ue2te_mapping.erase(ptrUe);
-
-  pthread_mutex_unlock(&globGtp.gtp_lock);
-  LOG_I(GTPU, "[%ld] Deleted all tunnels for ue id %lu (%d tunnels deleted)\n", instance, ue_id, nb);
-  return !GTPNOK;
-}
-
 int gtpv1u_delete_x2u_tunnel(const instance_t instanceP, const gtpv1u_enb_delete_tunnel_req_t *const req_pP)
 {
   LOG_E(GTPU, "x2 tunnel not implemented\n");
   return 0;
-}
-
-int gtpv1u_delete_ngu_tunnel(const instance_t instance, gtpv1u_gnb_delete_tunnel_req_t *req)
-{
-  return newGtpuDeleteTunnels(instance, req->ue_id, req->num_pdusession, req->pdusession_id);
 }
 
 static gtpv1u_bearer_t create_bearer(int socket, const struct sockaddr_in *addr, uint32_t teid, uint16_t seq)
