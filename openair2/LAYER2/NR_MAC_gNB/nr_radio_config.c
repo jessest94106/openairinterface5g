@@ -1150,7 +1150,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
         tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 13));
         asn1cSeqAdd(&tda_list->list, tda);
         if (do_SRS) {
-          tda = set_TimeDomainResourceAllocation(k2, get_SLIV(0, 12));
+          tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 12));
           asn1cSeqAdd(&tda_list->list, tda);
         }
       }
