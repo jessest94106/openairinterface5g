@@ -2517,7 +2517,7 @@ void set_max_fb_time(NR_UE_UL_BWP_t *UL_BWP, const NR_UE_DL_BWP_t *DL_BWP)
 {
   UL_BWP->max_fb_time = 8; // default value
   // take the maximum in dl_DataToUL_ACK list
-  if (DL_BWP->dci_format != NR_DL_DCI_FORMAT_1_0 && UL_BWP->pucch_Config) {
+  if (UL_BWP->pucch_Config) {
     const struct NR_PUCCH_Config__dl_DataToUL_ACK *fb_times = UL_BWP->pucch_Config->dl_DataToUL_ACK;
     for (int i = 0; i < fb_times->list.count; i++) {
       if(*fb_times->list.array[i] > UL_BWP->max_fb_time)
