@@ -886,7 +886,8 @@ static void nr_configure_lc_config(NR_UE_MAC_INST_t *mac,
                                    nr_lcid_rb_t rb)
 {
   NR_LC_SCHEDULING_INFO *lc_sched_info = get_scheduling_info_from_lcid(mac, lc_info->lcid);
-  lc_info->rb = rb;
+  if (rb.type != NR_LCID_NONE)
+    lc_info->rb = rb;
   lc_info->rb_suspended = false;
   if (rb.type == NR_LCID_SRB && !mac_lc_config->ul_SpecificParameters) {
     // release configuration and reset to default
@@ -914,6 +915,12 @@ static void nr_configure_lc_config(NR_UE_MAC_INST_t *mac,
 static nr_lcid_rb_t configure_lcid_rb(NR_RLC_BearerConfig_t *rlc_bearer)
 {
   nr_lcid_rb_t rb;
+  if (!rlc_bearer->servedRadioBearer) {
+    LOG_W(NR_MAC, "RLC bearer config does not contain servedRadioBearer.\n");
+    rb.type = NR_LCID_NONE;
+    return rb;
+  }
+
   if (rlc_bearer->servedRadioBearer->present == NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity) {
     rb.type = NR_LCID_SRB;
     rb.choice.srb_id = rlc_bearer->servedRadioBearer->choice.srb_Identity;
@@ -953,8 +960,6 @@ static void configure_logicalChannelBearer(NR_UE_MAC_INST_t *mac,
     for (int i = 0; i < rlc_toadd_list->list.count; i++) {
       NR_RLC_BearerConfig_t *rlc_bearer = rlc_toadd_list->list.array[i];
       nr_lcid_rb_t rb = configure_lcid_rb(rlc_bearer);
-      if (rb.type == NR_LCID_NONE)
-        continue;
       int lc_identity = rlc_bearer->logicalChannelIdentity;
       NR_LogicalChannelConfig_t *mac_lc_config = rlc_bearer->mac_LogicalChannelConfig;
       int j;
