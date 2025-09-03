@@ -1651,6 +1651,22 @@ static void nr_rrc_signal_maxrtxindication(int ue_id)
   itti_send_msg_to_task(TASK_RRC_NRUE, ue_id, msg);
 }
 
+/** @brief Release all active RLC entities for a UE and set to inactive.
+ * This is typically used when tearing down all DRBs at UE side,
+ * such as after a PDU session release or full reconfiguration.
+ * @param rrc Pointer to NR_UE_RRC_INST_t structure
+ * @param id Logical Channel ID (must be in range [0, NR_MAX_NUM_LCID-1]) */
+static void nr_rrc_release_rlc_entity(NR_UE_RRC_INST_t *rrc, int id)
+{
+  DevAssert(rrc);
+  DevAssert(id >= 0 && id < NR_MAX_NUM_LCID);
+  if (rrc->active_RLC_entity[id]) {
+    rrc->active_RLC_entity[id] = false;
+    nr_rlc_release_entity(rrc->ue_id, id);
+    LOG_I(RLC, "Released RLC entity: ue_id=%ld, lc_id=%d\n", rrc->ue_id, id);
+  }
+}
+
 static void nr_rrc_manage_rlc_bearers(NR_UE_RRC_INST_t *rrc, const NR_CellGroupConfig_t *cellGroupConfig)
 {
   if (cellGroupConfig->rlc_BearerToReleaseList != NULL) {
@@ -1830,10 +1846,7 @@ static void nr_rrc_rrcsetup_fallback(NR_UE_RRC_INST_t *rrc)
     }
   }
   for (int i = 1; i < NR_MAX_NUM_LCID; i++) {
-    if (rrc->active_RLC_entity[i]) {
-      rrc->active_RLC_entity[i] = false;
-      nr_rlc_release_entity(rrc->ue_id, i);
-    }
+    nr_rrc_release_rlc_entity(rrc, i);
   }
   nr_sdap_delete_ue_entities(rrc->ue_id);
 
@@ -2938,10 +2951,7 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
     }
   }
   for (int i = 0; i < NR_MAX_NUM_LCID; i++) {
-    if (rrc->active_RLC_entity[i]) {
-      rrc->active_RLC_entity[i] = false;
-      nr_rlc_release_entity(rrc->ue_id, i);
-    }
+    nr_rrc_release_rlc_entity(rrc, i);
   }
 
   for (int i = 0; i < NB_CNX_UE; i++) {
