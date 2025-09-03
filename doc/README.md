@@ -71,8 +71,6 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
 Legacy unmaintained files:
 - [`L2NFAPI_NOS1.md`](./L2NFAPI_NOS1.md), [`L2NFAPI_S1.md`](./L2NFAPI_S1.md):
   old L2simulator, not valid anymore
-- [`SystemX-tutorial-design.md`](./SystemX-tutorial-design.md): old, high-level
-  documentation
 - [`UL_MIMO.txt`](./UL_MIMO.txt): UL-MIMO specific notes
 
 # Designs
