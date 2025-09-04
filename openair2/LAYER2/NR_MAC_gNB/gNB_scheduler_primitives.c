@@ -572,10 +572,9 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
                   NR_sched_pdcch_t *sched_pdcch,
-                  bool is_common,
                   float pdcch_cl_adjust)
 {
-  const uint32_t Y = is_common ? 0 : get_Y(ss, slot, rnti);
+  const uint32_t Y = get_Y(ss, slot, rnti);
   uint8_t nr_of_candidates;
 
   int agg_level_search_order[NUM_PDCCH_AGG_LEVELS];
@@ -2518,7 +2517,7 @@ void set_max_fb_time(NR_UE_UL_BWP_t *UL_BWP, const NR_UE_DL_BWP_t *DL_BWP)
 {
   UL_BWP->max_fb_time = 8; // default value
   // take the maximum in dl_DataToUL_ACK list
-  if (DL_BWP->dci_format != NR_DL_DCI_FORMAT_1_0 && UL_BWP->pucch_Config) {
+  if (UL_BWP->pucch_Config) {
     const struct NR_PUCCH_Config__dl_DataToUL_ACK *fb_times = UL_BWP->pucch_Config->dl_DataToUL_ACK;
     for (int i = 0; i < fb_times->list.count; i++) {
       if(*fb_times->list.array[i] > UL_BWP->max_fb_time)
