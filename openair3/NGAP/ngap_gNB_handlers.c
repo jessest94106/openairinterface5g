@@ -1127,7 +1127,14 @@ static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_N
     TBCD_TO_MCC_MNC(&(item_p->tAI.pLMNIdentity), msg->plmn_identity[i].mcc, msg->plmn_identity[i].mnc, msg->plmn_identity[i].mnc_digit_length);
     OCTET_STRING_TO_INT16(&(item_p->tAI.tAC), msg->tac[i]);
     msg->tai_size++;
-    NGAP_DEBUG("[SCTP %u] Received Paging: MCC %d, MNC %d, TAC %d\n", assoc_id, msg->plmn_identity[i].mcc, msg->plmn_identity[i].mnc, msg->tac[i]);
+    plmn_id_t *p = &msg->plmn_identity[i];
+    LOG_D(NGAP,
+          "[SCTP %u] PLMN in TAI list for Paging: MCC=%03d, MNC=%0*d, TAC=%d\n",
+          assoc_id,
+          p->mcc,
+          p->mnc_digit_length,
+          p->mnc,
+          msg->tac[i]);
   }
 
   //paging parameter values

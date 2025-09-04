@@ -74,23 +74,27 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
   // Select the AMF corresponding to the GUAMI from the RegisteredAMF IE
   if (msg->ue_identity.presenceMask & NGAP_UE_IDENTITIES_guami) {
     const nr_guami_t *guami = &msg->ue_identity.guami;
-    NGAP_DEBUG("GUAMI is present: MCC=%03d MNC=%03d RegionID=%d SetID=%d Pointer=%d\n",
-               guami->mcc,
-               guami->mnc,
-               guami->amf_region_id,
-               guami->amf_set_id,
-               guami->amf_pointer);
+    LOG_D(NGAP,
+          "GUAMI is present: MCC=%03d MNC=%0*d RegionID=%d SetID=%d Pointer=%d\n",
+          guami->mcc,
+          guami->mnc_len,
+          guami->mnc,
+          guami->amf_region_id,
+          guami->amf_set_id,
+          guami->amf_pointer);
     amf = ngap_gNB_nnsf_select_amf_by_guami(instance_p, msg->establishment_cause, *guami);
     if (amf) {
-      NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through GUAMI MCC %d MNC %d AMFRI %d AMFSI %d AMFPT %d\n",
-                msg->gNB_ue_ngap_id,
-                amf->amf_name,
-                amf->assoc_id,
-                guami->mcc,
-                guami->mnc,
-                guami->amf_region_id,
-                guami->amf_set_id,
-                guami->amf_pointer);
+      LOG_I(NGAP,
+            "UE %d: Chose AMF '%s' (assoc_id %d) through GUAMI MCC=%03d MNC=%0*d AMFRI %d AMFSI %d AMFPT %d\n",
+            msg->gNB_ue_ngap_id,
+            amf->amf_name,
+            amf->assoc_id,
+            guami->mcc,
+            guami->mnc_len,
+            guami->mnc,
+            guami->amf_region_id,
+            guami->amf_set_id,
+            guami->amf_pointer);
       return amf;
     }
   }
@@ -101,13 +105,15 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
       const fiveg_s_tmsi_t *fgs_tmsi = &msg->ue_identity.s_tmsi;
       amf = ngap_gNB_nnsf_select_amf_by_amf_setid(instance_p, msg->establishment_cause, msg->plmn, fgs_tmsi->amf_set_id);
       if (amf) {
-        NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through S-TMSI AMFSI %d and selected PLMN MCC %d MNC %d\n",
-                  msg->gNB_ue_ngap_id,
-                  amf->amf_name,
-                  amf->assoc_id,
-                  fgs_tmsi->amf_set_id,
-                  msg->plmn.mcc,
-                  msg->plmn.mnc);
+        LOG_I(NGAP,
+              "UE %d: Chose AMF '%s' (assoc_id %d) through S-TMSI AMFSI %d and selected PLMN MCC=%03d MNC=%0*d\n",
+              msg->gNB_ue_ngap_id,
+              amf->amf_name,
+              amf->assoc_id,
+              fgs_tmsi->amf_set_id,
+              msg->plmn.mcc,
+              msg->plmn.mnc_digit_length,
+              msg->plmn.mnc);
         return amf;
       }
     }
@@ -117,13 +123,14 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
   // Select the AMF based on the selected PLMN identity received through RRCSetupComplete
   amf = ngap_gNB_nnsf_select_amf_by_plmn_id(instance_p, msg->establishment_cause, msg->plmn);
   if (amf) {
-    NGAP_INFO("UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN MCC=%03d MNC=%0*d\n",
-              msg->gNB_ue_ngap_id,
-              amf->amf_name,
-              amf->assoc_id,
-              msg->plmn.mcc,
-              msg->plmn.mnc_digit_length,
-              msg->plmn.mnc);
+    LOG_I(NGAP,
+          "UE %d: Chose AMF '%s' (assoc_id %d) through selected PLMN MCC=%03d MNC=%0*d\n",
+          msg->gNB_ue_ngap_id,
+          amf->amf_name,
+          amf->assoc_id,
+          msg->plmn.mcc,
+          msg->plmn.mnc_digit_length,
+          msg->plmn.mnc);
     return amf;
   } else {
     // Select the AMF with the highest capacity
