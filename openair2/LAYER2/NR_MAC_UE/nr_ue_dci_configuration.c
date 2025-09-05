@@ -483,6 +483,15 @@ void ue_dci_configuration(NR_UE_MAC_INST_t *mac, fapi_nr_dl_config_request_t *dl
       }
       config_dci_pdu(mac, dl_config, rnti_type, slot, ra_SS);
     }
+    // If Msg3 has C-RNTI MAC CE, also monitor dedicated search spaces during contention resolution
+    // according to TS 38.321 section 5.1.5
+    if (ra->ra_state == nrRA_WAIT_CONTENTION_RESOLUTION && mac->msg3_C_RNTI) {
+      for (int i = 0; i < pdcch_config->list_SS.count; i++) {
+        NR_SearchSpace_t *ss = pdcch_config->list_SS.array[i];
+        if (is_ss_monitor_occasion(frame, slot, slots_per_frame, ss))
+          config_dci_pdu(mac, dl_config, TYPE_C_RNTI_, slot, ss);
+      }
+    }
   } else if (mac->state == UE_CONNECTED) {
     /*
       In RRC Connected state, the UE monitors for fallback DCI with C-RNTI in common and UE-specific SS.
