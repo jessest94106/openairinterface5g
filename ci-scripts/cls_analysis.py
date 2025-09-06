@@ -28,7 +28,7 @@ import json
 
 class Analysis():
 
-	def analyze_oc_physim(result_junit, details_json, logPath):
+	def analyze_physim(result_junit, details_json, logPath):
 		try:
 			tree = ET.parse(result_junit)
 			root = tree.getroot()

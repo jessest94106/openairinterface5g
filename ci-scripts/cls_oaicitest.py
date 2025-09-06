@@ -264,7 +264,7 @@ def Deploy_Physim(ctx, HTML, node, workdir, script, options):
 		archiveArtifact(ssh, ctx, f'{workdir}/physim_log.txt')
 		archiveArtifact(ssh, ctx, f'{workdir}/LastTestsFailed.log')
 		archiveArtifact(ssh, ctx, f'{workdir}/LastTest.log')
-	test_status, test_summary, test_result = cls_analysis.Analysis.analyze_oc_physim(result_junit, details_json, ctx.logPath)
+	test_status, test_summary, test_result = cls_analysis.Analysis.analyze_physim(result_junit, details_json, ctx.logPath)
 	if test_summary:
 		if test_status:
 			HTML.CreateHtmlTestRow('N/A', 'OK', CONST.ALL_PROCESSES_OK)
