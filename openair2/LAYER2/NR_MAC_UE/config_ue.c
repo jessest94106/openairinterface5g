@@ -1978,11 +1978,22 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
   LOG_I(NR_MAC, "Configuring CRNTI %x\n", mac->crnti);
 
   RA_config_t *ra = &mac->ra;
+  bool is_cfra = false;
   if (reconfWithSync->rach_ConfigDedicated) {
     AssertFatal(reconfWithSync->rach_ConfigDedicated->present == NR_ReconfigurationWithSync__rach_ConfigDedicated_PR_uplink,
                 "RACH on supplementaryUplink not supported\n");
+    NR_RACH_ConfigDedicated_t *rach_ConfigDedicated = reconfWithSync->rach_ConfigDedicated->choice.uplink;
+    if (rach_ConfigDedicated->cfra)
+      is_cfra = true;
+    if (rach_ConfigDedicated->ext1 && rach_ConfigDedicated->ext1->cfra_TwoStep_r16)
+      is_cfra = true;
     UPDATE_IE(ra->rach_ConfigDedicated, reconfWithSync->rach_ConfigDedicated->choice.uplink, NR_RACH_ConfigDedicated_t);
   }
+
+  // in case of CBRA and reconfiguration with sync (handover)
+  // the UE sends MSG3 with C-RNTI to identify itself
+  if (!is_cfra)
+    mac->msg3_C_RNTI = true;
 
   if (reconfWithSync->spCellConfigCommon) {
     NR_ServingCellConfigCommon_t *scc = reconfWithSync->spCellConfigCommon;
