@@ -28,6 +28,23 @@ import json
 
 class Analysis():
 
+	def _get_test_description(properties):
+		env_vars = None
+		for p in properties:
+			if p["name"] == "ENVIRONMENT":
+				env_vars = p["value"] # save for later if no custom property
+			if p["name"] == "TEST_DESCRIPTION":
+				return p["value"]
+		# if we came till here, it means there is no custom test property
+		# saved in JSON.  See if we have a description in environment variables
+		if not env_vars:
+			return "<none>"
+		for ev in env_vars:
+			name, value = ev.split("=", 1)
+			if name == "TEST_DESCRIPTION":
+				return value
+		return "<none>"
+
 	def analyze_physim(result_junit, details_json, logPath):
 		try:
 			tree = ET.parse(result_junit)
@@ -60,7 +77,7 @@ class Analysis():
 		for test in root: # for each test
 			test_name = test.attrib["name"]
 			test_exec = json_test_desc[test_name]["properties"][1]["value"][0]
-			desc = json_test_desc[test_name]["properties"][1]["value"][1]
+			desc = Analysis._get_test_description(json_test_desc[test_name]["properties"])
 			# get runtime and checks
 			test_check = test.attrib["status"] == "run"
 			time = round(float(test.attrib["time"]), 1)

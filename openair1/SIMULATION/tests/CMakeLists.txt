@@ -1,3 +1,5 @@
+define_property(TEST PROPERTY TEST_DESCRIPTION BRIEF_DOCS "A human-readable description of this test")
+
 # Define a macro to add tests for different physical simulators
 macro(add_physim_test test_name test_description test_exec)
   # catch all the arguments past the last expected arqument and store them in the options_list
@@ -11,8 +13,12 @@ macro(add_physim_test test_name test_description test_exec)
     COMMAND_EXPAND_LISTS
   )
   set_tests_properties(${test_name} PROPERTIES
-    LABELS "${test_exec}: ${test_description};${test_exec}"
-    ENVIRONMENT "LD_LIBRARY_PATH=."
+    LABELS "${test_exec}"
+    TEST_DESCRIPTION "${test_description}"
+    # pass test description also through environment variable: for cmake < 3.30,
+    # in JSON export, we cannot recover the description otherwise
+    # see also https://gitlab.kitware.com/cmake/cmake/-/issues/21490
+    ENVIRONMENT "LD_LIBRARY_PATH=.;TEST_DESCRIPTION=${test_description}"
   )
   add_dependencies(tests ${test_exec})
 endmacro()
