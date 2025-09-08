@@ -533,6 +533,6 @@ class HTMLManagement():
 					self.htmlFile.write('        <td bgcolor = "green" ><font color="white"><b>' + value[2]  + '</b></font></td>\n')
 				else:
 					self.htmlFile.write('        <td bgcolor = "red" ><font color="white"><b>' + value[2]  + '</b></font></td>\n')
-				self.htmlFile.write('        <td bgcolor = "lightcyan">' + value[1] + '</td>\n')
+				self.htmlFile.write(f'        <td colspan="2" bgcolor = "lightcyan"><pre style="display: inline flow-root list-item; margin: 0 3px 0 3px; min-width: 24em;">{value[1]}</pre></td>\n')
 
 		self.htmlFile.close()
