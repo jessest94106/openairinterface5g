@@ -159,3 +159,11 @@ For legacy support or archival purposes, you can still find this implementation 
 ```bash
 git checkout 2025.w18
 ```
+
+# Unmaintained tests
+
+A few tests dedicated to 4G are unmaintained:
+
+- `mbmssim`
+- `scansim`
+- all simulators of format `www-tmyyyy` (for instance, `dlsim_tm4`)
