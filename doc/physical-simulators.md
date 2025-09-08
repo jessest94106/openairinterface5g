@@ -100,7 +100,7 @@ ctest -L nr_ulsch -j 4
 To define a new test or modify existing ones, update the following file:
 
 ```
-openair1/PHY/CODING/tests/CMakeLists.txt
+openair1/SIMULATION/tests/CMakeLists.txt
 ```
 
 Use the `add_physim_test` macro with the following arguments:
