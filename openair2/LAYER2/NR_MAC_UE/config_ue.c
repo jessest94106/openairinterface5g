@@ -262,8 +262,6 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
                                                                 mac->frequency_range);
     //prach_fd_occasion->num_unused_root_sequences = ???
   }
-  cfg->prach_config.ssb_per_rach = rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->present-1;
-
 }
 
 // computes round-trip-time between ue and sat based on SIB19 ephemeris data
@@ -547,7 +545,6 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
       prach_fd_occasion->num_root_sequences =
           compute_nr_root_seq(rach_ConfigCommon, nb_preambles, frame_type, mac->frequency_range);
 
-      cfg->prach_config.ssb_per_rach = rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB->present - 1;
       // prach_fd_occasion->num_unused_root_sequences = ???
     }
   }
@@ -1718,10 +1715,13 @@ static void configure_common_BWP_ul(NR_UE_MAC_INST_t *mac, int bwp_id, NR_BWP_Up
       mac->sc_info.initial_ul_BWPStart = bwp->BWPStart;
     }
     if (ul_common->rach_ConfigCommon) {
-      HANDLE_SETUPRELEASE_DIRECT(bwp->rach_ConfigCommon,
-                                 ul_common->rach_ConfigCommon,
-                                 NR_RACH_ConfigCommon_t,
-                                 asn_DEF_NR_RACH_ConfigCommon);
+      // ssb_perRACH_OccasionAndCB_PreamblesPerSSB is need M
+      // if NULL we need to maintain the information
+      NR_SetupRelease_RACH_ConfigCommon_t *rachcommon = ul_common->rach_ConfigCommon;
+      if (rachcommon->present == NR_SetupRelease_RACH_ConfigCommon_PR_setup
+          && rachcommon->choice.setup->ssb_perRACH_OccasionAndCB_PreamblesPerSSB)
+        mac->ssb_ro_preambles = get_ssb_ro_preambles_4step(rachcommon->choice.setup->ssb_perRACH_OccasionAndCB_PreamblesPerSSB);
+      HANDLE_SETUPRELEASE_DIRECT(bwp->rach_ConfigCommon, rachcommon, NR_RACH_ConfigCommon_t, asn_DEF_NR_RACH_ConfigCommon);
     }
     if (ul_common->ext1 && ul_common->ext1->msgA_ConfigCommon_r16) {
       HANDLE_SETUPRELEASE_DIRECT(bwp->msgA_ConfigCommon_r16,

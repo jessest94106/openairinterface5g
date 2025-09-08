@@ -190,7 +190,7 @@ static void select_preamble_group(NR_UE_MAC_INST_t *mac)
   // else if Msg3 is being retransmitted, we keep what used in first transmission of Msg3
 }
 
-static ssb_ro_preambles_t get_ssb_ro_preambles_4step(struct NR_RACH_ConfigCommon__ssb_perRACH_OccasionAndCB_PreamblesPerSSB *config)
+ssb_ro_preambles_t get_ssb_ro_preambles_4step(struct NR_RACH_ConfigCommon__ssb_perRACH_OccasionAndCB_PreamblesPerSSB *config)
 {
   ssb_ro_preambles_t ret = {0};
   switch (config->present) {
@@ -293,9 +293,7 @@ static void config_preamble_index(NR_UE_MAC_INST_t *mac)
   bool groupBconfigured = false;
   int preamb_ga = 0;
   if (ra->ra_type == RA_4_STEP) {
-    AssertFatal(nr_rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB,
-                "Not expeting ssb_perRACH_OccasionAndCB_PreamblesPerSSB to be NULL here\n");
-    ra->ssb_ro_config = get_ssb_ro_preambles_4step(nr_rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB);
+    ra->ssb_ro_config = mac->ssb_ro_preambles;
     if (nr_rach_ConfigCommon->totalNumberOfRA_Preambles)
       nb_of_preambles = *nr_rach_ConfigCommon->totalNumberOfRA_Preambles;
     // Amongst the contention-based Random Access Preambles associated with an SSB the first numberOfRA-PreamblesGroupA
@@ -321,7 +319,7 @@ static void config_preamble_index(NR_UE_MAC_INST_t *mac)
     if (twostep->msgA_SSB_PerRACH_OccasionAndCB_PreamblesPerSSB_r16)
       ra->ssb_ro_config = get_ssb_ro_preambles_2step(twostep->msgA_SSB_PerRACH_OccasionAndCB_PreamblesPerSSB_r16);
     else
-      ra->ssb_ro_config = get_ssb_ro_preambles_4step(nr_rach_ConfigCommon->ssb_perRACH_OccasionAndCB_PreamblesPerSSB);
+      ra->ssb_ro_config = mac->ssb_ro_preambles;
     if (twostep->msgA_TotalNumberOfRA_Preambles_r16)
       nb_of_preambles = *twostep->msgA_TotalNumberOfRA_Preambles_r16;
   }
