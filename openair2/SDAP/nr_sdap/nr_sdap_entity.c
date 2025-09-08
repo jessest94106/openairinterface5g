@@ -34,6 +34,8 @@
 #include "tun_if.h"
 #include "nr_sdap.h"
 
+#define NO_SDAP_HEADER 0
+
 typedef struct {
   nr_sdap_entity_t *sdap_entity_llist;
 } nr_sdap_entity_info;
@@ -49,12 +51,11 @@ static int get_sdap_role(bool is_gnb, const NR_SDAP_Config_t *sdap_config)
 {
   sdap_role_t role_ul = is_gnb ? SDAP_UL_RX : SDAP_UL_TX;
   sdap_role_t role_dl = is_gnb ? SDAP_DL_TX : SDAP_DL_RX;
-  int role = 0;
+  int role = NO_SDAP_HEADER;
   if (sdap_config->sdap_HeaderUL == NR_SDAP_Config__sdap_HeaderUL_present)
     role |= role_ul;
   if (sdap_config->sdap_HeaderDL == NR_SDAP_Config__sdap_HeaderDL_present)
     role |= role_dl;
-  DevAssert(role != 0);
   return role;
 }
 
@@ -106,11 +107,14 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
   uint8_t sdap_buf[SDAP_MAX_PDU];
   int pdcp_entity = entity->qfi2drb_map(entity, qfi);
 
-  if(pdcp_entity){
+  if (pdcp_entity != SDAP_MAP_RULE_EMPTY) {
     sdap_drb_id = pdcp_entity;
     sdap_ul_tx = entity->qfi2drb_table[qfi].entity_role & SDAP_UL_TX; // UE TX entity
     sdap_dl_tx = entity->qfi2drb_table[qfi].entity_role & SDAP_DL_TX; // gNB TX entity
     LOG_D(SDAP, "TX - QFI: %u is mapped to DRB ID: %d\n", qfi, entity->qfi2drb_table[qfi].drb_id);
+  } else {
+    LOG_E(SDAP, "QFI %u not mapped to any DRB - dropping SDU of size %d\n", qfi, sdu_buffer_size);
+    return false;
   }
 
   if (!sdap_ul_tx && !sdap_dl_tx) {
@@ -672,6 +676,7 @@ sdap_config_t nr_sdap_get_config(const int is_gnb, const NR_SDAP_Config_t *sdap_
   sdap_config_t sdapConfig = {0};
   sdapConfig.drb_id = drb_id;
   sdapConfig.role = get_sdap_role(is_gnb, sdap_Config);
+  LOG_D(SDAP, "SDAP headers %s\n", sdapConfig.role == NO_SDAP_HEADER ? "absent" : "present");
   sdapConfig.defaultDRB = sdap_Config->defaultDRB;
   // 3GPP TS 38.331 The network sets sdap-HeaderUL to present if the field defaultDRB is set to true
   if (sdapConfig.defaultDRB && (sdap_Config->sdap_HeaderUL != NR_SDAP_Config__sdap_HeaderUL_present))
