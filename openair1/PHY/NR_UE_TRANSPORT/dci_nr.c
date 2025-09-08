@@ -249,44 +249,43 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
      * the position 0+c_rb-N_RB_DL/2 in rxdataF and we have to point the pointer at (1+c_rb-N_RB_DL/2) in rxdataF
      */
 
-    int c_rb = 0;
-    for (int rb = 0; rb < coreset_nbr_rb; rb++, c_rb++) {
-      int c_rb_by6 = c_rb / 6;
+    for (int rb_group = 0; rb_group < coreset_nbr_rb / 6; rb_group++) {
+      if ((coreset_freq_dom[rb_group / 8] & (1 << (7 - (rb_group & 7)))) == 0) {
+        continue;
+      }
+      for (int rb = 0; rb < 6; rb++) {
+        int c_rb = rb_group * 6 + rb;
+        c16_t *rxF = NULL;
+        if ((frame_parms->N_RB_DL & 1) == 0) {
+          if ((c_rb + n_BWP_start) < frame_parms->N_RB_DL / 2)
+            // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
+            // at (offset + c_br + symbol * ofdm_symbol_size): even case
+            rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
+          else
+            // number of RBs is even  and c_rb is higher than half system bandwidth (we don't skip DC)
+            // if these conditions are true the pointer has to be situated at the 1st part of the rxdataF
+            // we point at the 1st part of the rxdataF in symbol
+            rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - frame_parms->N_RB_DL / 2);
+        } else {
+          if ((c_rb + n_BWP_start) <= frame_parms->N_RB_DL / 2)
+            // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
+            //  at (offset + c_br + symbol * ofdm_symbol_size): odd case
+            rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
+          else
+            // number of RBs is odd  and c_rb is higher than half system bandwidth + 1
+            // if these conditions are true the pointer has to be situated at the 1st part of
+            // the rxdataF just after the first IQ symbols of the RB containing DC
+            // we point at the 1st part of the rxdataF in symbol
+            rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - frame_parms->N_RB_DL / 2) - 6;
+        }
 
-      // skip zeros in frequency domain bitmap
-      while ((coreset_freq_dom[c_rb_by6 / 8] & (1 << (7 - (c_rb_by6 & 7)))) == 0) {
-        c_rb += 6;
-        c_rb_by6 = c_rb / 6;
+        const int valid_re[RE_PER_RB_OUT_DMRS] = {0, 2, 3, 4, 6, 7, 8, 10, 11};
+        for (int i = 0; i < sizeofArray(valid_re); i++) {
+          *rxF_ext++ = rxF[valid_re[i]];
+          *dl_ch0_ext++ = dl_ch0[valid_re[i]];
+        }
+        dl_ch0 += RE_PER_RB;
       }
-      c16_t *rxF = NULL;
-      if ((frame_parms->N_RB_DL & 1) == 0) {
-        if ((c_rb + n_BWP_start) < frame_parms->N_RB_DL / 2)
-          // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
-          // at (offset + c_br + symbol * ofdm_symbol_size): even case
-          rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
-        else
-          // number of RBs is even  and c_rb is higher than half system bandwidth (we don't skip DC)
-          // if these conditions are true the pointer has to be situated at the 1st part of the rxdataF
-          // we point at the 1st part of the rxdataF in symbol
-          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - frame_parms->N_RB_DL / 2);
-      } else {
-        if ((c_rb + n_BWP_start) <= frame_parms->N_RB_DL / 2)
-          // if RB to be treated is lower than middle system bandwidth then rxdataF pointed
-          //  at (offset + c_br + symbol * ofdm_symbol_size): odd case
-          rxF = rxFbase + frame_parms->first_carrier_offset + RE_PER_RB * (c_rb + n_BWP_start);
-        else
-          // number of RBs is odd  and c_rb is higher than half system bandwidth + 1
-          // if these conditions are true the pointer has to be situated at the 1st part of
-          // the rxdataF just after the first IQ symbols of the RB containing DC
-          // we point at the 1st part of the rxdataF in symbol
-          rxF = rxFbase + RE_PER_RB * (c_rb + n_BWP_start - frame_parms->N_RB_DL / 2) - 6;
-      }
-      const int valid_re[RE_PER_RB_OUT_DMRS] = {0, 2, 3, 4, 6, 7, 8, 10, 11};
-      for (int i = 0; i < sizeofArray(valid_re); i++) {
-        *rxF_ext++ = rxF[valid_re[i]];
-        *dl_ch0_ext++ = dl_ch0[valid_re[i]];
-      }
-      dl_ch0 += RE_PER_RB;
     }
   }
 }
