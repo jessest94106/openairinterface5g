@@ -90,13 +90,16 @@ class Analysis():
 			with open(f'{log_dir}/{test_name}.log', 'w') as f:
 				f.write(output)
 			# prepare result and info
-			info = f"Runtime: {f'{time:.3f}'[:5]} s"
 			resultstr = 'PASS' if (test_check and time_check and output_check) else 'FAIL'
+			info = f"{test_name}.log: test {resultstr}"
+			for l in output.splitlines():
+				if l.startswith("CHECK "):
+					info += f"\n{l}"
 			if test_check:
 				if not output_check:
-					info += " Test log exceeds maximal allowed length 100 kB"
+					info += "\nTest log exceeds maximal allowed length 100 kB"
 				if not time_check:
-					info += " Test exceeds 150s"
+					info += "\nTest exceeds 150s"
 				if not (time_check and output_check):
 					nb_failed += 1 # time threshold/output length error, not counted for by ctest as of now
 			test_result[test_name] = [desc, info, resultstr]
