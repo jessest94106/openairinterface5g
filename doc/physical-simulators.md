@@ -18,6 +18,12 @@ Physims are essential for:
 * Regression testing
 * Ensuring correctness before merging new contributions into the repository
 
+These tests are run automatically as part of the following
+pipelines:
+
+- [RAN-PhySim-Cluster-4G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-Cluster-4G/)
+- [RAN-PhySim-Cluster-5G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-Cluster-5G/)
+
 ## Examples of Simulators
 
 | Technology | Simulators                                | Description                      |
@@ -31,7 +37,7 @@ Physims are essential for:
 |            | `nr_psbchsim`                             | Sidelink simulation              |
 | Coding     | `ldpctest`, `polartest`, `smallblocktest` | LDPC, Polar, and other FEC tests |
 
-### Source Locations
+## Source Locations
 
 * 4G PHY simulators: `openair1/SIMULATION/LTE_PHY/`
 * 5G PHY simulators: `openair1/SIMULATION/NR_PHY/`
@@ -47,6 +53,9 @@ openair1/SIMULATION/NR_PHY/dlsim.c
 # How to Run Simulators Using `ctest`
 
 ## Option 1: Using CMake
+
+Build the simulators and tests using the dedicated cmake option, then run
+`ctest` which will run all registered tests.
 
 ```bash
 cd openairinterface5g
@@ -67,9 +76,7 @@ cd ran_build/build
 ctest
 ```
 
-# `ctest` Usage Tips
-
-## Useful Options
+## `ctest` Usage Tips
 
 Use the following options to customize test execution:
 
@@ -84,16 +91,12 @@ Use the following options to customize test execution:
 
 For the complete list of `ctest` options, refer to the manual:
 
-```bash
-man ctest
-```
+    man ctest
 
-## Example
+For instance, to run only all run NR ULSCH simulator tests, with 4 jobs in
+parallel, type
 
-```bash
-# Run only NR ULSCH simulator tests, in parallel
-ctest -L nr_ulsch -j 4
-```
+    ctest -L nr_ulschsim -j 4
 
 # Adding a New Physim Test
 
@@ -120,9 +123,6 @@ where:
 For instance, a PRACHsim looks like this:
 
     add_physim_test(physim.5g.nr_prachsim.test8 "15kHz SCS, 25 PRBs" nr_prachsim -a -s -30 -n 300 -p 99 -R 25 -m 0)
-
-These tests are run automatically as part of the following
-pipelines: [RAN-PhySim-Cluster-4G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-Cluster-4G/) and [RAN-PhySim-Cluster-5G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-Cluster-5G/)
 
 ## `add_timed_physim_test()`
 
@@ -161,7 +161,7 @@ For instance, this could look like this:
     add_timed_physim_test(physim.5g.nr_dlsim.test3 "Some description" nr_dlsim -P)
     check_physim_threshold(physim.5g.nr_dlsim.test3 "DLSCH encoding time" "< 50")
 
-### How to rerun failed CI tests using `ctest`
+# How to rerun failed CI tests using `ctest`
 
 Ctest automatically logs the failed tests in LastTestsFailed.log. This log is archived in
 the CI artifacts and can be reused locally to rerun only those failed tests.
