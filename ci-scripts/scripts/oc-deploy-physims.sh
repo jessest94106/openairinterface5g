@@ -13,7 +13,7 @@ OAI_DIR=${4}
 cat /opt/oc-password | oc login -u oaicicd --server https://api.oai.cs.eurecom.fr:6443 > /dev/null
 oc project ${OC_NS} > /dev/null
 oc tag oaicicd-ran/oai-physim:${IMG_TAG} ${OC_NS}/oai-physim:${IMG_TAG}
-helm install ${OC_RELEASE} ${OAI_DIR}/charts/${OC_RELEASE} --set global.image.version=${IMG_TAG} --wait
+helm install ${OC_RELEASE} ${OAI_DIR}/charts/${OC_RELEASE} --set global.image.version=${IMG_TAG} --wait --timeout 120s
 POD_ID=$(oc get pods | grep oai-${OC_RELEASE} | awk '{print $1}')
 sleep 10
 echo "Monitoring logs for 'FINISHED' in pod '$POD_ID'"
