@@ -237,7 +237,6 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
 
     STAILQ_INSERT_TAIL(&amf_desc_p->served_guami, new_guami_p, next);
   }
-  ngap_dump_served_guami(amf_desc_p);
 
   /* Set the capacity of this AMF */
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_NGSetupResponseIEs_t, ie, container,
@@ -254,7 +253,7 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
     memcpy(amf_desc_p->amf_name, ie->value.choice.AMFName.buf, ie->value.choice.AMFName.size);
     amf_desc_p->amf_name[ie->value.choice.AMFName.size] = '\0';
   }
-
+  ngap_dump_served_guami(amf_desc_p);
   
   /* mandatory set the plmn supports */
   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_NGSetupResponseIEs_t, ie, container,
