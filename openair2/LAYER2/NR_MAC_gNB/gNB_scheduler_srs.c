@@ -527,10 +527,9 @@ void nr_schedule_srs(int module_id, frame_t frame, int slot)
 
   UE_iterator(UE_info->connected_ue_list, UE) {
     const int CC_id = 0;
-    NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_UE_UL_BWP_t *current_BWP = &UE->current_UL_BWP;
 
-    if ((sched_ctrl->ul_failure && !get_softmodem_params()->phy_test) || nr_timer_is_active(&sched_ctrl->transm_interrupt)) {
+    if (!nr_mac_ue_is_active(UE) && !get_softmodem_params()->phy_test) {
       continue;
     }
 

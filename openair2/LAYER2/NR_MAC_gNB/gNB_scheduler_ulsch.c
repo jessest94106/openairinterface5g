@@ -1963,7 +1963,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   UE_iterator(UE_list, UE) {
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-    if (sched_ctrl->ul_failure)
+    if (!nr_mac_ue_is_active(UE))
       continue;
 
     LOG_D(NR_MAC,"pf_ul: preparing UL scheduling for UE %04x\n",UE->rnti);

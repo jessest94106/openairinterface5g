@@ -3432,10 +3432,7 @@ void nr_measgap_scheduling(gNB_MAC_INST *nr_mac, frame_t frame, sub_frame_t slot
     interrupt_followup_action_t a = nr_timer_is_active(t) ? UE->interrupt_action : FOLLOW_INSYNC;
     // start a timer to stop scheduling UE during MeasGap, or extend timer for
     // duration of measGap with existing follow-up action
-    // TODO: if the timer is running, it might be to stop scheduling of the UE afterwards, but then it does not make sense to stop
-    //  scheduling the UE now, we should maybe just skip it?
     if (!nr_timer_is_active(t) || nr_timer_remaining_time(t) < mgc->mgl_slots) {
-      nr_mac_trigger_ul_failure(&UE->UE_sched_ctrl, UE->current_DL_BWP.scs); /* set the UE to "not active" */
       nr_mac_interrupt_ue_transmission(nr_mac, UE, a, mgc->mgl_slots);
     }
   }
@@ -3564,12 +3561,9 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
     if (nr_timer_tick(&sched_ctrl->transm_interrupt)) {
       /* expired */
       nr_timer_stop(&sched_ctrl->transm_interrupt);
-      if (UE->interrupt_action == FOLLOW_OUTOFSYNC) {
+      if (UE->interrupt_action == FOLLOW_OUTOFSYNC)
         nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
-      } else {
-        DevAssert(UE->interrupt_action == FOLLOW_INSYNC);
-        nr_mac_reset_ul_failure(sched_ctrl);
-      }
+      /* else: default FOLLOW_INSYNC: nothing to do (UE is now active again) */
     }
   }
 }
@@ -3775,6 +3769,17 @@ bool nr_mac_check_release(NR_UE_sched_ctrl_t *sched_ctrl, int rnti)
     return false;
   sched_ctrl->release_timer--;
   return sched_ctrl->release_timer == 0;
+}
+
+bool nr_mac_ue_is_active(const NR_UE_info_t *ue)
+{
+  /* pass NR_UE_info_t, so that later we could adapt, e.g., for DRX */
+  const NR_UE_sched_ctrl_t *sched_ctrl = &ue->UE_sched_ctrl;
+  if (sched_ctrl->ul_failure)
+    return false;
+  if (nr_timer_is_active(&sched_ctrl->transm_interrupt))
+    return false;
+  return true;
 }
 
 #define UL_FAILURE_REQ_GRACE 10000
