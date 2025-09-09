@@ -198,6 +198,7 @@ void reset_mac_inst(NR_UE_MAC_INST_t *nr_mac)
 
   // stop any ongoing RACH procedure
   if (nr_mac->ra.RA_active) {
+    nr_mac->msg3_C_RNTI = false;
     nr_mac->ra.ra_state = nrRA_UE_IDLE;
     nr_mac->ra.RA_active = false;
   }
