@@ -1079,7 +1079,6 @@ int32_t nrLDPC_coding_init()
           "could not find mandatory --nrLDPC_coding_aal.dpdk_dev. If you used --nrLDPC_coding_t2.*, please rename all options to "
           "--nrLDPC_coding_aal.*\n");
   AssertFatal(dpdk_dev != NULL, "nrLDPC_coding_aal.dpdk_dev was not provided");
-  AssertFatal(dpdk_core_list != NULL, "nrLDPC_coding_aal.dpdk_core_list was not provided");
 
   char dpdk_dev_full[32];
   if (normalize_dpdk_dev(dpdk_dev, dpdk_dev_full, sizeof(dpdk_dev_full)) != 0) {
@@ -1087,20 +1086,30 @@ int32_t nrLDPC_coding_init()
     return -1;
   }
 
-  int argc = 7;
-  char *argv[11] = {"bbdev", "-l", dpdk_core_list, "-a", dpdk_dev_full, "--file-prefix", dpdk_file_prefix, "--", "--", "--", "--"};
-  if (vfio_vf_token != NULL) {
-    argc += 2;
-    argv[7] = "--vfio-vf-token";
-    argv[8] = vfio_vf_token;
-  }
-  ret = rte_eal_init(argc, argv);
-  if (ret < 0) {
-    LOG_W(NR_PHY, "EAL initialization failed, probing DPDK device %s\n", dpdk_dev_full);
-    if (rte_dev_probe(dpdk_dev_full) != 0) {
-      LOG_E(NR_PHY, "bbdev %s not found\n", dpdk_dev_full);
+  // Detect if EAL was initialized by probing the device
+  LOG_I(NR_PHY, "Probing DPDK device %s to know if EAL is initialized. This may generate EAL error messages\n", dpdk_dev_full);
+  if (rte_dev_probe(dpdk_dev_full) != 0) {
+    LOG_I(NR_PHY, "Probing DPDK device %s failed, initializing EAL before continuing\n", dpdk_dev_full);
+    // EAL was not initialized yet
+    // We initialize EAL
+    AssertFatal(dpdk_core_list != NULL, "nrLDPC_coding_aal.dpdk_core_list was not provided");
+
+    int argc = 7;
+    char *argv[11] =
+        {"bbdev", "-l", dpdk_core_list, "-a", dpdk_dev_full, "--file-prefix", dpdk_file_prefix, "--", "--", "--", "--"};
+    if (vfio_vf_token != NULL) {
+      argc += 2;
+      argv[7] = "--vfio-vf-token";
+      argv[8] = vfio_vf_token;
+    }
+    ret = rte_eal_init(argc, argv);
+    if (ret < 0) {
+      LOG_E(NR_PHY, "EAL initialization failed\n");
       return (-1);
     }
+  } else {
+    // EAL was already initialized
+    LOG_I(NR_PHY, "Probing DPDK device %s succeeded, skipping EAL initialization\n", dpdk_dev_full);
   }
   uint16_t nb_bbdevs = rte_bbdev_count();
   AssertFatal(nb_bbdevs > 0, "no bbdev found");
