@@ -95,6 +95,7 @@ void nr_fill_dl_indication(nr_downlink_indication_t *dl_ind,
   dl_ind->gNB_index = proc->gNB_id;
   dl_ind->module_id = ue->Mod_id;
   dl_ind->cc_id     = ue->CC_id;
+  dl_ind->hfn       = proc->hfn_rx;
   dl_ind->frame     = proc->frame_rx;
   dl_ind->slot      = proc->nr_slot_rx;
   dl_ind->phy_data  = phy_data;

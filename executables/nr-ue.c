@@ -434,8 +434,10 @@ void processSlotTX(void *arg)
         nr_sidelink_indication_t sl_indication = {.module_id = UE->Mod_id,
                                                   .gNB_index = proc->gNB_id,
                                                   .cc_id = UE->CC_id,
+                                                  .hfn_tx = proc->hfn_tx,
                                                   .frame_tx = proc->frame_tx,
                                                   .slot_tx = proc->nr_slot_tx,
+                                                  .hfn_rx = proc->hfn_rx,
                                                   .frame_rx = proc->frame_rx,
                                                   .slot_rx = proc->nr_slot_rx,
                                                   .slot_type = SIDELINK_SLOT_TYPE_TX,
@@ -968,6 +970,8 @@ void *UE_thread(void *arg)
     curMsg.proc.nr_slot_tx  = (absolute_slot + duration_rx_to_tx) % nb_slot_frame;
     curMsg.proc.frame_rx    = (absolute_slot / nb_slot_frame) % MAX_FRAME_NUMBER;
     curMsg.proc.frame_tx    = ((absolute_slot + duration_rx_to_tx) / nb_slot_frame) % MAX_FRAME_NUMBER;
+    curMsg.proc.hfn_rx      = (absolute_slot / nb_slot_frame) / MAX_FRAME_NUMBER;
+    curMsg.proc.hfn_tx      = ((absolute_slot + duration_rx_to_tx) / nb_slot_frame) / MAX_FRAME_NUMBER;
     if (UE->received_config_request) {
       if (UE->sl_mode) {
         curMsg.proc.rx_slot_type = sl_nr_ue_slot_select(sl_cfg, curMsg.proc.nr_slot_rx, TDD);
@@ -1048,7 +1052,7 @@ void *UE_thread(void *arg)
     }
 
     if (curMsg.proc.nr_slot_rx == 0)
-      nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.frame_rx, curMsg.proc.gNB_id);
+      nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.hfn_rx, curMsg.proc.frame_rx, curMsg.proc.gNB_id);
 
     // RX slot processing. We launch and forget.
     notifiedFIFO_elt_t *newRx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_tx, NULL, UE_dl_processing);

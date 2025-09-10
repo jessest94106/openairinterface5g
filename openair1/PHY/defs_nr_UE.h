@@ -538,11 +538,14 @@ typedef struct {
   /// NR slot index within frame_rx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_rx;
   int tx_slot_type;
-  //#endif
   /// frame to act upon for transmission
   int frame_tx;
   /// frame to act upon for reception
   int frame_rx;
+  /// hyper frame number to act upon for transmission
+  int hfn_tx;
+  /// hyper frame number to act upon for reception
+  int hfn_rx;
 } UE_nr_rxtx_proc_t;
 
 typedef struct {

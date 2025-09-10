@@ -73,6 +73,7 @@ void nr_ue_decode_BCCH_DL_SCH(NR_UE_MAC_INST_t *mac,
                               uint8_t ack_nack,
                               uint8_t *pduP,
                               uint32_t pdu_len,
+                              int hfn,
                               int frame,
                               int slot);
 
@@ -82,6 +83,8 @@ void nr_release_mac_config_logicalChannelBearer(NR_UE_MAC_INST_t *mac, long chan
 
 void nr_rrc_mac_config_req_cg(module_id_t module_id,
                               int cc_idP,
+                              int hfn,
+                              int frame,
                               NR_CellGroupConfig_t *cell_group_config,
                               NR_UE_NR_Capability_t *ue_Capability);
 
@@ -90,7 +93,7 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mibP
 void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *sib1, bool can_start_ra);
 
 struct position; /* forward declaration */
-void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19_r17, bool can_start_ra);
+void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19_r17, int hfn, int frame, bool can_start_ra);
 void nr_rrc_mac_resume_rb(module_id_t module_id, bool is_srb, int rb_id);
 void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t cause);
 

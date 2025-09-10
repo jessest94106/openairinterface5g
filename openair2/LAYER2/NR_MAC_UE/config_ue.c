@@ -305,7 +305,9 @@ static void calculate_ue_sat_ta(const position_t *position_params,
 // populate ntn_ta structure from mac
 static void configure_ntn_ta(module_id_t module_id,
                              ntn_timing_advance_componets_t *ntn_ta,
-                             const NR_NTN_Config_r17_t *ntn_Config_r17)
+                             const NR_NTN_Config_r17_t *ntn_Config_r17,
+                             int hfn,
+                             int frame)
 {
   if (!ntn_Config_r17)
     return;
@@ -380,7 +382,7 @@ static void configure_ntn_ta(module_id_t module_id,
         ntn_ta->N_UE_TA_drift_variant);
 }
 
-static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP)
+static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP, int hfn, int frame)
 {
   fapi_nr_config_request_t *cfg = &mac->phy_config.config_req;
 
@@ -555,7 +557,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   // NTN Config
   if (scc->ext2) {
     UPDATE_IE(mac->sc_info.ntn_Config_r17, scc->ext2->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17);
+    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
   } else {
     asn1cFreeStruc(asn_DEF_NR_NTN_Config_r17, mac->sc_info.ntn_Config_r17);
   }
@@ -1947,7 +1949,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
-void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, bool can_start_ra)
+void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, int hfn, int frame, bool can_start_ra)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1956,7 +1958,7 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, b
   if (sib19) {
     // update ntn_Config_r17 with received values
     UPDATE_IE(mac->sc_info.ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17);
+    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
   }
   if (mac->state == UE_RECEIVING_SIB && can_start_ra)
     mac->state = UE_PERFORMING_RA;
@@ -1966,6 +1968,8 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, b
 
 static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
                                              int cc_idP,
+                                             int hfn,
+                                             int frame,
                                              const NR_ReconfigurationWithSync_t *reconfWithSync)
 {
   reset_mac_inst(mac);
@@ -1985,7 +1989,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
       mac->physCellId = *scc->physCellId;
     mac->dmrs_TypeA_Position = scc->dmrs_TypeA_Position;
     UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
-    config_common_ue(mac, scc, cc_idP);
+    config_common_ue(mac, scc, cc_idP, hfn, frame);
     // Build the list of all the valid/transmitted SSBs according to the config
     LOG_D(NR_MAC,"Build SSB list\n");
     build_ssb_list(mac);
@@ -2754,6 +2758,8 @@ static void handle_mac_uecap_info(NR_UE_MAC_INST_t *mac, NR_UE_NR_Capability_t *
 
 void nr_rrc_mac_config_req_cg(module_id_t module_id,
                               int cc_idP,
+                              int hfn,
+                              int frame,
                               NR_CellGroupConfig_t *cell_group_config,
                               NR_UE_NR_Capability_t *ue_Capability)
 {
@@ -2772,7 +2778,7 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
     mac->servCellIndex = spCellConfig->servCellIndex ? *spCellConfig->servCellIndex : 0;
     if (spCellConfig->reconfigurationWithSync) {
       LOG_A(NR_MAC, "Received reconfigurationWithSync\n");
-      handle_reconfiguration_with_sync(mac, cc_idP, spCellConfig->reconfigurationWithSync);
+      handle_reconfiguration_with_sync(mac, cc_idP, hfn, frame, spCellConfig->reconfigurationWithSync);
     }
     if (scd) {
       mac->tag_Id = scd->tag_Id;

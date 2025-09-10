@@ -73,7 +73,7 @@ int get_from_lte_ue_fd();
 void nr_rrc_SI_timers(NR_UE_RRC_SI_INFO *SInfo);
 void init_SI_timers(NR_UE_RRC_SI_INFO *SInfo);
 
-void nr_ue_rrc_timer_trigger(int module_id, int frame, int gnb_id);
+void nr_ue_rrc_timer_trigger(int module_id, int hfn, int frame, int gnb_id);
 void handle_t300_expiry(NR_UE_RRC_INST_t *rrc);
 void handle_t430_expiry(NR_UE_RRC_INST_t *rrc);
 
