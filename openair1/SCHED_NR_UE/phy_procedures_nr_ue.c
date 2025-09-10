@@ -1044,7 +1044,7 @@ void pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
 
     // Hold the channel estimates in frequency domain.
   int32_t pdcch_est_size = ((((fp->symbols_per_slot*(fp->ofdm_symbol_size+LTE_CE_FILTER_LENGTH))+15)/16)*16);
-  __attribute__((aligned(16))) c16_t pdcch_dl_ch_estimates[4 * fp->nb_antennas_rx][pdcch_est_size];
+  __attribute__((aligned(16))) c16_t pdcch_dl_ch_estimates[fp->nb_antennas_rx][pdcch_est_size];
 
   uint8_t dci_cnt = 0;
   for(int n_ss = 0; n_ss<phy_pdcch_config->nb_search_space; n_ss++) {
