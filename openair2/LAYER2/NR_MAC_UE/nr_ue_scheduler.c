@@ -2849,6 +2849,7 @@ static void schedule_ntn_config_command(fapi_nr_dl_config_request_t *dl_config, 
 {
   fapi_nr_dl_ntn_config_command_pdu *ntn_config_command_pdu = &dl_config->dl_config_list[dl_config->number_pdus].ntn_config_command_pdu;
 
+  ntn_config_command_pdu->epoch_hfn = mac->ntn_ta.epoch_hfn;
   ntn_config_command_pdu->epoch_sfn = mac->ntn_ta.epoch_sfn;
   ntn_config_command_pdu->epoch_subframe = mac->ntn_ta.epoch_subframe;
   ntn_config_command_pdu->cell_specific_k_offset = mac->ntn_ta.cell_specific_k_offset;

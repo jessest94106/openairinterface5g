@@ -318,6 +318,10 @@ static void configure_ntn_ta(module_id_t module_id,
   // epochTime_r17 must be present (this is assured by function `eval_epoch_time()`)
   const NR_EpochTime_r17_t *epoch_time_r17 = ntn_Config_r17->epochTime_r17;
   AssertFatal(epoch_time_r17, "epoch_time_r17 should not be NULL here\n");
+  if (epoch_time_r17->sfn_r17 >= frame)
+    ntn_ta->epoch_hfn = hfn;
+  else
+    ntn_ta->epoch_hfn = hfn + 1;
   ntn_ta->epoch_sfn = epoch_time_r17->sfn_r17;
   ntn_ta->epoch_subframe = epoch_time_r17->subFrameNR_r17;
 
@@ -368,9 +372,11 @@ static void configure_ntn_ta(module_id_t module_id,
 
   ntn_ta->ntn_params_changed = true;
 
-  LOG_D(NR_MAC,
-        "SIB19 Rxd. Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s², "
+  LOG_I(NR_MAC,
+        "SIB19 Rxd. Epoch HFN: %d, Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, "
+        "N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s², "
         "N_UE_TA: %fms, drift: %fµs/s, variant %fµs/s²\n",
+        ntn_ta->epoch_hfn,
         ntn_ta->epoch_sfn,
         ntn_ta->epoch_subframe,
         ntn_ta->cell_specific_k_offset,

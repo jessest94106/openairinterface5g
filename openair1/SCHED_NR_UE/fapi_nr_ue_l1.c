@@ -95,6 +95,7 @@ static void configure_ntn_params(PHY_VARS_NR_UE *ue, fapi_nr_dl_ntn_config_comma
     ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
   }
 
+  ue->ntn_config_message->ntn_config_params.epoch_hfn = ntn_params_message->epoch_hfn;
   ue->ntn_config_message->ntn_config_params.epoch_sfn = ntn_params_message->epoch_sfn;
   ue->ntn_config_message->ntn_config_params.epoch_subframe = ntn_params_message->epoch_subframe;
   ue->ntn_config_message->ntn_config_params.cell_specific_k_offset = ntn_params_message->cell_specific_k_offset;

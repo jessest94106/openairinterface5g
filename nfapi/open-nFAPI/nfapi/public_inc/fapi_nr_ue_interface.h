@@ -562,6 +562,7 @@ typedef struct {
 } fapi_nr_ta_command_pdu;
 
 typedef struct {
+  int epoch_hfn;
   int epoch_sfn;
   int epoch_subframe;
 

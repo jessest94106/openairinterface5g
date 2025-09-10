@@ -543,6 +543,7 @@ typedef struct {
 } si_schedInfo_t;
 
 typedef struct ntn_timing_advance_components {
+  int epoch_hfn;
   int epoch_sfn;
   int epoch_subframe;
 
