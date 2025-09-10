@@ -595,6 +595,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
         /* Extract short BSR value */
         ce_ptr = &pduP[mac_subheader_len];
         sched_ctrl->estimated_ul_buffer = estimate_ul_buffer_short_bsr((NR_BSR_SHORT *)ce_ptr);
+        sched_ctrl->sched_ul_bytes = 0;
         LOG_D(NR_MAC, "SHORT BSR at %4d.%2d, est buf %d\n", frameP, slot, sched_ctrl->estimated_ul_buffer);
         break;
 
@@ -603,6 +604,7 @@ static int nr_process_mac_pdu(instance_t module_idP,
         /* Extract long BSR value */
         ce_ptr = &pduP[mac_subheader_len];
         sched_ctrl->estimated_ul_buffer = estimate_ul_buffer_long_bsr((NR_BSR_LONG *)ce_ptr);
+        sched_ctrl->sched_ul_bytes = 0;
         LOG_D(NR_MAC, "LONG BSR at %4d.%2d, estim buf %d\n", frameP, slot, sched_ctrl->estimated_ul_buffer);
         break;
 
