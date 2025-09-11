@@ -54,10 +54,10 @@ static const uint16_t srs_max_number_cs[3] = {8, 12, 6};
     @param slot_number slot number
     @returns 0 on success -1 on error with message */
 
-int generate_srs_nr(nfapi_nr_srs_pdu_t *srs_config_pdu,
-                    NR_DL_FRAME_PARMS *frame_parms,
+int generate_srs_nr(NR_DL_FRAME_PARMS *frame_parms,
                     c16_t **txdataF,
                     uint16_t symbol_offset,
+                    int bwp_start,
                     nr_srs_info_t *nr_srs_info,
                     int16_t amp,
                     frame_t frame_number,
