@@ -32,7 +32,6 @@
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #include "PHY/INIT/nr_phy_init.h"
 #include "PHY/MODULATION/nr_modulation.h"
-#include "PHY/NR_UE_TRANSPORT/srs_modulation_nr.h"
 #include "T.h"
 #include "executables/nr-softmodem.h"
 #include "executables/softmodem-common.h"

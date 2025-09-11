@@ -35,43 +35,8 @@
 
 #include "PHY/defs_nr_UE.h"
 
-#define SRS_PERIODICITY                 (17)
-
-static const uint16_t srs_periodicity[SRS_PERIODICITY] = {1, 2, 4, 5, 8, 10, 16, 20, 32, 40, 64, 80, 160, 320, 640, 1280, 2560};
-
-// TS 38.211 - Table 6.4.1.4.2-1
-static const uint16_t srs_max_number_cs[3] = {8, 12, 6};
-
 /*************** FUNCTIONS *****************************************/
 
-/** \brief This function generates the sounding reference symbol (SRS) for the uplink according to 38.211 6.4.1.4 Sounding reference signal
-    @param frame_parms NR DL Frame parameters
-    @param txdataF pointer to the frequency domain TX signal
-    @param symbol_offset symbol offset added in txdataF
-    @param nr_srs_info pointer to the srs info structure
-    @param amp amplitude of generated signal
-    @param frame_number frame number
-    @param slot_number slot number
-    @returns 0 on success -1 on error with message */
-
-int generate_srs_nr(NR_DL_FRAME_PARMS *frame_parms,
-                    c16_t **txdataF,
-                    uint16_t symbol_offset,
-                    int bwp_start,
-                    nr_srs_info_t *nr_srs_info,
-                    int16_t amp,
-                    frame_t frame_number,
-                    slot_t slot_number);
-
-/** \brief This function checks for periodic srs if srs should be transmitted in this slot
- *  @param p_SRS_Resource pointer to active resource
-    @param frame_parms NR DL Frame parameters
-    @param txdataF pointer to the frequency domain TX signal
-    @returns 0 if srs should be transmitted -1 on error with message */
-
-int is_srs_period_nr(SRS_Resource_t *p_SRS_Resource,
-                     NR_DL_FRAME_PARMS *frame_parms,
-                     int frame_tx, int slot_tx);
 
 /** \brief This function processes srs configuration
  *  @param ue context
