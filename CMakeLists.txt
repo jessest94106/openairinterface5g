@@ -1678,9 +1678,8 @@ include_directories("${NFAPI_DIR}/nfapi/inc")
 include_directories("${NFAPI_DIR}/sim_common/inc")
 include_directories("${NFAPI_DIR}/pnf_sim/inc")
 
-add_library(oai_iqplayer MODULE
-	${OPENAIR_DIR}/radio/iqplayer/iqplayer_lib.c
-	)
+add_library(oai_iqplayer MODULE ${OPENAIR_DIR}/radio/iqplayer/iqplayer_lib.c)
+target_link_libraries(oai_iqplayer PRIVATE log_headers)
 
 #################################
 # add executables for operation
@@ -2090,7 +2089,7 @@ if (${T_TRACER})
         nr_ulschsim ldpctest polartest smallblocktest
         #all "add_library" definitions
         ITTI lte_rrc nr_rrc s1ap x2ap m2ap m3ap f1ap
-        params_libconfig oai_usrpdevif oai_bladerfdevif oai_lmssdrdevif oai_iqplayer
+        params_libconfig
         oai_eth_transpro HASHTABLE UTIL
         SECURITY SCHED_LIB SCHED_NR_LIB SCHED_RU_LIB SCHED_UE_LIB SCHED_NR_UE_LIB
         NFAPI_LIB NFAPI_PNF_LIB NFAPI_VNF_LIB NFAPI_USER_LIB
