@@ -618,6 +618,65 @@ NGAP_NGAP_PDU_t *encode_ng_handover_notify(const ngap_handover_notify_t *msg)
   return pdu;
 }
 
+/** @brief NGAP Handover Cancel encoding (9.2.3.11 3GPP TS 38.413 Handover Cancel)
+ * 8.4.5 Handover Cancellation (source NG-RAN -> AMF) */
+NGAP_NGAP_PDU_t *encode_ng_handover_cancel(const ngap_handover_cancel_t *msg)
+{
+  DevAssert(msg != NULL);
+
+  NGAP_NGAP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  pdu->present = NGAP_NGAP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, head);
+  head->procedureCode = NGAP_ProcedureCode_id_HandoverCancel;
+  head->criticality = NGAP_Criticality_reject;
+  head->value.present = NGAP_InitiatingMessage__value_PR_HandoverCancel;
+  NGAP_HandoverCancel_t *out = &head->value.choice.HandoverCancel;
+
+  // AMF UE NGAP ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverCancelIEs_t, ie1);
+  ie1->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
+  ie1->criticality = NGAP_Criticality_reject;
+  ie1->value.present = NGAP_HandoverCancelIEs__value_PR_AMF_UE_NGAP_ID;
+  asn_uint642INTEGER(&ie1->value.choice.AMF_UE_NGAP_ID, msg->amf_ue_ngap_id);
+
+  // RAN UE NGAP ID (M)
+  asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverCancelIEs_t, ie2);
+  ie2->id = NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID;
+  ie2->criticality = NGAP_Criticality_reject;
+  ie2->value.present = NGAP_HandoverCancelIEs__value_PR_RAN_UE_NGAP_ID;
+  ie2->value.choice.RAN_UE_NGAP_ID = msg->gNB_ue_ngap_id;
+
+  // Cause (M)
+  asn1cSequenceAdd(out->protocolIEs.list, NGAP_HandoverCancelIEs_t, ie3);
+  ie3->id = NGAP_ProtocolIE_ID_id_Cause;
+  ie3->criticality = NGAP_Criticality_reject;
+  ie3->value.present = NGAP_HandoverCancelIEs__value_PR_Cause;
+  encode_ngap_cause(&ie3->value.choice.Cause, &msg->cause);
+
+  return pdu;
+}
+
+/** @brief Decode NGAP Handover Cancel Acknowledge (9.2.3.12 3GPP TS 38.413) */
+int decode_ng_handover_cancel_ack(ngap_handover_cancel_ack_t *out, const NGAP_NGAP_PDU_t *pdu)
+{
+  DevAssert(out != NULL);
+  DevAssert(pdu != NULL);
+
+  NGAP_HandoverCancelAcknowledge_t *container = &pdu->choice.successfulOutcome->value.choice.HandoverCancelAcknowledge;
+  NGAP_HandoverCancelAcknowledgeIEs_t *ie;
+
+  /* AMF UE NGAP ID (M) */
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCancelAcknowledgeIEs_t, ie, container, NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID, true);
+  asn_INTEGER2ulong(&ie->value.choice.AMF_UE_NGAP_ID, &out->amf_ue_ngap_id);
+
+  /* RAN UE NGAP ID (M) */
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_HandoverCancelAcknowledgeIEs_t, ie, container, NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID, true);
+  out->gNB_ue_ngap_id = ie->value.choice.RAN_UE_NGAP_ID;
+
+  return 0;
+}
+
 /** @brief Encode NGAP UL RAN Status Transfer (9.2.3.14 of 3GPP TS 38.413) */
 NGAP_NGAP_PDU_t *encode_ng_ul_ran_status_transfer(const ngap_ran_status_transfer_t *msg)
 {

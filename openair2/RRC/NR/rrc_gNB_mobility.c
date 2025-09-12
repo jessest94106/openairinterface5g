@@ -489,6 +489,16 @@ static void nr_rrc_n2_ho_complete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   rrc_gNB_send_NGAP_HANDOVER_NOTIFY(rrc, UE);
 }
 
+/** @brief This callback is used by the source gNB to inform the AMF
+ *         about the cancellation of an ongoing handover */
+static void nr_rrc_n2_ho_cancel(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
+{
+  DevAssert(UE->ho_context);
+  DevAssert(UE->ho_context->source);
+  ngap_cause_t cause = {.type = NGAP_CAUSE_RADIO_NETWORK, .value = NGAP_CAUSE_RADIO_NETWORK_HANDOVER_CANCELLED};
+  rrc_gNB_send_NGAP_HANDOVER_CANCEL(rrc->module_id, UE, cause);
+}
+
 /** @brief Callback function to trigger NG Handover Failure on the target gNB, to inform the AMF
  * that the preparation of resources has failed (e.g. unsatisfied criteria, gNB is already loaded).
  * This message represents an Unsuccessful Outcome of the Handover Resource Allocation */
@@ -546,6 +556,7 @@ void nr_rrc_trigger_n2_ho(gNB_RRC_INST *rrc,
   ue->ho_context = alloc_ho_ctx(HO_CTX_SOURCE);
   ue->ho_context->source->du = get_du_for_ue(rrc, ue->rrc_ue_id);
   ue->ho_context->source->ho_status_transfer = rrc_gNB_send_NGAP_ul_ran_status_transfer;
+  ue->ho_context->source->ho_cancel = nr_rrc_n2_ho_cancel;
 
   rrc_gNB_send_NGAP_HANDOVER_REQUIRED(rrc, ue, neighbour_config, hoPrepInfo);
   free_byte_array(hoPrepInfo);

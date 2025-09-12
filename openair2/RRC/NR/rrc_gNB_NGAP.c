@@ -1403,6 +1403,30 @@ void rrc_gNB_send_NGAP_HANDOVER_NOTIFY(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
 }
 
+/** @brief Prepare NG Handover Cancel (source NG-RAN) and inform NGAP (N2-based HO only)
+ *  3GPP TS 38.413 §8.4.5 (Handover Cancellation) - source NG-RAN -> AMF
+ *  3GPP TS 38.413 §9.2.3.11 (HANDOVER CANCEL)
+ *  @param rrc CU/RRC instance
+ *  @param UE UE context
+ *  @param cause cancellation cause */
+void rrc_gNB_send_NGAP_HANDOVER_CANCEL(int module_id, gNB_RRC_UE_t *UE, ngap_cause_t cause)
+{
+  DevAssert(UE != NULL);
+
+  LOG_I(NR_RRC, "Triggering NGAP Handover Cancel (gNB_ue_ngap_id=%d, amf_ue_ngap_id=%ld)\n", UE->rrc_ue_id, UE->amf_ue_ngap_id);
+
+  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_HANDOVER_CANCEL);
+  ngap_handover_cancel_t *ho_cancel = &NGAP_HANDOVER_CANCEL(msg_p);
+  memset(ho_cancel, 0, sizeof(*ho_cancel));
+
+  /* Mandatory IEs (38.413 §9.2.3.11) */
+  ho_cancel->gNB_ue_ngap_id = UE->rrc_ue_id;
+  ho_cancel->amf_ue_ngap_id = UE->amf_ue_ngap_id;
+  ho_cancel->cause = cause;
+
+  itti_send_msg_to_task(TASK_NGAP, module_id, msg_p);
+}
+
 void rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t xid)
 {
   int pdu_sessions_released = 0;

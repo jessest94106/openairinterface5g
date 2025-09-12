@@ -105,6 +105,7 @@ void rrc_gNB_process_HandoverCommand(gNB_RRC_INST *rrc, const ngap_handover_comm
 void rrc_gNB_free_Handover_Command(ngap_handover_command_t *msg);
 
 void rrc_gNB_send_NGAP_HANDOVER_NOTIFY(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE);
+void rrc_gNB_send_NGAP_HANDOVER_CANCEL(int module_id, gNB_RRC_UE_t *UE, ngap_cause_t cause);
 
 int rrc_gNB_send_NGAP_ul_ran_status_transfer(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const int n_to_mod, const e1_pdcp_status_info_t *pdcp_status);
 

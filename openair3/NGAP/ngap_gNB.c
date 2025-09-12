@@ -463,6 +463,57 @@ static int ngap_gNB_handover_notify(instance_t instance, const ngap_handover_not
   return 0;
 }
 
+/** @brief NGAP: Handover Cancel callback */
+static int ngap_gNB_handover_cancel(instance_t instance, const ngap_handover_cancel_t *msg)
+{
+  DevAssert(msg != NULL);
+  byte_array_t ba = {.buf = NULL, .len = 0};
+
+  // Retrieve NGAP gNB instance
+  ngap_gNB_instance_t *ngap_gNB_instance_p = ngap_gNB_get_instance(instance);
+  DevAssert(ngap_gNB_instance_p != NULL);
+
+  // we must have the UE context by RAN UE NGAP ID
+  ngap_gNB_ue_context_t *ue_context_p = ngap_get_ue_context(msg->gNB_ue_ngap_id);
+  if (ue_context_p == NULL) {
+    NGAP_ERROR("Failed to encode Handover Cancel: no UE context for gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
+    return -1;
+  }
+
+  if (ue_context_p->gNB_ue_ngap_id != msg->gNB_ue_ngap_id) {
+    NGAP_ERROR("Failed to encode Handover Cancel: mismatched gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
+    return -1;
+  }
+
+  if (ue_context_p->amf_ue_ngap_id != msg->amf_ue_ngap_id) {
+    NGAP_ERROR("Failed to encode Handover Cancel: mismatched amf_ue_ngap_id=%ld\n", msg->amf_ue_ngap_id);
+    return -1;
+  }
+
+  /* Encode NGAP PDU */
+  NGAP_NGAP_PDU_t *pdu = encode_ng_handover_cancel(msg);
+  if (pdu == NULL) {
+    NGAP_ERROR("Failed to encode NG Handover Cancel\n");
+    return -1;
+  }
+
+  if (ngap_gNB_encode_pdu(pdu, &ba.buf, (uint32_t *)&ba.len) < 0) {
+    NGAP_ERROR("Failed to encode NG Handover Cancel message PDU\n");
+    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
+    return -1;
+  }
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
+
+  /* UE-associated signalling -> use the UE's allocated SCTP stream */
+  ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance,
+                                   ue_context_p->amf_ref->assoc_id,
+                                   ba.buf,
+                                   ba.len,
+                                   ue_context_p->tx_stream);
+
+  return 0;
+}
+
 int ngap_gNB_handle_ul_ran_status_transfer(instance_t instance, const ngap_ran_status_transfer_t *msg)
 {
   NGAP_DEBUG("Triggered UL RAN Status Transfer\n");
@@ -585,6 +636,10 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
 
       case NGAP_HANDOVER_NOTIFY:
         ngap_gNB_handover_notify(instance, &NGAP_HANDOVER_NOTIFY(received_msg));
+        break;
+
+      case NGAP_HANDOVER_CANCEL:
+        ngap_gNB_handover_cancel(instance, &NGAP_HANDOVER_CANCEL(received_msg));
         break;
 
       case NGAP_UL_RAN_STATUS_TRANSFER:

@@ -71,6 +71,8 @@
 #define NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_request_ack
 #define NGAP_HANDOVER_COMMAND(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_command
 #define NGAP_HANDOVER_NOTIFY(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_notify
+#define NGAP_HANDOVER_CANCEL(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_cancel
+#define NGAP_HANDOVER_CANCEL_ACK(mSGpTR) (mSGpTR)->ittiMsg.ngap_handover_cancel_ack
 
 #define NGAP_UE_CONTEXT_RELEASE_REQ(mSGpTR)     (mSGpTR)->ittiMsg.ngap_ue_release_req
 #define NGAP_PDUSESSION_RELEASE_COMMAND(mSGpTR)      (mSGpTR)->ittiMsg.ngap_pdusession_release_command
@@ -700,6 +702,24 @@ typedef struct {
   // User Location Information
   user_location_information_t user_info;
 } ngap_handover_notify_t;
+
+/* 9.2.3.11 3GPP TS 38.413 */
+typedef struct {
+  // RAN UE NGAP ID
+  uint32_t gNB_ue_ngap_id;
+  // AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+  // Cause
+  ngap_cause_t cause;
+} ngap_handover_cancel_t;
+
+/* 9.2.3.12 3GPP TS 38.413 */
+typedef struct {
+  // RAN UE NGAP ID
+  uint32_t gNB_ue_ngap_id;
+  // AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+} ngap_handover_cancel_ack_t;
 
 typedef struct ngap_ue_cap_info_ind_s {
   uint32_t  gNB_ue_ngap_id;

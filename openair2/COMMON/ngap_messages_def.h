@@ -75,6 +75,7 @@ MESSAGE_DEF(NGAP_HANDOVER_REQUIRED, MESSAGE_PRIORITY_MED, ngap_handover_required
 MESSAGE_DEF(NGAP_HANDOVER_FAILURE, MESSAGE_PRIORITY_MED, ngap_handover_failure_t, ngap_handover_failure)
 MESSAGE_DEF(NGAP_HANDOVER_REQUEST_ACKNOWLEDGE, MESSAGE_PRIORITY_MED, ngap_handover_request_ack_t, ngap_handover_request_ack)
 MESSAGE_DEF(NGAP_HANDOVER_NOTIFY, MESSAGE_PRIORITY_MED, ngap_handover_notify_t, ngap_handover_notify)
+MESSAGE_DEF(NGAP_HANDOVER_CANCEL, MESSAGE_PRIORITY_MED, ngap_handover_cancel_t, ngap_handover_cancel)
 MESSAGE_DEF(NGAP_UL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_transfer_t, ngap_ul_ran_status_transfer)
 MESSAGE_DEF(NGAP_DL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_transfer_t, ngap_dl_ran_status_transfer)
 
@@ -89,6 +90,7 @@ MESSAGE_DEF(NGAP_PDUSESSION_RELEASE_COMMAND     , MESSAGE_PRIORITY_MED, ngap_pdu
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_COMMAND, MESSAGE_PRIORITY_MED, ngap_ue_release_command_t        , ngap_ue_release_command)
 MESSAGE_DEF(NGAP_HANDOVER_REQUEST, MESSAGE_PRIORITY_MED, ngap_handover_request_t, ngap_handover_request)
 MESSAGE_DEF(NGAP_HANDOVER_COMMAND, MESSAGE_PRIORITY_MED, ngap_handover_command_t, ngap_handover_command)
+MESSAGE_DEF(NGAP_HANDOVER_CANCEL_ACK, MESSAGE_PRIORITY_MED, ngap_handover_cancel_ack_t, ngap_handover_cancel_ack)
 
 /* NGAP <-> RRC messages (can be initiated either by MME or gNB) */
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_REQ    , MESSAGE_PRIORITY_MED, ngap_ue_release_req_t            , ngap_ue_release_req)
