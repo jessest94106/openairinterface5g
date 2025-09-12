@@ -628,7 +628,7 @@ static void pf_dl(module_id_t module_id,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_UE_DL_BWP_t *current_BWP = &UE->current_DL_BWP;
 
-    if (sched_ctrl->ul_failure)
+    if (!nr_mac_ue_is_active(UE))
       continue;
 
     const NR_mac_dir_stats_t *stats = &UE->mac_stats.dl;
@@ -683,7 +683,8 @@ static void pf_dl(module_id_t module_id,
       const int max_mcs_table = current_BWP->mcsTableIdx == 1 ? 27 : 28;
       const int max_mcs = min(sched_ctrl->dl_max_mcs, max_mcs_table);
       if (bo->harq_round_max == 1) {
-        sched_pdsch->mcs = min(bo->max_mcs, max_mcs);
+        int new_mcs = min(bo->max_mcs, max_mcs);
+        sched_pdsch->mcs = max(bo->min_mcs, new_mcs);
         sched_ctrl->dl_bler_stats.mcs = sched_pdsch->mcs;
       } else
         sched_pdsch->mcs = get_mcs_from_bler(bo, stats, &sched_ctrl->dl_bler_stats, max_mcs, frame);
@@ -1037,7 +1038,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_UE_DL_BWP_t *current_BWP = &UE->current_DL_BWP;
 
-    if (sched_ctrl->ul_failure && !get_softmodem_params()->phy_test)
+    if (!nr_mac_ue_is_active(UE) && !get_softmodem_params()->phy_test)
       continue;
 
     NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;

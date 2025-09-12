@@ -284,7 +284,8 @@ static void configure_ratematching_csi(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsc
                                        int slot,
                                        int mu,
                                        int slots_per_frame,
-                                       const NR_PDSCH_Config_t *pdsch_config)
+                                       const NR_PDSCH_Config_t *pdsch_config,
+                                       NR_CSI_MeasConfig_t *csi_MeasConfig)
 {
   // only for C-RNTI, MCS-C-RNTI, CS-RNTI (and only C-RNTI is supported for now)
   if (rnti_type != TYPE_C_RNTI_)
@@ -316,6 +317,25 @@ static void configure_ratematching_csi(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsc
       csi_pdu->subcarrier_spacing = mu;
       configure_csi_resource_mapping(csi_pdu, &zp_res->resourceMapping, dlsch_pdu->BWPSize, dlsch_pdu->BWPStart);
       dlsch_pdu->numCsiRsForRateMatching++;
+    }
+  }
+
+  // Handle NZP CSI-RS for rate matching
+  if (csi_MeasConfig && csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList) {
+    for (int i = 0; i < csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList->list.count; i++) {
+      NR_NZP_CSI_RS_Resource_t *nzp_res = csi_MeasConfig->nzp_CSI_RS_ResourceToAddModList->list.array[i];
+      if (nzp_res->periodicityAndOffset) {
+        int period, offset;
+        csi_period_offset(NULL, nzp_res->periodicityAndOffset, &period, &offset);
+        if ((frame * slots_per_frame + slot - offset) % period != 0)
+          continue;
+        AssertFatal(dlsch_pdu->numCsiRsForRateMatching < NFAPI_MAX_NUM_CSI_RATEMATCH, "csiRsForRateMatching out of bounds\n");
+        fapi_nr_dl_config_csirs_pdu_rel15_t *csi_pdu = &dlsch_pdu->csiRsForRateMatching[dlsch_pdu->numCsiRsForRateMatching];
+        csi_pdu->csi_type = 1; // NZP CSI-RS
+        csi_pdu->subcarrier_spacing = mu;
+        configure_csi_resource_mapping(csi_pdu, &nzp_res->resourceMapping, dlsch_pdu->BWPSize, dlsch_pdu->BWPStart);
+        dlsch_pdu->numCsiRsForRateMatching++;
+      }
     }
   }
 
@@ -769,8 +789,15 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
 
   dlsch_pdu->numCsiRsForRateMatching = 0;
   int slots_frame = mac->frame_structure.numb_slots_frame;
-  configure_ratematching_csi(dlsch_pdu, dl_config, rnti_type, frame, slot, dlsch_pdu->SubcarrierSpacing, slots_frame, pdsch_config);
-
+  configure_ratematching_csi(dlsch_pdu,
+                             dl_config,
+                             rnti_type,
+                             frame,
+                             slot,
+                             dlsch_pdu->SubcarrierSpacing,
+                             slots_frame,
+                             pdsch_config,
+                             mac->sc_info.csi_MeasConfig);
 
   /* IDENTIFIER_DCI_FORMATS */
   /* FREQ_DOM_RESOURCE_ASSIGNMENT_DL */
@@ -1105,7 +1132,15 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
   nr_rnti_type_t rnti_type = get_rnti_type(mac, dci_ind->rnti);
   dlsch_pdu->numCsiRsForRateMatching = 0;
   int slots_frame = mac->frame_structure.numb_slots_frame;
-  configure_ratematching_csi(dlsch_pdu, dl_config, rnti_type, frame, slot, current_DL_BWP->scs, slots_frame, pdsch_Config);
+  configure_ratematching_csi(dlsch_pdu,
+                             dl_config,
+                             rnti_type,
+                             frame,
+                             slot,
+                             current_DL_BWP->scs,
+                             slots_frame,
+                             pdsch_Config,
+                             mac->sc_info.csi_MeasConfig);
 
   /* IDENTIFIER_DCI_FORMATS */
   /* CARRIER_IND */
