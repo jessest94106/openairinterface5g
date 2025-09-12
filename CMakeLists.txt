@@ -609,11 +609,6 @@ add_library(UTIL
   ${OPENAIR_DIR}/common/utils/LOG/vcd_signal_dumper.c
   ${OPENAIR2_DIR}/UTIL/OPT/probe.c
 )
-if (ENABLE_LTTNG)
-  find_package(LTTngUST 2.3.8 EXACT REQUIRED)
-else()
-  message(STATUS "LTTNG support disabled")
-endif()
 
 pkg_check_modules(cap libcap)
 if (cap_FOUND)
