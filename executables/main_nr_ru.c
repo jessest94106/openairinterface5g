@@ -217,7 +217,14 @@ int main(int argc, char **argv)
   ret = ru->nr_start_if(ru, NULL);
   AssertFatal(ret == 0, "Could not start xran\n");
 
+  LOG_I(PHY, "starting vrtsim\n");
+  ret = openair0_load(&ru->rfdevice, "vrtsim", &ru->openair0_cfg, NULL);
+  AssertFatal(ret == 0, "RU %u: openair0_load() ret %d: cannot initialize vrtsim\n", ru->idx, ret);
+  ret = ru->rfdevice.trx_start_func(&ru->rfdevice);
+  AssertFatal(ret == 0, "RU %u: trx_start_func() ret %d: cannot start vrtsim\n", ru->idx, ret);
+
   threadCreate(&oru.north_read_thread, oru_north_read_thread, (void *)&oru, "north_read_thread", -1, OAI_PRIORITY_RT_MAX);
+  threadCreate(&oru.south_read_thread, oru_south_read_thread, (void *)&oru, "south_read_thread", -1, OAI_PRIORITY_RT_MAX);
 
   while (oai_exit == 0)
     sleep(1);
