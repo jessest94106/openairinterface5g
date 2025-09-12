@@ -51,10 +51,12 @@ typedef struct {
   int numerology;
 
   pthread_t north_read_thread;
+  pthread_t south_read_thread;
 } ORU_t;
 
 int get_oru_options(ORU_t *oru);
 void oru_init_frame_parms(ORU_t *oru);
 void *oru_north_read_thread(void *arg);
+void *oru_south_read_thread(void *arg);
 
 #endif
