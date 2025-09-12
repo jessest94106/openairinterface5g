@@ -138,6 +138,7 @@ typedef enum {
 #define GNB_CONFIG_STRING_CU_SIB_LIST                   "cu_sibs"
 #define GNB_CONFIG_STRING_DU_SIB_LIST                   "du_sibs"
 #define GNB_CONFIG_STRING_DOSINR                        "do_SINR"
+#define GNB_CONFIG_STRING_1ST_ACTIVE_BWP                "first_active_bwp"
 
 #define GNB_CONFIG_HLP_STRING_ENABLE_SDAP               "enable the SDAP layer\n"
 #define GNB_CONFIG_HLP_FORCE256QAMOFF                   "suppress activation of 256 QAM despite UE support"
@@ -152,6 +153,7 @@ typedef enum {
 #define GNB_CONFIG_HLP_CU_SIBS                          "List of CU generated SIBs to be transmitted"
 #define GNB_CONFIG_HLP_DU_SIBS                          "List of DU generated SIBs to be transmitted"
 #define GNB_CONFIG_HLP_DOSINR                           "Enable CSI feedback using SINR measurements on SSB"
+
 
 /*-----------------------------------------------------------------------------------------------------------------------------------------*/
 /*                                            cell configuration parameters                                                                */
@@ -199,6 +201,7 @@ typedef enum {
 {GNB_CONFIG_STRING_CU_SIB_LIST,                  GNB_CONFIG_HLP_CU_SIBS, 0, .iptr=NULL, .defintarrayval=0,        TYPE_INTARRAY,  0},  \
 {GNB_CONFIG_STRING_DU_SIB_LIST,                  GNB_CONFIG_HLP_DU_SIBS, 0, .iptr=NULL, .defintarrayval=0,        TYPE_INTARRAY,  0},  \
 {GNB_CONFIG_STRING_DOSINR,      GNB_CONFIG_HLP_DOSINR,   0,            .iptr=NULL,  .defintval=0,                 TYPE_INT,       0},  \
+{GNB_CONFIG_STRING_1ST_ACTIVE_BWP,               NULL,   0,            .iptr=NULL,  .defintval=0,                 TYPE_INT,       0},  \
 }
 // clang-format on
 
@@ -242,6 +245,7 @@ typedef enum {
 #define GNB_CU_SIBS_IDX                 36
 #define GNB_DU_SIBS_IDX                 37
 #define GNB_DO_SINR_IDX                 38
+#define GNB_1ST_ACTIVE_BWP_IDX          39
 
 #define TRACKING_AREA_CODE_OKRANGE {0x0001,0xFFFD}
 #define NUM_DL_HARQ_OKVALUES {2,4,6,8,10,12,16,32}
@@ -287,9 +291,33 @@ typedef enum {
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
+  { .s5 = { NULL } },                                             \
 }
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+#define GNB_CONFIG_STRING_BWP_LIST                      "bwp_list"
+
+#define GNB_CONFIG_STRING_BWP_SCS     "scs"
+#define GNB_CONFIG_STRING_BWP_START   "bwpStart"
+#define GNB_CONFIG_STRING_BWP_SIZE    "bwpSize"
+
+#define GNB_BWP_SCS_IDX       0
+#define GNB_BWP_START_IDX     1
+#define GNB_BWP_SIZE_IDX      2
+
+#define GNBBWPPARAMS_DESC {                                                                  \
+ {GNB_CONFIG_STRING_BWP_SCS,            NULL,   0,            .iptr=NULL,  .defintarrayval=0,            TYPE_INT,  0},  \
+ {GNB_CONFIG_STRING_BWP_START,          NULL,   0,            .iptr=NULL,  .defintarrayval=0,            TYPE_INT,  0},  \
+ {GNB_CONFIG_STRING_BWP_SIZE,           NULL,   0,            .iptr=NULL,  .defintarrayval=0,            TYPE_INT,  0},  \
+}
+
+#define BWPPARAMS_CHECK {                                         \
+  { .s5 = { NULL } },                                             \
+  { .s5 = { NULL } },                                             \
+  { .s5 = { NULL } },                                             \
+}
+
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 /* Neighbour Cell Configurations*/
@@ -515,6 +543,60 @@ typedef enum {
 #define GNB_REDCAP_CELL_BARRED_REDCAP1_RX_R17_IDX            0
 #define GNB_REDCAP_CELL_BARRED_REDCAP2_RX_R17_IDX            1
 #define GNB_REDCAP_INTRA_FREQ_RESELECTION_REDCAP_R17_IDX     2
+
+/*-------------------------------------------------------------------------------------------------------------------------------------*/
+/*                                            PTRS configuration parameters                                                          */
+/*-------------------------------------------------------------------------------------------------------------------------------------*/
+
+#define GNB_CONFIG_STRING_PTRS                                           "phaseTrackingRS"
+#define GNB_CONFIG_STRING_DLPTRSFREQDENSITY0_0                           "dl_ptrsFreqDensity0_0"
+#define GNB_CONFIG_STRING_DLPTRSFREQDENSITY1_0                           "dl_ptrsFreqDensity1_0"
+#define GNB_CONFIG_STRING_DLPTRSTIMEDENSITY0_0                           "dl_ptrsTimeDensity0_0"
+#define GNB_CONFIG_STRING_DLPTRSTIMEDENSITY1_0                           "dl_ptrsTimeDensity1_0"
+#define GNB_CONFIG_STRING_DLPTRSTIMEDENSITY2_0                           "dl_ptrsTimeDensity2_0"
+#define GNB_CONFIG_STRING_DLPTRSEPRERATIO_0                              "dl_ptrsEpreRatio_0"
+#define GNB_CONFIG_STRING_DLPTRSREOFFSET_0                               "dl_ptrsReOffset_0"
+#define GNB_CONFIG_STRING_ULPTRSFREQDENSITY0_0                           "ul_ptrsFreqDensity0_0"
+#define GNB_CONFIG_STRING_ULPTRSFREQDENSITY1_0                           "ul_ptrsFreqDensity1_0"
+#define GNB_CONFIG_STRING_ULPTRSTIMEDENSITY0_0                           "ul_ptrsTimeDensity0_0"
+#define GNB_CONFIG_STRING_ULPTRSTIMEDENSITY1_0                           "ul_ptrsTimeDensity1_0"
+#define GNB_CONFIG_STRING_ULPTRSTIMEDENSITY2_0                           "ul_ptrsTimeDensity2_0"
+#define GNB_CONFIG_STRING_ULPTRSREOFFSET_0                               "ul_ptrsReOffset_0"
+#define GNB_CONFIG_STRING_ULPTRSMAXPORTS_0                               "ul_ptrsMaxPorts_0"
+#define GNB_CONFIG_STRING_ULPTRSPOWER_0                                  "ul_ptrsPower_0"
+
+#define GNB_PTRS_PARAMS_DESC { \
+{GNB_CONFIG_STRING_DLPTRSFREQDENSITY0_0,   NULL,  0,  .iptr=NULL,  .defintval=0,  TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_DLPTRSFREQDENSITY1_0,   NULL,  0,  .iptr=NULL,  .defintval=0,  TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_DLPTRSTIMEDENSITY0_0,   NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_DLPTRSTIMEDENSITY1_0,   NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_DLPTRSTIMEDENSITY2_0,   NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_DLPTRSEPRERATIO_0,      NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_DLPTRSREOFFSET_0,       NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSFREQDENSITY0_0,   NULL,  0,  .iptr=NULL,  .defintval=0,  TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSFREQDENSITY1_0,   NULL,  0,  .iptr=NULL,  .defintval=0,  TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSTIMEDENSITY0_0,   NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSTIMEDENSITY1_0,   NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSTIMEDENSITY2_0,   NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSREOFFSET_0,       NULL,  0,  .iptr=NULL,  .defintval=-1, TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSMAXPORTS_0,       NULL,  0,  .iptr=NULL,  .defintval=0,  TYPE_INT, 0}, \
+{GNB_CONFIG_STRING_ULPTRSPOWER_0,          NULL,  0,  .iptr=NULL,  .defintval=0,  TYPE_INT, 0}}
+
+#define GNB_DLPTRSFREQDENSITY0_0_IDX   0
+#define GNB_DLPTRSFREQDENSITY1_0_IDX   1
+#define GNB_DLPTRSTIMEDENSITY0_0_IDX   2
+#define GNB_DLPTRSTIMEDENSITY1_0_IDX   3
+#define GNB_DLPTRSTIMEDENSITY2_0_IDX   4
+#define GNB_DLPTRSEPRERATIO_0_IDX      5
+#define GNB_DLPTRSREOFFSET_0_IDX       6
+#define GNB_ULPTRSFREQDENSITY0_0_IDX   7
+#define GNB_ULPTRSFREQDENSITY1_0_IDX   8
+#define GNB_ULPTRSTIMEDENSITY0_0_IDX   9
+#define GNB_ULPTRSTIMEDENSITY1_0_IDX  10
+#define GNB_ULPTRSTIMEDENSITY2_0_IDX  11
+#define GNB_ULPTRSREOFFSET_0_IDX      12
+#define GNB_ULPTRSMAXPORTS_0_IDX      13
+#define GNB_ULPTRSPOWER_0_IDX         14
 
 /*---------------------------------------------------------------------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------------------------------------------------------*/

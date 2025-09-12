@@ -3473,13 +3473,59 @@ void nr_measgap_scheduling(gNB_MAC_INST *nr_mac, frame_t frame, sub_frame_t slot
   }
 }
 
+void clean_bwp_structures(NR_SpCellConfig_t *spCellConfig)
+{
+  NR_ServingCellConfig_t *spCellConfigDedicated = spCellConfig->spCellConfigDedicated;
+  if (spCellConfigDedicated->downlinkBWP_ToReleaseList) {
+    struct NR_ServingCellConfig__downlinkBWP_ToReleaseList *rel_dl = spCellConfigDedicated->downlinkBWP_ToReleaseList;
+    struct NR_ServingCellConfig__downlinkBWP_ToAddModList *add_dl = spCellConfigDedicated->downlinkBWP_ToAddModList;
+    int num_rel = rel_dl->list.count;
+    int num_add = add_dl->list.count;
+    for (int i = 0; i < num_rel; i++) {
+      NR_BWP_Id_t *rel_id = rel_dl->list.array[i];
+      for (int j = 0; j < num_add; j++) {
+        NR_BWP_Downlink_t *dl_bwp = add_dl->list.array[j];
+        if (*rel_id == dl_bwp->bwp_Id) {
+          asn_sequence_del(&add_dl->list, j, 1);
+        }
+      }
+      asn_sequence_del(&rel_dl->list, i, 1);
+    }
+    if (rel_dl->list.count == 0)
+      free_and_zero(rel_dl);
+    if (add_dl->list.count == 0)
+      free_and_zero(add_dl);
+  }
+  if (spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList) {
+    struct NR_UplinkConfig__uplinkBWP_ToReleaseList *rel_ul = spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList;
+    struct NR_UplinkConfig__uplinkBWP_ToAddModList *add_ul = spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList;
+    int num_rel = rel_ul->list.count;
+    int num_add = add_ul->list.count;
+    for (int i = 0; i < num_rel; i++) {
+      NR_BWP_Id_t *rel_id = rel_ul->list.array[i];
+      for (int j = 0; j < num_add; j++) {
+        NR_BWP_Uplink_t *ul_bwp = add_ul->list.array[j];
+        if (*rel_id == ul_bwp->bwp_Id) {
+          asn_sequence_del(&add_ul->list, j, 1);
+        }
+      }
+      asn_sequence_del(&rel_ul->list, i, 1);
+    }
+    if (rel_ul->list.count == 0)
+      free_and_zero(rel_ul);
+    if (add_ul->list.count == 0)
+      free_and_zero(add_ul);
+  }
+}
+
 void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
 {
   DevAssert(cell_group != NULL);
+  NR_SpCellConfig_t *spCellConfig = cell_group->spCellConfig;
   /* remove a reconfigurationWithSync, we don't need it anymore */
-  if (cell_group->spCellConfig && cell_group->spCellConfig->reconfigurationWithSync != NULL) {
-    ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cell_group->spCellConfig->reconfigurationWithSync);
-    cell_group->spCellConfig->reconfigurationWithSync = NULL;
+  if (spCellConfig && spCellConfig->reconfigurationWithSync != NULL) {
+    ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, spCellConfig->reconfigurationWithSync);
+    spCellConfig->reconfigurationWithSync = NULL;
   }
   /* remove the rlc_BearerToReleaseList, we don't need it anymore */
   if (cell_group->rlc_BearerToReleaseList != NULL) {
@@ -3491,6 +3537,8 @@ void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
   /* remove reestablishRLC, we don't need it anymore */
   for (int i = 0; i < cell_group->rlc_BearerToAddModList->list.count; ++i)
     free_and_zero(cell_group->rlc_BearerToAddModList->list.array[i]->reestablishRLC);
+  /* clean BWP structures */
+  clean_bwp_structures(spCellConfig);
 }
 
 int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs)
@@ -3776,8 +3824,7 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   int CC_id = 0;
   int srb_id = 1;
   const NR_ServingCellConfigCommon_t *scc = mac->common_channels[CC_id].ServingCellConfigCommon;
-  const NR_ServingCellConfig_t *sccd = UE->is_redcap ? NULL : mac->common_channels[CC_id].pre_ServingCellConfig;
-  NR_CellGroupConfig_t *cellGroupConfig = get_initial_cellGroupConfig(UE->uid, scc, sccd, &mac->radio_config, &mac->rlc_config);
+  NR_CellGroupConfig_t *cellGroupConfig = get_initial_cellGroupConfig(UE->uid, scc, &mac->radio_config, &mac->rlc_config);
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = cellGroupConfig;
 
@@ -3873,11 +3920,29 @@ bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *
   return false;
 }
 
-void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_t *UE)
+void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_t *UE, int new_bwp_id)
 {
   DevAssert(UE->CellGroup != NULL);
+  NR_CellGroupConfig_t *cellGroup_for_UE = NULL;
+  if (new_bwp_id >= 0) {
+    AssertFatal(UE->current_DL_BWP.bwp_id == UE->current_UL_BWP.bwp_id, "We only support same BWP for UL and DL\n");
+    if (new_bwp_id == UE->current_DL_BWP.bwp_id)
+      LOG_E(NR_MAC, "Source BWP ID and target BWP ID are the same, can't perform switch\n");
+    else
+      cellGroup_for_UE = update_cellGroupConfig_for_BWP_switch(UE->CellGroup,
+                                                               &nrmac->radio_config,
+                                                               UE->capability,
+                                                               nrmac->common_channels[0].ServingCellConfigCommon,
+                                                               UE->uid,
+                                                               UE->current_DL_BWP.bwp_id,
+                                                               new_bwp_id);
+  }
   uint8_t buf[2048];
-  asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, UE->CellGroup, buf, sizeof(buf));
+  asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
+                                                  NULL,
+                                                  cellGroup_for_UE ? cellGroup_for_UE : UE->CellGroup,
+                                                  buf,
+                                                  sizeof(buf));
   AssertFatal(enc_rval.encoded > 0, "ASN1 encoding of CellGroupConfig failed, failed type %s\n", enc_rval.failed_type->name);
   du_to_cu_rrc_information_t du2cu = {
     .cellGroupConfig = buf,
@@ -3892,6 +3957,8 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_
     .cause_value = F1AP_CauseRadioNetwork_action_desirable_for_radio_reasons,
   };
   nrmac->mac_rrc.ue_context_modification_required(&required);
+  if (cellGroup_for_UE)
+    free_cellGroupConfig(cellGroup_for_UE);
 }
 
 /* \brief add bearers from CellGroupConfig.

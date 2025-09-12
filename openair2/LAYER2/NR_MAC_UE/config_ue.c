@@ -2680,8 +2680,8 @@ static void configure_BWPs(NR_UE_MAC_INST_t *mac, NR_ServingCellConfig_t *scd)
   if (scd->downlinkBWP_ToReleaseList) {
     for (int i = 0; i < scd->downlinkBWP_ToReleaseList->list.count; i++) {
       for (int j = 0; j < mac->dl_BWPs.count; j++) {
-        if (*scd->downlinkBWP_ToReleaseList->list.array[i] == mac->dl_BWPs.array[i]->bwp_id)
-          release_dl_BWP(mac, i);
+        if (*scd->downlinkBWP_ToReleaseList->list.array[i] == mac->dl_BWPs.array[j]->bwp_id)
+          release_dl_BWP(mac, j);
       }
     }
   }
@@ -2702,8 +2702,8 @@ static void configure_BWPs(NR_UE_MAC_INST_t *mac, NR_ServingCellConfig_t *scd)
     if (scd->uplinkConfig->uplinkBWP_ToReleaseList) {
       for (int i = 0; i < scd->uplinkConfig->uplinkBWP_ToReleaseList->list.count; i++) {
         for (int j = 0; j < mac->ul_BWPs.count; j++) {
-          if (*scd->uplinkConfig->uplinkBWP_ToReleaseList->list.array[i] == mac->ul_BWPs.array[i]->bwp_id)
-            release_ul_BWP(mac, i);
+          if (*scd->uplinkConfig->uplinkBWP_ToReleaseList->list.array[i] == mac->ul_BWPs.array[j]->bwp_id)
+            release_ul_BWP(mac, j);
         }
       }
     }
