@@ -1005,11 +1005,14 @@ static int get_max_pdcch_symb(const NR_UE_PDCCH_CONFIG *phy_pdcch_config)
 
 void pdcch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_data_t *phy_data)
 {
+  NR_UE_PDCCH_CONFIG *phy_pdcch_config = &phy_data->phy_pdcch_config;
+  if (phy_pdcch_config->nb_search_space == 0)
+    return;
+
   TracyCZone(ctx, true);
   /* process PDCCH */
   LOG_D(PHY, " ------ --> PDCCH ChannelComp/LLR Frame.slot %d.%d ------  \n", proc->frame_rx % 1024, proc->nr_slot_rx);
   start_meas_nr_ue_phy(ue, DLSCH_RX_PDCCH_STATS);
-  NR_UE_PDCCH_CONFIG *phy_pdcch_config = &phy_data->phy_pdcch_config;
   int num_monitoring_occ = get_max_pdcch_monOcc(phy_pdcch_config);
   int max_nb_symb_pdcch = get_max_pdcch_symb(phy_pdcch_config);
   int llr_size_symbol = get_pdcch_max_rbs(phy_pdcch_config) * 9;
