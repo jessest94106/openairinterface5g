@@ -78,6 +78,7 @@
 
 typedef struct NRRrcMacRaInd_s {
   bool RA_succeeded;
+  int gnb_index;
 } NRRrcMacRaInd;
 
 typedef struct NRRrcMacMsg3Ind_s {

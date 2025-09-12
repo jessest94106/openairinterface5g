@@ -46,9 +46,6 @@ NR_UE_RRC_INST_t* get_NR_UE_rrc_inst(int instance);
 void init_nsa_message (NR_UE_RRC_INST_t *rrc, char* reconfig_file, char* rbconfig_file);
 
 void process_nsa_message(NR_UE_RRC_INST_t *rrc, nsa_message_t nsa_message_type, void *message, int msg_len);
-
-void nr_rrc_cellgroup_configuration(NR_UE_RRC_INST_t *rrc, NR_CellGroupConfig_t *cellGroupConfig, int gNB_index);
-
 void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
                           NR_Release_Cause_t release_cause,
                           NR_RRCRelease_t *RRCRelease);
