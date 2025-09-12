@@ -478,7 +478,6 @@ typedef struct {
 } nr_mac_rrc_config_cg_t;
 typedef struct {
   NR_BCCH_BCH_Message_t *bcch;
-  int get_sib;
   bool access_barred;
 } nr_mac_rrc_config_mib_t;
 typedef struct {
@@ -489,6 +488,10 @@ typedef struct {
   NR_SIB19_r17_t *sib19;
   bool can_start_ra;
 } nr_mac_rrc_config_other_sib_t;
+typedef struct {
+  int get_sib;
+} nr_mac_rrc_sched_sib_t;
+
 
 enum payload_type {
   NR_MAC_RRC_CONFIG_RESET,
@@ -496,6 +499,7 @@ enum payload_type {
   NR_MAC_RRC_CONFIG_MIB,
   NR_MAC_RRC_CONFIG_SIB1,
   NR_MAC_RRC_CONFIG_OTHER_SIB,
+  NR_MAC_RRC_SCHED_SIB,
   NR_MAC_RRC_RESUME_RB
 };
 
@@ -506,6 +510,7 @@ typedef struct {
     nr_mac_rrc_config_cg_t config_cg;
     nr_mac_rrc_config_mib_t config_mib;
     nr_mac_rrc_config_sib1_t config_sib1;
+    nr_mac_rrc_sched_sib_t sched_sib;
     nr_mac_rrc_config_other_sib_t config_other_sib;
     nr_mac_rrc_resume_rb_t resume_rb;
   } payload;

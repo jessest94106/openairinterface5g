@@ -146,7 +146,6 @@ void process_msg_rcc_to_mac(nr_mac_rrc_message_t *msg, int instance_id)
       nr_rrc_mac_config_req_mib(instance_id,
                                 0,
                                 msg->payload.config_mib.bcch->message.choice.mib,
-                                msg->payload.config_mib.get_sib,
                                 msg->payload.config_mib.access_barred);
       ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, msg->payload.config_mib.bcch);
       break;
@@ -160,6 +159,9 @@ void process_msg_rcc_to_mac(nr_mac_rrc_message_t *msg, int instance_id)
       bool can_start_ra = msg->payload.config_other_sib.can_start_ra;
       nr_rrc_mac_config_other_sib(instance_id, msg->payload.config_other_sib.sib19, can_start_ra);
     } break;
+    case NR_MAC_RRC_SCHED_SIB:
+      nr_rrc_mac_sched_sib(instance_id, msg->payload.sched_sib.get_sib);
+      break;
     case NR_MAC_RRC_RESUME_RB:
       nr_rrc_mac_resume_rb(instance_id, msg->payload.resume_rb.is_srb, msg->payload.resume_rb.rb_id);
       break;
