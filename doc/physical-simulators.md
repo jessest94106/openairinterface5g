@@ -23,6 +23,7 @@ pipelines:
 
 - [RAN-PhySim-Cluster-4G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-Cluster-4G/)
 - [RAN-PhySim-Cluster-5G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-Cluster-5G/)
+- [RAN-PhySim-GraceHopper-5G](https://jenkins-oai.eurecom.fr/job/RAN-PhySim-GraceHopper-5G/)
 
 ## Examples of Simulators
 
