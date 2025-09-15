@@ -3472,9 +3472,9 @@ void clean_bwp_structures(NR_SpCellConfig_t *spCellConfig)
       asn_sequence_del(&rel_dl->list, i, 1);
     }
     if (rel_dl->list.count == 0)
-      free_and_zero(rel_dl);
+      free_and_zero(spCellConfigDedicated->downlinkBWP_ToReleaseList);
     if (add_dl->list.count == 0)
-      free_and_zero(add_dl);
+      free_and_zero(spCellConfigDedicated->downlinkBWP_ToAddModList);
   }
   if (spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList) {
     struct NR_UplinkConfig__uplinkBWP_ToReleaseList *rel_ul = spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList;
@@ -3492,9 +3492,9 @@ void clean_bwp_structures(NR_SpCellConfig_t *spCellConfig)
       asn_sequence_del(&rel_ul->list, i, 1);
     }
     if (rel_ul->list.count == 0)
-      free_and_zero(rel_ul);
+      free_and_zero(spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList);
     if (add_ul->list.count == 0)
-      free_and_zero(add_ul);
+      free_and_zero(spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList);
   }
 }
 
