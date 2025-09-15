@@ -204,7 +204,9 @@ typedef struct l3_measurements_s {
   int reports_sent;
   int max_reports;
   long report_interval_ms;
+  bool neighbor_cell_valid;
   NR_timer_t TA2;
+  NR_timer_t TA3;
   NR_timer_t periodic_report_timer;
 } l3_measurements_t;
 
