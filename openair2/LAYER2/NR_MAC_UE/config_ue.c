@@ -1060,7 +1060,7 @@ void nr_rrc_mac_config_req_mib(module_id_t module_id, int cc_idP, NR_MIB_t *mib,
   nr_ue_decode_mib(mac, cc_idP);
   if (get_softmodem_params()->phy_test)
     mac->state = UE_CONNECTED;
-  else if (mac->state == UE_NOT_SYNC && !IS_SA_MODE(get_softmodem_params()))
+  else if (mac->state == UE_NOT_SYNC_RECONF)
     mac->state = UE_PERFORMING_RA;
 
   ret = pthread_mutex_unlock(&mac->if_mutex);
@@ -1811,7 +1811,7 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
       LOG_A(NR_MAC, "Received detach indication\n");
       reset_ra(mac, true);
       reset_mac_inst(mac);
-      nr_ue_reset_sync_state(mac);
+      nr_ue_reset_sync_state(mac, false);
       release_mac_configuration(mac, cause);
       mac->state = UE_DETACHING;
       break;
@@ -1828,7 +1828,7 @@ void nr_rrc_mac_config_req_reset(module_id_t module_id, NR_UE_MAC_reset_cause_t 
     case RE_ESTABLISHMENT:
       reset_mac_inst(mac);
       nr_ue_mac_default_configs(mac);
-      nr_ue_reset_sync_state(mac);
+      nr_ue_reset_sync_state(mac, true);
       release_mac_configuration(mac, cause);
       // suspend all RBs except SRB0
       for (int j = 0; j < mac->lc_ordered_list.count; j++) {
@@ -1971,9 +1971,7 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, b
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
-static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
-                                             int cc_idP,
-                                             const NR_ReconfigurationWithSync_t *reconfWithSync)
+static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac, int cc_idP, const NR_ReconfigurationWithSync_t *reconfWithSync)
 {
   reset_mac_inst(mac);
   mac->crnti = reconfWithSync->newUE_Identity;
@@ -2015,7 +2013,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
       configure_common_BWP_ul(mac, bwp_id, scc->uplinkConfigCommon->initialUplinkBWP);
   }
 
-  mac->state = UE_NOT_SYNC;
+  mac->state = UE_NOT_SYNC_RECONF;
   ra->ra_state = nrRA_UE_IDLE;
   nr_ue_mac_default_configs(mac);
 
