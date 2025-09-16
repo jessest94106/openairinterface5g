@@ -464,9 +464,6 @@ target_include_directories(f1ap PUBLIC F1AP_DIR)
 target_link_libraries(f1ap PUBLIC asn1_f1ap GTPV1U)
 target_link_libraries(f1ap PRIVATE ngap nr_rrc HASHTABLE f1ap_lib)
 target_include_directories(f1ap PRIVATE ${F1AP_DIR}/lib)
-if(E2_AGENT)
-  target_compile_definitions(f1ap PRIVATE E2_AGENT)
-endif()
 
 # LPP
 ##############
@@ -1306,12 +1303,6 @@ add_library(L2
 target_link_libraries(L2 PRIVATE x2ap s1ap lte_rrc m2ap)
 target_link_libraries(L2 PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 
-if(E2_AGENT)
-  target_link_libraries(L2 PUBLIC e2_agent e2_agent_arg e2_ran_func_du_cucp_cuup)
-  target_compile_definitions(L2 PRIVATE ${E2AP_VERSION} ${KPM_VERSION} E2_AGENT)
-endif()
-
-
 add_library(MAC_UE_NR ${MAC_NR_SRC_UE})
 target_link_libraries(MAC_UE_NR PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs PUBLIC nr_ue_power_procedures nr_ue_ra_procedures)
 
@@ -1337,10 +1328,6 @@ target_link_libraries(e1_if PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs asn1_f1ap
 target_link_libraries(L2_NR PRIVATE f1ap x2ap s1ap ngap nr_rrc e1ap nr_rlc nr_common)
 if(OAI_AERIAL)
     target_compile_definitions(L2_NR PRIVATE ENABLE_AERIAL)
-endif()
-if(E2_AGENT)
-  target_link_libraries(L2_NR PUBLIC e2_agent e2_agent_arg e2_ran_func_du_cucp_cuup)
-  target_compile_definitions(L2_NR PRIVATE ${E2AP_VERSION} ${KPM_VERSION} E2_AGENT)
 endif()
 
 add_library(L2_LTE_NR
@@ -1754,6 +1741,7 @@ target_link_libraries(lte-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 target_link_libraries(lte-softmodem PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES} ${lapack_LIBRARIES})
 
 if(E2_AGENT)
+  target_link_libraries(lte-softmodem PUBLIC e2_agent e2_agent_arg e2_ran_func_du_cucp_cuup)
   target_compile_definitions(lte-softmodem PRIVATE ${E2AP_VERSION} ${KPM_VERSION} E2_AGENT)
 endif()
 
@@ -1857,6 +1845,7 @@ if (OAI_AERIAL)
   target_link_libraries(nr-softmodem PUBLIC aerial_lib)
 endif()
 if(E2_AGENT)
+  target_link_libraries(nr-softmodem PUBLIC e2_agent e2_agent_arg e2_ran_func_du_cucp_cuup)
   target_compile_definitions(nr-softmodem PRIVATE ${E2AP_VERSION} ${KPM_VERSION} E2_AGENT)
 endif()
 
