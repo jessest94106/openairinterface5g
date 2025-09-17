@@ -515,6 +515,8 @@ static void test_bearer_context_modification_request(void)
       .sessionId = 1,
       .numDRB2Modify = 1,
       .DRBnGRanModList[0] = drb_to_mod,
+      .n_drb_to_remove = 1,
+      .drbs_to_remove[0].id = 2,
   };
 
   DRB_nGRAN_to_setup_t drb_to_setup = {

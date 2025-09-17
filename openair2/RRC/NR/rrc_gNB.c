@@ -2879,6 +2879,7 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
       /* pass QoS info to MAC */
       int nb_qos_flows = drb_config->numQosFlowSetup;
       AssertFatal(nb_qos_flows > 0, "must map at least one flow to a DRB\n");
+      DevAssert(nb_qos_flows <= MAX_QOS_FLOWS);
       drb->nr.flows_len = nb_qos_flows;
       drb->nr.flows = calloc_or_fail(nb_qos_flows, sizeof(*drb->nr.flows));
       for (int j = 0; j < nb_qos_flows; j++) {

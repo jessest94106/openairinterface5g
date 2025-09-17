@@ -76,6 +76,8 @@
 #include "E1AP_PDU-Session-Resource-To-Modify-Item.h"
 #include "E1AP_DRB-To-Modify-List-NG-RAN.h"
 #include "E1AP_DRB-To-Modify-Item-NG-RAN.h"
+#include "E1AP_DRB-To-Remove-List-NG-RAN.h"
+#include "E1AP_DRB-To-Remove-Item-NG-RAN.h"
 #include "E1AP_PDU-Session-Resource-To-Setup-Mod-Item.h"
 #include "E1AP_DRB-To-Setup-Mod-Item-NG-RAN.h"
 #include "E1AP_PDU-Session-Resource-To-Remove-Item.h"

@@ -1465,6 +1465,14 @@ static E1AP_PDU_Session_Resource_To_Modify_Item_t e1_encode_pdu_session_to_mod_i
       *ie1_2 = e1_encode_qos_flow_to_setup(k);
     }
   }
+  // DRB To Remove List (O)
+  if (in->n_drb_to_remove > 0) {
+    asn1cCalloc(out.dRB_To_Remove_List_NG_RAN, drb2Remove_List);
+    for (int r = 0; r < in->n_drb_to_remove; r++) {
+      asn1cSequenceAdd(drb2Remove_List->list, E1AP_DRB_To_Remove_Item_NG_RAN_t, drb2Rem);
+      drb2Rem->dRB_ID = in->drbs_to_remove[r].id;
+    }
+  }
   return out;
 }
 
@@ -1746,6 +1754,15 @@ static bool e1_decode_pdu_session_to_mod_item(pdu_session_to_mod_t *out, const E
       }
     }
   }
+  // DRB To Remove List (O)
+  if (in->dRB_To_Remove_List_NG_RAN) {
+    E1AP_DRB_To_Remove_List_NG_RAN_t *rm = in->dRB_To_Remove_List_NG_RAN;
+    out->n_drb_to_remove = rm->list.count;
+    for (int r = 0; r < rm->list.count; r++) {
+      E1AP_DRB_To_Remove_Item_NG_RAN_t *item = rm->list.array[r];
+      out->drbs_to_remove[r].id = item->dRB_ID;
+    }
+  }
   return true;
 }
 
@@ -1931,6 +1948,9 @@ static pdu_session_to_mod_t cp_pdu_session_to_mod_item(const pdu_session_to_mod_
   // DRB to modify list
   for (int j = 0; j < msg->numDRB2Modify; j++)
     cp.DRBnGRanModList[j] = cp_drb_to_mod_item(&msg->DRBnGRanModList[j]);
+  // DRB to remove list
+  for (int r = 0; r < msg->n_drb_to_remove; r++)
+    cp.drbs_to_remove[r] = msg->drbs_to_remove[r];
   _E1_CP_OPTIONAL_IE(&cp, msg, securityIndication);
   _E1_CP_OPTIONAL_IE(&cp, msg, UP_TL_information);
   return cp;
@@ -2021,6 +2041,10 @@ static bool eq_pdu_session_to_mod_item(const pdu_session_to_mod_t *a, const pdu_
       return false;
   }
   _E1_EQ_CHECK_OPTIONAL_PTR(a, b, securityIndication);
+  _E1_EQ_CHECK_INT(a->n_drb_to_remove, b->n_drb_to_remove);
+  for (int r = 0; r < a->n_drb_to_remove; r++) {
+    _E1_EQ_CHECK_LONG(a->drbs_to_remove[r].id, b->drbs_to_remove[r].id);
+  }
   if (a->securityIndication && b->securityIndication) {
     if (!eq_security_ind(a->securityIndication, b->securityIndication))
       return false;
