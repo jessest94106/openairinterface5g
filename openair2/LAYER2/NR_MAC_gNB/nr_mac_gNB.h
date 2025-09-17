@@ -762,8 +762,6 @@ typedef struct measgap_config {
   int mgl_slots;
 } measgap_config_t;
 
-typedef enum interrupt_followup_action { FOLLOW_INSYNC, FOLLOW_OUTOFSYNC } interrupt_followup_action_t;
-
 /*! \brief UE list used by gNB to order UEs/CC for scheduling*/
 typedef struct {
   rnti_t rnti;
@@ -780,7 +778,6 @@ typedef struct {
   /// in case of reestablishment, old spCellConfig to apply after
   /// reconfiguration
   NR_SpCellConfig_t *reconfigSpCellConfig;
-  interrupt_followup_action_t interrupt_action;
   NR_UE_NR_Capability_t *capability;
   measgap_config_t measgap_config;
   // UE selected beam index
