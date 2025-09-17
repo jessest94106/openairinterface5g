@@ -688,6 +688,10 @@ typedef struct {
   /// Timer for RRC processing procedures and transmission activity
   NR_timer_t transm_interrupt;
 
+  /// Timer for timeout before UE is set to UL failure (e.g.,
+  /// "TransmissionActionIndicator" handling
+  NR_timer_t transm_timeout;
+
   /// sri, ul_ri and tpmi based on SRS
   nr_srs_feedback_t srs_feedback;
 

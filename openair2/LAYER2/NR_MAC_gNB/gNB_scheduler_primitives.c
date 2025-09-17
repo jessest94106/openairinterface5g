@@ -3567,10 +3567,23 @@ int nr_mac_interrupt_ue_transmission(gNB_MAC_INST *mac, NR_UE_info_t *UE, int sl
   return 0;
 }
 
+static void nr_mac_ue_transmission_timeout(gNB_MAC_INST *mac, NR_UE_info_t *UE, int slots)
+{
+  DevAssert(mac != NULL);
+  DevAssert(UE != NULL);
+  NR_SCHED_ENSURE_LOCKED(&mac->sched_lock);
+
+  nr_timer_setup(&UE->UE_sched_ctrl.transm_timeout, slots, 1);
+  nr_timer_start(&UE->UE_sched_ctrl.transm_timeout);
+
+  LOG_I(NR_MAC, "UE %04x: Timeout for UE transmission (%d slots)\n", UE->rnti, slots);
+  return;
+}
+
 int nr_transmission_action_indicator_stop(gNB_MAC_INST *mac, NR_UE_info_t *UE_info)
 {
   int delay = nr_mac_get_reconfig_delay_slots(UE_info->current_DL_BWP.scs);
-  nr_mac_interrupt_ue_transmission(mac, UE_info, delay);
+  nr_mac_ue_transmission_timeout(mac, UE_info, delay);
   LOG_I(NR_MAC, "gNB-DU received the TransmissionActionIndicator with Stop value for UE %04x\n", UE_info->rnti);
   return 0;
 }
@@ -3639,6 +3652,11 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
     if (nr_timer_tick(&sched_ctrl->transm_interrupt)) {
       /* expired */
       nr_timer_stop(&sched_ctrl->transm_interrupt);
+    }
+    if (nr_timer_tick(&sched_ctrl->transm_timeout)) {
+      nr_timer_stop(&sched_ctrl->transm_timeout);
+      LOG_W(NR_MAC, "UE %04x UL failure after transmission timeout\n", UE->rnti);
+      nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
     }
   }
 }
