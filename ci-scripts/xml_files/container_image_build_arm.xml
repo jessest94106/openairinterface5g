@@ -40,7 +40,7 @@
 		<class>Build_Image</class>
 		<desc>Build all Images</desc>
 		<node>gracehopper3-oai</node>
-		<kind>native_arm</kind>
+		<kind>native_armv9</kind>
 	</testCase>
 
         <testCase id="000010">
