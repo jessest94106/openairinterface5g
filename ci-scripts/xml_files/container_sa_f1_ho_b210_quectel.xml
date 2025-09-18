@@ -30,6 +30,7 @@
     000003
     000004
     000005
+    000027
     000006
     000007
     000008
@@ -87,6 +88,13 @@
     <node>rocket</node>
   </testCase>
 
+  <testCase id="000027">
+    <class>Custom_Command</class>
+    <desc>Set attenuator to 0 for DU0 and 17 for DU1</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 0 -r 3,4 17 -d 5</command>
+  </testCase>
+
   <testCase id="000006">
     <class>Deploy_Object</class>
     <desc>Deploy gNB-CU in a container</desc>
@@ -134,9 +142,9 @@
 
   <testCase id="000012">
     <class>Custom_Command</class>
-    <desc>Trigger Handover</desc>
-    <node>groot</node>
-    <command>echo ci trigger_f1_ho | ncat 127.0.0.1 9090</command>
+    <desc>Attenuate DU0 by 15 and remove the attenuation on DU1 to trigger Handover</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 15 -r 3,4 0 -d 5</command>
   </testCase>
 
   <testCase id="000013">
@@ -156,10 +164,10 @@
   </testCase>
 
   <testCase id="000015">
-    <class>Custom_Command</class>
-    <desc>Trigger Handover</desc>
-    <node>groot</node>
-    <command>echo ci trigger_f1_ho | ncat 127.0.0.1 9090</command>
+   <class>Custom_Command</class>
+    <desc>Attenuate DU1 by 17dB and remove attenuation on DU0 to trigger Handover</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 0 -r 3,4 17 -d 5</command>
   </testCase>
 
   <testCase id="000016">
@@ -179,10 +187,10 @@
   </testCase>
 
   <testCase id="000018">
-    <class>Custom_Command</class>
-    <desc>Trigger Handover</desc>
-    <node>groot</node>
-    <command>echo ci trigger_f1_ho | ncat 127.0.0.1 9090</command>
+   <class>Custom_Command</class>
+    <desc>Attenuate DU0 by 15 and remove the attenuation on DU1 to trigger Handover</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 15 -r 3,4 0 -d 5</command>
   </testCase>
 
   <testCase id="000019">
