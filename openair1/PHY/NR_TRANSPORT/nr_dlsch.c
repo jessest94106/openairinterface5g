@@ -470,12 +470,14 @@ static inline void do_txdataF(c16_t **txdataF,
     // get pmi info
     const int pmi = (pb->prg_size > 0) ? (pb->prgs_list[(int)rb / pb->prg_size].pm_idx) : 0;
     const int pmi2 = (rb < (rel15->rbSize - 1) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb + 1) / pb->prg_size].pm_idx) : -1;
+    const int pmi3 = (rb < (rel15->rbSize - 2) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb + 2) / pb->prg_size].pm_idx) : -1;
+    const int pmi4 = (rb < (rel15->rbSize - 3) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb + 3) / pb->prg_size].pm_idx) : -1;
 
     // If pmi of next RB and pmi of current RB are the same, we do 2 RB in a row
     // if pmi differs, or current rb is the end (rel15->rbSize - 1), than we do 1 RB in a row
-    const int rb_step = pmi == pmi2 ? 2 : 1;
+    int rb_step0 = pmi == pmi2 ? 2 : 1;
+    const int rb_step = rb_step0==2 && pmi3==pmi && pmi4==pmi ? 4 : rb_step0;
     const int re_cnt = NR_NB_SC_PER_RB * rb_step;
-
     if (pmi == 0) { // unitary Precoding
       if (subCarrier + re_cnt <= symbol_sz) { // RB does not cross DC
         if (ant < rel15->nrOfLayers)
