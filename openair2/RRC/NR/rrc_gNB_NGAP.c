@@ -1129,11 +1129,10 @@ void rrc_gNB_send_NGAP_HANDOVER_FAILURE(gNB_RRC_INST *rrc, ngap_handover_failure
 /** @brief Process NG Handover Request message (8.4.2.2 3GPP TS 38.413) */
 int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, ngap_handover_request_t *msg)
 {
-  LOG_I(NR_RRC, "Received Handover Request (on PCI=%lu) \n", msg->nr_cell_id);
   struct nr_rrc_du_container_t *du = get_du_by_cell_id(rrc, msg->nr_cell_id);
   if (du == NULL) {
     /* Cell Not Found! Return HO Request Failure*/
-    LOG_E(RRC, "Failed to process Handover Request: no DU found with PCI=%lu \n", msg->nr_cell_id);
+    LOG_E(RRC, "Failed to process Handover Request: no DU found with NR Cell ID=%lu \n", msg->nr_cell_id);
     ngap_handover_failure_t fail = {
         .amf_ue_ngap_id = msg->amf_ue_ngap_id,
         .cause.type = NGAP_CAUSE_RADIO_NETWORK,
@@ -1142,6 +1141,8 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
     return -1;
   }
+  uint16_t pci = du->setup_req->cell[0].info.nr_pci;
+  LOG_I(NR_RRC, "Received Handover Request (on NR Cell ID=%lu, PCI=%u) \n", msg->nr_cell_id, pci);
 
   // Create UE context
   sctp_assoc_t curr_assoc_id = du->assoc_id;
