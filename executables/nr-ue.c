@@ -671,8 +671,8 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int duration_r
       AssertFatal(read_block_size == tmp, "");
 
       if (IS_SOFTMODEM_RFSIM) {
-        const openair0_timestamp writeTimestamp =
-            *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx) - UE->N_TA_offset - UE->timing_advance;
+        const openair0_timestamp writeTimestamp = *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx)
+                                                  - UE->N_TA_offset - UE->timing_advance - UE->timing_advance_ntn;
         dummyWrite(UE, writeTimestamp, fp->get_samples_per_slot(slot, fp));
       }
     }
@@ -698,8 +698,8 @@ static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int d
     const int res = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, (void **)UE->common_vars.rxdata, unitTransfer, fp->nb_antennas_rx);
     DevAssert(unitTransfer == res);
     if (IS_SOFTMODEM_RFSIM) {
-      const openair0_timestamp writeTimestamp =
-          *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx) - UE->N_TA_offset - UE->timing_advance;
+      const openair0_timestamp writeTimestamp = *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx)
+                                                - UE->N_TA_offset - UE->timing_advance - UE->timing_advance_ntn;
       dummyWrite(UE, writeTimestamp, unitTransfer);
     }
     slot = (slot + 1) % fp->slots_per_subframe;
@@ -759,20 +759,20 @@ static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAM
   const double N_common_ta_drift = ntn_config_params->N_common_ta_drift;
   const double N_common_ta_drift_variant = ntn_config_params->N_common_ta_drift_variant;
 
-  UE->timing_advance = (N_UE_TA_adj + N_common_ta_adj
-                      + N_common_ta_drift * ms_since_epoch / 1e6
-                      + N_common_ta_drift_variant * ((int64_t)ms_since_epoch * ms_since_epoch) / 1e9)
-                     * fp->samples_per_subframe;
+  UE->timing_advance_ntn = (N_UE_TA_adj + N_common_ta_adj
+                          + N_common_ta_drift * ms_since_epoch / 1e6
+                          + N_common_ta_drift_variant * ((int64_t)ms_since_epoch * ms_since_epoch) / 1e9)
+                         * fp->samples_per_subframe;
 
   LOG_D(PHY,
         "N_UE_TA_adj = %f ms, N_common_ta_adj = %f ms, N_common_ta_drift = %f µs/s, N_common_ta_drift_variant = %f µs/s², ms_since_epoch = %d ms, "
-        "computed timing_advance = %d samples\n",
+        "computed timing_advance_ntn = %d samples\n",
         N_UE_TA_adj,
         N_common_ta_adj,
         N_common_ta_drift,
         N_common_ta_drift_variant,
         ms_since_epoch,
-        UE->timing_advance);
+        UE->timing_advance_ntn);
 }
 
 static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
@@ -838,7 +838,7 @@ void *UE_thread(void *arg)
   int ntn_koffset = 0;
 
   int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
-  int timing_advance = UE->timing_advance;
+  int timing_advance = UE->timing_advance + UE->timing_advance_ntn;
   UE->N_TA_offset = determine_N_TA_offset(UE);
   NR_UE_MAC_INST_t *mac = get_mac_inst(UE->Mod_id);
 
@@ -1022,8 +1022,8 @@ void *UE_thread(void *arg)
       // we shift of half of measured drift, at each beginning of frame for both rx and tx
       iq_shift_to_apply = shiftForNextFrame;
       // autonomous timing advance calculation, which does not use SIB19 information
-      if (get_nrUE_params()->autonomous_ta)
-        UE->timing_advance -= 2 * shiftForNextFrame;
+      if (ntn_koffset && get_nrUE_params()->autonomous_ta)
+        UE->timing_advance_ntn -= 2 * shiftForNextFrame;
       shiftForNextFrame = -round(UE->max_pos_acc * get_nrUE_params()->time_sync_I);
     }
 
@@ -1072,7 +1072,7 @@ void *UE_thread(void *arg)
 
     // but use current UE->timing_advance value to compute writeBlockSize
     int writeBlockSize = fp->get_samples_per_slot((slot_nr + duration_rx_to_tx) % nb_slot_frame, fp) - iq_shift_to_apply;
-    int new_timing_advance = UE->timing_advance;
+    int new_timing_advance = UE->timing_advance + UE->timing_advance_ntn;
     if (new_timing_advance != timing_advance) {
       writeBlockSize -= new_timing_advance - timing_advance;
       timing_advance = new_timing_advance;

@@ -467,7 +467,8 @@ typedef struct PHY_VARS_NR_UE_s {
 
   /// Timing Advance updates variables
   /// Timing advance update computed from the TA command signalled from gNB
-  int timing_advance;
+  int timing_advance; /// corresponds to N_TA
+  int timing_advance_ntn; /// corresponds to N_common_TA_adj + N_UE_TA_adj
   int N_TA_offset; ///timing offset used in TDD
   int ta_frame;
   int ta_slot;
