@@ -419,7 +419,7 @@ iperf -uc 10.0.1.2 -B 10.0.1.1 -i1 -t10 -b1M
 ```
 to send data from the gNB down to the UE.
 
-Note that this does not work if both interfaces are on the same host. We
+> Note that this does not work if both interfaces are on the same host. We
 recommend to use two different hosts, or at least network namespaces, to route
 traffic through the gNB/UE tunnel.
 

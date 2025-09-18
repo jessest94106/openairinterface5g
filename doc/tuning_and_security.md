@@ -75,7 +75,7 @@ considerations. Rather, consider giving specific capabilities as outlined
 below. Read `capabilities(7)` (`man 7 capabilities`) for more information on
 each of the below capabilities.
 
-Note that we tested this using 5G executables; 4G should work, but have not
+> Note that we tested this using 5G executables; 4G should work, but have not
 been tested as extensively. If in doubt, run eNB/lteUE using `sudo`. The below
 comments on capabilities apply in general as well; however, 4G executable might
 not warn about missing capabilities or just fail.

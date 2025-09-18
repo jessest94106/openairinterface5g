@@ -55,8 +55,7 @@ These loops are autonomous in their thread waiting incoming message.
 
 ## P7 interface main loop
 
-- Note: As explained before, the P7 reception loop is the same as the P5 messages when not using socket-based
-  communication
+> **Note:** As explained before, the P7 reception loop is the same as the P5 messages when not using socket-based communication
 
 In this case, when the P5 interface receives appropriate message, it starts the p7 interface by launching a thread
 

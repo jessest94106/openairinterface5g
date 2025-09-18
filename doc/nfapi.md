@@ -72,7 +72,7 @@ If the type is `VNF`, you have to modify the `MACRLCs.tr_s_preference`
 - `MACRLCs.local_s_portd` (local south port for control): VNF's P5 local port
 - `MACRLCs.remote_s_portd` (remote south port for data): PNF's P7 remote port
 
-Note that any L1-specific section (`L1s`, `RUs`,
+> Note that any L1-specific section (`L1s`, `RUs`,
 RFsimulator-specific/IF7.2-specific configuration or other radios, if
 necessary) will be ignored and can be deleted.
 
@@ -86,7 +86,7 @@ If the type is `PNF`, you have to modify modify the `L1s.tr_n_preference`
 - `L1s.local_n_portd` (local north port for data): PNF's P7 local port
 - `L1s.remote_n_portd` (remote north port for data): VNF's P7 remote port
 
-Note that this file should contain additional, L1-specific sections (`L1s`,
+> Note that this file should contain additional, L1-specific sections (`L1s`,
 `RUs` RFsimulator-specific/IF7.2-specific configuration or other radios, if
 necessary).
 
@@ -111,7 +111,7 @@ can proceed as follows:
   `pnf.conf`, or provide them on the command line for the PNF.
 - to run, proceed as described in the quick start above.
 
-Note: all L1-specific options have to be passed to the PNF, and remaining
+> **Note:** all L1-specific options have to be passed to the PNF, and remaining
 options to the VNF.
 
 ## Transport mechanisms between VNF and PNF
@@ -123,8 +123,8 @@ other:
 
    The socket type may be changed by editing `nfapi_pnf_config_create()` and
    `nfapi_vnf_config_create()`, in both of which `_this->sctp = <value, 0 or
-   1>;` indicate whether SCTP or regular sockets are to be used.  Note: The
-   value of `_this->sctp` **must** be the same on the VNF and PNF.
+   1>;` indicate whether SCTP or regular sockets are to be used.
+   > **Note:** The value of `_this->sctp` **must** be the same on the VNF and PNF.
 2. Intel WLS Lib, which uses DPDK to achieve a shared memory communication between components.
 3. nvIPC, which is used exclusively for the NVIDIA Aerial L1. Thus, it is only
    applicable for the VNF.
@@ -244,7 +244,7 @@ Run the O-DU over GDB
 
     sudo -E gdb -ex run --readnever --args  ./odu/odu
 
-Note: If you see the following prompt in GDB
+> **Note:** If you see the following prompt in GDB
 
     This GDB supports auto-downloading debuginfo from the following URLs:
       <https://debuginfod.ubuntu.com>

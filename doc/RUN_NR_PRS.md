@@ -52,7 +52,7 @@ prs_config = (
 To TURN OFF PRS, set `NumPRSResources=0` in gNB `prs_config` section. nrUE config has `Active_gNBs` to specify number of active gNBs transmitting PRS signal simultaneously. Find the help string for PRS parameters in `openair2/COMMON/prs_nr_paramdef.h` <br><br>
 
 # gNB in `phy-test` mode
-Note that `numactl` is only needed if you run on a NUMA architecture with more than 1 CPU. In this case it should be installed on Linux using command `sudo apt-get install -y numactl`
+> Note that `numactl` is only needed if you run on a NUMA architecture with more than 1 CPU. In this case it should be installed on Linux using command `sudo apt-get install -y numactl`
 
 Also check the numa nodes USRP’s are connected to, using the following command:
 

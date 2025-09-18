@@ -12,9 +12,9 @@
   </tr>
 </table>
 
-**2022/03/08: CAUTION, THIS TUTORIAL IS NO LONGER VALID on the `develop` branch after the `2022.w01` tag.**
+> **2022/03/08: CAUTION, THIS TUTORIAL IS NO LONGER VALID on the `develop` branch after the `2022.w01` tag.**
 
-**2022/03/08: CAUTION, THE LAST VALID TAG on `develop` branch is `2021.w51_c`.**
+> **2022/03/08: CAUTION, THE LAST VALID TAG on `develop` branch is `2021.w51_c`.**
 
 **Table of Contents**
 
@@ -33,7 +33,7 @@ Example of L2 nFAPI Simulator testing environment:
 
 <img src="./images/L2-sim-noS1-2-host-deployment.png" alt="" border=3>
 
-Note that the IP addresses are indicative and need to be adapted to your environment.
+> Note that the IP addresses are indicative and need to be adapted to your environment.
 
 # 2. Retrieve the OAI eNB-UE source code #
 
@@ -115,7 +115,7 @@ You can repeat the operation for as many users you want to test with.
 
 # 4. Setup of the Configuration files #
 
-**CAUTION: both proposed configuration files resides in the ci-scripts realm. You can copy them but you CANNOT push any modification on these 2 files as part of an MR without informing the CI team.**
+> **CAUTION: both proposed configuration files resides in the ci-scripts realm. You can copy them but you CANNOT push any modification on these 2 files as part of an MR without informing the CI team.**
 
 ## 4.1. The eNB Configuration file ##
 
@@ -143,7 +143,8 @@ MACRLCs = (
 );
 ```
 
-If you are testing more than 16 UEs, a proper setting on the RUs is necessary. **Note that this part is NOT present in the original configuration file**.
+If you are testing more than 16 UEs, a proper setting on the RUs is necessary. 
+> **Note that this part is NOT present in the original configuration file**.
 
 ```
 RUs = (

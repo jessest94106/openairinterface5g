@@ -230,7 +230,7 @@ Run NR gNB Softmodem in RF Simulation:
 ```
 sudo ./cmake_targets/ran_build/build/nr-softmodem -O ./targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.band78.sa.fr1.106PRB.1x1.usrpx410_3300MHz.conf --gNBs.[0].min_rxtxtime 6 --rfsim --rfsimulator.serveraddr server --phy-test -d --T_stdout 2 --T_nowait
 ```
-Note: User needs to change the name of gNB config file to your gNB config file. 
+> **Note:** User needs to change the name of gNB config file to your gNB config file.
 
 It is worth mentioning that the possible values for T-tracer control options
 - --T_stdout option:  default 1

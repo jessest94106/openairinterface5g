@@ -37,7 +37,7 @@ Our code might not work with all 5G phones yet, but we are constantly improving 
 *  Simcom SIMCOM8200EA 
 *  Quectel RM500Q-GL
 
-Note1: In the version we have at Eurecom, you need to set the PLMN to 50501, and you also need to change the firmware to "11.0.0 (RD1A.201105.003.B1, Nov 2020, EU carriers)" (see [Factory Images for Nexus and Pixel Devices](https://developers.google.com/android/images))
+> **Note1:** In the version we have at Eurecom, you need to set the PLMN to 50501, and you also need to change the firmware to "11.0.0 (RD1A.201105.003.B1, Nov 2020, EU carriers)" (see [Factory Images for Nexus and Pixel Devices](https://developers.google.com/android/images))
 
 ## Repository
 

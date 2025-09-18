@@ -75,7 +75,7 @@ if(ENABLE_TESTS)
 endif()
 ```
 
-Note that this might get more complicated, e.g., typically you will have to
+> Note that this might get more complicated, e.g., typically you will have to
 link some library into the executable with `target_link_libraries()`, or pass
 some option to the test program.
 

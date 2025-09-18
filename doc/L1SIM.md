@@ -12,7 +12,7 @@
   </tr>
 </table>
 
-**Note: unless you know what you are doing, you likely do not need this!
+> **Note: Unless you know what you are doing, you likely do not need this!**
 Rather, you are probably looking for the
 [RFsimulator](../radio/rfsimulator/README.md)!**
 
@@ -20,7 +20,7 @@ oaisim has been scraped and replaced by the same programs that are used for the
 real-time operation, `lte-softmodem` and `lte-uesoftmodem`. This uses the IF4p5
 fronthaul protocol to achieve the communication.
 
-Context: oaisim used to be a simulation mode inside OAI to emulate an eNB and
+> Context: oaisim used to be a simulation mode inside OAI to emulate an eNB and
 multiple UEs.
 
 [[_TOC_]]
