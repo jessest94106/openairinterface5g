@@ -683,10 +683,5 @@ static inline long GET_DURATION_RX_TO_TX(const ntn_timing_advance_componets_t *n
   return NR_UE_CAPABILITY_SLOT_RX_TO_TX + (ntn_ta->cell_specific_k_offset << scs);
 }
 
-static inline double get_total_TA_ms(const ntn_timing_advance_componets_t *ntn_ta)
-{
-  return ntn_ta->N_common_ta_adj;
-}
-
 /*@}*/
 #endif /*__LAYER2_MAC_DEFS_H__ */
