@@ -96,8 +96,8 @@ time_management = {
 ```
 ### RF simulator CU/DU "IQ samples time"
 
-Let's suppose the CU runs on a machine with IP address 1.2.3.4 and the DU
-runs on a machine with IP address 10.11.12.13.
+Let's suppose the CU runs on a machine with IP address `1.2.3.4` and the DU
+runs on a machine with IP address `10.11.12.13`.
 
 The DU has the time source and so is the server. The CU acts as a client.
 
