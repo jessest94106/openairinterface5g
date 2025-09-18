@@ -1196,12 +1196,15 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
 
   if (!trigger_bearer_setup(rrc, UE, msg->nb_of_pdusessions, to_setup, msg->ue_ambr.br_dl)) {
     LOG_E(NR_RRC, "Failed to establish PDU session: handover failed\n");
+
     ngap_handover_failure_t fail = {
         .amf_ue_ngap_id = msg->amf_ue_ngap_id,
         .cause.type = NGAP_CAUSE_RADIO_NETWORK,
         .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM,
     };
     rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    rrc_remove_ue(rrc, ue_context_p);
+    return -1;
   }
 
   return 0;
