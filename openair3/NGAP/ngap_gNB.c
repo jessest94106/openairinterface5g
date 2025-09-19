@@ -416,7 +416,7 @@ static int ngap_gNB_handover_notify(instance_t instance, const ngap_handover_not
   DevAssert(ngap_gNB_instance_p != NULL);
 
   if ((ue_context_p = ngap_get_ue_context(msg->gNB_ue_ngap_id)) == NULL) {
-    NGAP_ERROR("Failed to encode Handover Notify: no ue context associated with gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
+    NGAP_ERROR("Failed to find UE context for Handover Notify: gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
     return -1;
   }
   DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gNB_ue_ngap_id);
@@ -502,7 +502,7 @@ int ngap_gNB_handle_ul_ran_status_transfer(instance_t instance, const ngap_ran_s
 
   ngap_gNB_ue_context_t *ue_context_p = ngap_get_ue_context(msg->gnb_ue_ngap_id);
   if (!ue_context_p) {
-    NGAP_ERROR("Could not find UE context for gNB_ue_ngap_id %d\n", msg->gnb_ue_ngap_id);
+    NGAP_ERROR("Failed to find UE context for gNB_ue_ngap_id %d\n", msg->gnb_ue_ngap_id);
     return -1;
   }
 
