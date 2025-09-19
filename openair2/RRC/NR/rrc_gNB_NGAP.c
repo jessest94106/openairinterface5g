@@ -1306,9 +1306,8 @@ void rrc_gNB_free_Handover_Command(ngap_handover_command_t *msg)
 */
 int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(MessageDef *msg_p, instance_t instance)
 {
-  gNB_RRC_INST *rrc = RC.nrrrc[0];
-  uint32_t gNB_ue_ngap_id = 0;
-  gNB_ue_ngap_id = NGAP_UE_CONTEXT_RELEASE_COMMAND(msg_p).gNB_ue_ngap_id;
+  gNB_RRC_INST *rrc = RC.nrrrc[instance];
+  uint32_t gNB_ue_ngap_id = NGAP_UE_CONTEXT_RELEASE_COMMAND(msg_p).gNB_ue_ngap_id;
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[instance], gNB_ue_ngap_id);
 
   if (ue_context_p == NULL) {
