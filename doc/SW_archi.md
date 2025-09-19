@@ -1,21 +1,3 @@
-<style type="text/css" rel="stylesheet">
-
-body {
-   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-   font-size: 13px;
-   line-height: 18px;
-   color: #fff;
-   background-color: #110F14;
-}
-  h2 { margin-left: 20px; }
-  h3 { margin-left: 40px; }
-  h4 { margin-left: 60px; }
-
-.func2 { margin-left: 20px; }
-.func3 { margin-left: 40px; }
-.func4 { margin-left: 60px; }
-
-</style>
 
 ```mermaid
 flowchart TB
@@ -83,7 +65,6 @@ end
 ```
 
 This tuto for 5G gNB design, with Open Cells main
-{: .text-center}
 
 # The main thread is in ru_thread()
 The infinite loop:
@@ -97,10 +78,10 @@ The infinite loop:
     (each sample has a incremental number representing a very accurate timing)  
 raw incoming data is in buffer called "rxdata"  
     We derivate frame number, slot number, ... from the RX timestamp
-{: .func2}
+
 ## gNB_top()
-only compute frame numbre, slot number, ...
-{: .func3}
+only compute frame number, slot number, ...
+
 ## ocp_rxtx()
 main processing for both UL and DL  
 start by calling oai_subframe_ind() that trigger processing in pnf_p7_subframe_ind() purpose ???  
@@ -110,90 +91,87 @@ but not actual coherency (see below handle_nr_rach() assumes data is up-to-date)
 The first part (in NR_UL_indication, uses the data computed by the lower part (phy_procedures_gNB_uespec_RX), but for the **previous** slot  
 Then, phy_procedures_gNB_uespec_RX will hereafter replace the data for the next run  
 This is very tricky and not thread safe at all.
-{: .func3}
+
 
 ### NR_UL_indication()  
 This block processes data already decoded and stored in structures behind UL_INFO
-{: .func4}
+
 
 * handle_nr_rach()  
 process data from RACH primary detection  
 if the input is a UE RACH detection
-{: .func4}
+
     * nr_schedule_msg2()
-{: .func4}
+
 * handle_nr_uci()  
 handles uplink control information, i.e., for the moment HARQ feedback.
-{: .func4}
+
 * handle_nr_ulsch()  
 handles ulsch data prepared by nr_fill_indication()
-{: .func4}
+
 * gNB_dlsch_ulsch_scheduler ()  
 the **scheduler** is called here, see dedicated chapter
-{: .func4}
+
 * NR_Schedule_response()  
 process as per the scheduler decided
-{: .func4}
+
 
 ### L1_nr_prach_procedures()  
 ????
-{: .func4}
 ### phy_procedures_gNB_uespec_RX()
 * nr_decode_pucch0()  
 actual CCH channel decoding form rxdataF (rx data in frequency domain)  
 populates UL_INFO.uci_ind, actual uci data is in gNB->pucch  
-{: .func4}
+
 * nr_rx_pusch()  
-{: .func4}
+
     * extracts data from rxdataF (frequency transformed received data)
-{: .func4}
+
     * nr_pusch_channel_estimation()
-{: .func4}
+
     * nr_ulsch_extract_rbs_single()
-{: .func4}
+
     * nr_scale_channel()
-{: .func4}
+
     * nr_ulsch_channel_level()
-{: .func4}
+
     * nr_ulsch_channel_compensation()
-{: .func4}
+
     * nr_ulsch_compute_llr()  
 this function creates the "likelyhood ratios"  
-{: .func4}
+
 * nr_ulsch_procedures()
-{: .func4}
+
     * actual ULsch decoding
-{: .func4}
+
     * nr_ulsch_unscrambling()
- {: .func4}
+
    * nr_ulsch_decoding()
- {: .func4}
+
    * nr_fill_indication()   
 populate the data for the next call to "NR_UL_indication()"  
 it would be better to call **NR_UL_indication()** now instead of before (on previous slot)
-{: .func4}
+
 
 ### phy_procedures_gNB_TX()
 * nr_common_signal_procedures()  
 generate common signals
-{: .func4}
+
 * nr_generate_dci()
 generate DCI: the scheduling informtion for each UE in both DL and UL
-{: .func4}
+
 * nr_generate_pdsch()  
 generate DL shared channel (user data)
-{: .func4}
+
 
 ### nr_feptx_prec()
 tx precoding
-{: .func3}
 ### nr_feptx0
 do the inverse DFT
-{: .func3}
 ### tx_rf()
 send radio signal samples to the RF board  
 the samples numbers are the future time for these samples emission on-air
-{: .func3}
+
 
 # Scheduler
 
@@ -483,12 +461,5 @@ NGAP would be a itti thread as is S1AP (+twin thread SCTP that is almost void pr
 About all messages are exchanged with RRC thread  
 
 
-<div class="panel panel-info">
-**Note**
-{: .panel-heading}
-<div class="panel-body">
 
-
-</div>
-</div>
 
