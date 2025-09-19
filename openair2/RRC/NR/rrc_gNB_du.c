@@ -619,6 +619,8 @@ void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t
 
 nr_rrc_du_container_t *get_du_for_ue(gNB_RRC_INST *rrc, uint32_t ue_id)
 {
+  if (!cu_exists_f1_ue_data(ue_id))
+    return NULL;
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
   return get_du_by_assoc_id(rrc, ue_data.du_assoc_id);
 }
