@@ -1299,8 +1299,8 @@ static void nr_update_rlc_buffers_status(NR_UE_MAC_INST_t *mac, frame_t frameP, 
             rlc_status.bytes_in_buffer,
             frameP,
             slotP);
-      lc_sched_info->LCID_buffer_remain = rlc_status.bytes_in_buffer;
     }
+    lc_sched_info->LCID_buffer_remain = rlc_status.bytes_in_buffer;
   }
 }
 
