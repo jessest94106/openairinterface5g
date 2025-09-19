@@ -38,6 +38,8 @@
 #include "impl_defs_nr.h"
 #include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
 
+#include <pthread.h>
+
 #define MAX_NUM_SUBCARRIER_SPACING 5
 #define NR_MAX_OFDM_SYMBOL_SIZE 8192
 
@@ -312,6 +314,7 @@ typedef struct {
     int32_t sfn;
     int8_t  slot;
     int8_t  rxAnt_idx;
+    pthread_mutex_t dl_toa_mtx; // protect reading of max from write
     // circular buffer to be able to read maximum of last estimations
     float dl_toa[128]; // set through set_prs_dl_toa()
     float *next_dl_toa;

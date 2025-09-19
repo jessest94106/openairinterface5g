@@ -73,10 +73,28 @@ void peak_estimator(c16_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *
 
 void set_prs_dl_toa(prs_meas_t *prs_meas, float dl_toa)
 {
+  int rc = pthread_mutex_lock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_lock() failed: errno %d, %s\n", errno, strerror(errno));
   *prs_meas->next_dl_toa++ = dl_toa;
   if (prs_meas->next_dl_toa >= prs_meas->dl_toa + sizeofArray(prs_meas->dl_toa))
     prs_meas->next_dl_toa = prs_meas->dl_toa;
   LOG_D(NR_PHY, "next_dl_toa %p\n", prs_meas->next_dl_toa);
+  rc = pthread_mutex_unlock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_unlock() failed: errno %d, %s\n", errno, strerror(errno));
+}
+
+float get_prs_max_dl_toa(prs_meas_t *prs_meas)
+{
+  float max = 0.0f;
+  int rc = pthread_mutex_lock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_lock() failed: errno %d, %s\n", errno, strerror(errno));
+  for (int i = 0; i < sizeofArray(prs_meas->dl_toa); ++i) {
+    max = cmax(max, prs_meas->dl_toa[i]);
+    LOG_I(NR_PHY, "i %d dl_toa %.3f max %.3f\n", i, prs_meas->dl_toa[i], max);
+  }
+  rc = pthread_mutex_unlock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_unlock() failed: errno %d, %s\n", errno, strerror(errno));
+  return max;
 }
 
 int nr_prs_channel_estimation(uint8_t gNB_id,

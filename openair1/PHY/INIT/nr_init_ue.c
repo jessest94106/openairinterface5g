@@ -159,6 +159,7 @@ void init_nr_prs_ue_vars(PHY_VARS_NR_UE *ue)
         AssertFatal((prs_vars[idx]->prs_resource[k].prs_meas[j]!=NULL), "%s: PRS measurements malloc failed for gNB_id %d, rx_ant %d\n", __FUNCTION__, idx, j);
         prs_meas_t *m = prs_vars[idx]->prs_resource[k].prs_meas[j];
         m->next_dl_toa = m->dl_toa;
+        pthread_mutex_init(&m->dl_toa_mtx, NULL);
       }
     }
   }
