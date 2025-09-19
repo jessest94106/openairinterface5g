@@ -303,7 +303,7 @@ int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
   }
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
-    xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, &pdu);
+    xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, pdu);
 
   byte_array_t out = { .buf = NULL, .len = 0 };
   if (ngap_gNB_encode_pdu(pdu, &out.buf, (uint32_t *)&out.len) < 0) {
