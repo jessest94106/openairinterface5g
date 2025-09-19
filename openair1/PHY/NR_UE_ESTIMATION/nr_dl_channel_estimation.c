@@ -73,7 +73,10 @@ void peak_estimator(c16_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *
 
 void set_prs_dl_toa(prs_meas_t *prs_meas, float dl_toa)
 {
-  prs_meas->dl_toa = dl_toa;
+  *prs_meas->next_dl_toa++ = dl_toa;
+  if (prs_meas->next_dl_toa >= prs_meas->dl_toa + sizeofArray(prs_meas->dl_toa))
+    prs_meas->next_dl_toa = prs_meas->dl_toa;
+  LOG_D(NR_PHY, "next_dl_toa %p\n", prs_meas->next_dl_toa);
 }
 
 int nr_prs_channel_estimation(uint8_t gNB_id,

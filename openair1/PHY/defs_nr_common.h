@@ -312,7 +312,9 @@ typedef struct {
     int32_t sfn;
     int8_t  slot;
     int8_t  rxAnt_idx;
-    float dl_toa;
+    // circular buffer to be able to read maximum of last estimations
+    float dl_toa[128]; // set through set_prs_dl_toa()
+    float *next_dl_toa;
     int32_t dl_aoa;
     float snr;
     float rsrp;
