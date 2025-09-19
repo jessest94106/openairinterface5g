@@ -71,6 +71,11 @@ void peak_estimator(c16_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *
   }
 }
 
+void set_prs_dl_toa(prs_meas_t *prs_meas, float dl_toa)
+{
+  prs_meas->dl_toa = dl_toa;
+}
+
 int nr_prs_channel_estimation(uint8_t gNB_id,
                               uint8_t rsc_id,
                               uint8_t rep_num,
@@ -448,9 +453,9 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
     prs_meas[rxAnt]->slot       = proc->nr_slot_rx;
     prs_meas[rxAnt]->rxAnt_idx  = rxAnt;
     prs_meas[rxAnt]->dl_aoa     = rsc_id;
-    prs_meas[rxAnt]->dl_toa = prs_toa / (float)NR_PRS_IDFT_OVERSAMP_FACTOR;
-    if ((frame_params->ofdm_symbol_size - prs_meas[rxAnt]->dl_toa) < frame_params->ofdm_symbol_size / 2)
-      prs_meas[rxAnt]->dl_toa -= (frame_params->ofdm_symbol_size);
+    float dl_toa = prs_toa / (float)NR_PRS_IDFT_OVERSAMP_FACTOR;
+    if ((frame_params->ofdm_symbol_size - dl_toa) < frame_params->ofdm_symbol_size / 2)
+      dl_toa -= (frame_params->ofdm_symbol_size);
     LOG_I(PHY,
           "[gNB %d][rsc %d][Rx %d][sfn %d][slot %d] DL PRS ToA ==> %.1f / %d samples, peak channel power %.1f dBm, SNR %+.1f dB, rsrp %+.1f dBm\n",
           gNB_id,
@@ -458,11 +463,13 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
           rxAnt,
           proc->frame_rx,
           proc->nr_slot_rx,
-          prs_meas[rxAnt]->dl_toa,
+          dl_toa,
           frame_params->ofdm_symbol_size,
           ch_pwr_dbm,
           prs_meas[rxAnt]->snr,
           prs_meas[rxAnt]->rsrp_dBm);
+
+    set_prs_dl_toa(prs_meas[rxAnt], dl_toa);
 
 #ifdef DEBUG_PRS_CHEST
     sprintf(filename, "%s%i%s", "PRSpilot_", rxAnt, ".m");
