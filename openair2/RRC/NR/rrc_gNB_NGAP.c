@@ -1725,7 +1725,7 @@ int rrc_gNB_process_NGAP_DL_RAN_STATUS_TRANSFER(MessageDef *msg_p, instance_t in
           s->dl_count.sn_len == NGAP_SN_LENGTH_18 ? "18-bit" : "12-bit");
 
     // Send to PDCP layer
-    e1_send_bearer_updates(rrc, UE, 0, NULL, s);
+    e1_notify_pdcp_status(rrc, UE, s);
   }
 
   return 0;
