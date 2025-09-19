@@ -298,7 +298,6 @@ int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_required(msg);
   if (!pdu) {
     NGAP_ERROR("Failed to encode Handover Required\n");
-    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
     return -1;
   }
 
@@ -307,11 +306,10 @@ int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
 
   byte_array_t out = { .buf = NULL, .len = 0 };
   if (ngap_gNB_encode_pdu(pdu, &out.buf, (uint32_t *)&out.len) < 0) {
-    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
     NGAP_ERROR("Failed to encode Handover Required message\n");
+    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
     return -1;
   }
-  free(pdu);
 
   /* UE associated signalling -> use the allocated stream */
   ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance,
@@ -320,6 +318,7 @@ int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
                                    out.len,
                                    ue_context_p->tx_stream);
 
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
   return 0;
 }
 
@@ -342,7 +341,6 @@ static int ngap_gNB_handover_failure(instance_t instance, const ngap_handover_fa
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_failure(msg);
   if (!pdu) {
     NGAP_ERROR("Failed to encode NG Handover Failure\n");
-    ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
     return -1;
   }
 
@@ -364,7 +362,7 @@ static int ngap_gNB_handover_failure(instance_t instance, const ngap_handover_fa
   }
 
   ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance, amf->assoc_id, buffer, length, amf->nextstream);
-  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, &pdu);
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
 
   return 0;
 }
@@ -410,7 +408,7 @@ static int ngap_gNB_handover_request_acknowledge(instance_t instance, ngap_hando
   /* UE associated signalling -> use the allocated stream */
   ngap_gNB_itti_send_sctp_data_req(ngap->instance, ue_context_p.amf_ref->assoc_id, ba.buf, ba.len, ue_context_p.tx_stream);
   NGAP_INFO("Sent Handover Request Acknowledge to AMF\n");
-
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
   return 0;
 }
 
@@ -450,6 +448,7 @@ static int ngap_gNB_handover_notify(instance_t instance, const ngap_handover_not
                                    ba.buf,
                                    ba.len,
                                    ue_context_p->tx_stream);
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
 
   return 0;
 }
@@ -489,7 +488,6 @@ static int ngap_gNB_handover_cancel(instance_t instance, const ngap_handover_can
     ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
     return -1;
   }
-  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
 
   /* UE-associated signalling -> use the UE's allocated SCTP stream */
   ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance,
@@ -498,6 +496,7 @@ static int ngap_gNB_handover_cancel(instance_t instance, const ngap_handover_can
                                    ba.len,
                                    ue_context_p->tx_stream);
 
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
   return 0;
 }
 
@@ -530,6 +529,7 @@ int ngap_gNB_handle_ul_ran_status_transfer(instance_t instance, const ngap_ran_s
   }
 
   ngap_gNB_itti_send_sctp_data_req(instance, ue_context_p->amf_ref->assoc_id, out.buf, out.len, ue_context_p->tx_stream);
+  ASN_STRUCT_FREE(asn_DEF_NGAP_NGAP_PDU, pdu);
   return 0;
 }
 
@@ -769,11 +769,13 @@ static int ngap_gNB_generate_ng_setup_request(
 
   if (ngap_gNB_encode_pdu(&pdu, &buffer, &len) < 0) {
     NGAP_ERROR("Failed to encode NG setup request\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
     return -1;
   }
 
   /* Non UE-Associated signalling -> stream = 0 */
   ngap_gNB_itti_send_sctp_data_req(instance_p->instance, ngap_amf_data_p->assoc_id, buffer, len, 0);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
   return ret;
 }
 
