@@ -24,6 +24,21 @@ project (OpenAirInterface LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(OAI_VERSION 2.4.0)
 
+option(CUDA_ENABLE "Enable CUDA accelerated channel simulation" OFF)
+if(CUDA_ENABLE)
+    find_package(CUDA REQUIRED)
+    find_package(CUDAToolkit REQUIRED)
+    message(STATUS "CUDA explicitly enabled, building with GPU acceleration support.")
+
+    enable_language(CUDA)
+
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+        set(CMAKE_CUDA_ARCHITECTURES 90)
+    endif()
+
+    add_compile_definitions(ENABLE_CUDA)
+endif()
+
 #########################################################
 # Base directories, compatible with legacy OAI building #
 #########################################################
@@ -1687,6 +1702,17 @@ set (SIMUSRC
 add_library(SIMU STATIC ${SIMUSRC} )
 target_include_directories(SIMU PUBLIC ${OPENAIR1_DIR}/SIMULATION/TOOLS ${OPENAIR1_DIR}/SIMULATION/RF)
 
+option(CHANNEL_SSE "Enable SSE optimizations for channel simulation" OFF)
+if(CHANNEL_SSE)
+    message(STATUS "SSE-optimized channel simulation enabled.")
+    target_compile_definitions(SIMU PRIVATE CHANNEL_SSE)
+endif()
+
+if(CUDA_FOUND)
+  set_property(TARGET SIMU PROPERTY CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
+  set_property(TARGET SIMU PROPERTY LINKER_LANGUAGE CXX)
+endif()
+
 include_directories("${NFAPI_DIR}/nfapi/public_inc")
 include_directories("${NFAPI_DIR}/common/public_inc")
 include_directories("${NFAPI_DIR}/pnf/public_inc")
@@ -2084,10 +2110,19 @@ target_link_libraries(nr_srssim PRIVATE
   m pthread ITTI dl nr_ue_phy_meas physim_common
   )
 
+if(CUDA_ENABLE)
+  if (TARGET oai_cuda_lib)
+      target_link_libraries(nr_dlsim PRIVATE oai_cuda_lib)
+      target_link_libraries(nr_ulsim PRIVATE oai_cuda_lib)
+
+      target_compile_definitions(nr_dlsim PRIVATE ENABLE_CUDA)
+      target_compile_definitions(nr_ulsim PRIVATE ENABLE_CUDA)
+  endif()
+endif()
+
 # these simulators do not compile:
 # dlsim_tm7 pbchsim scansim mbmssim pdcchsim pucchsim prachsim syncsim
 foreach(myExe dlsim ulsim)
-
   add_executable(${myExe}
     ${OPENAIR1_DIR}/SIMULATION/LTE_PHY/${myExe}.c
     ${OPENAIR_DIR}/common/utils/lte/ue_power.c
@@ -2197,6 +2232,11 @@ add_subdirectory(openair3)
 add_subdirectory(radio)
 add_subdirectory(tests)
 
+if(TARGET oai_cuda_lib)
+    message(STATUS "CUDA library 'oai_cuda_lib' found, linking to targets...")
+    target_link_libraries(nr_dlsim PRIVATE oai_cuda_lib)
+    target_link_libraries(nr_ulsim PRIVATE oai_cuda_lib)
+endif()
 
 if(PACKAGING_LTE OR PACKAGING_NR OR PACKAGING_COMMON OR PACKAGING_USRP OR PACKAGING_PHYSIM)
   include("tools/packages/packages.cmake")
