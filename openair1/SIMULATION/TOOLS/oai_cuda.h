@@ -32,7 +32,17 @@
 
 #ifdef __NVCC__
     #include <curand_kernel.h>
-    // Kernels go here.
+    __device__ float2 complex_mul(float2 a, float2 b);
+
+    __global__ void multipath_channel_kernel(
+        const float2* __restrict__ d_channel_coeffs,
+        const float* __restrict__ tx_sig,
+        float2* __restrict__ rx_sig,
+        int num_samples,
+        int channel_length,
+        int nb_tx,
+        int nb_rx);
+
 #endif // __NVCC__
 
 
@@ -40,8 +50,22 @@
 extern "C" {
 #endif
 
-    // Cuda function declarations will go here.
-    
+    void multipath_channel_cuda(
+        float **rx_sig_re, float **rx_sig_im,
+        int nb_tx, int nb_rx, int channel_length,
+        uint32_t length, uint64_t channel_offset,
+        float *h_channel_coeffs,
+        void *d_tx_sig, void *d_rx_sig,
+        void *d_channel_coeffs,
+        void *h_tx_sig_pinned
+    );
+
+    void interleave_channel_output_cuda(float **rx_sig_re,
+                                        float **rx_sig_im,
+                                        void **output_interleaved,
+                                        int nb_rx,
+                                        int num_samples);
+
 #ifdef __cplusplus
 }
 #endif

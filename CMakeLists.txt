@@ -36,6 +36,23 @@ if(CUDA_ENABLE)
         set(CMAKE_CUDA_ARCHITECTURES 90)
     endif()
 
+    option(USE_UNIFIED_MEMORY "Enable CUDA Unified Memory path" OFF)
+    option(USE_ATS_MEMORY "Enable ATS Hybrid Memory path" ON)
+
+    if(USE_UNIFIED_MEMORY AND USE_ATS_MEMORY)
+        message(FATAL_ERROR "Cannot enable both USE_UNIFIED_MEMORY and USE_ATS_MEMORY at the same time.")
+    endif()
+
+    if(USE_UNIFIED_MEMORY)
+        add_compile_definitions(USE_UNIFIED_MEMORY)
+        message(STATUS "CUDA Unified Memory path enabled.")
+    elseif(USE_ATS_MEMORY)
+        add_compile_definitions(USE_ATS_MEMORY)
+        message(STATUS "CUDA ATS Hybrid Memory path enabled.")
+    else()
+        message(STATUS "CUDA Explicit Copy path enabled (default ATS was overridden).")
+    endif()
+
     add_compile_definitions(ENABLE_CUDA)
 endif()
 
@@ -295,6 +312,22 @@ if(GIT_FOUND)
     OUTPUT_VARIABLE GIT_COMMIT_DATE
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
+endif()
+
+option(USE_UNIFIED_MEMORY "Enable CUDA Unified Memory path instead of explicit copies" OFF)
+
+option(USE_ATS_MEMORY "Enable Hybrid ATS (CPU->GPU) and Explicit Copy (GPU->CPU) path" OFF)
+
+if(USE_UNIFIED_MEMORY AND USE_ATS_MEMORY)
+  message(FATAL_ERROR "Cannot enable both USE_UNIFIED_MEMORY and USE_ATS_MEMORY at the same time.")
+endif()
+
+if(USE_UNIFIED_MEMORY)
+  add_compile_definitions(USE_UNIFIED_MEMORY)
+  message(STATUS "CUDA Unified Memory path enabled.")
+elseif(USE_ATS_MEMORY)
+  add_compile_definitions(USE_ATS_MEMORY)
+  message(STATUS "CUDA ATS Hybrid Memory path enabled.")
 endif()
 
 # Debug related options
