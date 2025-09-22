@@ -1123,29 +1123,27 @@ int main(int argc, char **argv)
         phy_procedures_gNB_TX(gNB, &Sched_INFO->DL_req, &Sched_INFO->TX_req, &Sched_INFO->UL_dci_req, frame, slot);
         stop_meas(&gNB->phy_proc_tx);
 
-        int txdataF_offset = slot * frame_parms->samples_per_slot_wCP;
-
         if (n_trials==1) {
           LOG_M("txsigF0.m","txsF0=",
-                &gNB->common_vars.txdataF[0][0][txdataF_offset +2 * frame_parms->ofdm_symbol_size],
+                &gNB->common_vars.txdataF[0][0][2 * frame_parms->ofdm_symbol_size],
                 frame_parms->ofdm_symbol_size,
                 1,
                 1);
           if (gNB->frame_parms.nb_antennas_tx>1)
             LOG_M("txsigF1.m","txsF1=",
-                  &gNB->common_vars.txdataF[0][1][txdataF_offset + 2 * frame_parms->ofdm_symbol_size],
+                  &gNB->common_vars.txdataF[0][1][2 * frame_parms->ofdm_symbol_size],
                   frame_parms->ofdm_symbol_size,
                   1,
                   1);
         }
         if (n_trials == 1)
-          printf("slot_offset %d, txdataF_offset %d \n", slot_offset, txdataF_offset);
+          printf("slot_offset %d\n", slot_offset);
 
         //TODO: loop over slots
         for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++) {
 
           if (cyclic_prefix_type == 1) {
-            PHY_ofdm_mod((int *)&gNB->common_vars.txdataF[0][aa][txdataF_offset],
+            PHY_ofdm_mod((int *)gNB->common_vars.txdataF[0][aa],
                          (int *)&txdata[aa][slot_offset],
                          frame_parms->ofdm_symbol_size,
                          12,
@@ -1156,7 +1154,7 @@ int main(int argc, char **argv)
             for (int i = 0; i < 14; i++) {
               was_symbol_used[i] = true;
             }
-            nr_normal_prefix_mod(&gNB->common_vars.txdataF[0][aa][txdataF_offset],
+            nr_normal_prefix_mod(gNB->common_vars.txdataF[0][aa],
                                  &txdata[aa][slot_offset],
                                  14,
                                  frame_parms,

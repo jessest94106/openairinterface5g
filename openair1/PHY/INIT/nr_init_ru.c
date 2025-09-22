@@ -97,7 +97,7 @@ void nr_phy_init_RU(RU_t *ru)
     ru->common.txdataF = (int32_t **)malloc16(ru->nb_tx*sizeof(int32_t*));
     // [hna] samples_per_frame without CP
     for(int i = 0; i < ru->nb_tx; ++i)
-      ru->common.txdataF[i] = (int32_t*)malloc16_clear(fp->samples_per_frame_wCP * sizeof(int32_t));
+      ru->common.txdataF[i] = (int32_t *)malloc16_clear(fp->samples_per_slot_wCP * sizeof(int32_t));
 
     // allocate IFFT input buffers (TX)
     ru->common.txdataF_BF = (int32_t **)malloc16(nb_tx_streams * sizeof(int32_t*));
