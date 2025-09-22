@@ -2577,8 +2577,8 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
     rrc_pdu->param.n3_outgoing = f1u_gtp_update(e1_pdu->tl_info.teId, e1_pdu->tl_info.tlAddress);
 
     // save the tunnel address for the DRBs
-    for (int i = 0; i < e1_pdu->numDRBSetup; i++) {
-      DRB_nGRAN_setup_t *drb_config = &e1_pdu->DRBnGRanList[i];
+    for (int j = 0; j < e1_pdu->numDRBSetup; j++) {
+      DRB_nGRAN_setup_t *drb_config = &e1_pdu->DRBnGRanList[j];
       // numUpParam only relevant in F1, but not monolithic
       AssertFatal(drb_config->numUpParam <= 1, "can only up to one UP param\n");
       drb_t *drb = get_drb(UE, drb_config->id);
