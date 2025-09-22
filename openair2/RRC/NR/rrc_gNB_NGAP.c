@@ -1129,6 +1129,19 @@ void rrc_gNB_send_NGAP_HANDOVER_FAILURE(gNB_RRC_INST *rrc, ngap_handover_failure
 /** @brief Process NG Handover Request message (8.4.2.2 3GPP TS 38.413) */
 int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, ngap_handover_request_t *msg)
 {
+  // Check if UE context already exists for this AMF UE NGAP ID
+  rrc_gNB_ue_context_t *existing_ue_context = rrc_gNB_get_ue_context_by_amf_ue_ngap_id(rrc, msg->amf_ue_ngap_id);
+  if (existing_ue_context != NULL) {
+    LOG_E(RRC, "UE context already exists for AMF UE NGAP ID %ld, cannot process handover request\n", msg->amf_ue_ngap_id);
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    return -1;
+  }
+
   struct nr_rrc_du_container_t *du = get_du_by_cell_id(rrc, msg->nr_cell_id);
   if (du == NULL) {
     /* Cell Not Found! Return HO Request Failure*/
@@ -1150,10 +1163,6 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
   // allocate context for target
-  if (UE->ho_context != NULL) {
-    LOG_E(NR_RRC, "Ongoing handover for UE %d, cannot trigger new\n", UE->rrc_ue_id);
-    return -1;
-  }
   UE->ho_context = alloc_ho_ctx(HO_CTX_TARGET);
   UE->ho_context->target->ho_trigger = nr_rrc_trigger_n2_ho_target;
 
