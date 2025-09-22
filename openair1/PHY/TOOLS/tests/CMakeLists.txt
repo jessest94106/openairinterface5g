@@ -39,3 +39,15 @@ target_link_libraries(test_sse_intrinsics PRIVATE GTest::gtest LOG minimal_lib)
 add_dependencies(tests test_sse_intrinsics)
 add_test(NAME test_sse_intrinsics
   COMMAND ./test_sse_intrinsics)
+
+if(CUDA_ENABLE)
+add_executable(test_multipath test_multipath.c)
+target_link_libraries(test_multipath PRIVATE UTIL SIMU LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_multipath)
+add_test(NAME test_multipath COMMAND test_multipath)
+
+if (TARGET oai_cuda_lib)
+    target_compile_definitions(test_multipath PRIVATE ENABLE_CUDA)
+endif()
+endif()
