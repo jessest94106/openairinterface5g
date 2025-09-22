@@ -567,9 +567,9 @@ int main(int argc, char **argv)
         }
       }
     }
-    LOG_M("txsigF0.m","txsF0", gNB->common_vars.txdataF[0][0],frame_length_complex_samples_no_prefix, 1, 1);
-    if (gNB->frame_parms.nb_antennas_tx>1)
-      LOG_M("txsigF1.m","txsF1", gNB->common_vars.txdataF[0][1],frame_length_complex_samples_no_prefix, 1, 1);
+    LOG_M("txsigF0.m", "txsF0", gNB->common_vars.txdataF[0][0], frame_parms->samples_per_slot_wCP, 1, 1);
+    if (gNB->frame_parms.nb_antennas_tx > 1)
+      LOG_M("txsigF1.m", "txsF1", gNB->common_vars.txdataF[0][1], frame_parms->samples_per_slot_wCP, 1, 1);
 
   } else {
     printf("Reading %d samples from file to antenna buffer %d\n",frame_length_complex_samples,0);

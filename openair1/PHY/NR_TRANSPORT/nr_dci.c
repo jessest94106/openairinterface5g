@@ -53,7 +53,6 @@ static void nr_pdcch_scrambling(uint32_t *in, uint32_t size, uint32_t Nid, uint3
 
 void nr_generate_dci(PHY_VARS_gNB *gNB,
                      const nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15,
-                     int txdataF_offset,
                      NR_DL_FRAME_PARMS *frame_parms,
                      int slot)
 {
@@ -179,7 +178,7 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
 
     /// Resource mapping
     uint16_t amp = gNB->TX_AMP;
-    c16_t *txdataF = gNB->common_vars.txdataF[beam_nb][0] + txdataF_offset;
+    c16_t *txdataF = gNB->common_vars.txdataF[beam_nb][0];
     if (cset_start_sc >= frame_parms->ofdm_symbol_size)
       cset_start_sc -= frame_parms->ofdm_symbol_size;
 
