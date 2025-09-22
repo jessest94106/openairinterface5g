@@ -99,21 +99,54 @@ void rxAddInput(const c16_t *input_sig,
       double vel_sat_gnb = 0;
       double acc_sat_gnb = 0;
       if (channelDesc->modelid == SAT_LEO_TRANS) {
-        const double acc_sat_x = 0;
-        const double acc_sat_y = -w_sat * w_sat * radius_sat * sin(w_sat * t);
-        const double acc_sat_z = -w_sat * w_sat * radius_sat * cos(w_sat * t);
+        const double t5 = t + 5;
+        const double t10 = t + 10;
 
         const double pos_gnb_x = 0;
         const double pos_gnb_y = 0;
         const double pos_gnb_z = radius_earth;
 
+        const double pos_sat_x5 = 0;
+        const double pos_sat_y5 = radius_sat * sin(w_sat * t5);
+        const double pos_sat_z5 = radius_sat * cos(w_sat * t5);
+
+        const double pos_sat_x10 = 0;
+        const double pos_sat_y10 = radius_sat * sin(w_sat * t10);
+        const double pos_sat_z10 = radius_sat * cos(w_sat * t10);
+
         const double dir_sat_gnb_x = pos_gnb_x - pos_sat_x;
         const double dir_sat_gnb_y = pos_gnb_y - pos_sat_y;
         const double dir_sat_gnb_z = pos_gnb_z - pos_sat_z;
 
+        const double dir_sat_gnb_x5 = pos_gnb_x - pos_sat_x5;
+        const double dir_sat_gnb_y5 = pos_gnb_y - pos_sat_y5;
+        const double dir_sat_gnb_z5 = pos_gnb_z - pos_sat_z5;
+
+        const double dir_sat_gnb_x10 = pos_gnb_x - pos_sat_x10;
+        const double dir_sat_gnb_y10 = pos_gnb_y - pos_sat_y10;
+        const double dir_sat_gnb_z10 = pos_gnb_z - pos_sat_z10;
+
         dist_sat_gnb = sqrt(dir_sat_gnb_x * dir_sat_gnb_x + dir_sat_gnb_y * dir_sat_gnb_y + dir_sat_gnb_z * dir_sat_gnb_z);
-        vel_sat_gnb = (vel_sat_x * dir_sat_gnb_x + vel_sat_y * dir_sat_gnb_y + vel_sat_z * dir_sat_gnb_z) / dist_sat_gnb;
-        acc_sat_gnb = (acc_sat_x * dir_sat_gnb_x + acc_sat_y * dir_sat_gnb_y + acc_sat_z * dir_sat_gnb_z) / dist_sat_gnb;
+        const double dist_sat_gnb5 = sqrt(dir_sat_gnb_x5 * dir_sat_gnb_x5 + dir_sat_gnb_y5 * dir_sat_gnb_y5 + dir_sat_gnb_z5 * dir_sat_gnb_z5);
+        const double dist_sat_gnb10 = sqrt(dir_sat_gnb_x10 * dir_sat_gnb_x10 + dir_sat_gnb_y10 * dir_sat_gnb_y10 + dir_sat_gnb_z10 * dir_sat_gnb_z10);
+
+        // calculate vel_sat_gnb and acc_sat_gnb, so the delay is correct for epoch_time, epoch_time + 5 seconds and epoch_time + 10 seconds
+        //
+        // dist_sat_gnb   = dist_sat_gnb +  0 * vel_sat_gnb +   0 * acc_sat_gnb;
+        // dist_sat_gnb5  = dist_sat_gnb +  5 * vel_sat_gnb +  25 * acc_sat_gnb;
+        // dist_sat_gnb10 = dist_sat_gnb + 10 * vel_sat_gnb + 100 * acc_sat_gnb;
+        //
+        // vel_sat_gnb = (dist_sat_gnb5 - dist_sat_gnb) / 5 - 5 * acc_sat_gnb;
+        // acc_sat_gnb = (dist_sat_gnb10 - dist_sat_gnb) / 100 - vel_sat_gnb / 10;
+        //
+        // vel_sat_gnb = (dist_sat_gnb5 - dist_sat_gnb) / 5 - 5 * ((dist_sat_gnb10 - dist_sat_gnb) / 100 - vel_sat_gnb / 10);
+
+        vel_sat_gnb = 2 * (dist_sat_gnb5 - dist_sat_gnb) / 5 - (dist_sat_gnb10 - dist_sat_gnb) / 10;
+        acc_sat_gnb = (dist_sat_gnb10 - dist_sat_gnb) / 50 - (dist_sat_gnb5 - dist_sat_gnb) / 25;
+
+        // in the moment when the satellite disappears behind the horizon acc_sat_gnb might become negative, what is invalid
+        if (acc_sat_gnb < 0)
+          acc_sat_gnb = 0;
       }
 
       const double prop_delay = (dist_ue_sat + dist_sat_gnb) / c;
@@ -128,7 +161,7 @@ void rxAddInput(const c16_t *input_sig,
         last_TS = TS;
         LOG_I(HW, "Satellite orbit: time %f s, Position = (%f, %f, %f), Velocity = (%f, %f, %f)\n", t, pos_sat_x, pos_sat_y, pos_sat_z, vel_sat_x, vel_sat_y, vel_sat_z);
         LOG_I(HW, "Uplink delay %f ms, Doppler shift UE->SAT %f kHz\n", prop_delay * 1000, f_Doppler_shift_ue_sat / 1000);
-        LOG_I(HW, "Satellite velocity towards gNB: %f m/s, acceleration towards gNB: %f m/s²\n", vel_sat_gnb, acc_sat_gnb);
+        LOG_I(HW, "Satellite velocity towards gNB: %f m/s, acceleration towards gNB: %f m/s²\n", -vel_sat_gnb, acc_sat_gnb);
       }
 
       const int samples_per_subframe = channelDesc->sampling_rate / 1000;
@@ -138,7 +171,7 @@ void rxAddInput(const c16_t *input_sig,
             .sfn = (abs_subframe / 10 + 1) % 1024,
             .subframe = 0,
             .delay = 2 * dist_sat_gnb / (c * 4.072e-9),
-            .drift = 2 * -vel_sat_gnb / (c * 0.2e-9),
+            .drift = 2 * vel_sat_gnb / (c * 0.2e-9),
             .accel = 2 * acc_sat_gnb / (c * 0.2e-10),
             .position.X = pos_sat_x / 1.3,
             .position.Y = pos_sat_y / 1.3,
