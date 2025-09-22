@@ -1138,14 +1138,19 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   activate_srb(UE, SRB2);
   nr_rrc_pdcp_config_security(UE, false);
 
-  // Copy PDU Session Resource Setup item to RRC struct and do PDU Session Resource Setup procedure
-  pdusession_t to_setup = {
-    .nssai = msg->pduSessionResourceSetupList->nssai,
-    .pdu_session_type = msg->pduSessionResourceSetupList->pdu_session_type ,
-    .pdusession_id = msg->pduSessionResourceSetupList->pdusession_id,
-  };
-  cp_pdusession_transfer_to_pdusession(&to_setup, &msg->pduSessionResourceSetupList->pdusessionTransfer);
-  if (!trigger_bearer_setup(rrc, UE, msg->nb_of_pdusessions, &to_setup, msg->ue_ambr.br_dl)) {
+  // Process all PDU Session Resource Setup items from handover request
+  DevAssert(msg->nb_of_pdusessions <= NGAP_MAX_PDU_SESSION);
+  pdusession_t to_setup[NGAP_MAX_PDU_SESSION];
+  for (int i = 0; i < msg->nb_of_pdusessions; i++) {
+    ho_request_pdusession_t *ho_pdu = &msg->pduSessionResourceSetupList[i];
+    pdusession_t *pdu = &to_setup[i];
+    pdu->nssai = ho_pdu->nssai;
+    pdu->pdu_session_type = ho_pdu->pdu_session_type;
+    pdu->pdusession_id = ho_pdu->pdusession_id;
+    cp_pdusession_transfer_to_pdusession(pdu, &ho_pdu->pdusessionTransfer);
+  }
+
+  if (!trigger_bearer_setup(rrc, UE, msg->nb_of_pdusessions, to_setup, msg->ue_ambr.br_dl)) {
     LOG_E(NR_RRC, "Failed to establish PDU session: handover failed\n");
     ngap_handover_failure_t fail = {
         .amf_ue_ngap_id = msg->amf_ue_ngap_id,
