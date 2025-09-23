@@ -217,8 +217,6 @@ void nr_feptx(void *arg)
   int startSymbol = feptx->startSymbol;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   int numSymbols = feptx->numSymbols;
-  int numSamples = feptx->numSymbols * fp->ofdm_symbol_size;
-  int txdataF_offset = startSymbol * fp->ofdm_symbol_size;
 
   int tx_idx = aa + bb * ru->nb_tx;
 
@@ -232,11 +230,17 @@ void nr_feptx(void *arg)
   }
 
   // If there is no digital beamforming we just need to copy the data to RU
-  if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf)
-    memcpy((void *)&ru->common.txdataF_BF[tx_idx][txdataF_offset],
-           (void *)&ru->gNB_list[0]->common_vars.txdataF[bb][aa][txdataF_offset],
-           numSamples * sizeof(int32_t));
-  else {
+  if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf) {
+    // FFT shift
+    const NR_DL_FRAME_PARMS *fp = &ru->gNB_list[0]->frame_parms;
+    fft_shift(ru->gNB_list[0]->common_vars.txdataF[bb][aa],
+              fp->ofdm_symbol_size,
+              fp->N_RB_DL,
+              (c16_t *)ru->common.txdataF_BF[tx_idx],
+              fp->ofdm_symbol_size,
+              startSymbol,
+              numSymbols);
+  } else {
     AssertFatal(false, "This needs to be fixed by using appropriate beams from config\n");
   }
 
