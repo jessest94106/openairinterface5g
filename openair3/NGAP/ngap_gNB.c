@@ -677,7 +677,7 @@ static int ngap_gNB_generate_ng_setup_request(
   pdu.choice.initiatingMessage->value.present = NGAP_InitiatingMessage__value_PR_NGSetupRequest;
   out = &pdu.choice.initiatingMessage->value.choice.NGSetupRequest;
   /* mandatory */
-  ie = (NGAP_NGSetupRequestIEs_t *)calloc(1, sizeof(NGAP_NGSetupRequestIEs_t));
+  ie = calloc_or_fail(1, sizeof(NGAP_NGSetupRequestIEs_t));
   ie->id = NGAP_ProtocolIE_ID_id_GlobalRANNodeID;
   ie->criticality = NGAP_Criticality_reject;
   ie->value.present = NGAP_NGSetupRequestIEs__value_PR_GlobalRANNodeID;
@@ -700,7 +700,7 @@ static int ngap_gNB_generate_ng_setup_request(
 
   /* optional */
   if (instance_p->gNB_name) {
-    ie = (NGAP_NGSetupRequestIEs_t *)calloc(1, sizeof(NGAP_NGSetupRequestIEs_t));
+    ie = calloc_or_fail(1, sizeof(NGAP_NGSetupRequestIEs_t));
     ie->id = NGAP_ProtocolIE_ID_id_RANNodeName;
     ie->criticality = NGAP_Criticality_ignore;
     ie->value.present = NGAP_NGSetupRequestIEs__value_PR_RANNodeName;
@@ -710,28 +710,28 @@ static int ngap_gNB_generate_ng_setup_request(
   }
 
   /* mandatory */
-  ie = (NGAP_NGSetupRequestIEs_t *)calloc(1, sizeof(NGAP_NGSetupRequestIEs_t));
+  ie = calloc_or_fail(1, sizeof(NGAP_NGSetupRequestIEs_t));
   ie->id = NGAP_ProtocolIE_ID_id_SupportedTAList;
   ie->criticality = NGAP_Criticality_reject;
   ie->value.present = NGAP_NGSetupRequestIEs__value_PR_SupportedTAList;
   {
-    ta = (NGAP_SupportedTAItem_t *)calloc(1, sizeof(NGAP_SupportedTAItem_t));
+    ta = (NGAP_SupportedTAItem_t *)calloc_or_fail(1, sizeof(NGAP_SupportedTAItem_t));
     INT24_TO_OCTET_STRING(instance_p->tac, &ta->tAC);
     {
       for (int i = 0; i < ngap_amf_data_p->broadcast_plmn_num; ++i) {
-        plmn = (NGAP_BroadcastPLMNItem_t *)calloc(1, sizeof(NGAP_BroadcastPLMNItem_t));
+        plmn = (NGAP_BroadcastPLMNItem_t *)calloc_or_fail(1, sizeof(NGAP_BroadcastPLMNItem_t));
         ngap_plmn_t *plmn_req = &instance_p->plmn[ngap_amf_data_p->broadcast_plmn_index[i]];
         plmn_id_t *plmn_id = &instance_p->plmn[ngap_amf_data_p->broadcast_plmn_index[i]].plmn;
         MCC_MNC_TO_TBCD(plmn_id->mcc, plmn_id->mnc, plmn_id->mnc_digit_length, &plmn->pLMNIdentity);
 
         for (int si = 0; si < plmn_req->num_nssai; si++) {
-          ssi = (NGAP_SliceSupportItem_t *)calloc(1, sizeof(NGAP_SliceSupportItem_t));
+          ssi = (NGAP_SliceSupportItem_t *)calloc_or_fail(1, sizeof(NGAP_SliceSupportItem_t));
           INT8_TO_OCTET_STRING(plmn_req->s_nssai[si].sst, &ssi->s_NSSAI.sST);
 
           const uint32_t sd = plmn_req->s_nssai[si].sd;
           if (sd != 0xffffff) {
-            ssi->s_NSSAI.sD = calloc(1, sizeof(NGAP_SD_t));
-            ssi->s_NSSAI.sD->buf = calloc(3, sizeof(uint8_t));
+            ssi->s_NSSAI.sD = calloc_or_fail(1, sizeof(NGAP_SD_t));
+            ssi->s_NSSAI.sD->buf = calloc_or_fail(3, sizeof(uint8_t));
             ssi->s_NSSAI.sD->size = 3;
             ssi->s_NSSAI.sD->buf[0] = (sd & 0xff0000) >> 16;
             ssi->s_NSSAI.sD->buf[1] = (sd & 0x00ff00) >> 8;
@@ -749,7 +749,7 @@ static int ngap_gNB_generate_ng_setup_request(
   asn1cSeqAdd(&out->protocolIEs.list, ie);
   
   /* mandatory */
-  ie = (NGAP_NGSetupRequestIEs_t *)calloc(1, sizeof(NGAP_NGSetupRequestIEs_t));
+  ie = calloc_or_fail(1, sizeof(NGAP_NGSetupRequestIEs_t));
   ie->id = NGAP_ProtocolIE_ID_id_DefaultPagingDRX;
   ie->criticality = NGAP_Criticality_ignore;
   ie->value.present = NGAP_NGSetupRequestIEs__value_PR_PagingDRX;
