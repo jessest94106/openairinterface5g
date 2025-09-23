@@ -2338,6 +2338,9 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
 
 static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
 {
+  /* Clean up handover context if it exists */
+  if (UE->ho_context)
+    nr_rrc_finalize_ho(UE);
   ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
   ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, UE->measResults);

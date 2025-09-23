@@ -453,10 +453,8 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
   RB_FOREACH(ue_context_p, rrc_nr_ue_tree_s, &rrc->rrc_ue_head) {
     gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
     uint32_t ue_id = UE->rrc_ue_id;
-    if (UE->ho_context != NULL) {
+    if (UE->ho_context != NULL)
       LOG_W(NR_RRC, "DU disconnected while handover for UE %d active\n", ue_id);
-      nr_rrc_finalize_ho(UE);
-    }
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
     if (ue_data.du_assoc_id != assoc_id)
       continue; /* this UE is on another DU */
