@@ -296,10 +296,7 @@ int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
   DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gNB_ue_ngap_id);
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_required(msg);
-  if (!pdu) {
-    NGAP_ERROR("Failed to encode Handover Required\n");
-    return -1;
-  }
+  DevAssert(pdu != NULL);
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, pdu);
@@ -339,10 +336,7 @@ static int ngap_gNB_handover_failure(instance_t instance, const ngap_handover_fa
   DevAssert(ngap_gNB_instance_p != NULL);
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_failure(msg);
-  if (!pdu) {
-    NGAP_ERROR("Failed to encode NG Handover Failure\n");
-    return -1;
-  }
+  DevAssert(pdu != NULL);
 
   if (ngap_gNB_encode_pdu(pdu, &buffer, &length) < 0) {
     NGAP_ERROR("Failed to encode HANDOVER FAILURE MESSAGE\n");
@@ -377,10 +371,7 @@ static int ngap_gNB_handover_request_acknowledge(instance_t instance, ngap_hando
   DevAssert(ngap != NULL);
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_request_ack(msg);
-  if (!pdu) {
-    NGAP_ERROR("Failed to encode NG Handover Request Acknowledge\n");
-    return -1;
-  }
+  DevAssert(pdu != NULL);
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NGAP_NGAP_PDU, pdu);
@@ -436,6 +427,10 @@ static int ngap_gNB_handover_notify(instance_t instance, const ngap_handover_not
   }
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_notify(msg);
+  if (!pdu) {
+    NGAP_ERROR("Failed to encode NG Handover Notify\n");
+    return -1;
+  }
 
   if (ngap_gNB_encode_pdu(pdu, &ba.buf, (uint32_t *)&ba.len) < 0) {
     NGAP_ERROR("Failed to encode NG Handover Notify message\n");
@@ -479,10 +474,7 @@ static int ngap_gNB_handover_cancel(instance_t instance, const ngap_handover_can
 
   /* Encode NGAP PDU */
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_cancel(msg);
-  if (pdu == NULL) {
-    NGAP_ERROR("Failed to encode NG Handover Cancel\n");
-    return -1;
-  }
+  DevAssert(pdu != NULL);
 
   if (ngap_gNB_encode_pdu(pdu, &ba.buf, (uint32_t *)&ba.len) < 0) {
     NGAP_ERROR("Failed to encode NG Handover Cancel message PDU\n");
@@ -517,10 +509,7 @@ int ngap_gNB_handle_ul_ran_status_transfer(instance_t instance, const ngap_ran_s
   DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gnb_ue_ngap_id);
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_ul_ran_status_transfer(msg);
-  if (!pdu) {
-    NGAP_ERROR("Failed to encode UL RAN Status Transfer\n");
-    return -1;
-  }
+  DevAssert(pdu != NULL);
 
   byte_array_t out = {.buf = NULL, .len = 0};
   if (ngap_gNB_encode_pdu(pdu, &out.buf, (uint32_t *)&out.len) < 0) {
