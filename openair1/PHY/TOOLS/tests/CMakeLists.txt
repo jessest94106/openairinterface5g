@@ -59,9 +59,16 @@ target_link_libraries(test_channel_simulation PRIVATE UTIL SIMU PHY_COMMON LOG C
 add_dependencies(tests test_channel_simulation)
 add_test(NAME test_channel_simulation COMMAND test_channel_simulation)
 
+add_executable(test_channel_scalability test_channel_scalability.c)
+target_link_libraries(test_channel_scalability PRIVATE UTIL SIMU PHY_COMMON LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_channel_scalability)
+add_test(NAME test_channel_scalability COMMAND test_channel_scalability)
+
 if (TARGET oai_cuda_lib)
     target_compile_definitions(test_multipath PRIVATE ENABLE_CUDA)
     target_compile_definitions(test_noise PRIVATE ENABLE_CUDA)
     target_compile_definitions(test_channel_simulation PRIVATE ENABLE_CUDA)
+    target_compile_definitions(test_channel_scalability PRIVATE ENABLE_CUDA)
 endif()
 endif()
