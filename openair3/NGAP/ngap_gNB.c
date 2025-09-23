@@ -293,12 +293,7 @@ int ngap_handover_required(instance_t instance, ngap_handover_required_t *msg)
     return -1;
   }
 
-  if ((ue_context_p->gNB_ue_ngap_id != msg->gNB_ue_ngap_id)) {
-    NGAP_ERROR("ue_context_p->gNB_ue_ngap_id %d does not match msg->gNB_ue_ngap_id %d\n",
-               ue_context_p->gNB_ue_ngap_id,
-               msg->gNB_ue_ngap_id);
-    return -1;
-  }
+  DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gNB_ue_ngap_id);
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_handover_required(msg);
   if (!pdu) {
@@ -434,11 +429,7 @@ static int ngap_gNB_handover_notify(instance_t instance, const ngap_handover_not
     NGAP_ERROR("Failed to encode Handover Notify: no ue context associated with gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
     return -1;
   }
-
-  if (ue_context_p->gNB_ue_ngap_id != msg->gNB_ue_ngap_id) {
-    NGAP_ERROR("Failed to encode Handover Notify: unknown gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
-    return -1;
-  }
+  DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gNB_ue_ngap_id);
 
   if (ue_context_p->amf_ue_ngap_id != msg->amf_ue_ngap_id) {
     NGAP_ERROR("Failed to encode Handover Notify: unknown amf_ue_ngap_id=%ld\n", msg->amf_ue_ngap_id);
@@ -479,11 +470,7 @@ static int ngap_gNB_handover_cancel(instance_t instance, const ngap_handover_can
     NGAP_ERROR("Failed to encode Handover Cancel: no UE context for gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
     return -1;
   }
-
-  if (ue_context_p->gNB_ue_ngap_id != msg->gNB_ue_ngap_id) {
-    NGAP_ERROR("Failed to encode Handover Cancel: mismatched gNB_ue_ngap_id=%d\n", msg->gNB_ue_ngap_id);
-    return -1;
-  }
+  DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gNB_ue_ngap_id);
 
   if (ue_context_p->amf_ue_ngap_id != msg->amf_ue_ngap_id) {
     NGAP_ERROR("Failed to encode Handover Cancel: mismatched amf_ue_ngap_id=%ld\n", msg->amf_ue_ngap_id);
@@ -522,10 +509,12 @@ int ngap_gNB_handle_ul_ran_status_transfer(instance_t instance, const ngap_ran_s
   DevAssert(ngap_gNB_instance_p != NULL);
 
   ngap_gNB_ue_context_t *ue_context_p = ngap_get_ue_context(msg->gnb_ue_ngap_id);
-  if (!ue_context_p || ue_context_p->gNB_ue_ngap_id != msg->gnb_ue_ngap_id) {
+  if (!ue_context_p) {
     NGAP_ERROR("Could not find UE context for gNB_ue_ngap_id %d\n", msg->gnb_ue_ngap_id);
     return -1;
   }
+
+  DevAssert(ue_context_p->gNB_ue_ngap_id == msg->gnb_ue_ngap_id);
 
   NGAP_NGAP_PDU_t *pdu = encode_ng_ul_ran_status_transfer(msg);
   if (!pdu) {
