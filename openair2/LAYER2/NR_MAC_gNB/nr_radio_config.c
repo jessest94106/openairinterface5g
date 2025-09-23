@@ -1505,10 +1505,38 @@ static NR_PTRS_UplinkConfig_t *config_ulptrs(const nr_ptrs_config_t *ptrs)
   return ulptrs;
 }
 
-static NR_SetupRelease_PUSCH_Config_t *config_pusch(const bool use_deltaMCS,
+long ue_supported_ul_layers(const NR_UE_NR_Capability_t *uecap)
+{
+  long ul_max_layers = 1;
+  if (uecap
+      && uecap->featureSets
+      && uecap->featureSets->featureSetsUplinkPerCC
+      && uecap->featureSets->featureSetsUplinkPerCC->list.count > 0) {
+    NR_FeatureSetUplinkPerCC_t *ul_feature_setup_per_cc = uecap->featureSets->featureSetsUplinkPerCC->list.array[0];
+    if (ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
+      switch (*ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
+        case NR_MIMO_LayersUL_twoLayers:
+          ul_max_layers = 2;
+          break;
+        case NR_MIMO_LayersUL_fourLayers:
+          ul_max_layers = 4;
+          break;
+        default:
+          ul_max_layers = 1;
+      }
+    }
+  }
+  return ul_max_layers;
+}
+
+static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
+{
+  return min(ue_supported_ul_layers(uecap), configuration->pusch_AntennaPorts);
+}
+
+static NR_SetupRelease_PUSCH_Config_t *config_pusch(const nr_mac_config_t *configuration,
                                                     const NR_ServingCellConfigCommon_t *scc,
-                                                    const NR_UE_NR_Capability_t *uecap,
-                                                    const nr_ptrs_config_t *ptrs)
+                                                    const NR_UE_NR_Capability_t *uecap)
 {
   NR_SetupRelease_PUSCH_Config_t *setup_puschconfig = calloc(1, sizeof(*setup_puschconfig));
   setup_puschconfig->present = NR_SetupRelease_PUSCH_Config_PR_setup;
@@ -1526,8 +1554,8 @@ static NR_SetupRelease_PUSCH_Config_t *config_pusch(const bool use_deltaMCS,
   if (!pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup)
     pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup = calloc(1, sizeof(*pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup));
   NR_DMRS_UplinkConfig_t *NR_DMRS_UplinkConfig = pusch_Config->dmrs_UplinkForPUSCH_MappingTypeB->choice.setup;
-  if (ptrs) {
-    NR_PTRS_UplinkConfig_t *ptrs_config = config_ulptrs(ptrs);
+  if (configuration->ptrs) {
+    NR_PTRS_UplinkConfig_t *ptrs_config = config_ulptrs(configuration->ptrs);
     NR_SetupRelease_PTRS_UplinkConfig_t *phaseTrackingRS = calloc(1, sizeof(*phaseTrackingRS));
     phaseTrackingRS->present = NR_SetupRelease_PTRS_UplinkConfig_PR_setup;
     phaseTrackingRS->choice.setup = ptrs_config;
@@ -1569,7 +1597,7 @@ static NR_SetupRelease_PUSCH_Config_t *config_pusch(const bool use_deltaMCS,
   asn1cSeqAdd(&pusch_Config->pusch_PowerControl->pathlossReferenceRSToAddModList->list, plrefRS);
   pusch_Config->pusch_PowerControl->pathlossReferenceRSToReleaseList = NULL;
   pusch_Config->pusch_PowerControl->twoPUSCH_PC_AdjustmentStates = NULL;
-  if (use_deltaMCS) {
+  if (configuration->use_deltaMCS) {
     if (!pusch_Config->pusch_PowerControl->deltaMCS)
       pusch_Config->pusch_PowerControl->deltaMCS = calloc(1, sizeof(*pusch_Config->pusch_PowerControl->deltaMCS));
     *pusch_Config->pusch_PowerControl->deltaMCS = NR_PUSCH_PowerControl__deltaMCS_enabled;
@@ -1582,14 +1610,14 @@ static NR_SetupRelease_PUSCH_Config_t *config_pusch(const bool use_deltaMCS,
   pusch_Config->resourceAllocation = NR_PUSCH_Config__resourceAllocation_resourceAllocationType1;
   pusch_Config->pusch_TimeDomainAllocationList = NULL;
   pusch_Config->pusch_AggregationFactor = NULL;
-  set_ul_mcs_table(uecap, scc, pusch_Config);
+  set_ul_mcs_table(configuration->force_UL256qam_off ? NULL : uecap, scc, pusch_Config);
   pusch_Config->transformPrecoder = NULL;
   if (!pusch_Config->codebookSubset)
     pusch_Config->codebookSubset = calloc(1, sizeof(*pusch_Config->codebookSubset));
   *pusch_Config->codebookSubset = NR_PUSCH_Config__codebookSubset_nonCoherent;
   if (!pusch_Config->maxRank)
     pusch_Config->maxRank = calloc(1, sizeof(*pusch_Config->maxRank));
-  *pusch_Config->maxRank = 1;
+  *pusch_Config->maxRank = set_ul_max_layers(configuration, uecap);
   pusch_Config->rbg_Size = NULL;
   pusch_Config->uci_OnPUSCH = NULL;
   pusch_Config->tp_pi2BPSK = NULL;
@@ -1855,10 +1883,7 @@ static NR_BWP_Uplink_t *config_uplinkBWP(long bwp_loop,
   scheduling_request_config(scc, pucch_Config, ubwp->bwp_Common->genericParameters.subcarrierSpacing);
   set_dl_DataToUL_ACK(pucch_Config, configuration->minRXTXTIME, ubwp->bwp_Common->genericParameters.subcarrierSpacing);
 
-  ubwp->bwp_Dedicated->pusch_Config = config_pusch(configuration->use_deltaMCS,
-                                                   scc,
-                                                   configuration->force_UL256qam_off ? NULL : uecap,
-                                                   configuration->ptrs);
+  ubwp->bwp_Dedicated->pusch_Config = config_pusch(configuration, scc, uecap);
 
   ubwp->bwp_Dedicated->srs_Config = get_config_srs(scc,
                                                    NULL,
@@ -3268,6 +3293,7 @@ static void fill_harq_IEs(NR_ServingCellConfig_t *scc, int num_dlharq, int num_u
 static NR_BWP_UplinkDedicated_t *configure_initial_ul_bwp(const NR_ServingCellConfigCommon_t *scc,
                                                           const nr_mac_config_t *configuration,
                                                           int maxMIMO_Layers,
+                                                          const NR_UE_NR_Capability_t *uecap,
                                                           int id)
 {
   NR_BWP_UplinkDedicated_t *initialUplinkBWP = calloc(1, sizeof(*initialUplinkBWP));
@@ -3282,14 +3308,14 @@ static NR_BWP_UplinkDedicated_t *configure_initial_ul_bwp(const NR_ServingCellCo
   pucch_Config->resourceToAddModList = calloc(1, sizeof(*pucch_Config->resourceToAddModList));
   pucch_Config->resourceToReleaseList = NULL;
   int num_pucch2 = get_nb_pucch2_per_slot(scc, curr_bwp);
-  config_pucch_resset0(pucch_Config, id, curr_bwp, num_pucch2, NULL);
-  config_pucch_resset1(pucch_Config, id, num_pucch2, NULL);
+  config_pucch_resset0(pucch_Config, id, curr_bwp, num_pucch2, uecap);
+  config_pucch_resset1(pucch_Config, id, num_pucch2, uecap);
   set_pucch_power_config(pucch_Config, configuration->do_CSIRS);
 
-  initialUplinkBWP->pusch_Config = config_pusch(configuration->use_deltaMCS, scc, NULL, configuration->ptrs);
+  initialUplinkBWP->pusch_Config = config_pusch(configuration, scc, uecap);
 
   // We are using do_srs = 0 here because the periodic SRS will only be enabled in update_cellGroupConfig() if do_srs == 1
-  initialUplinkBWP->srs_Config = get_config_srs(scc, NULL, curr_bwp, id, 0, maxMIMO_Layers, configuration->minRXTXTIME, 0);
+  initialUplinkBWP->srs_Config = get_config_srs(scc, uecap, curr_bwp, id, 0, maxMIMO_Layers, configuration->minRXTXTIME, 0);
 
   scheduling_request_config(scc, pucch_Config, scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing);
   set_dl_DataToUL_ACK(pucch_Config, configuration->minRXTXTIME, genericParameters->subcarrierSpacing);
@@ -3510,7 +3536,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   asn1cCallocOne(configDedicated->firstActiveDownlinkBWP_Id, first_active_bwp);
   asn1cCallocOne(uplinkConfig->firstActiveUplinkBWP_Id, first_active_bwp);
   if (first_active_bwp == 0) {
-    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, maxMIMO_Layers, uid);
+    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, maxMIMO_Layers, NULL, uid);
     configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, configuration);
   } else {
     configDedicated->downlinkBWP_ToAddModList = calloc(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
@@ -3743,35 +3769,6 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   return cellGroupConfig;
 }
 
-long ue_supported_ul_layers(const NR_UE_NR_Capability_t *uecap)
-{
-  long ul_max_layers = 1;
-  if (uecap
-      && uecap->featureSets
-      && uecap->featureSets->featureSetsUplinkPerCC
-      && uecap->featureSets->featureSetsUplinkPerCC->list.count > 0) {
-    NR_FeatureSetUplinkPerCC_t *ul_feature_setup_per_cc = uecap->featureSets->featureSetsUplinkPerCC->list.array[0];
-    if (ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
-      switch (*ul_feature_setup_per_cc->mimo_CB_PUSCH->maxNumberMIMO_LayersCB_PUSCH) {
-        case NR_MIMO_LayersUL_twoLayers:
-          ul_max_layers = 2;
-          break;
-        case NR_MIMO_LayersUL_fourLayers:
-          ul_max_layers = 4;
-          break;
-        default:
-          ul_max_layers = 1;
-      }
-    }
-  }
-  return ul_max_layers;
-}
-
-static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
-{
-  return min(ue_supported_ul_layers(uecap), configuration->pusch_AntennaPorts);
-}
-
 NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
                                                              const nr_mac_config_t *configuration,
                                                              const NR_UE_NR_Capability_t *uecap,
@@ -3821,7 +3818,7 @@ NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_
       configDedicated->initialDownlinkBWP = calloc_or_fail(1, sizeof(*configDedicated->initialDownlinkBWP));
     if (!uplinkConfig->initialUplinkBWP)
       uplinkConfig->initialUplinkBWP = calloc_or_fail(1, sizeof(*uplinkConfig->initialUplinkBWP));
-    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, ul_maxMIMO_Layers, uid);
+    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, ul_maxMIMO_Layers, uecap, uid);
     configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, configuration);
   } else {
     if (!configDedicated->downlinkBWP_ToAddModList)
@@ -4059,10 +4056,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
   ulConfig->initialUplinkBWP = initialUplinkBWP;
   initialUplinkBWP->pucch_Config = NULL;
 
-  initialUplinkBWP->pusch_Config = config_pusch(configuration->use_deltaMCS,
-                                                servingcellconfigcommon,
-                                                uecap,
-                                                configuration->ptrs);
+  initialUplinkBWP->pusch_Config = config_pusch(configuration, servingcellconfigcommon, uecap);
 
   long maxMIMO_Layers = set_ul_max_layers(configuration, uecap);
   int curr_bwp = NRRIV2BW(servingcellconfigcommon->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth,
