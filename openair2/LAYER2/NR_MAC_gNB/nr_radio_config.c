@@ -4361,8 +4361,10 @@ measgap_config_t create_measgap_config(const NR_MeasurementTimingConfiguration_t
   const NR_SSB_MTC_t *ssb_mtc = &ft->ssb_MeasurementTimingConfiguration;
   NR_MeasGapConfig_t *measGapConfig = get_gap_config_from_smtc(ssb_mtc);
   const NR_GapConfig_t *gap_config = get_gap_config(measGapConfig);
-  if (!gap_config)
+  if (!gap_config) {
+    ASN_STRUCT_FREE(asn_DEF_NR_MeasGapConfig, measGapConfig);
     return mgc;
+  }
 
   mgc.mgrp_ms = get_mgrp(gap_config->mgrp);
   DevAssert(mgc.mgrp_ms != -1);
@@ -4385,6 +4387,10 @@ measgap_config_t create_measgap_config(const NR_MeasurementTimingConfiguration_t
   mgc.mgl_slots = ((int)(10 * (mgc.mgl_ms + max_k2)) << scs) / 10;
 
   mgc.enable = true;
+
+  // Free the allocated measGapConfig structure after we're done using gap_config
+  ASN_STRUCT_FREE(asn_DEF_NR_MeasGapConfig, measGapConfig);
+
   return mgc;
 }
 
