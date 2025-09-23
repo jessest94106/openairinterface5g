@@ -320,6 +320,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
       if (gNB->phase_comp) {
         apply_nr_rotation_TX(fp,
                              gNB->common_vars.txdataF[i][aa],
+                             true,
                              fp->symbol_rotation[0],
                              slot,
                              fp->N_RB_DL,

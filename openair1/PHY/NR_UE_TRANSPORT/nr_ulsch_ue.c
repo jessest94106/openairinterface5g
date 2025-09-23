@@ -1619,7 +1619,14 @@ uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
       if (was_symbol_used[i] == false)
         continue;
       for (int ap = 0; ap < n_antenna_ports; ap++) {
-        apply_nr_rotation_TX(frame_parms, txdataF[ap], frame_parms->symbol_rotation[linktype], slot, N_RB, i, 1);
+        apply_nr_rotation_TX(frame_parms,
+                             txdataF[ap],
+                             false,
+                             frame_parms->symbol_rotation[linktype],
+                             slot,
+                             N_RB,
+                             i,
+                             1);
       }
     }
   }

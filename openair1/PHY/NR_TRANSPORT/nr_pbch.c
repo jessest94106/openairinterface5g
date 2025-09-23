@@ -71,7 +71,7 @@ void nr_generate_pbch_dmrs(uint32_t *gold_pbch_dmrs,
   /// Resource mapping
   // PBCH DMRS are mapped  within the SSB block on every fourth subcarrier starting from nushift of symbols 1, 2, 3
   ///symbol 1  [0+nushift:4:236+nushift] -- 60 mod symbols
-  k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier + nushift;
+  k = frame_parms->ssb_start_subcarrier + nushift;
   l = ssb_start_symbol + 1;
 
   for (int m = 0; m < 60; m++) {
@@ -80,13 +80,10 @@ void nr_generate_pbch_dmrs(uint32_t *gold_pbch_dmrs,
 #endif
     txdataF[l * frame_parms->ofdm_symbol_size + k] = c16mulRealShift(mod_dmrs[m], amp, 15);
     k+=4;
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
   ///symbol 2  [0+u:4:44+nushift ; 192+nu:4:236+nushift] -- 24 mod symbols
-  k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier + nushift;
+  k = frame_parms->ssb_start_subcarrier + nushift;
   l++;
 
   for (int m = 60; m < 84; m++) {
@@ -100,13 +97,10 @@ void nr_generate_pbch_dmrs(uint32_t *gold_pbch_dmrs,
            ((int16_t *)txdataF)[((l*frame_parms->ofdm_symbol_size + k)<<1)+1]);
 #endif
     k+=(m==71)?148:4; // Jump from 44+nu to 192+nu
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
   ///symbol 3  [0+nushift:4:236+nushift] -- 60 mod symbols
-  k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier + nushift;
+  k = frame_parms->ssb_start_subcarrier + nushift;
   l++;
 
   for (int m = 84; m < NR_PBCH_DMRS_LENGTH; m++) {
@@ -115,9 +109,6 @@ void nr_generate_pbch_dmrs(uint32_t *gold_pbch_dmrs,
 #endif
     txdataF[l * frame_parms->ofdm_symbol_size + k] = c16mulRealShift(mod_dmrs[m], amp, 15);
     k+=4;
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
 #ifdef DEBUG_PBCH_DMRS
@@ -334,7 +325,7 @@ void nr_generate_pbch(PHY_VARS_gNB *gNB,
   nushift = config->cell_config.phy_cell_id.value &3;
   // PBCH modulated symbols are mapped  within the SSB block on symbols 1, 2, 3 excluding the subcarriers used for the PBCH DMRS
   ///symbol 1  [0:239] -- 180 mod symbols
-  int k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier;
+  int k = frame_parms->ssb_start_subcarrier;
   int l = ssb_start_symbol + 1;
   int m = 0;
   int16_t amp = gNB->TX_AMP;
@@ -351,13 +342,10 @@ void nr_generate_pbch(PHY_VARS_gNB *gNB,
       k++;
       m++;
     }
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
   ///symbol 2  [0:47 ; 192:239] -- 72 mod symbols
-  k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier;
+  k = frame_parms->ssb_start_subcarrier;
   l++;
   m=180;
 
@@ -373,15 +361,9 @@ void nr_generate_pbch(PHY_VARS_gNB *gNB,
       k++;
       m++;
     }
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
   k += 144;
-
-  if (k >= frame_parms->ofdm_symbol_size)
-    k-=frame_parms->ofdm_symbol_size;
 
   m=216;
 
@@ -397,13 +379,10 @@ void nr_generate_pbch(PHY_VARS_gNB *gNB,
       k++;
       m++;
     }
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
   ///symbol 3  [0:239] -- 180 mod symbols
-  k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier;
+  k = frame_parms->ssb_start_subcarrier;
   l++;
   m=252;
 
@@ -419,9 +398,5 @@ void nr_generate_pbch(PHY_VARS_gNB *gNB,
       k++;
       m++;
     }
-
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 }

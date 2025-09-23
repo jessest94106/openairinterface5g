@@ -612,21 +612,6 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
         int num_totalRB = p_prbMapElm->nRBSize;
         int start_totalRB = p_prbMapElm->nRBStart;
 
-        int pos_len = 0;
-        int neg_len = 0;
-
-        if (start_totalRB < (num_totalRB >> 1)) // there are PRBs left of DC
-          neg_len = min((num_totalRB * 6) - (start_totalRB * 12), num_totalRB * N_SC_PER_PRB);
-        pos_len = (num_totalRB * N_SC_PER_PRB) - neg_len;
-        // Calculation of the pointer for the section in the buffer.
-        // start of positive frequency component
-        uint16_t *src1 = (uint16_t *)&pos[(neg_len == 0) ? ((start_totalRB * N_SC_PER_PRB) - (num_totalRB * 6)) : 0];
-        // start of negative frequency component
-        uint16_t *src2 = (uint16_t *)&pos[(start_totalRB * N_SC_PER_PRB) + fftsize - (num_totalRB * 6)];
-
-        uint32_t local_src[num_totalRB * N_SC_PER_PRB] __attribute__((aligned(64)));
-        memcpy((void *)local_src, (void *)src2, neg_len * 4);
-        memcpy((void *)&local_src[neg_len], (void *)src1, pos_len * 4);
         if (ptr && pos) {
           u8dptr = (uint8_t *)ptr;
           int16_t payload_len = 0;
@@ -662,26 +647,33 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
             }
             uint16_t *dst16 = (uint16_t *)dst;
 
+            // Start of this section
+            int32_t *pos_start = pos + (start_totalRB + startRB) * N_SC_PER_PRB;
+
             if (p_prbMapElm->compMethod == XRAN_COMPMETHOD_NONE) {
               payload_len = numRB * N_SC_PER_PRB * 4L;
               /* convert to Network order */
               // NOTE: ggc 11 knows how to generate AVX2 for this!
               for (idx = 0; idx < (numRB * N_SC_PER_PRB) * 2; idx++)
-                ((uint16_t *)dst16)[idx] = htons(((uint16_t *)local_src)[idx + startRB * N_SC_PER_PRB * 2]);
+                ((uint16_t *)dst16)[idx] = htons(((uint16_t *)pos_start)[idx]);
             } else if (p_prbMapElm->compMethod == XRAN_COMPMETHOD_BLKFLOAT) {
               payload_len = (3 * p_prbMapElm->iqWidth + 1) * numRB;
+
+              /* Although arm intrinsics natively handle unaligned memory
+              access, we use a 64 byte aligned input here for maximum
+              performance. So the src_compr buffer is used for both x86 and arm.
+              */
+              uint32_t src_compr[num_totalRB * N_SC_PER_PRB] __attribute__((aligned(64)));
+
+              /* Copy from txdataF with current symbol's PRB start (nRBStart) +
+              current section's PRB start (UP_nPRBStart) */
+              memcpy(src_compr, pos_start, (numRB * N_SC_PER_PRB) * sizeof(*pos_start));
 
 #if defined(__i386__) || defined(__x86_64__)
               struct xranlib_compress_request bfp_com_req = {};
               struct xranlib_compress_response bfp_com_rsp = {};
 
-              uint32_t src_compr[num_totalRB * N_SC_PER_PRB] __attribute__((aligned(64)));
-              if (numRB == num_totalRB) {
-                bfp_com_req.data_in = (int16_t *)local_src;
-              } else {
-                memcpy(src_compr, local_src + (startRB * N_SC_PER_PRB), (numRB * N_SC_PER_PRB) * sizeof(*local_src));
-                bfp_com_req.data_in = (int16_t *)src_compr;
-              }
+              bfp_com_req.data_in = (int16_t *)src_compr;
 
               bfp_com_req.numRBs = numRB;
               bfp_com_req.len = payload_len;
@@ -693,7 +685,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
 
               xranlib_compress_avx512(&bfp_com_req, &bfp_com_rsp);
 #elif defined(__arm__) || defined(__aarch64__)
-              armral_bfp_compression(p_prbMapElm->iqWidth, numRB, (int16_t *)(local_src + startRB * N_SC_PER_PRB), (int8_t *)dst);
+              armral_bfp_compression(p_prbMapElm->iqWidth, numRB, (int16_t *)src_compr, (int8_t *)dst);
 #else
               AssertFatal(1 == 0, "BFP compression not supported on this architecture");
 #endif
@@ -950,7 +942,6 @@ int xran_fh_tx_send_slot_BySymbol(ru_info_t *ru, int frame, int slot, uint64_t t
 
   const struct xran_fh_init *fh_init = get_xran_fh_init();
   const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
-  int nPRBs = fh_cfg->nDLRBs;
   int fftsize = 1 << fh_cfg->nDLFftSize;
   int nb_tx_per_ru = ru->nb_tx / fh_init->xran_ports;
   int nb_rx_per_ru = ru->nb_rx / fh_init->xran_ports;
@@ -1105,36 +1096,32 @@ int xran_fh_tx_send_slot_BySymbol(ru_info_t *ru, int frame, int slot, uint64_t t
             }
             uint16_t *dst16 = (uint16_t *)dst;
 
-            int pos_len = 0;
-            int neg_len = 0;
-
-            if (p_prbMapElm->UP_nRBStart < (nPRBs >> 1)) // there are PRBs left of DC
-              neg_len = min((nPRBs * 6) - (p_prbMapElm->UP_nRBStart * 12), p_prbMapElm->UP_nRBSize * N_SC_PER_PRB);
-            pos_len = (p_prbMapElm->UP_nRBSize * N_SC_PER_PRB) - neg_len;
-            // Calculation of the pointer for the section in the buffer.
-            // start of positive frequency component
-            uint16_t *src1 = (uint16_t *)&pos[(neg_len == 0) ? ((p_prbMapElm->UP_nRBStart * N_SC_PER_PRB) - (nPRBs * 6)) : 0];
-            // start of negative frequency component
-            uint16_t *src2 = (uint16_t *)&pos[(p_prbMapElm->UP_nRBStart * N_SC_PER_PRB) + fftsize - (nPRBs * 6)];
-
-            uint32_t local_src[p_prbMapElm->UP_nRBSize * N_SC_PER_PRB] __attribute__((aligned(64)));
-            memcpy((void *)local_src, (void *)src2, neg_len * 4);
-            memcpy((void *)&local_src[neg_len], (void *)src1, pos_len * 4);
+            int32_t *pos_start = pos + p_prbMapElm->UP_nRBStart * N_SC_PER_PRB;
+            uint32_t numPrb = p_prbMapElm->UP_nRBSize;
             if (p_prbMapElm->compMethod == XRAN_COMPMETHOD_NONE) {
-              payload_len = p_prbMapElm->UP_nRBSize * N_SC_PER_PRB * 4L;
+              payload_len = numPrb * N_SC_PER_PRB * 4L;
               /* convert to Network order */
               // NOTE: ggc 11 knows how to generate AVX2 for this!
-              for (idx = 0; idx < (pos_len + neg_len) * 2; idx++)
-                ((uint16_t *)dst16)[idx] = htons(((uint16_t *)local_src)[idx]);
+              for (idx = 0; idx < numPrb * N_SC_PER_PRB * 2; idx++)
+                ((uint16_t *)dst16)[idx] = htons(((uint16_t *)pos_start)[idx]);
             } else if (p_prbMapElm->compMethod == XRAN_COMPMETHOD_BLKFLOAT) {
-              payload_len = (3 * p_prbMapElm->iqWidth + 1) * p_prbMapElm->UP_nRBSize;
+              payload_len = (3 * p_prbMapElm->iqWidth + 1) * numPrb;
 
+              /* Although arm intrinsics natively handle unaligned memory
+              access, we use a 64 byte aligned input here for maximum
+              performance. So the src_compr buffer is used for both x86 and arm.
+              */
+              uint32_t src_compr[numPrb * N_SC_PER_PRB] __attribute__((aligned(64)));
+
+              /* Copy from txdataF with current symbol's PRB start (nRBStart) +
+              current section's PRB start (UP_nPRBStart) */
+              memcpy(src_compr, pos_start, (numPrb * N_SC_PER_PRB) * sizeof(*pos_start));
 #if defined(__i386__) || defined(__x86_64__)
               struct xranlib_compress_request bfp_com_req = {};
               struct xranlib_compress_response bfp_com_rsp = {};
 
-              bfp_com_req.data_in = (int16_t *)local_src;
-              bfp_com_req.numRBs = p_prbMapElm->UP_nRBSize;
+              bfp_com_req.data_in = (int16_t *)src_compr;
+              bfp_com_req.numRBs = numPrb;
               bfp_com_req.len = payload_len;
               bfp_com_req.compMethod = p_prbMapElm->compMethod;
               bfp_com_req.iqWidth = p_prbMapElm->iqWidth;
@@ -1144,7 +1131,7 @@ int xran_fh_tx_send_slot_BySymbol(ru_info_t *ru, int frame, int slot, uint64_t t
 
               xranlib_compress_avx512(&bfp_com_req, &bfp_com_rsp);
 #elif defined(__arm__) || defined(__aarch64__)
-              armral_bfp_compression(p_prbMapElm->iqWidth, p_prbMapElm->UP_nRBSize, (int16_t *)local_src, (int8_t *)dst);
+              armral_bfp_compression(p_prbMapElm->iqWidth, numPrb, (int16_t *)src_compr, (int8_t *)dst);
 #else
               AssertFatal(1 == 0, "BFP compression not supported on this architecture");
 #endif

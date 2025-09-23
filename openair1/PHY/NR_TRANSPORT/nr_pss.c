@@ -49,8 +49,7 @@ int nr_generate_pss(  c16_t *txdataF,
   /// Resource mapping
 
   // PSS occupies a predefined position (subcarriers 56-182, symbol 0) within the SSB block starting from
-  int k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier + 56; //and
-  if (k>= frame_parms->ofdm_symbol_size) k-=frame_parms->ofdm_symbol_size;
+  int k = frame_parms->ssb_start_subcarrier + 56;
 
   int l = ssb_start_symbol;
 
@@ -61,9 +60,6 @@ int nr_generate_pss(  c16_t *txdataF,
     //      printf("pss: writing position k %d / %d\n",k,frame_parms->ofdm_symbol_size);
     ((int16_t*)txdataF)[2*(l*frame_parms->ofdm_symbol_size + k)] = (((int16_t)amp) * d_pss) >> 15;
     k++;
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 
 #ifdef NR_PSS_DEBUG

@@ -51,9 +51,9 @@ int nr_generate_prs(int slot, c16_t *txdataF, int16_t amp, prs_config_t *prs_cfg
     else if (prs_cfg->CombSize == 12){
       k_prime = k_prime_table[3][symInd];
     }
-    
-    k = (prs_cfg->REOffset+k_prime) % prs_cfg->CombSize + prs_cfg->RBOffset*12 + frame_parms->first_carrier_offset;
-    
+
+    k = (prs_cfg->REOffset + k_prime) % prs_cfg->CombSize + prs_cfg->RBOffset * 12;
+
     // QPSK modulation
     uint32_t *gold = nr_gold_prs(prs_cfg->NPRSID, slot, l);
     for (int m = 0; m < (12/prs_cfg->CombSize) * prs_cfg->NumRB; m++) {
@@ -66,10 +66,7 @@ int nr_generate_prs(int slot, c16_t *txdataF, int16_t amp, prs_config_t *prs_cfg
       txdataF[l * frame_parms->ofdm_symbol_size + k] = c16mulRealShift(mod_prs[m], amp, 15);
 
       k = k +  prs_cfg->CombSize;
-    
-      if (k >= frame_parms->ofdm_symbol_size)
-        k-=frame_parms->ofdm_symbol_size;
-      }
+    }
   }
 #ifdef DEBUG_PRS_MAP
   LOG_M("nr_prs.m", "prs",(int16_t *)&txdataF[prs_cfg->SymbolStart*frame_parms->ofdm_symbol_size],prs_cfg->NumPRSSymbols*frame_parms->ofdm_symbol_size, 1, 1);

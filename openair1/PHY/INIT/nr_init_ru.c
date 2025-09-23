@@ -103,7 +103,8 @@ void nr_phy_init_RU(RU_t *ru)
     ru->common.txdataF_BF = (int32_t **)malloc16(nb_tx_streams * sizeof(int32_t*));
     LOG_D(PHY, "[INIT] common.txdata_BF= %p (%lu bytes)\n", ru->common.txdataF_BF, nb_tx_streams * sizeof(int32_t *));
     for (int i = 0; i < nb_tx_streams; i++) {
-      ru->common.txdataF_BF[i] = (int32_t*)malloc16_clear(fp->samples_per_subframe_wCP * sizeof(int32_t));
+      ru->common.txdataF_BF[i] =
+          (int32_t *)malloc16_clear(fp->samples_per_slot_wCP * sizeof(int32_t));
       LOG_D(PHY, "txdataF_BF[%d] %p for RU %d\n", i, ru->common.txdataF_BF[i], ru->idx);
     }
     // allocate FFT output buffers (RX)
