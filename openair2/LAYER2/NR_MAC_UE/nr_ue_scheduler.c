@@ -2855,6 +2855,8 @@ static void schedule_ntn_config_command(fapi_nr_dl_config_request_t *dl_config, 
   ntn_config_command_pdu->omega = mac->ntn_ta.omega;
   ntn_config_command_pdu->pos_sat_0 = mac->ntn_ta.pos_sat_0;
   ntn_config_command_pdu->pos_sat_90 = mac->ntn_ta.pos_sat_90;
+  ntn_config_command_pdu->vel_sat_0 = mac->ntn_ta.vel_sat_0;
+  ntn_config_command_pdu->vel_sat_90 = mac->ntn_ta.vel_sat_90;
 
   ntn_config_command_pdu->N_common_ta_adj = mac->ntn_ta.N_common_ta_adj;
   ntn_config_command_pdu->N_common_ta_drift = mac->ntn_ta.N_common_ta_drift;

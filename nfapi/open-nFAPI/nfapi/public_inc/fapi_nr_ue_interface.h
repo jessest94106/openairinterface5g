@@ -569,10 +569,14 @@ typedef struct {
 
   // orbital angular velocity in rad/ms
   double omega;
-  // satellite position at epoch time
+  // satellite position vector at epoch time
   position_t pos_sat_0;
-  // satellite position at 90° orbit
+  // satellite position vector at 90° orbit
   position_t pos_sat_90;
+  // satellite velocity vector at epoch time
+  position_t vel_sat_0;
+  // satellite velocity vector at 90° orbit
+  position_t vel_sat_90;
 
   // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
   double N_common_ta_adj;

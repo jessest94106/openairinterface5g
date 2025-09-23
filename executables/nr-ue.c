@@ -732,15 +732,32 @@ static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAM
                                + ntn_config_params->epoch_hfn * 10240;
   const int ms_since_epoch = abs_subframe_tx - abs_subframe_epoch;
 
-  const double omega = ntn_config_params->omega;
-  const double cos_wt = cos(omega * ms_since_epoch);
-  const double sin_wt = sin(omega * ms_since_epoch);
-
   const position_t pos_sat_0 = ntn_config_params->pos_sat_0;
-  const position_t pos_sat_90 = ntn_config_params->pos_sat_90;
-  const position_t pos_sat = {pos_sat_0.X * cos_wt + pos_sat_90.X * sin_wt,
-                              pos_sat_0.Y * cos_wt + pos_sat_90.Y * sin_wt,
-                              pos_sat_0.Z * cos_wt + pos_sat_90.Z * sin_wt};
+  const position_t vel_sat_0 = ntn_config_params->vel_sat_0;
+
+  position_t pos_sat;
+  position_t vel_sat;
+
+  const double omega = ntn_config_params->omega;
+  if (omega) {
+    const double cos_wt = cos(omega * ms_since_epoch);
+    const double sin_wt = sin(omega * ms_since_epoch);
+
+    const position_t pos_sat_90 = ntn_config_params->pos_sat_90;
+    pos_sat = (position_t){pos_sat_0.X * cos_wt + pos_sat_90.X * sin_wt,
+                           pos_sat_0.Y * cos_wt + pos_sat_90.Y * sin_wt,
+                           pos_sat_0.Z * cos_wt + pos_sat_90.Z * sin_wt};
+
+    const position_t vel_sat_90 = ntn_config_params->vel_sat_90;
+    vel_sat = (position_t){vel_sat_0.X * cos_wt + vel_sat_90.X * sin_wt,
+                           vel_sat_0.Y * cos_wt + vel_sat_90.Y * sin_wt,
+                           vel_sat_0.Z * cos_wt + vel_sat_90.Z * sin_wt};
+  } else {
+    pos_sat = (position_t){pos_sat_0.X + vel_sat_0.X * ms_since_epoch / 1000,
+                           pos_sat_0.Y + vel_sat_0.Y * ms_since_epoch / 1000,
+                           pos_sat_0.Z + vel_sat_0.Z * ms_since_epoch / 1000};
+    vel_sat = vel_sat_0;
+  }
 
   position_t pos_ue = {0};
   get_position_coordinates(UE->Mod_id, &pos_ue);
@@ -750,6 +767,9 @@ static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAM
 
   // calculate distance between SAT and UE
   const double distance = sqrt(dir_sat_ue.X * dir_sat_ue.X + dir_sat_ue.Y * dir_sat_ue.Y + dir_sat_ue.Z * dir_sat_ue.Z);
+
+  // calculate projected velocity from SAT towards UE
+  const double vel_sat_ue = (vel_sat.X * dir_sat_ue.X + vel_sat.Y * dir_sat_ue.Y + vel_sat.Z * dir_sat_ue.Z) / distance;
 
   // calculate round-trip-time (factor 2) between SAT and UE in ms (factor 1000)
   const double N_UE_TA_adj = 2000 * distance / SPEED_OF_LIGHT;
@@ -764,14 +784,15 @@ static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAM
                          * fp->samples_per_subframe;
 
   LOG_D(PHY,
-        "N_UE_TA_adj = %f ms, N_common_ta_adj = %f ms, N_common_ta_drift = %f µs/s, N_common_ta_drift_variant = %f µs/s², ms_since_epoch = %d ms, "
-        "computed timing_advance_ntn = %d samples\n",
+        "N_UE_TA_adj = %f ms, N_common_ta_adj = %f ms, N_common_ta_drift = %f µs/s, N_common_ta_drift_variant = %f µs/s², "
+        "ms_since_epoch = %d ms, computed timing_advance_ntn = %d samples, satellite velocity towards UE = %f m/s\n",
         N_UE_TA_adj,
         N_common_ta_adj,
         N_common_ta_drift,
         N_common_ta_drift_variant,
         ms_since_epoch,
-        UE->timing_advance_ntn);
+        UE->timing_advance_ntn,
+        vel_sat_ue);
 }
 
 static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,

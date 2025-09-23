@@ -102,6 +102,8 @@ static void configure_ntn_params(PHY_VARS_NR_UE *ue, fapi_nr_dl_ntn_config_comma
   ue->ntn_config_message->ntn_config_params.omega = ntn_params_message->omega;
   ue->ntn_config_message->ntn_config_params.pos_sat_0 = ntn_params_message->pos_sat_0;
   ue->ntn_config_message->ntn_config_params.pos_sat_90 = ntn_params_message->pos_sat_90;
+  ue->ntn_config_message->ntn_config_params.vel_sat_0 = ntn_params_message->vel_sat_0;
+  ue->ntn_config_message->ntn_config_params.vel_sat_90 = ntn_params_message->vel_sat_90;
 
   ue->ntn_config_message->ntn_config_params.N_common_ta_adj = ntn_params_message->N_common_ta_adj;
   ue->ntn_config_message->ntn_config_params.N_common_ta_drift = ntn_params_message->N_common_ta_drift;

@@ -279,29 +279,49 @@ static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timi
   const double vel_sat_2 = vel_sat.X * vel_sat.X + vel_sat.Y * vel_sat.Y + vel_sat.Z * vel_sat.Z;
   const double vel_mag = sqrt(vel_sat_2);
 
-  // calculate angular velocity in rad/ms
-  const double omega = vel_mag / (radius * 1000);
+  double omega; // angular velocity in rad/ms
+  position_t pos_sat_90; // sat position vector in 90° orbit
+  position_t vel_sat_90; // sat velocity vector in 90° orbit
 
-  // calculate sat position in 90° orbit
-  position_t pos_sat_90 = pos_sat;
-  if (vel_mag) {
-    const double scaling = radius / vel_mag;
+  // assuming circular orbit when satellite moves faster than 1000 m/s
+  // 1000 m/s are chosen because according to Wikipedia, this seems to be a reasonable minimal
+  // orbital velocity: https://en.wikipedia.org/wiki/Orbital_speed#Tangential_velocities_at_altitude
+  if (vel_mag > 1000) {
+    omega = vel_mag / (radius * 1000);
+    double scaling = radius / vel_mag;
     pos_sat_90 = (position_t){vel_sat.X * scaling, vel_sat.Y * scaling, vel_sat.Z * scaling};
+    scaling = -vel_mag / radius;
+    vel_sat_90 = (position_t){pos_sat.X * scaling, pos_sat.Y * scaling, pos_sat.Z * scaling};
+  } else {
+    omega = 0;
+    pos_sat_90 = pos_sat;
+    vel_sat_90 = vel_sat;
   }
 
   LOG_I(NR_MAC,
-        "Satellite angular velocity = %e rad/ms, sat_pos = {%f, %f, %f}, sat_pos_90 = {%f, %f, %f}\n",
-        omega,
+        "Satellite orbital radius %f m, pos_sat_0 = {%f, %f, %f}, pos_sat_90 = {%f, %f, %f}\n"
+        "Satellite velocity %f m/s, angular velocity = %e rad/ms, vel_sat_0 = {%f, %f, %f}, vel_sat_90 = {%f, %f, %f}\n",
+        radius,
         pos_sat.X,
         pos_sat.Y,
         pos_sat.Z,
         pos_sat_90.X,
         pos_sat_90.Y,
-        pos_sat_90.Z);
+        pos_sat_90.Z,
+        vel_mag,
+        omega,
+        vel_sat.X,
+        vel_sat.Y,
+        vel_sat.Z,
+        vel_sat_90.X,
+        vel_sat_90.Y,
+        vel_sat_90.Z);
 
   ntn_ta->omega = omega;
   ntn_ta->pos_sat_0 = pos_sat;
   ntn_ta->pos_sat_90 = pos_sat_90;
+  ntn_ta->vel_sat_0 = vel_sat;
+  ntn_ta->vel_sat_90 = vel_sat_90;
 }
 
 // populate ntn_ta structure from mac
@@ -332,11 +352,15 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
       ntn_ta->omega = 0;
       ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
       ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
+      ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
+      ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
     }
   } else { // Need R - Release if not present
     ntn_ta->omega = 0;
     ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
     ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
+    ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
+    ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
   }
 
   // handle cellSpecificKoffset_r17
