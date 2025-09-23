@@ -3922,7 +3922,7 @@ bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *
   return false;
 }
 
-void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_t *UE, int new_bwp_id)
+void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int new_bwp_id)
 {
   DevAssert(UE->CellGroup != NULL);
   NR_CellGroupConfig_t *cellGroup_for_UE = NULL;
@@ -3930,7 +3930,8 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_
     AssertFatal(UE->current_DL_BWP.bwp_id == UE->current_UL_BWP.bwp_id, "We only support same BWP for UL and DL\n");
     if (new_bwp_id == UE->current_DL_BWP.bwp_id)
       LOG_E(NR_MAC, "Source BWP ID and target BWP ID are the same, can't perform switch\n");
-    else
+    else {
+      UE->sc_info.csi_MeasConfig = NULL;  // to avoid segfault when freeing csi_MeasConfig in configDedicated
       cellGroup_for_UE = update_cellGroupConfig_for_BWP_switch(UE->CellGroup,
                                                                &nrmac->radio_config,
                                                                UE->capability,
@@ -3938,6 +3939,7 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_
                                                                UE->uid,
                                                                UE->current_DL_BWP.bwp_id,
                                                                new_bwp_id);
+    }
   }
   uint8_t buf[2048];
   asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,

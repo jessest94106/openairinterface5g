@@ -3367,10 +3367,14 @@ static NR_CSI_MeasConfig_t *get_csiMeasConfig(const NR_ServingCellConfig_t *conf
     pdsch_Config = configDedicated->initialDownlinkBWP->pdsch_Config;
     curr_bwp = NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   } else {
-    NR_BWP_Downlink_t *bwp = configDedicated->downlinkBWP_ToAddModList->list.array[0];
+    NR_BWP_Downlink_t *bwp = NULL;
+    for (int i = 0; i < configDedicated->downlinkBWP_ToAddModList->list.count; i++) {
+      if (bwp_id == configDedicated->downlinkBWP_ToAddModList->list.array[i]->bwp_Id)
+        bwp = configDedicated->downlinkBWP_ToAddModList->list.array[i];
+    }
+    AssertFatal(bwp, "BWP ID doesn't match\n");
     pdsch_Config = bwp->bwp_Dedicated->pdsch_Config;
     curr_bwp = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
-    AssertFatal(bwp_id == bwp->bwp_Id, "BWP ID doesn't match\n");
   }
 
   const int pdsch_AntennaPorts =
