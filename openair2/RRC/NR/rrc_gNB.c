@@ -836,11 +836,14 @@ void rrc_gNB_generate_dedicatedRRCReconfiguration_release(gNB_RRC_INST *rrc,
   nr_rrc_reconfig_param_t params = {.transaction_id = xid};
 
   NR_DRB_ToReleaseList_t *to_release = CALLOC(sizeof(*to_release), 1);
-  int i = 0;
   FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, item, &ue_p->pduSessions) {
-    if ((item->status == PDU_SESSION_STATUS_TORELEASE) && item->xid == xid) {
-      asn1cSequenceAdd(to_release->list, NR_DRB_Identity_t, DRB_release);
-      *DRB_release = ++i; // DRB ID
+    if ((item->status != PDU_SESSION_STATUS_TORELEASE) && item->xid != xid)
+      continue;
+    FOR_EACH_SEQ_ARR(drb_t *, drb, &ue_p->drbs) {
+      if (drb->pdusession_id == item->param.pdusession_id) {
+        asn1cSequenceAdd(to_release->list, NR_DRB_Identity_t, DRB_release);
+        *DRB_release = drb->drb_id; // DRB ID
+      }
     }
   }
   params.drb_release_list = to_release;
