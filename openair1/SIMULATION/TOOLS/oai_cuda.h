@@ -24,47 +24,92 @@
 
 #include <stdint.h>
 
-
 #ifdef __NVCC__
+typedef struct complex16 {
+  int16_t r;
+  int16_t i;
+} c16_t;
 #else
-    #include "PHY/TOOLS/tools_defs.h"
+#include "PHY/TOOLS/tools_defs.h"
 #endif
 
 #ifdef __NVCC__
-    #include <curand_kernel.h>
-    __device__ float2 complex_mul(float2 a, float2 b);
+#include <curand_kernel.h>
+__device__ float2 complex_mul(float2 a, float2 b);
 
-    __global__ void multipath_channel_kernel(
-        const float2* __restrict__ d_channel_coeffs,
-        const float* __restrict__ tx_sig,
-        float2* __restrict__ rx_sig,
-        int num_samples,
-        int channel_length,
-        int nb_tx,
-        int nb_rx);
+__global__ void multipath_channel_kernel(const float2 *__restrict__ d_channel_coeffs,
+                                         const float *__restrict__ tx_sig,
+                                         float2 *__restrict__ rx_sig,
+                                         int num_samples,
+                                         int channel_length,
+                                         int nb_tx,
+                                         int nb_rx);
+
+__global__ void add_noise_and_phase_noise_kernel(const float2 *__restrict__ r_sig,
+                                                 short2 *__restrict__ output_sig,
+                                                 curandState_t *states,
+                                                 int num_samples,
+                                                 float sigma,
+                                                 float pn_std_dev,
+                                                 bool apply_phase_noise);
 
 #endif // __NVCC__
-
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    void multipath_channel_cuda(
-        float **rx_sig_re, float **rx_sig_im,
-        int nb_tx, int nb_rx, int channel_length,
-        uint32_t length, uint64_t channel_offset,
-        float *h_channel_coeffs,
-        void *d_tx_sig, void *d_rx_sig,
-        void *d_channel_coeffs,
-        void *h_tx_sig_pinned
-    );
+void multipath_channel_cuda(float **rx_sig_re,
+                            float **rx_sig_im,
+                            int nb_tx,
+                            int nb_rx,
+                            int channel_length,
+                            uint32_t length,
+                            uint64_t channel_offset,
+                            float *h_channel_coeffs,
+                            void *d_tx_sig,
+                            void *d_rx_sig,
+                            void *d_channel_coeffs,
+                            void *h_tx_sig_pinned);
 
-    void interleave_channel_output_cuda(float **rx_sig_re,
-                                        float **rx_sig_im,
-                                        void **output_interleaved,
-                                        int nb_rx,
-                                        int num_samples);
+void add_noise_cuda(const float **r_re,
+                    const float **r_im,
+                    c16_t **output_signal,
+                    int num_samples,
+                    int nb_rx,
+                    float sigma2,
+                    double ts,
+                    int slot_offset,
+                    int delay,
+                    uint16_t pdu_bit_map,
+                    uint16_t ptrs_bit_map,
+                    void *d_r_sig,
+                    void *d_output_sig,
+                    void *d_curand_states,
+                    void *h_r_sig_pinned,
+                    void *h_output_sig_pinned);
+
+/**
+ * \brief Interleaves separate real and imaginary signal buffers into a complex format.
+ *
+ * This utility function takes separate planar buffers for the real (I) and imaginary (Q)
+ * components of a signal and combines them into a single interleaved buffer of float2
+ * structs, which is a common format for CUDA processing.
+ *
+ * \param[in]  rx_sig_re          Array of pointers to the real parts of the input signals.
+ * \param[in]  rx_sig_im          Array of pointers to the imaginary parts of the input signals.
+ * \param[out] output_interleaved Pointer to an array of pointers where the interleaved output will be stored.
+ * \param[in]  nb_rx              The number of receive antennas (i.e., the number of signals).
+ * \param[in]  num_samples        The number of samples per signal.
+ *
+ * \note The caller is responsible for allocating memory for the `output_interleaved` buffer. It should
+ * point to an array of `nb_rx` pointers, where each of those pointers is allocated with a size of
+ * `num_samples * sizeof(float2)`.
+ */
+void interleave_channel_output_cuda(float **rx_sig_re, float **rx_sig_im, void **output_interleaved, int nb_rx, int num_samples);
+
+void *create_and_init_curand_states_cuda(int num_elements, unsigned long long seed);
+void destroy_curand_states_cuda(void *d_curand_states);
 
 #ifdef __cplusplus
 }
