@@ -141,8 +141,6 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
                                               long *fullConfig,
                                               int gNB_index);
 
-static void nr_rrc_ue_process_measConfig(rrcPerNB_t *rrc, NR_MeasConfig_t *const measConfig, NR_UE_Timers_Constants_t *timers);
-
 /**
  * @brief Sends an RRC message to the connected UE MAC instance.
  *
@@ -804,6 +802,274 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
         SEQUENCE_free(&asn_DEF_NR_RadioBearerConfig, RadioBearerConfig, 1);
       } else
         nr_rrc_ue_process_RadioBearerConfig(rrc, RadioBearerConfig);
+    }
+  }
+}
+
+static void handle_meas_reporting_remove(rrcPerNB_t *rrc, int id, NR_UE_Timers_Constants_t *timers)
+{
+  // remove the measurement reporting entry for this measId if included
+  asn1cFreeStruc(asn_DEF_NR_VarMeasReport, rrc->MeasReport[id]);
+  // TODO stop the periodical reporting timer or timer T321, whichever is running,
+  // and reset the associated information (e.g. timeToTrigger) for this measId
+  nr_timer_stop(&timers->T321);
+
+  l3_measurements_t *l3_measurements = &rrc->l3_measurements;
+  nr_timer_stop(&l3_measurements->TA2);
+  nr_timer_stop(&l3_measurements->periodic_report_timer);
+
+  l3_measurements->reports_sent = 0;
+  l3_measurements->max_reports = 0;
+  l3_measurements->report_interval_ms = 0;
+}
+
+static void handle_measobj_remove(rrcPerNB_t *rrc, struct NR_MeasObjectToRemoveList *remove_list, NR_UE_Timers_Constants_t *timers)
+{
+  // section 5.5.2.4 in 38.331
+  for (int i = 0; i < remove_list->list.count; i++) {
+    // for each measObjectId included in the received measObjectToRemoveList
+    // that is part of measObjectList in the configuration
+    NR_MeasObjectId_t id = *remove_list->list.array[i];
+    if (rrc->MeasObj[id - 1]) {
+      // remove the entry with the matching measObjectId from the measObjectList
+      asn1cFreeStruc(asn_DEF_NR_MeasObjectToAddMod, rrc->MeasObj[id - 1]);
+      // remove all measId associated with this measObjectId from the measIdList
+      for (int j = 0; j < MAX_MEAS_ID; j++) {
+        if (rrc->MeasId[j] && rrc->MeasId[j]->measObjectId == id) {
+          asn1cFreeStruc(asn_DEF_NR_MeasIdToAddMod, rrc->MeasId[j]);
+          handle_meas_reporting_remove(rrc, j, timers);
+        }
+      }
+    }
+  }
+}
+
+static void update_ssb_configmob(NR_SSB_ConfigMobility_t *source, NR_SSB_ConfigMobility_t *target)
+{
+  if (source->ssb_ToMeasure)
+    HANDLE_SETUPRELEASE_IE(target->ssb_ToMeasure, source->ssb_ToMeasure, NR_SSB_ToMeasure_t, asn_DEF_NR_SSB_ToMeasure);
+  target->deriveSSB_IndexFromCell = source->deriveSSB_IndexFromCell;
+  if (source->ss_RSSI_Measurement)
+    UPDATE_IE(target->ss_RSSI_Measurement, source->ss_RSSI_Measurement, NR_SS_RSSI_Measurement_t);
+}
+
+static void update_nr_measobj(NR_MeasObjectNR_t *source, NR_MeasObjectNR_t *target)
+{
+  UPDATE_IE(target->ssbFrequency, source->ssbFrequency, NR_ARFCN_ValueNR_t);
+  UPDATE_IE(target->ssbSubcarrierSpacing, source->ssbSubcarrierSpacing, NR_SubcarrierSpacing_t);
+  UPDATE_IE(target->smtc1, source->smtc1, NR_SSB_MTC_t);
+  if (source->smtc2) {
+    target->smtc2->periodicity = source->smtc2->periodicity;
+    if (source->smtc2->pci_List)
+      UPDATE_IE(target->smtc2->pci_List, source->smtc2->pci_List, struct NR_SSB_MTC2__pci_List);
+  }
+  else
+    asn1cFreeStruc(asn_DEF_NR_SSB_MTC2, target->smtc2);
+  UPDATE_IE(target->refFreqCSI_RS, source->refFreqCSI_RS, NR_ARFCN_ValueNR_t);
+  if (source->referenceSignalConfig.ssb_ConfigMobility)
+    update_ssb_configmob(source->referenceSignalConfig.ssb_ConfigMobility, target->referenceSignalConfig.ssb_ConfigMobility);
+  UPDATE_IE(target->absThreshSS_BlocksConsolidation, source->absThreshSS_BlocksConsolidation, NR_ThresholdNR_t);
+  UPDATE_IE(target->absThreshCSI_RS_Consolidation, source->absThreshCSI_RS_Consolidation, NR_ThresholdNR_t);
+  UPDATE_IE(target->nrofSS_BlocksToAverage, source->nrofSS_BlocksToAverage, long);
+  UPDATE_IE(target->nrofCSI_RS_ResourcesToAverage, source->nrofCSI_RS_ResourcesToAverage, long);
+  target->quantityConfigIndex = source->quantityConfigIndex;
+  target->offsetMO = source->offsetMO;
+  if (source->cellsToRemoveList) {
+    RELEASE_IE_FROMLIST(source->cellsToRemoveList, target->cellsToAddModList, physCellId);
+  }
+  if (source->cellsToAddModList) {
+    if (!target->cellsToAddModList)
+      target->cellsToAddModList = calloc(1, sizeof(*target->cellsToAddModList));
+    ADDMOD_IE_FROMLIST(source->cellsToAddModList, target->cellsToAddModList, physCellId, NR_CellsToAddMod_t);
+  }
+  if (source->excludedCellsToRemoveList) {
+    RELEASE_IE_FROMLIST(source->excludedCellsToRemoveList, target->excludedCellsToAddModList, pci_RangeIndex);
+  }
+  if (source->excludedCellsToAddModList) {
+    if (!target->excludedCellsToAddModList)
+      target->excludedCellsToAddModList = calloc(1, sizeof(*target->excludedCellsToAddModList));
+    ADDMOD_IE_FROMLIST(source->excludedCellsToAddModList, target->excludedCellsToAddModList, pci_RangeIndex, NR_PCI_RangeElement_t);
+  }
+  if (source->allowedCellsToRemoveList) {
+    RELEASE_IE_FROMLIST(source->allowedCellsToRemoveList, target->allowedCellsToAddModList, pci_RangeIndex);
+  }
+  if (source->allowedCellsToAddModList) {
+    if (!target->allowedCellsToAddModList)
+      target->allowedCellsToAddModList = calloc(1, sizeof(*target->allowedCellsToAddModList));
+    ADDMOD_IE_FROMLIST(source->allowedCellsToAddModList, target->allowedCellsToAddModList, pci_RangeIndex, NR_PCI_RangeElement_t);
+  }
+  if (source->ext1) {
+    UPDATE_IE(target->ext1->freqBandIndicatorNR, source->ext1->freqBandIndicatorNR, NR_FreqBandIndicatorNR_t);
+    UPDATE_IE(target->ext1->measCycleSCell, source->ext1->measCycleSCell, long);
+  }
+}
+
+static void handle_measobj_addmod(rrcPerNB_t *rrc, struct NR_MeasObjectToAddModList *addmod_list)
+{
+  // section 5.5.2.5 in 38.331
+  for (int i = 0; i < addmod_list->list.count; i++) {
+    NR_MeasObjectToAddMod_t *measObj = addmod_list->list.array[i];
+    if (measObj->measObject.present != NR_MeasObjectToAddMod__measObject_PR_measObjectNR) {
+      LOG_E(NR_RRC, "Cannot handle MeasObjt other than NR\n");
+      continue;
+    }
+    NR_MeasObjectId_t id = measObj->measObjectId;
+    if (rrc->MeasObj[id]) {
+      update_nr_measobj(measObj->measObject.choice.measObjectNR, rrc->MeasObj[id]->measObject.choice.measObjectNR);
+    }
+    else {
+      // add a new entry for the received measObject to the measObjectList
+      UPDATE_IE(rrc->MeasObj[id], addmod_list->list.array[i], NR_MeasObjectToAddMod_t);
+    }
+  }
+}
+
+static void handle_reportconfig_remove(rrcPerNB_t *rrc,
+                                       struct NR_ReportConfigToRemoveList *remove_list,
+                                       NR_UE_Timers_Constants_t *timers)
+{
+  for (int i = 0; i < remove_list->list.count; i++) {
+    NR_ReportConfigId_t id = *remove_list->list.array[i];
+    // remove the entry with the matching reportConfigId from the reportConfigList
+    asn1cFreeStruc(asn_DEF_NR_ReportConfigToAddMod, rrc->ReportConfig[id]);
+    for (int j = 0; j < MAX_MEAS_ID; j++) {
+      if (rrc->MeasId[j] && rrc->MeasId[j]->reportConfigId == id) {
+        // remove all measId associated with the reportConfigId from the measIdList
+        asn1cFreeStruc(asn_DEF_NR_MeasIdToAddMod, rrc->MeasId[j]);
+        handle_meas_reporting_remove(rrc, j, timers);
+      }
+    }
+  }
+}
+
+static void handle_reportconfig_addmod(rrcPerNB_t *rrc,
+                                       struct NR_ReportConfigToAddModList *addmod_list,
+                                       NR_UE_Timers_Constants_t *timers)
+{
+  for (int i = 0; i < addmod_list->list.count; i++) {
+    NR_ReportConfigToAddMod_t *rep = addmod_list->list.array[i];
+    if (rep->reportConfig.present != NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR) {
+      LOG_E(NR_RRC, "Cannot handle reportConfig type other than NR\n");
+      continue;
+    }
+    NR_ReportConfigId_t id = rep->reportConfigId;
+    if (rrc->ReportConfig[id]) {
+      for (int j = 0; j < MAX_MEAS_ID; j++) {
+        // for each measId associated with this reportConfigId included in the measIdList
+        if (rrc->MeasId[j] && rrc->MeasId[j]->reportConfigId == id)
+          handle_meas_reporting_remove(rrc, j, timers);
+      }
+    }
+    UPDATE_IE(rrc->ReportConfig[id], addmod_list->list.array[i], NR_ReportConfigToAddMod_t);
+  }
+}
+
+static void handle_quantityconfig(rrcPerNB_t *rrc, NR_QuantityConfig_t *quantityConfig, NR_UE_Timers_Constants_t *timers)
+{
+  if (quantityConfig->quantityConfigNR_List) {
+    for (int i = 0; i < quantityConfig->quantityConfigNR_List->list.count; i++) {
+      NR_QuantityConfigNR_t *quantityNR = quantityConfig->quantityConfigNR_List->list.array[i];
+      if (!rrc->QuantityConfig[i])
+        rrc->QuantityConfig[i] = calloc(1, sizeof(*rrc->QuantityConfig[i]));
+      rrc->QuantityConfig[i]->quantityConfigCell = quantityNR->quantityConfigCell;
+      // TODO: It remains to compute ssb_filter_coeff_rsrp and csi_RS_filter_coeff_rsrp for multiple quantityConfig
+      // TS 38.331 - 5.5.3.2 Layer 3 filtering
+      NR_QuantityConfigRS_t *qcc = &quantityNR->quantityConfigCell;
+      l3_measurements_t *l3_measurements = &rrc->l3_measurements;
+      if (qcc->ssb_FilterConfig.filterCoefficientRSRP)
+        l3_measurements->ssb_filter_coeff_rsrp = 1. / pow(2, (*qcc->ssb_FilterConfig.filterCoefficientRSRP) / 4);
+      if (qcc->csi_RS_FilterConfig.filterCoefficientRSRP)
+        l3_measurements->csi_RS_filter_coeff_rsrp = 1. / pow(2, (*qcc->csi_RS_FilterConfig.filterCoefficientRSRP) / 4);
+      if (quantityNR->quantityConfigRS_Index)
+        UPDATE_IE(rrc->QuantityConfig[i]->quantityConfigRS_Index, quantityNR->quantityConfigRS_Index, struct NR_QuantityConfigRS);
+    }
+  }
+  for (int j = 0; j < MAX_MEAS_ID; j++) {
+    // for each measId included in the measIdList
+    if (rrc->MeasId[j])
+      handle_meas_reporting_remove(rrc, j, timers);
+  }
+}
+
+static void handle_measid_remove(rrcPerNB_t *rrc, struct NR_MeasIdToRemoveList *remove_list, NR_UE_Timers_Constants_t *timers)
+{
+  for (int i = 0; i < remove_list->list.count; i++) {
+    NR_MeasId_t id = *remove_list->list.array[i];
+    if (rrc->MeasId[id]) {
+      asn1cFreeStruc(asn_DEF_NR_MeasIdToAddMod, rrc->MeasId[id]);
+      handle_meas_reporting_remove(rrc, id, timers);
+    }
+  }
+}
+
+static void handle_measid_addmod(rrcPerNB_t *rrc, struct NR_MeasIdToAddModList *addmod_list, NR_UE_Timers_Constants_t *timers)
+{
+  for (int i = 0; i < addmod_list->list.count; i++) {
+    NR_MeasId_t id = addmod_list->list.array[i]->measId;
+    NR_ReportConfigId_t reportId = addmod_list->list.array[i]->reportConfigId;
+    NR_MeasObjectId_t measObjectId = addmod_list->list.array[i]->measObjectId;
+    UPDATE_IE(rrc->MeasId[id], addmod_list->list.array[i], NR_MeasIdToAddMod_t);
+    handle_meas_reporting_remove(rrc, id, timers);
+    if (rrc->ReportConfig[reportId]) {
+      NR_ReportConfigToAddMod_t *report = rrc->ReportConfig[reportId];
+      AssertFatal(report->reportConfig.present == NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR,
+                  "Only NR config report is supported\n");
+      NR_ReportConfigNR_t *reportNR = report->reportConfig.choice.reportConfigNR;
+      // if the reportType is set to reportCGI in the reportConfig associated with this measId
+      if (reportNR->reportType.present == NR_ReportConfigNR__reportType_PR_reportCGI) {
+        if (rrc->MeasObj[measObjectId]) {
+          if (rrc->MeasObj[measObjectId]->measObject.present == NR_MeasObjectToAddMod__measObject_PR_measObjectNR) {
+            NR_MeasObjectNR_t *obj_nr = rrc->MeasObj[measObjectId]->measObject.choice.measObjectNR;
+            NR_ARFCN_ValueNR_t freq = 0;
+            if (obj_nr->ssbFrequency)
+              freq = *obj_nr->ssbFrequency;
+            else if (obj_nr->refFreqCSI_RS)
+              freq = *obj_nr->refFreqCSI_RS;
+            AssertFatal(freq > 0, "Invalid ARFCN frequency for this measurement object\n");
+            if (get_freq_range_from_arfcn(freq) == FR2)
+              nr_timer_setup(&timers->T321, 16000, 10); // 16 seconds for FR2
+            else
+              nr_timer_setup(&timers->T321, 2000, 10); // 2 seconds for FR1
+          }
+          else // EUTRA
+            nr_timer_setup(&timers->T321, 1000, 10); // 1 second for EUTRA
+          nr_timer_start(&timers->T321);
+        }
+      }
+    }
+  }
+}
+
+static void nr_rrc_ue_process_measConfig(rrcPerNB_t *rrc, NR_MeasConfig_t *const measConfig, NR_UE_Timers_Constants_t *timers)
+{
+  if (measConfig->measObjectToRemoveList)
+    handle_measobj_remove(rrc, measConfig->measObjectToRemoveList, timers);
+
+  if (measConfig->measObjectToAddModList)
+    handle_measobj_addmod(rrc, measConfig->measObjectToAddModList);
+
+  if (measConfig->reportConfigToRemoveList)
+    handle_reportconfig_remove(rrc, measConfig->reportConfigToRemoveList, timers);
+
+  if (measConfig->reportConfigToAddModList)
+    handle_reportconfig_addmod(rrc, measConfig->reportConfigToAddModList, timers);
+
+  if (measConfig->quantityConfig)
+    handle_quantityconfig(rrc, measConfig->quantityConfig, timers);
+
+  if (measConfig->measIdToRemoveList)
+    handle_measid_remove(rrc, measConfig->measIdToRemoveList, timers);
+
+  if (measConfig->measIdToAddModList)
+    handle_measid_addmod(rrc, measConfig->measIdToAddModList, timers);
+
+  LOG_W(NR_RRC, "Measurement gaps not yet supported!\n");
+
+  if (measConfig->s_MeasureConfig) {
+    if (measConfig->s_MeasureConfig->present == NR_MeasConfig__s_MeasureConfig_PR_ssb_RSRP) {
+      rrc->s_measure = measConfig->s_MeasureConfig->choice.ssb_RSRP;
+    } else if (measConfig->s_MeasureConfig->present == NR_MeasConfig__s_MeasureConfig_PR_csi_RSRP) {
+      rrc->s_measure = measConfig->s_MeasureConfig->choice.csi_RSRP;
     }
   }
 }
@@ -1843,274 +2109,6 @@ static void nr_rrc_ue_process_securityModeCommand(NR_UE_RRC_INST_t *ue_rrc,
   for (int i = 1; i < NR_NUM_SRB; i++) {
     if (ue_rrc->Srb[i] == RB_ESTABLISHED)
       nr_pdcp_config_set_security(ue_rrc->ue_id, i, true, &security_parameters);
-  }
-}
-
-static void handle_meas_reporting_remove(rrcPerNB_t *rrc, int id, NR_UE_Timers_Constants_t *timers)
-{
-  // remove the measurement reporting entry for this measId if included
-  asn1cFreeStruc(asn_DEF_NR_VarMeasReport, rrc->MeasReport[id]);
-  // TODO stop the periodical reporting timer or timer T321, whichever is running,
-  // and reset the associated information (e.g. timeToTrigger) for this measId
-  nr_timer_stop(&timers->T321);
-
-  l3_measurements_t *l3_measurements = &rrc->l3_measurements;
-  nr_timer_stop(&l3_measurements->TA2);
-  nr_timer_stop(&l3_measurements->periodic_report_timer);
-
-  l3_measurements->reports_sent = 0;
-  l3_measurements->max_reports = 0;
-  l3_measurements->report_interval_ms = 0;
-}
-
-static void handle_measobj_remove(rrcPerNB_t *rrc, struct NR_MeasObjectToRemoveList *remove_list, NR_UE_Timers_Constants_t *timers)
-{
-  // section 5.5.2.4 in 38.331
-  for (int i = 0; i < remove_list->list.count; i++) {
-    // for each measObjectId included in the received measObjectToRemoveList
-    // that is part of measObjectList in the configuration
-    NR_MeasObjectId_t id = *remove_list->list.array[i];
-    if (rrc->MeasObj[id - 1]) {
-      // remove the entry with the matching measObjectId from the measObjectList
-      asn1cFreeStruc(asn_DEF_NR_MeasObjectToAddMod, rrc->MeasObj[id - 1]);
-      // remove all measId associated with this measObjectId from the measIdList
-      for (int j = 0; j < MAX_MEAS_ID; j++) {
-        if (rrc->MeasId[j] && rrc->MeasId[j]->measObjectId == id) {
-          asn1cFreeStruc(asn_DEF_NR_MeasIdToAddMod, rrc->MeasId[j]);
-          handle_meas_reporting_remove(rrc, j, timers);
-        }
-      }
-    }
-  }
-}
-
-static void update_ssb_configmob(NR_SSB_ConfigMobility_t *source, NR_SSB_ConfigMobility_t *target)
-{
-  if (source->ssb_ToMeasure)
-    HANDLE_SETUPRELEASE_IE(target->ssb_ToMeasure, source->ssb_ToMeasure, NR_SSB_ToMeasure_t, asn_DEF_NR_SSB_ToMeasure);
-  target->deriveSSB_IndexFromCell = source->deriveSSB_IndexFromCell;
-  if (source->ss_RSSI_Measurement)
-    UPDATE_IE(target->ss_RSSI_Measurement, source->ss_RSSI_Measurement, NR_SS_RSSI_Measurement_t);
-}
-
-static void update_nr_measobj(NR_MeasObjectNR_t *source, NR_MeasObjectNR_t *target)
-{
-  UPDATE_IE(target->ssbFrequency, source->ssbFrequency, NR_ARFCN_ValueNR_t);
-  UPDATE_IE(target->ssbSubcarrierSpacing, source->ssbSubcarrierSpacing, NR_SubcarrierSpacing_t);
-  UPDATE_IE(target->smtc1, source->smtc1, NR_SSB_MTC_t);
-  if (source->smtc2) {
-    target->smtc2->periodicity = source->smtc2->periodicity;
-    if (source->smtc2->pci_List)
-      UPDATE_IE(target->smtc2->pci_List, source->smtc2->pci_List, struct NR_SSB_MTC2__pci_List);
-  }
-  else
-    asn1cFreeStruc(asn_DEF_NR_SSB_MTC2, target->smtc2);
-  UPDATE_IE(target->refFreqCSI_RS, source->refFreqCSI_RS, NR_ARFCN_ValueNR_t);
-  if (source->referenceSignalConfig.ssb_ConfigMobility)
-    update_ssb_configmob(source->referenceSignalConfig.ssb_ConfigMobility, target->referenceSignalConfig.ssb_ConfigMobility);
-  UPDATE_IE(target->absThreshSS_BlocksConsolidation, source->absThreshSS_BlocksConsolidation, NR_ThresholdNR_t);
-  UPDATE_IE(target->absThreshCSI_RS_Consolidation, source->absThreshCSI_RS_Consolidation, NR_ThresholdNR_t);
-  UPDATE_IE(target->nrofSS_BlocksToAverage, source->nrofSS_BlocksToAverage, long);
-  UPDATE_IE(target->nrofCSI_RS_ResourcesToAverage, source->nrofCSI_RS_ResourcesToAverage, long);
-  target->quantityConfigIndex = source->quantityConfigIndex;
-  target->offsetMO = source->offsetMO;
-  if (source->cellsToRemoveList) {
-    RELEASE_IE_FROMLIST(source->cellsToRemoveList, target->cellsToAddModList, physCellId);
-  }
-  if (source->cellsToAddModList) {
-    if (!target->cellsToAddModList)
-      target->cellsToAddModList = calloc(1, sizeof(*target->cellsToAddModList));
-    ADDMOD_IE_FROMLIST(source->cellsToAddModList, target->cellsToAddModList, physCellId, NR_CellsToAddMod_t);
-  }
-  if (source->excludedCellsToRemoveList) {
-    RELEASE_IE_FROMLIST(source->excludedCellsToRemoveList, target->excludedCellsToAddModList, pci_RangeIndex);
-  }
-  if (source->excludedCellsToAddModList) {
-    if (!target->excludedCellsToAddModList)
-      target->excludedCellsToAddModList = calloc(1, sizeof(*target->excludedCellsToAddModList));
-    ADDMOD_IE_FROMLIST(source->excludedCellsToAddModList, target->excludedCellsToAddModList, pci_RangeIndex, NR_PCI_RangeElement_t);
-  }
-  if (source->allowedCellsToRemoveList) {
-    RELEASE_IE_FROMLIST(source->allowedCellsToRemoveList, target->allowedCellsToAddModList, pci_RangeIndex);
-  }
-  if (source->allowedCellsToAddModList) {
-    if (!target->allowedCellsToAddModList)
-      target->allowedCellsToAddModList = calloc(1, sizeof(*target->allowedCellsToAddModList));
-    ADDMOD_IE_FROMLIST(source->allowedCellsToAddModList, target->allowedCellsToAddModList, pci_RangeIndex, NR_PCI_RangeElement_t);
-  }
-  if (source->ext1) {
-    UPDATE_IE(target->ext1->freqBandIndicatorNR, source->ext1->freqBandIndicatorNR, NR_FreqBandIndicatorNR_t);
-    UPDATE_IE(target->ext1->measCycleSCell, source->ext1->measCycleSCell, long);
-  }
-}
-
-static void handle_measobj_addmod(rrcPerNB_t *rrc, struct NR_MeasObjectToAddModList *addmod_list)
-{
-  // section 5.5.2.5 in 38.331
-  for (int i = 0; i < addmod_list->list.count; i++) {
-    NR_MeasObjectToAddMod_t *measObj = addmod_list->list.array[i];
-    if (measObj->measObject.present != NR_MeasObjectToAddMod__measObject_PR_measObjectNR) {
-      LOG_E(NR_RRC, "Cannot handle MeasObjt other than NR\n");
-      continue;
-    }
-    NR_MeasObjectId_t id = measObj->measObjectId;
-    if (rrc->MeasObj[id]) {
-      update_nr_measobj(measObj->measObject.choice.measObjectNR, rrc->MeasObj[id]->measObject.choice.measObjectNR);
-    }
-    else {
-      // add a new entry for the received measObject to the measObjectList
-      UPDATE_IE(rrc->MeasObj[id], addmod_list->list.array[i], NR_MeasObjectToAddMod_t);
-    }
-  }
-}
-
-static void handle_reportconfig_remove(rrcPerNB_t *rrc,
-                                       struct NR_ReportConfigToRemoveList *remove_list,
-                                       NR_UE_Timers_Constants_t *timers)
-{
-  for (int i = 0; i < remove_list->list.count; i++) {
-    NR_ReportConfigId_t id = *remove_list->list.array[i];
-    // remove the entry with the matching reportConfigId from the reportConfigList
-    asn1cFreeStruc(asn_DEF_NR_ReportConfigToAddMod, rrc->ReportConfig[id]);
-    for (int j = 0; j < MAX_MEAS_ID; j++) {
-      if (rrc->MeasId[j] && rrc->MeasId[j]->reportConfigId == id) {
-        // remove all measId associated with the reportConfigId from the measIdList
-        asn1cFreeStruc(asn_DEF_NR_MeasIdToAddMod, rrc->MeasId[j]);
-        handle_meas_reporting_remove(rrc, j, timers);
-      }
-    }
-  }
-}
-
-static void handle_reportconfig_addmod(rrcPerNB_t *rrc,
-                                       struct NR_ReportConfigToAddModList *addmod_list,
-                                       NR_UE_Timers_Constants_t *timers)
-{
-  for (int i = 0; i < addmod_list->list.count; i++) {
-    NR_ReportConfigToAddMod_t *rep = addmod_list->list.array[i];
-    if (rep->reportConfig.present != NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR) {
-      LOG_E(NR_RRC, "Cannot handle reportConfig type other than NR\n");
-      continue;
-    }
-    NR_ReportConfigId_t id = rep->reportConfigId;
-    if (rrc->ReportConfig[id]) {
-      for (int j = 0; j < MAX_MEAS_ID; j++) {
-        // for each measId associated with this reportConfigId included in the measIdList
-        if (rrc->MeasId[j] && rrc->MeasId[j]->reportConfigId == id)
-          handle_meas_reporting_remove(rrc, j, timers);
-      }
-    }
-    UPDATE_IE(rrc->ReportConfig[id], addmod_list->list.array[i], NR_ReportConfigToAddMod_t);
-  }
-}
-
-static void handle_quantityconfig(rrcPerNB_t *rrc, NR_QuantityConfig_t *quantityConfig, NR_UE_Timers_Constants_t *timers)
-{
-  if (quantityConfig->quantityConfigNR_List) {
-    for (int i = 0; i < quantityConfig->quantityConfigNR_List->list.count; i++) {
-      NR_QuantityConfigNR_t *quantityNR = quantityConfig->quantityConfigNR_List->list.array[i];
-      if (!rrc->QuantityConfig[i])
-        rrc->QuantityConfig[i] = calloc(1, sizeof(*rrc->QuantityConfig[i]));
-      rrc->QuantityConfig[i]->quantityConfigCell = quantityNR->quantityConfigCell;
-      // TODO: It remains to compute ssb_filter_coeff_rsrp and csi_RS_filter_coeff_rsrp for multiple quantityConfig
-      // TS 38.331 - 5.5.3.2 Layer 3 filtering
-      NR_QuantityConfigRS_t *qcc = &quantityNR->quantityConfigCell;
-      l3_measurements_t *l3_measurements = &rrc->l3_measurements;
-      if (qcc->ssb_FilterConfig.filterCoefficientRSRP)
-        l3_measurements->ssb_filter_coeff_rsrp = 1. / pow(2, (*qcc->ssb_FilterConfig.filterCoefficientRSRP) / 4);
-      if (qcc->csi_RS_FilterConfig.filterCoefficientRSRP)
-        l3_measurements->csi_RS_filter_coeff_rsrp = 1. / pow(2, (*qcc->csi_RS_FilterConfig.filterCoefficientRSRP) / 4);
-      if (quantityNR->quantityConfigRS_Index)
-        UPDATE_IE(rrc->QuantityConfig[i]->quantityConfigRS_Index, quantityNR->quantityConfigRS_Index, struct NR_QuantityConfigRS);
-    }
-  }
-  for (int j = 0; j < MAX_MEAS_ID; j++) {
-    // for each measId included in the measIdList
-    if (rrc->MeasId[j])
-      handle_meas_reporting_remove(rrc, j, timers);
-  }
-}
-
-static void handle_measid_remove(rrcPerNB_t *rrc, struct NR_MeasIdToRemoveList *remove_list, NR_UE_Timers_Constants_t *timers)
-{
-  for (int i = 0; i < remove_list->list.count; i++) {
-    NR_MeasId_t id = *remove_list->list.array[i];
-    if (rrc->MeasId[id]) {
-      asn1cFreeStruc(asn_DEF_NR_MeasIdToAddMod, rrc->MeasId[id]);
-      handle_meas_reporting_remove(rrc, id, timers);
-    }
-  }
-}
-
-static void handle_measid_addmod(rrcPerNB_t *rrc, struct NR_MeasIdToAddModList *addmod_list, NR_UE_Timers_Constants_t *timers)
-{
-  for (int i = 0; i < addmod_list->list.count; i++) {
-    NR_MeasId_t id = addmod_list->list.array[i]->measId;
-    NR_ReportConfigId_t reportId = addmod_list->list.array[i]->reportConfigId;
-    NR_MeasObjectId_t measObjectId = addmod_list->list.array[i]->measObjectId;
-    UPDATE_IE(rrc->MeasId[id], addmod_list->list.array[i], NR_MeasIdToAddMod_t);
-    handle_meas_reporting_remove(rrc, id, timers);
-    if (rrc->ReportConfig[reportId]) {
-      NR_ReportConfigToAddMod_t *report = rrc->ReportConfig[reportId];
-      AssertFatal(report->reportConfig.present == NR_ReportConfigToAddMod__reportConfig_PR_reportConfigNR,
-                  "Only NR config report is supported\n");
-      NR_ReportConfigNR_t *reportNR = report->reportConfig.choice.reportConfigNR;
-      // if the reportType is set to reportCGI in the reportConfig associated with this measId
-      if (reportNR->reportType.present == NR_ReportConfigNR__reportType_PR_reportCGI) {
-        if (rrc->MeasObj[measObjectId]) {
-          if (rrc->MeasObj[measObjectId]->measObject.present == NR_MeasObjectToAddMod__measObject_PR_measObjectNR) {
-            NR_MeasObjectNR_t *obj_nr = rrc->MeasObj[measObjectId]->measObject.choice.measObjectNR;
-            NR_ARFCN_ValueNR_t freq = 0;
-            if (obj_nr->ssbFrequency)
-              freq = *obj_nr->ssbFrequency;
-            else if (obj_nr->refFreqCSI_RS)
-              freq = *obj_nr->refFreqCSI_RS;
-            AssertFatal(freq > 0, "Invalid ARFCN frequency for this measurement object\n");
-            if (get_freq_range_from_arfcn(freq) == FR2)
-              nr_timer_setup(&timers->T321, 16000, 10); // 16 seconds for FR2
-            else
-              nr_timer_setup(&timers->T321, 2000, 10); // 2 seconds for FR1
-          }
-          else // EUTRA
-            nr_timer_setup(&timers->T321, 1000, 10); // 1 second for EUTRA
-          nr_timer_start(&timers->T321);
-        }
-      }
-    }
-  }
-}
-
-static void nr_rrc_ue_process_measConfig(rrcPerNB_t *rrc, NR_MeasConfig_t *const measConfig, NR_UE_Timers_Constants_t *timers)
-{
-  if (measConfig->measObjectToRemoveList)
-    handle_measobj_remove(rrc, measConfig->measObjectToRemoveList, timers);
-
-  if (measConfig->measObjectToAddModList)
-    handle_measobj_addmod(rrc, measConfig->measObjectToAddModList);
-
-  if (measConfig->reportConfigToRemoveList)
-    handle_reportconfig_remove(rrc, measConfig->reportConfigToRemoveList, timers);
-
-  if (measConfig->reportConfigToAddModList)
-    handle_reportconfig_addmod(rrc, measConfig->reportConfigToAddModList, timers);
-
-  if (measConfig->quantityConfig)
-    handle_quantityconfig(rrc, measConfig->quantityConfig, timers);
-
-  if (measConfig->measIdToRemoveList)
-    handle_measid_remove(rrc, measConfig->measIdToRemoveList, timers);
-
-  if (measConfig->measIdToAddModList)
-    handle_measid_addmod(rrc, measConfig->measIdToAddModList, timers);
-
-  LOG_W(NR_RRC, "Measurement gaps not yet supported!\n");
-
-  if (measConfig->s_MeasureConfig) {
-    if (measConfig->s_MeasureConfig->present == NR_MeasConfig__s_MeasureConfig_PR_ssb_RSRP) {
-      rrc->s_measure = measConfig->s_MeasureConfig->choice.ssb_RSRP;
-    } else if (measConfig->s_MeasureConfig->present == NR_MeasConfig__s_MeasureConfig_PR_csi_RSRP) {
-      rrc->s_measure = measConfig->s_MeasureConfig->choice.csi_RSRP;
-    }
   }
 }
 
