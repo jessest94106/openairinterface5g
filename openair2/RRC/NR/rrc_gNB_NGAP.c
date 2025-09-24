@@ -176,7 +176,7 @@ static void cp_pdusession_transfer_to_pdusession(pdusession_t *dst, const pduses
   dst->n3_incoming = src->n3_incoming;
   /* QoS handling */
   DevAssert(!dst->qos.data);
-  DevAssert(src->nb_qos < QOSFLOW_MAX_VALUE);
+  DevAssert(src->nb_qos < MAX_QOS_FLOWS);
   // Initialise mapped QoS list per PDU Session
   seq_arr_init(&dst->qos, sizeof(nr_rrc_qos_t));
   // Add QoS flow to list
@@ -355,7 +355,7 @@ bool trigger_bearer_setup(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, pdusession
 
       FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos, &session->qos) {
         pdusession_level_qos_parameter_t *qos_session = &qos->qos;
-        DevAssert(drb->numQosFlow2Setup < QOSFLOW_MAX_VALUE);
+        DevAssert(drb->numQosFlow2Setup < MAX_QOS_FLOWS);
         qos_flow_to_setup_t *qos_flow = &drb->qosFlows[drb->numQosFlow2Setup++];
         qos_characteristics_t *qos_char = &qos_flow->qos_params.qos_characteristics;
         qos_flow->qfi = qos_session->qfi;
@@ -515,7 +515,7 @@ static pdusession_setup_t fill_ngap_pdusession_setup(pdusession_t *session)
   out.pdu_session_type = session->pdu_session_type;
   out.n3_outgoing = cp_gtp_tunnel(session->n3_outgoing);
   FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos_session, &session->qos) {
-    DevAssert(out.nb_of_qos_flow < QOSFLOW_MAX_VALUE);
+    DevAssert(out.nb_of_qos_flow < MAX_QOS_FLOWS);
     pdusession_associate_qosflow_t *q = &out.associated_qos_flows[out.nb_of_qos_flow++];
     q->qfi = qos_session->qos.qfi;
     q->qos_flow_mapping_ind = QOSFLOW_MAPPING_INDICATION_DL;
@@ -882,7 +882,7 @@ void rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(MessageDef *msg_p, instance_t ins
 static void nr_rrc_update_qos(seq_arr_t *list, const int nb_qos, const pdusession_level_qos_parameter_t *in_qos)
 {
   DevAssert(nb_qos == 1);
-  DevAssert(nb_qos < QOSFLOW_MAX_VALUE);
+  DevAssert(nb_qos < MAX_QOS_FLOWS);
   for (uint8_t i = 0; i < nb_qos; ++i) {
     nr_rrc_qos_t *qos = find_qos(list, in_qos[i].qfi);
     if (qos) {
@@ -1012,7 +1012,7 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
       pdusession_modify_t *p = &resp->pdusessions[pdu_sessions_done++];
       p->pdusession_id = session->param.pdusession_id;
       FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos_session, &session->param.qos) {
-        DevAssert(p->nb_of_qos_flow < QOSFLOW_MAX_VALUE);
+        DevAssert(p->nb_of_qos_flow < MAX_QOS_FLOWS);
         qos_flow_tobe_modified_t *q = &p->qos[p->nb_of_qos_flow++];
         q->qfi = qos_session->qos.qfi;
       }
@@ -1414,7 +1414,7 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(gNB_RRC_INST *rrc, gNB_RRC_U
     memcpy(transfer->gNB_addr.buffer, session->param.n3_outgoing.addr.buffer, session->param.n3_outgoing.addr.length);
     transfer->gNB_addr.length = session->param.n3_outgoing.addr.length;
     FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos, &session->param.qos) {
-      DevAssert(transfer->nb_of_qos_flow < QOSFLOW_MAX_VALUE);
+      DevAssert(transfer->nb_of_qos_flow < MAX_QOS_FLOWS);
       pdusession_associate_qosflow_t *qos_setup = &transfer->qos_setup_list[transfer->nb_of_qos_flow++];
       qos_setup->qfi = qos->qos.qfi;
       qos_setup->qos_flow_mapping_ind = QOSFLOW_MAPPING_INDICATION_DL;
@@ -1662,7 +1662,7 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
     pdusession_resource_info_t *pdu_info = &msg.source2target->pdu_session_resource[msg.source2target->nb_pdu_session_resource++];
     pdu_info->pdusession_id = session->pdusession_id;
     FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos, &session->qos) {
-      DevAssert(pdu_info->nb_of_qos_flow < QOSFLOW_MAX_VALUE);
+      DevAssert(pdu_info->nb_of_qos_flow < MAX_QOS_FLOWS);
       qosflow_info_t *qos_flow = &pdu_info->qos_flow_info[pdu_info->nb_of_qos_flow++];
       qos_flow->qfi = qos->qos.qfi;
     }

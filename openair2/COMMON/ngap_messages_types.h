@@ -91,8 +91,6 @@
 #define NGAP_MAX_NB_AMF_IP_ADDRESS 10
 #define NGAP_IMSI_LENGTH           16
 
-#define QOSFLOW_MAX_VALUE           64
-
 #define NGAP_MAX_NO_TAI_PAGING 16 // 9.2.4.1 3GPP TS 38.413
 
 /* Security key length used within gNB
@@ -241,7 +239,7 @@ typedef struct ngap_mobility_restriction_s{
 /* PDU Session Resource Setup Request Transfer (9.3.4.1 3GPP TS 38.413) */
 typedef struct {
   uint8_t nb_qos;
-  pdusession_level_qos_parameter_t qos[QOSFLOW_MAX_VALUE];
+  pdusession_level_qos_parameter_t qos[MAX_QOS_FLOWS];
   pdu_session_type_t pdu_session_type;
   // UPF endpoint of the NG-U (N3) transport bearer
   gtpu_tunnel_t n3_incoming;
@@ -272,7 +270,7 @@ typedef struct pdusession_setup_s {
   uint8_t  nb_of_qos_flow;
   
   /* qos flow list(1 ~ 64) */
-  pdusession_associate_qosflow_t associated_qos_flows[QOSFLOW_MAX_VALUE];
+  pdusession_associate_qosflow_t associated_qos_flows[MAX_QOS_FLOWS];
 } pdusession_setup_t;
 
 typedef struct qos_flow_tobe_modified_s {
@@ -286,7 +284,7 @@ typedef struct pdusession_modify_s {
   uint8_t nb_of_qos_flow;
 
   // qos_flow_add_or_modify
-  qos_flow_tobe_modified_t qos[QOSFLOW_MAX_VALUE];
+  qos_flow_tobe_modified_t qos[MAX_QOS_FLOWS];
 } pdusession_modify_t;
 
 /* Cause (9.3.1.2 of 3GPP TS 38.413) */
@@ -506,7 +504,7 @@ typedef struct {
   uint8_t pdusession_id;
   // QoS Flow Information List
   uint8_t nb_of_qos_flow;
-  qosflow_info_t qos_flow_info[QOSFLOW_MAX_VALUE];
+  qosflow_info_t qos_flow_info[MAX_QOS_FLOWS];
 } pdusession_resource_info_t;
 
 /* 3GPP TS 38.413 9.3.1.97 */
@@ -627,7 +625,7 @@ typedef struct {
 typedef struct {
   // QoS Flow Setup Response List
   uint8_t nb_of_qos_flow;
-  pdusession_associate_qosflow_t qos_setup_list[QOSFLOW_MAX_VALUE];
+  pdusession_associate_qosflow_t qos_setup_list[MAX_QOS_FLOWS];
   // DL NG-U UP TNL Information
   uint32_t gtp_teid;
   transport_layer_addr_t gNB_addr;
@@ -657,7 +655,7 @@ typedef struct {
 typedef struct {
   // QoS Flow to be Forwarded List
   uint8_t nb_of_qos_flow;
-  pdusession_associate_qosflow_t qos_setup_list[QOSFLOW_MAX_VALUE];
+  pdusession_associate_qosflow_t qos_setup_list[MAX_QOS_FLOWS];
   // UL Forwarding UP TNL Information
   uint32_t gtp_teid;
   transport_layer_addr_t gNB_addr;

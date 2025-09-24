@@ -60,7 +60,7 @@ nr_rrc_qos_t *add_qos(seq_arr_t *qos, const pdusession_level_qos_parameter_t *in
   DevAssert(qos);
   DevAssert(in);
 
-  if (seq_arr_size(qos) == QOSFLOW_MAX_VALUE) {
+  if (seq_arr_size(qos) == MAX_QOS_FLOWS) {
     LOG_W(NR_RRC, "Reached maximum number of QoS flows = %ld\n", seq_arr_size(qos));
     return NULL;
   }
@@ -270,7 +270,7 @@ drb_t *generateDRB(gNB_RRC_UE_t *ue,
   FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos_session, &pduSession->qos) {
     qos_session->drb_id = est_drb->drb_id; // Map DRB to QoS
     est_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index++] = qos_session->qos.qfi;
-    DevAssert(qos_flow_index <= QOSFLOW_MAX_VALUE);
+    DevAssert(qos_flow_index <= MAX_QOS_FLOWS);
   }
   /* PDCP Configuration */
   set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering, pdcp_config, ue->redcap_cap);
@@ -299,7 +299,7 @@ NR_DRB_ToAddMod_t *generateDRB_ASN1(const drb_t *drb_asn1)
   SDAP_config->sdap_HeaderUL = drb_asn1->cnAssociation.sdap_config.sdap_HeaderUL;
   SDAP_config->defaultDRB = drb_asn1->cnAssociation.sdap_config.defaultDRB;
 
-  for (int qos_flow_index = 0; qos_flow_index < QOSFLOW_MAX_VALUE; qos_flow_index++) {
+  for (int qos_flow_index = 0; qos_flow_index < MAX_QOS_FLOWS; qos_flow_index++) {
     if (drb_asn1->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index] != 0) {
       asn1cSequenceAdd(sdapFlows->list, NR_QFI_t, qfi);
       *qfi = drb_asn1->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index];

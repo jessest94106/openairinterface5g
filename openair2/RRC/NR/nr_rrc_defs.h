@@ -132,7 +132,7 @@ typedef struct drb_s {
       int pdusession_id;
       int sdap_HeaderDL;
       int sdap_HeaderUL;
-      int mappedQoS_FlowsToAdd[QOSFLOW_MAX_VALUE];
+      int mappedQoS_FlowsToAdd[MAX_QOS_FLOWS];
     } sdap_config;
   } cnAssociation;
   struct pdcp_config_s {
