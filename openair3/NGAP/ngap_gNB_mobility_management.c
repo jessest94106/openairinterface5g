@@ -88,7 +88,9 @@ NGAP_NGAP_PDU_t *encode_ng_handover_required(const ngap_handover_required_t *msg
     asn1cSequenceAdd(ie6->value.choice.PDUSessionResourceListHORqd.list, NGAP_PDUSessionResourceItemHORqd_t, hoRequiredPduSession);
     // PDU Session ID (M)
     hoRequiredPduSession->pDUSessionID = msg->pdusessions[i].pdusession_id;
-    // Handover Required Transfer (M)
+    // Handover Required Transfer (M) - ASN.1 encoding of empty transfer structure
+    // This is a mandatory field in the NGAP Handover Required message, however it contains
+    // only Direct Forwarding Path Availability IE, which is optional and is not sent
     NGAP_HandoverRequiredTransfer_t hoRequiredTransfer = {0};
     uint8_t ho_req_transfer_transparent_container_buffer[128] = {0};
     if (LOG_DEBUGFLAG(DEBUG_ASN1))

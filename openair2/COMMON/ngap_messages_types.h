@@ -545,8 +545,6 @@ typedef enum {
 typedef struct {
   // PDU Session ID
   uint8_t pdusession_id;
-  // Handover Required Transfer
-  byte_array_t ho_required_transfer;
 } pdusession_resource_t;
 
 /* 3GPP TS 38.413 9.2.3.1 */

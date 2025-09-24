@@ -1610,10 +1610,6 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
       if (!pduSession)
         continue;
       pdusession_t *session = &pduSession->param;
-      // Handover Required Transfer (M)
-      uint8_t ho_required_transfer[128] = {0};
-      msg.pdusessions[i].ho_required_transfer.buf = ho_required_transfer;
-      msg.pdusessions[i].ho_required_transfer.len = sizeof(ho_required_transfer);
       // PDU Session ID
       msg.pdusessions[i].pdusession_id = session->pdusession_id;
       // PDU Session Resource Information List (O)
