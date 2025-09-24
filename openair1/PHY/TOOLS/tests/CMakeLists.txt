@@ -47,6 +47,12 @@ target_link_libraries(test_multipath PRIVATE UTIL SIMU LOG CONFIG_LIB shlib_load
 add_dependencies(tests test_multipath)
 add_test(NAME test_multipath COMMAND test_multipath)
 
+add_executable(test_noise test_noise.c)
+target_link_libraries(test_noise PRIVATE UTIL SIMU PHY_COMMON LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_noise)
+add_test(NAME test_noise COMMAND test_noise)
+
 if (TARGET oai_cuda_lib)
     target_compile_definitions(test_multipath PRIVATE ENABLE_CUDA)
 endif()
