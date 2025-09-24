@@ -233,10 +233,10 @@ def Custom_Command(HTML, node, command):
     HTML.CreateHtmlTestRowQueue(command, status, message)
     return status == 'OK' or status == 'Warning'
 
-def Custom_Script(HTML, node, script):
+def Custom_Script(HTML, node, script, args):
 	logging.info(f"Executing custom script on {node}")
 	with cls_cmd.getConnection(node) as c:
-		ret = c.exec_script(script, 90)
+		ret = c.exec_script(script, 90, args)
 	logging.debug(f"Custom_Script: {script} on node: {node} - return code {ret.returncode}, output:\n{ret.stdout}")
 	status = 'OK'
 	message = [ret.stdout]
