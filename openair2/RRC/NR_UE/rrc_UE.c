@@ -134,7 +134,6 @@ static const char nr_nas_attach_req_imsi_dummy_NSA_case[] = {
     0x11,
 };
 
-static void nr_rrc_ue_generate_rrcReestablishmentComplete(const NR_UE_RRC_INST_t *rrc, const NR_RRCReestablishment_t *rrcReestablishment);
 static void process_lte_nsa_msg(NR_UE_RRC_INST_t *rrc, nsa_msg_t *msg, int msg_len);
 static void nr_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc, NR_UECapabilityEnquiry_t *UECapabilityEnquiry);
 static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
@@ -2129,6 +2128,36 @@ static void nr_rrc_ue_generate_RRCReconfigurationComplete(NR_UE_RRC_INST_t *rrc,
   nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, size, buffer, deliver_pdu_srb_rlc, NULL);
 }
 
+static void nr_rrc_ue_generate_rrcReestablishmentComplete(const NR_UE_RRC_INST_t *rrc,
+                                                          const NR_RRCReestablishment_t *rrcReestablishment)
+{
+  uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
+  int size = do_RRCReestablishmentComplete(buffer, NR_RRC_BUF_SIZE, rrcReestablishment->rrc_TransactionIdentifier);
+  LOG_I(NR_RRC, "[RAPROC] Logical Channel UL-DCCH (SRB1), Generating RRCReestablishmentComplete (bytes %d)\n", size);
+  int srb_id = 1; // RRC re-establishment complete on SRB1
+  nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, size, buffer, deliver_pdu_srb_rlc, NULL);
+}
+
+void *recv_msgs_from_lte_ue(void *args_p)
+{
+  itti_mark_task_ready (TASK_RRC_NSA_NRUE);
+  int from_lte_ue_fd = get_from_lte_ue_fd();
+  for (;;) {
+    nsa_msg_t msg;
+    int recvLen = recvfrom(from_lte_ue_fd, &msg, sizeof(msg), MSG_WAITALL | MSG_TRUNC, NULL, NULL);
+    if (recvLen == -1) {
+      LOG_E(NR_RRC, "%s: recvfrom: %s\n", __func__, strerror(errno));
+      continue;
+    }
+    if (recvLen > sizeof(msg)) {
+      LOG_E(NR_RRC, "%s: Received truncated message %d\n", __func__, recvLen);
+      continue;
+    }
+    process_lte_nsa_msg(get_NR_UE_rrc_inst(0), &msg, recvLen);
+  }
+  return NULL;
+}
+
 static void nr_rrc_ue_process_rrcReestablishment(NR_UE_RRC_INST_t *rrc,
                                                  const int gNB_index,
                                                  const NR_RRCReestablishment_t *rrcReestablishment,
@@ -2779,36 +2808,6 @@ static void nr_rrc_initiate_rrcReestablishment(NR_UE_RRC_INST_t *rrc, NR_Reestab
   rrc_msg.payload_type = NR_MAC_RRC_CONFIG_RESET;
   rrc_msg.payload.config_reset.cause = RE_ESTABLISHMENT;
   nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
-}
-
-static void nr_rrc_ue_generate_rrcReestablishmentComplete(const NR_UE_RRC_INST_t *rrc,
-                                                          const NR_RRCReestablishment_t *rrcReestablishment)
-{
-  uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
-  int size = do_RRCReestablishmentComplete(buffer, NR_RRC_BUF_SIZE, rrcReestablishment->rrc_TransactionIdentifier);
-  LOG_I(NR_RRC, "[RAPROC] Logical Channel UL-DCCH (SRB1), Generating RRCReestablishmentComplete (bytes %d)\n", size);
-  int srb_id = 1; // RRC re-establishment complete on SRB1
-  nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, size, buffer, deliver_pdu_srb_rlc, NULL);
-}
-
-void *recv_msgs_from_lte_ue(void *args_p)
-{
-  itti_mark_task_ready (TASK_RRC_NSA_NRUE);
-  int from_lte_ue_fd = get_from_lte_ue_fd();
-  for (;;) {
-    nsa_msg_t msg;
-    int recvLen = recvfrom(from_lte_ue_fd, &msg, sizeof(msg), MSG_WAITALL | MSG_TRUNC, NULL, NULL);
-    if (recvLen == -1) {
-      LOG_E(NR_RRC, "%s: recvfrom: %s\n", __func__, strerror(errno));
-      continue;
-    }
-    if (recvLen > sizeof(msg)) {
-      LOG_E(NR_RRC, "%s: Received truncated message %d\n", __func__, recvLen);
-      continue;
-    }
-    process_lte_nsa_msg(get_NR_UE_rrc_inst(0), &msg, recvLen);
-  }
-  return NULL;
 }
 
 static void nsa_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc)
