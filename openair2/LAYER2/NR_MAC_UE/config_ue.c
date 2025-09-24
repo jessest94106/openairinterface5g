@@ -299,15 +299,17 @@ static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timi
   }
 
   LOG_I(NR_MAC,
-        "Satellite orbital radius %f m, pos_sat_0 = {%f, %f, %f}, pos_sat_90 = {%f, %f, %f}\n"
-        "Satellite velocity %f m/s, angular velocity = %e rad/ms, vel_sat_0 = {%f, %f, %f}, vel_sat_90 = {%f, %f, %f}\n",
+        "Satellite orbital radius %f m, pos_sat_0 = {%f, %f, %f}, pos_sat_90 = {%f, %f, %f}\n",
         radius,
         pos_sat.X,
         pos_sat.Y,
         pos_sat.Z,
         pos_sat_90.X,
         pos_sat_90.Y,
-        pos_sat_90.Z,
+        pos_sat_90.Z);
+
+  LOG_I(NR_MAC,
+        "Satellite velocity %f m/s, angular velocity = %e rad/ms, vel_sat_0 = {%f, %f, %f}, vel_sat_90 = {%f, %f, %f}\n",
         vel_mag,
         omega,
         vel_sat.X,
@@ -340,29 +342,6 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
   ntn_ta->epoch_sfn = epoch_time_r17->sfn_r17;
   ntn_ta->epoch_subframe = epoch_time_r17->subFrameNR_r17;
 
-  // handle ephemerisInfo_r17
-  const NR_EphemerisInfo_r17_t *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
-  if (ephemeris_info) {
-    if (ephemeris_info->present == NR_EphemerisInfo_r17_PR_positionVelocity_r17) {
-      const NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
-      AssertFatal(position_velocity, "position_velocity should not be NULL here\n");
-      prepare_ue_sat_ta(position_velocity, ntn_ta);
-    } else {
-      LOG_W(NR_MAC, "NR UE currently supports only ephemerisInfo_r17 of type positionVelocity_r17\n");
-      ntn_ta->omega = 0;
-      ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
-      ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
-      ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
-      ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
-    }
-  } else { // Need R - Release if not present
-    ntn_ta->omega = 0;
-    ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
-    ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
-    ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
-    ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
-  }
-
   // handle cellSpecificKoffset_r17
   if (ntn_Config_r17->cellSpecificKoffset_r17)
     ntn_ta->cell_specific_k_offset = *ntn_Config_r17->cellSpecificKoffset_r17;
@@ -389,11 +368,9 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
     ntn_ta->N_common_ta_drift_variant = 0;
   }
 
-  ntn_ta->ntn_params_changed = true;
-
   LOG_I(NR_MAC,
-        "SIB19 Rxd. Epoch HFN: %d, Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, "
-        "N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s²\n",
+        "NTN Config Rxd. Epoch HFN: %d, Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, "
+        "N_Common_Ta: %fms, drift: %fµs/s, variant: %fµs/s²\n",
         ntn_ta->epoch_hfn,
         ntn_ta->epoch_sfn,
         ntn_ta->epoch_subframe,
@@ -401,6 +378,31 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
         ntn_ta->N_common_ta_adj,
         ntn_ta->N_common_ta_drift,
         ntn_ta->N_common_ta_drift_variant);
+
+  // handle ephemerisInfo_r17
+  const NR_EphemerisInfo_r17_t *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
+  if (ephemeris_info) {
+    if (ephemeris_info->present == NR_EphemerisInfo_r17_PR_positionVelocity_r17) {
+      const NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
+      AssertFatal(position_velocity, "position_velocity should not be NULL here\n");
+      prepare_ue_sat_ta(position_velocity, ntn_ta);
+    } else {
+      LOG_W(NR_MAC, "NR UE currently supports only ephemerisInfo_r17 of type positionVelocity_r17\n");
+      ntn_ta->omega = 0;
+      ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
+      ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
+      ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
+      ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
+    }
+  } else { // Need R - Release if not present
+    ntn_ta->omega = 0;
+    ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
+    ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
+    ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
+    ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
+  }
+
+  ntn_ta->ntn_params_changed = true;
 }
 
 static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP, int hfn, int frame)
