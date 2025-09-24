@@ -89,6 +89,28 @@ void add_noise_cuda(const float **r_re,
                     void *h_r_sig_pinned,
                     void *h_output_sig_pinned);
 
+void run_channel_pipeline_cuda(c16_t **output_signal,
+                               int nb_tx,
+                               int nb_rx,
+                               int channel_length,
+                               uint32_t num_samples,
+                               float *h_channel_coeffs,
+                               float sigma2,
+                               double ts,
+                               uint16_t pdu_bit_map,
+                               uint16_t ptrs_bit_map,
+                               int slot_offset,
+                               int delay,
+                               void *d_tx_sig,
+                               void *d_intermediate_sig,
+                               void *d_final_output,
+                               void *d_curand_states,
+                               void *h_tx_sig_pinned,
+                               void *h_final_output_pinned,
+                               void *d_channel_coeffs);
+
+void sum_channel_outputs_cuda(void **d_individual_outputs, void *d_final_output, int num_channels, int nb_rx, int num_samples);
+
 /**
  * \brief Interleaves separate real and imaginary signal buffers into a complex format.
  *
