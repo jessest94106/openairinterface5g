@@ -3325,6 +3325,7 @@ static NR_BWP_UplinkDedicated_t *configure_initial_ul_bwp(const NR_ServingCellCo
 static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCellConfigCommon_t *scc,
                                                             const int pdsch_AntennaPorts,
                                                             uint64_t bitmap,
+                                                            const NR_UE_NR_Capability_t *uecap,
                                                             const nr_mac_config_t *configuration)
 {
   NR_BWP_DownlinkDedicated_t *bwp_Dedicated = calloc(1, sizeof(*bwp_Dedicated));
@@ -3356,6 +3357,11 @@ static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCell
   bwp_Dedicated->pdcch_Config->choice.setup = pdcch_Config;
 
   bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts, configuration->ptrs);
+  // we might call configuration of initial BWP for BWP switch when we already have UE capabilities
+  set_dl_mcs_table(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing,
+                   configuration->force_256qam_off ? NULL : uecap,
+                   bwp_Dedicated,
+                   scc);
   return bwp_Dedicated;
 }
 
@@ -3537,7 +3543,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   asn1cCallocOne(uplinkConfig->firstActiveUplinkBWP_Id, first_active_bwp);
   if (first_active_bwp == 0) {
     uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, maxMIMO_Layers, NULL, uid);
-    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, configuration);
+    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, NULL, configuration);
   } else {
     configDedicated->downlinkBWP_ToAddModList = calloc(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
     NR_BWP_Downlink_t *bwp = config_downlinkBWP(scc,
@@ -3819,7 +3825,7 @@ NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_
     if (!uplinkConfig->initialUplinkBWP)
       uplinkConfig->initialUplinkBWP = calloc_or_fail(1, sizeof(*uplinkConfig->initialUplinkBWP));
     uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, ul_maxMIMO_Layers, uecap, uid);
-    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, configuration);
+    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, uecap, configuration);
   } else {
     if (!configDedicated->downlinkBWP_ToAddModList)
       configDedicated->downlinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
