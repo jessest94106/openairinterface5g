@@ -136,8 +136,7 @@ int precoding_weigths_generation(nfapi_nr_pm_list_t *mat,
                 nfapi_nr_pm_weights_t *weights = &mat->pmi_pdu[pmiq].weights[j_col][i_rows];
                 res_code = sqrt(1 / (double)L) * v_lm[llc][mmc][i_rows];
                 c16_t precoder_weight = convert_precoder_weight(res_code);
-                weights->precoder_weight_Re = precoder_weight.r;
-                weights->precoder_weight_Im = precoder_weight.i;
+                *weights = precoder_weight;
                 LOG_D(PHY,
                       "%d Layer Precoding Matrix[pmi %d][antPort %d][layerIdx %d]= %f+j %f -> Fixed Point %d+j %d \n",
                       L,
@@ -146,15 +145,14 @@ int precoding_weigths_generation(nfapi_nr_pm_list_t *mat,
                       j_col,
                       creal(res_code),
                       cimag(res_code),
-                      weights->precoder_weight_Re,
-                      weights->precoder_weight_Im);
+                      weights->r,
+                      weights->i);
               }
               for (int i_rows = N1 * N2; i_rows < 2 * N1 * N2; i_rows++) {
                 nfapi_nr_pm_weights_t *weights = &mat->pmi_pdu[pmiq].weights[j_col][i_rows];
                 res_code = sqrt(1 / (double)L) * (phase_sign)*theta_n[nn] * v_lm[llc][mmc][i_rows - N1 * N2];
                 c16_t precoder_weight = convert_precoder_weight(res_code);
-                weights->precoder_weight_Re = precoder_weight.r;
-                weights->precoder_weight_Im = precoder_weight.i;
+                *weights = precoder_weight;
                 LOG_D(PHY,
                       "%d Layer Precoding Matrix[pmi %d][antPort %d][layerIdx %d]= %f+j %f -> Fixed Point %d+j %d \n",
                       L,
@@ -163,8 +161,8 @@ int precoding_weigths_generation(nfapi_nr_pm_list_t *mat,
                       j_col,
                       creal(res_code),
                       cimag(res_code),
-                      weights->precoder_weight_Re,
-                      weights->precoder_weight_Im);
+                      weights->r,
+                      weights->i);
               }
             }
             pmiq++;

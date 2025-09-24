@@ -760,7 +760,7 @@ static uint8_t pack_pm_table_tlv_value(void *tlv, uint8_t **ppWritePackedMsg, ui
     for (int k = 0; k < pm_pdu->numLayers; k++) {
       for (int j = 0; j < pm_pdu->num_ant_ports; j++) {
         const nfapi_nr_pm_weights_t *pm_weight = &pm_pdu->weights[k][j];
-        if (!(push16(pm_weight->precoder_weight_Re, ppWritePackedMsg, end) && push16(pm_weight->precoder_weight_Im, ppWritePackedMsg, end))) {
+        if (!(push16(pm_weight->r, ppWritePackedMsg, end) && push16(pm_weight->i, ppWritePackedMsg, end))) {
           return 0;
         }
       }
@@ -1307,8 +1307,7 @@ static uint8_t unpack_pm_table_tlv_value(void *tlv, uint8_t **ppReadPackedMsg, u
     for (int k = 0; k < pm_pdu->numLayers; k++) {
       for (int j = 0; j < pm_pdu->num_ant_ports; j++) {
         nfapi_nr_pm_weights_t *pm_weight = &pm_pdu->weights[k][j];
-        if (!(pulls16(ppReadPackedMsg, &pm_weight->precoder_weight_Re, end)
-              && pulls16(ppReadPackedMsg, &pm_weight->precoder_weight_Im, end))) {
+        if (!(pulls16(ppReadPackedMsg, &pm_weight->r, end) && pulls16(ppReadPackedMsg, &pm_weight->i, end))) {
           return 0;
         }
       }

@@ -239,8 +239,8 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
       for (int j = 0; j < num_layers; j++) {
         for (int k = 0; k < num_ant_ports; k++) {
           nfapi_nr_pm_weights_t* pm_weight = &pmi_pdu->weights[j][k];
-          pm_weight->precoder_weight_Re = (int16_t)rand16_range(1, 0xffff);
-          pm_weight->precoder_weight_Im = (int16_t)rand16_range(1, 0xffff);
+          pm_weight->r = (int16_t)rand16_range(1, 0xffff);
+          pm_weight->i = (int16_t)rand16_range(1, 0xffff);
         }
       }
     }
