@@ -28,6 +28,13 @@ while [ $# -gt 0 ]; do
   # RC to signal error). In both cases, the result is logged in an array to
   # output at the end of the script.
   #
+  # To search for the number, first substr() returns what has been matched
+  # (PATTERN + number), and sub() deletes PATTERN and whitespace, resulting in
+  # the number (measurement). To force number into a numeric context, we add 0,
+  # as awk would otherwise compare a string to a number (example:
+  #   gawk 'BEGIN { meas = "117"; if (meas > 96) { } else { print "fail";}}'
+  # printfs "fail").
+  #
   # Example: pattern "PHY proc tx", condition "< 200"
   # The awk script tries to match every line for "PHY proc tx _NUMBER_" (where
   # number is a decimal), and compares _NUMBER_ against condition "< 200",
@@ -35,14 +42,16 @@ while [ $# -gt 0 ]; do
   # If the condition holds, will set "CHECK PHY proc tx _NUMBER_ < 200 SUCCESS".
   # If the condition fails, will set "CHECK PHY proc tx _NUMBER_ < 200 FAIL".
   SCRIPT+='
-  match($0, /'${PATTERN}' +([0-9]+(\.[0-9]+)?)/, n) {
-    if (n[1] '${COND}') {
+  match($0, /'${PATTERN}' +([0-9]+(\.[0-9]+)?)/) {
+    meas = substr($0, RSTART, RLENGTH);
+    sub(/'${PATTERN}' +/, "", meas);
+    if ((meas+0) '${COND}') {
       r = "SUCCESS";
     } else {
       r = "FAIL";
       RC = 1;
     }
-    RESULTS['${NUM}']=sprintf("CHECK %-35s %7.2f %-8s %s", "'${PATTERN}'", n[1], " '${COND}'", r);
+    RESULTS['${NUM}']=sprintf("CHECK %-35s %7.2f %-8s %s", "'${PATTERN}'", meas, " '${COND}'", r);
   }
 '
 
