@@ -25,7 +25,6 @@
         <htmlTabName>AERIAL 100 MHz TDD SA</htmlTabName>
         <htmlTabIcon>tasks</htmlTabIcon>
         <TestCaseRequestedList>
-                555000
                 111111
                 000222
                 800813
@@ -40,15 +39,8 @@
                 000222
                 222222
                 333333
-                000555
         </TestCaseRequestedList>
         <TestCaseExclusionList></TestCaseExclusionList>
-        <testCase id="555000">
-                <class>DeployCoreNetwork</class>
-                <desc>Initialize 5G Core</desc>
-                <cn_id>oc-cn5g-20897-aerial</cn_id>
-        </testCase>
-
         <testCase id="111111">
                 <class>Pull_Local_Registry</class>
                 <desc>Pull Images from Local Registry</desc>
@@ -159,13 +151,6 @@
                 <desc>Clean Test Images on Test Server</desc>
                 <node>gracehopper1-oai</node>
                 <images>oai-gnb-aerial</images>
-        </testCase>
-
-        <testCase id="000555">
-                <class>UndeployCoreNetwork</class>
-                <always_exec>true</always_exec>
-                <desc>Terminate 5G Core</desc>
-                <cn_id>oc-cn5g-20897-aerial</cn_id>
         </testCase>
 </testCaseList>
 
