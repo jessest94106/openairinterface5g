@@ -134,8 +134,6 @@ static const char nr_nas_attach_req_imsi_dummy_NSA_case[] = {
     0x11,
 };
 
-static void nr_rrc_ue_process_RadioBearerConfig(NR_UE_RRC_INST_t *ue_rrc,
-                                                NR_RadioBearerConfig_t *const radioBearerConfig);
 static void nr_rrc_ue_generate_rrcReestablishmentComplete(const NR_UE_RRC_INST_t *rrc, const NR_RRCReestablishment_t *rrcReestablishment);
 static void process_lte_nsa_msg(NR_UE_RRC_INST_t *rrc, nsa_msg_t *msg, int msg_len);
 static void nr_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc, NR_UECapabilityEnquiry_t *UECapabilityEnquiry);
@@ -609,6 +607,125 @@ static void nr_rrc_process_dedicatedNAS_MessageList(NR_UE_RRC_INST_t *rrc, NR_RR
     }
     tmp->list.count = 0; // to prevent the automatic free by ASN1_FREE
   }
+}
+
+/**
+ * @brief add, modify and release SRBs and/or DRBs
+ * @ref   3GPP TS 38.331
+ */
+static void nr_rrc_ue_process_RadioBearerConfig(NR_UE_RRC_INST_t *ue_rrc, NR_RadioBearerConfig_t *const radioBearerConfig)
+{
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    xer_fprint(stdout, &asn_DEF_NR_RadioBearerConfig, (const void *)radioBearerConfig);
+
+  if (radioBearerConfig->srb3_ToRelease) {
+    nr_pdcp_release_srb(ue_rrc->ue_id, 3);
+    ue_rrc->Srb[3] = RB_NOT_PRESENT;
+  }
+
+  nr_pdcp_entity_security_keys_and_algos_t security_rrc_parameters = {0};
+  nr_pdcp_entity_security_keys_and_algos_t security_up_parameters = {0};
+
+  if (ue_rrc->as_security_activated) {
+    if (radioBearerConfig->securityConfig != NULL) {
+      // When the field is not included, continue to use the currently configured keyToUse
+      if (radioBearerConfig->securityConfig->keyToUse) {
+        AssertFatal(*radioBearerConfig->securityConfig->keyToUse == NR_SecurityConfig__keyToUse_master,
+                    "Secondary key usage seems not to be implemented\n");
+        ue_rrc->keyToUse = *radioBearerConfig->securityConfig->keyToUse;
+      }
+      // When the field is not included, continue to use the currently configured security algorithm
+      if (radioBearerConfig->securityConfig->securityAlgorithmConfig) {
+        ue_rrc->cipheringAlgorithm = radioBearerConfig->securityConfig->securityAlgorithmConfig->cipheringAlgorithm;
+        ue_rrc->integrityProtAlgorithm = *radioBearerConfig->securityConfig->securityAlgorithmConfig->integrityProtAlgorithm;
+      }
+    }
+    security_rrc_parameters = get_security_rrc_parameters(ue_rrc, true);
+    security_up_parameters = get_security_rrc_parameters(ue_rrc, false);
+  }
+
+  if (radioBearerConfig->srb_ToAddModList != NULL) {
+    for (int cnt = 0; cnt < radioBearerConfig->srb_ToAddModList->list.count; cnt++) {
+      struct NR_SRB_ToAddMod *srb = radioBearerConfig->srb_ToAddModList->list.array[cnt];
+      if (ue_rrc->Srb[srb->srb_Identity] == RB_NOT_PRESENT) {
+        ue_rrc->Srb[srb->srb_Identity] = RB_ESTABLISHED;
+        add_srb(false,
+                ue_rrc->ue_id,
+                radioBearerConfig->srb_ToAddModList->list.array[cnt],
+                &security_rrc_parameters);
+      }
+      else {
+        AssertFatal(srb->discardOnPDCP == NULL, "discardOnPDCP not yet implemented\n");
+        if (srb->reestablishPDCP) {
+          ue_rrc->Srb[srb->srb_Identity] = RB_ESTABLISHED;
+          nr_pdcp_reestablishment(ue_rrc->ue_id,
+                                  srb->srb_Identity,
+                                  true,
+                                  &security_rrc_parameters);
+        }
+        if (srb->pdcp_Config && srb->pdcp_Config->t_Reordering)
+          nr_pdcp_reconfigure_srb(ue_rrc->ue_id, srb->srb_Identity, *srb->pdcp_Config->t_Reordering);
+      }
+    }
+  }
+
+  if (radioBearerConfig->drb_ToReleaseList) {
+    for (int cnt = 0; cnt < radioBearerConfig->drb_ToReleaseList->list.count; cnt++) {
+      NR_DRB_Identity_t *DRB_id = radioBearerConfig->drb_ToReleaseList->list.array[cnt];
+      if (DRB_id) {
+        nr_pdcp_release_drb(ue_rrc->ue_id, *DRB_id);
+        set_DRB_status(ue_rrc, *DRB_id, RB_NOT_PRESENT);
+      }
+    }
+  }
+
+  /**
+   * Establish/reconfig DRBs if DRB-ToAddMod is present
+   * according to 3GPP TS 38.331 clause 5.3.5.6.5 DRB addition/modification
+   */
+  if (radioBearerConfig->drb_ToAddModList != NULL) {
+    for (int cnt = 0; cnt < radioBearerConfig->drb_ToAddModList->list.count; cnt++) {
+      struct NR_DRB_ToAddMod *drb = radioBearerConfig->drb_ToAddModList->list.array[cnt];
+      int DRB_id = drb->drb_Identity;
+      if (get_DRB_status(ue_rrc, DRB_id) != RB_NOT_PRESENT) {
+        if (drb->reestablishPDCP) {
+          set_DRB_status(ue_rrc, DRB_id, RB_ESTABLISHED);
+          /* get integrity and cipehring settings from radioBearerConfig */
+          bool has_integrity = drb->pdcp_Config != NULL
+                               && drb->pdcp_Config->drb != NULL
+                               && drb->pdcp_Config->drb->integrityProtection != NULL;
+          bool has_ciphering = !(drb->pdcp_Config != NULL
+                                 && drb->pdcp_Config->ext1 != NULL
+                                 && drb->pdcp_Config->ext1->cipheringDisabled != NULL);
+          security_up_parameters.ciphering_algorithm = has_ciphering ? ue_rrc->cipheringAlgorithm : 0;
+          security_up_parameters.integrity_algorithm = has_integrity ? ue_rrc->integrityProtAlgorithm : 0;
+          /* re-establish */
+          nr_pdcp_reestablishment(ue_rrc->ue_id,
+                                  DRB_id,
+                                  false,
+                                  &security_up_parameters);
+        }
+        AssertFatal(drb->recoverPDCP == NULL, "recoverPDCP not yet implemented\n");
+        /* sdap-Config is included (SA mode) */
+        NR_SDAP_Config_t *sdap_Config = drb->cnAssociation ? drb->cnAssociation->choice.sdap_Config : NULL;
+        /* PDCP reconfiguration */
+        if (drb->pdcp_Config)
+          nr_pdcp_reconfigure_drb(ue_rrc->ue_id, DRB_id, drb->pdcp_Config);
+        /* SDAP entity reconfiguration */
+        if (sdap_Config)
+          nr_reconfigure_sdap_entity(sdap_Config, ue_rrc->ue_id, sdap_Config->pdu_Session, DRB_id);
+      } else {
+        set_DRB_status(ue_rrc ,DRB_id, RB_ESTABLISHED);
+        add_drb(false,
+                ue_rrc->ue_id,
+                radioBearerConfig->drb_ToAddModList->list.array[cnt],
+                &security_up_parameters);
+      }
+    }
+  } // drb_ToAddModList //
+
+  ue_rrc->nrRrcState = RRC_STATE_CONNECTED_NR;
+  LOG_I(NR_RRC, "State = NR_RRC_CONNECTED\n");
 }
 
 static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530, int gNB_index)
@@ -1466,8 +1583,7 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
   // perform the cell group configuration procedure in accordance with the received masterCellGroup
   nr_rrc_ue_process_masterCellGroup(rrc, &rrcSetup->criticalExtensions.choice.rrcSetup->masterCellGroup, NULL, 0);
   // perform the radio bearer configuration procedure in accordance with the received radioBearerConfig
-  nr_rrc_ue_process_RadioBearerConfig(rrc,
-                                      &rrcSetup->criticalExtensions.choice.rrcSetup->radioBearerConfig);
+  nr_rrc_ue_process_RadioBearerConfig(rrc, &rrcSetup->criticalExtensions.choice.rrcSetup->radioBearerConfig);
 
   // TODO (not handled) if stored, discard the cell reselection priority information provided by
   // the cellReselectionPriorities or inherited from another RAT
@@ -1997,126 +2113,6 @@ static void nr_rrc_ue_process_measConfig(rrcPerNB_t *rrc, NR_MeasConfig_t *const
       rrc->s_measure = measConfig->s_MeasureConfig->choice.csi_RSRP;
     }
   }
-}
-
-/**
- * @brief add, modify and release SRBs and/or DRBs
- * @ref   3GPP TS 38.331
- */
-static void nr_rrc_ue_process_RadioBearerConfig(NR_UE_RRC_INST_t *ue_rrc,
-                                                NR_RadioBearerConfig_t *const radioBearerConfig)
-{
-  if (LOG_DEBUGFLAG(DEBUG_ASN1))
-    xer_fprint(stdout, &asn_DEF_NR_RadioBearerConfig, (const void *)radioBearerConfig);
-
-  if (radioBearerConfig->srb3_ToRelease) {
-    nr_pdcp_release_srb(ue_rrc->ue_id, 3);
-    ue_rrc->Srb[3] = RB_NOT_PRESENT;
-  }
-
-  nr_pdcp_entity_security_keys_and_algos_t security_rrc_parameters = {0};
-  nr_pdcp_entity_security_keys_and_algos_t security_up_parameters = {0};
-
-  if (ue_rrc->as_security_activated) {
-    if (radioBearerConfig->securityConfig != NULL) {
-      // When the field is not included, continue to use the currently configured keyToUse
-      if (radioBearerConfig->securityConfig->keyToUse) {
-        AssertFatal(*radioBearerConfig->securityConfig->keyToUse == NR_SecurityConfig__keyToUse_master,
-                    "Secondary key usage seems not to be implemented\n");
-        ue_rrc->keyToUse = *radioBearerConfig->securityConfig->keyToUse;
-      }
-      // When the field is not included, continue to use the currently configured security algorithm
-      if (radioBearerConfig->securityConfig->securityAlgorithmConfig) {
-        ue_rrc->cipheringAlgorithm = radioBearerConfig->securityConfig->securityAlgorithmConfig->cipheringAlgorithm;
-        ue_rrc->integrityProtAlgorithm = *radioBearerConfig->securityConfig->securityAlgorithmConfig->integrityProtAlgorithm;
-      }
-    }
-    security_rrc_parameters = get_security_rrc_parameters(ue_rrc, true);
-    security_up_parameters = get_security_rrc_parameters(ue_rrc, false);
-  }
-
-  if (radioBearerConfig->srb_ToAddModList != NULL) {
-    for (int cnt = 0; cnt < radioBearerConfig->srb_ToAddModList->list.count; cnt++) {
-      struct NR_SRB_ToAddMod *srb = radioBearerConfig->srb_ToAddModList->list.array[cnt];
-      if (ue_rrc->Srb[srb->srb_Identity] == RB_NOT_PRESENT) {
-        ue_rrc->Srb[srb->srb_Identity] = RB_ESTABLISHED;
-        add_srb(false,
-                ue_rrc->ue_id,
-                radioBearerConfig->srb_ToAddModList->list.array[cnt],
-                &security_rrc_parameters);
-      }
-      else {
-        AssertFatal(srb->discardOnPDCP == NULL, "discardOnPDCP not yet implemented\n");
-        if (srb->reestablishPDCP) {
-          ue_rrc->Srb[srb->srb_Identity] = RB_ESTABLISHED;
-          nr_pdcp_reestablishment(ue_rrc->ue_id,
-                                  srb->srb_Identity,
-                                  true,
-                                  &security_rrc_parameters);
-        }
-        if (srb->pdcp_Config && srb->pdcp_Config->t_Reordering)
-          nr_pdcp_reconfigure_srb(ue_rrc->ue_id, srb->srb_Identity, *srb->pdcp_Config->t_Reordering);
-      }
-    }
-  }
-
-  if (radioBearerConfig->drb_ToReleaseList) {
-    for (int cnt = 0; cnt < radioBearerConfig->drb_ToReleaseList->list.count; cnt++) {
-      NR_DRB_Identity_t *DRB_id = radioBearerConfig->drb_ToReleaseList->list.array[cnt];
-      if (DRB_id) {
-        nr_pdcp_release_drb(ue_rrc->ue_id, *DRB_id);
-        set_DRB_status(ue_rrc, *DRB_id, RB_NOT_PRESENT);
-      }
-    }
-  }
-
-  /**
-   * Establish/reconfig DRBs if DRB-ToAddMod is present
-   * according to 3GPP TS 38.331 clause 5.3.5.6.5 DRB addition/modification
-   */
-  if (radioBearerConfig->drb_ToAddModList != NULL) {
-    for (int cnt = 0; cnt < radioBearerConfig->drb_ToAddModList->list.count; cnt++) {
-      struct NR_DRB_ToAddMod *drb = radioBearerConfig->drb_ToAddModList->list.array[cnt];
-      int DRB_id = drb->drb_Identity;
-      if (get_DRB_status(ue_rrc, DRB_id) != RB_NOT_PRESENT) {
-        if (drb->reestablishPDCP) {
-          set_DRB_status(ue_rrc, DRB_id, RB_ESTABLISHED);
-          /* get integrity and cipehring settings from radioBearerConfig */
-          bool has_integrity = drb->pdcp_Config != NULL
-                               && drb->pdcp_Config->drb != NULL
-                               && drb->pdcp_Config->drb->integrityProtection != NULL;
-          bool has_ciphering = !(drb->pdcp_Config != NULL
-                                 && drb->pdcp_Config->ext1 != NULL
-                                 && drb->pdcp_Config->ext1->cipheringDisabled != NULL);
-          security_up_parameters.ciphering_algorithm = has_ciphering ? ue_rrc->cipheringAlgorithm : 0;
-          security_up_parameters.integrity_algorithm = has_integrity ? ue_rrc->integrityProtAlgorithm : 0;
-          /* re-establish */
-          nr_pdcp_reestablishment(ue_rrc->ue_id,
-                                  DRB_id,
-                                  false,
-                                  &security_up_parameters);
-        }
-        AssertFatal(drb->recoverPDCP == NULL, "recoverPDCP not yet implemented\n");
-        /* sdap-Config is included (SA mode) */
-        NR_SDAP_Config_t *sdap_Config = drb->cnAssociation ? drb->cnAssociation->choice.sdap_Config : NULL;
-        /* PDCP reconfiguration */
-        if (drb->pdcp_Config)
-          nr_pdcp_reconfigure_drb(ue_rrc->ue_id, DRB_id, drb->pdcp_Config);
-        /* SDAP entity reconfiguration */
-        if (sdap_Config)
-          nr_reconfigure_sdap_entity(sdap_Config, ue_rrc->ue_id, sdap_Config->pdu_Session, DRB_id);
-      } else {
-        set_DRB_status(ue_rrc ,DRB_id, RB_ESTABLISHED);
-        add_drb(false,
-                ue_rrc->ue_id,
-                radioBearerConfig->drb_ToAddModList->list.array[cnt],
-                &security_up_parameters);
-      }
-    }
-  } // drb_ToAddModList //
-
-  ue_rrc->nrRrcState = RRC_STATE_CONNECTED_NR;
-  LOG_I(NR_RRC, "State = NR_RRC_CONNECTED\n");
 }
 
 static void nr_rrc_ue_generate_RRCReconfigurationComplete(NR_UE_RRC_INST_t *rrc, const int srb_id, const uint8_t Transaction_id)
