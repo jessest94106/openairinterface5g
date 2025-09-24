@@ -87,6 +87,7 @@
 #include "rrc_gNB_mobility.h"
 #include "rrc_gNB_radio_bearers.h"
 #include "rrc_messages_types.h"
+#include "rrc_gNB_asn1.h"
 #include "seq_arr.h"
 #include "tree.h"
 #include "uper_decoder.h"
@@ -100,6 +101,7 @@
 #include "ds/byte_array.h"
 #include "alg/find.h"
 #include "NR_HandoverCommand.h"
+#include "openair2/SDAP/nr_sdap/nr_sdap_configuration.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
@@ -330,17 +332,63 @@ NR_SRB_ToAddModList_t *createSRBlist(gNB_RRC_UE_t *ue, uint8_t reestablish)
   return list;
 }
 
-NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish)
+static NR_SDAP_Config_t *nr_rrc_build_sdap_config_ie(const int pdusession_id,
+                                                     uint8_t n_flows,
+                                                     pdusession_level_qos_parameter_t *qos,
+                                                     const nr_sdap_configuration_t *sdap_config)
 {
-  NR_DRB_ToAddMod_t *DRB_config = NULL;
+  DevAssert(n_flows < MAX_QOS_FLOWS);
+  // SDAP
+  NR_SDAP_Config_t *sc = calloc_or_fail(1, sizeof(*sc));
+  sc->defaultDRB = true;
+  sc->pdu_Session = pdusession_id;
+  sc->sdap_HeaderDL = sdap_config->header_dl_absent ? NR_SDAP_Config__sdap_HeaderDL_absent : NR_SDAP_Config__sdap_HeaderDL_present;
+  sc->sdap_HeaderUL = sdap_config->header_ul_absent ? NR_SDAP_Config__sdap_HeaderUL_absent : NR_SDAP_Config__sdap_HeaderUL_present;
+  // QoS
+  asn1cCalloc(sc->mappedQoS_FlowsToAdd, mappedQoS_FlowsToAdd);
+  for (uint8_t i = 0; i < n_flows; ++i) {
+    DevAssert(i < MAX_QOS_FLOWS);
+    NR_QFI_t *qfi = calloc_or_fail(1, sizeof(*qfi));
+    *qfi = qos[i].qfi;
+    LOG_D(NR_RRC, "Adding QFI %ld to PDU Session %d\n", *qfi, pdusession_id);
+    asn1cSeqAdd(&mappedQoS_FlowsToAdd->list, qfi);
+  }
+  return sc;
+}
+
+NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish, bool do_integrity, bool do_ciphering)
+{
   NR_DRB_ToAddModList_t *DRB_configList = CALLOC(sizeof(*DRB_configList), 1);
 
   FOR_EACH_SEQ_ARR(drb_t *, drb, &ue->drbs) {
-    DRB_config = generateDRB_ASN1(drb);
-    if (reestablish) {
-      asn1cCallocOne(DRB_config->reestablishPDCP, NR_DRB_ToAddMod__reestablishPDCP_true);
+    rrc_pdu_session_param_t *pduSession = find_pduSession(&ue->pduSessions, drb->pdusession_id);
+    if (!pduSession) {
+      LOG_D(NR_RRC, "PDU Session %d not found, skip\n", drb->pdusession_id);
+      continue;
     }
-    asn1cSeqAdd(&DRB_configList->list, DRB_config);
+    pdusession_t *session = &pduSession->param;
+    NR_DRB_ToAddMod_t *drb_ToAddMod = calloc_or_fail(1, sizeof(*drb_ToAddMod));
+    drb_ToAddMod->drb_Identity = drb->drb_id;
+    // PDCP config
+    drb_ToAddMod->pdcp_Config = nr_rrc_build_pdcp_config_ie(do_integrity, do_ciphering, &drb->pdcp_config);
+    if (reestablish) {
+      asn1cCallocOne(drb_ToAddMod->reestablishPDCP, NR_DRB_ToAddMod__reestablishPDCP_true);
+    }
+    // cn-association: SDAP config
+    // Get all QoS flows mapped to this DRB
+    pdusession_level_qos_parameter_t flows_to_add[MAX_QOS_FLOWS] = {0};
+    uint8_t n_flows = 0;
+    FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, q, &session->qos)
+    {
+      if (q->drb_id == drb->drb_id) {
+        DevAssert(n_flows < MAX_QOS_FLOWS);
+        flows_to_add[n_flows++] = q->qos;
+      }
+    }
+    asn1cCalloc(drb_ToAddMod->cnAssociation, cn_association);
+    cn_association->present = NR_DRB_ToAddMod__cnAssociation_PR_sdap_Config;
+    cn_association->choice.sdap_Config = nr_rrc_build_sdap_config_ie(drb->pdusession_id, n_flows, flows_to_add, &session->sdap_config);
+    asn1cSeqAdd(&DRB_configList->list, drb_ToAddMod);
   }
   if (DRB_configList->list.count == 0) {
     free(DRB_configList);
@@ -644,8 +692,10 @@ nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC
   uint8_t xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
 
   // Re-establish PDCP for SRB2 only
+  bool do_integrity = rrc->security.do_drb_integrity;
+  bool do_ciphering = rrc->security.do_drb_ciphering;
   NR_SRB_ToAddModList_t *SRBs = createSRBlist(UE, srb_reest_bitmap);
-  NR_DRB_ToAddModList_t *DRBs = createDRBlist(UE, drb_reestablish);
+  NR_DRB_ToAddModList_t *DRBs = createDRBlist(UE, drb_reestablish, do_integrity, do_ciphering);
 
   nr_rrc_reconfig_param_t params = {.cell_group_config = UE->masterCellGroup,
                                     .transaction_id = xid,
@@ -882,9 +932,8 @@ static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
     /* PDCP configuration */
     if (!drb_e1->pdcp_config)
       drb_e1->pdcp_config = malloc_or_fail(sizeof(*drb_e1->pdcp_config));
-    bearer_context_pdcp_config_t *pdcp_config = drb_e1->pdcp_config;
-    set_bearer_context_pdcp_config(pdcp_config, drb, rrc->configuration.um_on_default_drb);
-    pdcp_config->pDCP_Reestablishment = true;
+    *drb_e1->pdcp_config = set_bearer_context_pdcp_config(drb->pdcp_config, rrc->configuration.um_on_default_drb, ue_p->redcap_cap);
+    drb_e1->pdcp_config->pDCP_Reestablishment = true;
     /* increase DRB to modify counter */
     pdu_e1->numDRB2Modify += 1;
   }
@@ -1048,7 +1097,9 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
    * or at the first reconfiguration after RRC connection reestablishment in NR */
   NR_SRB_ToAddModList_t *SRBs = createSRBlist(ue_p, 1 << SRB2); // Re-establish PDCP for SRB2 only
   /* Create drb-ToAddModList */
-  NR_DRB_ToAddModList_t *DRBs = createDRBlist(ue_p, true);
+  bool do_integrity = rrc->security.do_drb_integrity;
+  bool do_ciphering = rrc->security.do_drb_ciphering;
+  NR_DRB_ToAddModList_t *DRBs = createDRBlist(ue_p, true, do_integrity, do_ciphering);
 
   uint8_t new_xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
   ue_p->xids[new_xid] = RRC_REESTABLISH_COMPLETE;
@@ -2077,7 +2128,8 @@ static void fill_e1_bearer_modif_pdcp_status(gNB_RRC_UE_t *UE,
   drb_to_mod->pdcp_sn_status_requested = false;
   // PDCP SN Status Information
   drb_to_mod->pdcp_config = calloc_or_fail(1, sizeof(*drb_to_mod->pdcp_config));
-  set_bearer_context_pdcp_config(drb_to_mod->pdcp_config, get_drb(&UE->drbs, drb_id), um_on_default_drb);
+  drb_t *drb = get_drb(&UE->drbs, drb_id);
+  *drb_to_mod->pdcp_config = set_bearer_context_pdcp_config(drb->pdcp_config, um_on_default_drb, UE->redcap_cap);
   drb_to_mod->pdcp_status = calloc_or_fail(1, sizeof(*drb_to_mod->pdcp_status));
   drb_to_mod->pdcp_status->dl_count.hfn = drb_status->dl_count.hfn;
   drb_to_mod->pdcp_status->dl_count.sn = drb_status->dl_count.pdcp_sn;
@@ -2488,6 +2540,7 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
     for (int i = 0; i < pduSession[p].numDRBSetup; i++) {
       const DRB_nGRAN_setup_t *drb_config = &pduSession[p].DRBnGRanList[i];
       drb_t *rrc_drb = get_drb(&UE->drbs, pduSession[p].DRBnGRanList[i].id);
+      nr_pdcp_configuration_t pdcp = rrc_drb->pdcp_config;
       DevAssert(rrc_drb);
 
       DevAssert(nb_drb < MAX_DRBS_PER_UE);
@@ -2522,10 +2575,11 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
       drb->up_ul_tnl[0].teid = drb_config->UpParamList[0].tl_info.teId;
       drb->up_ul_tnl_len = 1;
       drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
+      DevAssert(pdcp.drb.sn_size == 18 || pdcp.drb.sn_size == 12);
       drb->dl_pdcp_sn_len = malloc_or_fail(sizeof(*drb->dl_pdcp_sn_len));
-      *drb->dl_pdcp_sn_len = rrc_drb->pdcp_config.pdcp_SN_SizeDL == 1 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+      *drb->dl_pdcp_sn_len = pdcp.drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
       drb->ul_pdcp_sn_len = malloc_or_fail(sizeof(*drb->ul_pdcp_sn_len));
-      *drb->ul_pdcp_sn_len = rrc_drb->pdcp_config.pdcp_SN_SizeUL == 1 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+      *drb->ul_pdcp_sn_len = pdcp.drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
 
       nb_drb++;
     }

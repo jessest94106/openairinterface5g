@@ -142,9 +142,11 @@ rrc_pdu_session_param_t *add_pduSession(seq_arr_t *sessions_ptr, const pdusessio
 }
 
 /** @brief Add drb_t item in the UE context list for @param pdusession_id */
-drb_t *nr_rrc_add_drb(seq_arr_t *drb_ptr, int pdusession_id)
+drb_t *nr_rrc_add_drb(seq_arr_t *drb_ptr, int pdusession_id, nr_pdcp_configuration_t *pdcp)
 {
   DevAssert(drb_ptr);
+  DevAssert(pdcp != NULL);
+  DevAssert(pdusession_id > 0 && pdusession_id <= NGAP_MAX_PDU_SESSION);
 
   // Get next available DRB ID
   int drb_id = 0;
@@ -162,7 +164,7 @@ drb_t *nr_rrc_add_drb(seq_arr_t *drb_ptr, int pdusession_id)
   }
 
   // Add item to the list
-  drb_t in = {.drb_id = drb_id, .cnAssociation.sdap_config.pdusession_id = pdusession_id};
+  drb_t in = {.drb_id = drb_id, .pdusession_id = pdusession_id, .pdcp_config = *pdcp};
   seq_arr_push_back(drb_ptr, &in, sizeof(drb_t));
   drb_t *out = get_drb(drb_ptr, drb_id);
   DevAssert(out);
@@ -201,129 +203,26 @@ rrc_pdu_session_param_t *find_pduSession_from_drbId(gNB_RRC_UE_t *ue, int drb_id
     LOG_E(NR_RRC, "UE %d: DRB %d not found\n", ue->rrc_ue_id, drb_id);
     return NULL;
   }
-  int id = drb->cnAssociation.sdap_config.pdusession_id;
+  int id = drb->pdusession_id;
   return find_pduSession(&ue->pduSessions, id);
 }
 
-void set_default_drb_pdcp_config(struct pdcp_config_s *pdcp_config,
-                                 int do_drb_integrity,
-                                 int do_drb_ciphering,
-                                 const nr_pdcp_configuration_t *default_pdcp_config,
-                                 const nr_redcap_ue_cap_t *redcap_cap)
+bearer_context_pdcp_config_t set_bearer_context_pdcp_config(const nr_pdcp_configuration_t pdcp,
+                                                            bool um_on_default_drb,
+                                                            const nr_redcap_ue_cap_t *redcap_cap)
 {
-  AssertError(pdcp_config != NULL, return, "Failed to set default PDCP configuration for DRB!\n");
-  pdcp_config->discardTimer = encode_discard_timer(default_pdcp_config->drb.discard_timer);
+  bearer_context_pdcp_config_t out = {0};
   if (redcap_cap && redcap_cap->support_of_redcap_r17 && !redcap_cap->pdcp_drb_long_sn_redcap_r17) {
     LOG_I(NR_RRC, "UE is RedCap without long PDCP SN support: overriding PDCP SN size to 12\n");
-    pdcp_config->pdcp_SN_SizeDL = NR_PDCP_Config__drb__pdcp_SN_SizeDL_len12bits;
-    pdcp_config->pdcp_SN_SizeUL = NR_PDCP_Config__drb__pdcp_SN_SizeUL_len12bits;
+    out.pDCP_SN_Size_DL = NR_PDCP_Config__drb__pdcp_SN_SizeDL_len12bits;
+    out.pDCP_SN_Size_UL = NR_PDCP_Config__drb__pdcp_SN_SizeUL_len12bits;
   } else {
-    pdcp_config->pdcp_SN_SizeDL = encode_sn_size_dl(default_pdcp_config->drb.sn_size);
-    pdcp_config->pdcp_SN_SizeUL = encode_sn_size_ul(default_pdcp_config->drb.sn_size);
+    out.pDCP_SN_Size_DL = encode_sn_size_dl(pdcp.drb.sn_size);
+    out.pDCP_SN_Size_UL = encode_sn_size_ul(pdcp.drb.sn_size);
   }
-  pdcp_config->t_Reordering = encode_t_reordering(default_pdcp_config->drb.t_reordering);
-  pdcp_config->headerCompression.present = NR_PDCP_Config__drb__headerCompression_PR_notUsed;
-  pdcp_config->headerCompression.NotUsed = 0;
-  pdcp_config->integrityProtection = do_drb_integrity ? NR_PDCP_Config__drb__integrityProtection_enabled : 1;
-  pdcp_config->ext1.cipheringDisabled = do_drb_ciphering ? 1 : NR_PDCP_Config__ext1__cipheringDisabled_true;
-}
-
-void set_bearer_context_pdcp_config(bearer_context_pdcp_config_t *pdcp_config, drb_t *rrc_drb, bool um_on_default_drb)
-{
-  AssertError(rrc_drb != NULL && pdcp_config != NULL, return, "Failed to set default bearer context PDCP configuration!\n");
-  pdcp_config->pDCP_SN_Size_UL = rrc_drb->pdcp_config.pdcp_SN_SizeUL;
-  pdcp_config->pDCP_SN_Size_DL = rrc_drb->pdcp_config.pdcp_SN_SizeDL;
-  pdcp_config->discardTimer = rrc_drb->pdcp_config.discardTimer;
-  pdcp_config->reorderingTimer = rrc_drb->pdcp_config.t_Reordering;
-  pdcp_config->rLC_Mode = um_on_default_drb ? E1AP_RLC_Mode_rlc_um_bidirectional : E1AP_RLC_Mode_rlc_am;
-}
-
-drb_t *generateDRB(gNB_RRC_UE_t *ue,
-                   const pdusession_t *pduSession,
-                   bool enable_sdap,
-                   int do_drb_integrity,
-                   int do_drb_ciphering,
-                   const nr_pdcp_configuration_t *pdcp_config)
-{
-  DevAssert(ue != NULL);
-
-  drb_t *est_drb = nr_rrc_add_drb(&ue->drbs, pduSession->pdusession_id);
-  if (!est_drb) {
-    LOG_E(NR_RRC, "UE %d: failed to add DRB for PDU session ID %d\n", ue->rrc_ue_id, pduSession->pdusession_id);
-    return NULL;
-  }
-  LOG_I(NR_RRC, "UE %d: configure DRB ID %d for PDU session ID %d\n", ue->rrc_ue_id, est_drb->drb_id, pduSession->pdusession_id);
-
-  est_drb->cnAssociation.sdap_config.defaultDRB = true;
-
-  /* SDAP Configuration */
-  est_drb->cnAssociation.present = NR_DRB_ToAddMod__cnAssociation_PR_sdap_Config;
-  est_drb->cnAssociation.sdap_config.pdusession_id = pduSession->pdusession_id;
-  if (enable_sdap) {
-    est_drb->cnAssociation.sdap_config.sdap_HeaderDL = NR_SDAP_Config__sdap_HeaderDL_present;
-    est_drb->cnAssociation.sdap_config.sdap_HeaderUL = NR_SDAP_Config__sdap_HeaderUL_present;
-  } else {
-    est_drb->cnAssociation.sdap_config.sdap_HeaderDL = NR_SDAP_Config__sdap_HeaderDL_absent;
-    est_drb->cnAssociation.sdap_config.sdap_HeaderUL = NR_SDAP_Config__sdap_HeaderUL_absent;
-  }
-  int qos_flow_index = 0;
-  FOR_EACH_SEQ_ARR(nr_rrc_qos_t *, qos_session, &pduSession->qos) {
-    qos_session->drb_id = est_drb->drb_id; // Map DRB to QoS
-    est_drb->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index++] = qos_session->qos.qfi;
-    DevAssert(qos_flow_index <= MAX_QOS_FLOWS);
-  }
-  /* PDCP Configuration */
-  set_default_drb_pdcp_config(&est_drb->pdcp_config, do_drb_integrity, do_drb_ciphering, pdcp_config, ue->redcap_cap);
-
-  drb_t *rrc_drb = get_drb(&ue->drbs, est_drb->drb_id);
-  DevAssert(rrc_drb);
-  return rrc_drb;
-}
-
-NR_DRB_ToAddMod_t *generateDRB_ASN1(const drb_t *drb_asn1)
-{
-  NR_DRB_ToAddMod_t *DRB_config = CALLOC(1, sizeof(*DRB_config));
-  NR_SDAP_Config_t *SDAP_config = CALLOC(1, sizeof(NR_SDAP_Config_t));
-
-  asn1cCalloc(DRB_config->cnAssociation, association);
-  asn1cCalloc(SDAP_config->mappedQoS_FlowsToAdd, sdapFlows);
-  asn1cCalloc(DRB_config->pdcp_Config, pdcpConfig);
-  asn1cCalloc(pdcpConfig->drb, drb);
-
-  DRB_config->drb_Identity = drb_asn1->drb_id;
-  association->present = drb_asn1->cnAssociation.present;
-
-  /* SDAP Configuration */
-  SDAP_config->pdu_Session = drb_asn1->cnAssociation.sdap_config.pdusession_id;
-  SDAP_config->sdap_HeaderDL = drb_asn1->cnAssociation.sdap_config.sdap_HeaderDL;
-  SDAP_config->sdap_HeaderUL = drb_asn1->cnAssociation.sdap_config.sdap_HeaderUL;
-  SDAP_config->defaultDRB = drb_asn1->cnAssociation.sdap_config.defaultDRB;
-
-  for (int qos_flow_index = 0; qos_flow_index < MAX_QOS_FLOWS; qos_flow_index++) {
-    if (drb_asn1->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index] != 0) {
-      asn1cSequenceAdd(sdapFlows->list, NR_QFI_t, qfi);
-      *qfi = drb_asn1->cnAssociation.sdap_config.mappedQoS_FlowsToAdd[qos_flow_index];
-    }
-  }
-
-  association->choice.sdap_Config = SDAP_config;
-
-  /* PDCP Configuration */
-  asn1cCallocOne(drb->discardTimer, drb_asn1->pdcp_config.discardTimer);
-  asn1cCallocOne(drb->pdcp_SN_SizeUL, drb_asn1->pdcp_config.pdcp_SN_SizeUL);
-  asn1cCallocOne(drb->pdcp_SN_SizeDL, drb_asn1->pdcp_config.pdcp_SN_SizeDL);
-  asn1cCallocOne(pdcpConfig->t_Reordering, drb_asn1->pdcp_config.t_Reordering);
-
-  drb->headerCompression.present = drb_asn1->pdcp_config.headerCompression.present;
-  drb->headerCompression.choice.notUsed = drb_asn1->pdcp_config.headerCompression.NotUsed;
-
-  if (!drb_asn1->pdcp_config.integrityProtection) {
-    asn1cCallocOne(drb->integrityProtection, drb_asn1->pdcp_config.integrityProtection);
-  }
-  if (!drb_asn1->pdcp_config.ext1.cipheringDisabled) {
-    asn1cCalloc(pdcpConfig->ext1, ext1);
-    asn1cCallocOne(ext1->cipheringDisabled, drb_asn1->pdcp_config.ext1.cipheringDisabled);
-  }
-
-  return DRB_config;
+  out.discardTimer = encode_discard_timer(pdcp.drb.discard_timer);
+  out.reorderingTimer = encode_t_reordering(pdcp.drb.t_reordering);
+  out.rLC_Mode = um_on_default_drb ? E1AP_RLC_Mode_rlc_um_bidirectional : E1AP_RLC_Mode_rlc_am;
+  out.pDCP_Reestablishment = false;
+  return out;
 }

@@ -125,7 +125,7 @@ nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC
 f1ap_qos_flow_param_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param);
 void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *configuration);
 NR_SRB_ToAddModList_t *createSRBlist(gNB_RRC_UE_t *ue, uint8_t reestablish);
-NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish);
+NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish, bool do_integrity, bool do_ciphering);
 void activate_srb(gNB_RRC_UE_t *UE, int srb_id);
 void e1_send_bearer_updates(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, int n, f1ap_drb_setup_t *drbs, const ngap_drb_status_t *drb_status);
 
