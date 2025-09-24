@@ -105,6 +105,55 @@ __global__ void multipath_channel_kernel(const float2 *__restrict__ d_channel_co
   rx_sig[rx_ant_idx * num_samples + i].y = rx_tmp.y;
 }
 
+__global__ void multipath_channel_kernel_batched(const float2 *__restrict__ d_channel_coeffs,
+                                                 const float2 *__restrict__ tx_sig,
+                                                 float2 *__restrict__ rx_sig,
+                                                 int num_samples,
+                                                 int channel_length,
+                                                 int nb_tx,
+                                                 int nb_rx)
+{
+  extern __shared__ float2 tx_shared[];
+
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int rx_ant_idx = blockIdx.y;
+  const int c = blockIdx.z;
+
+  if (i >= num_samples)
+    return;
+
+  float2 rx_tmp = make_float2(0.0f, 0.0f);
+
+  const int padding_len = channel_length - 1;
+  const int padded_num_samples = num_samples + padding_len;
+
+  const int channel_tx_offset = c * nb_tx * padded_num_samples;
+  const int channel_rx_offset = c * nb_rx * num_samples;
+
+  for (int j = 0; j < nb_tx; j++) {
+    const int tid = threadIdx.x;
+    const int block_start_idx = blockIdx.x * blockDim.x;
+    const int shared_mem_size = blockDim.x + channel_length - 1;
+
+    for (int k = tid; k < shared_mem_size; k += blockDim.x) {
+      int load_idx = block_start_idx + k;
+      tx_shared[k] = tx_sig[channel_tx_offset + j * padded_num_samples + load_idx];
+    }
+    __syncthreads();
+
+    for (int l = 0; l < channel_length; l++) {
+      float2 tx_sample = tx_shared[tid + (channel_length - 1) - l];
+      int chan_link_idx = (c * nb_tx * nb_rx) + (rx_ant_idx + j * nb_rx);
+      float2 chan_weight = d_channel_coeffs[chan_link_idx * channel_length + l];
+      rx_tmp = complex_add(rx_tmp, complex_mul(tx_sample, chan_weight));
+    }
+    __syncthreads();
+  }
+
+  rx_sig[channel_rx_offset + rx_ant_idx * num_samples + i].x = rx_tmp.x;
+  rx_sig[channel_rx_offset + rx_ant_idx * num_samples + i].y = rx_tmp.y;
+}
+
 extern "C" {
 
 void multipath_channel_cuda(float **rx_sig_re,

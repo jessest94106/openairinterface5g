@@ -86,6 +86,50 @@ __global__ void add_noise_and_phase_noise_kernel(const float2 *__restrict__ r_si
                                                  (short)fmaxf(-32768.0f, fminf(32767.0f, final_signal.y)));
 }
 
+__global__ void add_noise_and_phase_noise_kernel_batched(const float2 *__restrict__ r_sig,
+                                                         short2 *__restrict__ output_sig,
+                                                         curandState_t *states,
+                                                         int num_samples,
+                                                         int nb_rx,
+                                                         float sigma,
+                                                         float pn_std_dev,
+                                                         bool apply_phase_noise)
+{
+  const int i = blockIdx.x * blockDim.x + threadIdx.x; // Sample index
+  const int ii = blockIdx.y; // RX antenna index
+  const int c = blockIdx.z; // Channel index
+
+  if (i >= num_samples)
+    return;
+
+  const int flat_output_idx = (c * nb_rx * num_samples) + (ii * num_samples) + i;
+  // Index for the smaller, reused pool of cuRAND states (does NOT include channel)
+  const int state_pool_idx = (ii * num_samples) + i;
+
+  curandState_t local_state = states[state_pool_idx];
+
+  float2 noisy_signal = r_sig[flat_output_idx];
+
+  float2 awgn = curand_normal2(&local_state);
+  noisy_signal.x += awgn.x * sigma;
+  noisy_signal.y += awgn.y * sigma;
+
+  float2 final_signal = noisy_signal;
+
+  if (apply_phase_noise) {
+    float phase_error = curand_normal(&local_state) * pn_std_dev;
+    float cos_phi, sin_phi;
+    __sincosf(phase_error, &sin_phi, &cos_phi);
+    float2 phase_rot = make_float2(cos_phi, sin_phi);
+    final_signal = complex_mul(noisy_signal, phase_rot);
+  }
+
+  states[state_pool_idx] = local_state;
+
+  output_sig[flat_output_idx] = make_short2((short)fmaxf(-32768.0f, fminf(32767.0f, final_signal.x)),
+                                            (short)fmaxf(-32768.0f, fminf(32767.0f, final_signal.y)));
+}
+
 extern "C" {
 
 void add_noise_cuda(const float **r_re,
