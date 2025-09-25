@@ -259,6 +259,55 @@ uint32_t get_samples_per_slot(int slot, const NR_DL_FRAME_PARMS *fp)
   return samp_count;
 }
 
+uint32_t get_samples_symbol_duration(const NR_DL_FRAME_PARMS *fp, int slot, int start_symbol, int num_symbols)
+{
+  int end_symbol = start_symbol + num_symbols - 1;
+  AssertFatal(start_symbol <= end_symbol && start_symbol >= 0 && end_symbol < fp->symbols_per_slot,
+              "Symbol range is invalid start_symbol %d, num_symbols %d symbols_per_slot %d\n",
+              start_symbol,
+              num_symbols,
+              fp->symbols_per_slot);
+  if (num_symbols == fp->symbols_per_slot) {
+    return get_samples_per_slot(slot, fp);
+  }
+  uint32_t num_samples = 0;
+  int num_symbols_added = 0;
+
+  // Handle symbols with different nb_prefix_samples0
+  if (fp->numerology_index == 0) {
+    // Add symbol 0
+    if (start_symbol == 0) {
+      num_samples += fp->nb_prefix_samples0 + fp->ofdm_symbol_size;
+      num_symbols_added++;
+    }
+    // Add symbol 7
+    if (start_symbol <= 7 && end_symbol >= 7) {
+      num_samples += fp->nb_prefix_samples0 + fp->ofdm_symbol_size;
+      num_symbols_added++;
+    }
+  } else {
+    // Add first symbol
+    if (start_symbol == 0) {
+      num_samples += (slot % (fp->slots_per_subframe / 2)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0;
+      num_samples += fp->ofdm_symbol_size;
+      num_symbols_added++;
+    }
+  }
+
+  int num_symbols_left = max(0, num_symbols - num_symbols_added);
+  num_samples += num_symbols_left * (fp->nb_prefix_samples + fp->ofdm_symbol_size);
+  return num_samples;
+}
+
+uint32_t get_samples_symbol_timestamp(const NR_DL_FRAME_PARMS *fp, int slot, int symbol)
+{
+  if (symbol == 0) {
+    return 0;
+  }
+
+  return get_samples_symbol_duration(fp, slot, 0, symbol);
+}
+
 uint32_t get_slot_from_timestamp(openair0_timestamp timestamp_rx, const NR_DL_FRAME_PARMS *fp)
 {
    uint32_t slot_idx = 0;

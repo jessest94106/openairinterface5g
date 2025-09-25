@@ -1,0 +1,131 @@
+/*
+ * Licensed to the OpenAirInterface (OAI) Software Alliance under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The OpenAirInterface Software Alliance licenses this file to You under
+ * the OAI Public License, Version 1.1  (the "License"); you may not use this file
+ * except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.openairinterface.org/?page_id=698
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *-------------------------------------------------------------------------------
+ * For more information about the OpenAirInterface (OAI) Software Alliance:
+ *      contact@openairinterface.org
+ */
+
+#include "gtest/gtest.h"
+extern "C" {
+#include "openair1/PHY/defs_nr_common.h"
+#include "openair1/PHY/INIT/nr_phy_init.h"
+
+static softmodem_params_t softmodem_params;
+softmodem_params_t *get_softmodem_params(void)
+{
+  return &softmodem_params;
+}
+}
+
+void test_coherence_symbol_api(NR_DL_FRAME_PARMS *fp)
+{
+  EXPECT_EQ(get_samples_symbol_timestamp(fp, 0, 0), fp->get_samples_slot_timestamp(0, fp, 0));
+
+  for (int slot = 0; slot < 4; slot++) {
+    EXPECT_EQ(get_samples_symbol_duration(fp, slot, 0, fp->symbols_per_slot) + fp->get_samples_slot_timestamp(slot, fp, 0),
+              fp->get_samples_slot_timestamp(slot + 1, fp, 0));
+  }
+
+  for (int symbol = 0; symbol < fp->symbols_per_slot - 1; symbol++) {
+    EXPECT_EQ(get_samples_symbol_timestamp(fp, 0, symbol + 1) - get_samples_symbol_timestamp(fp, 0, symbol),
+              get_samples_symbol_duration(fp, 0, symbol, 1));
+  }
+}
+
+TEST(nr_frame_params, test_mu_3)
+{
+  NR_DL_FRAME_PARMS fp;
+  int mu = NR_MU_3;
+  memset(&fp, 0, sizeof(fp));
+  nfapi_nr_config_request_scf_t cfg;
+  cfg.carrier_config.num_rx_ant.value = 4;
+  cfg.carrier_config.num_tx_ant.value = 4;
+  cfg.carrier_config.dl_grid_size[mu].value = 66;
+  cfg.carrier_config.ul_grid_size[mu].value = 66;
+  cfg.cell_config.frame_duplex_type.value = TDD;
+  cfg.ssb_config.scs_common.value = mu;
+  fp.dl_CarrierFreq = 27524520000;
+  fp.nr_band = 261;
+  nr_init_frame_parms(&cfg, &fp);
+  nr_dump_frame_parms(&fp);
+  test_coherence_symbol_api(&fp);
+}
+
+TEST(nr_frame_params, test_mu_2)
+{
+  NR_DL_FRAME_PARMS fp;
+  int mu = NR_MU_2;
+  memset(&fp, 0, sizeof(fp));
+  nfapi_nr_config_request_scf_t cfg;
+  cfg.carrier_config.num_rx_ant.value = 4;
+  cfg.carrier_config.num_tx_ant.value = 4;
+  cfg.carrier_config.dl_grid_size[mu].value = 51;
+  cfg.carrier_config.ul_grid_size[mu].value = 51;
+  cfg.cell_config.frame_duplex_type.value = TDD;
+  cfg.ssb_config.scs_common.value = mu;
+  fp.dl_CarrierFreq = 27524520000;
+  fp.nr_band = 261;
+  nr_init_frame_parms(&cfg, &fp);
+  nr_dump_frame_parms(&fp);
+  test_coherence_symbol_api(&fp);
+}
+
+TEST(nr_frame_params, test_mu_1)
+{
+  NR_DL_FRAME_PARMS fp;
+  int mu = NR_MU_1;
+  memset(&fp, 0, sizeof(fp));
+  nfapi_nr_config_request_scf_t cfg;
+  cfg.carrier_config.num_rx_ant.value = 4;
+  cfg.carrier_config.num_tx_ant.value = 4;
+  cfg.carrier_config.dl_grid_size[mu].value = 106;
+  cfg.carrier_config.ul_grid_size[mu].value = 106;
+  cfg.cell_config.frame_duplex_type.value = TDD;
+  cfg.ssb_config.scs_common.value = mu;
+  fp.dl_CarrierFreq = 3600000000;
+  fp.nr_band = 78;
+  nr_init_frame_parms(&cfg, &fp);
+  nr_dump_frame_parms(&fp);
+  test_coherence_symbol_api(&fp);
+}
+
+TEST(nr_frame_params, test_mu_0)
+{
+  int mu = NR_MU_0;
+  NR_DL_FRAME_PARMS fp;
+  memset(&fp, 0, sizeof(fp));
+  nfapi_nr_config_request_scf_t cfg;
+  cfg.carrier_config.num_rx_ant.value = 4;
+  cfg.carrier_config.num_tx_ant.value = 4;
+  cfg.carrier_config.dl_grid_size[mu].value = 216;
+  cfg.carrier_config.ul_grid_size[mu].value = 216;
+  cfg.cell_config.frame_duplex_type.value = TDD;
+  cfg.ssb_config.scs_common.value = mu;
+  fp.dl_CarrierFreq = 2600000000;
+  fp.nr_band = 38;
+  nr_init_frame_parms(&cfg, &fp);
+  nr_dump_frame_parms(&fp);
+  test_coherence_symbol_api(&fp);
+}
+
+int main(int argc, char **argv)
+{
+  uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY);
+  logInit();
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

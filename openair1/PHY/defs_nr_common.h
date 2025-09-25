@@ -336,4 +336,9 @@ typedef struct {
 #define KHz (1000UL)
 #define MHz (1000*KHz)
 
+// Get symbol duration within slot in samples
+uint32_t get_samples_symbol_duration(const NR_DL_FRAME_PARMS *fp, int slot, int start_symbol, int num_symbols);
+// Get timestamp of symbol within slot in samples
+uint32_t get_samples_symbol_timestamp(const NR_DL_FRAME_PARMS *fp, int slot, int symbol);
+
 #endif
