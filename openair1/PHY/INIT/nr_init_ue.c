@@ -338,8 +338,6 @@ void term_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     free_and_zero(ue->prs_vars[idx]);
   }
 
-  free_and_zero(ue->ntn_config_message);
-  
   sl_ue_free(ue);
 }
 

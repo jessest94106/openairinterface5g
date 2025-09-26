@@ -263,7 +263,7 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
 }
 
 // prepare data for orbit propagation based on SIB19 ephemeris data to be able to compute the round-trip-time between ue and sat
-static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timing_advance_componets_t *ntn_ta)
+static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, fapi_nr_ntn_config_t *ntn_ta)
 {
   // get sat position coordinates
   const position_t pos_sat = {sat_pos->positionX_r17 * 1.3, sat_pos->positionY_r17 * 1.3, sat_pos->positionZ_r17 * 1.3};
@@ -327,7 +327,7 @@ static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timi
 }
 
 // populate ntn_ta structure from mac
-static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NTN_Config_r17_t *ntn_Config_r17, int hfn, int frame)
+static void configure_ntn_ta(fapi_nr_ntn_config_t *ntn_ta, const NR_NTN_Config_r17_t *ntn_Config_r17, int hfn, int frame)
 {
   if (!ntn_Config_r17)
     return;
@@ -402,7 +402,7 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
     ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
   }
 
-  ntn_ta->ntn_params_changed = true;
+  ntn_ta->params_changed = true;
 }
 
 static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP, int hfn, int frame)
@@ -579,7 +579,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   // NTN Config
   if (scc->ext2) {
     UPDATE_IE(mac->sc_info.ntn_Config_r17, scc->ext2->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(&mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
+    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame);
   } else {
     asn1cFreeStruc(asn_DEF_NR_NTN_Config_r17, mac->sc_info.ntn_Config_r17);
   }
@@ -1977,6 +1977,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
     mac->state = UE_PERFORMING_RA;
 
   mac->if_module->phy_config_request(&mac->phy_config);
+  mac->phy_config.config_req.ntn_config.params_changed = false;
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
@@ -1990,7 +1991,9 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, i
   if (sib19) {
     // update ntn_Config_r17 with received values
     UPDATE_IE(mac->sc_info.ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(&mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
+    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame);
+    mac->if_module->phy_config_request(&mac->phy_config);
+    mac->phy_config.config_req.ntn_config.params_changed = false;
   }
   if (mac->state == UE_RECEIVING_SIB && can_start_ra)
     mac->state = UE_PERFORMING_RA;
@@ -2053,6 +2056,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
   mac->synch_request.synch_req.target_Nid_cell = mac->physCellId;
   mac->if_module->synch_request(&mac->synch_request);
   mac->if_module->phy_config_request(&mac->phy_config);
+  mac->phy_config.config_req.ntn_config.params_changed = false;
 }
 
 static void configure_physicalcellgroup(NR_UE_MAC_INST_t *mac,

@@ -177,8 +177,7 @@ void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
   ue->dci_thres   = 0;
   ue->target_Nid_cell = -1;
 
-  ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
-  ue->ntn_config_message->update = false;
+  ue->nrUE_config.ntn_config.params_changed = false;
 
   // initialize all signal buffers
   init_nr_ue_signal(ue, nb_connected_gNB);
@@ -737,11 +736,11 @@ static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
 
 static void fix_ntn_epoch_hfn(PHY_VARS_NR_UE *UE, int hfn, int frame)
 {
-  const int epoch_frame = UE->ntn_config_message->ntn_config_params.epoch_sfn;
+  const int epoch_frame = UE->nrUE_config.ntn_config.epoch_sfn;
   const int diff1 = (frame - epoch_frame + 1024) % 1024;
   const int diff2 = (epoch_frame - frame + 1024) % 1024;
 
-  int *epoch_hfn = &UE->ntn_config_message->ntn_config_params.epoch_hfn;
+  int *epoch_hfn = &UE->nrUE_config.ntn_config.epoch_hfn;
   if (diff1 < diff2) { // epoch_frame in the past
     LOG_I(PHY, "epoch is %d frames in the past\n", diff1);
     if (epoch_frame <= frame)
@@ -763,7 +762,7 @@ static void fix_ntn_epoch_hfn(PHY_VARS_NR_UE *UE, int hfn, int frame)
 // calculate TA and Doppler based on the NTN-Config, if abs_subframe_tx < 0 then apply only Doppler
 static void apply_ntn_timing_advance_and_doppler(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_PARMS *fp, int abs_subframe_tx)
 {
-  const fapi_nr_dl_ntn_config_command_pdu *ntn_config_params = &UE->ntn_config_message->ntn_config_params;
+  const fapi_nr_ntn_config_t *ntn_config_params = &UE->nrUE_config.ntn_config;
 
   // Handle terrestrial networks
   if (ntn_config_params->cell_specific_k_offset == 0) {
@@ -860,10 +859,10 @@ static void apply_ntn_config(PHY_VARS_NR_UE *UE,
                              int *timing_advance,
                              int *ntn_koffset)
 {
-  if (UE->ntn_config_message->update) {
-    UE->ntn_config_message->update = false;
+  if (UE->nrUE_config.ntn_config.params_changed) {
+    UE->nrUE_config.ntn_config.params_changed = false;
 
-    const fapi_nr_dl_ntn_config_command_pdu *ntn_config_params = &UE->ntn_config_message->ntn_config_params;
+    const fapi_nr_ntn_config_t *ntn_config_params = &UE->nrUE_config.ntn_config;
 
     const int mu = fp->numerology_index;
     const int koffset = ntn_config_params->cell_specific_k_offset;
@@ -1058,7 +1057,7 @@ void *UE_thread(void *arg)
       const int frame_rx = (absolute_slot / nb_slot_frame) % 1024;
       const int hfn_rx = (absolute_slot / nb_slot_frame) / 1024;
       fix_ntn_epoch_hfn(UE, hfn_rx, frame_rx);
-      if (UE->ntn_config_message->update) {
+      if (UE->nrUE_config.ntn_config.params_changed) {
         apply_ntn_config(UE, fp, hfn_rx, frame_rx, 0, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
       } else {
         const int mu = fp->numerology_index;

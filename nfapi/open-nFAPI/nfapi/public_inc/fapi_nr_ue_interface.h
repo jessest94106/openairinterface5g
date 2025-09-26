@@ -587,7 +587,9 @@ typedef struct {
 
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
-} fapi_nr_dl_ntn_config_command_pdu;
+
+  bool params_changed;
+} fapi_nr_ntn_config_t;
 
 typedef struct {
   uint8_t pdu_type;
@@ -597,7 +599,6 @@ typedef struct {
     fapi_nr_dl_config_csirs_pdu csirs_config_pdu;
     fapi_nr_dl_config_csiim_pdu csiim_config_pdu;
     fapi_nr_ta_command_pdu ta_command_pdu;
-    fapi_nr_dl_ntn_config_command_pdu ntn_config_command_pdu;
   };
 } fapi_nr_dl_config_request_pdu_t;
 
@@ -729,6 +730,7 @@ typedef struct {
   fapi_nr_ssb_table_t ssb_table;
   fapi_nr_tdd_table_t tdd_table;
   fapi_nr_prach_config_t prach_config;
+  fapi_nr_ntn_config_t ntn_config;
 
 } fapi_nr_config_request_t;
 

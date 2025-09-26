@@ -329,11 +329,6 @@ typedef struct UE_NR_SCAN_INFO_s {
   int32_t freq_offset_Hz[3][10];
 } UE_NR_SCAN_INFO_t;
 
-typedef struct {
-  bool update;
-  fapi_nr_dl_ntn_config_command_pdu ntn_config_params;
-} ntn_config_message_t;
-
 /// Top-level PHY Data Structure for UE
 typedef struct PHY_VARS_NR_UE_s {
   openair0_config_t openair0_cfg[MAX_CARDS];
@@ -527,7 +522,6 @@ typedef struct PHY_VARS_NR_UE_s {
   Actor_t sync_actor;
   Actor_t *dl_actors;
   Actor_t *ul_actors;
-  ntn_config_message_t* ntn_config_message;
   pthread_t main_thread;
   pthread_t stat_thread;
 } PHY_VARS_NR_UE;
