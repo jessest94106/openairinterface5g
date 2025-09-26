@@ -588,6 +588,7 @@ typedef struct {
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
 
+  bool is_targetcell;
   bool params_changed;
 } fapi_nr_ntn_config_t;
 

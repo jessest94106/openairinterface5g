@@ -327,7 +327,11 @@ static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, fapi_nr_
 }
 
 // populate ntn_ta structure from mac
-static void configure_ntn_ta(fapi_nr_ntn_config_t *ntn_ta, const NR_NTN_Config_r17_t *ntn_Config_r17, int hfn, int frame)
+static void configure_ntn_ta(fapi_nr_ntn_config_t *ntn_ta,
+                             const NR_NTN_Config_r17_t *ntn_Config_r17,
+                             int hfn,
+                             int frame,
+                             bool is_targetcell)
 {
   if (!ntn_Config_r17)
     return;
@@ -402,6 +406,7 @@ static void configure_ntn_ta(fapi_nr_ntn_config_t *ntn_ta, const NR_NTN_Config_r
     ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
   }
 
+  ntn_ta->is_targetcell = is_targetcell;
   ntn_ta->params_changed = true;
 }
 
@@ -579,7 +584,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   // NTN Config
   if (scc->ext2) {
     UPDATE_IE(mac->sc_info.ntn_Config_r17, scc->ext2->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame);
+    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame, true);
   } else {
     asn1cFreeStruc(asn_DEF_NR_NTN_Config_r17, mac->sc_info.ntn_Config_r17);
   }
@@ -1991,7 +1996,7 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, i
   if (sib19) {
     // update ntn_Config_r17 with received values
     UPDATE_IE(mac->sc_info.ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame);
+    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame, false);
     mac->if_module->phy_config_request(&mac->phy_config);
     mac->phy_config.config_req.ntn_config.params_changed = false;
   }
