@@ -588,6 +588,21 @@ struct openair0_device_t {
    */
   int (*trx_set_gains_func)(openair0_device *device, openair0_config_t *openair0_cfg);
 
+  /*! \brief Set tx/rx beams
+   *
+   * Set the tx/rx beams. This has to be done in advance of the reception in order to
+   * allow the underlying device to change receiver configuration. The exact time depends
+   * on the device.
+   *
+   * NOTICE: the samples returned from trx_read_func may belong to more than one beam. It is up
+   * to the application to determine the beam of the received samples.
+   *
+   * \param device the hardware to use
+   * \param beam_map the beams to receive
+   * \return 0 on success
+   */
+  int (*trx_set_beams)(openair0_device *device, uint64_t beam_map, openair0_timestamp timestamp);
+
   /*! \brief RRU Configuration callback
    * \param idx RU index
    * \param arg pointer to capabilities or configuration
