@@ -987,7 +987,7 @@ void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
     .meas_type = NFAPI_NR_CSI_MEAS,
     .Nid_cell = frame_parms->Nid_cell,
     .is_neighboring_cell = false,
-    .rsrp_dBm = BOUNDED_EVAL(16, rsrp_dBm + 157, 113), // TS 38.133 - Table 10.1.6.1-1
+    .rsrp_dBm = rsrp_dBm,
     .rank_indicator = rank_indicator,
     .i1 = *i1,
     .i2 = *i2,

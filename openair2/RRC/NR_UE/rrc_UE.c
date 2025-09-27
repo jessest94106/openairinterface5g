@@ -2589,14 +2589,14 @@ void *rrc_nrue(void *notUsed)
           NR_RRC_MAC_MEAS_DATA_IND(msg_p).is_neighboring_cell? "Neighboring cell" : "Active cell",
           NR_RRC_MAC_MEAS_DATA_IND(msg_p).Nid_cell,
           NR_RRC_MAC_MEAS_DATA_IND(msg_p).is_csi_meas ? "CSI meas" : "SSB meas",
-          NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp_dBm - 157);
+          NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp_dBm);
 
     rrcPerNB_t *rrcNB = rrc->perNB + NR_RRC_MAC_MEAS_DATA_IND(msg_p).gnb_index;
     nr_ue_meas_filtering(rrcNB,
                          NR_RRC_MAC_MEAS_DATA_IND(msg_p).is_neighboring_cell,
                          NR_RRC_MAC_MEAS_DATA_IND(msg_p).Nid_cell,
                          NR_RRC_MAC_MEAS_DATA_IND(msg_p).is_csi_meas,
-                         NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp_dBm - 157);
+                         NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp_dBm);
     nr_ue_check_meas_report(rrc, NR_RRC_MAC_MEAS_DATA_IND(msg_p).gnb_index);
     break;
 

@@ -236,11 +236,10 @@ void nr_ue_ssb_rsrp_measurements(PHY_VARS_NR_UE *ue,
     .gNB_index = proc->gNB_id,
     .meas_type = NFAPI_NR_SS_MEAS,
     .Nid_cell = ue->frame_parms.Nid_cell,
+    .rsrp_dBm = ue->measurements.ssb_rsrp_dBm[ssb_index],
     .ssb_index = ssb_index,
     .is_neighboring_cell = false,
   };
-  int ssb_rsrp_dBm = ue->measurements.ssb_rsrp_dBm[ssb_index];
-  l1_measurements.rsrp_dBm = BOUNDED_EVAL(16, ssb_rsrp_dBm + 157, 113); // TS 38.133 - Table 10.1.6.1-1
   nr_downlink_indication_t dl_indication = {0};
   fapi_nr_rx_indication_t rx_ind = {0};
   nr_fill_dl_indication(&dl_indication, NULL, &rx_ind, proc, ue, NULL);
