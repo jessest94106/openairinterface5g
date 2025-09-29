@@ -21,12 +21,12 @@
 
 -->
 <testCaseList>
-        <htmlTabRef>physim-tab</htmlTabRef>
-        <htmlTabName>PhySim</htmlTabName>
+        <htmlTabRef>physim-timed-tab</htmlTabRef>
+        <htmlTabName>PhySim with timing check</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
         <TestCaseRequestedList>
           800813
-          010201
+	  010202
         </TestCaseRequestedList>
         <TestCaseExclusionList></TestCaseExclusionList>
 
@@ -36,11 +36,11 @@
                 <node>localhost</node>
         </testCase>
 
-        <testCase id="010201">
-                <class>Build_Deploy_Docker_PhySim</class>
-                <desc>Build and Deploy PhySim</desc>
-                <node>localhost</node>
-                <ctest-opt>-R 5g -E "nr_dlsim|nr_ulsim|ldpctest" -j32</ctest-opt> <!-- one nr_dlsim test fails on ARM -->
+	<testCase id="010202">
+		<class>Build_Deploy_Docker_PhySim</class>
+		<desc>Build and Deploy PhySim with timing check</desc>
+		<node>localhost</node>
+		<ctest-opt>-R 5g -R "nr_dlsim|nr_ulsim|ldpctest" -E physim.5g.nr_dlsim.mcs.mimo.test9 -j1</ctest-opt> <!-- one nr_dlsim test fails on ARM -->
 	</testCase>
 
 </testCaseList>
