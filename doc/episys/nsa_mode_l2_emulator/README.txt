@@ -17,7 +17,7 @@ Channel_Abstraction_UE_Handling_LTE.PNG image).
 
 The updates to the OAI code base removed some latent bugs, added multi-UE scalability,
 and were tested with a standard bypass proxy between the UE(s) and eNB/gNB. The bypass proxy is
-publicly available on GitHub (https://github.com/EpiSci/oai-lte-multi-ue-proxy). With this package,
+publicly available on [GitHub](https://github.com/EpiSci/oai-lte-multi-ue-proxy). With this package,
 various multi-UE scenarios can be tested without the overhead of PHY-layer features
 of underlying radios. The added features to the OAI code base are listed below.
 
@@ -52,7 +52,7 @@ set LOG_MINIMAL = 0 in the log.h file.
 Additionally, NSA mode includes the establishment between an NR UE and the gNB via the LTE UE and eNB
 connection. For NSA mode, the downlink channel abstraction has not been added to the feature set yet.
 NSA mode has been tested and is fully functional with EpiSci's public version of the nFAPI proxy
-located at https://github.com/EpiSci/oai-lte-multi-ue-proxy
+located at [GitHub Repository](https://github.com/EpiSci/oai-lte-multi-ue-proxy)
 NSA mode establishment includes the following steps:
 
  - First UE capability enquiry is sent to NR UE
@@ -90,5 +90,5 @@ test set up is included below.
     there will be a total of 7 processes running for this particular scenario.
     These processes are LTE UE #1, LTE UE #2, NR UE #1, NR UE #2, eNB, gNB and the
     proxy. A detailed description of the launch processes can be found at
-    https://github.com/EpiSci/oai-lte-multi-ue-proxy/blob/master/README.md
+    [GitHub Repository](https://github.com/EpiSci/oai-lte-multi-ue-proxy/blob/master/README.md)
 

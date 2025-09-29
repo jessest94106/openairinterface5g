@@ -1,8 +1,7 @@
 # I/Q record-replay
 ## using the iq record-replay
 
-This feature provides I/Q record-replay as initially presented in the 4th OAI workshop for LTE
-(https://www.openairinterface.org/docs/workshop/4_OAI_Workshop_20171107/Talks/MONGAZON_Nokia-Bell-Labs-OAI-IQ.pdf)
+This feature provides I/Q record-replay as initially presented in the [4th OAI workshop for LTE](https://www.openairinterface.org/docs/workshop/4_OAI_Workshop_20171107/Talks/MONGAZON_Nokia-Bell-Labs-OAI-IQ.pdf)
 The current implementation has been temporarily disrupted for LTE and only works for 5G SA
 nr-uesoftmodem executable.
 

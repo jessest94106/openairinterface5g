@@ -17,7 +17,7 @@ Channel_Abstraction_UE_Handling_LTE.PNG image).
 
 The updates to the OAI code base removed some latent bugs, added multi-UE scalability,
 and were tested with a standard bypass proxy between the UE(s) and eNB. The bypass proxy is
-publicly available on GitHub (https://github.com/EpiSci/oai-lte-multi-ue-proxy). With this package,
+publicly available on [GitHub](https://github.com/EpiSci/oai-lte-multi-ue-proxy). With this package,
 various multi-UE scenarios can be tested without the overhead of PHY-layer features
 of underlying radios. The features added in the L2 Emulator Mode for LTE are:
 

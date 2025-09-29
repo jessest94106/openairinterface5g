@@ -219,7 +219,7 @@ You can of course use all standard cmake/ninja/make commands in this directory.
 
 ## cmake presets
 
-CMake presets are common project configure options. See https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html
+CMake presets are common project configure options. See [here](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html).
 
 Configure presets:
 

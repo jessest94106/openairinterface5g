@@ -44,8 +44,7 @@ More information can be found in [the contributing page](../CONTRIBUTING.md).
   recommended and default branch.**
 - `master`: contains a known stable version.
 
-You can find the latest stable tag release here:
-https://gitlab.eurecom.fr/oai/openairinterface5g/tags
+You can find the latest stable tag release [here](https://gitlab.eurecom.fr/oai/openairinterface5g/tags).
 
 The tag naming conventions are:
 
