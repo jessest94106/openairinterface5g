@@ -46,34 +46,6 @@
 //#define DEBUG_MEAS_UE
 //#define DEBUG_RANK_EST
 
-uint32_t get_nr_rx_total_gain_dB (module_id_t Mod_id,uint8_t CC_id)
-{
-
-  PHY_VARS_NR_UE *ue = PHY_vars_UE_g[Mod_id][CC_id];
-
-  if (ue)
-    return ue->rx_total_gain_dB;
-
-  return 0xFFFFFFFF;
-}
-
-
-float_t get_nr_RSRP(module_id_t Mod_id,uint8_t CC_id,uint8_t gNB_index)
-{
-
-  AssertFatal(PHY_vars_UE_g!=NULL,"PHY_vars_UE_g is null\n");
-  AssertFatal(PHY_vars_UE_g[Mod_id]!=NULL,"PHY_vars_UE_g[%d] is null\n",Mod_id);
-  AssertFatal(PHY_vars_UE_g[Mod_id][CC_id]!=NULL,"PHY_vars_UE_g[%d][%d] is null\n",Mod_id,CC_id);
-
-  PHY_VARS_NR_UE *ue = PHY_vars_UE_g[Mod_id][CC_id];
-
-  if (ue)
-    return (10*log10(ue->measurements.rsrp[gNB_index])-
-	    get_nr_rx_total_gain_dB(Mod_id,0) -
-	    10*log10(20*12));
-  return -140.0;
-}
-
 void nr_ue_measurements(PHY_VARS_NR_UE *ue,
                         const UE_nr_rxtx_proc_t *proc,
                         NR_UE_DLSCH_t *dlsch,
