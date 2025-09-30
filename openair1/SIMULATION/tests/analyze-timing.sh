@@ -6,12 +6,9 @@
 
 function die() { echo $@ 1>&2; exit 1; }
 
-# RC will be the return code. If any rule fails, it will set RC=1, which will
-# make the script fail. Print also every line, because the logs are piped into
-# this script, but a user is typically also interested into the raw logs.
+# Print every line, because the logs are piped into this script, but a user is
+# typically also interested into the raw logs.
 SCRIPT='
-  BEGIN { RC = 0; }
-
   { print $0 }
 '
 
@@ -24,9 +21,9 @@ while [ $# -gt 0 ]; do
   shift 2
 
   # Add a rule that searches for a PATTERN + number, and checks against
-  # CONDition. If the condition does not hold, it is counted as a failure (sets
-  # RC to signal error). In both cases, the result is logged in an array to
-  # output at the end of the script.
+  # CONDition. If the condition does not hold, it is counted as a failure. In
+  # both cases, the result is logged in an array to output at the end of the
+  # script.
   #
   # To search for the number, first substr() returns what has been matched
   # (PATTERN + number), and sub() deletes PATTERN and whitespace, resulting in
@@ -49,7 +46,6 @@ while [ $# -gt 0 ]; do
       r = "SUCCESS";
     } else {
       r = "FAIL";
-      RC = 1;
     }
     RESULTS['${NUM}']=sprintf("CHECK %-35s %7.2f %-8s %s", "'${PATTERN}'", meas, " '${COND}'", r);
   }
@@ -63,7 +59,6 @@ while [ $# -gt 0 ]; do
   END {
     if (!RESULTS['${NUM}']) {
       RESULTS['${NUM}']=sprintf("CHECK %-35s          %-7s NOTFOUND", "'${PATTERN}'", "'${COND}'");
-      RC = 1;
     }
   }
 '
@@ -75,8 +70,11 @@ done
 # (0 on success, i.e..all conditions checked, otherwise 1 on failure).
 SCRIPT+='
   END {
+    RC = 0;
     for (i = 0; i < '${NUM}'; ++i) {
       print RESULTS[i]
+      if (!(RESULTS[i] ~ /SUCCESS$/))
+        RC = 1;
     }
     exit RC
   }
