@@ -55,6 +55,8 @@ typedef struct {
   uint32_t C;
   /// Number of bits in code segments
   uint32_t K;
+  ///
+  uint32_t Kb;
   /// Number of "Filler" bits
   uint32_t F;
   /// Number of soft channel bits
@@ -135,4 +137,13 @@ typedef struct {
   // PTRS symbol index, to be updated every PTRS symbol within a slot.
   uint8_t ptrs_symbol_index;
 } NR_UE_DLSCH_t;
+
+typedef struct {
+  uint16_t Q_dash_ACK; // number of coded HARQ-ACK symbols
+  uint16_t E_uci_ACK; // number of coded HARQ-ACK bits
+  uint16_t Q_dash_ACK_rvd; // number of coded HARQ-ACK symbols reserved
+  uint16_t E_uci_ACK_rvd; // number of coded HARQ-ACK bits reserved
+  uint32_t G_ulsch; // bit capacity of ULSCH
+} rate_match_info_uci_t;
+
 #endif
