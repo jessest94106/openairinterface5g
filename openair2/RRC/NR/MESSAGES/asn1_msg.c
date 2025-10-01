@@ -545,15 +545,35 @@ static NR_RRCReconfiguration_IEs_t *build_RRCReconfiguration_IEs(const nr_rrc_re
 
     /* masterCellGroup */
     if (params->cell_group_config) {
-      // Encode in extension IE (Master cell group)
-      uint8_t *buf = NULL;
-      ssize_t len = uper_encode_to_new_buffer(&asn_DEF_NR_CellGroupConfig, NULL, params->cell_group_config, (void **)&buf);
-      AssertFatal(len > 0, "ASN1 message encoding failed (%lu)!\n", len);
+      uint8_t temp[4096];
+      asn_enc_rval_t enc = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, params->cell_group_config, temp, sizeof(temp));
+
+      if (enc.encoded <= 0) {
+        LOG_E(NR_RRC, "ASN.1 encoding failed for NR_CellGroupConfig (encoded=%ld)\n", enc.encoded);
+        if (enc.failed_type) {
+          LOG_E(NR_RRC, "Failed at ASN.1 type: %s\n", enc.failed_type->name);
+        }
+        if (enc.structure_ptr) {
+          LOG_E(NR_RRC, "Failed at structure element: %p\n", enc.structure_ptr);
+        }
+        // Print diagnostic information to help debug the issue
+        LOG_E(NR_RRC, "CellGroupConfig structure that failed to encode:\n");
+        xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *)params->cell_group_config);
+        ASN_STRUCT_FREE(asn_DEF_NR_RRCReconfiguration_IEs, ie);
+        return NULL;
+      }
+      DevAssert(enc.encoded <= sizeof(temp) * 8); // Encoded data must fit in temp buffer
+      // Allocate buffer for the encoded data and copy it
+      // enc.encoded is in bits, convert to bytes
+      size_t encoded_bytes = (enc.encoded + 7) / 8;
+      uint8_t *buf = calloc_or_fail(1, encoded_bytes);
+      memcpy(buf, temp, encoded_bytes);
+
       if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
         xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *)params->cell_group_config);
       }
       ie->nonCriticalExtension->masterCellGroup = calloc_or_fail(1, sizeof(*ie->nonCriticalExtension->masterCellGroup));
-      *ie->nonCriticalExtension->masterCellGroup = (OCTET_STRING_t){.buf = buf, .size = len};
+      *ie->nonCriticalExtension->masterCellGroup = (OCTET_STRING_t){.buf = buf, .size = encoded_bytes};
     }
 
     /* masterKeyUpdate */
@@ -608,6 +628,10 @@ byte_array_t do_RRCReconfiguration(const nr_rrc_reconfig_param_t *params)
 {
   byte_array_t msg = {.buf = NULL, .len = 0};
   NR_RRCReconfiguration_IEs_t *ie = build_RRCReconfiguration_IEs(params);
+  if (!ie) {
+    LOG_E(NR_RRC, "%s: failed to encode RRCReconfiguration\n", __func__);
+    return msg;
+  }
 
   NR_DL_DCCH_Message_t dl_dcch_msg = {0};
   dl_dcch_msg.message.present = NR_DL_DCCH_MessageType_PR_c1;
