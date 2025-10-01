@@ -62,7 +62,7 @@ likely won't work well.
 
 USRP B2XX or Blade RF are USB based radios recommended to use with USB 3.0. You can choose a minimum hardware to do functional testing and performance hardware for performance testing. This hardware you can find in Mini-PCs or laptops.
 
-The minimum requirements stated in [simulated radio](.##simulated-radio) apply.
+The minimum requirements stated in [simulated radio](#simulated-radio) apply.
 
 #### Minimum requirements for both gNB and UE Stack
 
@@ -89,7 +89,7 @@ tune your system to get high performance.
 
 USRP N3XX/X3XX/X4XX requires two dedicated 10G SFP+ connections. For these radios we only recommend having performance hardware. This hardware you can find in Desktop servers or rack/blade servers. For the gNB, the same applies in case of using AW2S radios.
 
-The minimum requirements stated in [simulated radio](.##simulated-radio) apply.
+The minimum requirements stated in [simulated radio](#simulated-radio) apply.
 
 Apart from this you should follow [tuning and security tips](./tuning_and_security.md) to 
 tune your system to get high performance. 
@@ -120,4 +120,4 @@ tune your system to get high performance.
 
 We have dedicated documentation for O-RAN Radio Units. [Refer to 7.2 FH documentation](./ORAN_FHI7.2_Tutorial.md) before purchasing a Desktop server or rack/blade server. 
 
-The minimum requirements stated in [simulated radio](.##simulated-radio) apply.
+The minimum requirements stated in [simulated radio](#simulated-radio) apply.
