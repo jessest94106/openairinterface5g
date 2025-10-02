@@ -404,7 +404,8 @@ void phy_procedures_nrUE_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, n
                                   (c16_t **)txdataF,
                                   txp,
                                   link_type_ul,
-                                  was_symbol_used);
+                                  was_symbol_used,
+                                  ue->no_phase_pre_comp);
     stop_meas_nr_ue_phy(ue, OFDM_MOD_STATS);
   }
 
@@ -1214,13 +1215,7 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     }
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PDSCH, VCD_FUNCTION_OUT);
 
-    uint8_t nb_re_dmrs;
-    if (dlsch_config->dmrsConfigType == NFAPI_NR_DMRS_TYPE1) {
-      nb_re_dmrs = 6 * dlsch_config->n_dmrs_cdm_groups;
-    }
-    else {
-      nb_re_dmrs = 4 * dlsch_config->n_dmrs_cdm_groups;
-    }
+    const uint8_t nb_re_dmrs = get_num_dmrs_re_per_rb(dlsch_config->dmrsConfigType, dlsch_config->n_dmrs_cdm_groups);
     uint16_t dmrs_len = get_num_dmrs(dlsch_config->dlDmrsSymbPos);
     uint32_t unav_res = 0;
     if(dlsch_config->pduBitmap & 0x1) {
