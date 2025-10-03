@@ -607,10 +607,10 @@ static void nr_rrc_process_dedicatedNAS_MessageList(NR_UE_RRC_INST_t *rrc, NR_RR
       nas_establish_cnf_t *msg = &NAS_CONN_ESTABLI_CNF(ittiMsg);
       msg->errCode = AS_SUCCESS;
       msg->nasMsg.length = tmp->list.array[i]->size;
-      msg->nasMsg.nas_data = tmp->list.array[i]->buf;
+      msg->nasMsg.nas_data = malloc_or_fail(msg->nasMsg.length);
+      memcpy(msg->nasMsg.nas_data, tmp->list.array[i]->buf, msg->nasMsg.length);
       itti_send_msg_to_task(TASK_NAS_NRUE, rrc->ue_id, ittiMsg);
     }
-    tmp->list.count = 0; // to prevent the automatic free by ASN1_FREE
   }
 }
 
