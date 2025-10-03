@@ -774,7 +774,7 @@ static inline __attribute__((always_inline)) int16x8_t cmac0_prec128(int16x8_t x
 }
 static inline __attribute__((always_inline)) int16x8_t cmac_prec128(int16x8_t y, int16x8_t x, int16x8_t wr, int16x8_t wi) {
   int16x8_t produ = cmac0_prec128(x, wr, wi);
-  return vaddq_s16(y, produ.val[0]);
+  return vaddq_s16(y, produ);
 }
 #else
 static inline __attribute__((always_inline)) simde__m128i cmac0_prec128(simde__m128i x, simde__m128i w_c, simde__m128i w_s)
@@ -960,7 +960,7 @@ void nr_layer_precoder_simd(const int n_layers,
       const int16x8_t x1 = vld1q_s16((const int16_t *)in1++);
       // Accumulate the product
       int16x8_t y = cmac0_prec128(x0, w_c0, w_s0);
-      y = cmac_prec128(y, x1, w_cr1, w_s1);
+      y = cmac_prec128(y, x1, w_c1, w_s1);
       // Store the result to txdataF
       *(int16x8_t *)out = y;
     }
@@ -975,8 +975,8 @@ void nr_layer_precoder_simd(const int n_layers,
       // Accumulate the product
       int16x8_t y = cmac0_prec128(x0, w_c0, w_s0);
       ;
-      y = cmac_prec128(y, x1, w_cr1, w_s1);
-      y = cmac_prec128(y, x2, w_cr2, w_s2);
+      y = cmac_prec128(y, x1, w_c1, w_s1);
+      y = cmac_prec128(y, x2, w_c2, w_s2);
       // Store the result to txdataF
       *(int16x8_t *)out = y;
     }
@@ -993,9 +993,9 @@ void nr_layer_precoder_simd(const int n_layers,
       // Accumulate the product
       int16x8_t y = cmac0_prec128(x0, w_c0, w_s0);
       ;
-      y = cmac_prec128(y, x1, w_cr1, w_s1);
-      y = cmac_prec128(y, x2, w_cr2, w_s2);
-      y = cmac_prec128(y, x3, w_cr3, w_s3);
+      y = cmac_prec128(y, x1, w_c1, w_s1);
+      y = cmac_prec128(y, x2, w_c2, w_s2);
+      y = cmac_prec128(y, x3, w_c3, w_s3);
       // Store the result to txdataF
       *(int16x8_t *)out = y;
     }
