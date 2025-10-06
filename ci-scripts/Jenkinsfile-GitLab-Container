@@ -267,6 +267,23 @@ pipeline {
         }
       }
     }
+    stage ("DockerHub-Push") {
+      when { expression {doBuild && "PUSH".equals(env.gitlabActionType)} }
+      steps {
+        script {
+          triggerSlaveJob ('RAN-DockerHub-Push', 'DockerHub-Push')
+        }
+      }
+      post {
+        failure {
+          script {
+            echo "Push to Docker-Hub KO"
+            currentBuild.result = 'FAILURE'
+            failingStages += '\n * RAN-DockerHub-Push'
+          }
+        }
+      }
+    }
     stage ("Image Test Processes") {
       when { expression {doBuild} }
       parallel {
@@ -752,23 +769,6 @@ pipeline {
                 failingStages += saOAIUEStatus
               }
             }
-          }
-        }
-      }
-    }
-    stage ("DockerHub-Push") {
-      when { expression {doBuild && "PUSH".equals(env.gitlabActionType)} }
-      steps {
-        script {
-          triggerSlaveJob ('RAN-DockerHub-Push', 'DockerHub-Push')
-        }
-      }
-      post {
-        failure {
-          script {
-            echo "Push to Docker-Hub KO"
-            currentBuild.result = 'FAILURE'
-            failingStages += '\n * RAN-DockerHub-Push'
           }
         }
       }
