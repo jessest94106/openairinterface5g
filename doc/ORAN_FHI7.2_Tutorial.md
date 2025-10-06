@@ -100,8 +100,8 @@ Tested libxran releases:
 
 Your server could be:
 
-* One NUMA node (See [one NUMA node example](#111-one-numa-node)): all the processors are sharing a single memory system.
-* Two NUMA nodes (see [two NUMA nodes example](#112-two-numa-node)): processors are grouped in 2 memory systems.
+* One NUMA node (See [one NUMA node example](#one-numa-node)): all the processors are sharing a single memory system.
+* Two NUMA nodes (see [two NUMA nodes example](#two-numa-nodes)): processors are grouped in 2 memory systems.
   - Usually the even (ie `0,2,4,...`) CPUs are on the 1st socket
   - And the odd (ie (`1,3,5,...`) CPUs are on the 2nd socket
 
