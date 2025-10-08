@@ -663,9 +663,10 @@ static int startClient(openair0_device *device)
 
 static int rfsimulator_write_internal(rfsimulator_state_t *t,
                                       openair0_timestamp timestamp,
-                                      void **samplesVoid,
+                                      void ***samplesVoid,
                                       int nsamps,
                                       int nbAnt,
+                                      uint64_t beam_map,
                                       int flags)
 {
   mutexlock(t->Sockmutex);
@@ -677,14 +678,14 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
     if (b->conn_sock >= 0) {
       if (!nbAnt)
         LOG_E(HW, "rfsimulator sending 0 tx antennas\n");
-      samplesBlockHeader_t header = {(uint32_t)nsamps, (uint32_t)nbAnt, (uint64_t)timestamp};
+      samplesBlockHeader_t header = {(uint32_t)nsamps, (uint32_t)nbAnt, (uint64_t)timestamp, 0, 0, beam_map};
       fullwrite(b->conn_sock, &header, sizeof(header), t);
       if (nbAnt == 1) {
-        fullwrite(b->conn_sock, samplesVoid[0], sampleToByte(nsamps, nbAnt), t);
+        fullwrite(b->conn_sock, samplesVoid[0][0], sampleToByte(nsamps, nbAnt), t);
       } else {
         sample_t tmpSamples[nsamps][nbAnt];
         for (int a = 0; a < nbAnt; a++) {
-          sample_t *in = (sample_t *)samplesVoid[a];
+          sample_t *in = (sample_t *)samplesVoid[0][a];
           for (int s = 0; s < nsamps; s++)
             tmpSamples[s][a] = in[s];
         }
@@ -714,7 +715,7 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
         nsamps,
         timestamp,
         timestamp + nsamps,
-        signal_energy(static_cast<int32_t *>(samplesVoid[0]), nsamps));
+        signal_energy(static_cast<int32_t *>(samplesVoid[0][0]), nsamps));
 
   /* trace only first antenna */
   T(T_USRP_TX_ANT0, T_INT(timestamp), T_BUFFER(samplesVoid[0], (int)sampleToByte(nsamps, 1)));
@@ -722,16 +723,23 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
   return nsamps;
 }
 
-static int rfsimulator_write(openair0_device *device,
-                             openair0_timestamp timestamp,
-                             void **samplesVoid,
-                             int nsamps,
-                             int nbAnt,
-                             int flags)
+static int rfsimulator_write_beams(openair0_device *device,
+                                   openair0_timestamp timestamp,
+                                   void ***samplesVoid,
+                                   int nsamps,
+                                   int nbAnt,
+                                   int num_beams,
+                                   int flags)
 {
   timestamp -= device->openair0_cfg->command_line_sample_advance;
   rfsimulator_state_t *t = static_cast<rfsimulator_state_t *>(device->priv);
-  return rfsimulator_write_internal(t, timestamp, samplesVoid, nsamps, nbAnt, flags);
+  return rfsimulator_write_internal(t, timestamp, samplesVoid, nsamps, nbAnt, 1, flags);
+}
+
+static int rfsimulator_write(openair0_device *device, openair0_timestamp timestamp, void **buff, int nsamps, int cc, int flags)
+{
+  void **tmp = buff;
+  return rfsimulator_write_beams(device, timestamp, &tmp, nsamps, cc, 1, flags);
 }
 
 static bool add_client(rfsimulator_state_t *t)
@@ -761,7 +769,7 @@ static bool add_client(rfsimulator_state_t *t)
   void *samplesVoid[t->tx_num_channels];
   for (int i = 0; i < t->tx_num_channels; i++)
     samplesVoid[i] = (void *)&v;
-  samplesBlockHeader_t header = {(uint32_t)1, (uint32_t)t->tx_num_channels, (uint64_t)t->lastWroteTS};
+  samplesBlockHeader_t header = {1, (uint32_t)t->tx_num_channels, (uint64_t)t->lastWroteTS, 0, 0, 1};
   fullwrite(conn_sock, &header, sizeof(header), t);
   fullwrite(conn_sock, samplesVoid, sampleToByte(1, t->tx_num_channels), t);
 
@@ -1145,6 +1153,7 @@ int device_init(openair0_device *device, openair0_config_t *openair0_cfg) {
   device->trx_set_freq_func = rfsimulator_set_freq;
   device->trx_set_gains_func = rfsimulator_set_gains;
   device->trx_write_func = rfsimulator_write;
+  device->trx_write_beams_func = rfsimulator_write_beams;
   device->trx_read_func = rfsimulator_read;
   /* let's pretend to be a b2x0 */
   device->type = RFSIMULATOR;

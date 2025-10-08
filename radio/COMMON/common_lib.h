@@ -491,12 +491,29 @@ struct openair0_device_t {
   /*! \brief Called to send samples to the RF target
       @param device pointer to the device structure specific to the RF hardware target
       @param timestamp The timestamp at whicch the first sample MUST be sent
-      @param buff Buffer which holds the samples (2 dimensional)
+      @param buff Buffer which holds the samples (3 dimensional)
       @param nsamps number of samples to be sent
-      @param number of antennas 
+      @param nb_antennas_tx number of antennas
+      @param num_beams number of beams
       @param flags flags must be set to true if timestamp parameter needs to be applied
   */
-  int (*trx_write_func)(openair0_device *device, openair0_timestamp timestamp, void **buff, int nsamps,int antenna_id, int flags);
+  int (*trx_write_beams_func)(openair0_device *device,
+                              openair0_timestamp timestamp,
+                              void ***buff,
+                              int nsamps,
+                              int nb_antennas_tx,
+                              int num_beams,
+                              int flags);
+
+  /*! \brief Called to send samples to the RF target
+      @param device pointer to the device structure specific to the RF hardware target
+      @param timestamp The timestamp at whicch the first sample MUST be sent
+      @param buff Buffer which holds the samples (2 dimensional)
+      @param nsamps number of samples to be sent
+      @param nb_antennas_tx number of antennas
+      @param flags flags must be set to true if timestamp parameter needs to be applied
+  */
+  int (*trx_write_func)(openair0_device *device, openair0_timestamp timestamp, void **buff, int nsamps, int nb_antennas_tx, int flags);
 
   /*! \brief Called to send samples to the RF target
       @param device pointer to the device structure specific to the RF hardware target
@@ -629,6 +646,7 @@ typedef struct {
   uint64_t timestamp;      // Timestamp value of first sample
   uint32_t option_value;   // Option value
   uint32_t option_flag;    // Option flag
+  uint64_t beam_map;
 } samplesBlockHeader_t;
 
 #ifdef __cplusplus
