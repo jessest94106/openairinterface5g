@@ -604,6 +604,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
 
     /*DCI format-related configuration*/
     if (dci_format == NR_UL_DCI_FORMAT_0_0) {
+      pusch_config_pdu->dmrs_ports = 1;
       if (!tp_enabled && pusch_config_pdu->nr_of_symbols < 3)
         pusch_config_pdu->num_dmrs_cdm_grps_no_data = 1;
       else
