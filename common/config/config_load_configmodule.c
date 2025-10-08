@@ -150,7 +150,7 @@ int config_cmdlineonly_getlist(configmodule_interface_t *cfg,
   return 0;
 }
 
-int config_cmdlineonly_get(configmodule_interface_t *cfg, paramdef_t *cfgoptions, int numoptions, char *prefix)
+int config_cmdlineonly_get(configmodule_interface_t *cfg, paramdef_t *cfgoptions, int numoptions, const char *prefix)
 {
   int defval;
   int fatalerror=0;

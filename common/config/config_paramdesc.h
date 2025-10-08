@@ -105,7 +105,7 @@ typedef union checkedparam {
 #define DEFAULT_EXTRA_SZ 256
 typedef struct paramdef {
   char         optname[MAX_OPTNAME_SIZE]; /* parameter name, can be used as long command line option */
-  char         *helpstr;                  /* help string */
+  const char         *helpstr;                  /* help string */
   unsigned int paramflags;                /* value is a "ored" combination of above PARAMFLAG_XXXX values */
   union { /* pointer to the parameter value, completed by the config module */
     char      **strptr;
@@ -122,7 +122,7 @@ typedef struct paramdef {
     void      *voidptr;
   } ;
   union {                                /* default parameter value, to be used when PARAMFLAG_MANDATORY is not specified */
-    char      *defstrval;
+    const char      *defstrval;
     char      **defstrlistval;
     uint32_t  defuintval;
     int       defintval;

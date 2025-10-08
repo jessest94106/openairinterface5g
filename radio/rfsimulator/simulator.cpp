@@ -42,12 +42,14 @@
 
 #include <common/utils/assertions.h>
 #include <common/utils/LOG/log.h>
-#include <common/utils/load_module_shlib.h>
 #include <common/utils/telnetsrv/telnetsrv.h>
 #include <common/config/config_userapi.h>
 #include "common_lib.h"
 #define CHANNELMOD_DYNAMICLOAD
+extern "C" {
+#include <common/utils/load_module_shlib.h>
 #include <openair1/SIMULATION/TOOLS/sim.h>
+}
 #include "rfsimulator.h"
 
 #define PORT 4043 // default TCP port for this simulator
@@ -104,7 +106,7 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
   };
 // clang-format on
 static void getset_currentchannels_type(char *buf, int debug, webdatadef_t *tdata, telnet_printfunc_t prnt);
-extern int get_currentchannels_type(char *buf, int debug, webdatadef_t *tdata, telnet_printfunc_t prnt); // in random_channel.c
+extern int get_currentchannels_type(const char *buf, int debug, webdatadef_t *tdata, telnet_printfunc_t prnt); // in random_channel.c
 static int rfsimu_setchanmod_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 static int rfsimu_setdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 static int rfsimu_getdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
@@ -172,7 +174,7 @@ static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
   uint64_t buff_index = bridge->next_buf++ % MAX_FD_RFSIMU;
   buffer_t *ptr = &bridge->buf[buff_index];
   bridge->nb_cnx++;
-  ptr->circularBuf = calloc(1, sampleToByte(CirSize, 1));
+  ptr->circularBuf = static_cast<sample_t *>(calloc(1, sampleToByte(CirSize, 1)));
   if (ptr->circularBuf == NULL) {
     LOG_E(HW, "malloc(%lu) failed\n", sampleToByte(CirSize, 1));
     return NULL;
@@ -208,7 +210,7 @@ static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
     ptr->channel_model = find_channel_desc_fromname(modelname); // path_loss in dB
     if (!ptr->channel_model) {
       // Use legacy method to find channel model - this will use the same channel model for all clients
-      char *legacy_model_name = (bridge->role == SIMU_ROLE_SERVER) ? "rfsimu_channel_ue0" : "rfsimu_channel_enB0";
+      const char *legacy_model_name = (bridge->role == SIMU_ROLE_SERVER) ? "rfsimu_channel_ue0" : "rfsimu_channel_enB0";
       ptr->channel_model = find_channel_desc_fromname(legacy_model_name);
       if (!ptr->channel_model) {
         LOG_E(HW, "Channel model %s/%s not found, check config file\n", modelname, legacy_model_name);
@@ -282,7 +284,7 @@ static void fullwrite(int fd, void *_buf, ssize_t count, rfsimulator_state_t *t)
       LOG_E(HW, "write() in save iq file failed (%d)\n", errno);
   }
 
-  char *buf = _buf;
+  char *buf = static_cast<char *>(_buf);
   ssize_t l;
 
   while (count) {
@@ -384,7 +386,7 @@ static int rfsimu_setchanmod_cmd(char *buff, int debug, telnet_printfunc_t prnt,
         if (b->conn_sock >= 0 && (strcmp(b->channel_model->model_name, modelname) == 0)) {
           channel_desc_t *newmodel = new_channel_desc_scm(t->tx_num_channels,
                                                           t->rx_num_channels,
-                                                          channelmod,
+                                                          static_cast<SCM_t>(channelmod),
                                                           t->sample_rate,
                                                           t->rx_freq,
                                                           t->tx_bw,
@@ -520,9 +522,9 @@ static int startServer(openair0_device *device)
   snprintf(port, sizeof(port), "%d", t->port);
 
   struct addrinfo hints = {
-      .ai_family = AF_INET6,
-      .ai_socktype = SOCK_STREAM,
-      .ai_flags = AI_PASSIVE,
+    .ai_flags = AI_PASSIVE,
+    .ai_family = AF_INET6,
+    .ai_socktype = SOCK_STREAM,
   };
 
   int s = getaddrinfo(NULL, port, &hints, &results);
@@ -619,7 +621,7 @@ static int client_try_connect(const char *host, uint16_t port)
 
 static int startClient(openair0_device *device)
 {
-  rfsimulator_state_t *t = device->priv;
+  rfsimulator_state_t *t = static_cast<rfsimulator_state_t *>(device->priv);
   t->role = SIMU_ROLE_CLIENT;
   int sock;
 
@@ -673,9 +675,9 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
     buffer_t *b = &t->buf[i];
 
     if (b->conn_sock >= 0) {
-      samplesBlockHeader_t header = {nsamps, nbAnt, timestamp};
       if (!nbAnt)
         LOG_E(HW, "rfsimulator sending 0 tx antennas\n");
+      samplesBlockHeader_t header = {(uint32_t)nsamps, (uint32_t)nbAnt, (uint64_t)timestamp};
       fullwrite(b->conn_sock, &header, sizeof(header), t);
       if (nbAnt == 1) {
         fullwrite(b->conn_sock, samplesVoid[0], sampleToByte(nsamps, nbAnt), t);
@@ -712,10 +714,10 @@ static int rfsimulator_write_internal(rfsimulator_state_t *t,
         nsamps,
         timestamp,
         timestamp + nsamps,
-        signal_energy(samplesVoid[0], nsamps));
+        signal_energy(static_cast<int32_t *>(samplesVoid[0]), nsamps));
 
   /* trace only first antenna */
-  T(T_USRP_TX_ANT0, T_INT(timestamp), T_BUFFER(samplesVoid[0], sampleToByte(nsamps, 1)));
+  T(T_USRP_TX_ANT0, T_INT(timestamp), T_BUFFER(samplesVoid[0], (int)sampleToByte(nsamps, 1)));
 
   return nsamps;
 }
@@ -728,7 +730,8 @@ static int rfsimulator_write(openair0_device *device,
                              int flags)
 {
   timestamp -= device->openair0_cfg->command_line_sample_advance;
-  return rfsimulator_write_internal(device->priv, timestamp, samplesVoid, nsamps, nbAnt, flags);
+  rfsimulator_state_t *t = static_cast<rfsimulator_state_t *>(device->priv);
+  return rfsimulator_write_internal(t, timestamp, samplesVoid, nsamps, nbAnt, flags);
 }
 
 static bool add_client(rfsimulator_state_t *t)
@@ -758,7 +761,7 @@ static bool add_client(rfsimulator_state_t *t)
   void *samplesVoid[t->tx_num_channels];
   for (int i = 0; i < t->tx_num_channels; i++)
     samplesVoid[i] = (void *)&v;
-  samplesBlockHeader_t header = {1, t->tx_num_channels, t->lastWroteTS};
+  samplesBlockHeader_t header = {(uint32_t)1, (uint32_t)t->tx_num_channels, (uint64_t)t->lastWroteTS};
   fullwrite(conn_sock, &header, sizeof(header), t);
   fullwrite(conn_sock, samplesVoid, sampleToByte(1, t->tx_num_channels), t);
 
@@ -780,7 +783,7 @@ static void process_recv_header(rfsimulator_state_t *t, buffer_t *b, bool first_
     b->lastReceivedTS = b->th.timestamp;
     b->trashingPacket = true;
   } else {
-    if (b->lastReceivedTS < b->th.timestamp) {
+    if (b->lastReceivedTS < (int64_t)b->th.timestamp) {
       // We have a transmission hole to fill, like TDD
       // we create no signal samples up to the beginning of this reception
       int nbAnt = b->th.nbAnt;
@@ -798,7 +801,7 @@ static void process_recv_header(rfsimulator_state_t *t, buffer_t *b, bool first_
         memset(b->circularBuf, 0, sampleToByte(CirSize, 1));
       }
       b->lastReceivedTS = b->th.timestamp;
-    } else if (b->lastReceivedTS > b->th.timestamp) {
+    } else if (b->lastReceivedTS > (int64_t)b->th.timestamp) {
       LOG_W(HW, "Received data in past: current is %lu, new reception: %lu!\n", b->lastReceivedTS, b->th.timestamp);
       b->trashingPacket = true;
     }
@@ -850,7 +853,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, bool first_time)
   }
 
   for (int nbEv = 0; nbEv < nfds; ++nbEv) {
-    buffer_t *b = events[nbEv].data.ptr;
+    buffer_t *b = static_cast<buffer_t *>(events[nbEv].data.ptr);
 
     if (events[nbEv].events & EPOLLIN && b == NULL) {
       bool ret = add_client(t);
@@ -895,7 +898,7 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, bool first_time)
 
 static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimestamp, void **samplesVoid, int nsamps, int nbAnt)
 {
-  rfsimulator_state_t *t = device->priv;
+  rfsimulator_state_t *t = static_cast<rfsimulator_state_t *>(device->priv);
   LOG_D(HW,
         "Enter rfsimulator_read, expect %d samples, will release at TS: %ld, nbAnt %d\n",
         nsamps,
@@ -995,7 +998,7 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
           sample_t *out = (sample_t *)samplesVoid[a_rx];
           if (nbAnt_tx == 1 && t->nb_cnx == 1) { // optimized for 1 Tx and 1 UE
             sample_t *firstSample = (sample_t *)&(ptr->circularBuf[firstIndex]);
-            if (firstIndex + nsamps > CirSize) {
+            if ((uint64_t)firstIndex + (uint64_t)nsamps > CirSize) {
               int tailSz = CirSize - firstIndex;
               memcpy(out, firstSample, sampleToByte(tailSz, 1));
               memcpy(out + tailSz, &ptr->circularBuf[0], sampleToByte(nsamps - tailSz, 1));
@@ -1060,10 +1063,10 @@ static int rfsimulator_read(openair0_device *device, openair0_timestamp *ptimest
         nsamps,
         *ptimestamp,
         t->nextRxTstamp,
-        signal_energy(samplesVoid[0], nsamps));
+        signal_energy(static_cast<int32_t *>(samplesVoid[0]), nsamps));
 
   /* trace only first antenna */
-  T(T_USRP_RX_ANT0, T_INT(t->nextRxTstamp), T_BUFFER(samplesVoid[0], sampleToByte(nsamps, 1)));
+  T(T_USRP_RX_ANT0, T_INT(t->nextRxTstamp), T_BUFFER(samplesVoid[0], (int)sampleToByte(nsamps, 1)));
 
   return nsamps;
 }
@@ -1075,7 +1078,7 @@ static int rfsimulator_reset_stats(openair0_device *device) {
   return 0;
 }
 static void rfsimulator_end(openair0_device *device) {
-  rfsimulator_state_t *s = device->priv;
+  rfsimulator_state_t *s = static_cast<rfsimulator_state_t *>(device->priv);
   for (int i = 0; i < MAX_FD_RFSIMU; i++) {
     buffer_t *b = &s->buf[i];
     if (b->conn_sock >= 0)
@@ -1096,7 +1099,7 @@ static int rfsimulator_stop(openair0_device *device) {
   return 0;
 }
 static int rfsimulator_set_freq(openair0_device *device, openair0_config_t *openair0_cfg) {
-  rfsimulator_state_t *s = device->priv;
+  rfsimulator_state_t *s = static_cast<rfsimulator_state_t *>(device->priv);
   s->rx_freq = openair0_cfg->rx_freq[0];
   return 0;
 }
@@ -1107,11 +1110,11 @@ static int rfsimulator_write_init(openair0_device *device) {
   return 0;
 }
 
-__attribute__((__visibility__("default")))
+extern "C" __attribute__((__visibility__("default")))
 int device_init(openair0_device *device, openair0_config_t *openair0_cfg) {
   // to change the log level, use this on command line
   // --log_config.hw_log_level debug
-  rfsimulator_state_t *rfsimulator = calloc(sizeof(rfsimulator_state_t), 1);
+  rfsimulator_state_t *rfsimulator = static_cast<rfsimulator_state_t *>(calloc(sizeof(rfsimulator_state_t), 1));
   // initialize channel simulation
   rfsimulator->tx_num_channels = openair0_cfg->tx_num_channels;
   rfsimulator->rx_num_channels = openair0_cfg->rx_num_channels;
