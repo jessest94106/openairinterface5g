@@ -589,11 +589,13 @@ static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
 
   rsrp_report->nr_reports = csi_report->CSI_report_bitlen.nb_ssbri_cri;
   int bitlen = csi_report->CSI_report_bitlen.cri_ssbri_bitlen;
-  uint8_t curr_payload = pickandreverse_bits(payload, bitlen, *cumul_bits);
-  rsrp_report->resource_id[0] = *(index_list[bitlen > 0 ? ((curr_payload) & ~(~1U << (bitlen - 1))) : bitlen]);
-  *cumul_bits += bitlen;
+  for (int i = 0; i < rsrp_report->nr_reports; i++) {
+    uint8_t idx_payload = pickandreverse_bits(payload, bitlen, *cumul_bits);
+    rsrp_report->resource_id[i] = *(index_list[bitlen > 0 ? ((idx_payload) & ~(~1U << (bitlen - 1))) : bitlen]);
+    *cumul_bits += bitlen;
+  }
 
-  curr_payload = pickandreverse_bits(payload, 7, *cumul_bits);
+  uint8_t curr_payload = pickandreverse_bits(payload, 7, *cumul_bits);
   int rsrp = curr_payload & 0x7f;
   *cumul_bits += 7;
   csi_report->nb_of_csi_ssb_report++;
@@ -605,10 +607,6 @@ static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
   }
 
   for (int i = 1; i < rsrp_report->nr_reports; i++) {
-    curr_payload = pickandreverse_bits(payload, bitlen, *cumul_bits);
-    rsrp_report->resource_id[i] = *(index_list[bitlen > 0 ? ((curr_payload) & ~(~1U << (bitlen - 1))) : bitlen]);
-    *cumul_bits += bitlen;
-
     curr_payload = pickandreverse_bits(payload, 4, *cumul_bits);
     csi_report->nb_of_csi_ssb_report++;
     rsrp_report->RSRP[i] = get_diff_rsrp(curr_payload & 0x0f, rsrp_report->RSRP[0]);
