@@ -231,8 +231,7 @@ bool pdcp_data_req(protocol_ctxt_t  *ctxt_pP,
   hashtable_rc_t     h_rc;
   uint8_t            rb_offset= (srb_flagP == 0) ? DTCH -1 : 0;
   uint16_t           pdcp_uid=0;
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_DATA_REQ,VCD_FUNCTION_IN);
-  CHECK_CTXT_ARGS(ctxt_pP);
+  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_DATA_REQ, VCD_FUNCTION_IN);
 #if T_TRACER
 
   if (ctxt_pP->enb_flag != ENB_FLAG_NO)
