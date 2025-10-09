@@ -184,6 +184,6 @@ void nr_mac_rrc_meas_ind_ue(module_id_t module_id,
                             uint16_t Nid_cell,
                             bool csi_meas,
                             bool is_neighboring_cell,
-                            uint8_t rsrp_dBm)
+                            int rsrp_dBm)
 {
 }

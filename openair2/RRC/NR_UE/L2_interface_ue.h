@@ -42,7 +42,7 @@ void nr_mac_rrc_meas_ind_ue(module_id_t module_id,
                             uint16_t Nid_cell,
                             bool csi_meas,
                             bool is_neighboring_cell,
-                            uint8_t rsrp_dBm);
+                            int rsrp_dBm);
 void nr_mac_rrc_inactivity_timer_ind(const module_id_t mod_id);
 void nr_mac_rrc_msg3_ind(const module_id_t mod_id, const int rnti, bool prepare_payload);
 void nr_ue_rrc_timer_trigger(int instance, int frame, int gnb_id);
