@@ -33,6 +33,39 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define ALIGNARRAYSIZE(a, b) (((a + b - 1) / b) * b)
+#define ALNARS_16_4(a) ALIGNARRAYSIZE(a, 4)
+
+typedef struct complexd {
+  double r;
+  double i;
+} cd_t;
+
+typedef struct complexf {
+  float r;
+  float i;
+} cf_t;
+
+typedef struct complex8 {
+  int8_t r;
+  int8_t i;
+} c8_t;
+
+typedef struct complex16 {
+  int16_t r;
+  int16_t i;
+} c16_t;
+
+typedef struct complex32 {
+  int32_t r;
+  int32_t i;
+} c32_t;
+
+typedef struct complex64 {
+  int64_t r;
+  int64_t i;
+} c64_t;
+
 //-----------------------------------------------------------------------------
 // GENERIC ACCESS STRATUM TYPES
 //-----------------------------------------------------------------------------
