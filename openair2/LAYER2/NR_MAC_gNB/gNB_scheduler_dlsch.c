@@ -592,6 +592,19 @@ static bool allocate_dl_retransmission(gNB_MAC_INST *nr_mac,
   return true;
 }
 
+static void ack_reconfig(gNB_MAC_INST *mac, NR_UE_info_t *UE)
+{
+  if (UE->reconfigSpCellConfig) {
+    // in case of reestablishment, the spCellConfig had to be released
+    // temporarily. Reapply now before doing the reconfiguration.
+    UE->CellGroup->spCellConfig = UE->reconfigSpCellConfig;
+    // UE->reconfigSpCellConfig to be NULLed after receiving reconfiguration complete
+  }
+  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
+  configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
+  UE->await_reconfig = false;
+}
+
 typedef struct UEsched_s {
   float coef;
   NR_UE_info_t * UE;
@@ -865,6 +878,12 @@ static void pf_dl(gNB_MAC_INST *mac,
       .time_domain_allocation = tda,
       .tda_info = tda_info,
     };
+
+    sched_pdsch.action = NULL;
+    int srb1 = 1;
+    /* everything that's only 3 bytes is an ack. To be safe, use a bit more. */
+    if (iterator->UE->await_reconfig && sched_ctrl->rlc_status[srb1].bytes_in_buffer > 10)
+      sched_pdsch.action = ack_reconfig;
 
     // Fix me: currently, the RLC does not give us the total number of PDUs
     // awaiting. Therefore, for the time being, we put a fixed overhead of 12

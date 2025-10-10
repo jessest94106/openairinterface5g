@@ -770,9 +770,12 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
   } else if (req->reconfig_compl) {
     LOG_I(NR_MAC, "DU received confirmation of successful RRC Reconfiguration\n");
     if (UE->reconfigSpCellConfig) {
-      // in case of reestablishment, the spCellConfig had to be released
-      // temporarily. Reapply now before doing the reconfiguration.
-      UE->CellGroup->spCellConfig = UE->reconfigSpCellConfig;
+      if (UE->await_reconfig) {
+        // in case of reestablishment, the spCellConfig had to be released
+        // temporarily. Reapply now before doing the reconfiguration.
+        UE->CellGroup->spCellConfig = UE->reconfigSpCellConfig;
+        UE->await_reconfig = false;
+      }
       UE->reconfigSpCellConfig = NULL;
       for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
         nr_lc_config_t *c = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
@@ -971,6 +974,7 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
      * reconfiguration has succeeded (indicated by the CU) */
     UE->reconfigSpCellConfig = UE->CellGroup->spCellConfig;
     UE->CellGroup->spCellConfig = NULL;
+    UE->await_reconfig = true;
     mac_remove_nr_ue(mac, *dl_rrc->old_gNB_DU_ue_id);
     pthread_mutex_unlock(&mac->sched_lock);
     nr_rlc_remove_ue(dl_rrc->gNB_DU_ue_id);

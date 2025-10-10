@@ -475,6 +475,9 @@ typedef struct NR_pdsch_dmrs {
   NR_PTRS_DownlinkConfig_t *phaseTrackingRS;
 } NR_pdsch_dmrs_t;
 
+struct NR_UE_info;
+struct gNB_MAC_INST_s;
+typedef void (*feedback_action_t)(struct gNB_MAC_INST_s *mac, struct NR_UE_info *ue);
 typedef struct NR_sched_pdsch {
   /// RB allocation within active BWP
   uint16_t rbSize;
@@ -501,6 +504,7 @@ typedef struct NR_sched_pdsch {
   // time_domain_allocation is the index of a list of tda
   int time_domain_allocation;
   NR_tda_info_t tda_info;
+  feedback_action_t action;
 } NR_sched_pdsch_t;
 
 typedef struct NR_UE_harq {
@@ -772,7 +776,7 @@ typedef struct measgap_config {
 } measgap_config_t;
 
 /*! \brief UE list used by gNB to order UEs/CC for scheduling*/
-typedef struct {
+typedef struct NR_UE_info {
   rnti_t rnti;
   uid_t uid; // unique ID of this UE
   /// scheduling control info
@@ -795,6 +799,7 @@ typedef struct {
   float dl_thr_ue;
   long pdsch_HARQ_ACK_Codebook;
   bool is_redcap;
+  bool await_reconfig;
   NR_RA_t *ra;
 } NR_UE_info_t;
 

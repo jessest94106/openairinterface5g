@@ -3948,6 +3948,7 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE,
                                                   buf,
                                                   sizeof(buf));
   AssertFatal(enc_rval.encoded > 0, "ASN1 encoding of CellGroupConfig failed, failed type %s\n", enc_rval.failed_type->name);
+  UE->await_reconfig = true;
   du_to_cu_rrc_information_t du2cu = {
     .cellGroupConfig = buf,
     .cellGroupConfig_length = (enc_rval.encoded + 7) >> 3,
