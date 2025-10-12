@@ -3922,14 +3922,32 @@ bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *
   return false;
 }
 
+static bool verify_bwp_switch(const NR_UE_info_t *UE, const nr_mac_config_t *configuration, int new_bwp_id)
+{
+  if (new_bwp_id == UE->current_DL_BWP.bwp_id) {
+    LOG_E(NR_MAC, "Source BWP ID and target BWP ID are the same, can't perform switch\n");
+    return false;
+  }
+
+  if (new_bwp_id == 0)
+    return true;
+  for (int i = 0; i < configuration->num_additional_bwps; i++) {
+    const nr_bwp_config_t *bwp_config = &configuration->bwp_config[i];
+    if (bwp_config->id == new_bwp_id)
+      return true;
+  }
+  LOG_E(NR_MAC, "New BWP %d does not belong to the list of configured BWPs, can't perform switch\n", new_bwp_id);
+  return false;
+}
+
 void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int new_bwp_id)
 {
   DevAssert(UE->CellGroup != NULL);
   NR_CellGroupConfig_t *cellGroup_for_UE = NULL;
   if (new_bwp_id >= 0) {
     AssertFatal(UE->current_DL_BWP.bwp_id == UE->current_UL_BWP.bwp_id, "We only support same BWP for UL and DL\n");
-    if (new_bwp_id == UE->current_DL_BWP.bwp_id)
-      LOG_E(NR_MAC, "Source BWP ID and target BWP ID are the same, can't perform switch\n");
+    if (!verify_bwp_switch(UE, &nrmac->radio_config, new_bwp_id))
+      return;
     else {
       UE->sc_info.csi_MeasConfig = NULL;  // to avoid segfault when freeing csi_MeasConfig in configDedicated
       cellGroup_for_UE = update_cellGroupConfig_for_BWP_switch(UE->CellGroup,
