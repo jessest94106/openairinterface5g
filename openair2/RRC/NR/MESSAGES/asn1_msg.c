@@ -855,7 +855,7 @@ int do_nrMeasurementReport_SA(NR_MeasurementReport_t *measurementReport,
                               long trigger_quantity,
                               long rs_type,
                               uint16_t Nid_cell,
-                              int rsrp_dBm,
+                              int rsrp_index,
                               uint8_t *buffer,
                               size_t buffer_size)
 {
@@ -884,9 +884,9 @@ int do_nrMeasurementReport_SA(NR_MeasurementReport_t *measurementReport,
   struct NR_MeasQuantityResults *active_mq_res = CALLOC(1, sizeof(struct NR_MeasQuantityResults));
 
   if (trigger_quantity == NR_MeasTriggerQuantityOffset_PR_rsrp) {
-    active_mq_res->rsrp = CALLOC(1, sizeof(NR_RSRP_Range_t));
-
-    *active_mq_res->rsrp = rsrp_dBm + 157;
+    asn1cCalloc(active_mq_res->rsrp, rsrp);
+    // Assign precomputed RSRP index
+    *rsrp = rsrp_index;
     if (rs_type == NR_NR_RS_Type_ssb)
       measResultServingCell->measResult.cellResults.resultsSSB_Cell = active_mq_res;
     else

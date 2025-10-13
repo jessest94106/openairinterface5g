@@ -130,7 +130,7 @@ int do_nrMeasurementReport_SA(NR_MeasurementReport_t *measurementReport,
                               long trigger_quantity,
                               long rs_type,
                               uint16_t Nid_cell,
-                              int rsrp_dBm,
+                              int rsrp_index,
                               uint8_t *buffer,
                               size_t buffer_size);
 
