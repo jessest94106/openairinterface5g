@@ -307,6 +307,7 @@ These modes of operation are supported:
    - Support for 256 QAM
    - Support for up to 2 TX antenna
    - Support for up to 2 layers
+   - Support for UCI on PUSCH
 *  NR-PUCCH
    - Format 0 (2 bits for ACK/NACK and SR)
    - Format 2 (mainly for CSI feedback)
@@ -339,6 +340,8 @@ These modes of operation are supported:
 * Minimum system information (MSI)
    - MIB processing
    - Scheduling of system information block 1 (SIB1) reception
+* Other system information
+   - Scheduling of other system information blocks reception
 * Random access procedure (needs improvement, there is still not a clear separation between MAC and PHY)
    - Mapping SSBs to multiple ROs
    - Scheduling of PRACH
@@ -407,8 +410,11 @@ These modes of operation are supported:
 
 * Integration of RRC messages and procedures supporting UE 5G SA connection according to 38.331 Rel.16
    - RRCSetupRequest/RRCSetup/RRCSetupComplete
+   - RRCReject
+   - RRCRelease/ RRC going to IDLE
    - RRC Uplink/Downlink Information transfer carrying NAS messages transparently
    - RRC Reconfiguration/Reconfiguration complete
+   - RRCSetup fallback (after reestablishment)
    - RRCReestablishmentRequest/RRC Reestablishment/Reestablishment complete
    - Support for master cell group configuration
    - Reception of UECapabilityEnquiry, encoding and transmission of UECapability
