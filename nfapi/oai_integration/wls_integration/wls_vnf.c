@@ -26,8 +26,10 @@
 #include <rte_string_fns.h>
 #include <rte_common.h>
 #include <rte_lcore.h>
-#include <rte_debug.h>
 #include <nr_fapi_p5.h>
+#include "common/utils/LOG/log.h"
+#include <rte_errno.h>
+#include <unistd.h>
 #include <common/platform_constants.h>
 
 static nfapi_vnf_config_t *config;
@@ -92,17 +94,54 @@ static bool wls_mac_create_mem_array(PWLS_MAC_MEM_SRUCT pMemArray, void *pMemArr
   return true;
 }
 
-void mac_dpdk_init()
+bool primary_process_running(int argc, char *argv[])
 {
-  char *my_argv[] = {"OAI_VNF", "-c3", "--proc-type=auto", "--file-prefix", WLS_DEV_NAME, "--iova-mode=pa"};
-  printf("\nCalling rte_eal_init: ");
-  for (unsigned long i = 0; i < RTE_DIM(my_argv); i++) {
-    printf("%s ", my_argv[i]);
-  }
-  printf("\n");
+  // If the PNF was stopped normally, this is enough, as the mp_socket file does not exist
+  if (access("/var/run/dpdk/" WLS_DEV_NAME "/mp_socket", W_OK | R_OK) != 0)
+    return false;
 
-  if (rte_eal_init(RTE_DIM(my_argv), my_argv) < 0)
-    rte_panic("\nCannot init EAL\n");
+  // If we run rte_eal_init before the primary process is running, it will result in a 'Connection Refused' error in the logs, but
+  // the call itself will succeed ( retval not -1 )
+  //
+  // We can use rte_eal_primary_proc_alive to determine if the primary process is running, the issue is that since the init had a
+  // refused connection, if we try to open WLS after rte_eal_primary_proc_alive reports that the primary is running, it will fail,
+  // since rte_eal_init failed to connect to the primary process, and we can't call rte_eal_init in the same process more than once,
+  // or it will result in an EALREADY error
+  //
+  // Given this, a new process is created that calls rte_eal_init and checks whether the primary process is running, exiting
+  // right after and reporting to our VNF the primary status
+  //
+  // When the VNF receives the status from the forked process that the
+  // primary process is running, it then calls rte_eal_init, which at this point we know will be successful, and continue to open
+  // the WLS instance
+  pid_t pid = fork();
+  if (pid == 0) {
+    // We set the log level to emergency , effectively disabling logs in the child process
+    // This prevents too many logs being printed out to the terminal while we wait for the primary process to be available
+    rte_log_set_global_level(RTE_LOG_EMERG);
+    AssertFatal(rte_eal_init(argc, argv) != -1, "rte_eal_init() failed\n");
+    int status = rte_eal_primary_proc_alive(NULL) == 0;
+    rte_eal_cleanup();
+    _exit(status);
+  }
+  int status;
+  waitpid(pid, &status, 0);
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+bool mac_dpdk_init()
+{
+  char *my_argv[] = {"OAI_VNF", "-c3", "--proc-type=secondary", "--file-prefix", WLS_DEV_NAME, "--iova-mode=pa"};
+  NFAPI_TRACE(NFAPI_TRACE_DEBUG, "\nCalling rte_eal_init: ");
+  for (int i = 0; i < RTE_DIM(my_argv); i++) {
+    NFAPI_TRACE(NFAPI_TRACE_DEBUG, "%s ", my_argv[i]);
+  }
+  NFAPI_TRACE(NFAPI_TRACE_DEBUG, "\n");
+  while (!primary_process_running(RTE_DIM(my_argv), my_argv)) {
+    NFAPI_TRACE(NFAPI_TRACE_INFO, "DPDK primary process not available yet, retrying in 1 second...\n");
+    sleep(1);
+  }
+  return rte_eal_init(RTE_DIM(my_argv), my_argv) >= 0;
 }
 
 static uint32_t wls_mac_alloc_mem_array(PWLS_MAC_MEM_SRUCT pMemArray, void **ppBlock)
