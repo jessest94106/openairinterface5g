@@ -27,6 +27,7 @@
  * When the opposite side switch from passive reading to active R+Write, the synchro is not fully deterministic
  */
 
+#include "utils.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -165,8 +166,8 @@ typedef struct buffer_s {
   char *circularBufEnd;
   sample_t *circularBuf;
   channel_desc_t *channel_model;
-  char *beamPtr;
-  size_t beam_ptr_sz;
+  char *packet_ptr;
+  size_t payload_sz;
   size_t remainToTransferBeam;
 } buffer_t;
 
@@ -993,10 +994,6 @@ static bool add_client(rfsimulator_state_t *t)
 
 static void process_recv_header(rfsimulator_state_t *t, buffer_t *b, bool first_time)
 {
-  // check the header and start block transfer
-  if (b->remainToTransfer != 0)
-    return;
-
   b->headerMode = false; // We got the header
 
   if (first_time) {
@@ -1031,42 +1028,65 @@ static void process_recv_header(rfsimulator_state_t *t, buffer_t *b, bool first_
       LOG_W(HW, "UEsock(%d) Tx/Rx shift too large Tx:%lu, Rx:%lu\n", b->conn_sock, t->lastWroteTS, b->lastReceivedTS);
     mutexunlock(t->Sockmutex);
   }
-  // move back the pointer to overwrite the header, we don't need it anymore
-  b->transferPtr = (char *)&b->circularBuf[(b->lastReceivedTS * b->th.nbAnt) % CirSize];
-  // we now need to read the samples
-  b->remainToTransfer = sampleToByte(b->th.size, b->th.nbAnt);
 
-  if (t->beam_ctrl->enable_beams) {
-    int num_beams = __builtin_popcountll(b->th.beam_map);
-    AssertFatal(num_beams > 0, "Needs at least one beam\n");
-    int num_ant = b->th.nbAnt;
-    int num_samples = b->th.size;
-    size_t beam_packet_size = sizeof(sample_t) * num_ant * num_beams * num_samples;
-    if (b->beamPtr == NULL || beam_packet_size > b->beam_ptr_sz) {
-      free(b->beamPtr);
-      b->beamPtr = static_cast<char *>(malloc(beam_packet_size));
-    }
-    b->remainToTransferBeam = beam_packet_size;
+  int num_beams = __builtin_popcountll(b->th.beam_map);
+  AssertFatal(b->th.beam_map == 1ULL || t->beam_ctrl->enable_beams == 1,
+              "The transmitter has enabled beam simulation while this receiver has not\n");
+  size_t payload_sz = sampleToByte(b->th.size, b->th.nbAnt) * num_beams;
+  if (b->packet_ptr == NULL || payload_sz > b->payload_sz) {
+    free(b->packet_ptr);
+    b->packet_ptr = static_cast<char *>(calloc_or_fail(1, payload_sz));
+    b->payload_sz = payload_sz;
   }
+  b->transferPtr = b->packet_ptr;
+  b->remainToTransfer = payload_sz;
   return;
 }
 
 static void process_recv(rfsimulator_state_t *t, buffer_t *b, bool first_time)
 {
-  if (b->transferPtr == b->circularBufEnd)
-    b->transferPtr = (char *)b->circularBuf;
-
-  if (!b->trashingPacket) {
-    b->lastReceivedTS = b->th.timestamp + b->th.size - byteToSample(b->remainToTransfer, b->th.nbAnt);
-    LOG_D(HW, "UEsock: %d Set b->lastReceivedTS %ld\n", b->conn_sock, b->lastReceivedTS);
+  int num_beams = __builtin_popcountll(b->th.beam_map);
+  AssertFatal(num_beams > 0, "Needs at least one beam\n");
+  int num_ant = b->th.nbAnt;
+  int num_samples = b->th.size;
+  int tx_beam_ids[MAX_BEAMS];
+  int *tx_beam_ids_p = tx_beam_ids;
+  for (int i = 0; i < MAX_BEAMS; i++) {
+    if (b->th.beam_map & (1ULL << i)) {
+      *tx_beam_ids_p++ = i;
+    }
   }
-
-  if (b->remainToTransfer == 0) {
-    LOG_D(HW, "UEsock: %d Completed block reception: %ld\n", b->conn_sock, b->lastReceivedTS);
-    b->headerMode = true;
-    b->transferPtr = (char *)&b->th;
-    b->remainToTransfer = sizeof(samplesBlockHeader_t);
-    b->trashingPacket = false;
+  c16_t *in = (c16_t *)b->packet_ptr;
+  int num_samples_to_process = num_samples;
+  openair0_timestamp first_sample_timestamp = b->th.timestamp;
+  while (num_samples_to_process > 0) {
+    uint32_t nsamps_out;
+    uint64_t rx_beam_map = get_beam_map(&t->beam_ctrl->rx, first_sample_timestamp, num_samples_to_process, &nsamps_out);
+    AssertFatal(__builtin_popcountll(rx_beam_map) == 1, "Only supports 1 beam\n");
+    int rx_beam_id = 0;
+    for (int i = 0; i < MAX_BEAMS; i++) {
+      if (rx_beam_map & (1ULL << i)) {
+        rx_beam_id = i;
+        break;
+      }
+    }
+    for (uint i = 0; i < nsamps_out; i++) {
+      for (int aatx = 0; aatx < num_ant; aatx++) {
+        c16_t *out = &b->circularBuf[((first_sample_timestamp + i) * num_ant + aatx) % CirSize];
+        cf_t sample = {.r = 0, .i = 0};
+        for (int beam = 0; beam < num_beams; beam++) {
+          float gain_dB = get_rx_gain_db(t, rx_beam_id, tx_beam_ids[beam]);
+          float gain_linear = powf(10, gain_dB / 20.0);
+          sample.r += in->r * gain_linear;
+          sample.i += in->i * gain_linear;
+          in++;
+        }
+        out->r = sample.r;
+        out->i = sample.i;
+      }
+    }
+    first_sample_timestamp += nsamps_out;
+    num_samples_to_process -= nsamps_out;
   }
 }
 
@@ -1103,94 +1123,32 @@ static bool flushInput(rfsimulator_state_t *t, int timeout, bool first_time)
       continue;
     }
 
-    ssize_t blockSz;
-    if (b->headerMode)
-      blockSz = b->remainToTransfer;
-    else {
-      blockSz =
-          b->transferPtr + b->remainToTransfer <= b->circularBufEnd ? b->remainToTransfer : b->circularBufEnd - b->transferPtr;
-    }
-
-    ssize_t sz = 0;
-    if (!b->headerMode && t->beam_ctrl->enable_beams) {
-      int num_beams = __builtin_popcountll(b->th.beam_map);
-      AssertFatal(num_beams > 0, "Needs at least one beam\n");
-      int num_ant = b->th.nbAnt;
-      int num_samples = b->th.size;
-      size_t beam_packet_size = sizeof(sample_t) * num_beams * num_ant * num_samples;
-      size_t bytes_received = beam_packet_size - b->remainToTransferBeam;
-      ssize_t recv_size = recv(b->conn_sock, &b->beamPtr[bytes_received], b->remainToTransferBeam, MSG_DONTWAIT);
-      if (recv_size <= 0) {
-        if (recv_size < 0 && errno != EAGAIN)
-          LOG_E(HW, "recv() failed, errno(%d)\n", errno);
-        continue;
-      }
-      b->remainToTransferBeam -= recv_size;
-
-      int beam_sample_sz = num_beams * num_ant * sizeof(sample_t);
-      int previously_written_sample = bytes_received / beam_sample_sz;
-      int last_full_sample = (bytes_received + recv_size) / beam_sample_sz;
-      int num_samples_received = last_full_sample - previously_written_sample;
-      int first_sample = previously_written_sample + 1;
-      openair0_timestamp sample_timestamp = b->th.timestamp + first_sample;
-
-      int tx_beam_ids[MAX_BEAMS];
-      int *tx_beam_ids_p = tx_beam_ids;
-      for (int i = 0; i < MAX_BEAMS; i++) {
-        if (b->th.beam_map & (1ULL << i)) {
-          *tx_beam_ids_p++ = i;
-        }
-      }
-      c16_t *in = (c16_t *)&b->beamPtr[first_sample * beam_sample_sz];
-      int num_samples_to_process = num_samples_received;
-      openair0_timestamp first_sample_timestamp = sample_timestamp;
-      while (num_samples_to_process > 0) {
-        uint32_t nsamps_out;
-        uint64_t rx_beam_map = get_beam_map(&t->beam_ctrl->rx, first_sample_timestamp, num_samples_to_process, &nsamps_out);
-        AssertFatal(__builtin_popcountll(rx_beam_map) == 1, "Only supports 1 beam\n");
-        int rx_beam_id = 0;
-        for (int i = 0; i < MAX_BEAMS; i++) {
-          if (rx_beam_map & (1ULL << i)) {
-            rx_beam_id = i;
-            break;
-          }
-        }
-        for (uint i = 0; i < nsamps_out; i++) {
-          for (int aatx = 0; aatx < num_ant; aatx++) {
-            c16_t *out = &b->circularBuf[((first_sample_timestamp + i) * num_ant + aatx) % CirSize];
-            cf_t sample = {.r = 0, .i = 0};
-            for (int beam = 0; beam < num_beams; beam++) {
-              float gain_dB = get_rx_gain_db(t, rx_beam_id, tx_beam_ids[beam]);
-              float gain_linear = powf(10, gain_dB / 20.0);
-              sample.r += in->r * gain_linear;
-              sample.i += in->i * gain_linear;
-              in++;
-            }
-            out->r = sample.r;
-            out->i = sample.i;
-          }
-        }
-        first_sample_timestamp += nsamps_out;
-        num_samples_to_process -= nsamps_out;
-      }
-      int antenna_samples_sz = num_ant * sizeof(sample_t);
-      // pretend we received some samples without beams
-      sz = num_samples_received * antenna_samples_sz;
-    } else {
-      sz = recv(b->conn_sock, b->transferPtr, blockSz, MSG_DONTWAIT);
-      if (sz <= 0) {
-        if (sz < 0 && errno != EAGAIN)
-          LOG_E(HW, "recv() failed, errno(%d)\n", errno);
-        continue;
-      }
+    ssize_t sz = recv(b->conn_sock, b->transferPtr, b->remainToTransfer, MSG_DONTWAIT);
+    if (sz <= 0) {
+      if (sz < 0 && errno != EAGAIN)
+        LOG_E(HW, "recv() failed, errno(%d)\n", errno);
+      continue;
     }
     LOG_D(HW, "Socket rcv %zd bytes\n", sz);
     b->remainToTransfer -= sz;
     b->transferPtr += sz;
-    if (b->headerMode)
-      process_recv_header(t, b, first_time);
-    else
-      process_recv(t, b, first_time);
+    if (b->remainToTransfer == 0) {
+      if (b->headerMode)
+        process_recv_header(t, b, first_time);
+      else {
+        LOG_D(HW, "UEsock: %d Completed block reception: %ld\n", b->conn_sock, b->lastReceivedTS);
+        b->headerMode = true;
+        b->transferPtr = (char *)&b->th;
+        b->remainToTransfer = sizeof(samplesBlockHeader_t);
+
+        if (!b->trashingPacket) {
+          process_recv(t, b, first_time);
+          b->lastReceivedTS = b->th.timestamp + b->th.size;
+          LOG_D(HW, "UEsock: %d Set b->lastReceivedTS %ld\n", b->conn_sock, b->lastReceivedTS);
+        }
+        b->trashingPacket = false;
+      }
+    }
   }
   return nfds > 0;
 }
