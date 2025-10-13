@@ -279,6 +279,7 @@ These modes of operation are supported:
    - DCI formats: 00, 10, 01 and 11
 *  Reception of NR-PDSCH (including Segmentation, LDPC decoding, rate de-matching, de-scrambling, de-modulation, RB de-mapping, etc).
    - PDSCH mapping type A and B
+   - Downlink resource allocation type 0 and 1
    - DMRS configuration type 1 and 2
    - Single and multiple DMRS symbols
    - PTRS support

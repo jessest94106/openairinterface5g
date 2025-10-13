@@ -818,10 +818,7 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
     return -1;
   }
 
-  dlsch_pdu->rb_offset = dlsch_pdu->start_rb + dlsch_pdu->BWPStart;
-
-  if (mac->get_sib1)
-    dlsch_pdu->rb_offset -= dlsch_pdu->BWPStart;
+  dlsch_pdu->refPoint = mac->get_sib1 ? 1 : 0;
 
   /* TIME_DOM_RESOURCE_ASSIGNMENT */
   int dmrs_typeA_pos = mac->dmrs_TypeA_Position;
@@ -1163,7 +1160,7 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
     LOG_W(MAC, "[%d.%d] Invalid frequency_domain_assignment. Possibly due to false DCI. Ignoring DCI!\n", frame, slot);
     return -1;
   }
-  dlsch_pdu->rb_offset = dlsch_pdu->start_rb + dlsch_pdu->BWPStart;
+  dlsch_pdu->refPoint = 0;
   /* TIME_DOM_RESOURCE_ASSIGNMENT */
   int dmrs_typeA_pos = mac->dmrs_TypeA_Position;
   int mux_pattern = 1;
