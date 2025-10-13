@@ -1029,7 +1029,10 @@ int main(int argc, char **argv)
     reset_meas(&gNB->dlsch_rate_matching_stats);
     reset_meas(&gNB->dlsch_segmentation_stats);
     reset_meas(&gNB->dlsch_modulation_stats);
+    reset_meas(&gNB->dlsch_pdsch_generation_stats);
     reset_meas(&gNB->dlsch_precoding_stats);
+    reset_meas(&gNB->dlsch_layer_mapping_stats);
+    reset_meas(&gNB->dlsch_resource_mapping_stats);
     reset_meas(&gNB->dlsch_encoding_stats);
     reset_meas(&gNB->dci_generation_stats);
     reset_meas(&gNB->tinput);
@@ -1343,7 +1346,12 @@ int main(int argc, char **argv)
       printStatIndent3(&gNB->dlsch_interleaving_stats,  "DLSCH Interleaving time");
       printStatIndent2(&gNB->dlsch_modulation_stats,"DLSCH modulation time");
       printStatIndent2(&gNB->dlsch_scrambling_stats, "DLSCH scrambling time");
-      printStatIndent2(&gNB->dlsch_precoding_stats,"DLSCH Mapping/Precoding time");
+      printStatIndent2(&gNB->dlsch_pdsch_generation_stats,"DLSCH PDSCH Generation time");
+      printStatIndent3(&gNB->dlsch_layer_mapping_stats,"DLSCH Layer Mapping time");
+      gNB->dlsch_resource_mapping_stats.trials = gNB->dlsch_layer_mapping_stats.trials;
+      printStatIndent3(&gNB->dlsch_resource_mapping_stats,"DLSCH Resource Mapping time");
+      gNB->dlsch_precoding_stats.trials = gNB->dlsch_layer_mapping_stats.trials;
+      printStatIndent3(&gNB->dlsch_precoding_stats,"DLSCH Precoding time");
       if (gNB->phase_comp)
         printStatIndent2(&gNB->phase_comp_stats, "Phase Compensation");
 

@@ -287,8 +287,8 @@ bool eq_config_request(const nfapi_nr_config_request_scf_t *unpacked_req, const 
       for (int k = 0; k < req_pmi_pdu->num_ant_ports; ++k) {
         const nfapi_nr_pm_weights_t* req_pm_weight = &req_pmi_pdu->weights[j][k];
         const nfapi_nr_pm_weights_t* unpacked_pm_weight = &unpacked_pmi_pdu->weights[j][k];
-        EQ(unpacked_pm_weight->precoder_weight_Re, req_pm_weight->precoder_weight_Re);
-        EQ(unpacked_pm_weight->precoder_weight_Im, req_pm_weight->precoder_weight_Im);
+        EQ(unpacked_pm_weight->r, req_pm_weight->r);
+        EQ(unpacked_pm_weight->i, req_pm_weight->i);
       }
     }
   }
@@ -848,10 +848,7 @@ void copy_config_request(const nfapi_nr_config_request_scf_t *src, nfapi_nr_conf
       dst_pmi_pdu->num_ant_ports = src_pmi_pdu->num_ant_ports;
       for (int j = 0; j < dst_pmi_pdu->numLayers; ++j) {
         for (int k = 0; k < dst_pmi_pdu->num_ant_ports; ++k) {
-         nfapi_nr_pm_weights_t* dst_pm_weight = &dst_pmi_pdu->weights[j][k];
-         const nfapi_nr_pm_weights_t* src_pm_weight = &src_pmi_pdu->weights[j][k];
-          dst_pm_weight->precoder_weight_Re = src_pm_weight->precoder_weight_Re;
-          dst_pm_weight->precoder_weight_Im = src_pm_weight->precoder_weight_Im;
+          dst_pmi_pdu->weights[j][k] = src_pmi_pdu->weights[j][k];
         }
       }
     }
@@ -1313,8 +1310,8 @@ void dump_config_request(const nfapi_nr_config_request_scf_t *msg)
     for (int k = 0; k < pm_pdu->numLayers; k++) {
       for (int l = 0; l < pm_pdu->num_ant_ports; l++) {
         const nfapi_nr_pm_weights_t *pm_weights = &pm_pdu->weights[k][l];
-        INDENTED_GENERIC_PRINT("Dig Beam Weight Real", "0x%02x", pm_weights->precoder_weight_Re);
-        INDENTED_GENERIC_PRINT("Dig Beam Weight Imaginary", "0x%02x", pm_weights->precoder_weight_Im);
+        INDENTED_GENERIC_PRINT("Dig Beam Weight Real", "0x%02x", pm_weights->r);
+        INDENTED_GENERIC_PRINT("Dig Beam Weight Imaginary", "0x%02x", pm_weights->i);
       }
     }
     depth--;
