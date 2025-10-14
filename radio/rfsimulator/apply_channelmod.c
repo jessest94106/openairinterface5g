@@ -41,14 +41,12 @@
   either we regenerate the channel (call again random_channel(desc,0)), or we keep it over subframes
   legacy: we regenerate each sub frame in UL, and each frame only in DL
 */
-void rxAddInput(const c16_t *input_sig,
+void rxAddInput(const c16_t **input_sig,
                 cf_t *after_channel_sig,
                 int rxAnt,
                 channel_desc_t *channelDesc,
                 int nbSamples,
-                uint64_t TS,
-                uint32_t CirSize,
-                bool add_noise)
+                uint64_t TS)
 {
   static uint64_t last_TS = 0;
 
@@ -249,8 +247,7 @@ void rxAddInput(const c16_t *input_sig,
   const double pathLossLinear = pow(10, channelDesc->path_loss_dB / 20.0);
   // Energy in one sample to calibrate input noise
   // the normalized OAI value seems to be 256 as average amplitude (numerical amplification = 1)
-  const double noise_per_sample = add_noise ? pow(10, channelDesc->noise_power_dB / 10.0) * 256 : 0;
-  const uint64_t dd = channelDesc->channel_offset;
+  const double noise_per_sample = pow(10, channelDesc->noise_power_dB / 10.0) * 256;
   const int nbTx = channelDesc->nb_tx;
   double Doppler_phase_cur = channelDesc->Doppler_phase_cur[rxAnt];
   Doppler_phase_cur -= 2 * M_PI * round(Doppler_phase_cur / (2 * M_PI));
@@ -264,15 +261,8 @@ void rxAddInput(const c16_t *input_sig,
 
       // const struct complex *channelModelEnd=channelModel+channelDesc->channel_length;
       for (int l = 0; l < (int)channelDesc->channel_length; l++) {
-        // let's assume TS+i >= l
-        // fixme: the rfsimulator current structure is interleaved antennas
-        // this has been designed to not have to wait a full block transmission
-        // but it is not very usefull
-        // it would be better to split out each antenna in a separate flow
-        // that will allow to mix ru antennas freely
-        // (X + cirSize) % cirSize to ensure that index is positive
-        const int idx = ((TS + i - l - dd) * nbTx + txAnt + CirSize) % CirSize;
-        const struct complex16 tx16 = input_sig[idx];
+        const int idx = i - l + channelDesc->channel_length - 1;
+        const struct complex16 tx16 = input_sig[txAnt][idx];
         rx_tmp.r += tx16.r * channelModel[l].r - tx16.i * channelModel[l].i;
         rx_tmp.i += tx16.i * channelModel[l].r + tx16.r * channelModel[l].i;
       } // l
@@ -297,12 +287,11 @@ void rxAddInput(const c16_t *input_sig,
 
   channelDesc->Doppler_phase_cur[rxAnt] = Doppler_phase_cur;
 
-  if ((TS * nbTx) % CirSize + nbSamples <= CirSize)
-    // Cast to a wrong type for compatibility !
-    LOG_D(HW,
-          "Input power %f, output power: %f, channel path loss %f, noise coeff: %f \n",
-          10 * log10((double)signal_energy((int32_t *)&input_sig[(TS * nbTx) % CirSize], nbSamples)),
-          10 * log10((double)signal_energy((int32_t *)after_channel_sig, nbSamples)),
-          channelDesc->path_loss_dB,
-          10 * log10(noise_per_sample));
+  // Cast to a wrong type for compatibility !
+  LOG_D(HW,
+        "Input power %f, output power: %f, channel path loss %f, noise coeff: %f \n",
+        10 * log10((double)signal_energy((int32_t *)&input_sig[0], nbSamples)),
+        10 * log10((double)signal_energy((int32_t *)after_channel_sig, nbSamples)),
+        channelDesc->path_loss_dB,
+        10 * log10(noise_per_sample));
 }
