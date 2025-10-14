@@ -535,7 +535,27 @@ struct openair0_device_t {
    * antennas from which to receive samples \returns the number of sample read
    */
 
-  int (*trx_read_func)(openair0_device *device, openair0_timestamp *ptimestamp, void **buff, int nsamps,int num_antennas);
+  int (*trx_read_func)(openair0_device *device, openair0_timestamp *ptimestamp, void **buff, int nsamps, int num_antennas);
+
+  /*! \brief Receive samples from hardware.
+   * Read nsamps samples from each channel to buffers. buff[0] is the array for
+   * the first channel. *ptimestamp is the time at which the first sample
+   * was received.
+   * \param device the hardware to use
+   * \param[out] ptimestamp the time at which the first sample was received.
+   * \param[out] buff An array of pointers to buffers for received samples. The buffers must be large enough to hold the number of
+   * samples nsamps.
+   * \param nsamps Number of samples. One sample is 2 byte I + 2 byte Q => 4 byte.
+   * \param num_antennas number of antennas from which to receive samples
+   * \param num_beams number of beams from which to receive samples
+   * \returns the number of sample read
+   */
+  int (*trx_read_beams_func)(openair0_device *device,
+                             openair0_timestamp *ptimestamp,
+                             void ***buff,
+                             int nsamps,
+                             int num_antennas,
+                             int num_beams);
 
   /*! \brief Receive samples from hardware, this version provides a single antenna at a time and returns.
    * Read nsamps samples from each channel to buffers. buff[0] is the array for
