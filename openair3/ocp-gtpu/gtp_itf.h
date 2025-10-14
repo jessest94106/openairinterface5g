@@ -49,7 +49,6 @@ typedef struct gtpv1u_gnb_delete_tunnel_req_s gtpv1u_gnb_delete_tunnel_req_t;
   typedef bool (*gtpCallbackSDAP)(protocol_ctxt_t  *ctxt_pP,
                                   const ue_id_t        ue_id,
                                   const srb_flag_t     srb_flagP,
-                                  const int        rb_idP,
                                   const mui_t          muiP,
                                   const confirm_t      confirmP,
                                   const sdu_size_t     sdu_buffer_sizeP,

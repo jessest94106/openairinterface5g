@@ -1244,7 +1244,6 @@ static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, const st
       if (!uedata.callBackSDAP(&ctxt,
                                        uedata.ue_id,
                                        srb_flag,
-                                       rb_id,
                                        mui,
                                        confirm,
                                        sdu_buffer_size,

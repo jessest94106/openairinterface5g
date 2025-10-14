@@ -47,7 +47,6 @@ static void reblock_tun_socket(int fd)
 bool sdap_data_req(protocol_ctxt_t *ctxt_p,
                    const ue_id_t ue_id,
                    const srb_flag_t srb_flag,
-                   const int rb_id,
                    const mui_t mui,
                    const confirm_t confirm,
                    const sdu_size_t sdu_buffer_size,
@@ -69,7 +68,6 @@ bool sdap_data_req(protocol_ctxt_t *ctxt_p,
   bool ret = sdap_entity->tx_entity(sdap_entity,
                                     ctxt_p,
                                     srb_flag,
-                                    rb_id,
                                     mui,
                                     confirm,
                                     sdu_buffer_size,
@@ -115,8 +113,6 @@ static void *sdap_tun_read_thread(void *arg)
   int len;
   reblock_tun_socket(entity->pdusession_sock);
 
-  int rb_id = 1;
-
   while (!entity->stop_thread) {
     len = read(entity->pdusession_sock, &rx_buf, NL_MAX_PAYLOAD);
     if (len == -1) {
@@ -147,7 +143,6 @@ static void *sdap_tun_read_thread(void *arg)
     entity->tx_entity(entity,
                       &ctxt,
                       SRB_FLAG_NO,
-                      rb_id,
                       RLC_MUI_UNDEFINED,
                       RLC_SDU_CONFIRM_NO,
                       len,

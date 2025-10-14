@@ -165,7 +165,6 @@ static struct ue_stat {
 static bool recv_ng(protocol_ctxt_t *ctxt,
                     const ue_id_t ue_id,
                     const srb_flag_t flag,
-                    const int rb,
                     const mui_t mui,
                     const confirm_t confirm,
                     const sdu_size_t size,

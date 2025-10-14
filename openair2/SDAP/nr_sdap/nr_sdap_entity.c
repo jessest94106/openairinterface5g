@@ -81,7 +81,6 @@ void nr_pdcp_submit_sdap_ctrl_pdu(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_
 static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
                               protocol_ctxt_t *ctxt_p,
                               const srb_flag_t srb_flag,
-                              const int rb_id,
                               const mui_t mui,
                               const confirm_t confirm,
                               const sdu_size_t sdu_buffer_size,
@@ -94,8 +93,6 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
   /* The offset of the SDAP header, it might be 0 if has_sdap_tx is not true in the pdcp entity. */
   int offset=0;
   bool ret = false;
-  /*Hardcode DRB ID given from upper layer (ue/gnb_tun_read_thread rb_id), it will change if we have SDAP*/
-  int sdap_drb_id = rb_id;
   bool sdap_ul_tx = false;
   bool sdap_dl_tx = false;
 
@@ -105,10 +102,9 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
   }
 
   uint8_t sdap_buf[SDAP_MAX_PDU];
-  int pdcp_entity = entity->qfi2drb_map(entity, qfi);
+  int drb_id = entity->qfi2drb_map(entity, qfi);
 
-  if (pdcp_entity != SDAP_MAP_RULE_EMPTY) {
-    sdap_drb_id = pdcp_entity;
+  if (drb_id != SDAP_MAP_RULE_EMPTY) {
     sdap_ul_tx = entity->qfi2drb_table[qfi].entity_role & SDAP_UL_TX; // UE TX entity
     sdap_dl_tx = entity->qfi2drb_table[qfi].entity_role & SDAP_DL_TX; // gNB TX entity
     LOG_D(SDAP, "TX - QFI: %u is mapped to DRB ID: %d\n", qfi, entity->qfi2drb_table[qfi].drb_id);
@@ -121,7 +117,7 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
     LOG_D(SDAP, "TX - DRB ID: %d does not have SDAP header\n", entity->qfi2drb_table[qfi].drb_id);
     ret = nr_pdcp_data_req_drb(ctxt_p,
                                srb_flag,
-                               sdap_drb_id,
+                               drb_id,
                                mui,
                                confirm,
                                sdu_buffer_size,
@@ -189,7 +185,7 @@ static bool nr_sdap_tx_entity(nr_sdap_entity_t *entity,
    */
   ret = nr_pdcp_data_req_drb(ctxt_p,
                              srb_flag,
-                             sdap_drb_id,
+                             drb_id,
                              mui,
                              confirm,
                              sdu_buffer_size + offset,
