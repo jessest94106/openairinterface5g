@@ -3739,10 +3739,11 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   return cellGroupConfig;
 }
 
-static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
+long ue_supported_ul_layers(const NR_UE_NR_Capability_t *uecap)
 {
   long ul_max_layers = 1;
-  if (uecap && uecap->featureSets
+  if (uecap
+      && uecap->featureSets
       && uecap->featureSets->featureSetsUplinkPerCC
       && uecap->featureSets->featureSetsUplinkPerCC->list.count > 0) {
     NR_FeatureSetUplinkPerCC_t *ul_feature_setup_per_cc = uecap->featureSets->featureSetsUplinkPerCC->list.array[0];
@@ -3758,9 +3759,13 @@ static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_
           ul_max_layers = 1;
       }
     }
-    ul_max_layers = min(ul_max_layers, configuration->pusch_AntennaPorts);
   }
   return ul_max_layers;
+}
+
+static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
+{
+  return min(ue_supported_ul_layers(uecap), configuration->pusch_AntennaPorts);
 }
 
 NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
