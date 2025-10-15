@@ -55,6 +55,10 @@
  000031
  020022
  040026
+ 040025
+ 000031
+ 020022
+ 040027
  100021
  222222
         </TestCaseRequestedList>
@@ -64,7 +68,7 @@
                 <class>Pull_Local_Registry</class>
                 <desc>Pull Images from Local Registry</desc>
                 <node>localhost</node>
-                <images>oai-gnb-asan oai-nr-cuup-asan oai-nr-ue-asan</images>
+                <images>oai-gnb-asan oai-nr-ue-asan</images>
         </testCase>
         <testCase id="800813">
                 <class>Create_Workspace</class>
@@ -245,7 +249,7 @@
                 <always_exec>true</always_exec>
                 <desc>Clean Test Images on Test Server</desc>
                 <node>localhost</node>
-                <images>oai-gnb-asan oai-nr-cuup-asan oai-nr-ue-asan</images>
+                <images>oai-gnb-asan oai-nr-ue-asan</images>
         </testCase>
 
 </testCaseList>
