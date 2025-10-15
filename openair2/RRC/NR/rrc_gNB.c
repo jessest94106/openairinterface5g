@@ -115,6 +115,97 @@
 
 mui_t rrc_gNB_mui = 0;
 
+/* Per-transaction max_delays counter to limit retry attempts */
+#define MAX_DELAYS 100
+
+/** @brief clone and re-enqueue an NGAP message after delaying
+ * delays the ongoing transaction (in msg_p) by setting a timer to wait
+ * 10ms; upon expiry, delivers to RRC, which sends the message to itself */
+static void delay_transaction(MessageDef *msg_p, int wait_us)
+{
+  MessagesIds id = ITTI_MSG_ID(msg_p);
+  AssertFatal(id == NGAP_PDUSESSION_SETUP_REQ || id == NGAP_PDUSESSION_RELEASE_COMMAND,
+              "delay_transaction(): unsupported message id %d\n",
+              id);
+
+  MessageDef *new = itti_alloc_new_message(TASK_RRC_GNB, 0, id);
+
+  // Copy only the specific message struct, not the entire union.
+  // The union (msg_t) contains all message types and is much larger than
+  // the allocated space (which is sized for the specific message type only).
+  if (id == NGAP_PDUSESSION_SETUP_REQ) {
+    NGAP_PDUSESSION_SETUP_REQ(new) = NGAP_PDUSESSION_SETUP_REQ(msg_p);
+  } else if (id == NGAP_PDUSESSION_RELEASE_COMMAND) {
+    NGAP_PDUSESSION_RELEASE_COMMAND(new) = NGAP_PDUSESSION_RELEASE_COMMAND(msg_p);
+  }
+
+  int instance = msg_p->ittiMsgHeader.originInstance;
+  long timer_id;
+  timer_setup(0, wait_us, TASK_RRC_GNB, instance, TIMER_ONE_SHOT, new, &timer_id);
+}
+
+static void reset_delayed_action(delayed_action_state_t *delayed_action)
+{
+  delayed_action->ongoing_transaction = false;
+  delayed_action->max_delays = 0;
+}
+
+void init_delayed_action(delayed_action_state_t *delayed_action)
+{
+  delayed_action->ongoing_transaction = true;
+  delayed_action->max_delays = MAX_DELAYS;
+}
+
+/* \brief checks if any transaction is ongoing for any xid of this UE */
+static bool transaction_ongoing(const gNB_RRC_UE_t *UE)
+{
+  for (int xid = 0; xid < NR_RRC_TRANSACTION_IDENTIFIER_NUMBER; ++xid) {
+    if (UE->xids[xid] != RRC_ACTION_NONE)
+      return true;
+  }
+  return false;
+}
+
+/** @brief delay control: returns true if delayed, false if should proceed
+ * This is a hack. We observed that with some UEs, PDU session requests might
+ * come in quick succession, faster than the RRC reconfiguration for the PDU
+ * session requests can be carried out (UE is doing reconfig, and second PDU
+ * session request arrives). We don't have currently the means to "queue up"
+ * these transactions, which would probably involve some rework of the RRC.
+ * To still allow these requests to come in and succeed, we below check and delay transactions
+ * for 10ms. However, to not accidentally end up in infinite loops, the
+ * maximum number is capped on a per-UE basis as indicated in variable
+ * max_delays_pdu_session. See commit 277f8da0 for more details. */
+static bool rrc_delay_transaction(instance_t instance, MessageDef *msg_p)
+{
+  uint32_t cu_ue_id = 0;
+  if (ITTI_MSG_ID(msg_p) == NGAP_PDUSESSION_SETUP_REQ) {
+    cu_ue_id = NGAP_PDUSESSION_SETUP_REQ(msg_p).gNB_ue_ngap_id;
+  } else if (ITTI_MSG_ID(msg_p) == NGAP_PDUSESSION_RELEASE_COMMAND) {
+    cu_ue_id = NGAP_PDUSESSION_RELEASE_COMMAND(msg_p).gNB_ue_ngap_id;
+  }
+  AssertFatal(cu_ue_id > 0, "cu_ue_id not found in message %s\n", ITTI_MSG_NAME(msg_p));
+
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[instance], cu_ue_id);
+  DevAssert(ue_context_p);
+
+  gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+  bool delay = UE->delayed_action.ongoing_transaction && UE->delayed_action.max_delays > 0;
+  /* Check if any PDU session action is ongoing */
+  if (delay || transaction_ongoing(UE)) {
+    int wait_us = 10000;
+    LOG_I(NR_RRC,
+          "UE %d: ongoing transaction, delaying incoming transaction by %d us\n",
+          UE->rrc_ue_id,
+          wait_us);
+    delay_transaction(msg_p, wait_us);
+    UE->delayed_action.max_delays--;
+    return true; /* delayed */
+  }
+  LOG_D(NR_RRC, "UE %d: no delayed action ongoing, proceeding with incoming transaction\n", UE->rrc_ue_id);
+  return false; /* not delayed */
+}
+
 typedef struct deliver_ue_ctxt_release_data_t {
   gNB_RRC_INST *rrc;
   f1ap_ue_context_rel_cmd_t *release_cmd;
@@ -1856,6 +1947,7 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
   switch (UE->xids[xid]) {
     case RRC_PDUSESSION_RELEASE: {
       rrc_gNB_send_NGAP_PDUSESSION_RELEASE_RESPONSE(rrc, UE, xid);
+      reset_delayed_action(&UE->delayed_action);
     } break;
     case RRC_PDUSESSION_ESTABLISH:
       if (UE->n_initial_pdu > 0) {
@@ -1870,6 +1962,7 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
         LOG_W(NR_RRC,
               "UE %d: RRC Reconfiguration Complete for PDU session establishment, but no PDU sessions were setup\n",
               UE->rrc_ue_id);
+      reset_delayed_action(&UE->delayed_action);
       break;
     case RRC_PDUSESSION_MODIFY:
       rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(rrc, UE, xid);
@@ -1885,9 +1978,6 @@ static void handle_rrcReconfigurationComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
       LOG_E(RRC, "UE %d: Received unexpected transaction type %d for xid %d\n", UE->rrc_ue_id, UE->xids[xid], xid);
       break;
   }
-
-  if (UE->xids[xid] == RRC_PDUSESSION_ESTABLISH)
-    UE->ongoing_pdusession_setup_request = false;
 
   UE->xids[xid] = RRC_ACTION_NONE;
   for (int i = 0; i < NR_RRC_TRANSACTION_IDENTIFIER_NUMBER; ++i) {
@@ -3005,7 +3095,8 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case NGAP_PDUSESSION_SETUP_REQ:
-        rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(msg_p, instance);
+        if (!rrc_delay_transaction(instance, msg_p))
+          rrc_gNB_process_NGAP_PDUSESSION_SETUP_REQ(msg_p, instance);
         break;
 
       case NGAP_PDUSESSION_MODIFY_REQ:
@@ -3013,7 +3104,8 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case NGAP_PDUSESSION_RELEASE_COMMAND:
-        rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(&NGAP_PDUSESSION_RELEASE_COMMAND(msg_p), RC.nrrrc[instance]);
+        if (!rrc_delay_transaction(instance, msg_p))
+          rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(&NGAP_PDUSESSION_RELEASE_COMMAND(msg_p), RC.nrrrc[instance]);
         break;
 
       case NGAP_DL_RAN_STATUS_TRANSFER:
