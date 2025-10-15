@@ -92,14 +92,14 @@
     <desc>Deploy gNB-CU in a container</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_f1_b210_ho</yaml_path>
     <node>groot</node>
-    <services>oai_cu</services>
+    <services>oai-cu</services>
   </testCase>
 
   <testCase id="000007">
     <class>Deploy_Object</class>
     <desc>Deploy gNB-DU0 (TDD/Band77/20MHz/B210) in a container</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_f1_b210_ho</yaml_path>
-    <services>oai_du0</services>
+    <services>oai-du0</services>
     <node>groot</node>
   </testCase>
 
@@ -123,7 +123,7 @@
     <desc>Deploy gNB-DU1 (TDD/Band77/20MHz/B210) in a container</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_f1_b210_ho</yaml_path>
     <node>rocket</node>
-    <services>oai_du1</services>
+    <services>oai-du1</services>
   </testCase>
 
   <testCase id="000011">

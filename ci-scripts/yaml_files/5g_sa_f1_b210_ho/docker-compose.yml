@@ -1,5 +1,5 @@
 services:
-    oai_cu:
+    oai-cu:
         image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}
         container_name: oai-cu
         cap_drop:
@@ -25,7 +25,7 @@ services:
             timeout: 5s
             retries: 5
 
-    oai_du0:
+    oai-du0:
         image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}
         container_name: oai-du0
         cap_drop:
@@ -57,7 +57,7 @@ services:
             timeout: 5s
             retries: 5
 
-    oai_du1:
+    oai-du1:
         image: ${REGISTRY:-oaisoftwarealliance}/${GNB_IMG:-oai-gnb}:${TAG:-develop}
         container_name: oai-du1
         cap_drop:
