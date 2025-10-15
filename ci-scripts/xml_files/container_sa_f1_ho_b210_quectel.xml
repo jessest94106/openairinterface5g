@@ -58,7 +58,7 @@
   <testCase id="000001">
     <class>DeployCoreNetwork</class>
     <desc>Initialize 5G Core</desc>
-    <cn_id>oc-cn5g-00102-ho</cn_id>
+    <cn_id>oc-cn5g-00103-ho</cn_id>
   </testCase>
 
   <testCase id="000002">
@@ -113,7 +113,7 @@
     <class>Ping</class>
     <desc>Ping: 100pings in 20sec</desc>
     <id>raspix</id>
-    <svr_id>oc-cn5g-00102-ho</svr_id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 100 -i 0.2</ping_args>
     <ping_packetloss_threshold>5</ping_packetloss_threshold>
   </testCase>
@@ -143,7 +143,7 @@
     <class>Ping</class>
     <desc>Ping: 50pings in 10sec</desc>
     <id>raspix</id>
-    <svr_id>oc-cn5g-00102-ho</svr_id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 50 -i 0.2</ping_args>
     <ping_packetloss_threshold>5</ping_packetloss_threshold>
   </testCase>
@@ -166,7 +166,7 @@
     <class>Ping</class>
     <desc>Ping: 50pings in 10sec</desc>
     <id>raspix</id>
-    <svr_id>oc-cn5g-00102-ho</svr_id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 50 -i 0.2</ping_args>
     <ping_packetloss_threshold>5</ping_packetloss_threshold>
   </testCase>
@@ -189,7 +189,7 @@
     <class>Ping</class>
     <desc>Ping: 50pings in 10sec</desc>
     <id>raspix</id>
-    <svr_id>oc-cn5g-00102-ho</svr_id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 50 -i 0.2</ping_args>
     <ping_packetloss_threshold>5</ping_packetloss_threshold>
   </testCase>
@@ -244,7 +244,7 @@
     <class>UndeployCoreNetwork</class>
     <always_exec>true</always_exec>
     <desc>Terminate 5G Core</desc>
-    <cn_id>oc-cn5g-00102-ho</cn_id>
+    <cn_id>oc-cn5g-00103-ho</cn_id>
   </testCase>
 
 </testCaseList>
