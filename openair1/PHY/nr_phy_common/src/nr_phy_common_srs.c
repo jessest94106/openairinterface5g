@@ -139,7 +139,7 @@ static int compute_n_b(frame_t frame_number,
 *                See TS 38.211 - Section 6.4.1.4 Sounding reference signal
 *
 ***************************************************************************/
-bool generate_srs_nr(NR_DL_FRAME_PARMS *frame_parms,
+bool generate_srs_nr(const NR_DL_FRAME_PARMS *frame_parms,
                      c16_t **txdataF,
                      uint16_t symbol_offset,
                      int bwp_start,
