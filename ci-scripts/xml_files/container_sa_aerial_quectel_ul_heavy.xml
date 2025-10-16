@@ -21,8 +21,8 @@
 
 -->
 <testCaseList>
-        <htmlTabRef>TEST-AERIAL-SA</htmlTabRef>
-        <htmlTabName>AERIAL 100 MHz TDD SA</htmlTabName>
+        <htmlTabRef>TEST-AERIAL-SA-UL-Heavy</htmlTabRef>
+        <htmlTabName>AERIAL 100 MHz DSUUU SA</htmlTabName>
         <htmlTabIcon>tasks</htmlTabIcon>
         <TestCaseRequestedList>
                 111111
@@ -32,10 +32,9 @@
                 002223
                 000111
                 000011
-                000022
+                000032
                 000033
-                200022
-                300033
+                000022
                 000222
                 222222
                 333333
@@ -46,7 +45,7 @@
                 <desc>Pull Images from Local Registry</desc>
                 <node>gracehopper1-oai</node>
                 <images>oai-gnb-aerial</images>
-		<tag_prefix>arm_</tag_prefix>
+                <tag_prefix>arm_</tag_prefix>
         </testCase>
 
         <testCase id="800813">
@@ -59,7 +58,7 @@
                 <class>Deploy_Object</class>
                 <desc>Deploy PNF/Nvidia CUBB in a container</desc>
                 <node>gracehopper1-oai</node>
-                <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial_ul</yaml_path>
                 <services>nv-cubb</services>
         </testCase>
 
@@ -67,7 +66,7 @@
                 <class>Deploy_Object</class>
                 <desc>Deploy VNF in a container</desc>
                 <node>gracehopper1-oai</node>
-                <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial_ul</yaml_path>
                 <services>oai-gnb-aerial</services>
         </testCase>
 
@@ -88,44 +87,33 @@
 
         <testCase id="000022">
                 <class>Iperf</class>
-                <desc>iperf (DL/UDP/500M)(30 sec)(single-ue profile)</desc>
-                <iperf_args>-u -b 500M -t 30 -R</iperf_args>
+                <desc>iperf (DL/UDP/200M)(30 sec)(single-ue profile)</desc>
+                <iperf_args>-u -b 200M -t 30 -R</iperf_args>
                 <svr_id>oc-cn5g-20897-aerial</svr_id>
                 <id>up2-aerial</id>
                 <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
                 <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
+        </testCase>
+
+        <testCase id="000032">
+                <class>Iperf</class>
+                <desc>iperf (UL/UDP/200M)(30 sec)(single-ue profile)</desc>
+                <iperf_args>-u -b 200M -t 30 -l 1428</iperf_args>
+                <svr_id>oc-cn5g-20897-aerial</svr_id>
+                <id>up2-aerial</id>
+                <iperf_packetloss_threshold>10</iperf_packetloss_threshold>
+                <iperf_bitrate_threshold>90</iperf_bitrate_threshold>
         </testCase>
 
         <testCase id="000033">
                 <class>Iperf</class>
-                <desc>iperf (UL/UDP/40M)(30 sec)(single-ue profile)</desc>
-                <iperf_args>-u -b 40M -t 30 -l 1428</iperf_args>
-                <svr_id>oc-cn5g-20897-aerial</svr_id>
-                <id>up2-aerial</id>
-                <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
-                <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
-        </testCase>
-
-       <testCase id="200022">
-                <class>Iperf</class>
-                <desc>Optional iperf (DL/UDP/1000M)(30 sec)(single-ue profile)</desc>
+                <desc>iperf (UL/UDP/220M)(30 sec)(single-ue profile)</desc>
                 <may_fail>true</may_fail>
-                <iperf_args>-u -b 1000M -t 30 -R</iperf_args>
+                <iperf_args>-u -b 220M -t 30 -l 1428</iperf_args>
                 <svr_id>oc-cn5g-20897-aerial</svr_id>
                 <id>up2-aerial</id>
-                <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
-                <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
-        </testCase>
-
-        <testCase id="300033">
-                <class>Iperf</class>
-                <desc>Optional iperf (UL/UDP/90M)(30 sec)(single-ue profile)</desc>
-                <may_fail>true</may_fail>
-                <iperf_args>-u -b 90M -t 30 -l 1428</iperf_args>
-                <svr_id>oc-cn5g-20897-aerial</svr_id>
-                <id>up2-aerial</id>
-                <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
-                <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
+                <iperf_packetloss_threshold>10</iperf_packetloss_threshold>
+                <iperf_bitrate_threshold>90</iperf_bitrate_threshold>
         </testCase>
 
         <testCase id="000222">
@@ -140,7 +128,7 @@
                 <always_exec>true</always_exec>
                 <desc>Undeploy gNB</desc>
                 <node>gracehopper1-oai</node>
-                <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial_ul</yaml_path>
                 <d_retx_th>20,100,100,100</d_retx_th>
                 <u_retx_th>20,100,100,100</u_retx_th>
         </testCase>
