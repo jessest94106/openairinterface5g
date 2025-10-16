@@ -78,24 +78,18 @@ int nr_pbch_channel_estimation(const NR_DL_FRAME_PARMS *fp,
                                bool sidelink,
                                uint Nid);
 
-int nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
-                                const UE_nr_rxtx_proc_t *proc,
-                                int nl,
-                                unsigned short p,
-                                unsigned char symbol,
-                                unsigned char nscid,
-                                unsigned short scrambling_id,
-                                unsigned short BWPStart,
-                                uint8_t config_type,
-                                int n_dmrs_cdm_groups,
-                                uint16_t rb_offset,
-                                unsigned short bwp_start_subcarrier,
-                                unsigned short nb_rb_pdsch,
-                                uint32_t pdsch_est_size,
-                                int32_t dl_ch_estimates[][pdsch_est_size],
-                                int rxdataFsize,
-                                c16_t rxdataF[][rxdataFsize],
-                                uint32_t *nvar);
+void nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
+                                 const UE_nr_rxtx_proc_t *proc,
+                                 const fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch,
+                                 const freq_alloc_bitmap_t *freq_alloc,
+                                 int nl,
+                                 unsigned short p,
+                                 unsigned char symbol,
+                                 uint32_t pdsch_est_size,
+                                 int32_t dl_ch_estimates[][pdsch_est_size],
+                                 int rxdataFsize,
+                                 c16_t rxdataF[][rxdataFsize],
+                                 uint32_t *nvar);
 
 int nr_adjust_synch_ue(NR_DL_FRAME_PARMS *frame_parms,
                        PHY_VARS_NR_UE *ue,
@@ -108,7 +102,7 @@ int nr_adjust_synch_ue(NR_DL_FRAME_PARMS *frame_parms,
 
 void nr_ue_measurements(PHY_VARS_NR_UE *ue,
                         const UE_nr_rxtx_proc_t *proc,
-                        NR_UE_DLSCH_t *dlsch,
+                        int number_rbs,
                         uint32_t pdsch_est_size,
                         int32_t dl_ch_estimates[][pdsch_est_size]);
 
@@ -143,7 +137,6 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
                               uint8_t gNB_id,
                               uint8_t nr_slot_rx,
                               unsigned char symbol,
-                              uint32_t nb_re_pdsch,
                               uint16_t rnti,
                               NR_UE_DLSCH_t dlsch[2]);
 

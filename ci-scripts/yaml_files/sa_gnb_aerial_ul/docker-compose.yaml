@@ -23,7 +23,7 @@ services:
       - ../../../cmake_targets/share:/opt/cuBB/share
     userns_mode: host
     ipc: "shareable"
-    image: cubb-build:25-2.1
+    image: cubb-build:25-2.1_srs-ul-heavy
     environment:
       - cuBB_SDK=/opt/nvidia/cuBB
     command: bash -c "sudo rm -rf /tmp/phy.log && sudo chmod +x /opt/nvidia/cuBB/aerial_l1_entrypoint.sh && /opt/nvidia/cuBB/aerial_l1_entrypoint.sh"
@@ -33,7 +33,7 @@ services:
       timeout: 5s
       retries: 5
   oai-gnb-aerial:
-    cpuset: "13-14"
+    cpuset: "13-16"
     image: ${REGISTRY:-oaisoftwarealliance}/oai-gnb-aerial:${TAG:-develop}
     depends_on:
       nv-cubb:
@@ -56,10 +56,8 @@ services:
                 - gpu
     network_mode: host
     shm_size: 4096m
-    stdin_open: true
-    tty: true
     volumes:
-      - ../../conf_files/gnb-vnf.sa.band78.273prb.aerial.conf:/opt/oai-gnb/etc/gnb.conf
+      - ../../conf_files/gnb-vnf.sa.band78.273prb.aerial.ul-heavy.conf:/opt/oai-gnb/etc/gnb.conf
     container_name: oai-gnb-aerial
     healthcheck:
       test: /bin/bash -c "ps aux | grep -v grep | grep -c softmodem"

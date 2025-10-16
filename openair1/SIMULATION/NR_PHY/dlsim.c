@@ -965,12 +965,9 @@ int main(int argc, char **argv)
   //NR_COMMON_channels_t *cc = RC.nrmac[0]->common_channels;
   int ret = 1;
   initNamedTpool(gNBthreads, &gNB->threadPool, true, "gNB-tpool");
-  initNotifiedFIFO(&gNB->L1_tx_free);
-  initNotifiedFIFO(&gNB->L1_tx_filled);
   initNotifiedFIFO(&gNB->L1_tx_out);
   // we create 2 threads for L1 tx processing
-  notifiedFIFO_elt_t *msgL1Tx = newNotifiedFIFO_elt(sizeof(processingData_L1tx_t),0,&gNB->L1_tx_free,processSlotTX);
-  processingData_L1tx_t *msgDataTx = (processingData_L1tx_t *)NotifiedFifoData(msgL1Tx);
+  processingData_L1tx_t *msgDataTx = malloc(sizeof(processingData_L1tx_t));
   init_DLSCH_struct(gNB, msgDataTx);
   msgDataTx->slot = slot;
   msgDataTx->frame = frame;
@@ -1029,7 +1026,10 @@ int main(int argc, char **argv)
     reset_meas(&gNB->dlsch_rate_matching_stats);
     reset_meas(&gNB->dlsch_segmentation_stats);
     reset_meas(&gNB->dlsch_modulation_stats);
+    reset_meas(&gNB->dlsch_pdsch_generation_stats);
     reset_meas(&gNB->dlsch_precoding_stats);
+    reset_meas(&gNB->dlsch_layer_mapping_stats);
+    reset_meas(&gNB->dlsch_resource_mapping_stats);
     reset_meas(&gNB->dlsch_encoding_stats);
     reset_meas(&gNB->dci_generation_stats);
     reset_meas(&gNB->tinput);
@@ -1091,7 +1091,6 @@ int main(int argc, char **argv)
         Sched_INFO->frame = frame;
         Sched_INFO->slot = slot;
         Sched_INFO->UL_dci_req.numPdus = 0;
-        pushNotifiedFIFO(&gNB->L1_tx_free,msgL1Tx);
         nr_schedule_response(Sched_INFO);
 
         /* PTRS values for DLSIM calculations   */
@@ -1343,7 +1342,12 @@ int main(int argc, char **argv)
       printStatIndent3(&gNB->dlsch_interleaving_stats,  "DLSCH Interleaving time");
       printStatIndent2(&gNB->dlsch_modulation_stats,"DLSCH modulation time");
       printStatIndent2(&gNB->dlsch_scrambling_stats, "DLSCH scrambling time");
-      printStatIndent2(&gNB->dlsch_precoding_stats,"DLSCH Mapping/Precoding time");
+      printStatIndent2(&gNB->dlsch_pdsch_generation_stats,"DLSCH PDSCH Generation time");
+      printStatIndent3(&gNB->dlsch_layer_mapping_stats,"DLSCH Layer Mapping time");
+      gNB->dlsch_resource_mapping_stats.trials = gNB->dlsch_layer_mapping_stats.trials;
+      printStatIndent3(&gNB->dlsch_resource_mapping_stats,"DLSCH Resource Mapping time");
+      gNB->dlsch_precoding_stats.trials = gNB->dlsch_layer_mapping_stats.trials;
+      printStatIndent3(&gNB->dlsch_precoding_stats,"DLSCH Precoding time");
       if (gNB->phase_comp)
         printStatIndent2(&gNB->phase_comp_stats, "Phase Compensation");
 

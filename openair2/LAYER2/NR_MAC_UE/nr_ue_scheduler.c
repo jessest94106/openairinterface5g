@@ -398,7 +398,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
   pusch_config_pdu->nrOfLayers = 1;
   pusch_config_pdu->Tpmi = 0;
   pusch_config_pdu->rnti = rnti;
-
+  pusch_config_pdu->dmrs_ports = 1;
   pusch_dmrs_AdditionalPosition_t add_pos = pusch_dmrs_pos2;
   int dmrslength = 1;
   NR_PUSCH_Config_t *pusch_Config = current_UL_BWP->pusch_Config;
@@ -435,7 +435,6 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
     pusch_config_pdu->rb_size = msgA_PUSCH_Resource->nrofPRBs_PerMsgA_PO_r16;
     pusch_config_pdu->mcs_table = 0;
     pusch_config_pdu->frequency_hopping = msgA_PUSCH_Resource->msgA_IntraSlotFrequencyHopping_r16 ? *msgA_PUSCH_Resource->msgA_IntraSlotFrequencyHopping_r16 : 0;
-    pusch_config_pdu->dmrs_ports = 1; // is in SIB1 nrofDMRS_Sequences_r16?
     pusch_config_pdu->pusch_data.new_data_indicator = 1; // new data
     pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2;
     pusch_config_pdu->ul_dmrs_symb_pos = get_l_prime(3, 0, pusch_dmrs_pos2, pusch_len1, 10, mac->dmrs_TypeA_Position);
@@ -529,7 +528,6 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
 
     // DM-RS configuration according to 6.2.2 UE DM-RS transmission procedure in 38.214
     pusch_config_pdu->num_dmrs_cdm_grps_no_data = 2;
-    pusch_config_pdu->dmrs_ports = 1;
 
     // DMRS sequence initialization [TS 38.211, sec 6.4.1.1.1].
     // Should match what is sent in DCI 0_1, otherwise set to 0.
@@ -1718,10 +1716,6 @@ static bool schedule_uci_on_pusch(NR_UE_MAC_INST_t *mac,
 static void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frame, int slot)
 {
   PUCCH_sched_t pucch[3] = {0}; // TODO the size might change in the future in case of multiple SR or multiple CSI in a slot
-
-  mac->nr_ue_emul_l1.num_srs = 0;
-  mac->nr_ue_emul_l1.num_harqs = 0;
-  mac->nr_ue_emul_l1.num_csi_reports = 0;
   int num_res = 0;
 
   if (mac->ra.ra_pucch) {
@@ -1771,9 +1765,6 @@ static void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frame, int slot
             pucch[j].n_harq,
             pucch[j].n_sr,
             pucch[j].n_csi);
-      mac->nr_ue_emul_l1.num_srs = pucch[j].n_sr;
-      mac->nr_ue_emul_l1.num_harqs = pucch[j].n_harq;
-      mac->nr_ue_emul_l1.num_csi_reports = pucch[j].n_csi;
 
       // checking if we need to schedule pucch[j] on PUSCH
       if (schedule_uci_on_pusch(mac, frame, slot, &pucch[j], mac->current_UL_BWP))
@@ -1784,9 +1775,6 @@ static void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frame, int slot
         LOG_E(NR_MAC, "Error in pucch allocation\n");
         return;
       }
-      DevAssert(mac->current_DL_BWP != NULL);
-      int mu = mac->current_DL_BWP->scs;
-      mac->nr_ue_emul_l1.active_uci_sfn_slot = NFAPI_SFNSLOT2DEC(mu, frame, slot);
       int ret = nr_ue_configure_pucch(mac,
                                       slot,
                                       frame,

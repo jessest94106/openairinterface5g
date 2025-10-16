@@ -321,11 +321,15 @@ def ExecuteActionWithParam(action, ctx):
 			# Change all execution targets to localhost
 			node = 'localhost'
 		command = test.findtext('command')
+		# Allow referencing repository workspace path in XML via %%workspace%%
+		command = command.replace("%%workspace%%", CONTAINERS.eNBSourceCodePath)
 		success = cls_oaicitest.Custom_Command(HTML, node, command)
 
 	elif action == 'Custom_Script':
 		node = test.findtext('node')
 		script = test.findtext('script')
+		# Allow referencing repository workspace path in XML via %%workspace%%
+		script = script.replace("%%workspace%%", CONTAINERS.eNBSourceCodePath)
 		success = cls_oaicitest.Custom_Script(HTML, node, script)
 
 	elif action == 'Pull_Cluster_Image':

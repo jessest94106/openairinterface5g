@@ -470,12 +470,14 @@ static inline void do_txdataF(c16_t **txdataF,
     // get pmi info
     const int pmi = (pb->prg_size > 0) ? (pb->prgs_list[(int)rb / pb->prg_size].pm_idx) : 0;
     const int pmi2 = (rb < (rel15->rbSize - 1) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb + 1) / pb->prg_size].pm_idx) : -1;
+    const int pmi3 = (rb < (rel15->rbSize - 2) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb + 2) / pb->prg_size].pm_idx) : -1;
+    const int pmi4 = (rb < (rel15->rbSize - 3) && pb->prg_size > 0) ? (pb->prgs_list[(int)(rb + 3) / pb->prg_size].pm_idx) : -1;
 
     // If pmi of next RB and pmi of current RB are the same, we do 2 RB in a row
     // if pmi differs, or current rb is the end (rel15->rbSize - 1), than we do 1 RB in a row
-    const int rb_step = pmi == pmi2 ? 2 : 1;
+    int rb_step0 = pmi == pmi2 ? 2 : 1;
+    const int rb_step = rb_step0==2 && pmi3==pmi && pmi4==pmi ? 4 : rb_step0;
     const int re_cnt = NR_NB_SC_PER_RB * rb_step;
-
     if (pmi == 0) { // unitary Precoding
       if (subCarrier + re_cnt <= symbol_sz) { // RB does not cross DC
         if (ant < rel15->nrOfLayers)
@@ -643,6 +645,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
 #endif
   }
 
+  start_meas(&gNB->dlsch_pdsch_generation_stats);
   /// Resource mapping
   // Non interleaved VRB to PRB mapping
   uint16_t start_sc = frame_parms->first_carrier_offset + (rel15->rbStart + rel15->BWPStart) * NR_NB_SC_PER_RB;
@@ -664,6 +667,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   c16_t mod_dmrs[(n_dmrs+63)&~63] __attribute__((aligned(64)));
   unsigned int re_beginning_of_symbol = 0;
 
+  start_meas(&gNB->dlsch_layer_mapping_stats);
   int layerSz2 = (layerSz + 63) & ~63;
   c16_t tx_layers[rel15->nrOfLayers][layerSz2] __attribute__((aligned(64)));
   memset(tx_layers, 0, sizeof(tx_layers));
@@ -676,7 +680,6 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   //        pmi = prgs_list[rbidx/prg_size].pm_idx, rbidx =0,...,rbSize-1
   // The Precoding matrix:
   // The Codebook Type I
-  start_meas(&gNB->dlsch_precoding_stats);
   nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
   // beam number in multi-beam scenario (concurrent beams)
   int bitmap = SL_to_bitmap(rel15->StartSymbolIndex, rel15->NrOfSymbols);
@@ -689,9 +692,10 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
                                       bitmap);
 
   c16_t **txdataF = gNB->common_vars.txdataF[beam_nb];
-
+  stop_meas(&gNB->dlsch_layer_mapping_stats);
   // Loop Over OFDM symbols:
   for (int l_symbol = rel15->StartSymbolIndex; l_symbol < rel15->StartSymbolIndex + rel15->NrOfSymbols; l_symbol++) {
+    start_meas(&gNB->dlsch_resource_mapping_stats);
     int l_prime = 0; // single symbol layer 0
     int l_overline = get_l0(rel15->dlDmrsSymbPos);
 
@@ -758,13 +762,14 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
     re_beginning_of_symbol += layer_sz;
     stop_meas(&gNB->dlsch_resource_mapping_stats);
 
+    start_meas(&gNB->dlsch_precoding_stats);
     for (int ant = 0; ant < frame_parms->nb_antennas_tx; ant++) {
       const size_t txdataF_offset_per_symbol = l_symbol * symbol_sz + txdataF_offset;
       do_txdataF(txdataF, symbol_sz, txdataF_precoding, gNB, rel15, ant, start_sc, txdataF_offset_per_symbol);
     }
+    stop_meas(&gNB->dlsch_precoding_stats);
   }
-
-  stop_meas(&gNB->dlsch_precoding_stats);
+  stop_meas(&gNB->dlsch_pdsch_generation_stats);
   /* output and its parts for each dlsch should be aligned on 64 bytes (or 8 * 64 bits)
    * should remain a multiple of 8 * 64 with enough offset to fit each dlsch
    */

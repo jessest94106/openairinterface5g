@@ -818,10 +818,7 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
     return -1;
   }
 
-  dlsch_pdu->rb_offset = dlsch_pdu->start_rb + dlsch_pdu->BWPStart;
-
-  if (mac->get_sib1)
-    dlsch_pdu->rb_offset -= dlsch_pdu->BWPStart;
+  dlsch_pdu->refPoint = mac->get_sib1 ? 1 : 0;
 
   /* TIME_DOM_RESOURCE_ASSIGNMENT */
   int dmrs_typeA_pos = mac->dmrs_TypeA_Position;
@@ -1163,7 +1160,7 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
     LOG_W(MAC, "[%d.%d] Invalid frequency_domain_assignment. Possibly due to false DCI. Ignoring DCI!\n", frame, slot);
     return -1;
   }
-  dlsch_pdu->rb_offset = dlsch_pdu->start_rb + dlsch_pdu->BWPStart;
+  dlsch_pdu->refPoint = 0;
   /* TIME_DOM_RESOURCE_ASSIGNMENT */
   int dmrs_typeA_pos = mac->dmrs_TypeA_Position;
   int mux_pattern = 1;
@@ -2419,11 +2416,6 @@ bool get_downlink_ack(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sche
               dl_harq_pid, current_harq->ul_frame, current_harq->ul_slot);
         /* check if current tx slot should transmit downlink acknowlegment */
         if (current_harq->ul_frame == frame && current_harq->ul_slot == slot) {
-          if (get_softmodem_params()->emulate_l1) {
-            mac->nr_ue_emul_l1.harq[dl_harq_pid].active = true;
-            mac->nr_ue_emul_l1.harq[dl_harq_pid].active_dl_harq_sfn = frame;
-            mac->nr_ue_emul_l1.harq[dl_harq_pid].active_dl_harq_slot = slot;
-          }
           if (res_ind != -1 && res_ind != current_harq->pucch_resource_indicator)
             LOG_E(NR_MAC,
                   "Value of pucch_resource_indicator %d not matching with what set before %d (Possibly due to a false DCI) \n",
@@ -2916,17 +2908,6 @@ static int compare_ssb_rsrp(const void *a, const void *b)
   return mb->ssb_rsrp_dBm - ma->ssb_rsrp_dBm;
 }
 
-// returns index from RSRP
-// according to Table 10.1.6.1-1 in 38.133
-static uint8_t get_rsrp_index(int rsrp)
-{
-  int index = rsrp + 157;
-  if (rsrp > -44)
-    index = 113;
-  if (rsrp < -140)
-    index = 16;
-  return index;
-}
 
 static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
                                           struct NR_CSI_ReportConfig *csi_reportconfig,
@@ -3048,18 +3029,6 @@ static csi_payload_t get_csirs_RI_PMI_CQI_payload(NR_UE_MAC_INST_t *mac,
           int pmi_x1_bitlen = csi_report->csi_meas_bitlen.pmi_x1_bitlen[mac->l1_measurements.rank_indicator];
           int pmi_x2_bitlen = csi_report->csi_meas_bitlen.pmi_x2_bitlen[mac->l1_measurements.rank_indicator];
           int cqi_bitlen = csi_report->csi_meas_bitlen.cqi_bitlen[mac->l1_measurements.rank_indicator];
-
-          if (get_softmodem_params()->emulate_l1) {
-            static const uint8_t mcs_to_cqi[] = {0, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
-                                                 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15};
-            CHECK_INDEX(nr_bler_data, NR_NUM_MCS - 1);
-            int mcs = get_mcs_from_sinr(nr_bler_data, (mac->nr_ue_emul_l1.cqi - 640) * 0.1);
-            CHECK_INDEX(mcs_to_cqi, mcs);
-            mac->l1_measurements.rank_indicator = mac->nr_ue_emul_l1.ri;
-            mac->l1_measurements.i1 = mac->nr_ue_emul_l1.pmi;
-            mac->l1_measurements.cqi = mcs_to_cqi[mcs];
-          }
-
           int padding_bitlen = 0;
           // TODO: Improvements will be needed to cri_bitlen>0 and pmi_x1_bitlen>0
           if (mapping_type == ON_PUSCH) {
@@ -4287,21 +4256,6 @@ static void nr_ue_process_rar(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *d
       handle_rar_reception(mac, rar, frame, slot);
       if (ra->cfra)
         nr_ra_succeeded(mac, dl_info->gNB_index, frame, slot);
-      if (get_softmodem_params()->emulate_l1) {
-        /* When we are emulating L1 with multiple UEs, the rx_indication will have
-           multiple RAR PDUs. The code would previously handle each of these PDUs,
-           but it should only be handling the single RAR that matches the current
-           UE. */
-        LOG_I(NR_MAC, "RAR PDU found for our UE with PDU index %d\n", pdu_id);
-        dl_info->rx_ind->number_pdus = 1;
-        if (pdu_id != 0) {
-          memcpy(&dl_info->rx_ind->rx_indication_body[0],
-                &dl_info->rx_ind->rx_indication_body[pdu_id],
-                sizeof(fapi_nr_rx_indication_body_t));
-        }
-        mac->nr_ue_emul_l1.expected_rar = false;
-        memset(mac->nr_ue_emul_l1.index_has_rar, 0, sizeof(mac->nr_ue_emul_l1.index_has_rar));
-      }
       break;
     }
     if (rarh->E == 0) {

@@ -501,6 +501,8 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t dlsch_encoding_stats;
   time_stats_t dlsch_modulation_stats;
   time_stats_t dlsch_scrambling_stats;
+  time_stats_t dlsch_pdsch_generation_stats;
+  time_stats_t dlsch_layer_mapping_stats;
   time_stats_t dlsch_resource_mapping_stats;
   time_stats_t dlsch_precoding_stats;
   time_stats_t tinput;
@@ -537,17 +539,10 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t srs_beam_report_stats;
   time_stats_t srs_iq_matrix_stats;
 
-  notifiedFIFO_t respPuschSymb;
-  notifiedFIFO_t respDecode;
   notifiedFIFO_t resp_L1;
-  notifiedFIFO_t L1_tx_free;
-  notifiedFIFO_t L1_tx_filled;
   notifiedFIFO_t L1_tx_out;
   notifiedFIFO_t L1_rx_out;
-  notifiedFIFO_t resp_RU_tx;
   tpool_t threadPool;
-  int nbSymb;
-  int nbAarx;
   int num_pusch_symbols_per_thread;
   int dmrs_num_antennas_per_thread;
   pthread_t L1_rx_thread;
