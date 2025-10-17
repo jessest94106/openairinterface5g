@@ -59,6 +59,8 @@ int nr_est_timing_advance_srs(const NR_DL_FRAME_PARMS *frame_parms,
     timing_advance = timing_advance - frame_parms->ofdm_symbol_size;
   }
 
+  LOG_I(NR_PHY, "Estimated SRS ToA %d\n", timing_advance);
+
   // Scale the 16 factor in N_TA calculation in 38.213 section 4.2 according to the used FFT size
   const uint16_t bw_scaling = frame_parms->ofdm_symbol_size >> 7;
 
