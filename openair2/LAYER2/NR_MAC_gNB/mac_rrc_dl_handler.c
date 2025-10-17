@@ -634,6 +634,59 @@ static void handle_ue_context_rrc_container(const byte_array_t *rrc_container, c
   nr_rlc_srb_recv_sdu(rnti, id, rrc_container->buf, rrc_container->len);
 }
 
+/** @brief Get and clone CellGroupConfig for UE Context Setup/Modification response.
+ * The source depends on re-establishment state:
+ * - CellGroup: Currently active/runtime CellGroupConfig used by MAC for scheduling.
+ *   During re-establishment, spCellConfig is removed from it (per TS 38.331 §5.3.7.2).
+ * - reconfigCellGroup: Staging area that holds a complete CellGroupConfig saved before
+ *   modifications. During re-establishment, it still contains spCellConfig (saved before
+ *   removal). It becomes the new CellGroup when reconfiguration completes.
+ * During re-establishment, we must clone from reconfigCellGroup to get a complete
+ * CellGroupConfig with spCellConfig for transparent forwarding to the UE.
+ * @param UE UE context
+ * @return Cloned CellGroupConfig */
+static NR_CellGroupConfig_t *get_cellgroup_config(NR_UE_info_t *UE)
+{
+  if (UE->reestablish_rlc && UE->reconfigCellGroup != NULL) {
+    return clone_CellGroupConfig(UE->reconfigCellGroup);
+  } else {
+    return clone_CellGroupConfig(UE->CellGroup);
+  }
+}
+
+/** @brief Update CellGroupConfig for RRC re-establishment procedure.
+ * This function prepares a complete CellGroupConfig for gNB-DU Configuration Query response
+ * during RRC re-establishment.
+ * The function sets reestablishRLC flags for all RLC bearers except SRB1.
+ * SRB1 is removed from the bearer list since it is already re-established during
+ * RRCReestablishment and should not be included. */
+static void update_cellgroup_for_reestablishment(NR_UE_info_t *UE, NR_CellGroupConfig_t *new_CellGroup)
+{
+  DevAssert(new_CellGroup);
+  DevAssert(new_CellGroup->spCellConfig);
+  DevAssert(UE->reestablish_rlc);
+  LOG_I(NR_MAC, "UE %04x: Re-establishment detected, setting reestablishRLC flags\n", UE->rnti);
+  struct NR_CellGroupConfig__rlc_BearerToAddModList *addmod = new_CellGroup->rlc_BearerToAddModList;
+  if (addmod && addmod->list.count > 0) {
+    LOG_I(NR_MAC, "UE %04x: CellGroupConfig has %d bearers:\n", UE->rnti, addmod->list.count);
+    for (int i = 0; i < addmod->list.count; ++i) {
+      NR_RLC_BearerConfig_t *bearer = addmod->list.array[i];
+      int lcid = bearer->logicalChannelIdentity;
+      int rb_type = bearer->servedRadioBearer->present;
+      int rb_id = (rb_type == NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity)
+                      ? bearer->servedRadioBearer->choice.srb_Identity
+                      : bearer->servedRadioBearer->choice.drb_Identity;
+      if (rb_type == NR_RLC_BearerConfig__servedRadioBearer_PR_srb_Identity && rb_id == 1) {
+        asn_sequence_del(&addmod->list, i, 1);
+        --i;
+        continue;
+      }
+      LOG_I(NR_MAC, "UE %04x: Re-establishing RLC for LCID %d\n", UE->rnti, lcid);
+      asn1cCallocOne(addmod->list.array[i]->reestablishRLC, NR_RLC_BearerConfig__reestablishRLC_true);
+    }
+  }
+}
+
 void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 {
   const bool is_SA = IS_SA_MODE(get_softmodem_params());
@@ -766,7 +819,7 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
     return;
   }
 
-  NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
+  NR_CellGroupConfig_t *new_CellGroup = get_cellgroup_config(UE);
 
   if (req->srbs_len > 0) {
     resp.srbs_len = handle_ue_context_srbs_setup(UE, req->srbs_len, req->srbs, &resp.srbs, new_CellGroup, &mac->rlc_config);
@@ -804,6 +857,7 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
       for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
         nr_lc_config_t *c = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
         c->suspended = false;
+        LOG_I(NR_MAC, "UE %04x: Re-establishing RLC for LCID %d\n", UE->rnti, c->lcid);
         nr_rlc_reestablish_entity(req->gNB_DU_ue_id, c->lcid);
       }
       UE->reestablish_rlc = false;
@@ -821,12 +875,21 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
     update_cellGroupConfig(new_CellGroup, UE->uid, UE->capability, &mac->radio_config, scc);
   }
 
-  // 3GPP TS 38.473 Clause 8.3.4: If gNB-DU Configuration Query is present, include CellGroupConfig
+  /* 3GPP TS 38.473 Clause 8.3.4: If gNB-DU Configuration Query is present, include CellGroupConfig
+   * (CU requested CellGroupConfig for transparent forwarding) */
   if (req->gNB_DU_Configuration_Query != NULL && *req->gNB_DU_Configuration_Query) {
     LOG_I(NR_MAC, "UE %04x: gNB-DU Configuration Query received, will include CellGroupConfig in response\n", UE->rnti);
+
+    if (UE->reestablish_rlc) {
+      update_cellgroup_for_reestablishment(UE, new_CellGroup);
+    }
+
+    /* Encode CellGroupConfig for transparent forwarding in the DU to CU trasnfer IE
+     * CU will forward these encoded bytes directly to UE without decode/re-encode cycles */
     resp.du_to_cu_rrc_info = calloc_or_fail(1, sizeof(du_to_cu_rrc_information_t));
     resp.du_to_cu_rrc_info->cell_group_config = encode_cellgroup_config(new_CellGroup);
 
+    // Replace reconfigCellGroup with new_CellGroup (now contains complete config with spCellConfig restored)
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
     UE->reconfigCellGroup = new_CellGroup;
     configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);

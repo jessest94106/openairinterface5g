@@ -861,7 +861,7 @@ nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC
   NR_SRB_ToAddModList_t *SRBs = createSRBlist(UE, srb_reest_bitmap);
   NR_DRB_ToAddModList_t *DRBs = createDRBlist(UE, drb_reestablish, do_integrity, do_ciphering);
 
-  nr_rrc_reconfig_param_t params = {.cell_group_config = UE->masterCellGroup,
+  nr_rrc_reconfig_param_t params = {.cgc = &UE->mcg,
                                     .transaction_id = xid,
                                     .drb_config_list = DRBs,
                                     .meas_config = UE->measConfig,
@@ -918,10 +918,22 @@ byte_array_t rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *
   return msg;
 }
 
-static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
+/** @brief Generate and send RRC Reconfiguration message.
+ * Handles both normal reconfiguration and first reconfiguration after re-establishment.
+ * @param rrc RRC instance
+ * @param ue_p UE context
+ * @param is_reestablishment True if this is the first reconfiguration after re-establishment */
+static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, bool is_reestablishment)
 {
-  /* do not re-establish PDCP for any bearer */
-  nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, ue_p, 0, false);
+  /** Get RRC Reconfiguration parameters
+   * For the first reconfiguration after a re-establishment: re-establish PDCP for SRB2
+   * (SRB1 already re-established in RRCReestablishment) and all DRBs,
+   * For the subsequent reconfigurations: do not re-establish PDCP for any bearer */
+  uint8_t srb_reest_bitmap = is_reestablishment ? (1 << SRB2) : 0;
+  bool drb_reestablish = is_reestablishment;
+  nr_rrc_reconfig_param_t params = get_RRCReconfiguration_params(rrc, ue_p, srb_reest_bitmap, drb_reestablish);
+
+  // Handle PDU session status updates
   FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, item, &ue_p->pduSessions) {
     if (item->status == PDU_SESSION_STATUS_NEW) {
       item->status = PDU_SESSION_STATUS_DONE;
@@ -932,15 +944,27 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
   }
 
   // Set xid for RRC transaction
-  ue_p->xids[params.transaction_id] = params.n_drb_rel > 0 ? RRC_PDUSESSION_RELEASE : RRC_PDUSESSION_ESTABLISH;
+  if (is_reestablishment) {
+    ue_p->xids[params.transaction_id] = RRC_REESTABLISH_COMPLETE;
+  } else {
+    ue_p->xids[params.transaction_id] = params.n_drb_rel > 0 ? RRC_PDUSESSION_RELEASE : RRC_PDUSESSION_ESTABLISH;
+  }
 
   byte_array_t msg = rrc_gNB_encode_RRCReconfiguration(rrc, ue_p, params);
   if (msg.len <= 0) {
-    LOG_E(NR_RRC, "UE %d: Failed to generate RRCReconfiguration\n", ue_p->rrc_ue_id);
+    LOG_E(NR_RRC,
+          "UE %d: Failed to generate RRCReconfiguration%s\n",
+          ue_p->rrc_ue_id,
+          is_reestablishment ? " for re-establishment" : "");
+    free_RRCReconfiguration_params(params);
     return;
   }
 
-  LOG_UE_DL_EVENT(ue_p, "Generate RRCReconfiguration (bytes %ld, xid %d)\n", msg.len, params.transaction_id);
+  LOG_UE_DL_EVENT(ue_p,
+                  "Generate RRCReconfiguration%s (bytes %ld, xid %d)\n",
+                  is_reestablishment ? " after re-establishment" : "",
+                  msg.len,
+                  params.transaction_id);
   const uint32_t msg_id = NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration;
   nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, msg_id, msg.buf, msg.len);
   free_RRCReconfiguration_params(params);
@@ -1230,46 +1254,9 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
 {
   LOG_I(NR_RRC, "UE %d Processing NR_RRCReestablishmentComplete from UE\n", ue_p->rrc_ue_id);
 
-  int i = 0;
-
   ue_p->xids[xid] = RRC_ACTION_NONE;
 
   ue_p->Srb[1].Active = 1;
-
-  NR_CellGroupConfig_t *cellGroupConfig = calloc(1, sizeof(NR_CellGroupConfig_t));
-
-  cellGroupConfig->spCellConfig = ue_p->masterCellGroup->spCellConfig;
-  cellGroupConfig->mac_CellGroupConfig = ue_p->masterCellGroup->mac_CellGroupConfig;
-  cellGroupConfig->physicalCellGroupConfig = ue_p->masterCellGroup->physicalCellGroupConfig;
-  cellGroupConfig->rlc_BearerToReleaseList = NULL;
-  cellGroupConfig->rlc_BearerToAddModList = calloc(1, sizeof(*cellGroupConfig->rlc_BearerToAddModList));
-
-  /*
-   * Get SRB2, DRB configuration from the existing UE context,
-   * also start from SRB2 (i=1) and not from SRB1 (i=0).
-   */
-  for (i = 1; i < ue_p->masterCellGroup->rlc_BearerToAddModList->list.count; ++i)
-    asn1cSeqAdd(&cellGroupConfig->rlc_BearerToAddModList->list, ue_p->masterCellGroup->rlc_BearerToAddModList->list.array[i]);
-
-  /*
-   * At this stage, PDCP entity are re-established and reestablishRLC is flagged
-   * with RRCReconfiguration to complete RLC re-establishment of remaining bearers
-   */
-  for (i = 0; i < cellGroupConfig->rlc_BearerToAddModList->list.count; i++) {
-    asn1cCallocOne(cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC,
-                   NR_RLC_BearerConfig__reestablishRLC_true);
-  }
-
-  /* TODO: remove a reconfigurationWithSync, we don't need it for
-   * reestablishment. The whole reason why this might be here is that we store
-   * the CellGroupConfig (after handover), and simply reuse it for
-   * reestablishment, instead of re-requesting the CellGroupConfig from the DU.
-   * Hence, add below hack; the solution would be to request the
-   * CellGroupConfig from the DU when doing reestablishment. */
-  if (cellGroupConfig->spCellConfig && cellGroupConfig->spCellConfig->reconfigurationWithSync) {
-    ASN_STRUCT_FREE(asn_DEF_NR_ReconfigurationWithSync, cellGroupConfig->spCellConfig->reconfigurationWithSync);
-    cellGroupConfig->spCellConfig->reconfigurationWithSync = NULL;
-  }
 
   /* Re-establish SRB2 according to clause 5.3.5.6.3 of 3GPP TS 38.331
    * (SRB1 is re-established with RRCReestablishment message)
@@ -1287,37 +1274,26 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
   /* PDCP Reestablishment of DRBs according to 5.3.5.6.5 of 3GPP TS 38.331 (over E1) */
   cuup_notify_reestablishment(rrc, ue_p);
 
-  /* Create srb-ToAddModList, 3GPP TS 38.331 RadioBearerConfig:
-   * do not re-establish PDCP for SRB1, when resuming an RRC connection,
-   * or at the first reconfiguration after RRC connection reestablishment in NR */
-  NR_SRB_ToAddModList_t *SRBs = createSRBlist(ue_p, 1 << SRB2); // Re-establish PDCP for SRB2 only
-  /* Create drb-ToAddModList */
-  bool do_integrity = rrc->security.do_drb_integrity;
-  bool do_ciphering = rrc->security.do_drb_ciphering;
-  NR_DRB_ToAddModList_t *DRBs = createDRBlist(ue_p, true, do_integrity, do_ciphering);
+  // Request DU to provide CellGroupConfig with reestablishRLC flags for re-establishment
+  // According to TS 38.473 transparency requirements, CU should not construct or re-encode CellGroupConfig
+  f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
 
-  uint8_t new_xid = rrc_gNB_get_next_transaction_identifier(rrc->module_id);
-  ue_p->xids[new_xid] = RRC_REESTABLISH_COMPLETE;
-  nr_rrc_reconfig_param_t params = {.cell_group_config = cellGroupConfig,
-                                    .meas_config = ue_p->measConfig,
-                                    .drb_config_list = DRBs,
-                                    .srb_config_list = SRBs,
-                                    .transaction_id = new_xid};
-  byte_array_t msg = do_RRCReconfiguration(&params);
-  if (msg.len <= 0) {
-    LOG_E(NR_RRC, "UE %d: Failed to generate RRCReconfiguration\n", ue_p->rrc_ue_id);
-    return;
-  }
-  LOG_DUMPMSG(NR_RRC, DEBUG_RRC, msg.buf, msg.len, "[MSG] RRC Reconfiguration\n");
-  LOG_I(NR_RRC,
-        "UE %d RNTI %04x: Generate NR_RRCReconfiguration after reestablishment complete (bytes %ld)\n",
-        ue_p->rrc_ue_id,
-        ue_p->rnti,
-        msg.len);
-  const uint32_t msg_id = NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration;
-  nr_rrc_transfer_protected_rrc_message(rrc, ue_p, DL_SCH_LCID_DCCH, msg_id, msg.buf, msg.len);
-  free_RRCReconfiguration_params(params);
-  free_byte_array(msg);
+  f1ap_ue_context_mod_req_t ue_context_modif_req = {
+      .gNB_CU_ue_id = ue_p->rrc_ue_id,
+      .gNB_DU_ue_id = ue_data.secondary_ue,
+  };
+
+  // Request CellGroupConfig from DU in the response
+  ue_context_modif_req.gNB_DU_Configuration_Query = calloc_or_fail(1, sizeof(bool));
+  *ue_context_modif_req.gNB_DU_Configuration_Query = true;
+
+  /** Send UE context modification request to DU, which will respond with CellGroupConfig
+   * containing reestablishRLC flags for re-establishment.
+   * The response will be handled in rrc_CU_process_ue_context_modification_response()
+   * which will store the encoded CellGroupConfig and trigger RRC Reconfiguration */
+  rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &ue_context_modif_req);
+
 }
 
 int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int dl_bwp_id, const int ul_bwp_id)
@@ -1326,16 +1302,7 @@ int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int 
   ue_p->xids[xid] = RRC_DEDICATED_RECONF;
   ue_p->ongoing_reconfiguration = true;
 
-  NR_CellGroupConfig_t *masterCellGroup = ue_p->masterCellGroup;
-  if (dl_bwp_id > 0) {
-    *masterCellGroup->spCellConfig->spCellConfigDedicated->firstActiveDownlinkBWP_Id = dl_bwp_id;
-    *masterCellGroup->spCellConfig->spCellConfigDedicated->defaultDownlinkBWP_Id = dl_bwp_id;
-  }
-  if (ul_bwp_id > 0) {
-    *masterCellGroup->spCellConfig->spCellConfigDedicated->uplinkConfig->firstActiveUplinkBWP_Id = ul_bwp_id;
-  }
-
-  nr_rrc_reconfig_param_t params = {.cell_group_config = masterCellGroup, .transaction_id = xid};
+  nr_rrc_reconfig_param_t params = {.cgc = &ue_p->mcg, .transaction_id = xid};
   byte_array_t msg = do_RRCReconfiguration(&params);
   if (msg.len <= 0) {
     LOG_E(NR_RRC, "UE %d: Failed to generate RRCReconfiguration\n", ue_p->rrc_ue_id);
@@ -1346,6 +1313,19 @@ int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int 
   free_byte_array(msg);
   free_RRCReconfiguration_params(params);
   return 0;
+}
+
+/** @brief Store encoded CellGroupConfig for transparent forwarding (TS 38.473 requirement).
+ * CU must not decode/re-encode CellGroupConfig, only forward encoded bytes to UE. */
+static void store_cgc(gNB_RRC_UE_t *UE, const byte_array_t *cgc)
+{
+  LOG_D(RRC, "UE %04x storing CellGroupConfig encoded bytes for transparent forwarding (len=%ld)\n", UE->rnti, cgc->len);
+
+  free_byte_array(UE->mcg);
+  UE->mcg = copy_byte_array(*cgc);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1))
+    dump_cgc(UE->mcg.buf, UE->mcg.len);
 }
 
 static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
@@ -1405,19 +1385,12 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
     rrc_gNB_generate_RRCReject(rrc, ue_context_p);
     return;
   }
-  NR_CellGroupConfig_t *cellGroupConfig = NULL;
-  asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
-                                                 &asn_DEF_NR_CellGroupConfig,
-                                                 (void **)&cellGroupConfig,
-                                                 msg->du2cu_rrc_container,
-                                                 msg->du2cu_rrc_container_length);
-  AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
 
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-  UE = &ue_context_p->ue_context;
+  byte_array_t cgc = {.buf = msg->du2cu_rrc_container, .len = msg->du2cu_rrc_container_length};
+  store_cgc(UE, &cgc);
   UE->establishment_cause = rrcSetupRequest->establishmentCause;
   UE->nr_cellid = msg->nr_cellid;
-  UE->masterCellGroup = cellGroupConfig;
   UE->ongoing_reconfiguration = false;
   UE->measConfig = nr_rrc_get_measconfig(rrc, UE->nr_cellid);
   activate_srb(UE, 1);
@@ -1561,9 +1534,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     f1u_dl_gtp_rollback(UE);
 
     /* we need the original CellGroupConfig */
-    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
-    UE->masterCellGroup = source_ctx->old_cellGroupConfig;
-    source_ctx->old_cellGroupConfig = NULL;
+    store_cgc(UE, &source_ctx->old_cgc);
 
     /* update to old DU assoc id -- RNTI + secondary DU UE ID further below */
     ue_data.du_assoc_id = source_ctx->du->assoc_id;
@@ -2449,6 +2420,61 @@ void e1_notify_pdcp_status(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const ngap_drb_s
   free_e1ap_context_mod_request(&req);
 }
 
+static NR_MeasGapConfig_t *get_meas_gap_config(const f1ap_du_to_cu_rrc_info_t *du_to_cu_rrc_info)
+{
+  if (!du_to_cu_rrc_info->meas_gap_config) {
+    return NULL;
+  }
+
+  NR_MeasGapConfig_t *measGapConfig = NULL;
+  asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
+                                                 &asn_DEF_NR_MeasGapConfig,
+                                                 (void **)&measGapConfig,
+                                                 (uint8_t *)du_to_cu_rrc_info->meas_gap_config->buf,
+                                                 du_to_cu_rrc_info->meas_gap_config->len);
+  AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "measGapConfig decode error\n");
+  return measGapConfig;
+}
+
+/** @brief Detect re-establishment by checking reestablishRLC flags in CellGroupConfig.
+ * Temporary decode only for detection (not for modification, to preserve transparency).
+ * DU sets reestablishRLC=true for bearers needing RLC re-establishment (except SRB1).
+ * @param cgc Encoded CellGroupConfig from DU to CU transfer IE
+ * @return True if re-establishment is detected, false otherwise */
+static bool rrc_detect_reestablishment(const byte_array_t *cgc)
+{
+  if (!cgc || !cgc->buf || cgc->len == 0) {
+    return false;
+  }
+
+  NR_CellGroupConfig_t *temp_cellGroupConfig = NULL;
+  asn_dec_rval_t dec_rval =
+      uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&temp_cellGroupConfig, cgc->buf, cgc->len);
+  if (dec_rval.code != RC_OK || dec_rval.consumed == 0) {
+    LOG_W(NR_RRC,
+          "Failed to decode CellGroupConfig for re-establishment detection (code=%d, consumed=%zu)\n",
+          dec_rval.code,
+          dec_rval.consumed);
+    return false;
+  }
+
+  bool is_reestablishment = false;
+  // Check if any RLC bearer has reestablishRLC flag set
+  if (temp_cellGroupConfig->rlc_BearerToAddModList && temp_cellGroupConfig->rlc_BearerToAddModList->list.count > 0) {
+    for (int i = 0; i < temp_cellGroupConfig->rlc_BearerToAddModList->list.count; i++) {
+      if (temp_cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC
+          && *temp_cellGroupConfig->rlc_BearerToAddModList->list.array[i]->reestablishRLC
+                 == NR_RLC_BearerConfig__reestablishRLC_true) {
+        is_reestablishment = true;
+        break;
+      }
+    }
+  }
+  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, temp_cellGroupConfig);
+  return is_reestablishment;
+}
+
+
 static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance_t instance)
 {
   f1ap_ue_context_setup_resp_t *resp = &F1AP_UE_CONTEXT_SETUP_RESP(msg_p);
@@ -2461,30 +2487,15 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   UE->f1_ue_context_active = true;
 
-  NR_CellGroupConfig_t *cellGroupConfig = NULL;
+  // Store the encoded CellGroupConfig for transparent forwarding
   byte_array_t *cgc = &resp->du_to_cu_rrc_info.cell_group_config;
-  asn_dec_rval_t dec_rval =
-      uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, (uint8_t *)cgc->buf, cgc->len);
-  AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
+  store_cgc(UE, cgc);
 
-  if (resp->du_to_cu_rrc_info.meas_gap_config) {
-    NR_MeasGapConfig_t *measGapConfig = NULL;
-    asn_dec_rval_t dec_rval_mgc = uper_decode_complete(NULL,
-                                                       &asn_DEF_NR_MeasGapConfig,
-                                                       (void **)&measGapConfig,
-                                                       (uint8_t *)resp->du_to_cu_rrc_info.meas_gap_config->buf,
-                                                       resp->du_to_cu_rrc_info.meas_gap_config->len);
-    AssertFatal(dec_rval_mgc.code == RC_OK && dec_rval_mgc.consumed > 0, "measGapConfig decode error\n");
+  // Process measurement gap config if present
+  NR_MeasGapConfig_t *measGapConfig = get_meas_gap_config(&resp->du_to_cu_rrc_info);
+  if (measGapConfig) {
     UE->measConfig->measGapConfig = measGapConfig;
   }
-
-  if (UE->masterCellGroup) {
-    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
-    LOG_I(RRC, "UE %04x replacing existing CellGroupConfig with new one received from DU\n", UE->rnti);
-  }
-  UE->masterCellGroup = cellGroupConfig;
-  if (LOG_DEBUGFLAG(DEBUG_ASN1))
-    xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
 
   if (!IS_SA_MODE(get_softmodem_params())) {
     rrc_add_nsa_user_resp(rrc, UE, resp);
@@ -2506,7 +2517,9 @@ static void rrc_CU_process_ue_context_setup_response(MessageDef *msg_p, instance
   }
 
   if (UE->ho_context == NULL) {
-    rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+    // Check if this is a re-establishment scenario by examining the CellGroupConfig
+    bool is_reestablishment = rrc_detect_reestablishment(cgc);
+    rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE, is_reestablishment);
   } else {
     // case of handover
     // handling of "target CU" information
@@ -2578,7 +2591,7 @@ static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
   if (UE->ho_context)
     nr_rrc_finalize_ho(UE);
   ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->UE_Capability_nr);
-  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
+  free_byte_array(UE->mcg);
   ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, UE->measResults);
   FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);
   free_MeasConfig(UE->measConfig);
@@ -2641,22 +2654,18 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
   }
 
   if (resp->du_to_cu_rrc_info) {
-    NR_CellGroupConfig_t *cellGroupConfig = NULL;
     byte_array_t *cgc = &resp->du_to_cu_rrc_info->cell_group_config;
-    asn_dec_rval_t dec_rval =
-        uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, (uint8_t *)cgc->buf, cgc->len);
-    AssertFatal(dec_rval.code == RC_OK && dec_rval.consumed > 0, "Cell group config decode error\n");
 
     /* hack for interoperability with srsRAN: ignore cell group config if empty */
     /* cell group config is empty if buffer length is 2 and content is all 0 */
     bool cgc_is_empty = cgc->len == 2 && cgc->buf[0] == 0 && cgc->buf[1] == 0;
     if (!cgc_is_empty) {
-      if (UE->masterCellGroup) {
-        ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
-        LOG_I(RRC, "UE %04x replacing existing CellGroupConfig with new one received from DU\n", UE->rnti);
-      }
-      UE->masterCellGroup = cellGroupConfig;
-      rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE);
+      // Store the encoded CellGroupConfig for transparent forwarding
+      store_cgc(UE, cgc);
+
+      // Check if this is a re-establishment scenario by examining the CellGroupConfig
+      bool is_reestablishment = rrc_detect_reestablishment(cgc);
+      rrc_gNB_generate_dedicatedRRCReconfiguration(rrc, UE, is_reestablishment);
     } else {
       LOG_W(NR_RRC, "hack: UE %d: ignore empty CellGroupConfig in UEContextModificationResponse\n", UE->rrc_ue_id);
     }
@@ -2704,31 +2713,12 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_
           UE->rrc_ue_id,
           UE->rnti);
 
-    NR_CellGroupConfig_t *cellGroupConfig = NULL;
-    asn_dec_rval_t dec_rval = uper_decode_complete(NULL,
-                                                   &asn_DEF_NR_CellGroupConfig,
-                                                   (void **)&cellGroupConfig,
-                                                   (uint8_t *)required->du_to_cu_rrc_information->cellGroupConfig,
-                                                   required->du_to_cu_rrc_information->cellGroupConfig_length);
-    if (dec_rval.code != RC_OK && dec_rval.consumed == 0) {
-      LOG_E(RRC, "Cell group config decode error, refusing reconfiguration\n");
-      f1ap_ue_context_modif_refuse_t refuse = {
-        .gNB_CU_ue_id = required->gNB_CU_ue_id,
-        .gNB_DU_ue_id = required->gNB_DU_ue_id,
-        .cause = F1AP_CAUSE_PROTOCOL,
-        .cause_value = F1AP_CauseProtocol_transfer_syntax_error,
-      };
-      rrc->mac_rrc.ue_context_modification_refuse(msg_p->ittiMsgHeader.originInstance, &refuse);
-      return;
-    }
+    // Store the encoded CellGroupConfig for transparent forwarding
+    uint8_t *cgc_buf = required->du_to_cu_rrc_information->cellGroupConfig;
+    size_t cgc_len = required->du_to_cu_rrc_information->cellGroupConfig_length;
 
-    if (UE->masterCellGroup) {
-      ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
-      LOG_I(RRC, "UE %d/RNTI %04x replacing existing CellGroupConfig with new one received from DU\n", UE->rrc_ue_id, UE->rnti);
-    }
-    UE->masterCellGroup = cellGroupConfig;
-    if (LOG_DEBUGFLAG(DEBUG_ASN1))
-      xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);
+    byte_array_t temp_cgc = {.buf = cgc_buf, .len = cgc_len};
+    store_cgc(UE, &temp_cgc);
 
     /* trigger reconfiguration */
     if (!UE->ongoing_reconfiguration)

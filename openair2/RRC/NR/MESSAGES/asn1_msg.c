@@ -532,7 +532,7 @@ static NR_RRCReconfiguration_IEs_t *build_RRCReconfiguration_IEs(const nr_rrc_re
   ie->measConfig = params->meas_config;
 
   /* nonCriticalExtension, RRCReconfiguration-v1530-IEs */
-  if (params->cell_group_config || params->num_nas_msg) {
+  if (params->cgc || params->num_nas_msg) {
     // Allocate memory for extension IE
     ie->nonCriticalExtension = calloc_or_fail(1, sizeof(*ie->nonCriticalExtension));
   }
@@ -549,37 +549,13 @@ static NR_RRCReconfiguration_IEs_t *build_RRCReconfiguration_IEs(const nr_rrc_re
       }
     }
 
-    /* masterCellGroup */
-    if (params->cell_group_config) {
-      uint8_t temp[4096];
-      asn_enc_rval_t enc = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, params->cell_group_config, temp, sizeof(temp));
-
-      if (enc.encoded <= 0) {
-        LOG_E(NR_RRC, "ASN.1 encoding failed for NR_CellGroupConfig (encoded=%ld)\n", enc.encoded);
-        if (enc.failed_type) {
-          LOG_E(NR_RRC, "Failed at ASN.1 type: %s\n", enc.failed_type->name);
-        }
-        if (enc.structure_ptr) {
-          LOG_E(NR_RRC, "Failed at structure element: %p\n", enc.structure_ptr);
-        }
-        // Print diagnostic information to help debug the issue
-        LOG_E(NR_RRC, "CellGroupConfig structure that failed to encode:\n");
-        xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *)params->cell_group_config);
-        ASN_STRUCT_FREE(asn_DEF_NR_RRCReconfiguration_IEs, ie);
-        return NULL;
-      }
-      DevAssert(enc.encoded <= sizeof(temp) * 8); // Encoded data must fit in temp buffer
-      // Allocate buffer for the encoded data and copy it
-      // enc.encoded is in bits, convert to bytes
-      size_t encoded_bytes = (enc.encoded + 7) / 8;
-      uint8_t *buf = calloc_or_fail(1, encoded_bytes);
-      memcpy(buf, temp, encoded_bytes);
-
-      if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
-        xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *)params->cell_group_config);
-      }
+    /* masterCellGroup - Transparent forwarding per TS 38.473 */
+    if (params->cgc) {
+      // Copy pre-encoded CellGroupConfig bytes directly without decode/re-encode (TS 38.473 transparency)
+      // CU receives encoded bytes from DU and forwards to UE without modification
+      LOG_D(NR_RRC, "Transparent forwarding CellGroupConfig (len=%ld bytes)\n", params->cgc->len);
       ie->nonCriticalExtension->masterCellGroup = calloc_or_fail(1, sizeof(*ie->nonCriticalExtension->masterCellGroup));
-      *ie->nonCriticalExtension->masterCellGroup = (OCTET_STRING_t){.buf = buf, .size = encoded_bytes};
+      OCTET_STRING_fromBuf(ie->nonCriticalExtension->masterCellGroup, (const char *)params->cgc->buf, params->cgc->len);
     }
 
     /* masterKeyUpdate */
@@ -630,7 +606,7 @@ static byte_array_t do_HO_RRCReconfiguration(nr_rrc_reconfig_param_t *params)
   return msg;
 }
 
-static void dump_cgc(const uint8_t *buf, size_t len)
+void dump_cgc(const uint8_t *buf, size_t len)
 {
   // Decode the encoded CellGroupConfig for debugging
   NR_CellGroupConfig_t *temp_cellGroupConfig = NULL;
