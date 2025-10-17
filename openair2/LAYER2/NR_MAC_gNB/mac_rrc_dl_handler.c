@@ -821,7 +821,9 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
     update_cellGroupConfig(new_CellGroup, UE->uid, UE->capability, &mac->radio_config, scc);
   }
 
-  if (req->srbs_len > 0 || req->drbs_len > 0 || req->drbs_rel_len > 0 || ue_cap != NULL) {
+  // 3GPP TS 38.473 Clause 8.3.4: If gNB-DU Configuration Query is present, include CellGroupConfig
+  if (req->gNB_DU_Configuration_Query != NULL && *req->gNB_DU_Configuration_Query) {
+    LOG_I(NR_MAC, "UE %04x: gNB-DU Configuration Query received, will include CellGroupConfig in response\n", UE->rnti);
     resp.du_to_cu_rrc_info = calloc_or_fail(1, sizeof(du_to_cu_rrc_information_t));
     resp.du_to_cu_rrc_info->cell_group_config = encode_cellgroup_config(new_CellGroup);
 

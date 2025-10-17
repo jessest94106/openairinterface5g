@@ -1027,6 +1027,10 @@ static void rrc_gNB_send_f1_drb_release_request(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
   req.drbs_rel_len = n_drb_to_release;
   memcpy(req.drbs_rel, drb_to_release, n_drb_to_release * sizeof(int));
 
+  // Request CellGroupConfig from DU in the response
+  req.gNB_DU_Configuration_Query = calloc_or_fail(1, sizeof(*req.gNB_DU_Configuration_Query));
+  *req.gNB_DU_Configuration_Query = true;
+
   /* send UE Context Modification to DU without attaching any RRC container */
   rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &req);
   LOG_I(NR_RRC, "UE %d: send F1 UE Context Modification Request with DRB release (%d DRBs)\n", ue_p->rrc_ue_id, req.drbs_rel_len);
@@ -3662,6 +3666,10 @@ void rrc_gNB_generate_UeContextModificationRequest(const gNB_RRC_INST *rrc,
       .drbs_rel = (f1ap_drb_to_release_t *)rel_drbs,
       .cu_to_du_rrc_info = cu2du,
   };
+
+  // Request CellGroupConfig from DU in the response
+  ue_context_modif_req.gNB_DU_Configuration_Query = calloc_or_fail(1, sizeof(*ue_context_modif_req.gNB_DU_Configuration_Query));
+  *ue_context_modif_req.gNB_DU_Configuration_Query = true;
   rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &ue_context_modif_req);
   // avoid attempt to release rel_drbs
   ue_context_modif_req.drbs_rel_len = 0;
