@@ -304,7 +304,7 @@ static void configure_srs_info(fapi_nr_ul_config_srs_pdu *srs_config_pdu, nr_srs
 *                send srs according to current configuration
 *
 *********************************************************************/
-static bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
+bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
                                  const UE_nr_rxtx_proc_t *proc,
                                  c16_t **txdataF,
                                  nr_phy_data_tx_t *phy_data,
