@@ -1186,11 +1186,11 @@ static void rfsimulator_read_internal(rfsimulator_state_t *t,
           memset(temp_array, 0, sizeof(temp_array));
           channel_modelling = true;
         }
-        const uint64_t dd = ptr->channel_model->channel_offset;
+        const uint64_t channel_offset = ptr->channel_model->channel_offset;
         const uint64_t channel_length = ptr->channel_model->channel_length;
         std::vector<std::vector<c16_t>> ant_buffers = combine_received_beams(t,
                                                                              ptr->received_packets,
-                                                                             timestamp - dd - (channel_length - 1),
+                                                                             timestamp - channel_offset - (channel_length - 1),
                                                                              ptr->nbAnt,
                                                                              nsamps + channel_length - 1,
                                                                              rx_beam_id);
@@ -1314,6 +1314,14 @@ static int rfsimulator_read_beams(openair0_device *device,
   int ret = clock_gettime(CLOCK_REALTIME, &start_time);
   AssertFatal(ret == 0, "clock_gettime() failed: errno %d, %s\n", errno, strerror(errno));
 
+  for (int sock = 0; sock < MAX_FD_RFSIMU; sock++) {
+    buffer_t *ptr = &t->buf[sock];
+
+    if (ptr->conn_sock != -1 && ptr->channel_model != NULL) {
+      update_channel_model(ptr->channel_model, t->nextRxTstamp);
+    }
+  }
+
   if (t->poll_telnetcmdq)
     t->poll_telnetcmdq(t->telnetcmd_qid, t);
 
@@ -1375,7 +1383,7 @@ static int rfsimulator_read_beams(openair0_device *device,
     if (ptr->conn_sock != -1 && !ptr->received_packets.empty()) {
       openair0_timestamp timestamp_to_free = t->nextRxTstamp - 1;
       if (ptr->channel_model) {
-        timestamp_to_free -= ptr->channel_model->channel_length - ptr->channel_model->channel_offset;
+        timestamp_to_free -= (ptr->channel_model->channel_length - 1) + ptr->channel_model->channel_offset;
       }
       clear_old_packets(ptr->received_packets, timestamp_to_free);
     }

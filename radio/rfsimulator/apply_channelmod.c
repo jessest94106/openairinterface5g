@@ -27,29 +27,9 @@
 #include "openair2/LAYER2/NR_MAC_gNB/mac_config.h"
 #include "rfsimulator.h"
 
-/*
-  Legacy study:
-  The parameters are:
-  gain&loss (decay, signal power, ...)
-  either a fixed gain in dB, a target power in dBm or ACG (automatic control gain) to a target average
-  => don't redo the AGC, as it was used in UE case, that must have a AGC inside the UE
-  will be better to handle the "set_gain()" called by UE to apply it's gain (enable test of UE power loop)
-  lin_amp = pow(10.0,.05*txpwr_dBm)/sqrt(nb_tx_antennas);
-  a lot of operations in legacy, grouped in one simulation signal decay: txgain*decay*rxgain
-
-  multi_path (auto convolution, ISI, ...)
-  either we regenerate the channel (call again random_channel(desc,0)), or we keep it over subframes
-  legacy: we regenerate each sub frame in UL, and each frame only in DL
-*/
-void rxAddInput(const c16_t **input_sig,
-                cf_t *after_channel_sig,
-                int rxAnt,
-                channel_desc_t *channelDesc,
-                int nbSamples,
-                uint64_t TS)
+void update_channel_model(channel_desc_t *channelDesc, uint64_t TS)
 {
   static uint64_t last_TS = 0;
-
   if ((channelDesc->sat_height > 0)
       && (channelDesc->enable_dynamic_delay
           || channelDesc->enable_dynamic_Doppler)) { // model for transparent satellite on circular orbit
@@ -239,7 +219,29 @@ void rxAddInput(const c16_t **input_sig,
       }
     }
   }
+}
 
+/*
+  Legacy study:
+  The parameters are:
+  gain&loss (decay, signal power, ...)
+  either a fixed gain in dB, a target power in dBm or ACG (automatic control gain) to a target average
+  => don't redo the AGC, as it was used in UE case, that must have a AGC inside the UE
+  will be better to handle the "set_gain()" called by UE to apply it's gain (enable test of UE power loop)
+  lin_amp = pow(10.0,.05*txpwr_dBm)/sqrt(nb_tx_antennas);
+  a lot of operations in legacy, grouped in one simulation signal decay: txgain*decay*rxgain
+
+  multi_path (auto convolution, ISI, ...)
+  either we regenerate the channel (call again random_channel(desc,0)), or we keep it over subframes
+  legacy: we regenerate each sub frame in UL, and each frame only in DL
+*/
+void rxAddInput(const c16_t **input_sig,
+                cf_t *after_channel_sig,
+                int rxAnt,
+                channel_desc_t *channelDesc,
+                int nbSamples,
+                uint64_t TS)
+{
   // channelDesc->path_loss_dB should contain the total path gain
   // so, in actual RF: tx gain + path loss + rx gain (+antenna gain, ...)
   // UE and NB gain control to be added
