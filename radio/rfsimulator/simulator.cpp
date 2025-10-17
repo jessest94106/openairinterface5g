@@ -83,29 +83,29 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
   "        chanmod:   enable channel modelisation\n"                                               \
   "        saviq:     enable saving written iqs to a file\n"
 
-// clang-format off
-/*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-/*                                            configuration parameters for the rfsimulator device */
-/*   optname                     helpstr                     paramflags           XXXptr                               defXXXval                          type         numelt  */
-/*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define simOpt PARAMFLAG_NOFREE | PARAMFLAG_CMDLINE_NOPREFIXENABLED
+// clang-format off
+/*----------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*                                            configuration parameters for the rfsimulator device */
+/* optname                              helpstr                                 paramflags  XXXptr                            defXXXval */
+/*----------------------------------------------------------------------------------------------------------------------------------------------------*/
 #define RFSIMULATOR_PARAMS_DESC {					\
-    {"serveraddr",             "<ip address to connect to>\n",        simOpt,  .strptr=&rfsimulator->ip,               .defstrval="127.0.0.1",           TYPE_STRING,    0 },\
-      {"serverport", "<port to connect to>\n", simOpt, .u16ptr = &(rfsimulator->port), .defuintval = PORT, TYPE_UINT16, 0},       \
-      {RFSIMU_OPTIONS_PARAMNAME, RFSIM_CONFIG_HELP_OPTIONS, 0, .strlistptr = NULL, .defstrlistval = NULL, TYPE_STRINGLIST, 0},    \
-    {"IQfile",                 "<file path to use when saving IQs>\n",simOpt,  .strptr=&saveF,                         .defstrval="/tmp/rfsimulator.iqs",TYPE_STRING,    0 },\
-      {"modelname", "<channel model name>\n", simOpt, .strptr = &modelname, .defstrval = "AWGN", TYPE_STRING, 0},                 \
-      {"ploss", "<channel path loss in dB>\n", simOpt, .dblptr = &(rfsimulator->chan_pathloss), .defdblval = 0, TYPE_DOUBLE, 0},  \
-    {"forgetfact",             "<channel forget factor ((0 to 1)>\n", simOpt,  .dblptr=&(rfsimulator->chan_forgetfact),.defdblval=0,                     TYPE_DOUBLE,    0 },\
-      {"offset", "<channel offset in samps>\n", simOpt, .u64ptr = &(rfsimulator->chan_offset), .defint64val = 0, TYPE_UINT64, 0}, \
-    {"prop_delay",             "<propagation delay in ms>\n",         simOpt,  .dblptr=&(rfsimulator->prop_delay_ms),  .defdblval=0.0,                   TYPE_DOUBLE,    0 },\
-    {"wait_timeout",           "<wait timeout if no UE connected>\n", simOpt,  .iptr=&(rfsimulator->wait_timeout),     .defintval=1,                     TYPE_INT,       0 },\
-    {"enable_beams", "enable simplified beam simulation",              PARAMFLAG_BOOL,  .iptr=&(beam_ctrl->enable_beams), .defintval=0, TYPE_INT, 0},\
-    {"num_concurrent_beams", "number of concurrent beams supported",  simOpt,  .iptr=&(beam_ctrl->num_concurrent_beams), .defintval=1, TYPE_INT, 0},\
-    {"tx_beam_map", "initial beam map", simOpt, .u64ptr=&(beam_ctrl->tx.beam_map), .defintval=1, TYPE_UINT64, 0},\
-    {"rx_beam_map", "initial beam map", simOpt, .u64ptr=&(beam_ctrl->rx.beam_map), .defintval=1, TYPE_UINT64, 0},\
-    {RFSIMU_BEAM_GAINS,  "beam gain matrix in toeplitz form (first row only)", simOpt, .strptr=NULL, .defstrval=NULL,      TYPE_STRING,  0}, \
-  };
+  STRINGPARAM("serveraddr",             "<ip address to connect to>\n",             simOpt, &rfsimulator->ip,                 "127.0.0.1"),           \
+  UINT16PARAM("serverport",             "<port to connect to>\n",                   simOpt, &rfsimulator->port,               PORT),                  \
+  STRLISTPARAM(RFSIMU_OPTIONS_PARAMNAME, RFSIM_CONFIG_HELP_OPTIONS,                 simOpt, NULL,                             NULL),                  \
+  STRINGPARAM("IQfile",                 "<file path to use when saving IQs>\n",     simOpt, &saveF,                           "/tmp/rfsimulator.iqs"),\
+  STRINGPARAM("modelname",              "<channel model name>\n",                   simOpt, &modelname,                       "AWGN"),                \
+  DOUBLEPARAM("ploss",                  "<channel path loss in dB>\n",              simOpt, &rfsimulator->chan_pathloss,      0),                     \
+  DOUBLEPARAM("forgetfact",             "<channel forget factor ((0 to 1)>\n",      simOpt, &rfsimulator->chan_forgetfact,    0),                     \
+  UINT64PARAM("offset",                 "<channel offset in samps>\n",              simOpt, &rfsimulator->chan_offset,        0L),                     \
+  DOUBLEPARAM("prop_delay",             "<propagation delay in ms>\n",              simOpt, &(rfsimulator->prop_delay_ms),    0.0),                   \
+  INTPARAM("wait_timeout",              "<wait timeout if no UE connected>\n",      simOpt, &rfsimulator->wait_timeout,       1),                     \
+  BOOLPARAM("enable_beams",             "<enable simplified beam simulation>\n",    simOpt, &(beam_ctrl->enable_beams),       0),                     \
+  INTPARAM("num_concurrent_beams",      "<number of concurrent beams supported>\n", simOpt, &beam_ctrl->num_concurrent_beams, 1),                     \
+  UINT64PARAM("tx_beam_map",            "<initial beam map>\n",                     simOpt, &beam_ctrl->tx.beam_map,          1),                     \
+  UINT64PARAM("rx_beam_map",            "<initial beam map>\n",                     simOpt, &beam_ctrl->rx.beam_map,          1),                     \
+  STRINGPARAM(RFSIMU_BEAM_GAINS,        "<beam gain matrix in toeplitz form>\n",    simOpt, NULL,                             NULL),                  \
+};
 // clang-format on
 static void getset_currentchannels_type(char *buf, int debug, webdatadef_t *tdata, telnet_printfunc_t prnt);
 extern int get_currentchannels_type(const char *buf,

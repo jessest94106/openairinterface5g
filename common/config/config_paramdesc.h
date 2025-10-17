@@ -161,6 +161,50 @@ typedef struct paramdef {
 #define TYPE_LIST       55
 
 #define ANY_IPV4ADDR_STRING "0.0.0.0"
+
+// Macros to simplify defining parameters in paramdef_t arrays in C++ source code
+#define OPTNAME(x) .optname = x
+#define HELPSTR(x) .helpstr = x
+#define PARAMFLAG(x) .paramflags = x
+#define PARAMTYPE(x) .type = x
+#define STRINGPARAM(name, help, flags, ptr, defval)                                                                         \
+  {                                                                                                                         \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .strptr = ptr, .defstrval = defval, PARAMTYPE(TYPE_STRING), .numelt = 0 \
+  }
+#define DOUBLEPARAM(name, help, flags, ptr, defval)                                                                         \
+  {                                                                                                                         \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .dblptr = ptr, .defdblval = defval, PARAMTYPE(TYPE_DOUBLE), .numelt = 0 \
+  }
+#define INTPARAM(name, help, flags, ptr, defval)                                                                       \
+  {                                                                                                                    \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .iptr = ptr, .defintval = defval, PARAMTYPE(TYPE_INT), .numelt = 0 \
+  }
+#define UINT16PARAM(name, help, flags, ptr, defval)                                                                          \
+  {                                                                                                                          \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .u16ptr = ptr, .defuintval = defval, PARAMTYPE(TYPE_UINT16), .numelt = 0 \
+  }
+#define STRLISTPARAM(name, help, flags, ptr, defval)                                                                        \
+  {                                                                                                                         \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .strlistptr = ptr, .defstrlistval = defval, PARAMTYPE(TYPE_STRINGLIST), \
+        .numelt = 0                                                                                                         \
+  }
+#define INT64PARAM(name, help, flags, ptr, defval)                                                                           \
+  {                                                                                                                          \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .i64ptr = ptr, .defint64val = defval, PARAMTYPE(TYPE_INT64), .numelt = 0 \
+  }
+#define INTPARAM(name, help, flags, ptr, defval)                                                                       \
+  {                                                                                                                    \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .iptr = ptr, .defintval = defval, PARAMTYPE(TYPE_INT), .numelt = 0 \
+  }
+#define BOOLPARAM(name, help, flags, ptr, defval)                                                                      \
+  {                                                                                                                    \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .iptr = ptr, .defintval = defval, PARAMTYPE(TYPE_INT), .numelt = 0 \
+  }
+#define UINT64PARAM(name, help, flags, ptr, defval)                                                                          \
+  {                                                                                                                          \
+    OPTNAME(name), HELPSTR(help), PARAMFLAG(flags), .u64ptr = ptr, .defuintval = defval, PARAMTYPE(TYPE_UINT64), .numelt = 0 \
+  }
+
 typedef struct paramlist_def {
   char listname[MAX_OPTNAME_SIZE];
   paramdef_t **paramarray;
