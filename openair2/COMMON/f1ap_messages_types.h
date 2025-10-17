@@ -552,6 +552,9 @@ typedef struct f1ap_ue_context_mod_req_t {
 
   byte_array_t *rrc_container;
 
+  // gNB-DU Configuration Query
+  bool *gNB_DU_Configuration_Query;
+
   int srbs_len;
   f1ap_srb_to_setup_t *srbs; // reuse the same type as for setup; there is a
                              // list for SRB modification
