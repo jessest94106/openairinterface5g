@@ -84,6 +84,7 @@ bool eq_f1ap_cu_configuration_update_acknowledge(const f1ap_gnb_cu_configuration
                                                  const f1ap_gnb_cu_configuration_update_acknowledge_t *b);
 f1ap_gnb_cu_configuration_update_acknowledge_t cp_f1ap_cu_configuration_update_acknowledge(
     const f1ap_gnb_cu_configuration_update_acknowledge_t *msg);
+void free_f1ap_cu_configuration_update_acknowledge(const f1ap_gnb_cu_configuration_update_acknowledge_t *msg);
 
 /* F1 gNB-DU Configuration Update Acknowledge */
 struct F1AP_F1AP_PDU *encode_f1ap_du_configuration_update_acknowledge(const f1ap_gnb_du_configuration_update_acknowledge_t *msg);

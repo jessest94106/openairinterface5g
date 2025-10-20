@@ -1161,6 +1161,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
   req->gNB_DU_id = id;
   req->gNB_DU_name = strdup(name);
   req->num_cells_available = 1;
+  req->cell = calloc_or_fail(req->num_cells_available, sizeof(*req->cell));
   req->cell[0].info = *info;
   LOG_I(GNB_APP,
         "F1AP: gNB idx %d gNB_DU_id %ld, gNB_DU_name %s, TAC %d MCC/MNC/length %d/%d/%d cellID %ld\n",
