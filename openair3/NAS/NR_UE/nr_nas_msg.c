@@ -56,7 +56,6 @@
 #include "aka_functions.h"
 #include "assertions.h"
 #include "common/utils/ds/byte_array.h"
-#include "common/utils/tun_if.h"
 #include "commonDef.h"
 #include "intertask_interface.h"
 #include "kdf.h"
