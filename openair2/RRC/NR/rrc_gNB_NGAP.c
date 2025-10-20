@@ -223,17 +223,22 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   req->nas_pdu = create_byte_array(rrcSetupComplete->dedicatedNAS_Message.size, rrcSetupComplete->dedicatedNAS_Message.buf);
 
   /* Selected PLMN Identity (Optional)
-   * selectedPLMN-Identity in RRCSetupComplete: Index of the PLMN selected by the UE from the plmn-IdentityInfoList (SIB1)
-   * Selected PLMN Identity in INITIAL UE MESSAGE: Indicates the selected PLMN id for the non-3GPP access.*/
-  if (rrcSetupComplete->selectedPLMN_Identity > rrc->configuration.num_plmn) {
+   * selectedPLMN-Identity in RRCSetupComplete: Index of the PLMN selected by the UE from the plmn-IdentityInfoList (SIB1) */
+  int idx = rrcSetupComplete->selectedPLMN_Identity - 1; // Convert 1-based PLMN Identity IE to 0-based index
+  if (idx < 0 || idx >= rrc->configuration.num_plmn) {
     LOG_E(NGAP,
-          "Failed to send Initial UE Message: selected PLMN (%ld) identity is out of bounds (%d)\n",
-          rrcSetupComplete->selectedPLMN_Identity,
+          "Failed to send Initial UE Message: selected PLMN index (%d) is out of bounds [0..%d)\n",
+          idx,
           rrc->configuration.num_plmn);
     return;
   }
-  int selected_plmn_identity = rrcSetupComplete->selectedPLMN_Identity - 1; // Convert 1-based PLMN Identity IE to 0-based index
-  req->plmn = rrc->configuration.plmn[selected_plmn_identity]; // Select from the stored list
+  req->plmn = rrc->configuration.plmn[idx]; // Select from the stored list
+  /* UE is connected to only one PLMN at a time: store this as the serving PLMN */
+  UE->serving_plmn = req->plmn;
+
+  // Cell ID (NR CGI)
+  req->nr_cell_id = UE->nr_cellid;
+  // PLMN (NR CGI and TAI)
   plmn_id_t *p = &req->plmn;
   LOG_I(NGAP, "Selected PLMN in the NG Initial UE Message: MCC=%03d MNC=%0*d\n", p->mcc, p->mnc_digit_length, p->mnc);
 
@@ -721,6 +726,10 @@ void rrc_gNB_send_NGAP_UPLINK_NAS(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_
   NGAP_UPLINK_NAS(msg_p).gNB_ue_ngap_id = UE->rrc_ue_id;
   NGAP_UPLINK_NAS(msg_p).nas_pdu.len = nas->size;
   NGAP_UPLINK_NAS(msg_p).nas_pdu.buf = buf;
+  /* Fill PLMN and location info: use serving PLMN of the UE */
+  NGAP_UPLINK_NAS(msg_p).plmn = UE->serving_plmn;
+  NGAP_UPLINK_NAS(msg_p).nr_cell_id = rrc->nr_cellid;
+  NGAP_UPLINK_NAS(msg_p).tac = rrc->configuration.tac;
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
 }
 

@@ -421,6 +421,8 @@ typedef struct ngap_nas_first_req_s {
   /* PLMN: Selected PLMN Identity (optional)
    * User Location Information (mandatory) */
   plmn_id_t plmn;
+  // NR Cell ID for NR CGI (mandatory)
+  uint32_t nr_cell_id;
   // RRC Establishment Cause (mandatory)
   ngap_rrc_establishment_cause_t establishment_cause;
   // NAS-PDU (mandatory)
@@ -434,6 +436,10 @@ typedef struct ngap_uplink_nas_s {
   uint32_t gNB_ue_ngap_id;
   /* NAS pdu */
   byte_array_t nas_pdu;
+  /* UserLocationInformation (mandatory) */
+  plmn_id_t plmn; // CGI and TAI
+  uint32_t nr_cell_id; // CGI
+  uint32_t tac; // TAI
 } ngap_uplink_nas_t;
 
 typedef struct target_cell_id_s {
