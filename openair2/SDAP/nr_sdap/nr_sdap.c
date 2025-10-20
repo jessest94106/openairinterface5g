@@ -165,7 +165,7 @@ void start_sdap_tun_gnb_first_ue_default_pdu_session(ue_id_t ue_id, int pdu_sess
   char *ifprefix = get_softmodem_params()->nsa ? "oaitun_gnb" : "oaitun_enb";
   char ifname[IFNAMSIZ];
   tun_generate_ifname(ifname, ifprefix, ue_id - 1);
-  entity->pdusession_sock = tun_alloc(ifname);
+  entity->pdusession_sock = tuntap_alloc(IFF_TUN, ifname);
   entity->pdusession_if_name = strdup(ifname);
   tun_config(ifname, "10.0.1.1", NULL);
   threadCreate(&entity->pdusession_thread, sdap_tun_read_thread, entity, "gnb_tun_read_thread", -1, OAI_PRIORITY_RT_LOW);
@@ -189,8 +189,8 @@ void create_ue_ip_if(const char *ipv4, const char *ipv6, int ue_id, int pdu_sess
 {
   int default_pdu = get_softmodem_params()->default_pdu_session_id;
   char ifname[IFNAMSIZ];
-  tun_generate_ue_ifname(ifname, ue_id, pdu_session_id != default_pdu ? pdu_session_id : -1);
-  const int sock = tun_alloc(ifname);
+  tuntap_generate_ue_ifname(ifname, IFF_TUN, ue_id, pdu_session_id != default_pdu ? pdu_session_id : -1);
+  const int sock = tuntap_alloc(IFF_TUN, ifname);
   tun_config(ifname, ipv4, ipv6);
   if (ipv4) {
     setup_ue_ipv4_route(ifname, ue_id, ipv4);
@@ -212,7 +212,7 @@ void remove_ip_if(nr_sdap_entity_t *entity)
   int ret = pthread_join(entity->pdusession_thread, NULL);
   AssertFatal(ret == 0, "pthread_join() failed, errno: %d, %s\n", errno, strerror(errno));
   // Bring down the IP interface
-  tun_destroy(entity->pdusession_if_name);
+  tuntap_destroy(entity->pdusession_if_name);
   free(entity->pdusession_if_name);
   entity->pdusession_if_name = NULL;
 }

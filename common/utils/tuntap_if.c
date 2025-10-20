@@ -27,7 +27,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <linux/ipv6.h>
-#include <linux/if_tun.h>
 #include <linux/netlink.h>
 
 #include "tuntap_if.h"
@@ -38,7 +37,7 @@
 int nas_sock_fd[MAX_MOBILES_PER_ENB * 2]; // Allocated for both LTE UE and NR UE.
 int nas_sock_mbms_fd;
 
-int tun_alloc(const char *dev)
+int tuntap_alloc(int flag, const char *dev)
 {
   struct ifreq ifr;
   int fd, err;
@@ -54,7 +53,8 @@ int tun_alloc(const char *dev)
    *
    *        IFF_NO_PI - Do not provide packet information
    */
-  ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+  DevAssert(flag == IFF_TUN || flag == IFF_TAP);
+  ifr.ifr_flags = flag | IFF_NO_PI;
   strncpy(ifr.ifr_name, dev, sizeof(ifr.ifr_name) - 1);
   if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
     close(fd);
@@ -76,7 +76,7 @@ int tun_alloc(const char *dev)
 
 int tun_init_mbms(char *ifname)
 {
-  nas_sock_mbms_fd = tun_alloc(ifname);
+  nas_sock_mbms_fd = tuntap_alloc(IFF_TUN, ifname);
 
   if (nas_sock_mbms_fd == -1) {
     LOG_E(UTIL, "Error opening mbms socket %s (%d:%s)\n", ifname, errno, strerror(errno));
@@ -96,7 +96,7 @@ int tun_init_mbms(char *ifname)
 
 int tun_init(const char *ifname, int instance_id)
 {
-  nas_sock_fd[instance_id] = tun_alloc(ifname);
+  nas_sock_fd[instance_id] = tuntap_alloc(IFF_TUN, ifname);
 
   if (nas_sock_fd[instance_id] == -1) {
     LOG_E(UTIL, "Error opening socket %s (%d:%s)\n", ifname, errno, strerror(errno));
@@ -238,9 +238,28 @@ bool tun_config(const char* ifname, const char *ipv4, const char *ipv6)
     success = set_if_flags(sock_fd, ifname, (IFF_UP | IFF_NOARP | IFF_POINTOPOINT) & ~IFF_MULTICAST);
 
   if (success)
-    LOG_I(OIP, "Interface %s successfully configured, IPv4 %s, IPv6 %s\n", ifname, ipv4, ipv6);
+    LOG_A(OIP, "TUN Interface %s successfully configured, IPv4 %s, IPv6 %s\n", ifname, ipv4, ipv6);
   else
     LOG_E(OIP, "Interface %s couldn't be configured (IPv4 %s, IPv6 %s)\n", ifname, ipv4, ipv6);
+
+  close(sock_fd);
+  return success;
+}
+
+bool tap_config(const char* ifname)
+{
+  int sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock_fd < 0) {
+    LOG_E(UTIL, "Failed creating socket for interface management: %d, %s\n", errno, strerror(errno));
+    return false;
+  }
+
+  bool success = set_if_flags(sock_fd, ifname, IFF_UP);
+
+  if (success)
+    LOG_A(OIP, "TAP interface %s successfully configured\n", ifname);
+  else
+    LOG_E(OIP, "Tap interface %s couldn't be configured\n", ifname);
 
   close(sock_fd);
   return success;
@@ -274,14 +293,16 @@ int tun_generate_ifname(char *ifname, const char *ifprefix, int instance_id)
   return snprintf(ifname, IFNAMSIZ, "%s%d", ifprefix, instance_id + 1);
 }
 
-int tun_generate_ue_ifname(char *ifname, int instance_id, int pdu_session_id)
+int tuntap_generate_ue_ifname(char *ifname, int flag, int instance_id, int pdu_session_id)
 {
+  DevAssert(flag == IFF_TUN || flag == IFF_TAP);
   char pdu_session_string[10];
   snprintf(pdu_session_string, sizeof(pdu_session_string), "p%d", pdu_session_id);
-  return snprintf(ifname, IFNAMSIZ, "%s%d%s", "oaitun_ue", instance_id + 1, pdu_session_id == -1 ? "" : pdu_session_string);
+  const char *basename = flag == IFF_TUN ? "oaitun_ue" : "oaitap_ue";
+  return snprintf(ifname, IFNAMSIZ, "%s%d%s", basename, instance_id + 1, pdu_session_id == -1 ? "" : pdu_session_string);
 }
 
-void tun_destroy(const char *dev)
+void tuntap_destroy(const char *dev)
 {
   // Use a new socket for ioctl operations
   int fd = socket(AF_INET, SOCK_DGRAM, 0);
