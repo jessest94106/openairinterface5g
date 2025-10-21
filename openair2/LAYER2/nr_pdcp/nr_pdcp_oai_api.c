@@ -575,11 +575,11 @@ void add_srb(int is_gnb,
   nr_pdcp_manager_unlock(nr_pdcp_ue_manager);
 }
 
-void add_drb(int is_gnb,
-             const ue_id_t UEid,
-             const NR_PDCP_Config_t *pdcp,
-             sdap_config_t *sdap,
-             const nr_pdcp_entity_security_keys_and_algos_t *security_parameters)
+void nr_pdcp_add_drb(int is_gnb,
+                     const ue_id_t UEid,
+                     const NR_PDCP_Config_t *pdcp,
+                     const sdap_config_t *sdap,
+                     const nr_pdcp_entity_security_keys_and_algos_t *security_parameters)
 {
   nr_pdcp_ue_t *ue;
 

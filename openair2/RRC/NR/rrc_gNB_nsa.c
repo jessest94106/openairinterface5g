@@ -179,7 +179,7 @@ static void rrc_nsa_add_drb(const int ue_id,
     // add SDAP entity (terminated at gNB, since it's EPC)
     new_nr_sdap_entity(GNB_FLAG_YES, ue_id, sdap);
     // add PDCP entity
-    add_drb(GNB_FLAG_YES, ue_id, drb->pdcp_Config, &sdap, sp);
+    nr_pdcp_add_drb(GNB_FLAG_YES, ue_id, drb->pdcp_Config, &sdap, sp);
   }
 }
 
