@@ -2795,13 +2795,13 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       } else
         nb_meas = 2;
 
-      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList SSB_resource;
+      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
       for (int csi_ssb_idx = 0; csi_ssb_idx < csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.count; csi_ssb_idx++) {
         if (csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceSetId
             == *(csi_resourceconfig->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->csi_SSB_ResourceSetList->list.array[0])) {
-          SSB_resource = csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceList;
+          SSB_resource = &csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceList;
           /// only one SSB resource set from spec 38.331 IE CSI-ResourceConfig
-          nb_ssb = SSB_resource.list.count;
+          nb_ssb = SSB_resource->list.count;
           break;
         }
       }
@@ -2816,7 +2816,7 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       for (int measured_ssb_idx = 0; measured_ssb_idx < MAX_NB_SSB; measured_ssb_idx++) {
         // searching for the SSB index in the SSB resource table
         for (int ssb_resource = 0; ssb_resource < nb_ssb; ssb_resource++) {
-          if (*SSB_resource.list.array[ssb_resource] == measured_ssb_idx) {
+          if (*SSB_resource->list.array[ssb_resource] == measured_ssb_idx) {
             sorted_sinr_measurements[sorted_idx].ssb_index = ssb_resource;
             sorted_sinr_measurements[sorted_idx].ssb_rsrp_dBm = mac->ssb_measurements[measured_ssb_idx].ssb_rsrp_dBm;
             sorted_sinr_measurements[sorted_idx].ssb_sinr_dB = mac->ssb_measurements[measured_ssb_idx].ssb_sinr_dB;
@@ -2827,25 +2827,20 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       }
       qsort(sorted_sinr_measurements, nb_ssb, sizeof(NR_RSRP_meas_t), compare_ssb_sinr);
 
-      uint8_t ssbi;
-
       // TS38.212 v16.5.0: Table 6.3.1.1.2-8A
-      if (ssbri_bits > 0) {
-        ssbi = sorted_sinr_measurements[0].ssb_index;
-        temp_payload = reverse_bits(ssbi, ssbri_bits);
-        bits += ssbri_bits;
+      for (int i = 0; i < nb_meas; i++) {
+        if (ssbri_bits > 0) {
+          uint8_t ssbi = sorted_sinr_measurements[i].ssb_index;
+          temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
+          bits += ssbri_bits;
+        }
       }
 
       uint8_t sinr_idx = get_sinr_index(sorted_sinr_measurements[0].ssb_sinr_dB);
       temp_payload |= (reverse_bits(sinr_idx, 7) << bits);
       bits += 7; // 7 bits for highest SINR
 
-      // from the second SSB, differential report
       for (int i = 1; i < nb_meas; i++) {
-        ssbi = sorted_sinr_measurements[i].ssb_index;
-        temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
-        bits += ssbri_bits;
-
         sinr_idx = get_sinr_diff_index(sorted_sinr_measurements[0].ssb_sinr_dB, sorted_sinr_measurements[i].ssb_sinr_dB);
         temp_payload |= (reverse_bits(sinr_idx, 4) << bits);
         bits += 4; // 4 bits for differential SINR
