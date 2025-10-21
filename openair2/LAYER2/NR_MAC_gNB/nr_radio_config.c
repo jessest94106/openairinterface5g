@@ -1771,7 +1771,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
     agg_level_candidates[PDCCH_AGG_LEVEL4] = NR_SearchSpace__nrofCandidates__aggregationLevel4_n1;
     agg_level_candidates[PDCCH_AGG_LEVEL8] = NR_SearchSpace__nrofCandidates__aggregationLevel8_n0;
     agg_level_candidates[PDCCH_AGG_LEVEL16] = NR_SearchSpace__nrofCandidates__aggregationLevel16_n0;
-    ss = rrc_searchspace_config(true, searchspaceid, 0, agg_level_candidates);
+    ss = rrc_searchspace_config(true, searchspaceid, coreset->controlResourceSetId, agg_level_candidates);
   }
   asn1cSeqAdd(&bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonSearchSpaceList->list, ss);
 
@@ -1812,7 +1812,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   verify_agg_levels(num_cces, configuration->num_agg_level_candidates, coreset2->controlResourceSetId, rrc_num_agg_level_candidates);
 
   searchspaceid = 10 + bwp->bwp_Id;
-  NR_SearchSpace_t *ss2 = rrc_searchspace_config(true, searchspaceid, is_SA ? 0 : coreset2->controlResourceSetId, agg_level_candidates);
+  NR_SearchSpace_t *ss2 = rrc_searchspace_config(true, searchspaceid, coreset2->controlResourceSetId, agg_level_candidates);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss2);
 
   searchspaceid = 20 + bwp->bwp_Id;
