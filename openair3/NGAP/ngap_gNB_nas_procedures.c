@@ -76,9 +76,9 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
     const nr_guami_t *guami = &msg->ue_identity.guami;
     LOG_D(NGAP,
           "GUAMI is present: MCC=%03d MNC=%0*d RegionID=%d SetID=%d Pointer=%d\n",
-          guami->mcc,
-          guami->mnc_len,
-          guami->mnc,
+          guami->plmn.mcc,
+          guami->plmn.mnc_digit_length,
+          guami->plmn.mnc,
           guami->amf_region_id,
           guami->amf_set_id,
           guami->amf_pointer);
@@ -89,9 +89,9 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
             msg->gNB_ue_ngap_id,
             amf->amf_name,
             amf->assoc_id,
-            guami->mcc,
-            guami->mnc_len,
-            guami->mnc,
+            guami->plmn.mcc,
+            guami->plmn.mnc_digit_length,
+            guami->plmn.mnc,
             guami->amf_region_id,
             guami->amf_set_id,
             guami->amf_pointer);

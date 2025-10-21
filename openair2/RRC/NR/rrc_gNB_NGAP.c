@@ -165,9 +165,7 @@ static nr_guami_t get_guami(const uint32_t amf_Id, const plmn_id_t plmn)
   guami.amf_region_id = (amf_Id >> 16) & 0xff;
   guami.amf_set_id = (amf_Id >> 6) & 0x3ff;
   guami.amf_pointer = amf_Id & 0x3f;
-  guami.mcc = plmn.mcc;
-  guami.mnc = plmn.mnc;
-  guami.mnc_len = plmn.mnc_digit_length;
+  guami.plmn = plmn;
   return guami;
 }
 
