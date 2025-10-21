@@ -110,6 +110,24 @@ static const uint16_t NGAP_INTEGRITY_NIA3_MASK = 0x2000;
 
 static void set_UE_security_algos(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const ngap_security_capabilities_t *cap);
 
+/** @brief Validates PLMN against allowed PLMN list and returns pointer to matching PLMN
+ * @param rrc RRC instance
+ * @param plmn PLMN to validate
+ * @return pointer to matching PLMN in configuration, or NULL if not found */
+static const plmn_id_t *get_serving_plmn(gNB_RRC_INST *rrc, const plmn_id_t *plmn)
+{
+  // Find matching PLMN in configuration
+  for (int idx = 0; idx < rrc->configuration.num_plmn; idx++) {
+    const plmn_id_t *allowed = &rrc->configuration.plmn[idx];
+    if (allowed->mcc == plmn->mcc && allowed->mnc == plmn->mnc && allowed->mnc_digit_length == plmn->mnc_digit_length) {
+      LOG_D(NR_RRC, "PLMN (MCC:%d, MNC:%*d) matched with allowed PLMN[%d]\n", plmn->mcc, plmn->mnc_digit_length, plmn->mnc, idx);
+      return allowed;
+    }
+  }
+  LOG_W(NR_RRC, "PLMN (MCC:%d, MNC:%*d) not found in allowed PLMN list\n", plmn->mcc, plmn->mnc_digit_length, plmn->mnc);
+  return NULL;
+}
+
 /*!
  *\brief save security key.
  *\param UE              UE context.
@@ -1161,6 +1179,20 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
     return -1;
   }
+
+  // Validate PLMN from GUAMI against allowed PLMN list
+  const plmn_id_t *serving_plmn = get_serving_plmn(rrc, &msg->guami.plmn);
+  if (!serving_plmn) {
+    LOG_E(NR_RRC, "PLMN from GUAMI not supported - rejecting handover\n");
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_TARGET_NOT_ALLOWED,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    return -1;
+  }
+
   uint16_t pci = du->setup_req->cell[0].info.nr_pci;
   LOG_I(NR_RRC, "Received Handover Request (on NR Cell ID=%lu, PCI=%u) \n", msg->nr_cell_id, pci);
 
@@ -1176,6 +1208,9 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   // Store IDs in UE context
   UE->amf_ue_ngap_id = msg->amf_ue_ngap_id;
   UE->ue_guami = msg->guami;
+  // Store the serving PLMN
+  UE->serving_plmn = *serving_plmn;
+
   UE->ho_context->target->ue_ho_prep_info = copy_byte_array(msg->ue_ho_prep_info);
   // store the received UE Security Capabilities in the UE context
   FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);
