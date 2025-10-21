@@ -158,42 +158,47 @@ static bool setInterfaceParameter(int sock_fd, const char *ifn, int af, const ch
 }
 
 
-typedef enum { INTERFACE_DOWN, INTERFACE_UP } if_action_t;
 /*
-* \brief bring interface up (up != 0) or down (up == 0)
+* \brief Get an interface's flags.
+* \param[in]  sock_fd socket to use for getting the flags
+* \param[in]  ifn the interface name for which to get flags
+* \param[out] flags the flags of the interface
+* \return true on success, false otherwise
 */
-static bool change_interface_state(int sock_fd, const char *ifn, if_action_t if_action)
+static bool get_if_flags(int sock_fd, const char *ifn, short *flags)
 {
-  const char *action = if_action == INTERFACE_DOWN ? "DOWN" : "UP";
-
   struct ifreq ifr = {0};
   strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name) - 1);
 
   /* get flags of this interface: see netdevice(7) */
-  bool success = ioctl(sock_fd, SIOCGIFFLAGS, (caddr_t)&ifr) == 0;
-  if (!success && if_action == INTERFACE_DOWN && errno == ENODEV) {
-    LOG_W(OIP, "trying to remove non-existant device %s\n", ifn);
-    return true;
+  int success = ioctl(sock_fd, SIOCGIFFLAGS, (caddr_t)&ifr) == 0;
+  if (!success) {
+    LOG_W(OIP, "On interface %s: ioctl() failed: %d, %s\n", ifn, errno, strerror(errno));
+    return false;
   }
-  LOG_D(OIP, "Got flags for %s: 0x%x (action: %s)\n", ifn, ifr.ifr_flags, action);
-
-  if (if_action == INTERFACE_UP) {
-    ifr.ifr_flags |= IFF_UP | IFF_NOARP | IFF_POINTOPOINT;
-    ifr.ifr_flags &= ~IFF_MULTICAST;
-  } else {
-    ifr.ifr_flags &= ~IFF_UP;
-  }
-
-  success = ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == 0;
-  if (!success)
-    goto fail_interface_state;
-  LOG_D(OIP, "Interface %s successfully set %s\n", ifn, action);
-
+  *flags = ifr.ifr_flags;
   return true;
+}
 
-fail_interface_state:
-  LOG_E(OIP, "Bringing interface %s for %s: ioctl call failed: %d, %s\n", action, ifn, errno, strerror(errno));
-  return false;
+/*
+ * \brief Set an interface's flags.
+* \param[in]  sock_fd socket to use for setting the flags
+* \param[in]  ifn the interface name for which to set flags
+* \param[in]  flags the flags to set for the interface
+* \return true on success, false otherwise
+ */
+static bool set_if_flags(int sock_fd, const char *ifn, short flags)
+{
+  struct ifreq ifr = {0};
+  strncpy(ifr.ifr_name, ifn, sizeof(ifr.ifr_name) - 1);
+  ifr.ifr_flags = flags;
+
+  int success = ioctl(sock_fd, SIOCSIFFLAGS, (caddr_t)&ifr) == 0;
+  if (!success) {
+    LOG_W(OIP, "On interface %s: ioctl() failed: %d, %s\n", ifn, errno, strerror(errno));
+    return false;
+  }
+  return true;
 }
 
 
@@ -227,8 +232,10 @@ bool tun_config(const char* ifname, const char *ipv4, const char *ipv6)
     close(sock_fd);
   }
 
+  // if successfully set IP addresses: set iterface up, disable ARP, no
+  // multicast, point-to-point
   if (success)
-    success = change_interface_state(sock_fd, ifname, INTERFACE_UP);
+    success = set_if_flags(sock_fd, ifname, (IFF_UP | IFF_NOARP | IFF_POINTOPOINT) & ~IFF_MULTICAST);
 
   if (success)
     LOG_I(OIP, "Interface %s successfully configured, IPv4 %s, IPv6 %s\n", ifname, ipv4, ipv6);
@@ -283,11 +290,12 @@ void tun_destroy(const char *dev)
     return;
   }
 
-  bool success = change_interface_state(fd, dev, INTERFACE_DOWN);
+  // interface not up => down
+  short flags;
+  bool success = get_if_flags(fd, dev, &flags);
+  success = success && set_if_flags(fd, dev, flags & ~IFF_UP);
   if (success) {
     LOG_I(UTIL, "Interface %s is now down.\n", dev);
-  } else {
-    LOG_E(UTIL, "Could not bring interface %s down.\n", dev);
-  }
+  } // no else: get_if_flags()/set_if_flags() should have printed error
   close(fd);
 }
