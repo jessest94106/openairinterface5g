@@ -164,18 +164,15 @@ int nr_sdap_map_ctrl_pdu(nr_sdap_entity_t *entity, int map_type, uint8_t dl_qfi)
  */
 void nr_sdap_submit_ctrl_pdu(ue_id_t ue_id, int sdap_ctrl_pdu_drb, nr_sdap_ul_hdr_t ctrl_pdu);
 
-/*
- * TS 37.324 4.4 5.1.1 SDAP entity establishment
- * Establish an SDAP entity.
- */
-nr_sdap_entity_t *new_nr_sdap_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t sdap);
-
 /* Entity Handling Related Functions */
 nr_sdap_entity_t *nr_sdap_get_entity(ue_id_t ue_id, int pdusession_id);
 
 sdap_config_t nr_sdap_get_config(const int is_gnb, const NR_SDAP_Config_t *sdap_Config, const int drb_id);
 
 void nr_sdap_release_drb(ue_id_t ue_id, int drb_id, int pdusession_id);
+
+/** @brief Add or modify an SDAP entity based on whether it already exists */
+void nr_sdap_addmod_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t sdap);
 
 /**
  * @brief Function to delete a single SDAP Entity based on the ue_id and pdusession_id.
