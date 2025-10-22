@@ -59,8 +59,9 @@ void dump_nr_I0_stats(FILE *fd,PHY_VARS_gNB *gNB);
 
 void gNB_I0_measurements(PHY_VARS_gNB *gNB, int slot, int first_symb, int num_symb, uint32_t rb_mask_ul[14][9]);
 
-int nr_est_timing_advance_srs(const NR_DL_FRAME_PARMS *frame_parms,
-                              const c16_t srs_estimated_channel_time[][frame_parms->ofdm_symbol_size]);
+int nr_est_timing_advance_srs(
+    const NR_DL_FRAME_PARMS *frame_parms,
+    const c16_t srs_estimated_channel_time[][NR_SRS_IDFT_OVERSAMP_FACTOR * frame_parms->ofdm_symbol_size]);
 
 void nr_pusch_ptrs_processing(PHY_VARS_gNB *gNB,
                               NR_DL_FRAME_PARMS *frame_parms,
@@ -81,8 +82,8 @@ int nr_srs_channel_estimation(int ant,
                               c16_t srs_received_signal[ofdm_symbol_size * N_symb_SRS],
                               c16_t srs_received_noise[ofdm_symbol_size * N_symb_SRS],
                               c16_t srs_estimated_channel_freq[ofdm_symbol_size * N_symb_SRS],
-                              c16_t srs_estimated_channel_time[ofdm_symbol_size],
-                              c16_t srs_estimated_channel_time_shifted[ofdm_symbol_size],
+                              c16_t srs_estimated_channel_time[NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size],
+                              c16_t srs_estimated_channel_time_shifted[NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size],
                               uint32_t *signal_power,
                               uint32_t *noise_power,
                               int16_t *noise_power_per_rb);

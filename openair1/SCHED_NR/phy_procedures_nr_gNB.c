@@ -868,14 +868,14 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
                           nr_srs_info_t *nr_srs_info,
                           int *srs_est,
                           c16_t srs_estimated_channel_freq[][N_ap][ofdm_symbol_size * N_symb_SRS],
-                          c16_t srs_estimated_channel_time[][N_ap][ofdm_symbol_size],
+                          c16_t srs_estimated_channel_time[][N_ap][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size],
                           int16_t *snr_per_rb)
 {
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   nfapi_nr_srs_pdu_t *srs_pdu = &srs->srs_pdu;
   c16_t srs_received_signal[nb_antennas_rx][ofdm_symbol_size * N_symb_SRS];
   c16_t srs_received_noise[nb_antennas_rx][ofdm_symbol_size * N_symb_SRS];
-  c16_t srs_estimated_channel_time_shifted[nb_antennas_rx][N_ap][ofdm_symbol_size];
+  c16_t srs_estimated_channel_time_shifted[nb_antennas_rx][N_ap][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size];
 
   start_meas(&gNB->generate_srs_stats);
 
@@ -946,7 +946,7 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
     T_INT(frame_rx),
     T_INT(0),
     T_INT(0),
-    T_BUFFER(srs_estimated_channel_time_shifted[0][0], ofdm_symbol_size * sizeof(int32_t)));
+    T_BUFFER(srs_estimated_channel_time_shifted[0][0], NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size * sizeof(int32_t)));
 
   T(T_GNB_PHY_UL_SNR_ESTIMATE,
     T_INT(0),
@@ -1171,7 +1171,8 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     int srs_est;
 
     c16_t srs_estimated_channel_freq[nb_antennas_rx][N_ap][ofdm_symbol_size * N_symb_SRS] __attribute__((aligned(32)));
-    c16_t srs_estimated_channel_time[nb_antennas_rx][N_ap][ofdm_symbol_size] __attribute__((aligned(32)));
+    c16_t srs_estimated_channel_time[nb_antennas_rx][N_ap][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size]
+        __attribute__((aligned(32)));
 
     nr_srs_rx_procedures(gNB,
                          frame_rx,

@@ -242,7 +242,7 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
                           nr_srs_info_t *nr_srs_info,
                           int *srs_est,
                           c16_t srs_estimated_channel_freq[][N_ap][ofdm_symbol_size * N_symb_SRS],
-                          c16_t srs_estimated_channel_time[][N_ap][ofdm_symbol_size],
+                          c16_t srs_estimated_channel_time[][N_ap][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size],
                           int16_t *snr_per_rb);
 
 int get_nr_prach_duration(uint8_t prach_format);

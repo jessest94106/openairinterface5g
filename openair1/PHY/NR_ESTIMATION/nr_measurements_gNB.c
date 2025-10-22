@@ -37,12 +37,12 @@
 #define I0_SKIP_DC 1
 
 int nr_est_timing_advance_srs(const NR_DL_FRAME_PARMS *frame_parms,
-                              const c16_t srs_estimated_channel_time[][frame_parms->ofdm_symbol_size])
+                              const c16_t srs_estimated_channel_time[][NR_SRS_IDFT_OVERSAMP_FACTOR * frame_parms->ofdm_symbol_size])
 {
   int timing_advance = 0;
   int max_val = 0;
 
-  for (int i = 0; i < frame_parms->ofdm_symbol_size; i++) {
+  for (int i = 0; i < NR_SRS_IDFT_OVERSAMP_FACTOR * frame_parms->ofdm_symbol_size; i++) {
     int temp = 0;
     for (int aa = 0; aa < frame_parms->nb_antennas_rx; aa++) {
       int Re = ((c16_t*)srs_estimated_channel_time[aa])[i].r;
@@ -55,9 +55,10 @@ int nr_est_timing_advance_srs(const NR_DL_FRAME_PARMS *frame_parms,
     }
   }
 
-  if (timing_advance > frame_parms->ofdm_symbol_size/2) {
-    timing_advance = timing_advance - frame_parms->ofdm_symbol_size;
+  if (timing_advance > (NR_SRS_IDFT_OVERSAMP_FACTOR * frame_parms->ofdm_symbol_size) / 2) {
+    timing_advance = timing_advance - (NR_SRS_IDFT_OVERSAMP_FACTOR * frame_parms->ofdm_symbol_size);
   }
+  timing_advance = timing_advance / NR_SRS_IDFT_OVERSAMP_FACTOR;
 
   LOG_I(NR_PHY, "Estimated SRS ToA %d\n", timing_advance);
 
