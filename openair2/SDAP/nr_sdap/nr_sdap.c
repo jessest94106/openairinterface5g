@@ -166,16 +166,18 @@ void start_sdap_tun_gnb_first_ue_default_pdu_session(ue_id_t ue_id, int pdu_sess
   char ifname[IFNAMSIZ];
   tun_generate_ifname(ifname, ifprefix, ue_id - 1);
   entity->pdusession_sock = tun_alloc(ifname);
+  entity->pdusession_if_name = strdup(ifname);
   tun_config(ifname, "10.0.1.1", NULL);
   threadCreate(&entity->pdusession_thread, sdap_tun_read_thread, entity, "gnb_tun_read_thread", -1, OAI_PRIORITY_RT_LOW);
 }
 
-static void start_sdap_tun_ue(ue_id_t ue_id, int pdu_session_id, int sock)
+static void start_sdap_tun_ue(ue_id_t ue_id, int pdu_session_id, int sock, const char *ifname)
 {
   nr_sdap_entity_t *entity = nr_sdap_get_entity(ue_id, pdu_session_id);
   DevAssert(entity != NULL);
   DevAssert(!entity->is_gnb);
   entity->pdusession_sock = sock;
+  entity->pdusession_if_name = strdup(ifname);
   entity->stop_thread = false;
   char thread_name[64];
   snprintf(thread_name, sizeof(thread_name), "ue_tun_read_%ld_p%d", ue_id, pdu_session_id);
@@ -193,12 +195,14 @@ void create_ue_ip_if(const char *ipv4, const char *ipv6, int ue_id, int pdu_sess
   if (ipv4) {
     setup_ue_ipv4_route(ifname, ue_id, ipv4);
   }
-  start_sdap_tun_ue(ue_id, pdu_session_id, sock); // interface name suffix is ue_id+1
+  start_sdap_tun_ue(ue_id, pdu_session_id, sock, ifname); // interface name suffix is ue_id+1
 }
 
 void remove_ip_if(nr_sdap_entity_t *entity)
 {
   DevAssert(entity != NULL);
+  DevAssert(entity->pdusession_if_name != NULL);
+
   // Stop the read thread
   entity->stop_thread = true;
 
@@ -208,13 +212,7 @@ void remove_ip_if(nr_sdap_entity_t *entity)
   int ret = pthread_join(entity->pdusession_thread, NULL);
   AssertFatal(ret == 0, "pthread_join() failed, errno: %d, %s\n", errno, strerror(errno));
   // Bring down the IP interface
-  int default_pdu = get_softmodem_params()->default_pdu_session_id;
-  char ifname[IFNAMSIZ];
-  if (entity->is_gnb) {
-    char *ifprefix = get_softmodem_params()->nsa ? "oaitun_gnb" : "oaitun_enb";
-    tun_generate_ifname(ifname, ifprefix, entity->ue_id - 1);
-  } else {
-    tun_generate_ue_ifname(ifname, entity->ue_id, entity->pdusession_id != default_pdu ? entity->pdusession_id : -1);
-  }
-  tun_destroy(ifname);
+  tun_destroy(entity->pdusession_if_name);
+  free(entity->pdusession_if_name);
+  entity->pdusession_if_name = NULL;
 }
