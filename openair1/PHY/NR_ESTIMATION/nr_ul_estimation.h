@@ -59,9 +59,13 @@ void dump_nr_I0_stats(FILE *fd,PHY_VARS_gNB *gNB);
 
 void gNB_I0_measurements(PHY_VARS_gNB *gNB, int slot, int first_symb, int num_symb, uint32_t rb_mask_ul[14][9]);
 
-int nr_est_timing_advance_srs(
-    const NR_DL_FRAME_PARMS *frame_parms,
-    const c16_t srs_estimated_channel_time[][NR_SRS_IDFT_OVERSAMP_FACTOR * frame_parms->ofdm_symbol_size]);
+void nr_est_srs_timing_advance_offset(uint16_t ofdm_symbol_size,
+                                      const c16_t srs_estimated_channel_time[][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size],
+                                      uint8_t ant,
+                                      uint8_t N_ap,
+                                      uint32_t samples_per_frame,
+                                      uint16_t *timing_advance_offset,
+                                      int16_t *timing_advance_offset_nsec);
 
 void nr_pusch_ptrs_processing(PHY_VARS_gNB *gNB,
                               NR_DL_FRAME_PARMS *frame_parms,

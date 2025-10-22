@@ -88,9 +88,8 @@ int main(int argc, char *argv[])
   sigaction(SIGINT, &sigint_action, &oldaction);
 
   double SNR, snr0 = 0, snr1 = 20.0;
-  double sum_srs_snr = 0;
   double sigma, sigma_dB;
-  double snr_step = 5;
+  double snr_step = 1;
   uint8_t snr1set = 0;
   double **s_re, **s_im, **r_re, **r_im;
   int trial, n_trials = 1, delay = 0;
@@ -128,7 +127,7 @@ int main(int argc, char *argv[])
   InitSinLUT();
 
   int c;
-  while ((c = getopt(argc, argv, "--:O:a:b:c:d:e:f:g:h:i:k:l:m:n:p:s:u:y:z:A:B:C:H:PR:S:L:")) != -1) {
+  while ((c = getopt(argc, argv, "--:O:a:b:c:d:e:f:g:h:i:kl:m:n:p:s:u:y:z:A:B:C:H:PR:S:L:")) != -1) {
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */
     /* with this opstring getopt returns 1 for non-option arguments, refer to 'man 3 getopt' */
     if (c == 1 || c == '-' || c == 'O')
@@ -570,7 +569,8 @@ int main(int argc, char *argv[])
     reset_meas(&gNB->srs_channel_estimation_stats);
     reset_meas(&gNB->srs_timing_advance_stats);
 
-    sum_srs_snr = 0;
+    double sum_srs_snr = 0;
+    int tao_ns_count = 0;
     for (trial = 0; trial < n_trials && !stop; trial++) {
       // Estimate noise power from the transmitter level and SNR
       sigma_dB = 10 * log10(((double)txlev_sum) * ((double)ofdm_symbol_size / (12 * srs_pdu.bwp_size))) - SNR;
@@ -627,6 +627,8 @@ int main(int argc, char *argv[])
       uint8_t N_ap = 1 << srs->srs_pdu.num_ant_ports;
       uint8_t nb_antennas_rx = fp->nb_antennas_rx;
       int16_t snr_per_rb[srs->srs_pdu.bwp_size];
+      uint16_t timing_advance_offset;
+      int16_t timing_advance_offset_nsec[nb_antennas_rx];
       int srs_est;
       c16_t srs_estimated_channel_freq[nb_antennas_rx][N_ap][ofdm_symbol_size * N_symb_SRS] __attribute__((aligned(32)));
       c16_t srs_estimated_channel_time[nb_antennas_rx][N_ap][ofdm_symbol_size] __attribute__((aligned(32)));
@@ -643,16 +645,41 @@ int main(int argc, char *argv[])
                            &srs_est,
                            srs_estimated_channel_freq,
                            srs_estimated_channel_time,
-                           snr_per_rb);
+                           snr_per_rb,
+                           &timing_advance_offset,
+                           timing_advance_offset_nsec);
 
-      start_meas(&gNB->srs_timing_advance_stats);
-      nr_est_timing_advance_srs(fp, srs_estimated_channel_time[0]);
-      stop_meas(&gNB->srs_timing_advance_stats);
       sum_srs_snr += pow(10, (double)gNB->srs->snr / 10.0);
+
+      int16_t delay_ns = delay * 1e9 / (fp->samples_per_frame * 100);
+      for (int ant_idx = 0; ant_idx < nb_antennas_rx; ant_idx++) {
+        if (n_trials == 1)
+          printf("[RX ant %d] SRS estimated: TA offset %d, TA offset ns %d \n",
+                 ant_idx,
+                 timing_advance_offset,
+                 timing_advance_offset_nsec[ant_idx]);
+        if (timing_advance_offset_nsec[ant_idx] == delay_ns)
+          tao_ns_count++;
+      }
       stop_meas(&gNB->rx_srs_stats);
     } // trail loop
-    sum_srs_snr /= n_trials;
-    printf("Actual SNR : %f, Estimated SNR from SRS %f (dB)\n", SNR, 10 * log10(sum_srs_snr));
+    float tao_ns_rate = (float)tao_ns_count / (n_trials * n_rx);
+    float SRS_SNR_dB = 10 * log10(sum_srs_snr / n_trials);
+    printf("Actual SNR : %f, Estimated SNR from SRS %f (dB), TA offset success rate %f %%\n", SNR, SRS_SNR_dB, tao_ns_rate * 100);
+
+    int srs_ret = 1;
+    if (SNR > 30 && SRS_SNR_dB > 30) {
+      srs_ret = 0;
+    } else if (SNR >= SRS_SNR_dB) {
+      srs_ret = SRS_SNR_dB >= 0.7 * SNR ? 0 : 1;
+    } else if (SRS_SNR_dB > SNR) {
+      srs_ret = SNR >= 0.7 * SRS_SNR_dB ? 0 : 1;
+    }
+
+    if (tao_ns_rate > 0.9 && srs_ret == 0) {
+      ret = 0;
+      break;
+    }
 
     if (print_perf == 1) {
       printf("\ngNB RX\n");
@@ -665,6 +692,10 @@ int main(int argc, char *argv[])
     }
 
   } // SNR loop
+
+  printf("*************\n");
+  printf("SRS test %s\n", ret == 0 ? "OK" : "FAILED");
+  printf("*************\n");
 
   // free memory
 

@@ -869,7 +869,9 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
                           int *srs_est,
                           c16_t srs_estimated_channel_freq[][N_ap][ofdm_symbol_size * N_symb_SRS],
                           c16_t srs_estimated_channel_time[][N_ap][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size],
-                          int16_t *snr_per_rb)
+                          int16_t *snr_per_rb,
+                          uint16_t *timing_advance_offset,
+                          int16_t *timing_advance_offset_nsec)
 {
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   nfapi_nr_srs_pdu_t *srs_pdu = &srs->srs_pdu;
@@ -930,6 +932,18 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
       snr_per_rb[rb] = dB_fixed(signal_power_avg) - dB_fixed(max(noise_power_per_rb[rb] / nb_antennas_rx, 1));
     }
     stop_meas(&gNB->srs_channel_estimation_stats);
+
+    start_meas(&gNB->srs_timing_advance_stats);
+    for (int ant_rx_ind = 0; ant_rx_ind < nb_antennas_rx; ant_rx_ind++) {
+      nr_est_srs_timing_advance_offset(ofdm_symbol_size,
+                                       srs_estimated_channel_time[ant_rx_ind],
+                                       ant_rx_ind,
+                                       N_ap,
+                                       frame_parms->samples_per_frame,
+                                       timing_advance_offset,
+                                       &timing_advance_offset_nsec[ant_rx_ind]);
+    }
+    stop_meas(&gNB->srs_timing_advance_stats);
   }
 
   T(T_GNB_PHY_UL_FREQ_CHANNEL_ESTIMATE,
@@ -1168,6 +1182,8 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     uint8_t N_ap = 1 << srs->srs_pdu.num_ant_ports;
     int16_t snr_per_rb[srs->srs_pdu.bwp_size];
     nfapi_nr_srs_pdu_t *srs_pdu = &srs->srs_pdu;
+    uint16_t timing_advance_offset;
+    int16_t timing_advance_offset_nsec[nb_antennas_rx];
     int srs_est;
 
     c16_t srs_estimated_channel_freq[nb_antennas_rx][N_ap][ofdm_symbol_size * N_symb_SRS] __attribute__((aligned(32)));
@@ -1186,7 +1202,9 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
                          &srs_est,
                          srs_estimated_channel_freq,
                          srs_estimated_channel_time,
-                         snr_per_rb);
+                         snr_per_rb,
+                         &timing_advance_offset,
+                         timing_advance_offset_nsec);
 
     if ((gNB->srs->snr * 10) < gNB->srs_thres) {
       srs_est = -1;
@@ -1200,13 +1218,9 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     nfapi_nr_srs_indication_pdu_t *srs_indication = UL_INFO->srs_pdu_list + UL_INFO->srs_ind.number_of_pdus++;
     srs_indication->handle = srs_pdu->handle;
     srs_indication->rnti = srs_pdu->rnti;
-    start_meas(&gNB->srs_timing_advance_stats);
-    srs_indication->timing_advance_offset =
-        srs_est >= 0 ? nr_est_timing_advance_srs(frame_parms, srs_estimated_channel_time[0]) : 0xFFFF;
-    stop_meas(&gNB->srs_timing_advance_stats);
-    srs_indication->timing_advance_offset_nsec =
-        srs_est >= 0 ? (int16_t)((((int32_t)srs_indication->timing_advance_offset - 31) * ((int32_t)TC_NSEC_x32768)) >> 15)
-                     : 0xFFFF;
+    srs_indication->timing_advance_offset = srs_est >= 0 ? timing_advance_offset : 0xFFFF;
+    // TODO: currently we fill timing_advance_offset_nsec for antenna 0. Need to extend it for other antennas
+    srs_indication->timing_advance_offset_nsec = srs_est >= 0 ? timing_advance_offset_nsec[0] : 0x8000;
     switch (srs_pdu->srs_parameters_v4.usage) {
       case 0:
         LOG_W(NR_PHY, "SRS report was not requested by MAC\n");
