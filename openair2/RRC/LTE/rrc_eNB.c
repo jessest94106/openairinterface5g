@@ -79,7 +79,7 @@
 #include "T.h"
 #include "LTE_MeasResults.h"
 
-#include "common/utils/tun_if.h"
+#include "common/utils/tuntap_if.h"
 
 #include "rrc_eNB_S1AP.h"
 #include "rrc_eNB_GTPV1U.h"

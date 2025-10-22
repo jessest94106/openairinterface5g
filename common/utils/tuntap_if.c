@@ -30,7 +30,7 @@
 #include <linux/if_tun.h>
 #include <linux/netlink.h>
 
-#include "tun_if.h"
+#include "tuntap_if.h"
 #include "common/platform_constants.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/system.h"

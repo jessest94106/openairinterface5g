@@ -31,7 +31,7 @@
 #include "gtpv1_u_messages_types.h"
 #include "intertask_interface.h"
 #include "rlc.h"
-#include "tun_if.h"
+#include "tuntap_if.h"
 #include "nr_sdap.h"
 
 #define NO_SDAP_HEADER 0
