@@ -235,7 +235,7 @@ void update_channel_model(channel_desc_t *channelDesc, uint64_t TS)
   either we regenerate the channel (call again random_channel(desc,0)), or we keep it over subframes
   legacy: we regenerate each sub frame in UL, and each frame only in DL
 */
-void rxAddInput(const c16_t **input_sig,
+void rxAddInput(c16_t **input_sig,
                 cf_t *after_channel_sig,
                 int rxAnt,
                 channel_desc_t *channelDesc,

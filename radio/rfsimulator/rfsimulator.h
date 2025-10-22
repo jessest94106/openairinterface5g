@@ -24,7 +24,7 @@
 #ifndef __RFSIMULATOR_H
 #define __RFSIMULATOR_H
 #include <stdbool.h>
-void rxAddInput(const c16_t **input_sig,
+void rxAddInput(c16_t **input_sig,
                 cf_t *after_channel_sig,
                 int rxAnt,
                 channel_desc_t *channelDesc,
