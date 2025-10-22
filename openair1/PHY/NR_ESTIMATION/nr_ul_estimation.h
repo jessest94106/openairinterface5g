@@ -70,21 +70,22 @@ void nr_pusch_ptrs_processing(PHY_VARS_gNB *gNB,
                               unsigned char symbol,
                               uint32_t nb_re_pusch);
 
-int nr_srs_channel_estimation(
-    const PHY_VARS_gNB *gNB,
-    const int frame,
-    const int slot,
-    const nfapi_nr_srs_pdu_t *srs_pdu,
-    const nr_srs_info_t *nr_srs_info,
-    const c16_t **srs_generated_signal,
-    c16_t srs_received_signal[][gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)],
-    c16_t srs_received_noise[][gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)],
-    c16_t srs_estimated_channel_freq[][1 << srs_pdu->num_ant_ports]
-                                    [gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)],
-    c16_t srs_estimated_channel_time[][1 << srs_pdu->num_ant_ports][gNB->frame_parms.ofdm_symbol_size],
-    c16_t srs_estimated_channel_time_shifted[][1 << srs_pdu->num_ant_ports][gNB->frame_parms.ofdm_symbol_size],
-    int16_t *snr_per_rb,
-    int8_t *snr);
+int nr_srs_channel_estimation(const PHY_VARS_gNB *gNB,
+                              const int frame,
+                              const int slot,
+                              const int ant,
+                              const int p_index,
+                              const nfapi_nr_srs_pdu_t *srs_pdu,
+                              const nr_srs_info_t *nr_srs_info,
+                              const c16_t *srs_generated_signal,
+                              c16_t srs_received_signal[gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)],
+                              c16_t srs_received_noise[gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)],
+                              c16_t srs_estimated_channel_freq[gNB->frame_parms.ofdm_symbol_size * (1 << srs_pdu->num_symbols)],
+                              c16_t srs_estimated_channel_time[gNB->frame_parms.ofdm_symbol_size],
+                              c16_t srs_estimated_channel_time_shifted[gNB->frame_parms.ofdm_symbol_size],
+                              uint32_t *signal_power,
+                              uint32_t *noise_power,
+                              int16_t *noise_power_per_rb);
 
 void nr_freq_equalization(NR_DL_FRAME_PARMS *frame_parms,
                           c16_t *rxdataF_comp,

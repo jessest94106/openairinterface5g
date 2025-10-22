@@ -889,21 +889,46 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
   *srs_est = nr_get_srs_signal(gNB, rxdataF, frame_rx, slot_rx, srs_pdu, nr_srs_info, srs_received_signal, srs_received_noise);
   stop_meas(&gNB->get_srs_signal_stats);
 
+  uint32_t signal_power_avg = 0;
+  uint32_t noise_power_avg = 0;
+  int16_t noise_power_per_rb[srs_pdu->bwp_size];
+  memset(noise_power_per_rb, 0, srs_pdu->bwp_size * sizeof(int16_t));
+
   if (*srs_est >= 0) {
     start_meas(&gNB->srs_channel_estimation_stats);
-    nr_srs_channel_estimation(gNB,
-                              frame_rx,
-                              slot_rx,
-                              srs_pdu,
-                              nr_srs_info,
-                              (const c16_t **)nr_srs_info->srs_generated_signal,
-                              srs_received_signal,
-                              srs_received_noise,
-                              srs_estimated_channel_freq,
-                              srs_estimated_channel_time,
-                              srs_estimated_channel_time_shifted,
-                              snr_per_rb,
-                              &gNB->srs->snr);
+    for (int ant_rx_ind = 0; ant_rx_ind < nb_antennas_rx; ant_rx_ind++) {
+      uint32_t noise_power = 0;
+      for (int p_ind = 0; p_ind < N_ap; p_ind++) {
+        uint32_t signal_power = 0;
+        nr_srs_channel_estimation(gNB,
+                                  frame_rx,
+                                  slot_rx,
+                                  ant_rx_ind,
+                                  p_ind,
+                                  srs_pdu,
+                                  nr_srs_info,
+                                  nr_srs_info->srs_generated_signal[p_ind],
+                                  srs_received_signal[ant_rx_ind],
+                                  srs_received_noise[ant_rx_ind],
+                                  srs_estimated_channel_freq[ant_rx_ind][p_ind],
+                                  srs_estimated_channel_time[ant_rx_ind][p_ind],
+                                  srs_estimated_channel_time_shifted[ant_rx_ind][p_ind],
+                                  &signal_power,
+                                  &noise_power,
+                                  noise_power_per_rb);
+        signal_power_avg += signal_power;
+      }
+      noise_power_avg += noise_power;
+    }
+    signal_power_avg /= (nb_antennas_rx * N_ap);
+    noise_power_avg /= nb_antennas_rx;
+    signal_power_avg = max(signal_power_avg, 1);
+    gNB->srs->snr = dB_fixed(signal_power_avg) - dB_fixed(max(noise_power_avg, 1));
+
+    const uint16_t m_SRS_b = get_m_srs(srs_pdu->config_index, srs_pdu->bandwidth_index);
+    for (int rb = 0; rb < m_SRS_b; rb++) {
+      snr_per_rb[rb] = dB_fixed(signal_power_avg) - dB_fixed(max(noise_power_per_rb[rb] / nb_antennas_rx, 1));
+    }
     stop_meas(&gNB->srs_channel_estimation_stats);
   }
 
