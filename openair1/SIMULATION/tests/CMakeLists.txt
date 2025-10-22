@@ -342,6 +342,21 @@ add_physim_test(physim.5g.nr_psbchsim.test1 "SLSS Search" nr_psbchsim -I)
 add_physim_test(physim.5g.nr_psbchsim.test2 "PSBCH TxRx" nr_psbchsim -n 30)
 
 ####################################################################################
+######                           nr_srssim unit test                          ######
+####################################################################################
+
+add_physim_test(physim.5g.nr_srssim.test1 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 24, Combsize 2" nr_srssim -n300 -R106 -y2 -z2 -d 24)
+add_physim_test(physim.5g.nr_srssim.test2 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 15, Combsize 2, Threequarter sampling" nr_srssim -n300 -R106 -y2 -z2 -d 15 -k)
+add_physim_test(physim.5g.nr_srssim.test3 "SRS: 30KHz SCS, 217 PRBs, SNR 20 dB, ToA 8, Combsize 2" nr_srssim -n300 -R217 -y2 -z2 -d 8)
+add_physim_test(physim.5g.nr_srssim.test4 "SRS: 30KHz SCS, 273 PRBs, SNR 20 dB, TOA 30, Combsize 2" nr_srssim -n300 -R273 -y2 -z2 -d 30)
+add_physim_test(physim.5g.nr_srssim.test5 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 16, Combsize 2, Cyclic shift 3" nr_srssim -n300 -R106 -y2 -z2 -d 16 -i 1)
+add_physim_test(physim.5g.nr_srssim.test6 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 23, Combsize 2, Comb offset 1" nr_srssim -n300 -R106 -y2 -z2 -d 23 -f 1)
+add_physim_test(physim.5g.nr_srssim.test7 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 8, Combsize 2, Symbol start 9" nr_srssim -n300 -R106 -y2 -z2 -d 8 -a 9)
+add_physim_test(physim.5g.nr_srssim.test8 "SRS: 120KHz SCS, 32 PRBs, SNR 20 dB, ToA 19, Combsize 2" nr_srssim -n300 -R32 -y2 -z2 -d 19 -u 3)
+add_physim_test(physim.5g.nr_srssim.test9 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 11, Combsize 4" nr_srssim -n300 -R106 -y2 -z2 -d 11 -e 1)
+add_physim_test(physim.5g.nr_srssim.test10 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 7, Combsize 4, Comb offset 1" nr_srssim -n300 -R106 -y2 -z2 -d 7 -e 1 -f 1)
+
+####################################################################################
 ######                           offload-specific tests                       ######
 ####################################################################################
 
