@@ -23,6 +23,7 @@
 
 #include <libxml/parser.h>
 #include <string.h>
+#include <stdlib.h>
 
 static char *find_ru_xml_node(xmlNode *node, const char *filter)
 {
