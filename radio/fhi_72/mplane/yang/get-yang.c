@@ -68,7 +68,11 @@ static bool store_schemas(xmlNode *node, ru_session_t *ru_session, struct ly_ctx
         if (!mod) {
           MP_LOG_W("Unable to load module \"%s\" from RU \"%s\".\n", module_name, ru_session->ru_ip_add);
 	        nc_rpc_free(get_schema_rpc);
+#ifdef MPLANE_V1
+          ly_ctx_destroy(*ctx, NULL);
+#elif defined MPLANE_V2
           ly_ctx_destroy(*ctx);
+#endif
 	        return false;
 	      }
       }
