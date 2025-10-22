@@ -293,7 +293,10 @@ typedef enum {
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
+  { .s3a = { config_checkstr_assign_integer, \
+             {"ssb_rsrp", "ssb_sinr", "cri_rsrp"}, \
+             {SSB_RSRP, SSB_SINR, CRI_RSRP}, \
+             3 } }, \
   { .s5 = { NULL } },                                             \
   { .s5 = { NULL } },                                             \
 }
