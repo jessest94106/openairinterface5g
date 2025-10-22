@@ -900,11 +900,11 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
       uint32_t noise_power = 0;
       for (int p_ind = 0; p_ind < N_ap; p_ind++) {
         uint32_t signal_power = 0;
-        nr_srs_channel_estimation(gNB,
-                                  frame_rx,
-                                  slot_rx,
-                                  ant_rx_ind,
+        nr_srs_channel_estimation(ant_rx_ind,
                                   p_ind,
+                                  ofdm_symbol_size,
+                                  frame_parms->first_carrier_offset,
+                                  N_symb_SRS,
                                   srs_pdu,
                                   nr_srs_info,
                                   nr_srs_info->srs_generated_signal[p_ind],
@@ -1247,10 +1247,10 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
         start_meas(&gNB->srs_beam_report_stats);
         nfapi_nr_srs_beamforming_report_t nr_srs_bf_report;
         nr_srs_bf_report.prg_size = srs_pdu->beamforming.prg_size;
-        nr_srs_bf_report.num_symbols = 1 << srs_pdu->num_symbols;
+        nr_srs_bf_report.num_symbols = N_symb_SRS;
         nr_srs_bf_report.wide_band_snr =
             srs_est >= 0 ? (gNB->srs->snr + 64) << 1 : 0xFF; // 0xFF will be set if this field is invalid
-        nr_srs_bf_report.num_reported_symbols = 1 << srs_pdu->num_symbols;
+        nr_srs_bf_report.num_reported_symbols = N_symb_SRS;
         AssertFatal(nr_srs_bf_report.num_reported_symbols == 1,
                     "nr_srs_bf_report.num_reported_symbols %i not handled yet!\n",
                     nr_srs_bf_report.num_reported_symbols);
