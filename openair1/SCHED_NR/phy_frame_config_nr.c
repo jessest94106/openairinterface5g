@@ -226,7 +226,7 @@ void do_tdd_config_sim(PHY_VARS_gNB *gNB, int mu)
     pc->tdd_slot_bitmap[i].num_dl_symbols = 6;
     pc->tdd_slot_bitmap[i].num_ul_symbols = 4;
   }
-  for (int i = pc->num_ul_slots; i < fs.numb_slots_period; i++) {
+  for (int i = fs.numb_slots_period - pc->num_ul_slots; i < fs.numb_slots_period; i++) {
     pc->tdd_slot_bitmap[i].slot_type = TDD_NR_UPLINK_SLOT;
     pc->tdd_slot_bitmap[i].num_dl_symbols = 0;
     pc->tdd_slot_bitmap[i].num_ul_symbols = 0;
