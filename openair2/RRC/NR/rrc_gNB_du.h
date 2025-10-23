@@ -34,6 +34,9 @@ struct nr_rrc_cell_container_t;
 struct f1ap_gnb_du_configuration_update_s;
 struct f1ap_served_cell_info_t;
 
+#include "f1ap_messages_types.h"
+#include "ngap_messages_types.h"
+
 void rrc_gNB_process_f1_setup_req(struct f1ap_setup_req_s *req, sctp_assoc_t assoc_id);
 void rrc_CU_process_f1_lost_connection(struct gNB_RRC_INST_s *rrc, struct f1ap_lost_connection_t *lc, sctp_assoc_t assoc_id);
 void rrc_gNB_process_f1_du_configuration_update(struct f1ap_gnb_du_configuration_update_s *conf_up, sctp_assoc_t assoc_id);
@@ -57,5 +60,7 @@ struct nr_rrc_du_container_t *find_target_du(struct gNB_RRC_INST_s *rrc, sctp_as
   }
 
 void trigger_f1_reset(struct gNB_RRC_INST_s *rrc, sctp_assoc_t du_assoc_id);
+
+void rrc_send_paging_to_dus(struct gNB_RRC_INST_s *rrc, const nr_tai_t tais[], uint8_t n_tai, f1ap_paging_t *f1ap_msg);
 
 #endif /* RRC_GNB_DU_H_ */

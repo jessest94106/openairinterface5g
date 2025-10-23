@@ -820,3 +820,71 @@ void trigger_f1_reset(gNB_RRC_INST *rrc, sctp_assoc_t du_assoc_id)
   };
   rrc->mac_rrc.f1_reset(du_assoc_id, &reset);
 }
+
+/** @brief Distribute paging to DUs serving cells matching any of the requested TAIs.
+ *  Loops DUs once, collects matching cells per DU, sends one message per DU.
+ *  Each cell is added at most once per DU (cells are unique by cell_id within a DU).
+ *  Per 3GPP TS 23.003, TAI is uniquely identified by (PLMN, TAC) combination.
+ *  @param rrc RRC instance
+ *  @param tais Array of TAIs (PLMN + TAC) to match against
+ *  @param n_tai Number of TAIs in the array (must be > 0)
+ *  @param msg Pre-filled F1AP paging message */
+void rrc_send_paging_to_dus(gNB_RRC_INST *rrc, const nr_tai_t tais[], uint8_t n_tai, f1ap_paging_t *msg)
+{
+  DevAssert(msg && !msg->cells);
+  DevAssert(n_tai > 0);
+
+  nr_rrc_du_container_t *du = NULL;
+  // Loop over DUs once, for each DU, collects matching cells
+  RB_FOREACH (du, rrc_du_tree, &rrc->dus) {
+    RETURN_IF_INVALID_ASSOC_ID(du->assoc_id);
+
+    // Stack-allocated cell list for this DU iteration
+    f1ap_paging_cell_item_t cells[F1AP_MAX_NB_CELLS] = {0};
+    msg->cells = cells;
+    msg->n_cells = 0;
+
+    // For each cell in this DU, check if it matches any of the matching TAIs
+    FOR_EACH_SEQ_ARR (nr_rrc_cell_container_t **, cell, &du->cells) {
+      if (msg->n_cells >= F1AP_MAX_NB_CELLS) {
+        LOG_W(F1AP,
+              "[gNB] Paging: DU assoc_id %d has more than %d matching cells, skipping next cells\n",
+              du->assoc_id,
+              F1AP_MAX_NB_CELLS);
+        break;
+      }
+
+      const nr_rrc_cell_info_t *info = &(*cell)->info;
+      const plmn_id_t *cell_plmn = &info->plmn;
+      const uint16_t cell_tac = info->tac;
+      // Check if this cell's TAI (PLMN + TAC) matches any of the matching TAIs
+      for (uint8_t j = 0; j < n_tai; j++) {
+        const nr_tai_t *req_tai = &tais[j];
+        const plmn_id_t *req_plmn = &req_tai->plmn;
+        const uint16_t req_tac = req_tai->tac;
+        if (cell_plmn->mcc == req_plmn->mcc && cell_plmn->mnc == req_plmn->mnc
+            && cell_plmn->mnc_digit_length == req_plmn->mnc_digit_length && cell_tac == req_tac) {
+          f1ap_paging_cell_item_t *paging_cell = &msg->cells[msg->n_cells++];
+          paging_cell->plmn = *cell_plmn;
+          paging_cell->nr_cellid = info->cell_id;
+          break; // Found match, no need to check other TAIs
+        }
+      }
+    }
+
+    // Skip DUs with no matching cells
+    if (msg->n_cells == 0)
+      continue;
+    DevAssert(msg->n_cells <= F1AP_MAX_NB_CELLS);
+    LOG_I(F1AP,
+          "[gNB] Paging transfer to DU assoc_id %d: ue_identity_index_value=%u, paging_identity=%lu, n_cells=%u\n",
+          du->assoc_id,
+          msg->ue_identity_index_value,
+          msg->identity.cn_ue_paging_identity,
+          msg->n_cells);
+    // Send one message to the DU with all matching cells
+    rrc->mac_rrc.paging_transfer(du->assoc_id, msg);
+  }
+
+  msg->cells = NULL; // Stack allocation, no need to free
+}
