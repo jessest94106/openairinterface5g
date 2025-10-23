@@ -45,7 +45,7 @@ int nr_generate_prs(int slot,
                     int16_t amp,
                     prs_config_t *prs_cfg,
                     nfapi_nr_config_request_scf_t *config,
-                    NR_DL_FRAME_PARMS *frame_parms);
+                    const NR_DL_FRAME_PARMS *frame_parms);
 
 /*!
 \fn int nr_generate_pss

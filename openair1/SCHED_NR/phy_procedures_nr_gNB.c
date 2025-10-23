@@ -45,6 +45,15 @@
 
 //#define DEBUG_RXDATA
 //#define SRS_IND_DEBUG
+static void nr_fill_indication(PHY_VARS_gNB *gNB,
+                               int frame,
+                               int slot_rx,
+                               int UE_id,
+                               uint8_t harq_pid,
+                               uint8_t crc_flag,
+                               int dtx_flag,
+                               nfapi_nr_crc_t *crc,
+                               nfapi_nr_rx_data_pdu_t *pdu);
 
 int beam_index_allocation(bool das,
                           int fapi_beam_index,
@@ -186,10 +195,10 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
 void clear_slot_beamid(PHY_VARS_gNB *gNB, int slot)
 {
   LOG_D(PHY, "Clearing beam_id structure for slot %d\n", slot);
-  NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
+  int slot_sz = gNB->frame_parms.symbols_per_slot;
   for (int i = 0; i < gNB->common_vars.num_beams_period; i++) {
     if (gNB->common_vars.beam_id)
-      memset(&gNB->common_vars.beam_id[i][slot * fp->symbols_per_slot], -1, fp->symbols_per_slot * sizeof(int));
+      memset(&gNB->common_vars.beam_id[i][slot * slot_sz], -1, slot_sz * sizeof(**gNB->common_vars.beam_id));
   }
 }
 
@@ -199,11 +208,9 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
                            int do_meas)
 {
   PHY_VARS_gNB *gNB = msgTx->gNB;
-  NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
-  int slot_prs = 0;
-  int txdataF_offset = slot * fp->samples_per_slot_wCP;
-  prs_config_t *prs_config = NULL;
+  const int txdataF_offset = slot * fp->samples_per_slot_wCP;
 
   if ((cfg->cell_config.frame_duplex_type.value == TDD) && (nr_slot_select(cfg,frame,slot) == NR_UPLINK_SLOT))
     return;
@@ -213,19 +220,19 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   // clear the transmit data array and beam index for the current slot
   for (int i = 0; i < gNB->common_vars.num_beams_period; i++) {
     for (int aa = 0; aa < cfg->carrier_config.num_tx_ant.value; aa++) {
-      memset(&gNB->common_vars.txdataF[i][aa][txdataF_offset], 0, fp->samples_per_slot_wCP * sizeof(int32_t));
+      memset(&gNB->common_vars.txdataF[i][aa][txdataF_offset], 0, fp->samples_per_slot_wCP * sizeof(***gNB->common_vars.txdataF));
     }
   }
 
   // Check for PRS slot - section 7.4.1.7.4 in 3GPP rel16 38.211
   for(int rsc_id = 0; rsc_id < gNB->prs_vars.NumPRSResources; rsc_id++)
   {
-    prs_config = &gNB->prs_vars.prs_cfg[rsc_id];
+    prs_config_t *prs_config = &gNB->prs_vars.prs_cfg[rsc_id];
     for (int i = 0; i < prs_config->PRSResourceRepetition; i++)
     {
       if( (((frame*fp->slots_per_frame + slot) - (prs_config->PRSResourceSetPeriod[1] + prs_config->PRSResourceOffset)+prs_config->PRSResourceSetPeriod[0])%prs_config->PRSResourceSetPeriod[0]) == i*prs_config->PRSResourceTimeGap )
       {
-        slot_prs = (slot - i*prs_config->PRSResourceTimeGap + fp->slots_per_frame)%fp->slots_per_frame;
+        int slot_prs = (slot - i * prs_config->PRSResourceTimeGap + fp->slots_per_frame) % fp->slots_per_frame;
         LOG_D(PHY,"gNB_TX: frame %d, slot %d, slot_prs %d, PRS Resource ID %d\n",frame, slot, slot_prs, rsc_id);
         nr_generate_prs(slot_prs, &gNB->common_vars.txdataF[0][0][txdataF_offset], AMP, prs_config, cfg, fp);
       }
@@ -537,24 +544,24 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
   return ret_nr_ulsch_decoding;
 }
 
-void nr_fill_indication(PHY_VARS_gNB *gNB,
-                        int frame,
-                        int slot_rx,
-                        int ULSCH_id,
-                        uint8_t harq_pid,
-                        uint8_t crc_flag,
-                        int dtx_flag,
-                        nfapi_nr_crc_t *crc,
-                        nfapi_nr_rx_data_pdu_t *pdu)
+static void nr_fill_indication(PHY_VARS_gNB *gNB,
+                               int frame,
+                               int slot_rx,
+                               int ULSCH_id,
+                               uint8_t harq_pid,
+                               uint8_t crc_flag,
+                               int dtx_flag,
+                               nfapi_nr_crc_t *crc,
+                               nfapi_nr_rx_data_pdu_t *pdu)
 {
-  NR_gNB_ULSCH_t *ulsch = &gNB->ulsch[ULSCH_id];
-  NR_UL_gNB_HARQ_t *harq_process = ulsch->harq_process;
-  NR_gNB_PHY_STATS_t *stats = get_phy_stats(gNB, ulsch->rnti);
+  NR_UL_gNB_HARQ_t *harq_process = gNB->ulsch[ULSCH_id].harq_process;
+  NR_gNB_PHY_STATS_t *stats = get_phy_stats(gNB, gNB->ulsch[ULSCH_id].rnti);
+  NR_gNB_PUSCH *pusch = &gNB->pusch_vars[ULSCH_id];
 
   nfapi_nr_pusch_pdu_t *pusch_pdu = &harq_process->ulsch_pdu;
 
   // Get estimated timing advance for MAC
-  int sync_pos = ulsch->delay.est_delay;
+  const int sync_pos = gNB->ulsch[ULSCH_id].delay.est_delay;
 
   // scale the 16 factor in N_TA calculation in 38.213 section 4.2 according to the used FFT size
   uint16_t bw_scaling = 16 * gNB->frame_parms.ofdm_symbol_size / 2048;
@@ -584,16 +591,15 @@ void nr_fill_indication(PHY_VARS_gNB *gNB,
           timing_advance_update);
 
   // estimate UL_CQI for MAC
-  int SNRtimes10 =
-      dB_fixed_x10(gNB->pusch_vars[ULSCH_id].ulsch_power_tot) - dB_fixed_x10(gNB->pusch_vars[ULSCH_id].ulsch_noise_power_tot);
+  int SNRtimes10 = dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot);
 
   LOG_D(PHY,
         "%d.%d: Estimated SNR for PUSCH is = %f dB (ulsch_power %f, noise %f) delay %d\n",
         frame,
         slot_rx,
         SNRtimes10 / 10.0,
-        dB_fixed_x10(gNB->pusch_vars[ULSCH_id].ulsch_power_tot) / 10.0,
-        dB_fixed_x10(gNB->pusch_vars[ULSCH_id].ulsch_noise_power_tot) / 10.0,
+        dB_fixed_x10(pusch->ulsch_power_tot) / 10.0,
+        dB_fixed_x10(pusch->ulsch_noise_power_tot) / 10.0,
         sync_pos);
 
   int cqi;
@@ -609,8 +615,7 @@ void nr_fill_indication(PHY_VARS_gNB *gNB,
   crc->ul_cqi = cqi;
   crc->timing_advance = timing_advance_update;
   // in terms of dBFS range -128 to 0 with 0.1 step
-  crc->rssi =
-      (dtx_flag == 0) ? 1280 - (10 * dB_fixed(32767 * 32767) - dB_fixed_times10(gNB->pusch_vars[ULSCH_id].ulsch_power[0])) : 0;
+  crc->rssi = (dtx_flag == 0) ? 1280 - (10 * dB_fixed(32767 * 32767) - dB_fixed_times10(pusch->ulsch_power[0])) : 0;
 
   pdu->handle = pusch_pdu->handle;
   pdu->rnti = pusch_pdu->rnti;
@@ -704,21 +709,23 @@ static void fill_ul_rb_mask(PHY_VARS_gNB *gNB,
   }
 }
 
-int fill_srs_reported_symbol(nfapi_nr_srs_reported_symbol_t *reported_symbol,
-                             const nfapi_nr_srs_pdu_t *srs_pdu,
-                                  const int N_RB_UL,
-                                  const int16_t *snr_per_rb,
-                                  const int srs_est) {
+static int fill_srs_reported_symbol(nfapi_nr_srs_reported_symbol_t *reported_symbol,
+                                    const nfapi_nr_srs_pdu_t *srs_pdu,
+                                    const int N_RB_UL,
+                                    const int16_t *snr_per_rb,
+                                    const int srs_est)
+{
   reported_symbol->num_prgs = srs_pdu->beamforming.num_prgs;
   for (int prg_idx = 0; prg_idx < reported_symbol->num_prgs; prg_idx++) {
-    if (srs_est<0) {
-      reported_symbol->prg_list[prg_idx].rb_snr = 0xFF;
+    uint8_t *snr = &reported_symbol->prg_list[prg_idx].rb_snr;
+    if (srs_est < 0) {
+      *snr = 0xFF;
     } else if (snr_per_rb[prg_idx] < -64) {
-      reported_symbol->prg_list[prg_idx].rb_snr = 0;
+      *snr = 0;
     } else if (snr_per_rb[prg_idx] > 63) {
-      reported_symbol->prg_list[prg_idx].rb_snr = 0xFE;
+      *snr = 0xFE;
     } else {
-      reported_symbol->prg_list[prg_idx].rb_snr = (snr_per_rb[prg_idx] + 64) << 1;
+      *snr = (snr_per_rb[prg_idx] + 64) << 1;
     }
   }
 
