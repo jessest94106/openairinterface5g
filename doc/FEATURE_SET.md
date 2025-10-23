@@ -198,6 +198,13 @@ These modes of operation are supported:
   - Interface with E1AP for CU-CP/CU-CP split deployment option
   - Periodic RRC measurements of serving/neighbour cells and A2/A3 event
     handling
+- RRC Mobility Management Procedures:
+  - Inter-DU Handover (F1-based handover within same CU)
+  - Inter-gNB Handover (N2-based handover between different gNBs)
+  - Handover Preparation Information generation and processing
+  - Handover Command generation and processing
+  - PDCP Status transfer procedures
+  - Support for handover decision triggers (A3 events, manual triggers)
 - Initial support for RedCap (see MAC)
 
 ## gNB X2AP
@@ -216,6 +223,16 @@ These modes of operation are supported:
   - NGAP UE context release request/complete
   - NGAP UE radio capability info indication
   - NGAP PDU session resource setup request/response
+  - NGAP Mobility Management Procedures:
+    * NGAP Handover Required
+    * NGAP Handover Request
+    * NGAP Handover Request Acknowledge
+    * NGAP Handover Command
+    * NGAP Handover Notify
+    * NGAP Handover Cancel
+    * NGAP Handover Cancel Acknowledge
+    * NGAP Uplink RAN Status Transfer
+    * NGAP Downlink RAN Status Transfer
 - Interface with RRC
 
 ## gNB F1AP
@@ -235,6 +252,8 @@ These modes of operation are supported:
   - F1 gNB CU configuration update
   - F1 gNB DU configuration update
   - F1 Reset (handled at DU only, full reset only)
+  - F1 Mobility Management Procedures:
+    * F1 Intra-CU Handover (Inter-DU mobility)
 - Interface with RRC
 - Interface with GTP-u (tunnel creation/handling for F1-U interface)
 - One CU(-CP) can handle multiple DUs
@@ -421,17 +440,27 @@ These modes of operation are supported:
 * Interface with PDCP: configuration, DCCH and CCCH message handling
 * Interface with RLC and MAC for configuration
 
-## UE NAS
+## UE 5G NAS
 
-* Transfer of NAS messages between the AMF and the UE supporting the UE registration with the core network and the PDU session  establishment according to 24.501 Rel.16
+* Transfer of NAS messages between the AMF and the UE supporting the UE registration with the core network and the PDU session establishment according to 24.501 Rel.16
+* 5GMM (5G Mobility Management) messages:
+  - Service Request/Accept/Reject (enc/dec library only)
   - Identity Request/Response
   - Authentication Request/Response
   - Security Mode Command/Complete
   - Registration Request/Accept/Complete
+  - Deregistration Request (UE originating)
+  - Uplink NAS Transport
+* 5GSM (5G Session Management) messages:
   - PDU Session Establishment Request/Accept
-  - NAS configuration and basic interfacing with RRC
+* Security Features:
+  - NAS message integrity protection and ciphering
+  - Security context establishment and management
+* Integration:
+  - NAS configuration and interfacing with RRC
+  - Integration with SDAP for user plane data transfer
 
-
+For detailed implementation status, encoding/decoding support, and unit test coverage, see [5G NAS Implementation Documentation](5Gnas.md).
 
 # OpenAirInterface 4G LTE eNB Feature Set #
 
