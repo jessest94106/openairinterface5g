@@ -286,8 +286,7 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *inst
       struct plmn_identity_s   *served_plmn_p = NULL;
 
       STAILQ_FOREACH(served_plmn_p, &guami_p->served_plmns, next) {
-        if ((served_plmn_p->mcc == guami.mcc) &&
-            (served_plmn_p->mnc == guami.mnc)) {
+        if ((served_plmn_p->mcc == guami.plmn.mcc) && (served_plmn_p->mnc == guami.plmn.mnc)) {
           break;
         }
       }
@@ -322,9 +321,9 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami(ngap_gNB_instance_t *inst
   }
 
   NGAP_WARN("No matching AMF found for GUAMI (MCC=%03d MNC=%0*d RegionID=%d SetID=%d Pointer=%d)\n",
-            guami.mcc,
-            guami.mnc_len,
-            guami.mnc,
+            guami.plmn.mcc,
+            guami.plmn.mnc_digit_length,
+            guami.plmn.mnc,
             guami.amf_region_id,
             guami.amf_set_id,
             guami.amf_pointer);
@@ -373,8 +372,7 @@ ngap_gNB_amf_data_t *ngap_gNB_nnsf_select_amf_by_guami_no_cause(ngap_gNB_instanc
       struct plmn_identity_s    *served_plmn_p = NULL;
 
       STAILQ_FOREACH(served_plmn_p, &guami_p->served_plmns, next) {
-        if ((served_plmn_p->mcc == guami.mcc) &&
-            (served_plmn_p->mnc == guami.mnc)) {
+        if ((served_plmn_p->mcc == guami.plmn.mcc) && (served_plmn_p->mnc == guami.plmn.mnc)) {
           break;
         }
       }

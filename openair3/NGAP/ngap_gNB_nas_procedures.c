@@ -76,9 +76,9 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
     const nr_guami_t *guami = &msg->ue_identity.guami;
     LOG_D(NGAP,
           "GUAMI is present: MCC=%03d MNC=%0*d RegionID=%d SetID=%d Pointer=%d\n",
-          guami->mcc,
-          guami->mnc_len,
-          guami->mnc,
+          guami->plmn.mcc,
+          guami->plmn.mnc_digit_length,
+          guami->plmn.mnc,
           guami->amf_region_id,
           guami->amf_set_id,
           guami->amf_pointer);
@@ -89,9 +89,9 @@ static ngap_gNB_amf_data_t *select_amf(ngap_gNB_instance_t *instance_p, const ng
             msg->gNB_ue_ngap_id,
             amf->amf_name,
             amf->assoc_id,
-            guami->mcc,
-            guami->mnc_len,
-            guami->mnc,
+            guami->plmn.mcc,
+            guami->plmn.mnc_digit_length,
+            guami->plmn.mnc,
             guami->amf_region_id,
             guami->amf_set_id,
             guami->amf_pointer);
@@ -181,7 +181,6 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
     .amf_ref = amf,
     .gNB_ue_ngap_id = UEfirstReq->gNB_ue_ngap_id,
     .gNB_instance = instance_p,
-    .selected_plmn_identity = UEfirstReq->plmn,
   };
 
   // RAN UE NGAP ID (M)
@@ -211,16 +210,14 @@ int ngap_gNB_handle_nas_first_req(instance_t instance, ngap_nas_first_req_t *UEf
     ie->value.choice.UserLocationInformation.present = NGAP_UserLocationInformation_PR_userLocationInformationNR;
     asn1cCalloc(ie->value.choice.UserLocationInformation.choice.userLocationInformationNR, userinfo_nr_p);
 
-    /* Set nRCellIdentity. default userLocationInformationNR */
-    MACRO_GNB_ID_TO_CELL_IDENTITY(instance_p->gNB_id,
-                                  0, // Cell ID
-                                  &userinfo_nr_p->nR_CGI.nRCellIdentity);
+    /* NR CGI: use gNB ID and Cell ID passed from RRC */
+    MACRO_GNB_ID_TO_CELL_IDENTITY(instance_p->gNB_id, UEfirstReq->nr_cell_id, &userinfo_nr_p->nR_CGI.nRCellIdentity);
 
-    plmn_id_t *plmn = &ue_desc_p.selected_plmn_identity;
+    /* Use UE's selected PLMN for nR-CGI (from Initial UE Message) */
+    plmn_id_t *plmn = &UEfirstReq->plmn;
     MCC_MNC_TO_TBCD(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->nR_CGI.pLMNIdentity);
 
-    /* In case of network sharing,
-       the selected PLMN is indicated by the PLMN Identity IE within the TAI IE */
+    /* Set TAI - use UE's selected PLMN */
     INT24_TO_OCTET_STRING(instance_p->tac, &userinfo_nr_p->tAI.tAC);
     MCC_MNC_TO_PLMNID(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->tAI.pLMNIdentity);
   }
@@ -444,17 +441,20 @@ int ngap_gNB_nas_uplink(instance_t instance, ngap_uplink_nas_t *ngap_uplink_nas_
     ie->value.choice.UserLocationInformation.present = NGAP_UserLocationInformation_PR_userLocationInformationNR;
     asn1cCalloc(ie->value.choice.UserLocationInformation.choice.userLocationInformationNR, userinfo_nr_p);
 
-    /* Set nRCellIdentity. default userLocationInformationNR */
+    /* Set nRCellIdentity: use gNB ID and Cell ID */
     MACRO_GNB_ID_TO_CELL_IDENTITY(ngap_gNB_instance_p->gNB_id,
-                                  0, // Cell ID
+                                  ngap_uplink_nas_p->nr_cell_id,
                                   &userinfo_nr_p->nR_CGI.nRCellIdentity);
-    plmn_id_t *plmn = &ue_context_p->selected_plmn_identity;
+
+    /* NR CGI */
+    plmn_id_t *plmn = &ngap_uplink_nas_p->plmn;
     MCC_MNC_TO_TBCD(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->nR_CGI.pLMNIdentity);
 
-    /* Set TAI */
-    INT24_TO_OCTET_STRING(ngap_gNB_instance_p->tac, &userinfo_nr_p->tAI.tAC);
+    /* TAI */
+    INT24_TO_OCTET_STRING(ngap_uplink_nas_p->tac, &userinfo_nr_p->tAI.tAC);
     MCC_MNC_TO_PLMNID(plmn->mcc, plmn->mnc, plmn->mnc_digit_length, &userinfo_nr_p->tAI.pLMNIdentity);
   }
+
   if (ngap_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {
     NGAP_ERROR("Failed to encode uplink NAS transport\n");
     /* Encode procedure has failed... */
