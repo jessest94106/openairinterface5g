@@ -3523,7 +3523,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case NGAP_PAGING_IND:
-        rrc_gNB_process_PAGING_IND(msg_p, instance);
+        rrc_gNB_process_PAGING_IND(RC.nrrrc[instance], instance, &NGAP_PAGING_IND(msg_p));
         break;
 
       case NGAP_HANDOVER_REQUEST:

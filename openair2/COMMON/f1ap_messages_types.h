@@ -68,7 +68,6 @@
 #define F1AP_UE_CONTEXT_RELEASE_CMD(mSGpTR)        (mSGpTR)->ittiMsg.f1ap_ue_context_release_cmd
 #define F1AP_UE_CONTEXT_RELEASE_COMPLETE(mSGpTR)   (mSGpTR)->ittiMsg.f1ap_ue_context_release_complete
 
-#define F1AP_PAGING_IND(mSGpTR)                    (mSGpTR)->ittiMsg.f1ap_paging_ind
 #define F1AP_PAGING(mSGpTR)                        (mSGpTR)->ittiMsg.f1ap_paging
 
 /* Length of the transport layer address string
@@ -632,15 +631,6 @@ typedef struct f1ap_ue_context_rel_cplt_t {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
 } f1ap_ue_context_rel_cplt_t;
-
-typedef struct f1ap_paging_ind_s {
-  uint16_t ueidentityindexvalue;
-  uint64_t fiveg_s_tmsi;
-  uint8_t  fiveg_s_tmsi_length;
-  plmn_id_t plmn;
-  uint64_t nr_cellid;
-  uint8_t  paging_drx;
-} f1ap_paging_ind_t;
 
 typedef struct f1ap_paging_cell_item_s {
   plmn_id_t plmn;
