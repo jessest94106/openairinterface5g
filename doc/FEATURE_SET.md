@@ -29,7 +29,7 @@ The following features are valid for the gNB and the 5G-NR UE.
 *  Static FDD
 *  Normal CP
 *  Subcarrier spacings: 15 and 30kHz (FR1), 120kHz (FR2)
-*  Bandwidths: 10, 20, 40, 60, 80, 100MHz
+*  Bandwidths: 5-100MHz (FR1), 100 and 200MHz (FR2)
 *  Intermediate downlink and uplink frequencies to interface with IF equipment
 *  Procedures for 4-layer DL and 2-layer UL SU-MIMO
 *  Slot format: 14 OFDM symbols in UL or DL
