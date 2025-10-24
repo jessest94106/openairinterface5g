@@ -2144,7 +2144,7 @@ static void config_rsrp_meas_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
   for (int csi_list = 0; csi_list < csi_MeasConfig->csi_ResourceConfigToAddModList->list.count; csi_list++) {
     NR_CSI_ResourceConfig_t *csires = csi_MeasConfig->csi_ResourceConfigToAddModList->list.array[csi_list];
     if (csires->csi_RS_ResourceSetList.present == NR_CSI_ResourceConfig__csi_RS_ResourceSetList_PR_nzp_CSI_RS_SSB) {
-      if (configuration->do_CSIRS && num_antenna_ports < 4) {
+      if (configuration->report_type == CRI_RSRP && configuration->do_CSIRS && num_antenna_ports < 4) {
         if (csires->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->nzp_CSI_RS_ResourceSetList)
           resource_id = csires->csi_ResourceConfigId;
       } else {
@@ -2166,20 +2166,19 @@ static void config_rsrp_meas_report(NR_CSI_MeasConfig_t *csi_MeasConfig,
   csirep->reportConfigType.choice.periodic = calloc(1, sizeof(*csirep->reportConfigType.choice.periodic));
   set_csi_meas_periodicity(servingcellconfigcommon, csirep, uid, curr_bwp, true);
   asn1cSeqAdd(&csirep->reportConfigType.choice.periodic->pucch_CSI_ResourceList.list, pucchcsires);
-  if (configuration->do_CSIRS && num_antenna_ports < 4) {
+  if (configuration->report_type == SSB_SINR) {
+    csirep->reportQuantity.present = NR_CSI_ReportConfig__reportQuantity_PR_none;
+    csirep->reportQuantity.choice.none = (NULL_t)0;
+    csirep->ext2 = calloc(1, sizeof(*csirep->ext2));
+    csirep->ext2->reportQuantity_r16 = calloc(1, sizeof(*csirep->ext2->reportQuantity_r16));
+    csirep->ext2->reportQuantity_r16->present = NR_CSI_ReportConfig__ext2__reportQuantity_r16_PR_ssb_Index_SINR_r16;
+    csirep->ext2->reportQuantity_r16->choice.ssb_Index_SINR_r16 = (NULL_t)0;
+  } else if (configuration->report_type == CRI_RSRP && configuration->do_CSIRS && num_antenna_ports < 4) {
     csirep->reportQuantity.present = NR_CSI_ReportConfig__reportQuantity_PR_cri_RSRP;
     csirep->reportQuantity.choice.cri_RSRP = (NULL_t)0;
   } else {
     csirep->reportQuantity.present = NR_CSI_ReportConfig__reportQuantity_PR_ssb_Index_RSRP;
     csirep->reportQuantity.choice.ssb_Index_RSRP = (NULL_t)0;
-    if (configuration->do_SINR) {
-      csirep->reportQuantity.present = NR_CSI_ReportConfig__reportQuantity_PR_none;
-      csirep->reportQuantity.choice.none = (NULL_t)0;
-      csirep->ext2 = calloc(1, sizeof(*csirep->ext2));
-      csirep->ext2->reportQuantity_r16 = calloc(1, sizeof(*csirep->ext2->reportQuantity_r16));
-      csirep->ext2->reportQuantity_r16->present = NR_CSI_ReportConfig__ext2__reportQuantity_r16_PR_ssb_Index_SINR_r16;
-      csirep->ext2->reportQuantity_r16->choice.ssb_Index_SINR_r16 = (NULL_t)0;
-    }
   }
   csirep->groupBasedBeamReporting.present = NR_CSI_ReportConfig__groupBasedBeamReporting_PR_disabled;
   csirep->groupBasedBeamReporting.choice.disabled = calloc(1, sizeof(*csirep->groupBasedBeamReporting.choice.disabled));
@@ -3867,8 +3866,15 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
   NR_CSI_MeasConfig_t *csi_MeasConfig = spCellConfigDedicated->csi_MeasConfig->choice.setup;
   for (int report = 0; report < csi_MeasConfig->csi_ReportConfigToAddModList->list.count; report++) {
     NR_CSI_ReportConfig_t *csirep = csi_MeasConfig->csi_ReportConfigToAddModList->list.array[report];
-    if(csirep->codebookConfig)
+    if (csirep->codebookConfig)
       config_csi_codebook(&configuration->pdsch_AntennaPorts, *pdsch_servingcellconfig->ext1->maxMIMO_Layers, csirep->codebookConfig);
+    if (csirep->groupBasedBeamReporting.present == NR_CSI_ReportConfig__groupBasedBeamReporting_PR_disabled
+        && csirep->groupBasedBeamReporting.choice.disabled
+        && csirep->groupBasedBeamReporting.choice.disabled->nrofReportedRS)
+      *csirep->groupBasedBeamReporting.choice.disabled->nrofReportedRS = config_nrofReportedRS(uecap,
+                                                                                               get_ssb_bitmap(scc),
+                                                                                               scc,
+                                                                                               configuration->max_num_rsrp);
   }
 
   NR_UplinkConfig_t *uplinkConfig = spCellConfigDedicated->uplinkConfig;

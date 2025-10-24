@@ -1508,13 +1508,18 @@ nr_dci_format_t nr_ue_process_dci_indication_pdu(NR_UE_MAC_INST_t *mac, frame_t 
 
 void nr_ue_process_l1_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, fapi_nr_l1_measurements_t *l1_measurements)
 {
-  LOG_D(NR_MAC, "(%d.%d) Received CSI-RS measurements\n", frame, slot);
-  memcpy(&mac->l1_measurements, l1_measurements, sizeof(*l1_measurements));
+  LOG_D(NR_MAC, "(%d.%d) Received measurements from L1\n", frame, slot);
   bool csi_meas = l1_measurements->meas_type == NFAPI_NR_CSI_MEAS;
   if (!csi_meas && !l1_measurements->is_neighboring_cell) {
     int ssb_index = l1_measurements->ssb_index;
     mac->ssb_measurements[ssb_index].ssb_rsrp_dBm = l1_measurements->rsrp_dBm;
     mac->ssb_measurements[ssb_index].ssb_sinr_dB = l1_measurements->sinr_dB;
+  } else if (csi_meas) {
+    mac->csirs_measurements.rsrp_dBm = l1_measurements->rsrp_dBm;
+    mac->csirs_measurements.i1 = l1_measurements->i1;
+    mac->csirs_measurements.i2 = l1_measurements->i2;
+    mac->csirs_measurements.cqi = l1_measurements->cqi;
+    mac->csirs_measurements.ri = l1_measurements->rank_indicator;
   }
   nr_mac_rrc_meas_ind_ue(mac->ue_id,
                          l1_measurements->gNB_index,
@@ -2790,13 +2795,13 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       } else
         nb_meas = 2;
 
-      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList SSB_resource;
+      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
       for (int csi_ssb_idx = 0; csi_ssb_idx < csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.count; csi_ssb_idx++) {
         if (csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceSetId
             == *(csi_resourceconfig->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->csi_SSB_ResourceSetList->list.array[0])) {
-          SSB_resource = csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceList;
+          SSB_resource = &csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceList;
           /// only one SSB resource set from spec 38.331 IE CSI-ResourceConfig
-          nb_ssb = SSB_resource.list.count;
+          nb_ssb = SSB_resource->list.count;
           break;
         }
       }
@@ -2811,7 +2816,7 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       for (int measured_ssb_idx = 0; measured_ssb_idx < MAX_NB_SSB; measured_ssb_idx++) {
         // searching for the SSB index in the SSB resource table
         for (int ssb_resource = 0; ssb_resource < nb_ssb; ssb_resource++) {
-          if (*SSB_resource.list.array[ssb_resource] == measured_ssb_idx) {
+          if (*SSB_resource->list.array[ssb_resource] == measured_ssb_idx) {
             sorted_sinr_measurements[sorted_idx].ssb_index = ssb_resource;
             sorted_sinr_measurements[sorted_idx].ssb_rsrp_dBm = mac->ssb_measurements[measured_ssb_idx].ssb_rsrp_dBm;
             sorted_sinr_measurements[sorted_idx].ssb_sinr_dB = mac->ssb_measurements[measured_ssb_idx].ssb_sinr_dB;
@@ -2822,25 +2827,20 @@ static csi_payload_t get_ssb_sinr_payload(NR_UE_MAC_INST_t *mac,
       }
       qsort(sorted_sinr_measurements, nb_ssb, sizeof(NR_RSRP_meas_t), compare_ssb_sinr);
 
-      uint8_t ssbi;
-
       // TS38.212 v16.5.0: Table 6.3.1.1.2-8A
-      if (ssbri_bits > 0) {
-        ssbi = sorted_sinr_measurements[0].ssb_index;
-        temp_payload = reverse_bits(ssbi, ssbri_bits);
-        bits += ssbri_bits;
+      for (int i = 0; i < nb_meas; i++) {
+        if (ssbri_bits > 0) {
+          uint8_t ssbi = sorted_sinr_measurements[i].ssb_index;
+          temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
+          bits += ssbri_bits;
+        }
       }
 
       uint8_t sinr_idx = get_sinr_index(sorted_sinr_measurements[0].ssb_sinr_dB);
       temp_payload |= (reverse_bits(sinr_idx, 7) << bits);
       bits += 7; // 7 bits for highest SINR
 
-      // from the second SSB, differential report
       for (int i = 1; i < nb_meas; i++) {
-        ssbi = sorted_sinr_measurements[i].ssb_index;
-        temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
-        bits += ssbri_bits;
-
         sinr_idx = get_sinr_diff_index(sorted_sinr_measurements[0].ssb_sinr_dB, sorted_sinr_measurements[i].ssb_sinr_dB);
         temp_payload |= (reverse_bits(sinr_idx, 4) << bits);
         bits += 4; // 4 bits for differential SINR
@@ -2931,13 +2931,13 @@ static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
       } else
         nb_meas = 2;
 
-      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList SSB_resource;
+      struct NR_CSI_SSB_ResourceSet__csi_SSB_ResourceList *SSB_resource = NULL;
       for (int csi_ssb_idx = 0; csi_ssb_idx < csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.count; csi_ssb_idx++) {
         if (csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceSetId ==
             *(csi_resourceconfig->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->csi_SSB_ResourceSetList->list.array[0])){
-          SSB_resource = csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceList;
+          SSB_resource = &csi_MeasConfig->csi_SSB_ResourceSetToAddModList->list.array[csi_ssb_idx]->csi_SSB_ResourceList;
           ///only one SSB resource set from spec 38.331 IE CSI-ResourceConfig
-          nb_ssb = SSB_resource.list.count;
+          nb_ssb = SSB_resource->list.count;
           break;
         }
       }
@@ -2952,7 +2952,7 @@ static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
       for (int measured_ssb_idx = 0; measured_ssb_idx < MAX_NB_SSB; measured_ssb_idx++) {
         // searching for the SSB index in the SSB resource table
         for (int ssb_resource = 0; ssb_resource < nb_ssb; ssb_resource++) {
-          if (*SSB_resource.list.array[ssb_resource] == measured_ssb_idx) {
+          if (*SSB_resource->list.array[ssb_resource] == measured_ssb_idx) {
             sorted_rsrp_measurements[sorted_idx].ssb_index = ssb_resource;
             sorted_rsrp_measurements[sorted_idx].ssb_rsrp_dBm = mac->ssb_measurements[measured_ssb_idx].ssb_rsrp_dBm;
             sorted_rsrp_measurements[sorted_idx].ssb_sinr_dB = mac->ssb_measurements[measured_ssb_idx].ssb_sinr_dB;
@@ -2963,12 +2963,12 @@ static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
       }
       qsort(sorted_rsrp_measurements, nb_ssb, sizeof(NR_RSRP_meas_t), compare_ssb_rsrp);
 
-      uint32_t ssbi;
-
-      if (ssbri_bits > 0) {
-        ssbi = sorted_rsrp_measurements[0].ssb_index;
-        temp_payload = reverse_bits(ssbi, ssbri_bits);
-        bits += ssbri_bits;
+      for (int i = 0; i < nb_meas; i++) {
+        if (ssbri_bits > 0) {
+          uint32_t ssbi = sorted_rsrp_measurements[i].ssb_index;
+          temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
+          bits += ssbri_bits;
+        }
       }
 
       uint8_t rsrp_idx = get_rsrp_index(sorted_rsrp_measurements[0].ssb_rsrp_dBm);
@@ -2977,15 +2977,11 @@ static csi_payload_t get_ssb_rsrp_payload(NR_UE_MAC_INST_t *mac,
 
       // from the second SSB, differential report
       for (int i = 1; i < nb_meas; i++) {
-        ssbi = sorted_rsrp_measurements[i].ssb_index;
-        temp_payload |= (reverse_bits(ssbi, ssbri_bits) << bits);
-        bits += ssbri_bits;
-
         rsrp_idx = get_rsrp_diff_index(sorted_rsrp_measurements[0].ssb_rsrp_dBm,sorted_rsrp_measurements[i].ssb_rsrp_dBm);
         temp_payload |= (reverse_bits(rsrp_idx, 4) << bits);
         bits += 4; // 4 bits for subsequent RSRP
       }
-      break; // resorce found
+      break; // resource found
     }
   }
   int max_bits = sizeof(((csi_payload_t *)0)->part1_payload) * 8;
@@ -3026,28 +3022,28 @@ static csi_payload_t get_csirs_RI_PMI_CQI_payload(NR_UE_MAC_INST_t *mac,
           AssertFatal(csi_report, "Couldn't find CSI report with ID %ld\n", csi_reportconfig->reportConfigId);
           int cri_bitlen = csi_report->csi_meas_bitlen.cri_bitlen;
           int ri_bitlen = csi_report->csi_meas_bitlen.ri_bitlen;
-          int pmi_x1_bitlen = csi_report->csi_meas_bitlen.pmi_x1_bitlen[mac->l1_measurements.rank_indicator];
-          int pmi_x2_bitlen = csi_report->csi_meas_bitlen.pmi_x2_bitlen[mac->l1_measurements.rank_indicator];
-          int cqi_bitlen = csi_report->csi_meas_bitlen.cqi_bitlen[mac->l1_measurements.rank_indicator];
+          int pmi_x1_bitlen = csi_report->csi_meas_bitlen.pmi_x1_bitlen[mac->csirs_measurements.ri];
+          int pmi_x2_bitlen = csi_report->csi_meas_bitlen.pmi_x2_bitlen[mac->csirs_measurements.ri];
+          int cqi_bitlen = csi_report->csi_meas_bitlen.cqi_bitlen[mac->csirs_measurements.ri];
           int padding_bitlen = 0;
           // TODO: Improvements will be needed to cri_bitlen>0 and pmi_x1_bitlen>0
           if (mapping_type == ON_PUSCH) {
             p1_bits = cri_bitlen + ri_bitlen + cqi_bitlen;
             p2_bits = pmi_x1_bitlen + pmi_x2_bitlen;
             temp_payload_1 = (0/*mac->csi_measurements.cri*/ << (cqi_bitlen + ri_bitlen)) |
-                             (mac->l1_measurements.rank_indicator << cqi_bitlen) |
-                             (mac->l1_measurements.cqi);
-            temp_payload_2 = (mac->l1_measurements.i1 << pmi_x2_bitlen) |
-                             mac->l1_measurements.i2;
+                             (mac->csirs_measurements.ri << cqi_bitlen) |
+                             (mac->csirs_measurements.cqi);
+            temp_payload_2 = (mac->csirs_measurements.i1 << pmi_x2_bitlen) |
+                             mac->csirs_measurements.i2;
           }
           else {
             p1_bits = nr_get_csi_bitlen(csi_report);
             padding_bitlen = p1_bits - (cri_bitlen + ri_bitlen + pmi_x1_bitlen + pmi_x2_bitlen + cqi_bitlen);
             temp_payload_1 = (0/*mac->csi_measurements.cri*/ << (cqi_bitlen + pmi_x2_bitlen + pmi_x1_bitlen + padding_bitlen + ri_bitlen)) |
-                             (mac->l1_measurements.rank_indicator << (cqi_bitlen + pmi_x2_bitlen + pmi_x1_bitlen + padding_bitlen)) |
-                             (mac->l1_measurements.i1 << (cqi_bitlen + pmi_x2_bitlen)) |
-                             (mac->l1_measurements.i2 << (cqi_bitlen)) |
-                             (mac->l1_measurements.cqi);
+                             (mac->csirs_measurements.ri << (cqi_bitlen + pmi_x2_bitlen + pmi_x1_bitlen + padding_bitlen)) |
+                             (mac->csirs_measurements.i1 << (cqi_bitlen + pmi_x2_bitlen)) |
+                             (mac->csirs_measurements.i2 << (cqi_bitlen)) |
+                             (mac->csirs_measurements.cqi);
           }
 
           temp_payload_1 = reverse_bits(temp_payload_1, p1_bits);
@@ -3106,7 +3102,7 @@ static csi_payload_t get_csirs_RSRP_payload(NR_UE_MAC_INST_t *mac,
           }
 
           // TODO: Improvements will be needed to cri_ssbri_bitlen>0
-          temp_payload = get_rsrp_index(mac->l1_measurements.rsrp_dBm);
+          temp_payload = get_rsrp_index(mac->csirs_measurements.rsrp_dBm);
           temp_payload = reverse_bits(temp_payload, n_bits);
 
           LOG_D(NR_MAC, "cri_ssbri_bitlen = %d\n", cri_ssbri_bitlen);

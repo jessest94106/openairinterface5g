@@ -110,6 +110,24 @@ static const uint16_t NGAP_INTEGRITY_NIA3_MASK = 0x2000;
 
 static void set_UE_security_algos(const gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const ngap_security_capabilities_t *cap);
 
+/** @brief Validates PLMN against allowed PLMN list and returns pointer to matching PLMN
+ * @param rrc RRC instance
+ * @param plmn PLMN to validate
+ * @return pointer to matching PLMN in configuration, or NULL if not found */
+static const plmn_id_t *get_serving_plmn(gNB_RRC_INST *rrc, const plmn_id_t *plmn)
+{
+  // Find matching PLMN in configuration
+  for (int idx = 0; idx < rrc->configuration.num_plmn; idx++) {
+    const plmn_id_t *allowed = &rrc->configuration.plmn[idx];
+    if (allowed->mcc == plmn->mcc && allowed->mnc == plmn->mnc && allowed->mnc_digit_length == plmn->mnc_digit_length) {
+      LOG_D(NR_RRC, "PLMN (MCC:%d, MNC:%*d) matched with allowed PLMN[%d]\n", plmn->mcc, plmn->mnc_digit_length, plmn->mnc, idx);
+      return allowed;
+    }
+  }
+  LOG_W(NR_RRC, "PLMN (MCC:%d, MNC:%*d) not found in allowed PLMN list\n", plmn->mcc, plmn->mnc_digit_length, plmn->mnc);
+  return NULL;
+}
+
 /*!
  *\brief save security key.
  *\param UE              UE context.
@@ -122,7 +140,9 @@ static void set_UE_security_key(gNB_RRC_UE_t *UE, uint8_t *security_key_pP)
   /* Saves the security key */
   memcpy(UE->kgnb, security_key_pP, SECURITY_KEY_LENGTH);
   memset(UE->nh, 0, SECURITY_KEY_LENGTH);
-  UE->nh_ncc = -1;
+  /* 3GPP TS 33.501 §6.9.2.1.1: On Initial Context Setup, AMF does not send NH;
+   * gNB shall initialize NCC to 0. */
+  UE->nh_ncc = 0;
 
   char ascii_buffer[65];
   for (i = 0; i < 32; i++) {
@@ -165,9 +185,7 @@ static nr_guami_t get_guami(const uint32_t amf_Id, const plmn_id_t plmn)
   guami.amf_region_id = (amf_Id >> 16) & 0xff;
   guami.amf_set_id = (amf_Id >> 6) & 0x3ff;
   guami.amf_pointer = amf_Id & 0x3f;
-  guami.mcc = plmn.mcc;
-  guami.mnc = plmn.mnc;
-  guami.mnc_len = plmn.mnc_digit_length;
+  guami.plmn = plmn;
   return guami;
 }
 
@@ -223,17 +241,22 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   req->nas_pdu = create_byte_array(rrcSetupComplete->dedicatedNAS_Message.size, rrcSetupComplete->dedicatedNAS_Message.buf);
 
   /* Selected PLMN Identity (Optional)
-   * selectedPLMN-Identity in RRCSetupComplete: Index of the PLMN selected by the UE from the plmn-IdentityInfoList (SIB1)
-   * Selected PLMN Identity in INITIAL UE MESSAGE: Indicates the selected PLMN id for the non-3GPP access.*/
-  if (rrcSetupComplete->selectedPLMN_Identity > rrc->configuration.num_plmn) {
+   * selectedPLMN-Identity in RRCSetupComplete: Index of the PLMN selected by the UE from the plmn-IdentityInfoList (SIB1) */
+  int idx = rrcSetupComplete->selectedPLMN_Identity - 1; // Convert 1-based PLMN Identity IE to 0-based index
+  if (idx < 0 || idx >= rrc->configuration.num_plmn) {
     LOG_E(NGAP,
-          "Failed to send Initial UE Message: selected PLMN (%ld) identity is out of bounds (%d)\n",
-          rrcSetupComplete->selectedPLMN_Identity,
+          "Failed to send Initial UE Message: selected PLMN index (%d) is out of bounds [0..%d)\n",
+          idx,
           rrc->configuration.num_plmn);
     return;
   }
-  int selected_plmn_identity = rrcSetupComplete->selectedPLMN_Identity - 1; // Convert 1-based PLMN Identity IE to 0-based index
-  req->plmn = rrc->configuration.plmn[selected_plmn_identity]; // Select from the stored list
+  req->plmn = rrc->configuration.plmn[idx]; // Select from the stored list
+  /* UE is connected to only one PLMN at a time: store this as the serving PLMN */
+  UE->serving_plmn = req->plmn;
+
+  // Cell ID (NR CGI)
+  req->nr_cell_id = UE->nr_cellid;
+  // PLMN (NR CGI and TAI)
   plmn_id_t *p = &req->plmn;
   LOG_I(NGAP, "Selected PLMN in the NG Initial UE Message: MCC=%03d MNC=%0*d\n", p->mcc, p->mnc_digit_length, p->mnc);
 
@@ -721,6 +744,10 @@ void rrc_gNB_send_NGAP_UPLINK_NAS(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_
   NGAP_UPLINK_NAS(msg_p).gNB_ue_ngap_id = UE->rrc_ue_id;
   NGAP_UPLINK_NAS(msg_p).nas_pdu.len = nas->size;
   NGAP_UPLINK_NAS(msg_p).nas_pdu.buf = buf;
+  /* Fill PLMN and location info: use serving PLMN of the UE */
+  NGAP_UPLINK_NAS(msg_p).plmn = UE->serving_plmn;
+  NGAP_UPLINK_NAS(msg_p).nr_cell_id = rrc->nr_cellid;
+  NGAP_UPLINK_NAS(msg_p).tac = rrc->configuration.tac;
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
 }
 
@@ -1154,6 +1181,20 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
     return -1;
   }
+
+  // Validate PLMN from GUAMI against allowed PLMN list
+  const plmn_id_t *serving_plmn = get_serving_plmn(rrc, &msg->guami.plmn);
+  if (!serving_plmn) {
+    LOG_E(NR_RRC, "PLMN from GUAMI not supported - rejecting handover\n");
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_TARGET_NOT_ALLOWED,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    return -1;
+  }
+
   uint16_t pci = du->setup_req->cell[0].info.nr_pci;
   LOG_I(NR_RRC, "Received Handover Request (on NR Cell ID=%lu, PCI=%u) \n", msg->nr_cell_id, pci);
 
@@ -1169,6 +1210,9 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   // Store IDs in UE context
   UE->amf_ue_ngap_id = msg->amf_ue_ngap_id;
   UE->ue_guami = msg->guami;
+  // Store the serving PLMN
+  UE->serving_plmn = *serving_plmn;
+
   UE->ho_context->target->ue_ho_prep_info = copy_byte_array(msg->ue_ho_prep_info);
   // store the received UE Security Capabilities in the UE context
   FREE_AND_ZERO_BYTE_ARRAY(UE->ue_cap_buffer);

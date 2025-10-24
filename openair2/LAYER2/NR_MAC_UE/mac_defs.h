@@ -431,6 +431,14 @@ typedef struct {
   float_t ssb_sinr_dB;
 } NR_SSB_meas_t;
 
+typedef struct {
+  int rsrp_dBm;
+  uint8_t ri;
+  uint16_t i1;
+  uint8_t i2;
+  uint8_t cqi;
+} NR_CSIRS_meas_t;
+
 typedef enum ta_type {
   no_ta = 0,
   adjustment_ta,
@@ -601,9 +609,6 @@ typedef struct NR_UE_MAC_INST_s {
 
   nr_csi_report_t csi_report_template[MAX_CSI_REPORTCONFIG];
 
-  /// measurements from SS or CSI-RS
-  fapi_nr_l1_measurements_t l1_measurements;
-
   ////	FAPI-like interface message
   fapi_nr_ul_config_request_t *ul_config_request;
   fapi_nr_dl_config_request_t *dl_config_request;
@@ -633,6 +638,7 @@ typedef struct NR_UE_MAC_INST_s {
   int ssb_start_subcarrier;
 
   NR_SSB_meas_t ssb_measurements[MAX_NB_SSB];
+  NR_CSIRS_meas_t csirs_measurements;
 
   dci_pdu_rel15_t def_dci_pdu_rel15[NR_MAX_SLOTS_PER_FRAME][8];
 

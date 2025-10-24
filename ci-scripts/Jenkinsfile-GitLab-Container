@@ -271,14 +271,15 @@ pipeline {
       when { expression {doBuild && "PUSH".equals(env.gitlabActionType)} }
       steps {
         script {
-          triggerSlaveJob ('RAN-DockerHub-Push', 'DockerHub-Push')
+          catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+            triggerSlaveJob ('RAN-DockerHub-Push', 'DockerHub-Push')
+          }
         }
       }
       post {
         failure {
           script {
             echo "Push to Docker-Hub KO"
-            currentBuild.result = 'FAILURE'
             failingStages += '\n * RAN-DockerHub-Push'
           }
         }

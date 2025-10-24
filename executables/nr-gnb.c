@@ -114,7 +114,10 @@ static void tx_func(processingData_L1tx_t *info)
   pushNotifiedFIFO(&gNB->resp_L1, res);
 
   int tx_slot_type = nr_slot_select(cfg, frame_tx, slot_tx);
-  if (tx_slot_type == NR_DOWNLINK_SLOT || tx_slot_type == NR_MIXED_SLOT || get_softmodem_params()->continuous_tx || IS_SOFTMODEM_RFSIM) {
+  // TODO check for analog_beam_list is a workaround while no beam API for beam
+  // selection is implemented
+  if (tx_slot_type == NR_DOWNLINK_SLOT || tx_slot_type == NR_MIXED_SLOT || get_softmodem_params()->continuous_tx || IS_SOFTMODEM_RFSIM 
+    || cfg->analog_beamforming_ve.analog_beam_list) {
     start_meas(&info->gNB->phy_proc_tx);
     phy_procedures_gNB_TX(info, frame_tx, slot_tx, 1);
 
@@ -190,17 +193,17 @@ static void rx_func(processingData_L1_t *info)
     //WA: comment rotation in tx/rx
     if (gNB->phase_comp) {
       //apply the rx signal rotation here
-      int soffset = (slot_rx & 3) * gNB->frame_parms.symbols_per_slot * gNB->frame_parms.ofdm_symbol_size;
+      int soffset = (slot_rx % RU_RX_SLOT_DEPTH) * gNB->frame_parms.symbols_per_slot * gNB->frame_parms.ofdm_symbol_size;
       for (int bb = 0; bb < gNB->common_vars.num_beams_period; bb++) {
         for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++) {
-          apply_nr_rotation_RX(&gNB->frame_parms,
-                               gNB->common_vars.rxdataF[bb][aa],
-                               gNB->frame_parms.symbol_rotation[1],
-                               slot_rx,
-                               gNB->frame_parms.N_RB_UL,
-                               soffset,
-                               0,
-                               gNB->frame_parms.Ncp == EXTENDED ? 12 : 14);
+          const uint max_symb = (gNB->frame_parms.Ncp == EXTENDED) ? 12 : 14;
+          for (int sym = 0; sym < max_symb; sym++)
+            apply_nr_rotation_symbol_RX(&gNB->frame_parms,
+                                        gNB->common_vars.rxdataF[bb][aa] + soffset + sym * gNB->frame_parms.ofdm_symbol_size,
+                                        gNB->frame_parms.symbol_rotation[1],
+                                        gNB->frame_parms.N_RB_UL,
+                                        slot_rx,
+                                        sym);
         }
       }
     }
