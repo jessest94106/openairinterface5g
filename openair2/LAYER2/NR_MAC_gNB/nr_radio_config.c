@@ -3866,8 +3866,15 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
   NR_CSI_MeasConfig_t *csi_MeasConfig = spCellConfigDedicated->csi_MeasConfig->choice.setup;
   for (int report = 0; report < csi_MeasConfig->csi_ReportConfigToAddModList->list.count; report++) {
     NR_CSI_ReportConfig_t *csirep = csi_MeasConfig->csi_ReportConfigToAddModList->list.array[report];
-    if(csirep->codebookConfig)
+    if (csirep->codebookConfig)
       config_csi_codebook(&configuration->pdsch_AntennaPorts, *pdsch_servingcellconfig->ext1->maxMIMO_Layers, csirep->codebookConfig);
+    if (csirep->groupBasedBeamReporting.present == NR_CSI_ReportConfig__groupBasedBeamReporting_PR_disabled
+        && csirep->groupBasedBeamReporting.choice.disabled
+        && csirep->groupBasedBeamReporting.choice.disabled->nrofReportedRS)
+      *csirep->groupBasedBeamReporting.choice.disabled->nrofReportedRS = config_nrofReportedRS(uecap,
+                                                                                               get_ssb_bitmap(scc),
+                                                                                               scc,
+                                                                                               configuration->max_num_rsrp);
   }
 
   NR_UplinkConfig_t *uplinkConfig = spCellConfigDedicated->uplinkConfig;
