@@ -125,13 +125,14 @@ These modes of operation are supported:
 - MAC downlink scheduler
   - phy-test scheduler (fixed allocation and usable also without UE)
   - regular scheduler with dynamic proportionally-fair allocation
-  - MCS adaptation from HARQ BLER
+  - MCS adaptation from HARQ BLER or SSB-SINR report
 - MAC header generation (including timing advance)
 - ACK/NACK handling and HARQ procedures for downlink
 - MAC uplink scheduler
   - phy-test scheduler (fixed allocation)
   - regular scheduler with dynamic proportionally-fair allocation
   - HARQ procedures for uplink
+  - MCS adaption from HARQ BLER or PUSCH SINR
 - Scheduler procedures for SRS reception
   - Periodic SRS reception
   - Channel rank computation up to 2x2 scenario
@@ -149,7 +150,12 @@ These modes of operation are supported:
   - RedCap SIB1 v17 IEs supported
   - Coexistence of RedCap and Normal UEs
   - Handling of RedCap capability for small PDCP/RLC SN size
-- Scheduling of SIBs (2, 19)
+- Scheduling of other SIBs (2, 19)
+- NTN
+  - Support downlinkHARQ-FeedbackDisabled-r17
+  - Support for 32 PDSCH and PUSCH HARQ processes per UE
+  - Consider ntn-Config-r17.cellSpecificKoffset-r17 in scheduling
+  - Function-based interface for ntn-Config-r17 updates (used by NTN-LEO RFsimulator)
 
 ## gNB RLC
 
@@ -296,7 +302,8 @@ These modes of operation are supported:
    - non-blind synchronization (information required: carrier frequency, bandwidth, numerology)
    - option to search SSB inside the bandwidth available
 *  Time tracking based on PBCH DMRS
-*  Frequency offset estimation based on PSS and SSS
+*  Initial Frequency offset estimation based on PSS and SSS
+*  Continuous Frequency offset estimation and compensation based on PBCH DMRS
 *  15kHz and 30kHz SCS for FR1 and 120 kHz SCS for FR2
 *  Reception of NR-PSS/NR-SSS
 *  NR-PBCH supports multiple SSBs and flexible periodicity
@@ -342,6 +349,10 @@ These modes of operation are supported:
    - Support for multiple gNB reception with gNBs synced via GPSDO
 * NR-PRACH
    - Formats 0,1,2,3, A1-A3, B1-B3
+* NTN
+   - TA adjustemt based on ntn-Config-r17 information
+   - Autonomous TA adjustemt between SIB19 receptions based on DL time tracking
+   - UL Doppler pre-compensation based on continuous DL FO estimation
 *  Highly efficient 3GPP compliant LDPC encoder and decoder (BG1 and BG2 are supported)
 *  Highly efficient 3GPP compliant polar encoder and decoder
 *  Encoder and decoder for short block
@@ -397,6 +408,10 @@ These modes of operation are supported:
    - Periodic and aperiodic SRS transmission
 * Bandwidth part (BWP) operation
    - Operation in configured dedicated BWP through RRCSetup or RRCReconfiguration
+* NTN
+   - Support downlinkHARQ-FeedbackDisabled-r17
+   - Support for 32 PDSCH and PUSCH HARQ processes
+   - Consider ntn-Config-r17.cellSpecificKoffset-r17 in scheduling
 
 
 ## UE RLC
@@ -437,6 +452,9 @@ These modes of operation are supported:
    - RRCReestablishmentRequest/RRC Reestablishment/Reestablishment complete
    - Support for master cell group configuration
    - Reception of UECapabilityEnquiry, encoding and transmission of UECapability
+* NTN according to 38.331 Rel.17
+   - Reception of ntn-Config-r17 from SIB19 or reconfigurationWithSync
+   - Handling of ntn-UlSyncValidityDuration-r17 in SIB19
 * Interface with PDCP: configuration, DCCH and CCCH message handling
 * Interface with RLC and MAC for configuration
 
