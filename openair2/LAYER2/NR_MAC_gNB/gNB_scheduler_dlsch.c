@@ -1224,7 +1224,7 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
     T(T_GNB_MAC_RETRANSMISSION_DL_PDU_WITH_DATA, T_INT(module_id), T_INT(CC_id), T_INT(rnti),
       T_INT(frame), T_INT(slot), T_INT(current_harq_pid), T_INT(harq->round), T_BUFFER(harq->transportBlock.buf, TBS));
     UE->mac_stats.dl.total_rbs_retx += sched_pdsch->rbSize;
-    nr_mac->mac_stats.used_prb_aggregate += sched_pdsch->rbSize;
+    nr_mac->mac_stats.dl.used_prb_aggregate += sched_pdsch->rbSize;
   } else { /* initial transmission */
     LOG_D(NR_MAC, "Initial HARQ transmission in %d.%d\n", frame, slot);
     uint8_t *buf = allocate_transportBlock_buffer(&harq->transportBlock, TBS);
@@ -1338,7 +1338,7 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
     UE->mac_stats.dl.num_mac_sdu += sdus;
     UE->mac_stats.dl.current_rbs = sched_pdsch->rbSize;
     UE->mac_stats.dl.total_sdu_bytes += dlsch_total_bytes;
-    nr_mac->mac_stats.used_prb_aggregate += sched_pdsch->rbSize;
+    nr_mac->mac_stats.dl.used_prb_aggregate += sched_pdsch->rbSize;
 
     /* save retransmission information */
     harq->sched_pdsch = *sched_pdsch;
@@ -1388,7 +1388,7 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
   NR_ServingCellConfigCommon_t *scc = gNB_mac->common_channels[CC_id].ServingCellConfigCommon;
   int bw = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
-  gNB_mac->mac_stats.total_prb_aggregate += bw;
+  gNB_mac->mac_stats.dl.total_prb_aggregate += bw;
 
   nfapi_nr_dl_tti_request_body_t *dl_req = &DL_req->dl_tti_request_body;
   post_process_pdsch_t pdsch = { frame, slot, dl_req, TX_req };
