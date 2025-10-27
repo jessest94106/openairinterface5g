@@ -355,7 +355,8 @@ These modes of operation are supported:
    - Different TA adjustemt algorithms between SIB19 receptions:
       - Autonomous TA adjustemt based on DL time tracking
       - Standard compliant epoch time based TA adjustment including orbital propagation
-   - UL Doppler pre-compensation based on continuous DL FO estimation
+   - DL Doppler compensation based on ntn-Config-r17 information
+   - UL Doppler pre-compensation based on ntn-Config-r17 information and residual DL FO estimation
 *  Highly efficient 3GPP compliant LDPC encoder and decoder (BG1 and BG2 are supported)
 *  Highly efficient 3GPP compliant polar encoder and decoder
 *  Encoder and decoder for short block
