@@ -85,7 +85,7 @@ def CheckClassValidity(xml_class_list,action,id):
 		resp=True
 	return resp
 
-def ExecuteActionWithParam(action, ctx):
+def ExecuteActionWithParam(action, ctx, node):
 	global RAN
 	global HTML
 	global CONTAINERS
@@ -94,7 +94,6 @@ def ExecuteActionWithParam(action, ctx):
 	if action == 'Build_eNB' or action == 'Build_Image' or action == 'Build_Proxy' or action == "Build_Cluster_Image" or action == "Build_Run_Tests":
 		RAN.Build_eNB_args=test.findtext('Build_eNB_args')
 		CONTAINERS.imageKind=test.findtext('kind')
-		node = test.findtext('node')
 		proxy_commit = test.findtext('proxy_commit')
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
@@ -110,7 +109,6 @@ def ExecuteActionWithParam(action, ctx):
 			success = CONTAINERS.BuildRunTests(ctx, node, HTML)
 
 	elif action == 'Initialize_eNB':
-		node = test.findtext('node')
 		datalog_rt_stats_file=test.findtext('rt_stats_cfg')
 		if datalog_rt_stats_file is None:
 			RAN.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
@@ -131,7 +129,6 @@ def ExecuteActionWithParam(action, ctx):
 		success = RAN.InitializeeNB(ctx, node, HTML)
 
 	elif action == 'Terminate_eNB':
-		node = test.findtext('node')
 		#retx checkers
 		string_field = test.findtext('d_retx_th')
 		if (string_field is not None):
@@ -150,7 +147,6 @@ def ExecuteActionWithParam(action, ctx):
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
-		node = test.findtext('node') if not force_local else 'localhost'
 		if action == 'Initialize_UE':
 			success = CiTestObj.InitializeUE(node, HTML)
 		elif action == 'Attach_UE':
@@ -173,7 +169,6 @@ def ExecuteActionWithParam(action, ctx):
 		CiTestObj.svr_id = test.findtext('svr_id') or None
 		if test.findtext('svr_node'):
 			CiTestObj.svr_node = test.findtext('svr_node') if not force_local else 'localhost'
-		node = test.findtext('node') if not force_local else 'localhost'
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
 		success = CiTestObj.Ping(ctx, node, HTML)
 
@@ -181,7 +176,6 @@ def ExecuteActionWithParam(action, ctx):
 		CiTestObj.iperf_args = test.findtext('iperf_args')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		CiTestObj.svr_id = test.findtext('svr_id') or None
-		node = test.findtext('node') if not force_local else 'localhost'
 		if test.findtext('svr_node'):
 			CiTestObj.svr_node = test.findtext('svr_node') if not force_local else 'localhost'
 		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
@@ -206,7 +200,6 @@ def ExecuteActionWithParam(action, ctx):
 
 	elif action == 'Deploy_Run_OC_PhySim':
 		oc_release = test.findtext('oc_release')
-		node = test.findtext('node') or None
 		script = "scripts/oc-deploy-physims.sh"
 		image_tag = cls_containerize.CreateTag(CLUSTER.ranCommitID, CLUSTER.ranBranch, CLUSTER.ranAllowMerge)
 		options = f"oaicicd-core-for-ci-ran {oc_release} {image_tag} {CLUSTER.eNBSourceCodePath}"
@@ -214,7 +207,6 @@ def ExecuteActionWithParam(action, ctx):
 		success = cls_oaicitest.Deploy_Physim(ctx, HTML, node, workdir, script, options)
 
 	elif action == 'Build_Deploy_Docker_PhySim' or action == 'Build_Deploy_Source_PhySim':
-		node = test.findtext('node') or None
 		ctest_opt = test.findtext('ctest-opt') or ''
 		script = "scripts/docker-build-and-deploy-physims.sh" if action == 'Build_Deploy_Docker_PhySim' else 'scripts/source-deploy-physims.sh'
 		options = f"{CONTAINERS.eNBSourceCodePath} {ctest_opt}"
@@ -227,7 +219,6 @@ def ExecuteActionWithParam(action, ctx):
 		success = core_op(cn_id, ctx, HTML)
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
-		node = test.findtext('node')
 		CONTAINERS.yamlPath = test.findtext('yaml_path')
 		string_field=test.findtext('d_retx_th')
 		if (string_field is not None):
@@ -249,15 +240,12 @@ def ExecuteActionWithParam(action, ctx):
 			success = CONTAINERS.Create_Workspace(node, HTML)
 
 	elif action == 'LicenceAndFormattingCheck':
-		node = test.findtext('node')
 		success = SCA.LicenceAndFormattingCheck(ctx, node, HTML)
 
 	elif action == 'Cppcheck_Analysis':
-		node = test.findtext('node')
 		success = SCA.CppCheckAnalysis(ctx, node, HTML)
 
 	elif action == 'Push_Local_Registry':
-		node = test.findtext('node')
 		tag_prefix = test.findtext('tag_prefix') or ""
 		success = CONTAINERS.Push_Image_to_Local_Registry(node, HTML, tag_prefix)
 
@@ -265,7 +253,6 @@ def ExecuteActionWithParam(action, ctx):
 		if force_local:
 			# Do not pull or remove images when running locally. User is supposed to handle image creation & cleanup
 			return True
-		node = test.findtext('node')
 		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
 		# hack: for FlexRIC, we need to overwrite the tag to use
@@ -278,17 +265,12 @@ def ExecuteActionWithParam(action, ctx):
 			success = CONTAINERS.Clean_Test_Server_Images(HTML, node, images, tag=tag)
 
 	elif action == 'Custom_Command':
-		node = test.findtext('node')
-		if force_local:
-			# Change all execution targets to localhost
-			node = 'localhost'
 		command = test.findtext('command')
 		# Allow referencing repository workspace path in XML via %%workspace%%
 		command = command.replace("%%workspace%%", CONTAINERS.eNBSourceCodePath)
 		success = cls_oaicitest.Custom_Command(HTML, node, command)
 
 	elif action == 'Custom_Script':
-		node = test.findtext('node')
 		script = test.findtext('script')
 		# Allow referencing repository workspace path in XML via %%workspace%%
 		script = script.replace("%%workspace%%", CONTAINERS.eNBSourceCodePath)
@@ -297,7 +279,6 @@ def ExecuteActionWithParam(action, ctx):
 	elif action == 'Pull_Cluster_Image':
 		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
-		node = test.findtext('node')
 		success = CLUSTER.PullClusterImage(HTML, node, images, tag_prefix=tag_prefix)
 
 	else:
@@ -525,6 +506,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 			ctx = TestCaseCtx(i, int(id), logPath)
 			HTML.testCase_id=CiTestObj.testCase_id
 			desc = test.findtext('desc')
+			node = test.findtext('node') if not force_local else 'localhost'
 			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
 			may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
 			HTML.desc = desc
@@ -539,7 +521,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 				HTML.CreateHtmlTestRowQueue(msg, "SKIP", [])
 				break
 			try:
-				test_succeeded = ExecuteActionWithParam(action, ctx)
+				test_succeeded = ExecuteActionWithParam(action, ctx, node)
 				if not test_succeeded and may_fail:
 					logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
 				elif not test_succeeded:
