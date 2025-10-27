@@ -83,7 +83,7 @@
                 <class>Ping</class>
                 <desc>Ping gNB from NR-UE</desc>
                 <id>rfsim5g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_gnb_nos1</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c20 -i0.2</ping_args>
@@ -94,7 +94,7 @@
                 <class>Ping</class>
                 <desc>Ping NR-UE from gNB</desc>
                 <id>rfsim5g_gnb_nos1</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_ue</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c20 -i0.2</ping_args>

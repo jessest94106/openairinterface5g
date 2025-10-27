@@ -150,31 +150,21 @@ def ExecuteActionWithParam(action, ctx):
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
-		if force_local:
-			# Change all execution targets to localhost
-			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
-		else:
-			if test.findtext('nodes'):
-				CiTestObj.nodes = test.findtext('nodes').split(' ')
-				if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
-					logging.error('Number of Nodes are not equal to the total number of UEs')
-					sys.exit("Mismatch in number of Nodes and UIs")
-			else:
-				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+		node = test.findtext('node') if not force_local else 'localhost'
 		if action == 'Initialize_UE':
-			success = CiTestObj.InitializeUE(HTML)
+			success = CiTestObj.InitializeUE(node, HTML)
 		elif action == 'Attach_UE':
-			success = CiTestObj.AttachUE(HTML)
+			success = CiTestObj.AttachUE(node, HTML)
 		elif action == 'Detach_UE':
-			success = CiTestObj.DetachUE(HTML)
+			success = CiTestObj.DetachUE(node, HTML)
 		elif action == 'Terminate_UE':
-			success = CiTestObj.TerminateUE(ctx, HTML)
+			success = CiTestObj.TerminateUE(ctx, node, HTML)
 		elif action == 'CheckStatusUE':
-			success = CiTestObj.CheckStatusUE(HTML)
+			success = CiTestObj.CheckStatusUE(node, HTML)
 		elif action == 'DataEnable_UE':
-			success = CiTestObj.DataEnableUE(HTML)
+			success = CiTestObj.DataEnableUE(node, HTML)
 		elif action == 'DataDisable_UE':
-			success = CiTestObj.DataDisableUE(HTML)
+			success = CiTestObj.DataDisableUE(node, HTML)
 
 	elif action == 'Ping':
 		CiTestObj.ping_args = test.findtext('ping_args')
@@ -183,35 +173,15 @@ def ExecuteActionWithParam(action, ctx):
 		CiTestObj.svr_id = test.findtext('svr_id') or None
 		if test.findtext('svr_node'):
 			CiTestObj.svr_node = test.findtext('svr_node') if not force_local else 'localhost'
-		if force_local:
-			# Change all execution targets to localhost
-			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
-		else:
-			if test.findtext('nodes'):
-				CiTestObj.nodes = test.findtext('nodes').split(' ')
-				if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
-					logging.error('Number of Nodes are not equal to the total number of UEs')
-					sys.exit("Mismatch in number of Nodes and UIs")
-			else:
-				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+		node = test.findtext('node') if not force_local else 'localhost'
 		ping_rttavg_threshold = test.findtext('ping_rttavg_threshold') or ''
-		success = CiTestObj.Ping(ctx, HTML)
+		success = CiTestObj.Ping(ctx, node, HTML)
 
 	elif action == 'Iperf' or action == 'Iperf2_Unidir':
 		CiTestObj.iperf_args = test.findtext('iperf_args')
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
 		CiTestObj.svr_id = test.findtext('svr_id') or None
-		if force_local:
-			# Change all execution targets to localhost
-			CiTestObj.nodes = ['localhost'] * len(CiTestObj.ue_ids)
-		else:
-			if test.findtext('nodes'):
-				CiTestObj.nodes = test.findtext('nodes').split(' ')
-				if len(CiTestObj.ue_ids) != len(CiTestObj.nodes):
-					logging.error('Number of Nodes are not equal to the total number of UEs')
-					sys.exit("Mismatch in number of Nodes and UIs")
-			else:
-				CiTestObj.nodes = [None] * len(CiTestObj.ue_ids)
+		node = test.findtext('node') if not force_local else 'localhost'
 		if test.findtext('svr_node'):
 			CiTestObj.svr_node = test.findtext('svr_node') if not force_local else 'localhost'
 		CiTestObj.iperf_packetloss_threshold = test.findtext('iperf_packetloss_threshold')
@@ -226,9 +196,9 @@ def ExecuteActionWithParam(action, ctx):
 			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
 			CiTestObj.iperf_options = 'check'
 		if action == 'Iperf':
-			success = CiTestObj.Iperf(ctx, HTML)
+			success = CiTestObj.Iperf(ctx, node, HTML)
 		elif action == 'Iperf2_Unidir':
-			success = CiTestObj.Iperf2_Unidir(ctx, HTML)
+			success = CiTestObj.Iperf2_Unidir(ctx, node, HTML)
 
 	elif action == 'IdleSleep':
 		st = test.findtext('idle_sleep_time_in_sec') or "5"
