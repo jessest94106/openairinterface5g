@@ -85,14 +85,6 @@ def CheckClassValidity(xml_class_list,action,id):
 		resp=True
 	return resp
 
-#assigning parameters to object instance attributes (even if the attributes do not exist !!)
-def AssignParams(params_dict):
-
-	for key,value in params_dict.items():
-		setattr(CiTestObj, key, value)
-		setattr(RAN, key, value)
-		setattr(HTML, key, value)
-
 def ExecuteActionWithParam(action, ctx):
 	global RAN
 	global HTML
@@ -399,16 +391,7 @@ CLUSTER = cls_cluster.Cluster()
 import args_parse
 # Force local execution, move all execution targets to localhost
 force_local = False
-py_param_file_present, py_params, mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER)
-
-
-
-#-----------------------------------------------------------
-# TEMPORARY params management (UNUSED)
-#-----------------------------------------------------------
-#temporary solution for testing:
-if py_param_file_present == True:
-	AssignParams(py_params)
+mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER)
 
 #-----------------------------------------------------------
 # mode amd XML class (action) analysis
