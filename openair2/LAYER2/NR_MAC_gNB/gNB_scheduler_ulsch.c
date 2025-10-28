@@ -2606,7 +2606,6 @@ void post_process_ulsch(gNB_MAC_INST *nr_mac, post_process_pusch_t *pusch, NR_UE
                      &uldci_payload,
                      current_BWP->dci_format,
                      TYPE_C_RNTI_,
-                     current_BWP->bwp_id,
                      ss,
                      coreset,
                      UE->pdsch_HARQ_ACK_Codebook,

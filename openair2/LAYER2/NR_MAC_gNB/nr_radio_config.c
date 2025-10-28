@@ -1724,20 +1724,18 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
                                              const NR_UE_NR_Capability_t *uecap,
                                              int dl_antenna_ports,
                                              bool force_256qam_off,
-                                             int bwp_loop,
                                              bool is_SA,
                                              const nr_mac_config_t *configuration)
 {
   NR_BWP_Downlink_t *bwp = calloc_or_fail(1, sizeof(*bwp));
+  bwp->bwp_Id = 1;
   bwp->bwp_Common = calloc(1,sizeof(*bwp->bwp_Common));
-  if(configuration->num_additional_bwps > 0) {
-    const nr_bwp_config_t *bwp_config = &configuration->bwp_config[bwp_loop];
-    bwp->bwp_Id = bwp_config->id;
+  if(configuration->num_additional_bwps > 0 && configuration->first_active_bwp > 0) {
+    const nr_bwp_config_t *bwp_config = &configuration->bwp_config[configuration->first_active_bwp - 1];
     bwp->bwp_Common->genericParameters.locationAndBandwidth = bwp_config->location_and_bw;
     bwp->bwp_Common->genericParameters.subcarrierSpacing = bwp_config->scs;
     bwp->bwp_Common->genericParameters.cyclicPrefix = NULL;
   } else {
-    bwp->bwp_Id=bwp_loop+1;
     bwp->bwp_Common->genericParameters.locationAndBandwidth = PRBalloc_to_locationandbandwidth(scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth,0);
     bwp->bwp_Common->genericParameters.subcarrierSpacing = scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.subcarrierSpacing;
     bwp->bwp_Common->genericParameters.cyclicPrefix = scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.cyclicPrefix;
@@ -1830,8 +1828,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   return bwp;
 }
 
-static NR_BWP_Uplink_t *config_uplinkBWP(long bwp_loop,
-                                         bool is_SA,
+static NR_BWP_Uplink_t *config_uplinkBWP(bool is_SA,
                                          int uid,
                                          int maxMIMO_Layers,
                                          const nr_mac_config_t *configuration,
@@ -1839,14 +1836,14 @@ static NR_BWP_Uplink_t *config_uplinkBWP(long bwp_loop,
                                          const NR_UE_NR_Capability_t *uecap)
 {
   NR_BWP_Uplink_t *ubwp = calloc_or_fail(1, sizeof(*ubwp));
+  ubwp->bwp_Id = 1;
   ubwp->bwp_Common = calloc(1, sizeof(*ubwp->bwp_Common));
-  if(configuration->num_additional_bwps > 0) {
-    ubwp->bwp_Id = configuration->bwp_config[bwp_loop].id;
-    ubwp->bwp_Common->genericParameters.locationAndBandwidth = configuration->bwp_config[bwp_loop].location_and_bw;
-    ubwp->bwp_Common->genericParameters.subcarrierSpacing = configuration->bwp_config[bwp_loop].scs;
+  if(configuration->num_additional_bwps > 0 && configuration->first_active_bwp > 0) {
+    int bwp_idx = configuration->first_active_bwp - 1;
+    ubwp->bwp_Common->genericParameters.locationAndBandwidth = configuration->bwp_config[bwp_idx].location_and_bw;
+    ubwp->bwp_Common->genericParameters.subcarrierSpacing = configuration->bwp_config[bwp_idx].scs;
     ubwp->bwp_Common->genericParameters.cyclicPrefix = NULL;
   } else {
-    ubwp->bwp_Id=bwp_loop+1;
     ubwp->bwp_Common->genericParameters.locationAndBandwidth = PRBalloc_to_locationandbandwidth(scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth,0);
     ubwp->bwp_Common->genericParameters.subcarrierSpacing = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
     ubwp->bwp_Common->genericParameters.cyclicPrefix = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.cyclicPrefix;
@@ -1889,7 +1886,7 @@ static NR_BWP_Uplink_t *config_uplinkBWP(long bwp_loop,
                                                    NULL,
                                                    curr_bwp,
                                                    uid,
-                                                   bwp_loop + 1,
+                                                   ubwp->bwp_Id,
                                                    maxMIMO_Layers,
                                                    configuration->minRXTXTIME,
                                                    configuration->do_SRS);
@@ -3537,7 +3534,7 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   uint64_t bitmap = get_ssb_bitmap(scc);
   int first_active_bwp = 0;
   if (configuration->num_additional_bwps > 0)
-    first_active_bwp = configuration->first_active_bwp;
+    first_active_bwp = configuration->first_active_bwp > 0 ? 1 : 0;
 
   asn1cCallocOne(configDedicated->firstActiveDownlinkBWP_Id, first_active_bwp);
   asn1cCallocOne(uplinkConfig->firstActiveUplinkBWP_Id, first_active_bwp);
@@ -3550,12 +3547,11 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
                                                 NULL,
                                                 0,
                                                 false,
-                                                first_active_bwp - 1,
                                                 true,
                                                 configuration);
     asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, bwp);
     uplinkConfig->uplinkBWP_ToAddModList = calloc(1, sizeof(*uplinkConfig->uplinkBWP_ToAddModList));
-    NR_BWP_Uplink_t *ubwp = config_uplinkBWP(first_active_bwp - 1, true, uid, maxMIMO_Layers, configuration, scc, NULL);
+    NR_BWP_Uplink_t *ubwp = config_uplinkBWP(true, uid, maxMIMO_Layers, configuration, scc, NULL);
     asn1cSeqAdd(&uplinkConfig->uplinkBWP_ToAddModList->list, ubwp);
   }
 
@@ -3775,46 +3771,22 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   return cellGroupConfig;
 }
 
-NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
-                                                             const nr_mac_config_t *configuration,
-                                                             const NR_UE_NR_Capability_t *uecap,
-                                                             const NR_ServingCellConfigCommon_t *scc,
-                                                             int uid,
-                                                             int old_bwp,
-                                                             int new_bwp)
+NR_CellGroupConfig_t *update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,
+                                                            const nr_mac_config_t *configuration,
+                                                            const NR_UE_NR_Capability_t *uecap,
+                                                            const NR_ServingCellConfigCommon_t *scc,
+                                                            int uid,
+                                                            int old_bwp,
+                                                            int new_bwp)
 {
   NR_SpCellConfig_t *spCellConfig = cellGroupConfig->spCellConfig;
   NR_ServingCellConfig_t *configDedicated = spCellConfig->spCellConfigDedicated;
-  *configDedicated->firstActiveDownlinkBWP_Id = new_bwp;
+  *configDedicated->firstActiveDownlinkBWP_Id = new_bwp != 0;  // 1 for any BWP != 0
   NR_UplinkConfig_t *uplinkConfig = configDedicated->uplinkConfig;
-  *uplinkConfig->firstActiveUplinkBWP_Id = new_bwp;
+  *uplinkConfig->firstActiveUplinkBWP_Id = new_bwp != 0;  // 1 for any BWP != 0
+  nr_mac_config_t local_config = *configuration;
   long ul_maxMIMO_Layers = set_ul_max_layers(configuration, uecap);
-
-  // release old BWP
-  struct NR_ServingCellConfig__downlinkBWP_ToAddModList *dl_BWP_list = configDedicated->downlinkBWP_ToAddModList;
-  struct NR_UplinkConfig__uplinkBWP_ToAddModList *ul_BWP_list = uplinkConfig->uplinkBWP_ToAddModList;
-  if (old_bwp > 0) {   // we need to remove old BWP only if it is not the initial
-    AssertFatal(dl_BWP_list, "Source BWP %d should be present in the list\n", old_bwp);
-    AssertFatal(ul_BWP_list, "Source BWP %d should be present in the list\n", old_bwp);
-    NR_BWP_Id_t id = dl_BWP_list->list.array[0]->bwp_Id;
-    if (!configDedicated->downlinkBWP_ToReleaseList)
-      configDedicated->downlinkBWP_ToReleaseList = calloc_or_fail(1, sizeof(*configDedicated->downlinkBWP_ToReleaseList));
-    asn1cSequenceAdd(configDedicated->downlinkBWP_ToReleaseList->list, NR_BWP_Id_t, rel_id);
-    *rel_id = id;
-    AssertFatal(configDedicated->downlinkBWP_ToReleaseList->list.count == 1,
-                "logic error: there shouldn't be more than 1 BWP to release, but downlinkBWP_ToReleaseList has %d\n",
-                configDedicated->downlinkBWP_ToReleaseList->list.count);
-
-    id = ul_BWP_list->list.array[0]->bwp_Id;
-    if (!uplinkConfig->uplinkBWP_ToReleaseList)
-      uplinkConfig->uplinkBWP_ToReleaseList = calloc_or_fail(1, sizeof(*uplinkConfig->uplinkBWP_ToReleaseList));
-    asn1cSequenceAdd(uplinkConfig->uplinkBWP_ToReleaseList->list, NR_BWP_Id_t, ul_rel_id);
-    *ul_rel_id = id;
-    AssertFatal(uplinkConfig->uplinkBWP_ToReleaseList->list.count == 1,
-                "logic error: there shouldn't be more than 1 BWP to release, but uplinkBWP_ToReleaseList has %d\n",
-                uplinkConfig->uplinkBWP_ToReleaseList->list.count);
-  }
-
+  local_config.first_active_bwp = new_bwp;
   uint64_t bitmap = get_ssb_bitmap(scc);
   const int pdsch_AntennaPorts =
     configuration->pdsch_AntennaPorts.N1 * configuration->pdsch_AntennaPorts.N2 * configuration->pdsch_AntennaPorts.XP;
@@ -3824,23 +3796,22 @@ NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_
       configDedicated->initialDownlinkBWP = calloc_or_fail(1, sizeof(*configDedicated->initialDownlinkBWP));
     if (!uplinkConfig->initialUplinkBWP)
       uplinkConfig->initialUplinkBWP = calloc_or_fail(1, sizeof(*uplinkConfig->initialUplinkBWP));
-    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, configuration, ul_maxMIMO_Layers, uecap, uid);
-    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, uecap, configuration);
+    uplinkConfig->initialUplinkBWP = configure_initial_ul_bwp(scc, &local_config, ul_maxMIMO_Layers, uecap, uid);
+    configDedicated->initialDownlinkBWP = configure_initial_dl_bwp(scc, pdsch_AntennaPorts, bitmap, uecap, &local_config);
   } else {
     if (!configDedicated->downlinkBWP_ToAddModList)
       configDedicated->downlinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
     NR_BWP_Downlink_t *dl_bwp = config_downlinkBWP(scc,
                                                    uecap,
                                                    pdsch_AntennaPorts,
-                                                   configuration->force_256qam_off,
-                                                   new_bwp - 1,
+                                                   local_config.force_256qam_off,
                                                    true,
-                                                   configuration);
+                                                   &local_config);
     asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, dl_bwp);
 
     if (!uplinkConfig->uplinkBWP_ToAddModList)
       uplinkConfig->uplinkBWP_ToAddModList = calloc_or_fail(1, sizeof(*uplinkConfig->uplinkBWP_ToAddModList));
-    NR_BWP_Uplink_t *ul_bwp = config_uplinkBWP(new_bwp - 1, true, uid, ul_maxMIMO_Layers, configuration, scc, uecap);
+    NR_BWP_Uplink_t *ul_bwp = config_uplinkBWP(true, uid, ul_maxMIMO_Layers, &local_config, scc, uecap);
     asn1cSeqAdd(&uplinkConfig->uplinkBWP_ToAddModList->list, ul_bwp);
   }
 
@@ -3848,9 +3819,9 @@ NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_
   configDedicated->csi_MeasConfig->choice.setup = get_csiMeasConfig(configDedicated,
                                                                     uecap,
                                                                     scc,
-                                                                    configuration,
+                                                                    &local_config,
                                                                     uid,
-                                                                    new_bwp,
+                                                                    *uplinkConfig->firstActiveUplinkBWP_Id,
                                                                     bitmap);
 
   // we temporarily need to keep both the old and the new BWP in the CG used by the gNB
@@ -4077,44 +4048,27 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
                                                 configuration->do_SRS);
 
   // Downlink BWPs
-  int n_dl_bwp = 1;
   int firstActiveDownlinkBWP_Id = 1;
-  if (configuration->num_additional_bwps > 0) {
-    n_dl_bwp = configuration->num_additional_bwps;
-    firstActiveDownlinkBWP_Id = configuration->first_active_bwp;
-  }
   configDedicated->downlinkBWP_ToAddModList = calloc(1, sizeof(*configDedicated->downlinkBWP_ToAddModList));
-  for (int bwp_loop = 0; bwp_loop < n_dl_bwp; bwp_loop++) {
-    NR_BWP_Downlink_t *bwp = config_downlinkBWP(servingcellconfigcommon,
-                                                uecap,
-                                                dl_antenna_ports,
-                                                configuration->force_256qam_off,
-                                                bwp_loop,
-                                                false,
-                                                configuration);
-    asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, bwp);
-    configDedicated->firstActiveDownlinkBWP_Id = calloc(1, sizeof(*configDedicated->firstActiveDownlinkBWP_Id));
-    *configDedicated->firstActiveDownlinkBWP_Id = firstActiveDownlinkBWP_Id;
-    configDedicated->defaultDownlinkBWP_Id = calloc(1, sizeof(*configDedicated->defaultDownlinkBWP_Id));
-    *configDedicated->defaultDownlinkBWP_Id = 1;
-  }
+  NR_BWP_Downlink_t *bwp = config_downlinkBWP(servingcellconfigcommon,
+                                              uecap,
+                                              dl_antenna_ports,
+                                              configuration->force_256qam_off,
+                                              false,
+                                              configuration);
+  asn1cSeqAdd(&configDedicated->downlinkBWP_ToAddModList->list, bwp);
+  configDedicated->firstActiveDownlinkBWP_Id = calloc(1, sizeof(*configDedicated->firstActiveDownlinkBWP_Id));
+  *configDedicated->firstActiveDownlinkBWP_Id = firstActiveDownlinkBWP_Id;
+  configDedicated->defaultDownlinkBWP_Id = calloc(1, sizeof(*configDedicated->defaultDownlinkBWP_Id));
+  *configDedicated->defaultDownlinkBWP_Id = 1;
 
   // Uplink BWPs
-  int n_ul_bwp = 1;
   int firstActiveUplinkBWP_Id = 1;
-  if (configuration->num_additional_bwps > 0) {
-    n_ul_bwp = configuration->num_additional_bwps;
-    firstActiveUplinkBWP_Id = configuration->first_active_bwp;
-  }
-  if (n_ul_bwp > 0) {
-    ulConfig->uplinkBWP_ToAddModList = calloc(1, sizeof(*ulConfig->uplinkBWP_ToAddModList));
-    for (int bwp_loop = 0; bwp_loop < n_ul_bwp; bwp_loop++) {
-      NR_BWP_Uplink_t *ubwp = config_uplinkBWP(bwp_loop, false, uid, maxMIMO_Layers, configuration, servingcellconfigcommon, uecap);
-      asn1cSeqAdd(&ulConfig->uplinkBWP_ToAddModList->list, ubwp);
-    }
-    ulConfig->firstActiveUplinkBWP_Id = calloc(1, sizeof(*ulConfig->firstActiveUplinkBWP_Id));
-    *ulConfig->firstActiveUplinkBWP_Id = firstActiveUplinkBWP_Id;
-  }
+  ulConfig->uplinkBWP_ToAddModList = calloc(1, sizeof(*ulConfig->uplinkBWP_ToAddModList));
+  NR_BWP_Uplink_t *ubwp = config_uplinkBWP(false, uid, maxMIMO_Layers, configuration, servingcellconfigcommon, uecap);
+  asn1cSeqAdd(&ulConfig->uplinkBWP_ToAddModList->list, ubwp);
+  ulConfig->firstActiveUplinkBWP_Id = calloc(1, sizeof(*ulConfig->firstActiveUplinkBWP_Id));
+  *ulConfig->firstActiveUplinkBWP_Id = firstActiveUplinkBWP_Id;
 
   configDedicated->bwp_InactivityTimer = NULL;
   configDedicated->downlinkBWP_ToReleaseList = NULL;

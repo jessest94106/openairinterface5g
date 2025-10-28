@@ -801,6 +801,11 @@ typedef struct NR_UE_info {
   bool is_redcap;
   bool await_reconfig;
   NR_RA_t *ra;
+  // 3GPP mandates that BWPs are enumerated consecutively, but we only send one (dedicated)
+  // BWP to the UE (and modify that BWP on reconfiguration); consequently, the BWP ID for a
+  // dedicated BWP is always 1 from the UE's point of view, even if the gNB has multiple BWPs.
+  // The below ID is the "true" (non-consecutive) BWP ID from the gNB's point of view
+  NR_BWP_Id_t local_bwp_id;
 } NR_UE_info_t;
 
 typedef struct {

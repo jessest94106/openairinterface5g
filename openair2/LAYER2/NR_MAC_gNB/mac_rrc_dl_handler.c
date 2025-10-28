@@ -576,6 +576,7 @@ static NR_UE_info_t *create_new_UE(gNB_MAC_INST *mac, uint32_t cu_id, const NR_C
     cellGroupConfig->spCellConfig->reconfigurationWithSync = get_reconfiguration_with_sync(UE->rnti, UE->uid, scc, mac->frame);
     // TODO: in NSA we assign capabilities here, otherwise outside => not logic
     UE->capability = cap;
+    UE->local_bwp_id = 1; // get_default_secondaryCellGroup sets 1st active BWP as 1
   }
   // note: we don't pass the cellGroupConfig to add_new_nr_ue() because we need
   // the uid to create the CellGroupConfig (which is in the UE context created

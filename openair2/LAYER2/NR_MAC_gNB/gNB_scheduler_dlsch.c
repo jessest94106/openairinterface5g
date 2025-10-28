@@ -601,6 +601,8 @@ static void ack_reconfig(gNB_MAC_INST *mac, NR_UE_info_t *UE)
     // UE->reconfigSpCellConfig to be NULLed after receiving reconfiguration complete
   }
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
+  /* clean BWP structures */
+  clean_bwp_structures(UE->CellGroup->spCellConfig);
   configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
   UE->await_reconfig = false;
 }
@@ -1210,7 +1212,6 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
                      &dci_payload,
                      current_BWP->dci_format,
                      rnti_type,
-                     bwp_id,
                      sched_ctrl->search_space,
                      sched_ctrl->coreset,
                      UE->pdsch_HARQ_ACK_Codebook,
