@@ -88,7 +88,6 @@ int main(int argc, char *argv[])
   sigaction(SIGINT, &sigint_action, &oldaction);
 
   double SNR, snr0 = 0, snr1 = 20.0;
-  double sigma, sigma_dB;
   double snr_step = 1;
   uint8_t snr1set = 0;
   double **s_re, **s_im, **r_re, **r_im;
@@ -105,7 +104,6 @@ int main(int argc, char *argv[])
   int srs_comb_offset = 0;
   int srs_cyclic_shift = 0;
   int nb_symb_srs = 0;
-  int32_t txlev_sum = 0, atxlev[4];
   int i;
   int loglvl = OAILOG_WARNING;
   int print_perf = 0;
@@ -502,44 +500,31 @@ int main(int argc, char *argv[])
   uint16_t ofdm_symbol_size = fp->ofdm_symbol_size;
   int slot_offsetF = (slot % RU_RX_SLOT_DEPTH) * NR_SYMBOLS_PER_SLOT * ofdm_symbol_size;
 
-  c16_t *txF[fp->nb_antennas_tx];
-  for (i = 0; i < fp->nb_antennas_tx; i++)
+  c16_t *txF[n_tx];
+  for (i = 0; i < n_tx; i++)
     txF[i] = txdataF[i] + slot_offsetF;
+
+  c16_t *txd[n_tx];
+  for (i = 0; i < n_tx; i++)
+    txd[i] = txdata[i] + slot_offset;
 
   ue_srs_procedures_nr(UE, &proc, (c16_t **)txF, &phy_data, was_symbol_used);
 
   //------------ TX rotation and OFDM Modulation --------------------------
-
-  for (int aa = 0; aa < fp->nb_antennas_tx; aa++) {
-    apply_nr_rotation_TX(fp, &txF[aa][0], fp->symbol_rotation[1], slot, fp->N_RB_UL, 0, fp->Ncp == EXTENDED ? 12 : 14);
-    if (srs_pdu.cyclic_prefix == 1) {
-      for (i = 0; i < NR_NUMBER_OF_SYMBOLS_PER_SLOT_EXTENDED_CP; i++) {
-        if (was_symbol_used[i] == true) {
-          PHY_ofdm_mod((int *)&txF[aa][0],
-                       (int *)&txdata[aa][slot_offset + (ofdm_symbol_size + fp->nb_prefix_samples) * i],
-                       ofdm_symbol_size,
-                       1,
-                       fp->nb_prefix_samples,
-                       CYCLIC_PREFIX);
-        }
-      }
-    } else {
-      nr_normal_prefix_mod(&txF[aa][0], &txdata[aa][slot_offset], fp->symbols_per_slot, fp, slot, was_symbol_used);
-    }
-  }
+  nr_tx_rotation_and_ofdm_mod(slot, fp, n_tx, txF, txd, link_type_ul, was_symbol_used, false);
 
   //----------- Apply propagation channel and add noise ----------------------------
 
   double ts = 1.0 / (fp->subcarrier_spacing * ofdm_symbol_size);
 
   for (i = 0; i < slot_length; i++) {
-    for (int aa = 0; aa < UE->frame_parms.nb_antennas_tx; aa++) {
+    for (int aa = 0; aa < n_tx; aa++) {
       s_re[aa][i] = (double)txdata[aa][slot_offset + i].r;
       s_im[aa][i] = (double)txdata[aa][slot_offset + i].i;
     }
   }
 
-  // Compute SRS symbol offset
+  // Compute SRS symbol offset and length
   int symbol_offset = slot_offset;
   int abs_first_symbol = slot * fp->symbols_per_slot;
   int idx_sym;
@@ -547,19 +532,10 @@ int main(int argc, char *argv[])
     symbol_offset += (idx_sym % (0x7 << fp->numerology_index)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0;
 
   symbol_offset += ofdm_symbol_size * srs_pdu.time_start_position;
+  int symbol_length = ofdm_symbol_size + (idx_sym % (0x7 << fp->numerology_index)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0;
 
-  // Compute transmitter level
-  txlev_sum = 0;
-  for (int aa = 0; aa < UE->frame_parms.nb_antennas_tx; aa++) {
-    atxlev[aa] = signal_energy(
-        (int32_t *)&txdata[aa][symbol_offset],
-        ofdm_symbol_size + (idx_sym % (0x7 << fp->numerology_index)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0);
-
-    txlev_sum += atxlev[aa];
-
-    if (n_trials == 1)
-      printf("txlev[%d] = %d (%f dB) txlev_sum %d\n", aa, atxlev[aa], 10 * log10((double)atxlev[aa]), txlev_sum);
-  }
+  // Compute transmitter energy level
+  double txlev_sum = compute_tx_energy_level(txdata, n_tx, symbol_offset, symbol_length, n_trials);
 
   for (SNR = snr0; SNR <= snr1 && !stop; SNR += snr_step) {
     varArray_t *table_rx = initVarArray(1000, sizeof(double));
@@ -573,15 +549,7 @@ int main(int argc, char *argv[])
     int tao_ns_count = 0;
     for (trial = 0; trial < n_trials && !stop; trial++) {
       // Estimate noise power from the transmitter level and SNR
-      sigma_dB = 10 * log10(((double)txlev_sum) * ((double)ofdm_symbol_size / (12 * srs_pdu.bwp_size))) - SNR;
-      sigma = pow(10, sigma_dB / 10);
-
-      if (n_trials == 1)
-        printf("sigma %f (%f dB), txlev_sum %f (factor %f)\n",
-               sigma,
-               sigma_dB,
-               10 * log10((double)txlev_sum),
-               (double)(double)ofdm_symbol_size / (12 * srs_pdu.bwp_size));
+      double sigma = compute_noise_variance(txlev_sum, ofdm_symbol_size, srs_pdu.bwp_size, SNR, n_trials);
 
       //----------- Apply propagation channel ----------------------------
       multipath_channel(UE2gNB, s_re, s_im, r_re, r_im, slot_length, 0, (n_trials == 1) ? 1 : 0);
@@ -590,34 +558,24 @@ int main(int argc, char *argv[])
       add_noise(rxdata,
                 (const double **)r_re,
                 (const double **)r_im,
-                sigma,
+                sigma, // noise power
                 slot_length,
                 slot_offset,
                 ts,
                 0, // delay
                 0, // pdu_bit_map
                 0, // PTRS_BITMAP,
-                fp->nb_antennas_rx);
+                n_rx);
 
       //----------- OFDM Demodulation and RX rotation--------------------------
-
-      for (uint8_t symbol = 0; symbol < (fp->Ncp == EXTENDED ? 12 : 14); symbol++) {
-        for (int aa = 0; aa < fp->nb_antennas_rx; aa++)
-          nr_slot_fep_ul(fp, (int32_t *)&rxdata[aa][0], (int32_t *)&gNB->common_vars.rxdataF[0][aa][slot_offsetF], symbol, slot, 0);
-      }
-
-      for (int aa = 0; aa < fp->nb_antennas_rx; aa++) {
-        for (uint8_t symbol = 0; symbol < fp->symbols_per_slot; symbol++) {
-          if (was_symbol_used[symbol] == true) {
-            apply_nr_rotation_symbol_RX(fp,
-                                        &gNB->common_vars.rxdataF[0][aa][slot_offsetF + symbol * fp->ofdm_symbol_size],
-                                        fp->symbol_rotation[1],
-                                        fp->N_RB_UL,
-                                        slot,
-                                        symbol);
-          }
-        }
-      }
+      nr_ofdm_demod_and_rx_rotation(rxdata,
+                                    gNB->common_vars.rxdataF[0],
+                                    fp,
+                                    n_rx,
+                                    slot,
+                                    slot_offsetF,
+                                    link_type_ul,
+                                    was_symbol_used);
 
       //----------- UE RX SRS procedures ---------------------
 
@@ -625,18 +583,17 @@ int main(int argc, char *argv[])
       NR_gNB_SRS_t *srs = &gNB->srs[0];
       uint8_t N_symb_SRS = 1 << srs->srs_pdu.num_symbols;
       uint8_t N_ap = 1 << srs->srs_pdu.num_ant_ports;
-      uint8_t nb_antennas_rx = fp->nb_antennas_rx;
       int16_t snr_per_rb[srs->srs_pdu.bwp_size];
       uint16_t timing_advance_offset;
-      int16_t timing_advance_offset_nsec[nb_antennas_rx];
+      int16_t timing_advance_offset_nsec[n_rx];
       int srs_est;
-      c16_t srs_estimated_channel_freq[nb_antennas_rx][N_ap][ofdm_symbol_size * N_symb_SRS] __attribute__((aligned(32)));
-      c16_t srs_estimated_channel_time[nb_antennas_rx][N_ap][ofdm_symbol_size] __attribute__((aligned(32)));
+      c16_t srs_estimated_channel_freq[n_rx][N_ap][ofdm_symbol_size * N_symb_SRS] __attribute__((aligned(32)));
+      c16_t srs_estimated_channel_time[n_rx][N_ap][ofdm_symbol_size] __attribute__((aligned(32)));
 
       nr_srs_rx_procedures(gNB,
                            frame,
                            slot,
-                           nb_antennas_rx,
+                           n_rx,
                            N_ap,
                            N_symb_SRS,
                            ofdm_symbol_size,
@@ -652,7 +609,7 @@ int main(int argc, char *argv[])
       sum_srs_snr += pow(10, (double)gNB->srs->snr / 10.0);
 
       int16_t delay_ns = delay * 1e9 / (fp->samples_per_frame * 100);
-      for (int ant_idx = 0; ant_idx < nb_antennas_rx; ant_idx++) {
+      for (int ant_idx = 0; ant_idx < n_rx; ant_idx++) {
         if (n_trials == 1)
           printf("[RX ant %d] SRS estimated: TA offset %d, TA offset ns %d \n",
                  ant_idx,

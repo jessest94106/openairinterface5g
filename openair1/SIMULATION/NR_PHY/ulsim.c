@@ -1460,26 +1460,20 @@ int main(int argc, char *argv[])
         UL_INFO.crc_ind.number_crcs = 0;
         UL_INFO.srs_ind.number_of_pdus = 0;
 
-        for(uint8_t symbol = 0; symbol < (gNB->frame_parms.Ncp == EXTENDED ? 12 : 14); symbol++) {
-          for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++)
-            nr_slot_fep_ul(&gNB->frame_parms,
-                           (int32_t *)rxdata[aa],
-                           (int32_t *)gNB->common_vars.rxdataF[0][aa],
-                           symbol,
-                           slot,
-                           0);
-        }
+        //----------- OFDM Demodulation and RX rotation--------------------------
+        bool was_symbol_used[14] = {0};
         int offset = (slot & 3) * gNB->frame_parms.symbols_per_slot * gNB->frame_parms.ofdm_symbol_size;
-        for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++)  {
-          const unsigned int max_symb = (gNB->frame_parms.Ncp == EXTENDED) ? 12 : 14;
-          for (int sym = 0; sym < max_symb; sym++)
-            apply_nr_rotation_symbol_RX(&gNB->frame_parms,
-                                        gNB->common_vars.rxdataF[0][aa] + offset + sym * gNB->frame_parms.ofdm_symbol_size,
-                                        gNB->frame_parms.symbol_rotation[1],
-                                        gNB->frame_parms.N_RB_UL,
-                                        slot,
-                                        sym);
+        for (int i = 0; i < 14; i++) {
+          was_symbol_used[i] = true;
         }
+        nr_ofdm_demod_and_rx_rotation(rxdata,
+                                      gNB->common_vars.rxdataF[0],
+                                      &gNB->frame_parms,
+                                      gNB->frame_parms.nb_antennas_rx,
+                                      slot,
+                                      offset,
+                                      link_type_ul,
+                                      was_symbol_used);
 
         ul_proc_error = phy_procedures_gNB_uespec_RX(gNB, frame, slot, &UL_INFO);
 
