@@ -529,6 +529,37 @@ void activate_srb(gNB_RRC_UE_t *UE, int srb_id)
   freeSRBlist(list);
 }
 
+static f1ap_ue_context_setup_req_t rrc_fill_f1_ue_context_setup(gNB_RRC_UE_t *ue,
+                                                                const nr_rrc_du_container_t *du,
+                                                                const uint32_t *gNB_DU_ue_id)
+{
+  f1ap_ue_context_setup_req_t req = {
+      .gNB_CU_ue_id = ue->rrc_ue_id,
+      .servCellIndex = 0,
+  };
+
+  req.gnb_du_ue_agg_mbr_ul = malloc_or_fail(sizeof(*req.gnb_du_ue_agg_mbr_ul));
+  *req.gnb_du_ue_agg_mbr_ul = 1000000000;
+  req.cu_to_du_rrc_info.meas_timing_config = get_meas_timing_config(du->mtc, ue->measConfig);
+  if (ue->ue_cap_buffer.len > 0) {
+    req.cu_to_du_rrc_info.ue_cap = malloc_or_fail(sizeof(byte_array_t));
+    *req.cu_to_du_rrc_info.ue_cap = copy_byte_array(ue->ue_cap_buffer);
+  }
+  if (gNB_DU_ue_id) {
+    req.gNB_DU_ue_id = malloc_or_fail(sizeof(*req.gNB_DU_ue_id));
+    *req.gNB_DU_ue_id = *gNB_DU_ue_id;
+  }
+
+  /* PLMN and cell ID from DU setup request */
+  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
+  req.plmn.mcc = cell_info->plmn.mcc;
+  req.plmn.mnc = cell_info->plmn.mnc;
+  req.plmn.mnc_digit_length = cell_info->plmn.mnc_digit_length;
+  req.nr_cellid = cell_info->nr_cellid;
+
+  return req;
+}
+
 //-----------------------------------------------------------------------------
 static void rrc_gNB_generate_RRCSetup(instance_t instance,
                                       rnti_t rnti,
@@ -2815,7 +2846,7 @@ void rrc_gNB_process_e1_bearer_context_setup_resp(e1ap_bearer_setup_resp_t *resp
   }
 
   if (!UE->f1_ue_context_active)
-    rrc_gNB_generate_UeContextSetupRequest(rrc, ue_context_p, resp);
+    rrc_f1_ue_context_setup_from_e1_response(rrc, ue_context_p, resp);
   else
     rrc_gNB_generate_UeContextModificationRequest(rrc, ue_context_p, resp, 0, NULL);
 }
@@ -3397,25 +3428,96 @@ int rrc_gNB_generate_pcch_msg(sctp_assoc_t assoc_id, const NR_SIB1_t *sib1, uint
 
 /* F1AP UE Context Management Procedures */
 
-//-----------------------------------------------------------------------------
-void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
-                                            rrc_gNB_ue_context_t *const ue_context_pP,
-                                            const e1ap_bearer_setup_resp_t *resp)
-//-----------------------------------------------------------------------------
+/** @brief Fill DRB to Be Setup List for F1 UE Context Setup Request
+ * Returns number of DRBs filled, 0 if none */
+static int rrc_fill_f1_drb_to_setup(const gNB_RRC_INST *rrc, const gNB_RRC_UE_t *ue, f1ap_drb_to_setup_t drbs[MAX_DRBS_PER_UE])
+{
+  int nb_drb = 0;
+
+  FOR_EACH_SEQ_ARR(drb_t *, rrc_drb, &ue->drbs) {
+    DevAssert(nb_drb < MAX_DRBS_PER_UE);
+    f1ap_drb_to_setup_t *drb = &drbs[nb_drb];
+    nr_pdcp_configuration_t *pdcp = &rrc_drb->pdcp_config;
+    nb_drb++;
+    /* fetch an existing PDU session for this DRB */
+    rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId((gNB_RRC_UE_t *)ue, rrc_drb->drb_id);
+    AssertFatal(pdu != NULL, "no PDU session for DRB ID %d\n", rrc_drb->drb_id);
+
+    drb->id = rrc_drb->drb_id;
+
+    drb->qos_choice = F1AP_QOS_CHOICE_NR;
+    drb->nr.nssai = pdu->param.nssai;
+    drb->nr.flows_len = 1;
+    drb->nr.flows = calloc_or_fail(1, sizeof(*drb->nr.flows));
+
+    /* QoS flow associated with this DRB: use first QoS flow */
+    AssertFatal(seq_arr_size(&pdu->param.qos) == 1, "only 1 Qos flow supported\n");
+    nr_rrc_qos_t *qos_param = (nr_rrc_qos_t *)seq_arr_at(&pdu->param.qos, 0);
+    DevAssert(qos_param->qos.qfi > 0);
+    drb->nr.flows[0].qfi = qos_param->qos.qfi;
+    drb->nr.flows[0].param = get_qos_char_from_qos_flow_param(&qos_param->qos);
+    /* the DRB QoS parameters: reuse the ones from the first flow */
+    drb->nr.drb_qos = drb->nr.flows[0].param;
+
+    memcpy(&drb->up_ul_tnl[0].tl_address, &rrc_drb->cuup_tunnel_config.addr.buffer, sizeof(uint8_t) * 4);
+    drb->up_ul_tnl[0].teid = rrc_drb->cuup_tunnel_config.teid;
+    drb->up_ul_tnl_len = 1;
+
+    drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
+    DevAssert(pdcp->drb.sn_size == 18 || pdcp->drb.sn_size == 12);
+    drb->dl_pdcp_sn_len = malloc_or_fail(sizeof(*drb->dl_pdcp_sn_len));
+    *drb->dl_pdcp_sn_len = pdcp->drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+    drb->ul_pdcp_sn_len = malloc_or_fail(sizeof(*drb->ul_pdcp_sn_len));
+    *drb->ul_pdcp_sn_len = pdcp->drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+  }
+  return nb_drb;
+}
+
+void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
+                                           gNB_RRC_UE_t *ue,
+                                           const nr_rrc_du_container_t *du,
+                                           const byte_array_t *ho_prep_info)
+{
+  DevAssert(du != NULL);
+  byte_array_t *hpi = NULL;
+  if (ho_prep_info) {
+    hpi = malloc_or_fail(sizeof(*hpi));
+    *hpi = copy_byte_array(*ho_prep_info);
+  }
+  int nb_srb = 2;
+  f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
+  f1ap_drb_to_setup_t *drbs = calloc_or_fail(MAX_DRBS_PER_UE, sizeof(*drbs));
+  int nb_drb = rrc_fill_f1_drb_to_setup(rrc, ue, drbs);
+  srbs[0].id = SRB1;
+  srbs[1].id = SRB2;
+  free_MeasConfig(ue->measConfig);
+  ue->measConfig = nr_rrc_get_measconfig(rrc, du->setup_req->cell[0].info.nr_cellid);
+  byte_array_t *meas_config = calloc_or_fail(1, sizeof(*meas_config));
+  meas_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
+  meas_config->len = do_NR_MeasConfig(ue->measConfig, meas_config->buf, NR_RRC_BUF_SIZE);
+  f1ap_ue_context_setup_req_t req = rrc_fill_f1_ue_context_setup(ue, du, NULL);
+  req.srbs_len = 2;
+  req.srbs = srbs;
+  req.drbs_len = nb_drb;
+  req.drbs = drbs;
+  req.cu_to_du_rrc_info.meas_config = meas_config;
+  req.cu_to_du_rrc_info.ho_prep_info = hpi;
+
+  RETURN_IF_INVALID_ASSOC_ID(du->assoc_id);
+  rrc->mac_rrc.ue_context_setup_request(du->assoc_id, &req);
+  free_ue_context_setup_req(&req);
+}
+
+void rrc_f1_ue_context_setup_from_e1_response(const gNB_RRC_INST *rrc,
+                                              rrc_gNB_ue_context_t *const ue_context_pP,
+                                              const e1ap_bearer_setup_resp_t *resp)
 {
   gNB_RRC_UE_t *ue_p = &ue_context_pP->ue_context;
   AssertFatal(!ue_p->f1_ue_context_active, "logic error: ue context already active\n");
 
   AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
 
-  f1ap_cu_to_du_rrc_info_t cu2du = {0};
-  if (ue_p->ue_cap_buffer.len > 0) {
-    cu2du.ue_cap = malloc_or_fail(sizeof(byte_array_t));
-    *cu2du.ue_cap = copy_byte_array(ue_p->ue_cap_buffer);
-  }
-
   nr_rrc_du_container_t *du = get_du_for_ue((gNB_RRC_INST *)rrc, ue_p->rrc_ue_id);
-  cu2du.meas_timing_config = get_meas_timing_config(du->mtc, ue_p->measConfig);
 
   int nb_srb = 1;
   f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
@@ -3426,29 +3528,14 @@ void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
   f1ap_drb_to_setup_t *drbs = calloc_or_fail(32, sizeof(*drbs)); // maximum DRB can be 32
   int n_drbs = fill_drb_to_be_setup_from_e1_resp(rrc, ue_p, resp->pduSession, resp->numPDUSessions, drbs);
 
-  /* gNB-DU UE Aggregate Maximum Bit Rate Uplink is C- ifDRBSetup */
-  uint64_t *agg_mbr = malloc_or_fail(sizeof(*agg_mbr));
-  *agg_mbr = 1000000000 /* bps */;
-
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
-  uint32_t *du_ue_id = malloc_or_fail(sizeof(*du_ue_id));
-  *du_ue_id = ue_data.secondary_ue;
-  f1ap_ue_context_setup_req_t ue_context_setup_req = {
-      .gNB_CU_ue_id = ue_p->rrc_ue_id,
-      .gNB_DU_ue_id = du_ue_id,
-      .plmn.mcc = rrc->configuration.plmn[0].mcc,
-      .plmn.mnc = rrc->configuration.plmn[0].mnc,
-      .plmn.mnc_digit_length = rrc->configuration.plmn[0].mnc_digit_length,
-      .nr_cellid = rrc->nr_cellid,
-      .servCellIndex = 0, /* TODO: correct value? */
-      .srbs_len = nb_srb,
-      .srbs = srbs,
-      .drbs_len = n_drbs,
-      .drbs = drbs,
-      .cu_to_du_rrc_info = cu2du,
-      .gnb_du_ue_agg_mbr_ul = agg_mbr,
-  };
+  const uint32_t du_ue_id = ue_data.secondary_ue;
+  f1ap_ue_context_setup_req_t ue_context_setup_req = rrc_fill_f1_ue_context_setup(ue_p, du, &du_ue_id);
+  ue_context_setup_req.srbs_len = nb_srb;
+  ue_context_setup_req.srbs = srbs;
+  ue_context_setup_req.drbs_len = n_drbs;
+  ue_context_setup_req.drbs = drbs;
 
   rrc->mac_rrc.ue_context_setup_request(ue_data.du_assoc_id, &ue_context_setup_req);
   free_ue_context_setup_req(&ue_context_setup_req);
