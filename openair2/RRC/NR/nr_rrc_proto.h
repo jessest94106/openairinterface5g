@@ -124,6 +124,11 @@ void activate_srb(gNB_RRC_UE_t *UE, int srb_id);
 void e1_notify_pdcp_status(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const ngap_drb_status_t *drb_status);
 void init_delayed_action(delayed_action_state_t *delayed_action);
 
+/** @brief Prepare and send F1AP UE Context Setup Request for a target DU
+ * @param rrc RRC instance
+ * @param ue UE context
+ * @param du Target DU container containing cell and setup information
+ * @param ho_prep_info Optional handover preparation information (NULL if not provided) */
 void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
                                            gNB_RRC_UE_t *ue,
                                            const nr_rrc_du_container_t *du,

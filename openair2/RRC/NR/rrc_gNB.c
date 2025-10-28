@@ -529,6 +529,13 @@ void activate_srb(gNB_RRC_UE_t *UE, int srb_id)
   freeSRBlist(list);
 }
 
+/** @brief Fill common fields of F1AP UE Context Setup Request
+ * This helper function initializes common fields that are shared between
+ * different UE context setup scenarios (serving DU, target DU).
+ * @param ue UE context
+ * @param du DU container for measurement timing configuration
+ * @param gNB_DU_ue_id Optional gNB-DU UE ID to include in the request (NULL if not provided)
+ * @return F1AP UE Context Setup Request */
 static f1ap_ue_context_setup_req_t rrc_fill_f1_ue_context_setup(gNB_RRC_UE_t *ue,
                                                                 const nr_rrc_du_container_t *du,
                                                                 const uint32_t *gNB_DU_ue_id)
@@ -538,13 +545,20 @@ static f1ap_ue_context_setup_req_t rrc_fill_f1_ue_context_setup(gNB_RRC_UE_t *ue
       .servCellIndex = 0,
   };
 
+  /* UE Aggregate Maximum Bit Rate Uplink is C-ifDRBSetup: 1 Gbps */
   req.gnb_du_ue_agg_mbr_ul = malloc_or_fail(sizeof(*req.gnb_du_ue_agg_mbr_ul));
-  *req.gnb_du_ue_agg_mbr_ul = 1000000000;
+  *req.gnb_du_ue_agg_mbr_ul = 1000000000; /* bps */
+
+  /* Measurement timing configuration */
   req.cu_to_du_rrc_info.meas_timing_config = get_meas_timing_config(du->mtc, ue->measConfig);
+
+  /* UE capabilities */
   if (ue->ue_cap_buffer.len > 0) {
     req.cu_to_du_rrc_info.ue_cap = malloc_or_fail(sizeof(byte_array_t));
     *req.cu_to_du_rrc_info.ue_cap = copy_byte_array(ue->ue_cap_buffer);
   }
+
+  /* gNB-DU UE ID */
   if (gNB_DU_ue_id) {
     req.gNB_DU_ue_id = malloc_or_fail(sizeof(*req.gNB_DU_ue_id));
     *req.gNB_DU_ue_id = *gNB_DU_ue_id;
@@ -3473,29 +3487,60 @@ static int rrc_fill_f1_drb_to_setup(const gNB_RRC_INST *rrc, const gNB_RRC_UE_t 
   return nb_drb;
 }
 
+/** @brief Prepare and send F1AP UE Context Setup Request for a target DU
+ * This function prepares and sends an F1AP UE Context Setup Request for
+ * a target DU in handover/mobility or reestablishment scenarios.
+ * It configures:
+ * - SRB1 and SRB2 for signaling
+ * - All existing DRBs from the UE context
+ * - Measurement configuration updated for the target DU's cell
+ * - PLMN and cell information from the target DU
+ * - UE aggregate maximum bit rate
+ * - Handover preparation information (if provided)
+ * @param rrc RRC instance
+ * @param ue UE context
+ * @param du Target DU container containing cell and setup information
+ * @param ho_prep_info Optional handover preparation information */
 void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
                                            gNB_RRC_UE_t *ue,
                                            const nr_rrc_du_container_t *du,
                                            const byte_array_t *ho_prep_info)
 {
   DevAssert(du != NULL);
+  /* Handle two scenarios:
+   * 1. Handover (ho_prep_info provided): Prepare and copy handover preparation information
+   *    for the target DU. The target DU will assign a new gNB-DU UE ID in the response.
+   * 2. Reestablishment on different DU (ho_prep_info NULL): The UE is accessing a different
+   *    DU than the original one. Use secondary_ue (the new DU's RNTI) as gNB-DU UE ID because
+   *    the UE context already exists in MAC layer from when RRCReestablishmentRequest was
+   *    received on the new DU. The MAC layer will find the existing UE context using this RNTI. */
   byte_array_t *hpi = NULL;
   if (ho_prep_info) {
+    /* Handover scenario: copy handover preparation information */
     hpi = malloc_or_fail(sizeof(*hpi));
     *hpi = copy_byte_array(*ho_prep_info);
   }
+  LOG_I(NR_RRC, "Triggering UE Context Setup for UE %d on DU %d\n", ue->rrc_ue_id, du->assoc_id);
   int nb_srb = 2;
   f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
   f1ap_drb_to_setup_t *drbs = calloc_or_fail(MAX_DRBS_PER_UE, sizeof(*drbs));
+
+  /* Fill DRBs */
   int nb_drb = rrc_fill_f1_drb_to_setup(rrc, ue, drbs);
+
+  /* Prepare SRBs */
   srbs[0].id = SRB1;
   srbs[1].id = SRB2;
+
+  /* Update measurement config for target DU */
   free_MeasConfig(ue->measConfig);
   ue->measConfig = nr_rrc_get_measconfig(rrc, du->setup_req->cell[0].info.nr_cellid);
   byte_array_t *meas_config = calloc_or_fail(1, sizeof(*meas_config));
   meas_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
   meas_config->len = do_NR_MeasConfig(ue->measConfig, meas_config->buf, NR_RRC_BUF_SIZE);
+  /* Fill common fields */
   f1ap_ue_context_setup_req_t req = rrc_fill_f1_ue_context_setup(ue, du, NULL);
+  /* Fill target DU specific fields */
   req.srbs_len = 2;
   req.srbs = srbs;
   req.drbs_len = nb_drb;
@@ -3508,6 +3553,18 @@ void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
   free_ue_context_setup_req(&req);
 }
 
+/** @brief Prepare and send F1AP UE Context Setup Request to serving DU after E1AP bearer setup
+ * This function is called when the CU-CP receives an E1AP Bearer Context Setup Response
+ * and the UE context is not yet active on the F1 interface. It prepares a complete F1AP
+ * UE Context Setup Request containing:
+ * - SRB configuration (SRB2)
+ * - DRB configuration derived from the E1AP bearer setup response
+ * - UE capabilities and measurement timing configuration
+ * - PLMN and cell information from the serving DU
+ * The request is sent to the serving DU.
+ * @param rrc RRC instance
+ * @param ue_context_pP UE context
+ * @param resp E1AP bearer setup response containing PDU session and DRB information */
 void rrc_f1_ue_context_setup_from_e1_response(const gNB_RRC_INST *rrc,
                                               rrc_gNB_ue_context_t *const ue_context_pP,
                                               const e1ap_bearer_setup_resp_t *resp)
@@ -3528,10 +3585,14 @@ void rrc_f1_ue_context_setup_from_e1_response(const gNB_RRC_INST *rrc,
   f1ap_drb_to_setup_t *drbs = calloc_or_fail(32, sizeof(*drbs)); // maximum DRB can be 32
   int n_drbs = fill_drb_to_be_setup_from_e1_resp(rrc, ue_p, resp->pduSession, resp->numPDUSessions, drbs);
 
+  /* Get gNB DU UE ID */
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   const uint32_t du_ue_id = ue_data.secondary_ue;
+
+  /* Fill common fields */
   f1ap_ue_context_setup_req_t ue_context_setup_req = rrc_fill_f1_ue_context_setup(ue_p, du, &du_ue_id);
+  /* Fill bearers information for serving DU */
   ue_context_setup_req.srbs_len = nb_srb;
   ue_context_setup_req.srbs = srbs;
   ue_context_setup_req.drbs_len = n_drbs;
