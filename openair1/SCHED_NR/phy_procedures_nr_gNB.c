@@ -918,7 +918,26 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
                                   &signal_power,
                                   &noise_power,
                                   noise_power_per_rb);
+
         signal_power_avg += signal_power;
+
+        T(T_GNB_PHY_UL_FREQ_CHANNEL_ESTIMATE,
+          T_INT(gNB->Mod_id),
+          T_INT(srs_pdu->rnti),
+          T_INT(frame_rx),
+          T_INT(slot_rx),
+          T_INT(ant_rx_ind),
+          T_INT(p_ind),
+          T_BUFFER(srs_estimated_channel_freq[ant_rx_ind][p_ind], ofdm_symbol_size * sizeof(c16_t)));
+
+        T(T_GNB_PHY_UL_TIME_CHANNEL_ESTIMATE,
+          T_INT(gNB->Mod_id),
+          T_INT(srs_pdu->rnti),
+          T_INT(frame_rx),
+          T_INT(slot_rx),
+          T_INT(ant_rx_ind),
+          T_INT(p_ind),
+          T_BUFFER(srs_estimated_channel_time_shifted[ant_rx_ind][p_ind], ofdm_symbol_size * sizeof(c16_t)));
       }
       noise_power_avg += noise_power;
     }
@@ -944,31 +963,22 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
                                        &timing_advance_offset_nsec[ant_rx_ind]);
     }
     stop_meas(&gNB->srs_timing_advance_stats);
+
+    T(T_GNB_PHY_UL_SNR_ESTIMATE,
+      T_INT(0),
+      T_INT(srs_pdu->rnti),
+      T_INT(frame_rx),
+      T_INT(0),
+      T_INT(0),
+      T_BUFFER(snr_per_rb, srs_pdu->bwp_size * sizeof(int16_t)));
+
+    T(T_GNB_PHY_UL_SRS_TOA_NS,
+      T_INT(gNB->Mod_id),
+      T_INT(srs_pdu->rnti),
+      T_INT(frame_rx),
+      T_INT(slot_rx),
+      T_BUFFER(timing_advance_offset_nsec, nb_antennas_rx * sizeof(int16_t)));
   }
-
-  T(T_GNB_PHY_UL_FREQ_CHANNEL_ESTIMATE,
-    T_INT(0),
-    T_INT(srs_pdu->rnti),
-    T_INT(frame_rx),
-    T_INT(0),
-    T_INT(0),
-    T_BUFFER(srs_estimated_channel_freq[0][0], ofdm_symbol_size * sizeof(int32_t)));
-
-  T(T_GNB_PHY_UL_TIME_CHANNEL_ESTIMATE,
-    T_INT(0),
-    T_INT(srs_pdu->rnti),
-    T_INT(frame_rx),
-    T_INT(0),
-    T_INT(0),
-    T_BUFFER(srs_estimated_channel_time_shifted[0][0], NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size * sizeof(int32_t)));
-
-  T(T_GNB_PHY_UL_SNR_ESTIMATE,
-    T_INT(0),
-    T_INT(srs_pdu->rnti),
-    T_INT(frame_rx),
-    T_INT(0),
-    T_INT(0),
-    T_BUFFER(snr_per_rb, srs_pdu->bwp_size * sizeof(int16_t)));
 }
 
 int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, NR_UL_IND_t *UL_INFO)
