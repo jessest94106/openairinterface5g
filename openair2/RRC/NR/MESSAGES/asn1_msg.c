@@ -630,6 +630,49 @@ static byte_array_t do_HO_RRCReconfiguration(nr_rrc_reconfig_param_t *params)
   return msg;
 }
 
+static void dump_cgc(const uint8_t *buf, size_t len)
+{
+  // Decode the encoded CellGroupConfig for debugging
+  NR_CellGroupConfig_t *temp_cellGroupConfig = NULL;
+  asn_dec_rval_t dec_rval = uper_decode_complete(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&temp_cellGroupConfig, buf, len);
+  if (dec_rval.code == RC_OK && dec_rval.consumed > 0) {
+    xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, temp_cellGroupConfig);
+    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, temp_cellGroupConfig);
+  } else {
+    LOG_W(NR_RRC, "Failed to decode CellGroupConfig (code=%d consumed=%zu)\n", dec_rval.code, dec_rval.consumed);
+  }
+}
+
+static void dump_mcg(const NR_DL_DCCH_Message_t *dl_dcch_msg)
+{
+  if (!dl_dcch_msg) {
+    LOG_W(NR_RRC, "DL_DCCH_Message is NULL\n");
+    return;
+  }
+
+  const NR_RRCReconfiguration_IEs_t *reconf_ies = NULL;
+  const struct NR_DL_DCCH_MessageType__c1 *c1 = NULL;
+
+  if (dl_dcch_msg->message.present == NR_DL_DCCH_MessageType_PR_c1
+      && (c1 = dl_dcch_msg->message.choice.c1)
+      && c1->present == NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration
+      && c1->choice.rrcReconfiguration
+      && c1->choice.rrcReconfiguration->criticalExtensions.present
+             == NR_RRCReconfiguration__criticalExtensions_PR_rrcReconfiguration
+      && c1->choice.rrcReconfiguration->criticalExtensions.choice.rrcReconfiguration) {
+    reconf_ies = c1->choice.rrcReconfiguration->criticalExtensions.choice.rrcReconfiguration;
+  }
+
+  if (reconf_ies && reconf_ies->nonCriticalExtension && reconf_ies->nonCriticalExtension->masterCellGroup) {
+    const OCTET_STRING_t *mcg = reconf_ies->nonCriticalExtension->masterCellGroup;
+
+    /* decode and XER print CellGroupConfig */
+    dump_cgc(mcg->buf, mcg->size);
+  } else {
+    LOG_W(NR_RRC, "No masterCellGroup found in RRCReconfiguration nonCriticalExtension\n");
+  }
+}
+
 byte_array_t do_RRCReconfiguration(const nr_rrc_reconfig_param_t *params)
 {
   byte_array_t msg = {.buf = NULL, .len = 0};
@@ -651,6 +694,7 @@ byte_array_t do_RRCReconfiguration(const nr_rrc_reconfig_param_t *params)
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NR_DL_DCCH_Message, (void *)&dl_dcch_msg);
+    dump_mcg(&dl_dcch_msg);
   }
 
   int val = uper_encode_to_new_buffer(&asn_DEF_NR_DL_DCCH_Message, NULL, &dl_dcch_msg, (void **)&msg.buf);
