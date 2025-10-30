@@ -1267,14 +1267,14 @@ static void rfsimulator_read_internal(rfsimulator_state_t *t,
       } else {
         if (is_first_beam && is_first_peer && (ptr->nbAnt == 1 || nbAnt == 1)) {
           // optimization: The buffer is uninitialized so samples can be written directly in the buffer
-          combine_received_beams(t, ptr->received_packets, timestamp, 1, nsamps, rx_beam_id, samples);
+          combine_received_beams(t, ptr->received_packets, timestamp - t->chan_offset, 1, nsamps, rx_beam_id, samples);
         } else {
           std::vector<std::vector<c16_t>> ant_buffers(ptr->nbAnt, std::vector<c16_t>(nsamps, {0, 0}));
           c16_t *input[ant_buffers.size()];
           for (uint aatx = 0; aatx < ant_buffers.size(); aatx++) {
             input[aatx] = ant_buffers[aatx].data();
           }
-          combine_received_beams(t, ptr->received_packets, timestamp, ptr->nbAnt, nsamps, rx_beam_id, input);
+          combine_received_beams(t, ptr->received_packets, timestamp - t->chan_offset, ptr->nbAnt, nsamps, rx_beam_id, input);
           for (int aarx = 0; aarx < nbAnt; aarx++) {
             double H_awgn_mimo_coeff[ant_buffers.size()];
             for (int aatx = 0; aatx < (int)ant_buffers.size(); aatx++) {
@@ -1455,7 +1455,10 @@ static int rfsimulator_read_beams(openair0_device *device,
     if (ptr->conn_sock != -1 && !ptr->received_packets.empty()) {
       openair0_timestamp timestamp_to_free = t->nextRxTstamp - 1;
       if (ptr->channel_model) {
-        timestamp_to_free -= (ptr->channel_model->channel_length - 1) + ptr->channel_model->channel_offset;
+        timestamp_to_free -=
+            (ptr->channel_model->channel_length - 1) + std::max(ptr->channel_model->channel_offset, t->chan_offset);
+      } else {
+        timestamp_to_free -= t->chan_offset;
       }
       clear_old_packets(ptr->received_packets, timestamp_to_free);
     }
