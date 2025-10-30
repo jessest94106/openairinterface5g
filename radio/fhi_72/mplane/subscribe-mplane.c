@@ -47,6 +47,8 @@ static void notif_clb_v1(struct nc_session *session, const struct nc_notif *noti
   MP_LOG_I("\nReceived notification at (%s)\n%s\n", notif->datetime, subs_reply);
 
   recv_notif_v1(notif, answer);
+
+  free(subs_reply);
 }
 #elif MPLANE_V2
 static void log_v2_pm_info(const char *ru_ip_add, struct lyd_node_inner *stats)
@@ -124,11 +126,14 @@ static void notif_clb_v2(struct nc_session *session, const struct lyd_node *envp
   struct lyd_node_inner *op_inner = (struct lyd_node_inner *)op;
   if (strcmp(op_inner->schema->name, "measurement-result-stats") == 0) {
     log_v2_pm_info(ru_ip_add, op_inner);
+    free(subs_reply);
     return;
   }
   MP_LOG_I("Received notification from RU \"%s\" at (%s)\n%s\n", ru_ip_add, ((struct lyd_node_opaq *)lyd_child(envp))->value, subs_reply);
 
   recv_notif_v2(op_inner, answer);
+
+  free(subs_reply);
 }
 #endif
 

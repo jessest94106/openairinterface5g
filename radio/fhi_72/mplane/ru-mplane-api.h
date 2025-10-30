@@ -188,6 +188,8 @@ typedef struct {
 
 } ru_session_list_t;
 
+void free_ru_session_list(ru_session_list_t *src);
+
 bool get_config_for_xran(const char *buffer, const int max_num_ant, xran_mplane_t *xran_mplane);
 
 bool get_uplane_info(const char *buffer, ru_mplane_config_t *ru_mplane_config);

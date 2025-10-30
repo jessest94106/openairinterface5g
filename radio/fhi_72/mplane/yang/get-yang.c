@@ -42,20 +42,30 @@ static bool store_schemas(xmlNode *node, ru_session_t *ru_session, struct ly_ctx
     if (strcmp((const char *)cur_node->name, "schema") == 0) {
 
       xmlNode *name_node = xmlFirstElementChild(cur_node);
-      char *module_name = (char *)xmlNodeGetContent(name_node);
+      xmlChar *module_name = xmlNodeGetContent(name_node);
       xmlNode *revision_node = xmlNextElementSibling(name_node);
-      char *module_revision = (char *)xmlNodeGetContent(revision_node);
+      xmlChar *module_revision = xmlNodeGetContent(revision_node);
       xmlNode *format_node = xmlNextElementSibling(revision_node);
-      char *module_format = (char *)xmlNodeGetContent(format_node);
+      xmlChar *module_format = xmlNodeGetContent(format_node);
 
-      if (strcmp(module_format, "yang") != 0)
+      if (strcmp((char*)module_format, "yang") != 0) {
+	xmlFree(module_name);
+	xmlFree(module_revision);
+	xmlFree(module_format);
         continue;
+      }
 
       MP_LOG_I("RPC request to RU \"%s\" = <get-schema> for module \"%s\".\n", ru_session->ru_ip_add, module_name);
-      struct nc_rpc *get_schema_rpc = nc_rpc_getschema(module_name, module_revision, "yang", param);
+      struct nc_rpc *get_schema_rpc = nc_rpc_getschema((char*)module_name, (char*)module_revision, "yang", param);
       char *schema_data = NULL;
       bool success = rpc_send_recv((struct nc_session *)ru_session->session, get_schema_rpc, wd, timeout, &schema_data);
-      AssertError(success, return false, "[MPLANE] Unable to get schema for module \"%s\" from RU \"%s\".\n", module_name, ru_session->ru_ip_add);
+      if (!success) {
+        MP_LOG_W("[MPLANE] Unable to get schema for module \"%s\" from RU \"%s\".\n", module_name, ru_session->ru_ip_add);
+        xmlFree(module_name);
+        xmlFree(module_revision);
+        xmlFree(module_format);
+	return false;
+      }
 
       if (schema_data) {
 #ifdef MPLANE_V1
@@ -73,10 +83,16 @@ static bool store_schemas(xmlNode *node, ru_session_t *ru_session, struct ly_ctx
 #elif defined MPLANE_V2
           ly_ctx_destroy(*ctx);
 #endif
-	        return false;
-	      }
+	  xmlFree(module_name);
+          xmlFree(module_revision);
+          xmlFree(module_format);
+	  return false;
+        }
       }
       nc_rpc_free(get_schema_rpc);
+      xmlFree(module_name);
+      xmlFree(module_revision);
+      xmlFree(module_format);
     }
   }
 
@@ -109,6 +125,7 @@ bool load_yang_models(ru_session_t *ru_session, const char *buffer)
   xmlNode *root_element = xmlDocGetRootElement(doc);
 
   bool success = load_from_operational_ds(root_element->children, ru_session, ctx);
+  xmlFreeDoc(doc);
   if (success) {
     MP_LOG_I("Successfully loaded all yang modules from operational datastore for RU \"%s\".\n", ru_session->ru_ip_add);
     return true;
