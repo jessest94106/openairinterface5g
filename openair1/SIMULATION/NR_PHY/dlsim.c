@@ -182,13 +182,13 @@ extern void fix_scd(NR_ServingCellConfig_t *scd);// forward declaration
 /* specific dlsim DL preprocessor: uses rbStart/rbSize/mcs/nrOfLayers from command line of dlsim */
 int g_mcsIndex = -1, g_mcsTableIdx = 0, g_rbStart = -1, g_rbSize = -1, g_nrOfLayers = 1, g_pmi = 0;
 
-void nr_dlsim_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
+void nr_dlsim_preprocessor(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pp_pdsch)
 {
-  NR_UE_info_t *UE_info = RC.nrmac[module_id]->UE_info.connected_ue_list[0];
-  AssertFatal(RC.nrmac[module_id]->UE_info.connected_ue_list[1] == NULL, "Only single UE allowed in dlsim\n");
+  NR_UE_info_t *UE_info = nr_mac->UE_info.connected_ue_list[0];
+  AssertFatal(nr_mac->UE_info.connected_ue_list[1] == NULL, "Only single UE allowed in dlsim\n");
   NR_UE_sched_ctrl_t *sched_ctrl = &UE_info->UE_sched_ctrl;
   NR_UE_DL_BWP_t *current_BWP = &UE_info->current_DL_BWP;
-  NR_ServingCellConfigCommon_t *scc = RC.nrmac[0]->common_channels[0].ServingCellConfigCommon;
+  NR_ServingCellConfigCommon_t *scc = nr_mac->common_channels[0].ServingCellConfigCommon;
 
   uint8_t nr_of_candidates = 0;
   if (g_mcsIndex < 4) {
@@ -201,8 +201,8 @@ void nr_dlsim_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
                                 &nr_of_candidates,
                                 sched_ctrl->search_space,4);
   }
-  uint32_t Y = get_Y(sched_ctrl->search_space, slot, UE_info->rnti);
-  int CCEIndex = find_pdcch_candidate(RC.nrmac[module_id],
+  uint32_t Y = get_Y(sched_ctrl->search_space, pp_pdsch->slot, UE_info->rnti);
+  int CCEIndex = find_pdcch_candidate(nr_mac,
                                       /* CC_id = */ 0,
                                       sched_ctrl->aggregation_level,
                                       nr_of_candidates,
@@ -210,49 +210,55 @@ void nr_dlsim_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
                                       &sched_ctrl->sched_pdcch,
                                       sched_ctrl->coreset,
                                       Y);
-  AssertFatal(CCEIndex>=0, "%4d.%2d could not find CCE for DL DCI UE %d/RNTI %04x\n", frame, slot, 0, UE_info->rnti);
+  AssertFatal(CCEIndex >= 0,
+              "%4d.%2d could not find CCE for DL DCI UE %d/RNTI %04x\n",
+              pp_pdsch->frame,
+              pp_pdsch->slot,
+              0,
+              UE_info->rnti);
   sched_ctrl->cce_index = CCEIndex;
 
-  NR_sched_pdsch_t *sched_pdsch = &sched_ctrl->sched_pdsch;
-  sched_pdsch->rbStart = g_rbStart;
-  sched_pdsch->rbSize = g_rbSize;
-  sched_pdsch->bwp_info = get_pdsch_bwp_start_size(RC.nrmac[module_id], UE_info);
-  sched_pdsch->mcs = g_mcsIndex;
-  sched_pdsch->nrOfLayers = g_nrOfLayers;
-  sched_pdsch->pm_index = g_pmi;
+  NR_sched_pdsch_t sched_pdsch = {
+      .rbStart = g_rbStart,
+      .rbSize = g_rbSize,
+      .bwp_info = get_pdsch_bwp_start_size(nr_mac, UE_info),
+      .mcs = g_mcsIndex,
+      .nrOfLayers = g_nrOfLayers,
+      .pm_index = g_pmi,
+  };
   /* the following might override the table that is mandated by RRC
    * configuration */
   current_BWP->mcsTableIdx = g_mcsTableIdx;
-  sched_pdsch->time_domain_allocation = get_dl_tda(RC.nrmac[module_id], slot);
-  AssertFatal(sched_pdsch->time_domain_allocation >= 0,"Unable to find PDSCH time domain allocation in list\n");
+  sched_pdsch.time_domain_allocation = get_dl_tda(nr_mac, pp_pdsch->slot);
+  AssertFatal(sched_pdsch.time_domain_allocation >= 0,"Unable to find PDSCH time domain allocation in list\n");
 
-  sched_pdsch->tda_info = get_dl_tda_info(current_BWP,
+  sched_pdsch.tda_info = get_dl_tda_info(current_BWP,
                                           sched_ctrl->search_space->searchSpaceType->present,
-                                          sched_pdsch->time_domain_allocation,
+                                          sched_pdsch.time_domain_allocation,
                                           NR_MIB__dmrs_TypeA_Position_pos2,
                                           1,
                                           TYPE_C_RNTI_,
                                           sched_ctrl->coreset->controlResourceSetId,
                                           false);
 
-  sched_pdsch->dmrs_parms = get_dl_dmrs_params(scc,
+  sched_pdsch.dmrs_parms = get_dl_dmrs_params(scc,
                                                current_BWP,
-                                               &sched_pdsch->tda_info,
-                                               sched_pdsch->nrOfLayers);
+                                               &sched_pdsch.tda_info,
+                                               sched_pdsch.nrOfLayers);
 
-  sched_pdsch->Qm = nr_get_Qm_dl(sched_pdsch->mcs, current_BWP->mcsTableIdx);
-  sched_pdsch->R = nr_get_code_rate_dl(sched_pdsch->mcs, current_BWP->mcsTableIdx);
-  sched_pdsch->tb_size = nr_compute_tbs(sched_pdsch->Qm,
-                                        sched_pdsch->R,
-                                        sched_pdsch->rbSize,
-                                        sched_pdsch->tda_info.nrOfSymbols,
-                                        sched_pdsch->dmrs_parms.N_PRB_DMRS * sched_pdsch->dmrs_parms.N_DMRS_SLOT,
+  sched_pdsch.Qm = nr_get_Qm_dl(sched_pdsch.mcs, current_BWP->mcsTableIdx);
+  sched_pdsch.R = nr_get_code_rate_dl(sched_pdsch.mcs, current_BWP->mcsTableIdx);
+  sched_pdsch.tb_size = nr_compute_tbs(sched_pdsch.Qm,
+                                        sched_pdsch.R,
+                                        sched_pdsch.rbSize,
+                                        sched_pdsch.tda_info.nrOfSymbols,
+                                        sched_pdsch.dmrs_parms.N_PRB_DMRS * sched_pdsch.dmrs_parms.N_DMRS_SLOT,
                                         0 /* N_PRB_oh, 0 for initialBWP */,
                                         0 /* tb_scaling */,
-                                        sched_pdsch->nrOfLayers) >> 3;
+                                        sched_pdsch.nrOfLayers) >> 3;
 
   /* the simulator assumes the HARQ PID is equal to the slot number */
-  sched_pdsch->dl_harq_pid = slot;
+  sched_pdsch.dl_harq_pid = pp_pdsch->slot;
 
   /* The scheduler uses lists to track whether a HARQ process is
    * free/busy/awaiting retransmission, and updates the HARQ process states.
@@ -261,15 +267,17 @@ void nr_dlsim_preprocessor(module_id_t module_id, frame_t frame, slot_t slot)
    * Therefore, below lines just "repair" everything so that the scheduler
    * won't remark that there is no HARQ feedback */
   sched_ctrl->feedback_dl_harq.head = -1; // always overwrite feedback HARQ process
-  if (sched_ctrl->harq_processes[slot].round == 0) // depending on round set in simulation ...
-    add_front_nr_list(&sched_ctrl->available_dl_harq, slot); // ... make PID available
+  if (sched_ctrl->harq_processes[pp_pdsch->slot].round == 0) // depending on round set in simulation ...
+    add_front_nr_list(&sched_ctrl->available_dl_harq, pp_pdsch->slot); // ... make PID available
   else
-    add_front_nr_list(&sched_ctrl->retrans_dl_harq, slot);   // ... make PID retransmission
-  sched_ctrl->harq_processes[slot].is_waiting = false;
-  AssertFatal(sched_pdsch->rbStart >= 0, "invalid rbStart %d\n", sched_pdsch->rbStart);
-  AssertFatal(sched_pdsch->rbSize > 0, "invalid rbSize %d\n", sched_pdsch->rbSize);
-  AssertFatal(sched_pdsch->mcs >= 0, "invalid mcs %d\n", sched_pdsch->mcs);
+    add_front_nr_list(&sched_ctrl->retrans_dl_harq, pp_pdsch->slot);   // ... make PID retransmission
+  sched_ctrl->harq_processes[pp_pdsch->slot].is_waiting = false;
+  AssertFatal(sched_pdsch.rbStart >= 0, "invalid rbStart %d\n", sched_pdsch.rbStart);
+  AssertFatal(sched_pdsch.rbSize > 0, "invalid rbSize %d\n", sched_pdsch.rbSize);
+  AssertFatal(sched_pdsch.mcs >= 0, "invalid mcs %d\n", sched_pdsch.mcs);
   AssertFatal(current_BWP->mcsTableIdx >= 0 && current_BWP->mcsTableIdx <= 2, "invalid mcsTableIdx %d\n", current_BWP->mcsTableIdx);
+
+  post_process_dlsch(nr_mac, pp_pdsch, UE_info, &sched_pdsch);
 }
 
 nrUE_params_t nrUE_params;
