@@ -285,7 +285,7 @@ int get_coreset_num_cces(uint8_t *FreqDomainResource, int duration);
 int get_nr_table_idx(int nr_bandP, uint8_t scs_index);
 int32_t get_delta_duplex(int nr_bandP, uint8_t scs_index);
 frame_type_t get_frame_type(uint16_t nr_bandP, uint8_t scs_index);
-uint16_t get_band(uint64_t downlink_frequency, int32_t delta_duplex);
+uint16_t get_band(uint64_t downlink_frequency, int32_t delta_duplex, int64_t dlbw, int64_t ulbw);
 int NRRIV2BW(int locationAndBandwidth,int N_RB);
 int NRRIV2PRBOFFSET(int locationAndBandwidth,int N_RB);
 int PRBalloc_to_locationandbandwidth0(int NPRB,int RBstart,int BWPsize);

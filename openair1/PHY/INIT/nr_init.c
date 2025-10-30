@@ -375,7 +375,7 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   fp->ul_CarrierFreq = ((ul_bw_khz>>1) + gNB_config->carrier_config.uplink_frequency.value)*1000 ;
 
   int32_t dlul_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
-  fp->nr_band = get_band(fp->dl_CarrierFreq, dlul_offset);
+  fp->nr_band = get_band(fp->dl_CarrierFreq, dlul_offset, dl_bw_khz, ul_bw_khz);
 
   LOG_I(PHY, "DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %d Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, dlul_offset);
 
