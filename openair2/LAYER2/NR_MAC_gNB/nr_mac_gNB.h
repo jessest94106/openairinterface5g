@@ -639,8 +639,6 @@ typedef struct {
   /// PHR info: nominal UE transmit power levels (dBm)
   int pcmax;
 
-  /// Sched PDSCH: scheduling decisions, copied into HARQ and cleared every TTI
-  NR_sched_pdsch_t sched_pdsch;
   /// UE-estimated maximum MCS (from CSI-RS)
   uint8_t dl_max_mcs;
 
@@ -803,7 +801,6 @@ typedef struct {
 typedef struct {
   /// scheduling control info
   // last element always NULL
-  pthread_mutex_t mutex;
   NR_UE_info_t *connected_ue_list[MAX_MOBILES_PER_GNB + 1];
   NR_UE_info_t *access_ue_list[NR_NB_RA_PROC_MAX + 1];
   // bitmap of CSI-RS already scheduled in current slot
@@ -826,7 +823,18 @@ typedef struct {
   nr_beam_mode_t beam_mode;
 } NR_beam_info_t;
 
-#define UE_iterator(BaSe, VaR) NR_UE_info_t ** VaR##pptr=BaSe, *VaR; while ((VaR=*(VaR##pptr++)))
+#define UE_iterator(BaSe, VaR) for (NR_UE_info_t **VaR##pptr=BaSe, *VaR=*VaR##pptr; VaR; VaR=*(++VaR##pptr))
+
+typedef struct {
+  /// current frame
+  frame_t frame;
+  /// current slot
+  slot_t slot;
+  /// FAPI DL req in which allocations are made
+  nfapi_nr_dl_tti_request_body_t *dl_req;
+  /// TX_data request holds the actual data
+  nfapi_nr_tx_data_request_t *TX_req;
+} post_process_pdsch_t;
 
 typedef struct {
   /// current frame for DCI
@@ -843,7 +851,7 @@ typedef struct {
 struct gNB_MAC_INST_s;
 typedef struct gNB_MAC_INST_s gNB_MAC_INST;
 
-typedef void (*nr_pp_impl_dl)(module_id_t mod_id, frame_t frame, slot_t slot);
+typedef void (*nr_pp_impl_dl)(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pp_pdsch);
 typedef void (*nr_pp_impl_ul)(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_pusch);
 
 typedef struct f1_config_t {
@@ -980,6 +988,11 @@ typedef struct gNB_MAC_INST_s {
   nr_mac_rrc_ul_if_t mac_rrc;
   f1_config_t f1_config;
   int16_t frame;
+
+  /// number of UEs to exceed to disable stats
+  int stats_max_ue;
+  /// if stats are currently enabled
+  bool print_ue_stats;
 
   pthread_mutex_t sched_lock;
 

@@ -210,8 +210,8 @@ static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
 {
   /* The offset of the SDAP header, it might be 0 if has_sdap_rx is not true in the pdcp entity. */
   int offset=0;
-  int qfi = buf[0] & 0x3F; // QFI is always the first 6 bits in the first octet
-  if (qfi <= 0 || qfi >= SDAP_MAX_QFI) {
+  uint8_t qfi = buf[0] & 0x3F; // QFI is always the first 6 bits in the first octet
+  if (qfi >= SDAP_MAX_QFI) {
     LOG_E(SDAP, "Invalid QFI %d received in SDAP header\n", qfi);
     return;
   }
@@ -450,7 +450,7 @@ static void nr_sdap_add_qos_flows_to_drb(nr_sdap_entity_t *entity, const sdap_co
   for (int i = 0; i < sdap->mappedQFIs2AddCount; i++) {
     uint8_t qfi = sdap->mappedQFIs2Add[i];
     LOG_D(SDAP, "Adding QFI to DRB mapping rules: %d mapped QFIs for DRB %d\n", sdap->mappedQFIs2AddCount, sdap->drb_id);
-    if (qfi < SDAP_MAX_QFI && qfi > SDAP_MAP_RULE_EMPTY && sdap->drb_id > 0 && sdap->drb_id <= MAX_DRBS_PER_UE) {
+    if (qfi < SDAP_MAX_QFI && sdap->drb_id > SDAP_MAP_RULE_EMPTY && sdap->drb_id <= MAX_DRBS_PER_UE) {
       entity->qfi2drb_map_add(entity, qfi, sdap->drb_id, sdap->role);
     } else {
       LOG_E(SDAP, "Failed to add qfi2drb mapping: QFI=%d, DRB=%d\n", qfi, sdap->drb_id);
@@ -487,13 +487,13 @@ static void nr_sdap_qfi2drb_map_update(nr_sdap_entity_t *entity, const sdap_conf
  * @param   is_gnb, indicates whether it is for gNB or UE
  * @param   ue_id, UE ID
  * @param   sdap, SDAP configuration */
-static void nr_sdap_add_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t sdap)
+static void nr_sdap_add_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t *sdap)
 {
   nr_sdap_entity_t *sdap_entity = calloc_or_fail(1, sizeof(*sdap_entity));
 
   // SDAP entity ids
   sdap_entity->ue_id = ue_id;
-  sdap_entity->pdusession_id = sdap.pdusession_id;
+  sdap_entity->pdusession_id = sdap->pdusession_id;
   sdap_entity->is_gnb = is_gnb;
 
   // rx/tx entities
@@ -513,13 +513,13 @@ static void nr_sdap_add_entity(const int is_gnb, const ue_id_t ue_id, const sdap
   sdap_entity->pdusession_sock = -1;
 
   // set default DRB
-  if (sdap.defaultDRB) {
-    sdap_entity->default_drb = sdap.drb_id;
+  if (sdap->defaultDRB) {
+    sdap_entity->default_drb = sdap->drb_id;
     LOG_I(SDAP, "Default DRB for the created SDAP entity: DRB %d \n", sdap_entity->default_drb);
   }
 
   // Add QoS flows to the DRB (initial configuration)
-  nr_sdap_add_qos_flows_to_drb(sdap_entity, &sdap);
+  nr_sdap_add_qos_flows_to_drb(sdap_entity, sdap);
 
   // update SDAP entity list pointers
   sdap_entity->next_entity = sdap_info.sdap_entity_llist;
@@ -533,11 +533,11 @@ static void nr_sdap_add_entity(const int is_gnb, const ue_id_t ue_id, const sdap
 }
 
 /** @brief Add or modify an SDAP entity if it already exists */
-void nr_sdap_addmod_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t sdap)
+void nr_sdap_addmod_entity(const int is_gnb, const ue_id_t ue_id, const sdap_config_t *sdap)
 {
-  nr_sdap_entity_t *sdap_entity = nr_sdap_get_entity(ue_id, sdap.pdusession_id);
+  nr_sdap_entity_t *sdap_entity = nr_sdap_get_entity(ue_id, sdap->pdusession_id);
   if (sdap_entity) {
-    sdap_entity->qfi2drb_map_update(sdap_entity, &sdap);
+    sdap_entity->qfi2drb_map_update(sdap_entity, sdap);
   } else {
     nr_sdap_add_entity(is_gnb, ue_id, sdap);
   }
