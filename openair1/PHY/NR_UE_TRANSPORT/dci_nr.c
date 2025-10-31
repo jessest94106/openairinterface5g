@@ -294,8 +294,9 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
 }
 
 static void nr_pdcch_channel_compensation(int arraySz,
-                                          c16_t rxdataF_ext[][arraySz],
-                                          c16_t dl_ch_estimates_ext[][arraySz],
+                                          int sz2,
+                                          c16_t rxdataF_ext[][sz2],
+                                          c16_t dl_ch_estimates_ext[][sz2],
                                           c16_t rxdataF_comp[][arraySz],
                                           int antRx,
                                           uint8_t output_shift)
@@ -306,17 +307,17 @@ static void nr_pdcch_channel_compensation(int arraySz,
   }
 }
 
-static void nr_pdcch_detection_mrc(int sz, c16_t rxdataF_comp[][sz])
+static void nr_pdcch_detection_mrc(int nb_ant, int sz, c16_t rxdataF_comp[][sz])
 {
-  LOG_D(NR_PHY_DCI, "we enter nr_pdcch_detection_mrc (hard coded 2 antennas)\n");
   c16_t *rx0 = rxdataF_comp[0];
-  c16_t *rx1 = rxdataF_comp[1];
-
   // MRC on each re of rb
   // input always aligned and accepting tail padding to process all actual samples
-  for (int i = 0; i < sz; i += 4) {
-    *(simde__m128i *)(rx0 + i) =
-        simde_mm_adds_epi16(simde_mm_srai_epi16(*(simde__m128i *)(rx0 + i), 1), simde_mm_srai_epi16(*(simde__m128i *)(rx1 + i), 1));
+  for (int a = 1; a < nb_ant; a++) {
+    c16_t *rx = rxdataF_comp[a];
+    for (int i = 0; i < sz; i += 4) {
+      *(simde__m128i *)(rx0 + i) = simde_mm_adds_epi16(simde_mm_srai_epi16(*(simde__m128i *)(rx0 + i), 1),
+                                                       simde_mm_srai_epi16(*(simde__m128i *)(rx + i), 1));
+    }
   }
 }
 
@@ -334,7 +335,7 @@ static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
   NR_DL_FRAME_PARMS *fp = &ue->frame_parms;
   NR_UE_PDCCH_CONFIG *phy_pdcch_config = &phy_data->phy_pdcch_config;
   fapi_nr_coreset_t *coreset = &phy_pdcch_config->pdcch_config[ss_idx].coreset;
-  int32_t pdcch_est_size = ((((fp->ofdm_symbol_size + LTE_CE_FILTER_LENGTH) + 15) / 16) * 16);
+  int32_t pdcch_est_size = ceil_mod(fp->ofdm_symbol_size + LTE_CE_FILTER_LENGTH, 16);
   __attribute__((aligned(16))) c16_t pdcch_dl_ch_estimates[fp->nb_antennas_rx][pdcch_est_size];
 
   nr_pdcch_channel_estimation(ue,
@@ -347,12 +348,9 @@ static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
                               pdcch_dl_ch_estimates,
                               rxdataF);
 
-  const int32_t rx_size = ((4 * fp->N_RB_DL * 12 + 31) >> 5) << 5;
+  const int32_t rx_size = ceil_mod(fp->N_RB_DL * 12, 32);
   __attribute__((aligned(32))) c16_t rxdataF_ext[fp->nb_antennas_rx][rx_size];
-  __attribute__((aligned(32))) c16_t rxdataF_comp[fp->nb_antennas_rx][rx_size];
   __attribute__((aligned(32))) c16_t pdcch_dl_ch_estimates_ext[fp->nb_antennas_rx][rx_size];
-  memset(rxdataF_comp, 0, sizeof(rxdataF_comp));
-
   int n_rb;
   int rb_offset;
   get_coreset_rballoc(coreset->frequency_domain_resource, &n_rb, &rb_offset);
@@ -376,20 +374,21 @@ static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
   for (int i = 1; i < fp->nb_antennas_rx; i++)
       avgs = cmax(avgs, avg[i]);
   const int log2_maxh = (log2_approx(avgs) / 2) + 5; //+frame_parms->nb_antennas_rx;
-
-  nr_pdcch_channel_compensation(rx_size,
+  int rx_comp_sz = ceil_mod(llr_size_symbol, 4);
+  __attribute__((aligned(32))) c16_t rxdataF_comp[fp->nb_antennas_rx][rx_comp_sz];
+  memset(rxdataF_comp, 0, sizeof(rxdataF_comp));
+  nr_pdcch_channel_compensation(rx_comp_sz,
+                                rx_size,
                                 rxdataF_ext,
                                 pdcch_dl_ch_estimates_ext,
                                 rxdataF_comp,
                                 fp->nb_antennas_rx,
                                 log2_maxh); // log2_maxh+I0_shift
 
-  UEscopeCopy(ue, pdcchRxdataF_comp, rxdataF_comp, sizeof(struct complex16), fp->nb_antennas_rx, rx_size, 0);
-
   if (fp->nb_antennas_rx > 1) {
-    nr_pdcch_detection_mrc(rx_size, rxdataF_comp);
+    nr_pdcch_detection_mrc(fp->nb_antennas_rx, rx_comp_sz, rxdataF_comp);
   }
-
+  UEscopeCopy(ue, pdcchRxdataF_comp, rxdataF_comp[0], sizeof(c16_t), 1, llr_size_symbol, 0);
   nr_pdcch_llr(llr_size_symbol, rxdataF_comp[0], llr);
 }
 
