@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
         AssertFatal(nb_symb_srs == 1 || nb_symb_srs == 2 || nb_symb_srs == 4,
                     "number of srs symbols %d is not 1,2,4\n",
                     nb_symb_srs);
-        nb_symb_srs >>= 2; // Value: 0 = 1 symbol, 1 = 2 symbols, 2 = 4 symbols
+        nb_symb_srs >>= 1; // Value: 0 = 1 symbol, 1 = 2 symbols, 2 = 4 symbols
         break;
 
       case 'c':

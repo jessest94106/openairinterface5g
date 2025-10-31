@@ -355,6 +355,11 @@ add_physim_test(physim.5g.nr_srssim.test7 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, 
 add_physim_test(physim.5g.nr_srssim.test8 "SRS: 120KHz SCS, 32 PRBs, SNR 20 dB, ToA 19, Combsize 2" nr_srssim -n300 -R32 -y2 -z2 -d 19 -u 3)
 add_physim_test(physim.5g.nr_srssim.test9 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 11, Combsize 4" nr_srssim -n300 -R106 -y2 -z2 -d 11 -e 1)
 add_physim_test(physim.5g.nr_srssim.test10 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 7, Combsize 4, Comb offset 1" nr_srssim -n300 -R106 -y2 -z2 -d 7 -e 1 -f 1)
+add_physim_test(physim.5g.nr_srssim.test11 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 24, Combsize 2, SRS symbols 2" nr_srssim -n300 -R106 -y2 -z2 -d 24 -b 2)
+add_physim_test(physim.5g.nr_srssim.test12 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 24, Combsize 2, SRS symbols 4" nr_srssim -n300 -R106 -y2 -z2 -d 24 -b 4)
+add_physim_test(physim.5g.nr_srssim.test13 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 24, Combsize 4, SRS symbols 2" nr_srssim -n300 -R106 -y2 -z2 -d 24 -b 2 -e1)
+add_physim_test(physim.5g.nr_srssim.test14 "SRS: 30KHz SCS, 106 PRBs, SNR 20 dB, ToA 24, Combsize 4, SRS symbols 4" nr_srssim -n300 -R106 -y2 -z2 -d 24 -b 4 -e1)
+add_physim_test(physim.5g.nr_srssim.test15 "SRS: 30KHz SCS, 217 PRBs, SNR 20 dB, ToA 8, Combsize 2, SRS symbols 4" nr_srssim -n300 -R217 -y2 -z2 -d 8 -b 4)
 
 ####################################################################################
 ######                           offload-specific tests                       ######
