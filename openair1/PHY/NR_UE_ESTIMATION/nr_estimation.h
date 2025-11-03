@@ -44,15 +44,16 @@ void peak_estimator(int32_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t
 /*!
 \brief This function performs channel estimation including frequency and temporal interpolation
 */
-void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
-                                 const UE_nr_rxtx_proc_t *proc,
-                                 unsigned char symbol,
-                                 fapi_nr_coreset_t *coreset,
+void nr_pdcch_channel_estimation(const PHY_VARS_NR_UE *ue,
+                                 int nb_rb,
+                                 int rb_offset,
+                                 int dmrs_ref,
                                  uint16_t first_carrier_offset,
                                  uint16_t BWPStart,
                                  int32_t pdcch_est_size,
                                  c16_t pdcch_dl_ch_estimates[][pdcch_est_size],
-                                 c16_t rxdataF[ue->frame_parms.nb_antennas_rx][ue->frame_parms.ofdm_symbol_size]);
+                                 c16_t rxdataF[ue->frame_parms.nb_antennas_rx][ue->frame_parms.ofdm_symbol_size],
+                                 c16_t *pilot);
 
 c32_t nr_pbch_dmrs_correlation(const NR_DL_FRAME_PARMS *fp,
                                const UE_nr_rxtx_proc_t *proc,

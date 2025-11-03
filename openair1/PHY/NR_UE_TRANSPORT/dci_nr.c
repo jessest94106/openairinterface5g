@@ -40,7 +40,7 @@
 #include "PHY/sse_intrin.h"
 #include "common/utils/nr/nr_common.h"
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
-#include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
+#include "openair1/PHY/NR_REFSIG/refsig_defs_ue.h"
 #include "PHY/NR_UE_ESTIMATION/nr_estimation.h"
 
 #include "assertions.h"
@@ -337,23 +337,34 @@ static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
   fapi_nr_coreset_t *coreset = &phy_pdcch_config->pdcch_config[ss_idx].coreset;
   int32_t pdcch_est_size = ceil_mod(fp->ofdm_symbol_size + LTE_CE_FILTER_LENGTH, 16);
   __attribute__((aligned(16))) c16_t pdcch_dl_ch_estimates[fp->nb_antennas_rx][pdcch_est_size];
+  int n_rb;
+  int rb_offset;
+  get_coreset_rballoc(coreset->frequency_domain_resource, &n_rb, &rb_offset);
 
+  unsigned short scrambling_id = coreset->pdcch_dmrs_scrambling_id;
+  int dmrs_ref = 0;
+  if (coreset->CoreSetType == NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG)
+    dmrs_ref = phy_pdcch_config->pdcch_config[ss_idx].BWPStart;
+  // generate pilot
+  c16_t pilot[(n_rb + dmrs_ref) * 3] __attribute__((aligned(16)));
+  // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
+  const uint32_t *gold =
+      nr_gold_pdcch(ue->frame_parms.N_RB_DL, ue->frame_parms.symbols_per_slot, scrambling_id, proc->nr_slot_rx, symbol);
+  nr_pdcch_dmrs_ref(gold, pilot, n_rb + dmrs_ref);
   nr_pdcch_channel_estimation(ue,
-                              proc,
-                              symbol,
-                              coreset,
+                              n_rb,
+                              rb_offset,
+                              dmrs_ref,
                               fp->first_carrier_offset,
                               phy_pdcch_config->pdcch_config[ss_idx].BWPStart,
                               pdcch_est_size,
                               pdcch_dl_ch_estimates,
-                              rxdataF);
+                              rxdataF,
+                              pilot);
 
   const int32_t rx_size = ceil_mod(fp->N_RB_DL * 12, 32);
   __attribute__((aligned(32))) c16_t rxdataF_ext[fp->nb_antennas_rx][rx_size];
   __attribute__((aligned(32))) c16_t pdcch_dl_ch_estimates_ext[fp->nb_antennas_rx][rx_size];
-  int n_rb;
-  int rb_offset;
-  get_coreset_rballoc(coreset->frequency_domain_resource, &n_rb, &rb_offset);
 
   nr_pdcch_extract_rbs_single(ue->frame_parms.ofdm_symbol_size,
                               rxdataF,
