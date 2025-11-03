@@ -1490,6 +1490,7 @@ static void rfsimulator_end(openair0_device *device)
   }
   clear_beam_queue(&s->beam_ctrl->tx, INT64_MAX);
   clear_beam_queue(&s->beam_ctrl->rx, INT64_MAX);
+  delete s->beam_ctrl;
   close(s->epollfd);
   free(s);
 }
