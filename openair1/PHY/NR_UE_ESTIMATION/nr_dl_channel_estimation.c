@@ -807,10 +807,8 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
                                  c16_t pdcch_dl_ch_estimates[][pdcch_est_size],
                                  c16_t rxdataF[ue->frame_parms.nb_antennas_rx][ue->frame_parms.ofdm_symbol_size])
 {
+  const int symb_sz = ue->frame_parms.ofdm_symbol_size;
   int slot = proc->nr_slot_rx;
-  unsigned char aarx;
-  unsigned short k;
-  unsigned int pilot_cnt;
 
   int nb_rb_coreset=0;
   int coreset_start_rb=0;
@@ -823,14 +821,6 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
 #endif
 
   unsigned short coreset_start_subcarrier = first_carrier_offset+(BWPStart + coreset_start_rb)*12;
-
-#ifdef DEBUG_PDCCH
-  printf("PDCCH Channel Estimation : OFDM size %d, Ncp=%d, slot=%d, symbol %d\n",
-         ue->frame_parms.ofdm_symbol_size,
-         ue->frame_parms.Ncp,
-         slot,
-         symbol);
-#endif
 
 #if CH_INTERP
   int16_t *fl = filt16a_l1;
@@ -846,14 +836,13 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
   c16_t pilot[(nb_rb_coreset + dmrs_ref) * 3] __attribute__((aligned(16)));
   // Note: pilot returned by the following function is already the complex conjugate of the transmitted DMRS
   const uint32_t *gold = nr_gold_pdcch(ue->frame_parms.N_RB_DL, ue->frame_parms.symbols_per_slot, scrambling_id, slot, symbol);
-  nr_pdcch_dmrs_rx(gold, pilot, nb_rb_coreset + dmrs_ref);
+  nr_pdcch_dmrs_ref(gold, pilot, nb_rb_coreset + dmrs_ref);
 
-  for (aarx=0; aarx<ue->frame_parms.nb_antennas_rx; aarx++) {
-
-    k = coreset_start_subcarrier;
+  for (int aarx = 0; aarx < ue->frame_parms.nb_antennas_rx; aarx++) {
+    int k = coreset_start_subcarrier;
     c16_t *pil = &pilot[dmrs_ref * 3];
     c16_t *rxF = &rxdataF[aarx][k + 1];
-    c16_t *dl_ch = &pdcch_dl_ch_estimates[aarx][0];
+    c16_t *dl_ch = pdcch_dl_ch_estimates[aarx];
 
     memset(dl_ch, 0, sizeof(c16_t) * ue->frame_parms.ofdm_symbol_size);
 
@@ -871,36 +860,36 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
     rxF += 4;
     k += 2;
 
-    if (k >= ue->frame_parms.ofdm_symbol_size) {
-      k  -= ue->frame_parms.ofdm_symbol_size;
+    if (k >= symb_sz) {
+      k -= symb_sz;
       rxF = &rxdataF[aarx][k + 1];
     }
     multadd_real_vector_complex_scalar(fm, c16mulShift(*pil++, *rxF, 15), dl_ch, 16);
-    k = (k + 4) % ue->frame_parms.ofdm_symbol_size;
-    rxF = (c16_t *)&rxdataF[aarx][k + 1)];
+    k = (k + 4) % symb_sz;
+    rxF = &rxdataF[aarx][k + 1)];
 
     multadd_real_vector_complex_scalar(fr, c16mulShift(*pil++, *rxF, 15), dl_ch, 16);
     dl_ch += 12;
-    k = (k + 4) % ue->frame_parms.ofdm_symbol_size;
-    rxF = (c16_t *)&rxdataF[aarx][k + 1];
+    k = (k + 4) % symb_sz;
+    rxF = &rxdataF[aarx][k + 1];
 
-    for (pilot_cnt=3; pilot_cnt<(3*nb_rb_coreset); pilot_cnt += 3) {
+    for (int pilot_cnt = 3; pilot_cnt < (3 * nb_rb_coreset); pilot_cnt += 3) {
       multadd_real_vector_complex_scalar(fl, c16mulShift(*pil++, *rxF, 15), dl_ch, 16);
-      k = (k + 4) % ue->frame_parms.ofdm_symbol_size;
-      rxF = (c16_t *)&rxdataF[aarx][k + 1];
+      k = (k + 4) % symb_sz;
+      rxF = &rxdataF[aarx][k + 1];
 
       multadd_real_vector_complex_scalar(fm, c16mulShift(*pil++, *rxF, 15), dl_ch, 16);
-      k = (k + 4) % ue->frame_parms.ofdm_symbol_size;
-      rxF = (c16_t *)&rxdataF[aarx][k + 1];
+      k = (k + 4) % symb_sz;
+      rxF = &rxdataF[aarx][k + 1];
       multadd_real_vector_complex_scalar(fr, c16mulShift(*pil++, *rxF, 15), dl_ch, 16);
       dl_ch += 12;
-      k = (k + 4) % ue->frame_parms.ofdm_symbol_size;
-      rxF = (c16_t *)&rxdataF[aarx][k + 1];
+      k = (k + 4) % symb_sz;
+      rxF = &rxdataF[aarx][k + 1];
     }
-  #else //ELSE CH_INTERP
+#else //ELSE CH_INTERP
     c32_t ch_sum = {0, 0};
 
-    for (pilot_cnt = 0; pilot_cnt < 3*nb_rb_coreset; pilot_cnt++) {
+    for (int pilot_cnt = 0; pilot_cnt < 3 * nb_rb_coreset; pilot_cnt++) {
 
 #ifdef DEBUG_PDCCH
       printf("pilot[%u] = (%d, %d)\trxF[%d] = (%d, %d)\n", pilot_cnt, pil[0], pil[1], k+1, rxF[0], rxF[1]);
@@ -908,8 +897,8 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
       c16_t ch = c16mulShift(*pil++, *rxF, 15);
       ch_sum.r += ch.r;
       ch_sum.i += ch.i;
-      k = (k + 4) % ue->frame_parms.ofdm_symbol_size;
-      rxF = (c16_t *)&rxdataF[aarx][k + 1];
+      k = (k + 4) % symb_sz;
+      rxF = &rxdataF[aarx][k + 1];
 
       if (pilot_cnt % 3 == 2) {
         ch.r = ch_sum.r / 3;
@@ -923,11 +912,10 @@ void nr_pdcch_channel_estimation(PHY_VARS_NR_UE *ue,
         ch_sum = (c32_t){0};
       }
     }
-  #endif //END CH_INTERP
+#endif //END CH_INTERP
 
 
     //}
-
   }
 }
 

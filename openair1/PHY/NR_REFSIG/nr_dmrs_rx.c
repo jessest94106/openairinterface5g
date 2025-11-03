@@ -150,7 +150,7 @@ int nr_pdsch_dmrs_rx(const PHY_VARS_NR_UE *ue,
   return(0);
 }
 
-void nr_pdcch_dmrs_rx(const unsigned int *nr_gold_pdcch, c16_t *output, unsigned short nb_rb_coreset)
+void nr_pdcch_dmrs_ref(const unsigned int *nr_gold_pdcch, c16_t *output, unsigned short nb_rb_coreset)
 {
   for (int i = 0; i < ((nb_rb_coreset * 6) >> 1); i++) {
     output[i] = get_modulated(nr_gold_pdcch, i, true);
