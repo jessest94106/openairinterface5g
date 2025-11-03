@@ -69,7 +69,7 @@ static meas_record_lst_t fill_DRB_PdcpSduVolumeDL(__attribute__((unused))uint32_
   meas_record.value = INTEGER_MEAS_VALUE;
 
   // Get DL data volume delivered to PDCP layer
-  meas_record.int_val = (pdcp.rxsdu_bytes - last_pdcp_sdu_total_bytes[ue_idx].dl)*8/1000;   // [kb]
+  meas_record.int_val = (pdcp.rxsdu_bytes - last_pdcp_sdu_total_bytes[ue_idx].dl)*8/1000000;   // [Mb]
   last_pdcp_sdu_total_bytes[ue_idx].dl = pdcp.rxsdu_bytes;
 
   return meas_record;
@@ -88,7 +88,7 @@ static meas_record_lst_t fill_DRB_PdcpSduVolumeUL(__attribute__((unused))uint32_
   meas_record.value = INTEGER_MEAS_VALUE;
 
   // Get UL data volume delivered from PDCP layer
-  meas_record.int_val = (pdcp.txsdu_bytes - last_pdcp_sdu_total_bytes[ue_idx].ul)*8/1000;   // [kb]
+  meas_record.int_val = (pdcp.txsdu_bytes - last_pdcp_sdu_total_bytes[ue_idx].ul)*8/1000000;   // [Mb]
   last_pdcp_sdu_total_bytes[ue_idx].ul = pdcp.txsdu_bytes;
 
   return meas_record;
