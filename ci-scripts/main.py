@@ -296,8 +296,16 @@ def test_in_list(test, list):
 			return True
 	return False
 
+test_runner_abort = False
 def receive_signal(signum, frame):
-	sys.exit(1)
+    global test_runner_abort
+    if not test_runner_abort:
+        logging.warning("received signal, canceling steps")
+        logging.info("send signal again to exit immediately")
+        test_runner_abort = True
+    else:
+        logging.warning("received signal again, exiting")
+        sys.exit(1)
 
 def ShowTestID(ctx, desc):
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
@@ -488,7 +496,7 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 			#logging.info('test will be run: ' + test)
 			todo_tests.append(test)
 
-	signal.signal(signal.SIGUSR1, receive_signal)
+	signal.signal(signal.SIGINT, receive_signal)
 
 	HTML.CreateHtmlTabHeader()
 
@@ -498,6 +506,8 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	i = 0
 	for test_case_id in todo_tests:
 		for test in all_tests:
+			if test_runner_abort:
+				task_set_succeeded = False
 			id = test.get('id')
 			if test_case_id != id:
 				continue
