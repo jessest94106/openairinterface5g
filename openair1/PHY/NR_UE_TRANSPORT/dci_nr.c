@@ -81,7 +81,8 @@ static void nr_pdcch_demapping_deinterleaving(uint32_t coreset_nbr_rb,
                                               uint8_t n_shift,
                                               uint8_t number_of_candidates,
                                               uint16_t *CCE,
-                                              uint8_t *L)
+                                              uint8_t *L,
+                                              int llr_stride_per_symbol)
 {
   /*
    * This function will do demapping and deinterleaving from llr containing demodulated symbols
@@ -168,7 +169,7 @@ static void nr_pdcch_demapping_deinterleaving(uint32_t coreset_nbr_rb,
       for (int cce_count = 0; cce_count < L[c_id]; cce_count++) {
         for (int k = 0; k < NR_NB_REG_PER_CCE / reg_bundle_size_L; k++) { // loop over REG bundles
           int f = f_bundle_j_list_ord[c_id][k + NR_NB_REG_PER_CCE * cce_count / reg_bundle_size_L];
-          c16_t *in = llr + (f * B_rb + symbol_idx * coreset_nbr_rb) * RE_PER_RB_OUT_DMRS;
+          c16_t *in = llr + f * B_rb * RE_PER_RB_OUT_DMRS + symbol_idx * llr_stride_per_symbol;
           // loop over the RBs of the bundle
           memcpy(e_rx + RE_PER_RB_OUT_DMRS * rb_count, in, B_rb * RE_PER_RB_OUT_DMRS * sizeof(*e_rx));
           rb_count += B_rb;
@@ -497,6 +498,7 @@ void nr_pdcch_dci_indication(const UE_nr_rxtx_proc_t *proc,
     fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15 = &phy_pdcch_config->pdcch_config[ss_idx];
     uint8_t unused_start_symb[NR_SYMBOLS_PER_SLOT] = {0};
     const int num_monitoring_occ = get_pdcch_mon_occasions_slot(rel15, unused_start_symb);
+    const int llr_stride = llr_size / rel15->coreset.duration;
 
     int n_rb;
     int rb_offset;
@@ -515,7 +517,8 @@ void nr_pdcch_dci_indication(const UE_nr_rxtx_proc_t *proc,
                                         rel15->coreset.ShiftIndex,
                                         rel15->number_of_candidates,
                                         rel15->CCE,
-                                        rel15->L);
+                                        rel15->L,
+                                        llr_stride);
 
       nr_dci_decoding_procedure(ue, proc, pdcch_e_rx, rel15, &dci_ind);
     }
