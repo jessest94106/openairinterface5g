@@ -160,6 +160,12 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
     ho_ctx->source->du_ue_id = ue_data.secondary_ue;
     ho_ctx->source->old_rnti = ue->rnti;
 
+    // Save the GTP-U tunnel info for source DU before process UE context setup request/response
+    // since tunnel info will be updated by calling store_du_f1u_tunnel() in rrc_CU_process_ue_context_setup_response()
+    FOR_EACH_SEQ_ARR(drb_t *, drb, &ue->drbs) {
+      ho_ctx->source->old_du_tunnel_config = drb->du_tunnel_config;
+    }
+
     int result = asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&ho_ctx->source->old_cellGroupConfig, ue->masterCellGroup);
     AssertFatal(result == 0, "error during asn_copy() of CellGroupConfig\n");
   }
