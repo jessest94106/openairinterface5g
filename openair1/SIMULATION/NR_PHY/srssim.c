@@ -588,7 +588,7 @@ int main(int argc, char *argv[])
       int16_t timing_advance_offset_nsec[n_rx];
       int srs_est;
       c16_t srs_estimated_channel_freq[n_rx][N_ap][ofdm_symbol_size * N_symb_SRS] __attribute__((aligned(32)));
-      c16_t srs_estimated_channel_time[n_rx][N_ap][ofdm_symbol_size] __attribute__((aligned(32)));
+      c16_t srs_estimated_channel_time[n_rx][N_ap][NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size] __attribute__((aligned(32)));
 
       nr_srs_rx_procedures(gNB,
                            frame,
@@ -624,6 +624,18 @@ int main(int argc, char *argv[])
     float SRS_SNR_dB = 10 * log10(sum_srs_snr / n_trials);
     printf("Actual SNR : %f, Estimated SNR from SRS %f (dB), TA offset success rate %f %%\n", SNR, SRS_SNR_dB, tao_ns_rate * 100);
 
+    if (print_perf == 1) {
+      printf("\ngNB RX\n");
+      printDistribution(&gNB->rx_srs_stats, table_rx, "RX SRS time");
+      printStatIndent(&gNB->generate_srs_stats, "Generate SRS sequence time");
+      printStatIndent(&gNB->get_srs_signal_stats, "Get SRS signal time");
+      printStatIndent(&gNB->srs_channel_estimation_stats, "SRS channel estimation time");
+      printStatIndent(&gNB->srs_timing_advance_stats, "SRS timing advance estimation time");
+      printf("\n");
+    }
+
+    free(table_rx);
+
     int srs_ret = 1;
     if (SNR > 30 && SRS_SNR_dB > 30) {
       srs_ret = 0;
@@ -638,16 +650,6 @@ int main(int argc, char *argv[])
       break;
     }
 
-    if (print_perf == 1) {
-      printf("\ngNB RX\n");
-      printDistribution(&gNB->rx_srs_stats, table_rx, "RX SRS time");
-      printStatIndent(&gNB->generate_srs_stats, "Generate SRS sequence time");
-      printStatIndent(&gNB->get_srs_signal_stats, "Get SRS signal time");
-      printStatIndent(&gNB->srs_channel_estimation_stats, "SRS channel estimation time");
-      printStatIndent(&gNB->srs_timing_advance_stats, "SRS timing advance estimation time");
-      printf("\n");
-    }
-
   } // SNR loop
 
   printf("*************\n");
@@ -659,33 +661,27 @@ int main(int argc, char *argv[])
   for (i = 0; i < n_tx; i++) {
     free(s_re[i]);
     free(s_im[i]);
+    free(txdata[i]);
+    free(txdataF[i]);
   }
+  free(s_re);
+  free(s_im);
+  free(txdata);
+  free(txdataF);
+
   for (i = 0; i < n_rx; i++) {
     free(r_re[i]);
     free(r_im[i]);
+    free(rxdata[i]);
+    free(gNB->common_vars.rxdataF[0][i]);
   }
 
-  free(s_re);
-  free(s_im);
   free(r_re);
   free(r_im);
-
-  for (i = 0; i < n_rx; i++) {
-    free(rxdata[i]);
-  }
   free(rxdata);
 
-  for (i = 0; i < n_tx; i++) {
-    free(txdata[i]);
-  }
-  free(txdata);
-
-  for (i = 0; i < n_tx; i++) {
-    free(txdataF[i]);
-  }
-  free(txdataF);
-
   phy_free_nr_gNB(gNB);
+  free_channel_desc_scm(UE2gNB);
   free_and_zero(UE->nr_srs_info);
   free(gNB->RU_list[0]);
   free(UE);
