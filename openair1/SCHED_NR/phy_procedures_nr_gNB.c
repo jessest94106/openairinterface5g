@@ -94,10 +94,10 @@ int beam_index_allocation(bool das,
   return idx;
 }
 
-void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_dl_tti_ssb_pdu ssb_pdu)
+void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, const nfapi_nr_dl_tti_ssb_pdu *ssb_pdu)
 {
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
-  nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &ssb_pdu.ssb_pdu_rel15;
+  const nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &ssb_pdu->ssb_pdu_rel15;
   uint8_t ssb_index = pdu->SsbBlockIndex;
   LOG_D(PHY,"common_signal_procedures: frame %d, slot %d ssb index %d\n", frame, slot, ssb_index);
 
@@ -145,7 +145,7 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
         fp->ssb_start_subcarrier);
 
   LOG_D(PHY,"SS TX: frame %d, slot %d, start_symbol %d\n", frame, slot, ssb_start_symbol);
-  nfapi_nr_tx_precoding_and_beamforming_t *pb = &pdu->precoding_and_beamforming;
+  const nfapi_nr_tx_precoding_and_beamforming_t *pb = &pdu->precoding_and_beamforming;
   c16_t ***txdataF = gNB->common_vars.txdataF;
   int txdataF_offset = slot * fp->samples_per_slot_wCP;
   // beam number in a scenario with multiple concurrent beams
@@ -183,7 +183,7 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
 #endif
 
   nr_generate_pbch(gNB,
-                   &ssb_pdu,
+                   ssb_pdu,
                    &txdataF[beam_nb][0][txdataF_offset],
                    ssb_start_symbol,
                    n_hf,
@@ -245,7 +245,7 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,1);
   for (int i = 0; i < fp->Lmax; i++) {
     if (msgTx->ssb[i].active) {
-      nr_common_signal_procedures(gNB, frame, slot, msgTx->ssb[i].ssb_pdu);
+      nr_common_signal_procedures(gNB, frame, slot, &msgTx->ssb[i].ssb_pdu);
       msgTx->ssb[i].active = false;
     }
   }

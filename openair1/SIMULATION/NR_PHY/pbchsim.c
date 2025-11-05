@@ -541,7 +541,7 @@ int main(int argc, char **argv)
         for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++)
           memset(gNB->common_vars.txdataF[0][aa], 0, frame_parms->samples_per_slot_wCP * sizeof(int32_t));
 
-        nr_common_signal_procedures (gNB,frame,slot,msgDataTx.ssb[i].ssb_pdu);
+        nr_common_signal_procedures (gNB,frame,slot, &msgDataTx.ssb[i].ssb_pdu);
 
         int samp = frame_parms->get_samples_slot_timestamp(slot, frame_parms, 0);
         for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++) {
