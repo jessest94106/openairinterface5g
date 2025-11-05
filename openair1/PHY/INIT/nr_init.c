@@ -44,6 +44,9 @@
 #include <string.h>
 #include "nfapi/open-nFAPI/fapi/inc/nr_fapi_p5_utils.h"
 
+static void init_DLSCH_struct(PHY_VARS_gNB *gNB);
+static void destroy_DLSCH_struct(const PHY_VARS_gNB *gNB);
+
 int l1_north_init_gNB()
 {
   AssertFatal(RC.nb_nr_L1_inst > 0, "Failed to init PHY callbacks: nb_nr_L1_inst = %d\n", RC.nb_nr_L1_inst);
@@ -155,6 +158,8 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   /// Transport init necessary for NR synchro
   init_nr_transport(gNB);
 
+  init_DLSCH_struct(gNB);
+
   gNB->nr_srs_info = (nr_srs_info_t **)malloc16_clear(gNB->max_nb_srs * sizeof(nr_srs_info_t*));
   for (int id = 0; id < gNB->max_nb_srs; id++) {
     gNB->nr_srs_info[id] = (nr_srs_info_t *)malloc16_clear(sizeof(nr_srs_info_t));
@@ -240,6 +245,8 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
   free_gnb_lowpapr_sequences();
 
   reset_nr_transport(gNB);
+
+  destroy_DLSCH_struct(gNB);
 
   NR_gNB_COMMON * common_vars = &gNB->common_vars;
   for (int j = 0; j < common_vars->num_beams_period; j++) {
@@ -401,29 +408,27 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   init_timeshift_rotation(fp);
 }
 
-void init_DLSCH_struct(PHY_VARS_gNB *gNB, processingData_L1tx_t *msg)
+static void init_DLSCH_struct(PHY_VARS_gNB *gNB)
 {
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   uint16_t grid_size = cfg->carrier_config.dl_grid_size[fp->numerology_index].value;
-  msg->num_pdsch_slot = 0;
-
-  msg->dlsch = calloc(gNB->max_nb_pdsch, sizeof(*msg->dlsch));
+  gNB->dlsch = calloc(gNB->max_nb_pdsch, sizeof(*gNB->dlsch));
   for (int i = 0; i < gNB->max_nb_pdsch; i++) {
     LOG_D(PHY, "Allocating Transport Channel Buffers for DLSCH %d/%d\n", i, gNB->max_nb_pdsch);
-    msg->dlsch[i] = new_gNB_dlsch(fp, grid_size);
+    gNB->dlsch[i] = new_gNB_dlsch(fp, grid_size);
   }
 }
 
-void reset_DLSCH_struct(const PHY_VARS_gNB *gNB, processingData_L1tx_t *msg)
+static void destroy_DLSCH_struct(const PHY_VARS_gNB *gNB)
 {
   const NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   const nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   const uint16_t grid_size = cfg->carrier_config.dl_grid_size[fp->numerology_index].value;
   for (int i = 0; i < gNB->max_nb_pdsch; i++) {
-    free_gNB_dlsch(&msg->dlsch[i], grid_size, fp);
+    free_gNB_dlsch(&gNB->dlsch[i], grid_size, fp);
   }
-  free(msg->dlsch);
+  free(gNB->dlsch);
 }
 
 void init_nr_transport(PHY_VARS_gNB *gNB)

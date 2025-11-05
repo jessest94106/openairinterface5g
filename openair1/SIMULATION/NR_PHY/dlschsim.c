@@ -439,9 +439,9 @@ int main(int argc, char **argv)
   nr_init_dl_harq_processes(UE->dl_harq_processes, 8, nb_rb);
 
 	unsigned char harq_pid = 0; //dlsch->harq_ids[subframe];
-  processingData_L1tx_t msgDataTx;
-  init_DLSCH_struct(gNB, &msgDataTx);
-  NR_gNB_DLSCH_t *dlsch = &msgDataTx.dlsch[0];
+  processingData_L1tx_t msgDataTx = {0};
+  msgDataTx.gNB = gNB;
+  NR_gNB_DLSCH_t *dlsch = &msgDataTx.gNB->dlsch[0];
   nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 	//time_stats_t *rm_stats, *te_stats, *i_stats;
 	unsigned int TBS = 8424;
@@ -620,8 +620,6 @@ int main(int argc, char **argv)
 	}
 
   free_channel_desc_scm(gNB2UE);
-
-  reset_DLSCH_struct(gNB, &msgDataTx);
 
   int nb_slots_to_set = (1 << mu) * NR_NUMBER_OF_SUBFRAMES_PER_FRAME;
   for (int i = 0; i < nb_slots_to_set; ++i)

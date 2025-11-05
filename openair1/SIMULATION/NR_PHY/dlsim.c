@@ -976,9 +976,9 @@ int main(int argc, char **argv)
   initNotifiedFIFO(&gNB->L1_tx_out);
   // we create 2 threads for L1 tx processing
   processingData_L1tx_t *msgDataTx = malloc(sizeof(processingData_L1tx_t));
-  init_DLSCH_struct(gNB, msgDataTx);
   msgDataTx->slot = slot;
   msgDataTx->frame = frame;
+  msgDataTx->gNB = gNB;
   gNB->msgDataTx = msgDataTx;
 
   // Buffers to store internal memory of slot process
@@ -1058,7 +1058,7 @@ int main(int argc, char **argv)
     n_false_positive = 0;
     if (n_trials== 1) num_rounds = 1;
 
-    NR_gNB_DLSCH_t *gNB_dlsch = &msgDataTx->dlsch[0];
+    NR_gNB_DLSCH_t *gNB_dlsch = &msgDataTx->gNB->dlsch[0];
     nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &gNB_dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     for (trial = 0; trial < n_trials && !stop; trial++) {

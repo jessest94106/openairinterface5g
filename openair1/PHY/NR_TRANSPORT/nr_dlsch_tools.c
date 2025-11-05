@@ -36,7 +36,7 @@
 
 void nr_fill_dlsch_dl_tti_req(processingData_L1tx_t *msgTx, nfapi_nr_dl_tti_pdsch_pdu *pdsch_pdu)
 {
-  NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[msgTx->num_pdsch_slot];
+  NR_gNB_DLSCH_t *dlsch = &msgTx->gNB->dlsch[msgTx->num_pdsch_slot];
   /// DLSCH struct
   memcpy((void*)&dlsch->pdsch_pdu, (void*)pdsch_pdu, sizeof(nfapi_nr_dl_tti_pdsch_pdu));
   AssertFatal(msgTx->num_pdsch_slot == pdsch_pdu->pdsch_pdu_rel15.pduIndex,
@@ -53,7 +53,7 @@ void nr_fill_dlsch_tx_req(processingData_L1tx_t *msgTx, int idx, uint8_t *sdu)
 
   /* not sure if FAPI could transmit DL_TTI_req and TX_req in different orders.
    * for the moment, assume they are in the same order (and check!) */
-  NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[idx];
+  NR_gNB_DLSCH_t *dlsch = &msgTx->gNB->dlsch[idx];
   nfapi_nr_dl_tti_pdsch_pdu *pdsch = &dlsch->pdsch_pdu;
   AssertFatal(pdsch->pdsch_pdu_rel15.pduIndex == idx, "PDSCH PDU index %d does not match %d\n", pdsch->pdsch_pdu_rel15.pduIndex, idx);
   dlsch->pdu = sdu;

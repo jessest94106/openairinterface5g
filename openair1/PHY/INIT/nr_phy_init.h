@@ -46,9 +46,6 @@ int l1_north_init_gNB(void);
 void init_nr_transport(PHY_VARS_gNB *gNB);
 void reset_nr_transport(PHY_VARS_gNB *gNB);
 
-void init_DLSCH_struct(PHY_VARS_gNB *gNB, processingData_L1tx_t *msg);
-void reset_DLSCH_struct(const PHY_VARS_gNB *gNB, processingData_L1tx_t *msg);
-
 void RCconfig_nrUE_prs(void *cfg);
 void init_nr_prs_ue_vars(PHY_VARS_NR_UE *ue);
 void nr_init_dl_harq_processes(NR_DL_UE_HARQ_t harq_list[2][NR_MAX_DLSCH_HARQ_PROCESSES], int number_of_processes, int num_rb);

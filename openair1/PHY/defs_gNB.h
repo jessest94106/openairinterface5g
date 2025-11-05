@@ -386,6 +386,8 @@ typedef struct PHY_VARS_gNB_s {
 
   NR_gNB_COMMON common_vars;
   prach_list_t prach_list;
+  // TODO: can we remove c from NR_gNB_DLSCH_t and put it on the stack?
+  NR_gNB_DLSCH_t *dlsch;
   NR_gNB_PRS prs_vars;
   NR_gNB_PUSCH *pusch_vars;
   NR_gNB_PUCCH_t *pucch;
@@ -580,7 +582,6 @@ typedef struct processingData_L1tx {
   /// corresponds to UL_dci_req->ul_dci_pdu_list
   nfapi_nr_dl_tti_pdcch_pdu ul_pdcch_pdu[NFAPI_NR_MAX_NB_CORESETS];
   nfapi_nr_dl_tti_csi_rs_pdu csirs_pdu[NFAPI_NR_MAX_NB_CORESETS];
-  NR_gNB_DLSCH_t *dlsch;
   nfapi_nr_dl_tti_ssb_pdu ssb_pdu[64];
   int n_ssb_pdu;
   int n_csirs_pdu;

@@ -361,7 +361,6 @@ void init_gNB_Tpool(int inst)
   notifiedFIFO_elt_t *msgL1Tx = newNotifiedFIFO_elt(sizeof(processingData_L1tx_t), 0, &gNB->L1_tx_out, NULL);
   processingData_L1tx_t *msgDataTx = (processingData_L1tx_t *)NotifiedFifoData(msgL1Tx);
   memset(msgDataTx, 0, sizeof(processingData_L1tx_t));
-  init_DLSCH_struct(gNB, msgDataTx);
   // this will be removed when the msgDataTx is not necessary anymore
   gNB->msgDataTx = msgDataTx;
 
