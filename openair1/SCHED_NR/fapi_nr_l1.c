@@ -174,7 +174,7 @@ void nr_schedule_ul_dci_req(PHY_VARS_gNB *gNB, nfapi_nr_ul_dci_request_t *UL_dci
 
   msgTx->num_ul_pdcch = UL_dci_req->numPdus;
   for (int i = 0; i < UL_dci_req->numPdus; i++)
-    msgTx->ul_pdcch_pdu[i] = UL_dci_req->ul_dci_pdu_list[i];
+    msgTx->ul_pdcch_pdu[i] = UL_dci_req->ul_dci_pdu_list[i].pdcch_pdu;
 }
 
 void nr_schedule_response(NR_Sched_Rsp_t *Sched_INFO)
