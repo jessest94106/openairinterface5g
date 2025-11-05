@@ -46,6 +46,16 @@
 //#define DEBUG_RXDATA
 //#define SRS_IND_DEBUG
 
+static void nr_fill_indication(PHY_VARS_gNB *gNB,
+                               int frame,
+                               int slot_rx,
+                               int ULSCH_id,
+                               uint8_t harq_pid,
+                               uint8_t crc_flag,
+                               int dtx_flag,
+                               nfapi_nr_crc_t *crc,
+                               nfapi_nr_rx_data_pdu_t *pdu);
+
 int beam_index_allocation(bool das,
                           int fapi_beam_index,
                           nfapi_nr_analog_beamforming_ve_t *analog_bf,
@@ -537,15 +547,15 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
   return ret_nr_ulsch_decoding;
 }
 
-void nr_fill_indication(PHY_VARS_gNB *gNB,
-                        int frame,
-                        int slot_rx,
-                        int ULSCH_id,
-                        uint8_t harq_pid,
-                        uint8_t crc_flag,
-                        int dtx_flag,
-                        nfapi_nr_crc_t *crc,
-                        nfapi_nr_rx_data_pdu_t *pdu)
+static void nr_fill_indication(PHY_VARS_gNB *gNB,
+                               int frame,
+                               int slot_rx,
+                               int ULSCH_id,
+                               uint8_t harq_pid,
+                               uint8_t crc_flag,
+                               int dtx_flag,
+                               nfapi_nr_crc_t *crc,
+                               nfapi_nr_rx_data_pdu_t *pdu)
 {
   NR_gNB_ULSCH_t *ulsch = &gNB->ulsch[ULSCH_id];
   NR_UL_gNB_HARQ_t *harq_process = ulsch->harq_process;

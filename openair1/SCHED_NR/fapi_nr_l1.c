@@ -38,8 +38,7 @@
 #include "openair2/NR_PHY_INTERFACE/nr_sched_response.h"
 #include "nfapi/oai_integration/nfapi_vnf.h"
 
-void handle_nr_nfapi_ssb_pdu(processingData_L1tx_t *msgTx,int frame,int slot,
-                             nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu)
+static void handle_nr_nfapi_ssb_pdu(processingData_L1tx_t *msgTx, int frame, int slot, nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu)
 {
 
   AssertFatal(dl_tti_pdu->ssb_pdu.ssb_pdu_rel15.bchPayloadFlag== 1, "bchPayloadFlat %d != 1\n",
@@ -56,7 +55,7 @@ void handle_nr_nfapi_ssb_pdu(processingData_L1tx_t *msgTx,int frame,int slot,
   }
 }
 
-void handle_nfapi_nr_csirs_pdu(processingData_L1tx_t *msgTx, int frame, int slot, nfapi_nr_dl_tti_csi_rs_pdu *csirs_pdu)
+static void handle_nfapi_nr_csirs_pdu(processingData_L1tx_t *msgTx, int frame, int slot, nfapi_nr_dl_tti_csi_rs_pdu *csirs_pdu)
 {
   int found = 0;
 
