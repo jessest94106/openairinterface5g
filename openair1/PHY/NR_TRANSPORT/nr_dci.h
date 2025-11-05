@@ -26,7 +26,11 @@
 #include "PHY/NR_REFSIG/nr_refsig.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface.h"
 
-void nr_generate_dci_top(processingData_L1tx_t *msgTx, int slot, int txdataF_offset);
+void nr_generate_dci(PHY_VARS_gNB *gNB,
+                     const nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15,
+                     int txdataF_offset,
+                     NR_DL_FRAME_PARMS *frame_parms,
+                     int slot);
 
 int16_t find_nr_pdcch(int frame,int slot, PHY_VARS_gNB *gNB,find_type_t type);
 

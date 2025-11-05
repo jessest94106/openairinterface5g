@@ -255,12 +255,17 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   int num_pdcch_pdus = msgTx->num_ul_pdcch + msgTx->num_dl_pdcch;
 
   if (num_pdcch_pdus > 0) {
-    LOG_D(PHY, "[gNB %d] Frame %d slot %d Calling nr_generate_dci_top (number of UL/DL PDCCH PDUs %d/%d)\n",
+    LOG_D(PHY, "[gNB %d] Frame %d slot %d Calling nr_generate_dci() (number of UL/DL PDCCH PDUs %d/%d)\n",
 	  gNB->Mod_id, frame, slot, msgTx->num_ul_pdcch, msgTx->num_dl_pdcch);
   
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_gNB_PDCCH_TX,1);
 
-    nr_generate_dci_top(msgTx, slot, txdataF_offset);
+    start_meas(&gNB->dci_generation_stats);
+    for (int i = 0; i < msgTx->num_dl_pdcch; ++i)
+      nr_generate_dci(gNB, &msgTx->pdcch_pdu[i].pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
+    for (int i = 0; i < msgTx->num_ul_pdcch; ++i)
+      nr_generate_dci(gNB, &msgTx->ul_pdcch_pdu[i].pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
+    stop_meas(&gNB->dci_generation_stats);
 
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_gNB_PDCCH_TX,0);
   }
