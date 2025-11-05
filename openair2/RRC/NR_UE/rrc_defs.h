@@ -70,6 +70,7 @@
 #define MAX_MEAS_CONFIG 64
 #define MAX_MEAS_ID 64
 #define MAX_QUANTITY_CONFIG 2
+#define NUMBER_OF_NEIGHBORING_CELLS_MAX 1
 
 typedef enum {
   nr_SecondaryCellGroupConfig_r15=0,
@@ -196,6 +197,7 @@ typedef struct l3_measurements_s {
   float ssb_filter_coeff_rsrp;
   float csi_RS_filter_coeff_rsrp;
   meas_t serving_cell;
+  meas_t neighboring_cell[NUMBER_OF_NEIGHBORING_CELLS_MAX];
   long trigger_to_measid;
   long trigger_quantity;
   long rs_type;

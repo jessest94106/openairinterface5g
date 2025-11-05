@@ -125,6 +125,17 @@ typedef enum {
 
 #define debug_msg if (((mac_xface->frame%100) == 0) || (mac_xface->frame < 50)) msg
 
+#define NEIGHBOR_CELL_MAX_CONSECUTIVE_FAILURES 10
+
+typedef struct {
+  int pss_search_start;
+  int pss_search_length;
+  uint32_t ssb_rsrp;
+  int ssb_rsrp_dBm;
+  int consec_fail; // Counter for consecutive detection failures
+  bool valid_meas;
+} neighboring_cell_info_t;
+
 typedef struct {
   uint8_t decoded_output[3]; // PBCH paylod not larger than 3B
   uint8_t xtra_byte;
@@ -214,7 +225,9 @@ typedef struct {
   unsigned char  nb_antennas_rx;
   /// DLSCH error counter
   // short          dlsch_errors;
-
+  /// Info about neighboring cells to perform the measurements
+  neighboring_cell_info_t neighboring_cell_info[NUMBER_OF_NEIGHBORING_CELLS_MAX];
+  bool meas_request_pending;
 } PHY_NR_MEASUREMENTS;
 
 typedef struct {

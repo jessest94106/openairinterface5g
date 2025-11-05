@@ -2858,3 +2858,17 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
+
+void nr_rrc_mac_config_req_meas(module_id_t module_id, const nr_neighbor_cell_info_t *neighbor_cells, int num_neighbors)
+{
+  NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
+
+  for (int i = 0; i < num_neighbors && i < NUMBER_OF_NEIGHBORING_CELLS_MAX; i++) {
+    fapi_nr_neighboring_cell_t *phy_cell = &mac->phy_config.config_req.meas_config.nr_neighboring_cell[i];
+    phy_cell->Nid_cell = neighbor_cells[i].Nid_cell;
+    phy_cell->ssb_freq = neighbor_cells[i].ssb_freq;
+    phy_cell->active = neighbor_cells[i].active;
+  }
+
+  mac->if_module->phy_config_request(&mac->phy_config);
+}
