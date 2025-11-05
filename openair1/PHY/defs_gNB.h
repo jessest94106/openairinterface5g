@@ -73,11 +73,6 @@ typedef struct {
 } NR_DL_gNB_HARQ_t;
 
 typedef struct {
-  uint8_t active;
-  nfapi_nr_dl_tti_csi_rs_pdu csirs_pdu;
-} NR_gNB_CSIRS_t;
-
-typedef struct {
   int dump_frame;
   int round_trials[8];
   int total_bytes_tx;
@@ -597,10 +592,11 @@ typedef struct processingData_L1tx {
   nfapi_nr_dl_tti_pdcch_pdu pdcch_pdu[NFAPI_NR_MAX_NB_CORESETS];
   /// corresponds to UL_dci_req->ul_dci_pdu_list
   nfapi_nr_dl_tti_pdcch_pdu ul_pdcch_pdu[NFAPI_NR_MAX_NB_CORESETS];
-  NR_gNB_CSIRS_t csirs_pdu[NR_SYMBOLS_PER_SLOT];
+  nfapi_nr_dl_tti_csi_rs_pdu csirs_pdu[NFAPI_NR_MAX_NB_CORESETS];
   NR_gNB_DLSCH_t **dlsch;
   nfapi_nr_dl_tti_ssb_pdu ssb_pdu[64];
   int n_ssb_pdu;
+  int n_csirs_pdu;
   uint16_t num_pdsch_slot;
   int num_dl_pdcch;
   int num_ul_pdcch;

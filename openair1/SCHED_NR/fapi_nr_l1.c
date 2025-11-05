@@ -52,20 +52,7 @@ static void handle_nr_nfapi_ssb_pdu(processingData_L1tx_t *msgTx, int frame, int
 
 static void handle_nfapi_nr_csirs_pdu(processingData_L1tx_t *msgTx, int frame, int slot, nfapi_nr_dl_tti_csi_rs_pdu *csirs_pdu)
 {
-  int found = 0;
-
-  for (int id = 0; id < NR_NUMBER_OF_SYMBOLS_PER_SLOT; id++) {
-    NR_gNB_CSIRS_t *csirs = &msgTx->csirs_pdu[id];
-    if (csirs->active == 0) {
-      LOG_D(NR_PHY,"Frame %d Slot %d CSI_RS with ID %d is now active\n",frame,slot,id);
-      csirs->active = 1;
-      memcpy((void*)&csirs->csirs_pdu, (void*)csirs_pdu, sizeof(nfapi_nr_dl_tti_csi_rs_pdu));
-      found = 1;
-      break;
-    }
-  }
-  if (found == 0)
-    LOG_E(MAC,"CSI-RS list is full\n");
+  msgTx->csirs_pdu[msgTx->n_csirs_pdu++] = *csirs_pdu;
 }
 
 void nr_schedule_dl_tti_req(PHY_VARS_gNB *gNB, nfapi_nr_dl_tti_request_t *DL_req)

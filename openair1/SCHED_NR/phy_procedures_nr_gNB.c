@@ -203,6 +203,46 @@ void clear_slot_beamid(PHY_VARS_gNB *gNB, int slot)
   }
 }
 
+static void nr_generate_csi_rs_gNB(PHY_VARS_gNB *gNB,
+                                   int slot,
+                                   const nfapi_nr_config_request_scf_t *cfg,
+                                   const nfapi_nr_dl_tti_csi_rs_pdu *csi_rs_pdu)
+{
+  const nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csi_rs_pdu->csi_rs_pdu_rel15;
+  if (csi_params->csi_type == 2) // ZP-CSI
+    return;
+
+  csi_mapping_parms_t mapping_parms =
+      get_csi_mapping_parms(csi_params->row, csi_params->freq_domain, csi_params->symb_l0, csi_params->symb_l1);
+  const nfapi_nr_tx_precoding_and_beamforming_t *pb = &csi_params->precodingAndBeamforming;
+  int csi_bitmap = 0;
+  int lprime_num = mapping_parms.lprime + 1;
+  for (int j = 0; j < mapping_parms.size; j++)
+    csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
+  int beam_nb = beam_index_allocation(gNB->enable_analog_das,
+                                      pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+                                      &cfg->analog_beamforming_ve,
+                                      &gNB->common_vars,
+                                      slot,
+                                      gNB->frame_parms.symbols_per_slot,
+                                      csi_bitmap);
+
+  nr_generate_csi_rs(&gNB->frame_parms,
+                     &mapping_parms,
+                     gNB->TX_AMP,
+                     slot,
+                     csi_params->freq_density,
+                     csi_params->start_rb,
+                     csi_params->nr_of_rbs,
+                     csi_params->symb_l0,
+                     csi_params->symb_l1,
+                     csi_params->row,
+                     csi_params->scramb_id,
+                     csi_params->power_control_offset_ss,
+                     csi_params->cdm_type,
+                     gNB->common_vars.txdataF[beam_nb]);
+}
+
 void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
                            int frame,
                            int slot,
@@ -277,49 +317,9 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   }
   msgTx->num_pdsch_slot = 0;
 
-  for (int i = 0; i < NR_SYMBOLS_PER_SLOT; i++){
-    NR_gNB_CSIRS_t *csirs = &msgTx->csirs_pdu[i];
-    if (csirs->active == 1) {
-      LOG_D(PHY, "CSI-RS generation started in frame %d.%d\n",frame,slot);
-      nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csirs->csirs_pdu.csi_rs_pdu_rel15;
-      if (csi_params->csi_type == 2) { // ZP-CSI
-        csirs->active = 0;
-        return;
-      }
-      csi_mapping_parms_t mapping_parms = get_csi_mapping_parms(csi_params->row,
-                                                                csi_params->freq_domain,
-                                                                csi_params->symb_l0,
-                                                                csi_params->symb_l1);
-      nfapi_nr_tx_precoding_and_beamforming_t *pb = &csi_params->precodingAndBeamforming;
-      int csi_bitmap = 0;
-      int lprime_num = mapping_parms.lprime + 1;
-      for (int j = 0; j < mapping_parms.size; j++)
-        csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
-      int beam_nb = beam_index_allocation(gNB->enable_analog_das,
-                                          pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
-                                          &cfg->analog_beamforming_ve,
-                                          &gNB->common_vars,
-                                          slot,
-                                          fp->symbols_per_slot,
-                                          csi_bitmap);
-
-      nr_generate_csi_rs(&gNB->frame_parms,
-                         &mapping_parms,
-                         gNB->TX_AMP,
-                         slot,
-                         csi_params->freq_density,
-                         csi_params->start_rb,
-                         csi_params->nr_of_rbs,
-                         csi_params->symb_l0,
-                         csi_params->symb_l1,
-                         csi_params->row,
-                         csi_params->scramb_id,
-                         csi_params->power_control_offset_ss,
-                         csi_params->cdm_type,
-                         gNB->common_vars.txdataF[beam_nb]);
-      csirs->active = 0;
-    }
-  }
+  for (int i = 0; i < msgTx->n_csirs_pdu; i++)
+    nr_generate_csi_rs_gNB(gNB, slot, cfg, &msgTx->csirs_pdu[i]);
+  msgTx->n_csirs_pdu = 0;
 
   //apply the OFDM symbol rotation here
   start_meas(&gNB->phase_comp_stats);
