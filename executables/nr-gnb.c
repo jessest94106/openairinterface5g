@@ -362,7 +362,6 @@ void init_gNB_Tpool(int inst)
   processingData_L1tx_t *msgDataTx = (processingData_L1tx_t *)NotifiedFifoData(msgL1Tx);
   memset(msgDataTx, 0, sizeof(processingData_L1tx_t));
   init_DLSCH_struct(gNB, msgDataTx);
-  memset(msgDataTx->ssb, 0, 64 * sizeof(NR_gNB_SSB_t));
   // this will be removed when the msgDataTx is not necessary anymore
   gNB->msgDataTx = msgDataTx;
 

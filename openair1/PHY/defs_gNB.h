@@ -130,11 +130,6 @@ typedef struct {
 } NR_gNB_DLSCH_t;
 
 typedef struct {
-  bool active;
-  nfapi_nr_dl_tti_ssb_pdu ssb_pdu;
-} NR_gNB_SSB_t;
-
-typedef struct {
   uint8_t NumPRSResources;
   prs_config_t prs_cfg[NR_MAX_PRS_RESOURCES_PER_SET];
 } NR_gNB_PRS;
@@ -604,7 +599,8 @@ typedef struct processingData_L1tx {
   nfapi_nr_dl_tti_pdcch_pdu ul_pdcch_pdu[NFAPI_NR_MAX_NB_CORESETS];
   NR_gNB_CSIRS_t csirs_pdu[NR_SYMBOLS_PER_SLOT];
   NR_gNB_DLSCH_t **dlsch;
-  NR_gNB_SSB_t ssb[64];
+  nfapi_nr_dl_tti_ssb_pdu ssb_pdu[64];
+  int n_ssb_pdu;
   uint16_t num_pdsch_slot;
   int num_dl_pdcch;
   int num_ul_pdcch;

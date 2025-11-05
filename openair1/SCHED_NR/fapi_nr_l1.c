@@ -47,12 +47,7 @@ static void handle_nr_nfapi_ssb_pdu(processingData_L1tx_t *msgTx, int frame, int
   uint8_t i_ssb = dl_tti_pdu->ssb_pdu.ssb_pdu_rel15.SsbBlockIndex;
 
   LOG_D(NR_PHY,"%d.%d : ssb index %d pbch_pdu: %x\n",frame,slot,i_ssb,dl_tti_pdu->ssb_pdu.ssb_pdu_rel15.bchPayload);
-  if (msgTx->ssb[i_ssb].active)
-    AssertFatal(1==0,"SSB PDU with index %d already active\n",i_ssb);
-  else {
-    msgTx->ssb[i_ssb].active = true;
-    memcpy((void*)&msgTx->ssb[i_ssb].ssb_pdu,&dl_tti_pdu->ssb_pdu,sizeof(dl_tti_pdu->ssb_pdu));
-  }
+  msgTx->ssb_pdu[msgTx->n_ssb_pdu++] = dl_tti_pdu->ssb_pdu;
 }
 
 static void handle_nfapi_nr_csirs_pdu(processingData_L1tx_t *msgTx, int frame, int slot, nfapi_nr_dl_tti_csi_rs_pdu *csirs_pdu)

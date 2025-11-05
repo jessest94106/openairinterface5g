@@ -979,7 +979,6 @@ int main(int argc, char **argv)
   init_DLSCH_struct(gNB, msgDataTx);
   msgDataTx->slot = slot;
   msgDataTx->frame = frame;
-  memset(msgDataTx->ssb, 0, 64*sizeof(NR_gNB_SSB_t));
   gNB->msgDataTx = msgDataTx;
 
   // Buffers to store internal memory of slot process
@@ -1117,8 +1116,8 @@ int main(int argc, char **argv)
           LOG_D(PHY,"[DLSIM] PTRS Symbols in a slot: %2u, RE per Symbol: %3u, RE in a slot %4d\n", ptrsSymbPerSlot, ptrsRePerSymb, ptrsSymbPerSlot * ptrsRePerSymb);
         }
 
-        msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.bchPayload=0x001234;
-        msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.SsbBlockIndex = 0;
+        msgDataTx->ssb_pdu[0].ssb_pdu_rel15.bchPayload = 0x001234;
+        msgDataTx->ssb_pdu[0].ssb_pdu_rel15.SsbBlockIndex = 0;
         msgDataTx->gNB = gNB;
 
         start_meas(&gNB->phy_proc_tx);

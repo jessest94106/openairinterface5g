@@ -243,12 +243,9 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
   }
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,1);
-  for (int i = 0; i < fp->Lmax; i++) {
-    if (msgTx->ssb[i].active) {
-      nr_common_signal_procedures(gNB, frame, slot, &msgTx->ssb[i].ssb_pdu);
-      msgTx->ssb[i].active = false;
-    }
-  }
+  for (int i = 0; i < msgTx->n_ssb_pdu; i++)
+    nr_common_signal_procedures(gNB, frame, slot, &msgTx->ssb_pdu[i]);
+  msgTx->n_ssb_pdu = 0;
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,0);
 
