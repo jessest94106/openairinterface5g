@@ -299,7 +299,6 @@ class OaiCiTest():
 		self.iperf_packetloss_threshold = ''
 		self.iperf_bitrate_threshold = ''
 		self.iperf_profile = ''
-		self.iperf_options = ''
 		self.iperf_tcp_rate_target = ''
 		self.finalStatus = False
 		self.air_interface=''
@@ -520,7 +519,7 @@ class OaiCiTest():
 		return (status, f'{ue_header}\n{msg}')
 
 	def Iperf(self, ctx, node, HTML, infra_file="ci_infra.yaml"):
-		logging.debug(f'Iperf: iperf_args "{self.iperf_args}" iperf_packetloss_threshold "{self.iperf_packetloss_threshold}" iperf_bitrate_threshold "{self.iperf_bitrate_threshold}" iperf_profile "{self.iperf_profile}" iperf_options "{self.iperf_options}"')
+		logging.debug(f'Iperf: iperf_args "{self.iperf_args}" iperf_packetloss_threshold "{self.iperf_packetloss_threshold}" iperf_bitrate_threshold "{self.iperf_bitrate_threshold}" iperf_profile "{self.iperf_profile}"')
 
 		if self.ue_ids == [] or self.svr_id == None:
 			raise Exception("no module names in self.ue_ids or/and self.svr_id provided")

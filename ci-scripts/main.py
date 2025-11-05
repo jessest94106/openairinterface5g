@@ -185,10 +185,6 @@ def ExecuteActionWithParam(action, ctx, node):
 		if CiTestObj.iperf_profile != 'balanced' and CiTestObj.iperf_profile != 'unbalanced' and CiTestObj.iperf_profile != 'single-ue':
 			logging.error(f'test-case has wrong profile {CiTestObj.iperf_profile}, forcing balanced')
 			CiTestObj.iperf_profile = 'balanced'
-		CiTestObj.iperf_options = test.findtext('iperf_options') or 'check'
-		if CiTestObj.iperf_options != 'check' and CiTestObj.iperf_options != 'sink':
-			logging.error('test-case has wrong option ' + CiTestObj.iperf_options)
-			CiTestObj.iperf_options = 'check'
 		if action == 'Iperf':
 			success = CiTestObj.Iperf(ctx, node, HTML)
 		elif action == 'Iperf2_Unidir':
