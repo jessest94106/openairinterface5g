@@ -242,6 +242,13 @@ nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
                                   int numGscn);
 
 /*!
+  \brief Common SSB search function shared by initial sync and neighbor cell search
+  @param params Pointer to SSB search parameters structure
+  @return true if SSB was successfully detected, false otherwise
+*/
+bool nr_search_ssb_common(nr_ssb_search_params_t *params);
+
+/*!
   \brief This function gets the carrier frequencies either from FP or command-line-set global variables, depending on the
   availability of the latter
   @param ue

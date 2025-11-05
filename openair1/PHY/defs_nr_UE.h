@@ -573,6 +573,30 @@ typedef struct {
   task_ans_t *ans;
 } nr_ue_ssb_scan_t;
 
+// Common SSB search parameters - used by both initial sync and neighbor cell search
+typedef struct {
+  const NR_DL_FRAME_PARMS *frame_parms;
+  c16_t **rxdata;
+  uint32_t rxdata_size;
+  int ssb_start_subcarrier;
+  int target_nid_cell; // -1 for blind search, specific PCI for targeted search
+  int exclude_nid_cell; // -1 for no exclusion, or serving cell PCI to exclude
+  bool apply_freq_offset; // whether to compensate frequency offset
+  int search_frame_id; // Frame index to search (0, 1, 2...) within rxdata buffer
+  bool fo_flag; // frequency offset estimation flag for pss_synchro_nr()
+  void *rxdataF; // Pre-allocated rxdataF buffer
+  void *pssTime; // Pre-generated PSS time sequences
+  // Output parameters
+  int *detected_nid_cell; // detected PCI
+  int *ssb_offset; // SSB offset in samples
+  int32_t *sss_metric; // SSS detection metric
+  int *freq_offset_pss; // PSS frequency offset estimate
+  int *freq_offset_sss; // SSS frequency offset estimate
+  uint8_t *sss_phase; // SSS phase
+  int *pss_peak; // PSS correlation peak power
+  int *pss_avg; // PSS correlation average power
+} nr_ssb_search_params_t;
+
 typedef struct nr_phy_data_tx_s {
   NR_UE_ULSCH_t ulsch;
   NR_UE_PUCCH pucch_vars;
