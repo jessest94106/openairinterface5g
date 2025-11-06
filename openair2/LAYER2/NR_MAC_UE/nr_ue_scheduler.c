@@ -891,8 +891,8 @@ csi_payload_t nr_ue_aperiodic_csi_reporting(NR_UE_MAC_INST_t *mac, dci_field_t c
         if (report_config->reportConfigId == id) {
           struct NR_CSI_ReportConfig__reportConfigType__aperiodic__reportSlotOffsetList *offset_list = &report_config->reportConfigType.choice.aperiodic->reportSlotOffsetList;
           AssertFatal(tda < offset_list->list.count, "TDA index from DCI %d exceeds slot offset list %d\n", tda, offset_list->list.count);
-          if (k2 == NULL || *k2 < *offset_list->list.array[tda])
-            k2 = offset_list->list.array[tda];
+          if (*k2 < *offset_list->list.array[tda])
+            *k2 = *offset_list->list.array[tda];
           found = c;
           break;
         }
