@@ -80,7 +80,7 @@
                 <class>Iperf</class>
                 <desc>Iperf UDP DL</desc>
                 <id>rfsim4g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim4g_enb_nos1</svr_id>
                 <svr_node>localhost</svr_node>
                 <iperf_args>-u -t 30 -b 2M -R</iperf_args>

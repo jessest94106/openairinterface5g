@@ -80,7 +80,7 @@
                 <class>Iperf2_Unidir</class>
                 <desc>Iperf2 UDP DL</desc>
                 <id>rfsim4g_ue_fembms</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim4g_enb_fembms</svr_id>
                 <svr_node>localhost</svr_node>
                 <iperf_args>-u -t 30 -b 2M</iperf_args>

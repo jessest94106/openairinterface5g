@@ -72,14 +72,14 @@
                 <class>Attach_UE</class>
                 <desc>Attach OAI UE (Wait for IP)</desc>
                 <id>rfsim5g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
         </testCase>
 
         <testCase id="020001">
                 <class>Ping</class>
                 <desc>Ping ext-dn from NR-UE</desc>
                 <id>rfsim5g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
@@ -90,7 +90,7 @@
                 <class>Ping</class>
                 <desc>Ping NR-UE from ext-dn</desc>
                 <id>rfsim5g_ext_dn</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_ue</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
@@ -101,14 +101,14 @@
                 <class>Attach_UE</class>
                 <desc>Verify 2nd PDU session is up</desc>
                 <id>rfsim5g_ue_pdu_2</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
         </testCase>
 
         <testCase id="020003">
                 <class>Ping</class>
                 <desc>Ping ext-dn from NR-UE on PDU session ID 2</desc>
                 <id>rfsim5g_ue_pdu_2</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c 20 -i 0.25</ping_args>
@@ -120,7 +120,7 @@
                 <desc>Iperf (DL/3Mbps/UDP)(20 sec)</desc>
                 <iperf_args>-u -b 3M -t 20 -R</iperf_args>
                 <id>rfsim5g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
@@ -132,7 +132,7 @@
                 <desc>Iperf (UL/1Mbps/UDP)(20 sec)</desc>
                 <iperf_args>-u -b 1M -t 20</iperf_args>
                 <id>rfsim5g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>rfsim5g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <iperf_packetloss_threshold>5</iperf_packetloss_threshold>
