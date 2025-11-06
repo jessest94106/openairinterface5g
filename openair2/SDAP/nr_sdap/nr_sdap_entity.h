@@ -99,6 +99,7 @@ typedef struct nr_sdap_entity_s {
   /// sdap_tun_read_thread needs to know if we are gNB/UE, so for noS1 mode,
   /// store which one we are
   bool is_gnb;
+  bool enable_sdap;
   int pdusession_id;
   int pdusession_sock;
   pthread_t pdusession_thread;
