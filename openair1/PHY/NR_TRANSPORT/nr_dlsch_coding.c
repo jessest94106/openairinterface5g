@@ -203,7 +203,6 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
     // The harq_pid is not unique among the active HARQ processes in the instance so we use dlsch_id instead
     TB_parameters->harq_unique_pid = dlsch_id;
     TB_parameters->BG = rel15->maintenance_parms_v3.ldpcBaseGraph;
-    TB_parameters->Z = harq->Z;
     TB_parameters->A = A;
     start_meas(dlsch_segmentation_stats);
     TB_parameters->Kb = nr_segmentation(harq->b,

@@ -62,12 +62,8 @@ typedef struct {
   uint8_t *b;
   /// Pointers to transport block segments
   uint8_t **c;
-  /// Frame where current HARQ round was sent
-  uint32_t frame;
   /// Interleaver outputs
   uint8_t *f;
-  /// LDPC lifting size
-  uint32_t Z;
   /// REs unavailable for DLSCH (overlapping with PTRS, CSIRS etc.)
   uint32_t unav_res;
 } NR_DL_gNB_HARQ_t;
@@ -118,10 +114,6 @@ typedef struct {
 typedef struct {
   /// Pointers to variables related to DLSCH harq process
   NR_DL_gNB_HARQ_t harq_process;
-  /// Active flag for baseband transmitter processing
-  uint8_t active;
-  /// Number of soft channel bits
-  uint32_t G;
 } NR_gNB_DLSCH_t;
 
 typedef struct {
