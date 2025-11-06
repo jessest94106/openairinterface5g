@@ -37,6 +37,8 @@
 #include "openair2/LAYER2/NR_MAC_UE/mac_defs.h"
 #include "openair2/LAYER2/NR_MAC_UE/mac_proto.h"
 #include "openair2/RRC/NR_UE/rrc_proto.h"
+#include "openair1/PHY/phy_extern_nr_ue.h"
+#include "openair1/PHY/defs_nr_common.h"
 
 #define TELNETSERVERCODE
 #include "telnetsrv.h"
@@ -110,6 +112,26 @@ static int force_deregistration(char *buf, int debug, telnet_printfunc_t prnt)
   return 0;
 }
 
+extern float get_prs_max_dl_toa(prs_meas_t *prs_meas);
+static int get_dl_toa(char *buf, int debug, telnet_printfunc_t prnt)
+{
+  // TODO multiple antennas, resources, gNBs?
+  int gNB_id = 0;
+  int rsc_id = 0;
+  int ant = 0;
+
+  PHY_VARS_NR_UE *UE = PHY_vars_UE_g[0][0];
+  if (!UE || !UE->prs_vars[gNB_id])
+    ERROR_MSG_RET("no UE/prs_vars found!\n");
+  NR_PRS_RESOURCE_t *prs_res = &UE->prs_vars[gNB_id]->prs_resource[rsc_id];
+  if (!prs_res->prs_meas || !prs_res->prs_meas[ant])
+    ERROR_MSG_RET("prs_meas not initialized!\n");
+
+  float max = get_prs_max_dl_toa(prs_res->prs_meas[ant]);
+  prnt("UE max PRS DL ToA %.3f\n", max);
+  return 0;
+}
+
 /* Telnet shell command definitions */
 static telnetshell_cmddef_t cicmds[] = {
   {"sync_state", "[UE_ID(int,opt)]", get_sync_state},
@@ -117,6 +139,7 @@ static telnetshell_cmddef_t cicmds[] = {
   {"force_RRC_IDLE", "", force_RRC_IDLE},
   {"force_crnti_ra", "", force_crnti_ra},
   {"deregistration", "", force_deregistration},
+  {"get_max_dl_toa", "[ant]", get_dl_toa},
   {"", "", NULL},
 };
 

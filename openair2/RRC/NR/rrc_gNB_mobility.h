@@ -56,6 +56,8 @@ typedef struct nr_ho_source_cu {
   ho_cancel_t ho_cancel;
   /// status transfer
   ho_status_transfer_t ho_status_transfer;
+  /// old (source) downlink tunnel
+  gtpu_tunnel_t old_du_tunnel_config;
 } nr_ho_source_cu_t;
 
 /* acknowledgement of handover request. buf+len is the RRC Reconfiguration */

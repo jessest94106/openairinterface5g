@@ -1283,6 +1283,20 @@ static rrc_gNB_ue_context_t *rrc_gNB_get_ue_context_source_cell(gNB_RRC_INST *rr
   return NULL;
 }
 
+/**
+ * @brief Rollback F1-U DL TL and TEID in RRC
+ */
+static void f1u_dl_gtp_rollback(gNB_RRC_UE_t *UE)
+{
+  DevAssert(UE != NULL);
+  DevAssert(UE->ho_context->source != NULL);
+
+  FOR_EACH_SEQ_ARR(drb_t *, drb, &UE->drbs) {
+    drb->du_tunnel_config = UE->ho_context->source->old_du_tunnel_config;
+    LOG_W(NR_RRC, "DRB id %d rollback to tunnel TEID %x\n", drb->drb_id, drb->du_tunnel_config.teid);
+  }
+}
+
 static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
                                                  sctp_assoc_t assoc_id,
                                                  const NR_RRCReestablishmentRequest_IEs_t *req,
@@ -1361,6 +1375,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     }
 
     source_ctx->ho_cancel(rrc, UE);
+    f1u_dl_gtp_rollback(UE);
 
     /* we need the original CellGroupConfig */
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->masterCellGroup);

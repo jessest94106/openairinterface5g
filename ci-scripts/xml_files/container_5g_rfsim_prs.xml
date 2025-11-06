@@ -21,17 +21,16 @@
 
 -->
 <testCaseList>
-        <htmlTabRef>rfsim-4glte-fembms</htmlTabRef>
-        <htmlTabName>Monolithic eNB - FeMBMS</htmlTabName>
+        <htmlTabRef>rfsim-5gnr-prs</htmlTabRef>
+        <htmlTabName>Monolithic gNB with PRS</htmlTabName>
         <htmlTabIcon>wrench</htmlTabIcon>
         <TestCaseRequestedList>
  111111
  800813
+ 000012
  000013
- 000002
- 000014
- 000001
- 030011
+ 040001
+ 040023
  100011
  222222
         </TestCaseRequestedList>
@@ -41,59 +40,53 @@
                 <class>Pull_Local_Registry</class>
                 <desc>Pull Images from Local Registry</desc>
                 <node>localhost</node>
-                <images>oai-enb-asan oai-lte-ue-asan</images>
-        </testCase>
+                <images>oai-gnb-asan oai-nr-ue-asan</images>
+	</testCase>
+
         <testCase id="800813">
                 <class>Create_Workspace</class>
                 <desc>Create new Workspace</desc>
                 <node>localhost</node>
-        </testCase>
-        <testCase id="000001">
-                <class>IdleSleep</class>
-                <desc>Sleep</desc>
-                <idle_sleep_time_in_sec>30</idle_sleep_time_in_sec>
-        </testCase>
+	</testCase>
 
-        <testCase id="000002">
-                <class>IdleSleep</class>
-                <desc>Sleep</desc>
-                <idle_sleep_time_in_sec>10</idle_sleep_time_in_sec>
+        <testCase id="000012">
+                <class>Deploy_Object</class>
+                <desc>Deploy OAI 5G gNB+UE RF sim SA</desc>
+                <node>localhost</node>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_prs</yaml_path>
+                <services>oai-gnb oai-nr-ue</services>
         </testCase>
 
         <testCase id="000013">
-                <class>Deploy_Object</class>
-                <desc>Deploy OAI 4G eNB RF sim (FeMBMS)</desc>
+                <class>Attach_UE</class>
+                <desc>Attach OAI UE (Wait for IP)</desc>
+                <id>rfsim5g_ue</id>
                 <node>localhost</node>
-                <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fembms</yaml_path>
-                <services>oai_enb0</services>
+	</testCase>
+
+        <testCase id="040001">
+                <class>IdleSleep</class>
+                <desc>Sleep</desc>
+                <idle_sleep_time_in_sec>2</idle_sleep_time_in_sec>
         </testCase>
 
-        <testCase id="000014">
-                <class>Deploy_Object</class>
-                <desc>Deploy OAI 4G LTE-UE RF sim (FeMBMS)</desc>
-                <node>localhost</node>
-                <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fembms</yaml_path>
-                <services>oai_ue0</services>
-        </testCase>
-
-        <testCase id="030011">
-                <class>Iperf2_Unidir</class>
-                <desc>Iperf2 UDP DL</desc>
-                <id>rfsim4g_ue_fembms</id>
-                <node>localhost</node>
-                <svr_id>rfsim4g_enb_fembms</svr_id>
-                <svr_node>localhost</svr_node>
-                <iperf_args>-u -t 30 -b 2M</iperf_args>
-                <iperf_packetloss_threshold>25</iperf_packetloss_threshold>
-                <iperf_bitrate_threshold>80</iperf_bitrate_threshold>
-        </testCase>
+	<testCase id="040023">
+		<class>Custom_Script</class>
+		<always_exec>true</always_exec>
+		<desc>Set and verify distance at 50, 100, 150 m</desc>
+		<node>localhost</node>
+		<script>scripts/set-and-verify-distance-prs.sh</script>
+		<args>50 100 150</args>
+	</testCase>
 
         <testCase id="100011">
                 <class>Undeploy_Object</class>
                 <always_exec>true</always_exec>
-                <desc>Undeploy all OAI 4G stack</desc>
+                <desc>Undeploy all OAI 5G stack</desc>
                 <node>localhost</node>
-                <yaml_path>ci-scripts/yaml_files/4g_rfsimulator_fembms</yaml_path>
+                <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_prs</yaml_path>
+                <d_retx_th>30,100,100,100</d_retx_th>
+                <u_retx_th>30,100,100,100</u_retx_th>
         </testCase>
 
         <testCase id="222222">
@@ -101,7 +94,7 @@
                 <always_exec>true</always_exec>
                 <desc>Clean Test Images on Test Server</desc>
                 <node>localhost</node>
-                <images>oai-enb-asan oai-lte-ue-asan</images>
+                <images>oai-gnb-asan oai-nr-ue-asan</images>
         </testCase>
 
 </testCaseList>

@@ -88,14 +88,14 @@
                 <class>Attach_UE</class>
                 <desc>Attach OAI UE</desc>
                 <id>l2sim4g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
         </testCase>
 
         <testCase id="020001">
                 <class>Ping</class>
                 <desc>Ping trf-gen from LTE-UE 1</desc>
                 <id>l2sim4g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>l2sim4g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c 20</ping_args>
@@ -106,7 +106,7 @@
                 <class>Ping</class>
                 <desc>Ping LTE-UE 1 from trf-gen</desc>
                 <id>l2sim4g_ext_dn</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>l2sim4g_ue</svr_id>
                 <svr_node>localhost</svr_node>
                 <ping_args>-c 20</ping_args>
@@ -117,7 +117,7 @@
                 <class>Iperf</class>
                 <desc>Iperf UDP Downlink</desc>
                 <id>l2sim4g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>l2sim4g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <iperf_args>-u -t 30 -b 1M -R</iperf_args>
@@ -129,7 +129,7 @@
                 <class>Iperf</class>
                 <desc>Iperf UDP Uplink</desc>
                 <id>l2sim4g_ue</id>
-                <nodes>localhost</nodes>
+                <node>localhost</node>
                 <svr_id>l2sim4g_ext_dn</svr_id>
                 <svr_node>localhost</svr_node>
                 <iperf_args>-u -t 30 -b 3M</iperf_args>
