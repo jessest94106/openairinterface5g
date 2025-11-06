@@ -47,12 +47,12 @@
 #define NO_INTERP 1
 
 /* Generic function to find the peak of channel estimation buffer */
-void peak_estimator(int32_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *peak_val, int32_t mean_val)
+void peak_estimator(c16_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *peak_val, int32_t mean_val)
 {
   int32_t max_val = 0, max_idx = 0, abs_val = 0;
   for(int k = 0; k < buf_len; k++)
   {
-    abs_val = squaredMod(((c16_t*)buffer)[k]);
+    abs_val = squaredMod(buffer[k]);
     if(abs_val > max_val)
     {
       max_val = abs_val;
@@ -71,6 +71,32 @@ void peak_estimator(int32_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t
   }
 }
 
+void set_prs_dl_toa(prs_meas_t *prs_meas, float dl_toa)
+{
+  int rc = pthread_mutex_lock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_lock() failed: errno %d, %s\n", errno, strerror(errno));
+  *prs_meas->next_dl_toa++ = dl_toa;
+  if (prs_meas->next_dl_toa >= prs_meas->dl_toa + sizeofArray(prs_meas->dl_toa))
+    prs_meas->next_dl_toa = prs_meas->dl_toa;
+  LOG_D(NR_PHY, "next_dl_toa %p\n", prs_meas->next_dl_toa);
+  rc = pthread_mutex_unlock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_unlock() failed: errno %d, %s\n", errno, strerror(errno));
+}
+
+float get_prs_max_dl_toa(prs_meas_t *prs_meas)
+{
+  float max = 0.0f;
+  int rc = pthread_mutex_lock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_lock() failed: errno %d, %s\n", errno, strerror(errno));
+  for (int i = 0; i < sizeofArray(prs_meas->dl_toa); ++i) {
+    max = cmax(max, prs_meas->dl_toa[i]);
+    LOG_I(NR_PHY, "i %d dl_toa %.3f max %.3f\n", i, prs_meas->dl_toa[i], max);
+  }
+  rc = pthread_mutex_unlock(&prs_meas->dl_toa_mtx);
+  AssertFatal(rc == 0, "pthread_mutex_unlock() failed: errno %d, %s\n", errno, strerror(errno));
+  return max;
+}
+
 int nr_prs_channel_estimation(uint8_t gNB_id,
                               uint8_t rsc_id,
                               uint8_t rep_num,
@@ -83,8 +109,8 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
   prs_config_t *prs_cfg  = &ue->prs_vars[gNB_id]->prs_resource[rsc_id].prs_cfg;
   prs_meas_t **prs_meas  = ue->prs_vars[gNB_id]->prs_resource[rsc_id].prs_meas;
   c16_t ch_tmp_buf[ ue->frame_parms.ofdm_symbol_size] __attribute__((aligned(32)));
-  int32_t chF_interpol[frame_params->nb_antennas_rx][NR_PRS_IDFT_OVERSAMP_FACTOR*ue->frame_parms.ofdm_symbol_size] __attribute__((aligned(32)));
-  int32_t chT_interpol[frame_params->nb_antennas_rx][NR_PRS_IDFT_OVERSAMP_FACTOR*ue->frame_parms.ofdm_symbol_size] __attribute__((aligned(32)));
+  c16_t chF_interpol[frame_params->nb_antennas_rx][NR_PRS_IDFT_OVERSAMP_FACTOR*ue->frame_parms.ofdm_symbol_size] __attribute__((aligned(32)));
+  c16_t chT_interpol[frame_params->nb_antennas_rx][NR_PRS_IDFT_OVERSAMP_FACTOR*ue->frame_parms.ofdm_symbol_size] __attribute__((aligned(32)));
   memset(ch_tmp_buf,0,sizeof(ch_tmp_buf));
   memset(chF_interpol,0,sizeof(chF_interpol));
   memset(chT_interpol,0,sizeof(chF_interpol));
@@ -315,10 +341,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
 
         //Start pilot
         c16_t ch = c16MulConjShift(*pil, *rxF, 15);
-        multadd_real_vector_complex_scalar(fl,
-	      	       ch,
-	      	       ch_tmp,
-	      	       16);
+        multadd_real_vector_complex_scalar(fl, ch, ch_tmp, 16);
 
         // SNR & RSRP estimation
         rsrp += squaredMod(*rxF);
@@ -331,10 +354,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
         k   = (k+prs_cfg->CombSize) % frame_params->ofdm_symbol_size;
         rxF = &rxdataF[rxAnt][l * frame_params->ofdm_symbol_size + k];
         ch = c16MulConjShift(*pil, *rxF, 15);
-        multadd_real_vector_complex_scalar(fml,
-	      	       ch,
-	      	       ch_tmp,
-	      	       16);
+        multadd_real_vector_complex_scalar(fml, ch, ch_tmp, 16);
 
         // SNR & RSRP estimation
         rsrp += squaredMod(*rxF);
@@ -352,10 +372,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
         for(int pIdx = 2; pIdx < num_pilots-2; pIdx++)
         {
           c16_t ch = c16MulConjShift(*pil, *rxF, 15);
-          multadd_real_vector_complex_scalar(fmm,
-	      	         ch,
-	      	         ch_tmp,
-	      	         16);
+          multadd_real_vector_complex_scalar(fmm, ch, ch_tmp, 16);
 
           // SNR & RSRP estimation
           rsrp += squaredMod(*rxF);
@@ -372,10 +389,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
 
         //End pilot
         ch = c16MulConjShift(*pil, *rxF, 15);
-        multadd_real_vector_complex_scalar(fmr,
-	      	       ch,
-	      	       ch_tmp,
-	      	       16);
+        multadd_real_vector_complex_scalar(fmr, ch, ch_tmp, 16);
 
         // SNR & RSRP estimation
         rsrp += squaredMod(*rxF);
@@ -388,10 +402,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
         k   = (k+prs_cfg->CombSize) % frame_params->ofdm_symbol_size;
         rxF = &rxdataF[rxAnt][l * frame_params->ofdm_symbol_size + k];
         ch = c16MulConjShift(*pil, *rxF, 15);
-        multadd_real_vector_complex_scalar(fr,
-	      	       ch,
-	      	       ch_tmp,
-	      	       16);
+        multadd_real_vector_complex_scalar(fr, ch, ch_tmp, 16);
 
         // SNR & RSRP estimation
         rsrp += squaredMod(*rxF);
@@ -435,9 +446,9 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
 
     // Place PRS channel estimates in FFT shifted format
     if(first_half > 0)
-      memcpy((int16_t *)&chF_interpol[rxAnt][start_offset], &ch_tmp[0], first_half * sizeof(int32_t));
+      memcpy(&chF_interpol[rxAnt][start_offset], &ch_tmp[0], first_half * sizeof(c16_t));
     if(second_half > 0)
-      memcpy((int16_t *)&chF_interpol[rxAnt][0], &ch_tmp[first_half << 1], second_half * sizeof(int32_t));
+      memcpy(&chF_interpol[rxAnt][0], &ch_tmp[first_half], second_half * sizeof(c16_t));
 
     // Convert to time domain
     freq2time(NR_PRS_IDFT_OVERSAMP_FACTOR * frame_params->ofdm_symbol_size,
@@ -463,9 +474,9 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
     prs_meas[rxAnt]->slot       = proc->nr_slot_rx;
     prs_meas[rxAnt]->rxAnt_idx  = rxAnt;
     prs_meas[rxAnt]->dl_aoa     = rsc_id;
-    prs_meas[rxAnt]->dl_toa = prs_toa / (float)NR_PRS_IDFT_OVERSAMP_FACTOR;
-    if ((frame_params->ofdm_symbol_size - prs_meas[rxAnt]->dl_toa) < frame_params->ofdm_symbol_size / 2)
-      prs_meas[rxAnt]->dl_toa -= (frame_params->ofdm_symbol_size);
+    float dl_toa = prs_toa / (float)NR_PRS_IDFT_OVERSAMP_FACTOR;
+    if ((frame_params->ofdm_symbol_size - dl_toa) < frame_params->ofdm_symbol_size / 2)
+      dl_toa -= (frame_params->ofdm_symbol_size);
     LOG_I(PHY,
           "[gNB %d][rsc %d][Rx %d][sfn %d][slot %d] DL PRS ToA ==> %.1f / %d samples, peak channel power %.1f dBm, SNR %+.1f dB, rsrp %+.1f dBm\n",
           gNB_id,
@@ -473,11 +484,13 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
           rxAnt,
           proc->frame_rx,
           proc->nr_slot_rx,
-          prs_meas[rxAnt]->dl_toa,
+          dl_toa,
           frame_params->ofdm_symbol_size,
           ch_pwr_dbm,
           prs_meas[rxAnt]->snr,
           prs_meas[rxAnt]->rsrp_dBm);
+
+    set_prs_dl_toa(prs_meas[rxAnt], dl_toa);
 
 #ifdef DEBUG_PRS_CHEST
     sprintf(filename, "%s%i%s", "PRSpilot_", rxAnt, ".m");
@@ -496,7 +509,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
     // T tracer dump
     T(T_UE_PHY_INPUT_SIGNAL, T_INT(gNB_id),
       T_INT(proc->frame_rx), T_INT(proc->nr_slot_rx),
-      T_INT(rxAnt), T_BUFFER(&rxdataF[rxAnt][0], frame_params->samples_per_slot_wCP*sizeof(int32_t)));
+      T_INT(rxAnt), T_BUFFER(&rxdataF[rxAnt][0], frame_params->samples_per_slot_wCP*sizeof(c16_t)));
 
     T(T_UE_PHY_DL_CHANNEL_ESTIMATE_FREQ,
       T_INT(gNB_id),
@@ -504,7 +517,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
       T_INT(proc->frame_rx),
       T_INT(proc->nr_slot_rx),
       T_INT(rxAnt),
-      T_BUFFER(&chF_interpol[rxAnt][0], NR_PRS_IDFT_OVERSAMP_FACTOR * frame_params->ofdm_symbol_size * sizeof(int32_t)));
+      T_BUFFER(&chF_interpol[rxAnt][0], NR_PRS_IDFT_OVERSAMP_FACTOR * frame_params->ofdm_symbol_size * sizeof(c16_t)));
 
     T(T_UE_PHY_DL_CHANNEL_ESTIMATE,
       T_INT(gNB_id),
@@ -512,7 +525,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
       T_INT(proc->frame_rx),
       T_INT(proc->nr_slot_rx),
       T_INT(rxAnt),
-      T_BUFFER(&chT_interpol[rxAnt][0], NR_PRS_IDFT_OVERSAMP_FACTOR * frame_params->ofdm_symbol_size * sizeof(int32_t)));
+      T_BUFFER(&chT_interpol[rxAnt][0], NR_PRS_IDFT_OVERSAMP_FACTOR * frame_params->ofdm_symbol_size * sizeof(c16_t)));
   }
 
   return(0);

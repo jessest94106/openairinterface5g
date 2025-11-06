@@ -268,9 +268,10 @@ def ExecuteActionWithParam(action, ctx, node):
 
 	elif action == 'Custom_Script':
 		script = test.findtext('script')
+		args = test.findtext('args')
 		# Allow referencing repository workspace path in XML via %%workspace%%
 		script = script.replace("%%workspace%%", CONTAINERS.eNBSourceCodePath)
-		success = cls_oaicitest.Custom_Script(HTML, node, script)
+		success = cls_oaicitest.Custom_Script(HTML, node, script, args)
 
 	elif action == 'Pull_Cluster_Image':
 		tag_prefix = test.findtext('tag_prefix') or ""

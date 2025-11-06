@@ -39,7 +39,7 @@ int nr_prs_channel_estimation(uint8_t gNB_id,
                               c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP]);
 
 /* Generic function to find the peak of channel estimation buffer */
-void peak_estimator(int32_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *peak_val, int32_t mean_val);
+void peak_estimator(c16_t *buffer, int32_t buf_len, int32_t *peak_idx, int32_t *peak_val, int32_t mean_val);
 
 /*!
 \brief This function performs channel estimation including frequency and temporal interpolation
