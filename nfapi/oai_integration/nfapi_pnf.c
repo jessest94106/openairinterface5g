@@ -1825,13 +1825,6 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   nfapi_nr_send_pnf_start_resp(config, p7_config->phy_id);
   printf("[PNF] Sending first P7 slot indication\n");
 #endif
-#if 1
-  nfapi_pnf_p7_slot_ind(p7_config, p7_config->phy_id, 0, 0);
-  printf("[PNF] Sent first P7 slot ind\n");
-#else
-  nfapi_pnf_p7_subframe_ind(p7_config, p7_config->phy_id, 0); // SFN_SF set to zero - correct???
-  printf("[PNF] Sent first P7 subframe ind\n");
-#endif
 
   return 0;
 }
