@@ -394,14 +394,17 @@ operation. This data structure has in turn two pointers, one to the source CU
 both are present. In N2 and Xn, only one pointer is supposed to be set at the
 corresponding CU.
 
-`nr_ho_source_cu_t` contains notably a function pointer `ho_cancel` for
-handover cancel.  `nr_ho_target_cu_t` contains function pointers `ho_req_ack`
+- `nr_ho_source_cu_t` contains notably a function pointer `ho_cancel` for
+handover cancel.  
+- `nr_ho_target_cu_t` contains function pointers `ho_req_ack`
 for handover request acknowledge, `ho_success` for handover success,
 `ho_failure` for handover failure (N2 only).
 be seen in the sequence diagram above, either the "target CU" or "source CU"
 needs to do an operation, and a "switch" from target to source CU is done using
-these function pointers. For instance, in F1, the handover request acknowledge
+these function pointers. 
+- For instance, in F1, the handover request acknowledge
 function pointers merely calls another (RRC) function which triggers a
-reconfiguration. In the case of N2, the handover request acknowledge function
+reconfiguration. 
+- In the case of N2, the handover request acknowledge function
 pointer should trigger the NGAP Handover Request Acknowledge, and the handover
 success function pointer should trigger the NGAP Handover Success message.

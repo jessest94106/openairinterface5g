@@ -90,6 +90,7 @@ UE 2460: LCID 4: TX     1526169592 RX          16152 bytes
 ```
 
 In the first line,
+
 * `UE RNTI` (here `2460`): this is also used as the DU UE ID over F1; each line
   is prepended with the RNTI
 * `CU UE ID` (`2`): separate identifier from the RNTI to handle multiple
@@ -109,6 +110,7 @@ In the first line,
 The second and third line reflect channel state information (CSI) as
 reported by the UE, and only appear if CSI-RS/SRS are enabled and _received_
 (for some bands, they cannot be enabled):
+
 * `CQI` (`15`): the channel quality indicator is a number between 0 and 15. It
   indicates the achievable spectral efficiency of the UE. 15 means highest, 0
   is lowest. This corresponds to a 4-bit table in 38.214 with actual spectral
@@ -121,6 +123,7 @@ reported by the UE, and only appear if CSI-RS/SRS are enabled and _received_
 * `UL-RI`, `TPMI`: same as DL.
 
 The fourth and fifth line show HARQ-related information:
+
 * `dlsch_rounds A/B/C/D` (`32917/5113/1504/560`). This is the number of
   transmissions by the gNB for each round of the HARQ protocol. `A` is the first
   round, B is the second, etc. If `A` is high and `B` is low, `C` is lower and `D` is
@@ -168,6 +171,7 @@ The fourth and fifth line show HARQ-related information:
   but could not allocate the DCI.
 
 In the last lines:
+
 * `MAC` shows the amount of MAC PDU bytes scheduled in transmit (`TX`,
   `1530943191`) and receive (`RX`, `194148`) directions
 * `LCID X` shows the amount of MAC SDU/RLC PDU data for Logical Channel ID with
@@ -321,6 +325,7 @@ The TDD configuration parameters allow to use one or two TDD patterns.
 #### Single TDD pattern
 
 Configure the TDD pattern through these options:
+
 - `dl_UL_TransmissionPeriodicity`: Refers to the UL/DL slots periodicity for
   the TDD pattern. See below for valid numbers.
 - `nrofDownlinkSlots`: Refers to the number of consecutive DL slots in the TDD

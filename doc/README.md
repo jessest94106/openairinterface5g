@@ -40,17 +40,17 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
 # Tutorials
 
 - Step-by-step tutorials to set up 5G:
-  * [OAI 5GC](./NR_SA_Tutorial_OAI_CN5G.md)
-  * [OAI gNB with COTS UE](./NR_SA_Tutorial_COTS_UE.md)
-  * [OAI NR-UE](./NR_SA_Tutorial_OAI_nrUE.md)
-  * [Multiple OAI NR-UE with RFsimulator](./NR_SA_Tutorial_OAI_multi_UE.md)
+    * [OAI 5GC](./NR_SA_Tutorial_OAI_CN5G.md)
+    * [OAI gNB with COTS UE](./NR_SA_Tutorial_COTS_UE.md)
+    * [OAI NR-UE](./NR_SA_Tutorial_OAI_nrUE.md)
+    * [Multiple OAI NR-UE with RFsimulator](./NR_SA_Tutorial_OAI_multi_UE.md)
 - [RUNMODEM.md](./RUNMODEM.md): Generic information on how to
-  * Run simulators
-  * Run with hardware
-  * Specific OAI modes (phy-test, do-ra, noS1)
-  * (5G) Using SDAP and custom DRBs
-  * IF setups and arbitrary frequencies
-  * MIMO
+    * Run simulators
+    * Run with hardware
+    * Specific OAI modes (phy-test, do-ra, noS1)
+    * (5G) Using SDAP and custom DRBs
+    * IF setups and arbitrary frequencies
+    * MIMO
 - [How to run OAI with O-RAN 7.2 FHI](./ORAN_FHI7.2_Tutorial.md)
 - [How to run a 5G-NSA setup](./TESTING_OAI_NSA_COTS_UE.md)
 - [How to run a 4G setup using L1 simulator](./L1SIM.md) _Note: we recommend the RFsimulator_

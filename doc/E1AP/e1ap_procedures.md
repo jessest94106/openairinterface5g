@@ -16,18 +16,21 @@
 
 # Introduction
 The E1 interface is between the gNB-CU-CP (Central Unit - Control Plane) and gNB-CU-UP (Central Unit - User Plane) nodes. This interface is governed by the E1 Application Protocol (E1AP) outlined in the 3GPP release 16 specifications, specifically in the documents:
+
 * 3GPP TS 38.463 - E1 Application Protocol (E1AP)
 * 3GPP TS 38.460 - E1 general aspects and principles
 * 3GPP TS 38.461 - E1 interface: layer 1 
 * 3GPP TS 38.462 - E1 interface: signaling transport
 
 The E1AP protocol consists of the following sets of functions:
+
 * E1 Interface Management functions
 * E1 Bearer Context Management functions
 * TEID allocation function
 
 ## E1 Bearer Context Management function
 This function handles the establishment, modification, and release of E1 bearer contexts.
+
 * E1 Bearer Context Establishment: initiation of E1 bearer context is by gNB-CU-CP and acceptance or rejection is determined by gNB-CU-UP based on admission control criteria (e.g., resource availability).
 * E1 Bearer Context Modification: can be initiated by either gNB-CU-CP or gNB-CU-UP, with the receiving node having the authority to accept or reject the modification.
 * Release of Bearer Context: can be triggered either directly by gNB-CU-CP or following a request from gNB-CU-UP.

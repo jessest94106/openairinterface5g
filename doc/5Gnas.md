@@ -2,7 +2,7 @@
 
 This document provides an overview of the 5G System Non-Access Stratum (5GS NAS) protocol as specified in 3GPP TS 24.501. It highlights key message types involved in Mobility and Session Management and explains how these are implemented within the OAI software stack. The document outlines the structure of the OAI codebase by detailing current support for encoding, decoding, and unit testing of specific NAS messages, and explains how the UE handles USIM simulation and message generation.
 
-[TOC]
+[[_TOC_]]
 
 # About 5GS NAS
 
@@ -42,21 +42,28 @@ The following tables lists implemented NAS messages and whether there is an enco
 * Handles 5GMM state and mode
 
 [openair3/NAS/NR_UE/5GS/fgs_nas_lib.c](../openair3/NAS/NR_UE/5GS/fgs_nas_lib.c):
+
 [openair3/NAS/NR_UE/5GS/NR_NAS_defs.h](../openair3/NAS/NR_UE/5GS/NR_NAS_defs.h):
+
 * encoding and decoding functions for 5G NAS message headers and payloads
 * relies on 5GMM/5GSM messages libs for payload encoding
 
 [openair3/NAS/NR_UE/5GS/fgs_nas_utils.h](../openair3/NAS/NR_UE/5GS/fgs_nas_utils.h):
+
 * NAS helpers, macros
 
 [openair3/NAS/NR_UE/5GS/5GMM](../openair3/NAS/NR_UE/5GS/5GMM):
+
 * encoding/decoding functions and definitions for 5GMM NAS messages payloads
 
 [openair3/NAS/NR_UE/5GS/5GMM/MSG/fgmm_lib.c](../openair3/NAS/NR_UE/5GS/5GMM/MSG/fgmm_lib.c):
+
 [openair3/NAS/NR_UE/5GS/5GMM/MSG/fgmm_lib.h](../openair3/NAS/NR_UE/5GS/5GMM/MSG/fgmm_lib.h):
+
 * encoding/decoding functions and definitions for common 5GMM IEs
 
 [openair3/NAS/NR_UE/5GS/5GSM](../openair3/NAS/NR_UE/5GS/5GSM):
+
 * encoding and decoding functions for 5GSM NAS messages payloads
 
 # USIM Simulation
