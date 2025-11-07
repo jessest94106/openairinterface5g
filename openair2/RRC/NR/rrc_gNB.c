@@ -1250,7 +1250,10 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
 }
 
 /// @brief Function tha processes RRCReestablishmentComplete message sent by the UE, after RRCReestasblishment request.
-static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const uint8_t xid)
+static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc,
+                                                       gNB_RRC_UE_t *ue_p,
+                                                       const uint8_t xid,
+                                                       const sctp_assoc_t assoc_id)
 {
   LOG_I(NR_RRC, "UE %d Processing NR_RRCReestablishmentComplete from UE\n", ue_p->rrc_ue_id);
 
@@ -1274,26 +1277,40 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RR
   /* PDCP Reestablishment of DRBs according to 5.3.5.6.5 of 3GPP TS 38.331 (over E1) */
   cuup_notify_reestablishment(rrc, ue_p);
 
-  // Request DU to provide CellGroupConfig with reestablishRLC flags for re-establishment
-  // According to TS 38.473 transparency requirements, CU should not construct or re-encode CellGroupConfig
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
 
-  f1ap_ue_context_mod_req_t ue_context_modif_req = {
-      .gNB_CU_ue_id = ue_p->rrc_ue_id,
-      .gNB_DU_ue_id = ue_data.secondary_ue,
-  };
+  bool different_du_detected = !ue_p->f1_ue_context_active;
+  if (different_du_detected) {
+    /** Handle UE access on a different DU than the original one
+     * Per 38.401 8.7: "If the UE accessed from a gNB-DU other than the original
+     * one, the gNB-CU should trigger the UE Context Setup procedure". */
+    /* UE is accessing a different DU - trigger UE Context Setup per TS 38.401 §8.7 */
+    nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, assoc_id);
+    if (du == NULL) {
+      LOG_E(NR_RRC, "UE %d: cannot find DU for assoc_id %d\n", ue_p->rrc_ue_id, assoc_id);
+      return;
+    }
+    rrc_f1_ue_context_setup_for_target_du(rrc, ue_p, du, NULL);
+  } else {
+    // Request DU to provide CellGroupConfig with reestablishRLC flags for re-establishment
+    // According to TS 38.473 transparency requirements, CU should not construct or re-encode CellGroupConfig
+    f1ap_ue_context_mod_req_t ue_context_modif_req = {
+        .gNB_CU_ue_id = ue_p->rrc_ue_id,
+        .gNB_DU_ue_id = ue_data.secondary_ue,
+    };
 
-  // Request CellGroupConfig from DU in the response
-  ue_context_modif_req.gNB_DU_Configuration_Query = calloc_or_fail(1, sizeof(bool));
-  *ue_context_modif_req.gNB_DU_Configuration_Query = true;
+    // Request CellGroupConfig from DU in the response
+    ue_context_modif_req.gNB_DU_Configuration_Query = calloc_or_fail(1, sizeof(*ue_context_modif_req.gNB_DU_Configuration_Query));
+    *ue_context_modif_req.gNB_DU_Configuration_Query = true;
 
-  /** Send UE context modification request to DU, which will respond with CellGroupConfig
-   * containing reestablishRLC flags for re-establishment.
-   * The response will be handled in rrc_CU_process_ue_context_modification_response()
-   * which will store the encoded CellGroupConfig and trigger RRC Reconfiguration */
-  rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &ue_context_modif_req);
-
+    /** Send UE context modification request to DU, which will respond with CellGroupConfig
+     * containing reestablishRLC flags for re-establishment.
+     * The response will be handled in rrc_CU_process_ue_context_modification_response()
+     * which will store the encoded CellGroupConfig and trigger RRC Reconfiguration */
+    rrc->mac_rrc.ue_context_modification_request(ue_data.du_assoc_id, &ue_context_modif_req);
+    free_ue_context_mod_req(&ue_context_modif_req);
+  }
 }
 
 int nr_rrc_reconfiguration_req(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p, const int dl_bwp_id, const int ul_bwp_id)
@@ -1546,11 +1563,46 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     if (assoc_id != ue_data.du_assoc_id) {
       /* Different DU scenario - physCellId differs because UE is re-establishing on a different DU.
        * Re-establishment is allowed, UE Context Setup will be triggered at RRCReestablishmentComplete. */
+      // Store original du_assoc_id and du_ue_id for immediate release
+      const sctp_assoc_t old_du_assoc_id = ue_data.du_assoc_id;
+      const uint32_t old_du_ue_id = ue_data.secondary_ue;
       LOG_I(NR_RRC,
-            "UE %d: Re-establishment on different DU (physCellId %ld from old cell != %d from new DU)\n",
+            "UE %d: Re-establishment on different DU (physCellId %ld from old cell != %d from new DU, du_assoc_id %d -> %d)\n",
             UE->rrc_ue_id,
             physCellId,
-            cell_info->nr_pci);
+            cell_info->nr_pci,
+            ue_data.du_assoc_id,
+            assoc_id);
+
+      // Update to new DU
+      ue_data.du_assoc_id = assoc_id;
+
+      /* Release old DU context immediately per 3GPP TS 38.473 §8.3.3.2:
+       * "Interactions with UE Context Setup procedure:
+       * The UE Context Release procedure may be performed before the UE Context Setup
+       * procedure to release an existing UE-associated logical F1-connection and related
+       * resources in the gNB-DU" */
+      DevAssert(old_du_ue_id != 0);
+      RETURN_IF_INVALID_ASSOC_ID(old_du_assoc_id);
+      f1ap_ue_context_rel_cmd_t cmd = {
+          .gNB_CU_ue_id = UE->rrc_ue_id,
+          .gNB_DU_ue_id = old_du_ue_id,
+          .cause = F1AP_CAUSE_RADIO_NETWORK,
+          .cause_value = F1AP_CauseRadioNetwork_normal_release,
+      };
+      rrc->mac_rrc.ue_context_release_command(old_du_assoc_id, &cmd);
+      LOG_I(NR_RRC,
+            "UE %d: Re-establishment on different DU - releasing old DU immediately (assoc_id %d, DU UE ID %u)\n",
+            UE->rrc_ue_id,
+            old_du_assoc_id,
+            old_du_ue_id);
+
+      // on a new DU: we will have to send f1_ue_context again
+      UE->f1_ue_context_active = false;
+
+      // Update f1_ue_data after release
+      bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
+      DevAssert(success);
     } else {
       /* Same DU but different physCellId - "too fast movement" scenario:
        * UE was moving from previous cell so quickly that RRCReestablishment for previous cell was received in this cell */
@@ -1763,17 +1815,21 @@ static void rrc_gNB_process_MeasurementReport(gNB_RRC_INST *rrc, gNB_RRC_UE_t *U
   LOG_E(NR_RRC, "Incoming Report Type: %d is not supported! \n", report_config->choice.reportConfigNR->reportType.present);
 }
 
-static int handle_rrcReestablishmentComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_RRCReestablishmentComplete_t *cplt)
+static void handle_rrcReestablishmentComplete(gNB_RRC_INST *rrc,
+                                              gNB_RRC_UE_t *UE,
+                                              const uint32_t gNB_DU_ue_id,
+                                              const NR_RRCReestablishmentComplete_t *cplt,
+                                              const sctp_assoc_t assoc_id)
 {
   NR_RRCReestablishmentComplete__criticalExtensions_PR p = cplt->criticalExtensions.present;
   if (p != NR_RRCReestablishmentComplete__criticalExtensions_PR_rrcReestablishmentComplete) {
     LOG_E(NR_RRC, "UE %d: expected presence of rrcReestablishmentComplete, but message has %d\n", UE->rrc_ue_id, p);
-    return -1;
+    return;
   }
-  rrc_gNB_process_RRCReestablishmentComplete(rrc, UE, cplt->rrc_TransactionIdentifier);
+
+  rrc_gNB_process_RRCReestablishmentComplete(rrc, UE, cplt->rrc_TransactionIdentifier, assoc_id);
 
   UE->ue_reestablishment_counter++;
-  return 0;
 }
 
 /**
@@ -2079,7 +2135,7 @@ static void rrc_gNB_generate_UECapabilityEnquiry(gNB_RRC_INST *rrc, gNB_RRC_UE_t
   nr_rrc_transfer_protected_rrc_message(rrc, ue, DL_SCH_LCID_DCCH, msg_id, buffer, size);
 }
 
-static int rrc_gNB_decode_dcch(gNB_RRC_INST *rrc, const f1ap_ul_rrc_message_t *msg)
+static int rrc_gNB_decode_dcch(gNB_RRC_INST *rrc, const f1ap_ul_rrc_message_t *msg, const sctp_assoc_t assoc_id)
 {
   /* we look up by CU UE ID! Do NOT change back to RNTI! */
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, msg->gNB_CU_ue_id);
@@ -2184,7 +2240,8 @@ static int rrc_gNB_decode_dcch(gNB_RRC_INST *rrc, const f1ap_ul_rrc_message_t *m
 
       case NR_UL_DCCH_MessageType__c1_PR_rrcReestablishmentComplete:
         LOG_UE_UL_EVENT(UE, "Received RRCReestablishmentComplete\n");
-        handle_rrcReestablishmentComplete(rrc, UE, ul_dcch_msg->message.choice.c1->choice.rrcReestablishmentComplete);
+        const NR_RRCReestablishmentComplete_t *rc = ul_dcch_msg->message.choice.c1->choice.rrcReestablishmentComplete;
+        handle_rrcReestablishmentComplete(rrc, UE, msg->gNB_DU_ue_id, rc, assoc_id);
         break;
 
       default:
@@ -2706,6 +2763,37 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_
     return;
   }
 
+  /* Check if UE is accessing a different DU than its current one */
+  f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
+
+  /** Refuse UE Context Modification Required from any DU if:
+   * UE Context Setup Request was sent but Setup Response hasn't arrived yet.
+   * This includes the case where UE is re-establishing on a different DU. The CU has
+   * already triggered UE Context Setup on the new DU (per TS 38.401 §8.7), and Setup Response
+   * is pending. Modification Required from any DU during this transition should be refused
+   * to avoid conflicts with the ongoing Setup procedure.
+   *
+   * Note: according to TS 38.401 §8.7 "it is assumed that the UE accessed the original gNB-DU
+   * where the UE context is available for that UE, and either steps 9-10 or steps 9’-10’
+   * may be executed or both could be skipped."
+   * By design, CU-CP will trigger UE Context Setup Modification Request and DU does not send
+   * Modification Required during re-establishment. */
+  if (!UE->f1_ue_context_active) {
+    LOG_W(NR_RRC,
+          "UE %d: UE Context Modification Required received while UE Context Setup is pending (CU UE ID %d), refusing\n",
+          UE->rrc_ue_id,
+          required->gNB_CU_ue_id);
+    f1ap_ue_context_modif_refuse_t refuse = {
+        .gNB_CU_ue_id = required->gNB_CU_ue_id,
+        .gNB_DU_ue_id = required->gNB_DU_ue_id,
+        .cause = F1AP_CAUSE_RADIO_NETWORK,
+        .cause_value = F1AP_CauseRadioNetwork_interaction_with_other_procedure,
+    };
+    rrc->mac_rrc.ue_context_modification_refuse(msg_p->ittiMsgHeader.originInstance, &refuse);
+    return;
+  }
+
   if (required->du_to_cu_rrc_information && required->du_to_cu_rrc_information->cellGroupConfig) {
     gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
     LOG_I(RRC,
@@ -3152,7 +3240,7 @@ void *rrc_gnb_task(void *args_p) {
       /* Messages from PDCP */
       /* From DU -> CU */
       case F1AP_UL_RRC_MESSAGE:
-        rrc_gNB_decode_dcch(RC.nrrrc[instance], &F1AP_UL_RRC_MESSAGE(msg_p));
+        rrc_gNB_decode_dcch(RC.nrrrc[instance], &F1AP_UL_RRC_MESSAGE(msg_p), msg_p->ittiMsgHeader.originInstance);
         free_ul_rrc_message_transfer(&F1AP_UL_RRC_MESSAGE(msg_p));
         break;
 

@@ -733,7 +733,8 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   AssertFatal(UE, "no UE found or could not be created, but UE Context Setup Failed not implemented\n");
   resp.gNB_DU_ue_id = UE->rnti;
 
-  NR_CellGroupConfig_t *new_CellGroup = clone_CellGroupConfig(UE->CellGroup);
+  NR_CellGroupConfig_t *new_CellGroup = get_cellgroup_config(UE);
+
   // Needed for DRB Setup (e.g., RLC might reduce SN size)
   UE->capability = ue_cap;
 
@@ -755,6 +756,15 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     // store the new UE capabilities, and update the cellGroupConfig
     // only to be done if we did not already update through the cg_configinfo
     update_cellGroupConfig(new_CellGroup, UE->uid, UE->capability, &mac->radio_config, scc);
+  }
+
+  /* During re-establishment, prepare CellGroupConfig for UE Context Setup response.
+   * Per TS 38.401 §8.7: when a UE re-establishes on a different DU, the CU triggers
+   * UE Context Setup on the new DU. The DU must respond with a CellGroupConfig that has
+   * reestablishRLC flags set for all RLC bearers except SRB1. This prepares the CellGroupConfig
+   * for transparent forwarding to the UE per TS 38.473 transparency requirements. */
+  if (UE->reestablish_rlc) {
+    update_cellgroup_for_reestablishment(UE, new_CellGroup);
   }
 
   if (!ue_id_provided && cg_configinfo == NULL) {
