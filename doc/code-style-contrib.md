@@ -260,5 +260,5 @@ When reporting a bug, please clearly
   command lines).
 
 You are encouraged to use these bullet points to structure your issue for easy
-understanding.  Use code tags (the "insert code" button with symbol `</>` in
+understanding.  Use code tags (the "insert code" button with symbol &lt;/&gt; in
 the gitlab editor) for logs and small code snippets.
