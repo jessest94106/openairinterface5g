@@ -1718,7 +1718,10 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc,
       rrc->arfcn_ssb = *dcc->frequencyInfoDL->absoluteFrequencySSB;
 
     // consider the target SpCell to be one with a physical cell identity indicated by the physCellId
-    rrc->phyCellID = *reconfigurationWithSync->spCellConfigCommon->physCellId;
+    if (!reconfigurationWithSync->spCellConfigCommon->physCellId)
+      LOG_E(NR_RRC, "physCellId absent but should be mandatory present upon cell change and cell addition\n");
+    else
+      rrc->phyCellID = *reconfigurationWithSync->spCellConfigCommon->physCellId;
   }
 
   NR_UE_Timers_Constants_t *tac = &rrc->timers_and_constants;
