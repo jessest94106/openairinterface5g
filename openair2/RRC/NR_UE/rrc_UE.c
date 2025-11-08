@@ -747,12 +747,15 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
 {
   AssertFatal(!fullConfig, "fullConfig not supported yet\n");
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
-  uper_decode(NULL,
-              &asn_DEF_NR_CellGroupConfig,   //might be added prefix later
-              (void **)&cellGroupConfig,
-              (uint8_t *)masterCellGroup->buf,
-              masterCellGroup->size, 0, 0);
-
+  asn_dec_rval_t dec_rval = uper_decode(NULL,
+                                        &asn_DEF_NR_CellGroupConfig, //might be added prefix later
+                                        (void **)&cellGroupConfig,
+                                        (uint8_t *)masterCellGroup->buf,
+                                        masterCellGroup->size, 0, 0);
+  if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
+    LOG_E(NR_RRC, "CellGroupConfig decode error\n");
+    return;
+  }
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
   }
