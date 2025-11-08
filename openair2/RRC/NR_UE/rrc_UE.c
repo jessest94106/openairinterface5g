@@ -826,28 +826,30 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
   NR_RRCReconfiguration_v1540_IEs_t *rec_1540 = rec_1530->nonCriticalExtension;
   if (rec_1540) {
     NR_RRCReconfiguration_v1560_IEs_t *rec_1560 = rec_1540->nonCriticalExtension;
-    if (rec_1560->sk_Counter) {
-      // TODO perform AS security key update procedure as specified in 5.3.5.7
-      LOG_E(NR_RRC, "RRCReconfiguration includes sk-Counter but this is not implemented yet\n");
-    }
-    if (rec_1560->mrdc_SecondaryCellGroupConfig) {
-      // TODO perform handling of mrdc-SecondaryCellGroupConfig as specified in 5.3.5.3
-      LOG_E(NR_RRC, "RRCReconfiguration includes mrdc-SecondaryCellGroupConfig but this is not handled yet\n");
-    }
-    if (rec_1560->radioBearerConfig2) {
-      NR_RadioBearerConfig_t *RadioBearerConfig = NULL;
-      asn_dec_rval_t dec_rval = uper_decode(NULL,
-                                            &asn_DEF_NR_RadioBearerConfig,
-                                            (void **)&RadioBearerConfig,
-                                            (uint8_t *)rec_1560->radioBearerConfig2->buf,
-                                            rec_1560->radioBearerConfig2->size,
-                                            0,
-                                            0);
-      if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-        LOG_E(NR_RRC, "radioBearerConfig2 decode error\n");
-        SEQUENCE_free(&asn_DEF_NR_RadioBearerConfig, RadioBearerConfig, 1);
-      } else
-        nr_rrc_ue_process_RadioBearerConfig(rrc, RadioBearerConfig);
+    if (rec_1560) {
+      if (rec_1560->sk_Counter) {
+        // TODO perform AS security key update procedure as specified in 5.3.5.7
+        LOG_E(NR_RRC, "RRCReconfiguration includes sk-Counter but this is not implemented yet\n");
+      }
+      if (rec_1560->mrdc_SecondaryCellGroupConfig) {
+        // TODO perform handling of mrdc-SecondaryCellGroupConfig as specified in 5.3.5.3
+        LOG_E(NR_RRC, "RRCReconfiguration includes mrdc-SecondaryCellGroupConfig but this is not handled yet\n");
+      }
+      if (rec_1560->radioBearerConfig2) {
+        NR_RadioBearerConfig_t *RadioBearerConfig = NULL;
+        asn_dec_rval_t dec_rval = uper_decode(NULL,
+                                              &asn_DEF_NR_RadioBearerConfig,
+                                              (void **)&RadioBearerConfig,
+                                              (uint8_t *)rec_1560->radioBearerConfig2->buf,
+                                              rec_1560->radioBearerConfig2->size,
+                                              0,
+                                              0);
+        if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
+          LOG_E(NR_RRC, "radioBearerConfig2 decode error\n");
+          SEQUENCE_free(&asn_DEF_NR_RadioBearerConfig, RadioBearerConfig, 1);
+        } else
+          nr_rrc_ue_process_RadioBearerConfig(rrc, RadioBearerConfig);
+      }
     }
   }
 }
