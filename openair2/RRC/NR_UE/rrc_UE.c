@@ -1161,20 +1161,19 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
           LOG_E(NR_RRC, "\n");
           // free the memory
           SEQUENCE_free(&asn_DEF_NR_CellGroupConfig, (void *)cellGroupConfig, 1);
+        } else {
+          if (LOG_DEBUGFLAG(DEBUG_ASN1))
+            xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
+
+          nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index);
+          AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
+          nr_mac_rrc_message_t rrc_msg = {0};
+          rrc_msg.payload_type = NR_MAC_RRC_CONFIG_CG;
+          nr_mac_rrc_config_cg_t *config_cg = &rrc_msg.payload.config_cg;
+          config_cg->cellGroupConfig = cellGroupConfig;
+          config_cg->UE_NR_Capability = rrc->UECap.UE_NR_Capability;
+          nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
         }
-
-        if (LOG_DEBUGFLAG(DEBUG_ASN1))
-          xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
-
-        nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index);
-
-        AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
-        nr_mac_rrc_message_t rrc_msg = {0};
-        rrc_msg.payload_type = NR_MAC_RRC_CONFIG_CG;
-        nr_mac_rrc_config_cg_t *config_cg = &rrc_msg.payload.config_cg;
-        config_cg->cellGroupConfig = cellGroupConfig;
-        config_cg->UE_NR_Capability = rrc->UECap.UE_NR_Capability;
-        nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
       }
       if (ie->measConfig) {
         LOG_I(NR_RRC, "RRCReconfiguration includes Measurement Configuration\n");
