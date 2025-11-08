@@ -1684,8 +1684,13 @@ static void nr_rrc_manage_rlc_bearers(NR_UE_RRC_INST_t *rrc, const NR_CellGroupC
           nr_rlc_set_rlf_handler(rrc->ue_id, nr_rrc_signal_maxrtxindication);
         } else { // DRB
           NR_DRB_Identity_t drb_id = rlc_bearer->servedRadioBearer->choice.drb_Identity;
-          nr_rlc_add_drb(rrc->ue_id, drb_id, rlc_bearer);
-          nr_rlc_set_rlf_handler(rrc->ue_id, nr_rrc_signal_maxrtxindication);
+          if (!rlc_bearer->rlc_Config) {
+            LOG_E(RLC, "RLC-Config not present but is mandatory for setup\n");
+            rrc->active_RLC_entity[lcid] = false;
+          } else {
+            nr_rlc_add_drb(rrc->ue_id, drb_id, rlc_bearer);
+            nr_rlc_set_rlf_handler(rrc->ue_id, nr_rrc_signal_maxrtxindication);
+          }
         }
       }
     }

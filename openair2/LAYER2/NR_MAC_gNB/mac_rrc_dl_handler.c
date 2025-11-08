@@ -329,7 +329,7 @@ static int handle_ue_context_drbs_setup(NR_UE_info_t *UE,
       *rlc_BearerConfig->rlc_Config->choice.am->dl_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size12;
       *rlc_BearerConfig->rlc_Config->choice.am->ul_AM_RLC.sn_FieldLength = NR_SN_FieldLengthAM_size12;
     }
-
+    AssertFatal(rlc_BearerConfig->rlc_Config, "We expect rlc-Config to be always present when we configure a DRB\n");
     nr_rlc_add_drb(UE->rnti, drb->id, rlc_BearerConfig);
 
     nr_lc_config_t c = {.lcid = rlc_BearerConfig->logicalChannelIdentity, .nssai = drb->nr.nssai};
