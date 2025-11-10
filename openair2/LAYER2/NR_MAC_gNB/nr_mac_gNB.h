@@ -191,6 +191,7 @@ typedef struct nr_mac_config_t {
   int minRXTXTIME;
   int do_CSIRS;
   int do_SRS;
+  int do_TCI;
   int max_num_rsrp;
   bool force_256qam_off;
   bool force_UL256qam_off;

@@ -3573,10 +3573,8 @@ void nr_mac_release_ue(gNB_MAC_INST *mac, int rnti)
   mac_remove_nr_ue(mac, rnti);
 }
 
-static void beam_switching_procedure(NR_UE_info_t *UE)
+static void beam_switching_procedure(NR_UE_info_t *UE, int new_beam_index)
 {
-  NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  int new_beam_index = sched_ctrl->UE_mac_ce_ctrl.tci_state_ind.tciStateId;
   LOG_I(NR_MAC, "[UE %x] Switching to beam with ID %d (from %d)\n", UE->rnti, new_beam_index, UE->UE_beam_index);
   UE->UE_beam_index = new_beam_index;
 }
@@ -3621,7 +3619,7 @@ void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot)
     }
     if (nr_timer_tick(&sched_ctrl->tci_beam_switch)) {
       nr_timer_stop(&sched_ctrl->tci_beam_switch);
-      beam_switching_procedure(UE);
+      beam_switching_procedure(UE, sched_ctrl->UE_mac_ce_ctrl.tci_state_ind.tciStateId);
     }
   }
 }
@@ -3754,11 +3752,18 @@ void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   // do not perform beam procedures if there is no beam information
   if (mac->beam_info.beam_mode == NO_BEAM_MODE)
     return;
-  NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  tciStateInd_t *tci = &sched_ctrl->UE_mac_ce_ctrl.tci_state_ind;
-  RSRP_report_t *rsrp_report = &sched_ctrl->CSI_report.ssb_rsrp_report;
+
   // simple beam switching algorithm -> we select beam with highest RSRP from CSI report
+  NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+  RSRP_report_t *rsrp_report = &sched_ctrl->CSI_report.ssb_rsrp_report;
   int new_bf_index = get_beam_from_ssbidx(mac, rsrp_report->resource_id[0]);
+  if (!mac->radio_config.do_TCI) { // if not TCI is configure we switch beam directly
+    if (UE->UE_beam_index != new_bf_index)
+      beam_switching_procedure(UE, new_bf_index);
+    return;
+  }
+
+  tciStateInd_t *tci = &sched_ctrl->UE_mac_ce_ctrl.tci_state_ind;
   if (UE->UE_beam_index == new_bf_index) {
     if (tci->is_scheduled) {
       LOG_I(NR_MAC, "[UE %x] Stopping procedure to switch beam, old beam reported as best again\n", UE->rnti);
