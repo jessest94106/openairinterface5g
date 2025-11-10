@@ -180,6 +180,11 @@ bool generate_srs_nr(const NR_DL_FRAME_PARMS *frame_parms,
   LOG_I(NR_PHY,"M_sc_b_SRS = %i\n", M_sc_b_SRS);
 #endif
 
+  AssertFatal(l0 + nr_srs_info->N_symb_SRS - 1 < frame_parms->symbols_per_slot,
+              "last symbol index %d should be < %d\n",
+              l0 + nr_srs_info->N_symb_SRS,
+              frame_parms->symbols_per_slot - 1);
+
   // Validation of SRS config parameters
 
   if (nr_srs_info->R == 0) {

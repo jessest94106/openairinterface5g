@@ -314,12 +314,13 @@ bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
     return false;
   }
 
+  NR_DL_FRAME_PARMS *frame_parms = &(ue->frame_parms);
   fapi_nr_ul_config_srs_pdu *srs_config_pdu = &phy_data->srs_vars.srs_config_pdu;
-  int first_srs_symbol = ue->frame_parms.symbols_per_slot - 1 - srs_config_pdu->time_start_position;
+  const uint8_t l0 = frame_parms->symbols_per_slot - 1 - srs_config_pdu->time_start_position;
   // Num consecutive SRS symbols according to 38.211 6.4.1.4.1
   int num_srs_symbols[] = {1, 2, 4, 8, 12};
-  int last_srs_symbol = first_srs_symbol + num_srs_symbols[srs_config_pdu->num_symbols] - 1;
-  for (int i = first_srs_symbol; i <= last_srs_symbol; i++) {
+  int last_srs_symbol = l0 + num_srs_symbols[srs_config_pdu->num_symbols] - 1;
+  for (int i = l0; i <= last_srs_symbol; i++) {
     was_symbol_used[i] = true;
   }
 
@@ -351,8 +352,7 @@ bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
 #endif
 
   configure_srs_info(srs_config_pdu, ue->nr_srs_info);
-  NR_DL_FRAME_PARMS *frame_parms = &(ue->frame_parms);
-  uint16_t symbol_offset = (frame_parms->symbols_per_slot - 1 - srs_config_pdu->time_start_position)*frame_parms->ofdm_symbol_size;
+  uint16_t symbol_offset = l0 * frame_parms->ofdm_symbol_size;
   bool generated = generate_srs_nr(frame_parms,
                                    txdataF,
                                    symbol_offset,

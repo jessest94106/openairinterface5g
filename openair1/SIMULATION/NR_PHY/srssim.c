@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
   bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
   int slot_offset = get_samples_slot_timestamp(fp, slot);
   uint16_t ofdm_symbol_size = fp->ofdm_symbol_size;
-  int slot_offsetF = (slot % RU_RX_SLOT_DEPTH) * NR_SYMBOLS_PER_SLOT * ofdm_symbol_size;
+  int slot_offsetF = (slot % RU_RX_SLOT_DEPTH) * fp->symbols_per_slot * ofdm_symbol_size;
 
   c16_t *txF[n_tx];
   for (i = 0; i < n_tx; i++)
@@ -528,10 +528,10 @@ int main(int argc, char *argv[])
   int symbol_offset = slot_offset;
   int abs_first_symbol = slot * fp->symbols_per_slot;
   int idx_sym;
-  for (idx_sym = abs_first_symbol; idx_sym < abs_first_symbol + srs_pdu.time_start_position; idx_sym++)
+  for (idx_sym = abs_first_symbol; idx_sym < abs_first_symbol + srs_start_symbol; idx_sym++)
     symbol_offset += (idx_sym % (0x7 << fp->numerology_index)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0;
 
-  symbol_offset += ofdm_symbol_size * srs_pdu.time_start_position;
+  symbol_offset += ofdm_symbol_size * srs_start_symbol;
   int symbol_length = ofdm_symbol_size + (idx_sym % (0x7 << fp->numerology_index)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0;
 
   // Compute transmitter energy level

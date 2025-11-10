@@ -1273,7 +1273,7 @@ int main(int argc, char *argv[])
           srs_pdu->subcarrier_spacing = gNB->frame_parms.subcarrier_spacing;
           srs_pdu->num_ant_ports = n_tx == 4 ? 2 : n_tx == 2 ? 1 : 0;
           srs_pdu->sequence_id = 40;
-          srs_pdu->time_start_position = gNB->frame_parms.symbols_per_slot - 1;
+          srs_pdu->time_start_position = 0;
           srs_pdu->config_index = rrc_get_max_nr_csrs(srs_pdu->bwp_size, srs_pdu->bandwidth_index);
           srs_pdu->resource_type = NR_SRS_Resource__resourceType_PR_periodic;
           srs_pdu->t_srs = 1;
@@ -1371,6 +1371,7 @@ int main(int argc, char *argv[])
           srs_config_pdu->sequence_id = 40;
           srs_config_pdu->resource_type = NR_SRS_Resource__resourceType_PR_periodic;
           srs_config_pdu->t_srs = 1;
+          srs_config_pdu->time_start_position = 0;
         }
 
         for (int i = 0; i < (TBS / 8); i++)
