@@ -52,7 +52,7 @@ static void nr_pdcch_scrambling(uint32_t *in, uint32_t size, uint32_t Nid, uint3
 }
 
 static void nr_generate_dci(PHY_VARS_gNB *gNB,
-                            nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15,
+                            const nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15,
                             int txdataF_offset,
                             NR_DL_FRAME_PARMS *frame_parms,
                             int slot)

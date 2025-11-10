@@ -51,7 +51,7 @@ static void nr_pdsch_codeword_scrambling(uint8_t *in, uint32_t size, uint8_t q, 
   nr_codeword_scrambling(in, size, q, Nid, n_RNTI, out);
 }
 
-static int do_ptrs_symbol(nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15,
+static int do_ptrs_symbol(const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15,
                           int start_sc,
                           int symbol_sz,
                           c16_t *txF,
@@ -339,7 +339,7 @@ static inline void neg_dmrs(c16_t *in, c16_t *out, int sz)
 
 static inline int do_onelayer(NR_DL_FRAME_PARMS *frame_parms,
                               int slot,
-                              nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15,
+                              const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15,
                               int layer,
                               c16_t *output,
                               c16_t *txl_start,
@@ -457,7 +457,7 @@ static inline void do_txdataF(c16_t **txdataF,
                               int symbol_sz,
                               c16_t txdataF_precoding[][symbol_sz],
                               PHY_VARS_gNB *gNB,
-                              nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15,
+                              const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15,
                               int ant,
                               int start_sc,
                               int txdataF_offset_per_symbol)
@@ -465,7 +465,7 @@ static inline void do_txdataF(c16_t **txdataF,
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   int rb = 0;
   uint16_t subCarrier = start_sc;
-  nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
+  const nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
   while (rb < rel15->rbSize) {
     // get pmi info
     const int pmi = (pb->prg_size > 0) ? (pb->prgs_list[(int)rb / pb->prg_size].pm_idx) : 0;
@@ -556,7 +556,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   time_stats_t *dlsch_scrambling_stats = &gNB->dlsch_scrambling_stats;
   time_stats_t *dlsch_modulation_stats = &gNB->dlsch_modulation_stats;
   NR_DL_gNB_HARQ_t *harq = &dlsch->harq_process;
-  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &harq->pdsch_pdu.pdsch_pdu_rel15;
+  const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &harq->pdsch_pdu.pdsch_pdu_rel15;
   const int layerSz = frame_parms->N_RB_DL * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB;
   const int symbol_sz=frame_parms->ofdm_symbol_size;
   const int dmrs_Type = rel15->dmrsConfigType;
@@ -680,7 +680,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   //        pmi = prgs_list[rbidx/prg_size].pm_idx, rbidx =0,...,rbSize-1
   // The Precoding matrix:
   // The Codebook Type I
-  nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
+  const nfapi_nr_tx_precoding_and_beamforming_t *pb = &rel15->precodingAndBeamforming;
   // beam number in multi-beam scenario (concurrent beams)
   int bitmap = SL_to_bitmap(rel15->StartSymbolIndex, rel15->NrOfSymbols);
   int beam_nb = beam_index_allocation(gNB->enable_analog_das,
@@ -795,7 +795,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
   for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
     NR_gNB_DLSCH_t *dlsch = msgTx->dlsch[dlsch_id];
     NR_DL_gNB_HARQ_t *harq = &dlsch->harq_process;
-    nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &harq->pdsch_pdu.pdsch_pdu_rel15;
+    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &harq->pdsch_pdu.pdsch_pdu_rel15;
 
     LOG_D(PHY,
           "pdsch: BWPStart %d, BWPSize %d, rbStart %d, rbsize %d\n",

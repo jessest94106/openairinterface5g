@@ -58,7 +58,7 @@ static void nr_fill_indication(PHY_VARS_gNB *gNB,
 
 int beam_index_allocation(bool das,
                           int fapi_beam_index,
-                          nfapi_nr_analog_beamforming_ve_t *analog_bf,
+                          const nfapi_nr_analog_beamforming_ve_t *analog_bf,
                           NR_gNB_COMMON *common_vars,
                           int slot,
                           int symbols_per_slot,
