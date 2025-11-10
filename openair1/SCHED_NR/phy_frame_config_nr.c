@@ -199,8 +199,8 @@ void do_tdd_config_sim(PHY_VARS_gNB *gNB, int mu)
   switch (mu)
   {
   case 0:
-    pc->num_dl_slots = 3;
-    pc->num_ul_slots = 1;
+    pc->num_dl_slots = 7;
+    pc->num_ul_slots = 2;
     break;
   
   case 1:
@@ -209,8 +209,8 @@ void do_tdd_config_sim(PHY_VARS_gNB *gNB, int mu)
     break;
 
   case 3:
-    pc->num_dl_slots = 27;
-    pc->num_ul_slots = 12;
+    pc->num_dl_slots = 7;
+    pc->num_ul_slots = 2;
     break;
 
   default:
