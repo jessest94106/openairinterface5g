@@ -811,7 +811,7 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
   }
 
   // re-initialize ta update variables after RA procedure completion
-  UE->UE_sched_ctrl.ta_frame = frame;
+  UE->UE_sched_ctrl.ta_frame = (frame + 100) % MAX_FRAME_NUMBER;
 
   LOG_A(NR_MAC, "%4d.%2d PUSCH with TC_RNTI 0x%04x received correctly\n", frame, slot, rnti);
 
