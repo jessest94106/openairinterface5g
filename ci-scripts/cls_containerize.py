@@ -165,25 +165,26 @@ def CopyinServiceLog(ssh, lSourcePath, svcName, wd_yaml, ctx):
 	ssh.run(f'docker compose -f {wd_yaml} logs {svcName} --no-log-prefix &> {remote_filename}')
 	return archiveArtifact(ssh, ctx, remote_filename)
 
-def GetRunningServices(ssh, file):
+def GetDeployedServices(ssh, file):
 	ret = ssh.run(f'docker compose -f {file} config --services')
 	if ret.returncode != 0:
+		logging.error("could not get services")
 		return None
 	allServices = ret.stdout.splitlines()
-	running_services = []
+	deployed_services = []
 	for s in allServices:
-		# outputs the hash if the container is running
-		ret = ssh.run(f'docker compose -f {file} ps --all --quiet -- {s}')
+		# outputs the hash if the container has been deployed (but might be stopped)
+		ret = ssh.run(f'docker compose -f {file} ps --all --quiet -- {s}', silent=True)
 		if ret.returncode != 0:
-			logging.info(f"service {s}: {ret.stdout}")
+			# error: should not happen as we iterate over docker-provided service list
+			logging.error(f"service {s}: {ret.stdout}")
 		elif ret.stdout == "":
-			logging.warning(f"could not retrieve information for service {s}")
+			logging.info(f"service {s} not deployed")
 		else:
 			c = ret.stdout
-			logging.debug(f'running service {s} with container id {c}')
-			running_services.append((s, c))
-	logging.info(f'stopping services: {running_services}')
-	return running_services
+			logging.info(f'service {s} with container id {c}')
+			deployed_services.append(s)
+	return deployed_services
 
 def CheckLogs(self, filename, HTML, RAN):
 	success = True
@@ -763,19 +764,19 @@ class Containerize():
 		wd_yaml = f'{wd}/docker-compose.y*ml'
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
-			services = GetRunningServices(ssh, wd_yaml)
+			services = GetDeployedServices(ssh, wd_yaml)
 			copyin_res = None
+			ssh.run(f'docker compose -f {wd_yaml} stop')
 			if services is not None:
-				all_serv = " ".join([s for s, _ in services])
-				ssh.run(f'docker compose -f {wd_yaml} stop -- {all_serv}')
-				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s, _ in services]
+				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s in services]
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd_yaml} down -v')
 			ssh.run(f'rm {wd}/.env')
 		if not copyin_res:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
-			return False
+			logging.error(f"could not copy all files: {copyin_res=} {services=}")
+			success = False
 		else:
 			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
 			success = all(log_results)
