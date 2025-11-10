@@ -29,8 +29,6 @@ void nr_schedule_rx_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_nr_prach_p
 
 void  nr_phy_config_request(NR_PHY_Config_t *gNB){}
 
-void install_nr_schedule_handlers(NR_IF_Module_t *if_inst){}
-
 void nr_dump_frame_parms(NR_DL_FRAME_PARMS *fp){}
 
 bool vnf_nr_send_p5_msg(vnf_t *vnf, uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t *msg, uint32_t msg_len)
