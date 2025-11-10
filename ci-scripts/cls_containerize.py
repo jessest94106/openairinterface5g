@@ -760,17 +760,18 @@ class Containerize():
 		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {node}\u001B[0m')
 		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
+		wd_yaml = f'{wd}/docker-compose.y*ml'
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
-			services = GetRunningServices(ssh, f"{wd}/docker-compose.y*ml")
+			services = GetRunningServices(ssh, wd_yaml)
 			copyin_res = None
 			if services is not None:
 				all_serv = " ".join([s for s, _ in services])
-				ssh.run(f'docker compose -f {wd}/docker-compose.y*ml stop -- {all_serv}')
-				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, f"{wd}/docker-compose.y*ml", ctx) for s, _ in services]
+				ssh.run(f'docker compose -f {wd_yaml} stop -- {all_serv}')
+				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s, _ in services]
 			else:
 				logging.warning('could not identify services to stop => no log file')
-			ssh.run(f'docker compose -f {wd}/docker-compose.y*ml down -v')
+			ssh.run(f'docker compose -f {wd_yaml} down -v')
 			ssh.run(f'rm {wd}/.env')
 		if not copyin_res:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
