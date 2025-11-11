@@ -733,6 +733,7 @@ void *imscope_thread(void *data_void_ptr)
     static float t = 0;
     static bool show_imgui_demo_window = false;
     static bool show_implot_demo_window = false;
+    static bool show_scope_settings_window = false;
     ImGui::DockSpaceOverViewport();
     if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("File")) {
@@ -752,6 +753,12 @@ void *imscope_thread(void *data_void_ptr)
         }
         ImGui::EndMenu();
       }
+      if (ImGui::BeginMenu("Settings")) {
+        if (ImGui::MenuItem("Global scope settings")) {
+          show_scope_settings_window = !show_scope_settings_window;
+        }
+        ImGui::EndMenu();
+      }
       ImGui::EndMainMenuBar();
     }
 
@@ -759,16 +766,6 @@ void *imscope_thread(void *data_void_ptr)
     ImGui::Text("Total time used by IQ capture procedures per milisecond: %.2f [us]/[ms]", iq_procedure_timer.average / 1000);
     if (ImGui::IsItemHovered()) {
       ImGui::SetTooltip("Total time used in PHY threads for copying out IQ data for the scope, in uS, averaged over 1 ms");
-    }
-    ImGui::End();
-
-    ImGui::Begin("Global scope settings");
-    ImGui::ShowStyleSelector("ImGui Style");
-    ImPlot::ShowStyleSelector("ImPlot Style");
-    ImPlot::ShowColormapSelector("ImPlot Colormap");
-    ImGui::SliderInt("FPS target", &target_fps, 12, 60);
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Reduces scope flickering in unfrozen mode. Can reduce impact on perfromance of the modem");
     }
     ImGui::End();
 
@@ -788,7 +785,19 @@ void *imscope_thread(void *data_void_ptr)
       ImPlot::ShowDemoWindow();
     if (show_imgui_demo_window)
       ImGui::ShowDemoWindow();
-
+    // Settings
+    if (show_scope_settings_window) {
+      ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+      ImGui::Begin("Global scope settings", &show_scope_settings_window);
+      ImGui::ShowStyleSelector("ImGui Style");
+      ImPlot::ShowStyleSelector("ImPlot Style");
+      ImPlot::ShowColormapSelector("ImPlot Colormap");
+      ImGui::SliderInt("FPS target", &target_fps, 12, 60);
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Reduces scope flickering in unfrozen mode. Can reduce impact on perfromance of the modem");
+      }
+      ImGui::End();
+    }
     // Rendering
     ImGui::Render();
     glViewport(0, 0, display_w, display_h);
