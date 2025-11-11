@@ -41,15 +41,19 @@ For each DU, it prints:
 
 ```
 1 connected DUs
-[1] DU ID 3584 (gNB-OAI-DU) assoc_id 8: nrCellID 12345678, PCI 0, SSB ARFCN 641280
-    TDD: band 78 ARFCN 640008 SCS 30 (kHz) PRB 106
+[1] DU ID 3584 (gNB-OAI) integrated DU-CU: 1 cell
+  [1] nrCellID 12345678, PCI 0, Mode TDD, SSB ARFCN 641280
+      TDD: band 78 ARFCN 640008 SCS 30 (kHz) PRB 106
 ```
 
-i.e., an index (`[1]`), the DU ID and it's name, the SCTP association ID
-(`assoc_id 8`, cf. UE information), and DU specific information for the cell
-(cell ID, physical cell identity/PCI, the SSB frequency in ARFCN notation, the
-band and Point A ARFCN, subcarrier spacing/SCS, and the number of resource
-blocks/PRB). Only one cell per DU is supported.
+The output shows:
+- Total number of connected DUs
+- For each DU: an index (`[1]`), the DU ID and name, connection type (either `integrated DU-CU` for monolithic deployments or `assoc_id X` for split deployments), and the number of cells served by this DU
+- For each cell served by the DU: a cell index (`[1]`), the NR Cell ID, Physical Cell ID (PCI), operating mode (TDD or FDD), and SSB ARFCN
+- Cell-specific frequency information: for TDD mode, the band, Point A ARFCN, subcarrier spacing (SCS), and number of resource blocks (PRB); for FDD mode, separate DL and UL frequency information
+
+The RRC enables the support of multiple cells per DU (though currently each DU
+typically serves one cell in practice).
 
 As of now, it does not print information about connected CU-UPs or AMFs.
 
