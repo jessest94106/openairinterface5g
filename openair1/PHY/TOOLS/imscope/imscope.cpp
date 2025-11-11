@@ -100,6 +100,7 @@ class LLRPlot {
 
     ImScopeDataWrapper &scope_data = scope_array[type];
     if (ImPlot::BeginPlot(label)) {
+      ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
       if (!frozen || next) {
         if (scope_data.is_data_ready) {
           iq_procedure_timer.Add(scope_data.data.time_taken_in_ns);
@@ -205,6 +206,7 @@ class IQHist {
     if (plot_type == 0) {
       float x = ImGui::CalcItemWidth();
       if (ImPlot::BeginPlot(label.c_str(), {x, x})) {
+        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
         ImPlot::PlotHistogram2D(label.c_str(),
                                 iq_data->real.data(),
                                 iq_data->imag.data(),
@@ -217,6 +219,7 @@ class IQHist {
     } else if (plot_type == 2) {
       float x = ImGui::CalcItemWidth();
       if (ImPlot::BeginPlot(label.c_str(), {x, x})) {
+        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
         int points_drawn = 0;
         while (points_drawn < iq_data->len) {
           // Limit the amount of data plotted with PlotScatter call (issue with vertices/draw call)
@@ -232,6 +235,7 @@ class IQHist {
       }
     } else if (plot_type == 1) {
       if (ImPlot::BeginPlot(label.c_str())) {
+        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
         ImPlot::PlotLine(label.c_str(), iq_data->power.data(), iq_data->len);
         ImPlot::EndPlot();
       }
@@ -364,6 +368,7 @@ class IQSlotHeatmap {
     static std::vector<int> symbol_boundaries = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
     if (ImPlot::BeginPlot(label.c_str(), {(float)ImGui::GetWindowWidth() * 0.9f, 0})) {
       auto num_sc = num_rb * NR_NB_SC_PER_RB;
+      ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
       ImPlot::SetupAxes("symbols", "subcarriers");
       ImPlot::SetupAxisLimits(ImAxis_X1, num_symbols, 0);
       ImPlot::SetupAxisLimits(ImAxis_Y1, num_sc, 0);
@@ -429,6 +434,7 @@ void ShowUeScope(void *data_void_ptr, float t)
     rbs_buffer.AddPoint(t, getKPIUE()->nofRBs);
     bler.AddPoint(t, (float)getKPIUE()->nb_nack / (float)getKPIUE()->nb_total);
     mcs.AddPoint(t, (float)getKPIUE()->dl_mcs);
+    ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
     ImPlot::SetupAxes("time", "noOfRbs");
     ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
     ImPlot::SetupAxisLimits(ImAxis_Y1, 0, NR_MAX_RB);
