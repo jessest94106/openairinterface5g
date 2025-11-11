@@ -444,6 +444,23 @@ void ShowUeScope(void *data_void_ptr, float t)
   }
   ImGui::End();
 
+  if (ImGui::Begin("UE PDCCH IQ")) {
+    static auto iq_data = new IQData();
+    static auto pdcch_iq_hist = new IQHist("PDCCH IQ");
+    bool new_data = false;
+    if (pdcch_iq_hist->ShouldReadData()) {
+      new_data = iq_data->TryCollect(&scope_array[pdcchRxdataF_comp], t, pdcch_iq_hist->GetEpsilon(), iq_procedure_timer);
+    }
+    pdcch_iq_hist->Draw(iq_data, t, new_data);
+  }
+  ImGui::End();
+
+  if (ImGui::Begin("UE PDCCH LLR")) {
+    static auto llr_plot = new LLRPlot();
+    llr_plot->Draw(t, pdcchLlr, "PDCCH LLR");
+  }
+  ImGui::End();
+
   if (ImGui::Begin("UE PDSCH IQ")) {
     static auto iq_data = new IQData();
     static auto pdsch_iq_hist = new IQHist("PDSCH IQ");
