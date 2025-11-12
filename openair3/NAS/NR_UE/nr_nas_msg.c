@@ -38,6 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "common/utils/ds/byte_array.h"
+#include "common/utils/nr/nr_common.h"
 #include "AuthenticationResponseParameter.h"
 #include "FGCNasMessageContainer.h"
 #include "FGSDeregistrationRequestUEOriginating.h"
@@ -1787,7 +1788,7 @@ static void send_nas_5gmm_ind(instance_t instance, const Guti5GSMobileIdentity_t
   MessageDef *msg = itti_alloc_new_message(TASK_NAS_NRUE, 0, NAS_5GMM_IND);
   nas_5gmm_ind_t *ind = &NAS_5GMM_IND(msg);
   LOG_I(NR_RRC, "5G-GUTI: AMF pointer %u, AMF Set ID %u, 5G-TMSI %u \n", guti->amfpointer, guti->amfsetid, guti->tmsi);
-  ind->fiveG_STMSI = ((uint64_t)guti->amfsetid << 38) | ((uint64_t)guti->amfpointer << 32) | guti->tmsi;
+  ind->fiveG_STMSI = nr_construct_5g_s_tmsi(guti->amfsetid, guti->amfpointer, guti->tmsi);
   itti_send_msg_to_task(TASK_RRC_NRUE, instance, msg);
 }
 

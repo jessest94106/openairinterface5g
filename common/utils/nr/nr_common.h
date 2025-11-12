@@ -357,6 +357,12 @@ frequency_range_t get_freq_range_from_band(uint16_t band);
  */
 float get_beta_dmrs(int num_cdm_groups_no_data, bool is_type2);
 
+/** @brief Construct full 5G-S-TMSI from 5G-S-TMSI components */
+uint64_t nr_construct_5g_s_tmsi(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi);
+
+/** @brief Construct 5G-S-TMSI-Part1 from 5G-S-TMSI components */
+uint64_t nr_construct_5g_s_tmsi_part1(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi);
+
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
 #define BOUNDED_EVAL(a, b, c) (min(c, max(a, b)))

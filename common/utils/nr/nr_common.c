@@ -1487,3 +1487,35 @@ float get_beta_dmrs(int num_cdm_groups_no_data, bool is_type2)
   }
   return beta_dmrs_pusch;
 }
+
+/** @brief Construct full 5G-S-TMSI from 5G-S-TMSI components
+ * @param amf_set_id AMF Set ID (10 bits)
+ * @param amf_pointer AMF Pointer (6 bits)
+ * @param m_tmsi 5G-TMSI (32 bits)
+ * @return Full 5G-S-TMSI (48 bits)
+ * @note The 5G-S-TMSI is constructed as a 48-bit value:
+ *       - Bits 38-47: AMF Set ID (10 bits)
+ *       - Bits 32-37: AMF Pointer (6 bits)
+ *       - Bits 0-31:  5G-TMSI (32 bits)
+ * @ref 3GPP TS 23.003 */
+uint64_t nr_construct_5g_s_tmsi(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi)
+{
+  // Construct full 5G-S-TMSI: <AMF Set ID (10 bits)><AMF Pointer (6 bits)><5G-TMSI (32 bits)>
+  return ((uint64_t)amf_set_id << 38) | ((uint64_t)amf_pointer << 32) | m_tmsi;
+}
+
+/** @brief Construct 5G-S-TMSI-Part1 from 5G-S-TMSI components
+ * @param amf_set_id AMF Set ID (10 bits)
+ * @param amf_pointer AMF Pointer (6 bits)
+ * @param m_tmsi 5G-TMSI (32 bits)
+ * @return 5G-S-TMSI-Part1 (rightmost 39 bits of the full 5G-S-TMSI)
+ * @note 5G-S-TMSI-Part1 is the rightmost 39 bits of the full 5G-S-TMSI:
+ *       - Bits 32-37: AMF Pointer (6 bits)
+ *       - Bits 0-31:  5G-TMSI (32 bits)
+ * @ref 3GPP TS 23.003 */
+uint64_t nr_construct_5g_s_tmsi_part1(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi)
+{
+  // Construct full 5G-S-TMSI and extract Part1: rightmost 39 bits
+  uint64_t full_s_tmsi = nr_construct_5g_s_tmsi(amf_set_id, amf_pointer, m_tmsi);
+  return full_s_tmsi & ((1ULL << 39) - 1);
+}
