@@ -379,15 +379,13 @@ static void match_crc_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, nfapi_nr_crc
   }
 }
 
-extern void handle_nr_slot_ind(uint16_t sfn, uint16_t slot);
+extern void handle_nr_slot_ind(uint16_t sfn, uint16_t slot, NR_Sched_Rsp_t *sched_response);
 static void pnf_send_slot_ind(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp)
 {
   module_id_t module_id = 0;
   int CC_id = 0;
   reset_sched_response(rsp, ind->sfn, ind->slot, module_id, CC_id);
-  handle_nr_slot_ind(ind->sfn, ind->slot);
-
-  // TODO copy messages from FAPI buffers
+  handle_nr_slot_ind(ind->sfn, ind->slot, rsp);
 }
 
 static void run_scheduler_monolithic(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp)
@@ -398,7 +396,8 @@ static void run_scheduler_monolithic(const nfapi_nr_slot_indication_scf_t *ind, 
   gNB_dlsch_ulsch_scheduler(rsp->module_id, ind->sfn, ind->slot, rsp);
 }
 
-void NR_UL_indication(NR_UL_IND_t *UL_info) {
+static void NR_UL_indication(NR_UL_IND_t *UL_info)
+{
   AssertFatal(UL_info!=NULL,"UL_info is null\n");
   module_id_t module_id = UL_info->module_id;
   int CC_id = UL_info->CC_id;
@@ -475,12 +474,14 @@ NR_IF_Module_t *NR_IF_Module_init(int Mod_id) {
 
     nr_if_inst[Mod_id]->CC_mask=0;
     nr_if_inst[Mod_id]->NR_UL_indication = NR_UL_indication;
-    if (NFAPI_MODE == NFAPI_MONOLITHIC)
+    if (NFAPI_MODE == NFAPI_MONOLITHIC) {
       nr_if_inst[Mod_id]->NR_slot_indication = run_scheduler_monolithic;
-    else if (NFAPI_MODE == NFAPI_MODE_PNF)
+    } else if (NFAPI_MODE == NFAPI_MODE_PNF) {
       nr_if_inst[Mod_id]->NR_slot_indication = pnf_send_slot_ind;
-    else // NFAPI_MODE_VNF
-      NULL;
+    } else { // NFAPI_MODE_VNF
+      DevAssert(NFAPI_MODE == NFAPI_MODE_VNF || NFAPI_MODE == NFAPI_MODE_AERIAL);
+      nr_if_inst[Mod_id]->NR_slot_indication = run_scheduler_monolithic;
+    }
     AssertFatal(pthread_mutex_init(&nr_if_inst[Mod_id]->if_mutex,NULL)==0,
                 "allocation of nr_if_inst[%d]->if_mutex fails\n",Mod_id);
   }

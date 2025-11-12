@@ -199,8 +199,6 @@ void nr_schedule_ul_dci_req() {};
 void nr_schedule_tx_req() {};
 void nr_schedule_ul_tti_req() {};
 void nr_slot_select() {};
-void NR_UL_indication(NR_UL_IND_t *UL_INFO) {};
-void gNB_dlsch_ulsch_scheduler() {};
 
 /*------------------------------------------------------------------------*/
 

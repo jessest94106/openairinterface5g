@@ -971,65 +971,63 @@ int phy_cqi_indication(struct nfapi_vnf_p7_config *config, nfapi_cqi_indication_
 //NR phy indication
 
 
-NR_Sched_Rsp_t g_sched_resp;
-void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slot, NR_Sched_Rsp_t* sched_info);
 int oai_nfapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req);
 int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req);
 int oai_nfapi_tx_data_req(nfapi_nr_tx_data_request_t* tx_data_req);
 int oai_nfapi_ul_dci_req(nfapi_nr_ul_dci_request_t* ul_dci_req);
 
-int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind)
-{
-  // Call into the scheduler (this is hardcoded and should be init properly!)
-  // memset(sched_resp, 0, sizeof(*sched_resp));
-  gNB_dlsch_ulsch_scheduler(0, slot_ind->sfn, slot_ind->slot, &g_sched_resp);
-
-#ifdef ENABLE_AERIAL
-    bool send_slt_resp = false;
-    if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs> 0) {
-      oai_fapi_dl_tti_req(&g_sched_resp.DL_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.UL_tti_req.n_pdus > 0) {
-      oai_fapi_ul_tti_req(&g_sched_resp.UL_tti_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.TX_req.Number_of_PDUs > 0) {
-      oai_fapi_tx_data_req(&g_sched_resp.TX_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.UL_dci_req.numPdus > 0) {
-      oai_fapi_ul_dci_req(&g_sched_resp.UL_dci_req);
-      send_slt_resp = true;
-    }
-    if (send_slt_resp) {
-      oai_fapi_send_end_request(0,slot_ind->sfn, slot_ind->slot);
-    }
-#else
-  if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs > 0)
-    oai_nfapi_dl_tti_req(&g_sched_resp.DL_req);
-
-  if (g_sched_resp.UL_tti_req.n_pdus > 0)
-    oai_nfapi_ul_tti_req(&g_sched_resp.UL_tti_req);
-
-  if (g_sched_resp.TX_req.Number_of_PDUs > 0)
-    oai_nfapi_tx_data_req(&g_sched_resp.TX_req);
-
-  if (g_sched_resp.UL_dci_req.numPdus > 0)
-    oai_nfapi_ul_dci_req(&g_sched_resp.UL_dci_req);
-#endif
-
-  NR_UL_IND_t ind = {.frame = slot_ind->sfn, .slot = slot_ind->slot, };
-  NR_UL_indication(&ind);
-
-  return 1;
-}
-
 int phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
 {
   LOG_D(MAC, "VNF SFN/Slot %d.%d \n", ind->sfn, ind->slot);
 
-  trigger_scheduler(ind);
+  // this variable is very big (multiple MB), so we put it into static storage
+  // to not overflow the stack while still having it in local (function) scope
+  // also, phy_nr_slot_indication() is only executed by one thread, serially
+  static NR_Sched_Rsp_t sched_response;
+  NR_IF_Module_t *ifi = RC.nrmac[0]->if_inst;
+  ifi->NR_slot_indication(ind, &sched_response);
+
+#ifdef ENABLE_AERIAL
+    bool send_slt_resp = false;
+    if (sched_response.DL_req.dl_tti_request_body.nPDUs> 0) {
+      oai_fapi_dl_tti_req(&sched_response.DL_req);
+      send_slt_resp = true;
+    }
+    if (sched_response.UL_tti_req.n_pdus > 0) {
+      oai_fapi_ul_tti_req(&sched_response.UL_tti_req);
+      send_slt_resp = true;
+    }
+    if (sched_response.TX_req.Number_of_PDUs > 0) {
+      oai_fapi_tx_data_req(&sched_response.TX_req);
+      send_slt_resp = true;
+    }
+    if (sched_response.UL_dci_req.numPdus > 0) {
+      oai_fapi_ul_dci_req(&sched_response.UL_dci_req);
+      send_slt_resp = true;
+    }
+    if (send_slt_resp) {
+      oai_fapi_send_end_request(0, ind->sfn, ind->slot);
+    }
+#else
+  if (sched_response.DL_req.dl_tti_request_body.nPDUs > 0)
+    oai_nfapi_dl_tti_req(&sched_response.DL_req);
+
+  if (sched_response.UL_tti_req.n_pdus > 0)
+    oai_nfapi_ul_tti_req(&sched_response.UL_tti_req);
+
+  if (sched_response.TX_req.Number_of_PDUs > 0)
+    oai_nfapi_tx_data_req(&sched_response.TX_req);
+
+  if (sched_response.UL_dci_req.numPdus > 0)
+    oai_nfapi_ul_dci_req(&sched_response.UL_dci_req);
+#endif
+
+  /* the below works because the function behind the callback collects
+   * messages from queue into which messages have been copied.
+   * TODO we should have different callbacks for received messages and call
+   * into the scheduler separately for each message instead of one big one. */
+  NR_UL_IND_t ul_ind = {.frame = ind->sfn, .slot = ind->slot, };
+  ifi->NR_UL_indication(&ul_ind);
 
   return 1;
 }

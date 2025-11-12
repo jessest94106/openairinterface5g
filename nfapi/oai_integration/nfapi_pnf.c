@@ -2314,7 +2314,7 @@ static void maybe_slow_down_pnf(int mu)
   last_execution = current_execution;
 }
 
-void handle_nr_slot_ind(uint16_t sfn, uint16_t slot)
+void handle_nr_slot_ind(uint16_t sfn, uint16_t slot, NR_Sched_Rsp_t *sched_resp)
 {
   nfapi_pnf_p7_config_t *config = p7_config_g;
   pnf_p7_t *_this = (pnf_p7_t *)(config);
@@ -2345,7 +2345,14 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot)
   oai_nfapi_nr_slot_indication(&ind);
 
   // copy data from appropriate p7 slot buffers into channel structures for PHY processing
-  nfapi_pnf_p7_slot_ind(config, config->phy_id, sfn, slot);
+  nfapi_pnf_p7_get_msgs(config,
+                        config->phy_id,
+                        sfn,
+                        slot,
+                        &sched_resp->DL_req,
+                        &sched_resp->UL_tti_req,
+                        &sched_resp->UL_dci_req,
+                        &sched_resp->TX_req);
 
   return;
 }
