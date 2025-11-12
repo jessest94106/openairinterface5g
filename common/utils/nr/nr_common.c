@@ -1463,6 +1463,18 @@ uint64_t nr_construct_5g_s_tmsi(uint16_t amf_set_id, uint8_t amf_pointer, uint32
   return ((uint64_t)amf_set_id << 38) | ((uint64_t)amf_pointer << 32) | m_tmsi;
 }
 
+/** @brief Extract 5G-S-TMSI-Part1 from full 5G-S-TMSI
+ * @param fiveg_s_tmsi Full 5G-S-TMSI (48 bits)
+ * @return 5G-S-TMSI-Part1 (rightmost 39 bits)
+ * @note 5G-S-TMSI-Part1 is the rightmost 39 bits of the full 5G-S-TMSI:
+ *       - Bits 32-37: AMF Pointer (6 bits)
+ *       - Bits 0-31:  5G-TMSI (32 bits)
+ * @ref 3GPP TS 23.003 */
+uint64_t nr_extract_5g_s_tmsi_part1(const uint64_t fiveg_s_tmsi)
+{
+  return fiveg_s_tmsi & ((1ULL << 39) - 1);
+}
+
 /** @brief Construct 5G-S-TMSI-Part1 from 5G-S-TMSI components
  * @param amf_set_id AMF Set ID (10 bits)
  * @param amf_pointer AMF Pointer (6 bits)
@@ -1476,5 +1488,48 @@ uint64_t nr_construct_5g_s_tmsi_part1(uint16_t amf_set_id, uint8_t amf_pointer, 
 {
   // Construct full 5G-S-TMSI and extract Part1: rightmost 39 bits
   uint64_t full_s_tmsi = nr_construct_5g_s_tmsi(amf_set_id, amf_pointer, m_tmsi);
-  return full_s_tmsi & ((1ULL << 39) - 1);
+  return nr_extract_5g_s_tmsi_part1(full_s_tmsi);
+}
+
+/** @brief Extract 5G-S-TMSI-Part2 from full 5G-S-TMSI
+ * @param fiveg_s_tmsi Full 5G-S-TMSI (48 bits)
+ * @return 5G-S-TMSI-Part2 (leftmost 9 bits)
+ * @note 5G-S-TMSI-Part2 is the leftmost 9 bits of the full 5G-S-TMSI:
+ *       - Bits 39-47: AMF Set ID (9 bits)
+ * @ref 3GPP TS 23.003 */
+uint16_t nr_extract_5g_s_tmsi_part2(const uint64_t fiveg_s_tmsi)
+{
+  return (fiveg_s_tmsi >> 39) & ((1ULL << 9) - 1);
+}
+
+/** @brief Build full 5G-S-TMSI from Part1 and Part2
+ * @param part1 5G-S-TMSI-Part1 (rightmost 39 bits)
+ * @param part2 5G-S-TMSI-Part2 (leftmost 9 bits)
+ * @return Full 5G-S-TMSI (48 bits)
+ * @note Combines Part2 (leftmost 9 bits) and Part1 (rightmost 39 bits)
+ * @ref 3GPP TS 23.003 */
+uint64_t nr_build_full_5g_s_tmsi(const uint64_t part1, const uint16_t part2)
+{
+  return ((uint64_t)part2 << 39) | part1;
+}
+
+/** @brief Deconstruct full 5G-S-TMSI into its components
+ * @param fiveg_s_tmsi Full 5G-S-TMSI (48 bits)
+ * @param[out] amf_set_id Pointer to store AMF Set ID (10 bits)
+ * @param[out] amf_pointer Pointer to store AMF Pointer (6 bits)
+ * @param[out] m_tmsi Pointer to store 5G-TMSI (32 bits)
+ * @note The 5G-S-TMSI is deconstructed from a 48-bit value:
+ *       - Bits 38-47: AMF Set ID (10 bits)
+ *       - Bits 32-37: AMF Pointer (6 bits)
+ *       - Bits 0-31:  5G-TMSI (32 bits)
+ * @ref 3GPP TS 23.003 */
+void nr_deconstruct_5g_s_tmsi(const uint64_t fiveg_s_tmsi, uint16_t *amf_set_id, uint8_t *amf_pointer, uint32_t *m_tmsi)
+{
+  DevAssert(amf_set_id != NULL);
+  DevAssert(amf_pointer != NULL);
+  DevAssert(m_tmsi != NULL);
+
+  *amf_set_id = fiveg_s_tmsi >> 38;
+  *amf_pointer = (fiveg_s_tmsi >> 32) & 0x3F;
+  *m_tmsi = fiveg_s_tmsi;
 }
