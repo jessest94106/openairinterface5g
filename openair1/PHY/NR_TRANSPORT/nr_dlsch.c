@@ -773,9 +773,8 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   return ((size_output_tb + 511) >> 9) << 6;
 }
 
-void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
+void nr_generate_pdsch(PHY_VARS_gNB *gNB, int n_dlsch, NR_gNB_DLSCH_t *dlsch_array, int frame, int slot)
 {
-  PHY_VARS_gNB *gNB = msgTx->gNB;
   NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   time_stats_t *dlsch_encoding_stats = &gNB->dlsch_encoding_stats;
   time_stats_t *tinput = &gNB->tinput;
@@ -788,8 +787,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 
   size_t size_output = 0;
 
-  for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[dlsch_id];
+  for (int i = 0; i < n_dlsch; i++) {
+    NR_gNB_DLSCH_t *dlsch = &dlsch_array[i];
     const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     LOG_D(PHY,
@@ -817,7 +816,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
     dlsch->unav_res = ptrsSymbPerSlot * n_ptrs;
 
     /// CRC, coding, interleaving and rate matching
-    AssertFatal(dlsch->pdu != NULL, "%4d.%2d no PDU for PDSCH generation\n", msgTx->frame, msgTx->slot);
+    AssertFatal(dlsch->pdu != NULL, "%4d.%2d no PDU for PDSCH generation\n", frame, slot);
 
     /* output and its parts for each dlsch should be aligned on 64 bytes (or 8 * 64 bits)
      * => size_output is a sum of parts sizes rounded up to a multiple of 8 * 64
@@ -831,7 +830,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 
   start_meas(dlsch_encoding_stats);
   if (nr_dlsch_encoding(gNB,
-                        msgTx,
+                        n_dlsch,
+                        dlsch_array,
                         frame,
                         slot,
                         frame_parms,
@@ -849,8 +849,8 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
   stop_meas(dlsch_encoding_stats);
 
   unsigned char *output_ptr = output;
-  for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    output_ptr += do_one_dlsch(output_ptr, gNB, &msgTx->dlsch[dlsch_id], slot);
+  for (int i = 0; i < n_dlsch; i++) {
+    output_ptr += do_one_dlsch(output_ptr, gNB, &dlsch_array[i], slot);
   }
 }
 

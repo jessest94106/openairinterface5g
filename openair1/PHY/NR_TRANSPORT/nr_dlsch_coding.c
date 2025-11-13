@@ -104,7 +104,8 @@ NR_gNB_DLSCH_t new_gNB_dlsch(NR_DL_FRAME_PARMS *frame_parms, uint16_t N_RB)
 }
 
 int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
-                      processingData_L1tx_t *msgTx,
+                      int n_dlsch,
+                      NR_gNB_DLSCH_t *dlsch_array,
                       int frame,
                       uint8_t slot,
                       NR_DL_FRAME_PARMS *frame_parms,
@@ -119,11 +120,11 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ENCODING, VCD_FUNCTION_IN);
 
-  nrLDPC_TB_encoding_parameters_t TBs[msgTx->num_pdsch_slot];
+  nrLDPC_TB_encoding_parameters_t TBs[n_dlsch];
   memset(TBs, 0, sizeof(TBs));
   nrLDPC_slot_encoding_parameters_t slot_parameters = {.frame = frame,
                                                        .slot = slot,
-                                                       .nb_TBs = msgTx->num_pdsch_slot,
+                                                       .nb_TBs = n_dlsch,
                                                        .threadPool = &gNB->threadPool,
                                                        .tinput = tinput,
                                                        .tprep = tprep,
@@ -133,8 +134,8 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
 
   int num_segments = 0;
 
-  for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[dlsch_id];
+  for (int i = 0; i < n_dlsch; i++) {
+    NR_gNB_DLSCH_t *dlsch = &dlsch_array[i];
 
     unsigned int crc = 1;
     const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
@@ -192,10 +193,10 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
       memcpy(dlsch->b, a, (A / 8) + 3); // using 3 bytes to mimic the case of 24 bit crc
     }
 
-    nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[dlsch_id];
+    nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[i];
 
-    // The harq_pid is not unique among the active HARQ processes in the instance so we use dlsch_id instead
-    TB_parameters->harq_unique_pid = dlsch_id;
+    // The harq_pid is not unique among the active HARQ processes in the instance so we use i instead
+    TB_parameters->harq_unique_pid = i;
     TB_parameters->BG = rel15->maintenance_parms_v3.ldpcBaseGraph;
     TB_parameters->A = A;
     start_meas(dlsch_segmentation_stats);
@@ -221,11 +222,11 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
   size_t segments_offset = 0;
   size_t dlsch_offset = 0;
 
-  for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[dlsch_id];
+  for (int i = 0; i < n_dlsch; i++) {
+    NR_gNB_DLSCH_t *dlsch = &dlsch_array[i];
     const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
-    nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[dlsch_id];
+    nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[i];
 
 #ifdef DEBUG_DLSCH_CODING
     for (int r = 0; r < TB_parameters->C; r++) {
@@ -281,8 +282,8 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
 
   gNB->nrLDPC_coding_interface.nrLDPC_coding_encoder(&slot_parameters);
 
-  for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[dlsch_id];
+  for (int i = 0; i < n_dlsch; i++) {
+    nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[i];
     for (int r = 0; r < TB_parameters->C; r++) {
       nrLDPC_segment_encoding_parameters_t *segment_parameters = &TB_parameters->segments[r];
       merge_meas(dlsch_interleaving_stats, &segment_parameters->ts_interleave);
