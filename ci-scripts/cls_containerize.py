@@ -758,6 +758,35 @@ class Containerize():
 			logging.error('\u001B[1m Deploying objects Failed\u001B[0m')
 		return deployed
 
+	def StopObject(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		if not self.services:
+			raise ValueError(f'no services provided')
+		logging.info(f'\u001B[1m Stopping objects "{self.services}" from server: {node}\u001B[0m')
+		reqServices = self.services.split()
+		yaml = self.yamlPath.strip('/')
+		wd = f'{lSourcePath}/{yaml}'
+		wd_yaml = f'{wd}/docker-compose.y*ml'
+		with cls_cmd.getConnection(node) as ssh:
+			ExistEnvFilePrint(ssh, wd)
+			services = GetDeployedServices(ssh, wd_yaml)
+			success = []
+			fail = []
+			for s in reqServices:
+				if s in services:
+					ssh.run(f'docker compose -f {wd_yaml} stop -- {s}')
+					success.append(s)
+				else:
+					logging.error(f"no such service {s}")
+					fail.append(s)
+		if success == reqServices:
+			logging.info('\u001B[1m Stopping object Pass\u001B[0m')
+			HTML.CreateHtmlTestRowQueue(self.services, 'OK', [f'Stopped {self.services}'])
+		else:
+			logging.error('\u001B[1m Stopping object Failed\u001B[0m')
+			HTML.CreateHtmlTestRowQueue(self.services, 'KO', [f'Failed stopping {" ".join(fail)}, succeeded {" ".join(success)}'])
+		return success
+
 	def UndeployObject(self, ctx, node, HTML, RAN):
 		lSourcePath = self.eNBSourceCodePath
 		logging.info(f'\u001B[1m Undeploying all objects from server {node}\u001B[0m')
