@@ -102,7 +102,6 @@
 #include "NGAP_PDUSessionResourceAdmittedItem.h"
 #include "NGAP_HandoverRequestAcknowledgeTransfer.h"
 #include "NGAP_QosFlowItemWithDataForwarding.h"
-#include "NR_HandoverPreparationInformation.h"
 #include "NGAP_HandoverNotify.h"
 #include "NGAP_DRBsSubjectToStatusTransferItem.h"
 #include "NGAP_DRBStatusUL.h"
