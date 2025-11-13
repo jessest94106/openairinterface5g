@@ -716,7 +716,6 @@ class Containerize():
 	def DeployObject(self, ctx, node, HTML):
 		num_attempts = self.num_attempts
 		lSourcePath = self.eNBSourceCodePath
-		logging.debug(f'Deploying OAI Object on server: {node}')
 		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
@@ -727,6 +726,7 @@ class Containerize():
 				logging.error(msg)
 				HTML.CreateHtmlTestRowQueue('N/A', 'KO', [msg])
 				return False
+			logging.info(f'\u001B[1mDeploying object(s) "{services}" on server {node}\u001B[0m')
 			ExistEnvFilePrint(ssh, wd)
 			WriteEnvFile(ssh, services, wd, self.deploymentTag, self.flexricTag)
 			if num_attempts <= 0:
@@ -751,14 +751,16 @@ class Containerize():
 		imagesInfo = info.stdout.splitlines()[1:]
 		logging.debug(f'{info.stdout.splitlines()[1:]}')
 		if deployed:
-			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['\n'.join(imagesInfo)])
+			HTML.CreateHtmlTestRowQueue(self.services, 'OK', ['\n'.join(imagesInfo)])
+			logging.info('\u001B[1m Deploying objects Pass\u001B[0m')
 		else:
-			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
+			HTML.CreateHtmlTestRowQueue(self.services, 'KO', ['\n'.join(imagesInfo)])
+			logging.error('\u001B[1m Deploying objects Failed\u001B[0m')
 		return deployed
 
 	def UndeployObject(self, ctx, node, HTML, RAN):
 		lSourcePath = self.eNBSourceCodePath
-		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {node}\u001B[0m')
+		logging.info(f'\u001B[1m Undeploying all objects from server {node}\u001B[0m')
 		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
@@ -781,7 +783,7 @@ class Containerize():
 			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
 			success = all(log_results)
 		if success:
-			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m')
+			logging.info('\u001B[1m Undeploying objects Pass\u001B[0m')
 		else:
-			logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
+			logging.error('\u001B[1m Undeploying objects Failed\u001B[0m')
 		return success
