@@ -652,7 +652,6 @@ add_library(SCHED_LIB ${SCHED_SRC})
 target_link_libraries(SCHED_LIB PRIVATE asn1_lte_rrc_hdrs)
 
 set(SCHED_NR_SRC
-  ${OPENAIR1_DIR}/SCHED_NR/fapi_nr_l1.c
   ${OPENAIR1_DIR}/SCHED_NR/phy_procedures_nr_gNB.c
   ${OPENAIR1_DIR}/SCHED_NR/nr_prach_procedures.c
   ${OPENAIR1_DIR}/SCHED_NR/phy_frame_config_nr.c
@@ -939,7 +938,6 @@ set(PHY_SRC_UE
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_dci.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_dci_tools.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_dlsch.c
-  ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_dlsch_tools.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_dlsch_coding.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_ulsch_decoding.c
   ${OPENAIR1_DIR}/PHY/NR_TRANSPORT/nr_ulsch.c
@@ -1215,7 +1213,6 @@ set (MAC_SRC
 
 set (MAC_NR_SRC
   ${NR_PHY_INTERFACE_DIR}/NR_IF_Module.c
-  ${NR_PHY_INTERFACE_DIR}/nr_sched_response.c
   ${NR_GNB_MAC_DIR}/main.c
   ${NR_GNB_MAC_DIR}/config.c
   ${NR_GNB_MAC_DIR}/gNB_scheduler.c

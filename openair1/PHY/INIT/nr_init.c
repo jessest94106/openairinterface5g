@@ -39,7 +39,6 @@
 #include <complex.h>
 #include "PHY/NR_TRANSPORT/nr_ulsch.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
-#include "SCHED_NR/fapi_nr_l1.h"
 #include "PHY/NR_REFSIG/ul_ref_seq_nr.h"
 #include <string.h>
 #include "nfapi/open-nFAPI/fapi/inc/nr_fapi_p5_utils.h"
@@ -61,7 +60,6 @@ int l1_north_init_gNB()
 
     LOG_D(NR_PHY, "RC.gNB[%d]: installing callbacks\n", i);
     RC.gNB[i]->if_inst->NR_PHY_config_req = nr_phy_config_request;
-    RC.gNB[i]->if_inst->NR_Schedule_response = nr_schedule_response;
   }
 
   return 0;
@@ -292,7 +290,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
 void install_nr_schedule_handlers(NR_IF_Module_t *if_inst)
 {
   if_inst->NR_PHY_config_req = nr_phy_config_request;
-  if_inst->NR_Schedule_response = nr_schedule_response;
 }
 
 void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,

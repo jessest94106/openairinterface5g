@@ -122,7 +122,6 @@ typedef struct {
 typedef struct NR_IF_Module_s {
   //define the function pointer
   void (*NR_UL_indication)(NR_UL_IND_t *UL_INFO);
-  void (*NR_Schedule_response)(NR_Sched_Rsp_t *Sched_INFO);
   void (*NR_slot_indication)(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp);
   void (*NR_PHY_config_req)(NR_PHY_Config_t *config_INFO);
   uint32_t CC_mask;
@@ -136,8 +135,5 @@ typedef struct NR_IF_Module_s {
 NR_IF_Module_t *NR_IF_Module_init(int Mod_id);
 
 void NR_IF_Module_kill(int Mod_id);
-
-/*Interface for Downlink, transmitting the DLSCH SDU, DCI SDU*/
-void NR_Schedule_Response(NR_Sched_Rsp_t *Sched_INFO);
 
 #endif /*_NFAPI_INTERFACE_NR_H_*/

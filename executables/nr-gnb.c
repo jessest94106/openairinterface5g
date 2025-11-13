@@ -55,7 +55,6 @@
 #include "PHY/defs_gNB.h"
 #include "PHY/defs_nr_common.h"
 #include "PHY/impl_defs_nr.h"
-#include "SCHED_NR/fapi_nr_l1.h"
 #include "SCHED_NR/phy_frame_config_nr.h"
 #include "SCHED_NR/sched_nr.h"
 #include "assertions.h"
@@ -65,7 +64,6 @@
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "nfapi_nr_interface_scf.h"
 #include "notified_fifo.h"
-#include "openair2/NR_PHY_INTERFACE/nr_sched_response.h"
 #include "thread-pool.h"
 #include "time_meas.h"
 #include "utils.h"
@@ -251,7 +249,6 @@ static size_t dump_L1_meas_stats(PHY_VARS_gNB *gNB, RU_t *ru, char *output, size
   output += print_meas_log(&gNB->ul_indication_stats, "UL Indication", NULL, NULL, output, end - output);
   output += print_meas_log(&gNB->slot_indication_stats, "Slot Indication", NULL, NULL, output, end - output);
   output += print_meas_log(&gNB->rx_pusch_stats, "PUSCH inner-receiver", NULL, NULL, output, end - output);
-  output += print_meas_log(&gNB->schedule_response_stats, "Schedule Response", NULL, NULL, output, end - output);
   output += print_meas_log(&gNB->rx_prach, "PRACH RX", NULL, NULL, output, end - output);
   if (ru->feprx)
     output += print_meas_log(&ru->ofdm_demod_stats, "feprx", NULL, NULL, output, end - output);
@@ -313,7 +310,6 @@ void *nrL1_stats_thread(void *param) {
   reset_meas(&gNB->ul_indication_stats);
   reset_meas(&gNB->slot_indication_stats);
   reset_meas(&gNB->rx_pusch_stats);
-  reset_meas(&gNB->schedule_response_stats);
   reset_meas(&gNB->dlsch_scrambling_stats);
   reset_meas(&gNB->dlsch_modulation_stats);
   reset_meas(&gNB->dlsch_resource_mapping_stats);
@@ -360,12 +356,6 @@ void init_gNB_Tpool(int inst)
   threadCreate(&gNB->L1_rx_thread, L1_rx_thread, (void *)gNB, "L1_rx_thread", gNB->L1_rx_thread_core, OAI_PRIORITY_RT_MAX);
   // create the TX thread responsible for TX processing start event (L1_tx_out msg queue), then launch tx_func()
   threadCreate(&gNB->L1_tx_thread, L1_tx_thread, (void *)gNB, "L1_tx_thread", gNB->L1_tx_thread_core, OAI_PRIORITY_RT_MAX);
-
-  notifiedFIFO_elt_t *msgL1Tx = newNotifiedFIFO_elt(sizeof(processingData_L1tx_t), 0, &gNB->L1_tx_out, NULL);
-  processingData_L1tx_t *msgDataTx = (processingData_L1tx_t *)NotifiedFifoData(msgL1Tx);
-  memset(msgDataTx, 0, sizeof(processingData_L1tx_t));
-  // this will be removed when the msgDataTx is not necessary anymore
-  gNB->msgDataTx = msgDataTx;
 
   if (!IS_SOFTMODEM_NOSTATS)
     threadCreate(&proc->L1_stats_thread, nrL1_stats_thread, (void *)gNB, "L1_stats", -1, OAI_PRIORITY_RT_LOW);
@@ -443,7 +433,6 @@ void init_gNB()
     AssertFatal((gNB->if_inst = NR_IF_Module_init(inst)) != NULL, "Cannot register interface");
 
     LOG_I(NR_PHY, "Registered with MAC interface module (%p)\n", gNB->if_inst);
-    gNB->if_inst->NR_Schedule_response = nr_schedule_response;
     gNB->if_inst->NR_PHY_config_req = nr_phy_config_request;
 
     gNB->prach_energy_counter = 0;

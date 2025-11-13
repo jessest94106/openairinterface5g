@@ -41,7 +41,6 @@
 #include "nfapi/oai_integration/gnb_ind_vars.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "nfapi_interface.h"
-#include "openair2/NR_PHY_INTERFACE/nr_sched_response.h"
 #include "openair2/PHY_INTERFACE/queue_t.h"
 #include "utils.h"
 #include "nfapi/oai_integration/nfapi_pnf.h"
@@ -485,8 +484,6 @@ NR_IF_Module_t *NR_IF_Module_init(int Mod_id) {
     AssertFatal(pthread_mutex_init(&nr_if_inst[Mod_id]->if_mutex,NULL)==0,
                 "allocation of nr_if_inst[%d]->if_mutex fails\n",Mod_id);
   }
-
-  init_sched_response();
 
   return nr_if_inst[Mod_id];
 }

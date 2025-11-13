@@ -473,7 +473,6 @@ typedef struct PHY_VARS_gNB_s {
   time_stats_t rx_pusch_symbol_processing_stats;
   time_stats_t ul_indication_stats;
   time_stats_t slot_indication_stats;
-  time_stats_t schedule_response_stats;
   time_stats_t ulsch_decoding_stats;
   time_stats_t ts_deinterleave;
   time_stats_t ts_rate_unmatch;
@@ -501,7 +500,6 @@ typedef struct PHY_VARS_gNB_s {
   int L1_rx_thread_core;
   pthread_t L1_tx_thread;
   int L1_tx_thread_core;
-  struct processingData_L1tx *msgDataTx;
   void *scopeData;
 } PHY_VARS_gNB;
 
@@ -578,18 +576,6 @@ typedef struct processingData_L1tx {
   int slot_rx;
   openair0_timestamp timestamp_tx;
   PHY_VARS_gNB *gNB;
-  nfapi_nr_dl_tti_pdcch_pdu pdcch_pdu[NFAPI_NR_MAX_NB_CORESETS];
-  /// corresponds to UL_dci_req->ul_dci_pdu_list
-  nfapi_nr_dl_tti_pdcch_pdu ul_pdcch_pdu[NFAPI_NR_MAX_NB_CORESETS];
-  nfapi_nr_dl_tti_csi_rs_pdu csirs_pdu[NFAPI_NR_MAX_NB_CORESETS];
-  nfapi_nr_dl_tti_ssb_pdu ssb_pdu[64];
-  int n_ssb_pdu;
-  int n_csirs_pdu;
-  uint16_t num_pdsch_slot;
-  int num_dl_pdcch;
-  int num_ul_pdcch;
-  /* a reference to the sched_response, to release it when not needed anymore */
-  int sched_response_id;
 } processingData_L1tx_t;
 
 typedef struct processingData_L1rx {
