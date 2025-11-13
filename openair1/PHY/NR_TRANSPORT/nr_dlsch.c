@@ -789,7 +789,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
   size_t size_output = 0;
 
   for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    NR_gNB_DLSCH_t *dlsch = msgTx->dlsch[dlsch_id];
+    NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[dlsch_id];
     const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     LOG_D(PHY,
@@ -850,7 +850,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 
   unsigned char *output_ptr = output;
   for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    output_ptr += do_one_dlsch(output_ptr, gNB, msgTx->dlsch[dlsch_id], slot);
+    output_ptr += do_one_dlsch(output_ptr, gNB, &msgTx->dlsch[dlsch_id], slot);
   }
 }
 

@@ -441,7 +441,7 @@ int main(int argc, char **argv)
 	unsigned char harq_pid = 0; //dlsch->harq_ids[subframe];
   processingData_L1tx_t msgDataTx;
   init_DLSCH_struct(gNB, &msgDataTx);
-  NR_gNB_DLSCH_t *dlsch = &msgDataTx.dlsch[0][0];
+  NR_gNB_DLSCH_t *dlsch = &msgDataTx.dlsch[0];
   nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 	//time_stats_t *rm_stats, *te_stats, *i_stats;
 	unsigned int TBS = 8424;

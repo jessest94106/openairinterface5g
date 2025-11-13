@@ -1058,7 +1058,7 @@ int main(int argc, char **argv)
     n_false_positive = 0;
     if (n_trials== 1) num_rounds = 1;
 
-    NR_gNB_DLSCH_t *gNB_dlsch = &msgDataTx->dlsch[0][0];
+    NR_gNB_DLSCH_t *gNB_dlsch = &msgDataTx->dlsch[0];
     nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &gNB_dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     for (trial = 0; trial < n_trials && !stop; trial++) {

@@ -134,7 +134,7 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
   int num_segments = 0;
 
   for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    NR_gNB_DLSCH_t *dlsch = msgTx->dlsch[dlsch_id];
+    NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[dlsch_id];
 
     unsigned int crc = 1;
     const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
@@ -222,7 +222,7 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
   size_t dlsch_offset = 0;
 
   for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
-    NR_gNB_DLSCH_t *dlsch = msgTx->dlsch[dlsch_id];
+    NR_gNB_DLSCH_t *dlsch = &msgTx->dlsch[dlsch_id];
     const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[dlsch_id];
