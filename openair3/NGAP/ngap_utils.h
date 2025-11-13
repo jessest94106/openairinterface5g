@@ -27,6 +27,7 @@
 #include <string.h>
 #include "common/utils/LOG/log.h"
 #include "assertions.h"
+#include "common/utils/eq_check.h"
 
 #define NGAP_UE_ID_FMT "0x%06" PRIX32
 

@@ -49,6 +49,7 @@
 #include "ngap_gNB_mobility_management.h"
 #include "ngap_gNB_pdu_session_management.h"
 #include "ngap_gNB_nas_procedures.h"
+#include "ngap_gNB_paging.h"
 #include "ngap_gNB_trace.h"
 #include "ngap_gNB_ue_context.h"
 #include "ngap_messages_types.h"
@@ -1101,10 +1102,7 @@ static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_N
 {
   ngap_gNB_amf_data_t   *amf_desc_p        = NULL;
   ngap_gNB_instance_t   *ngap_gNB_instance = NULL;
-  NGAP_Paging_t         *container;
-  NGAP_PagingIEs_t      *ie;
   DevAssert(pdu != NULL);
-  container = &pdu->choice.initiatingMessage->value.choice.Paging;
   // received Paging Message from AMF
   NGAP_DEBUG("[SCTP %u] Received Paging Message From AMF\n",assoc_id);
 
@@ -1130,67 +1128,20 @@ static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_N
   }
 
    MessageDef *message_p = itti_alloc_new_message(TASK_NGAP, 0, NGAP_PAGING_IND);
-   ngap_paging_ind_t * msg=&NGAP_PAGING_IND(message_p);
-   memset(msg, 0, sizeof(*msg));
+   ngap_paging_ind_t *msg = &NGAP_PAGING_IND(message_p);
 
-   /* convert NGAP_PagingIEs_t to ngap_paging_ind_t */
-   /* id-UEIdentityIndexValue : convert UE Identity Index value */
-   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_PagingIEs_t, ie, container, NGAP_ProtocolIE_ID_id_UEPagingIdentity, true);
-
-   struct NGAP_FiveG_S_TMSI *fiveG_S_TMSI = ie->value.choice.UEPagingIdentity.choice.fiveG_S_TMSI;
-   OCTET_STRING_TO_INT16(&fiveG_S_TMSI->aMFSetID, msg->ue_paging_identity.s_tmsi.amf_set_id);
-   OCTET_STRING_TO_INT8(&fiveG_S_TMSI->aMFPointer, msg->ue_paging_identity.s_tmsi.amf_pointer);
-   OCTET_STRING_TO_INT32(&fiveG_S_TMSI->fiveG_TMSI, msg->ue_paging_identity.s_tmsi.m_tmsi);
-
-   NGAP_DEBUG("[SCTP %u] Received Paging Identity amf_set_id %d, amf_pointer %d, m_tmsi %d\n",
-              assoc_id,
-              msg->ue_paging_identity.s_tmsi.amf_set_id,
-              msg->ue_paging_identity.s_tmsi.amf_pointer,
-              msg->ue_paging_identity.s_tmsi.m_tmsi);
-
-   msg->paging_drx = NGAP_PAGING_DRX_256;
-   /* id-pagingDRX */
-   NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_PagingIEs_t, ie, container, NGAP_ProtocolIE_ID_id_PagingDRX, false);
-
-   /* optional */
-   if (ie) {
-     msg->paging_drx = ie->value.choice.PagingDRX;
-   } else {
-     msg->paging_drx = NGAP_PAGING_DRX_256;
+   /* Decode NGAP Paging message */
+   if (!decode_ng_paging(msg, pdu)) {
+     NGAP_ERROR("[SCTP %u] Failed to decode NGAP Paging message\n", assoc_id);
+     free_ng_paging(msg);
+     itti_free(TASK_NGAP, message_p);
+     return -1;
    }
 
-  /* id-TAIList */
-  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_PagingIEs_t, ie, container,
-                             NGAP_ProtocolIE_ID_id_TAIListForPaging, true);
+   /* send message to RRC */
+   itti_send_msg_to_task(TASK_RRC_GNB, ngap_gNB_instance->instance, message_p);
 
-  NGAP_INFO("[SCTP %u] Received Paging taiList For Paging: count %d\n", assoc_id, ie->value.choice.TAIListForPaging.list.count);
-
-  for (int i = 0; i < ie->value.choice.TAIListForPaging.list.count; i++) {
-    NGAP_TAIListForPagingItem_t *item_p;
-    item_p = (NGAP_TAIListForPagingItem_t *)ie->value.choice.TAIListForPaging.list.array[i];
-    TBCD_TO_MCC_MNC(&(item_p->tAI.pLMNIdentity), msg->plmn_identity[i].mcc, msg->plmn_identity[i].mnc, msg->plmn_identity[i].mnc_digit_length);
-    OCTET_STRING_TO_INT16(&(item_p->tAI.tAC), msg->tac[i]);
-    msg->tai_size++;
-    plmn_id_t *p = &msg->plmn_identity[i];
-    LOG_D(NGAP,
-          "[SCTP %u] PLMN in TAI list for Paging: MCC=%03d, MNC=%0*d, TAC=%d\n",
-          assoc_id,
-          p->mcc,
-          p->mnc_digit_length,
-          p->mnc,
-          msg->tac[i]);
-  }
-
-  //paging parameter values
-  NGAP_DEBUG("[SCTP %u] Received Paging parameters: Paging Identity amf_set_id %d amf_pointer %d m_tmsi %d paging_drx %d paging_priority %d\n",assoc_id,
-             msg->ue_paging_identity.s_tmsi.amf_set_id,
-             msg->ue_paging_identity.s_tmsi.amf_pointer,
-             msg->ue_paging_identity.s_tmsi.m_tmsi,
-             msg->paging_drx, msg->paging_priority);
-  /* send message to RRC */
-  itti_send_msg_to_task(TASK_RRC_GNB, ngap_gNB_instance->instance, message_p);
-
-  return 0;
+   return 0;
 }
 
 static bool decodePDUSessionResourceModify(pdusession_transfer_t *out, const OCTET_STRING_t in)

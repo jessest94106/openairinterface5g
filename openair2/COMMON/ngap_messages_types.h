@@ -32,7 +32,6 @@
 #include "common/5g_platform_types.h"
 #include "common/platform_constants.h"
 #include "common/platform_types.h"
-#include "common/5g_platform_types.h"
 #include "s1ap_messages_types.h"
 #include "ds/byte_array.h"
 #include "utils.h"
@@ -89,39 +88,46 @@
 
 #define NGAP_MAX_NB_AMF_IP_ADDRESS 10
 
-#define NGAP_MAX_NO_TAI_PAGING 16 // 9.2.4.1 3GPP TS 38.413
-
 /* Security key length used within gNB
  * Even if only 16 bytes will be effectively used,
  * the key length is 32 bytes (256 bits)
  */
 #define SECURITY_KEY_LENGTH 32
 
-typedef enum ngap_paging_drx_e {
-  NGAP_PAGING_DRX_32  = 0x0,
-  NGAP_PAGING_DRX_64  = 0x1,
-  NGAP_PAGING_DRX_128 = 0x2,
-  NGAP_PAGING_DRX_256 = 0x3
-} ngap_paging_drx_t;
+#define NGAP_MAX_NO_TAI_PAGING 16 // 9.2.4.1 3GPP TS 38.413
 
-/* Lower value codepoint
- * indicates higher priority.
- */
-typedef enum ngap_paging_priority_s {
-  NGAP_PAGING_PRIO_LEVEL1  = 0,
-  NGAP_PAGING_PRIO_LEVEL2  = 1,
-  NGAP_PAGING_PRIO_LEVEL3  = 2,
-  NGAP_PAGING_PRIO_LEVEL4  = 3,
-  NGAP_PAGING_PRIO_LEVEL5  = 4,
-  NGAP_PAGING_PRIO_LEVEL6  = 5,
-  NGAP_PAGING_PRIO_LEVEL7  = 6,
-  NGAP_PAGING_PRIO_LEVEL8  = 7
-} ngap_paging_priority_t;
+/* Paging DRX values (3GPP TS 38.413) */
+#define FOREACH_PAGING_DRX(DRX_DEF) \
+  DRX_DEF(NGAP_PAGING_DRX_32, 0x0)  \
+  DRX_DEF(NGAP_PAGING_DRX_64, 0x1)  \
+  DRX_DEF(NGAP_PAGING_DRX_128, 0x2) \
+  DRX_DEF(NGAP_PAGING_DRX_256, 0x3)
 
-typedef enum ngap_cn_domain_s {
-  NGAP_CN_DOMAIN_PS = 1,
-  NGAP_CN_DOMAIN_CS = 2
-} ngap_cn_domain_t;
+/* Lower value codepoint indicates higher priority (3GPP TS 38.413) */
+#define FOREACH_PAGING_PRIORITY(PRIO_DEF) \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL1, 0)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL2, 1)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL3, 2)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL4, 3)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL5, 4)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL6, 5)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL7, 6)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL8, 7)
+
+/* Paging Origin (9.3.3.22 of 3GPP TS 38.413) */
+#define FOREACH_PAGING_ORIGIN(ORIGIN_DEF) ORIGIN_DEF(NGAP_PAGING_ORIGIN_NON_3GPP, 0)
+
+static const text_info_t paging_drx_text[] = {FOREACH_PAGING_DRX(TO_TEXT)};
+
+static const text_info_t paging_prio_text[] = {FOREACH_PAGING_PRIORITY(TO_TEXT)};
+
+static const text_info_t paging_origin_text[] = {FOREACH_PAGING_ORIGIN(TO_TEXT)};
+
+typedef enum { FOREACH_PAGING_DRX(TO_ENUM) } ngap_paging_drx_t;
+
+typedef enum { FOREACH_PAGING_PRIORITY(TO_ENUM) } ngap_paging_priority_t;
+
+typedef enum { FOREACH_PAGING_ORIGIN(TO_ENUM) } ngap_paging_origin_t;
 
 typedef struct ngap_net_ip_address_s {
   unsigned ipv4:1;
@@ -170,10 +176,6 @@ typedef struct fiveg_s_tmsi_s {
   uint8_t  amf_pointer;
   uint32_t m_tmsi;
 } fiveg_s_tmsi_t;
-
-typedef struct ngap_ue_paging_identity_s {
-  fiveg_s_tmsi_t s_tmsi;
-} ngap_ue_paging_identity_t;
 
 typedef enum ngap_ue_identities_presenceMask_e {
   NGAP_UE_IDENTITIES_FiveG_s_tmsi  = 1 << 1,
@@ -797,29 +799,6 @@ typedef struct ngap_initial_context_setup_req_s {
   byte_array_t nas_pdu;
 } ngap_initial_context_setup_req_t;
 
-
-typedef struct ngap_paging_ind_s {
-  /* UE paging identity */
-  ngap_ue_paging_identity_t ue_paging_identity;
-
-  /* Indicates origin of paging */
-  ngap_cn_domain_t cn_domain;
-
-  /* PLMN_identity in TAI of Paging*/
-  plmn_id_t plmn_identity[NGAP_MAX_NO_TAI_PAGING];
-
-  /* TAC in TAIList of Paging*/
-  int16_t tac[NGAP_MAX_NO_TAI_PAGING];
-
-  /* size of TAIList*/
-  int16_t tai_size;
-
-  /* Optional fields */
-  ngap_paging_drx_t paging_drx;
-
-  ngap_paging_priority_t paging_priority;
-} ngap_paging_ind_t;
-
 typedef struct ngap_pdusession_setup_req_s {
   /* UE id for initial connection to NGAP */
   uint32_t gNB_ue_ngap_id;
@@ -945,6 +924,45 @@ typedef struct ngap_pdusession_release_resp_s {
   uint16_t nb_of_pdusessions_released;
   pdusession_release_t pdusession_release[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_release_resp_t;
+
+/** NG PAGING PROCEDURES (9.2.4. of 3GPP TS 38.413) */
+
+typedef struct {
+  plmn_id_t plmn;
+  uint16_t tac;
+} nr_tai_t;
+
+typedef struct ngap_ue_paging_identity_s {
+  fiveg_s_tmsi_t s_tmsi;
+} ngap_ue_paging_identity_t;
+
+/** 9.3.1.72 Paging Attempt Information (3GPP TS 38.413) */
+typedef struct {
+  /* Paging Attempt Count */
+  uint8_t paging_attempt_count;
+  /* Intended Number of Paging Attempts */
+  uint8_t intended_paging_attempts;
+} ngap_paging_attempt_info_t;
+
+/** 9.2.4.1 3GPP TS 38.413 */
+typedef struct {
+  /* UE paging identity */
+  ngap_ue_paging_identity_t ue_paging_identity;
+
+  /* TAI List for Paging */
+  nr_tai_t tai_list[NGAP_MAX_NO_TAI_PAGING];
+  int16_t n_tai;
+
+  /* Optional fields */
+  ngap_paging_drx_t *paging_drx;
+  ngap_paging_priority_t *paging_priority;
+  /* UE Radio Capability for Paging (optional) */
+  byte_array_t *ue_radio_capability;
+  /* Paging Origin (optional) */
+  ngap_paging_origin_t *origin;
+  /* Assistance Data for Paging (optional) */
+  ngap_paging_attempt_info_t *paging_attempt_info;
+} ngap_paging_ind_t;
 
 /** 9.2.3.14 Uplink RAN Status Transfer (3GPP TS 38.413)
  * COUNT value used for both UL and DL PDCP SN + HFN (12-bit or 18-bit SN) */

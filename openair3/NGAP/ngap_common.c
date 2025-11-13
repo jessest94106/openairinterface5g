@@ -27,6 +27,7 @@
  * \version 0.1
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "conversions.h"
@@ -330,4 +331,15 @@ byte_array_t encode_ngap_pdusession_setup_response_transfer(const pdusession_set
   out.buf = res.buffer;
   out.len = res.result.encoded;
   return out;
+}
+
+bool eq_ngap_plmn(const plmn_id_t *a, const plmn_id_t *b)
+{
+  if (a == NULL || b == NULL) {
+    return false;
+  }
+  _EQ_CHECK_INT(a->mcc, b->mcc);
+  _EQ_CHECK_INT(a->mnc, b->mnc);
+  _EQ_CHECK_INT(a->mnc_digit_length, b->mnc_digit_length);
+  return true;
 }

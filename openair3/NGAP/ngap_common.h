@@ -63,5 +63,7 @@ void *decode_pdusession_transfer(const asn_TYPE_descriptor_t *td, const OCTET_ST
 bool decodePDUSessionResourceSetup(pdusession_transfer_t *out, const OCTET_STRING_t in);
 byte_array_t encode_ngap_pdusession_setup_response_transfer(const pdusession_setup_t *pdusession);
 
+bool eq_ngap_plmn(const plmn_id_t *a, const plmn_id_t *b);
+
 /** @}*/
 #endif /* NGAP_COMMON_H_ */

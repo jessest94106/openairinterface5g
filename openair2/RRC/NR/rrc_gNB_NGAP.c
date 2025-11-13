@@ -1632,19 +1632,20 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(ngap_pdusession_release_comm
 int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance)
 {
   ngap_paging_ind_t *msg = &NGAP_PAGING_IND(msg_p);
-  for (uint16_t tai_size = 0; tai_size < msg->tai_size; tai_size++) {
-    plmn_id_t *p = &msg->plmn_identity[tai_size];
+  for (uint16_t tai_idx = 0; tai_idx < msg->n_tai; tai_idx++) {
+    nr_tai_t *tai = &msg->tai_list[tai_idx];
+    plmn_id_t *p = &tai->plmn;
     LOG_I(NR_RRC,
           "[gNB %ld] TAI List for Paging: MCC=%03d, MNC=%0*d, TAC=%d\n",
           instance,
           p->mcc,
           p->mnc_digit_length,
           p->mnc,
-          msg->tac[tai_size]);
+          tai->tac);
     nr_rrc_config_t *req = &RC.nrrrc[instance]->configuration;
     for (uint8_t j = 0; j < req->num_plmn; j++) {
       plmn_id_t *req_plmn = &req->plmn[j];
-      if (req_plmn->mcc == p->mcc && req_plmn->mnc == p->mnc && req->tac == msg->tac[tai_size]) {
+      if (req_plmn->mcc == p->mcc && req_plmn->mnc == p->mnc && req->tac == tai->tac) {
         for (uint8_t CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
           AssertFatal(false, "to be implemented properly\n");
           if (NODE_IS_CU(RC.nrrrc[instance]->node_type)) {
@@ -1669,7 +1670,7 @@ int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance)
             F1AP_PAGING_IND(m).nr_cellid = cell->info.cell_id;
             F1AP_PAGING_IND(m).ueidentityindexvalue = (uint16_t)(msg->ue_paging_identity.s_tmsi.m_tmsi % 1024);
             F1AP_PAGING_IND(m).fiveg_s_tmsi = msg->ue_paging_identity.s_tmsi.m_tmsi;
-            F1AP_PAGING_IND(m).paging_drx = msg->paging_drx;
+            F1AP_PAGING_IND(m).paging_drx = msg->paging_drx ? (uint8_t)*msg->paging_drx : 0;
             LOG_E(F1AP, "ueidentityindexvalue %u fiveg_s_tmsi %ld paging_drx %u\n", F1AP_PAGING_IND (m).ueidentityindexvalue, F1AP_PAGING_IND (m).fiveg_s_tmsi, F1AP_PAGING_IND (m).paging_drx);
             itti_send_msg_to_task(TASK_CU_F1, instance, m);
           } else {
