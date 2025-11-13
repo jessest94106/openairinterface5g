@@ -1059,7 +1059,7 @@ int main(int argc, char **argv)
     if (n_trials== 1) num_rounds = 1;
 
     NR_gNB_DLSCH_t *gNB_dlsch = &msgDataTx->dlsch[0][0];
-    nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &gNB_dlsch->harq_process.pdsch_pdu.pdsch_pdu_rel15;
+    nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &gNB_dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     for (trial = 0; trial < n_trials && !stop; trial++) {
 
@@ -1255,7 +1255,7 @@ int main(int argc, char **argv)
         }
 
         for (i = 0; i < available_bits; i++) {
-          const uint8_t current_bit = (gNB_dlsch->harq_process.f[i / 8] & (1 << (i & 7))) >> (i & 7);
+          const uint8_t current_bit = (gNB_dlsch->f[i / 8] & (1 << (i & 7))) >> (i & 7);
           if (((current_bit == 0) && (UE_llr[i] <= 0)) || ((current_bit == 1) && (UE_llr[i] >= 0))) {
             if (errors_scrambling[round] == 0) {
               LOG_D(PHY,"First bit in error in unscrambling = %d\n",i);
@@ -1275,7 +1275,7 @@ int main(int argc, char **argv)
       for (i = 0; i < TBS; i++) {
 
 	estimated_output_bit[i] = (UE->phy_sim_dlsch_b[i/8] & (1 << (i & 7))) >> (i & 7);
-	test_input_bit[i]       = (gNB_dlsch->harq_process.b[i / 8] & (1 << (i & 7))) >> (i & 7); // Further correct for multiple segments
+	test_input_bit[i]       = (gNB_dlsch->b[i / 8] & (1 << (i & 7))) >> (i & 7); // Further correct for multiple segments
 	
 	if (estimated_output_bit[i] != test_input_bit[i]) {
 	  if(errors_bit == 0)

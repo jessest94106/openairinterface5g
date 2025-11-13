@@ -54,21 +54,6 @@ typedef struct {
 } NR_gNB_PUCCH0_LUT_t;
 
 typedef struct {
-  /// Nfapi DLSCH PDU
-  nfapi_nr_dl_tti_pdsch_pdu pdsch_pdu;
-  /// pointer to pdu from MAC interface (this is "a" in 36.212)
-  uint8_t *pdu;
-  /// Pointer to the payload
-  uint8_t *b;
-  /// Pointers to transport block segments
-  uint8_t **c;
-  /// Interleaver outputs
-  uint8_t *f;
-  /// REs unavailable for DLSCH (overlapping with PTRS, CSIRS etc.)
-  uint32_t unav_res;
-} NR_DL_gNB_HARQ_t;
-
-typedef struct {
   int dump_frame;
   int round_trials[8];
   int total_bytes_tx;
@@ -112,8 +97,18 @@ typedef struct {
 } NR_gNB_PHY_STATS_t;
 
 typedef struct {
-  /// Pointers to variables related to DLSCH harq process
-  NR_DL_gNB_HARQ_t harq_process;
+  /// Nfapi DLSCH PDU
+  nfapi_nr_dl_tti_pdsch_pdu pdsch_pdu;
+  /// pointer to pdu from MAC interface (this is "a" in 36.212)
+  uint8_t *pdu;
+  /// Pointer to the payload
+  uint8_t *b;
+  /// Pointers to transport block segments
+  uint8_t **c;
+  /// Interleaver outputs
+  uint8_t *f;
+  /// REs unavailable for DLSCH (overlapping with PTRS, CSIRS etc.)
+  uint32_t unav_res;
 } NR_gNB_DLSCH_t;
 
 typedef struct {

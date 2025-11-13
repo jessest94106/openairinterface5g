@@ -555,8 +555,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
 
   time_stats_t *dlsch_scrambling_stats = &gNB->dlsch_scrambling_stats;
   time_stats_t *dlsch_modulation_stats = &gNB->dlsch_modulation_stats;
-  NR_DL_gNB_HARQ_t *harq = &dlsch->harq_process;
-  const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &harq->pdsch_pdu.pdsch_pdu_rel15;
+  const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
   const int layerSz = frame_parms->N_RB_DL * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB;
   const int symbol_sz=frame_parms->ofdm_symbol_size;
   const int dmrs_Type = rel15->dmrsConfigType;
@@ -591,9 +590,9 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
 
 #ifdef DEBUG_DLSCH
   printf("PDSCH encoding:\nPayload:\n");
-  for (int i = 0; i < (harq->B >> 3); i += 16) {
+  for (int i = 0; i < (dlsch->B >> 3); i += 16) {
     for (int j = 0; j < 16; j++)
-      printf("0x%02x\t", harq->pdu[i + j]);
+      printf("0x%02x\t", dlsch->pdu[i + j]);
     printf("\n");
   }
   printf("\nEncoded payload:\n");
@@ -606,7 +605,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
 #endif
 
   if (IS_SOFTMODEM_DLSIM)
-    memcpy(harq->f, input_ptr, (encoded_length + 7) >> 3);
+    memcpy(dlsch->f, input_ptr, (encoded_length + 7) >> 3);
 
   c16_t mod_symbs[rel15->NrOfCodewords][encoded_length] __attribute__((aligned(64)));
   for (int codeWord = 0; codeWord < rel15->NrOfCodewords; codeWord++) {
@@ -791,8 +790,7 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
 
   for (int dlsch_id = 0; dlsch_id < msgTx->num_pdsch_slot; dlsch_id++) {
     NR_gNB_DLSCH_t *dlsch = msgTx->dlsch[dlsch_id];
-    NR_DL_gNB_HARQ_t *harq = &dlsch->harq_process;
-    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &harq->pdsch_pdu.pdsch_pdu_rel15;
+    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 
     LOG_D(PHY,
           "pdsch: BWPStart %d, BWPSize %d, rbStart %d, rbsize %d\n",
@@ -816,10 +814,10 @@ void nr_generate_pdsch(processingData_L1tx_t *msgTx, int frame, int slot)
       n_ptrs = (rel15->rbSize + rel15->PTRSFreqDensity - 1) / rel15->PTRSFreqDensity;
       ptrsSymbPerSlot = get_ptrs_symbols_in_slot(dlPtrsSymPos, rel15->StartSymbolIndex, rel15->NrOfSymbols);
     }
-    harq->unav_res = ptrsSymbPerSlot * n_ptrs;
+    dlsch->unav_res = ptrsSymbPerSlot * n_ptrs;
 
     /// CRC, coding, interleaving and rate matching
-    AssertFatal(harq->pdu != NULL, "%4d.%2d no HARQ PDU for PDSCH generation\n", msgTx->frame, msgTx->slot);
+    AssertFatal(dlsch->pdu != NULL, "%4d.%2d no PDU for PDSCH generation\n", msgTx->frame, msgTx->slot);
 
     /* output and its parts for each dlsch should be aligned on 64 bytes (or 8 * 64 bits)
      * => size_output is a sum of parts sizes rounded up to a multiple of 8 * 64

@@ -442,7 +442,7 @@ int main(int argc, char **argv)
   processingData_L1tx_t msgDataTx;
   init_DLSCH_struct(gNB, &msgDataTx);
   NR_gNB_DLSCH_t *dlsch = &msgDataTx.dlsch[0][0];
-  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->harq_process.pdsch_pdu.pdsch_pdu_rel15;
+  nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
 	//time_stats_t *rm_stats, *te_stats, *i_stats;
 	unsigned int TBS = 8424;
 	uint8_t nb_re_dmrs = 6;  // No data in dmrs symbol
@@ -498,7 +498,7 @@ int main(int argc, char **argv)
 	printf("harq process ue mcs = %d Qm = %d, symb %d\n", dlsch0_ue->dlsch_config.mcs, dlsch0_ue->dlsch_config.qamModOrder, nb_symb_sch);
 
   uint8_t test_input[TBS / 8 + 4]; // + 3 for CRC + 1 additional byte, see nr_dlsch_encoding()
-  dlsch->harq_process.pdu = test_input;
+  dlsch->pdu = test_input;
 	//unsigned char test_input[TBS / 8]  __attribute__ ((aligned(16)));
 	for (i = 0; i < TBS / 8; i++)
 		test_input[i] = (unsigned char) rand();
