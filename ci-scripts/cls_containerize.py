@@ -47,6 +47,7 @@ import helpreadme as HELP
 import constants as CONST
 import cls_oaicitest
 from cls_ci_helper import archiveArtifact
+from collections import deque
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes
@@ -216,6 +217,24 @@ def CheckLogs(self, filename, HTML, RAN):
 		else:
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
 		HTML.htmleNBFailureMsg = ""
+	elif 'xapp' in name:
+		opt = f"Undeploy {name}"
+		with open(f'{filename}', "r") as f:
+			last_line = deque(f, maxlen=1).pop()
+		if ('Test xApp run SUCCESSFULLY' in last_line):
+			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["xApp run successfully"])
+		else:
+			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["xApp didn't run successfully"])
+			success = False
+	elif 'RIC' in name:
+		opt = f"Undeploy {name}"
+		with open(f'{filename}', 'r') as f:
+			last_line = deque(f, maxlen=1).pop()
+		if ('Removing E2 Node' in last_line):
+			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["nearRT-RIC run successfully"])
+		else:
+			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["nearRT-RIC didn't run successfully"])
+			success = False
 	else:
 		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
 	logging.debug(f"log check: file {filename} passed analysis {success}")
