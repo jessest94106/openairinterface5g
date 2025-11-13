@@ -69,6 +69,8 @@ RUN ldconfig && ldd /opt/oai-gnb/bin/nr-cuup
 WORKDIR /opt/oai-gnb/etc
 
 WORKDIR /opt/oai-gnb
+
+COPY --from=gnb-base /usr/local/bin/yq /usr/local/bin/yq
 COPY --from=gnb-base /tini /tini
 ENTRYPOINT ["/tini", "-v", "--", "/opt/oai-gnb/bin/entrypoint.sh"]
 CMD ["/opt/oai-gnb/bin/nr-cuup", "-O", "/opt/oai-gnb/etc/gnb.conf"]
