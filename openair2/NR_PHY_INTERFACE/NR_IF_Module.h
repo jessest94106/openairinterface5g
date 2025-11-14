@@ -111,6 +111,7 @@ typedef struct {
   /// Pointers to DL SDUs
   nfapi_nr_tx_data_request_t TX_req;
 } NR_Sched_Rsp_t;
+void reset_sched_response(NR_Sched_Rsp_t *sched_response, int frame, int slot, int module_id, int CC_id);
 
 typedef struct {
   uint8_t Mod_id;
@@ -122,7 +123,7 @@ typedef struct NR_IF_Module_s {
   //define the function pointer
   void (*NR_UL_indication)(NR_UL_IND_t *UL_INFO);
   void (*NR_Schedule_response)(NR_Sched_Rsp_t *Sched_INFO);
-  void (*NR_slot_indication)(module_id_t module_idP, int CC_id, int frame, int slot);
+  void (*NR_slot_indication)(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp);
   void (*NR_PHY_config_req)(NR_PHY_Config_t *config_INFO);
   uint32_t CC_mask;
   uint16_t current_frame;

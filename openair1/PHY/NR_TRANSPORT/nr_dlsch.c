@@ -555,7 +555,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
 
   time_stats_t *dlsch_scrambling_stats = &gNB->dlsch_scrambling_stats;
   time_stats_t *dlsch_modulation_stats = &gNB->dlsch_modulation_stats;
-  const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
+  const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu->pdsch_pdu_rel15;
   const int layerSz = frame_parms->N_RB_DL * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB;
   const int symbol_sz=frame_parms->ofdm_symbol_size;
   const int dmrs_Type = rel15->dmrsConfigType;
@@ -789,7 +789,7 @@ void nr_generate_pdsch(PHY_VARS_gNB *gNB, int n_dlsch, NR_gNB_DLSCH_t *dlsch_arr
 
   for (int i = 0; i < n_dlsch; i++) {
     NR_gNB_DLSCH_t *dlsch = &dlsch_array[i];
-    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
+    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu->pdsch_pdu_rel15;
 
     LOG_D(PHY,
           "pdsch: BWPStart %d, BWPSize %d, rbStart %d, rbsize %d\n",

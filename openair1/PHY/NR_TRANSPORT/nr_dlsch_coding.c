@@ -138,7 +138,7 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
     NR_gNB_DLSCH_t *dlsch = &dlsch_array[i];
 
     unsigned int crc = 1;
-    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
+    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu->pdsch_pdu_rel15;
     uint32_t A = rel15->TBSize[0] << 3;
     unsigned char *a = dlsch->pdu;
     if (rel15->rnti != SI_RNTI) {
@@ -224,7 +224,7 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
 
   for (int i = 0; i < n_dlsch; i++) {
     NR_gNB_DLSCH_t *dlsch = &dlsch_array[i];
-    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu.pdsch_pdu_rel15;
+    const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu->pdsch_pdu_rel15;
 
     nrLDPC_TB_encoding_parameters_t *TB_parameters = &TBs[i];
 

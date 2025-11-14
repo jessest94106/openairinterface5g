@@ -54,7 +54,7 @@ void nr_fill_dlsch_tx_req(processingData_L1tx_t *msgTx, int idx, uint8_t *sdu)
   /* not sure if FAPI could transmit DL_TTI_req and TX_req in different orders.
    * for the moment, assume they are in the same order (and check!) */
   NR_gNB_DLSCH_t *dlsch = &msgTx->gNB->dlsch[idx];
-  nfapi_nr_dl_tti_pdsch_pdu *pdsch = &dlsch->pdsch_pdu;
+  const nfapi_nr_dl_tti_pdsch_pdu *pdsch = dlsch->pdsch_pdu;
   AssertFatal(pdsch->pdsch_pdu_rel15.pduIndex == idx, "PDSCH PDU index %d does not match %d\n", pdsch->pdsch_pdu_rel15.pduIndex, idx);
   dlsch->pdu = sdu;
 }

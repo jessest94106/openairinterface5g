@@ -243,12 +243,14 @@ static void nr_generate_csi_rs_gNB(PHY_VARS_gNB *gNB,
                      gNB->common_vars.txdataF[beam_nb]);
 }
 
-void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
+void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
+                           const nfapi_nr_dl_tti_request_t *DL_req,
+                           const nfapi_nr_tx_data_request_t *TX_req,
+                           const nfapi_nr_ul_dci_request_t *UL_dci_req,
                            int frame,
                            int slot,
                            int do_meas)
 {
-  PHY_VARS_gNB *gNB = msgTx->gNB;
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   int slot_prs = 0;
@@ -282,44 +284,41 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
     }
   }
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,1);
-  for (int i = 0; i < msgTx->n_ssb_pdu; i++)
-    nr_common_signal_procedures(gNB, frame, slot, &msgTx->ssb_pdu[i]);
-  msgTx->n_ssb_pdu = 0;
+  for (int i = 0; i < UL_dci_req->numPdus; ++i)
+    nr_generate_dci(gNB, &UL_dci_req->ul_dci_pdu_list[i].pdcch_pdu.pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,0);
-
-  int num_pdcch_pdus = msgTx->num_ul_pdcch + msgTx->num_dl_pdcch;
-
-  if (num_pdcch_pdus > 0) {
-    LOG_D(PHY, "[gNB %d] Frame %d slot %d Calling nr_generate_dci() (number of UL/DL PDCCH PDUs %d/%d)\n",
-	  gNB->Mod_id, frame, slot, msgTx->num_ul_pdcch, msgTx->num_dl_pdcch);
-  
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_gNB_PDCCH_TX,1);
-
-    start_meas(&gNB->dci_generation_stats);
-    for (int i = 0; i < msgTx->num_dl_pdcch; ++i)
-      nr_generate_dci(gNB, &msgTx->pdcch_pdu[i].pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
-    for (int i = 0; i < msgTx->num_ul_pdcch; ++i)
-      nr_generate_dci(gNB, &msgTx->ul_pdcch_pdu[i].pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
-    stop_meas(&gNB->dci_generation_stats);
-
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_gNB_PDCCH_TX,0);
+  int num_pdsch = 0;
+  for (int i = 0; i < DL_req->dl_tti_request_body.nPDUs; ++i) {
+    const nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu = &DL_req->dl_tti_request_body.dl_tti_pdu_list[i];
+    switch (dl_tti_pdu->PDUType) {
+      case NFAPI_NR_DL_TTI_SSB_PDU_TYPE:
+        nr_common_signal_procedures(gNB, frame, slot, &dl_tti_pdu->ssb_pdu);
+        break;
+      case NFAPI_NR_DL_TTI_PDCCH_PDU_TYPE:
+        nr_generate_dci(gNB, &dl_tti_pdu->pdcch_pdu.pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
+        break;
+      case NFAPI_NR_DL_TTI_CSI_RS_PDU_TYPE:
+        nr_generate_csi_rs_gNB(gNB, slot, cfg, &dl_tti_pdu->csi_rs_pdu);
+        break;
+      case NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE: {
+        int tx_data_idx = dl_tti_pdu->pdsch_pdu.pdsch_pdu_rel15.pduIndex;
+        DevAssert(tx_data_idx < TX_req->Number_of_PDUs);
+        // reuse dlsch variables, as there are multiple very large memory
+        // buffers
+        gNB->dlsch[num_pdsch].pdsch_pdu = &dl_tti_pdu->pdsch_pdu;
+        gNB->dlsch[num_pdsch].pdu = (uint8_t *)TX_req->pdu_list[tx_data_idx].TLVs[0].value.direct;
+        DevAssert(num_pdsch < gNB->max_nb_pdsch);
+        num_pdsch++;
+        } break;
+    }
   }
-  msgTx->num_dl_pdcch = 0;
-  msgTx->num_ul_pdcch = 0;
  
-  if (msgTx->num_pdsch_slot > 0) {
+  if (num_pdsch > 0) {
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_GENERATE_DLSCH,1);
-    LOG_D(PHY, "PDSCH generation started (%d) in frame %d.%d\n", msgTx->num_pdsch_slot,frame,slot);
-    nr_generate_pdsch(gNB, msgTx->num_pdsch_slot, gNB->dlsch, frame, slot);
+    LOG_D(PHY, "PDSCH generation started (%d) in frame %d.%d\n", num_pdsch, frame, slot);
+    nr_generate_pdsch(gNB, num_pdsch, gNB->dlsch, frame, slot);
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_GENERATE_DLSCH,0);
   }
-  msgTx->num_pdsch_slot = 0;
-
-  for (int i = 0; i < msgTx->n_csirs_pdu; i++)
-    nr_generate_csi_rs_gNB(gNB, slot, cfg, &msgTx->csirs_pdu[i]);
-  msgTx->n_csirs_pdu = 0;
 
   //apply the OFDM symbol rotation here
   start_meas(&gNB->phase_comp_stats);
@@ -1292,4 +1291,41 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_UESPEC_RX,0);
   return pusch_DTX;
+}
+
+void nr_save_ul_tti_req(PHY_VARS_gNB *gNB, nfapi_nr_ul_tti_request_t *UL_tti_req)
+{
+  DevAssert(gNB != NULL);
+  DevAssert(UL_tti_req != NULL);
+
+  int frame = UL_tti_req->SFN;
+  int slot = UL_tti_req->Slot;
+
+  for (int i = 0; i < UL_tti_req->n_pdus; i++) {
+    int type = UL_tti_req->pdus_list[i].pdu_type;
+    LOG_D(NR_PHY,
+          "frame %d, slot %d got %s for %d.%d\n",
+          frame,
+          slot,
+          txt_nfapi_nr_ul_config_pdu_type[type],
+          UL_tti_req->SFN,
+          UL_tti_req->Slot);
+    switch (type) {
+      case NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE:
+        nr_fill_ulsch(gNB, UL_tti_req->SFN, UL_tti_req->Slot, &UL_tti_req->pdus_list[i].pusch_pdu);
+        break;
+      case NFAPI_NR_UL_CONFIG_PUCCH_PDU_TYPE:
+        nr_fill_pucch(gNB, UL_tti_req->SFN, UL_tti_req->Slot, &UL_tti_req->pdus_list[i].pucch_pdu);
+        break;
+      case NFAPI_NR_UL_CONFIG_PRACH_PDU_TYPE: {
+        nfapi_nr_prach_pdu_t *prach_pdu = &UL_tti_req->pdus_list[i].prach_pdu;
+        prach_item_t *prach = nr_schedule_rx_prach(gNB, UL_tti_req->SFN, UL_tti_req->Slot, prach_pdu);
+        if (!prach)
+          LOG_W(NR_PHY_RACH, "Error in scheduling rach\n");
+      } break;
+      case NFAPI_NR_UL_CONFIG_SRS_PDU_TYPE:
+        nr_fill_srs(gNB, UL_tti_req->SFN, UL_tti_req->Slot, &UL_tti_req->pdus_list[i].srs_pdu);
+        break;
+    }
+  }
 }

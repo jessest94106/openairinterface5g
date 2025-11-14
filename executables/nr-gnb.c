@@ -82,8 +82,6 @@ static void tx_func(processingData_L1tx_t *info)
   int slot_rx = info->slot_rx;
   LOG_D(NR_PHY, "%d.%d running tx_func\n", frame_tx, slot_tx);
   PHY_VARS_gNB *gNB = info->gNB;
-  module_id_t module_id = gNB->Mod_id;
-  uint8_t CC_id = gNB->CC_id;
   NR_IF_Module_t *ifi = gNB->if_inst;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
 
@@ -94,15 +92,22 @@ static void tx_func(processingData_L1tx_t *info)
     reset_active_ulsch(gNB, frame_rx);
   }
 
+  clear_slot_beamid(gNB, slot_tx);
+
+  nfapi_nr_slot_indication_scf_t ind = {.sfn = frame_tx, .slot = slot_tx};
   start_meas(&gNB->slot_indication_stats);
-  ifi->NR_slot_indication(module_id, CC_id, frame_tx, slot_tx);
+  // this variable is very big (multiple MB), so we put it into static storage
+  // to not overflow the stack while still having it in local (function) scope
+  // also, tx_func() is only executed by one thread, serially
+  static NR_Sched_Rsp_t sched_response;
+  ifi->NR_slot_indication(&ind, &sched_response);
   stop_meas(&gNB->slot_indication_stats);
-  gNB->msgDataTx->timestamp_tx = info->timestamp_tx;
-  info = gNB->msgDataTx;
+
   info->gNB = gNB;
 
   // At this point, MAC scheduler just ran, including scheduling
   // PRACH/PUCCH/PUSCH, so trigger RX chain processing
+  nr_save_ul_tti_req(gNB, &sched_response.UL_tti_req);
   LOG_D(NR_PHY, "Trigger RX for %d.%d\n", frame_rx, slot_rx);
   notifiedFIFO_elt_t *res = newNotifiedFIFO_elt(sizeof(processingData_L1_t), 0, &gNB->resp_L1, NULL);
   processingData_L1_t *syncMsg = NotifiedFifoData(res);
@@ -119,7 +124,13 @@ static void tx_func(processingData_L1tx_t *info)
   if (tx_slot_type == NR_DOWNLINK_SLOT || tx_slot_type == NR_MIXED_SLOT || get_softmodem_params()->continuous_tx || IS_SOFTMODEM_RFSIM 
     || cfg->analog_beamforming_ve.analog_beam_list) {
     start_meas(&info->gNB->phy_proc_tx);
-    phy_procedures_gNB_TX(info, frame_tx, slot_tx, 1);
+    phy_procedures_gNB_TX(info->gNB,
+                          &sched_response.DL_req,
+                          &sched_response.TX_req,
+                          &sched_response.UL_dci_req,
+                          frame_tx,
+                          slot_tx,
+                          1);
 
     PHY_VARS_gNB *gNB = info->gNB;
     processingData_RU_t syncMsgRU;
@@ -130,14 +141,6 @@ static void tx_func(processingData_L1tx_t *info)
     LOG_D(PHY, "gNB: %d.%d : calling RU TX function\n", syncMsgRU.frame_tx, syncMsgRU.slot_tx);
     ru_tx_func((void *)&syncMsgRU);
     stop_meas(&info->gNB->phy_proc_tx);
-  }
-
-  if (NFAPI_MODE == NFAPI_MONOLITHIC) {
-    /* this thread is done with the sched_info, decrease the reference counter.
-     * This only applies for monolithic; in the PNF, the memory is allocated in
-     * a ring buffer that should never be overwritten (one frame duration). */
-    LOG_D(NR_PHY, "Calling deref_sched_response for id %d (tx_func) in %d.%d\n", info->sched_response_id, frame_tx, slot_tx);
-    deref_sched_response(info->sched_response_id);
   }
 }
 
