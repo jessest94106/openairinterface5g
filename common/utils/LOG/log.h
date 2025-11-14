@@ -206,6 +206,7 @@ typedef struct {
 
 typedef struct  {
   const char        *name;
+  char headerName[19];
   int level;
   int filelog;
   FILE              *stream;

@@ -461,9 +461,15 @@ int register_log_component(const char *name, const char *fext, int compidx)
   }
 
   if (computed_compidx >= 0 && computed_compidx <MAX_LOG_COMPONENTS) {
-    g_log->log_component[computed_compidx].name = strdup(name);
-    g_log->log_component[computed_compidx].stream = stdout;
-    g_log->log_component[computed_compidx].filelog = 0;
+    log_component_t *c = &g_log->log_component[computed_compidx];
+    c->name = strdup(name);
+    int n = snprintf(c->headerName, sizeof(c->headerName), "[%s", c->name);
+    if (n >= sizeof(c->headerName) - 1) // snprintf() truncated
+      n = sizeof(c->headerName) - 2;
+    c->headerName[n] = ']';
+    c->headerName[n + 1] = 0;
+    c->stream = stdout;
+    c->filelog = 0;
     g_log->log_rarely_used[computed_compidx].filelog_name = calloc(1, strlen(name) + 16); /* /tmp/<name>.%s  */
     sprintf(g_log->log_rarely_used[computed_compidx].filelog_name, "/tmp/%s.", name);
     strncat(g_log->log_rarely_used[computed_compidx].filelog_name, fext, 3);
@@ -598,11 +604,11 @@ static inline int log_header(log_component_t *c,
 
   return snprintf(log_buffer,
                   buffsize,
-                  "%s%s%s[%s]%s%s%s",
+                  "%s%s%s%-8s%s%s%s",
                   flag & FLAG_NOCOLOR ? "" : log_level_highlight_start[level],
                   timeString,
                   threadIdString,
-                  c->name,
+                  c->headerName,
                   g_log->level2string[level], // will print space if no level selected
                   l,
                   threadname);
