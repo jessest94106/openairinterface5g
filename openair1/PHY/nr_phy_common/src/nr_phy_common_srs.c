@@ -293,7 +293,7 @@ bool generate_srs_nr(NR_DL_FRAME_PARMS *frame_parms,
       }
       uint8_t k_l_offset = 0; // If the SRS is configured by the IE SRS-PosResource-r16, the quantity k_l_offset is
                               // given by TS 38.211 - Table 6.4.1.4.3-2, otherwise k_l_offset = 0.
-      uint8_t k_0_overbar_p = (nr_srs_info->n_shift * NR_NB_SC_PER_RB + (K_TC_p + k_l_offset)) % K_TC;
+      uint8_t k_0_overbar_p = nr_srs_info->n_shift * NR_NB_SC_PER_RB + (K_TC_p + k_l_offset) % K_TC;
       uint8_t k_0_p = k_0_overbar_p + K_TC * M_sc_b_SRS * sum_n_b;
       nr_srs_info->k_0_p[p_index][l_line] = k_0_p;
 
