@@ -747,12 +747,15 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
 {
   AssertFatal(!fullConfig, "fullConfig not supported yet\n");
   NR_CellGroupConfig_t *cellGroupConfig = NULL;
-  uper_decode(NULL,
-              &asn_DEF_NR_CellGroupConfig,   //might be added prefix later
-              (void **)&cellGroupConfig,
-              (uint8_t *)masterCellGroup->buf,
-              masterCellGroup->size, 0, 0);
-
+  asn_dec_rval_t dec_rval = uper_decode(NULL,
+                                        &asn_DEF_NR_CellGroupConfig, //might be added prefix later
+                                        (void **)&cellGroupConfig,
+                                        (uint8_t *)masterCellGroup->buf,
+                                        masterCellGroup->size, 0, 0);
+  if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
+    LOG_E(NR_RRC, "CellGroupConfig decode error\n");
+    return;
+  }
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
   }
@@ -823,28 +826,30 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
   NR_RRCReconfiguration_v1540_IEs_t *rec_1540 = rec_1530->nonCriticalExtension;
   if (rec_1540) {
     NR_RRCReconfiguration_v1560_IEs_t *rec_1560 = rec_1540->nonCriticalExtension;
-    if (rec_1560->sk_Counter) {
-      // TODO perform AS security key update procedure as specified in 5.3.5.7
-      LOG_E(NR_RRC, "RRCReconfiguration includes sk-Counter but this is not implemented yet\n");
-    }
-    if (rec_1560->mrdc_SecondaryCellGroupConfig) {
-      // TODO perform handling of mrdc-SecondaryCellGroupConfig as specified in 5.3.5.3
-      LOG_E(NR_RRC, "RRCReconfiguration includes mrdc-SecondaryCellGroupConfig but this is not handled yet\n");
-    }
-    if (rec_1560->radioBearerConfig2) {
-      NR_RadioBearerConfig_t *RadioBearerConfig = NULL;
-      asn_dec_rval_t dec_rval = uper_decode(NULL,
-                                            &asn_DEF_NR_RadioBearerConfig,
-                                            (void **)&RadioBearerConfig,
-                                            (uint8_t *)rec_1560->radioBearerConfig2->buf,
-                                            rec_1560->radioBearerConfig2->size,
-                                            0,
-                                            0);
-      if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
-        LOG_E(NR_RRC, "radioBearerConfig2 decode error\n");
-        SEQUENCE_free(&asn_DEF_NR_RadioBearerConfig, RadioBearerConfig, 1);
-      } else
-        nr_rrc_ue_process_RadioBearerConfig(rrc, RadioBearerConfig);
+    if (rec_1560) {
+      if (rec_1560->sk_Counter) {
+        // TODO perform AS security key update procedure as specified in 5.3.5.7
+        LOG_E(NR_RRC, "RRCReconfiguration includes sk-Counter but this is not implemented yet\n");
+      }
+      if (rec_1560->mrdc_SecondaryCellGroupConfig) {
+        // TODO perform handling of mrdc-SecondaryCellGroupConfig as specified in 5.3.5.3
+        LOG_E(NR_RRC, "RRCReconfiguration includes mrdc-SecondaryCellGroupConfig but this is not handled yet\n");
+      }
+      if (rec_1560->radioBearerConfig2) {
+        NR_RadioBearerConfig_t *RadioBearerConfig = NULL;
+        asn_dec_rval_t dec_rval = uper_decode(NULL,
+                                              &asn_DEF_NR_RadioBearerConfig,
+                                              (void **)&RadioBearerConfig,
+                                              (uint8_t *)rec_1560->radioBearerConfig2->buf,
+                                              rec_1560->radioBearerConfig2->size,
+                                              0,
+                                              0);
+        if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
+          LOG_E(NR_RRC, "radioBearerConfig2 decode error\n");
+          SEQUENCE_free(&asn_DEF_NR_RadioBearerConfig, RadioBearerConfig, 1);
+        } else
+          nr_rrc_ue_process_RadioBearerConfig(rrc, RadioBearerConfig);
+      }
     }
   }
 }
@@ -1158,20 +1163,19 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
           LOG_E(NR_RRC, "\n");
           // free the memory
           SEQUENCE_free(&asn_DEF_NR_CellGroupConfig, (void *)cellGroupConfig, 1);
+        } else {
+          if (LOG_DEBUGFLAG(DEBUG_ASN1))
+            xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
+
+          nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index);
+          AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
+          nr_mac_rrc_message_t rrc_msg = {0};
+          rrc_msg.payload_type = NR_MAC_RRC_CONFIG_CG;
+          nr_mac_rrc_config_cg_t *config_cg = &rrc_msg.payload.config_cg;
+          config_cg->cellGroupConfig = cellGroupConfig;
+          config_cg->UE_NR_Capability = rrc->UECap.UE_NR_Capability;
+          nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
         }
-
-        if (LOG_DEBUGFLAG(DEBUG_ASN1))
-          xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
-
-        nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index);
-
-        AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
-        nr_mac_rrc_message_t rrc_msg = {0};
-        rrc_msg.payload_type = NR_MAC_RRC_CONFIG_CG;
-        nr_mac_rrc_config_cg_t *config_cg = &rrc_msg.payload.config_cg;
-        config_cg->cellGroupConfig = cellGroupConfig;
-        config_cg->UE_NR_Capability = rrc->UECap.UE_NR_Capability;
-        nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
       }
       if (ie->measConfig) {
         LOG_I(NR_RRC, "RRCReconfiguration includes Measurement Configuration\n");
@@ -1681,8 +1685,13 @@ static void nr_rrc_manage_rlc_bearers(NR_UE_RRC_INST_t *rrc, const NR_CellGroupC
           nr_rlc_set_rlf_handler(rrc->ue_id, nr_rrc_signal_maxrtxindication);
         } else { // DRB
           NR_DRB_Identity_t drb_id = rlc_bearer->servedRadioBearer->choice.drb_Identity;
-          nr_rlc_add_drb(rrc->ue_id, drb_id, rlc_bearer);
-          nr_rlc_set_rlf_handler(rrc->ue_id, nr_rrc_signal_maxrtxindication);
+          if (!rlc_bearer->rlc_Config) {
+            LOG_E(RLC, "RLC-Config not present but is mandatory for setup\n");
+            rrc->active_RLC_entity[lcid] = false;
+          } else {
+            nr_rlc_add_drb(rrc->ue_id, drb_id, rlc_bearer);
+            nr_rlc_set_rlf_handler(rrc->ue_id, nr_rrc_signal_maxrtxindication);
+          }
         }
       }
     }
@@ -1710,7 +1719,10 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc,
       rrc->arfcn_ssb = *dcc->frequencyInfoDL->absoluteFrequencySSB;
 
     // consider the target SpCell to be one with a physical cell identity indicated by the physCellId
-    rrc->phyCellID = *reconfigurationWithSync->spCellConfigCommon->physCellId;
+    if (!reconfigurationWithSync->spCellConfigCommon->physCellId)
+      LOG_E(NR_RRC, "physCellId absent but should be mandatory present upon cell change and cell addition\n");
+    else
+      rrc->phyCellID = *reconfigurationWithSync->spCellConfigCommon->physCellId;
   }
 
   NR_UE_Timers_Constants_t *tac = &rrc->timers_and_constants;
@@ -2235,13 +2247,7 @@ static void nr_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc, NR_UECa
   AssertFatal (enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
   rrc->UECap.sdu_size = (enc_rval.encoded + 7) / 8;
   LOG_I(PHY, "[RRC]UE NR Capability encoded, %d bytes (%zd bits)\n", rrc->UECap.sdu_size, enc_rval.encoded + 7);
-  /* RAT Container */
-  NR_UE_CapabilityRAT_Container_t *ue_CapabilityRAT_Container = CALLOC(1, sizeof(NR_UE_CapabilityRAT_Container_t));
-  ue_CapabilityRAT_Container->rat_Type = NR_RAT_Type_nr;
-  OCTET_STRING_fromBuf(&ue_CapabilityRAT_Container->ue_CapabilityRAT_Container, (const char *)rrc->UECap.sdu, rrc->UECap.sdu_size);
   NR_UECapabilityEnquiry_IEs_t *ueCapabilityEnquiry_ie = UECapabilityEnquiry->criticalExtensions.choice.ueCapabilityEnquiry;
-  //  ue_CapabilityRAT_Container.ueCapabilityRAT_Container.buf  = UE_rrc_inst[ue_mod_idP].UECapability;
-  // ue_CapabilityRAT_Container.ueCapabilityRAT_Container.size = UE_rrc_inst[ue_mod_idP].UECapability_size;
   AssertFatal(UECapabilityEnquiry->criticalExtensions.present == NR_UECapabilityEnquiry__criticalExtensions_PR_ueCapabilityEnquiry,
               "UECapabilityEnquiry->criticalExtensions.present (%d) != UECapabilityEnquiry__criticalExtensions_PR_c1 (%d)\n",
               UECapabilityEnquiry->criticalExtensions.present,NR_UECapabilityEnquiry__criticalExtensions_PR_ueCapabilityEnquiry);
@@ -2254,6 +2260,10 @@ static void nr_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc, NR_UECa
 
   for (int i = 0; i < ueCapabilityEnquiry_ie->ue_CapabilityRAT_RequestList.list.count; i++) {
     if (ueCapabilityEnquiry_ie->ue_CapabilityRAT_RequestList.list.array[i]->rat_Type == NR_RAT_Type_nr) {
+      /* RAT Container */
+      NR_UE_CapabilityRAT_Container_t *ue_CapabilityRAT_Container = CALLOC(1, sizeof(NR_UE_CapabilityRAT_Container_t));
+      ue_CapabilityRAT_Container->rat_Type = NR_RAT_Type_nr;
+      OCTET_STRING_fromBuf(&ue_CapabilityRAT_Container->ue_CapabilityRAT_Container, (const char *)rrc->UECap.sdu, rrc->UECap.sdu_size);
       asn1cSeqAdd(&UEcapList->list, ue_CapabilityRAT_Container);
       uint8_t buffer[500];
       asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_UL_DCCH_Message, NULL, (void *)&ul_dcch_msg, buffer, 500);
@@ -2267,8 +2277,7 @@ static void nr_rrc_ue_process_ueCapabilityEnquiry(NR_UE_RRC_INST_t *rrc, NR_UECa
       nr_pdcp_data_req_srb(rrc->ue_id, srb_id, 0, (enc_rval.encoded + 7) / 8, buffer, deliver_pdu_srb_rlc, NULL);
     }
   }
-  /* Free struct members after it's done
-     including locally allocated ue_CapabilityRAT_Container */
+  /* Free struct members after it's done including locally allocated ue_CapabilityRAT_Container */
   ASN_STRUCT_RESET(asn_DEF_NR_UL_DCCH_Message, &ul_dcch_msg);
 }
 
