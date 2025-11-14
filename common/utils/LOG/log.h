@@ -217,7 +217,7 @@ typedef struct  {
 typedef struct {
   log_component_t         log_component[MAX_LOG_COMPONENTS];
   log_component_back_t log_rarely_used[MAX_LOG_COMPONENTS];
-  char                    level2string[NUM_LOG_LEVEL];
+  char level2string[NUM_LOG_LEVEL][4];
   int                     flag;
   char                   *filelog_name;
   debug_flags_t debug_mask;

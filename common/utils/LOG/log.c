@@ -509,11 +509,14 @@ int logInit (void)
   for (int i = 0; i < MAX_LOG_PREDEF_COMPONENTS; i++)
     register_log_component(comp_name[i], comp_extension[i], i);
 
-  for (int i=0 ; log_level_names[i].name != NULL ; i++)
-    g_log->level2string[i] = toupper(log_level_names[i].name[0]); // uppercased first letter of level name
-  
   g_log->filelog_name = "/tmp/openair.log";
   log_getconfig(g_log);
+
+  for (int i = 0; log_level_names[i].name != NULL; i++)
+    if (g_log->flag & FLAG_LEVEL)
+      snprintf(g_log->level2string[i], sizeof g_log->level2string[i], " %c ", toupper(log_level_names[i].name[0]));
+    else
+      snprintf(g_log->level2string[i], sizeof g_log->level2string[i], " ");
 
   // set all unused component items to 0, they are for non predefined components
   for (int i=MAX_LOG_PREDEF_COMPONENTS; i < MAX_LOG_COMPONENTS; i++) {
@@ -592,15 +595,17 @@ static inline int log_header(log_component_t *c,
   } else {
     threadIdString[0] = 0;
   }
-  return snprintf(log_buffer, buffsize, "%s%s%s[%s] %c %s%s",
-		   flag & FLAG_NOCOLOR ? "" : log_level_highlight_start[level],
-		   timeString,
-		   threadIdString,
-		   c->name,
-		   flag & FLAG_LEVEL ? g_log->level2string[level] : ' ',
-		   l,
-		   threadname
-		   );
+
+  return snprintf(log_buffer,
+                  buffsize,
+                  "%s%s%s[%s]%s%s%s",
+                  flag & FLAG_NOCOLOR ? "" : log_level_highlight_start[level],
+                  timeString,
+                  threadIdString,
+                  c->name,
+                  g_log->level2string[level], // will print space if no level selected
+                  l,
+                  threadname);
 }
 
 void logRecord_mt(const char *file,
