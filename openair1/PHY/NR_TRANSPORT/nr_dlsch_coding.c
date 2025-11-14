@@ -122,15 +122,6 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
 
   nrLDPC_TB_encoding_parameters_t TBs[n_dlsch];
   memset(TBs, 0, sizeof(TBs));
-  nrLDPC_slot_encoding_parameters_t slot_parameters = {.frame = frame,
-                                                       .slot = slot,
-                                                       .nb_TBs = n_dlsch,
-                                                       .threadPool = &gNB->threadPool,
-                                                       .tinput = tinput,
-                                                       .tprep = tprep,
-                                                       .tparity = tparity,
-                                                       .toutput = toutput,
-                                                       .TBs = TBs};
 
   int num_segments = 0;
 
@@ -280,6 +271,15 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
     dlsch_offset += ceil_mod(dlsch_size, 8 * 64);
   }
 
+  nrLDPC_slot_encoding_parameters_t slot_parameters = {.frame = frame,
+                                                       .slot = slot,
+                                                       .nb_TBs = n_dlsch,
+                                                       .threadPool = &gNB->threadPool,
+                                                       .tinput = tinput,
+                                                       .tprep = tprep,
+                                                       .tparity = tparity,
+                                                       .toutput = toutput,
+                                                       .TBs = TBs};
   gNB->nrLDPC_coding_interface.nrLDPC_coding_encoder(&slot_parameters);
 
   for (int i = 0; i < n_dlsch; i++) {
