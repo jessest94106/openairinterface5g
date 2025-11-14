@@ -156,10 +156,6 @@ extern char uecap_xer[1024];
 char uecap_xer_in=0;
 
 /* TODO these declarations are to be removed */
-void nr_schedule_dl_tti_req(void) {};
-void nr_schedule_ul_dci_req() {};
-void nr_schedule_tx_req() {};
-void nr_schedule_ul_tti_req() {};
 void nr_slot_select() {};
 
 /* see file openair2/LAYER2/MAC/main.c for why abstraction_flag is needed

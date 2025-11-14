@@ -27,7 +27,6 @@
 #include "PHY/NR_TRANSPORT/nr_dci.h"
 #include "PHY/NR_ESTIMATION/nr_ul_estimation.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_interface.h"
-#include "fapi_nr_l1.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/LOG/vcd_signal_dumper.h"
 #include "PHY/INIT/nr_phy_init.h"
@@ -55,9 +54,19 @@ static void nr_fill_indication(PHY_VARS_gNB *gNB,
                                nfapi_nr_crc_t *crc,
                                nfapi_nr_rx_data_pdu_t *pdu);
 
+static void nr_fill_indication(PHY_VARS_gNB *gNB,
+                               int frame,
+                               int slot_rx,
+                               int ULSCH_id,
+                               uint8_t harq_pid,
+                               uint8_t crc_flag,
+                               int dtx_flag,
+                               nfapi_nr_crc_t *crc,
+                               nfapi_nr_rx_data_pdu_t *pdu);
+
 int beam_index_allocation(bool das,
                           int fapi_beam_index,
-                          nfapi_nr_analog_beamforming_ve_t *analog_bf,
+                          const nfapi_nr_analog_beamforming_ve_t *analog_bf,
                           NR_gNB_COMMON *common_vars,
                           int slot,
                           int symbols_per_slot,
@@ -93,10 +102,10 @@ int beam_index_allocation(bool das,
   return idx;
 }
 
-void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_dl_tti_ssb_pdu ssb_pdu)
+void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, const nfapi_nr_dl_tti_ssb_pdu *ssb_pdu)
 {
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
-  nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &ssb_pdu.ssb_pdu_rel15;
+  const nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &ssb_pdu->ssb_pdu_rel15;
   uint8_t ssb_index = pdu->SsbBlockIndex;
   LOG_D(PHY,"common_signal_procedures: frame %d, slot %d ssb index %d\n", frame, slot, ssb_index);
 
@@ -144,7 +153,7 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
         fp->ssb_start_subcarrier);
 
   LOG_D(PHY,"SS TX: frame %d, slot %d, start_symbol %d\n", frame, slot, ssb_start_symbol);
-  nfapi_nr_tx_precoding_and_beamforming_t *pb = &pdu->precoding_and_beamforming;
+  const nfapi_nr_tx_precoding_and_beamforming_t *pb = &pdu->precoding_and_beamforming;
   c16_t ***txdataF = gNB->common_vars.txdataF;
   int txdataF_offset = slot * fp->samples_per_slot_wCP;
   // beam number in a scenario with multiple concurrent beams
@@ -182,7 +191,7 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_n
 #endif
 
   nr_generate_pbch(gNB,
-                   &ssb_pdu,
+                   ssb_pdu,
                    &txdataF[beam_nb][0][txdataF_offset],
                    ssb_start_symbol,
                    n_hf,
@@ -202,12 +211,54 @@ void clear_slot_beamid(PHY_VARS_gNB *gNB, int slot)
   }
 }
 
-void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
+static void nr_generate_csi_rs_gNB(PHY_VARS_gNB *gNB,
+                                   int slot,
+                                   const nfapi_nr_config_request_scf_t *cfg,
+                                   const nfapi_nr_dl_tti_csi_rs_pdu *csi_rs_pdu)
+{
+  const nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csi_rs_pdu->csi_rs_pdu_rel15;
+  if (csi_params->csi_type == 2) // ZP-CSI
+    return;
+
+  csi_mapping_parms_t mapping_parms =
+      get_csi_mapping_parms(csi_params->row, csi_params->freq_domain, csi_params->symb_l0, csi_params->symb_l1);
+  const nfapi_nr_tx_precoding_and_beamforming_t *pb = &csi_params->precodingAndBeamforming;
+  int csi_bitmap = 0;
+  int lprime_num = mapping_parms.lprime + 1;
+  for (int j = 0; j < mapping_parms.size; j++)
+    csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
+  int beam_nb = beam_index_allocation(gNB->enable_analog_das,
+                                      pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
+                                      &cfg->analog_beamforming_ve,
+                                      &gNB->common_vars,
+                                      slot,
+                                      gNB->frame_parms.symbols_per_slot,
+                                      csi_bitmap);
+
+  nr_generate_csi_rs(&gNB->frame_parms,
+                     &mapping_parms,
+                     gNB->TX_AMP,
+                     slot,
+                     csi_params->freq_density,
+                     csi_params->start_rb,
+                     csi_params->nr_of_rbs,
+                     csi_params->symb_l0,
+                     csi_params->symb_l1,
+                     csi_params->row,
+                     csi_params->scramb_id,
+                     csi_params->power_control_offset_ss,
+                     csi_params->cdm_type,
+                     gNB->common_vars.txdataF[beam_nb]);
+}
+
+void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
+                           const nfapi_nr_dl_tti_request_t *DL_req,
+                           const nfapi_nr_tx_data_request_t *TX_req,
+                           const nfapi_nr_ul_dci_request_t *UL_dci_req,
                            int frame,
                            int slot,
                            int do_meas)
 {
-  PHY_VARS_gNB *gNB = msgTx->gNB;
   const NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   const int txdataF_offset = slot * fp->samples_per_slot_wCP;
@@ -239,81 +290,40 @@ void phy_procedures_gNB_TX(processingData_L1tx_t *msgTx,
     }
   }
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,1);
-  for (int i = 0; i < fp->Lmax; i++) {
-    if (msgTx->ssb[i].active) {
-      nr_common_signal_procedures(gNB, frame, slot, msgTx->ssb[i].ssb_pdu);
-      msgTx->ssb[i].active = false;
+  for (int i = 0; i < UL_dci_req->numPdus; ++i)
+    nr_generate_dci(gNB, &UL_dci_req->ul_dci_pdu_list[i].pdcch_pdu.pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
+
+  int num_pdsch = 0;
+  for (int i = 0; i < DL_req->dl_tti_request_body.nPDUs; ++i) {
+    const nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu = &DL_req->dl_tti_request_body.dl_tti_pdu_list[i];
+    switch (dl_tti_pdu->PDUType) {
+      case NFAPI_NR_DL_TTI_SSB_PDU_TYPE:
+        nr_common_signal_procedures(gNB, frame, slot, &dl_tti_pdu->ssb_pdu);
+        break;
+      case NFAPI_NR_DL_TTI_PDCCH_PDU_TYPE:
+        nr_generate_dci(gNB, &dl_tti_pdu->pdcch_pdu.pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
+        break;
+      case NFAPI_NR_DL_TTI_CSI_RS_PDU_TYPE:
+        nr_generate_csi_rs_gNB(gNB, slot, cfg, &dl_tti_pdu->csi_rs_pdu);
+        break;
+      case NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE: {
+        int tx_data_idx = dl_tti_pdu->pdsch_pdu.pdsch_pdu_rel15.pduIndex;
+        DevAssert(tx_data_idx < TX_req->Number_of_PDUs);
+        // reuse dlsch variables, as there are multiple very large memory
+        // buffers
+        gNB->dlsch[num_pdsch].pdsch_pdu = &dl_tti_pdu->pdsch_pdu;
+        gNB->dlsch[num_pdsch].pdu = (uint8_t *)TX_req->pdu_list[tx_data_idx].TLVs[0].value.direct;
+        DevAssert(num_pdsch < gNB->max_nb_pdsch);
+        num_pdsch++;
+        } break;
     }
   }
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_COMMON_TX,0);
-
-  int num_pdcch_pdus = msgTx->num_ul_pdcch + msgTx->num_dl_pdcch;
-
-  if (num_pdcch_pdus > 0) {
-    LOG_D(PHY, "[gNB %d] Frame %d slot %d Calling nr_generate_dci_top (number of UL/DL PDCCH PDUs %d/%d)\n",
-	  gNB->Mod_id, frame, slot, msgTx->num_ul_pdcch, msgTx->num_dl_pdcch);
-  
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_gNB_PDCCH_TX,1);
-
-    nr_generate_dci_top(msgTx, slot, txdataF_offset);
-
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_gNB_PDCCH_TX,0);
-  }
-  msgTx->num_dl_pdcch = 0;
-  msgTx->num_ul_pdcch = 0;
  
-  if (msgTx->num_pdsch_slot > 0) {
+  if (num_pdsch > 0) {
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_GENERATE_DLSCH,1);
-    LOG_D(PHY, "PDSCH generation started (%d) in frame %d.%d\n", msgTx->num_pdsch_slot,frame,slot);
-    nr_generate_pdsch(msgTx, frame, slot);
+    LOG_D(PHY, "PDSCH generation started (%d) in frame %d.%d\n", num_pdsch, frame, slot);
+    nr_generate_pdsch(gNB, num_pdsch, gNB->dlsch, frame, slot);
     VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_GENERATE_DLSCH,0);
-  }
-  msgTx->num_pdsch_slot = 0;
-
-  for (int i = 0; i < NR_SYMBOLS_PER_SLOT; i++){
-    NR_gNB_CSIRS_t *csirs = &msgTx->csirs_pdu[i];
-    if (csirs->active == 1) {
-      LOG_D(PHY, "CSI-RS generation started in frame %d.%d\n",frame,slot);
-      nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csirs->csirs_pdu.csi_rs_pdu_rel15;
-      if (csi_params->csi_type == 2) { // ZP-CSI
-        csirs->active = 0;
-        return;
-      }
-      csi_mapping_parms_t mapping_parms = get_csi_mapping_parms(csi_params->row,
-                                                                csi_params->freq_domain,
-                                                                csi_params->symb_l0,
-                                                                csi_params->symb_l1);
-      nfapi_nr_tx_precoding_and_beamforming_t *pb = &csi_params->precodingAndBeamforming;
-      int csi_bitmap = 0;
-      int lprime_num = mapping_parms.lprime + 1;
-      for (int j = 0; j < mapping_parms.size; j++)
-        csi_bitmap |= ((1 << lprime_num) - 1) << mapping_parms.loverline[j];
-      int beam_nb = beam_index_allocation(gNB->enable_analog_das,
-                                          pb->prgs_list[0].dig_bf_interface_list[0].beam_idx,
-                                          &cfg->analog_beamforming_ve,
-                                          &gNB->common_vars,
-                                          slot,
-                                          fp->symbols_per_slot,
-                                          csi_bitmap);
-
-      nr_generate_csi_rs(&gNB->frame_parms,
-                         &mapping_parms,
-                         gNB->TX_AMP,
-                         slot,
-                         csi_params->freq_density,
-                         csi_params->start_rb,
-                         csi_params->nr_of_rbs,
-                         csi_params->symb_l0,
-                         csi_params->symb_l1,
-                         csi_params->row,
-                         csi_params->scramb_id,
-                         csi_params->power_control_offset_ss,
-                         csi_params->cdm_type,
-                         gNB->common_vars.txdataF[beam_nb]);
-      csirs->active = 0;
-    }
   }
 
   //apply the OFDM symbol rotation here
@@ -1298,4 +1308,41 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
 
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_UESPEC_RX,0);
   return pusch_DTX;
+}
+
+void nr_save_ul_tti_req(PHY_VARS_gNB *gNB, nfapi_nr_ul_tti_request_t *UL_tti_req)
+{
+  DevAssert(gNB != NULL);
+  DevAssert(UL_tti_req != NULL);
+
+  int frame = UL_tti_req->SFN;
+  int slot = UL_tti_req->Slot;
+
+  for (int i = 0; i < UL_tti_req->n_pdus; i++) {
+    int type = UL_tti_req->pdus_list[i].pdu_type;
+    LOG_D(NR_PHY,
+          "frame %d, slot %d got %s for %d.%d\n",
+          frame,
+          slot,
+          txt_nfapi_nr_ul_config_pdu_type[type],
+          UL_tti_req->SFN,
+          UL_tti_req->Slot);
+    switch (type) {
+      case NFAPI_NR_UL_CONFIG_PUSCH_PDU_TYPE:
+        nr_fill_ulsch(gNB, UL_tti_req->SFN, UL_tti_req->Slot, &UL_tti_req->pdus_list[i].pusch_pdu);
+        break;
+      case NFAPI_NR_UL_CONFIG_PUCCH_PDU_TYPE:
+        nr_fill_pucch(gNB, UL_tti_req->SFN, UL_tti_req->Slot, &UL_tti_req->pdus_list[i].pucch_pdu);
+        break;
+      case NFAPI_NR_UL_CONFIG_PRACH_PDU_TYPE: {
+        nfapi_nr_prach_pdu_t *prach_pdu = &UL_tti_req->pdus_list[i].prach_pdu;
+        prach_item_t *prach = nr_schedule_rx_prach(gNB, UL_tti_req->SFN, UL_tti_req->Slot, prach_pdu);
+        if (!prach)
+          LOG_W(NR_PHY_RACH, "Error in scheduling rach\n");
+      } break;
+      case NFAPI_NR_UL_CONFIG_SRS_PDU_TYPE:
+        nr_fill_srs(gNB, UL_tti_req->SFN, UL_tti_req->Slot, &UL_tti_req->pdus_list[i].srs_pdu);
+        break;
+    }
+  }
 }

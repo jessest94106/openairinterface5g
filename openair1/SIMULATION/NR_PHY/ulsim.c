@@ -60,7 +60,6 @@
 #include "PHY/defs_nr_common.h"
 #include "PHY/impl_defs_nr.h"
 #include "PHY/phy_vars_nr_ue.h"
-#include "SCHED_NR/fapi_nr_l1.h"
 #include "SCHED_NR/sched_nr.h"
 #include "SCHED_NR_UE/defs.h"
 #include "SCHED_NR_UE/fapi_nr_ue_l1.h"
@@ -727,11 +726,6 @@ int main(int argc, char *argv[])
   else
     initNamedTpool(gNBthreads, &gNB->threadPool, true, "gNB-tpool");
 
-  processingData_L1tx_t *msgDataTx = malloc(sizeof(processingData_L1tx_t));
-  msgDataTx->slot = -1;
-  gNB->msgDataTx = msgDataTx;
-  //gNB_config = &gNB->gNB_config;
-
   NR_UL_IND_t UL_INFO = {0};
   UL_INFO.crc_ind.crc_list = UL_INFO.crc_pdu_list;
   UL_INFO.rx_ind.pdu_list = UL_INFO.rx_pdu_list;
@@ -1284,15 +1278,15 @@ int main(int argc, char *argv[])
           srs_pdu->beamforming.prg_size = 1;
         }
 
+        /* load FAPI into RX of L1 */
+        nr_save_ul_tti_req(gNB, &Sched_INFO->UL_tti_req);
+
         /// UE UL PDUs
 
         UE->ul_harq_processes[harq_pid].round = round;
         UE_proc.nr_slot_tx = slot;
         UE_proc.frame_tx = frame;
         UE_proc.gNB_id = 0;
-
-        // prepare ULSCH/PUSCH reception
-        nr_schedule_response(Sched_INFO);
 
         // --------- setting parameters for UE --------
         nr_scheduled_response_t scheduled_response = {.ul_config = &ul_config, .phy_data = (void *)&phy_data};

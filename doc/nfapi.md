@@ -242,10 +242,10 @@ To see the (any) periodical output at the PNF, define `NFAPI_TRACE_LEVEL=info`.
 This output shows:
 
 ```
-41056.739654 [I] 3556767424: pnf_p7_slot_ind: [P7:1] msgs ontime 489 thr DL 0.06 UL 0.01 msg late 0 (vtime)
+41056.739654 [I] 3556767424: nr_pnf_p7_get_msgs: [P7:1] msgs ontime 489 thr DL 0.06 UL 0.01 msg late 0 (vtime)
 ```
 
-The first numbers are timestamps. `pnf_p7_slot_ind` is the name of the
+The first numbers are timestamps. `nr_pnf_p7_get_msgs` is the name of the
 functions that prints the output. `[P7:1]` refers to the fact that these are
 information on P7, of PHY ID 1. Finally, `msgs ontime 489` means that in the
 last window (since the last print), 489 messages arrived at the PNF in total.

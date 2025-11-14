@@ -124,7 +124,6 @@ int vnf_nr_unpack_vendor_extension_tlv(nfapi_tl_t *tl,
 {
   return -1;
 }
-void install_nr_schedule_handlers(NR_IF_Module_t *if_inst);
 void install_schedule_handlers(IF_Module_t *if_inst);
 extern int sf_ahead;
 
@@ -326,71 +325,6 @@ int pnf_config_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_pnf_config_
   return 0;
 }
 
-int wake_gNB_rxtx(PHY_VARS_gNB *gNB, uint16_t sfn, uint16_t slot) {
-  struct timespec curr_t;
-  clock_gettime(CLOCK_MONOTONIC,&curr_t);
- //NFAPI_TRACE(NFAPI_TRACE_INFO, "\n wake_gNB_rxtx before assignment sfn:%d slot:%d TIME %d.%d",sfn,slot,curr_t.tv_sec,curr_t.tv_nsec);
-  gNB_L1_proc_t *proc=&gNB->proc;
-  gNB_L1_rxtx_proc_t *L1_proc= (slot&1)? &proc->L1_proc : &proc->L1_proc_tx;
-
-  NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
-  //NFAPI_TRACE(NFAPI_TRACE_INFO, "%s(eNB:%p, sfn:%d, sf:%d)\n", __FUNCTION__, eNB, sfn, sf);
-  //int i;
-  struct timespec wait;
-  clock_gettime(CLOCK_REALTIME, &wait);
-  wait.tv_sec = 0;
-  wait.tv_nsec +=5000L;
-  //wait.tv_nsec = 0;
-  // wake up TX for subframe n+sf_ahead
-  // lock the TX mutex and make sure the thread is ready
-  AssertFatal(gNB->if_inst->sl_ahead==6,"gNB->if_inst->sl_ahead %d : This is hard-coded to 6 in nfapi P7!!!\n",gNB->if_inst->sl_ahead);
-  if (pthread_mutex_timedlock(&L1_proc->mutex,&wait) != 0) {
-    LOG_E( PHY, "[gNB] ERROR pthread_mutex_lock for gNB RXTX thread %d (IC %d)\n", L1_proc->slot_rx&1,L1_proc->instance_cnt );
-    exit_fun( "error locking mutex_rxtx" );
-    return(-1);
-  }
-
-  {
-    static uint16_t old_slot = 0;
-    static uint16_t old_sfn = 0;
-    proc->slot_rx = old_slot;
-    proc->frame_rx = old_sfn;
-    // Try to be 1 frame back
-    old_slot = slot;
-    old_sfn = sfn;
-    //NFAPI_TRACE(NFAPI_TRACE_INFO, "\n wake_gNB_rxtx after assignment sfn:%d slot:%d",proc->frame_rx,proc->slot_rx);
-    if (old_slot == 0 && old_sfn % 100 == 0) LOG_W( PHY,"[gNB] sfn/slot:%d%d old_sfn/slot:%d%d proc[rx:%d%d]\n", sfn, slot, old_sfn, old_slot, proc->frame_rx, proc->slot_rx);
-  }
-
-  ++L1_proc->instance_cnt;
-  //LOG_D( PHY,"[VNF-subframe_ind] sfn/sf:%d:%d proc[frame_rx:%d subframe_rx:%d] L1_proc->instance_cnt_rxtx:%d \n", sfn, sf, proc->frame_rx, proc->subframe_rx, L1_proc->instance_cnt_rxtx);
-  // We have just received and processed the common part of a subframe, say n.
-  // TS_rx is the last received timestamp (start of 1st slot), TS_tx is the desired
-  // transmitted timestamp of the next TX slot (first).
-  // The last (TS_rx mod samples_per_frame) was n*samples_per_tti,
-  // we want to generate subframe (n+N), so TS_tx = TX_rx+N*samples_per_tti,
-  // and proc->subframe_tx = proc->subframe_rx+sf_ahead
-  L1_proc->timestamp_tx = proc->timestamp_rx + (gNB->if_inst->sl_ahead *fp->samples_per_subframe);
-  L1_proc->frame_rx     = proc->frame_rx;
-  L1_proc->slot_rx      = proc->slot_rx;
-  L1_proc->frame_tx     = (L1_proc->slot_rx > (19-gNB->if_inst->sl_ahead)) ? (L1_proc->frame_rx+1)&1023 : L1_proc->frame_rx;
-  L1_proc->slot_tx      = (L1_proc->slot_rx + gNB->if_inst->sl_ahead)%20;
-
-  //LOG_D(PHY, "sfn/sf:%d%d proc[rx:%d%d] rx:%d%d] About to wake rxtx thread\n\n", sfn, slot, proc->frame_rx, proc->slot_rx, L1_proc->frame_rx, L1_proc->slot_rx);
-  //NFAPI_TRACE(NFAPI_TRACE_INFO, "\nEntering wake_gNB_rxtx sfn %d slot %d\n",L1_proc->frame_rx,L1_proc->slot_rx);
-  // the thread can now be woken up
-  if (pthread_cond_signal(&L1_proc->cond) != 0) {
-    LOG_E( PHY, "[gNB] ERROR pthread_cond_signal for gNB RXn-TXnp4 thread\n");
-    exit_fun( "ERROR pthread_clond_signal" );
-    return(-1);
-  }
-
-  //LOG_D(PHY,"%s() About to attempt pthread_mutex_unlock\n", __FUNCTION__);
-  pthread_mutex_unlock( &L1_proc->mutex );
-  //LOG_D(PHY,"%s() UNLOCKED pthread_mutex_unlock\n", __FUNCTION__);
-  return(0);
-}
-
 int wake_eNB_rxtx(PHY_VARS_eNB *eNB, uint16_t sfn, uint16_t sf) {
   L1_proc_t *proc=&eNB->proc;
   L1_rxtx_proc_t *L1_proc= (sf&1)? &proc->L1_proc : &proc->L1_proc_tx;
@@ -497,28 +431,6 @@ int phy_sync_indication(struct nfapi_vnf_p7_config *config, uint8_t sync) {
   return(0);
 }
 
-
-int phy_slot_indication(struct nfapi_vnf_p7_config *config, uint16_t phy_id, uint16_t sfn, uint16_t slot) {
-  static uint8_t first_time = 1;
-
-  if (first_time) {
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] slot indication %d.%d\n", sfn, slot);
-    first_time = 0;
-  }
-
-  if (RC.gNB && RC.gNB[0]->configured) {
-    // uint16_t sfn = NFAPI_SFNSF2SFN(sfn_sf);
-    // uint16_t sf = NFAPI_SFNSF2SF(sfn_sf);
-    LOG_D(PHY,"[VNF] slot indication sfn:%d slot:%d\n", sfn, slot);
-    wake_gNB_rxtx(RC.gNB[0], sfn, slot); // DONE: find NR equivalent
-  } else {
-    NFAPI_TRACE(NFAPI_TRACE_INFO, "[VNF] %s() RC.gNB:%p\n", __FUNCTION__, RC.gNB);
-
-    if (RC.gNB) NFAPI_TRACE(NFAPI_TRACE_INFO, "RC.gNB[0]->configured:%d\n", RC.gNB[0]->configured);
-  }
-
-  return 0;
-}
 
 int phy_subframe_indication(struct nfapi_vnf_p7_config *config, uint16_t phy_id, uint16_t sfn_sf) {
   static uint8_t first_time = 1;
@@ -971,65 +883,63 @@ int phy_cqi_indication(struct nfapi_vnf_p7_config *config, nfapi_cqi_indication_
 //NR phy indication
 
 
-NR_Sched_Rsp_t g_sched_resp;
-void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slot, NR_Sched_Rsp_t* sched_info);
 int oai_nfapi_dl_tti_req(nfapi_nr_dl_tti_request_t *dl_config_req);
 int oai_nfapi_ul_tti_req(nfapi_nr_ul_tti_request_t *ul_tti_req);
 int oai_nfapi_tx_data_req(nfapi_nr_tx_data_request_t* tx_data_req);
 int oai_nfapi_ul_dci_req(nfapi_nr_ul_dci_request_t* ul_dci_req);
 
-int trigger_scheduler(nfapi_nr_slot_indication_scf_t *slot_ind)
-{
-  // Call into the scheduler (this is hardcoded and should be init properly!)
-  // memset(sched_resp, 0, sizeof(*sched_resp));
-  gNB_dlsch_ulsch_scheduler(0, slot_ind->sfn, slot_ind->slot, &g_sched_resp);
-
-#ifdef ENABLE_AERIAL
-    bool send_slt_resp = false;
-    if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs> 0) {
-      oai_fapi_dl_tti_req(&g_sched_resp.DL_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.UL_tti_req.n_pdus > 0) {
-      oai_fapi_ul_tti_req(&g_sched_resp.UL_tti_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.TX_req.Number_of_PDUs > 0) {
-      oai_fapi_tx_data_req(&g_sched_resp.TX_req);
-      send_slt_resp = true;
-    }
-    if (g_sched_resp.UL_dci_req.numPdus > 0) {
-      oai_fapi_ul_dci_req(&g_sched_resp.UL_dci_req);
-      send_slt_resp = true;
-    }
-    if (send_slt_resp) {
-      oai_fapi_send_end_request(0,slot_ind->sfn, slot_ind->slot);
-    }
-#else
-  if (g_sched_resp.DL_req.dl_tti_request_body.nPDUs > 0)
-    oai_nfapi_dl_tti_req(&g_sched_resp.DL_req);
-
-  if (g_sched_resp.UL_tti_req.n_pdus > 0)
-    oai_nfapi_ul_tti_req(&g_sched_resp.UL_tti_req);
-
-  if (g_sched_resp.TX_req.Number_of_PDUs > 0)
-    oai_nfapi_tx_data_req(&g_sched_resp.TX_req);
-
-  if (g_sched_resp.UL_dci_req.numPdus > 0)
-    oai_nfapi_ul_dci_req(&g_sched_resp.UL_dci_req);
-#endif
-
-  NR_UL_IND_t ind = {.frame = slot_ind->sfn, .slot = slot_ind->slot, };
-  NR_UL_indication(&ind);
-
-  return 1;
-}
-
 int phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
 {
   LOG_D(MAC, "VNF SFN/Slot %d.%d \n", ind->sfn, ind->slot);
 
-  trigger_scheduler(ind);
+  // this variable is very big (multiple MB), so we put it into static storage
+  // to not overflow the stack while still having it in local (function) scope
+  // also, phy_nr_slot_indication() is only executed by one thread, serially
+  static NR_Sched_Rsp_t sched_response;
+  NR_IF_Module_t *ifi = RC.nrmac[0]->if_inst;
+  ifi->NR_slot_indication(ind, &sched_response);
+
+#ifdef ENABLE_AERIAL
+    bool send_slt_resp = false;
+    if (sched_response.DL_req.dl_tti_request_body.nPDUs> 0) {
+      oai_fapi_dl_tti_req(&sched_response.DL_req);
+      send_slt_resp = true;
+    }
+    if (sched_response.UL_tti_req.n_pdus > 0) {
+      oai_fapi_ul_tti_req(&sched_response.UL_tti_req);
+      send_slt_resp = true;
+    }
+    if (sched_response.TX_req.Number_of_PDUs > 0) {
+      oai_fapi_tx_data_req(&sched_response.TX_req);
+      send_slt_resp = true;
+    }
+    if (sched_response.UL_dci_req.numPdus > 0) {
+      oai_fapi_ul_dci_req(&sched_response.UL_dci_req);
+      send_slt_resp = true;
+    }
+    if (send_slt_resp) {
+      oai_fapi_send_end_request(0, ind->sfn, ind->slot);
+    }
+#else
+  if (sched_response.DL_req.dl_tti_request_body.nPDUs > 0)
+    oai_nfapi_dl_tti_req(&sched_response.DL_req);
+
+  if (sched_response.UL_tti_req.n_pdus > 0)
+    oai_nfapi_ul_tti_req(&sched_response.UL_tti_req);
+
+  if (sched_response.TX_req.Number_of_PDUs > 0)
+    oai_nfapi_tx_data_req(&sched_response.TX_req);
+
+  if (sched_response.UL_dci_req.numPdus > 0)
+    oai_nfapi_ul_dci_req(&sched_response.UL_dci_req);
+#endif
+
+  /* the below works because the function behind the callback collects
+   * messages from queue into which messages have been copied.
+   * TODO we should have different callbacks for received messages and call
+   * into the scheduler separately for each message instead of one big one. */
+  NR_UL_IND_t ul_ind = {.frame = ind->sfn, .slot = ind->slot, };
+  ifi->NR_UL_indication(&ul_ind);
 
   return 1;
 }
@@ -1305,7 +1215,7 @@ void *configure_nr_p7_vnf(void *ptr)
   p7_vnf->config->port = p7_vnf->local_port;
 #ifndef ENABLE_AERIAL
   p7_vnf->config->sync_indication = &phy_sync_indication;
-  p7_vnf->config->slot_indication = &phy_slot_indication;
+  p7_vnf->config->slot_indication = NULL;
   p7_vnf->config->harq_indication = &phy_harq_indication;
 #endif
   p7_vnf->config->nr_crc_indication = &phy_nr_crc_indication;
@@ -1367,7 +1277,7 @@ void *vnf_p7_thread_start(void *ptr) {
   p7_vnf->config->port = p7_vnf->local_port;
   p7_vnf->config->sync_indication = &phy_sync_indication;
   p7_vnf->config->subframe_indication = &phy_subframe_indication;
-  p7_vnf->config->slot_indication = &phy_slot_indication;
+  p7_vnf->config->slot_indication = NULL;
 
   p7_vnf->config->harq_indication = &phy_harq_indication;
   p7_vnf->config->crc_indication = &phy_crc_indication;

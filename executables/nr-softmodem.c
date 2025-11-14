@@ -423,8 +423,6 @@ int start_L1L2(module_id_t gnb_id)
   /* block threads */
   oai_exit = 0;
   sync_var = -1;
-  extern void init_sched_response(void);
-  init_sched_response();
 
   /* update config */
   gNB_MAC_INST *mac = RC.nrmac[0];

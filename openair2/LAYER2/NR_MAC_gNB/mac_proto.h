@@ -67,13 +67,7 @@ int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs);
 
 int nr_transmission_action_indicator_stop(gNB_MAC_INST *mac, NR_UE_info_t *UE_info);
 
-void clear_nr_nfapi_information(gNB_MAC_INST *gNB,
-                                int CC_idP,
-                                frame_t frameP,
-                                slot_t slotP,
-                                nfapi_nr_dl_tti_request_t *DL_req,
-                                nfapi_nr_tx_data_request_t *TX_req,
-                                nfapi_nr_ul_dci_request_t *UL_dci_req);
+void clear_nr_nfapi_information(gNB_MAC_INST *gNB, int CC_idP, frame_t frameP, slot_t slotP);
 
 void nr_mac_update_timers(module_id_t module_id, frame_t frame, slot_t slot);
 
