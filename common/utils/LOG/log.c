@@ -604,12 +604,13 @@ static inline int log_header(log_component_t *c,
 
   return snprintf(log_buffer,
                   buffsize,
-                  "%s%s%s%-8s%s%s%s",
+                  "%s%s%s%-8s%s%-*s%s",
                   flag & FLAG_NOCOLOR ? "" : log_level_highlight_start[level],
                   timeString,
                   threadIdString,
                   c->headerName,
                   g_log->level2string[level], // will print space if no level selected
+                  l[0] == 0 ? 0 : 32,
                   l,
                   threadname);
 }
