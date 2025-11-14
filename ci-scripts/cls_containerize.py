@@ -47,6 +47,7 @@ import helpreadme as HELP
 import constants as CONST
 import cls_oaicitest
 from cls_ci_helper import archiveArtifact
+from collections import deque
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes
@@ -165,25 +166,26 @@ def CopyinServiceLog(ssh, lSourcePath, svcName, wd_yaml, ctx):
 	ssh.run(f'docker compose -f {wd_yaml} logs {svcName} --no-log-prefix &> {remote_filename}')
 	return archiveArtifact(ssh, ctx, remote_filename)
 
-def GetRunningServices(ssh, file):
+def GetDeployedServices(ssh, file):
 	ret = ssh.run(f'docker compose -f {file} config --services')
 	if ret.returncode != 0:
+		logging.error("could not get services")
 		return None
 	allServices = ret.stdout.splitlines()
-	running_services = []
+	deployed_services = []
 	for s in allServices:
-		# outputs the hash if the container is running
-		ret = ssh.run(f'docker compose -f {file} ps --all --quiet -- {s}')
+		# outputs the hash if the container has been deployed (but might be stopped)
+		ret = ssh.run(f'docker compose -f {file} ps --all --quiet -- {s}', silent=True)
 		if ret.returncode != 0:
-			logging.info(f"service {s}: {ret.stdout}")
+			# error: should not happen as we iterate over docker-provided service list
+			logging.error(f"service {s}: {ret.stdout}")
 		elif ret.stdout == "":
-			logging.warning(f"could not retrieve information for service {s}")
+			logging.info(f"service {s} not deployed")
 		else:
 			c = ret.stdout
-			logging.debug(f'running service {s} with container id {c}')
-			running_services.append((s, c))
-	logging.info(f'stopping services: {running_services}')
-	return running_services
+			logging.info(f'service {s} with container id {c}')
+			deployed_services.append(s)
+	return deployed_services
 
 def CheckLogs(self, filename, HTML, RAN):
 	success = True
@@ -215,6 +217,24 @@ def CheckLogs(self, filename, HTML, RAN):
 		else:
 			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
 		HTML.htmleNBFailureMsg = ""
+	elif 'xapp' in name:
+		opt = f"Undeploy {name}"
+		with open(f'{filename}', "r") as f:
+			last_line = deque(f, maxlen=1).pop()
+		if ('Test xApp run SUCCESSFULLY' in last_line):
+			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["xApp run successfully"])
+		else:
+			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["xApp didn't run successfully"])
+			success = False
+	elif 'RIC' in name:
+		opt = f"Undeploy {name}"
+		with open(f'{filename}', 'r') as f:
+			last_line = deque(f, maxlen=1).pop()
+		if ('Removing E2 Node' in last_line):
+			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["nearRT-RIC run successfully"])
+		else:
+			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["nearRT-RIC didn't run successfully"])
+			success = False
 	else:
 		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
 	logging.debug(f"log check: file {filename} passed analysis {success}")
@@ -715,7 +735,6 @@ class Containerize():
 	def DeployObject(self, ctx, node, HTML):
 		num_attempts = self.num_attempts
 		lSourcePath = self.eNBSourceCodePath
-		logging.debug(f'Deploying OAI Object on server: {node}')
 		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
 		wd_yaml = f'{wd}/docker-compose.y*ml'
@@ -726,6 +745,7 @@ class Containerize():
 				logging.error(msg)
 				HTML.CreateHtmlTestRowQueue('N/A', 'KO', [msg])
 				return False
+			logging.info(f'\u001B[1mDeploying object(s) "{services}" on server {node}\u001B[0m')
 			ExistEnvFilePrint(ssh, wd)
 			WriteEnvFile(ssh, services, wd, self.deploymentTag, self.flexricTag)
 			if num_attempts <= 0:
@@ -750,36 +770,68 @@ class Containerize():
 		imagesInfo = info.stdout.splitlines()[1:]
 		logging.debug(f'{info.stdout.splitlines()[1:]}')
 		if deployed:
-			HTML.CreateHtmlTestRowQueue('N/A', 'OK', ['\n'.join(imagesInfo)])
+			HTML.CreateHtmlTestRowQueue(self.services, 'OK', ['\n'.join(imagesInfo)])
+			logging.info('\u001B[1m Deploying objects Pass\u001B[0m')
 		else:
-			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['\n'.join(imagesInfo)])
+			HTML.CreateHtmlTestRowQueue(self.services, 'KO', ['\n'.join(imagesInfo)])
+			logging.error('\u001B[1m Deploying objects Failed\u001B[0m')
 		return deployed
+
+	def StopObject(self, ctx, node, HTML):
+		lSourcePath = self.eNBSourceCodePath
+		if not self.services:
+			raise ValueError(f'no services provided')
+		logging.info(f'\u001B[1m Stopping objects "{self.services}" from server: {node}\u001B[0m')
+		reqServices = self.services.split()
+		yaml = self.yamlPath.strip('/')
+		wd = f'{lSourcePath}/{yaml}'
+		wd_yaml = f'{wd}/docker-compose.y*ml'
+		with cls_cmd.getConnection(node) as ssh:
+			ExistEnvFilePrint(ssh, wd)
+			services = GetDeployedServices(ssh, wd_yaml)
+			success = []
+			fail = []
+			for s in reqServices:
+				if s in services:
+					ssh.run(f'docker compose -f {wd_yaml} stop -- {s}')
+					success.append(s)
+				else:
+					logging.error(f"no such service {s}")
+					fail.append(s)
+		if success == reqServices:
+			logging.info('\u001B[1m Stopping object Pass\u001B[0m')
+			HTML.CreateHtmlTestRowQueue(self.services, 'OK', [f'Stopped {self.services}'])
+		else:
+			logging.error('\u001B[1m Stopping object Failed\u001B[0m')
+			HTML.CreateHtmlTestRowQueue(self.services, 'KO', [f'Failed stopping {" ".join(fail)}, succeeded {" ".join(success)}'])
+		return success
 
 	def UndeployObject(self, ctx, node, HTML, RAN):
 		lSourcePath = self.eNBSourceCodePath
-		logging.debug(f'\u001B[1m Undeploying OAI Object from server: {node}\u001B[0m')
+		logging.info(f'\u001B[1m Undeploying all objects from server {node}\u001B[0m')
 		yaml = self.yamlPath.strip('/')
 		wd = f'{lSourcePath}/{yaml}'
+		wd_yaml = f'{wd}/docker-compose.y*ml'
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
-			services = GetRunningServices(ssh, f"{wd}/docker-compose.y*ml")
+			services = GetDeployedServices(ssh, wd_yaml)
 			copyin_res = None
+			ssh.run(f'docker compose -f {wd_yaml} stop')
 			if services is not None:
-				all_serv = " ".join([s for s, _ in services])
-				ssh.run(f'docker compose -f {wd}/docker-compose.y*ml stop -- {all_serv}')
-				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, f"{wd}/docker-compose.y*ml", ctx) for s, _ in services]
+				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s in services]
 			else:
 				logging.warning('could not identify services to stop => no log file')
-			ssh.run(f'docker compose -f {wd}/docker-compose.y*ml down -v')
+			ssh.run(f'docker compose -f {wd_yaml} down -v')
 			ssh.run(f'rm {wd}/.env')
 		if not copyin_res:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
-			return False
+			logging.error(f"could not copy all files: {copyin_res=} {services=}")
+			success = False
 		else:
 			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
 			success = all(log_results)
 		if success:
-			logging.info('\u001B[1m Undeploying OAI Object Pass\u001B[0m')
+			logging.info('\u001B[1m Undeploying objects Pass\u001B[0m')
 		else:
-			logging.error('\u001B[1m Undeploying OAI Object Failed\u001B[0m')
+			logging.error('\u001B[1m Undeploying objects Failed\u001B[0m')
 		return success
