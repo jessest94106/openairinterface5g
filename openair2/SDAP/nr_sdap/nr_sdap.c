@@ -170,7 +170,7 @@ void start_sdap_tun_gnb_first_ue_default_pdu_session(ue_id_t ue_id)
   threadCreate(&entity->pdusession_thread, sdap_tun_read_thread, entity, "gnb_tun_read_thread", -1, OAI_PRIORITY_RT_LOW);
 }
 
-void start_sdap_tun_ue(ue_id_t ue_id, int pdu_session_id, int sock)
+static void start_sdap_tun_ue(ue_id_t ue_id, int pdu_session_id, int sock)
 {
   nr_sdap_entity_t *entity = nr_sdap_get_entity(ue_id, pdu_session_id);
   DevAssert(entity != NULL);
