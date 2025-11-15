@@ -292,7 +292,7 @@ static int gtpv1uCreateAndSendMsg(gtpv1u_bearer_t *bearer,
   DevAssert(bearer->ip.ss_family == AF_INET);
   struct sockaddr_in *to = (struct sockaddr_in *)&bearer->ip;
   LOG_D(GTPU,
-        "Peer IP:" IPV4_ADDR " port:%u outgoing teid:%x\n",
+        "Peer IP:" IPV4_ADDR " port:%u outgoing TEID:0x%x\n",
         IPV4_ADDR_FORMAT(to->sin_addr.s_addr),
         htons(to->sin_port),
         bearer->teid_outgoing);
@@ -332,7 +332,7 @@ static void _gtpv1uSendDirect(instance_t instance,
   }
 
   LOG_D(GTPU,
-        "[%ld] sending a packet to UE:RAB:teid %lx/%x/%x, len %lu, oldseq %d, oldnum %d\n",
+        "[%ld] sending a packet to UE:RAB:TEID %lx/%d/0x%x, len %lu, oldseq %d, oldnum %d\n",
         instance,
         ue_id,
         bearer_id,
@@ -492,7 +492,7 @@ static void gtpv1uEndTunnel(instance_t instance, gtpv1u_enb_end_marker_req_t *re
   }
 
   LOG_D(GTPU,
-        "[%ld] sending a end packet packet to UE:RAB:teid %lx/%x/%x\n",
+        "[%ld] sending a end packet packet to UE:RAB:TEID %lx/%d/0x%x\n",
         instance,
         ue_id,
         bearer_id,
@@ -641,7 +641,7 @@ void GtpuUpdateTunnelOutgoingAddressAndTeid(instance_t instance,
   struct sockaddr_in *sa4 = (struct sockaddr_in *)sockaddr;
   struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sockaddr;
   LOG_I(GTPU,
-        "[%ld] UE ID %ld: Update tunnel TEID incoming %x outgoing %x to remote IPv4 %s, IPv6 %s, port %d\n",
+        "[%ld] UE ID %ld: Update tunnel TEID incoming 0x%x outgoing 0x%x to remote IPv4 %s, IPv6 %s, port %d\n",
         instance,
         ue_id,
         ptr2->second.teid_incoming,
@@ -676,7 +676,7 @@ teid_t newGtpuCreateTunnel(instance_t instance,
   teid_t incoming_teid = gtpv1uNewTeid();
 
   while (globGtp.te2ue_mapping.find(incoming_teid) != globGtp.te2ue_mapping.end()) {
-    LOG_W(GTPU, "[%ld] generated a random Teid that exists, re-generating (%x)\n", instance, incoming_teid);
+    LOG_W(GTPU, "[%ld] generated a random TEID that exists, re-generating (0x%x)\n", instance, incoming_teid);
     incoming_teid = gtpv1uNewTeid();
   };
 
@@ -721,7 +721,7 @@ teid_t newGtpuCreateTunnel(instance_t instance,
   char ip4[INET_ADDRSTRLEN];
   char ip6[INET6_ADDRSTRLEN];
   LOG_I(GTPU,
-        "[%ld] UE ID %ld: Create tunnel TEID incoming %x outgoing %x to remote IPv4 %s, IPv6 %s, port %d\n",
+        "[%ld] UE ID %ld: Create tunnel TEID incoming 0x%x outgoing 0x%x to remote IPv4 %s, IPv6 %s, port %d\n",
         instance,
         ue_id,
         bearer.teid_incoming,
@@ -825,7 +825,7 @@ int gtpv1u_create_ngu_tunnel(const instance_t instance,
                              gtpCallbackSDAP callBackSDAP)
 {
   LOG_D(GTPU,
-        "[%ld] Start create tunnels for ue id %lu, num_tunnels %d, sgw_S1u_teid %x\n",
+        "[%ld] Start create tunnels for ue id %lu, num_tunnels %d, TEID 0x%x\n",
         instance,
         create_tunnel_req->ue_id,
         create_tunnel_req->num_tunnels,
@@ -905,17 +905,17 @@ int newGtpuDeleteOneTunnel(instance_t instance, ue_id_t ue_id, int rb_id)
   }
   map<ue_id_t, gtpv1u_bearer_t>::iterator rb_it = ue_it->second.bearers.find(rb_id);
   if (rb_it == ue_it->second.bearers.end()) {
-    LOG_E(GTPU, "%s() UE %ld has no bearer %d, available\n", __func__, ue_id, rb_id);
+    LOG_E(GTPU, "%s() UE %ld has no tunnel for bearer %d\n", __func__, ue_id, rb_id);
     pthread_mutex_unlock(&globGtp.gtp_lock);
     return !GTPNOK;
   }
-  int teid = rb_it->second.teid_incoming;
+  teid_t teid = rb_it->second.teid_incoming;
   globGtp.te2ue_mapping.erase(teid);
   ue_it->second.bearers.erase(rb_id);
   pthread_mutex_unlock(&globGtp.gtp_lock);
-  LOG_I(GTPU, "Deleted tunnel TEID %d (RB %d) for ue id %ld, remaining bearers:\n", teid, rb_id, ue_id);
+  LOG_I(GTPU, "Deleted tunnel TEID 0x%x for bearer %d of UE %ld, remaining tunnels:\n", teid, rb_id, ue_id);
   for (auto b : ue_it->second.bearers)
-    LOG_I(GTPU, "bearer %ld\n", b.first);
+    LOG_I(GTPU, "Bearer %ld\n", b.first);
   return !GTPNOK;
 }
 
@@ -982,43 +982,10 @@ int gtpv1u_delete_all_s1u_tunnel(const instance_t instance, const rnti_t rnti)
   return newGtpuDeleteAllTunnels(instance, rnti);
 }
 
-int newGtpuDeleteTunnels(instance_t instance, ue_id_t ue_id, int nbTunnels, int *pdusession_id)
-{
-  LOG_D(GTPU, "[%ld] Start delete tunnels for ue id %lu\n", instance, ue_id);
-  pthread_mutex_lock(&globGtp.gtp_lock);
-  getInstRetInt(compatInst(instance));
-  getUeRetInt(inst, ue_id);
-  int nb = 0;
-
-  for (int i = 0; i < nbTunnels; i++) {
-    auto ptr2 = ptrUe->second.bearers.find(pdusession_id[i]);
-
-    if (ptr2 == ptrUe->second.bearers.end()) {
-      LOG_E(GTPU, "[%ld] GTP-U instance: delete of not existing tunnel UE ID:RAB: %ld/%x\n", instance, ue_id, pdusession_id[i]);
-    } else {
-      globGtp.te2ue_mapping.erase(ptr2->second.teid_incoming);
-      nb++;
-    }
-  }
-
-  if (ptrUe->second.bearers.size() == 0)
-    // no tunnels on this ue id, erase the ue entry
-    inst->ue2te_mapping.erase(ptrUe);
-
-  pthread_mutex_unlock(&globGtp.gtp_lock);
-  LOG_I(GTPU, "[%ld] Deleted all tunnels for ue id %lu (%d tunnels deleted)\n", instance, ue_id, nb);
-  return !GTPNOK;
-}
-
 int gtpv1u_delete_x2u_tunnel(const instance_t instanceP, const gtpv1u_enb_delete_tunnel_req_t *const req_pP)
 {
   LOG_E(GTPU, "x2 tunnel not implemented\n");
   return 0;
-}
-
-int gtpv1u_delete_ngu_tunnel(const instance_t instance, gtpv1u_gnb_delete_tunnel_req_t *req)
-{
-  return newGtpuDeleteTunnels(instance, req->ue_id, req->num_pdusession, req->pdusession_id);
 }
 
 static gtpv1u_bearer_t create_bearer(int socket, const struct sockaddr_in *addr, uint32_t teid, uint16_t seq)
@@ -1043,7 +1010,7 @@ static int Gtpv1uHandleEchoReq(int h, uint8_t *msgBuf, uint32_t msgBufLen, const
   }
 
   uint16_t seq = ntohs(*(uint16_t *)(msgHdr + 1));
-  LOG_D(GTPU, "[%d] Received a echo request, TEID: %d, seq: %hu\n", h, msgHdr->teid, seq);
+  LOG_D(GTPU, "[%d] Received a echo request, TEID: 0x%x, seq: %hu\n", h, msgHdr->teid, seq);
   uint8_t recovery[2] = {14, 0};
   gtpv1u_bearer_t bearer = create_bearer(h, addr, ntohl(msgHdr->teid), seq);
   return gtpv1uCreateAndSendMsg(&bearer,
@@ -1061,10 +1028,11 @@ static int Gtpv1uHandleError(int h, uint8_t *msgBuf, uint32_t msgBufLen, const s
   if (msgBufLen < sizeof(Gtpv1uError))
     LOG_E(GTPU, "Received GTP error indication with truncated size %u (mini size: %lu)\n", msgBufLen,sizeof(Gtpv1uError)+4);
   Gtpv1uError *msg = ( Gtpv1uError *)msgBuf;
-  LOG_E(GTPU, "Received GTP error indication: \n"
-        "   TEID %u (must be 0 from TS 29.281)\n"
-        "   TV id for TEID %u (must be 16)\n"
-        "   TEID in error %u (should be a TEID we sent)\n"
+  LOG_E(GTPU,
+        "Received GTP error indication: \n"
+        "   TEID 0x%x (must be 0 from TS 29.281)\n"
+        "   TV id for TEID 0x%x (must be 16)\n"
+        "   TEID in error 0x%x (should be a TEID we sent)\n"
         "   TV id for GTP addr %u (should be 133)\n"
         "   len for addr of UPF %u (should be IPv4 or IPv6 len)"
         "   (TS 29.281 Sec 7.3.1 Error Handling not implemented)\n",
@@ -1103,7 +1071,7 @@ static int Gtpv1uHandleEndMarker(int h, uint8_t *msgBuf, uint32_t msgBufLen, con
   auto tunnel = globGtp.te2ue_mapping.find(ntohl(msgHdr->teid));
 
   if (tunnel == globGtp.te2ue_mapping.end()) {
-    LOG_E(GTPU, "[%d] Received a incoming packet on unknown teid (%x) Dropping!\n", h, msgHdr->teid);
+    LOG_E(GTPU, "[%d] Received a incoming packet on unknown TEID (0x%x) Dropping!\n", h, msgHdr->teid);
     pthread_mutex_unlock(&globGtp.gtp_lock);
     return GTPNOK;
   }
@@ -1132,7 +1100,7 @@ static int Gtpv1uHandleEndMarker(int h, uint8_t *msgBuf, uint32_t msgBufLen, con
   if (!tunnel->second.callBack(&ctxt, srb_flag, rb_id, mui, confirm, 0, NULL, mode, &sourceL2Id, &destinationL2Id))
     LOG_E(GTPU, "[%d] down layer refused incoming packet\n", h);
 
-  LOG_D(GTPU, "[%d] Received END marker packet for: teid:%x\n", h, ntohl(msgHdr->teid));
+  LOG_D(GTPU, "[%d] Received END marker packet for: TEID:0x%x\n", h, ntohl(msgHdr->teid));
   return !GTPNOK;
 }
 
@@ -1149,7 +1117,7 @@ static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, const st
   auto tunnel = globGtp.te2ue_mapping.find(ntohl(msgHdr->teid));
 
   if (tunnel == globGtp.te2ue_mapping.end()) {
-    LOG_E(GTPU, "[%d] Received a incoming packet on unknown teid (%x) Dropping!\n", h, ntohl(msgHdr->teid));
+    LOG_E(GTPU, "[%d] Received a incoming packet on unknown TEID (0x%x) Dropping!\n", h, ntohl(msgHdr->teid));
     pthread_mutex_unlock(&globGtp.gtp_lock);
     return GTPNOK;
   }
@@ -1282,7 +1250,7 @@ static int Gtpv1uHandleGpdu(int h, uint8_t *msgBuf, uint32_t msgBufLen, const st
                            1);
   }
 
-  LOG_D(GTPU, "[%d] Received a %d bytes packet for: teid:%x\n", h, msgBufLen - offset, ntohl(msgHdr->teid));
+  LOG_D(GTPU, "[%d] Received a %d bytes packet for: TEID:0x%x\n", h, msgBufLen - offset, ntohl(msgHdr->teid));
   return !GTPNOK;
 }
 
