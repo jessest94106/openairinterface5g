@@ -1697,11 +1697,11 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   if (has_nssai_sd)
     INT24_TO_BUFFER(pdu_req->sd, &mm_msg->snssai.value[1]);
   size += 1 + 1 + nssai_len;
-  int dnnSize = strlen(nas->uicc->dnnStr);
+  int dnnSize = strlen(pdu_req->dnn);
   mm_msg->dnn.value = calloc(1, dnnSize + 1);
   mm_msg->dnn.length = dnnSize + 1;
   mm_msg->dnn.value[0] = dnnSize;
-  memcpy(mm_msg->dnn.value + 1, nas->uicc->dnnStr, dnnSize);
+  memcpy(mm_msg->dnn.value + 1, pdu_req->dnn, dnnSize);
   size += (1 + 1 + dnnSize + 1);
 
   // encode the message
@@ -1776,10 +1776,12 @@ static void send_nas_5gmm_ind(instance_t instance, const Guti5GSMobileIdentity_t
 void request_pdusession(nr_ue_nas_t *nas, int pdusession_id)
 {
   MessageDef *message_p = itti_alloc_new_message(TASK_NAS_NRUE, nas->UE_id, NAS_PDU_SESSION_REQ);
-  NAS_PDU_SESSION_REQ(message_p).pdusession_id = pdusession_id;
-  NAS_PDU_SESSION_REQ(message_p).pdusession_type = 0x91; // 0x91 = IPv4, 0x92 = IPv6, 0x93 = IPv4v6
-  NAS_PDU_SESSION_REQ(message_p).sst = nas->uicc->nssai_sst;
-  NAS_PDU_SESSION_REQ(message_p).sd = nas->uicc->nssai_sd;
+  nas_pdu_session_req_t *pdu_req = &NAS_PDU_SESSION_REQ(message_p);
+  pdu_req->pdusession_id = pdusession_id;
+  pdu_req->pdusession_type = 0x91; // 0x91 = IPv4, 0x92 = IPv6, 0x93 = IPv4v6
+  pdu_req->sst = nas->uicc->nssai_sst;
+  pdu_req->sd = nas->uicc->nssai_sd;
+  snprintf(pdu_req->dnn, sizeof(pdu_req->dnn), "%s", nas->uicc->dnnStr);
   itti_send_msg_to_task(TASK_NAS_NRUE, nas->UE_id, message_p);
 }
 
