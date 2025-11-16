@@ -39,10 +39,12 @@
 #include <complex.h>
 #include "PHY/NR_TRANSPORT/nr_ulsch.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
-#include "SCHED_NR/fapi_nr_l1.h"
 #include "PHY/NR_REFSIG/ul_ref_seq_nr.h"
 #include <string.h>
 #include "nfapi/open-nFAPI/fapi/inc/nr_fapi_p5_utils.h"
+
+static void init_DLSCH_struct(PHY_VARS_gNB *gNB);
+static void destroy_DLSCH_struct(const PHY_VARS_gNB *gNB);
 
 int l1_north_init_gNB()
 {
@@ -58,7 +60,6 @@ int l1_north_init_gNB()
 
     LOG_D(NR_PHY, "RC.gNB[%d]: installing callbacks\n", i);
     RC.gNB[i]->if_inst->NR_PHY_config_req = nr_phy_config_request;
-    RC.gNB[i]->if_inst->NR_Schedule_response = nr_schedule_response;
   }
 
   return 0;
@@ -155,6 +156,8 @@ void phy_init_nr_gNB(PHY_VARS_gNB *gNB)
   /// Transport init necessary for NR synchro
   init_nr_transport(gNB);
 
+  init_DLSCH_struct(gNB);
+
   gNB->nr_srs_info = (nr_srs_info_t **)malloc16_clear(gNB->max_nb_srs * sizeof(nr_srs_info_t*));
   for (int id = 0; id < gNB->max_nb_srs; id++) {
     gNB->nr_srs_info[id] = (nr_srs_info_t *)malloc16_clear(sizeof(nr_srs_info_t));
@@ -241,6 +244,8 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
 
   reset_nr_transport(gNB);
 
+  destroy_DLSCH_struct(gNB);
+
   NR_gNB_COMMON * common_vars = &gNB->common_vars;
   for (int j = 0; j < common_vars->num_beams_period; j++) {
     if (common_vars->beam_id)
@@ -279,13 +284,6 @@ void phy_free_nr_gNB(PHY_VARS_gNB *gNB)
 
   free_nrLDPC_coding_interface(&gNB->nrLDPC_coding_interface);
 
-}
-
-//Adding nr_schedule_handler
-void install_nr_schedule_handlers(NR_IF_Module_t *if_inst)
-{
-  if_inst->NR_PHY_config_req = nr_phy_config_request;
-  if_inst->NR_Schedule_response = nr_schedule_response;
 }
 
 void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
@@ -366,7 +364,7 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   fp->ul_CarrierFreq = ((ul_bw_khz>>1) + gNB_config->carrier_config.uplink_frequency.value)*1000 ;
 
   int32_t dlul_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
-  fp->nr_band = get_band(fp->dl_CarrierFreq, dlul_offset);
+  fp->nr_band = get_band(fp->dl_CarrierFreq, dlul_offset, dl_bw_khz, ul_bw_khz);
 
   LOG_I(PHY, "DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %d Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, dlul_offset);
 
@@ -401,37 +399,27 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   init_timeshift_rotation(fp);
 }
 
-void init_DLSCH_struct(PHY_VARS_gNB *gNB, processingData_L1tx_t *msg)
+static void init_DLSCH_struct(PHY_VARS_gNB *gNB)
 {
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   uint16_t grid_size = cfg->carrier_config.dl_grid_size[fp->numerology_index].value;
-  msg->num_pdsch_slot = 0;
-
-  msg->dlsch = malloc16(gNB->max_nb_pdsch * sizeof(NR_gNB_DLSCH_t *));
-  int num_cw = NR_MAX_NB_LAYERS > 4? 2:1;
+  gNB->dlsch = calloc(gNB->max_nb_pdsch, sizeof(*gNB->dlsch));
   for (int i = 0; i < gNB->max_nb_pdsch; i++) {
     LOG_D(PHY, "Allocating Transport Channel Buffers for DLSCH %d/%d\n", i, gNB->max_nb_pdsch);
-    msg->dlsch[i] = (NR_gNB_DLSCH_t *)malloc16(num_cw * sizeof(NR_gNB_DLSCH_t));
-    for (int j = 0; j < num_cw; j++) {
-      msg->dlsch[i][j] = new_gNB_dlsch(fp, grid_size);
-    }
+    gNB->dlsch[i] = new_gNB_dlsch(fp, grid_size);
   }
 }
 
-void reset_DLSCH_struct(const PHY_VARS_gNB *gNB, processingData_L1tx_t *msg)
+static void destroy_DLSCH_struct(const PHY_VARS_gNB *gNB)
 {
   const NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   const nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   const uint16_t grid_size = cfg->carrier_config.dl_grid_size[fp->numerology_index].value;
-  int num_cw = NR_MAX_NB_LAYERS > 4? 2:1;
   for (int i = 0; i < gNB->max_nb_pdsch; i++) {
-    for (int j = 0; j < num_cw; j++) {
-      free_gNB_dlsch(&msg->dlsch[i][j], grid_size, fp);
-    }
-    free(msg->dlsch[i]);
+    free_gNB_dlsch(&gNB->dlsch[i], grid_size, fp);
   }
-  free(msg->dlsch);
+  free(gNB->dlsch);
 }
 
 void init_nr_transport(PHY_VARS_gNB *gNB)

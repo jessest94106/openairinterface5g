@@ -236,6 +236,7 @@ void nr_ue_ssb_rsrp_measurements(PHY_VARS_NR_UE *ue,
     .meas_type = NFAPI_NR_SS_MEAS,
     .Nid_cell = ue->frame_parms.Nid_cell,
     .rsrp_dBm = ue->measurements.ssb_rsrp_dBm[ssb_index],
+    .sinr_dB = ue->measurements.ssb_sinr_dB[ssb_index],
     .ssb_index = ssb_index,
     .is_neighboring_cell = false,
   };

@@ -64,7 +64,8 @@ typedef struct {
   uint8_t transaction_id;
   NR_SRB_ToAddModList_t *srb_config_list;
   NR_DRB_ToAddModList_t *drb_config_list;
-  NR_DRB_ToReleaseList_t *drb_release_list;
+  int *drb_rel;
+  int n_drb_rel;
   NR_SecurityConfig_t *security_config;
   NR_MeasConfig_t *meas_config;
   byte_array_t dedicated_NAS_msg_list[MAX_DRBS_PER_UE];

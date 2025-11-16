@@ -177,7 +177,7 @@ it would be better to call **NR_UL_indication()** now instead of before (on prev
 * nr_common_signal_procedures()  
 generate common signals
 {: .func4}
-* nr_generate_dci_top()
+* nr_generate_dci()
 generate DCI: the scheduling informtion for each UE in both DL and UL
 {: .func4}
 * nr_generate_pdsch()  

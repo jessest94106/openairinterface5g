@@ -649,9 +649,8 @@ static void pf_dl(gNB_MAC_INST *mac,
     stats->current_bytes = 0;
     stats->current_rbs = 0;
 
-    /* Check if this UE should get TA (every 100 frames). If we add the CE,
-     * ta_apply will be reset */
-    if (frame == ((sched_ctrl->ta_frame + 100) % 1024))
+    /* Check if this UE should get TA. If we add the CE, ta_apply will be reset */
+    if (frame == sched_ctrl->ta_frame)
       sched_ctrl->ta_apply = true;
 
     int total_rem_ues = 0;
@@ -690,7 +689,7 @@ static void pf_dl(gNB_MAC_INST *mac,
       update_dlsch_buffer(pp_pdsch->frame, pp_pdsch->slot, UE);
 
       /* Check DL buffer and skip this UE if no bytes and no TA necessary */
-      if (sched_ctrl->num_total_bytes == 0 && frame != (sched_ctrl->ta_frame + 100) % 1024)
+      if (sched_ctrl->num_total_bytes == 0 && sched_ctrl->ta_apply == false)
         continue;
 
       /* Calculate coeff */
@@ -871,8 +870,8 @@ static void pf_dl(gNB_MAC_INST *mac,
     // awaiting. Therefore, for the time being, we put a fixed overhead of 12
     // (for 4 PDUs) and optionally + 2 for TA. Once RLC gives the number of
     // PDUs, we replace with 3 * numPDUs
-    const int oh = 3 * 4 + 2 * (frame == (sched_ctrl->ta_frame + 100) % 1024);
-    //const int oh = 3 * sched_ctrl->dl_pdus_total + 2 * (frame == (sched_ctrl->ta_frame + 100) % 1024);
+    const int oh = 3 * 4 + (sched_ctrl->ta_apply ? 2 : 0);
+    //const int oh = 3 * sched_ctrl->dl_pdus_total + (sched_ctrl->ta_apply ? 2 : 0);
     nr_find_nb_rb(sched_pdsch.Qm,
                   sched_pdsch.R,
                   1, // no transform precoding for DL
@@ -1224,7 +1223,7 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
     T(T_GNB_MAC_RETRANSMISSION_DL_PDU_WITH_DATA, T_INT(module_id), T_INT(CC_id), T_INT(rnti),
       T_INT(frame), T_INT(slot), T_INT(current_harq_pid), T_INT(harq->round), T_BUFFER(harq->transportBlock.buf, TBS));
     UE->mac_stats.dl.total_rbs_retx += sched_pdsch->rbSize;
-    nr_mac->mac_stats.used_prb_aggregate += sched_pdsch->rbSize;
+    nr_mac->mac_stats.dl.used_prb_aggregate += sched_pdsch->rbSize;
   } else { /* initial transmission */
     LOG_D(NR_MAC, "Initial HARQ transmission in %d.%d\n", frame, slot);
     uint8_t *buf = allocate_transportBlock_buffer(&harq->transportBlock, TBS);
@@ -1338,7 +1337,7 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
     UE->mac_stats.dl.num_mac_sdu += sdus;
     UE->mac_stats.dl.current_rbs = sched_pdsch->rbSize;
     UE->mac_stats.dl.total_sdu_bytes += dlsch_total_bytes;
-    nr_mac->mac_stats.used_prb_aggregate += sched_pdsch->rbSize;
+    nr_mac->mac_stats.dl.used_prb_aggregate += sched_pdsch->rbSize;
 
     /* save retransmission information */
     harq->sched_pdsch = *sched_pdsch;
@@ -1349,8 +1348,9 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
     // ta command is sent, values are reset
     if (sched_ctrl->ta_apply) {
       sched_ctrl->ta_apply = false;
-      sched_ctrl->ta_frame = frame;
-      LOG_D(NR_MAC, "%d.%2d UE %04x TA scheduled, resetting TA frame\n", frame, slot, UE->rnti);
+      sched_ctrl->ta_update = 31;
+      sched_ctrl->ta_frame = (frame + 100) % MAX_FRAME_NUMBER;
+      LOG_D(NR_MAC, "%d.%2d UE %04x TA scheduled, setting next TA frame to %d\n", frame, slot, UE->rnti, sched_ctrl->ta_frame);
     }
 
     T(T_GNB_MAC_DL_PDU_WITH_DATA, T_INT(module_id), T_INT(CC_id), T_INT(rnti),
@@ -1387,8 +1387,8 @@ void nr_schedule_ue_spec(module_id_t module_id,
     return;
 
   NR_ServingCellConfigCommon_t *scc = gNB_mac->common_channels[CC_id].ServingCellConfigCommon;
-  const NR_BWP_t *initialDL = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-  gNB_mac->mac_stats.total_prb_aggregate += NRRIV2BW(initialDL->locationAndBandwidth, MAX_BWP_SIZE);
+  int bw = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
+  gNB_mac->mac_stats.dl.total_prb_aggregate += bw;
 
   nfapi_nr_dl_tti_request_body_t *dl_req = &DL_req->dl_tti_request_body;
   post_process_pdsch_t pdsch = { frame, slot, dl_req, TX_req };

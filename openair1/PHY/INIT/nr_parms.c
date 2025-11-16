@@ -379,14 +379,12 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
   fp->N_RB_SL = config->carrier_config.sl_grid_size[fp->numerology_index];
 
   fp->frame_type = get_frame_type(fp->nr_band, fp->numerology_index);
-  int32_t uplink_frequency_offset = get_delta_duplex(fp->nr_band, fp->numerology_index);
+  int64_t uplink_frequency_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
   uplink_frequency_offset *= 1000;
 
-  LOG_I(PHY, "Initializing frame parms: DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %d Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, uplink_frequency_offset);
+  LOG_I(PHY, "Initializing frame parms: DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %ld Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, uplink_frequency_offset);
 
   AssertFatal(fp->frame_type==config->cell_config.frame_duplex_type, "Invalid duplex type (frame_type %d,cell_config.frame_duplex_type %d) in config request file for band %d\n", fp->frame_type,config->cell_config.frame_duplex_type,fp->nr_band);
-
-  AssertFatal(fp->ul_CarrierFreq == (fp->dl_CarrierFreq + uplink_frequency_offset), "Disagreement in uplink frequency for band %d: ul_CarrierFreq = %lu Hz vs expected %lu Hz\n", fp->nr_band, fp->ul_CarrierFreq, fp->dl_CarrierFreq + uplink_frequency_offset);
 
   LOG_I(PHY,"Initializing frame parms for mu %d, N_RB %d, Ncp %d\n",fp->numerology_index, fp->N_RB_DL, Ncp);
 
@@ -508,7 +506,7 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
   fp->ofdm_offset_divisor = ofdm_offset_divisor;
   fp->threequarter_fs = threequarter_fs;
 
-  fp->nr_band = get_band(config->sl_carrier_config.sl_frequency, 0);
+  fp->nr_band = get_band(config->sl_carrier_config.sl_frequency, 0, 0, 0);
 
   fp->att_rx = 0;
   fp->att_tx = 0;
@@ -522,8 +520,6 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
   fp->Ncp = config->sl_bwp_config.sl_cyclic_prefix;
 
   fp->frame_type = get_frame_type(fp->nr_band, fp->numerology_index);
-  int32_t uplink_frequency_offset = get_delta_duplex(fp->nr_band, fp->numerology_index);
-  uplink_frequency_offset *= 1000;
 
   uint64_t bw_khz = (12 * config->sl_carrier_config.sl_grid_size) * (15 << config->sl_bwp_config.sl_scs);
   // REfer to section 3GPP spec 38.101 5.4E.2.1
@@ -539,20 +535,14 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
   LOG_D(PHY, "CarrierFreq %lu Hz\n", fp->sl_CarrierFreq);
 
   LOG_I(PHY,
-        "Initializing frame parms: DL frequency %lu Hz, UL frequency %lu Hz SL frequency %lu Hz: band %d, uldl offset %d Hz\n",
+        "Initializing frame parms: DL frequency %lu Hz, UL frequency %lu Hz SL frequency %lu Hz: band %d\n",
         fp->dl_CarrierFreq,
         fp->ul_CarrierFreq,
         fp->sl_CarrierFreq,
-        fp->nr_band,
-        uplink_frequency_offset);
+        fp->nr_band);
 
   AssertFatal(fp->frame_type == TDD, "Sidelink bands only support TDD");
 
-  AssertFatal(fp->ul_CarrierFreq == (fp->dl_CarrierFreq + uplink_frequency_offset),
-              "Disagreement in uplink frequency for band %d: ul_CarrierFreq = %lu Hz vs expected %lu Hz\n",
-              fp->nr_band,
-              fp->ul_CarrierFreq,
-              fp->dl_CarrierFreq + uplink_frequency_offset);
 
   LOG_I(PHY, "Initializing frame parms for mu %d, N_RB %d, Ncp %d\n", fp->numerology_index, fp->N_RB_DL, fp->Ncp);
 

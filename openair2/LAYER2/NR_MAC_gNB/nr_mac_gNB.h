@@ -870,6 +870,11 @@ typedef struct {
   uint64_t used_prb_aggregate;
 } mac_stats_t;
 
+typedef struct dlul_mac_stats {
+  mac_stats_t dl;
+  mac_stats_t ul;
+} dlul_mac_stats_t;
+
 /// helper type to encapsulate a frame/slot combination in a single type.
 /// Currently only used in the UL preprocessor. Note: if you use this type
 /// further, please refactor it into a common type first.
@@ -996,7 +1001,7 @@ typedef struct gNB_MAC_INST_s {
 
   pthread_mutex_t sched_lock;
 
-  mac_stats_t mac_stats;
+  dlul_mac_stats_t mac_stats;
   uint64_t num_scheduled_prach_rx;
 } gNB_MAC_INST;
 

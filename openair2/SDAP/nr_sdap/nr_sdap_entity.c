@@ -210,15 +210,20 @@ static void nr_sdap_rx_entity(nr_sdap_entity_t *entity,
 {
   /* The offset of the SDAP header, it might be 0 if has_sdap_rx is not true in the pdcp entity. */
   int offset=0;
-  uint8_t qfi = buf[0] & 0x3F; // QFI is always the first 6 bits in the first octet
-  if (qfi >= SDAP_MAX_QFI) {
-    LOG_E(SDAP, "Invalid QFI %d received in SDAP header\n", qfi);
-    return;
+  bool sdap_ul_rx = false;
+  bool sdap_dl_rx = false;
+  /* If SDAP header is disabled for this entity, bypass header parsing */
+  if (entity->enable_sdap) {
+    uint8_t qfi = buf[0] & 0x3F; // QFI is always the first 6 bits in the first octet
+    if (qfi >= SDAP_MAX_QFI) {
+      LOG_E(SDAP, "Invalid QFI %d received in SDAP header\n", qfi);
+      return;
+    }
+    // Fetch entity role from the qfi2drb_table
+    sdap_ul_rx = entity->qfi2drb_table[qfi].entity_role & SDAP_UL_RX; // gNB RX entity
+    sdap_dl_rx = entity->qfi2drb_table[qfi].entity_role & SDAP_DL_RX; // UE RX entity
   }
 
-  // Fetch entity role from the qfi2drb_table
-  bool sdap_ul_rx = entity->qfi2drb_table[qfi].entity_role & SDAP_UL_RX; // gNB RX entity
-  bool sdap_dl_rx = entity->qfi2drb_table[qfi].entity_role & SDAP_DL_RX; // UE RX entity
 
   if (is_gnb) { // gNB
     if (sdap_ul_rx) { // UL Data/Control PDU with SDAP header
@@ -495,6 +500,7 @@ static void nr_sdap_add_entity(const int is_gnb, const ue_id_t ue_id, const sdap
   sdap_entity->ue_id = ue_id;
   sdap_entity->pdusession_id = sdap->pdusession_id;
   sdap_entity->is_gnb = is_gnb;
+  sdap_entity->enable_sdap = (sdap->role != NO_SDAP_HEADER);
 
   // rx/tx entities
   sdap_entity->tx_entity = nr_sdap_tx_entity;
@@ -590,14 +596,13 @@ bool nr_sdap_delete_entity(ue_id_t ue_id, int pdusession_id)
     LOG_E(SDAP, "SDAP entities not established or Invalid range of pdusession_id [0, 256].\n");
     return false;
   }
-  LOG_D(SDAP, "Deleting SDAP entity for UE %lx and PDU Session id %d\n", ue_id, entityPtr->pdusession_id);
 
   if (entityPtr->ue_id == ue_id && entityPtr->pdusession_id == pdusession_id) {
     sdap_info.sdap_entity_llist = sdap_info.sdap_entity_llist->next_entity;
     if (entityPtr->pdusession_sock != -1)
       remove_ip_if(entityPtr);
     free(entityPtr);
-    LOG_D(SDAP, "Successfully deleted Entity.\n");
+    LOG_D(SDAP, "Successfully deleted SDAP entity for UE %lx and PDU Session id %d\n", ue_id, pdusession_id);
     return true;
   } else {
     while ((entityPtr->ue_id != ue_id || entityPtr->pdusession_id != pdusession_id) && entityPtr->next_entity != NULL
@@ -613,7 +618,7 @@ bool nr_sdap_delete_entity(ue_id_t ue_id, int pdusession_id)
         remove_ip_if(entityPtr);
       }
       free(entityPtr);
-      LOG_D(SDAP, "Successfully deleted Entity.\n");
+      LOG_D(SDAP, "Successfully deleted Entity for UE %lx and PDU Session id %d\n", ue_id, pdusession_id);
       return true;
     }
   }

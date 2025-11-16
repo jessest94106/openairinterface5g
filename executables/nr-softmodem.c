@@ -423,8 +423,6 @@ int start_L1L2(module_id_t gnb_id)
   /* block threads */
   oai_exit = 0;
   sync_var = -1;
-  extern void init_sched_response(void);
-  init_sched_response();
 
   /* update config */
   gNB_MAC_INST *mac = RC.nrmac[0];
@@ -473,8 +471,9 @@ static void initialize_agent(ngran_node_t node_type, e2_agent_args_t oai_args)
 
   printf("After RCconfig_NR_E2agent %s %s \n",oai_args.sm_dir, oai_args.ip  );
 
-  fr_args_t args = { .ip = oai_args.ip }; // init_fr_args(0, NULL);
-  memcpy(args.libs_dir, oai_args.sm_dir, 128);
+  fr_args_t args = {0};
+  memcpy(args.ip, oai_args.ip, FR_IP_ADDRESS_LEN);
+  memcpy(args.libs_dir, oai_args.sm_dir, FR_CONF_FILE_LEN);
 
   sleep(1);
   const gNB_RRC_INST* rrc = RC.nrrrc[0];

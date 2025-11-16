@@ -125,6 +125,8 @@ static const uint16_t cqi_table3[16][2] = {{0, 0},
 static void determine_aggregation_level_search_order(int agg_level_search_order[NUM_PDCCH_AGG_LEVELS],
                                                      float pdcch_cl_adjust);
 
+static int nr_mac_interrupt_ue_transmission(gNB_MAC_INST *mac, NR_UE_info_t *UE, int slots, int slots_per_frame);
+
 uint8_t get_dl_nrOfLayers(const NR_UE_sched_ctrl_t *sched_ctrl, const nr_dci_format_t dci_format)
 {
   // TODO check this but it should be enough for now
@@ -3435,7 +3437,7 @@ void nr_measgap_scheduling(gNB_MAC_INST *nr_mac, frame_t frame, sub_frame_t slot
       continue;
 
     const int slots_frame = nr_mac->frame_structure.numb_slots_frame;
-    const frame_t f = (frame + (slot + mgc->n_slots_advance) / slots_frame) % 1024;
+    const frame_t f = (frame + (slot + mgc->n_slots_advance) / slots_frame) % MAX_FRAME_NUMBER;
     const slot_t s = (slot + mgc->n_slots_advance) % slots_frame;
 
     // TS 38 331 - Section 5.5.2.9 Measurement gap configuration
@@ -3446,7 +3448,7 @@ void nr_measgap_scheduling(gNB_MAC_INST *nr_mac, frame_t frame, sub_frame_t slot
     // start a timer to stop scheduling UE during MeasGap, or extend timer for
     // duration of measGap with existing follow-up action
     if (!nr_timer_is_active(t) || nr_timer_remaining_time(t) < mgc->mgl_slots) {
-      nr_mac_interrupt_ue_transmission(nr_mac, UE, mgc->mgl_slots);
+      nr_mac_interrupt_ue_transmission(nr_mac, UE, mgc->mgl_slots, slots_frame);
     }
   }
 }
@@ -3530,7 +3532,7 @@ int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs)
   return (delay_ms << scs) + sl_ahead;
 }
 
-int nr_mac_interrupt_ue_transmission(gNB_MAC_INST *mac, NR_UE_info_t *UE, int slots)
+static int nr_mac_interrupt_ue_transmission(gNB_MAC_INST *mac, NR_UE_info_t *UE, int slots, int slots_per_frame)
 {
   DevAssert(mac != NULL);
   DevAssert(UE != NULL);
@@ -3539,11 +3541,11 @@ int nr_mac_interrupt_ue_transmission(gNB_MAC_INST *mac, NR_UE_info_t *UE, int sl
   nr_timer_setup(&UE->UE_sched_ctrl.transm_interrupt, slots, 1);
   nr_timer_start(&UE->UE_sched_ctrl.transm_interrupt);
 
-  // it might happen that timing advance command should be sent during the UE
-  // inactivity time. To prevent this, set a variable as if we would have just
-  // sent it. This way, another TA command will for sure be sent in some
-  // frames, after the inactivity of the UE.
-  UE->UE_sched_ctrl.ta_frame = (mac->frame - 1 + 1024) % 1024;
+  // it might happen that timing advance command should be sent during the UE inactivity time.
+  // To prevent this, delay next TA command just after the UE inactivity time.
+  const int inactive_frames = slots / slots_per_frame + 1;
+  if ((UE->UE_sched_ctrl.ta_frame - mac->frame + MAX_FRAME_NUMBER) % MAX_FRAME_NUMBER < inactive_frames)
+    UE->UE_sched_ctrl.ta_frame = (mac->frame + inactive_frames) % MAX_FRAME_NUMBER;
 
   LOG_D(NR_MAC, "UE %04x: Interrupt UE transmission (%d slots)\n", UE->rnti, slots);
   return 0;

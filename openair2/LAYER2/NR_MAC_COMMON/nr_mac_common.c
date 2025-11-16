@@ -2819,11 +2819,13 @@ uint16_t nr_dci_size(const NR_UE_DL_BWP_t *DL_BWP,
       dci_pdu->harq_pid.nbits = 4;
       dci_pdu->frequency_domain_assignment.nbits = (uint8_t)ceil(log2((N_RB * (N_RB + 1)) >>1)); // Freq domain assignment -- hopping scenario to be updated
       size += dci_pdu->frequency_domain_assignment.nbits;
-      if(alt_size >= size)
-        size += alt_size - size; // Padding to match 1_0 size
-      else if (ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
-        dci_pdu->frequency_domain_assignment.nbits -= (size - alt_size);
-        size = alt_size;
+      if (alt_size) {
+        if(alt_size >= size)
+          size += alt_size - size; // Padding to match 1_0 size
+        else if (ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
+          dci_pdu->frequency_domain_assignment.nbits -= (size - alt_size);
+          size = alt_size;
+        }
       }
       // UL/SUL indicator assumed to be 0
       break;
@@ -3133,7 +3135,7 @@ uint16_t nr_dci_size(const NR_UE_DL_BWP_t *DL_BWP,
     default:
       AssertFatal(1==0, "Invalid NR DCI format %d\n", format);
   }
-  LOG_D(NR_MAC, "DCI size: %d\n", size);
+  LOG_D(NR_MAC, "DCI format %d size: %d alt_size %d\n", format, size, alt_size);
   return size;
 }
 

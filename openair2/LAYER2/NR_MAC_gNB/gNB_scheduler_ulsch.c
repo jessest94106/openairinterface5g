@@ -811,7 +811,7 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
   }
 
   // re-initialize ta update variables after RA procedure completion
-  UE->UE_sched_ctrl.ta_frame = frame;
+  UE->UE_sched_ctrl.ta_frame = (frame + 100) % MAX_FRAME_NUMBER;
 
   LOG_A(NR_MAC, "%4d.%2d PUSCH with TC_RNTI 0x%04x received correctly\n", frame, slot, rnti);
 
@@ -2455,6 +2455,7 @@ void post_process_ulsch(gNB_MAC_INST *nr_mac, post_process_pusch_t *pusch, NR_UE
   }
   UE->mac_stats.ul.current_bytes = sched_pusch->tb_size;
   UE->mac_stats.ul.current_rbs = sched_pusch->rbSize;
+  nr_mac->mac_stats.ul.used_prb_aggregate += sched_pusch->rbSize;
   sched_ctrl->last_ul_frame = sched_pusch->frame;
   sched_ctrl->last_ul_slot = sched_pusch->slot;
 
@@ -2697,6 +2698,7 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
     int tda = seq_arr_dist(&nr_mac->ul_tda, seq_arr_front(&nr_mac->ul_tda), tda_info);
     AssertFatal(tda >= 0 && tda < 16, "illegal TDA index %d\n", tda);
 
+    nr_mac->mac_stats.ul.total_prb_aggregate += bw;
     int len[num_beams];
     for (int i = 0; i < num_beams; i++)
       len[i] = rb_len;

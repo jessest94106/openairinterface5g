@@ -519,10 +519,10 @@ int main(int argc, char **argv)
     exit(-1);
   }
 
-  processingData_L1tx_t msgDataTx;
   // generate signal
   const uint32_t rxdataF_sz = UE->frame_parms.samples_per_slot_wCP;
   __attribute__ ((aligned(32))) c16_t rxdataF[UE->frame_parms.nb_antennas_rx][rxdataF_sz];
+  nfapi_nr_dl_tti_ssb_pdu ssb_pdu[64] = {0};
   if (input_fd==NULL) {
 
     for (i=0; i<frame_parms->Lmax; i++) {
@@ -530,10 +530,10 @@ int main(int argc, char **argv)
 
         const int sc_offset = frame_parms->freq_range == FR1 ? ssb_subcarrier_offset<<mu : ssb_subcarrier_offset;
         const int prb_offset = frame_parms->freq_range == FR1 ? gNB->gNB_config.ssb_table.ssb_offset_point_a.value<<mu : gNB->gNB_config.ssb_table.ssb_offset_point_a.value << (mu - 2);
-        msgDataTx.ssb[i].ssb_pdu.ssb_pdu_rel15.bchPayload = 0x55dd33;
-        msgDataTx.ssb[i].ssb_pdu.ssb_pdu_rel15.SsbBlockIndex = i;
-        msgDataTx.ssb[i].ssb_pdu.ssb_pdu_rel15.SsbSubcarrierOffset = sc_offset;
-        msgDataTx.ssb[i].ssb_pdu.ssb_pdu_rel15.ssbOffsetPointA = prb_offset;
+        ssb_pdu[i].ssb_pdu_rel15.bchPayload = 0x55dd33;
+        ssb_pdu[i].ssb_pdu_rel15.SsbBlockIndex = i;
+        ssb_pdu[i].ssb_pdu_rel15.SsbSubcarrierOffset = sc_offset;
+        ssb_pdu[i].ssb_pdu_rel15.ssbOffsetPointA = prb_offset;
 
         start_symbol = nr_get_ssb_start_symbol(frame_parms,i);
         int slot = start_symbol/14;
@@ -541,7 +541,7 @@ int main(int argc, char **argv)
         for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++)
           memset(gNB->common_vars.txdataF[0][aa], 0, frame_parms->samples_per_slot_wCP * sizeof(int32_t));
 
-        nr_common_signal_procedures (gNB,frame,slot,msgDataTx.ssb[i].ssb_pdu);
+        nr_common_signal_procedures (gNB,frame,slot, &ssb_pdu[i]);
 
         int samp = frame_parms->get_samples_slot_timestamp(slot, frame_parms, 0);
         for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++) {
@@ -744,7 +744,7 @@ int main(int argc, char **argv)
                                                              gNB->gNB_config.ssb_table.ssb_subcarrier_offset.value,
                                                              frame_parms->Lmax);
           int payload_ret = (result.xtra_byte == xtra_byte);
-          nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &msgDataTx.ssb[ssb_index].ssb_pdu.ssb_pdu_rel15;
+          nfapi_nr_dl_tti_ssb_pdu_rel15_t *pdu = &ssb_pdu[ssb_index].ssb_pdu_rel15;
           for (int i = 0; i < 3; i++)
             payload_ret += (result.decoded_output[i] == ((pdu->bchPayload >> (8 * i)) & 0xff));
           // printf("ret %d\n", payload_ret);

@@ -62,7 +62,6 @@
 #include "PHY/defs_nr_common.h"
 #include "PHY/impl_defs_nr.h"
 #include "PHY/phy_vars_nr_ue.h"
-#include "SCHED_NR/fapi_nr_l1.h"
 #include "SCHED_NR/sched_nr.h"
 #include "SCHED_NR_UE/defs.h"
 #include "SCHED_NR_UE/fapi_nr_ue_l1.h"
@@ -285,7 +284,6 @@ nrUE_params_t nrUE_params;
 nrUE_params_t *get_nrUE_params(void) {
   return &nrUE_params;
 }
-
 
 void validate_input_pmi(nfapi_nr_config_request_scf_t *gNB_config,
                         nr_pdsch_AntennaPorts_t pdsch_AntennaPorts,
@@ -974,13 +972,6 @@ int main(int argc, char **argv)
   int ret = 1;
   initNamedTpool(gNBthreads, &gNB->threadPool, true, "gNB-tpool");
   initNotifiedFIFO(&gNB->L1_tx_out);
-  // we create 2 threads for L1 tx processing
-  processingData_L1tx_t *msgDataTx = malloc(sizeof(processingData_L1tx_t));
-  init_DLSCH_struct(gNB, msgDataTx);
-  msgDataTx->slot = slot;
-  msgDataTx->frame = frame;
-  memset(msgDataTx->ssb, 0, 64*sizeof(NR_gNB_SSB_t));
-  gNB->msgDataTx = msgDataTx;
 
   // Buffers to store internal memory of slot process
   int rx_size = (((14 * UE->frame_parms.N_RB_DL * 12 * sizeof(int32_t)) + 15) >> 4) << 4;
@@ -1059,8 +1050,13 @@ int main(int argc, char **argv)
     n_false_positive = 0;
     if (n_trials== 1) num_rounds = 1;
 
-    NR_gNB_DLSCH_t *gNB_dlsch = &msgDataTx->dlsch[0][0];
-    nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &gNB_dlsch->harq_process.pdsch_pdu.pdsch_pdu_rel15;
+    NR_gNB_DLSCH_t *gNB_dlsch = &gNB->dlsch[0];
+    memset(Sched_INFO, 0, sizeof(*Sched_INFO));
+    Sched_INFO->sched_response_id = -1;
+    nfapi_nr_dl_tti_request_body_t *dl_req = &Sched_INFO->DL_req.dl_tti_request_body;
+    // scheduler will place PDSCH second (after PDCCH), verification below
+    nfapi_nr_dl_tti_request_pdu_t  *dl_tti_pdsch_pdu = &dl_req->dl_tti_pdu_list[1];
+    nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = &dl_tti_pdsch_pdu->pdsch_pdu.pdsch_pdu_rel15;
 
     for (trial = 0; trial < n_trials && !stop; trial++) {
 
@@ -1082,11 +1078,9 @@ int main(int argc, char **argv)
       UE_harq_process->DLround = round;
       UE_harq_process->first_rx = 1;
 
-      memset(Sched_INFO, 0, sizeof(*Sched_INFO));
-      Sched_INFO->sched_response_id = -1;
-
       while (round < num_rounds && !UE_harq_process->decodeResult && !stop) {
-        clear_nr_nfapi_information(RC.nrmac[0], 0, frame, slot, &Sched_INFO->DL_req, &Sched_INFO->TX_req, &Sched_INFO->UL_dci_req);
+        reset_sched_response(Sched_INFO, frame, slot, 0, 0);
+        clear_nr_nfapi_information(RC.nrmac[0], 0, frame, slot);
         UE_info->UE_sched_ctrl.harq_processes[harq_pid].ndi = !(trial&1);
         UE_info->UE_sched_ctrl.harq_processes[harq_pid].round = round;
 
@@ -1094,18 +1088,13 @@ int main(int argc, char **argv)
         NR_SCHED_LOCK(&gNB_mac->sched_lock);
         nr_schedule_ue_spec(0, frame, slot, &Sched_INFO->DL_req, &Sched_INFO->TX_req);
         NR_SCHED_UNLOCK(&gNB_mac->sched_lock);
-        Sched_INFO->module_id = 0;
-        Sched_INFO->CC_id = 0;
-        Sched_INFO->frame = frame;
-        Sched_INFO->slot = slot;
-        Sched_INFO->UL_dci_req.numPdus = 0;
-        nr_schedule_response(Sched_INFO);
+
+        /* check that second message is indeed PDSCH */
+        DevAssert(dl_tti_pdsch_pdu->PDUType == NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE);
 
         /* PTRS values for DLSIM calculations   */
-        nfapi_nr_dl_tti_request_body_t *dl_req = &Sched_INFO->DL_req.dl_tti_request_body;
-        nfapi_nr_dl_tti_request_pdu_t  *dl_tti_pdsch_pdu = &dl_req->dl_tti_pdu_list[1];
-        nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = &dl_tti_pdsch_pdu->pdsch_pdu.pdsch_pdu_rel15;
         pdu_bit_map = pdsch_pdu_rel15->pduBitmap;
+	// This is already in DL procedures??
         if(pdu_bit_map & 0x1) {
           set_ptrs_symb_idx(&dlPtrsSymPos,
                             pdsch_pdu_rel15->NrOfSymbols,
@@ -1113,16 +1102,12 @@ int main(int argc, char **argv)
                             1<<pdsch_pdu_rel15->PTRSTimeDensity,
                             pdsch_pdu_rel15->dlDmrsSymbPos);
           ptrsSymbPerSlot = get_ptrs_symbols_in_slot(dlPtrsSymPos, pdsch_pdu_rel15->StartSymbolIndex, pdsch_pdu_rel15->NrOfSymbols);
-          ptrsRePerSymb = ((rel15->rbSize + rel15->PTRSFreqDensity - 1) / rel15->PTRSFreqDensity);
+          ptrsRePerSymb = ((pdsch_pdu_rel15->rbSize + pdsch_pdu_rel15->PTRSFreqDensity - 1) / pdsch_pdu_rel15->PTRSFreqDensity);
           LOG_D(PHY,"[DLSIM] PTRS Symbols in a slot: %2u, RE per Symbol: %3u, RE in a slot %4d\n", ptrsSymbPerSlot, ptrsRePerSymb, ptrsSymbPerSlot * ptrsRePerSymb);
         }
 
-        msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.bchPayload=0x001234;
-        msgDataTx->ssb[0].ssb_pdu.ssb_pdu_rel15.SsbBlockIndex = 0;
-        msgDataTx->gNB = gNB;
-
         start_meas(&gNB->phy_proc_tx);
-        phy_procedures_gNB_TX(msgDataTx,frame,slot,1);
+        phy_procedures_gNB_TX(gNB, &Sched_INFO->DL_req, &Sched_INFO->TX_req, &Sched_INFO->UL_dci_req, frame, slot, 1);
         stop_meas(&gNB->phy_proc_tx);
 
         int txdataF_offset = slot * frame_parms->samples_per_slot_wCP;
@@ -1197,9 +1182,9 @@ int main(int argc, char **argv)
 
         double ts = 1.0/(frame_parms->subcarrier_spacing * frame_parms->ofdm_symbol_size); 
         //Compute AWGN variance
-        sigma2_dB = 10 * log10((double)txlev_sum * ((double)UE->frame_parms.ofdm_symbol_size/(12*rel15->rbSize))) - SNR;
+        sigma2_dB = 10 * log10((double)txlev_sum * ((double)UE->frame_parms.ofdm_symbol_size/(12*pdsch_pdu_rel15->rbSize))) - SNR;
         sigma2    = pow(10, sigma2_dB/10);
-        if (n_trials==1) printf("sigma2 %f (%f dB), txlev_sum %f (factor %f)\n",sigma2,sigma2_dB,10*log10((double)txlev_sum),(double)(double)UE->frame_parms.ofdm_symbol_size/(12*rel15->rbSize));
+        if (n_trials==1) printf("sigma2 %f (%f dB), txlev_sum %f (factor %f)\n",sigma2,sigma2_dB,10*log10((double)txlev_sum),(double)(double)UE->frame_parms.ofdm_symbol_size/(12*pdsch_pdu_rel15->rbSize));
 
         for (aa = 0; aa < n_rx; aa++) {
           bzero(r_re[aa], slot_length * sizeof(double));
@@ -1241,22 +1226,22 @@ int main(int argc, char **argv)
 
         int16_t *UE_llr = (int16_t*)UE->phy_sim_pdsch_llr;
 
-        TBS                  = dlsch0->dlsch_config.TBS;//rel15->TBSize[0];
+        TBS                  = dlsch0->dlsch_config.TBS;
         uint16_t length_dmrs = get_num_dmrs(dlsch0->dlsch_config.dlDmrsSymbPos);
         uint16_t nb_rb       = dlsch0->dlsch_config.number_rbs;
         uint8_t  nb_re_dmrs  = dlsch0->dlsch_config.dmrsConfigType == NFAPI_NR_DMRS_TYPE1 ? 6*dlsch0->dlsch_config.n_dmrs_cdm_groups : 4*dlsch0->dlsch_config.n_dmrs_cdm_groups;
         uint8_t  mod_order   = dlsch0->dlsch_config.qamModOrder;
         uint8_t  nb_symb_sch = dlsch0->dlsch_config.number_symbols;
         uint32_t unav_res = ptrsSymbPerSlot * ptrsRePerSymb;
-        available_bits = nr_get_G(nb_rb, nb_symb_sch, nb_re_dmrs, length_dmrs, unav_res, mod_order, rel15->nrOfLayers);
+        available_bits = nr_get_G(nb_rb, nb_symb_sch, nb_re_dmrs, length_dmrs, unav_res, mod_order, pdsch_pdu_rel15->nrOfLayers);
         if (pdu_bit_map & 0x1) {
           if (trial == 0 && round == 0) {
-            printf("[DLSIM][PTRS] Available bits are: %5u, removed PTRS bits are: %5u \n", available_bits, (ptrsSymbPerSlot * ptrsRePerSymb * rel15->nrOfLayers * mod_order));
+            printf("[DLSIM][PTRS] Available bits are: %5u, removed PTRS bits are: %5u \n", available_bits, (ptrsSymbPerSlot * ptrsRePerSymb * pdsch_pdu_rel15->nrOfLayers * mod_order));
           }
         }
 
         for (i = 0; i < available_bits; i++) {
-          const uint8_t current_bit = (gNB_dlsch->harq_process.f[i / 8] & (1 << (i & 7))) >> (i & 7);
+          const uint8_t current_bit = (gNB_dlsch->f[i / 8] & (1 << (i & 7))) >> (i & 7);
           if (((current_bit == 0) && (UE_llr[i] <= 0)) || ((current_bit == 1) && (UE_llr[i] >= 0))) {
             if (errors_scrambling[round] == 0) {
               LOG_D(PHY,"First bit in error in unscrambling = %d\n",i);
@@ -1270,13 +1255,13 @@ int main(int argc, char **argv)
       } // round
 
       if (test_input_bit == NULL) {
-        test_input_bit = (unsigned char *)malloc16(8 * rel15->TBSize[0]);
-        estimated_output_bit = (unsigned char *)malloc16(8 * rel15->TBSize[0]);
+        test_input_bit = (unsigned char *)malloc16(8 * pdsch_pdu_rel15->TBSize[0]);
+        estimated_output_bit = (unsigned char *)malloc16(8 * pdsch_pdu_rel15->TBSize[0]);
       }
       for (i = 0; i < TBS; i++) {
 
 	estimated_output_bit[i] = (UE->phy_sim_dlsch_b[i/8] & (1 << (i & 7))) >> (i & 7);
-	test_input_bit[i]       = (gNB_dlsch->harq_process.b[i / 8] & (1 << (i & 7))) >> (i & 7); // Further correct for multiple segments
+	test_input_bit[i]       = (gNB_dlsch->b[i / 8] & (1 << (i & 7))) >> (i & 7); // Further correct for multiple segments
 	
 	if (estimated_output_bit[i] != test_input_bit[i]) {
 	  if(errors_bit == 0)
@@ -1320,7 +1305,7 @@ int main(int argc, char **argv)
     printf("), Channel BER (%e", berStats[0]);
     for (int r = 1; r < num_rounds; r++)
       printf(",%e", berStats[r]);
-    printf(") Avg round %.2f, Eff Rate %.4f bits/slot, Eff Throughput %.2f, TBS %u bits/slot\n", roundStats, effRate, effRate / (8 * rel15->TBSize[0]) * 100, 8 * rel15->TBSize[0]);
+    printf(") Avg round %.2f, Eff Rate %.4f bits/slot, Eff Throughput %.2f, TBS %u bits/slot\n", roundStats, effRate, effRate / (8 * pdsch_pdu_rel15->TBSize[0]) * 100, 8 * pdsch_pdu_rel15->TBSize[0]);
     printf("*****************************************\n");
     printf("\n");
     // writing to csv file
@@ -1328,7 +1313,7 @@ int main(int argc, char **argv)
       fprintf(csv_file,"%f,%d/%d,",SNR,n_false_positive,n_trials);
       for (int r = 0; r < num_rounds; r++)
         fprintf(csv_file,"%d/%d,%u/%u,%f,%e,",n_errors[r], round_trials[r], errors_scrambling[r], available_bits * round_trials[r],blerStats[r],berStats[r]);
-      fprintf(csv_file,"%.2f,%.4f,%.2f,%u\n", roundStats, effRate, effRate / (8 * rel15->TBSize[0]) * 100, 8 * rel15->TBSize[0]);
+      fprintf(csv_file,"%.2f,%.4f,%.2f,%u\n", roundStats, effRate, effRate / (8 * pdsch_pdu_rel15->TBSize[0]) * 100, 8 * pdsch_pdu_rel15->TBSize[0]);
     }
     if (print_perf==1) {
       printf("\ngNB TX function statistics (per %d us slot, NPRB %d, mcs %d, C %d, block %d)\n",
@@ -1336,7 +1321,7 @@ int main(int argc, char **argv)
              g_rbSize,
              g_mcsIndex,
              UE->dl_harq_processes[0][slot].C,
-             8 * rel15->TBSize[0]);
+             8 * pdsch_pdu_rel15->TBSize[0]);
       printDistribution(&gNB->phy_proc_tx,table_tx,"PHY proc tx");
       printStatIndent2(&gNB->dci_generation_stats, "DCI encoding time");
       printStatIndent2(&gNB->dlsch_encoding_stats,"DLSCH encoding time");
@@ -1378,8 +1363,8 @@ int main(int argc, char **argv)
       const uint32_t numReSym = (g_rbSize * 12 + 15) & (~15);
       for (int l = 0; l < g_nrOfLayers; l++) {
         for (int r = 0; r < n_rx; r++) {
-          const int s = rel15->StartSymbolIndex;
-          const int n = rel15->NrOfSymbols;
+          const int s = pdsch_pdu_rel15->StartSymbolIndex;
+          const int n = pdsch_pdu_rel15->NrOfSymbols;
           for (int i = s; i < s + n; i++) {
             const uint32_t dmrsBitMap = phy_data.dlsch[0].dlsch_config.dlDmrsSymbPos;
             const uint32_t dmrsCfg = phy_data.dlsch[0].dlsch_config.dmrsConfigType;
@@ -1415,7 +1400,7 @@ int main(int argc, char **argv)
       break;
     }
 
-    if (effRate >= (eff_tp_check * 8 * rel15->TBSize[0])) {
+    if (effRate >= (eff_tp_check * 8 * pdsch_pdu_rel15->TBSize[0])) {
       printf("PDSCH test OK\n");
       ret = 0;
       break;

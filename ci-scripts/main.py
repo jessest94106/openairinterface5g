@@ -214,7 +214,7 @@ def ExecuteActionWithParam(action, ctx, node):
 		core_op = getattr(cls_oaicitest.OaiCiTest, action)
 		success = core_op(cn_id, ctx, HTML)
 
-	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace":
+	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace" or action == "Stop_Object":
 		CONTAINERS.yamlPath = test.findtext('yaml_path')
 		string_field=test.findtext('d_retx_th')
 		if (string_field is not None):
@@ -227,6 +227,8 @@ def ExecuteActionWithParam(action, ctx, node):
 		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
 		if action == 'Deploy_Object':
 			success = CONTAINERS.DeployObject(ctx, node, HTML)
+		elif action == 'Stop_Object':
+			success = CONTAINERS.StopObject(ctx, node, HTML)
 		elif action == 'Undeploy_Object':
 			success = CONTAINERS.UndeployObject(ctx, node, HTML, RAN)
 		elif action == 'Create_Workspace':
