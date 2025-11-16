@@ -1785,14 +1785,14 @@ void request_pdusession(nr_ue_nas_t *nas, int pdusession_id)
   itti_send_msg_to_task(TASK_NAS_NRUE, nas->UE_id, message_p);
 }
 
-static int get_user_nssai_idx(const nr_nas_msg_snssai_t allowed_nssai[NAS_MAX_NUMBER_SLICES], const nr_ue_nas_t *nas)
+static int get_user_nssai_idx(nssai_t ch_nssai, const nr_nas_msg_snssai_t allowed_nssai[NAS_MAX_NUMBER_SLICES])
 {
   for (int i = 0; i < NAS_MAX_NUMBER_SLICES; i++) {
     const nr_nas_msg_snssai_t *nssai = allowed_nssai + i;
     /* If it was received in Registration Accept, check the SD
        in the stored Allowed N-SSAI, else, consider the SD valid */
-    bool sd_match = !nssai->sd || (nas->uicc->nssai_sd == *nssai->sd);
-    if ((nas->uicc->nssai_sst == nssai->sst) && sd_match)
+    bool sd_match = !nssai->sd || (ch_nssai.sd == *nssai->sd);
+    if ((ch_nssai.sst == nssai->sst) && sd_match)
       return i;
   }
   return -1;
@@ -1867,7 +1867,8 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
     send_nas_uplink_data_req(nas, &initialNasMsg);
     LOG_I(NAS, "Send NAS_UPLINK_DATA_REQ message(RegistrationComplete)\n");
   }
-  if (get_user_nssai_idx(msg.nas_allowed_nssai, nas) < 0) {
+  nssai_t ch_nssai = {nas->uicc->nssai_sst, nas->uicc->nssai_sd};
+  if (get_user_nssai_idx(ch_nssai, msg.nas_allowed_nssai) < 0) {
     LOG_E(NAS, "NSSAI parameters not match with allowed NSSAI. Couldn't request PDU session.\n");
   } else {
     request_pdusession(nas, get_softmodem_params()->default_pdu_session_id);
