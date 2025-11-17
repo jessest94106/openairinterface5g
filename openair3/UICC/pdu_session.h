@@ -31,6 +31,6 @@ typedef struct {
   char *dnn; // [103]?
 } pdu_session_config_t;
 
-int get_pdu_session_configs(int module_id, pdu_session_config_t *configs, int max_len);
+int get_pdu_session_configs(const char *uiccName, pdu_session_config_t *configs, int max_len);
 
 #endif /* PDU_SESSION_H_ */

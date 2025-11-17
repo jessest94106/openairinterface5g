@@ -1773,8 +1773,9 @@ static void send_nas_5gmm_ind(instance_t instance, const Guti5GSMobileIdentity_t
   itti_send_msg_to_task(TASK_RRC_NRUE, instance, msg);
 }
 
-void request_pdusession(nr_ue_nas_t *nas, int pdusession_id, int t, nssai_t nssai, const char *dnn)
+void request_pdusession(nr_ue_nas_t *nas, const pdu_session_config_t *pdu)
 {
+  int t = pdu->type;
   AssertFatal(t == PDU_SESSION_TYPE_IPV4 || t == PDU_SESSION_TYPE_IPV6 || t == PDU_SESSION_TYPE_IPV4V6
                   || t == PDU_SESSION_TYPE_UNSTRUCT || t == PDU_SESSION_TYPE_ETHER,
               "illegal PDU session type %d\n",
@@ -1782,12 +1783,12 @@ void request_pdusession(nr_ue_nas_t *nas, int pdusession_id, int t, nssai_t nssa
   AssertFatal(t != PDU_SESSION_TYPE_UNSTRUCT, "unstructured PDU sessions not handled yet\n");
   MessageDef *message_p = itti_alloc_new_message(TASK_NAS_NRUE, nas->UE_id, NAS_PDU_SESSION_REQ);
   nas_pdu_session_req_t *pdu_req = &NAS_PDU_SESSION_REQ(message_p);
-  pdu_req->pdusession_id = pdusession_id;
+  pdu_req->pdusession_id = pdu->id;
   // 24.501: joint PDU session type IEI (0x9-, Table 8.3.1.1.1) and type (9.11.4.11)
   pdu_req->pdusession_type = 0x90 | t;
-  pdu_req->sst = nssai.sst;
-  pdu_req->sd = nssai.sd;
-  snprintf(pdu_req->dnn, sizeof(pdu_req->dnn), "%s", dnn);
+  pdu_req->sst = pdu->nssai.sst;
+  pdu_req->sd = pdu->nssai.sd;
+  snprintf(pdu_req->dnn, sizeof(pdu_req->dnn), "%s", pdu->dnn);
   itti_send_msg_to_task(TASK_NAS_NRUE, nas->UE_id, message_p);
 }
 
@@ -1873,14 +1874,18 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
     send_nas_uplink_data_req(nas, &initialNasMsg);
     LOG_I(NAS, "Send NAS_UPLINK_DATA_REQ message(RegistrationComplete)\n");
   }
-  nssai_t ch_nssai = {nas->uicc->nssai_sst, nas->uicc->nssai_sd};
-  if (get_user_nssai_idx(ch_nssai, msg.nas_allowed_nssai) < 0) {
-    LOG_E(NAS, "NSSAI parameters not match with allowed NSSAI. Couldn't request PDU session.\n");
-  } else {
-    nssai_t nssai = {nas->uicc->nssai_sst, nas->uicc->nssai_sd};
-    request_pdusession(nas, get_softmodem_params()->default_pdu_session_id, PDU_SESSION_TYPE_IPV4, nssai, nas->uicc->dnnStr);
-    if (get_nrUE_params()->extra_pdu_id != -1) {
-      request_pdusession(nas, get_nrUE_params()->extra_pdu_id, PDU_SESSION_TYPE_IPV4, nssai, nas->uicc->dnnStr);
+  if (nas->uicc->n_pdu_sessions == 0)
+    LOG_W(SIM, "no PDU sessions to request configured\n");
+  for (const pdu_session_config_t *pdu = nas->uicc->pdu_sessions; pdu < nas->uicc->pdu_sessions + nas->uicc->n_pdu_sessions; ++pdu) {
+    if (get_user_nssai_idx(pdu->nssai, msg.nas_allowed_nssai) < 0) {
+      LOG_E(NAS,
+            "PDU session ID %d NSSAI %d.%d: mismatch for allowed NSSAI. Couldn't request PDU session.\n",
+            pdu->id,
+            pdu->nssai.sst,
+            pdu->nssai.sd);
+    } else {
+      LOG_I(NAS, "requested PDU session ID %d type %d NSSAI %d.%d DNN %s\n", pdu->id, pdu->type, pdu->nssai.sst, pdu->nssai.sd, pdu->dnn);
+      request_pdusession(nas, pdu);
     }
   }
   // Free local message after processing

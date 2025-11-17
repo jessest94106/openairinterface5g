@@ -82,7 +82,7 @@ static int config_check_dnn(configmodule_interface_t *cfg, paramdef_t *param)
   return 0;
 }
 
-int get_pdu_session_configs(int module_id, pdu_session_config_t *configs, int max_len)
+int get_pdu_session_configs(const char *uiccName, pdu_session_config_t *configs, int max_len)
 {
   paramdef_t pdu_sess_params[] = PDU_SESS_PARAMS_DESC;
   const int npsp = sizeofArray(pdu_sess_params);
@@ -92,7 +92,7 @@ int get_pdu_session_configs(int module_id, pdu_session_config_t *configs, int ma
                 "param_def_t array and corresponding checkedparam_t array should have the same size");
   for (int i = 0; i < sizeofArray(pdu_sess_params); ++i)
     pdu_sess_params[i].chkPptr = &pdu_sess_params_check[i];
-  int ret = config_getlist(config_get_if(), &pdu_sess_list, pdu_sess_params, sizeofArray(pdu_sess_params), NULL);
+  int ret = config_getlist(config_get_if(), &pdu_sess_list, pdu_sess_params, sizeofArray(pdu_sess_params), uiccName);
   if (ret < 0) {
     // couldn't load configuration from pdu_sessions, caller has to handle
     return -1;
