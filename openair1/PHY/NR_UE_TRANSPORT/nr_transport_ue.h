@@ -154,6 +154,8 @@ typedef struct {
   uint16_t E_uci_ACK_rvd; // number of coded HARQ-ACK bits reserved
   uint16_t Q_dash_CSI1; // number of coded CSI part 1 symbols
   uint16_t E_uci_CSI1; // number of coded CSI part 1 bits
+  uint16_t Q_dash_CSI2; // number of coded CSI part 2 symbols
+  uint16_t E_uci_CSI2; // number of coded CSI part 2 bits
   uint32_t G_ulsch; // bit capacity of ULSCH
 } rate_match_info_uci_t;
 
