@@ -32,7 +32,7 @@ pusch.DMRS.SequenceHopping = 0;
 
 pusch.BetaOffsetACK = 20;
 pusch.BetaOffsetCSI1 = 6.25;
-pusch.BetaOffsetCSI2 = 1;
+pusch.BetaOffsetCSI2 = 6.25;
 pusch.UCIScaling = 1;
 
 A = 37896;
@@ -43,7 +43,7 @@ nlayers = pusch.NumLayers; % Number of layers for decoding
 
 oack = 3;
 ocsi1 = 4;
-ocsi2 = 0;
+ocsi2 = 4;
 cbsInfo = nrULSCHInfo(pusch, rate, A, oack, ocsi1, ocsi2); % Get ULSCH information
 
 ack = randi([0 1],oack,1);
@@ -51,7 +51,7 @@ csi1 = randi([0 1],ocsi1,1);
 csi2 = randi([0 1],ocsi2,1);
 cack = nrUCIEncode(ack,cbsInfo.GACK,pusch.Modulation);
 ccsi1 = nrUCIEncode(csi1,cbsInfo.GCSI1,pusch.Modulation);
-ccsi2 = [];
+ccsi2 = nrUCIEncode(csi2,cbsInfo.GCSI2,pusch.Modulation);
 
 tb_data = randi([0 1],A,1);
 % Transport block CRC attachment
