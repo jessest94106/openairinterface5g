@@ -3726,8 +3726,8 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
   // type0-pdcch search space
   float big_o = 0.0f;
   float big_m = 0.0f;
-  type0_PDCCH_CSS_config->sfn_c = -1;   //  only valid for mux=1
-  type0_PDCCH_CSS_config->n_c = UINT_MAX;
+  type0_PDCCH_CSS_config->sfn_c = 0; //  only valid for mux=1
+  type0_PDCCH_CSS_config->slot = UINT_MAX;
   type0_PDCCH_CSS_config->first_symbol_index = UINT_MAX;
   type0_PDCCH_CSS_config->search_space_duration = 0;  //  element of search space
   //  38.213 table 10.1-1
@@ -3738,9 +3738,9 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     big_o = table_38213_13_11_c1[index_4lsb];
     big_m = table_38213_13_11_c3[index_4lsb];
 
-    uint32_t temp = (uint32_t)(big_o*(1<<scs_pdcch)) + (uint32_t)(type0_PDCCH_CSS_config->ssb_index*big_m);
-    type0_PDCCH_CSS_config->n_c = temp / num_slot_per_frame;
-    type0_PDCCH_CSS_config->sfn_c = type0_PDCCH_CSS_config->n_c % 2;
+    uint32_t temp = (uint32_t)(big_o * (1 << scs_pdcch)) + (uint32_t)(type0_PDCCH_CSS_config->ssb_index * big_m);
+    type0_PDCCH_CSS_config->slot = temp % num_slot_per_frame;
+    type0_PDCCH_CSS_config->sfn_c = (temp / num_slot_per_frame) % 2;
 
     if((index_4lsb == 1 || index_4lsb == 3 || index_4lsb == 5 || index_4lsb == 7) && (type0_PDCCH_CSS_config->ssb_index&1)){
       type0_PDCCH_CSS_config->first_symbol_index = type0_PDCCH_CSS_config->num_symbols;
@@ -3757,9 +3757,9 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     big_o = table_38213_13_12_c1[index_4lsb];
     big_m = table_38213_13_12_c3[index_4lsb];
 
-    uint32_t temp = (uint32_t)(big_o*(1<<scs_pdcch)) + (uint32_t)(type0_PDCCH_CSS_config->ssb_index*big_m);
-    type0_PDCCH_CSS_config->n_c = temp / num_slot_per_frame;
-    type0_PDCCH_CSS_config->sfn_c = type0_PDCCH_CSS_config->n_c % 2;
+    uint32_t temp = (uint32_t)(big_o * (1 << scs_pdcch)) + (uint32_t)(type0_PDCCH_CSS_config->ssb_index * big_m);
+    type0_PDCCH_CSS_config->slot = temp % num_slot_per_frame;
+    type0_PDCCH_CSS_config->sfn_c = (temp / num_slot_per_frame) % 2;
 
     if((index_4lsb == 1 || index_4lsb == 3 || index_4lsb == 5 || index_4lsb == 10) && (type0_PDCCH_CSS_config->ssb_index&1)){
       type0_PDCCH_CSS_config->first_symbol_index = 7;
@@ -3782,7 +3782,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
       AssertFatal(index_4lsb == 0, "38.213 Table 13-13 4 LSB out of range\n");
       //  PDCCH monitoring occasions (SFN and slot number) same as SSB frame-slot
       //                sfn_c = SFN_C_EQ_SFN_SSB;
-      type0_PDCCH_CSS_config->n_c = ssb_slot;
+      type0_PDCCH_CSS_config->slot = ssb_slot;
       switch(type0_PDCCH_CSS_config->ssb_index & 0x3){    //  ssb_index(i) mod 4
         case 0:
           type0_PDCCH_CSS_config->first_symbol_index = 0;
@@ -3804,7 +3804,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
       AssertFatal(index_4lsb == 0, "38.213 Table 13-14 4 LSB out of range\n");
       //  PDCCH monitoring occasions (SFN and slot number) same as SSB frame-slot
       //                sfn_c = SFN_C_EQ_SFN_SSB;
-      type0_PDCCH_CSS_config->n_c = ssb_slot;
+      type0_PDCCH_CSS_config->slot = ssb_slot;
       switch(type0_PDCCH_CSS_config->ssb_index & 0x7){    //  ssb_index(i) mod 8
         case 0:
           type0_PDCCH_CSS_config->first_symbol_index = 0;
@@ -3820,11 +3820,11 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
           break;
         case 4:
           type0_PDCCH_CSS_config->first_symbol_index = 12;
-          type0_PDCCH_CSS_config->n_c = ssb_slot - 1;
+          type0_PDCCH_CSS_config->slot = ssb_slot - 1;
           break;
         case 5:
           type0_PDCCH_CSS_config->first_symbol_index = 13;
-          type0_PDCCH_CSS_config->n_c = ssb_slot - 1;
+          type0_PDCCH_CSS_config->slot = ssb_slot - 1;
           break;
         case 6:
           type0_PDCCH_CSS_config->first_symbol_index = 0;
@@ -3848,7 +3848,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
       AssertFatal(index_4lsb == 0, "38.213 Table 13-15 4 LSB out of range\n");
       //  PDCCH monitoring occasions (SFN and slot number) same as SSB frame-slot
       //                sfn_c = SFN_C_EQ_SFN_SSB;
-      type0_PDCCH_CSS_config->n_c = ssb_slot;
+      type0_PDCCH_CSS_config->slot = ssb_slot;
       switch(type0_PDCCH_CSS_config->ssb_index & 0x3){    //  ssb_index(i) mod 4
         case 0:
           type0_PDCCH_CSS_config->first_symbol_index = 4;
@@ -3870,11 +3870,8 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
     // SSB periodicity in slots
     type0_PDCCH_CSS_config->search_space_frame_period = ssb_period * slots_per_frame;
   }
+  AssertFatal(type0_PDCCH_CSS_config->slot != UINT_MAX, "type0_PDCCH_CSS_config slot not configured");
 
-  AssertFatal(type0_PDCCH_CSS_config->sfn_c >= 0, "");
-  AssertFatal(type0_PDCCH_CSS_config->n_c != UINT_MAX, "");
-
-  type0_PDCCH_CSS_config->n_0 = ((uint32_t)(big_o*(1<<scs_pdcch)) + (uint32_t)(type0_PDCCH_CSS_config->ssb_index*big_m))%num_slot_per_frame;
   type0_PDCCH_CSS_config->cset_start_rb = ssb_offset_point_a - type0_PDCCH_CSS_config->rb_offset;
   AssertFatal(type0_PDCCH_CSS_config->cset_start_rb >= 0, "Invalid CSET0 start PRB %d SSB offset point A %d RB offset %d\n",
               type0_PDCCH_CSS_config->cset_start_rb, ssb_offset_point_a, type0_PDCCH_CSS_config->rb_offset);
@@ -3950,8 +3947,8 @@ void fill_searchSpaceZero(NR_SearchSpace_t *ss0, int slots_per_frame, NR_Type0_P
 
   const uint32_t periodicity = type0_PDCCH_CSS_config->search_space_frame_period;
   const uint32_t offset = type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern == 1 ?
-                          type0_PDCCH_CSS_config->n_0 + (slots_per_frame * type0_PDCCH_CSS_config->sfn_c) :
-                          type0_PDCCH_CSS_config->n_c;
+                          type0_PDCCH_CSS_config->slot + (slots_per_frame * type0_PDCCH_CSS_config->sfn_c) :
+                          type0_PDCCH_CSS_config->slot;
 
   ss0->searchSpaceId = 0;
   *ss0->controlResourceSetId = 0;

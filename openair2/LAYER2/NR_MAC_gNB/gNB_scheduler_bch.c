@@ -85,7 +85,7 @@ static void schedule_ssb(frame_t frame,
   dl_config_pdu->ssb_pdu.ssb_pdu_rel15.precoding_and_beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = beam_index;
   dl_req->nPDUs++;
 
-  LOG_D(MAC,"Scheduling ssb %d at frame %d and slot %d\n", i_ssb, frame, slot);
+  LOG_D(NR_MAC,"Scheduling ssb %d at frame %d and slot %d\n", i_ssb, frame, slot);
 }
 
 static void fill_ssb_vrb_map(NR_COMMON_channels_t *cc,
@@ -521,6 +521,19 @@ static bool check_sib1_tda(gNB_MAC_INST *gNB_mac,
   }
 }
 
+static bool check_frame_sib1(NR_ServingCellConfigCommon_t *scc, NR_Type0_PDCCH_CSS_config_t *type0, int frame)
+{
+  if (type0->type0_pdcch_ss_mux_pattern == 1)
+    return frame % 2 == type0->sfn_c;
+  else {
+    long ssb_period = *scc->ssb_periodicityServingCell;
+    int ssb_frame_periodicity = 1;  // every how many frames SSB are generated
+    if (ssb_period > 1) // 0 is every half frame
+      ssb_frame_periodicity = 1 << (ssb_period -1);
+    return frame % ssb_frame_periodicity == 0;
+  }
+}
+
 void schedule_nr_sib1(module_id_t module_idP,
                       frame_t frameP,
                       slot_t slotP,
@@ -553,13 +566,14 @@ void schedule_nr_sib1(module_id_t module_idP,
 
     NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = &gNB_mac->type0_PDCCH_CSS_config[i];
 
-    if((frameP % 2 == type0_PDCCH_CSS_config->sfn_c) &&
-       (slotP == type0_PDCCH_CSS_config->n_0) &&
+    if(check_frame_sib1(scc, type0_PDCCH_CSS_config, frameP) &&
+       (slotP == type0_PDCCH_CSS_config->slot) &&
        (type0_PDCCH_CSS_config->num_rbs > 0) &&
        (type0_PDCCH_CSS_config->active == true)) {
 
       AssertFatal(is_dl_slot(slotP, &gNB_mac->frame_structure),
-                  "Trying to schedule SIB1 in slot %d which is not DL. Check searchSpaceZero configuration.\n",
+                  "Trying to schedule SIB1 for SSB %d in slot %d which is not DL. Check searchSpaceZero configuration.\n",
+                  type0_PDCCH_CSS_config->ssb_index,
                   slotP);
       const int n_slots_frame = gNB_mac->frame_structure.numb_slots_frame;
       int beam_index = get_beam_from_ssbidx(gNB_mac, i);
