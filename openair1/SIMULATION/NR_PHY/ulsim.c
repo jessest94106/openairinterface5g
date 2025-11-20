@@ -257,15 +257,15 @@ static void prepare_ue_pusch_pdu_from_matlab_vector(const bool uci_on_pusch,
   p_vec_bits += var.A;
   copy_bytes_to_packed_bits(p_vec_bits, var.oack, false, pb);
 
-  pusch_config_pdu->pusch_uci.csi_part1_bit_length = var.ocsi1;
-  pb = (uint8_t *)&pusch_config_pdu->pusch_uci.csi_part1_payload;
-  memset(pb, 0, sizeof(pusch_config_pdu->pusch_uci.csi_part1_payload));
+  pusch_config_pdu->pusch_uci.csi_payload.p1_bits = var.ocsi1;
+  pb = (uint8_t *)&pusch_config_pdu->pusch_uci.csi_payload.part1_payload;
+  memset(pb, 0, sizeof(pusch_config_pdu->pusch_uci.csi_payload.part1_payload));
   p_vec_bits += var.oack;
   copy_bytes_to_packed_bits(p_vec_bits, var.ocsi1, false, pb);
 
-  pusch_config_pdu->pusch_uci.csi_part2_bit_length = var.ocsi2;
-  pb = (uint8_t *)&pusch_config_pdu->pusch_uci.csi_part2_payload;
-  memset(pb, 0, sizeof(pusch_config_pdu->pusch_uci.csi_part2_payload));
+  pusch_config_pdu->pusch_uci.csi_payload.p2_bits = var.ocsi2;
+  pb = (uint8_t *)&pusch_config_pdu->pusch_uci.csi_payload.part2_payload;
+  memset(pb, 0, sizeof(pusch_config_pdu->pusch_uci.csi_payload.part2_payload));
   p_vec_bits += var.ocsi1;
   copy_bytes_to_packed_bits(p_vec_bits, var.ocsi2, false, pb);
 }
@@ -1342,16 +1342,14 @@ int main(int argc, char *argv[])
           pusch_config_pdu->num_dmrs_cdm_grps_no_data = num_dmrs_cdm_grps_no_data;
         }
         if (uci_on_pusch) {
-          const nfapi_nr_ue_pusch_uci_t pusch_uci = {.alpha_scaling = 3,
-                                                     .beta_offset_csi1 = 13,
-                                                     .beta_offset_csi2 = 13,
-                                                     .beta_offset_harq_ack = 11,
-                                                     .harq_ack_bit_length = 3,
-                                                     .harq_payload = 3,
-                                                     .csi_part1_bit_length = 4,
-                                                     .csi_part1_payload = 15,
-                                                     .csi_part2_bit_length = 4,
-                                                     .csi_part2_payload = 15};
+          const nfapi_nr_ue_pusch_uci_t pusch_uci = {
+              .alpha_scaling = 3,
+              .beta_offset_csi1 = 13,
+              .beta_offset_csi2 = 13,
+              .beta_offset_harq_ack = 11,
+              .harq_ack_bit_length = 3,
+              .harq_payload = 3,
+              .csi_payload = {.p1_bits = 4, .part1_payload = 15, .p2_bits = 4, .part2_payload = 15}};
           pusch_config_pdu->pusch_uci = pusch_uci;
           prepare_ue_pusch_pdu_from_matlab_vector(uci_on_pusch, uci_ulsch_matlab_vec, pusch_config_pdu, cw_buf);
         }

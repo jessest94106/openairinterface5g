@@ -124,7 +124,7 @@ void release_mac_configuration(NR_UE_MAC_INST_t *mac,
 void nr_ue_ul_scheduler(NR_UE_MAC_INST_t *mac, nr_uplink_indication_t *ul_info);
 void nr_ue_dl_scheduler(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info);
 
-csi_payload_t nr_ue_aperiodic_csi_reporting(NR_UE_MAC_INST_t *mac, dci_field_t csi_request, int tda, long *K2);
+nfapi_nr_ue_csi_payload_t nr_ue_aperiodic_csi_reporting(NR_UE_MAC_INST_t *mac, dci_field_t csi_request, int tda, long *K2);
 
 nr_dci_format_t nr_ue_process_dci_indication_pdu(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, fapi_nr_dci_indication_pdu_t *dci);
 
@@ -139,7 +139,7 @@ bool trigger_periodic_scheduling_request(NR_UE_MAC_INST_t *mac,
 
 int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sched_t *pucch);
 
-csi_payload_t nr_get_csi_payload(NR_UE_MAC_INST_t *mac,
+nfapi_nr_ue_csi_payload_t nr_get_csi_payload(NR_UE_MAC_INST_t *mac,
                                  int csi_report_id,
                                  CSI_mapping_t mapping_type,
                                  const NR_CSI_MeasConfig_t *csi_MeasConfig);
@@ -330,7 +330,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
                         NR_tda_info_t *tda_info,
                         nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu,
                         dci_pdu_rel15_t *dci,
-                        csi_payload_t *csi_report,
+                        nfapi_nr_ue_csi_payload_t *csi_report,
                         RAR_grant_t *rar_grant,
                         rnti_t rnti,
                         int ss_type,

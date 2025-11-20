@@ -353,7 +353,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
                         NR_tda_info_t *tda_info,
                         nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu,
                         dci_pdu_rel15_t *dci,
-                        csi_payload_t *csi_report,
+                        nfapi_nr_ue_csi_payload_t *csi_report,
                         RAR_grant_t *rar_grant,
                         rnti_t rnti,
                         int ss_type,
@@ -534,10 +534,7 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
     pusch_config_pdu->ulsch_indicator = dci->ulsch_indicator;
     if (dci->csi_request.nbits > 0 && dci->csi_request.val > 0) {
       AssertFatal(csi_report, "CSI report needs to be present in case of CSI request\n");
-      pusch_config_pdu->pusch_uci.csi_part1_bit_length = csi_report->p1_bits;
-      pusch_config_pdu->pusch_uci.csi_part1_payload = csi_report->part1_payload;
-      pusch_config_pdu->pusch_uci.csi_part2_bit_length = csi_report->p2_bits;
-      pusch_config_pdu->pusch_uci.csi_part2_payload = csi_report->part2_payload;
+      pusch_config_pdu->pusch_uci.csi_payload = *csi_report;
       AssertFatal(pusch_Config && pusch_Config->uci_OnPUSCH, "UCI on PUSCH need to be configured\n");
       NR_UCI_OnPUSCH_t *onPusch = pusch_Config->uci_OnPUSCH->choice.setup;
       AssertFatal(onPusch &&
@@ -546,17 +543,17 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
                   "Only semistatic beta offset is supported\n");
       NR_BetaOffsets_t *beta_offsets = onPusch->betaOffsets->choice.semiStatic;
 
-      pusch_config_pdu->pusch_uci.beta_offset_csi1 = pusch_config_pdu->pusch_uci.csi_part1_bit_length < 12 ?
+      pusch_config_pdu->pusch_uci.beta_offset_csi1 = pusch_config_pdu->pusch_uci.csi_payload.p1_bits < 12 ?
                                                      *beta_offsets->betaOffsetCSI_Part1_Index1 :
                                                      *beta_offsets->betaOffsetCSI_Part1_Index2;
-      pusch_config_pdu->pusch_uci.beta_offset_csi2 = pusch_config_pdu->pusch_uci.csi_part2_bit_length < 12 ?
+      pusch_config_pdu->pusch_uci.beta_offset_csi2 = pusch_config_pdu->pusch_uci.csi_payload.p2_bits < 12 ?
                                                      *beta_offsets->betaOffsetCSI_Part2_Index1 :
                                                      *beta_offsets->betaOffsetCSI_Part2_Index2;
       pusch_config_pdu->pusch_uci.alpha_scaling = onPusch->scaling;
     }
     else {
-      pusch_config_pdu->pusch_uci.csi_part1_bit_length = 0;
-      pusch_config_pdu->pusch_uci.csi_part2_bit_length = 0;
+      pusch_config_pdu->pusch_uci.csi_payload.p1_bits = 0;
+      pusch_config_pdu->pusch_uci.csi_payload.p2_bits = 0;
     }
 
     pusch_config_pdu->pusch_uci.harq_ack_bit_length = 0;
@@ -864,13 +861,13 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
   return 0;
 }
 
-csi_payload_t nr_ue_aperiodic_csi_reporting(NR_UE_MAC_INST_t *mac, dci_field_t csi_request, int tda, long *k2)
+nfapi_nr_ue_csi_payload_t nr_ue_aperiodic_csi_reporting(NR_UE_MAC_INST_t *mac, dci_field_t csi_request, int tda, long *k2)
 {
   NR_CSI_AperiodicTriggerStateList_t *aperiodicTriggerStateList = mac->sc_info.aperiodicTriggerStateList;
   AssertFatal(aperiodicTriggerStateList, "Received CSI request via DCI but aperiodicTriggerStateList is not present\n");
   int n_states = aperiodicTriggerStateList->list.count;
   int n_ts = csi_request.nbits;
-  csi_payload_t csi = {0};
+  nfapi_nr_ue_csi_payload_t csi = {0};
   AssertFatal(n_states <= ((1 << n_ts) - 1), "Case of subselection indication of trigger states not supported yet\n");
   int num_trig = 0;
   for (int i = 0; i < n_ts; i++) {
@@ -1791,9 +1788,9 @@ static bool schedule_uci_on_pusch(NR_UE_MAC_INST_t *mac,
       LOG_E(NR_MAC, "UCI on PUSCH need to be configured to schedule UCI on PUSCH\n");
     }
   }
-  if (pusch_pdu->pusch_uci.csi_part1_bit_length == 0 && pusch_pdu->pusch_uci.csi_part2_bit_length == 0) {
+  if (pusch_pdu->pusch_uci.csi_payload.p1_bits == 0 && pusch_pdu->pusch_uci.csi_payload.p1_bits == 0) {
     // To support this we would need to shift some bits into CSI part2 -> need to change the logic
-    AssertFatal(pucch->n_csi == 0, "Multiplexing periodic CSI on PUSCH not supported\n");
+    AssertFatal(pucch->csi_payload.p1_bits == 0, "Multiplexing periodic CSI on PUSCH not supported\n");
   }
 
   release_ul_config(ulcfg_pdu, false);
@@ -1845,14 +1842,14 @@ static void nr_ue_pucch_scheduler(NR_UE_MAC_INST_t *mac, frame_t frame, int slot
   }
 
   for (int j = 0; j < num_res; j++) {
-    if (pucch[j].n_harq + pucch[j].n_sr + pucch[j].n_csi != 0) {
+    if (pucch[j].n_harq + pucch[j].n_sr + pucch[j].csi_payload.p1_bits != 0) {
       LOG_D(NR_MAC,
             "%d.%d configure pucch, O_ACK %d, O_SR %d, O_CSI %d\n",
             frame,
             slot,
             pucch[j].n_harq,
             pucch[j].n_sr,
-            pucch[j].n_csi);
+            pucch[j].csi_payload.p1_bits);
 
       // checking if we need to schedule pucch[j] on PUSCH
       if (schedule_uci_on_pusch(mac, frame, slot, &pucch[j], mac->current_UL_BWP))

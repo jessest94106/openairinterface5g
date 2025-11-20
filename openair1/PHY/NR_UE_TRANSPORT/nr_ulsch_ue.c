@@ -772,13 +772,13 @@ static rate_match_info_uci_t calc_rate_match_info_uci(const nfapi_nr_ue_pusch_pd
   const double beta_csi1 = get_beta_offset_csi(pusch_pdu->pusch_uci.beta_offset_csi1);
 
   // get the number of coded CSI part 1 symbols and bits, TS 38.212 section 6.3.2.4.1.2
-  const uint16_t ocsi1 = pusch_pdu->pusch_uci.csi_part1_bit_length;
+  const uint16_t ocsi1 = pusch_pdu->pusch_uci.csi_payload.p1_bits;
   rminfo.Q_dash_CSI1 = get_Qd(ocsi1, beta_csi1, alpha, sumKr, s1, s1, rminfo.Q_dash_ACK);
   rminfo.E_uci_CSI1 = rminfo.Q_dash_CSI1 * nlqm;
 
   // get the number of coded CSI part 2 symbols and bits, TS 38.212 section 6.3.2.4.1.3
   const double beta_csi2 = get_beta_offset_csi(pusch_pdu->pusch_uci.beta_offset_csi2);
-  const uint16_t ocsi2 = pusch_pdu->pusch_uci.csi_part2_bit_length;
+  const uint16_t ocsi2 = pusch_pdu->pusch_uci.csi_payload.p2_bits;
   rminfo.Q_dash_CSI2 = get_Qd(ocsi2, beta_csi2, alpha, sumKr, s1, s1, rminfo.Q_dash_ACK + rminfo.Q_dash_CSI1);
   rminfo.E_uci_CSI2 = rminfo.Q_dash_CSI2 * nlqm;
 
@@ -1253,7 +1253,7 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
     return;
   }
 
-  bool uci_present = (pusch_pdu->pusch_uci.harq_ack_bit_length != 0) || (pusch_pdu->pusch_uci.csi_part1_bit_length != 0);
+  bool uci_present = (pusch_pdu->pusch_uci.harq_ack_bit_length != 0) || (pusch_pdu->pusch_uci.csi_payload.p1_bits != 0);
   if (uci_present) {
     rm_info = calc_rate_match_info_uci(pusch_pdu, harq_process_ul_ue, nl_qm, &G[pusch_id]);
   }
@@ -1301,9 +1301,9 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 
   uint64_t b_csi1[16] = {0}; // limit to 1024-bit encoded length
   uint64_t b_csi2[16] = {0}; // limit to 1024-bit encoded length
-  if (pusch_pdu->pusch_uci.csi_part1_bit_length != 0) {
-    nr_uci_encoding(pusch_pdu->pusch_uci.csi_part1_payload,
-                    pusch_pdu->pusch_uci.csi_part1_bit_length,
+  if (pusch_pdu->pusch_uci.csi_payload.p1_bits != 0) {
+    nr_uci_encoding(pusch_pdu->pusch_uci.csi_payload.part1_payload,
+                    pusch_pdu->pusch_uci.csi_payload.p1_bits,
                     pucch_pdu->prb_size,
                     true,
                     rm_info.E_uci_CSI1,
@@ -1313,9 +1313,9 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
     uci_present |= true;
 
     // Process CSI Part 2 if any
-    if (pusch_pdu->pusch_uci.csi_part2_bit_length > 0)
-      nr_uci_encoding(pusch_pdu->pusch_uci.csi_part2_payload,
-                      pusch_pdu->pusch_uci.csi_part2_bit_length,
+    if (pusch_pdu->pusch_uci.csi_payload.p2_bits > 0)
+      nr_uci_encoding(pusch_pdu->pusch_uci.csi_payload.part2_payload,
+                      pusch_pdu->pusch_uci.csi_payload.p2_bits,
                       pucch_pdu->prb_size,
                       true,
                       rm_info.E_uci_CSI2,
@@ -1376,7 +1376,7 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
   /////////////////////////ULSCH scrambling/////////////////////////
 
   uint32_t available_bits;
-  bool is_uci_on_pusch = (pusch_pdu->pusch_uci.harq_ack_bit_length != 0 || pusch_pdu->pusch_uci.csi_part1_bit_length != 0);
+  bool is_uci_on_pusch = (pusch_pdu->pusch_uci.harq_ack_bit_length != 0 || pusch_pdu->pusch_uci.csi_payload.p1_bits != 0);
 
   if (is_uci_on_pusch) {
     // UCI on PUSCH is present, so available bits are the total codeword length
