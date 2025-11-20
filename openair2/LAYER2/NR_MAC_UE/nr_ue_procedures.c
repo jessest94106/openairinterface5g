@@ -2600,7 +2600,12 @@ int compute_csi_priority(NR_UE_MAC_INST_t *mac, NR_CSI_ReportConfig_t *csirep)
   return 2 * Ncells * Ms * y + Ncells * Ms * k + Ms * c + s;
 }
 
-int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCCH_sched_t *pucch)
+int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac,
+                            frame_t frame,
+                            int slot,
+                            nfapi_nr_ue_csi_payload_t *csi_payload,
+                            NR_PUCCH_Resource_t **csi_pucch,
+                            bool csi_on_pusch)
 {
   NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
   NR_PUCCH_Config_t *pucch_Config = current_UL_BWP ? current_UL_BWP->pucch_Config : NULL;
@@ -2642,8 +2647,8 @@ int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCC
       // This CSI Report ID is not associated with current active BWP
       continue;
     }
-    NR_PUCCH_Resource_t *csi_pucch = find_pucch_resource_from_list(pucch_Config->resourceToAddModList, csi_res_id);
-    AssertFatal(csi_pucch != NULL, "Couldn't find PUCCH Resource ID for SR in PUCCH resource list\n");
+    *csi_pucch = find_pucch_resource_from_list(pucch_Config->resourceToAddModList, csi_res_id);
+    AssertFatal(*csi_pucch != NULL, "Couldn't find PUCCH Resource ID for CSI in PUCCH resource list\n");
     LOG_D(NR_MAC, "Preparing CSI report in frame %d slot %d CSI report ID %d\n", frame, slot, csi_report_id);
     int temp_priority = compute_csi_priority(mac, csirep);
     if (num_csi > 0) {
@@ -2654,19 +2659,13 @@ int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCC
         // we discard previous report
         csi_priority = temp_priority;
         num_csi = 1;
-        csi_payload_t csi = nr_get_csi_payload(mac, csi_report_id, WIDEBAND_ON_PUCCH, csi_measconfig);
-        pucch->n_csi = csi.p1_bits;
-        pucch->csi_part1_payload = csi.part1_payload;
-        pucch->pucch_resource = csi_pucch;
+        *csi_payload = nr_get_csi_payload(mac, csi_report_id, csi_on_pusch ? ON_PUSCH : WIDEBAND_ON_PUCCH, csi_measconfig);
       } else
         continue;
     } else {
       num_csi = 1;
       csi_priority = temp_priority;
-      csi_payload_t csi = nr_get_csi_payload(mac, csi_report_id, WIDEBAND_ON_PUCCH, csi_measconfig);
-      pucch->n_csi = csi.p1_bits;
-      pucch->csi_part1_payload = csi.part1_payload;
-      pucch->pucch_resource = csi_pucch;
+      *csi_payload = nr_get_csi_payload(mac, csi_report_id, csi_on_pusch ? ON_PUSCH : WIDEBAND_ON_PUCCH, csi_measconfig);
     }
   }
   return num_csi;
