@@ -791,6 +791,7 @@ int nr_srs_channel_estimation(int ant,
 #endif
 
   const uint64_t subcarrier_offset = first_carrier_offset + srs_pdu->bwp_start * NR_NB_SC_PER_RB;
+  const uint64_t first_subcarrier = (first_carrier_offset - (ofdm_symbol_size >> 1)) + srs_pdu->bwp_start * NR_NB_SC_PER_RB;
 
   const uint8_t N_ap = 1 << srs_pdu->num_ant_ports;
   const uint8_t K_TC = 2 << srs_pdu->comb_size;
@@ -810,20 +811,16 @@ int nr_srs_channel_estimation(int ant,
   for (int srs_symb = 0; srs_symb < N_symb_SRS; srs_symb++) {
     uint16_t srs_symbol_offset = srs_symb * ofdm_symbol_size;
 
-    uint8_t mem_offset =
-        ((16
-          - ((intptr_t)&srs_estimated_channel_freq[srs_symbol_offset + subcarrier_offset + nr_srs_info->k_0_p[p_index][srs_symb]]))
-         & 0xF)
-        >> 2; // >> 2 <=> /sizeof(int32_t)
+    // Additional 4 in the array size is needed to maintain 16 byte memory alignment required for AVX2 instructions in channel
+    // interpolation
+    c16_t srs_est[ofdm_symbol_size + 4] __attribute__((aligned(32)));
+    memset(srs_est, 0, (ofdm_symbol_size + 4) * sizeof(c16_t));
 
-    // filt16_end is {4096,8192,8192,8192,12288,16384,16384,16384,0,0,0,0,0,0,0,0}
-    // The End of OFDM symbol corresponds to the position of last 16384 in the filter
-    // The c16multaddVectRealComplex applies the remaining 8 zeros of filter, therefore, to avoid a buffer overflow,
-    // we added 8 in the array size
-    c16_t srs_est[ofdm_symbol_size + mem_offset + 8] __attribute__((aligned(32)));
+    // Estimate 16 byte memory alignment offset for the first SRS subcarrier to use AVX2 instructions in channel interpolation
+    uint8_t mem_offset = (16 - (((intptr_t)&srs_est[first_subcarrier + nr_srs_info->k_0_p[p_index][srs_symb]]) & 0xF))
+                         >> 2; // >> 2 <=> /sizeof(int32_t)
+
     c16_t ls_estimated = {0};
-
-    memset(srs_est, 0, (ofdm_symbol_size + mem_offset + 8) * sizeof(c16_t));
 
 #ifdef SRS_DEBUG
     LOG_I(NR_PHY, "====================== UE port %d --> gNB Rx antenna %i ======================\n", p_index, ant);
@@ -835,7 +832,8 @@ int nr_srs_channel_estimation(int ant,
       subcarrier -= ofdm_symbol_size;
     }
 
-    c16_t *srs_estimated_channel16 = &srs_est[subcarrier + mem_offset];
+    uint16_t subcarrier_abs = mem_offset + first_subcarrier + nr_srs_info->k_0_p[p_index][srs_symb];
+    c16_t *srs_estimated_channel16 = &srs_est[subcarrier_abs];
 
     for (int k = 0; k < M_sc_b_SRS; k++) {
       if (k % fd_cdm == 0) {
@@ -880,47 +878,33 @@ int nr_srs_channel_estimation(int ant,
             ls_estimated.i);
 #endif
 
-      const uint16_t sc_offset = subcarrier + mem_offset;
-
       // Channel interpolation
       if (srs_pdu->comb_size == 0) {
         if (k == 0) { // First subcarrier case
           // filt8_start is {12288,8192,4096,0,0,0,0,0}
           c16multaddVectRealComplex(filt8_start, &ls_estimated, srs_estimated_channel16, 8);
-        } else if (subcarrier < K_TC) { // Start of OFDM symbol case
-          // filt8_start is {12288,8192,4096,0,0,0,0,0}
-          srs_estimated_channel16 = &srs_est[subcarrier];
-          const short *filter = mem_offset == 0 ? filt8_start : filt8_start_shift2;
-          c16multaddVectRealComplex(filter, &ls_estimated, srs_estimated_channel16, 8);
-        } else if ((subcarrier + K_TC) >= ofdm_symbol_size
-                   || k == (M_sc_b_SRS - 1)) { // End of OFDM symbol or last subcarrier cases
+        } else if (k == (M_sc_b_SRS - 1)) { // End of OFDM symbol or last subcarrier cases
           // filt8_end is {4096,8192,12288,16384,0,0,0,0}
-          const short *filter = mem_offset == 0 || k == (M_sc_b_SRS - 1) ? filt8_end : filt8_end_shift2;
-          c16multaddVectRealComplex(filter, &ls_estimated, srs_estimated_channel16, 8);
+          c16multaddVectRealComplex(filt8_end, &ls_estimated, srs_estimated_channel16, 8);
         } else if (k % 2 == 1) { // 1st middle case
           // filt8_middle2 is {4096,8192,8192,8192,4096,0,0,0}
           c16multaddVectRealComplex(filt8_middle2, &ls_estimated, srs_estimated_channel16, 8);
         } else if (k % 2 == 0) { // 2nd middle case
           // filt8_middle4 is {0,0,4096,8192,8192,8192,4096,0}
           c16multaddVectRealComplex(filt8_middle4, &ls_estimated, srs_estimated_channel16, 8);
-          srs_estimated_channel16 = &srs_est[sc_offset];
+          srs_estimated_channel16 = &srs_est[subcarrier_abs];
         }
       } else {
         if (k == 0) { // First subcarrier case
           // filt16_start is {12288,8192,8192,8192,4096,0,0,0,0,0,0,0,0,0,0,0}
           c16multaddVectRealComplex(filt16_start, &ls_estimated, srs_estimated_channel16, 16);
-        } else if (subcarrier < K_TC) { // Start of OFDM symbol case
-          srs_estimated_channel16 = &srs_est[sc_offset];
-          // filt16_start is {12288,8192,8192,8192,4096,0,0,0,0,0,0,0,0,0,0,0}
-          c16multaddVectRealComplex(filt16_start, &ls_estimated, srs_estimated_channel16, 16);
-        } else if ((subcarrier + K_TC) >= ofdm_symbol_size
-                   || k == (M_sc_b_SRS - 1)) { // End of OFDM symbol or last subcarrier cases
+        } else if (k == (M_sc_b_SRS - 1)) { // End of OFDM symbol or last subcarrier cases
           // filt16_end is {4096,8192,8192,8192,12288,16384,16384,16384,0,0,0,0,0,0,0,0}
           c16multaddVectRealComplex(filt16_end, &ls_estimated, srs_estimated_channel16, 16);
         } else { // Middle case
           // filt16_middle4 is {4096,8192,8192,8192,8192,8192,8192,8192,4096,0,0,0,0,0,0,0}
           c16multaddVectRealComplex(filt16_middle4, &ls_estimated, srs_estimated_channel16, 16);
-          srs_estimated_channel16 = &srs_est[sc_offset];
+          srs_estimated_channel16 = &srs_est[subcarrier_abs];
         }
       }
 
@@ -929,6 +913,8 @@ int nr_srs_channel_estimation(int ant,
       if (subcarrier >= ofdm_symbol_size) {
         subcarrier -= ofdm_symbol_size;
       }
+
+      subcarrier_abs += K_TC;
 
     } // for (int k = 0; k < M_sc_b_SRS; k++)
 
@@ -946,6 +932,8 @@ int nr_srs_channel_estimation(int ant,
     if (subcarrier >= ofdm_symbol_size) {
       subcarrier -= ofdm_symbol_size;
     }
+
+    subcarrier_abs = first_subcarrier + nr_srs_info->k_0_p[p_index][srs_symb];
 
     for (int k = 0; k < K_TC * M_sc_b_SRS; k++) {
       int subcarrier_log = subcarrier - subcarrier_offset;
@@ -966,8 +954,8 @@ int nr_srs_channel_estimation(int ant,
             subcarrier_log,
             srs_ls_estimated_channel[srs_symbol_offset + subcarrier].r,
             srs_ls_estimated_channel[srs_symbol_offset + subcarrier].i,
-            srs_estimated_channel_freq[srs_symbol_offset + subcarrier].r,
-            srs_estimated_channel_freq[srs_symbol_offset + subcarrier].i,
+            srs_estimated_channel_freq[srs_symbol_offset + subcarrier_abs].r,
+            srs_estimated_channel_freq[srs_symbol_offset + subcarrier_abs].i,
             srs_received_noise[srs_symbol_offset + subcarrier].r,
             srs_received_noise[srs_symbol_offset + subcarrier].i);
 
@@ -976,6 +964,7 @@ int nr_srs_channel_estimation(int ant,
       if (subcarrier >= ofdm_symbol_size) {
         subcarrier -= ofdm_symbol_size;
       }
+      subcarrier_abs++;
     }
 #endif
   }
@@ -990,10 +979,8 @@ int nr_srs_channel_estimation(int ant,
   memset(chF_interpol, 0, sizeof(chF_interpol));
 
   // Place SRS channel estimates in FFT shifted format for oversampling
-  memcpy(&chF_interpol[0], &srs_estimated_channel_freq_avg[0], ofdm_symbol_size_half * sizeof(c16_t));
-  memcpy(&chF_interpol[start_offset],
-         &srs_estimated_channel_freq_avg[ofdm_symbol_size_half],
-         ofdm_symbol_size_half * sizeof(c16_t));
+  memcpy(&chF_interpol[0], &srs_estimated_channel_freq_avg[ofdm_symbol_size_half], ofdm_symbol_size_half * sizeof(c16_t));
+  memcpy(&chF_interpol[start_offset], &srs_estimated_channel_freq_avg[0], ofdm_symbol_size_half * sizeof(c16_t));
 
   // Convert to time domain oversampled
   freq2time(ofdm_os_size, (int16_t *)chF_interpol, (int16_t *)srs_estimated_channel_time);
@@ -1005,32 +992,38 @@ int nr_srs_channel_estimation(int ant,
 
   // Compute wideband SNR on the symbol 0
   int tot_subcarriers = m_SRS_b * NR_NB_SC_PER_RB;
+
+  uint16_t subcarrier_abs = first_subcarrier + nr_srs_info->k_0_p[p_index][0];
+  if (subcarrier_abs + tot_subcarriers < ofdm_symbol_size_half) {
+    *signal_power = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier_abs], tot_subcarriers) / tot_subcarriers;
+  } else {
+    int size1 = ofdm_symbol_size_half - subcarrier_abs;
+    int size2 = tot_subcarriers - size1;
+    uint64_t signal_power_p1 = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier_abs], size1) * size1;
+    uint64_t signal_power_p2 = signal_energy_nodc(&srs_estimated_channel_freq[ofdm_symbol_size_half], size2) * size2;
+    *signal_power = (signal_power_p1 + signal_power_p2) / tot_subcarriers;
+  }
+
+  if (*signal_power == 0) {
+    LOG_W(NR_PHY, "Received SRS signal power is 0\n");
+    return -1;
+  }
+
   subcarrier = subcarrier_offset + nr_srs_info->k_0_p[p_index][0];
   if (subcarrier >= ofdm_symbol_size) {
     subcarrier -= ofdm_symbol_size;
   }
-  if (subcarrier + tot_subcarriers < ofdm_symbol_size) {
-    *signal_power = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier], tot_subcarriers) / tot_subcarriers;
-    if (p_index == 0) {
+
+  if (p_index == 0) {
+    if (subcarrier + tot_subcarriers < ofdm_symbol_size) {
       *noise_power = signal_energy_nodc(&srs_received_noise[subcarrier], tot_subcarriers) / tot_subcarriers;
-    }
-  } else {
-    int size1 = ofdm_symbol_size - subcarrier;
-    int size2 = tot_subcarriers - size1;
-    uint64_t signal_power_p1 = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier], size1) * size1;
-    uint64_t signal_power_p2 = signal_energy_nodc(&srs_estimated_channel_freq[0], size2) * size2;
-    *signal_power = (signal_power_p1 + signal_power_p2) / tot_subcarriers;
-    if (p_index == 0) {
+    } else {
+      int size1 = ofdm_symbol_size - subcarrier;
+      int size2 = tot_subcarriers - size1;
       uint64_t noise_power_p1 = signal_energy_nodc(&srs_received_noise[subcarrier], size1) * size1;
       uint64_t noise_power_p2 = signal_energy_nodc(&srs_received_noise[0], size2) * size2;
       *noise_power = (noise_power_p1 + noise_power_p2) / tot_subcarriers;
     }
-  }
-
-  *signal_power = max(*signal_power, 1);
-  if (*signal_power == 0) {
-    LOG_W(NR_PHY, "Received SRS signal power is 0\n");
-    return -1;
   }
 
   // Compute SNR per RB for port 0 and symbol 0

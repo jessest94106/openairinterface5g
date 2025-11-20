@@ -938,7 +938,8 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
           T_INT(slot_rx),
           T_INT(ant_rx_ind),
           T_INT(p_ind),
-          T_BUFFER(srs_estimated_channel_time_shifted[ant_rx_ind][p_ind], ofdm_symbol_size * sizeof(c16_t)));
+          T_BUFFER(srs_estimated_channel_time_shifted[ant_rx_ind][p_ind],
+                   NR_SRS_IDFT_OVERSAMP_FACTOR * ofdm_symbol_size * sizeof(c16_t)));
       }
       noise_power_avg += noise_power;
     }
