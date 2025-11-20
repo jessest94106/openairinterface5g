@@ -2601,64 +2601,69 @@ int nr_get_csi_measurements(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, PUCC
 {
   NR_UE_UL_BWP_t *current_UL_BWP = mac->current_UL_BWP;
   NR_PUCCH_Config_t *pucch_Config = current_UL_BWP ? current_UL_BWP->pucch_Config : NULL;
+
+  if (!mac->sc_info.csi_MeasConfig || !pucch_Config)
+    return 0;
+
   int num_csi = 0;
+  NR_CSI_MeasConfig_t *csi_measconfig = mac->sc_info.csi_MeasConfig;
 
-  if (mac->sc_info.csi_MeasConfig) {
-    NR_CSI_MeasConfig_t *csi_measconfig = mac->sc_info.csi_MeasConfig;
+  int csi_priority = INT_MAX;
+  for (int csi_report_id = 0; csi_report_id < csi_measconfig->csi_ReportConfigToAddModList->list.count; csi_report_id++) {
+    NR_CSI_ReportConfig_t *csirep = csi_measconfig->csi_ReportConfigToAddModList->list.array[csi_report_id];
 
-    int csi_priority = INT_MAX;
-    for (int csi_report_id = 0; csi_report_id < csi_measconfig->csi_ReportConfigToAddModList->list.count; csi_report_id++) {
-      NR_CSI_ReportConfig_t *csirep = csi_measconfig->csi_ReportConfigToAddModList->list.array[csi_report_id];
+    AssertFatal(csirep->reportConfigType.present == NR_CSI_ReportConfig__reportConfigType_PR_aperiodic
+                    || csirep->reportConfigType.present == NR_CSI_ReportConfig__reportConfigType_PR_periodic,
+                "Not supported CSI report type\n");
 
-      if(csirep->reportConfigType.present == NR_CSI_ReportConfig__reportConfigType_PR_periodic) {
-        int period, offset;
-        csi_period_offset(csirep, NULL, &period, &offset);
-        const int n_slots_frame = mac->frame_structure.numb_slots_frame;
-        if (((n_slots_frame*frame + slot - offset)%period) == 0 && pucch_Config) {
-          int csi_res_id = -1;
-          for (int i = 0; i < csirep->reportConfigType.choice.periodic->pucch_CSI_ResourceList.list.count; i++) {
-            const NR_PUCCH_CSI_Resource_t *pucchcsires =
-                csirep->reportConfigType.choice.periodic->pucch_CSI_ResourceList.list.array[i];
-            if (pucchcsires->uplinkBandwidthPartId == current_UL_BWP->bwp_id) {
-              csi_res_id = pucchcsires->pucch_Resource;
-              break;
-            }
-          }
-          if (csi_res_id < 0) {
-            // This CSI Report ID is not associated with current active BWP
-            continue;
-          }
-          NR_PUCCH_Resource_t *csi_pucch = find_pucch_resource_from_list(pucch_Config->resourceToAddModList, csi_res_id);
-          AssertFatal(csi_pucch != NULL, "Couldn't find PUCCH Resource ID for SR in PUCCH resource list\n");
-          LOG_D(NR_MAC, "Preparing CSI report in frame %d slot %d CSI report ID %d\n", frame, slot, csi_report_id);
-          int temp_priority = compute_csi_priority(mac, csirep);
-          if (num_csi > 0) {
-            // need to verify if we can multiplex multiple CSI report
-            if (pucch_Config->multi_CSI_PUCCH_ResourceList) {
-              AssertFatal(false, "Multiplexing multiple CSI report in a single PUCCH not supported yet\n");
-            } else if (temp_priority < csi_priority) {
-              // we discard previous report
-              csi_priority = temp_priority;
-              num_csi = 1;
-              csi_payload_t csi = nr_get_csi_payload(mac, csi_report_id, WIDEBAND_ON_PUCCH, csi_measconfig);
-              pucch->n_csi = csi.p1_bits;
-              pucch->csi_part1_payload = csi.part1_payload;
-              pucch->pucch_resource = csi_pucch;
-            } else
-              continue;
-          } else {
-            num_csi = 1;
-            csi_priority = temp_priority;
-            csi_payload_t csi = nr_get_csi_payload(mac, csi_report_id, WIDEBAND_ON_PUCCH, csi_measconfig);
-            pucch->n_csi = csi.p1_bits;
-            pucch->csi_part1_payload = csi.part1_payload;
-            pucch->pucch_resource = csi_pucch;
-          }
-        }
+    // Aperiodic CSI measurements handled in nr_ue_aperiodic_csi_reporting function
+    if (csirep->reportConfigType.present != NR_CSI_ReportConfig__reportConfigType_PR_periodic)
+      continue;
+
+    int period, offset;
+    csi_period_offset(csirep, NULL, &period, &offset);
+    const int n_slots_frame = mac->frame_structure.numb_slots_frame;
+    // Check if current slot falls in the report period
+    if (((n_slots_frame * frame + slot - offset) % period) != 0)
+      continue;
+
+    int csi_res_id = -1;
+    for (int i = 0; i < csirep->reportConfigType.choice.periodic->pucch_CSI_ResourceList.list.count; i++) {
+      const NR_PUCCH_CSI_Resource_t *pucchcsires = csirep->reportConfigType.choice.periodic->pucch_CSI_ResourceList.list.array[i];
+      if (pucchcsires->uplinkBandwidthPartId == current_UL_BWP->bwp_id) {
+        csi_res_id = pucchcsires->pucch_Resource;
+        break;
       }
-      else
-        AssertFatal(csirep->reportConfigType.present == NR_CSI_ReportConfig__reportConfigType_PR_aperiodic,
-                    "Not supported CSI report type\n");
+    }
+    if (csi_res_id < 0) {
+      // This CSI Report ID is not associated with current active BWP
+      continue;
+    }
+    NR_PUCCH_Resource_t *csi_pucch = find_pucch_resource_from_list(pucch_Config->resourceToAddModList, csi_res_id);
+    AssertFatal(csi_pucch != NULL, "Couldn't find PUCCH Resource ID for SR in PUCCH resource list\n");
+    LOG_D(NR_MAC, "Preparing CSI report in frame %d slot %d CSI report ID %d\n", frame, slot, csi_report_id);
+    int temp_priority = compute_csi_priority(mac, csirep);
+    if (num_csi > 0) {
+      // need to verify if we can multiplex multiple CSI report
+      if (pucch_Config->multi_CSI_PUCCH_ResourceList) {
+        AssertFatal(false, "Multiplexing multiple CSI report in a single PUCCH not supported yet\n");
+      } else if (temp_priority < csi_priority) {
+        // we discard previous report
+        csi_priority = temp_priority;
+        num_csi = 1;
+        csi_payload_t csi = nr_get_csi_payload(mac, csi_report_id, WIDEBAND_ON_PUCCH, csi_measconfig);
+        pucch->n_csi = csi.p1_bits;
+        pucch->csi_part1_payload = csi.part1_payload;
+        pucch->pucch_resource = csi_pucch;
+      } else
+        continue;
+    } else {
+      num_csi = 1;
+      csi_priority = temp_priority;
+      csi_payload_t csi = nr_get_csi_payload(mac, csi_report_id, WIDEBAND_ON_PUCCH, csi_measconfig);
+      pucch->n_csi = csi.p1_bits;
+      pucch->csi_part1_payload = csi.part1_payload;
+      pucch->pucch_resource = csi_pucch;
     }
   }
   return num_csi;
