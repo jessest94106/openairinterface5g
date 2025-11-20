@@ -3556,6 +3556,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
                                            NR_SubcarrierSpacing_t scs_ssb,
                                            frequency_range_t frequency_range,
                                            int nr_band,
+                                           int grid_size,
                                            uint32_t ssb_index,
                                            uint32_t ssb_period,
                                            uint32_t ssb_offset_point_a)
@@ -3885,6 +3886,11 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
               type0_PDCCH_CSS_config->cset_start_rb,
               ssb_offset_point_a,
               type0_PDCCH_CSS_config->rb_offset);
+  AssertFatal(type0_PDCCH_CSS_config->cset_start_rb + type0_PDCCH_CSS_config->num_rbs <= grid_size,
+              "Invalid combination of start PRB %d and size %d of CSET0. Exceeds full BW %d\n",
+              type0_PDCCH_CSS_config->cset_start_rb,
+              type0_PDCCH_CSS_config->num_rbs,
+              grid_size);
 }
 
 void fill_coresetZero(NR_ControlResourceSet_t *coreset0, NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config)

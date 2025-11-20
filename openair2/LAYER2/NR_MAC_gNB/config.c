@@ -789,6 +789,7 @@ static void config_sched_ctrlCommon(gNB_MAC_INST *nr_mac)
 
   NR_SubcarrierSpacing_t scs = *scc->ssbSubcarrierSpacing;
   const long band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
+  const int bw = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
   uint16_t ssb_start_symbol = get_ssb_start_symbol(band, scs, 0);
 
   int8_t ssb_period = *scc->ssb_periodicityServingCell;
@@ -810,6 +811,7 @@ static void config_sched_ctrlCommon(gNB_MAC_INST *nr_mac)
                                         scs,
                                         frequency_range,
                                         band,
+                                        bw,
                                         0,
                                         ssb_frame_periodicity,
                                         prb_offset);

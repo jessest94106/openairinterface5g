@@ -244,6 +244,7 @@ void get_type0_PDCCH_CSS_config_parameters(NR_Type0_PDCCH_CSS_config_t *type0_PD
                                            NR_SubcarrierSpacing_t scs_ssb,
                                            frequency_range_t frequency_range,
                                            int nr_band,
+                                           int grid_size,
                                            uint32_t ssb_index,
                                            uint32_t ssb_period,
                                            uint32_t ssb_offset_point_a);

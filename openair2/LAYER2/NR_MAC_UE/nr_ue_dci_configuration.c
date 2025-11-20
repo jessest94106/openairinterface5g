@@ -449,6 +449,7 @@ void ue_dci_configuration(NR_UE_MAC_INST_t *mac, fapi_nr_dl_config_request_t *dl
                                           scs,
                                           mac->frequency_range,
                                           mac->nr_band,
+                                          273,  // at this point UE in principle doesn't know the grid size (we assume the largest)
                                           mac->mib_ssb,
                                           1, // If the UE is not configured with a periodicity, the UE assumes a periodicity of a half frame
                                           ssb_offset_point_a);

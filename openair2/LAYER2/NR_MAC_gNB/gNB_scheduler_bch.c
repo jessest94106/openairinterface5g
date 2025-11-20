@@ -134,7 +134,7 @@ static void schedule_one_ssb(gNB_MAC_INST *gNB,
   const NR_MIB_t *mib = cc->mib->message.choice.mib;
   uint32_t mib_pdu = (*(uint32_t *)cc->MIB_pdu) & ((1 << 24) - 1);
   uint8_t ssbSubcarrierOffset = gNB->ssb_SubcarrierOffset;
-
+  const int bw = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth;
   uint16_t ssb_start_symbol = get_ssb_start_symbol(band, scs, i_ssb);
   NR_beam_alloc_t beam =
       beam_allocation_procedure(&gNB->beam_info, frameP, slotP, get_beam_from_ssbidx(gNB, i_ssb), slots_per_frame);
@@ -159,6 +159,7 @@ static void schedule_one_ssb(gNB_MAC_INST *gNB,
                                           scs,
                                           FR,
                                           band,
+                                          bw,
                                           i_ssb,
                                           ssb_frame_periodicity,
                                           prb_offset);
