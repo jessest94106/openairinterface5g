@@ -3217,7 +3217,7 @@ int16_t fill_dmrs_mask(const NR_PDSCH_Config_t *pdsch_Config,
   // For TypeB, ld is the duration of the scheduled PDSCH resources
   int ld = (mappingtype == typeA) ? (NrOfSymbols + startSymbol) : NrOfSymbols;
 
-  AssertFatal(ld > 2 && ld < 15,"Illegal NrOfSymbols according to Table 5.1.2.1-1 Spec 38.214 %d\n",ld);
+  AssertFatal(ld > 1 && ld < 15,"Illegal NrOfSymbols according to Table 5.1.2.1-1 Spec 38.214 %d\n",ld);
   AssertFatal((NrOfSymbols + startSymbol) < 15,"Illegal S+L according to Table 5.1.2.1-1 Spec 38.214 S:%d L:%d\n",startSymbol, NrOfSymbols);
 
   if (mappingtype == typeA) {
