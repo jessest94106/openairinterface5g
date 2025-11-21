@@ -86,9 +86,9 @@ def CreateTag(ranCommitID, ranBranch, ranAllowMerge):
 	return tagToUse
 
 def AnalyzeBuildLogs(image, lf):
-	errorandwarnings = {}
 	committed = False
 	tagged = False
+	errors = []
 	with open(lf, mode='r') as inputfile:
 		for line in inputfile:
 			lineHasTag = re.search(f'Successfully tagged {image}:', str(line)) is not None
@@ -97,11 +97,13 @@ def AnalyzeBuildLogs(image, lf):
 			# the OpenShift Cluster builder prepends image registry URL
 			lineHasCommit = re.search(r'COMMIT [a-zA-Z0-9\.:/\-]*' + image, str(line)) is not None
 			committed = committed or lineHasCommit
-	errorandwarnings['errors'] = 0 if committed or tagged else 1
-	errorandwarnings['warnings'] = 0
-	errorandwarnings['status'] = committed or tagged
-	logging.info(f"Analyzing {image}, file {lf}: {errorandwarnings}")
-	return errorandwarnings
+			if re.search(r'error:|Errors|ERROR', line):
+				errors.append(f"=> {line.strip()}")
+	status = (committed or tagged) and len(errors) == 0
+	logging.info(f"Analyzing {image}, file {lf}: {status=}, {len(errors)} errors")
+	for e in errors:
+		logging.info(e)
+	return status, errors
 
 def GetImageName(ssh, svcName, file):
 	ret = ssh.run(f"docker compose -f {file} config --format json {svcName}  | jq -r '.services.\"{svcName}\".image'", silent=True)
@@ -460,9 +462,9 @@ class Containerize():
 
 		# Analyze the logs
 		for name, lf in log_files:
-			ret = AnalyzeBuildLogs(name, lf)
-			imgStatus = ret['status']
-			msg = f"size {allImagesSize[name]}, analysis of {os.path.basename(lf)}: {ret['errors']} errors, {ret['warnings']} warnings"
+			imgStatus, errors = AnalyzeBuildLogs(name, lf)
+			info = f"Analysis of {os.path.basename(lf)}: {imgStatus=}, size {allImagesSize[name]}, {len(errors)} errors"
+			msg = "\n".join([info] + errors)
 			HTML.CreateHtmlTestRowQueue(name, 'OK' if imgStatus else 'KO', [msg])
 			status = status and imgStatus
 		
