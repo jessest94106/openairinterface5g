@@ -674,11 +674,361 @@ typedef struct f1ap_reset_ack_t {
 /* Structure of Position Information Transfer related NRPPA messages */
 /* IE structures for Positioning related messages as per TS 38.473 V16.3.1*/
 
+typedef enum f1ap_subcarrier_spacing_e {
+  F1AP_SUBCARRIER_SPACING_15KHZ,
+  F1AP_SUBCARRIER_SPACING_30KHZ,
+  F1AP_SUBCARRIER_SPACING_60KHZ,
+  F1AP_SUBCARRIER_SPACING_120KHZ
+} f1ap_subcarrier_spacing_pr;
+
+typedef struct f1ap_scs_specific_carrier_s {
+  uint32_t offset_to_carrier;
+  f1ap_subcarrier_spacing_pr subcarrier_spacing;
+  uint16_t carrier_bandwidth;
+} f1ap_scs_specific_carrier_t;
+
+typedef struct f1ap_uplink_channel_bw_per_scs_list_s {
+  f1ap_scs_specific_carrier_t *scs_specific_carrier;
+  uint32_t scs_specific_carrier_list_length;
+} f1ap_uplink_channel_bw_per_scs_list_t;
+
+typedef enum f1ap_transmission_comb_e {
+  F1AP_TRANSMISSION_COMB_PR_NOTHING,
+  F1AP_TRANSMISSION_COMB_PR_N2,
+  F1AP_TRANSMISSION_COMB_PR_N4
+} f1ap_transmission_comb_pr;
+
+typedef struct f1ap_transmission_comb_n2_s {
+  uint8_t comb_offset_n2;
+  uint8_t cyclic_shift_n2;
+} f1ap_transmission_comb_n2_t, f1ap_transmission_comb_pos_n2_t;
+
+typedef struct f1ap_transmission_comb_n4_s {
+  uint8_t comb_offset_n4;
+  uint8_t cyclic_shift_n4;
+} f1ap_transmission_comb_n4_t, f1ap_transmission_comb_pos_n4_t;
+
+typedef union f1ap_transmission_comb_c {
+  f1ap_transmission_comb_n2_t n2;
+  f1ap_transmission_comb_n4_t n4;
+} f1ap_transmission_comb_u;
+
+typedef struct f1ap_transmission_comb_s {
+  f1ap_transmission_comb_pr present;
+  f1ap_transmission_comb_u choice;
+} f1ap_transmission_comb_t;
+
+typedef enum f1ap_srs_resource_type_periodicity_e {
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1 = 0,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT4,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT5,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT8,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT10,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT16,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT20,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT32,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT40,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT64,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT80,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT160,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT320,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT640,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1280,
+  F1AP_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2560
+} f1ap_srs_resource_type_periodicity_pr;
+
+typedef struct f1ap_resource_type_periodic_s {
+  f1ap_srs_resource_type_periodicity_pr periodicity;
+  uint16_t offset;
+} f1ap_resource_type_periodic_t, f1ap_resource_type_semi_persistent_t;
+
+typedef union f1ap_resource_type_c {
+  f1ap_resource_type_periodic_t periodic;
+  f1ap_resource_type_semi_persistent_t semi_persistent;
+  bool aperiodic;
+} f1ap_resource_type_u;
+
+typedef enum f1ap_resource_type_e {
+  F1AP_RESOURCE_TYPE_PR_NOTHING,
+  F1AP_RESOURCE_TYPE_PR_PERIODIC,
+  F1AP_RESOURCE_TYPE_PR_SEMI_PERSISTENT,
+  F1AP_RESOURCE_TYPE_PR_APERIODIC
+} f1ap_resource_type_pr;
+
+typedef struct f1ap_resource_type_s {
+  f1ap_resource_type_pr present;
+  f1ap_resource_type_u choice;
+} f1ap_resource_type_t;
+
+typedef struct f1ap_transmission_comb_n8_s {
+  uint8_t comb_offset_n8;
+  uint8_t cyclic_shift_n8;
+} f1ap_transmission_comb_pos_n8_t;
+
+typedef union f1ap_transmission_comb_pos_c {
+  f1ap_transmission_comb_pos_n2_t n2;
+  f1ap_transmission_comb_pos_n4_t n4;
+  f1ap_transmission_comb_pos_n8_t n8;
+} f1ap_transmission_comb_pos_u;
+
+typedef enum f1ap_transmission_comb_pos_e {
+  F1AP_TRANSMISSION_COMB_POS_PR_NOTHING,
+  F1AP_TRANSMISSION_COMB_POS_PR_N2,
+  F1AP_TRANSMISSION_COMB_POS_PR_N4,
+  F1AP_TRANSMISSION_COMB_POS_PR_N8
+} f1ap_transmission_comb_pos_pr;
+
+typedef struct f1ap_transmission_comb_pos_s {
+  f1ap_transmission_comb_pos_pr present;
+  f1ap_transmission_comb_pos_u choice;
+} f1ap_transmission_comb_pos_t;
+
+typedef enum f1ap_srs_resource_type_pos_periodicity_e {
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1 = 0,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT4,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT8,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT16,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT32,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT64,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT80,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT160,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT320,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT640,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1280,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2560,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5120,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10240,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20480,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40960,
+  F1AP_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT81920
+} f1ap_srs_resource_type_pos_periodicity_pr;
+
+typedef struct f1ap_resource_type_periodic_pos_s {
+  f1ap_srs_resource_type_pos_periodicity_pr periodicity;
+  uint16_t offset;
+} f1ap_resource_type_periodic_pos_t, f1ap_resource_type_semi_persistent_pos_t;
+
+typedef struct f1ap_resource_type_aperiodic_pos_s {
+  uint8_t slot_offset;
+} f1ap_resource_type_aperiodic_pos_t;
+
+typedef union f1ap_resource_type_pos_c {
+  f1ap_resource_type_periodic_pos_t periodic;
+  f1ap_resource_type_semi_persistent_pos_t semi_persistent;
+  f1ap_resource_type_aperiodic_pos_t aperiodic;
+} f1ap_resource_type_pos_u;
+
+typedef enum f1ap_resource_type_pos_e {
+  F1AP_RESOURCE_TYPE_POS_PR_NOTHING,
+  F1AP_RESOURCE_TYPE_POS_PR_PERIODIC,
+  F1AP_RESOURCE_TYPE_POS_PR_SEMI_PERSISTENT,
+  F1AP_RESOURCE_TYPE_POS_PR_APERIODIC
+} f1ap_resource_type_pos_pr;
+
+typedef struct f1ap_resource_type_pos_s {
+  f1ap_resource_type_pos_pr present;
+  f1ap_resource_type_pos_u choice;
+} f1ap_resource_type_pos_t;
+
+typedef struct f1ap_srs_resource_id_list_s {
+  long *srs_resource_id;
+  uint8_t srs_resource_id_list_length;
+} f1ap_srs_resource_id_list_t;
+
+typedef struct f1ap_resource_set_type_aperiodic_s {
+  uint8_t srs_resource_trigger;
+  long slot_offset;
+} f1ap_resource_set_type_aperiodic_t;
+
+typedef union f1ap_resource_set_type_c {
+  bool periodic;
+  bool semi_persistent;
+  f1ap_resource_set_type_aperiodic_t aperiodic;
+} f1ap_resource_set_type_u;
+
+typedef enum f1ap_resource_set_type_e {
+  F1AP_RESOURCE_SET_TYPE_PR_NOTHING,
+  F1AP_RESOURCE_SET_TYPE_PR_PERIODIC,
+  F1AP_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT,
+  F1AP_RESOURCE_SET_TYPE_PR_APERIODIC
+} f1ap_resource_set_type_pr;
+
+typedef struct f1ap_resource_set_type_s {
+  f1ap_resource_set_type_pr present;
+  f1ap_resource_set_type_u choice;
+} f1ap_resource_set_type_t;
+
+typedef struct f1ap_pos_srs_resource_id_list_s {
+  long *srs_pos_resource_id;
+  uint32_t pos_srs_resource_id_list_length;
+} f1ap_pos_srs_resource_id_list_t;
+
+typedef union f1ap_pos_resource_set_type_c {
+  bool periodic;
+  bool semi_persistent;
+  uint8_t srs_resource;
+} f1ap_pos_resource_set_type_u;
+
+typedef enum f1ap_pos_resource_set_type_e {
+  F1AP_POS_RESOURCE_SET_TYPE_PR_NOTHING,
+  F1AP_POS_RESOURCE_SET_TYPE_PR_PERIODIC,
+  F1AP_POS_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT,
+  F1AP_POS_RESOURCE_SET_TYPE_PR_APERIODIC
+} f1ap_pos_resource_set_type_pr;
+
+typedef struct f1ap_pos_resource_set_type_s {
+  f1ap_pos_resource_set_type_pr present;
+  f1ap_pos_resource_set_type_u choice;
+} f1ap_pos_resource_set_type_t;
+
+typedef enum f1ap_srs_resource_number_of_ports_e {
+  F1AP_SRS_NUMBER_OF_PORTS_N1,
+  F1AP_SRS_NUMBER_OF_PORTS_N2,
+  F1AP_SRS_NUMBER_OF_PORTS_N4
+} f1ap_srs_resource_number_of_ports_pr;
+
+typedef enum f1ap_srs_resource_number_of_symbols_e {
+  F1AP_SRS_NUMBER_OF_SYMBOLS_N1,
+  F1AP_SRS_NUMBER_OF_SYMBOLS_N2,
+  F1AP_SRS_NUMBER_OF_SYMBOLS_N4
+} f1ap_srs_resource_number_of_symbols_pr;
+
+typedef enum f1ap_srs_repetition_factor_e {
+  F1AP_SRS_REPETITION_FACTOR_RF1,
+  F1AP_SRS_REPETITION_FACTOR_RF2,
+  F1AP_SRS_REPETITION_FACTOR_RF4
+} f1ap_srs_repetition_factor_pr;
+
+typedef enum f1ap_srs_group_or_sequencehopping_e {
+  F1AP_GROUPORSEQUENCEHOPPING_NOTHING,
+  F1AP_GROUPORSEQUENCEHOPPING_GROUPHOPPING,
+  F1AP_GROUPORSEQUENCEHOPPING_SEQUENCEHOPPING
+} f1ap_srs_group_or_sequencehopping_pr;
+
+typedef struct f1ap_srs_resource_s {
+  uint32_t srs_resource_id;
+  f1ap_srs_resource_number_of_ports_pr nr_of_srs_ports;
+  f1ap_transmission_comb_t transmission_comb;
+  uint8_t start_position;
+  f1ap_srs_resource_number_of_symbols_pr nr_of_symbols;
+  f1ap_srs_repetition_factor_pr repetition_factor;
+  uint8_t freq_domain_position;
+  uint16_t freq_domain_shift;
+  uint8_t c_srs;
+  uint8_t b_srs;
+  uint8_t b_hop;
+  f1ap_srs_group_or_sequencehopping_pr group_or_sequence_hopping;
+  f1ap_resource_type_t resource_type;
+  uint16_t sequence_id;
+} f1ap_srs_resource_t;
+
+typedef enum f1ap_srs_resource_item_number_of_symbols_e {
+  F1AP_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N1,
+  F1AP_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N2,
+  F1AP_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N4,
+  F1AP_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N8,
+  F1AP_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N12
+} f1ap_srs_resource_item_number_of_symbols_pr;
+
+typedef struct f1ap_pos_srs_resource_item_s {
+  uint32_t srs_pos_resource_id;
+  f1ap_transmission_comb_pos_t transmission_comb_pos;
+  uint8_t start_position;
+  f1ap_srs_resource_item_number_of_symbols_pr nr_of_symbols;
+  uint16_t freq_domain_shift;
+  uint8_t c_srs;
+  f1ap_srs_group_or_sequencehopping_pr group_or_sequence_hopping;
+  f1ap_resource_type_pos_t resource_type_pos;
+  uint32_t sequence_id;
+} f1ap_pos_srs_resource_item_t;
+
+typedef struct f1ap_srs_resource_set_s {
+  uint8_t srs_resource_set_id;
+  f1ap_srs_resource_id_list_t srs_resource_id_list;
+  f1ap_resource_set_type_t resource_set_type;
+} f1ap_srs_resource_set_t;
+
+typedef struct f1ap_pos_srs_resource_set_item_s {
+  uint8_t pos_srs_resource_set_id;
+  f1ap_pos_srs_resource_id_list_t pos_srs_resource_id_list;
+  f1ap_pos_resource_set_type_t pos_resource_set_type;
+} f1ap_pos_srs_resource_set_item_t;
+
+typedef struct f1ap_srs_resource_list_s {
+  f1ap_srs_resource_t *srs_resource;
+  uint32_t srs_resource_list_length;
+} f1ap_srs_resource_list_t;
+
+typedef struct f1ap_pos_srs_resource_list_s {
+  f1ap_pos_srs_resource_item_t *pos_srs_resource_item;
+  uint32_t pos_srs_resource_list_length;
+} f1ap_pos_srs_resource_list_t;
+
+typedef struct f1ap_srs_resource_set_list_s {
+  f1ap_srs_resource_set_t *srs_resource_set;
+  uint32_t srs_resource_set_list_length;
+} f1ap_srs_resource_set_list_t;
+
+typedef struct f1ap_pos_srs_resource_set_list_s {
+  f1ap_pos_srs_resource_set_item_t *pos_srs_resource_set_item;
+  uint32_t pos_srs_resource_set_list_length;
+} f1ap_pos_srs_resource_set_list_t;
+
+typedef struct f1ap_srs_config_s {
+  f1ap_srs_resource_list_t *srs_resource_list;
+  f1ap_pos_srs_resource_list_t *pos_srs_resource_list;
+  f1ap_srs_resource_set_list_t *srs_resource_set_list;
+  f1ap_pos_srs_resource_set_list_t *pos_srs_resource_set_list;
+} f1ap_srs_config_t;
+
+typedef enum f1ap_cp_type_e { F1AP_CP_TYPE_NORMAL, F1AP_CP_TYPE_EXTENDED } f1ap_cp_type_pr;
+
+typedef struct f1ap_active_ul_bwp_s {
+  uint32_t location_and_bandwidth;
+  f1ap_subcarrier_spacing_pr subcarrier_spacing;
+  f1ap_cp_type_pr cyclic_prefix;
+  uint32_t tx_direct_current_location;
+  uint8_t shift_7_dot_5kHz;
+  f1ap_srs_config_t srs_config;
+} f1ap_active_ul_bwp_t;
+
+typedef struct f1ap_srs_carrier_list_item_s {
+  uint32_t pointA;
+  f1ap_uplink_channel_bw_per_scs_list_t uplink_channel_bw_per_scs_list;
+  f1ap_active_ul_bwp_t active_ul_bwp;
+  uint16_t pci;
+} f1ap_srs_carrier_list_item_t;
+
+typedef struct f1ap_srs_carrier_list_s {
+  f1ap_srs_carrier_list_item_t *srs_carrier_list_item;
+  uint32_t srs_carrier_list_length;
+} f1ap_srs_carrier_list_t;
+
+// optional: IE 9.3.1.192 (TS 38.473 V16.21.0)
+typedef struct f1ap_srs_configuration_s {
+  f1ap_srs_carrier_list_t srs_carrier_list;
+} f1ap_srs_configuration_t;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
   // IE 9.3.1.5 (mandatory)
   uint32_t gNB_DU_ue_id;
 } f1ap_positioning_information_req_t;
+
+typedef struct f1ap_positioning_information_resp_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+  // IE 9.3.1.192 (optional)
+  f1ap_srs_configuration_t *srs_configuration;
+} f1ap_positioning_information_resp_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */

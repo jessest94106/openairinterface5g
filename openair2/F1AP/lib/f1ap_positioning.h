@@ -27,10 +27,18 @@
 
 struct F1AP_F1AP_PDU;
 
+// positioning information request
 struct F1AP_F1AP_PDU *encode_positioning_information_req(const f1ap_positioning_information_req_t *msg);
 bool decode_positioning_information_req(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_information_req_t *out);
 f1ap_positioning_information_req_t cp_positioning_information_req(const f1ap_positioning_information_req_t *orig);
 bool eq_positioning_information_req(const f1ap_positioning_information_req_t *a, const f1ap_positioning_information_req_t *b);
 void free_positioning_information_req(f1ap_positioning_information_req_t *msg);
+
+// positioning information response
+struct F1AP_F1AP_PDU *encode_positioning_information_resp(const f1ap_positioning_information_resp_t *msg);
+bool decode_positioning_information_resp(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_information_resp_t *out);
+f1ap_positioning_information_resp_t cp_positioning_information_resp(const f1ap_positioning_information_resp_t *orig);
+bool eq_positioning_information_resp(const f1ap_positioning_information_resp_t *a, const f1ap_positioning_information_resp_t *b);
+void free_positioning_information_resp(f1ap_positioning_information_resp_t *msg);
 
 #endif /* F1AP_POSITIONING_H_ */
