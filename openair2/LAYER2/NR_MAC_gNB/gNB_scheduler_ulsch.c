@@ -2081,8 +2081,8 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
 
     /* Create UE_sched for UEs eligibale for new data transmission*/
     /* Calculate coefficient*/
-    const uint8_t Qm = nr_get_Qm_dl(selected_mcs, current_BWP->mcs_table);
-    const uint16_t R = nr_get_code_rate_dl(selected_mcs, current_BWP->mcs_table);
+    const uint8_t Qm = nr_get_Qm_ul(selected_mcs, current_BWP->mcs_table);
+    const uint16_t R = nr_get_code_rate_ul(selected_mcs, current_BWP->mcs_table);
     const uint32_t tbs = nr_compute_tbs(Qm,
                                         R,
                                         1, /* rbSize */
