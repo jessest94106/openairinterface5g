@@ -398,6 +398,8 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action, c16_t **tx
     double ul_freq_offset = -UE->freq_offset * ((double)fp->ul_CarrierFreq / (double)fp->dl_CarrierFreq);
     if (get_nrUE_params()->cont_fo_comp == 2) // different from LO frequency error compensation, Doppler UL pre-compensation has to be negative
       ul_freq_offset = -ul_freq_offset;
+    else if (get_nrUE_params()->cont_fo_comp == 3) // do not consider residual DL FO for UL pre-compensation at all
+      ul_freq_offset = 0;
     for (int i = 0; i < fp->nb_antennas_tx; i++)
       nr_fo_compensation(UE->ul_Doppler_shift + ul_freq_offset,
                          fp->samples_per_subframe,
