@@ -736,6 +736,10 @@ static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
 
 static void fix_ntn_epoch_hfn(PHY_VARS_NR_UE *UE, int hfn, int frame)
 {
+  if (!UE->nrUE_config.ntn_config.is_targetcell)
+    return;
+  UE->nrUE_config.ntn_config.is_targetcell = false;
+
   const int epoch_frame = UE->nrUE_config.ntn_config.epoch_sfn;
   const int diff1 = (frame - epoch_frame + 1024) % 1024;
   const int diff2 = (epoch_frame - frame + 1024) % 1024;
@@ -1057,22 +1061,31 @@ void *UE_thread(void *arg)
       // we have the decoded frame index in the return of the synch process
       // and we shifted above to the first slot of next frame
       decoded_frame_rx = (decoded_frame_rx + 1) % MAX_FRAME_NUMBER;
+      const int prev_frame_rx = (absolute_slot / nb_slot_frame) % MAX_FRAME_NUMBER;
+      const int prev_hfn_rx = (absolute_slot / nb_slot_frame) / MAX_FRAME_NUMBER;
+      int decoded_hfn_rx = prev_hfn_rx;
+      if (decoded_frame_rx <= prev_frame_rx)
+        decoded_hfn_rx++;
       // we do ++ first in the regular processing, so it will be begin of frame;
-      absolute_slot = decoded_frame_rx * nb_slot_frame - 1;
+      absolute_slot = (decoded_hfn_rx * MAX_FRAME_NUMBER + decoded_frame_rx) * nb_slot_frame - 1;
       if (UE->sl_mode == 2) {
         // Set to the slot where the SL-SSB was decoded
         absolute_slot += UE->SL_UE_PHY_PARAMS.sync_params.slot_offset;
       }
       // With the correct frame and slot numbers, we can now fix the UL timing
-      const int frame_rx = (absolute_slot / nb_slot_frame) % 1024;
-      const int hfn_rx = (absolute_slot / nb_slot_frame) / 1024;
-      fix_ntn_epoch_hfn(UE, hfn_rx, frame_rx);
-      UE->nrUE_config.ntn_config.is_targetcell = false;
+      fix_ntn_epoch_hfn(UE, decoded_hfn_rx, decoded_frame_rx);
       if (UE->nrUE_config.ntn_config.params_changed) {
-        apply_ntn_config(UE, fp, hfn_rx, frame_rx, 0, &duration_rx_to_tx, &timing_advance, &ntn_koffset, &ntn_targetcell);
+        apply_ntn_config(UE,
+                         fp,
+                         decoded_hfn_rx,
+                         decoded_frame_rx,
+                         0,
+                         &duration_rx_to_tx,
+                         &timing_advance,
+                         &ntn_koffset,
+                         &ntn_targetcell);
       } else {
-        const int mu = fp->numerology_index;
-        const int abs_subframe_tx = 10240 * hfn_rx + 10 * frame_rx + (duration_rx_to_tx >> mu);
+        const int abs_subframe_tx = (absolute_slot + 1 + duration_rx_to_tx) / fp->slots_per_subframe;
         apply_ntn_timing_advance_and_doppler(UE, fp, abs_subframe_tx);
         ntn_targetcell = false;
       }
