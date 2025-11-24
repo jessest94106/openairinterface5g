@@ -398,7 +398,8 @@ bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
   // except for the case when DCI format 1_0 is decoded in any common search space in which case the size of CORESET 0 shall be
   // used if CORESET 0 is configured for the cell and the size of initial DL bandwidth part shall be used if CORESET 0 is not
   // configured for the cell.
-  if (dl_bwp->dci_format == NR_DL_DCI_FORMAT_1_0 && sched_ctrl->search_space->searchSpaceType
+  if (dl_bwp->dci_format == NR_DL_DCI_FORMAT_1_0
+      && sched_ctrl->search_space->searchSpaceType
       && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
     if (sched_ctrl->coreset->controlResourceSetId == 0) {
       bwp_info.bwpStart = nr_mac->cset0_bwp_start;
@@ -406,9 +407,9 @@ bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
       bwp_info.bwpStart = dl_bwp->BWPStart + sched_ctrl->sched_pdcch.rb_start;
     }
     if (nr_mac->cset0_bwp_size > 0) {
-      bwp_info.bwpSize = min(dl_bwp->BWPSize - bwp_info.bwpStart, nr_mac->cset0_bwp_size);
+      bwp_info.bwpSize = min(dl_bwp->BWPSize, nr_mac->cset0_bwp_size);
     } else {
-      bwp_info.bwpSize = min(dl_bwp->BWPSize - bwp_info.bwpStart, UE->sc_info.initial_dl_BWPSize);
+      bwp_info.bwpSize = min(dl_bwp->BWPSize, UE->sc_info.initial_dl_BWPSize);
     }
   } else {
     bwp_info.bwpSize = dl_bwp->BWPSize;
