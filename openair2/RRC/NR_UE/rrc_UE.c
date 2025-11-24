@@ -210,7 +210,7 @@ static void get_epochtime_from_sib19scheduling(NR_UE_RRC_SI_INFO *SI_info, int *
         slot);
 }
 
-static int eval_epoch_time(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntncfg, int frame)
+static int eval_epoch_time(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntncfg, int frame, bool is_targetcell)
 {
   int epoch_frame = 0, epoch_subframe = 0;
   int diff_frames = 0;
@@ -229,11 +229,19 @@ static int eval_epoch_time(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntnc
     ntncfg->epochTime_r17->sfn_r17 = epoch_frame;
     ntncfg->epochTime_r17->subFrameNR_r17 = epoch_subframe;
   }
-  // For serving cell, the field sfn indicates the current SFN or the next upcoming SFN
-  // after the frame where the message indicating the epochTime is received
-  // i.e. Epochframe can be present or future SFN
-  diff_frames = (epoch_frame - frame + 1024) % 1024;    // According to 38.331 Epochtime is defined for serving cell like this
-  LOG_I(NR_RRC, "Epoch frame %d, ahead by %d frames\n", epoch_frame, diff_frames);
+  if (is_targetcell) {
+    // For Target cell,the SFN nearest to the frame needs to be considered
+    // i.e. Epochframe can be in the past or future
+    int diff1 = (frame - epoch_frame + 1024) % 1024;
+    int diff2 = (epoch_frame - frame + 1024) % 1024;
+    diff_frames = (diff1 < diff2) ? -diff1 : diff2;
+  } else {
+    // For serving cell, the field sfn indicates the current SFN or the next upcoming SFN
+    // after the frame where the message indicating the epochTime is received
+    // i.e. Epochframe can be present or future SFN
+    diff_frames = (epoch_frame - frame + 1024) % 1024;    // According to 38.331 Epochtime is defined for serving cell like this
+  }
+  LOG_I(NR_RRC, "Epoch frame %d ahead by %d frames\n", epoch_frame, diff_frames);
   return diff_frames;
 }
 
@@ -257,11 +265,11 @@ static int get_ntn_timervalues(NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *
   return sib19_timer_ms;
 }
 
-static void nr_rrc_process_ntnconfig(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntncfg, int frame)
+static void nr_rrc_process_ntnconfig(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *SI_info, NR_NTN_Config_r17_t *ntncfg, int frame, bool is_targetcell)
 {
   SI_info->SInfo_r17.sib19_validity = true;
   // Check if Epochtime is sent or not
-  int diff_frames = eval_epoch_time(SI_info, ntncfg, frame);
+  int diff_frames = eval_epoch_time(SI_info, ntncfg, frame, is_targetcell);
 
   if (ntncfg->ntn_UlSyncValidityDuration_r17) { // ulsyncvalidity duration configured
     int val430_ms = 0, sib19_timer_ms = 0;
@@ -361,7 +369,7 @@ static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si,
         sib19 = typeandinfo->choice.sib19_v1700;
         if (g_log->log_component[NR_RRC].level >= OAILOG_DEBUG)
           xer_fprint(stdout, &asn_DEF_NR_SIB19_r17, (const void *)sib19);
-        nr_rrc_process_ntnconfig(rrc, SI_info, sib19->ntn_Config_r17, frame);
+        nr_rrc_process_ntnconfig(rrc, SI_info, sib19->ntn_Config_r17, frame, false);
         break;
       default:
         break;
@@ -1454,6 +1462,11 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
                                                  uint8_t *const bufferP,
                                                  const uint8_t buffer_len)
 {
+  // MIB received on the target cell. Now process target ntncfg once new timing is received.
+  if (phycellid == rrc->phyCellID && rrc->target_ntncfg) {
+    rrc->process_target_ntncfg = true;
+  }
+
   NR_BCCH_BCH_Message_t *bcch_message = NULL;
   rrc->phyCellID = phycellid;
   rrc->arfcn_ssb = ssb_arfcn;
@@ -1754,13 +1767,20 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc,
 
   // 3GPP TS38.331 section 5.3.5.5.2
   nr_timer_stop(&tac->T430);
+
+  if (rrc->target_ntncfg) {
+    ASN_STRUCT_FREE(asn_DEF_NR_NTN_Config_r17, rrc->target_ntncfg);
+    rrc->target_ntncfg = NULL;
+    rrc->process_target_ntncfg = false;
+  }
   if (reconfigurationWithSync->spCellConfigCommon &&
       reconfigurationWithSync->spCellConfigCommon->ext2 &&
       reconfigurationWithSync->spCellConfigCommon->ext2->ntn_Config_r17) {
     NR_NTN_Config_r17_t *ntncfg = reconfigurationWithSync->spCellConfigCommon->ext2->ntn_Config_r17;
     // EPOCH time is always sent if NTN config is sent through DCCH
     AssertFatal(ntncfg->epochTime_r17, "NTN-CONFIG sent in dedicated mode should have EPOCHTIME\n");
-    nr_rrc_process_ntnconfig(rrc, &rrc->perNB[gNB_index].SInfo, ntncfg, rrc->current_frame);
+    const int copy_result = asn_copy(&asn_DEF_NR_NTN_Config_r17, (void **)&rrc->target_ntncfg, ntncfg);
+    AssertFatal(copy_result == 0, "unable to copy NR_NTN_Config_r17_t\n");
   }
 }
 
@@ -2626,6 +2646,13 @@ void *rrc_nrue(void *notUsed)
     nr_rrc_handle_timers(rrc);
     NR_UE_RRC_SI_INFO *SInfo = &rrc->perNB[NRRRC_FRAME_PROCESS(msg_p).gnb_id].SInfo;
     nr_rrc_SI_timers(SInfo);
+    if (rrc->process_target_ntncfg) {
+      // Process target NTNCFG as the target cells timing is acquired
+      nr_rrc_process_ntnconfig(rrc, &rrc->perNB[NRRRC_FRAME_PROCESS(msg_p).gnb_id].SInfo, rrc->target_ntncfg, rrc->current_frame, true);
+      ASN_STRUCT_FREE(asn_DEF_NR_NTN_Config_r17, rrc->target_ntncfg);
+      rrc->target_ntncfg = NULL;
+      rrc->process_target_ntncfg = false;
+    }
     break;
 
   case NR_RRC_MAC_INAC_IND:
@@ -2806,6 +2833,14 @@ static void nr_rrc_initiate_rrcReestablishment(NR_UE_RRC_INST_t *rrc, NR_Reestab
       set_DRB_status(rrc, i, RB_SUSPENDED);
     }
   }
+
+  // Free Target NTNcfg is stored
+  if (rrc->target_ntncfg) {
+    ASN_STRUCT_FREE(asn_DEF_NR_NTN_Config_r17, rrc->target_ntncfg);
+    rrc->target_ntncfg = NULL;
+    rrc->process_target_ntncfg = false;
+  }
+
   // release the MCG SCell(s), if configured
   // no SCell configured in our implementation
 
@@ -2994,6 +3029,13 @@ void nr_rrc_going_to_IDLE(NR_UE_RRC_INST_t *rrc,
   if (rrc->nrRrcState == RRC_STATE_DETACH_NR) {
     asn1cFreeStruc(asn_DEF_NR_UE_NR_Capability, rrc->UECap.UE_NR_Capability);
     asn1cFreeStruc(asn_DEF_NR_UE_TimersAndConstants, tac->sib1_TimersAndConstants);
+  }
+
+  // Free Target NTNcfg is stored
+  if (rrc->target_ntncfg) {
+    ASN_STRUCT_FREE(asn_DEF_NR_NTN_Config_r17, rrc->target_ntncfg);
+    rrc->target_ntncfg = NULL;
+    rrc->process_target_ntncfg = false;
   }
 
   // reset MAC
