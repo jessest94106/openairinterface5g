@@ -1139,14 +1139,23 @@ void nr_mac_prepare_ra_ue(gNB_MAC_INST *nrmac, NR_UE_info_t *UE)
   uint8_t num_preamble = cfra->resources.choice.ssb->ssb_ResourceList.list.count;
   ra->preambles.num_preambles = num_preamble;
   NR_COMMON_channels_t *cc = &nrmac->common_channels[0];
+  char buf[200];
+  int idx = 0;
   for (int i = 0; i < cc->num_active_ssb; i++) {
     for (int j = 0; j < num_preamble; j++) {
       if (cc->ssb_index[i] == cfra->resources.choice.ssb->ssb_ResourceList.list.array[j]->ssb) {
         // one dedicated preamble for each beam
         ra->preambles.preamble_list[i] = cfra->resources.choice.ssb->ssb_ResourceList.list.array[j]->ra_PreambleIndex;
+        if (idx < sizeof(buf) - 1)
+          idx += snprintf(buf + idx, sizeof(buf) - idx, "  %d", ra->preambles.preamble_list[i]);
         break;
       }
     }
   }
-  LOG_I(NR_MAC, "Added new %s process for UE RNTI %04x with initial CellGroup\n", ra->cfra ? "CFRA" : "CBRA", UE->rnti);
+  LOG_I(NR_MAC,
+        "Added new %s process for UE RNTI %04x with initial CellGroup and %d preamble(s): %s\n",
+        ra->cfra ? "CFRA" : "CBRA",
+        UE->rnti,
+        num_preamble,
+        buf);
 }
