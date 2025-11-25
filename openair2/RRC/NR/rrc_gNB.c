@@ -3187,10 +3187,6 @@ void *rrc_gnb_task(void *args_p) {
         rrc_gNB_process_dc_overall_timeout(instance, &X2AP_ENDC_DC_OVERALL_TIMEOUT(msg_p));
         break;
 
-      case NGAP_UE_CONTEXT_RELEASE_REQ:
-        rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_REQ(msg_p, instance);
-        break;
-
       case NGAP_UE_CONTEXT_RELEASE_COMMAND:
         rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_COMMAND(msg_p, instance);
         break;

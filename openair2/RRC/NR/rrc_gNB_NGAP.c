@@ -1049,7 +1049,8 @@ int rrc_gNB_send_NGAP_PDUSESSION_MODIFY_RESP(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE
   return 0;
 }
 
-//------------------------------------------------------------------------------
+/** @brief Send UE Context Release Request (NG-RAN node initiated)
+ * Direction: NG-RAN node -> AMF (8.3.2.2 3GPP TS 38.413) */
 void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(const module_id_t gnb_mod_idP,
                                               const rrc_gNB_ue_context_t *const ue_context_pP,
                                               const ngap_cause_t causeP)
@@ -1068,38 +1069,10 @@ void rrc_gNB_send_NGAP_UE_CONTEXT_RELEASE_REQ(const module_id_t gnb_mod_idP,
     // PDU Session Resource List (optional)
     FOR_EACH_SEQ_ARR(rrc_pdu_session_param_t *, session, &UE->pduSessions) {
       DevAssert(req->nb_of_pdusessions < NGAP_MAX_PDU_SESSION);
-      req->pdusessions[req->nb_of_pdusessions].pdusession_id = session->param.pdusession_id;
+      req->pdusession_ids[req->nb_of_pdusessions] = session->param.pdusession_id;
       req->nb_of_pdusessions++;
     }
     itti_send_msg_to_task(TASK_NGAP, GNB_MODULE_ID_TO_INSTANCE(gnb_mod_idP), msg);
-  }
-}
-/*------------------------------------------------------------------------------*/
-int rrc_gNB_process_NGAP_UE_CONTEXT_RELEASE_REQ(MessageDef *msg_p, instance_t instance)
-{
-  uint32_t gNB_ue_ngap_id;
-  gNB_ue_ngap_id = NGAP_UE_CONTEXT_RELEASE_REQ(msg_p).gNB_ue_ngap_id;
-  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(RC.nrrrc[instance], gNB_ue_ngap_id);
-
-  if (ue_context_p == NULL) {
-    /* Can not associate this message to an UE index, send a failure to ngAP and discard it! */
-    MessageDef *msg_fail_p;
-    LOG_W(RRC, "[gNB %ld] In NGAP_UE_CONTEXT_RELEASE_REQ: unknown UE from gNB_ue_ngap_id (%u)\n",
-          instance,
-          gNB_ue_ngap_id);
-    msg_fail_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_UE_CONTEXT_RELEASE_RESP); /* TODO change message ID. */
-    NGAP_UE_CONTEXT_RELEASE_RESP(msg_fail_p).gNB_ue_ngap_id = gNB_ue_ngap_id;
-    // TODO add failure cause when defined!
-    itti_send_msg_to_task(TASK_NGAP, instance, msg_fail_p);
-    return (-1);
-  } else {
-
-    /* Send the response */
-    MessageDef *msg_resp_p;
-    msg_resp_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_UE_CONTEXT_RELEASE_RESP);
-    NGAP_UE_CONTEXT_RELEASE_RESP(msg_resp_p).gNB_ue_ngap_id = gNB_ue_ngap_id;
-    itti_send_msg_to_task(TASK_NGAP, instance, msg_resp_p);
-    return (0);
   }
 }
 
