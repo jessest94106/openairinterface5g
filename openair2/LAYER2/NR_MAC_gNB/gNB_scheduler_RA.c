@@ -1629,8 +1629,6 @@ static void nr_generate_Msg2(module_id_t module_idP,
         ra->Msg3_frame,
         ra->Msg3_slot);
 
-  LOG_A(NR_MAC, "%d.%d Send RAR to RA-RNTI %04x\n", frameP, slotP, ra->RA_rnti);
-
   tx_req->PDU_index = pduindex;
   tx_req->num_TLV = 1;
   tx_req->TLVs[0].length = TBS;
