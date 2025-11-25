@@ -785,6 +785,7 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
 {
   gNB_MAC_INST *nr_mac = RC.nrmac[module_idP];
   NR_RA_t *ra = UE->ra;
+  DevAssert(!ra->cfra);
   NR_COMMON_channels_t *cc = &nr_mac->common_channels[CC_id];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
@@ -1451,6 +1452,11 @@ static void nr_generate_Msg2(module_id_t module_idP,
     return;
 
   const NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
+  // check the feasibility of Msg3, the actual Msg3 allocation
+  // is further below. In the case of CFRA, we don't need Msg3, but 38.321
+  // §5.1.4 does not clearly exclude Msg3, and UL TA might still be useful.
+  // Before the change in this commit, we used CFRA but required Msg3, which
+  // COTS UE would often (but not always) send.
   bool ret = get_feasible_msg3_tda(scc,
                                    get_delta_for_k2(ul_bwp->scs),
                                    ul_bwp->tdaList_Common,
@@ -1523,6 +1529,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
     return;
   }
 
+  // get an actual Msg3 allocation in CBRA
   bool msg3_ret = nr_get_Msg3alloc(nr_mac, CC_id, slotP, frameP, UE);
   if (!msg3_ret) {
     reset_beam_status(&nr_mac->beam_info, ra->Msg3_frame, ra->Msg3_slot, UE->UE_beam_index, n_slots_frame, ra->Msg3_beam.new_beam);
@@ -1609,25 +1616,31 @@ static void nr_generate_Msg2(module_id_t module_idP,
   // DL TX request
   nfapi_nr_pdu_t *tx_req = &TX_req->pdu_list[TX_req->Number_of_PDUs];
 
-  // Program UL processing for Msg3
+  // If CFRA: 38.321 §5.1.4 does not clearly say (to me) if UL grant should be
+  // dropped or not, and COTS UE would often send Msg3 if we configured CFRA
+  // but required Msg3. Also, "if RAR includes a MAC subPDU with RAPID: [...]
+  // indicate the reception of an acknowledgement for SI request to upper
+  // layers." which is not the case here.
   nr_add_msg3(module_idP, CC_id, frameP, slotP, UE, (uint8_t *)&tx_req->TLVs[0].value.direct[0]);
 
-  // Start RA contention resolution timer in Msg3 transmission slot (current slot + K2)
-  // 3GPP TS 38.321 Section 5.1.5 Contention Resolution
-  start_ra_contention_resolution_timer(
-      ra,
-      scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->ra_ContentionResolutionTimer,
-      *ul_bwp->tdaList_Common->list.array[ra->Msg3_tda_id]->k2 + get_NTN_Koffset(scc),
-      ul_bwp->scs);
+  if (!ra->cfra) {
+    LOG_D(NR_MAC,
+          "UE %04x: %d.%d: Setting RA-Msg3 reception for SFN.Slot %d.%d\n",
+          UE->rnti,
+          frameP,
+          slotP,
+          ra->Msg3_frame,
+          ra->Msg3_slot);
 
-  LOG_D(NR_MAC,
-        "UE %04x: %d.%d: Setting RA-Msg3 reception (%s) for SFN.Slot %d.%d\n",
-        UE->rnti,
-        frameP,
-        slotP,
-        ra->cfra ? "CFRA" : "CBRA",
-        ra->Msg3_frame,
-        ra->Msg3_slot);
+    // Start RA contention resolution timer in Msg3 transmission slot (current slot + K2)
+    // 3GPP TS 38.321 Section 5.1.5 Contention Resolution
+    start_ra_contention_resolution_timer(
+        ra,
+        scc->uplinkConfigCommon->initialUplinkBWP->rach_ConfigCommon->choice.setup->ra_ContentionResolutionTimer,
+        *ul_bwp->tdaList_Common->list.array[ra->Msg3_tda_id]->k2 + get_NTN_Koffset(scc),
+        ul_bwp->scs);
+
+  }
 
   tx_req->PDU_index = pduindex;
   tx_req->num_TLV = 1;
@@ -1652,6 +1665,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
     vrb_map[bwp_info.bwpStart + rb + rbStart] |= SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
   }
 
+  // In CFRA: in Msg3 handling, will unconditionally mark succeeded
   ra->ra_state = nrRA_WAIT_Msg3;
 }
 
@@ -1673,6 +1687,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_SearchSpace_t *ss = sched_ctrl->search_space;
     NR_RA_t *ra = UE->ra;
+    DevAssert(!ra->cfra);
     const char *ra_type_str = ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4";
     NR_ControlResourceSet_t *coreset = sched_ctrl->coreset;
     AssertFatal(coreset != NULL, "Coreset cannot be null for RA %s\n", ra_type_str);

@@ -725,13 +725,6 @@ static void handle_nr_ul_harq(gNB_MAC_INST *nrmac,
 
 static void handle_msg3_failed_rx(gNB_MAC_INST *mac, NR_RA_t *ra, rnti_t rnti, int harq_round_max)
 {
-  // for CFRA (NSA) do not schedule retransmission of msg3
-  if (ra->cfra) {
-    LOG_W(NR_MAC, "UE %04x RA failed at state %s (NSA msg3 reception failed)\n", rnti, nrra_text[ra->ra_state]);
-    nr_release_ra_UE(mac, rnti);
-    return;
-  }
-
   if (ra->msg3_round >= harq_round_max - 1) {
     LOG_W(NR_MAC, "UE %04x RA failed at state %s (Reached msg3 max harq rounds)\n", rnti, nrra_text[ra->ra_state]);
     nr_release_ra_UE(mac, rnti);
@@ -756,6 +749,7 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
                          const uint16_t rssi)
 {
   gNB_MAC_INST *mac = RC.nrmac[mod_id];
+  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
   NR_UE_info_t *UE = find_ra_UE(&mac->UE_info, rnti);
   if (!UE) {
     LOG_E(NR_MAC, "UL SDU discarded. Couldn't finde UE with RNTI %04x \n", rnti);
@@ -766,6 +760,31 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
   if (ra->ra_type == RA_4_STEP && ra->ra_state != nrRA_WAIT_Msg3) {
     LOG_W(NR_MAC, "UL SDU discarded for RNTI %04x RA state not waiting for PUSCH\n", UE->rnti);
     return;
+  }
+
+  // CFRA: we scheduled Msg3 (which does not exist in CFRA, see also
+  // nr_generate_Msg2()). We did not mark RA as complete right away, as the
+  // DLSCH scheduler might schedule in the same slot as Msg2 if RLC has data
+  // (which can only happen in do-ra), so we mark it as complete now.
+  if (ra->cfra) {
+    NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+    nr_mac_reset_ul_failure(sched_ctrl);
+    reset_dl_harq_list(sched_ctrl);
+    reset_ul_harq_list(sched_ctrl);
+    // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration in SA
+    // in NSA (or do-ra) there is no reconfiguration in NR
+    int ss_type = IS_SA_MODE(get_softmodem_params()) ? NR_SearchSpace__searchSpaceType_PR_common
+                                                     : NR_SearchSpace__searchSpaceType_PR_ue_Specific;
+    configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
+    // initialize ta_frame in case there is no Msg3 received
+    UE->UE_sched_ctrl.ta_frame = (frame + 100) % MAX_FRAME_NUMBER;
+    if (!transition_ra_connected_nr_ue(mac, UE)) {
+      LOG_E(NR_MAC, "cannot add UE %04x: list is full\n", UE->rnti);
+      delete_nr_ue_data(UE, NULL, &mac->UE_info.uid_allocator);
+    } else {
+      LOG_A(NR_MAC, "(rnti 0x%04x) CFRA procedure succeeded!\n", UE->rnti);
+    }
+    return; // TODO: handle Msg3 in case it has been received?
   }
 
   const int target_snrx10 = mac->pusch_target_snrx10;
@@ -826,94 +845,73 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
     UE_scheduling_control->ta_update = timing_advance;
   UE_scheduling_control->raw_rssi = rssi;
   LOG_D(NR_MAC, "[UE %04x] PUSCH TPC %d and TA %d\n", UE->rnti, UE_scheduling_control->tpc0, UE_scheduling_control->ta_update);
-  NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
-  if (ra->cfra) {
-    LOG_A(NR_MAC, "(rnti 0x%04x) CFRA procedure succeeded!\n", UE->rnti);
-    nr_mac_reset_ul_failure(UE_scheduling_control);
-    reset_dl_harq_list(UE_scheduling_control);
-    reset_ul_harq_list(UE_scheduling_control);
-    process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, UE->CellGroup->rlc_BearerToAddModList);
-    int ss_type;
-    // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration in SA
-    // in NSA (or do-ra) there is no reconfiguration in NR
-    if (IS_SA_MODE(get_softmodem_params()))
-      ss_type = NR_SearchSpace__searchSpaceType_PR_common;
-    else
-      ss_type = NR_SearchSpace__searchSpaceType_PR_ue_Specific;
-    configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
-    if (!transition_ra_connected_nr_ue(mac, UE)) {
-      LOG_E(NR_MAC, "cannot add UE %04x: list is full\n", UE->rnti);
-      delete_nr_ue_data(UE, NULL, &mac->UE_info.uid_allocator);
-      return;
-    }
-  } else {
-    LOG_D(NR_MAC, "[RAPROC] Received %s:\n", ra->ra_type == RA_2_STEP ? "MsgA-PUSCH" : "Msg3");
-    for (uint32_t k = 0; k < sdu_len; k++) {
-      LOG_D(NR_MAC, "(%i): 0x%x\n", k, sdu[k]);
-    }
 
-    // 3GPP TS 38.321 Section 5.4.3 Multiplexing and assembly
-    // Logical channels shall be prioritised in accordance with the following order (highest priority listed first):
-    // - MAC CE for C-RNTI, or data from UL-CCCH;
-    // This way, we need to process MAC CE for C-RNTI if RA is active and it is present in the MAC PDU
-    // Search for MAC CE for C-RNTI
-    rnti_t crnti = lcid_crnti_lookahead(sdu, sdu_len);
-    if (crnti != 0) { // 3GPP TS 38.321 Table 7.1-1: RNTI values, RNTI 0x0000: N/A
-      // Replace the current UE by the UE identified by C-RNTI
-      NR_UE_info_t *old_UE = find_nr_UE(&mac->UE_info, crnti);
-      if (!old_UE) {
-        // The UE identified by C-RNTI no longer exists at the gNB
-        // Let's abort the current RA, so the UE will trigger a new RA later but using RRCSetupRequest instead. A better
-        // solution may be implemented
-        LOG_W(NR_MAC, "No UE found with C-RNTI %04x, ignoring Msg3 to have UE come back with new RA attempt\n", UE->rnti);
-        nr_release_ra_UE(mac, rnti);
-        return;
-      }
-      // in case UE beam has changed
-      old_UE->UE_beam_index = UE->UE_beam_index;
-      // Reset UL failure for old UE
-      nr_mac_reset_ul_failure(&old_UE->UE_sched_ctrl);
-      // Reset HARQ processes
-      reset_dl_harq_list(&old_UE->UE_sched_ctrl);
-      reset_ul_harq_list(&old_UE->UE_sched_ctrl);
+  LOG_D(NR_MAC, "[RAPROC] Received %s:\n", ra->ra_type == RA_2_STEP ? "MsgA-PUSCH" : "Msg3");
+  for (uint32_t k = 0; k < sdu_len; k++) {
+    LOG_D(NR_MAC, "(%i): 0x%x\n", k, sdu[k]);
+  }
 
-      // Only trigger RRCReconfiguration if UE is not performing RRCReestablishment
-      // The RRCReconfiguration will be triggered by the RRCReestablishmentComplete
-      if (!old_UE->reconfigSpCellConfig) {
-        LOG_I(NR_MAC, "Received UL_SCH_LCID_C_RNTI with C-RNTI 0x%04x, triggering RRC Reconfiguration\n", crnti);
-        // Trigger RRCReconfiguration
-        nr_mac_trigger_reconfiguration(mac, old_UE, -1);
-        // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
-        configure_UE_BWP(mac, scc, old_UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
-      }
+  // 3GPP TS 38.321 Section 5.4.3 Multiplexing and assembly
+  // Logical channels shall be prioritised in accordance with the following order (highest priority listed first):
+  // - MAC CE for C-RNTI, or data from UL-CCCH;
+  // This way, we need to process MAC CE for C-RNTI if RA is active and it is present in the MAC PDU
+  // Search for MAC CE for C-RNTI
+  rnti_t crnti = lcid_crnti_lookahead(sdu, sdu_len);
+  if (crnti != 0) { // 3GPP TS 38.321 Table 7.1-1: RNTI values, RNTI 0x0000: N/A
+    // Replace the current UE by the UE identified by C-RNTI
+    NR_UE_info_t *old_UE = find_nr_UE(&mac->UE_info, crnti);
+    if (!old_UE) {
+      // The UE identified by C-RNTI no longer exists at the gNB
+      // Let's abort the current RA, so the UE will trigger a new RA later but using RRCSetupRequest instead. A better
+      // solution may be implemented
+      LOG_W(NR_MAC, "No UE found with C-RNTI %04x, ignoring Msg3 to have UE come back with new RA attempt\n", UE->rnti);
       nr_release_ra_UE(mac, rnti);
-      LOG_A(NR_MAC, "%4d.%2d RA with C-RNTI %04x complete\n", frame, slot, crnti);
-
-      // Decode the entire MAC PDU
-      // It may have multiple MAC subPDUs, for example, a MAC subPDU with LCID 1 caring a RRCReestablishmentComplete
-      nr_process_mac_pdu(mod_id, old_UE, CC_id, frame, slot, sdu, sdu_len, -1);
       return;
     }
+    // in case UE beam has changed
+    old_UE->UE_beam_index = UE->UE_beam_index;
+    // Reset UL failure for old UE
+    nr_mac_reset_ul_failure(&old_UE->UE_sched_ctrl);
+    // Reset HARQ processes
+    reset_dl_harq_list(&old_UE->UE_sched_ctrl);
+    reset_ul_harq_list(&old_UE->UE_sched_ctrl);
 
-    // UE Contention Resolution Identity
-    // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
-    // First byte corresponds to R/LCID MAC sub-header
-    memcpy(ra->cont_res_id, &sdu[1], sizeof(uint8_t) * 6);
+    // Only trigger RRCReconfiguration if UE is not performing RRCReestablishment
+    // The RRCReconfiguration will be triggered by the RRCReestablishmentComplete
+    if (!old_UE->reconfigSpCellConfig) {
+      LOG_I(NR_MAC, "Received UL_SCH_LCID_C_RNTI with C-RNTI 0x%04x, triggering RRC Reconfiguration\n", crnti);
+      // Trigger RRCReconfiguration
+      nr_mac_trigger_reconfiguration(mac, old_UE, -1);
+      // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration
+      configure_UE_BWP(mac, scc, old_UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
+    }
+    nr_release_ra_UE(mac, rnti);
+    LOG_A(NR_MAC, "%4d.%2d RA with C-RNTI %04x complete\n", frame, slot, crnti);
 
-    // Decode MAC PDU
-    // the function is only called to decode the contention resolution sub-header
-    // harq_pid set a non-valid value because it is not used in this call
-    nr_process_mac_pdu(mod_id, UE, CC_id, frame, slot, sdu, sdu_len, -1);
-
-    LOG_I(NR_MAC,
-          "Activating scheduling %s for TC_RNTI 0x%04x (state %s)\n",
-          ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4",
-          UE->rnti,
-          nrra_text[ra->ra_state]);
-    ra->ra_state = ra->ra_type == RA_2_STEP ? nrRA_MsgB : nrRA_Msg4;
-    LOG_D(NR_MAC, "TC_RNTI 0x%04x next RA state %s\n", UE->rnti, nrra_text[ra->ra_state]);
+    // Decode the entire MAC PDU
+    // It may have multiple MAC subPDUs, for example, a MAC subPDU with LCID 1 caring a RRCReestablishmentComplete
+    nr_process_mac_pdu(mod_id, old_UE, CC_id, frame, slot, sdu, sdu_len, -1);
     return;
   }
+
+  // UE Contention Resolution Identity
+  // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
+  // First byte corresponds to R/LCID MAC sub-header
+  memcpy(ra->cont_res_id, &sdu[1], sizeof(uint8_t) * 6);
+
+  // Decode MAC PDU
+  // the function is only called to decode the contention resolution sub-header
+  // harq_pid set a non-valid value because it is not used in this call
+  nr_process_mac_pdu(mod_id, UE, CC_id, frame, slot, sdu, sdu_len, -1);
+
+  LOG_I(NR_MAC,
+        "Activating scheduling %s for TC_RNTI 0x%04x (state %s)\n",
+        ra->ra_type == RA_2_STEP ? "MsgB" : "Msg4",
+        UE->rnti,
+        nrra_text[ra->ra_state]);
+  ra->ra_state = ra->ra_type == RA_2_STEP ? nrRA_MsgB : nrRA_Msg4;
+  LOG_D(NR_MAC, "TC_RNTI 0x%04x next RA state %s\n", UE->rnti, nrra_text[ra->ra_state]);
+  return;
 }
 
 static void _nr_rx_sdu(const module_id_t gnb_mod_idP,
