@@ -1192,7 +1192,11 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   // Activate SRBs
   activate_srb(UE, SRB1);
   activate_srb(UE, SRB2);
-  nr_rrc_pdcp_config_security(UE, false);
+  // During N2 handover, the UE continues using the old security context from the source gNB
+  // until it receives and processes the RRC Reconfiguration with masterKeyUpdate. The first
+  // PDUs sent after CFRA are still ciphered with the old keys. The target gNB must enable
+  // ciphering during handover setup to correctly decipher and verify integrity of these PDUs.
+  nr_rrc_pdcp_config_security(UE, true);
 
   // Process all PDU Session Resource Setup items from handover request
   DevAssert(msg->nb_of_pdusessions <= NGAP_MAX_PDU_SESSION);
