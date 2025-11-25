@@ -1526,9 +1526,9 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(ngap_pdusession_release_comm
         cmd->nb_pdusessions_torelease);
   e1ap_bearer_mod_req_t req = {0};
   for (int pdusession = 0; pdusession < cmd->nb_pdusessions_torelease; pdusession++) {
-    rrc_pdu_session_param_t *pduSession = find_pduSession(&UE->pduSessions, cmd->pdusession_release_params[pdusession].pdusession_id);
+    rrc_pdu_session_param_t *pduSession = find_pduSession(&UE->pduSessions, cmd->pdusession_ids[pdusession]);
     if (!pduSession) {
-      LOG_E(NR_RRC, "Failed to release non-existing PDU Session %d\n", cmd->pdusession_release_params[pdusession].pdusession_id);
+      LOG_E(NR_RRC, "Failed to release non-existing PDU Session %d\n", cmd->pdusession_ids[pdusession]);
       continue;
     }
     if (pduSession->status == PDU_SESSION_STATUS_TORELEASE) {

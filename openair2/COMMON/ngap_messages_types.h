@@ -902,12 +902,6 @@ typedef struct ngap_pdusession_modify_resp_s {
   pdusession_failed_t pdusessions_failed[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_modify_resp_t;
 
-typedef struct pdusession_release_s {
-  /* Unique pdusession_id for the UE. */
-  uint8_t pdusession_id;
-  byte_array_t data;
-} pdusession_release_t;
-
 typedef struct ngap_pdusession_release_command_s {
   /* AMF UE id  */
   uint64_t amf_ue_ngap_id;
@@ -918,13 +912,18 @@ typedef struct ngap_pdusession_release_command_s {
   /* The NAS PDU should be forwarded by the RRC layer to the NAS layer */
   byte_array_t nas_pdu;
 
-  /* Number of pdusession to be released in the list */
+  // PDU Session Resource to Release List (mandatory)
   uint16_t nb_pdusessions_torelease;
-
-  /* PDUSession release command */
-  pdusession_release_t pdusession_release_params[NGAP_MAX_PDU_SESSION];
+  uint16_t pdusession_ids[NGAP_MAX_PDU_SESSION];
 
 } ngap_pdusession_release_command_t;
+
+typedef struct pdusession_release_s {
+  // PDU Session ID (mandatory)
+  uint8_t pdusession_id;
+  // PDU Session Resource Release Response Transfer (mandatory)
+  byte_array_t pdusession_release_response_transfer;
+} pdusession_release_t;
 
 typedef struct ngap_pdusession_release_resp_s {
   // AMF UE NGAP ID
