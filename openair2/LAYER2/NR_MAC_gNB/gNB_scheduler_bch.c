@@ -375,8 +375,10 @@ static NR_sched_pdsch_t schedule_control_sib1(gNB_MAC_INST *gNB_mac,
     for (int rb = 0; rb < pdsch.rbSize; rb++) {
       vrb_map[rb + type0_PDCCH_CSS_config->cset_start_rb] |= SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
     }
-  } else 
+  } else {
     pdsch.tb_size = 0; // to signal we couldn't allocate TBS
+    pdsch.time_domain_allocation = -1;
+  }
 
   return pdsch;
 }
@@ -472,6 +474,53 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
         pdcch_pdu_rel15->numDlDci);
 }
 
+static bool check_sib1_tda(gNB_MAC_INST *gNB_mac,
+                           NR_sched_pdcch_t *sched_pdcch,
+                           NR_beam_alloc_t *beam,
+                           int tda,
+                           int ssb_index,
+                           int CC_id,
+                           int candidate_idx)
+{
+  NR_COMMON_channels_t *cc = &gNB_mac->common_channels[CC_id];
+  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+  NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = &gNB_mac->type0_PDCCH_CSS_config[ssb_index];
+  default_table_type_t table_type = get_default_table_type(type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern);
+  // If the PDSCH was scheduled with SI-RNTI in PDCCH Type0 common search space,
+  // the UE may assume that this PDSCH resource allocation is not applied (Table 5.1.2.1.1-4 and 5 in 38.214)
+  int row = tda + 1;
+  if (table_type == defaultB && (row == 12 || row == 13 || row == 14))
+    false;
+  if (table_type == defaultC && (row == 1 || row == 6 || row == 7 ||row > 12))
+    false;
+  // assuming normal CP
+  NR_tda_info_t tda_info = get_info_from_tda_tables(table_type, tda, scc->dmrs_TypeA_Position, true);
+  // SIB1 TDA going to the last symbol would cause overlap with CSI-RS
+  if (!tda_info.valid_tda || tda_info.startSymbolIndex + tda_info.nrOfSymbols == 14)
+    false;
+  if (tda_info.startSymbolIndex < type0_PDCCH_CSS_config->first_symbol_index + type0_PDCCH_CSS_config->num_symbols)
+    false;
+
+  NR_pdsch_dmrs_t dmrs_parms = get_dl_dmrs_params(scc, NULL, &tda_info, 1);
+  // Configure sched_ctrlCommon for SIB1
+  gNB_mac->sib1_pdsch[ssb_index] = schedule_control_sib1(gNB_mac,
+                                                         CC_id,
+                                                         sched_pdcch,
+                                                         type0_PDCCH_CSS_config,
+                                                         tda,
+                                                         &dmrs_parms,
+                                                         &tda_info,
+                                                         candidate_idx,
+                                                         beam->idx,
+                                                         cc->sib1_bcch_length);
+  if (gNB_mac->sib1_pdsch[ssb_index].tb_size > 0) {
+    LOG_D(NR_MAC, "Found TDA for SIB1: %d\n", tda);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void schedule_nr_sib1(module_id_t module_idP,
                       frame_t frameP,
                       slot_t slotP,
@@ -483,7 +532,8 @@ void schedule_nr_sib1(module_id_t module_idP,
   const int CC_id = 0;
   uint8_t candidate_idx = 0;
   gNB_MAC_INST *gNB_mac = RC.nrmac[module_idP];
-  NR_ServingCellConfigCommon_t *scc = gNB_mac->common_channels[CC_id].ServingCellConfigCommon;
+  NR_COMMON_channels_t *cc = &gNB_mac->common_channels[CC_id];
+  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   int L_max;
   switch (scc->ssb_PositionsInBurst->present) {
     case 1:
@@ -515,55 +565,32 @@ void schedule_nr_sib1(module_id_t module_idP,
       int beam_index = get_beam_from_ssbidx(gNB_mac, i);
       NR_beam_alloc_t beam = beam_allocation_procedure(&gNB_mac->beam_info, frameP, slotP, beam_index, n_slots_frame);
       AssertFatal(beam.idx >= 0, "Cannot allocate SIB1 corresponding to SSB %d in any available beam\n", i);
-      NR_COMMON_channels_t *cc = &gNB_mac->common_channels[0];
       LOG_D(NR_MAC,"(%d.%d) SIB1 transmission: ssb_index %d\n", frameP, slotP, type0_PDCCH_CSS_config->ssb_index);
-      default_table_type_t table_type = get_default_table_type(type0_PDCCH_CSS_config->type0_pdcch_ss_mux_pattern);
       NR_sched_pdcch_t sched_pdcch = set_pdcch_structure(NULL,
                                                          gNB_mac->sched_ctrlCommon->search_space,
                                                          gNB_mac->sched_ctrlCommon->coreset,
                                                          scc,
                                                          NULL,
                                                          type0_PDCCH_CSS_config);
-      int time_domain_allocation = -1;
-      NR_sched_pdsch_t sched_pdsch = {0};
-      for (int t = 0; t < 16; t++) {
-        // If the PDSCH was scheduled with SI-RNTI in PDCCH Type0 common search space,
-        // the UE may assume that this PDSCH resource allocation is not applied (Table 5.1.2.1.1-4 and 5 in 38.214)
-        int row = t + 1;
-        if (table_type == defaultB && (row == 12 || row == 13 || row == 14))
-          continue;
-        if (table_type == defaultC && (row == 1 || row == 6 || row == 7 ||row > 12))
-          continue;
-        // assuming normal CP
-        NR_tda_info_t tda_info = get_info_from_tda_tables(table_type, t, scc->dmrs_TypeA_Position, true);
-        // SIB1 TDA going to the last symbol would cause overlap with CSI-RS
-        if (!tda_info.valid_tda || tda_info.startSymbolIndex + tda_info.nrOfSymbols == 14)
-          continue;
-        if (tda_info.startSymbolIndex < type0_PDCCH_CSS_config->first_symbol_index + type0_PDCCH_CSS_config->num_symbols)
-          continue;
 
-        NR_pdsch_dmrs_t dmrs_parms = get_dl_dmrs_params(scc, NULL, &tda_info, 1);
-        // Configure sched_ctrlCommon for SIB1
-        sched_pdsch = schedule_control_sib1(gNB_mac,
-                                            CC_id,
-                                            &sched_pdcch,
-                                            type0_PDCCH_CSS_config,
-                                            t,
-                                            &dmrs_parms,
-                                            &tda_info,
-                                            candidate_idx,
-                                            beam.idx,
-                                            cc->sib1_bcch_length);
-        if (sched_pdsch.tb_size > 0) {
-          time_domain_allocation = t;
-          break;
+      bool res = false;
+      if (gNB_mac->sib1_pdsch[i].time_domain_allocation < 0) {
+        for (int t = 0; t < 16; t++) {
+          if (check_sib1_tda(gNB_mac, &sched_pdcch, &beam, t, i, CC_id, candidate_idx)) {
+            res = true;
+            break;
+          }
         }
       }
-      AssertFatal(time_domain_allocation > 0, "Couldn't select any TDA for SIB1\n");
+      AssertFatal(gNB_mac->sib1_pdsch[i].time_domain_allocation >= 0, "Couldn't select any TDA for SIB1\n");
+      if (!res)
+        res = check_sib1_tda(gNB_mac, &sched_pdcch, &beam, gNB_mac->sib1_pdsch[i].time_domain_allocation, i, CC_id, candidate_idx);
+      int tb_size = gNB_mac->sib1_pdsch[i].tb_size;
+      AssertFatal(res && tb_size > 0, "Couldn't allocate TB for SIB1 for an already allocated TDA\n");
       nfapi_nr_dl_tti_request_body_t *dl_req = &DL_req->dl_tti_request_body;
       int pdu_index = gNB_mac->pdu_index[0]++;
       nr_fill_nfapi_dl_SIB_pdu(gNB_mac,
-                               &sched_pdsch,
+                               &gNB_mac->sib1_pdsch[i],
                                &sched_pdcch,
                                gNB_mac->sched_ctrlCommon->search_space,
                                gNB_mac->sched_ctrlCommon->coreset,
@@ -579,11 +606,11 @@ void schedule_nr_sib1(module_id_t module_idP,
       nfapi_nr_pdu_t *tx_req = &TX_req->pdu_list[ntx_req];
 
       // Data to be transmitted
-      memcpy(tx_req->TLVs[0].value.direct, cc->sib1_bcch_pdu, sched_pdsch.tb_size);
+      memcpy(tx_req->TLVs[0].value.direct, cc->sib1_bcch_pdu, tb_size);
 
       tx_req->PDU_index  = pdu_index;
       tx_req->num_TLV = 1;
-      tx_req->TLVs[0].length = sched_pdsch.tb_size;
+      tx_req->TLVs[0].length = tb_size;
       tx_req->PDU_length = compute_PDU_length(tx_req->num_TLV, tx_req->TLVs[0].length);
       TX_req->Number_of_PDUs++;
       TX_req->SFN = frameP;
