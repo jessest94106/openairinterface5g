@@ -1113,7 +1113,12 @@ void post_process_dlsch(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pdsch, NR_UE
   // TODO: verify the case where maxMIMO_Layers is NULL, in which case
   //       in principle maxMIMO_layers should be given by the maximum number of layers
   //       for PDSCH supported by the UE for the serving cell (5.4.2.1 of 38.212)
-  long maxMIMO_Layers = UE->sc_info.maxMIMO_Layers_PDSCH ? *UE->sc_info.maxMIMO_Layers_PDSCH : 1;
+  long ue_supp_nl = ue_supported_dl_layers(scc, UE->capability);
+  long maxMIMO_Layers = UE->sc_info.maxMIMO_Layers_PDSCH ? *UE->sc_info.maxMIMO_Layers_PDSCH : ue_supp_nl;
+  if (maxMIMO_Layers < 1) {
+    LOG_D(NR_MAC, "Both maxMIMO_Layers_PDSCH and UE supported layers are not present, defaulting to 1\n");
+    maxMIMO_Layers = 1;
+  }
   const int nl_tbslbrm = min(maxMIMO_Layers, 4);
   nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu = prepare_pdsch_pdu(dl_tti_pdsch_pdu,
                                                                    nr_mac,
@@ -1395,5 +1400,4 @@ void nr_schedule_ue_spec(module_id_t module_id,
 
   /* PREPROCESSOR */
   gNB_mac->pre_processor_dl(gNB_mac, &pdsch);
-
 }
