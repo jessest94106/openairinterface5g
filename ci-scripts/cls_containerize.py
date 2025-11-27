@@ -581,7 +581,7 @@ class Containerize():
 		ret = cmd.run(f"docker image inspect --format=\'Size = {{{{.Size}}}} bytes\' {baseImage}:{baseTag}")
 		if ret.returncode != 0:
 			logging.error(f'No {baseImage} image present, cannot build tests')
-			HTML.CreateHtmlTestRow(self.imageKind, 'KO', CONST.ALL_PROCESSES_OK)
+			HTML.CreateHtmlTestRow("Unit test build failed", 'KO', CONST.ALL_PROCESSES_OK)
 			return False
 
 		# build ran-unittests image
