@@ -1121,7 +1121,8 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
                                 NR_ReportConfigToAddMod_t *rc_PER,
                                 NR_ReportConfigToAddMod_t *rc_A2,
                                 seq_arr_t *rc_A3_seq,
-                                seq_arr_t *neigh_seq)
+                                seq_arr_t *neigh_seq,
+                                int *neigh_a3_id)
 {
   DevAssert(mt != NULL && mt->frequencyAndTiming != NULL);
   const struct NR_MeasTiming__frequencyAndTiming *ft = mt->frequencyAndTiming;
@@ -1207,7 +1208,10 @@ NR_MeasConfig_t *get_MeasConfig(const NR_MeasTiming_t *mt,
   if (neigh_seq) {
     int i = 0;
     FOR_EACH_SEQ_ARR(nr_neighbour_cell_t *, neigh_cell, neigh_seq) {
-      NR_ReportConfigId_t reportConfigId = neigh_cell->physicalCellId == -1 ? 3 : i + 4;
+      NR_ReportConfigId_t reportConfigId = neigh_a3_id[i];
+      /* check that there is a A3 configured for this neighbour */
+      if (reportConfigId == -1)
+        continue;
       NR_MeasIdToAddMod_t *measid_A3 = get_MeasId(meas_idx + 1, reportConfigId, i + 2);
       meas_idx++;
       asn1cSeqAdd(&mc->measIdToAddModList->list, measid_A3);
