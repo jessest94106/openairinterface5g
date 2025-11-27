@@ -239,13 +239,14 @@ these values onto the diagonals, making it symmetric.
 * `--rfsimulator.beam_map <beam_map>` : where `<beam_map>` is a `uint64_t` value where each bit is an enabled TX/RX beam.
    For gNB: Initial beam_map, i.e. which beams gNB transmits/receives before calling beam APIs.
    For UE: Beam position in beam space in the simulation. The UE is not expected to use the beam APIs for now.
+* `--rfsimulator.beam_ids <beam_ids>` : where `<beam_ids>` is a comma separated list. Same as above but added for convenience.
 
 ## Runtime commands
 
 ### Moving the UE in beam space
 
-Use telnet command `rfsimu setbeams <beam_map>`. It works similar to the CLI command `--rfsimulator.beam_map <beam_map>`.
-Suggest to only use single bits here
+Use telnet command `rfsimu setbeams <beam_map>` or `rfsimu setbeamids <beam_ids>`. They correspond to the CLI parameters described
+above and work the same way.
 
 ### Modifying the gNB beam
 

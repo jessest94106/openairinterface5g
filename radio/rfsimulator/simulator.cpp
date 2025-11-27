@@ -79,6 +79,7 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
 #define RFSIMU_SECTION "rfsimulator"
 #define RFSIMU_OPTIONS_PARAMNAME "options"
 #define RFSIMU_BEAM_GAINS "beam_gains"
+#define RFSIMU_BEAM_IDS "beam_ids"
 
 #define RFSIM_CONFIG_HELP_OPTIONS                                                                  \
   " list of comma separated options to enable rf simulator functionalities. Available options: \n" \
@@ -106,6 +107,7 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
   BOOLPARAM("enable_beams",             "<enable simplified beam simulation>\n",    simBool,&(beam_ctrl->enable_beams),       0),                     \
   INTPARAM("num_concurrent_beams",      "<number of concurrent beams supported>\n", simOpt, &beam_ctrl->num_concurrent_beams, 1),                     \
   UINT64PARAM("beam_map",               "<initial beam map>\n",                     simOpt, &beam_map,                        1),                     \
+  STRINGPARAM(RFSIMU_BEAM_IDS,          "<initial beam ids>\n",                     simOpt, NULL,                             NULL),                  \
   STRINGPARAM(RFSIMU_BEAM_GAINS,        "<beam gain matrix in toeplitz form>\n",    simOpt, NULL,                             NULL),                  \
 };
 // clang-format on
@@ -119,6 +121,7 @@ static int rfsimu_setdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt
 static int rfsimu_getdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 static int rfsimu_vtime_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 static int rfsimu_set_beam(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
+static int rfsimu_set_beamids(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 // clang-format off
 static telnetshell_cmddef_t rfsimu_cmdarray[] = {
     {"show models", "", (cmdfunc_t)rfsimu_setchanmod_cmd, {(webfunc_t)getset_currentchannels_type}, TELNETSRV_CMDFLAG_WEBSRVONLY | TELNETSRV_CMDFLAG_GETWEBTBLDATA, NULL},
@@ -127,6 +130,7 @@ static telnetshell_cmddef_t rfsimu_cmdarray[] = {
     {"getdistance", "<model name>", (cmdfunc_t)rfsimu_getdistance_cmd, {NULL}, TELNETSRV_CMDFLAG_PUSHINTPOOLQ},
     {"vtime", "", (cmdfunc_t)rfsimu_vtime_cmd, {NULL}, TELNETSRV_CMDFLAG_PUSHINTPOOLQ | TELNETSRV_CMDFLAG_AUTOUPDATE},
     {"setbeam", "beam_map", (cmdfunc_t)rfsimu_set_beam, {NULL}, TELNETSRV_CMDFLAG_PUSHINTPOOLQ},
+    {"setbeamids", "beam_id1,beam_id2,...", (cmdfunc_t)rfsimu_set_beamids, {NULL}, TELNETSRV_CMDFLAG_PUSHINTPOOLQ},
     {"", "", NULL},
 };
 // clang-format on
@@ -562,6 +566,18 @@ static void rfsimulator_readconfig(rfsimulator_state_t *rfsimulator)
   beam_ctrl->rx.beams = initial_beams;
   beam_ctrl->tx.beams = initial_beams;
 
+  int beam_ids_param_index = config_paramidx_fromname(rfsimu_params, sizeofArray(rfsimu_params), RFSIMU_BEAM_IDS);
+  if (rfsimu_params[beam_ids_param_index].strptr) {
+    std::vector<int> beam_ids;
+    std::stringstream ss(*rfsimu_params[beam_ids_param_index].strptr);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+      beam_ids.push_back(std::stoi(token));
+    }
+    beam_ctrl->rx.beams = beam_ids;
+    beam_ctrl->tx.beams = beam_ids;
+  }
+
   if (strncasecmp(rfsimulator->ip, "enb", 3) == 0 || strncasecmp(rfsimulator->ip, "server", 3) == 0)
     rfsimulator->role = SIMU_ROLE_SERVER;
   else
@@ -579,6 +595,25 @@ static int rfsimu_set_beam(char *buff, int debug, telnet_printfunc_t prnt, void 
   beam_ctrl->rx.beams = beam_map_to_beams(beam_map);
   beam_ctrl->tx.beams = beam_map_to_beams(beam_map);
   prnt("Beam map set to 0x%lx\n", beam_map);
+  return CMDSTATUS_FOUND;
+}
+
+static int rfsimu_set_beamids(char *buff, int debug, telnet_printfunc_t prnt, void *arg)
+{
+  rfsimulator_state_t *t = (rfsimulator_state_t *)arg;
+  rfsim_beam_ctrl_t *beam_ctrl = t->beam_ctrl;
+  AssertFatal(beam_ctrl->enable_beams, "Beam simualtion is disabled, cannot set beams\n");
+  std::vector<int> beam_ids;
+  std::stringstream ss(buff);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    beam_ids.push_back(std::stoi(token));
+  }
+  std::lock_guard<std::mutex> lock_tx(beam_ctrl->tx.mutex);
+  std::lock_guard<std::mutex> lock_rx(beam_ctrl->rx.mutex);
+  beam_ctrl->rx.beams = beam_ids;
+  beam_ctrl->tx.beams = beam_ids;
+  prnt("Beam ids set\n");
   return CMDSTATUS_FOUND;
 }
 
