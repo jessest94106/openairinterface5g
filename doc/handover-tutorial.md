@@ -209,8 +209,8 @@ instead of waiting for UE measurement report.)
 Our CI setup consists of:
 - 2 USRPs B210 that are synchronized by connecting them to an Octoclock over
   10MHz refrence and a PPS signal. The RU hosts are synchronized via NTP.
-- Mini-Circuits RC4DAT-6G-60 programmable attenuator. To control the digital attenuator,
-  a Python script was developed `ci-scripts/attenuatorctl.py`.
+- Mini-Circuits RC4DAT-6G-60 programmable attenuator. To control the digital
+  attenuator, a Python script was developed `ci-scripts/attenuatorctl.py`.
 - Quectel RM520 as a UE.
 - The setup is run using Docker `ci-scripts/yaml_files/5g_sa_f1_b210_ho`.
 
@@ -328,7 +328,8 @@ nr_measurement_configuration = {
 };
 ```
 
-`@include` this configuration file inside the gNB section of CU file as shown below.
+`@include` this configuration file inside the gNB section of CU file as shown
+below.
 
 ```
     plmn_list = ({ mcc = 001; mnc = 01; mnc_length = 2; snssaiList = ({ sst = 1, sd = 0xffffff })});
@@ -390,7 +391,7 @@ are as follows:
   on UTC time or a timer-based solution, which can also be applied jointly (or
   not) with another trigger as the measurement-based trigger. The timer-based
   handover trigger considers the deterministic satellite movement to predict
-  the time duration for which the satellite’s footprint covers a certain zone.
+  the time duration for which the satellite's footprint covers a certain zone.
 
 - **Timing advance value-based triggering**: This method uses the timing
   advance value (independently or jointly with another trigger) to trigger a
@@ -432,14 +433,14 @@ We assume:
 
 * Two independent gNBs connected to the same 5GC via N2 interface.
 * A UE initially connected to gNB-PCI0, which will be handed over to gNB-PCI1.
-* Handover is triggered by either a decision based measurement event (e.g. A3) or
-telnet command.
+* Handover is triggered by either a decision based measurement event (e.g. A3)
+or telnet command.
 
 ## Steps to run N2 handover with OAI UE
 
 **Note for same-machine setup:** When running both gNBs on the same machine,
-you need to assign a unique IP address to the second gNB to avoid network conflicts.
-For example:
+you need to assign a unique IP address to the second gNB to avoid network
+conflicts. For example:
 
 ```sh
 sudo ip addr add 192.168.71.180/24 dev rfsim5g-public
@@ -490,15 +491,20 @@ From gNB-PCI0, trigger handover on target gNB with PCI 1 for UE ID 1:
 ```sh
 echo ci trigger_n2_ho 1,1 | nc 127.0.0.1 9090 && echo
 ```
-where the input parameters correspond to the PCI of the neighbour cell and the RRC ID of the UE.
+where the input parameters correspond to the PCI of the neighbor cell and the
+RRC ID of the UE.
 
 This will initiate the N2 handover on the source gNB.
 
 ## Neighbour list and measurement configuration
 
-Make sure the configuration file contains a neighbour list and measurement configuration, e.g. [neighbour-config-rfsim.conf](../../ci-scripts/conf_files/neighbour-config.conf).
-This configuration can also be present in a different file and included in the gNB configuration file with `@include "neighbour-config-rfsim.conf"`.
+Make sure the configuration file contains a neighbour list and measurement
+configuration, e.g. [neighbour-config-rfsim.conf](../../ci-scripts/conf_files/neighbour-config.conf).
+This configuration can also be present in a different file and included in the
+gNB configuration file with `@include "neighbour-config-rfsim.conf"`.
 
-For each gNB there is a `neighbour_cell_configuration` linked to its serving cell ID.
+For each gNB there is a `neighbour_cell_configuration` linked to its serving
+cell ID.
 
-See the example above for `neighbour-config-ho.conf`. The same configuration is for both F1 and N2 handover.
+See the example above for `neighbour-config-ho.conf`. The same configuration
+is for both F1 and N2 handover.
