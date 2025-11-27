@@ -75,9 +75,6 @@ bool wls_vnf_nr_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *
   return false;
 }
 
-void wls_vnf_set_p7_config(void *p7_config)
-{
-}
 
 bool wls_vnf_nr_send_p5_message(vnf_t *vnf,uint16_t p5_idx, nfapi_nr_p4_p5_message_header_t* msg, uint32_t msg_len)
 {
@@ -107,4 +104,28 @@ void *wls_fapi_pnf_nr_start_thread(void *ptr)
 void wls_pnf_set_p7_config(void *p7_config)
 {
 
+}
+
+void wls_fapi_nr_pnf_stop()
+{
+}
+
+void wls_pnf_close(pthread_t p5_thread)
+{
+}
+
+void wls_vnf_send_stop_request()
+{
+}
+
+void wls_vnf_stop()
+{
+}
+
+void socket_nfapi_nr_pnf_stop()
+{
+}
+
+void socket_nfapi_send_stop_request(vnf_t *vnf)
+{
 }

@@ -1356,6 +1356,18 @@ static void config_pdcp(configmodule_interface_t *cfg, nr_pdcp_configuration_t *
   pdcp_config->drb.discard_timer = config_get_processedint(cfg, &pdcp_params[CONFIG_NR_PDCP_DRB_DISCARD_TIMER_IDX]);
 }
 
+void nfapi_stop_l1()
+{
+  if (NFAPI_MODE && (NFAPI_MODE == NFAPI_MODE_AERIAL || NFAPI_MODE == NFAPI_MODE_VNF)) {
+    stop_nr_nfapi_vnf();
+  } else if (NFAPI_MODE && NFAPI_MODE == NFAPI_MODE_PNF) {
+    // PNF should just wait for the STOP.request to come from the L2
+    // If instead it was stopped first, in some cases it makes sense for it to terminate itself (WLS)
+    // Sends a STOP.indication to the VNF
+    stop_nr_nfapi_pnf();
+  }
+}
+
 static void get_bwp_config(nr_mac_config_t *configuration)
 {
   char path[MAX_OPTNAME_SIZE * 2 + 8];
