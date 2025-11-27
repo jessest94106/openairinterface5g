@@ -832,7 +832,6 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
     nr_mac_reset_ul_failure(UE_scheduling_control);
     reset_dl_harq_list(UE_scheduling_control);
     reset_ul_harq_list(UE_scheduling_control);
-    process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, UE->CellGroup->rlc_BearerToAddModList);
     int ss_type;
     // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration in SA
     // in NSA (or do-ra) there is no reconfiguration in NR

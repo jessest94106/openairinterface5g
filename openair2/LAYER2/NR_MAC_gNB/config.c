@@ -1099,6 +1099,13 @@ void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const plmn_id_t *plmn, uint64_t 
   AssertFatal(cc->sib1_bcch_length > 0, "could not encode SIB1\n");
 }
 
+static bool process_addmod_bearers_cellGroupConfig(NR_UE_sched_ctrl_t *sched_ctrl, const NR_RLC_BearerConfig_t *conf)
+{
+  int priority = conf->mac_LogicalChannelConfig->ul_SpecificParameters->priority;
+  nr_lc_config_t c = {.lcid = conf->logicalChannelIdentity, .priority = priority};
+  return nr_mac_add_lcid(sched_ctrl, &c);
+}
+
 bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t *CellGroup)
 {
   /* ideally, instead of this function, "users" of this function should call
@@ -1120,7 +1127,9 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t
   }
   int ss_type = NR_SearchSpace__searchSpaceType_PR_ue_Specific;
   configure_UE_BWP(nrmac, nrmac->common_channels[0].ServingCellConfigCommon, UE, false, ss_type, -1, -1);
-  process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, CellGroup->rlc_BearerToAddModList);
+  const struct NR_CellGroupConfig__rlc_BearerToAddModList *l = CellGroup->rlc_BearerToAddModList;
+  for (int i = 0; l != NULL && i < l->list.count; ++i)
+    process_addmod_bearers_cellGroupConfig(&UE->UE_sched_ctrl, CellGroup->rlc_BearerToAddModList->list.array[i]);
   AssertFatal(CellGroup->rlc_BearerToReleaseList == NULL, "cannot release bearers while adding new UEs\n");
   NR_SCHED_UNLOCK(&nrmac->sched_lock);
   LOG_I(NR_MAC, "Added new UE %x with initial CellGroup\n", rnti);

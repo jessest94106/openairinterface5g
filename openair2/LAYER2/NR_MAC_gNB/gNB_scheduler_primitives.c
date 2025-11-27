@@ -3963,23 +3963,6 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_
     free_cellGroupConfig(cellGroup_for_UE);
 }
 
-/* \brief add bearers from CellGroupConfig.
- *
- * This is a kind of hack, as this should be processed through a F1 UE Context
- * setup request, but some modes do not use that (NSA/do-ra/phy_test).  */
-void process_addmod_bearers_cellGroupConfig(NR_UE_sched_ctrl_t *sched_ctrl, const struct NR_CellGroupConfig__rlc_BearerToAddModList *addmod)
-{
-  if (addmod == NULL)
-    return; /* nothing to do */
-
-  for (int i = 0; i < addmod->list.count; ++i) {
-    const NR_RLC_BearerConfig_t *conf = addmod->list.array[i];
-    int lcid = conf->logicalChannelIdentity;
-    nr_lc_config_t c = {.lcid = lcid};
-    nr_mac_add_lcid(sched_ctrl, &c);
-  }
-}
-
 long get_lcid_from_drbid(int drb_id)
 {
   return drb_id + 3; /* LCID is DRB + 3 */
