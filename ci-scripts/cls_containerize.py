@@ -304,7 +304,7 @@ class Containerize():
 		result = re.search('gNB', self.imageKind)
 		if result is not None:
 			imageNames.append(('oai-gnb', 'gNB', 'oai-gnb', ''))
-		result = re.search('all', self.imageKind)
+		result = re.search('x86', self.imageKind)
 		if result is not None:
 			imageNames.append(('oai-enb', 'eNB', 'oai-enb', ''))
 			imageNames.append(('oai-gnb', 'gNB', 'oai-gnb', ''))
@@ -315,7 +315,6 @@ class Containerize():
 				imageNames.append(('oai-physim', 'phySim', 'oai-physim', ''))
 			if self.host == 'Ubuntu':
 				imageNames.append(('oai-lte-ru', 'lteRU', 'oai-lte-ru', ''))
-				imageNames.append(('oai-gnb-aerial', 'gNB.aerial', 'oai-gnb-aerial', ''))
 				# Building again the 5G images with Address Sanitizer
 				imageNames.append(('ran-build', 'build', 'ran-build-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
 				imageNames.append(('oai-enb', 'eNB', 'oai-enb-asan', '--build-arg "BUILD_OPTION=--sanitize"'))
