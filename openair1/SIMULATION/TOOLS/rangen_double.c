@@ -25,6 +25,7 @@
 
 #include  "sim.h"
 
+static inline void tableNor(unsigned long seed);
 static unsigned int urseed, iy, ir[98]; /// uniformrandom
 static bool tableNordDone = false; /// gaussZiggurat
 
@@ -49,14 +50,16 @@ void fill_random(void *buf, size_t sz)
 static const unsigned int a = 1664525lu;
 
 /*!\brief Initialization routine for Uniform/Gaussian random number generators. */
-void randominit(unsigned long seed_init)
+// fix seed number by env variable OAI_RNGSEED
+void randominit()
 {
-  unsigned long seed = seed_init;
-  if (seed_init == 0)
-    fill_random(&seed, sizeof(seed));
+  unsigned long seed;
   const char* str_oai_rngseed = getenv("OAI_RNGSEED");
-  if (str_oai_rngseed != NULL)
+  if (str_oai_rngseed != NULL) {
     seed = atoi(str_oai_rngseed);
+  } else {
+    fill_random(&seed, sizeof(seed));
+  }
   printf("Initializing random number generator, seed %lu\n", seed);
 
   // initialize uniformrandom RNG
@@ -71,7 +74,6 @@ void randominit(unsigned long seed_init)
 
   // initialize gaussZiggurat RNG
   tableNor(seed);
-  tableNordDone = true;
 }
 
 /*
@@ -164,7 +166,7 @@ double nfix(void)
 }
 
 /*!Procedure to create tables for normal distribution kn,wn and fn. */
-void tableNor(unsigned long seed)
+static inline void tableNor(unsigned long seed)
 {
   jsr = seed;
   double dn = 3.442619855899;
@@ -194,12 +196,11 @@ void tableNor(unsigned long seed)
 
 double __attribute__ ((no_sanitize("address", "undefined"))) gaussZiggurat(double mean, double variance)
 {
-  if (!tableNordDone) {
-    // let's make reasonnable constant tables
-    unsigned long seed;
-    fill_random(&seed, sizeof(seed));
-    tableNor(seed);
+  if (!__builtin_expect(tableNordDone, 1)) {
+    fprintf(stderr, "%s(): RNG not initialized, run randominit() first\n", __func__);
+    abort();
   }
+
   hz = SHR3;
   iz = hz & 127;
   return hz != INT32_MIN && abs(hz) < kn[iz] ? hz * wn[iz] : nfix();

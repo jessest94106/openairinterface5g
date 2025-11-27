@@ -141,7 +141,7 @@ int main(int argc, char **argv)
   }
 
   // logInit();
-  randominit(0);
+  randominit();
 
   int c;
   while ((c = getopt(argc, argv, "--:O:df:hpVg:i:j:n:l:m:r:s:S:y:z:M:N:F:R:P:L:X:")) != -1) {

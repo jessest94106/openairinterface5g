@@ -162,7 +162,7 @@ int main(int argc, char **argv){
     exit_fun("[SOFTMODEM] Error, configuration module init failed\n");
   }
 
-  randominit(0);
+  randominit();
 
   int c;
   while ((c = getopt (argc, argv, "--:O:hHaA:Cc:l:r:p:g:m:n:s:S:t:x:y:v:V:z:N:F:d:Z:L:R:E")) != -1) {

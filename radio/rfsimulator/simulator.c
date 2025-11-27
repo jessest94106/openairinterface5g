@@ -199,20 +199,6 @@ static buffer_t *allocCirBuf(rfsimulator_state_t *bridge, int sock)
 
   if (bridge->channelmod > 0) {
     // create channel simulation model for this mode reception
-    static bool init_done = false;
-
-    if (!init_done) {
-      uint64_t rand;
-      FILE *h = fopen("/dev/random", "r");
-
-      if (1 != fread(&rand, sizeof(rand), 1, h))
-        LOG_W(HW, "Can't read /dev/random\n");
-
-      fclose(h);
-      randominit(rand);
-      tableNor(rand);
-      init_done = true;
-    }
     char modelname[30];
     snprintf(modelname,
              sizeofArray(modelname),
@@ -1170,7 +1156,7 @@ int device_init(openair0_device *device, openair0_config_t *openair0_cfg) {
 
   AssertFatal((rfsimulator->epollfd = epoll_create1(0)) != -1, "epoll_create1() failed, errno(%d)", errno);
   // we need to call randominit() for telnet server (use gaussdouble=>uniformrand)
-  randominit(0);
+  randominit();
   set_taus_seed(0);
   /* look for telnet server, if it is loaded, add the channel modeling commands to it */
   add_telnetcmd_func_t addcmd = (add_telnetcmd_func_t)get_shlibmodule_fptr("telnetsrv", TELNET_ADDCMD_FNAME);
