@@ -172,14 +172,16 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
 
   struct xran_fh_init *fh_init = get_xran_fh_init();
   struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
-  int prach_sym = get_prach_conf_duration(0);
+  nr_prach_info_t prach_info = get_prach_info(0);
   struct xran_ru_config *ru_conf = &fh_cfg->ru_conf;
   int slots_per_frame = 10 << fh_cfg->frame_conf.nNumerology;
   int slots_per_subframe = 1 << fh_cfg->frame_conf.nNumerology;
 
   int tti = slots_per_frame * (frame) + (slot);
   uint32_t subframe = slot / slots_per_subframe;
-  uint32_t is_prach_slot = xran_is_prach_slot(0, subframe, (slot % slots_per_subframe));
+  // PRACH occasion in a frame if and only if SFN % x == y, TS 38.211 Table 6.3.3.2-2/3/4
+  uint32_t is_prach_frame = (frame % prach_info.x == prach_info.y);
+  uint32_t is_prach_slot = is_prach_frame && xran_is_prach_slot(0, subframe, (slot % slots_per_subframe));
 
   int nb_rx_per_ru = ru->nb_rx / fh_init->xran_ports;
   /* If it is PRACH slot, copy prach IQ from XRAN PRACH buffer to OAI PRACH buffer */
@@ -188,7 +190,7 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
       LOG_W(HW, "we get rach data from ru, but it is not scheduled %d.%d\n", frame, slot);
       return -1;
     }
-    for (sym_idx = 0; sym_idx < prach_sym; sym_idx++) {
+    for (sym_idx = 0; sym_idx < prach_info.N_dur; sym_idx++) {
       for (int aa = 0; aa < ru->nb_rx; aa++) {
         int16_t *dst, *src;
         int idx = 0;
