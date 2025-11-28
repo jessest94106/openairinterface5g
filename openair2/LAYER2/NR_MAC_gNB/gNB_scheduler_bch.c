@@ -320,62 +320,37 @@ static bool update_rb_mcs_tbs(NR_sched_pdsch_t *pdsch, uint32_t num_total_bytes,
   return true;
 }
 
-static NR_sched_pdsch_t schedule_control_sib1(gNB_MAC_INST *gNB_mac,
-                                              int CC_id,
-                                              NR_sched_pdcch_t *pdcch,
-                                              NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
-                                              int time_domain_allocation,
-                                              NR_pdsch_dmrs_t *dmrs_parms,
-                                              NR_tda_info_t *tda_info,
-                                              uint8_t candidate_idx,
-                                              int beam,
-                                              uint16_t num_total_bytes)
+static NR_sched_pdsch_t allocate_sib1(gNB_MAC_INST *gNB_mac,
+                                      int CC_id,
+                                      NR_sched_pdcch_t *pdcch,
+                                      NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config,
+                                      int aggregation_level,
+                                      int cce_index,
+                                      int time_domain_allocation,
+                                      NR_tda_info_t *tda_info,
+                                      int beam,
+                                      uint16_t num_total_bytes)
 {
-  AssertFatal(gNB_mac->sched_ctrlCommon, "sched_ctrlCommon is NULL\n");
   NR_COMMON_channels_t *cc = &gNB_mac->common_channels[CC_id];
-  uint16_t *vrb_map = cc->vrb_map[beam];
+  NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
+  NR_pdsch_dmrs_t dmrs_parms = get_dl_dmrs_params(scc, NULL, tda_info, 1);
   NR_sched_pdsch_t pdsch = {
       .bwp_info = get_pdsch_bwp_start_size(gNB_mac, NULL),
       .time_domain_allocation = time_domain_allocation,
-      .dmrs_parms = *dmrs_parms,
+      .dmrs_parms = dmrs_parms,
       .tda_info = *tda_info,
       .nrOfLayers = 1,
       .pm_index = 0,
       .mcs = 0, // starting from mcs 0
   };
-  gNB_mac->sched_ctrlCommon->num_total_bytes = num_total_bytes;
 
-  uint8_t nr_of_candidates = 0;
-
-  for (int i = 0; i < 3; i++) {
-    find_aggregation_candidates(&gNB_mac->sched_ctrlCommon->aggregation_level, &nr_of_candidates, gNB_mac->sched_ctrlCommon->search_space,4<<i);
-    if (nr_of_candidates > 0)
-      break; // choosing the lower value of aggregation level available
-  }
-  AssertFatal(nr_of_candidates > 0, "nr_of_candidates is 0\n");
-  gNB_mac->sched_ctrlCommon->cce_index = find_pdcch_candidate(gNB_mac,
-                                                              CC_id,
-                                                              gNB_mac->sched_ctrlCommon->aggregation_level,
-                                                              nr_of_candidates,
-                                                              beam,
-                                                              pdcch,
-                                                              gNB_mac->sched_ctrlCommon->coreset,
-                                                              0);
-
-  AssertFatal(gNB_mac->sched_ctrlCommon->cce_index >= 0, "Could not find CCE for coreset0\n");
-
-  bool success = update_rb_mcs_tbs(&pdsch, gNB_mac->sched_ctrlCommon->num_total_bytes, vrb_map);
+  uint16_t *vrb_map = cc->vrb_map[beam];
+  bool success = update_rb_mcs_tbs(&pdsch, num_total_bytes, vrb_map);
   if (success) {
     // Mark the corresponding RBs as used
-    fill_pdcch_vrb_map(gNB_mac,
-                       CC_id,
-                       pdcch,
-                       gNB_mac->sched_ctrlCommon->cce_index,
-                       gNB_mac->sched_ctrlCommon->aggregation_level,
-                       beam);
-    for (int rb = 0; rb < pdsch.rbSize; rb++) {
+    fill_pdcch_vrb_map(gNB_mac, CC_id, pdcch, cce_index, aggregation_level, beam);
+    for (int rb = 0; rb < pdsch.rbSize; rb++)
       vrb_map[rb + type0_PDCCH_CSS_config->cset_start_rb] |= SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
-    }
   } else {
     pdsch.tb_size = 0; // to signal we couldn't allocate TBS
     pdsch.time_domain_allocation = -1;
@@ -478,10 +453,11 @@ static void nr_fill_nfapi_dl_SIB_pdu(gNB_MAC_INST *gNB_mac,
 static bool check_sib1_tda(gNB_MAC_INST *gNB_mac,
                            NR_sched_pdcch_t *sched_pdcch,
                            NR_beam_alloc_t *beam,
+                           int aggregation_level,
+                           int cce_index,
                            int tda,
                            int ssb_index,
-                           int CC_id,
-                           int candidate_idx)
+                           int CC_id)
 {
   NR_COMMON_channels_t *cc = &gNB_mac->common_channels[CC_id];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
@@ -502,18 +478,17 @@ static bool check_sib1_tda(gNB_MAC_INST *gNB_mac,
   if (tda_info.startSymbolIndex < type0_PDCCH_CSS_config->first_symbol_index + type0_PDCCH_CSS_config->num_symbols)
     return false;
 
-  NR_pdsch_dmrs_t dmrs_parms = get_dl_dmrs_params(scc, NULL, &tda_info, 1);
-  // Configure sched_ctrlCommon for SIB1
-  gNB_mac->sib1_pdsch[ssb_index] = schedule_control_sib1(gNB_mac,
-                                                         CC_id,
-                                                         sched_pdcch,
-                                                         type0_PDCCH_CSS_config,
-                                                         tda,
-                                                         &dmrs_parms,
-                                                         &tda_info,
-                                                         candidate_idx,
-                                                         beam->idx,
-                                                         cc->sib1_bcch_length);
+  gNB_mac->sib1_pdsch[ssb_index] = allocate_sib1(gNB_mac,
+                                                 CC_id,
+                                                 sched_pdcch,
+                                                 type0_PDCCH_CSS_config,
+                                                 aggregation_level,
+                                                 cce_index,
+                                                 tda,
+                                                 &tda_info,
+                                                 beam->idx,
+                                                 cc->sib1_bcch_length);
+
   if (gNB_mac->sib1_pdsch[ssb_index].tb_size > 0) {
     LOG_D(NR_MAC, "Found TDA for SIB1: %d\n", tda);
     return true;
@@ -544,7 +519,6 @@ void schedule_nr_sib1(module_id_t module_idP,
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   // TODO: Get these values from RRC
   const int CC_id = 0;
-  uint8_t candidate_idx = 0;
   gNB_MAC_INST *gNB_mac = RC.nrmac[module_idP];
   NR_COMMON_channels_t *cc = &gNB_mac->common_channels[CC_id];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
@@ -588,10 +562,30 @@ void schedule_nr_sib1(module_id_t module_idP,
                                                          NULL,
                                                          type0_PDCCH_CSS_config);
 
+
+      uint8_t nr_of_candidates, aggregation_level;
+      for (int c = 0; c < 3; c++) {
+        find_aggregation_candidates(&aggregation_level,
+                                    &nr_of_candidates,
+                                    gNB_mac->sched_ctrlCommon->search_space,
+                                    4 << c);
+        if (nr_of_candidates > 0)
+          break; // choosing the lower value of aggregation level available
+      }
+      AssertFatal(nr_of_candidates > 0, "nr_of_candidates is 0\n");
+      int cce_index = find_pdcch_candidate(gNB_mac,
+                                           CC_id,
+                                           aggregation_level,
+                                           nr_of_candidates,
+                                           beam.idx,
+                                           &sched_pdcch,
+                                           gNB_mac->sched_ctrlCommon->coreset,
+                                           0);
+
       bool res = false;
       if (gNB_mac->sib1_pdsch[i].time_domain_allocation < 0) {
         for (int t = 0; t < 16; t++) {
-          if (check_sib1_tda(gNB_mac, &sched_pdcch, &beam, t, i, CC_id, candidate_idx)) {
+          if (check_sib1_tda(gNB_mac, &sched_pdcch, &beam, aggregation_level, cce_index, t, i, CC_id)) {
             res = true;
             break;
           }
@@ -599,7 +593,14 @@ void schedule_nr_sib1(module_id_t module_idP,
       }
       AssertFatal(gNB_mac->sib1_pdsch[i].time_domain_allocation >= 0, "Couldn't select any TDA for SIB1\n");
       if (!res)
-        res = check_sib1_tda(gNB_mac, &sched_pdcch, &beam, gNB_mac->sib1_pdsch[i].time_domain_allocation, i, CC_id, candidate_idx);
+        res = check_sib1_tda(gNB_mac,
+                             &sched_pdcch,
+                             &beam,
+                             aggregation_level,
+                             cce_index,
+                             gNB_mac->sib1_pdsch[i].time_domain_allocation,
+                             i,
+                             CC_id);
       int tb_size = gNB_mac->sib1_pdsch[i].tb_size;
       AssertFatal(res && tb_size > 0, "Couldn't allocate TB for SIB1 for an already allocated TDA\n");
       nfapi_nr_dl_tti_request_body_t *dl_req = &DL_req->dl_tti_request_body;
@@ -609,8 +610,8 @@ void schedule_nr_sib1(module_id_t module_idP,
                                &sched_pdcch,
                                gNB_mac->sched_ctrlCommon->search_space,
                                gNB_mac->sched_ctrlCommon->coreset,
-                               gNB_mac->sched_ctrlCommon->aggregation_level,
-                               gNB_mac->sched_ctrlCommon->cce_index,
+                               aggregation_level,
+                               cce_index,
                                dl_req,
                                pdu_index,
                                type0_PDCCH_CSS_config,
@@ -682,7 +683,6 @@ static void other_sib_sched_control(module_id_t module_idP,
 
   NR_COMMON_channels_t *cc = &gNB_mac->common_channels[0];
   NR_Type0_PDCCH_CSS_config_t *type0_PDCCH_CSS_config = &gNB_mac->type0_PDCCH_CSS_config[cc->ssb_index[beam_index]];
-  AssertFatal(gNB_mac->sched_ctrlCommon, "sched_ctrlCommon is NULL\n");
   NR_PDSCH_ConfigCommon_t *pdsch_ConfigCommon = scc->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup;
   int time_domain_allocation = 1;
   NR_tda_info_t tda_info = set_tda_info_from_list(pdsch_ConfigCommon->pdsch_TimeDomainAllocationList, time_domain_allocation);
