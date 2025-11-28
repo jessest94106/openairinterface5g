@@ -766,6 +766,7 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
   // nr_generate_Msg2()). We did not mark RA as complete right away, as the
   // DLSCH scheduler might schedule in the same slot as Msg2 if RLC has data
   // (which can only happen in do-ra), so we mark it as complete now.
+  bool cfra = ra->cfra;
   if (ra->cfra) {
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     nr_mac_reset_ul_failure(sched_ctrl);
@@ -784,11 +785,13 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
     } else {
       LOG_A(NR_MAC, "(rnti 0x%04x) CFRA procedure succeeded!\n", UE->rnti);
     }
-    return; // TODO: handle Msg3 in case it has been received?
   }
 
   const int target_snrx10 = mac->pusch_target_snrx10;
   if (!sdu) { // NACK
+    if (cfra)  // no Msg3 on CFRA, no problem
+      return;
+
     if (ra->ra_state != nrRA_WAIT_Msg3)
       return;
 
@@ -818,10 +821,11 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
 
   if (no_sig) {
     LOG_W(NR_MAC, "MSG3 ULSCH with no signal\n");
-    handle_msg3_failed_rx(mac, ra, rnti, mac->ul_bler.harq_round_max);
+    if (!cfra)
+      handle_msg3_failed_rx(mac, ra, rnti, mac->ul_bler.harq_round_max);
     return;
   }
-  if (ra->ra_type == RA_2_STEP) {
+  if (!cfra && ra->ra_type == RA_2_STEP) {
     // random access pusch with RA-RNTI
     if (ra->RA_rnti != rnti) {
       LOG_E(NR_MAC, "expected TC_RNTI %04x to match current RNTI %04x\n", ra->RA_rnti, rnti);
@@ -893,6 +897,9 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
     nr_process_mac_pdu(mod_id, old_UE, CC_id, frame, slot, sdu, sdu_len, -1);
     return;
   }
+
+  if (cfra)
+    return; // rest not relevant for CFRA
 
   // UE Contention Resolution Identity
   // Store the first 48 bits belonging to the uplink CCCH SDU within Msg3 to fill in Msg4
