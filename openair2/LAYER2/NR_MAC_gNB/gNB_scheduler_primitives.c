@@ -513,7 +513,7 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
 
   for (int i = 0; i < sps; i++) {
     if ((monitoringSymbolsWithinSlot >> (sps - 1 - i)) & 1) {
-      pdcch.StartSymbolIndex = ss->searchSpaceId == 0 ? i + type0_PDCCH_CSS_config->first_symbol_index : i;
+      pdcch.StartSymbolIndex = i;
       break;
     }
   }
