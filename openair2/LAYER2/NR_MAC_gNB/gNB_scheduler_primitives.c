@@ -397,7 +397,7 @@ NR_ControlResourceSet_t *get_coreset(gNB_MAC_INST *nrmac,
                                      NR_ControlResourceSetId_t coreset_id)
 {
   if (coreset_id == 0) {
-    return nrmac->sched_ctrlCommon->coreset; // this is coreset 0
+    return &nrmac->sched_ctrlSIB1->coreset; // this is coreset 0
   }
   if (bwp_dedicated) {
     const int n = bwp_dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.count;

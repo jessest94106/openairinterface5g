@@ -883,6 +883,11 @@ typedef struct dlul_mac_stats {
   mac_stats_t ul;
 } dlul_mac_stats_t;
 
+typedef struct {
+  NR_SearchSpace_t search_space[MAX_NUM_OF_SSB];
+  NR_ControlResourceSet_t coreset;
+} NR_sched_ctrl_sib1_t;
+
 /// helper type to encapsulate a frame/slot combination in a single type.
 /// Currently only used in the UL preprocessor. Note: if you use this type
 /// further, please refactor it into a common type first.
@@ -979,11 +984,11 @@ typedef struct gNB_MAC_INST_s {
   nr_mac_config_t radio_config;
   nr_rlc_configuration_t rlc_config;
 
-  NR_UE_sched_ctrl_t *sched_ctrlCommon;
+  NR_sched_ctrl_sib1_t *sched_ctrlSIB1;
   NR_sched_pdcch_t *sched_pdcch_otherSI;
   uint16_t cset0_bwp_start;
   uint16_t cset0_bwp_size;
-  NR_Type0_PDCCH_CSS_config_t type0_PDCCH_CSS_config[64];
+  NR_Type0_PDCCH_CSS_config_t type0_PDCCH_CSS_config[MAX_NUM_OF_SSB];
 
   bool first_MIB;
   NR_bler_options_t dl_bler;
