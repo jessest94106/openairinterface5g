@@ -241,14 +241,14 @@ The below configuration further enables periodic measurements, A2 event
 Better than Serving").
 The A2 event can be disabled by setting `enable = 0`.
 The A3 event cannot be disabled as of now. It can be made
-specific to cells or set to `cell_id = -1` which means "any cell".
+specific to cells or set to `physCellId = -1` which means "any cell".
 
 `hysteresis` is a margin added to the serving cell measurements to
 prevent unnecessary or frequent handovers. It ensures that the neighbouring
 cell must show sufficiently better signal quality before a handover is
 triggered. It is an integer between 0 and 30.
 
-`timeToTrigger` the time during which specific criteria for the event
+`time_to_trigger` the time during which specific criteria for the event
 needs to be met in order to trigger a measurement report. It is an enumerated
 parameter and in the configuration below it is set to 1 which corresponds to
 `ms40` or 40 milliseconds.
@@ -312,17 +312,17 @@ nr_measurement_configuration = {
   };
 
   A2 = {
-    enable        = 1;
-    threshold     = 60;
-    timeToTrigger = 1;
+    enable          = 1;
+    threshold       = 60;
+    time_to_trigger = 1;
   };
 
   A3 = (
     {
-      cell_id        = -1;
-      offset         = 10;
-      hysteresis     = 0;
-      timeToTrigger  = 1;
+      physCellId      = -1;
+      offset          = 10;
+      hysteresis      = 0;
+      time_to_trigger = 1;
     }
   )
 };
