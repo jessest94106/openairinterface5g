@@ -1463,14 +1463,11 @@ int get_format0(uint8_t index, uint8_t unpaired, frequency_range_t frequency_ran
   return format;
 }
 
-void find_aggregation_candidates(uint8_t *aggregation_level,
-                                 uint8_t *nr_of_candidates,
-                                 const NR_SearchSpace_t *ss,
-                                 int L)
+void find_aggregation_candidates(int *aggregation_level, int *nr_of_candidates, const NR_SearchSpace_t *ss, int L)
 {
-  AssertFatal(L>=1 && L<=16,"L %d not ok\n", L);
+  AssertFatal(L >= 1 && L <= 16,"L %d not ok\n", L);
   *nr_of_candidates = 0;
-  switch(L) {
+  switch (L) {
     case 1:
       if (ss->nrofCandidates->aggregationLevel1 != NR_SearchSpace__nrofCandidates__aggregationLevel1_n0) {
         *aggregation_level = 1;

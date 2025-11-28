@@ -592,7 +592,7 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const int CC_id,
                   const int slot,
                   const rnti_t rnti,
-                  uint8_t *aggregation_level,
+                  int *aggregation_level,
                   int beam_idx,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
@@ -600,11 +600,9 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   float pdcch_cl_adjust)
 {
   const uint32_t Y = get_Y(ss, slot, rnti);
-  uint8_t nr_of_candidates;
-
   int agg_level_search_order[NUM_PDCCH_AGG_LEVELS];
   determine_aggregation_level_search_order(agg_level_search_order, pdcch_cl_adjust);
-
+  int nr_of_candidates;
   for (int i = 0; i < NUM_PDCCH_AGG_LEVELS; i++) {
     find_aggregation_candidates(aggregation_level, &nr_of_candidates, ss, 1 << agg_level_search_order[i]);
     if (nr_of_candidates > 0)

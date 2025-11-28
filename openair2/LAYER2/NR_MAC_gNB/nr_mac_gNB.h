@@ -620,7 +620,7 @@ typedef struct {
   /// CCE index and Aggr. Level are shared for PUSCH/PDSCH allocation decisions
   /// corresponding to the sched_pusch/sched_pdsch structures below
   int cce_index;
-  uint8_t aggregation_level;
+  int aggregation_level;
   uint32_t dl_cce_fail, ul_cce_fail;
 
   /// Array of PUCCH scheduling information

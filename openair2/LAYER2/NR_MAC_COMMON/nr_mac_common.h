@@ -171,10 +171,7 @@ uint16_t get_rb_bwp_dci(nr_dci_format_t format,
                         uint16_t initial_ul_bwp_size,
                         uint16_t initial_dl_bwp_size);
 
-void find_aggregation_candidates(uint8_t *aggregation_level,
-                                 uint8_t *nr_of_candidates,
-                                 const NR_SearchSpace_t *ss,
-                                 int maxL);
+void find_aggregation_candidates(int *aggregation_level, int *nr_of_candidates, const NR_SearchSpace_t *ss, int L);
 
 bool get_nr_prach_sched_from_info(nr_prach_info_t info,
                                   int config_index,

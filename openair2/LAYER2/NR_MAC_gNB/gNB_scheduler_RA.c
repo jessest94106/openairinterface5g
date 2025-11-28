@@ -918,7 +918,7 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
       nr_mac->pdcch_pdu_idx[CC_id][coresetid] = pdcch_pdu_rel15;
     }
 
-    uint8_t aggregation_level;
+    int aggregation_level;
     int CCEIndex = get_cce_index(nr_mac,
                                  CC_id, slot, 0,
                                  &aggregation_level,
@@ -1517,7 +1517,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
     return;
   }
 
-  uint8_t aggregation_level;
+  int aggregation_level;
   int CCEIndex = get_cce_index(nr_mac, CC_id, slotP, 0, &aggregation_level, beam.idx, ss, coreset, &sched_ctrl->sched_pdcch, 0);
 
   if (CCEIndex < 0) {
@@ -1716,7 +1716,7 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
       return;
 
     // get CCEindex, needed also for PUCCH and then later for PDCCH
-    uint8_t aggregation_level;
+    int aggregation_level;
     int CCEIndex = get_cce_index(nr_mac,
                                  CC_id, slotP, 0,
                                  &aggregation_level,

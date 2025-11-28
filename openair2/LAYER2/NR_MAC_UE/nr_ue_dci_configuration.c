@@ -44,11 +44,8 @@ static void fill_dci_search_candidates(const NR_SearchSpace_t *ss, fapi_nr_dl_co
 
   int i = 0;
   for (int maxL = 16; maxL > 0; maxL >>= 1) {
-    uint8_t aggregation, max_number_of_candidates;
-    find_aggregation_candidates(&aggregation,
-                                &max_number_of_candidates,
-                                ss,
-                                maxL);
+    int aggregation, max_number_of_candidates;
+    find_aggregation_candidates(&aggregation, &max_number_of_candidates, ss, maxL);
     if (max_number_of_candidates == 0)
       continue;
     LOG_T(NR_MAC_DCI, "L %d, max number of candidates %d, aggregation %d\n", maxL, max_number_of_candidates, aggregation);
