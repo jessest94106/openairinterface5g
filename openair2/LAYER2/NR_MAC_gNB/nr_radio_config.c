@@ -585,22 +585,13 @@ static void config_csiim(int do_csirs,
 }
 
 
-void set_dl_maxmimolayers(NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig,
-                          const NR_ServingCellConfigCommon_t *scc,
-                          const NR_UE_NR_Capability_t *uecap,
-                          int maxMIMO_layers)
+long ue_supported_dl_layers(const NR_ServingCellConfigCommon_t *scc, const NR_UE_NR_Capability_t *uecap)
 {
-  if(!pdsch_servingcellconfig->ext1)
-    pdsch_servingcellconfig->ext1=calloc(1,sizeof(*pdsch_servingcellconfig->ext1));
-  if(!pdsch_servingcellconfig->ext1->maxMIMO_Layers)
-    pdsch_servingcellconfig->ext1->maxMIMO_Layers = calloc(1,sizeof(*pdsch_servingcellconfig->ext1->maxMIMO_Layers));
-
   NR_SCS_SpecificCarrier_t *scs_carrier = scc->downlinkConfigCommon->frequencyInfoDL->scs_SpecificCarrierList.list.array[0];
   int band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
   const frequency_range_t freq_range = get_freq_range_from_band(band);
   const int scs = scs_carrier->subcarrierSpacing;
   const int bw_size = scs_carrier->carrierBandwidth;
-
   NR_FeatureSets_t *fs = uecap ? uecap->featureSets : NULL;
   if (fs) {
     const int bw_mhz = get_supported_bw_mhz(freq_range, get_supported_band_index(scs, freq_range, bw_size));
@@ -610,16 +601,29 @@ void set_dl_maxmimolayers(NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig,
       if (scs == dl_fs->supportedSubcarrierSpacingDL &&
           supported_bw_comparison(bw_mhz, &dl_fs->supportedBandwidthDL, dl_fs->channelBW_90mhz) &&
           dl_fs->maxNumberMIMO_LayersPDSCH) {
-        long ue_supported_layers = (2 << *dl_fs->maxNumberMIMO_LayersPDSCH);
-        if (maxMIMO_layers == -1) 
-          *pdsch_servingcellconfig->ext1->maxMIMO_Layers = NR_MAX_SUPPORTED_DL_LAYERS < ue_supported_layers ? NR_MAX_SUPPORTED_DL_LAYERS : ue_supported_layers;
-        else 
-          *pdsch_servingcellconfig->ext1->maxMIMO_Layers = maxMIMO_layers < ue_supported_layers ? maxMIMO_layers : ue_supported_layers;
-        return;
+        return (2 << *dl_fs->maxNumberMIMO_LayersPDSCH);
       }
     }
   }
-  *pdsch_servingcellconfig->ext1->maxMIMO_Layers = 2;
+  return -1;
+}
+
+static void set_dl_maxmimolayers(NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig,
+                                 const NR_ServingCellConfigCommon_t *scc,
+                                 const NR_UE_NR_Capability_t *uecap,
+                                 int maxMIMO_layers)
+{
+  if(!pdsch_servingcellconfig->ext1)
+    pdsch_servingcellconfig->ext1 = calloc(1, sizeof(*pdsch_servingcellconfig->ext1));
+  if(!pdsch_servingcellconfig->ext1->maxMIMO_Layers)
+    pdsch_servingcellconfig->ext1->maxMIMO_Layers = calloc(1, sizeof(*pdsch_servingcellconfig->ext1->maxMIMO_Layers));
+
+  long l = ue_supported_dl_layers(scc, uecap);
+  long ue_supported_layers = l > 1 ? l : 2; // min UE supported layers = 2
+  if (maxMIMO_layers == -1) 
+    *pdsch_servingcellconfig->ext1->maxMIMO_Layers = min(NR_MAX_SUPPORTED_DL_LAYERS, ue_supported_layers);
+  else 
+    *pdsch_servingcellconfig->ext1->maxMIMO_Layers = min(maxMIMO_layers, ue_supported_layers);
 }
 
 // TODO: Implement to b_SRS = 1 and b_SRS = 2
@@ -3735,10 +3739,11 @@ NR_CellGroupConfig_t *get_initial_cellGroupConfig(int uid,
   return cellGroupConfig;
 }
 
-static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
+long ue_supported_ul_layers(const NR_UE_NR_Capability_t *uecap)
 {
   long ul_max_layers = 1;
-  if (uecap && uecap->featureSets
+  if (uecap
+      && uecap->featureSets
       && uecap->featureSets->featureSetsUplinkPerCC
       && uecap->featureSets->featureSetsUplinkPerCC->list.count > 0) {
     NR_FeatureSetUplinkPerCC_t *ul_feature_setup_per_cc = uecap->featureSets->featureSetsUplinkPerCC->list.array[0];
@@ -3754,9 +3759,13 @@ static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_
           ul_max_layers = 1;
       }
     }
-    ul_max_layers = min(ul_max_layers, configuration->pusch_AntennaPorts);
   }
   return ul_max_layers;
+}
+
+static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
+{
+  return min(ue_supported_ul_layers(uecap), configuration->pusch_AntennaPorts);
 }
 
 NR_CellGroupConfig_t * update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t *cellGroupConfig,

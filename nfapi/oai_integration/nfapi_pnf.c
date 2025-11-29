@@ -1780,6 +1780,35 @@ int nr_start_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nf
   return 0;
 }
 
+void stop_nr_nfapi_pnf()
+{
+#ifdef ENABLE_WLS
+  wls_fapi_nr_pnf_stop();
+#endif
+#ifdef ENABLE_SOCKET
+  socket_nfapi_nr_pnf_stop();
+#endif
+}
+static bool has_sent_stop_ind = false;
+int nr_stop_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi_nr_stop_request_scf_t *req)
+{
+  if (has_sent_stop_ind) {
+    // STOP.indication already sent, nothing to do
+    return 0;
+  }
+  NFAPI_TRACE(NFAPI_TRACE_INFO, "Send STOP.indication\n");
+  nfapi_nr_stop_indication_scf_t resp = {.header.message_id = NFAPI_NR_PHY_MSG_TYPE_STOP_INDICATION,
+                                         .header.phy_id = req->header.phy_id};
+  nfapi_nr_stop_indication(config, &resp);
+  has_sent_stop_ind = true;
+#ifdef ENABLE_WLS
+  wls_pnf_close(pnf_p5_init_and_receive_pthread);
+#endif
+  // raise the SIGTERM to simulate CTRL+C
+  raise(SIGTERM);
+  return 0;
+}
+
 int measurement_request(nfapi_pnf_config_t *config, nfapi_pnf_phy_config_t *phy, nfapi_measurement_request_t *req) {
   nfapi_measurement_response_t resp;
   memset(&resp, 0, sizeof(resp));
@@ -2135,6 +2164,7 @@ void configure_nr_nfapi_pnf(char *vnf_ip_addr, int vnf_p5_port, char *pnf_ip_add
   config->nr_param_req = &nr_param_request;
   config->nr_config_req = &nr_config_request;
   config->nr_start_req = &nr_start_request;
+  config->nr_stop_req = &nr_stop_request;
   config->rssi_req = &rssi_request;
   config->broadcast_detect_req = &broadcast_detect_request;
   config->system_information_schedule_req = &system_information_schedule_request;

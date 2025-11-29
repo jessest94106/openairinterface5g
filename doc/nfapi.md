@@ -194,14 +194,19 @@ Clone the Radisys repository (We're currently using the `oai_integration` branch
 
     git clone https://gerrit.o-ran-sc.org/r/o-du/l2 -b oai-integration
 
-Build the O-DU
+Build the O-DU (More details can be found in O-RAN's documentation page [here](https://docs.o-ran-sc.org/projects/o-ran-sc-o-du-l2/en/latest/user-guide.html#i-execution-on-locally-compiling-o-du-high-source-code))
 
     cd ~/l2/build/odu
     make clean_all;make odu PHY=INTEL_L1 MACHINE=BIT64 MODE=TDD;make cu_stub NODE=TEST_STUB MACHINE=BIT64 MODE=TDD;make ric_stub NODE=TEST_STUB MACHINE=BIT64 MODE=TDD
 
+The O-DU requires some virtual interfaces to be setup in order to enable communication between the O-DU, CU_stub and RIC_stub
 Setup local interfaces for the cu_stub, ric_stub and o_du
+The IP addresses shown match the ones specified in OSC ODU configuration file, found in <o-du directory>/build/config/tdd_odu_config.xml
+The parameters referenced are <DU_IP_V4_ADDR>, <CU_IP_V4_ADDR> and <RIC_IP_V4_ADDR>
 
-    sudo ifconfig enp7s0:ODU "192.168.130.81" && sudo ifconfig enp7s0:CU_STUB "192.168.130.82" && sudo ifconfig enp7s0:RIC_STUB "192.168.130.80"
+    sudo ifconfig <interface name>:ODU "192.168.130.81" 
+    sudo ifconfig <interface name>:CU_STUB "192.168.130.82"
+    sudo ifconfig <interface name>:RIC_STUB "192.168.130.80"
 
 Run cu_stu and ric_stub in separate terminals
 

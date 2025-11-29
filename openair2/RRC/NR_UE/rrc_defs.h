@@ -268,6 +268,8 @@ typedef struct NR_UE_RRC_INST_s {
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;
   // NTN params
   bool is_NTN_UE;
+  NR_NTN_Config_r17_t *target_ntncfg;
+  bool process_target_ntncfg;
   notifiedFIFO_t *mac_input_nf;
 } NR_UE_RRC_INST_t;
 

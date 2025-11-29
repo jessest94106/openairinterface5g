@@ -728,34 +728,19 @@ int nr_pnf_p7_get_msgs(pnf_p7_t* pnf_p7,
     ret_dl_tti->SFN = sfn;
     ret_dl_tti->Slot = slot;
     ret_dl_tti->dl_tti_request_body.nPDUs = 0;
+    nfapi_nr_dl_tti_request_t* dl_tti_req = &tx_slot_buffer->dl_tti_req;
+    if (dl_tti_req->SFN == sfn && dl_tti_req->Slot == slot) {
+      copy_dl_tti_request(dl_tti_req, ret_dl_tti);
+      tx_slot_buffer->dl_tti_req.SFN = -1;
+      tx_slot_buffer->dl_tti_req.Slot = -1;
+    }
+
     ret_tx_data->SFN = sfn;
     ret_tx_data->Slot = slot;
     ret_tx_data->Number_of_PDUs = 0;
-    nfapi_nr_dl_tti_request_t* dl_tti_req = &tx_slot_buffer->dl_tti_req;
     nfapi_nr_tx_data_request_t* txd = &tx_slot_buffer->tx_data_req;
-    if (dl_tti_req->SFN == sfn && dl_tti_req->Slot == slot && txd->SFN == sfn && txd->Slot == slot) {
-      nfapi_nr_dl_tti_request_body_t* p_tti = &dl_tti_req->dl_tti_request_body;
-      int ret_idx = 0;
-      for (int i = 0; i < p_tti->nPDUs; ++i) {
-        int tx_index = p_tti->dl_tti_pdu_list[i].pdsch_pdu.pdsch_pdu_rel15.pduIndex - 1;
-        if (tx_index >= txd->Number_of_PDUs) {
-          NFAPI_TRACE(NFAPI_TRACE_ERROR,
-                      "%4d.%2d no corresponding tx_data.request for dl_tti.request index %d, dropping\n",
-                      sfn,
-                      slot,
-                      tx_index);
-          continue;
-        }
-        ret_dl_tti->dl_tti_request_body.dl_tti_pdu_list[ret_idx] = p_tti->dl_tti_pdu_list[i];
-        // TODO avoid huge copy
-        ret_tx_data->pdu_list[ret_idx] = txd->pdu_list[i];
-        ret_idx++;
-      }
-      ret_dl_tti->dl_tti_request_body.nPDUs = ret_idx;
-      ret_tx_data->Number_of_PDUs = ret_idx;
-
-      tx_slot_buffer->dl_tti_req.SFN = -1;
-      tx_slot_buffer->dl_tti_req.Slot = -1;
+    if (txd->SFN == sfn && txd->Slot == slot) {
+      copy_tx_data_request(txd, ret_tx_data);
       tx_slot_buffer->tx_data_req.SFN = -1;
       tx_slot_buffer->tx_data_req.Slot = -1;
     }
@@ -764,10 +749,7 @@ int nr_pnf_p7_get_msgs(pnf_p7_t* pnf_p7,
     ret_ul_tti->Slot = slot;
     ret_ul_tti->n_pdus = 0;
     if (tx_slot_buffer->ul_tti_req.SFN == sfn && tx_slot_buffer->ul_tti_req.Slot == slot) {
-      nfapi_nr_ul_tti_request_t* p = &tx_slot_buffer->ul_tti_req;
-      ret_ul_tti->n_pdus = p->n_pdus;
-      for (int i = 0; i < p->n_pdus; ++i)
-        ret_ul_tti->pdus_list[i] = p->pdus_list[i];
+      copy_ul_tti_request(&tx_slot_buffer->ul_tti_req, ret_ul_tti);
       tx_slot_buffer->ul_tti_req.SFN = -1;
       tx_slot_buffer->ul_tti_req.Slot = -1;
     }
@@ -776,10 +758,7 @@ int nr_pnf_p7_get_msgs(pnf_p7_t* pnf_p7,
     ret_ul_dci->Slot = slot;
     ret_ul_dci->numPdus = 0;
     if (tx_slot_buffer->ul_dci_req.SFN == sfn && tx_slot_buffer->ul_dci_req.Slot == slot) {
-      nfapi_nr_ul_dci_request_t* p = &tx_slot_buffer->ul_dci_req;
-      ret_ul_dci->numPdus = p->numPdus;
-      for (int i = 0; i < p->numPdus; ++i)
-        ret_ul_dci->ul_dci_pdu_list[i] = p->ul_dci_pdu_list[i];
+      copy_ul_dci_request(&tx_slot_buffer->ul_dci_req, ret_ul_dci);
       tx_slot_buffer->ul_dci_req.SFN = -1;
       tx_slot_buffer->ul_dci_req.Slot = -1;
     }

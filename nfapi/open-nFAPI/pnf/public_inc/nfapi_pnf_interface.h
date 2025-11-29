@@ -497,6 +497,14 @@ int nfapi_nr_pnf_start_resp(nfapi_pnf_config_t* config, nfapi_nr_start_response_
  */
 int nfapi_pnf_stop_resp(nfapi_pnf_config_t* config, nfapi_stop_response_t* resp);
 
+/*! Send the STOP.indication
+ * \param config A pointer to a pnf configuration
+ * \param resp A pointer to the message structure
+ * \return 0 for success, -1 for failure
+ *
+ */
+int nfapi_nr_stop_indication(nfapi_pnf_config_t* config, nfapi_nr_stop_indication_scf_t* resp);
+
 /*! Send the MEASUREMENT.response
  * \param config A pointer to a pnf configuraiton
  * \param resp A pointer to the message structure

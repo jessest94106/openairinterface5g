@@ -1063,15 +1063,10 @@ static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
     }
   }
 
-#if 0
-  /* According to current understanding of E1 specifications, it is not needed
-   * to send security information because this does not change.
-   * But let's keep the code here in case it's needed.
-   */
-  // Always send security information
+  /* During reestablishment, for DRB integrity protection security keys change (KgNB* is derived),
+   * so security information MUST be sent to CU-UP to update DRB security keys. */
   req.secInfo = malloc_or_fail(sizeof(*req.secInfo));
   fill_security_info(rrc, ue_p, req.secInfo);
-#endif
 
   /* Send E1 Bearer Context Modification Request (3GPP TS 38.463) */
   sctp_assoc_t assoc_id = get_existing_cuup_for_ue(rrc, ue_p);
@@ -3407,26 +3402,7 @@ void rrc_gNB_generate_UeContextSetupRequest(const gNB_RRC_INST *rrc,
   }
 
   nr_rrc_du_container_t *du = get_du_for_ue((gNB_RRC_INST *)rrc, ue_p->rrc_ue_id);
-  byte_array_t *meas_timing_config = NULL;
-  if (du->mtc && ue_p->measConfig && ue_p->measConfig->measObjectToAddModList) {
-    NR_MeasObjectToAddModList_t *mo_list = ue_p->measConfig->measObjectToAddModList;
-    NR_ARFCN_ValueNR_t ssbFrequency0;
-    for (int i = 0; i < mo_list->list.count; i++) {
-      NR_MeasObjectToAddMod_t *mo = mo_list->list.array[i];
-      if (mo->measObject.present == NR_MeasObjectToAddMod__measObject_PR_measObjectNR) {
-        NR_MeasObjectNR_t *monr = mo->measObject.choice.measObjectNR;
-        if (i == 0) {
-          ssbFrequency0 = *monr->ssbFrequency;
-        } else if (ssbFrequency0 != *monr->ssbFrequency) {
-          meas_timing_config = calloc_or_fail(1, sizeof(*meas_timing_config));
-          meas_timing_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
-          meas_timing_config->len = do_NR_MeasurementTimingConfiguration(du->mtc, meas_timing_config->buf, NR_RRC_BUF_SIZE);
-          cu2du.meas_timing_config = meas_timing_config;
-          break;
-        }
-      }
-    }
-  }
+  cu2du.meas_timing_config = get_meas_timing_config(du->mtc, ue_p->measConfig);
 
   int nb_srb = 1;
   f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));

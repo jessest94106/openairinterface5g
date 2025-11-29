@@ -308,13 +308,21 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
         break;
       case NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE: {
         int tx_data_idx = dl_tti_pdu->pdsch_pdu.pdsch_pdu_rel15.pduIndex;
-        DevAssert(tx_data_idx < TX_req->Number_of_PDUs);
-        // reuse dlsch variables, as there are multiple very large memory
-        // buffers
-        gNB->dlsch[num_pdsch].pdsch_pdu = &dl_tti_pdu->pdsch_pdu;
-        gNB->dlsch[num_pdsch].pdu = (uint8_t *)TX_req->pdu_list[tx_data_idx].TLVs[0].value.direct;
-        DevAssert(num_pdsch < gNB->max_nb_pdsch);
-        num_pdsch++;
+        if (tx_data_idx < TX_req->Number_of_PDUs && TX_req->pdu_list[tx_data_idx].PDU_index == tx_data_idx) {
+          // reuse dlsch variables, as there are multiple very large memory
+          // buffers
+          gNB->dlsch[num_pdsch].pdsch_pdu = &dl_tti_pdu->pdsch_pdu;
+          gNB->dlsch[num_pdsch].pdu = (uint8_t *)TX_req->pdu_list[tx_data_idx].TLVs[0].value.direct;
+          DevAssert(num_pdsch < gNB->max_nb_pdsch);
+          num_pdsch++;
+        } else {
+          LOG_E(NR_PHY,
+                "%4d.%2d no corresponding tx_data.request for dl_tti.request index %d (out of %d)\n",
+                frame,
+                slot,
+                tx_data_idx,
+                TX_req->Number_of_PDUs);
+        }
         } break;
     }
   }

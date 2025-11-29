@@ -681,11 +681,9 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     /* new UE: tell the UE to reestablish RLC */
     struct NR_CellGroupConfig__rlc_BearerToAddModList *addmod = new_CellGroup->rlc_BearerToAddModList;
     for (int i = 0; i < addmod->list.count; ++i) {
-      asn1cCallocOne(addmod->list.array[i]->reestablishRLC, NR_RLC_BearerConfig__reestablishRLC_true);
-      for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
-        nr_lc_config_t *lc_config = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
-        nr_rlc_reestablish_entity(UE->rnti, lc_config->lcid);
-      }
+      NR_RLC_BearerConfig_t *bc = addmod->list.array[i];
+      asn1cCallocOne(bc->reestablishRLC, NR_RLC_BearerConfig__reestablishRLC_true);
+      nr_rlc_reestablish_entity(UE->rnti, bc->logicalChannelIdentity);
     }
   }
 
