@@ -56,7 +56,14 @@ void randominit()
   unsigned long seed;
   const char* str_oai_rngseed = getenv("OAI_RNGSEED");
   if (str_oai_rngseed != NULL) {
-    seed = atoi(str_oai_rngseed);
+    char *end;
+    seed = strtoul(str_oai_rngseed, &end, 0); /* 0: any base in hex, dec, oct */
+    AssertFatal(*end == '\0' || *end == '\n',
+                "could not read seed %s at char '%c' (%d), pos %ld\n",
+                str_oai_rngseed,
+                *end,
+                *end,
+                end - str_oai_rngseed);
   } else {
     fill_random(&seed, sizeof(seed));
   }
