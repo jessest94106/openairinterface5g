@@ -773,10 +773,9 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
     nr_mac_reset_ul_failure(sched_ctrl);
     reset_dl_harq_list(sched_ctrl);
     reset_ul_harq_list(sched_ctrl);
-    // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration in SA
-    // in NSA (or do-ra) there is no reconfiguration in NR
-    int ss_type = IS_SA_MODE(get_softmodem_params()) ? NR_SearchSpace__searchSpaceType_PR_common
-                                                     : NR_SearchSpace__searchSpaceType_PR_ue_Specific;
+    // we configure the UE using dedicated search space: In SA (CFRA used for
+    // handover) and NSA (or do-ra), the UE has the full config already.
+    int ss_type = NR_SearchSpace__searchSpaceType_PR_ue_Specific;
     configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
     // initialize ta_frame in case there is no Msg3 received
     UE->UE_sched_ctrl.ta_frame = (frame + 100) % MAX_FRAME_NUMBER;
