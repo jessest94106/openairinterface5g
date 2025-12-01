@@ -340,7 +340,6 @@ int main(int argc, char **argv)
   T_Config_Init();
 #endif
   initTpool(get_softmodem_params()->threadPoolConfig, &(nrUE_params.Tpool), cpumeas(CPUMEAS_GETSTATE));
-  //randominit (0);
   set_taus_seed (0);
 
   if (!has_cap_sys_nice())

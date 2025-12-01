@@ -572,11 +572,6 @@ channel_desc_t *new_channel_desc_scm(uint8_t nb_tx,
                                      double path_loss_dB,
                                      float noise_power_dB)
 {
-  // To create tables for normal distribution
-  struct timespec t;
-  clock_gettime(CLOCK_MONOTONIC, &t);
-  tableNor((long) (t.tv_nsec % INT_MAX));
-
   channel_desc_t *chan_desc = (channel_desc_t *)calloc(1,sizeof(channel_desc_t));
 
   for(int i=0; i<max_chan; i++) {

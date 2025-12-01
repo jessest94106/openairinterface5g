@@ -325,15 +325,13 @@ int main(int argc, char **argv)
   // int frame_length_complex_samples_no_prefix;
   NR_DL_FRAME_PARMS *frame_parms;
 
-  int seed = 0;
-
   cpuf = get_cpu_freq_GHz();
 
   if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == 0) {
     exit_fun("[NR_PSBCHSIM] Error, configuration module init failed\n");
   }
 
-  randominit(0);
+  randominit();
 
   int c;
   while ((c = getopt(argc, argv, "--:O:c:hn:o:s:FIL:N:R:S:T:")) != -1) {
@@ -456,7 +454,7 @@ int main(int argc, char **argv)
     }
   }
 
-  randominit(seed);
+  randominit();
 
   logInit();
   set_glog(loglvl);

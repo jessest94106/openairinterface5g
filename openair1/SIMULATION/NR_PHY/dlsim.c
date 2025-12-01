@@ -393,7 +393,7 @@ int main(int argc, char **argv)
     exit_fun("[NR_DLSIM] Error, configuration module init failed\n");
   }
 
-  randominit(0);
+  randominit();
 
   int print_perf = 0;
 

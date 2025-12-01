@@ -492,7 +492,6 @@ int main( int argc, char **argv ) {
 #if T_TRACER
   T_Config_Init();
 #endif
-  //randominit (0);
   set_taus_seed (0);
   cpuf=get_cpu_freq_GHz();
   pthread_cond_init(&sync_cond,NULL);

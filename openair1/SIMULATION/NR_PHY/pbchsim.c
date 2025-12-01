@@ -176,8 +176,6 @@ int main(int argc, char **argv)
 
   float target_error_rate = 0.01;
 
-  int seed = 0;
-
   cpuf = get_cpu_freq_GHz();
 
   if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == 0) {
@@ -185,8 +183,7 @@ int main(int argc, char **argv)
   }
 
   int c;
-  while ((c = getopt (argc, argv, "--:O:c:F:g:hIL:m:M:n:N:o:P:r:R:s:S:x:y:z:")) != -1) {
-
+  while ((c = getopt(argc, argv, "--:O:c:F:g:hIL:m:M:n:N:o:P:R:s:S:x:y:z:")) != -1) {
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */
     /* with this opstring getopt returns 1 for non-option arguments, refer to 'man 3 getopt' */
     if (c == 1 || c == '-' || c == 'O')
@@ -312,20 +309,6 @@ int main(int argc, char **argv)
         printf("Illegal PBCH phase (0-3) got %d\n",pbch_phase);
       break;
 
-    /*
-    case 'r':
-      ricean_factor = pow(10,-.1*atof(optarg));
-      if (ricean_factor>1) {
-        printf("Ricean factor must be between 0 and 1\n");
-        exit(-1);
-      }
-      break;
-    */
-
-    case 'r':
-      seed = atoi(optarg);
-      break;
-
     case 'R':
       N_RB_DL = atoi(optarg);
       break;
@@ -379,8 +362,10 @@ int main(int argc, char **argv)
 
     default:
     case 'h':
-      printf("%s -F input_filename -g channel_mod -h(elp) -I(nitial sync) -L log_lvl -n n_frames -M SSBs -n frames -N cell_id -o FO -P phase -r seed -R RBs -s snr0 -S snr1 -x transmission_mode -y TXant -z RXant\n",
-             argv[0]);
+      printf(
+          "OAI_RNGSEED=xxx ./%s -F input_filename -g channel_mod -h(elp) -I(nitial sync) -L log_lvl -n n_frames -M SSBs -n frames "
+          "-N cell_id -o FO -P phase -R RBs -s snr0 -S snr1 -x transmission_mode -y TXant -z RXant\n",
+          argv[0]);
       //printf("-A Interpolation_filname Run with Abstraction to generate Scatter plot using interpolation polynomial in file\n");
       printf("-c SSB subcarrier offset\n");
       //printf("-C Generate Calibration information for Abstraction (effective SNR adjustment to remove Pe bias w.r.t. AWGN)\n");
@@ -401,7 +386,6 @@ int main(int argc, char **argv)
       //printf("-O oversampling factor (1,2,4,8,16)\n");
       //printf("-p Use extended prefix mode\n");
       printf("-P PBCH phase, allowed values 0-3\n");
-      printf("-r set the random number generator seed (default: 0 = current time)\n");
       printf("-R N_RB_DL\n");
       printf("-s Starting SNR, runs from SNR0 to SNR0 + 10 dB if not -S given. If -n 1, then just SNR is simulated\n");
       printf("-S Ending SNR, runs from SNR0 to SNR1\n");
@@ -414,7 +398,7 @@ int main(int argc, char **argv)
     }
   }
 
-  randominit(seed);
+  randominit();
 
   logInit();
   set_glog(loglvl);

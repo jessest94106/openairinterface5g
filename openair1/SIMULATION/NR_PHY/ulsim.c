@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
   }
   int ul_proc_error = 0; // uplink processing checking status flag
   //logInit();
-  randominit(0);
+  randominit();
 
   /* initialize the sin-cos table */
   InitSinLUT();
