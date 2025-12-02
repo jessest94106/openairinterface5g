@@ -2603,3 +2603,120 @@ void free_positioning_activation_req(f1ap_positioning_activation_req_t *msg)
       break;
   }
 }
+
+/**
+ * @brief Encode F1 positioning activation response to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_activation_resp(const f1ap_positioning_activation_resp_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningActivation;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_SuccessfulOutcome__value_PR_PositioningActivationResponse;
+  F1AP_PositioningActivationResponse_t *out = &tmp->value.choice.PositioningActivationResponse;
+
+  /* mandatory : GNB_CU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningActivationResponseIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningActivationResponseIEs__value_PR_GNB_CU_UE_F1AP_ID;
+  ie1->value.choice.GNB_CU_UE_F1AP_ID = msg->gNB_CU_ue_id;
+
+  /* mandatory : GNB_DU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningActivationResponseIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningActivationResponseIEs__value_PR_GNB_DU_UE_F1AP_ID;
+  ie2->value.choice.GNB_DU_UE_F1AP_ID = msg->gNB_DU_ue_id;
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 positioning activation response
+ */
+bool decode_positioning_activation_resp(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_activation_resp_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningActivationResponse_t *in = &pdu->choice.successfulOutcome->value.choice.PositioningActivationResponse;
+  F1AP_PositioningActivationResponseIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningActivationResponseIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningActivationResponseIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID,
+                   true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningActivationResponseIEs__value_PR_GNB_CU_UE_F1AP_ID);
+        out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningActivationResponseIEs__value_PR_GNB_DU_UE_F1AP_ID);
+        out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_SystemFrameNumber:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      case F1AP_ProtocolIE_ID_id_SlotNumber:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      case F1AP_ProtocolIE_ID_id_CriticalityDiagnostics:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 positioning activation response deep copy
+ */
+f1ap_positioning_activation_resp_t cp_positioning_activation_resp(const f1ap_positioning_activation_resp_t *orig)
+{
+  /* copy all mandatory fields that are not dynamic memory */
+  f1ap_positioning_activation_resp_t cp = {
+      .gNB_CU_ue_id = orig->gNB_CU_ue_id,
+      .gNB_DU_ue_id = orig->gNB_DU_ue_id,
+  };
+
+  return cp;
+}
+
+/**
+ * @brief F1 positioning activation response equality check
+ */
+bool eq_positioning_activation_resp(const f1ap_positioning_activation_resp_t *a, const f1ap_positioning_activation_resp_t *b)
+{
+  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 positioning activation response
+ */
+void free_positioning_activation_resp(f1ap_positioning_activation_resp_t *msg)
+{
+  // nothing to free
+}

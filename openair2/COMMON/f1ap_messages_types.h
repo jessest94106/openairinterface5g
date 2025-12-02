@@ -1067,4 +1067,11 @@ typedef struct f1ap_positioning_activation_req_s {
   f1ap_srs_type_t srs_type;
 } f1ap_positioning_activation_req_t;
 
+typedef struct f1ap_positioning_activation_resp_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+} f1ap_positioning_activation_resp_t;
+
 #endif /* F1AP_MESSAGES_TYPES_H_ */
