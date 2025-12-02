@@ -1716,6 +1716,36 @@ static void test_f1ap_positioning_activation_response()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_activation_failure()
+{
+  f1ap_positioning_activation_failure_t orig = {
+      .gNB_CU_ue_id = 12,
+      .gNB_DU_ue_id = 19,
+      .cause = F1AP_CAUSE_MISC,
+      .cause_value = 3,
+  };
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_activation_failure(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_activation_failure_t decoded = {0};
+  bool ret = decode_positioning_activation_failure(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_activation_failure(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_activation_failure(&orig, &decoded);
+  AssertFatal(ret, "eq_positioning_activation_failure(): decoded message doesn't match\n");
+  free_positioning_activation_failure(&decoded);
+
+  f1ap_positioning_activation_failure_t cp = cp_positioning_activation_failure(&orig);
+  ret = eq_positioning_activation_failure(&orig, &cp);
+  AssertFatal(ret, "eq_positioning_activation_failure(): copied message doesn't match\n");
+  free_positioning_activation_failure(&orig);
+  free_positioning_activation_failure(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1747,5 +1777,6 @@ int main()
   test_f1ap_positioning_information_failure();
   test_f1ap_positioning_activation_request();
   test_f1ap_positioning_activation_response();
+  test_f1ap_positioning_activation_failure();
   return 0;
 }

@@ -1074,4 +1074,15 @@ typedef struct f1ap_positioning_activation_resp_s {
   uint32_t gNB_DU_ue_id;
 } f1ap_positioning_activation_resp_t;
 
+typedef struct f1ap_positioning_activation_failure_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+  // IE 9.3.1.2 (mandatory)
+  f1ap_Cause_t cause;
+  // IE 9.3.1.2 (mandatory)
+  long cause_value;
+} f1ap_positioning_activation_failure_t;
+
 #endif /* F1AP_MESSAGES_TYPES_H_ */
