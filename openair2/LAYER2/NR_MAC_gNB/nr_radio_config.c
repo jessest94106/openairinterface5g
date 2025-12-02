@@ -3517,19 +3517,6 @@ static NR_SpCellConfig_t *get_initial_SpCellConfig(int uid,
   asn1cCallocOne(pdsch_servingcellconfig->nrofHARQ_ProcessesForPDSCH, NR_PDSCH_ServingCellConfig__nrofHARQ_ProcessesForPDSCH_n16);
   pdsch_servingcellconfig->pucch_Cell = NULL;
   set_dl_maxmimolayers(pdsch_servingcellconfig, scc, NULL, configuration->maxMIMO_layers);
-  if (configuration->disable_harq) {
-    if (!pdsch_servingcellconfig->ext3)
-      pdsch_servingcellconfig->ext3 = calloc(1, sizeof(*pdsch_servingcellconfig->ext3));
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17 = calloc(1, sizeof(*pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17));
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->present = NR_SetupRelease_DownlinkHARQ_FeedbackDisabled_r17_PR_setup;
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf = calloc(4, sizeof(uint8_t));
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.size = 4;
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.bits_unused = 0;
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[0] = 0xFF;
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[1] = 0xFF;
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[2] = 0xFF;
-    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[3] = 0xFF;
-  }
 
   uint64_t bitmap = get_ssb_bitmap(scc);
   int first_active_bwp = 0;
@@ -3852,6 +3839,20 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
   NR_ServingCellConfig_t *spCellConfigDedicated = SpCellConfig->spCellConfigDedicated;
   NR_PDSCH_ServingCellConfig_t *pdsch_servingcellconfig = spCellConfigDedicated->pdsch_ServingCellConfig->choice.setup;
   set_dl_maxmimolayers(pdsch_servingcellconfig, scc, uecap, configuration->maxMIMO_layers);
+
+  if (configuration->disable_harq) {
+    if (!pdsch_servingcellconfig->ext3)
+      pdsch_servingcellconfig->ext3 = calloc(1, sizeof(*pdsch_servingcellconfig->ext3));
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17 = calloc(1, sizeof(*pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17));
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->present = NR_SetupRelease_DownlinkHARQ_FeedbackDisabled_r17_PR_setup;
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf = calloc(4, sizeof(uint8_t));
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.size = 4;
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.bits_unused = 0;
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[0] = 0xFF;
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[1] = 0xFF;
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[2] = 0xFF;
+    pdsch_servingcellconfig->ext3->downlinkHARQ_FeedbackDisabled_r17->choice.setup.buf[3] = 0xFF;
+  }
 
   NR_CSI_MeasConfig_t *csi_MeasConfig = spCellConfigDedicated->csi_MeasConfig->choice.setup;
   for (int report = 0; report < csi_MeasConfig->csi_ReportConfigToAddModList->list.count; report++) {
