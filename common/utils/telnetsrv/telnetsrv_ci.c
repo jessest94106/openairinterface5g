@@ -348,7 +348,7 @@ static int trigger_ngap_pdu_session_release(char *buf, int debug, telnet_printfu
     if (sid < 1 || sid > 255) {
       ERROR_MSG_RET("Invalid pdusession_id(int): %s (must be between 1 and 255)\n", tokens[i]);
     }
-    msg->pdusession_release_params[nb_sessions++].pdusession_id = sid;
+    msg->pdusession_ids[nb_sessions++] = sid;
   }
 
   msg->nb_pdusessions_torelease = nb_sessions;
@@ -356,7 +356,7 @@ static int trigger_ngap_pdu_session_release(char *buf, int debug, telnet_printfu
   if (prnt) {
     prnt("Triggering NGAP PDU Session Release for gNB_ue_ngap_id=%d: releasing pdusession_id=%d", gNB_ue_ngap_id);
     for (int i = 0; i < nb_sessions; ++i) {
-      prnt(" %d,", msg->pdusession_release_params[i].pdusession_id);
+      prnt(" %d,", msg->pdusession_ids[i]);
     }
     prnt("\n");
   }
