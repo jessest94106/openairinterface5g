@@ -118,6 +118,15 @@ void nr_derive_key_ng_ran_star(uint16_t pci, uint64_t nr_arfcn_dl, const uint8_t
 {
 }
 
+/* this is a hack, but necessary for E2 agent. We compile in all of RRC
+ * (because of CMakeLists.txt), but we don't need it (only nr_radio_config.c).
+ * however, if E2 agent is defined, the following functions are used in
+ * rrc_gNB.c, but defined in RAN functions. In order to avoid pulling this in
+ * here as well, only provide a prototype (and abort if they are ever called). */
+void signal_rrc_msg(void /*const nr_rrc_class_e nr_channel, const uint32_t rrc_msg_id, const byte_array_t rrc_ba*/ ) { abort(); }
+void signal_rrc_state_changed_to(void /* const gNB_RRC_UE_t *rrc_ue_context, const rrc_state_e2sm_rc_e rrc_state */) { abort(); }
+void signal_ue_id(void /* const gNB_RRC_UE_t *rrc_ue_context, const uint16_t class, const uint32_t msg_id */) { abort(); }
+
 /* Function to set or overwrite PTRS DL RRC parameters */
 static void rrc_config_dl_ptrs_params(NR_BWP_Downlink_t *bwp, long *ptrsNrb, long *ptrsMcs, long *epre_Ratio, long *reOffset)
 {
