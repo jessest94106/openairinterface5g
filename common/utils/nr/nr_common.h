@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include "assertions.h"
 #include "common/utils/utils.h"
+#include "common/utils/LOG/log.h"
 
 #define MAX_SI_GROUPS 3
 #define NR_MAX_PDSCH_TBS 3824
@@ -270,6 +271,19 @@ static __attribute__((always_inline)) inline int count_bits64_with_mask(uint64_t
 {
   uint64_t mask = ((1LL << num) - 1) << start;
   return count_bits64(v & mask);
+}
+
+static inline void warn_higher_threequarter_fs(const int n_rb, const int mu)
+{
+  LOG_W(PHY,
+        "3/4 sampling is not possible for current PRB size: %d and numerology: %d.\n "
+        "So 6/4 sampling is chosen to support x3xx type USRPs.\n "
+        "Note that this sampling rate increases fronthaul traffic, FFT buffer size and processing time by a factor of two compared "
+        "to 3/4 sampling rate.\n "
+        "Some PRACH configuration might not be supported with 6/4 FFT size.\n "
+        "Consider reducing the PRB size that would fit within the FFT size of 3/4 sampling\n",
+        n_rb,
+        mu);
 }
 
 uint64_t reverse_bits(uint64_t in, int n_bits);
