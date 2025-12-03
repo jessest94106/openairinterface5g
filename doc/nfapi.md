@@ -1,3 +1,5 @@
+# FAPI/nFAPI split in OAI
+
 This document describes the SmallCellForum (SCF) (n)FAPI split in 5G, i.e.,
 between the MAC/L2 and PHY/L1. It also describes how to make use of the 
 multiple transport mechanisms between the 2.
@@ -10,7 +12,7 @@ about nFAPI can be found in SCF 225.2.0.
 
 [[_TOC_]]
 
-# Quickstart
+## Quickstart
 
 Compile OAI as normal. Start the CN and make sure that the VNF configuration
 matches the PLMN/IP addresses. Then, run the VNF
@@ -29,7 +31,7 @@ VNF!)
 You should not observe a difference between nFAPI split and monolithic.
 
 
-# Status
+## Status
 
 All FAPI message can be transferred between VNF and PNF. This is because OAI
 uses FAPI with its corresponding messages internally, whether a split is in use
@@ -54,7 +56,7 @@ When using RFsim, the system might run slower than in monolithic. This is
 because the PNF needs to slow down the execution time of a specific slot,
 because it has to send a Slot.indication to the VNF for scheduling.
 
-# Configuration
+## Configuration
 
 Both PNF and VNF are run through the `nr-softmodem` executable. The type of
 mode is switched through the `--nfapi` switch, with options `MONOLITHIC`
@@ -256,7 +258,7 @@ Run the OAI-UE
 
     sudo ./nr-uesoftmodem -r 273 --numerology 1 --band 78 -C 3400140000 --ssb 1518 --uicc0.imsi 001010000000001 --rfsim
 
-# nFAPI logging system
+## nFAPI logging system
 
 nFAPI has its own logging system, independent of OAI's. It can be activated by
 setting the `NFAPI_TRACE_LEVEL` environment variable to an appropriate value;
