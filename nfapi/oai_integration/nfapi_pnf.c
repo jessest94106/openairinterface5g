@@ -2315,7 +2315,7 @@ void handle_nr_slot_ind(uint16_t sfn, uint16_t slot, NR_Sched_Rsp_t *sched_resp)
 #ifndef ENABLE_WLS
   int slot_ahead = 2 << mu;
 #else
-  int slot_ahead = 1;
+  int slot_ahead = 1 << mu;
 #endif
   uint16_t sfn_tx = sfn;
   uint16_t slot_tx = slot;
