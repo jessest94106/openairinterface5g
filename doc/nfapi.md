@@ -285,3 +285,26 @@ done over virtual time, i.e., frames/slots as executed by the 5G Systems. For
 instance, these numbers might be slightly higher or slower in RFsim than in
 wall-clock time, depending if the system advances faster or slower than
 wall-clock time.
+
+## Troubleshoot
+
+When operating using the FAPI split, the PNF needs to give the VNF extra time
+to schedule the next slot. Especially since the current nFAPI split still
+relies on slot indications, extra time due to transport delays need to be
+accounted for.  Currently, this delay is set conservatively, meaning that it
+should work for most systems, but can create problems during random access:
+
+    [NR_MAC] exceeded RA window: preamble at 411.19 now 413.0 (diff 21), ra_ResponseWindow 5/20 slots
+    [NR_MAC] sfn: 413.0 UE RA-RNTI 010b TC-RNTI 5d82: exceeded RA window, cannot schedule Msg2
+
+means that the VNF received a preamble (411.19), but the current slot to be
+scheduled (413.0) is beyond the random access response window (20 slots). In
+this case, try one of the following:
+
+- If the radio allows, reduce the L1 TX advance `RUs.[0].sl_ahead` by some
+  slots, but note that this could make the system less stable.
+- Change the code to reduce `sl_ahead` inside function `handle_nr_slot_ind()`,
+  to reduce the FAPI scheduling slot time budget.
+- Non-standard: You can manually increase the response window by setting
+  `gNBs.[0].servingCellConfigCommon.[0].ra_ResponseWindow` to, e.g., 6. Note
+  that the maximum allowed response window is 10ms.
