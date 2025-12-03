@@ -173,6 +173,26 @@ After installing WLS, you can run the build command as shown below:
 
 Refer to the above steps in [Quickstart](#quickstart), but run the PNF first as it is the WLS "master".
 
+To optimize the performance of your setup, you can provide the option
+`--thread-pool <list of allocated CPUs>` in the PNF command line. This allows
+you to pin PNF processing threads to specific CPU cores, as they might
+otherwise interfere with DPDK used by WLS.
+
+Before selecting which CPU cores to allocate: run `nr-softmodem` without the
+`--thread-pool` option and use a process monitoring tool such as htop to check
+CPU availability. Check for lightly loaded cores, and use them in the
+thread-pool for the PNF.
+
+Example commands for running an OTA test with USRP B200 on 40MHz:
+
+Run PNF
+
+    sudo NFAPI_TRACE_LEVEL=info ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-pnf.band78.rfsim.conf --nfapi PNF --continuous-tx -E --thread-pool 1,2,3,4,5
+
+Run VNF
+
+    sudo NFAPI_TRACE_LEVEL=info ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-vnf.sa.band78.106prb.nfapi.conf --nfapi VNF
+
 #### How to run OAI PNF with OSC/Radisys O-DU
 
 Set up the hugepages for DPDK (1GB page size, 6 pages; this only needs to be
