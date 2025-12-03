@@ -1,3 +1,5 @@
+# FAPI/nFAPI split in OAI
+
 This document describes the SmallCellForum (SCF) (n)FAPI split in 5G, i.e.,
 between the MAC/L2 and PHY/L1. It also describes how to make use of the 
 multiple transport mechanisms between the 2.
@@ -10,7 +12,7 @@ about nFAPI can be found in SCF 225.2.0.
 
 [[_TOC_]]
 
-# Quickstart
+## Quickstart
 
 Compile OAI as normal. Start the CN and make sure that the VNF configuration
 matches the PLMN/IP addresses. Then, run the VNF
@@ -29,7 +31,7 @@ VNF!)
 You should not observe a difference between nFAPI split and monolithic.
 
 
-# Status
+## Status
 
 All FAPI message can be transferred between VNF and PNF. This is because OAI
 uses FAPI with its corresponding messages internally, whether a split is in use
@@ -54,7 +56,7 @@ When using RFsim, the system might run slower than in monolithic. This is
 because the PNF needs to slow down the execution time of a specific slot,
 because it has to send a Slot.indication to the VNF for scheduling.
 
-# Configuration
+## Configuration
 
 Both PNF and VNF are run through the `nr-softmodem` executable. The type of
 mode is switched through the `--nfapi` switch, with options `MONOLITHIC`
@@ -173,6 +175,26 @@ After installing WLS, you can run the build command as shown below:
 
 Refer to the above steps in [Quickstart](#quickstart), but run the PNF first as it is the WLS "master".
 
+To optimize the performance of your setup, you can provide the option
+`--thread-pool <list of allocated CPUs>` in the PNF command line. This allows
+you to pin PNF processing threads to specific CPU cores, as they might
+otherwise interfere with DPDK used by WLS.
+
+Before selecting which CPU cores to allocate: run `nr-softmodem` without the
+`--thread-pool` option and use a process monitoring tool such as htop to check
+CPU availability. Check for lightly loaded cores, and use them in the
+thread-pool for the PNF.
+
+Example commands for running an OTA test with USRP B200 on 40MHz:
+
+Run PNF
+
+    sudo NFAPI_TRACE_LEVEL=info ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-pnf.band78.rfsim.conf --nfapi PNF --continuous-tx -E --thread-pool 1,2,3,4,5
+
+Run VNF
+
+    sudo NFAPI_TRACE_LEVEL=info ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-vnf.sa.band78.106prb.nfapi.conf --nfapi VNF
+
 #### How to run OAI PNF with OSC/Radisys O-DU
 
 Set up the hugepages for DPDK (1GB page size, 6 pages; this only needs to be
@@ -236,7 +258,7 @@ Run the OAI-UE
 
     sudo ./nr-uesoftmodem -r 273 --numerology 1 --band 78 -C 3400140000 --ssb 1518 --uicc0.imsi 001010000000001 --rfsim
 
-# nFAPI logging system
+## nFAPI logging system
 
 nFAPI has its own logging system, independent of OAI's. It can be activated by
 setting the `NFAPI_TRACE_LEVEL` environment variable to an appropriate value;
@@ -263,3 +285,26 @@ done over virtual time, i.e., frames/slots as executed by the 5G Systems. For
 instance, these numbers might be slightly higher or slower in RFsim than in
 wall-clock time, depending if the system advances faster or slower than
 wall-clock time.
+
+## Troubleshoot
+
+When operating using the FAPI split, the PNF needs to give the VNF extra time
+to schedule the next slot. Especially since the current nFAPI split still
+relies on slot indications, extra time due to transport delays need to be
+accounted for.  Currently, this delay is set conservatively, meaning that it
+should work for most systems, but can create problems during random access:
+
+    [NR_MAC] exceeded RA window: preamble at 411.19 now 413.0 (diff 21), ra_ResponseWindow 5/20 slots
+    [NR_MAC] sfn: 413.0 UE RA-RNTI 010b TC-RNTI 5d82: exceeded RA window, cannot schedule Msg2
+
+means that the VNF received a preamble (411.19), but the current slot to be
+scheduled (413.0) is beyond the random access response window (20 slots). In
+this case, try one of the following:
+
+- If the radio allows, reduce the L1 TX advance `RUs.[0].sl_ahead` by some
+  slots, but note that this could make the system less stable.
+- Change the code to reduce `sl_ahead` inside function `handle_nr_slot_ind()`,
+  to reduce the FAPI scheduling slot time budget.
+- Non-standard: You can manually increase the response window by setting
+  `gNBs.[0].servingCellConfigCommon.[0].ra_ResponseWindow` to, e.g., 6. Note
+  that the maximum allowed response window is 10ms.
