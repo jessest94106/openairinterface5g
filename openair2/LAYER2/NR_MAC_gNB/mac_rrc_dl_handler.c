@@ -1006,6 +1006,11 @@ void ue_context_release_command(const f1ap_ue_context_rel_cmd_t *cmd)
   NR_SCHED_UNLOCK(&mac->sched_lock);
 }
 
+/** @brief Process a DL RRC MESSAGE TRANSFER. Handles delivery of an RRC message to a UE
+ * via the F1AP DL RRC MESSAGE TRANSFER procedure, as specified in TS 38.473. This procedure
+ * is also responsible for re-establishing UE context when required (e.g., during RRC connection
+ * reestablishment).
+ * @param dl_rrc Pointer to the DL RRC MESSAGE TRANSFER data structure. */
 void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
 {
   LOG_D(NR_MAC,
@@ -1033,50 +1038,71 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     DevAssert(success);
   }
 
-
-  /* if we get the old-gNB-DU-UE-ID, this means there is a reestablishment
-   * ongoing. */
+  /* Per TS 38.473: "The DL RRC MESSAGE TRANSFER message shall include, if available,
+   * the old gNB-DU UE F1AP ID IE so that the gNB-DU can retrieve the existing UE context
+   * in RRC connection reestablishment procedure, as defined in TS 38.401"
+   *
+   * "If the gNB-DU identifies the UE-associated logical F1-connection by the gNB-DU UE F1AP ID
+   * IE in the DL RRC MESSAGE TRANSFER message and the old gNB-DU UE F1AP ID IE is included,
+   * it shall release the old gNB-DU UE F1AP ID and the related configurations associated
+   * with the old gNB-DU UE F1AP ID." */
   if (dl_rrc->old_gNB_DU_ue_id != NULL) {
     AssertFatal(*dl_rrc->old_gNB_DU_ue_id != dl_rrc->gNB_DU_ue_id,
                 "logic bug: current and old gNB DU UE ID cannot be the same\n");
-    /* 38.401 says: "Find UE context based on old gNB-DU UE F1AP ID, replace
-     * old C-RNTI/PCI with new C-RNTI/PCI". Below, we do the inverse: we keep
-     * the new UE context (with new C-RNTI), but set up everything to reuse the
-     * old config. */
     NR_UE_info_t *oldUE = find_nr_UE(&mac->UE_info, *dl_rrc->old_gNB_DU_ue_id);
-    AssertFatal(oldUE, "CU claims we should know UE %04x, but we don't\n", *dl_rrc->old_gNB_DU_ue_id);
-    pthread_mutex_lock(&mac->sched_lock);
-    uid_t temp_uid = UE->uid;
-    UE->uid = oldUE->uid;
-    oldUE->uid = temp_uid;
-    for (int i = 1; i < seq_arr_size(&oldUE->UE_sched_ctrl.lc_config); ++i) {
-      const nr_lc_config_t *c = seq_arr_at(&oldUE->UE_sched_ctrl.lc_config, i);
-      nr_lc_config_t new = *c;
-      new.suspended = true;
-      nr_mac_add_lcid(&UE->UE_sched_ctrl, &new);
+    if (oldUE == NULL) {
+      /* No matching UE-associated logical F1-connection for the old gNB-DU UE F1AP ID.
+       * Per TS 38.473, if there's no matching connection, there's nothing to release. */
+      LOG_I(NR_MAC,
+           "DL RRC Message Transfer: old gNB-DU UE F1AP ID %04x has no matching UE-associated logical F1-connection, nothing to "
+           "release\n",
+           *dl_rrc->old_gNB_DU_ue_id);
+      /* Clean up any F1 UE data associated with the old gNB-DU UE F1AP ID */
+      if (du_exists_f1_ue_data(*dl_rrc->old_gNB_DU_ue_id)) {
+        du_remove_f1_ue_data(*dl_rrc->old_gNB_DU_ue_id);
+      }
+    } else {
+      /* Per TS 38.401: "Find UE context based on old gNB-DU UE F1AP ID, replace
+       * old C-RNTI/PCI with new C-RNTI/PCI". Below, we do the inverse: we keep
+       * the new UE context (with new C-RNTI), but set up everything to reuse the
+       * old config. */
+      pthread_mutex_lock(&mac->sched_lock);
+      uid_t temp_uid = UE->uid;
+      UE->uid = oldUE->uid;
+      oldUE->uid = temp_uid;
+      for (int i = 1; i < seq_arr_size(&oldUE->UE_sched_ctrl.lc_config); ++i) {
+        const nr_lc_config_t *c = seq_arr_at(&oldUE->UE_sched_ctrl.lc_config, i);
+        nr_lc_config_t new = *c;
+        new.suspended = true;
+        nr_mac_add_lcid(&UE->UE_sched_ctrl, &new);
+      }
+      ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
+      UE->CellGroup = oldUE->CellGroup;
+      oldUE->CellGroup = NULL;
+      ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->capability);
+      UE->capability = oldUE->capability;
+      oldUE->capability = NULL;
+      UE->mac_stats = oldUE->mac_stats;
+      UE->measgap_config = oldUE->measgap_config;
+      UE->local_bwp_id = oldUE->local_bwp_id;
+      mac_remove_nr_ue(mac, *dl_rrc->old_gNB_DU_ue_id);
+      pthread_mutex_unlock(&mac->sched_lock);
+      nr_rlc_remove_ue(dl_rrc->gNB_DU_ue_id);
+      nr_rlc_update_id(*dl_rrc->old_gNB_DU_ue_id, dl_rrc->gNB_DU_ue_id);
+      instance_t f1inst = get_f1_gtp_instance();
+      if (f1inst >= 0) // we actually use F1-U
+        gtpv1u_update_ue_id(f1inst, *dl_rrc->old_gNB_DU_ue_id, dl_rrc->gNB_DU_ue_id);
     }
-    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
-    UE->CellGroup = oldUE->CellGroup;
-    oldUE->CellGroup = NULL;
-    ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->capability);
-    UE->capability = oldUE->capability;
-    oldUE->capability = NULL;
-    UE->mac_stats = oldUE->mac_stats;
-    UE->measgap_config = oldUE->measgap_config;
-    UE->local_bwp_id = oldUE->local_bwp_id;
-    /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
+    /* Per TS 38.331 5.3.7.2: the UE releases the spCellConfig, so we drop it
      * from the current configuration. It will be reapplied when the
      * reconfiguration has succeeded (indicated by the CU) */
     asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&UE->reconfigCellGroup, UE->CellGroup);
     ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->CellGroup->spCellConfig);
     UE->CellGroup->spCellConfig = NULL;
     UE->reestablish_rlc = true;
-    mac_remove_nr_ue(mac, *dl_rrc->old_gNB_DU_ue_id);
-    pthread_mutex_unlock(&mac->sched_lock);
-    nr_rlc_remove_ue(dl_rrc->gNB_DU_ue_id);
-    nr_rlc_update_id(*dl_rrc->old_gNB_DU_ue_id, dl_rrc->gNB_DU_ue_id);
-    /* 38.331 clause 5.3.7.4: apply gNB RLC configuration for SRB1 to match the UE RLC configuration defined in 9.2.1 */
-    nr_rlc_configuration_t rlc_configuration = mac->rlc_config; // use configuration file values for timers t_poll_retransmit, t_reassembly and t_status_prohibit
+    /* Per TS 38.331 clause 5.3.7.4: apply gNB RLC configuration for SRB1 to match the UE RLC configuration defined in 9.2.1.
+     * Use configuration file values for timers t_poll_retransmit, t_reassembly and t_status_prohibit */
+    nr_rlc_configuration_t rlc_configuration = mac->rlc_config;
     rlc_configuration.srb.poll_pdu = -1;
     rlc_configuration.srb.poll_byte = -1;
     rlc_configuration.srb.max_retx_threshold = 8;
@@ -1084,9 +1110,6 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     NR_RLC_Config_t *rlc_Config = nr_srb_config(&rlc_configuration);
     nr_rlc_reconfigure_entity(dl_rrc->gNB_DU_ue_id, 1, rlc_Config);
     ASN_STRUCT_FREE(asn_DEF_NR_RLC_Config, rlc_Config);
-    instance_t f1inst = get_f1_gtp_instance();
-    if (f1inst >= 0) // we actually use F1-U
-      gtpv1u_update_ue_id(f1inst, *dl_rrc->old_gNB_DU_ue_id, dl_rrc->gNB_DU_ue_id);
   }
 
   /* the DU ue id is the RNTI */
