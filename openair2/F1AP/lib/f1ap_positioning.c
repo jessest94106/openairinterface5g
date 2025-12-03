@@ -3033,3 +3033,160 @@ void free_positioning_deactivation(f1ap_positioning_deactivation_t *msg)
 {
   // nothing to free
 }
+
+/**
+ * @brief Encode F1 positioning information update to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_information_update(const f1ap_positioning_information_update_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningInformationUpdate;
+  tmp->criticality = F1AP_Criticality_ignore;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_PositioningInformationUpdate;
+  F1AP_PositioningInformationUpdate_t *out = &tmp->value.choice.PositioningInformationUpdate;
+
+  /* mandatory : GNB_CU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningInformationUpdateIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningInformationUpdateIEs__value_PR_GNB_CU_UE_F1AP_ID;
+  ie1->value.choice.GNB_CU_UE_F1AP_ID = msg->gNB_CU_ue_id;
+
+  /* mandatory : GNB_DU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningInformationUpdateIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningInformationUpdateIEs__value_PR_GNB_DU_UE_F1AP_ID;
+  ie2->value.choice.GNB_DU_UE_F1AP_ID = msg->gNB_DU_ue_id;
+
+  /* optional : SRSConfiguration */
+  if (msg->srs_configuration) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningInformationUpdateIEs_t, ie3);
+    ie3->id = F1AP_ProtocolIE_ID_id_SRSConfiguration;
+    ie3->criticality = F1AP_Criticality_ignore;
+    ie3->value.present = F1AP_PositioningInformationUpdateIEs__value_PR_SRSConfiguration;
+    f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    ie3->value.choice.SRSConfiguration.sRSCarrier_List = encode_srs_carrier_list(srs_carrier_list);
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 positioning information update
+ */
+bool decode_positioning_information_update(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_information_update_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningInformationUpdate_t *in = &pdu->choice.initiatingMessage->value.choice.PositioningInformationUpdate;
+  F1AP_PositioningInformationUpdateIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningInformationUpdateIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningInformationUpdateIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningInformationUpdateIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_SRSConfiguration,
+                   false);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningInformationUpdateIEs__value_PR_GNB_CU_UE_F1AP_ID);
+        out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningInformationUpdateIEs__value_PR_GNB_DU_UE_F1AP_ID);
+        out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_SRSConfiguration:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningInformationUpdateIEs__value_PR_SRSConfiguration);
+        F1AP_SRSCarrier_List_t *f1_sRSCarrier_List = &ie->value.choice.SRSConfiguration.sRSCarrier_List;
+        out->srs_configuration = calloc_or_fail(1, sizeof(*out->srs_configuration));
+        f1ap_srs_carrier_list_t *srs_carrier_list = &out->srs_configuration->srs_carrier_list;
+        decode_srs_carrier_list(srs_carrier_list, f1_sRSCarrier_List);
+        break;
+      case F1AP_ProtocolIE_ID_id_SFNInitialisationTime:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 positioning information update deep copy
+ */
+f1ap_positioning_information_update_t cp_positioning_information_update(const f1ap_positioning_information_update_t *orig)
+{
+  /* copy all mandatory fields that are not dynamic memory */
+  f1ap_positioning_information_update_t cp = {
+      .gNB_CU_ue_id = orig->gNB_CU_ue_id,
+      .gNB_DU_ue_id = orig->gNB_DU_ue_id,
+  };
+
+  /* optional: SRS Configuration */
+  if (orig->srs_configuration) {
+    cp.srs_configuration = calloc_or_fail(1, sizeof(*cp.srs_configuration));
+    f1ap_srs_carrier_list_t *srs_carrier_list_cp = &cp.srs_configuration->srs_carrier_list;
+    f1ap_srs_carrier_list_t *srs_carrier_list = &orig->srs_configuration->srs_carrier_list;
+    *srs_carrier_list_cp = cp_srs_carrier_list(srs_carrier_list);
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 positioning information update equality check
+ */
+bool eq_positioning_information_update(const f1ap_positioning_information_update_t *a,
+                                       const f1ap_positioning_information_update_t *b)
+{
+  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+
+  /* optional: SRS Configuration */
+  if ((a->srs_configuration == NULL) != (b->srs_configuration == NULL)) {
+    return false;
+  }
+  if (a->srs_configuration) {
+    f1ap_srs_carrier_list_t *srs_carrier_list_a = &a->srs_configuration->srs_carrier_list;
+    f1ap_srs_carrier_list_t *srs_carrier_list_b = &b->srs_configuration->srs_carrier_list;
+    _F1_CHECK_EXP(eq_srs_carrier_list(srs_carrier_list_a, srs_carrier_list_b));
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 positioning information update
+ */
+void free_positioning_information_update(f1ap_positioning_information_update_t *msg)
+{
+  /* optional: SRS Configuration */
+  if (msg->srs_configuration) {
+    f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    free_srs_carrier_list(srs_carrier_list);
+    free(msg->srs_configuration);
+  }
+}

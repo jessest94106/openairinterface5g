@@ -78,4 +78,12 @@ f1ap_positioning_deactivation_t cp_positioning_deactivation(const f1ap_positioni
 bool eq_positioning_deactivation(const f1ap_positioning_deactivation_t *a, const f1ap_positioning_deactivation_t *b);
 void free_positioning_deactivation(f1ap_positioning_deactivation_t *msg);
 
+// positioning information update
+struct F1AP_F1AP_PDU *encode_positioning_information_update(const f1ap_positioning_information_update_t *msg);
+bool decode_positioning_information_update(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_information_update_t *out);
+f1ap_positioning_information_update_t cp_positioning_information_update(const f1ap_positioning_information_update_t *orig);
+bool eq_positioning_information_update(const f1ap_positioning_information_update_t *a,
+                                       const f1ap_positioning_information_update_t *b);
+void free_positioning_information_update(f1ap_positioning_information_update_t *msg);
+
 #endif /* F1AP_POSITIONING_H_ */

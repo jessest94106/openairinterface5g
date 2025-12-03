@@ -1789,6 +1789,40 @@ static void test_f1ap_positioning_deactivation()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_information_update()
+{
+  f1ap_positioning_information_update_t orig = {
+      .gNB_CU_ue_id = 12,
+      .gNB_DU_ue_id = 19,
+  };
+
+  // SRS configuration
+  orig.srs_configuration = calloc_or_fail(1, sizeof(*orig.srs_configuration));
+  f1ap_srs_carrier_list_t *srs_carrier_list = &orig.srs_configuration->srs_carrier_list;
+  fill_srs_carrier_list(srs_carrier_list);
+
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_information_update(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_information_update_t decoded = {0};
+  bool ret = decode_positioning_information_update(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_information_update(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_information_update(&orig, &decoded);
+  AssertFatal(ret, "eq_positioning_information_update(): decoded message doesn't match\n");
+  free_positioning_information_update(&decoded);
+
+  f1ap_positioning_information_update_t cp = cp_positioning_information_update(&orig);
+  ret = eq_positioning_information_update(&orig, &cp);
+  AssertFatal(ret, "eq_positioning_information_update(): copied message doesn't match\n");
+  free_positioning_information_update(&orig);
+  free_positioning_information_update(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1822,5 +1856,6 @@ int main()
   test_f1ap_positioning_activation_response();
   test_f1ap_positioning_activation_failure();
   test_f1ap_positioning_deactivation();
+  test_f1ap_positioning_information_update();
   return 0;
 }

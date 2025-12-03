@@ -1110,4 +1110,13 @@ typedef struct f1ap_positioning_deactivation_s {
   f1ap_abort_transmission_t abort_transmission;
 } f1ap_positioning_deactivation_t;
 
+typedef struct f1ap_positioning_information_update_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+  // IE 9.3.1.192 (optional)
+  f1ap_srs_configuration_t *srs_configuration;
+} f1ap_positioning_information_update_t;
+
 #endif /* F1AP_MESSAGES_TYPES_H_ */
