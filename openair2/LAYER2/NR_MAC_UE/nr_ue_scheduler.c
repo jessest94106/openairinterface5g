@@ -586,11 +586,10 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
 
     pusch_config_pdu->pusch_uci.harq_ack_bit_length = 0;
 
+    pusch_config_pdu->bwp_start = current_UL_BWP->BWPStart;
     if (dci_format == NR_UL_DCI_FORMAT_0_0 && ss_type == NR_SearchSpace__searchSpaceType_PR_common) {
-      pusch_config_pdu->bwp_start = sc_info->initial_ul_BWPStart;
       pusch_config_pdu->bwp_size = sc_info->initial_ul_BWPSize;
     } else {
-      pusch_config_pdu->bwp_start = current_UL_BWP->BWPStart;
       pusch_config_pdu->bwp_size = current_UL_BWP->BWPSize;
     }
 

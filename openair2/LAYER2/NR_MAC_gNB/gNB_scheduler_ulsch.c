@@ -163,7 +163,8 @@ bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE)
   // contiguously allocated non-interleaved virtual resource blocks within the active bandwidth part of size   PRBs except for the
   // case when DCI format 0_0 is decoded in any common search space in which case the size of the initial UL bandwidth part shall
   // be used.
-  if (ul_bwp->dci_format == NR_UL_DCI_FORMAT_0_0 && sched_ctrl->search_space->searchSpaceType
+  if (ul_bwp->dci_format == NR_UL_DCI_FORMAT_0_0
+      && sched_ctrl->search_space->searchSpaceType
       && sched_ctrl->search_space->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_common) {
     bwp_info.bwpSize = min(ul_bwp->BWPSize, UE->sc_info.initial_ul_BWPSize);
   } else {
@@ -772,10 +773,9 @@ static void nr_rx_ra_sdu(const module_id_t mod_id,
     nr_mac_reset_ul_failure(sched_ctrl);
     reset_dl_harq_list(sched_ctrl);
     reset_ul_harq_list(sched_ctrl);
-    // we configure the UE using common search space with DCIX0 while waiting for a reconfiguration in SA
-    // in NSA (or do-ra) there is no reconfiguration in NR
-    int ss_type = IS_SA_MODE(get_softmodem_params()) ? NR_SearchSpace__searchSpaceType_PR_common
-                                                     : NR_SearchSpace__searchSpaceType_PR_ue_Specific;
+    // we configure the UE using dedicated search space: In SA (CFRA used for
+    // handover) and NSA (or do-ra), the UE has the full config already.
+    int ss_type = NR_SearchSpace__searchSpaceType_PR_ue_Specific;
     configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
     // initialize ta_frame in case there is no Msg3 received
     UE->UE_sched_ctrl.ta_frame = (frame + 100) % MAX_FRAME_NUMBER;
@@ -2606,7 +2606,6 @@ void post_process_ulsch(gNB_MAC_INST *nr_mac, post_process_pusch_t *pusch, NR_UE
                      &uldci_payload,
                      current_BWP->dci_format,
                      TYPE_C_RNTI_,
-                     current_BWP->bwp_id,
                      ss,
                      coreset,
                      UE->pdsch_HARQ_ACK_Codebook,
