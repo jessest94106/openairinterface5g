@@ -38,6 +38,7 @@
 #include "openair2/LAYER2/nr_rlc/nr_rlc_ue_manager.h"
 #include "openair2/LAYER2/nr_rlc/nr_rlc_entity_am.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
+#include "openair2/LAYER2/NR_MAC_gNB/mac_config.h"
 #include "openair2/RRC/NR/rrc_gNB_mobility.h"
 #include "openair3/NGAP/ngap_gNB_ue_context.h"
 
@@ -276,6 +277,8 @@ static int get_current_bwp(char *buf, int debug, telnet_printfunc_t prnt)
   if (rnti < 0)
     ERROR_MSG_RET("could not identify UE (no UE, no such RNTI, or multiple UEs)\n");
   NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[0]->UE_info, rnti);
+  if (!UE)
+    ERROR_MSG_RET("could not find UE with RNTI %04x\n", rnti);
   int dl_bwp = UE->current_DL_BWP.bwp_id;
   const char *dl_bwp_text = dl_bwp > 0 ? "dedicated" : "initial";
   int ul_bwp = UE->current_UL_BWP.bwp_id;
@@ -348,7 +351,7 @@ static int trigger_ngap_pdu_session_release(char *buf, int debug, telnet_printfu
     if (sid < 1 || sid > 255) {
       ERROR_MSG_RET("Invalid pdusession_id(int): %s (must be between 1 and 255)\n", tokens[i]);
     }
-    msg->pdusession_release_params[nb_sessions++].pdusession_id = sid;
+    msg->pdusession_ids[nb_sessions++] = sid;
   }
 
   msg->nb_pdusessions_torelease = nb_sessions;
@@ -356,13 +359,31 @@ static int trigger_ngap_pdu_session_release(char *buf, int debug, telnet_printfu
   if (prnt) {
     prnt("Triggering NGAP PDU Session Release for gNB_ue_ngap_id=%d: releasing pdusession_id=%d", gNB_ue_ngap_id);
     for (int i = 0; i < nb_sessions; ++i) {
-      prnt(" %d,", msg->pdusession_release_params[i].pdusession_id);
+      prnt(" %d,", msg->pdusession_ids[i]);
     }
     prnt("\n");
   }
 
   itti_send_msg_to_task(TASK_RRC_GNB, 0, message_p);
   return 0;
+}
+
+static int trigger_bwp_switch(char *buf, int debug, telnet_printfunc_t prnt)
+{
+  char *sbwpId = strtok(buf, " ");
+  int bwpId = atoi(sbwpId);
+  char *srnti = strtok(NULL, " ");
+  prnt("bwpId %d rnti %s\n", bwpId, srnti);
+  int rnti = fetch_rnti(srnti, prnt);
+  if (rnti < 0)
+    ERROR_MSG_RET("could not identify UE (no UE, no such RNTI, or multiple UEs)\n");
+  if (!nr_trigger_bwp_switch(rnti, bwpId)) {
+    prnt("failed trigger BWP switch for UE %04x BWP ID %d\n", rnti, bwpId);
+    return -1;
+  } else {
+    prnt("triggered BWP switch to BWP ID %d for UE %04x\n", bwpId, rnti);
+    return 0;
+  }
 }
 
 static telnetshell_cmddef_t cicmds[] = {
@@ -374,6 +395,7 @@ static telnetshell_cmddef_t cicmds[] = {
     {"trigger_f1_ho", "[rrc_ue_id(int,opt)]", rrc_gNB_trigger_f1_ho},
     {"fetch_du_by_ue_id", "[rrc_ue_id(int,opt)]", fetch_du_by_ue_id},
     {"get_current_bwp", "[rnti(hex,opt)]", get_current_bwp},
+    {"trigger_bwp_switch", "newBWPId [rnti(hex,opt)]", trigger_bwp_switch},
     {"trigger_n2_ho", "[neighbour_pci(uint32_t),ueId(uint32_t)]", rrc_gNB_trigger_n2_ho},
     {"pdu_session_release", "[gNB_ue_ngap_id(int,opt)]", trigger_ngap_pdu_session_release},
     {"", "", NULL},

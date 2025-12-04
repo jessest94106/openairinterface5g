@@ -405,7 +405,6 @@ int main ( int argc, char **argv )
 #if T_TRACER
   T_Config_Init();
 #endif
-  //randominit (0);
   set_taus_seed (0);
   printf("configuring for RAU/RRU\n");
 

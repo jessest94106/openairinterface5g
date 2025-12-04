@@ -1065,6 +1065,24 @@ bool nr_update_sib19(const gnb_sat_position_update_t *sat_position)
   return true;
 }
 
+bool nr_trigger_bwp_switch(uint16_t rnti, int bwp_id)
+{
+  gNB_MAC_INST *nrmac = RC.nrmac[0];
+  NR_SCHED_LOCK(&nrmac->sched_lock);
+  NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, rnti);
+  bool success = false;
+  if (!UE) {
+    LOG_W(NR_MAC, "could not find UE for RNTI %04x\n", rnti);
+  } else if (UE->current_DL_BWP.bwp_id == bwp_id) {
+    LOG_W(NR_MAC, "UE %04x is already on BWP ID %d, not triggering reconfiguration\n", rnti, bwp_id);
+  } else { // UE != NULL && current_DL_BWP.bwp_id != bwp_id
+    nr_mac_trigger_reconfiguration(nrmac, UE, bwp_id);
+    success = true;
+  }
+  NR_SCHED_UNLOCK(&nrmac->sched_lock);
+  return success;
+}
+
 void prepare_du_configuration_update(gNB_MAC_INST *mac,
                                      f1ap_served_cell_info_t *info,
                                      NR_BCCH_BCH_Message_t *mib,
@@ -1116,8 +1134,9 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, uint32_t rnti, NR_CellGroupConfig_t
   NR_SCHED_LOCK(&nrmac->sched_lock);
 
   NR_UE_info_t *UE = get_new_nr_ue_inst(&nrmac->UE_info.uid_allocator, rnti, CellGroup);
-  DevAssert(UE->uid < MAX_MOBILES_PER_GNB); // test-mode: we assume we can always create a UE
-  free_and_zero(UE->ra); // test-mode (sims, phy-test): UE will not do RA
+  DevAssert(UE->uid < MAX_MOBILES_PER_GNB); // physical simulators: we assume we can always create a UE
+  free_and_zero(UE->ra); // physical simulators: UE will not do RA
+  UE->local_bwp_id = 1;  // for physical simulators
   bool res = add_connected_nr_ue(nrmac, UE);
   if (!res) {
     LOG_E(NR_MAC, "Error adding UE %04x\n", rnti);

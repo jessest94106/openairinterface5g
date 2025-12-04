@@ -907,8 +907,10 @@ dci_pdu_rel15_t prepare_dci_dl_payload(const gNB_MAC_INST *gNB_mac,
   dci_payload.dai[0].val = pucch ? (pucch->dai_c - 1) & 3 : 0;
   // bwp indicator
   // as per table 7.3.1.1.2-1 in 38.212
-  if (dl_BWP)
-    dci_payload.bwp_indicator.val = UE->sc_info.n_dl_bwp < 4 ? dl_BWP->bwp_id : dl_BWP->bwp_id - 1;
+  if (dl_BWP) {
+    int ext_bwp_id = dl_BWP->bwp_id ? 1 : 0; // BWP-ID sent to the UE is always 1 except for BWP 0
+    dci_payload.bwp_indicator.val = UE->sc_info.n_dl_bwp < 4 ? ext_bwp_id : ext_bwp_id - 1;
+  }
   return dci_payload;
 }
 
@@ -1182,7 +1184,6 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
                   NR_UE_UL_BWP_t *ul_bwp,
                   NR_SearchSpace__searchSpaceType_PR ss_type)
 {
-  int bwp_id = ul_bwp->bwp_id;
   nr_dci_format_t dci_format = ul_bwp->dci_format;
 
   // 3GPP TS 38.214 Section 6.1.2.2.2 Uplink resource allocation type 1
@@ -1214,7 +1215,8 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
       LOG_D(NR_MAC,"Configuring DCI Format 0_1\n");
       dci_pdu_rel15->dai[0].val = 0; //TODO
       // bwp indicator as per table 7.3.1.1.2-1 in 38.212
-      dci_pdu_rel15->bwp_indicator.val = sc_info->n_ul_bwp < 4 ? bwp_id : bwp_id - 1;
+      int ext_bwp_id = ul_bwp->bwp_id ? 1 : 0; // BWP-ID sent to the UE is always 1 except for BWP 0
+      dci_pdu_rel15->bwp_indicator.val = sc_info->n_ul_bwp < 4 ? ext_bwp_id : ext_bwp_id - 1;
       // SRS resource indicator
       if (pusch_Config && pusch_Config->txConfig != NULL) {
         AssertFatal(*pusch_Config->txConfig == NR_PUSCH_Config__txConfig_codebook,
@@ -1640,7 +1642,6 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
                         dci_pdu_rel15_t *dci_pdu_rel15,
                         int dci_format,
                         int rnti_type,
-                        int bwp_id,
                         NR_SearchSpace_t *ss,
                         NR_ControlResourceSet_t *coreset,
                         long pdsch_HARQ_ACK_Codebook,
@@ -1671,7 +1672,6 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
                              NR_UL_DCI_FORMAT_0_0,
                              rnti_type,
                              coreset,
-                             bwp_id,
                              ss->searchSpaceType->present,
                              cset0_bwp_size,
                              0);
@@ -1685,7 +1685,6 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
                              NR_DL_DCI_FORMAT_1_0,
                              rnti_type,
                              coreset,
-                             bwp_id,
                              ss->searchSpaceType->present,
                              cset0_bwp_size,
                              0);
@@ -1702,10 +1701,10 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
                              dci_format,
                              rnti_type,
                              coreset,
-                             bwp_id,
                              ss->searchSpaceType->present,
                              cset0_bwp_size,
                              alt_size);
+
   if (dci_size == 0)
     return;
   pdcch_dci_pdu->PayloadSizeBits = dci_size;
@@ -2703,38 +2702,26 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
       AssertFatal(dl_bwp_switch == ul_bwp_switch, "Different UL and DL BWP not supported\n");
       DL_BWP->bwp_id = dl_bwp_switch;
       UL_BWP->bwp_id = ul_bwp_switch;
+      UE->local_bwp_id = dl_bwp_switch; // assuming they are the same
     } else {
-      // (re)configuring BWP
-      // TODO BWP switching not via RRC reconfiguration
-      // via RRC if firstActiveXlinkBWP_Id is NULL, MAC stays on the same BWP as before
-      if (servingCellConfig->firstActiveDownlinkBWP_Id)
-        DL_BWP->bwp_id = *servingCellConfig->firstActiveDownlinkBWP_Id;
-      if (servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id)
-        UL_BWP->bwp_id = *servingCellConfig->uplinkConfig->firstActiveUplinkBWP_Id;
+      DL_BWP->bwp_id = UE->local_bwp_id;
+      UL_BWP->bwp_id = UE->local_bwp_id;
     }
 
     const struct NR_ServingCellConfig__downlinkBWP_ToAddModList *bwpList = servingCellConfig->downlinkBWP_ToAddModList;
     if(bwpList)
-      sc_info->n_dl_bwp = bwpList->list.count;
-    if (DL_BWP->bwp_id>0) {
-      for (int i=0; i<bwpList->list.count; i++) {
-        dl_bwp = bwpList->list.array[i];
-        if(dl_bwp->bwp_Id == DL_BWP->bwp_id)
-          break;
-      }
-      AssertFatal(dl_bwp!=NULL,"Couldn't find DLBWP corresponding to BWP ID %ld\n",DL_BWP->bwp_id);
+      sc_info->n_dl_bwp = 1;
+    if (DL_BWP->bwp_id > 0) {
+      dl_bwp = bwpList->list.array[0];
+      AssertFatal(dl_bwp, "Couldn't find DLBWP corresponding to BWP ID %ld\n", DL_BWP->bwp_id);
     }
 
     const struct NR_UplinkConfig__uplinkBWP_ToAddModList *ubwpList = servingCellConfig->uplinkConfig->uplinkBWP_ToAddModList;
     if(ubwpList)
-      sc_info->n_ul_bwp = ubwpList->list.count;
-    if (UL_BWP->bwp_id>0) {
-      for (int i=0; i<ubwpList->list.count; i++) {
-        ul_bwp = ubwpList->list.array[i];
-        if(ul_bwp->bwp_Id == UL_BWP->bwp_id)
-          break;
-      }
-      AssertFatal(ul_bwp!=NULL,"Couldn't find ULBWP corresponding to BWP ID %ld\n",UL_BWP->bwp_id);
+      sc_info->n_ul_bwp = 1;
+    if (UL_BWP->bwp_id > 0) {
+      ul_bwp = ubwpList->list.array[0];
+      AssertFatal(ul_bwp, "Couldn't find ULBWP corresponding to BWP ID %ld\n", UL_BWP->bwp_id);
     }
 
     // selection of dedicated BWPs
@@ -2762,12 +2749,12 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
   }
 
   // TDA lists
-  if (DL_BWP->bwp_id>0)
+  if (DL_BWP->bwp_id > 0)
     DL_BWP->tdaList_Common = dl_bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList;
   else
     DL_BWP->tdaList_Common = scc->downlinkConfigCommon->initialDownlinkBWP->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList;
 
-  if(UL_BWP->bwp_id>0)
+  if(UL_BWP->bwp_id > 0)
     UL_BWP->tdaList_Common = ul_bwp->bwp_Common->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList;
   else
     UL_BWP->tdaList_Common = scc->uplinkConfigCommon->initialUplinkBWP->pusch_ConfigCommon->choice.setup->pusch_TimeDomainAllocationList;
@@ -3217,9 +3204,10 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, slot_t slot, nfapi_nr_dl_tt
     NR_NZP_CSI_RS_ResourceSetId_t *nzp = NULL;
     for (int csi_list=0; csi_list<csi_measconfig->csi_ResourceConfigToAddModList->list.count; csi_list++) {
       NR_CSI_ResourceConfig_t *csires = csi_measconfig->csi_ResourceConfigToAddModList->list.array[csi_list];
-      if(csires->bwp_Id == dl_bwp->bwp_id &&
-         csires->csi_RS_ResourceSetList.present == NR_CSI_ResourceConfig__csi_RS_ResourceSetList_PR_nzp_CSI_RS_SSB &&
-         csires->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->nzp_CSI_RS_ResourceSetList) {
+      if (csires->bwp_Id > 1)
+        LOG_E(NR_MAC, "Invalid CSI resource BWP ID %ld, we only configure BWP up to 1\n", csires->bwp_Id);
+      else if (csires->csi_RS_ResourceSetList.present == NR_CSI_ResourceConfig__csi_RS_ResourceSetList_PR_nzp_CSI_RS_SSB &&
+               csires->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->nzp_CSI_RS_ResourceSetList) {
         nzp = csires->csi_RS_ResourceSetList.choice.nzp_CSI_RS_SSB->nzp_CSI_RS_ResourceSetList->list.array[0];
       }
     }
@@ -3456,46 +3444,11 @@ void nr_measgap_scheduling(gNB_MAC_INST *nr_mac, frame_t frame, sub_frame_t slot
 void clean_bwp_structures(NR_SpCellConfig_t *spCellConfig)
 {
   NR_ServingCellConfig_t *spCellConfigDedicated = spCellConfig->spCellConfigDedicated;
-  if (spCellConfigDedicated->downlinkBWP_ToReleaseList) {
-    struct NR_ServingCellConfig__downlinkBWP_ToReleaseList *rel_dl = spCellConfigDedicated->downlinkBWP_ToReleaseList;
-    struct NR_ServingCellConfig__downlinkBWP_ToAddModList *add_dl = spCellConfigDedicated->downlinkBWP_ToAddModList;
-    int num_rel = rel_dl->list.count;
-    int num_add = add_dl->list.count;
-    for (int i = 0; i < num_rel; i++) {
-      NR_BWP_Id_t *rel_id = rel_dl->list.array[i];
-      for (int j = 0; j < num_add; j++) {
-        NR_BWP_Downlink_t *dl_bwp = add_dl->list.array[j];
-        if (*rel_id == dl_bwp->bwp_Id) {
-          asn_sequence_del(&add_dl->list, j, 1);
-        }
-      }
-      asn_sequence_del(&rel_dl->list, i, 1);
-    }
-    if (rel_dl->list.count == 0)
-      free_and_zero(rel_dl);
-    if (add_dl->list.count == 0)
-      free_and_zero(add_dl);
-  }
-  if (spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList) {
-    struct NR_UplinkConfig__uplinkBWP_ToReleaseList *rel_ul = spCellConfigDedicated->uplinkConfig->uplinkBWP_ToReleaseList;
-    struct NR_UplinkConfig__uplinkBWP_ToAddModList *add_ul = spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList;
-    int num_rel = rel_ul->list.count;
-    int num_add = add_ul->list.count;
-    for (int i = 0; i < num_rel; i++) {
-      NR_BWP_Id_t *rel_id = rel_ul->list.array[i];
-      for (int j = 0; j < num_add; j++) {
-        NR_BWP_Uplink_t *ul_bwp = add_ul->list.array[j];
-        if (*rel_id == ul_bwp->bwp_Id) {
-          asn_sequence_del(&add_ul->list, j, 1);
-        }
-      }
-      asn_sequence_del(&rel_ul->list, i, 1);
-    }
-    if (rel_ul->list.count == 0)
-      free_and_zero(rel_ul);
-    if (add_ul->list.count == 0)
-      free_and_zero(add_ul);
-  }
+  if (spCellConfigDedicated->downlinkBWP_ToAddModList && spCellConfigDedicated->downlinkBWP_ToAddModList->list.count > 1)
+    asn_sequence_del(&spCellConfigDedicated->downlinkBWP_ToAddModList->list, 0, 1);
+  if (spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList
+      && spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList->list.count > 1)
+    asn_sequence_del(&spCellConfigDedicated->uplinkConfig->uplinkBWP_ToAddModList->list, 0, 1);
 }
 
 void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
@@ -3517,8 +3470,6 @@ void nr_mac_clean_cellgroup(NR_CellGroupConfig_t *cell_group)
   /* remove reestablishRLC, we don't need it anymore */
   for (int i = 0; i < cell_group->rlc_BearerToAddModList->list.count; ++i)
     free_and_zero(cell_group->rlc_BearerToAddModList->list.array[i]->reestablishRLC);
-  /* clean BWP structures */
-  clean_bwp_structures(spCellConfig);
 }
 
 int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs)
@@ -3818,6 +3769,7 @@ bool prepare_initial_ul_rrc_message(gNB_MAC_INST *mac, NR_UE_info_t *UE)
   NR_CellGroupConfig_t *cellGroupConfig = get_initial_cellGroupConfig(UE->uid, scc, &mac->radio_config, &mac->rlc_config);
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
   UE->CellGroup = cellGroupConfig;
+  UE->local_bwp_id = mac->radio_config.first_active_bwp;
 
   if (!cellGroupConfig)
     return true;
@@ -3922,15 +3874,35 @@ bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *
   return false;
 }
 
-void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_t *UE, int new_bwp_id)
+static bool verify_bwp_switch(const NR_UE_info_t *UE, const nr_mac_config_t *configuration, int new_bwp_id)
+{
+  if (new_bwp_id == UE->current_DL_BWP.bwp_id) {
+    LOG_E(NR_MAC, "Source BWP ID and target BWP ID are the same, can't perform switch\n");
+    return false;
+  }
+
+  if (new_bwp_id == 0)
+    return true;
+  for (int i = 0; i < configuration->num_additional_bwps; i++) {
+    const nr_bwp_config_t *bwp_config = &configuration->bwp_config[i];
+    if (bwp_config->id == new_bwp_id)
+      return true;
+  }
+  LOG_E(NR_MAC, "New BWP %d does not belong to the list of configured BWPs, can't perform switch\n", new_bwp_id);
+  return false;
+}
+
+void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int new_bwp_id)
 {
   DevAssert(UE->CellGroup != NULL);
   NR_CellGroupConfig_t *cellGroup_for_UE = NULL;
   if (new_bwp_id >= 0) {
     AssertFatal(UE->current_DL_BWP.bwp_id == UE->current_UL_BWP.bwp_id, "We only support same BWP for UL and DL\n");
-    if (new_bwp_id == UE->current_DL_BWP.bwp_id)
-      LOG_E(NR_MAC, "Source BWP ID and target BWP ID are the same, can't perform switch\n");
-    else
+    if (!verify_bwp_switch(UE, &nrmac->radio_config, new_bwp_id))
+      return;
+    else {
+      UE->sc_info.csi_MeasConfig = NULL;  // to avoid segfault when freeing csi_MeasConfig in configDedicated
+      UE->local_bwp_id = new_bwp_id;
       cellGroup_for_UE = update_cellGroupConfig_for_BWP_switch(UE->CellGroup,
                                                                &nrmac->radio_config,
                                                                UE->capability,
@@ -3938,6 +3910,7 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_
                                                                UE->uid,
                                                                UE->current_DL_BWP.bwp_id,
                                                                new_bwp_id);
+    }
   }
   uint8_t buf[2048];
   asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
@@ -3946,6 +3919,7 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, const NR_UE_info_
                                                   buf,
                                                   sizeof(buf));
   AssertFatal(enc_rval.encoded > 0, "ASN1 encoding of CellGroupConfig failed, failed type %s\n", enc_rval.failed_type->name);
+  UE->await_reconfig = true;
   du_to_cu_rrc_information_t du2cu = {
     .cellGroupConfig = buf,
     .cellGroupConfig_length = (enc_rval.encoded + 7) >> 3,

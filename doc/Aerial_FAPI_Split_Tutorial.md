@@ -82,7 +82,7 @@ of the FAPI 10.04 version of the SRS PDU, and RX_Beamforming PDU.
 | Applicative Threads    | Allocated CPUs |
 |------------------------|----------------|
 | PTP & PHC2SYS Services | 41             |
-| OAI `nr-softmodem`     | 13-14          |
+| OAI `nr-softmodem`     | 13-16          |
 
 ## PTP configuration
 

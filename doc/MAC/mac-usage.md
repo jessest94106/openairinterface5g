@@ -420,3 +420,29 @@ Note that you should increase the aggregation level candidates as described in
 [the corresponding section above](#pdcch-aggregation-level). This is because the
 scheduler has to schedule multiple DCIs in a single DL slots for multiple UL
 slots. As a suggestion, you could try `uess_agg_levels = [4, 2, 2, 0, 0]`.
+
+## Multiple Dedicated BWPs
+
+A maximum of 4 dedicated BWPs can be configured for a UE per standard, but only
+1 BWP can be active in UL and DL direction at a given time.  In the code we
+only configure a single BWP for the UE at a given time and we would switch by
+reconfiguring this BWP. All this procedure is transparent for users and LOGs
+mark BWP switching according to the configuration file enumeration.  It is
+possible to configure multiple dedicated BWPs and 1st active BWP via
+configuration file.
+
+### Setup of the Configuration files ##
+
+In the configuration file you have the option to select the 1st active BWP, the
+BWP location and SCS of each BWP in the following way (example with 2
+additional BWPs):
+
+```
+    first_active_bwp = 1;
+    bwp_list = ({ scs = 1; bwpStart = 0; bwpSize = 106;},
+                { scs = 1; bwpStart = 0; bwpSize = 24;});
+```
+
+This example configures 3 additional BWPs, with IDs from 1 to 3. A similar
+example can be found in configuration file
+`ci-scripts/conf_files/gnb-du.sa.band78.106prb.usrpb200.conf` tested in CI.
