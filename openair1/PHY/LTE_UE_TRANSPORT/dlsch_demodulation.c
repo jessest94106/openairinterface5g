@@ -41,8 +41,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <linux/version.h>
-#include <lapacke_utils.h>
-#include <lapacke.h>
 #include "linear_preprocessing_rec.h"
 
 //#define DEBUG_MMSE
@@ -53,36 +51,283 @@
  * default value: 0
  */
 int16_t dlsch_demod_shift = 0;
-int16_t interf_unaw_shift = 13;
+static const int16_t interf_unaw_shift = 13;
 
 unsigned char offset_mumimo_llr_drange_fix=0;
-//inferference-free case
-unsigned char interf_unaw_shift_tm4_mcs[29]= {5, 3, 4, 3, 3, 2, 1, 1, 2, 0, 1, 1, 1, 1, 0, 0,
-                                              1, 1, 1, 1, 0, 2, 1, 0, 1, 0, 1, 0, 0
-                                             } ;
-unsigned char interf_unaw_shift_tm1_mcs[29]= {5, 5, 4, 3, 3, 3, 2, 2, 4, 4, 2, 3, 3, 3, 1, 1,
-                                              0, 1, 1, 2, 5, 4, 4, 6, 5, 1, 0, 5, 6
-                                             } ; // mcs 21, 26, 28 seem to be errorneous
+// inferference-free case
 
-/*
-//original values from sebastion + same hand tuning
-unsigned char offset_mumimo_llr_drange[29][3]={{8,8,8},{7,7,7},{7,7,7},{7,7,7},{6,6,6},{6,6,6},{6,6,6},{5,5,5},{4,4,4},{1,2,4}, // QPSK
-{5,5,4},{5,5,5},{5,5,5},{3,3,3},{2,2,2},{2,2,2},{2,2,2}, // 16-QAM
-{2,2,1},{3,3,3},{3,3,3},{3,3,1},{2,2,2},{2,2,2},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0}}; //64-QAM
+static const unsigned char offset_mumimo_llr_drange[29][3] = {
+    {0, 6, 5}, {0, 4, 5}, {0, 4, 5}, {0, 5, 4}, {0, 5, 6}, {0, 5, 3}, {0, 4, 4}, {0, 4, 4}, {0, 3, 3}, {0, 1, 2},
+    {1, 1, 0}, {1, 3, 2}, {3, 4, 1}, {2, 0, 0}, {2, 2, 2}, {1, 1, 1}, {2, 1, 0}, {2, 1, 1}, {1, 0, 1}, {1, 0, 1},
+    {0, 0, 0}, {1, 0, 0}, {0, 0, 0}, {0, 1, 0}, {1, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+
+static void mmse_processing_oai(LTE_UE_PDSCH *pdsch_vars,
+                                LTE_DL_FRAME_PARMS *frame_parms,
+                                PHY_MEASUREMENTS *measurements,
+                                unsigned char first_symbol_flag,
+                                MIMO_mode_t mimo_mode,
+                                unsigned short mmse_flag,
+                                int noise_power,
+                                unsigned char symbol,
+                                unsigned short nb_rb);
+
+static void precode_channel_est(int32_t **dl_ch_estimates_ext,
+                                LTE_DL_FRAME_PARMS *frame_parms,
+                                LTE_UE_PDSCH *pdsch_vars,
+                                unsigned char symbol,
+                                unsigned short nb_rb,
+                                MIMO_mode_t mimo_mode);
+
+static void rxdataF_to_float(int32_t **rxdataF_ext, float complex **rxdataF_f, int n_rx, int length, int start_point);
+static void chan_est_to_float(int32_t **dl_ch_estimates_ext,
+                              float complex **dl_ch_estimates_ext_f,
+                              int n_tx,
+                              int n_rx,
+                              int length,
+                              int start_point);
+
+static void float_to_chan_est(int32_t **dl_ch_estimates_ext,
+                              float complex **dl_ch_estimates_ext_f,
+                              int n_tx,
+                              int n_rx,
+                              int length,
+                              int start_point);
+
+static void float_to_rxdataF(int32_t **rxdataF_ext, float complex **rxdataF_f, int n_tx, int n_rx, int length, int start_point);
+
+static void mult_mmse_rxdataF(float complex **Wmmse,
+                              float complex **rxdataF_ext_f,
+                              int n_tx,
+                              int n_rx,
+                              int length,
+                              int start_point);
+
+static void mult_mmse_chan_est(float complex **Wmmse,
+                               float complex **dl_ch_estimates_ext_f,
+                               int n_tx,
+                               int n_rx,
+                               int length,
+                               int start_point);
+
+static void mmse_processing_core(int32_t **rxdataF_ext,
+                                 int32_t **dl_ch_estimates_ext,
+                                 int sigma2,
+                                 int n_tx,
+                                 int n_rx,
+                                 int length,
+                                 int start_point);
+
+static void dlsch_channel_compensation_TM34(LTE_DL_FRAME_PARMS *frame_parms,
+                                            LTE_UE_PDSCH *lte_ue_pdsch_vars,
+                                            PHY_MEASUREMENTS *phy_measurements,
+                                            int eNB_id,
+                                            unsigned char symbol,
+                                            unsigned char mod_order0,
+                                            unsigned char mod_order1,
+                                            int harq_pid,
+                                            int round,
+                                            MIMO_mode_t mimo_mode,
+                                            unsigned short nb_rb,
+                                            unsigned short mmse_flag,
+                                            unsigned char output_shift0,
+                                            unsigned char output_shift1);
+
+static void dlsch_channel_compensation_TM56(int **rxdataF_ext,
+                                            int **dl_ch_estimates_ext,
+                                            int **dl_ch_mag,
+                                            int **dl_ch_magb,
+                                            int **rxdataF_comp,
+                                            unsigned char *pmi_ext,
+                                            LTE_DL_FRAME_PARMS *frame_parms,
+                                            PHY_MEASUREMENTS *measurements,
+                                            int eNB_id,
+                                            unsigned char symbol,
+                                            unsigned char mod_order,
+                                            unsigned short nb_rb,
+                                            unsigned char output_shift,
+                                            unsigned char dl_power_off);
+
+static void dlsch_dual_stream_correlation(LTE_DL_FRAME_PARMS *frame_parms,
+                                          unsigned char symbol,
+                                          unsigned short nb_rb,
+                                          int **dl_ch_estimates_ext,
+                                          int **dl_ch_estimates_ext_i,
+                                          int **dl_ch_rho_ext,
+                                          unsigned char output_shift);
+
+/** \fn dlsch_extract_rbs_single(int32_t **rxdataF,
+    int32_t **dl_ch_estimates,
+    int32_t **rxdataF_ext,
+    int32_t **dl_ch_estimates_ext,
+    uint16_t pmi,
+    uint8_t *pmi_ext,
+    uint32_t *rb_alloc,
+    uint8_t symbol,
+    uint8_t subframe,
+    LTE_DL_FRAME_PARMS *frame_parms)
+    \brief This function extracts the received resource blocks, both channel estimates and data symbols,
+    for the current allocation and for single antenna eNB transmission.
+    @param rxdataF Raw FFT output of received signal
+    @param dl_ch_estimates Channel estimates of current slot
+    @param rxdataF_ext FFT output for RBs in this allocation
+    @param dl_ch_estimates_ext Channel estimates for RBs in this allocation
+    @param pmi subband Precoding matrix indicator
+    @param pmi_ext Extracted PMI for chosen RBs
+    @param rb_alloc RB allocation vector
+    @param symbol Symbol to extract
+    @param subframe Subframe number
+    @param vrb_type Flag to indicate distributed VRB type
+    @param high_speed_flag
+    @param frame_parms Pointer to frame descriptor
 */
-/*
-//first optimization try
-unsigned char offset_mumimo_llr_drange[29][3]={{7, 8, 7},{6, 6, 7},{6, 6, 7},{6, 6, 6},{5, 6, 6},{5, 5, 6},{5, 5, 6},{4, 5, 4},{4, 3, 4},{3, 2, 2},{6, 5, 5},{5, 4, 4},{5, 5, 4},{3, 3, 2},{2, 2, 1},{2, 1, 1},{2, 2, 2},{3, 3, 3},{3, 3, 2},{3, 3, 2},{3, 2, 1},{2, 2, 2},{2, 2, 2},{0, 0, 0},{0, 0, 0},{0, 0, 0},{0, 0, 0},{0, 0, 0}};
+static uint16_t dlsch_extract_rbs_single(int32_t **rxdataF,
+                                         int32_t **dl_ch_estimates,
+                                         int32_t **rxdataF_ext,
+                                         int32_t **dl_ch_estimates_ext,
+                                         uint16_t pmi,
+                                         uint8_t *pmi_ext,
+                                         uint32_t *rb_alloc,
+                                         uint8_t symbol,
+                                         uint8_t subframe,
+                                         uint32_t high_speed_flag,
+                                         LTE_DL_FRAME_PARMS *frame_parms);
+
+/** \fn dlsch_alamouti(LTE_DL_FRAME_PARMS *frame_parms,
+    int32_t **rxdataF_comp,
+    int32_t **dl_ch_mag,
+    int32_t **dl_ch_magb,
+    uint8_t symbol,
+    uint16_t nb_rb)
+    \brief This function does Alamouti combining on RX and prepares LLR inputs by skipping pilots, PBCH and primary/secondary
+   synchronization signals.
+    @param frame_parms Frame descriptor structure
+    @param rxdataF_comp Compensated channel output
+    @param dl_ch_mag First squared-magnitude of channel (16QAM and 64QAM) for LLR computation.  Alamouti combining should be
+   performed on this as well. Result is stored in first antenna position
+    @param dl_ch_magb Second squared-magnitude of channel (64QAM only) for LLR computation.  Alamouti combining should be performed
+   on this as well. Result is stored in first antenna position
+    @param symbol Symbol in sub-frame
+    @param nb_rb Number of RBs in this allocation
 */
-//second optimization try
-/*
-  unsigned char offset_mumimo_llr_drange[29][3]={{5, 8, 7},{4, 6, 8},{3, 6, 7},{7, 7, 6},{4, 7, 8},{4, 7, 4},{6, 6, 6},{3, 6, 6},{3, 6, 6},{1, 3, 4},{1, 1, 0},{3, 3, 2},{3, 4, 1},{4, 0, 1},{4, 2, 2},{3, 1, 2},{2, 1, 0},{2, 1, 1},{1, 0, 1},{1, 0, 1},{0, 0, 0},{1, 0, 0},{0, 0, 0},{0, 1, 0},{1, 0, 0},{0, 0, 0},{0, 0, 0},{0, 0, 0},{0, 0, 0}};  w
+static void dlsch_alamouti(LTE_DL_FRAME_PARMS *frame_parms,
+                           int32_t **rxdataF_comp,
+                           int32_t **dl_ch_mag,
+                           int32_t **dl_ch_magb,
+                           uint8_t symbol,
+                           uint16_t nb_rb);
+
+/** \fn dlsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
+    int32_t **rxdataF_comp,
+    int32_t **rxdataF_comp_i,
+    int32_t **rho,
+    int32_t **rho_i,
+    int32_t **dl_ch_mag,
+    int32_t **dl_ch_magb,
+    uint8_t symbol,
+    uint16_t nb_rb,
+    uint8_t dual_stream_UE)
+
+    \brief This function does maximal-ratio combining for dual-antenna receivers.
+    @param frame_parms Frame descriptor structure
+    @param rxdataF_comp Compensated channel output
+    @param rxdataF_comp_i Compensated channel output for interference
+    @param rho Cross correlation between spatial channels
+    @param rho_i Cross correlation between signal and inteference channels
+    @param dl_ch_mag First squared-magnitude of channel (16QAM and 64QAM) for LLR computation.  Alamouti combining should be
+   performed on this as well. Result is stored in first antenna position
+    @param dl_ch_magb Second squared-magnitude of channel (64QAM only) for LLR computation.  Alamouti combining should be performed
+   on this as well. Result is stored in first antenna position
+    @param symbol Symbol in sub-frame
+    @param nb_rb Number of RBs in this allocation
+    @param dual_stream_UE Flag to indicate dual-stream detection
 */
-unsigned char offset_mumimo_llr_drange[29][3]= {{0, 6, 5},{0, 4, 5},{0, 4, 5},{0, 5, 4},{0, 5, 6},{0, 5, 3},{0, 4, 4},{0, 4, 4},{0, 3, 3},{0, 1, 2},{1, 1, 0},{1, 3, 2},{3, 4, 1},{2, 0, 0},{2, 2, 2},{1, 1, 1},{2, 1, 0},{2, 1, 1},{1, 0, 1},{1, 0, 1},{0, 0, 0},{1, 0, 0},{0, 0, 0},{0, 1, 0},{1, 0, 0},{0, 0, 0},{0, 0, 0},{0, 0, 0},{0, 0, 0}};
+static void dlsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
+                                int32_t **rxdataF_comp,
+                                int32_t **rxdataF_comp_i,
+                                int32_t **rho,
+                                int32_t **rho_i,
+                                int32_t **dl_ch_mag,
+                                int32_t **dl_ch_magb,
+                                int32_t **dl_ch_mag_i,
+                                int32_t **dl_ch_magb_i,
+                                uint8_t symbol,
+                                uint16_t nb_rb,
+                                uint8_t dual_stream_UE);
 
+static void dlsch_detection_mrc_TM34(LTE_DL_FRAME_PARMS *frame_parms,
+                                     LTE_UE_PDSCH *lte_ue_pdsch_vars,
+                                     int harq_pid,
+                                     int round,
+                                     unsigned char symbol,
+                                     unsigned short nb_rb,
+                                     unsigned char dual_stream_UE);
 
-extern void print_shorts(char *s,int16_t *x);
+/** \fn dlsch_extract_rbs_dual(int32_t **rxdataF,
+    int32_t **dl_ch_estimates,
+    int32_t **rxdataF_ext,
+    int32_t **dl_ch_estimates_ext,
+    uint16_t pmi,
+    uint8_t *pmi_ext,
+    uint32_t *rb_alloc,
+    uint8_t symbol,
+    LTE_DL_FRAME_PARMS *frame_parms)
+    \brief This function extracts the received resource blocks, both channel estimates and data symbols,
+    for the current allocation and for dual antenna eNB transmission.
+    @param rxdataF Raw FFT output of received signal
+    @param dl_ch_estimates Channel estimates of current slot
+    @param rxdataF_ext FFT output for RBs in this allocation
+    @param dl_ch_estimates_ext Channel estimates for RBs in this allocation
+    @param pmi subband Precoding matrix indicator
+    @param pmi_ext Extracted PMI for chosen RBs
+    @param rb_alloc RB allocation vector
+    @param symbol Symbol to extract
+    @param subframe Subframe index
+    @param high_speed_flag
+    @param frame_parms Pointer to frame descriptor
+*/
+static uint16_t dlsch_extract_rbs_dual(int32_t **rxdataF,
+                                       int32_t **dl_ch_estimates,
+                                       int32_t **rxdataF_ext,
+                                       int32_t **dl_ch_estimates_ext,
+                                       uint16_t pmi,
+                                       uint8_t *pmi_ext,
+                                       uint32_t *rb_alloc,
+                                       uint8_t symbol,
+                                       uint8_t subframe,
+                                       uint32_t high_speed_flag,
+                                       LTE_DL_FRAME_PARMS *frame_parms,
+                                       MIMO_mode_t mimo_mode);
 
+/** \fn dlsch_extract_rbs_TM7(int32_t **rxdataF,
+    int32_t **dl_bf_ch_estimates,
+    int32_t **rxdataF_ext,
+    int32_t **dl_bf_ch_estimates_ext,
+    uint32_t *rb_alloc,
+    uint8_t symbol,
+    uint8_t subframe,
+    uint32_t high_speed_flag,
+    LTE_DL_FRAME_PARMS *frame_parms)
+    \brief This function extracts the received resource blocks, both channel estimates and data symbols,
+    for the current allocation and for single antenna eNB transmission.
+    @param rxdataF Raw FFT output of received signal
+    @param dl_bf_ch_estimates Beamforming channel estimates of current slot
+    @param rxdataF_ext FFT output for RBs in this allocation
+    @param dl_bf_ch_estimates_ext Beamforming channel estimates for RBs in this allocation
+    @param rb_alloc RB allocation vector
+    @param symbol Symbol to extract
+    @param subframe Subframe number
+    @param high_speed_flag
+    @param frame_parms Pointer to frame descriptor
+*/
+static uint16_t dlsch_extract_rbs_TM7(int32_t **rxdataF,
+                                      int32_t **dl_bf_ch_estimates,
+                                      int32_t **rxdataF_ext,
+                                      int32_t **dl_bf_ch_estimates_ext,
+                                      uint32_t *rb_alloc,
+                                      uint8_t symbol,
+                                      uint8_t subframe,
+                                      uint32_t high_speed_flag,
+                                      LTE_DL_FRAME_PARMS *frame_parms);
 
 int rx_pdsch(PHY_VARS_UE *ue,
              PDSCH_t type,
@@ -790,17 +1035,9 @@ int rx_pdsch(PHY_VARS_UE *ue,
   }
 
   //  printf("Combining");
-  if ((dlsch0_harq->mimo_mode == SISO) ||
-      ((dlsch0_harq->mimo_mode >= UNIFORM_PRECODING11) &&
-       (dlsch0_harq->mimo_mode <= PUSCH_PRECODING0)) ||
-      (dlsch0_harq->mimo_mode == TM7)) {
-    /*
-      dlsch_siso(frame_parms,
-      pdsch_vars[eNB_id]->rxdataF_comp,
-      pdsch_vars[eNB_id_i]->rxdataF_comp,
-      symbol,
-      nb_rb);
-    */
+  if ((dlsch0_harq->mimo_mode == SISO)
+      || ((dlsch0_harq->mimo_mode >= UNIFORM_PRECODING11) && (dlsch0_harq->mimo_mode <= PUSCH_PRECODING0))
+      || (dlsch0_harq->mimo_mode == TM7)) {
   } else if (dlsch0_harq->mimo_mode == ALAMOUTI) {
     dlsch_alamouti(frame_parms,
                    pdsch_vars[eNB_id]->rxdataF_comp0,
@@ -1381,116 +1618,8 @@ void dlsch_channel_compensation(int **rxdataF_ext,
 
 }
 
-void dlsch_channel_compensation_core(int **rxdataF_ext,
-                                     int **dl_ch_estimates_ext,
-                                     int **dl_ch_mag,
-                                     int **dl_ch_magb,
-                                     int **rxdataF_comp,
-                                     int **rho,
-                                     unsigned char n_tx,
-                                     unsigned char n_rx,
-                                     unsigned char mod_order,
-                                     unsigned char output_shift,
-                                     int length,
-                                     int start_point)
-
+static void prec2A_TM56_128(unsigned char pmi, simde__m128i *ch0, simde__m128i *ch1)
 {
-  unsigned short ii;
-  int length_mod8 = 0;
-  simde__m128i *dl_ch128,*dl_ch_mag128,*dl_ch_mag128b, *dl_ch128_2, *rxdataF128,*rxdataF_comp128,*rho128;
-  simde__m128i QAM_amp128={0};
-  int aatx = 0, aarx = 0;
-
-  for (aatx=0; aatx<n_tx; aatx++) {
-    simde__m128i QAM_amp128b={0};
-
-    if (mod_order == 4) {
-      QAM_amp128 = simde_mm_set1_epi16(QAM16_n1);  // 2/sqrt(10)
-      QAM_amp128b = simde_mm_setzero_si128();
-    } else if (mod_order == 6) {
-      QAM_amp128  = simde_mm_set1_epi16(QAM64_n1); //
-      QAM_amp128b = simde_mm_set1_epi16(QAM64_n2);
-    }
-
-    for (aarx=0; aarx<n_rx; aarx++) {
-      /* TODO: hack to be removed. There is crash for 1 antenna case, so
-       * for 1 antenna case, I put back the value 2 as it was before
-       * Elena's commit.
-       */
-      int x = n_rx > 1 ? n_rx : 2;
-      dl_ch128          = (simde__m128i *)&dl_ch_estimates_ext[aatx*x + aarx][start_point];
-      dl_ch_mag128      = (simde__m128i *)&dl_ch_mag[aatx*x + aarx][start_point];
-      dl_ch_mag128b     = (simde__m128i *)&dl_ch_magb[aatx*x + aarx][start_point];
-      rxdataF128        = (simde__m128i *)&rxdataF_ext[aarx][start_point];
-      rxdataF_comp128   = (simde__m128i *)&rxdataF_comp[aatx*x + aarx][start_point];
-      length_mod8 = length&7;
-
-      if (length_mod8 == 0) {
-        for (ii=0; ii<length>>3; ++ii) {
-          if (mod_order>2) {
-            simde__m128i mmtmpD0, mmtmpD1;
-            // get channel amplitude if not QPSK
-            mmtmpD0 = oai_mm_smadd(dl_ch128[0], dl_ch128[0], output_shift);
-            mmtmpD1 = oai_mm_smadd(dl_ch128[1], dl_ch128[1], output_shift);
-            mmtmpD0 = simde_mm_packs_epi32(mmtmpD0, mmtmpD1);
-            // store channel magnitude here in a new field of dlsch
-            dl_ch_mag128[0] = simde_mm_unpacklo_epi16(mmtmpD0, mmtmpD0);
-            dl_ch_mag128b[0] = dl_ch_mag128[0];
-            dl_ch_mag128[0] = simde_mm_mulhi_epi16(dl_ch_mag128[0], QAM_amp128);
-            dl_ch_mag128[0] = simde_mm_slli_epi16(dl_ch_mag128[0], 1);
-            dl_ch_mag128[1] = simde_mm_unpackhi_epi16(mmtmpD0, mmtmpD0);
-            dl_ch_mag128b[1] = dl_ch_mag128[1];
-            dl_ch_mag128[1] = simde_mm_mulhi_epi16(dl_ch_mag128[1], QAM_amp128);
-            dl_ch_mag128[1] = simde_mm_slli_epi16(dl_ch_mag128[1], 1);
-            dl_ch_mag128b[0] = simde_mm_mulhi_epi16(dl_ch_mag128b[0], QAM_amp128b);
-            dl_ch_mag128b[0] = simde_mm_slli_epi16(dl_ch_mag128b[0], 1);
-            dl_ch_mag128b[1] = simde_mm_mulhi_epi16(dl_ch_mag128b[1], QAM_amp128b);
-            dl_ch_mag128b[1] = simde_mm_slli_epi16(dl_ch_mag128b[1], 1);
-          }
-
-          // multiply by conjugated channel
-          rxdataF_comp128[0] = oai_mm_cpx_mult_conj(dl_ch128[0], rxdataF128[0], output_shift);
-          rxdataF_comp128[1] = oai_mm_cpx_mult_conj(dl_ch128[1], rxdataF128[1], output_shift);
-          dl_ch128+=2;
-          dl_ch_mag128+=2;
-          dl_ch_mag128b+=2;
-          rxdataF128+=2;
-          rxdataF_comp128+=2;
-        }
-      } else {
-        printf ("Channel Compensation: Received number of subcarriers is not multiple of 8, \n"
-                "need to adapt the code!\n");
-      }
-    }
-  }
-
-  /*This part of code makes sense only for processing in 2x2 blocks*/
-  if (rho) {
-    for (aarx=0; aarx<n_rx; aarx++) {
-      rho128      = (simde__m128i *)&rho[aarx][start_point];
-      dl_ch128    = (simde__m128i *)&dl_ch_estimates_ext[aarx][start_point];
-      dl_ch128_2  = (simde__m128i *)&dl_ch_estimates_ext[2+aarx][start_point];
-
-      if (length_mod8 == 0) {
-        for (ii=0; ii<length>>3; ++ii) {
-          // multiply by conjugated channel
-          rho128[0] = oai_mm_cpx_mult_conj(dl_ch128[0], dl_ch128_2[0], output_shift);
-          rho128[1] = oai_mm_cpx_mult_conj(dl_ch128[1], dl_ch128_2[1], output_shift);
-          dl_ch128+=2;
-          dl_ch128_2+=2;
-          rho128+=2;
-        }
-      } else {
-        printf ("Channel Compensation: Received number of subcarriers is not multiple of 8, \n"
-                "need to adapt the code!\n");
-      }
-    }
-  }
-
-}
-
-
-void prec2A_TM56_128(unsigned char pmi,simde__m128i *ch0,simde__m128i *ch1) {
   simde__m128i amp;
   amp = simde_mm_set1_epi16(ONE_OVER_SQRT2_Q15);
 
@@ -1526,7 +1655,7 @@ void prec2A_TM56_128(unsigned char pmi,simde__m128i *ch0,simde__m128i *ch1) {
 //              stream 1 .5(1,-1) .5(1,1)  .5(1,-1) .5(1,1)
 // store "precoded" channel for stream 0 in ch0, stream 1 in ch1
 
-short TM3_prec[8]__attribute__((aligned(16))) = {1,1,-1,-1,1,1,-1,-1} ;
+static const short TM3_prec[8] __attribute__((aligned(16))) = {1, 1, -1, -1, 1, 1, -1, -1};
 
 void prec2A_TM3_128(simde__m128i *ch0,simde__m128i *ch1) {
   simde__m128i amp = simde_mm_set1_epi16(ONE_OVER_SQRT2_Q15);
@@ -1558,7 +1687,8 @@ void prec2A_TM3_128(simde__m128i *ch0,simde__m128i *ch1) {
 // pmi = 0 => stream 0 (1,1), stream 1 (1,-1)
 // pmi = 1 => stream 0 (1,j), stream 2 (1,-j)
 
-void prec2A_TM4_128(int pmi,simde__m128i *ch0,simde__m128i *ch1) {
+static void prec2A_TM4_128(int pmi, simde__m128i *ch0, simde__m128i *ch1)
+{
   // sqrt(2) is already taken into account in computation sqrt_rho_a, sqrt_rho_b,
   //so divide by 2 is replaced by divide by sqrt(2).
   // printf ("demod pmi=%d\n", pmi);
@@ -1595,20 +1725,21 @@ void prec2A_TM4_128(int pmi,simde__m128i *ch0,simde__m128i *ch1) {
   //print_shorts("prec2A_TM4 ch1 (end):",ch1);
 }
 
-void dlsch_channel_compensation_TM56(int **rxdataF_ext,
-                                     int **dl_ch_estimates_ext,
-                                     int **dl_ch_mag,
-                                     int **dl_ch_magb,
-                                     int **rxdataF_comp,
-                                     unsigned char *pmi_ext,
-                                     LTE_DL_FRAME_PARMS *frame_parms,
-                                     PHY_MEASUREMENTS *measurements,
-                                     int eNB_id,
-                                     unsigned char symbol,
-                                     unsigned char mod_order,
-                                     unsigned short nb_rb,
-                                     unsigned char output_shift,
-                                     unsigned char dl_power_off) {
+static void dlsch_channel_compensation_TM56(int **rxdataF_ext,
+                                            int **dl_ch_estimates_ext,
+                                            int **dl_ch_mag,
+                                            int **dl_ch_magb,
+                                            int **rxdataF_comp,
+                                            unsigned char *pmi_ext,
+                                            LTE_DL_FRAME_PARMS *frame_parms,
+                                            PHY_MEASUREMENTS *measurements,
+                                            int eNB_id,
+                                            unsigned char symbol,
+                                            unsigned char mod_order,
+                                            unsigned short nb_rb,
+                                            unsigned char output_shift,
+                                            unsigned char dl_power_off)
+{
   unsigned short rb,Nre;
   simde__m128i *dl_ch0_128,*dl_ch1_128,*dl_ch_mag128,*dl_ch_mag128b,*rxdataF128,*rxdataF_comp128;
   unsigned char aarx=0,symbol_mod,pilots=0;
@@ -1719,17 +1850,17 @@ void dlsch_channel_compensation_TM56(int **rxdataF_ext,
   } // rx_antennas
 
   measurements->precoded_cqi_dB[eNB_id][0] = dB_fixed2(precoded_signal_strength,measurements->n0_power_tot);
-  //printf("eNB_id %d, symbol %d: precoded CQI %d dB\n",eNB_id,symbol,
-  //   measurements->precoded_cqi_dB[eNB_id][0]);
-
+  // printf("eNB_id %d, symbol %d: precoded CQI %d dB\n",eNB_id,symbol,
+  //    measurements->precoded_cqi_dB[eNB_id][0]);
 }
 
-void precode_channel_est(int32_t **dl_ch_estimates_ext,
-                         LTE_DL_FRAME_PARMS *frame_parms,
-                         LTE_UE_PDSCH *pdsch_vars,
-                         unsigned char symbol,
-                         unsigned short nb_rb,
-                         MIMO_mode_t mimo_mode) {
+static void precode_channel_est(int32_t **dl_ch_estimates_ext,
+                                LTE_DL_FRAME_PARMS *frame_parms,
+                                LTE_UE_PDSCH *pdsch_vars,
+                                unsigned char symbol,
+                                unsigned short nb_rb,
+                                MIMO_mode_t mimo_mode)
+{
   unsigned short rb;
   simde__m128i *dl_ch0_128,*dl_ch1_128;
   unsigned char aarx=0,symbol_mod,pilots=0;
@@ -1788,20 +1919,21 @@ void precode_channel_est(int32_t **dl_ch_estimates_ext,
   }
 }
 
-void dlsch_channel_compensation_TM34(LTE_DL_FRAME_PARMS *frame_parms,
-                                     LTE_UE_PDSCH *pdsch_vars,
-                                     PHY_MEASUREMENTS *measurements,
-                                     int eNB_id,
-                                     unsigned char symbol,
-                                     unsigned char mod_order0,
-                                     unsigned char mod_order1,
-                                     int harq_pid,
-                                     int round,
-                                     MIMO_mode_t mimo_mode,
-                                     unsigned short nb_rb,
-                                     unsigned short mmse_flag,
-                                     unsigned char output_shift0,
-                                     unsigned char output_shift1) {
+static void dlsch_channel_compensation_TM34(LTE_DL_FRAME_PARMS *frame_parms,
+                                            LTE_UE_PDSCH *pdsch_vars,
+                                            PHY_MEASUREMENTS *measurements,
+                                            int eNB_id,
+                                            unsigned char symbol,
+                                            unsigned char mod_order0,
+                                            unsigned char mod_order1,
+                                            int harq_pid,
+                                            int round,
+                                            MIMO_mode_t mimo_mode,
+                                            unsigned short nb_rb,
+                                            unsigned short mmse_flag,
+                                            unsigned char output_shift0,
+                                            unsigned char output_shift1)
+{
   unsigned short rb,Nre;
   simde__m128i *dl_ch0_128,*dl_ch1_128,*dl_ch_mag0_128,*dl_ch_mag1_128,*dl_ch_mag0_128b,*dl_ch_mag1_128b,*rxdataF128,*rxdataF_comp0_128,*rxdataF_comp1_128;
   unsigned char aarx=0,symbol_mod,pilots=0;
@@ -2017,7 +2149,6 @@ void dlsch_channel_compensation_TM34(LTE_DL_FRAME_PARMS *frame_parms,
   //  measurements->precoded_cqi_dB[eNB_id][0]);
 }
 
-
 void dlsch_dual_stream_correlation(LTE_DL_FRAME_PARMS *frame_parms,
                                    unsigned char symbol,
                                    unsigned short nb_rb,
@@ -2068,19 +2199,19 @@ void dlsch_dual_stream_correlation(LTE_DL_FRAME_PARMS *frame_parms,
 
 }
 
-
-void dlsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
-                         int **rxdataF_comp,
-                         int **rxdataF_comp_i,
-                         int **rho,
-                         int **rho_i,
-                         int **dl_ch_mag,
-                         int **dl_ch_magb,
-                         int **dl_ch_mag_i,
-                         int **dl_ch_magb_i,
-                         unsigned char symbol,
-                         unsigned short nb_rb,
-                         unsigned char dual_stream_UE) {
+static void dlsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
+                                int **rxdataF_comp,
+                                int **rxdataF_comp_i,
+                                int **rho,
+                                int **rho_i,
+                                int **dl_ch_mag,
+                                int **dl_ch_magb,
+                                int **dl_ch_mag_i,
+                                int **dl_ch_magb_i,
+                                unsigned char symbol,
+                                unsigned short nb_rb,
+                                unsigned char dual_stream_UE)
+{
   unsigned char aatx;
   int i;
   simde__m128i *rxdataF_comp128_0,*rxdataF_comp128_1,*rxdataF_comp128_i0,*rxdataF_comp128_i1,*dl_ch_mag128_0,*dl_ch_mag128_1,*dl_ch_mag128_0b,*dl_ch_mag128_1b,*rho128_0,*rho128_1,*rho128_i0,*rho128_i1,
@@ -2136,16 +2267,16 @@ void dlsch_detection_mrc(LTE_DL_FRAME_PARMS *frame_parms,
       }
     }
   }
-
 }
 
-void dlsch_detection_mrc_TM34(LTE_DL_FRAME_PARMS *frame_parms,
-                              LTE_UE_PDSCH *pdsch_vars,
-                              int harq_pid,
-                              int round,
-                              unsigned char symbol,
-                              unsigned short nb_rb,
-                              unsigned char dual_stream_UE) {
+static void dlsch_detection_mrc_TM34(LTE_DL_FRAME_PARMS *frame_parms,
+                                     LTE_UE_PDSCH *pdsch_vars,
+                                     int harq_pid,
+                                     int round,
+                                     unsigned char symbol,
+                                     unsigned short nb_rb,
+                                     unsigned char dual_stream_UE)
+{
   int i;
   simde__m128i *rxdataF_comp128_0,*rxdataF_comp128_1;
   simde__m128i *dl_ch_mag128_0,*dl_ch_mag128_1;
@@ -2259,7 +2390,6 @@ void dlsch_detection_mrc_TM34(LTE_DL_FRAME_PARMS *frame_parms,
       }
     }
   }
-
 }
 
 void dlsch_scale_channel(int **dl_ch_estimates_ext,
@@ -2462,15 +2592,16 @@ void dlsch_channel_level_median(int **dl_ch_estimates_ext,
 
 }
 
-void mmse_processing_oai(LTE_UE_PDSCH *pdsch_vars,
-                         LTE_DL_FRAME_PARMS *frame_parms,
-                         PHY_MEASUREMENTS *measurements,
-                         unsigned char first_symbol_flag,
-                         MIMO_mode_t mimo_mode,
-                         unsigned short mmse_flag,
-                         int noise_power,
-                         unsigned char symbol,
-                         unsigned short nb_rb) {
+static void mmse_processing_oai(LTE_UE_PDSCH *pdsch_vars,
+                                LTE_DL_FRAME_PARMS *frame_parms,
+                                PHY_MEASUREMENTS *measurements,
+                                unsigned char first_symbol_flag,
+                                MIMO_mode_t mimo_mode,
+                                unsigned short mmse_flag,
+                                int noise_power,
+                                unsigned char symbol,
+                                unsigned short nb_rb)
+{
   int **rxdataF_ext           = pdsch_vars->rxdataF_ext;
   int **dl_ch_estimates_ext   = pdsch_vars->dl_ch_estimates_ext;
   unsigned char *pmi_ext      = pdsch_vars->pmi_ext;
@@ -2617,107 +2748,6 @@ void mmse_processing_core(int32_t **rxdataF_ext,
   free(rxdataF_ext_flcpx);
 }
 
-
-/*THIS FUNCTION TAKES FLOAT_POINT INPUT. SHOULD NOT BE USED WITH OAI*/
-void mmse_processing_core_flp(float complex **rxdataF_ext_flcpx,
-                              float complex **H,
-                              int32_t **rxdataF_ext,
-                              int32_t **dl_ch_estimates_ext,
-                              float noise_power,
-                              int n_tx,
-                              int n_rx,
-                              int length,
-                              int start_point) {
-  int aatx, aarx, re;
-  float max = 0;
-  float one_over_max = 0;
-  float complex **W_MMSE= malloc(n_tx*n_rx*sizeof(float complex *));
-
-  for (int j=0; j<n_tx*n_rx; j++) {
-    W_MMSE[j] = malloc(sizeof(float complex)*length);
-  }
-
-  float complex *H_re=  malloc(n_tx*n_rx*sizeof(float complex));
-  float complex *W_MMSE_re=  malloc(n_tx*n_rx*sizeof(float complex));
-
-  for (re=0; re<length; re++) {
-    for (aatx=0; aatx<n_tx; aatx++) {
-      for (aarx=0; aarx<n_rx; aarx++) {
-        H_re[aatx*n_rx + aarx] = H[aatx*n_rx + aarx][re];
-#ifdef DEBUG_MMSE
-
-        if (re == 0)
-          printf(" H_re[%d]= (%f + i%f)\n", aatx*n_rx + aarx, creal(H_re[aatx*n_rx + aarx]), cimag(H_re[aatx*n_rx + aarx]));
-
-#endif
-      }
-    }
-
-    compute_MMSE(H_re, n_tx, noise_power, W_MMSE_re);
-
-    for (aatx=0; aatx<n_tx; aatx++) {
-      for (aarx=0; aarx<n_rx; aarx++) {
-        W_MMSE[aatx*n_rx + aarx][re] = W_MMSE_re[aatx*n_rx + aarx];
-
-        if (fabs(creal(W_MMSE_re[aatx*n_rx + aarx])) > max)
-          max = fabs(creal(W_MMSE_re[aatx*n_rx + aarx]));
-
-        if (fabs(cimag(W_MMSE_re[aatx*n_rx + aarx])) > max)
-          max = fabs(cimag(W_MMSE_re[aatx*n_rx + aarx]));
-      }
-    }
-  }
-
-  one_over_max = 1.0/max;
-
-  for (re=0; re<length; re++)
-    for (aatx=0; aatx<n_tx; aatx++)
-      for (aarx=0; aarx<n_rx; aarx++) {
-#ifdef DEBUG_MMSE
-
-        if (re == 0)
-          printf(" W_MMSE[%d] = (%f + i%f)\n", aatx*n_rx + aarx, creal(W_MMSE[aatx*n_rx + aarx][re]), cimag(W_MMSE[aatx*n_rx + aarx][re]));
-
-#endif
-        W_MMSE[aatx*n_rx + aarx][re] = one_over_max*W_MMSE[aatx*n_rx + aarx][re];
-#ifdef DEBUG_MMSE
-
-        if (re == 0)
-          printf(" AFTER NORM W_MMSE[%d] = (%f + i%f), max = %f \n", aatx*n_rx + aarx, creal(W_MMSE[aatx*n_rx + aarx][re]), cimag(W_MMSE[aatx*n_rx + aarx][re]), max);
-
-#endif
-      }
-
-  mult_mmse_rxdataF(W_MMSE,
-                    rxdataF_ext_flcpx,
-                    n_tx,
-                    n_rx,
-                    length,
-                    start_point);
-  mult_mmse_chan_est(W_MMSE,
-                     H,
-                     n_tx,
-                     n_rx,
-                     length,
-                     start_point);
-  float_to_rxdataF(rxdataF_ext,
-                   rxdataF_ext_flcpx,
-                   n_tx,
-                   n_rx,
-                   length,
-                   start_point);
-  float_to_chan_est(dl_ch_estimates_ext,
-                    H,
-                    n_tx,
-                    n_rx,
-                    length,
-                    start_point);
-  free(H_re);
-  free(W_MMSE);
-  free(W_MMSE_re);
-}
-
-
 void dlsch_channel_aver_band(int **dl_ch_estimates_ext,
                              LTE_DL_FRAME_PARMS *frame_parms,
                              struct complex32 *chan_avg,
@@ -2792,20 +2822,12 @@ void dlsch_channel_aver_band(int **dl_ch_estimates_ext,
 
 }
 
-void rxdataF_to_float(int32_t **rxdataF_ext,
-                      float complex **rxdataF_f,
-                      int n_rx,
-                      int length,
-                      int start_point) {
-  short re;
-  int aarx;
-  int16_t imag;
-  int16_t real;
-
-  for (aarx=0; aarx<n_rx; aarx++) {
-    for (re=0; re<length; re++) {
-      imag = (int16_t) (rxdataF_ext[aarx][start_point + re] >> 16);
-      real = (int16_t) (rxdataF_ext[aarx][start_point + re] & 0xffff);
+static void rxdataF_to_float(int32_t **rxdataF_ext, float complex **rxdataF_f, int n_rx, int length, int start_point)
+{
+  for (int aarx = 0; aarx < n_rx; aarx++) {
+    for (int re = 0; re < length; re++) {
+      int16_t imag = (int16_t)(rxdataF_ext[aarx][start_point + re] >> 16);
+      int16_t real = (int16_t)(rxdataF_ext[aarx][start_point + re] & 0xffff);
       rxdataF_f[aarx][re] = (float)(real/(32768.0)) + I*(float)(imag/(32768.0));
 #ifdef DEBUG_MMSE
 
@@ -2820,24 +2842,18 @@ void rxdataF_to_float(int32_t **rxdataF_ext,
   }
 }
 
-
-
-void chan_est_to_float(int32_t **dl_ch_estimates_ext,
-                       float complex **dl_ch_estimates_ext_f,
-                       int n_tx,
-                       int n_rx,
-                       int length,
-                       int start_point) {
-  short re;
-  int aatx,aarx;
-  int16_t imag;
-  int16_t real;
-
-  for (aatx=0; aatx<n_tx; aatx++) {
-    for (aarx=0; aarx<n_rx; aarx++) {
-      for (re=0; re<length; re++) {
-        imag = (int16_t) (dl_ch_estimates_ext[aatx*n_rx + aarx][start_point + re] >> 16);
-        real = (int16_t) (dl_ch_estimates_ext[aatx*n_rx + aarx][start_point+ re] & 0xffff);
+static void chan_est_to_float(int32_t **dl_ch_estimates_ext,
+                              float complex **dl_ch_estimates_ext_f,
+                              int n_tx,
+                              int n_rx,
+                              int length,
+                              int start_point)
+{
+  for (int aatx = 0; aatx < n_tx; aatx++) {
+    for (int aarx = 0; aarx < n_rx; aarx++) {
+      for (int re = 0; re < length; re++) {
+        int16_t imag = (int16_t)(dl_ch_estimates_ext[aatx * n_rx + aarx][start_point + re] >> 16);
+        int16_t real = (int16_t)(dl_ch_estimates_ext[aatx * n_rx + aarx][start_point + re] & 0xffff);
         dl_ch_estimates_ext_f[aatx*n_rx + aarx][re] = (float)(real/(32768.0)) + I*(float)(imag/(32768.0));
 #ifdef DEBUG_MMSE
 
@@ -2857,15 +2873,12 @@ void float_to_chan_est(int32_t **dl_ch_estimates_ext,
                        int n_tx,
                        int n_rx,
                        int length,
-                       int start_point) {
-  short re;
-  int aarx, aatx;
-  int16_t imag;
-  int16_t real;
-
-  for (aatx=0; aatx<n_tx; aatx++) {
-    for (aarx=0; aarx<n_rx; aarx++) {
-      for (re=0; re<length; re++) {
+                       int start_point)
+{
+  for (int aatx = 0; aatx < n_tx; aatx++) {
+    for (int aarx = 0; aarx < n_rx; aarx++) {
+      for (int re = 0; re < length; re++) {
+        int16_t imag, real;
         if (cimag(dl_ch_estimates_ext_f[aatx*n_rx + aarx][re])<-1)
           imag = -INT16_MAX;
         else if (cimag(dl_ch_estimates_ext_f[aatx*n_rx + aarx][re])>=1)
@@ -2895,20 +2908,11 @@ void float_to_chan_est(int32_t **dl_ch_estimates_ext,
   }
 }
 
-
-void float_to_rxdataF(int32_t **rxdataF_ext,
-                      float complex **rxdataF_f,
-                      int n_tx,
-                      int n_rx,
-                      int length,
-                      int start_point) {
-  short re;
-  int aarx;
-  int16_t imag;
-  int16_t real;
-
-  for (aarx=0; aarx<n_rx; aarx++) {
-    for (re=0; re<length; re++) {
+static void float_to_rxdataF(int32_t **rxdataF_ext, float complex **rxdataF_f, int n_tx, int n_rx, int length, int start_point)
+{
+  for (int aarx = 0; aarx < n_rx; aarx++) {
+    for (int re = 0; re < length; re++) {
+      int16_t imag, real;
       if (cimag(rxdataF_f[aarx][re])<-1)
         imag = -INT16_MAX;
       else if (cimag(rxdataF_f[aarx][re])>=1)
@@ -2937,7 +2941,6 @@ void float_to_rxdataF(int32_t **rxdataF_ext,
   }
 }
 
-
 void mult_mmse_rxdataF(float complex **Wmmse,
                        float complex **rxdataF_ext_f,
                        int n_tx,
@@ -2946,9 +2949,9 @@ void mult_mmse_rxdataF(float complex **Wmmse,
                        int start_point) {
   short re;
   int aarx, aatx;
-  float complex *rxdata_re =  malloc(n_rx*sizeof(float complex));
-  float complex *rxdata_mmse_re =  malloc(n_rx*sizeof(float complex));
-  float complex *Wmmse_re =  malloc(n_tx*n_rx*sizeof(float complex));
+  float complex rxdata_re[n_rx];
+  float complex rxdata_mmse_re[n_rx];
+  float complex Wmmse_re[n_tx][n_rx];
 
   for (re=0; re<length; re++) {
     for (aarx=0; aarx<n_rx; aarx++) {
@@ -2963,11 +2966,11 @@ void mult_mmse_rxdataF(float complex **Wmmse,
 
     for (aatx=0; aatx<n_tx; aatx++) {
       for (aarx=0; aarx<n_rx; aarx++) {
-        Wmmse_re[aatx*n_rx + aarx] = Wmmse[aatx*n_rx + aarx][re];
+        Wmmse_re[aatx][aarx] = Wmmse[aatx * n_rx + aarx][re];
       }
     }
 
-    mutl_matrix_matrix_col_based(Wmmse_re, rxdata_re, n_rx, n_tx, n_rx, 1, rxdata_mmse_re);
+    mutl_matrix_matrix_col_based((float complex *)Wmmse_re, rxdata_re, n_rx, n_tx, n_rx, 1, rxdata_mmse_re);
 
     for (aarx=0; aarx<n_rx; aarx++) {
       rxdataF_ext_f[aarx][re] = rxdata_mmse_re[aarx];
@@ -2979,10 +2982,6 @@ void mult_mmse_rxdataF(float complex **Wmmse,
 #endif
     }
   }
-
-  free(rxdata_re);
-  free(rxdata_mmse_re);
-  free(Wmmse_re);
 }
 
 void mult_mmse_chan_est(float complex **Wmmse,
@@ -3281,12 +3280,13 @@ void dlsch_channel_level_TM7(int **dl_bf_ch_estimates_ext,
 
 }
 //#define ONE_OVER_2_Q15 16384
-void dlsch_alamouti(LTE_DL_FRAME_PARMS *frame_parms,
-                    int **rxdataF_comp,
-                    int **dl_ch_mag,
-                    int **dl_ch_magb,
-                    unsigned char symbol,
-                    unsigned short nb_rb) {
+static void dlsch_alamouti(LTE_DL_FRAME_PARMS *frame_parms,
+                           int **rxdataF_comp,
+                           int **dl_ch_mag,
+                           int **dl_ch_magb,
+                           unsigned char symbol,
+                           unsigned short nb_rb)
+{
   short *rxF0,*rxF1;
   simde__m128i *ch_mag0,*ch_mag1,*ch_mag0b,*ch_mag1b;
   unsigned char rb,re;
@@ -3345,24 +3345,24 @@ void dlsch_alamouti(LTE_DL_FRAME_PARMS *frame_parms,
       ch_mag1b+=2;
     }
   }
-
 }
 
 //==============================================================================================
 // Extraction functions
 //==============================================================================================
 
-unsigned short dlsch_extract_rbs_single(int **rxdataF,
-                                        int **dl_ch_estimates,
-                                        int **rxdataF_ext,
-                                        int **dl_ch_estimates_ext,
-                                        unsigned short pmi,
-                                        unsigned char *pmi_ext,
-                                        unsigned int *rb_alloc,
-                                        unsigned char symbol,
-                                        unsigned char subframe,
-                                        uint32_t high_speed_flag,
-                                        LTE_DL_FRAME_PARMS *frame_parms) {
+static unsigned short dlsch_extract_rbs_single(int **rxdataF,
+                                               int **dl_ch_estimates,
+                                               int **rxdataF_ext,
+                                               int **dl_ch_estimates_ext,
+                                               unsigned short pmi,
+                                               unsigned char *pmi_ext,
+                                               unsigned int *rb_alloc,
+                                               unsigned char symbol,
+                                               unsigned char subframe,
+                                               uint32_t high_speed_flag,
+                                               LTE_DL_FRAME_PARMS *frame_parms)
+{
   unsigned short rb,nb_rb=0;
   unsigned char rb_alloc_ind;
   unsigned char i,aarx,l,nsymb,skip_half=0,sss_symb,pss_symb=0;
@@ -3929,18 +3929,19 @@ unsigned short dlsch_extract_rbs_single(int **rxdataF,
   return(nb_rb/frame_parms->nb_antennas_rx);
 }
 
-unsigned short dlsch_extract_rbs_dual(int **rxdataF,
-                                      int **dl_ch_estimates,
-                                      int **rxdataF_ext,
-                                      int **dl_ch_estimates_ext,
-                                      unsigned short pmi,
-                                      unsigned char *pmi_ext,
-                                      unsigned int *rb_alloc,
-                                      unsigned char symbol,
-                                      unsigned char subframe,
-                                      uint32_t high_speed_flag,
-                                      LTE_DL_FRAME_PARMS *frame_parms,
-                                      MIMO_mode_t mimo_mode) {
+static unsigned short dlsch_extract_rbs_dual(int **rxdataF,
+                                             int **dl_ch_estimates,
+                                             int **rxdataF_ext,
+                                             int **dl_ch_estimates_ext,
+                                             unsigned short pmi,
+                                             unsigned char *pmi_ext,
+                                             unsigned int *rb_alloc,
+                                             unsigned char symbol,
+                                             unsigned char subframe,
+                                             uint32_t high_speed_flag,
+                                             LTE_DL_FRAME_PARMS *frame_parms,
+                                             MIMO_mode_t mimo_mode)
+{
   int prb,nb_rb=0;
   int prb_off,prb_off2;
   int rb_alloc_ind,skip_half=0,sss_symb,pss_symb=0,nsymb,l;
@@ -4369,15 +4370,16 @@ unsigned short dlsch_extract_rbs_dual(int **rxdataF,
   return(nb_rb/frame_parms->nb_antennas_rx);
 }
 
-unsigned short dlsch_extract_rbs_TM7(int **rxdataF,
-                                     int **dl_bf_ch_estimates,
-                                     int **rxdataF_ext,
-                                     int **dl_bf_ch_estimates_ext,
-                                     unsigned int *rb_alloc,
-                                     unsigned char symbol,
-                                     unsigned char subframe,
-                                     uint32_t high_speed_flag,
-                                     LTE_DL_FRAME_PARMS *frame_parms) {
+static unsigned short dlsch_extract_rbs_TM7(int **rxdataF,
+                                            int **dl_bf_ch_estimates,
+                                            int **rxdataF_ext,
+                                            int **dl_bf_ch_estimates_ext,
+                                            unsigned int *rb_alloc,
+                                            unsigned char symbol,
+                                            unsigned char subframe,
+                                            uint32_t high_speed_flag,
+                                            LTE_DL_FRAME_PARMS *frame_parms)
+{
   unsigned short rb,nb_rb=0;
   unsigned char rb_alloc_ind;
   unsigned char i,aarx,l,nsymb,skip_half=0,sss_symb,pss_symb=0;
