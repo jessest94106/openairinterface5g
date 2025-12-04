@@ -2488,7 +2488,7 @@ NR_UE_info_t *find_ra_UE(NR_UEs_t *UEs, rnti_t rntiP)
 void delete_nr_ue_data(NR_UE_info_t *UE, NR_COMMON_channels_t *ccPtr, uid_allocator_t *uia)
 {
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
-  ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->reconfigSpCellConfig);
+  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
   ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->capability);
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   seq_arr_free(&sched_ctrl->lc_config, NULL);
@@ -2852,6 +2852,20 @@ void configure_UE_BWP(gNB_MAC_INST *nr_mac,
             sc_info->nrofHARQ_ProcessesForPUSCH_r17 = pusch_servingcellconfig->ext3->nrofHARQ_ProcessesForPUSCH_r17;
         }
       }
+    } else {
+      sc_info->csi_MeasConfig = NULL;
+      sc_info->nrofHARQ_ProcessesForPDSCH = NULL;
+      sc_info->maxMIMO_Layers_PDSCH = NULL;
+      sc_info->downlinkHARQ_FeedbackDisabled_r17 = NULL;
+      sc_info->pdsch_CGB_Transmission = NULL;
+      sc_info->nrofHARQ_ProcessesForPDSCH_v1700 = NULL;
+      sc_info->crossCarrierSchedulingConfig = NULL;
+      sc_info->supplementaryUplink = NULL;
+      sc_info->carrierSwitching = NULL;
+      sc_info->maxMIMO_Layers_PUSCH = NULL;
+      sc_info->rateMatching_PUSCH = NULL;
+      sc_info->pusch_CGB_Transmission = NULL;
+      sc_info->nrofHARQ_ProcessesForPUSCH_r17 = NULL;
     }
 
     if (CellGroup && CellGroup->physicalCellGroupConfig)
@@ -3919,7 +3933,7 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE,
                                                   buf,
                                                   sizeof(buf));
   AssertFatal(enc_rval.encoded > 0, "ASN1 encoding of CellGroupConfig failed, failed type %s\n", enc_rval.failed_type->name);
-  UE->await_reconfig = true;
+  UE->reestablish_rlc = true;
   du_to_cu_rrc_information_t du2cu = {
     .cellGroupConfig = buf,
     .cellGroupConfig_length = (enc_rval.encoded + 7) >> 3,
