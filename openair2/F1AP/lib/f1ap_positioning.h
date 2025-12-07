@@ -100,4 +100,11 @@ f1ap_trp_information_resp_t cp_trp_information_resp(const f1ap_trp_information_r
 bool eq_trp_information_resp(const f1ap_trp_information_resp_t *a, const f1ap_trp_information_resp_t *b);
 void free_trp_information_resp(f1ap_trp_information_resp_t *msg);
 
+// trp information failure
+struct F1AP_F1AP_PDU *encode_trp_information_failure(const f1ap_trp_information_failure_t *msg);
+bool decode_trp_information_failure(const struct F1AP_F1AP_PDU *pdu, f1ap_trp_information_failure_t *out);
+f1ap_trp_information_failure_t cp_trp_information_failure(const f1ap_trp_information_failure_t *orig);
+bool eq_trp_information_failure(const f1ap_trp_information_failure_t *a, const f1ap_trp_information_failure_t *b);
+void free_trp_information_failure(f1ap_trp_information_failure_t *msg);
+
 #endif /* F1AP_POSITIONING_H_ */
