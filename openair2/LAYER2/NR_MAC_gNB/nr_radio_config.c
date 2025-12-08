@@ -273,20 +273,41 @@ NR_SearchSpace_t *rrc_searchspace_config(bool is_common,
   return ss;
 }
 
-static NR_ControlResourceSet_t *get_coreset_config(int bwp_id, int bwp_start, int bwp_size, uint64_t ssb_bitmap)
+static NR_ControlResourceSet_t *get_coreset_config(int bwp_id,
+                                                   int cset_offset,
+                                                   int cset_limit,
+                                                   int bwp_start,
+                                                   int bwp_size,
+                                                   uint64_t ssb_bitmap)
 {
   NR_ControlResourceSet_t *coreset = calloc(1, sizeof(*coreset));
   AssertFatal(coreset != NULL, "out of memory\n");
   // frequency domain resources depending on BWP size
   int additional_offset = (bwp_start + 5) / 6 * 6 - bwp_start;
+  int cset_shift = 0;
+  if (cset_offset > additional_offset) {
+    cset_shift = cset_offset / 6 + (cset_offset % 6 > 0);
+    additional_offset += cset_shift * 6;
+  }
   int eff_bwp_size = bwp_size - additional_offset;
+  if (cset_limit && eff_bwp_size > cset_limit)
+    eff_bwp_size = cset_limit;
+  AssertFatal(eff_bwp_size >= 24, "CORESET effective BWP size %d is less than 24 PRB, can't allocate\n", eff_bwp_size);
   coreset->frequencyDomainResources.buf = calloc(1,6);
-  coreset->frequencyDomainResources.buf[0] = (eff_bwp_size < 48) ? 0xf0 : 0xff;
-  coreset->frequencyDomainResources.buf[1] = (eff_bwp_size < 96) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[2] = (eff_bwp_size < 144) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[3] = (eff_bwp_size < 192) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[4] = (eff_bwp_size < 240) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[5] = 0x00;
+  uint64_t buf = 0;
+  if (eff_bwp_size < 48)
+    buf = 0xf;
+  else {
+    for (int i = 0; i < eff_bwp_size / 48; i++) {
+      buf <<= 8;
+      buf += 0xff;
+    }
+  }
+  buf <<= cset_shift;
+  for (int b = 0; b < 6; b++) {
+    uint8_t temp_buf = (buf >> (8 * b)) & 0xff;
+    reverse_bits_u8(&temp_buf, 1, &coreset->frequencyDomainResources.buf[b]);
+  }
   coreset->frequencyDomainResources.size = 6;
   coreset->frequencyDomainResources.bits_unused = 3;
   coreset->duration = (eff_bwp_size < 48) ? 2 : 1;
@@ -1001,8 +1022,8 @@ void prepare_sim_uecap(NR_UE_NR_Capability_t *cap,
 void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsch_TimeDomainAllocationList,
                           frame_type_t frame_type,
                           NR_TDD_UL_DL_ConfigCommon_t *tdd_UL_DL_ConfigurationCommon,
-                          int curr_bwp) {
-
+                          int curr_bwp)
+{
   // coreset duration setting to be improved in the framework of RRC harmonization, potentially using a common function
   int len_coreset = 1;
   if (curr_bwp < 48)
@@ -1751,7 +1772,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   int bwp_size = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   int bwp_start = NRRIV2PRBOFFSET(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   uint64_t ssb_bitmap = get_ssb_bitmap(scc);
-  NR_ControlResourceSet_t *coreset = get_coreset_config(bwp->bwp_Id, bwp_start, bwp_size, ssb_bitmap);
+  NR_ControlResourceSet_t *coreset = get_coreset_config(bwp->bwp_Id, 0, 0, bwp_start, bwp_size, ssb_bitmap);
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonControlResourceSet = coreset;
 
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->searchSpaceZero=NULL;
@@ -1803,9 +1824,8 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList = calloc(1,sizeof(*bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList));
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList = calloc(1,sizeof(*bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList));
 
-  // coreset2 is identical to coreset above, but reallocated to prevent double
-  // frees
-  NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, bwp_start, bwp_size, ssb_bitmap);
+  // coreset2 is identical to coreset above, but reallocated to prevent double frees
+  NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, 0, 0, bwp_start, bwp_size, ssb_bitmap);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset2);
   int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   int num_cces = get_coreset_num_cces(coreset2->frequencyDomainResources.buf, coreset2->duration);
@@ -2710,6 +2730,17 @@ static BIT_STRING_t bit_string_clone(const BIT_STRING_t *orig)
   return bs;
 }
 
+
+void configure_coreset_for_mux23(const NR_ServingCellConfigCommon_t *scc, int offset, int limit, int bwp_start, int bwp_size)
+{
+  NR_ControlResourceSet_t *coreset = get_coreset_config(5, offset, limit, bwp_start, bwp_size, get_ssb_bitmap(scc));
+  NR_PDCCH_ConfigCommon_t *pdcch_common = scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup;
+  pdcch_common->commonControlResourceSet = coreset;
+  for (int i = 0; i < pdcch_common->commonSearchSpaceList->list.count; i++) {
+    *pdcch_common->commonSearchSpaceList->list.array[i]->controlResourceSetId = coreset->controlResourceSetId;
+  }
+}
+
 NR_BCCH_DL_SCH_Message_t *get_SIB1_NR(const NR_ServingCellConfigCommon_t *scc,
                                       const plmn_id_t *plmn,
                                       uint64_t cellID,
@@ -3336,7 +3367,7 @@ static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCell
   NR_BWP_t *genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
   int bwp_size = NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
   int bwp_start = NRRIV2PRBOFFSET(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
-  NR_ControlResourceSet_t *coreset = get_coreset_config(0, bwp_start, bwp_size, bitmap);
+  NR_ControlResourceSet_t *coreset = get_coreset_config(0, 0, 0, bwp_start, bwp_size, bitmap);
   asn1cSeqAdd(&pdcch_Config->controlResourceSetToAddModList->list, coreset);
 
   int css_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];

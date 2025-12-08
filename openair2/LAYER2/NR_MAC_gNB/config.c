@@ -821,6 +821,15 @@ static void config_sched_ctrlSIB1(gNB_MAC_INST *nr_mac)
   fill_coresetZero(&sched_ctrlCommon->coreset, &type0_PDCCH_CSS_config);
   nr_mac->cset0_bwp_start = type0_PDCCH_CSS_config.cset_start_rb;
   nr_mac->cset0_bwp_size = type0_PDCCH_CSS_config.num_rbs;
+  if (type0_PDCCH_CSS_config.type0_pdcch_ss_mux_pattern > 1) {
+    int bwp_start = NRRIV2PRBOFFSET(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth,
+                                    MAX_BWP_SIZE);
+    int bwp_size = NRRIV2BW(scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
+    // we need to configure a commonControlResourceSet != 0
+    // because CSET0 would start from a symbol != 0 and that's unwanted for anything but SIB1
+    // The network configures the commonControlResourceSet in SIB1 so that it is contained in the bandwidth of CSET0
+    configure_coreset_for_mux23(scc, nr_mac->cset0_bwp_start - bwp_start, nr_mac->cset0_bwp_size, bwp_start, bwp_size);
+  }
 }
 
 /**
