@@ -31,7 +31,6 @@
  */
 
 #define _GNU_SOURCE
-#define SPEED_OF_LIGHT 299792458
 
 #include "mac_defs.h"
 #include "NR_MAC_UE/mac_proto.h"
@@ -41,7 +40,6 @@
 #include "executables/softmodem-common.h"
 #include "SCHED_NR/phy_frame_config_nr.h"
 #include "oai_asn1.h"
-#include "executables/position_interface.h"
 
 #define ASIGN_P_VAL(dst, src) \
   do {                        \
@@ -266,56 +264,61 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
 
 }
 
-// computes round-trip-time between ue and sat based on SIB19 ephemeris data
-static void calculate_ue_sat_ta(const position_t *position_params,
-                                const NR_PositionVelocity_r17_t *sat_pos,
-                                ntn_timing_advance_componets_t *ntn_ta)
+// prepare data for orbit propagation based on SIB19 ephemeris data to be able to compute the round-trip-time between ue and sat
+static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timing_advance_componets_t *ntn_ta)
 {
-  // get UE position coordinates
-  const position_t pos_ue = *position_params;
-
   // get sat position coordinates
   const position_t pos_sat = {sat_pos->positionX_r17 * 1.3, sat_pos->positionY_r17 * 1.3, sat_pos->positionZ_r17 * 1.3};
-
-  // calculate directional vector from SAT to UE
-  const position_t dir_sat_ue = {pos_ue.X - pos_sat.X, pos_ue.Y - pos_sat.Y, pos_ue.Z - pos_sat.Z};
-
-  // calculate distance between SAT and UE
-  double distance = sqrt(dir_sat_ue.X * dir_sat_ue.X + dir_sat_ue.Y * dir_sat_ue.Y + dir_sat_ue.Z * dir_sat_ue.Z);
 
   // get sat velocity vector
   const position_t vel_sat = {sat_pos->velocityVX_r17 * 0.06, sat_pos->velocityVY_r17 * 0.06, sat_pos->velocityVZ_r17 * 0.06};
 
-  // calculate SAT velocity towards UE
-  double velocity = (vel_sat.X * dir_sat_ue.X + vel_sat.Y * dir_sat_ue.Y + vel_sat.Z * dir_sat_ue.Z) / distance;
-
-  // calculate SAT acceleration towards UE
+  // calculate orbital radius
   const double radius_2 = pos_sat.X * pos_sat.X + pos_sat.Y * pos_sat.Y + pos_sat.Z * pos_sat.Z;
+  const double radius = sqrt(radius_2);
+
+  // calculate sat velocity magnitude
   const double vel_sat_2 = vel_sat.X * vel_sat.X + vel_sat.Y * vel_sat.Y + vel_sat.Z * vel_sat.Z;
-  const double acceleration =
-      -(pos_sat.X * dir_sat_ue.X + pos_sat.Y * dir_sat_ue.Y + pos_sat.Z * dir_sat_ue.Z) * vel_sat_2 / (radius_2 * distance);
+  const double vel_mag = sqrt(vel_sat_2);
 
-  LOG_D(NR_MAC, "Satellite velocity towards UE: %f m/s, acceleration towards UE: %f m/s²\n", velocity, acceleration);
+  // calculate angular velocity in rad/ms
+  const double omega = vel_mag / (radius * 1000);
 
-  ntn_ta->N_UE_TA_adj = (2 * distance / SPEED_OF_LIGHT) * 1e3; // in ms
-  ntn_ta->N_UE_TA_drift = (2 * -velocity / SPEED_OF_LIGHT) * 1e6; // in µs/s
-  ntn_ta->N_UE_TA_drift_variant = (2 * acceleration / SPEED_OF_LIGHT) * 1e6; // in µs/s²
+  // calculate sat position in 90° orbit
+  position_t pos_sat_90 = pos_sat;
+  if (vel_mag) {
+    const double scaling = radius / vel_mag;
+    pos_sat_90 = (position_t){vel_sat.X * scaling, vel_sat.Y * scaling, vel_sat.Z * scaling};
+  }
+
+  LOG_I(NR_MAC,
+        "Satellite angular velocity = %e rad/ms, sat_pos = {%f, %f, %f}, sat_pos_90 = {%f, %f, %f}\n",
+        omega,
+        pos_sat.X,
+        pos_sat.Y,
+        pos_sat.Z,
+        pos_sat_90.X,
+        pos_sat_90.Y,
+        pos_sat_90.Z);
+
+  ntn_ta->omega = omega;
+  ntn_ta->pos_sat_0 = pos_sat;
+  ntn_ta->pos_sat_90 = pos_sat_90;
 }
 
 // populate ntn_ta structure from mac
-static void configure_ntn_ta(module_id_t module_id,
-                             ntn_timing_advance_componets_t *ntn_ta,
-                             const NR_NTN_Config_r17_t *ntn_Config_r17)
+static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NTN_Config_r17_t *ntn_Config_r17, int hfn, int frame)
 {
   if (!ntn_Config_r17)
     return;
 
-  position_t position_params = {0};
-  get_position_coordinates(module_id, &position_params);
-
   // epochTime_r17 must be present (this is assured by function `eval_epoch_time()`)
   const NR_EpochTime_r17_t *epoch_time_r17 = ntn_Config_r17->epochTime_r17;
   AssertFatal(epoch_time_r17, "epoch_time_r17 should not be NULL here\n");
+  if (epoch_time_r17->sfn_r17 >= frame)
+    ntn_ta->epoch_hfn = hfn;
+  else
+    ntn_ta->epoch_hfn = hfn + 1;
   ntn_ta->epoch_sfn = epoch_time_r17->sfn_r17;
   ntn_ta->epoch_subframe = epoch_time_r17->subFrameNR_r17;
 
@@ -325,17 +328,17 @@ static void configure_ntn_ta(module_id_t module_id,
     if (ephemeris_info->present == NR_EphemerisInfo_r17_PR_positionVelocity_r17) {
       const NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
       AssertFatal(position_velocity, "position_velocity should not be NULL here\n");
-      calculate_ue_sat_ta(&position_params, position_velocity, ntn_ta);
+      prepare_ue_sat_ta(position_velocity, ntn_ta);
     } else {
       LOG_W(NR_MAC, "NR UE currently supports only ephemerisInfo_r17 of type positionVelocity_r17\n");
-      ntn_ta->N_UE_TA_adj = 0;
-      ntn_ta->N_UE_TA_drift = 0;
-      ntn_ta->N_UE_TA_drift_variant = 0;
+      ntn_ta->omega = 0;
+      ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
+      ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
     }
   } else { // Need R - Release if not present
-    ntn_ta->N_UE_TA_adj = 0;
-    ntn_ta->N_UE_TA_drift = 0;
-    ntn_ta->N_UE_TA_drift_variant = 0;
+    ntn_ta->omega = 0;
+    ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
+    ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
   }
 
   // handle cellSpecificKoffset_r17
@@ -366,21 +369,19 @@ static void configure_ntn_ta(module_id_t module_id,
 
   ntn_ta->ntn_params_changed = true;
 
-  LOG_D(NR_MAC,
-        "SIB19 Rxd. Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s², "
-        "N_UE_TA: %fms, drift: %fµs/s, variant %fµs/s²\n",
+  LOG_I(NR_MAC,
+        "SIB19 Rxd. Epoch HFN: %d, Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, "
+        "N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s²\n",
+        ntn_ta->epoch_hfn,
         ntn_ta->epoch_sfn,
         ntn_ta->epoch_subframe,
         ntn_ta->cell_specific_k_offset,
         ntn_ta->N_common_ta_adj,
         ntn_ta->N_common_ta_drift,
-        ntn_ta->N_common_ta_drift_variant,
-        ntn_ta->N_UE_TA_adj,
-        ntn_ta->N_UE_TA_drift,
-        ntn_ta->N_UE_TA_drift_variant);
+        ntn_ta->N_common_ta_drift_variant);
 }
 
-static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP)
+static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP, int hfn, int frame)
 {
   fapi_nr_config_request_t *cfg = &mac->phy_config.config_req;
 
@@ -555,7 +556,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   // NTN Config
   if (scc->ext2) {
     UPDATE_IE(mac->sc_info.ntn_Config_r17, scc->ext2->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17);
+    configure_ntn_ta(&mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
   } else {
     asn1cFreeStruc(asn_DEF_NR_NTN_Config_r17, mac->sc_info.ntn_Config_r17);
   }
@@ -1947,7 +1948,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
 
-void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, bool can_start_ra)
+void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, int hfn, int frame, bool can_start_ra)
 {
   NR_UE_MAC_INST_t *mac = get_mac_inst(module_id);
   int ret = pthread_mutex_lock(&mac->if_mutex);
@@ -1956,7 +1957,7 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, b
   if (sib19) {
     // update ntn_Config_r17 with received values
     UPDATE_IE(mac->sc_info.ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(mac->ue_id, &mac->ntn_ta, mac->sc_info.ntn_Config_r17);
+    configure_ntn_ta(&mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
   }
   if (mac->state == UE_RECEIVING_SIB && can_start_ra)
     mac->state = UE_PERFORMING_RA;
@@ -1966,6 +1967,8 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, b
 
 static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
                                              int cc_idP,
+                                             int hfn,
+                                             int frame,
                                              const NR_ReconfigurationWithSync_t *reconfWithSync)
 {
   reset_mac_inst(mac);
@@ -1985,7 +1988,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
       mac->physCellId = *scc->physCellId;
     mac->dmrs_TypeA_Position = scc->dmrs_TypeA_Position;
     UPDATE_IE(mac->tdd_UL_DL_ConfigurationCommon, scc->tdd_UL_DL_ConfigurationCommon, NR_TDD_UL_DL_ConfigCommon_t);
-    config_common_ue(mac, scc, cc_idP);
+    config_common_ue(mac, scc, cc_idP, hfn, frame);
     // Build the list of all the valid/transmitted SSBs according to the config
     LOG_D(NR_MAC,"Build SSB list\n");
     build_ssb_list(mac);
@@ -2754,6 +2757,8 @@ static void handle_mac_uecap_info(NR_UE_MAC_INST_t *mac, NR_UE_NR_Capability_t *
 
 void nr_rrc_mac_config_req_cg(module_id_t module_id,
                               int cc_idP,
+                              int hfn,
+                              int frame,
                               NR_CellGroupConfig_t *cell_group_config,
                               NR_UE_NR_Capability_t *ue_Capability)
 {
@@ -2772,7 +2777,7 @@ void nr_rrc_mac_config_req_cg(module_id_t module_id,
     mac->servCellIndex = spCellConfig->servCellIndex ? *spCellConfig->servCellIndex : 0;
     if (spCellConfig->reconfigurationWithSync) {
       LOG_A(NR_MAC, "Received reconfigurationWithSync\n");
-      handle_reconfiguration_with_sync(mac, cc_idP, spCellConfig->reconfigurationWithSync);
+      handle_reconfiguration_with_sync(mac, cc_idP, hfn, frame, spCellConfig->reconfigurationWithSync);
     }
     if (scd) {
       mac->tag_Id = scd->tag_Id;

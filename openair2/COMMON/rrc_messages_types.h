@@ -438,6 +438,7 @@ typedef struct rrc_subframe_process_s {
 } RrcSubframeProcess;
 
 typedef struct nrrrc_frame_process_s {
+  int hfn;
   int frame;
   int gnb_id;
 } NRRrcFrameProcess;
@@ -475,6 +476,8 @@ typedef struct {
 typedef struct {
   NR_CellGroupConfig_t *cellGroupConfig;
   NR_UE_NR_Capability_t *UE_NR_Capability;
+  int hfn;
+  int frame;
 } nr_mac_rrc_config_cg_t;
 typedef struct {
   NR_BCCH_BCH_Message_t *bcch;
@@ -487,6 +490,8 @@ typedef struct {
 } nr_mac_rrc_config_sib1_t;
 typedef struct {
   NR_SIB19_r17_t *sib19;
+  int hfn;
+  int frame;
   bool can_start_ra;
 } nr_mac_rrc_config_other_sib_t;
 

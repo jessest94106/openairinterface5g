@@ -292,7 +292,7 @@ static void nr_rrc_process_ntnconfig(NR_UE_RRC_INST_t *rrc, NR_UE_RRC_SI_INFO *S
     nr_timer_start(&SI_info->SInfo_r17.sib19_timer);
 }
 
-static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, NR_UE_RRC_INST_t *rrc, int frame)
+static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si, NR_UE_RRC_INST_t *rrc, int hfn, int frame)
 {
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_RRC_UE_DECODE_SI, VCD_FUNCTION_IN);
 
@@ -381,6 +381,8 @@ static void nr_decode_SI(NR_UE_RRC_SI_INFO *SI_info, NR_SystemInformation_t *si,
     rrc_msg.payload_type = NR_MAC_RRC_CONFIG_OTHER_SIB;
     nr_mac_rrc_config_other_sib_t *sib19_msg = &rrc_msg.payload.config_other_sib;
     asn_copy(&asn_DEF_NR_SIB19_r17, (void **)&sib19_msg->sib19, sib19);
+    sib19_msg->hfn = hfn;
+    sib19_msg->frame = frame;
     sib19_msg->can_start_ra = rrc->is_NTN_UE;
     nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
   }
@@ -776,6 +778,8 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
   nr_mac_rrc_config_cg_t *mac_msg = &rrc_msg.payload.config_cg;
   mac_msg->cellGroupConfig = cellGroupConfig;
   mac_msg->UE_NR_Capability = rrc->UECap.UE_NR_Capability;
+  mac_msg->hfn = rrc->current_hfn;
+  mac_msg->frame = rrc->current_frame;
   nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
 }
 
@@ -824,7 +828,7 @@ static void nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
       SEQUENCE_free(&asn_DEF_NR_SystemInformation, si, 1);
     } else {
       LOG_I(NR_RRC, "[UE %ld] Decoding dedicatedSystemInformationDelivery\n", rrc->ue_id);
-      nr_decode_SI(SI_info, si, rrc, rrc->current_frame);
+      nr_decode_SI(SI_info, si, rrc, rrc->current_hfn, rrc->current_frame);
     }
   }
   if (rec_1530->otherConfig) {
@@ -1182,6 +1186,8 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
           nr_mac_rrc_config_cg_t *config_cg = &rrc_msg.payload.config_cg;
           config_cg->cellGroupConfig = cellGroupConfig;
           config_cg->UE_NR_Capability = rrc->UECap.UE_NR_Capability;
+          config_cg->hfn = rrc->current_hfn;
+          config_cg->frame = rrc->current_frame;
           nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
         }
       }
@@ -1611,6 +1617,7 @@ static void nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
                                                     const uint8_t Sdu_len,
                                                     const uint8_t rsrq,
                                                     const uint8_t rsrp,
+                                                    int hfn,
                                                     int frame,
                                                     int slot)
 {
@@ -1650,7 +1657,7 @@ static void nr_rrc_ue_decode_NR_BCCH_DL_SCH_Message(NR_UE_RRC_INST_t *rrc,
       case NR_BCCH_DL_SCH_MessageType__c1_PR_systemInformation:
         LOG_I(NR_RRC, "[UE %ld] %d:%d Decoding SI\n", rrc->ue_id, frame, slot);
         NR_SystemInformation_t *si = bcch_message->message.choice.c1->choice.systemInformation;
-        nr_decode_SI(SI_info, si, rrc, frame);
+        nr_decode_SI(SI_info, si, rrc, hfn, frame);
         break;
       case NR_BCCH_DL_SCH_MessageType__c1_PR_NOTHING:
       default:
@@ -2640,6 +2647,7 @@ void *rrc_nrue(void *notUsed)
   } break;
 
   case NRRRC_FRAME_PROCESS:
+    rrc->current_hfn = NRRRC_FRAME_PROCESS(msg_p).hfn;
     rrc->current_frame = NRRRC_FRAME_PROCESS(msg_p).frame;
     LOG_D(NR_RRC, "Received %s: frame %d\n", ITTI_MSG_NAME(msg_p), rrc->current_frame);
     // increase the timers every 10ms (every new frame)
@@ -2698,6 +2706,7 @@ void *rrc_nrue(void *notUsed)
                                               bcch->sdu_size,
                                               bcch->rsrq,
                                               bcch->rsrp,
+                                              bcch->hfn,
                                               bcch->frame,
                                               bcch->slot);
     break;

@@ -434,8 +434,10 @@ void processSlotTX(void *arg)
         nr_sidelink_indication_t sl_indication = {.module_id = UE->Mod_id,
                                                   .gNB_index = proc->gNB_id,
                                                   .cc_id = UE->CC_id,
+                                                  .hfn_tx = proc->hfn_tx,
                                                   .frame_tx = proc->frame_tx,
                                                   .slot_tx = proc->nr_slot_tx,
+                                                  .hfn_rx = proc->hfn_rx,
                                                   .frame_rx = proc->frame_rx,
                                                   .slot_rx = proc->nr_slot_rx,
                                                   .slot_type = SIDELINK_SLOT_TYPE_TX,
@@ -669,8 +671,8 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int duration_r
       AssertFatal(read_block_size == tmp, "");
 
       if (IS_SOFTMODEM_RFSIM) {
-        const openair0_timestamp writeTimestamp =
-            *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx) - UE->N_TA_offset - UE->timing_advance;
+        const openair0_timestamp writeTimestamp = *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx)
+                                                  - UE->N_TA_offset - UE->timing_advance - UE->timing_advance_ntn;
         dummyWrite(UE, writeTimestamp, fp->get_samples_per_slot(slot, fp));
       }
     }
@@ -696,8 +698,8 @@ static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int d
     const int res = UE->rfdevice.trx_read_func(&UE->rfdevice, timestamp, (void **)UE->common_vars.rxdata, unitTransfer, fp->nb_antennas_rx);
     DevAssert(unitTransfer == res);
     if (IS_SOFTMODEM_RFSIM) {
-      const openair0_timestamp writeTimestamp =
-          *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx) - UE->N_TA_offset - UE->timing_advance;
+      const openair0_timestamp writeTimestamp = *timestamp + fp->get_samples_slot_timestamp(slot, fp, duration_rx_to_tx)
+                                                - UE->N_TA_offset - UE->timing_advance - UE->timing_advance_ntn;
       dummyWrite(UE, writeTimestamp, unitTransfer);
     }
     slot = (slot + 1) % fp->slots_per_subframe;
@@ -721,8 +723,61 @@ static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
   return rem_samples + next_slot_first_symbol;
 }
 
+#define SPEED_OF_LIGHT 299792458
+static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_PARMS *fp, int abs_subframe_tx)
+{
+  const fapi_nr_dl_ntn_config_command_pdu *ntn_config_params = &UE->ntn_config_message->ntn_config_params;
+
+  const int abs_subframe_epoch = ntn_config_params->epoch_subframe
+                               + ntn_config_params->epoch_sfn * 10
+                               + ntn_config_params->epoch_hfn * 10240;
+  const int ms_since_epoch = abs_subframe_tx - abs_subframe_epoch;
+
+  const double omega = ntn_config_params->omega;
+  const double cos_wt = cos(omega * ms_since_epoch);
+  const double sin_wt = sin(omega * ms_since_epoch);
+
+  const position_t pos_sat_0 = ntn_config_params->pos_sat_0;
+  const position_t pos_sat_90 = ntn_config_params->pos_sat_90;
+  const position_t pos_sat = {pos_sat_0.X * cos_wt + pos_sat_90.X * sin_wt,
+                              pos_sat_0.Y * cos_wt + pos_sat_90.Y * sin_wt,
+                              pos_sat_0.Z * cos_wt + pos_sat_90.Z * sin_wt};
+
+  position_t pos_ue = {0};
+  get_position_coordinates(UE->Mod_id, &pos_ue);
+
+  // calculate directional vector from SAT to UE
+  const position_t dir_sat_ue = {pos_ue.X - pos_sat.X, pos_ue.Y - pos_sat.Y, pos_ue.Z - pos_sat.Z};
+
+  // calculate distance between SAT and UE
+  const double distance = sqrt(dir_sat_ue.X * dir_sat_ue.X + dir_sat_ue.Y * dir_sat_ue.Y + dir_sat_ue.Z * dir_sat_ue.Z);
+
+  // calculate round-trip-time (factor 2) between SAT and UE in ms (factor 1000)
+  const double N_UE_TA_adj = 2000 * distance / SPEED_OF_LIGHT;
+
+  const double N_common_ta_adj = ntn_config_params->N_common_ta_adj;
+  const double N_common_ta_drift = ntn_config_params->N_common_ta_drift;
+  const double N_common_ta_drift_variant = ntn_config_params->N_common_ta_drift_variant;
+
+  UE->timing_advance_ntn = (N_UE_TA_adj + N_common_ta_adj
+                          + N_common_ta_drift * ms_since_epoch / 1e6
+                          + N_common_ta_drift_variant * ((int64_t)ms_since_epoch * ms_since_epoch) / 1e9)
+                         * fp->samples_per_subframe;
+
+  LOG_D(PHY,
+        "N_UE_TA_adj = %f ms, N_common_ta_adj = %f ms, N_common_ta_drift = %f µs/s, N_common_ta_drift_variant = %f µs/s², ms_since_epoch = %d ms, "
+        "computed timing_advance_ntn = %d samples\n",
+        N_UE_TA_adj,
+        N_common_ta_adj,
+        N_common_ta_drift,
+        N_common_ta_drift_variant,
+        ms_since_epoch,
+        UE->timing_advance_ntn);
+}
+
 static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
                                     NR_DL_FRAME_PARMS *fp,
+                                    int hfn_rx,
                                     int frame_rx,
                                     int slot_rx,
                                     int *duration_rx_to_tx,
@@ -742,34 +797,8 @@ static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
       *timing_advance -= fp->get_samples_slot_timestamp(slot_rx, fp, (*ntn_koffset - koffset) << mu);
     *ntn_koffset = koffset;
 
-    const int abs_subframe_tx = 10 * frame_rx + ((slot_rx + *duration_rx_to_tx) >> mu);
-    const int abs_subframe_epoch =
-        10 * UE->ntn_config_message->ntn_config_params.epoch_sfn + UE->ntn_config_message->ntn_config_params.epoch_subframe;
-    int ms_since_epoch = abs_subframe_tx - abs_subframe_epoch;
-    // cope with sfn wrap-around
-    //   this currently limits us to epoch times that are not more than 5.12 seconds in the future (allowed are up to 10.24 seconds)
-    //   and ntn-UlSyncValidityDuration < 5.12 seconds (allowed are up to 900 seconds)
-    //   TODO: fix this limitation by introducing the hyper frame number HFN
-    if (ms_since_epoch < -5120)
-      ms_since_epoch += 10240;
-    else if (ms_since_epoch > 5120)
-      ms_since_epoch -= 10240;
-
-    const double total_ta_ms = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_ms;
-    const double total_ta_drift = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift; // µs/s
-    const double total_ta_drift_variant = UE->ntn_config_message->ntn_config_params.ntn_total_time_advance_drift_variant; // µs/s²
-    UE->timing_advance = fp->samples_per_subframe * (total_ta_ms + (total_ta_drift / 1000.0) * (ms_since_epoch / 1000.0) + (total_ta_drift_variant / 1000.0) * (ms_since_epoch / 1000.0) * (ms_since_epoch / 1000.0));
-
-    LOG_I(PHY,
-          "k_offset = %d ms (%d slots), total_ta_ms = %f ms, total_ta_drift = %f µs/s, total_ta_drift_variant = %f µs/s², ms_since_epoch = %d ms, computed "
-          "timing_advance = %d samples\n",
-          *ntn_koffset,
-          *ntn_koffset << mu,
-          total_ta_ms,
-          total_ta_drift,
-          total_ta_drift_variant,
-          ms_since_epoch,
-          UE->timing_advance);
+    const int abs_subframe_tx = 10240 * hfn_rx + 10 * frame_rx + ((slot_rx + *duration_rx_to_tx) >> mu);
+    apply_ntn_timing_advance(UE, fp, abs_subframe_tx);
   }
 }
 
@@ -809,7 +838,7 @@ void *UE_thread(void *arg)
   int ntn_koffset = 0;
 
   int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
-  int timing_advance = UE->timing_advance;
+  int timing_advance = UE->timing_advance + UE->timing_advance_ntn;
   UE->N_TA_offset = determine_N_TA_offset(UE);
   NR_UE_MAC_INST_t *mac = get_mac_inst(UE->Mod_id);
 
@@ -968,6 +997,8 @@ void *UE_thread(void *arg)
     curMsg.proc.nr_slot_tx  = (absolute_slot + duration_rx_to_tx) % nb_slot_frame;
     curMsg.proc.frame_rx    = (absolute_slot / nb_slot_frame) % MAX_FRAME_NUMBER;
     curMsg.proc.frame_tx    = ((absolute_slot + duration_rx_to_tx) / nb_slot_frame) % MAX_FRAME_NUMBER;
+    curMsg.proc.hfn_rx      = (absolute_slot / nb_slot_frame) / MAX_FRAME_NUMBER;
+    curMsg.proc.hfn_tx      = ((absolute_slot + duration_rx_to_tx) / nb_slot_frame) / MAX_FRAME_NUMBER;
     if (UE->received_config_request) {
       if (UE->sl_mode) {
         curMsg.proc.rx_slot_type = sl_nr_ue_slot_select(sl_cfg, curMsg.proc.nr_slot_rx, TDD);
@@ -990,10 +1021,16 @@ void *UE_thread(void *arg)
     if (slot_nr == nb_slot_frame - 1) {
       // we shift of half of measured drift, at each beginning of frame for both rx and tx
       iq_shift_to_apply = shiftForNextFrame;
-      // TODO: remove this autonomous TA and use up-to-date values of ta-Common, ta-CommonDrift and ta-CommonDriftVariant from received SIB19 instead
-      if (get_nrUE_params()->autonomous_ta)
-        UE->timing_advance -= 2 * shiftForNextFrame;
+      // autonomous timing advance calculation, which does not use SIB19 information
+      if (ntn_koffset && get_nrUE_params()->autonomous_ta)
+        UE->timing_advance_ntn -= 2 * shiftForNextFrame;
       shiftForNextFrame = -round(UE->max_pos_acc * get_nrUE_params()->time_sync_I);
+    }
+
+    // Calculate new TA based on SIB19 information for each subframe in NTN mode, if "autonomous_ta" is not enabled
+    if (ntn_koffset && !get_nrUE_params()->autonomous_ta && (absolute_slot + duration_rx_to_tx) % fp->slots_per_subframe == 0) {
+      const int abs_subframe_tx = (absolute_slot + duration_rx_to_tx) / fp->slots_per_subframe;
+      apply_ntn_timing_advance(UE, fp, abs_subframe_tx);
     }
 
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
@@ -1035,7 +1072,7 @@ void *UE_thread(void *arg)
 
     // but use current UE->timing_advance value to compute writeBlockSize
     int writeBlockSize = fp->get_samples_per_slot((slot_nr + duration_rx_to_tx) % nb_slot_frame, fp) - iq_shift_to_apply;
-    int new_timing_advance = UE->timing_advance;
+    int new_timing_advance = UE->timing_advance + UE->timing_advance_ntn;
     if (new_timing_advance != timing_advance) {
       writeBlockSize -= new_timing_advance - timing_advance;
       timing_advance = new_timing_advance;
@@ -1048,7 +1085,7 @@ void *UE_thread(void *arg)
     }
 
     if (curMsg.proc.nr_slot_rx == 0)
-      nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.frame_rx, curMsg.proc.gNB_id);
+      nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.hfn_rx, curMsg.proc.frame_rx, curMsg.proc.gNB_id);
 
     // RX slot processing. We launch and forget.
     notifiedFIFO_elt_t *newRx = newNotifiedFIFO_elt(sizeof(nr_rxtx_thread_data_t), curMsg.proc.nr_slot_tx, NULL, UE_dl_processing);
@@ -1064,7 +1101,7 @@ void *UE_thread(void *arg)
     }
 
     // apply new NTN timing information
-    apply_ntn_config(UE, fp, curMsg.proc.frame_rx, curMsg.proc.nr_slot_rx, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
+    apply_ntn_config(UE, fp, curMsg.proc.hfn_rx, curMsg.proc.frame_rx, curMsg.proc.nr_slot_rx, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
 
     // Start TX slot processing here. It runs in parallel with RX slot processing
     // in current code, DURATION_RX_TO_TX constant is the limit to get UL data to encode from a RX slot
