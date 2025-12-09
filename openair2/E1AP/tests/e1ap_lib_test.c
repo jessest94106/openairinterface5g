@@ -505,7 +505,7 @@ static void test_bearer_context_modification_request(void)
     .pdcp_config = malloc_or_fail(sizeof(*drb_to_mod.pdcp_config)),
     .pdcp_sn_status_requested = true,
     .pdcp_status = malloc_or_fail(sizeof(*drb_to_mod.pdcp_status)),
-    .numQosFlow2Setup = 1,
+    .numQosFlowsMod = 1,
     .qosFlows[0] = dummy_qos_flows,
   };
   *drb_to_mod.pdcp_config = dummy_pdcp_config;
