@@ -404,8 +404,8 @@ typedef struct DRB_nGRAN_to_modify_s {
   // DL UP Transport Layer Information (O) (clause 9.3.1.13, 9.3.2.1)
   int numDlUpParam;
   up_params_t DlUpParamList[E1AP_MAX_NUM_UP_PARAM];
-  // QoS Flows Information To Modify (O) (clause 9.3.1.25, 9.3.1.26)
-  int numQosFlow2Setup;
+  // Flow Mapping Information (O) (clause 9.3.1.25, 9.3.1.26)
+  int numQosFlowsMod;
   qos_flow_to_setup_t qosFlows[E1AP_MAX_NUM_QOS_FLOWS];
 } DRB_nGRAN_to_mod_t;
 

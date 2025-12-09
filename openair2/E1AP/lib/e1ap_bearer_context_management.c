@@ -1459,7 +1459,7 @@ static E1AP_PDU_Session_Resource_To_Modify_Item_t e1_encode_pdu_session_to_mod_i
       }
     }
     // QoS Flows to setup (O)
-    for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlow2Setup; k++) {
+    for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlowsMod; k++) {
       asn1cCalloc(drb2Mod->flow_Mapping_Information, flow_Mapping_Information);
       asn1cSequenceAdd(flow_Mapping_Information->list, E1AP_QoS_Flow_QoS_Parameter_Item_t, ie1_2);
       *ie1_2 = e1_encode_qos_flow_to_setup(k);
@@ -1748,7 +1748,7 @@ static bool e1_decode_pdu_session_to_mod_item(pdu_session_to_mod_t *out, const E
     // QoS Flows Information To Be Setup (O)
     if (drb2Mod->flow_Mapping_Information) {
       E1AP_QoS_Flow_QoS_Parameter_List_t *qos2SetupList = drb2Mod->flow_Mapping_Information;
-      drb->numQosFlow2Setup = qos2SetupList->list.count;
+      drb->numQosFlowsMod = qos2SetupList->list.count;
       for (int k = 0; k < qos2SetupList->list.count; k++) {
         CHECK_E1AP_DEC(e1_decode_qos_flow_to_setup(drb->qosFlows + k, qos2SetupList->list.array[k]));
       }
@@ -1992,8 +1992,8 @@ static bool eq_security_ind(security_indication_t *a, security_indication_t *b)
 static bool eq_drb_to_mod(const DRB_nGRAN_to_mod_t *a, const DRB_nGRAN_to_mod_t *b)
 {
   _E1_EQ_CHECK_LONG(a->id, b->id);
-  _E1_EQ_CHECK_INT(a->numQosFlow2Setup, b->numQosFlow2Setup);
-  for (int i = 0; i < a->numQosFlow2Setup; i++) {
+  _E1_EQ_CHECK_INT(a->numQosFlowsMod, b->numQosFlowsMod);
+  for (int i = 0; i < a->numQosFlowsMod; i++) {
     if (!eq_qos_flow(&a->qosFlows[i], &b->qosFlows[i]))
       return false;
   }
