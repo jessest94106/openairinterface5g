@@ -19,6 +19,7 @@
  *      contact@openairinterface.org
  */
 
+#include "PHY/defs_nr_common.h"
 #define _GNU_SOURCE // For pthread_setname_np
 #include <pthread.h>
 #include <openair1/PHY/impl_defs_top.h>
@@ -706,11 +707,7 @@ static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp *timestamp, int d
 }
 
 static inline int get_firstSymSamp(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
-  if (fp->numerology_index == 0)
-    return fp->nb_prefix_samples0 + fp->ofdm_symbol_size;
-  int num_samples = (slot%(fp->slots_per_subframe/2)) ? fp->nb_prefix_samples : fp->nb_prefix_samples0;
-  num_samples += fp->ofdm_symbol_size;
-  return num_samples;
+  return get_samples_symbol_duration(fp, slot, 0, 1);
 }
 
 static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
