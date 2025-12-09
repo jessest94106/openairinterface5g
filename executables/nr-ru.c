@@ -896,6 +896,7 @@ static void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_
     }
   }
 
+  split7->prach_fftSize = prach_config->prach_sequence_length.value == 0 ? 10 : 8; // need to handle 5kHz cases better than this
   split7->fftSize = log2(fp->ofdm_symbol_size);
 
   // M-plane related parameters

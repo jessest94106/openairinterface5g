@@ -199,6 +199,8 @@ typedef struct split7_config {
   /*! this is the exponent in 2^X for the FFT size */
   uint16_t fftSize;
 
+  /*! this is the ceil of the exponent in 2^X for the prach FFT size */
+  uint16_t prach_fftSize;
   // M-plane related parameters
   uint16_t dl_k0[5];
   uint16_t ul_k0[5];
