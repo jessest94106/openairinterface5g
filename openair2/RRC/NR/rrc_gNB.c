@@ -2852,6 +2852,104 @@ f1ap_qos_flow_param_t get_qos_char_from_qos_flow_param(const pdusession_level_qo
   return qos_char;
 }
 
+static f1ap_drb_info_nr_t fill_f1_drb_info_nr(pdusession_t *pdu, const uint8_t *qfis, const int num_qfis)
+{
+  f1ap_drb_info_nr_t drb_info = {0};
+  drb_info.nssai = pdu->nssai;
+  drb_info.flows_len = num_qfis;
+  drb_info.flows = calloc_or_fail(num_qfis, sizeof(*drb_info.flows));
+  for (int i = 0; i < num_qfis; i++) {
+    int qfi = qfis[i];
+    /* find the stored QoS flow parameters for this QFI */
+    nr_rrc_qos_t *qos_param = find_qos(&pdu->qos, qfi);
+    DevAssert(qos_param);
+    /* QoS flows Flows Mapped to DRB Item */
+    f1ap_drb_flows_mapped_t *flow = &drb_info.flows[i];
+    flow->qfi = qfi;
+    flow->param = get_qos_char_from_qos_flow_param(&qos_param->qos);
+  }
+  /* DRB QoS IE: we just reuse the ones from the first flow */
+  drb_info.drb_qos = drb_info.flows[0].param;
+  return drb_info;
+}
+
+/** @brief Fill F1 DRB to Be Setup List (UE Context Setup Request)
+ * @param rrc RRC instance
+ * @param rrc_drb RRC DRB structure
+ * @param pdu PDU session parameters
+ * @param qfis List of QFIs
+ * @param num_qfis Number of QFIs in list
+ * @return Filled F1 DRB to setup structure */
+static f1ap_drb_to_setup_t fill_f1_drb_to_be_setup(const gNB_RRC_INST *rrc,
+                                                   const drb_t *rrc_drb,
+                                                   rrc_pdu_session_param_t *pdu,
+                                                   const uint8_t *qfis,
+                                                   int num_qfis)
+{
+  DevAssert(rrc);
+  DevAssert(rrc_drb);
+  DevAssert(pdu);
+  DevAssert(qfis);
+  DevAssert(num_qfis > 0);
+  DevAssert(num_qfis <= MAX_QOS_FLOWS);
+
+  f1ap_drb_to_setup_t drb = {0};
+
+  drb.id = rrc_drb->drb_id;
+  drb.qos_choice = F1AP_QOS_CHOICE_NR;
+  /* DRB Info (including QoS flows) */
+  drb.nr = fill_f1_drb_info_nr(&pdu->param, qfis, num_qfis);
+
+  /* tunnel info */
+  if (rrc_drb->cuup_tunnel_config.addr.length != sizeof(in_addr_t)) {
+    LOG_W(RRC,
+          "IPv4 address expected (length == %zu), got length %d\n",
+          sizeof(in_addr_t),
+          rrc_drb->cuup_tunnel_config.addr.length);
+  }
+  memcpy(&drb.up_ul_tnl[0].tl_address, rrc_drb->cuup_tunnel_config.addr.buffer, sizeof(in_addr_t));
+  drb.up_ul_tnl[0].teid = rrc_drb->cuup_tunnel_config.teid;
+  drb.up_ul_tnl_len = 1;
+
+  /* RLC mode */
+  drb.rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
+
+  /* PDCP SN length */
+  const nr_pdcp_configuration_t *pdcp = &rrc_drb->pdcp_config;
+  DevAssert(pdcp->drb.sn_size == 18 || pdcp->drb.sn_size == 12);
+  drb.dl_pdcp_sn_len = malloc_or_fail(sizeof(*drb.dl_pdcp_sn_len));
+  *drb.dl_pdcp_sn_len = pdcp->drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+  drb.ul_pdcp_sn_len = malloc_or_fail(sizeof(*drb.ul_pdcp_sn_len));
+  *drb.ul_pdcp_sn_len = pdcp->drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+
+  return drb;
+}
+
+/** @brief Helper function to process DRBs from a PDU session's DRB setup list */
+static int fill_f1_drbs_from_e1(const gNB_RRC_INST *rrc,
+                                gNB_RRC_UE_t *UE,
+                                rrc_pdu_session_param_t *pdu,
+                                const DRB_nGRAN_setup_t *drb_list,
+                                const int drb_list_len,
+                                f1ap_drb_to_setup_t drbs[32])
+{
+  int nb_drb = 0;
+  for (int i = 0; i < drb_list_len; i++) {
+    const DRB_nGRAN_setup_t *drb_config = &drb_list[i];
+    drb_t *rrc_drb = get_drb(&UE->drbs, drb_config->id);
+    DevAssert(rrc_drb);
+    int nb_qos_flows = drb_config->numQosFlowSetup;
+    DevAssert(nb_qos_flows <= MAX_QOS_FLOWS);
+    AssertFatal(nb_qos_flows > 0, "must map at least one flow to a DRB\n");
+    uint8_t qfis[MAX_QOS_FLOWS] = {0};
+    for (int j = 0; j < nb_qos_flows; j++)
+      qfis[j] = drb_config->qosFlows[j].qfi;
+    drbs[nb_drb++] = fill_f1_drb_to_be_setup(rrc, rrc_drb, pdu, qfis, nb_qos_flows);
+  }
+  DevAssert(nb_drb < MAX_DRBS_PER_UE);
+  return nb_drb;
+}
+
 /* \brief fills a list of DRBs to be setup from a number of PDU sessions in E1
  * bearer setup response */
 static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
@@ -2862,56 +2960,12 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
 {
   int nb_drb = 0;
   for (int p = 0; p < numPduSession; ++p) {
-    rrc_pdu_session_param_t *pdu = find_pduSession(&UE->pduSessions, pduSession[p].id);
+    const pdu_session_setup_t *session = &pduSession[p];
+    rrc_pdu_session_param_t *pdu = find_pduSession(&UE->pduSessions, session->id);
     DevAssert(pdu);
-    for (int i = 0; i < pduSession[p].numDRBSetup; i++) {
-      const DRB_nGRAN_setup_t *drb_config = &pduSession[p].DRBnGRanList[i];
-      drb_t *rrc_drb = get_drb(&UE->drbs, pduSession[p].DRBnGRanList[i].id);
-      nr_pdcp_configuration_t pdcp = rrc_drb->pdcp_config;
-      DevAssert(rrc_drb);
-
-      DevAssert(nb_drb < MAX_DRBS_PER_UE);
-      f1ap_drb_to_setup_t *drb = &drbs[nb_drb];
-      drb->id = rrc_drb->drb_id;
-
-      drb->qos_choice = F1AP_QOS_CHOICE_NR;
-
-      /* pass QoS info to MAC */
-      int nb_qos_flows = drb_config->numQosFlowSetup;
-      AssertFatal(nb_qos_flows > 0, "must map at least one flow to a DRB\n");
-      DevAssert(nb_qos_flows <= MAX_QOS_FLOWS);
-      drb->nr.flows_len = nb_qos_flows;
-      drb->nr.flows = calloc_or_fail(nb_qos_flows, sizeof(*drb->nr.flows));
-      for (int j = 0; j < nb_qos_flows; j++) {
-        int qfi = drb_config->qosFlows[j].qfi;
-        /* find the QoS characteristics stored at RRC based on QFI returned
-         * from E1. We expect this to correspond to a QFI we passed to E1
-         * previously, so we expect it to exist. */
-        nr_rrc_qos_t *qos_param = find_qos(&pdu->param.qos, qfi);
-        DevAssert(qos_param);
-        f1ap_drb_flows_mapped_t *flow = &drb->nr.flows[j];
-        flow->qfi = qfi;
-        flow->param = get_qos_char_from_qos_flow_param(&qos_param->qos);
-      }
-      /* the DRB QoS parameters: we just reuse the ones from the first flow */
-      drb->nr.drb_qos = drb->nr.flows[0].param;
-
-      /* pass NSSAI info to MAC */
-      drb->nr.nssai = pdu->param.nssai;
-
-      drb->up_ul_tnl[0].tl_address = drb_config->UpParamList[0].tl_info.tlAddress;
-      drb->up_ul_tnl[0].teid = drb_config->UpParamList[0].tl_info.teId;
-      drb->up_ul_tnl_len = 1;
-      drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
-      DevAssert(pdcp.drb.sn_size == 18 || pdcp.drb.sn_size == 12);
-      drb->dl_pdcp_sn_len = malloc_or_fail(sizeof(*drb->dl_pdcp_sn_len));
-      *drb->dl_pdcp_sn_len = pdcp.drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
-      drb->ul_pdcp_sn_len = malloc_or_fail(sizeof(*drb->ul_pdcp_sn_len));
-      *drb->ul_pdcp_sn_len = pdcp.drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
-
-      nb_drb++;
-    }
+    nb_drb += fill_f1_drbs_from_e1(rrc, UE, pdu, session->DRBnGRanList, session->numDRBSetup, drbs);
   }
+  DevAssert(nb_drb < MAX_DRBS_PER_UE);
   return nb_drb;
 }
 
@@ -3555,39 +3609,23 @@ static int rrc_fill_f1_drb_to_setup(const gNB_RRC_INST *rrc, const gNB_RRC_UE_t 
 
   FOR_EACH_SEQ_ARR(drb_t *, rrc_drb, &ue->drbs) {
     DevAssert(nb_drb < MAX_DRBS_PER_UE);
-    f1ap_drb_to_setup_t *drb = &drbs[nb_drb];
-    nr_pdcp_configuration_t *pdcp = &rrc_drb->pdcp_config;
-    nb_drb++;
     /* fetch an existing PDU session for this DRB */
     rrc_pdu_session_param_t *pdu = find_pduSession_from_drbId((gNB_RRC_UE_t *)ue, rrc_drb->drb_id);
     AssertFatal(pdu != NULL, "no PDU session for DRB ID %d\n", rrc_drb->drb_id);
 
-    drb->id = rrc_drb->drb_id;
+    /* Collect all QFIs mapped to this DRB */
+    uint8_t qfis[MAX_QOS_FLOWS] = {0};
+    int num_qfis = 0;
+    FOR_EACH_SEQ_ARR (nr_rrc_qos_t *, qos, &pdu->param.qos) {
+      if (qos->drb_id == rrc_drb->drb_id) {
+        DevAssert(num_qfis < MAX_QOS_FLOWS);
+        qfis[num_qfis++] = qos->qos.qfi;
+      }
+    }
+    AssertFatal(num_qfis > 0, "no QoS flows mapped to DRB ID %d\n", rrc_drb->drb_id);
 
-    drb->qos_choice = F1AP_QOS_CHOICE_NR;
-    drb->nr.nssai = pdu->param.nssai;
-    drb->nr.flows_len = 1;
-    drb->nr.flows = calloc_or_fail(1, sizeof(*drb->nr.flows));
-
-    /* QoS flow associated with this DRB: use first QoS flow */
-    AssertFatal(seq_arr_size(&pdu->param.qos) == 1, "only 1 Qos flow supported\n");
-    nr_rrc_qos_t *qos_param = (nr_rrc_qos_t *)seq_arr_at(&pdu->param.qos, 0);
-    DevAssert(qos_param->qos.qfi > 0);
-    drb->nr.flows[0].qfi = qos_param->qos.qfi;
-    drb->nr.flows[0].param = get_qos_char_from_qos_flow_param(&qos_param->qos);
-    /* the DRB QoS parameters: reuse the ones from the first flow */
-    drb->nr.drb_qos = drb->nr.flows[0].param;
-
-    memcpy(&drb->up_ul_tnl[0].tl_address, &rrc_drb->cuup_tunnel_config.addr.buffer, sizeof(uint8_t) * 4);
-    drb->up_ul_tnl[0].teid = rrc_drb->cuup_tunnel_config.teid;
-    drb->up_ul_tnl_len = 1;
-
-    drb->rlc_mode = rrc->configuration.um_on_default_drb ? F1AP_RLC_MODE_UM_BIDIR : F1AP_RLC_MODE_AM;
-    DevAssert(pdcp->drb.sn_size == 18 || pdcp->drb.sn_size == 12);
-    drb->dl_pdcp_sn_len = malloc_or_fail(sizeof(*drb->dl_pdcp_sn_len));
-    *drb->dl_pdcp_sn_len = pdcp->drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
-    drb->ul_pdcp_sn_len = malloc_or_fail(sizeof(*drb->ul_pdcp_sn_len));
-    *drb->ul_pdcp_sn_len = pdcp->drb.sn_size == 18 ? F1AP_PDCP_SN_18B : F1AP_PDCP_SN_12B;
+    /* Use the common function to fill DRB setup */
+    drbs[nb_drb++] = fill_f1_drb_to_be_setup(rrc, rrc_drb, pdu, qfis, num_qfis);
   }
   return nb_drb;
 }

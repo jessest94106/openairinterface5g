@@ -39,6 +39,7 @@
 #include "NR_CG-ConfigInfo.h"
 #include "NR_RRCReconfiguration.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
+#include "f1ap_messages_types.h"
 
 #define SRB1 1
 #define SRB2 2
