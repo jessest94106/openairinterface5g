@@ -470,19 +470,30 @@ The hardcoded DRBs will be treated like GBR Flows. Due to code limitations at th
 
 ## IF setup with OAI
 
-OAI is also compatible with Intermediate Frequency (IF) equipment. This allows to use RF front-end that with arbitrary frequencies bands that do not comply with the standardised 3GPP NR bands. 
+OAI is also compatible with Intermediate Frequency (IF) equipment, allowing the
+use of RF front-ends operating on arbitrary frequency bands that do not conform
+to the standardized 3GPP NR bands.
 
-To configure the IF frequencies it is necessary to use two command-line options at UE side:
-- `if_freq`, downlink frequency in Hz
-- `if_freq_off`, uplink frequency offset in Hz
+### OAIUE configuration
+To configure IF frequencies on the UE side, provide the following command-line
+options:
+- `if_freq`: DL frequency in Hz
+- `if_freq_off`: UL frequency offset in Hz
 
-Accordingly, the following parameters must be configured in the RUs section of the gNB configuration file:
-- `if_freq`
-- `if_offset`
+### gNB configuration
+On the gNB side, the corresponding parameters must be set in the RUs section of
+the configuration file:
+- `if_freq`: DL frequency in Hz
+- `if_offset`: UL frequency offset in Hz
+
+> Note: When using a libconfig-based configuration file for the gNB, ensure that
+> `if_freq` numeric value is suffixed with "L" so it is correctly parsed as
+> 64-bit integer.
 
 ### Run OAI with custom DL/UL arbitrary frequencies
 
-The following example uses DL frequency 2169.080 MHz and UL frequency offset -400 MHz, with a configuration file for band 66 (FDD) at gNB side.
+The following example uses DL frequency 2169.080 MHz and UL frequency offset
+-400 MHz, with a configuration file for band 66 (FDD) at gNB side.
 
 On two separate machines with USRPs, run:
 
