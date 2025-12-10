@@ -165,11 +165,6 @@ void init_prach_list(prach_list_t *);
 
 typedef struct NR_DL_FRAME_PARMS NR_DL_FRAME_PARMS;
 
-typedef uint32_t (*get_samples_per_slot_t)(int slot, const NR_DL_FRAME_PARMS *fp);
-typedef uint32_t (*get_slot_from_timestamp_t)(openair0_timestamp timestamp_rx, const NR_DL_FRAME_PARMS *fp);
-
-typedef uint32_t (*get_samples_slot_timestamp_t)(int slot, const NR_DL_FRAME_PARMS *fp, unsigned int sl_ahead);
-
 struct NR_DL_FRAME_PARMS {
   /// frequency range
   frequency_range_t freq_range;
@@ -225,12 +220,6 @@ struct NR_DL_FRAME_PARMS {
   uint16_t slots_per_frame;
   /// Number of samples in a subframe
   uint32_t samples_per_subframe;
-  /// Number of samples in current slot
-  get_samples_per_slot_t get_samples_per_slot;
-  /// slot calculation from timestamp
-  get_slot_from_timestamp_t get_slot_from_timestamp;
-  /// Number of samples before slot
-  get_samples_slot_timestamp_t get_samples_slot_timestamp;
   /// Number of samples in 0th and center slot of a subframe
   uint32_t samples_per_slot0;
   /// Number of samples in other slots of the subframe
@@ -340,5 +329,13 @@ typedef struct {
 uint32_t get_samples_symbol_duration(const NR_DL_FRAME_PARMS *fp, int slot, int start_symbol, int num_symbols);
 // Get timestamp of symbol within slot in samples
 uint32_t get_samples_symbol_timestamp(const NR_DL_FRAME_PARMS *fp, int slot, int symbol);
+// Get slot duration between two slot
+uint32_t get_samples_slot_duration(const NR_DL_FRAME_PARMS *fp, unsigned int start_slot, unsigned int num_slots);
+// Get timestamp of slot from start of frame
+uint32_t get_samples_slot_timestamp(const NR_DL_FRAME_PARMS *fp, unsigned int slot);
+// Get slot from timestamp
+uint32_t get_slot_from_timestamp(openair0_timestamp timestamp_rx, const NR_DL_FRAME_PARMS *fp);
+// Get number of samples in the slot
+uint32_t get_samples_per_slot(int slot, const NR_DL_FRAME_PARMS *fp);
 
 #endif

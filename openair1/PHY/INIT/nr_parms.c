@@ -310,29 +310,63 @@ uint32_t get_samples_symbol_timestamp(const NR_DL_FRAME_PARMS *fp, int slot, int
 
 uint32_t get_slot_from_timestamp(openair0_timestamp timestamp_rx, const NR_DL_FRAME_PARMS *fp)
 {
-   uint32_t slot_idx = 0;
-   int samples_till_the_slot = fp->get_samples_per_slot(slot_idx,fp)-1;
-   timestamp_rx = timestamp_rx%fp->samples_per_frame;
+  timestamp_rx = timestamp_rx % fp->samples_per_frame;
+  if (timestamp_rx < fp->samples_per_slot0)
+    return 0;
 
-    while (timestamp_rx > samples_till_the_slot) {
-        slot_idx++;
-        samples_till_the_slot += fp->get_samples_per_slot(slot_idx,fp);
-     }
-   return slot_idx; 
+  if (fp->numerology_index == 0)
+    return timestamp_rx / fp->samples_per_subframe;
+
+  const unsigned int num_half_sf = timestamp_rx / (fp->samples_per_subframe / 2);
+  const unsigned int slot_per_half_sf = fp->slots_per_subframe / 2;
+
+  uint32_t slot_count = num_half_sf * slot_per_half_sf;
+  int samp_idx = num_half_sf * (fp->samples_per_subframe / 2) - 1;
+
+  // Remaining samples
+  if (samp_idx < timestamp_rx) {
+    slot_count++;
+    samp_idx += fp->samples_per_slot0; // First slot of half subframe
+  }
+  if (samp_idx < timestamp_rx) {
+    const unsigned int rem_samples = timestamp_rx - samp_idx;
+    const unsigned int num_slots = ceil((double)rem_samples / fp->samples_per_slotN0);
+    slot_count += num_slots;
+  }
+
+  return slot_count - 1;
 }
 
-uint32_t get_samples_slot_timestamp(int slot, const NR_DL_FRAME_PARMS *fp, unsigned int sl_ahead)
+uint32_t get_samples_slot_timestamp(const NR_DL_FRAME_PARMS *fp, unsigned int slot)
 {
-  uint32_t samp_count = 0;
+  if (slot == 0)
+    return 0;
 
-  if(!sl_ahead) {
-    for(unsigned int idx_slot = 0; idx_slot < slot; idx_slot++)
-      samp_count += fp->get_samples_per_slot(idx_slot, fp);
-  } else {
-    for (unsigned int idx_slot = slot; idx_slot < slot + sl_ahead; idx_slot++)
-      samp_count += fp->get_samples_per_slot(idx_slot, fp);
+  if (fp->numerology_index == 0)
+    return slot * fp->samples_per_subframe;
+
+  uint32_t samp_count = 0;
+  // Number of half subframes
+  const unsigned int num_half_sf = slot / (fp->slots_per_subframe / 2);
+  samp_count += num_half_sf * fp->samples_per_subframe / 2;
+
+  // Remaining slots
+  unsigned int rem_slots = slot % (fp->slots_per_subframe / 2);
+  if (rem_slots > 0) {
+    samp_count += fp->samples_per_slot0; // First slot of the last half subframe
+    rem_slots--;
   }
+  samp_count += rem_slots * fp->samples_per_slotN0; // Remaining slots of the last half subframe
+
   return samp_count;
+}
+
+uint32_t get_samples_slot_duration(const NR_DL_FRAME_PARMS *fp, unsigned int start_slot, unsigned int num_slots)
+{
+  if (start_slot == 0 && num_slots == 0)
+    return 0;
+
+  return (get_samples_slot_timestamp(fp, start_slot + num_slots) - get_samples_slot_timestamp(fp, start_slot));
 }
 
 void nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg, NR_DL_FRAME_PARMS *fp)
@@ -371,9 +405,6 @@ void nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg, NR_DL_FRAME_PARMS *
   fp->samples_per_slot0 = fp->nb_prefix_samples0 + ((fp->symbols_per_slot-1)*fp->nb_prefix_samples) + (fp->symbols_per_slot*fp->ofdm_symbol_size); 
   fp->samples_per_subframe = (fp->nb_prefix_samples0 + fp->ofdm_symbol_size) * 2 + 
                              (fp->nb_prefix_samples + fp->ofdm_symbol_size) * (fp->symbols_per_slot * fp->slots_per_subframe - 2); 
-  fp->get_samples_per_slot = &get_samples_per_slot;
-  fp->get_samples_slot_timestamp = &get_samples_slot_timestamp;
-  fp->get_slot_from_timestamp = &get_slot_from_timestamp;
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
   fp->freq_range = get_freq_range_from_freq(fp->dl_CarrierFreq);
 
@@ -454,8 +485,6 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
   fp->samples_per_slot0 = fp->nb_prefix_samples0 + ((fp->symbols_per_slot-1)*fp->nb_prefix_samples) + (fp->symbols_per_slot*fp->ofdm_symbol_size); 
   fp->samples_per_subframe = (fp->nb_prefix_samples0 + fp->ofdm_symbol_size) * 2 + 
                              (fp->nb_prefix_samples + fp->ofdm_symbol_size) * (fp->symbols_per_slot * fp->slots_per_subframe - 2); 
-  fp->get_samples_per_slot = &get_samples_per_slot;
-  fp->get_samples_slot_timestamp = &get_samples_slot_timestamp;
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
   fp->freq_range = get_freq_range_from_freq(fp->dl_CarrierFreq);
 
@@ -512,8 +541,6 @@ void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, uint64_t downlink
   frame_parms->samples_per_slot0 = frame_parms->nb_prefix_samples0 + ((frame_parms->symbols_per_slot-1)*frame_parms->nb_prefix_samples) + (frame_parms->symbols_per_slot*frame_parms->ofdm_symbol_size);
   frame_parms->samples_per_subframe = (frame_parms->nb_prefix_samples0 + frame_parms->ofdm_symbol_size) * 2 +
                              (frame_parms->nb_prefix_samples + frame_parms->ofdm_symbol_size) * (frame_parms->symbols_per_slot * frame_parms->slots_per_subframe - 2);
-  frame_parms->get_samples_per_slot = &get_samples_per_slot;
-  frame_parms->get_samples_slot_timestamp = &get_samples_slot_timestamp;
   frame_parms->samples_per_frame = 10 * frame_parms->samples_per_subframe;
 
   LOG_W(PHY, "samples_per_subframe %d/per second %d, wCP %d\n", frame_parms->samples_per_subframe, 1000*frame_parms->samples_per_subframe, frame_parms->samples_per_subframe_wCP);
@@ -613,8 +640,6 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
       fp->nb_prefix_samples0 + ((fp->symbols_per_slot - 1) * fp->nb_prefix_samples) + (fp->symbols_per_slot * fp->ofdm_symbol_size);
   fp->samples_per_subframe = (fp->nb_prefix_samples0 + fp->ofdm_symbol_size) * 2
                              + (fp->nb_prefix_samples + fp->ofdm_symbol_size) * (fp->symbols_per_slot * fp->slots_per_subframe - 2);
-  fp->get_samples_per_slot = &get_samples_per_slot;
-  fp->get_samples_slot_timestamp = &get_samples_slot_timestamp;
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
   fp->freq_range = get_freq_range_from_freq(fp->sl_CarrierFreq);
 

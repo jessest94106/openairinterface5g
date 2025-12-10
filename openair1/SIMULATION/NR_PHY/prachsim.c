@@ -665,7 +665,7 @@ int main(int argc, char **argv){
                        UE->X_u);
 
   int prach_start = subframe * frame_parms->samples_per_subframe;
-  int slot_start = frame_parms->get_samples_slot_timestamp(slot, frame_parms, 0);
+  int slot_start = get_samples_slot_timestamp(frame_parms, slot);
   c16_t *tx[frame_parms->nb_antennas_rx];
   for (int i = 0; i < frame_parms->nb_antennas_rx; i++)
     tx[i] = txdata[i] + slot_start;

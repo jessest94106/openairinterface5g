@@ -33,11 +33,11 @@ softmodem_params_t *get_softmodem_params(void)
 
 void test_coherence_symbol_api(NR_DL_FRAME_PARMS *fp)
 {
-  EXPECT_EQ(get_samples_symbol_timestamp(fp, 0, 0), fp->get_samples_slot_timestamp(0, fp, 0));
+  EXPECT_EQ(get_samples_symbol_timestamp(fp, 0, 0), get_samples_slot_timestamp(fp, 0));
 
   for (int slot = 0; slot < 4; slot++) {
-    EXPECT_EQ(get_samples_symbol_duration(fp, slot, 0, fp->symbols_per_slot) + fp->get_samples_slot_timestamp(slot, fp, 0),
-              fp->get_samples_slot_timestamp(slot + 1, fp, 0));
+    EXPECT_EQ(get_samples_symbol_duration(fp, slot, 0, fp->symbols_per_slot) + get_samples_slot_timestamp(fp, slot),
+              get_samples_slot_timestamp(fp, slot + 1));
   }
 
   for (int symbol = 0; symbol < fp->symbols_per_slot - 1; symbol++) {

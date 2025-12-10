@@ -969,17 +969,14 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     buf[7] = (int16_t)ulsch->harq_pid;
     memcpy(&gNB->common_vars.debugBuff[gNB->common_vars.debugBuff_sample_offset + 4],
            &ru->common.rxdata[0][slot_offset],
-           frame_parms->get_samples_per_slot(slot_rx, frame_parms) * sizeof(int32_t));
-    gNB->common_vars.debugBuff_sample_offset += (frame_parms->get_samples_per_slot(slot_rx, frame_parms) + 1000 + 4);
-    if (gNB->common_vars.debugBuff_sample_offset > ((frame_parms->get_samples_per_slot(slot_rx, frame_parms) + 1000 + 2) * 20)) {
+           get_samples_per_slot(slot_rx, frame_parms) * sizeof(int32_t));
+    gNB->common_vars.debugBuff_sample_offset += (get_samples_per_slot(slot_rx, frame_parms) + 1000 + 4);
+    if (gNB->common_vars.debugBuff_sample_offset > ((get_samples_per_slot(slot_rx, frame_parms) + 1000 + 2) * 20)) {
       FILE *f;
       f = fopen("rxdata_buff.raw", "w");
       if (f == NULL)
         exit(1);
-      fwrite((int16_t *)gNB->common_vars.debugBuff,
-             2,
-             (frame_parms->get_samples_per_slot(slot_rx, frame_parms) + 1000 + 4) * 20 * 2,
-             f);
+      fwrite((int16_t *)gNB->common_vars.debugBuff, 2, (get_samples_per_slot(slot_rx, frame_parms) + 1000 + 4) * 20 * 2, f);
       fclose(f);
       exit(-1);
     }
