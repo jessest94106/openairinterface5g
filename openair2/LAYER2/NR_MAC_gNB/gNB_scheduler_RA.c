@@ -104,7 +104,7 @@ static int16_t ssb_index_from_prach(module_id_t module_idP,
   int config_period = cc->prach_info.x;
   //  prach_occasion_id = subframe_index * N_t_slot * N_RA_slot * fdm + N_RA_slot_index * N_t_slot * fdm + freq_index + fdm * start_symbol_index;
   prach_occasion_id =
-      (((frameP % (cc->max_association_period * config_period)) / config_period) * cc->total_prach_occasions_per_config_period)
+      (((frameP % (cc->association_period * config_period)) / config_period) * cc->total_prach_occasions_per_config_period)
       + (RA_sfn_index + slot_index) * cc->prach_info.N_t_slot * fdm + start_symbol_index * fdm + freq_index;
 
   //one SSB have more than one continuous RO
@@ -178,7 +178,7 @@ void find_SSB_and_RO_available(gNB_MAC_INST *nrmac)
   float num_ssb_per_RO = ssb_per_rach_occasion[cfg->prach_config.ssb_per_rach.value];	
   uint8_t fdm = cfg->prach_config.num_prach_fd_occasions.value;
   uint64_t L_ssb = (((uint64_t) cfg->ssb_table.ssb_mask_list[0].ssb_mask.value) << 32) | cfg->ssb_table.ssb_mask_list[1].ssb_mask.value;
-  uint32_t total_RA_occasions = prach_info.N_RA_sfn * prach_info.N_t_slot * prach_info.N_RA_slot * fdm;
+  cc->total_prach_occasions_per_config_period = prach_info.N_RA_sfn * prach_info.N_t_slot * prach_info.N_RA_slot * fdm;
 
   for(int i = 0; i < 64; i++) {
     if ((L_ssb >> (63 - i)) & 0x01) { // only if the bit of L_ssb at current ssb index is 1
@@ -187,15 +187,22 @@ void find_SSB_and_RO_available(gNB_MAC_INST *nrmac)
     }
   }
 
-  cc->total_prach_occasions_per_config_period = total_RA_occasions;
+  // An association period, starting from frame 0, for mapping SS/PBCH block indexes to PRACH occasions is the smallest
+  // value in the set determined by the PRACH configuration period according Table 8.1-1 of 38.213
+  // such that all tx SSB indexes are mapped at least once to the PRACH occasions within the association period
+  // An association pattern period includes one or more association periods and is determined
+  // so that a pattern between PRACH occasions and SS/PBCH block indexes repeats at most every 160 msec
+  int total_RA_occasions = 0;
   for (int i = 1; (1 << (i - 1)) <= prach_info.max_association_period; i++) {
-    cc->max_association_period = (1 << (i - 1));
-    total_RA_occasions = total_RA_occasions * cc->max_association_period;
-    if(total_RA_occasions >= (int) (num_active_ssb / num_ssb_per_RO)) {
+    cc->association_period = (1 << (i - 1));
+    int temp_RA_occasions = cc->total_prach_occasions_per_config_period * cc->association_period;
+    if(temp_RA_occasions >= (int) (num_active_ssb / num_ssb_per_RO)) {
+      total_RA_occasions = temp_RA_occasions;
       repetition = (uint16_t)((total_RA_occasions * num_ssb_per_RO) / num_active_ssb);
       break;
     }
   }
+  AssertFatal(total_RA_occasions > 0, "Couldn't find a valid association period for PRACH occasions\n");
 
   unused_RA_occasion = total_RA_occasions - (int)((num_active_ssb * repetition) / num_ssb_per_RO);
   cc->total_prach_occasions = total_RA_occasions - unused_RA_occasion;
@@ -208,7 +215,7 @@ void find_SSB_and_RO_available(gNB_MAC_INST *nrmac)
         cc->total_prach_occasions,
         cc->num_active_ssb,
         unused_RA_occasion,
-        cc->max_association_period,
+        cc->association_period,
         prach_info.N_RA_sfn,
         cc->total_prach_occasions_per_config_period);
 }
@@ -401,7 +408,7 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
         nfapi_nr_prach_pdu_t *prach_pdu = &newpdu->prach_pdu;
         for (int td_index = 0; td_index < N_t_slot; td_index++) {
           uint32_t config_period = cc->prach_info.x;
-          prach_occasion_id = (((frameP % (cc->max_association_period * config_period))/config_period) * cc->total_prach_occasions_per_config_period) +
+          prach_occasion_id = (((frameP % (cc->association_period * config_period))/config_period) * cc->total_prach_occasions_per_config_period) +
                               (RA_sfn_index + slot_index) * N_t_slot * fdm + td_index * fdm + fdm_index;
 
           if (prach_occasion_id >= cc->total_prach_occasions) // to be confirmed: unused occasion?
@@ -756,7 +763,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
   // return current SSB order in the list of tranmitted SSBs
   int n_ssb = ssb_index_from_prach(module_idP, frame, slot, preamble_index, freq_index, symbol);
   UE->UE_beam_index = get_fapi_beamforming_index(nr_mac, cc->ssb_index[n_ssb]);
-
+  LOG_I(NR_MAC, "UE %04x: Sync beam index %d\n", UE->rnti, UE->UE_beam_index);
   NR_SCHED_UNLOCK(&nr_mac->sched_lock);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_INITIATE_RA_PROC, 0);
 }

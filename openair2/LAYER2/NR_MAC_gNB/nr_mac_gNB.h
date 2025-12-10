@@ -319,7 +319,7 @@ typedef struct {
   //Total available prach occasions
   int total_prach_occasions;
   //Max Association period
-  int max_association_period;
+  int association_period;
   //SSB index
   uint8_t ssb_index[MAX_NUM_OF_SSB];
   //CB preambles for each SSB
