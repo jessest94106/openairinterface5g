@@ -21,6 +21,7 @@
 
 #include "gtest/gtest.h"
 extern "C" {
+#include <stdlib.h>
 #include "openair1/PHY/defs_nr_common.h"
 #include "openair1/PHY/INIT/nr_phy_init.h"
 
@@ -29,6 +30,28 @@ softmodem_params_t *get_softmodem_params(void)
 {
   return &softmodem_params;
 }
+}
+
+uint32_t ref_get_samples_slot_timestamp(NR_DL_FRAME_PARMS *fp, unsigned int slot)
+{
+  uint32_t samp_count = 0;
+  for (unsigned int i = 0; i < slot; i++) {
+    samp_count += get_samples_per_slot(i, fp);
+  }
+  return samp_count;
+}
+
+uint32_t ref_get_slot_from_timestamp(openair0_timestamp ts, NR_DL_FRAME_PARMS *fp)
+{
+  uint32_t slot_idx = 0;
+  int samples_till_the_slot = get_samples_per_slot(slot_idx, fp) - 1;
+  ts = ts % fp->samples_per_frame;
+
+  while (ts > samples_till_the_slot) {
+    slot_idx++;
+    samples_till_the_slot += get_samples_per_slot(slot_idx, fp);
+  }
+  return slot_idx;
 }
 
 void test_coherence_symbol_api(NR_DL_FRAME_PARMS *fp)
@@ -43,6 +66,25 @@ void test_coherence_symbol_api(NR_DL_FRAME_PARMS *fp)
   for (int symbol = 0; symbol < fp->symbols_per_slot - 1; symbol++) {
     EXPECT_EQ(get_samples_symbol_timestamp(fp, 0, symbol + 1) - get_samples_symbol_timestamp(fp, 0, symbol),
               get_samples_symbol_duration(fp, 0, symbol, 1));
+  }
+}
+
+void test_coherence_slot_api(NR_DL_FRAME_PARMS *fp)
+{
+  for (unsigned int slot = 0; slot < fp->slots_per_frame; slot++) {
+    EXPECT_EQ(get_samples_slot_timestamp(fp, slot), ref_get_samples_slot_timestamp(fp, slot));
+  }
+
+  openair0_timestamp ts = get_samples_per_slot(0, fp);
+  // When timestamp is the last sample of the slot
+  EXPECT_EQ(get_slot_from_timestamp(ts - 1, fp), 0);
+  for (unsigned int slot = 0; slot < fp->slots_per_frame; slot++) {
+    // When timestamp is the first sample of the slot
+    ts = ref_get_samples_slot_timestamp(fp, slot);
+    EXPECT_EQ(get_slot_from_timestamp(ts, fp), slot);
+    // When timestamp is anywhere in the slot
+    ts += (rand() % fp->samples_per_slotN0);
+    EXPECT_EQ(get_slot_from_timestamp(ts, fp), slot);
   }
 }
 
@@ -63,6 +105,7 @@ TEST(nr_frame_params, test_mu_3)
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
+  test_coherence_slot_api(&fp);
 }
 
 TEST(nr_frame_params, test_mu_2)
@@ -82,6 +125,7 @@ TEST(nr_frame_params, test_mu_2)
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
+  test_coherence_slot_api(&fp);
 }
 
 TEST(nr_frame_params, test_mu_1)
@@ -101,6 +145,7 @@ TEST(nr_frame_params, test_mu_1)
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
+  test_coherence_slot_api(&fp);
 }
 
 TEST(nr_frame_params, test_mu_0)
@@ -120,6 +165,7 @@ TEST(nr_frame_params, test_mu_0)
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
+  test_coherence_slot_api(&fp);
 }
 
 int main(int argc, char **argv)
