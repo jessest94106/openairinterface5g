@@ -190,6 +190,35 @@ uint32_t nr_ue_calculate_ssb_rsrp(const NR_DL_FRAME_PARMS *fp,
   return rsrp;
 }
 
+// Send SSB RSRP measurement to MAC
+static void send_ssb_rsrp_meas(PHY_VARS_NR_UE *ue,
+                               const UE_nr_rxtx_proc_t *proc,
+                               uint16_t Nid_cell,
+                               int rsrp_dBm,
+                               bool is_neighboring_cell,
+                               int ssb_index,
+                               float sinr_dB)
+{
+  if (!ue->if_inst || !ue->if_inst->dl_indication)
+    return;
+
+  fapi_nr_l1_measurements_t l1_measurements = {
+      .gNB_index = proc->gNB_id,
+      .meas_type = NFAPI_NR_SS_MEAS,
+      .Nid_cell = Nid_cell,
+      .is_neighboring_cell = is_neighboring_cell,
+      .rsrp_dBm = rsrp_dBm,
+      .ssb_index = ssb_index,
+      .sinr_dB = sinr_dB,
+  };
+
+  nr_downlink_indication_t dl_indication = {0};
+  fapi_nr_rx_indication_t rx_ind = {0};
+  nr_fill_dl_indication(&dl_indication, NULL, &rx_ind, proc, ue, NULL);
+  nr_fill_rx_indication(&rx_ind, FAPI_NR_MEAS_IND, ue, NULL, NULL, 1, proc, &l1_measurements, NULL);
+  ue->if_inst->dl_indication(&dl_indication);
+}
+
 // This function implements:
 // - SS reference signal received power (SS-RSRP) as per clause 5.1.1 of 3GPP TS 38.215 version 16.3.0 Release 16
 // - no Layer 3 filtering implemented (no filterCoefficient provided from RRC)
@@ -233,23 +262,13 @@ void nr_ue_ssb_rsrp_measurements(PHY_VARS_NR_UE *ue,
         ue->measurements.ssb_sinr_dB[ssb_index]);
 
   // Send SS measurements to MAC
-  if (!ue->if_inst || !ue->if_inst->dl_indication)
-    return;
-
-  fapi_nr_l1_measurements_t l1_measurements = {
-    .gNB_index = proc->gNB_id,
-    .meas_type = NFAPI_NR_SS_MEAS,
-    .Nid_cell = ue->frame_parms.Nid_cell,
-    .rsrp_dBm = ue->measurements.ssb_rsrp_dBm[ssb_index],
-    .sinr_dB = ue->measurements.ssb_sinr_dB[ssb_index],
-    .ssb_index = ssb_index,
-    .is_neighboring_cell = false,
-  };
-  nr_downlink_indication_t dl_indication = {0};
-  fapi_nr_rx_indication_t rx_ind = {0};
-  nr_fill_dl_indication(&dl_indication, NULL, &rx_ind, proc, ue, NULL);
-  nr_fill_rx_indication(&rx_ind, FAPI_NR_MEAS_IND, ue, NULL, NULL, 1, proc, &l1_measurements, NULL);
-  ue->if_inst->dl_indication(&dl_indication);
+  send_ssb_rsrp_meas(ue,
+                     proc,
+                     ue->frame_parms.Nid_cell,
+                     ue->measurements.ssb_rsrp_dBm[ssb_index],
+                     false,
+                     ssb_index,
+                     ue->measurements.ssb_sinr_dB[ssb_index]);
 }
 
 static bool search_neighboring_cell(NR_DL_FRAME_PARMS *frame_parms,
@@ -457,25 +476,7 @@ void do_neighboring_cell_measurements(UE_nr_rxtx_proc_t *proc, PHY_VARS_NR_UE *u
           neighboring_cell_info->pss_search_length = frame_parms->samples_per_frame + (2 * frame_parms->ofdm_symbol_size);
           neighboring_cell_info->valid_meas = false;
           neighboring_cell_info->consec_fail = 0;
-
-          // Send invalid RSRP to MAC to trigger reset
-          if (ue->if_inst && ue->if_inst->dl_indication) {
-            fapi_nr_l1_measurements_t l1_measurements = {
-                .gNB_index = proc->gNB_id,
-                .meas_type = NFAPI_NR_SS_MEAS,
-                .Nid_cell = neighbor_cell->Nid_cell,
-                .is_neighboring_cell = true,
-                .rsrp_dBm = INT_MAX,
-                .ssb_index = -1,
-                .sinr_dB = 0.0,
-            };
-
-            nr_downlink_indication_t dl_indication = {0};
-            fapi_nr_rx_indication_t rx_ind = {0};
-            nr_fill_dl_indication(&dl_indication, NULL, &rx_ind, proc, ue, NULL);
-            nr_fill_rx_indication(&rx_ind, FAPI_NR_MEAS_IND, ue, NULL, NULL, 1, proc, &l1_measurements, NULL);
-            ue->if_inst->dl_indication(&dl_indication);
-          }
+          send_ssb_rsrp_meas(ue, proc, neighbor_cell->Nid_cell, INT_MAX, true, -1, 0.0);
         }
         continue;
       }
@@ -489,22 +490,7 @@ void do_neighboring_cell_measurements(UE_nr_rxtx_proc_t *proc, PHY_VARS_NR_UE *u
                                           - dB_fixed(ue->frame_parms.ofdm_symbol_size);
 
     // Send SS measurements to MAC
-    if (!ue->if_inst || !ue->if_inst->dl_indication)
-      continue;
-
-    fapi_nr_l1_measurements_t l1_measurements = {
-        .gNB_index = proc->gNB_id,
-        .meas_type = NFAPI_NR_SS_MEAS,
-        .Nid_cell = nr_neighboring_cell->Nid_cell,
-        .is_neighboring_cell = true,
-        .rsrp_dBm = neighboring_cell_info->ssb_rsrp_dBm,
-    };
-
-    nr_downlink_indication_t dl_indication = {0};
-    fapi_nr_rx_indication_t rx_ind = {0};
-    nr_fill_dl_indication(&dl_indication, NULL, &rx_ind, proc, ue, NULL);
-    nr_fill_rx_indication(&rx_ind, FAPI_NR_MEAS_IND, ue, NULL, NULL, 1, proc, &l1_measurements, NULL);
-    ue->if_inst->dl_indication(&dl_indication);
+    send_ssb_rsrp_meas(ue, proc, neighbor_cell->Nid_cell, neighboring_cell_info->ssb_rsrp_dBm, true, -1, 0.0);
   }
 }
 
