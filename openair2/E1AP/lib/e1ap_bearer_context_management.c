@@ -192,8 +192,8 @@ static E1AP_SDAP_Configuration_t e1_encode_sdap_config(const bearer_context_sdap
 {
   E1AP_SDAP_Configuration_t out = {0};
   out.defaultDRB = in->defaultDRB ? E1AP_DefaultDRB_true : E1AP_DefaultDRB_false;
-  out.sDAP_Header_UL = in->sDAP_Header_UL;
-  out.sDAP_Header_DL = in->sDAP_Header_DL;
+  out.sDAP_Header_UL = in->sDAP_Header_UL ? E1AP_SDAP_Header_UL_present : E1AP_SDAP_Header_UL_absent;
+  out.sDAP_Header_DL = in->sDAP_Header_DL ? E1AP_SDAP_Header_DL_present : E1AP_SDAP_Header_DL_absent;
   return out;
 }
 
@@ -201,8 +201,8 @@ static E1AP_SDAP_Configuration_t e1_encode_sdap_config(const bearer_context_sdap
 static bool e1_decode_sdap_config(bearer_context_sdap_config_t *out, const E1AP_SDAP_Configuration_t *in)
 {
   out->defaultDRB = in->defaultDRB == E1AP_DefaultDRB_true;
-  out->sDAP_Header_UL = in->sDAP_Header_UL;
-  out->sDAP_Header_DL = in->sDAP_Header_DL;
+  out->sDAP_Header_UL = in->sDAP_Header_UL == E1AP_SDAP_Header_UL_present;
+  out->sDAP_Header_DL = in->sDAP_Header_DL == E1AP_SDAP_Header_DL_present;
   return true;
 }
 
@@ -212,8 +212,8 @@ static bool e1_decode_sdap_config(bearer_context_sdap_config_t *out, const E1AP_
 static bool eq_sdap_config(const bearer_context_sdap_config_t *a, const bearer_context_sdap_config_t *b)
 {
   _E1_EQ_CHECK_LONG(a->defaultDRB, b->defaultDRB);
-  _E1_EQ_CHECK_LONG(a->sDAP_Header_UL, b->sDAP_Header_UL);
-  _E1_EQ_CHECK_LONG(a->sDAP_Header_DL, b->sDAP_Header_DL);
+  _E1_EQ_CHECK_INT(a->sDAP_Header_UL, b->sDAP_Header_UL);
+  _E1_EQ_CHECK_INT(a->sDAP_Header_DL, b->sDAP_Header_DL);
   return true;
 }
 

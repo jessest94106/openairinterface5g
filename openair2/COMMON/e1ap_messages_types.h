@@ -268,8 +268,8 @@ typedef struct up_params_s {
 /* IE SDAP Configuration (clause 9.3.1.39 of 3GPP TS 38.463) */
 typedef struct bearer_context_sdap_config_s {
   long defaultDRB;
-  long sDAP_Header_UL;
-  long sDAP_Header_DL;
+  bool sDAP_Header_UL;
+  bool sDAP_Header_DL;
 } bearer_context_sdap_config_t;
 
 /* IE PDCP Configuration (clause 9.3.1.38 of 3GPP TS 38.463) */
