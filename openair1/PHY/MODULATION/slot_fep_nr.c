@@ -80,7 +80,7 @@ int nr_slot_fep(PHY_VARS_NR_UE *ue,
   // For Sidelink 16 frames worth of samples is processed to find SSB, for 5G-NR 2.
   const unsigned int total_samples = (is_sl) ? 16 * frame_parms->samples_per_frame : 2 * frame_parms->samples_per_frame;
 
-  unsigned int rx_offset = frame_parms->get_samples_slot_timestamp(slot, frame_parms, 0);
+  unsigned int rx_offset = get_samples_slot_timestamp(frame_parms, slot);
   const unsigned int abs_symbol = slot * frame_parms->symbols_per_slot + symbol;
   for (int idx_symb = slot * frame_parms->symbols_per_slot; idx_symb <= abs_symbol; idx_symb++)
     rx_offset += (idx_symb % (0x7 << frame_parms->numerology_index)) ? nb_prefix_samples : nb_prefix_samples0;
@@ -150,7 +150,7 @@ int nr_slot_fep_ul(NR_DL_FRAME_PARMS *frame_parms,
   int32_t tmp_dft_in[8192] __attribute__ ((aligned (32)));
 
   // offset of first OFDM symbol
-  unsigned int rxdata_offset = frame_parms->get_samples_slot_timestamp(Ns,frame_parms,0);
+  unsigned int rxdata_offset = get_samples_slot_timestamp(frame_parms, Ns);
   unsigned int abs_symbol = Ns * frame_parms->symbols_per_slot + symbol;
   for (int idx_symb = Ns*frame_parms->symbols_per_slot; idx_symb <= abs_symbol; idx_symb++)
     rxdata_offset += (idx_symb%(0x7<<frame_parms->numerology_index)) ? nb_prefix_samples : nb_prefix_samples0;

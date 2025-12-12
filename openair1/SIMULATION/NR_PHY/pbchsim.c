@@ -527,7 +527,7 @@ int main(int argc, char **argv)
 
         nr_common_signal_procedures (gNB,frame,slot, &ssb_pdu[i]);
 
-        int samp = frame_parms->get_samples_slot_timestamp(slot, frame_parms, 0);
+        int samp = get_samples_slot_timestamp(frame_parms, slot);
         for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++) {
           if (cyclic_prefix_type == 1) {
             apply_nr_rotation_TX(frame_parms,

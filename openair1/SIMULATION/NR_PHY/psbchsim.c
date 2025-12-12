@@ -574,7 +574,7 @@ int main(int argc, char **argv)
          proc.frame_rx,
          proc.nr_slot_rx,
          sl_uerx->sl_config.sl_sync_source.rx_slss_id);
-  int slot_start = frame_parms->get_samples_slot_timestamp(slot, frame_parms, 0);
+  int slot_start = get_samples_slot_timestamp(frame_parms, slot);
   c16_t *tx[frame_parms->nb_antennas_rx];
   for (int i = 0; i < frame_parms->nb_antennas_rx; i++)
     tx[i] = UE_TX->common_vars.txData[i] + slot_start;

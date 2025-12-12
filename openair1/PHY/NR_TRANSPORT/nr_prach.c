@@ -362,7 +362,7 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
     // Fixme: slot or slot makes no sense ???
     int slot2 = p->prach_sequence_length ? p->slot : p->slot;
     int idx = aa + beam_id * p->nb_rx;
-    c16_t *prach = (c16_t *)&rxdata[idx][fp->get_samples_slot_timestamp(slot2, fp, 0) + sample_offset_slot - N_TA_offset];
+    c16_t *prach = (c16_t *)&rxdata[idx][get_samples_slot_timestamp(fp, slot2) + sample_offset_slot - N_TA_offset];
 
     // do DFT
     c16_t *prach2 = prach + Ncp;

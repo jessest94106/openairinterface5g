@@ -352,7 +352,9 @@ These modes of operation are supported:
    - Formats 0,1,2,3, A1-A3, B1-B3
 * NTN
    - TA adjustemt based on ntn-Config-r17 information
-   - Autonomous TA adjustemt between SIB19 receptions based on DL time tracking
+   - Different TA adjustemt algorithms between SIB19 receptions:
+      - Autonomous TA adjustemt based on DL time tracking
+      - Standard compliant epoch time based TA adjustment including orbital propagation
    - UL Doppler pre-compensation based on continuous DL FO estimation
 *  Highly efficient 3GPP compliant LDPC encoder and decoder (BG1 and BG2 are supported)
 *  Highly efficient 3GPP compliant polar encoder and decoder

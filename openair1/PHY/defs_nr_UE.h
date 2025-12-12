@@ -467,7 +467,8 @@ typedef struct PHY_VARS_NR_UE_s {
 
   /// Timing Advance updates variables
   /// Timing advance update computed from the TA command signalled from gNB
-  int timing_advance;
+  int timing_advance; /// corresponds to N_TA
+  int timing_advance_ntn; /// corresponds to N_common_TA_adj + N_UE_TA_adj
   int N_TA_offset; ///timing offset used in TDD
   int ta_frame;
   int ta_slot;
@@ -538,11 +539,14 @@ typedef struct {
   /// NR slot index within frame_rx [0 .. slots_per_frame - 1] to act upon for transmission
   int nr_slot_rx;
   int tx_slot_type;
-  //#endif
   /// frame to act upon for transmission
   int frame_tx;
   /// frame to act upon for reception
   int frame_rx;
+  /// hyper frame number to act upon for transmission
+  int hfn_tx;
+  /// hyper frame number to act upon for reception
+  int hfn_rx;
 } UE_nr_rxtx_proc_t;
 
 typedef struct {

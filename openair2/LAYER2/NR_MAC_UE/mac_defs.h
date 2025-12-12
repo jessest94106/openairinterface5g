@@ -62,6 +62,8 @@
 #include "NR_MeasConfig.h"
 #include "NR_ServingCellConfigCommonSIB.h"
 
+/* position_t */
+#include "executables/position_interface.h"
 
 // ==========
 // NR UE defs
@@ -148,6 +150,7 @@
 // Define the UE L2 states with X-Macro
 #define NR_UE_L2_STATES \
   UE_STATE(UE_NOT_SYNC) \
+  UE_STATE(UE_NOT_SYNC_RECONF) \
   UE_STATE(UE_BARRED) \
   UE_STATE(UE_RECEIVING_SIB) \
   UE_STATE(UE_PERFORMING_RA) \
@@ -543,8 +546,16 @@ typedef struct {
 } si_schedInfo_t;
 
 typedef struct ntn_timing_advance_components {
+  int epoch_hfn;
   int epoch_sfn;
   int epoch_subframe;
+
+  // orbital angular velocity in rad/ms
+  double omega;
+  // satellite position at epoch time
+  position_t pos_sat_0;
+  // satellite position at 90° orbit
+  position_t pos_sat_90;
 
   // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
   double N_common_ta_adj;
@@ -552,12 +563,7 @@ typedef struct ntn_timing_advance_components {
   double N_common_ta_drift;
   // change rate of common ta drift in µs/s²
   double N_common_ta_drift_variant;
-  // N_UE_TA_adj calculated round-trip-time between UE and SAT (ms)
-  double N_UE_TA_adj;
-  // drift rate of N_UE_TA in µs/s
-  double N_UE_TA_drift;
-  // change rate of N_UE_TA drift in µs/s²
-  double N_UE_TA_drift_variant;
+
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
 
@@ -639,6 +645,7 @@ typedef struct NR_UE_MAC_INST_s {
 
   NR_SSB_meas_t ssb_measurements[MAX_NB_SSB];
   NR_CSIRS_meas_t csirs_measurements;
+  ssb_ro_preambles_t ssb_ro_preambles;
 
   dci_pdu_rel15_t def_dci_pdu_rel15[NR_MAX_SLOTS_PER_FRAME][8];
 
@@ -676,21 +683,6 @@ static inline int GET_NTN_UE_K_OFFSET(const ntn_timing_advance_componets_t *ntn_
 static inline long GET_DURATION_RX_TO_TX(const ntn_timing_advance_componets_t *ntn_ta, int scs)
 {
   return NR_UE_CAPABILITY_SLOT_RX_TO_TX + (ntn_ta->cell_specific_k_offset << scs);
-}
-
-static inline double get_total_TA_ms(const ntn_timing_advance_componets_t *ntn_ta)
-{
-  return ntn_ta->N_common_ta_adj + ntn_ta->N_UE_TA_adj;
-}
-
-static inline double get_total_TA_drift(const ntn_timing_advance_componets_t *ntn_ta)
-{
-  return ntn_ta->N_common_ta_drift + ntn_ta->N_UE_TA_drift;
-}
-
-static inline double get_total_TA_drift_variant(const ntn_timing_advance_componets_t *ntn_ta)
-{
-  return ntn_ta->N_common_ta_drift_variant + ntn_ta->N_UE_TA_drift_variant;
 }
 
 /*@}*/

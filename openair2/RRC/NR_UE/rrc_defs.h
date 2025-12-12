@@ -262,8 +262,9 @@ typedef struct NR_UE_RRC_INST_s {
   // 5G-S-TMSI
   uint64_t fiveG_S_TMSI;
   // Frame timing received from MAC
+  int current_hfn;
   int current_frame;
-
+  bool sched_reconfsync_sib1;
   //Sidelink params
   NR_SL_PreconfigurationNR_r16_t *sl_preconfig;
   // NTN params

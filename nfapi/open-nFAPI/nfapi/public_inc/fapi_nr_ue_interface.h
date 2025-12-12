@@ -24,6 +24,7 @@
 #include "PHY/impl_defs_top.h"
 #include "PHY/impl_defs_nr.h"
 #include "common/utils/nr/nr_common.h"
+#include "executables/position_interface.h"
 
 #define NFAPI_UE_MAX_NUM_CB 8
 #define NFAPI_MAX_NUM_UL_PDU 255
@@ -562,18 +563,26 @@ typedef struct {
 } fapi_nr_ta_command_pdu;
 
 typedef struct {
+  int epoch_hfn;
   int epoch_sfn;
   int epoch_subframe;
 
+  // orbital angular velocity in rad/ms
+  double omega;
+  // satellite position at epoch time
+  position_t pos_sat_0;
+  // satellite position at 90° orbit
+  position_t pos_sat_90;
+
+  // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
+  double N_common_ta_adj;
+  // drift rate of common ta in µs/s
+  double N_common_ta_drift;
+  // change rate of common ta drift in µs/s²
+  double N_common_ta_drift_variant;
+
   // cell scheduling offset expressed in terms of 15kHz SCS
   long cell_specific_k_offset;
-
-  // ntn_total_time_advance_ms represents the complete round-trip-time between gNB and UE via SAT
-  double ntn_total_time_advance_ms;
-  // drift rate of ntn_total_time_advance_ms in µs/s
-  double ntn_total_time_advance_drift;
-  // change rate of ntn_total_time_advance_ms drift in µs/s²
-  double ntn_total_time_advance_drift_variant;
 } fapi_nr_dl_ntn_config_command_pdu;
 
 typedef struct {
@@ -697,7 +706,6 @@ typedef struct
   uint8_t restricted_set_config;//PRACH restricted set config Value: 0: unrestricted 1: restricted set type A 2: restricted set type B
   uint8_t num_prach_fd_occasions;//Corresponds to the parameter 𝑀 in [38.211, sec 6.3.3.2] which equals the higher layer parameter msg1FDM Value: 1,2,4,8
   fapi_nr_num_prach_fd_occasions_t* num_prach_fd_occasions_list;
-  uint8_t ssb_per_rach;//SSB-per-RACH-occasion Value: 0: 1/8 1:1/4, 2:1/2 3:1 4:2 5:4, 6:8 7:16
   uint8_t prach_multiple_carriers_in_a_band;//0 = disabled 1 = enabled
   uint8_t root_seq_computed; // flag set and used only in PHY to indicate if table is computed with this config
 
