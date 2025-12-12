@@ -55,10 +55,11 @@ void free_nr_ue_ul_harq(NR_UL_UE_HARQ_t harq_list[NR_MAX_ULSCH_HARQ_PROCESSES], 
 
 void phy_init_nr_top(PHY_VARS_NR_UE *ue);
 void phy_term_nr_top(void);
+#ifndef __cplusplus
 void init_delay_table(uint16_t ofdm_symbol_size,
                       int max_delay_comp,
                       int max_ofdm_symbol_size,
                       c16_t delay_table[][max_ofdm_symbol_size]);
-
+#endif
 void sl_ue_phy_init(PHY_VARS_NR_UE *UE);
 #endif
