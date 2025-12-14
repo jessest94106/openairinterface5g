@@ -1150,8 +1150,8 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
 
   const int minfbtime = mac->radio_config.minRXTXTIME + NTN_gNB_Koffset;
   const NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
-  const int n_slots_frame = mac->frame_structure.numb_slots_frame;
   const frame_structure_t *fs = &mac->frame_structure;
+  const int n_slots_frame = fs->numb_slots_frame;
 
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   NR_PUCCH_Config_t *pucch_Config = ul_bwp->pucch_Config;
@@ -1173,8 +1173,11 @@ int nr_acknack_scheduling(gNB_MAC_INST *mac,
     const int pucch_slot = (slot + pdsch_to_harq_feedback[f] + NTN_gNB_Koffset) % n_slots_frame;
     // check if the slot is UL
     if (fs->frame_type == TDD) {
-      int mod_slot = pucch_slot % fs->numb_slots_period;
+      int mod_slot = get_slot_idx_in_period(pucch_slot, fs);
       if (!is_ul_slot(mod_slot, fs))
+        continue;
+      const tdd_period_config_t *pc = &fs->period_cfg;
+      if (r_pucch >= 0 && is_mixed_slot(mod_slot, fs) && pc->tdd_slot_bitmap[mod_slot].num_ul_symbols < 2)
         continue;
     }
     const int pucch_frame = (frame + ((slot + pdsch_to_harq_feedback[f] + NTN_gNB_Koffset) / n_slots_frame)) % MAX_FRAME_NUMBER;
