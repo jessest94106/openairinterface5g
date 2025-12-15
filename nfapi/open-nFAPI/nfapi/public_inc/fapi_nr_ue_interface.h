@@ -73,6 +73,7 @@ typedef struct {
 typedef struct {
   /// frequency_domain_resource;
   uint8_t frequency_domain_resource[6];
+  uint32_t rb_offset;
   uint8_t StartSymbolIndex;
   uint16_t StartSymbolBitmap;
   uint8_t duration;
