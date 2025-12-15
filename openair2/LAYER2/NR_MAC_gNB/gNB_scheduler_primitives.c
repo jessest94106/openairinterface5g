@@ -454,6 +454,7 @@ static NR_SearchSpace_t *get_searchspace(NR_ServingCellConfigCommon_t *scc,
 /// @param rb_start Output parameter for the starting resource block index of the CORESET
 static void get_coreset_rb_params(const NR_ControlResourceSet_t *coreset, uint16_t *n_rb, uint16_t *rb_start)
 {
+  AssertFatal(!coreset->ext1 || !coreset->ext1->rb_Offset_r16, "rb-Offset in coreset configuration not handled\n");
   *n_rb = 0;
   *rb_start = 0;
   

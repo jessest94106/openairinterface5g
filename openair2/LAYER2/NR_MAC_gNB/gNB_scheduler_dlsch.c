@@ -404,7 +404,8 @@ bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
     if (sched_ctrl->coreset->controlResourceSetId == 0) {
       bwp_info.bwpStart = nr_mac->cset0_bwp_start;
     } else {
-      bwp_info.bwpStart = dl_bwp->BWPStart + sched_ctrl->sched_pdcch.rb_start;
+      int additional_offset = (dl_bwp->BWPStart + 5) / 6 * 6 - dl_bwp->BWPStart;
+      bwp_info.bwpStart = dl_bwp->BWPStart + sched_ctrl->sched_pdcch.rb_start + additional_offset;
     }
     if (nr_mac->cset0_bwp_size > 0) {
       bwp_info.bwpSize = min(dl_bwp->BWPSize, nr_mac->cset0_bwp_size);
