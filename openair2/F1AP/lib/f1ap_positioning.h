@@ -154,4 +154,12 @@ f1ap_positioning_measurement_failure_indication_t cp_positioning_measurement_fai
 bool eq_positioning_measurement_failure_indication(const f1ap_positioning_measurement_failure_indication_t *a,
                                                    const f1ap_positioning_measurement_failure_indication_t *b);
 void free_positioning_measurement_failure_indication(f1ap_positioning_measurement_failure_indication_t *msg);
+
+// positioning measurement update
+struct F1AP_F1AP_PDU *encode_positioning_measurement_update(const f1ap_positioning_measurement_update_t *msg);
+bool decode_positioning_measurement_update(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_measurement_update_t *out);
+f1ap_positioning_measurement_update_t cp_positioning_measurement_update(const f1ap_positioning_measurement_update_t *orig);
+bool eq_positioning_measurement_update(const f1ap_positioning_measurement_update_t *a,
+                                       const f1ap_positioning_measurement_update_t *b);
+void free_positioning_measurement_update(f1ap_positioning_measurement_update_t *msg);
 #endif /* F1AP_POSITIONING_H_ */

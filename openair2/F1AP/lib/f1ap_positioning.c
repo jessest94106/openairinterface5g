@@ -6250,3 +6250,171 @@ void free_positioning_measurement_failure_indication(f1ap_positioning_measuremen
 {
   // nothing to free
 }
+
+/**
+ * @brief Encode F1 positioning measurement update to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_measurement_update(const f1ap_positioning_measurement_update_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningMeasurementUpdate;
+  tmp->criticality = F1AP_Criticality_ignore;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_PositioningMeasurementUpdate;
+  F1AP_PositioningMeasurementUpdate_t *out = &tmp->value.choice.PositioningMeasurementUpdate;
+
+  /* mandatory : TransactionID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementUpdateIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningMeasurementUpdateIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+
+  /* mandatory : LMF_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementUpdateIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_LMF_MeasurementID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningMeasurementUpdateIEs__value_PR_LMF_MeasurementID;
+  ie2->value.choice.LMF_MeasurementID = msg->lmf_measurement_id;
+
+  /* mandatory : RAN_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementUpdateIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_RAN_MeasurementID;
+  ie3->criticality = F1AP_Criticality_reject;
+  ie3->value.present = F1AP_PositioningMeasurementUpdateIEs__value_PR_RAN_MeasurementID;
+  ie3->value.choice.RAN_MeasurementID = msg->ran_measurement_id;
+
+  /* optional: SRS Configuration */
+  if (msg->srs_configuration) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementUpdateIEs_t, ie4);
+    ie4->id = F1AP_ProtocolIE_ID_id_SRSConfiguration;
+    ie4->criticality = F1AP_Criticality_ignore;
+    ie4->value.present = F1AP_PositioningMeasurementUpdateIEs__value_PR_SRSConfiguration;
+    f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    ie4->value.choice.SRSConfiguration.sRSCarrier_List = encode_srs_carrier_list(srs_carrier_list);
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 Positioning Measurement Update
+ */
+bool decode_positioning_measurement_update(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_measurement_update_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningMeasurementUpdate_t *in = &pdu->choice.initiatingMessage->value.choice.PositioningMeasurementUpdate;
+  F1AP_PositioningMeasurementUpdateIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementUpdateIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementUpdateIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_LMF_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementUpdateIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_RAN_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementUpdateIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_SRSConfiguration,
+                   false);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementUpdateIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_LMF_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementUpdateIEs__value_PR_LMF_MeasurementID);
+        out->lmf_measurement_id = ie->value.choice.LMF_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_RAN_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementUpdateIEs__value_PR_RAN_MeasurementID);
+        out->ran_measurement_id = ie->value.choice.RAN_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_SRSConfiguration:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementUpdateIEs__value_PR_SRSConfiguration);
+        F1AP_SRSCarrier_List_t *f1_sRSCarrier_List = &ie->value.choice.SRSConfiguration.sRSCarrier_List;
+        out->srs_configuration = calloc_or_fail(1, sizeof(*out->srs_configuration));
+        f1ap_srs_carrier_list_t *srs_carrier_list = &out->srs_configuration->srs_carrier_list;
+        decode_srs_carrier_list(srs_carrier_list, f1_sRSCarrier_List);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 Positioning Measurement Update deep copy
+ */
+f1ap_positioning_measurement_update_t cp_positioning_measurement_update(const f1ap_positioning_measurement_update_t *orig)
+{
+  // copy all mandatory fields that are not dynamic memory
+  f1ap_positioning_measurement_update_t cp = {
+      .transaction_id = orig->transaction_id,
+      .lmf_measurement_id = orig->lmf_measurement_id,
+      .ran_measurement_id = orig->ran_measurement_id,
+  };
+
+  /* optional: SRS Configuration */
+  if (orig->srs_configuration) {
+    cp.srs_configuration = calloc_or_fail(1, sizeof(*cp.srs_configuration));
+    f1ap_srs_carrier_list_t *srs_carrier_list_cp = &cp.srs_configuration->srs_carrier_list;
+    f1ap_srs_carrier_list_t *srs_carrier_list = &orig->srs_configuration->srs_carrier_list;
+    *srs_carrier_list_cp = cp_srs_carrier_list(srs_carrier_list);
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 Positioning Measurement Update equality check
+ */
+bool eq_positioning_measurement_update(const f1ap_positioning_measurement_update_t *a,
+                                       const f1ap_positioning_measurement_update_t *b)
+{
+  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->lmf_measurement_id, b->lmf_measurement_id);
+  _F1_EQ_CHECK_INT(a->ran_measurement_id, b->ran_measurement_id);
+
+  /* optional: SRS Configuration */
+  if ((a->srs_configuration == NULL) != (b->srs_configuration == NULL)) {
+    return false;
+  }
+  if (a->srs_configuration) {
+    f1ap_srs_carrier_list_t *srs_carrier_list_a = &a->srs_configuration->srs_carrier_list;
+    f1ap_srs_carrier_list_t *srs_carrier_list_b = &b->srs_configuration->srs_carrier_list;
+    _F1_CHECK_EXP(eq_srs_carrier_list(srs_carrier_list_a, srs_carrier_list_b));
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 Positioning Measurement Update
+ */
+void free_positioning_measurement_update(f1ap_positioning_measurement_update_t *msg)
+{
+  /* SRS Configuration */
+  if (msg->srs_configuration) {
+    f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    free_srs_carrier_list(srs_carrier_list);
+    free(msg->srs_configuration);
+  }
+}
