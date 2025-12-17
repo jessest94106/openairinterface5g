@@ -3813,14 +3813,12 @@ NR_CellGroupConfig_t *update_cellGroupConfig_for_BWP_switch(NR_CellGroupConfig_t
 
   // we temporarily need to keep both the old and the new BWP in the CG used by the gNB
   // while removing the old from the CG sent to the UE
-  if (old_bwp > 0) {
-    NR_CellGroupConfig_t *clone_cg = NULL;
-    const int copy_result = asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&clone_cg, cellGroupConfig);
-    AssertFatal(copy_result == 0, "unable to copy NR_CellGroupConfig for cloning\n");
+  NR_CellGroupConfig_t *clone_cg = NULL;
+  const int copy_result = asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&clone_cg, cellGroupConfig);
+  AssertFatal(copy_result == 0, "unable to copy NR_CellGroupConfig for cloning\n");
+  if (old_bwp > 0)
     clean_bwp_structures(clone_cg->spCellConfig);
-    return clone_cg;
-  }
-  return NULL;
+  return clone_cg;
 }
 
 void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
@@ -3931,11 +3929,6 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
     set_dl_mcs_table(scs, configuration->force_256qam_off ? NULL : uecap, bwp_Dedicated, scc);
     update_cqitables(bwp_Dedicated->pdsch_Config, csi_MeasConfig);
   }
-}
-
-void free_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig)
-{
-  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, cellGroupConfig);
 }
 
 int encode_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig, uint8_t *buffer, int max_buffer_size)

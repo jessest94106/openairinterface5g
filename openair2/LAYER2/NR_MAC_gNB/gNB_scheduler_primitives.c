@@ -3933,7 +3933,8 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE,
                                                   buf,
                                                   sizeof(buf));
   AssertFatal(enc_rval.encoded > 0, "ASN1 encoding of CellGroupConfig failed, failed type %s\n", enc_rval.failed_type->name);
-  UE->reestablish_rlc = true;
+  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
+  UE->reconfigCellGroup = cellGroup_for_UE;
   du_to_cu_rrc_information_t du2cu = {
     .cellGroupConfig = buf,
     .cellGroupConfig_length = (enc_rval.encoded + 7) >> 3,
@@ -3947,8 +3948,6 @@ void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE,
     .cause_value = F1AP_CauseRadioNetwork_action_desirable_for_radio_reasons,
   };
   nrmac->mac_rrc.ue_context_modification_required(&required);
-  if (cellGroup_for_UE)
-    free_cellGroupConfig(cellGroup_for_UE);
 }
 
 long get_lcid_from_drbid(int drb_id)

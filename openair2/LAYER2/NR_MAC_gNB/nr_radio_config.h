@@ -96,7 +96,6 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const NR_UE_NR_Capability_t *uecap,
                             const nr_mac_config_t *configuration,
                             const NR_ServingCellConfigCommon_t *scc);
-void free_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig);
 int encode_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig, uint8_t *buffer, int max_buffer_size);
 NR_CellGroupConfig_t *decode_cellGroupConfig(const uint8_t *buffer, int max_buffer_size);
 
