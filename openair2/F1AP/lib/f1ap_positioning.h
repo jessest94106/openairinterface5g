@@ -136,4 +136,22 @@ f1ap_positioning_measurement_report_t cp_positioning_measurement_report(const f1
 bool eq_positioning_measurement_report(const f1ap_positioning_measurement_report_t *a,
                                        const f1ap_positioning_measurement_report_t *b);
 void free_positioning_measurement_report(f1ap_positioning_measurement_report_t *msg);
+
+// positioning measurement abort
+struct F1AP_F1AP_PDU *encode_positioning_measurement_abort(const f1ap_positioning_measurement_abort_t *msg);
+bool decode_positioning_measurement_abort(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_measurement_abort_t *out);
+f1ap_positioning_measurement_abort_t cp_positioning_measurement_abort(const f1ap_positioning_measurement_abort_t *orig);
+bool eq_positioning_measurement_abort(const f1ap_positioning_measurement_abort_t *a, const f1ap_positioning_measurement_abort_t *b);
+void free_positioning_measurement_abort(f1ap_positioning_measurement_abort_t *msg);
+
+// positioning measurement failure indication
+struct F1AP_F1AP_PDU *encode_positioning_measurement_failure_indication(
+    const f1ap_positioning_measurement_failure_indication_t *msg);
+bool decode_positioning_measurement_failure_indication(const struct F1AP_F1AP_PDU *pdu,
+                                                       f1ap_positioning_measurement_failure_indication_t *out);
+f1ap_positioning_measurement_failure_indication_t cp_positioning_measurement_failure_indication(
+    const f1ap_positioning_measurement_failure_indication_t *orig);
+bool eq_positioning_measurement_failure_indication(const f1ap_positioning_measurement_failure_indication_t *a,
+                                                   const f1ap_positioning_measurement_failure_indication_t *b);
+void free_positioning_measurement_failure_indication(f1ap_positioning_measurement_failure_indication_t *msg);
 #endif /* F1AP_POSITIONING_H_ */
