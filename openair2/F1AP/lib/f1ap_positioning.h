@@ -128,4 +128,12 @@ f1ap_positioning_measurement_failure_t cp_positioning_measurement_failure(const 
 bool eq_positioning_measurement_failure(const f1ap_positioning_measurement_failure_t *a,
                                         const f1ap_positioning_measurement_failure_t *b);
 void free_positioning_measurement_failure(f1ap_positioning_measurement_failure_t *msg);
+
+// positioning measurement report
+struct F1AP_F1AP_PDU *encode_positioning_measurement_report(const f1ap_positioning_measurement_report_t *msg);
+bool decode_positioning_measurement_report(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_measurement_report_t *out);
+f1ap_positioning_measurement_report_t cp_positioning_measurement_report(const f1ap_positioning_measurement_report_t *orig);
+bool eq_positioning_measurement_report(const f1ap_positioning_measurement_report_t *a,
+                                       const f1ap_positioning_measurement_report_t *b);
+void free_positioning_measurement_report(f1ap_positioning_measurement_report_t *msg);
 #endif /* F1AP_POSITIONING_H_ */

@@ -2166,6 +2166,108 @@ static void test_f1ap_positioning_measurement_failure()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_measurement_report()
+{
+  f1ap_positioning_measurement_report_t orig = {
+      .transaction_id = 12,
+      .lmf_measurement_id = 1999,
+      .ran_measurement_id = 2225,
+  };
+
+  orig.pos_measurement_result_list = calloc_or_fail(1, sizeof(*orig.pos_measurement_result_list));
+  uint32_t pos_meas_result_list_len = 2;
+  orig.pos_measurement_result_list->pos_measurement_result_list_length = pos_meas_result_list_len;
+  orig.pos_measurement_result_list->pos_measurement_result_list_item =
+      calloc_or_fail(pos_meas_result_list_len, sizeof(*orig.pos_measurement_result_list->pos_measurement_result_list_item));
+  for (int i = 0; i < pos_meas_result_list_len; i++) {
+    f1ap_pos_measurement_result_list_item_t *pos_meas_result_list_item =
+        &orig.pos_measurement_result_list->pos_measurement_result_list_item[i];
+    pos_meas_result_list_item->trp_id = 10 + i;
+
+    f1ap_pos_measurement_result_t *posMeasurementResult = &pos_meas_result_list_item->pos_measurement_result;
+    uint32_t pos_meas_result_length = 4;
+    posMeasurementResult->pos_measurement_result_item_length = pos_meas_result_length;
+    posMeasurementResult->pos_measurement_result_item =
+        calloc_or_fail(pos_meas_result_length, sizeof(*posMeasurementResult->pos_measurement_result_item));
+
+    // Angle of arrival
+    f1ap_pos_measurement_result_item_t *pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[0];
+    f1ap_measured_results_value_t *measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+    measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL;
+    f1ap_ul_aoa_t *uL_AngleOfArrival = &measuredResultsValue->choice.ul_angle_of_arrival;
+    uL_AngleOfArrival->azimuth_aoa = 700 + i;
+    uL_AngleOfArrival->zenith_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->zenith_aoa));
+    *uL_AngleOfArrival->zenith_aoa = 450 + i;
+    uL_AngleOfArrival->lcs_to_gcs_translation_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->lcs_to_gcs_translation_aoa));
+    uL_AngleOfArrival->lcs_to_gcs_translation_aoa->alpha = 200;
+    uL_AngleOfArrival->lcs_to_gcs_translation_aoa->beta = 220;
+    uL_AngleOfArrival->lcs_to_gcs_translation_aoa->gamma = 280;
+
+    f1ap_time_stamp_t *timeStamp = &pos_measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 100;
+    timeStamp->slot_index.present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_30;
+    timeStamp->slot_index.choice.scs_30 = 15;
+
+    // UL SRS RSRP
+    pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[1];
+    measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+    measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP;
+    measuredResultsValue->choice.ul_srs_rsrp = 100 + i;
+
+    timeStamp = &pos_measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 101;
+    timeStamp->slot_index.present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_15;
+    timeStamp->slot_index.choice.scs_15 = 8;
+
+    // UL RToA
+    pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[2];
+    measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+    measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_UL_RTOA;
+    f1ap_ul_rtoa_measurement_t *uL_RTOA = &measuredResultsValue->choice.ul_rtoa;
+    uL_RTOA->ul_rtoa_measurement_item.present = F1AP_ULRTOAMEAS_PR_K1;
+    uL_RTOA->ul_rtoa_measurement_item.choice.k1 = 98500 + i;
+
+    timeStamp = &pos_measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 102;
+    timeStamp->slot_index.present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_60;
+    timeStamp->slot_index.choice.scs_60 = 31;
+
+    // gNB RX-TX Time Diff
+    pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[3];
+    measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+    measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF;
+    f1ap_gnb_rx_tx_time_diff_t *gNB_RxTxTimeDiff = &measuredResultsValue->choice.gnb_rx_tx_time_diff;
+    gNB_RxTxTimeDiff->rx_tx_time_diff.present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K3;
+    gNB_RxTxTimeDiff->rx_tx_time_diff.choice.k3 = 98412 + i;
+
+    timeStamp = &pos_measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 103;
+    timeStamp->slot_index.present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_120;
+    timeStamp->slot_index.choice.scs_120 = 70;
+  }
+
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_measurement_report(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_measurement_report_t decoded = {0};
+  bool ret = decode_positioning_measurement_report(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_measurement_report(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_measurement_report(&orig, &decoded);
+  AssertFatal(ret, "eq_positioning_measurement_report(): decoded message doesn't match\n");
+  free_positioning_measurement_report(&decoded);
+
+  f1ap_positioning_measurement_report_t cp = cp_positioning_measurement_report(&orig);
+  ret = eq_positioning_measurement_report(&orig, &cp);
+  AssertFatal(ret, "eq_positioning_measurement_report(): copied message doesn't match\n");
+  free_positioning_measurement_report(&orig);
+  free_positioning_measurement_report(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -2206,5 +2308,6 @@ int main()
   test_f1ap_positioning_measurement_request();
   test_f1ap_positioning_measurement_response();
   test_f1ap_positioning_measurement_failure();
+  test_f1ap_positioning_measurement_report();
   return 0;
 }

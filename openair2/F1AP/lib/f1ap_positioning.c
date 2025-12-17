@@ -5781,3 +5781,212 @@ void free_positioning_measurement_failure(f1ap_positioning_measurement_failure_t
 {
   // nothing to free
 }
+
+/**
+ * @brief Encode F1 positioning measurement report to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_measurement_report(const f1ap_positioning_measurement_report_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningMeasurementReport;
+  tmp->criticality = F1AP_Criticality_ignore;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_PositioningMeasurementReport;
+  F1AP_PositioningMeasurementReport_t *out = &tmp->value.choice.PositioningMeasurementReport;
+
+  /* mandatory : TransactionID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementReportIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningMeasurementReportIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+
+  /* mandatory : LMF_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementReportIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_LMF_MeasurementID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningMeasurementReportIEs__value_PR_LMF_MeasurementID;
+  ie2->value.choice.LMF_MeasurementID = msg->lmf_measurement_id;
+
+  /* mandatory : RAN_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementReportIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_RAN_MeasurementID;
+  ie3->criticality = F1AP_Criticality_reject;
+  ie3->value.present = F1AP_PositioningMeasurementReportIEs__value_PR_RAN_MeasurementID;
+  ie3->value.choice.RAN_MeasurementID = msg->ran_measurement_id;
+
+  /* Positioning Measurement Result List */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementReportIEs_t, ie4);
+  ie4->id = F1AP_ProtocolIE_ID_id_PosMeasurementResultList;
+  ie4->criticality = F1AP_Criticality_reject;
+  ie4->value.present = F1AP_PositioningMeasurementReportIEs__value_PR_PosMeasurementResultList;
+  const f1ap_pos_measurement_result_list_t *pos_meas_res_list = msg->pos_measurement_result_list;
+  for (int i = 0; i < pos_meas_res_list->pos_measurement_result_list_length; i++) {
+    // mandatory : Positioning Measurement Result List Item
+    asn1cSequenceAdd(ie4->value.choice.PosMeasurementResultList.list,
+                     F1AP_PosMeasurementResultList_Item_t,
+                     f1_pos_meas_result_list_item);
+    f1ap_pos_measurement_result_list_item_t *pos_meas_res_list_item = &pos_meas_res_list->pos_measurement_result_list_item[i];
+    F1AP_PosMeasurementResult_t *f1_posMeasurementResult = &f1_pos_meas_result_list_item->posMeasurementResult;
+    f1ap_pos_measurement_result_t *pos_measurement_result = &pos_meas_res_list_item->pos_measurement_result;
+    *f1_posMeasurementResult = encode_positioning_measurement_result(pos_measurement_result);
+    f1_pos_meas_result_list_item->tRPID = pos_meas_res_list_item->trp_id;
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 Positioning Measurement report
+ */
+bool decode_positioning_measurement_report(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_measurement_report_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningMeasurementReport_t *in = &pdu->choice.initiatingMessage->value.choice.PositioningMeasurementReport;
+  F1AP_PositioningMeasurementReportIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementReportIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementReportIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_LMF_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementReportIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_RAN_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementReportIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_PosMeasurementResultList,
+                   true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementReportIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_LMF_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementReportIEs__value_PR_LMF_MeasurementID);
+        out->lmf_measurement_id = ie->value.choice.LMF_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_RAN_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementReportIEs__value_PR_RAN_MeasurementID);
+        out->ran_measurement_id = ie->value.choice.RAN_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_PosMeasurementResultList:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementReportIEs__value_PR_PosMeasurementResultList);
+        F1AP_PosMeasurementResultList_t *f1_PosMeasurementResultList = &ie->value.choice.PosMeasurementResultList;
+        uint32_t pos_meas_result_list_len = f1_PosMeasurementResultList->list.count;
+        out->pos_measurement_result_list = calloc_or_fail(1, sizeof(*out->pos_measurement_result_list));
+        f1ap_pos_measurement_result_list_t *pos_meas_res_list = out->pos_measurement_result_list;
+        pos_meas_res_list->pos_measurement_result_list_length = pos_meas_result_list_len;
+        pos_meas_res_list->pos_measurement_result_list_item =
+            calloc_or_fail(pos_meas_result_list_len, sizeof(*pos_meas_res_list->pos_measurement_result_list_item));
+        for (int i = 0; i < pos_meas_result_list_len; i++) {
+          F1AP_PosMeasurementResultList_Item_t *f1_pos_meas_result_list_item = f1_PosMeasurementResultList->list.array[i];
+          f1ap_pos_measurement_result_list_item_t *pos_meas_result_list_item =
+              &pos_meas_res_list->pos_measurement_result_list_item[i];
+          _F1_CHECK_EXP(decode_positioning_measurement_result(&f1_pos_meas_result_list_item->posMeasurementResult,
+                                                              &pos_meas_result_list_item->pos_measurement_result));
+          pos_meas_result_list_item->trp_id = f1_pos_meas_result_list_item->tRPID;
+        }
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 Positioning Measurement report deep copy
+ */
+f1ap_positioning_measurement_report_t cp_positioning_measurement_report(const f1ap_positioning_measurement_report_t *orig)
+{
+  // copy all mandatory fields that are not dynamic memory
+  f1ap_positioning_measurement_report_t cp = {
+      .transaction_id = orig->transaction_id,
+      .lmf_measurement_id = orig->lmf_measurement_id,
+      .ran_measurement_id = orig->ran_measurement_id,
+  };
+
+  cp.pos_measurement_result_list = calloc_or_fail(1, sizeof(*cp.pos_measurement_result_list));
+  f1ap_pos_measurement_result_list_t *list_orig = orig->pos_measurement_result_list;
+  f1ap_pos_measurement_result_list_t *list_cp = cp.pos_measurement_result_list;
+  uint32_t pos_meas_result_list_len = list_orig->pos_measurement_result_list_length;
+  list_cp->pos_measurement_result_list_length = pos_meas_result_list_len;
+  list_cp->pos_measurement_result_list_item =
+      calloc_or_fail(pos_meas_result_list_len, sizeof(*list_cp->pos_measurement_result_list_item));
+  for (int i = 0; i < pos_meas_result_list_len; i++) {
+    f1ap_pos_measurement_result_list_item_t *item_cp = &list_cp->pos_measurement_result_list_item[i];
+    f1ap_pos_measurement_result_list_item_t *item_orig = &list_orig->pos_measurement_result_list_item[i];
+    item_cp->pos_measurement_result = cp_positioning_measurement_result(&item_orig->pos_measurement_result);
+    item_cp->trp_id = item_orig->trp_id;
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 Positioning Measurement report equality check
+ */
+bool eq_positioning_measurement_report(const f1ap_positioning_measurement_report_t *a,
+                                       const f1ap_positioning_measurement_report_t *b)
+{
+  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->lmf_measurement_id, b->lmf_measurement_id);
+  _F1_EQ_CHECK_INT(a->ran_measurement_id, b->ran_measurement_id);
+
+  f1ap_pos_measurement_result_list_t *list_a = a->pos_measurement_result_list;
+  f1ap_pos_measurement_result_list_t *list_b = b->pos_measurement_result_list;
+  uint32_t pos_meas_result_list_len = list_a->pos_measurement_result_list_length;
+  _F1_EQ_CHECK_INT(list_b->pos_measurement_result_list_length, pos_meas_result_list_len);
+  for (int i = 0; i < pos_meas_result_list_len; i++) {
+    f1ap_pos_measurement_result_list_item_t *item_a = &list_a->pos_measurement_result_list_item[i];
+    f1ap_pos_measurement_result_list_item_t *item_b = &list_b->pos_measurement_result_list_item[i];
+    _F1_CHECK_EXP(eq_positioning_measurement_result(&item_a->pos_measurement_result, &item_b->pos_measurement_result));
+    _F1_EQ_CHECK_INT(item_a->trp_id, item_b->trp_id);
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 Positioning Measurement report
+ */
+void free_positioning_measurement_report(f1ap_positioning_measurement_report_t *msg)
+{
+  f1ap_pos_measurement_result_list_t *list = msg->pos_measurement_result_list;
+  uint32_t pos_meas_result_list_len = list->pos_measurement_result_list_length;
+  for (int i = 0; i < pos_meas_result_list_len; i++) {
+    f1ap_pos_measurement_result_t *posMeasurementResult = &list->pos_measurement_result_list_item[i].pos_measurement_result;
+    uint32_t pos_meas_result_length = posMeasurementResult->pos_measurement_result_item_length;
+    for (int j = 0; j < pos_meas_result_length; j++) {
+      f1ap_pos_measurement_result_item_t *item = &posMeasurementResult->pos_measurement_result_item[j];
+      f1ap_measured_results_value_t *measuredResultsValue = &item->measured_results_value;
+      if (measuredResultsValue->present == F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL) {
+        if (measuredResultsValue->choice.ul_angle_of_arrival.zenith_aoa) {
+          free(measuredResultsValue->choice.ul_angle_of_arrival.zenith_aoa);
+        }
+        if (measuredResultsValue->choice.ul_angle_of_arrival.lcs_to_gcs_translation_aoa) {
+          free(measuredResultsValue->choice.ul_angle_of_arrival.lcs_to_gcs_translation_aoa);
+        }
+      }
+    }
+    free(posMeasurementResult->pos_measurement_result_item);
+  }
+  free(msg->pos_measurement_result_list->pos_measurement_result_list_item);
+  free(msg->pos_measurement_result_list);
+}
