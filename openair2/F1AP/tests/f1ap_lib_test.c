@@ -2135,6 +2135,37 @@ static void test_f1ap_positioning_measurement_response()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_measurement_failure()
+{
+  f1ap_positioning_measurement_failure_t orig = {
+      .transaction_id = 12,
+      .lmf_measurement_id = 1999,
+      .ran_measurement_id = 2225,
+      .cause = F1AP_CAUSE_MISC,
+      .cause_value = 3,
+  };
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_measurement_failure(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_measurement_failure_t decoded = {0};
+  bool ret = decode_positioning_measurement_failure(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_measurement_failure(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_measurement_failure(&orig, &decoded);
+  AssertFatal(ret, "eq_positioning_measurement_failure(): decoded message doesn't match\n");
+  free_positioning_measurement_failure(&decoded);
+
+  f1ap_positioning_measurement_failure_t cp = cp_positioning_measurement_failure(&orig);
+  ret = eq_positioning_measurement_failure(&orig, &cp);
+  AssertFatal(ret, "eq_positioning_measurement_failure(): copied message doesn't match\n");
+  free_positioning_measurement_failure(&orig);
+  free_positioning_measurement_failure(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -2174,5 +2205,6 @@ int main()
   test_f1ap_trp_information_failure();
   test_f1ap_positioning_measurement_request();
   test_f1ap_positioning_measurement_response();
+  test_f1ap_positioning_measurement_failure();
   return 0;
 }

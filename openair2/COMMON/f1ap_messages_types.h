@@ -1547,4 +1547,16 @@ typedef struct f1ap_positioning_measurement_resp_s {
   f1ap_pos_measurement_result_list_t *pos_measurement_result_list;
 } f1ap_positioning_measurement_resp_t;
 
+typedef struct f1ap_positioning_measurement_failure_s {
+  // IE 9.3.1.23 (mandatory)
+  uint8_t transaction_id;
+  // (mandatory)
+  uint16_t lmf_measurement_id;
+  // (mandatory)
+  uint16_t ran_measurement_id;
+  // IE 9.3.1.2 (mandatory)
+  f1ap_Cause_t cause;
+  // IE 9.3.1.2 (mandatory)
+  long cause_value;
+} f1ap_positioning_measurement_failure_t;
 #endif /* F1AP_MESSAGES_TYPES_H_ */
