@@ -363,7 +363,6 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
   read_prach_data(ru, *frame, *slot);
 
   const struct xran_fh_init *fh_init = get_xran_fh_init();
-  int nPRBs = fh_cfg->nULRBs;
   int fftsize = 1 << fh_cfg->nULFftSize;
 
   int slot_offset_rxdata = 3 & (*slot);
@@ -386,93 +385,110 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
         if (!is_tdd_ul_symbol(frame_conf, *slot, sym_idx))
           continue;
 
-        uint8_t *pData;
         oran_buf_list_t *bufs = get_xran_buffers(ant_id / nb_rx_per_ru);
         uint8_t *pPrbMapData = bufs->dstcp[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
-        struct xran_prb_map *pPrbMap = (struct xran_prb_map *)pPrbMapData;
+        struct xran_prb_map *pRbMap = (struct xran_prb_map *)pPrbMapData;
 
-        struct xran_prb_elm *pRbElm = &pPrbMap->prbMap[0];
-#ifdef E_RELEASE
-        struct xran_section_desc *p_sec_desc = pRbElm->p_sec_desc[sym_idx][0];
-#elif defined F_RELEASE
-        struct xran_section_desc *p_sec_desc = &pRbElm->sec_desc[sym_idx][0];
-#endif
-        uint32_t one_rb_size =
-            (((pRbElm->iqWidth == 0) || (pRbElm->iqWidth == 16)) ? (N_SC_PER_PRB * 2 * 2) : (3 * pRbElm->iqWidth + 1));
-        if (fh_init->mtu < pRbElm->nRBSize * one_rb_size)
-          pData = bufs->dst[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN]
-                      .pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
-                      .pData;
-        else
-          pData = p_sec_desc->pData;
-        ptr = pData;
-        pos = (int32_t *)(start_ptr + (4 * sym_idx * fftsize));
-        if (ptr == NULL || pos == NULL)
-          continue;
-
-        struct xran_prb_map *pRbMap = pPrbMap;
-
-        uint32_t idxElm = 0;
         uint8_t *src = (uint8_t *)ptr;
 
-        LOG_D(HW, "pRbMap->nPrbElm %d\n", pRbMap->nPrbElm);
-        for (idxElm = 0; idxElm < pRbMap->nPrbElm; idxElm++) {
-          LOG_D(HW,
-                "prbMap[%d] : PRBstart %d nPRBs %d\n",
-                idxElm,
-                pRbMap->prbMap[idxElm].nRBStart,
-                pRbMap->prbMap[idxElm].nRBSize);
-          pRbElm = &pRbMap->prbMap[idxElm];
-          int pos_len = 0;
-          int neg_len = 0;
+        // even when the fragmentation occurs, nRBSize & nRBStart carry the same values in each prbMap
+        // therefore, I took the liberty to just extract these values from the first prbMap
+        int num_totalRB = pRbMap->prbMap[0].nRBSize;
+        int start_totalRB = pRbMap->prbMap[0].nRBStart;
+        int32_t local_dst[num_totalRB * N_SC_PER_PRB] __attribute__((aligned(64)));
 
-          if (pRbElm->nRBStart < (nPRBs >> 1)) // there are PRBs left of DC
-            neg_len = min((nPRBs * 6) - (pRbElm->nRBStart * 12), pRbElm->nRBSize * N_SC_PER_PRB);
-          pos_len = (pRbElm->nRBSize * N_SC_PER_PRB) - neg_len;
-
-          src = pData;
-          // Calculation of the pointer for the section in the buffer.
-          // positive half
-          uint8_t *dst1 = (uint8_t *)(pos + (neg_len == 0 ? ((pRbElm->nRBStart * N_SC_PER_PRB) - (nPRBs * 6)) : 0));
-          // negative half
-          uint8_t *dst2 = (uint8_t *)(pos + (pRbElm->nRBStart * N_SC_PER_PRB) + fftsize - (nPRBs * 6));
-          int32_t local_dst[pRbElm->nRBSize * N_SC_PER_PRB] __attribute__((aligned(64)));
-          if (pRbElm->compMethod == XRAN_COMPMETHOD_NONE) {
-            // NOTE: gcc 11 knows how to generate AVX2 for this!
-            for (idx = 0; idx < pRbElm->nRBSize * N_SC_PER_PRB * 2; idx++)
-              ((int16_t *)local_dst)[idx] = ((int16_t)ntohs(((uint16_t *)src)[idx])) >> 2;
-            memcpy((void *)dst2, (void *)local_dst, neg_len * 4);
-            memcpy((void *)dst1, (void *)&local_dst[neg_len], pos_len * 4);
-          } else if (pRbElm->compMethod == XRAN_COMPMETHOD_BLKFLOAT) {
-#if defined(__i386__) || defined(__x86_64__)
-            struct xranlib_decompress_request bfp_decom_req = {};
-            struct xranlib_decompress_response bfp_decom_rsp = {};
-
-            int16_t payload_len = (3 * pRbElm->iqWidth + 1) * pRbElm->nRBSize;
-
-            bfp_decom_req.data_in = (int8_t *)src;
-            bfp_decom_req.numRBs = pRbElm->nRBSize;
-            bfp_decom_req.len = payload_len;
-            bfp_decom_req.compMethod = pRbElm->compMethod;
-            bfp_decom_req.iqWidth = pRbElm->iqWidth;
-
-            bfp_decom_rsp.data_out = (int16_t *)local_dst;
-            bfp_decom_rsp.len = 0;
-
-            xranlib_decompress_avx512(&bfp_decom_req, &bfp_decom_rsp);
-#elif defined(__arm__) || defined(__aarch64__)
-            armral_bfp_decompression(pRbElm->iqWidth, pRbElm->nRBSize, (int8_t *)src, (int16_t *)local_dst);
-#else
-            AssertFatal(1 == 0, "BFP compression not supported on this architecture");
-#endif
-            memcpy((void *)dst2, (void *)local_dst, neg_len * 4);
-            memcpy((void *)dst1, (void *)&local_dst[neg_len], pos_len * 4);
-            outcnt++;
-          } else {
-            printf("pRbElm->compMethod == %d is not supported\n", pRbElm->compMethod);
-            exit(-1);
+        LOG_D(HW, "[%d.%d] pRbMap->nPrbElm %d\n", *frame, *slot, pRbMap->nPrbElm);
+        for (uint32_t idxElm = 0; idxElm < pRbMap->nPrbElm; idxElm++) {
+          int numRB, startRB;
+          uint8_t *pData;
+          struct xran_section_desc *p_sec_desc = NULL;
+          struct xran_prb_elm *pRbElm = &pRbMap->prbMap[idxElm];
+#ifdef E_RELEASE
+          uint32_t one_rb_size =
+              (((pRbElm->iqWidth == 0) || (pRbElm->iqWidth == 16)) ? (N_SC_PER_PRB * 2 * 2) : (3 * pRbElm->iqWidth + 1));
+          if (fh_init->mtu < num_totalRB * one_rb_size)
+            pData = bufs->dst[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN]
+                        .pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
+                        .pData;
+          else {
+            p_sec_desc = pRbElm->p_sec_desc[sym_idx][0];
+            pData = p_sec_desc->pData;
           }
-        }
+          numRB = num_totalRB;
+          startRB = start_totalRB;
+          {
+            {
+#elif defined F_RELEASE
+          // UP_nRBSize & UP_nRBStart are for DL U-plane only
+          LOG_D(HW, "[%d.%d] idxElm[%d] startSym[%d]:numSym[%d] UP_startRB[%d]:UP_numRB[%d] sym_idx[%d] ant_id[%d] pRbElm->nRBStart[%d]:pRbElm->nRBSize[%d]\n", *frame, *slot, idxElm, pRbElm->nStartSymb, pRbElm->numSymb, pRbElm->UP_nRBStart, pRbElm->UP_nRBSize, sym_idx, ant_id, pRbElm->nRBStart, pRbElm->nRBSize);
+          for (int idxDesc = 0; idxDesc < XRAN_MAX_FRAGMENT; idxDesc++) {
+            p_sec_desc = &pRbElm->sec_desc[sym_idx][idxDesc];
+            if (p_sec_desc == NULL)
+              continue;
+            if (sym_idx >= pRbElm->nStartSymb && sym_idx < pRbElm->nStartSymb + pRbElm->numSymb) {
+              if (!p_sec_desc->pCtrl)
+                continue;
+              pData = p_sec_desc->pData;
+              numRB = p_sec_desc->num_prbu;
+              startRB = p_sec_desc->start_prbu;
+              // num_prbu & start_prbu are for UL U-plane only
+              LOG_D(HW, "p_sec_desc[%d] startRB[%d]:numRB[%d]\n", idxDesc, startRB, numRB);
+#endif
+              ptr = pData;
+              pos = (int32_t *)(start_ptr + (4 * sym_idx * fftsize));
+              if (ptr == NULL || pos == NULL)
+                continue;
+              src = pData;
+              if (pRbElm->compMethod == XRAN_COMPMETHOD_NONE) {
+                // NOTE: gcc 11 knows how to generate AVX2 for this!
+                for (idx = 0; idx < (numRB * N_SC_PER_PRB) * 2; idx++)
+                  ((int16_t *)local_dst)[idx + startRB * N_SC_PER_PRB * 2] = ((int16_t)ntohs(((uint16_t *)src)[idx])) >> 2;
+              } else if (pRbElm->compMethod == XRAN_COMPMETHOD_BLKFLOAT) {
+#if defined(__i386__) || defined(__x86_64__)
+                struct xranlib_decompress_request bfp_decom_req = {};
+                struct xranlib_decompress_response bfp_decom_rsp = {};
+
+                int16_t payload_len = (3 * pRbElm->iqWidth + 1) * numRB;
+
+                bfp_decom_req.data_in = (int8_t *)src;
+                bfp_decom_req.numRBs = numRB;
+                bfp_decom_req.len = payload_len;
+                bfp_decom_req.compMethod = pRbElm->compMethod;
+                bfp_decom_req.iqWidth = pRbElm->iqWidth;
+
+                bfp_decom_rsp.data_out = (int16_t *) (local_dst + startRB * N_SC_PER_PRB);
+                bfp_decom_rsp.len = 0;
+
+                xranlib_decompress_avx512(&bfp_decom_req, &bfp_decom_rsp);
+#elif defined(__arm__) || defined(__aarch64__)
+                armral_bfp_decompression(pRbElm->iqWidth, numRB, (int8_t *)src, (int16_t *)local_dst);
+#else
+                AssertFatal(1 == 0, "BFP compression not supported on this architecture");
+#endif
+                outcnt++;
+              } else {
+                printf("pRbElm->compMethod == %d is not supported\n", pRbElm->compMethod);
+                exit(-1);
+              }
+              if ((startRB + numRB) == (start_totalRB + num_totalRB)) {
+                int pos_len = 0;
+                int neg_len = 0;
+
+                if (start_totalRB < (num_totalRB >> 1)) // there are PRBs left of DC
+                  neg_len = min((num_totalRB * 6) - (start_totalRB * 12), num_totalRB * N_SC_PER_PRB);
+                pos_len = (num_totalRB * N_SC_PER_PRB) - neg_len;
+                // Calculation of the pointer for the section in the buffer.
+                // positive half
+                uint8_t *dst1 = (uint8_t *)(pos + (neg_len == 0 ? ((start_totalRB * N_SC_PER_PRB) - (num_totalRB * 6)) : 0));
+                // negative half
+                uint8_t *dst2 = (uint8_t *)(pos + (start_totalRB * N_SC_PER_PRB) + fftsize - (num_totalRB * 6));
+                memcpy((void *)dst2, (void *)local_dst, neg_len * 4);
+                memcpy((void *)dst1, (void *)&local_dst[neg_len], pos_len * 4);
+              }
+            }
+          } // idxDesc
+        } // idxElm
+
       } // sym_ind
     } // ant_ind
   } // vv_inf
