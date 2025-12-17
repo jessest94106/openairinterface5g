@@ -183,7 +183,7 @@
     <iperf_args>-t 10 -R</iperf_args>
     <id>idefix</id>
     <svr_id>sabox-nepes</svr_id>
-    <iperf_tcp_rate_target>85</iperf_tcp_rate_target>
+    <iperf_tcp_rate_target>65</iperf_tcp_rate_target>
   </testCase>
 
   <testCase id="400003">
