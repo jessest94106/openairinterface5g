@@ -210,9 +210,12 @@ void nr_ue_ssb_rsrp_measurements(PHY_VARS_NR_UE *ue,
 
   openair0_config_t *cfg0 = &ue->openair0_cfg[0];
 
-  ue->measurements.ssb_rsrp_dBm[ssb_index] = rsrp_db_per_re + 30 - SQ15_SQUARED_NORM_FACTOR_DB
-                                             - ((int)cfg0->rx_gain[0] - (int)cfg0->rx_gain_offset[0])
-                                             - dB_fixed(fp->ofdm_symbol_size);
+  if (rsrp_avg == 0)
+    ue->measurements.ssb_rsrp_dBm[ssb_index] = -200; // lower than any value to be reported per Table 10.1.6.1-1 of 38.133
+  else
+    ue->measurements.ssb_rsrp_dBm[ssb_index] = rsrp_db_per_re + 30 - SQ15_SQUARED_NORM_FACTOR_DB
+                                               - ((int)cfg0->rx_gain[0] - (int)cfg0->rx_gain_offset[0])
+                                               - dB_fixed(fp->ofdm_symbol_size);
 
   // to obtain non-integer dB value with a resoluion of 0.5dB
   uint32_t signal_pwr = rsrp_avg > ue->measurements.n0_power_avg ? rsrp_avg - ue->measurements.n0_power_avg : 0;
