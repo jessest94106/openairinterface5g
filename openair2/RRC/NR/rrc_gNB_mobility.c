@@ -492,10 +492,7 @@ static void nr_rrc_n2_ho_acknowledge(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
   /* this is the callback for N2 handover after F1 UE context setup response in
    * the handover case. Check that there was no associated DU, then set it */
   AssertFatal(previous_data.secondary_ue == -1, "there was already a DU present\n");
-  previous_data.secondary_ue = UE->ho_context->target->du_ue_id;
-  bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &previous_data);
-  DevAssert(success);
-  LOG_I(NR_RRC, "Updated CU F1AP Context for UE %d, DU Id : %u\n", UE->rrc_ue_id, UE->ho_context->target->du_ue_id);
+  nr_rrc_apply_target_context(UE);
 
   byte_array_t hoCommand = rrc_gNB_encode_HandoverCommand(UE, rrc);
   if (hoCommand.len < 0) {
