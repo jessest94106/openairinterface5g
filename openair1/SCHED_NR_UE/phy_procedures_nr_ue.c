@@ -360,7 +360,8 @@ bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
                                    ue->nr_srs_info,
                                    AMP,
                                    proc->frame_tx,
-                                   proc->nr_slot_tx);
+                                   proc->nr_slot_tx,
+                                   frame_parms->nb_antennas_tx);
   return generated;
 }
 

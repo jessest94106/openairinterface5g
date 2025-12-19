@@ -883,7 +883,15 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
   start_meas(&gNB->generate_srs_stats);
 
   if (check_and_configure_srs_info(srs_pdu, nr_srs_info)) {
-    generate_srs_nr(frame_parms, nr_srs_info->srs_generated_signal, 0, srs_pdu->bwp_start, nr_srs_info, AMP, frame_rx, slot_rx);
+    generate_srs_nr(frame_parms,
+                    nr_srs_info->srs_generated_signal,
+                    0,
+                    srs_pdu->bwp_start,
+                    nr_srs_info,
+                    AMP,
+                    frame_rx,
+                    slot_rx,
+                    nb_antennas_rx);
   }
 
   stop_meas(&gNB->generate_srs_stats);
