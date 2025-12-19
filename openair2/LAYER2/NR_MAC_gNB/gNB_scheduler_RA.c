@@ -421,7 +421,7 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
             // ordered ssb number
             int n_ssb = (int) (prach_occasion_id / (int)(1 / num_ssb_per_RO)) % cc->num_active_ssb;
             // fapi beam index
-            beam_index = get_fapi_beamforming_index(gNB, cc->ssb_index[n_ssb]);
+            beam_index = get_beam_from_ssbidx(gNB, cc->ssb_index[n_ssb]);
             // multi-beam allocation structure
             beam = beam_allocation_procedure(&gNB->beam_info, frameP, slotP, beam_index, slots_frame);
             AssertFatal(beam.idx >= 0, "Cannot allocate PRACH corresponding to %d SSB transmitted in any available beam\n", n_ssb + 1);
@@ -429,7 +429,7 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
             int first_ssb_index = (prach_occasion_id * (int)num_ssb_per_RO) % cc->num_active_ssb;
             for(int j = first_ssb_index; j < first_ssb_index + num_ssb_per_RO; j++) {
               // fapi beam index
-              beam_index = get_fapi_beamforming_index(gNB, cc->ssb_index[j]);
+              beam_index = get_beam_from_ssbidx(gNB, cc->ssb_index[j]);
               // multi-beam allocation structure
               beam = beam_allocation_procedure(&gNB->beam_info, frameP, slotP, beam_index, slots_frame);
               AssertFatal(beam.idx >= 0, "Cannot allocate PRACH corresponding to SSB %d in any available beam\n", j);
@@ -516,7 +516,8 @@ void schedule_nr_prach(module_id_t module_idP, frame_t frameP, slot_t slotP)
           prach_pdu->beamforming.num_prgs = 1;
           prach_pdu->beamforming.prg_size = n_ra_rb;
           prach_pdu->beamforming.dig_bf_interface = num_td_occ;
-          prach_pdu->beamforming.prgs_list[0].dig_bf_interface_list[num_td_occ - 1].beam_idx = beam_index;
+          const uint16_t fapi_beam = convert_to_fapi_beam(beam_index, gNB->beam_info.beam_mode);
+          prach_pdu->beamforming.prgs_list[0].dig_bf_interface_list[num_td_occ - 1].beam_idx = fapi_beam;
 
           LOG_D(NR_MAC,
                 "Frame %d, Slot %d: Prach Occasion id = %u  fdm index = %u start symbol = %u slot index = %u subframe index = %u \n",
@@ -762,7 +763,7 @@ void nr_initiate_ra_proc(module_id_t module_idP,
   configure_UE_BWP(nr_mac, scc, UE, true, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
   // return current SSB order in the list of tranmitted SSBs
   int n_ssb = ssb_index_from_prach(module_idP, frame, slot, preamble_index, freq_index, symbol);
-  UE->UE_beam_index = get_fapi_beamforming_index(nr_mac, cc->ssb_index[n_ssb]);
+  UE->UE_beam_index = get_beam_from_ssbidx(nr_mac, cc->ssb_index[n_ssb]);
   LOG_I(NR_MAC, "UE %04x: Sync beam index %d\n", UE->rnti, UE->UE_beam_index);
   NR_SCHED_UNLOCK(&nr_mac->sched_lock);
   VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_INITIATE_RA_PROC, 0);
@@ -900,7 +901,8 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                                                         0,
                                                         ra->msg3_round,
                                                         ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping,
-                                                        UE->rnti);
+                                                        UE->rnti,
+                                                        nr_mac->beam_info.beam_mode);
     future_ul_tti_req->n_pdus += 1;
 
     // generation of DCI 0_0 to schedule msg3 retransmission
@@ -933,14 +935,9 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
     }
 
     // Fill PDCCH DL DCI PDU
-    nfapi_nr_dl_dci_pdu_t *dci_pdu = prepare_dci_pdu(pdcch_pdu_rel15,
-                                                     scc,
-                                                     ss,
-                                                     coreset,
-                                                     aggregation_level,
-                                                     CCEIndex,
-                                                     UE->UE_beam_index,
-                                                     UE->rnti);
+    const uint16_t fapi_beam = convert_to_fapi_beam(UE->UE_beam_index, nr_mac->beam_info.beam_mode);
+    nfapi_nr_dl_dci_pdu_t *dci_pdu =
+        prepare_dci_pdu(pdcch_pdu_rel15, scc, ss, coreset, aggregation_level, CCEIndex, fapi_beam, UE->rnti);
     pdcch_pdu_rel15->numDlDci++;
 
     dci_pdu_rel15_t uldci_payload = {0};
@@ -1204,7 +1201,8 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
                                                       0,
                                                       0,
                                                       ul_bwp->pusch_Config && ul_bwp->pusch_Config->frequencyHopping,
-                                                      UE->rnti);
+                                                      UE->rnti,
+                                                      mac->beam_info.beam_mode);
   future_ul_tti_req->n_pdus += 1;
 
   // calling function to fill rar message
@@ -1326,6 +1324,7 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
   NR_COMMON_channels_t *cc = &nr_mac->common_channels[CC_id];
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
   NR_UE_DL_BWP_t *dl_bwp = &UE->current_DL_BWP;
+  const uint16_t fapi_beam = convert_to_fapi_beam(UE->UE_beam_index, nr_mac->beam_info.beam_mode);
   nfapi_nr_dl_tti_pdsch_pdu_rel15_t *pdsch_pdu_rel15 = prepare_pdsch_pdu(dl_tti_pdsch_pdu,
                                                                          nr_mac,
                                                                          UE,
@@ -1334,19 +1333,13 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
                                                                          false,
                                                                          round,
                                                                          rnti,
-                                                                         UE->UE_beam_index,
+                                                                         fapi_beam,
                                                                          1,
                                                                          pduindex);
 
   /* Fill PDCCH DL DCI PDU */
-  nfapi_nr_dl_dci_pdu_t *dci_pdu = prepare_dci_pdu(pdcch_pdu_rel15,
-                                                   scc,
-                                                   sched_ctrl->search_space,
-                                                   coreset,
-                                                   aggregation_level,
-                                                   CCEIndex,
-                                                   UE->UE_beam_index,
-                                                   rnti);
+  nfapi_nr_dl_dci_pdu_t *dci_pdu =
+      prepare_dci_pdu(pdcch_pdu_rel15, scc, sched_ctrl->search_space, coreset, aggregation_level, CCEIndex, fapi_beam, rnti);
   pdcch_pdu_rel15->numDlDci++;
 
   dci_pdu_rel15_t dci_payload = prepare_dci_dl_payload(nr_mac,

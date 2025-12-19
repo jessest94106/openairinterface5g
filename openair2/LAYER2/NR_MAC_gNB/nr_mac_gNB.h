@@ -794,7 +794,7 @@ typedef struct NR_UE_info {
   NR_UE_NR_Capability_t *capability;
   measgap_config_t measgap_config;
   // UE selected beam index
-  uint8_t UE_beam_index;
+  uint16_t UE_beam_index;
   float ul_thr_ue;
   float dl_thr_ue;
   long pdsch_HARQ_ACK_Codebook;
@@ -826,7 +826,7 @@ typedef enum {
 
 typedef struct {
   /// list of allocated beams per period
-  int **beam_allocation;
+  int16_t **beam_allocation;
   int beam_duration; // in slots
   int beams_per_period;
   int beam_allocation_size;
@@ -993,7 +993,7 @@ typedef struct gNB_MAC_INST_s {
   uint16_t min_grant_prb;
   bool identity_pm;
   int precoding_matrix_size[NR_MAX_NB_LAYERS];
-  int fapi_beam_index[MAX_NUM_OF_SSB];
+  int beam_index_list[MAX_NUM_OF_SSB];
 
   /// dedicate UL TDA, common for all UEs
   seq_arr_t ul_tda;

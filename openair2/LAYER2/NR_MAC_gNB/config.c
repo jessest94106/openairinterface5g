@@ -708,7 +708,6 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
   // precoding matrix configuration (to be improved)
   cfg->pmi_list = init_DL_MIMO_codebook(nrmac, pdsch_AntennaPorts);
 
-  int nb_beams = config->nb_bfw[1]; // number of beams
   if (nrmac->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX) {
     LOG_I(NR_MAC, "Configuring analog beamforming in config_request message\n");
     cfg->analog_beamforming_ve.num_beams_period_vendor_ext.tl.tag = NFAPI_NR_FAPI_NUM_BEAMS_PERIOD_VENDOR_EXTENSION_TAG;
@@ -717,14 +716,6 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
     cfg->analog_beamforming_ve.analog_bf_vendor_ext.tl.tag = NFAPI_NR_FAPI_ANALOG_BF_VENDOR_EXTENSION_TAG;
     cfg->analog_beamforming_ve.analog_bf_vendor_ext.value = 1;  // analog BF enabled
     cfg->num_tlv++;
-    cfg->analog_beamforming_ve.total_num_beams_vendor_ext.tl.tag = NFAPI_NR_FAPI_TOTAL_NUM_BEAMS_VENDOR_EXTENSION_TAG;
-    cfg->analog_beamforming_ve.total_num_beams_vendor_ext.value = nb_beams;
-    cfg->num_tlv++;
-    cfg->analog_beamforming_ve.analog_beam_list = malloc16(nb_beams * sizeof(*cfg->analog_beamforming_ve.analog_beam_list));
-    for (int i = 0; i < nb_beams; i++) {
-      cfg->analog_beamforming_ve.analog_beam_list[i].tl.tag = NFAPI_NR_FAPI_ANALOG_BEAM_VENDOR_EXTENSION_TAG;
-      cfg->analog_beamforming_ve.analog_beam_list[i].value = config->bw_list[i];
-    }
   } else {
     cfg->analog_beamforming_ve.analog_bf_vendor_ext.value = 0;  // analog BF disabled
     if (NFAPI_MODE == NFAPI_MONOLITHIC) {
@@ -780,7 +771,7 @@ static void initialize_beam_information(NR_beam_info_t *beam_info, int mu, int s
               slots_per_frame);
   beam_info->beam_allocation_size = size / beam_info->beam_duration;
   for (int i = 0; i < beam_info->beams_per_period; i++) {
-    beam_info->beam_allocation[i] = malloc16(beam_info->beam_allocation_size * sizeof(int));
+    beam_info->beam_allocation[i] = malloc16(beam_info->beam_allocation_size * sizeof(*beam_info->beam_allocation));
     for (int j = 0; j < beam_info->beam_allocation_size; j++)
       beam_info->beam_allocation[i][j] = -1;
   }
@@ -885,7 +876,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, c
   LOG_D(NR_MAC, "Configuring common parameters from NR ServingCellConfig\n");
 
   config_common(nrmac, config, scc);
-  fapi_beam_index_allocation(scc, config, nrmac);
+  fill_beam_index_list(scc, config, nrmac);
 
   if (NFAPI_MODE == NFAPI_MONOLITHIC) {
     // nothing to be sent in the other cases

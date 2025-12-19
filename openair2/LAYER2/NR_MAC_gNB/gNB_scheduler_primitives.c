@@ -1326,7 +1326,8 @@ void nr_configure_pucch(nfapi_nr_pucch_pdu_t *pucch_pdu,
                         uint16_t O_csi,
                         uint16_t O_ack,
                         uint8_t O_sr,
-                        int r_pucch)
+                        int r_pucch,
+                        nr_beam_mode_t beam_mode)
 {
   NR_PUCCH_Resource_t *pucchres;
   NR_PUCCH_FormatConfig_t *pucchfmt;
@@ -1534,7 +1535,8 @@ void nr_configure_pucch(nfapi_nr_pucch_pdu_t *pucch_pdu,
   pucch_pdu->beamforming.num_prgs = 1;
   pucch_pdu->beamforming.prg_size = pucch_pdu->prb_size;
   pucch_pdu->beamforming.dig_bf_interface = 1;
-  pucch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
+  const uint16_t fapi_beam = convert_to_fapi_beam(UE->UE_beam_index, beam_mode);
+  pucch_pdu->beamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = fapi_beam;
 }
 
 void set_r_pucch_parms(int rsetindex,
@@ -3246,7 +3248,8 @@ void nr_csirs_scheduling(int Mod_idP, frame_t frame, slot_t slot, nfapi_nr_dl_tt
           csirs_pdu_rel15->precodingAndBeamforming.prg_size = resourceMapping.freqBand.nrofRBs; //1 PRG of max size
           csirs_pdu_rel15->precodingAndBeamforming.dig_bf_interfaces = 1;
           csirs_pdu_rel15->precodingAndBeamforming.prgs_list[0].pm_idx = 0;
-          csirs_pdu_rel15->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = UE->UE_beam_index;
+          const uint16_t fapi_beam = convert_to_fapi_beam(UE->UE_beam_index, gNB_mac->beam_info.beam_mode);
+          csirs_pdu_rel15->precodingAndBeamforming.prgs_list[0].dig_bf_interface_list[0].beam_idx = fapi_beam;
           csirs_pdu_rel15->bwp_size = dl_bwp->BWPSize;
           csirs_pdu_rel15->bwp_start = dl_bwp->BWPStart;
           csirs_pdu_rel15->subcarrier_spacing = dl_bwp->scs;
@@ -3619,45 +3622,48 @@ void UL_tti_req_ahead_initialization(gNB_MAC_INST *gNB, int n, int CCid, frame_t
   }
 }
 
-int get_fapi_beamforming_index(gNB_MAC_INST *mac, int ssb_idx)
+int get_beam_from_ssbidx(gNB_MAC_INST *mac, int ssb_idx)
 {
-  int beam_idx = mac->fapi_beam_index[ssb_idx];
+  int beam_idx = mac->beam_index_list[ssb_idx];
   AssertFatal(beam_idx >= 0, "Invalid beamforming index %d\n", beam_idx);
   return beam_idx;
 }
 
-// TODO this is a placeholder for a possibly more complex function
-// for now the fapi beam index is the number of SSBs transmitted before ssb_index i
-void fapi_beam_index_allocation(NR_ServingCellConfigCommon_t *scc, const nr_mac_config_t *config, gNB_MAC_INST *mac)
+uint64_t get_ssb_bitmap_and_len(const NR_ServingCellConfigCommon_t *scc, uint8_t *len)
 {
-  if (mac->beam_info.beam_mode == NO_BEAM_MODE)
-    return;
-  int len = 0;
-  uint8_t* buf = NULL;
   switch (scc->ssb_PositionsInBurst->present) {
     case NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR_shortBitmap:
-      len = 4;
-      buf = scc->ssb_PositionsInBurst->choice.shortBitmap.buf;
+      *len = 4;
       break;
     case NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR_mediumBitmap:
-      len = 8;
-      buf = scc->ssb_PositionsInBurst->choice.mediumBitmap.buf;
+      *len = 8;
       break;
     case NR_ServingCellConfigCommon__ssb_PositionsInBurst_PR_longBitmap:
-      len = 64;
-      buf = scc->ssb_PositionsInBurst->choice.longBitmap.buf;
+      *len = 64;
       break;
     default :
       AssertFatal(false, "Invalid configuration\n");
   }
+  return get_ssb_bitmap(scc);
+}
+
+// TODO this is a placeholder for a possibly more complex function
+// for now the fapi beam index is the number of SSBs transmitted before ssb_index i
+void fill_beam_index_list(NR_ServingCellConfigCommon_t *scc, const nr_mac_config_t *config, gNB_MAC_INST *mac)
+{
+  if (mac->beam_info.beam_mode == NO_BEAM_MODE)
+    return;
+
+  uint8_t len = 0;
+  const uint64_t ssbBitmap = get_ssb_bitmap_and_len(scc, &len);
   int index = 0;
   for (int i = 0; i < len; ++i) {
-    if ((buf[i / 8] >> (7 - i % 8)) & 0x1) {
+    if (IS_BIT_SET(ssbBitmap, (63 - i))) {
       int fapi_index = mac->beam_info.beam_mode == LOPHY_BEAM_IDX ? config->bw_list[index] : index;
-      mac->fapi_beam_index[i] = fapi_index;
+      mac->beam_index_list[i] = fapi_index;
       index++;
     } else
-      mac->fapi_beam_index[i] = -1;
+      mac->beam_index_list[i] = -1;
   }
 }
 
@@ -3666,7 +3672,7 @@ static inline int get_beam_index(const NR_beam_info_t *beam_info, int frame, int
   return ((frame * slots_per_frame + slot) / beam_info->beam_duration) % beam_info->beam_allocation_size;
 }
 
-NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame)
+NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, int slot, int16_t beam_index, int slots_per_frame)
 {
   // if no beam allocation for analog beamforming we always return beam index 0 (no multiple beams)
   if (beam_info->beam_mode == NO_BEAM_MODE)
@@ -3675,7 +3681,7 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
   const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
   for (int i = 0; i < beam_info->beams_per_period; i++) {
     NR_beam_alloc_t beam_struct = {.new_beam = false, .idx = i};
-    int *beam = &beam_info->beam_allocation[i][index];
+    int16_t *beam = &beam_info->beam_allocation[i][index];
     if (*beam == -1) {
       beam_struct.new_beam = true;
       *beam = beam_index;
@@ -3689,7 +3695,23 @@ NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, 
   return (NR_beam_alloc_t) {.new_beam = false, .idx = -1};
 }
 
-void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int beam_index, int slots_per_frame, bool new_beam)
+uint16_t convert_to_fapi_beam(const uint16_t beam_idx, const nr_beam_mode_t mode)
+{
+  AssertFatal(beam_idx >= 0 && beam_idx < 32768, "Beam index out of range. Valid range is [0, 32767]\n");
+  return (mode == LOPHY_BEAM_IDX) ? SET_BIT(beam_idx, 15) : beam_idx;
+}
+
+int16_t get_allocated_beam(const NR_beam_info_t *beam_info, int frame, int slot, int slots_per_frame, int beam_number_in_period)
+{
+  int16_t beam_idx = 0;
+  if (beam_info->beam_mode != NO_BEAM_MODE) {
+    const int index = get_beam_index(beam_info, frame, slot, slots_per_frame);
+    beam_idx = beam_info->beam_allocation[beam_number_in_period][index];
+  }
+  return beam_idx;
+}
+
+void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int16_t beam_index, int slots_per_frame, bool new_beam)
 {
   if(!new_beam) // need to reset only if the beam was allocated specifically for this instance
     return;
@@ -3707,7 +3729,7 @@ void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
     return;
   RSRP_report_t *rsrp_report = &UE->UE_sched_ctrl.CSI_report.ssb_rsrp_report;
   // simple beam switching algorithm -> we select beam with highest RSRP from CSI report
-  int new_bf_index = get_fapi_beamforming_index(mac, rsrp_report->resource_id[0]);
+  int new_bf_index = get_beam_from_ssbidx(mac, rsrp_report->resource_id[0]);
   if (UE->UE_beam_index == new_bf_index)
     return; // no beam change needed
 
