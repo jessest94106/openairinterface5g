@@ -1093,8 +1093,11 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
   uint32_t ssb_arfcn = get_ssb_arfcn(du);
   LOG_I(NR_RRC, "Reestablishment update key pci=%d, earfcn_dl=%u\n", cell_info->nr_pci, ssb_arfcn);
 
-  /* Derive KgNB* using NH if nh_ncc > 0 (vertical derivation), else use KgNB (horizontal derivation) */
-  const uint8_t *base_key = ue_p->nh_ncc > 0 ? ue_p->nh : ue_p->kgnb;
+  /* Per TS 33.501 6.9.2.3.4: When sending RRCReestablishment with nextHopChainingCount,
+   * we're staying at the same NCC level (not advancing), so use horizontal derivation
+   * from the currently active KgNB. Vertical derivation (from NH) is only used when
+   * advancing to a new NCC level, which happens during handover or masterKeyUpdate. */
+  const uint8_t *base_key = ue_p->kgnb;
   nr_derive_key_ng_ran_star(cell_info->nr_pci, ssb_arfcn, base_key, ue_p->kgnb);
   int size = do_RRCReestablishment(ue_context_pP->ue_context.nh_ncc, buffer, NR_RRC_BUF_SIZE, xid);
 
