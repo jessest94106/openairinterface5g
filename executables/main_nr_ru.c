@@ -40,6 +40,7 @@
 #include <executables/thread-common.h>
 #include "nr-oru.h"
 #include "openair1/PHY/INIT/nr_phy_init.h"
+#include "openair1/SCHED_NR/sched_nr.h"
 
 pthread_cond_t sync_cond;
 pthread_mutex_t sync_mutex;
@@ -56,6 +57,8 @@ extern void kill_NR_RU_proc(int inst);
 extern void set_function_spec_param(RU_t *ru);
 extern void start_NR_RU();
 extern void init_NR_RU(configmodule_interface_t *cfg, char *);
+void fill_rf_config(RU_t *ru, char *rf_config_file);
+void fill_split7_2_config(split7_config_t *split7, const nfapi_nr_config_request_scf_t *config, const NR_DL_FRAME_PARMS *fp);
 
 int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 
@@ -201,8 +204,20 @@ int main(int argc, char **argv)
   AssertFatal(ret == 0, "Cannot configure oru, check your config file/cmdline");
   ru->numerology = oru.numerology;
   oru_init_frame_parms(&oru);
-  nr_dump_frame_parms(ru->nr_frame_parms);
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+  nr_dump_frame_parms(fp);
+  nr_phy_init_RU(oru.ru);
+  fill_rf_config(ru, ru->rf_config_file);
+  fill_split7_2_config(&ru->openair0_cfg.split7, &ru->config, fp);
+  ru->N_TA_offset = set_default_nta_offset(fp->freq_range, fp->samples_per_subframe);
 
+
+  ret = openair0_transport_load(&ru->ifdevice, &ru->openair0_cfg, &ru->eth_params);
+  AssertFatal(ret == 0, "RU %u: openair0_transport_init() ret %d: cannot initialize transport potocol\n", ru->idx, ret);
+  ret = ru->nr_start_if(ru, NULL);
+  AssertFatal(ret == 0, "Could not start xran\n");
+
+  threadCreate(&oru.north_read_thread, oru_north_read_thread, (void *)&oru, "north_read_thread", -1, OAI_PRIORITY_RT_MAX);
 
   while (oai_exit == 0)
     sleep(1);

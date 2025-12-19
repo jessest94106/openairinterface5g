@@ -188,3 +188,32 @@ void oru_init_frame_parms(ORU_t *oru)
     }
   }
 }
+
+void *oru_north_read_thread(void *arg)
+{
+  ORU_t *oru = (ORU_t *)arg;
+
+  RU_t *ru = (RU_t *)oru->ru;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+
+  AssertFatal(ru->ifdevice.xran_api.north_in_func != NULL, "No fronthaul interface at north port");
+  __attribute__((aligned(32))) c16_t txDataF[ru->nb_tx][fp->ofdm_symbol_size * 14];
+  c16_t *txDataF_ptr[ru->nb_tx];
+  for (int aatx = 0; aatx < ru->nb_tx; aatx++) {
+    txDataF_ptr[aatx] = txDataF[aatx];
+  }
+  while (!oai_exit) {
+    int num_symbols = 0;
+    sense_of_time_t sense_of_time;
+    ru->ifdevice.xran_api.north_in_func((uint32_t **)txDataF_ptr, ru->nb_tx, &sense_of_time, &num_symbols);
+    if (sense_of_time.frame % 256 == 0 && sense_of_time.slot == 0) {
+      LOG_I(PHY,
+            "[RU_thread] read data: frame %d, slot %d, start_symbol %d, num_symbols %d\n",
+            sense_of_time.frame,
+            sense_of_time.slot,
+            sense_of_time.symbol,
+            num_symbols);
+    }
+  }
+  return NULL;
+}
