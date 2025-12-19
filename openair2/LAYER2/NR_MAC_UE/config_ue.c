@@ -406,6 +406,13 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
                                                     *scc->ssbSubcarrierSpacing,
                                                     frequencyInfoDL->absoluteFrequencyPointA)
                                        / 1000; // freq in kHz
+    LOG_I(NR_MAC,
+          "[UE %d] Set dl_frequency=%u kHz (from absoluteFrequencyPointA=%ld, band=%d, scs=%ld)\n",
+          mac->ue_id,
+          cfg->carrier_config.dl_frequency,
+          frequencyInfoDL->absoluteFrequencyPointA,
+          mac->nr_band,
+          *scc->ssbSubcarrierSpacing);
 
     for (int i = 0; i < 5; i++) {
       if (i == frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing) {

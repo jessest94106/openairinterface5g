@@ -833,8 +833,10 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc,
     /* if the frequencyInfoDL is included, consider the target SpCell
        to be one on the SSB frequency indicated by the frequencyInfoDL */
     const NR_DownlinkConfigCommon_t *dcc = reconfigurationWithSync->spCellConfigCommon->downlinkConfigCommon;
-    if (dcc && dcc->frequencyInfoDL && dcc->frequencyInfoDL->absoluteFrequencySSB)
+    if (dcc && dcc->frequencyInfoDL && dcc->frequencyInfoDL->absoluteFrequencySSB) {
       rrc->arfcn_ssb = *dcc->frequencyInfoDL->absoluteFrequencySSB;
+      LOG_I(NR_RRC, "UE %ld: updated ARFCN_SSB=%ld\n", rrc->ue_id, rrc->arfcn_ssb);
+    }
 
     // consider the target SpCell to be one with a physical cell identity indicated by the physCellId
     if (!reconfigurationWithSync->spCellConfigCommon->physCellId)
@@ -1662,6 +1664,15 @@ static void nr_rrc_ue_decode_NR_BCCH_BCH_Message(NR_UE_RRC_INST_t *rrc,
   }
 
   NR_BCCH_BCH_Message_t *bcch_message = NULL;
+  if (rrc->phyCellID != phycellid || rrc->arfcn_ssb != ssb_arfcn) {
+    LOG_I(NR_RRC,
+          "[UE %ld] BCCH update: phyCellID %d->%u, arfcn_ssb %ld->%ld\n",
+          rrc->ue_id,
+          rrc->phyCellID,
+          phycellid,
+          rrc->arfcn_ssb,
+          ssb_arfcn);
+  }
   rrc->phyCellID = phycellid;
   rrc->arfcn_ssb = ssb_arfcn;
 
@@ -2287,6 +2298,7 @@ static void nr_rrc_ue_process_rrcReestablishment(NR_UE_RRC_INST_t *rrc,
   // perform the actions upon going to RRC_IDLE as specified in 5.3.11
   // with release cause 'RRC connection failure', upon which the procedure ends
   if (!integrity_pass) {
+    LOG_W(NR_RRC, "Integrity of RRCReestablishment failed, going to IDLE\n");
     NR_Release_Cause_t release_cause = RRC_CONNECTION_FAILURE;
     nr_rrc_going_to_IDLE(rrc, release_cause, NULL);
     return;
