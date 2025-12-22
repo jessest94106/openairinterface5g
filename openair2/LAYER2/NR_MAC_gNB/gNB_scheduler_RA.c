@@ -812,8 +812,12 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
   uint16_t K2 = tda_info.k2 + get_NTN_Koffset(scc);
   const int sched_frame = (frame + (slot + K2) / slots_frame) % MAX_FRAME_NUMBER;
   const int sched_slot = (slot + K2) % slots_frame;
+  uint16_t slot_bitmap = get_ul_bitmap(&nr_mac->frame_structure, sched_slot);
+  uint16_t msg3_mask = SL_to_bitmap(tda_info.startSymbolIndex, tda_info.nrOfSymbols);
 
-  if (!is_dl_slot(slot, &nr_mac->frame_structure) || !is_ul_slot(sched_slot, &nr_mac->frame_structure))
+  if (!is_dl_slot(slot, &nr_mac->frame_structure)
+      || !is_ul_slot(sched_slot, &nr_mac->frame_structure)
+      || !((msg3_mask & slot_bitmap) == msg3_mask))
     return;
 
   NR_beam_alloc_t beam_ul = beam_allocation_procedure(&nr_mac->beam_info, sched_frame, sched_slot, UE->UE_beam_index, slots_frame);
