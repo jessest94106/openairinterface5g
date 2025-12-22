@@ -199,10 +199,11 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
   if (nr_slot_select(cfg,frame_tx,slot_tx) == NR_UPLINK_SLOT)
     return;
 
+  int Ptx = cfg->carrier_config.num_tx_ant.value;
   // If there is no digital beamforming we just need to copy the data to RU
   if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf) {
     for (int b = 0; b < ru->num_beams_period; b++) {
-      for (int i = 0; i < ru->nb_tx; ++i) {
+      for (int i = 0; i < Ptx; ++i) {
         int tx_idx = i + b * ru->nb_tx;
         memcpy((void*)ru->common.txdataF_BF[tx_idx],
                (void*)&gNB->common_vars.txdataF[b][i][txdataF_offset],
