@@ -86,4 +86,11 @@ bool eq_positioning_information_update(const f1ap_positioning_information_update
                                        const f1ap_positioning_information_update_t *b);
 void free_positioning_information_update(f1ap_positioning_information_update_t *msg);
 
+// trp information request
+struct F1AP_F1AP_PDU *encode_trp_information_req(const f1ap_trp_information_req_t *msg);
+bool decode_trp_information_req(const struct F1AP_F1AP_PDU *pdu, f1ap_trp_information_req_t *out);
+f1ap_trp_information_req_t cp_trp_information_req(const f1ap_trp_information_req_t *orig);
+bool eq_trp_information_req(const f1ap_trp_information_req_t *a, const f1ap_trp_information_req_t *b);
+void free_trp_information_req(f1ap_trp_information_req_t *msg);
+
 #endif /* F1AP_POSITIONING_H_ */

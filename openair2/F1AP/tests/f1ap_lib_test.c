@@ -1823,6 +1823,49 @@ static void test_f1ap_positioning_information_update()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_trp_information_request()
+{
+  f1ap_trp_information_req_t orig = {
+      .transaction_id = 12,
+      .has_trp_list = true,
+  };
+
+  uint32_t trp_list_length = 4;
+  orig.trp_list.trp_list_length = trp_list_length;
+  orig.trp_list.trp_list_item = calloc_or_fail(trp_list_length, sizeof(*orig.trp_list.trp_list_item));
+  for (int i = 0; i < trp_list_length; i++) {
+    orig.trp_list.trp_list_item[i].trp_id = i + 1;
+  }
+  uint8_t trp_info_type_list_length = 2;
+  f1ap_trp_information_type_list_t *trp_information_type_list = &orig.trp_information_type_list;
+  trp_information_type_list->trp_information_type_list_length = trp_info_type_list_length;
+  trp_information_type_list->trp_information_type_item =
+      calloc_or_fail(trp_info_type_list_length, sizeof(*trp_information_type_list->trp_information_type_item));
+  trp_information_type_list->trp_information_type_item[0] = F1AP_TRP_INFORMATION_TYPE_ITEM_NR_ARFCN;
+  trp_information_type_list->trp_information_type_item[1] = F1AP_TRP_INFORMATION_TYPE_ITEM_PRS_CONFIG;
+
+  F1AP_F1AP_PDU_t *f1enc = encode_trp_information_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_trp_information_req_t decoded = {0};
+  bool ret = decode_trp_information_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_trp_information_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_trp_information_req(&orig, &decoded);
+  AssertFatal(ret, "eq_trp_information_req(): decoded message doesn't match\n");
+  free_trp_information_req(&decoded);
+
+  f1ap_trp_information_req_t cp = cp_trp_information_req(&orig);
+  ret = eq_trp_information_req(&orig, &cp);
+  AssertFatal(ret, "eq_trp_information_req(): copied message doesn't match\n");
+  free_trp_information_req(&orig);
+  free_trp_information_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1857,5 +1900,6 @@ int main()
   test_f1ap_positioning_activation_failure();
   test_f1ap_positioning_deactivation();
   test_f1ap_positioning_information_update();
+  test_f1ap_trp_information_request();
   return 0;
 }

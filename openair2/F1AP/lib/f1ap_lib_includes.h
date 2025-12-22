@@ -73,5 +73,6 @@
 #include "F1AP_PosResourceSetTypeAP.h"
 #include "F1AP_SemipersistentSRS.h"
 #include "F1AP_AperiodicSRS.h"
+#include "F1AP_TRPListItem.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

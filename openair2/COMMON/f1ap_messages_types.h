@@ -1047,6 +1047,31 @@ typedef struct f1ap_abort_transmission_s {
   f1ap_abort_transmission_u choice;
 } f1ap_abort_transmission_t;
 
+typedef struct f1ap_trp_list_item_s {
+  uint32_t trp_id;
+} f1ap_trp_list_item_t;
+
+typedef struct f1ap_trp_list_s {
+  f1ap_trp_list_item_t *trp_list_item;
+  uint32_t trp_list_length;
+} f1ap_trp_list_t;
+
+typedef enum f1ap_trp_information_type_item_e {
+  F1AP_TRP_INFORMATION_TYPE_ITEM_NR_PCI,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_NG_RAN_CGI,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_NR_ARFCN,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_PRS_CONFIG,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_SSB_CONFIG,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_SFN_INIT_TIME,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_SPATIAL_DIRECTION_INFO,
+  F1AP_TRP_INFORMATION_TYPE_ITEM_GEO_COORDINATES
+} f1ap_trp_information_type_item_pr;
+
+typedef struct f1ap_trp_information_type_list_s {
+  f1ap_trp_information_type_item_pr *trp_information_type_item;
+  uint8_t trp_information_type_list_length;
+} f1ap_trp_information_type_list_t;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
@@ -1118,5 +1143,15 @@ typedef struct f1ap_positioning_information_update_s {
   // IE 9.3.1.192 (optional)
   f1ap_srs_configuration_t *srs_configuration;
 } f1ap_positioning_information_update_t;
+
+typedef struct f1ap_trp_information_req_s {
+  // IE 9.3.1.23 (mandatory)
+  uint8_t transaction_id;
+  bool has_trp_list;
+  // mandatory
+  f1ap_trp_list_t trp_list;
+  // mandatory
+  f1ap_trp_information_type_list_t trp_information_type_list;
+} f1ap_trp_information_req_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */
