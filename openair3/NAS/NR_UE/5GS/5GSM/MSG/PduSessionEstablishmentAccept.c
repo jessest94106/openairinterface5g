@@ -23,6 +23,7 @@
 #include <arpa/inet.h>
 #include "PduSessionEstablishmentAccept.h"
 #include "common/utils/LOG/log.h"
+#include "common/utils/utils.h" // text_info_t, TO_ENUM, TO_TEXT
 #include "fgs_nas_utils.h"
 
 /**

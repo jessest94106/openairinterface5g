@@ -29,15 +29,6 @@
 #include "utils.h" // text_info_t, TO_ENUM, TO_TEXT
 #include "common/utils/eq_check.h"
 
-/* Map task id to printable name. */
-typedef struct {
-  int id;
-  char text[256];
-} text_info_t;
-
-#define TO_TEXT(LabEl, nUmID) {nUmID, #LabEl},
-#define TO_ENUM(LabEl, nUmID ) LabEl = nUmID,
-
 #define GET_SHORT(input, size) ({           \
     uint16_t tmp16;                         \
     memcpy(&tmp16, (input), sizeof(tmp16)); \
