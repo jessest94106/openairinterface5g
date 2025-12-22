@@ -1031,6 +1031,22 @@ typedef struct f1ap_srs_type_s {
   f1ap_srs_type_u choice;
 } f1ap_srs_type_t;
 
+typedef union f1ap_abort_transmission_c {
+  uint8_t srs_resource_set_id;
+  bool release_all;
+} f1ap_abort_transmission_u;
+
+typedef enum f1ap_abort_transmission_e {
+  F1AP_ABORT_TRANSMISSION_PR_NOTHING,
+  F1AP_ABORT_TRANSMISSION_PR_SRSRESOURCESETID,
+  F1AP_ABORT_TRANSMISSION_PR_RELEASEALL
+} f1ap_abort_transmission_pr;
+
+typedef struct f1ap_abort_transmission_s {
+  f1ap_abort_transmission_pr present;
+  f1ap_abort_transmission_u choice;
+} f1ap_abort_transmission_t;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
@@ -1084,5 +1100,14 @@ typedef struct f1ap_positioning_activation_failure_s {
   // IE 9.3.1.2 (mandatory)
   long cause_value;
 } f1ap_positioning_activation_failure_t;
+
+typedef struct f1ap_positioning_deactivation_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+  // (mandatory)
+  f1ap_abort_transmission_t abort_transmission;
+} f1ap_positioning_deactivation_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */

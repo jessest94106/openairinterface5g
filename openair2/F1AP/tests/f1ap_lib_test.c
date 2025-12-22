@@ -1746,6 +1746,49 @@ static void test_f1ap_positioning_activation_failure()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_deactivation_msg(f1ap_positioning_deactivation_t *orig)
+{
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_deactivation(orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_deactivation_t decoded = {0};
+  bool ret = decode_positioning_deactivation(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_deactivation(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_deactivation(orig, &decoded);
+  AssertFatal(ret, "eq_positioning_deactivation(): decoded message doesn't match\n");
+  free_positioning_deactivation(&decoded);
+
+  f1ap_positioning_deactivation_t cp = cp_positioning_deactivation(orig);
+  ret = eq_positioning_deactivation(orig, &cp);
+  AssertFatal(ret, "eq_positioning_deactivation(): copied message doesn't match\n");
+  free_positioning_deactivation(orig);
+  free_positioning_deactivation(&cp);
+}
+
+static void test_f1ap_positioning_deactivation()
+{
+  /* Abort Transmission SRS Resource Set ID test*/
+  f1ap_positioning_deactivation_t orig = {
+      .gNB_CU_ue_id = 12,
+      .gNB_DU_ue_id = 19,
+      .abort_transmission.present = F1AP_ABORT_TRANSMISSION_PR_SRSRESOURCESETID,
+      .abort_transmission.choice.srs_resource_set_id = 10,
+  };
+  test_f1ap_positioning_deactivation_msg(&orig);
+
+  /* Abort Transmission release ALL test*/
+  orig.gNB_CU_ue_id = 12;
+  orig.gNB_DU_ue_id = 19;
+  orig.abort_transmission.present = F1AP_ABORT_TRANSMISSION_PR_RELEASEALL;
+  orig.abort_transmission.choice.release_all = true;
+  test_f1ap_positioning_deactivation_msg(&orig);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1778,5 +1821,6 @@ int main()
   test_f1ap_positioning_activation_request();
   test_f1ap_positioning_activation_response();
   test_f1ap_positioning_activation_failure();
+  test_f1ap_positioning_deactivation();
   return 0;
 }

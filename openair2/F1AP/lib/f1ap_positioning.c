@@ -2032,6 +2032,48 @@ static bool decode_f1ap_srstype(const F1AP_SRSType_t *srs_type, f1ap_srs_type_t 
   return true;
 }
 
+static F1AP_AbortTransmission_t encode_f1ap_abort_transmission(const f1ap_abort_transmission_t *abort_tx)
+{
+  F1AP_AbortTransmission_t f1_abort_tx = {0};
+  switch (abort_tx->present) {
+    case F1AP_ABORT_TRANSMISSION_PR_NOTHING:
+      f1_abort_tx.present = F1AP_AbortTransmission_PR_NOTHING;
+      break;
+    case F1AP_ABORT_TRANSMISSION_PR_SRSRESOURCESETID:
+      f1_abort_tx.present = F1AP_AbortTransmission_PR_sRSResourceSetID;
+      f1_abort_tx.choice.sRSResourceSetID = abort_tx->choice.srs_resource_set_id;
+      break;
+    case F1AP_ABORT_TRANSMISSION_PR_RELEASEALL:
+      f1_abort_tx.present = F1AP_AbortTransmission_PR_releaseALL;
+      break;
+    default:
+      AssertFatal(false, "unknown Abort Transmission %d\n", abort_tx->present);
+      break;
+  }
+  return f1_abort_tx;
+}
+
+static bool decode_f1ap_abort_transmission(const F1AP_AbortTransmission_t *in, f1ap_abort_transmission_t *out)
+{
+  switch (in->present) {
+    case F1AP_AbortTransmission_PR_NOTHING:
+      out->present = F1AP_ABORT_TRANSMISSION_PR_NOTHING;
+      break;
+    case F1AP_AbortTransmission_PR_sRSResourceSetID:
+      out->present = F1AP_ABORT_TRANSMISSION_PR_SRSRESOURCESETID;
+      out->choice.srs_resource_set_id = in->choice.sRSResourceSetID;
+      break;
+    case F1AP_AbortTransmission_PR_releaseALL:
+      out->present = F1AP_ABORT_TRANSMISSION_PR_RELEASEALL;
+      out->choice.release_all = true;
+      break;
+    default:
+      AssertError(false, return false, "received illegal Abort Transmission %d\n", in->present);
+      break;
+  }
+  return true;
+}
+
 /**
  * @brief Encode F1 positioning information request to ASN.1
  */
@@ -2845,6 +2887,149 @@ bool eq_positioning_activation_failure(const f1ap_positioning_activation_failure
  * @brief Free Allocated F1 positioning activation failure
  */
 void free_positioning_activation_failure(f1ap_positioning_activation_failure_t *msg)
+{
+  // nothing to free
+}
+
+/**
+ * @brief Encode F1 positioning deactivation to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_deactivation(const f1ap_positioning_deactivation_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningDeactivation;
+  tmp->criticality = F1AP_Criticality_ignore;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_PositioningDeactivation;
+  F1AP_PositioningDeactivation_t *out = &tmp->value.choice.PositioningDeactivation;
+
+  /* mandatory : GNB_CU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningDeactivationIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningDeactivationIEs__value_PR_GNB_CU_UE_F1AP_ID;
+  ie1->value.choice.GNB_CU_UE_F1AP_ID = msg->gNB_CU_ue_id;
+
+  /* mandatory : GNB_DU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningDeactivationIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningDeactivationIEs__value_PR_GNB_DU_UE_F1AP_ID;
+  ie2->value.choice.GNB_DU_UE_F1AP_ID = msg->gNB_DU_ue_id;
+
+  /* mandatory : CHOICE ABORT TRANSMISSION */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningDeactivationIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_AbortTransmission;
+  ie3->criticality = F1AP_Criticality_ignore;
+  ie3->value.present = F1AP_PositioningDeactivationIEs__value_PR_AbortTransmission;
+  ie3->value.choice.AbortTransmission = encode_f1ap_abort_transmission(&msg->abort_transmission);
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 positioning deactivation
+ */
+bool decode_positioning_deactivation(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_deactivation_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningDeactivation_t *in = &pdu->choice.initiatingMessage->value.choice.PositioningDeactivation;
+  F1AP_PositioningDeactivationIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningDeactivationIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID, true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningDeactivationIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID, true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningDeactivationIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_AbortTransmission, true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningDeactivationIEs__value_PR_GNB_CU_UE_F1AP_ID);
+        out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningDeactivationIEs__value_PR_GNB_DU_UE_F1AP_ID);
+        out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_AbortTransmission:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningDeactivationIEs__value_PR_AbortTransmission);
+        _F1_CHECK_EXP(decode_f1ap_abort_transmission(&ie->value.choice.AbortTransmission, &out->abort_transmission));
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 positioning deactivation deep copy
+ */
+f1ap_positioning_deactivation_t cp_positioning_deactivation(const f1ap_positioning_deactivation_t *orig)
+{
+  /* copy all mandatory fields that are not dynamic memory */
+  f1ap_positioning_deactivation_t cp = {
+      .gNB_CU_ue_id = orig->gNB_CU_ue_id,
+      .gNB_DU_ue_id = orig->gNB_DU_ue_id,
+      .abort_transmission.present = orig->abort_transmission.present,
+  };
+  // do this properly abort mission
+  switch (orig->abort_transmission.present) {
+    case F1AP_ABORT_TRANSMISSION_PR_NOTHING:
+      // nothing to copy
+      break;
+    case F1AP_ABORT_TRANSMISSION_PR_SRSRESOURCESETID:
+      cp.abort_transmission.choice.srs_resource_set_id = orig->abort_transmission.choice.srs_resource_set_id;
+      break;
+    case F1AP_ABORT_TRANSMISSION_PR_RELEASEALL:
+      cp.abort_transmission.choice.release_all = orig->abort_transmission.choice.release_all;
+      break;
+    default:
+      PRINT_ERROR("received illegal Abort Transmission value %d\n", orig->abort_transmission.present);
+      break;
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 positioning deactivation equality check
+ */
+bool eq_positioning_deactivation(const f1ap_positioning_deactivation_t *a, const f1ap_positioning_deactivation_t *b)
+{
+  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _F1_EQ_CHECK_INT(a->abort_transmission.present, b->abort_transmission.present);
+  switch (a->abort_transmission.present) {
+    case F1AP_ABORT_TRANSMISSION_PR_NOTHING:
+      // nothing to check
+      break;
+    case F1AP_ABORT_TRANSMISSION_PR_SRSRESOURCESETID:
+      _F1_EQ_CHECK_INT(a->abort_transmission.choice.srs_resource_set_id, b->abort_transmission.choice.srs_resource_set_id);
+      break;
+    case F1AP_ABORT_TRANSMISSION_PR_RELEASEALL:
+      _F1_EQ_CHECK_INT(a->abort_transmission.choice.release_all, b->abort_transmission.choice.release_all);
+      break;
+    default:
+      PRINT_ERROR("received illegal Abort Transmission value %d\n", a->abort_transmission.present);
+      break;
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 positioning activation failure
+ */
+void free_positioning_deactivation(f1ap_positioning_deactivation_t *msg)
 {
   // nothing to free
 }
