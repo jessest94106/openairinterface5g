@@ -71,5 +71,7 @@
 #include "F1AP_PosResourceSetTypePR.h"
 #include "F1AP_PosResourceSetTypeSP.h"
 #include "F1AP_PosResourceSetTypeAP.h"
+#include "F1AP_SemipersistentSRS.h"
+#include "F1AP_AperiodicSRS.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

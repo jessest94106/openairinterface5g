@@ -1015,6 +1015,22 @@ typedef struct f1ap_srs_configuration_s {
   f1ap_srs_carrier_list_t srs_carrier_list;
 } f1ap_srs_configuration_t;
 
+typedef union f1ap_srs_type_c {
+  uint8_t *srs_resource_set_id;
+  bool *aperiodic;
+} f1ap_srs_type_u;
+
+typedef enum f1ap_srs_type_e {
+  F1AP_SRS_TYPE_PR_NOTHING,
+  F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS,
+  F1AP_SRS_TYPE_PR_APERIODICSRS
+} f1ap_srs_type_pr;
+
+typedef struct f1ap_srs_type_s {
+  f1ap_srs_type_pr present;
+  f1ap_srs_type_u choice;
+} f1ap_srs_type_t;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
@@ -1041,5 +1057,14 @@ typedef struct f1ap_positioning_information_failure_s {
   // IE 9.3.1.2 (mandatory)
   long cause_value;
 } f1ap_positioning_information_failure_t;
+
+typedef struct f1ap_positioning_activation_req_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+  // (mandatory)
+  f1ap_srs_type_t srs_type;
+} f1ap_positioning_activation_req_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */

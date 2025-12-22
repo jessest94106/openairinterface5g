@@ -1640,6 +1640,53 @@ static void test_f1ap_positioning_information_failure()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_activation_request_msg(f1ap_positioning_activation_req_t *orig)
+{
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_activation_req(orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_activation_req_t decoded = {0};
+  bool ret = decode_positioning_activation_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_activation_request(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_activation_req(orig, &decoded);
+  AssertFatal(ret, "eq_positioning_activation_request(): decoded message doesn't match\n");
+  free_positioning_activation_req(&decoded);
+
+  f1ap_positioning_activation_req_t cp = cp_positioning_activation_req(orig);
+  ret = eq_positioning_activation_req(orig, &cp);
+  AssertFatal(ret, "eq_positioning_activation_request(): copied message doesn't match\n");
+  free_positioning_activation_req(&cp);
+  free_positioning_activation_req(orig);
+}
+
+static void test_f1ap_positioning_activation_request()
+{
+  /* semipersistent srs test*/
+  f1ap_positioning_activation_req_t orig = {
+      .gNB_CU_ue_id = 12,
+      .gNB_DU_ue_id = 19,
+      .srs_type.present = F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS,
+  };
+
+  orig.srs_type.choice.srs_resource_set_id = calloc_or_fail(1, sizeof(*orig.srs_type.choice.srs_resource_set_id));
+  *orig.srs_type.choice.srs_resource_set_id = 1;
+  test_f1ap_positioning_activation_request_msg(&orig);
+
+  /* aperiodic srs test*/
+  orig.gNB_CU_ue_id = 12;
+  orig.gNB_DU_ue_id = 19;
+  orig.srs_type.present = F1AP_SRS_TYPE_PR_APERIODICSRS;
+  orig.srs_type.choice.aperiodic = calloc_or_fail(1, sizeof(*orig.srs_type.choice.aperiodic));
+  // set aperiodic = 0 to enable
+  *orig.srs_type.choice.aperiodic = 0;
+  test_f1ap_positioning_activation_request_msg(&orig);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1669,5 +1716,6 @@ int main()
   test_f1ap_positioning_information_request();
   test_f1ap_positioning_information_response();
   test_f1ap_positioning_information_failure();
+  test_f1ap_positioning_activation_request();
   return 0;
 }

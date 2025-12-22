@@ -1984,6 +1984,54 @@ static void free_srs_carrier_list(f1ap_srs_carrier_list_t *srs_carrier_list)
   free(srs_carrier_list->srs_carrier_list_item);
 }
 
+static F1AP_SRSType_t encode_f1ap_srstype(const f1ap_srs_type_t *srs_type)
+{
+  F1AP_SRSType_t f1_srstype = {0};
+  switch (srs_type->present) {
+    case F1AP_SRS_TYPE_PR_NOTHING:
+      f1_srstype.present = F1AP_SRSType_PR_NOTHING;
+      break;
+    case F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS:
+      f1_srstype.present = F1AP_SRSType_PR_semipersistentSRS;
+      asn1cCalloc(f1_srstype.choice.semipersistentSRS, sp_srs);
+      sp_srs->sRSResourceSetID = *srs_type->choice.srs_resource_set_id;
+      break;
+    case F1AP_SRS_TYPE_PR_APERIODICSRS:
+      f1_srstype.present = F1AP_SRSType_PR_aperiodicSRS;
+      asn1cCalloc(f1_srstype.choice.aperiodicSRS, ap_srs);
+      ap_srs->aperiodic = *srs_type->choice.aperiodic;
+      break;
+    default:
+      AssertFatal(false, "unknown SRS type %d\n", srs_type->present);
+      break;
+  }
+  return f1_srstype;
+}
+
+static bool decode_f1ap_srstype(const F1AP_SRSType_t *srs_type, f1ap_srs_type_t *out)
+{
+  switch (srs_type->present) {
+    case F1AP_SRSType_PR_NOTHING:
+      out->present = F1AP_SRS_TYPE_PR_NOTHING;
+      break;
+    case F1AP_SRSType_PR_semipersistentSRS:
+      out->present = F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS;
+      out->choice.srs_resource_set_id = calloc_or_fail(1, sizeof(*out->choice.srs_resource_set_id));
+      *out->choice.srs_resource_set_id = srs_type->choice.semipersistentSRS->sRSResourceSetID;
+      break;
+    case F1AP_SRSType_PR_aperiodicSRS:
+      out->present = F1AP_SRS_TYPE_PR_APERIODICSRS;
+      out->choice.aperiodic = calloc_or_fail(1, sizeof(*out->choice.aperiodic));
+      *out->choice.aperiodic = srs_type->choice.aperiodicSRS->aperiodic;
+      break;
+    default:
+      PRINT_ERROR("received illegal SRS type %d\n", srs_type->present);
+      return false;
+      break;
+  }
+  return true;
+}
+
 /**
  * @brief Encode F1 positioning information request to ASN.1
  */
@@ -2380,4 +2428,178 @@ bool eq_positioning_information_failure(const f1ap_positioning_information_failu
 void free_positioning_information_failure(f1ap_positioning_information_failure_t *msg)
 {
   // nothing to free
+}
+
+/**
+ * @brief Encode F1 positioning activation request to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_activation_req(const f1ap_positioning_activation_req_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningActivation;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_PositioningActivationRequest;
+  F1AP_PositioningActivationRequest_t *out = &tmp->value.choice.PositioningActivationRequest;
+
+  /* mandatory : GNB_CU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningActivationRequestIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningActivationRequestIEs__value_PR_GNB_CU_UE_F1AP_ID;
+  ie1->value.choice.GNB_CU_UE_F1AP_ID = msg->gNB_CU_ue_id;
+
+  /* mandatory : GNB_DU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningActivationRequestIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningActivationRequestIEs__value_PR_GNB_DU_UE_F1AP_ID;
+  ie2->value.choice.GNB_DU_UE_F1AP_ID = msg->gNB_DU_ue_id;
+
+  /* mandatory : SRS type */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningActivationRequestIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_SRSType;
+  ie3->criticality = F1AP_Criticality_reject;
+  ie3->value.present = F1AP_PositioningActivationRequestIEs__value_PR_SRSType;
+  ie3->value.choice.SRSType = encode_f1ap_srstype(&msg->srs_type);
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 positioning activation request
+ */
+bool decode_positioning_activation_req(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_activation_req_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningActivationRequest_t *in = &pdu->choice.initiatingMessage->value.choice.PositioningActivationRequest;
+  F1AP_PositioningActivationRequestIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningActivationRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningActivationRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningActivationRequestIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_SRSType, true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningActivationRequestIEs__value_PR_GNB_CU_UE_F1AP_ID);
+        out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningActivationRequestIEs__value_PR_GNB_DU_UE_F1AP_ID);
+        out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_SRSType:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningActivationRequestIEs__value_PR_SRSType);
+        _F1_CHECK_EXP(decode_f1ap_srstype(&ie->value.choice.SRSType, &out->srs_type));
+        break;
+      case F1AP_ProtocolIE_ID_id_ActivationTime:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 positioning activation request deep copy
+ */
+f1ap_positioning_activation_req_t cp_positioning_activation_req(const f1ap_positioning_activation_req_t *orig)
+{
+  /* copy all mandatory fields that are not dynamic memory */
+  f1ap_positioning_activation_req_t cp = {
+      .gNB_CU_ue_id = orig->gNB_CU_ue_id,
+      .gNB_DU_ue_id = orig->gNB_DU_ue_id,
+      .srs_type.present = orig->srs_type.present,
+  };
+
+  switch (orig->srs_type.present) {
+    case F1AP_SRS_TYPE_PR_NOTHING:
+      // nothing to copy
+      break;
+    case F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS:
+      cp.srs_type.choice.srs_resource_set_id = calloc_or_fail(1, sizeof(*cp.srs_type.choice.srs_resource_set_id));
+      *cp.srs_type.choice.srs_resource_set_id = *orig->srs_type.choice.srs_resource_set_id;
+      break;
+    case F1AP_SRS_TYPE_PR_APERIODICSRS:
+      cp.srs_type.choice.aperiodic = calloc_or_fail(1, sizeof(*cp.srs_type.choice.aperiodic));
+      *cp.srs_type.choice.aperiodic = *orig->srs_type.choice.aperiodic;
+      break;
+    default:
+      PRINT_ERROR("received illegal SRS type %d\n", orig->srs_type.present);
+      break;
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 positioning activation request equality check
+ */
+bool eq_positioning_activation_req(const f1ap_positioning_activation_req_t *a, const f1ap_positioning_activation_req_t *b)
+{
+  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _F1_EQ_CHECK_INT(a->srs_type.present, b->srs_type.present);
+
+  const f1ap_srs_type_t *srs_type_a = &a->srs_type;
+  const f1ap_srs_type_t *srs_type_b = &b->srs_type;
+  switch (srs_type_a->present) {
+    case F1AP_SRS_TYPE_PR_NOTHING:
+      // nothing to check
+      break;
+    case F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS:
+      _F1_EQ_CHECK_INT(*srs_type_a->choice.srs_resource_set_id, *srs_type_b->choice.srs_resource_set_id);
+      break;
+    case F1AP_SRS_TYPE_PR_APERIODICSRS:
+      _F1_EQ_CHECK_INT(*srs_type_a->choice.aperiodic, *srs_type_b->choice.aperiodic);
+      break;
+    default:
+      PRINT_ERROR("received illegal SRS type %d\n", srs_type_a->present);
+      break;
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 activation request
+ */
+void free_positioning_activation_req(f1ap_positioning_activation_req_t *msg)
+{
+  DevAssert(msg != NULL);
+
+  switch (msg->srs_type.present) {
+    case F1AP_SRS_TYPE_PR_NOTHING:
+      // nothing to free
+      return;
+    case F1AP_SRS_TYPE_PR_SEMIPERSISTENTSRS:
+      free(msg->srs_type.choice.srs_resource_set_id);
+      break;
+    case F1AP_SRS_TYPE_PR_APERIODICSRS:
+      free(msg->srs_type.choice.aperiodic);
+      break;
+    default:
+      PRINT_ERROR("received illegal SRS type %d\n", msg->srs_type.present);
+      break;
+  }
 }

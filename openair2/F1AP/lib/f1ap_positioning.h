@@ -49,4 +49,11 @@ bool eq_positioning_information_failure(const f1ap_positioning_information_failu
                                         const f1ap_positioning_information_failure_t *b);
 void free_positioning_information_failure(f1ap_positioning_information_failure_t *msg);
 
+// positioning activation request
+struct F1AP_F1AP_PDU *encode_positioning_activation_req(const f1ap_positioning_activation_req_t *msg);
+bool decode_positioning_activation_req(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_activation_req_t *out);
+f1ap_positioning_activation_req_t cp_positioning_activation_req(const f1ap_positioning_activation_req_t *orig);
+bool eq_positioning_activation_req(const f1ap_positioning_activation_req_t *a, const f1ap_positioning_activation_req_t *b);
+void free_positioning_activation_req(f1ap_positioning_activation_req_t *msg);
+
 #endif /* F1AP_POSITIONING_H_ */
