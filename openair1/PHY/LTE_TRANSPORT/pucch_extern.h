@@ -36,8 +36,6 @@
 #include <stdint.h>
 
 /* PUCCH format3 >> */
-#define D_I             0
-#define D_Q             1
 #define D_IQDATA        2
 #define D_NSLT1SF       2
 #define D_NSYM1SLT      7

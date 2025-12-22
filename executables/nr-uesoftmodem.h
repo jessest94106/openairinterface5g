@@ -31,14 +31,6 @@ extern uint16_t ue_id_g;
 /* command line options definitions, CMDLINE_XXXX_DESC macros are used to initialize paramdef_t arrays which are then used as argument
    when calling config_get or config_getlist functions                                                                                 */
 
-#define CALIBRX_OPT       "calib-ue-rx"
-#define CALIBRXMED_OPT    "calib-ue-rx-med"
-#define CALIBRXBYP_OPT    "calib-ue-rx-byp"
-#define DBGPRACH_OPT      "debug-ue-prach"
-#define NOL2CONNECT_OPT   "no-L2-connect"
-#define CALIBPRACH_OPT    "calib-prach-tx"
-#define DUMPFRAME_OPT     "ue-dump-frame"
-
 /*------------------------------------------------------------------------------------------------------------------------------------------*/
 /*                                            command line parameters defining UE running mode                                              */
 /*   optname                     helpstr                paramflags                      XXXptr        defXXXval         type       numelt   */

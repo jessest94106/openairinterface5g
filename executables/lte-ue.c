@@ -59,9 +59,6 @@
 #include "common/config/config_userapi.h"
 #include "T.h"
 
-extern double cpuf;
-
-
 #define FRAME_PERIOD    100000000ULL
 #define DAQ_PERIOD      66667ULL
 #define FIFO_PRIORITY   40
