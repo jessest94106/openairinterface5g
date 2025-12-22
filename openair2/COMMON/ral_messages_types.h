@@ -86,23 +86,7 @@ typedef MIH_C_CONFIG_STATUS_T  ral_config_status_t;
 typedef MIH_C_TH_ACTION_T      ral_th_action_t;
 typedef MIH_C_LINK_ACTION_T      ral_link_action_t;
 
-
-#define RAL_STATUS_SUCCESS                 MIH_C_STATUS_SUCCESS
-#define RAL_STATUS_UNSPECIFIED_FAILURE     MIH_C_STATUS_UNSPECIFIED_FAILURE
-#define RAL_STATUS_REJECTED                MIH_C_STATUS_REJECTED
-#define RAL_STATUS_AUTHORIZATION_FAILURE   MIH_C_STATUS_AUTHORIZATION_FAILURE
-#define RAL_STATUS_NETWORK_ERROR           MIH_C_STATUS_NETWORK_ERROR
-
-
-#define RAL_3GPP_ADDR_LENGTH             MIH_C_3GPP_ADDR_LENGTH
-#define RAL_3GPP2_ADDR_LENGTH            MIH_C_3GPP2_ADDR_LENGTH
-#define RAL_OTHER_L2_ADDR_LENGTH         MIH_C_OTHER_L2_ADDR_LENGTH
-#define RAL_LINK_SCAN_RSP_LENGTH         MIH_C_LINK_SCAN_RSP_LENGTH
-#define RAL_THRESHOLD_LIST_LENGTH        MIH_C_THRESHOLD_LIST_LENGTH
 #define RAL_LINK_ADDR_LIST_LENGTH        MIH_C_LINK_ADDR_LIST_LENGTH
-#define RAL_QOS_LIST_LENGTH              MIH_C_QOS_LIST_LENGTH
-#define RAL_LINK_STATUS_REQ_LIST_LENGTH  MIH_C_LINK_STATUS_REQ_LIST_LENGTH
-#define RAL_LINK_CFG_PARAM_LIST_LENGTH   MIH_C_LINK_CFG_PARAM_LIST_LENGTH
 
 typedef  struct ral_network_id_s {
   u_int16_t length;
@@ -206,12 +190,6 @@ typedef struct rrc_ral_connection_reconfiguration_ho_ind_s {
   //unsigned int cell_id:28;
 } rrc_ral_connection_reconfiguration_ho_ind_t;
 
-
-
-
-#define RAL_ABOVE_THRESHOLD                                    MIH_C_ABOVE_THRESHOLD
-#define RAL_BELOW_THRESHOLD                                    MIH_C_BELOW_THRESHOLD
-#define RAL_NO_THRESHOLD                                       0xFF
 typedef struct ral_threshold_s {
   uint16_t        threshold_val;
   uint8_t         threshold_xdir;
@@ -219,39 +197,17 @@ typedef struct ral_threshold_s {
 
 
 typedef MIH_C_LINK_PARAM_GEN_T                                 ral_link_param_gen_t;
-#define RAL_LINK_PARAM_GEN_DATA_RATE                           MIH_C_LINK_PARAM_GEN_DATA_RATE
-#define RAL_LINK_PARAM_GEN_SIGNAL_STRENGTH                     MIH_C_LINK_PARAM_GEN_SIGNAL_STRENGTH
-#define RAL_LINK_PARAM_GEN_SINR                                MIH_C_LINK_PARAM_GEN_SINR
-#define RAL_LINK_PARAM_GEN_THROUGHPUT                          MIH_C_LINK_PARAM_GEN_THROUGHPUT
 #define RAL_LINK_PARAM_GEN_PACKET_ERROR_RATE                   MIH_C_LINK_PARAM_GEN_PACKET_ERROR_RATE
 #define RAL_LINK_PARAM_GEN_MAX                                 RAL_LINK_PARAM_GEN_PACKET_ERROR_RATE
 
 typedef MIH_C_LINK_PARAM_QOS_T                                 ral_link_param_qos_t;
-#define RAL_LINK_PARAM_QOS_MAX_NUM_DIF_COS_SUPPORTED            MIH_C_LINK_PARAM_QOS_MAX_NUM_DIF_COS_SUPPORTED
-#define RAL_LINK_PARAM_QOS_MIN_PACKET_TRANSFER_DELAY_ALL_COS    MIH_C_LINK_PARAM_QOS_MIN_PACKET_TRANSFER_DELAY_ALL_COS
-#define RAL_LINK_PARAM_QOS_AVG_PACKET_TRANSFER_DELAY_ALL_COS    MIH_C_LINK_PARAM_QOS_AVG_PACKET_TRANSFER_DELAY_ALL_COS
-#define RAL_LINK_PARAM_QOS_MAX_PACKET_TRANSFER_DELAY_ALL_COS    MIH_C_LINK_PARAM_QOS_MAX_PACKET_TRANSFER_DELAY_ALL_COS
-#define RAL_LINK_PARAM_QOS_STD_DEVIATION_PACKET_TRANSFER_DELAY  MIH_C_LINK_PARAM_QOS_STD_DEVIATION_PACKET_TRANSFER_DELAY
 #define RAL_LINK_PARAM_QOS_PACKET_LOSS_RATE_ALL_COS_FRAME_RATIO MIH_C_LINK_PARAM_QOS_PACKET_LOSS_RATE_ALL_COS_FRAME_RATIO
-#define RAL_LINK_PARAM_QOS_MAX                                  RAL_LINK_PARAM_QOS_PACKET_LOSS_RATE_ALL_COS_FRAME_RATIO
 
 typedef MIH_C_LINK_PARAM_LTE_T                                 ral_link_param_lte_t;
-#define RAL_LINK_PARAM_LTE_UE_RSRP                             MIH_C_LINK_PARAM_LTE_UE_RSRP
-#define RAL_LINK_PARAM_LTE_UE_RSRQ                             MIH_C_LINK_PARAM_LTE_UE_RSRQ
-#define RAL_LINK_PARAM_LTE_UE_CQI                              MIH_C_LINK_PARAM_LTE_UE_CQI
-#define RAL_LINK_PARAM_LTE_AVAILABLE_BW                        MIH_C_LINK_PARAM_LTE_AVAILABLE_BW
-#define RAL_LINK_PARAM_LTE_PACKET_DELAY                        MIH_C_LINK_PARAM_LTE_PACKET_DELAY
-#define RAL_LINK_PARAM_LTE_PACKET_LOSS_RATE                    MIH_C_LINK_PARAM_LTE_PACKET_LOSS_RATE
-#define RAL_LINK_PARAM_LTE_L2_BUFFER_STATUS                    MIH_C_LINK_PARAM_LTE_L2_BUFFER_STATUS
-#define RAL_LINK_PARAM_LTE_MOBILE_NODE_CAPABILITIES            MIH_C_LINK_PARAM_LTE_MOBILE_NODE_CAPABILITIES
-#define RAL_LINK_PARAM_LTE_EMBMS_CAPABILITY                    MIH_C_LINK_PARAM_LTE_EMBMS_CAPABILITY
-#define RAL_LINK_PARAM_LTE_JUMBO_FEASIBILITY                   MIH_C_LINK_PARAM_LTE_JUMBO_FEASIBILITY
-#define RAL_LINK_PARAM_LTE_JUMBO_SETUP_STATUS                  MIH_C_LINK_PARAM_LTE_JUMBO_SETUP_STATUS
 #define RAL_LINK_PARAM_LTE_NUM_ACTIVE_EMBMS_RECEIVERS_PER_FLOW MIH_C_LINK_PARAM_LTE_NUM_ACTIVE_EMBMS_RECEIVERS_PER_FLOW
 #define RAL_LINK_PARAM_LTE_MAX                                 RAL_LINK_PARAM_LTE_NUM_ACTIVE_EMBMS_RECEIVERS_PER_FLOW
 
 #define RAL_LINK_PARAM_TYPE_CHOICE_GEN       MIH_C_LINK_PARAM_TYPE_CHOICE_GEN  // 0
-#define RAL_LINK_PARAM_TYPE_CHOICE_QOS       MIH_C_LINK_PARAM_TYPE_CHOICE_QOS
 #define RAL_LINK_PARAM_TYPE_CHOICE_LTE       MIH_C_LINK_PARAM_TYPE_CHOICE_LTE  // 12
 
 typedef struct ral_link_param_type_s {
@@ -277,12 +233,6 @@ typedef struct ral_qos_param_val_s {
     LIST(MIH_C_PK_LOSS_RATE,    pk_loss_rate)
   } _union;
 } ral_qos_param_val_t;
-#define RAL_QOS_PARAM_VAL_CHOICE_NUM_QOS_TYPES   MIH_C_QOS_PARAM_VAL_CHOICE_NUM_QOS_TYPES
-#define RAL_QOS_PARAM_VAL_CHOICE_MIN_PK_TX_DELAY MIH_C_QOS_PARAM_VAL_CHOICE_MIN_PK_TX_DELAY
-#define RAL_QOS_PARAM_VAL_CHOICE_AVG_PK_TX_DELAY MIH_C_QOS_PARAM_VAL_CHOICE_AVG_PK_TX_DELAY
-#define RAL_QOS_PARAM_VAL_CHOICE_MAX_PK_TX_DELAY MIH_C_QOS_PARAM_VAL_CHOICE_MAX_PK_TX_DELAY
-#define RAL_QOS_PARAM_VAL_CHOICE_PK_DELAY_JITTER MIH_C_QOS_PARAM_VAL_CHOICE_PK_DELAY_JITTER
-#define RAL_QOS_PARAM_VAL_CHOICE_PK_LOSS_RATE    MIH_C_QOS_PARAM_VAL_CHOICE_PK_LOSS_RATE
 
 typedef struct ral_link_param_s {
   ral_link_param_type_t      link_param_type;
@@ -292,21 +242,14 @@ typedef struct ral_link_param_s {
     ral_qos_param_val_t    qos_param_val;
   } _union;
 } ral_link_param_t;
-#define RAL_LINK_PARAM_CHOICE_LINK_PARAM_VAL MIH_C_LINK_PARAM_CHOICE_LINK_PARAM_VAL
-#define RAL_LINK_PARAM_CHOICE_QOS_PARAM_VAL  MIH_C_LINK_PARAM_CHOICE_QOS_PARAM_VAL
 
 typedef struct ral_link_cfg_param_s {
   ral_link_param_type_t        link_param_type;
-#define  RAL_LINK_CFG_PARAM_CHOICE_TIMER_NULL 0
-#define  RAL_LINK_CFG_PARAM_CHOICE_TIMER      1
   uint8_t                      union_choice;
   union  {
     uint8_t    null_attr;
     uint16_t   timer_interval;         // This timer value (ms) is used to set the interval between periodic reports.
   } _union;
-#define RAL_TH_ACTION_SET_NORMAL_THRESHOLD      MIH_C_SET_NORMAL_THRESHOLD
-#define RAL_TH_ACTION_SET_ONE_SHOT_THRESHOLD    MIH_C_SET_ONE_SHOT_THRESHOLD
-#define RAL_TH_ACTION_CANCEL_THRESHOLD          MIH_C_CANCEL_THRESHOLD
   ral_th_action_t             th_action; // indicates what action to apply to the listed thresholds.
   // When “Cancel threshold” is selected and no thresholds are specified, then
   // all currently configured thresholds for the given LINK_PARAM_TYPE are can-

@@ -28,7 +28,6 @@
  * \email: navid.nikaein@eurecom.fr and raymond.knopp@eurecom.fr
  */
 #define RRC_ENB
-#define RRC_ENB_C
 #include "oai_asn1.h"
 #include <asn_application.h>
 #include "uper_encoder.h"
@@ -102,7 +101,6 @@
 #include "openair1/PHY/LTE_TRANSPORT/transport_proto.h"
 
 #define ASN_MAX_ENCODE_SIZE 4096
-#define NUMBEROF_DRBS_TOBE_ADDED 1
 static int encode_CG_ConfigInfo(char *buffer,int buffer_size,rrc_eNB_ue_context_t *const ue_context_pP,int *enc_size);
 
 mui_t                               rrc_eNB_mui = 0;

@@ -38,7 +38,6 @@
 #include <dlfcn.h>
 #include "common/platform_types.h"
 
-#define CONFIG_LOADCONFIG_MAIN
 #include "config_load_configmodule.h"
 #include "config_userapi.h"
 #include "../utils/LOG/log.h"

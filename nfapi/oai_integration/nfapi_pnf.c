@@ -72,7 +72,6 @@
 #include <socket/include/socket_pnf.h>
 #endif
 
-#define NUM_P5_PHY 2
 
 #define _GNU_SOURCE
 

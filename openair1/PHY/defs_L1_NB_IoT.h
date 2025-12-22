@@ -59,8 +59,6 @@
     #define malloc16(x) memalign(32,x)
 #endif
 #define free16(y,x) free(y)
-#define bigmalloc malloc
-#define bigmalloc16 malloc16
 #define openair_free(y,x) free((y))
 #define PAGE_SIZE 4096
 
@@ -86,7 +84,6 @@ static inline void* malloc16_clear( size_t size )
 */
 
 
-// #define PAGE_MASK 0xfffff000
 // #define virt_to_phys(x) (x)
 
 // #define openair_sched_exit() exit(-1)

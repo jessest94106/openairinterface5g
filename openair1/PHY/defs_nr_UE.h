@@ -69,12 +69,9 @@
     #define malloc16(x) memalign(32,x)
 #endif
 #define free16(y,x) free(y)
-#define bigmalloc malloc
-#define bigmalloc16 malloc16
 #define openair_free(y,x) free((y))
 #define PAGE_SIZE 4096
 
-#define PAGE_MASK 0xfffff000
 #define virt_to_phys(x) (x)
 #define openair_sched_exit() exit(-1)
 
@@ -266,7 +263,6 @@ typedef struct {
 
 #define NR_PDCCH_DEFS_NR_UE
 #define NR_NBR_CORESET_ACT_BWP      3  // The number of CoreSets per BWP is limited to 3 (including initial CORESET: ControlResourceId 0)
-#define NR_NBR_SEARCHSPACE_ACT_BWP  10 // The number of SearchSpaces per BWP is limited to 10 (including initial SEARCHSPACE: SearchSpaceId 0)
 #ifdef NR_PDCCH_DEFS_NR_UE
 
 #define MAX_NR_DCI_DECODED_SLOT     10    // This value is not specified
@@ -288,8 +284,6 @@ typedef struct {
   fapi_nr_dl_config_dci_dl_pdu_rel15_t pdcch_config[FAPI_NR_MAX_SS];
 } NR_UE_PDCCH_CONFIG;
 
-#define NR_PSBCH_MAX_NB_CARRIERS 132
-#define NR_PSBCH_MAX_NB_MOD_SYMBOLS 99
 #define NR_PSBCH_DMRS_LENGTH 297 // in mod symbols
 #define NR_PSBCH_DMRS_LENGTH_DWORD 20 // ceil(2(QPSK)*NR_PBCH_DMRS_LENGTH/32)
 
