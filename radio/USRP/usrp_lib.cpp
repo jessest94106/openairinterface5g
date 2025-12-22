@@ -478,14 +478,15 @@ static int trx_usrp_write(openair0_device *device,
       nsamps2 = (nsamps+7)>>3;
       simde__m256i buff_tx[cc < 2 ? 2 : cc][nsamps2];
 
-      // bring RX data into 12 LSBs for softmodem RX
+      // bring TX data into 16 MSBs, assuming it is on the 12 LSB  after OAI computation
+      const int shift = 4;
       for (int i = 0; i < cc; i++) {
         for (int j = 0; j < nsamps2; j++) {
           if ((((uintptr_t)buff[i]) & 0x1F) == 0) {
-            buff_tx[i][j] = simde_mm256_slli_epi16(((simde__m256i *)buff[i])[j], 4);
+            buff_tx[i][j] = simde_mm256_slli_epi16(((simde__m256i *)buff[i])[j], shift);
           } else {
             simde__m256i tmp = simde_mm256_loadu_si256(((simde__m256i *)buff[i]) + j);
-            buff_tx[i][j] = simde_mm256_slli_epi16(tmp, 4);
+            buff_tx[i][j] = simde_mm256_slli_epi16(tmp, shift);
           }
         }
       }
@@ -605,17 +606,17 @@ void *trx_usrp_write_thread(void * arg){
 
         nsamps2 = (nsamps+7)>>3;
         simde__m256i buff_tx[cc < 2 ? 2 : cc][nsamps2];
-
-        // bring RX data into 12 LSBs for softmodem RX
+        // bring TX data into 16 MSBs, assuming it is on the 12 LSB  after OAI computation
+        const int shift = 4;
         for (int i = 0; i < cc; i++) {
           for (int j = 0; j < nsamps2; j++) {
             if ((((uintptr_t) buff[i])&0x1F)==0) {
-              buff_tx[i][j] = simde_mm256_slli_epi16(((simde__m256i *)buff[i])[j], 4);
+              buff_tx[i][j] = simde_mm256_slli_epi16(((simde__m256i *)buff[i])[j], shift);
             }
             else
             {
               simde__m256i tmp = simde_mm256_loadu_si256(((simde__m256i *)buff[i]) + j);
-              buff_tx[i][j] = simde_mm256_slli_epi16(tmp,4);
+              buff_tx[i][j] = simde_mm256_slli_epi16(tmp, shift);
             }
           }
         }
@@ -752,11 +753,13 @@ static int trx_usrp_read(openair0_device *device, openair0_timestamp *ptimestamp
   // bring RX data into 12 LSBs for softmodem RX
   for (int i=0; i<cc; i++) {
     for (int j = 0; j < nsamps2; j++) {
-      // FK: in some cases the buffer might not be 32 byte aligned, so we cannot use avx2
-
+      // bring RX data into 12 LSBs for softmodem RX,
+      // this keeps the significant bits of B210 and may loose better ADC results,
+      // but it makes free bits in MSB for signal processing on int16
       if ((((uintptr_t) buff[i])&0x1F)==0) {
         ((simde__m256i *)buff[i])[j] = simde_mm256_srai_epi16(buff_tmp[i][j], rxshift);
       } else {
+        // FK: in some cases the buffer might not be 32 byte aligned, so we cannot use avx2
         simde__m256i tmp = simde_mm256_srai_epi16(buff_tmp[i][j], rxshift);
         simde_mm256_storeu_si256(((simde__m256i *)buff[i]) + j, tmp);
       }
@@ -1338,12 +1341,6 @@ extern "C" {
         break;
     }
   }
-
-  /* device specific */
-  //openair0_cfg[0].txlaunch_wait = 1;//manage when TX processing is triggered
-  //openair0_cfg[0].txlaunch_wait_slotcount = 1; //manage when TX processing is triggered
-  openair0_cfg[0].iq_txshift = 4;//shift
-  openair0_cfg[0].iq_rxrescale = 15;//rescale iqs
 
   if(openair0_cfg[0].tx_subdev!=NULL){
     LOG_I(HW, "openair0_cfg[0].tx_subdev == %s\n", openair0_cfg[0].tx_subdev);
