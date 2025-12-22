@@ -819,7 +819,6 @@ static void fill_rf_config(RU_t *ru, char *rf_config_file)
                         N_RB,
                         fp->threequarter_fs,
                         &cfg->sample_rate,
-                        &cfg->samples_per_frame,
                         &cfg->tx_bw,
                         &cfg->rx_bw);
 
@@ -833,7 +832,6 @@ static void fill_rf_config(RU_t *ru, char *rf_config_file)
   AssertFatal(ru->nb_tx > 0 && ru->nb_tx <= 8, "openair0 does not support more than 8 antennas\n");
   AssertFatal(ru->nb_rx > 0 && ru->nb_rx <= 8, "openair0 does not support more than 8 antennas\n");
 
-  cfg->Mod_id = 0;
   cfg->num_rb_dl = N_RB;
   cfg->tx_num_channels = ru->nb_tx * ru->num_beams_period;
   cfg->rx_num_channels = ru->nb_rx * ru->num_beams_period;

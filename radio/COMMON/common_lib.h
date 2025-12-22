@@ -117,7 +117,6 @@ typedef enum {
   MAX_TRANSP_TYPE
 } transport_type_t;
 
-
 /*!\brief  openair0 device host type */
 typedef enum {
   MIN_HOST_TYPE = 0,
@@ -211,16 +210,10 @@ typedef struct split7_config {
 
 /*! \brief RF frontend parameters set by application */
 typedef struct openair0_config {
-  //! Module ID for this configuration
-  int Mod_id;
-  //! duplexing mode
-  duplex_mode_t duplex_mode;
+   //! duplexing mode
+  duplex_mode_t duplex_mode; 
   //! number of downlink resource blocks
-  int num_rb_dl;
-  //! number of samples per frame
-  unsigned int  samples_per_frame;
-  //! the sample rate for both transmit and receive.
-  double sample_rate;
+  int num_rb_dl;  double sample_rate;
   //! flag to indicate that the device is doing mmapped DMA transfers
   int mmapped_dma;
   //! offset in samples between TX and RX paths
@@ -254,8 +247,6 @@ typedef struct openair0_config {
   //! \brief memory
   //! \brief Pointer to Calibration table for RX gains
   rx_gain_calib_table_t *rx_gain_calib_table;
-  //! mode for rxgain (ExpressMIMO2)
-  rx_gain_t rxg_mode[8];
   //! \brief Gain for RX in dB.
   //! index: [0..rx_num_channels]
   double rx_gain[8];
@@ -278,23 +269,9 @@ typedef struct openair0_config {
   int autocal[8];
   //! Configuration file for LMS7002M
   char *configFilename;
-  //! remote IP/MAC addr for Ethernet interface
-  char *remote_addr;
-  //! remote port number for Ethernet interface
-  unsigned int remote_port;
-  //! local IP/MAC addr for Ethernet interface (eNB/BBU, UE)
-  char *my_addr;
-  //! local port number for Ethernet interface (eNB/BBU, UE)
-  unsigned int my_port;
   //! record player configuration, definition in record_player.h
   uint32_t       recplay_mode;
   recplay_conf_t *recplay_conf;
-  //! number of samples per tti
-  unsigned int  samples_per_tti;
-  //! the sample rate for receive.
-  double rx_sample_rate;
-  //! the sample rate for transmit.
-  double tx_sample_rate;
   //! Flag to indicate this configuration is for NR
   int nr_flag;
   //! NR band number
@@ -406,16 +383,10 @@ typedef struct {
   } queue[WRITE_QUEUE_SZ];
 } re_order_t;
 
-/*!\brief structure holds the parameters to configure USRP devices */
+/*!\brief structure holds the parameters to configure RF devices */
 struct openair0_device_t {
   /*!tx write thread*/
   openair0_thread_t write_thread;
-
-  /*!brief Module ID of this device */
-  int Mod_id;
-
-  /*!brief Component Carrier ID of this device */
-  int CC_id;
 
   /*!brief Type of this device */
   dev_type_t type;
@@ -435,16 +406,11 @@ struct openair0_device_t {
   recplay_state_t *recplay_state;
   /* !brief Indicates if device already initialized */
   int is_init;
-
-
   /*!brief Can be used by driver to hold internal structure*/
   void *priv;
 
   /*!brief pointer to FH state, used in ECPRI split 8*/
   fhstate_t fhstate;
-
-  /*!brief message response for notification fifo*/
-  notifiedFIFO_t *respudpTX;
 
   /*!brief UDP TX thread context*/
   udp_ctx_t **utx;
@@ -678,14 +644,6 @@ struct openair0_device_t {
   re_order_t reOrder;
 };
 
-/* type of device init function, implemented in shared lib */
-typedef int(*oai_device_initfunc_t)(openair0_device *device, openair0_config_t *openair0_cfg);
-/* type of transport init function, implemented in shared lib */
-typedef int(*oai_transport_initfunc_t)(openair0_device *device, openair0_config_t *openair0_cfg, eth_params_t *eth_params);
-
-#define OPTION_LZ4  0x00000001          // LZ4 compression (option_value is set to compressed size)
-
-
 typedef struct {
   uint32_t size;           // Number of samples per antenna to follow this header
   uint32_t nbAnt;          // Total number of antennas following this header
@@ -706,7 +664,6 @@ extern "C"
 
 #define  DEVICE_SECTION   "device"
 #define  CONFIG_HLP_DEVICE  "Identifies the oai device (the interface to RF) to use, the shared lib \"lib_<name>.so\" will be loaded"
-
 #define  CONFIG_DEVICEOPT_NAME "name"
 
 /* inclusion for device configuration */
@@ -726,12 +683,6 @@ const char *get_devname(int devtype);
 int openair0_device_load(openair0_device *device, openair0_config_t *openair0_cfg);
 /*! \brief Initialize transport protocol . It returns 0 if OK */
 int openair0_transport_load(openair0_device *device, openair0_config_t *openair0_cfg, eth_params_t *eth_params);
-
-
-/*! \brief Get current timestamp of USRP
- * \param device the hardware to use
- */
-openair0_timestamp get_usrp_time(openair0_device *device);
 
 /*! \brief Set RX frequencies
  * \param device the hardware to use

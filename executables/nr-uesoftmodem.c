@@ -238,14 +238,12 @@ void init_openair0(PHY_VARS_NR_UE *ue)
     uint64_t dl_carrier, ul_carrier;
     cfg->configFilename    = NULL;
     cfg->sample_rate       = frame_parms->samples_per_subframe * 1e3;
-    cfg->samples_per_frame = frame_parms->samples_per_frame;
 
     if (frame_parms->frame_type==TDD)
       cfg->duplex_mode = duplex_mode_TDD;
     else
       cfg->duplex_mode = duplex_mode_FDD;
 
-    cfg->Mod_id = 0;
     cfg->num_rb_dl = frame_parms->N_RB_DL;
     cfg->clock_source = get_softmodem_params()->clock_source;
     cfg->time_source = get_softmodem_params()->timing_source;

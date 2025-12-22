@@ -397,7 +397,6 @@ __attribute__((__visibility__("default"))) int transport_init(openair0_device *d
   eth->e.if_name = eth_params->local_if_name;
   eth->last_msg = (rru_config_msg_type_t)-1;
 
-  device->Mod_id = 0;
   device->transp_type = ETHERNET_TP;
   device->trx_start_func = trx_oran_start;
   device->trx_get_stats_func = trx_oran_get_stats;
