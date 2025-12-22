@@ -2253,3 +2253,131 @@ void free_positioning_information_resp(f1ap_positioning_information_resp_t *msg)
     free(msg->srs_configuration);
   }
 }
+
+/**
+ * @brief Encode F1 positioning information failure to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_information_failure(const f1ap_positioning_information_failure_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_unsuccessfulOutcome;
+  asn1cCalloc(pdu->choice.unsuccessfulOutcome, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningInformationExchange;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_UnsuccessfulOutcome__value_PR_PositioningInformationFailure;
+  F1AP_PositioningInformationFailure_t *out = &tmp->value.choice.PositioningInformationFailure;
+
+  /* mandatory : GNB_CU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningInformationFailureIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningInformationFailureIEs__value_PR_GNB_CU_UE_F1AP_ID;
+  ie1->value.choice.GNB_CU_UE_F1AP_ID = msg->gNB_CU_ue_id;
+
+  /* mandatory : GNB_DU_UE_F1AP_ID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningInformationFailureIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningInformationFailureIEs__value_PR_GNB_DU_UE_F1AP_ID;
+  ie2->value.choice.GNB_DU_UE_F1AP_ID = msg->gNB_DU_ue_id;
+
+  /* mandatory : Cause */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningInformationFailureIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_Cause;
+  ie3->criticality = F1AP_Criticality_ignore;
+  ie3->value.present = F1AP_PositioningInformationFailureIEs__value_PR_Cause;
+  ie3->value.choice.Cause = encode_f1ap_cause(msg->cause, msg->cause_value);
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 positioning information failure
+ */
+bool decode_positioning_information_failure(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_information_failure_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningInformationFailure_t *in = &pdu->choice.unsuccessfulOutcome->value.choice.PositioningInformationFailure;
+  F1AP_PositioningInformationFailureIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningInformationFailureIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningInformationFailureIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningInformationFailureIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_Cause, true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_gNB_CU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningInformationFailureIEs__value_PR_GNB_CU_UE_F1AP_ID);
+        out->gNB_CU_ue_id = ie->value.choice.GNB_CU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_gNB_DU_UE_F1AP_ID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningInformationFailureIEs__value_PR_GNB_DU_UE_F1AP_ID);
+        out->gNB_DU_ue_id = ie->value.choice.GNB_DU_UE_F1AP_ID;
+        break;
+      case F1AP_ProtocolIE_ID_id_Cause:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningInformationFailureIEs__value_PR_Cause);
+        _F1_CHECK_EXP(decode_f1ap_cause(ie->value.choice.Cause, &out->cause, &out->cause_value));
+        break;
+      case F1AP_ProtocolIE_ID_id_CriticalityDiagnostics:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 positioning information failure deep copy
+ */
+f1ap_positioning_information_failure_t cp_positioning_information_failure(const f1ap_positioning_information_failure_t *orig)
+{
+  /* copy all mandatory fields that are not dynamic memory */
+  f1ap_positioning_information_failure_t cp = {
+      .gNB_CU_ue_id = orig->gNB_CU_ue_id,
+      .gNB_DU_ue_id = orig->gNB_DU_ue_id,
+      .cause = orig->cause,
+      .cause_value = orig->cause_value,
+  };
+
+  return cp;
+}
+
+/**
+ * @brief F1 positioning information failure equality check
+ */
+bool eq_positioning_information_failure(const f1ap_positioning_information_failure_t *a,
+                                        const f1ap_positioning_information_failure_t *b)
+{
+  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _F1_EQ_CHECK_INT(a->cause, b->cause);
+  _F1_EQ_CHECK_LONG(a->cause_value, b->cause_value);
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 positioning information failure
+ */
+void free_positioning_information_failure(f1ap_positioning_information_failure_t *msg)
+{
+  // nothing to free
+}
