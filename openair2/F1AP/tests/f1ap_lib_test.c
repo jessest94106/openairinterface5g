@@ -43,6 +43,7 @@
 #include "lib/f1ap_rrc_message_transfer.h"
 #include "lib/f1ap_interface_management.h"
 #include "lib/f1ap_ue_context.h"
+#include "lib/f1ap_positioning.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
 {
@@ -1268,6 +1269,34 @@ static void test_f1ap_ue_context_release_complete()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_information_request()
+{
+  f1ap_positioning_information_req_t orig = {
+      .gNB_CU_ue_id = 12,
+      .gNB_DU_ue_id = 19,
+  };
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_information_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_information_req_t decoded = {0};
+  bool ret = decode_positioning_information_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_information_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_information_req(&orig, &decoded);
+  AssertFatal(ret, "eq_positioning_information_req(): decoded message doesn't match\n");
+  free_positioning_information_req(&decoded);
+
+  f1ap_positioning_information_req_t cp = cp_positioning_information_req(&orig);
+  ret = eq_positioning_information_req(&orig, &cp);
+  AssertFatal(ret, "eq_positioning_information_req(): copied message doesn't match\n");
+  free_positioning_information_req(&orig);
+  free_positioning_information_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1294,5 +1323,6 @@ int main()
   test_f1ap_ue_context_release_request();
   test_f1ap_ue_context_release_command();
   test_f1ap_ue_context_release_complete();
+  test_f1ap_positioning_information_request();
   return 0;
 }

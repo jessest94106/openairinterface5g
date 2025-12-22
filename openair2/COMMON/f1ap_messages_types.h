@@ -671,4 +671,14 @@ typedef struct f1ap_reset_ack_t {
   //uint16_t criticality_diagnostics; // not implemented as of now
 } f1ap_reset_ack_t;
 
+/* Structure of Position Information Transfer related NRPPA messages */
+/* IE structures for Positioning related messages as per TS 38.473 V16.3.1*/
+
+typedef struct f1ap_positioning_information_req_s {
+  // IE 9.3.1.4 (mandatory)
+  uint32_t gNB_CU_ue_id;
+  // IE 9.3.1.5 (mandatory)
+  uint32_t gNB_DU_ue_id;
+} f1ap_positioning_information_req_t;
+
 #endif /* F1AP_MESSAGES_TYPES_H_ */
