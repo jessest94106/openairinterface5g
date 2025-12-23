@@ -273,21 +273,23 @@ NR_SearchSpace_t *rrc_searchspace_config(bool is_common,
   return ss;
 }
 
-static NR_ControlResourceSet_t *get_coreset_config(int bwp_id, int curr_bwp, uint64_t ssb_bitmap)
+static NR_ControlResourceSet_t *get_coreset_config(int bwp_id, int bwp_start, int bwp_size, uint64_t ssb_bitmap)
 {
   NR_ControlResourceSet_t *coreset = calloc(1, sizeof(*coreset));
   AssertFatal(coreset != NULL, "out of memory\n");
   // frequency domain resources depending on BWP size
+  int additional_offset = (bwp_start + 5) / 6 * 6 - bwp_start;
+  int eff_bwp_size = bwp_size - additional_offset;
   coreset->frequencyDomainResources.buf = calloc(1,6);
-  coreset->frequencyDomainResources.buf[0] = (curr_bwp < 48) ? 0xf0 : 0xff;
-  coreset->frequencyDomainResources.buf[1] = (curr_bwp < 96) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[2] = (curr_bwp < 144) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[3] = (curr_bwp < 192) ? 0x00 : 0xff;
-  coreset->frequencyDomainResources.buf[4] = (curr_bwp < 240) ? 0x00 : 0xff;
+  coreset->frequencyDomainResources.buf[0] = (eff_bwp_size < 48) ? 0xf0 : 0xff;
+  coreset->frequencyDomainResources.buf[1] = (eff_bwp_size < 96) ? 0x00 : 0xff;
+  coreset->frequencyDomainResources.buf[2] = (eff_bwp_size < 144) ? 0x00 : 0xff;
+  coreset->frequencyDomainResources.buf[3] = (eff_bwp_size < 192) ? 0x00 : 0xff;
+  coreset->frequencyDomainResources.buf[4] = (eff_bwp_size < 240) ? 0x00 : 0xff;
   coreset->frequencyDomainResources.buf[5] = 0x00;
   coreset->frequencyDomainResources.size = 6;
   coreset->frequencyDomainResources.bits_unused = 3;
-  coreset->duration = (curr_bwp < 48) ? 2 : 1;
+  coreset->duration = (eff_bwp_size < 48) ? 2 : 1;
   coreset->cce_REG_MappingType.present = NR_ControlResourceSet__cce_REG_MappingType_PR_nonInterleaved;
   coreset->precoderGranularity = NR_ControlResourceSet__precoderGranularity_sameAsREG_bundle;
 
@@ -1746,10 +1748,10 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup = calloc(1,sizeof(*bwp->bwp_Common->pdcch_ConfigCommon->choice.setup));
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->controlResourceSetZero = NULL;
 
-  int curr_bwp = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth,MAX_BWP_SIZE);
-
+  int bwp_size = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
+  int bwp_start = NRRIV2PRBOFFSET(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   uint64_t ssb_bitmap = get_ssb_bitmap(scc);
-  NR_ControlResourceSet_t *coreset = get_coreset_config(bwp->bwp_Id, curr_bwp, ssb_bitmap);
+  NR_ControlResourceSet_t *coreset = get_coreset_config(bwp->bwp_Id, bwp_start, bwp_size, ssb_bitmap);
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonControlResourceSet = coreset;
 
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->searchSpaceZero=NULL;
@@ -1790,7 +1792,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   nr_rrc_config_dl_tda(bwp->bwp_Common->pdsch_ConfigCommon->choice.setup->pdsch_TimeDomainAllocationList,
                        get_frame_type((int)*scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0], *scc->ssbSubcarrierSpacing),
                        scc->tdd_UL_DL_ConfigurationCommon,
-                       curr_bwp);
+                       bwp_size);
 
   if (!bwp->bwp_Dedicated) {
     bwp->bwp_Dedicated=calloc(1,sizeof(*bwp->bwp_Dedicated));
@@ -1803,7 +1805,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
 
   // coreset2 is identical to coreset above, but reallocated to prevent double
   // frees
-  NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, curr_bwp, ssb_bitmap);
+  NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, bwp_start, bwp_size, ssb_bitmap);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset2);
   int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   int num_cces = get_coreset_num_cces(coreset2->frequencyDomainResources.buf, coreset2->duration);
@@ -3332,8 +3334,9 @@ static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCell
   pdcch_Config->searchSpacesToAddModList = calloc(1, sizeof(*pdcch_Config->searchSpacesToAddModList));
   pdcch_Config->controlResourceSetToAddModList = calloc(1, sizeof(*pdcch_Config->controlResourceSetToAddModList));
   NR_BWP_t *genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
-  int curr_bwp = NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
-  NR_ControlResourceSet_t *coreset = get_coreset_config(0, curr_bwp, bitmap);
+  int bwp_size = NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
+  int bwp_start = NRRIV2PRBOFFSET(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
+  NR_ControlResourceSet_t *coreset = get_coreset_config(0, bwp_start, bwp_size, bitmap);
   asn1cSeqAdd(&pdcch_Config->controlResourceSetToAddModList->list, coreset);
 
   int css_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];

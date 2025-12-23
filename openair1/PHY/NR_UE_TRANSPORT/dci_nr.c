@@ -204,6 +204,7 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
                                         c16_t dl_ch_estimates_ext[][arraySz],
                                         NR_DL_FRAME_PARMS *frame_parms,
                                         uint8_t *coreset_freq_dom,
+                                        uint32_t rb_offset,
                                         uint32_t coreset_nbr_rb,
                                         uint32_t n_BWP_start)
 {
@@ -250,7 +251,7 @@ static void nr_pdcch_extract_rbs_single(uint32_t rxdataF_sz,
         continue;
       }
       for (int rb = 0; rb < 6; rb++) {
-        int c_rb = rb_group * 6 + rb;
+        int c_rb = rb_group * 6 + rb + rb_offset;
         c16_t *rxF = NULL;
         if ((frame_parms->N_RB_DL & 1) == 0) {
           if ((c_rb + n_BWP_start) < frame_parms->N_RB_DL / 2)
@@ -338,10 +339,9 @@ static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
   fapi_nr_coreset_t *coreset = &phy_pdcch_config->pdcch_config[ss_idx].coreset;
   int32_t pdcch_est_size = ceil_mod(fp->ofdm_symbol_size + LTE_CE_FILTER_LENGTH, 16);
   __attribute__((aligned(16))) c16_t pdcch_dl_ch_estimates[fp->nb_antennas_rx][pdcch_est_size];
-  int n_rb;
-  int rb_offset;
-  get_coreset_rballoc(coreset->frequency_domain_resource, &n_rb, &rb_offset);
-
+  int n_rb, cset_start;
+  get_coreset_rballoc(coreset->frequency_domain_resource, &n_rb, &cset_start);
+  int rb_offset = cset_start + coreset->rb_offset;
   unsigned short scrambling_id = coreset->pdcch_dmrs_scrambling_id;
   int dmrs_ref = 0;
   if (coreset->CoreSetType == NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG)
@@ -376,6 +376,7 @@ static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
                               pdcch_dl_ch_estimates_ext,
                               fp,
                               coreset->frequency_domain_resource,
+                              coreset->rb_offset,
                               n_rb,
                               phy_pdcch_config->pdcch_config[ss_idx].BWPStart);
 
@@ -509,10 +510,8 @@ void nr_pdcch_dci_indication(const UE_nr_rxtx_proc_t *proc,
     uint8_t unused_start_symb[NR_SYMBOLS_PER_SLOT] = {0};
     const int num_monitoring_occ = get_pdcch_mon_occasions_slot(rel15, unused_start_symb);
     const int llr_stride = llr_size / rel15->coreset.duration;
-
-    int n_rb;
-    int rb_offset;
-    get_coreset_rballoc(rel15->coreset.frequency_domain_resource, &n_rb, &rb_offset);
+    int n_rb, cset_start;
+    get_coreset_rballoc(rel15->coreset.frequency_domain_resource, &n_rb, &cset_start);
 
     for (int m = 0; m < num_monitoring_occ; m++) {
       /// PDCCH/DCI e-sequence (input to rate matching).
@@ -643,9 +642,9 @@ static void nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
             .ss_type = rel15->ss_type_options[k],
             .coreset_type = rel15->coreset.CoreSetType,
         };
-        int n_rb, rb_offset;
-        get_coreset_rballoc(rel15->coreset.frequency_domain_resource, &n_rb, &rb_offset);
-        dci->cset_start = rel15->BWPStart + rb_offset;
+        int n_rb, cset_start;
+        get_coreset_rballoc(rel15->coreset.frequency_domain_resource, &n_rb, &cset_start);
+        dci->cset_start = rel15->BWPStart + cset_start + rel15->coreset.rb_offset;
         dci->payloadSize = dci_length;
         memcpy(dci->payloadBits, dci_estimation, (dci_length + 7) / 8);
         dci_ind->number_of_dcis++;
