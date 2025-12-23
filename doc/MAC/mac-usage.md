@@ -255,8 +255,6 @@ configuration](../RRC/rrc-usage.md) as well for SIB configuration.
 * `pusch_AntennaPorts` (default 1): number of antenna ports in PUSCH
 * `maxMIMO_layers` (default -1=unlimited): maximum number of MIMO layers to use
   in downlink
-* `sib1_tda` (default 1): time domain allocation (TDA) indices to use for SIB1
-  (38.214 section 5.1.2.1.1)
 * `do_CSIRS` (default 0): flag whether to use channel-state information
   reference signal (CSI-RS)
 * `do_SRS` (default 0): flag whether to use sounding reference signal (SRS)

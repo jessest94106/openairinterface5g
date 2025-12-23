@@ -296,7 +296,6 @@ This allows to reuse HARQ processes immediately, but it breaks compatibility wit
 To enable this feature, the `disable_harq` flag has to be added to the gNB conf file in the section `gNBs.[0]`
 ```
 ...
-    sib1_tda     = 5;
     min_rxtxtime = 6;
     disable_harq = 1; // <--
 
