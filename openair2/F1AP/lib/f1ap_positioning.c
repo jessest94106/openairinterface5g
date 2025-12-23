@@ -4461,3 +4461,341 @@ void free_trp_information_failure(f1ap_trp_information_failure_t *msg)
 {
   // nothing to free
 }
+
+/**
+ * @brief Encode F1 positioning measurement request to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_measurement_req(const f1ap_positioning_measurement_req_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu->choice.initiatingMessage, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningMeasurementExchange;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_InitiatingMessage__value_PR_PositioningMeasurementRequest;
+  F1AP_PositioningMeasurementRequest_t *out = &tmp->value.choice.PositioningMeasurementRequest;
+
+  /* mandatory : TransactionID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+
+  /* mandatory : LMF_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_LMF_MeasurementID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_LMF_MeasurementID;
+  ie2->value.choice.LMF_MeasurementID = msg->lmf_measurement_id;
+
+  /* mandatory : RAN_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_RAN_MeasurementID;
+  ie3->criticality = F1AP_Criticality_reject;
+  ie3->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_RAN_MeasurementID;
+  ie3->value.choice.RAN_MeasurementID = msg->ran_measurement_id;
+
+  /* TRP Measurement Request List */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie4);
+  ie4->id = F1AP_ProtocolIE_ID_id_TRP_MeasurementRequestList;
+  ie4->criticality = F1AP_Criticality_reject;
+  ie4->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_TRP_MeasurementRequestList;
+  F1AP_TRP_MeasurementRequestList_t *f1_trp_meas_req_list = &ie4->value.choice.TRP_MeasurementRequestList;
+  const f1ap_trp_measurement_request_list_t *trp_meas_req_list = &msg->trp_measurement_request_list;
+  for (int i = 0; i < trp_meas_req_list->trp_measurement_request_list_length; i++) {
+    // mandatory : TRP List Item
+    asn1cSequenceAdd(f1_trp_meas_req_list->list, F1AP_TRP_MeasurementRequestItem_t, trp_meas_req_item);
+    trp_meas_req_item->tRPID = trp_meas_req_list->trp_measurement_request_item[i].tRPID;
+  }
+
+  /* mandatory : PosReportCharacteristics */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie5);
+  ie5->id = F1AP_ProtocolIE_ID_id_PosReportCharacteristics;
+  ie5->criticality = F1AP_Criticality_reject;
+  ie5->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_PosReportCharacteristics;
+  ie5->value.choice.PosReportCharacteristics = msg->pos_report_characteristics;
+
+  /* C : if ReportCharacteristicsPeriodic */
+  if (msg->pos_report_characteristics == F1AP_POSREPORTCHARACTERISTICS_PERIODIC) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie6);
+    ie6->id = F1AP_ProtocolIE_ID_id_PosMeasurementPeriodicity;
+    ie6->criticality = F1AP_Criticality_reject;
+    ie6->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_MeasurementPeriodicity;
+    ie6->value.choice.MeasurementPeriodicity = msg->measurement_periodicity;
+  }
+
+  /* mandatory : Positioning Measurement Periodicity */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie7);
+  ie7->id = F1AP_ProtocolIE_ID_id_PosMeasurementQuantities;
+  ie7->criticality = F1AP_Criticality_reject;
+  ie7->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_PosMeasurementQuantities;
+  F1AP_PosMeasurementQuantities_t *f1_pos_meas_quantities = &ie7->value.choice.PosMeasurementQuantities;
+  const f1ap_pos_measurement_quantities_t *pos_meas_quantities = &msg->pos_measurement_quantities;
+  for (int i = 0; i < pos_meas_quantities->pos_measurement_quantities_length; i++) {
+    // mandatory: PosMeasurementQuantitiesItem
+    asn1cSequenceAdd(f1_pos_meas_quantities->list, F1AP_PosMeasurementQuantities_Item_t, pos_meas_quantity_item);
+    pos_meas_quantity_item->posMeasurementType = pos_meas_quantities->pos_measurement_quantities_item[i].pos_measurement_type;
+  }
+
+  /* optional: SRS Configuration */
+  if (msg->srs_configuration) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementRequestIEs_t, ie8);
+    ie8->id = F1AP_ProtocolIE_ID_id_SRSConfiguration;
+    ie8->criticality = F1AP_Criticality_ignore;
+    ie8->value.present = F1AP_PositioningMeasurementRequestIEs__value_PR_SRSConfiguration;
+    f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    ie8->value.choice.SRSConfiguration.sRSCarrier_List = encode_srs_carrier_list(srs_carrier_list);
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 Positioning Measurement request
+ */
+bool decode_positioning_measurement_req(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_measurement_req_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningMeasurementRequest_t *in = &pdu->choice.initiatingMessage->value.choice.PositioningMeasurementRequest;
+  F1AP_PositioningMeasurementRequestIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_LMF_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_RAN_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_TRP_MeasurementRequestList,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_PosReportCharacteristics,
+                   true);
+  F1AP_PosReportCharacteristics_t *report_char = &ie->value.choice.PosReportCharacteristics;
+  if (*report_char == F1AP_PosReportCharacteristics_periodic) {
+    F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                     ie,
+                     &in->protocolIEs.list,
+                     F1AP_ProtocolIE_ID_id_PosMeasurementPeriodicity,
+                     true);
+  }
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_PosMeasurementQuantities,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementRequestIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_SRSConfiguration,
+                   false);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_LMF_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_LMF_MeasurementID);
+        out->lmf_measurement_id = ie->value.choice.LMF_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_RAN_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_RAN_MeasurementID);
+        out->ran_measurement_id = ie->value.choice.RAN_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_TRP_MeasurementRequestList:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_TRP_MeasurementRequestList);
+        F1AP_TRP_MeasurementRequestList_t *f1_trp_meas_req_list = &ie->value.choice.TRP_MeasurementRequestList;
+        f1ap_trp_measurement_request_list_t *trp_meas_req_list = &out->trp_measurement_request_list;
+        uint32_t trp_meas_req_list_len = f1_trp_meas_req_list->list.count;
+        AssertError(trp_meas_req_list_len > 0, return false, "at least 1 TRP must be present");
+        trp_meas_req_list->trp_measurement_request_list_length = trp_meas_req_list_len;
+        trp_meas_req_list->trp_measurement_request_item =
+            calloc_or_fail(trp_meas_req_list_len, sizeof(*trp_meas_req_list->trp_measurement_request_item));
+        for (int i = 0; i < trp_meas_req_list_len; i++) {
+          trp_meas_req_list->trp_measurement_request_item[i].tRPID = f1_trp_meas_req_list->list.array[i]->tRPID;
+        }
+        break;
+      case F1AP_ProtocolIE_ID_id_PosReportCharacteristics:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_PosReportCharacteristics);
+        out->pos_report_characteristics = ie->value.choice.PosReportCharacteristics;
+        break;
+      case F1AP_ProtocolIE_ID_id_PosMeasurementPeriodicity:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_MeasurementPeriodicity);
+        out->measurement_periodicity = ie->value.choice.MeasurementPeriodicity;
+        break;
+      case F1AP_ProtocolIE_ID_id_PosMeasurementQuantities:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_PosMeasurementQuantities);
+        F1AP_PosMeasurementQuantities_t *f1_pos_meas_quantities = &ie->value.choice.PosMeasurementQuantities;
+        f1ap_pos_measurement_quantities_t *pos_meas_quantities = &out->pos_measurement_quantities;
+        uint32_t pos_meas_quantities_len = f1_pos_meas_quantities->list.count;
+        AssertError(pos_meas_quantities_len > 0, return false, "at least 1 position measurement must be present");
+        pos_meas_quantities->pos_measurement_quantities_length = pos_meas_quantities_len;
+        pos_meas_quantities->pos_measurement_quantities_item =
+            calloc_or_fail(pos_meas_quantities_len, sizeof(*pos_meas_quantities->pos_measurement_quantities_item));
+        for (int i = 0; i < pos_meas_quantities_len; i++) {
+          f1ap_pos_measurement_quantities_item_t *pos_meas_quantities_item =
+              &pos_meas_quantities->pos_measurement_quantities_item[i];
+          F1AP_PosMeasurementQuantities_Item_t *f1_PosMeasurementQuantities_Item = f1_pos_meas_quantities->list.array[i];
+          pos_meas_quantities_item->pos_measurement_type = f1_PosMeasurementQuantities_Item->posMeasurementType;
+        }
+        break;
+      case F1AP_ProtocolIE_ID_id_SFNInitialisationTime:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not supported, skipping\n", ie->id);
+        break;
+      case F1AP_ProtocolIE_ID_id_SRSConfiguration:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementRequestIEs__value_PR_SRSConfiguration);
+        F1AP_SRSCarrier_List_t *f1_sRSCarrier_List = &ie->value.choice.SRSConfiguration.sRSCarrier_List;
+        out->srs_configuration = calloc_or_fail(1, sizeof(*out->srs_configuration));
+        f1ap_srs_carrier_list_t *srs_carrier_list = &out->srs_configuration->srs_carrier_list;
+        decode_srs_carrier_list(srs_carrier_list, f1_sRSCarrier_List);
+        break;
+      case F1AP_ProtocolIE_ID_id_MeasurementBeamInfoRequest:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not supported, skipping\n", ie->id);
+        break;
+      case F1AP_ProtocolIE_ID_id_SystemFrameNumber:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not supported, skipping\n", ie->id);
+        break;
+      case F1AP_ProtocolIE_ID_id_SlotNumber:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not supported, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 Positioning Measurement request deep copy
+ */
+f1ap_positioning_measurement_req_t cp_positioning_measurement_req(const f1ap_positioning_measurement_req_t *orig)
+{
+  // copy all mandatory fields that are not dynamic memory
+  f1ap_positioning_measurement_req_t cp = {
+      .transaction_id = orig->transaction_id,
+      .lmf_measurement_id = orig->lmf_measurement_id,
+      .ran_measurement_id = orig->ran_measurement_id,
+  };
+
+  f1ap_trp_measurement_request_list_t *trp_meas_req_list_cp = &cp.trp_measurement_request_list;
+  const f1ap_trp_measurement_request_list_t *trp_meas_req_list_orig = &orig->trp_measurement_request_list;
+  uint32_t trp_meas_req_list_len = trp_meas_req_list_orig->trp_measurement_request_list_length;
+  AssertFatal(trp_meas_req_list_len > 0, "at least 1 TRP must be present");
+  trp_meas_req_list_cp->trp_measurement_request_list_length = trp_meas_req_list_len;
+  trp_meas_req_list_cp->trp_measurement_request_item =
+      calloc_or_fail(trp_meas_req_list_len, sizeof(*trp_meas_req_list_cp->trp_measurement_request_item));
+  for (int i = 0; i < trp_meas_req_list_len; i++) {
+    trp_meas_req_list_cp->trp_measurement_request_item[i].tRPID = trp_meas_req_list_orig->trp_measurement_request_item[i].tRPID;
+  }
+
+  cp.pos_report_characteristics = orig->pos_report_characteristics;
+  if (orig->pos_report_characteristics == F1AP_POSREPORTCHARACTERISTICS_PERIODIC) {
+    cp.measurement_periodicity = orig->measurement_periodicity;
+  }
+
+  f1ap_pos_measurement_quantities_t *q_out = &cp.pos_measurement_quantities;
+  const f1ap_pos_measurement_quantities_t *q_in = &orig->pos_measurement_quantities;
+  uint32_t q_len = q_in->pos_measurement_quantities_length;
+  AssertFatal(q_len > 0, "at least 1 position measurement must be present");
+  q_out->pos_measurement_quantities_length = q_len;
+  q_out->pos_measurement_quantities_item = calloc_or_fail(q_len, sizeof(*q_out->pos_measurement_quantities_item));
+  for (int i = 0; i < q_len; i++) {
+    f1ap_pos_measurement_quantities_item_t *q_item_in = &q_in->pos_measurement_quantities_item[i];
+    f1ap_pos_measurement_quantities_item_t *q_item_out = &q_out->pos_measurement_quantities_item[i];
+    q_item_out->pos_measurement_type = q_item_in->pos_measurement_type;
+  }
+
+  /* optional: SRS Configuration */
+  if (orig->srs_configuration) {
+    cp.srs_configuration = calloc_or_fail(1, sizeof(*cp.srs_configuration));
+    f1ap_srs_carrier_list_t *srs_carrier_list_cp = &cp.srs_configuration->srs_carrier_list;
+    f1ap_srs_carrier_list_t *srs_carrier_list = &orig->srs_configuration->srs_carrier_list;
+    *srs_carrier_list_cp = cp_srs_carrier_list(srs_carrier_list);
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 Positioning Measurement request equality check
+ */
+bool eq_positioning_measurement_req(const f1ap_positioning_measurement_req_t *a, const f1ap_positioning_measurement_req_t *b)
+{
+  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->lmf_measurement_id, b->lmf_measurement_id);
+  _F1_EQ_CHECK_INT(a->ran_measurement_id, b->ran_measurement_id);
+
+  const f1ap_trp_measurement_request_list_t *trp_meas_req_list_a = &a->trp_measurement_request_list;
+  const f1ap_trp_measurement_request_list_t *trp_meas_req_list_b = &b->trp_measurement_request_list;
+  uint32_t trp_meas_req_list_len = trp_meas_req_list_a->trp_measurement_request_list_length;
+  AssertFatal(trp_meas_req_list_len > 0, "at least 1 TRP must be present");
+  _F1_EQ_CHECK_INT(trp_meas_req_list_b->trp_measurement_request_list_length, trp_meas_req_list_len);
+  for (int i = 0; i < trp_meas_req_list_len; i++) {
+    _F1_EQ_CHECK_INT(trp_meas_req_list_a->trp_measurement_request_item[i].tRPID,
+                     trp_meas_req_list_b->trp_measurement_request_item[i].tRPID);
+  }
+
+  _F1_EQ_CHECK_INT(a->pos_report_characteristics, b->pos_report_characteristics);
+  if (a->pos_report_characteristics == F1AP_POSREPORTCHARACTERISTICS_PERIODIC) {
+    _F1_EQ_CHECK_INT(a->measurement_periodicity, b->measurement_periodicity);
+  }
+
+  const f1ap_pos_measurement_quantities_t *pos_meas_quantities_a = &a->pos_measurement_quantities;
+  const f1ap_pos_measurement_quantities_t *pos_meas_quantities_b = &b->pos_measurement_quantities;
+  uint32_t pos_meas_quantities_len = pos_meas_quantities_a->pos_measurement_quantities_length;
+  AssertFatal(pos_meas_quantities_len > 0, "at least 1 position measurement must be present");
+  _F1_EQ_CHECK_INT(pos_meas_quantities_b->pos_measurement_quantities_length, pos_meas_quantities_len);
+  for (int i = 0; i < pos_meas_quantities_len; i++) {
+    f1ap_pos_measurement_quantities_item_t *a_pos_meas_quantities_item = &pos_meas_quantities_a->pos_measurement_quantities_item[i];
+    f1ap_pos_measurement_quantities_item_t *b_pos_meas_quantities_item = &pos_meas_quantities_b->pos_measurement_quantities_item[i];
+    _F1_EQ_CHECK_INT(a_pos_meas_quantities_item->pos_measurement_type, b_pos_meas_quantities_item->pos_measurement_type);
+  }
+
+  /* optional: SRS Configuration */
+  if ((a->srs_configuration == NULL) != (b->srs_configuration == NULL)) {
+    return false;
+  }
+  if (a->srs_configuration) {
+    f1ap_srs_carrier_list_t *srs_carrier_list_a = &a->srs_configuration->srs_carrier_list;
+    f1ap_srs_carrier_list_t *srs_carrier_list_b = &b->srs_configuration->srs_carrier_list;
+    _F1_CHECK_EXP(eq_srs_carrier_list(srs_carrier_list_a, srs_carrier_list_b));
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 Positioning Measurement request
+ */
+void free_positioning_measurement_req(f1ap_positioning_measurement_req_t *msg)
+{
+  free(msg->trp_measurement_request_list.trp_measurement_request_item);
+  free(msg->pos_measurement_quantities.pos_measurement_quantities_item);
+
+  /* optional: SRS Configuration */
+  if (msg->srs_configuration) {
+    f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    free_srs_carrier_list(srs_carrier_list);
+    free(msg->srs_configuration);
+  }
+}

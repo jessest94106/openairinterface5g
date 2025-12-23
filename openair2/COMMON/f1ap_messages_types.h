@@ -1249,6 +1249,52 @@ typedef struct f1ap_trp_information_list_s {
   uint32_t trp_information_item_length;
 } f1ap_trp_information_list_t;
 
+typedef struct f1ap_trp_measurement_request_item_s {
+  uint32_t tRPID;
+} f1ap_trp_measurement_request_item_t;
+
+typedef struct f1ap_trp_measurement_request_list_s {
+  f1ap_trp_measurement_request_item_t *trp_measurement_request_item;
+  uint32_t trp_measurement_request_list_length;
+} f1ap_trp_measurement_request_list_t;
+
+typedef enum f1ap_PosMeasurementType_e {
+  F1AP_POSMEASUREMENTTYPE_GNB_RX_TX = 0,
+  F1AP_POSMEASUREMENTTYPE_UL_SRS_RSRP = 1,
+  F1AP_POSMEASUREMENTTYPE_UL_AOA = 2,
+  F1AP_POSMEASUREMENTTYPE_UL_RTOA = 3
+} f1ap_PosMeasurementType_e;
+
+typedef struct f1ap_pos_measurement_quantities_item_s {
+  f1ap_PosMeasurementType_e pos_measurement_type;
+} f1ap_pos_measurement_quantities_item_t;
+
+typedef struct f1ap_pos_measurement_quantities_s {
+  f1ap_pos_measurement_quantities_item_t *pos_measurement_quantities_item;
+  uint32_t pos_measurement_quantities_length;
+} f1ap_pos_measurement_quantities_t;
+
+typedef enum f1ap_pos_measurement_periodicity_e {
+  F1AP_POSMEASUREMENTPERIODICITY_MS120 = 0,
+  F1AP_POSMEASUREMENTPERIODICITY_MS240 = 1,
+  F1AP_POSMEASUREMENTPERIODICITY_MS480 = 2,
+  F1AP_POSMEASUREMENTPERIODICITY_MS640 = 3,
+  F1AP_POSMEASUREMENTPERIODICITY_MS1024 = 4,
+  F1AP_POSMEASUREMENTPERIODICITY_MS2048 = 5,
+  F1AP_POSMEASUREMENTPERIODICITY_MS5120 = 6,
+  F1AP_POSMEASUREMENTPERIODICITY_MS10240 = 7,
+  F1AP_POSMEASUREMENTPERIODICITY_MIN1 = 8,
+  F1AP_POSMEASUREMENTPERIODICITY_MIN6 = 9,
+  F1AP_POSMEASUREMENTPERIODICITY_MIN12 = 10,
+  F1AP_POSMEASUREMENTPERIODICITY_MIN30 = 11,
+  F1AP_POSMEASUREMENTPERIODICITY_MIN60 = 12
+} f1ap_pos_measurement_periodicity_pr;
+
+typedef enum f1ap_pos_report_characteristics_e {
+  F1AP_POSREPORTCHARACTERISTICS_ONDEMAND = 0,
+  F1AP_POSREPORTCHARACTERISTICS_PERIODIC = 1
+} f1ap_pos_report_characteristics_pr;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
@@ -1346,5 +1392,24 @@ typedef struct f1ap_trp_information_failure_s {
   // IE 9.3.1.2 (mandatory)
   long cause_value;
 } f1ap_trp_information_failure_t;
+
+typedef struct f1ap_measurement_req_s {
+  // IE 9.3.1.23 (mandatory)
+  uint8_t transaction_id;
+  // (mandatory)
+  uint16_t lmf_measurement_id;
+  // (mandatory)
+  uint16_t ran_measurement_id;
+  // (mandatory)
+  f1ap_trp_measurement_request_list_t trp_measurement_request_list;
+  // (mandatory) ondemand = 0, periodic = 1
+  f1ap_pos_report_characteristics_pr pos_report_characteristics;
+  // if report characteristics periodic
+  f1ap_pos_measurement_periodicity_pr measurement_periodicity;
+  // (mandatory)
+  f1ap_pos_measurement_quantities_t pos_measurement_quantities;
+  // IE 9.3.1.192 (optional)
+  f1ap_srs_configuration_t *srs_configuration;
+} f1ap_positioning_measurement_req_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */

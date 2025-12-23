@@ -82,5 +82,7 @@
 #include "F1AP_TRPPositionReferenced.h"
 #include "F1AP_RelativeGeodeticLocation.h"
 #include "F1AP_RelativeCartesianLocation.h"
+#include "F1AP_TRP-MeasurementRequestItem.h"
+#include "F1AP_PosMeasurementQuantities-Item.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

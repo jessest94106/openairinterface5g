@@ -107,4 +107,11 @@ f1ap_trp_information_failure_t cp_trp_information_failure(const f1ap_trp_informa
 bool eq_trp_information_failure(const f1ap_trp_information_failure_t *a, const f1ap_trp_information_failure_t *b);
 void free_trp_information_failure(f1ap_trp_information_failure_t *msg);
 
+// positioning measurement request
+struct F1AP_F1AP_PDU *encode_positioning_measurement_req(const f1ap_positioning_measurement_req_t *msg);
+bool decode_positioning_measurement_req(const struct F1AP_F1AP_PDU *pdu, f1ap_positioning_measurement_req_t *out);
+f1ap_positioning_measurement_req_t cp_positioning_measurement_req(const f1ap_positioning_measurement_req_t *orig);
+bool eq_positioning_measurement_req(const f1ap_positioning_measurement_req_t *a, const f1ap_positioning_measurement_req_t *b);
+void free_positioning_measurement_req(f1ap_positioning_measurement_req_t *msg);
+
 #endif /* F1AP_POSITIONING_H_ */

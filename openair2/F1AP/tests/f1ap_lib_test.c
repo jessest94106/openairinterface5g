@@ -1975,6 +1975,64 @@ static void test_f1ap_trp_information_failure()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_positioning_measurement_request()
+{
+  f1ap_positioning_measurement_req_t orig = {
+      .transaction_id = 12,
+      .lmf_measurement_id = 1999,
+      .ran_measurement_id = 2225,
+  };
+
+  uint32_t trp_meas_req_list_len = 3;
+  orig.trp_measurement_request_list.trp_measurement_request_list_length = trp_meas_req_list_len;
+  orig.trp_measurement_request_list.trp_measurement_request_item =
+      calloc_or_fail(trp_meas_req_list_len, sizeof(*orig.trp_measurement_request_list.trp_measurement_request_item));
+  for (int i = 0; i < trp_meas_req_list_len; i++) {
+    orig.trp_measurement_request_list.trp_measurement_request_item[i].tRPID = 115 + i;
+  }
+
+  orig.pos_report_characteristics = F1AP_POSREPORTCHARACTERISTICS_PERIODIC;
+  orig.measurement_periodicity = F1AP_POSMEASUREMENTPERIODICITY_MS480;
+
+  uint32_t pos_meas_quantities_len = 4;
+  orig.pos_measurement_quantities.pos_measurement_quantities_length = pos_meas_quantities_len;
+
+  f1ap_pos_measurement_quantities_item_t *pos_meas_quantities_item =
+      calloc_or_fail(pos_meas_quantities_len, sizeof(*pos_meas_quantities_item));
+  orig.pos_measurement_quantities.pos_measurement_quantities_item = pos_meas_quantities_item;
+
+  pos_meas_quantities_item[0].pos_measurement_type = F1AP_POSMEASUREMENTTYPE_GNB_RX_TX;
+  pos_meas_quantities_item[1].pos_measurement_type = F1AP_POSMEASUREMENTTYPE_UL_SRS_RSRP;
+  pos_meas_quantities_item[2].pos_measurement_type = F1AP_POSMEASUREMENTTYPE_UL_AOA;
+  pos_meas_quantities_item[3].pos_measurement_type = F1AP_POSMEASUREMENTTYPE_UL_RTOA;
+
+  // SRS configuration
+  orig.srs_configuration = calloc_or_fail(1, sizeof(*orig.srs_configuration));
+  f1ap_srs_carrier_list_t *srs_carrier_list = &orig.srs_configuration->srs_carrier_list;
+  fill_srs_carrier_list(srs_carrier_list);
+
+  F1AP_F1AP_PDU_t *f1enc = encode_positioning_measurement_req(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_positioning_measurement_req_t decoded = {0};
+  bool ret = decode_positioning_measurement_req(f1dec, &decoded);
+  AssertFatal(ret, "decode_positioning_measurement_req(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_positioning_measurement_req(&orig, &decoded);
+  AssertFatal(ret, "eq_positioning_measurement_req(): decoded message doesn't match\n");
+  free_positioning_measurement_req(&decoded);
+
+  f1ap_positioning_measurement_req_t cp = cp_positioning_measurement_req(&orig);
+  ret = eq_positioning_measurement_req(&orig, &cp);
+  AssertFatal(ret, "eq_positioning_measurement_req(): copied message doesn't match\n");
+  free_positioning_measurement_req(&orig);
+  free_positioning_measurement_req(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -2012,5 +2070,6 @@ int main()
   test_f1ap_trp_information_request();
   test_f1ap_trp_information_response();
   test_f1ap_trp_information_failure();
+  test_f1ap_positioning_measurement_request();
   return 0;
 }
