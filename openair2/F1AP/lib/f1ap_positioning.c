@@ -2074,6 +2074,772 @@ static bool decode_f1ap_abort_transmission(const F1AP_AbortTransmission_t *in, f
   return true;
 }
 
+static F1AP_TRPReferencePointType_t encode_reference_point_type(const f1ap_trp_reference_point_type_t *in)
+{
+  F1AP_TRPReferencePointType_t out = {0};
+  switch (in->present) {
+    case F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_GEODETIC:
+      out.present = F1AP_TRPReferencePointType_PR_tRPPositionRelativeGeodetic;
+      asn1cCalloc(out.choice.tRPPositionRelativeGeodetic, f1_tRPPositionRelativeGeodetic);
+      const f1ap_relative_geodetic_location_t *tRPPositionRelativeGeodetic = &in->choice.trp_position_relative_geodetic;
+      f1_tRPPositionRelativeGeodetic->milli_Arc_SecondUnits = tRPPositionRelativeGeodetic->milli_arc_second_units;
+      f1_tRPPositionRelativeGeodetic->heightUnits = tRPPositionRelativeGeodetic->height_units;
+      f1_tRPPositionRelativeGeodetic->deltaLatitude = tRPPositionRelativeGeodetic->delta_latitude;
+      f1_tRPPositionRelativeGeodetic->deltaLongitude = tRPPositionRelativeGeodetic->delta_longitude;
+      f1_tRPPositionRelativeGeodetic->deltaHeight = tRPPositionRelativeGeodetic->delta_height;
+
+      F1AP_LocationUncertainty_t *f1_locationUncertainty_g = &f1_tRPPositionRelativeGeodetic->locationUncertainty;
+      const f1ap_location_uncertainty_t *locationUncertainty_g = &tRPPositionRelativeGeodetic->location_uncertainty;
+      f1_locationUncertainty_g->horizontalUncertainty = locationUncertainty_g->horizontal_uncertainty;
+      f1_locationUncertainty_g->horizontalConfidence = locationUncertainty_g->horizontal_confidence;
+      f1_locationUncertainty_g->verticalUncertainty = locationUncertainty_g->vertical_uncertainty;
+      f1_locationUncertainty_g->verticalConfidence = locationUncertainty_g->vertical_confidence;
+      break;
+    case F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN:
+      out.present = F1AP_TRPReferencePointType_PR_tRPPositionRelativeCartesian;
+      asn1cCalloc(out.choice.tRPPositionRelativeCartesian, f1_tRPPositionRelativeCartesian);
+      const f1ap_relative_cartesian_location_t *tRPPositionRelativeCartesian = &in->choice.trp_position_relative_cartesian;
+      f1_tRPPositionRelativeCartesian->xYZunit = tRPPositionRelativeCartesian->xyz_unit;
+      f1_tRPPositionRelativeCartesian->xvalue = tRPPositionRelativeCartesian->xvalue;
+      f1_tRPPositionRelativeCartesian->yvalue = tRPPositionRelativeCartesian->yvalue;
+      f1_tRPPositionRelativeCartesian->zvalue = tRPPositionRelativeCartesian->zvalue;
+
+      F1AP_LocationUncertainty_t *f1_locationUncertainty_c = &f1_tRPPositionRelativeCartesian->locationUncertainty;
+      const f1ap_location_uncertainty_t *locationUncertainty_c = &tRPPositionRelativeCartesian->location_uncertainty;
+      f1_locationUncertainty_c->horizontalUncertainty = locationUncertainty_c->horizontal_uncertainty;
+      f1_locationUncertainty_c->horizontalConfidence = locationUncertainty_c->horizontal_confidence;
+      f1_locationUncertainty_c->verticalUncertainty = locationUncertainty_c->vertical_uncertainty;
+      f1_locationUncertainty_c->verticalConfidence = locationUncertainty_c->vertical_confidence;
+      break;
+    default:
+      AssertFatal(false, "illegal trp reference point type entry %d\n", in->present);
+      break;
+  }
+  return out;
+}
+
+static F1AP_NGRANHighAccuracyAccessPointPosition_t encode_trp_ha_pos(const f1ap_ngran_high_accuracy_access_point_position_t *in)
+{
+  F1AP_NGRANHighAccuracyAccessPointPosition_t out = {0};
+  out.latitude = in->latitude;
+  out.longitude = in->longitude;
+  out.altitude = in->altitude;
+  out.uncertaintySemi_major = in->uncertainty_semi_major;
+  out.uncertaintySemi_minor = in->uncertainty_semi_minor;
+  out.orientationOfMajorAxis = in->orientation_of_major_axis;
+  out.horizontalConfidence = in->horizontal_confidence;
+  out.uncertaintyAltitude = in->uncertainty_altitude;
+  out.verticalConfidence = in->vertical_confidence;
+  return out;
+}
+
+static F1AP_GeographicalCoordinates_t encode_geographical_coordinates(const f1ap_geographical_coordinates_t *in)
+{
+  F1AP_GeographicalCoordinates_t out = {0};
+  F1AP_TRPPositionDefinitionType_t *f1_trp_pos_def_type = &out.tRPPositionDefinitionType;
+  const f1ap_trp_position_definition_type_t *trp_pos_def_type = &in->trp_position_definition_type;
+  switch (trp_pos_def_type->present) {
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_NOTHING:
+      f1_trp_pos_def_type->present = F1AP_TRPPositionDefinitionType_PR_NOTHING;
+      break;
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_DIRECT:
+      f1_trp_pos_def_type->present = F1AP_TRPPositionDefinitionType_PR_direct;
+      asn1cCalloc(f1_trp_pos_def_type->choice.direct, f1_direct);
+      const f1ap_trp_position_direct_t *direct = &trp_pos_def_type->choice.direct;
+
+      if (direct->accuracy.present == F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPPOSITION) {
+        f1_direct->accuracy.present = F1AP_TRPPositionDirectAccuracy_PR_tRPPosition;
+        const f1ap_access_point_position_t *trp_pos = &direct->accuracy.choice.trp_position;
+        F1AP_AccessPointPosition_t *f1_trp_pos = f1_direct->accuracy.choice.tRPPosition;
+        f1_trp_pos->latitudeSign = trp_pos->latitude_sign;
+        f1_trp_pos->latitude = trp_pos->latitude;
+        f1_trp_pos->longitude = trp_pos->longitude;
+        f1_trp_pos->directionOfAltitude = trp_pos->direction_of_altitude;
+        f1_trp_pos->altitude = trp_pos->altitude;
+        f1_trp_pos->uncertaintySemi_major = trp_pos->uncertainty_semi_major;
+        f1_trp_pos->uncertaintySemi_minor = trp_pos->uncertainty_semi_minor;
+        f1_trp_pos->orientationOfMajorAxis = trp_pos->orientation_of_major_axis;
+        f1_trp_pos->uncertaintyAltitude = trp_pos->uncertainty_altitude;
+        f1_trp_pos->confidence = trp_pos->confidence;
+      } else if (direct->accuracy.present == F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPHAPOSITION) {
+        f1_direct->accuracy.present = F1AP_TRPPositionDirectAccuracy_PR_tRPHAposition;
+        const f1ap_ngran_high_accuracy_access_point_position_t *trp_ha_pos = &direct->accuracy.choice.trp_HAposition;
+        F1AP_NGRANHighAccuracyAccessPointPosition_t *f1_trp_ha_pos = f1_direct->accuracy.choice.tRPHAposition;
+        *f1_trp_ha_pos = encode_trp_ha_pos(trp_ha_pos);
+      } else {
+        AssertFatal(false, "illegal direct accuracy entry %d\n", direct->accuracy.present);
+      }
+      break;
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED:
+      f1_trp_pos_def_type->present = F1AP_TRPPositionDefinitionType_PR_referenced;
+      asn1cCalloc(f1_trp_pos_def_type->choice.referenced, f1_referenced);
+      const f1ap_trp_position_referenced_t *referenced = &trp_pos_def_type->choice.referenced;
+      F1AP_ReferencePoint_t *f1_referencePoint = &f1_referenced->referencePoint;
+      const f1ap_reference_point_t *referencePoint = &referenced->reference_point;
+
+      if (referencePoint->present == F1AP_REFERENCE_POINT_PR_COORDINATEID) {
+        f1_referencePoint->present = F1AP_ReferencePoint_PR_coordinateID;
+        f1_referencePoint->choice.coordinateID = referencePoint->choice.coordinate_id;
+      } else if (referencePoint->present == F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATE) {
+        f1_referencePoint->present = F1AP_ReferencePoint_PR_referencePointCoordinate;
+        const f1ap_access_point_position_t *referencePointCoordinate = &referencePoint->choice.reference_point_coordinate;
+        asn1cCalloc(f1_referencePoint->choice.referencePointCoordinate, f1_referencePointCoordinate);
+        f1_referencePointCoordinate->latitudeSign = referencePointCoordinate->latitude_sign;
+        f1_referencePointCoordinate->latitude = referencePointCoordinate->latitude;
+        f1_referencePointCoordinate->longitude = referencePointCoordinate->longitude;
+        f1_referencePointCoordinate->directionOfAltitude = referencePointCoordinate->direction_of_altitude;
+        f1_referencePointCoordinate->altitude = referencePointCoordinate->altitude;
+        f1_referencePointCoordinate->uncertaintySemi_major = referencePointCoordinate->uncertainty_semi_major;
+        f1_referencePointCoordinate->uncertaintySemi_minor = referencePointCoordinate->uncertainty_semi_minor;
+        f1_referencePointCoordinate->orientationOfMajorAxis = referencePointCoordinate->orientation_of_major_axis;
+        f1_referencePointCoordinate->uncertaintyAltitude = referencePointCoordinate->uncertainty_altitude;
+        f1_referencePointCoordinate->confidence = referencePointCoordinate->confidence;
+      } else if (referencePoint->present == F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATEHA) {
+        f1_referencePoint->present = F1AP_ReferencePoint_PR_referencePointCoordinateHA;
+        const f1ap_ngran_high_accuracy_access_point_position_t *referencePointCoordinateHA =
+            &referencePoint->choice.reference_point_coordinateHA;
+        asn1cCalloc(f1_referencePoint->choice.referencePointCoordinateHA, f1_referencePointCoordinateHA);
+        *f1_referencePointCoordinateHA = encode_trp_ha_pos(referencePointCoordinateHA);
+      } else {
+        AssertFatal(false, "illegal reference point entry %d\n", referencePoint->present);
+      }
+
+      F1AP_TRPReferencePointType_t *f1_referencePointType = &f1_referenced->referencePointType;
+      const f1ap_trp_reference_point_type_t *referencePointType = &referenced->reference_point_type;
+      *f1_referencePointType = encode_reference_point_type(referencePointType);
+      break;
+    default:
+      AssertFatal(false, "illegal Geographical Coordinates entry\n");
+      break;
+  }
+  return out;
+}
+
+static void decode_reference_point_type(const F1AP_TRPReferencePointType_t *in, f1ap_trp_reference_point_type_t *out)
+{
+  switch (in->present) {
+    case F1AP_TRPReferencePointType_PR_tRPPositionRelativeGeodetic:
+      out->present = F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_GEODETIC;
+      F1AP_RelativeGeodeticLocation_t *f1_tRPPositionRelativeGeodetic = in->choice.tRPPositionRelativeGeodetic;
+      f1ap_relative_geodetic_location_t *tRPPositionRelativeGeodetic = &out->choice.trp_position_relative_geodetic;
+      tRPPositionRelativeGeodetic->milli_arc_second_units = f1_tRPPositionRelativeGeodetic->milli_Arc_SecondUnits;
+      tRPPositionRelativeGeodetic->height_units = f1_tRPPositionRelativeGeodetic->heightUnits;
+      tRPPositionRelativeGeodetic->delta_latitude = f1_tRPPositionRelativeGeodetic->deltaLatitude;
+      tRPPositionRelativeGeodetic->delta_longitude = f1_tRPPositionRelativeGeodetic->deltaLongitude;
+      tRPPositionRelativeGeodetic->delta_height = f1_tRPPositionRelativeGeodetic->deltaHeight;
+
+      F1AP_LocationUncertainty_t *f1_locationUncertainty_g = &f1_tRPPositionRelativeGeodetic->locationUncertainty;
+      f1ap_location_uncertainty_t *locationUncertainty_g = &tRPPositionRelativeGeodetic->location_uncertainty;
+      locationUncertainty_g->horizontal_uncertainty = f1_locationUncertainty_g->horizontalUncertainty;
+      locationUncertainty_g->horizontal_confidence = f1_locationUncertainty_g->horizontalConfidence;
+      locationUncertainty_g->vertical_uncertainty = f1_locationUncertainty_g->verticalUncertainty;
+      locationUncertainty_g->vertical_confidence = f1_locationUncertainty_g->verticalConfidence;
+      break;
+    case F1AP_TRPReferencePointType_PR_tRPPositionRelativeCartesian:
+      out->present = F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN;
+      F1AP_RelativeCartesianLocation_t *f1_tRPPositionRelativeCartesian = in->choice.tRPPositionRelativeCartesian;
+      f1ap_relative_cartesian_location_t *tRPPositionRelativeCartesian = &out->choice.trp_position_relative_cartesian;
+      tRPPositionRelativeCartesian->xyz_unit = f1_tRPPositionRelativeCartesian->xYZunit;
+      tRPPositionRelativeCartesian->xvalue = f1_tRPPositionRelativeCartesian->xvalue;
+      tRPPositionRelativeCartesian->yvalue = f1_tRPPositionRelativeCartesian->yvalue;
+      tRPPositionRelativeCartesian->zvalue = f1_tRPPositionRelativeCartesian->zvalue;
+
+      F1AP_LocationUncertainty_t *f1_locationUncertainty_c = &f1_tRPPositionRelativeCartesian->locationUncertainty;
+      f1ap_location_uncertainty_t *locationUncertainty_c = &tRPPositionRelativeCartesian->location_uncertainty;
+      locationUncertainty_c->horizontal_uncertainty = f1_locationUncertainty_c->horizontalUncertainty;
+      locationUncertainty_c->horizontal_confidence = f1_locationUncertainty_c->horizontalConfidence;
+      locationUncertainty_c->vertical_uncertainty = f1_locationUncertainty_c->verticalUncertainty;
+      locationUncertainty_c->vertical_confidence = f1_locationUncertainty_c->verticalConfidence;
+      break;
+    default:
+      AssertFatal(false, "illegal trp reference point type entry %d\n", in->present);
+      break;
+  }
+}
+
+static void decode_trp_ha_pos(const F1AP_NGRANHighAccuracyAccessPointPosition_t *in,
+                              f1ap_ngran_high_accuracy_access_point_position_t *out)
+{
+  out->latitude = in->latitude;
+  out->longitude = in->longitude;
+  out->altitude = in->altitude;
+  out->uncertainty_semi_major = in->uncertaintySemi_major;
+  out->uncertainty_semi_minor = in->uncertaintySemi_minor;
+  out->orientation_of_major_axis = in->orientationOfMajorAxis;
+  out->horizontal_confidence = in->horizontalConfidence;
+  out->uncertainty_altitude = in->uncertaintyAltitude;
+  out->vertical_confidence = in->verticalConfidence;
+}
+
+static void decode_geographical_coordinates(const F1AP_GeographicalCoordinates_t *in, f1ap_geographical_coordinates_t *out)
+{
+  const F1AP_TRPPositionDefinitionType_t *f1_trp_pos_def_type = &in->tRPPositionDefinitionType;
+  f1ap_trp_position_definition_type_t *trp_pos_def_type = &out->trp_position_definition_type;
+  switch (f1_trp_pos_def_type->present) {
+    case F1AP_TRPPositionDefinitionType_PR_NOTHING:
+      trp_pos_def_type->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_NOTHING;
+      break;
+    case F1AP_TRPPositionDefinitionType_PR_direct:
+      trp_pos_def_type->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_DIRECT;
+      F1AP_TRPPositionDirect_t *f1_direct = f1_trp_pos_def_type->choice.direct;
+      f1ap_trp_position_direct_t *direct = &trp_pos_def_type->choice.direct;
+
+      if (f1_direct->accuracy.present == F1AP_TRPPositionDirectAccuracy_PR_tRPPosition) {
+        direct->accuracy.present = F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPPOSITION;
+        f1ap_access_point_position_t *trp_pos = &direct->accuracy.choice.trp_position;
+        F1AP_AccessPointPosition_t *f1_trp_pos = f1_direct->accuracy.choice.tRPPosition;
+        trp_pos->latitude_sign = f1_trp_pos->latitudeSign;
+        trp_pos->latitude = f1_trp_pos->latitude;
+        trp_pos->longitude = f1_trp_pos->longitude;
+        trp_pos->direction_of_altitude = f1_trp_pos->directionOfAltitude;
+        trp_pos->altitude = f1_trp_pos->altitude;
+        trp_pos->uncertainty_semi_major = f1_trp_pos->uncertaintySemi_major;
+        trp_pos->uncertainty_semi_minor = f1_trp_pos->uncertaintySemi_minor;
+        trp_pos->orientation_of_major_axis = f1_trp_pos->orientationOfMajorAxis;
+        trp_pos->uncertainty_altitude = f1_trp_pos->uncertaintyAltitude;
+        trp_pos->confidence = f1_trp_pos->confidence;
+      } else if (f1_direct->accuracy.present == F1AP_TRPPositionDirectAccuracy_PR_tRPHAposition) {
+        direct->accuracy.present = F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPHAPOSITION;
+        f1ap_ngran_high_accuracy_access_point_position_t *trp_ha_pos = &direct->accuracy.choice.trp_HAposition;
+        F1AP_NGRANHighAccuracyAccessPointPosition_t *f1_trp_ha_pos = f1_direct->accuracy.choice.tRPHAposition;
+        decode_trp_ha_pos(f1_trp_ha_pos, trp_ha_pos);
+      } else {
+        AssertFatal(false, "illegal direct accuracy entry %d\n", direct->accuracy.present);
+      }
+      break;
+    case F1AP_TRPPositionDefinitionType_PR_referenced:
+      trp_pos_def_type->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED;
+      F1AP_TRPPositionReferenced_t *f1_referenced = f1_trp_pos_def_type->choice.referenced;
+      f1ap_trp_position_referenced_t *referenced = &trp_pos_def_type->choice.referenced;
+      F1AP_ReferencePoint_t *f1_referencePoint = &f1_referenced->referencePoint;
+      f1ap_reference_point_t *referencePoint = &referenced->reference_point;
+
+      if (f1_referencePoint->present == F1AP_ReferencePoint_PR_coordinateID) {
+        referencePoint->present = F1AP_REFERENCE_POINT_PR_COORDINATEID;
+        referencePoint->choice.coordinate_id = f1_referencePoint->choice.coordinateID;
+      } else if (f1_referencePoint->present == F1AP_ReferencePoint_PR_referencePointCoordinate) {
+        referencePoint->present = F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATE;
+        f1ap_access_point_position_t *referencePointCoordinate = &referencePoint->choice.reference_point_coordinate;
+        F1AP_AccessPointPosition_t *f1_referencePointCoordinate = f1_referencePoint->choice.referencePointCoordinate;
+        referencePointCoordinate->latitude_sign = f1_referencePointCoordinate->latitudeSign;
+        referencePointCoordinate->latitude = f1_referencePointCoordinate->latitude;
+        referencePointCoordinate->longitude = f1_referencePointCoordinate->longitude;
+        referencePointCoordinate->direction_of_altitude = f1_referencePointCoordinate->directionOfAltitude;
+        referencePointCoordinate->altitude = f1_referencePointCoordinate->altitude;
+        referencePointCoordinate->uncertainty_semi_major = f1_referencePointCoordinate->uncertaintySemi_major;
+        referencePointCoordinate->uncertainty_semi_minor = f1_referencePointCoordinate->uncertaintySemi_minor;
+        referencePointCoordinate->orientation_of_major_axis = f1_referencePointCoordinate->orientationOfMajorAxis;
+        referencePointCoordinate->uncertainty_altitude = f1_referencePointCoordinate->uncertaintyAltitude;
+        referencePointCoordinate->confidence = f1_referencePointCoordinate->confidence;
+      } else if (f1_referencePoint->present == F1AP_ReferencePoint_PR_referencePointCoordinateHA) {
+        referencePoint->present = F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATEHA;
+        f1ap_ngran_high_accuracy_access_point_position_t *referencePointCoordinateHA =
+            &referencePoint->choice.reference_point_coordinateHA;
+        F1AP_NGRANHighAccuracyAccessPointPosition_t *f1_referencePointCoordinateHA =
+            f1_referencePoint->choice.referencePointCoordinateHA;
+        decode_trp_ha_pos(f1_referencePointCoordinateHA, referencePointCoordinateHA);
+      } else {
+        AssertFatal(false, "illegal reference point entry %d\n", referencePoint->present);
+      }
+
+      F1AP_TRPReferencePointType_t *f1_referencePointType = &f1_referenced->referencePointType;
+      f1ap_trp_reference_point_type_t *referencePointType = &referenced->reference_point_type;
+      decode_reference_point_type(f1_referencePointType, referencePointType);
+      break;
+    default:
+      AssertFatal(false, "illegal Geographical Coordinates entry\n");
+      break;
+  }
+}
+
+static f1ap_trp_reference_point_type_t cp_encode_reference_point_type(const f1ap_trp_reference_point_type_t *in)
+{
+  f1ap_trp_reference_point_type_t out = {0};
+  switch (in->present) {
+    case F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_GEODETIC:
+      out.present = F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_GEODETIC;
+      const f1ap_relative_geodetic_location_t *f1_tRPPositionRelativeGeodetic = &in->choice.trp_position_relative_geodetic;
+      f1ap_relative_geodetic_location_t *tRPPositionRelativeGeodetic = &out.choice.trp_position_relative_geodetic;
+      tRPPositionRelativeGeodetic->milli_arc_second_units = f1_tRPPositionRelativeGeodetic->milli_arc_second_units;
+      tRPPositionRelativeGeodetic->height_units = f1_tRPPositionRelativeGeodetic->height_units;
+      tRPPositionRelativeGeodetic->delta_latitude = f1_tRPPositionRelativeGeodetic->delta_latitude;
+      tRPPositionRelativeGeodetic->delta_longitude = f1_tRPPositionRelativeGeodetic->delta_longitude;
+      tRPPositionRelativeGeodetic->delta_height = f1_tRPPositionRelativeGeodetic->delta_height;
+
+      const f1ap_location_uncertainty_t *f1_locationUncertainty_g = &f1_tRPPositionRelativeGeodetic->location_uncertainty;
+      f1ap_location_uncertainty_t *locationUncertainty_g = &tRPPositionRelativeGeodetic->location_uncertainty;
+      locationUncertainty_g->horizontal_uncertainty = f1_locationUncertainty_g->horizontal_uncertainty;
+      locationUncertainty_g->horizontal_confidence = f1_locationUncertainty_g->horizontal_confidence;
+      locationUncertainty_g->vertical_uncertainty = f1_locationUncertainty_g->vertical_uncertainty;
+      locationUncertainty_g->vertical_confidence = f1_locationUncertainty_g->vertical_confidence;
+      break;
+    case F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN:
+      out.present = F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN;
+      const f1ap_relative_cartesian_location_t *f1_tRPPositionRelativeCartesian = &in->choice.trp_position_relative_cartesian;
+      f1ap_relative_cartesian_location_t *tRPPositionRelativeCartesian = &out.choice.trp_position_relative_cartesian;
+      tRPPositionRelativeCartesian->xyz_unit = f1_tRPPositionRelativeCartesian->xyz_unit;
+      tRPPositionRelativeCartesian->xvalue = f1_tRPPositionRelativeCartesian->xvalue;
+      tRPPositionRelativeCartesian->yvalue = f1_tRPPositionRelativeCartesian->yvalue;
+      tRPPositionRelativeCartesian->zvalue = f1_tRPPositionRelativeCartesian->zvalue;
+
+      const f1ap_location_uncertainty_t *f1_locationUncertainty_c = &f1_tRPPositionRelativeCartesian->location_uncertainty;
+      f1ap_location_uncertainty_t *locationUncertainty_c = &tRPPositionRelativeCartesian->location_uncertainty;
+      locationUncertainty_c->horizontal_uncertainty = f1_locationUncertainty_c->horizontal_uncertainty;
+      locationUncertainty_c->horizontal_confidence = f1_locationUncertainty_c->horizontal_confidence;
+      locationUncertainty_c->vertical_uncertainty = f1_locationUncertainty_c->vertical_uncertainty;
+      locationUncertainty_c->vertical_confidence = f1_locationUncertainty_c->vertical_confidence;
+      break;
+    default:
+      AssertFatal(false, "illegal trp reference point type entry %d\n", in->present);
+      break;
+  }
+  return out;
+}
+
+static f1ap_ngran_high_accuracy_access_point_position_t cp_trp_ha_pos(const f1ap_ngran_high_accuracy_access_point_position_t *in)
+{
+  f1ap_ngran_high_accuracy_access_point_position_t out = {0};
+  out.latitude = in->latitude;
+  out.longitude = in->longitude;
+  out.altitude = in->altitude;
+  out.uncertainty_semi_major = in->uncertainty_semi_major;
+  out.uncertainty_semi_minor = in->uncertainty_semi_minor;
+  out.orientation_of_major_axis = in->orientation_of_major_axis;
+  out.horizontal_confidence = in->horizontal_confidence;
+  out.uncertainty_altitude = in->uncertainty_altitude;
+  out.vertical_confidence = in->vertical_confidence;
+  return out;
+}
+
+static f1ap_geographical_coordinates_t cp_geographical_coordinates(const f1ap_geographical_coordinates_t *in)
+{
+  f1ap_geographical_coordinates_t out = {0};
+  const f1ap_trp_position_definition_type_t *f1_trp_pos_def_type = &in->trp_position_definition_type;
+  f1ap_trp_position_definition_type_t *trp_pos_def_type = &out.trp_position_definition_type;
+  switch (f1_trp_pos_def_type->present) {
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_NOTHING:
+      trp_pos_def_type->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_NOTHING;
+      break;
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_DIRECT:
+      trp_pos_def_type->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_DIRECT;
+      const f1ap_trp_position_direct_t *f1_direct = &f1_trp_pos_def_type->choice.direct;
+      f1ap_trp_position_direct_t *direct = &trp_pos_def_type->choice.direct;
+
+      if (f1_direct->accuracy.present == F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPPOSITION) {
+        direct->accuracy.present = F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPPOSITION;
+        f1ap_access_point_position_t *trp_pos = &direct->accuracy.choice.trp_position;
+        const f1ap_access_point_position_t *f1_trp_pos = &f1_direct->accuracy.choice.trp_position;
+        trp_pos->latitude_sign = f1_trp_pos->latitude_sign;
+        trp_pos->latitude = f1_trp_pos->latitude;
+        trp_pos->longitude = f1_trp_pos->longitude;
+        trp_pos->direction_of_altitude = f1_trp_pos->direction_of_altitude;
+        trp_pos->altitude = f1_trp_pos->altitude;
+        trp_pos->uncertainty_semi_major = f1_trp_pos->uncertainty_semi_major;
+        trp_pos->uncertainty_semi_minor = f1_trp_pos->uncertainty_semi_minor;
+        trp_pos->orientation_of_major_axis = f1_trp_pos->orientation_of_major_axis;
+        trp_pos->uncertainty_altitude = f1_trp_pos->uncertainty_altitude;
+        trp_pos->confidence = f1_trp_pos->confidence;
+      } else if (f1_direct->accuracy.present == F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPHAPOSITION) {
+        direct->accuracy.present = F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPHAPOSITION;
+        f1ap_ngran_high_accuracy_access_point_position_t *trp_ha_pos = &direct->accuracy.choice.trp_HAposition;
+        const f1ap_ngran_high_accuracy_access_point_position_t *f1_trp_ha_pos = &f1_direct->accuracy.choice.trp_HAposition;
+        *trp_ha_pos = cp_trp_ha_pos(f1_trp_ha_pos);
+      } else {
+        AssertFatal(false, "illegal direct accuracy entry %d\n", direct->accuracy.present);
+      }
+      break;
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED:
+      trp_pos_def_type->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED;
+      const f1ap_trp_position_referenced_t *f1_referenced = &f1_trp_pos_def_type->choice.referenced;
+      f1ap_trp_position_referenced_t *referenced = &trp_pos_def_type->choice.referenced;
+      const f1ap_reference_point_t *f1_referencePoint = &f1_referenced->reference_point;
+      f1ap_reference_point_t *referencePoint = &referenced->reference_point;
+
+      if (f1_referencePoint->present == F1AP_REFERENCE_POINT_PR_COORDINATEID) {
+        referencePoint->present = F1AP_REFERENCE_POINT_PR_COORDINATEID;
+        referencePoint->choice.coordinate_id = f1_referencePoint->choice.coordinate_id;
+      } else if (f1_referencePoint->present == F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATE) {
+        referencePoint->present = F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATE;
+        f1ap_access_point_position_t *referencePointCoordinate = &referencePoint->choice.reference_point_coordinate;
+        const f1ap_access_point_position_t *f1_referencePointCoordinate = &f1_referencePoint->choice.reference_point_coordinate;
+        referencePointCoordinate->latitude_sign = f1_referencePointCoordinate->latitude_sign;
+        referencePointCoordinate->latitude = f1_referencePointCoordinate->latitude;
+        referencePointCoordinate->longitude = f1_referencePointCoordinate->longitude;
+        referencePointCoordinate->direction_of_altitude = f1_referencePointCoordinate->direction_of_altitude;
+        referencePointCoordinate->altitude = f1_referencePointCoordinate->altitude;
+        referencePointCoordinate->uncertainty_semi_major = f1_referencePointCoordinate->uncertainty_semi_major;
+        referencePointCoordinate->uncertainty_semi_minor = f1_referencePointCoordinate->uncertainty_semi_minor;
+        referencePointCoordinate->orientation_of_major_axis = f1_referencePointCoordinate->orientation_of_major_axis;
+        referencePointCoordinate->uncertainty_altitude = f1_referencePointCoordinate->uncertainty_altitude;
+        referencePointCoordinate->confidence = f1_referencePointCoordinate->confidence;
+      } else if (f1_referencePoint->present == F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATEHA) {
+        referencePoint->present = F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATEHA;
+        f1ap_ngran_high_accuracy_access_point_position_t *referencePointCoordinateHA =
+            &referencePoint->choice.reference_point_coordinateHA;
+        const f1ap_ngran_high_accuracy_access_point_position_t *f1_referencePointCoordinateHA =
+            &f1_referencePoint->choice.reference_point_coordinateHA;
+        *referencePointCoordinateHA = cp_trp_ha_pos(f1_referencePointCoordinateHA);
+      } else {
+        AssertFatal(false, "illegal reference point entry %d\n", referencePoint->present);
+      }
+
+      const f1ap_trp_reference_point_type_t *f1_referencePointType = &f1_referenced->reference_point_type;
+      f1ap_trp_reference_point_type_t *referencePointType = &referenced->reference_point_type;
+      *referencePointType = cp_encode_reference_point_type(f1_referencePointType);
+      break;
+    default:
+      AssertFatal(false, "illegal Geographical Coordinates entry\n");
+      break;
+  }
+  return out;
+}
+
+static bool eq_reference_point_type(const f1ap_trp_reference_point_type_t *f1_referencePointType,
+                                    const f1ap_trp_reference_point_type_t *referencePointType)
+{
+  _F1_EQ_CHECK_INT(f1_referencePointType->present, referencePointType->present);
+  switch (f1_referencePointType->present) {
+    case F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_GEODETIC: {
+      const f1ap_relative_geodetic_location_t *f1_tRPPositionRelativeGeodetic =
+          &f1_referencePointType->choice.trp_position_relative_geodetic;
+      const f1ap_relative_geodetic_location_t *tRPPositionRelativeGeodetic =
+          &referencePointType->choice.trp_position_relative_geodetic;
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeGeodetic->milli_arc_second_units,
+                        f1_tRPPositionRelativeGeodetic->milli_arc_second_units);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeGeodetic->height_units, f1_tRPPositionRelativeGeodetic->height_units);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeGeodetic->delta_latitude, f1_tRPPositionRelativeGeodetic->delta_latitude);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeGeodetic->delta_longitude, f1_tRPPositionRelativeGeodetic->delta_longitude);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeGeodetic->delta_height, f1_tRPPositionRelativeGeodetic->delta_height);
+
+      const f1ap_location_uncertainty_t *f1_locationUncertainty_g = &f1_tRPPositionRelativeGeodetic->location_uncertainty;
+      const f1ap_location_uncertainty_t *locationUncertainty_g = &tRPPositionRelativeGeodetic->location_uncertainty;
+      _F1_EQ_CHECK_LONG(locationUncertainty_g->horizontal_uncertainty, f1_locationUncertainty_g->horizontal_uncertainty);
+      _F1_EQ_CHECK_LONG(locationUncertainty_g->horizontal_confidence, f1_locationUncertainty_g->horizontal_confidence);
+      _F1_EQ_CHECK_LONG(locationUncertainty_g->vertical_uncertainty, f1_locationUncertainty_g->vertical_uncertainty);
+      _F1_EQ_CHECK_LONG(locationUncertainty_g->vertical_confidence, f1_locationUncertainty_g->vertical_confidence);
+      break;
+    }
+    case F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN: {
+      const f1ap_relative_cartesian_location_t *f1_tRPPositionRelativeCartesian =
+          &f1_referencePointType->choice.trp_position_relative_cartesian;
+      const f1ap_relative_cartesian_location_t *tRPPositionRelativeCartesian =
+          &referencePointType->choice.trp_position_relative_cartesian;
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeCartesian->xyz_unit, f1_tRPPositionRelativeCartesian->xyz_unit);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeCartesian->xvalue, f1_tRPPositionRelativeCartesian->xvalue);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeCartesian->yvalue, f1_tRPPositionRelativeCartesian->yvalue);
+      _F1_EQ_CHECK_LONG(tRPPositionRelativeCartesian->zvalue, f1_tRPPositionRelativeCartesian->zvalue);
+
+      const f1ap_location_uncertainty_t *f1_locationUncertainty_c = &f1_tRPPositionRelativeCartesian->location_uncertainty;
+      const f1ap_location_uncertainty_t *locationUncertainty_c = &tRPPositionRelativeCartesian->location_uncertainty;
+      _F1_EQ_CHECK_LONG(locationUncertainty_c->horizontal_uncertainty, f1_locationUncertainty_c->horizontal_uncertainty);
+      _F1_EQ_CHECK_LONG(locationUncertainty_c->horizontal_confidence, f1_locationUncertainty_c->horizontal_confidence);
+      _F1_EQ_CHECK_LONG(locationUncertainty_c->vertical_uncertainty, f1_locationUncertainty_c->vertical_uncertainty);
+      _F1_EQ_CHECK_LONG(locationUncertainty_c->vertical_confidence, f1_locationUncertainty_c->vertical_confidence);
+      break;
+    }
+    default:
+      AssertError(false, return false, "illegal trp reference point type entry %d\n", f1_referencePointType->present);
+      break;
+  }
+  return true;
+}
+
+static bool eq_trp_ha_pos(const f1ap_ngran_high_accuracy_access_point_position_t *trp_ha_pos,
+                          const f1ap_ngran_high_accuracy_access_point_position_t *f1_trp_ha_pos)
+{
+  _F1_EQ_CHECK_LONG(trp_ha_pos->latitude, f1_trp_ha_pos->latitude);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->longitude, f1_trp_ha_pos->longitude);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->altitude, f1_trp_ha_pos->altitude);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->uncertainty_semi_major, f1_trp_ha_pos->uncertainty_semi_major);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->uncertainty_semi_minor, f1_trp_ha_pos->uncertainty_semi_minor);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->orientation_of_major_axis, f1_trp_ha_pos->orientation_of_major_axis);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->horizontal_confidence, f1_trp_ha_pos->horizontal_confidence);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->uncertainty_altitude, f1_trp_ha_pos->uncertainty_altitude);
+  _F1_EQ_CHECK_LONG(trp_ha_pos->vertical_confidence, f1_trp_ha_pos->vertical_confidence);
+  return true;
+}
+
+static bool eq_geographical_coordinates(const f1ap_geographical_coordinates_t *in, const f1ap_geographical_coordinates_t *out)
+{
+  const f1ap_trp_position_definition_type_t *f1_trp_pos_def_type = &in->trp_position_definition_type;
+  const f1ap_trp_position_definition_type_t *trp_pos_def_type = &out->trp_position_definition_type;
+  _F1_EQ_CHECK_INT(f1_trp_pos_def_type->present, trp_pos_def_type->present);
+  switch (f1_trp_pos_def_type->present) {
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_NOTHING:
+      // nothing to check
+      break;
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_DIRECT: {
+      const f1ap_trp_position_direct_t *f1_direct = &f1_trp_pos_def_type->choice.direct;
+      const f1ap_trp_position_direct_t *direct = &trp_pos_def_type->choice.direct;
+      _F1_EQ_CHECK_INT(f1_direct->accuracy.present, direct->accuracy.present);
+
+      if (f1_direct->accuracy.present == F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPPOSITION) {
+        const f1ap_access_point_position_t *trp_pos = &direct->accuracy.choice.trp_position;
+        const f1ap_access_point_position_t *f1_trp_pos = &f1_direct->accuracy.choice.trp_position;
+        _F1_EQ_CHECK_LONG(trp_pos->latitude_sign, f1_trp_pos->latitude_sign);
+        _F1_EQ_CHECK_LONG(trp_pos->latitude, f1_trp_pos->latitude);
+        _F1_EQ_CHECK_LONG(trp_pos->longitude, f1_trp_pos->longitude);
+        _F1_EQ_CHECK_LONG(trp_pos->direction_of_altitude, f1_trp_pos->direction_of_altitude);
+        _F1_EQ_CHECK_LONG(trp_pos->altitude, f1_trp_pos->altitude);
+        _F1_EQ_CHECK_LONG(trp_pos->uncertainty_semi_major, f1_trp_pos->uncertainty_semi_major);
+        _F1_EQ_CHECK_LONG(trp_pos->uncertainty_semi_minor, f1_trp_pos->uncertainty_semi_minor);
+        _F1_EQ_CHECK_LONG(trp_pos->orientation_of_major_axis, f1_trp_pos->orientation_of_major_axis);
+        _F1_EQ_CHECK_LONG(trp_pos->uncertainty_altitude, f1_trp_pos->uncertainty_altitude);
+        _F1_EQ_CHECK_LONG(trp_pos->confidence, f1_trp_pos->confidence);
+      } else if (f1_direct->accuracy.present == F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPHAPOSITION) {
+        const f1ap_ngran_high_accuracy_access_point_position_t *trp_ha_pos = &direct->accuracy.choice.trp_HAposition;
+        const f1ap_ngran_high_accuracy_access_point_position_t *f1_trp_ha_pos = &f1_direct->accuracy.choice.trp_HAposition;
+        _F1_CHECK_EXP(eq_trp_ha_pos(trp_ha_pos, f1_trp_ha_pos));
+      } else {
+        AssertError(false, return false, "illegal direct accuracy entry %d\n", direct->accuracy.present);
+      }
+      break;
+    }
+    case F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED: {
+      const f1ap_trp_position_referenced_t *f1_referenced = &f1_trp_pos_def_type->choice.referenced;
+      const f1ap_trp_position_referenced_t *referenced = &trp_pos_def_type->choice.referenced;
+      const f1ap_reference_point_t *f1_referencePoint = &f1_referenced->reference_point;
+      const f1ap_reference_point_t *referencePoint = &referenced->reference_point;
+      _F1_EQ_CHECK_INT(f1_referencePoint->present, referencePoint->present);
+
+      if (f1_referencePoint->present == F1AP_REFERENCE_POINT_PR_COORDINATEID) {
+        _F1_EQ_CHECK_LONG(referencePoint->choice.coordinate_id, f1_referencePoint->choice.coordinate_id);
+      } else if (f1_referencePoint->present == F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATE) {
+        const f1ap_access_point_position_t *referencePointCoordinate = &referencePoint->choice.reference_point_coordinate;
+        const f1ap_access_point_position_t *f1_referencePointCoordinate = &f1_referencePoint->choice.reference_point_coordinate;
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->latitude_sign, f1_referencePointCoordinate->latitude_sign);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->latitude, f1_referencePointCoordinate->latitude);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->longitude, f1_referencePointCoordinate->longitude);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->direction_of_altitude, f1_referencePointCoordinate->direction_of_altitude);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->altitude, f1_referencePointCoordinate->altitude);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->uncertainty_semi_major, f1_referencePointCoordinate->uncertainty_semi_major);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->uncertainty_semi_minor, f1_referencePointCoordinate->uncertainty_semi_minor);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->orientation_of_major_axis,
+                          f1_referencePointCoordinate->orientation_of_major_axis);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->uncertainty_altitude, f1_referencePointCoordinate->uncertainty_altitude);
+        _F1_EQ_CHECK_LONG(referencePointCoordinate->confidence, f1_referencePointCoordinate->confidence);
+      } else if (f1_referencePoint->present == F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATEHA) {
+        const f1ap_ngran_high_accuracy_access_point_position_t *referencePointCoordinateHA =
+            &referencePoint->choice.reference_point_coordinateHA;
+        const f1ap_ngran_high_accuracy_access_point_position_t *f1_referencePointCoordinateHA =
+            &f1_referencePoint->choice.reference_point_coordinateHA;
+        _F1_CHECK_EXP(eq_trp_ha_pos(referencePointCoordinateHA, f1_referencePointCoordinateHA));
+      } else {
+        AssertError(false, return false, "illegal reference point entry %d\n", referencePoint->present);
+      }
+
+      const f1ap_trp_reference_point_type_t *f1_referencePointType = &f1_referenced->reference_point_type;
+      const f1ap_trp_reference_point_type_t *referencePointType = &referenced->reference_point_type;
+      _F1_CHECK_EXP(eq_reference_point_type(f1_referencePointType, referencePointType));
+      break;
+    }
+    default:
+      AssertError(false, return false, "illegal Geographical Coordinates entry\n");
+      break;
+  }
+  return true;
+}
+
+static F1AP_TRPInformationTypeResponseItem_t encode_trp_info_type_response_item(const f1ap_trp_information_type_response_item_t *in)
+{
+  F1AP_TRPInformationTypeResponseItem_t out = {0};
+  switch (in->present) {
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NOTHING:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_NOTHING;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_pCI_NR;
+      out.choice.pCI_NR = in->choice.pci_nr;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_nG_RAN_CGI;
+      asn1cCalloc(out.choice.nG_RAN_CGI, nG_RAN_CGI);
+      MCC_MNC_TO_PLMNID(in->choice.ng_ran_cgi.plmn.mcc,
+                        in->choice.ng_ran_cgi.plmn.mnc,
+                        in->choice.ng_ran_cgi.plmn.mnc_digit_length,
+                        &(nG_RAN_CGI->pLMN_Identity));
+      NR_CELL_ID_TO_BIT_STRING(in->choice.ng_ran_cgi.nr_cellid, &(nG_RAN_CGI->nRCellIdentity));
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NRARFCN:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_nRARFCN;
+      out.choice.nRARFCN = in->choice.nr_arfcn;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PRSCONFIGURATION:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_pRSConfiguration;
+      AssertFatal(false, "TRP information type response item PRS configuration unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SSBINFORMATION:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_sSBinformation;
+      AssertFatal(false, "TRP information type response item SSB Information unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SFNINITIALISATIONTIME:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_sFNInitialisationTime;
+      AssertFatal(false, "TRP information type response item SFN Initialization Time unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SPATIALDIRECTIONINFORMATION:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_spatialDirectionInformation;
+      AssertFatal(false, "TRP information type response item Spatial Direction Information unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES:
+      out.present = F1AP_TRPInformationTypeResponseItem_PR_geographicalCoordinates;
+      asn1cCalloc(out.choice.geographicalCoordinates, f1_geo_coord);
+      f1ap_geographical_coordinates_t geo_coord = in->choice.geographical_coordinates;
+      *f1_geo_coord = encode_geographical_coordinates(&geo_coord);
+      break;
+    default:
+      AssertFatal(false, "received illegal trp information type response item %d\n", in->present);
+      break;
+  }
+  return out;
+}
+
+static void decode_trp_info_type_response_item(const F1AP_TRPInformationTypeResponseItem_t *in,
+                                               f1ap_trp_information_type_response_item_t *out)
+{
+  switch (in->present) {
+    case F1AP_TRPInformationTypeResponseItem_PR_NOTHING:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NOTHING;
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_pCI_NR:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR;
+      out->choice.pci_nr = in->choice.pCI_NR;
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_nG_RAN_CGI:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI;
+      // NR CGI (M)
+      PLMNID_TO_MCC_MNC(&(in->choice.nG_RAN_CGI->pLMN_Identity),
+                        out->choice.ng_ran_cgi.plmn.mcc,
+                        out->choice.ng_ran_cgi.plmn.mnc,
+                        out->choice.ng_ran_cgi.plmn.mnc_digit_length);
+      // NR Cell Identity (M)
+      BIT_STRING_TO_NR_CELL_IDENTITY(&in->choice.nG_RAN_CGI->nRCellIdentity, out->choice.ng_ran_cgi.nr_cellid);
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_nRARFCN:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NRARFCN;
+      out->choice.nr_arfcn = in->choice.nRARFCN;
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_pRSConfiguration:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PRSCONFIGURATION;
+      AssertFatal(false, "TRP information type response item PRS configuration unsupported\n");
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_sSBinformation:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SSBINFORMATION;
+      AssertFatal(false, "TRP information type response item SSB Information unsupported\n");
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_sFNInitialisationTime:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SFNINITIALISATIONTIME;
+      AssertFatal(false, "TRP information type response item SFN Initialization Time unsupported\n");
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_spatialDirectionInformation:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SPATIALDIRECTIONINFORMATION;
+      AssertFatal(false, "TRP information type response item Spatial Direction Information unsupported\n");
+      break;
+    case F1AP_TRPInformationTypeResponseItem_PR_geographicalCoordinates:
+      out->present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES;
+      decode_geographical_coordinates(in->choice.geographicalCoordinates, &out->choice.geographical_coordinates);
+      break;
+    default:
+      AssertFatal(false, "received illegal trp information type response item %d\n", in->present);
+      break;
+  }
+}
+
+static f1ap_trp_information_type_response_item_t cp_trp_info_type_response_item(const f1ap_trp_information_type_response_item_t *in)
+{
+  f1ap_trp_information_type_response_item_t out = {0};
+  switch (in->present) {
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NOTHING:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NOTHING;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR;
+      out.choice.pci_nr = in->choice.pci_nr;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI;
+      out.choice.ng_ran_cgi.plmn.mcc = in->choice.ng_ran_cgi.plmn.mcc;
+      out.choice.ng_ran_cgi.plmn.mnc = in->choice.ng_ran_cgi.plmn.mnc;
+      out.choice.ng_ran_cgi.plmn.mnc_digit_length = in->choice.ng_ran_cgi.plmn.mnc_digit_length;
+      out.choice.ng_ran_cgi.nr_cellid = in->choice.ng_ran_cgi.nr_cellid;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NRARFCN:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NRARFCN;
+      out.choice.nr_arfcn = in->choice.nr_arfcn;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PRSCONFIGURATION:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PRSCONFIGURATION;
+      AssertFatal(false, "TRP information type response item PRS configuration unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SSBINFORMATION:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SSBINFORMATION;
+      AssertFatal(false, "TRP information type response item SSB Information unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SFNINITIALISATIONTIME:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SFNINITIALISATIONTIME;
+      AssertFatal(false, "TRP information type response item SFN Initialization Time unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SPATIALDIRECTIONINFORMATION:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SPATIALDIRECTIONINFORMATION;
+      AssertFatal(false, "TRP information type response item Spatial Direction Information unsupported\n");
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES:
+      out.present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES;
+      out.choice.geographical_coordinates = cp_geographical_coordinates(&in->choice.geographical_coordinates);
+      break;
+    default:
+      AssertFatal(false, "received illegal trp information type response item %d\n", in->present);
+      break;
+  }
+  return out;
+}
+
+static bool eq_trp_info_type_response_item(const f1ap_trp_information_type_response_item_t *in,
+                                           const f1ap_trp_information_type_response_item_t *out)
+{
+  _F1_EQ_CHECK_INT(in->present, out->present);
+  switch (in->present) {
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NOTHING:
+      // nothing to check
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR:
+      _F1_EQ_CHECK_INT(in->choice.pci_nr, out->choice.pci_nr);
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI:
+      _F1_EQ_CHECK_INT(in->choice.ng_ran_cgi.plmn.mcc, out->choice.ng_ran_cgi.plmn.mcc);
+      _F1_EQ_CHECK_INT(in->choice.ng_ran_cgi.plmn.mnc, out->choice.ng_ran_cgi.plmn.mnc);
+      _F1_EQ_CHECK_INT(in->choice.ng_ran_cgi.plmn.mnc_digit_length, out->choice.ng_ran_cgi.plmn.mnc_digit_length);
+      _F1_EQ_CHECK_LONG(in->choice.ng_ran_cgi.nr_cellid, out->choice.ng_ran_cgi.nr_cellid);
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NRARFCN:
+      _F1_EQ_CHECK_INT(in->choice.nr_arfcn, out->choice.nr_arfcn);
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PRSCONFIGURATION:
+      PRINT_ERROR("TRP information type response item PRS configuration unsupported\n");
+      return false;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SSBINFORMATION:
+      PRINT_ERROR("TRP information type response item SSB Information unsupported\n");
+      return false;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SFNINITIALISATIONTIME:
+      PRINT_ERROR("TRP information type response item SFN Initialization Time unsupported\n");
+      return false;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SPATIALDIRECTIONINFORMATION:
+      PRINT_ERROR("TRP information type response item Spatial Direction Information unsupported\n");
+      return false;
+      break;
+    case F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES:
+      _F1_CHECK_EXP(eq_geographical_coordinates(&in->choice.geographical_coordinates, &out->choice.geographical_coordinates));
+      break;
+    default:
+      PRINT_ERROR("received illegal trp information type response item %d\n", in->present);
+      return false;
+      break;
+  }
+  return true;
+}
+
 /**
  * @brief Encode F1 positioning information request to ASN.1
  */
@@ -3375,4 +4141,218 @@ void free_trp_information_req(f1ap_trp_information_req_t *msg)
     free(msg->trp_list.trp_list_item);
   }
   free(msg->trp_information_type_list.trp_information_type_item);
+}
+
+/**
+ * @brief Encode F1 TRP information response to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_trp_information_resp(const f1ap_trp_information_resp_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_TRPInformationExchange;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_SuccessfulOutcome__value_PR_TRPInformationResponse;
+  F1AP_TRPInformationResponse_t *out = &tmp->value.choice.TRPInformationResponse;
+
+  /* mandatory : TransactionID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_TRPInformationResponseIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_TRPInformationResponseIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+
+  /* mandatory : TRPInformationList */
+  // Supported : NR PCI, NG-RAN CGI, NR ARFCN, Geogarphical Coordinates
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_TRPInformationResponseIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_TRPInformationListTRPResp;
+  ie3->criticality = F1AP_Criticality_ignore;
+  ie3->value.present = F1AP_TRPInformationResponseIEs__value_PR_TRPInformationListTRPResp;
+  uint32_t trp_info_item_len = msg->trp_information_list.trp_information_item_length;
+  for (int i = 0; i < trp_info_item_len; i++) {
+    // TRPInformationItem (M)
+    asn1cSequenceAdd(ie3->value.choice.TRPInformationListTRPResp.list, F1AP_TRPInformationItemTRPResp_t, trpinfolist);
+    trpinfolist->id = F1AP_ProtocolIE_ID_id_TRPInformationItem;
+    trpinfolist->criticality = F1AP_Criticality_ignore;
+    trpinfolist->value.present = F1AP_TRPInformationItemTRPResp__value_PR_TRPInformationItem;
+    F1AP_TRPInformationItem_t *trp_info_item = &trpinfolist->value.choice.TRPInformationItem;
+    F1AP_TRPInformation_t *trp_info = &trp_info_item->tRPInformation;
+    f1ap_trp_information_t *tRPInformation = &msg->trp_information_list.trp_information_item[i];
+    trp_info->tRPID = tRPInformation->trp_id;
+
+    f1ap_trp_information_type_response_list_t *tRPInformationTypeResponseList = &tRPInformation->trp_information_type_response_list;
+    uint8_t trp_item_len = tRPInformationTypeResponseList->trp_information_type_response_item_length;
+
+    for (int j = 0; j < trp_item_len; j++) {
+      asn1cSequenceAdd(trp_info->tRPInformationTypeResponseList, F1AP_TRPInformationTypeResponseItem_t, trp_resp_item);
+      *trp_resp_item = encode_trp_info_type_response_item(&tRPInformationTypeResponseList->trp_information_type_response_item[j]);
+    }
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 TRP information response
+ */
+bool decode_trp_information_resp(const F1AP_F1AP_PDU_t *pdu, f1ap_trp_information_resp_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_TRPInformationResponse_t *in = &pdu->choice.successfulOutcome->value.choice.TRPInformationResponse;
+  F1AP_TRPInformationResponseIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_TRPInformationResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_TRPInformationResponseIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_TRPInformationListTRPResp,
+                   true);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_TRPInformationResponseIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_TRPInformationListTRPResp:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_TRPInformationResponseIEs__value_PR_TRPInformationListTRPResp);
+        uint32_t trp_info_item_length = ie->value.choice.TRPInformationListTRPResp.list.count;
+        AssertError(trp_info_item_length > 0, return false, "at least 1 TRP Information Item must be present");
+        out->trp_information_list.trp_information_item_length = trp_info_item_length;
+        f1ap_trp_information_t *trp_info_item = calloc_or_fail(trp_info_item_length, sizeof(*trp_info_item));
+        out->trp_information_list.trp_information_item = trp_info_item;
+        for (int i = 0; i < trp_info_item_length; i++) {
+          F1AP_TRPInformationItemTRPResp_t *f1_trpinfolist =
+              (F1AP_TRPInformationItemTRPResp_t *)ie->value.choice.TRPInformationListTRPResp.list.array[i];
+          _F1_EQ_CHECK_LONG(f1_trpinfolist->id, F1AP_ProtocolIE_ID_id_TRPInformationItem);
+          _F1_EQ_CHECK_INT(f1_trpinfolist->value.present, F1AP_TRPInformationItemTRPResp__value_PR_TRPInformationItem);
+          F1AP_TRPInformationItem_t *f1_trp_info_item = &f1_trpinfolist->value.choice.TRPInformationItem;
+          F1AP_TRPInformation_t *f1_trp_info = &f1_trp_info_item->tRPInformation;
+          trp_info_item[i].trp_id = f1_trp_info->tRPID;
+
+          F1AP_TRPInformationTypeResponseList_t *f1_trp_info_type_resp_list =
+              (F1AP_TRPInformationTypeResponseList_t *)&f1_trp_info->tRPInformationTypeResponseList;
+
+          uint8_t trp_info_type_resp_item_len = f1_trp_info_type_resp_list->list.count;
+          AssertError(trp_info_type_resp_item_len > 0,
+                      return false,
+                      "at least 1 TRP Information type response Item must be present");
+          f1ap_trp_information_type_response_list_t *trp_info_resp_list = &trp_info_item[i].trp_information_type_response_list;
+          trp_info_resp_list->trp_information_type_response_item_length = trp_info_type_resp_item_len;
+          trp_info_resp_list->trp_information_type_response_item =
+              calloc_or_fail(trp_info_type_resp_item_len, sizeof(*trp_info_resp_list->trp_information_type_response_item));
+          for (int j = 0; j < trp_info_type_resp_item_len; j++) {
+            f1ap_trp_information_type_response_item_t *trp_info_type_resp_item =
+                &trp_info_resp_list->trp_information_type_response_item[j];
+            decode_trp_info_type_response_item(f1_trp_info_type_resp_list->list.array[j], trp_info_type_resp_item);
+          }
+        }
+        break;
+      case F1AP_ProtocolIE_ID_id_CriticalityDiagnostics:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 TRP information response deep copy
+ */
+f1ap_trp_information_resp_t cp_trp_information_resp(const f1ap_trp_information_resp_t *orig)
+{
+  /* copy all mandatory fields that are not dynamic memory */
+  f1ap_trp_information_resp_t cp = {
+      .transaction_id = orig->transaction_id,
+  };
+
+  uint32_t trp_info_item_length = orig->trp_information_list.trp_information_item_length;
+  AssertFatal(trp_info_item_length > 0, "at least 1 TRP Information Item must be present\n");
+  cp.trp_information_list.trp_information_item_length = trp_info_item_length;
+  cp.trp_information_list.trp_information_item =
+      calloc_or_fail(trp_info_item_length, sizeof(*cp.trp_information_list.trp_information_item));
+
+  f1ap_trp_information_t *trp_information_item_cp = cp.trp_information_list.trp_information_item;
+  f1ap_trp_information_t *trp_information_item_orig = orig->trp_information_list.trp_information_item;
+
+  for (int i = 0; i < trp_info_item_length; i++) {
+    uint8_t trp_info_type_resp_item_len =
+        trp_information_item_orig[i].trp_information_type_response_list.trp_information_type_response_item_length;
+    AssertFatal(trp_info_type_resp_item_len > 0, "at least 1 TRP Information type response Item must be present\n");
+
+    trp_information_item_cp[i].trp_id = trp_information_item_orig[i].trp_id;
+
+    f1ap_trp_information_type_response_list_t *trp_info_type_resp_list_cp =
+        &trp_information_item_cp[i].trp_information_type_response_list;
+    f1ap_trp_information_type_response_list_t *trp_info_type_resp_list_orig =
+        &trp_information_item_orig[i].trp_information_type_response_list;
+    trp_info_type_resp_list_cp->trp_information_type_response_item_length = trp_info_type_resp_item_len;
+    trp_info_type_resp_list_cp->trp_information_type_response_item =
+        calloc_or_fail(trp_info_type_resp_item_len, sizeof(*trp_info_type_resp_list_cp->trp_information_type_response_item));
+    for (int j = 0; j < trp_info_type_resp_item_len; j++) {
+      trp_info_type_resp_list_cp->trp_information_type_response_item[j] =
+          cp_trp_info_type_response_item(&trp_info_type_resp_list_orig->trp_information_type_response_item[j]);
+    }
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 TRP information response equality check
+ */
+bool eq_trp_information_resp(const f1ap_trp_information_resp_t *a, const f1ap_trp_information_resp_t *b)
+{
+  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+
+  _F1_EQ_CHECK_INT(a->trp_information_list.trp_information_item_length, b->trp_information_list.trp_information_item_length);
+  uint32_t trp_info_item_length = a->trp_information_list.trp_information_item_length;
+  AssertError(trp_info_item_length > 0, return false, "at least 1 TRP Information Item must be present\n");
+
+  f1ap_trp_information_t *trp_information_item_a = a->trp_information_list.trp_information_item;
+  f1ap_trp_information_t *trp_information_item_b = b->trp_information_list.trp_information_item;
+
+  for (int i = 0; i < trp_info_item_length; i++) {
+    f1ap_trp_information_type_response_list_t *trp_info_type_resp_list_a =
+        &trp_information_item_a[i].trp_information_type_response_list;
+    f1ap_trp_information_type_response_list_t *trp_info_type_resp_list_b =
+        &trp_information_item_b[i].trp_information_type_response_list;
+    _F1_EQ_CHECK_INT(trp_info_type_resp_list_a->trp_information_type_response_item_length,
+                     trp_info_type_resp_list_b->trp_information_type_response_item_length);
+    uint8_t trp_info_type_resp_item_len = trp_info_type_resp_list_a->trp_information_type_response_item_length;
+    AssertError(trp_info_type_resp_item_len > 0, return false, "at least 1 TRP Information type response Item must be present\n");
+    _F1_EQ_CHECK_INT(trp_information_item_a[i].trp_id, trp_information_item_b[i].trp_id);
+    for (int j = 0; j < trp_info_type_resp_item_len; j++) {
+      _F1_CHECK_EXP(eq_trp_info_type_response_item(&trp_info_type_resp_list_a->trp_information_type_response_item[j],
+                                                   &trp_info_type_resp_list_b->trp_information_type_response_item[j]));
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 TRP information response
+ */
+void free_trp_information_resp(f1ap_trp_information_resp_t *msg)
+{
+  f1ap_trp_information_list_t *trp_information_list = &msg->trp_information_list;
+  uint32_t trp_info_item_length = trp_information_list->trp_information_item_length;
+  for (int i = 0; i < trp_info_item_length; i++) {
+    f1ap_trp_information_t *trp_information_item = &trp_information_list->trp_information_item[i];
+    f1ap_trp_information_type_response_list_t *trp_info_type_resp_list = &trp_information_item->trp_information_type_response_list;
+    free(trp_info_type_resp_list->trp_information_type_response_item);
+  }
+  free(msg->trp_information_list.trp_information_item);
 }

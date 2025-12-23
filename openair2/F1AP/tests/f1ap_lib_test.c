@@ -1866,6 +1866,86 @@ static void test_f1ap_trp_information_request()
   printf("%s() successful\n", __func__);
 }
 
+static void test_f1ap_trp_information_response()
+{
+  f1ap_trp_information_resp_t orig = {
+      .transaction_id = 12,
+  };
+
+  orig.trp_information_list.trp_information_item_length = 3;
+  uint32_t trp_info_item_len = orig.trp_information_list.trp_information_item_length;
+  orig.trp_information_list.trp_information_item =
+      calloc_or_fail(trp_info_item_len, sizeof(*orig.trp_information_list.trp_information_item));
+
+  uint8_t trp_info_type_resp_item_len = 3;
+  for (int i = 0; i < trp_info_item_len; i++) {
+    f1ap_trp_information_t *tRPInformation = &orig.trp_information_list.trp_information_item[i];
+    tRPInformation->trp_information_type_response_list.trp_information_type_response_item_length = trp_info_type_resp_item_len;
+    tRPInformation->trp_id = 11 + i;
+    f1ap_trp_information_type_response_item_t *trp_info_type_resp_item =
+        calloc_or_fail(trp_info_type_resp_item_len, sizeof(*trp_info_type_resp_item));
+    tRPInformation->trp_information_type_response_list.trp_information_type_response_item = trp_info_type_resp_item;
+
+    // nrPCI
+    trp_info_type_resp_item[0].present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR;
+    trp_info_type_resp_item[0].choice.pci_nr = 123 + i;
+
+    // nG_RAN_CGI
+    trp_info_type_resp_item[1].present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI;
+    trp_info_type_resp_item[1].choice.ng_ran_cgi.plmn.mcc = 208;
+    trp_info_type_resp_item[1].choice.ng_ran_cgi.plmn.mnc = 92 + i;
+    trp_info_type_resp_item[1].choice.ng_ran_cgi.plmn.mnc_digit_length = 2;
+    trp_info_type_resp_item[1].choice.ng_ran_cgi.nr_cellid = 117 + i;
+
+    // geographicalCoordinates
+    trp_info_type_resp_item[2].present = F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES;
+    f1ap_geographical_coordinates_t *geographical_coordinates = &trp_info_type_resp_item[2].choice.geographical_coordinates;
+    f1ap_trp_position_definition_type_t *tRPPositionDefinitionType = &geographical_coordinates->trp_position_definition_type;
+    // referenced
+    tRPPositionDefinitionType->present = F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED;
+    f1ap_trp_position_referenced_t *referenced = &tRPPositionDefinitionType->choice.referenced;
+    // coordinate ID
+    referenced->reference_point.present = F1AP_REFERENCE_POINT_PR_COORDINATEID;
+    referenced->reference_point.choice.coordinate_id = 2;
+    f1ap_trp_reference_point_type_t *referencePointType = &referenced->reference_point_type;
+    // relative cartesian
+    referencePointType->present = F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN;
+    f1ap_relative_cartesian_location_t *trp_pos_cart = &referencePointType->choice.trp_position_relative_cartesian;
+    // 0 = millimeter
+    trp_pos_cart->xyz_unit = 0;
+    // random reference cartesian coordinates in millimeter
+    trp_pos_cart->xvalue = 7100 + i * 2;
+    trp_pos_cart->yvalue = 1100 + i * 2;
+    trp_pos_cart->zvalue = -4100 + i * 2;
+    // testing random values for uncertainity and confidence
+    trp_pos_cart->location_uncertainty.horizontal_uncertainty = i + 1;
+    trp_pos_cart->location_uncertainty.horizontal_confidence = i + 2;
+    trp_pos_cart->location_uncertainty.vertical_uncertainty = i + 3;
+    trp_pos_cart->location_uncertainty.vertical_confidence = i + 4;
+  }
+
+  F1AP_F1AP_PDU_t *f1enc = encode_trp_information_resp(&orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_trp_information_resp_t decoded = {0};
+  bool ret = decode_trp_information_resp(f1dec, &decoded);
+  AssertFatal(ret, "decode_trp_information_resp(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_trp_information_resp(&orig, &decoded);
+  AssertFatal(ret, "eq_trp_information_resp(): decoded message doesn't match\n");
+  free_trp_information_resp(&decoded);
+
+  f1ap_trp_information_resp_t cp = cp_trp_information_resp(&orig);
+  ret = eq_trp_information_resp(&orig, &cp);
+  AssertFatal(ret, "eq_trp_information_resp(): copied message doesn't match\n");
+  free_trp_information_resp(&orig);
+  free_trp_information_resp(&cp);
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -1901,5 +1981,6 @@ int main()
   test_f1ap_positioning_deactivation();
   test_f1ap_positioning_information_update();
   test_f1ap_trp_information_request();
+  test_f1ap_trp_information_response();
   return 0;
 }

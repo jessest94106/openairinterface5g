@@ -1072,6 +1072,183 @@ typedef struct f1ap_trp_information_type_list_s {
   uint8_t trp_information_type_list_length;
 } f1ap_trp_information_type_list_t;
 
+typedef struct f1ap_access_point_position_s {
+  long latitude_sign;
+  long latitude;
+  long longitude;
+  long direction_of_altitude;
+  long altitude;
+  long uncertainty_semi_major;
+  long uncertainty_semi_minor;
+  long orientation_of_major_axis;
+  long uncertainty_altitude;
+  long confidence;
+} f1ap_access_point_position_t;
+
+typedef struct f1ap_ngran_high_accuracy_access_point_position_s {
+  long latitude;
+  long longitude;
+  long altitude;
+  long uncertainty_semi_major;
+  long uncertainty_semi_minor;
+  long orientation_of_major_axis;
+  long horizontal_confidence;
+  long uncertainty_altitude;
+  long vertical_confidence;
+} f1ap_ngran_high_accuracy_access_point_position_t;
+
+typedef union f1ap_trp_position_direct_accuracy_c {
+  f1ap_access_point_position_t trp_position;
+  f1ap_ngran_high_accuracy_access_point_position_t trp_HAposition;
+} f1ap_trp_position_direct_accuracy_u;
+
+typedef enum f1ap_trp_position_direct_accuracy_e {
+  F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_NOTHING,
+  F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPPOSITION,
+  F1AP_TRP_POSITION_DIRECT_ACCURACY_PR_TRPHAPOSITION
+} f1ap_trp_position_direct_accuracy_pr;
+
+typedef struct f1ap_trp_position_direct_accuracy_s {
+  f1ap_trp_position_direct_accuracy_pr present;
+  f1ap_trp_position_direct_accuracy_u choice;
+} f1ap_trp_position_direct_accuracy_t;
+
+typedef struct f1ap_trp_position_direct_s {
+  f1ap_trp_position_direct_accuracy_t accuracy;
+} f1ap_trp_position_direct_t;
+
+typedef enum f1ap_reference_point_e {
+  F1AP_REFERENCE_POINT_PR_NOTHING,
+  F1AP_REFERENCE_POINT_PR_COORDINATEID,
+  F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATE,
+  F1AP_REFERENCE_POINT_PR_REFERENCEPOINTCOORDINATEHA
+} f1ap_reference_point_pr;
+
+typedef union f1ap_reference_point_c {
+  long coordinate_id;
+  f1ap_access_point_position_t reference_point_coordinate;
+  f1ap_ngran_high_accuracy_access_point_position_t reference_point_coordinateHA;
+} f1ap_reference_point_u;
+
+typedef struct f1ap_reference_point_s {
+  f1ap_reference_point_pr present;
+  f1ap_reference_point_u choice;
+} f1ap_reference_point_t;
+
+typedef struct f1ap_location_uncertainty_s {
+  long horizontal_uncertainty;
+  long horizontal_confidence;
+  long vertical_uncertainty;
+  long vertical_confidence;
+} f1ap_location_uncertainty_t;
+
+typedef struct f1ap_relative_geodetic_location_s {
+  long milli_arc_second_units;
+  long height_units;
+  long delta_latitude;
+  long delta_longitude;
+  long delta_height;
+  f1ap_location_uncertainty_t location_uncertainty;
+} f1ap_relative_geodetic_location_t;
+
+typedef struct f1ap_relative_cartesian_location_s {
+  long xyz_unit;
+  long xvalue;
+  long yvalue;
+  long zvalue;
+  f1ap_location_uncertainty_t location_uncertainty;
+} f1ap_relative_cartesian_location_t;
+
+typedef union f1ap_trp_reference_point_type_c {
+  f1ap_relative_geodetic_location_t trp_position_relative_geodetic;
+  f1ap_relative_cartesian_location_t trp_position_relative_cartesian;
+} f1ap_trp_reference_point_type_u;
+
+typedef enum f1ap_trp_reference_point_type_e {
+  F1AP_TRP_REFERENCE_POINT_TYPE_PR_NOTHING,
+  F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_GEODETIC,
+  F1AP_TRP_REFERENCE_POINT_TYPE_PR_TRPPOSITION_RELATIVE_CARTESIAN
+} f1ap_trp_reference_point_type_pr;
+
+typedef struct f1ap_trp_reference_point_type_t {
+  f1ap_trp_reference_point_type_pr present;
+  f1ap_trp_reference_point_type_u choice;
+} f1ap_trp_reference_point_type_t;
+
+typedef struct f1ap_trp_position_referenced_t {
+  f1ap_reference_point_t reference_point;
+  f1ap_trp_reference_point_type_t reference_point_type;
+} f1ap_trp_position_referenced_t;
+
+typedef union f1ap_trp_position_definition_type_c {
+  f1ap_trp_position_direct_t direct;
+  f1ap_trp_position_referenced_t referenced;
+} f1ap_trp_position_definition_type_u;
+
+typedef enum f1ap_trp_position_definition_type_e {
+  F1AP_TRP_POSITION_DEFINITION_TYPE_PR_NOTHING,
+  F1AP_TRP_POSITION_DEFINITION_TYPE_PR_DIRECT,
+  F1AP_TRP_POSITION_DEFINITION_TYPE_PR_REFERENCED
+} f1ap_trp_position_definition_type_pr;
+
+typedef struct f1ap_trp_position_definition_type_s {
+  f1ap_trp_position_definition_type_u choice;
+  f1ap_trp_position_definition_type_pr present;
+} f1ap_trp_position_definition_type_t;
+
+typedef struct f1ap_geographical_coordinates_s {
+  f1ap_trp_position_definition_type_t trp_position_definition_type;
+} f1ap_geographical_coordinates_t;
+
+typedef struct f1ap_ng_ran_cgi_s {
+  plmn_id_t plmn;
+  uint64_t nr_cellid;
+} f1ap_ng_ran_cgi_t;
+
+typedef union f1ap_trp_information_type_response_item_c {
+  uint16_t pci_nr;
+  f1ap_ng_ran_cgi_t ng_ran_cgi;
+  uint32_t nr_arfcn;
+  // f1ap_prs_configuration_t pRSConfiguration;
+  // f1ap_ssb_information_t sSBinformation;
+  // bit_string_t sFNInitialisationTime;
+  // f1ap_spatial_direction_information_t spatialDirectionInformation;
+  f1ap_geographical_coordinates_t geographical_coordinates;
+} f1ap_trp_information_type_response_item_u;
+
+typedef enum f1ap_trp_information_type_response_item_e {
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NOTHING,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PCI_NR,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NG_RAN_CGI,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_NRARFCN,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_PRSCONFIGURATION,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SSBINFORMATION,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SFNINITIALISATIONTIME,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_SPATIALDIRECTIONINFORMATION,
+  F1AP_TRP_INFORMATION_TYPE_RESPONSE_ITEM_PR_GEOGRAPHICALCOORDINATES
+} f1ap_trp_information_type_response_item_pr;
+
+typedef struct f1ap_trp_information_type_response_item_s {
+  f1ap_trp_information_type_response_item_pr present;
+  f1ap_trp_information_type_response_item_u choice;
+} f1ap_trp_information_type_response_item_t;
+
+typedef struct f1ap_trp_information_type_response_list_s {
+  f1ap_trp_information_type_response_item_t *trp_information_type_response_item;
+  uint8_t trp_information_type_response_item_length;
+} f1ap_trp_information_type_response_list_t;
+
+typedef struct f1ap_trp_information_s {
+  uint32_t trp_id;
+  f1ap_trp_information_type_response_list_t trp_information_type_response_list;
+} f1ap_trp_information_t;
+
+// IE 9.3.1.176 (TS 38.473 V16.21.0)
+typedef struct f1ap_trp_information_list_s {
+  f1ap_trp_information_t *trp_information_item;
+  uint32_t trp_information_item_length;
+} f1ap_trp_information_list_t;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
@@ -1153,5 +1330,12 @@ typedef struct f1ap_trp_information_req_s {
   // mandatory
   f1ap_trp_information_type_list_t trp_information_type_list;
 } f1ap_trp_information_req_t;
+
+typedef struct f1ap_trp_information_resp_s {
+  // IE 9.3.1.23 (mandatory)
+  uint8_t transaction_id;
+  // mandatory
+  f1ap_trp_information_list_t trp_information_list;
+} f1ap_trp_information_resp_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */

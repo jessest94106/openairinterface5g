@@ -74,5 +74,13 @@
 #include "F1AP_SemipersistentSRS.h"
 #include "F1AP_AperiodicSRS.h"
 #include "F1AP_TRPListItem.h"
+#include "F1AP_TRPInformationTypeResponseItem.h"
+#include "F1AP_GeographicalCoordinates.h"
+#include "F1AP_TRPPositionDirect.h"
+#include "F1AP_AccessPointPosition.h"
+#include "F1AP_NGRANHighAccuracyAccessPointPosition.h"
+#include "F1AP_TRPPositionReferenced.h"
+#include "F1AP_RelativeGeodeticLocation.h"
+#include "F1AP_RelativeCartesianLocation.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */
