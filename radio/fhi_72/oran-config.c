@@ -20,6 +20,7 @@
  */
 
 #include "oran-config.h"
+#include "common/config/config_userapi.h"
 #include "oran-params.h"
 #include "common/utils/assertions.h"
 #include "common_lib.h"
@@ -890,7 +891,13 @@ static bool set_maxmin_pd(const paramdef_t *pd, int num, const char *name, uint1
   return true;
 }
 
-static bool set_fh_config(void *mplane_api, int ru_idx, int num_rus, enum xran_category xran_cat, const openair0_config_t *oai0, struct xran_fh_config *fh_config)
+static bool set_fh_config(void *mplane_api,
+                          int ru_idx,
+                          int num_rus,
+                          enum xran_category xran_cat,
+                          const openair0_config_t *oai0,
+                          struct xran_fh_config *fh_config,
+                          bool is_du)
 {
   AssertFatal(num_rus == 1 || num_rus == 2, "only support 1 or 2 RUs as of now\n");
   AssertFatal(ru_idx < num_rus, "illegal ru_idx %d: must be < %d\n", ru_idx, num_rus);
@@ -950,15 +957,47 @@ static bool set_fh_config(void *mplane_api, int ru_idx, int num_rus, enum xran_c
   fh_config->ttiCb = NULL; // check tti_to_phy_cb(), tx_cp_dl_cb() and tx_cp_ul_cb => first_call
   fh_config->ttiCbParam = NULL; // check tti_to_phy_cb(), tx_cp_dl_cb() and tx_cp_ul_cb => first_call
 
-  /* DU delay profile */
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_DL, &fh_config->T1a_min_cp_dl, &fh_config->T1a_max_cp_dl)) // E - min not used in xran, max yes; F - both min and max are used in xran
-    return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_CP_UL, &fh_config->T1a_min_cp_ul, &fh_config->T1a_max_cp_ul)) // both E and F - min not used in xran, max yes
-    return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_T1A_UP, &fh_config->T1a_min_up, &fh_config->T1a_max_up)) // both E and F - min not used in xran, max yes
-    return false;
-  if (!set_maxmin_pd(fhp, nfh, ORAN_FH_CONFIG_TA4, &fh_config->Ta4_min, &fh_config->Ta4_max)) // both E and F - min not used in xran, max yes
-    return false;
+  if (is_du) {
+    /* DU delay profile */
+    if (!set_maxmin_pd(fhp,
+                       nfh,
+                       ORAN_FH_CONFIG_T1A_CP_DL,
+                       &fh_config->T1a_min_cp_dl,
+                       &fh_config->T1a_max_cp_dl)) // E - min not used in xran, max yes; F - both min and max are used in xran
+      return false;
+    if (!set_maxmin_pd(fhp,
+                       nfh,
+                       ORAN_FH_CONFIG_T1A_CP_UL,
+                       &fh_config->T1a_min_cp_ul,
+                       &fh_config->T1a_max_cp_ul)) // both E and F - min not used in xran, max yes
+      return false;
+    if (!set_maxmin_pd(fhp,
+                       nfh,
+                       ORAN_FH_CONFIG_T1A_UP,
+                       &fh_config->T1a_min_up,
+                       &fh_config->T1a_max_up)) // both E and F - min not used in xran, max yes
+      return false;
+    if (!set_maxmin_pd(fhp,
+                       nfh,
+                       ORAN_FH_CONFIG_TA4,
+                       &fh_config->Ta4_min,
+                       &fh_config->Ta4_max)) // both E and F - min not used in xran, max yes
+      return false;
+  } else {
+    /* RU delay profile */
+    if (!set_maxmin_pd(fhp,
+                       nfh,
+                       ORAN_FH_CONFIG_TA3,
+                       &fh_config->Ta3_min,
+                       &fh_config->Ta3_max)) // both E and F - min not used in xran, max yes
+      return false;
+    if (!set_maxmin_pd(fhp,
+                       nfh,
+                       ORAN_FH_CONFIG_T2A,
+                       &fh_config->T2a_min_up,
+                       &fh_config->T2a_max_up)) // both E and F - min not used in xran, max yes
+      return false;
+  }
 
   fh_config->enableCP = 1; // enable C-plane
   fh_config->prachEnable = 1; // enable PRACH
@@ -1038,14 +1077,15 @@ bool get_xran_config(void *mplane_api, const struct openair0_config *openair0_cf
   ru_session_list_t *ru_session_list = (ru_session_list_t *)mplane_api;
   for (int32_t o_xu_id = 0; o_xu_id < fh_init->xran_ports; o_xu_id++) {
     xran_mplane_t *xran_mplane = &ru_session_list->ru_session[o_xu_id].xran_mplane;
-    if (!set_fh_config(xran_mplane, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id])) {
+    if (!set_fh_config(xran_mplane, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id], true)) {
       MP_LOG_I("could not read FHI 7.2/RU-specific config\n");
       return false;
     }
   }
 #else
+  bool is_du = fh_init->io_cfg.id == 0;
   for (int32_t o_xu_id = 0; o_xu_id < fh_init->xran_ports; o_xu_id++) {
-    if (!set_fh_config(NULL, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id])) {
+    if (!set_fh_config(NULL, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id], is_du)) {
       printf("could not read FHI 7.2/RU-specific config\n");
       return false;
     }
