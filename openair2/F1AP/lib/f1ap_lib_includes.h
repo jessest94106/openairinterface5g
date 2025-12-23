@@ -84,5 +84,11 @@
 #include "F1AP_RelativeCartesianLocation.h"
 #include "F1AP_TRP-MeasurementRequestItem.h"
 #include "F1AP_PosMeasurementQuantities-Item.h"
+#include "F1AP_PosMeasurementResultList-Item.h"
+#include "F1AP_PosMeasurementResultItem.h"
+#include "F1AP_UL-AoA.h"
+#include "F1AP_UL-RTOA-Measurement.h"
+#include "F1AP_GNB-RxTxTimeDiff.h"
+#include "F1AP_LCS-to-GCS-TranslationAoA.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

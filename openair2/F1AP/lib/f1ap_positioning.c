@@ -2840,6 +2840,628 @@ static bool eq_trp_info_type_response_item(const f1ap_trp_information_type_respo
   return true;
 }
 
+static F1AP_PosMeasurementResult_t encode_positioning_measurement_result(const f1ap_pos_measurement_result_t *posMeasurementResult)
+{
+  F1AP_PosMeasurementResult_t f1_posMeasurementResult = {0};
+  for (int i = 0; i < posMeasurementResult->pos_measurement_result_item_length; i++) {
+    asn1cSequenceAdd(f1_posMeasurementResult.list, F1AP_PosMeasurementResultItem_t, f1_pos_measurement_result_item);
+    f1ap_pos_measurement_result_item_t *pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[i];
+
+    // measuredResultsValue
+    F1AP_MeasuredResultsValue_t *f1_measuredResultsValue = &f1_pos_measurement_result_item->measuredResultsValue;
+    f1ap_measured_results_value_t *measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+
+    switch (measuredResultsValue->present) {
+      case F1AP_MEASURED_RESULTS_VALUE_PR_NOTHING:
+        f1_measuredResultsValue->present = F1AP_MeasuredResultsValue_PR_NOTHING;
+        break;
+      // Angle of Arrival
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL:
+        f1_measuredResultsValue->present = F1AP_MeasuredResultsValue_PR_uL_AngleOfArrival;
+        asn1cCalloc(f1_measuredResultsValue->choice.uL_AngleOfArrival, f1_uL_AngleOfArrival);
+        f1ap_ul_aoa_t *uL_AngleOfArrival = &measuredResultsValue->choice.ul_angle_of_arrival;
+        f1_uL_AngleOfArrival->azimuthAoA = uL_AngleOfArrival->azimuth_aoa;
+        if (uL_AngleOfArrival->zenith_aoa) {
+          asn1cCalloc(f1_uL_AngleOfArrival->zenithAoA, f1_zenithAoA);
+          *f1_zenithAoA = *uL_AngleOfArrival->zenith_aoa;
+        }
+        if (uL_AngleOfArrival->lcs_to_gcs_translation_aoa) {
+          asn1cCalloc(f1_uL_AngleOfArrival->lCS_to_GCS_TranslationAoA, f1_lCS_to_GCS_TranslationAoA);
+          f1ap_lcs_to_gcs_translationaoa_t *lCS_to_GCS_TranslationAoA = uL_AngleOfArrival->lcs_to_gcs_translation_aoa;
+
+          f1_lCS_to_GCS_TranslationAoA->alpha = lCS_to_GCS_TranslationAoA->alpha;
+          f1_lCS_to_GCS_TranslationAoA->beta = lCS_to_GCS_TranslationAoA->beta;
+          f1_lCS_to_GCS_TranslationAoA->gamma = lCS_to_GCS_TranslationAoA->gamma;
+        }
+        break;
+      // UL SRS RSRP
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP:
+        f1_measuredResultsValue->present = F1AP_MeasuredResultsValue_PR_uL_SRS_RSRP;
+        f1_measuredResultsValue->choice.uL_SRS_RSRP = measuredResultsValue->choice.ul_srs_rsrp;
+        break;
+      // UL RTOA
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_RTOA:
+        f1_measuredResultsValue->present = F1AP_MeasuredResultsValue_PR_uL_RTOA;
+        asn1cCalloc(f1_measuredResultsValue->choice.uL_RTOA, f1_uL_RTOA);
+        f1ap_ul_rtoa_measurement_t *uL_RTOA = &measuredResultsValue->choice.ul_rtoa;
+        f1ap_ul_rtoa_measurement_item_t *ul_rtoa_meas_item = &uL_RTOA->ul_rtoa_measurement_item;
+        F1AP_UL_RTOA_MeasurementItem_t *f1_ul_rtoa_meas_item = &f1_uL_RTOA->uL_RTOA_MeasurementItem;
+
+        switch (ul_rtoa_meas_item->present) {
+          case F1AP_ULRTOAMEAS_PR_NOTHING:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_NOTHING;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K0:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_k0;
+            f1_ul_rtoa_meas_item->choice.k0 = ul_rtoa_meas_item->choice.k0;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K1:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_k1;
+            f1_ul_rtoa_meas_item->choice.k1 = ul_rtoa_meas_item->choice.k1;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K2:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_k2;
+            f1_ul_rtoa_meas_item->choice.k2 = ul_rtoa_meas_item->choice.k2;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K3:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_k3;
+            f1_ul_rtoa_meas_item->choice.k3 = ul_rtoa_meas_item->choice.k3;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K4:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_k4;
+            f1_ul_rtoa_meas_item->choice.k4 = ul_rtoa_meas_item->choice.k4;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K5:
+            f1_ul_rtoa_meas_item->present = F1AP_UL_RTOA_MeasurementItem_PR_k5;
+            f1_ul_rtoa_meas_item->choice.k5 = ul_rtoa_meas_item->choice.k5;
+            break;
+          default:
+            AssertFatal(false, "Illegal uL_RTOA_MeasurementItem %d\n", ul_rtoa_meas_item->present);
+            break;
+        }
+        break;
+      // gNB RX-TX Time Diff
+      case F1AP_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF:
+        f1_measuredResultsValue->present = F1AP_MeasuredResultsValue_PR_gNB_RxTxTimeDiff;
+        asn1cCalloc(f1_measuredResultsValue->choice.gNB_RxTxTimeDiff, f1_gNB_RxTxTimeDiff);
+
+        f1ap_gnb_rx_tx_time_diff_t *gNB_RxTxTimeDiff = &measuredResultsValue->choice.gnb_rx_tx_time_diff;
+        f1ap_gnb_rx_tx_time_diff_meas_t *rx_tx_time_diff = &gNB_RxTxTimeDiff->rx_tx_time_diff;
+        F1AP_GNBRxTxTimeDiffMeas_t *f1_rxTxTimeDiff = &f1_gNB_RxTxTimeDiff->rxTxTimeDiff;
+
+        switch (rx_tx_time_diff->present) {
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_NOTHING:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_NOTHING;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K0:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_k0;
+            f1_rxTxTimeDiff->choice.k0 = rx_tx_time_diff->choice.k0;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K1:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_k1;
+            f1_rxTxTimeDiff->choice.k1 = rx_tx_time_diff->choice.k1;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K2:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_k2;
+            f1_rxTxTimeDiff->choice.k2 = rx_tx_time_diff->choice.k2;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K3:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_k3;
+            f1_rxTxTimeDiff->choice.k3 = rx_tx_time_diff->choice.k3;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K4:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_k4;
+            f1_rxTxTimeDiff->choice.k4 = rx_tx_time_diff->choice.k4;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K5:
+            f1_rxTxTimeDiff->present = F1AP_GNBRxTxTimeDiffMeas_PR_k5;
+            f1_rxTxTimeDiff->choice.k5 = rx_tx_time_diff->choice.k5;
+            break;
+          default:
+            AssertFatal(false, "Illegal rxTxTimeDiff value %d\n", rx_tx_time_diff->present);
+            break;
+        }
+        break;
+      default:
+        AssertFatal(false, "Illegal measuredResultsValue %d\n", measuredResultsValue->present);
+        break;
+    }
+
+    // timeStamp
+    F1AP_TimeStamp_t *f1_timeStamp = &f1_pos_measurement_result_item->timeStamp;
+    f1ap_time_stamp_t *timeStamp = &pos_measurement_result_item->time_stamp;
+    f1_timeStamp->systemFrameNumber = timeStamp->system_frame_number;
+    F1AP_TimeStampSlotIndex_t *f1_slotIndex = &f1_timeStamp->slotIndex;
+    f1ap_time_stamp_slot_index_t *slot_index = &timeStamp->slot_index;
+    switch (slot_index->present) {
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_NOTHING:
+        f1_slotIndex->present = F1AP_TimeStampSlotIndex_PR_NOTHING;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_15:
+        f1_slotIndex->present = F1AP_TimeStampSlotIndex_PR_sCS_15;
+        f1_slotIndex->choice.sCS_15 = slot_index->choice.scs_15;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_30:
+        f1_slotIndex->present = F1AP_TimeStampSlotIndex_PR_sCS_30;
+        f1_slotIndex->choice.sCS_30 = slot_index->choice.scs_30;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_60:
+        f1_slotIndex->present = F1AP_TimeStampSlotIndex_PR_sCS_60;
+        f1_slotIndex->choice.sCS_60 = slot_index->choice.scs_60;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_120:
+        f1_slotIndex->present = F1AP_TimeStampSlotIndex_PR_sCS_120;
+        f1_slotIndex->choice.sCS_120 = slot_index->choice.scs_120;
+        break;
+      default:
+        AssertFatal(false, "Illegal slotIndex value %d\n", slot_index->present);
+        break;
+    }
+  }
+  return f1_posMeasurementResult;
+}
+
+static bool decode_positioning_measurement_result(F1AP_PosMeasurementResult_t *f1_posMeasurementResult,
+                                                  f1ap_pos_measurement_result_t *posMeasurementResult)
+{
+  uint32_t pos_meas_result_length = f1_posMeasurementResult->list.count;
+  posMeasurementResult->pos_measurement_result_item_length = pos_meas_result_length;
+  posMeasurementResult->pos_measurement_result_item =
+      calloc_or_fail(pos_meas_result_length, sizeof(*posMeasurementResult->pos_measurement_result_item));
+  for (int i = 0; i < pos_meas_result_length; i++) {
+    F1AP_PosMeasurementResultItem_t *f1_pos_measurement_result_item = f1_posMeasurementResult->list.array[i];
+    f1ap_pos_measurement_result_item_t *pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[i];
+
+    // measuredResultsValue
+    F1AP_MeasuredResultsValue_t *f1_measuredResultsValue = &f1_pos_measurement_result_item->measuredResultsValue;
+    f1ap_measured_results_value_t *measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+
+    switch (f1_measuredResultsValue->present) {
+      case F1AP_MeasuredResultsValue_PR_NOTHING:
+        measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_NOTHING;
+        break;
+      // Angle of Arrival
+      case F1AP_MeasuredResultsValue_PR_uL_AngleOfArrival:
+        measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL;
+
+        F1AP_UL_AoA_t *f1_uL_AngleOfArrival = f1_measuredResultsValue->choice.uL_AngleOfArrival;
+        f1ap_ul_aoa_t *uL_AngleOfArrival = &measuredResultsValue->choice.ul_angle_of_arrival;
+
+        uL_AngleOfArrival->azimuth_aoa = f1_uL_AngleOfArrival->azimuthAoA;
+        if (f1_uL_AngleOfArrival->zenithAoA) {
+          uL_AngleOfArrival->zenith_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->zenith_aoa));
+          *uL_AngleOfArrival->zenith_aoa = *f1_uL_AngleOfArrival->zenithAoA;
+        }
+        if (f1_uL_AngleOfArrival->lCS_to_GCS_TranslationAoA) {
+          uL_AngleOfArrival->lcs_to_gcs_translation_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->lcs_to_gcs_translation_aoa));
+          f1ap_lcs_to_gcs_translationaoa_t *lCS_to_GCS_TranslationAoA = uL_AngleOfArrival->lcs_to_gcs_translation_aoa;
+          F1AP_LCS_to_GCS_TranslationAoA_t *f1_lCS_to_GCS_TranslationAoA = f1_uL_AngleOfArrival->lCS_to_GCS_TranslationAoA;
+
+          lCS_to_GCS_TranslationAoA->alpha = f1_lCS_to_GCS_TranslationAoA->alpha;
+          lCS_to_GCS_TranslationAoA->beta = f1_lCS_to_GCS_TranslationAoA->beta;
+          lCS_to_GCS_TranslationAoA->gamma = f1_lCS_to_GCS_TranslationAoA->gamma;
+        }
+        break;
+      // UL SRS RSRP
+      case F1AP_MeasuredResultsValue_PR_uL_SRS_RSRP:
+        measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP;
+        measuredResultsValue->choice.ul_srs_rsrp = f1_measuredResultsValue->choice.uL_SRS_RSRP;
+        break;
+      // UL RTOA
+      case F1AP_MeasuredResultsValue_PR_uL_RTOA:
+        measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_UL_RTOA;
+        F1AP_UL_RTOA_Measurement_t *f1_uL_RTOA = f1_measuredResultsValue->choice.uL_RTOA;
+        f1ap_ul_rtoa_measurement_t *uL_RTOA = &measuredResultsValue->choice.ul_rtoa;
+        F1AP_UL_RTOA_MeasurementItem_t *f1_ul_rtoa_meas_item = &f1_uL_RTOA->uL_RTOA_MeasurementItem;
+        f1ap_ul_rtoa_measurement_item_t *ul_rtoa_meas_item = &uL_RTOA->ul_rtoa_measurement_item;
+
+        switch (f1_ul_rtoa_meas_item->present) {
+          case F1AP_UL_RTOA_MeasurementItem_PR_NOTHING:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_NOTHING;
+            break;
+          case F1AP_UL_RTOA_MeasurementItem_PR_k0:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_K0;
+            ul_rtoa_meas_item->choice.k0 = f1_ul_rtoa_meas_item->choice.k0;
+            break;
+          case F1AP_UL_RTOA_MeasurementItem_PR_k1:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_K1;
+            ul_rtoa_meas_item->choice.k1 = f1_ul_rtoa_meas_item->choice.k1;
+            break;
+          case F1AP_UL_RTOA_MeasurementItem_PR_k2:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_K2;
+            ul_rtoa_meas_item->choice.k2 = f1_ul_rtoa_meas_item->choice.k2;
+            break;
+          case F1AP_UL_RTOA_MeasurementItem_PR_k3:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_K3;
+            ul_rtoa_meas_item->choice.k3 = f1_ul_rtoa_meas_item->choice.k3;
+            break;
+          case F1AP_UL_RTOA_MeasurementItem_PR_k4:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_K4;
+            ul_rtoa_meas_item->choice.k4 = f1_ul_rtoa_meas_item->choice.k4;
+            break;
+          case F1AP_UL_RTOA_MeasurementItem_PR_k5:
+            ul_rtoa_meas_item->present = F1AP_ULRTOAMEAS_PR_K5;
+            ul_rtoa_meas_item->choice.k5 = f1_ul_rtoa_meas_item->choice.k5;
+            break;
+          default:
+            AssertError(false, return false, "Illegal uL_RTOA_MeasurementItem %d\n", f1_ul_rtoa_meas_item->present);
+            break;
+        }
+        break;
+      // gNB RX-TX Time Diff
+      case F1AP_MeasuredResultsValue_PR_gNB_RxTxTimeDiff:
+        measuredResultsValue->present = F1AP_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF;
+        F1AP_GNB_RxTxTimeDiff_t *f1_gNB_RxTxTimeDiff = f1_measuredResultsValue->choice.gNB_RxTxTimeDiff;
+        f1ap_gnb_rx_tx_time_diff_t *gNB_RxTxTimeDiff = &measuredResultsValue->choice.gnb_rx_tx_time_diff;
+        F1AP_GNBRxTxTimeDiffMeas_t *f1_rxTxTimeDiff = &f1_gNB_RxTxTimeDiff->rxTxTimeDiff;
+        f1ap_gnb_rx_tx_time_diff_meas_t *rx_tx_time_diff = &gNB_RxTxTimeDiff->rx_tx_time_diff;
+
+        switch (f1_rxTxTimeDiff->present) {
+          case F1AP_GNBRxTxTimeDiffMeas_PR_NOTHING:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_NOTHING;
+            break;
+          case F1AP_GNBRxTxTimeDiffMeas_PR_k0:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K0;
+            rx_tx_time_diff->choice.k0 = f1_rxTxTimeDiff->choice.k0;
+            break;
+          case F1AP_GNBRxTxTimeDiffMeas_PR_k1:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K1;
+            rx_tx_time_diff->choice.k1 = f1_rxTxTimeDiff->choice.k1;
+            break;
+          case F1AP_GNBRxTxTimeDiffMeas_PR_k2:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K2;
+            rx_tx_time_diff->choice.k2 = f1_rxTxTimeDiff->choice.k2;
+            break;
+          case F1AP_GNBRxTxTimeDiffMeas_PR_k3:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K3;
+            rx_tx_time_diff->choice.k3 = f1_rxTxTimeDiff->choice.k3;
+            break;
+          case F1AP_GNBRxTxTimeDiffMeas_PR_k4:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K4;
+            rx_tx_time_diff->choice.k4 = f1_rxTxTimeDiff->choice.k4;
+            break;
+          case F1AP_GNBRxTxTimeDiffMeas_PR_k5:
+            rx_tx_time_diff->present = F1AP_GNBRXTXTIMEDIFFMEAS_PR_K5;
+            rx_tx_time_diff->choice.k5 = f1_rxTxTimeDiff->choice.k5;
+            break;
+          default:
+            AssertError(false, return false, "Illegal rxTxTimeDiff value %d\n", f1_rxTxTimeDiff->present);
+            break;
+        }
+        break;
+      default:
+        AssertError(false, return false, "Illegal measuredResultsValue %d\n", f1_measuredResultsValue->present);
+        break;
+    }
+
+    // timeStamp
+    F1AP_TimeStamp_t *f1_timeStamp = &f1_pos_measurement_result_item->timeStamp;
+    f1ap_time_stamp_t *timeStamp = &pos_measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = f1_timeStamp->systemFrameNumber;
+    F1AP_TimeStampSlotIndex_t *f1_slotIndex = &f1_timeStamp->slotIndex;
+    f1ap_time_stamp_slot_index_t *slot_index = &timeStamp->slot_index;
+    switch (f1_slotIndex->present) {
+      case F1AP_TimeStampSlotIndex_PR_NOTHING:
+        slot_index->present = F1AP_TIME_STAMP_SLOT_INDEX_PR_NOTHING;
+        break;
+      case F1AP_TimeStampSlotIndex_PR_sCS_15:
+        slot_index->present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_15;
+        slot_index->choice.scs_15 = f1_slotIndex->choice.sCS_15;
+        break;
+      case F1AP_TimeStampSlotIndex_PR_sCS_30:
+        slot_index->present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_30;
+        slot_index->choice.scs_30 = f1_slotIndex->choice.sCS_30;
+        break;
+      case F1AP_TimeStampSlotIndex_PR_sCS_60:
+        slot_index->present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_60;
+        slot_index->choice.scs_60 = f1_slotIndex->choice.sCS_60;
+        break;
+      case F1AP_TimeStampSlotIndex_PR_sCS_120:
+        slot_index->present = F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_120;
+        slot_index->choice.scs_120 = f1_slotIndex->choice.sCS_120;
+        break;
+      default:
+        AssertError(false, return false, "Illegal slotIndex value %d\n", f1_slotIndex->present);
+        break;
+    }
+  }
+  return true;
+}
+
+static f1ap_pos_measurement_result_t cp_positioning_measurement_result(const f1ap_pos_measurement_result_t *in)
+{
+  f1ap_pos_measurement_result_t out = {0};
+  uint32_t pos_meas_result_length = in->pos_measurement_result_item_length;
+  out.pos_measurement_result_item_length = pos_meas_result_length;
+  out.pos_measurement_result_item = calloc_or_fail(pos_meas_result_length, sizeof(*out.pos_measurement_result_item));
+  for (int i = 0; i < pos_meas_result_length; i++) {
+    f1ap_pos_measurement_result_item_t *f1_pos_measurement_result_item = &in->pos_measurement_result_item[i];
+    f1ap_pos_measurement_result_item_t *pos_measurement_result_item = &out.pos_measurement_result_item[i];
+
+    // measuredResultsValue
+    f1ap_measured_results_value_t *f1_measuredResultsValue = &f1_pos_measurement_result_item->measured_results_value;
+    f1ap_measured_results_value_t *measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+
+    measuredResultsValue->present = f1_measuredResultsValue->present;
+    switch (f1_measuredResultsValue->present) {
+      case F1AP_MEASURED_RESULTS_VALUE_PR_NOTHING:
+        // nothing to copy
+        break;
+      // Angle of Arrival
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL: {
+        f1ap_ul_aoa_t *f1_uL_AngleOfArrival = &f1_measuredResultsValue->choice.ul_angle_of_arrival;
+        f1ap_ul_aoa_t *uL_AngleOfArrival = &measuredResultsValue->choice.ul_angle_of_arrival;
+
+        uL_AngleOfArrival->azimuth_aoa = f1_uL_AngleOfArrival->azimuth_aoa;
+        if (f1_uL_AngleOfArrival->zenith_aoa) {
+          uL_AngleOfArrival->zenith_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->zenith_aoa));
+          *uL_AngleOfArrival->zenith_aoa = *f1_uL_AngleOfArrival->zenith_aoa;
+        }
+        if (f1_uL_AngleOfArrival->lcs_to_gcs_translation_aoa) {
+          uL_AngleOfArrival->lcs_to_gcs_translation_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->lcs_to_gcs_translation_aoa));
+
+          f1ap_lcs_to_gcs_translationaoa_t *lCS_to_GCS_TranslationAoA = uL_AngleOfArrival->lcs_to_gcs_translation_aoa;
+          f1ap_lcs_to_gcs_translationaoa_t *f1_lCS_to_GCS_TranslationAoA = f1_uL_AngleOfArrival->lcs_to_gcs_translation_aoa;
+
+          lCS_to_GCS_TranslationAoA->alpha = f1_lCS_to_GCS_TranslationAoA->alpha;
+          lCS_to_GCS_TranslationAoA->beta = f1_lCS_to_GCS_TranslationAoA->beta;
+          lCS_to_GCS_TranslationAoA->gamma = f1_lCS_to_GCS_TranslationAoA->gamma;
+        }
+        break;
+      }
+      // UL SRS RSRP
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP:
+        measuredResultsValue->choice.ul_srs_rsrp = f1_measuredResultsValue->choice.ul_srs_rsrp;
+        break;
+      // UL RTOA
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_RTOA: {
+        f1ap_ul_rtoa_measurement_t *f1_uL_RTOA = &f1_measuredResultsValue->choice.ul_rtoa;
+        f1ap_ul_rtoa_measurement_t *uL_RTOA = &measuredResultsValue->choice.ul_rtoa;
+        f1ap_ul_rtoa_measurement_item_t *f1_ul_rtoa_meas_item = &f1_uL_RTOA->ul_rtoa_measurement_item;
+        f1ap_ul_rtoa_measurement_item_t *ul_rtoa_meas_item = &uL_RTOA->ul_rtoa_measurement_item;
+
+        switch (f1_ul_rtoa_meas_item->present) {
+          case F1AP_ULRTOAMEAS_PR_NOTHING:
+            break;
+          case F1AP_ULRTOAMEAS_PR_K0:
+            ul_rtoa_meas_item->choice.k0 = f1_ul_rtoa_meas_item->choice.k0;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K1:
+            ul_rtoa_meas_item->choice.k1 = f1_ul_rtoa_meas_item->choice.k1;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K2:
+            ul_rtoa_meas_item->choice.k2 = f1_ul_rtoa_meas_item->choice.k2;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K3:
+            ul_rtoa_meas_item->choice.k3 = f1_ul_rtoa_meas_item->choice.k3;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K4:
+            ul_rtoa_meas_item->choice.k4 = f1_ul_rtoa_meas_item->choice.k4;
+            break;
+          case F1AP_ULRTOAMEAS_PR_K5:
+            ul_rtoa_meas_item->choice.k5 = f1_ul_rtoa_meas_item->choice.k5;
+            break;
+          default:
+            AssertFatal(false, "Illegal uL_RTOA_MeasurementItem %d\n", f1_uL_RTOA->ul_rtoa_measurement_item.present);
+            break;
+        }
+        break;
+      }
+      // gNB RX-TX Time Diff
+      case F1AP_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF: {
+        f1ap_gnb_rx_tx_time_diff_t *f1_gNB_RxTxTimeDiff = &f1_measuredResultsValue->choice.gnb_rx_tx_time_diff;
+        f1ap_gnb_rx_tx_time_diff_t *gNB_RxTxTimeDiff = &measuredResultsValue->choice.gnb_rx_tx_time_diff;
+        f1_gNB_RxTxTimeDiff->rx_tx_time_diff.present = gNB_RxTxTimeDiff->rx_tx_time_diff.present;
+
+        f1ap_gnb_rx_tx_time_diff_meas_t *f1_rx_tx_time_diff = &f1_gNB_RxTxTimeDiff->rx_tx_time_diff;
+        f1ap_gnb_rx_tx_time_diff_meas_t *rx_tx_time_diff = &gNB_RxTxTimeDiff->rx_tx_time_diff;
+
+        switch (f1_rx_tx_time_diff->present) {
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_NOTHING:
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K0:
+            rx_tx_time_diff->choice.k0 = f1_rx_tx_time_diff->choice.k0;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K1:
+            rx_tx_time_diff->choice.k1 = f1_rx_tx_time_diff->choice.k1;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K2:
+            rx_tx_time_diff->choice.k2 = f1_rx_tx_time_diff->choice.k2;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K3:
+            rx_tx_time_diff->choice.k3 = f1_rx_tx_time_diff->choice.k3;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K4:
+            rx_tx_time_diff->choice.k4 = f1_rx_tx_time_diff->choice.k4;
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K5:
+            rx_tx_time_diff->choice.k5 = f1_rx_tx_time_diff->choice.k5;
+            break;
+          default:
+            AssertFatal(false, "Illegal rxTxTimeDiff value %d\n", f1_rx_tx_time_diff->present);
+            break;
+        }
+        break;
+      }
+      default:
+        AssertFatal(false, "Illegal measuredResultsValue %d\n", f1_measuredResultsValue->present);
+        break;
+    }
+
+    // timeStamp
+    f1ap_time_stamp_t *f1_timeStamp = &f1_pos_measurement_result_item->time_stamp;
+    f1ap_time_stamp_t *timeStamp = &pos_measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = f1_timeStamp->system_frame_number;
+    f1ap_time_stamp_slot_index_t *f1_slot_index = &f1_timeStamp->slot_index;
+    f1ap_time_stamp_slot_index_t *slot_index = &timeStamp->slot_index;
+    switch (f1_slot_index->present) {
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_NOTHING:
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_15:
+        slot_index->choice.scs_15 = f1_slot_index->choice.scs_15;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_30:
+        slot_index->choice.scs_30 = f1_slot_index->choice.scs_30;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_60:
+        slot_index->choice.scs_60 = f1_slot_index->choice.scs_60;
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_120:
+        slot_index->choice.scs_120 = f1_slot_index->choice.scs_120;
+        break;
+      default:
+        AssertFatal(false, "Illegal slotIndex value %d\n", f1_slot_index->present);
+        break;
+    }
+  }
+  return out;
+}
+
+static bool eq_positioning_measurement_result(const f1ap_pos_measurement_result_t *f1_posMeasurementResult,
+                                              const f1ap_pos_measurement_result_t *posMeasurementResult)
+{
+  uint32_t pos_meas_result_length = f1_posMeasurementResult->pos_measurement_result_item_length;
+  _F1_EQ_CHECK_INT(posMeasurementResult->pos_measurement_result_item_length, pos_meas_result_length);
+  for (int i = 0; i < pos_meas_result_length; i++) {
+    f1ap_pos_measurement_result_item_t *f1_pos_measurement_result_item = &f1_posMeasurementResult->pos_measurement_result_item[i];
+    f1ap_pos_measurement_result_item_t *pos_measurement_result_item = &posMeasurementResult->pos_measurement_result_item[i];
+
+    // measuredResultsValue
+    f1ap_measured_results_value_t *f1_measuredResultsValue = &f1_pos_measurement_result_item->measured_results_value;
+    f1ap_measured_results_value_t *measuredResultsValue = &pos_measurement_result_item->measured_results_value;
+
+    _F1_EQ_CHECK_INT(measuredResultsValue->present, f1_measuredResultsValue->present);
+    switch (measuredResultsValue->present) {
+      case F1AP_MEASURED_RESULTS_VALUE_PR_NOTHING:
+        // nothing to check
+        break;
+      // Angle of Arrival
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL: {
+        f1ap_ul_aoa_t *f1_uL_AngleOfArrival = &f1_measuredResultsValue->choice.ul_angle_of_arrival;
+        f1ap_ul_aoa_t *uL_AngleOfArrival = &measuredResultsValue->choice.ul_angle_of_arrival;
+
+        _F1_EQ_CHECK_INT(uL_AngleOfArrival->azimuth_aoa, f1_uL_AngleOfArrival->azimuth_aoa);
+        if (f1_uL_AngleOfArrival->zenith_aoa) {
+          _F1_EQ_CHECK_INT(*uL_AngleOfArrival->zenith_aoa, *f1_uL_AngleOfArrival->zenith_aoa);
+        }
+        if (f1_uL_AngleOfArrival->lcs_to_gcs_translation_aoa) {
+          f1ap_lcs_to_gcs_translationaoa_t *lCS_to_GCS_TranslationAoA = uL_AngleOfArrival->lcs_to_gcs_translation_aoa;
+          f1ap_lcs_to_gcs_translationaoa_t *f1_lCS_to_GCS_TranslationAoA = f1_uL_AngleOfArrival->lcs_to_gcs_translation_aoa;
+
+          _F1_EQ_CHECK_INT(lCS_to_GCS_TranslationAoA->alpha, f1_lCS_to_GCS_TranslationAoA->alpha);
+          _F1_EQ_CHECK_INT(lCS_to_GCS_TranslationAoA->beta, f1_lCS_to_GCS_TranslationAoA->beta);
+          _F1_EQ_CHECK_INT(lCS_to_GCS_TranslationAoA->gamma, f1_lCS_to_GCS_TranslationAoA->gamma);
+        }
+        break;
+      }
+      // UL SRS RSRP
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP:
+        _F1_EQ_CHECK_INT(measuredResultsValue->choice.ul_srs_rsrp, f1_measuredResultsValue->choice.ul_srs_rsrp);
+        break;
+      // UL RTOA
+      case F1AP_MEASURED_RESULTS_VALUE_PR_UL_RTOA: {
+        f1ap_ul_rtoa_measurement_t *f1_uL_RTOA = &f1_measuredResultsValue->choice.ul_rtoa;
+        f1ap_ul_rtoa_measurement_t *uL_RTOA = &measuredResultsValue->choice.ul_rtoa;
+
+        f1ap_ul_rtoa_measurement_item_t *f1_ul_rtoa_meas_item = &f1_uL_RTOA->ul_rtoa_measurement_item;
+        f1ap_ul_rtoa_measurement_item_t *ul_rtoa_meas_item = &uL_RTOA->ul_rtoa_measurement_item;
+
+        switch (f1_ul_rtoa_meas_item->present) {
+          case F1AP_ULRTOAMEAS_PR_NOTHING:
+            break;
+          case F1AP_ULRTOAMEAS_PR_K0:
+            _F1_EQ_CHECK_INT(ul_rtoa_meas_item->choice.k0, f1_ul_rtoa_meas_item->choice.k0);
+            break;
+          case F1AP_ULRTOAMEAS_PR_K1:
+            _F1_EQ_CHECK_INT(ul_rtoa_meas_item->choice.k1, f1_ul_rtoa_meas_item->choice.k1);
+            break;
+          case F1AP_ULRTOAMEAS_PR_K2:
+            _F1_EQ_CHECK_INT(ul_rtoa_meas_item->choice.k2, f1_ul_rtoa_meas_item->choice.k2);
+            break;
+          case F1AP_ULRTOAMEAS_PR_K3:
+            _F1_EQ_CHECK_INT(ul_rtoa_meas_item->choice.k3, f1_ul_rtoa_meas_item->choice.k3);
+            break;
+          case F1AP_ULRTOAMEAS_PR_K4:
+            _F1_EQ_CHECK_INT(ul_rtoa_meas_item->choice.k4, f1_ul_rtoa_meas_item->choice.k4);
+            break;
+          case F1AP_ULRTOAMEAS_PR_K5:
+            _F1_EQ_CHECK_INT(ul_rtoa_meas_item->choice.k5, f1_ul_rtoa_meas_item->choice.k5);
+            break;
+          default:
+            AssertError(false, return false, "Illegal uL_RTOA_MeasurementItem %d\n", f1_ul_rtoa_meas_item->present);
+            break;
+        }
+        break;
+      }
+      // gNB RX-TX Time Diff
+      case F1AP_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF: {
+        f1ap_gnb_rx_tx_time_diff_t *f1_gNB_RxTxTimeDiff = &f1_measuredResultsValue->choice.gnb_rx_tx_time_diff;
+        f1ap_gnb_rx_tx_time_diff_t *gNB_RxTxTimeDiff = &measuredResultsValue->choice.gnb_rx_tx_time_diff;
+        f1ap_gnb_rx_tx_time_diff_meas_t *f1_rx_tx_time_diff = &f1_gNB_RxTxTimeDiff->rx_tx_time_diff;
+        f1ap_gnb_rx_tx_time_diff_meas_t *rx_tx_time_diff = &gNB_RxTxTimeDiff->rx_tx_time_diff;
+        _F1_EQ_CHECK_INT(f1_rx_tx_time_diff->present, rx_tx_time_diff->present);
+        switch (f1_rx_tx_time_diff->present) {
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_NOTHING:
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K0:
+            _F1_EQ_CHECK_INT(rx_tx_time_diff->choice.k0, f1_rx_tx_time_diff->choice.k0);
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K1:
+            _F1_EQ_CHECK_INT(rx_tx_time_diff->choice.k1, f1_rx_tx_time_diff->choice.k1);
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K2:
+            _F1_EQ_CHECK_INT(rx_tx_time_diff->choice.k2, f1_rx_tx_time_diff->choice.k2);
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K3:
+            _F1_EQ_CHECK_INT(rx_tx_time_diff->choice.k3, f1_rx_tx_time_diff->choice.k3);
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K4:
+            _F1_EQ_CHECK_INT(rx_tx_time_diff->choice.k4, f1_rx_tx_time_diff->choice.k4);
+            break;
+          case F1AP_GNBRXTXTIMEDIFFMEAS_PR_K5:
+            _F1_EQ_CHECK_INT(rx_tx_time_diff->choice.k5, f1_rx_tx_time_diff->choice.k5);
+            break;
+          default:
+            AssertError(false, return false, "Illegal rxTxTimeDiff value %d\n", f1_rx_tx_time_diff->present);
+            break;
+        }
+        break;
+      }
+      default:
+        AssertError(false, return false, "Illegal measuredResultsValue %d\n", f1_measuredResultsValue->present);
+        break;
+    }
+
+    // timeStamp
+    f1ap_time_stamp_t *f1_timeStamp = &f1_pos_measurement_result_item->time_stamp;
+    f1ap_time_stamp_t *timeStamp = &pos_measurement_result_item->time_stamp;
+    _F1_EQ_CHECK_INT(timeStamp->system_frame_number, f1_timeStamp->system_frame_number);
+    f1ap_time_stamp_slot_index_t *f1_slot_index = &f1_timeStamp->slot_index;
+    f1ap_time_stamp_slot_index_t *slot_index = &timeStamp->slot_index;
+
+    switch (f1_slot_index->present) {
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_NOTHING:
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_15:
+        _F1_EQ_CHECK_INT(slot_index->choice.scs_15, f1_slot_index->choice.scs_15);
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_30:
+        _F1_EQ_CHECK_INT(slot_index->choice.scs_30, f1_slot_index->choice.scs_30);
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_60:
+        _F1_EQ_CHECK_INT(slot_index->choice.scs_60, f1_slot_index->choice.scs_60);
+        break;
+      case F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_120:
+        _F1_EQ_CHECK_INT(slot_index->choice.scs_120, f1_slot_index->choice.scs_120);
+        break;
+      default:
+        AssertError(false, return false, "Illegal slotIndex value %d\n", f1_slot_index->present);
+        break;
+    }
+  }
+  return true;
+}
+
 /**
  * @brief Encode F1 positioning information request to ASN.1
  */
@@ -4797,5 +5419,223 @@ void free_positioning_measurement_req(f1ap_positioning_measurement_req_t *msg)
     f1ap_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
     free_srs_carrier_list(srs_carrier_list);
     free(msg->srs_configuration);
+  }
+}
+
+/**
+ * @brief Encode F1 positioning measurement response to ASN.1
+ */
+F1AP_F1AP_PDU_t *encode_positioning_measurement_resp(const f1ap_positioning_measurement_resp_t *msg)
+{
+  F1AP_F1AP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message Type */
+  pdu->present = F1AP_F1AP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, tmp);
+  tmp->procedureCode = F1AP_ProcedureCode_id_PositioningMeasurementExchange;
+  tmp->criticality = F1AP_Criticality_reject;
+  tmp->value.present = F1AP_SuccessfulOutcome__value_PR_PositioningMeasurementResponse;
+  F1AP_PositioningMeasurementResponse_t *out = &tmp->value.choice.PositioningMeasurementResponse;
+
+  /* mandatory : TransactionID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementResponseIEs_t, ie1);
+  ie1->id = F1AP_ProtocolIE_ID_id_TransactionID;
+  ie1->criticality = F1AP_Criticality_reject;
+  ie1->value.present = F1AP_PositioningMeasurementResponseIEs__value_PR_TransactionID;
+  ie1->value.choice.TransactionID = msg->transaction_id;
+
+  /* mandatory : LMF_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementResponseIEs_t, ie2);
+  ie2->id = F1AP_ProtocolIE_ID_id_LMF_MeasurementID;
+  ie2->criticality = F1AP_Criticality_reject;
+  ie2->value.present = F1AP_PositioningMeasurementResponseIEs__value_PR_LMF_MeasurementID;
+  ie2->value.choice.LMF_MeasurementID = msg->lmf_measurement_id;
+
+  /* mandatory : RAN_MeasurementID */
+  asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementResponseIEs_t, ie3);
+  ie3->id = F1AP_ProtocolIE_ID_id_RAN_MeasurementID;
+  ie3->criticality = F1AP_Criticality_reject;
+  ie3->value.present = F1AP_PositioningMeasurementResponseIEs__value_PR_RAN_MeasurementID;
+  ie3->value.choice.RAN_MeasurementID = msg->ran_measurement_id;
+
+  /* Positioning Measurement Result List */
+  if (msg->pos_measurement_result_list) {
+    asn1cSequenceAdd(out->protocolIEs.list, F1AP_PositioningMeasurementResponseIEs_t, ie4);
+    ie4->id = F1AP_ProtocolIE_ID_id_PosMeasurementResultList;
+    ie4->criticality = F1AP_Criticality_reject;
+    ie4->value.present = F1AP_PositioningMeasurementResponseIEs__value_PR_PosMeasurementResultList;
+    const f1ap_pos_measurement_result_list_t *in_list = msg->pos_measurement_result_list;
+    for (int i = 0; i < in_list->pos_measurement_result_list_length; i++) {
+      // mandatory : Positioning Measurement Result List Item
+      asn1cSequenceAdd(ie4->value.choice.PosMeasurementResultList.list, F1AP_PosMeasurementResultList_Item_t, out_item);
+      f1ap_pos_measurement_result_list_item_t *in_item = &in_list->pos_measurement_result_list_item[i];
+      F1AP_PosMeasurementResult_t *out_result = &out_item->posMeasurementResult;
+      f1ap_pos_measurement_result_t *in_result = &in_item->pos_measurement_result;
+      *out_result = encode_positioning_measurement_result(in_result);
+      out_item->tRPID = in_item->trp_id;
+    }
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief Decode F1 Positioning Measurement response
+ */
+bool decode_positioning_measurement_resp(const F1AP_F1AP_PDU_t *pdu, f1ap_positioning_measurement_resp_t *out)
+{
+  DevAssert(out != NULL);
+  memset(out, 0, sizeof(*out));
+
+  F1AP_PositioningMeasurementResponse_t *in = &pdu->choice.successfulOutcome->value.choice.PositioningMeasurementResponse;
+  F1AP_PositioningMeasurementResponseIEs_t *ie;
+
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementResponseIEs_t, ie, &in->protocolIEs.list, F1AP_ProtocolIE_ID_id_TransactionID, true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementResponseIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_LMF_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementResponseIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_RAN_MeasurementID,
+                   true);
+  F1AP_LIB_FIND_IE(F1AP_PositioningMeasurementResponseIEs_t,
+                   ie,
+                   &in->protocolIEs.list,
+                   F1AP_ProtocolIE_ID_id_PosMeasurementResultList,
+                   false);
+
+  for (int i = 0; i < in->protocolIEs.list.count; ++i) {
+    ie = in->protocolIEs.list.array[i];
+    AssertError(ie != NULL, return false, "in->protocolIEs.list.array[i] is NULL");
+    switch (ie->id) {
+      case F1AP_ProtocolIE_ID_id_TransactionID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementResponseIEs__value_PR_TransactionID);
+        out->transaction_id = ie->value.choice.TransactionID;
+        break;
+      case F1AP_ProtocolIE_ID_id_LMF_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementResponseIEs__value_PR_LMF_MeasurementID);
+        out->lmf_measurement_id = ie->value.choice.LMF_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_RAN_MeasurementID:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementResponseIEs__value_PR_RAN_MeasurementID);
+        out->ran_measurement_id = ie->value.choice.RAN_MeasurementID;
+        break;
+      case F1AP_ProtocolIE_ID_id_PosMeasurementResultList:
+        _F1_EQ_CHECK_INT(ie->value.present, F1AP_PositioningMeasurementResponseIEs__value_PR_PosMeasurementResultList);
+        F1AP_PosMeasurementResultList_t *in_list = &ie->value.choice.PosMeasurementResultList;
+        uint32_t pos_meas_result_list_len = in_list->list.count;
+        out->pos_measurement_result_list = calloc_or_fail(1, sizeof(*out->pos_measurement_result_list));
+        f1ap_pos_measurement_result_list_t *out_list = out->pos_measurement_result_list;
+        out_list->pos_measurement_result_list_length = pos_meas_result_list_len;
+        out_list->pos_measurement_result_list_item =
+            calloc_or_fail(pos_meas_result_list_len, sizeof(*out_list->pos_measurement_result_list_item));
+        for (int i = 0; i < pos_meas_result_list_len; i++) {
+          F1AP_PosMeasurementResultList_Item_t *in_item = in_list->list.array[i];
+          f1ap_pos_measurement_result_list_item_t *out_item = &out_list->pos_measurement_result_list_item[i];
+          _F1_CHECK_EXP(decode_positioning_measurement_result(&in_item->posMeasurementResult, &out_item->pos_measurement_result));
+          out_item->trp_id = in_item->tRPID;
+        }
+        break;
+      case F1AP_ProtocolIE_ID_id_CriticalityDiagnostics:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld not handled, skipping\n", ie->id);
+        break;
+      default:
+        PRINT_ERROR("F1AP_ProtocolIE_ID_id %ld unknown, skipping\n", ie->id);
+        break;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief F1 Positioning Measurement response deep copy
+ */
+f1ap_positioning_measurement_resp_t cp_positioning_measurement_resp(const f1ap_positioning_measurement_resp_t *orig)
+{
+  // copy all mandatory fields that are not dynamic memory
+  f1ap_positioning_measurement_resp_t cp = {
+      .transaction_id = orig->transaction_id,
+      .lmf_measurement_id = orig->lmf_measurement_id,
+      .ran_measurement_id = orig->ran_measurement_id,
+  };
+
+  if (orig->pos_measurement_result_list) {
+    cp.pos_measurement_result_list = calloc_or_fail(1, sizeof(*cp.pos_measurement_result_list));
+    f1ap_pos_measurement_result_list_t *list_orig = orig->pos_measurement_result_list;
+    f1ap_pos_measurement_result_list_t *list_cp = cp.pos_measurement_result_list;
+    uint32_t pos_meas_result_list_len = list_orig->pos_measurement_result_list_length;
+    list_cp->pos_measurement_result_list_length = pos_meas_result_list_len;
+    list_cp->pos_measurement_result_list_item =
+        calloc_or_fail(pos_meas_result_list_len, sizeof(*list_cp->pos_measurement_result_list_item));
+    for (int i = 0; i < pos_meas_result_list_len; i++) {
+      f1ap_pos_measurement_result_list_item_t *item_cp = &list_cp->pos_measurement_result_list_item[i];
+      f1ap_pos_measurement_result_list_item_t *item_orig = &list_orig->pos_measurement_result_list_item[i];
+      item_cp->pos_measurement_result = cp_positioning_measurement_result(&item_orig->pos_measurement_result);
+      item_cp->trp_id = item_orig->trp_id;
+    }
+  }
+
+  return cp;
+}
+
+/**
+ * @brief F1 Positioning Measurement response equality check
+ */
+bool eq_positioning_measurement_resp(const f1ap_positioning_measurement_resp_t *a, const f1ap_positioning_measurement_resp_t *b)
+{
+  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _F1_EQ_CHECK_INT(a->lmf_measurement_id, b->lmf_measurement_id);
+  _F1_EQ_CHECK_INT(a->ran_measurement_id, b->ran_measurement_id);
+
+  if ((a->pos_measurement_result_list == NULL) != (b->pos_measurement_result_list == NULL)) {
+    return false;
+  }
+  if (a->pos_measurement_result_list) {
+    f1ap_pos_measurement_result_list_t *list_a = a->pos_measurement_result_list;
+    f1ap_pos_measurement_result_list_t *list_b = b->pos_measurement_result_list;
+    uint32_t pos_meas_result_list_len = list_a->pos_measurement_result_list_length;
+    _F1_EQ_CHECK_INT(list_b->pos_measurement_result_list_length, pos_meas_result_list_len);
+    for (int i = 0; i < pos_meas_result_list_len; i++) {
+      f1ap_pos_measurement_result_list_item_t *item_a = &list_a->pos_measurement_result_list_item[i];
+      f1ap_pos_measurement_result_list_item_t *item_b = &list_b->pos_measurement_result_list_item[i];
+      _F1_CHECK_EXP(eq_positioning_measurement_result(&item_a->pos_measurement_result, &item_b->pos_measurement_result));
+      _F1_EQ_CHECK_INT(item_a->trp_id, item_b->trp_id);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief Free Allocated F1 Positioning Measurement response
+ */
+void free_positioning_measurement_resp(f1ap_positioning_measurement_resp_t *msg)
+{
+  if (msg->pos_measurement_result_list) {
+    f1ap_pos_measurement_result_list_t *list = msg->pos_measurement_result_list;
+    uint32_t pos_meas_result_list_len = list->pos_measurement_result_list_length;
+    for (int i = 0; i < pos_meas_result_list_len; i++) {
+      f1ap_pos_measurement_result_t *posMeasurementResult = &list->pos_measurement_result_list_item[i].pos_measurement_result;
+      uint32_t pos_meas_result_length = posMeasurementResult->pos_measurement_result_item_length;
+      for (int j = 0; j < pos_meas_result_length; j++) {
+        f1ap_pos_measurement_result_item_t *item = &posMeasurementResult->pos_measurement_result_item[j];
+        f1ap_measured_results_value_t *measuredResultsValue = &item->measured_results_value;
+        if (measuredResultsValue->present == F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL) {
+          if (measuredResultsValue->choice.ul_angle_of_arrival.zenith_aoa) {
+            free(measuredResultsValue->choice.ul_angle_of_arrival.zenith_aoa);
+          }
+          if (measuredResultsValue->choice.ul_angle_of_arrival.lcs_to_gcs_translation_aoa) {
+            free(measuredResultsValue->choice.ul_angle_of_arrival.lcs_to_gcs_translation_aoa);
+          }
+        }
+      }
+      free(posMeasurementResult->pos_measurement_result_item);
+    }
+    free(msg->pos_measurement_result_list->pos_measurement_result_list_item);
+    free(msg->pos_measurement_result_list);
   }
 }

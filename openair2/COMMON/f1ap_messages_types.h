@@ -1295,6 +1295,130 @@ typedef enum f1ap_pos_report_characteristics_e {
   F1AP_POSREPORTCHARACTERISTICS_PERIODIC = 1
 } f1ap_pos_report_characteristics_pr;
 
+typedef struct f1ap_lcs_to_gcs_translationaoa_c {
+  uint16_t alpha;
+  uint16_t beta;
+  uint16_t gamma;
+} f1ap_lcs_to_gcs_translationaoa_t;
+
+typedef struct f1ap_ul_aoa_s {
+  uint16_t azimuth_aoa;
+  uint16_t *zenith_aoa;
+  f1ap_lcs_to_gcs_translationaoa_t *lcs_to_gcs_translation_aoa;
+} f1ap_ul_aoa_t;
+
+typedef union f1ap_relative_path_delay_c {
+  uint32_t k0;
+  uint32_t k1;
+  uint32_t k2;
+  uint32_t k3;
+  uint32_t k4;
+  uint32_t k5;
+} f1ap_relative_path_delay_u, f1ap_ul_rtoa_measurement_item_u, f1ap_gnb_rx_tx_time_diff_meas_u;
+
+typedef enum f1ap_gnb_rx_tx_time_diff_meas_e {
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_NOTHING,
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_K0,
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_K1,
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_K2,
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_K3,
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_K4,
+  F1AP_GNBRXTXTIMEDIFFMEAS_PR_K5
+} f1ap_gnb_rx_tx_time_diff_meas_pr;
+
+typedef struct f1ap_gnb_rx_tx_time_diff_meas_s {
+  f1ap_gnb_rx_tx_time_diff_meas_pr present;
+  f1ap_gnb_rx_tx_time_diff_meas_u choice;
+} f1ap_gnb_rx_tx_time_diff_meas_t;
+
+typedef enum f1ap_ul_rtoa_measurement_item_e {
+  F1AP_ULRTOAMEAS_PR_NOTHING,
+  F1AP_ULRTOAMEAS_PR_K0,
+  F1AP_ULRTOAMEAS_PR_K1,
+  F1AP_ULRTOAMEAS_PR_K2,
+  F1AP_ULRTOAMEAS_PR_K3,
+  F1AP_ULRTOAMEAS_PR_K4,
+  F1AP_ULRTOAMEAS_PR_K5
+} f1ap_ul_rtoa_measurement_item_pr;
+
+typedef struct f1ap_ul_rtoa_measurement_item_s {
+  f1ap_ul_rtoa_measurement_item_pr present;
+  f1ap_ul_rtoa_measurement_item_u choice;
+} f1ap_ul_rtoa_measurement_item_t;
+
+typedef union f1ap_ul_rtoa_measurement_s {
+  f1ap_ul_rtoa_measurement_item_t ul_rtoa_measurement_item;
+} f1ap_ul_rtoa_measurement_t;
+
+typedef struct f1ap_gnb_rx_tx_time_diff_s {
+  f1ap_gnb_rx_tx_time_diff_meas_t rx_tx_time_diff;
+} f1ap_gnb_rx_tx_time_diff_t;
+
+typedef union f1ap_measured_results_value_c {
+  f1ap_ul_aoa_t ul_angle_of_arrival;
+  uint8_t ul_srs_rsrp;
+  f1ap_ul_rtoa_measurement_t ul_rtoa;
+  f1ap_gnb_rx_tx_time_diff_t gnb_rx_tx_time_diff;
+} f1ap_measured_results_value_u;
+
+typedef enum f1ap_measured_results_value_e {
+  F1AP_MEASURED_RESULTS_VALUE_PR_NOTHING,
+  F1AP_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL,
+  F1AP_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP,
+  F1AP_MEASURED_RESULTS_VALUE_PR_UL_RTOA,
+  F1AP_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF
+} f1ap_measured_results_value_pr;
+
+typedef struct f1ap_measured_results_value_s {
+  f1ap_measured_results_value_pr present;
+  f1ap_measured_results_value_u choice;
+} f1ap_measured_results_value_t;
+
+typedef union f1ap_time_stamp_slot_index_c {
+  uint8_t scs_15;
+  uint8_t scs_30;
+  uint8_t scs_60;
+  uint8_t scs_120;
+} f1ap_time_stamp_slot_index_u;
+
+typedef enum f1ap_time_stamp_slot_index_e {
+  F1AP_TIME_STAMP_SLOT_INDEX_PR_NOTHING,
+  F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_15,
+  F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_30,
+  F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_60,
+  F1AP_TIME_STAMP_SLOT_INDEX_PR_SCS_120
+} f1ap_time_stamp_slot_index_pr;
+
+typedef struct f1ap_time_stamp_slot_index_s {
+  f1ap_time_stamp_slot_index_pr present;
+  f1ap_time_stamp_slot_index_u choice;
+} f1ap_time_stamp_slot_index_t;
+
+typedef struct f1ap_time_stamp_s {
+  uint16_t system_frame_number;
+  f1ap_time_stamp_slot_index_t slot_index;
+} f1ap_time_stamp_t;
+
+typedef struct f1ap_pos_measurement_result_item_s {
+  f1ap_measured_results_value_t measured_results_value;
+  f1ap_time_stamp_t time_stamp;
+} f1ap_pos_measurement_result_item_t;
+
+typedef struct f1ap_pos_measurement_result_s {
+  f1ap_pos_measurement_result_item_t *pos_measurement_result_item;
+  uint32_t pos_measurement_result_item_length;
+} f1ap_pos_measurement_result_t;
+
+typedef struct f1ap_pos_measurement_result_list_item_s {
+  f1ap_pos_measurement_result_t pos_measurement_result;
+  uint32_t trp_id;
+} f1ap_pos_measurement_result_list_item_t;
+
+typedef struct f1ap_pos_measurement_result_list_s {
+  f1ap_pos_measurement_result_list_item_t *pos_measurement_result_list_item;
+  uint32_t pos_measurement_result_list_length;
+} f1ap_pos_measurement_result_list_t;
+
 typedef struct f1ap_positioning_information_req_s {
   // IE 9.3.1.4 (mandatory)
   uint32_t gNB_CU_ue_id;
@@ -1411,5 +1535,16 @@ typedef struct f1ap_measurement_req_s {
   // IE 9.3.1.192 (optional)
   f1ap_srs_configuration_t *srs_configuration;
 } f1ap_positioning_measurement_req_t;
+
+typedef struct f1ap_positioning_measurement_resp_s {
+  // IE 9.3.1.23 (mandatory)
+  uint8_t transaction_id;
+  // (mandatory)
+  uint16_t lmf_measurement_id;
+  // (mandatory)
+  uint16_t ran_measurement_id;
+  // (mandatory)
+  f1ap_pos_measurement_result_list_t *pos_measurement_result_list;
+} f1ap_positioning_measurement_resp_t;
 
 #endif /* F1AP_MESSAGES_TYPES_H_ */
