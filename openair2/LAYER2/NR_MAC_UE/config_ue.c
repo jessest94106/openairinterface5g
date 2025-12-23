@@ -263,7 +263,7 @@ static void config_common_ue_sa(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommo
 }
 
 // prepare data for orbit propagation based on SIB19 ephemeris data to be able to compute the round-trip-time between ue and sat
-static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timing_advance_componets_t *ntn_ta)
+static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, fapi_nr_ntn_config_t *ntn_ta)
 {
   // get sat position coordinates
   const position_t pos_sat = {sat_pos->positionX_r17 * 1.3, sat_pos->positionY_r17 * 1.3, sat_pos->positionZ_r17 * 1.3};
@@ -279,19 +279,28 @@ static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timi
   const double vel_sat_2 = vel_sat.X * vel_sat.X + vel_sat.Y * vel_sat.Y + vel_sat.Z * vel_sat.Z;
   const double vel_mag = sqrt(vel_sat_2);
 
-  // calculate angular velocity in rad/ms
-  const double omega = vel_mag / (radius * 1000);
+  double omega; // angular velocity in rad/ms
+  position_t pos_sat_90; // sat position vector in 90° orbit
+  position_t vel_sat_90; // sat velocity vector in 90° orbit
 
-  // calculate sat position in 90° orbit
-  position_t pos_sat_90 = pos_sat;
-  if (vel_mag) {
-    const double scaling = radius / vel_mag;
+  // assuming circular orbit when satellite moves faster than 1000 m/s
+  // 1000 m/s are chosen because according to Wikipedia, this seems to be a reasonable minimal
+  // orbital velocity: https://en.wikipedia.org/wiki/Orbital_speed#Tangential_velocities_at_altitude
+  if (vel_mag > 1000) {
+    omega = vel_mag / (radius * 1000);
+    double scaling = radius / vel_mag;
     pos_sat_90 = (position_t){vel_sat.X * scaling, vel_sat.Y * scaling, vel_sat.Z * scaling};
+    scaling = -vel_mag / radius;
+    vel_sat_90 = (position_t){pos_sat.X * scaling, pos_sat.Y * scaling, pos_sat.Z * scaling};
+  } else {
+    omega = 0;
+    pos_sat_90 = pos_sat;
+    vel_sat_90 = vel_sat;
   }
 
   LOG_I(NR_MAC,
-        "Satellite angular velocity = %e rad/ms, sat_pos = {%f, %f, %f}, sat_pos_90 = {%f, %f, %f}\n",
-        omega,
+        "Satellite orbital radius %f m, pos_sat_0 = {%f, %f, %f}, pos_sat_90 = {%f, %f, %f}\n",
+        radius,
         pos_sat.X,
         pos_sat.Y,
         pos_sat.Z,
@@ -299,13 +308,30 @@ static void prepare_ue_sat_ta(const NR_PositionVelocity_r17_t *sat_pos, ntn_timi
         pos_sat_90.Y,
         pos_sat_90.Z);
 
+  LOG_I(NR_MAC,
+        "Satellite velocity %f m/s, angular velocity = %e rad/ms, vel_sat_0 = {%f, %f, %f}, vel_sat_90 = {%f, %f, %f}\n",
+        vel_mag,
+        omega,
+        vel_sat.X,
+        vel_sat.Y,
+        vel_sat.Z,
+        vel_sat_90.X,
+        vel_sat_90.Y,
+        vel_sat_90.Z);
+
   ntn_ta->omega = omega;
   ntn_ta->pos_sat_0 = pos_sat;
   ntn_ta->pos_sat_90 = pos_sat_90;
+  ntn_ta->vel_sat_0 = vel_sat;
+  ntn_ta->vel_sat_90 = vel_sat_90;
 }
 
 // populate ntn_ta structure from mac
-static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NTN_Config_r17_t *ntn_Config_r17, int hfn, int frame)
+static void configure_ntn_ta(fapi_nr_ntn_config_t *ntn_ta,
+                             const NR_NTN_Config_r17_t *ntn_Config_r17,
+                             int hfn,
+                             int frame,
+                             bool is_targetcell)
 {
   if (!ntn_Config_r17)
     return;
@@ -319,25 +345,6 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
     ntn_ta->epoch_hfn = hfn + 1;
   ntn_ta->epoch_sfn = epoch_time_r17->sfn_r17;
   ntn_ta->epoch_subframe = epoch_time_r17->subFrameNR_r17;
-
-  // handle ephemerisInfo_r17
-  const NR_EphemerisInfo_r17_t *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
-  if (ephemeris_info) {
-    if (ephemeris_info->present == NR_EphemerisInfo_r17_PR_positionVelocity_r17) {
-      const NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
-      AssertFatal(position_velocity, "position_velocity should not be NULL here\n");
-      prepare_ue_sat_ta(position_velocity, ntn_ta);
-    } else {
-      LOG_W(NR_MAC, "NR UE currently supports only ephemerisInfo_r17 of type positionVelocity_r17\n");
-      ntn_ta->omega = 0;
-      ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
-      ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
-    }
-  } else { // Need R - Release if not present
-    ntn_ta->omega = 0;
-    ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
-    ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
-  }
 
   // handle cellSpecificKoffset_r17
   if (ntn_Config_r17->cellSpecificKoffset_r17)
@@ -365,11 +372,9 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
     ntn_ta->N_common_ta_drift_variant = 0;
   }
 
-  ntn_ta->ntn_params_changed = true;
-
   LOG_I(NR_MAC,
-        "SIB19 Rxd. Epoch HFN: %d, Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, "
-        "N_Common_Ta: %fms, drift: %fµs/s, variant %fµs/s²\n",
+        "NTN Config Rxd. Epoch HFN: %d, Epoch SFN: %d, Epoch Subframe: %d, k_offset: %ldms, "
+        "N_Common_Ta: %fms, drift: %fµs/s, variant: %fµs/s²\n",
         ntn_ta->epoch_hfn,
         ntn_ta->epoch_sfn,
         ntn_ta->epoch_subframe,
@@ -377,6 +382,32 @@ static void configure_ntn_ta(ntn_timing_advance_componets_t *ntn_ta, const NR_NT
         ntn_ta->N_common_ta_adj,
         ntn_ta->N_common_ta_drift,
         ntn_ta->N_common_ta_drift_variant);
+
+  // handle ephemerisInfo_r17
+  const NR_EphemerisInfo_r17_t *ephemeris_info = ntn_Config_r17->ephemerisInfo_r17;
+  if (ephemeris_info) {
+    if (ephemeris_info->present == NR_EphemerisInfo_r17_PR_positionVelocity_r17) {
+      const NR_PositionVelocity_r17_t *position_velocity = ephemeris_info->choice.positionVelocity_r17;
+      AssertFatal(position_velocity, "position_velocity should not be NULL here\n");
+      prepare_ue_sat_ta(position_velocity, ntn_ta);
+    } else {
+      LOG_W(NR_MAC, "NR UE currently supports only ephemerisInfo_r17 of type positionVelocity_r17\n");
+      ntn_ta->omega = 0;
+      ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
+      ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
+      ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
+      ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
+    }
+  } else { // Need R - Release if not present
+    ntn_ta->omega = 0;
+    ntn_ta->pos_sat_0 = (position_t){0, 0, 0};
+    ntn_ta->pos_sat_90 = (position_t){0, 0, 0};
+    ntn_ta->vel_sat_0 = (position_t){0, 0, 0};
+    ntn_ta->vel_sat_90 = (position_t){0, 0, 0};
+  }
+
+  ntn_ta->is_targetcell = is_targetcell;
+  ntn_ta->params_changed = true;
 }
 
 static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t *scc, int cc_idP, int hfn, int frame)
@@ -553,7 +584,7 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
   // NTN Config
   if (scc->ext2) {
     UPDATE_IE(mac->sc_info.ntn_Config_r17, scc->ext2->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(&mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
+    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame, true);
   } else {
     asn1cFreeStruc(asn_DEF_NR_NTN_Config_r17, mac->sc_info.ntn_Config_r17);
   }
@@ -1951,6 +1982,7 @@ void nr_rrc_mac_config_req_sib1(module_id_t module_id, int cc_idP, NR_SIB1_t *si
     mac->state = UE_PERFORMING_RA;
 
   mac->if_module->phy_config_request(&mac->phy_config);
+  mac->phy_config.config_req.ntn_config.params_changed = false;
   ret = pthread_mutex_unlock(&mac->if_mutex);
   AssertFatal(!ret, "mutex failed %d\n", ret);
 }
@@ -1964,7 +1996,9 @@ void nr_rrc_mac_config_other_sib(module_id_t module_id, NR_SIB19_r17_t *sib19, i
   if (sib19) {
     // update ntn_Config_r17 with received values
     UPDATE_IE(mac->sc_info.ntn_Config_r17, sib19->ntn_Config_r17, NR_NTN_Config_r17_t);
-    configure_ntn_ta(&mac->ntn_ta, mac->sc_info.ntn_Config_r17, hfn, frame);
+    configure_ntn_ta(&mac->phy_config.config_req.ntn_config, mac->sc_info.ntn_Config_r17, hfn, frame, false);
+    mac->if_module->phy_config_request(&mac->phy_config);
+    mac->phy_config.config_req.ntn_config.params_changed = false;
   }
   if (mac->state == UE_RECEIVING_SIB && can_start_ra)
     mac->state = UE_PERFORMING_RA;
@@ -2027,6 +2061,7 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
   mac->synch_request.synch_req.target_Nid_cell = mac->physCellId;
   mac->if_module->synch_request(&mac->synch_request);
   mac->if_module->phy_config_request(&mac->phy_config);
+  mac->phy_config.config_req.ntn_config.params_changed = false;
 }
 
 static void configure_physicalcellgroup(NR_UE_MAC_INST_t *mac,
