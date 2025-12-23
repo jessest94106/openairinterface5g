@@ -58,6 +58,7 @@ typedef struct {
 typedef struct {
   uint16_t cb_symbol_mask;
   int num_symbols[NR_SYMBOLS_PER_SLOT];
+  int start_symbol[NR_SYMBOLS_PER_SLOT];
   int symbol_diff;
   int numerology;
 } oran_symbol_callback_args_t;
@@ -73,45 +74,66 @@ void symbol_callback(void *args, struct xran_sense_of_time *p_sense_of_time)
     return;
   }
 
-  uint32_t frame = p_sense_of_time->nFrameIdx;
-  uint32_t slot = p_sense_of_time->nSlotIdx + p_sense_of_time->nSubframeIdx * (1 << callback_args->numerology);
-  uint32_t subframe = p_sense_of_time->nSubframeIdx;
+  int num_symbols = callback_args->num_symbols[p_sense_of_time->nSymIdx];
+  int start_symbol = callback_args->start_symbol[p_sense_of_time->nSymIdx];
+
+  // Adjust timing by symbol_diff
+  int slot_index_increments = (p_sense_of_time->nSymIdx + callback_args->symbol_diff) / NR_SYMBOLS_PER_SLOT;
+  int num_slots_per_subframe = 1 << callback_args->numerology;
+
+  int target_slot_in_frame =
+      p_sense_of_time->nSlotIdx + p_sense_of_time->nSubframeIdx * num_slots_per_subframe + slot_index_increments;
+  int frame = p_sense_of_time->nFrameIdx;
+  int num_slots_per_frame = 10 << callback_args->numerology;
+  while (target_slot_in_frame >= num_slots_per_frame) {
+    target_slot_in_frame -= num_slots_per_frame;
+    frame++;
+    if (frame >= 1024) {
+      frame = 0;
+    }
+  }
 
   const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   int mu = fh_cfg->frame_conf.nNumerology;
   AssertFatal(mu == 1, "Only numerology 1 supported for RU\n");
-  const int slots_in_sf = 1 << mu;
-  uint32_t slot_in_frame = slot + subframe * slots_in_sf;
 
   LOG_D(HW,
-        "Push %d.%d (slot %d, subframe %d, symbol_diff %d)\n",
+        "Callback triggered at frame.slot.synbol %d.%d.%d targets %d.%d.%d, num_symbols %d, symbol_diff %d\n",
+        p_sense_of_time->nFrameIdx,
+        p_sense_of_time->nSlotIdx + p_sense_of_time->nSubframeIdx * num_slots_per_subframe,
+        p_sense_of_time->nSymIdx,
         frame,
-        slot_in_frame,
-        slot,
-        subframe,
+        target_slot_in_frame,
+        start_symbol,
+        num_symbols,
         callback_args->symbol_diff);
+
   notifiedFIFO_elt_t *req = newNotifiedFIFO_elt(sizeof(ru_dl_sync_info_t), 0, NULL, NULL);
   ru_dl_sync_info_t *info = NotifiedFifoData(req);
   info->frame = frame;
-  info->slot = slot;
-  info->symbol = p_sense_of_time->nSymIdx;
-  info->num_symbols = callback_args->num_symbols[p_sense_of_time->nSymIdx];
+  info->slot = target_slot_in_frame;
+  info->symbol = start_symbol;
+  info->num_symbols = num_symbols;
 
   int slot_duration_uS[] = {1000, 500, 250, 125};
   uint64_t slot_in_second_offset_nS = ((uint64_t)p_sense_of_time->tti_counter * slot_duration_uS[mu]) * 1000UL;
 
   float symbol_duration_nS = ((float)slot_duration_uS[mu] * 1000) / 14.0f;
-  uint64_t symbol_in_slot_offset_nS = (uint64_t)(p_sense_of_time->nSymIdx * symbol_duration_nS);
+  uint64_t symbol_in_slot_offset_nS = (uint64_t)((p_sense_of_time->nSymIdx + callback_args->symbol_diff) * symbol_duration_nS);
 
   info->ts.tv_sec = p_sense_of_time->nSecond;
   info->ts.tv_nsec = slot_in_second_offset_nS + symbol_in_slot_offset_nS;
+  if (info->ts.tv_nsec >= 1000000000UL) {
+    info->ts.tv_sec += 1;
+    info->ts.tv_nsec -= 1000000000UL;
+  }
 
   AssertFatal(info->ts.tv_nsec < 1000000000UL, "ORAN: Invalid tv_nsec %ld\n", info->ts.tv_nsec);
 
   pushNotifiedFIFO(&ru_dl_sync_fifo, req);
 }
 
-int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, int *symbol, int* num_symbols, struct timespec *ts)
+int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, int *symbol, int *num_symbols, struct timespec *ts)
 {
   notifiedFIFO_elt_t *res = pullNotifiedFIFO(&ru_dl_sync_fifo);
   ru_dl_sync_info_t *info = NotifiedFifoData(res);
@@ -125,7 +147,11 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
   return 0;
 }
 
-int process_ru_uplane(struct rte_mbuf *pkt, void *handle, struct xran_eaxc_info *p_cid, uint16_t port_id, struct xran_sense_of_time *p_sense_of_time)
+int process_ru_uplane(struct rte_mbuf *pkt,
+                      void *handle,
+                      struct xran_eaxc_info *p_cid,
+                      uint16_t port_id,
+                      struct xran_sense_of_time *p_sense_of_time)
 {
   static uint64_t num_packets = 0;
   num_packets++;
@@ -148,7 +174,7 @@ int process_ru_uplane(struct rte_mbuf *pkt, void *handle, struct xran_eaxc_info 
   uint16_t sym_inc;
   uint16_t rb;
   uint16_t sect_id;
-  int expect_comp  = fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE;
+  int expect_comp = fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE;
   enum xran_comp_hdr_type staticComp = fh_cfg->ru_conf.xranCompHdrType;
   uint8_t compMeth = XRAN_COMPMETHOD_NONE;
   uint8_t iqWidth = 0;
@@ -206,28 +232,45 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
   return MBUF_FREE;
 }
 
-void init_oru_packet_processor(void* handle, int callbacks_per_slot)
+void init_oru_packet_processor(void *handle, int callbacks_per_slot)
 {
-  AssertFatal(callbacks_per_slot <= NR_SYMBOLS_PER_SLOT, "Can do at most %d callbacks per slot", NR_SYMBOLS_PER_SLOT);
+  AssertFatal(callbacks_per_slot <= NR_SYMBOLS_PER_SLOT,
+              "Can do at most %d callbacks per slot",
+              NR_SYMBOLS_PER_SLOT);
   static bool installed = false;
   AssertFatal(!installed, "Cannot init oru twice\n");
   installed = true;
 
+  // Represents RX window end
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
+  int mu = fh_cfg->frame_conf.nNumerology;
+  uint32_t T2a_min = fh_cfg->T2a_min_up;
+  int slot_duration_uS[] = {1000, 500, 250, 125};
+  float symbol_duration_nS = ((float)slot_duration_uS[mu] * 1000) / 14.0f;
+  uint32_t symbol_offset = (float)(T2a_min * 1000) / symbol_duration_nS;
+  AssertFatal(symbol_offset > 0, "The amount of time after RX window end for O-RU is 0. Adjust T2a_min_up %u [uS]\n", T2a_min);
+  LOG_I(HW, "Installing %d callbacks %d symbols before OTA\n", callbacks_per_slot, symbol_offset);
+
   static oran_symbol_callback_args_t args = {0};
+  args.numerology = mu;
 
   int symbols_per_callback = NR_SYMBOLS_PER_SLOT / callbacks_per_slot;
 
   int start_symbol = 0;
   for (int i = 0; i < callbacks_per_slot; i++) {
-    args.cb_symbol_mask |= (1U << start_symbol);
-    args.num_symbols[start_symbol] = symbols_per_callback;
+    int extra_symbols = 0;
     if (i == callbacks_per_slot - 1) {
       // Extend last callback to include leftover symbols
-      args.num_symbols[start_symbol] += NR_SYMBOLS_PER_SLOT % callbacks_per_slot;
+      extra_symbols += NR_SYMBOLS_PER_SLOT % callbacks_per_slot;
     }
+    int num_sybmols_this_callback = symbols_per_callback + extra_symbols;
+    int end_symbol = start_symbol + num_sybmols_this_callback - 1;
+    int callback_symbol = (end_symbol - symbol_offset + NR_SYMBOLS_PER_SLOT) % NR_SYMBOLS_PER_SLOT;
+    args.cb_symbol_mask |= (1U << callback_symbol);
+    args.num_symbols[callback_symbol] = num_sybmols_this_callback;
+    args.start_symbol[callback_symbol] = start_symbol;
+    args.symbol_diff = symbol_offset;
     start_symbol += symbols_per_callback;
   }
-  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
-  int mu = fh_cfg->frame_conf.nNumerology;
   xran_hook_install(handle, process_ru_uplane, NULL, process_ru_cplane, NULL, symbol_callback, &args, mu);
 }
