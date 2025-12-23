@@ -981,11 +981,6 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id, frame_t frame, slot_t slot, c
     return;
   }
 
-  NR_CSI_MeasConfig_t *csi_MeasConfig = UE->sc_info.csi_MeasConfig;
-  if (csi_MeasConfig == NULL) {
-    NR_SCHED_UNLOCK(&nrmac->sched_lock);
-    return;
-  }
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
 
   // tpc (power control)
@@ -1021,8 +1016,11 @@ void handle_nr_uci_pucch_2_3_4(module_id_t mod_id, frame_t frame, slot_t slot, c
   if ((uci_234->pduBitmap >> 2) & 0x01) {
     LOG_D(NR_MAC, "CSI CRC %d\n", uci_234->csi_part1.csi_part1_crc);
     if (uci_234->csi_part1.csi_part1_crc != 1) {
-      // API to parse the csi report and store it into sched_ctrl
-      extract_pucch_csi_report(csi_MeasConfig, uci_234, frame, slot, UE, nrmac);
+      NR_CSI_MeasConfig_t *csi_MeasConfig = UE->sc_info.csi_MeasConfig;
+      if (csi_MeasConfig != NULL) {
+        // API to parse the csi report and store it into sched_ctrl
+        extract_pucch_csi_report(csi_MeasConfig, uci_234, frame, slot, UE, nrmac);
+      }
     }
     free(uci_234->csi_part1.csi_part1_payload);
   }

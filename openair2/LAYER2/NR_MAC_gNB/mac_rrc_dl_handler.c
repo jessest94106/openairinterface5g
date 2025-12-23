@@ -695,8 +695,8 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   cgc.len = (enc_rval.encoded + 7) >> 3;
   resp.du_to_cu_rrc_info.cell_group_config = cgc;
 
-  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
-  UE->CellGroup = new_CellGroup;
+  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
+  UE->reconfigCellGroup = new_CellGroup;
   int ss_type = cg_configinfo ? NR_SearchSpace__searchSpaceType_PR_ue_Specific: NR_SearchSpace__searchSpaceType_PR_common;
   configure_UE_BWP(mac, scc, UE, false, ss_type, -1, -1);
 
@@ -770,19 +770,19 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
           "RRC reconfiguration outcome unsuccessful, but no rollback mechanism implemented to come back to old configuration\n");
   } else if (req->reconfig_compl) {
     LOG_I(NR_MAC, "DU received confirmation of successful RRC Reconfiguration\n");
-    if (UE->reconfigSpCellConfig) {
-      if (UE->await_reconfig) {
-        // in case of reestablishment, the spCellConfig had to be released
-        // temporarily. Reapply now before doing the reconfiguration.
-        UE->CellGroup->spCellConfig = UE->reconfigSpCellConfig;
-        UE->await_reconfig = false;
-      }
-      UE->reconfigSpCellConfig = NULL;
+    if (UE->reconfigCellGroup) {
+      LOG_W(NR_MAC, "reconfigCellGroup still present, did we miss ACK for RRCReconfiguration?\n");
+      ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
+      UE->CellGroup = UE->reconfigCellGroup;
+      UE->reconfigCellGroup = NULL;
+    }
+    if (UE->reestablish_rlc) {
       for (int i = 1; i < seq_arr_size(&UE->UE_sched_ctrl.lc_config); ++i) {
         nr_lc_config_t *c = seq_arr_at(&UE->UE_sched_ctrl.lc_config, i);
         c->suspended = false;
         nr_rlc_reestablish_entity(req->gNB_DU_ue_id, c->lcid);
       }
+      UE->reestablish_rlc = false;
     }
     // we re-configure the BWP to apply the CellGroup and to use UE specific Search Space with DCIX1
     configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_ue_Specific, -1, -1);
@@ -809,8 +809,8 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
     cgc.len = (enc_rval.encoded + 7) >> 3;
     resp.du_to_cu_rrc_info->cell_group_config = cgc;
 
-    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
-    UE->CellGroup = new_CellGroup;
+    ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
+    UE->reconfigCellGroup = new_CellGroup;
     configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
   } else {
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, new_CellGroup); // we actually don't need it
@@ -966,16 +966,19 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
     UE->CellGroup = oldUE->CellGroup;
     oldUE->CellGroup = NULL;
+    ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->capability);
     UE->capability = oldUE->capability;
     oldUE->capability = NULL;
     UE->mac_stats = oldUE->mac_stats;
     UE->measgap_config = oldUE->measgap_config;
+    UE->local_bwp_id = oldUE->local_bwp_id;
     /* 38.331 5.3.7.2 says that the UE releases the spCellConfig, so we drop it
      * from the current configuration. It will be reapplied when the
      * reconfiguration has succeeded (indicated by the CU) */
-    UE->reconfigSpCellConfig = UE->CellGroup->spCellConfig;
+    asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&UE->reconfigCellGroup, UE->CellGroup);
+    ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->CellGroup->spCellConfig);
     UE->CellGroup->spCellConfig = NULL;
-    UE->await_reconfig = true;
+    UE->reestablish_rlc = true;
     mac_remove_nr_ue(mac, *dl_rrc->old_gNB_DU_ue_id);
     pthread_mutex_unlock(&mac->sched_lock);
     nr_rlc_remove_ue(dl_rrc->gNB_DU_ue_id);
