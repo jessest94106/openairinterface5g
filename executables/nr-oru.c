@@ -198,6 +198,7 @@ void *oru_north_read_thread(void *arg)
 
   AssertFatal(ru->ifdevice.xran_api.north_in_func != NULL, "No fronthaul interface at north port");
   __attribute__((aligned(32))) c16_t txDataF[ru->nb_tx][fp->ofdm_symbol_size * 14];
+  memset(txDataF, 0, sizeof(txDataF));
   c16_t *txDataF_ptr[ru->nb_tx];
   for (int aatx = 0; aatx < ru->nb_tx; aatx++) {
     txDataF_ptr[aatx] = txDataF[aatx];
