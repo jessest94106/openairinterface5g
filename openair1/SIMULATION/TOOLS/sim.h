@@ -347,7 +347,7 @@ channel_desc_t *new_channel_desc_scm(uint8_t nb_tx,
                                      double path_loss_dB,
                                      float noise_power_dB);
 
-channel_desc_t *find_channel_desc_fromname( char *modelname );
+channel_desc_t *find_channel_desc_fromname(const char *modelname);
 
 
 /**

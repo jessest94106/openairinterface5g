@@ -548,6 +548,18 @@ static int vrtsim_write(openair0_device *device, openair0_timestamp timestamp, v
                            : vrtsim_write_internal(vrtsim_state, timestamp, (c16_t *)samplesVoid[0], nsamps, 0, flags, 0);
 }
 
+static int vrtsim_write_beams(openair0_device *device,
+                              openair0_timestamp timestamp,
+                              void ***buff,
+                              int nsamps,
+                              int nb_antennas_tx,
+                              int num_beams,
+                              int flags)
+{
+  vrtsim_write(device, timestamp, (void **)buff[0], nsamps, nb_antennas_tx, flags);
+  return nsamps;
+}
+
 static int vrtsim_read(openair0_device *device, openair0_timestamp *ptimestamp, void **samplesVoid, int nsamps, int nbAnt)
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
@@ -657,6 +669,16 @@ static int vrtsim_set_freq(openair0_device *device, openair0_config_t *openair0_
   return 0;
 }
 
+static int vrtsim_set_beams(openair0_device *device, uint64_t beam_map, openair0_timestamp timestamp)
+{
+  return 0;
+}
+
+static int vrtsim_set_beams2(openair0_device *device, int *beam_ids, int num_beams, openair0_timestamp timestamp)
+{
+  return 0;
+}
+
 __attribute__((__visibility__("default"))) int device_init(openair0_device *device, openair0_config_t *openair0_cfg)
 {
   randominit();
@@ -673,6 +695,9 @@ __attribute__((__visibility__("default"))) int device_init(openair0_device *devi
   device->trx_set_gains_func = vrtsim_stub2;
   device->trx_write_func = vrtsim_write;
   device->trx_read_func = vrtsim_read;
+  device->trx_write_beams_func = vrtsim_write_beams;
+  device->trx_set_beams = vrtsim_set_beams;
+  device->trx_set_beams2 = vrtsim_set_beams2;
 
   device->type = RFSIMULATOR;
   device->openair0_cfg = &openair0_cfg[0];
