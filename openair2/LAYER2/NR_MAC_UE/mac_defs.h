@@ -545,31 +545,6 @@ typedef struct {
   A_SEQUENCE_OF(si_schedinfo_config_t) si_SchedInfo_list;
 } si_schedInfo_t;
 
-typedef struct ntn_timing_advance_components {
-  int epoch_hfn;
-  int epoch_sfn;
-  int epoch_subframe;
-
-  // orbital angular velocity in rad/ms
-  double omega;
-  // satellite position at epoch time
-  position_t pos_sat_0;
-  // satellite position at 90° orbit
-  position_t pos_sat_90;
-
-  // N_common_ta_adj represents common round-trip-time between gNB and SAT received in SIB19 (ms)
-  double N_common_ta_adj;
-  // drift rate of common ta in µs/s
-  double N_common_ta_drift;
-  // change rate of common ta drift in µs/s²
-  double N_common_ta_drift_variant;
-
-  // cell scheduling offset expressed in terms of 15kHz SCS
-  long cell_specific_k_offset;
-
-  bool ntn_params_changed;
-} ntn_timing_advance_componets_t;
-
 /*!\brief Top level UE MAC structure */
 typedef struct NR_UE_MAC_INST_s {
   module_id_t ue_id;
@@ -633,8 +608,6 @@ typedef struct NR_UE_MAC_INST_s {
   int p_Max;
   int p_Max_alt;
 
-  ntn_timing_advance_componets_t ntn_ta;
-
   long pdsch_HARQ_ACK_Codebook;
 
   NR_Type0_PDCCH_CSS_config_t type0_PDCCH_CSS_config;
@@ -675,12 +648,12 @@ typedef struct NR_UE_MAC_INST_s {
   notifiedFIFO_t input_nf;
 } NR_UE_MAC_INST_t;
 
-static inline int GET_NTN_UE_K_OFFSET(const ntn_timing_advance_componets_t *ntn_ta, int scs)
+static inline int GET_NTN_UE_K_OFFSET(const fapi_nr_ntn_config_t *ntn_ta, int scs)
 {
   return (int)ntn_ta->cell_specific_k_offset << scs;
 }
 
-static inline long GET_DURATION_RX_TO_TX(const ntn_timing_advance_componets_t *ntn_ta, int scs)
+static inline long GET_DURATION_RX_TO_TX(const fapi_nr_ntn_config_t *ntn_ta, int scs)
 {
   return NR_UE_CAPABILITY_SLOT_RX_TO_TX + (ntn_ta->cell_specific_k_offset << scs);
 }

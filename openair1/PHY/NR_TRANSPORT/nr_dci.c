@@ -61,9 +61,13 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
   int reg_list[MAX_DCI_CORESET][NR_MAX_PDCCH_AGG_LEVEL * NR_NB_REG_PER_CCE];
   nr_fill_reg_list(reg_list, pdcch_pdu_rel15);
   // compute rb_offset and n_prb based on frequency allocation
-  int rb_offset;
-  int n_rb;
-  get_coreset_rballoc(pdcch_pdu_rel15->FreqDomainResource,&n_rb,&rb_offset);
+  int n_rb, cset_start;
+  get_coreset_rballoc(pdcch_pdu_rel15->FreqDomainResource, &n_rb, &cset_start);
+  int additional_offset = 0;
+  // first common RB of the first group of 6 PRBs has common RB index equal to 6 * ⌈BWP_start / 6⌉
+  if (pdcch_pdu_rel15->CoreSetType == 1)
+    additional_offset = (pdcch_pdu_rel15->BWPStart + 5) / 6 * 6 - pdcch_pdu_rel15->BWPStart;
+  int rb_offset = cset_start + additional_offset;
   uint16_t cset_start_sc = frame_parms->first_carrier_offset + (pdcch_pdu_rel15->BWPStart + rb_offset) * NR_NB_SC_PER_RB;
   int idx1 = pdcch_pdu_rel15->StartSymbolIndex+pdcch_pdu_rel15->DurationSymbols;
   int idx2 = (((n_rb + rb_offset + pdcch_pdu_rel15->BWPStart) * 3) + 15) & ~15;
@@ -194,7 +198,7 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
         // dmrs index depends on reference point for k according to 38.211 7.4.1.3.2
         int dmrs_idx;
         if (pdcch_pdu_rel15->CoreSetType == NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG)
-          dmrs_idx = (reg_list[d][reg_count] + pdcch_pdu_rel15->BWPStart) * 3;
+          dmrs_idx = (reg_list[d][reg_count] + pdcch_pdu_rel15->BWPStart + rb_offset) * 3;
         else
           dmrs_idx = (reg_list[d][reg_count] + rb_offset) * 3;
 

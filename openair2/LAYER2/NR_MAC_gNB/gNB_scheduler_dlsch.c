@@ -404,7 +404,8 @@ bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE)
     if (sched_ctrl->coreset->controlResourceSetId == 0) {
       bwp_info.bwpStart = nr_mac->cset0_bwp_start;
     } else {
-      bwp_info.bwpStart = dl_bwp->BWPStart + sched_ctrl->sched_pdcch.rb_start;
+      int additional_offset = (dl_bwp->BWPStart + 5) / 6 * 6 - dl_bwp->BWPStart;
+      bwp_info.bwpStart = dl_bwp->BWPStart + sched_ctrl->sched_pdcch.rb_start + additional_offset;
     }
     if (nr_mac->cset0_bwp_size > 0) {
       bwp_info.bwpSize = min(dl_bwp->BWPSize, nr_mac->cset0_bwp_size);
@@ -595,17 +596,17 @@ static bool allocate_dl_retransmission(gNB_MAC_INST *nr_mac,
 
 static void ack_reconfig(gNB_MAC_INST *mac, NR_UE_info_t *UE)
 {
-  if (UE->reconfigSpCellConfig) {
-    // in case of reestablishment, the spCellConfig had to be released
-    // temporarily. Reapply now before doing the reconfiguration.
-    UE->CellGroup->spCellConfig = UE->reconfigSpCellConfig;
-    // UE->reconfigSpCellConfig to be NULLed after receiving reconfiguration complete
+  if (!UE->reconfigCellGroup) {
+    LOG_W(NR_MAC, "Received ACK for RRCReconfiguration, but nothing to apply!\n");
+    return;
   }
+  ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
+  UE->CellGroup = UE->reconfigCellGroup;
+  UE->reconfigCellGroup = NULL;
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
   /* clean BWP structures */
   clean_bwp_structures(UE->CellGroup->spCellConfig);
   configure_UE_BWP(mac, scc, UE, false, NR_SearchSpace__searchSpaceType_PR_common, -1, -1);
-  UE->await_reconfig = false;
 }
 
 typedef struct UEsched_s {
@@ -885,7 +886,7 @@ static void pf_dl(gNB_MAC_INST *mac,
     sched_pdsch.action = NULL;
     int srb1 = 1;
     /* everything that's only 3 bytes is an ack. To be safe, use a bit more. */
-    if (iterator->UE->await_reconfig && sched_ctrl->rlc_status[srb1].bytes_in_buffer > 10)
+    if (iterator->UE->reconfigCellGroup && sched_ctrl->rlc_status[srb1].bytes_in_buffer > 10)
       sched_pdsch.action = ack_reconfig;
 
     // Fix me: currently, the RLC does not give us the total number of PDUs

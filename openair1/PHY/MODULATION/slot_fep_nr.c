@@ -119,7 +119,7 @@ int nr_slot_fep(PHY_VARS_NR_UE *ue,
 
     if (ue && ue->cont_fo_comp) {
       start_meas_nr_ue_phy(ue, RX_FO_COMPENSATION_STATS);
-      nr_fo_compensation(ue->freq_offset,
+      nr_fo_compensation(ue->dl_Doppler_shift + ue->freq_offset,
                          frame_parms->samples_per_subframe,
                          rx_offset,
                          rxdata_symb_ptr[aa],

@@ -338,7 +338,7 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
 
   const struct xran_fh_init *fh_init = get_xran_fh_init();
   int nPRBs = fh_cfg->nULRBs;
-  int fftsize = 1 << fh_cfg->ru_conf.fftSize;
+  int fftsize = 1 << fh_cfg->nULFftSize;
 
   int slot_offset_rxdata = 3 & (*slot);
   uint32_t slot_size = 4 * 14 * fftsize;
@@ -496,7 +496,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
   const struct xran_fh_init *fh_init = get_xran_fh_init();
   const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   int nPRBs = fh_cfg->nDLRBs;
-  int fftsize = 1 << fh_cfg->ru_conf.fftSize;
+  int fftsize = 1 << fh_cfg->nDLFftSize;
   int nb_tx_per_ru = ru->nb_tx / fh_init->xran_ports;
   int nb_rx_per_ru = ru->nb_rx / fh_init->xran_ports;
 

@@ -122,9 +122,18 @@ static void config_dci_pdu(NR_UE_MAC_INST_t *mac,
   if(coreset_id > 0) {
     coreset = ue_get_coreset(pdcch_config, coreset_id);
     rel15->coreset.CoreSetType = NFAPI_NR_CSET_CONFIG_PDCCH_CONFIG;
+    if (coreset->ext1 && coreset->ext1->rb_Offset_r16)
+      rel15->coreset.rb_offset = *coreset->ext1->rb_Offset_r16;
+    else {
+      // first common RB of the first group of 6 PRBs has common RB index equal to
+      // 6 * ⌈BWP_start / 6⌉ if rb-Offset is not provided
+      int start_common = (current_DL_BWP->BWPStart + 5) / 6 * 6;
+      rel15->coreset.rb_offset = start_common - current_DL_BWP->BWPStart;
+    }
   } else {
     coreset = mac->coreset0;
     rel15->coreset.CoreSetType = NFAPI_NR_CSET_CONFIG_MIB_SIB1;
+    rel15->coreset.rb_offset = 0;
   }
 
   rel15->coreset.duration = coreset->duration;

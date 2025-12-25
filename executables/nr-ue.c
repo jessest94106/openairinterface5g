@@ -176,8 +176,7 @@ void init_nr_ue_vars(PHY_VARS_NR_UE *ue, uint8_t UE_id)
   ue->dci_thres   = 0;
   ue->target_Nid_cell = -1;
 
-  ue->ntn_config_message = CALLOC(1, sizeof(*ue->ntn_config_message));
-  ue->ntn_config_message->update = false;
+  ue->nrUE_config.ntn_config.params_changed = false;
 
   // initialize all signal buffers
   init_nr_ue_signal(ue, nb_connected_gNB);
@@ -257,7 +256,7 @@ static void UE_synch(void *arg) {
         + round((float)((ret.rx_offset << 1) % fp->samples_per_subframe) / fp->samples_per_slot0);
 
     if (get_nrUE_params()->cont_fo_comp) {
-      UE->freq_offset = freq_offset;
+      UE->freq_offset = freq_offset - UE->dl_Doppler_shift;
     } else {
       // rerun with new cell parameters and frequency-offset
       nr_rf_card_config_freq(cfg0, ul_carrier, dl_carrier, freq_offset);
@@ -398,8 +397,15 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action, c16_t **tx
     double ul_freq_offset = -UE->freq_offset * ((double)fp->ul_CarrierFreq / (double)fp->dl_CarrierFreq);
     if (get_nrUE_params()->cont_fo_comp == 2) // different from LO frequency error compensation, Doppler UL pre-compensation has to be negative
       ul_freq_offset = -ul_freq_offset;
+    else if (get_nrUE_params()->cont_fo_comp == 3) // do not consider residual DL FO for UL pre-compensation at all
+      ul_freq_offset = 0;
     for (int i = 0; i < fp->nb_antennas_tx; i++)
-      nr_fo_compensation(ul_freq_offset, fp->samples_per_subframe, writeTimestamp, txp[i], txp[i], writeBlockSize);
+      nr_fo_compensation(UE->ul_Doppler_shift + ul_freq_offset,
+                         fp->samples_per_subframe,
+                         writeTimestamp,
+                         txp[i],
+                         txp[i],
+                         writeBlockSize);
   }
 
   int tmp = openair0_write_reorder(&UE->rfdevice, writeTimestamp, (void **)txp, writeBlockSize, fp->nb_antennas_tx, flags);
@@ -491,6 +497,8 @@ static uint64_t get_carrier_frequency(const int N_RB, const int mu, const uint32
   return carrier_freq;
 }
 
+static void apply_ntn_timing_advance_and_doppler(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_PARMS *fp, int abs_subframe_tx);
+
 static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
 {
   NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
@@ -514,6 +522,12 @@ static int handle_sync_req_from_mac(PHY_VARS_NR_UE *UE)
       UE->rfdevice.trx_set_freq_func(&UE->rfdevice, &UE->openair0_cfg[UE->rf_map.card]);
       init_symbol_rotation(fp);
     }
+
+    // Apply Doppler based on NTN-Config for target cell
+    if (UE->nrUE_config.ntn_config.is_targetcell)
+      apply_ntn_timing_advance_and_doppler(UE, fp, -1);
+    // Apply NTN DL Doppler as initial FO
+    UE->initial_fo = UE->dl_Doppler_shift;
 
     /* Clearing UE harq while DL actors are active causes race condition.
         So we let the current execution to complete here.*/
@@ -721,25 +735,80 @@ static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
   return rem_samples + next_slot_first_symbol;
 }
 
-#define SPEED_OF_LIGHT 299792458
-static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_PARMS *fp, int abs_subframe_tx)
+static void fix_ntn_epoch_hfn(PHY_VARS_NR_UE *UE, int hfn, int frame)
 {
-  const fapi_nr_dl_ntn_config_command_pdu *ntn_config_params = &UE->ntn_config_message->ntn_config_params;
+  if (!UE->nrUE_config.ntn_config.is_targetcell)
+    return;
+  UE->nrUE_config.ntn_config.is_targetcell = false;
+
+  const int epoch_frame = UE->nrUE_config.ntn_config.epoch_sfn;
+  const int diff1 = (frame - epoch_frame + 1024) % 1024;
+  const int diff2 = (epoch_frame - frame + 1024) % 1024;
+
+  int *epoch_hfn = &UE->nrUE_config.ntn_config.epoch_hfn;
+  if (diff1 < diff2) { // epoch_frame in the past
+    LOG_I(PHY, "epoch is %d frames in the past\n", diff1);
+    if (epoch_frame <= frame)
+      *epoch_hfn = hfn;
+    else
+      *epoch_hfn = hfn - 1;
+  } else { // epoch_frame in the future
+    LOG_I(PHY, "epoch is %d frames in the future\n", diff2);
+    if (epoch_frame >= frame)
+      *epoch_hfn = hfn;
+    else
+      *epoch_hfn = hfn + 1;
+  }
+  LOG_I(PHY, "setting epoch_hfn = %d\n", *epoch_hfn);
+}
+
+#define SPEED_OF_LIGHT 299792458
+
+// calculate TA and Doppler based on the NTN-Config, if abs_subframe_tx < 0 then apply only Doppler
+static void apply_ntn_timing_advance_and_doppler(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_PARMS *fp, int abs_subframe_tx)
+{
+  const fapi_nr_ntn_config_t *ntn_config_params = &UE->nrUE_config.ntn_config;
+
+  // Handle terrestrial networks
+  if (ntn_config_params->cell_specific_k_offset == 0) {
+    if (abs_subframe_tx >= 0)
+      UE->timing_advance_ntn = 0;
+    UE->dl_Doppler_shift = 0;
+    UE->ul_Doppler_shift = 0;
+    return;
+  }
 
   const int abs_subframe_epoch = ntn_config_params->epoch_subframe
                                + ntn_config_params->epoch_sfn * 10
                                + ntn_config_params->epoch_hfn * 10240;
-  const int ms_since_epoch = abs_subframe_tx - abs_subframe_epoch;
-
-  const double omega = ntn_config_params->omega;
-  const double cos_wt = cos(omega * ms_since_epoch);
-  const double sin_wt = sin(omega * ms_since_epoch);
+  const int ms_since_epoch = abs_subframe_tx < 0 ? 0 : abs_subframe_tx - abs_subframe_epoch;
 
   const position_t pos_sat_0 = ntn_config_params->pos_sat_0;
-  const position_t pos_sat_90 = ntn_config_params->pos_sat_90;
-  const position_t pos_sat = {pos_sat_0.X * cos_wt + pos_sat_90.X * sin_wt,
-                              pos_sat_0.Y * cos_wt + pos_sat_90.Y * sin_wt,
-                              pos_sat_0.Z * cos_wt + pos_sat_90.Z * sin_wt};
+  const position_t vel_sat_0 = ntn_config_params->vel_sat_0;
+
+  position_t pos_sat;
+  position_t vel_sat;
+
+  const double omega = ntn_config_params->omega;
+  if (omega) {
+    const double cos_wt = cos(omega * ms_since_epoch);
+    const double sin_wt = sin(omega * ms_since_epoch);
+
+    const position_t pos_sat_90 = ntn_config_params->pos_sat_90;
+    pos_sat = (position_t){pos_sat_0.X * cos_wt + pos_sat_90.X * sin_wt,
+                           pos_sat_0.Y * cos_wt + pos_sat_90.Y * sin_wt,
+                           pos_sat_0.Z * cos_wt + pos_sat_90.Z * sin_wt};
+
+    const position_t vel_sat_90 = ntn_config_params->vel_sat_90;
+    vel_sat = (position_t){vel_sat_0.X * cos_wt + vel_sat_90.X * sin_wt,
+                           vel_sat_0.Y * cos_wt + vel_sat_90.Y * sin_wt,
+                           vel_sat_0.Z * cos_wt + vel_sat_90.Z * sin_wt};
+  } else {
+    pos_sat = (position_t){pos_sat_0.X + vel_sat_0.X * ms_since_epoch / 1000,
+                           pos_sat_0.Y + vel_sat_0.Y * ms_since_epoch / 1000,
+                           pos_sat_0.Z + vel_sat_0.Z * ms_since_epoch / 1000};
+    vel_sat = vel_sat_0;
+  }
 
   position_t pos_ue = {0};
   get_position_coordinates(UE->Mod_id, &pos_ue);
@@ -750,6 +819,15 @@ static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAM
   // calculate distance between SAT and UE
   const double distance = sqrt(dir_sat_ue.X * dir_sat_ue.X + dir_sat_ue.Y * dir_sat_ue.Y + dir_sat_ue.Z * dir_sat_ue.Z);
 
+  // calculate projected velocity from SAT towards UE
+  const double vel_sat_ue = (vel_sat.X * dir_sat_ue.X + vel_sat.Y * dir_sat_ue.Y + vel_sat.Z * dir_sat_ue.Z) / distance;
+
+  // calculate DL Doppler shift (moving source)
+  const double dl_Doppler_shift = (vel_sat_ue / (SPEED_OF_LIGHT - vel_sat_ue)) * fp->dl_CarrierFreq;
+
+  // calculate UL Doppler shift (moving target)
+  const double ul_Doppler_shift = (vel_sat_ue / SPEED_OF_LIGHT) * fp->ul_CarrierFreq;
+
   // calculate round-trip-time (factor 2) between SAT and UE in ms (factor 1000)
   const double N_UE_TA_adj = 2000 * distance / SPEED_OF_LIGHT;
 
@@ -757,47 +835,73 @@ static inline void apply_ntn_timing_advance(PHY_VARS_NR_UE *UE, const NR_DL_FRAM
   const double N_common_ta_drift = ntn_config_params->N_common_ta_drift;
   const double N_common_ta_drift_variant = ntn_config_params->N_common_ta_drift_variant;
 
-  UE->timing_advance_ntn = (N_UE_TA_adj + N_common_ta_adj
-                          + N_common_ta_drift * ms_since_epoch / 1e6
-                          + N_common_ta_drift_variant * ((int64_t)ms_since_epoch * ms_since_epoch) / 1e9)
-                         * fp->samples_per_subframe;
+  if (abs_subframe_tx >= 0) {
+    UE->timing_advance_ntn = (N_UE_TA_adj + N_common_ta_adj + N_common_ta_drift * ms_since_epoch / 1e6
+                              + N_common_ta_drift_variant * ((int64_t)ms_since_epoch * ms_since_epoch) / 1e9)
+                             * fp->samples_per_subframe;
+  }
 
-  LOG_D(PHY,
-        "N_UE_TA_adj = %f ms, N_common_ta_adj = %f ms, N_common_ta_drift = %f µs/s, N_common_ta_drift_variant = %f µs/s², ms_since_epoch = %d ms, "
-        "computed timing_advance_ntn = %d samples\n",
-        N_UE_TA_adj,
-        N_common_ta_adj,
-        N_common_ta_drift,
-        N_common_ta_drift_variant,
-        ms_since_epoch,
-        UE->timing_advance_ntn);
+  UE->freq_offset -= dl_Doppler_shift - UE->dl_Doppler_shift;
+  UE->dl_Doppler_shift = dl_Doppler_shift;
+  UE->ul_Doppler_shift = ul_Doppler_shift;
+
+  if (abs_subframe_tx < 0) {
+    LOG_I(PHY,
+          "satellite velocity towards UE = %f m/s, DL Doppler shift = %f kHz, UL Doppler shift = %f kHz\n",
+          vel_sat_ue,
+          dl_Doppler_shift / 1000,
+          ul_Doppler_shift / 1000);
+  }
 }
 
-static inline void apply_ntn_config(PHY_VARS_NR_UE *UE,
-                                    NR_DL_FRAME_PARMS *fp,
-                                    int hfn_rx,
-                                    int frame_rx,
-                                    int slot_rx,
-                                    int *duration_rx_to_tx,
-                                    int *timing_advance,
-                                    int *ntn_koffset)
+// apply values based on the NTN-Config
+static void apply_ntn_config(PHY_VARS_NR_UE *UE,
+                             NR_DL_FRAME_PARMS *fp,
+                             int hfn_rx,
+                             int frame_rx,
+                             int slot_rx,
+                             int *duration_rx_to_tx,
+                             int *timing_advance,
+                             int *ntn_koffset,
+                             bool *ntn_targetcell)
 {
-  if (UE->ntn_config_message->update) {
-    UE->ntn_config_message->update = false;
+  // return if there is no pending update
+  if (!UE->nrUE_config.ntn_config.params_changed)
+    return;
 
-    const int mu = fp->numerology_index;
-    const int koffset = UE->ntn_config_message->ntn_config_params.cell_specific_k_offset;
+  *ntn_targetcell = UE->nrUE_config.ntn_config.is_targetcell;
 
-    *duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + (koffset << mu);
-    if (koffset > *ntn_koffset)
-      *timing_advance += get_samples_slot_duration(fp, slot_rx, (koffset - *ntn_koffset) << mu);
-    else if (koffset < *ntn_koffset)
-      *timing_advance -= get_samples_slot_duration(fp, slot_rx, (*ntn_koffset - koffset) << mu);
-    *ntn_koffset = koffset;
+  // skip update if it is for the target cell
+  if (UE->nrUE_config.ntn_config.is_targetcell)
+    return;
 
-    const int abs_subframe_tx = 10240 * hfn_rx + 10 * frame_rx + ((slot_rx + *duration_rx_to_tx) >> mu);
-    apply_ntn_timing_advance(UE, fp, abs_subframe_tx);
-  }
+  UE->nrUE_config.ntn_config.params_changed = false;
+
+  const fapi_nr_ntn_config_t *ntn_config_params = &UE->nrUE_config.ntn_config;
+
+  const int mu = fp->numerology_index;
+  const int koffset = ntn_config_params->cell_specific_k_offset;
+
+  *duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX + (koffset << mu);
+  if (koffset > *ntn_koffset)
+    *timing_advance += get_samples_slot_duration(fp, slot_rx, (koffset - *ntn_koffset) << mu);
+  else if (koffset < *ntn_koffset)
+    *timing_advance -= get_samples_slot_duration(fp, slot_rx, (*ntn_koffset - koffset) << mu);
+  *ntn_koffset = koffset;
+
+  const int abs_subframe_tx = 10240 * hfn_rx + 10 * frame_rx + ((slot_rx + *duration_rx_to_tx) >> mu);
+  apply_ntn_timing_advance_and_doppler(UE, fp, abs_subframe_tx);
+
+  LOG_I(PHY,
+        "k_offset: %dms, N_Common_Ta: %fms, drift: %fµs/s, variant: %fµs/s², "
+        "timing_advance_ntn: %d samples, DL Doppler shift: %fkHz, UL Doppler shift: %fkHz\n",
+        koffset << mu,
+        ntn_config_params->N_common_ta_adj,
+        ntn_config_params->N_common_ta_drift,
+        ntn_config_params->N_common_ta_drift_variant,
+        UE->timing_advance_ntn,
+        UE->dl_Doppler_shift / 1000,
+        UE->ul_Doppler_shift / 1000);
 }
 
 void *UE_thread(void *arg)
@@ -832,9 +936,15 @@ void *UE_thread(void *arg)
   notifiedFIFO_t freeBlocks;
   initNotifiedFIFO_nothreadSafe(&freeBlocks);
 
-  double ntn_init_time_drift = get_nrUE_params()->ntn_init_time_drift;
-  int ntn_koffset = 0;
+  const double ntn_init_time_drift = get_nrUE_params()->ntn_init_time_drift;
+  if (get_nrUE_params()->time_sync_I)
+    // ntn_init_time_drift is in µs/s, max_pos_acc * time_sync_I is in samples/frame
+    UE->max_pos_acc = ntn_init_time_drift * 1e-6 * fp->samples_per_frame / get_nrUE_params()->time_sync_I;
+  else
+    UE->max_pos_acc = 0;
 
+  bool ntn_targetcell = false;
+  int ntn_koffset = 0;
   int duration_rx_to_tx = NR_UE_CAPABILITY_SLOT_RX_TO_TX;
   int timing_advance = UE->timing_advance + UE->timing_advance_ntn;
   UE->N_TA_offset = determine_N_TA_offset(UE);
@@ -930,10 +1040,6 @@ void *UE_thread(void *arg)
       syncMsg->UE = UE;
       memset(&syncMsg->proc, 0, sizeof(syncMsg->proc));
       pushNotifiedFIFO(&UE->sync_actor.fifo, Msg);
-      if (ntn_koffset == 0) { // reset timing_advance for TN
-        timing_advance = 0;
-        UE->timing_advance = 0;
-      }
       trashed_frames = 0;
       syncRunning = true;
       continue;
@@ -943,13 +1049,8 @@ void *UE_thread(void *arg)
       stream_status = STREAM_STATUS_SYNCING;
       syncInFrame(UE, &sync_timestamp, duration_rx_to_tx, intialSyncOffset);
       openair0_write_reorder_clear_context(&UE->rfdevice);
-      if (get_nrUE_params()->time_sync_I)
-        // ntn_init_time_drift is in µs/s, max_pos_acc * time_sync_I is in samples/frame
-        UE->max_pos_acc = ntn_init_time_drift * 1e-6 * fp->samples_per_frame / get_nrUE_params()->time_sync_I;
-      else
-        UE->max_pos_acc = 0;
       shiftForNextFrame = -(UE->init_sync_frame + trashed_frames + 2) * UE->max_pos_acc * get_nrUE_params()->time_sync_I; // compensate for the time drift that happened during initial sync
-      LOG_D(PHY, "max_pos_acc = %d, shiftForNextFrame = %d\n", UE->max_pos_acc, shiftForNextFrame);
+      LOG_I(PHY, "max_pos_acc = %d, shiftForNextFrame = %d\n", UE->max_pos_acc, shiftForNextFrame);
       // read in first symbol
       AssertFatal(fp->ofdm_symbol_size + fp->nb_prefix_samples0
                       == UE->rfdevice.trx_read_func(&UE->rfdevice,
@@ -961,12 +1062,35 @@ void *UE_thread(void *arg)
       // we have the decoded frame index in the return of the synch process
       // and we shifted above to the first slot of next frame
       decoded_frame_rx = (decoded_frame_rx + 1) % MAX_FRAME_NUMBER;
+      const int prev_frame_rx = (absolute_slot / nb_slot_frame) % MAX_FRAME_NUMBER;
+      const int prev_hfn_rx = (absolute_slot / nb_slot_frame) / MAX_FRAME_NUMBER;
+      int decoded_hfn_rx = prev_hfn_rx;
+      if (decoded_frame_rx <= prev_frame_rx)
+        decoded_hfn_rx++;
       // we do ++ first in the regular processing, so it will be begin of frame;
-      absolute_slot = decoded_frame_rx * nb_slot_frame - 1;
+      absolute_slot = (decoded_hfn_rx * MAX_FRAME_NUMBER + decoded_frame_rx) * nb_slot_frame - 1;
       if (UE->sl_mode == 2) {
         // Set to the slot where the SL-SSB was decoded
         absolute_slot += UE->SL_UE_PHY_PARAMS.sync_params.slot_offset;
       }
+      // With the correct frame and slot numbers, we can now fix the UL timing
+      fix_ntn_epoch_hfn(UE, decoded_hfn_rx, decoded_frame_rx);
+      if (UE->nrUE_config.ntn_config.params_changed) {
+        apply_ntn_config(UE,
+                         fp,
+                         decoded_hfn_rx,
+                         decoded_frame_rx,
+                         0,
+                         &duration_rx_to_tx,
+                         &timing_advance,
+                         &ntn_koffset,
+                         &ntn_targetcell);
+      } else {
+        const int abs_subframe_tx = (absolute_slot + 1 + duration_rx_to_tx) / fp->slots_per_subframe;
+        apply_ntn_timing_advance_and_doppler(UE, fp, abs_subframe_tx);
+        ntn_targetcell = false;
+      }
+      UE->timing_advance = 0;
       // We have resynchronized, maybe after RF loss so we need to purge any existing context
       memset(tx_wait_for_dlsch, 0, sizeof(tx_wait_for_dlsch));
       for (int i = 0; i < NUM_PROCESS_SLOT_TX_BARRIERS; i++) {
@@ -1026,9 +1150,10 @@ void *UE_thread(void *arg)
     }
 
     // Calculate new TA based on SIB19 information for each subframe in NTN mode, if "autonomous_ta" is not enabled
-    if (ntn_koffset && !get_nrUE_params()->autonomous_ta && (absolute_slot + duration_rx_to_tx) % fp->slots_per_subframe == 0) {
+    if (ntn_koffset && !ntn_targetcell && !get_nrUE_params()->autonomous_ta
+        && (absolute_slot + duration_rx_to_tx) % fp->slots_per_subframe == 0) {
       const int abs_subframe_tx = (absolute_slot + duration_rx_to_tx) / fp->slots_per_subframe;
-      apply_ntn_timing_advance(UE, fp, abs_subframe_tx);
+      apply_ntn_timing_advance_and_doppler(UE, fp, abs_subframe_tx);
     }
 
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
@@ -1081,6 +1206,11 @@ void *UE_thread(void *arg)
       writeBlockSize -= new_N_TA_offset - UE->N_TA_offset;
       UE->N_TA_offset = new_N_TA_offset;
     }
+    if (writeBlockSize < 0) {
+      timing_advance += writeBlockSize - 1;
+      LOG_I(PHY, "writeBlockSize is %d, setting it to 1 and changing timing_advance to %d\n", writeBlockSize, timing_advance);
+      writeBlockSize = 1;
+    }
 
     if (curMsg.proc.nr_slot_rx == 0)
       nr_ue_rrc_timer_trigger(UE->Mod_id, curMsg.proc.hfn_rx, curMsg.proc.frame_rx, curMsg.proc.gNB_id);
@@ -1099,7 +1229,15 @@ void *UE_thread(void *arg)
     }
 
     // apply new NTN timing information
-    apply_ntn_config(UE, fp, curMsg.proc.hfn_rx, curMsg.proc.frame_rx, curMsg.proc.nr_slot_rx, &duration_rx_to_tx, &timing_advance, &ntn_koffset);
+    apply_ntn_config(UE,
+                     fp,
+                     curMsg.proc.hfn_rx,
+                     curMsg.proc.frame_rx,
+                     curMsg.proc.nr_slot_rx,
+                     &duration_rx_to_tx,
+                     &timing_advance,
+                     &ntn_koffset,
+                     &ntn_targetcell);
 
     // Start TX slot processing here. It runs in parallel with RX slot processing
     // in current code, DURATION_RX_TO_TX constant is the limit to get UL data to encode from a RX slot
@@ -1113,7 +1251,7 @@ void *UE_thread(void *arg)
     curMsgTx->absolute_deadline_us = absolute_deadline_us;
 
     int slot = curMsgTx->proc.nr_slot_tx;
-    int slot_and_frame = slot + curMsgTx->proc.frame_tx * UE->frame_parms.slots_per_frame;
+    int slot_and_frame = slot + curMsgTx->proc.frame_tx * nb_slot_frame;
     int next_tx_slot_and_frame = absolute_slot + duration_rx_to_tx + 1;
     int wait_for_prev_slot = stream_status == STREAM_STATUS_SYNCED ? 1 : 0;
 

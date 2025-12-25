@@ -186,7 +186,6 @@ typedef enum {
 } nr_config_report_type_t;
 
 typedef struct nr_mac_config_t {
-  int sib1_tda;
   nr_pdsch_AntennaPorts_t pdsch_AntennaPorts;
   int pusch_AntennaPorts;
   int minRXTXTIME;
@@ -788,9 +787,8 @@ typedef struct NR_UE_info {
   NR_mac_stats_t mac_stats;
   /// currently active CellGroupConfig
   NR_CellGroupConfig_t *CellGroup;
-  /// in case of reestablishment, old spCellConfig to apply after
-  /// reconfiguration
-  NR_SpCellConfig_t *reconfigSpCellConfig;
+  /// in case of reconfiguration, new CellConfig to apply
+  NR_CellGroupConfig_t *reconfigCellGroup;
   NR_UE_NR_Capability_t *capability;
   measgap_config_t measgap_config;
   // UE selected beam index
@@ -799,7 +797,7 @@ typedef struct NR_UE_info {
   float dl_thr_ue;
   long pdsch_HARQ_ACK_Codebook;
   bool is_redcap;
-  bool await_reconfig;
+  bool reestablish_rlc;
   NR_RA_t *ra;
   // 3GPP mandates that BWPs are enumerated consecutively, but we only send one (dedicated)
   // BWP to the UE (and modify that BWP on reconfiguration); consequently, the BWP ID for a
@@ -994,6 +992,7 @@ typedef struct gNB_MAC_INST_s {
   bool identity_pm;
   int precoding_matrix_size[NR_MAX_NB_LAYERS];
   int beam_index_list[MAX_NUM_OF_SSB];
+  NR_sched_pdsch_t sib1_pdsch[MAX_NUM_OF_SSB];
 
   /// dedicate UL TDA, common for all UEs
   seq_arr_t ul_tda;
