@@ -1038,11 +1038,11 @@ pkg_check_modules(lapacke REQUIRED lapacke)
 
 add_library(PHY_UE ${PHY_SRC_UE})
 target_link_libraries(PHY_UE PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs UTIL)
-# RHEL needs also cblas, but Ubuntu does not have it. So `cblas_LIBRARIES` will
-# be empty for Ubuntu, a no-op
+# RHEL needs also cblas, but Ubuntu does not have it. So `cblas_LIBRARIES` and
+# `cblas_INCLUDE_DIRS` will be empty for Ubuntu, a no-op
 pkg_check_modules(cblas cblas)
 target_link_libraries(PHY_UE PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES})
-target_include_directories(PHY_UE PRIVATE ${blas_INCLUDE_DIRS} ${lapacke_INCLUDE_DIRS})
+target_include_directories(PHY_UE PRIVATE ${blas_INCLUDE_DIRS} ${cblas_INCLUDE_DIRS} ${lapacke_INCLUDE_DIRS})
 
 add_library(PHY_NR_COMMON ${PHY_NR_SRC_COMMON})
 target_link_libraries(PHY_NR_COMMON PUBLIC UTIL)
