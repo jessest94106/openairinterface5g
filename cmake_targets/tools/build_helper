@@ -496,9 +496,6 @@ check_install_oai_software() {
         ninja-build \
 	pkg-config \
 	git \
-	libblas-dev \
-	liblapack-dev \
-	liblapacke-dev \
 	libreadline-dev \
 	libconfig-dev \
 	libsctp-dev  \
@@ -536,10 +533,6 @@ check_install_oai_software() {
       openssl-devel \
       patch \
       readline-devel \
-      lapack \
-      lapack-devel \
-      blas \
-      blas-devel \
       vim-common \
       zlib-devel \
       yaml-cpp-devel

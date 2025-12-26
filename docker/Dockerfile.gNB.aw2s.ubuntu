@@ -48,7 +48,6 @@ RUN apt-get update && \
         procps \
         libsctp1 \
         tzdata \
-        libblas3 \
         libc6 \
         libconfig9 \
         gdb \

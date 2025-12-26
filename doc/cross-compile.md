@@ -42,10 +42,7 @@ sudo apt install -y gcc-aarch64-linux-gnu \
                     g++-aarch64-linux-gnu
 
 sudo apt-get install -y \
-    libblas-dev:arm64 \
     libc6-dev-i386 \
-    liblapack-dev:arm64 \
-    liblapacke-dev:arm64 \
     libreadline-dev:arm64 \
     libgnutls28-dev:arm64 \
     libconfig-dev:arm64 \

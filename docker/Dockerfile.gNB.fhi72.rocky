@@ -90,10 +90,6 @@ COPY --from=gnb-build /usr/local/lib64/flexric /usr/local/lib64/flexric
 COPY --from=gnb-base \
     /lib64/libconfig.so.11 \
     /lib64/libforms.so.2 \
-    /lib64/libblas.so.3 \
-    /lib64/libcblas.so.3 \
-    /lib64/liblapack.so.3 \
-    /lib64/liblapacke.so.3 \
     /lib64/libicudata.so.67 \
     /lib64/libicui18n.so.67 \
     /lib64/libicuuc.so.67 \

@@ -44,7 +44,7 @@
 #include "linear_preprocessing_rec.h"
 
 //#define DEBUG_MMSE
-#define USE_MMSE
+//#define USE_MMSE
 
 /* dynamic shift for LLR computation for TM3/4
  * set as command line argument, see lte-softmodem.c
