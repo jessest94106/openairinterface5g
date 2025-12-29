@@ -24,6 +24,7 @@
 
 #include <netinet/in.h>
 #include <netinet/sctp.h>
+#include <stdbool.h>
 #include "common/5g_platform_types.h"
 #include "common/platform_constants.h"
 #include "common/utils/ds/byte_array.h"
@@ -639,6 +640,68 @@ typedef struct f1ap_paging_ind_s {
   uint64_t nr_cellid;
   uint8_t  paging_drx;
 } f1ap_paging_ind_t;
+
+typedef struct f1ap_paging_cell_item_s {
+  plmn_id_t plmn;
+  uint64_t nr_cellid;
+} f1ap_paging_cell_item_t;
+
+typedef enum f1ap_paging_identity_type_e {
+  F1AP_PAGING_IDENTITY_RAN_UE, // RAN UE Paging Identity (I-RNTI)
+  F1AP_PAGING_IDENTITY_CN_UE // CN UE Paging Identity (5G-S-TMSI)
+} f1ap_paging_identity_type_t;
+
+typedef union f1ap_paging_identity_u {
+  // RAN UE Paging Identity (I-RNTI)
+  uint64_t ran_ue_paging_identity;
+  // CN UE Paging Identity (5G-S-TMSI)
+  uint64_t cn_ue_paging_identity;
+} f1ap_paging_identity_t;
+
+/** @brief Paging DRX (9.3.1.40 TS 38.473)
+ * This IE indicates the Paging DRX as defined in
+ * TS 38.304. Unit in radio frames.*/
+typedef enum f1ap_paging_drx_e {
+  F1AP_PAGING_DRX_32 = 0,
+  F1AP_PAGING_DRX_64 = 1,
+  F1AP_PAGING_DRX_128 = 2,
+  F1AP_PAGING_DRX_256 = 3
+} f1ap_paging_drx_t;
+
+/** @brief Paging Priority (9.3.1.41 TS 38.473)
+ * Lower value codepoint indicates higher priority.
+ * codepoint indicates higher priority.*/
+typedef enum f1ap_paging_priority_e {
+  F1AP_PAGING_PRIO_LEVEL1 = 0,
+  F1AP_PAGING_PRIO_LEVEL2 = 1,
+  F1AP_PAGING_PRIO_LEVEL3 = 2,
+  F1AP_PAGING_PRIO_LEVEL4 = 3,
+  F1AP_PAGING_PRIO_LEVEL5 = 4,
+  F1AP_PAGING_PRIO_LEVEL6 = 5,
+  F1AP_PAGING_PRIO_LEVEL7 = 6,
+  F1AP_PAGING_PRIO_LEVEL8 = 7
+} f1ap_paging_priority_t;
+
+typedef bool f1ap_paging_origin_t;
+#define F1AP_PAGING_ORIGIN_NON_3GPP true
+
+/* 9.2.6.1 Paging (3GPP TS 38.473) */
+typedef struct {
+  // UE Identity Index value (mandatory)
+  uint16_t ue_identity_index_value;
+  // Paging Identity (mandatory)
+  f1ap_paging_identity_type_t identity_type;
+  f1ap_paging_identity_t identity;
+  // Paging DRX: 0 (32), 1 (64), 2 (128), 3 (256) (optional)
+  f1ap_paging_drx_t *drx;
+  // Paging priority (optional)
+  f1ap_paging_priority_t *priority;
+  // Paging origin (optional)
+  f1ap_paging_origin_t *origin;
+  // Paging Cell List (mandatory); max 512 cells
+  uint16_t n_cells;
+  f1ap_paging_cell_item_t *cells;
+} f1ap_paging_t;
 
 typedef struct f1ap_lost_connection_t {
   int dummy;
