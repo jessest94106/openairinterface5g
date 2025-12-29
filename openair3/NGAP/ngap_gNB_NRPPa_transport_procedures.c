@@ -1,0 +1,129 @@
+/*
+ * Licensed to the OpenAirInterface (OAI) Software Alliance under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The OpenAirInterface Software Alliance licenses this file to You under
+ * the OAI Public License, Version 1.1  (the "License"); you may not use this file
+ * except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.openairinterface.org/?page_id=698
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *-------------------------------------------------------------------------------
+ * For more information about the OpenAirInterface (OAI) Software Alliance:
+ *      contact@openairinterface.org
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+#include "assertions.h"
+#include "conversions.h"
+
+#include "intertask_interface.h"
+
+#include "ngap_common.h"
+#include "ngap_gNB_defs.h"
+#include "ngap_gNB_itti_messaging.h"
+#include "ngap_gNB_encoder.h"
+#include "ngap_gNB_nnsf.h"
+#include "ngap_gNB_ue_context.h"
+#include "ngap_gNB_management_procedures.h"
+
+#include "ngap_gNB_NRPPa_transport_procedures.h"
+
+// UPLINK UE ASSOCIATED NRPPA TRANSPORT (9.2.9.2 of TS 38.413 Version 16.0.0)
+int ngap_gNB_uplink_ue_associated_nrppa_transport(instance_t instance, const ngap_uplink_ue_associated_nrppa_t *msg)
+{
+  LOG_I(NGAP, "Initiating ngap_gNB_uplink_ue_associated_nrppa_transport \n");
+  DevAssert(msg != NULL);
+  DevAssert(msg->routing_id.buf);
+  DevAssert(msg->routing_id.len);
+  DevAssert(msg->nrppa_pdu.buf);
+  DevAssert(msg->nrppa_pdu.len);
+  struct ngap_gNB_ue_context_s *ue_context_p = NULL;
+  ngap_gNB_instance_t *ngap_gNB_instance_p = NULL;
+
+  // Retrieve the NGAP gNB instance associated with Mod_id
+  ngap_gNB_instance_p = ngap_gNB_get_instance(instance);
+  DevAssert(ngap_gNB_instance_p != NULL);
+
+  if ((ue_context_p = ngap_get_ue_context(msg->gNB_ue_ngap_id)) == NULL) {
+    // The context for this gNB ue ngap id doesn't exist in the map of gNB UEs
+    LOG_E(NGAP, "Failed to find ue context associated with gNB ue ngap id: %08x\n", msg->gNB_ue_ngap_id);
+    return -1;
+  }
+  /* Prepare the NGAP message to encode */
+  NGAP_NGAP_PDU_t pdu = {0};
+
+  // IE: 9.3.1.1 Message Type UplinkUEAssociatedNRPPaTransport
+  pdu.present = NGAP_NGAP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu.choice.initiatingMessage, head);
+  head->procedureCode = NGAP_ProcedureCode_id_UplinkUEAssociatedNRPPaTransport;
+  head->criticality = NGAP_Criticality_ignore;
+  head->value.present = NGAP_InitiatingMessage__value_PR_UplinkUEAssociatedNRPPaTransport;
+  NGAP_UplinkUEAssociatedNRPPaTransport_t *out = &head->value.choice.UplinkUEAssociatedNRPPaTransport;
+
+  // IE: 9.3.3.1 AMF UE NGAP ID  (mandatory)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkUEAssociatedNRPPaTransportIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_UplinkUEAssociatedNRPPaTransportIEs__value_PR_AMF_UE_NGAP_ID;
+    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, msg->amf_ue_ngap_id);
+  }
+
+  // IE: 9.3.3.2 RAN UE NGAP ID  (mandatory)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkUEAssociatedNRPPaTransportIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_UplinkUEAssociatedNRPPaTransportIEs__value_PR_RAN_UE_NGAP_ID;
+    ie->value.choice.RAN_UE_NGAP_ID = msg->gNB_ue_ngap_id;
+  }
+
+  // IE: 9.3.3.13 Routing ID  (mandatory)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkUEAssociatedNRPPaTransportIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_RoutingID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_UplinkUEAssociatedNRPPaTransportIEs__value_PR_RoutingID;
+    ie->value.choice.RoutingID.buf = msg->routing_id.buf;
+    ie->value.choice.RoutingID.size = msg->routing_id.len;
+  }
+
+  // IE: 9.3.3.14 NRPPa-PDU   (mandatory)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkUEAssociatedNRPPaTransportIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_NRPPa_PDU;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_UplinkUEAssociatedNRPPaTransportIEs__value_PR_NRPPa_PDU;
+    ie->value.choice.NRPPa_PDU.buf = msg->nrppa_pdu.buf;
+    ie->value.choice.NRPPa_PDU.size = msg->nrppa_pdu.len;
+  }
+
+  // Encode NGAP message
+  uint8_t *buffer = NULL;
+  uint32_t length = 0;
+  if (ngap_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {
+    LOG_E(NGAP, "Failed to encode Uplink UE Associated NRPPa Transport\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
+    return -1;
+  }
+  LOG_I(NGAP, "Sending ngap_gNB_uplink_ue_associated_nrppa_transport over SCTP\n");
+
+  // UE associated signalling -> use the allocated stream
+  ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance,
+                                   ue_context_p->amf_ref->assoc_id,
+                                   buffer,
+                                   length,
+                                   ue_context_p->tx_stream);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
+  return 0;
+}
