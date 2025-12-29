@@ -47,6 +47,7 @@
 #include "ngap_gNB_nnsf.h"
 #include "ngap_gNB_management_procedures.h"
 #include "ngap_gNB_mobility_management.h"
+#include "ngap_gNB_pdu_session_management.h"
 #include "ngap_gNB_nas_procedures.h"
 #include "ngap_gNB_trace.h"
 #include "ngap_gNB_ue_context.h"

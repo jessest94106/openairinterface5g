@@ -271,3 +271,43 @@ bool decodePDUSessionResourceSetup(pdusession_transfer_t *out, const OCTET_STRIN
 
   return true;
 }
+
+/** @brief PDU Session Resource Setup Response Transfer encoding (9.3.4.2 3GPP TS 38.413) */
+byte_array_t encode_ngap_pdusession_setup_response_transfer(const pdusession_setup_t *pdusession)
+{
+  NGAP_PDUSessionResourceSetupResponseTransfer_t pdusessionTransfer = {0};
+  byte_array_t out = {0};
+
+  // DL QoS Flow per TNL Information (Mandatory)
+  NGAP_QosFlowPerTNLInformation_t *dLQosFlowPerTNLInformation = &pdusessionTransfer.dLQosFlowPerTNLInformation;
+
+  // UP Transport Layer Information (Mandatory)
+  dLQosFlowPerTNLInformation->uPTransportLayerInformation.present = NGAP_UPTransportLayerInformation_PR_gTPTunnel;
+  asn1cCalloc(dLQosFlowPerTNLInformation->uPTransportLayerInformation.choice.gTPTunnel, gtp);
+  GTP_TEID_TO_ASN1(pdusession->n3_outgoing.teid, &gtp->gTP_TEID);
+  tnl_to_bitstring(&gtp->transportLayerAddress, pdusession->n3_outgoing.addr);
+  char ip_str[INET_ADDRSTRLEN] = {0};
+  inet_ntop(AF_INET, gtp->transportLayerAddress.buf, ip_str, sizeof(ip_str));
+  NGAP_DEBUG("Encoded PDU Session Transfer (%d): TEID=0x%08x, Addr=%s\n",
+             pdusession->pdusession_id,
+             pdusession->n3_outgoing.teid,
+             ip_str);
+
+  // Associated QoS Flow List (Mandatory)
+  for (int j = 0; j < pdusession->nb_of_qos_flow; j++) {
+    asn1cSequenceAdd(dLQosFlowPerTNLInformation->associatedQosFlowList.list, NGAP_AssociatedQosFlowItem_t, qos_item);
+    // QoS Flow Identifier (Mandatory)
+    qos_item->qosFlowIdentifier = pdusession->associated_qos_flows[j].qfi;
+  }
+
+  // Encode
+  asn_encode_to_new_buffer_result_t res = asn_encode_to_new_buffer(NULL,
+                                                                   ATS_ALIGNED_CANONICAL_PER,
+                                                                   &asn_DEF_NGAP_PDUSessionResourceSetupResponseTransfer,
+                                                                   &pdusessionTransfer);
+  AssertFatal(res.buffer, "ASN1 message encoding failed (%s, %lu)!\n", res.result.failed_type->name, res.result.encoded);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_PDUSessionResourceSetupResponseTransfer, &pdusessionTransfer);
+  out.buf = res.buffer;
+  out.len = res.result.encoded;
+  return out;
+}

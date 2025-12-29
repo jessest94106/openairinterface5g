@@ -91,7 +91,7 @@ void encode_ngap_nr_cgi(NGAP_NR_CGI_t *out, const plmn_id_t *plmn, const uint32_
 pdusession_level_qos_parameter_t fill_qos(uint8_t qfi, const NGAP_QosFlowLevelQosParameters_t *params);
 void *decode_pdusession_transfer(const asn_TYPE_descriptor_t *td, const OCTET_STRING_t buf);
 bool decodePDUSessionResourceSetup(pdusession_transfer_t *out, const OCTET_STRING_t in);
+byte_array_t encode_ngap_pdusession_setup_response_transfer(const pdusession_setup_t *pdusession);
 
 /** @}*/
-
 #endif /* NGAP_COMMON_H_ */
