@@ -88,3 +88,9 @@ MESSAGE_DEF(NGAP_HANDOVER_CANCEL_ACK, MESSAGE_PRIORITY_MED, ngap_handover_cancel
 
 /* NGAP <-> RRC messages (can be initiated either by MME or gNB) */
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_REQ    , MESSAGE_PRIORITY_MED, ngap_ue_release_req_t            , ngap_ue_release_req)
+
+/* NGAP -> NRPPA messages*/
+MESSAGE_DEF(NGAP_DOWNLINKUEASSOCIATEDNRPPA,
+            MESSAGE_PRIORITY_MED,
+            ngap_downlink_ue_associated_nrppa_t,
+            ngap_downlink_ue_associated_nrppa)

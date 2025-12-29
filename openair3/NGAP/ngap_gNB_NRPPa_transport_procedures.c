@@ -194,3 +194,84 @@ int ngap_gNB_uplink_non_ue_associated_nrppa_transport(instance_t instance, const
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
   return 0;
 }
+
+// handle DOWNLINK UE ASSOCIATED NRPPA TRANSPORT (9.2.9.1 of TS 38.413 Version 16.0.0)
+int ngap_gNB_handle_downlink_ue_associated_nrppa_transport(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
+{
+  DevAssert(pdu != NULL);
+  ngap_gNB_amf_data_t *amf_desc_p = NULL;
+
+  if ((amf_desc_p = ngap_gNB_get_AMF(NULL, assoc_id, 0)) == NULL) {
+    NGAP_ERROR("[SCTP %d] Received NRPPa downlink message for non existing AMF context\n", assoc_id);
+    return -1;
+  }
+
+  ngap_gNB_instance_t *ngap_gNB_instance = NULL;
+  ngap_gNB_instance = amf_desc_p->ngap_gNB_instance;
+
+  // Prepare the NGAP message for NRPPA
+  NGAP_DownlinkUEAssociatedNRPPaTransport_t *container = NULL;
+  NGAP_DownlinkUEAssociatedNRPPaTransportIEs_t *ie = NULL;
+
+  // IE: 9.3.1.1 Message Type
+  container = &pdu->choice.initiatingMessage->value.choice.DownlinkUEAssociatedNRPPaTransport;
+
+  // IE: 9.3.3.1 AMF UE NGAP ID
+  uint64_t amf_ue_ngap_id;
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkUEAssociatedNRPPaTransportIEs_t,
+                             ie,
+                             container,
+                             NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID,
+                             true);
+  asn_INTEGER2ulong(&(ie->value.choice.AMF_UE_NGAP_ID), &amf_ue_ngap_id);
+
+  // IE: 9.3.3.2 RAN UE NGAP ID
+  NGAP_RAN_UE_NGAP_ID_t gnb_ue_ngap_id;
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkUEAssociatedNRPPaTransportIEs_t,
+                             ie,
+                             container,
+                             NGAP_ProtocolIE_ID_id_RAN_UE_NGAP_ID,
+                             true);
+  gnb_ue_ngap_id = ie->value.choice.RAN_UE_NGAP_ID;
+
+  ngap_gNB_ue_context_t *ue_desc_p = NULL;
+  if ((ue_desc_p = ngap_get_ue_context(gnb_ue_ngap_id)) == NULL) {
+    NGAP_ERROR("[SCTP %d] Received NRPPa downlink message for non existing UE context gNB_UE_NGAP_ID: 0x%lx\n",
+               assoc_id,
+               gnb_ue_ngap_id);
+    return -1;
+  }
+
+  // Is it the first outcome of the AMF for this UE ? If so store the amf UE ngap id
+  if (ue_desc_p->amf_ue_ngap_id == 0) {
+    ue_desc_p->amf_ue_ngap_id = amf_ue_ngap_id;
+  } else {
+    // We already have a amf ue ngap id check the received is the same
+    if (ue_desc_p->amf_ue_ngap_id != amf_ue_ngap_id) {
+      NGAP_ERROR("[SCTP %d] Mismatch in AMF UE NGAP ID (0x%lx != 0x%" PRIx64 "\n",
+                 assoc_id,
+                 amf_ue_ngap_id,
+                 (uint64_t)ue_desc_p->amf_ue_ngap_id);
+      return -1;
+    }
+  }
+
+  MessageDef *msg = itti_alloc_new_message(TASK_NGAP, 0, NGAP_DOWNLINKUEASSOCIATEDNRPPA);
+  ngap_downlink_ue_associated_nrppa_t *dl_ue_assoc_nrppa = &NGAP_DOWNLINKUEASSOCIATEDNRPPA(msg);
+
+  dl_ue_assoc_nrppa->amf_ue_ngap_id = amf_ue_ngap_id;
+  dl_ue_assoc_nrppa->gNB_ue_ngap_id = gnb_ue_ngap_id;
+
+  // IE: 9.3.3.13 Routing ID
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkUEAssociatedNRPPaTransportIEs_t, ie, container, NGAP_ProtocolIE_ID_id_RoutingID, true);
+  dl_ue_assoc_nrppa->routing_id = create_byte_array(ie->value.choice.RoutingID.size, ie->value.choice.RoutingID.buf);
+
+  // IE: 9.3.3.14 NRPPa-PDU
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkUEAssociatedNRPPaTransportIEs_t, ie, container, NGAP_ProtocolIE_ID_id_NRPPa_PDU, true);
+  dl_ue_assoc_nrppa->nrppa_pdu = create_byte_array(ie->value.choice.NRPPa_PDU.size, ie->value.choice.NRPPa_PDU.buf);
+
+  // Forward the NRPPA PDU to NRPPA
+  itti_send_msg_to_task(TASK_NRPPA, ngap_gNB_instance->instance, msg);
+
+  return 0;
+}
