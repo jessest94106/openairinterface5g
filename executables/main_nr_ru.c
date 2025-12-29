@@ -200,6 +200,7 @@ int main(int argc, char **argv)
   RU_t *ru = RC.ru[0];
   ORU_t oru = {0};
   oru.ru = ru;
+  oru.num_sync_messages_needed = 2;
   int ret = get_oru_options(&oru);
   AssertFatal(ret == 0, "Cannot configure oru, check your config file/cmdline");
   ru->numerology = oru.numerology;
@@ -225,6 +226,7 @@ int main(int argc, char **argv)
 
   threadCreate(&oru.north_read_thread, oru_north_read_thread, (void *)&oru, "north_read_thread", -1, OAI_PRIORITY_RT_MAX);
   threadCreate(&oru.south_read_thread, oru_south_read_thread, (void *)&oru, "south_read_thread", -1, OAI_PRIORITY_RT_MAX);
+  threadCreate(&oru.oru_sync_thread, oru_sync_thread, (void *)&oru, "oru_sync_thread", -1, OAI_PRIORITY_RT_MAX);
 
   while (oai_exit == 0)
     sleep(1);
