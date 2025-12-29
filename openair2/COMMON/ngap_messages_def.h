@@ -94,3 +94,7 @@ MESSAGE_DEF(NGAP_DOWNLINKUEASSOCIATEDNRPPA,
             MESSAGE_PRIORITY_MED,
             ngap_downlink_ue_associated_nrppa_t,
             ngap_downlink_ue_associated_nrppa)
+MESSAGE_DEF(NGAP_DOWNLINKNONUEASSOCIATEDNRPPA,
+            MESSAGE_PRIORITY_MED,
+            ngap_downlink_non_ue_associated_nrppa_t,
+            ngap_downlink_non_ue_associated_nrppa)

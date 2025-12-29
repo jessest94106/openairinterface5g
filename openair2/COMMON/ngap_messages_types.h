@@ -80,6 +80,7 @@
 #define NGAP_DL_RAN_STATUS_TRANSFER(mSGpTR) (mSGpTR)->ittiMsg.ngap_dl_ran_status_transfer
 
 #define NGAP_DOWNLINKUEASSOCIATEDNRPPA(mSGpTR) (mSGpTR)->ittiMsg.ngap_downlink_ue_associated_nrppa
+#define NGAP_DOWNLINKNONUEASSOCIATEDNRPPA(mSGpTR) (mSGpTR)->ittiMsg.ngap_downlink_non_ue_associated_nrppa
 //-------------------------------------------------------------------------------------------//
 
 /* Length of the transport layer address string
@@ -1039,5 +1040,13 @@ typedef struct {
   // NRPPa pdu (Mandatory)
   byte_array_t nrppa_pdu;
 } ngap_downlink_ue_associated_nrppa_t;
+
+// Downlink NON UE Associated NRPPA Transport message (9.2.9.3 3GPP 38.413 v16.0.0)
+typedef struct {
+  // Routing ID (Mandatory)
+  byte_array_t routing_id;
+  // NRPPa pdu (Mandatory)
+  byte_array_t nrppa_pdu;
+} ngap_downlink_non_ue_associated_nrppa_t;
 
 #endif /* NGAP_MESSAGES_TYPES_H_ */
