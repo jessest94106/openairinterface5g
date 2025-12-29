@@ -441,6 +441,7 @@ add_library(ngap
   ${NGAP_DIR}/ngap_gNB_overload.c
   ${NGAP_DIR}/ngap_gNB_trace.c
   ${NGAP_DIR}/ngap_gNB_ue_context.c
+  ${NGAP_DIR}/ngap_gNB_NRPPa_transport_procedures.c
   )
 target_link_libraries(ngap PUBLIC asn1_ngap)
 target_link_libraries(ngap PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
