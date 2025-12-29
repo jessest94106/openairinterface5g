@@ -58,6 +58,7 @@
 #include "ngap_gNB_mobility_management.h"
 #include "ngap_gNB_ue_context.h"
 #include "ngap_gNB_pdu_session_management.h"
+#include "ngap_gNB_NRPPa_transport_procedures.h"
 #include "oai_asn1.h"
 #include "openair3/SECU/kdf.h"
 #include "queue.h"
@@ -624,6 +625,14 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
 
       case NGAP_UL_RAN_STATUS_TRANSFER:
         ngap_gNB_handle_ul_ran_status_transfer(instance, &NGAP_UL_RAN_STATUS_TRANSFER(received_msg));
+        break;
+
+      case NGAP_UPLINKUEASSOCIATEDNRPPA:
+        ngap_gNB_uplink_ue_associated_nrppa_transport(instance, &NGAP_UPLINKUEASSOCIATEDNRPPA(received_msg));
+        break;
+
+      case NGAP_UPLINKNONUEASSOCIATEDNRPPA:
+        ngap_gNB_uplink_non_ue_associated_nrppa_transport(instance, &NGAP_UPLINKNONUEASSOCIATEDNRPPA(received_msg));
         break;
 
       default:
