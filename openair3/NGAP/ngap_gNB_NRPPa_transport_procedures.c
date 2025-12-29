@@ -275,3 +275,40 @@ int ngap_gNB_handle_downlink_ue_associated_nrppa_transport(sctp_assoc_t assoc_id
 
   return 0;
 }
+
+// handle DOWNLINK NON UE ASSOCIATED NRPPA TRANSPORT (9.2.9.3 of TS 38.413 Version 16.0.0)
+int ngap_gNB_handle_downlink_non_ue_associated_nrppa_transport(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
+{
+  DevAssert(pdu != NULL);
+  ngap_gNB_amf_data_t *amf_desc_p = NULL;
+
+  if ((amf_desc_p = ngap_gNB_get_AMF(NULL, assoc_id, 0)) == NULL) {
+    NGAP_ERROR("[SCTP %d] Received NRPPa downlink message for non existing AMF context\n", assoc_id);
+    return -1;
+  }
+
+  ngap_gNB_instance_t *ngap_gNB_instance = NULL;
+  ngap_gNB_instance = amf_desc_p->ngap_gNB_instance;
+
+  MessageDef *msg = itti_alloc_new_message(TASK_NGAP, 0, NGAP_DOWNLINKNONUEASSOCIATEDNRPPA);
+  ngap_downlink_non_ue_associated_nrppa_t *dl_non_ue_assoc_nrppa = &NGAP_DOWNLINKNONUEASSOCIATEDNRPPA(msg);
+
+  // Prepare the NGAP message to forward to NRPPA
+  NGAP_DownlinkNonUEAssociatedNRPPaTransport_t *container;
+  NGAP_DownlinkNonUEAssociatedNRPPaTransportIEs_t *ie;
+
+  // IE: 9.3.1.1 Message Type
+  container = &pdu->choice.initiatingMessage->value.choice.DownlinkNonUEAssociatedNRPPaTransport;
+
+  // IE: 9.3.3.13 Routing ID
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkNonUEAssociatedNRPPaTransportIEs_t, ie, container, NGAP_ProtocolIE_ID_id_RoutingID, true);
+  dl_non_ue_assoc_nrppa->routing_id = create_byte_array(ie->value.choice.RoutingID.size, ie->value.choice.RoutingID.buf);
+
+  // IE: 9.3.3.14 NRPPa-PDU
+  NGAP_FIND_PROTOCOLIE_BY_ID(NGAP_DownlinkNonUEAssociatedNRPPaTransportIEs_t, ie, container, NGAP_ProtocolIE_ID_id_NRPPa_PDU, true);
+  dl_non_ue_assoc_nrppa->nrppa_pdu = create_byte_array(ie->value.choice.NRPPa_PDU.size, ie->value.choice.NRPPa_PDU.buf);
+
+  itti_send_msg_to_task(TASK_NRPPA, ngap_gNB_instance->instance, msg);
+
+  return 0;
+}
