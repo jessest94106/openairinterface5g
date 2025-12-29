@@ -294,6 +294,7 @@ typedef struct {
   TASK_DEF(TASK_RAL_ENB, 200)         \
   TASK_DEF(TASK_S1AP, 200)            \
   TASK_DEF(TASK_NGAP, 200)            \
+  TASK_DEF(TASK_NRPPA, 200)           \
   TASK_DEF(TASK_X2AP, 200)            \
   TASK_DEF(TASK_M2AP_ENB, 200)        \
   TASK_DEF(TASK_M2AP_MCE, 200)        \
