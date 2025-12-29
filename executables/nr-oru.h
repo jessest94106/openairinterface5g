@@ -52,11 +52,15 @@ typedef struct {
 
   pthread_t north_read_thread;
   pthread_t south_read_thread;
+  pthread_t oru_sync_thread;
+  int num_sync_messages_needed;
+  notifiedFIFO_t sync_fifo;
 } ORU_t;
 
 int get_oru_options(ORU_t *oru);
 void oru_init_frame_parms(ORU_t *oru);
 void *oru_north_read_thread(void *arg);
 void *oru_south_read_thread(void *arg);
+void *oru_sync_thread(void *arg);
 
 #endif
