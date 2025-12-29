@@ -79,6 +79,8 @@
  **/
 typedef int (*ngap_message_decoded_callback)(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu);
 
+void tnl_to_bitstring(BIT_STRING_t *out, const transport_layer_addr_t in);
+void bitstring_to_tnl(transport_layer_addr_t *out, const BIT_STRING_t in);
 void encode_ngap_cause(NGAP_Cause_t *out, const ngap_cause_t *in);
 nr_guami_t decode_ngap_guami(const NGAP_GUAMI_t *in);
 ngap_cause_t decode_ngap_cause(const NGAP_Cause_t *in);

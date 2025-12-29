@@ -28,8 +28,28 @@
  */
 
 #include <stdint.h>
+#include <arpa/inet.h>
 #include "conversions.h"
 #include "ngap_common.h"
+#include "ngap_msg_includes.h"
+
+void tnl_to_bitstring(BIT_STRING_t *out, const transport_layer_addr_t in)
+{
+  if (in.length) {
+    out->buf = malloc_or_fail(in.length);
+    memcpy(out->buf, in.buffer, in.length);
+    out->size = in.length;
+    out->bits_unused = 0;
+  }
+}
+
+void bitstring_to_tnl(transport_layer_addr_t *out, const BIT_STRING_t in)
+{
+  if (in.size) {
+    memcpy(out->buffer, in.buf, in.size);
+    out->length = in.size;
+  }
+}
 
 void encode_ngap_cause(NGAP_Cause_t *out, const ngap_cause_t *in)
 {
