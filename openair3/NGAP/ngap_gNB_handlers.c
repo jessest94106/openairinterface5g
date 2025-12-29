@@ -1529,6 +1529,8 @@ static int ngap_gNB_handle_dl_ran_status_transfer(sctp_assoc_t assoc_id, uint32_
   return 0;
 }
 
+typedef int (*ngap_message_decoded_callback)(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu);
+
 /* Handlers matrix. Only gNB related procedure present here */
 const ngap_message_decoded_callback ngap_messages_callback[][3] = {
     {0, 0, 0}, /* AMFConfigurationUpdate */

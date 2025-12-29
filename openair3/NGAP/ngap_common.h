@@ -36,48 +36,16 @@
 #ifndef NGAP_COMMON_H_
 #define NGAP_COMMON_H_
 
-#include "common/utils/LOG/log.h"
+#include <stdbool.h>
 #include "oai_asn1.h"
+#include "ngap_utils.h"
 #include "ngap_msg_includes.h"
-#include "openair2/COMMON/ngap_messages_types.h"
+#include "ngap_messages_types.h"
 
 /* Checking version of ASN1C compiler */
 #if (ASN1C_ENVIRONMENT_VERSION < ASN1C_MINIMUM_VERSION)
 # error "You are compiling ngap with the wrong version of ASN1C"
 #endif
-
-# include "common/utils/LOG/log.h"
-# include "ngap_gNB_default_values.h"
-# define NGAP_ERROR(x, args...) LOG_E(NGAP, x, ##args)
-# define NGAP_WARN(x, args...)  LOG_W(NGAP, x, ##args)
-# define NGAP_TRAF(x, args...)  LOG_I(NGAP, x, ##args)
-# define NGAP_INFO(x, args...) LOG_I(NGAP, x, ##args)
-# define NGAP_DEBUG(x, args...) LOG_D(NGAP, x, ##args)
-
-#define NGAP_FIND_PROTOCOLIE_BY_ID(IE_TYPE, ie, container, IE_ID, mandatory)                                                            \
-  do {                                                                                                                                  \
-    IE_TYPE **ptr;                                                                                                                      \
-    ie = NULL;                                                                                                                          \
-    for (ptr = container->protocolIEs.list.array; ptr < &container->protocolIEs.list.array[container->protocolIEs.list.count]; ptr++) { \
-      if ((*ptr)->id == IE_ID) {                                                                                                        \
-        ie = *ptr;                                                                                                                      \
-        break;                                                                                                                          \
-      }                                                                                                                                 \
-    }                                                                                                                                   \
-    if (ie == NULL) {                                                                                                                   \
-      if (mandatory) {                                                                                                                  \
-        AssertFatal(NGAP, "NGAP_FIND_PROTOCOLIE_BY_ID ie is NULL (searching for ie: %ld)\n", IE_ID);                                    \
-      } else {                                                                                                                          \
-        NGAP_DEBUG("NGAP_FIND_PROTOCOLIE_BY_ID ie is NULL (searching for ie: %ld)\n", IE_ID);                                            \
-      }                                                                                                                                 \
-    }                                                                                                                                   \
-  } while (0);                                                                                                                          \
-  if (mandatory && !ie)                                                                                                                 \
-  return -1
-
-/** \brief Function callback prototype.
- **/
-typedef int (*ngap_message_decoded_callback)(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu);
 
 void tnl_to_bitstring(BIT_STRING_t *out, const transport_layer_addr_t in);
 void bitstring_to_tnl(transport_layer_addr_t *out, const BIT_STRING_t in);
