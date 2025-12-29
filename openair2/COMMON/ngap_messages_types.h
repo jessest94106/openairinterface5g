@@ -351,7 +351,11 @@ typedef struct {
 } ngap_plmn_t;
 
 //-------------------------------------------------------------------------------------------//
-// gNB application layer -> NGAP messages
+
+/** @brief NG SETUP REQUEST message (9.2.6.1 of 3GPP TS 38.413)
+ * This message is sent by the NG-RAN node to transfer application layer information
+ * for an NG-C interface instance.
+ * Direction: NG-RAN node -> AMF */
 typedef struct ngap_register_gnb_req_s {
   /* Unique gNB_id to identify the gNB within EPC.
    * For macro gNB ids this field should be 20 bits long.
