@@ -50,6 +50,7 @@
 #include "ngap_gNB_pdu_session_management.h"
 #include "ngap_gNB_nas_procedures.h"
 #include "ngap_gNB_paging.h"
+#include "ngap_gNB_NRPPa_transport_procedures.h"
 #include "ngap_gNB_trace.h"
 #include "ngap_gNB_ue_context.h"
 #include "ngap_messages_types.h"
@@ -1499,10 +1500,10 @@ const ngap_message_decoded_callback ngap_messages_callback[][3] = {
     {0, 0, 0}, /* CellTrafficTrace */
     {ngap_gNB_handle_deactivate_trace, 0, 0}, /* DeactivateTrace */
     {ngap_gNB_handle_nas_downlink, 0, 0}, /* DownlinkNASTransport */
-    {0, 0, 0}, /* DownlinkNonUEAssociatedNRPPaTransport */
+    {ngap_gNB_handle_downlink_non_ue_associated_nrppa_transport, 0, 0}, /* DownlinkNonUEAssociatedNRPPaTransport */
     {0, 0, 0}, /* DownlinkRANConfigurationTransfer */
     {ngap_gNB_handle_dl_ran_status_transfer, 0, 0}, /* DownlinkRANStatusTransfer */
-    {0, 0, 0}, /* DownlinkUEAssociatedNRPPaTransport */
+    {ngap_gNB_handle_downlink_ue_associated_nrppa_transport, 0, 0}, /* DownlinkUEAssociatedNRPPaTransport */
     {ngap_gNB_handle_error_indication, 0, 0}, /* ErrorIndication */
     {0, ngap_gNB_handle_handover_cancel_ack, 0}, /* HandoverCancel */
     {0, 0, 0}, /* HandoverNotification */
