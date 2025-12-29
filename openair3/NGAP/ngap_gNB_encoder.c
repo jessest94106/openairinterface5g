@@ -56,7 +56,9 @@ static inline int ngap_gNB_encode_initiating(NGAP_NGAP_PDU_t *pdu, uint8_t **buf
                                       NGAP_ProcedureCode_id_UplinkRANStatusTransfer,
                                       NGAP_ProcedureCode_id_HandoverPreparation,
                                       NGAP_ProcedureCode_id_HandoverCancel,
-                                      NGAP_ProcedureCode_id_HandoverNotification};
+                                      NGAP_ProcedureCode_id_HandoverNotification,
+                                      NGAP_ProcedureCode_id_UplinkUEAssociatedNRPPaTransport,
+                                      NGAP_ProcedureCode_id_UplinkNonUEAssociatedNRPPaTransport};
   int i;
   for (i = 0; i < sizeofArray(tmp); i++)
     if (pdu->choice.initiatingMessage->procedureCode == tmp[i])

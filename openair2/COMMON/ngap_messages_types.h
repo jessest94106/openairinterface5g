@@ -81,6 +81,9 @@
 
 #define NGAP_DOWNLINKUEASSOCIATEDNRPPA(mSGpTR) (mSGpTR)->ittiMsg.ngap_downlink_ue_associated_nrppa
 #define NGAP_DOWNLINKNONUEASSOCIATEDNRPPA(mSGpTR) (mSGpTR)->ittiMsg.ngap_downlink_non_ue_associated_nrppa
+
+#define NGAP_UPLINKUEASSOCIATEDNRPPA(mSGpTR) (mSGpTR)->ittiMsg.ngap_uplink_ue_associated_nrppa
+#define NGAP_UPLINKNONUEASSOCIATEDNRPPA(mSGpTR) (mSGpTR)->ittiMsg.ngap_uplink_non_ue_associated_nrppa
 //-------------------------------------------------------------------------------------------//
 
 /* Length of the transport layer address string
