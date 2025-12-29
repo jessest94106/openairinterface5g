@@ -127,3 +127,70 @@ int ngap_gNB_uplink_ue_associated_nrppa_transport(instance_t instance, const nga
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
   return 0;
 }
+
+// UPLINK NON UE ASSOCIATED NRPPA TRANSPORT (9.2.9.4 of TS 38.413 Version 16.0.0)
+int ngap_gNB_uplink_non_ue_associated_nrppa_transport(instance_t instance, const ngap_uplink_non_ue_associated_nrppa_t *msg)
+{
+  LOG_I(NGAP, "ngap_gNB_uplink_non_ue_associated_nrppa_transport\n");
+  DevAssert(msg != NULL);
+  DevAssert(msg->routing_id.buf);
+  DevAssert(msg->routing_id.len);
+  DevAssert(msg->nrppa_pdu.buf);
+  DevAssert(msg->nrppa_pdu.len);
+
+  // Retrieve the NGAP gNB instance associated with Mod_id
+  ngap_gNB_instance_t *ngap_gNB_instance_p = NULL;
+  ngap_gNB_instance_p = ngap_gNB_get_instance(instance);
+  DevAssert(ngap_gNB_instance_p != NULL);
+
+  // Retrieve the NGAP gNB amf data
+  ngap_gNB_amf_data_t *amf_desc_p = NULL;
+  amf_desc_p = ngap_gNB_get_AMF_from_instance(ngap_gNB_instance_p);
+  DevAssert(amf_desc_p != NULL);
+
+  // Prepare the NGAP message to encode
+  NGAP_NGAP_PDU_t pdu = {0};
+
+  // IE: 9.3.1.1 Message Type UplinkNonUEAssociatedNRPPaTransport
+  pdu.present = NGAP_NGAP_PDU_PR_initiatingMessage;
+  asn1cCalloc(pdu.choice.initiatingMessage, head);
+  head->procedureCode = NGAP_ProcedureCode_id_UplinkNonUEAssociatedNRPPaTransport;
+  head->criticality = NGAP_Criticality_ignore;
+  head->value.present = NGAP_InitiatingMessage__value_PR_UplinkNonUEAssociatedNRPPaTransport;
+  NGAP_UplinkNonUEAssociatedNRPPaTransport_t *out = &head->value.choice.UplinkNonUEAssociatedNRPPaTransport;
+
+  // IE: 9.3.3.13 Routing ID (mandatory)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkNonUEAssociatedNRPPaTransportIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_RoutingID;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_UplinkNonUEAssociatedNRPPaTransportIEs__value_PR_RoutingID;
+    ie->value.choice.RoutingID.buf = msg->routing_id.buf;
+    ie->value.choice.RoutingID.size = msg->routing_id.len;
+  }
+
+  // IE: 9.3.3.14 NRPPa-PDU (mandatory)
+  {
+    asn1cSequenceAdd(out->protocolIEs.list, NGAP_UplinkNonUEAssociatedNRPPaTransportIEs_t, ie);
+    ie->id = NGAP_ProtocolIE_ID_id_NRPPa_PDU;
+    ie->criticality = NGAP_Criticality_reject;
+    ie->value.present = NGAP_UplinkNonUEAssociatedNRPPaTransportIEs__value_PR_NRPPa_PDU;
+    ie->value.choice.NRPPa_PDU.buf = msg->nrppa_pdu.buf;
+    ie->value.choice.NRPPa_PDU.size = msg->nrppa_pdu.len;
+  }
+
+  // Encode NGAP message
+  uint8_t *buffer = NULL;
+  uint32_t length = 0;
+  if (ngap_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {
+    LOG_E(NGAP, "Failed to encode Uplink Non UE Associated NRPPa Transport\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
+    return -1;
+  }
+
+  // Non UE-Associated signalling -> stream = 0
+  LOG_I(NGAP, "Sending ngap_gNB_uplink_non_ue_associated_nrppa_transport over SCTP (assoc_id %d)\n", amf_desc_p->assoc_id);
+  ngap_gNB_itti_send_sctp_data_req(ngap_gNB_instance_p->instance, amf_desc_p->assoc_id, buffer, length, 0);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_NGAP_PDU, &pdu);
+  return 0;
+}

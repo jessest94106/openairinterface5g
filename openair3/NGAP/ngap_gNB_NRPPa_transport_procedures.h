@@ -25,4 +25,7 @@
 // UPLINK UE ASSOCIATED NRPPA TRANSPORT (9.2.9.2 of TS 38.413 Version 16.0.0)
 int ngap_gNB_uplink_ue_associated_nrppa_transport(instance_t instance, const ngap_uplink_ue_associated_nrppa_t *msg);
 
+// UPLINK NON UE ASSOCIATED NRPPA TRANSPORT (9.2.9.4 of TS 38.413 Version 16.0.0)
+int ngap_gNB_uplink_non_ue_associated_nrppa_transport(instance_t instance, const ngap_uplink_non_ue_associated_nrppa_t *msg);
+
 #endif /* NGAP_GNB_NRPPA_PROCEDURES_H_ */
