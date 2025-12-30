@@ -18,12 +18,16 @@
  * For more information about the OpenAirInterface (OAI) Software Alliance:
  *      contact@openairinterface.org
  */
+#include "assertions.h"
 #include "common/config/config_userapi.h"
 #include "nr-oru.h"
 #include "openair1/PHY/defs_nr_common.h"
+#include "openair1/PHY/MODULATION/nr_modulation.h"
+#include "openair1/SCHED_NR/sched_nr.h"
 
 #define CONFIG_SECTION_ORU "ORUs.[0]"
 
+// clang-format off
 #define CONFIG_STRING_ORU_TX_BW_LIST               "tx_bw"
 #define CONFIG_STRING_ORU_RX_BW_LIST               "rx_bw"
 #define CONFIG_STRING_ORU_CARRIER_TX_LIST          "carrier_tx"
@@ -37,6 +41,7 @@
 #define CONFIG_STRING_ORU_NUM_UL_SLOTS             "num_ul_slots"
 #define CONFIG_STRING_ORU_NUM_DL_SYMBOLS           "num_dl_symbols"
 #define CONFIG_STRING_ORU_NUM_UL_SYMBOLS           "num_ul_symbols"
+#define CONFIG_STRING_ORU_TP_CORES                  "tp_cores"
 
 #define HLP_ORU_TX_BW "set the TX bandwidth list per component carrier"
 #define HLP_ORU_RX_BW "set the RX bandwidth list per component carrier"
@@ -51,6 +56,7 @@
 #define HLP_ORU_NUM_UL_SLOTS   "set the number of UL Slots in TDD"
 #define HLP_ORU_NUM_DL_SYMBOLS "set the number of DL symbols in the mixed slot"
 #define HLP_ORU_NUM_UL_SYMBOLS "set the number of UL symbols in the mixed slot"
+#define HLP_ORU_TP_CORES       "CPU cores used for threadpool"
 
 #define CMDLINE_PARAMS_DESC_ORU \
 { \
@@ -67,7 +73,9 @@
   {CONFIG_STRING_ORU_NUM_UL_SLOTS,              HLP_ORU_NUM_UL_SLOTS,               0,    .uptr=NULL,       .defintval=1,                 TYPE_UINT,         0}, \
   {CONFIG_STRING_ORU_NUM_DL_SYMBOLS,            HLP_ORU_NUM_DL_SYMBOLS,             0,    .uptr=NULL,       .defintval=7,                 TYPE_UINT,         0}, \
   {CONFIG_STRING_ORU_NUM_UL_SYMBOLS,            HLP_ORU_NUM_UL_SYMBOLS,             0,    .uptr=NULL,       .defintval=3,                 TYPE_UINT,         0}, \
+  {CONFIG_STRING_ORU_TP_CORES,                  HLP_ORU_TP_CORES,                   0,    .iptr=NULL,       .defintarrayval=DEFTPCORES,   TYPE_INTARRAY,     4}, \
 }
+// clang-format on
 
 extern void set_scs_parameters(NR_DL_FRAME_PARMS *fp, int mu, int N_RB_DL, int ssb_case);
 typedef struct {
@@ -83,10 +91,31 @@ typedef struct {
   int64_t sync_offset;
 } sync_params_t;
 
+typedef struct {
+  RU_t *ru;
+  NR_DL_FRAME_PARMS *fp;
+  int slot;
+  int start_symbol;
+  int num_symbols;
+  int aatx;
+  c16_t *txdataF;
+  task_ans_t *task_ans;
+} dl_symbol_process_t;
+
+extern void tx_rf_symbols(RU_t *ru, int frame, int slot, uint64_t timestamp, int start_symbol, int num_symbols);
+static void oru_downlink_processing(ORU_t *oru,
+                                    c16_t *txDataF_ptr[oru->ru->nb_tx],
+                                    int frame,
+                                    int slot,
+                                    int start_symbol,
+                                    int num_symbols,
+                                    openair0_timestamp_t timestamp_tx);
+
 int get_oru_options(ORU_t *oru)
 {
   int DEFBW[] = {273};
   int DEFCARRIER[] = {3430560};
+  int DEFTPCORES[] = {-1, -1, -1, -1};
   paramdef_t param[] = CMDLINE_PARAMS_DESC_ORU;
   int nump = sizeofArray(param);
 
@@ -112,9 +141,24 @@ int get_oru_options(ORU_t *oru)
   oru->num_DL_symbols = *gpd(param, nump, CONFIG_STRING_ORU_NUM_DL_SYMBOLS)->iptr;
   oru->num_UL_symbols = *gpd(param, nump, CONFIG_STRING_ORU_NUM_UL_SYMBOLS)->iptr;
 
+  int* tp_cores = gpd(param, nump, CONFIG_STRING_ORU_TP_CORES)->iptr;
+  int num_tp_cores = gpd(param, nump, CONFIG_STRING_ORU_TP_CORES)->numelt;
+  AssertFatal(num_tp_cores > 0, "No threadpool cores specified\n");
+
+  char tpool_config[(3 + 1) * num_tp_cores + 1];
+  char* tpool_config_p = tpool_config;
+  for (int i = 0; i < num_tp_cores; i++) {
+    int ret = snprintf(tpool_config_p, 4, "%d,", tp_cores[i]);
+    AssertFatal(ret > 0, "snprintf failed\n");
+    tpool_config_p += ret;
+  }
+  *tpool_config_p = '\0';
+
+  LOG_A(PHY, "ORU threadpool cores: %s\n", tpool_config);
+  initTpool(tpool_config, &oru->tpool, false);
+
   return 0;
 }
-
 
 void oru_init_frame_parms(ORU_t *oru)
 {
@@ -210,6 +254,22 @@ void initialize_sync_params(NR_DL_FRAME_PARMS *fp, sync_params_t *sync_params, i
       (uint64_t)(initial_sync->frame) * fp->samples_per_subframe * 10 + get_samples_slot_timestamp(fp, initial_sync->slot);
 }
 
+static openair0_timestamp_t get_timestamp(ORU_t *oru, sense_of_time_t *sense_of_time, sync_params_t *sync_params)
+{
+  if (sync_params->last_frame > sense_of_time->frame) {
+    sync_params->frame_unwrap++;
+  }
+  sync_params->last_frame = sense_of_time->frame;
+  NR_DL_FRAME_PARMS *fp = oru->ru->nr_frame_parms;
+  int num_frames = sense_of_time->frame + sync_params->frame_unwrap * 1024;
+
+  uint64_t timestamp = (uint64_t)(num_frames)*fp->samples_per_subframe * 10 + get_samples_slot_timestamp(fp, sense_of_time->slot)
+                       + get_samples_symbol_timestamp(fp, sense_of_time->slot, sense_of_time->symbol);
+
+  timestamp += sync_params->sync_offset;
+  return timestamp;
+}
+
 void *oru_north_read_thread(void *arg)
 {
   ORU_t *oru = (ORU_t *)arg;
@@ -224,23 +284,25 @@ void *oru_north_read_thread(void *arg)
   for (int aatx = 0; aatx < ru->nb_tx; aatx++) {
     txDataF_ptr[aatx] = txDataF[aatx];
   }
+  ru->common.txdataF_BF = (int32_t **)txDataF_ptr;
 
-  notifiedFIFO_elt_t * elt = pullNotifiedFIFO(&oru->sync_fifo);
+  notifiedFIFO_elt_t *elt = pullNotifiedFIFO(&oru->sync_fifo);
   initial_sync_t *initial_sync = NotifiedFifoData(elt);
   sync_params_t sync_params;
   initialize_sync_params(fp, &sync_params, initial_sync);
   LOG_A(PHY,
-    "ORU North read thread started at frame %d, slot %d, symbol %d\n",
-    initial_sync->frame,
-    initial_sync->slot,
-    initial_sync->symbol);
+        "ORU North read thread started at frame %d, slot %d, symbol %d\n",
+        initial_sync->frame,
+        initial_sync->slot,
+        initial_sync->symbol);
   delNotifiedFIFO_elt(elt);
 
   while (!oai_exit) {
     int num_symbols = 0;
     sense_of_time_t sense_of_time;
     ru->ifdevice.xran_api.north_in_func((uint32_t **)txDataF_ptr, ru->nb_tx, &sense_of_time, &num_symbols);
-    if (sense_of_time.frame % 256 == 0 && sense_of_time.slot == 0) {
+    openair0_timestamp_t timestamp_tx = get_timestamp(oru, &sense_of_time, &sync_params);
+    if ((sense_of_time.frame % 256 == 0) && sense_of_time.slot == 0) {
       LOG_I(PHY,
             "[RU_thread] read data: frame %d, slot %d, start_symbol %d, num_symbols %d\n",
             sense_of_time.frame,
@@ -248,6 +310,16 @@ void *oru_north_read_thread(void *arg)
             sense_of_time.symbol,
             num_symbols);
     }
+    nfapi_nr_config_request_scf_t *cfg = &ru->config;
+    int slot_type = nr_slot_select(cfg, sense_of_time.frame, sense_of_time.slot % fp->slots_per_frame);
+    if (slot_type != NR_UPLINK_SLOT)
+      oru_downlink_processing(oru,
+                              txDataF_ptr,
+                              sense_of_time.frame,
+                              sense_of_time.slot,
+                              sense_of_time.symbol,
+                              num_symbols,
+                              timestamp_tx);
   }
   return NULL;
 }
@@ -322,14 +394,11 @@ void rx_initial_sync(ORU_t *oru, int *slot, int *frame)
 void *oru_south_read_thread(void *arg)
 {
   ORU_t *oru = arg;
-  
+
   int slot;
   int frame;
   rx_initial_sync(oru, &slot, &frame);
-  LOG_A(PHY,
-        "ORU South read thread started at frame %d, slot %d\n",
-        frame,
-        slot);
+  LOG_A(PHY, "ORU South read thread started at frame %d, slot %d\n", frame, slot);
 
   // Perform RX processing
   return NULL;
@@ -382,4 +451,63 @@ void *oru_sync_thread(void *arg)
   }
 
   return NULL;
+}
+
+static void dl_symbol_process(void *arg)
+{
+  dl_symbol_process_t *args = (dl_symbol_process_t *)arg;
+  apply_nr_rotation_TX(args->fp,
+                       args->txdataF,
+                       false,
+                       args->fp->symbol_rotation[0],
+                       args->slot,
+                       args->fp->N_RB_DL,
+                       args->start_symbol,
+                       args->num_symbols);
+  nr_feptx0(args->ru, args->slot, args->start_symbol, args->num_symbols, args->aatx);
+  completed_task_ans(args->task_ans);
+}
+
+static void oru_downlink_processing(ORU_t *oru,
+                                    c16_t *txDataF_ptr[oru->ru->nb_tx],
+                                    int frame,
+                                    int slot,
+                                    int start_symbol,
+                                    int num_symbols,
+                                    openair0_timestamp_t timestamp_tx)
+{
+  RU_t *ru = oru->ru;
+  start_meas(&ru->tx_fhaul);
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+  int num_paralell_workers_per_antenna = num_symbols > 4 ? 2 : 1; // Ensure at least quarter slot parallelization
+  task_t tasks[ru->nb_tx][num_paralell_workers_per_antenna];
+  dl_symbol_process_t dl_process_args[ru->nb_tx][num_paralell_workers_per_antenna];
+  task_ans_t task_ans;
+  init_task_ans(&task_ans, num_paralell_workers_per_antenna * ru->nb_tx);
+  for (int aatx = 0; aatx < ru->nb_tx; aatx++) {
+    for (int i = 0; i < num_paralell_workers_per_antenna; i++) {
+      tasks[aatx][i].func = dl_symbol_process;
+      tasks[aatx][i].args = (void *)&dl_process_args[aatx][i];
+      dl_process_args[aatx][i].ru = ru;
+      dl_process_args[aatx][i].fp = fp;
+      dl_process_args[aatx][i].slot = slot;
+      dl_process_args[aatx][i].start_symbol = start_symbol + num_symbols / num_paralell_workers_per_antenna * i;
+      dl_process_args[aatx][i].num_symbols =
+          min(num_symbols / num_paralell_workers_per_antenna, num_symbols - (num_symbols / num_paralell_workers_per_antenna) * i);
+      dl_process_args[aatx][i].aatx = aatx;
+      dl_process_args[aatx][i].txdataF = txDataF_ptr[aatx];
+      dl_process_args[aatx][i].task_ans = &task_ans;
+      pushTpool(&oru->tpool, tasks[aatx][i]);
+    }
+  }
+  LOG_D(PHY,
+        "[RU_thread] transmit data: frame %d, slot %d, start_symbol %d, num_symbols %d, timestamp %ld\n",
+        frame,
+        slot,
+        start_symbol,
+        num_symbols,
+        timestamp_tx);
+  join_task_ans(&task_ans);
+  tx_rf_symbols(ru, frame, slot, timestamp_tx, start_symbol, num_symbols);
+  stop_meas(&ru->tx_fhaul);
 }
