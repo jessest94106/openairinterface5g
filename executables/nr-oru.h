@@ -21,6 +21,7 @@
 #ifndef __NR_ORU_H__
 #define __NR_ORU_H__
 #include "openair1/PHY/defs_RU.h"
+#include "thread-pool.h"
 
 typedef struct {
   RU_t *ru;
@@ -55,6 +56,7 @@ typedef struct {
   pthread_t oru_sync_thread;
   int num_sync_messages_needed;
   notifiedFIFO_t sync_fifo;
+  tpool_t tpool;
 } ORU_t;
 
 int get_oru_options(ORU_t *oru);

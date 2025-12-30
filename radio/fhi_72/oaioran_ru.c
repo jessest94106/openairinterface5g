@@ -478,11 +478,6 @@ int process_ru_uplane(struct rte_mbuf *pkt,
 
 int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, struct xran_sense_of_time *p_sense_of_time)
 {
-  static uint64_t num_packets = 0;
-  num_packets++;
-  if (num_packets % 10000 == 0) {
-    LOG_I(HW, "received cplane packets %lu\n", num_packets);
-  }
   return MBUF_FREE;
 }
 
