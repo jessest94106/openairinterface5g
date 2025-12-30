@@ -305,6 +305,29 @@ typedef struct {
     int32_t reserved;
 } prs_meas_t;
 
+// Configuration parameters required for 5G Positioning
+// TRP Cartesian Coordinate information
+typedef struct trp_s {
+  // TRP id
+  uint32_t id;
+  // TRP x-axis value
+  uint32_t x_axis;
+  // TRP y-axis value
+  uint32_t y_axis;
+  // TRP z-axis value
+  uint32_t z_axis;
+  // 0 = mm, 1 = cm, 2 = dm
+  uint8_t unit;
+} trp_t;
+
+#define MAX_NUM_TRPs 8
+typedef struct {
+  trp_t trps[MAX_NUM_TRPs];
+  uint8_t num_trp;
+  // Serving gNB indicator
+  bool is_serving_gNB;
+} positioning_config_t;
+
 // rel16 prs k_prime table as per ts138.211 sec.7.4.1.7.2
 #define K_PRIME_TABLE_ROW_SIZE 4
 #define K_PRIME_TABLE_COL_SIZE 12
