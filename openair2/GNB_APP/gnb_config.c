@@ -80,6 +80,7 @@
 #include "utils.h"
 #include "x2ap_messages_types.h"
 #include "gnb_config_common.h"
+#include "positioning_nr_paramdef.h"
 
 static int DEFBANDS[] = {7};
 static int DEFENBS[] = {0};

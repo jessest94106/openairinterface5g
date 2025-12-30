@@ -27,6 +27,7 @@
 #include "openair2/GNB_APP/gnb_config_ng.h"
 #include "openair2/GNB_APP/gnb_paramdef.h"
 #include "openair3/SCTP/sctp_default_values.h"
+#include "openair3/NRPPA/nrppa_gNB_config.h"
 
 RAN_CONTEXT_t RC;
 THREAD_STRUCT thread_struct;
