@@ -196,9 +196,16 @@ double compute_tx_energy_level(c16_t **txdata, int nb_antennas, int offset, int 
 }
 
 // Computes noise variance from the input transmit energy and SNR
-double compute_noise_variance(double txlev_sum, uint16_t ofdm_symbol_size, int N_RB, double SNR, int n_trials)
+double compute_noise_variance(double txlev_sum,
+                              uint16_t ofdm_symbol_size,
+                              int N_RB,
+                              uint8_t precod_nbr_layers,
+                              double SNR,
+                              int n_trials)
 {
-  double sigma_dB = 10 * log10(txlev_sum * ((double)ofdm_symbol_size / (12 * N_RB))) - SNR;
+  // Justification of division by precod_nbr_layers:
+  // When the channel is the identity matrix, the results in terms of SNR should be almost equal for 2x2 and 4x4.
+  double sigma_dB = 10 * log10(txlev_sum / precod_nbr_layers * ((double)ofdm_symbol_size / (12 * N_RB))) - SNR;
   double sigma = pow(10, sigma_dB / 10);
 
   if (n_trials == 1)

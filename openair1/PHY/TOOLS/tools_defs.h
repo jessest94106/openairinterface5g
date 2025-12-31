@@ -929,7 +929,12 @@ double signal_energy_fp2(struct complexd *s, uint32_t length);
 
 double compute_tx_energy_level(c16_t **txdata, int nb_antennas, int offset, int length, int n_trials);
 
-double compute_noise_variance(double txlev_sum, uint16_t ofdm_symbol_size, int N_RB, double SNR, int n_trials);
+double compute_noise_variance(double txlev_sum,
+                              uint16_t ofdm_symbol_size,
+                              int N_RB,
+                              uint8_t precod_nbr_layers,
+                              double SNR,
+                              int n_trials);
 
 int32_t iSqrt(int32_t value);
 uint8_t log2_approx(uint32_t);

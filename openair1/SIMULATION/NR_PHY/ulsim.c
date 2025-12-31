@@ -281,7 +281,6 @@ int main(int argc, char *argv[])
   char *filename_csv = NULL;
   int i;
   double SNR, snr0 = -2.0, snr1 = 2.0;
-  double sigma, sigma_dB;
   double snr_step = .2;
   uint8_t snr1set = 0;
   int slot = 8, frame = 1;
@@ -308,7 +307,7 @@ int main(int argc, char *argv[])
   int Imcs = 9;
   uint8_t precod_nbr_layers = 1;
   int tx_offset;
-  int32_t txlev_sum = 0, atxlev[4];
+  double txlev_sum = 0;
   int start_rb = 0;
   int UE_id = 0;
   int print_perf = 0;
@@ -1401,36 +1400,22 @@ int main(int argc, char *argv[])
           }
           ///////////
           ////////////////////////////////////////////////////
+          // Compute transmitter energy level
           tx_offset = get_samples_slot_timestamp(&gNB->frame_parms, slot);
-          txlev_sum = 0;
-          for (int aa = 0; aa < UE->frame_parms.nb_antennas_tx; aa++) {
-            atxlev[aa] =
-                signal_energy((int32_t *)&UE->common_vars
-                                  .txData[aa][tx_offset + 5 * gNB->frame_parms.ofdm_symbol_size
-                                              + 4 * gNB->frame_parms.nb_prefix_samples + gNB->frame_parms.nb_prefix_samples0],
-                              gNB->frame_parms.ofdm_symbol_size + gNB->frame_parms.nb_prefix_samples);
-
-            txlev_sum += atxlev[aa];
-
-            if (n_trials == 1)
-              printf("txlev[%d] = %d (%f dB) txlev_sum %d\n", aa, atxlev[aa], 10 * log10((double)atxlev[aa]), txlev_sum);
-          }
+          int symbol_offset = tx_offset + 5 * gNB->frame_parms.ofdm_symbol_size + 4 * gNB->frame_parms.nb_prefix_samples
+                              + gNB->frame_parms.nb_prefix_samples0;
+          int symbol_length = gNB->frame_parms.ofdm_symbol_size + gNB->frame_parms.nb_prefix_samples;
+          txlev_sum = compute_tx_energy_level(UE->common_vars.txData,
+                                              UE->frame_parms.nb_antennas_tx,
+                                              symbol_offset,
+                                              symbol_length,
+                                              n_trials);
         } else
           n_trials = 1;
 
         if (input_fd == NULL) {
-          // Justification of division by precod_nbr_layers:
-          // When the channel is the identity matrix, the results in terms of SNR should be almost equal for 2x2 and 4x4.
-          sigma_dB =
-              10 * log10((double)txlev_sum / precod_nbr_layers * ((double)gNB->frame_parms.ofdm_symbol_size / (12 * nb_rb))) - SNR;
-          sigma = pow(10, sigma_dB / 10);
-
-          if (n_trials == 1)
-            printf("sigma %f (%f dB), txlev_sum %f (factor %f)\n",
-                   sigma,
-                   sigma_dB,
-                   10 * log10((double)txlev_sum),
-                   (double)(double)gNB->frame_parms.ofdm_symbol_size / (12 * nb_rb));
+          double sigma =
+              compute_noise_variance(txlev_sum, gNB->frame_parms.ofdm_symbol_size, nb_rb, precod_nbr_layers, SNR, n_trials);
 
           for (i = 0; i < slot_length; i++) {
             for (int aa = 0; aa < UE->frame_parms.nb_antennas_tx; aa++) {
