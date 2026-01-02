@@ -1229,6 +1229,49 @@ unsigned int get_prach_K(int prach_sequence_length, int prach_fmt_id, int pusch_
   return K;
 }
 
+// Based on 38.211 Table 6.3.3.1-1 and Table 6.3.3.1-2.
+uint32_t get_prach_num_reps(int prach_fmt_id)
+{
+  switch (prach_fmt_id) {
+    case 0:
+      return 1;
+      break;
+    case 1:
+      return 2;
+      break;
+    case 2:
+      return 4;
+      break;
+    case 3:
+      return 4;
+      break;
+    case 4: // A1
+      return 2;
+      break;
+    case 5: // A2
+      return 4;
+      break;
+    case 6: // A3
+      return 6;
+      break;
+    case 7: // B1
+      return 2;
+      break;
+    case 8: // B4
+      return 12;
+      break;
+    case 9: // C0
+      return 1;
+      break;
+    case 10: // C2
+      return 4;
+      break;
+    default:
+      AssertFatal(0, "Invalid PRACH format %d\n", prach_fmt_id);
+      break;
+  }
+}
+
 int get_delay_idx(int delay, int max_delay_comp)
 {
   int delay_idx = max_delay_comp + delay;
