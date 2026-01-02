@@ -131,7 +131,9 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
                                     int prachOccasion,
                                     int32_t **rxdata,
                                     NR_DL_FRAME_PARMS *fp,
-                                    int N_TA_offset)
+                                    int N_TA_offset,
+                                    int rep_index,
+                                    uint reps)
 {
   int sample_offset_slot;
   const int sum = fp->ofdm_symbol_size + fp->nb_prefix_samples;
@@ -158,7 +160,6 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
         p->pdu.num_ra,
         prachStartSymbol,
         prachOccasion);
-  int reps;
   int Ncp;
   int dftlen;
   int mu = p->numerology_index;
@@ -172,25 +173,21 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
           p->msg1_frequencystart);
     switch (p->pdu.prach_format) {
       case 0:
-        reps = 1;
         Ncp = 3168;
         dftlen = 24576;
         break;
 
       case 1:
-        reps = 2;
         Ncp = 21024;
         dftlen = 24576;
         break;
 
       case 2:
-        reps = 4;
         Ncp = 4688;
         dftlen = 24576;
         break;
 
       case 3:
-        reps = 4;
         Ncp = 3168;
         dftlen = 6144;
         break;
@@ -209,22 +206,18 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
           prachStartSymbol);
     switch (p->pdu.prach_format) {
       case 4: // A1
-        reps = 2;
         Ncp = 288 >> mu;
         break;
 
       case 5: // A2
-        reps = 4;
         Ncp = 576 >> mu;
         break;
 
       case 6: // A3
-        reps = 6;
         Ncp = 864 >> mu;
         break;
 
       case 7: // B1
-        reps = 2;
         Ncp = 216 >> mu;
         break;
 
@@ -242,17 +235,14 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
         */
 
       case 8: // B4
-        reps = 12;
         Ncp = 936 >> mu;
         break;
 
       case 9: // C0
-        reps = 1;
         Ncp = 1240 >> mu;
         break;
 
       case 10: // C2
-        reps = 4;
         Ncp = 2048 >> mu;
         break;
 
@@ -366,18 +356,25 @@ static void rx_nr_prach_ru_internal(prach_item_t *p,
     // do DFT
     c16_t *prach2 = prach + Ncp;
     c16_t rxsigF_tmp[N_ZC];
-    memset(rxsigF_tmp, 0, sizeof(rxsigF_tmp));
-    for (int i = 0; i < reps; i++, prach2 += dftlen) {
+    for (int i = 0; i < reps; i++) {
       c16_t tmp[dftlen] __attribute__((aligned(32)));
-      dft(dftsize, (int16_t *)prach2, (int16_t *)tmp, 1);
+      dft(dftsize, (int16_t *)(prach2 + (rep_index + i) * dftlen), (int16_t *)tmp, 1);
       // Coherent combining of PRACH repetitions (assumes channel does not change, to be revisted for "long" PRACH)
       LOG_D(PHY, "Doing PRACH combining of %d reptitions N_ZC %d\n", reps, N_ZC);
       //    if (k+N_ZC > dftlen) { // PRACH signal is split around DC
       int k2 = k;
-      for (int j = 0; j < N_ZC; j++, k2++) {
-        if (k2 == dftlen)
-          k2 = 0;
-        rxsigF_tmp[j] = c16add(rxsigF_tmp[j], tmp[k2]);
+      if (i == 0) {
+        for (int j = 0; j < N_ZC; j++, k2++) {
+          if (k2 == dftlen)
+            k2 = 0;
+          rxsigF_tmp[j] = tmp[k2];
+        }
+      } else {
+        for (int j = 0; j < N_ZC; j++, k2++) {
+          if (k2 == dftlen)
+            k2 = 0;
+          rxsigF_tmp[j] = c16add(rxsigF_tmp[j], tmp[k2]);
+        }
       }
     }
     memcpy(p->rxsigF[prachOccasion][aa], rxsigF_tmp, sizeof(rxsigF_tmp));
@@ -394,7 +391,15 @@ void rx_nr_prach_ru(prach_item_t *p, int32_t **rxdata, NR_DL_FRAME_PARMS *fp, in
     // comment FK: the standard 38.211 section 5.3.2 has one extra term +14*N_RA_slot. This is because there prachStartSymbol is
     // given wrt to start of the 15kHz slot or 60kHz slot. Here we work slot based, so this function is anyway only called in slots
     // where there is PRACH. Its up to the MAC to schedule another PRACH PDU in the case there are there N_RA_slot \in {0,1}.
-    rx_nr_prach_ru_internal(p, beam_id, prachStartSymbol, prach_oc, rxdata, fp, N_TA_offset);
+    rx_nr_prach_ru_internal(p,
+                            beam_id,
+                            prachStartSymbol,
+                            prach_oc,
+                            rxdata,
+                            fp,
+                            N_TA_offset,
+                            0,
+                            get_prach_num_reps(p->pdu.prach_format));
   }
 }
 

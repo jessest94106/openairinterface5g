@@ -326,6 +326,7 @@ unsigned short get_N_b_srs(int c_srs, int b_srs);
 uint8_t get_long_prach_dur(unsigned int format, unsigned int num_slots_subframe);
 uint8_t get_PRACH_k_bar(unsigned int delta_f_RA_PRACH, unsigned int delta_f_PUSCH);
 unsigned int get_prach_K(int prach_sequence_length, int prach_fmt_id, int pusch_mu, int prach_mu);
+uint32_t get_prach_num_reps(int prach_fmt_id);
 
 int get_slot_idx_in_period(const int slot, const frame_structure_t *fs);
 
