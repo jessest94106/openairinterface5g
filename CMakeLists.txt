@@ -342,7 +342,7 @@ target_link_libraries(lte_rrc PRIVATE nr_rrc)
 #NR RRC
 #######
 add_library(nr_rrc ${OPENAIR2_DIR}/RRC/NR/MESSAGES/asn1_msg.c)
-target_link_libraries(nr_rrc PUBLIC asn1_nr_rrc asn1_lte_rrc)
+target_link_libraries(nr_rrc PUBLIC asn1_nr_rrc asn1_lte_rrc rrc_cell_management)
 
 # S1AP
 ##############
