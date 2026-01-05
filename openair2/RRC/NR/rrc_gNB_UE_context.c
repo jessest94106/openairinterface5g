@@ -41,6 +41,7 @@
 #include "openair2/F1AP/f1ap_ids.h"
 #include "tree.h"
 #include "rrc_gNB_radio_bearers.h"
+#include "rrc_cell_management.h"
 
 static void rrc_gNB_ue_context_update_time(rrc_gNB_ue_context_t *ctxt)
 {
@@ -224,6 +225,8 @@ rrc_gNB_ue_context_t *rrc_gNB_create_ue_context(sctp_assoc_t assoc_id,
   seq_arr_init(&ue->pduSessions, sizeof(rrc_pdu_session_param_t));
   // Initialise setup DRBs list
   seq_arr_init(&ue->drbs, sizeof(drb_t));
+  // Initialise serving cells list
+  seq_arr_init(&ue->serving_cells, sizeof(ue_serving_cell_t));
 
   RB_INSERT(rrc_nr_ue_tree_s, &rrc_instance_pP->rrc_ue_head, ue_context_p);
   LOG_UE_EVENT(ue,

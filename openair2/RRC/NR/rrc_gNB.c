@@ -2664,6 +2664,7 @@ static void rrc_delete_ue_data(gNB_RRC_UE_t *UE)
   UE->redcap_cap = NULL;
   seq_arr_free(&UE->pduSessions, free_pdusession);
   seq_arr_free(&UE->drbs, free_drb);
+  seq_arr_free(&UE->serving_cells, NULL);
 }
 
 void rrc_remove_ue(gNB_RRC_INST *rrc, rrc_gNB_ue_context_t *ue_context_p)
