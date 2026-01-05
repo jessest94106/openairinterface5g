@@ -1006,8 +1006,14 @@ static void nr_rrc_process_reconfigurationWithSync(NR_UE_RRC_INST_t *rrc,
   }
 }
 
-static void nr_rrc_cellgroup_configuration(NR_UE_RRC_INST_t *rrc, NR_CellGroupConfig_t *cgConfig, int gNB_index, bool dedicatedsib1)
+static bool nr_rrc_cellgroup_configuration(NR_UE_RRC_INST_t *rrc, NR_CellGroupConfig_t *cgConfig, int gNB_index, bool dedicatedsib1)
 {
+  if (!check_cellgroup_config(cgConfig)) {
+    // if we received a configuration not supported or with some wrong combination
+    // we call the function for RLF (re-establishment if security is activated, going to IDLE otherwise)
+    handle_rlf_detection(rrc);
+    return false;
+  }
   NR_SpCellConfig_t *spCellConfig = cgConfig->spCellConfig;
   if(spCellConfig) {
     NR_ServingCellConfig_t *spCellConfigDedicated = spCellConfig->spCellConfigDedicated;
@@ -1059,14 +1065,10 @@ static void nr_rrc_cellgroup_configuration(NR_UE_RRC_INST_t *rrc, NR_CellGroupCo
   }
 
   nr_rrc_manage_rlc_bearers(rrc, cgConfig);
-
-  if (cgConfig->ext1)
-    AssertFatal(cgConfig->ext1->reportUplinkTxDirectCurrent == NULL, "Reporting of UplinkTxDirectCurrent not implemented\n");
-  AssertFatal(cgConfig->sCellToReleaseList == NULL, "Secondary serving cell release not implemented\n");
-  AssertFatal(cgConfig->sCellToAddModList == NULL, "Secondary serving cell addition not implemented\n");
+  return true;
 }
 
-static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
+static bool nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
                                               OCTET_STRING_t *masterCellGroup,
                                               long *fullConfig,
                                               int gNB_index)
@@ -1080,13 +1082,15 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
                                         masterCellGroup->size, 0, 0);
   if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
     LOG_E(NR_RRC, "CellGroupConfig decode error\n");
-    return;
+    return false;
   }
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
     xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
   }
 
-  nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index, false);
+  bool ret = nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index, false);
+  if (!ret)
+    return false;
 
   LOG_D(RRC, "Sending CellGroupConfig to MAC the pointer will be managed by mac\n");
   nr_mac_rrc_message_t rrc_msg = {0};
@@ -1097,6 +1101,7 @@ static void nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
   mac_msg->hfn = rrc->current_hfn;
   mac_msg->frame = rrc->current_frame;
   nr_rrc_send_msg_to_mac(rrc, &rrc_msg);
+  return true;
 }
 
 static bool nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCReconfiguration_v1530_IEs_t *rec_1530, int gNB_index)
@@ -1105,8 +1110,11 @@ static bool nr_rrc_process_reconfiguration_v1530(NR_UE_RRC_INST_t *rrc, NR_RRCRe
     // TODO perform the full configuration procedure as specified in 5.3.5.11 of 331
     LOG_E(NR_RRC, "RRCReconfiguration includes fullConfig but this is not implemented yet\n");
   }
-  if (rec_1530->masterCellGroup)
-    nr_rrc_ue_process_masterCellGroup(rrc, rec_1530->masterCellGroup, rec_1530->fullConfig, gNB_index);
+  if (rec_1530->masterCellGroup) {
+    bool ret = nr_rrc_ue_process_masterCellGroup(rrc, rec_1530->masterCellGroup, rec_1530->fullConfig, gNB_index);
+    if (!ret)
+      return false;
+  }
   if (rec_1530->masterKeyUpdate) {
     as_security_key_update(rrc, rec_1530->masterKeyUpdate);
     nr_pdcp_entity_security_keys_and_algos_t sp = get_security_rrc_parameters(rrc, true);
@@ -1548,7 +1556,8 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
           if (LOG_DEBUGFLAG(DEBUG_ASN1))
             xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
 
-          nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index, dedicatedsib1);
+          bool ret = nr_rrc_cellgroup_configuration(rrc, cellGroupConfig, gNB_index, dedicatedsib1);
+          AssertFatal(ret, "CellGroup has wrong configuration for the UE. Unexpected\n");
           AssertFatal(!IS_SA_MODE(get_softmodem_params()), "secondaryCellGroup only used in NSA for now\n");
           nr_mac_rrc_message_t rrc_msg = {0};
           rrc_msg.payload_type = NR_MAC_RRC_CONFIG_CG;
@@ -2152,7 +2161,9 @@ static void nr_rrc_process_rrcsetup(NR_UE_RRC_INST_t *rrc, const NR_RRCSetup_t *
     nr_rrc_rrcsetup_fallback(rrc);
 
   // perform the cell group configuration procedure in accordance with the received masterCellGroup
-  nr_rrc_ue_process_masterCellGroup(rrc, &rrcSetup->criticalExtensions.choice.rrcSetup->masterCellGroup, NULL, 0);
+  bool ret = nr_rrc_ue_process_masterCellGroup(rrc, &rrcSetup->criticalExtensions.choice.rrcSetup->masterCellGroup, NULL, 0);
+  if (!ret)
+    return;
   // perform the radio bearer configuration procedure in accordance with the received radioBearerConfig
   nr_rrc_ue_process_RadioBearerConfig(rrc, &rrcSetup->criticalExtensions.choice.rrcSetup->radioBearerConfig);
 
