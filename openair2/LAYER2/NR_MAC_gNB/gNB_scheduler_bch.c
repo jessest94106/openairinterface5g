@@ -490,16 +490,16 @@ static bool check_sib1_tda(gNB_MAC_INST *gNB_mac,
   // the UE may assume that this PDSCH resource allocation is not applied (Table 5.1.2.1.1-4 and 5 in 38.214)
   int row = tda + 1;
   if (table_type == defaultB && (row == 12 || row == 13 || row == 14))
-    false;
+    return false;
   if (table_type == defaultC && (row == 1 || row == 6 || row == 7 ||row > 12))
-    false;
+    return false;
   // assuming normal CP
   NR_tda_info_t tda_info = get_info_from_tda_tables(table_type, tda, scc->dmrs_TypeA_Position, true);
   // SIB1 TDA going to the last symbol would cause overlap with CSI-RS
   if (!tda_info.valid_tda || tda_info.startSymbolIndex + tda_info.nrOfSymbols == 14)
-    false;
+    return false;
   if (tda_info.startSymbolIndex < type0_PDCCH_CSS_config->first_symbol_index + type0_PDCCH_CSS_config->num_symbols)
-    false;
+    return false;
 
   NR_pdsch_dmrs_t dmrs_parms = get_dl_dmrs_params(scc, NULL, &tda_info, 1);
   // Configure sched_ctrlCommon for SIB1
