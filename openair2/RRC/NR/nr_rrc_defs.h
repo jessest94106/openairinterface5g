@@ -166,6 +166,21 @@ typedef struct {
   pdusession_level_qos_parameter_t qos;
 } nr_rrc_qos_t;
 
+/** @brief UE serving cell information
+ * @note ServCellIndex is a short identity used to uniquely identify a serving cell
+ *       (PCell, PSCell, or SCell) across cell groups (TS 38.331).
+ *       Value 0 applies for the PCell, while the SCellIndex that has previously
+ *       been assigned applies for SCells.
+ * @note Range: 0..maxNrofServingCells-1 where maxNrofServingCells = 32 */
+typedef struct {
+  /* NR Cell Identity (cell_id) */
+  uint64_t nci;
+  /* ServCellIndex (TS 38.331): 0 = PCell, 1-31 = SCell */
+  uint8_t serving_cell_id;
+  /* SCTP association ID of the DU that owns this cell (for fast lookup) */
+  sctp_assoc_t assoc_id;
+} ue_serving_cell_t;
+
 /* forward declaration */
 typedef struct nr_handover_context_s nr_handover_context_t;
 
@@ -208,6 +223,9 @@ typedef struct gNB_RRC_UE_s {
   NR_EstablishmentCause_t            establishment_cause;
 
   uint64_t nr_cellid;
+  /* Dynamic array of UE serving cells */
+  seq_arr_t serving_cells; /* ue_serving_cell_t */
+
   uint32_t                           rrc_ue_id;
   uint64_t amf_ue_ngap_id;
   // Globally Unique AMF Identifier
@@ -335,15 +353,69 @@ typedef struct cucp_cuup_if_s {
   cucp_cuup_bearer_context_release_func_t bearer_context_release;
 } cucp_cuup_if_t;
 
+typedef struct {
+  int band;
+  uint32_t arfcn;
+  uint8_t scs;
+  uint16_t nrb;
+} nr_rrc_freq_info_t;
+
+typedef struct {
+  nr_rrc_freq_info_t dlul;
+} nr_rrc_tdd_info_t;
+
+typedef struct {
+  nr_rrc_freq_info_t dl;
+  nr_rrc_freq_info_t ul;
+} nr_rrc_fdd_info_t;
+
+typedef struct {
+  /* operating mode: TDD or FDD */
+  enum { NR_MODE_TDD = 0, NR_MODE_FDD = 1 } mode;
+  uint64_t cell_id;
+  uint16_t pci;
+  union {
+    nr_rrc_tdd_info_t tdd;
+    nr_rrc_fdd_info_t fdd;
+  };
+  plmn_id_t plmn;
+  uint16_t tac;
+} nr_rrc_cell_info_t;
+
+typedef struct nr_rrc_cell_container_t {
+  /* Tree-related data */
+  RB_ENTRY(nr_rrc_cell_container_t) entries;
+  /* transport association */
+  sctp_assoc_t assoc_id;
+  /* Cell-only RRC-local info */
+  nr_rrc_cell_info_t info;
+  /* MIB message (6.2.2 TS 38.331) */
+  NR_MIB_t *mib;
+  /* SIB1 message (6.2.2 TS 38.331) */
+  NR_SIB1_t *sib1;
+  /* MeasurementTimingConfiguration inter-node (TS 38.331) */
+  NR_MeasurementTimingConfiguration_t *mtc;
+} nr_rrc_cell_container_t;
+
 typedef struct nr_rrc_du_container_t {
   /* Tree-related data */
   RB_ENTRY(nr_rrc_du_container_t) entries;
-
+  /* DU-only information */
+  /* Transport association identifier for this DU */
   sctp_assoc_t assoc_id;
+  /* DU identity */
+  uint64_t gNB_DU_id;
+  /* DU name */
+  char *gNB_DU_name;
+  /* RRC version */
+  uint8_t rrc_ver[3];
+  // Cell-specific information (F1AP Setup Request, MIB, SIB1, MeasurementTimingConfiguration)
   f1ap_setup_req_t *setup_req;
   NR_MIB_t *mib;
   NR_SIB1_t *sib1;
   NR_MeasurementTimingConfiguration_t *mtc;
+  /* Cells, indexed by cell_id */
+  seq_arr_t cells; /* nr_rrc_cell_container_t* */
 } nr_rrc_du_container_t;
 
 typedef struct nr_rrc_cuup_container_t {
@@ -386,6 +458,10 @@ typedef struct gNB_RRC_INST_s {
 
   RB_HEAD(rrc_du_tree, nr_rrc_du_container_t) dus; // DUs, indexed by assoc_id
   size_t num_dus;
+
+  /* Global cell tree, indexed by cell_id */
+  RB_HEAD(rrc_cell_tree, nr_rrc_cell_container_t) cells;
+  size_t num_cells;
 
   RB_HEAD(rrc_cuup_tree, nr_rrc_cuup_container_t) cuups; // CU-UPs, indexed by assoc_id
   size_t num_cuups;
