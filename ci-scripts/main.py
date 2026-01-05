@@ -308,7 +308,7 @@ def receive_signal(signum, frame):
 
 def ShowTestID(ctx, desc):
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
-    logging.info(f'\u001B[1m Test ID: {ctx.test_id} (#{ctx.count}) \u001B[0m')
+    logging.info(f'\u001B[1m Test ID: {ctx.test_id} \u001B[0m')
     logging.info(f'\u001B[1m {desc} \u001B[0m')
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
 
@@ -502,46 +502,40 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	task_set_succeeded = True
 	HTML.startTime=int(round(time.time() * 1000))
 
-	i = 0
-	for test_case_id in todo_tests:
-		for test in all_tests:
-			if test_runner_abort:
+	for index, test in enumerate(all_tests, start=1):
+		if test_runner_abort:
+			task_set_succeeded = False
+		test_case_id = f"{index:06d}"
+		ctx = TestCaseCtx(int(test_case_id), logPath)
+		HTML.testCase_id = test_case_id
+		desc = test.findtext('desc')
+		node = test.findtext('node') if not force_local else 'localhost'
+		always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
+		may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
+		HTML.desc = desc
+		action = test.findtext('class')
+		if not CheckClassValidity(xml_class_list, action, test_case_id):
+			task_set_succeeded = False
+			continue
+		ShowTestID(ctx, desc)
+		if not task_set_succeeded and not always_exec:
+			msg = f"skipping test due to prior error"
+			logging.warning(msg)
+			HTML.CreateHtmlTestRowQueue(msg, "SKIP", [])
+			continue
+		try:
+			test_succeeded = ExecuteActionWithParam(action, ctx, node)
+			if not test_succeeded and may_fail:
+				logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
+			elif not test_succeeded:
+				logging.error(f"test ID {test_case_id} action {action} failed ({test_succeeded}), skipping next tests")
 				task_set_succeeded = False
-			id = test.get('id')
-			if test_case_id != id:
-				continue
-			i += 1
-			CiTestObj.testCase_id = id
-			ctx = TestCaseCtx(i, int(id), logPath)
-			HTML.testCase_id=CiTestObj.testCase_id
-			desc = test.findtext('desc')
-			node = test.findtext('node') if not force_local else 'localhost'
-			always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
-			may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
-			HTML.desc = desc
-			action = test.findtext('class')
-			if (CheckClassValidity(xml_class_list, action, id) == False):
-				task_set_succeeded = False
-				continue
-			ShowTestID(ctx, desc)
-			if not task_set_succeeded and not always_exec:
-				msg = f"skipping test due to prior error"
-				logging.warning(msg)
-				HTML.CreateHtmlTestRowQueue(msg, "SKIP", [])
-				break
-			try:
-				test_succeeded = ExecuteActionWithParam(action, ctx, node)
-				if not test_succeeded and may_fail:
-					logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
-				elif not test_succeeded:
-					logging.error(f"test ID {test_case_id} action {action} failed ({test_succeeded}), skipping next tests")
-					task_set_succeeded = False
-			except Exception as e:
-				s = traceback.format_exc()
-				logging.error(f'while running CI, an exception occurred:\n{s}')
-				HTML.CreateHtmlTestRowQueue("N/A", 'KO', [f"CI test code encountered an exception:\n{s}"])
-				task_set_succeeded = False
-				break
+		except Exception as e:
+			s = traceback.format_exc()
+			logging.error(f'while running CI, an exception occurred:\n{s}')
+			HTML.CreateHtmlTestRowQueue("N/A", 'KO', [f"CI test code encountered an exception:\n{s}"])
+			task_set_succeeded = False
+			continue
 
 	if not task_set_succeeded:
 		logging.error('\u001B[1;37;41mScenario failed\u001B[0m')
