@@ -38,7 +38,7 @@
 #include "executables/softmodem-common.h"
 #include <stdio.h>
 
-void fill_dci_search_candidates(const NR_SearchSpace_t *ss, fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15, const uint32_t Y)
+static void fill_dci_search_candidates(const NR_SearchSpace_t *ss, fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15, const uint32_t Y)
 {
   LOG_T(NR_MAC_DCI, "Filling search candidates for DCI\n");
 
@@ -89,7 +89,7 @@ void fill_dci_search_candidates(const NR_SearchSpace_t *ss, fapi_nr_dl_config_dc
   rel15->number_of_candidates = i;
 }
 
-NR_ControlResourceSet_t *ue_get_coreset(const NR_BWP_PDCCH_t *config, const int coreset_id)
+static NR_ControlResourceSet_t *ue_get_coreset(const NR_BWP_PDCCH_t *config, const int coreset_id)
 {
   if (config->commonControlResourceSet && coreset_id == config->commonControlResourceSet->controlResourceSetId)
     return config->commonControlResourceSet;
@@ -362,12 +362,12 @@ bool is_ss_monitor_occasion(const int frame, const int slot, const int slots_per
   return monitor;
 }
 
-bool search_space_monitoring_ocasion_other_si(NR_UE_MAC_INST_t *mac,
-                                              const NR_SearchSpace_t *ss,
-                                              const int abs_slot,
-                                              const int frame,
-                                              const int slot,
-                                              const int slots_per_frame)
+static bool search_space_monitoring_ocasion_other_si(NR_UE_MAC_INST_t *mac,
+                                                     const NR_SearchSpace_t *ss,
+                                                     const int abs_slot,
+                                                     const int frame,
+                                                     const int slot,
+                                                     const int slots_per_frame)
 {
   const int duration = ss->duration ? *ss->duration : 1;
   int period, offset;
