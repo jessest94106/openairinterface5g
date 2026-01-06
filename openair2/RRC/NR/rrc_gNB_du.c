@@ -72,6 +72,9 @@ static NR_SSB_MTC_t *get_ssb_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
   return ssb_mtc;
 }
 
+/** @brief Return the frequency of the SS block of the cell for which this message is included,
+ * or of other SS blocks within the same carrier. MeasurementTimingConfiguration message is
+ * used to convey assistance information for measurement timing between nodes (e.g F1 setup) */
 static int ssb_arfcn_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
 {
   /* format has been verified when accepting MeasurementTimingConfiguration */
@@ -728,6 +731,11 @@ nr_rrc_du_container_t *get_du_for_ue(gNB_RRC_INST *rrc, uint32_t ue_id)
   return get_du_by_assoc_id(rrc, ue_data.du_assoc_id);
 }
 
+/** @brief Dump DU and cell information to file
+ * @param[in] rrc RRC instance
+ * @param[in] f File handle to write to
+ * @note Complexity: O(d + N_CELL) = O(N_CELL) where d = number of DUs, N_CELL = total number of cells across all DUs
+ * @note Called periodically (every 1 second) for stats logging */
 void dump_du_info(const gNB_RRC_INST *rrc, FILE *f)
 {
   fprintf(f, "%ld connected DUs \n", rrc->num_dus);
