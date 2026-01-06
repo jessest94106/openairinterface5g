@@ -330,7 +330,17 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                 pdsch_scope_req_t *scope_req);
 
 int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, uint8_t gNB_id, int frame, uint8_t slot, c16_t **txData);
-
+void apply_ntn_config(PHY_VARS_NR_UE *UE,
+                      NR_DL_FRAME_PARMS *fp,
+                      int hfn_rx,
+                      int frame_rx,
+                      int slot_rx,
+                      int *duration_rx_to_tx,
+                      int *timing_advance,
+                      int *ntn_koffset,
+                      bool *ntn_targetcell);
+void fix_ntn_epoch_hfn(PHY_VARS_NR_UE *UE, int hfn, int frame);
+void apply_ntn_timing_advance_and_doppler(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_PARMS *fp, int abs_subframe_tx);
 void dump_nrdlsch(PHY_VARS_NR_UE *ue,uint8_t gNB_id,uint8_t nr_slot_rx,unsigned int *coded_bits_per_codeword,int round,  unsigned char harq_pid);
 void nr_a_sum_b(c16_t *input_x, c16_t *input_y, unsigned short nb_rb);
 
