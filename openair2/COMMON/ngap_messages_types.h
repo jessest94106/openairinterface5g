@@ -474,7 +474,7 @@ typedef struct {
   // Cell type
   uint8_t type;
   // Time UE Stayed in Cell
-  long time_in_cell;
+  uint16_t time_in_cell;
   // Cause
   ngap_cause_t *cause;
 } last_visited_ngran_cell_info_t;
