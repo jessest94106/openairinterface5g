@@ -90,6 +90,7 @@
 #include "uper_encoder.h"
 #include "rrc_gNB_mobility.h"
 #include "rrc_gNB_du.h"
+#include "rrc_cell_management.h"
 #include "common/utils/alg/find.h"
 
 #ifdef E2_AGENT
@@ -1102,14 +1103,27 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     return -1;
   }
 
-  struct nr_rrc_du_container_t *du = get_du_by_cell_id(rrc, msg->nr_cell_id);
-  if (du == NULL) {
+  // Get cell by cell_id
+  nr_rrc_cell_container_t *cell = get_cell_by_cell_id(&rrc->cells, msg->nr_cell_id);
+  if (cell == NULL) {
     /* Cell Not Found! Return HO Request Failure*/
-    LOG_E(RRC, "Failed to process Handover Request: no DU found with NR Cell ID=%lu \n", msg->nr_cell_id);
+    LOG_E(RRC, "Failed to process Handover Request: no cell found with NR Cell ID=%lu \n", msg->nr_cell_id);
     ngap_handover_failure_t fail = {
         .amf_ue_ngap_id = msg->amf_ue_ngap_id,
         .cause.type = NGAP_CAUSE_RADIO_NETWORK,
         .cause.value = NGAP_CAUSE_RADIO_NETWORK_RADIO_RESOURCES_NOT_AVAILABLE,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    return -1;
+  }
+
+  struct nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, cell->assoc_id);
+  if(du == NULL) {
+    LOG_E(NR_RRC, "Failed to process Handover Request: no DU found with assoc_id=%d\n", cell->assoc_id);
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM,
     };
     rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
     return -1;
@@ -1128,12 +1142,11 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     return -1;
   }
 
-  uint16_t pci = du->setup_req->cell[0].info.nr_pci;
+  uint16_t pci = cell->info.pci;
   LOG_I(NR_RRC, "Received Handover Request (on NR Cell ID=%lu, PCI=%u) \n", msg->nr_cell_id, pci);
 
   // Create UE context
-  sctp_assoc_t curr_assoc_id = du->assoc_id;
-  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_create_ue_context(curr_assoc_id, UINT16_MAX, rrc, UINT64_MAX, UINT32_MAX);
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_create_ue_context(du->assoc_id, UINT16_MAX, rrc, UINT64_MAX, UINT32_MAX);
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
   // allocate context for target
@@ -1159,9 +1172,9 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   // Reset KgNB
   memset(UE->kgnb, 0, SECURITY_KEY_LENGTH);
   // Derive KgNB*
-  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
+  const nr_rrc_cell_info_t *cell_info = &cell->info;
   uint32_t ssb_arfcn = get_ssb_arfcn(du);
-  nr_derive_key_ng_ran_star(cell_info->nr_pci, ssb_arfcn, UE->nh, UE->kgnb);
+  nr_derive_key_ng_ran_star(cell_info->pci, ssb_arfcn, UE->nh, UE->kgnb);
   UE->as_security_active = true;
   // Activate SRBs
   activate_srb(UE, SRB1);
