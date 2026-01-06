@@ -161,13 +161,13 @@ static int nr_cell_id_match(const void *key, const void *element)
   return 1;
 }
 
-static neighbour_cell_configuration_t *get_cell_neighbour_list(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *cell_info)
+static neighbour_cell_configuration_t *get_cell_neighbour_list(const gNB_RRC_INST *rrc, const nr_rrc_cell_container_t *cell)
 {
   void *base = seq_arr_front(rrc->neighbour_cell_configuration);
   size_t nmemb = seq_arr_size(rrc->neighbour_cell_configuration);
   size_t size = sizeof(neighbour_cell_configuration_t);
 
-  void *it = bsearch((void *)&cell_info->nr_cellid, base, nmemb, size, nr_cell_id_match);
+  void *it = bsearch((void *)&cell->info.cell_id, base, nmemb, size, nr_cell_id_match);
 
   return (neighbour_cell_configuration_t *)it;
 }
@@ -201,28 +201,39 @@ static void is_intra_frequency_neighbour(void *ssb_arfcn, void *neighbour_cell)
 /**
  * @brief Labels neighbour cells if they are intra frequency to prepare meas config only for intra frequency ho
  * @param[in] rrc     Pointer to RRC instance
- * @param[in] cell_info Pointer to cell information
+ * @param[in] du      Pointer to DU container
+ * @param[in] cell    Pointer to cell container
  */
 static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc,
                                              const nr_rrc_du_container_t *du,
-                                             const f1ap_served_cell_info_t *cell_info)
+                                             const nr_rrc_cell_container_t *cell)
 {
   if (!rrc->neighbour_cell_configuration)
     return;
 
-  neighbour_cell_configuration_t *neighbour_cell_config = get_cell_neighbour_list(rrc, cell_info);
+  neighbour_cell_configuration_t *neighbour_cell_config = get_cell_neighbour_list(rrc, cell);
   if (!neighbour_cell_config)
     return;
 
-  LOG_D(NR_RRC, "HO LOG: Cell: %lu has neighbour cell configuration!\n", cell_info->nr_cellid);
   uint32_t ssb_arfcn = get_ssb_arfcn(du);
+  LOG_D(NR_RRC,
+        "Cell %lu (PCI %d, SSB ARFCN %u) has neighbour cell configuration, labeling intra-frequency neighbours\n",
+        cell->info.cell_id,
+        cell->info.pci,
+        ssb_arfcn);
 
   seq_arr_t *cell_neighbour_list = neighbour_cell_config->neighbour_cells;
   for_each(cell_neighbour_list, (void *)&ssb_arfcn, is_intra_frequency_neighbour);
 }
 
-static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_configuration, const f1ap_served_cell_info_t *cell, int ssb_arfcn)
+static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_configuration, const f1ap_served_cell_info_t *cell)
 {
+  // MTC is mandatory, but some DUs don't send it in the F1 Setup Request, so
+  // "tolerate" this behavior, despite it being mandatory
+  NR_MeasurementTimingConfiguration_t *mtc = extract_mtc(cell->measurement_timing_config, cell->measurement_timing_config_len);
+  int ssb_arfcn = ssb_arfcn_mtc(mtc);
+  ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
+
   for (int c = 0; c < neighbour_cell_configuration->size; c++) {
     const neighbour_cell_configuration_t *neighbour_config = seq_arr_at(neighbour_cell_configuration, c);
     for (int ni = 0; ni < neighbour_config->neighbour_cells->size; ni++) {
@@ -278,6 +289,44 @@ static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_config
   return true;
 }
 
+static void cp_f1_served_cell_info_to_cell(nr_rrc_cell_container_t *dst, const f1ap_served_cell_info_t *src)
+{
+  DevAssert(dst != NULL);
+  DevAssert(src != NULL);
+
+  // Copy basic cell information
+  dst->info.cell_id = src->nr_cellid;
+  dst->info.pci = src->nr_pci;
+  dst->info.plmn = src->plmn;
+  dst->info.tac = src->tac ? *src->tac : 0;
+
+  // Copy frequency information based on mode
+  if (src->mode == F1AP_MODE_TDD) {
+    dst->info.mode = NR_MODE_TDD;
+    dst->info.tdd.dlul.band = src->tdd.freqinfo.band;
+    dst->info.tdd.dlul.arfcn = src->tdd.freqinfo.arfcn;
+    dst->info.tdd.dlul.scs = src->tdd.tbw.scs;
+    dst->info.tdd.dlul.nrb = src->tdd.tbw.nrb;
+  } else {
+    dst->info.mode = NR_MODE_FDD;
+    /* DL */
+    dst->info.fdd.dl.band = src->fdd.dl_freqinfo.band;
+    dst->info.fdd.dl.arfcn = src->fdd.dl_freqinfo.arfcn;
+    dst->info.fdd.dl.scs = src->fdd.dl_tbw.scs;
+    dst->info.fdd.dl.nrb = src->fdd.dl_tbw.nrb;
+    /* UL */
+    dst->info.fdd.ul.band = src->fdd.ul_freqinfo.band;
+    dst->info.fdd.ul.arfcn = src->fdd.ul_freqinfo.arfcn;
+    dst->info.fdd.ul.scs = src->fdd.ul_tbw.scs;
+    dst->info.fdd.ul.nrb = src->fdd.ul_tbw.nrb;
+  }
+
+  // Extract and store MTC
+  if (src->measurement_timing_config_len > 0) {
+    dst->mtc = extract_mtc(src->measurement_timing_config, src->measurement_timing_config_len);
+  }
+}
+
 void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
 {
   AssertFatal(assoc_id != 0, "illegal assoc_id == 0: should be -1 (monolithic) or >0 (split)\n");
@@ -315,46 +364,22 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   }
   nr_rrc_du_container_t *it = NULL;
   RB_FOREACH(it, rrc_du_tree, &rrc->dus) {
-    if (it->setup_req->gNB_DU_id == req->gNB_DU_id) {
+    if (it->gNB_DU_id == req->gNB_DU_id) {
       LOG_E(NR_RRC,
             "gNB-DU ID: existing DU %s on assoc_id %d already has ID %ld, rejecting requesting gNB-DU\n",
-            it->setup_req->gNB_DU_name,
+            it->gNB_DU_name,
             it->assoc_id,
-            it->setup_req->gNB_DU_id);
-      fail.cause = F1AP_CauseMisc_unspecified;
-      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-      return;
-    }
-    // note: we assume that each DU contains only one cell; otherwise, we would
-    // need to check every cell in the requesting DU to any existing cell.
-    const f1ap_served_cell_info_t *exist_info = &it->setup_req->cell[0].info;
-    const f1ap_served_cell_info_t *new_info = &req->cell[0].info;
-    if (exist_info->nr_cellid == new_info->nr_cellid || exist_info->nr_pci == new_info->nr_pci) {
-      LOG_E(NR_RRC,
-            "existing DU %s on assoc_id %d already has cellID %ld/physCellId %d, rejecting requesting gNB-DU with cellID %ld/physCellId %d\n",
-            it->setup_req->gNB_DU_name,
-            it->assoc_id,
-            exist_info->nr_cellid,
-            exist_info->nr_pci,
-            new_info->nr_cellid,
-            new_info->nr_pci);
+            it->gNB_DU_id);
       fail.cause = F1AP_CauseMisc_unspecified;
       rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
       return;
     }
   }
 
-  // MTC is mandatory, but some DUs don't send it in the F1 Setup Request, so
-  // "tolerate" this behavior, despite it being mandatory
-  NR_MeasurementTimingConfiguration_t *mtc =
-      extract_mtc(cell_info->measurement_timing_config, cell_info->measurement_timing_config_len);
-
-  if (rrc->neighbour_cell_configuration
-      && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info, ssb_arfcn_mtc(mtc))) {
+  if (rrc->neighbour_cell_configuration && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info)) {
     LOG_E(NR_RRC, "problem with DU %ld in neighbor configuration, rejecting DU\n", req->gNB_DU_id);
     f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
     rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
     return;
   }
 
@@ -367,21 +392,41 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
       LOG_W(NR_RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
       fail.cause = F1AP_CauseProtocol_semantic_error;
       rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-      ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
       return;
     }
   }
   LOG_I(NR_RRC, "Accepting DU %ld (%s), sending F1 Setup Response\n", req->gNB_DU_id, req->gNB_DU_name);
   LOG_I(NR_RRC, "DU uses RRC version %u.%u.%u\n", req->rrc_ver[0], req->rrc_ver[1], req->rrc_ver[2]);
 
-  // we accept the DU
-  nr_rrc_du_container_t *du = calloc(1, sizeof(*du));
-  AssertFatal(du, "out of memory\n");
-  du->assoc_id = assoc_id;
+  /* Create cell and add to global tree */
+  nr_rrc_cell_container_t *new = calloc_or_fail(1, sizeof(*new));
+  new->assoc_id = assoc_id;
+  cp_f1_served_cell_info_to_cell(new, cell_info);
+  new->mib = mib;
+  new->sib1 = sib1;
+  // Add cell to DU's cell array
+  nr_rrc_cell_container_t *collision = rrc_add_cell(rrc, new);
+  if (collision != NULL) {
+    nr_rrc_du_container_t *existing_du = get_du_by_assoc_id(rrc, collision->assoc_id);
+    const char *du_name = existing_du ? existing_du->gNB_DU_name : "unknown";
+    LOG_E(NR_RRC,
+          "Cell ID %lu already exists in DU %s (assoc_id %d), rejecting requesting gNB-DU\n",
+          new->info.cell_id,
+          du_name,
+          collision->assoc_id);
+    rrc_free_cell_container(new);
+    fail.cause = F1AP_CauseRadioNetwork_cell_not_available;
+    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+    return;
+  }
 
-  /* ITTI will free the setup request message via free(). So the memory
-   * "inside" of the message will remain, but the "outside" container no, so
-   * allocate memory and copy it in */
+  // DU is accepted, add it to tree and add cell to DU's cell array
+  nr_rrc_du_container_t *du = calloc_or_fail(1, sizeof(*du));
+  du->mtc = new->mtc; // TODO: remove in upcoming commit (kept for backward compatibility)
+  du->assoc_id = assoc_id;
+  du->gNB_DU_id = req->gNB_DU_id;
+  du->gNB_DU_name = strdup(req->gNB_DU_name ? req->gNB_DU_name : "N/A");
+  memcpy(du->rrc_ver, req->rrc_ver, sizeof(du->rrc_ver));
   du->setup_req = calloc(1,sizeof(*du->setup_req));
   AssertFatal(du->setup_req, "out of memory\n");
   // Copy F1AP message
@@ -389,9 +434,14 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   // MIB can be null and configured later via DU Configuration Update
   du->mib = mib;
   du->sib1 = sib1;
-  du->mtc = mtc;
-  RB_INSERT(rrc_du_tree, &rrc->dus, du);
-  rrc->num_dus++;
+  // Initialize cell array for this DU
+  seq_arr_init(&du->cells, sizeof(nr_rrc_cell_container_t *));
+  nr_rrc_du_container_t *du_collision = rrc_add_du(rrc, du);
+  AssertFatal(du_collision == NULL, "rrc_add_du should succeed for new DU (assoc_id %d)", assoc_id);
+
+  nr_rrc_cell_container_t *added = rrc_add_cell_to_du(&du->cells, new);
+  AssertFatal(added != NULL, "Failed to add cell %ld to DU %ld\n", new->info.cell_id, du->gNB_DU_id);
+  LOG_I(NR_RRC, "DU %ld: Added cell %ld\n", du->gNB_DU_id, new->info.cell_id);
 
   served_cells_to_activate_t cell = {
       .plmn = cell_info->plmn,
@@ -407,7 +457,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
       nr_SIBs_t *sib = (nr_SIBs_t *)seq_arr_at(sibs, i);
       switch (sib->SIB_type) {
         case 2: {
-          NR_SSB_MTC_t *ssbmtc = get_ssb_mtc(mtc);
+          NR_SSB_MTC_t *ssbmtc = get_ssb_mtc(new->mtc);
           sib->SIB_size = do_SIB2_NR(&sib->SIB_buffer, ssbmtc);
           cell.SI_msg[cell.num_SI].SI_container = sib->SIB_buffer;
           cell.SI_msg[cell.num_SI].SI_container_length = sib->SIB_size;
@@ -420,8 +470,8 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
     }
   }
 
-  if (du->mib != NULL && du->sib1 != NULL)
-    label_intra_frequency_neighbours(rrc, du, cell_info);
+  if (new->mib != NULL &&new->sib1 != NULL)
+    label_intra_frequency_neighbours(rrc, du, new);
 
   f1ap_setup_resp_t resp = {.transaction_id = req->transaction_id,
                             .num_cells_to_activate = 1,
@@ -557,8 +607,10 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
       }
     }
     if (du->mib != NULL && du->sib1 != NULL) {
-      const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-      label_intra_frequency_neighbours(rrc, du, cell_info);
+      nr_rrc_cell_container_t *cell = get_cell_by_cell_id(&rrc->cells, conf_up->cell_to_modify[0].old_nr_cellid);
+      if (cell != NULL && cell->assoc_id == du->assoc_id) {
+        label_intra_frequency_neighbours(rrc, du, cell);
+      }
     }
   }
 
@@ -599,10 +651,9 @@ void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t
   if (du->setup_req)
     free_f1ap_setup_request(du->setup_req);
   free(du->setup_req);
-  nr_rrc_du_container_t *removed = RB_REMOVE(rrc_du_tree, &rrc->dus, du);
-  DevAssert(removed != NULL);
-  free(du);
-  rrc->num_dus--;
+
+  // Clean up DU and associated cell resources
+  rrc_cleanup_du(rrc, du);
 
   int num = invalidate_du_connections(rrc, assoc_id);
   if (num > 0) {

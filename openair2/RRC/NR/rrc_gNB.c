@@ -370,6 +370,7 @@ void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *c
   RB_INIT(&rrc->rrc_ue_head);
   RB_INIT(&rrc->cuups);
   RB_INIT(&rrc->dus);
+  RB_INIT(&rrc->cells);
   rrc->configuration = *configuration;
 }
 
