@@ -423,7 +423,7 @@ static F1AP_ProtocolExtensionContainer_11023P34_t *write_slice_info(int num_ssi,
 /**
  * @brief F1AP Setup Request memory management
  */
-void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_du_system_info_t *sys_info)
+static void free_f1ap_cell(const f1ap_served_cell_info_t *info, const f1ap_gnb_du_system_info_t *sys_info)
 {
   if (sys_info) {
     free(sys_info->mib);
@@ -886,7 +886,7 @@ bool decode_f1ap_setup_request(const F1AP_F1AP_PDU_t *pdu, f1ap_setup_req_t *out
   return true;
 }
 
-f1ap_served_cell_info_t copy_f1ap_served_cell_info(const f1ap_served_cell_info_t *src)
+static f1ap_served_cell_info_t copy_f1ap_served_cell_info(const f1ap_served_cell_info_t *src)
 {
   f1ap_served_cell_info_t dst = {
     .plmn = src->plmn,
