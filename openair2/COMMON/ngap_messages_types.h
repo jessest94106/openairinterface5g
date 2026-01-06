@@ -473,7 +473,7 @@ typedef struct {
   cell_id_t id;
   // Cell type
   uint8_t type;
-  // Time UE Stayed in Cell
+  // Time UE Stayed in Cell (seconds)
   uint16_t time_in_cell;
   // Cause
   ngap_cause_t *cause;
