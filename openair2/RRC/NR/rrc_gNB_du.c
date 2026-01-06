@@ -500,6 +500,7 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
     uint32_t ue_id = UE->rrc_ue_id;
     if (UE->ho_context != NULL)
       LOG_W(NR_RRC, "DU disconnected while handover for UE %d active\n", ue_id);
+
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
     if (ue_data.du_assoc_id != assoc_id)
       continue; /* this UE is on another DU */
@@ -526,26 +527,77 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
   return count;
 }
 
-static void update_cell_info(nr_rrc_du_container_t *du, const f1ap_served_cell_info_t *new_ci)
+/** @brief Update cell information from F1AP DU configuration update
+ * @param[in] rrc RRC instance (needed to get DU and check PCI duplicates)
+ * @param[in] old_nci The cell_id used to find the cell in the tree
+ * @param[in] new_ci Pointer to the new cell information from F1AP message
+ * @return Pointer to the updated cell container, or NULL on failure
+ * @note RB tree manipulation: The cell tree is keyed by cell_id. If the cell_id changes
+ *       during update, the node must be removed from the tree before updating (using the
+ *       old cell_id) and re-inserted after updating (using the new cell_id). This is
+ *       necessary because RB trees maintain ordering based on the key value. If cell_id
+ *       doesn't change, no tree manipulation is needed. */
+static nr_rrc_cell_container_t *update_cell_info(gNB_RRC_INST *rrc, const uint64_t old_nci, const f1ap_served_cell_info_t *new_ci)
 {
-  DevAssert(du != NULL);
+  DevAssert(rrc != NULL);
   DevAssert(new_ci != NULL);
 
-  AssertFatal(du->setup_req->num_cells_available == 1, "expected 1 cell for DU, but has %d\n", du->setup_req->num_cells_available);
-  f1ap_served_cell_info_t *ci = &du->setup_req->cell[0].info;
-  // make sure no memory is allocated
-  free_f1ap_cell(ci, NULL);
-  *ci = copy_f1ap_served_cell_info(new_ci);
-
-  NR_MeasurementTimingConfiguration_t *new_mtc =
-      extract_mtc(new_ci->measurement_timing_config, new_ci->measurement_timing_config_len);
-  if (new_mtc != NULL) {
-    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, du->mtc);
-    du->mtc = new_mtc;
-  } else {
-    LOG_E(NR_RRC, "error decoding MeasurementTimingConfiguration during cell update, ignoring new config\n");
-    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, new_mtc);
+  struct rrc_cell_tree *cells = &rrc->cells;
+  // Find the cell by old cell_id from the update message
+  nr_rrc_cell_container_t *cell = get_cell_by_cell_id(cells, old_nci);
+  if (cell == NULL) {
+    LOG_W(NR_RRC, "no cell with ID %ld found, ignoring gNB-DU configuration update\n", old_nci);
+    return NULL;
   }
+
+  // Check if PCI will change - if so, check for duplicate PCI within the same DU
+  bool pci_changed = (cell->info.pci != new_ci->nr_pci);
+  if (pci_changed) {
+    nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, cell->assoc_id);
+    if (du != NULL) {
+      // Check if new PCI would conflict with another cell in this DU (excluding current cell)
+      nr_rrc_cell_container_t *existing_pci = rrc_get_cell_by_pci_for_du(&du->cells, new_ci->nr_pci);
+      if (existing_pci != NULL && existing_pci != cell) {
+        LOG_E(NR_RRC,
+              "Cannot change PCI from %d to %d: PCI %d already exists in this DU (cell ID %lu)\n",
+              cell->info.pci,
+              new_ci->nr_pci,
+              new_ci->nr_pci,
+              existing_pci->info.cell_id);
+        return NULL;
+      }
+    }
+  }
+
+  // Check if cell_id will change - if so, need to update tree structure
+  bool cell_id_changed = (old_nci != new_ci->nr_cellid);
+  if (cell_id_changed) {
+    // Check if new cell_id would create a duplicate (excluding current cell)
+    nr_rrc_cell_container_t *existing = get_cell_by_cell_id(cells, new_ci->nr_cellid);
+    if (existing != NULL && existing != cell) {
+      LOG_E(NR_RRC, "Cannot change cell_id from %ld to %ld: new cell_id already exists\n", old_nci, new_ci->nr_cellid);
+      return NULL;
+    }
+    // Remove from tree before updating cell_id
+    nr_rrc_cell_container_t *removed = RB_REMOVE(rrc_cell_tree, cells, cell);
+    AssertFatal(removed == cell, "Failed to remove cell %ld from tree\n", old_nci);
+  }
+
+  // Free old MTC before updating
+  if (new_ci->measurement_timing_config_len > 0)
+    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, cell->mtc);
+
+  // Update cell information from the new F1AP served cell info
+  cp_f1_served_cell_info_to_cell(cell, new_ci);
+
+  // If cell_id changed, re-insert into tree with new cell_id
+  if (cell_id_changed) {
+    nr_rrc_cell_container_t *existing = RB_INSERT(rrc_cell_tree, cells, cell);
+    AssertFatal(existing == NULL, "Failed to insert cell %ld into tree\n", cell->info.cell_id);
+    LOG_I(NR_RRC, "Updated cell_id from %ld to %ld\n", old_nci, cell->info.cell_id);
+  }
+
+  return cell;
 }
 
 void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update_t *conf_up, sctp_assoc_t assoc_id)
@@ -562,55 +614,83 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
 
   nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, assoc_id);
   AssertError(du != NULL, return, "no DU found for assoc_id %d\n", assoc_id);
-
-  const f1ap_served_cell_info_t *info = &du->setup_req->cell[0].info;
-  if (conf_up->num_cells_to_add > 0) {
-    // Here we check if the number of cell limit is respectet, otherwise send failure
-    LOG_W(NR_RRC, "du_configuration_update->cells_to_add_list is not supported yet");
+  // Validate each cell to add for uniqueness (cell_id globally; PCI within this DU)
+  for (uint16_t i = 0; i < conf_up->num_cells_to_add; i++) {
+    f1ap_served_cell_info_t *cell_info = &conf_up->cell_to_add[i].info;
+    // Check for duplicate cell_id globally
+    nr_rrc_cell_container_t *existing = get_cell_by_cell_id(&rrc->cells, cell_info->nr_cellid);
+    if (existing != NULL) {
+      nr_rrc_du_container_t *existing_du = get_du_by_assoc_id(rrc, existing->assoc_id);
+      const char *du_name = existing_du ? existing_du->gNB_DU_name : "unknown";
+      LOG_E(NR_RRC,
+            "Cell ID %lu already exists in DU %s (assoc_id %d), rejecting cell addition\n",
+            cell_info->nr_cellid,
+            du_name,
+            existing->assoc_id);
+      /** @todo send failure message */
+      return;
+    }
+    // Check for duplicate PCI within this DU
+    nr_rrc_cell_container_t *existing_pci = rrc_get_cell_by_pci_for_du(&du->cells, cell_info->nr_pci);
+    if (existing_pci != NULL) {
+      LOG_E(NR_RRC,
+            "PCI %d already exists in this DU (cell ID %lu), rejecting cell addition (cell ID %lu)\n",
+            cell_info->nr_pci,
+            existing_pci->info.cell_id,
+            cell_info->nr_cellid);
+      /** @todo send failure message */
+      return;
+    }
   }
 
   if (conf_up->num_cells_to_modify > 0) {
     // here the old nrcgi is used to find the cell information, if it exist then we modify consequently otherwise we fail
     AssertFatal(conf_up->num_cells_to_modify == 1, "cannot handle more than one cell!\n");
-
-    if (info->nr_cellid != conf_up->cell_to_modify[0].old_nr_cellid) {
-      LOG_W(NR_RRC, "no cell with ID %ld found, ignoring gNB-DU configuration update\n", conf_up->cell_to_modify[0].old_nr_cellid);
-      return;
-    }
+    const uint64_t old_nci = conf_up->cell_to_modify[0].old_nr_cellid;
+    const f1ap_served_cell_info_t *new_ci = &conf_up->cell_to_modify[0].info;
 
     // verify the new plmn of the cell
-    if (!rrc_gNB_plmn_matches(rrc, &conf_up->cell_to_modify[0].info)) {
+    if (!rrc_gNB_plmn_matches(rrc, new_ci)) {
       LOG_W(NR_RRC, "PLMN does not match, ignoring gNB-DU configuration update\n");
       return;
     }
 
-    update_cell_info(du, &conf_up->cell_to_modify[0].info);
+    nr_rrc_cell_container_t *cell = update_cell_info(rrc, old_nci, new_ci);
+    if (cell == NULL) {
+      LOG_W(NR_RRC, "Failed to update cell %ld, ignoring gNB-DU configuration update\n", old_nci);
+      return;
+    }
+    if (cell->assoc_id != du->assoc_id) {
+      LOG_W(NR_RRC,
+            "cell %ld belongs to different DU (assoc_id %d vs %d), ignoring gNB-DU configuration update\n",
+            old_nci,
+            cell->assoc_id,
+            du->assoc_id);
+      return;
+    }
 
     const f1ap_gnb_du_system_info_t *sys_info = conf_up->cell_to_modify[0].sys_info;
 
     if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
       // MIB is mandatory, so will be overwritten. SIB1 is optional, so will
       // only be overwritten if present in sys_info
-      ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
+      ASN_STRUCT_FREE(asn_DEF_NR_MIB, cell->mib);
       if (sys_info->sib1 != NULL) {
-        ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
-        du->sib1 = NULL;
+        ASN_STRUCT_FREE(asn_DEF_NR_SIB1, cell->sib1);
+        cell->sib1 = NULL;
       }
 
       NR_MIB_t *mib = NULL;
-      if (!extract_sys_info(sys_info, &mib, &du->sib1)) {
-        LOG_W(NR_RRC, "cannot update sys_info for DU %ld\n", du->setup_req->gNB_DU_id);
+      if (!extract_sys_info(sys_info, &mib, &cell->sib1)) {
+        LOG_W(NR_RRC, "cannot update sys_info for DU %ld\n", du->gNB_DU_id);
       } else {
         DevAssert(mib != NULL);
-        du->mib = mib;
-        LOG_I(NR_RRC, "update system information of DU %ld\n", du->setup_req->gNB_DU_id);
+        cell->mib = mib;
+        LOG_I(NR_RRC, "update system information of DU %ld\n", du->gNB_DU_id);
       }
     }
-    if (du->mib != NULL && du->sib1 != NULL) {
-      nr_rrc_cell_container_t *cell = get_cell_by_cell_id(&rrc->cells, conf_up->cell_to_modify[0].old_nr_cellid);
-      if (cell != NULL && cell->assoc_id == du->assoc_id) {
-        label_intra_frequency_neighbours(rrc, du, cell);
-      }
+    if (du->mib != NULL && du->sib1 != NULL && cell != NULL) {
+      label_intra_frequency_neighbours(rrc, du, cell);
     }
   }
 
