@@ -30,6 +30,15 @@
 // Generate RB tree functions (prototypes)
 int rrc_cell_cmp(const struct nr_rrc_cell_container_t *a, const struct nr_rrc_cell_container_t *b);
 RB_PROTOTYPE(rrc_cell_tree, nr_rrc_cell_container_t, entries, rrc_cell_cmp);
+int du_compare(const struct nr_rrc_du_container_t *a, const struct nr_rrc_du_container_t *b);
+RB_PROTOTYPE(rrc_du_tree, nr_rrc_du_container_t, entries, du_compare);
+
+// DU management (global DU tree)
+nr_rrc_du_container_t *rrc_add_du(gNB_RRC_INST *rrc, nr_rrc_du_container_t *du);
+void rrc_rm_du(gNB_RRC_INST *rrc, nr_rrc_du_container_t *du);
+void rrc_cleanup_du(gNB_RRC_INST *rrc, nr_rrc_du_container_t *du);
+void rrc_free_du_container(nr_rrc_du_container_t *du);
+nr_rrc_du_container_t *get_du_by_assoc_id(gNB_RRC_INST *rrc, const sctp_assoc_t assoc_id);
 
 // Cell management (global cell tree)
 nr_rrc_cell_container_t *get_cell_by_cell_id(struct rrc_cell_tree *cells, const uint64_t cell_id);

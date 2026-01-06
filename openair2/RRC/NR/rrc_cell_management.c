@@ -32,6 +32,89 @@
 #include "NR_SIB1.h" // for asn_DEF_NR_SIB1
 #include "NR_MeasurementTimingConfiguration.h" // for asn_DEF_NR_MeasurementTimingConfiguration
 
+/** @brief Comparison function for DU tree
+ * @param[in] a Pointer to first DU container
+ * @param[in] b Pointer to second DU container
+ * @return Comparison result */
+int du_compare(const nr_rrc_du_container_t *a, const nr_rrc_du_container_t *b)
+{
+  if (a->assoc_id > b->assoc_id)
+    return 1;
+  if (a->assoc_id == b->assoc_id)
+    return 0;
+  return -1; /* a->assoc_id < b->assoc_id */
+}
+
+// Generate RB tree functions for DU tree
+RB_GENERATE(rrc_du_tree, nr_rrc_du_container_t, entries, du_compare);
+
+/** @brief Find DU by SCTP association ID (uses DU RB-tree lookup)
+ * @param[in] rrc Pointer to RRC instance
+ * @param[in] assoc_id SCTP association ID
+ * @return Pointer to the DU container, or NULL if not found
+ * @note O(log N_DU) complexity using DU RB-tree lookup */
+nr_rrc_du_container_t *get_du_by_assoc_id(gNB_RRC_INST *rrc, const sctp_assoc_t assoc_id)
+{
+  DevAssert(rrc != NULL);
+  nr_rrc_du_container_t e = {.assoc_id = assoc_id};
+  return RB_FIND(rrc_du_tree, &rrc->dus, &e);
+}
+
+/** @brief Add DU to RRC DU tree and increment rrc->num_dus on success
+ * @param[in] rrc Pointer to RRC instance
+ * @param[in] du Pointer to DU container to add
+ * @return NULL if inserted successfully; pointer to existing DU (collision) if duplicate assoc_id */
+nr_rrc_du_container_t *rrc_add_du(gNB_RRC_INST *rrc, nr_rrc_du_container_t *du)
+{
+  DevAssert(rrc != NULL);
+  DevAssert(du != NULL);
+  nr_rrc_du_container_t *collision = RB_INSERT(rrc_du_tree, &rrc->dus, du);
+  if (collision == NULL)
+    rrc->num_dus++;
+  return collision;
+}
+
+/** @brief Free a DU container and its allocated fields (gNB_DU_name); free the DU itself
+ * @param[in] du Pointer to DU container to free
+ * @note Does NOT remove the DU from the tree or free du->cells; caller must do RB_REMOVE and seq_arr_free first */
+void rrc_free_du_container(nr_rrc_du_container_t *du)
+{
+  DevAssert(du != NULL);
+  free(du->gNB_DU_name);
+  free(du);
+}
+
+/** @brief Remove DU from RRC DU tree, decrement rrc->num_dus, and free the DU and its resources
+ * @param[in] rrc Pointer to RRC instance
+ * @param[in] du Pointer to DU container to remove (caller must have removed and freed all cells first) */
+void rrc_rm_du(gNB_RRC_INST *rrc, nr_rrc_du_container_t *du)
+{
+  DevAssert(rrc != NULL);
+  DevAssert(du != NULL);
+  nr_rrc_du_container_t *removed = RB_REMOVE(rrc_du_tree, &rrc->dus, du);
+  AssertFatal(removed == du, "Failed to remove DU (assoc_id %d) from tree\n", du->assoc_id);
+  rrc->num_dus--;
+  seq_arr_free(&du->cells, NULL);
+  rrc_free_du_container(du);
+}
+
+/** @brief Remove all cells from the DU (and from global cell tree), remove the DU from the tree, and free the DU
+ * @param[in] rrc Pointer to RRC instance
+ * @param[in] du Pointer to DU container to cleanup (removed from tree and freed) */
+void rrc_cleanup_du(gNB_RRC_INST *rrc, nr_rrc_du_container_t *du)
+{
+  DevAssert(rrc != NULL);
+  DevAssert(du != NULL);
+  for (size_t i = seq_arr_size(&du->cells); i > 0; i--) {
+    nr_rrc_cell_container_t **cell_ptr = seq_arr_at(&du->cells, i - 1);
+    nr_rrc_cell_container_t *cell = *cell_ptr;
+    LOG_I(NR_RRC, "Removing cell %lu from DU cells array\n", cell->info.cell_id);
+    seq_arr_erase(&du->cells, cell_ptr);
+    rrc_rm_cell(rrc, cell);
+  }
+  rrc_rm_du(rrc, du);
+}
+
 /** @brief Comparison function for cell tree
  * @param[in] a Pointer to first cell container
  * @param[in] b Pointer to second cell container

@@ -38,7 +38,6 @@ void rrc_CU_process_f1_lost_connection(struct gNB_RRC_INST_s *rrc, struct f1ap_l
 void rrc_gNB_process_f1_du_configuration_update(struct f1ap_gnb_du_configuration_update_s *conf_up, sctp_assoc_t assoc_id);
 
 struct nr_rrc_du_container_t *get_du_for_ue(struct gNB_RRC_INST_s *rrc, uint32_t ue_id);
-struct nr_rrc_du_container_t *get_du_by_assoc_id(struct gNB_RRC_INST_s *rrc, sctp_assoc_t assoc_id);
 const struct f1ap_served_cell_info_t *get_cell_information_by_phycellId(int phyCellId);
 struct nr_rrc_du_container_t *get_du_by_cell_id(struct gNB_RRC_INST_s *rrc, uint64_t cell_id);
 

@@ -20,6 +20,7 @@
  */
 
 #include "rrc_gNB_du.h"
+#include "rrc_cell_management.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,18 +84,6 @@ int get_ssb_arfcn(const struct nr_rrc_du_container_t *du)
   DevAssert(du != NULL && du->mtc != NULL);
   return ssb_arfcn_mtc(du->mtc);
 }
-
-static int du_compare(const nr_rrc_du_container_t *a, const nr_rrc_du_container_t *b)
-{
-  if (a->assoc_id > b->assoc_id)
-    return 1;
-  if (a->assoc_id == b->assoc_id)
-    return 0;
-  return -1; /* a->assoc_id < b->assoc_id */
-}
-
-/* Tree management functions */
-RB_GENERATE/*_STATIC*/(rrc_du_tree, nr_rrc_du_container_t, entries, du_compare);
 
 static bool rrc_gNB_plmn_matches(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *info)
 {
@@ -627,12 +616,6 @@ nr_rrc_du_container_t *get_du_for_ue(gNB_RRC_INST *rrc, uint32_t ue_id)
     return NULL;
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
   return get_du_by_assoc_id(rrc, ue_data.du_assoc_id);
-}
-
-nr_rrc_du_container_t *get_du_by_assoc_id(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
-{
-  nr_rrc_du_container_t e = {.assoc_id = assoc_id};
-  return RB_FIND(rrc_du_tree, &rrc->dus, &e);
 }
 
 /* \brief find DU by cell ID. Note: currently the CU is limited to one cell per

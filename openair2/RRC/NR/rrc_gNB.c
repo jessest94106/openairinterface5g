@@ -84,6 +84,7 @@
 #include "rrc_gNB_du.h"
 #include "rrc_gNB_mobility.h"
 #include "rrc_gNB_radio_bearers.h"
+#include "rrc_cell_management.h"
 #include "rrc_messages_types.h"
 #include "rrc_gNB_asn1.h"
 #include "seq_arr.h"
