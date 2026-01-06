@@ -53,12 +53,12 @@
 #include "utils.h"
 #include "xer_encoder.h"
 
-int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
+static int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
 {
   return cell_info->mode == F1AP_MODE_TDD ? cell_info->tdd.freqinfo.band : cell_info->fdd.dl_freqinfo.band;
 }
 
-int get_ssb_scs(const struct f1ap_served_cell_info_t *cell_info)
+static int get_ssb_scs(const struct f1ap_served_cell_info_t *cell_info)
 {
   return cell_info->mode == F1AP_MODE_TDD ? cell_info->tdd.tbw.scs : cell_info->fdd.dl_tbw.scs;
 }
