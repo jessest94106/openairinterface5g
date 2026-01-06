@@ -222,7 +222,6 @@ typedef struct gNB_RRC_UE_s {
   uint64_t                           ng_5G_S_TMSI_Part1;
   NR_EstablishmentCause_t            establishment_cause;
 
-  uint64_t nr_cellid;
   /* Dynamic array of UE serving cells */
   seq_arr_t serving_cells; /* ue_serving_cell_t */
 
@@ -409,11 +408,6 @@ typedef struct nr_rrc_du_container_t {
   char *gNB_DU_name;
   /* RRC version */
   uint8_t rrc_ver[3];
-  // Cell-specific information (F1AP Setup Request, MIB, SIB1, MeasurementTimingConfiguration)
-  f1ap_setup_req_t *setup_req;
-  NR_MIB_t *mib;
-  NR_SIB1_t *sib1;
-  NR_MeasurementTimingConfiguration_t *mtc;
   /* Cells, indexed by cell_id */
   seq_arr_t cells; /* nr_rrc_cell_container_t* */
 } nr_rrc_du_container_t;
@@ -436,8 +430,6 @@ typedef struct gNB_RRC_INST_s {
   eth_params_t                                        eth_params_s;
   uid_allocator_t                                     uid_allocator;
   RB_HEAD(rrc_nr_ue_tree_s, rrc_gNB_ue_context_s) rrc_ue_head; // ue_context tree key search by rnti
-  /// NR cell id
-  uint64_t nr_cellid;
 
   // RRC configuration
   gNB_RrcConfigurationReq configuration;
@@ -471,8 +463,12 @@ typedef struct gNB_RRC_INST_s {
   nr_rlc_configuration_t rlc_config;
 } gNB_RRC_INST;
 
+/** Forward declaration for UE log macros */
+const ue_serving_cell_t *ue_get_pcell_entry(const gNB_RRC_UE_t *ue);
+
 #define UE_LOG_FMT "(cellID %lx, UE ID %d RNTI %04x)"
-#define UE_LOG_ARGS(ue_context) (ue_context)->nr_cellid, (ue_context)->rrc_ue_id, (ue_context)->rnti
+#define UE_LOG_ARGS(ue_context) \
+  (ue_get_pcell_entry(ue_context) ? ue_get_pcell_entry(ue_context)->nci : 0), (ue_context)->rrc_ue_id, (ue_context)->rnti
 
 #define LOG_UE_DL_EVENT(ue_context, fmt, ...) LOG_A(NR_RRC, "[DL] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)
 #define LOG_UE_EVENT(ue_context, fmt, ...)    LOG_A(NR_RRC, "[--] " UE_LOG_FMT " " fmt, UE_LOG_ARGS(ue_context) __VA_OPT__(,) __VA_ARGS__)

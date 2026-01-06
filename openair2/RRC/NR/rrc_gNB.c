@@ -82,6 +82,7 @@
 #include "openair2/F1AP/lib/f1ap_ue_context.h"
 #include "rrc_gNB_NGAP.h"
 #include "rrc_gNB_du.h"
+#include "rrc_cell_management.h"
 #include "rrc_gNB_mobility.h"
 #include "rrc_gNB_radio_bearers.h"
 #include "rrc_cell_management.h"
@@ -533,16 +534,18 @@ void activate_srb(gNB_RRC_UE_t *UE, int srb_id)
  * This helper function initializes common fields that are shared between
  * different UE context setup scenarios (serving DU, target DU).
  * @param ue UE context
- * @param du DU container for measurement timing configuration
+ * @param cell (primary serving) cell container
  * @param gNB_DU_ue_id Optional gNB-DU UE ID to include in the request (NULL if not provided)
  * @return F1AP UE Context Setup Request */
 static f1ap_ue_context_setup_req_t rrc_fill_f1_ue_context_setup(gNB_RRC_UE_t *ue,
-                                                                const nr_rrc_du_container_t *du,
+                                                                const nr_rrc_cell_container_t *cell,
                                                                 const uint32_t *gNB_DU_ue_id)
 {
   f1ap_ue_context_setup_req_t req = {
       .gNB_CU_ue_id = ue->rrc_ue_id,
-      .servCellIndex = 0,
+      .servCellIndex = RRC_PCELL_INDEX,
+      .plmn = cell->info.plmn,
+      .nr_cellid = cell->info.cell_id,
   };
 
   /* UE Aggregate Maximum Bit Rate Uplink is C-ifDRBSetup: 1 Gbps */
@@ -550,7 +553,7 @@ static f1ap_ue_context_setup_req_t rrc_fill_f1_ue_context_setup(gNB_RRC_UE_t *ue
   *req.gnb_du_ue_agg_mbr_ul = 1000000000; /* bps */
 
   /* Measurement timing configuration */
-  req.cu_to_du_rrc_info.meas_timing_config = get_meas_timing_config(du->mtc, ue->measConfig);
+  req.cu_to_du_rrc_info.meas_timing_config = get_meas_timing_config(cell->mtc, ue->measConfig);
 
   /* UE capabilities */
   if (ue->ue_cap_buffer.len > 0) {
@@ -563,13 +566,6 @@ static f1ap_ue_context_setup_req_t rrc_fill_f1_ue_context_setup(gNB_RRC_UE_t *ue
     req.gNB_DU_ue_id = malloc_or_fail(sizeof(*req.gNB_DU_ue_id));
     *req.gNB_DU_ue_id = *gNB_DU_ue_id;
   }
-
-  /* PLMN and cell ID from DU setup request */
-  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-  req.plmn.mcc = cell_info->plmn.mcc;
-  req.plmn.mnc = cell_info->plmn.mnc;
-  req.plmn.mnc_digit_length = cell_info->plmn.mnc_digit_length;
-  req.nr_cellid = cell_info->nr_cellid;
 
   return req;
 }
@@ -772,22 +768,24 @@ void free_RRCReconfiguration_params(nr_rrc_reconfig_param_t params)
 
 NR_MeasConfig_t *nr_rrc_get_measconfig(const gNB_RRC_INST *rrc, uint64_t nr_cellid)
 {
-  nr_rrc_du_container_t *du = get_du_by_cell_id((gNB_RRC_INST *)rrc, nr_cellid);
-  DevAssert(du != NULL);
-  f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
+  nr_rrc_cell_container_t *cell = get_cell_by_cell_id(&((gNB_RRC_INST *)rrc)->cells, nr_cellid);
+  DevAssert(cell != NULL);
 
-  if (du->mtc != NULL) {
+  if (cell->mtc != NULL) {
     NR_ReportConfigToAddMod_t *rc_PER = NULL;
     NR_ReportConfigToAddMod_t *rc_A2 = NULL;
     seq_arr_t rc_A3_seq = {0};
     seq_arr_t neigh_seq = {0};
     seq_arr_init(&rc_A3_seq, sizeof(NR_ReportConfigToAddMod_t));
     seq_arr_init(&neigh_seq, sizeof(nr_neighbour_cell_t));
-    int scs = get_ssb_scs(cell_info);
-    int band = get_dl_band(cell_info);
-    const NR_MeasTimingList_t *mtlist = du->mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
+
+    // Get cell info from the cell container
+    int scs = cell->info.mode == NR_MODE_TDD ? cell->info.tdd.dlul.scs : cell->info.fdd.dl.scs;
+    int band = cell->info.mode == NR_MODE_TDD ? cell->info.tdd.dlul.band : cell->info.fdd.dl.band;
+
+    const NR_MeasTimingList_t *mtlist = cell->mtc->criticalExtensions.choice.c1->choice.measTimingConf->measTiming;
     const NR_MeasTiming_t *mt = mtlist->list.array[0];
-    const neighbour_cell_configuration_t *neighbour_config = get_neighbour_cell_config(rrc, cell_info->nr_cellid);
+    const neighbour_cell_configuration_t *neighbour_config = get_neighbour_cell_config(rrc, cell->info.cell_id);
     seq_arr_t *neighbour_cells = NULL;
     if (neighbour_config)
       neighbour_cells = neighbour_config->neighbour_cells;
@@ -837,7 +835,7 @@ NR_MeasConfig_t *nr_rrc_get_measconfig(const gNB_RRC_INST *rrc, uint64_t nr_cell
     if (rrc->measurementConfiguration.a2_event)
       rc_A2 = prepare_a2_event_report(rrc->measurementConfiguration.a2_event);
 
-    NR_MeasConfig_t *result = get_MeasConfig(mt, band, scs, cell_info->nr_pci, rc_PER, rc_A2, &rc_A3_seq, &neigh_seq, neigh_a3_id);
+    NR_MeasConfig_t *result = get_MeasConfig(mt, band, scs, cell->info.pci, rc_PER, rc_A2, &rc_A3_seq, &neigh_seq, neigh_a3_id);
 
     // Clean up sequence arrays
     seq_arr_free(&rc_A3_seq, NULL);
@@ -1060,12 +1058,14 @@ static void rrc_gNB_send_f1_drb_release_request(gNB_RRC_INST *rrc, gNB_RRC_UE_t 
   f1ap_ue_context_mod_req_t req = {
       .gNB_CU_ue_id = ue_p->rrc_ue_id,
       .gNB_DU_ue_id = ue_data.secondary_ue,
-      .servCellIndex = 0,
+      .servCellIndex = RRC_PCELL_INDEX,
   };
   req.plmn = malloc_or_fail(sizeof(*req.plmn));
   *req.plmn = rrc->configuration.plmn[0];
+  nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(rrc, ue_p);
+  DevAssert(cell != NULL);
   req.nr_cellid = malloc_or_fail(sizeof(*req.nr_cellid));
-  *req.nr_cellid = rrc->nr_cellid;
+  *req.nr_cellid = cell->info.cell_id;
   req.drbs_rel = malloc_or_fail(sizeof(*req.drbs_rel));
   req.drbs_rel_len = n_drb_to_release;
   memcpy(req.drbs_rel, drb_to_release, n_drb_to_release * sizeof(int));
@@ -1192,7 +1192,7 @@ static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
  * @param du DU container containing cell information for key derivation */
 static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context_pP,
                                                 const rnti_t old_rnti,
-                                                const nr_rrc_du_container_t *du)
+                                                const nr_rrc_cell_container_t *cell)
 {
   module_id_t module_id = 0;
   gNB_RRC_INST *rrc = RC.nrrrc[module_id];
@@ -1200,16 +1200,19 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
   uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
   uint8_t xid = rrc_gNB_get_next_transaction_identifier(module_id);
   ue_p->xids[xid] = RRC_REESTABLISH;
-  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-  uint32_t ssb_arfcn = get_ssb_arfcn(du);
-  LOG_I(NR_RRC, "Reestablishment update key pci=%d, earfcn_dl=%u\n", cell_info->nr_pci, ssb_arfcn);
+
+  nr_rrc_cell_container_t *pcell = rrc_get_pcell_for_ue(rrc, ue_p);
+  DevAssert(pcell != NULL);
+  DevAssert(pcell->info.cell_id == cell->info.cell_id);
+  uint32_t ssb_arfcn = get_ssb_arfcn(pcell);
+  LOG_I(NR_RRC, "Reestablishment update key pci=%d, earfcn_dl=%u\n", pcell->info.pci, ssb_arfcn);
 
   /* Per TS 33.501 6.9.2.3.4: When sending RRCReestablishment with nextHopChainingCount,
    * we're staying at the same NCC level (not advancing), so use horizontal derivation
    * from the currently active KgNB. Vertical derivation (from NH) is only used when
    * advancing to a new NCC level, which happens during handover or masterKeyUpdate. */
   const uint8_t *base_key = ue_p->kgnb;
-  nr_derive_key_ng_ran_star(cell_info->nr_pci, ssb_arfcn, base_key, ue_p->kgnb);
+  nr_derive_key_ng_ran_star(pcell->info.pci, ssb_arfcn, base_key, ue_p->kgnb);
   int size = do_RRCReestablishment(ue_context_pP->ue_context.nh_ncc, buffer, NR_RRC_BUF_SIZE, xid);
 
   LOG_A(NR_RRC, "Send RRCReestablishment [%d bytes] to RNTI %04x\n", size, ue_p->rnti);
@@ -1284,13 +1287,13 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc,
     /** Handle UE access on a different DU than the original one
      * Per 38.401 8.7: "If the UE accessed from a gNB-DU other than the original
      * one, the gNB-CU should trigger the UE Context Setup procedure". */
-    /* UE is accessing a different DU - trigger UE Context Setup per TS 38.401 §8.7 */
-    nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, assoc_id);
-    if (du == NULL) {
-      LOG_E(NR_RRC, "UE %d: cannot find DU for assoc_id %d\n", ue_p->rrc_ue_id, assoc_id);
+    nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(rrc, ue_p);
+    // UE should have a PCell set at this point (set when RRCReestablishmentRequest was handled)
+    if (cell == NULL) {
+      LOG_E(NR_RRC, "UE %d: no PCell for reestablishment on different DU\n", ue_p->rrc_ue_id);
       return;
     }
-    rrc_f1_ue_context_setup_for_target_du(rrc, ue_p, du, NULL);
+    rrc_f1_ue_context_setup_for_target_du(rrc, ue_p, cell, NULL);
   } else {
     // Request DU to provide CellGroupConfig with reestablishRLC flags for re-establishment
     // According to TS 38.473 transparency requirements, CU should not construct or re-encode CellGroupConfig
@@ -1406,9 +1409,17 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
   byte_array_t cgc = {.buf = msg->du2cu_rrc_container, .len = msg->du2cu_rrc_container_length};
   store_cgc(UE, &cgc);
   UE->establishment_cause = rrcSetupRequest->establishmentCause;
-  UE->nr_cellid = msg->nr_cellid;
+  // Add PCell to serving_cells array
+  nr_rrc_cell_container_t *cell = get_cell_by_cell_id(&rrc->cells, msg->nr_cellid);
+  if (!cell) {
+    LOG_E(NR_RRC, "Cell %ld not found, rejecting UE\n", msg->nr_cellid);
+    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
+    return;
+  }
+  /* Add PCell to serving_cells array */
+  rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
   UE->ongoing_reconfiguration = false;
-  UE->measConfig = nr_rrc_get_measconfig(rrc, UE->nr_cellid);
+  UE->measConfig = nr_rrc_get_measconfig(rrc, msg->nr_cellid);
   activate_srb(UE, 1);
   rrc_gNB_generate_RRCSetup(0, msg->crnti, ue_context_p, msg->du2cu_rrc_container, msg->du2cu_rrc_container_length);
 }
@@ -1436,7 +1447,8 @@ static rrc_gNB_ue_context_t *rrc_gNB_get_ue_context_source_cell(gNB_RRC_INST *rr
     if (!ue->ho_context || !ue->ho_context->source)
       continue;
     nr_ho_source_cu_t *source_ctx = ue->ho_context->source;
-    if (source_ctx->old_rnti == rntiP && source_ctx->du->setup_req->cell[0].info.nr_pci == pci)
+    const nr_rrc_cell_container_t *source_cell = source_ctx->cell;
+    if (source_cell && source_ctx->old_rnti == rntiP && source_cell->info.pci == pci)
       return ue_context_p;
   }
   return NULL;
@@ -1454,6 +1466,28 @@ static void f1u_dl_gtp_rollback(gNB_RRC_UE_t *UE)
     drb->du_tunnel_config = UE->ho_context->source->old_du_tunnel_config;
     LOG_W(NR_RRC, "DRB id %d rollback to tunnel TEID %x\n", drb->drb_id, drb->du_tunnel_config.teid);
   }
+}
+
+/** @brief Resolve previous/old cell (UE identity physCellId): same cell, else neighbor
+ * of current cell, else any cell with that PCI in this DU. */
+static const nr_rrc_cell_container_t *get_previous_cell_by_pci_in_du(gNB_RRC_INST *rrc,
+                                                                     const nr_rrc_cell_container_t *current_cell,
+                                                                     const nr_rrc_du_container_t *du,
+                                                                     uint16_t pci)
+{
+  if (current_cell->info.pci == pci)
+    return current_cell;
+
+  const neighbour_cell_configuration_t *neigh_config = get_neighbour_cell_config(rrc, current_cell->info.cell_id);
+  if (neigh_config != NULL) {
+    const nr_neighbour_cell_t *neighbour = get_neighbour_cell_by_pci(neigh_config, pci);
+    if (neighbour != NULL) {
+      nr_rrc_cell_container_t *c = get_cell_by_cell_id(&rrc->cells, neighbour->nrcell_id);
+      if (c != NULL && c->assoc_id == du->assoc_id)
+        return c;
+    }
+  }
+  return rrc_get_cell_by_pci_for_du(&du->cells, pci);
 }
 
 static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
@@ -1486,15 +1520,17 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
-  if (du->mib == NULL || du->sib1 == NULL) {
-    /* we don't have MIB/SIB1 of the DU, and therefore cannot generate the
-     * Reestablishment (as we would need the SSB's ARFCN, which we cannot
-     * compute). So generate RRC Setup instead */
-    LOG_E(NR_RRC, "Reestablishment request: no MIB/SIB1 of DU present, cannot do reestablishment, force setup request\n");
-    goto fallback_rrc_setup;
+  // Fetch current cell: where the reestablishment request was received
+  nr_rrc_cell_container_t *current_cell = get_cell_by_cell_id(&rrc->cells, msg->nr_cellid);
+  if (current_cell == NULL || current_cell->assoc_id != du->assoc_id) {
+    LOG_E(NR_RRC,
+          "received CCCH message, but no corresponding cell found for nr_cellid %ld in DU (assoc_id %d)\n",
+          msg->nr_cellid,
+          assoc_id);
+    return;
   }
 
-  if (du->mtc == NULL) {
+  if (current_cell->mtc == NULL) {
     // some UEs don't send MeasurementTimingConfiguration, so we don't know the
     // SSB ARFCN and can't do reestablishment. handle it gracefully by doing
     // RRC setup procedure instead
@@ -1503,7 +1539,12 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
-  // Try to find UE context by RNTI and assoc_id (normal case: same DU)
+  const nr_rrc_cell_container_t *cell = get_previous_cell_by_pci_in_du(rrc, current_cell, du, (uint16_t)physCellId);
+  if (cell == NULL) {
+    LOG_E(NR_RRC, "received CCCH message, but no corresponding cell found for PCI %ld in DU (assoc_id %d)\n", physCellId, assoc_id);
+    return;
+  }
+
   ue_context_p = rrc_gNB_get_ue_context_by_rnti(rrc, assoc_id, old_rnti);
   if (ue_context_p == NULL) {
     // Fallback 1: Try to find UE by RNTI only (re-establishment on different DU scenario)
@@ -1526,14 +1567,12 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
-  /* should check phys cell ID to identify the correct cell */
-  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-  const f1ap_served_cell_info_t *previous_cell_info = get_cell_information_by_phycellId(physCellId);
   f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
 
   nr_ho_source_cu_t *source_ctx = UE->ho_context ? UE->ho_context->source : NULL;
-  DevAssert(!source_ctx || source_ctx->du->setup_req->num_cells_available == 1);
-  bool ho_reestab_on_source = source_ctx && previous_cell_info->nr_cellid == source_ctx->du->setup_req->cell[0].info.nr_cellid;
+  DevAssert(!source_ctx || source_ctx->cell != NULL);
+  const nr_rrc_cell_container_t *source_cell = source_ctx ? source_ctx->cell : NULL;
+  bool ho_reestab_on_source = source_cell ? cell->info.cell_id == source_cell->info.cell_id : false;
 
   if (ho_reestab_on_source) {
     /* the UE came back on the source DU while doing handover, release at
@@ -1553,11 +1592,11 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     store_cgc(UE, &source_ctx->old_cgc);
 
     /* update to old DU assoc id -- RNTI + secondary DU UE ID further below */
-    ue_data.du_assoc_id = source_ctx->du->assoc_id;
+    ue_data.du_assoc_id = source_cell->assoc_id;
     bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
     DevAssert(success);
     nr_rrc_finalize_ho(UE);
-  } else if (physCellId != cell_info->nr_pci) {
+  } else if (physCellId != cell->info.pci) {
     /* Check if this is a different DU scenario or "too fast movement" scenario */
     if (assoc_id != ue_data.du_assoc_id) {
       /* Different DU scenario - physCellId differs because UE is re-establishing on a different DU.
@@ -1569,7 +1608,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
             "UE %d: Re-establishment on different DU (physCellId %ld from old cell != %d from new DU, du_assoc_id %d -> %d)\n",
             UE->rrc_ue_id,
             physCellId,
-            cell_info->nr_pci,
+            cell->info.pci,
             ue_data.du_assoc_id,
             assoc_id);
 
@@ -1608,7 +1647,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
       LOG_I(NR_RRC,
             "RRC Reestablishment Request from different physCellId (%ld) than current physCellId (%d), fallback to RRC setup\n",
             physCellId,
-            cell_info->nr_pci);
+            cell->info.pci);
       ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
       goto fallback_rrc_setup;
     }
@@ -1618,12 +1657,24 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
 
   // update with new RNTI, and update secondary UE association
   UE->rnti = msg->crnti;
-  UE->nr_cellid = msg->nr_cellid;
+
+  /* Update PCell in serving_cells array */
+  DevAssert(cell->info.cell_id == msg->nr_cellid);
+  // Reset the serving set to the new PCell, remove all serving cells from the current PCell's DU.
+  const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
+  DevAssert(existing_pcell != NULL);
+  rrc_remove_ue_scells_from_du(UE, existing_pcell->assoc_id);
+  ue_serving_cell_t *added = rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+  if (added == NULL) {
+    LOG_E(NR_RRC, "Reestablishment: failed to add PCell (cell %ld), rejecting reestablishment\n", cell->info.cell_id);
+    goto fallback_rrc_setup;
+  }
+
   ue_data.secondary_ue = msg->gNB_DU_ue_id;
   bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
   DevAssert(success);
 
-  rrc_gNB_generate_RRCReestablishment(ue_context_p, old_rnti, du);
+  rrc_gNB_generate_RRCReestablishment(ue_context_p, old_rnti, cell);
   return;
 
 fallback_rrc_setup:
@@ -1715,13 +1766,34 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
               neighbour_pci,
               neighbourCellRSRP);
 
-        const f1ap_served_cell_info_t *neigh_cell = get_cell_information_by_phycellId(neighbour_pci);
-        const f1ap_served_cell_info_t *serving_cell = get_cell_information_by_phycellId(scell_pci);
-        const neighbour_cell_configuration_t *cell = get_neighbour_cell_config(rrc, serving_cell->nr_cellid);
+        // Resolve source cell by PCI from UE's serving cells
+        const nr_rrc_cell_container_t *source_cell = NULL;
+        FOR_EACH_SEQ_ARR (ue_serving_cell_t *, scell, &ue->serving_cells) {
+          nr_rrc_cell_container_t *cell_by_id = get_cell_by_cell_id(&rrc->cells, scell->nci);
+          if (cell_by_id != NULL && cell_by_id->info.pci == scell_pci) {
+            source_cell = cell_by_id;
+            break;
+          }
+        }
+        if (source_cell == NULL) {
+          LOG_W(NR_RRC,
+                "UE %d: received measurement report but source cell with PCI %d not found in UE's serving cells, skipping\n",
+                ue->rrc_ue_id,
+                scell_pci);
+          continue;
+        }
+
+        // Resolve target cell via neighbour configuration
+        const neighbour_cell_configuration_t *cell = get_neighbour_cell_config(rrc, source_cell->info.cell_id);
         const nr_neighbour_cell_t *neighbour = get_neighbour_cell_by_pci(cell, neighbour_pci);
+        const nr_rrc_cell_container_t *target_cell = NULL;
+        if (neighbour != NULL) {
+          // Resolve target cell by cell_id from neighbour config (may be NULL if no F1 connection)
+          target_cell = get_cell_by_cell_id(&rrc->cells, neighbour->nrcell_id);
+        }
         // CU does not have f1 connection with neighbour cell context. So  check does serving cell has this phyCellId as a
         // neighbour.
-        if (!neigh_cell && neighbour) {
+        if (!target_cell && neighbour) {
           // No F1 connection but static neighbour configuration is available
           const nr_a3_event_t *a3_event_configuration = get_a3_configuration(rrc, neighbour->physicalCellId);
           /* if no A3 event configured for this physical cell ID, try to get the default one */
@@ -1740,12 +1812,9 @@ static void process_Event_Based_Measurement_Report(gNB_RRC_INST *rrc,
             }
             LOG_D(NR_RRC, "HO LOG: Trigger N2 HO for the neighbour gnb: %u cell: %lu\n", neighbour->gNB_ID, neighbour->nrcell_id);
           }
-        } else if (neigh_cell && neighbour) {
+        } else if (target_cell && neighbour) {
           /* we know the cell and are connected to the DU! */
-          nr_rrc_du_container_t *source_du = get_du_by_cell_id(rrc, serving_cell->nr_cellid);
-          DevAssert(source_du);
-          nr_rrc_du_container_t *target_du = get_du_by_cell_id(rrc, neigh_cell->nr_cellid);
-          nr_rrc_trigger_f1_ho(rrc, ue, source_du, target_du);
+          nr_rrc_trigger_f1_ho(rrc, ue, source_cell, target_cell);
         } else {
           LOG_W(NR_RRC, "UE %d: received A3 event for stronger neighbor PCI %d, but no such neighbour in configuration\n", ue->rrc_ue_id, neighbour_pci);
         }
@@ -2614,12 +2683,15 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
   if (UE->ho_context != NULL) {
     nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
-    bool from_source_du = source_ctx && source_ctx->du->assoc_id == assoc_id;
+    bool from_source_du = source_ctx && source_ctx->cell->assoc_id == assoc_id;
     if (from_source_du) {
       // we received release request from the source DU, but HO is still
       // ongoing; free the UE, and remove the HO context.
-      LOG_W(NR_RRC, "UE %d: release request from source DU ID %ld during HO, marking HO as complete\n", UE->rrc_ue_id, source_ctx->du->setup_req->gNB_DU_id);
-      RETURN_IF_INVALID_ASSOC_ID(source_ctx->du->assoc_id);
+      LOG_W(NR_RRC,
+            "UE %d: release request from source cell PCI %d during HO, marking HO as complete\n",
+            UE->rrc_ue_id,
+            source_ctx->cell->info.pci);
+      RETURN_IF_INVALID_ASSOC_ID(source_ctx->cell->assoc_id);
       f1ap_ue_context_rel_cmd_t cmd = {
           .gNB_CU_ue_id = UE->rrc_ue_id,
           .gNB_DU_ue_id = source_ctx->du_ue_id,
@@ -2747,6 +2819,10 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
     nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
     DevAssert(source_ctx->old_rnti == UE->rnti);
     nr_rrc_apply_target_context(UE);
+    /* Update cell association after handover */
+    if (!nr_rrc_update_cell_assoc_after_ho(rrc, UE)) {
+      return;
+    }
   }
 }
 
@@ -2768,7 +2844,9 @@ static void rrc_CU_process_ue_modification_required(MessageDef *msg_p, instance_
   }
 
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-  if (UE->ho_context && UE->ho_context->source && UE->ho_context->source->du && UE->ho_context->source->du->assoc_id == assoc_id) {
+  bool on_source_du = UE->ho_context && UE->ho_context->source && UE->ho_context->source->cell
+                      && UE->ho_context->source->cell->assoc_id == assoc_id;
+  if (on_source_du) {
     LOG_W(NR_RRC, "UE %d: UE Context Modification Required during handover, ignoring message\n", UE->rrc_ue_id);
     return;
   }
@@ -3606,14 +3684,14 @@ static int rrc_fill_f1_drb_to_setup(const gNB_RRC_INST *rrc, const gNB_RRC_UE_t 
  * - Handover preparation information (if provided)
  * @param rrc RRC instance
  * @param ue UE context
- * @param du Target DU container containing cell and setup information
+ * @param cell Target cell container containing cell information
  * @param ho_prep_info Optional handover preparation information */
 void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
                                            gNB_RRC_UE_t *ue,
-                                           const nr_rrc_du_container_t *du,
+                                           const nr_rrc_cell_container_t *cell,
                                            const byte_array_t *ho_prep_info)
 {
-  DevAssert(du != NULL);
+  DevAssert(cell != NULL);
   /* Handle two scenarios:
    * 1. Handover (ho_prep_info provided): Prepare and copy handover preparation information
    *    for the target DU. The target DU will assign a new gNB-DU UE ID in the response.
@@ -3635,7 +3713,7 @@ void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
     du_ue_id = ue_data.secondary_ue;
     opt_du_ue_id = &du_ue_id;
   }
-  LOG_I(NR_RRC, "Triggering UE Context Setup for UE %d on DU %d\n", ue->rrc_ue_id, du->assoc_id);
+  LOG_I(NR_RRC, "Triggering UE Context Setup for UE %d on DU %d\n", ue->rrc_ue_id, cell->assoc_id);
   int nb_srb = 2;
   f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
   f1ap_drb_to_setup_t *drbs = calloc_or_fail(MAX_DRBS_PER_UE, sizeof(*drbs));
@@ -3649,12 +3727,12 @@ void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
 
   /* Update measurement config for target DU */
   free_MeasConfig(ue->measConfig);
-  ue->measConfig = nr_rrc_get_measconfig(rrc, du->setup_req->cell[0].info.nr_cellid);
+  ue->measConfig = nr_rrc_get_measconfig(rrc, cell->info.cell_id);
   byte_array_t *meas_config = calloc_or_fail(1, sizeof(*meas_config));
   meas_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
   meas_config->len = do_NR_MeasConfig(ue->measConfig, meas_config->buf, NR_RRC_BUF_SIZE);
   /* Fill common fields */
-  f1ap_ue_context_setup_req_t req = rrc_fill_f1_ue_context_setup(ue, du, opt_du_ue_id);
+  f1ap_ue_context_setup_req_t req = rrc_fill_f1_ue_context_setup(ue, cell, opt_du_ue_id);
   /* Fill target DU specific fields */
   req.srbs_len = 2;
   req.srbs = srbs;
@@ -3663,8 +3741,8 @@ void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
   req.cu_to_du_rrc_info.meas_config = meas_config;
   req.cu_to_du_rrc_info.ho_prep_info = hpi;
 
-  RETURN_IF_INVALID_ASSOC_ID(du->assoc_id);
-  rrc->mac_rrc.ue_context_setup_request(du->assoc_id, &req);
+  RETURN_IF_INVALID_ASSOC_ID(cell->assoc_id);
+  rrc->mac_rrc.ue_context_setup_request(cell->assoc_id, &req);
   free_ue_context_setup_req(&req);
 }
 
@@ -3689,7 +3767,8 @@ void rrc_f1_ue_context_setup_from_e1_response(const gNB_RRC_INST *rrc,
 
   AssertFatal(!NODE_IS_DU(rrc->node_type), "illegal node type DU!\n");
 
-  nr_rrc_du_container_t *du = get_du_for_ue((gNB_RRC_INST *)rrc, ue_p->rrc_ue_id);
+  nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue((gNB_RRC_INST *)rrc, ue_p);
+  DevAssert(cell != NULL);
 
   int nb_srb = 1;
   f1ap_srb_to_setup_t *srbs = calloc_or_fail(nb_srb, sizeof(*srbs));
@@ -3706,7 +3785,7 @@ void rrc_f1_ue_context_setup_from_e1_response(const gNB_RRC_INST *rrc,
   const uint32_t du_ue_id = ue_data.secondary_ue;
 
   /* Fill common fields */
-  f1ap_ue_context_setup_req_t ue_context_setup_req = rrc_fill_f1_ue_context_setup(ue_p, du, &du_ue_id);
+  f1ap_ue_context_setup_req_t ue_context_setup_req = rrc_fill_f1_ue_context_setup(ue_p, cell, &du_ue_id);
   /* Fill bearers information for serving DU */
   ue_context_setup_req.srbs_len = nb_srb;
   ue_context_setup_req.srbs = srbs;

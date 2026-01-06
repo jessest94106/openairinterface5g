@@ -43,6 +43,7 @@
 #include "tree.h"
 #include "e1ap_interface_management.h"
 #include "rrc_gNB_NGAP.h"
+#include "rrc_cell_management.h"
 
 static int cuup_compare(const nr_rrc_cuup_container_t *a, const nr_rrc_cuup_container_t *b)
 {

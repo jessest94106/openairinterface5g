@@ -79,10 +79,15 @@ static int ssb_arfcn_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
   return mtlist->list.array[0]->frequencyAndTiming->carrierFreq;
 }
 
-int get_ssb_arfcn(const struct nr_rrc_du_container_t *du)
+/** @brief Find first cell owned by this DU (assoc_id) and return its SSB ARFCN
+ * @note Current assumption is that each DU serves only one cell*/
+int get_ssb_arfcn(const struct nr_rrc_cell_container_t *cell)
 {
-  DevAssert(du != NULL && du->mtc != NULL);
-  return ssb_arfcn_mtc(du->mtc);
+  DevAssert(cell != NULL);
+  if (cell->mtc != NULL)
+    return ssb_arfcn_mtc(cell->mtc);
+  AssertFatal(false, "no mtc found for cell %ld\n", cell->info.cell_id);
+  return 0;
 }
 
 static bool rrc_gNB_plmn_matches(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *info)
@@ -172,22 +177,6 @@ static neighbour_cell_configuration_t *get_cell_neighbour_list(const gNB_RRC_INS
   return (neighbour_cell_configuration_t *)it;
 }
 
-const struct f1ap_served_cell_info_t *get_cell_information_by_phycellId(int phyCellId)
-{
-  gNB_RRC_INST *rrc = RC.nrrrc[0];
-  nr_rrc_du_container_t *it = NULL;
-  RB_FOREACH (it, rrc_du_tree, &rrc->dus) {
-    for (int cellIdx = 0; cellIdx < it->setup_req->num_cells_available; cellIdx++) {
-      const f1ap_served_cell_info_t *cell_info = &(it->setup_req->cell[cellIdx].info);
-      if (cell_info->nr_pci == phyCellId) {
-        LOG_D(NR_RRC, "HO LOG: Found cell with phyCellId %d\n", phyCellId);
-        return cell_info;
-      }
-    }
-  }
-  return NULL;
-}
-
 static void is_intra_frequency_neighbour(void *ssb_arfcn, void *neighbour_cell)
 {
   uint32_t *ssb_arfcn_ptr = (uint32_t *)ssb_arfcn;
@@ -201,12 +190,9 @@ static void is_intra_frequency_neighbour(void *ssb_arfcn, void *neighbour_cell)
 /**
  * @brief Labels neighbour cells if they are intra frequency to prepare meas config only for intra frequency ho
  * @param[in] rrc     Pointer to RRC instance
- * @param[in] du      Pointer to DU container
  * @param[in] cell    Pointer to cell container
  */
-static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc,
-                                             const nr_rrc_du_container_t *du,
-                                             const nr_rrc_cell_container_t *cell)
+static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc, const nr_rrc_cell_container_t *cell)
 {
   if (!rrc->neighbour_cell_configuration)
     return;
@@ -215,7 +201,7 @@ static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc,
   if (!neighbour_cell_config)
     return;
 
-  uint32_t ssb_arfcn = get_ssb_arfcn(du);
+  uint32_t ssb_arfcn = get_ssb_arfcn(cell);
   LOG_D(NR_RRC,
         "Cell %lu (PCI %d, SSB ARFCN %u) has neighbour cell configuration, labeling intra-frequency neighbours\n",
         cell->info.cell_id,
@@ -422,18 +408,11 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
 
   // DU is accepted, add it to tree and add cell to DU's cell array
   nr_rrc_du_container_t *du = calloc_or_fail(1, sizeof(*du));
-  du->mtc = new->mtc; // TODO: remove in upcoming commit (kept for backward compatibility)
   du->assoc_id = assoc_id;
   du->gNB_DU_id = req->gNB_DU_id;
   du->gNB_DU_name = strdup(req->gNB_DU_name ? req->gNB_DU_name : "N/A");
   memcpy(du->rrc_ver, req->rrc_ver, sizeof(du->rrc_ver));
-  du->setup_req = calloc(1,sizeof(*du->setup_req));
-  AssertFatal(du->setup_req, "out of memory\n");
-  // Copy F1AP message
-  *du->setup_req = cp_f1ap_setup_request(req);
-  // MIB can be null and configured later via DU Configuration Update
-  du->mib = mib;
-  du->sib1 = sib1;
+
   // Initialize cell array for this DU
   seq_arr_init(&du->cells, sizeof(nr_rrc_cell_container_t *));
   nr_rrc_du_container_t *du_collision = rrc_add_du(rrc, du);
@@ -471,7 +450,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   }
 
   if (new->mib != NULL &&new->sib1 != NULL)
-    label_intra_frequency_neighbours(rrc, du, new);
+    label_intra_frequency_neighbours(rrc, new);
 
   f1ap_setup_resp_t resp = {.transaction_id = req->transaction_id,
                             .num_cells_to_activate = 1,
@@ -500,6 +479,9 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
     uint32_t ue_id = UE->rrc_ue_id;
     if (UE->ho_context != NULL)
       LOG_W(NR_RRC, "DU disconnected while handover for UE %d active\n", ue_id);
+
+    // Remove SCells from this DU for this UE
+    rrc_remove_ue_scells_from_du(UE, assoc_id);
 
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
     if (ue_data.du_assoc_id != assoc_id)
@@ -689,8 +671,9 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
         LOG_I(NR_RRC, "update system information of DU %ld\n", du->gNB_DU_id);
       }
     }
-    if (du->mib != NULL && du->sib1 != NULL && cell != NULL) {
-      label_intra_frequency_neighbours(rrc, du, cell);
+
+    if (cell && cell->mib != NULL && cell->sib1 != NULL && cell->assoc_id == du->assoc_id) {
+      label_intra_frequency_neighbours(rrc, cell);
     }
   }
 
@@ -723,15 +706,6 @@ void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t
     return;
   }
 
-  f1ap_setup_req_t *req = du->setup_req;
-  LOG_I(NR_RRC, "releasing DU ID %ld (%s) on assoc_id %d\n", req->gNB_DU_id, req->gNB_DU_name, assoc_id);
-  ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
-  ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
-  ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, du->mtc);
-  if (du->setup_req)
-    free_f1ap_setup_request(du->setup_req);
-  free(du->setup_req);
-
   // Clean up DU and associated cell resources
   rrc_cleanup_du(rrc, du);
 
@@ -749,46 +723,48 @@ nr_rrc_du_container_t *get_du_for_ue(gNB_RRC_INST *rrc, uint32_t ue_id)
   return get_du_by_assoc_id(rrc, ue_data.du_assoc_id);
 }
 
-/* \brief find DU by cell ID. Note: currently the CU is limited to one cell per
- * DU, hence here, DU == cell. Modify this to look up a specific cell. */
-nr_rrc_du_container_t *get_du_by_cell_id(gNB_RRC_INST *rrc, uint64_t cell_id)
-{
-  nr_rrc_du_container_t *du = NULL;
-  RB_FOREACH(du, rrc_du_tree, &rrc->dus) {
-    if (cell_id == du->setup_req->cell[0].info.nr_cellid)
-      return du;
-  }
-  return NULL;
-}
-
 void dump_du_info(const gNB_RRC_INST *rrc, FILE *f)
 {
   fprintf(f, "%ld connected DUs \n", rrc->num_dus);
-  int i = 1;
+  int du_idx = 1;
   nr_rrc_du_container_t *du = NULL;
-  /* cast is necessary to eliminate warning "discards ‘const’ qualifier" */
+  /* cast is necessary to eliminate warning "discards 'const' qualifier" */
   RB_FOREACH(du, rrc_du_tree, &((gNB_RRC_INST *)rrc)->dus) {
-    const f1ap_setup_req_t *sr = du->setup_req;
-    fprintf(f, "[%d] DU ID %ld (%s) ", i++, sr->gNB_DU_id, sr->gNB_DU_name);
+    fprintf(f, "[%d] DU ID %ld (%s) ", du_idx++, du->gNB_DU_id, du->gNB_DU_name);
     if (du->assoc_id == -1) {
       fprintf(f, "integrated DU-CU");
     } else {
       fprintf(f, "assoc_id %d", du->assoc_id);
     }
-    const f1ap_served_cell_info_t *info = &sr->cell[0].info;
-    fprintf(f, ": nrCellID %ld, PCI %d, SSB ARFCN %d\n", info->nr_cellid, info->nr_pci, get_ssb_arfcn(du));
 
-    if (info->mode == F1AP_MODE_TDD) {
-      const f1ap_nr_frequency_info_t *fi = &info->tdd.freqinfo;
-      const f1ap_transmission_bandwidth_t *tb = &info->tdd.tbw;
-      fprintf(f, "    TDD: band %d ARFCN %d SCS %d (kHz) PRB %d\n", fi->band, fi->arfcn, 15 * (1 << tb->scs), tb->nrb);
+    /* Print all cells for this DU */
+    int cell_count = seq_arr_size(&du->cells);
+
+    if (cell_count == 0) {
+      fprintf(f, ": no cells\n");
     } else {
-      const f1ap_nr_frequency_info_t *dfi = &info->fdd.dl_freqinfo;
-      const f1ap_transmission_bandwidth_t *dtb = &info->fdd.dl_tbw;
-      fprintf(f, "    FDD: DL band %d ARFCN %d SCS %d (kHz) PRB %d\n", dfi->band, dfi->arfcn, 15 * (1 << dtb->scs), dtb->nrb);
-      const f1ap_nr_frequency_info_t *ufi = &info->fdd.ul_freqinfo;
-      const f1ap_transmission_bandwidth_t *utb = &info->fdd.ul_tbw;
-      fprintf(f, "         UL band %d ARFCN %d SCS %d (kHz) PRB %d\n", ufi->band, ufi->arfcn, 15 * (1 << utb->scs), utb->nrb);
+      fprintf(f, ": %d cell%s\n", cell_count, cell_count > 1 ? "s" : "");
+      int cell_idx = 1;
+      FOR_EACH_SEQ_ARR (nr_rrc_cell_container_t **, cell_ptr, &du->cells) {
+        nr_rrc_cell_container_t *cell = *cell_ptr;
+        const char *mode = (cell->info.mode == NR_MODE_TDD) ? "TDD" : "FDD";
+        fprintf(f,
+                "  [%d] nrCellID %lu, PCI %d, Mode %s, SSB ARFCN %d\n",
+                cell_idx++,
+                cell->info.cell_id,
+                cell->info.pci,
+                mode,
+                ssb_arfcn_mtc(cell->mtc));
+        if (cell->info.mode == NR_MODE_TDD) {
+          const nr_rrc_freq_info_t *tdd = &cell->info.tdd.dlul;
+          fprintf(f, "      TDD: band %d ARFCN %d SCS %d (kHz) PRB %d\n", tdd->band, tdd->arfcn, 15 * (1 << tdd->scs), tdd->nrb);
+        } else {
+          const nr_rrc_freq_info_t *dl = &cell->info.fdd.dl;
+          const nr_rrc_freq_info_t *ul = &cell->info.fdd.ul;
+          fprintf(f, "      DL:  band %d ARFCN %d SCS %d (kHz) PRB %d\n", dl->band, dl->arfcn, 15 * (1 << dl->scs), dl->nrb);
+          fprintf(f, "      UL:  band %d ARFCN %d SCS %d (kHz) PRB %d\n", ul->band, ul->arfcn, 15 * (1 << ul->scs), ul->nrb);
+        }
+      }
     }
   }
 }
