@@ -197,6 +197,15 @@ void create_ue_ip_if(const char *ipv4, const char *ipv6, int ue_id, int pdu_sess
   start_sdap_tun_ue(ue_id, pdu_session_id, sock, ifname); // interface name suffix is ue_id+1
 }
 
+void create_ue_eth_if(int ue_id, int pdu_session_id, bool is_default)
+{
+  char ifname[IFNAMSIZ];
+  tuntap_generate_ue_ifname(ifname, IFF_TAP, ue_id, is_default ? -1 : pdu_session_id);
+  const int sock = tuntap_alloc(IFF_TAP, ifname);
+  tap_config(ifname); // brings the interface up
+  start_sdap_tun_ue(ue_id, pdu_session_id, sock, ifname);
+}
+
 void remove_ip_if(nr_sdap_entity_t *entity)
 {
   DevAssert(entity != NULL);

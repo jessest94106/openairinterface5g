@@ -1568,11 +1568,14 @@ static void handle_pdu_session_accept(const nr_ue_nas_t *nas, uint8_t *pdu_buffe
 
   // process PDU Session: pass ID -1 to not append PDU ID to interface
   bool is_default = idx == 0;
-  if (msg.pdu_addr_ie.pdu_length)
+  if (msg.pdu_type == PDU_SESSION_TYPE_ETHER) {
+    create_ue_eth_if(instance, sm_header.pdu_session_id, is_default);
+  } else if (msg.pdu_addr_ie.pdu_length) {
     process_pdu_session_addr(&msg, instance, sm_header.pdu_session_id, is_default);
-  else
-    LOG_W(NAS, "Optional PDU Address IE was not provided\n");
-  
+  } else {
+    LOG_W(NAS, "Unhandled PDU session type %d, ignoring PDU session ID %d\n", msg.pdu_type, sm_header.pdu_session_id);
+  }
+
   set_qfi(msg.qos_rules.rule->qfi, sm_header.pdu_session_id, instance);
 }
 
