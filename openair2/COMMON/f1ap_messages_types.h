@@ -69,6 +69,7 @@
 #define F1AP_UE_CONTEXT_RELEASE_COMPLETE(mSGpTR)   (mSGpTR)->ittiMsg.f1ap_ue_context_release_complete
 
 #define F1AP_PAGING_IND(mSGpTR)                    (mSGpTR)->ittiMsg.f1ap_paging_ind
+#define F1AP_PAGING(mSGpTR)                        (mSGpTR)->ittiMsg.f1ap_paging
 
 /* Length of the transport layer address string
  * 160 bits / 8 bits by char.
