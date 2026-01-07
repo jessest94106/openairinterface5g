@@ -20,8 +20,11 @@
  */
 #ifndef __NR_ORU_H__
 #define __NR_ORU_H__
+#include "PHY/defs_nr_common.h"
 #include "openair1/PHY/defs_RU.h"
 #include "thread-pool.h"
+#include "common/utils/nr/nr_common.h"
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_prach_config.h"
 
 typedef struct {
   RU_t *ru;
@@ -57,6 +60,12 @@ typedef struct {
   int num_sync_messages_needed;
   notifiedFIFO_t sync_fifo;
   tpool_t tpool;
+
+  // PRACH related
+  nr_prach_info_t prach_info;
+  time_stats_t rx_prach;
+  time_stats_t rx;
+  prach_item_t prach_item;
 } ORU_t;
 
 int get_oru_options(ORU_t *oru);
@@ -64,5 +73,6 @@ void oru_init_frame_parms(ORU_t *oru);
 void *oru_north_read_thread(void *arg);
 void *oru_south_read_thread(void *arg);
 void *oru_sync_thread(void *arg);
+void prepare_prach_item(ORU_t *oru);
 
 #endif

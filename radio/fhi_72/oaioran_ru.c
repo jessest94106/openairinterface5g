@@ -35,6 +35,9 @@
 #include "xran_fh_o_ru.h"
 #include "xran_compression.h"
 #include "armral_bfp_compression.h"
+#include <xran_pkt.h>
+#include <xran_pkt_up.h>
+#include <xran_transport.h>
 
 #if defined(__arm__) || defined(__aarch64__)
 #else
@@ -52,6 +55,10 @@
 #include "oran-config.h" // for g_kbar
 
 #include "common/utils/threadPool/notified_fifo.h"
+
+#define RATE_LIMIT(n) if (({ static int _counter = 0; _counter++ % (n) == 0; }))
+#define ETHER_TYPE_ECPRI 0xAEFE
+#define MAX_NUM_ANTENNAS 4
 
 notifiedFIFO_t ru_dl_sync_fifo;
 extern volatile bool first_call_set;
@@ -230,6 +237,22 @@ static void print_statistics(packet_processor_context_t *context)
   LOG_I(HW, "RU: packets processed %lu\n", context->up_processed);
   LOG_I(HW, "RU: packets dropped %lu\n", context->up_dropped);
 }
+
+typedef struct {
+  int section_id;
+  int num_prb;
+  int start_prb;
+  int slot;
+  int frame;
+  int mu;
+  int filter_id;
+} oran_prach_cplane_config_t;
+
+oran_prach_cplane_config_t prach_config_per_antenna[MAX_NUM_ANTENNAS] = {0};
+static uint8_t prach_seq_id[MAX_NUM_ANTENNAS] = {0};
+
+extern int32_t xran_ethdi_mbuf_send(struct rte_mbuf *mb, uint16_t ethertype, uint16_t vf_id);
+extern uint16_t xran_map_ecpriPcid_to_vf(void *p_dev_ctx, int32_t dir, int32_t cc_id, int32_t ru_port_id);
 
 void symbol_callback(void *args, struct xran_sense_of_time *p_sense_of_time)
 {
@@ -478,7 +501,58 @@ int process_ru_uplane(struct rte_mbuf *pkt,
 
 int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, struct xran_sense_of_time *p_sense_of_time)
 {
-  return MBUF_FREE;
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(port_id);
+  struct xran_ecpri_hdr *ecpri_hdr;
+  struct xran_recv_packet_info xran_recv_packet_info;
+  int ret = xran_parse_ecpri_hdr(pkt, &ecpri_hdr, &xran_recv_packet_info);
+  if (ret != XRAN_STATUS_SUCCESS) {
+    return MBUF_FREE;
+  }
+  struct xran_cp_radioapp_common_header *apphdr = (void *)rte_pktmbuf_adj(pkt, sizeof(struct xran_ecpri_hdr));
+  if (apphdr == NULL) {
+    LOG_W(HW, "issue extracting apphdr\n");
+    return MBUF_FREE;
+  }
+  apphdr->field.all_bits = rte_be_to_cpu_32(apphdr->field.all_bits);
+  if (apphdr->field.payloadVer != XRAN_PAYLOAD_VER) {
+    LOG_W(HW, "Invalid payloadVer field %d\n", apphdr->field.payloadVer);
+    return MBUF_FREE;
+  }
+
+  switch (apphdr->sectionType) {
+    case XRAN_CP_SECTIONTYPE_3: {
+      struct xran_cp_radioapp_section3_header *hdr = (struct xran_cp_radioapp_section3_header *)apphdr;
+      if (hdr->cmnhdr.numOfSections != 1) {
+        LOG_W(HW, "Only support one section\n");
+        return MBUF_FREE;
+      }
+
+      hdr->timeOffset = rte_be_to_cpu_16(hdr->timeOffset);
+      hdr->cpLength = rte_be_to_cpu_16(hdr->cpLength);
+
+      struct xran_cp_radioapp_section3 *section = (void *)rte_pktmbuf_adj(pkt, sizeof(struct xran_cp_radioapp_section3_header));
+      if (section == NULL) {
+        LOG_W(HW, "Issue extracting section\n");
+        return MBUF_FREE;
+      }
+      *((uint64_t *)section) = rte_be_to_cpu_64(*((uint64_t *)section));
+      int mu = hdr->frameStructure.uScs;
+      int aarx = xran_recv_packet_info.eaxc.ruPortId - fh_cfg->prach_conf.eAxC_offset;
+      oran_prach_cplane_config_t prach_config = {
+          .frame = hdr->cmnhdr.field.frameId,
+          .slot = hdr->cmnhdr.field.slotId + hdr->cmnhdr.field.subframeId + hdr->cmnhdr.field.subframeId * hdr->frameStructure.uScs,
+          .num_prb = section->hdr.u1.common.numPrbc,
+          .start_prb = section->hdr.u1.common.startPrbc,
+          .section_id = section->hdr.u1.common.sectionId,
+          .mu = mu,
+          .filter_id = hdr->cmnhdr.field.filterIndex
+      };
+      prach_config_per_antenna[aarx] = prach_config;
+      return MBUF_FREE;
+    }
+    default:
+      return MBUF_FREE;
+  }
 }
 
 void init_oru_packet_processor(void *handle, int callbacks_per_slot)
@@ -489,6 +563,13 @@ void init_oru_packet_processor(void *handle, int callbacks_per_slot)
   static bool installed = false;
   AssertFatal(!installed, "Cannot init oru twice\n");
   installed = true;
+  for (int aarx = 0; aarx < MAX_NUM_ANTENNAS; aarx++) {
+    prach_config_per_antenna[aarx].section_id = -1;
+    prach_config_per_antenna[aarx].num_prb = -1;
+    prach_config_per_antenna[aarx].start_prb = -1;
+    prach_config_per_antenna[aarx].slot = -1;
+    prach_config_per_antenna[aarx].frame = -1;
+  }
 
 
   // Represents RX window end
@@ -524,4 +605,113 @@ void init_oru_packet_processor(void *handle, int callbacks_per_slot)
     start_symbol += symbols_per_callback;
   }
   xran_hook_install(handle, process_ru_uplane, NULL, process_ru_cplane, NULL, symbol_callback, &args, mu);
+}
+
+extern void *xran_ethdi_mbuf_alloc(void);
+
+void fill_ecpri_header(struct xran_ecpri_hdr *ecpri_header,
+                       uint8_t ecpri_mesg_type,
+                       size_t ecpri_payload_size,
+                       uint8_t CC_ID,
+                       uint8_t Ant_ID,
+                       uint8_t seq_id,
+                       uint8_t oxu_port_id)
+{
+  ecpri_header->cmnhdr.data.data_num_1 = 0x0;
+  ecpri_header->cmnhdr.bits.ecpri_ver = XRAN_ECPRI_VER;
+  ecpri_header->cmnhdr.bits.ecpri_mesg_type = ecpri_mesg_type;
+  ecpri_header->cmnhdr.bits.ecpri_payl_size = rte_cpu_to_be_16(ecpri_payload_size);
+  ecpri_header->ecpri_xtc_id = xran_compose_cid(0, 0, CC_ID, Ant_ID);
+  ecpri_header->ecpri_seq_id.bits.seq_id = seq_id;
+  ecpri_header->ecpri_seq_id.bits.e_bit = 1;
+  ecpri_header->ecpri_seq_id.bits.sub_seq_id = 0;
+  /// No byteswap for ecpri_seq_id. Possibly because of inverse definition in xran
+}
+
+void fill_radio_app_header(struct radio_app_common_hdr *radio_app_header,
+                           int filter_id,
+                           int direction,
+                           int frame,
+                           int slot,
+                           int symbol,
+                           int mu)
+{
+  radio_app_header->frame_id = frame & 0xff;
+  radio_app_header->sf_slot_sym.slot_id = slot % (1 << mu);
+  radio_app_header->sf_slot_sym.subframe_id = slot / (1 << mu);
+  radio_app_header->sf_slot_sym.symb_id = symbol;
+  radio_app_header->sf_slot_sym.value = rte_cpu_to_be_16(radio_app_header->sf_slot_sym.value);
+  radio_app_header->data_feature.data_direction = direction;
+  radio_app_header->data_feature.payl_ver = 1;
+  radio_app_header->data_feature.filter_id = filter_id;
+}
+
+void fill_data_section_header(struct data_section_hdr *data_section_hdr, int num_prb, int start_prb, int section_id)
+{
+  data_section_hdr->fields.all_bits = 0;
+  data_section_hdr->fields.num_prbu = (uint8_t)XRAN_CONVERT_NUMPRBC(num_prb);
+  data_section_hdr->fields.start_prbu = (start_prb & 0x03ff);
+  data_section_hdr->fields.sect_id = section_id;
+  data_section_hdr->fields.all_bits = rte_cpu_to_be_32(data_section_hdr->fields.all_bits);
+}
+
+void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int symbol)
+{
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
+  uint8_t mu = fh_cfg->frame_conf.nNumerology;
+
+  AssertFatal(fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
+  // TODO: With compression, have to add compression header to header_len
+  size_t header_length = sizeof(struct xran_ecpri_hdr) + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr);
+
+  // TODO: For compression, have to re-evaluate data size;
+  // TODO: Only support short format PRACH
+  const uint prach_length = 139;
+  size_t data_len = sizeof(int32_t) * prach_length;
+
+  oran_prach_cplane_config_t *prach_config = &prach_config_per_antenna[aarx];
+  if (prach_config->section_id == -1) {
+    RATE_LIMIT(1000)
+      LOG_W(HW, "PRACH was not yet configured by the O-DU\n");
+    return;
+  }
+  if (prach_config->frame != (frame & 0xff) || prach_config->slot != slot) {
+    RATE_LIMIT(1000)
+      LOG_W(HW,
+            "PRACH was not configured for frame.slot %d.%d, configuration is for frame.slot %d.%d\n",
+            frame,
+            slot,
+            prach_config->frame,
+            prach_config->slot);
+    return;
+  }
+
+  struct rte_mbuf *mbuf = xran_ethdi_mbuf_alloc();
+  AssertFatal(mbuf != NULL, "out of mbufs\n");
+  char *buf = rte_pktmbuf_append(mbuf, header_length + data_len);
+  AssertFatal(buf, "incorrect mbuf size\n");
+
+  struct xran_ecpri_hdr *ecpri_header = (struct xran_ecpri_hdr *)rte_pktmbuf_mtod(mbuf, char *);
+  uint16_t ecpri_payload_size = xran_get_ecpri_hdr_size() + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr) + data_len;
+  fill_ecpri_header(ecpri_header, ECPRI_IQ_DATA, ecpri_payload_size, 0, aarx + fh_cfg->prach_conf.eAxC_offset, prach_seq_id[aarx]++, 0);
+
+  struct radio_app_common_hdr *radio_app_header = (struct radio_app_common_hdr *)(ecpri_header + 1);
+  fill_radio_app_header(radio_app_header, prach_config->filter_id, XRAN_DIR_UL, frame, slot, symbol, mu);
+
+  struct data_section_hdr *data_section_header = (struct data_section_hdr *)(radio_app_header + 1);
+  fill_data_section_header(data_section_header, prach_config->num_prb, prach_config->start_prb, prach_config->section_id);
+
+  void *iq_data_start = (void *)(data_section_header + 1);
+  int16_t *dest = (int16_t *)iq_data_start;
+  uint16_t *src = (uint16_t *)prachF;
+  for (int i = 0; i < prach_length * 2; i++) {
+    dest[i] = (int16_t)htons(src[i]);
+  }
+
+  buf = rte_pktmbuf_prepend(mbuf, sizeof(struct rte_ether_hdr));
+  AssertFatal(buf != NULL, "incorrect mbuf size\n");
+
+  int vf_id = xran_map_ecpriPcid_to_vf(gxran_handle, XRAN_DIR_UL, 0, aarx + fh_cfg->prach_conf.eAxC_offset);
+  int ret = xran_ethdi_mbuf_send(mbuf, ETHER_TYPE_ECPRI, vf_id);
+  AssertFatal(ret == 1, "Error sending mbuf\n");
 }

@@ -18,12 +18,14 @@
  * For more information about the OpenAirInterface (OAI) Software Alliance:
  *      contact@openairinterface.org
  */
+#include "PHY/defs_RU.h"
 #include "assertions.h"
 #include "common/config/config_userapi.h"
 #include "nr-oru.h"
 #include "openair1/PHY/defs_nr_common.h"
 #include "openair1/PHY/MODULATION/nr_modulation.h"
 #include "openair1/SCHED_NR/sched_nr.h"
+#include "openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.h"
 
 #define CONFIG_SECTION_ORU "ORUs.[0]"
 
@@ -103,6 +105,16 @@ typedef struct {
 } dl_symbol_process_t;
 
 extern void tx_rf_symbols(RU_t *ru, int frame, int slot, uint64_t timestamp, int start_symbol, int num_symbols);
+extern void rx_nr_prach_ru_internal(prach_item_t *p,
+                                    int beam_id,
+                                    int prachStartSymbol,
+                                    int prachOccasion,
+                                    int32_t **rxdata,
+                                    NR_DL_FRAME_PARMS *fp,
+                                    int N_TA_offset,
+                                    int rep_index,
+                                    uint reps);
+
 static void oru_downlink_processing(ORU_t *oru,
                                     c16_t *txDataF_ptr[oru->ru->nb_tx],
                                     int frame,
@@ -270,6 +282,48 @@ static openair0_timestamp_t get_timestamp(ORU_t *oru, sense_of_time_t *sense_of_
   return timestamp;
 }
 
+void receive_prach(ORU_t *oru, int frame, int slot, int prach_symbol)
+{
+  RU_t *ru = oru->ru;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+  oru->prach_item.frame = frame;
+  oru->prach_item.slot = slot;
+
+
+  rx_nr_prach_ru_internal(&oru->prach_item,
+                          0,
+                          oru->prach_info.start_symbol,
+                          0,
+                          ru->common.rxdata,
+                          fp,
+                          ru->N_TA_offset,
+                          prach_symbol,
+                          1);
+  for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
+    ru->ifdevice.xran_api.write_prach((uint32_t *)oru->prach_item.rxsigF[0][aarx], aarx, frame, slot, prach_symbol);
+  }
+}
+
+// Returns PRACH symbol that was received in current frame, slot and symbol.
+// If no PRACH symbol was received, returns -1
+int get_prach_symbol(ORU_t *oru, int frame, int slot, int symbol, int numerology)
+{
+  uint16_t RA_sfn_index;
+  AssertFatal(oru->ru->nr_frame_parms->frame_type == TDD, "Only supports TDD\n");
+  if (get_nr_prach_sched_from_info(oru->prach_info, oru->prach_config_index, frame, slot, numerology, FR1, &RA_sfn_index, true)) {
+    int format = oru->prach_item.pdu.prach_format;
+    int start_symbol = oru->prach_item.pdu.prach_start_symbol;
+    symbol -= start_symbol;
+    // TODO: Support more PRACH formats
+    AssertFatal(format == 8, "only support format B4\n");
+    // TODO: This is not exactly the case but it is correct
+    if (symbol > 0 && symbol < 12) {
+      return symbol;
+    }
+  }
+  return -1;
+}
+
 void *oru_north_read_thread(void *arg)
 {
   ORU_t *oru = (ORU_t *)arg;
@@ -400,6 +454,49 @@ void *oru_south_read_thread(void *arg)
   rx_initial_sync(oru, &slot, &frame);
   LOG_A(PHY, "ORU South read thread started at frame %d, slot %d\n", frame, slot);
 
+  RU_t *ru = oru->ru;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+
+  while (!oai_exit) {
+    int rx_slot_type = nr_slot_select(&ru->config, frame, slot);
+    for (int symbol = 0; symbol < 14; symbol++) {
+      int samples_to_read = get_samples_symbol_duration(fp, slot, symbol, 1);
+      size_t offset = get_samples_slot_timestamp(fp, slot) + get_samples_symbol_timestamp(fp, slot, symbol);
+      c16_t *rxp[fp->nb_antennas_rx];
+      for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
+        rxp[aarx] = (c16_t *)&ru->common.rxdata[aarx][offset];
+      }
+
+      openair0_timestamp_t timestamp;
+      int num_samples_read = ru->rfdevice.trx_read_func(&ru->rfdevice, &timestamp, (void **)rxp, samples_to_read, ru->nb_rx);
+      AssertFatal(num_samples_read == samples_to_read, "Unexpected number of samples received\n");
+      LOG_D(PHY,
+            "[ORU south] read data: frame %d, slot %d, symbol %d, timestamp %ld num_symbols %d, samples %d\n",
+            frame,
+            slot,
+            symbol,
+            timestamp,
+            1,
+            num_samples_read);
+
+      if (rx_slot_type == NR_UPLINK_SLOT || rx_slot_type == NR_MIXED_SLOT) {
+        int prach_symbol = get_prach_symbol(oru, frame, slot, symbol, ru->numerology);
+        if (prach_symbol == 11) {
+          receive_prach(oru, frame, slot, prach_symbol);
+        }
+        stop_meas(&oru->rx);
+      }
+    }
+    slot++;
+    if (slot == fp->slots_per_frame) {
+      slot = 0;
+      frame++;
+      if (frame == 1024) {
+        frame = 0;
+      }
+    }
+  }
+
   // Perform RX processing
   return NULL;
 }
@@ -510,4 +607,84 @@ static void oru_downlink_processing(ORU_t *oru,
   join_task_ans(&task_ans);
   tx_rf_symbols(ru, frame, slot, timestamp_tx, start_symbol, num_symbols);
   stop_meas(&ru->tx_fhaul);
+}
+
+void prepare_prach_item(ORU_t *oru)
+{
+  AssertFatal(oru->ru != NULL, "ORU not configured\n");
+  AssertFatal(oru->ru->nr_frame_parms != NULL, "ORU not configured\n");
+  NR_DL_FRAME_PARMS *fp = oru->ru->nr_frame_parms;
+  RU_t *ru = oru->ru;
+  prach_item_t *prach_item = &oru->prach_item;
+  prach_item->num_slots = oru->prach_info.format < 4 ? get_long_prach_dur(oru->prach_info.format, fp->numerology_index) : 1;
+  prach_item->msg1_frequencystart = oru->prach_msg1_freq;
+  prach_item->mu = fp->numerology_index;
+  nfapi_nr_config_request_scf_t *cfg = &ru->config;
+  prach_item->prach_sequence_length = cfg->prach_config.prach_sequence_length.value;
+  prach_item->restricted_set = 0;
+  prach_item->numerology_index = fp->numerology_index;
+  prach_item->nb_rx = ru->nb_rx;
+  prach_item->rx_prach = &oru->rx_prach;
+  prach_item->beams[0] = 0; // TODO: Beamforming not supported yet
+
+  // Fill PRACH PDU
+  nfapi_nr_prach_pdu_t *prach_pdu = &prach_item->pdu;
+  prach_pdu->prach_start_symbol = oru->prach_info.start_symbol;
+  prach_pdu->num_prach_ocas = 1; // TODO: Hardcoded.
+
+  uint16_t format0 = oru->prach_info.format & 0xff;
+  uint16_t format1 = (oru->prach_info.format >> 8) & 0xff;
+  if (format1 != 0xff) {
+    switch (format0) {
+      case 0xa1:
+        prach_pdu->prach_format = 11;
+        break;
+      case 0xa2:
+        prach_pdu->prach_format = 12;
+        break;
+      case 0xa3:
+        prach_pdu->prach_format = 13;
+        break;
+      default:
+        AssertFatal(1 == 0, "Only formats A1/B1 A2/B2 A3/B3 are valid for dual format");
+    }
+  } else {
+    switch (format0) {
+      case 0:
+        prach_pdu->prach_format = 0;
+        break;
+      case 1:
+        prach_pdu->prach_format = 1;
+        break;
+      case 2:
+        prach_pdu->prach_format = 2;
+        break;
+      case 3:
+        prach_pdu->prach_format = 3;
+        break;
+      case 0xa1:
+        prach_pdu->prach_format = 4;
+        break;
+      case 0xa2:
+        prach_pdu->prach_format = 5;
+        break;
+      case 0xa3:
+        prach_pdu->prach_format = 6;
+        break;
+      case 0xb1:
+        prach_pdu->prach_format = 7;
+        break;
+      case 0xb4:
+        prach_pdu->prach_format = 8;
+        break;
+      case 0xc0:
+        prach_pdu->prach_format = 9;
+        break;
+      case 0xc2:
+        prach_pdu->prach_format = 10;
+        break;
+      default:
+        AssertFatal(1 == 0, "Invalid PRACH format");
+    }
+  }
 }

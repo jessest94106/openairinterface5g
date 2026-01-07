@@ -125,15 +125,15 @@ prach_item_t *nr_schedule_rx_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_n
   return prach;
 }
 
-static void rx_nr_prach_ru_internal(prach_item_t *p,
-                                    int beam_id,
-                                    int prachStartSymbol,
-                                    int prachOccasion,
-                                    int32_t **rxdata,
-                                    NR_DL_FRAME_PARMS *fp,
-                                    int N_TA_offset,
-                                    int rep_index,
-                                    uint reps)
+void rx_nr_prach_ru_internal(prach_item_t *p,
+                             int beam_id,
+                             int prachStartSymbol,
+                             int prachOccasion,
+                             int32_t **rxdata,
+                             NR_DL_FRAME_PARMS *fp,
+                             int N_TA_offset,
+                             int rep_index,
+                             uint reps)
 {
   int sample_offset_slot;
   const int sum = fp->ofdm_symbol_size + fp->nb_prefix_samples;
