@@ -1558,17 +1558,25 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     DevAssert(success);
     nr_rrc_finalize_ho(UE);
   } else if (physCellId != cell_info->nr_pci) {
-    /* UE was moving from previous cell so quickly that RRCReestablishment for previous cell was received in this cell */
-    LOG_I(NR_RRC,
-          "RRC Reestablishment Request from different physCellId (%ld) than current physCellId (%d), fallback to RRC setup\n",
-          physCellId,
-          cell_info->nr_pci);
-    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
-    /* 38.401 8.7: "If the UE accessed from a gNB-DU other than the original
-     * one, the gNB-CU should trigger the UE Context Setup procedure". Let's
-     * assume that the old DU will trigger a release request, also freeing the
-     * ongoing context at the CU. Hence, create new below */
-    goto fallback_rrc_setup;
+    /* Check if this is a different DU scenario or "too fast movement" scenario */
+    if (assoc_id != ue_data.du_assoc_id) {
+      /* Different DU scenario - physCellId differs because UE is re-establishing on a different DU.
+       * Re-establishment is allowed, UE Context Setup will be triggered at RRCReestablishmentComplete. */
+      LOG_I(NR_RRC,
+            "UE %d: Re-establishment on different DU (physCellId %ld from old cell != %d from new DU)\n",
+            UE->rrc_ue_id,
+            physCellId,
+            cell_info->nr_pci);
+    } else {
+      /* Same DU but different physCellId - "too fast movement" scenario:
+       * UE was moving from previous cell so quickly that RRCReestablishment for previous cell was received in this cell */
+      LOG_I(NR_RRC,
+            "RRC Reestablishment Request from different physCellId (%ld) than current physCellId (%d), fallback to RRC setup\n",
+            physCellId,
+            cell_info->nr_pci);
+      ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
+      goto fallback_rrc_setup;
+    }
   }
 
   /* TODO: start timer in ITTI and drop UE if it does not come back */
