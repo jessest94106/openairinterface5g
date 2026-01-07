@@ -14,4 +14,4 @@
 #include "openair2/COMMON/f1ap_messages_def.h"
 #include "openair2/COMMON/e1ap_messages_def.h"
 #include "openair2/COMMON/ngap_messages_def.h"
-
+#include "openair2/COMMON/nrppa_messages_def.h"

@@ -28,6 +28,7 @@
 #include "openair2/GNB_APP/gnb_paramdef.h"
 #include "openair3/SCTP/sctp_default_values.h"
 #include "openair3/NRPPA/nrppa_gNB_config.h"
+#include "openair3/NRPPA/nrppa_gNB.h"
 
 RAN_CONTEXT_t RC;
 THREAD_STRUCT thread_struct;
@@ -82,6 +83,9 @@ int main(int argc, char **argv)
 
   rc = itti_create_task(TASK_NGAP, ngap_gNB_task, NULL);
   AssertFatal(rc >= 0, "Create task for NGAP failed\n");
+
+  rc = itti_create_task(TASK_NRPPA, nrppa_gNB_task, NULL);
+  AssertFatal(rc >= 0, "Create task for NRPPA failed\n");
 
   MessageDef *msg_p;
   msg_p = itti_alloc_new_message(TASK_GNB_APP, 0, NGAP_REGISTER_GNB_REQ);
