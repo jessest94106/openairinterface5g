@@ -1469,11 +1469,12 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   const char *scause = get_reestab_cause(req->reestablishmentCause);
   const long physCellId = req->ue_Identity.physCellId;
   long ngap_cause = NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED; /* cause in case of NGAP release req */
+  const rnti_t old_rnti = req->ue_Identity.c_RNTI;
   rrc_gNB_ue_context_t *ue_context_p = NULL;
   LOG_I(NR_RRC,
-        "Reestablishment RNTI %04x req C-RNTI %04lx physCellId %ld cause %s\n",
+        "Reestablishment RNTI %04x req C-RNTI %04x physCellId %ld cause %s\n",
         msg->crnti,
-        req->ue_Identity.c_RNTI,
+        old_rnti,
         physCellId,
         scause);
 
@@ -1483,10 +1484,9 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     return;
   }
 
-  // 3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1: RNTI values
-  if (req->ue_Identity.c_RNTI < 0x1 || req->ue_Identity.c_RNTI > 0xffef) {
-    /* c_RNTI range error should not happen */
-    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04lx range error, fallback to RRC setup\n", req->ue_Identity.c_RNTI);
+  // Validate C-RNTI range (3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1)
+  if (old_rnti < 0x1 || old_rnti > 0xffef) {
+    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04x range error, fallback to RRC setup\n", old_rnti);
     goto fallback_rrc_setup;
   }
 
@@ -1507,7 +1507,6 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
-  rnti_t old_rnti = req->ue_Identity.c_RNTI;
   ue_context_p = rrc_gNB_get_ue_context_by_rnti(rrc, assoc_id, old_rnti);
   if (ue_context_p == NULL) {
     ue_context_p = rrc_gNB_get_ue_context_source_cell(rrc, physCellId, old_rnti);
@@ -1518,9 +1517,17 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
+  if (!UE->as_security_active) {
+    /* no active security context, need to restart entire connection */
+    LOG_E(NR_RRC, "UE requested Reestablishment without activated AS security\n");
+    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
+    goto fallback_rrc_setup;
+  }
+
   /* should check phys cell ID to identify the correct cell */
   const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
   const f1ap_served_cell_info_t *previous_cell_info = get_cell_information_by_phycellId(physCellId);
+  f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
 
   nr_ho_source_cu_t *source_ctx = UE->ho_context ? UE->ho_context->source : NULL;
   DevAssert(!source_ctx || source_ctx->du->setup_req->num_cells_available == 1);
@@ -1546,7 +1553,6 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     source_ctx->old_cellGroupConfig = NULL;
 
     /* update to old DU assoc id -- RNTI + secondary DU UE ID further below */
-    f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
     ue_data.du_assoc_id = source_ctx->du->assoc_id;
     bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
     DevAssert(success);
@@ -1565,19 +1571,11 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
-  if (!UE->as_security_active) {
-    /* no active security context, need to restart entire connection */
-    LOG_E(NR_RRC, "UE requested Reestablishment without activated AS security\n");
-    ngap_cause = NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON;
-    goto fallback_rrc_setup;
-  }
-
   /* TODO: start timer in ITTI and drop UE if it does not come back */
 
   // update with new RNTI, and update secondary UE association
   UE->rnti = msg->crnti;
   UE->nr_cellid = msg->nr_cellid;
-  f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
   ue_data.secondary_ue = msg->gNB_DU_ue_id;
   bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
   DevAssert(success);
