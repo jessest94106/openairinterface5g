@@ -1510,12 +1510,18 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     goto fallback_rrc_setup;
   }
 
+  // Try to find UE context by RNTI and assoc_id (normal case: same DU)
   ue_context_p = rrc_gNB_get_ue_context_by_rnti(rrc, assoc_id, old_rnti);
   if (ue_context_p == NULL) {
-    ue_context_p = rrc_gNB_get_ue_context_source_cell(rrc, physCellId, old_rnti);
+    // Fallback 1: Try to find UE by RNTI only (re-establishment on different DU scenario)
+    ue_context_p = rrc_gNB_get_ue_context_by_rnti_any_du(rrc, old_rnti);
     if (ue_context_p == NULL) {
-      LOG_E(NR_RRC, "NR_RRCReestablishmentRequest without UE context, fallback to RRC setup\n");
-      goto fallback_rrc_setup;
+      // Fallback 2: Try to find UE by source cell (handover scenario)
+      ue_context_p = rrc_gNB_get_ue_context_source_cell(rrc, physCellId, old_rnti);
+      if (ue_context_p == NULL) {
+        LOG_E(NR_RRC, "NR_RRCReestablishmentRequest without UE context, fallback to RRC setup\n");
+        goto fallback_rrc_setup;
+      }
     }
   }
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
