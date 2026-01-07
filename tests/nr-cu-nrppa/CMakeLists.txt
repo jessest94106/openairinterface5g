@@ -5,6 +5,6 @@ add_executable(nr-cu-nrppa-test nr-cu-nrppa.c
 target_link_libraries(nr-cu-nrppa-test PRIVATE
                       CONFIG_LIB ITTI SCTP_CLIENT
                       f1ap ngap SECURITY
-                      UTIL softmodem_common)
+                      UTIL softmodem_common nrppa)
 target_link_libraries(nr-cu-nrppa-test PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 add_dependencies(nr-cu-nrppa-test params_libconfig)
