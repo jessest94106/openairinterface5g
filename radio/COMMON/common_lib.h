@@ -680,6 +680,16 @@ struct openair0_device {
      * \param num_symbols number of symbols
      */
     void (*north_in_func)(uint32_t **txdataF, int nb_tx, sense_of_time_t* sense_of_time, int *num_symbols);
+
+    /*!
+     * \brief Write prach data for one PRACH symbol
+     * \param prachF Frequency domain PRACH data size 139 (only short format support)
+     * \param aarx
+     * \param frame
+     * \param slot
+     * \param symbol
+     */
+    void (*write_prach)(uint32_t *prachF, int aarx, int frame, int slot, int symbol);
   } xran_api;
 };
 

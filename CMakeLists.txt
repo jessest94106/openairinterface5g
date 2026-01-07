@@ -1834,7 +1834,7 @@ target_link_libraries(nr-oru PRIVATE
   radio_common softmodem_common)
 target_link_libraries(nr-oru PRIVATE pthread m CONFIG_LIB rt ${T_LIB} utils
   barrier actor)
-target_link_libraries(nr-oru PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs nr_phy_common time_management PHY_NR)
+target_link_libraries(nr-oru PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs nr_phy_common time_management PHY_NR MAC_NR_COMMON)
 
 # nr-softmodem
 ###################################################

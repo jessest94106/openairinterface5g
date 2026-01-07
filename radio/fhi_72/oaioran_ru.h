@@ -32,5 +32,6 @@ void init_oru_packet_processor(void* handle, int callbacks_per_slot);
 
 // Read samples DL IQ samples for frame slot symbol for all antennas
 int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, int *symbol, int *num_symbols, struct timespec *ts);
+void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int symbol);
 
 #endif
