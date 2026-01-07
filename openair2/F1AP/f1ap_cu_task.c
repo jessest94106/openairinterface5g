@@ -202,9 +202,8 @@ void *F1AP_CU_task(void *arg) {
         free_ue_context_rel_cmd(&F1AP_UE_CONTEXT_RELEASE_CMD(received_msg));
         break;
 
-      case F1AP_PAGING_IND:
-        CU_send_Paging(assoc_id,
-                       &F1AP_PAGING_IND(received_msg));
+      case F1AP_PAGING:
+        CU_send_Paging(assoc_id, &F1AP_PAGING(received_msg));
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_CONFIRM:
