@@ -1773,15 +1773,21 @@ static void send_nas_5gmm_ind(instance_t instance, const Guti5GSMobileIdentity_t
   itti_send_msg_to_task(TASK_RRC_NRUE, instance, msg);
 }
 
-void request_pdusession(nr_ue_nas_t *nas, int pdusession_id)
+void request_pdusession(nr_ue_nas_t *nas, int pdusession_id, int t, nssai_t nssai, const char *dnn)
 {
+  AssertFatal(t == PDU_SESSION_TYPE_IPV4 || t == PDU_SESSION_TYPE_IPV6 || t == PDU_SESSION_TYPE_IPV4V6
+                  || t == PDU_SESSION_TYPE_UNSTRUCT || t == PDU_SESSION_TYPE_ETHER,
+              "illegal PDU session type %d\n",
+              t);
+  AssertFatal(t != PDU_SESSION_TYPE_UNSTRUCT, "unstructured PDU sessions not handled yet\n");
   MessageDef *message_p = itti_alloc_new_message(TASK_NAS_NRUE, nas->UE_id, NAS_PDU_SESSION_REQ);
   nas_pdu_session_req_t *pdu_req = &NAS_PDU_SESSION_REQ(message_p);
   pdu_req->pdusession_id = pdusession_id;
-  pdu_req->pdusession_type = 0x91; // 0x91 = IPv4, 0x92 = IPv6, 0x93 = IPv4v6
-  pdu_req->sst = nas->uicc->nssai_sst;
-  pdu_req->sd = nas->uicc->nssai_sd;
-  snprintf(pdu_req->dnn, sizeof(pdu_req->dnn), "%s", nas->uicc->dnnStr);
+  // 24.501: joint PDU session type IEI (0x9-, Table 8.3.1.1.1) and type (9.11.4.11)
+  pdu_req->pdusession_type = 0x90 | t;
+  pdu_req->sst = nssai.sst;
+  pdu_req->sd = nssai.sd;
+  snprintf(pdu_req->dnn, sizeof(pdu_req->dnn), "%s", dnn);
   itti_send_msg_to_task(TASK_NAS_NRUE, nas->UE_id, message_p);
 }
 
@@ -1871,9 +1877,10 @@ static void handle_registration_accept(nr_ue_nas_t *nas, const uint8_t *pdu_buff
   if (get_user_nssai_idx(ch_nssai, msg.nas_allowed_nssai) < 0) {
     LOG_E(NAS, "NSSAI parameters not match with allowed NSSAI. Couldn't request PDU session.\n");
   } else {
-    request_pdusession(nas, get_softmodem_params()->default_pdu_session_id);
+    nssai_t nssai = {nas->uicc->nssai_sst, nas->uicc->nssai_sd};
+    request_pdusession(nas, get_softmodem_params()->default_pdu_session_id, PDU_SESSION_TYPE_IPV4, nssai, nas->uicc->dnnStr);
     if (get_nrUE_params()->extra_pdu_id != -1) {
-      request_pdusession(nas, get_nrUE_params()->extra_pdu_id);
+      request_pdusession(nas, get_nrUE_params()->extra_pdu_id, PDU_SESSION_TYPE_IPV4, nssai, nas->uicc->dnnStr);
     }
   }
   // Free local message after processing
