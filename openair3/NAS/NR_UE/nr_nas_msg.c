@@ -1544,8 +1544,10 @@ static void handle_pdu_session_accept(uint8_t *pdu_buffer, uint32_t msg_length, 
   size += decoded;
 
   // decode PDU Session Establishment Accept
-  if (!decode_pdu_session_establishment_accept_msg(&msg, pdu_buffer + size, msg_length))
+  if (!decode_pdu_session_establishment_accept_msg(&msg, pdu_buffer + size, msg_length)) {
     LOG_E(NAS, "decode_pdu_session_establishment_accept_msg failure\n");
+    return;
+  }
 
   // process PDU Session
   if (msg.pdu_addr_ie.pdu_length)
