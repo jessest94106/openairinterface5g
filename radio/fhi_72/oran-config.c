@@ -440,14 +440,6 @@ void print_fh_config(const struct xran_fh_config *fh_config)
 #endif
 }
 
-static const paramdef_t *gpd(const paramdef_t *pd, int num, const char *name)
-{
-  /* the config module does not know const-correctness... */
-  int idx = config_paramidx_fromname((paramdef_t *)pd, num, (char *)name);
-  DevAssert(idx >= 0);
-  return &pd[idx];
-}
-
 static uint64_t get_u64_mask(const paramdef_t *pd)
 {
   DevAssert(pd != NULL);
