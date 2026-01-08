@@ -1649,7 +1649,7 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUIRED(gNB_RRC_INST *rrc,
   msg.source2target->ue_history_info.cause->type = NGAP_CAUSE_RADIO_NETWORK;
   msg.source2target->ue_history_info.cause->value = NGAP_CAUSE_RADIO_NETWORK_HANDOVER_DESIRABLE_FOR_RADIO_REASON;
   msg.source2target->ue_history_info.type = NGAP_CellSize_small;
-  msg.source2target->ue_history_info.time_in_cell = 500; // dummy number for now
+  msg.source2target->ue_history_info.time_in_cell = min(time(NULL) - UE->last_seen, 4095);
   msg.source2target->ue_history_info.id = target_cell;
 
   /* Fill both PDU Session Resource List IE (M) in Handover Required
