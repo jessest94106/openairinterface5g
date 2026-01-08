@@ -209,7 +209,7 @@ def CheckLogs(self, filename, HTML, RAN):
 	elif 'nv-cubb' in name:
 		msg = 'Undeploy PNF/Nvidia CUBB'
 		HTML.CreateHtmlTestRow(msg, 'OK', CONST.ALL_PROCESSES_OK)
-	elif (any(sub in name for sub in ['enb','rru','rcc','cu','du','gnb'])):
+	elif (any(sub in name for sub in ['enb','rru','rcc','cu','du','gnb','vnf'])):
 		logging.debug(f'\u001B[1m Analyzing XnB logfile {filename}\u001B[0m')
 		logStatus = RAN.AnalyzeLogFile_eNB(filename, HTML, self.ran_checkers)
 		opt = f"xNB log analysis ({name})"

@@ -54,6 +54,10 @@ extern "C" {
 #include <common/utils/load_module_shlib.h>
 #include <openair1/SIMULATION/TOOLS/sim.h>
 #include "rfsimulator.h"
+extern int get_currentchannels_type(const char *buf,
+                                    int debug,
+                                    webdatadef_t *tdata,
+                                    telnet_printfunc_t prnt); // in random_channel.c
 }
 #include <queue>
 #include <mutex>
@@ -112,10 +116,6 @@ typedef enum { SIMU_ROLE_SERVER = 1, SIMU_ROLE_CLIENT } simuRole;
 };
 // clang-format on
 static void getset_currentchannels_type(char *buf, int debug, webdatadef_t *tdata, telnet_printfunc_t prnt);
-extern int get_currentchannels_type(const char *buf,
-                                    int debug,
-                                    webdatadef_t *tdata,
-                                    telnet_printfunc_t prnt); // in random_channel.c
 static int rfsimu_setchanmod_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 static int rfsimu_setdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
 static int rfsimu_getdistance_cmd(char *buff, int debug, telnet_printfunc_t prnt, void *arg);
