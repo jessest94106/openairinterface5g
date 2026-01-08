@@ -276,10 +276,6 @@ typedef struct openair0_config {
   char *sdr_addrs;
   //! Auto calibration flag
   int autocal[8];
-  //! rf devices work with x bits iqs when oai have its own iq format
-  //! the two following parameters are used to convert iqs
-  int iq_txshift;
-  int iq_rxrescale;
   //! Configuration file for LMS7002M
   char *configFilename;
   //! remote IP/MAC addr for Ethernet interface
