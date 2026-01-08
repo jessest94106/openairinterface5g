@@ -1742,7 +1742,7 @@ int main(int argc, char *argv[])
       printStatIndent2(&gNB->rx_pusch_symbol_processing_stats, "RX PUSCH Symbol Processing time");
       printStatIndent(&gNB->ulsch_decoding_stats,"ULSCH total decoding time");
       printStatIndent2(&gNB->ts_deinterleave, "ULSCH segment deinterleaving time");
-      printStatIndent2(&gNB->ts_rate_unmatch, "ULSCH segment rate recovery time");
+      printStatIndent2(&gNB->ts_rate_unmatch, "ULSCH segment rate matching time");
       printStatIndent2(&gNB->ts_ldpc_decode, "ULSCH segments decoding time");
       printStatIndent(&gNB->rx_srs_stats,"RX SRS time");
       printStatIndent2(&gNB->generate_srs_stats,"Generate SRS sequence time");
