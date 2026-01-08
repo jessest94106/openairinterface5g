@@ -1710,9 +1710,6 @@ static void generatePduSessionEstablishRequest(nr_ue_nas_t *nas, as_nas_info_t *
   const bool has_nssai_sd = pdu_req->sd != 0xffffff; // 0xffffff means "no SD", TS 23.003
   const size_t nssai_len = has_nssai_sd ? 4 : 1;
   mm_msg->snssai.length = nssai_len;
-  // Fixme: it seems there are a lot of memory errors in this: this value was on the stack,
-  //  but pushed  in a itti message to another thread
-  //  this kind of error seems in many places in 5G NAS
   mm_msg->snssai.value = calloc(1, nssai_len);
   mm_msg->snssai.value[0] = pdu_req->sst;
   if (has_nssai_sd)
