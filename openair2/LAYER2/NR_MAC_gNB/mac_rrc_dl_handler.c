@@ -621,6 +621,19 @@ static byte_array_t encode_cellgroup_config(const NR_CellGroupConfig_t *cellGrou
   return cgc;
 }
 
+/** @brief Handle RRC container from UE Context Setup/Modification request.
+ * Per 3GPP TS 38.473, the RRCContainer IE contains an RRC message (e.g., DL-DCCH-Message
+ * as defined in TS 38.331) that is encapsulated in a PDCP PDU. The DU forwards this
+ * container transparently to the UE via SRB1 without decode/re-encode cycles.
+ * @param rrc_container RRC container
+ * @param rnti RNTI of the UE */
+static void handle_ue_context_rrc_container(const byte_array_t *rrc_container, const rnti_t rnti)
+{
+  DevAssert(rrc_container);
+  logical_chan_id_t id = 1;
+  nr_rlc_srb_recv_sdu(rnti, id, rrc_container->buf, rrc_container->len);
+}
+
 void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 {
   const bool is_SA = IS_SA_MODE(get_softmodem_params());
@@ -681,8 +694,7 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
   }
 
   if (req->rrc_container != NULL) {
-    logical_chan_id_t id = 1;
-    nr_rlc_srb_recv_sdu(UE->rnti, id, req->rrc_container->buf, req->rrc_container->len);
+    handle_ue_context_rrc_container(req->rrc_container, UE->rnti);
   }
 
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
@@ -769,8 +781,7 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
   }
 
   if (req->rrc_container != NULL) {
-    logical_chan_id_t id = 1;
-    nr_rlc_srb_recv_sdu(req->gNB_DU_ue_id, id, req->rrc_container->buf, req->rrc_container->len);
+    handle_ue_context_rrc_container(req->rrc_container, req->gNB_DU_ue_id);
   }
 
   NR_ServingCellConfigCommon_t *scc = mac->common_channels[0].ServingCellConfigCommon;
