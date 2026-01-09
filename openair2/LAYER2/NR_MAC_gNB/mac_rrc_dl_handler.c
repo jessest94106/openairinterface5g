@@ -607,6 +607,20 @@ static NR_UE_info_t *create_new_UE(gNB_MAC_INST *mac, uint32_t cu_id, const NR_C
   return UE;
 }
 
+/** @brief Encode CellGroupConfig to byte array for transparent forwarding in F1AP messages.
+ * The encoded bytes are intended for transparent forwarding to the UE without
+ * decode/re-encode cycles per TS 38.473 transparency requirements.
+ * @param cellGroup CellGroupConfig to encode
+ * @return Encoded byte array */
+static byte_array_t encode_cellgroup_config(const NR_CellGroupConfig_t *cellGroup)
+{
+  byte_array_t cgc = {0};
+  ssize_t encoded = uper_encode_to_new_buffer(&asn_DEF_NR_CellGroupConfig, NULL, cellGroup, (void **)&cgc.buf);
+  AssertFatal(encoded > 0, "Could not encode CellGroup\n");
+  cgc.len = encoded;
+  return cgc;
+}
+
 void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 {
   const bool is_SA = IS_SA_MODE(get_softmodem_params());
@@ -688,12 +702,7 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
     }
   }
 
-  byte_array_t cgc = { .buf = calloc_or_fail(1,1024) };
-  asn_enc_rval_t enc_rval =
-      uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig, NULL, new_CellGroup, cgc.buf, 1024);
-  AssertFatal(enc_rval.encoded > 0, "Could not encode CellGroup, failed element %s\n", enc_rval.failed_type->name);
-  cgc.len = (enc_rval.encoded + 7) >> 3;
-  resp.du_to_cu_rrc_info.cell_group_config = cgc;
+  resp.du_to_cu_rrc_info.cell_group_config = encode_cellgroup_config(new_CellGroup);
 
   ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
   UE->reconfigCellGroup = new_CellGroup;
@@ -803,15 +812,7 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
 
   if (req->srbs_len > 0 || req->drbs_len > 0 || req->drbs_rel_len > 0 || ue_cap != NULL) {
     resp.du_to_cu_rrc_info = calloc_or_fail(1, sizeof(du_to_cu_rrc_information_t));
-    byte_array_t cgc = { .buf = calloc_or_fail(1, 1024) };
-    asn_enc_rval_t enc_rval = uper_encode_to_buffer(&asn_DEF_NR_CellGroupConfig,
-                                                    NULL,
-                                                    new_CellGroup,
-                                                    cgc.buf,
-                                                    1024);
-    AssertFatal(enc_rval.encoded > 0, "Could not encode CellGroup, failed element %s\n", enc_rval.failed_type->name);
-    cgc.len = (enc_rval.encoded + 7) >> 3;
-    resp.du_to_cu_rrc_info->cell_group_config = cgc;
+    resp.du_to_cu_rrc_info->cell_group_config = encode_cellgroup_config(new_CellGroup);
 
     ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
     UE->reconfigCellGroup = new_CellGroup;
