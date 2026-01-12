@@ -409,6 +409,7 @@ __attribute__((__visibility__("default"))) int transport_init(openair0_device_t 
   device->openair0_cfg = &openair0_cfg[0];
   device->xran_api.north_in_func = oran_fh_if4p5_north_in;
   device->xran_api.write_prach = xran_oru_send_prach;
+  device->xran_api.write_pusch = xran_oru_send_pusch;
 
   return 0;
 }
