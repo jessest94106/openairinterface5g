@@ -84,7 +84,6 @@ void ngap_handle_ng_setup_message(ngap_gNB_amf_data_t *amf_desc_p, int sctp_shut
       }
     }
   } else {
-    LOG_A(NGAP, "Received NGSetupResponse from AMF\n");
     /* Check that at least one setup message is pending */
     DevCheck(amf_desc_p->ngap_gNB_instance->ngap_amf_pending_nb > 0, amf_desc_p->ngap_gNB_instance->instance,
              amf_desc_p->ngap_gNB_instance->ngap_amf_pending_nb, 0);
@@ -314,6 +313,7 @@ static int ngap_gNB_handle_ng_setup_response(sctp_assoc_t assoc_id, uint32_t str
   amf_desc_p->state = NGAP_GNB_STATE_CONNECTED;
   amf_desc_p->ngap_gNB_instance->ngap_amf_associated_nb ++;
   ngap_handle_ng_setup_message(amf_desc_p, 0);
+  LOG_A(NGAP, "Received NGSetupResponse from AMF\n");
 
   return 0;
 }
