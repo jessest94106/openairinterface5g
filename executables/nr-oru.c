@@ -26,6 +26,7 @@
 #include "openair1/PHY/MODULATION/nr_modulation.h"
 #include "openair1/SCHED_NR/sched_nr.h"
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_mac_common.h"
+#include "thread-pool.h"
 
 #define CONFIG_SECTION_ORU "ORUs.[0]"
 
@@ -104,7 +105,17 @@ typedef struct {
   task_ans_t *task_ans;
 } dl_symbol_process_t;
 
+typedef struct {
+  ORU_t *oru;
+  int frame;
+  int slot;
+  int symbol;
+  int aarx;
+} pusch_symbol_job_t;
+
 extern void tx_rf_symbols(RU_t *ru, int frame, int slot, uint64_t timestamp, int start_symbol, int num_symbols);
+static void receive_pusch(void *args);
+
 extern void rx_nr_prach_ru_internal(prach_item_t *p,
                                     int beam_id,
                                     int prachStartSymbol,
@@ -317,7 +328,7 @@ int get_prach_symbol(ORU_t *oru, int frame, int slot, int symbol, int numerology
     // TODO: Support more PRACH formats
     AssertFatal(format == 8, "only support format B4\n");
     // TODO: This is not exactly the case but it is correct
-    if (symbol > 0 && symbol < 12) {
+    if (symbol >= 0 && symbol < 12) {
       return symbol;
     }
   }
@@ -457,6 +468,9 @@ void *oru_south_read_thread(void *arg)
   RU_t *ru = oru->ru;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
 
+  const int max_pusch_jobs = 300;
+  pusch_symbol_job_t pusch_job_pool[max_pusch_jobs];
+  uint32_t pusch_job_index = 0;
   while (!oai_exit) {
     int rx_slot_type = nr_slot_select(&ru->config, frame, slot);
     for (int symbol = 0; symbol < 14; symbol++) {
@@ -480,9 +494,30 @@ void *oru_south_read_thread(void *arg)
             num_samples_read);
 
       if (rx_slot_type == NR_UPLINK_SLOT || rx_slot_type == NR_MIXED_SLOT) {
+
+        nfapi_nr_config_request_scf_t *config = &ru->config;
+        nfapi_nr_tdd_table_t *tdd_table = &config->tdd_table;
+        AssertFatal(tdd_table->tdd_period.tl.tag == NFAPI_NR_CONFIG_TDD_PERIOD_TAG, "");
+        int nb_periods_per_frame = get_nb_periods_per_frame(tdd_table->tdd_period.value);
+        int n_tdd_period = fp->slots_per_frame / nb_periods_per_frame;
+        nfapi_nr_max_num_of_symbol_per_slot_t *max_num_of_symbol_per_slot_list =
+            config->tdd_table.max_tdd_periodicity_list[slot % n_tdd_period].max_num_of_symbol_per_slot_list;
+        if (max_num_of_symbol_per_slot_list[symbol].slot_config.value != 1)
+          continue;
+
         int prach_symbol = get_prach_symbol(oru, frame, slot, symbol, ru->numerology);
-        if (prach_symbol == 11) {
+        if (prach_symbol != -1) {
           receive_prach(oru, frame, slot, prach_symbol);
+        }
+        for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
+          pusch_symbol_job_t *job = &pusch_job_pool[pusch_job_index++ % max_pusch_jobs];
+          job->oru = oru;
+          job->aarx = aarx;
+          job->frame = frame;
+          job->slot = slot;
+          job->symbol = symbol;
+          task_t task = {.func = receive_pusch, .args = job};
+          pushTpool(&oru->tpool, task);
         }
         stop_meas(&oru->rx);
       }
@@ -494,6 +529,10 @@ void *oru_south_read_thread(void *arg)
       if (frame == 1024) {
         frame = 0;
       }
+    }
+    if (frame % 256 == 0 && slot == 0) {
+      LOG_I(PHY,
+            "[ORU south] read data: frame %d, slot %d\n", frame, slot);
     }
   }
 
@@ -687,4 +726,27 @@ void prepare_prach_item(ORU_t *oru)
         AssertFatal(1 == 0, "Invalid PRACH format");
     }
   }
+}
+
+static void receive_pusch(void *args)
+{
+  pusch_symbol_job_t *job = args;
+  ORU_t *oru = job->oru;
+  int frame = job->frame;
+  int slot = job->slot;
+  int symbol = job->symbol;
+  int aarx = job->aarx;
+  RU_t *ru = oru->ru;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+
+  c16_t rxdataF[fp->ofdm_symbol_size] __attribute__((aligned(32)));
+
+  nr_symbol_fep_ul(fp, (c16_t *)ru->common.rxdata[aarx], rxdataF, symbol, slot, ru->N_TA_offset);
+  apply_nr_rotation_symbol_RX(fp,
+                              rxdataF,
+                              fp->symbol_rotation[link_type_ul],
+                              fp->N_RB_UL,
+                              slot,
+                              symbol);
+  ru->ifdevice.xran_api.write_pusch((uint32_t *)rxdataF, aarx, frame, slot, symbol);
 }
