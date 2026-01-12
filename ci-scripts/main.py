@@ -455,45 +455,10 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	xmlTree = ET.parse(xml_test_file)
 	xmlRoot = xmlTree.getroot()
 
-	exclusion_tests=xmlRoot.findtext('TestCaseExclusionList',default='')
-	requested_tests=xmlRoot.findtext('TestCaseRequestedList',default='')
 	if (HTML.nbTestXMLfiles == 1):
 		HTML.htmlTabRefs.append(xmlRoot.findtext('htmlTabRef',default='test-tab-0'))
 		HTML.htmlTabNames.append(xmlRoot.findtext('htmlTabName',default='Test-0'))
 	all_tests=xmlRoot.findall('testCase')
-
-	exclusion_tests=exclusion_tests.split()
-	requested_tests=requested_tests.split()
-
-	#check that exclusion tests are well formatted
-	#(6 digits or less than 6 digits followed by +)
-	for test in exclusion_tests:
-		if     (not re.match('^[0-9]{6}$', test) and
-				not re.match('^[0-9]{1,5}\\+$', test)):
-			logging.error('exclusion test is invalidly formatted: ' + test)
-			sys.exit(1)
-		else:
-			logging.info(test)
-
-	#check that requested tests are well formatted
-	#(6 digits or less than 6 digits followed by +)
-	#be verbose
-	for test in requested_tests:
-		if     (re.match('^[0-9]{6}$', test) or
-				re.match('^[0-9]{1,5}\\+$', test)):
-			logging.info('test group/case requested: ' + test)
-		else:
-			logging.error('requested test is invalidly formatted: ' + test)
-			sys.exit(1)
-
-	#get the list of tests to be done
-	todo_tests=[]
-	for test in requested_tests:
-		if    (test_in_list(test, exclusion_tests)):
-			logging.info('test will be skipped: ' + test)
-		else:
-			#logging.info('test will be run: ' + test)
-			todo_tests.append(test)
 
 	signal.signal(signal.SIGINT, receive_signal)
 
