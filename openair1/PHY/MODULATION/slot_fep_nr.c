@@ -135,7 +135,7 @@ int nr_slot_fep(PHY_VARS_NR_UE *ue,
   return 0;
 }
 
-int nr_slot_fep_ul(NR_DL_FRAME_PARMS *frame_parms,
+int nr_slot_fep_ul(const NR_DL_FRAME_PARMS *frame_parms,
                    int32_t *rxdata,
                    int32_t *rxdataF,
                    unsigned char symbol,
@@ -235,5 +235,29 @@ void apply_nr_rotation_symbol_RX(const NR_DL_FRAME_PARMS *frame_parms,
                     this_symbol + frame_parms->first_carrier_offset,
                     nb_rb * 6,
                     15);
+  }
+}
+
+void nr_ofdm_demod_and_rx_rotation(c16_t **rxdata,
+                                   c16_t **rxdataF,
+                                   const NR_DL_FRAME_PARMS *fp,
+                                   int nb_antennas,
+                                   int slot,
+                                   int slot_offsetF,
+                                   enum nr_Link linktype,
+                                   bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT])
+{
+  for (int aa = 0; aa < nb_antennas; aa++) {
+    for (uint8_t symbol = 0; symbol < fp->symbols_per_slot; symbol++) {
+      if (was_symbol_used[symbol] == true) {
+        nr_slot_fep_ul(fp, (int32_t *)&rxdata[aa][0], (int32_t *)&rxdataF[aa][slot_offsetF], symbol, slot, 0);
+        apply_nr_rotation_symbol_RX(fp,
+                                    &rxdataF[aa][slot_offsetF + symbol * fp->ofdm_symbol_size],
+                                    fp->symbol_rotation[linktype],
+                                    fp->N_RB_UL,
+                                    slot,
+                                    symbol);
+      }
+    }
   }
 }

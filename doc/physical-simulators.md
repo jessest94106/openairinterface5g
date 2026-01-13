@@ -36,6 +36,7 @@ pipelines:
 |            | `nr_pbchsim`                              | Broadcast channel simulation     |
 |            | `nr_prachsim`                             | PRACH simulation                 |
 |            | `nr_psbchsim`                             | Sidelink simulation              |
+|            | `nr_srssim`                               | SRS simulation                   |
 | Coding     | `ldpctest`, `polartest`, `smallblocktest` | LDPC, Polar, and other FEC tests |
 
 ## Source Locations

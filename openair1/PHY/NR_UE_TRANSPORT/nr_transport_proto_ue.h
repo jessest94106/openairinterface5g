@@ -168,15 +168,20 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
 /** \brief This function does IFFT for PUSCH
 */
 
-uint8_t nr_ue_pusch_common_procedures(PHY_VARS_NR_UE *UE,
-                                      const uint8_t slot,
-                                      const NR_DL_FRAME_PARMS *frame_parms,
-                                      const uint8_t n_antenna_ports,
-                                      c16_t **txdataF,
-                                      c16_t **txdata,
-                                      uint32_t linktype,
-                                      bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT],
-                                      bool no_phase_pre_comp);
+uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
+                                    const NR_DL_FRAME_PARMS *frame_parms,
+                                    const uint8_t n_antenna_ports,
+                                    c16_t **txdataF,
+                                    c16_t **txdata,
+                                    uint32_t linktype,
+                                    bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT],
+                                    bool no_phase_pre_comp);
+
+bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
+                                 const UE_nr_rxtx_proc_t *proc,
+                                 c16_t **txdataF,
+                                 nr_phy_data_tx_t *phy_data,
+                                 bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT]);
 
 void clean_UE_harq(PHY_VARS_NR_UE *UE);
 
