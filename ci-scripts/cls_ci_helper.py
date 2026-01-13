@@ -24,14 +24,14 @@ from typing import NamedTuple
 import logging
 
 class TestCaseCtx(NamedTuple):
-    test_id: int
+    test_idx: int
     logPath: str
 
     def Default(logPath):
         return TestCaseCtx(112233, logPath)
     def baseFilename(self):
         # typically, the test ID is of form 001234 (6 digits)
-        return f"{self.logPath}/{self.test_id:06d}"
+        return f"{self.logPath}/{self.test_idx:06d}"
 
 def archiveArtifact(cmd, ctx, remote_path):
     base = os.path.basename(remote_path)

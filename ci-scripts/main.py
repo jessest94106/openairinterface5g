@@ -98,7 +98,7 @@ def ExecuteActionWithParam(action, ctx, node):
 		if proxy_commit is not None:
 			CONTAINERS.proxyCommit = proxy_commit
 		if action == 'Build_eNB':
-			success = cls_native.Native.Build(ctx, node, HTML.testCase_id, HTML, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
+			success = cls_native.Native.Build(ctx, node, HTML, RAN.eNBSourceCodePath, RAN.Build_eNB_args)
 		elif action == 'Build_Image':
 			success = CONTAINERS.BuildImage(ctx, node, HTML)
 		elif action == 'Build_Proxy':
@@ -308,7 +308,7 @@ def receive_signal(signum, frame):
 
 def ShowTestID(ctx, desc):
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
-    logging.info(f'\u001B[1m Test ID: {ctx.test_id} \u001B[0m')
+    logging.info(f'\u001B[1m Test #{ctx.test_idx} \u001B[0m')
     logging.info(f'\u001B[1m {desc} \u001B[0m')
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
 
@@ -470,16 +470,16 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 	for index, test in enumerate(all_tests, start=1):
 		if test_runner_abort:
 			task_set_succeeded = False
-		test_case_id = f"{index:06d}"
-		ctx = TestCaseCtx(int(test_case_id), logPath)
-		HTML.testCase_id = test_case_id
+		test_case_idx = f"{index:06d}"
+		ctx = TestCaseCtx(int(test_case_idx), logPath)
+		HTML.testCaseIdx = test_case_idx
 		desc = test.findtext('desc')
 		node = test.findtext('node') if not force_local else 'localhost'
 		always_exec = test.findtext('always_exec') in ['True', 'true', 'Yes', 'yes']
 		may_fail = test.findtext('may_fail') in ['True', 'true', 'Yes', 'yes']
 		HTML.desc = desc
 		action = test.findtext('class')
-		if not CheckClassValidity(xml_class_list, action, test_case_id):
+		if not CheckClassValidity(xml_class_list, action, test_case_idx):
 			task_set_succeeded = False
 			continue
 		ShowTestID(ctx, desc)
@@ -491,9 +491,9 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 		try:
 			test_succeeded = ExecuteActionWithParam(action, ctx, node)
 			if not test_succeeded and may_fail:
-				logging.warning(f"test ID {test_case_id} action {action} may or may not fail, proceeding despite error")
+				logging.warning(f"test ID {test_case_idx} action {action} may or may not fail, proceeding despite error")
 			elif not test_succeeded:
-				logging.error(f"test ID {test_case_id} action {action} failed ({test_succeeded}), skipping next tests")
+				logging.error(f"test ID {test_case_idx} action {action} failed ({test_succeeded}), skipping next tests")
 				task_set_succeeded = False
 		except Exception as e:
 			s = traceback.format_exc()
