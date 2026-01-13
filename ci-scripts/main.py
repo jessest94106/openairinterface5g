@@ -58,7 +58,7 @@ import re		# reg
 import time		# sleep
 import os
 import subprocess
-import xml.etree.ElementTree as ET
+import lxml.etree as ET
 import logging
 import signal
 import traceback
@@ -306,10 +306,10 @@ def receive_signal(signum, frame):
         logging.warning("received signal again, exiting")
         sys.exit(1)
 
-def ShowTestID(ctx, desc):
+def ShowTestID(ctx, desc, file, line):
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
-    logging.info(f'\u001B[1m Test #{ctx.test_idx} \u001B[0m')
-    logging.info(f'\u001B[1m {desc} \u001B[0m')
+    logging.info(f'\u001B[1m Test #{ctx.test_idx} ({file}:{line})   \u001B[0m')
+    logging.info(f'\u001B[1m {desc}                                 \u001B[0m')
     logging.info(f'\u001B[1m----------------------------------------\u001B[0m')
 
 #-----------------------------------------------------------
@@ -482,7 +482,9 @@ elif re.match('^TesteNB$', mode, re.IGNORECASE) or re.match('^TestUE$', mode, re
 		if not CheckClassValidity(xml_class_list, action, test_case_idx):
 			task_set_succeeded = False
 			continue
-		ShowTestID(ctx, desc)
+		file = os.path.basename(xml_test_file)
+		line = test.find('class').sourceline
+		ShowTestID(ctx, desc, file, line)
 		if not task_set_succeeded and not always_exec:
 			msg = f"skipping test due to prior error"
 			logging.warning(msg)
