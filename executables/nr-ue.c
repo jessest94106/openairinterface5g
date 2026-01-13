@@ -216,7 +216,7 @@ static void UE_synch(void *arg) {
   LOG_I(PHY, "[UE thread Synch] Running Initial Synch \n");
 
   uint64_t dl_carrier, ul_carrier;
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   nr_initial_sync_t ret = {false, 0, 0};
   if (UE->sl_mode == 2) {
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
@@ -298,7 +298,7 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action, c16_t **tx
   const fapi_nr_config_request_t *cfg = &UE->nrUE_config;
   const UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
 
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
@@ -399,7 +399,7 @@ void processSlotTX(void *arg)
 
   LOG_D(PHY, "SlotTx %d.%d => slot type %d\n", proc->frame_tx, proc->nr_slot_tx, proc->tx_slot_type);
 
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   c16_t *txp[fp->nb_antennas_tx];
   for (int i = 0; i < fp->nb_antennas_tx; i++) {
     txp[i] = UE->common_vars.txData[i] + get_samples_slot_timestamp(fp, proc->nr_slot_tx);
@@ -533,7 +533,7 @@ static int UE_dl_preprocessing(PHY_VARS_NR_UE *UE,
 {
   TracyCZone(ctx, true);
   int sampleShift = INT_MAX;
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
@@ -621,7 +621,7 @@ void UE_dl_processing(void *arg) {
 
 void dummyWrite(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, int writeBlockSize)
 {
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
@@ -638,7 +638,7 @@ void dummyWrite(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, int writeBlo
 
 void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration_rx_to_tx, bool toTrash)
 {
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   // two frames for initial sync
   int num_frames = 2;
   // In Sidelink worst case SL-SSB can be sent once in 16 frames
@@ -681,7 +681,7 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration
 
 static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration_rx_to_tx, openair0_timestamp_t rx_offset)
 {
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
@@ -704,11 +704,13 @@ static void syncInFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int
   }
 }
 
-static inline int get_firstSymSamp(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
+static inline int get_firstSymSamp(uint16_t slot, const NR_DL_FRAME_PARMS *fp)
+{
   return get_samples_symbol_duration(fp, slot, 0, 1);
 }
 
-static inline int get_readBlockSize(uint16_t slot, NR_DL_FRAME_PARMS *fp) {
+static inline int get_readBlockSize(uint16_t slot, const NR_DL_FRAME_PARMS *fp)
+{
   int rem_samples = get_samples_per_slot(slot, fp) - get_firstSymSamp(slot, fp);
   int next_slot_first_symbol = 0;
   if (slot < (fp->slots_per_frame-1))
@@ -720,11 +722,11 @@ void *UE_thread(void *arg)
 {
   //this thread should be over the processing thread to keep in real time
   PHY_VARS_NR_UE *UE = (PHY_VARS_NR_UE *)arg;
+  const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   //  int tx_enabled = 0;
   void *rxp[NB_ANTENNAS_RX];
   enum stream_status_e stream_status = STREAM_STATUS_UNSYNC;
   fapi_nr_config_request_t *cfg = &UE->nrUE_config;
-  NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   sl_nr_phy_config_request_t *sl_cfg = NULL;
   if (UE->sl_mode == 2) {
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
