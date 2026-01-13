@@ -1542,8 +1542,7 @@ static void nr_generate_Msg2(module_id_t module_idP,
   float T_c_ns = 0.509;
   int numerology = ul_bwp->scs;
   float rtt_ns = T_c_ns * 16 * 64 / (1 << numerology) * ra->timing_offset;
-  float speed_of_light_in_meters_per_second = 299792458.0f;
-  float distance_in_meters = speed_of_light_in_meters_per_second * rtt_ns / 1000 / 1000 / 1000 / 2;
+  float distance_in_meters = (float) SPEED_OF_LIGHT * rtt_ns / 1000 / 1000 / 1000 / 2;
   LOG_A(NR_MAC,
         "UE %04x: %d.%d Generating RA-Msg2 DCI, RA RNTI 0x%x, state %d, preamble_index(RAPID) %d, "
         "timing_offset = %d (estimated distance %.1f [m])\n",
