@@ -625,14 +625,13 @@ void dummyWrite(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, int writeBlo
   if (UE->sl_mode == 2)
     fp = &UE->SL_UE_PHY_PARAMS.sl_frame_params;
 
-  void *dummy_tx[fp->nb_antennas_tx];
-  // 2 because the function we call use pairs of int16_t implicitly as complex numbers
-  int16_t dummy_tx_data[2 * writeBlockSize];
+  c16_t *dummy_tx[fp->nb_antennas_tx];
+  c16_t dummy_tx_data[writeBlockSize];
   memset(dummy_tx_data, 0, sizeof(dummy_tx_data));
   for (int i = 0; i < fp->nb_antennas_tx; i++)
     dummy_tx[i] = dummy_tx_data;
 
-  int tmp = nrue_ru_write(UE, timestamp, dummy_tx, writeBlockSize, fp->nb_antennas_tx, 4);
+  int tmp = nrue_ru_write(UE, timestamp, (void **)dummy_tx, writeBlockSize, fp->nb_antennas_tx, 4);
   AssertFatal(writeBlockSize == tmp, "");
 }
 
@@ -647,9 +646,9 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration
     num_frames = SL_NR_PSBCH_REPETITION_IN_FRAMES;
   }
 
-  void *rxp[NB_ANTENNAS_RX];
+  c16_t *rxp[fp->nb_antennas_rx];
   if (toTrash) {
-    rxp[0] = malloc16(get_samples_per_slot(0, fp) * 4);
+    rxp[0] = malloc16(get_samples_per_slot(0, fp) * sizeof(c16_t));
     for (int i = 1; i < fp->nb_antennas_rx; i++)
       rxp[i] = rxp[0];
   }
@@ -658,11 +657,10 @@ void readFrame(PHY_VARS_NR_UE *UE, openair0_timestamp_t *timestamp, int duration
     for (int slot = 0; slot < fp->slots_per_subframe; slot++) {
       if (!toTrash)
         for (int i = 0; i < fp->nb_antennas_rx; i++)
-          rxp[i] =
-              ((void *)&UE->common_vars.rxdata[i][0]) + 4 * ((x * fp->samples_per_subframe) + get_samples_slot_timestamp(fp, slot));
+          rxp[i] = &UE->common_vars.rxdata[i][x * fp->samples_per_subframe + get_samples_slot_timestamp(fp, slot)];
 
       int read_block_size = get_samples_per_slot(slot, fp);
-      int tmp = nrue_ru_read(UE, timestamp, rxp, read_block_size, fp->nb_antennas_rx);
+      int tmp = nrue_ru_read(UE, timestamp, (void **)rxp, read_block_size, fp->nb_antennas_rx);
       UEscopeCopy(UE, ueTimeDomainSamplesBeforeSync, rxp[0], sizeof(c16_t), 1, read_block_size, 0);
       AssertFatal(read_block_size == tmp, "");
 
@@ -724,7 +722,7 @@ void *UE_thread(void *arg)
   PHY_VARS_NR_UE *UE = (PHY_VARS_NR_UE *)arg;
   const NR_DL_FRAME_PARMS *fp = &UE->frame_parms;
   //  int tx_enabled = 0;
-  void *rxp[NB_ANTENNAS_RX];
+  c16_t *rxp[fp->nb_antennas_rx];
   enum stream_status_e stream_status = STREAM_STATUS_UNSYNC;
   fapi_nr_config_request_t *cfg = &UE->nrUE_config;
   sl_nr_phy_config_request_t *sl_cfg = NULL;
@@ -945,7 +943,7 @@ void *UE_thread(void *arg)
 
     int firstSymSamp = get_firstSymSamp(slot_nr, fp);
     for (int i = 0; i < fp->nb_antennas_rx; i++)
-      rxp[i] = (void *)&UE->common_vars.rxdata[i][firstSymSamp + get_samples_slot_timestamp(fp, slot_nr)];
+      rxp[i] = &UE->common_vars.rxdata[i][firstSymSamp + get_samples_slot_timestamp(fp, slot_nr)];
 
     int iq_shift_to_apply = 0;
     if (slot_nr == nb_slot_frame - 1) {
@@ -966,9 +964,9 @@ void *UE_thread(void *arg)
 
     const int readBlockSize = get_readBlockSize(slot_nr, fp) - iq_shift_to_apply;
     openair0_timestamp_t rx_timestamp;
-    int tmp = nrue_ru_read(UE, &rx_timestamp, rxp, readBlockSize, fp->nb_antennas_rx);
+    int tmp = nrue_ru_read(UE, &rx_timestamp, (void **)rxp, readBlockSize, fp->nb_antennas_rx);
     metadata meta = {.slot =  curMsg.proc.nr_slot_rx, .frame =  curMsg.proc.frame_rx};
-    UEscopeCopyWithMetadata(UE, ueTimeDomainSamples, rxp[0] - firstSymSamp * sizeof(c16_t), sizeof(c16_t), 1, readBlockSize, 0, &meta);
+    UEscopeCopyWithMetadata(UE, ueTimeDomainSamples, rxp[0] - firstSymSamp, sizeof(c16_t), 1, readBlockSize, 0, &meta);
     AssertFatal(readBlockSize == tmp, "");
     struct timespec current_time;
     if (clock_gettime(CLOCK_REALTIME, &current_time)) {
