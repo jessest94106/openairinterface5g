@@ -2585,17 +2585,9 @@ static void rrc_CU_process_ue_context_modification_response(MessageDef *msg_p, i
   // nothing is to be done, we wait for confirmation to release the UE in the
   // CU/DU)
   if (UE->ho_context && UE->ho_context->target && UE->ho_context->source) {
-    nr_ho_target_cu_t *target_ctx = UE->ho_context->target;
-    f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
-    ue_data.secondary_ue = target_ctx->du_ue_id;
-    ue_data.du_assoc_id = target_ctx->du->assoc_id;
-    bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
-    DevAssert(success);
-    LOG_I(NR_RRC, "UE %d handover: update RNTI from %04x to %04x\n", UE->rrc_ue_id, UE->rnti, target_ctx->new_rnti);
     nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
     DevAssert(source_ctx->old_rnti == UE->rnti);
-    UE->rnti = target_ctx->new_rnti;
-    UE->nr_cellid = target_ctx->du->setup_req->cell[0].info.nr_cellid;
+    nr_rrc_apply_target_context(UE);
   }
 }
 
