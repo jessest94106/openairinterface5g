@@ -331,7 +331,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
 
 int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, uint8_t gNB_id, int frame, uint8_t slot, c16_t **txData);
 void apply_ntn_config(PHY_VARS_NR_UE *UE,
-                      NR_DL_FRAME_PARMS *fp,
+                      const NR_DL_FRAME_PARMS *fp,
                       int hfn_rx,
                       int frame_rx,
                       int slot_rx,
