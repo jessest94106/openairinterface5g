@@ -294,6 +294,10 @@ static int nr_ue_slot_select(const fapi_nr_config_request_t *cfg, int nr_slot)
 
 static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action, c16_t **txp)
 {
+  int writeBlockSize = rxtxD->writeBlockSize;
+  if (writeBlockSize == 0)
+    return;
+
   PHY_VARS_NR_UE *UE = rxtxD->UE;
   const fapi_nr_config_request_t *cfg = &UE->nrUE_config;
   const UE_nr_rxtx_proc_t *proc = &rxtxD->proc;
@@ -353,7 +357,6 @@ static void RU_write(nr_rxtx_thread_data_t *rxtxD, bool sl_tx_action, c16_t **tx
   }
 
   openair0_timestamp_t writeTimestamp = proc->timestamp_tx;
-  int writeBlockSize = rxtxD->writeBlockSize;
   // if writeBlockSize gets longer that slot size, fill with dummy
   const int maxWriteBlockSize = get_samples_per_slot(proc->nr_slot_tx, fp);
   while (writeBlockSize > maxWriteBlockSize) {
@@ -1010,9 +1013,9 @@ void *UE_thread(void *arg)
       UE->N_TA_offset = new_N_TA_offset;
     }
     if (writeBlockSize < 0) {
-      timing_advance += writeBlockSize - 1;
-      LOG_I(PHY, "writeBlockSize is %d, setting it to 1 and changing timing_advance to %d\n", writeBlockSize, timing_advance);
-      writeBlockSize = 1;
+      timing_advance += writeBlockSize;
+      LOG_I(PHY, "writeBlockSize is %d, setting it to 0 and changing timing_advance to %d\n", writeBlockSize, timing_advance);
+      writeBlockSize = 0;
     }
 
     if (curMsg.proc.nr_slot_rx == 0)
