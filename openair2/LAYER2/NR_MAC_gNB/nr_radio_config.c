@@ -3944,14 +3944,6 @@ int encode_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig, uint8_t *buffe
   return (enc_rval.encoded + 7) / 8;
 }
 
-NR_CellGroupConfig_t *decode_cellGroupConfig(const uint8_t *buffer, int buffer_size)
-{
-  NR_CellGroupConfig_t *cellGroupConfig = NULL;
-  asn_dec_rval_t rval = uper_decode(NULL, &asn_DEF_NR_CellGroupConfig, (void **)&cellGroupConfig, buffer, buffer_size, 0, 0);
-  AssertFatal(rval.code == RC_OK, "could not decode cellGroupConfig\n");
-  return cellGroupConfig;
-}
-
 static NR_ServingCellConfigCommon_t *clone_ServingCellConfigCommon(const NR_ServingCellConfigCommon_t *scc)
 {
   if (scc == NULL)
