@@ -2440,10 +2440,8 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
   gNB_RRC_INST *rrc = RC.nrrrc[instance];
   rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_get_ue_context(rrc, req->gNB_CU_ue_id);
   int srbid = 1;
-  // valid AMF UE NGAP ID range is 0..2^40-1
-  if (!ue_context_p || ue_context_p->ue_context.amf_ue_ngap_id >= (1LL << 40)) {
-    const char *reason = !ue_context_p ? "could not find UE context" : "no AMF";
-    LOG_W(RRC, "%s for CU UE ID %u: auto-generate release command\n", reason, req->gNB_CU_ue_id);
+  if (!ue_context_p) {
+    LOG_W(RRC, "could not find UE context for CU UE ID %u: auto-generate release command\n", req->gNB_CU_ue_id);
     uint8_t buffer[NR_RRC_BUF_SIZE] = {0};
     int size = do_NR_RRCRelease(buffer, NR_RRC_BUF_SIZE, rrc_gNB_get_next_transaction_identifier(0));
     RETURN_IF_INVALID_ASSOC_ID(assoc_id);
