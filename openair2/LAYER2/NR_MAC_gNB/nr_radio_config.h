@@ -97,7 +97,6 @@ void update_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig,
                             const nr_mac_config_t *configuration,
                             const NR_ServingCellConfigCommon_t *scc);
 int encode_cellGroupConfig(NR_CellGroupConfig_t *cellGroupConfig, uint8_t *buffer, int max_buffer_size);
-NR_CellGroupConfig_t *decode_cellGroupConfig(const uint8_t *buffer, int max_buffer_size);
 
 /* Note: this function returns a new CellGroupConfig for a user with given
  * configuration, but it will also overwrite the ServingCellConfig passed in

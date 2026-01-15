@@ -78,7 +78,7 @@ void nr_ue_layer_mapping(const c16_t *mod_symbs, const int n_layers, const int n
 \param sample_offset offset within rxdata (points to beginning of subframe)
 */
 
-int nr_slot_fep_ul(NR_DL_FRAME_PARMS *frame_parms,
+int nr_slot_fep_ul(const NR_DL_FRAME_PARMS *frame_parms,
                    int32_t *rxdata,
                    int32_t *rxdataF,
                    unsigned char symbol,
@@ -110,6 +110,15 @@ void apply_nr_rotation_TX(const NR_DL_FRAME_PARMS *fp,
                           int nb_rb,
                           int first_symbol,
                           int nsymb);
+
+void nr_ofdm_demod_and_rx_rotation(c16_t **rxdata,
+                                   c16_t **rxdataF,
+                                   const NR_DL_FRAME_PARMS *fp,
+                                   int nb_antennas,
+                                   int slot,
+                                   int slot_offsetF,
+                                   enum nr_Link linktype,
+                                   bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT]);
 
 void perform_symbol_rotation(NR_DL_FRAME_PARMS *fp, double f0, c16_t *symbol_rotation);
 

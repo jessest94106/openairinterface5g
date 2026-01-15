@@ -1123,24 +1123,32 @@ The assumed configuration is that with N RUs each having an M×M configuration,
 we effectively reach an (N×M)×(N×M) configuration.
 
 Some caveats:
-- Since it's a distributed antenna, this implies that this setup will deploy a
+- Even in case of a distributed antenna, this setup will deploy a
   single cell only -- multiple cells on different RUs are not supported.
 - All RUs should use the same MTU, so either "normal" (1500 byte) MTU or jumbo
   frames, but not a mix of both.
 - We tested only two RUs as of now, i.e., an 8×8 configuration.
-- Testing is currently limited to 4 logical antenna ports in DL; in UL, up to 8 can be used.
+- In case of a single array is currently limited to 4 logical antenna ports in DL;
+  in UL, up to 8 can be used.
 
-For two RUs each using a 4x4 configuration, make sure to configure the 8x8
-configuration, i.e., set `nb_tx` and `nb_rx` under `RUs` to 8 each (NOT two
-`RUs`!). Also, set the antenna port information as listed above, i.e.,
+For two RUs using a 8x8 configuration, i.e. a single antenna system, the reference DU configuration file is
+[`gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf).
 
-```
-pdsch_AntennaPorts_XP = 2;
-pdsch_AntennaPorts_N1 = 2;
-pusch_AntennaPorts    = 8;
-maxMIMO_layers        = 2;
-```
-Once testing for 8 antenna ports in DL is complete, we will change pdsch_AntennaPorts_N1 to 4.
+For two RUs each using a 4x4 configuration, i.e. a distributed antenna system (DAS),
+we use the analog beamforming implementation. More details can be found in
+[this document](./analog_beamforming.md). It is important to note that
+the configuration file should be set as a 4x4 scenario and each RU would be given a
+different beam. The reference DU configuration file is [`gnb-du.sa.band77.273prb.fhi72.4x4-das-benetel650_650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.4x4-das-benetel650_650.conf).
+
+DAS is enabled by setting to 1 the parameter `enable_das` in `L1` section.
+
+The following parameters shall be configured on the gNB in the `MACRLC` section:
+- `set_analog_beamforming`
+- `beam_duration`
+- `beams_per_period`
+
+For guidance on how to set these parameters please refer to
+the [analog beamforming document](./analog_beamforming.md).
 
 Next, configure the `fhi_72` section as indicated below:
 
@@ -1201,9 +1209,6 @@ fhi_72 = {
   });
 ```
 </details>
-
-Compare also with the example (DU) configuration in
-[`gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-du.sa.band77.273prb.fhi72.8x8-benetel650_650.conf).
 
 Afterwards, start the gNB with the modified configuration file. If everything
 went well, you should see the RU counters for both RUs go up:
