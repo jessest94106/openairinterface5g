@@ -16,5 +16,6 @@ tracer/extract_input_subframe
 tracer/extract_output_subframe
 tracer/extract
 tracer/multi
+tracer/csv
 tracee/tracee
 incgen
