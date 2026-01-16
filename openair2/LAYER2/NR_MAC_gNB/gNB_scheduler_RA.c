@@ -1314,6 +1314,10 @@ static void prepare_dl_pdus(gNB_MAC_INST *nr_mac,
     nr_configure_pdcch(pdcch_pdu_rel15, coreset, &sched_ctrl->sched_pdcch);
     nr_mac->pdcch_pdu_idx[CC_id][coresetid] = pdcch_pdu_rel15;
   }
+  AssertFatal(
+      pdcch_pdu_rel15->StartSymbolIndex + pdcch_pdu_rel15->DurationSymbols <= sched_pdsch->tda_info.startSymbolIndex,
+      "'initialDLBWPcontrolResourceSetZero' value in configuration file is not supported for the current Bandwidth! PDSCH is "
+      "overlapping CORESET! Please check 3GPP TS 38.213 Section 13 and choose an index with less number of symbols for CORESET\n");
 
   nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdsch_pdu = &dl_req->dl_tti_pdu_list[dl_req->nPDUs];
   memset((void *)dl_tti_pdsch_pdu, 0, sizeof(nfapi_nr_dl_tti_request_pdu_t));
