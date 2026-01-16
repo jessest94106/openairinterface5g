@@ -1137,12 +1137,13 @@ static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p)
   free_e1ap_context_mod_request(&req);
 }
 
-/**
- * @brief RRCReestablishment message
- *        Direction: Network to UE
- */
+/** @brief Generate and send RRCReestablishment message to UE
+ * This function implements the gNB side of the RRC Connection Re-establishment procedure
+ * as specified in 3GPP TS 38.331 clause 5.3.7.4.
+ * @param ue_context_pP UE context pointer
+ * @param old_rnti Previous RNTI of the UE before re-establishment
+ * @param du DU container containing cell information for key derivation */
 static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context_pP,
-                                                const uint8_t *masterCellGroup_from_DU,
                                                 const rnti_t old_rnti,
                                                 const nr_rrc_du_container_t *du)
 {
@@ -1167,7 +1168,9 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
   LOG_A(NR_RRC, "Send RRCReestablishment [%d bytes] to RNTI %04x\n", size, ue_p->rnti);
 
   /* Ciphering and Integrity according to TS 33.501 */
-  nr_pdcp_entity_security_keys_and_algos_t security_parameters;
+  nr_pdcp_entity_security_keys_and_algos_t security_parameters = {0};
+  DevAssert(ue_p->ciphering_algorithm >= NR_CipheringAlgorithm_nea0 && ue_p->ciphering_algorithm <= NR_CipheringAlgorithm_nea2);
+  DevAssert(ue_p->integrity_algorithm >= NR_IntegrityProtAlgorithm_nia0 && ue_p->integrity_algorithm <= NR_IntegrityProtAlgorithm_nia2);
   /* Derive the keys from kgnb */
   nr_derive_key(RRC_ENC_ALG, ue_p->ciphering_algorithm, ue_p->kgnb, security_parameters.ciphering_key);
   nr_derive_key(RRC_INT_ALG, ue_p->integrity_algorithm, ue_p->kgnb, security_parameters.integrity_key);
@@ -1588,7 +1591,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   bool success = cu_update_f1_ue_data(UE->rrc_ue_id, &ue_data);
   DevAssert(success);
 
-  rrc_gNB_generate_RRCReestablishment(ue_context_p, msg->du2cu_rrc_container, old_rnti, du);
+  rrc_gNB_generate_RRCReestablishment(ue_context_p, old_rnti, du);
   return;
 
 fallback_rrc_setup:
