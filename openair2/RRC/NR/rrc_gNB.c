@@ -918,6 +918,9 @@ byte_array_t rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *
   return msg;
 }
 
+/* Forward declaration */
+static void cuup_notify_reestablishment(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue_p);
+
 /** @brief Generate and send RRC Reconfiguration message.
  * Handles both normal reconfiguration and first reconfiguration after re-establishment.
  * @param rrc RRC instance
@@ -958,6 +961,22 @@ static void rrc_gNB_generate_dedicatedRRCReconfiguration(gNB_RRC_INST *rrc, gNB_
           is_reestablishment ? " for re-establishment" : "");
     free_RRCReconfiguration_params(params);
     return;
+  }
+
+  /* Per TS 38.331 5.3.5.6.3, re-establish SRB2 PDCP when sending the first
+   * RRCReconfiguration after reestablishment */
+  if (is_reestablishment) {
+    if (ue_p->Srb[SRB2].Active) {
+      nr_pdcp_entity_security_keys_and_algos_t security_parameters = {0};
+      security_parameters.ciphering_algorithm = ue_p->ciphering_algorithm;
+      security_parameters.integrity_algorithm = ue_p->integrity_algorithm;
+      nr_derive_key(RRC_ENC_ALG, ue_p->ciphering_algorithm, ue_p->kgnb, security_parameters.ciphering_key);
+      nr_derive_key(RRC_INT_ALG, ue_p->integrity_algorithm, ue_p->kgnb, security_parameters.integrity_key);
+      nr_pdcp_reestablishment(ue_p->rrc_ue_id, SRB2, true, &security_parameters);
+    }
+    /* Per TS 38.331 5.3.5.6.5, re-establish PDCP for all DRBs when sending the first
+     * RRCReconfiguration after RRC connection re-establishment (over E1 to CU-UP) */
+    cuup_notify_reestablishment(rrc, ue_p);
   }
 
   LOG_UE_DL_EVENT(ue_p,
@@ -1215,16 +1234,14 @@ static void rrc_gNB_generate_RRCReestablishment(rrc_gNB_ue_context_t *ue_context
   security_parameters.integrity_algorithm = ue_p->integrity_algorithm;
   security_parameters.ciphering_algorithm = 0;
 
-  /* SRBs */
-  for (int srb_id = 1; srb_id < NR_NUM_SRB; srb_id++) {
-    if (ue_p->Srb[srb_id].Active)
-      nr_pdcp_config_set_security(ue_p->rrc_ue_id, srb_id, true, &security_parameters);
-  }
-  /* Re-establish PDCP for SRB1, according to 5.3.7.4 of 3GPP TS 38.331 */
-  nr_pdcp_reestablishment(ue_p->rrc_ue_id,
-                          1,
-                          true,
-                          &security_parameters);
+  /* Re-establish PDCP for SRB1, according to 5.3.7.4 of 3GPP TS 38.331,
+   * and configure security via set_security internally.
+   * Note: SRB2 is NOT re-established here. Per TS 38.331 5.3.5.6.3, SRB2
+   * should be re-established in the first RRCReconfiguration after
+   * RRCReestablishmentComplete */
+  ue_p->Srb[SRB1].Active = 1;
+  nr_pdcp_reestablishment(ue_p->rrc_ue_id, SRB1, true, &security_parameters);
+
   /* F1AP DL RRC Message Transfer */
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
@@ -1258,24 +1275,6 @@ static void rrc_gNB_process_RRCReestablishmentComplete(gNB_RRC_INST *rrc,
   LOG_I(NR_RRC, "UE %d Processing NR_RRCReestablishmentComplete from UE\n", ue_p->rrc_ue_id);
 
   ue_p->xids[xid] = RRC_ACTION_NONE;
-
-  ue_p->Srb[1].Active = 1;
-
-  /* Re-establish SRB2 according to clause 5.3.5.6.3 of 3GPP TS 38.331
-   * (SRB1 is re-established with RRCReestablishment message)
-   */
-  int srb_id = 2;
-  if (ue_p->Srb[srb_id].Active) {
-    nr_pdcp_entity_security_keys_and_algos_t security_parameters;
-    security_parameters.ciphering_algorithm = ue_p->ciphering_algorithm;
-    security_parameters.integrity_algorithm = ue_p->integrity_algorithm;
-    nr_derive_key(RRC_ENC_ALG, ue_p->ciphering_algorithm, ue_p->kgnb, security_parameters.ciphering_key);
-    nr_derive_key(RRC_INT_ALG, ue_p->integrity_algorithm, ue_p->kgnb, security_parameters.integrity_key);
-
-    nr_pdcp_reestablishment(ue_p->rrc_ue_id, srb_id, true, &security_parameters);
-  }
-  /* PDCP Reestablishment of DRBs according to 5.3.5.6.5 of 3GPP TS 38.331 (over E1) */
-  cuup_notify_reestablishment(rrc, ue_p);
 
   f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_p->rrc_ue_id);
   RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
