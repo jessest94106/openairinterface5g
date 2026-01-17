@@ -450,11 +450,6 @@ static void perform_channel_modelling(void *arg)
   int nb_tx_ant = channel_modelling_args->nbAnt;
   c16_t **input_samples = (c16_t **)channel_modelling_args->samples;
 
-  int aligned_nsamps = ceil_mod(nsamps, (512 / 8) / sizeof(cf_t));
-  cf_t samples[aligned_nsamps] __attribute__((aligned(64)));
-  // Apply noise from global settings
-  get_noise_vector((float *)samples, nsamps * 2);
-
   channel_desc_t *channel_desc = vrtsim_state->channel_desc;
 
   if (channel_desc == NULL) {
@@ -488,16 +483,25 @@ static void perform_channel_modelling(void *arg)
   }
 
   for (int batch_index = 0; batch_index < channel_modelling_args->num_batches; batch_index++) {
-    int start_sample = batch_index * channel_modelling_args->batch_size;
-    int num_samples = min(channel_modelling_args->batch_size, nsamps - start_sample);
+    const int start_sample = batch_index * channel_modelling_args->batch_size;
+    const int num_samples = min(channel_modelling_args->batch_size, nsamps - start_sample);
     if (start_sample >= nsamps) {
       break;
     }
+
+    const int aligned_batch = ceil_mod(num_samples, (512 / 8) / sizeof(cf_t));
+    cf_t samples[aligned_batch] __attribute__((aligned(64)));
+    memset(samples, 0, sizeof(samples));
+
+    // Apply noise from global settings (only valid samples)
+    get_noise_vector((float *)samples, num_samples * 2);
+
     for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
-      for (int i = start_sample; i < start_sample + num_samples; i++) {
-        cf_t *impulse_response = channel_impulse_response_p[aatx];
+      cf_t *impulse_response = channel_impulse_response_p[aatx];
+      for (int i = 0; i < num_samples; i++) {
+        const int gi = start_sample + i;
         for (int l = 0; l < channel_desc->channel_length; l++) {
-          int idx = i - l;
+          const int idx = gi - l;
           // TODO: Use AVX2 for this
           c16_t tx_input = idx >= 0 ? input_samples[aatx][idx]
                                     : channel_modelling_args->saved_samples[aatx][SAVED_SAMPLES_LEN + idx];
@@ -507,31 +511,32 @@ static void perform_channel_modelling(void *arg)
       }
     }
 
-    // Convert to c16_t
-    c16_t samples_out[aligned_nsamps] __attribute__((aligned(64)));
-  #if defined(__AVX512F__)
-    for (int i = 0; i < aligned_nsamps / 8; i++) {
+    // Convert to c16_t (only once per batch)
+    c16_t samples_out[aligned_batch] __attribute__((aligned(64)));
+#if defined(__AVX512F__)
+    for (int i = 0; i < aligned_batch / 8; i++) {
       simde__m512 *in = (simde__m512 *)&samples[i * 8];
       simde__m256i *out = (simde__m256i *)&samples_out[i * 8];
       *out = simde_mm512_cvtsepi32_epi16(simde_mm512_cvtps_epi32(*in));
     }
-  #elif defined(__AVX2__)
-    for (int i = 0; i < aligned_nsamps / 4; i++) {
+#elif defined(__AVX2__)
+    for (int i = 0; i < aligned_batch / 4; i++) {
       simde__m256 *in = (simde__m256 *)&samples[i * 4];
       simde__m128i *out = (simde__m128i *)&samples_out[i * 4];
       *out = simde_mm256_cvtsepi32_epi16(simde_mm256_cvtps_epi32(*in));
     }
-  #else
-    for (int i = 0; i < nsamps; i++) {
+#else
+    for (int i = 0; i < num_samples; i++) {
       samples_out[i].r = lroundf(samples[i].r);
       samples_out[i].i = lroundf(samples[i].i);
     }
-  #endif
+#endif
 
+    // Write the batch as a single contiguous transfer
     vrtsim_write_internal(channel_modelling_args->vrtsim_state,
-                          channel_modelling_args->timestamp,
+                          channel_modelling_args->timestamp + start_sample,
                           samples_out,
-                          channel_modelling_args->nsamps,
+                          num_samples,
                           aarx,
                           channel_modelling_args->flags,
                           aarx);
@@ -582,7 +587,6 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
       for (int aatx = 0; aatx < nbAnt; aatx++)
         memcpy(&args->saved_samples[aatx][0], saved_samples[aatx], sizeof(c16_t) * SAVED_SAMPLES_LEN);
     }
-    memcpy(args->saved_samples, saved_samples, sizeof(saved_samples));
     pushNotifiedFIFO(&vrtsim_state->channel_modelling_actors[aarx].fifo, task);
   }
 
