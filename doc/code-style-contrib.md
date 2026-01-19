@@ -1,3 +1,5 @@
+# Contribution Guidelines and Coding Style for Developers
+
 This document lays out the basic contribution policies for developers. It
 describes the generel workflow, describes some coding rules, and how code
 review is performed.

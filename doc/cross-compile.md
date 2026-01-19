@@ -1,4 +1,6 @@
-OpenAirInterface Cross-Compiler User Guide: explains how to build OAI for ARM64
+# OpenAirInterface Cross-Compiler User Guide
+
+This document explains how to build OAI for ARM64
 (using the instruction set aarch64).
 
 [[_TOC_]]

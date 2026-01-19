@@ -1,3 +1,5 @@
+# SmallCellForum 5G (n)FAPI split
+
 This document describes the broad way in which the VNF and PNF work internally,
 from configuration, to P5 and P7 message exchange and processing.
 Their internal processing is broadly independent on which transport mechanism
