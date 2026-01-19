@@ -19,7 +19,7 @@ Regarding to the APIs between different services, they are such as the following
 
 The following figure shows OAI gNB and UE with the Data Recording App system architecture. 
 
-<img src="images/data_recording_arch.svg" alt="OAI gNB and UE with the Data Recording App system architectur" width="1000">
+![OAI gNB and UE with the Data Recording App system architecture](./images/data_recording_arch.svg)
 
 ## Required Packages
 Install all required system packages with the following commands:
@@ -298,7 +298,7 @@ python3 data_recording_app_v1.0.py
 The recorded data set will be stored in the configured path, assume `/home/user/workarea/oai_recorded_data/`. 
 The following figure shows an example of recorded data set.
 
-<img src="images/sigmf_dataset.svg" alt="Example from SigMF recorded data set" width="600">
+![Example from SigMF recorded data set](./images/sigmf_dataset.svg)
 
 ## Overview on Collected Data Set
 
@@ -496,7 +496,7 @@ For synchronization validation and to show how to read SigMF metadata, a simple 
     - Number of OFDM symbols = 13
     - So, the valid number of bits in the transport block (slot) is: 3312 bits. If we will fill DMRS locations by zeros, the number of bits is: 3744 bits, but it is not done due to the real-timing issues. For Tx scrambled bits data de-serialization, the user can reconstruct the Tx Scrambled Bits Grid (2D Grid) by using the captured DMRS grid or Channel Estimates Grid as a reference and no need to derive the DMRS symbols locations based on 5G NR config parameters.
 
-<img src="images/data_serialization_tx_scrambled_bit_message.svg" alt="Data serialization " width="500">
+![Data serialization](./images/data_serialization_tx_scrambled_bit_message.svg)
 
 ### To Do List:
 

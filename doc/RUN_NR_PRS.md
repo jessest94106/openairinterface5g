@@ -46,7 +46,7 @@ Also check the numa nodes USRP’s are connected to, using the following command
 
 ```cat /sys/class/net/eth_if/device/numa_node```
 
-Where `eth_if` has to be replaced with the name of the network interface the USRP is connected to. 
+Where `eth_if` has to be replaced with the name of the network interface the USRP is connected to.
 In our case the output is 0 and hence we use `numactl --cpunodebind=0 --membind=0`
 
 ### FR1 test
@@ -57,7 +57,7 @@ Open a terminal on the host machine, and execute below command to launch gNB wit
 If **N310 USRPs** are used, then run above command `without -E option` i.e without 3/4 sampling rate.<br><br>
 
 
-To run using **rfsimulator**, execute following command:  
+To run using **rfsimulator**, execute following command:
 
 ```sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb0.prs.band78.fr1.106PRB.usrpx310.conf --noS1 --rfsim --phy-test```
 
@@ -69,7 +69,7 @@ If RF beamforming module is NOT present, gNB can still be launched with USRP alo
 ```sudo numactl --cpunodebind=0 --membind=0 ./nr-softmodem -E -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb0.prs.band261.fr2.64PRB.usrpx310.conf --phy-test```<br><br>
 
 
-To run using **rfsimulator**, execute following command:  
+To run using **rfsimulator**, execute following command:
 
 ```sudo ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb0.prs.band261.fr2.64PRB.usrpx310.conf --noS1 --rfsim --phy-test```
 
@@ -86,19 +86,19 @@ To use GPSDO, make sure to change `clock_source` and `time_source` to `gpsdo` in
 ## nrUE in `phy-test` mode
 While running gNB and nrUE on the same host machine, `reconfig.raw` and `rbconfig.raw` files would be generated with the launch of gNB and and then nrUE would automatically source it from build directory. However, if gNB and nrUE are running on two different host machines, then run gNB first with the corresponding config and exit after few seconds. This would generate `reconfig.raw` and `rbconfig.raw` files.
 
-After this, nrUE can be launched using one of the below commands depending on the test scenario. If UE is NOT able to connect to the gNB, then check the USRP connections or try increasing `--ue-rxgain` in steps of 10dB.  
+After this, nrUE can be launched using one of the below commands depending on the test scenario. If UE is NOT able to connect to the gNB, then check the USRP connections or try increasing `--ue-rxgain` in steps of 10dB.
 
 Also check the instructions on `numactl` in gNB test section as it applies for nrUE execution as well.
 
 ### FR1 test
 Once gNB is up and running, open another terminal and execute below command to launch nrUE with **X310 USRPs**. Make sure to specify `IP_ADDR1` and `IP_ADDR2`(optional) correctly as per USRPs IP address
 
-```sudo numactl --cpunodebind=0 --membind=0 ./nr-uesoftmodem -E --phy-test --usrp-args "addr=IP_ADDR1,second_addr=IP_ADDR2,time_source=internal,clock_source=internal" -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.nr.prs.fr1.106prb.conf --ue-rxgain 80 --ue-fo-compensation --non-stop```  
+```sudo numactl --cpunodebind=0 --membind=0 ./nr-uesoftmodem -E --phy-test --usrp-args "addr=IP_ADDR1,second_addr=IP_ADDR2,time_source=internal,clock_source=internal" -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.nr.prs.fr1.106prb.conf --ue-rxgain 80 --ue-fo-compensation --non-stop```
 
 If **N310 USRPs** are used, then run above command `without -E option` i.e without 3/4 sampling rate.<br><br>
 
 
-To run using **rfsimulator** with local ETH IF `127.0.0.1`, execute following command:  
+To run using **rfsimulator** with local ETH IF `127.0.0.1`, execute following command:
 
 ```
 sudo ./nr-uesoftmodem --rfsim --phy-test --noS1 -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.nr.prs.fr1.106prb.conf --rfsimulator.serveraddr 127.0.0.1
@@ -112,7 +112,7 @@ If RF beamforming module is NOT present, nrUE can still be launched with USRP al
 ```sudo numactl --cpunodebind=0 --membind=0 ./nr-uesoftmodem -E --phy-test -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.nr.prs.fr2.64prb.conf --usrp-args "addr=IP_ADDR1,second_addr=IP_ADDR2,time_source=internal,clock_source=internal" --ue-rxgain 80 --ue-fo-compensation --if_freq 50000000 --non-stop```<br><br>
 
 
-To run using **rfsimulator** with local ETH IF `127.0.0.1`, execute following command:  
+To run using **rfsimulator** with local ETH IF `127.0.0.1`, execute following command:
 
 ```
 sudo ./nr-uesoftmodem --rfsim --phy-test --noS1 -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/ue.nr.prs.fr2.64prb.conf --rfsimulator.serveraddr 127.0.0.1
@@ -137,7 +137,7 @@ Once nrUE is launched with `--T_stdout 0 or 2` option, open another terminal. Na
 
 Once the build is successful, execute following command to start recording the PRS channel estimates dumps
 
-```./record -d ../T_messages.txt -on LEGACY_PHY_INFO -on UE_PHY_DL_CHANNEL_ESTIMATE -on UE_PHY_DL_CHANNEL_ESTIMATE_FREQ -o prs_dumps.raw```  
+```./record -d ../T_messages.txt -on LEGACY_PHY_INFO -on UE_PHY_DL_CHANNEL_ESTIMATE -on UE_PHY_DL_CHANNEL_ESTIMATE_FREQ -o prs_dumps.raw```
 
 Exit using `Ctrl+C` to stop recording, else it will keep running and take lot of disk space. Generally running it for 1-2 minutes should collect sufficient dumps.<br><br>
 
@@ -155,7 +155,7 @@ Once T tracer dumps are recorded, PRS channel estimates can be extracted from .r
 
 ```./extract_prs_dumps.sh -g <num_gnb> -n <num_resources> -f <recorded .raw file> -c <count>```
 
-In the end, the script will zip all the extracted dumps to `prs_dumps.tgz`. Make sure to check help in running script using -h option: 
+In the end, the script will zip all the extracted dumps to `prs_dumps.tgz`. Make sure to check help in running script using -h option:
 ```./extract_prs_dumps.sh -h```<br><br>
 
 ## Using Matlab/Octave script to visualize PRS channel estimates
@@ -164,19 +164,13 @@ We have developed `plot_prs_Ttracer_dumps.m` script to visualize the extracted P
 Make sure to enter the parameters script asks as input like below:
 
 ```
-Enter the directory path to T tracer dumps: '<workspace>/openairinterface5g/common/utils/T/tracer'  
-Enter the OFDM FFT size used for file parsing: <frame_parms->ofdm_symbol_size>  
-Enter number of PRS respurces: <NumPRSResources>  
+Enter the directory path to T tracer dumps: '<workspace>/openairinterface5g/common/utils/T/tracer'
+Enter the OFDM FFT size used for file parsing: <frame_parms->ofdm_symbol_size>
+Enter number of PRS respurces: <NumPRSResources>
 Enter number of active gNBs: <Active_gNBs>
 ```
 This script will read the IQ data from extracted PRS dumps(chF_gnbX_Y.raw and chT_gnbX_Y.raw) and plot them like below
-<table style="border-collapse: collapse; border: none;">
-  <tr style="border-collapse: collapse; border: none;">
-    <td style="border-collapse: collapse; border: none;">
-         <img src="./images/PRS_CFR_FR2_64PRB_8rsc.PNG" alt="" border=1 height=400 width=500>
-         <img src="./images/PRS_CIR_FR2_64PRB_8rsc.PNG" alt="" border=1 height=400 width=500>
-         </img>
-         <figcaption align = "center"><b>Fig.1 - FR2 100MHz test</b></figcaption>
-    </td>
-  </tr>
-</table>
+
+![PRS CFR FR2](./images/PRS_CFR_FR2_64PRB_8rsc.PNG)
+
+![PRS CIR FR2](./images/PRS_CIR_FR2_64PRB_8rsc.PNG)

@@ -18,7 +18,7 @@
 
 Example of L2 nFAPI Simulator testing environment:
 
-<img src="./images/L2-sim-S1-3-host-deployment.png" alt="" border=3>
+![L2-sim-S1-3-host-deployment](./images/L2-sim-S1-3-host-deployment.png)
 
 > Note that the IP addresses are indicative and need to be adapted to your environment.
 
