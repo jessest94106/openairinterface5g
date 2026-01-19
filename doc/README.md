@@ -1,12 +1,12 @@
 # OpenAirInterface documentation overview
 
-This is the general overview page of the OpenAirInterface documentation.  
+This is the general overview page of the OpenAirInterface documentation.
 This page groups links to general information, tutorials, design documents, radio integration, and special-purpose libraries.
 
-**IMPORTANT NOTE:**  
+**IMPORTANT NOTE:**
 Before reading this documentation, we strongly advise you to keep your own repository rebased on `develop`
-or at least to checkout the documentation on the version of the repository you are using.  
-Then the documentation will better reflect the features available in your repository so that you may avoid some errors.  
+or at least to checkout the documentation on the version of the repository you are using.
+Then the documentation will better reflect the features available in your repository so that you may avoid some errors.
 Beware if you previously pulled the `develop` branch that your repository may be now behind `develop`.
 
 [[_TOC_]]
@@ -130,3 +130,4 @@ The other SDRs (AW2S, LimeSDR, ...) have no READMEs.
 - [formatting](../tools/formatting/README.md) is a clang-format error detection tool
 - [iwyu](../tools/iwyu/README.md) is a tool to detect `#include` errors
 - [docker-dev-env](../tools/docker-dev-env/README.md) is a ubuntu24 docker development environment
+- [doc_best_practices.md](./doc_best_practices.md): overall best practices for writing documentations
