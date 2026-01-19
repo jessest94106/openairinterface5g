@@ -100,5 +100,8 @@
 // SDAP
 #define MAX_QOS_FLOWS 64
 
+// SDAP/5G NAS NOS1
+#define DEFAULT_NOS1_PDU_ID 10
+
 #define SPEED_OF_LIGHT 299792458 // in m/s
 #endif /* __PLATFORM_CONSTANTS_H__ */

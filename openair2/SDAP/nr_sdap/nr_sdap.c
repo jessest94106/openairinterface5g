@@ -157,9 +157,9 @@ static void *sdap_tun_read_thread(void *arg)
   return NULL;
 }
 
-void start_sdap_tun_gnb_first_ue_default_pdu_session(ue_id_t ue_id)
+void start_sdap_tun_gnb_first_ue_default_pdu_session(ue_id_t ue_id, int pdu_session_id)
 {
-  nr_sdap_entity_t *entity = nr_sdap_get_entity(ue_id, get_softmodem_params()->default_pdu_session_id);
+  nr_sdap_entity_t *entity = nr_sdap_get_entity(ue_id, pdu_session_id);
   DevAssert(entity != NULL);
   DevAssert(entity->is_gnb);
   char *ifprefix = get_softmodem_params()->nsa ? "oaitun_gnb" : "oaitun_enb";
