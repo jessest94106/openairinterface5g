@@ -144,7 +144,7 @@ int config_cmdlineonly_getlist(configmodule_interface_t *cfg,
                                paramlist_def_t *ParamList,
                                paramdef_t *params,
                                int numparams,
-                               char *prefix)
+                               const char *prefix)
 {
   ParamList->numelt = 0;
   return 0;
