@@ -557,13 +557,13 @@ int main(int argc, char **argv)
   printf("+----------------------------------+--------------------------+\n");
   printf("| %-32s | %-24s |\n", "Performance Metric", "Value");
   printf("+----------------------------------+--------------------------+\n");
-  printf("| %-32s | %-24.2f |\n", "Total CPU Time (us)", avg_cpu_us);
-  printf("| %-32s | %-24.2f |\n", "Total GPU Time (us)", avg_gpu_us);
-  printf("| %-32s | %-24.2f |\n", "Avg Time per Channel - CPU (us)", avg_cpu_per_channel_us);
-  printf("| %-32s | %-24.2f |\n", "Avg Time per Channel - GPU (us)", avg_gpu_per_channel_us);
+  printf("| %-32s   %-19.2f %-4s |\n", "Total CPU Time", avg_cpu_us, "[us]");
+  printf("| %-32s   %-19.2f %-4s |\n", "Total GPU Time", avg_gpu_us, "[us]");
+  printf("| %-32s   %-19.2f %-4s |\n", "Avg Time per Channel - CPU", avg_cpu_per_channel_us, "[us]");
+  printf("| %-32s   %-19.2f %-4s |\n", "Avg Time per Channel - GPU", avg_gpu_per_channel_us, "[us]");
   snprintf(val_str, sizeof(val_str), "%.2fx", speedup);
-  printf("| %-32s | %-24s |\n", "Speedup (CPU/GPU)", val_str);
-  printf("| %-32s | %-24.3f |\n", "GPU Throughput (GSPS)", gpu_throughput_gsps);
+  printf("| %-32s   %-24s |\n", "Speedup (CPU/GPU)", val_str);
+  printf("| %-32s   %-24.3f |\n", "GPU Throughput (GSPS)", gpu_throughput_gsps);
   printf("+----------------------------------+--------------------------+\n");
 
   free(tx_sig_data);
