@@ -185,11 +185,10 @@ static void start_sdap_tun_ue(ue_id_t ue_id, int pdu_session_id, int sock, const
 }
 
 
-void create_ue_ip_if(const char *ipv4, const char *ipv6, int ue_id, int pdu_session_id)
+void create_ue_ip_if(const char *ipv4, const char *ipv6, int ue_id, int pdu_session_id, bool is_default)
 {
-  int default_pdu = get_softmodem_params()->default_pdu_session_id;
   char ifname[IFNAMSIZ];
-  tuntap_generate_ue_ifname(ifname, IFF_TUN, ue_id, pdu_session_id != default_pdu ? pdu_session_id : -1);
+  tuntap_generate_ue_ifname(ifname, IFF_TUN, ue_id, is_default ? -1 : pdu_session_id);
   const int sock = tuntap_alloc(IFF_TUN, ifname);
   tun_config(ifname, ipv4, ipv6);
   if (ipv4) {
