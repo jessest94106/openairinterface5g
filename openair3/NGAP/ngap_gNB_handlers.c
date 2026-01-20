@@ -1098,6 +1098,12 @@ static int ngap_gNB_handle_handover_cancel_ack(sctp_assoc_t assoc_id, uint32_t s
   return 0;
 }
 
+/**
+ * @brief Handle NGAP Paging message from AMF
+ * @param assoc_id SCTP association ID
+ * @param stream SCTP stream ID (must be 0 for paging per TS 38.412 Clause 7)
+ * @param pdu NGAP PDU containing Paging message
+ * @return 0 on success, -1 on failure */
 static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_NGAP_PDU_t *pdu)
 {
   ngap_gNB_amf_data_t   *amf_desc_p        = NULL;
@@ -1106,10 +1112,14 @@ static int ngap_gNB_handle_paging(sctp_assoc_t assoc_id, uint32_t stream, NGAP_N
   // received Paging Message from AMF
   NGAP_DEBUG("[SCTP %u] Received Paging Message From AMF\n",assoc_id);
 
-  /* Paging procedure -> stream != 0 */
-  if (stream == 0) {
-    LOG_W(NGAP,"[SCTP %d] Received Paging procedure on stream (%d)\n",
-          assoc_id, stream);
+  /* Per 3GPP TS 38.412 Clause 7 (Transport layer):
+   * Paging is classified as "non-UE-associated signalling" because:
+   * - UE is in RRC_IDLE or RRC_INACTIVE state
+   * - No active UE context exists in the RAN
+   * - Paging targets UE by 5G-S-TMSI, not by RAN-UE-NGAP-ID
+   * Non-UE-associated signalling MUST use stream 0 (or a reserved stream pair) */
+  if (stream != 0) {
+    LOG_W(NGAP,"[SCTP %d] Received Paging procedure on stream != 0 (expected stream 0 per TS 38.412)\n", assoc_id);
     return -1;
   }
 
