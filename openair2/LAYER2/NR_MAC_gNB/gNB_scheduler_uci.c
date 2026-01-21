@@ -98,28 +98,6 @@ static void nr_fill_nfapi_pucch(gNB_MAC_INST *nrmac, frame_t frame, slot_t slot,
                      nrmac->beam_info.beam_mode);
 }
 
-#define MIN_RSRP_VALUE -141
-#define MAX_RSRP_VALUE -43
-
-//Measured RSRP Values Table 10.1.16.1-1 from 38.133
-//Stored all the upper limits[Max RSRP Value of corresponding index]
-//stored -1 for invalid values
-static const int L1_SSB_CSI_RSRP_measReport_mapping_38133_10_1_6_1_1[128] = {
-    -1,   -1,   -1,   -1,   -1,      -1,   -1,      -1,   -1,   -1, // 0 - 9
-    -1,   -1,   -1,   -1,   -1, -1, MIN_RSRP_VALUE, -140, -139, -138, // 10 - 19
-    -137, -136, -135, -134, -133,    -132, -131,    -130, -129, -128, // 20 - 29
-    -127, -126, -125, -124, -123,    -122, -121,    -120, -119, -118, // 30 - 39
-    -117, -116, -115, -114, -113,    -112, -111,    -110, -109, -108, // 40 - 49
-    -107, -106, -105, -104, -103,    -102, -101,    -100, -99,  -98, // 50 - 59
-    -97,  -96,  -95,  -94,  -93,     -92,  -91,     -90,  -89,  -88, // 60 - 69
-    -87,  -86,  -85,  -84,  -83,     -82,  -81,     -80,  -79,  -78, // 70 - 79
-    -77,  -76,  -75,  -74,  -73,     -72,  -71,     -70,  -69,  -68, // 80 - 89
-    -67,  -66,  -65,  -64,  -63,     -62,  -61,     -60,  -59,  -58, // 90 - 99
-    -57,  -56,  -55,  -54,  -53,     -52,  -51,     -50,  -49,  -48, // 100 - 109
-    -47,  -46,  -45,  -44, MAX_RSRP_VALUE, -1, -1,  -1,   -1,   -1, // 110 - 119
-    -1,   -1,   -1,   -1,   -1,      -1,   -1,      -1 // 120 - 127
-};
-
 //Differential RSRP values Table 10.1.6.1-2 from 38.133
 //Stored the upper limits[MAX RSRP Value]
 static const int diff_rsrp_ssb_csi_meas_10_1_6_1_2[16] = {
@@ -440,23 +418,16 @@ static int get_diff_sinr(int index, int best_SINRx10)
 //returns the measured RSRP value (upper limit)
 static bool get_measured_rsrp(uint8_t index, int *rsrp)
 {
-  //if index is invalid returning minimum rsrp -140
-  if (index <= 15)
+  *rsrp = -156 + index;
+  if (index < 16 || index > 113)
     return false;
-  if (index >= 114)
-    return false;
-
-  *rsrp = L1_SSB_CSI_RSRP_measReport_mapping_38133_10_1_6_1_1[index];
   return true;
 }
 
 //returns the differential RSRP value (upper limit)
 static int get_diff_rsrp(uint8_t index, int strongest_rsrp)
 {
-  if(strongest_rsrp != -1)
-    return strongest_rsrp + diff_rsrp_ssb_csi_meas_10_1_6_1_2[index];
-  else
-    return MIN_RSRP_VALUE;
+  return strongest_rsrp + diff_rsrp_ssb_csi_meas_10_1_6_1_2[index];
 }
 
 static uint8_t pickandreverse_bits(uint8_t *payload, uint16_t bitlen, uint8_t start_bit)
@@ -606,7 +577,7 @@ static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
   bool valid = get_measured_rsrp(rsrp, &rsrp_report->r[0].RSRP);
   LOG_D(NR_MAC, "SSB/CSI-RS index %d RSRP %d\n", rsrp_report->r[0].resource_id, rsrp_report->r[0].RSRP);
   if (!valid) {
-    LOG_E(NR_MAC, "UE %04x: reported RSRP out of 5G usable range %d dBm\n", UE->rnti, rsrp_report->r[0].RSRP);
+    LOG_I(NR_MAC, "UE %04x: reported RSRP out of 5G usable range %d dBm\n", UE->rnti, rsrp_report->r[0].RSRP);
     return;
   }
 
