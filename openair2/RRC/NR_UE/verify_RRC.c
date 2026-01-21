@@ -101,13 +101,55 @@ static bool check_csi_report_consistency(const NR_CSI_MeasConfig_t *meas)
   return true;
 }
 
+static bool check_srs_config(NR_SRS_Config_t *srs_Config)
+{
+  if (srs_Config->srs_ResourceToAddModList) {
+    for (int i = 0; i < srs_Config->srs_ResourceToAddModList->list.count; i++) {
+      NR_SRS_Resource_t *res = srs_Config->srs_ResourceToAddModList->list.array[i];
+      int start = NR_NUMBER_OF_SYMBOLS_PER_SLOT - res->resourceMapping.startPosition - 1;
+      int num = 1 << res->resourceMapping.nrofSymbols;
+      if (start + num > NR_NUMBER_OF_SYMBOLS_PER_SLOT) {
+        LOG_E(NR_RRC, "The configured SRS resource exceeds the slot boundary\n");
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+static bool check_ul_bwp_config(NR_BWP_UplinkDedicated_t *bwp_Config)
+{
+  if (bwp_Config->srs_Config && bwp_Config->srs_Config->choice.setup) {
+    if (!check_srs_config(bwp_Config->srs_Config->choice.setup))
+      return false;
+  }
+  return true;
+}
+
 bool check_cellgroup_config(const NR_CellGroupConfig_t *cgConfig)
 {
-  if (cgConfig->spCellConfig &&
-      cgConfig->spCellConfig->spCellConfigDedicated &&
-      cgConfig->spCellConfig->spCellConfigDedicated->csi_MeasConfig) {
-    if (!check_csi_report_consistency(cgConfig->spCellConfig->spCellConfigDedicated->csi_MeasConfig->choice.setup))
-      return false;
+  if (cgConfig->spCellConfig && cgConfig->spCellConfig->spCellConfigDedicated) {
+    NR_ServingCellConfig_t *spCellConfigDedicated = cgConfig->spCellConfig->spCellConfigDedicated;
+    if (spCellConfigDedicated->csi_MeasConfig) {
+      if (!check_csi_report_consistency(spCellConfigDedicated->csi_MeasConfig->choice.setup))
+        return false;
+    }
+    if (spCellConfigDedicated->uplinkConfig) {
+      NR_UplinkConfig_t *ul_Config = spCellConfigDedicated->uplinkConfig;
+      if (ul_Config->initialUplinkBWP) {
+        if (!check_ul_bwp_config(ul_Config->initialUplinkBWP))
+          return false;
+      }
+      if (ul_Config->uplinkBWP_ToAddModList) {
+        for (int i = 0; i < ul_Config->uplinkBWP_ToAddModList->list.count; i++) {
+          NR_BWP_Uplink_t *ul_bwp = ul_Config->uplinkBWP_ToAddModList->list.array[i];
+          if (ul_bwp->bwp_Dedicated) {
+            if (!check_ul_bwp_config(ul_bwp->bwp_Dedicated))
+              return false;
+          }
+        }
+      }
+    }
   }
 
   if (cgConfig->ext1 && cgConfig->ext1->reportUplinkTxDirectCurrent) {
