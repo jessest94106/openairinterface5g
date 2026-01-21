@@ -46,6 +46,7 @@ import cls_cmd
 import cls_cmd
 import helpreadme as HELP
 import constants as CONST
+import cls_analysis
 from cls_ci_helper import archiveArtifact
 
 #-----------------------------------------------------------
@@ -68,8 +69,6 @@ class RANManagement():
 		self.eNBmbmsEnables = [False, False, False]
 		self.eNBstatuses = [-1, -1, -1]
 		self.runtime_stats= ''
-		self.datalog_rt_stats={}
-		self.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
 		#checkers from xml
 		self.ran_checkers={}
 		self.cmd_prefix = '' # prefix before {lte,nr}-softmodem
@@ -151,8 +150,6 @@ class RANManagement():
 		logdir = os.path.dirname(logfile)
 
 		file = archiveArtifact(cmd, ctx, logfile)
-		archiveArtifact(cmd, ctx, f"{logdir}/nrL1_stats.log")
-		archiveArtifact(cmd, ctx, f"{logdir}/nrMAC_stats.log")
 		cmd.close()
 		if file is None:
 			logging.debug('\u001B[1;37;41m Could not copy xNB logfile to analyze it! \u001B[0m')
@@ -167,11 +164,21 @@ class RANManagement():
 		else:
 			HTML.CreateHtmlTestRow(self.runtime_stats, 'OK', CONST.ALL_PROCESSES_OK)
 
-		#display rt stats for gNB only
-		if len(self.datalog_rt_stats) != 0:
-			HTML.CreateHtmlDataLogTable(self.datalog_rt_stats)
-
 		return logStatus >= 0
+
+	def AnalyzeRTStats(self, HTML, node, ctx, thresholds):
+		logging.info(f'Analyzing realtime stats from server: {node}')
+		lSourcePath = self.eNBSourceCodePath
+
+		logdir = f'{lSourcePath}/cmake_targets'
+		with cls_cmd.getConnection(node) as cmd:
+			l1_file = archiveArtifact(cmd, ctx, f"{logdir}/nrL1_stats.log")
+			mac_file = archiveArtifact(cmd, ctx, f"{logdir}/nrMAC_stats.log")
+
+		logging.info(f"check against thresholds from {thresholds}")
+		success, datalog_rt_stats = cls_analysis.Analysis.analyze_rt_stats(thresholds, l1_file, mac_file)
+		HTML.CreateHtmlDataLogTable(datalog_rt_stats)
+		return success
 
 	def _analyzeUeRetx(self, rounds, checkers, regex):
 		if len(rounds) == 0 or len(checkers) == 0:
@@ -241,8 +248,6 @@ class RANManagement():
 		NSA_RAPROC_PUSCH_check = 0
 		#dlsch and ulsch statistics (dictionary)
 		dlsch_ulsch_stats = {}
-		#real time statistics (dictionary)
-		real_time_stats = {}
 		#count "problem receiving samples" msg
 		pb_receiving_samples_cnt = 0
 		#count "removing UE" msg
@@ -470,54 +475,6 @@ class RANManagement():
 
 		enb_log_file.close()
 
-
-		#the following part takes the *_stats.log files as source (not the stdout log file)
-
-		#the datalog config file has to be loaded
-		datalog_rt_stats_file=self.datalog_rt_stats_file
-		if (os.path.isfile(datalog_rt_stats_file)):
-			yaml_file=datalog_rt_stats_file
-		elif (os.path.isfile('ci-scripts/'+datalog_rt_stats_file)):
-			yaml_file='ci-scripts/'+datalog_rt_stats_file
-		else:
-			logging.error("Datalog RT stats yaml file cannot be found")
-			sys.exit("Datalog RT stats yaml file cannot be found")
-
-		with open(yaml_file,'r') as f:
-			datalog_rt_stats = yaml.load(f,Loader=yaml.FullLoader)
-		rt_keys = datalog_rt_stats['Ref'] #we use the keys from the Ref field  
-
-		# nrL1_stats.log/nrMAC_stats.log should be in the same directory as main log file
-		# currently the link is only implicit as below based on pattern matching
-		# I will rework this to give the file explicitly
-		l1_stats_fn = re.sub(r'-enb.log$', '-nrL1_stats.log', eNBlogFile)
-		mac_stats_fn = re.sub(r'-enb.log$', '-nrMAC_stats.log', eNBlogFile)
-		if os.path.isfile(l1_stats_fn) and os.path.isfile(mac_stats_fn):
-			# don't use CI-nrL1_stats.log, as this will increase the processing time for
-			# no reason, we just need the last occurence
-			nrL1_stats = open(l1_stats_fn, 'r')
-			nrMAC_stats = open(mac_stats_fn, 'r')
-			for line in nrL1_stats.readlines():
-				for k in rt_keys:
-					result = re.search(k, line)     
-					if result is not None:
-						#remove 1- all useless char before relevant info  2- trailing char
-						tmp=re.match(rf'^.*?(\b{k}\b.*)',line.rstrip()) #from python 3.6 we can use literal string interpolation for the variable k, using rf' in the regex
-						if tmp!=None: 
-							real_time_stats[k]=tmp.group(1)
-			for line in nrMAC_stats.readlines():
-				for k in rt_keys:
-					result = re.search(k, line)     
-					if result is not None:
-						#remove 1- all useless char before relevant info  2- trailing char
-						tmp=re.match(rf'^.*?(\b{k}\b.*)',line.rstrip()) #from python 3.6 we can use literal string interpolation for the variable k, using rf' in the regex
-						if tmp!=None: 
-							real_time_stats[k]=tmp.group(1)
-			nrL1_stats.close()
-			nrMAC_stats.close()
-		else:
-			logging.debug(f"NR Stats files for RT analysis not found: {l1_stats_fn}, {mac_stats_fn}")
-
 		#stdout log file and stat log files analysis completed
 		logging.debug('   File analysis (stdout, stats) completed')
 
@@ -600,31 +557,6 @@ class RANManagement():
 				ulcheckers = [] if 'u_retx_th' not in checkers else checkers['u_retx_th']
 				retx_status[ue]['ul'] = self._analyzeUeRetx(dlulstat['ulsch_rounds'], ulcheckers, r'^.*ulsch_rounds\s+(\d+)\/(\d+)\/(\d+)\/(\d+),\s+ulsch_errors\s+(\d+)')
 
-
-			#real time statistics
-			datalog_rt_stats['Data']={}
-			if len(real_time_stats)!=0: #check if dictionary is not empty
-				for k in real_time_stats:
-					tmp=re.match(r'^(?P<metric>.*):\s+(?P<avg>\d+\.\d+) us;\s+(?P<count>\d+);\s+(?P<max>\d+\.\d+) us;',real_time_stats[k])
-					if tmp is not None:
-						metric=tmp.group('metric')
-						avg=float(tmp.group('avg'))
-						max=float(tmp.group('max'))
-						count=int(tmp.group('count'))
-						datalog_rt_stats['Data'][metric]=["{:.0f}".format(avg),"{:.0f}".format(max),"{:d}".format(count),"{:.2f}".format(avg/datalog_rt_stats['Ref'][metric])]
-				#once all metrics are collected, store the data as a class attribute to build a dedicated HTML table afterward
-				self.datalog_rt_stats=datalog_rt_stats
-				#check if there is a fail => will render the test as failed
-				for k in datalog_rt_stats['Data']:
-					valnorm = float(datalog_rt_stats['Data'][k][3])
-					dev = datalog_rt_stats['DeviationThreshold'][k]
-					if valnorm > 1.0 + dev or valnorm < 1.0 - dev: # condition for fail : avg/ref deviates by more than "deviation threshold"
-						logging.debug(f'\u001B[1;30;43m normalized datalog_rt_stats metric {k}={valnorm} deviates by more than {dev}\u001B[0m')
-						RealTimeProcessingIssue = True
-			else:
-				statMsg = 'No real time stats found in the log file\n'
-				logging.debug('No real time stats found in the log file')
-				htmleNBFailureMsg += statMsg
 
 			if not showedByeMsg:
 				logging.debug('\u001B[1;37;41m ' + nodeB_prefix + 'NB did not show "Bye." message at end, it likely did not stop properly! \u001B[0m')
