@@ -278,7 +278,8 @@ static NR_ControlResourceSet_t *get_coreset_config(int bwp_id,
                                                    int cset_limit,
                                                    int bwp_start,
                                                    int bwp_size,
-                                                   uint64_t ssb_bitmap)
+                                                   uint64_t ssb_bitmap,
+                                                   bool doTCI)
 {
   NR_ControlResourceSet_t *coreset = calloc(1, sizeof(*coreset));
   AssertFatal(coreset != NULL, "out of memory\n");
@@ -317,13 +318,15 @@ static NR_ControlResourceSet_t *get_coreset_config(int bwp_id,
   // The ID space is used across the BWPs of a Serving Cell as per 38.331
   coreset->controlResourceSetId = bwp_id + 1;
 
-  coreset->tci_StatesPDCCH_ToAddList=calloc(1,sizeof(*coreset->tci_StatesPDCCH_ToAddList));
-  NR_TCI_StateId_t *tci[64];
-  for (int i=0;i<64;i++) {
-    if ((ssb_bitmap>>(63-i))&0x01){
-      tci[i]=calloc(1,sizeof(*tci[i]));
-      *tci[i] = i;
-      asn1cSeqAdd(&coreset->tci_StatesPDCCH_ToAddList->list,tci[i]);
+  if (doTCI) {
+    coreset->tci_StatesPDCCH_ToAddList = calloc(1,sizeof(*coreset->tci_StatesPDCCH_ToAddList));
+    int num_ssb = 0;
+    for (int i = 0; i < 64; i++) {
+      if ((ssb_bitmap >> (63 - i)) & 0x01) {
+        NR_TCI_StateId_t *tci = calloc(1, sizeof(*tci));
+        *tci = num_ssb++;
+        asn1cSeqAdd(&coreset->tci_StatesPDCCH_ToAddList->list, tci);
+      }
     }
   }
   coreset->tci_StatesPDCCH_ToReleaseList = NULL;
@@ -1693,7 +1696,11 @@ static NR_PTRS_DownlinkConfig_t *config_dlptrs(const nr_ptrs_config_t *ptrs)
   return ptrs_config;
 }
 
-static NR_SetupRelease_PDSCH_Config_t *config_pdsch(uint64_t ssb_bitmap, int bwp_Id, int dl_antenna_ports, nr_ptrs_config_t *ptrs)
+static NR_SetupRelease_PDSCH_Config_t *config_pdsch(uint64_t ssb_bitmap,
+                                                    int bwp_Id,
+                                                    int dl_antenna_ports,
+                                                    bool do_TCI,
+                                                    nr_ptrs_config_t *ptrs)
 {
   NR_SetupRelease_PDSCH_Config_t *setup_pdsch_Config = calloc(1,sizeof(*setup_pdsch_Config));
   setup_pdsch_Config->present = NR_SetupRelease_PDSCH_Config_PR_setup;
@@ -1726,19 +1733,21 @@ static NR_SetupRelease_PDSCH_Config_t *config_pdsch(uint64_t ssb_bitmap, int bwp
   pdsch_Config->prb_BundlingType.choice.staticBundling->bundleSize = calloc(1, sizeof(*pdsch_Config->prb_BundlingType.choice.staticBundling->bundleSize));
   *pdsch_Config->prb_BundlingType.choice.staticBundling->bundleSize = NR_PDSCH_Config__prb_BundlingType__staticBundling__bundleSize_wideband;
 
-  int n_ssb = 0;
-  if (!pdsch_Config->tci_StatesToAddModList)
-    pdsch_Config->tci_StatesToAddModList=calloc(1,sizeof(*pdsch_Config->tci_StatesToAddModList));
-  for (int i = 0; i < 64; i++) {
-    if (((ssb_bitmap >> (63 - i)) & 0x01) == 0)
-      continue;
-    asn1cSequenceAdd(pdsch_Config->tci_StatesToAddModList->list, NR_TCI_State_t, tcid);
-    tcid->tci_StateId = n_ssb++;
-    tcid->qcl_Type1.cell = NULL;
-    asn1cCallocOne(tcid->qcl_Type1.bwp_Id, bwp_Id);
-    tcid->qcl_Type1.referenceSignal.present = NR_QCL_Info__referenceSignal_PR_ssb;
-    tcid->qcl_Type1.referenceSignal.choice.ssb = i;
-    tcid->qcl_Type1.qcl_Type = NR_QCL_Info__qcl_Type_typeC;
+  if (do_TCI) {
+    int n_ssb = 0;
+    if (!pdsch_Config->tci_StatesToAddModList)
+      pdsch_Config->tci_StatesToAddModList=calloc(1,sizeof(*pdsch_Config->tci_StatesToAddModList));
+    for (int i = 0; i < 64; i++) {
+      if (((ssb_bitmap >> (63 - i)) & 0x01) == 0)
+        continue;
+      asn1cSequenceAdd(pdsch_Config->tci_StatesToAddModList->list, NR_TCI_State_t, tcid);
+      tcid->tci_StateId = n_ssb++;
+      tcid->qcl_Type1.cell = NULL;
+      asn1cCallocOne(tcid->qcl_Type1.bwp_Id, bwp_Id);
+      tcid->qcl_Type1.referenceSignal.present = NR_QCL_Info__referenceSignal_PR_ssb;
+      tcid->qcl_Type1.referenceSignal.choice.ssb = i;
+      tcid->qcl_Type1.qcl_Type = NR_QCL_Info__qcl_Type_typeC;
+    }
   }
   return setup_pdsch_Config;
 }
@@ -1772,7 +1781,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   int bwp_size = NRRIV2BW(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   int bwp_start = NRRIV2PRBOFFSET(bwp->bwp_Common->genericParameters.locationAndBandwidth, MAX_BWP_SIZE);
   uint64_t ssb_bitmap = get_ssb_bitmap(scc);
-  NR_ControlResourceSet_t *coreset = get_coreset_config(bwp->bwp_Id, 0, 0, bwp_start, bwp_size, ssb_bitmap);
+  NR_ControlResourceSet_t *coreset = get_coreset_config(bwp->bwp_Id, 0, 0, bwp_start, bwp_size, ssb_bitmap, configuration->do_TCI);
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->commonControlResourceSet = coreset;
 
   bwp->bwp_Common->pdcch_ConfigCommon->choice.setup->searchSpaceZero=NULL;
@@ -1825,7 +1834,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList = calloc(1,sizeof(*bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList));
 
   // coreset2 is identical to coreset above, but reallocated to prevent double frees
-  NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, 0, 0, bwp_start, bwp_size, ssb_bitmap);
+  NR_ControlResourceSet_t *coreset2 = get_coreset_config(bwp->bwp_Id, 0, 0, bwp_start, bwp_size, ssb_bitmap, configuration->do_TCI);
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list, coreset2);
   int rrc_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
   int num_cces = get_coreset_num_cces(coreset2->frequencyDomainResources.buf, coreset2->duration);
@@ -1841,7 +1850,7 @@ static NR_BWP_Downlink_t *config_downlinkBWP(const NR_ServingCellConfigCommon_t 
   asn1cSeqAdd(&bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToAddModList->list, ss3);
 
   bwp->bwp_Dedicated->pdcch_Config->choice.setup->searchSpacesToReleaseList = NULL;
-  bwp->bwp_Dedicated->pdsch_Config = config_pdsch(ssb_bitmap, bwp->bwp_Id, dl_antenna_ports, configuration->ptrs);
+  bwp->bwp_Dedicated->pdsch_Config = config_pdsch(ssb_bitmap, bwp->bwp_Id, dl_antenna_ports, configuration->do_TCI, configuration->ptrs);
 
   set_dl_mcs_table(bwp->bwp_Common->genericParameters.subcarrierSpacing,
                    force_256qam_off ? NULL : uecap,
@@ -2730,10 +2739,14 @@ static BIT_STRING_t bit_string_clone(const BIT_STRING_t *orig)
   return bs;
 }
 
-
-void configure_coreset_for_mux23(const NR_ServingCellConfigCommon_t *scc, int offset, int limit, int bwp_start, int bwp_size)
+void configure_coreset_for_mux23(const NR_ServingCellConfigCommon_t *scc,
+                                 int offset,
+                                 int limit,
+                                 int bwp_start,
+                                 int bwp_size,
+                                 bool do_TCI)
 {
-  NR_ControlResourceSet_t *coreset = get_coreset_config(5, offset, limit, bwp_start, bwp_size, get_ssb_bitmap(scc));
+  NR_ControlResourceSet_t *coreset = get_coreset_config(5, offset, limit, bwp_start, bwp_size, get_ssb_bitmap(scc), do_TCI);
   NR_PDCCH_ConfigCommon_t *pdcch_common = scc->downlinkConfigCommon->initialDownlinkBWP->pdcch_ConfigCommon->choice.setup;
   pdcch_common->commonControlResourceSet = coreset;
   for (int i = 0; i < pdcch_common->commonSearchSpaceList->list.count; i++) {
@@ -3367,7 +3380,7 @@ static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCell
   NR_BWP_t *genericParameters = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
   int bwp_size = NRRIV2BW(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
   int bwp_start = NRRIV2PRBOFFSET(genericParameters->locationAndBandwidth, MAX_BWP_SIZE);
-  NR_ControlResourceSet_t *coreset = get_coreset_config(0, 0, 0, bwp_start, bwp_size, bitmap);
+  NR_ControlResourceSet_t *coreset = get_coreset_config(0, 0, 0, bwp_start, bwp_size, bitmap, configuration->do_TCI);
   asn1cSeqAdd(&pdcch_Config->controlResourceSetToAddModList->list, coreset);
 
   int css_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
@@ -3387,7 +3400,7 @@ static NR_BWP_DownlinkDedicated_t *configure_initial_dl_bwp(const NR_ServingCell
   asn1cSeqAdd(&pdcch_Config->searchSpacesToAddModList->list, ss2);
   bwp_Dedicated->pdcch_Config->choice.setup = pdcch_Config;
 
-  bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts, configuration->ptrs);
+  bwp_Dedicated->pdsch_Config = config_pdsch(bitmap, 0, pdsch_AntennaPorts, configuration->do_TCI, configuration->ptrs);
   // we might call configuration of initial BWP for BWP switch when we already have UE capabilities
   set_dl_mcs_table(scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing,
                    configuration->force_256qam_off ? NULL : uecap,
@@ -4038,7 +4051,7 @@ NR_CellGroupConfig_t *get_default_secondaryCellGroup(const NR_ServingCellConfigC
   configDedicated->initialDownlinkBWP = calloc(1, sizeof(*configDedicated->initialDownlinkBWP));
   configDedicated->initialDownlinkBWP->pdcch_Config = NULL;
   configDedicated->initialDownlinkBWP->pdsch_Config =
-      config_pdsch(bitmap, 0, dl_antenna_ports, configuration->ptrs);
+      config_pdsch(bitmap, 0, dl_antenna_ports, configuration->do_TCI, configuration->ptrs);
   configDedicated->initialDownlinkBWP->sps_Config = NULL; // calloc(1,sizeof(struct NR_SetupRelease_SPS_Config));
 
   configDedicated->initialDownlinkBWP->radioLinkMonitoringConfig = NULL;
