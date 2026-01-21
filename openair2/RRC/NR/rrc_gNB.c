@@ -3515,10 +3515,18 @@ void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
    *    the UE context already exists in MAC layer from when RRCReestablishmentRequest was
    *    received on the new DU. The MAC layer will find the existing UE context using this RNTI. */
   byte_array_t *hpi = NULL;
+  uint32_t du_ue_id = 0;
+  uint32_t *opt_du_ue_id = NULL;
   if (ho_prep_info) {
     /* Handover scenario: copy handover preparation information */
     hpi = malloc_or_fail(sizeof(*hpi));
     *hpi = copy_byte_array(*ho_prep_info);
+  } else {
+    /* Reestablishment scenario: use secondary_ue from existing UE context */
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(ue->rrc_ue_id);
+    RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
+    du_ue_id = ue_data.secondary_ue;
+    opt_du_ue_id = &du_ue_id;
   }
   LOG_I(NR_RRC, "Triggering UE Context Setup for UE %d on DU %d\n", ue->rrc_ue_id, du->assoc_id);
   int nb_srb = 2;
@@ -3539,7 +3547,7 @@ void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
   meas_config->buf = calloc_or_fail(1, NR_RRC_BUF_SIZE);
   meas_config->len = do_NR_MeasConfig(ue->measConfig, meas_config->buf, NR_RRC_BUF_SIZE);
   /* Fill common fields */
-  f1ap_ue_context_setup_req_t req = rrc_fill_f1_ue_context_setup(ue, du, NULL);
+  f1ap_ue_context_setup_req_t req = rrc_fill_f1_ue_context_setup(ue, du, opt_du_ue_id);
   /* Fill target DU specific fields */
   req.srbs_len = 2;
   req.srbs = srbs;
