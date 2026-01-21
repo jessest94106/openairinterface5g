@@ -94,8 +94,6 @@ the [MAC configuration](../MAC/mac-usage.md) as well for SIB configuration.
 
 - `um_on_default_drb` (default: false): use RLC UM instead of RLC AM on default
   bearers
-- `drbs` (default: 0): the number of DRBs to allocate for a UE, only useful for
-  do-ra or phy-test testing
 
 #### Neighbor-gNB configuration
 
