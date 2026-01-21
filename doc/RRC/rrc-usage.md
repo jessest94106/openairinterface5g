@@ -84,7 +84,7 @@ the [MAC configuration](../MAC/mac-usage.md) as well for SIB configuration.
       `0xffffff` is a reserved value and means "no SD"
     Note that: SST=1, no SD is "eMBB"; SST=2, no SD is "URLLC"; SST=3, no SD
     is "mMTC"
-- `enable_sdap` (default: false): enable the use of the SDAP layer. If
+- `enable_sdap` (default: true): enable the use of the SDAP layer. If
   deactivated, a transparent SDAP header is prepended to packets, but no
   further processing is being done.
 - `cu_sibs` (default: `[]`) list of SIBs to give to the DU for transmission.
