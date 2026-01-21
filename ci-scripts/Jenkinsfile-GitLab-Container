@@ -334,6 +334,29 @@ pipeline {
             }
           }
         }
+        stage ("Channel-Simulation") {
+          when { expression {do5Gtest || do5GUeTest} }
+          steps {
+            script {
+              triggerSlaveJob ('RAN-Channel-Simulation', 'Channel-Simulation')
+            }
+          }
+          post {
+            always {
+              script {
+                // Using a unique variable name for each test stage to avoid overwriting on a global variable
+                // due to parallel-time concurrency
+                channelSimStatus = finalizeSlaveJob('RAN-Channel-Simulation')
+              }
+            }
+            failure {
+              script {
+                currentBuild.result = 'FAILURE'
+                failingStages += channelSimStatus
+              }
+            }
+          }
+        }
         stage ("PhySim-Cluster-4G") {
           when { expression {do4Gtest} }
           steps {
