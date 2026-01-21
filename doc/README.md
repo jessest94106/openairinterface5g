@@ -23,7 +23,7 @@ Beware if you previously pulled the `develop` branch that your repository may be
 
 [[_TOC_]]
 
-# General
+## General
 
 - [FEATURE_SET.md](./FEATURE_SET.md): lists supported features
 - [GET_SOURCES.md](./GET_SOURCES.md): how to download the sources
@@ -37,7 +37,7 @@ Beware if you previously pulled the `develop` branch that your repository may be
 
 There is some general information in the [OpenAirInterface Gitlab Wiki](https://gitlab.eurecom.fr/oai/openairinterface5g/-/wikis/home)
 
-# Tutorials
+## Tutorials
 
 - Step-by-step tutorials to set up 5G:
     * [OAI 5GC](./NR_SA_Tutorial_OAI_CN5G.md)
@@ -74,7 +74,7 @@ Legacy unmaintained files:
 - [`L2NFAPI_NOS1.md`](./L2NFAPI_NOS1.md), [`L2NFAPI_S1.md`](./L2NFAPI_S1.md):
   old L2simulator, not valid anymore
 
-# Designs
+## Designs
 
 - General software architecture notes: [SW_archi.md](./SW_archi.md)
 - [Information on E1](./E1AP/E1-design.md)
@@ -88,16 +88,16 @@ Legacy unmaintained files:
 - [Information on the UE 5G NAS implementation](./5Gnas.md)
 - [Information on UL-MIMO](./UL_MIMO.md): UL-MIMO specific notes
 
-# Building and running from images
+## Building and running from images
 
 - [How to build images](../docker/README.md)
 - [How to run 5G with the RFsimulator from images](../ci-scripts/yaml_files/5g_rfsimulator/README.md)
 - [How to run 4G with the RFsimulator from images](../ci-scripts/yaml_files/4g_rfsimulator_fdd_05MHz/README.md)
 - [How to run physical simulators in OpenShift](../openshift/README.md)
 
-# Libraries
+## Libraries
 
-## General
+### General
 
 - The [T tracer](../common/utils/T/DOC/T.md): a generic tracing tool (VCD, Wireshark, GUI, to save for later, ...)
 - [OPT](../openair2/UTIL/OPT/README.txt): how to trace to wireshark
@@ -108,7 +108,7 @@ Legacy unmaintained files:
 - The [LDPC implementation](../openair1/PHY/CODING/DOC/LDPCImplementation.md) is a shared library
 - The [time management](time_management.md) module
 
-## Radios
+### Radios
 
 Some directories under `radio` contain READMEs:
 
@@ -122,13 +122,13 @@ Some directories under `radio` contain READMEs:
 
 The other SDRs (AW2S, LimeSDR, ...) have no READMEs.
 
-## Special-purpose libraries
+### Special-purpose libraries
 
 - OAI has two scopes: one based on Xforms and one based on imgui, described in [this README](../openair1/PHY/TOOLS/readme.md)
 - OAI comes with an integrated [telnet server](../common/utils/telnetsrv/DOC/telnethelp.md) to monitor and control
 - OAI comes with an integrated [web server](../common/utils/websrv/DOC/websrv.md)
 
-# Testing
+## Testing
 
 - [UnitTests.md](./UnitTests.md) explains the unit testing setup
 - Component tests are under `tests/`. Currently, there is a simple CU-UP
@@ -137,7 +137,7 @@ The other SDRs (AW2S, LimeSDR, ...) have no READMEs.
 - The CI setup uses a [custom framework](../ci-scripts/README.md) to run
   end-to-end tests.
 
-# Developer tools
+## Developer tools
 
 - [formatting](../tools/formatting/README.md) is a clang-format error detection tool
 - [iwyu](../tools/iwyu/README.md) is a tool to detect `#include` errors

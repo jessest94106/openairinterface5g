@@ -8,7 +8,7 @@ To read more about the transport mechanisms available, and how to run the split,
 
 [[_TOC_]]
 
-# VNF/PNF Split
+## VNF/PNF Split
 
 The gNB is split into VNF (L2+) and PNF (L1)
 

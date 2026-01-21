@@ -20,7 +20,7 @@
 
 [[_TOC_]]
 
-# 1. Environment #
+## 1. Environment 
 
 3 servers are used in this deployment. You can use Virtual Machines instead of each server; like it is done in the CI process.
 
@@ -34,13 +34,13 @@ Example of L2 nFAPI Simulator testing environment:
 
 > Note that the IP addresses are indicative and need to be adapted to your environment.
 
-# 2. Prepare the EPC #
+## 2. Prepare the EPC 
 
 Create the environment for the EPC and register all **USIM** information into the **HSS** database.
 
 If you are using OAI-EPC ([see on GitHub](https://github.com/OPENAIRINTERFACE/openair-epc-fed)), build **HSS/MME/SPGW** and create config files.
 
-# 3. Retrieve the OAI eNB-UE source code #
+## 3. Retrieve the OAI eNB-UE source code 
 
 At the time of writing, the tag used in the `develop` branch to do this documentation was `2020.w16`.
 
@@ -62,7 +62,7 @@ cd ue_folder
 git checkout develop
 ```
 
-# 4. Setup of the USIM information in UE folder #
+## 4. Setup of the USIM information in UE folder 
 
 ```bash
 $ ssh sudousername@machineC
@@ -118,11 +118,11 @@ UE1: // <- Edit here
 
 You can repeat the operation for as many users you want to test with.
 
-# 5. Setup of the Configuration files #
+## 5. Setup of the Configuration files 
 
 > **CAUTION: both proposed configuration files resides in the ci-scripts realm. You can copy them but you CANNOT push any modification on these 2 files as part of an MR without informing the CI team.**
 
-## 5.1. The eNB Configuration file ##
+### 5.1. The eNB Configuration file 
 
 ```bash
 $ ssh sudousername@machineB
@@ -184,7 +184,7 @@ Last, the S1 interface shall be properly set.
     };
 ```
 
-## 5.2. The UE Configuration file ##
+### 5.2. The UE Configuration file 
 
 ```bash
 $ ssh sudousername@machineB
@@ -209,11 +209,11 @@ L1s = (
 );
 ```
 
-# 6. Build OAI UE and eNodeB #
+## 6. Build OAI UE and eNodeB 
 
 See [Build documentation](./BUILD.md).
 
-# 7. Start EPC #
+## 7. Start EPC 
 
 Start the EPC on machine `A`.
 
@@ -222,7 +222,7 @@ $ ssh sudousername@machineA
 # Start the EPC
 ```
 
-# 8. Start the eNB #
+## 8. Start the eNB 
 
 In the first terminal (the one you used to build the eNB):
 
@@ -236,7 +236,7 @@ If you don't use redirection, you can test but many logs are printed on the cons
 
 We do recommend the redirection in steady mode once your setup is correct.
 
-# 9. Start the UE #
+## 9. Start the UE 
 
 In the second terminal (the one you used to build the UE):
 
@@ -286,7 +286,7 @@ oaitun_uem1 Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-
 
 Having the 4 oaitun_ue tunnel interfaces up and with an allocated address means the connection with EPC went alright.
 
-# 10. Test with ping #
+## 10. Test with ping 
 
 In a third terminal, after around 10 seconds, the UE(s) shall be connected to the eNB: Check with ifconfig
 
@@ -300,7 +300,7 @@ $ ping -c 20 192.172.0.5
 
 iperf operations can also be performed.
 
-# 11. Limitations #
+## 11. Limitations 
 
 
 ----

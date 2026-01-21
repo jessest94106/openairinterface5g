@@ -15,11 +15,11 @@
 [[_TOC_]]
 
 
-# Intro
+## Intro
 
 This library is for the encoding, decoding and testing of F1AP (F1 Application Protocol) messages.
 
-# Implementation Details
+## Implementation Details
 
 The library includes the following components:
 
@@ -40,7 +40,7 @@ e.g. The following module contains functions that performs the encoding/decoding
 
 * [f1ap_rrc_message_transfer.c](../../openair2/F1AP/lib/f1ap_rrc_message_transfer.c)
 
-# Testing
+## Testing
 
 The functions in the file [f1ap_lib_common.c](../../openair2/F1AP/tests/f1ap_lib_test.c) are used to test F1AP message encoding and decoding functionalities, according to the following steps:
 

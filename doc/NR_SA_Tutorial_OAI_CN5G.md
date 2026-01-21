@@ -16,7 +16,7 @@
 
 [[_TOC_]]
 
-#  1. Scenario
+##  1. Scenario
 In this tutorial we describe how to configure and run a 5G end-to-end setup with OAI CN5G, OAI gNB and COTS UE.
 
 Minimum hardware requirements:
@@ -27,9 +27,9 @@ Minimum hardware requirements:
     - CPU: 8 cores x86_64 @ 3.5 GHz
     - RAM: 32 GB
 
-# 2. OAI CN5G
+## 2. OAI CN5G
 
-## 2.1 OAI CN5G pre-requisites
+### 2.1 OAI CN5G pre-requisites
 
 ```bash
 sudo apt install -y git net-tools putty
@@ -49,7 +49,7 @@ sudo usermod -a -G docker $(whoami)
 reboot
 ```
 
-## 2.2 OAI CN5G configuration files
+### 2.2 OAI CN5G configuration files
 Download and copy configuration files:
 ```bash
 wget -O ~/oai-cn5g.zip https://gitlab.eurecom.fr/oai/openairinterface5g/-/archive/develop/openairinterface5g-develop.zip?path=doc/tutorial_resources/oai-cn5g
@@ -58,31 +58,31 @@ mv ~/openairinterface5g-develop-doc-tutorial_resources-oai-cn5g/doc/tutorial_res
 rm -r ~/openairinterface5g-develop-doc-tutorial_resources-oai-cn5g ~/oai-cn5g.zip
 ```
 
-## 2.3 Pull OAI CN5G docker images
+### 2.3 Pull OAI CN5G docker images
 
 ```bash
 cd ~/oai-cn5g
 docker compose pull
 ```
 
-# 3. Run OAI CN5G
-## 3.1 Start OAI CN5G
+## 3. Run OAI CN5G
+### 3.1 Start OAI CN5G
 ```bash
 cd ~/oai-cn5g
 docker compose up -d
 ```
 
-## 3.2 Stop OAI CN5G
+### 3.2 Stop OAI CN5G
 ```bash
 cd ~/oai-cn5g
 docker compose down
 ```
 
-# 4. Run 5G NR SA end-to-end setup with OAI gNB
-## 4.1 Testing with COTS UE
+## 4. Run 5G NR SA end-to-end setup with OAI gNB
+### 4.1 Testing with COTS UE
 Please check this link:
 [Testing with OAI gNB and COTS UE](NR_SA_Tutorial_COTS_UE.md)
 
-## 4.2 Testing with OAI nrUE
+### 4.2 Testing with OAI nrUE
 Please check this link:
 [Testing with OAI gNB and OAI nrUE](NR_SA_Tutorial_OAI_nrUE.md)

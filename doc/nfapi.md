@@ -114,7 +114,7 @@ can proceed as follows:
 > **Note:** all L1-specific options have to be passed to the PNF, and remaining
 options to the VNF.
 
-## Transport mechanisms between VNF and PNF
+### Transport mechanisms between VNF and PNF
 
 Currently, the VNF/PNF split supports three transport mechanisms between each
 other:
@@ -133,15 +133,15 @@ The change between transport mechanisms is done at compilation time:
 - No changes to the `build_oai` call are required in order to select socket communication, as it is the default.
 - In order to select WLS as the transport mechanism between VNF and PNF, first install the WLS library, and afterwards use `-t WLS` as a parameter of `build_oai`:
 
-### How to use nFAPI
+#### How to use nFAPI
 
 nFAPI is used by default. Compile and configure as indicated above.
 
-### How to use Aerial
+#### How to use Aerial
 
 Refer to [this document](./Aerial_FAPI_Split_Tutorial.md) for more information.
 
-### How to use WLS lib
+#### How to use WLS lib
 
 Before the first compilation with WLS support, the [WLS
 library](https://docs.o-ran-sc.org/projects/o-ran-sc-o-du-phy/en/latest/wls-lib.html)
@@ -171,7 +171,7 @@ After installing WLS, you can run the build command as shown below:
 
     ./build_oai -t WLS -w USRP --gNB --nrUE --ninja -C
 
-#### How to run OAI PNF with OAI VNF
+##### How to run OAI PNF with OAI VNF
 
 Refer to the above steps in [Quickstart](#quickstart), but run the PNF first as it is the WLS "master".
 
@@ -195,7 +195,7 @@ Run VNF
 
     sudo NFAPI_TRACE_LEVEL=info ./nr-softmodem -O ../../../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb-vnf.sa.band78.106prb.nfapi.conf --nfapi VNF
 
-#### How to run OAI PNF with OSC/Radisys O-DU
+##### How to run OAI PNF with OSC/Radisys O-DU
 
 Set up the hugepages for DPDK (1GB page size, 6 pages; this only needs to be
 done once):

@@ -4,7 +4,7 @@ out the various configuration options that influence its behavior.
 
 [[_TOC_]]
 
-# General
+## General
 
 The 5G MAC scheduler is a proportional fair (PF) scheduler, "approximating
 wide-band CQI" (for lack of a better term, but CQI is typically used for PF)
@@ -67,7 +67,7 @@ happen.
 Say we have 0% PDCCH success rate (radio link failure scenario) but `pdcch_cl_adjust` is 0 indicating
 perfect PDCCH channel. it would take ~18 PDCCH failures to reach maximum aggregation level.
 
-# Periodic output and interpretation
+## Periodic output and interpretation
 
 The scheduler periodically outputs statistics that can help you judge the radio
 channel quality, i.e., why a UE does not perform as you would expect. The
@@ -179,9 +179,9 @@ In the last lines:
   and 2. LCIDs 4 and onward are mapped to DRBs 1 onward. If you have an LCID 4,
   it means you have a PDU session.
 
-# Configuration of the MAC
+## Configuration of the MAC
 
-## Split-related options (running in a DU)
+### Split-related options (running in a DU)
 
 See [nFAPI documentation](../nfapi.md) or [Aerial
 tutorial](../Aerial_FAPI_Split_Tutorial.md) for information about the (n)FAPI
@@ -189,7 +189,7 @@ split.
 
 See [F1 documentation](../F1AP/F1-design.md) for information about the F1 split.
 
-## MAC scheduler-related configuration options
+### MAC scheduler-related configuration options
 
 The following options have an influence on the MAC scheduler operation (for all
 UEs, if applicable), either on the MAC scheduler operation directly or how a UE
@@ -301,7 +301,7 @@ DL-MIMO is configured using following parameters:
 `pdsch_AntennaPorts_XP` , `pdsch_AntennaPorts_N1` , `pdsch_AntennaPorts_N2`, `maxMIMO_layers`
 (see also [`RUNMODEM.md`](../RUNMODEM.md))
 
-## ServingCellConfigCommon parameters
+### ServingCellConfigCommon parameters
 
 The `gNBs` configuration section has a big structure `servingCellConfigCommon`
 that has an influence on the overall behavior of MAC and L1. As the name says,
@@ -312,17 +312,17 @@ TS 38.331, section 6.3.2 "Radio resource control information elements".
 
 Below is a description of some of these parameters.
 
-### Frequency configuration
+#### Frequency configuration
 
 There are many parameters, such as `absoluteFrequencySSB`, etc., that have an
 impact on the frequency used by the gNB. For more information, please check the
 [corresponding document](../gNB_frequency_setup.md).
 
-### TDD pattern configuration
+#### TDD pattern configuration
 
 The TDD configuration parameters allow to use one or two TDD patterns.
 
-#### Single TDD pattern
+##### Single TDD pattern
 
 Configure the TDD pattern through these options:
 
@@ -363,7 +363,7 @@ The `dl_UL_TransmissionPeriodicity` is set to `5` (2.5ms). The above figure
 shows two TDD periods over 5ms. The 10 ms frame period must be strictly
 divisible by the sum of the TDD pattern periods.
 
-#### Two TDD patterns
+##### Two TDD patterns
 
 An optional `pattern2` structure is used to signal a TDD pattern 2.
 In this case, the TDD pattern may have two extended values of 3 ms and 4 ms.
@@ -414,7 +414,7 @@ pattern2: {
 };
 ```
 
-#### UL-heavy TDD patterns
+##### UL-heavy TDD patterns
 
 "UL-heavy TDD patterns", i.e., TDD patterns that have many UL slots are
 supported. Examples for such patterns would be DSUUU or DDDSUUUUUU.

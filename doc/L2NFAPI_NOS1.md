@@ -20,7 +20,7 @@
 
 [[_TOC_]]
 
-# 1. Environment #
+## 1. Environment 
 
 You may not have access to an EPC or you don't want to hassle to deploy one.
 
@@ -35,7 +35,7 @@ Example of L2 nFAPI Simulator testing environment:
 
 > Note that the IP addresses are indicative and need to be adapted to your environment.
 
-# 2. Retrieve the OAI eNB-UE source code #
+## 2. Retrieve the OAI eNB-UE source code 
 
 At the time of writing, the tag used in the `develop` branch to do this documentation was `2020.w16`.
 
@@ -57,7 +57,7 @@ cd ue_folder
 git checkout develop
 ```
 
-# 3. Setup of the USIM information in UE folder #
+## 3. Setup of the USIM information in UE folder 
 
 ```bash
 $ ssh sudousername@machineC
@@ -113,11 +113,11 @@ UE1: // <- Edit here
 
 You can repeat the operation for as many users you want to test with.
 
-# 4. Setup of the Configuration files #
+## 4. Setup of the Configuration files 
 
 > **CAUTION: both proposed configuration files resides in the ci-scripts realm. You can copy them but you CANNOT push any modification on these 2 files as part of an MR without informing the CI team.**
 
-## 4.1. The eNB Configuration file ##
+### 4.1. The eNB Configuration file 
 
 ```bash
 $ ssh sudousername@machineB
@@ -179,7 +179,7 @@ Last, the S1 interface shall be properly set.
     };
 ```
 
-## 4.2. The UE Configuration file ##
+### 4.2. The UE Configuration file 
 
 ```bash
 $ ssh sudousername@machineB
@@ -204,11 +204,11 @@ L1s = (
 );
 ```
 
-# 5. Build OAI UE and eNodeB #
+## 5. Build OAI UE and eNodeB 
 
 See [Build documentation](./BUILD.md).
 
-# 6. Start the eNB #
+## 6. Start the eNB 
 
 In the first terminal (the one you used to build the eNB):
 
@@ -230,7 +230,7 @@ If you don't use redirection, you can test but many logs are printed on the cons
 
 We do recommend the redirection in steady mode once your setup is correct.
 
-# 7. Start the UE #
+## 7. Start the UE 
 
 In the second terminal (the one you used to build the UE):
 
@@ -280,7 +280,7 @@ oaitun_uem1 Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-
 
 Having the 4 oaitun_ue tunnel interfaces up and with an allocated address means the connection with EPC went alright.
 
-# 8. Test with ping #
+## 8. Test with ping 
 
 In a third terminal, after around 10 seconds, the UE(s) shall be connected to the eNB: Check with ifconfig
 
@@ -320,7 +320,7 @@ $ ssh sudousername@machineC
 iperf -c 10.0.1.1 -u -t 30 -b 2M -i 1 -fm -B 10.0.1.2 -p 5002
 ```
 
-# 9. Limitations #
+## 9. Limitations 
 
 
 ----
