@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -e
 SHORT_COMMIT_SHA=$(git rev-parse --short=8 HEAD)
 COMMIT_SHA=$(git rev-parse HEAD)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -12,6 +11,8 @@ if [ $# -eq 0 ]
     echo "Provide a testcase as an argument"
     exit 1
 fi
+
+set -x
 
 # The script assumes you've build the following images:
 #
