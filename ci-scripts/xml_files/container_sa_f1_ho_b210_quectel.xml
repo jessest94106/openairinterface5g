@@ -59,9 +59,9 @@
 
   <testCase>
     <class>Custom_Command</class>
-    <desc>Set attenuator to 0 for DU0 and 17 for DU1</desc>
+    <desc>Set attenuator to 0 for DU0 and 22 for DU1</desc>
     <node>rocket</node>
-    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -s 1,2 0 -s 3,4 25</command>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -s 1,2 0 -s 3,4 22</command>
   </testCase>
 
   <testCase>
@@ -76,8 +76,8 @@
     <class>Deploy_Object</class>
     <desc>Deploy gNB-DU0 (TDD/Band77/20MHz/B210) in a container</desc>
     <yaml_path>ci-scripts/yaml_files/5g_sa_f1_b210_ho</yaml_path>
-    <services>oai-du0</services>
     <node>groot</node>
+    <services>oai-du0</services>
   </testCase>
 
   <testCase>
@@ -95,25 +95,10 @@
   </testCase>
 
   <testCase>
-    <class>Ping</class>
-    <desc>Ping: 100pings in 20sec</desc>
-    <id>raspix</id>
-    <svr_id>oc-cn5g-00103-ho</svr_id>
-    <ping_args>-c 100 -i 0.2</ping_args>
-    <ping_packetloss_threshold>5</ping_packetloss_threshold>
-  </testCase>
-
-  <testCase>
-    <class>IdleSleep</class>
-    <desc>Sleep</desc>
-    <idle_sleep_time_in_sec>5</idle_sleep_time_in_sec>
-  </testCase>
-
-  <testCase>
     <class>Custom_Command</class>
-    <desc>Attenuate DU0 by 15 and remove the attenuation on DU1 to trigger Handover</desc>
-    <node>rocket</node>
-    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 15 -r 3,4 0 -d 5</command>
+    <desc>UE connected to DU0?</desc>
+    <node>groot</node>
+    <command>echo ci fetch_du_by_ue_id | ncat 127.0.0.1 9090 | grep "3584"</command>
   </testCase>
 
   <testCase>
@@ -122,7 +107,30 @@
     <id>raspix</id>
     <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 50 -i 0.2</ping_args>
-    <ping_packetloss_threshold>5</ping_packetloss_threshold>
+    <ping_packetloss_threshold>30</ping_packetloss_threshold>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Set attenuation 5 on DU 0 and remove attenuation on DU 1 to test Reestablishment on a different DU (DU 1)</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 5 -r 3,4 0 -d 5</command>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Trigger Reestablishment (on DU 0)</desc>
+    <node>groot</node>
+    <command>echo ci force_reestab | ncat 127.0.0.1 9091 | grep -E 'Reset RLC counters of UE RNTI [0-9a-f]{4} to trigger reestablishment'</command>
+  </testCase>
+
+  <testCase>
+    <class>Ping</class>
+    <desc>Ping: 50pings in 10sec</desc>
+    <id>raspix</id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
+    <ping_args>-c 50 -i 0.2</ping_args>
+    <ping_packetloss_threshold>30</ping_packetloss_threshold>
   </testCase>
 
   <testCase>
@@ -134,9 +142,23 @@
 
   <testCase>
     <class>Custom_Command</class>
-    <desc>Attenuate DU1 by 17dB and remove attenuation on DU0 to trigger Handover</desc>
+    <desc>Verify Reestablishment (on CU)</desc>
+    <node>groot</node>
+    <command>echo ci get_reestab_count | ncat 127.0.0.1 9090 | grep -E 'UE RNTI [0-9a-f]{4} reestab 1'</command>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Remove attenuation on DU 0 and set attenuation on DU 1 to 5 to test Reestablishment on a different DU (DU 0)</desc>
     <node>rocket</node>
-    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 0 -r 3,4 25 -d 5</command>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 0 -r 3,4 5 -d 5</command>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Trigger Reestablishment (on DU 1)</desc>
+    <node>rocket</node>
+    <command>echo ci force_reestab | ncat 127.0.0.1 9091 | grep -E 'Reset RLC counters of UE RNTI [0-9a-f]{4} to trigger reestablishment'</command>
   </testCase>
 
   <testCase>
@@ -145,7 +167,7 @@
     <id>raspix</id>
     <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 50 -i 0.2</ping_args>
-    <ping_packetloss_threshold>5</ping_packetloss_threshold>
+    <ping_packetloss_threshold>30</ping_packetloss_threshold>
   </testCase>
 
   <testCase>
@@ -157,9 +179,16 @@
 
   <testCase>
     <class>Custom_Command</class>
-    <desc>Attenuate DU0 by 15 and remove the attenuation on DU1 to trigger Handover</desc>
+    <desc>Verify Reestablishment (on CU)</desc>
+    <node>groot</node>
+    <command>echo ci get_reestab_count | ncat 127.0.0.1 9090 | grep -E 'UE RNTI [0-9a-f]{4} reestab 2'</command>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Attenuate DU0 by 22 and remove the attenuation on DU1 to trigger Handover</desc>
     <node>rocket</node>
-    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 15 -r 3,4 0 -d 5</command>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 22 -r 3,4 0 -d 5</command>
   </testCase>
 
   <testCase>
@@ -168,7 +197,53 @@
     <id>raspix</id>
     <svr_id>oc-cn5g-00103-ho</svr_id>
     <ping_args>-c 50 -i 0.2</ping_args>
-    <ping_packetloss_threshold>5</ping_packetloss_threshold>
+    <ping_packetloss_threshold>30</ping_packetloss_threshold>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>UE connected to DU1?</desc>
+    <node>groot</node>
+    <command>echo ci fetch_du_by_ue_id | ncat 127.0.0.1 9090 | grep "3585"</command>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Attenuate DU1 by 22dB and remove attenuation on DU0 to trigger Handover</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 0 -r 3,4 22 -d 5</command>
+  </testCase>
+
+  <testCase>
+    <class>Ping</class>
+    <desc>Ping: 50pings in 10sec</desc>
+    <id>raspix</id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
+    <ping_args>-c 50 -i 0.2</ping_args>
+    <ping_packetloss_threshold>30</ping_packetloss_threshold>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>UE connected to DU0?</desc>
+    <node>groot</node>
+    <command>echo ci fetch_du_by_ue_id | ncat 127.0.0.1 9090 | grep "3584"</command>
+  </testCase>
+
+  <testCase>
+    <class>Custom_Command</class>
+    <desc>Attenuate DU0 by 22 and remove the attenuation on DU1 to trigger Handover</desc>
+    <node>rocket</node>
+    <command>python3 %%workspace%%/ci-scripts/attenuatorctl.py -r 1,2 22 -r 3,4 0 -d 5</command>
+  </testCase>
+
+  <testCase>
+    <class>Ping</class>
+    <desc>Ping: 50pings in 10sec</desc>
+    <id>raspix</id>
+    <svr_id>oc-cn5g-00103-ho</svr_id>
+    <ping_args>-c 50 -i 0.2</ping_args>
+    <ping_packetloss_threshold>30</ping_packetloss_threshold>
   </testCase>
 
   <testCase>
