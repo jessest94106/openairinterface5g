@@ -397,7 +397,7 @@ NR_ControlResourceSet_t *get_coreset(gNB_MAC_INST *nrmac,
                                      NR_ControlResourceSetId_t coreset_id)
 {
   if (coreset_id == 0) {
-    return nrmac->sched_ctrlCommon->coreset; // this is coreset 0
+    return &nrmac->sched_ctrlSIB1->coreset; // this is coreset 0
   }
   if (bwp_dedicated) {
     const int n = bwp_dedicated->pdcch_Config->choice.setup->controlResourceSetToAddModList->list.count;
@@ -513,7 +513,7 @@ NR_sched_pdcch_t set_pdcch_structure(gNB_MAC_INST *gNB_mac,
 
   for (int i = 0; i < sps; i++) {
     if ((monitoringSymbolsWithinSlot >> (sps - 1 - i)) & 1) {
-      pdcch.StartSymbolIndex = ss->searchSpaceId == 0 ? i + type0_PDCCH_CSS_config->first_symbol_index : i;
+      pdcch.StartSymbolIndex = i;
       break;
     }
   }
@@ -592,7 +592,7 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   const int CC_id,
                   const int slot,
                   const rnti_t rnti,
-                  uint8_t *aggregation_level,
+                  int *aggregation_level,
                   int beam_idx,
                   const NR_SearchSpace_t *ss,
                   const NR_ControlResourceSet_t *coreset,
@@ -600,11 +600,9 @@ int get_cce_index(const gNB_MAC_INST *nrmac,
                   float pdcch_cl_adjust)
 {
   const uint32_t Y = get_Y(ss, slot, rnti);
-  uint8_t nr_of_candidates;
-
   int agg_level_search_order[NUM_PDCCH_AGG_LEVELS];
   determine_aggregation_level_search_order(agg_level_search_order, pdcch_cl_adjust);
-
+  int nr_of_candidates;
   for (int i = 0; i < NUM_PDCCH_AGG_LEVELS; i++) {
     find_aggregation_candidates(aggregation_level, &nr_of_candidates, ss, 1 << agg_level_search_order[i]);
     if (nr_of_candidates > 0)
