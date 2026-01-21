@@ -22,6 +22,8 @@
 
 import re
 import os
+import logging
+import yaml
 
 import xml.etree.ElementTree as ET
 import json
@@ -109,3 +111,39 @@ class Analysis():
 		test_summary['Nbpass'] =  nb_tests - nb_failed
 		test_summary['Nbfail'] =  nb_failed
 		return nb_failed == 0, test_summary, test_result
+
+	def analyze_rt_stats(thresholds, L1_stats, MAC_stats):
+		with open(thresholds, 'r') as f:
+			datalog_rt_stats = yaml.load(f, Loader=yaml.FullLoader)
+
+		rt_keys = datalog_rt_stats['Ref']
+		real_time_stats = {}
+		for sf in [L1_stats, MAC_stats]:
+			with open(sf, 'r') as f:
+				for line in f.readlines():
+					for k in rt_keys:
+						result = re.search(k, line)
+						if result is not None:
+							tmp = re.match(rf'^.*?(\b{k}\b.*)', line.rstrip())
+							if tmp is not None:
+								real_time_stats[k] = tmp.group(1)
+
+		# datalog_rt_stats format must align with HTML.CreateHtmlDataLogTable()
+		datalog_rt_stats['Data']={}
+		for k in real_time_stats:
+			tmp = re.match(r'^(?P<metric>.*):\s+(?P<avg>\d+\.\d+) us;\s+(?P<count>\d+);\s+(?P<max>\d+\.\d+) us;', real_time_stats[k])
+			if tmp is not None:
+				metric = tmp.group('metric')
+				avg = float(tmp.group('avg'))
+				max = float(tmp.group('max'))
+				count = int(tmp.group('count'))
+				datalog_rt_stats['Data'][metric] = ["{:.0f}".format(avg),"{:.0f}".format(max),"{:d}".format(count),"{:.2f}".format(avg / datalog_rt_stats['Ref'][metric])]
+
+		success = True
+		for k in datalog_rt_stats['Data']:
+			valnorm = float(datalog_rt_stats['Data'][k][3])
+			dev = datalog_rt_stats['DeviationThreshold'][k]
+			if valnorm > 1.0 + dev or valnorm < 1.0 - dev: # condition for fail: avg/ref deviates by more than "deviation threshold"
+				logging.debug(f'\u001B[1;30;43m normalized metric {k}={valnorm} deviates by more than {dev}\u001B[0m')
+				success = False
+		return success, datalog_rt_stats

@@ -102,11 +102,6 @@ def ExecuteActionWithParam(action, ctx, node):
 			success = CONTAINERS.BuildRunTests(ctx, node, HTML)
 
 	elif action == 'Initialize_eNB':
-		datalog_rt_stats_file=test.findtext('rt_stats_cfg')
-		if datalog_rt_stats_file is None:
-			RAN.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
-		else:
-			RAN.datalog_rt_stats_file=datalog_rt_stats_file
 		RAN.Initialize_eNB_args=test.findtext('Initialize_eNB_args')
 		#local variable air_interface
 		air_interface = test.findtext('air_interface')		
@@ -270,6 +265,10 @@ def ExecuteActionWithParam(action, ctx, node):
 		tag_prefix = test.findtext('tag_prefix') or ""
 		images = test.findtext('images').split()
 		success = CLUSTER.PullClusterImage(HTML, node, images, tag_prefix=tag_prefix)
+
+	elif action == 'AnalyzeRTStats':
+		yaml = test.findtext('stats_cfg')
+		success = RAN.AnalyzeRTStats(HTML, node, ctx, yaml)
 
 	else:
 		logging.warning(f"unknown action {action}, skip step")
