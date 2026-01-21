@@ -3750,8 +3750,8 @@ void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE)
 
   // simple beam switching algorithm -> we select beam with highest RSRP from CSI report
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
-  RSRP_report_t *rsrp_report = &sched_ctrl->CSI_report.ssb_rsrp_report;
-  int new_bf_index = get_beam_from_ssbidx(mac, rsrp_report->resource_id[0]);
+  RSRP_report_list_t *rsrp_report = &sched_ctrl->CSI_report.ssb_rsrp_report;
+  int new_bf_index = get_beam_from_ssbidx(mac, rsrp_report->r[0].resource_id);
   if (!mac->radio_config.do_TCI) { // if not TCI is configure we switch beam directly
     if (UE->UE_beam_index != new_bf_index)
       beam_switching_procedure(UE, new_bf_index);

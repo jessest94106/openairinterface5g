@@ -495,7 +495,7 @@ static void evaluate_sinr_report(gNB_MAC_INST *nrmac,
   */
 
   nr_csi_report_t *csi_report = &UE->csi_report_template[csi_report_id];
-  RSRP_report_t *sinr_report;
+  RSRP_report_list_t *sinr_report;
   long **index_list;
   switch (reportQuantity_type_r16) {
     case NR_CSI_ReportConfig__ext2__reportQuantity_r16_PR_ssb_Index_SINR_r16:
@@ -510,13 +510,13 @@ static void evaluate_sinr_report(gNB_MAC_INST *nrmac,
       AssertFatal(false, "Invalid RSRP report type\n");
   }
 
-  sinr_report->nr_reports = csi_report->CSI_report_bitlen.nb_ssbri_cri;
+  sinr_report->nb = csi_report->CSI_report_bitlen.nb_ssbri_cri;
   uint16_t curr_payload;
-  for (int i = 0; i < sinr_report->nr_reports; i++) {
+  for (RSRP_report_t *i = sinr_report->r; i < sinr_report->r + sinr_report->nb; i++) {
     int bitlen = csi_report->CSI_report_bitlen.cri_ssbri_bitlen;
     curr_payload = pickandreverse_bits(payload, bitlen, *cumul_bits);
-    sinr_report->resource_id[i] = *(index_list[bitlen > 0 ? ((curr_payload) & ~(~1U << (bitlen - 1))) : bitlen]);
-    LOG_D(MAC, "SSB/CSI-RS index = %d\n", sinr_report->resource_id[i]);
+    i->resource_id = *(index_list[bitlen > 0 ? (curr_payload & ~(~1U << (bitlen - 1))) : bitlen]);
+    LOG_D(MAC, "SSB/CSI-RS index = %d\n", i->resource_id);
     *cumul_bits += bitlen;
   }
 
@@ -525,29 +525,29 @@ static void evaluate_sinr_report(gNB_MAC_INST *nrmac,
   *cumul_bits += 7;
 
   csi_report->nb_of_csi_ssb_report++;
-  int SINRx10 = get_measured_sinr(sinr_index);
+  const int SINRx10 = get_measured_sinr(sinr_index);
   if (SINRx10 == INT_MAX) {
     LOG_E(NR_MAC, "UE %04x: reported SINR index %d invalid\n", UE->rnti, sinr_index);
     return;
   }
-  sinr_report->SINRx10[0] = SINRx10;
+  sinr_report->r[0].SINRx10 = SINRx10;
 
-  for (int i = 1; i < sinr_report->nr_reports; i++) {
+  for (RSRP_report_t *i = sinr_report->r + 1; i < sinr_report->r + sinr_report->nb; i++) {
     curr_payload = pickandreverse_bits(payload, 4, *cumul_bits);
-    sinr_report->SINRx10[i] = get_diff_sinr(curr_payload & 0x0f, sinr_report->SINRx10[0]);
+    i->SINRx10 = get_diff_sinr(curr_payload & 0x0f, SINRx10);
     *cumul_bits += 4;
   }
 
   NR_mac_stats_t *stats = &UE->mac_stats;
   // including ssb SINR in mac stats
-  stats->cumul_sinrx10 += sinr_report->SINRx10[0];
+  stats->cumul_sinrx10 += sinr_report->r[0].SINRx10;
   stats->num_sinr_meas++;
 
   const int mcs_table = UE->current_DL_BWP.mcsTableIdx;
   const int nrOfLayers = get_dl_nrOfLayers(sched_ctrl, UE->current_DL_BWP.dci_format);
-  sched_ctrl->dl_max_mcs = get_mcs_from_SINRx10(mcs_table, sinr_report->SINRx10[0], nrOfLayers);
+  sched_ctrl->dl_max_mcs = get_mcs_from_SINRx10(mcs_table, sinr_report->r[0].SINRx10, nrOfLayers);
 
-  LOG_D(MAC, "Reported SSB-SINR = %d.%d, dl_max_mcs %d\n", sinr_report->SINRx10[0] / 10, sinr_report->SINRx10[0] % 10, sched_ctrl->dl_max_mcs);
+  LOG_D(MAC, "Reported SSB-SINR = %01f, dl_max_mcs %d\n", sinr_report->r[0].SINRx10 / 10.0, sched_ctrl->dl_max_mcs);
 }
 
 static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
@@ -576,7 +576,7 @@ static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
     multiple simultaneous spatial domain receive filter
   */
   nr_csi_report_t *csi_report = &UE->csi_report_template[csi_report_id];
-  RSRP_report_t *rsrp_report;
+  RSRP_report_list_t *rsrp_report;
   long **index_list;
   switch (reportQuantity_type) {
     case NR_CSI_ReportConfig__reportQuantity_PR_ssb_Index_RSRP:
@@ -591,11 +591,11 @@ static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
       AssertFatal(false, "Invalid RSRP report type\n");
   }
 
-  rsrp_report->nr_reports = csi_report->CSI_report_bitlen.nb_ssbri_cri;
+  rsrp_report->nb = csi_report->CSI_report_bitlen.nb_ssbri_cri;
   int bitlen = csi_report->CSI_report_bitlen.cri_ssbri_bitlen;
-  for (int i = 0; i < rsrp_report->nr_reports; i++) {
+  for (RSRP_report_t *i = rsrp_report->r; i < rsrp_report->r + rsrp_report->nb; i++) {
     uint8_t idx_payload = pickandreverse_bits(payload, bitlen, *cumul_bits);
-    rsrp_report->resource_id[i] = *(index_list[bitlen > 0 ? ((idx_payload) & ~(~1U << (bitlen - 1))) : bitlen]);
+    i->resource_id = *(index_list[bitlen > 0 ? (idx_payload & ~(~1U << (bitlen - 1))) : bitlen]);
     *cumul_bits += bitlen;
   }
 
@@ -603,24 +603,24 @@ static void evaluate_rsrp_report(gNB_MAC_INST *nrmac,
   int rsrp = curr_payload & 0x7f;
   *cumul_bits += 7;
   csi_report->nb_of_csi_ssb_report++;
-  bool valid = get_measured_rsrp(rsrp, &rsrp_report->RSRP[0]);
-  LOG_D(NR_MAC, "SSB/CSI-RS index %d RSRP %d\n", rsrp_report->resource_id[0], rsrp_report->RSRP[0]);
+  bool valid = get_measured_rsrp(rsrp, &rsrp_report->r[0].RSRP);
+  LOG_D(NR_MAC, "SSB/CSI-RS index %d RSRP %d\n", rsrp_report->r[0].resource_id, rsrp_report->r[0].RSRP);
   if (!valid) {
-    LOG_E(NR_MAC, "UE %04x: reported RSRP index %d invalid\n", UE->rnti, rsrp);
+    LOG_E(NR_MAC, "UE %04x: reported RSRP out of 5G usable range %d dBm\n", UE->rnti, rsrp_report->r[0].RSRP);
     return;
   }
 
-  for (int i = 1; i < rsrp_report->nr_reports; i++) {
+  for (RSRP_report_t *i = rsrp_report->r + 1; i < rsrp_report->r + rsrp_report->nb; i++) {
     curr_payload = pickandreverse_bits(payload, 4, *cumul_bits);
     csi_report->nb_of_csi_ssb_report++;
-    rsrp_report->RSRP[i] = get_diff_rsrp(curr_payload & 0x0f, rsrp_report->RSRP[0]);
-    LOG_D(NR_MAC, "SSB/CSI-RS index %d RSRP %d\n", rsrp_report->resource_id[i], rsrp_report->RSRP[i]);
+    i->RSRP = get_diff_rsrp(curr_payload & 0x0f, rsrp_report->r[0].RSRP);
+    LOG_D(NR_MAC, "SSB/CSI-RS index %d RSRP %d\n", i->resource_id, i->RSRP);
     *cumul_bits += 4;
   }
 
   NR_mac_stats_t *stats = &UE->mac_stats;
   // including ssb rsrp in mac stats
-  stats->cumul_rsrp += rsrp_report->RSRP[0];
+  stats->cumul_rsrp += rsrp_report->r[0].RSRP;
   stats->num_rsrp_meas++;
 }
 

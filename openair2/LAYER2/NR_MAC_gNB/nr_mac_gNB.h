@@ -552,18 +552,22 @@ struct CRI_RI_LI_PMI_CQI {
   bool print_report;
 };
 
-typedef struct RSRP_report {
-  uint8_t nr_reports;
-  uint8_t resource_id[MAX_NR_OF_REPORTED_RS];
-  int RSRP[MAX_NR_OF_REPORTED_RS];
-  int SINRx10[MAX_NR_OF_REPORTED_RS];
+typedef struct {
+  uint8_t resource_id;
+  int RSRP;
+  int SINRx10;
 } RSRP_report_t;
 
-struct CSI_Report {
+typedef struct {
+  int nb;
+  RSRP_report_t r[MAX_NR_OF_REPORTED_RS];
+} RSRP_report_list_t;
+
+typedef struct CSI_Report {
   struct CRI_RI_LI_PMI_CQI cri_ri_li_pmi_cqi_report;
-  RSRP_report_t ssb_rsrp_report;
-  RSRP_report_t csirs_rsrp_report;
-};
+  RSRP_report_list_t ssb_rsrp_report;
+  RSRP_report_list_t csirs_rsrp_report;
+} CSI_report_t;
 
 typedef enum {
   INACTIVE = 0,
@@ -661,7 +665,7 @@ typedef struct {
   bool ul_failure;
   int ul_failure_timer;
   int release_timer;
-  struct CSI_Report CSI_report;
+  CSI_report_t CSI_report;
   bool SR;
   /// information about every HARQ process
   NR_UE_harq_t harq_processes[NR_MAX_HARQ_PROCESSES];
