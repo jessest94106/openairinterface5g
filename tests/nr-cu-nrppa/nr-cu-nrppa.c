@@ -29,6 +29,8 @@
 #include "openair3/SCTP/sctp_default_values.h"
 #include "openair3/NRPPA/nrppa_gNB_config.h"
 #include "openair3/NRPPA/nrppa_gNB.h"
+#include "openair3/NAS/NR_UE/nr_nas_msg.h"
+#include "executables/nr-uesoftmodem.h"
 
 RAN_CONTEXT_t RC;
 THREAD_STRUCT thread_struct;
@@ -36,6 +38,7 @@ uint64_t downlink_frequency[MAX_NUM_CCs][4];
 int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
 int oai_exit = 0;
 int gnb_id;
+int NB_UE_INST = 1;
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
 {
@@ -60,6 +63,25 @@ nfapi_mode_t nfapi_getmode(void)
 ngran_node_t get_node_type()
 {
   return ngran_gNB_CUUP;
+}
+
+nrUE_params_t *get_nrUE_params(void)
+{
+  static nrUE_params_t params = {0};
+  params.extra_pdu_id = -1;
+  return &params;
+}
+
+void create_ue_ip_if(void)
+{
+}
+
+void create_ue_eth_if(void)
+{
+}
+
+void set_qfi(void)
+{
 }
 
 configmodule_interface_t *uniqCfg = NULL;
@@ -126,6 +148,106 @@ static nrppa_trp_information_resp_t fill_trp_resp(uint8_t transaction_id)
   return resp;
 }
 
+// Initializing UE NAS Context with simulated SIM data
+nr_ue_nas_t *simulated_ue_nas = NULL;
+void init_ue_nas_context(void)
+{
+  simulated_ue_nas = calloc_or_fail(1, sizeof(nr_ue_nas_t));
+  simulated_ue_nas->UE_id = 1;
+  simulated_ue_nas->security_container = calloc_or_fail(1, sizeof(stream_security_container_t));
+  // Allocation and simulation of UICC data
+  simulated_ue_nas->uicc = calloc_or_fail(1, sizeof(uicc_t));
+  // IMSI : 001010000000001
+  simulated_ue_nas->uicc->imsiStr = calloc_or_fail(1, 16 * sizeof(char));
+  strcpy(simulated_ue_nas->uicc->imsiStr, "001010000000001");
+  simulated_ue_nas->uicc->nmc_size = 2;
+  // DNN : oai
+  simulated_ue_nas->uicc->dnnStr = calloc_or_fail(1, 32 * sizeof(char));
+  strcpy(simulated_ue_nas->uicc->dnnStr, "oai");
+  // IMEISV : 6754567890123413
+  simulated_ue_nas->uicc->imeisvStr = calloc_or_fail(1, 17 * sizeof(char));
+  strcpy(simulated_ue_nas->uicc->imeisvStr, "6754567890123413");
+  // NSSAI: sst = 1, sd = 0xffffff
+  simulated_ue_nas->uicc->nssai_sst = 1;
+  simulated_ue_nas->uicc->nssai_sd = 0xffffff;
+  // Ki: fec86ba6eb707ed08905757b1bb44b8f
+  static const uint8_t TEST_K[16] =
+      {0xfe, 0xc8, 0x6b, 0xa6, 0xeb, 0x70, 0x7e, 0xd0, 0x89, 0x05, 0x75, 0x7b, 0x1b, 0xb4, 0x4b, 0x8f};
+  memcpy(simulated_ue_nas->uicc->key, TEST_K, 16);
+  // OPc: c42449363bbad02b66d16bc975d77cc1
+  static const uint8_t TEST_OPC[16] =
+      {0xc4, 0x24, 0x49, 0x36, 0x3b, 0xba, 0xd0, 0x2b, 0x66, 0xd1, 0x6b, 0xc9, 0x75, 0xd7, 0x7c, 0xc1};
+  memcpy(simulated_ue_nas->uicc->opc, TEST_OPC, 16);
+  simulated_ue_nas->security.nas_count_ul = 0;
+  simulated_ue_nas->security.nas_count_dl = 0;
+  simulated_ue_nas->fiveGMM_state = FGS_DEREGISTERED;
+}
+
+// Emulate registration request to register UE in the AMF (required for positioning)
+void send_initial_ue_message(instance_t instance)
+{
+  MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_NAS_FIRST_REQ);
+
+  NGAP_NAS_FIRST_REQ(msg_p).gNB_ue_ngap_id = 1; // Simulated UE ID
+
+  NGAP_NAS_FIRST_REQ(msg_p).plmn.mcc = 1;
+  NGAP_NAS_FIRST_REQ(msg_p).plmn.mnc = 1;
+  NGAP_NAS_FIRST_REQ(msg_p).plmn.mnc_digit_length = 2;
+
+  NGAP_NAS_FIRST_REQ(msg_p).nr_cell_id = gnb_id;
+
+  NGAP_NAS_FIRST_REQ(msg_p).establishment_cause = NGAP_RRC_CAUSE_MO_SIGNALLING;
+
+  as_nas_info_t initialNasMsg = {0};
+  generateRegistrationRequest(&initialNasMsg, simulated_ue_nas, false);
+
+  NGAP_NAS_FIRST_REQ(msg_p).nas_pdu.buf = initialNasMsg.nas_data;
+  NGAP_NAS_FIRST_REQ(msg_p).nas_pdu.len = initialNasMsg.length;
+
+  NGAP_NAS_FIRST_REQ(msg_p).ue_identity.presenceMask = 0;
+
+  itti_send_msg_to_task(TASK_NGAP, instance, msg_p);
+}
+
+void *gNB_app_task(void *args_p)
+{
+  MessageDef *msg_p = NULL;
+  const char *msg_name = NULL;
+  instance_t instance;
+  int result;
+  /* for no gcc warnings */
+  (void)instance;
+
+  itti_mark_task_ready(TASK_GNB_APP);
+  do {
+    // Wait for a message
+    itti_receive_msg(TASK_GNB_APP, &msg_p);
+
+    msg_name = ITTI_MSG_NAME(msg_p);
+    instance = ITTI_MSG_DESTINATION_INSTANCE(msg_p);
+
+    switch (ITTI_MSG_ID(msg_p)) {
+      case TERMINATE_MESSAGE:
+        LOG_W(GNB_APP, " *** Exiting GNB_APP thread\n");
+        itti_exit_task();
+        break;
+
+      case NGAP_REGISTER_GNB_CNF:
+        LOG_I(GNB_APP, "[gNB %ld] Received %s: associated AMF %d\n", instance, msg_name, NGAP_REGISTER_GNB_CNF(msg_p).nb_amf);
+        send_initial_ue_message(instance);
+        break;
+
+      default:
+        LOG_E(GNB_APP, "Received unexpected message %s\n", msg_name);
+        break;
+    }
+    result = itti_free(ITTI_MSG_ORIGIN_ID(msg_p), msg_p);
+    AssertFatal(result == EXIT_SUCCESS, "Failed to free memory (%d)!\n", result);
+  } while (1);
+
+  return NULL;
+}
+
 void *rrc_gnb_task(void *args_p)
 {
   MessageDef *msg_p;
@@ -150,6 +272,13 @@ void *rrc_gnb_task(void *args_p)
       case TERMINATE_MESSAGE:
         LOG_W(NR_RRC, " *** Exiting NR_RRC thread\n");
         itti_exit_task();
+        break;
+      case NGAP_DOWNLINK_NAS:
+        LOG_I(NR_RRC, "Ignore NGAP_DOWNLINK_NAS: dont have to handle");
+        ngap_downlink_nas_t *nas = &NGAP_DOWNLINK_NAS(msg_p);
+        if (nas->nas_pdu.buf) {
+          free(nas->nas_pdu.buf);
+        }
         break;
       case NRPPA_TRP_INFORMATION_REQ:
         nrppa_trp_information_req_t *trp_req = &NRPPA_TRP_INFORMATION_REQ(msg_p);
@@ -177,6 +306,8 @@ int main(int argc, char **argv)
   }
   logInit();
 
+  init_ue_nas_context();
+
   set_softmodem_sighandler();
 
   // Initialize ITTI tasks
@@ -193,6 +324,9 @@ int main(int argc, char **argv)
   AssertFatal(rc >= 0, "Create task for NRPPA failed\n");
 
   rc = itti_create_task(TASK_RRC_GNB, rrc_gnb_task, NULL);
+  AssertFatal(rc >= 0, "Create task for RRC failed\n");
+
+  rc = itti_create_task(TASK_GNB_APP, gNB_app_task, NULL);
   AssertFatal(rc >= 0, "Create task for RRC failed\n");
 
   MessageDef *msg_p;
