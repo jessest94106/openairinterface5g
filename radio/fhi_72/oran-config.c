@@ -687,8 +687,8 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
   if (!set_fh_eaxcid_conf_mplane(&fh_init->eAxCId_conf, xran_cat, ru_session_list))
     return false;
   /* maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be
-    communicated in a single xRAN network layer transaction. Supported 1500 bytes and 9600 bytes (Jumbo Frame);
-    xran only checks if (MTU <= 1500), therefore setting any value > 1500, xran assumes 9600 value is used */
+    communicated in a single xRAN network layer transaction. Based on the MTU size, xran calculates the number
+    of DL fragments (nPrbElm) needed for transmission of one symbol. */
   fh_init->mtu = ru_session_list->ru_session[0].xran_mplane.mtu; // we suppose that each RU supports the same MTU size
 
   int num_ru_addr = (fh_init->io_cfg.one_vf_cu_plane) ? num_rus : 2*num_rus;
@@ -711,8 +711,8 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
   if (!set_fh_eaxcid_conf(&fh_init->eAxCId_conf, xran_cat))
     return false;
   /* maximum transmission unit (MTU) is the size of the largest protocol data unit (PDU) that can be
-    communicated in a single xRAN network layer transaction. Supported 1500 bytes and 9600 bytes (Jumbo Frame);
-    xran only checks if (MTU <= 1500), therefore setting any value > 1500, xran assumes 9600 value is used */
+    communicated in a single xRAN network layer transaction. Based on the MTU size, xran calculates the number
+    of DL fragments (nPrbElm) needed for transmission of one symbol. */
   fh_init->mtu = *gpd(fhip, nump, ORAN_CONFIG_MTU)->uptr;
   int num_ru_addr = gpd(fhip, nump, ORAN_CONFIG_RU_ADDR)->numelt;
   fh_init->p_o_ru_addr = calloc(num_ru_addr, sizeof(struct rte_ether_addr));
