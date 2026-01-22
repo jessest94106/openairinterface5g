@@ -19,14 +19,9 @@
  *      contact@openairinterface.org
  */
 
-#ifndef NRPPA_GNB_POSITIONING_PROCEDURES_H_
-#define NRPPA_GNB_POSITIONING_PROCEDURES_H_
+#ifndef NRPPA_GNB_ENCODER_H_
+#define NRPPA_GNB_ENCODER_H_
 
-int nrppa_gNB_handle_trp_information_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu);
-void free_trp_information_request(nrppa_trp_information_req_t *msg);
-int nrppa_gNB_trp_information_response(instance_t instance, MessageDef *msg_p);
-void free_trp_information_request(nrppa_trp_information_req_t *msg);
-NRPPA_TRPInformationItem_t encode_trp_info_type_response_item_nrppa(nrppa_trp_information_type_response_item_t *in);
-void free_trp_information_response(nrppa_trp_information_resp_t *msg);
+int nrppa_gNB_encode_pdu(NRPPA_NRPPA_PDU_t *pdu, uint8_t **buffer, uint32_t *len) __attribute__((warn_unused_result));
 
-#endif /* NRPPA_GNB_POSITIONING_PROCEDURES_H_ */
+#endif /* NRPPA_GNB_ENCODER_H_ */

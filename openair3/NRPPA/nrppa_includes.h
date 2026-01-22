@@ -35,5 +35,12 @@
 #include "NRPPA_ProtocolIE-Single-Container.h"
 #include "NRPPA_asn_constant.h"
 #include "NRPPA_TRPInformationRequest.h"
+#include "NRPPA_TRPInformationItem.h"
+#include "NRPPA_TRPPositionDirect.h"
+#include "NRPPA_NG-RANAccessPointPosition.h"
+#include "NRPPA_NGRANHighAccuracyAccessPointPosition.h"
+#include "NRPPA_TRPPositionReferenced.h"
+#include "NRPPA_RelativeGeodeticLocation.h"
+#include "NRPPA_RelativeCartesianLocation.h"
 
 #endif /* NRPPA_INCLUDE_H_ */

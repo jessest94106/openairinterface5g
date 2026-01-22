@@ -7,6 +7,7 @@ add_library(nrppa
   nrppa_gNB_decoder.c
   nrppa_gNB_ue_context.c
   nrppa_gNB_location_information_transfer.c
+  nrppa_gNB_encoder.c
   )
 
 target_link_libraries(nrppa PUBLIC asn1_nrppa)
