@@ -29,7 +29,6 @@
     <class>Build_Run_Tests</class>
     <desc>Build and Run UnitTests</desc>
     <node>obelix</node>
-    <kind>all</kind>
   </testCase>
 
 </testCaseList>
