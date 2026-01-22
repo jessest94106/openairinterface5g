@@ -1,9 +1,11 @@
-OpenAirInterface Cross-Compiler User Guide: explains how to build OAI for ARM64
+# OpenAirInterface Cross-Compiler User Guide
+
+This document explains how to build OAI for ARM64
 (using the instruction set aarch64).
 
 [[_TOC_]]
 
-# Environment
+## Environment
 
 Tested on Ubuntu 22. Newer version of Ubuntu should work as well, please file a
 bug report if not (Gitlab Issues page).
@@ -15,7 +17,7 @@ install the dependencies, if not done already:
 cmake_targets/build_oai -I
 ```
 
-# Install ARM64 dependencies
+## Install ARM64 dependencies
 
 Set up for install the package for ARM64.
 
@@ -57,9 +59,9 @@ The above enables apt to download packages for arm64. It also installs
 gcc cross-compilers for ARM64 in version 11. This version needs to match the
 versions of gcc defined in the cmake cross-compilation file (`cross-arm.cmake`).
 
-# Build for ARM64
+## Build for ARM64
 
-## Build code generation tools for host
+### Build code generation tools for host
 
 Use the x86 compiler to build the `ldpc_generators` and generate the header
 file in the `ran_build/build` folder.  They are necessary during a build for
@@ -76,7 +78,7 @@ cmake ../../..
 make -j`nproc` ldpc_generators generate_T
 ```
 
-## Build executables for ARM64
+### Build executables for ARM64
 
 Switch to the `ran_build/build-cross` folder to build the target executables
 for ARM. The `cross-arm.cmake` file defines some ARM-specific build tools
@@ -94,7 +96,7 @@ ninja lte-softmodem nr-softmodem nr-cuup oairu lte-uesoftmodem nr-uesoftmodem
 ninja params_libconfig coding rfsimulator
 ```
 
-# Further information
+## Further information
 
 You can do the above steps using docker, see dockerfiles
 `docker/Dockerfile.base.ubuntu.cross-arm64` and
