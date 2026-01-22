@@ -415,3 +415,30 @@ int nrppa_gNB_trp_information_response(instance_t instance, MessageDef *msg_p)
 
   return length;
 }
+
+int nrppa_gNB_handle_positioning_information_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu)
+{
+  DevAssert(pdu != NULL);
+  DevAssert(nrppa_msg_info != NULL);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NRPPA_NRPPA_PDU, pdu);
+  }
+
+  LOG_I(NRPPA, "Processing Received Positioning Information Request\n");
+
+  // Preparing positioning information request for RRC
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_GNB, 0, NRPPA_POSITIONING_INFORMATION_REQ);
+  nrppa_positioning_information_req_t *req = &NRPPA_POSITIONING_INFORMATION_REQ(msg);
+
+  // IE 9.2.4 nrppatransactionID : mandatory
+  req->transaction_id = pdu->choice.initiatingMessage->nrppatransactionID;
+
+  nrppa_store_ue_context(nrppa_msg_info, req->transaction_id);
+
+  LOG_I(NRPPA, "Forwarding to RRC Positioning Information Request transaction id=%d\n", req->transaction_id);
+
+  itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NRPPA_NRPPA_PDU, &pdu);
+  return 0;
+}

@@ -28,5 +28,6 @@ int nrppa_gNB_trp_information_response(instance_t instance, MessageDef *msg_p);
 void free_trp_information_request(nrppa_trp_information_req_t *msg);
 NRPPA_TRPInformationItem_t encode_trp_info_type_response_item_nrppa(nrppa_trp_information_type_response_item_t *in);
 void free_trp_information_response(nrppa_trp_information_resp_t *msg);
+int nrppa_gNB_handle_positioning_information_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu);
 
 #endif /* NRPPA_GNB_POSITIONING_PROCEDURES_H_ */
