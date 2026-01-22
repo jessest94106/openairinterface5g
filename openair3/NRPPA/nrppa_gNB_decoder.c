@@ -35,6 +35,11 @@ static int nrppa_gNB_decode_initiating_message(NRPPA_NRPPA_PDU_t *pdu)
       LOG_I(NRPPA, "TRP Information Request initiating message\n");
       free(res.buffer);
       break;
+    case NRPPA_ProcedureCode_id_positioningInformationExchange: // PositioningInformationRequest
+      res = asn_encode_to_new_buffer(NULL, ATS_CANONICAL_XER, &asn_DEF_NRPPA_NRPPA_PDU, pdu);
+      LOG_I(NRPPA, "Positioning Information Request initiating message\n");
+      free(res.buffer);
+      break;
 
     default:
       AssertFatal(false, "Unknown procedure ID (%d) for initiating message\n", (int)pdu->choice.initiatingMessage->procedureCode);

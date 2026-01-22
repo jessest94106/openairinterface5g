@@ -47,7 +47,9 @@ nrppa_message_decoded_callback nrppa_messages_callback[][3] = {
     {0, 0, 0}, // NRPPA_ProcedureCode_id_oTDOAInformationExchange       ((NRPPA_ProcedureCode_t)6)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_assistanceInformationControl   ((NRPPA_ProcedureCode_t)7)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_assistanceInformationFeedback  ((NRPPA_ProcedureCode_t)8)
-    {0, 0, 0}, // NRPPA_ProcedureCode_id_positioningInformationExchange ((NRPPA_ProcedureCode_t)9)
+    {nrppa_gNB_handle_positioning_information_request,
+     0,
+     0}, // NRPPA_ProcedureCode_id_positioningInformationExchange ((NRPPA_ProcedureCode_t)9)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_positioningInformationUpdate   ((NRPPA_ProcedureCode_t)10)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_Measurement ((NRPPA_ProcedureCode_t)11)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_MeasurementReport      ((NRPPA_ProcedureCode_t)12)
