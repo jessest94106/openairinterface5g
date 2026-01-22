@@ -57,6 +57,9 @@ void *nrppa_gNB_process_itti_msg(void *notUsed)
       case NGAP_DOWNLINKNONUEASSOCIATEDNRPPA:
         nrppa_handle_downlink_non_ue_associated_nrppa_transport(instance, &NGAP_DOWNLINKNONUEASSOCIATEDNRPPA(received_msg));
         break;
+      case NRPPA_TRP_INFORMATION_RESP:
+        nrppa_gNB_trp_information_response(instance, received_msg);
+        break;
       default:
         LOG_E(NRPPA, "Received unhandled message: %d:%s\n", ITTI_MSG_ID(received_msg), ITTI_MSG_NAME(received_msg));
         break;

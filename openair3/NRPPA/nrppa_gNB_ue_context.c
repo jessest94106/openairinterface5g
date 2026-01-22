@@ -83,3 +83,14 @@ struct nrppa_gNB_ue_context_s *nrppa_detach_ue_context(uint16_t transaction_id)
   RB_REMOVE(nrppa_ue_map, &nrppa_ue_head, tmp);
   return tmp;
 }
+
+void nrppa_free_ue_context(nrppa_gNB_ue_context_t *ue_info)
+{
+  if (!ue_info)
+    return;
+
+  if (ue_info->routing_id.buf) {
+    free(ue_info->routing_id.buf);
+  }
+  free(ue_info);
+}
