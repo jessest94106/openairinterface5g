@@ -45,11 +45,6 @@
 #include "defs_eNB.h"
 //#include <complex.h>
 #include "assertions.h"
-#if ENABLE_RAL
-#include "collection/hashtable/hashtable.h"
-#include "COMMON/ral_messages_types.h"
-#include "UTIL/queue.h"
-#endif
 #include "common/utils/LOG/log.h"
 #define msg(aRGS...) LOG_D(PHY, ##aRGS)
 //use msg in the real-time thread context
@@ -960,11 +955,6 @@ typedef struct {
     time_stats_t dlsch_llr_stripping_unit_SIC_stats;
     time_stats_t dlsch_unscrambling_SIC_stats;
 
-  #if ENABLE_RAL
-    hash_table_t    *ral_thresholds_timed;
-    SLIST_HEAD(ral_thresholds_gen_poll_s, ral_threshold_phy_t) ral_thresholds_gen_polled[RAL_LINK_PARAM_GEN_MAX];
-    SLIST_HEAD(ral_thresholds_lte_poll_s, ral_threshold_phy_t) ral_thresholds_lte_polled[RAL_LINK_PARAM_LTE_MAX];
-  #endif
   */
 } PHY_VARS_UE_NB_IoT;
 

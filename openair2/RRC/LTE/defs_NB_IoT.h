@@ -66,13 +66,6 @@
 # include "intertask_interface.h"
 # include "commonDef.h"
 
-
-#if ENABLE_RAL
-  #include "collection/hashtable/obj_hashtable.h"
-#endif
-
-
-
 /*I will change the name of the structure for compile purposes--> hope not to undo this process*/
 
 typedef unsigned int uid_NB_IoT_t;

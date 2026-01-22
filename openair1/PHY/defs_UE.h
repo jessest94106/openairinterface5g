@@ -76,11 +76,6 @@
 #define stop_UE_TIMING(a)
 #endif
 
-#if ENABLE_RAL
-#include "collection/hashtable/hashtable.h"
-#include "COMMON/ral_messages_types.h"
-#include "UTIL/queue.h"
-#endif
 #include "common/utils/LOG/log.h"
 #define msg(aRGS...) LOG_D(PHY, ##aRGS)
 

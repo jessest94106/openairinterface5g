@@ -92,10 +92,6 @@
 #include "intertask_interface.h"
 #include "softmodem-common.h"
 
-#if ENABLE_RAL
-  #include "rrc_eNB_ral.h"
-#endif
-
 #include "SIMULATION/TOOLS/sim.h" // for taus
 
 #include "openair1/PHY/LTE_TRANSPORT/transport_proto.h"
