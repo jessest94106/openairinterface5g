@@ -782,3 +782,23 @@ class Containerize():
 		else:
 			logging.error('\u001B[1m Undeploying objects Failed\u001B[0m')
 		return success
+
+	def AnalyzeRTStatsObject(self, HTML, node, ctx, thresholds):
+		logging.info(f'Analyzing realtime stats from server: {node}')
+		yaml = self.yamlPath.strip('/')
+		wd = f'{self.eNBSourceCodePath}/{yaml}'
+		wd_yaml = f'{wd}/docker-compose.y*ml'
+
+		with cls_cmd.getConnection(node) as cmd:
+			services = GetDeployedServices(cmd, wd_yaml)
+			s, _ = services[0] # we simply assume something is deployed, if not Exception will report
+			# similar to BuildRunTests(), use docker cp to avoid problems with permissions
+			cmd.run(f'docker compose -f {wd_yaml} cp {s}:/opt/oai-gnb/nrL1_stats.log {wd}/')
+			l1_file = archiveArtifact(cmd, ctx, f"{wd}/nrL1_stats.log")
+			cmd.run(f'docker compose -f {wd_yaml} cp {s}:/opt/oai-gnb/nrMAC_stats.log {wd}/')
+			mac_file = archiveArtifact(cmd, ctx, f"{wd}/nrMAC_stats.log")
+
+		logging.info(f"check against thresholds from {thresholds}")
+		success, datalog_rt_stats = cls_analysis.Analysis.analyze_rt_stats(thresholds, l1_file, mac_file)
+		HTML.CreateHtmlDataLogTable(datalog_rt_stats)
+		return success

@@ -257,6 +257,10 @@ def ExecuteActionWithParam(action, ctx, node):
 		yaml = test.findtext('stats_cfg')
 		success = RAN.AnalyzeRTStats(HTML, node, ctx, yaml)
 
+	elif action == 'AnalyzeRTStats_Object':
+		yaml = test.findtext('stats_cfg')
+		success = CONTAINERS.AnalyzeRTStatsObject(HTML, node, ctx, yaml)
+
 	else:
 		logging.warning(f"unknown action {action}, skip step")
 		success = True # by default, we skip the step and print a warning
