@@ -2633,6 +2633,16 @@ static void rrc_CU_process_ue_context_release_request(MessageDef *msg_p, sctp_as
     // if we receive the release request from the target DU (regardless if
     // successful), we assume it is "genuine" and ask the AMF to release
     nr_rrc_finalize_ho(UE);
+  } else {
+    f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+    if (ue_data.du_assoc_id != assoc_id) {
+      LOG_W(NR_RRC,
+            "UE context release request from unexpected DU with assoc_id %d for rrc_ue_id %d with du_assoc_id %d\n",
+            assoc_id,
+            UE->rrc_ue_id,
+            ue_data.du_assoc_id);
+      return;
+    }
   }
 
   /* TODO: marshall types correctly */
