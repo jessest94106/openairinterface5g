@@ -28,6 +28,7 @@
 #define NRPPA_TRP_INFORMATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_trp_information_resp
 #define NRPPA_POSITIONING_INFORMATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_req
 #define NRPPA_POSITIONING_INFORMATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_resp
+#define NRPPA_POSITIONING_ACTIVATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_req
 
 /* Structure of Positioning related NRPPA messages */
 /* IE structures for Positioning related messages as per TS 38.455 V16.7.1*/
@@ -570,6 +571,22 @@ typedef struct nrppa_trp_information_list_s {
   uint32_t trp_information_item_length;
 } nrppa_trp_information_list_t;
 
+typedef union nrppa_srs_type_c {
+  uint8_t *srs_resource_set_id;
+  bool *aperiodic;
+} nrppa_srs_type_u;
+
+typedef enum nrppa_srs_type_e {
+  NRPPA_SRS_TYPE_PR_NOTHING,
+  NRPPA_SRS_TYPE_PR_SEMIPERSISTENTSRS,
+  NRPPA_SRS_TYPE_PR_APERIODICSRS
+} nrppa_srs_type_pr;
+
+typedef struct nrppa_srs_type_s {
+  nrppa_srs_type_pr present;
+  nrppa_srs_type_u choice;
+} nrppa_srs_type_t;
+
 typedef struct nrppa_trp_information_req_s {
   // IE 9.2.4 (mandatory)
   uint16_t transaction_id;
@@ -598,5 +615,12 @@ typedef struct nrppa_positioning_information_resp_s {
   // IE 9.2.28 (optional)
   nrppa_srs_configuration_t *srs_configuration;
 } nrppa_positioning_information_resp_t;
+
+typedef struct nrppa_positioning_activation_req_s {
+  // IE 9.2.4 (mandatory)
+  uint16_t transaction_id;
+  // (mandatory)
+  nrppa_srs_type_t srs_type;
+} nrppa_positioning_activation_req_t;
 
 #endif // NRPPA_MESSAGES_TYPES_H_

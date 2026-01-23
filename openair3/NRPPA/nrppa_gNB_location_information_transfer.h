@@ -32,5 +32,8 @@ int nrppa_gNB_handle_positioning_information_request(nrppa_gnb_ue_info_t *nrppa_
 int nrppa_gNB_positioning_information_response(instance_t instance, MessageDef *msg_p);
 NRPPA_SRSCarrier_List_t encode_srs_carrier_list_nrppa(const nrppa_srs_carrier_list_t *in_list);
 void free_positioning_information_response(nrppa_positioning_information_resp_t *msg);
+int nrppa_gNB_handle_positioning_activation_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu);
+void decode_nrppa_srstype(NRPPA_SRSType_t *srs_type, nrppa_srs_type_t *out);
+void free_positioning_activation_request(nrppa_positioning_activation_req_t *msg);
 
 #endif /* NRPPA_GNB_POSITIONING_PROCEDURES_H_ */

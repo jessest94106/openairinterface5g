@@ -69,5 +69,7 @@
 #include "NRPPA_PosResourceSetTypePeriodic.h"
 #include "NRPPA_PosResourceSetTypeSemi-persistent.h"
 #include "NRPPA_PosResourceSetTypeAperiodic.h"
+#include "NRPPA_SemipersistentSRS.h"
+#include "NRPPA_AperiodicSRS.h"
 
 #endif /* NRPPA_INCLUDE_H_ */

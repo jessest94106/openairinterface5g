@@ -985,6 +985,37 @@ void free_positioning_information_response(nrppa_positioning_information_resp_t 
   }
 }
 
+void decode_nrppa_srstype(NRPPA_SRSType_t *srs_type, nrppa_srs_type_t *out)
+{
+  switch (srs_type->present) {
+    case NRPPA_SRSType_PR_NOTHING:
+      out->present = NRPPA_SRS_TYPE_PR_NOTHING;
+      break;
+    case NRPPA_SRSType_PR_semipersistentSRS:
+      out->present = NRPPA_SRS_TYPE_PR_SEMIPERSISTENTSRS;
+      out->choice.srs_resource_set_id = calloc_or_fail(1, sizeof(*out->choice.srs_resource_set_id));
+      *out->choice.srs_resource_set_id = srs_type->choice.semipersistentSRS->sRSResourceSetID;
+      break;
+    case NRPPA_SRSType_PR_aperiodicSRS:
+      out->present = NRPPA_SRS_TYPE_PR_APERIODICSRS;
+      out->choice.aperiodic = calloc_or_fail(1, sizeof(*out->choice.aperiodic));
+      *out->choice.aperiodic = srs_type->choice.aperiodicSRS->aperiodic;
+      break;
+    default:
+      AssertFatal(false, "received illegal SRS type\n");
+      break;
+  }
+}
+
+void free_positioning_activation_request(nrppa_positioning_activation_req_t *msg)
+{
+  if (msg->srs_type.present == NRPPA_SRS_TYPE_PR_SEMIPERSISTENTSRS) {
+    free(msg->srs_type.choice.srs_resource_set_id);
+  } else if (msg->srs_type.present == NRPPA_SRS_TYPE_PR_APERIODICSRS) {
+    free(msg->srs_type.choice.aperiodic);
+  }
+}
+
 int nrppa_gNB_handle_trp_information_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu)
 {
   LOG_I(NRPPA, "Processing Received TRP Information Request \n");
@@ -1243,4 +1274,41 @@ int nrppa_gNB_positioning_information_response(instance_t instance, MessageDef *
   nrppa_free_ue_context(ue_info);
   free(buffer);
   return length;
+}
+
+int nrppa_gNB_handle_positioning_activation_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu)
+{
+  LOG_I(NRPPA, "Processing Received Positioning Activation Request \n");
+  DevAssert(pdu != NULL);
+  DevAssert(nrppa_msg_info != NULL);
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NRPPA_NRPPA_PDU, pdu);
+  }
+
+  // Preparing positioning information request for RRC
+  MessageDef *msg = itti_alloc_new_message(TASK_RRC_GNB, 0, NRPPA_POSITIONING_ACTIVATION_REQ);
+  nrppa_positioning_activation_req_t *req = &NRPPA_POSITIONING_ACTIVATION_REQ(msg);
+
+  // Processing Received PositioningActivationRequest
+  NRPPA_PositioningActivationRequest_t *container = NULL;
+  NRPPA_PositioningActivationRequestIEs_t *ie = NULL;
+
+  // IE 9.2.3 Message type : mandatory
+  container = &pdu->choice.initiatingMessage->value.choice.PositioningActivationRequest;
+
+  // IE 9.2.4 nrppatransactionID : mandatory
+  req->transaction_id = pdu->choice.initiatingMessage->nrppatransactionID;
+
+  // IE SRSType : mandatory
+  NRPPA_FIND_PROTOCOLIE_BY_ID(NRPPA_PositioningActivationRequestIEs_t, ie, container, NRPPA_ProtocolIE_ID_id_SRSType, true);
+  decode_nrppa_srstype(&ie->value.choice.SRSType, &req->srs_type);
+
+  nrppa_store_ue_context(nrppa_msg_info, req->transaction_id);
+
+  LOG_I(NRPPA, "Forwarding to RRC Positioning Activation Request transaction id = %d\n", req->transaction_id);
+
+  itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
+  ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NRPPA_NRPPA_PDU, &pdu);
+  return 0;
 }

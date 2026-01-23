@@ -57,7 +57,9 @@ nrppa_message_decoded_callback nrppa_messages_callback[][3] = {
     {0, 0, 0}, // NRPPA_ProcedureCode_id_MeasurementAbort     ((NRPPA_ProcedureCode_t)14)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_MeasurementFailureIndication   ((NRPPA_ProcedureCode_t)15)
     {nrppa_gNB_handle_trp_information_request, 0, 0}, // NRPPA_ProcedureCode_id_tRPInformationExchange   ((NRPPA_ProcedureCode_t)16)
-    {0, 0, 0}, // NRPPA_ProcedureCode_id_positioningActivation        ((NRPPA_ProcedureCode_t)17)
+    {nrppa_gNB_handle_positioning_activation_request,
+     0,
+     0}, // NRPPA_ProcedureCode_id_positioningActivation        ((NRPPA_ProcedureCode_t)17)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_positioningDeactivation      ((NRPPA_ProcedureCode_t)18)
 };
 
