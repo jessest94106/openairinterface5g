@@ -27,6 +27,7 @@
 #define NRPPA_TRP_INFORMATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_trp_information_req
 #define NRPPA_TRP_INFORMATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_trp_information_resp
 #define NRPPA_POSITIONING_INFORMATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_req
+#define NRPPA_POSITIONING_INFORMATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_resp
 
 /* Structure of Positioning related NRPPA messages */
 /* IE structures for Positioning related messages as per TS 38.455 V16.7.1*/
@@ -223,6 +224,346 @@ typedef struct nrppa_trp_information_s {
   nrppa_trp_information_type_response_list_t trp_information_type_response_list;
 } nrppa_trp_information_t;
 
+typedef enum nrppa_subcarrier_spacing_e {
+  NRPPA_SUBCARRIER_SPACING_15KHZ,
+  NRPPA_SUBCARRIER_SPACING_30KHZ,
+  NRPPA_SUBCARRIER_SPACING_60KHZ,
+  NRPPA_SUBCARRIER_SPACING_120KHZ
+} nrppa_subcarrier_spacing_pr;
+
+typedef struct nrppa_scs_specific_carrier_s {
+  uint32_t offset_to_carrier;
+  nrppa_subcarrier_spacing_pr subcarrier_spacing;
+  uint16_t carrier_bandwidth;
+} nrppa_scs_specific_carrier_t;
+
+typedef struct nrppa_uplink_channel_bw_per_scs_list_s {
+  nrppa_scs_specific_carrier_t *scs_specific_carrier;
+  uint32_t scs_specific_carrier_list_length;
+} nrppa_uplink_channel_bw_per_scs_list_t;
+
+typedef enum nrppa_transmission_comb_e {
+  NRPPA_TRANSMISSION_COMB_PR_NOTHING,
+  NRPPA_TRANSMISSION_COMB_PR_N2,
+  NRPPA_TRANSMISSION_COMB_PR_N4
+} nrppa_transmission_comb_pr;
+
+typedef struct nrppa_transmission_comb_n2_s {
+  uint8_t comb_offset_n2;
+  uint8_t cyclic_shift_n2;
+} nrppa_transmission_comb_n2_t, nrppa_transmission_comb_pos_n2_t;
+
+typedef struct nrppa_transmission_comb_n4_s {
+  uint8_t comb_offset_n4;
+  uint8_t cyclic_shift_n4;
+} nrppa_transmission_comb_n4_t, nrppa_transmission_comb_pos_n4_t;
+
+typedef union nrppa_transmission_comb_c {
+  nrppa_transmission_comb_n2_t n2;
+  nrppa_transmission_comb_n4_t n4;
+} nrppa_transmission_comb_u;
+
+typedef struct nrppa_transmission_comb_s {
+  nrppa_transmission_comb_pr present;
+  nrppa_transmission_comb_u choice;
+} nrppa_transmission_comb_t;
+
+typedef enum nrppa_srs_resource_type_periodicity_e {
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1 = 0,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT4,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT5,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT8,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT10,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT16,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT20,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT32,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT40,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT64,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT80,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT160,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT320,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT640,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1280,
+  NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2560
+} nrppa_srs_resource_type_periodicity_pr;
+
+typedef struct nrppa_resource_type_periodic_s {
+  nrppa_srs_resource_type_periodicity_pr periodicity;
+  uint16_t offset;
+} nrppa_resource_type_periodic_t, nrppa_resource_type_semi_persistent_t;
+
+typedef union nrppa_resource_type_c {
+  nrppa_resource_type_periodic_t periodic;
+  nrppa_resource_type_semi_persistent_t semi_persistent;
+  bool aperiodic;
+} nrppa_resource_type_u;
+
+typedef enum nrppa_resource_type_e {
+  NRPPA_RESOURCE_TYPE_PR_NOTHING,
+  NRPPA_RESOURCE_TYPE_PR_PERIODIC,
+  NRPPA_RESOURCE_TYPE_PR_SEMI_PERSISTENT,
+  NRPPA_RESOURCE_TYPE_PR_APERIODIC
+} nrppa_resource_type_pr;
+
+typedef struct nrppa_resource_type_s {
+  nrppa_resource_type_pr present;
+  nrppa_resource_type_u choice;
+} nrppa_resource_type_t;
+
+typedef struct nrppa_transmission_comb_n8_s {
+  uint8_t comb_offset_n8;
+  uint8_t cyclic_shift_n8;
+} nrppa_transmission_comb_pos_n8_t;
+
+typedef union nrppa_transmission_comb_pos_c {
+  nrppa_transmission_comb_pos_n2_t n2;
+  nrppa_transmission_comb_pos_n4_t n4;
+  nrppa_transmission_comb_pos_n8_t n8;
+} nrppa_transmission_comb_pos_u;
+
+typedef enum nrppa_transmission_comb_pos_e {
+  NRPPA_TRANSMISSION_COMB_POS_PR_NOTHING,
+  NRPPA_TRANSMISSION_COMB_POS_PR_N2,
+  NRPPA_TRANSMISSION_COMB_POS_PR_N4,
+  NRPPA_TRANSMISSION_COMB_POS_PR_N8
+} nrppa_transmission_comb_pos_pr;
+
+typedef struct nrppa_transmission_comb_pos_s {
+  nrppa_transmission_comb_pos_pr present;
+  nrppa_transmission_comb_pos_u choice;
+} nrppa_transmission_comb_pos_t;
+
+typedef enum nrppa_srs_resource_type_pos_periodicity_e {
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1 = 0,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT4,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT8,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT16,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT32,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT64,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT80,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT160,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT320,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT640,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1280,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2560,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5120,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10240,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20480,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40960,
+  NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT81920
+} nrppa_srs_resource_type_pos_periodicity_pr;
+
+typedef struct nrppa_resource_type_periodic_pos_s {
+  nrppa_srs_resource_type_pos_periodicity_pr periodicity;
+  uint16_t offset;
+} nrppa_resource_type_periodic_pos_t, nrppa_resource_type_semi_persistent_pos_t;
+
+typedef struct nrppa_resource_type_aperiodic_pos_s {
+  uint8_t slot_offset;
+} nrppa_resource_type_aperiodic_pos_t;
+
+typedef union nrppa_resource_type_pos_c {
+  nrppa_resource_type_periodic_pos_t periodic;
+  nrppa_resource_type_semi_persistent_pos_t semi_persistent;
+  nrppa_resource_type_aperiodic_pos_t aperiodic;
+} nrppa_resource_type_pos_u;
+
+typedef enum nrppa_resource_type_pos_e {
+  NRPPA_RESOURCE_TYPE_POS_PR_NOTHING,
+  NRPPA_RESOURCE_TYPE_POS_PR_PERIODIC,
+  NRPPA_RESOURCE_TYPE_POS_PR_SEMI_PERSISTENT,
+  NRPPA_RESOURCE_TYPE_POS_PR_APERIODIC
+} nrppa_resource_type_pos_pr;
+
+typedef struct nrppa_resource_type_pos_s {
+  nrppa_resource_type_pos_pr present;
+  nrppa_resource_type_pos_u choice;
+} nrppa_resource_type_pos_t;
+
+typedef struct nrppa_srs_resource_id_list_s {
+  long *srs_resource_id;
+  uint8_t srs_resource_id_list_length;
+} nrppa_srs_resource_id_list_t;
+
+typedef struct nrppa_resource_set_type_aperiodic_s {
+  uint8_t srs_resource_trigger;
+  long slot_offset;
+} nrppa_resource_set_type_aperiodic_t;
+
+typedef union nrppa_resource_set_type_c {
+  bool periodic;
+  bool semi_persistent;
+  nrppa_resource_set_type_aperiodic_t aperiodic;
+} nrppa_resource_set_type_u;
+
+typedef enum nrppa_resource_set_type_e {
+  NRPPA_RESOURCE_SET_TYPE_PR_NOTHING,
+  NRPPA_RESOURCE_SET_TYPE_PR_PERIODIC,
+  NRPPA_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT,
+  NRPPA_RESOURCE_SET_TYPE_PR_APERIODIC
+} nrppa_resource_set_type_pr;
+
+typedef struct nrppa_resource_set_type_s {
+  nrppa_resource_set_type_pr present;
+  nrppa_resource_set_type_u choice;
+} nrppa_resource_set_type_t;
+
+typedef struct nrppa_pos_srs_resource_id_list_s {
+  long *srs_pos_resource_id;
+  uint32_t pos_srs_resource_id_list_length;
+} nrppa_pos_srs_resource_id_list_t;
+
+typedef union nrppa_pos_resource_set_type_c {
+  bool periodic;
+  bool semi_persistent;
+  uint8_t srs_resource;
+} nrppa_pos_resource_set_type_u;
+
+typedef enum nrppa_pos_resource_set_type_e {
+  NRPPA_POS_RESOURCE_SET_TYPE_PR_NOTHING,
+  NRPPA_POS_RESOURCE_SET_TYPE_PR_PERIODIC,
+  NRPPA_POS_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT,
+  NRPPA_POS_RESOURCE_SET_TYPE_PR_APERIODIC
+} nrppa_pos_resource_set_type_pr;
+
+typedef struct nrppa_pos_resource_set_type_s {
+  nrppa_pos_resource_set_type_pr present;
+  nrppa_pos_resource_set_type_u choice;
+} nrppa_pos_resource_set_type_t;
+
+typedef enum nrppa_srs_resource_number_of_ports_e {
+  NRPPA_SRS_NUMBER_OF_PORTS_N1,
+  NRPPA_SRS_NUMBER_OF_PORTS_N2,
+  NRPPA_SRS_NUMBER_OF_PORTS_N4
+} nrppa_srs_resource_number_of_ports_pr;
+
+typedef enum nrppa_srs_resource_number_of_symbols_e {
+  NRPPA_SRS_NUMBER_OF_SYMBOLS_N1,
+  NRPPA_SRS_NUMBER_OF_SYMBOLS_N2,
+  NRPPA_SRS_NUMBER_OF_SYMBOLS_N4
+} nrppa_srs_resource_number_of_symbols_pr;
+
+typedef enum nrppa_srs_repetition_factor_e {
+  NRPPA_SRS_REPETITION_FACTOR_RF1,
+  NRPPA_SRS_REPETITION_FACTOR_RF2,
+  NRPPA_SRS_REPETITION_FACTOR_RF4
+} nrppa_srs_repetition_factor_pr;
+
+typedef enum nrppa_srs_group_or_sequencehopping_e {
+  NRPPA_GROUPORSEQUENCEHOPPING_NOTHING,
+  NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING,
+  NRPPA_GROUPORSEQUENCEHOPPING_SEQUENCEHOPPING
+} nrppa_srs_group_or_sequencehopping_pr;
+
+typedef struct nrppa_srs_resource_s {
+  uint32_t srs_resource_id;
+  nrppa_srs_resource_number_of_ports_pr nr_of_srs_ports;
+  nrppa_transmission_comb_t transmission_comb;
+  uint8_t start_position;
+  nrppa_srs_resource_number_of_symbols_pr nr_of_symbols;
+  nrppa_srs_repetition_factor_pr repetition_factor;
+  uint8_t freq_domain_position;
+  uint16_t freq_domain_shift;
+  uint8_t c_srs;
+  uint8_t b_srs;
+  uint8_t b_hop;
+  nrppa_srs_group_or_sequencehopping_pr group_or_sequence_hopping;
+  nrppa_resource_type_t resource_type;
+  uint16_t sequence_id;
+} nrppa_srs_resource_t;
+
+typedef enum nrppa_srs_resource_item_number_of_symbols_e {
+  NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N1,
+  NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N2,
+  NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N4,
+  NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N8,
+  NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N12
+} nrppa_srs_resource_item_number_of_symbols_pr;
+
+typedef struct nrppa_pos_srs_resource_item_s {
+  uint32_t srs_pos_resource_id;
+  nrppa_transmission_comb_pos_t transmission_comb_pos;
+  uint8_t start_position;
+  nrppa_srs_resource_item_number_of_symbols_pr nr_of_symbols;
+  uint16_t freq_domain_shift;
+  uint8_t c_srs;
+  nrppa_srs_group_or_sequencehopping_pr group_or_sequence_hopping;
+  nrppa_resource_type_pos_t resource_type_pos;
+  uint32_t sequence_id;
+} nrppa_pos_srs_resource_item_t;
+
+typedef struct nrppa_srs_resource_set_s {
+  uint8_t srs_resource_set_id;
+  nrppa_srs_resource_id_list_t srs_resource_id_list;
+  nrppa_resource_set_type_t resource_set_type;
+} nrppa_srs_resource_set_t;
+
+typedef struct nrppa_pos_srs_resource_set_item_s {
+  uint8_t pos_srs_resource_set_id;
+  nrppa_pos_srs_resource_id_list_t pos_srs_resource_id_list;
+  nrppa_pos_resource_set_type_t pos_resource_set_type;
+} nrppa_pos_srs_resource_set_item_t;
+
+typedef struct nrppa_srs_resource_list_s {
+  nrppa_srs_resource_t *srs_resource;
+  uint32_t srs_resource_list_length;
+} nrppa_srs_resource_list_t;
+
+typedef struct nrppa_pos_srs_resource_list_s {
+  nrppa_pos_srs_resource_item_t *pos_srs_resource_item;
+  uint32_t pos_srs_resource_list_length;
+} nrppa_pos_srs_resource_list_t;
+
+typedef struct nrppa_srs_resource_set_list_s {
+  nrppa_srs_resource_set_t *srs_resource_set;
+  uint32_t srs_resource_set_list_length;
+} nrppa_srs_resource_set_list_t;
+
+typedef struct nrppa_pos_srs_resource_set_list_s {
+  nrppa_pos_srs_resource_set_item_t *pos_srs_resource_set_item;
+  uint32_t pos_srs_resource_set_list_length;
+} nrppa_pos_srs_resource_set_list_t;
+
+typedef struct nrppa_srs_config_s {
+  nrppa_srs_resource_list_t *srs_resource_list;
+  nrppa_pos_srs_resource_list_t *pos_srs_resource_list;
+  nrppa_srs_resource_set_list_t *srs_resource_set_list;
+  nrppa_pos_srs_resource_set_list_t *pos_srs_resource_set_list;
+} nrppa_srs_config_t;
+
+typedef enum nrppa_cp_type_e { NRPPA_CP_TYPE_NORMAL, NRPPA_CP_TYPE_EXTENDED } nrppa_cp_type_pr;
+
+typedef struct nrppa_active_ul_bwp_s {
+  uint32_t location_and_bandwidth;
+  nrppa_subcarrier_spacing_pr subcarrier_spacing;
+  nrppa_cp_type_pr cyclic_prefix;
+  uint32_t tx_direct_current_location;
+  uint8_t shift_7_dot_5kHz;
+  nrppa_srs_config_t srs_config;
+} nrppa_active_ul_bwp_t;
+
+typedef struct nrppa_srs_carrier_list_item_s {
+  uint32_t pointA;
+  nrppa_uplink_channel_bw_per_scs_list_t uplink_channel_bw_per_scs_list;
+  nrppa_active_ul_bwp_t active_ul_bwp;
+  uint16_t pci;
+} nrppa_srs_carrier_list_item_t;
+
+typedef struct nrppa_srs_carrier_list_s {
+  nrppa_srs_carrier_list_item_t *srs_carrier_list_item;
+  uint32_t srs_carrier_list_length;
+} nrppa_srs_carrier_list_t;
+
+typedef struct nrppa_srs_configuration_s {
+  nrppa_srs_carrier_list_t srs_carrier_list;
+} nrppa_srs_configuration_t;
+
 // IE 9.3.1.176 (TS 38.473 V16.21.0)
 typedef struct nrppa_trp_information_list_s {
   nrppa_trp_information_t *trp_information_item;
@@ -250,5 +591,12 @@ typedef struct nrppa_positioning_information_req_s {
   // IE 9.2.4 (mandatory)
   uint16_t transaction_id;
 } nrppa_positioning_information_req_t;
+
+typedef struct nrppa_positioning_information_resp_s {
+  // IE 9.2.4 (mandatory)
+  uint16_t transaction_id;
+  // IE 9.2.28 (optional)
+  nrppa_srs_configuration_t *srs_configuration;
+} nrppa_positioning_information_resp_t;
 
 #endif // NRPPA_MESSAGES_TYPES_H_

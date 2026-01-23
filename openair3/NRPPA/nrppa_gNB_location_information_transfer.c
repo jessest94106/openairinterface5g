@@ -263,6 +263,728 @@ void free_trp_information_response(nrppa_trp_information_resp_t *msg)
   free(msg->trp_information_list.trp_information_item);
 }
 
+static NRPPA_SRSConfig_t encode_srs_config(const nrppa_srs_config_t *in_config)
+{
+  NRPPA_SRSConfig_t out_config = {0};
+  // optional: srs_resource_list
+  if (in_config->srs_resource_list) {
+    nrppa_srs_resource_list_t *srs_resource_list = in_config->srs_resource_list;
+    uint32_t srs_resource_list_length = srs_resource_list->srs_resource_list_length;
+    asn1cCalloc(out_config.sRSResource_List, nrppa_sRSResource_List);
+    for (int i = 0; i < srs_resource_list_length; i++) {
+      asn1cSequenceAdd(nrppa_sRSResource_List->list, NRPPA_SRSResource_t, nrppa_srs_resource);
+      nrppa_srs_resource_t *srs_resource = &srs_resource_list->srs_resource[i];
+      nrppa_srs_resource->sRSResourceID = srs_resource->srs_resource_id;
+
+      switch (srs_resource->nr_of_srs_ports) {
+        case NRPPA_SRS_NUMBER_OF_PORTS_N1:
+          nrppa_srs_resource->nrofSRS_Ports = NRPPA_SRSResource__nrofSRS_Ports_port1;
+          break;
+        case NRPPA_SRS_NUMBER_OF_PORTS_N2:
+          nrppa_srs_resource->nrofSRS_Ports = NRPPA_SRSResource__nrofSRS_Ports_ports2;
+          break;
+        case NRPPA_SRS_NUMBER_OF_PORTS_N4:
+          nrppa_srs_resource->nrofSRS_Ports = NRPPA_SRSResource__nrofSRS_Ports_ports4;
+          break;
+        default:
+          AssertFatal(false, "illegal number of srs ports %d\n", srs_resource->nr_of_srs_ports);
+          break;
+      }
+
+      nrppa_transmission_comb_t *srs_res_tx_comb = &srs_resource->transmission_comb;
+      switch (srs_res_tx_comb->present) {
+        case NRPPA_TRANSMISSION_COMB_PR_NOTHING:
+          nrppa_srs_resource->transmissionComb.present = NRPPA_TransmissionComb_PR_NOTHING;
+          break;
+        case NRPPA_TRANSMISSION_COMB_PR_N2:
+          nrppa_srs_resource->transmissionComb.present = NRPPA_TransmissionComb_PR_n2;
+          asn1cCalloc(nrppa_srs_resource->transmissionComb.choice.n2, nrppa_n2);
+          nrppa_n2->combOffset_n2 = srs_res_tx_comb->choice.n2.comb_offset_n2;
+          nrppa_n2->cyclicShift_n2 = srs_res_tx_comb->choice.n2.cyclic_shift_n2;
+          break;
+        case NRPPA_TRANSMISSION_COMB_PR_N4:
+          nrppa_srs_resource->transmissionComb.present = NRPPA_TransmissionComb_PR_n4;
+          asn1cCalloc(nrppa_srs_resource->transmissionComb.choice.n4, nrppa_n4);
+          nrppa_n4->combOffset_n4 = srs_res_tx_comb->choice.n4.comb_offset_n4;
+          nrppa_n4->cyclicShift_n4 = srs_res_tx_comb->choice.n4.cyclic_shift_n4;
+          break;
+        default:
+          AssertFatal(false, "illegal transmissionComb %d\n", srs_res_tx_comb->present);
+          break;
+      }
+
+      nrppa_srs_resource->startPosition = srs_resource->start_position;
+
+      switch (srs_resource->nr_of_symbols) {
+        case NRPPA_SRS_NUMBER_OF_SYMBOLS_N1:
+          nrppa_srs_resource->nrofSymbols = NRPPA_SRSResource__nrofSymbols_n1;
+          break;
+        case NRPPA_SRS_NUMBER_OF_SYMBOLS_N2:
+          nrppa_srs_resource->nrofSymbols = NRPPA_SRSResource__nrofSymbols_n2;
+          break;
+        case NRPPA_SRS_NUMBER_OF_SYMBOLS_N4:
+          nrppa_srs_resource->nrofSymbols = NRPPA_SRSResource__nrofSymbols_n4;
+          break;
+        default:
+          AssertFatal(false, "illegal number of symbols %d\n", srs_resource->nr_of_symbols);
+          break;
+      }
+
+      switch (srs_resource->repetition_factor) {
+        case NRPPA_SRS_REPETITION_FACTOR_RF1:
+          nrppa_srs_resource->repetitionFactor = NRPPA_SRSResource__repetitionFactor_n1;
+          break;
+        case NRPPA_SRS_REPETITION_FACTOR_RF2:
+          nrppa_srs_resource->repetitionFactor = NRPPA_SRSResource__repetitionFactor_n2;
+          break;
+        case NRPPA_SRS_REPETITION_FACTOR_RF4:
+          nrppa_srs_resource->repetitionFactor = NRPPA_SRSResource__repetitionFactor_n4;
+          break;
+        default:
+          AssertFatal(false, "illegal repetition factor %d\n", srs_resource->repetition_factor);
+          break;
+      }
+
+      nrppa_srs_resource->freqDomainPosition = srs_resource->freq_domain_position;
+      nrppa_srs_resource->freqDomainShift = srs_resource->freq_domain_shift;
+      nrppa_srs_resource->c_SRS = srs_resource->c_srs;
+      nrppa_srs_resource->b_SRS = srs_resource->b_srs;
+      nrppa_srs_resource->b_hop = srs_resource->b_hop;
+
+      switch (srs_resource->group_or_sequence_hopping) {
+        case NRPPA_GROUPORSEQUENCEHOPPING_NOTHING:
+          nrppa_srs_resource->groupOrSequenceHopping = NRPPA_SRSResource__groupOrSequenceHopping_neither;
+          break;
+        case NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING:
+          nrppa_srs_resource->groupOrSequenceHopping = NRPPA_SRSResource__groupOrSequenceHopping_groupHopping;
+          break;
+        case NRPPA_GROUPORSEQUENCEHOPPING_SEQUENCEHOPPING:
+          nrppa_srs_resource->groupOrSequenceHopping = NRPPA_SRSResource__groupOrSequenceHopping_sequenceHopping;
+          break;
+        default:
+          AssertFatal(false, "illegal groupOrSequenceHopping %d\n", srs_resource->group_or_sequence_hopping);
+          break;
+      }
+
+      NRPPA_ResourceType_t *nrppa_resourceType = &nrppa_srs_resource->resourceType;
+      nrppa_resource_type_t *resource_type = &srs_resource->resource_type;
+      if (resource_type->present == NRPPA_RESOURCE_TYPE_PR_NOTHING) {
+        nrppa_resourceType->present = NRPPA_ResourceType_PR_NOTHING;
+      } else if (resource_type->present == NRPPA_RESOURCE_TYPE_PR_PERIODIC) {
+        nrppa_resourceType->present = NRPPA_ResourceType_PR_periodic;
+        asn1cCalloc(nrppa_resourceType->choice.periodic, nrppa_periodic);
+        switch (resource_type->choice.periodic.periodicity) {
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot1;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot2;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT4:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot4;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT5:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot5;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT8:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot8;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT10:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot10;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT16:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot16;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT20:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot20;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT32:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot32;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT40:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot40;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT64:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot64;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT80:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot80;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT160:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot160;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT320:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot320;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT640:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot640;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1280:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot1280;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2560:
+            nrppa_periodic->periodicity = NRPPA_ResourceTypePeriodic__periodicity_slot2560;
+            break;
+          default:
+            AssertFatal(false, "illegal periodicity %d\n", resource_type->choice.periodic.periodicity);
+            break;
+        }
+        nrppa_periodic->offset = resource_type->choice.periodic.offset;
+      } else if (resource_type->present == NRPPA_RESOURCE_TYPE_PR_SEMI_PERSISTENT) {
+        nrppa_resourceType->present = NRPPA_ResourceType_PR_semi_persistent;
+        asn1cCalloc(nrppa_resourceType->choice.semi_persistent, nrppa_semi_persistent);
+        switch (resource_type->choice.semi_persistent.periodicity) {
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot1;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot2;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT4:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot4;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT5:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot5;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT8:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot8;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT10:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot10;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT16:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot16;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT20:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot20;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT32:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot32;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT40:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot40;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT64:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot64;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT80:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot80;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT160:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot160;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT320:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot320;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT640:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot640;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT1280:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot1280;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT2560:
+            nrppa_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistent__periodicity_slot2560;
+            break;
+          default:
+            AssertFatal(false, "illegal periodicity %d\n", resource_type->choice.semi_persistent.periodicity);
+            break;
+        }
+        nrppa_semi_persistent->offset = resource_type->choice.semi_persistent.offset;
+      } else if (resource_type->present == NRPPA_RESOURCE_TYPE_PR_APERIODIC) {
+        nrppa_resourceType->present = NRPPA_ResourceType_PR_aperiodic;
+        asn1cCalloc(nrppa_resourceType->choice.aperiodic, nrppa_aperiodic);
+        nrppa_aperiodic->aperiodicResourceType = resource_type->choice.aperiodic;
+      } else {
+        AssertFatal(false, "illegal resourceType %d\n", resource_type->present);
+      }
+
+      nrppa_srs_resource->sequenceId = srs_resource->sequence_id;
+    }
+  }
+
+  // optional: pos_srs_resource_list
+  if (in_config->pos_srs_resource_list) {
+    nrppa_pos_srs_resource_list_t *pos_srs_resource_list = in_config->pos_srs_resource_list;
+    uint32_t pos_srs_resource_list_length = pos_srs_resource_list->pos_srs_resource_list_length;
+    asn1cCalloc(out_config.posSRSResource_List, nrppa_posSRSResource_List);
+    for (int i = 0; i < pos_srs_resource_list_length; i++) {
+      asn1cSequenceAdd(nrppa_posSRSResource_List->list, NRPPA_PosSRSResource_Item_t, nrppa_pos_srs_resource);
+      nrppa_pos_srs_resource_item_t *pos_srs_resource = &pos_srs_resource_list->pos_srs_resource_item[i];
+      nrppa_pos_srs_resource->srs_PosResourceId = pos_srs_resource->srs_pos_resource_id;
+
+      nrppa_transmission_comb_pos_t *pos_srs_res_tx_comb = &pos_srs_resource->transmission_comb_pos;
+      switch (pos_srs_res_tx_comb->present) {
+        case NRPPA_TRANSMISSION_COMB_POS_PR_NOTHING:
+          nrppa_pos_srs_resource->transmissionCombPos.present = NRPPA_TransmissionCombPos_PR_NOTHING;
+          break;
+        case NRPPA_TRANSMISSION_COMB_POS_PR_N2:
+          nrppa_pos_srs_resource->transmissionCombPos.present = NRPPA_TransmissionCombPos_PR_n2;
+          asn1cCalloc(nrppa_pos_srs_resource->transmissionCombPos.choice.n2, nrppa_pos_srs_resource_n2);
+          nrppa_transmission_comb_pos_n2_t *pos_srs_resource_n2 = &pos_srs_res_tx_comb->choice.n2;
+          nrppa_pos_srs_resource_n2->combOffset_n2 = pos_srs_resource_n2->comb_offset_n2;
+          nrppa_pos_srs_resource_n2->cyclicShift_n2 = pos_srs_resource_n2->cyclic_shift_n2;
+          break;
+        case NRPPA_TRANSMISSION_COMB_POS_PR_N4:
+          nrppa_pos_srs_resource->transmissionCombPos.present = NRPPA_TransmissionCombPos_PR_n4;
+          asn1cCalloc(nrppa_pos_srs_resource->transmissionCombPos.choice.n4, nrppa_pos_srs_resource_n4);
+          nrppa_transmission_comb_pos_n4_t *pos_srs_resource_n4 = &pos_srs_res_tx_comb->choice.n4;
+          nrppa_pos_srs_resource_n4->combOffset_n4 = pos_srs_resource_n4->comb_offset_n4;
+          nrppa_pos_srs_resource_n4->cyclicShift_n4 = pos_srs_resource_n4->cyclic_shift_n4;
+          break;
+        case NRPPA_TRANSMISSION_COMB_POS_PR_N8:
+          nrppa_pos_srs_resource->transmissionCombPos.present = NRPPA_TransmissionCombPos_PR_n8;
+          asn1cCalloc(nrppa_pos_srs_resource->transmissionCombPos.choice.n8, nrppa_pos_srs_resource_n8);
+          nrppa_transmission_comb_pos_n8_t *pos_srs_resource_n8 = &pos_srs_res_tx_comb->choice.n8;
+          nrppa_pos_srs_resource_n8->combOffset_n8 = pos_srs_resource_n8->comb_offset_n8;
+          nrppa_pos_srs_resource_n8->cyclicShift_n8 = pos_srs_resource_n8->cyclic_shift_n8;
+          break;
+        default:
+          AssertFatal(false, "illegal transmissionComb %d\n", pos_srs_res_tx_comb->present);
+          break;
+      }
+
+      nrppa_pos_srs_resource->startPosition = pos_srs_resource->start_position;
+
+      switch (pos_srs_resource->nr_of_symbols) {
+        case NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N1:
+          nrppa_pos_srs_resource->nrofSymbols = NRPPA_PosSRSResource_Item__nrofSymbols_n1;
+          break;
+        case NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N2:
+          nrppa_pos_srs_resource->nrofSymbols = NRPPA_PosSRSResource_Item__nrofSymbols_n2;
+          break;
+        case NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N4:
+          nrppa_pos_srs_resource->nrofSymbols = NRPPA_PosSRSResource_Item__nrofSymbols_n4;
+          break;
+        case NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N8:
+          nrppa_pos_srs_resource->nrofSymbols = NRPPA_PosSRSResource_Item__nrofSymbols_n8;
+          break;
+        case NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N12:
+          nrppa_pos_srs_resource->nrofSymbols = NRPPA_PosSRSResource_Item__nrofSymbols_n12;
+          break;
+        default:
+          AssertFatal(false, "illegal number of symbols %d\n", pos_srs_resource->nr_of_symbols);
+          break;
+      }
+
+      nrppa_pos_srs_resource->freqDomainShift = pos_srs_resource->freq_domain_shift;
+      nrppa_pos_srs_resource->c_SRS = pos_srs_resource->c_srs;
+
+      switch (pos_srs_resource->group_or_sequence_hopping) {
+        case NRPPA_GROUPORSEQUENCEHOPPING_NOTHING:
+          nrppa_pos_srs_resource->groupOrSequenceHopping = NRPPA_PosSRSResource_Item__groupOrSequenceHopping_neither;
+          break;
+        case NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING:
+          nrppa_pos_srs_resource->groupOrSequenceHopping = NRPPA_PosSRSResource_Item__groupOrSequenceHopping_groupHopping;
+          break;
+        case NRPPA_GROUPORSEQUENCEHOPPING_SEQUENCEHOPPING:
+          nrppa_pos_srs_resource->groupOrSequenceHopping = NRPPA_PosSRSResource_Item__groupOrSequenceHopping_sequenceHopping;
+          break;
+        default:
+          AssertFatal(false, "illegal groupOrSequenceHopping %d\n", pos_srs_resource->group_or_sequence_hopping);
+          break;
+      }
+
+      nrppa_resource_type_pos_t *resource_type_pos = &pos_srs_resource->resource_type_pos;
+      NRPPA_ResourceTypePos_t *nrppa_resourceTypePos = &nrppa_pos_srs_resource->resourceTypePos;
+      if (resource_type_pos->present == NRPPA_RESOURCE_TYPE_POS_PR_NOTHING) {
+        nrppa_resourceTypePos->present = NRPPA_ResourceTypePos_PR_NOTHING;
+      } else if (resource_type_pos->present == NRPPA_RESOURCE_TYPE_POS_PR_PERIODIC) {
+        nrppa_resourceTypePos->present = NRPPA_ResourceTypePos_PR_periodic;
+        asn1cCalloc(nrppa_resourceTypePos->choice.periodic, nrppa_pos_periodic);
+        switch (resource_type_pos->choice.periodic.periodicity) {
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot1;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot2;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT4:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot4;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot5;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT8:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot8;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot10;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT16:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot16;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot20;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT32:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot32;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot40;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT64:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot64;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT80:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot80;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT160:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot160;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT320:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot320;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT640:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot640;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1280:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot1280;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2560:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot2560;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5120:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot5120;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10240:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot10240;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20480:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot20480;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40960:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot40960;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT81920:
+            nrppa_pos_periodic->periodicity = NRPPA_ResourceTypePeriodicPos__periodicity_slot81920;
+            break;
+          default:
+            AssertFatal(false, "illegal periodicity %d\n", resource_type_pos->choice.periodic.periodicity);
+            break;
+        }
+
+        nrppa_pos_periodic->offset = resource_type_pos->choice.periodic.offset;
+      } else if (resource_type_pos->present == NRPPA_RESOURCE_TYPE_POS_PR_SEMI_PERSISTENT) {
+        nrppa_resourceTypePos->present = NRPPA_ResourceTypePos_PR_semi_persistent;
+        asn1cCalloc(nrppa_resourceTypePos->choice.semi_persistent, nrppa_pos_semi_persistent);
+        switch (resource_type_pos->choice.semi_persistent.periodicity) {
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot1;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot2;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT4:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot4;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot5;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT8:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot8;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot10;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT16:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot16;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot20;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT32:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot32;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot40;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT64:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot64;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT80:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot80;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT160:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot160;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT320:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot320;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT640:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot640;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT1280:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot1280;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT2560:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot2560;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5120:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot5120;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT10240:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot10240;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT20480:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot20480;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT40960:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot40960;
+            break;
+          case NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT81920:
+            nrppa_pos_semi_persistent->periodicity = NRPPA_ResourceTypeSemi_persistentPos__periodicity_slot81920;
+            break;
+          default:
+            AssertFatal(false, "illegal periodicity %d\n", resource_type_pos->choice.semi_persistent.periodicity);
+            break;
+        }
+        nrppa_pos_semi_persistent->offset = resource_type_pos->choice.semi_persistent.offset;
+      } else if (resource_type_pos->present == NRPPA_RESOURCE_TYPE_POS_PR_APERIODIC) {
+        nrppa_resourceTypePos->present = NRPPA_ResourceTypePos_PR_aperiodic;
+        asn1cCalloc(nrppa_resourceTypePos->choice.aperiodic, nrppa_pos_aperiodic);
+        nrppa_pos_aperiodic->slotOffset = resource_type_pos->choice.aperiodic.slot_offset;
+      } else {
+        AssertFatal(false, "illegal resourceType %d\n", resource_type_pos->present);
+      }
+
+      nrppa_pos_srs_resource->sequenceId = pos_srs_resource->sequence_id;
+    }
+  }
+
+  // optional: srs_resource_set_list
+  if (in_config->srs_resource_set_list) {
+    nrppa_srs_resource_set_list_t *srs_resource_set_list = in_config->srs_resource_set_list;
+    uint32_t srs_resource_set_list_length = srs_resource_set_list->srs_resource_set_list_length;
+    asn1cCalloc(out_config.sRSResourceSet_List, nrppa_sRSResourceSet_List);
+    for (int i = 0; i < srs_resource_set_list_length; i++) {
+      asn1cSequenceAdd(nrppa_sRSResourceSet_List->list, NRPPA_SRSResourceSet_t, nrppa_srs_resource_set);
+      nrppa_srs_resource_set_t *srs_resource_set = &srs_resource_set_list->srs_resource_set[i];
+      nrppa_srs_resource_set->sRSResourceSetID = srs_resource_set->srs_resource_set_id;
+      uint8_t srs_resource_id_list_length = srs_resource_set->srs_resource_id_list.srs_resource_id_list_length;
+      for (int j = 0; j < srs_resource_id_list_length; j++) {
+        asn1cSequenceAdd(nrppa_srs_resource_set->sRSResourceID_List.list, NRPPA_SRSResourceID_t, nrppa_srs_resource_id);
+        *nrppa_srs_resource_id = srs_resource_set->srs_resource_id_list.srs_resource_id[j];
+      }
+
+      NRPPA_ResourceSetType_t *nrppa_resourceSetType = &nrppa_srs_resource_set->resourceSetType;
+      nrppa_resource_set_type_t *resource_set_type = &srs_resource_set->resource_set_type;
+      switch (resource_set_type->present) {
+        case NRPPA_RESOURCE_SET_TYPE_PR_NOTHING:
+          nrppa_resourceSetType->present = NRPPA_ResourceSetType_PR_NOTHING;
+          break;
+        case NRPPA_RESOURCE_SET_TYPE_PR_PERIODIC:
+          nrppa_resourceSetType->present = NRPPA_ResourceSetType_PR_periodic;
+          asn1cCalloc(nrppa_resourceSetType->choice.periodic, nrppa_periodic_set_type);
+          nrppa_periodic_set_type->periodicSet = resource_set_type->choice.periodic;
+          break;
+        case NRPPA_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT:
+          nrppa_resourceSetType->present = NRPPA_ResourceSetType_PR_semi_persistent;
+          asn1cCalloc(nrppa_resourceSetType->choice.semi_persistent, nrppa_semi_persistent_set_type);
+          nrppa_semi_persistent_set_type->semi_persistentSet = resource_set_type->choice.semi_persistent;
+          break;
+        case NRPPA_RESOURCE_SET_TYPE_PR_APERIODIC:
+          nrppa_resourceSetType->present = NRPPA_ResourceSetType_PR_aperiodic;
+          asn1cCalloc(nrppa_resourceSetType->choice.aperiodic, nrppa_aperiodic_set_type);
+          nrppa_aperiodic_set_type->sRSResourceTrigger = resource_set_type->choice.aperiodic.srs_resource_trigger;
+          nrppa_aperiodic_set_type->slotoffset = resource_set_type->choice.aperiodic.slot_offset;
+          break;
+        default:
+          AssertFatal(false, "illegal resource set type %d\n", resource_set_type->present);
+          break;
+      }
+    }
+  }
+
+  // optional: pos_srs_resource_set_list
+  if (in_config->pos_srs_resource_set_list) {
+    nrppa_pos_srs_resource_set_list_t *pos_srs_resource_set_list = in_config->pos_srs_resource_set_list;
+    uint32_t pos_srs_resource_set_list_length = pos_srs_resource_set_list->pos_srs_resource_set_list_length;
+    asn1cCalloc(out_config.posSRSResourceSet_List, nrppa_posSRSResourceSet_List);
+    for (int i = 0; i < pos_srs_resource_set_list_length; i++) {
+      asn1cSequenceAdd(nrppa_posSRSResourceSet_List->list, NRPPA_PosSRSResourceSet_Item_t, nrppa_pos_srs_resource_set);
+      nrppa_pos_srs_resource_set_item_t *pos_srs_resource_set = &pos_srs_resource_set_list->pos_srs_resource_set_item[i];
+      nrppa_pos_srs_resource_set->possrsResourceSetID = pos_srs_resource_set->pos_srs_resource_set_id;
+      uint8_t pos_srs_resource_id_list_length = pos_srs_resource_set->pos_srs_resource_id_list.pos_srs_resource_id_list_length;
+      for (int j = 0; j < pos_srs_resource_id_list_length; j++) {
+        asn1cSequenceAdd(nrppa_pos_srs_resource_set->possRSResourceID_List.list,
+                         NRPPA_SRSPosResourceID_t,
+                         nrppa_pos_srs_resource_id);
+        *nrppa_pos_srs_resource_id = pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id[j];
+      }
+
+      NRPPA_PosResourceSetType_t *nrppa_posresourceSetType = &nrppa_pos_srs_resource_set->posresourceSetType;
+      nrppa_pos_resource_set_type_t *pos_resource_set_type = &pos_srs_resource_set->pos_resource_set_type;
+      switch (pos_resource_set_type->present) {
+        case NRPPA_POS_RESOURCE_SET_TYPE_PR_NOTHING:
+          nrppa_posresourceSetType->present = NRPPA_PosResourceSetType_PR_NOTHING;
+          break;
+        case NRPPA_POS_RESOURCE_SET_TYPE_PR_PERIODIC:
+          nrppa_posresourceSetType->present = NRPPA_PosResourceSetType_PR_periodic;
+          asn1cCalloc(nrppa_posresourceSetType->choice.periodic, nrppa_pos_periodic_set_type);
+          nrppa_pos_periodic_set_type->posperiodicSet = pos_resource_set_type->choice.periodic;
+          break;
+        case NRPPA_POS_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT:
+          nrppa_posresourceSetType->present = NRPPA_PosResourceSetType_PR_semi_persistent;
+          asn1cCalloc(nrppa_posresourceSetType->choice.semi_persistent, nrppa_pos_semi_persistent_set_type);
+          nrppa_pos_semi_persistent_set_type->possemi_persistentSet = pos_resource_set_type->choice.semi_persistent;
+          break;
+        case NRPPA_POS_RESOURCE_SET_TYPE_PR_APERIODIC:
+          nrppa_posresourceSetType->present = NRPPA_PosResourceSetType_PR_aperiodic;
+          asn1cCalloc(nrppa_posresourceSetType->choice.aperiodic, nrppa_pos_aperiodic_set_type);
+          nrppa_pos_aperiodic_set_type->sRSResourceTrigger = pos_resource_set_type->choice.srs_resource;
+          break;
+        default:
+          AssertFatal(false, "illegal resource set type pos %d\n", pos_resource_set_type->present);
+          break;
+      }
+    }
+  }
+  return out_config;
+}
+
+static NRPPA_SRSCarrier_List_Item_t encode_srs_carrier_list_item(const nrppa_srs_carrier_list_item_t *in_item)
+{
+  NRPPA_SRSCarrier_List_Item_t out_item = {0};
+  // pointA
+  out_item.pointA = in_item->pointA;
+
+  // Uplink Channel BW-PerSCS-List
+  const nrppa_uplink_channel_bw_per_scs_list_t *uplink_channel_bw_per_scs_list = &in_item->uplink_channel_bw_per_scs_list;
+  NRPPA_UplinkChannelBW_PerSCS_List_t *nrppa_uplink_channel_bw_per_scs_list = &out_item.uplinkChannelBW_PerSCS_List;
+
+  uint32_t scs_specific_carrier_list_length = uplink_channel_bw_per_scs_list->scs_specific_carrier_list_length;
+  for (int i = 0; i < scs_specific_carrier_list_length; i++) {
+    asn1cSequenceAdd(nrppa_uplink_channel_bw_per_scs_list->list, NRPPA_SCS_SpecificCarrier_t, nrppa_scs_specific_carrier);
+    nrppa_scs_specific_carrier_t *scs_specific_carrier = &uplink_channel_bw_per_scs_list->scs_specific_carrier[i];
+    // offset to carrier
+    nrppa_scs_specific_carrier->offsetToCarrier = scs_specific_carrier->offset_to_carrier;
+    // subcarrier spacing
+    switch (scs_specific_carrier->subcarrier_spacing) {
+      case NRPPA_SUBCARRIER_SPACING_15KHZ:
+        nrppa_scs_specific_carrier->subcarrierSpacing = NRPPA_SCS_SpecificCarrier__subcarrierSpacing_kHz15;
+        break;
+      case NRPPA_SUBCARRIER_SPACING_30KHZ:
+        nrppa_scs_specific_carrier->subcarrierSpacing = NRPPA_SCS_SpecificCarrier__subcarrierSpacing_kHz30;
+        break;
+      case NRPPA_SUBCARRIER_SPACING_60KHZ:
+        nrppa_scs_specific_carrier->subcarrierSpacing = NRPPA_SCS_SpecificCarrier__subcarrierSpacing_kHz60;
+        break;
+      case NRPPA_SUBCARRIER_SPACING_120KHZ:
+        nrppa_scs_specific_carrier->subcarrierSpacing = NRPPA_SCS_SpecificCarrier__subcarrierSpacing_kHz120;
+        break;
+      default:
+        AssertFatal(false, "illegal subcarrier spacing %d\n", scs_specific_carrier->subcarrier_spacing);
+        break;
+    }
+    // carrier bandwidth
+    nrppa_scs_specific_carrier->carrierBandwidth = scs_specific_carrier->carrier_bandwidth;
+  }
+
+  // Active UL BWP
+  NRPPA_ActiveULBWP_t *nrppa_active_ul_bwp = &out_item.activeULBWP;
+  const nrppa_active_ul_bwp_t *active_ul_bwp = &in_item->active_ul_bwp;
+
+  // location and bandwidth
+  nrppa_active_ul_bwp->locationAndBandwidth = active_ul_bwp->location_and_bandwidth;
+  // subcarrier spacing
+  switch (active_ul_bwp->subcarrier_spacing) {
+    case NRPPA_SUBCARRIER_SPACING_15KHZ:
+      nrppa_active_ul_bwp->subcarrierSpacing = NRPPA_ActiveULBWP__subcarrierSpacing_kHz15;
+      break;
+    case NRPPA_SUBCARRIER_SPACING_30KHZ:
+      nrppa_active_ul_bwp->subcarrierSpacing = NRPPA_ActiveULBWP__subcarrierSpacing_kHz30;
+      break;
+    case NRPPA_SUBCARRIER_SPACING_60KHZ:
+      nrppa_active_ul_bwp->subcarrierSpacing = NRPPA_ActiveULBWP__subcarrierSpacing_kHz60;
+      break;
+    case NRPPA_SUBCARRIER_SPACING_120KHZ:
+      nrppa_active_ul_bwp->subcarrierSpacing = NRPPA_ActiveULBWP__subcarrierSpacing_kHz120;
+      break;
+    default:
+      AssertFatal(false, "illegal subcarrier spacing %d\n", active_ul_bwp->subcarrier_spacing);
+      break;
+  }
+
+  // cyclic prefix
+  if (active_ul_bwp->cyclic_prefix == NRPPA_CP_TYPE_NORMAL)
+    nrppa_active_ul_bwp->cyclicPrefix = NRPPA_ActiveULBWP__cyclicPrefix_normal;
+  else
+    nrppa_active_ul_bwp->cyclicPrefix = NRPPA_ActiveULBWP__cyclicPrefix_extended;
+
+  // Tx Direct Current Location
+  nrppa_active_ul_bwp->txDirectCurrentLocation = active_ul_bwp->tx_direct_current_location;
+
+  // SRS Config
+  const nrppa_srs_config_t *sRSConfig = &active_ul_bwp->srs_config;
+  nrppa_active_ul_bwp->sRSConfig = encode_srs_config(sRSConfig);
+  return out_item;
+}
+
+NRPPA_SRSCarrier_List_t encode_srs_carrier_list_nrppa(const nrppa_srs_carrier_list_t *in_list)
+{
+  NRPPA_SRSCarrier_List_t out_list = {0};
+  uint32_t list_len = in_list->srs_carrier_list_length;
+  for (int i = 0; i < list_len; i++) {
+    asn1cSequenceAdd(out_list.list, NRPPA_SRSCarrier_List_Item_t, out_item);
+    nrppa_srs_carrier_list_item_t *in_item = &in_list->srs_carrier_list_item[i];
+    *out_item = encode_srs_carrier_list_item(in_item);
+  }
+  return out_list;
+}
+
+static void free_srs_carrier_list(nrppa_srs_carrier_list_t *srs_carrier_list)
+{
+  uint32_t srs_carrier_list_len = srs_carrier_list->srs_carrier_list_length;
+  for (int i = 0; i < srs_carrier_list_len; i++) {
+    nrppa_srs_carrier_list_item_t *srs_carrier_list_item = &srs_carrier_list->srs_carrier_list_item[i];
+    free(srs_carrier_list_item->uplink_channel_bw_per_scs_list.scs_specific_carrier);
+
+    nrppa_active_ul_bwp_t *active_ul_bwp = &srs_carrier_list_item->active_ul_bwp;
+    nrppa_srs_config_t *sRSConfig = &active_ul_bwp->srs_config;
+    if (sRSConfig->srs_resource_list) {
+      nrppa_srs_resource_list_t *srs_resource_list = sRSConfig->srs_resource_list;
+      free(srs_resource_list->srs_resource);
+      free(sRSConfig->srs_resource_list);
+    }
+    if (sRSConfig->pos_srs_resource_list) {
+      nrppa_pos_srs_resource_list_t *pos_srs_resource_list = sRSConfig->pos_srs_resource_list;
+      free(pos_srs_resource_list->pos_srs_resource_item);
+      free(sRSConfig->pos_srs_resource_list);
+    }
+    if (sRSConfig->srs_resource_set_list) {
+      nrppa_srs_resource_set_list_t *srs_resource_set_list = sRSConfig->srs_resource_set_list;
+      uint32_t srs_resource_set_list_length = srs_resource_set_list->srs_resource_set_list_length;
+      for (int j = 0; j < srs_resource_set_list_length; j++) {
+        nrppa_srs_resource_set_t *srs_resource_set = &srs_resource_set_list->srs_resource_set[j];
+        free(srs_resource_set->srs_resource_id_list.srs_resource_id);
+      }
+      free(srs_resource_set_list->srs_resource_set);
+      free(sRSConfig->srs_resource_set_list);
+    }
+    if (sRSConfig->pos_srs_resource_set_list) {
+      nrppa_pos_srs_resource_set_list_t *pos_srs_resource_set_list = sRSConfig->pos_srs_resource_set_list;
+      uint32_t pos_srs_resource_set_list_length = pos_srs_resource_set_list->pos_srs_resource_set_list_length;
+      for (int j = 0; j < pos_srs_resource_set_list_length; j++) {
+        nrppa_pos_srs_resource_set_item_t *pos_srs_resource_set = &pos_srs_resource_set_list->pos_srs_resource_set_item[j];
+        free(pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id);
+      }
+      free(pos_srs_resource_set_list->pos_srs_resource_set_item);
+      free(sRSConfig->pos_srs_resource_set_list);
+    }
+  }
+  free(srs_carrier_list->srs_carrier_list_item);
+}
+
+void free_positioning_information_response(nrppa_positioning_information_resp_t *msg)
+{
+  /* SRS Configuration (O) */
+  if (msg->srs_configuration) {
+    nrppa_srs_carrier_list_t *srs_carrier_list = &msg->srs_configuration->srs_carrier_list;
+    free_srs_carrier_list(srs_carrier_list);
+    free(msg->srs_configuration);
+  }
+}
+
 int nrppa_gNB_handle_trp_information_request(nrppa_gnb_ue_info_t *nrppa_msg_info, const NRPPA_NRPPA_PDU_t *pdu)
 {
   LOG_I(NRPPA, "Processing Received TRP Information Request \n");
@@ -441,4 +1163,84 @@ int nrppa_gNB_handle_positioning_information_request(nrppa_gnb_ue_info_t *nrppa_
   itti_send_msg_to_task(TASK_RRC_GNB, 0, msg);
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NRPPA_NRPPA_PDU, &pdu);
   return 0;
+}
+
+int nrppa_gNB_positioning_information_response(instance_t instance, MessageDef *msg_p)
+{
+  DevAssert(msg_p);
+  nrppa_positioning_information_resp_t *resp = &NRPPA_POSITIONING_INFORMATION_RESP(msg_p);
+  nrppa_gNB_ue_context_t *ue_info = nrppa_detach_ue_context(resp->transaction_id);
+
+  if (ue_info->gNB_ue_ngap_id <= 0 && ue_info->amf_ue_ngap_id <= 0) {
+    LOG_E(NRPPA, "Illegal gNB_ue_ngap_id %d and amf_ue_ngap_id %ld\n", ue_info->gNB_ue_ngap_id, ue_info->amf_ue_ngap_id);
+    free_positioning_information_response(resp);
+    nrppa_free_ue_context(ue_info);
+    return -1;
+  }
+
+  LOG_I(NRPPA,
+        "Received Positioning Information Response info from RRC with transaction_id = %u and gNB_ue_ngap_id %u\n",
+        ue_info->transaction_id,
+        ue_info->gNB_ue_ngap_id);
+
+  // Prepare NRPPA TRP Information transfer Response
+  NRPPA_NRPPA_PDU_t pdu = {0};
+
+  // IE: 9.2.3 Message Type : mandatory
+  pdu.present = NRPPA_NRPPA_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu.choice.successfulOutcome, head);
+  head->procedureCode = NRPPA_ProcedureCode_id_positioningInformationExchange;
+  head->criticality = NRPPA_Criticality_reject;
+  head->value.present = NRPPA_SuccessfulOutcome__value_PR_PositioningInformationResponse;
+
+  // IE 9.2.4 nrppatransactionID : mandatory
+  head->nrppatransactionID = resp->transaction_id;
+  NRPPA_PositioningInformationResponse_t *out = &head->value.choice.PositioningInformationResponse;
+
+  // IE SRS Configuration : optional
+  {
+    if (resp->srs_configuration) {
+      asn1cSequenceAdd(out->protocolIEs.list, NRPPA_PositioningInformationResponse_IEs_t, ie);
+      ie->id = NRPPA_ProtocolIE_ID_id_SRSConfiguration;
+      ie->criticality = NRPPA_Criticality_ignore;
+      ie->value.present = NRPPA_PositioningInformationResponse_IEs__value_PR_SRSConfiguration;
+      nrppa_srs_carrier_list_t *srs_carrier_list = &resp->srs_configuration->srs_carrier_list;
+      ie->value.choice.SRSConfiguration.sRSCarrier_List = encode_srs_carrier_list_nrppa(srs_carrier_list);
+    }
+  }
+
+  free_positioning_information_response(resp);
+
+  LOG_I(NRPPA, "Calling encoder for Positioning Information Response \n");
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NRPPA_NRPPA_PDU, &pdu);
+  }
+
+  // Encode NRPPA message
+  uint8_t *buffer = NULL;
+  uint32_t length = 0;
+  if (nrppa_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {
+    LOG_E(NRPPA, "Failed to encode Uplink NRPPa PositioningInformationResponse\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NRPPA_NRPPA_PDU, &pdu);
+    return -1;
+  }
+
+  MessageDef *msg = itti_alloc_new_message(TASK_NRPPA, 0, NGAP_UPLINKUEASSOCIATEDNRPPA);
+  ngap_uplink_ue_associated_nrppa_t *ULNRPPA = &NGAP_UPLINKUEASSOCIATEDNRPPA(msg);
+
+  ULNRPPA->gNB_ue_ngap_id = ue_info->gNB_ue_ngap_id;
+  ULNRPPA->amf_ue_ngap_id = ue_info->amf_ue_ngap_id;
+
+  // Routing ID
+  ULNRPPA->routing_id = create_byte_array(ue_info->routing_id.len, ue_info->routing_id.buf);
+
+  // NRPPA PDU
+  ULNRPPA->nrppa_pdu = create_byte_array(length, buffer);
+
+  // Forward the NRPPA PDU to NGAP
+  itti_send_msg_to_task(TASK_NGAP, instance, msg);
+  nrppa_free_ue_context(ue_info);
+  free(buffer);
+  return length;
 }

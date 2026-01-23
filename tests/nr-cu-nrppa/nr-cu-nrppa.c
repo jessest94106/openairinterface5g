@@ -148,6 +148,289 @@ static nrppa_trp_information_resp_t fill_trp_resp(uint8_t transaction_id)
   return resp;
 }
 
+static nrppa_positioning_information_resp_t fill_position_information_resp(uint16_t transaction_id)
+{
+  nrppa_positioning_information_resp_t resp = {0};
+  resp.transaction_id = transaction_id;
+  resp.srs_configuration = calloc_or_fail(1, sizeof(*resp.srs_configuration));
+  nrppa_srs_carrier_list_t *srs_carrier_list = &resp.srs_configuration->srs_carrier_list;
+  uint32_t srs_carrier_list_len = 2;
+  srs_carrier_list->srs_carrier_list_length = srs_carrier_list_len;
+  srs_carrier_list->srs_carrier_list_item = calloc_or_fail(srs_carrier_list_len, sizeof(*srs_carrier_list->srs_carrier_list_item));
+  for (int i = 0; i < srs_carrier_list_len; i++) {
+    nrppa_srs_carrier_list_item_t *srs_carrier_list_item = &srs_carrier_list->srs_carrier_list_item[i];
+    // pointA
+    srs_carrier_list_item->pointA = 87641 + i;
+
+    // Uplink Channel BW-PerSCS-List
+    nrppa_uplink_channel_bw_per_scs_list_t *uplink_channel_bw_per_scs_list = &srs_carrier_list_item->uplink_channel_bw_per_scs_list;
+
+    uint32_t scs_specific_carrier_list_length = 3;
+    uplink_channel_bw_per_scs_list->scs_specific_carrier_list_length = scs_specific_carrier_list_length;
+    uplink_channel_bw_per_scs_list->scs_specific_carrier =
+        calloc_or_fail(scs_specific_carrier_list_length, sizeof(*uplink_channel_bw_per_scs_list->scs_specific_carrier));
+    for (int j = 0; j < scs_specific_carrier_list_length; j++) {
+      nrppa_scs_specific_carrier_t *scs_specific_carrier = &uplink_channel_bw_per_scs_list->scs_specific_carrier[j];
+      // offset to carrier
+      scs_specific_carrier->offset_to_carrier = 100 + i + j;
+      // subcarrier spacing
+      scs_specific_carrier->subcarrier_spacing = NRPPA_SUBCARRIER_SPACING_30KHZ;
+      // carrier bandwidth
+      scs_specific_carrier->carrier_bandwidth = 106 + i + j;
+    }
+
+    // Active UL BWP
+    nrppa_active_ul_bwp_t *active_ul_bwp = &srs_carrier_list_item->active_ul_bwp;
+
+    // location and bandwidth
+    active_ul_bwp->location_and_bandwidth = 2775 + i;
+    // subcarrier spacing
+    active_ul_bwp->subcarrier_spacing = NRPPA_SUBCARRIER_SPACING_30KHZ;
+    // cyclic prefix
+    active_ul_bwp->cyclic_prefix = NRPPA_CP_TYPE_NORMAL;
+    // Tx Direct Current Location
+    active_ul_bwp->tx_direct_current_location = 10 + i;
+
+    // SRS Config
+    nrppa_srs_config_t *sRSConfig = &active_ul_bwp->srs_config;
+
+    // srs_resource_list
+    sRSConfig->srs_resource_list = calloc_or_fail(1, sizeof(*sRSConfig->srs_resource_list));
+    nrppa_srs_resource_list_t *srs_resource_list = sRSConfig->srs_resource_list;
+    uint32_t srs_resource_list_length = 3;
+    srs_resource_list->srs_resource_list_length = srs_resource_list_length;
+    srs_resource_list->srs_resource = calloc_or_fail(srs_resource_list_length, sizeof(*srs_resource_list->srs_resource));
+
+    // SRS resource config 1 : periodic
+    nrppa_srs_resource_t *srs_resource = &srs_resource_list->srs_resource[0];
+    srs_resource->srs_resource_id = 22;
+    srs_resource->nr_of_srs_ports = NRPPA_SRS_NUMBER_OF_PORTS_N2;
+    srs_resource->transmission_comb.present = NRPPA_TRANSMISSION_COMB_PR_N2;
+    srs_resource->transmission_comb.choice.n2.comb_offset_n2 = 1;
+    srs_resource->transmission_comb.choice.n2.cyclic_shift_n2 = 3;
+    srs_resource->start_position = 8;
+    srs_resource->nr_of_symbols = NRPPA_SRS_NUMBER_OF_SYMBOLS_N4;
+    srs_resource->repetition_factor = NRPPA_SRS_REPETITION_FACTOR_RF2;
+    srs_resource->freq_domain_position = 32;
+    srs_resource->freq_domain_shift = 108;
+    srs_resource->c_srs = 31;
+    srs_resource->b_srs = 1;
+    srs_resource->b_hop = 3;
+    srs_resource->group_or_sequence_hopping = NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING;
+    srs_resource->resource_type.present = NRPPA_RESOURCE_TYPE_PR_PERIODIC;
+
+    nrppa_resource_type_periodic_t *periodic = &srs_resource->resource_type.choice.periodic;
+    periodic->periodicity = NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT16;
+    periodic->offset = 1000;
+    srs_resource->sequence_id = 18;
+
+    // SRS resource config 2 : semi-persistent
+    srs_resource = &srs_resource_list->srs_resource[1];
+    srs_resource->srs_resource_id = 24;
+    srs_resource->nr_of_srs_ports = NRPPA_SRS_NUMBER_OF_PORTS_N4;
+    srs_resource->transmission_comb.present = NRPPA_TRANSMISSION_COMB_PR_N4;
+    srs_resource->transmission_comb.choice.n2.comb_offset_n2 = 3;
+    srs_resource->transmission_comb.choice.n2.cyclic_shift_n2 = 5;
+    srs_resource->start_position = 8;
+    srs_resource->nr_of_symbols = NRPPA_SRS_NUMBER_OF_SYMBOLS_N2;
+    srs_resource->repetition_factor = NRPPA_SRS_REPETITION_FACTOR_RF2;
+    srs_resource->freq_domain_position = 32;
+    srs_resource->freq_domain_shift = 108;
+    srs_resource->c_srs = 31;
+    srs_resource->b_srs = 1;
+    srs_resource->b_hop = 3;
+    srs_resource->group_or_sequence_hopping = NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING;
+    srs_resource->resource_type.present = NRPPA_RESOURCE_TYPE_PR_SEMI_PERSISTENT;
+
+    srs_resource->resource_type.present = NRPPA_RESOURCE_TYPE_PR_SEMI_PERSISTENT;
+    nrppa_resource_type_semi_persistent_t *semi_persistent = &srs_resource->resource_type.choice.semi_persistent;
+    semi_persistent->periodicity = NRPPA_SRS_RESOURCE_TYPE_PERIODICITY_SLOT40;
+    semi_persistent->offset = 1000;
+    srs_resource->sequence_id = 12;
+
+    // SRS resource config 2 : aperiodic
+    srs_resource = &srs_resource_list->srs_resource[2];
+    srs_resource->srs_resource_id = 26;
+    srs_resource->nr_of_srs_ports = NRPPA_SRS_NUMBER_OF_PORTS_N2;
+    srs_resource->transmission_comb.present = NRPPA_TRANSMISSION_COMB_PR_N2;
+    srs_resource->transmission_comb.choice.n2.comb_offset_n2 = 1;
+    srs_resource->transmission_comb.choice.n2.cyclic_shift_n2 = 3;
+    srs_resource->start_position = 8;
+    srs_resource->nr_of_symbols = NRPPA_SRS_NUMBER_OF_SYMBOLS_N4;
+    srs_resource->repetition_factor = NRPPA_SRS_REPETITION_FACTOR_RF2;
+    srs_resource->freq_domain_position = 32;
+    srs_resource->freq_domain_shift = 108;
+    srs_resource->c_srs = 31;
+    srs_resource->b_srs = 1;
+    srs_resource->b_hop = 3;
+    srs_resource->group_or_sequence_hopping = NRPPA_GROUPORSEQUENCEHOPPING_SEQUENCEHOPPING;
+    srs_resource->resource_type.present = NRPPA_RESOURCE_TYPE_PR_APERIODIC;
+    // set aperiodic = 0 to enable
+    srs_resource->resource_type.choice.aperiodic = 0;
+    srs_resource->sequence_id = 10;
+
+    // optional: pos_srs_resource_list
+    sRSConfig->pos_srs_resource_list = calloc_or_fail(1, sizeof(*sRSConfig->pos_srs_resource_list));
+    nrppa_pos_srs_resource_list_t *pos_srs_resource_list = sRSConfig->pos_srs_resource_list;
+    uint32_t pos_srs_resource_list_length = 3;
+    pos_srs_resource_list->pos_srs_resource_list_length = pos_srs_resource_list_length;
+    pos_srs_resource_list->pos_srs_resource_item =
+        calloc_or_fail(pos_srs_resource_list_length, sizeof(*pos_srs_resource_list->pos_srs_resource_item));
+
+    // periodic
+    nrppa_pos_srs_resource_item_t *pos_srs_resource = &pos_srs_resource_list->pos_srs_resource_item[0];
+    pos_srs_resource->srs_pos_resource_id = 12;
+    pos_srs_resource->transmission_comb_pos.present = NRPPA_TRANSMISSION_COMB_POS_PR_N2;
+    pos_srs_resource->transmission_comb_pos.choice.n2.comb_offset_n2 = 1;
+    pos_srs_resource->transmission_comb_pos.choice.n2.cyclic_shift_n2 = 4;
+    pos_srs_resource->start_position = 9;
+    pos_srs_resource->nr_of_symbols = NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N8;
+    pos_srs_resource->freq_domain_shift = 100;
+    pos_srs_resource->c_srs = 20;
+    pos_srs_resource->group_or_sequence_hopping = NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING;
+    pos_srs_resource->resource_type_pos.present = NRPPA_RESOURCE_TYPE_POS_PR_PERIODIC;
+    pos_srs_resource->resource_type_pos.choice.periodic.periodicity = NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5;
+    pos_srs_resource->resource_type_pos.choice.periodic.offset = 10;
+    pos_srs_resource->sequence_id = 1;
+
+    // semi-persistent
+    pos_srs_resource = &pos_srs_resource_list->pos_srs_resource_item[1];
+    pos_srs_resource->srs_pos_resource_id = 13;
+    pos_srs_resource->transmission_comb_pos.present = NRPPA_TRANSMISSION_COMB_POS_PR_N4;
+    pos_srs_resource->transmission_comb_pos.choice.n4.comb_offset_n4 = 3;
+    pos_srs_resource->transmission_comb_pos.choice.n4.cyclic_shift_n4 = 5;
+    pos_srs_resource->start_position = 12;
+    pos_srs_resource->nr_of_symbols = NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N12;
+    pos_srs_resource->freq_domain_shift = 100;
+    pos_srs_resource->c_srs = 20;
+    pos_srs_resource->group_or_sequence_hopping = NRPPA_GROUPORSEQUENCEHOPPING_GROUPHOPPING;
+    pos_srs_resource->resource_type_pos.present = NRPPA_RESOURCE_TYPE_POS_PR_SEMI_PERSISTENT;
+    pos_srs_resource->resource_type_pos.choice.semi_persistent.periodicity = NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT32;
+    pos_srs_resource->resource_type_pos.choice.semi_persistent.offset = 5;
+    pos_srs_resource->sequence_id = 2;
+
+    // aperiodic
+    pos_srs_resource = &pos_srs_resource_list->pos_srs_resource_item[2];
+    pos_srs_resource->srs_pos_resource_id = 14;
+    pos_srs_resource->transmission_comb_pos.present = NRPPA_TRANSMISSION_COMB_POS_PR_N8;
+    pos_srs_resource->transmission_comb_pos.choice.n8.comb_offset_n8 = 5;
+    pos_srs_resource->transmission_comb_pos.choice.n8.cyclic_shift_n8 = 2;
+    pos_srs_resource->start_position = 9;
+    pos_srs_resource->nr_of_symbols = NRPPA_SRS_RESOURCE_ITEM_NUMBER_OF_SYMBOLS_N4;
+    pos_srs_resource->freq_domain_shift = 100;
+    pos_srs_resource->c_srs = 20;
+    pos_srs_resource->group_or_sequence_hopping = NRPPA_GROUPORSEQUENCEHOPPING_SEQUENCEHOPPING;
+    pos_srs_resource->resource_type_pos.present = NRPPA_RESOURCE_TYPE_POS_PR_APERIODIC;
+    pos_srs_resource->resource_type_pos.choice.periodic.periodicity = NRPPA_SRS_RESOURCE_TYPE_POS_PERIODICITY_SLOT5;
+    pos_srs_resource->resource_type_pos.choice.aperiodic.slot_offset = 31;
+    pos_srs_resource->sequence_id = 3;
+
+    // optional: srs_resource_set_list
+    sRSConfig->srs_resource_set_list = calloc_or_fail(1, sizeof(*sRSConfig->srs_resource_set_list));
+    nrppa_srs_resource_set_list_t *srs_resource_set_list = sRSConfig->srs_resource_set_list;
+    uint32_t srs_resource_set_list_length = 3;
+    srs_resource_set_list->srs_resource_set_list_length = srs_resource_set_list_length;
+    srs_resource_set_list->srs_resource_set =
+        calloc_or_fail(srs_resource_set_list_length, sizeof(*srs_resource_set_list->srs_resource_set));
+
+    // periodic
+    nrppa_srs_resource_set_t *srs_resource_set = &srs_resource_set_list->srs_resource_set[0];
+    srs_resource_set->srs_resource_set_id = 0;
+    uint8_t srs_resource_id_list_length = 5;
+    srs_resource_set->srs_resource_id_list.srs_resource_id_list_length = srs_resource_id_list_length;
+    srs_resource_set->srs_resource_id_list.srs_resource_id =
+        calloc_or_fail(srs_resource_id_list_length, sizeof(*srs_resource_set->srs_resource_id_list.srs_resource_id));
+    for (int k = 0; k < srs_resource_id_list_length; k++) {
+      srs_resource_set->srs_resource_id_list.srs_resource_id[k] = k;
+    }
+    srs_resource_set->resource_set_type.present = NRPPA_RESOURCE_SET_TYPE_PR_PERIODIC;
+    // set periodic = 0 to enable
+    srs_resource_set->resource_set_type.choice.periodic = 0;
+
+    // semi-persistent
+    srs_resource_set = &srs_resource_set_list->srs_resource_set[1];
+    srs_resource_set->srs_resource_set_id = 1;
+    srs_resource_id_list_length = 5;
+    srs_resource_set->srs_resource_id_list.srs_resource_id_list_length = srs_resource_id_list_length;
+    srs_resource_set->srs_resource_id_list.srs_resource_id =
+        calloc_or_fail(srs_resource_id_list_length, sizeof(srs_resource_set->srs_resource_id_list.srs_resource_id));
+    for (int k = 0; k < srs_resource_id_list_length; k++) {
+      srs_resource_set->srs_resource_id_list.srs_resource_id[k] = k;
+    }
+    srs_resource_set->resource_set_type.present = NRPPA_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT;
+    // set semi_persistent = 0 to enable
+    srs_resource_set->resource_set_type.choice.semi_persistent = 0;
+
+    // aperiodic
+    srs_resource_set = &srs_resource_set_list->srs_resource_set[2];
+    srs_resource_set->srs_resource_set_id = 2;
+    srs_resource_id_list_length = 5;
+    srs_resource_set->srs_resource_id_list.srs_resource_id_list_length = srs_resource_id_list_length;
+    srs_resource_set->srs_resource_id_list.srs_resource_id =
+        calloc_or_fail(srs_resource_id_list_length, sizeof(*srs_resource_set->srs_resource_id_list.srs_resource_id));
+    for (int k = 0; k < srs_resource_id_list_length; k++) {
+      srs_resource_set->srs_resource_id_list.srs_resource_id[k] = k;
+    }
+
+    srs_resource_set->resource_set_type.present = NRPPA_RESOURCE_SET_TYPE_PR_APERIODIC;
+    srs_resource_set->resource_set_type.choice.aperiodic.srs_resource_trigger = 2;
+    srs_resource_set->resource_set_type.choice.aperiodic.slot_offset = 20;
+
+    // optional: pos_srs_resource_set_list
+    sRSConfig->pos_srs_resource_set_list = calloc_or_fail(1, sizeof(*sRSConfig->pos_srs_resource_set_list));
+    nrppa_pos_srs_resource_set_list_t *pos_srs_resource_set_list = sRSConfig->pos_srs_resource_set_list;
+    uint32_t pos_srs_resource_set_list_length = 3;
+    pos_srs_resource_set_list->pos_srs_resource_set_list_length = pos_srs_resource_set_list_length;
+    pos_srs_resource_set_list->pos_srs_resource_set_item =
+        calloc_or_fail(pos_srs_resource_set_list_length, sizeof(*pos_srs_resource_set_list->pos_srs_resource_set_item));
+
+    // periodic
+    nrppa_pos_srs_resource_set_item_t *pos_srs_resource_set = &pos_srs_resource_set_list->pos_srs_resource_set_item[0];
+    pos_srs_resource_set->pos_srs_resource_set_id = 0;
+    uint8_t pos_srs_resource_id_list_length = 5;
+    pos_srs_resource_set->pos_srs_resource_id_list.pos_srs_resource_id_list_length = pos_srs_resource_id_list_length;
+    pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id =
+        calloc_or_fail(pos_srs_resource_id_list_length,
+                       sizeof(*pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id));
+    for (int k = 0; k < pos_srs_resource_id_list_length; k++) {
+      pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id[k] = k;
+    }
+    pos_srs_resource_set->pos_resource_set_type.present = NRPPA_POS_RESOURCE_SET_TYPE_PR_PERIODIC;
+    // set periodic = 0 to enable
+    pos_srs_resource_set->pos_resource_set_type.choice.periodic = 0;
+
+    // semi-persistent
+    pos_srs_resource_set = &pos_srs_resource_set_list->pos_srs_resource_set_item[1];
+    pos_srs_resource_set->pos_srs_resource_set_id = 1;
+    pos_srs_resource_id_list_length = 5;
+    pos_srs_resource_set->pos_srs_resource_id_list.pos_srs_resource_id_list_length = pos_srs_resource_id_list_length;
+    pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id =
+        calloc_or_fail(pos_srs_resource_id_list_length,
+                       sizeof(*pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id));
+    for (int k = 0; k < pos_srs_resource_id_list_length; k++) {
+      pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id[k] = k;
+    }
+    pos_srs_resource_set->pos_resource_set_type.present = NRPPA_POS_RESOURCE_SET_TYPE_PR_SEMI_PERSISTENT;
+    // set semi_persistent = 0 to enable
+    pos_srs_resource_set->pos_resource_set_type.choice.semi_persistent = 0;
+
+    // aperiodic
+    pos_srs_resource_set = &pos_srs_resource_set_list->pos_srs_resource_set_item[2];
+    pos_srs_resource_set->pos_srs_resource_set_id = 2;
+    pos_srs_resource_id_list_length = 5;
+    pos_srs_resource_set->pos_srs_resource_id_list.pos_srs_resource_id_list_length = pos_srs_resource_id_list_length;
+    pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id =
+        calloc_or_fail(pos_srs_resource_id_list_length,
+                       sizeof(*pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id));
+    for (int k = 0; k < pos_srs_resource_id_list_length; k++) {
+      pos_srs_resource_set->pos_srs_resource_id_list.srs_pos_resource_id[k] = k;
+    }
+    pos_srs_resource_set->pos_resource_set_type.present = NRPPA_POS_RESOURCE_SET_TYPE_PR_APERIODIC;
+    pos_srs_resource_set->pos_resource_set_type.choice.srs_resource = 3;
+  }
+  return resp;
+}
+
 // Initializing UE NAS Context with simulated SIM data
 nr_ue_nas_t *simulated_ue_nas = NULL;
 void init_ue_nas_context(void)
@@ -286,6 +569,14 @@ void *rrc_gnb_task(void *args_p)
         msg_p_resp = itti_alloc_new_message(TASK_RRC_GNB, 0, NRPPA_TRP_INFORMATION_RESP);
         NRPPA_TRP_INFORMATION_RESP(msg_p_resp) = fill_trp_resp(trp_req->transaction_id);
         LOG_I(NR_RRC, "Sending NRPPA_TRP_INFORMATION_RESP to TASK_NRPPA\n");
+        itti_send_msg_to_task(TASK_NRPPA, 0, msg_p_resp);
+        break;
+      case NRPPA_POSITIONING_INFORMATION_REQ:
+        nrppa_positioning_information_req_t *pos_req = &NRPPA_POSITIONING_INFORMATION_REQ(msg_p);
+        LOG_I(NR_RRC, "Received NRPPA_POSITIONING_INFORMATION_REQ transaction_id %d\n", pos_req->transaction_id);
+        msg_p_resp = itti_alloc_new_message(TASK_RRC_GNB, 0, NRPPA_POSITIONING_INFORMATION_RESP);
+        NRPPA_POSITIONING_INFORMATION_RESP(msg_p_resp) = fill_position_information_resp(pos_req->transaction_id);
+        LOG_I(NR_RRC, "Sending NRPPA_POSITIONING_INFORMATION_RESP to TASK_NRPPA\n");
         itti_send_msg_to_task(TASK_NRPPA, 0, msg_p_resp);
         break;
       default:
