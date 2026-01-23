@@ -796,6 +796,19 @@ int get_subband_size(int NPRB,int size) {
  
 }
 
+void warn_higher_threequarter_fs(const int n_rb, const int mu)
+{
+  LOG_W(NR_PHY,
+        "3/4 sampling is not possible for current PRB size: %d and numerology: %d.\n "
+        "So 6/4 sampling is chosen to support x3xx type USRPs.\n "
+        "Note that this sampling rate increases fronthaul traffic, FFT buffer size and processing time by a factor of two compared "
+        "to 3/4 sampling rate.\n "
+        "Some PRACH configuration might not be supported with 6/4 FFT size.\n "
+        "Consider reducing the PRB size that would fit within the FFT size of 3/4 sampling\n",
+        n_rb,
+        mu);
+}
+
 void get_samplerate_and_bw(int mu,
                            int n_rb,
                            int8_t threequarter_fs,
