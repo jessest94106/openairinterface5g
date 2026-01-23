@@ -1312,3 +1312,68 @@ int nrppa_gNB_handle_positioning_activation_request(nrppa_gnb_ue_info_t *nrppa_m
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NRPPA_NRPPA_PDU, &pdu);
   return 0;
 }
+
+int nrppa_gNB_positioning_activation_response(instance_t instance, MessageDef *msg_p)
+{
+  DevAssert(msg_p);
+  nrppa_positioning_activation_resp_t *resp = &NRPPA_POSITIONING_ACTIVATION_RESP(msg_p);
+  nrppa_gNB_ue_context_t *ue_info = nrppa_detach_ue_context(resp->transaction_id);
+
+  if (ue_info->gNB_ue_ngap_id <= 0 && ue_info->amf_ue_ngap_id <= 0) {
+    LOG_E(NRPPA, "Illegal gNB_ue_ngap_id %d and amf_ue_ngap_id %ld\n", ue_info->gNB_ue_ngap_id, ue_info->amf_ue_ngap_id);
+    nrppa_free_ue_context(ue_info);
+    return -1;
+  }
+
+  LOG_I(NRPPA,
+        "Received PositioningInformationResponse info from RRC with transaction_id=%u and gNB_ue_ngap_id %u\n",
+        ue_info->transaction_id,
+        ue_info->gNB_ue_ngap_id);
+
+  // Prepare NRPPA TRP Information transfer Response
+  NRPPA_NRPPA_PDU_t pdu = {0};
+
+  // IE: 9.2.3 Message Type : mandatory
+  pdu.present = NRPPA_NRPPA_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu.choice.successfulOutcome, head);
+  head->procedureCode = NRPPA_ProcedureCode_id_positioningActivation;
+  head->criticality = NRPPA_Criticality_reject;
+  head->value.present = NRPPA_SuccessfulOutcome__value_PR_PositioningActivationResponse;
+
+  // IE 9.2.4 nrppatransactionID : mandatory
+  head->nrppatransactionID = resp->transaction_id;
+
+  LOG_I(NRPPA, "Calling encoder for PositioningActivationResponse \n");
+
+  if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
+    xer_fprint(stdout, &asn_DEF_NRPPA_NRPPA_PDU, &pdu);
+  }
+
+  // Encode NRPPA message
+  uint8_t *buffer = NULL;
+  uint32_t length = 0;
+  if (nrppa_gNB_encode_pdu(&pdu, &buffer, &length) < 0) {
+    LOG_E(NRPPA, "Failed to encode Uplink NRPPa PositioningActivationResponse\n");
+    nrppa_free_ue_context(ue_info);
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NRPPA_NRPPA_PDU, &pdu);
+    return -1;
+  }
+
+  MessageDef *msg = itti_alloc_new_message(TASK_NRPPA, 0, NGAP_UPLINKUEASSOCIATEDNRPPA);
+  ngap_uplink_ue_associated_nrppa_t *ULNRPPA = &NGAP_UPLINKUEASSOCIATEDNRPPA(msg);
+
+  ULNRPPA->gNB_ue_ngap_id = ue_info->gNB_ue_ngap_id;
+  ULNRPPA->amf_ue_ngap_id = ue_info->amf_ue_ngap_id;
+
+  // Routing ID
+  ULNRPPA->routing_id = create_byte_array(ue_info->routing_id.len, ue_info->routing_id.buf);
+
+  // NRPPA PDU
+  ULNRPPA->nrppa_pdu = create_byte_array(length, buffer);
+
+  // Forward the NRPPA PDU to NGAP
+  itti_send_msg_to_task(TASK_NGAP, instance, msg);
+  nrppa_free_ue_context(ue_info);
+  free(buffer);
+  return length;
+}

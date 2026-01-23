@@ -29,6 +29,7 @@
 #define NRPPA_POSITIONING_INFORMATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_req
 #define NRPPA_POSITIONING_INFORMATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_resp
 #define NRPPA_POSITIONING_ACTIVATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_req
+#define NRPPA_POSITIONING_ACTIVATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_resp
 
 /* Structure of Positioning related NRPPA messages */
 /* IE structures for Positioning related messages as per TS 38.455 V16.7.1*/
@@ -622,5 +623,10 @@ typedef struct nrppa_positioning_activation_req_s {
   // (mandatory)
   nrppa_srs_type_t srs_type;
 } nrppa_positioning_activation_req_t;
+
+typedef struct nrppa_positioning_activation_resp_s {
+  // IE 9.2.4 (mandatory)
+  uint16_t transaction_id;
+} nrppa_positioning_activation_resp_t;
 
 #endif // NRPPA_MESSAGES_TYPES_H_

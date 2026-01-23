@@ -31,6 +31,7 @@
 #include "openair3/NRPPA/nrppa_gNB.h"
 #include "openair3/NAS/NR_UE/nr_nas_msg.h"
 #include "executables/nr-uesoftmodem.h"
+#include "openair3/NRPPA/nrppa_gNB_location_information_transfer.c"
 
 RAN_CONTEXT_t RC;
 THREAD_STRUCT thread_struct;
@@ -578,6 +579,15 @@ void *rrc_gnb_task(void *args_p)
         NRPPA_POSITIONING_INFORMATION_RESP(msg_p_resp) = fill_position_information_resp(pos_req->transaction_id);
         LOG_I(NR_RRC, "Sending NRPPA_POSITIONING_INFORMATION_RESP to TASK_NRPPA\n");
         itti_send_msg_to_task(TASK_NRPPA, 0, msg_p_resp);
+        break;
+      case NRPPA_POSITIONING_ACTIVATION_REQ:
+        nrppa_positioning_activation_req_t *req = &NRPPA_POSITIONING_ACTIVATION_REQ(msg_p);
+        LOG_I(NR_RRC, "Received NRPPA_POSITIONING_ACTIVATION_REQ transaction_id %d\n", req->transaction_id);
+        msg_p_resp = itti_alloc_new_message(TASK_RRC_GNB, 0, NRPPA_POSITIONING_ACTIVATION_RESP);
+        NRPPA_POSITIONING_ACTIVATION_RESP(msg_p_resp).transaction_id = req->transaction_id;
+        LOG_I(NR_RRC, "Sending NRPPA_POSITIONING_ACTIVATION_RESP to TASK_NRPPA\n");
+        itti_send_msg_to_task(TASK_NRPPA, 0, msg_p_resp);
+        free_positioning_activation_request(req);
         break;
       default:
         LOG_E(NR_RRC, "[gNB %ld] Received unexpected message %s\n", instance, msg_name_p);
