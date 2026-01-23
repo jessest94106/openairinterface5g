@@ -28,3 +28,7 @@ MESSAGE_DEF(NRPPA_POSITIONING_INFORMATION_REQ,
             MESSAGE_PRIORITY_MED,
             nrppa_positioning_information_req_t,
             nrppa_positioning_information_req)
+MESSAGE_DEF(NRPPA_POSITIONING_INFORMATION_RESP,
+            MESSAGE_PRIORITY_MED,
+            nrppa_positioning_information_resp_t,
+            nrppa_positioning_information_resp)
