@@ -212,6 +212,8 @@ typedef struct split7_config {
 typedef struct openair0_config {
   //! Module ID for this configuration
   int Mod_id;
+  //! RU ID of this device
+  int ru_id;
   //! duplexing mode
   duplex_mode_t duplex_mode;
   //! number of downlink resource blocks

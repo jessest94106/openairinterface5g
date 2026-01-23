@@ -311,6 +311,7 @@ void nrue_init_openair0(void)
       cfg->duplex_mode = duplex_mode_FDD;
 
     cfg->Mod_id = 0;
+    cfg->ru_id = ru_id;
     cfg->num_rb_dl = frame_parms->N_RB_DL;
     cfg->tx_num_channels = min(4, frame_parms->nb_antennas_tx);
     cfg->rx_num_channels = min(4, frame_parms->nb_antennas_rx);
