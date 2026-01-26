@@ -81,9 +81,133 @@ static bool check_resourcesForChannelMeasurement(const NR_CSI_MeasConfig_t *meas
   return true;
 }
 
+static bool check_csi_resourceMapping_consistency(NR_CSI_RS_ResourceMapping_t resourceMapping)
+{
+  bool valid = true;
+  struct NR_CSI_RS_ResourceMapping__density *density = &resourceMapping.density;
+  switch(resourceMapping.frequencyDomainAllocation.present) {
+    case NR_CSI_RS_ResourceMapping__frequencyDomainAllocation_PR_row1:
+      if (resourceMapping.nrofPorts != NR_CSI_RS_ResourceMapping__nrofPorts_p1)
+        valid = false;
+      else if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_noCDM)
+        valid = false;
+      else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_three
+               && density->present != NR_CSI_RS_ResourceMapping__density_PR_NOTHING)
+        valid = false;
+      break;
+    case NR_CSI_RS_ResourceMapping__frequencyDomainAllocation_PR_row2:
+      if (resourceMapping.nrofPorts != NR_CSI_RS_ResourceMapping__nrofPorts_p1)
+        valid = false;
+      else if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_noCDM)
+        valid = false;
+      else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_dot5
+               && density->present != NR_CSI_RS_ResourceMapping__density_PR_one)
+        valid = false;
+      break;
+    case NR_CSI_RS_ResourceMapping__frequencyDomainAllocation_PR_row4:
+      if (resourceMapping.nrofPorts != NR_CSI_RS_ResourceMapping__nrofPorts_p4)
+        valid = false;
+      else if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2)
+        valid = false;
+      else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_one
+               && density->present != NR_CSI_RS_ResourceMapping__density_PR_NOTHING)
+        valid = false;
+      break;
+    case NR_CSI_RS_ResourceMapping__frequencyDomainAllocation_PR_other:
+      switch(resourceMapping.nrofPorts) {
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p1:
+          valid = false;  // 1 port is row 1 or 2 not other
+          break;
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p2:
+          if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2)
+            valid = false;
+          else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_dot5
+                   && density->present != NR_CSI_RS_ResourceMapping__density_PR_one)
+            valid = false;
+          break;
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p4:
+          // row 5 -> l0+1
+          if (resourceMapping.firstOFDMSymbolInTimeDomain == 13)
+            valid = false;
+          else if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2)
+            valid = false;
+          else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_one
+                   && density->present != NR_CSI_RS_ResourceMapping__density_PR_NOTHING)
+            valid = false;
+          break;
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p8: {
+          uint8_t freq = BIT_STRING_to_uint8(&resourceMapping.frequencyDomainAllocation.choice.other);
+          if (resourceMapping.cdm_Type == NR_CSI_RS_ResourceMapping__cdm_Type_cdm4_FD2_TD2 || count_bits(&freq, 1) != 4) {
+            // row 7 and 8 -> l0+1
+            if (resourceMapping.firstOFDMSymbolInTimeDomain == 13)
+              valid = false;
+          }
+          if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2
+              && resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_cdm4_FD2_TD2)
+            valid = false;
+          else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_one
+                   && density->present != NR_CSI_RS_ResourceMapping__density_PR_NOTHING)
+            valid = false;
+          break;
+        }
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p12:
+          if (resourceMapping.cdm_Type == NR_CSI_RS_ResourceMapping__cdm_Type_cdm4_FD2_TD2) {
+            // row 10 -> l0+1
+            if (resourceMapping.firstOFDMSymbolInTimeDomain == 13)
+              valid = false;
+          } else if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2)
+            valid = false;
+          else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_one
+                   && density->present != NR_CSI_RS_ResourceMapping__density_PR_NOTHING)
+            valid = false;
+          break;
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p16:
+          // l0 + 1 in all cases
+          if (resourceMapping.firstOFDMSymbolInTimeDomain == 13)
+            valid = false;
+          else if (resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2
+                   && resourceMapping.cdm_Type != NR_CSI_RS_ResourceMapping__cdm_Type_cdm4_FD2_TD2)
+            valid = false;
+          else if (density->present != NR_CSI_RS_ResourceMapping__density_PR_dot5
+                   && density->present != NR_CSI_RS_ResourceMapping__density_PR_one)
+            valid = false;
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p24:
+        case NR_CSI_RS_ResourceMapping__nrofPorts_p32:
+          if (resourceMapping.cdm_Type == NR_CSI_RS_ResourceMapping__cdm_Type_noCDM)
+            valid = false;
+          else if (resourceMapping.cdm_Type == NR_CSI_RS_ResourceMapping__cdm_Type_cdm4_FD2_TD2
+              || resourceMapping.cdm_Type == NR_CSI_RS_ResourceMapping__cdm_Type_fd_CDM2) {
+            // row 13, 14 and 16, 17 -> l0+1 and l1 (which should be larger than l0+1
+            if (resourceMapping.firstOFDMSymbolInTimeDomain == 13)
+              valid = false;
+            if (!resourceMapping.firstOFDMSymbolInTimeDomain2
+                || *resourceMapping.firstOFDMSymbolInTimeDomain2 <= resourceMapping.firstOFDMSymbolInTimeDomain + 1)
+              valid = false;
+          } else {
+            // row 15 and 18 -> l0+3
+            if (resourceMapping.firstOFDMSymbolInTimeDomain > 10)
+              valid = false;
+          }
+          if (valid
+              && (density->present != NR_CSI_RS_ResourceMapping__density_PR_dot5
+              && density->present != NR_CSI_RS_ResourceMapping__density_PR_one))
+            valid = false;
+          break;
+        default:
+          valid = false;
+      }
+      break;
+    default:
+      valid = false;
+  }
+  if (!valid)
+    return false;
+  return true;
+}
+
 static bool check_csi_report_consistency(const NR_CSI_MeasConfig_t *meas)
 {
-  if (!meas->csi_ReportConfigToAddModList)
+  if (!meas || !meas->csi_ReportConfigToAddModList)
     return true;
   for (int i = 0; i < meas->csi_ReportConfigToAddModList->list.count; i++) {
     NR_CSI_ReportConfig_t *csirep = meas->csi_ReportConfigToAddModList->list.array[i];
@@ -98,6 +222,28 @@ static bool check_csi_report_consistency(const NR_CSI_MeasConfig_t *meas)
         return false;
     }
   }
+  return true;
+}
+
+static bool check_csi_resource_consistency(const NR_CSI_MeasConfig_t *meas)
+{
+  if (!meas || !meas->nzp_CSI_RS_ResourceToAddModList)
+    return true;
+  for (int i = 0; i < meas->nzp_CSI_RS_ResourceToAddModList->list.count; i++) {
+    NR_NZP_CSI_RS_Resource_t *res = meas->nzp_CSI_RS_ResourceToAddModList->list.array[i];
+    if (!check_csi_resourceMapping_consistency(res->resourceMapping))
+      return false;
+  }
+  return true;
+}
+
+static bool check_csi_MeasConfig(struct NR_SetupRelease_CSI_MeasConfig *csi_MeasConfig)
+{
+  const NR_CSI_MeasConfig_t *meas = csi_MeasConfig->choice.setup;
+  if (!check_csi_report_consistency(meas))
+    return false;
+  if (!check_csi_resource_consistency(meas))
+    return false;
   return true;
 }
 
@@ -131,7 +277,7 @@ bool check_cellgroup_config(const NR_CellGroupConfig_t *cgConfig)
   if (cgConfig->spCellConfig && cgConfig->spCellConfig->spCellConfigDedicated) {
     NR_ServingCellConfig_t *spCellConfigDedicated = cgConfig->spCellConfig->spCellConfigDedicated;
     if (spCellConfigDedicated->csi_MeasConfig) {
-      if (!check_csi_report_consistency(spCellConfigDedicated->csi_MeasConfig->choice.setup))
+      if (!check_csi_MeasConfig(spCellConfigDedicated->csi_MeasConfig))
         return false;
     }
     if (spCellConfigDedicated->uplinkConfig) {
