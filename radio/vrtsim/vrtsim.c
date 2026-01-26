@@ -20,6 +20,7 @@
  */
 
 #include "PHY/TOOLS/tools_defs.h"
+#include "system.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -27,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -123,6 +125,7 @@ typedef struct {
   Actor_t *channel_modelling_actors;
   char *taps_socket;
   int client_num_rx_antennas;
+  struct timespec start_ts;
 } vrtsim_state_t;
 
 static void histogram_add(histogram_t *histogram, double diff)
@@ -203,30 +206,23 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
 static void *vrtsim_timing_job(void *arg)
 {
   vrtsim_state_t *vrtsim_state = arg;
-  struct timespec timestamp;
-  if (clock_gettime(CLOCK_REALTIME, &timestamp)) {
+  if (clock_gettime(CLOCK_REALTIME, &vrtsim_state->start_ts)) {
     LOG_E(UTIL, "clock_gettime failed\n");
     exit(1);
   }
-  double leftover_samples = 0;
+  int64_t last_sample_index = 0;
   while (vrtsim_state->run_timing_thread) {
     struct timespec current_time;
     if (clock_gettime(CLOCK_REALTIME, &current_time)) {
       LOG_E(UTIL, "clock_gettime failed\n");
       exit(1);
     }
-    uint64_t diff = (current_time.tv_sec - timestamp.tv_sec) * 1000000000 + (current_time.tv_nsec - timestamp.tv_nsec);
-    timestamp = current_time;
-    double samples_to_produce = vrtsim_state->sample_rate * vrtsim_state->timescale * diff / 1e9;
-
-    // Attempt to correct compounding rounding error
-    leftover_samples += samples_to_produce - (uint64_t)samples_to_produce;
-    if (leftover_samples > 1.0f) {
-      samples_to_produce += 1;
-      leftover_samples -= 1;
-    }
-    AssertFatal(samples_to_produce >= 0, "Negative samples to produce: %f\n", samples_to_produce);
+    uint64_t diff = (current_time.tv_sec - vrtsim_state->start_ts.tv_sec) * 1000000000
+                    + (current_time.tv_nsec - vrtsim_state->start_ts.tv_nsec);
+    double sample_index = vrtsim_state->sample_rate * vrtsim_state->timescale * diff / 1e9;
+    int64_t samples_to_produce = sample_index - last_sample_index;
     shm_td_iq_channel_produce_samples(vrtsim_state->channel, samples_to_produce);
+    last_sample_index = sample_index;
     usleep(1);
   }
   return 0;
@@ -293,8 +289,7 @@ static int vrtsim_connect(openair0_device *device)
     server_publish_client_info(client_info, vrtsim_state->connection_descriptor);
 
     vrtsim_state->run_timing_thread = true;
-    int ret = pthread_create(&vrtsim_state->timing_thread, NULL, vrtsim_timing_job, vrtsim_state);
-    AssertFatal(ret == 0, "pthread_create() failed: errno: %d, %s\n", errno, strerror(errno));
+    threadCreate(&vrtsim_state->timing_thread, vrtsim_timing_job, vrtsim_state, "vrtsim_timing", -1, OAI_PRIORITY_RT_MAX);
   } else {
     client_info_t client_info = client_read_info(vrtsim_state->connection_descriptor);
     AssertFatal(client_info.server_num_rx_antennas > 0, "Server did not publish valid client info, aborting client connection\n");
