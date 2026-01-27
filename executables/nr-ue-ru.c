@@ -505,7 +505,9 @@ int nrue_ru_write(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, void **buf
   return ret;
 }
 
-int openair0_write_reorder_common(PHY_VARS_NR_UE *UE,
+typedef int (*nrue_ru_write_t)(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, void **txp, int nsamps, int nbAnt, int flags);
+int openair0_write_reorder_common(nrue_ru_write_t nrue_ru_write,
+                                  PHY_VARS_NR_UE *UE,
                                   openair0_device_t *device,
                                   openair0_timestamp_t timestamp,
                                   void **txp,
@@ -516,7 +518,7 @@ int openair0_write_reorder_common(PHY_VARS_NR_UE *UE,
 int nrue_ru_write_reorder(PHY_VARS_NR_UE *UE, openair0_timestamp_t timestamp, void **txp, int nsamps, int nbAnt, int flags)
 {
   openair0_device_t *device = &openair0_dev[UE->rf_map.card];
-  return openair0_write_reorder_common(UE, device, timestamp, txp, nsamps, nbAnt, flags);
+  return openair0_write_reorder_common(nrue_ru_write, UE, device, timestamp, txp, nsamps, nbAnt, flags);
 }
 
 void nrue_ru_write_reorder_clear_context(PHY_VARS_NR_UE *UE)
