@@ -1350,20 +1350,33 @@ void fill_removal_lists_from_source_measConfig(NR_MeasConfig_t *currentMC, byte_
   ASN_STRUCT_FREE(asn_DEF_NR_RRCReconfiguration, rrcReconf);
 }
 
-int doRRCReconfiguration_from_HandoverCommand(byte_array_t *ba, const byte_array_t handoverCommand)
+byte_array_t doRRCReconfiguration_from_HandoverCommand(const byte_array_t handoverCommand)
 {
+  DevAssert(handoverCommand.buf);
+  DevAssert(handoverCommand.len > 0);
+  byte_array_t msg = {.buf = NULL, .len = 0};
+
   // Decode Handover Command
   NR_HandoverCommand_t *hoCommand = NULL;
   asn_dec_rval_t dec_rval = uper_decode_complete(NULL, &asn_DEF_NR_HandoverCommand, (void **)&hoCommand, handoverCommand.buf, handoverCommand.len);
 
-  if (dec_rval.code != RC_OK && dec_rval.consumed == 0) {
-    LOG_E(NR_RRC, "Can not decode Handover Command!\n");
-    return -1;
+  if (dec_rval.code != RC_OK || !hoCommand) {
+    LOG_E(NR_RRC, "Failed to decode Handover Command (dec_rval.code=%d)!\n", dec_rval.code);
+    return msg;
+  }
+
+  // Validate HandoverCommand structure
+  if (hoCommand->criticalExtensions.present != NR_HandoverCommand__criticalExtensions_PR_c1
+      || !hoCommand->criticalExtensions.choice.c1
+      || hoCommand->criticalExtensions.choice.c1->present != NR_HandoverCommand__criticalExtensions__c1_PR_handoverCommand
+      || !hoCommand->criticalExtensions.choice.c1->choice.handoverCommand) {
+    LOG_E(NR_RRC, "Invalid HandoverCommand in criticalExtensions.choice.c1->choice.handoverCommand\n");
+    ASN_STRUCT_FREE(asn_DEF_NR_HandoverCommand, hoCommand);
+    return msg;
   }
 
   // Prepare DL DCCH message for RRCReconfiguration
   NR_DL_DCCH_Message_t dl_dcch_msg = {0};
-  asn_enc_rval_t enc_rval;
   dl_dcch_msg.message.present = NR_DL_DCCH_MessageType_PR_c1;
   asn1cCalloc(dl_dcch_msg.message.choice.c1, c1);
   c1->present = NR_DL_DCCH_MessageType__c1_PR_rrcReconfiguration;
@@ -1371,18 +1384,37 @@ int doRRCReconfiguration_from_HandoverCommand(byte_array_t *ba, const byte_array
 
   // Decode RRCReconfiguration from handoverCommandMessage
   OCTET_STRING_t *ho = &hoCommand->criticalExtensions.choice.c1->choice.handoverCommand->handoverCommandMessage;
-  uper_decode_complete(NULL, &asn_DEF_NR_RRCReconfiguration, (void **)&rrcReconf, ho->buf, ho->size);
+  if (!ho->buf || ho->size == 0) {
+    LOG_E(NR_RRC, "Invalid handoverCommandMessage OCTET_STRING (buf=%p, size=%zu)!\n", ho->buf, ho->size);
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
+    ASN_STRUCT_FREE(asn_DEF_NR_HandoverCommand, hoCommand);
+    return msg;
+  }
+  asn_dec_rval_t rrc_dec_rval = uper_decode_complete(NULL, &asn_DEF_NR_RRCReconfiguration, (void **)&rrcReconf, ho->buf, ho->size);
+  if (rrc_dec_rval.code != RC_OK || !rrcReconf) {
+    LOG_E(NR_RRC, "Failed to decode RRCReconfiguration from Handover Command!\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
+    ASN_STRUCT_FREE(asn_DEF_NR_HandoverCommand, hoCommand);
+    return msg;
+  }
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NR_DL_DCCH_Message, (void *)&dl_dcch_msg);
 
-  // Encode DL DCCH message in buffer
-  enc_rval = uper_encode_to_buffer(&asn_DEF_NR_DL_DCCH_Message, NULL, &dl_dcch_msg, ba->buf, ba->len);
-  AssertFatal(enc_rval.encoded > 0, "ASN1 message encoding failed (%s, %lu)!\n", enc_rval.failed_type->name, enc_rval.encoded);
+  // Encode DL DCCH message to new buffer
+  int val = uper_encode_to_new_buffer(&asn_DEF_NR_DL_DCCH_Message, NULL, &dl_dcch_msg, (void **)&msg.buf);
+  if (val <= 0) {
+    LOG_E(NR_RRC, "Failed to encode RRCReconfiguration from Handover Command!\n");
+    ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
+    ASN_STRUCT_FREE(asn_DEF_NR_HandoverCommand, hoCommand);
+    return msg;
+  }
+  msg.len = val;
+  LOG_D(NR_RRC, "RRCReconfiguration from HandoverCommand: Encoded (%ld bytes)\n", msg.len);
 
   ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NR_DL_DCCH_Message, &dl_dcch_msg);
   ASN_STRUCT_FREE(asn_DEF_NR_HandoverCommand, hoCommand);
 
-  return ((enc_rval.encoded + 7) / 8);
+  return msg;
 }
 
 byte_array_t get_HandoverCommandMessage(nr_rrc_reconfig_param_t *params)
