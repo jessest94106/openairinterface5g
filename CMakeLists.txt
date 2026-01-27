@@ -1789,6 +1789,24 @@ target_link_libraries(lte-uesoftmodem PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIE
 target_link_libraries(lte-uesoftmodem PRIVATE
                       asn1_lte_rrc asn1_s1ap asn1_m2ap asn1_m3ap asn1_x2ap)
 
+# nr RRU
+add_executable(nr-oru
+  ${OPENAIR_DIR}/executables/nr-ru.c
+  ${OPENAIR_DIR}/openair1/PHY/INIT/nr_parms.c
+  ${OPENAIR_DIR}/openair1/SCHED_NR/phy_frame_config_nr.c
+  ${OPENAIR_DIR}/openair1/SCHED_NR/nr_prach_procedures.c
+  ${OPENAIR_DIR}/openair1/SCHED/phy_procedures_lte_common.c
+  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
+  ${OPENAIR_DIR}/radio/COMMON/record_player.c
+  ${OPENAIR_DIR}/executables/softmodem-common.c
+  ${OPENAIR_DIR}/executables/main_nr_ru.c
+)
+target_link_libraries(nr-oru PRIVATE
+  UTIL SCHED_RU_LIB PHY_COMMON PHY_RU PHY_NR shlib_loader z dl)
+target_link_libraries(nr-oru PRIVATE pthread m CONFIG_LIB rt ${T_LIB} utils
+  barrier actor)
+target_link_libraries(nr-oru PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs nr_phy_common time_management)
+
 # nr-softmodem
 ###################################################
 
