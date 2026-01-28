@@ -91,7 +91,7 @@ typedef struct {
   /// Component Carrier index
   uint8_t CC_id;
   /// timestamp transmitted to HW
-  openair0_timestamp timestamp_tx;
+  openair0_timestamp_t timestamp_tx;
   /// subframe to act upon for transmission
   int subframe_tx;
   /// subframe to act upon for reception
@@ -148,7 +148,7 @@ typedef struct {
   /// Component Carrier index
   uint8_t              CC_id;
   /// Last RX timestamp
-  openair0_timestamp timestamp_rx;
+  openair0_timestamp_t timestamp_rx;
   /// pthread attributes for main UE thread
   pthread_attr_t attr_ue;
   /// scheduling parameters for main UE thread
@@ -550,7 +550,7 @@ typedef struct {
   /// \brief Component carrier ID for this PHY instance
   uint8_t CC_id;
   /// \brief Mapping of CC_id antennas to cards
-  openair0_rf_map      rf_map;
+  openair0_rf_map_t rf_map;
   //uint8_t local_flag;
   /// \brief Indicator of current run mode of UE (normal_txrx, rx_calib_ue, no_L2_connect, debug_prach)
   runmode_t mode;
@@ -817,7 +817,7 @@ typedef struct {
   int instance_cnt_timer;
   /// RF and Interface devices per CC
 
-  openair0_device rfdevice;
+  openair0_device_t rfdevice;
   void *scopeData;
 } PHY_VARS_UE;
 

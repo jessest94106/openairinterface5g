@@ -7,6 +7,9 @@ uicc0:
 
 thread-pool: "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1"
 
+rfsimulator:
+  - serveraddr: "127.0.0.1"
+
 #/* configuration for channel modelisation */
 #/* To be included in main config file when */
 #/* channel modelisation is used (rfsimulator with chanmod options enabled) */

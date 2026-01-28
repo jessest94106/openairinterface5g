@@ -334,7 +334,7 @@ uint32_t get_samples_slot_duration(const NR_DL_FRAME_PARMS *fp, unsigned int sta
 // Get timestamp of slot from start of frame
 uint32_t get_samples_slot_timestamp(const NR_DL_FRAME_PARMS *fp, unsigned int slot);
 // Get slot from timestamp
-uint32_t get_slot_from_timestamp(openair0_timestamp timestamp_rx, const NR_DL_FRAME_PARMS *fp);
+uint32_t get_slot_from_timestamp(openair0_timestamp_t timestamp_rx, const NR_DL_FRAME_PARMS *fp);
 // Get number of samples in the slot
 uint32_t get_samples_per_slot(int slot, const NR_DL_FRAME_PARMS *fp);
 

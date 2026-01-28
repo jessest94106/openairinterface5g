@@ -191,7 +191,7 @@ The UE configuration must match the one of the network's AMF. The nrUE can conne
 When running the `nr-uesoftmodem`, one can specify the nrUE configuration file using the `-O` option. E.g.:
 
 ```bash
-sudo ./nr-uesoftmodem --rfsim --rfsimulator.serveraddr 127.0.0.1 -r 106 --numerology 1 --band 78 -C 3619200000 -O ~/nrue.uicc.conf
+sudo ./nr-uesoftmodem --rfsim --rfsimulator.[0].serveraddr 127.0.0.1 -r 106 --numerology 1 --band 78 -C 3619200000 -O ~/nrue.uicc.conf
 ```
 The CL option `--uicc0.imsi`  can override the IMSI value in the configuration file if necessary (e.g. when running multiple UEs): `--uicc0.imsi  001010000000001`.
 

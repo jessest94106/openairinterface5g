@@ -110,14 +110,6 @@ int main(int argc, char **argv) {
     .autocal={0},
     //! Configuration file for LMS7002M
     .configFilename="",
-    //! remote IP/MAC addr for Ethernet interface
-    .remote_addr="",
-    //! remote port number for Ethernet interface
-    .remote_port=0,
-    //! local IP/MAC addr for Ethernet interface (eNB/BBU, UE)
-    .my_addr=0,
-    //! local port number for Ethernet interface (eNB/BBU, UE)
-    .my_port=0,
     //! record player configuration, definition in record_player.h
     .recplay_mode=0,
     .recplay_conf=NULL,
@@ -125,7 +117,7 @@ int main(int argc, char **argv) {
     .samples_per_tti=0,
   };
   //-----------------------
-  openair0_device rfdevice= {
+  openair0_device_t rfdevice= {
     /*!tx write thread*/
     //.write_thread={0},
     /*!brief Module ID of this device */
@@ -306,7 +298,7 @@ int main(int argc, char **argv) {
   }
 
   CalibrationInitScope(samplesRx, &rfdevice);
-  openair0_timestamp timestamp=0;
+  openair0_timestamp_t timestamp=0;
   rfdevice.trx_start_func(&rfdevice);
   
   while(!oai_exit) {
