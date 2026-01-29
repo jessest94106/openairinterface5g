@@ -852,13 +852,10 @@ int main(int argc, char **argv)
   if (g_rbSize < 0) g_rbSize = N_RB_DL - g_rbStart;
 
   double fs,txbw,rxbw;
-  uint32_t samples;
-
   get_samplerate_and_bw(mu,
                         N_RB_DL,
                         frame_parms->threequarter_fs,
                         &fs,
-                        &samples,
                         &txbw,
                         &rxbw);
 

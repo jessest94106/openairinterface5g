@@ -444,13 +444,10 @@ int main(int argc, char **argv)
     gNB->common_vars.rxdataF[0][i] = malloc16_clear(gNB->frame_parms.samples_per_frame_wCP * sizeof(c16_t));
 
   double fs,txbw,rxbw;
-  uint32_t samples;
-
   get_samplerate_and_bw(mu,
                         N_RB_DL,
                         frame_parms->threequarter_fs,
                         &fs,
-                        &samples,
                         &txbw,
                         &rxbw);
 

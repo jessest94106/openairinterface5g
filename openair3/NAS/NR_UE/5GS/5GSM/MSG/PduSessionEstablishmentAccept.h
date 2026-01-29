@@ -53,7 +53,6 @@ typedef enum { FOREACH_IEI(TO_ENUM) } pduSessionEstablishment_IEI_t;
 #define PDU_SESSION_TYPE_ETHER 0b101
 #define IPv4_ADDRESS_LENGTH 4 // length of the IPv4 address associated with a PDU session
 #define IPv6_INTERFACE_ID_LENGTH 8 // interface identifier for the IPv6 link local address
-#define SMF_IPv6_LLA_LENGTH 16
 
 /* Rule operation codes - TS 24.501 Table 9.11.4.13.1 */
 

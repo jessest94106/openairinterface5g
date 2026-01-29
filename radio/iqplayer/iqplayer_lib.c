@@ -23,8 +23,6 @@
  *
  * \author:FrancoisTaburet: francois.taburet@nokia-bell-labs.com
  */
-#define _LARGEFILE_SOURCE
-#define _FILE_OFFSET_BITS 64
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>

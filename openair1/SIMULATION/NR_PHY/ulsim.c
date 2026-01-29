@@ -711,12 +711,10 @@ int main(int argc, char *argv[])
     snr1 = snr0 + 10;
 
   double sampling_frequency, tx_bandwidth, rx_bandwidth;
-  uint32_t samples;
   get_samplerate_and_bw(mu,
                         N_RB_DL,
                         threequarter_fs,
                         &sampling_frequency,
-                        &samples,
                         &tx_bandwidth,
                         &rx_bandwidth);
 

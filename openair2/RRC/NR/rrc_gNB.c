@@ -27,8 +27,6 @@
  * \company Eurecom, NTUST
  * \email: navid.nikaein@eurecom.fr and raymond.knopp@eurecom.fr, kroempa@gmail.com
  */
-#define RRC_GNB_C
-#define RRC_GNB_C
 
 #include <netinet/in.h>
 #include <netinet/sctp.h>

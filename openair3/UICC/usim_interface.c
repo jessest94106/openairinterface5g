@@ -27,7 +27,6 @@
 #include <openair3/NAS/COMMON/milenage.h>
 extern uint16_t NB_UE_INST;
 
-#define UICC_SECTION    "uicc"
 #define IMEISV_STR_MAX_LENGTH 16
 #define UICC_CONFIG_HELP_OPTIONS     " list of comma separated options to interface a simulated (real UICC to be developped). Available options: \n"\
   "        imsi: user imsi\n"\

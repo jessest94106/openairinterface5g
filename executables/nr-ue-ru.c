@@ -303,14 +303,12 @@ void nrue_init_openair0(void)
     openair0_config_t *cfg = &openair0_cfg[ru_id];
     cfg->configFilename    = NULL;
     cfg->sample_rate       = frame_parms->samples_per_subframe * 1e3;
-    cfg->samples_per_frame = frame_parms->samples_per_frame;
 
     if (frame_parms->frame_type == TDD)
       cfg->duplex_mode = duplex_mode_TDD;
     else
       cfg->duplex_mode = duplex_mode_FDD;
 
-    cfg->Mod_id = 0;
     cfg->ru_id = ru_id;
     cfg->num_rb_dl = frame_parms->N_RB_DL;
     cfg->tx_num_channels = min(4, frame_parms->nb_antennas_tx);

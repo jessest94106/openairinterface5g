@@ -1892,7 +1892,6 @@ INPUT                  = \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/RRC/LTE/rrc_eNB_S1AP.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/ENB_APP/enb_paramdef_emtc.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/ENB_APP/enb_config.c \
-@CMAKE_CURRENT_SOURCE_DIR@/../openair2/ENB_APP/enb_paramdef_mme.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/ENB_APP/enb_paramdef_mce.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/ENB_APP/L1_paramdef.h \
 @CMAKE_CURRENT_SOURCE_DIR@/../openair2/ENB_APP/enb_app.h \

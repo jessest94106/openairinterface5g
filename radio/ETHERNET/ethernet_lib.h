@@ -43,7 +43,6 @@
 #include <netinet/ether.h>
 
 #define MAX_INST 4
-#define DEFAULT_IF "lo"
 
 #define TX_FLAG 1
 #define RX_FLAG 0

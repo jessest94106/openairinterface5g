@@ -122,7 +122,7 @@ void nr_ue_ssb_rsrp_measurements(PHY_VARS_NR_UE *ue,
 typedef struct {
   UE_nr_rxtx_proc_t proc;
   PHY_VARS_NR_UE *ue;
-  c16_t *rxdata[NB_RX_ANTENNAS_MAX];
+  c16_t *rxdata[NB_ANTENNAS_RX];
   uint32_t rxdata_size;
   c16_t rxdata_ant[];
 } nr_meas_task_args_t;
