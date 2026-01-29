@@ -506,6 +506,7 @@ srb_found:
      * RRC, the RLC-PDCP interface does not transport this information */
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue->ue_id);
     ul_rrc->gNB_DU_ue_id = ue_data.secondary_ue;
+    message_p->ittiMsgHeader.originInstance = ue_data.du_assoc_id;
     ul_rrc->srb_id = srb_id;
     ul_rrc->rrc_container = malloc(size);
     AssertFatal(ul_rrc->rrc_container != NULL, "OUT OF MEMORY\n");

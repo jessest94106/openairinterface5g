@@ -70,7 +70,7 @@ typedef struct {
   NR_MeasConfig_t *meas_config;
   byte_array_t dedicated_NAS_msg_list[MAX_DRBS_PER_UE];
   int num_nas_msg;
-  NR_CellGroupConfig_t *cell_group_config;
+  byte_array_t *cgc;
   bool masterKeyUpdate;
   int nextHopChainingCount;
   byte_array_t ue_cap;
@@ -179,5 +179,6 @@ byte_array_t doRRCReconfiguration_from_HandoverCommand(byte_array_t handoverComm
 
 struct NR_UE_NR_Capability *get_ue_nr_capability(int rnti, uint8_t *buf, uint32_t len);
 NR_UE_NR_Capability_t *decode_nr_ue_capability(int rnti, const NR_UE_CapabilityRAT_ContainerList_t *clist);
+void dump_cgc(const uint8_t *buf, size_t len);
 
 #endif  /* __RRC_NR_MESSAGES_ASN1_MSG__H__ */
