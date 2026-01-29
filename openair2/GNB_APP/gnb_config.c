@@ -75,6 +75,7 @@
 #include "s1ap_messages_types.h"
 #include "sctp_default_values.h"
 #include "seq_arr.h"
+#include "common/utils/alg/find.h"
 #include "uper_encoder.h"
 #include "utils.h"
 #include "x2ap_messages_types.h"
@@ -1851,6 +1852,22 @@ static seq_arr_t *fill_cu_sibs(paramdef_t *GNBparamarray)
   return SIBs;
 }
 
+static bool eq_neighbour_pci(const void *vval, const void *vit)
+{
+  const int *pci = (const int *)vval;
+  const nr_neighbour_cell_t *neighbour = (const nr_neighbour_cell_t *)vit;
+  return neighbour->physicalCellId == *pci;
+}
+
+/** @brief Find neighbour by PCI within a cell's neighbour list (first match) */
+static nr_neighbour_cell_t *get_neighbour_by_pci(seq_arr_t *neighbour_cells, int pci)
+{
+  elm_arr_t elm = find_if(neighbour_cells, &pci, eq_neighbour_pci);
+  if (elm.found)
+    return (nr_neighbour_cell_t *)elm.it;
+  return NULL;
+}
+
 static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
 {
   char gnbpath[MAX_OPTNAME_SIZE + 8];
@@ -1908,6 +1925,14 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
       n.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
       n.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
       n.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
+      if (get_neighbour_by_pci(cell.neighbour_cells, n.physicalCellId) != NULL) {
+        LOG_E(GNB_APP,
+              "Cell %ld: duplicate PCI %d in neighbour list (nrcell_id %ld)\n",
+              cell.nr_cell_id,
+              n.physicalCellId,
+              n.nrcell_id);
+        AssertFatal(false, "PCI must be unique within a cell's neighbour list\n");
+      }
       seq_arr_push_back(cell.neighbour_cells, &n, sizeof(n));
       LOG_I(GNB_APP,
             "   [%d] neighbor ID %d cellId %ld PCI %d SCS %d SSB ARFCN %u TAC %u PLMN %03u.%0*u\n",
