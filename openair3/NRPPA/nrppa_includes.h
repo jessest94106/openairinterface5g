@@ -74,5 +74,10 @@
 #include "NRPPA_TRP-MeasurementRequestItem.h"
 #include "NRPPA_TRPMeasurementQuantities-Item.h"
 #include "NRPPA_TRPMeasurementQuantitiesList-Item.h"
+#include "NRPPA_TRP-MeasurementResponseList.h"
+#include "NRPPA_TRP-MeasurementResponseItem.h"
+#include "NRPPA_TrpMeasurementResultItem.h"
+#include "NRPPA_UL-RTOAMeasurement.h"
+#include "NRPPA_GNB-RxTxTimeDiff.h"
 
 #endif /* NRPPA_INCLUDE_H_ */

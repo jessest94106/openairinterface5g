@@ -41,3 +41,4 @@ MESSAGE_DEF(NRPPA_POSITIONING_ACTIVATION_RESP,
             nrppa_positioning_activation_resp_t,
             nrppa_positioning_activation_resp)
 MESSAGE_DEF(NRPPA_MEASUREMENT_REQ, MESSAGE_PRIORITY_MED, nrppa_measurement_req_t, nrppa_measurement_req)
+MESSAGE_DEF(NRPPA_MEASUREMENT_RESP, MESSAGE_PRIORITY_MED, nrppa_measurement_resp_t, nrppa_measurement_resp)
