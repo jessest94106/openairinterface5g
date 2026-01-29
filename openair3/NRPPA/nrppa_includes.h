@@ -71,5 +71,8 @@
 #include "NRPPA_PosResourceSetTypeAperiodic.h"
 #include "NRPPA_SemipersistentSRS.h"
 #include "NRPPA_AperiodicSRS.h"
+#include "NRPPA_TRP-MeasurementRequestItem.h"
+#include "NRPPA_TRPMeasurementQuantities-Item.h"
+#include "NRPPA_TRPMeasurementQuantitiesList-Item.h"
 
 #endif /* NRPPA_INCLUDE_H_ */

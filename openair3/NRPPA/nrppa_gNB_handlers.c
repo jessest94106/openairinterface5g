@@ -24,6 +24,7 @@
 #include "nrppa_gNB_decoder.h"
 #include "nrppa_common.h"
 #include "nrppa_gNB_location_information_transfer.h"
+#include "nrppa_gNB_measurement_information_transfer.h"
 
 char *nrppa_direction2String(int nrppa_dir)
 {
@@ -51,7 +52,7 @@ nrppa_message_decoded_callback nrppa_messages_callback[][3] = {
      0,
      0}, // NRPPA_ProcedureCode_id_positioningInformationExchange ((NRPPA_ProcedureCode_t)9)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_positioningInformationUpdate   ((NRPPA_ProcedureCode_t)10)
-    {0, 0, 0}, // NRPPA_ProcedureCode_id_Measurement ((NRPPA_ProcedureCode_t)11)
+    {nrppa_gNB_handle_measurement_request, 0, 0}, // NRPPA_ProcedureCode_id_Measurement ((NRPPA_ProcedureCode_t)11)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_MeasurementReport      ((NRPPA_ProcedureCode_t)12)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_MeasurementUpdate    ((NRPPA_ProcedureCode_t)13)
     {0, 0, 0}, // NRPPA_ProcedureCode_id_MeasurementAbort     ((NRPPA_ProcedureCode_t)14)

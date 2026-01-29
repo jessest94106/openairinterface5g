@@ -30,6 +30,7 @@
 #define NRPPA_POSITIONING_INFORMATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_information_resp
 #define NRPPA_POSITIONING_ACTIVATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_req
 #define NRPPA_POSITIONING_ACTIVATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_resp
+#define NRPPA_MEASUREMENT_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_measurement_req
 
 /* Structure of Positioning related NRPPA messages */
 /* IE structures for Positioning related messages as per TS 38.455 V16.7.1*/
@@ -588,6 +589,52 @@ typedef struct nrppa_srs_type_s {
   nrppa_srs_type_u choice;
 } nrppa_srs_type_t;
 
+typedef struct nrppa_trp_measurement_request_item_s {
+  uint32_t trp_id;
+} nrppa_trp_measurement_request_item_t;
+
+typedef struct nrppa_trp_measurement_request_list_s {
+  nrppa_trp_measurement_request_item_t *trp_measurement_request_item;
+  uint32_t trp_measurement_request_list_length;
+} nrppa_trp_measurement_request_list_t;
+
+typedef enum nrppa_pos_report_characteristics_e {
+  NRPPA_POSREPORTCHARACTERISTICS_ONDEMAND = 0,
+  NRPPA_POSREPORTCHARACTERISTICS_PERIODIC = 1
+} nrppa_report_characteristics_pr;
+
+typedef enum nrppa_pos_measurement_periodicity_e {
+  NRPPA_POSMEASUREMENTPERIODICITY_MS120 = 0,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS240 = 1,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS480 = 2,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS640 = 3,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS1024 = 4,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS2048 = 5,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS5120 = 6,
+  NRPPA_POSMEASUREMENTPERIODICITY_MS10240 = 7,
+  NRPPA_POSMEASUREMENTPERIODICITY_MIN1 = 8,
+  NRPPA_POSMEASUREMENTPERIODICITY_MIN6 = 9,
+  NRPPA_POSMEASUREMENTPERIODICITY_MIN12 = 10,
+  NRPPA_POSMEASUREMENTPERIODICITY_MIN30 = 11,
+  NRPPA_POSMEASUREMENTPERIODICITY_MIN60 = 12
+} nrppa_measurement_periodicity_pr;
+
+typedef enum nrppa_pos_measurement_type_e {
+  NRPPA_POSMEASUREMENTTYPE_GNB_RX_TX = 0,
+  NRPPA_POSMEASUREMENTTYPE_UL_SRS_RSRP = 1,
+  NRPPA_POSMEASUREMENTTYPE_UL_AOA = 2,
+  NRPPA_POSMEASUREMENTTYPE_UL_RTOA = 3
+} nrppa_measurement_type_pr;
+
+typedef struct nrppa_pos_measurement_quantities_item_s {
+  nrppa_measurement_type_pr measurement_type;
+} nrppa_measurement_quantities_item_t;
+
+typedef struct nrppa_pos_measurement_quantities_s {
+  nrppa_measurement_quantities_item_t *measurement_quantities_item;
+  uint32_t measurement_quantities_length;
+} nrppa_measurement_quantities_t;
+
 typedef struct nrppa_trp_information_req_s {
   // IE 9.2.4 (mandatory)
   uint16_t transaction_id;
@@ -628,5 +675,22 @@ typedef struct nrppa_positioning_activation_resp_s {
   // IE 9.2.4 (mandatory)
   uint16_t transaction_id;
 } nrppa_positioning_activation_resp_t;
+
+typedef struct nrppa_measurement_req_s {
+  // IE 9.2.4 (mandatory)
+  uint16_t transaction_id;
+  // (mandatory)
+  uint32_t lmf_measurement_id;
+  // (mandatory)
+  nrppa_trp_measurement_request_list_t trp_measurement_request_list;
+  // (mandatory) ondemand = 0, periodic = 1
+  nrppa_report_characteristics_pr report_characteristics;
+  // if report characteristics periodic
+  nrppa_measurement_periodicity_pr measurement_periodicity;
+  // (mandatory)
+  nrppa_measurement_quantities_t measurement_quantities;
+  // IE 9.2.28 (optional)
+  nrppa_srs_configuration_t *srs_configuration;
+} nrppa_measurement_req_t;
 
 #endif // NRPPA_MESSAGES_TYPES_H_

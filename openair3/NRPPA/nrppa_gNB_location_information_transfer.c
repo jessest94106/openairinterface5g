@@ -932,7 +932,7 @@ NRPPA_SRSCarrier_List_t encode_srs_carrier_list_nrppa(const nrppa_srs_carrier_li
   return out_list;
 }
 
-static void free_srs_carrier_list(nrppa_srs_carrier_list_t *srs_carrier_list)
+void free_srs_carrier_list(nrppa_srs_carrier_list_t *srs_carrier_list)
 {
   uint32_t srs_carrier_list_len = srs_carrier_list->srs_carrier_list_length;
   for (int i = 0; i < srs_carrier_list_len; i++) {
