@@ -31,6 +31,7 @@
 #include "nrppa_common.h"
 #include "nrppa_gNB_handlers.h"
 #include "nrppa_gNB_location_information_transfer.h"
+#include "nrppa_gNB_measurement_information_transfer.h"
 
 void nrppa_gNB_init(void)
 {
@@ -65,6 +66,9 @@ void *nrppa_gNB_process_itti_msg(void *notUsed)
         break;
       case NRPPA_POSITIONING_ACTIVATION_RESP:
         nrppa_gNB_positioning_activation_response(instance, received_msg);
+        break;
+      case NRPPA_MEASUREMENT_RESP:
+        nrppa_gNB_measurement_response(instance, received_msg);
         break;
       default:
         LOG_E(NRPPA, "Received unhandled message: %d:%s\n", ITTI_MSG_ID(received_msg), ITTI_MSG_NAME(received_msg));

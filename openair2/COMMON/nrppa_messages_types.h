@@ -31,6 +31,7 @@
 #define NRPPA_POSITIONING_ACTIVATION_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_req
 #define NRPPA_POSITIONING_ACTIVATION_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_positioning_activation_resp
 #define NRPPA_MEASUREMENT_REQ(mSGpTR) (mSGpTR)->ittiMsg.nrppa_measurement_req
+#define NRPPA_MEASUREMENT_RESP(mSGpTR) (mSGpTR)->ittiMsg.nrppa_measurement_resp
 
 /* Structure of Positioning related NRPPA messages */
 /* IE structures for Positioning related messages as per TS 38.455 V16.7.1*/
@@ -635,6 +636,122 @@ typedef struct nrppa_pos_measurement_quantities_s {
   uint32_t measurement_quantities_length;
 } nrppa_measurement_quantities_t;
 
+typedef struct nrppa_lcs_to_gcs_translationaoa_c {
+  uint16_t alpha;
+  uint16_t beta;
+  uint16_t gamma;
+} nrppa_lcs_to_gcs_translationaoa_t;
+
+typedef struct nrppa_ul_aoa_s {
+  uint16_t azimuth_aoa;
+  uint16_t *zenith_aoa;
+  nrppa_lcs_to_gcs_translationaoa_t *lcs_to_gcs_translation_aoa;
+} nrppa_ul_aoa_t;
+
+typedef union nrppa_relative_path_delay_c {
+  uint32_t k0;
+  uint32_t k1;
+  uint32_t k2;
+  uint32_t k3;
+  uint32_t k4;
+  uint32_t k5;
+} nrppa_relative_path_delay_u, nrppa_ul_rtoa_measurement_u, nrppa_gnb_rx_tx_time_diff_u;
+
+typedef enum nrppa_gnb_rx_tx_time_diff_meas_e {
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_NOTHING,
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K0,
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K1,
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K2,
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K3,
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K4,
+  NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K5
+} nrppa_gnb_rx_tx_time_diff_pr;
+
+typedef struct nrppa_gnb_rx_tx_time_diff_s {
+  nrppa_gnb_rx_tx_time_diff_pr present;
+  nrppa_gnb_rx_tx_time_diff_u choice;
+} nrppa_gnb_rx_tx_time_diff_t;
+
+typedef enum nrppa_ul_rtoa_measurement_e {
+  NRPPA_ULRTOAMEAS_PR_NOTHING,
+  NRPPA_ULRTOAMEAS_PR_K0,
+  NRPPA_ULRTOAMEAS_PR_K1,
+  NRPPA_ULRTOAMEAS_PR_K2,
+  NRPPA_ULRTOAMEAS_PR_K3,
+  NRPPA_ULRTOAMEAS_PR_K4,
+  NRPPA_ULRTOAMEAS_PR_K5
+} nrppa_ul_rtoa_measurement_pr;
+
+typedef struct nrppa_ul_rtoa_measurement_s {
+  nrppa_ul_rtoa_measurement_pr present;
+  nrppa_ul_rtoa_measurement_u choice;
+} nrppa_ul_rtoa_measurement_t;
+
+typedef union nrppa_measured_results_value_c {
+  nrppa_ul_aoa_t ul_angle_of_arrival;
+  uint8_t ul_srs_rsrp;
+  nrppa_ul_rtoa_measurement_t ul_rtoa;
+  nrppa_gnb_rx_tx_time_diff_t gnb_rx_tx_time_diff;
+} nrppa_measured_results_value_u;
+
+typedef enum nrppa_measured_results_value_e {
+  NRPPA_MEASURED_RESULTS_VALUE_PR_NOTHING,
+  NRPPA_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL,
+  NRPPA_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP,
+  NRPPA_MEASURED_RESULTS_VALUE_PR_UL_RTOA,
+  NRPPA_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF
+} nrppa_measured_results_value_pr;
+
+typedef struct nrppa_measured_results_value_s {
+  nrppa_measured_results_value_pr present;
+  nrppa_measured_results_value_u choice;
+} nrppa_measured_results_value_t;
+
+typedef union nrppa_time_stamp_slot_index_c {
+  uint8_t scs_15;
+  uint8_t scs_30;
+  uint8_t scs_60;
+  uint8_t scs_120;
+} nrppa_time_stamp_slot_index_u;
+
+typedef enum nrppa_time_stamp_slot_index_e {
+  NRPPA_TIME_STAMP_SLOT_INDEX_PR_NOTHING,
+  NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_15,
+  NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_30,
+  NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_60,
+  NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_120
+} nrppa_time_stamp_slot_index_pr;
+
+typedef struct nrppa_time_stamp_slot_index_s {
+  nrppa_time_stamp_slot_index_pr present;
+  nrppa_time_stamp_slot_index_u choice;
+} nrppa_time_stamp_slot_index_t;
+
+typedef struct nrppa_time_stamp_s {
+  uint16_t system_frame_number;
+  nrppa_time_stamp_slot_index_t slot_index;
+} nrppa_time_stamp_t;
+
+typedef struct nrppa_measurement_result_item_s {
+  nrppa_measured_results_value_t measured_results_value;
+  nrppa_time_stamp_t time_stamp;
+} nrppa_measurement_result_item_t;
+
+typedef struct nrppa_measurement_result_s {
+  nrppa_measurement_result_item_t *measurement_result_item;
+  uint32_t measurement_result_item_length;
+} nrppa_measurement_result_t;
+
+typedef struct nrppa_measurement_response_item_s {
+  nrppa_measurement_result_t measurement_result;
+  uint32_t trp_id;
+} nrppa_measurement_response_item_t;
+
+typedef struct nrppa_measurement_response_list_s {
+  nrppa_measurement_response_item_t *measurement_response_item;
+  uint32_t measurement_response_list_length;
+} nrppa_measurement_response_list_t;
+
 typedef struct nrppa_trp_information_req_s {
   // IE 9.2.4 (mandatory)
   uint16_t transaction_id;
@@ -692,5 +809,16 @@ typedef struct nrppa_measurement_req_s {
   // IE 9.2.28 (optional)
   nrppa_srs_configuration_t *srs_configuration;
 } nrppa_measurement_req_t;
+
+typedef struct nrppa_measurement_resp_s {
+  // IE 9.2.4 (mandatory)
+  uint16_t transaction_id;
+  // (mandatory)
+  uint32_t lmf_measurement_id;
+  // (mandatory)
+  uint32_t ran_measurement_id;
+  // (optional)
+  nrppa_measurement_response_list_t *measurement_response_list;
+} nrppa_measurement_resp_t;
 
 #endif // NRPPA_MESSAGES_TYPES_H_

@@ -32,6 +32,7 @@
 #include "openair3/NAS/NR_UE/nr_nas_msg.h"
 #include "executables/nr-uesoftmodem.h"
 #include "openair3/NRPPA/nrppa_gNB_location_information_transfer.c"
+#include "openair3/NRPPA/nrppa_gNB_measurement_information_transfer.h"
 
 RAN_CONTEXT_t RC;
 THREAD_STRUCT thread_struct;
@@ -432,6 +433,82 @@ static nrppa_positioning_information_resp_t fill_position_information_resp(uint1
   return resp;
 }
 
+static nrppa_measurement_resp_t fill_measurement_response(uint16_t transaction_id, uint32_t lmf_measurement_id)
+{
+  positioning_config_t positioning_config = RCconfig_nr_positioning();
+  nrppa_measurement_resp_t resp = {0};
+  resp.transaction_id = transaction_id;
+  resp.lmf_measurement_id = lmf_measurement_id;
+  resp.ran_measurement_id = 1;
+  resp.measurement_response_list = calloc_or_fail(1, sizeof(*resp.measurement_response_list));
+  uint32_t meas_response_list_len = positioning_config.num_trp;
+  resp.measurement_response_list->measurement_response_list_length = meas_response_list_len;
+  resp.measurement_response_list->measurement_response_item =
+      calloc_or_fail(meas_response_list_len, sizeof(*resp.measurement_response_list->measurement_response_item));
+  for (int i = 0; i < meas_response_list_len; i++) {
+    nrppa_measurement_response_item_t *meas_response_item = &resp.measurement_response_list->measurement_response_item[i];
+    meas_response_item->trp_id = positioning_config.trps[i].id;
+
+    nrppa_measurement_result_t *MeasurementResult = &meas_response_item->measurement_result;
+    uint32_t meas_result_length = 4;
+    MeasurementResult->measurement_result_item_length = meas_result_length;
+    MeasurementResult->measurement_result_item =
+        calloc_or_fail(meas_result_length, sizeof(*MeasurementResult->measurement_result_item));
+
+    // Angle of arrival
+    nrppa_measurement_result_item_t *measurement_result_item = &MeasurementResult->measurement_result_item[0];
+    nrppa_measured_results_value_t *measuredResultsValue = &measurement_result_item->measured_results_value;
+    measuredResultsValue->present = NRPPA_MEASURED_RESULTS_VALUE_PR_UL_ANGLEOFARRIVAL;
+    nrppa_ul_aoa_t *uL_AngleOfArrival = &measuredResultsValue->choice.ul_angle_of_arrival;
+    uL_AngleOfArrival->azimuth_aoa = 700 + i;
+    uL_AngleOfArrival->zenith_aoa = calloc_or_fail(1, sizeof(*uL_AngleOfArrival->zenith_aoa));
+    *uL_AngleOfArrival->zenith_aoa = 450 + i;
+
+    nrppa_time_stamp_t *timeStamp = &measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 100;
+    timeStamp->slot_index.present = NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_30;
+    timeStamp->slot_index.choice.scs_30 = 15;
+
+    // UL SRS RSRP
+    measurement_result_item = &MeasurementResult->measurement_result_item[1];
+    measuredResultsValue = &measurement_result_item->measured_results_value;
+    measuredResultsValue->present = NRPPA_MEASURED_RESULTS_VALUE_PR_UL_SRS_RSRP;
+    measuredResultsValue->choice.ul_srs_rsrp = 100 + i;
+
+    timeStamp = &measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 101;
+    timeStamp->slot_index.present = NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_15;
+    timeStamp->slot_index.choice.scs_15 = 8;
+
+    // UL RToA
+    measurement_result_item = &MeasurementResult->measurement_result_item[2];
+    measuredResultsValue = &measurement_result_item->measured_results_value;
+    measuredResultsValue->present = NRPPA_MEASURED_RESULTS_VALUE_PR_UL_RTOA;
+    nrppa_ul_rtoa_measurement_t *uL_RTOA = &measuredResultsValue->choice.ul_rtoa;
+    uL_RTOA->present = NRPPA_ULRTOAMEAS_PR_K1;
+    uL_RTOA->choice.k1 = 98500 + i;
+
+    timeStamp = &measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 102;
+    timeStamp->slot_index.present = NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_60;
+    timeStamp->slot_index.choice.scs_60 = 31;
+
+    // gNB RX-TX Time Diff
+    measurement_result_item = &MeasurementResult->measurement_result_item[3];
+    measuredResultsValue = &measurement_result_item->measured_results_value;
+    measuredResultsValue->present = NRPPA_MEASURED_RESULTS_VALUE_PR_GNB_RXTXTIMEDIFF;
+    nrppa_gnb_rx_tx_time_diff_t *gNB_RxTxTimeDiff = &measuredResultsValue->choice.gnb_rx_tx_time_diff;
+    gNB_RxTxTimeDiff->present = NRPPA_GNBRXTXTIMEDIFFMEAS_PR_K3;
+    gNB_RxTxTimeDiff->choice.k3 = 98412 + i;
+
+    timeStamp = &measurement_result_item->time_stamp;
+    timeStamp->system_frame_number = 103;
+    timeStamp->slot_index.present = NRPPA_TIME_STAMP_SLOT_INDEX_PR_SCS_120;
+    timeStamp->slot_index.choice.scs_120 = 70;
+  }
+  return resp;
+}
+
 // Initializing UE NAS Context with simulated SIM data
 nr_ue_nas_t *simulated_ue_nas = NULL;
 void init_ue_nas_context(void)
@@ -588,6 +665,15 @@ void *rrc_gnb_task(void *args_p)
         LOG_I(NR_RRC, "Sending NRPPA_POSITIONING_ACTIVATION_RESP to TASK_NRPPA\n");
         itti_send_msg_to_task(TASK_NRPPA, 0, msg_p_resp);
         free_positioning_activation_request(req);
+        break;
+      case NRPPA_MEASUREMENT_REQ:
+        nrppa_measurement_req_t *m_req = &NRPPA_MEASUREMENT_REQ(msg_p);
+        LOG_I(NR_RRC, "Received NRPPA_MEASUREMENT_REQ transaction_id %d\n", m_req->transaction_id);
+        msg_p_resp = itti_alloc_new_message(TASK_RRC_GNB, 0, NRPPA_MEASUREMENT_RESP);
+        NRPPA_MEASUREMENT_RESP(msg_p_resp) = fill_measurement_response(m_req->transaction_id, m_req->lmf_measurement_id);
+        LOG_I(NR_RRC, "Sending NRPPA_MEASUREMENT_RESP to TASK_NRPPA\n");
+        itti_send_msg_to_task(TASK_NRPPA, 0, msg_p_resp);
+        free_measurement_request(m_req);
         break;
       default:
         LOG_E(NR_RRC, "[gNB %ld] Received unexpected message %s\n", instance, msg_name_p);
