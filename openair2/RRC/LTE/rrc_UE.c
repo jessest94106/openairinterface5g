@@ -64,7 +64,7 @@
 #include "LTE_UECapabilityEnquiry.h"
 #include "LTE_UE-CapabilityRequest.h"
 
-#include "common/utils/tun_if.h"
+#include "common/utils/tuntap_if.h"
 #if ENABLE_RAL
   #include "rrc_UE_ral.h"
 #endif

@@ -201,7 +201,7 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
   byte_array_t cgci = {0};
   if (get_softmodem_params()->phy_test == 1 || get_softmodem_params()->do_ra == 1) {
     DevAssert(m == NULL);
-    UE->rb_config = get_default_rbconfig(10 /* EPS bearer ID */, 1 /* drb ID */, NR_CipheringAlgorithm_nea0, NR_SecurityConfig__keyToUse_master, &rrc->pdcp_config);
+    UE->rb_config = get_default_rbconfig(DEFAULT_NOS1_PDU_ID, 1 /* drb ID */, NR_CipheringAlgorithm_nea0, NR_SecurityConfig__keyToUse_master, &rrc->pdcp_config);
     int len = cg_config_info_from_ue_cap_file(sizeof tmp, tmp);
     DevAssert(len > 0);
     cgci = create_byte_array(len, tmp);
