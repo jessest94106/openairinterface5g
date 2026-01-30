@@ -41,13 +41,6 @@
 
 #include "openair2/LAYER2/NR_MAC_gNB/nr_mac_gNB.h"
 
-typedef struct {
-  uint8_t num_msg;
-  uint8_t opaque_handle;
-  uint16_t message_id;
-  uint32_t message_length;
-} fapi_phy_api_msg;
-
 int get_cpu_msg_buf_size();
 int get_cpu_data_buf_size();
 bool allocate_msg(nv_ipc_msg_t* send_msg);
