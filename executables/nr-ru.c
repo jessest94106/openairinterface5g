@@ -609,6 +609,25 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
     proc->first_rx = 0;
     *frame = proc->frame_rx;
     *slot  = proc->tti_rx;
+
+    // Align to slot boundary
+    uint64_t samples_to_slot_boundary = 0;
+    uint64_t sample_offset_within_frame = proc->timestamp_rx % fp->samples_per_frame;
+    uint64_t sample_offset_within_slot = sample_offset_within_frame - get_samples_slot_timestamp(fp, *slot);
+    if (sample_offset_within_slot > 0) {
+      samples_to_slot_boundary = get_samples_per_slot(*slot, fp) - sample_offset_within_slot;
+      LOG_A(NR_PHY, "Aligning to the slot boundary %lu\n", samples_to_slot_boundary);
+
+      // Read and discard the samples in the first_rx to align to the slot boundary
+      rxs = ru->rfdevice.trx_read_func(&ru->rfdevice, &ts, rxp, samples_to_slot_boundary, nb);
+      if (rxs != samples_to_slot_boundary)
+        LOG_E(PHY, "rx_rf: Asked for %ld samples, got %d from USRP\n", samples_to_slot_boundary, rxs);
+
+      proc->timestamp_rx += samples_to_slot_boundary;
+      if (*slot + 1 >= fp->slots_per_frame)
+        *frame = *frame + 1;
+      *slot = (*slot + 1) % fp->slots_per_frame;
+    }
   }
 
   metadata mt = {.slot = *slot, .frame = *frame};
