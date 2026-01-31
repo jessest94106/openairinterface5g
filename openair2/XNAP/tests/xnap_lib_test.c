@@ -165,11 +165,96 @@ static void test_xn_setup_request(void)
   printf("%s() successful \n", __func__);
 }
 
+/**
+ * 2. Xn Setup Response
+ */
+static void test_xn_setup_response(void)
+{
+  /* ---------- Common PLMNs ---------- */
+  plmn_id_t plmn0 = { .mcc = 208, .mnc = 95, .mnc_digit_length = 2 };
+  plmn_id_t plmn1 = { .mcc = 208, .mnc = 93, .mnc_digit_length = 2 };
+  
+  /* ---------- TAI support (2) ---------- */
+  xnap_tai_support_t *tai_support = calloc_or_fail(2, sizeof(*tai_support));
+  
+  /* ================= TAI 0 ================= */
+  tai_support[0].tac = 1;
+  tai_support[0].num_plmn = 2;
+  tai_support[0].plmn_support = calloc_or_fail(2, sizeof(*tai_support[0].plmn_support));
+  
+  /* ---- TAI 0 / PLMN 0 ---- */
+  tai_support[0].plmn_support[0].plmn = plmn0;
+  tai_support[0].plmn_support[0].num_nssai = 3;
+  tai_support[0].plmn_support[0].nssai = calloc_or_fail(3, sizeof(nssai_t));
+  
+  tai_support[0].plmn_support[0].nssai[0] = (nssai_t){ .sst = 1, .sd = 0x010203 };
+  tai_support[0].plmn_support[0].nssai[1] = (nssai_t){ .sst = 1, .sd = 0x010204 };
+  tai_support[0].plmn_support[0].nssai[2] = (nssai_t){ .sst = 1, .sd = 0x010205 };
+  
+  /* ---- TAI 0 / PLMN 1 ---- */
+  tai_support[0].plmn_support[1].plmn = plmn1;
+  tai_support[0].plmn_support[1].num_nssai = 3;
+  tai_support[0].plmn_support[1].nssai = calloc_or_fail(3, sizeof(nssai_t));
+  
+  tai_support[0].plmn_support[1].nssai[0] = (nssai_t){ .sst = 2, .sd = 0x020203 };
+  tai_support[0].plmn_support[1].nssai[1] = (nssai_t){ .sst = 2, .sd = 0x020204 };
+  tai_support[0].plmn_support[1].nssai[2] = (nssai_t){ .sst = 2, .sd = 0x020205 };
+  
+  /* ================= TAI 1 ================= */
+  tai_support[1].tac = 2;
+  tai_support[1].num_plmn = 2;
+  tai_support[1].plmn_support = calloc_or_fail(2, sizeof(*tai_support[1].plmn_support));
+  
+  /* ---- TAI 1 / PLMN 0 ---- */
+  tai_support[1].plmn_support[0].plmn = plmn0;
+  tai_support[1].plmn_support[0].num_nssai = 3;
+  tai_support[1].plmn_support[0].nssai = calloc_or_fail(3, sizeof(nssai_t));
+  
+  tai_support[1].plmn_support[0].nssai[0] = (nssai_t){ .sst = 3, .sd = 0x030203 };
+  tai_support[1].plmn_support[0].nssai[1] = (nssai_t){ .sst = 3, .sd = 0x030204 };
+  tai_support[1].plmn_support[0].nssai[2] = (nssai_t){ .sst = 3, .sd = 0x030205 };
+  
+  /* ---- TAI 1 / PLMN 1 ---- */
+  tai_support[1].plmn_support[1].plmn = plmn1;
+  tai_support[1].plmn_support[1].num_nssai = 3;
+  tai_support[1].plmn_support[1].nssai = calloc_or_fail(3, sizeof(nssai_t));
+  
+  tai_support[1].plmn_support[1].nssai[0] = (nssai_t){ .sst = 4, .sd = 0x040203 };
+  tai_support[1].plmn_support[1].nssai[1] = (nssai_t){ .sst = 4, .sd = 0x040204 };
+  tai_support[1].plmn_support[1].nssai[2] = (nssai_t){ .sst = 4, .sd = 0x040205 };
+  
+  /* ---------- create message ---------- */
+  xnap_setup_resp_t orig = {
+      .gNB_id = 0xABCDE,
+      .plmn = plmn0,
+      .num_tai = 2,
+      .tai_support = tai_support,
+  };
+  /* ---------- encode ---------- */
+  XNAP_XnAP_PDU_t *xnenc = encode_xn_setup_response(&orig);
+  XNAP_XnAP_PDU_t *xndec = xnap_encode_decode(xnenc);
+  xnap_msg_free(xnenc);
+
+  /* ---------- decode ---------- */
+  xnap_setup_resp_t decoded = {0};
+  bool ret = decode_xn_setup_response(&decoded, xndec);
+  AssertFatal(ret, "decode_xn_setup_response failed");
+  xnap_msg_free(xndec);
+
+  /* ---------- equality ---------- */
+  ret = eq_xnap_setup_response(&orig, &decoded);
+  AssertFatal(ret, "Xn Setup Response mismatch\n");
+  free_xnap_setup_response(&decoded);
+  free_xnap_setup_response(&orig);
+  printf("%s() successful \n", __func__);
+}
+
 int main() {
   printf("Starting XnAP Library Unit Tests...\n");
 
   /* Xn Interface Testing */
   test_xn_setup_request();
+  test_xn_setup_response();
 
   printf("All XnAP tests passed!\n");
   return 0;
