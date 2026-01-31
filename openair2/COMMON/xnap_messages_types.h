@@ -62,4 +62,14 @@ typedef struct {
   xnap_amf_region_info_t *amf_region_info;
 } xnap_setup_req_t;
 
+/* 3GPP TS 38.423 9.1.3.2 – Xn Setup Response */
+typedef struct {
+  // Global NG-RAN Node ID (gNB_id+plmn) (M)
+  uint32_t gNB_id;
+  plmn_id_t plmn;
+  // TAI Support List (M)
+  uint16_t num_tai;
+  xnap_tai_support_t *tai_support;
+} xnap_setup_resp_t;
+
 #endif /* XNAP_MESSAGES_TYPES_H_ */

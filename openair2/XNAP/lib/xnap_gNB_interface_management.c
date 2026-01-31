@@ -244,3 +244,162 @@ void free_xnap_setup_request(const xnap_setup_req_t *msg)
   free_xnap_tai_support(msg->tai_support, msg->num_tai);
   free(msg->amf_region_info);
 }
+
+/**
+ * @brief XnAP Setup Response encoding
+ */
+XNAP_XnAP_PDU_t *encode_xn_setup_response(const xnap_setup_resp_t *resp)
+{
+  XNAP_XnAP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* PDU type */
+  pdu->present = XNAP_XnAP_PDU_PR_successfulOutcome;
+  asn1cCalloc(pdu->choice.successfulOutcome, succMsg);
+  succMsg->procedureCode = XNAP_ProcedureCode_id_xnSetup;
+  succMsg->criticality = XNAP_Criticality_reject;
+  succMsg->value.present = XNAP_SuccessfulOutcome__value_PR_XnSetupResponse;
+
+  XNAP_XnSetupResponse_t *out = &succMsg->value.choice.XnSetupResponse;
+
+  /* Global NG-RAN Node ID (M) */
+  asn1cSequenceAdd(out->protocolIEs.list, XNAP_XnSetupResponse_IEs_t, ie1);
+  ie1->id = XNAP_ProtocolIE_ID_id_GlobalNG_RAN_node_ID;
+  ie1->criticality = XNAP_Criticality_reject;
+  ie1->value.present = XNAP_XnSetupResponse_IEs__value_PR_GlobalNG_RANNode_ID;
+
+  XNAP_GlobalNG_RANNode_ID_t *global = &ie1->value.choice.GlobalNG_RANNode_ID;
+  global->present = XNAP_GlobalNG_RANNode_ID_PR_gNB;
+  asn1cCalloc(global->choice.gNB, gnb);
+
+  MCC_MNC_TO_PLMNID(resp->plmn.mcc, resp->plmn.mnc, resp->plmn.mnc_digit_length, &gnb->plmn_id);
+  gnb->gnb_id.present = XNAP_GNB_ID_Choice_PR_gnb_ID;
+  MACRO_GNB_ID_TO_BIT_STRING(resp->gNB_id, &gnb->gnb_id.choice.gnb_ID);
+
+  /* TAI Support List (M) */
+  asn1cSequenceAdd(out->protocolIEs.list, XNAP_XnSetupResponse_IEs_t, ie2);
+  ie2->id = XNAP_ProtocolIE_ID_id_TAISupport_list;
+  ie2->criticality = XNAP_Criticality_reject;
+  ie2->value.present = XNAP_XnSetupResponse_IEs__value_PR_TAISupport_List;
+
+  for (int i = 0; i < resp->num_tai; i++) {
+    asn1cSequenceAdd(ie2->value.choice.TAISupport_List.list, XNAP_TAISupport_Item_t, taiItem);
+    INT24_TO_OCTET_STRING(resp->tai_support[i].tac, &taiItem->tac);
+
+    for (int j = 0; j < resp->tai_support[i].num_plmn; j++) {
+      const xnap_plmn_support_t *plmn = &resp->tai_support[i].plmn_support[j];
+      asn1cSequenceAdd(taiItem->broadcastPLMNs.list, XNAP_BroadcastPLMNinTAISupport_Item_t, plmnItem);
+      MCC_MNC_TO_PLMNID(plmn->plmn.mcc, plmn->plmn.mnc, plmn->plmn.mnc_digit_length, &plmnItem->plmn_id);
+
+      for (int k = 0; k < plmn->num_nssai; k++) {
+        asn1cSequenceAdd(plmnItem->tAISliceSupport_List.list, XNAP_S_NSSAI_t, nssai);
+        INT8_TO_OCTET_STRING(plmn->nssai[k].sst, &nssai->sst);
+        if (plmn->nssai[k].sd) { asn1cCalloc(nssai->sd, sd); INT24_TO_OCTET_STRING(plmn->nssai[k].sd, sd); }
+      }
+    }
+  }
+
+  return pdu;
+}
+
+/**
+ * @brief XnAP Setup Response decoding
+ */
+bool decode_xn_setup_response(xnap_setup_resp_t *out, const XNAP_XnAP_PDU_t *pdu)
+{
+  /* Check presence of message type */
+  _EQ_CHECK_INT(pdu->present, XNAP_XnAP_PDU_PR_successfulOutcome);
+  AssertError(pdu->choice.successfulOutcome != NULL, return false, "successfulOutcome is NULL");
+  _EQ_CHECK_LONG(pdu->choice.successfulOutcome->procedureCode, XNAP_ProcedureCode_id_xnSetup);
+  _EQ_CHECK_INT(pdu->choice.successfulOutcome->value.present, XNAP_SuccessfulOutcome__value_PR_XnSetupResponse);
+
+  /* XnSetupResponse container */
+  XNAP_XnSetupResponse_t *in = &pdu->choice.successfulOutcome->value.choice.XnSetupResponse;
+  XNAP_XnSetupResponse_IEs_t *ie;
+
+  /* Check presence of mandatory IEs */
+  XNAP_LIB_FIND_IE(XNAP_XnSetupResponse_IEs_t, ie, &in->protocolIEs.list, XNAP_ProtocolIE_ID_id_GlobalNG_RAN_node_ID, true);
+  XNAP_LIB_FIND_IE(XNAP_XnSetupResponse_IEs_t, ie, &in->protocolIEs.list, XNAP_ProtocolIE_ID_id_TAISupport_list, true);
+
+  /* Loop over all IEs */
+  for (int i = 0; i < in->protocolIEs.list.count; i++) {
+    AssertError(in->protocolIEs.list.array[i] != NULL, return false, "protocolIEs.list.array[i] is NULL");
+    ie = in->protocolIEs.list.array[i];
+
+    switch (ie->id) {
+
+      case XNAP_ProtocolIE_ID_id_GlobalNG_RAN_node_ID: {
+        _EQ_CHECK_INT(ie->value.present, XNAP_XnSetupResponse_IEs__value_PR_GlobalNG_RANNode_ID);
+        XNAP_GlobalNG_RANNode_ID_t *global = &ie->value.choice.GlobalNG_RANNode_ID;
+        AssertError(global->present == XNAP_GlobalNG_RANNode_ID_PR_gNB, return false, "Only gNB supported");
+        AssertError(global->choice.gNB != NULL, return false, "gNB is NULL");
+
+        PLMNID_TO_MCC_MNC(&global->choice.gNB->plmn_id, out->plmn.mcc, out->plmn.mnc, out->plmn.mnc_digit_length);
+        AssertError(global->choice.gNB->gnb_id.present == XNAP_GNB_ID_Choice_PR_gnb_ID, return false, "Unsupported gNB ID");
+        MACRO_BIT_STRING_TO_GNB_ID(&global->choice.gNB->gnb_id.choice.gnb_ID, out->gNB_id);
+      } break;
+
+      case XNAP_ProtocolIE_ID_id_TAISupport_list: {
+        _EQ_CHECK_INT(ie->value.present, XNAP_XnSetupResponse_IEs__value_PR_TAISupport_List);
+        out->num_tai = ie->value.choice.TAISupport_List.list.count;
+        out->tai_support = calloc_or_fail(out->num_tai, sizeof(*out->tai_support));
+
+        for (int m = 0; m < out->num_tai; m++) {
+          XNAP_TAISupport_Item_t *tai = ie->value.choice.TAISupport_List.list.array[m];
+          OCTET_STRING_TO_INT24(&tai->tac, out->tai_support[m].tac);
+
+          out->tai_support[m].num_plmn = tai->broadcastPLMNs.list.count;
+          out->tai_support[m].plmn_support = calloc_or_fail(out->tai_support[m].num_plmn, sizeof(*out->tai_support[m].plmn_support));
+
+          for (int j = 0; j < out->tai_support[m].num_plmn; j++) {
+            XNAP_BroadcastPLMNinTAISupport_Item_t *plmn_item = tai->broadcastPLMNs.list.array[j];
+            xnap_plmn_support_t *plmn = &out->tai_support[m].plmn_support[j];
+
+            PLMNID_TO_MCC_MNC(&plmn_item->plmn_id, plmn->plmn.mcc, plmn->plmn.mnc, plmn->plmn.mnc_digit_length);
+
+            plmn->num_nssai = plmn_item->tAISliceSupport_List.list.count;
+            plmn->nssai = calloc_or_fail(plmn->num_nssai, sizeof(*plmn->nssai));
+
+            for (int k = 0; k < plmn->num_nssai; k++) {
+              OCTET_STRING_TO_INT8(&plmn_item->tAISliceSupport_List.list.array[k]->sst, plmn->nssai[k].sst);
+              if (plmn_item->tAISliceSupport_List.list.array[k]->sd) {
+                OCTET_STRING_TO_INT24(plmn_item->tAISliceSupport_List.list.array[k]->sd, plmn->nssai[k].sd);
+              }
+            }
+          }
+        }
+      } break;
+
+      default:
+        AssertError(0, return false, "Unknown XnAP IE id %ld\n", ie->id);
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * @brief XnAP Setup Response main equality check
+ */
+bool eq_xnap_setup_response(const xnap_setup_resp_t *a, const xnap_setup_resp_t *b)
+{
+  _EQ_CHECK_UINT32(a->gNB_id, b->gNB_id);
+  if (!eq_xnap_plmn(&a->plmn, &b->plmn)) return false;
+
+  _EQ_CHECK_INT(a->num_tai, b->num_tai);
+  for (int i = 0; i < a->num_tai; i++) {
+    if (!eq_xnap_tai_support(&a->tai_support[i], &b->tai_support[i]))
+      return false;
+  }
+
+  return true;
+}
+
+/**
+ * @brief XnAP Setup Response memory management
+ */
+void free_xnap_setup_response(const xnap_setup_resp_t *msg)
+{
+  DevAssert(msg != NULL);
+  free_xnap_tai_support(msg->tai_support, msg->num_tai);
+}
+

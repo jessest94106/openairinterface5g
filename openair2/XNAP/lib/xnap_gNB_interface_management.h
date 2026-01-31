@@ -27,11 +27,15 @@
 typedef struct XNAP_XnAP_PDU XNAP_XnAP_PDU_t;
 
 XNAP_XnAP_PDU_t *encode_xn_setup_request(const xnap_setup_req_t *req);
+XNAP_XnAP_PDU_t *encode_xn_setup_response(const xnap_setup_resp_t *resp);
 
 bool decode_xn_setup_request(xnap_setup_req_t *req, const XNAP_XnAP_PDU_t *pdu);
+bool decode_xn_setup_response(xnap_setup_resp_t *out, const XNAP_XnAP_PDU_t *pdu);
 
 bool eq_xnap_setup_request(const xnap_setup_req_t *a, const xnap_setup_req_t *b);
+bool eq_xnap_setup_response(const xnap_setup_resp_t *a, const xnap_setup_resp_t *b);
 
 void free_xnap_setup_request(const xnap_setup_req_t *msg);
+void free_xnap_setup_response(const xnap_setup_resp_t *msg);
 
 #endif /* XNAP_GNB_INTERFACE_MANAGEMENT_H_ */
