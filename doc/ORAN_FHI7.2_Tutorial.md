@@ -719,7 +719,7 @@ RU must be rebooted so the changes apply.
 - The measured throughput was **520 Mbps DL** and **40 Mbps UL**.
 - With newer OAI versions, throughput degrades. This issue is currently under investigation.
 
-### ProtO-RU
+#### ProtO-RU
 
 [ProtO-RU](https://github.com/NUS-CIR/ProtO-RU) is a software implementation of an O-RAN 7.2 RU using a NI USRP.
 Different from other COTS RUs, ProtO-RU requires a larger DU delay profile which is larger than the TTI interval.
@@ -731,7 +731,7 @@ The OAI configuration file [`gnb.sa.band78.106prb.fhi72.1x1-proto-ru.conf`](../t
 - MTU 9216
 - 1T1R
 
-#### RU configuration
+##### RU configuration
 
 First, compile the RU as outlined in the [building ProtO-RU tutorial](https://github.com/NUS-CIR/ProtO-RU/tree/proto-ru?tab=readme-ov-file#building-proto-ru).
 Then, ensure that both your DU and ProtO-RU host are PTP synchronized.
