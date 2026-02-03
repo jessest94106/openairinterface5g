@@ -419,6 +419,9 @@ endif()
 ####################################################################################
 
 if (CUDA_ENABLE)
+add_physim_test(cuda.5g.channelsim.test_multipath  "unitary test designed specifically to validate the multipath_channel_cuda" test_multipath)
+add_physim_test(cuda.5g.channelsim.test_noise "unitary test that focuses on a single component: the add_noise_cuda function" test_noise)
+
 # --- Test Suite 1: 61440 samples, 2/4/8/32 TX - 2/4/8/32 RX  ---
 add_physim_test(cuda.5g.channelsim.test_channel_scalability.test1  "16 channels 61440 samples 2T2R Batch"  test_channel_scalability -c 16 -t 2 -r 2 -s 61440 -l 32 -m batch  -n 12)
 add_physim_test(cuda.5g.channelsim.test_channel_scalability.test2  "16 channels 61440 samples 2T2R Stream" test_channel_scalability -c 16 -t 2 -r 2 -s 61440 -l 32 -m stream -n 12)
