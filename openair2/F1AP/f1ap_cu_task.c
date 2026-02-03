@@ -38,6 +38,7 @@
 #include "lib/f1ap_interface_management.h"
 #include "lib/f1ap_ue_context.h"
 #include "f1ap_cu_paging.h"
+#include "lib/f1ap_paging.h"
 #include "f1ap_cu_task.h"
 #include "openair2/RRC/NR/nr_rrc_defs.h"
 #include <openair3/ocp-gtpu/gtp_itf.h>
@@ -204,6 +205,7 @@ void *F1AP_CU_task(void *arg) {
 
       case F1AP_PAGING:
         CU_send_Paging(assoc_id, &F1AP_PAGING(received_msg));
+        free_f1ap_paging(&F1AP_PAGING(received_msg));
         break;
 
       case F1AP_UE_CONTEXT_MODIFICATION_CONFIRM:

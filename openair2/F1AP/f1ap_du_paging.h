@@ -19,20 +19,10 @@
  *      contact@openairinterface.org
  */
 
-/*! \file f1ap_du_interface_management.h
- * \brief f1ap interface management for DU
- * \author EURECOM/NTUST
- * \date 2018
- * \version 0.1
- * \company Eurecom
- * \email: navid.nikaein@eurecom.fr, bing-kai.hong@eurecom.fr
- * \note
- * \warning
- */
-
 #ifndef F1AP_DU_PAGING_H_
 #define F1AP_DU_PAGING_H_
 
+/* Paging (gNB-CU initiated) */
 int DU_handle_Paging(instance_t instance, sctp_assoc_t assoc_id, uint32_t stream, F1AP_F1AP_PDU_t *pdu);
 
 #endif /* F1AP_DU_PAGING_H_ */
