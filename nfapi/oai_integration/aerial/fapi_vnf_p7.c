@@ -114,10 +114,10 @@ static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
                                            void *pPackedBuf,
                                            void *pDataBuf,
                                            uint32_t packedBufLen,
-                                           uint32_t dataBufLen,
+                                           int32_t dataBufLen,
                                            nfapi_p7_codec_config_t *config,
                                            nfapi_vnf_p7_config_t *p7_config,
-                                           uint32_t *data_len)
+                                           int32_t *data_len)
 {
   if (pMessageBuf == NULL || pPackedBuf == NULL) {
     NFAPI_TRACE(NFAPI_TRACE_ERROR, "P7 Pack supplied pointers are null\n");
@@ -130,7 +130,7 @@ static int32_t aerial_pack_tx_data_request(void *pMessageBuf,
   uint8_t *pPackedDataField = &pDataPackedMessage[0];
   uint8_t *pPackedDataFieldStart = &pDataPackedMessage[0];
   uint8_t **ppWriteData = &pPackedDataField;
-  const uint32_t dataBufLen32 = (dataBufLen + 3) / 4;
+  const int32_t dataBufLen32 = (dataBufLen + 3) / 4;
   nfapi_nr_tx_data_request_t *pNfapiMsg = (nfapi_nr_tx_data_request_t *)pMessageHeader;
   // Actual payloads are packed in a separate buffer
   for (int i = 0; i < pNfapiMsg->Number_of_PDUs; i++) {
@@ -201,7 +201,7 @@ bool aerial_nr_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *h
       size += pNfapiMsg->pdu_list[i].PDU_length;
     }
     AssertFatal(size <= get_cpu_data_buf_size(), "Message data larger than available buffer, tried to pack %" PRId64, size);
-    uint32_t data_len = 0;
+    int32_t data_len = 0;
     int32_t len_FAPI = aerial_pack_tx_data_request(header,
                                                    send_msg.msg_buf,
                                                    send_msg.data_buf,
@@ -213,7 +213,7 @@ bool aerial_nr_send_p7_message(vnf_p7_t *vnf_p7, nfapi_nr_p7_message_header_t *h
 
     // Set both lengths
     send_msg.msg_len = len_FAPI + 8; // adding 8 to account for the size of the FAPI header
-    send_msg.data_len = (int32_t)data_len;
+    send_msg.data_len = data_len;
 
     if (len_FAPI <= 0) {
       LOG_E(NFAPI_VNF, "Problem packing TX_DATA_request\n");
