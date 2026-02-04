@@ -95,6 +95,23 @@ int brf_error(int status);
 
 const bladerf_format format = BLADERF_FORMAT_SC16_Q11_META;
 
+static const char *ch_dir(bladerf_channel ch)
+{
+  switch (ch) {
+    case BLADERF_CHANNEL_RX(0):
+      return "RX0";
+    case BLADERF_CHANNEL_RX(1):
+      return "RX1";
+    case BLADERF_CHANNEL_TX(0):
+      return "TX0";
+    case BLADERF_CHANNEL_TX(1):
+      return "TX1";
+    default:
+      return "unknown";
+  }
+  return "unknown";
+}
+
 /*! \brief Start BladeRF
  * \param device the hardware to use
  * \returns 0 on success
@@ -333,6 +350,40 @@ int trx_brf_write_init(openair0_device_t *device)
     return 0;
 }
 
+typedef struct channel_config {
+    bladerf_channel channel;
+    unsigned int frequency;
+    unsigned int sample_rate;
+    unsigned int bandwidth;
+    int gain;
+} channel_config_t;
+
+
+static int configure_channel(struct bladerf *dev, channel_config_t *c)
+{
+  int status;
+  unsigned int actual_value = 0;
+  const char *dir = ch_dir(c->channel);
+
+  status = bladerf_set_frequency(dev, c->channel, c->frequency);
+  BLADERF_CHECK(status == 0, "Set %s frequency %u", dir, c->frequency);
+
+  status = bladerf_set_sample_rate(dev, c->channel, c->sample_rate, &actual_value);
+  BLADERF_CHECK(status == 0, "Set %s sample rate %u (is %u)", dir, c->sample_rate, actual_value);
+
+  status = bladerf_set_bandwidth(dev, c->channel, c->bandwidth, &actual_value);
+  BLADERF_CHECK(status == 0, "Set %s bandwidth %u (is %u)", dir, c->bandwidth, actual_value);
+
+  status = bladerf_set_gain(dev, c->channel, c->gain);
+  BLADERF_CHECK(status == 0, "Set %s gain %u", dir, c->gain);
+
+  bladerf_gain g;
+  status = bladerf_get_gain(dev, c->channel, &g);
+  BLADERF_CHECK(status == 0, "Get %s gain: %u", dir, g);
+
+  return 0;
+}
+
 /*! \brief Initialize Openair BLADERF target. It returns 0 if OK
  * \param device the hardware to use
  * \param openair0_cfg RF frontend parameters set by application
@@ -340,167 +391,156 @@ int trx_brf_write_init(openair0_device_t *device)
  */
 int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
 {
-    int status;
-    brf_state_t *brf = (brf_state_t*)malloc(sizeof(brf_state_t));
-    memset(brf, 0, sizeof(brf_state_t));
-    /* device specific */
-    //openair0_cfg->txlaunch_wait = 1;//manage when TX processing is triggered
-    //openair0_cfg->txlaunch_wait_slotcount = 1; //manage when TX processing is triggered
+  int status;
+  brf_state_t brf = {0};
 
-    // init required params
-    switch ((int)openair0_cfg->sample_rate) {
+  switch ((long) openair0_cfg->sample_rate) {
+    case 46080000:
+      openair0_cfg->samples_per_packet = 8192;
+      openair0_cfg->tx_sample_advance = 0;
+      brf.num_buffers = 128;
+      brf.num_transfers = 32;
+      brf.rx_timeout_ms = 2000;
+      break;
+
     case 30720000:
-        openair0_cfg->samples_per_packet    = 2048;
-        openair0_cfg->tx_sample_advance     = 0;
-        break;
+      openair0_cfg->samples_per_packet = 4096;
+      openair0_cfg->tx_sample_advance = 0;
+      brf.num_buffers = 128;
+      brf.num_transfers = 32;
+      brf.rx_timeout_ms = 2000;
+      break;
+
+    case 23040000:
+      openair0_cfg->samples_per_packet = 2048;
+      openair0_cfg->tx_sample_advance = 0;
+      brf.num_buffers = 64;
+      brf.num_transfers = 16;
+      brf.rx_timeout_ms = 2000;
+      break;
+
     case 15360000:
-        openair0_cfg->samples_per_packet    = 2048;
-        openair0_cfg->tx_sample_advance     = 0;
-        break;
+      openair0_cfg->samples_per_packet = 2048;
+      openair0_cfg->tx_sample_advance = 0;
+
+      brf.num_buffers = 64;
+      brf.num_transfers = 16;
+      brf.rx_timeout_ms = 2000;
+      break;
+    case 11520000:
+      openair0_cfg->samples_per_packet = 2048;
+      openair0_cfg->tx_sample_advance = 0;
+      brf.num_buffers = 64;
+      brf.num_transfers = 16;
+      brf.rx_timeout_ms = 2000;
+      break;
+
     case 7680000:
-        openair0_cfg->samples_per_packet    = 1024;
-        openair0_cfg->tx_sample_advance     = 0;
-        break;
+      openair0_cfg->samples_per_packet = 1024;
+      openair0_cfg->tx_sample_advance = 0;
+      brf.num_buffers = 32;
+      brf.num_transfers = 16;
+      brf.rx_timeout_ms = 2000;
+      break;
+
     case 1920000:
-        openair0_cfg->samples_per_packet    = 256;
-        openair0_cfg->tx_sample_advance     = 50;
-        break;
+      openair0_cfg->samples_per_packet = 256;
+      openair0_cfg->tx_sample_advance = 50;
+      brf.num_buffers = 128;
+      brf.num_transfers = 16;
+      brf.rx_timeout_ms = 2000;
+      break;
+
     default:
-        printf("Error: unknown sampling rate %f\n",openair0_cfg->sample_rate);
-        exit(-1);
-        break;
+      LOG_E(HW, "Error: unknown sampling rate %f\n", openair0_cfg->sample_rate);
+      return -1;
+      break;
+  }
+
+  brf.tx_timeout_ms = 2000;
+  brf.buffer_size = (unsigned int)openair0_cfg->samples_per_packet;
+  brf.sample_rate   = (unsigned int)openair0_cfg->sample_rate;
+
+  float rxterm = brf.num_transfers * brf.buffer_size * 1000.0 / brf.rx_timeout_ms;
+  float txterm = brf.num_transfers * brf.buffer_size * 1000.0 / brf.tx_timeout_ms;
+  LOG_I(HW,
+        "sample rate %d trnsfers %d timeout rx %d tx %d buffer size %d (rx %f, tx %f)\n",
+        brf.sample_rate,
+        brf.num_transfers,
+        brf.rx_timeout_ms,
+        brf.tx_timeout_ms,
+        brf.buffer_size,
+        rxterm,
+        txterm);
+  DevAssert(brf.sample_rate > txterm * 1.25); // see doc on async interface
+  DevAssert(brf.sample_rate > rxterm * 1.25);
+
+  memset(&brf.meta_rx, 0, sizeof(brf.meta_rx));
+  memset(&brf.meta_tx, 0, sizeof(brf.meta_tx));
+
+  // set this to BLADERF_LOG_LEVEL_VERBOSE for more detailed BladeRF info
+  bladerf_log_set_verbosity(BLADERF_LOG_LEVEL_INFO);
+
+  status = bladerf_open(&brf.dev, openair0_cfg->sdr_addrs);
+  BLADERF_CHECK(status == 0, "Init BladeRF device '%s'", openair0_cfg->sdr_addrs);
+
+  if (bladerf_device_speed(brf.dev) != BLADERF_DEVICE_SPEED_SUPER) {
+    LOG_E(HW, "Device does not operate at max speed, change the USB port\n");
+    return -1;
     }
 
-    //  The number of buffers to use in the underlying data stream
-    brf->num_buffers   = 128;
-    // the size of the underlying stream buffers, in samples
-    brf->buffer_size   = (unsigned int) openair0_cfg->samples_per_packet;//*sizeof(int32_t); // buffer size = 4096 for sample_len of 1024
-    brf->num_transfers = 16;
-    brf->rx_timeout_ms = 0;
-    brf->tx_timeout_ms = 0;
-    brf->sample_rate=(unsigned int)openair0_cfg->sample_rate;
+  /** [Forcing Tuning Mode to FPGA] */
+  const bladerf_tuning_mode tMode = BLADERF_TUNING_MODE_FPGA;
+  status = bladerf_set_tuning_mode(brf.dev, tMode);
+  BLADERF_CHECK(status == 0, "Set tuning mode FPGA");
 
-    memset(&brf->meta_rx, 0, sizeof(brf->meta_rx));
-    memset(&brf->meta_tx, 0, sizeof(brf->meta_tx));
+  status = bladerf_set_gain_mode(brf.dev, BLADERF_CHANNEL_RX(0), BLADERF_GAIN_MGC);
+  BLADERF_CHECK(status == 0, "Disable AGC");
 
-    printf("\n[BRF] sampling_rate %u, num_buffers %u,  buffer_size %u, num transfer %u, timeout_ms (rx %u, tx %u)\n",
-           brf->sample_rate, brf->num_buffers, brf->buffer_size,brf->num_transfers, brf->rx_timeout_ms, brf->tx_timeout_ms);
+  channel_config_t rx_chan = {
+    .channel = BLADERF_CHANNEL_RX(0),
+    .frequency = openair0_cfg->rx_freq[0],
+    .sample_rate = openair0_cfg->sample_rate,
+    .bandwidth = openair0_cfg->rx_bw,
+    .gain = openair0_cfg->rx_gain[0],
+  };
+  configure_channel(brf.dev, &rx_chan);
 
-    if ((status=bladerf_open(&brf->dev, "")) != 0 ) {
-        fprintf(stderr,"Failed to open brf device: %s\n",bladerf_strerror(status));
-        brf_error(status);
-    }
-    printf("[BRF] init dev %p\n", brf->dev);
-    switch(bladerf_device_speed(brf->dev)) {
-    case BLADERF_DEVICE_SPEED_SUPER:
-        printf("[BRF] Device operates at max speed\n");
-        break;
-    default:
-        printf("[BRF] Device does not operates at max speed, change the USB port\n");
-        brf_error(BLADERF_ERR_UNSUPPORTED);
-    }
-    // RX
-    // Example of CLI output: RX Frequency: 2539999999Hz
+  // This is a hack. The USRP library currently does max_gain-tx_gain (tx_gain
+  // is the attenuation, so completely illogical), but let's keep what users
+  // would expect by doing the same. Existing configs can then be reused.
+  // Note also that the doc says that get_gain_range() should be called after
+  // setting the frequency, but the gain should normally come from outside, so
+  // be set by user and independent of the exact frequency.
+  const struct bladerf_range *g = NULL;
+  status = bladerf_get_gain_range(brf.dev, BLADERF_CHANNEL_TX(0), &g);
+  BLADERF_CHECK(status == 0 && g != NULL, "Get TX0 gain range");
+  channel_config_t tx_chan = {
+    .channel = BLADERF_CHANNEL_TX(0),
+    .frequency = openair0_cfg->tx_freq[0],
+    .sample_rate = openair0_cfg->sample_rate,
+    .bandwidth = openair0_cfg->tx_bw,
+    .gain = g->max - openair0_cfg->tx_gain[0], // see comment above
+  };
+  configure_channel(brf.dev, &tx_chan);
 
+  LOG_I(HW, "BLADERF: Initializing device done\n");
+  device->type             = BLADERF_DEV;
+  device->trx_start_func = trx_brf_start;
+  device->trx_end_func   = trx_brf_end;
+  device->trx_read_func  = trx_brf_read;
+  device->trx_write_func = trx_brf_write;
+  device->trx_get_stats_func   = trx_brf_get_stats;
+  device->trx_reset_stats_func = trx_brf_reset_stats;
+  device->trx_stop_func        = trx_brf_stop;
+  device->trx_set_freq_func    = trx_brf_set_freq;
+  device->trx_set_gains_func   = trx_brf_set_gains;
+  device->trx_write_init       = trx_brf_write_init;
+  device->openair0_cfg = openair0_cfg;
+  device->priv = malloc_or_fail(sizeof(brf_state_t));
+  *(brf_state_t *)device->priv = brf;
 
-    if ((status=bladerf_set_gain_mode(brf->dev, BLADERF_MODULE_RX, BLADERF_GAIN_MGC))) {
-        fprintf(stderr, "[BRF] Failed to disable AGC\n");
-        brf_error(status);
-    }
-
-    if ((status=bladerf_set_frequency(brf->dev, BLADERF_MODULE_RX, (unsigned int) openair0_cfg->rx_freq[0])) != 0) {
-        fprintf(stderr,"Failed to set RX frequency: %s\n",bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set RX frequency to %u\n",(unsigned int)openair0_cfg->rx_freq[0]);
-
-
-
-    unsigned int actual_value=0;
-    if ((status=bladerf_set_sample_rate(brf->dev, BLADERF_MODULE_RX, (unsigned int) openair0_cfg->sample_rate, &actual_value)) != 0) {
-        fprintf(stderr,"Failed to set RX sample rate: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set RX sample rate to %u, %u\n", (unsigned int) openair0_cfg->sample_rate, actual_value);
-
-
-    if ((status=bladerf_set_bandwidth(brf->dev, BLADERF_MODULE_RX, (unsigned int) openair0_cfg->rx_bw*2, &actual_value)) != 0) {
-        fprintf(stderr,"Failed to set RX bandwidth: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set RX bandwidth to %u, %u\n",(unsigned int)openair0_cfg->rx_bw*2, actual_value);
-
-    if ((status=bladerf_set_gain(brf->dev, BLADERF_MODULE_RX, (int) openair0_cfg->rx_gain[0]-openair0_cfg[0].rx_gain_offset[0])) != 0) {
-        fprintf(stderr,"Failed to set RX gain: %s\n",bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set RX gain to %d (%d)\n",(int)(openair0_cfg->rx_gain[0]-openair0_cfg[0].rx_gain_offset[0]),(int)openair0_cfg[0].rx_gain_offset[0]);
-
-    // TX
-
-    if ((status=bladerf_set_frequency(brf->dev, BLADERF_MODULE_TX, (unsigned int) openair0_cfg->tx_freq[0])) != 0) {
-        fprintf(stderr,"Failed to set TX frequency: %s\n",bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set TX Frequency to %u\n", (unsigned int) openair0_cfg->tx_freq[0]);
-
-    if ((status=bladerf_set_sample_rate(brf->dev, BLADERF_MODULE_TX, (unsigned int) openair0_cfg->sample_rate, NULL)) != 0) {
-        fprintf(stderr,"Failed to set TX sample rate: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set TX sampling rate to %u \n", (unsigned int) openair0_cfg->sample_rate);
-
-    if ((status=bladerf_set_bandwidth(brf->dev, BLADERF_MODULE_TX,(unsigned int)openair0_cfg->tx_bw*2, NULL)) != 0) {
-        fprintf(stderr, "Failed to set TX bandwidth: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set TX bandwidth to %u \n", (unsigned int) openair0_cfg->tx_bw*2);
-
-    if ((status=bladerf_set_gain(brf->dev, BLADERF_MODULE_TX, (int) openair0_cfg->tx_gain[0])) != 0) {
-        fprintf(stderr,"Failed to set TX gain: %s\n",bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] set the TX gain to %d\n", (int)openair0_cfg->tx_gain[0]);
-
-
-    /* set log to info, available log levels are:
-     * - BLADERF_LOG_LEVEL_VERBOSE
-     * - BLADERF_LOG_LEVEL_DEBUG
-     * - BLADERF_LOG_LEVEL_INFO
-     * - BLADERF_LOG_LEVEL_WARNING
-     * - BLADERF_LOG_LEVEL_ERROR
-     * - BLADERF_LOG_LEVEL_CRITICAL
-     * - BLADERF_LOG_LEVEL_SILENT
-     */
-    bladerf_log_set_verbosity(BLADERF_LOG_LEVEL_INFO);
-
-    printf("BLADERF: Initializing openair0_device_t\n");
-    device->type             = BLADERF_DEV;
-    device->trx_start_func = trx_brf_start;
-    device->trx_end_func   = trx_brf_end;
-    device->trx_read_func  = trx_brf_read;
-    device->trx_write_func = trx_brf_write;
-    device->trx_get_stats_func   = trx_brf_get_stats;
-    device->trx_reset_stats_func = trx_brf_reset_stats;
-    device->trx_stop_func        = trx_brf_stop;
-    device->trx_set_freq_func    = trx_brf_set_freq;
-    device->trx_set_gains_func   = trx_brf_set_gains;
-    device->trx_write_init       = trx_brf_write_init;
-    device->openair0_cfg = openair0_cfg;
-    device->priv = (void *)brf;
-
-    //  memcpy((void*)&device->openair0_cfg,(void*)&openair0_cfg[0],sizeof(openair0_config_t));
-
-    if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_TX, false)) != 0) {
-        fprintf(stderr,"Failed to enable TX module: %s\n", bladerf_strerror(status));
-        abort();
-    }
-    if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_RX, false)) != 0) {
-        fprintf(stderr,"Failed to enable RX module: %s\n", bladerf_strerror(status));
-        abort();
-    }
-
-    return 0;
+  return 0;
 }
 
 
