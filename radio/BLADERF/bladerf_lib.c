@@ -19,59 +19,71 @@
  *      contact@openairinterface.org
  */
 
-/** bladerf_lib.c
- *
- * Author: navid nikaein
- */
-
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <inttypes.h>
-#include "bladerf_lib.h"
-#include "math.h"
-#include "PHY/sse_intrin.h"
+#include <stdint.h>
+
+#include <libbladeRF.h>
+#include "common_lib.h"
+
+/*! \brief BladeRF specific data structure */
+typedef struct {
+  //! opaque BladeRF device struct. An empty ("") or NULL device identifier will result in the first encountered device being opened
+  //! (using the first discovered backend)
+  struct bladerf *dev;
+
+  //! Number of buffers
+  unsigned int num_buffers;
+  //! Buffer size
+  unsigned int buffer_size;
+  //! Number of transfers
+  unsigned int num_transfers;
+  //! RX timeout
+  unsigned int rx_timeout_ms;
+  //! TX timeout
+  unsigned int tx_timeout_ms;
+  //! Metadata for RX
+  struct bladerf_metadata meta_rx;
+  //! Metadata for TX
+  struct bladerf_metadata meta_tx;
+  //! Sample rate
+  unsigned int sample_rate;
+
+  // --------------------------------
+  // Debug and output control
+  // --------------------------------
+  //! Number of underflows
+  int num_underflows;
+  //! Number of overflows
+  int num_overflows;
+  //! number of RX errors
+  int num_rx_errors;
+  //! Number of TX errors
+  int num_tx_errors;
+
+  //! timestamp of current TX
+  uint64_t tx_current_ts;
+  //! timestamp of current RX
+  uint64_t rx_current_ts;
+  //! number of actual samples transmitted
+  uint64_t tx_actual_nsamps;
+  //! number of actual samples received
+  uint64_t rx_actual_nsamps;
+  //! number of TX samples
+  uint64_t tx_nsamps;
+  //! number of RX samples
+  uint64_t rx_nsamps;
+  //! number of TX count
+  uint64_t tx_count;
+  //! number of RX count
+  uint64_t rx_count;
+} brf_state_t;
+
+int brf_error(int status);
 
 /** @addtogroup _BLADERF_PHY_RF_INTERFACE_
  * @{
  */
-
-//! Number of BladeRF devices
-int num_devices=0;
-
-/*These items configure the underlying asynch stream used by the the sync interface.
- */
-
-/*! \brief BladeRF Init function (not used at the moment)
- * \param device RF frontend parameters set by application
- * \returns 0 on success
- */
-int trx_brf_init(openair0_device_t *device)
-{
-    return 0;
-}
-
-
-/*! \brief get current timestamp
- *\param device the hardware to use
- *\param module the bladeRf module
- *\returns timestamp of BladeRF
- */
-openair0_timestamp_t trx_get_timestamp(openair0_device_t *device, bladerf_module module)
-{
-    int status;
-    struct bladerf_metadata meta;
-    brf_state_t *brf = (brf_state_t*)device->priv;
-    memset(&meta, 0, sizeof(meta));
-
-    if ((status=bladerf_get_timestamp(brf->dev, module, &meta.timestamp)) != 0) {
-        fprintf(stderr,"Failed to get current %s timestamp: %s\n",(module == BLADERF_MODULE_RX ) ? "RX" : "TX", bladerf_strerror(status));
-        return -1;
-    } // else {printf("Current RX timestampe  0x%016"PRIx64"\n", meta.timestamp); }
-
-    return meta.timestamp;
-}
-
 
 /*! \brief Start BladeRF
  * \param device the hardware to use
@@ -314,624 +326,6 @@ int trx_brf_write_init(openair0_device_t *device)
     return 0;
 }
 
-#define RXDCLENGTH 16384
-int16_t cos_fsover8[8]  = {2047,   1447,      0,  -1448,  -2047,  -1448,     0,   1447};
-int16_t cos_3fsover8[8] = {2047,  -1448,      0,   1447,  -2047,   1447,     0,  -1448};
-
-/*! \brief calibration table for BladeRF */
-rx_gain_calib_table_t calib_table_fx4[] = {
-    {2300000000.0,53.5},
-    {1880000000.0,57.0},
-    {816000000.0,73.0},
-    {-1,0}
-};
-
-
-/*! \brief set RX gain offset from calibration table
- * \param openair0_cfg RF frontend parameters set by application
- * \param chain_index RF chain ID
- */
-void set_rx_gain_offset(openair0_config_t *openair0_cfg,
-                        int chain_index)
-{
-    int i=0;
-    // loop through calibration table to find best adjustment factor for RX frequency
-    double min_diff = 6e9,diff;
-
-    while (openair0_cfg->rx_gain_calib_table[i].freq>0) {
-        diff = fabs(openair0_cfg->rx_freq[chain_index] - openair0_cfg->rx_gain_calib_table[i].freq);
-        printf("cal %d: freq %f, offset %f, diff %f\n",
-               i,
-               openair0_cfg->rx_gain_calib_table[i].freq,
-               openair0_cfg->rx_gain_calib_table[i].offset,diff);
-        if (min_diff > diff) {
-            min_diff = diff;
-            openair0_cfg->rx_gain_offset[chain_index] = openair0_cfg->rx_gain_calib_table[i].offset;
-        }
-        i++;
-    }
-
-}
-
-
-/*! \brief Calibrate LMSSDR RF
- * \param device the hardware to use
- */
-void calibrate_rf(openair0_device_t *device)
-{
-    /* TODO: this function does not seem to work. Disabled until fixed. */
-    return;
-
-    brf_state_t *brf = (brf_state_t *)device->priv;
-    openair0_timestamp_t ptimestamp;
-    int16_t *calib_buffp,*calib_tx_buffp;
-    int16_t calib_buff[2*RXDCLENGTH];
-    int16_t calib_tx_buff[2*RXDCLENGTH];
-    int i,j,offI,offQ,offIold,offQold,offInew,offQnew,offphase,offphaseold,offphasenew,offgain,offgainold,offgainnew;
-    int32_t meanI,meanQ,meanIold,meanQold;
-    int cnt=0,loop;
-
-    // put TX on a far-away frequency to avoid interference in RX band
-    bladerf_set_frequency(brf->dev,BLADERF_MODULE_TX, (unsigned int) device->openair0_cfg->rx_freq[0] + 200e6);
-    // Set gains to close to max
-    bladerf_set_gain(brf->dev, BLADERF_MODULE_RX, 60);
-    bladerf_set_gain(brf->dev, BLADERF_MODULE_TX, 60);
-
-    // fill TX buffer with fs/8 complex sinusoid
-    j=0;
-    for (i=0; i<RXDCLENGTH; i++) {
-        calib_tx_buff[j++] = cos_fsover8[i&7];
-        calib_tx_buff[j++] = cos_fsover8[(i+6)&7];  // sin
-    }
-    calib_buffp = &calib_buff[0];
-    calib_tx_buffp = &calib_tx_buff[0];
-    // Calibrate RX DC offset
-
-    offIold=offQold=2048;
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_I,offIold);
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_Q,offQold);
-    for (i=0; i<10; i++)
-        trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-
-    for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-        meanIold+=calib_buff[j++];
-        meanQold+=calib_buff[j++];
-    }
-    meanIold/=RXDCLENGTH;
-    meanQold/=RXDCLENGTH;
-    printf("[BRF] RX DC: (%d,%d) => (%d,%d)\n",offIold,offQold,meanIold,meanQold);
-
-    offI=offQ=-2048;
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_I,offI);
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_Q,offQ);
-    for (i=0; i<10; i++)
-        trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-
-    for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-        meanI+=calib_buff[j++];
-        meanQ+=calib_buff[j++];
-    }
-    meanI/=RXDCLENGTH;
-    meanQ/=RXDCLENGTH;
-    //  printf("[BRF] RX DC: (%d,%d) => (%d,%d)\n",offI,offQ,meanI,meanQ);
-
-    while (cnt++ < 12) {
-
-        offInew=(offIold+offI)>>1;
-        offQnew=(offQold+offQ)>>1;
-
-        if (meanI*meanI < meanIold*meanIold) {
-            meanIold = meanI;
-            offIold = offI;
-            printf("[BRF] *** RX DC: offI %d => %d\n",offIold,meanI);
-        }
-        if (meanQ*meanQ < meanQold*meanQold) {
-            meanQold = meanQ;
-            offQold = offQ;
-            printf("[BRF] *** RX DC: offQ %d => %d\n",offQold,meanQ);
-        }
-        offI = offInew;
-        offQ = offQnew;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_I,offI);
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_Q,offQ);
-
-        for (i=0; i<10; i++)
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            meanI+=calib_buff[j++];
-            meanQ+=calib_buff[j++];
-        }
-        meanI/=RXDCLENGTH;
-        meanQ/=RXDCLENGTH;
-        printf("[BRF] RX DC: (%d,%d) => (%d,%d)\n",offI,offQ,meanI,meanQ);
-    }
-
-    printf("[BRF] RX DC: (%d,%d) => (%d,%d)\n",offIold,offQold,meanIold,meanQold);
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_I,offIold);
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_LMS_DCOFF_Q,offQold);
-
-    // TX DC offset
-    // PUT TX as f_RX + fs/4
-    // loop back BLADERF_LB_RF_LNA1
-    bladerf_set_frequency(brf->dev,BLADERF_MODULE_TX, (unsigned int) device->openair0_cfg->rx_freq[0] + (unsigned int) device->openair0_cfg->sample_rate/4);
-    bladerf_set_loopback (brf->dev,BLADERF_LB_RF_LNA1);
-
-    offIold=2048;
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_I,offIold);
-    for (i=0; i<10; i++) {
-        trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-        trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-    }
-    for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-        switch (i&3) {
-        case 0:
-            meanIold+=calib_buff[j++];
-            break;
-        case 1:
-            meanQold+=calib_buff[j++];
-            break;
-        case 2:
-            meanIold-=calib_buff[j++];
-            break;
-        case 3:
-            meanQold-=calib_buff[j++];
-            break;
-        }
-    }
-    //  meanIold/=RXDCLENGTH;
-    //  meanQold/=RXDCLENGTH;
-    printf("[BRF] TX DC (offI): %d => (%d,%d)\n",offIold,meanIold,meanQold);
-
-    offI=-2048;
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_I,offI);
-    for (i=0; i<10; i++) {
-        trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-        trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-    }
-    for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-        switch (i&3) {
-        case 0:
-            meanI+=calib_buff[j++];
-            break;
-        case 1:
-            meanQ+=calib_buff[j++];
-            break;
-        case 2:
-            meanI-=calib_buff[j++];
-            break;
-        case 3:
-            meanQ-=calib_buff[j++];
-            break;
-        }
-    }
-    //  meanI/=RXDCLENGTH;
-    //  meanQ/=RXDCLENGTH;
-    printf("[BRF] TX DC (offI): %d => (%d,%d)\n",offI,meanI,meanQ);
-    cnt = 0;
-    while (cnt++ < 12) {
-
-        offInew=(offIold+offI)>>1;
-        if (meanI*meanI+meanQ*meanQ < meanIold*meanIold +meanQold*meanQold) {
-            printf("[BRF] TX DC (offI): ([%d,%d]) => %d : %d\n",offIold,offI,offInew,meanI*meanI+meanQ*meanQ);
-            meanIold = meanI;
-            meanQold = meanQ;
-            offIold = offI;
-        }
-        offI = offInew;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_I,offI);
-
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            switch (i&3) {
-            case 0:
-                meanI+=calib_buff[j++];
-                break;
-            case 1:
-                meanQ+=calib_buff[j++];
-                break;
-            case 2:
-                meanI-=calib_buff[j++];
-                break;
-            case 3:
-                meanQ-=calib_buff[j++];
-                break;
-            }
-        }
-        //    meanI/=RXDCLENGTH;
-        //   meanQ/=RXDCLENGTH;
-        //    printf("[BRF] TX DC (offI): %d => (%d,%d)\n",offI,meanI,meanQ);
-    }
-
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_I,offIold);
-
-    offQold=2048;
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_Q,offQold);
-    for (i=0; i<10; i++) {
-        trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-        trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-    }
-    // project on fs/4
-    for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-        switch (i&3) {
-        case 0:
-            meanIold+=calib_buff[j++];
-            break;
-        case 1:
-            meanQold+=calib_buff[j++];
-            break;
-        case 2:
-            meanIold-=calib_buff[j++];
-            break;
-        case 3:
-            meanQold-=calib_buff[j++];
-            break;
-        }
-    }
-    //  meanIold/=RXDCLENGTH;
-    //  meanQold/=RXDCLENGTH;
-    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQold,meanIold,meanQold);
-
-    offQ=-2048;
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_Q,offQ);
-    for (i=0; i<10; i++) {
-        trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-        trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-    }
-    for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-        switch (i&3) {
-        case 0:
-            meanI+=calib_buff[j++];
-            break;
-        case 1:
-            meanQ+=calib_buff[j++];
-            break;
-        case 2:
-            meanI-=calib_buff[j++];
-            break;
-        case 3:
-            meanQ-=calib_buff[j++];
-            break;
-        }
-    }
-    //  meanI/=RXDCLENGTH;
-    //  meanQ/=RXDCLENGTH;
-    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQ,meanI,meanQ);
-
-    cnt=0;
-    while (cnt++ < 12) {
-
-        offQnew=(offQold+offQ)>>1;
-        if (meanI*meanI+meanQ*meanQ < meanIold*meanIold +meanQold*meanQold) {
-            printf("[BRF] TX DC (offQ): ([%d,%d]) => %d : %d\n",offQold,offQ,offQnew,meanI*meanI+meanQ*meanQ);
-
-            meanIold = meanI;
-            meanQold = meanQ;
-            offQold = offQ;
-        }
-        offQ = offQnew;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_Q,offQ);
-
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            switch (i&3) {
-            case 0:
-                meanI+=calib_buff[j++];
-                break;
-            case 1:
-                meanQ+=calib_buff[j++];
-                break;
-            case 2:
-                meanI-=calib_buff[j++];
-                break;
-            case 3:
-                meanQ-=calib_buff[j++];
-                break;
-            }
-        }
-        //    meanI/=RXDCLENGTH;
-        //   meanQ/=RXDCLENGTH;
-        //    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQ,meanI,meanQ);
-    }
-
-    printf("[BRF] TX DC: (%d,%d) => (%d,%d)\n",offIold,offQold,meanIold,meanQold);
-
-    bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_LMS_DCOFF_Q,offQold);
-
-    // TX IQ imbalance
-    for (loop=0; loop<2; loop++) {
-        offphaseold=4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_PHASE,offphaseold);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on fs/8 (Image of TX signal in +ve frequencies)
-        for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-            meanIold+= (calib_buff[j]*cos_fsover8[i&7] - calib_buff[j+1]*cos_fsover8[(i+2)&7])>>11;
-            meanQold+= (calib_buff[j]*cos_fsover8[(i+2)&7] + calib_buff[j+1]*cos_fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanIold/=RXDCLENGTH;
-        meanQold/=RXDCLENGTH;
-        printf("[BRF] TX IQ (offphase): %d => (%d,%d)\n",offphaseold,meanIold,meanQold);
-
-        offphase=-4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_PHASE,offphase);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on fs/8 (Image of TX signal in +ve frequencies)
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            meanI+= (calib_buff[j]*cos_fsover8[i&7] - calib_buff[j+1]*cos_fsover8[(i+2)&7])>>11;
-            meanQ+= (calib_buff[j]*cos_fsover8[(i+2)&7] + calib_buff[j+1]*cos_fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanI/=RXDCLENGTH;
-        meanQ/=RXDCLENGTH;
-        printf("[BRF] TX IQ (offphase): %d => (%d,%d)\n",offphase,meanI,meanQ);
-
-        cnt=0;
-        while (cnt++ < 13) {
-
-            offphasenew=(offphaseold+offphase)>>1;
-            printf("[BRF] TX IQ (offphase): ([%d,%d]) => %d : %d\n",offphaseold,offphase,offphasenew,meanI*meanI+meanQ*meanQ);
-            if (meanI*meanI+meanQ*meanQ < meanIold*meanIold +meanQold*meanQold) {
-
-
-                meanIold = meanI;
-                meanQold = meanQ;
-                offphaseold = offphase;
-            }
-            offphase = offphasenew;
-            bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_PHASE,offphase);
-
-            for (i=0; i<10; i++) {
-                trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-                trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-            }
-            // project on fs/8 (Image of TX signal in +ve frequencies)
-            for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-                meanI+= (calib_buff[j]*cos_fsover8[i&7] - calib_buff[j+1]*cos_fsover8[(i+2)&7])>>11;
-                meanQ+= (calib_buff[j]*cos_fsover8[(i+2)&7] + calib_buff[j+1]*cos_fsover8[i&7])>>11;
-                j+=2;
-            }
-            meanI/=RXDCLENGTH;
-            meanQ/=RXDCLENGTH;
-
-            //    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQ,meanI,meanQ);
-        }
-
-        printf("[BRF] TX IQ offphase: %d => (%d,%d)\n",offphaseold,meanIold,meanQold);
-
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_PHASE,offphaseold);
-
-        offgainold=4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_GAIN,offgainold);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on fs/8 (Image of TX signal in +ve frequencies)
-        for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-            meanIold+= (calib_buff[j]*cos_fsover8[i&7] - calib_buff[j+1]*cos_fsover8[(i+2)&7])>>11;
-            meanQold+= (calib_buff[j]*cos_fsover8[(i+2)&7] + calib_buff[j+1]*cos_fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanIold/=RXDCLENGTH;
-        meanQold/=RXDCLENGTH;
-        printf("[BRF] TX IQ (offgain): %d => (%d,%d)\n",offgainold,meanIold,meanQold);
-
-        offgain=-4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_GAIN,offgain);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on fs/8 (Image of TX signal in +ve frequencies)
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            meanI+= (calib_buff[j]*cos_fsover8[i&7] - calib_buff[j+1]*cos_fsover8[(i+2)&7])>>11;
-            meanQ+= (calib_buff[j]*cos_fsover8[(i+2)&7] + calib_buff[j+1]*cos_fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanI/=RXDCLENGTH;
-        meanQ/=RXDCLENGTH;
-        printf("[BRF] TX IQ (offgain): %d => (%d,%d)\n",offgain,meanI,meanQ);
-
-        cnt=0;
-        while (cnt++ < 13) {
-
-            offgainnew=(offgainold+offgain)>>1;
-            if (meanI*meanI+meanQ*meanQ < meanIold*meanIold +meanQold*meanQold) {
-                printf("[BRF] TX IQ (offgain): ([%d,%d]) => %d : %d\n",offgainold,offgain,offgainnew,meanI*meanI+meanQ*meanQ);
-
-                meanIold = meanI;
-                meanQold = meanQ;
-                offgainold = offgain;
-            }
-            offgain = offgainnew;
-            bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_GAIN,offgain);
-
-            for (i=0; i<10; i++) {
-                trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-                trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-            }
-            // project on fs/8 (Image of TX signal in +ve frequencies)
-            for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-                meanI+= (calib_buff[j]*cos_fsover8[i&7] - calib_buff[j+1]*cos_fsover8[(i+2)&7])>>11;
-                meanQ+= (calib_buff[j]*cos_fsover8[(i+2)&7] + calib_buff[j+1]*cos_fsover8[i&7])>>11;
-                j+=2;
-            }
-            meanI/=RXDCLENGTH;
-            meanQ/=RXDCLENGTH;
-
-            //    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQ,meanI,meanQ);
-        }
-
-        printf("[BRF] TX IQ offgain: %d => (%d,%d)\n",offgainold,meanIold,meanQold);
-
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_TX,BLADERF_CORR_FPGA_GAIN,offgainold);
-    }
-
-    // RX IQ imbalance
-    for (loop=0; loop<2; loop++) {
-        offphaseold=4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_PHASE,offphaseold);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on -3fs/8 (Image of TX signal in -ve frequencies)
-        for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-            meanIold+= (calib_buff[j]*cos_3fsover8[i&7] - calib_buff[j+1]*cos_3fsover8[(i+2)&7])>>11;
-            meanQold+= (calib_buff[j]*cos_3fsover8[(i+2)&7] + calib_buff[j+1]*cos_3fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanIold/=RXDCLENGTH;
-        meanQold/=RXDCLENGTH;
-        printf("[BRF] RX IQ (offphase): %d => (%d,%d)\n",offphaseold,meanIold,meanQold);
-
-        offphase=-4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_PHASE,offphase);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on -3fs/8 (Image of TX signal in -ve frequencies)
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            meanI+= (calib_buff[j]*cos_3fsover8[i&7] - calib_buff[j+1]*cos_3fsover8[(i+2)&7])>>11;
-            meanQ+= (calib_buff[j]*cos_3fsover8[(i+2)&7] + calib_buff[j+1]*cos_3fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanI/=RXDCLENGTH;
-        meanQ/=RXDCLENGTH;
-        printf("[BRF] RX IQ (offphase): %d => (%d,%d)\n",offphase,meanI,meanQ);
-
-        cnt=0;
-        while (cnt++ < 13) {
-
-            offphasenew=(offphaseold+offphase)>>1;
-            printf("[BRF] RX IQ (offphase): ([%d,%d]) => %d : %d\n",offphaseold,offphase,offphasenew,meanI*meanI+meanQ*meanQ);
-            if (meanI*meanI+meanQ*meanQ < meanIold*meanIold +meanQold*meanQold) {
-
-
-                meanIold = meanI;
-                meanQold = meanQ;
-                offphaseold = offphase;
-            }
-            offphase = offphasenew;
-            bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_PHASE,offphase);
-
-            for (i=0; i<10; i++) {
-                trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-                trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-            }
-            // project on -3fs/8 (Image of TX signal in -ve frequencies)
-            for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-                meanI+= (calib_buff[j]*cos_3fsover8[i&7] - calib_buff[j+1]*cos_3fsover8[(i+2)&7])>>11;
-                meanQ+= (calib_buff[j]*cos_3fsover8[(i+2)&7] + calib_buff[j+1]*cos_3fsover8[i&7])>>11;
-                j+=2;
-            }
-            meanI/=RXDCLENGTH;
-            meanQ/=RXDCLENGTH;
-
-            //    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQ,meanI,meanQ);
-        }
-
-        printf("[BRF] RX IQ offphase: %d => (%d,%d)\n",offphaseold,meanIold,meanQold);
-
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_PHASE,offphaseold);
-
-        offgainold=4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_GAIN,offgainold);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0,0);
-        }
-        // project on -3fs/8 (Image of TX signal in +ve frequencies)
-        for (meanIold=meanQold=i=j=0; i<RXDCLENGTH; i++) {
-            meanIold+= (calib_buff[j]*cos_3fsover8[i&7] - calib_buff[j+1]*cos_3fsover8[(i+2)&7])>>11;
-            meanQold+= (calib_buff[j]*cos_3fsover8[(i+2)&7] + calib_buff[j+1]*cos_3fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanIold/=RXDCLENGTH;
-        meanQold/=RXDCLENGTH;
-        printf("[BRF] RX IQ (offgain): %d => (%d,%d)\n",offgainold,meanIold,meanQold);
-
-        offgain=-4096;
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_GAIN,offgain);
-        for (i=0; i<10; i++) {
-            trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-            trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-        }
-        // project on 3fs/8 (Image of TX signal in -ve frequencies)
-        for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-            meanI+= (calib_buff[j]*cos_3fsover8[i&7] - calib_buff[j+1]*cos_3fsover8[(i+2)&7])>>11;
-            meanQ+= (calib_buff[j]*cos_3fsover8[(i+2)&7] + calib_buff[j+1]*cos_3fsover8[i&7])>>11;
-            j+=2;
-        }
-
-        meanI/=RXDCLENGTH;
-        meanQ/=RXDCLENGTH;
-        printf("[BRF] RX IQ (offgain): %d => (%d,%d)\n",offgain,meanI,meanQ);
-
-        cnt=0;
-        while (cnt++ < 13) {
-
-            offgainnew=(offgainold+offgain)>>1;
-            if (meanI*meanI+meanQ*meanQ < meanIold*meanIold +meanQold*meanQold) {
-                printf("[BRF] RX IQ (offgain): ([%d,%d]) => %d : %d\n",offgainold,offgain,offgainnew,meanI*meanI+meanQ*meanQ);
-
-                meanIold = meanI;
-                meanQold = meanQ;
-                offgainold = offgain;
-            }
-            offgain = offgainnew;
-            bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_GAIN,offgain);
-
-            for (i=0; i<10; i++) {
-                trx_brf_read(device, &ptimestamp, (void **)&calib_buffp, RXDCLENGTH, 0);
-                trx_brf_write(device,ptimestamp+5*RXDCLENGTH, (void **)&calib_tx_buffp, RXDCLENGTH, 0, 0);
-            }
-            // project on -3fs/8 (Image of TX signal in -ve frequencies)
-            for (meanI=meanQ=i=j=0; i<RXDCLENGTH; i++) {
-                meanI+= (calib_buff[j]*cos_3fsover8[i&7] - calib_buff[j+1]*cos_3fsover8[(i+2)&7])>>11;
-                meanQ+= (calib_buff[j]*cos_3fsover8[(i+2)&7] + calib_buff[j+1]*cos_3fsover8[i&7])>>11;
-                j+=2;
-            }
-            meanI/=RXDCLENGTH;
-            meanQ/=RXDCLENGTH;
-
-            //    printf("[BRF] TX DC (offQ): %d => (%d,%d)\n",offQ,meanI,meanQ);
-        }
-
-        printf("[BRF] RX IQ offgain: %d => (%d,%d)\n",offgainold,meanIold,meanQold);
-
-        bladerf_set_correction(brf->dev,BLADERF_MODULE_RX,BLADERF_CORR_FPGA_GAIN,offgainold);
-    }
-
-    bladerf_set_frequency(brf->dev,BLADERF_MODULE_TX, (unsigned int) device->openair0_cfg->tx_freq[0]);
-    bladerf_set_loopback(brf->dev,BLADERF_LB_NONE);
-    bladerf_set_gain(brf->dev, BLADERF_MODULE_RX, (unsigned int) device->openair0_cfg->rx_gain[0]-device->openair0_cfg[0].rx_gain_offset[0]);
-    bladerf_set_gain(brf->dev, BLADERF_MODULE_TX, (unsigned int) device->openair0_cfg->tx_gain[0]);
-    //  LOG_M("blade_rf_test.m","rxs",calib_buff,RXDCLENGTH,1,1);
-}
-
-
 /*! \brief Initialize Openair BLADERF target. It returns 0 if OK
  * \param device the hardware to use
  * \param openair0_cfg RF frontend parameters set by application
@@ -969,7 +363,6 @@ int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
         exit(-1);
         break;
     }
-    openair0_cfg->rx_gain_calib_table = calib_table_fx4;
 
     //  The number of buffers to use in the underlying data stream
     brf->num_buffers   = 128;
@@ -1030,7 +423,6 @@ int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
     } else
         printf("[BRF] set RX bandwidth to %u, %u\n",(unsigned int)openair0_cfg->rx_bw*2, actual_value);
 
-    set_rx_gain_offset(&openair0_cfg[0],0);
     if ((status=bladerf_set_gain(brf->dev, BLADERF_MODULE_RX, (int) openair0_cfg->rx_gain[0]-openair0_cfg[0].rx_gain_offset[0])) != 0) {
         fprintf(stderr,"Failed to set RX gain: %s\n",bladerf_strerror(status));
         brf_error(status);
@@ -1097,24 +489,6 @@ int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
     } else
         printf("[BRF] RX module enabled \n");
 
-    // calibrate
-
-#if 0
-    /* those calls fail for "Nuand bladeRF 2.0 (bladerf2)", so commented,
-     * but let's keep the code in case it's needed (for other boards,
-     * for anything, unfortunately we don't have other boards to test
-     * right now)
-     */
-    if ((status=bladerf_calibrate_dc(brf->dev, BLADERF_DC_CAL_LPF_TUNING)) != 0 ||
-            (status=bladerf_calibrate_dc(brf->dev, BLADERF_DC_CAL_TX_LPF)) != 0 ||
-            (status=bladerf_calibrate_dc(brf->dev, BLADERF_DC_CAL_RX_LPF)) != 0 ||
-            (status=bladerf_calibrate_dc(brf->dev, BLADERF_DC_CAL_RXVGA2)) != 0) {
-        fprintf(stderr, "[BRF] error calibrating\n");
-        brf_error(status);
-    } else
-        printf("[BRF] calibration OK\n");
-#endif
-
     /* set log to info, available log levels are:
      * - BLADERF_LOG_LEVEL_VERBOSE
      * - BLADERF_LOG_LEVEL_DEBUG
@@ -1141,8 +515,6 @@ int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
     device->openair0_cfg = openair0_cfg;
     device->priv = (void *)brf;
 
-    calibrate_rf(device);
-
     //  memcpy((void*)&device->openair0_cfg,(void*)&openair0_cfg[0],sizeof(openair0_config_t));
 
     if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_TX, false)) != 0) {
@@ -1167,37 +539,5 @@ int brf_error(int status)
     fprintf(stderr, "[BRF] brf_error: %s\n", bladerf_strerror(status));
     exit(-1);
     return status; // or status error code
-}
-
-
-/*! \brief Open BladeRF from serial port
- * \param serial name of serial port on which to open BladeRF device
- * \returns bladerf device structure
- */
-struct bladerf * open_bladerf_from_serial(const char *serial)
-{
-    int status;
-    struct bladerf *dev;
-    struct bladerf_devinfo info;
-    /* Initialize all fields to "don't care" wildcard values.
-     *
-     * Immediately passing this to bladerf_open_with_devinfo() would cause
-     * libbladeRF to open any device on any available backend. */
-    bladerf_init_devinfo(&info);
-    /* Specify the desired device's serial number, while leaving all other
-     * fields in the info structure wildcard values */
-    strncpy(info.serial, serial, BLADERF_SERIAL_LENGTH - 1);
-    info.serial[BLADERF_SERIAL_LENGTH - 1] = '\0';
-    status = bladerf_open_with_devinfo(&dev, &info);
-
-    if (status == BLADERF_ERR_NODEV) {
-        printf("No devices available with serial=%s\n", serial);
-        return NULL;
-    } else if (status != 0) {
-        fprintf(stderr, "Failed to open device with serial=%s (%s)\n", serial, bladerf_strerror(status));
-        return NULL;
-    } else {
-        return dev;
-    }
 }
 /*@}*/
