@@ -2080,7 +2080,7 @@ add_executable(nr_srssim
   )
 
 target_link_libraries(nr_srssim PRIVATE
-  -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON nr_rrc L2_NR -lz -Wl,--end-group
+  -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON -lz -Wl,--end-group
   m pthread ITTI dl nr_ue_phy_meas physim_common
   )
 
