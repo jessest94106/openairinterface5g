@@ -85,6 +85,8 @@ int brf_error(int status);
  * @{
  */
 
+const bladerf_format format = BLADERF_FORMAT_SC16_Q11_META;
+
 /*! \brief Start BladeRF
  * \param device the hardware to use
  * \returns 0 on success
@@ -98,7 +100,7 @@ int trx_brf_start(openair0_device_t *device)
 
     if ((status = bladerf_sync_config(brf->dev,
                                       BLADERF_MODULE_TX,
-                                      BLADERF_FORMAT_SC16_Q11_META,
+                                      format,
                                       brf->num_buffers,
                                       brf->buffer_size,
                                       brf->num_transfers,
@@ -108,7 +110,7 @@ int trx_brf_start(openair0_device_t *device)
     }
     if ((status = bladerf_sync_config(brf->dev,
                                       BLADERF_MODULE_RX,
-                                      BLADERF_FORMAT_SC16_Q11_META,
+                                      format,
                                       brf->num_buffers,
                                       brf->buffer_size,
                                       brf->num_transfers,
