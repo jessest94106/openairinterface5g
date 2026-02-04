@@ -1082,6 +1082,9 @@ static bool nr_rrc_ue_process_masterCellGroup(NR_UE_RRC_INST_t *rrc,
                                         masterCellGroup->size, 0, 0);
   if ((dec_rval.code != RC_OK) && (dec_rval.consumed == 0)) {
     LOG_E(NR_RRC, "CellGroupConfig decode error\n");
+    // if the ASN1 decoding fails for the received CellGroup configuration
+    // we call the function for RLF (re-establishment if security is activated, going to IDLE otherwise)
+    handle_rlf_detection(rrc);
     return false;
   }
   if (LOG_DEBUGFLAG(DEBUG_ASN1)) {
@@ -1552,6 +1555,9 @@ static void nr_rrc_ue_process_rrcReconfiguration(NR_UE_RRC_INST_t *rrc, int gNB_
           LOG_E(NR_RRC, "\n");
           // free the memory
           SEQUENCE_free(&asn_DEF_NR_CellGroupConfig, (void *)cellGroupConfig, 1);
+          // if the ASN1 decoding fails for the received CellGroup configuration
+          // we call the function for RLF (re-establishment if security is activated, going to IDLE otherwise)
+          handle_rlf_detection(rrc);
         } else {
           if (LOG_DEBUGFLAG(DEBUG_ASN1))
             xer_fprint(stdout, &asn_DEF_NR_CellGroupConfig, (const void *) cellGroupConfig);
