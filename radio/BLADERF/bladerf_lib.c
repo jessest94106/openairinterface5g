@@ -85,55 +85,60 @@ int brf_error(int status);
  * @{
  */
 
+#define BLADERF_CHECK(COND, FMT, ...)                                                        \
+  if (COND) {                                                                                \
+    LOG_I(HW, FMT "\n" __VA_OPT__(, ) __VA_ARGS__);                                          \
+  } else {                                                                                   \
+    LOG_E(HW, "Failed: " FMT ": %s\n" __VA_OPT__(, ) __VA_ARGS__, bladerf_strerror(status)); \
+    return -1;                                                                               \
+  }
+
 const bladerf_format format = BLADERF_FORMAT_SC16_Q11_META;
 
 /*! \brief Start BladeRF
  * \param device the hardware to use
  * \returns 0 on success
  */
-int trx_brf_start(openair0_device_t *device)
+static int trx_brf_start(openair0_device_t *device)
 {
-    brf_state_t *brf = (brf_state_t*)device->priv;
-    int status;
+  brf_state_t *brf = device->priv;
+  int status;
 
-    brf->meta_tx.flags = 0;
+  brf->meta_tx.flags = 0;
 
-    if ((status = bladerf_sync_config(brf->dev,
-                                      BLADERF_MODULE_TX,
-                                      format,
-                                      brf->num_buffers,
-                                      brf->buffer_size,
-                                      brf->num_transfers,
-                                      100/*brf->tx_timeout_ms*/)) != 0 ) {
-        fprintf(stderr,"Failed to configure TX sync interface: %s\n", bladerf_strerror(status));
-        abort();
-    }
-    if ((status = bladerf_sync_config(brf->dev,
-                                      BLADERF_MODULE_RX,
-                                      format,
-                                      brf->num_buffers,
-                                      brf->buffer_size,
-                                      brf->num_transfers,
-                                      100/*brf->rx_timeout_ms*/)) != 0 ) {
-        fprintf(stderr,"Failed to configure RX sync interface: %s\n", bladerf_strerror(status));
-        abort();
-    }
-    if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_TX, true)) != 0) {
-        fprintf(stderr,"Failed to enable TX module: %s\n", bladerf_strerror(status));
-        abort();
-    }
-    if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_RX, true)) != 0) {
-        fprintf(stderr,"Failed to enable RX module: %s\n", bladerf_strerror(status));
-        abort();
-    }
+  /* Configure the device's TX module for use with the sync interface.
+   * SC16 Q11 samples *with* metadata are used. */
+  status = bladerf_sync_config(brf->dev, BLADERF_MODULE_TX, format,
+                               brf->num_buffers, brf->buffer_size, brf->num_transfers, brf->tx_timeout_ms);
+  BLADERF_CHECK(status == 0,
+                "Set TX sync interface num_buffers %u, buffer_size %u, num_transfer %u, tx_timeout_ms %u",
+                brf->num_buffers, brf->buffer_size, brf->num_transfers, brf->tx_timeout_ms);
 
-    return 0;
+  /* Configure the device's RX module for use with the sync interface.
+   * SC16 Q11 samples *with* metadata are used. */
+  status = bladerf_sync_config(brf->dev, BLADERF_MODULE_RX, format,
+                               brf->num_buffers, brf->buffer_size, brf->num_transfers, brf->rx_timeout_ms);
+  BLADERF_CHECK(status == 0,
+                "Set RX sync interface num_buffers %u, buffer_size %u, num_transfer %u, rx_timeout_ms %u",
+                brf->num_buffers, brf->buffer_size, brf->num_transfers, brf->rx_timeout_ms);
+
+  /* We must always enable the TX module after calling bladerf_sync_config(), and
+   * before  attempting to TX samples via  bladerf_sync_tx(). */
+  status = bladerf_enable_module(brf->dev, BLADERF_MODULE_TX, true);
+  BLADERF_CHECK(status == 0, "Enable TX module");
+
+  /* We must always enable the RX module after calling bladerf_sync_config(), and
+   * before  attempting to RX samples via  bladerf_sync_rx(). */
+  status = bladerf_enable_module(brf->dev, BLADERF_MODULE_RX, true);
+  BLADERF_CHECK(status == 0, "Enable RX module");
+
+  return 0;
 }
 
 
 /*! \brief Called to send samples to the BladeRF RF target
       \param device pointer to the device structure specific to the RF hardware target
-      \param timestamp The timestamp at whicch the first sample MUST be sent
+      \param timestamp The timestamp at which the first sample MUST be sent
       \param buff Buffer which holds the samples
       \param nsamps number of samples to be sent
       \param cc index of the component carrier
@@ -457,39 +462,6 @@ int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
     } else
         printf("[BRF] set the TX gain to %d\n", (int)openair0_cfg->tx_gain[0]);
 
-
-    /* Configure the device's TX module for use with the sync interface.
-      * SC16 Q11 samples *with* metadata are used. */
-    if ((status=bladerf_sync_config(brf->dev, BLADERF_MODULE_TX,BLADERF_FORMAT_SC16_Q11_META,brf->num_buffers,brf->buffer_size,brf->num_transfers,brf->tx_timeout_ms)) != 0 ) {
-        fprintf(stderr,"Failed to configure TX sync interface: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] configured TX  sync interface \n");
-
-    /* Configure the device's RX module for use with the sync interface.
-       * SC16 Q11 samples *with* metadata are used. */
-    if ((status=bladerf_sync_config(brf->dev, BLADERF_MODULE_RX, BLADERF_FORMAT_SC16_Q11_META,brf->num_buffers,brf->buffer_size,brf->num_transfers,brf->rx_timeout_ms)) != 0 ) {
-        fprintf(stderr,"Failed to configure RX sync interface: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] configured Rx sync interface \n");
-
-
-    /* We must always enable the TX module after calling bladerf_sync_config(), and
-     * before  attempting to TX samples via  bladerf_sync_tx(). */
-    if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_TX, true)) != 0) {
-        fprintf(stderr,"Failed to enable TX module: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] TX module enabled \n");
-
-    /* We must always enable the RX module after calling bladerf_sync_config(), and
-       * before  attempting to RX samples via  bladerf_sync_rx(). */
-    if ((status=bladerf_enable_module(brf->dev, BLADERF_MODULE_RX, true)) != 0) {
-        fprintf(stderr,"Failed to enable RX module: %s\n", bladerf_strerror(status));
-        brf_error(status);
-    } else
-        printf("[BRF] RX module enabled \n");
 
     /* set log to info, available log levels are:
      * - BLADERF_LOG_LEVEL_VERBOSE
