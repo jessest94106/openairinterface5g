@@ -179,13 +179,7 @@ void gNB_I0_measurements(PHY_VARS_gNB *gNB, int slot, int first_symb, int num_sy
 
   allocCast2D(n0_subband_power,
               unsigned int,
-              gNB->measurements.n0_subband_power,
-              frame_parms->nb_antennas_rx,
-              frame_parms->N_RB_UL,
-              false);
-  allocCast2D(n0_subband_power_dB,
-              unsigned int,
-              gNB->measurements.n0_subband_power_dB,
+              measurements->n0_subband_power,
               frame_parms->nb_antennas_rx,
               frame_parms->N_RB_UL,
               false);
@@ -193,17 +187,15 @@ void gNB_I0_measurements(PHY_VARS_gNB *gNB, int slot, int first_symb, int num_sy
   for (int rb = 0 ; rb<frame_parms->N_RB_UL;rb++) {
     int32_t n0_subband_tot_perPRB=0;
     if (nb_symb[rb] > 0) {
-      for (int aarx=0;aarx<frame_parms->nb_antennas_rx;aarx++) {
+      for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
         tmp_n0_subband[aarx][rb] /= nb_symb[rb];
         // apply exponential moving average to smooth noise measurements
         n0_subband_power[aarx][rb] = 0.9 * n0_subband_power[aarx][rb] + 0.1 * tmp_n0_subband[aarx][rb];
-        n0_subband_power_dB[aarx][rb] = dB_fixed(n0_subband_power[aarx][rb]);
         n0_subband_tot_perPRB += n0_subband_power[aarx][rb];
         n0_subband_tot_perANT[aarx] += n0_subband_power[aarx][rb];
       }
-      n0_subband_tot_perPRB/=frame_parms->nb_antennas_rx;
+      n0_subband_tot_perPRB /= frame_parms->nb_antennas_rx;
       measurements->n0_subband_power_tot_dB[rb] = dB_fixed(n0_subband_tot_perPRB);
-      measurements->n0_subband_power_tot_dBm[rb] = measurements->n0_subband_power_tot_dB[rb] - gNB->rx_total_gain_dB - dB_fixed(frame_parms->N_RB_UL);
       LOG_D(NR_PHY,"n0_subband_power_tot_dB[%d] => %d, over %d symbols\n",rb,measurements->n0_subband_power_tot_dB[rb],nb_symb[rb]);
       n0_subband_tot += n0_subband_tot_perPRB;
       nb_rb++;
