@@ -1127,7 +1127,6 @@ int device_init(openair0_device_t *device, openair0_config_t *openair0_cfg)
     bladerf_log_set_verbosity(BLADERF_LOG_LEVEL_INFO);
 
     printf("BLADERF: Initializing openair0_device_t\n");
-    device->Mod_id         = num_devices++;
     device->type             = BLADERF_DEV;
     device->trx_start_func = trx_brf_start;
     device->trx_end_func   = trx_brf_end;
