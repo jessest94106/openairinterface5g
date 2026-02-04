@@ -105,36 +105,47 @@ void nr_est_srs_timing_advance_offset(uint16_t ofdm_symbol_size,
         max_idx);
 }
 
-void dump_nr_I0_stats(FILE *fd,PHY_VARS_gNB *gNB) {
-
-
-    int min_I0=1000,max_I0=0;
-    int amin=0,amax=0;
-    fprintf(fd,"Blacklisted PRBs %d/%d\n",gNB->num_ulprbbl,gNB->frame_parms.N_RB_UL);
-    for (int i=0; i<gNB->frame_parms.N_RB_UL; i++) {
-      if (gNB->ulprbbl[i] > 0) continue;	    
-
-      if (gNB->measurements.n0_subband_power_tot_dB[i]<min_I0) {min_I0 = gNB->measurements.n0_subband_power_tot_dB[i]; amin=i;}
-
-      if (gNB->measurements.n0_subband_power_tot_dB[i]>max_I0) {max_I0 = gNB->measurements.n0_subband_power_tot_dB[i]; amax=i;}
+void dump_nr_I0_stats(FILE *fd, PHY_VARS_gNB *gNB)
+{
+  int min_I0 = 1000, max_I0 = 0;
+  int amin = 0, amax = 0;
+  fprintf(fd, "Blacklisted PRBs %d/%d\n", gNB->num_ulprbbl, gNB->frame_parms.N_RB_UL);
+  for (int i = 0; i < gNB->frame_parms.N_RB_UL; i++) {
+    if (gNB->ulprbbl[i] > 0)
+      continue;
+    if (gNB->measurements.n0_subband_power_tot_dB[i] < min_I0) {
+      min_I0 = gNB->measurements.n0_subband_power_tot_dB[i];
+      amin = i;
     }
-
-    for (int i=0; i<gNB->frame_parms.N_RB_UL; i++) {
-     if (gNB->ulprbbl[i] ==0) fprintf(fd,"%2d.",gNB->measurements.n0_subband_power_tot_dB[i]-gNB->measurements.n0_subband_power_avg_dB);
-     else fprintf(fd," X."); 
-     if (i%25 == 24) fprintf(fd,"\n");
+    if (gNB->measurements.n0_subband_power_tot_dB[i] > max_I0) {
+      max_I0 = gNB->measurements.n0_subband_power_tot_dB[i];
+      amax = i;
     }
-    fprintf(fd,"\n");
-    fprintf(fd,"max_IO = %d (%d), min_I0 = %d (%d), avg_I0 = %d dB",max_I0,amax,min_I0,amin,gNB->measurements.n0_subband_power_avg_dB);
-    if (gNB->frame_parms.nb_antennas_rx>1) {
-       fprintf(fd,"(");
-       for (int aarx=0;aarx<gNB->frame_parms.nb_antennas_rx;aarx++)
-         fprintf(fd,"%d.",gNB->measurements.n0_subband_power_avg_perANT_dB[aarx]);
-       fprintf(fd,")");
-    }
-    fprintf(fd,"\nPRACH I0 = %d.%d dB\n",gNB->measurements.prach_I0/10,gNB->measurements.prach_I0%10);
+  }
 
-
+  for (int i = 0; i < gNB->frame_parms.N_RB_UL; i++) {
+    if (gNB->ulprbbl[i] == 0)
+      fprintf(fd, "%2d.", gNB->measurements.n0_subband_power_tot_dB[i] - gNB->measurements.n0_subband_power_avg_dB);
+    else
+      fprintf(fd, " X.");
+    if (i % 25 == 24)
+      fprintf(fd, "\n");
+  }
+  fprintf(fd, "\n");
+  fprintf(fd,
+          "max_IO = %d (%d), min_I0 = %d (%d), avg_I0 = %d dB",
+          max_I0,
+          amax,
+          min_I0,
+          amin,
+          gNB->measurements.n0_subband_power_avg_dB);
+  if (gNB->frame_parms.nb_antennas_rx > 1) {
+    fprintf(fd, "(");
+    for (int aarx = 0; aarx < gNB->frame_parms.nb_antennas_rx; aarx++)
+      fprintf(fd, "%d.", gNB->measurements.n0_subband_power_avg_perANT_dB[aarx]);
+    fprintf(fd, ")");
+  }
+  fprintf(fd, "\nPRACH I0 = %d.%d dB\n", gNB->measurements.prach_I0 / 10, gNB->measurements.prach_I0 % 10);
 }
 
 void gNB_I0_measurements(PHY_VARS_gNB *gNB, int slot, int first_symb, int num_symb, uint32_t rb_mask_ul[14][9])
