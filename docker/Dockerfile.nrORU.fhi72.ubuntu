@@ -18,13 +18,14 @@
 # * For more information about the OpenAirInterface (OAI) Software Alliance:
 # *      contact@openairinterface.org
 # */
-
+ARG UBUNTU_IMAGE=ubuntu:noble
 FROM ran-base:latest AS ran-base
 
 FROM ran-build-fhi72:latest AS ran-build
 
 #start from scratch for target executable
-FROM ubuntu:noble AS oai-nr-oru
+FROM ${UBUNTU_IMAGE} AS oai-nr-oru
+ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 
