@@ -249,12 +249,43 @@ static void test_xn_setup_response(void)
   printf("%s() successful \n", __func__);
 }
 
+/**
+ * 3. Xn Setup Failure
+ */
+static void test_xn_setup_failure(void)
+{
+  /* ---------- create message ---------- */
+  xnap_setup_failure_t orig = {
+    .cause.type = XNAP_CAUSE_TRANSPORT,
+    .cause.value = XNAP_CAUSE_TRANSPORT_LAYER_TRANSPORT_RESOURCE_UNAVAILABLE,
+  };
+
+  /* ---------- encode ---------- */
+  XNAP_XnAP_PDU_t *xnenc = encode_xn_setup_failure(&orig);
+  XNAP_XnAP_PDU_t *xndec = xnap_encode_decode(xnenc);
+  xnap_msg_free(xnenc);
+
+  /* ---------- decode ---------- */
+  xnap_setup_failure_t decoded = {0};
+  bool ret = decode_xn_setup_failure(&decoded, xndec);
+  AssertFatal(ret, "decode_xn_setup_failure failed");
+  xnap_msg_free(xndec);
+
+  /* ---------- equality ---------- */
+  ret = eq_xnap_setup_failure(&orig, &decoded);
+  AssertFatal(ret, "Xn Setup Failure mismatch\n");
+  free_xnap_setup_failure(&decoded);
+  free_xnap_setup_failure(&orig);
+  printf("%s() successful \n", __func__);
+}
+
 int main() {
   printf("Starting XnAP Library Unit Tests...\n");
 
   /* Xn Interface Testing */
   test_xn_setup_request();
   test_xn_setup_response();
+  test_xn_setup_failure();
 
   printf("All XnAP tests passed!\n");
   return 0;

@@ -56,5 +56,9 @@ bool eq_xnap_plmn(const plmn_id_t *a, const plmn_id_t *b);
 bool eq_xnap_snssai(const nssai_t *a, const nssai_t *b);
 bool eq_xnap_tai_support(const xnap_tai_support_t *a, const xnap_tai_support_t *b);
 bool eq_xnap_plmn_support(const xnap_plmn_support_t *a, const xnap_plmn_support_t *b);
+bool eq_xnap_cause(const xnap_cause_t *a, const xnap_cause_t *b);
+
+int xnap_gNB_set_cause(XNAP_Cause_t *cause_p,const xnap_cause_t *in);
+xnap_cause_t decode_xnap_cause(const XNAP_Cause_t *in);
 
 #endif /* XNAP_LIB_COMMON_H_ */
