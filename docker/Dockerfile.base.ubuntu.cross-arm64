@@ -26,7 +26,8 @@
 #---------------------------------------------------------------------
 
 # Very important, the noble image shall not be using mirrors. A lot of them do NOT support ARM64.
-FROM ubuntu:noble AS ran-base
+ARG UBUNTU_IMAGE=ubuntu:noble
+FROM ${UBUNTU_IMAGE} AS ran-base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Paris
 # Specifying a working version of SIMDE for ARM:

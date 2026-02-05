@@ -25,12 +25,13 @@
 #
 #---------------------------------------------------------------------
 
+ARG UBUNTU_IMAGE=ubuntu:noble
 FROM ran-base:latest AS gnb-base
 
 FROM ran-build:latest AS gnb-build
 
 
-FROM ubuntu:noble AS oai-nr-cuup
+FROM ${UBUNTU_IMAGE} AS oai-nr-cuup
 ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
@@ -46,7 +47,7 @@ RUN apt-get update && \
         libyaml-cpp-dev && \
 # if the --sanitize option was used to build, additional packages are required
     /bin/bash -c 'if [[ "$BUILD_OPTION" = "--sanitize" ]]; then DEBIAN_FRONTEND=noninteractive apt-get install --yes \
-        libasan8 \ 
+        libasan8 \
         libubsan1; fi' && \
     rm -rf /var/lib/apt/lists/*
 
