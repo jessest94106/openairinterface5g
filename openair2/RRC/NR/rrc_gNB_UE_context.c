@@ -155,10 +155,11 @@ void rrc_gNB_remove_ue_context(gNB_RRC_INST *rrc_instance_pP, rrc_gNB_ue_context
     return;
   }
 
-  LOG_UE_EVENT(&ue_context_pP->ue_context, "Remove UE context\n");
+  gNB_RRC_UE_t *ue = &ue_context_pP->ue_context;
+  LOG_I(NR_RRC, "[--] (UE ID %d RNTI %04x) Remove UE context\n", ue->rrc_ue_id, ue->rnti);
   RB_REMOVE(rrc_nr_ue_tree_s, &rrc_instance_pP->rrc_ue_head, ue_context_pP);
-  uid_linear_allocator_free(&rrc_instance_pP->uid_allocator, ue_context_pP->ue_context.rrc_ue_id - 1);
-  cu_remove_f1_ue_data(ue_context_pP->ue_context.rrc_ue_id);
+  uid_linear_allocator_free(&rrc_instance_pP->uid_allocator, ue->rrc_ue_id - 1);
+  cu_remove_f1_ue_data(ue->rrc_ue_id);
   rrc_gNB_free_mem_ue_context(ue_context_pP);
 }
 
