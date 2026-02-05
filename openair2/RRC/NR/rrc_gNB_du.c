@@ -324,30 +324,9 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   f1ap_setup_failure_t fail = {.transaction_id = F1AP_get_next_transaction_identifier(0, 0)};
 
   // check:
-  // - it is one cell
   // - PLMN and Cell ID matches
   // - no previous DU with the same ID
   // else reject
-  if (req->num_cells_available != 1) {
-    LOG_E(NR_RRC, "can only handle on DU cell, but gNB_DU %ld has %d\n", req->gNB_DU_id, req->num_cells_available);
-    fail.cause = F1AP_CauseRadioNetwork_gNB_CU_Cell_Capacity_Exceeded;
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    return;
-  }
-  f1ap_served_cell_info_t *cell_info = &req->cell[0].info;
-  if (!rrc_gNB_plmn_matches(rrc, cell_info)) {
-    LOG_E(NR_RRC,
-          "PLMN mismatch: CU %03d.%0*d, DU %03d%0*d\n",
-          rrc->configuration.plmn[0].mcc,
-          rrc->configuration.plmn[0].mnc_digit_length,
-          rrc->configuration.plmn[0].mnc,
-          cell_info->plmn.mcc,
-          cell_info->plmn.mnc_digit_length,
-          cell_info->plmn.mnc);
-    fail.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU;
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    return;
-  }
   nr_rrc_du_container_t *it = NULL;
   RB_FOREACH(it, rrc_du_tree, &rrc->dus) {
     if (it->gNB_DU_id == req->gNB_DU_id) {
@@ -361,50 +340,7 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
       return;
     }
   }
-
-  if (rrc->neighbour_cell_configuration && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info)) {
-    LOG_E(NR_RRC, "problem with DU %ld in neighbor configuration, rejecting DU\n", req->gNB_DU_id);
-    f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    return;
-  }
-
-  const f1ap_gnb_du_system_info_t *sys_info = req->cell[0].sys_info;
-  NR_MIB_t *mib = NULL;
-  NR_SIB1_t *sib1 = NULL;
-
-  if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
-    if (!extract_sys_info(sys_info, &mib, &sib1)) {
-      LOG_W(NR_RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
-      fail.cause = F1AP_CauseProtocol_semantic_error;
-      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-      return;
-    }
-  }
-  LOG_I(NR_RRC, "Accepting DU %ld (%s), sending F1 Setup Response\n", req->gNB_DU_id, req->gNB_DU_name);
-  LOG_I(NR_RRC, "DU uses RRC version %u.%u.%u\n", req->rrc_ver[0], req->rrc_ver[1], req->rrc_ver[2]);
-
-  /* Create cell and add to global tree */
-  nr_rrc_cell_container_t *new = calloc_or_fail(1, sizeof(*new));
-  new->assoc_id = assoc_id;
-  cp_f1_served_cell_info_to_cell(new, cell_info);
-  new->mib = mib;
-  new->sib1 = sib1;
-  // Add cell to DU's cell array
-  nr_rrc_cell_container_t *collision = rrc_add_cell(rrc, new);
-  if (collision != NULL) {
-    nr_rrc_du_container_t *existing_du = get_du_by_assoc_id(rrc, collision->assoc_id);
-    const char *du_name = existing_du ? existing_du->gNB_DU_name : "unknown";
-    LOG_E(NR_RRC,
-          "Cell ID %lu already exists in DU %s (assoc_id %d), rejecting requesting gNB-DU\n",
-          new->info.cell_id,
-          du_name,
-          collision->assoc_id);
-    rrc_free_cell_container(new);
-    fail.cause = F1AP_CauseRadioNetwork_cell_not_available;
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    return;
-  }
+  LOG_I(NR_RRC, "Accepting DU %ld (%s) (RRC version %u.%u.%u)\n", req->gNB_DU_id, req->gNB_DU_name, req->rrc_ver[0], req->rrc_ver[1], req->rrc_ver[2]);
 
   // DU is accepted, add it to tree and add cell to DU's cell array
   nr_rrc_du_container_t *du = calloc_or_fail(1, sizeof(*du));
@@ -418,48 +354,117 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   nr_rrc_du_container_t *du_collision = rrc_add_du(rrc, du);
   AssertFatal(du_collision == NULL, "rrc_add_du should succeed for new DU (assoc_id %d)", assoc_id);
 
-  nr_rrc_cell_container_t *added = rrc_add_cell_to_du(&du->cells, new);
-  AssertFatal(added != NULL, "Failed to add cell %ld to DU %ld\n", new->info.cell_id, du->gNB_DU_id);
-  LOG_I(NR_RRC, "DU %ld: Added cell %ld\n", du->gNB_DU_id, new->info.cell_id);
-
-  served_cells_to_activate_t cell = {
-      .plmn = cell_info->plmn,
-      .nr_cellid = cell_info->nr_cellid,
-      .nrpci = cell_info->nr_pci,
-      .num_SI = 0,
-  };
-
-  // Encode CU SIBs and configure setup response with sysinfo
-  seq_arr_t *sibs = rrc->SIBs;
-  if (sibs) {
-    for (int i = 0; i < sibs->size; i++) {
-      nr_SIBs_t *sib = (nr_SIBs_t *)seq_arr_at(sibs, i);
-      switch (sib->SIB_type) {
-        case 2: {
-          NR_SSB_MTC_t *ssbmtc = get_ssb_mtc(new->mtc);
-          sib->SIB_size = do_SIB2_NR(&sib->SIB_buffer, ssbmtc);
-          cell.SI_msg[cell.num_SI].SI_container = sib->SIB_buffer;
-          cell.SI_msg[cell.num_SI].SI_container_length = sib->SIB_size;
-          cell.SI_msg[cell.num_SI].SI_type = sib->SIB_type;
-          cell.num_SI++;
-        } break;
-        default:
-          AssertFatal(false, "SIB%d not handled yet\n", sib->SIB_type);
-      }
-    }
-  }
-
-  if (new->mib != NULL &&new->sib1 != NULL)
-    label_intra_frequency_neighbours(rrc, new);
-
+  // Build F1 Setup Response
   f1ap_setup_resp_t resp = {.transaction_id = req->transaction_id,
-                            .num_cells_to_activate = 1,
-                            .cells_to_activate = calloc_or_fail(1, sizeof(*resp.cells_to_activate))};
-  resp.cells_to_activate[0] = cell;
+                            .num_cells_to_activate = req->num_cells_available,
+                            .cells_to_activate = calloc_or_fail(req->num_cells_available, sizeof(*resp.cells_to_activate))};
   int num = read_version(TO_STRING(NR_RRC_VERSION), &resp.rrc_ver[0], &resp.rrc_ver[1], &resp.rrc_ver[2]);
   AssertFatal(num == 3, "could not read RRC version string %s\n", TO_STRING(NR_RRC_VERSION));
   if (rrc->node_name != NULL)
     resp.gNB_CU_name = strdup(rrc->node_name);
+
+  if (req->num_cells_available > 1) {
+    LOG_W(NR_RRC, "Received F1 Setup Request with %u cells, only one cell is supported\n", req->num_cells_available);
+  }
+  for (int i = 0; i < req->num_cells_available; i++) {
+    f1ap_served_cell_info_t *cell_info = &req->cell[i].info;
+    if (!rrc_gNB_plmn_matches(rrc, cell_info)) {
+      LOG_E(NR_RRC,
+            "PLMN mismatch: CU %03d.%0*d, DU %03d%0*d\n",
+            rrc->configuration.plmn[0].mcc,
+            rrc->configuration.plmn[0].mnc_digit_length,
+            rrc->configuration.plmn[0].mnc,
+            cell_info->plmn.mcc,
+            cell_info->plmn.mnc_digit_length,
+            cell_info->plmn.mnc);
+      fail.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU;
+      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+      free_f1ap_setup_response(&resp);
+      return;
+    }
+
+    if (rrc->neighbour_cell_configuration && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info)) {
+      LOG_E(NR_RRC, "problem with DU %ld in neighbor configuration, rejecting DU\n", req->gNB_DU_id);
+      f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
+      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+      free_f1ap_setup_response(&resp);
+      return;
+    }
+
+    const f1ap_gnb_du_system_info_t *sys_info = req->cell[i].sys_info;
+    NR_MIB_t *mib = NULL;
+    NR_SIB1_t *sib1 = NULL;
+    if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
+      if (!extract_sys_info(sys_info, &mib, &sib1)) {
+        LOG_W(NR_RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
+        fail.cause = F1AP_CauseProtocol_semantic_error;
+        rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+        free_f1ap_setup_response(&resp);
+        return;
+      }
+    }
+
+    /* Create cell and add to global tree */
+    nr_rrc_cell_container_t *new = calloc_or_fail(1, sizeof(*new));
+    new->assoc_id = assoc_id;
+    cp_f1_served_cell_info_to_cell(new, cell_info);
+    new->mib = mib;
+    new->sib1 = sib1;
+    // Add cell to DU's cell array
+    nr_rrc_cell_container_t *collision = rrc_add_cell(rrc, new);
+    if (collision != NULL) {
+      nr_rrc_du_container_t *existing_du = get_du_by_assoc_id(rrc, collision->assoc_id);
+      const char *du_name = existing_du ? existing_du->gNB_DU_name : "unknown";
+      LOG_E(NR_RRC,
+            "Cell ID %lu already exists in DU %s (assoc_id %d), rejecting requesting gNB-DU\n",
+            new->info.cell_id,
+            du_name,
+            collision->assoc_id);
+      rrc_free_cell_container(new);
+      fail.cause = F1AP_CauseRadioNetwork_cell_not_available;
+      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+      free_f1ap_setup_response(&resp);
+      return;
+    }
+
+    nr_rrc_cell_container_t *added = rrc_add_cell_to_du(&du->cells, new);
+    AssertFatal(added != NULL, "Failed to add cell %ld to DU %ld\n", new->info.cell_id, du->gNB_DU_id);
+    LOG_I(NR_RRC, "DU %ld: Added cell %ld\n", du->gNB_DU_id, new->info.cell_id);
+
+    served_cells_to_activate_t cell = {
+        .plmn = cell_info->plmn,
+        .nr_cellid = cell_info->nr_cellid,
+        .nrpci = cell_info->nr_pci,
+        .num_SI = 0,
+    };
+
+    // Encode CU SIBs and configure setup response with sysinfo
+    seq_arr_t *sibs = rrc->SIBs;
+    if (sibs) {
+      for (int i = 0; i < sibs->size; i++) {
+        nr_SIBs_t *sib = (nr_SIBs_t *)seq_arr_at(sibs, i);
+        switch (sib->SIB_type) {
+          case 2: {
+            NR_SSB_MTC_t *ssbmtc = get_ssb_mtc(new->mtc);
+            sib->SIB_size = do_SIB2_NR(&sib->SIB_buffer, ssbmtc);
+            cell.SI_msg[cell.num_SI].SI_container = sib->SIB_buffer;
+            cell.SI_msg[cell.num_SI].SI_container_length = sib->SIB_size;
+            cell.SI_msg[cell.num_SI].SI_type = sib->SIB_type;
+            cell.num_SI++;
+          } break;
+          default:
+            AssertFatal(false, "SIB%d not handled yet\n", sib->SIB_type);
+        }
+      }
+    }
+
+    if (new->mib != NULL &&new->sib1 != NULL)
+      label_intra_frequency_neighbours(rrc, new);
+
+    resp.cells_to_activate[i] = cell;
+  }
+
+  LOG_I(NR_RRC, "DU %ld (%s): sending F1 Setup Response\n", req->gNB_DU_id, req->gNB_DU_name);
   rrc->mac_rrc.f1_setup_response(assoc_id, &resp);
   free_f1ap_setup_response(&resp);
 
