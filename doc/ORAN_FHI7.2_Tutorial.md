@@ -1031,6 +1031,7 @@ Edit the sample OAI gNB configuration file and check following parameters:
     * `prach_config`: PRACH-specific configuration
       * `eAxC_offset`:  PRACH antenna offset; if not set, default value of `N = max(Nrx,Ntx)` is used
       * `kbar`: the PRACH guard interval, provided in RU
+  * `app_id`: `DU` or `RU`. Sets the application `id` value in xRAN. Use the default value: `DU`.
 
 Layer mapping (eAxC offsets) happens as follows:
 - For PUSCH/PDSCH, the layers are mapped to `[0,1,...,Nrx-1]/[0,1,...,Ntx-1]` where `Nrx/Ntx` is the
@@ -1491,6 +1492,7 @@ fhi_72 = {
   * `dpdk_iova_mode`: [*]
   * `owdm_enable`: [*]
   * `fh_config`: only DU delay profile (`T1a` and `Ta4`)
+  * `app_id`: [*]
 
 [*] see [Configure OAI gNB](#configure-oai-gnb) for more details
 
