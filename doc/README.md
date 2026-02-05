@@ -44,6 +44,7 @@ There is some general information in the [OpenAirInterface Gitlab Wiki](https://
 - [How to run a 4G setup using L1 simulator](./L1SIM.md) _Note: we recommend the RFsimulator_
 - [How to use the L2 simulator](./L2NFAPI.md)
 - [How to use the OAI channel simulator](../openair1/SIMULATION/TOOLS/DOC/channel_simulation.md)
+- [How to use GPU-accelerated channel simulation](../openair1/SIMULATION/TOOLS/DOC/gpu_acceleration.md)
 - [How to use multiple BWPs](./RUN_NR_multiple_BWPs.md)
 - [How to run OAI-VNF and OAI-PNF](./nfapi.md): how to run the FAPI/nFAPI split,
   including some general remarks on FAPI/nFAPI.
