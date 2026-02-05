@@ -30,6 +30,7 @@
 #include "XNAP_ProtocolIE-Field.h"
 #include "XNAP_InitiatingMessage.h"
 #include "XNAP_SuccessfulOutcome.h"
+#include "XNAP_UnsuccessfulOutcome.h"
 
 #include "XNAP_GlobalgNB-ID.h"
 #include "XNAP_GlobalNG-RANNode-ID.h"
@@ -37,6 +38,7 @@
 #include "XNAP_TAISupport-Item.h"
 #include "XNAP_S-NSSAI.h"
 #include "XNAP_BroadcastPLMNinTAISupport-Item.h"
+#include "XNAP_Cause.h"
 
 #endif // XNAP_LIB_INCLUDES_H
 

@@ -403,3 +403,69 @@ void free_xnap_setup_response(const xnap_setup_resp_t *msg)
   free_xnap_tai_support(msg->tai_support, msg->num_tai);
 }
 
+/**
+ * @brief XnAP Setup Failure encoding
+ */
+XNAP_XnAP_PDU_t *encode_xn_setup_failure(const xnap_setup_failure_t *fail)
+{
+  XNAP_XnAP_PDU_t *pdu = calloc_or_fail(1, sizeof(*pdu));
+
+  /* Message type */
+  pdu->present = XNAP_XnAP_PDU_PR_unsuccessfulOutcome;
+  asn1cCalloc(pdu->choice.unsuccessfulOutcome, failMsg);
+  failMsg->procedureCode = XNAP_ProcedureCode_id_xnSetup;
+  failMsg->criticality = XNAP_Criticality_reject;
+  failMsg->value.present = XNAP_UnsuccessfulOutcome__value_PR_XnSetupFailure;
+
+  XNAP_XnSetupFailure_t *out = &failMsg->value.choice.XnSetupFailure;
+
+  /* Cause (M) */
+  asn1cSequenceAdd(out->protocolIEs.list, XNAP_XnSetupFailure_IEs_t, ie1);
+  ie1->id = XNAP_ProtocolIE_ID_id_Cause;
+  ie1->criticality = XNAP_Criticality_ignore;
+  ie1->value.present = XNAP_XnSetupFailure_IEs__value_PR_Cause;
+  xnap_gNB_set_cause(&ie1->value.choice.Cause, &fail->cause);
+  
+  return pdu;
+}
+
+/**
+ * @brief XnAP Setup Failure decoding
+ */
+bool decode_xn_setup_failure(xnap_setup_failure_t *out, const XNAP_XnAP_PDU_t *pdu)
+{
+  /* Check message type */
+  _EQ_CHECK_INT(pdu->present, XNAP_XnAP_PDU_PR_unsuccessfulOutcome);
+  AssertError(pdu->choice.unsuccessfulOutcome != NULL, return false, "unsuccessfulOutcome is NULL");
+  _EQ_CHECK_LONG(pdu->choice.unsuccessfulOutcome->procedureCode, XNAP_ProcedureCode_id_xnSetup);
+  _EQ_CHECK_INT(pdu->choice.unsuccessfulOutcome->value.present, XNAP_UnsuccessfulOutcome__value_PR_XnSetupFailure);
+
+  /* XnSetupFailure container */
+  XNAP_XnSetupFailure_t *in = &pdu->choice.unsuccessfulOutcome->value.choice.XnSetupFailure;
+  XNAP_XnSetupFailure_IEs_t *ie;
+
+  /* Check presence of mandatory IE */
+  XNAP_LIB_FIND_IE(XNAP_XnSetupFailure_IEs_t, ie, &in->protocolIEs.list, XNAP_ProtocolIE_ID_id_Cause, true);
+
+  /* Decode Cause */
+  _EQ_CHECK_INT(ie->value.present, XNAP_XnSetupFailure_IEs__value_PR_Cause);
+  out->cause = decode_xnap_cause(&ie->value.choice.Cause);
+
+  return true;
+}
+
+/**
+ * @brief XnAP Setup Failure equality check
+ */
+bool eq_xnap_setup_failure(const xnap_setup_failure_t *a, const xnap_setup_failure_t *b)
+{
+  return eq_xnap_cause(&a->cause, &b->cause);
+}
+
+/**
+ * @brief XnAP Setup Failure memory management
+ */
+void free_xnap_setup_failure(xnap_setup_failure_t *msg)
+{
+  // nothing to free
+}
