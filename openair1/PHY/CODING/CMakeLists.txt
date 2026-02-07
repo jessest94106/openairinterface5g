@@ -68,3 +68,4 @@ endif()
 
 add_subdirectory(nrLDPC_coding)
 add_subdirectory(nrLDPC_decoder)
+add_subdirectory(nrPolar_tools)
