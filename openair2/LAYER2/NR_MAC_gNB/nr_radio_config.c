@@ -41,6 +41,7 @@
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair3/UTILS/conversions.h"
 #include "LAYER2/nr_rlc/nr_rlc_asn1_utils.h"
+#include "reverse_bits.h"
 
 #include "NR_MeasurementTimingConfiguration.h"
 #include "uper_decoder.h"
