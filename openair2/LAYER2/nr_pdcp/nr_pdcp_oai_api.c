@@ -53,7 +53,7 @@
 #include "f1ap_messages_types.h"
 #include "gnb_config.h"
 #include "gtpv1_u_messages_types.h"
-#include "hashtable.h"
+#include "ds/hashtable.h"
 #include "intertask_interface.h"
 #include "common/utils/LOG/log.h"
 #include "nfapi/oai_integration/vendor_ext.h"
