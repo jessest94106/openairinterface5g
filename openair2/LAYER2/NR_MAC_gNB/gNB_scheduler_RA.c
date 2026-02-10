@@ -37,7 +37,6 @@
 
 /* Utils */
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/nr/nr_common.h"
 #include "UTIL/OPT/opt.h"
 
@@ -696,8 +695,6 @@ void nr_initiate_ra_proc(module_id_t module_idP,
                          int16_t timing_offset,
                          uint32_t preamble_power)
 {
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_INITIATE_RA_PROC, 1);
-
   gNB_MAC_INST *nr_mac = RC.nrmac[module_idP];
   NR_SCHED_LOCK(&nr_mac->sched_lock);
 
@@ -766,7 +763,6 @@ void nr_initiate_ra_proc(module_id_t module_idP,
   UE->UE_beam_index = get_beam_from_ssbidx(nr_mac, cc->ssb_index[n_ssb]);
   LOG_I(NR_MAC, "UE %04x: Sync beam index %d\n", UE->rnti, UE->UE_beam_index);
   NR_SCHED_UNLOCK(&nr_mac->sched_lock);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_INITIATE_RA_PROC, 0);
 }
 
 static void start_ra_contention_resolution_timer(NR_RA_t *ra, const long ra_ContentionResolutionTimer, const int K2, const int scs)

@@ -33,8 +33,6 @@
 #include "PHY/phy_extern.h"
 #include "PHY/TOOLS/phy_scope_interface.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
-// #include "PHY/INIT/phy_init.h"
 #include "openair2/ENB_APP/enb_paramdef.h"
 #include "system.h"
 #include "nfapi/oai_integration/vendor_ext.h"

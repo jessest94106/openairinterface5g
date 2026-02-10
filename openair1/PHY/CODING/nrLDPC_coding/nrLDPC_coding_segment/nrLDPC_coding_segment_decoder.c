@@ -37,7 +37,6 @@
 #include "PHY/NR_TRANSPORT/nr_dlsch.h"
 #include "SCHED_NR/sched_nr.h"
 #include "defs.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/LOG/log.h"
 
 #include <stdalign.h>

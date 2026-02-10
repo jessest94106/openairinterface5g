@@ -39,7 +39,6 @@
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include <openair1/PHY/CODING/nrSmallBlock/nr_small_block_defs.h>
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "openair1/PHY/NR_REFSIG/nr_refsig.h"
 
 #include "T.h"

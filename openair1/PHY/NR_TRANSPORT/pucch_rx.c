@@ -46,7 +46,6 @@
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "SCHED_NR/sched_nr.h"

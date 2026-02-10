@@ -36,7 +36,6 @@
 
 #include "common/utils/LOG/log.h"
 #include "common/utils/nr/nr_common.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "UTIL/OPT/opt.h"
 
 #include "openair2/X2AP/x2ap_eNB.h"
@@ -159,7 +158,6 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
 
   gNB->frame = frame;
   start_meas(&gNB->gNB_scheduler);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_IN);
 
   for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
     int num_beams = 1;
@@ -264,5 +262,4 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
 
   stop_meas(&gNB->gNB_scheduler);
   NR_SCHED_UNLOCK(&gNB->sched_lock);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ULSCH_SCHEDULER,VCD_FUNCTION_OUT);
 }

@@ -35,7 +35,6 @@
 #include "nfapi_nr_interface_scf.h"
 #include "nfapi_pnf.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "assertions.h"
 #include <time.h>
 
@@ -48,7 +47,6 @@ int get_nr_prach_duration(uint8_t prach_format)
 
 void L1_nr_prach_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_rach_indication_t *rach_ind)
 {
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_ENB_PRACH_RX,1);
   rach_ind->sfn = frame;
   rach_ind->slot = slot;
   rach_ind->number_of_pdus = 0;
@@ -129,5 +127,4 @@ void L1_nr_prach_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_rac
   rach_ind->slot = prach_start_slot;
   LOG_D(NR_PHY_RACH, "Freeing PRACH entry\n");
   free_nr_prach_entry(&gNB->prach_list, prach_id);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_ENB_PRACH_RX,0);
 }

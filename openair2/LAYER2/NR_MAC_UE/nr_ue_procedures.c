@@ -53,7 +53,6 @@
 #include "assertions.h"
 #include "oai_asn1.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 
 // #define DEBUG_MIB
@@ -4208,8 +4207,6 @@ int nr_write_ce_ulsch_pdu(uint8_t *mac_ce,
 
 void nr_ue_send_sdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info, int pdu_id)
 {
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SEND_SDU, VCD_FUNCTION_IN);
-
   LOG_D(NR_MAC,
         "In [%d.%d] Handling DLSCH PDU type %d\n",
         dl_info->frame,
@@ -4237,5 +4234,4 @@ void nr_ue_send_sdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info, in
     default :
       AssertFatal(false, "Invalid DLSCH PDU type\n");
   }
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SEND_SDU, VCD_FUNCTION_OUT);
 }
