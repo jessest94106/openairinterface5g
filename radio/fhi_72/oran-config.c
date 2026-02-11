@@ -461,14 +461,18 @@ char bbdev_dev[32] = "";
 char bbdev_vfio_vf_token[64] = "";
 #endif
 
-static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, int nump, const int num_rus, const int is_du)
+static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, int nump, const int num_rus)
 {
   DevAssert(fhip != NULL);
   int num_dev = gpd(fhip, nump, ORAN_CONFIG_DPDK_DEVICES)->numelt;
   AssertFatal(num_dev > 0, "need to provide DPDK devices for O-RAN 7.2 Fronthaul\n");
   AssertFatal(num_dev < 17, "too many DPDK devices for O-RAN 7.2 Fronthaul\n");
 
-  io_cfg->id = 1 - is_du; // 0 -> xran as O-DU; 1 -> xran as O-RU
+  int app_id_index = config_paramidx_fromname((paramdef_t *)fhip, nump, ORAN_CONFIG_APP_ID);
+  AssertFatal(app_id_index >= 0,"Index for %s config option not found!\n", ORAN_CONFIG_APP_ID);
+  io_cfg->id = config_get_processedint(config_get_if(), (paramdef_t *)&fhip[app_id_index]);
+  LOG_A(PHY, "Initializing XRAN layer as %s\n", io_cfg->id == XRAN_APP_ID_O_DU ? "O-DU" : "O-RU");
+
   io_cfg->num_vfs = num_dev; // number of VFs for C-plane and U-plane (should be even); max = XRAN_VF_MAX
   io_cfg->num_rxq = 1; // number of RX queues per VF
   for (int i = 0; i < num_dev; ++i) {
@@ -541,16 +545,16 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   /* if RU does support, io_cfg->eowd_cmn[0] should only be filled as id = O_DU; io_cfg->eowd_cmn[1] only used if id = O_RU */
   const uint16_t owdm_enable = *gpd(fhip, nump, ORAN_CONFIG_ECPRI_OWDM)->uptr;
   if (owdm_enable) {
-    io_cfg->eowd_cmn[0].initiator_en = is_du ? 1 : 0; // 1 -> initiator (always O-DU), 0 -> recipient (always O-RU)
-    io_cfg->eowd_cmn[0].numberOfSamples = 8; // total number of samples to be collected and averaged per port
-    io_cfg->eowd_cmn[0].filterType = 0; // 0 -> simple average based on number of measurements; not used in xran in both E and F releases
-    io_cfg->eowd_cmn[0].responseTo = 10000000; // response timeout in [ns]
-    io_cfg->eowd_cmn[0].measVf = 0; // VF using the OWD transmitter; within xran, the measurements are calculated per each supported VF, but starts from measVf
-    io_cfg->eowd_cmn[0].measState = 0; // the state of the OWD transmitter; 0 -> OWDMTX_INIT (enum xran_owdm_tx_state)
-    io_cfg->eowd_cmn[0].measId = 0; // measurement ID to be used by the transmitter
-    io_cfg->eowd_cmn[0].measMethod = 0; // measurement method; 0 -> XRAN_REQUEST (enum xran_owd_meas_method)
-    io_cfg->eowd_cmn[0].owdm_enable = 1; // 1 -> enabled; 0 -> disabled
-    io_cfg->eowd_cmn[0].owdm_PlLength = 40; // payload in the measurement packet; 40 <= PlLength <= 1400
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].initiator_en = io_cfg->id == XRAN_APP_ID_O_DU ? 1 : 0; // 1 -> initiator (always O-DU), 0 -> recipient (always O-RU)
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].numberOfSamples = 8; // total number of samples to be collected and averaged per port
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].filterType = 0; // 0 -> simple average based on number of measurements; not used in xran in both E and F releases
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].responseTo = 10000000; // response timeout in [ns]
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].measVf = 0; // VF using the OWD transmitter; within xran, the measurements are calculated per each supported VF, but starts from measVf
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].measState = 0; // the state of the OWD transmitter; 0 -> OWDMTX_INIT (enum xran_owdm_tx_state)
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].measId = 0; // measurement ID to be used by the transmitter
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].measMethod = 0; // measurement method; 0 -> XRAN_REQUEST (enum xran_owd_meas_method)
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].owdm_enable = 1; // 1 -> enabled; 0 -> disabled
+    io_cfg->eowd_cmn[XRAN_APP_ID_O_DU].owdm_PlLength = 40; // payload in the measurement packet; 40 <= PlLength <= 1400
   }
   /* eCPRI OWDM per port variables for O-DU; this parameter is filled within xran library */
   // eowd_port[0][XRAN_VF_MAX]
@@ -679,19 +683,6 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
   const int nfh = sizeofArray(FHconfigs);
   config_getlist(config_get_if(), &FH_ConfigList, FHconfigs, nfh, aprefix);
 
-  int num_rus = FH_ConfigList.numelt; // based on the number of fh_config sections -> number of RUs
-  int is_du = 0;
-
-  int num_ru_addr = gpd(fhip, nump, ORAN_CONFIG_RU_ADDR)->numelt;
-  int num_du_addr = gpd(fhip, nump, ORAN_CONFIG_DU_ADDR)->numelt;
-  if (num_ru_addr > 0 && num_du_addr == 0)
-    is_du = 1;
-  else if (num_du_addr > 0 && num_ru_addr == 0)
-    is_du = 0;
-  else
-    AssertFatal(false, "Illegal node configuration, num_du_addr %d, num_ru_addr %d\n", num_du_addr, num_ru_addr);
-  fh_init->xran_ports = is_du == 1 ? num_rus : num_du_addr;
-
 #ifdef OAI_MPLANE
   ru_session_list_t *ru_session_list = (ru_session_list_t *)mplane_api;
   int num_rus = ru_session_list->num_rus;
@@ -718,8 +709,10 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
     }
   }
 #else
+  int num_rus = FH_ConfigList.numelt; // based on the number of fh_config sections -> number of RUs
+  fh_init->xran_ports = num_rus;
 
-  if (!set_fh_io_cfg(&fh_init->io_cfg, fhip, nump, num_rus, is_du))
+  if (!set_fh_io_cfg(&fh_init->io_cfg, fhip, nump, num_rus))
     return false;
   if (!set_fh_eaxcid_conf(&fh_init->eAxCId_conf, xran_cat))
     return false;
@@ -728,13 +721,10 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
     of DL fragments (nPrbElm) needed for transmission of one symbol. */
   fh_init->mtu = *gpd(fhip, nump, ORAN_CONFIG_MTU)->uptr;
 
-  fh_init->p_o_du_addr = NULL; // DPDK retreives DU MAC address within the xran library with rte_eth_macaddr_get() function
-
-  char **ru_addrs,**du_addrs;
-
-  if (is_du > 0) {
+  if (fh_init->io_cfg.id == XRAN_APP_ID_O_DU) {
+    int num_ru_addr = gpd(fhip, nump, ORAN_CONFIG_RU_ADDR)->numelt;
     fh_init->p_o_ru_addr = calloc(num_ru_addr, sizeof(struct rte_ether_addr));
-    ru_addrs = gpd(fhip, nump, ORAN_CONFIG_RU_ADDR)->strlistptr;
+    char **ru_addrs = gpd(fhip, nump, ORAN_CONFIG_RU_ADDR)->strlistptr;
     AssertFatal(fh_init->p_o_ru_addr != NULL, "out of memory\n");
     for (int i = 0; i < num_ru_addr; ++i) {
       struct rte_ether_addr *ea = (struct rte_ether_addr *)fh_init->p_o_ru_addr;
@@ -743,10 +733,12 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
         return false;
       }
     }
+    // DPDK retreives DU MAC address within the xran library with rte_eth_macaddr_get() function
     fh_init->p_o_du_addr = NULL;
   } else {
+    int num_du_addr = gpd(fhip, nump, ORAN_CONFIG_DU_ADDR)->numelt;
     fh_init->p_o_du_addr = calloc(num_du_addr, sizeof(struct rte_ether_addr));
-    du_addrs = gpd(fhip, nump, ORAN_CONFIG_DU_ADDR)->strlistptr;
+    char **du_addrs = gpd(fhip, nump, ORAN_CONFIG_DU_ADDR)->strlistptr;
     AssertFatal(fh_init->p_o_du_addr != NULL, "out of memory\n");
     for (int i = 0; i < num_du_addr; ++i) {
       struct rte_ether_addr *ea = (struct rte_ether_addr *)fh_init->p_o_du_addr;
@@ -755,6 +747,7 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
         return false;
       }
     }
+    // DPDK retreives RU MAC address within the xran library with rte_eth_macaddr_get() function
     fh_init->p_o_ru_addr = NULL;
   }
 #endif
