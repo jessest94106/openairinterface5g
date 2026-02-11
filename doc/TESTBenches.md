@@ -234,6 +234,10 @@ information on how the images are built.
   - groot (CU+DU0) + B210, rocket (DU1) + B210, raspix (Quectel RM520N UE), OAI CN5G
   - OpenShift cluster for CN deployment
   - Attenuator (mini circuits RC4DAT-6G-60) - controlled from rocket
+- [RAN-Channel-Simulation](https://jenkins-oai.eurecom.fr/job/RAN-Channel-Simulation/)
+  ~5G-NR
+  - gracehopper1-oai
+  - run channel simulation on CPU and GPU using test_channel_scalability
 
 ### RAN-CI-NSA-Trigger
 

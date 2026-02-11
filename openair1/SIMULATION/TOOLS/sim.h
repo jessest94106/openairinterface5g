@@ -412,13 +412,39 @@ int random_channel(channel_desc_t *desc, uint8_t abstraction_flag);
 */
 
 void multipath_channel(channel_desc_t *desc,
-                       double *tx_sig_re[NB_ANTENNAS_TX],
-                       double *tx_sig_im[NB_ANTENNAS_TX],
-                       double *rx_sig_re[NB_ANTENNAS_RX],
-                       double *rx_sig_im[NB_ANTENNAS_RX],
+                       double **tx_sig_re,
+                       double **tx_sig_im,
+                       double **rx_sig_re,
+                       double **rx_sig_im,
                        uint32_t length,
                        uint8_t keep_channel,
 		       int log_channel);
+
+void multipath_channel_float(channel_desc_t *desc,
+                             float **tx_sig_interleaved,
+                             float **rx_sig_re,
+                             float **rx_sig_im,
+                             uint32_t length,
+                             uint8_t keep_channel,
+                             int log_channel);
+
+void interleave_channel_output(float **rx_sig_re,
+                               float **rx_sig_im,
+                               float **output_interleaved,
+                               int nb_rx,
+                               int num_samples);
+
+void add_noise_float(c16_t **rxdata,
+                     const float **r_re,
+                     const float **r_im,
+                     const float sigma2,
+                     const int length,
+                     const int slot_offset,
+                     const double ts,
+                     const int delay,
+                     bool apply_phase_noise,
+                     const uint8_t nb_antennas_rx);
+
 /*
 \fn double compute_pbch_sinr(channel_desc_t *desc,
                              channel_desc_t *desc_i1,

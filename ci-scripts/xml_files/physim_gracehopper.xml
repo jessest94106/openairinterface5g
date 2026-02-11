@@ -32,8 +32,9 @@
   </testCase>
 
   <testCase>
-    <class>Build_Deploy_Docker_PhySim</class>
-    <desc>Build and Deploy PhySim</desc>
+    <class>Build_Deploy_PhySim</class>
+    <desc>Build and Deploy PhySim in Docker</desc>
+    <script>scripts/docker-build-and-deploy-physims.sh</script>
     <node>localhost</node>
     <ctest-opt>-R 5g -E "nr_dlsim|nr_ulsim|ldpctest" -j32</ctest-opt>
   </testCase>

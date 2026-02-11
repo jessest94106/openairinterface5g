@@ -21,8 +21,8 @@
 
 -->
 <testCaseList>
-  <htmlTabRef>physim-timed-tab</htmlTabRef>
-  <htmlTabName>PhySim with timing check</htmlTabName>
+  <htmlTabRef>channelsim-tab</htmlTabRef>
+  <htmlTabName>ChannelSim</htmlTabName>
   <htmlTabIcon>wrench</htmlTabIcon>
 
   <testCase>
@@ -33,10 +33,11 @@
 
   <testCase>
     <class>Build_Deploy_PhySim</class>
-    <desc>Build and Deploy PhySim with timing check</desc>
-    <script>scripts/docker-build-and-deploy-physims.sh</script>
+    <desc>Build and Deploy Test Channel Simulation</desc>
+    <script>scripts/docker-build-and-deploy-chansim.sh</script>
     <node>localhost</node>
-    <ctest-opt>-R 5g -R "nr_dlsim|nr_ulsim|ldpctest" -E physim.5g.nr_dlsim.mcs.mimo.test9 -j1</ctest-opt>
+    <ctest-opt>-R cuda.5g.channelsim</ctest-opt>
   </testCase>
 
 </testCaseList>
+
