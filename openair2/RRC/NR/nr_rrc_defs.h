@@ -148,6 +148,16 @@ typedef enum {
   RRC_UECAPABILITY_ENQUIRY,
 } rrc_action_t;
 
+typedef struct nr_rrc_config {
+  uint32_t tac;
+  plmn_id_t plmn[PLMN_LIST_MAX_SIZE];
+  uint8_t num_plmn;
+
+  bool um_on_default_drb;
+  bool enable_sdap;
+  int drbs;
+} nr_rrc_config_t;
+
 /* Small state for delaying NG-triggered actions (setup/release) */
 typedef struct {
   int max_delays;
@@ -368,7 +378,7 @@ typedef struct gNB_RRC_INST_s {
   uint64_t nr_cellid;
 
   // RRC configuration
-  gNB_RrcConfigurationReq configuration;
+  nr_rrc_config_t configuration;
   seq_arr_t *SIBs;
 
   // gNB N3 GTPU instance
