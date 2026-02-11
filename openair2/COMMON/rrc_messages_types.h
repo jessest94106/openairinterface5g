@@ -425,12 +425,6 @@ typedef struct NRRrcConfigurationReq_s {
   int                     drbs;
 } gNB_RrcConfigurationReq;
 
-typedef struct NRDuDlReq_s {
-  rnti_t rnti;
-  uint8_t *buf;
-  uint64_t srb_id;
-}  NRDuDlReq_t;
-
 // eNB: realtime -> RRC messages
 typedef struct rrc_subframe_process_s {
   protocol_ctxt_t ctxt;
