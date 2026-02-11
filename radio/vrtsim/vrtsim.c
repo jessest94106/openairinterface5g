@@ -51,6 +51,8 @@
 #include "noise_device.h"
 #include "simde/x86/avx512.h"
 #include "taps_client.h"
+#include "cirdb_provider.h"
+#include "cirdb_yaml.h"
 
 // Simulator role
 typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
@@ -79,6 +81,15 @@ typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
      {"chanmod",                "Enable channel modelling",  0, .iptr = &vrtsim_state->chanmod,                  .defintval = 0,                  TYPE_INT,    0}, \
      {"taps-socket",            TAPS_SOCKET_HLP,             0, .strptr = &vrtsim_state->taps_socket,            .defstrval = NULL,               TYPE_STRING, 0}, \
      {"client-num-rx-antennas", CLIENT_NUM_RX_HLP,           0, .iptr = &vrtsim_state->client_num_rx_antennas,   .defintval = 1,                  TYPE_INT,    0}, \
+     /* CIR DB enable and paths */ \
+     {"cirdb",                  "Use CIR database for channel taps (1 yes, 0 no)", 0, .iptr = &vrtsim_state->use_cirdb,  .defintval = 0, TYPE_INT, 0}, \
+     {"cirdb-path",             "Directory that holds vrtsim.yaml and cir_db.bin", 0, .strptr = &vrtsim_state->cirdb_path, .defstrval = NULL, TYPE_STRING, 0}, \
+     {"cirdb_yaml",             "Absolute path to CIR DB YAML file (optional, overrides cirdb-path)", 0, .strptr = &vrtsim_state->cirdb_yaml, .defstrval = NULL, TYPE_STRING, 0}, \
+     {"cirdb_file",             "Absolute path to CIR DB binary file (optional, overrides cirdb-path)", 0, .strptr = &vrtsim_state->cirdb_file, .defstrval = NULL, TYPE_STRING, 0}, \
+     /* CIR DB selection knobs */ \
+     {"cirdb_model_id",         "Preferred TDL model id 0..4", 0, .iptr  = &vrtsim_state->cirdb_model_id,  .defintval = 0,    TYPE_INT,    0}, \
+     {"cirdb_ds_ns",            "Desired RMS delay spread in ns", 0, .dblptr = &vrtsim_state->cirdb_ds_ns, .defdblval = 10.0, TYPE_DOUBLE, 0}, \
+     {"cirdb_speed_mps",        "Desired speed in m/s", 0, .dblptr = &vrtsim_state->cirdb_speed_mps, .defdblval = 1.5, TYPE_DOUBLE, 0}, \
   };
 // clang-format on
 
@@ -126,6 +137,14 @@ typedef struct {
   char *taps_socket;
   int client_num_rx_antennas;
   struct timespec start_ts;
+  /* CIR DB state */
+  int use_cirdb;
+  char *cirdb_path;
+  char *cirdb_yaml;
+  char *cirdb_file;
+  int cirdb_model_id;
+  double cirdb_ds_ns;
+  double cirdb_speed_mps;
 } vrtsim_state_t;
 
 static void histogram_add(histogram_t *histogram, double diff)
@@ -166,7 +185,7 @@ static void load_channel_model(vrtsim_state_t *vrtsim_state)
   char *model_name = vrtsim_state->role == ROLE_CLIENT ? "client_tx_channel_model" : "server_tx_channel_model";
   vrtsim_state->channel_desc = find_channel_desc_fromname(model_name);
   AssertFatal(vrtsim_state->channel_desc != NULL,
-              "Could not find model name %s. Make sure it is present in the config file",
+              "Could not find model name %s. Make sure it is present in the config file\n",
               model_name);
   LOG_I(HW,
         "Channel model %s parameters: path_loss_dB=%.2f, nb_tx=%d, nb_rx=%d, channel_length=%d\n",
@@ -201,6 +220,9 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
     AssertFatal(false, "Invalid configuration: Build with OAI_VRTSIM_TAPS_CLIENT to use taps socket\n");
   }
 #endif
+  if (vrtsim_state->use_cirdb) {
+    LOG_A(HW, "VRTSIM: CIR DB is enabled at runtime\n");
+  }
 }
 
 static void *vrtsim_timing_job(void *arg)
@@ -305,7 +327,7 @@ static int vrtsim_connect(openair0_device_t *device)
 
   // Handle channel modelling after number of RX antennas are known
   int num_tx_stats = 1;
-  if (vrtsim_state->chanmod || vrtsim_state->taps_socket) {
+  if (vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb) {
     vrtsim_state->channel_modelling_actors = calloc_or_fail(vrtsim_state->peer_info.num_rx_antennas, sizeof(Actor_t));
     for (int i = 0; i < vrtsim_state->peer_info.num_rx_antennas; i++) {
       init_actor(&vrtsim_state->channel_modelling_actors[i], "chanmod", -1);
@@ -316,6 +338,53 @@ static int vrtsim_connect(openair0_device_t *device)
                           device->openair0_cfg[0].tx_num_channels,
                           vrtsim_state->peer_info.num_rx_antennas,
                           &vrtsim_state->channel_desc);
+    } else if (vrtsim_state->use_cirdb) {
+      const char *yaml_path = NULL;
+      const char *bin_path = NULL;
+
+      if (vrtsim_state->cirdb_yaml && vrtsim_state->cirdb_yaml[0])
+        yaml_path = vrtsim_state->cirdb_yaml;
+      if (vrtsim_state->cirdb_file && vrtsim_state->cirdb_file[0])
+        bin_path = vrtsim_state->cirdb_file;
+
+      char yaml_buf[PATH_MAX];
+      char bin_buf[PATH_MAX];
+
+      if (!yaml_path || !bin_path) {
+        const char *base = vrtsim_state->cirdb_path;
+        if (base && base[0]) {
+          if (!yaml_path) {
+            snprintf(yaml_buf, sizeof(yaml_buf), "%s/%s", base, "vrtsim.yaml");
+            yaml_path = yaml_buf;
+          }
+          if (!bin_path) {
+            snprintf(bin_buf, sizeof(bin_buf), "%s/%s", base, "cir_db.bin");
+            bin_path = bin_buf;
+          }
+        }
+      }
+
+      cirdb_select_opts_t sel = (cirdb_select_opts_t){0};
+      sel.yaml_path = yaml_path;
+      sel.bin_path = bin_path;
+      AssertFatal(vrtsim_state->cirdb_model_id >= 0 && vrtsim_state->cirdb_model_id <= 4,
+            "Invalid cirdb_model_id=%d (valid: 0..4)\n",
+            vrtsim_state->cirdb_model_id);
+      sel.want_model_id = vrtsim_state->cirdb_model_id;
+      sel.want_ds_ns = (float)(vrtsim_state->cirdb_ds_ns > 0.0 ? vrtsim_state->cirdb_ds_ns : -1.0);
+      sel.want_speed_mps = (float)(vrtsim_state->cirdb_speed_mps > 0.0 ? vrtsim_state->cirdb_speed_mps : -1.0);
+
+      LOG_A(HW,
+            "VRTSIM: CIR DB select yaml='%s' bin='%s'\n",
+            sel.yaml_path ? sel.yaml_path : "(auto)",
+            sel.bin_path ? sel.bin_path : "(auto)");
+
+      cirdb_connect(0,
+                    device->openair0_cfg[0].tx_num_channels,
+                    vrtsim_state->peer_info.num_rx_antennas,
+                    &sel,
+                    &vrtsim_state->channel_desc);
+      LOG_A(HW, "VRTSIM: channel taps via CIR DB\n");
     } else {
       load_channel_model(vrtsim_state);
     }
@@ -381,20 +450,21 @@ static void perform_channel_modelling(void *arg)
   int nb_tx_ant = channel_modelling_args->nbAnt;
   c16_t **input_samples = (c16_t **)channel_modelling_args->samples;
 
-  int aligned_nsamps = ceil_mod(nsamps, (512 / 8) / sizeof(cf_t));
-  cf_t samples[aligned_nsamps] __attribute__((aligned(64)));
-  // Apply noise from global settings
-  get_noise_vector((float *)samples, nsamps * 2);
-
   channel_desc_t *channel_desc = vrtsim_state->channel_desc;
 
   if (channel_desc == NULL) {
     return;
   }
 
+  if (vrtsim_state->use_cirdb) {
+    double seconds = (double)channel_modelling_args->timestamp / vrtsim_state->sample_rate;
+    uint64_t elapsed_ns = (uint64_t)(seconds * 1e9 + 0.5);
+    cirdb_update(elapsed_ns);
+  }
+
   cf_t channel_impulse_response[nb_tx_ant][channel_desc->channel_length];
   cf_t *channel_impulse_response_p[nb_tx_ant];
-  if (!vrtsim_state->taps_socket) {
+  if (!vrtsim_state->taps_socket && !vrtsim_state->use_cirdb) {
     const float pathloss_linear = powf(10, channel_desc->path_loss_dB / 20.0);
     // Convert channel impulse response to float + apply pathloss
     for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
@@ -413,16 +483,25 @@ static void perform_channel_modelling(void *arg)
   }
 
   for (int batch_index = 0; batch_index < channel_modelling_args->num_batches; batch_index++) {
-    int start_sample = batch_index * channel_modelling_args->batch_size;
-    int num_samples = min(channel_modelling_args->batch_size, nsamps - start_sample);
+    const int start_sample = batch_index * channel_modelling_args->batch_size;
+    const int num_samples = min(channel_modelling_args->batch_size, nsamps - start_sample);
     if (start_sample >= nsamps) {
       break;
     }
+
+    const int aligned_batch = ceil_mod(num_samples, (512 / 8) / sizeof(cf_t));
+    cf_t samples[aligned_batch] __attribute__((aligned(64)));
+    memset(samples, 0, sizeof(samples));
+
+    // Apply noise from global settings (only valid samples)
+    get_noise_vector((float *)samples, num_samples * 2);
+
     for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
-      for (int i = start_sample; i < start_sample + num_samples; i++) {
-        cf_t *impulse_response = channel_impulse_response_p[aatx];
+      cf_t *impulse_response = channel_impulse_response_p[aatx];
+      for (int i = 0; i < num_samples; i++) {
+        const int gi = start_sample + i;
         for (int l = 0; l < channel_desc->channel_length; l++) {
-          int idx = i - l;
+          const int idx = gi - l;
           // TODO: Use AVX2 for this
           c16_t tx_input = idx >= 0 ? input_samples[aatx][idx]
                                     : channel_modelling_args->saved_samples[aatx][SAVED_SAMPLES_LEN + idx];
@@ -432,31 +511,32 @@ static void perform_channel_modelling(void *arg)
       }
     }
 
-    // Convert to c16_t
-    c16_t samples_out[aligned_nsamps] __attribute__((aligned(64)));
-  #if defined(__AVX512F__)
-    for (int i = 0; i < aligned_nsamps / 8; i++) {
+    // Convert to c16_t (only once per batch)
+    c16_t samples_out[aligned_batch] __attribute__((aligned(64)));
+#if defined(__AVX512F__)
+    for (int i = 0; i < aligned_batch / 8; i++) {
       simde__m512 *in = (simde__m512 *)&samples[i * 8];
       simde__m256i *out = (simde__m256i *)&samples_out[i * 8];
       *out = simde_mm512_cvtsepi32_epi16(simde_mm512_cvtps_epi32(*in));
     }
-  #elif defined(__AVX2__)
-    for (int i = 0; i < aligned_nsamps / 4; i++) {
+#elif defined(__AVX2__)
+    for (int i = 0; i < aligned_batch / 4; i++) {
       simde__m256 *in = (simde__m256 *)&samples[i * 4];
       simde__m128i *out = (simde__m128i *)&samples_out[i * 4];
       *out = simde_mm256_cvtsepi32_epi16(simde_mm256_cvtps_epi32(*in));
     }
-  #else
-    for (int i = 0; i < nsamps; i++) {
+#else
+    for (int i = 0; i < num_samples; i++) {
       samples_out[i].r = lroundf(samples[i].r);
       samples_out[i].i = lroundf(samples[i].i);
     }
-  #endif
+#endif
 
+    // Write the batch as a single contiguous transfer
     vrtsim_write_internal(channel_modelling_args->vrtsim_state,
-                          channel_modelling_args->timestamp,
+                          channel_modelling_args->timestamp + start_sample,
                           samples_out,
-                          channel_modelling_args->nsamps,
+                          num_samples,
                           aarx,
                           channel_modelling_args->flags,
                           aarx);
@@ -507,7 +587,6 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
       for (int aatx = 0; aatx < nbAnt; aatx++)
         memcpy(&args->saved_samples[aatx][0], saved_samples[aatx], sizeof(c16_t) * SAVED_SAMPLES_LEN);
     }
-    memcpy(args->saved_samples, saved_samples, sizeof(saved_samples));
     pushNotifiedFIFO(&vrtsim_state->channel_modelling_actors[aarx].fifo, task);
   }
 
@@ -543,7 +622,7 @@ static int vrtsim_write(openair0_device_t *device,
   AssertFatal(timestamp >= 0, "Timestamp must be non-negative, got %ld\n", timestamp);
   timestamp -= device->openair0_cfg->command_line_sample_advance;
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
-  bool channel_modelling = vrtsim_state->chanmod || vrtsim_state->taps_socket;
+  bool channel_modelling = vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb;
   return channel_modelling ? vrtsim_write_with_chanmod(vrtsim_state, timestamp, samplesVoid, nsamps, nbAnt, flags)
                            : vrtsim_write_internal(vrtsim_state, timestamp, (c16_t *)samplesVoid[0], nsamps, 0, flags, 0);
 }
@@ -609,7 +688,7 @@ static void vrtsim_end(openair0_device_t *device)
   }
 
   tx_timing_t *tx_timing = vrtsim_state->tx_timing;
-  if (vrtsim_state->chanmod || vrtsim_state->taps_socket) {
+  if (vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb) {
     for (int i = 0; i < vrtsim_state->peer_info.num_rx_antennas; i++) {
       shutdown_actor(&vrtsim_state->channel_modelling_actors[i]);
     }
@@ -623,7 +702,9 @@ static void vrtsim_end(openair0_device_t *device)
     }
     tx_timing->average_tx_budget /= vrtsim_state->peer_info.num_rx_antennas;
     free_noise_device();
-    if (vrtsim_state->taps_socket) {
+    if (vrtsim_state->use_cirdb) {
+      cirdb_stop();
+    } else if (vrtsim_state->taps_socket) {
       taps_client_stop();
     }
   }
@@ -711,8 +792,9 @@ __attribute__((__visibility__("default"))) int device_init(openair0_device_t *de
   vrtsim_state->tx_num_channels = openair0_cfg->tx_num_channels;
   vrtsim_state->rx_num_channels = openair0_cfg->rx_num_channels;
 
-  if (vrtsim_state->chanmod || vrtsim_state->taps_socket) {
+  if (vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb) {
     init_channelmod();
+    randominit();
     int noise_power_dBFS = get_noise_power_dBFS();
     int16_t noise_power = noise_power_dBFS == INVALID_DBFS_VALUE ? 0 : (int16_t)(32767.0 / powf(10.0, .05 * -noise_power_dBFS));
     LOG_A(HW, "VRTSIM: Noise power %d sample value\n", noise_power);
