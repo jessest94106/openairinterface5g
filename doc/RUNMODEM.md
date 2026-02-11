@@ -544,7 +544,7 @@ sudo ./nr-uesoftmodem --do-ra
 
 #### Run OAI with SDAP & Custom DRBs
 
-To run OAI gNB with SDAP, simply include `--gNBs.[0].enable_sdap 1` to the binary's arguments.
+SDAP is enabled by default. To disable SDAP, include `--gNBs.[0].enable_sdap 0` to the binary's arguments.
 
 The DRB creation is dependent on the 5QI. 
 If the 5QI corresponds to a GBR Flow it assigns a dedicated data radio bearer.

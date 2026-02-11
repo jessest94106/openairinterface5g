@@ -268,8 +268,8 @@ typedef struct up_params_s {
 /* IE SDAP Configuration (clause 9.3.1.39 of 3GPP TS 38.463) */
 typedef struct bearer_context_sdap_config_s {
   long defaultDRB;
-  long sDAP_Header_UL;
-  long sDAP_Header_DL;
+  bool sDAP_Header_UL;
+  bool sDAP_Header_DL;
 } bearer_context_sdap_config_t;
 
 /* IE PDCP Configuration (clause 9.3.1.38 of 3GPP TS 38.463) */
@@ -404,10 +404,16 @@ typedef struct DRB_nGRAN_to_modify_s {
   // DL UP Transport Layer Information (O) (clause 9.3.1.13, 9.3.2.1)
   int numDlUpParam;
   up_params_t DlUpParamList[E1AP_MAX_NUM_UP_PARAM];
-  // QoS Flows Information To Modify (O) (clause 9.3.1.25, 9.3.1.26)
-  int numQosFlow2Setup;
+  // Flow Mapping Information (O) (clause 9.3.1.25, 9.3.1.26)
+  int numQosFlowsMod;
   qos_flow_to_setup_t qosFlows[E1AP_MAX_NUM_QOS_FLOWS];
 } DRB_nGRAN_to_mod_t;
+
+/* DRB To Remove Item (NG-RAN) clause 9.3.1.11 */
+typedef struct {
+  // DRB ID (M)
+  long id;
+} drb_to_remove_t;
 
 typedef enum e1ap_indication_e {
   SECURITY_REQUIRED = 0,
@@ -472,6 +478,9 @@ typedef struct pdu_session_to_mod_s {
   long numDRB2Modify;
   // DRB To Modify Item (1..<E1AP_MAX_NUM_DRBS>)
   DRB_nGRAN_to_mod_t DRBnGRanModList[E1AP_MAX_NUM_DRBS];
+  // DRB To Remove List (0..maxnoofDRBs)
+  int n_drb_to_remove;
+  drb_to_remove_t drbs_to_remove[E1AP_MAX_NUM_DRBS];
 } pdu_session_to_mod_t;
 
 /** PDU Session Resource To Remove List (3GPP TS 38.463 clause 9.3.3.12) */

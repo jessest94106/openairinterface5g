@@ -166,6 +166,11 @@ typedef struct {
   pdusession_level_qos_parameter_t qos;
 } nr_rrc_qos_t;
 
+typedef struct {
+  uint64_t dl_br;
+  uint64_t ul_br;
+} nr_rrc_ambr_t;
+
 /* forward declaration */
 typedef struct nr_handover_context_s nr_handover_context_t;
 
@@ -243,6 +248,9 @@ typedef struct gNB_RRC_UE_s {
    * delayed after security (and capability); PDU sessions are stored here */
   int n_initial_pdu;
   pdusession_t *initial_pdus;
+
+  // Aggregate Maximum Bit Rate
+  nr_rrc_ambr_t ambr;
 
   /* Nas Pdu */
   byte_array_t nas_pdu;

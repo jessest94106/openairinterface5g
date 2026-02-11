@@ -717,7 +717,6 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
   } else if (NODE_IS_DU(node_type)) {
     // verify that there is no bearer config
     verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
-    verify_gnb_param_notset(gnbp, GNB_DRBS, GNB_CONFIG_STRING_DRBS);
 
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
@@ -2092,9 +2091,7 @@ gNB_RRC_INST *RCconfig_NRRRC()
         nrrrc_config.num_plmn = set_plmn_config(nrrrc_config.plmn, k);
         nrrrc_config.enable_sdap = *GNBParamList.paramarray[i][GNB_ENABLE_SDAP_IDX].iptr;
         LOG_I(GNB_APP, "SDAP layer is %s\n", nrrrc_config.enable_sdap ? "enabled" : "disabled");
-        nrrrc_config.drbs = *GNBParamList.paramarray[i][GNB_DRBS].iptr;
         nrrrc_config.um_on_default_drb = *(GNBParamList.paramarray[i][GNB_UMONDEFAULTDRB_IDX].uptr);
-        LOG_I(GNB_APP, "Data Radio Bearer count %d\n", nrrrc_config.drbs);
 
       }//
     }//End for (k=0; k <num_gnbs ; k++)
