@@ -31,11 +31,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "LAYER2/MAC/mac_extern.h"
-#include "LTE_DRB-ToAddModList.h"
-#include "LTE_DRB-ToReleaseList.h"
-#include "LTE_PMCH-InfoList-r9.h"
-#include "LTE_SRB-ToAddModList.h"
 #include "NR_DRB-ToAddMod.h"
 #include "NR_QFI.h"
 #include "NR_SDAP-Config.h"
