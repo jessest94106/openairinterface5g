@@ -84,7 +84,7 @@ the [MAC configuration](../MAC/mac-usage.md) as well for SIB configuration.
       `0xffffff` is a reserved value and means "no SD"
     Note that: SST=1, no SD is "eMBB"; SST=2, no SD is "URLLC"; SST=3, no SD
     is "mMTC"
-- `enable_sdap` (default: false): enable the use of the SDAP layer. If
+- `enable_sdap` (default: true): enable the use of the SDAP layer. If
   deactivated, a transparent SDAP header is prepended to packets, but no
   further processing is being done.
 - `cu_sibs` (default: `[]`) list of SIBs to give to the DU for transmission.
@@ -94,8 +94,6 @@ the [MAC configuration](../MAC/mac-usage.md) as well for SIB configuration.
 
 - `um_on_default_drb` (default: false): use RLC UM instead of RLC AM on default
   bearers
-- `drbs` (default: 0): the number of DRBs to allocate for a UE, only useful for
-  do-ra or phy-test testing
 
 #### Neighbor-gNB configuration
 

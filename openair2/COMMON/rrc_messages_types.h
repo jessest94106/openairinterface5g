@@ -422,7 +422,6 @@ typedef struct NRRrcConfigurationReq_s {
 
   bool um_on_default_drb;
   bool                    enable_sdap;
-  int                     drbs;
 } gNB_RrcConfigurationReq;
 
 typedef struct NRDuDlReq_s {
