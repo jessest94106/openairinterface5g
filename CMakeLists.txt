@@ -515,8 +515,6 @@ target_link_libraries(params_libconfig PRIVATE config_internals ${libconfig_LIBR
 add_library(shlib_loader OBJECT common/utils/load_module_shlib.c)
 target_link_libraries(shlib_loader PRIVATE CONFIG_LIB)
 
-include_directories ("${OPENAIR_DIR}/radio/COMMON")
-
 ##############################################################
 #    ???!!! TO BE DOCUMENTED OPTIONS !!!???
 ##############################################################
@@ -1690,8 +1688,6 @@ add_executable(lte-softmodem
   ${OPENAIR2_DIR}/ENB_APP/NB_IoT_interface.c
   ${OPENAIR_DIR}/executables/create_tasks.c
   ${OPENAIR_DIR}/executables/create_tasks_mbms.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
-  ${OPENAIR_DIR}/radio/COMMON/record_player.c
   ${OPENAIR3_DIR}/NAS/UE/nas_ue_task.c
   ${PHY_INTERFACE_DIR}/queue_t.c
   ${OPENAIR_DIR}/common/utils/lte/ue_power.c
@@ -1704,7 +1700,7 @@ target_link_libraries(lte-softmodem PRIVATE
   -Wl,--start-group
   lte_rrc nr_rrc s1ap m2ap x2ap m3ap GTPV1U SECURITY UTIL SCTP_CLIENT MME_APP SCHED_LIB SCHED_RU_LIB
   PHY_COMMON PHY PHY_RU  L2 L2_LTE NFAPI_LIB NFAPI_VNF_LIB NFAPI_PNF_LIB NFAPI_USER_LIB MISC_NFAPI_LTE_LIB
-  ${NAS_UE_LIB} ITTI SIMU shlib_loader softmodem_common
+  ${NAS_UE_LIB} ITTI SIMU radio_common softmodem_common
   -Wl,--end-group z dl)
 
 target_link_libraries(lte-softmodem PRIVATE pthread m CONFIG_LIB rt)
@@ -1720,15 +1716,13 @@ endif()
 add_executable(oairu
   ${OPENAIR_DIR}/executables/lte-ru.c
   ${OPENAIR_DIR}/executables/ru_control.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
-  ${OPENAIR_DIR}/radio/COMMON/record_player.c
   ${OPENAIR_DIR}/openair1/SCHED/phy_procedures_lte_common.c
   ${OPENAIR_DIR}/executables/main_ru.c
   ${OPENAIR_DIR}/common/utils/lte/prach_utils.c
 )
 target_link_libraries(oairu PRIVATE
   -Wl,--start-group
-  SCHED_RU_LIB PHY_COMMON PHY_RU UTIL shlib_loader softmodem_common
+  SCHED_RU_LIB PHY_COMMON PHY_RU UTIL radio_common softmodem_common
   -Wl,--end-group z dl)
 
 target_link_libraries(oairu PRIVATE pthread m CONFIG_LIB rt ${T_LIB})
@@ -1746,8 +1740,6 @@ add_executable(lte-uesoftmodem
   ${OPENAIR_DIR}/executables/lte-ue.c
   ${OPENAIR_DIR}/executables/lte-uesoftmodem.c
   ${OPENAIR_DIR}/executables/create_tasks_ue.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
-  ${OPENAIR_DIR}/radio/COMMON/record_player.c
   ${OPENAIR3_DIR}/NAS/UE/nas_ue_task.c
   ${OPENAIR_DIR}/common/utils/lte/ue_power.c
   ${OPENAIR_DIR}/common/utils/lte/prach_utils.c
@@ -1759,7 +1751,7 @@ target_link_libraries(lte-uesoftmodem PRIVATE
   lte_rrc nr_rrc s1ap x2ap m2ap m3ap
   SECURITY UTIL SCTP_CLIENT MME_APP SCHED_RU_LIB SCHED_UE_LIB PHY_COMMON
   PHY_UE PHY_RU L2_UE L2_LTE SIMU NFAPI_LIB NFAPI_PNF_LIB NFAPI_USER_LIB MISC_NFAPI_LTE_LIB
-  ${NAS_UE_LIB} ITTI shlib_loader softmodem_common
+  ${NAS_UE_LIB} ITTI radio_common softmodem_common
   -Wl,--end-group z dl)
 
 target_link_libraries(lte-uesoftmodem PRIVATE pthread m CONFIG_LIB rt)
@@ -1778,13 +1770,11 @@ add_executable(nr-oru
   ${OPENAIR_DIR}/openair1/SCHED_NR/phy_frame_config_nr.c
   ${OPENAIR_DIR}/openair1/SCHED_NR/nr_prach_procedures.c
   ${OPENAIR_DIR}/openair1/SCHED/phy_procedures_lte_common.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
-  ${OPENAIR_DIR}/radio/COMMON/record_player.c
   ${OPENAIR_DIR}/executables/main_nr_ru.c
 )
 target_link_libraries(nr-oru PRIVATE
   UTIL SCHED_RU_LIB PHY_COMMON PHY_RU PHY_NR shlib_loader z dl
-  softmodem_common)
+  radio_common softmodem_common)
 target_link_libraries(nr-oru PRIVATE pthread m CONFIG_LIB rt ${T_LIB} utils
   barrier actor)
 target_link_libraries(nr-oru PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs nr_phy_common time_management)
@@ -1799,8 +1789,6 @@ add_executable(nr-softmodem
   ${OPENAIR_DIR}/executables/nr-gnb.c
   ${OPENAIR_DIR}/executables/nr-ru.c
   ${OPENAIR_DIR}/executables/nr-softmodem.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
-  ${OPENAIR_DIR}/radio/COMMON/record_player.c
   ${OPENAIR_DIR}/common/utils/lte/ue_power.c
   ${OPENAIR_DIR}/common/utils/lte/prach_utils.c
   ${PHY_INTERFACE_DIR}/queue_t.c
@@ -1812,7 +1800,7 @@ target_link_libraries(nr-softmodem PRIVATE
   UTIL SCTP_CLIENT SCHED_LIB SCHED_RU_LIB SCHED_NR_LIB PHY_NR PHY PHY_COMMON PHY_NR_COMMON PHY_RU GTPV1U SECURITY
   ITTI ${NAS_UE_LIB} lte_rrc nr_rrc
   ngap s1ap L2_LTE_NR L2_NR MAC_NR_COMMON NFAPI_LIB NFAPI_VNF_LIB NFAPI_PNF_LIB NFAPI_USER_LIB SIMU
-  x2ap f1ap m2ap m3ap e1ap shlib_loader
+  x2ap f1ap m2ap m3ap e1ap radio_common
   time_management softmodem_common
   -Wl,--end-group z dl)
 
@@ -1854,7 +1842,7 @@ target_link_libraries(nr-cuup PRIVATE
                       GTPV1U e1ap f1ap
                       time_management softmodem_common
                       alg
-                      z dl pthread shlib_loader ${T_LIB})
+                      z dl pthread ${T_LIB})
 target_link_libraries(nr-cuup PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 if(E2_AGENT)
   target_link_libraries(nr-cuup PRIVATE e2_agent e2_agent_arg e2_ran_func_cuup)
@@ -1871,8 +1859,6 @@ add_executable(nr-uesoftmodem
   ${OPENAIR_DIR}/executables/position_interface.c
   ${OPENAIR_DIR}/executables/nr-ue.c
   ${OPENAIR_DIR}/executables/nr-ue-ru.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
-  ${OPENAIR_DIR}/radio/COMMON/record_player.c
   ${OPENAIR2_DIR}/LAYER2/NR_MAC_COMMON/nr_mac_common.c
   ${OPENAIR2_DIR}/LAYER2/NR_MAC_COMMON/nr_mac_common_tdd.c
   ${OPENAIR1_DIR}/PHY/TOOLS/phy_scope_interface.c
@@ -1884,7 +1870,7 @@ target_link_libraries(nr-uesoftmodem PRIVATE
   -Wl,--start-group
   nr_rrc SECURITY UTIL SCHED_RU_LIB SCHED_NR_UE_LIB
   PHY_COMMON PHY_NR_COMMON PHY_NR_UE NR_L2_UE MAC_NR_COMMON NFAPI_LIB
-  ITTI SIMU shlib_loader
+  ITTI SIMU radio_common
   time_management softmodem_common
   -Wl,--end-group z dl)
 
@@ -1918,11 +1904,10 @@ target_link_libraries(nr-uesoftmodem PRIVATE
 add_executable(rftest
   ${OPENAIR_DIR}/openair1/PHY/TOOLS/calibration_test.c
   ${OPENAIR_DIR}/openair1/PHY/TOOLS/calibration_scope.c
-  ${OPENAIR_DIR}/radio/COMMON/common_lib.c
 )
 target_link_libraries(rftest PRIVATE
   minimal_lib PHY_NR_COMMON UTIL forms pthread dl m ${T_LIB}
-  shlib_loader softmodem_common)
+  radio_common softmodem_common)
 target_link_libraries(rftest PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 
 add_executable(polartest
@@ -1939,7 +1924,7 @@ add_executable(smallblocktest
 
 target_link_libraries(smallblocktest PRIVATE
   -Wl,--start-group UTIL SIMU PHY_NR PHY_COMMON PHY_NR_COMMON -Wl,--end-group
-  m pthread dl shlib_loader ${T_LIB}
+  m pthread dl ${T_LIB}
 )
 
 
@@ -1949,7 +1934,7 @@ add_executable(ldpctest
 )
 target_link_libraries(ldpctest PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON -Wl,--end-group
-  m pthread dl shlib_loader ${T_LIB}
+  m pthread dl ${T_LIB}
   # link 'check_crc' to make it resolved in the LDPC coding libraries
   # 'check_crc' is not used in ldpctest so it is not linked in the executable by default
   # --whole-archive links 'check_crc' in the executable even though it is note used, see 'man ld'
@@ -1962,14 +1947,14 @@ target_link_libraries(physim_common PRIVATE UTIL)
 add_executable(nr_dlschsim ${OPENAIR1_DIR}/SIMULATION/NR_PHY/dlschsim.c)
 target_link_libraries(nr_dlschsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB CONFIG_LIB MAC_NR_COMMON -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader physim_common
+  m pthread ${T_LIB} ITTI dl physim_common
   )
 target_link_libraries(nr_dlschsim PRIVATE asn1_nr_rrc_hdrs)
 
 add_executable(nr_pbchsim ${OPENAIR1_DIR}/SIMULATION/NR_PHY/pbchsim.c)
 target_link_libraries(nr_pbchsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB CONFIG_LIB MAC_NR_COMMON -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader physim_common
+  m pthread ${T_LIB} ITTI dl physim_common
 )
 target_link_libraries(nr_pbchsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
@@ -1981,14 +1966,14 @@ add_executable(nr_psbchsim
   )
 target_link_libraries(nr_psbchsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON CONFIG_LIB L2_NR -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader physim_common softmodem_common
+  m pthread ${T_LIB} ITTI dl physim_common softmodem_common
   )
 target_link_libraries(nr_psbchsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
 add_executable(nr_pucchsim ${OPENAIR1_DIR}/SIMULATION/NR_PHY/pucchsim.c)
 target_link_libraries(nr_pucchsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB CONFIG_LIB MAC_NR_COMMON -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader physim_common
+  m pthread ${T_LIB} ITTI dl physim_common
 )
 target_link_libraries(nr_pucchsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
@@ -2000,7 +1985,7 @@ add_executable(nr_dlsim
   )
 target_link_libraries(nr_dlsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON nr_rrc CONFIG_LIB L2_NR x2ap SECURITY ngap -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader nr_ue_phy_meas physim_common
+  m pthread ${T_LIB} ITTI dl nr_ue_phy_meas physim_common
   softmodem_common
   )
 target_link_libraries(nr_dlsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
@@ -2008,7 +1993,7 @@ target_link_libraries(nr_dlsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 add_executable(nr_prachsim ${OPENAIR1_DIR}/SIMULATION/NR_PHY/prachsim.c)
 target_link_libraries(nr_prachsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_RU PHY_NR_UE MAC_NR_COMMON SCHED_NR_LIB CONFIG_LIB -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader physim_common)
+  m pthread ${T_LIB} ITTI dl physim_common)
 target_link_libraries(nr_prachsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
 add_executable(nr_ulschsim
@@ -2017,7 +2002,7 @@ add_executable(nr_ulschsim
   )
 target_link_libraries(nr_ulschsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB CONFIG_LIB MAC_NR_COMMON -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader physim_common
+  m pthread ${T_LIB} ITTI dl physim_common
 )
 target_link_libraries(nr_ulschsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
@@ -2030,7 +2015,7 @@ add_executable(nr_ulsim
 
 target_link_libraries(nr_ulsim PRIVATE
   -Wl,--start-group UTIL SIMU PHY_COMMON PHY_NR_COMMON PHY_NR PHY_NR_UE SCHED_NR_LIB SCHED_NR_UE_LIB MAC_UE_NR MAC_NR_COMMON nr_rrc CONFIG_LIB L2_NR x2ap SECURITY ngap -Wl,--end-group
-  m pthread ${T_LIB} ITTI dl shlib_loader nr_ue_phy_meas physim_common softmodem_common
+  m pthread ${T_LIB} ITTI dl nr_ue_phy_meas physim_common softmodem_common
   )
 target_link_libraries(nr_ulsim PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
 
@@ -2059,7 +2044,7 @@ foreach(myExe dlsim ulsim)
     )
   target_link_libraries (${myExe} PRIVATE
     -Wl,--start-group SIMU UTIL SCHED_LIB SCHED_RU_LIB SCHED_UE_LIB PHY_COMMON PHY_NR_COMMON PHY PHY_UE PHY_RU ITTI -Wl,--end-group
-    pthread m rt CONFIG_LIB ${T_LIB} dl shlib_loader
+    pthread m rt CONFIG_LIB ${T_LIB} dl
     )
   target_link_libraries(${myExe} PRIVATE asn1_lte_rrc_hdrs)
   add_dependencies(${myExe} coding)
