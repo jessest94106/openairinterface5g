@@ -24,6 +24,7 @@
 #include <arpa/inet.h> // For htons and ntohs
 #include <stdlib.h> // For malloc and free
 #include "fgmm_lib.h"
+#include "common/utils/eq_check.h"
 
 #define MIN_AUTH_REJECT_LEN 3
 
@@ -55,13 +56,13 @@ int decode_fgmm_auth_reject(fgmm_auth_reject_msg_t *msg, const byte_array_t *buf
   if (iei == IEI_EAPMSG) {
     return (decoded + decode_eap_msg_ie(&msg->eap_msg, &ba));
   }
-  PRINT_NAS_ERROR("Expected EAP MSG but it is not present");
+  PRINT_ERROR("Expected EAP MSG but it is not present");
   return -1;
 }
 
 bool eq_auth_reject(fgmm_auth_reject_msg_t *a, fgmm_auth_reject_msg_t *b)
 {
-  _NAS_EQ_CHECK_LONG(a->eap_msg.len, b->eap_msg.len);
+  _EQ_CHECK_LONG(a->eap_msg.len, b->eap_msg.len);
   if (a->eap_msg.len > 0) {
     return !memcmp(a->eap_msg.buf, b->eap_msg.buf, a->eap_msg.len);
   }

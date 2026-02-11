@@ -27,12 +27,7 @@
 #include <stdio.h>
 #include "openair3/UTILS/conversions.h"
 #include "e1ap_messages_types.h"
-
-#ifdef E1AP_LOG_ERRORS
-#define PRINT_ERROR(fmt, ...) fprintf(stderr, "[%s] " fmt, __func__, ##__VA_ARGS__)
-#else
-#define PRINT_ERROR(...) // Do nothing
-#endif
+#include "common/utils/eq_check.h"
 
 #define CHECK_E1AP_DEC(exp)                                                             \
   do {                                                                                  \
@@ -41,22 +36,6 @@
         return false;                                                                   \
     }                                                                                   \
   } while (0)
-
-#define _E1_EQ_CHECK_GENERIC(condition, fmt, ...)                                                  \
-  do {                                                                                             \
-    if (!(condition)) {                                                                            \
-      PRINT_ERROR("E1 Equality Check failure: %s:%d: Condition '%s' failed: " fmt " != " fmt "\n", \
-                  __FILE__,                                                                        \
-                  __LINE__,                                                                        \
-                  #condition,                                                                      \
-                  ##__VA_ARGS__);                                                                  \
-      return false;                                                                                \
-    }                                                                                              \
-  } while (0)
-
-#define _E1_EQ_CHECK_LONG(A, B) _E1_EQ_CHECK_GENERIC(A == B, "%ld", A, B);
-#define _E1_EQ_CHECK_INT(A, B) _E1_EQ_CHECK_GENERIC(A == B, "%d", A, B);
-#define _E1_EQ_CHECK_STR(A, B) _E1_EQ_CHECK_GENERIC(strcmp(A, B) == 0, "'%s'", A, B);
 
 // Macro to look up IE. If mandatory and not found, macro will log an error and return false.
 #define E1AP_LIB_FIND_IE(IE_TYPE, ie, container, IE_ID, mandatory)                                           \
@@ -82,29 +61,6 @@
       (dest)->field = malloc_or_fail(sizeof(*(dest)->field)); \
       *(dest)->field = *(src)->field;                         \
     }                                                         \
-  } while (0)
-
-#define _E1_EQ_CHECK_OPTIONAL_IE(a, b, field, EQ_MACRO)               \
-  do {                                                                \
-    if (((a)->field && !(b)->field) || (!(a)->field && (b)->field)) { \
-      return false; /* One of the two is not allocated */             \
-    }                                                                 \
-    if ((a)->field && (b)->field) {                                   \
-      EQ_MACRO(*(a)->field, *(b)->field)                              \
-    }                                                                 \
-  } while (0)
-
-#define _E1_EQ_CHECK_OPTIONAL_PTR(a, b, field)                           \
-  do {                                                                   \
-    if (((a)->field && !(b)->field) || (!(a)->field && (b)->field)) {    \
-      PRINT_ERROR("%s:%d: optional IE '%s' not allocated: %p, %p\n",     \
-                  __FILE__,                                              \
-                  __LINE__,                                              \
-                  #field,                                                \
-                  (void *)(a)->field,                                    \
-                  (void *)(b)->field);                                   \
-      return false; /* One of the two is not allocated */                \
-    }                                                                    \
   } while (0)
 
 struct E1AP_Cause;

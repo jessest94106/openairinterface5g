@@ -25,6 +25,7 @@
 #include <stdlib.h> // For malloc and free
 #include "common/utils/utils.h" // For malloc_or_fail
 #include "common/utils/ds/byte_array.h" // For byte_array_t
+#include "common/utils/eq_check.h"
 #include "fgmm_lib.h"
 
 /** @brief Encode Service Accept (8.2.17 of 3GPP TS 24.501) */
@@ -53,7 +54,7 @@ int encode_fgs_service_accept(byte_array_t *buffer, const fgs_service_accept_msg
     // encode length of PDU session reactivation result error cause
     uint16_t error_len = msg->num_errors * sizeof(msg->cause[0]);
     if (error_len > MAX_NUM_PDU_ERRORS) {
-      PRINT_NAS_ERROR("encoded length is out of bound (IEI_PDU_SESSION_REACT_RESULT_ERROR_CAUSE)\n");
+      PRINT_ERROR("encoded length is out of bound (IEI_PDU_SESSION_REACT_RESULT_ERROR_CAUSE)\n");
       return -1;
     }
     uint16_t n_len = htons(error_len);
@@ -115,7 +116,7 @@ int decode_fgs_service_accept(fgs_service_accept_msg_t *msg, const byte_array_t 
         uint16_t error_len = ntohs(tmp);
         decoded += sizeof(error_len);
         if (error_len > MAX_NUM_PDU_ERRORS * sizeof(msg->cause[0])) {
-          PRINT_NAS_ERROR("IEI_PDU_SESSION_REACT_RESULT_ERROR_CAUSE: decoded length is out of bound\n");
+          PRINT_ERROR("IEI_PDU_SESSION_REACT_RESULT_ERROR_CAUSE: decoded length is out of bound\n");
           return -1;
         }
         // Decode each PDU Session ID and Cause
@@ -137,7 +138,7 @@ int decode_fgs_service_accept(fgs_service_accept_msg_t *msg, const byte_array_t 
         break;
 
       default:
-        PRINT_NAS_ERROR("Unkwown or invalid IEI %d\n", iei);
+        PRINT_ERROR("Unkwown or invalid IEI %d\n", iei);
         return -1;
     }
   }
@@ -150,26 +151,26 @@ int decode_fgs_service_accept(fgs_service_accept_msg_t *msg, const byte_array_t 
  */
 bool eq_service_accept(const fgs_service_accept_msg_t *a, const fgs_service_accept_msg_t *b)
 {
-  _NAS_EQ_CHECK_INT(a->has_psi_status, b->has_psi_status);
+  _EQ_CHECK_INT(a->has_psi_status, b->has_psi_status);
   if (a->has_psi_status && b->has_psi_status) {
     for (int i = 0; i < MAX_NUM_PSI; i++)
-      _NAS_EQ_CHECK_INT(a->psi_status[i], b->psi_status[i]);
+      _EQ_CHECK_INT(a->psi_status[i], b->psi_status[i]);
   }
-  _NAS_EQ_CHECK_INT(a->has_psi_res, b->has_psi_res);
+  _EQ_CHECK_INT(a->has_psi_res, b->has_psi_res);
   if (a->has_psi_res && b->has_psi_res) {
     for (int i = 0; i < MAX_NUM_PSI; i++)
-      _NAS_EQ_CHECK_INT(a->psi_res[i], b->psi_res[i]);
+      _EQ_CHECK_INT(a->psi_res[i], b->psi_res[i]);
   }
-  _NAS_EQ_CHECK_INT(a->num_errors, b->num_errors);
+  _EQ_CHECK_INT(a->num_errors, b->num_errors);
   if (a->num_errors && b->num_errors) {
     for (int i = 0; i < a->num_errors; i++) {
-      _NAS_EQ_CHECK_INT(a->cause[i].cause, b->cause[i].cause);
-      _NAS_EQ_CHECK_INT(a->cause[i].pdu_session_id, b->cause[i].pdu_session_id);
+      _EQ_CHECK_INT(a->cause[i].cause, b->cause[i].cause);
+      _EQ_CHECK_INT(a->cause[i].pdu_session_id, b->cause[i].pdu_session_id);
     }
   }
   if (a->t3448 != NULL || b->t3448 != NULL) {
     if (a->t3448 == NULL || b->t3448 == NULL) {
-      PRINT_NAS_ERROR("t3448 equality check failed\n");
+      PRINT_ERROR("t3448 equality check failed\n");
       return false;
     }
     if (!eq_gprs_timer(a->t3448, b->t3448))

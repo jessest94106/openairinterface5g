@@ -22,6 +22,7 @@
 #include "NR_NAS_defs.h"
 #include "nas_log.h"
 #include "TLVEncoder.h"
+#include "common/utils/eq_check.h"
 #include "fgs_nas_utils.h"
 
 int _nas_mm_msg_encode_header(const fgmm_msg_header_t *header, uint8_t *buffer, uint32_t len)
@@ -56,7 +57,7 @@ int mm_msg_encode(const fgmm_nas_message_plain_t *p, uint8_t *buffer, uint32_t l
   int enc_header = _nas_mm_msg_encode_header(&p->header, buffer, len);
 
   if (enc_header < 0) {
-    PRINT_NAS_ERROR("Failed to encode 5GMM message header\n");
+    PRINT_ERROR("Failed to encode 5GMM message header\n");
     return enc_header;
   }
 
@@ -104,7 +105,7 @@ int mm_msg_encode(const fgmm_nas_message_plain_t *p, uint8_t *buffer, uint32_t l
   }
 
   if (enc_msg < 0) {
-    PRINT_NAS_ERROR("Failed to encode 5GMM message\n");
+    PRINT_ERROR("Failed to encode 5GMM message\n");
     return enc_msg;
   }
 
@@ -116,7 +117,7 @@ int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_
   int size = 0;
 
   if (length < sizeof(fgs_nas_message_security_header_t)) {
-    PRINT_NAS_ERROR("Could not encode the NAS security header\n");
+    PRINT_ERROR("Could not encode the NAS security header\n");
     return -1;
   }
 
@@ -140,7 +141,7 @@ int nas_protected_security_header_encode(uint8_t *buffer, const fgs_nas_message_
 uint8_t decode_5gmm_msg_header(fgmm_msg_header_t *mm_header, const uint8_t *buffer, uint32_t len)
 {
   if (len < sizeof(fgmm_msg_header_t)) {
-    PRINT_NAS_ERROR("Failed to decode plain 5GMM header: buffer length too short\n");
+    PRINT_ERROR("Failed to decode plain 5GMM header: buffer length too short\n");
     return -1;
   }
   mm_header->ex_protocol_discriminator = *buffer++;
@@ -155,7 +156,7 @@ uint8_t decode_5gmm_msg_header(fgmm_msg_header_t *mm_header, const uint8_t *buff
 uint8_t decode_5gsm_msg_header(fgsm_msg_header_t *sm_header, const uint8_t *buffer, uint32_t len)
 {
   if (len < sizeof(fgsm_msg_header_t)) {
-    PRINT_NAS_ERROR("Failed to decode plain 5GSM header: buffer length too short\n");
+    PRINT_ERROR("Failed to decode plain 5GSM header: buffer length too short\n");
     return -1;
   }
   sm_header->ex_protocol_discriminator = *buffer++;
@@ -172,7 +173,7 @@ int decode_5gs_security_protected_header(fgs_nas_message_security_header_t *head
 {
   int decoded = 0;
   if (len < sizeof(fgs_nas_message_security_header_t)) {
-    PRINT_NAS_ERROR("Failed to decode security protected 5GS header: buffer length too short\n");
+    PRINT_ERROR("Failed to decode security protected 5GS header: buffer length too short\n");
     return -1;
   }
   header->protocol_discriminator = *buf++;

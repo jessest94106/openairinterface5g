@@ -172,19 +172,19 @@ f1ap_initial_ul_rrc_message_t cp_initial_ul_rrc_message_transfer(const f1ap_init
  */
 bool eq_initial_ul_rrc_message_transfer(const f1ap_initial_ul_rrc_message_t *a, const f1ap_initial_ul_rrc_message_t *b)
 {
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
   if (!eq_f1ap_plmn(&a->plmn, &b->plmn))
     return false;
-  _F1_EQ_CHECK_LONG(a->nr_cellid, b->nr_cellid);
-  _F1_EQ_CHECK_INT(a->crnti, b->crnti);
-  _F1_EQ_CHECK_INT(a->rrc_container_length, b->rrc_container_length);
-  _F1_EQ_CHECK_LONG(a->nr_cellid, b->nr_cellid);
+  _EQ_CHECK_LONG(a->nr_cellid, b->nr_cellid);
+  _EQ_CHECK_INT(a->crnti, b->crnti);
+  _EQ_CHECK_INT(a->rrc_container_length, b->rrc_container_length);
+  _EQ_CHECK_LONG(a->nr_cellid, b->nr_cellid);
   if (memcmp(a->rrc_container, b->rrc_container, a->rrc_container_length) != 0)
     return false;
-  _F1_EQ_CHECK_INT(a->du2cu_rrc_container_length, b->du2cu_rrc_container_length);
+  _EQ_CHECK_INT(a->du2cu_rrc_container_length, b->du2cu_rrc_container_length);
   if (memcmp(a->du2cu_rrc_container, b->du2cu_rrc_container, a->du2cu_rrc_container_length) != 0)
     return false;
-  _F1_EQ_CHECK_INT(a->transaction_id, b->transaction_id);
+  _EQ_CHECK_INT(a->transaction_id, b->transaction_id);
   return true;
 }
 
@@ -300,10 +300,10 @@ f1ap_ul_rrc_message_t cp_ul_rrc_message_transfer(const f1ap_ul_rrc_message_t *ms
  */
 bool eq_ul_rrc_message_transfer(const f1ap_ul_rrc_message_t *a, const f1ap_ul_rrc_message_t *b)
 {
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
-  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
-  _F1_EQ_CHECK_INT(a->rrc_container_length, b->rrc_container_length);
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _EQ_CHECK_INT(a->rrc_container_length, b->rrc_container_length);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
   if (memcmp(a->rrc_container, b->rrc_container, a->rrc_container_length) != 0)
     return false;
   return true;
@@ -456,16 +456,16 @@ f1ap_dl_rrc_message_t cp_dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *ms
  */
 bool eq_dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *a, const f1ap_dl_rrc_message_t *b)
 {
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
-  _F1_EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
-  _F1_EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_CU_ue_id, b->gNB_CU_ue_id);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->gNB_DU_ue_id, b->gNB_DU_ue_id);
   if (!(a->old_gNB_DU_ue_id == NULL && b->old_gNB_DU_ue_id == NULL))
-    _F1_EQ_CHECK_INT(*a->old_gNB_DU_ue_id, *b->old_gNB_DU_ue_id);
-  _F1_EQ_CHECK_INT(a->srb_id, b->srb_id);
-  _F1_EQ_CHECK_INT(a->execute_duplication, b->execute_duplication);
-  _F1_EQ_CHECK_INT(a->rrc_container_length, b->rrc_container_length);
+    _EQ_CHECK_INT(*a->old_gNB_DU_ue_id, *b->old_gNB_DU_ue_id);
+  _EQ_CHECK_INT(a->srb_id, b->srb_id);
+  _EQ_CHECK_INT(a->execute_duplication, b->execute_duplication);
+  _EQ_CHECK_INT(a->rrc_container_length, b->rrc_container_length);
   if (memcmp(a->rrc_container, b->rrc_container, a->rrc_container_length) != 0)
     return false;
   return true;
