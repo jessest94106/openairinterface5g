@@ -794,8 +794,6 @@ set(PHY_NRLDPC_CODINGIF
 
 add_library(dfts MODULE ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts.c ${OPENAIR1_DIR}/PHY/TOOLS/oai_dfts_neon.c)
 
-add_library(crc_byte OBJECT ${OPENAIR1_DIR}/PHY/CODING/crc_byte.c)
-
 set(PHY_SRC_COMMON
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/dci_tools_common.c
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/lte_mcs.c

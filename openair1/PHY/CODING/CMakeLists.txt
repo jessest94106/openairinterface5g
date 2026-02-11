@@ -66,6 +66,8 @@ if (ENABLE_LDPC_CUDA)
   add_dependencies(nr_dlschsim ldpc_cuda)
 endif()
 
+add_library(crc_byte OBJECT crc_byte.c)
+
 add_subdirectory(nrLDPC_coding)
 add_subdirectory(nrLDPC_decoder)
 add_subdirectory(nrPolar_tools)
