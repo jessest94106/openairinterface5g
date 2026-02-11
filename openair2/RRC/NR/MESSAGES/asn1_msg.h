@@ -32,6 +32,7 @@
 #define __RRC_NR_MESSAGES_ASN1_MSG__H__
 
 #include <common/utils/assertions.h>
+#include "common/platform_constants.h"
 #include <stdint.h>
 #include <stdio.h>
 #include "NR_ARFCN-ValueNR.h"
@@ -52,10 +53,10 @@
 #include "NR_SecurityConfig.h"
 #include "NR_MeasurementReport.h"
 #include "NR_MeasurementTimingConfiguration.h"
+#include "NR_UE-NR-Capability.h"
 #include "NR_UE-CapabilityRAT-ContainerList.h"
 #include "ds/seq_arr.h"
 #include "ds/byte_array.h"
-#include "rrc_messages_types.h"
 #include "openair2/LAYER2/nr_pdcp/nr_pdcp_configuration.h"
 #include "common/utils/nr/nr_common.h"
 struct asn_TYPE_descriptor_s;
