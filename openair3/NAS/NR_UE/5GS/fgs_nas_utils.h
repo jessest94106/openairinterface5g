@@ -26,24 +26,8 @@
 #include <arpa/inet.h>
 #include <string.h> // For memcpy
 #include <stdio.h>
-
-#define PRINT_NAS_ERROR(...) fprintf(stderr, ##__VA_ARGS__)
-
-#define _NAS_EQ_CHECK_GENERIC(condition, fmt, ...)                                                      \
-  do {                                                                                                  \
-    if (!(condition)) {                                                                                 \
-      PRINT_NAS_ERROR("NAS Equality Check failure: %s:%d: Condition '%s' failed: " fmt " != " fmt "\n", \
-                      __FILE__,                                                                         \
-                      __LINE__,                                                                         \
-                      #condition,                                                                       \
-                      ##__VA_ARGS__);                                                                   \
-      return false;                                                                                     \
-    }                                                                                                   \
-  } while (0)
-
-#define _NAS_EQ_CHECK_LONG(A, B) _NAS_EQ_CHECK_GENERIC(A == B, "%ld", A, B);
-#define _NAS_EQ_CHECK_INT(A, B) _NAS_EQ_CHECK_GENERIC(A == B, "%d", A, B);
-#define _NAS_EQ_CHECK_STR(A, B) _NAS_EQ_CHECK_GENERIC(strcmp(A, B) == 0, "'%s'", A, B);
+#include "utils.h" // text_info_t, TO_ENUM, TO_TEXT
+#include "common/utils/eq_check.h"
 
 /* Map task id to printable name. */
 typedef struct {

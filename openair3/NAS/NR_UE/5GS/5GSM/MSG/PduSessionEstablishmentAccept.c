@@ -205,7 +205,7 @@ int decode_pdu_session_establishment_accept_msg(pdu_session_establishment_accept
       }
 
       default:
-        PRINT_NAS_ERROR("Unknown IEI %d\n", psea_iei);
+        PRINT_ERROR("Unknown IEI %d\n", psea_iei);
         curPtr = buffer + msg_length; // we force stop processing
         break;
     }
