@@ -47,7 +47,7 @@ while [ $# -gt 0 ]; do
     } else {
       r = "FAIL";
     }
-    RESULTS['${NUM}']=sprintf("CHECK %-35s %7.2f %-8s %s", "'${PATTERN}'", meas, " '${COND}'", r);
+    RESULTS['${NUM}']=sprintf("CHECK %-40s %10.2f %-10s %s", "'${PATTERN}'", meas, "'${COND}'", r);
   }
 '
 
