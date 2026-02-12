@@ -663,8 +663,12 @@ static NR_CellGroupConfig_t *get_cellgroup_config(NR_UE_info_t *UE)
 static void update_cellgroup_for_reestablishment(NR_UE_info_t *UE, NR_CellGroupConfig_t *new_CellGroup)
 {
   DevAssert(new_CellGroup);
-  DevAssert(new_CellGroup->spCellConfig);
   DevAssert(UE->reestablish_rlc);
+  if (!new_CellGroup->spCellConfig) {
+    LOG_E(NR_MAC, "UE %04x: CellGroupConfig has no spCellConfig during reestablishment "
+          "(possible double reestablishment race), skipping reestablishRLC update\n", UE->rnti);
+    return;
+  }
   LOG_I(NR_MAC, "UE %04x: Re-establishment detected, setting reestablishRLC flags\n", UE->rnti);
   struct NR_CellGroupConfig__rlc_BearerToAddModList *addmod = new_CellGroup->rlc_BearerToAddModList;
   if (addmod && addmod->list.count > 0) {
@@ -1079,6 +1083,10 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
       ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->CellGroup);
       UE->CellGroup = oldUE->CellGroup;
       oldUE->CellGroup = NULL;
+      ASN_STRUCT_FREE(asn_DEF_NR_CellGroupConfig, UE->reconfigCellGroup);
+      UE->reconfigCellGroup = oldUE->reconfigCellGroup;
+      oldUE->reconfigCellGroup = NULL;
+      UE->reestablish_rlc = oldUE->reestablish_rlc;
       ASN_STRUCT_FREE(asn_DEF_NR_UE_NR_Capability, UE->capability);
       UE->capability = oldUE->capability;
       oldUE->capability = NULL;
@@ -1095,10 +1103,18 @@ void dl_rrc_message_transfer(const f1ap_dl_rrc_message_t *dl_rrc)
     }
     /* Per TS 38.331 5.3.7.2: the UE releases the spCellConfig, so we drop it
      * from the current configuration. It will be reapplied when the
-     * reconfiguration has succeeded (indicated by the CU) */
-    asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&UE->reconfigCellGroup, UE->CellGroup);
-    ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->CellGroup->spCellConfig);
-    UE->CellGroup->spCellConfig = NULL;
+     * reconfiguration has succeeded (indicated by the CU).
+     * Guard against double reestablishment: if reestablish_rlc is already set,
+     * reconfigCellGroup was saved by the first reestablishment and
+     * CellGroup.spCellConfig is already NULL — don't overwrite. */
+    if (!UE->reestablish_rlc) {
+      asn_copy(&asn_DEF_NR_CellGroupConfig, (void **)&UE->reconfigCellGroup, UE->CellGroup);
+      ASN_STRUCT_FREE(asn_DEF_NR_SpCellConfig, UE->CellGroup->spCellConfig);
+      UE->CellGroup->spCellConfig = NULL;
+    } else {
+      LOG_W(NR_MAC, "UE %04x: reestablishment while previous reestablishment still pending, "
+            "keeping saved reconfigCellGroup with spCellConfig\n", UE->rnti);
+    }
     UE->reestablish_rlc = true;
     /* Per TS 38.331 clause 5.3.7.4: apply gNB RLC configuration for SRB1 to match the UE RLC configuration defined in 9.2.1.
      * Use configuration file values for timers t_poll_retransmit, t_reassembly and t_status_prohibit */
