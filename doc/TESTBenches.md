@@ -220,7 +220,7 @@ information on how the images are built.
   ~5G-NR
   - 5G-NR SA test setup: OAI VNF + PNF/NVIDIA CUBB on gracehopper1-oai + Foxconn RU, up2 + COTS UE (Quectel RM520N), OAI CN5G
   - container images for gNB deployment
-- [RAN-SA-2x2-Module-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-2x2-Module-CN5G/)
+- [RAN-SA-Multi-Antenna-CN5G](https://jenkins-oai.eurecom.fr/view/RAN/job/RAN-SA-Multi-Antenna-CN5G/)
   ~5G-NR
   - matix + N310 (gNB), up2 + COTS UE (Quectel RM520N), OAI 5GC deployed in docker on matix
   - NR performance tests: 2x2 configuration, 60 MHz and 100 MHz bandwidth
