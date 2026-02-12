@@ -1747,13 +1747,12 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
     for (int i = 0; i < ru->num_bands; i++)
       ru->band[i] = param[RU_BAND_LIST_IDX].iptr[i];
     ru->openair0_cfg.nr_flag = *param[RU_NR_FLAG].iptr;
-    ru->openair0_cfg.nr_band = ru->band[0];
+    // TODO remove band from RU?
     ru->openair0_cfg.nr_scs_for_raster = *param[RU_NR_SCS_FOR_RASTER].iptr;
     LOG_D(PHY,
-          "[RU %d] Setting nr_flag %d, nr_band %d, nr_scs_for_raster %d\n",
+          "[RU %d] Setting nr_flag %d, nr_scs_for_raster %d\n",
           j,
           ru->openair0_cfg.nr_flag,
-          ru->openair0_cfg.nr_band,
           ru->openair0_cfg.nr_scs_for_raster);
     ru->openair0_cfg.rxfh_cores[0] = *param[RU_RXFH_CORE_ID].iptr;
     ru->openair0_cfg.txfh_cores[0] = *param[RU_TXFH_CORE_ID].iptr;
