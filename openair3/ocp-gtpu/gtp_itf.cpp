@@ -15,14 +15,14 @@ extern "C" {
 #include <openair3/UTILS/conversions.h>
 #include "common/utils/LOG/log.h"
 #include <common/utils/ocp_itti/intertask_interface.h>
-#include <openair2/COMMON/gtpv1_u_messages_types.h>
-#include <openair3/ocp-gtpu/gtp_itf.h>
-#include <openair2/LAYER2/PDCP_v10.1.0/pdcp.h>
-#include <openair2/LAYER2/nr_pdcp/nr_pdcp_oai_api.h>
-#include <openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h>
-#include "openair2/SDAP/nr_sdap/nr_sdap.h"
-#include "openair3/ocp-gtpu/gtpu_extensions.h"
 #include "sim.h"
+
+// TODO these dependencies should not exist and be removed
+#include "openair2/LAYER2/nr_rlc/nr_rlc_oai_api.h"
+#include "openair2/LAYER2/RLC/rlc.h"
+
+#include "gtp_itf.h"
+#include "gtpu_extensions.h"
 
 #pragma pack(1)
 
