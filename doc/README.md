@@ -104,7 +104,7 @@ Some directories under `radio` contain READMEs:
 
 - [RFsimulator](../radio/rfsimulator/README.md)
 - [USRP](../radio/USRP/README.md)
-- [BladeRF](../radio/BLADERF/README)
+- [BladeRF](../radio/BLADERF/README.md)
 - [IQPlayer](../radio/iqplayer/DOC/iqrecordplayer_usage.md), and [general documentation](./iqrecordplayer_usage.md)
 - [fhi_72](../radio/fhi_72/README.md)
 - [vrtsim](../radio/vrtsim/README.md)

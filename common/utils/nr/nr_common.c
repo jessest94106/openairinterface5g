@@ -1381,6 +1381,31 @@ unsigned short get_N_b_srs(int c_srs, int b_srs) {
   return srs_bandwidth_config[c_srs][b_srs][1];
 }
 
+// TODO: Implement to b_SRS = 1 and b_SRS = 2
+long rrc_get_max_nr_csrs(const int max_rbs, const long b_SRS)
+{
+  if(b_SRS>0) {
+    LOG_E(NR_RRC,"rrc_get_max_nr_csrs(): Not implemented yet for b_SRS>0\n");
+    return 0; // This c_srs is always valid
+  }
+
+  const uint16_t m_SRS[64] = { 4, 8, 12, 16, 16, 20, 24, 24, 28, 32, 36, 40, 48, 48, 52, 56, 60, 64, 72, 72, 76, 80, 88,
+                               96, 96, 104, 112, 120, 120, 120, 128, 128, 128, 132, 136, 144, 144, 144, 144, 152, 160,
+                               160, 160, 168, 176, 184, 192, 192, 192, 192, 208, 216, 224, 240, 240, 240, 240, 256, 256,
+                               256, 264, 272, 272, 272 };
+
+  long c_srs = 0;
+  uint16_t m = 4;
+  for(int c = 1; c<64; c++) {
+    if(m_SRS[c]>m && m_SRS[c]<max_rbs) {
+      c_srs = c;
+      m = m_SRS[c];
+    }
+  }
+
+  return c_srs;
+}
+
 frequency_range_t get_freq_range_from_freq(uint64_t freq)
 {
   // 3GPP TS 38.101-1 Version 19.0.0 Table 5.1-1: Definition of frequency ranges
