@@ -68,6 +68,8 @@ nrUE_params_t *get_nrUE_params(void)
 channel_desc_t *UE2gNB[MAX_MOBILES_PER_GNB][NUMBER_OF_gNB_MAX];
 configmodule_interface_t *uniqCfg = NULL;
 
+NR_IF_Module_t *NR_IF_Module_init(int Mod_id) { return (NULL); }
+
 void e1_bearer_context_setup(const e1ap_bearer_setup_req_t *req)
 {
   abort();

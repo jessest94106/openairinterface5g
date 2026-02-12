@@ -346,19 +346,10 @@ install_bladerf_driver_from_source(){
     make
     $SUDO make install
     $SUDO ldconfig
-    echo "Downloading FPGA and firmware images"
-    cd /tmp/bladeRF
-    #wget has been removed from default dependencies, so we must be sure that's installed
-    $SUDO $INSTALLER -y install wget
-    wget --tries=3 --retry-connrefused https://www.nuand.com/fx3/bladeRF_fw_latest.img
-    wget --tries=3 --retry-connrefused https://www.nuand.com/fpga/hostedx40-latest.rbf
-    sudo mkdir -p /usr/share/Nuand/bladeRF
-    sudo mv bladeRF_fw_latest.img /usr/share/Nuand/bladeRF/bladeRF_fw.img
-    sudo mv hostedx40-latest.rbf /usr/share/Nuand/bladeRF/hostedx40.rbf
 }
 
 check_install_bladerf_driver(){
-    if [[ "$OS_DISTRO" == "ubuntu" ]]; then
+    if [[ "$OS_BASEDISTRO" == "debian" ]]; then
         $SUDO apt-get install -y  bladerf libbladerf-dev
         $SUDO apt-get install -y bladerf-firmware-fx3
         $SUDO apt-get install -y bladerf-fpga-hostedx40
@@ -367,10 +358,6 @@ check_install_bladerf_driver(){
    else
         echo_error "BladeRF Installer for OAI does not support automatic build. Install BladeRF compiling sources manually from BladeRF website"
    fi
-}
-
-flash_firmware_bladerf() {
-	$SUDO bladeRF-cli --flash-firmware /usr/share/Nuand/bladeRF/bladeRF_fw.img
 }
 
 check_install_lmssdr_driver(){
