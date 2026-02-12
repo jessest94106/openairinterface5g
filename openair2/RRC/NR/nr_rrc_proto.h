@@ -128,11 +128,11 @@ void init_delayed_action(delayed_action_state_t *delayed_action);
 /** @brief Prepare and send F1AP UE Context Setup Request for a target DU
  * @param rrc RRC instance
  * @param ue UE context
- * @param du Target DU container containing cell and setup information
+ * @param cell Target cell container containing cell information
  * @param ho_prep_info Optional handover preparation information (NULL if not provided) */
 void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
                                            gNB_RRC_UE_t *ue,
-                                           const nr_rrc_du_container_t *du,
+                                           const nr_rrc_cell_container_t *cell,
                                            const byte_array_t *ho_prep_info);
 
 #endif

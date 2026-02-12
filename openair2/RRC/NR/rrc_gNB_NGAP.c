@@ -90,7 +90,9 @@
 #include "uper_encoder.h"
 #include "rrc_gNB_mobility.h"
 #include "rrc_gNB_du.h"
+#include "rrc_cell_management.h"
 #include "common/utils/alg/find.h"
+#include "common/utils/nr/nr_common.h"
 
 #ifdef E2_AGENT
 #include "openair2/E2AP/RAN_FUNCTION/O-RAN/ran_func_rc_extern.h"
@@ -254,8 +256,9 @@ void rrc_gNB_send_NGAP_NAS_FIRST_REQ(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, NR_RRC
   /* UE is connected to only one PLMN at a time: store this as the serving PLMN */
   UE->serving_plmn = req->plmn;
 
-  // Cell ID (NR CGI)
-  req->nr_cell_id = UE->nr_cellid;
+  nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(rrc, UE);
+  DevAssert(cell);
+  req->nr_cell_id = cell->info.cell_id;
   // PLMN (NR CGI and TAI)
   plmn_id_t *p = &req->plmn;
   LOG_I(NGAP, "Selected PLMN in the NG Initial UE Message: MCC=%03d MNC=%0*d\n", p->mcc, p->mnc_digit_length, p->mnc);
@@ -766,8 +769,10 @@ void rrc_gNB_send_NGAP_UPLINK_NAS(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const NR_
   NGAP_UPLINK_NAS(msg_p).nas_pdu.buf = buf;
   /* Fill PLMN and location info: use serving PLMN of the UE */
   NGAP_UPLINK_NAS(msg_p).plmn = UE->serving_plmn;
-  NGAP_UPLINK_NAS(msg_p).nr_cell_id = rrc->nr_cellid;
-  NGAP_UPLINK_NAS(msg_p).tac = rrc->configuration.tac;
+  nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(rrc, UE);
+  DevAssert(cell);
+  NGAP_UPLINK_NAS(msg_p).nr_cell_id = cell->info.cell_id;
+  NGAP_UPLINK_NAS(msg_p).tac = cell->info.tac != 0 ? cell->info.tac : rrc->configuration.tac;
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
 }
 
@@ -1128,14 +1133,27 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     return -1;
   }
 
-  struct nr_rrc_du_container_t *du = get_du_by_cell_id(rrc, msg->nr_cell_id);
-  if (du == NULL) {
+  // Get cell by cell_id
+  nr_rrc_cell_container_t *cell = get_cell_by_cell_id(&rrc->cells, msg->nr_cell_id);
+  if (cell == NULL) {
     /* Cell Not Found! Return HO Request Failure*/
-    LOG_E(RRC, "Failed to process Handover Request: no DU found with NR Cell ID=%lu \n", msg->nr_cell_id);
+    LOG_E(RRC, "Failed to process Handover Request: no cell found with NR Cell ID=%lu \n", msg->nr_cell_id);
     ngap_handover_failure_t fail = {
         .amf_ue_ngap_id = msg->amf_ue_ngap_id,
         .cause.type = NGAP_CAUSE_RADIO_NETWORK,
         .cause.value = NGAP_CAUSE_RADIO_NETWORK_RADIO_RESOURCES_NOT_AVAILABLE,
+    };
+    rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
+    return -1;
+  }
+
+  struct nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, cell->assoc_id);
+  if(du == NULL) {
+    LOG_E(NR_RRC, "Failed to process Handover Request: no DU found with assoc_id=%d\n", cell->assoc_id);
+    ngap_handover_failure_t fail = {
+        .amf_ue_ngap_id = msg->amf_ue_ngap_id,
+        .cause.type = NGAP_CAUSE_RADIO_NETWORK,
+        .cause.value = NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM,
     };
     rrc_gNB_send_NGAP_HANDOVER_FAILURE(rrc, &fail);
     return -1;
@@ -1154,16 +1172,16 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
     return -1;
   }
 
-  uint16_t pci = du->setup_req->cell[0].info.nr_pci;
+  uint16_t pci = cell->info.pci;
   LOG_I(NR_RRC, "Received Handover Request (on NR Cell ID=%lu, PCI=%u) \n", msg->nr_cell_id, pci);
 
   // Create UE context
-  sctp_assoc_t curr_assoc_id = du->assoc_id;
-  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_create_ue_context(curr_assoc_id, UINT16_MAX, rrc, UINT64_MAX, UINT32_MAX);
+  rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_create_ue_context(du->assoc_id, UINT16_MAX, rrc, UINT64_MAX, UINT32_MAX);
   gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
 
   // allocate context for target
   UE->ho_context = alloc_ho_ctx(HO_CTX_TARGET);
+  UE->ho_context->target->cell = cell;
   UE->ho_context->target->ho_trigger = nr_rrc_trigger_n2_ho_target;
 
   // Store IDs in UE context
@@ -1185,9 +1203,9 @@ int rrc_gNB_process_Handover_Request(gNB_RRC_INST *rrc, instance_t instance, nga
   // Reset KgNB
   memset(UE->kgnb, 0, SECURITY_KEY_LENGTH);
   // Derive KgNB*
-  const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-  uint32_t ssb_arfcn = get_ssb_arfcn(du);
-  nr_derive_key_ng_ran_star(cell_info->nr_pci, ssb_arfcn, UE->nh, UE->kgnb);
+  const nr_rrc_cell_info_t *cell_info = &cell->info;
+  uint32_t ssb_arfcn = get_ssb_arfcn(cell);
+  nr_derive_key_ng_ran_star(cell_info->pci, ssb_arfcn, UE->nh, UE->kgnb);
   UE->as_security_active = true;
   // Activate SRBs
   activate_srb(UE, SRB1);
@@ -1474,24 +1492,28 @@ void rrc_gNB_send_NGAP_HANDOVER_REQUEST_ACKNOWLEDGE(gNB_RRC_INST *rrc, gNB_RRC_U
 void rrc_gNB_send_NGAP_HANDOVER_NOTIFY(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
 {
   LOG_I(NR_RRC, "Triggering NGAP Handover Notify\n");
-  nr_rrc_du_container_t *du = get_du_by_cell_id(rrc, rrc->nr_cellid);
-  if (du == NULL) {
-    LOG_E(NR_RRC, "Failed to send Handover Notify: no DU found with NR Cell ID=%lu\n", rrc->nr_cellid);
+  nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(rrc, UE);
+  if (cell == NULL) {
+    LOG_E(NR_RRC, "Failed to send Handover Notify: no PCell found for UE %d\n", UE->rrc_ue_id);
     return;
   }
-
+  nr_rrc_du_container_t *du = get_du_for_ue(rrc, UE->rrc_ue_id);
+  if (du == NULL) {
+    LOG_E(NR_RRC, "Failed to send Handover Notify: no DU found for UE %d\n", UE->rrc_ue_id);
+    return;
+  }
   MessageDef *msg_p = itti_alloc_new_message(TASK_RRC_GNB, 0, NGAP_HANDOVER_NOTIFY);
   ngap_handover_notify_t *ho_notify = &NGAP_HANDOVER_NOTIFY(msg_p);
   memset(ho_notify, 0, sizeof(*ho_notify));
 
   ho_notify->gNB_ue_ngap_id = UE->rrc_ue_id;
   ho_notify->amf_ue_ngap_id = UE->amf_ue_ngap_id;
-  ho_notify->user_info.nrCellIdentity = rrc->nr_cellid;
+  ho_notify->user_info.nrCellIdentity = cell->info.cell_id;
 
   target_ran_node_id_t *target_ng_ran = &ho_notify->user_info.target_ng_ran;
-  target_ng_ran->tac = *du->setup_req->cell->info.tac;
+  target_ng_ran->tac = cell->info.tac;
   target_ng_ran->targetgNBId = rrc->node_id;
-  target_ng_ran->plmn_identity = du->setup_req->cell->info.plmn;
+  target_ng_ran->plmn_identity = cell->info.plmn;
 
   itti_send_msg_to_task(TASK_NGAP, rrc->module_id, msg_p);
 }
@@ -1628,7 +1650,23 @@ int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance)
           if (NODE_IS_CU(RC.nrrrc[instance]->node_type)) {
             MessageDef *m = itti_alloc_new_message(TASK_RRC_GNB, 0, F1AP_PAGING_IND);
             F1AP_PAGING_IND(m).plmn = *req_plmn;
-            F1AP_PAGING_IND (m).nr_cellid        = RC.nrrrc[j]->nr_cellid;
+            // Construct 5G-S-TMSI-Part1 from paging identity to find UE
+            const fiveg_s_tmsi_t *s_tmsi = &msg->ue_paging_identity.s_tmsi;
+            uint64_t s_tmsi_part1 = nr_construct_5g_s_tmsi_part1(s_tmsi->amf_set_id, s_tmsi->amf_pointer, s_tmsi->m_tmsi);
+            // Try to find UE by 5G-S-TMSI-Part1
+            rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_ue_context_5g_s_tmsi_exist(RC.nrrrc[instance], s_tmsi_part1);
+            if (ue_context_p == NULL) {
+              LOG_W(NR_RRC, "UE not found by paging identity\n");
+              return -1;
+            }
+            // UE found: use its associated cell
+            gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
+            nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(RC.nrrrc[instance], UE);
+            if (cell == NULL) {
+              LOG_W(NR_RRC, "UE %d (rnti %04x) found by paging identity but has no valid cell\n", UE->rrc_ue_id, UE->rnti);
+              return -1;
+            }
+            F1AP_PAGING_IND(m).nr_cellid = cell->info.cell_id;
             F1AP_PAGING_IND(m).ueidentityindexvalue = (uint16_t)(msg->ue_paging_identity.s_tmsi.m_tmsi % 1024);
             F1AP_PAGING_IND(m).fiveg_s_tmsi = msg->ue_paging_identity.s_tmsi.m_tmsi;
             F1AP_PAGING_IND(m).paging_drx = msg->paging_drx;

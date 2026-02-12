@@ -75,6 +75,7 @@
 #include "s1ap_messages_types.h"
 #include "sctp_default_values.h"
 #include "seq_arr.h"
+#include "common/utils/alg/find.h"
 #include "uper_encoder.h"
 #include "utils.h"
 #include "x2ap_messages_types.h"
@@ -1160,6 +1161,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
   req->gNB_DU_id = id;
   req->gNB_DU_name = strdup(name);
   req->num_cells_available = 1;
+  req->cell = calloc_or_fail(req->num_cells_available, sizeof(*req->cell));
   req->cell[0].info = *info;
   LOG_I(GNB_APP,
         "F1AP: gNB idx %d gNB_DU_id %ld, gNB_DU_name %s, TAC %d MCC/MNC/length %d/%d/%d cellID %ld\n",
@@ -1681,6 +1683,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     seq_arr_t *du_SIBs = RC.nrmac[0]->common_channels[0].du_SIBs;
     f1ap_setup_req_t *req = RC_read_F1Setup(gnb_du_id, name, &info, scc, mib, sib1, du_SIBs);
     AssertFatal(req != NULL, "could not read F1 Setup information\n");
+    LOG_I(GNB_APP, "Configured DU: cell ID %lu, PCI %d\n", info.nr_cellid, info.nr_pci);
     RC.nrmac[0]->f1_config.setup_req = req;
     RC.nrmac[0]->f1_config.gnb_id = gnb_id;
 
@@ -1849,6 +1852,22 @@ static seq_arr_t *fill_cu_sibs(paramdef_t *GNBparamarray)
   return SIBs;
 }
 
+static bool eq_neighbour_pci(const void *vval, const void *vit)
+{
+  const int *pci = (const int *)vval;
+  const nr_neighbour_cell_t *neighbour = (const nr_neighbour_cell_t *)vit;
+  return neighbour->physicalCellId == *pci;
+}
+
+/** @brief Find neighbour by PCI within a cell's neighbour list (first match) */
+static nr_neighbour_cell_t *get_neighbour_by_pci(seq_arr_t *neighbour_cells, int pci)
+{
+  elm_arr_t elm = find_if(neighbour_cells, &pci, eq_neighbour_pci);
+  if (elm.found)
+    return (nr_neighbour_cell_t *)elm.it;
+  return NULL;
+}
+
 static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
 {
   char gnbpath[MAX_OPTNAME_SIZE + 8];
@@ -1906,6 +1925,14 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
       n.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
       n.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
       n.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
+      if (get_neighbour_by_pci(cell.neighbour_cells, n.physicalCellId) != NULL) {
+        LOG_E(GNB_APP,
+              "Cell %ld: duplicate PCI %d in neighbour list (nrcell_id %ld)\n",
+              cell.nr_cell_id,
+              n.physicalCellId,
+              n.nrcell_id);
+        AssertFatal(false, "PCI must be unique within a cell's neighbour list\n");
+      }
       seq_arr_push_back(cell.neighbour_cells, &n, sizeof(n));
       LOG_I(GNB_APP,
             "   [%d] neighbor ID %d cellId %ld PCI %d SCS %d SSB ARFCN %u TAC %u PLMN %03u.%0*u\n",
@@ -2049,8 +2076,6 @@ gNB_RRC_INST *RCconfig_NRRRC()
       rrc->eth_params_s.remote_portd             = *(GNBParamList.paramarray[i][GNB_REMOTE_S_PORTD_IDX].uptr);
       rrc->eth_params_s.transp_preference        = ETH_UDP_MODE;
     }
-
-    rrc->nr_cellid        = (uint64_t)*(GNBParamList.paramarray[i][GNB_NRCELLID_IDX].u64ptr);
 
     if (strcmp(*(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr), "local_mac") == 0) {
       
