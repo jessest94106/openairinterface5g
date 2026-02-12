@@ -39,8 +39,6 @@
 //#include "PHY/extern.h"
 
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
-
 #include "T.h"
 #define ONE_OVER_SQRT2 23170 // 32767/sqrt(2) = 23170 (ONE_OVER_SQRT2)
 

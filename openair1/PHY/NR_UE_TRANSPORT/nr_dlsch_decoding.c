@@ -22,7 +22,6 @@
 /*! \file PHY/NR_UE_TRANSPORT/nr_dlsch_decoding_slot.c
  */
 
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "PHY/defs_nr_UE.h"
 #include "SCHED_NR_UE/harq_nr.h"
 #include "PHY/CODING/coding_extern.h"
@@ -144,8 +143,6 @@ void nr_dlsch_decoding(PHY_VARS_NR_UE *phy_vars_ue,
         TB_parameters->Qm,
         Coderate);
 
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_DLSCH_SEGMENTATION, VCD_FUNCTION_IN);
-
     if (harq_process->first_rx == 1) {
       // This is a new packet, so compute quantities regarding segmentation
       nr_segmentation(NULL,
@@ -179,8 +176,6 @@ void nr_dlsch_decoding(PHY_VARS_NR_UE *phy_vars_ue,
       TB_parameters->F = harq_process->F;
     }
     max_num_segments = max(max_num_segments, TB_parameters->C);
-
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_DLSCH_SEGMENTATION, VCD_FUNCTION_OUT);
 
     if (LOG_DEBUGFLAG(DEBUG_DLSCH_DECOD))
       LOG_I(PHY, "Segmentation: C %d, K %d\n", harq_process->C, harq_process->K);

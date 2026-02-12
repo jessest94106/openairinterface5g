@@ -28,7 +28,6 @@
 #include "common/ran_context.h"
 #include "common/config/config_userapi.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/load_module_shlib.h"
 #include "T.h"
 #include "PHY/defs_gNB.h"
@@ -143,7 +142,7 @@ int main(int argc, char **argv)
   randominit();
 
   int c;
-  while ((c = getopt(argc, argv, "--:O:df:hpVg:i:j:n:l:m:r:s:S:y:z:M:N:F:R:P:L:X:")) != -1) {
+  while ((c = getopt(argc, argv, "--:O:df:hpg:i:j:n:l:m:r:s:S:y:z:M:N:F:R:P:L:X:")) != -1) {
 
     /* ignore long options starting with '--' and their arguments that are handled by configmodule */
     /* with this opstring getopt returns 1 for non-option arguments, refer to 'man 3 getopt' */
@@ -214,10 +213,6 @@ int main(int argc, char **argv)
 			printf("Setting SNR0 to %f\n", snr0);
 #endif
 			break;
-
-		case 'V':
-		  ouput_vcd = 1;
-		  break;
 
 		case 'S':
 			snr1 = atof(optarg);
@@ -319,7 +314,6 @@ int main(int argc, char **argv)
 			printf("%s -h(elp) -p(extended_prefix) -N cell_id -f output_filename -F input_filename -g channel_model -n n_frames -t Delayspread -s snr0 -S snr1  -y TXant -z RXant -i Intefrence0 -j Interference1 -A interpolation_file -C(alibration offset dB) -N CellId\n", argv[0]);
 			printf("-h This message\n");
 			printf("-p Use extended prefix mode\n");
-			printf("-V Enable VCD dumb functions\n");
 			//printf("-d Use TDD\n");
 			printf("-n Number of frames to simulate\n");
 			printf("-s Starting SNR, runs from SNR0 to SNR0 + 5 dB.  If n_frames is 1 then just SNR is simulated\n");
@@ -350,9 +344,6 @@ int main(int argc, char **argv)
 
 	if (snr1set == 0)
 		snr1 = snr0 + 10;
-
-	if (ouput_vcd)
-        vcd_signal_dumper_init("/tmp/openair_dump_nr_dlschsim.vcd");
 
   gNB2UE = new_channel_desc_scm(n_tx,
                                 n_rx,
@@ -562,8 +553,6 @@ int main(int argc, char **argv)
 			exit(-1);
 #endif
 
-			vcd_signal_dumper_dump_function_by_name(VCD_SIGNAL_DUMPER_FUNCTIONS_DLSCH_DECODING0, VCD_FUNCTION_IN);
-
       int a_segments = MAX_NUM_NR_DLSCH_SEGMENTS_PER_LAYER*NR_MAX_NB_LAYERS;  //number of segments to be allocated
       int num_rb = dlsch0_ue->dlsch_config.number_rbs;
       if (num_rb != 273) {
@@ -584,8 +573,6 @@ int main(int argc, char **argv)
                         available_bits_array,
                         1,
                         DLSCH_ids);
-
-      vcd_signal_dumper_dump_function_by_name(VCD_SIGNAL_DUMPER_FUNCTIONS_DLSCH_DECODING0, VCD_FUNCTION_OUT);
 
       if (dlsch0_ue->last_iteration_cnt > dlsch0_ue->max_ldpc_iterations)
 				n_errors++;
@@ -657,8 +644,6 @@ int main(int argc, char **argv)
 	if (input_fd)
 		fclose(input_fd);
 
-	if (ouput_vcd)
-        vcd_signal_dumper_close();
   end_configmodule(uniqCfg);
   loader_reset();
   logTerm();

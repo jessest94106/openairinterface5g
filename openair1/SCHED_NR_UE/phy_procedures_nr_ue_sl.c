@@ -24,7 +24,6 @@
 #include "PHY/defs_nr_UE.h"
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "UTIL/OPT/opt.h"
 #include "intertask_interface.h"
 #include "T.h"
@@ -121,8 +120,6 @@ static int nr_ue_psbch_procedures(PHY_VARS_NR_UE *ue,
   sl_nr_ue_phy_params_t *sl_phy_params = &ue->SL_UE_PHY_PARAMS;
   uint16_t rx_slss_id = sl_phy_params->sl_config.sl_sync_source.rx_slss_id;
 
-  // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_PSBCH_PROCEDURES, VCD_FUNCTION_IN);
-
   LOG_D(NR_PHY,
         "[UE  %d] Frame %d Slot %d, Trying PSBCH (SLSS ID %d)\n",
         ue->Mod_id,
@@ -165,7 +162,6 @@ static int nr_ue_psbch_procedures(PHY_VARS_NR_UE *ue,
   if (ue->if_inst && ue->if_inst->sl_indication)
     ue->if_inst->sl_indication(&sl_indication);
 
-  // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_PSBCH_PROCEDURES, VCD_FUNCTION_OUT);
   return ret;
 }
 
@@ -177,7 +173,6 @@ int psbch_pscch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr
   NR_DL_FRAME_PARMS *fp = &sl_phy_params->sl_frame_params;
   int sampleShift = INT_MAX;
 
-  // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_RX_SL, VCD_FUNCTION_IN);
   start_meas(&sl_phy_params->phy_proc_sl_rx);
 
   LOG_D(NR_PHY, " ****** Sidelink RX-Chain for Frame.Slot %d.%d ******  \n", frame_rx % 1024, nr_slot_rx);
@@ -188,7 +183,6 @@ int psbch_pscch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr
   if (phy_data->sl_rx_action == SL_NR_CONFIG_TYPE_RX_PSBCH) {
     const int estimateSz = fp->symbols_per_slot * fp->ofdm_symbol_size;
 
-    // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PSBCH, VCD_FUNCTION_IN);
     LOG_D(NR_PHY, " ----- PSBCH RX TTI: frame.slot %d.%d ------  \n", frame_rx % 1024, nr_slot_rx);
 
     __attribute__((aligned(32))) struct complex16 dl_ch_estimates[fp->nb_antennas_rx][estimateSz];
@@ -243,7 +237,6 @@ int psbch_pscch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr
 
     LOG_D(NR_PHY, "Doing N0 measurements in %s\n", __FUNCTION__);
     //    nr_ue_rrc_measurements(ue, proc, rxdataF);
-    // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PSBCH, VCD_FUNCTION_OUT);
 
     if (frame_rx % 64 == 0) {
       LOG_I(NR_PHY, "============================================\n");
@@ -274,8 +267,6 @@ void phy_procedures_nrUE_SL_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc
 
   sl_nr_ue_phy_params_t *sl_phy_params = &ue->SL_UE_PHY_PARAMS;
   NR_DL_FRAME_PARMS *fp = &sl_phy_params->sl_frame_params;
-
-  // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_TX_SL,VCD_FUNCTION_IN);
 
   const int samplesF_per_slot = NR_SYMBOLS_PER_SLOT * fp->ofdm_symbol_size;
   c16_t txdataF_buf[fp->nb_antennas_tx * samplesF_per_slot] __attribute__((aligned(32)));
@@ -326,8 +317,5 @@ void phy_procedures_nrUE_SL_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc
   }
 
   LOG_D(NR_PHY, "****** end Sidelink TX-Chain for AbsSubframe %d.%d ******\n", frame_tx, slot_tx);
-
-  // VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_TX_SL, VCD_FUNCTION_OUT);
   stop_meas(&sl_phy_params->phy_proc_sl_tx);
-
 }
