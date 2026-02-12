@@ -118,9 +118,10 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, const n
   // by the higher-layer parameter subCarrierSpacingCommon
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
   const int scs = cfg->ssb_config.scs_common.value;
-  const int prb_offset = (fp->freq_range == FR1) ? pdu->ssbOffsetPointA >> scs : pdu->ssbOffsetPointA >> (scs - 2);
-  const int sc_offset = (fp->freq_range == FR1) ? pdu->SsbSubcarrierOffset >> scs : pdu->SsbSubcarrierOffset;
-  fp->ssb_start_subcarrier = (12 * prb_offset + sc_offset);
+  fp->ssb_start_subcarrier = nr_get_ssb_start_sc(scs,
+                                                 pdu->ssbOffsetPointA,
+                                                 pdu->SsbSubcarrierOffset,
+                                                 fp->freq_range);
 
   if (fp->print_ue_help_cmdline_log && IS_SA_MODE(get_softmodem_params())) {
     fp->print_ue_help_cmdline_log = false;
@@ -142,15 +143,6 @@ void nr_common_signal_procedures(PHY_VARS_gNB *gNB, int frame, int slot, const n
             fp->ssb_start_subcarrier,
             fp->threequarter_fs ? "-E" : "");
   }
-  LOG_D(PHY,
-        "ssbOffsetPointA %d SSB SsbSubcarrierOffset %d  prb_offset %d sc_offset %d scs %d ssb_start_subcarrier %d\n",
-        pdu->ssbOffsetPointA,
-        pdu->SsbSubcarrierOffset,
-        prb_offset,
-        sc_offset,
-        scs,
-        fp->ssb_start_subcarrier);
-
   LOG_D(PHY,"SS TX: frame %d, slot %d, start_symbol %d\n", frame, slot, ssb_start_symbol);
   const nfapi_nr_tx_precoding_and_beamforming_t *pb = &pdu->precoding_and_beamforming;
   c16_t ***txdataF = gNB->common_vars.txdataF;
