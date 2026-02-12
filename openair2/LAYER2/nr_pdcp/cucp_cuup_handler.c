@@ -37,7 +37,6 @@
 #include "common/utils/oai_asn1.h"
 #include "constr_TYPE.h"
 #include "cuup_cucp_if.h"
-#include "gtpv1_u_messages_types.h"
 #include "nr_pdcp/nr_pdcp_entity.h"
 #include "nr_pdcp_oai_api.h"
 #include "openair2/COMMON/e1ap_messages_types.h"

@@ -95,7 +95,7 @@ int get_ssb_arfcn(const struct nr_rrc_cell_container_t *cell)
 
 static bool rrc_gNB_plmn_matches(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *info)
 {
-  const gNB_RrcConfigurationReq *conf = &rrc->configuration;
+  const nr_rrc_config_t *conf = &rrc->configuration;
   return conf->num_plmn == 1 // F1 supports only one
          && conf->plmn[0].mcc == info->plmn.mcc && conf->plmn[0].mnc == info->plmn.mnc;
 }

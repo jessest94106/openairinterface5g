@@ -286,9 +286,6 @@ static inline void warn_higher_threequarter_fs(const int n_rb, const int mu)
         mu);
 }
 
-uint64_t reverse_bits(uint64_t in, int n_bits);
-void reverse_bits_u8(uint8_t const* in, size_t sz, uint8_t* out);
-
 uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t dl_nrarfcn);
 uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw);
 

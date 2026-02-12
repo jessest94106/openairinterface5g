@@ -31,11 +31,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "LAYER2/MAC/mac_extern.h"
-#include "LTE_DRB-ToAddModList.h"
-#include "LTE_DRB-ToReleaseList.h"
-#include "LTE_PMCH-InfoList-r9.h"
-#include "LTE_SRB-ToAddModList.h"
 #include "NR_DRB-ToAddMod.h"
 #include "NR_QFI.h"
 #include "NR_SDAP-Config.h"
@@ -53,7 +48,7 @@
 #include "f1ap_messages_types.h"
 #include "gnb_config.h"
 #include "gtpv1_u_messages_types.h"
-#include "hashtable.h"
+#include "ds/hashtable.h"
 #include "intertask_interface.h"
 #include "common/utils/LOG/log.h"
 #include "nfapi/oai_integration/vendor_ext.h"

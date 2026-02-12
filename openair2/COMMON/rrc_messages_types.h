@@ -414,22 +414,6 @@ typedef struct NbIoTRrcConfigurationReq_s {
   long                    ue_TimersAndConstants_n311_NB;
 } NbIoTRrcConfigurationReq;
 
-// gNB: GNB_APP -> RRC messages
-typedef struct NRRrcConfigurationReq_s {
-  uint32_t                tac;
-  plmn_id_t plmn[PLMN_LIST_MAX_SIZE];
-  uint8_t                 num_plmn;
-
-  bool um_on_default_drb;
-  bool                    enable_sdap;
-} gNB_RrcConfigurationReq;
-
-typedef struct NRDuDlReq_s {
-  rnti_t rnti;
-  uint8_t *buf;
-  uint64_t srb_id;
-}  NRDuDlReq_t;
-
 // eNB: realtime -> RRC messages
 typedef struct rrc_subframe_process_s {
   protocol_ctxt_t ctxt;

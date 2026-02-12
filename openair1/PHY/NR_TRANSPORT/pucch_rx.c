@@ -49,6 +49,7 @@
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "nfapi/oai_integration/vendor_ext.h"
 #include "SCHED_NR/sched_nr.h"
+#include "reverse_bits.h"
 
 #include "T.h"
 #include "nr_phy_common.h"

@@ -35,7 +35,7 @@
 #include <arpa/inet.h>
 
 #include "assertions.h"
-#include "hashtable.h"
+#include "ds/hashtable.h"
 #include "oai_asn1.h"
 #include "rrc_defs.h"
 #include "rrc_extern.h"

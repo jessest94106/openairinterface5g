@@ -2092,7 +2092,7 @@ gNB_RRC_INST *RCconfig_NRRRC()
     
     // search if in active list
     
-    gNB_RrcConfigurationReq nrrrc_config = {0};
+    nr_rrc_config_t nrrrc_config = {0};
     for (k=0; k <num_gnbs ; k++) {
       if (strcmp(GNBSParams[GNB_ACTIVE_GNBS_IDX].strlistptr[k], *(GNBParamList.paramarray[i][GNB_GNB_NAME_IDX].strptr) )== 0) {
 

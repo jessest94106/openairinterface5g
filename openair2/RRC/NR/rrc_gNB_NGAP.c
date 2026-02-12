@@ -1641,7 +1641,7 @@ int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance)
           p->mnc_digit_length,
           p->mnc,
           msg->tac[tai_size]);
-    gNB_RrcConfigurationReq *req = &RC.nrrrc[instance]->configuration;
+    nr_rrc_config_t *req = &RC.nrrrc[instance]->configuration;
     for (uint8_t j = 0; j < req->num_plmn; j++) {
       plmn_id_t *req_plmn = &req->plmn[j];
       if (req_plmn->mcc == p->mcc && req_plmn->mnc == p->mnc && req->tac == msg->tac[tai_size]) {

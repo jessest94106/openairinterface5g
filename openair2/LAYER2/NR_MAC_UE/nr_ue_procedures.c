@@ -51,6 +51,7 @@
 
 /* utils */
 #include "assertions.h"
+#include "reverse_bits.h"
 #include "oai_asn1.h"
 #include "common/utils/LOG/log.h"
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"

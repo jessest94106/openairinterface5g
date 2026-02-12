@@ -32,7 +32,7 @@
 #define MBMS_MULTICAST_OUT
 
 #include "assertions.h"
-#include "hashtable.h"
+#include "ds/hashtable.h"
 #include "pdcp.h"
 #include "pdcp_util.h"
 #include "pdcp_sequence_manager.h"
