@@ -1135,7 +1135,6 @@ set(L2_SRC
   ${RRC_DIR}/rrc_eNB_S1AP.c
   ${RRC_DIR}/rrc_eNB_M2AP.c
   ${RRC_DIR}/rrc_eNB_UE_context.c
-  ${NR_RRC_DIR}/rrc_gNB_UE_context.c
   ${RRC_DIR}/rrc_eNB_GTPV1U.c
   ${RRC_DIR}/rrc_common.c
   ${RRC_DIR}/L2_interface.c
