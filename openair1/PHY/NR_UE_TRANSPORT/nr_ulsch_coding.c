@@ -31,7 +31,6 @@
 #include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/NR_UE_TRANSPORT/nr_transport_ue.h"
 #include "executables/nr-uesoftmodem.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "PHY/log_tools.h"
 
 int nr_ulsch_pre_encoding(PHY_VARS_NR_UE *ue,
@@ -137,7 +136,6 @@ int nr_ulsch_pre_encoding(PHY_VARS_NR_UE *ue,
 
     harq_process->BG = pusch_pdu->ldpcBaseGraph;
 
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_SEGMENTATION, VCD_FUNCTION_IN);
     start_meas_nr_ue_phy(ue, ULSCH_SEGMENTATION_STATS);
     harq_process->Kb = nr_segmentation(harq_process->payload_AB,
                                        harq_process->c,
@@ -152,7 +150,6 @@ int nr_ulsch_pre_encoding(PHY_VARS_NR_UE *ue,
       return (-1);
     }
     stop_meas_nr_ue_phy(ue, ULSCH_SEGMENTATION_STATS);
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_SEGMENTATION, VCD_FUNCTION_OUT);
   } // pusch_id
   return 0;
 }
@@ -167,7 +164,6 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
                       uint16_t number_dmrs_symbols)
 {
   start_meas_nr_ue_phy(ue, ULSCH_ENCODING_STATS);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_UE_ULSCH_ENCODING, VCD_FUNCTION_IN);
 
   nrLDPC_TB_encoding_parameters_t TBs[nb_ulsch];
   memset(TBs, 0, sizeof(TBs));
@@ -237,9 +233,6 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
   } // pusch_id
 
   ///////////////////////// | LDCP coding | ////////////////////////////////////
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_LDPC_ENCODER_OPTIM, VCD_FUNCTION_IN);
-
   ue->nrLDPC_coding_interface.nrLDPC_coding_encoder(&slot_parameters);
 
   for (uint8_t pusch_id = 0; pusch_id < nb_ulsch; pusch_id++) {
@@ -252,9 +245,6 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
     }
   }
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_LDPC_ENCODER_OPTIM, VCD_FUNCTION_OUT);
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_UE_ULSCH_ENCODING, VCD_FUNCTION_OUT);
   stop_meas_nr_ue_phy(ue, ULSCH_ENCODING_STATS);
   return 0;
 }

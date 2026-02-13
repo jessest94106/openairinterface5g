@@ -41,6 +41,7 @@
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "openair3/UTILS/conversions.h"
 #include "LAYER2/nr_rlc/nr_rlc_asn1_utils.h"
+#include "reverse_bits.h"
 
 #include "NR_MeasurementTimingConfiguration.h"
 #include "uper_decoder.h"
@@ -650,31 +651,6 @@ static void set_dl_maxmimolayers(NR_PDSCH_ServingCellConfig_t *pdsch_servingcell
     *pdsch_servingcellconfig->ext1->maxMIMO_Layers = min(NR_MAX_SUPPORTED_DL_LAYERS, ue_supported_layers);
   else 
     *pdsch_servingcellconfig->ext1->maxMIMO_Layers = min(maxMIMO_layers, ue_supported_layers);
-}
-
-// TODO: Implement to b_SRS = 1 and b_SRS = 2
-long rrc_get_max_nr_csrs(const int max_rbs, const long b_SRS) {
-
-  if(b_SRS>0) {
-    LOG_E(NR_RRC,"rrc_get_max_nr_csrs(): Not implemented yet for b_SRS>0\n");
-    return 0; // This c_srs is always valid
-  }
-
-  const uint16_t m_SRS[64] = { 4, 8, 12, 16, 16, 20, 24, 24, 28, 32, 36, 40, 48, 48, 52, 56, 60, 64, 72, 72, 76, 80, 88,
-                               96, 96, 104, 112, 120, 120, 120, 128, 128, 128, 132, 136, 144, 144, 144, 144, 152, 160,
-                               160, 160, 168, 176, 184, 192, 192, 192, 192, 208, 216, 224, 240, 240, 240, 240, 256, 256,
-                               256, 264, 272, 272, 272 };
-
-  long c_srs = 0;
-  uint16_t m = 4;
-  for(int c = 1; c<64; c++) {
-    if(m_SRS[c]>m && m_SRS[c]<max_rbs) {
-      c_srs = c;
-      m = m_SRS[c];
-    }
-  }
-
-  return c_srs;
 }
 
 static struct NR_SRS_Resource__resourceType__periodic *configure_periodic_srs(const NR_ServingCellConfigCommon_t *scc,

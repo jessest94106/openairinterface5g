@@ -33,7 +33,6 @@
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "PHY/NR_TRANSPORT/nr_dlsch.h"
 #include "SCHED_NR/sched_nr.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/nr/nr_common.h"
 #include <syscall.h>
@@ -118,8 +117,6 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
                       time_stats_t *dlsch_interleaving_stats,
                       time_stats_t *dlsch_segmentation_stats)
 {
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ENCODING, VCD_FUNCTION_IN);
-
   nrLDPC_TB_encoding_parameters_t TBs[n_dlsch];
   memset(TBs, 0, sizeof(TBs));
 
@@ -291,7 +288,5 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
       // merge_meas(, &segment_parameters->ts_ldpc_encode);
     }
   }
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_DLSCH_ENCODING, VCD_FUNCTION_OUT);
   return 0;
 }

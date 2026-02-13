@@ -244,8 +244,9 @@ static void test_f1ap_setup_request(void)
       .rrc_ver[0] = 12,
       .rrc_ver[1] = 34,
       .rrc_ver[2] = 56,
-      .cell[0].info = info,
   };
+  orig.cell = calloc_or_fail(orig.num_cells_available, sizeof(*orig.cell));
+  orig.cell[0].info = info;
   orig.cell[0].sys_info = calloc_or_fail(1, sizeof(*orig.cell[0].sys_info));
   *orig.cell[0].sys_info = sys_info;
   // encode
@@ -322,12 +323,14 @@ static void test_f1ap_setup_response(void)
       .rrc_ver[1] = 34,
       .rrc_ver[2] = 56,
       .num_cells_to_activate = 1,
-      .cells_to_activate[0].nr_cellid = 123456,
-      .cells_to_activate[0].nrpci = 1,
-      .cells_to_activate[0].plmn.mcc = 12,
-      .cells_to_activate[0].plmn.mnc = 123,
-      .cells_to_activate[0].plmn.mnc_digit_length = 3,
   };
+  /* Allocate memory for cells_to_activate array */
+  orig.cells_to_activate = calloc_or_fail(orig.num_cells_to_activate, sizeof(*orig.cells_to_activate));
+  orig.cells_to_activate[0].nr_cellid = 123456;
+  orig.cells_to_activate[0].nrpci = 1;
+  orig.cells_to_activate[0].plmn.mcc = 12;
+  orig.cells_to_activate[0].plmn.mnc = 123;
+  orig.cells_to_activate[0].plmn.mnc_digit_length = 3;
   /* Cells to activate */
   if (orig.num_cells_to_activate) {
     /* SI_container */
@@ -556,30 +559,37 @@ static void test_f1ap_du_configuration_update(void)
   f1ap_gnb_du_configuration_update_t orig = {
       .transaction_id = 2,
       .num_cells_to_add = 1,
-      .cell_to_add[0].info = info2,
       .num_cells_to_modify = 1,
-      .cell_to_modify[0].info = info,
-      .cell_to_modify[0].old_nr_cellid = 1235UL,
-      .cell_to_modify[0].old_plmn.mcc = 208,
-      .cell_to_modify[0].old_plmn.mnc = 88,
-      .cell_to_modify[0].old_plmn.mnc_digit_length = 2,
       .num_cells_to_delete = 1,
-      .cell_to_delete[0].nr_cellid = 1234UL,
-      .cell_to_delete[0].plmn.mcc = 1,
-      .cell_to_delete[0].plmn.mnc = 1,
-      .cell_to_delete[0].plmn.mnc_digit_length = 3,
       .num_status = 2,
-      .status[0].nr_cellid = 542UL,
-      .status[0].plmn.mcc = 1,
-      .status[0].plmn.mnc = 2,
-      .status[0].plmn.mnc_digit_length = 3,
-      .status[0].service_state = F1AP_STATE_IN_SERVICE,
-      .status[1].nr_cellid = 33UL,
-      .status[1].plmn.mcc = 5,
-      .status[1].plmn.mnc = 13,
-      .status[1].plmn.mnc_digit_length = 2,
-      .status[1].service_state = F1AP_STATE_OUT_OF_SERVICE,
   };
+  /* Allocate memory for arrays */
+  orig.cell_to_add = calloc_or_fail(orig.num_cells_to_add, sizeof(*orig.cell_to_add));
+  orig.cell_to_modify = calloc_or_fail(orig.num_cells_to_modify, sizeof(*orig.cell_to_modify));
+  orig.cell_to_delete = calloc_or_fail(orig.num_cells_to_delete, sizeof(*orig.cell_to_delete));
+  orig.status = calloc_or_fail(orig.num_status, sizeof(*orig.status));
+
+  /* Fill in the data */
+  orig.cell_to_add[0].info = info2;
+  orig.cell_to_modify[0].info = info;
+  orig.cell_to_modify[0].old_nr_cellid = 1235UL;
+  orig.cell_to_modify[0].old_plmn.mcc = 208;
+  orig.cell_to_modify[0].old_plmn.mnc = 88;
+  orig.cell_to_modify[0].old_plmn.mnc_digit_length = 2;
+  orig.cell_to_delete[0].nr_cellid = 1234UL;
+  orig.cell_to_delete[0].plmn.mcc = 1;
+  orig.cell_to_delete[0].plmn.mnc = 1;
+  orig.cell_to_delete[0].plmn.mnc_digit_length = 3;
+  orig.status[0].nr_cellid = 542UL;
+  orig.status[0].plmn.mcc = 1;
+  orig.status[0].plmn.mnc = 2;
+  orig.status[0].plmn.mnc_digit_length = 3;
+  orig.status[0].service_state = F1AP_STATE_IN_SERVICE;
+  orig.status[1].nr_cellid = 33UL;
+  orig.status[1].plmn.mcc = 5;
+  orig.status[1].plmn.mnc = 13;
+  orig.status[1].plmn.mnc_digit_length = 2;
+  orig.status[1].service_state = F1AP_STATE_OUT_OF_SERVICE;
   orig.cell_to_modify[0].sys_info = calloc_or_fail(1, sizeof(*orig.cell_to_modify[0].sys_info));
   *orig.cell_to_modify[0].sys_info = sys_info;
   orig.gNB_DU_ID = malloc_or_fail(sizeof(*orig.gNB_DU_ID));
@@ -614,18 +624,18 @@ static void test_f1ap_du_configuration_update_acknowledge(void)
   f1ap_gnb_du_configuration_update_acknowledge_t orig = {
       .transaction_id = 5,
       .num_cells_to_activate = 1,
-      .cells_to_activate = {{
-          .nr_cellid = 987654321,
-          .nrpci = 50,
-          .plmn = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2},
-          .num_SI = 1,
-          .SI_msg = {{
-              .SI_type = 7,
-              .SI_container_length = 10,
-              .SI_container = malloc(sizeof(uint8_t) * 10),
-          }},
-      }},
   };
+  // Allocate memory for cells_to_activate array
+  orig.cells_to_activate = calloc_or_fail(orig.num_cells_to_activate, sizeof(*orig.cells_to_activate));
+  orig.cells_to_activate[0].nr_cellid = 987654321;
+  orig.cells_to_activate[0].nrpci = 50;
+  orig.cells_to_activate[0].plmn.mcc = 001;
+  orig.cells_to_activate[0].plmn.mnc = 01;
+  orig.cells_to_activate[0].plmn.mnc_digit_length = 2;
+  orig.cells_to_activate[0].num_SI = 1;
+  orig.cells_to_activate[0].SI_msg[0].SI_type = 7;
+  orig.cells_to_activate[0].SI_msg[0].SI_container_length = 10;
+  orig.cells_to_activate[0].SI_msg[0].SI_container = malloc(sizeof(uint8_t) * 10);
   for (int i = 0; i < orig.cells_to_activate[0].SI_msg[0].SI_container_length; i++) {
     orig.cells_to_activate[0].SI_msg[0].SI_container[i] = i;
   }
@@ -657,17 +667,21 @@ static void test_f1ap_du_configuration_update_acknowledge(void)
 static void test_f1ap_cu_configuration_update(void)
 {
   /* create message */
-  f1ap_gnb_cu_configuration_update_t orig = {.transaction_id = 2,
-                                             .num_cells_to_activate = 1,
-                                             .cells_to_activate = {{.nr_cellid = 123456789,
-                                                                    .nrpci = 100,
-                                                                    .plmn = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2},
-                                                                    .num_SI = 1,
-                                                                    .SI_msg = {{
-                                                                        .SI_type = 7,
-                                                                        .SI_container_length = 10,
-                                                                        .SI_container = malloc(sizeof(uint8_t) * 10),
-                                                                    }}}}};
+  f1ap_gnb_cu_configuration_update_t orig = {
+      .transaction_id = 2,
+      .num_cells_to_activate = 1,
+  };
+  // Allocate memory for cells_to_activate array
+  orig.cells_to_activate = calloc_or_fail(orig.num_cells_to_activate, sizeof(*orig.cells_to_activate));
+  orig.cells_to_activate[0].nr_cellid = 123456789;
+  orig.cells_to_activate[0].nrpci = 100;
+  orig.cells_to_activate[0].plmn.mcc = 001;
+  orig.cells_to_activate[0].plmn.mnc = 01;
+  orig.cells_to_activate[0].plmn.mnc_digit_length = 2;
+  orig.cells_to_activate[0].num_SI = 1;
+  orig.cells_to_activate[0].SI_msg[0].SI_type = 7;
+  orig.cells_to_activate[0].SI_msg[0].SI_container_length = 10;
+  orig.cells_to_activate[0].SI_msg[0].SI_container = malloc(sizeof(uint8_t) * 10);
   F1AP_F1AP_PDU_t *f1enc = encode_f1ap_cu_configuration_update(&orig);
   F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
   f1ap_msg_free(f1enc);
@@ -697,10 +711,14 @@ static void test_f1ap_cu_configuration_update_acknowledge(void)
   f1ap_gnb_cu_configuration_update_acknowledge_t orig = {
       .transaction_id = 2,
       .num_cells_failed_to_be_activated = 1,
-      .cells_failed_to_be_activated = {{.nr_cellid = 123456789,
-                                        .plmn = {.mcc = 001, .mnc = 01, .mnc_digit_length = 2},
-                                        .cause = F1AP_CAUSE_RADIO_NETWORK}}
-                                        };
+  };
+  // Allocate memory for cells_failed_to_be_activated array
+  orig.cells_failed_to_be_activated = calloc_or_fail(orig.num_cells_failed_to_be_activated, sizeof(*orig.cells_failed_to_be_activated));
+  orig.cells_failed_to_be_activated[0].nr_cellid = 123456789;
+  orig.cells_failed_to_be_activated[0].plmn.mcc = 001;
+  orig.cells_failed_to_be_activated[0].plmn.mnc = 01;
+  orig.cells_failed_to_be_activated[0].plmn.mnc_digit_length = 2;
+  orig.cells_failed_to_be_activated[0].cause = F1AP_CAUSE_RADIO_NETWORK;
   // F1AP Enc/dec
   F1AP_F1AP_PDU_t *f1enc = encode_f1ap_cu_configuration_update_acknowledge(&orig);
   F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
@@ -713,13 +731,14 @@ static void test_f1ap_cu_configuration_update_acknowledge(void)
   // Equality check
   ret = eq_f1ap_cu_configuration_update_acknowledge(&orig, &decoded);
   AssertFatal(ret, "eq_f1ap_cu_configuration_update_acknowledge(): decoded message doesn't match\n");
-  // No free needed
+  free_f1ap_cu_configuration_update_acknowledge(&decoded);
   // Deep copy
   f1ap_gnb_cu_configuration_update_acknowledge_t cp = cp_f1ap_cu_configuration_update_acknowledge(&orig);
   // Equality check
   ret = eq_f1ap_cu_configuration_update_acknowledge(&orig, &cp);
   AssertFatal(ret, "eq_f1ap_cu_configuration_update_acknowledge(): copied message doesn't match\n");
-  // No free needed
+  free_f1ap_cu_configuration_update_acknowledge(&cp);
+  free_f1ap_cu_configuration_update_acknowledge(&orig);
 }
 
 static byte_array_t get_test_ba(const char *s)

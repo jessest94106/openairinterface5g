@@ -22,7 +22,6 @@
 #include "nr_phy_init.h"
 #include "openair1/PHY/defs_RU.h"
 #include "openair1/PHY/impl_defs_nr.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "assertions.h"
 #include "PHY/MODULATION/nr_modulation.h"
 #include "PHY/NR_UE_TRANSPORT/nr_transport_ue.h"

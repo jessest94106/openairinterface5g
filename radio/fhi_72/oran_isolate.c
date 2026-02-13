@@ -29,7 +29,6 @@
 #include "xran_sync_api.h"
 
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "openair1/PHY/defs_gNB.h"
 #include "openair1/PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "oaioran.h"

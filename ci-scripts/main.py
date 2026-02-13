@@ -202,9 +202,9 @@ def ExecuteActionWithParam(action, ctx, node):
 		workdir = CLUSTER.eNBSourceCodePath
 		success = cls_oaicitest.Deploy_Physim(ctx, HTML, node, workdir, script, options)
 
-	elif action == 'Build_Deploy_Docker_PhySim' or action == 'Build_Deploy_Source_PhySim':
+	elif action == 'Build_Deploy_PhySim':
 		ctest_opt = test.findtext('ctest-opt') or ''
-		script = "scripts/docker-build-and-deploy-physims.sh" if action == 'Build_Deploy_Docker_PhySim' else 'scripts/source-deploy-physims.sh'
+		script = test.findtext('script')
 		options = f"{CONTAINERS.eNBSourceCodePath} {ctest_opt}"
 		workdir = CONTAINERS.eNBSourceCodePath
 		success = cls_oaicitest.Deploy_Physim(ctx, HTML, node, workdir, script, options)

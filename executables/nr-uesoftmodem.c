@@ -60,7 +60,6 @@ unsigned short config_frames[4] = {2,9,11,13};
 #endif
 #include "common/utils/LOG/log.h"
 #include "common/utils/time_manager/time_manager.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 
 #include "UTIL/OPT/opt.h"
 #include "LAYER2/nr_pdcp/nr_pdcp_oai_api.h"
@@ -166,8 +165,6 @@ static void get_options(configmodule_interface_t *cfg)
   paramdef_t cmdline_params[] = CMDLINE_NRUEPARAMS_DESC;
   int numparams = sizeofArray(cmdline_params);
   config_get(cfg, cmdline_params, numparams, NULL);
-  if (nrUE_params.vcdflag > 0)
-    ouput_vcd = 1;
   AssertFatal(nrUE_params.extra_pdu_id == -1,
               "Add additional PDU sessions in uicc.pdu_sessions array instead\n");
 }
@@ -285,9 +282,6 @@ int main(int argc, char **argv)
   int ret_loader = load_nrLDPC_coding_interface(NULL, &nrLDPC_coding_interface);
   AssertFatal(ret_loader == 0, "error loading LDPC library\n");
 
-  if (ouput_vcd) {
-    vcd_signal_dumper_init("/tmp/openair_dump_nrUE.vcd");
-  }
   // strdup to put the sring in the core file for post mortem identification
   char *pckg = strdup(OAI_PACKAGE_VERSION);
   LOG_I(HW, "Version: %s\n", pckg);
@@ -478,9 +472,6 @@ int main(int argc, char **argv)
   itti_wait_tasks_end(trigger_deregistration);
   LOG_W(NR_PHY, "Returned from ITTI signal handler\n");
   oai_exit = 1;
-
-  if (ouput_vcd)
-    vcd_signal_dumper_close();
 
   if (PHY_vars_UE_g && PHY_vars_UE_g[0]) {
     for (int CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {

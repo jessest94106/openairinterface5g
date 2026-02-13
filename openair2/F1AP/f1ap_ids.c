@@ -25,7 +25,7 @@
 #include "f1ap_ids.h"
 
 #include <pthread.h>
-#include "common/utils/hashtable/hashtable.h"
+#include "ds/hashtable.h"
 #include "common/utils/assertions.h"
 
 

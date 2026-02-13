@@ -28,7 +28,6 @@
 #include "PHY/NR_ESTIMATION/nr_ul_estimation.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_interface.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "PHY/INIT/nr_phy_init.h"
 #include "PHY/MODULATION/nr_modulation.h"
 #include "T.h"
@@ -264,8 +263,6 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
   if ((cfg->cell_config.frame_duplex_type.value == TDD) && (nr_slot_select(cfg,frame,slot) == NR_UPLINK_SLOT))
     return;
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_TX + gNB->CC_id, 1);
-
   // clear the transmit data array and beam index for the current slot
   for (int i = 0; i < gNB->common_vars.num_beams_period; i++) {
     for (int aa = 0; aa < cfg->carrier_config.num_tx_ant.value; aa++) {
@@ -326,10 +323,8 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
   }
  
   if (num_pdsch > 0) {
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_GENERATE_DLSCH,1);
     LOG_D(PHY, "PDSCH generation started (%d) in frame %d.%d\n", num_pdsch, frame, slot);
     nr_generate_pdsch(gNB, num_pdsch, gNB->dlsch, frame, slot);
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_GENERATE_DLSCH,0);
   }
 
   //apply the OFDM symbol rotation here
@@ -354,8 +349,6 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
     }
   }
   stop_meas(&gNB->phase_comp_stats);
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_TX + gNB->CC_id, 0);
 }
 
 static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, bool *ulsch_to_decode, NR_UL_IND_t *UL_INFO)
@@ -1002,7 +995,6 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
   const uint16_t ofdm_symbol_size = frame_parms->ofdm_symbol_size;
   const int nb_symb = frame_parms->symbols_per_slot;
   const uint8_t nb_antennas_rx = frame_parms->nb_antennas_rx;
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_UESPEC_RX,1);
   LOG_D(PHY,"phy_procedures_gNB_uespec_RX frame %d, slot %d\n",frame_rx,slot_rx);
   {
     // Mask of occupied RBs, per symbol and PRB
@@ -1115,7 +1107,6 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
 
     pusch_decode_done = 1;
 
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_RX_PUSCH, 1);
     start_meas(&gNB->rx_pusch_stats);
     nr_rx_pusch_tp(gNB, ULSCH_id, frame_rx, slot_rx, ulsch->harq_pid, ulsch->beam_nb);
     NR_gNB_PUSCH *pusch_vars = &gNB->pusch_vars[ULSCH_id];
@@ -1162,7 +1153,6 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     }
     ulsch_to_decode[ULSCH_id] = true;
     stop_meas(&gNB->rx_pusch_stats);
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_NR_RX_PUSCH, 0);
     // LOG_M("rxdataF_comp.m","rxF_comp",gNB->pusch_vars[0]->rxdataF_comp[0],6900,1,1);
     // LOG_M("rxdataF_ext.m","rxF_ext",gNB->pusch_vars[0]->rxdataF_ext[0],6900,1,1);
   }
@@ -1394,7 +1384,6 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
       T_BUFFER(&gNB->common_vars.rxdataF[0][0][0], nb_symb * ofdm_symbol_size * 4));
   }
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_gNB_UESPEC_RX,0);
   return pusch_DTX;
 }
 

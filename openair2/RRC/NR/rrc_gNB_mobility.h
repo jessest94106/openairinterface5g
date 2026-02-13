@@ -28,7 +28,7 @@
 /* forward declarations */
 typedef struct gNB_RRC_INST_s gNB_RRC_INST;
 typedef struct gNB_RRC_UE_s gNB_RRC_UE_t;
-typedef struct nr_rrc_du_container_t nr_rrc_du_container_t;
+typedef struct nr_rrc_cell_container_t nr_rrc_cell_container_t;
 
 typedef struct NR_CellGroupConfig NR_CellGroupConfig_t;
 
@@ -40,8 +40,8 @@ typedef int (*ho_status_transfer_t)(gNB_RRC_INST *rrc,
                                     const e1_pdcp_status_info_t *pdcp_status);
 
 typedef struct nr_ho_source_cu {
-  /// pointer to the (source) DU structure
-  const nr_rrc_du_container_t *du;
+  /// pointer to the (source) cell container
+  const nr_rrc_cell_container_t *cell;
   /// (source) DU UE ID; in F1, the DU UE ID will change to the new (target) DU
   /// UE ID during handover, and the CU needs to keep track of this in case of
   /// reestablishment
@@ -67,8 +67,8 @@ typedef void (*ho_failure_t)(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handove
 typedef void (*ho_trigger_t)(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue);
 
 typedef struct nr_ho_target_cu {
-  /// pointer to the (target) DU structure
-  const nr_rrc_du_container_t *du;
+  /// pointer to the (target) cell container
+  const nr_rrc_cell_container_t *cell;
   /// (target) DU UE ID; the (source) DU UE ID will change to the new (target)
   /// DU UE ID after sending a reconfiguration, which is later than when
   /// receiving this ID
@@ -95,7 +95,10 @@ typedef struct nr_handover_context_s {
 typedef enum { HO_CTX_BOTH, HO_CTX_SOURCE, HO_CTX_TARGET } ho_ctx_type_t;
 nr_handover_context_t *alloc_ho_ctx(ho_ctx_type_t type);
 
-void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue, nr_rrc_du_container_t *source_du, nr_rrc_du_container_t *target_du);
+void nr_rrc_trigger_f1_ho(gNB_RRC_INST *rrc,
+                          gNB_RRC_UE_t *ue,
+                          const nr_rrc_cell_container_t *source_cell,
+                          const nr_rrc_cell_container_t *target_cell);
 void nr_rrc_finalize_ho(gNB_RRC_UE_t *ue);
 void nr_rrc_n2_ho_failure(gNB_RRC_INST *rrc, uint32_t gnb_ue_id, ngap_handover_failure_t *msg);
 
@@ -111,5 +114,7 @@ void nr_rrc_trigger_n2_ho_target(gNB_RRC_INST *rrc, gNB_RRC_UE_t *ue);
 byte_array_t *get_meas_timing_config(const NR_MeasurementTimingConfiguration_t *mtc, const NR_MeasConfig_t *measConfig);
 
 void nr_rrc_apply_target_context(gNB_RRC_UE_t *UE);
+
+bool nr_rrc_update_cell_assoc_after_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE);
 
 #endif /* RRC_GNB_MOBILITY_H_ */

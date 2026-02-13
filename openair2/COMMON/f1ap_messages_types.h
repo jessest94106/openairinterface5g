@@ -74,12 +74,11 @@
  */
 #define F1AP_TRANSPORT_LAYER_ADDRESS_SIZE (160 / 8)
 
-
-// Note this should be 512 from maxval in 38.473
-#define F1AP_MAX_NB_CELLS 2
+/* F1 Setup Request (9.3.1.4 of 3GPP TS 38.473) */
+#define F1AP_MAX_NB_CELLS 512
 
 #define F1AP_MAX_NO_OF_TNL_ASSOCIATIONS 32
-#define F1AP_MAX_NO_UE_ID 1024
+#define F1AP_MAX_NO_UE_ID 65536
 
 /* 9.3.1.42 of 3GPP TS 38.473 - gNB-CU System Information */
 #define F1AP_MAX_NO_SIB_TYPES 32
@@ -122,54 +121,53 @@ typedef struct f1ap_tdd_info_t {
 } f1ap_tdd_info_t;
 
 typedef struct f1ap_served_cell_info_t {
-  // NR CGI
+  // NR CGI (Mandatory)
   plmn_id_t plmn;
   uint64_t nr_cellid; // NR Global Cell Id
-
-  // NR Physical Cell Ids
+  // NR PCI (Mandatory)
   uint16_t nr_pci;
-
-  /* Tracking area code */
+  // 5GS TAC (Optional)
   uint32_t *tac;
-
-  // Number of slice support items (max 16, could be increased to as much as 1024)
+  // TAI Slice Support List (Optional)
   uint16_t num_ssi;
   nssai_t nssai[MAX_NUM_SLICES];
-
+  // NR-Mode-Info (Mandatory)
   f1ap_mode_t mode;
   union {
     f1ap_fdd_info_t fdd;
     f1ap_tdd_info_t tdd;
   };
-
+  // Measurement Timing Configuration (Mandatory)
   uint8_t *measurement_timing_config;
   int measurement_timing_config_len;
 } f1ap_served_cell_info_t;
 
 typedef struct f1ap_gnb_du_system_info_t {
+  // MIB message (Mandatory)
   uint8_t *mib;
   int mib_length;
+  // SIB1 message (Mandatory)
   uint8_t *sib1;
   int sib1_length;
 } f1ap_gnb_du_system_info_t;
 
 typedef struct f1ap_setup_req_s {
-  /// ulong transaction id
+  // Transaction ID (Mandatory)
   uint64_t transaction_id;
-
-  // F1_Setup_Req payload
+  // gNB-DU ID (Mandatory)
   uint64_t gNB_DU_id;
+  // gNB-DU Name (Optional)
   char *gNB_DU_name;
-
-  /// rrc version
+  // gNB-DU RRC version (Mandatory)
   uint8_t rrc_ver[3];
-
-  /// number of DU cells available
-  uint16_t num_cells_available; //0< num_cells_available <= 512;
+  // gNB-DU Served Cells List (0..1)
+  uint16_t num_cells_available; // (1..512)
   struct {
+    // Served Cell Information (Mandatory)
     f1ap_served_cell_info_t info;
+    // gNB-DU System Information (Optional)
     f1ap_gnb_du_system_info_t *sys_info;
-  } cell[F1AP_MAX_NB_CELLS];
+  } *cell;
 } f1ap_setup_req_t;
 
 typedef struct f1ap_du_register_req_t {
@@ -203,8 +201,8 @@ typedef struct f1ap_setup_resp_s {
   /// string holding gNB_CU_name
   char     *gNB_CU_name;
   /// number of DU cells to activate
-  uint16_t num_cells_to_activate; //0< num_cells_to_activate <= 512;
-  served_cells_to_activate_t cells_to_activate[F1AP_MAX_NB_CELLS];
+  uint16_t num_cells_to_activate;
+  served_cells_to_activate_t *cells_to_activate;
 
   /// rrc version
   uint8_t rrc_ver[3];
@@ -215,8 +213,8 @@ typedef struct f1ap_gnb_cu_configuration_update_s {
   /// Transaction ID
   uint64_t transaction_id;
   /// number of DU cells to activate
-  uint16_t num_cells_to_activate; //0< num_cells_to_activate/mod <= 512;
-  served_cells_to_activate_t cells_to_activate[F1AP_MAX_NB_CELLS];
+  uint16_t num_cells_to_activate;
+  served_cells_to_activate_t *cells_to_activate;
 } f1ap_gnb_cu_configuration_update_t;
 
 typedef struct f1ap_setup_failure_s {
@@ -236,7 +234,7 @@ typedef struct f1ap_gnb_cu_configuration_update_acknowledge_s {
     plmn_id_t plmn;
     uint64_t nr_cellid;
     uint16_t cause;
-  } cells_failed_to_be_activated[F1AP_MAX_NB_CELLS];
+  } * cells_failed_to_be_activated;
   int have_criticality;
   uint16_t criticality_diagnostics;
   // gNB-CU TNL Association Setup List
@@ -245,14 +243,14 @@ typedef struct f1ap_gnb_cu_configuration_update_acknowledge_s {
   // gNB-CU TNL Association Failed to Setup List
   uint16_t noofTNLAssociations_failed;
   f1ap_cp_tnl_t tnlAssociations_failed[F1AP_MAX_NO_OF_TNL_ASSOCIATIONS];
-  // Dedicated SI Delivery Needed UE List
+  // Dedicated SI Delivery Needed UE List (max 65536 UE IDs)
   uint16_t noofDedicatedSIDeliveryNeededUEs;
   struct {
     uint32_t gNB_CU_ue_id;
     // NR CGI
     plmn_id_t ue_plmn;
     uint64_t ue_nr_cellid;
-  } dedicatedSIDeliveryNeededUEs[F1AP_MAX_NO_UE_ID];
+  } * dedicatedSIDeliveryNeededUEs;
 } f1ap_gnb_cu_configuration_update_acknowledge_t;
 
 typedef struct f1ap_gnb_cu_configuration_update_failure_s {
@@ -279,7 +277,7 @@ typedef struct f1ap_gnb_du_configuration_update_s {
   struct {
     f1ap_served_cell_info_t info;
     f1ap_gnb_du_system_info_t *sys_info;
-  } cell_to_add[F1AP_MAX_NB_CELLS];
+  } * cell_to_add;
 
   /// int cells_to_modify
   uint16_t num_cells_to_modify;
@@ -288,7 +286,7 @@ typedef struct f1ap_gnb_du_configuration_update_s {
     uint64_t old_nr_cellid; // NR Global Cell Id
     f1ap_served_cell_info_t info;
     f1ap_gnb_du_system_info_t *sys_info;
-  } cell_to_modify[F1AP_MAX_NB_CELLS];
+  } * cell_to_modify;
 
   /// int cells_to_delete
   uint16_t num_cells_to_delete;
@@ -296,9 +294,9 @@ typedef struct f1ap_gnb_du_configuration_update_s {
     // NR CGI
     plmn_id_t plmn;
     uint64_t nr_cellid; // NR Global Cell Id
-  } cell_to_delete[F1AP_MAX_NB_CELLS];
+  } * cell_to_delete;
 
-  f1ap_cell_status_t status[F1AP_MAX_NB_CELLS];
+  f1ap_cell_status_t *status;
   int num_status;
 
   /// gNB-DU unique ID, at least within a gNB-CU (0 .. 2^36 - 1)
@@ -310,7 +308,7 @@ typedef struct f1ap_gnb_du_configuration_update_acknowledge_s {
   uint64_t transaction_id;
   /// number of DU cells to activate
   uint16_t num_cells_to_activate; // 0< num_cells_to_activate <= 512;
-  served_cells_to_activate_t cells_to_activate[F1AP_MAX_NB_CELLS];
+  served_cells_to_activate_t *cells_to_activate;
 } f1ap_gnb_du_configuration_update_acknowledge_t;
 
 typedef struct f1ap_gnb_du_configuration_update_failure_s {

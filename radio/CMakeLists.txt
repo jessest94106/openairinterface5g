@@ -1,3 +1,5 @@
+add_subdirectory(COMMON)
+
 add_boolean_option(OAI_AW2SORI OFF "Activate OAI's AW2S driver" OFF)
 if(OAI_AW2SORI)
   add_subdirectory(AW2SORI)

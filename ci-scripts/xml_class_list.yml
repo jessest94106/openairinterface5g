@@ -24,8 +24,7 @@
   - Undeploy_Object
   - Cppcheck_Analysis
   - Deploy_Run_OC_PhySim
-  - Build_Deploy_Docker_PhySim
-  - Build_Deploy_Source_PhySim
+  - Build_Deploy_PhySim
   - LicenceAndFormattingCheck
   - Push_Local_Registry
   - Pull_Local_Registry

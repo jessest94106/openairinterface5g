@@ -37,7 +37,6 @@
 #include "common/utils/oai_asn1.h"
 #include "constr_TYPE.h"
 #include "cuup_cucp_if.h"
-#include "gtpv1_u_messages_types.h"
 #include "nr_pdcp/nr_pdcp_entity.h"
 #include "nr_pdcp_oai_api.h"
 #include "openair2/COMMON/e1ap_messages_types.h"
@@ -60,8 +59,11 @@ static void fill_DRB_configList_e1(NR_DRB_ToAddModList_t *DRB_configList, const 
     asn1cCalloc(ie->cnAssociation->choice.sdap_Config, sdap_config);
     sdap_config->pdu_Session = pdu->sessionId;
     /* SDAP */
-    sdap_config->sdap_HeaderDL = drb->sdap_config.sDAP_Header_DL;
-    sdap_config->sdap_HeaderUL = drb->sdap_config.sDAP_Header_UL;
+    /* Convert from internal representation to ASN.1 enum:
+     * Internal: false=absent, true=present (or uninitialized=false means absent)
+     * ASN.1: 0=present, 1=absent */
+    sdap_config->sdap_HeaderDL = drb->sdap_config.sDAP_Header_DL ? NR_SDAP_Config__sdap_HeaderDL_present : NR_SDAP_Config__sdap_HeaderDL_absent;
+    sdap_config->sdap_HeaderUL = drb->sdap_config.sDAP_Header_UL ? NR_SDAP_Config__sdap_HeaderUL_present : NR_SDAP_Config__sdap_HeaderUL_absent;
     sdap_config->defaultDRB    = drb->sdap_config.defaultDRB;
     asn1cCalloc(sdap_config->mappedQoS_FlowsToAdd, FlowsToAdd);
     for (int j = 0; j < drb->numQosFlow2Setup; j++) {

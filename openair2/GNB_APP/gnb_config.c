@@ -75,6 +75,7 @@
 #include "s1ap_messages_types.h"
 #include "sctp_default_values.h"
 #include "seq_arr.h"
+#include "common/utils/alg/find.h"
 #include "uper_encoder.h"
 #include "utils.h"
 #include "x2ap_messages_types.h"
@@ -717,7 +718,6 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
   } else if (NODE_IS_DU(node_type)) {
     // verify that there is no bearer config
     verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
-    verify_gnb_param_notset(gnbp, GNB_DRBS, GNB_CONFIG_STRING_DRBS);
 
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
@@ -1161,6 +1161,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
   req->gNB_DU_id = id;
   req->gNB_DU_name = strdup(name);
   req->num_cells_available = 1;
+  req->cell = calloc_or_fail(req->num_cells_available, sizeof(*req->cell));
   req->cell[0].info = *info;
   LOG_I(GNB_APP,
         "F1AP: gNB idx %d gNB_DU_id %ld, gNB_DU_name %s, TAC %d MCC/MNC/length %d/%d/%d cellID %ld\n",
@@ -1623,9 +1624,9 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_ulprbbl);
         memcpy(RC.nrmac[j]->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
       }
-      int ab = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMFORMING_IDX].u8ptr;
-      if (ab > 0) {
-        if (ab == 1)
+      RC.nrmac[j]->beam_info.beam_mode = config_get_processedint(cfg, &MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMFORMING_IDX]);
+      if (RC.nrmac[j]->beam_info.beam_mode != NO_BEAM_MODE) {
+        if (RC.nrmac[j]->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX)
           AssertFatal(NFAPI_MODE == NFAPI_MONOLITHIC, "Analog beamforming only supported for monolithic scenario\n");
         NR_beam_info_t *beam_info = &RC.nrmac[j]->beam_info;
         int beams_per_period = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAMS_PERIOD_IDX].u8ptr;
@@ -1633,10 +1634,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         beam_info->beam_duration = *MacRLC_ParamList.paramarray[j][MACRLC_ANALOG_BEAM_DURATION_IDX].u8ptr;
         beam_info->beams_per_period = beams_per_period;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
-        // TODO: Indicate this to MAC via FAPI TLV 0x0164.
-        beam_info->beam_mode = ab == 1 ? PRECONFIGURED_BEAM_IDX : LOPHY_BEAM_IDX;
-      } else {
-        RC.nrmac[j]->beam_info.beam_mode = NO_BEAM_MODE;
       }
       // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
       int n = MacRLC_ParamList.paramarray[j][MACRLC_BEAMWEIGHTS_IDX].numelt;
@@ -1646,7 +1643,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
           AssertFatal(*(L1_ParamList.paramarray[j][L1_ANALOG_DAS].uptr) == 0, "No need to set beam weights in case of DAS\n");
         }
         int num_beam = n;
-        if (!ab) {
+        if (RC.nrmac[j]->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX) {
           AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
           num_beam = n / num_tx;
         }
@@ -1682,6 +1679,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     seq_arr_t *du_SIBs = RC.nrmac[0]->common_channels[0].du_SIBs;
     f1ap_setup_req_t *req = RC_read_F1Setup(gnb_du_id, name, &info, scc, mib, sib1, du_SIBs);
     AssertFatal(req != NULL, "could not read F1 Setup information\n");
+    LOG_I(GNB_APP, "Configured DU: cell ID %lu, PCI %d\n", info.nr_cellid, info.nr_pci);
     RC.nrmac[0]->f1_config.setup_req = req;
     RC.nrmac[0]->f1_config.gnb_id = gnb_id;
 
@@ -1850,6 +1848,22 @@ static seq_arr_t *fill_cu_sibs(paramdef_t *GNBparamarray)
   return SIBs;
 }
 
+static bool eq_neighbour_pci(const void *vval, const void *vit)
+{
+  const int *pci = (const int *)vval;
+  const nr_neighbour_cell_t *neighbour = (const nr_neighbour_cell_t *)vit;
+  return neighbour->physicalCellId == *pci;
+}
+
+/** @brief Find neighbour by PCI within a cell's neighbour list (first match) */
+static nr_neighbour_cell_t *get_neighbour_by_pci(seq_arr_t *neighbour_cells, int pci)
+{
+  elm_arr_t elm = find_if(neighbour_cells, &pci, eq_neighbour_pci);
+  if (elm.found)
+    return (nr_neighbour_cell_t *)elm.it;
+  return NULL;
+}
+
 static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc)
 {
   char gnbpath[MAX_OPTNAME_SIZE + 8];
@@ -1907,6 +1921,14 @@ static void fill_neighbour_cell_configuration(uint8_t gnb_idx, gNB_RRC_INST *rrc
       n.plmn.mcc = *NeighbourPlmn[GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
       n.plmn.mnc = *NeighbourPlmn[GNB_MOBILE_NETWORK_CODE_IDX].uptr;
       n.plmn.mnc_digit_length = *NeighbourPlmn[GNB_MNC_DIGIT_LENGTH].uptr;
+      if (get_neighbour_by_pci(cell.neighbour_cells, n.physicalCellId) != NULL) {
+        LOG_E(GNB_APP,
+              "Cell %ld: duplicate PCI %d in neighbour list (nrcell_id %ld)\n",
+              cell.nr_cell_id,
+              n.physicalCellId,
+              n.nrcell_id);
+        AssertFatal(false, "PCI must be unique within a cell's neighbour list\n");
+      }
       seq_arr_push_back(cell.neighbour_cells, &n, sizeof(n));
       LOG_I(GNB_APP,
             "   [%d] neighbor ID %d cellId %ld PCI %d SCS %d SSB ARFCN %u TAC %u PLMN %03u.%0*u\n",
@@ -2051,8 +2073,6 @@ gNB_RRC_INST *RCconfig_NRRRC()
       rrc->eth_params_s.transp_preference        = ETH_UDP_MODE;
     }
 
-    rrc->nr_cellid        = (uint64_t)*(GNBParamList.paramarray[i][GNB_NRCELLID_IDX].u64ptr);
-
     if (strcmp(*(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr), "local_mac") == 0) {
       
     } else if (strcmp(*(GNBParamList.paramarray[i][GNB_TRANSPORT_S_PREFERENCE_IDX].strptr), "cudu") == 0) {
@@ -2068,7 +2088,7 @@ gNB_RRC_INST *RCconfig_NRRRC()
     
     // search if in active list
     
-    gNB_RrcConfigurationReq nrrrc_config = {0};
+    nr_rrc_config_t nrrrc_config = {0};
     for (k=0; k <num_gnbs ; k++) {
       if (strcmp(GNBSParams[GNB_ACTIVE_GNBS_IDX].strlistptr[k], *(GNBParamList.paramarray[i][GNB_GNB_NAME_IDX].strptr) )== 0) {
 
@@ -2092,9 +2112,7 @@ gNB_RRC_INST *RCconfig_NRRRC()
         nrrrc_config.num_plmn = set_plmn_config(nrrrc_config.plmn, k);
         nrrrc_config.enable_sdap = *GNBParamList.paramarray[i][GNB_ENABLE_SDAP_IDX].iptr;
         LOG_I(GNB_APP, "SDAP layer is %s\n", nrrrc_config.enable_sdap ? "enabled" : "disabled");
-        nrrrc_config.drbs = *GNBParamList.paramarray[i][GNB_DRBS].iptr;
         nrrrc_config.um_on_default_drb = *(GNBParamList.paramarray[i][GNB_UMONDEFAULTDRB_IDX].uptr);
-        LOG_I(GNB_APP, "Data Radio Bearer count %d\n", nrrrc_config.drbs);
 
       }//
     }//End for (k=0; k <num_gnbs ; k++)

@@ -48,7 +48,6 @@
 
 #include "common/utils/LOG/log.h"
 #include "common/utils/time_manager/time_manager.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 
 #include <executables/softmodem-common.h>
 /* these variables have to be defined before including ENB_APP/enb_paramdef.h and GNB_APP/gnb_paramdef.h */
@@ -244,9 +243,8 @@ int connect_rau(RU_t *ru) {
 /* Southbound Fronthaul functions, RCC/RAU                   */
 
 // southbound IF5 fronthaul for 16-bit OAI format
-void fh_if5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp) {
-  if (ru == RC.ru[0])
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TRX_TST, ru->proc.timestamp_tx & 0xffffffff);
+void fh_if5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp)
+{
   int offset = get_samples_slot_timestamp(ru->nr_frame_parms, slot);
   void *buffs[ru->nb_tx];
   for (int aid = 0; aid < ru->nb_tx; aid++)
@@ -266,10 +264,8 @@ void fh_if5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp) {
 }
 
 // southbound IF4p5 fronthaul
-void fh_if4p5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp) {
-  if (ru == RC.ru[0])
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TRX_TST, ru->proc.timestamp_tx & 0xffffffff);
-
+void fh_if4p5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp)
+{
   LOG_D(PHY,"Sending IF4p5 for frame %d subframe %d\n",ru->proc.frame_tx,ru->proc.tti_tx);
 
   if ((nr_slot_select(&ru->config, ru->proc.frame_tx, ru->proc.tti_tx) & NR_DOWNLINK_SLOT) > 0)
@@ -281,12 +277,10 @@ void fh_if4p5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp) {
 
 // Synchronous if5 from south
 
-void fh_if5_south_in(RU_t *ru,
-                     int *frame,
-                     int *tti) {
+void fh_if5_south_in(RU_t *ru, int *frame, int *tti)
+{
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   RU_proc_t *proc = &ru->proc;
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_RECV_IF5, 1 );   
   start_meas(&ru->rx_fhaul);
 
   ru->ifdevice.trx_read_func2(&ru->ifdevice, &proc->timestamp_rx, NULL, get_samples_per_slot(*tti, fp));
@@ -339,9 +333,6 @@ void fh_if5_south_in(RU_t *ru,
           proc->first_rx,
           ru->rx_fhaul.p_time / (cpu_freq_GHz * 1000.0),
           rxmeas.tv_nsec);
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TRX_TS, proc->timestamp_rx&0xffffffff );
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_RECV_IF5, 0 );
-
 }
 
 // Synchronous if4p5 from south
@@ -398,15 +389,7 @@ void fh_if4p5_south_in(RU_t *ru,
     *slot = proc->tti_rx;
   }
 
-  if (ru == RC.ru[0]) {
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_FRAME_NUMBER_RX0_RU, f );
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_RX0_RU,  sl);
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_FRAME_NUMBER_TX0_RU, proc->frame_tx );
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_TX0_RU, proc->tti_tx );
-  }
-
   proc->symbol_mask[proc->tti_rx] = 0;
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TRX_TS, proc->timestamp_rx&0xffffffff );
   LOG_D(PHY,"RU %d: fh_if4p5_south_in sleeping ...\n",ru->idx);
 }
 
@@ -448,7 +431,8 @@ void fh_if4p5_south_asynch_in(RU_t *ru,int *frame,int *slot) {
 
 // RRU IF4p5 TX fronthaul receiver. Assumes an if_device on input and if or rf device on output
 // receives one subframe's worth of IF4p5 OFDM symbols and OFDM modulates
-void fh_if4p5_north_in(RU_t *ru,int *frame,int *slot) {
+void fh_if4p5_north_in(RU_t *ru,int *frame,int *slot)
+{
   uint32_t symbol_number=0;
   uint32_t symbol_mask, symbol_mask_full;
   uint16_t packet_type;
@@ -461,12 +445,6 @@ void fh_if4p5_north_in(RU_t *ru,int *frame,int *slot) {
     recv_IF4p5(ru, frame, slot, &packet_type, &symbol_number);
     symbol_mask = symbol_mask | (1<<symbol_number);
   } while (symbol_mask != symbol_mask_full);
-
-  // dump VCD output for first RU in list
-  if (ru == RC.ru[0]) {
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_FRAME_NUMBER_TX0_RU, *frame );
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_TX0_RU, *slot );
-  }
 }
 
 void fh_if5_north_asynch_in(RU_t *ru, int *frame, int *slot)
@@ -525,12 +503,6 @@ void fh_if4p5_north_asynch_in(RU_t *ru,int *frame,int *slot) {
       ((uint64_t)frame_tx + proc->frame_tx_unwrap) * fp->samples_per_subframe * 10 + get_samples_slot_timestamp(fp, slot_tx);
   LOG_D(PHY, "RU %d/%d TST %lu, frame %d, subframe %d\n", ru->idx, 0, proc->timestamp_tx, frame_tx, slot_tx);
 
-  // dump VCD output for first RU in list
-  if (ru == RC.ru[0]) {
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_FRAME_NUMBER_TX0_RU, frame_tx );
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_TX0_RU, slot_tx );
-  }
-
   if (ru->feptx_ofdm)
     ru->feptx_ofdm(ru, frame_tx, slot_tx);
 
@@ -538,18 +510,16 @@ void fh_if4p5_north_asynch_in(RU_t *ru,int *frame,int *slot) {
     ru->fh_south_out(ru, frame_tx, slot_tx, proc->timestamp_tx);
 }
 
-void fh_if5_north_out(RU_t *ru) {
+void fh_if5_north_out(RU_t *ru)
+{
   /// **** send_IF5 of rxdata to BBU **** ///
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_SEND_IF5, 1 );
   AssertFatal(1 == 0, "Shouldn't get here\n");
 }
 
 // RRU IF4p5 northbound interface (RX)
-void fh_if4p5_north_out(RU_t *ru) {
+void fh_if4p5_north_out(RU_t *ru)
+{
   RU_proc_t *proc=&ru->proc;
-  if (ru->idx == 0)
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_RX0_RU, proc->tti_rx);
-
   start_meas(&ru->tx_fhaul);
   send_IF4p5(ru, proc->frame_rx, proc->tti_rx, IF4p5_PULFFT);
   stop_meas(&ru->tx_fhaul);
@@ -569,15 +539,12 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
   for (int i = 0; i < nb; i++)
     rxp[i] = (void *)&ru->common.rxdata[i][get_samples_slot_timestamp(fp, *slot)];
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_READ, 1);
   openair0_timestamp_t old_ts = proc->timestamp_rx;
   LOG_D(PHY,"Reading %d samples for slot %d (%p)\n", samples_per_slot, *slot, rxp[0]);
 
   openair0_timestamp_t ts;
   unsigned int rxs;
   rxs = ru->rfdevice.trx_read_func(&ru->rfdevice, &ts, rxp, samples_per_slot, nb);
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_READ, 0 );
   proc->timestamp_rx = ts-ru->ts_offset;
 
   if (rxs != samples_per_slot)
@@ -617,12 +584,6 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
         proc->tti_tx,
         fp->slots_per_frame);
 
-  // dump VCD output for first RU in list
-  if (ru == RC.ru[0]) {
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_FRAME_NUMBER_RX0_RU, proc->frame_rx );
-    VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_RX0_RU, proc->tti_rx );
-  }
-
   if (proc->first_rx == 0) {
     if (proc->tti_rx != *slot) {
       LOG_E(PHY,
@@ -652,8 +613,6 @@ static void rx_rf(RU_t *ru, int *frame, int *slot)
 
   metadata mt = {.slot = *slot, .frame = *frame};
   gNBscopeCopyWithMetadata(ru, gNbTimeDomainSamples, rxp[0], sizeof(c16_t), 1, samples_per_slot, 0, &mt);
-
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME( VCD_SIGNAL_DUMPER_VARIABLES_TRX_TS, (proc->timestamp_rx+ru->ts_offset)&0xffffffff );
 
   if (rxs != samples_per_slot) {
     //exit_fun( "problem receiving samples" );
@@ -773,17 +732,11 @@ void tx_rf(RU_t *ru, int frame,int slot, uint64_t timestamp)
   const int flags = flags_burst | (flags_gpio << 4);
   proc->first_tx = 0;
 
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TRX_WRITE_FLAGS, flags);
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_FRAME_NUMBER_TX0_RU, frame);
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TTI_NUMBER_TX0_RU, slot);
-
   int nt = ru->nb_tx * ru->num_beams_period;
   void *txp[nt];
   for (int i = 0; i < nt; i++)
     txp[i] = (void *)&ru->common.txdata[i][get_samples_slot_timestamp(fp, slot)] - sf_extension * sizeof(int32_t);
 
-  VCD_SIGNAL_DUMPER_DUMP_VARIABLE_BY_NAME(VCD_SIGNAL_DUMPER_VARIABLES_TRX_TST, (timestamp + ru->ts_offset) & 0xffffffff);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_WRITE, 1);
   // prepare tx buffer pointers
   uint32_t txs = ru->rfdevice.trx_write_func(&ru->rfdevice,
                                              timestamp + ru->ts_offset - sf_extension,
@@ -804,7 +757,6 @@ void tx_rf(RU_t *ru, int frame,int slot, uint64_t timestamp)
         siglen + sf_extension,
         txs,
         10 * log10((double)signal_energy(txp[0], siglen + sf_extension)));
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_TRX_WRITE, 0);
 }
 
 static void fill_rf_config(RU_t *ru, char *rf_config_file)
@@ -1208,10 +1160,8 @@ void *ru_thread(void *param)
         // Do PRACH RU processing
         prach_item_t *p = find_nr_prach(&gNB->prach_list, proc->frame_rx, proc->tti_rx, SEARCH_EXIST);
         if (p) {
-          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_RU_PRACH_RX, 1 );
           // need to extract RACH data for lqter processing by rx_nr_prach()
           rx_nr_prach_ru(p, ru->common.rxdata, ru->nr_frame_parms, ru->N_TA_offset);
-          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_RU_PRACH_RX, 0);
         } // end if (prach_id >= 0)
       } // end if (ru->feprx)
     } // end if (slot_type == NR_UPLINK_SLOT || slot_type == NR_MIXED_SLOT) {

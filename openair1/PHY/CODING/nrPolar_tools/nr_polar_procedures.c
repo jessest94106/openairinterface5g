@@ -30,8 +30,8 @@
  * \warning
  */
 
-#include "common/utils/nr/nr_common.h"
 #include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
+#include "reverse_bits.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>

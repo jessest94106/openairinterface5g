@@ -992,17 +992,8 @@ int nr_srs_channel_estimation(int ant,
 
   // Compute wideband SNR on the symbol 0
   int tot_subcarriers = m_SRS_b * NR_NB_SC_PER_RB;
-
   uint16_t subcarrier_abs = first_subcarrier + nr_srs_info->k_0_p[p_index][0];
-  if (subcarrier_abs + tot_subcarriers < ofdm_symbol_size_half) {
-    *signal_power = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier_abs], tot_subcarriers) / tot_subcarriers;
-  } else {
-    int size1 = ofdm_symbol_size_half - subcarrier_abs;
-    int size2 = tot_subcarriers - size1;
-    uint64_t signal_power_p1 = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier_abs], size1) * size1;
-    uint64_t signal_power_p2 = signal_energy_nodc(&srs_estimated_channel_freq[ofdm_symbol_size_half], size2) * size2;
-    *signal_power = (signal_power_p1 + signal_power_p2) / tot_subcarriers;
-  }
+  *signal_power = signal_energy_nodc(&srs_estimated_channel_freq[subcarrier_abs], tot_subcarriers);
 
   if (*signal_power == 0) {
     LOG_W(NR_PHY, "Received SRS signal power is 0\n");

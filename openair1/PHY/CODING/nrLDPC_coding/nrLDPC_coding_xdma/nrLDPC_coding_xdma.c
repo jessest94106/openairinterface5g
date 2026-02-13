@@ -40,7 +40,6 @@
 #include "PHY/defs_gNB.h"
 #include "SCHED_NR/sched_nr.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "defs.h"
 // #define DEBUG_ULSCH_DECODING
 // #define gNB_DEBUG_TRACE

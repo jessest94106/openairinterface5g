@@ -70,7 +70,6 @@
 fifo_dump_emos_UE emos_dump_UE;
 #endif
 
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "UTIL/OPT/opt.h"
 #include "intertask_interface.h"
 #include "T.h"
@@ -372,7 +371,6 @@ void phy_procedures_nrUE_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, n
 
   AssertFatal(ue->CC_id == 0, "Transmission on secondary CCs is not supported yet\n");
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_TX,VCD_FUNCTION_IN);
 #if T_TRACER
   T(T_UE_PHY_UL_TICK, T_INT(ue->Mod_id), T_INT(frame_tx % 1024), T_INT(slot_tx));
 #endif
@@ -416,7 +414,6 @@ void phy_procedures_nrUE_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, n
 
   LOG_D(PHY, "****** end TX-Chain for AbsSubframe %d.%d ******\n", proc->frame_tx, proc->nr_slot_tx);
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_TX, VCD_FUNCTION_OUT);
   stop_meas_nr_ue_phy(ue, PHY_PROC_TX);
 }
 
@@ -430,7 +427,6 @@ static void nr_ue_measurement_procedures(uint16_t l,
   NR_DL_FRAME_PARMS *frame_parms=&ue->frame_parms;
   int nr_slot_rx = proc->nr_slot_rx;
   int gNB_id = proc->gNB_id;
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_MEASUREMENT_PROCEDURES, VCD_FUNCTION_IN);
 
   if (l == 2) {
     LOG_D(PHY,"Doing UE measurement procedures in symbol l %u Ncp %d nr_slot_rx %d, rxdata %p\n",
@@ -459,18 +455,10 @@ static void nr_ue_measurement_procedures(uint16_t l,
   if (( nr_slot_rx == 2) && (l==(2-frame_parms->Ncp))) {
 
     // AGC
-
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_GAIN_CONTROL, VCD_FUNCTION_IN);
-
-
     //printf("start adjust gain power avg db %d\n", ue->measurements.rx_power_avg_dB[gNB_id]);
     phy_adjust_gain_nr (ue,ue->measurements.rx_power_avg_dB[gNB_id],gNB_id);
     
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_GAIN_CONTROL, VCD_FUNCTION_OUT);
-
-}
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_MEASUREMENT_PROCEDURES, VCD_FUNCTION_OUT);
+  }
 }
 
 static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
@@ -486,8 +474,6 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
   int frame_rx = proc->frame_rx;
   int nr_slot_rx = proc->nr_slot_rx;
   int gNB_id = proc->gNB_id;
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_PBCH_PROCEDURES, VCD_FUNCTION_IN);
 
   LOG_D(PHY,"[UE  %d] Frame %d Slot %d, Trying PBCH (NidCell %d, gNB_id %d)\n",ue->Mod_id,frame_rx,nr_slot_rx,ue->frame_parms.Nid_cell,gNB_id);
   fapiPbch_t result;
@@ -525,7 +511,6 @@ static int nr_ue_pbch_procedures(PHY_VARS_NR_UE *ue,
   } else {
     LOG_E(PHY, "[UE %d] frame %d, nr_slot_rx %d, Error decoding PBCH!\n", ue->Mod_id, frame_rx, nr_slot_rx);
   }
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_PBCH_PROCEDURES, VCD_FUNCTION_OUT);
   TracyCZoneEnd(ctx);
   return ret;
 }
@@ -1086,7 +1071,6 @@ int pbch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_da
   int sampleShift = INT_MAX;
   nr_ue_dlsch_init(phy_data->dlsch, NR_MAX_NB_LAYERS>4 ? 2:1, ue->max_ldpc_iterations);
   
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_RX, VCD_FUNCTION_IN);
 #if T_TRACER
   T(T_UE_PHY_DL_TICK, T_INT(ue->Mod_id), T_INT(frame_rx % 1024), T_INT(nr_slot_rx));
 #endif
@@ -1111,7 +1095,6 @@ int pbch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_da
         int ssb_slot_2 = (ssb_period == 0) ? ssb_slot + (fp->slots_per_frame >> 1) : -1;
 
         if (ssb_slot == nr_slot_rx || ssb_slot_2 == nr_slot_rx) {
-          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PBCH, VCD_FUNCTION_IN);
           LOG_D(PHY," ------  PBCH ChannelComp/LLR: frame.slot %d.%d ------  \n", frame_rx%1024, nr_slot_rx);
 
           __attribute__ ((aligned(32))) struct complex16 dl_ch_estimates[fp->nb_antennas_rx][estimateSz];
@@ -1189,7 +1172,6 @@ int pbch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_da
 
           LOG_D(PHY, "Doing N0 measurements in %s\n", __FUNCTION__);
           nr_ue_rrc_measurements(ue, proc, rxdataF);
-          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PBCH, VCD_FUNCTION_OUT);
         }
       }
     }
@@ -1279,7 +1261,6 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
   }
 
   if (dlsch[0].active) {
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PDSCH, VCD_FUNCTION_IN);
     fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_config = &dlsch[0].dlsch_config;
     uint16_t nb_symb_sch = dlsch_config->number_symbols;
     uint16_t start_symb_sch = dlsch_config->start_symbol;
@@ -1292,7 +1273,6 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
         slot_fep_map[m] = true;
       }
     }
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SLOT_FEP_PDSCH, VCD_FUNCTION_OUT);
 
     const uint8_t nb_re_dmrs = get_num_dmrs_re_per_rb(dlsch_config->dmrsConfigType, dlsch_config->n_dmrs_cdm_groups);
     uint16_t dmrs_len = get_num_dmrs(dlsch_config->dlDmrsSymbPos);
@@ -1322,18 +1302,13 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     for (int i = 0; i < nb_codewords; i++)
       llr[i] = (int16_t *)malloc16_clear(rx_llr_buf_sz * sizeof(int16_t));
 
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC_C, VCD_FUNCTION_IN);
     // it returns -1 in case of internal failure, or 0 in case of normal result
     int ret_pdsch = nr_ue_pdsch_procedures(ue, proc, dlsch, llr, rxdataF, G);
     TracyCPlot("pdsch mcs", dlsch->dlsch_config.mcs);
 
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC_C, VCD_FUNCTION_OUT);
-
     UEscopeCopy(ue, pdschLlr, llr[0], sizeof(int16_t), 1, G, 0);
 
     LOG_D(PHY, "DLSCH data reception at nr_slot_rx: %d\n", nr_slot_rx);
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC, VCD_FUNCTION_IN);
-
     start_meas_nr_ue_phy(ue, DLSCH_PROCEDURES_STATS);
 
     if (ret_pdsch >= 0) {
@@ -1361,7 +1336,6 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
     if (ue->phy_sim_pdsch_llr)
       memcpy(ue->phy_sim_pdsch_llr, llr[0], sizeof(int16_t) * rx_llr_buf_sz);
 
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDSCH_PROC, VCD_FUNCTION_OUT);
     for (int i=0; i<nb_codewords; i++)
       free(llr[i]);
   }
@@ -1387,9 +1361,6 @@ void pdsch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_
   phy_procedures_emos_UE_RX(ue,slot,gNB_id);
 #endif
 
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_RX, VCD_FUNCTION_OUT);
-
   LOG_D(PHY," ****** end RX-Chain  for AbsSubframe %d.%d ******  \n", frame_rx%1024, nr_slot_rx);
   UEscopeCopy(ue, commonRxdataF, rxdataF, sizeof(int32_t), ue->frame_parms.nb_antennas_rx, rxdataF_sz, 0);
 }
@@ -1402,8 +1373,6 @@ static void nr_ue_prach_procedures(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *
   int gNB_id = proc->gNB_id;
   int frame_tx = proc->frame_tx, nr_slot_tx = proc->nr_slot_tx, prach_power; // tx_amp
   uint8_t mod_id = ue->Mod_id;
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_TX_PRACH, VCD_FUNCTION_IN);
 
   NR_UE_PRACH *prach_var = ue->prach_vars[gNB_id];
   if (prach_var->active) {
@@ -1423,8 +1392,6 @@ static void nr_ue_prach_procedures(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *
 
       prach_var->amp = AMP;
 
-      VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_GENERATE_PRACH, VCD_FUNCTION_IN);
-
       start_meas_nr_ue_phy(ue, PRACH_GEN_STATS);
       prach_power = generate_nr_prach(ue, gNB_id, frame_tx, nr_slot_tx, txData);
       stop_meas_nr_ue_phy(ue, PRACH_GEN_STATS);
@@ -1435,8 +1402,6 @@ static void nr_ue_prach_procedures(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *
               proc->nr_slot_tx,
               ue->phy_cpu_stats.cpu_time_stats[PRACH_GEN_STATS].p_time / (cpuf * 1000.0));
       }
-
-      VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_GENERATE_PRACH, VCD_FUNCTION_OUT);
 
       LOG_D(PHY,
             "In %s: [UE %d][RAPROC][%d.%d]: Generated PRACH Msg1 (TX power PRACH %d dBm, digital power %d dBW (amp %d)\n",
@@ -1457,7 +1422,4 @@ static void nr_ue_prach_procedures(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *
     // set as inactive in the last slot
     prach_var->active = !(nr_slot_tx == (prach_pdu->prach_slot + prach_var->num_prach_slots - 1));
   }
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_UE_TX_PRACH, VCD_FUNCTION_OUT);
-
 }

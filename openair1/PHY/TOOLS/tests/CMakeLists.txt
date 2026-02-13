@@ -39,3 +39,36 @@ target_link_libraries(test_sse_intrinsics PRIVATE GTest::gtest LOG minimal_lib)
 add_dependencies(tests test_sse_intrinsics)
 add_test(NAME test_sse_intrinsics
   COMMAND ./test_sse_intrinsics)
+
+if(CUDA_ENABLE)
+add_executable(test_multipath test_multipath.c)
+target_link_libraries(test_multipath PRIVATE UTIL SIMU LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_multipath)
+add_test(NAME test_multipath COMMAND test_multipath)
+
+add_executable(test_noise test_noise.c)
+target_link_libraries(test_noise PRIVATE UTIL SIMU PHY_COMMON LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_noise)
+add_test(NAME test_noise COMMAND test_noise)
+
+add_executable(test_channel_simulation test_channel_simulation.c)
+target_link_libraries(test_channel_simulation PRIVATE UTIL SIMU PHY_COMMON LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_channel_simulation)
+add_test(NAME test_channel_simulation COMMAND test_channel_simulation)
+
+add_executable(test_channel_scalability test_channel_scalability.c)
+target_link_libraries(test_channel_scalability PRIVATE UTIL SIMU PHY_COMMON LOG CONFIG_LIB shlib_loader m oai_cuda_lib)
+
+add_dependencies(tests test_channel_scalability)
+add_test(NAME test_channel_scalability COMMAND test_channel_scalability)
+
+if (TARGET oai_cuda_lib)
+    target_compile_definitions(test_multipath PRIVATE ENABLE_CUDA)
+    target_compile_definitions(test_noise PRIVATE ENABLE_CUDA)
+    target_compile_definitions(test_channel_simulation PRIVATE ENABLE_CUDA)
+    target_compile_definitions(test_channel_scalability PRIVATE ENABLE_CUDA)
+endif()
+endif()

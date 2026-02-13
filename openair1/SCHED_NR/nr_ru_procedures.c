@@ -38,7 +38,6 @@
 
 #include "common/utils/LOG/log.h"
 #include "common/utils/system.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 
 #include "T.h"
 
@@ -54,8 +53,6 @@ void nr_feptx0(RU_t *ru, int tti_tx, int first_symbol, int num_symbols, int aa)
 
   unsigned int slot_offset,slot_offsetF;
   int slot = tti_tx;
-
-  //VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_OFDM+(first_symbol!=0?1:0) , 1 );
 
   if (aa == 0 && first_symbol == 0)
     start_meas(&ru->ofdm_mod_stats);
@@ -142,13 +139,11 @@ void nr_feptx0(RU_t *ru, int tti_tx, int first_symbol, int num_symbols, int aa)
 
   if (aa == 0 && first_symbol == 0)
     stop_meas(&ru->ofdm_mod_stats);
-        
-  //VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_OFDM+(first_symbol!=0?1:0), 0);
 }
 
 // RU FEP TX OFDM modulation, single-thread
-void nr_feptx_ofdm(RU_t *ru,int frame_tx,int tti_tx) {
-     
+void nr_feptx_ofdm(RU_t *ru,int frame_tx,int tti_tx)
+{
   nfapi_nr_config_request_scf_t *cfg = &ru->gNB_list[0]->gNB_config;
   NR_DL_FRAME_PARMS *fp=ru->nr_frame_parms;
   int cyclic_prefix_type = NFAPI_CP_NORMAL;
@@ -159,16 +154,10 @@ void nr_feptx_ofdm(RU_t *ru,int frame_tx,int tti_tx) {
   int slot = tti_tx;
   int *txdata = &ru->common.txdata[aa][get_samples_slot_timestamp(fp, slot)];
 
-  if (nr_slot_select(cfg,frame_tx,slot) == NR_UPLINK_SLOT) return;
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_OFDM , 1 );
-
-
-    //    LOG_D(HW,"Frame %d: Generating slot %d\n",frame,next_slot);
+  if (nr_slot_select(cfg,frame_tx,slot) == NR_UPLINK_SLOT)
+    return;
 
   nr_feptx0(ru,slot,0,NR_NUMBER_OF_SYMBOLS_PER_SLOT,aa);
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_OFDM , 0 );
 
   LOG_D(PHY,
         "feptx_ofdm (TXPATH): frame %d, slot %d: txp (time %p) %d dB, txp (freq) %d dB\n",
@@ -233,7 +222,6 @@ void nr_feptx(void *arg)
   int txdataF_offset = (slot * fp->samples_per_slot_wCP) + startSymbol * fp->ofdm_symbol_size;
   int txdataF_BF_offset = startSymbol * fp->ofdm_symbol_size;
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_PREC+feptx->aid , 1);
   int tx_idx = aa + bb * ru->nb_tx;
 
   if (tx_idx == 0)
@@ -256,9 +244,8 @@ void nr_feptx(void *arg)
 
   if (tx_idx == 0)
     stop_meas(&ru->precoding_stats);
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_PREC+feptx->aid , 0);
 
-      ////////////FEPTX////////////
+  ////////////FEPTX////////////
   nr_feptx0(ru, slot, startSymbol, numSymbols, tx_idx);
 
   // Task completed in //
@@ -271,8 +258,6 @@ void nr_feptx_tp(RU_t *ru, int frame_tx, int slot)
   nfapi_nr_config_request_scf_t *cfg = &ru->gNB_list[0]->gNB_config;
   if (nr_slot_select(cfg, frame_tx, slot) == NR_UPLINK_SLOT)
     return;
-  if (ru->idx == 0)
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_OFDM, 1);
   start_meas(&ru->ofdm_total_stats);
 
   int nt = ru->nb_tx * ru->num_beams_period;
@@ -316,8 +301,6 @@ void nr_feptx_tp(RU_t *ru, int frame_tx, int slot)
   join_task_ans(&ans);
 
   stop_meas(&ru->ofdm_total_stats);
-  if (ru->idx == 0)
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPTX_OFDM, 0);
 }
 
 // core RX FEP routine, called by threads in RU thread-pool
@@ -340,10 +323,9 @@ void nr_fep(void *arg)
 }
 
 // RU RX FEP using thread-pool
-void nr_fep_tp(RU_t *ru, int slot) {
-
-  int nbfeprx=0;
-  if (ru->idx == 0) VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPRX, 1 );
+void nr_fep_tp(RU_t *ru, int slot)
+{
+  int nbfeprx = 0;
   start_meas(&ru->ofdm_demod_stats);
 
   int nt = ru->nb_rx * ru->num_beams_period;
@@ -384,6 +366,4 @@ void nr_fep_tp(RU_t *ru, int slot) {
   join_task_ans(&ans);
 
   stop_meas(&ru->ofdm_demod_stats);
-  if (ru->idx == 0) VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME( VCD_SIGNAL_DUMPER_FUNCTIONS_PHY_PROCEDURES_RU_FEPRX, 0 );
 }
-

@@ -39,7 +39,6 @@
 #include "PHY/defs_nr_UE.h"
 
 #include "PHY/NR_REFSIG/ss_pbch_nr.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 
 #define DEFINE_VARIABLES_PSS_NR_H
 #include "PHY/NR_REFSIG/pss_nr.h"
@@ -391,7 +390,6 @@ int pss_synchro_nr(const c16_t **rxdata,
                    int *pssPeak,
                    int *pssAvg)
 {
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PSS_SYNCHRO_NR, VCD_FUNCTION_IN);
 #ifdef DBG_PSS_NR
 
   LOG_M("rxdata0_rand.m","rxd0_rand", &PHY_vars_UE->common_vars.rxdata[0][0], frame_parms->samples_per_frame, 1, 1);
@@ -406,12 +404,8 @@ int pss_synchro_nr(const c16_t **rxdata,
 
   start_meas(&generic_time[TIME_PSS]);
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PSS_SEARCH_TIME_NR, VCD_FUNCTION_IN);
-
   int synchro_position =
       pss_search_time_nr(rxdata, frame_parms, pssTime, fo_flag, is, target_Nid_cell, nid2, f_off, pssPeak, pssAvg, -1, -1);
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PSS_SEARCH_TIME_NR, VCD_FUNCTION_OUT);
 
 #if TEST_SYNCHRO_TIMING_PSS
 
@@ -444,7 +438,6 @@ int pss_synchro_nr(const c16_t **rxdata,
   }
 #endif
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PSS_SYNCHRO_NR, VCD_FUNCTION_OUT);
   return synchro_position;
 }
 

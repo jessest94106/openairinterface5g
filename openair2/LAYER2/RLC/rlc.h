@@ -37,7 +37,7 @@
 
 #include "common/platform_types.h"
 #include "common/platform_constants.h"
-#    include "hashtable.h"
+#include "ds/hashtable.h"
 #    include "LTE_asn_constant.h"
 #    include "common/utils/LOG/log.h"
 #include "intertask_interface.h"

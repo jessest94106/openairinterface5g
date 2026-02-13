@@ -21,7 +21,6 @@
 
 #include "nr_transport_common_proto.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #define DEBUG_SCRAMBLING(a)
 //#define DEBUG_SCRAMBLING(a) a
 void nr_codeword_scrambling(uint8_t *in,

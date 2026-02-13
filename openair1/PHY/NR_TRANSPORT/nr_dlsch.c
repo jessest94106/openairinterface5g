@@ -36,7 +36,6 @@
 #include "PHY/MODULATION/nr_modulation.h"
 #include "PHY/NR_REFSIG/dmrs_nr.h"
 #include "PHY/NR_REFSIG/ptrs_nr.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "common/utils/nr/nr_common.h"
 #include "executables/softmodem-common.h"
 #include "SCHED_NR/sched_nr.h"
@@ -628,7 +627,6 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
     /// Modulation
     start_meas(dlsch_modulation_stats);
     nr_modulation(scrambled_output, encoded_length, Qm, (int16_t *)mod_symbs[codeWord]);
-    VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_gNB_PDSCH_MODULATION, 0);
     stop_meas(dlsch_modulation_stats);
 #ifdef DEBUG_DLSCH
     printf("PDSCH Modulation: Qm %d(%d)\n", Qm, nb_re);

@@ -816,7 +816,8 @@ static inline void rotate_cpx_vector(const c16_t *const x, const c16_t *const al
         // Split interleaved -> separate real/imag
         int16x8_t br = vuzp1q_s16(x_128[i], x_128[i]);
         int16x8_t bi = vuzp2q_s16(x_128[i], x_128[i]);
-
+#ifdef __ARM_FEATURE_QRDMX
+        // ARMv8.1-A: Use RDM instructions (rounding doubling multiply)
         // Start with the two “diagonal” products using high-half, doubling, sat:
         // x = round( (2*ar*br) / 2^16 ), y = round( (2*ar*bi) / 2^16 )
         int16x8_t real = vqdmulhq_s16(ar, br);
@@ -827,7 +828,21 @@ static inline void rotate_cpx_vector(const c16_t *const x, const c16_t *const al
 
         // imag += round( (2*ai*br) / 2^16 )
         imag = vqrdmlahq_s16(imag, ai, br);
+#else
+        // ARMv8.0-A fallback: Use standard 32-bit multiply
+        int32x4_t real_lo = vmull_s16(vget_low_s16(ar), vget_low_s16(br));
+        int32x4_t real_hi = vmull_s16(vget_high_s16(ar), vget_high_s16(br));
+        real_lo = vmlsl_s16(real_lo, vget_low_s16(ai), vget_low_s16(bi));
+        real_hi = vmlsl_s16(real_hi, vget_high_s16(ai), vget_high_s16(bi));
 
+        int32x4_t imag_lo = vmull_s16(vget_low_s16(ar), vget_low_s16(bi));
+        int32x4_t imag_hi = vmull_s16(vget_high_s16(ar), vget_high_s16(bi));
+        imag_lo = vmlal_s16(imag_lo, vget_low_s16(ai), vget_low_s16(br));
+        imag_hi = vmlal_s16(imag_hi, vget_high_s16(ai), vget_high_s16(br));
+
+        int16x8_t real = vcombine_s16(vqrshrn_n_s32(real_lo, 15), vqrshrn_n_s32(real_hi, 15));
+        int16x8_t imag = vcombine_s16(vqrshrn_n_s32(imag_lo, 15), vqrshrn_n_s32(imag_hi, 15));
+#endif
         // Re-interleave [real, imag]
         int16x8x2_t z = vzipq_s16(real, imag);
 

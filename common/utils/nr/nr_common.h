@@ -286,9 +286,6 @@ static inline void warn_higher_threequarter_fs(const int n_rb, const int mu)
         mu);
 }
 
-uint64_t reverse_bits(uint64_t in, int n_bits);
-void reverse_bits_u8(uint8_t const* in, size_t sz, uint8_t* out);
-
 uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t dl_nrarfcn);
 uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw);
 
@@ -356,6 +353,12 @@ frequency_range_t get_freq_range_from_band(uint16_t band);
  * @note The values are the same for PUSCH and PDSCH and are derived from TS 38.214 Table 6.2.2-1./4.1-1
  */
 float get_beta_dmrs(int num_cdm_groups_no_data, bool is_type2);
+
+/** @brief Construct full 5G-S-TMSI from 5G-S-TMSI components */
+uint64_t nr_construct_5g_s_tmsi(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi);
+
+/** @brief Construct 5G-S-TMSI-Part1 from 5G-S-TMSI components */
+uint64_t nr_construct_5g_s_tmsi_part1(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi);
 
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))

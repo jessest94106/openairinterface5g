@@ -25,7 +25,6 @@
 #include "PHY/impl_defs_top.h"
 
 #include "executables/nr-uesoftmodem.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 
 //#define DEBUG_PHY
 
@@ -43,8 +42,6 @@ int nr_adjust_synch_ue(NR_DL_FRAME_PARMS *frame_parms,
                        short coef)
 {
   int max_val = 0, max_pos = 0;
-
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_ADJUST_SYNCH, VCD_FUNCTION_IN);
 
   // search for maximum position within the cyclic prefix
   for (int i = -frame_parms->nb_prefix_samples; i < frame_parms->nb_prefix_samples; i++) {
@@ -95,6 +92,5 @@ int nr_adjust_synch_ue(NR_DL_FRAME_PARMS *frame_parms,
   ue->max_pos_iir += -round(sampleShift * PID_P) * 32768;
   ue->max_pos_acc += max_pos;
 
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_ADJUST_SYNCH, VCD_FUNCTION_OUT);
   return sample_shift;
 }
