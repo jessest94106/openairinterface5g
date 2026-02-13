@@ -418,7 +418,9 @@ static void *sender_thread(void *v)
 {
   struct thr_data *d = v;
 
-  size_t oh = d->is_ul ? 3 : 0;
+  // Overhead: PDCP header (2 bytes) for UL packets
+  // SDAP headers are disabled, so only PDCP header is added
+  size_t oh = d->is_ul ? 2 : 0;
   size_t packet_len = d->data_len + oh;
   uint8_t buf[packet_len];
   memset(buf, 0, packet_len);

@@ -20,6 +20,7 @@
  */
 
 #include "rrc_gNB_du.h"
+#include "rrc_cell_management.h"
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,12 +53,12 @@
 #include "utils.h"
 #include "xer_encoder.h"
 
-int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
+static int get_dl_band(const struct f1ap_served_cell_info_t *cell_info)
 {
   return cell_info->mode == F1AP_MODE_TDD ? cell_info->tdd.freqinfo.band : cell_info->fdd.dl_freqinfo.band;
 }
 
-int get_ssb_scs(const struct f1ap_served_cell_info_t *cell_info)
+static int get_ssb_scs(const struct f1ap_served_cell_info_t *cell_info)
 {
   return cell_info->mode == F1AP_MODE_TDD ? cell_info->tdd.tbw.scs : cell_info->fdd.dl_tbw.scs;
 }
@@ -71,6 +72,9 @@ static NR_SSB_MTC_t *get_ssb_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
   return ssb_mtc;
 }
 
+/** @brief Return the frequency of the SS block of the cell for which this message is included,
+ * or of other SS blocks within the same carrier. MeasurementTimingConfiguration message is
+ * used to convey assistance information for measurement timing between nodes (e.g F1 setup) */
 static int ssb_arfcn_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
 {
   /* format has been verified when accepting MeasurementTimingConfiguration */
@@ -78,27 +82,20 @@ static int ssb_arfcn_mtc(const NR_MeasurementTimingConfiguration_t *mtc)
   return mtlist->list.array[0]->frequencyAndTiming->carrierFreq;
 }
 
-int get_ssb_arfcn(const struct nr_rrc_du_container_t *du)
+/** @brief Find first cell owned by this DU (assoc_id) and return its SSB ARFCN
+ * @note Current assumption is that each DU serves only one cell*/
+int get_ssb_arfcn(const struct nr_rrc_cell_container_t *cell)
 {
-  DevAssert(du != NULL && du->mtc != NULL);
-  return ssb_arfcn_mtc(du->mtc);
+  DevAssert(cell != NULL);
+  if (cell->mtc != NULL)
+    return ssb_arfcn_mtc(cell->mtc);
+  AssertFatal(false, "no mtc found for cell %ld\n", cell->info.cell_id);
+  return 0;
 }
-
-static int du_compare(const nr_rrc_du_container_t *a, const nr_rrc_du_container_t *b)
-{
-  if (a->assoc_id > b->assoc_id)
-    return 1;
-  if (a->assoc_id == b->assoc_id)
-    return 0;
-  return -1; /* a->assoc_id < b->assoc_id */
-}
-
-/* Tree management functions */
-RB_GENERATE/*_STATIC*/(rrc_du_tree, nr_rrc_du_container_t, entries, du_compare);
 
 static bool rrc_gNB_plmn_matches(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *info)
 {
-  const gNB_RrcConfigurationReq *conf = &rrc->configuration;
+  const nr_rrc_config_t *conf = &rrc->configuration;
   return conf->num_plmn == 1 // F1 supports only one
          && conf->plmn[0].mcc == info->plmn.mcc && conf->plmn[0].mnc == info->plmn.mnc;
 }
@@ -172,31 +169,15 @@ static int nr_cell_id_match(const void *key, const void *element)
   return 1;
 }
 
-static neighbour_cell_configuration_t *get_cell_neighbour_list(const gNB_RRC_INST *rrc, const f1ap_served_cell_info_t *cell_info)
+static neighbour_cell_configuration_t *get_cell_neighbour_list(const gNB_RRC_INST *rrc, const nr_rrc_cell_container_t *cell)
 {
   void *base = seq_arr_front(rrc->neighbour_cell_configuration);
   size_t nmemb = seq_arr_size(rrc->neighbour_cell_configuration);
   size_t size = sizeof(neighbour_cell_configuration_t);
 
-  void *it = bsearch((void *)&cell_info->nr_cellid, base, nmemb, size, nr_cell_id_match);
+  void *it = bsearch((void *)&cell->info.cell_id, base, nmemb, size, nr_cell_id_match);
 
   return (neighbour_cell_configuration_t *)it;
-}
-
-const struct f1ap_served_cell_info_t *get_cell_information_by_phycellId(int phyCellId)
-{
-  gNB_RRC_INST *rrc = RC.nrrrc[0];
-  nr_rrc_du_container_t *it = NULL;
-  RB_FOREACH (it, rrc_du_tree, &rrc->dus) {
-    for (int cellIdx = 0; cellIdx < it->setup_req->num_cells_available; cellIdx++) {
-      const f1ap_served_cell_info_t *cell_info = &(it->setup_req->cell[cellIdx].info);
-      if (cell_info->nr_pci == phyCellId) {
-        LOG_D(NR_RRC, "HO LOG: Found cell with phyCellId %d\n", phyCellId);
-        return cell_info;
-      }
-    }
-  }
-  return NULL;
 }
 
 static void is_intra_frequency_neighbour(void *ssb_arfcn, void *neighbour_cell)
@@ -212,28 +193,36 @@ static void is_intra_frequency_neighbour(void *ssb_arfcn, void *neighbour_cell)
 /**
  * @brief Labels neighbour cells if they are intra frequency to prepare meas config only for intra frequency ho
  * @param[in] rrc     Pointer to RRC instance
- * @param[in] cell_info Pointer to cell information
+ * @param[in] cell    Pointer to cell container
  */
-static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc,
-                                             const nr_rrc_du_container_t *du,
-                                             const f1ap_served_cell_info_t *cell_info)
+static void label_intra_frequency_neighbours(gNB_RRC_INST *rrc, const nr_rrc_cell_container_t *cell)
 {
   if (!rrc->neighbour_cell_configuration)
     return;
 
-  neighbour_cell_configuration_t *neighbour_cell_config = get_cell_neighbour_list(rrc, cell_info);
+  neighbour_cell_configuration_t *neighbour_cell_config = get_cell_neighbour_list(rrc, cell);
   if (!neighbour_cell_config)
     return;
 
-  LOG_D(NR_RRC, "HO LOG: Cell: %lu has neighbour cell configuration!\n", cell_info->nr_cellid);
-  uint32_t ssb_arfcn = get_ssb_arfcn(du);
+  uint32_t ssb_arfcn = get_ssb_arfcn(cell);
+  LOG_D(NR_RRC,
+        "Cell %lu (PCI %d, SSB ARFCN %u) has neighbour cell configuration, labeling intra-frequency neighbours\n",
+        cell->info.cell_id,
+        cell->info.pci,
+        ssb_arfcn);
 
   seq_arr_t *cell_neighbour_list = neighbour_cell_config->neighbour_cells;
   for_each(cell_neighbour_list, (void *)&ssb_arfcn, is_intra_frequency_neighbour);
 }
 
-static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_configuration, const f1ap_served_cell_info_t *cell, int ssb_arfcn)
+static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_configuration, const f1ap_served_cell_info_t *cell)
 {
+  // MTC is mandatory, but some DUs don't send it in the F1 Setup Request, so
+  // "tolerate" this behavior, despite it being mandatory
+  NR_MeasurementTimingConfiguration_t *mtc = extract_mtc(cell->measurement_timing_config, cell->measurement_timing_config_len);
+  int ssb_arfcn = ssb_arfcn_mtc(mtc);
+  ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
+
   for (int c = 0; c < neighbour_cell_configuration->size; c++) {
     const neighbour_cell_configuration_t *neighbour_config = seq_arr_at(neighbour_cell_configuration, c);
     for (int ni = 0; ni < neighbour_config->neighbour_cells->size; ni++) {
@@ -289,6 +278,44 @@ static bool valid_du_in_neighbour_configs(const seq_arr_t *neighbour_cell_config
   return true;
 }
 
+static void cp_f1_served_cell_info_to_cell(nr_rrc_cell_container_t *dst, const f1ap_served_cell_info_t *src)
+{
+  DevAssert(dst != NULL);
+  DevAssert(src != NULL);
+
+  // Copy basic cell information
+  dst->info.cell_id = src->nr_cellid;
+  dst->info.pci = src->nr_pci;
+  dst->info.plmn = src->plmn;
+  dst->info.tac = src->tac ? *src->tac : 0;
+
+  // Copy frequency information based on mode
+  if (src->mode == F1AP_MODE_TDD) {
+    dst->info.mode = NR_MODE_TDD;
+    dst->info.tdd.dlul.band = src->tdd.freqinfo.band;
+    dst->info.tdd.dlul.arfcn = src->tdd.freqinfo.arfcn;
+    dst->info.tdd.dlul.scs = src->tdd.tbw.scs;
+    dst->info.tdd.dlul.nrb = src->tdd.tbw.nrb;
+  } else {
+    dst->info.mode = NR_MODE_FDD;
+    /* DL */
+    dst->info.fdd.dl.band = src->fdd.dl_freqinfo.band;
+    dst->info.fdd.dl.arfcn = src->fdd.dl_freqinfo.arfcn;
+    dst->info.fdd.dl.scs = src->fdd.dl_tbw.scs;
+    dst->info.fdd.dl.nrb = src->fdd.dl_tbw.nrb;
+    /* UL */
+    dst->info.fdd.ul.band = src->fdd.ul_freqinfo.band;
+    dst->info.fdd.ul.arfcn = src->fdd.ul_freqinfo.arfcn;
+    dst->info.fdd.ul.scs = src->fdd.ul_tbw.scs;
+    dst->info.fdd.ul.nrb = src->fdd.ul_tbw.nrb;
+  }
+
+  // Extract and store MTC
+  if (src->measurement_timing_config_len > 0) {
+    dst->mtc = extract_mtc(src->measurement_timing_config, src->measurement_timing_config_len);
+  }
+}
+
 void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
 {
   AssertFatal(assoc_id != 0, "illegal assoc_id == 0: should be -1 (monolithic) or >0 (split)\n");
@@ -300,147 +327,147 @@ void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id)
   f1ap_setup_failure_t fail = {.transaction_id = F1AP_get_next_transaction_identifier(0, 0)};
 
   // check:
-  // - it is one cell
   // - PLMN and Cell ID matches
   // - no previous DU with the same ID
   // else reject
-  if (req->num_cells_available != 1) {
-    LOG_E(NR_RRC, "can only handle on DU cell, but gNB_DU %ld has %d\n", req->gNB_DU_id, req->num_cells_available);
-    fail.cause = F1AP_CauseRadioNetwork_gNB_CU_Cell_Capacity_Exceeded;
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    return;
-  }
-  f1ap_served_cell_info_t *cell_info = &req->cell[0].info;
-  if (!rrc_gNB_plmn_matches(rrc, cell_info)) {
-    LOG_E(NR_RRC,
-          "PLMN mismatch: CU %03d.%0*d, DU %03d%0*d\n",
-          rrc->configuration.plmn[0].mcc,
-          rrc->configuration.plmn[0].mnc_digit_length,
-          rrc->configuration.plmn[0].mnc,
-          cell_info->plmn.mcc,
-          cell_info->plmn.mnc_digit_length,
-          cell_info->plmn.mnc);
-    fail.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU;
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    return;
-  }
   nr_rrc_du_container_t *it = NULL;
   RB_FOREACH(it, rrc_du_tree, &rrc->dus) {
-    if (it->setup_req->gNB_DU_id == req->gNB_DU_id) {
+    if (it->gNB_DU_id == req->gNB_DU_id) {
       LOG_E(NR_RRC,
             "gNB-DU ID: existing DU %s on assoc_id %d already has ID %ld, rejecting requesting gNB-DU\n",
-            it->setup_req->gNB_DU_name,
+            it->gNB_DU_name,
             it->assoc_id,
-            it->setup_req->gNB_DU_id);
-      fail.cause = F1AP_CauseMisc_unspecified;
-      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-      return;
-    }
-    // note: we assume that each DU contains only one cell; otherwise, we would
-    // need to check every cell in the requesting DU to any existing cell.
-    const f1ap_served_cell_info_t *exist_info = &it->setup_req->cell[0].info;
-    const f1ap_served_cell_info_t *new_info = &req->cell[0].info;
-    if (exist_info->nr_cellid == new_info->nr_cellid || exist_info->nr_pci == new_info->nr_pci) {
-      LOG_E(NR_RRC,
-            "existing DU %s on assoc_id %d already has cellID %ld/physCellId %d, rejecting requesting gNB-DU with cellID %ld/physCellId %d\n",
-            it->setup_req->gNB_DU_name,
-            it->assoc_id,
-            exist_info->nr_cellid,
-            exist_info->nr_pci,
-            new_info->nr_cellid,
-            new_info->nr_pci);
+            it->gNB_DU_id);
       fail.cause = F1AP_CauseMisc_unspecified;
       rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
       return;
     }
   }
+  LOG_I(NR_RRC, "Accepting DU %ld (%s) (RRC version %u.%u.%u)\n", req->gNB_DU_id, req->gNB_DU_name, req->rrc_ver[0], req->rrc_ver[1], req->rrc_ver[2]);
 
-  // MTC is mandatory, but some DUs don't send it in the F1 Setup Request, so
-  // "tolerate" this behavior, despite it being mandatory
-  NR_MeasurementTimingConfiguration_t *mtc =
-      extract_mtc(cell_info->measurement_timing_config, cell_info->measurement_timing_config_len);
-
-  if (rrc->neighbour_cell_configuration
-      && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info, ssb_arfcn_mtc(mtc))) {
-    LOG_E(NR_RRC, "problem with DU %ld in neighbor configuration, rejecting DU\n", req->gNB_DU_id);
-    f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
-    rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
-    return;
-  }
-
-  const f1ap_gnb_du_system_info_t *sys_info = req->cell[0].sys_info;
-  NR_MIB_t *mib = NULL;
-  NR_SIB1_t *sib1 = NULL;
-
-  if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
-    if (!extract_sys_info(sys_info, &mib, &sib1)) {
-      LOG_W(NR_RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
-      fail.cause = F1AP_CauseProtocol_semantic_error;
-      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
-      ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, mtc);
-      return;
-    }
-  }
-  LOG_I(NR_RRC, "Accepting DU %ld (%s), sending F1 Setup Response\n", req->gNB_DU_id, req->gNB_DU_name);
-  LOG_I(NR_RRC, "DU uses RRC version %u.%u.%u\n", req->rrc_ver[0], req->rrc_ver[1], req->rrc_ver[2]);
-
-  // we accept the DU
-  nr_rrc_du_container_t *du = calloc(1, sizeof(*du));
-  AssertFatal(du, "out of memory\n");
+  // DU is accepted, add it to tree and add cell to DU's cell array
+  nr_rrc_du_container_t *du = calloc_or_fail(1, sizeof(*du));
   du->assoc_id = assoc_id;
+  du->gNB_DU_id = req->gNB_DU_id;
+  du->gNB_DU_name = strdup(req->gNB_DU_name ? req->gNB_DU_name : "N/A");
+  memcpy(du->rrc_ver, req->rrc_ver, sizeof(du->rrc_ver));
 
-  /* ITTI will free the setup request message via free(). So the memory
-   * "inside" of the message will remain, but the "outside" container no, so
-   * allocate memory and copy it in */
-  du->setup_req = calloc(1,sizeof(*du->setup_req));
-  AssertFatal(du->setup_req, "out of memory\n");
-  // Copy F1AP message
-  *du->setup_req = cp_f1ap_setup_request(req);
-  // MIB can be null and configured later via DU Configuration Update
-  du->mib = mib;
-  du->sib1 = sib1;
-  du->mtc = mtc;
-  RB_INSERT(rrc_du_tree, &rrc->dus, du);
-  rrc->num_dus++;
+  // Initialize cell array for this DU
+  seq_arr_init(&du->cells, sizeof(nr_rrc_cell_container_t *));
+  nr_rrc_du_container_t *du_collision = rrc_add_du(rrc, du);
+  AssertFatal(du_collision == NULL, "rrc_add_du should succeed for new DU (assoc_id %d)", assoc_id);
 
-  served_cells_to_activate_t cell = {
-      .plmn = cell_info->plmn,
-      .nr_cellid = cell_info->nr_cellid,
-      .nrpci = cell_info->nr_pci,
-      .num_SI = 0,
-  };
-
-  // Encode CU SIBs and configure setup response with sysinfo
-  seq_arr_t *sibs = rrc->SIBs;
-  if (sibs) {
-    for (int i = 0; i < sibs->size; i++) {
-      nr_SIBs_t *sib = (nr_SIBs_t *)seq_arr_at(sibs, i);
-      switch (sib->SIB_type) {
-        case 2: {
-          NR_SSB_MTC_t *ssbmtc = get_ssb_mtc(mtc);
-          sib->SIB_size = do_SIB2_NR(&sib->SIB_buffer, ssbmtc);
-          cell.SI_msg[cell.num_SI].SI_container = sib->SIB_buffer;
-          cell.SI_msg[cell.num_SI].SI_container_length = sib->SIB_size;
-          cell.SI_msg[cell.num_SI].SI_type = sib->SIB_type;
-          cell.num_SI++;
-        } break;
-        default:
-          AssertFatal(false, "SIB%d not handled yet\n", sib->SIB_type);
-      }
-    }
-  }
-
-  if (du->mib != NULL && du->sib1 != NULL)
-    label_intra_frequency_neighbours(rrc, du, cell_info);
-
+  // Build F1 Setup Response
   f1ap_setup_resp_t resp = {.transaction_id = req->transaction_id,
-                            .num_cells_to_activate = 1,
-                            .cells_to_activate[0] = cell};
+                            .num_cells_to_activate = req->num_cells_available,
+                            .cells_to_activate = calloc_or_fail(req->num_cells_available, sizeof(*resp.cells_to_activate))};
   int num = read_version(TO_STRING(NR_RRC_VERSION), &resp.rrc_ver[0], &resp.rrc_ver[1], &resp.rrc_ver[2]);
   AssertFatal(num == 3, "could not read RRC version string %s\n", TO_STRING(NR_RRC_VERSION));
   if (rrc->node_name != NULL)
     resp.gNB_CU_name = strdup(rrc->node_name);
+
+  if (req->num_cells_available > 1) {
+    LOG_W(NR_RRC, "Received F1 Setup Request with %u cells, only one cell is supported\n", req->num_cells_available);
+  }
+  for (int i = 0; i < req->num_cells_available; i++) {
+    f1ap_served_cell_info_t *cell_info = &req->cell[i].info;
+    if (!rrc_gNB_plmn_matches(rrc, cell_info)) {
+      LOG_E(NR_RRC,
+            "PLMN mismatch: CU %03d.%0*d, DU %03d%0*d\n",
+            rrc->configuration.plmn[0].mcc,
+            rrc->configuration.plmn[0].mnc_digit_length,
+            rrc->configuration.plmn[0].mnc,
+            cell_info->plmn.mcc,
+            cell_info->plmn.mnc_digit_length,
+            cell_info->plmn.mnc);
+      fail.cause = F1AP_CauseRadioNetwork_plmn_not_served_by_the_gNB_CU;
+      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+      free_f1ap_setup_response(&resp);
+      return;
+    }
+
+    if (rrc->neighbour_cell_configuration && !valid_du_in_neighbour_configs(rrc->neighbour_cell_configuration, cell_info)) {
+      LOG_E(NR_RRC, "problem with DU %ld in neighbor configuration, rejecting DU\n", req->gNB_DU_id);
+      f1ap_setup_failure_t fail = {.cause = F1AP_CauseMisc_unspecified};
+      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+      free_f1ap_setup_response(&resp);
+      return;
+    }
+
+    const f1ap_gnb_du_system_info_t *sys_info = req->cell[i].sys_info;
+    NR_MIB_t *mib = NULL;
+    NR_SIB1_t *sib1 = NULL;
+    if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
+      if (!extract_sys_info(sys_info, &mib, &sib1)) {
+        LOG_W(NR_RRC, "rejecting DU ID %ld\n", req->gNB_DU_id);
+        fail.cause = F1AP_CauseProtocol_semantic_error;
+        rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+        free_f1ap_setup_response(&resp);
+        return;
+      }
+    }
+
+    /* Create cell and add to global tree */
+    nr_rrc_cell_container_t *new = calloc_or_fail(1, sizeof(*new));
+    new->assoc_id = assoc_id;
+    cp_f1_served_cell_info_to_cell(new, cell_info);
+    new->mib = mib;
+    new->sib1 = sib1;
+    // Add cell to DU's cell array
+    nr_rrc_cell_container_t *collision = rrc_add_cell(rrc, new);
+    if (collision != NULL) {
+      nr_rrc_du_container_t *existing_du = get_du_by_assoc_id(rrc, collision->assoc_id);
+      const char *du_name = existing_du ? existing_du->gNB_DU_name : "unknown";
+      LOG_E(NR_RRC,
+            "Cell ID %lu already exists in DU %s (assoc_id %d), rejecting requesting gNB-DU\n",
+            new->info.cell_id,
+            du_name,
+            collision->assoc_id);
+      rrc_free_cell_container(new);
+      fail.cause = F1AP_CauseRadioNetwork_cell_not_available;
+      rrc->mac_rrc.f1_setup_failure(assoc_id, &fail);
+      free_f1ap_setup_response(&resp);
+      return;
+    }
+
+    nr_rrc_cell_container_t *added = rrc_add_cell_to_du(&du->cells, new);
+    AssertFatal(added != NULL, "Failed to add cell %ld to DU %ld\n", new->info.cell_id, du->gNB_DU_id);
+    LOG_I(NR_RRC, "DU %ld: Added cell %ld\n", du->gNB_DU_id, new->info.cell_id);
+
+    served_cells_to_activate_t cell = {
+        .plmn = cell_info->plmn,
+        .nr_cellid = cell_info->nr_cellid,
+        .nrpci = cell_info->nr_pci,
+        .num_SI = 0,
+    };
+
+    // Encode CU SIBs and configure setup response with sysinfo
+    seq_arr_t *sibs = rrc->SIBs;
+    if (sibs) {
+      for (int i = 0; i < sibs->size; i++) {
+        nr_SIBs_t *sib = (nr_SIBs_t *)seq_arr_at(sibs, i);
+        switch (sib->SIB_type) {
+          case 2: {
+            NR_SSB_MTC_t *ssbmtc = get_ssb_mtc(new->mtc);
+            sib->SIB_size = do_SIB2_NR(&sib->SIB_buffer, ssbmtc);
+            cell.SI_msg[cell.num_SI].SI_container = sib->SIB_buffer;
+            cell.SI_msg[cell.num_SI].SI_container_length = sib->SIB_size;
+            cell.SI_msg[cell.num_SI].SI_type = sib->SIB_type;
+            cell.num_SI++;
+          } break;
+          default:
+            AssertFatal(false, "SIB%d not handled yet\n", sib->SIB_type);
+        }
+      }
+    }
+
+    if (new->mib != NULL &&new->sib1 != NULL)
+      label_intra_frequency_neighbours(rrc, new);
+
+    resp.cells_to_activate[i] = cell;
+  }
+
+  LOG_I(NR_RRC, "DU %ld (%s): sending F1 Setup Response\n", req->gNB_DU_id, req->gNB_DU_name);
   rrc->mac_rrc.f1_setup_response(assoc_id, &resp);
   free_f1ap_setup_response(&resp);
 
@@ -460,6 +487,10 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
     uint32_t ue_id = UE->rrc_ue_id;
     if (UE->ho_context != NULL)
       LOG_W(NR_RRC, "DU disconnected while handover for UE %d active\n", ue_id);
+
+    // Remove SCells from this DU for this UE
+    rrc_remove_ue_scells_from_du(UE, assoc_id);
+
     f1_ue_data_t ue_data = cu_get_f1_ue_data(ue_id);
     if (ue_data.du_assoc_id != assoc_id)
       continue; /* this UE is on another DU */
@@ -486,26 +517,77 @@ static int invalidate_du_connections(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
   return count;
 }
 
-static void update_cell_info(nr_rrc_du_container_t *du, const f1ap_served_cell_info_t *new_ci)
+/** @brief Update cell information from F1AP DU configuration update
+ * @param[in] rrc RRC instance (needed to get DU and check PCI duplicates)
+ * @param[in] old_nci The cell_id used to find the cell in the tree
+ * @param[in] new_ci Pointer to the new cell information from F1AP message
+ * @return Pointer to the updated cell container, or NULL on failure
+ * @note RB tree manipulation: The cell tree is keyed by cell_id. If the cell_id changes
+ *       during update, the node must be removed from the tree before updating (using the
+ *       old cell_id) and re-inserted after updating (using the new cell_id). This is
+ *       necessary because RB trees maintain ordering based on the key value. If cell_id
+ *       doesn't change, no tree manipulation is needed. */
+static nr_rrc_cell_container_t *update_cell_info(gNB_RRC_INST *rrc, const uint64_t old_nci, const f1ap_served_cell_info_t *new_ci)
 {
-  DevAssert(du != NULL);
+  DevAssert(rrc != NULL);
   DevAssert(new_ci != NULL);
 
-  AssertFatal(du->setup_req->num_cells_available == 1, "expected 1 cell for DU, but has %d\n", du->setup_req->num_cells_available);
-  f1ap_served_cell_info_t *ci = &du->setup_req->cell[0].info;
-  // make sure no memory is allocated
-  free_f1ap_cell(ci, NULL);
-  *ci = copy_f1ap_served_cell_info(new_ci);
-
-  NR_MeasurementTimingConfiguration_t *new_mtc =
-      extract_mtc(new_ci->measurement_timing_config, new_ci->measurement_timing_config_len);
-  if (new_mtc != NULL) {
-    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, du->mtc);
-    du->mtc = new_mtc;
-  } else {
-    LOG_E(NR_RRC, "error decoding MeasurementTimingConfiguration during cell update, ignoring new config\n");
-    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, new_mtc);
+  struct rrc_cell_tree *cells = &rrc->cells;
+  // Find the cell by old cell_id from the update message
+  nr_rrc_cell_container_t *cell = get_cell_by_cell_id(cells, old_nci);
+  if (cell == NULL) {
+    LOG_W(NR_RRC, "no cell with ID %ld found, ignoring gNB-DU configuration update\n", old_nci);
+    return NULL;
   }
+
+  // Check if PCI will change - if so, check for duplicate PCI within the same DU
+  bool pci_changed = (cell->info.pci != new_ci->nr_pci);
+  if (pci_changed) {
+    nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, cell->assoc_id);
+    if (du != NULL) {
+      // Check if new PCI would conflict with another cell in this DU (excluding current cell)
+      nr_rrc_cell_container_t *existing_pci = rrc_get_cell_by_pci_for_du(&du->cells, new_ci->nr_pci);
+      if (existing_pci != NULL && existing_pci != cell) {
+        LOG_E(NR_RRC,
+              "Cannot change PCI from %d to %d: PCI %d already exists in this DU (cell ID %lu)\n",
+              cell->info.pci,
+              new_ci->nr_pci,
+              new_ci->nr_pci,
+              existing_pci->info.cell_id);
+        return NULL;
+      }
+    }
+  }
+
+  // Check if cell_id will change - if so, need to update tree structure
+  bool cell_id_changed = (old_nci != new_ci->nr_cellid);
+  if (cell_id_changed) {
+    // Check if new cell_id would create a duplicate (excluding current cell)
+    nr_rrc_cell_container_t *existing = get_cell_by_cell_id(cells, new_ci->nr_cellid);
+    if (existing != NULL && existing != cell) {
+      LOG_E(NR_RRC, "Cannot change cell_id from %ld to %ld: new cell_id already exists\n", old_nci, new_ci->nr_cellid);
+      return NULL;
+    }
+    // Remove from tree before updating cell_id
+    nr_rrc_cell_container_t *removed = RB_REMOVE(rrc_cell_tree, cells, cell);
+    AssertFatal(removed == cell, "Failed to remove cell %ld from tree\n", old_nci);
+  }
+
+  // Free old MTC before updating
+  if (new_ci->measurement_timing_config_len > 0)
+    ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, cell->mtc);
+
+  // Update cell information from the new F1AP served cell info
+  cp_f1_served_cell_info_to_cell(cell, new_ci);
+
+  // If cell_id changed, re-insert into tree with new cell_id
+  if (cell_id_changed) {
+    nr_rrc_cell_container_t *existing = RB_INSERT(rrc_cell_tree, cells, cell);
+    AssertFatal(existing == NULL, "Failed to insert cell %ld into tree\n", cell->info.cell_id);
+    LOG_I(NR_RRC, "Updated cell_id from %ld to %ld\n", old_nci, cell->info.cell_id);
+  }
+
+  return cell;
 }
 
 void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update_t *conf_up, sctp_assoc_t assoc_id)
@@ -522,53 +604,84 @@ void rrc_gNB_process_f1_du_configuration_update(f1ap_gnb_du_configuration_update
 
   nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, assoc_id);
   AssertError(du != NULL, return, "no DU found for assoc_id %d\n", assoc_id);
-
-  const f1ap_served_cell_info_t *info = &du->setup_req->cell[0].info;
-  if (conf_up->num_cells_to_add > 0) {
-    // Here we check if the number of cell limit is respectet, otherwise send failure
-    LOG_W(NR_RRC, "du_configuration_update->cells_to_add_list is not supported yet");
+  // Validate each cell to add for uniqueness (cell_id globally; PCI within this DU)
+  for (uint16_t i = 0; i < conf_up->num_cells_to_add; i++) {
+    f1ap_served_cell_info_t *cell_info = &conf_up->cell_to_add[i].info;
+    // Check for duplicate cell_id globally
+    nr_rrc_cell_container_t *existing = get_cell_by_cell_id(&rrc->cells, cell_info->nr_cellid);
+    if (existing != NULL) {
+      nr_rrc_du_container_t *existing_du = get_du_by_assoc_id(rrc, existing->assoc_id);
+      const char *du_name = existing_du ? existing_du->gNB_DU_name : "unknown";
+      LOG_E(NR_RRC,
+            "Cell ID %lu already exists in DU %s (assoc_id %d), rejecting cell addition\n",
+            cell_info->nr_cellid,
+            du_name,
+            existing->assoc_id);
+      /** @todo send failure message */
+      return;
+    }
+    // Check for duplicate PCI within this DU
+    nr_rrc_cell_container_t *existing_pci = rrc_get_cell_by_pci_for_du(&du->cells, cell_info->nr_pci);
+    if (existing_pci != NULL) {
+      LOG_E(NR_RRC,
+            "PCI %d already exists in this DU (cell ID %lu), rejecting cell addition (cell ID %lu)\n",
+            cell_info->nr_pci,
+            existing_pci->info.cell_id,
+            cell_info->nr_cellid);
+      /** @todo send failure message */
+      return;
+    }
   }
 
   if (conf_up->num_cells_to_modify > 0) {
     // here the old nrcgi is used to find the cell information, if it exist then we modify consequently otherwise we fail
     AssertFatal(conf_up->num_cells_to_modify == 1, "cannot handle more than one cell!\n");
-
-    if (info->nr_cellid != conf_up->cell_to_modify[0].old_nr_cellid) {
-      LOG_W(NR_RRC, "no cell with ID %ld found, ignoring gNB-DU configuration update\n", conf_up->cell_to_modify[0].old_nr_cellid);
-      return;
-    }
+    const uint64_t old_nci = conf_up->cell_to_modify[0].old_nr_cellid;
+    const f1ap_served_cell_info_t *new_ci = &conf_up->cell_to_modify[0].info;
 
     // verify the new plmn of the cell
-    if (!rrc_gNB_plmn_matches(rrc, &conf_up->cell_to_modify[0].info)) {
+    if (!rrc_gNB_plmn_matches(rrc, new_ci)) {
       LOG_W(NR_RRC, "PLMN does not match, ignoring gNB-DU configuration update\n");
       return;
     }
 
-    update_cell_info(du, &conf_up->cell_to_modify[0].info);
+    nr_rrc_cell_container_t *cell = update_cell_info(rrc, old_nci, new_ci);
+    if (cell == NULL) {
+      LOG_W(NR_RRC, "Failed to update cell %ld, ignoring gNB-DU configuration update\n", old_nci);
+      return;
+    }
+    if (cell->assoc_id != du->assoc_id) {
+      LOG_W(NR_RRC,
+            "cell %ld belongs to different DU (assoc_id %d vs %d), ignoring gNB-DU configuration update\n",
+            old_nci,
+            cell->assoc_id,
+            du->assoc_id);
+      return;
+    }
 
     const f1ap_gnb_du_system_info_t *sys_info = conf_up->cell_to_modify[0].sys_info;
 
     if (sys_info != NULL && sys_info->mib != NULL && !(sys_info->sib1 == NULL && IS_SA_MODE(get_softmodem_params()))) {
       // MIB is mandatory, so will be overwritten. SIB1 is optional, so will
       // only be overwritten if present in sys_info
-      ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
+      ASN_STRUCT_FREE(asn_DEF_NR_MIB, cell->mib);
       if (sys_info->sib1 != NULL) {
-        ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
-        du->sib1 = NULL;
+        ASN_STRUCT_FREE(asn_DEF_NR_SIB1, cell->sib1);
+        cell->sib1 = NULL;
       }
 
       NR_MIB_t *mib = NULL;
-      if (!extract_sys_info(sys_info, &mib, &du->sib1)) {
-        LOG_W(NR_RRC, "cannot update sys_info for DU %ld\n", du->setup_req->gNB_DU_id);
+      if (!extract_sys_info(sys_info, &mib, &cell->sib1)) {
+        LOG_W(NR_RRC, "cannot update sys_info for DU %ld\n", du->gNB_DU_id);
       } else {
         DevAssert(mib != NULL);
-        du->mib = mib;
-        LOG_I(NR_RRC, "update system information of DU %ld\n", du->setup_req->gNB_DU_id);
+        cell->mib = mib;
+        LOG_I(NR_RRC, "update system information of DU %ld\n", du->gNB_DU_id);
       }
     }
-    if (du->mib != NULL && du->sib1 != NULL) {
-      const f1ap_served_cell_info_t *cell_info = &du->setup_req->cell[0].info;
-      label_intra_frequency_neighbours(rrc, du, cell_info);
+
+    if (cell && cell->mib != NULL && cell->sib1 != NULL && cell->assoc_id == du->assoc_id) {
+      label_intra_frequency_neighbours(rrc, cell);
     }
   }
 
@@ -601,18 +714,8 @@ void rrc_CU_process_f1_lost_connection(gNB_RRC_INST *rrc, f1ap_lost_connection_t
     return;
   }
 
-  f1ap_setup_req_t *req = du->setup_req;
-  LOG_I(NR_RRC, "releasing DU ID %ld (%s) on assoc_id %d\n", req->gNB_DU_id, req->gNB_DU_name, assoc_id);
-  ASN_STRUCT_FREE(asn_DEF_NR_MIB, du->mib);
-  ASN_STRUCT_FREE(asn_DEF_NR_SIB1, du->sib1);
-  ASN_STRUCT_FREE(asn_DEF_NR_MeasurementTimingConfiguration, du->mtc);
-  if (du->setup_req)
-    free_f1ap_setup_request(du->setup_req);
-  free(du->setup_req);
-  nr_rrc_du_container_t *removed = RB_REMOVE(rrc_du_tree, &rrc->dus, du);
-  DevAssert(removed != NULL);
-  free(du);
-  rrc->num_dus--;
+  // Clean up DU and associated cell resources
+  rrc_cleanup_du(rrc, du);
 
   int num = invalidate_du_connections(rrc, assoc_id);
   if (num > 0) {
@@ -628,52 +731,53 @@ nr_rrc_du_container_t *get_du_for_ue(gNB_RRC_INST *rrc, uint32_t ue_id)
   return get_du_by_assoc_id(rrc, ue_data.du_assoc_id);
 }
 
-nr_rrc_du_container_t *get_du_by_assoc_id(gNB_RRC_INST *rrc, sctp_assoc_t assoc_id)
-{
-  nr_rrc_du_container_t e = {.assoc_id = assoc_id};
-  return RB_FIND(rrc_du_tree, &rrc->dus, &e);
-}
-
-/* \brief find DU by cell ID. Note: currently the CU is limited to one cell per
- * DU, hence here, DU == cell. Modify this to look up a specific cell. */
-nr_rrc_du_container_t *get_du_by_cell_id(gNB_RRC_INST *rrc, uint64_t cell_id)
-{
-  nr_rrc_du_container_t *du = NULL;
-  RB_FOREACH(du, rrc_du_tree, &rrc->dus) {
-    if (cell_id == du->setup_req->cell[0].info.nr_cellid)
-      return du;
-  }
-  return NULL;
-}
-
+/** @brief Dump DU and cell information to file
+ * @param[in] rrc RRC instance
+ * @param[in] f File handle to write to
+ * @note Complexity: O(d + N_CELL) = O(N_CELL) where d = number of DUs, N_CELL = total number of cells across all DUs
+ * @note Called periodically (every 1 second) for stats logging */
 void dump_du_info(const gNB_RRC_INST *rrc, FILE *f)
 {
   fprintf(f, "%ld connected DUs \n", rrc->num_dus);
-  int i = 1;
+  int du_idx = 1;
   nr_rrc_du_container_t *du = NULL;
-  /* cast is necessary to eliminate warning "discards ‘const’ qualifier" */
+  /* cast is necessary to eliminate warning "discards 'const' qualifier" */
   RB_FOREACH(du, rrc_du_tree, &((gNB_RRC_INST *)rrc)->dus) {
-    const f1ap_setup_req_t *sr = du->setup_req;
-    fprintf(f, "[%d] DU ID %ld (%s) ", i++, sr->gNB_DU_id, sr->gNB_DU_name);
+    fprintf(f, "[%d] DU ID %ld (%s) ", du_idx++, du->gNB_DU_id, du->gNB_DU_name);
     if (du->assoc_id == -1) {
       fprintf(f, "integrated DU-CU");
     } else {
       fprintf(f, "assoc_id %d", du->assoc_id);
     }
-    const f1ap_served_cell_info_t *info = &sr->cell[0].info;
-    fprintf(f, ": nrCellID %ld, PCI %d, SSB ARFCN %d\n", info->nr_cellid, info->nr_pci, get_ssb_arfcn(du));
 
-    if (info->mode == F1AP_MODE_TDD) {
-      const f1ap_nr_frequency_info_t *fi = &info->tdd.freqinfo;
-      const f1ap_transmission_bandwidth_t *tb = &info->tdd.tbw;
-      fprintf(f, "    TDD: band %d ARFCN %d SCS %d (kHz) PRB %d\n", fi->band, fi->arfcn, 15 * (1 << tb->scs), tb->nrb);
+    /* Print all cells for this DU */
+    int cell_count = seq_arr_size(&du->cells);
+
+    if (cell_count == 0) {
+      fprintf(f, ": no cells\n");
     } else {
-      const f1ap_nr_frequency_info_t *dfi = &info->fdd.dl_freqinfo;
-      const f1ap_transmission_bandwidth_t *dtb = &info->fdd.dl_tbw;
-      fprintf(f, "    FDD: DL band %d ARFCN %d SCS %d (kHz) PRB %d\n", dfi->band, dfi->arfcn, 15 * (1 << dtb->scs), dtb->nrb);
-      const f1ap_nr_frequency_info_t *ufi = &info->fdd.ul_freqinfo;
-      const f1ap_transmission_bandwidth_t *utb = &info->fdd.ul_tbw;
-      fprintf(f, "         UL band %d ARFCN %d SCS %d (kHz) PRB %d\n", ufi->band, ufi->arfcn, 15 * (1 << utb->scs), utb->nrb);
+      fprintf(f, ": %d cell%s\n", cell_count, cell_count > 1 ? "s" : "");
+      int cell_idx = 1;
+      FOR_EACH_SEQ_ARR (nr_rrc_cell_container_t **, cell_ptr, &du->cells) {
+        nr_rrc_cell_container_t *cell = *cell_ptr;
+        const char *mode = (cell->info.mode == NR_MODE_TDD) ? "TDD" : "FDD";
+        fprintf(f,
+                "  [%d] nrCellID %lu, PCI %d, Mode %s, SSB ARFCN %d\n",
+                cell_idx++,
+                cell->info.cell_id,
+                cell->info.pci,
+                mode,
+                ssb_arfcn_mtc(cell->mtc));
+        if (cell->info.mode == NR_MODE_TDD) {
+          const nr_rrc_freq_info_t *tdd = &cell->info.tdd.dlul;
+          fprintf(f, "      TDD: band %d ARFCN %d SCS %d (kHz) PRB %d\n", tdd->band, tdd->arfcn, 15 * (1 << tdd->scs), tdd->nrb);
+        } else {
+          const nr_rrc_freq_info_t *dl = &cell->info.fdd.dl;
+          const nr_rrc_freq_info_t *ul = &cell->info.fdd.ul;
+          fprintf(f, "      DL:  band %d ARFCN %d SCS %d (kHz) PRB %d\n", dl->band, dl->arfcn, 15 * (1 << dl->scs), dl->nrb);
+          fprintf(f, "      UL:  band %d ARFCN %d SCS %d (kHz) PRB %d\n", ul->band, ul->arfcn, 15 * (1 << ul->scs), ul->nrb);
+        }
+      }
     }
   }
 }

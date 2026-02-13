@@ -168,7 +168,7 @@ int fetch_du_by_ue_id(char *buf, int debug, telnet_printfunc_t prnt)
   nr_rrc_du_container_t *du = get_du_for_ue(RC.nrrrc[0], ue_id);
 
   if (du) {
-    prnt("gNB_DU_id %d is connected to ue_id %ld\n", du->setup_req->gNB_DU_id, ue_id);
+    prnt("gNB_DU_id %ld is connected to ue_id %ld\n", du->gNB_DU_id, ue_id);
     return 0;
   } else {
     ERROR_MSG_RET("No DU connected\n");

@@ -37,7 +37,6 @@
 #include "nr_common.h"
 #include <limits.h>
 #include <math.h>
-#include <simde/x86/gfni.h>
 
 #define C_SRS_NUMBER (64)
 #define B_SRS_NUMBER (4)
@@ -112,46 +111,6 @@ static const unsigned short srs_bandwidth_config[C_SRS_NUMBER][B_SRS_NUMBER][2] 
     /* 63 */ {{272, 1}, {16, 17}, {8, 2}, {4, 2}},
 };
 
-static const uint8_t bit_reverse_table_256[] = {
-    0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0, 0x10, 0x90, 0x50, 0xD0, 0x30, 0xB0, 0x70, 0xF0, 0x08, 0x88, 0x48, 0xC8,
-    0x28, 0xA8, 0x68, 0xE8, 0x18, 0x98, 0x58, 0xD8, 0x38, 0xB8, 0x78, 0xF8, 0x04, 0x84, 0x44, 0xC4, 0x24, 0xA4, 0x64, 0xE4,
-    0x14, 0x94, 0x54, 0xD4, 0x34, 0xB4, 0x74, 0xF4, 0x0C, 0x8C, 0x4C, 0xCC, 0x2C, 0xAC, 0x6C, 0xEC, 0x1C, 0x9C, 0x5C, 0xDC,
-    0x3C, 0xBC, 0x7C, 0xFC, 0x02, 0x82, 0x42, 0xC2, 0x22, 0xA2, 0x62, 0xE2, 0x12, 0x92, 0x52, 0xD2, 0x32, 0xB2, 0x72, 0xF2,
-    0x0A, 0x8A, 0x4A, 0xCA, 0x2A, 0xAA, 0x6A, 0xEA, 0x1A, 0x9A, 0x5A, 0xDA, 0x3A, 0xBA, 0x7A, 0xFA, 0x06, 0x86, 0x46, 0xC6,
-    0x26, 0xA6, 0x66, 0xE6, 0x16, 0x96, 0x56, 0xD6, 0x36, 0xB6, 0x76, 0xF6, 0x0E, 0x8E, 0x4E, 0xCE, 0x2E, 0xAE, 0x6E, 0xEE,
-    0x1E, 0x9E, 0x5E, 0xDE, 0x3E, 0xBE, 0x7E, 0xFE, 0x01, 0x81, 0x41, 0xC1, 0x21, 0xA1, 0x61, 0xE1, 0x11, 0x91, 0x51, 0xD1,
-    0x31, 0xB1, 0x71, 0xF1, 0x09, 0x89, 0x49, 0xC9, 0x29, 0xA9, 0x69, 0xE9, 0x19, 0x99, 0x59, 0xD9, 0x39, 0xB9, 0x79, 0xF9,
-    0x05, 0x85, 0x45, 0xC5, 0x25, 0xA5, 0x65, 0xE5, 0x15, 0x95, 0x55, 0xD5, 0x35, 0xB5, 0x75, 0xF5, 0x0D, 0x8D, 0x4D, 0xCD,
-    0x2D, 0xAD, 0x6D, 0xED, 0x1D, 0x9D, 0x5D, 0xDD, 0x3D, 0xBD, 0x7D, 0xFD, 0x03, 0x83, 0x43, 0xC3, 0x23, 0xA3, 0x63, 0xE3,
-    0x13, 0x93, 0x53, 0xD3, 0x33, 0xB3, 0x73, 0xF3, 0x0B, 0x8B, 0x4B, 0xCB, 0x2B, 0xAB, 0x6B, 0xEB, 0x1B, 0x9B, 0x5B, 0xDB,
-    0x3B, 0xBB, 0x7B, 0xFB, 0x07, 0x87, 0x47, 0xC7, 0x27, 0xA7, 0x67, 0xE7, 0x17, 0x97, 0x57, 0xD7, 0x37, 0xB7, 0x77, 0xF7,
-    0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF};
-
-void reverse_bits_u8(uint8_t const* in, size_t sz, uint8_t* out)
-{
-  DevAssert(in != NULL);
-  DevAssert(out != NULL);
-
-// Bit reversal implementation based on https://wunkolo.github.io/post/2020/11/gf2p8affineqb-bit-reversal/
-#if defined(__GFNI__) && defined(__AVX512F__)
-  int simde_sz = 64;
-  int i = 0;
-  int simde_bound = sz - simde_sz;
-  for (; i <= simde_bound; i += simde_sz) {
-    __m512i input = _mm512_loadu_epi8(&in[i]);
-    __m512i reversed = _mm512_gf2p8affine_epi64_epi8(input, _mm512_set1_epi64(0x8040201008040201), 0);
-    _mm512_storeu_epi8(&out[i], reversed);
-  }
-
-  for (; i < sz; ++i) {
-    out[i] = bit_reverse_table_256[in[i]];
-  }
-#else
-  for(size_t i = 0; i < sz; ++i)
-    out[i] = bit_reverse_table_256[in[i]];
-#endif
-}
-
 /** @brief 3GPP TS 38.133 Table 10.1.6.1-1 mapping from dBm to RSRP index */
 uint8_t get_rsrp_index(int rsrp_dBm)
 {
@@ -161,31 +120,6 @@ uint8_t get_rsrp_index(int rsrp_dBm)
   if (rsrp_dBm < -140)
     index = 16;
   return (uint8_t)index;
-}
-
-// Reverse bits implementation based on http://graphics.stanford.edu/~seander/bithacks.html
-uint64_t reverse_bits(uint64_t in, int n_bits)
-{
-  // Reverse n_bits in uint64_t variable, example:
-  // n_bits: 10
-  // in:      10 0000 1111
-  // return:  11 1100 0001
-
-  AssertFatal(n_bits <= 64, "Maximum bits to reverse is 64, impossible to reverse %d bits!\n", n_bits);
-  uint64_t rev_bits = 0;
-  uint8_t *p = (uint8_t *)&in;
-  uint8_t *q = (uint8_t *)&rev_bits;
-  int n_bytes = n_bits >> 3;
-  for (int n = 0; n < n_bytes; n++) {
-    q[n_bytes - 1 - n] = bit_reverse_table_256[p[n]];
-  }
-
-  // Reverse remaining bits (not aligned with 8-bit)
-  rev_bits = rev_bits << (n_bits % 8);
-  for (int i = n_bytes * 8; i < n_bits; i++) {
-    rev_bits |= ((in >> i) & 0x1) << (n_bits - i - 1);
-  }
-  return rev_bits;
 }
 
 #define NUM_BW_ENTRIES 15
@@ -1447,6 +1381,31 @@ unsigned short get_N_b_srs(int c_srs, int b_srs) {
   return srs_bandwidth_config[c_srs][b_srs][1];
 }
 
+// TODO: Implement to b_SRS = 1 and b_SRS = 2
+long rrc_get_max_nr_csrs(const int max_rbs, const long b_SRS)
+{
+  if(b_SRS>0) {
+    LOG_E(NR_RRC,"rrc_get_max_nr_csrs(): Not implemented yet for b_SRS>0\n");
+    return 0; // This c_srs is always valid
+  }
+
+  const uint16_t m_SRS[64] = { 4, 8, 12, 16, 16, 20, 24, 24, 28, 32, 36, 40, 48, 48, 52, 56, 60, 64, 72, 72, 76, 80, 88,
+                               96, 96, 104, 112, 120, 120, 120, 128, 128, 128, 132, 136, 144, 144, 144, 144, 152, 160,
+                               160, 160, 168, 176, 184, 192, 192, 192, 192, 208, 216, 224, 240, 240, 240, 240, 256, 256,
+                               256, 264, 272, 272, 272 };
+
+  long c_srs = 0;
+  uint16_t m = 4;
+  for(int c = 1; c<64; c++) {
+    if(m_SRS[c]>m && m_SRS[c]<max_rbs) {
+      c_srs = c;
+      m = m_SRS[c];
+    }
+  }
+
+  return c_srs;
+}
+
 frequency_range_t get_freq_range_from_freq(uint64_t freq)
 {
   // 3GPP TS 38.101-1 Version 19.0.0 Table 5.1-1: Definition of frequency ranges
@@ -1486,4 +1445,36 @@ float get_beta_dmrs(int num_cdm_groups_no_data, bool is_type2)
       beta_dmrs_pusch = powf(10.0, 4.77 / 20.0);
   }
   return beta_dmrs_pusch;
+}
+
+/** @brief Construct full 5G-S-TMSI from 5G-S-TMSI components
+ * @param amf_set_id AMF Set ID (10 bits)
+ * @param amf_pointer AMF Pointer (6 bits)
+ * @param m_tmsi 5G-TMSI (32 bits)
+ * @return Full 5G-S-TMSI (48 bits)
+ * @note The 5G-S-TMSI is constructed as a 48-bit value:
+ *       - Bits 38-47: AMF Set ID (10 bits)
+ *       - Bits 32-37: AMF Pointer (6 bits)
+ *       - Bits 0-31:  5G-TMSI (32 bits)
+ * @ref 3GPP TS 23.003 */
+uint64_t nr_construct_5g_s_tmsi(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi)
+{
+  // Construct full 5G-S-TMSI: <AMF Set ID (10 bits)><AMF Pointer (6 bits)><5G-TMSI (32 bits)>
+  return ((uint64_t)amf_set_id << 38) | ((uint64_t)amf_pointer << 32) | m_tmsi;
+}
+
+/** @brief Construct 5G-S-TMSI-Part1 from 5G-S-TMSI components
+ * @param amf_set_id AMF Set ID (10 bits)
+ * @param amf_pointer AMF Pointer (6 bits)
+ * @param m_tmsi 5G-TMSI (32 bits)
+ * @return 5G-S-TMSI-Part1 (rightmost 39 bits of the full 5G-S-TMSI)
+ * @note 5G-S-TMSI-Part1 is the rightmost 39 bits of the full 5G-S-TMSI:
+ *       - Bits 32-37: AMF Pointer (6 bits)
+ *       - Bits 0-31:  5G-TMSI (32 bits)
+ * @ref 3GPP TS 23.003 */
+uint64_t nr_construct_5g_s_tmsi_part1(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi)
+{
+  // Construct full 5G-S-TMSI and extract Part1: rightmost 39 bits
+  uint64_t full_s_tmsi = nr_construct_5g_s_tmsi(amf_set_id, amf_pointer, m_tmsi);
+  return full_s_tmsi & ((1ULL << 39) - 1);
 }

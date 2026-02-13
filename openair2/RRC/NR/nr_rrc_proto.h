@@ -39,6 +39,7 @@
 #include "NR_CG-ConfigInfo.h"
 #include "NR_RRCReconfiguration.h"
 #include "RRC/NR/MESSAGES/asn1_msg.h"
+#include "f1ap_messages_types.h"
 
 #define SRB1 1
 #define SRB2 2
@@ -117,7 +118,7 @@ byte_array_t rrc_gNB_encode_RRCReconfiguration(gNB_RRC_INST *rrc, gNB_RRC_UE_t *
 nr_rrc_reconfig_param_t get_RRCReconfiguration_params(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, uint8_t srb_reest_bitmap, bool drb_reestablish);
 
 f1ap_qos_flow_param_t get_qos_char_from_qos_flow_param(const pdusession_level_qos_parameter_t *qos_param);
-void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, gNB_RrcConfigurationReq *configuration);
+void openair_rrc_gNB_configuration(gNB_RRC_INST *rrc, nr_rrc_config_t *configuration);
 NR_SRB_ToAddModList_t *createSRBlist(gNB_RRC_UE_t *ue, uint8_t reestablish);
 NR_DRB_ToAddModList_t *createDRBlist(gNB_RRC_UE_t *ue, bool reestablish, bool do_integrity, bool do_ciphering);
 void activate_srb(gNB_RRC_UE_t *UE, int srb_id);
@@ -127,11 +128,11 @@ void init_delayed_action(delayed_action_state_t *delayed_action);
 /** @brief Prepare and send F1AP UE Context Setup Request for a target DU
  * @param rrc RRC instance
  * @param ue UE context
- * @param du Target DU container containing cell and setup information
+ * @param cell Target cell container containing cell information
  * @param ho_prep_info Optional handover preparation information (NULL if not provided) */
 void rrc_f1_ue_context_setup_for_target_du(const gNB_RRC_INST *rrc,
                                            gNB_RRC_UE_t *ue,
-                                           const nr_rrc_du_container_t *du,
+                                           const nr_rrc_cell_container_t *cell,
                                            const byte_array_t *ho_prep_info);
 
 #endif

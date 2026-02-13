@@ -229,7 +229,7 @@ In the `MACRLCs` section of the gNB/DU configuration file:
   (see `ulsch_max_frame_inactivity`) or after scheduling request (SR)
 * `identity_precoding_matrix` (default 0=false): flag to enable to use only
   the identity precoding matrix in DL precoding
-* `set_analog_beamforming` (default 0=false): flag to enable analog
+* `set_analog_beamforming` (default "none"): parameter to enable analog
   beamforming (for more information [`analog_beamforming.md`](../analog_beamforming.md))
 * `beam_duration` (default 1): duration/number of consecutive slots for a given set of
   beams, depending on hardware switching performance

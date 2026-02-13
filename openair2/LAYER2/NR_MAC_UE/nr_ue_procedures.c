@@ -51,9 +51,9 @@
 
 /* utils */
 #include "assertions.h"
+#include "reverse_bits.h"
 #include "oai_asn1.h"
 #include "common/utils/LOG/log.h"
-#include "common/utils/LOG/vcd_signal_dumper.h"
 #include "LAYER2/nr_rlc/nr_rlc_oai_api.h"
 
 // #define DEBUG_MIB
@@ -843,10 +843,23 @@ static int nr_ue_process_dci_dl_10(NR_UE_MAC_INST_t *mac,
   dlsch_pdu->number_symbols = tda_info.nrOfSymbols;
   dlsch_pdu->start_symbol = tda_info.startSymbolIndex;
 
-  struct NR_DMRS_DownlinkConfig *dl_dmrs_config = NULL;
-  if (pdsch_config)
-    dl_dmrs_config = (tda_info.mapping_type == typeA) ? pdsch_config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup
-                                                      : pdsch_config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup;
+  mappingType_t type = tda_info.mapping_type;
+  NR_DMRS_DownlinkConfig_t *dl_dmrs_config = NULL;
+  if (pdsch_config) {
+    if (type == typeA) {
+      if (!pdsch_config->dmrs_DownlinkForPDSCH_MappingTypeA) {
+        LOG_E(MAC, "Invalid PDSCH DMRS configuration, expected typeA but not configured\n");
+        return -1;
+      } else
+        dl_dmrs_config = pdsch_config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup;
+    } else { // typeB
+      if (!pdsch_config->dmrs_DownlinkForPDSCH_MappingTypeB) {
+        LOG_E(MAC, "Invalid PDSCH DMRS configuration, expected typeB but not configured\n");
+        return -1;
+      } else
+        dl_dmrs_config = pdsch_config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup;
+    }
+  }
 
   dlsch_pdu->nscid = 0;
   if (dl_dmrs_config && dl_dmrs_config->scramblingID0)
@@ -1184,9 +1197,23 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
   dlsch_pdu->number_symbols = tda_info.nrOfSymbols;
   dlsch_pdu->start_symbol = tda_info.startSymbolIndex;
 
-  struct NR_DMRS_DownlinkConfig *dl_dmrs_config = (tda_info.mapping_type == typeA)
-                                                      ? pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup
-                                                      : pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup;
+  mappingType_t type = tda_info.mapping_type;
+  NR_DMRS_DownlinkConfig_t *dl_dmrs_config = NULL;
+  if (pdsch_Config) {
+    if (type == typeA) {
+      if (!pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA) {
+        LOG_E(MAC, "Invalid PDSCH DMRS configuration, expected typeA but not configured\n");
+        return -1;
+      } else
+        dl_dmrs_config = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup;
+    } else { // typeB
+      if (!pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB) {
+        LOG_E(MAC, "Invalid PDSCH DMRS configuration, expected typeB but not configured\n");
+        return -1;
+      } else
+        dl_dmrs_config = pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeB->choice.setup;
+    }
+  }
 
   switch (dci->dmrs_sequence_initialization.val) {
     case 0:
@@ -1417,9 +1444,9 @@ static int nr_ue_process_dci_dl_11(NR_UE_MAC_INST_t *mac,
   dlsch_pdu->tbslbrm = nr_compute_tbslbrm(dlsch_pdu->mcs_table, sc_info->dl_bw_tbslbrm, nl_tbslbrm);
   /*PTRS configuration */
   dlsch_pdu->pduBitmap = 0;
-  if (pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS != NULL) {
+  if (dl_dmrs_config->phaseTrackingRS != NULL) {
     bool valid_ptrs_setup =
-        set_dl_ptrs_values(pdsch_Config->dmrs_DownlinkForPDSCH_MappingTypeA->choice.setup->phaseTrackingRS->choice.setup,
+        set_dl_ptrs_values(dl_dmrs_config->phaseTrackingRS->choice.setup,
                            dlsch_pdu->number_rbs,
                            dlsch_pdu->mcs,
                            dlsch_pdu->mcs_table,
@@ -4208,8 +4235,6 @@ int nr_write_ce_ulsch_pdu(uint8_t *mac_ce,
 
 void nr_ue_send_sdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info, int pdu_id)
 {
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SEND_SDU, VCD_FUNCTION_IN);
-
   LOG_D(NR_MAC,
         "In [%d.%d] Handling DLSCH PDU type %d\n",
         dl_info->frame,
@@ -4237,5 +4262,4 @@ void nr_ue_send_sdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *dl_info, in
     default :
       AssertFatal(false, "Invalid DLSCH PDU type\n");
   }
-  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_UE_SEND_SDU, VCD_FUNCTION_OUT);
 }

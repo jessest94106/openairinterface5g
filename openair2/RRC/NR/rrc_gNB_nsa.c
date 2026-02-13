@@ -62,6 +62,7 @@
 #include "openair3/SECU/key_nas_deriver.h"
 #include "openair2/SDAP/nr_sdap/nr_sdap_entity.h"
 #include "rrc_gNB_du.h"
+#include "rrc_cell_management.h"
 #include "rlc.h"
 #include "s1ap_messages_types.h"
 #include "tree.h"
@@ -368,20 +369,37 @@ void rrc_add_nsa_user(gNB_RRC_INST *rrc, x2ap_ENDC_sgnb_addition_req_t *m, sctp_
   *ue_agg_mbr_ul = 1000000000;
   byte_array_t *cg_configinfo = malloc_or_fail(sizeof(*cg_configinfo));
   *cg_configinfo = cgci;
+
+  f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
+  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
+  nr_rrc_du_container_t *du = get_du_by_assoc_id(rrc, ue_data.du_assoc_id);
+  if (!du) {
+    LOG_E(NR_RRC, "UE %d: no valid cell for UE context setup (DU assoc_id %d not found)\n", UE->rrc_ue_id, ue_data.du_assoc_id);
+    return;
+  }
+  // Get the first cell from the DU (NSA assumption: 1 cell per DU)
+  if (seq_arr_size(&du->cells) == 0) {
+    LOG_E(NR_RRC, "UE %d: no cells available in DU (assoc_id %d)\n", UE->rrc_ue_id, ue_data.du_assoc_id);
+    return;
+  }
+  nr_rrc_cell_container_t *ue_cell = *(nr_rrc_cell_container_t **)seq_arr_at(&du->cells, 0);
+  // Add the cell as PCell
+  if (rrc_add_ue_serving_cell(UE, ue_cell, RRC_PCELL_INDEX) == NULL) {
+    LOG_E(NR_RRC, "UE %d: failed to add PCell (cell %ld) for UE context setup\n", UE->rrc_ue_id, ue_cell->info.cell_id);
+    return;
+  }
   f1ap_ue_context_setup_req_t req = {
       .gNB_CU_ue_id = UE->rrc_ue_id,
       .plmn.mcc = rrc->configuration.plmn[0].mcc,
       .plmn.mnc = rrc->configuration.plmn[0].mnc,
       .plmn.mnc_digit_length = rrc->configuration.plmn[0].mnc_digit_length,
-      .nr_cellid = rrc->nr_cellid,
-      .servCellIndex = 0,
+      .nr_cellid = ue_cell->info.cell_id,
+      .servCellIndex = RRC_PCELL_INDEX,
       .drbs_len = 1,
       .drbs = drb,
       .cu_to_du_rrc_info.cg_configinfo = cg_configinfo,
       .gnb_du_ue_agg_mbr_ul = ue_agg_mbr_ul,
   };
-  f1_ue_data_t ue_data = cu_get_f1_ue_data(UE->rrc_ue_id);
-  RETURN_IF_INVALID_ASSOC_ID(ue_data.du_assoc_id);
   rrc->mac_rrc.ue_context_setup_request(ue_data.du_assoc_id, &req);
   free_ue_context_setup_req(&req);
 }

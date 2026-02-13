@@ -192,8 +192,8 @@ static E1AP_SDAP_Configuration_t e1_encode_sdap_config(const bearer_context_sdap
 {
   E1AP_SDAP_Configuration_t out = {0};
   out.defaultDRB = in->defaultDRB ? E1AP_DefaultDRB_true : E1AP_DefaultDRB_false;
-  out.sDAP_Header_UL = in->sDAP_Header_UL;
-  out.sDAP_Header_DL = in->sDAP_Header_DL;
+  out.sDAP_Header_UL = in->sDAP_Header_UL ? E1AP_SDAP_Header_UL_present : E1AP_SDAP_Header_UL_absent;
+  out.sDAP_Header_DL = in->sDAP_Header_DL ? E1AP_SDAP_Header_DL_present : E1AP_SDAP_Header_DL_absent;
   return out;
 }
 
@@ -201,8 +201,8 @@ static E1AP_SDAP_Configuration_t e1_encode_sdap_config(const bearer_context_sdap
 static bool e1_decode_sdap_config(bearer_context_sdap_config_t *out, const E1AP_SDAP_Configuration_t *in)
 {
   out->defaultDRB = in->defaultDRB == E1AP_DefaultDRB_true;
-  out->sDAP_Header_UL = in->sDAP_Header_UL;
-  out->sDAP_Header_DL = in->sDAP_Header_DL;
+  out->sDAP_Header_UL = in->sDAP_Header_UL == E1AP_SDAP_Header_UL_present;
+  out->sDAP_Header_DL = in->sDAP_Header_DL == E1AP_SDAP_Header_DL_present;
   return true;
 }
 
@@ -212,8 +212,8 @@ static bool e1_decode_sdap_config(bearer_context_sdap_config_t *out, const E1AP_
 static bool eq_sdap_config(const bearer_context_sdap_config_t *a, const bearer_context_sdap_config_t *b)
 {
   _E1_EQ_CHECK_LONG(a->defaultDRB, b->defaultDRB);
-  _E1_EQ_CHECK_LONG(a->sDAP_Header_UL, b->sDAP_Header_UL);
-  _E1_EQ_CHECK_LONG(a->sDAP_Header_DL, b->sDAP_Header_DL);
+  _E1_EQ_CHECK_INT(a->sDAP_Header_UL, b->sDAP_Header_UL);
+  _E1_EQ_CHECK_INT(a->sDAP_Header_DL, b->sDAP_Header_DL);
   return true;
 }
 
@@ -1459,10 +1459,18 @@ static E1AP_PDU_Session_Resource_To_Modify_Item_t e1_encode_pdu_session_to_mod_i
       }
     }
     // QoS Flows to setup (O)
-    for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlow2Setup; k++) {
+    for (const qos_flow_to_setup_t *k = j->qosFlows; k < j->qosFlows + j->numQosFlowsMod; k++) {
       asn1cCalloc(drb2Mod->flow_Mapping_Information, flow_Mapping_Information);
       asn1cSequenceAdd(flow_Mapping_Information->list, E1AP_QoS_Flow_QoS_Parameter_Item_t, ie1_2);
       *ie1_2 = e1_encode_qos_flow_to_setup(k);
+    }
+  }
+  // DRB To Remove List (O)
+  if (in->n_drb_to_remove > 0) {
+    asn1cCalloc(out.dRB_To_Remove_List_NG_RAN, drb2Remove_List);
+    for (int r = 0; r < in->n_drb_to_remove; r++) {
+      asn1cSequenceAdd(drb2Remove_List->list, E1AP_DRB_To_Remove_Item_NG_RAN_t, drb2Rem);
+      drb2Rem->dRB_ID = in->drbs_to_remove[r].id;
     }
   }
   return out;
@@ -1740,10 +1748,19 @@ static bool e1_decode_pdu_session_to_mod_item(pdu_session_to_mod_t *out, const E
     // QoS Flows Information To Be Setup (O)
     if (drb2Mod->flow_Mapping_Information) {
       E1AP_QoS_Flow_QoS_Parameter_List_t *qos2SetupList = drb2Mod->flow_Mapping_Information;
-      drb->numQosFlow2Setup = qos2SetupList->list.count;
+      drb->numQosFlowsMod = qos2SetupList->list.count;
       for (int k = 0; k < qos2SetupList->list.count; k++) {
         CHECK_E1AP_DEC(e1_decode_qos_flow_to_setup(drb->qosFlows + k, qos2SetupList->list.array[k]));
       }
+    }
+  }
+  // DRB To Remove List (O)
+  if (in->dRB_To_Remove_List_NG_RAN) {
+    E1AP_DRB_To_Remove_List_NG_RAN_t *rm = in->dRB_To_Remove_List_NG_RAN;
+    out->n_drb_to_remove = rm->list.count;
+    for (int r = 0; r < rm->list.count; r++) {
+      E1AP_DRB_To_Remove_Item_NG_RAN_t *item = rm->list.array[r];
+      out->drbs_to_remove[r].id = item->dRB_ID;
     }
   }
   return true;
@@ -1931,6 +1948,9 @@ static pdu_session_to_mod_t cp_pdu_session_to_mod_item(const pdu_session_to_mod_
   // DRB to modify list
   for (int j = 0; j < msg->numDRB2Modify; j++)
     cp.DRBnGRanModList[j] = cp_drb_to_mod_item(&msg->DRBnGRanModList[j]);
+  // DRB to remove list
+  for (int r = 0; r < msg->n_drb_to_remove; r++)
+    cp.drbs_to_remove[r] = msg->drbs_to_remove[r];
   _E1_CP_OPTIONAL_IE(&cp, msg, securityIndication);
   _E1_CP_OPTIONAL_IE(&cp, msg, UP_TL_information);
   return cp;
@@ -1972,8 +1992,8 @@ static bool eq_security_ind(security_indication_t *a, security_indication_t *b)
 static bool eq_drb_to_mod(const DRB_nGRAN_to_mod_t *a, const DRB_nGRAN_to_mod_t *b)
 {
   _E1_EQ_CHECK_LONG(a->id, b->id);
-  _E1_EQ_CHECK_INT(a->numQosFlow2Setup, b->numQosFlow2Setup);
-  for (int i = 0; i < a->numQosFlow2Setup; i++) {
+  _E1_EQ_CHECK_INT(a->numQosFlowsMod, b->numQosFlowsMod);
+  for (int i = 0; i < a->numQosFlowsMod; i++) {
     if (!eq_qos_flow(&a->qosFlows[i], &b->qosFlows[i]))
       return false;
   }
@@ -2021,6 +2041,10 @@ static bool eq_pdu_session_to_mod_item(const pdu_session_to_mod_t *a, const pdu_
       return false;
   }
   _E1_EQ_CHECK_OPTIONAL_PTR(a, b, securityIndication);
+  _E1_EQ_CHECK_INT(a->n_drb_to_remove, b->n_drb_to_remove);
+  for (int r = 0; r < a->n_drb_to_remove; r++) {
+    _E1_EQ_CHECK_LONG(a->drbs_to_remove[r].id, b->drbs_to_remove[r].id);
+  }
   if (a->securityIndication && b->securityIndication) {
     if (!eq_security_ind(a->securityIndication, b->securityIndication))
       return false;

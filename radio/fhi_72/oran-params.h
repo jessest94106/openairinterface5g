@@ -32,7 +32,7 @@
 #define ORAN_CONFIG_IO_CORE "io_core"
 #define ORAN_CONFIG_WORKER_CORES "worker_cores"
 #define ORAN_CONFIG_DU_KEYPAIR "du_key_pair" // only needed for M-plane
-#define ORAN_CONFIG_DU_ADDR "du_addr" // only needed for M-plane
+#define ORAN_CONFIG_DU_ADDR "du_addr" // needed for M-plane or O-RU
 #define ORAN_CONFIG_VLAN_TAG "vlan_tag" // only needed for M-plane
 #define ORAN_CONFIG_RU_ADDR "ru_addr" // not needed if M-plane used
 #define ORAN_CONFIG_RU_USERNAME "ru_username" // only needed for M-plane
@@ -44,6 +44,14 @@
 #define ORAN_CONFIG_DPDK_MEM_SIZE "dpdk_mem_size"
 #define ORAN_CONFIG_DPDK_IOVA_MODE "dpdk_iova_mode"
 #define ORAN_CONFIG_ECPRI_OWDM "owdm_enable"
+#define ORAN_CONFIG_APP_ID "app_id"
+
+#define APP_ID_O_DU "DU"
+#define APP_ID_O_RU "RU"
+
+// Provide a definition since xran is missing one
+#define XRAN_APP_ID_O_DU 0
+#define XRAN_APP_ID_O_RU 1
 
 // clang-format off
 // TODO: PCI addr check
@@ -66,6 +74,7 @@
   {ORAN_CONFIG_DPDK_MEM_SIZE,   "DPDK huge page pre-allocation in MiB\n",   0,                   .uptr=NULL,       .defuintval=8192,    TYPE_UINT,       0}, \
   {ORAN_CONFIG_DPDK_IOVA_MODE,  "DPDK IOVA mode\n",                         0,                   .strptr=NULL,     .defstrval="PA",     TYPE_STRING,     0}, \
   {ORAN_CONFIG_ECPRI_OWDM,      "eCPRI One-Way Delay Measurements\n",       PARAMFLAG_BOOL,      .uptr=NULL,       .defuintval=0,       TYPE_UINT,       0}, \
+  {ORAN_CONFIG_APP_ID,          "Either DU or RU",                          0,                   .strptr=NULL,     .defstrval=APP_ID_O_DU, TYPE_STRING,  0}  \
 }
 
 // clang-format off
@@ -88,6 +97,8 @@
     { .s3a = { config_checkstr_assign_integer,   \
 	       {"PA", "VA"}, {0, 1}, 2} },           \
     { .s5 = { NULL } },                          \
+    { .s3a = { config_checkstr_assign_integer,   \
+	       {APP_ID_O_DU, APP_ID_O_RU}, {XRAN_APP_ID_O_DU, XRAN_APP_ID_O_RU}, 2} },             \
 }
 
 

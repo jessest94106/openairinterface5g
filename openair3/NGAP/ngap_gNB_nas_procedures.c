@@ -1084,7 +1084,7 @@ int ngap_gNB_pdusession_modify_resp(instance_t instance, ngap_pdusession_modify_
     ie->id = NGAP_ProtocolIE_ID_id_AMF_UE_NGAP_ID;
     ie->criticality = NGAP_Criticality_ignore;
     ie->value.present = NGAP_PDUSessionResourceModifyResponseIEs__value_PR_AMF_UE_NGAP_ID;
-    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, ue_context_p->amf_ue_ngap_id);
+    asn_uint642INTEGER(&ie->value.choice.AMF_UE_NGAP_ID, pdusession_modify_resp_p->amf_ue_ngap_id);
     asn1cSeqAdd(&out->protocolIEs.list, ie);
   }
   /* mandatory */
@@ -1115,12 +1115,11 @@ int ngap_gNB_pdusession_modify_resp(instance_t instance, ngap_pdusession_modify_
         qos->qosFlowIdentifier = pdusession_modify_resp_p->pdusessions[i].qos[qos_flow_index].qfi;
       }
       asn_encode_to_new_buffer_result_t res = {0};
-      NGAP_PDUSessionResourceModifyResponseTransfer_t *transfer_p = NULL;
-      res = asn_encode_to_new_buffer(NULL, ATS_ALIGNED_CANONICAL_PER, &asn_DEF_NGAP_PDUSessionResourceModifyResponseTransfer, transfer_p);
+      res = asn_encode_to_new_buffer(NULL, ATS_ALIGNED_CANONICAL_PER, &asn_DEF_NGAP_PDUSessionResourceModifyResponseTransfer, &transfer);
       item->pDUSessionResourceModifyResponseTransfer.buf = res.buffer;
       item->pDUSessionResourceModifyResponseTransfer.size = res.result.encoded;
 
-      ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_PDUSessionResourceModifyResponseTransfer, transfer_p);
+      ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_PDUSessionResourceModifyResponseTransfer, &transfer);
 
       NGAP_DEBUG("pdusession_modify_resp: modified pdusession ID %ld\n", item->pDUSessionID);
     }
@@ -1143,12 +1142,11 @@ int ngap_gNB_pdusession_modify_resp(instance_t instance, ngap_pdusession_modify_
       encode_ngap_cause(&pdusessionTransfer.cause, &pdusession_modify_resp_p->pdusessions_failed[i].cause);
 
       asn_encode_to_new_buffer_result_t res = {0};
-      NGAP_PDUSessionResourceModifyUnsuccessfulTransfer_t *pdusessionTransfer_p = NULL;
       res = asn_encode_to_new_buffer(NULL, ATS_ALIGNED_CANONICAL_PER, &asn_DEF_NGAP_PDUSessionResourceModifyUnsuccessfulTransfer, &pdusessionTransfer);
       item->pDUSessionResourceModifyUnsuccessfulTransfer.buf = res.buffer;
       item->pDUSessionResourceModifyUnsuccessfulTransfer.size = res.result.encoded;
 
-      ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_PDUSessionResourceModifyUnsuccessfulTransfer, pdusessionTransfer_p);
+      ASN_STRUCT_FREE_CONTENTS_ONLY(asn_DEF_NGAP_PDUSessionResourceModifyUnsuccessfulTransfer, &pdusessionTransfer);
 
       NGAP_INFO("pdusession_modify_resp: failed pdusession ID %ld\n", item->pDUSessionID);
     }

@@ -40,7 +40,6 @@
 #include "assertions.h"
 #include "common/utils/load_module_shlib.h"
 #include "common/utils/LOG/log.h"
-//#include "targets/RT/USER/lte-softmodem.h"
 #include "executables/softmodem-common.h"
 
 #define MAX_GAP 100ULL
