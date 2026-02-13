@@ -1490,6 +1490,26 @@ static const nr_rrc_cell_container_t *get_previous_cell_by_pci_in_du(gNB_RRC_INS
   return rrc_get_cell_by_pci_for_du(&du->cells, pci);
 }
 
+/** @brief Update UE's PCell in serving_cells array
+ * @param[in] UE UE context
+ * @param[in] cell Cell container to set as PCell
+ * @return Pointer to added serving cell entry, or NULL on failure
+ * @note If UE already has a PCell, removes all serving cells from the old PCell's DU first */
+static ue_serving_cell_t *rrc_update_ue_pcell(gNB_RRC_UE_t *UE, const nr_rrc_cell_container_t *cell)
+{
+  DevAssert(UE != NULL);
+  DevAssert(cell != NULL);
+
+  // If UE already has a PCell, remove all serving cells from that DU first
+  const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
+  if (existing_pcell != NULL) {
+    rrc_remove_ue_scells_from_du(UE, existing_pcell->assoc_id);
+  }
+
+  // Add the new PCell
+  return rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+}
+
 static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
                                                  sctp_assoc_t assoc_id,
                                                  const NR_RRCReestablishmentRequest_IEs_t *req,
@@ -1501,6 +1521,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   long ngap_cause = NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED; /* cause in case of NGAP release req */
   const rnti_t old_rnti = req->ue_Identity.c_RNTI;
   rrc_gNB_ue_context_t *ue_context_p = NULL;
+  ue_serving_cell_t *added = NULL;
   LOG_I(NR_RRC,
         "Reestablishment RNTI %04x req C-RNTI %04x physCellId %ld cause %s\n",
         msg->crnti,
@@ -1514,12 +1535,6 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     return;
   }
 
-  // Validate C-RNTI range (3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1)
-  if (old_rnti < 0x1 || old_rnti > 0xffef) {
-    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04x range error, fallback to RRC setup\n", old_rnti);
-    goto fallback_rrc_setup;
-  }
-
   // Fetch current cell: where the reestablishment request was received
   nr_rrc_cell_container_t *current_cell = get_cell_by_cell_id(&rrc->cells, msg->nr_cellid);
   if (current_cell == NULL || current_cell->assoc_id != du->assoc_id) {
@@ -1528,6 +1543,12 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
           msg->nr_cellid,
           assoc_id);
     return;
+  }
+
+  // Validate C-RNTI range (3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1)
+  if (old_rnti < 0x1 || old_rnti > 0xffef) {
+    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04x range error, fallback to RRC setup\n", old_rnti);
+    goto fallback_rrc_setup;
   }
 
   if (current_cell->mtc == NULL) {
@@ -1660,14 +1681,10 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
 
   /* Update PCell in serving_cells array */
   DevAssert(cell->info.cell_id == msg->nr_cellid);
-  // Reset the serving set to the new PCell, remove all serving cells from the current PCell's DU.
-  const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
-  DevAssert(existing_pcell != NULL);
-  rrc_remove_ue_scells_from_du(UE, existing_pcell->assoc_id);
-  ue_serving_cell_t *added = rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+  added = rrc_update_ue_pcell(UE, cell);
   if (added == NULL) {
-    LOG_E(NR_RRC, "Reestablishment: failed to add PCell (cell %ld), rejecting reestablishment\n", cell->info.cell_id);
-    goto fallback_rrc_setup;
+    LOG_E(NR_RRC, "Reestablishment: failed to add PCell (cell %ld)\n", cell->info.cell_id);
+    return;
   }
 
   ue_data.secondary_ue = msg->gNB_DU_ue_id;
@@ -1688,6 +1705,8 @@ fallback_rrc_setup:
 
   rrc_gNB_ue_context_t *new = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
   activate_srb(&new->ue_context, 1);
+  added = rrc_update_ue_pcell(&new->ue_context, current_cell);
+  DevAssert(added);
   rrc_gNB_generate_RRCSetup(0, msg->crnti, new, msg->du2cu_rrc_container, msg->du2cu_rrc_container_length);
   return;
 }
