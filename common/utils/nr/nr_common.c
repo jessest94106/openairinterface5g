@@ -152,6 +152,32 @@ int get_smallest_supported_bandwidth_index(int scs, frequency_range_t frequency_
   return -1; // not found
 }
 
+// Table 5.4.3.3-1 38-101
+uint8_t set_ssb_case(int scs, int nr_band)
+{
+  uint8_t ssb_case = 0;
+  switch (scs) {
+    case 0:
+      ssb_case = 0; // case A
+      break;
+    case 1:
+      if (nr_band == 5 || nr_band == 24 || nr_band == 66 || nr_band == 255)
+        ssb_case = 1; // case B
+      else
+        ssb_case = 2; // case C
+      break;
+    case 3:
+      ssb_case = 3; // case D
+      break;
+    case 4:
+      ssb_case = 4; // case E
+      break;
+    default:
+      AssertFatal(false, "Invalid sub-carrier spacing for SSB\n");
+  }
+  return ssb_case;
+}
+
 // Table 5.2-1 NR operating bands in FR1 & FR2 (3GPP TS 38.101) (Rel.17)
 // Table 5.4.2.3-1 Applicable NR-ARFCN per operating band in FR1 & FR2 (3GPP TS 38.101)
 // Notes:

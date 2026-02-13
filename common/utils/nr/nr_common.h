@@ -288,7 +288,7 @@ static inline void warn_higher_threequarter_fs(const int n_rb, const int mu)
 
 uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t dl_nrarfcn);
 uint32_t to_nrarfcn(uint64_t dl_CarrierFreq);
-
+uint8_t set_ssb_case(int scs, int nr_band);
 int cce_to_reg_interleaving(const int R, int k, int n_shift, const int C, int L, const int N_regs);
 int get_SLIV(uint8_t S, uint8_t L);
 void get_coreset_rballoc(const uint8_t *FreqDomainResource, int *n_rb, int *rb_offset);

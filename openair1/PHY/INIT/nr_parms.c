@@ -29,73 +29,6 @@
 static const uint32_t nr_subcarrier_spacing[MAX_NUM_SUBCARRIER_SPACING] = {15e3, 30e3, 60e3, 120e3, 240e3};
 static const uint16_t nr_slots_per_subframe[MAX_NUM_SUBCARRIER_SPACING] = {1, 2, 4, 8, 16};
 
-// Table 5.4.3.3-1 38-101
-static const int nr_ssb_table[][3] = {
-    {1, 15, nr_ssb_type_A},
-    {2, 15, nr_ssb_type_A},
-    {3, 15, nr_ssb_type_A},
-    {5, 15, nr_ssb_type_A},
-    {5, 30, nr_ssb_type_B},
-    {7, 15, nr_ssb_type_A},
-    {8, 15, nr_ssb_type_A},
-    {12, 15, nr_ssb_type_A},
-    {13, 15, nr_ssb_type_A},
-    {14, 15, nr_ssb_type_A},
-    {18, 15, nr_ssb_type_A},
-    {20, 15, nr_ssb_type_A},
-    {24, 15, nr_ssb_type_A},
-    {24, 30, nr_ssb_type_B},
-    {25, 15, nr_ssb_type_A},
-    {26, 15, nr_ssb_type_A},
-    {28, 15, nr_ssb_type_A},
-    {29, 15, nr_ssb_type_A},
-    {30, 15, nr_ssb_type_A},
-    {34, 15, nr_ssb_type_A},
-    {34, 30, nr_ssb_type_C},
-    {38, 15, nr_ssb_type_A},
-    {38, 30, nr_ssb_type_C},
-    {39, 15, nr_ssb_type_A},
-    {39, 30, nr_ssb_type_C},
-    {40, 30, nr_ssb_type_C},
-    {41, 15, nr_ssb_type_A},
-    {41, 30, nr_ssb_type_C},
-    {46, 30, nr_ssb_type_C},
-    {48, 30, nr_ssb_type_C},
-    {50, 30, nr_ssb_type_C},
-    {51, 15, nr_ssb_type_A},
-    {53, 15, nr_ssb_type_A},
-    {53, 30, nr_ssb_type_C},
-    {65, 15, nr_ssb_type_A},
-    {66, 15, nr_ssb_type_A},
-    {66, 30, nr_ssb_type_B},
-    {67, 15, nr_ssb_type_A},
-    {70, 15, nr_ssb_type_A},
-    {71, 15, nr_ssb_type_A},
-    {74, 15, nr_ssb_type_A},
-    {75, 15, nr_ssb_type_A},
-    {76, 15, nr_ssb_type_A},
-    {77, 30, nr_ssb_type_C},
-    {78, 30, nr_ssb_type_C},
-    {79, 30, nr_ssb_type_C},
-    {85, 15, nr_ssb_type_A},
-    {90, 15, nr_ssb_type_A},
-    {90, 30, nr_ssb_type_C},
-    {91, 15, nr_ssb_type_A},
-    {92, 15, nr_ssb_type_A},
-    {93, 15, nr_ssb_type_A},
-    {94, 15, nr_ssb_type_A},
-    {96, 30, nr_ssb_type_C},
-    {100, 15, nr_ssb_type_A},
-    {101, 15, nr_ssb_type_A},
-    {101, 30, nr_ssb_type_C},
-    {102, 30, nr_ssb_type_C},
-    {104, 30, nr_ssb_type_C},
-    {254, 15, nr_ssb_type_A},
-    {254, 30, nr_ssb_type_C},
-    {255, 15, nr_ssb_type_A},
-    {255, 30, nr_ssb_type_B},
-    {256, 15, nr_ssb_type_A}};
-
 void set_Lmax(NR_DL_FRAME_PARMS *fp) {
   // definition of Lmax according to ts 38.213 section 4.1
   if (fp->dl_CarrierFreq < 6e9) {
@@ -150,55 +83,34 @@ int nr_get_ssb_start_symbol(const NR_DL_FRAME_PARMS *fp, uint8_t i_ssb)
   return symbol;
 }
 
-void set_scs_parameters (NR_DL_FRAME_PARMS *fp, int mu, int N_RB_DL)
+static void set_scs_parameters(NR_DL_FRAME_PARMS *fp, int mu, int N_RB_DL, int ssb_case)
 {
-  int idx = 0;
   switch(mu) {
     case NR_MU_0: //15kHz scs
       fp->subcarrier_spacing = nr_subcarrier_spacing[NR_MU_0];
       fp->slots_per_subframe = nr_slots_per_subframe[NR_MU_0];
-      fp->ssb_type = nr_ssb_type_A;
-      while (nr_ssb_table[idx][0] != fp->nr_band)
-        idx++;
-      AssertFatal(nr_ssb_table[idx][1] == 15,"SCS %d not applicable to band %d\n",
-                  fp->subcarrier_spacing,fp->nr_band);
       break;
-
     case NR_MU_1: //30kHz scs
       fp->subcarrier_spacing = nr_subcarrier_spacing[NR_MU_1];
       fp->slots_per_subframe = nr_slots_per_subframe[NR_MU_1];
-      while(nr_ssb_table[idx][0] != fp->nr_band ||
-            nr_ssb_table[idx][1] != 30) {
-        AssertFatal(nr_ssb_table[idx][0] <= fp->nr_band,
-                    "SCS %d not applicable to band %d\n",
-                    fp->subcarrier_spacing,
-                    fp->nr_band);
-        idx++;
-      }
-      fp->ssb_type = nr_ssb_table[idx][2];
       break;
-
     case NR_MU_2: //60kHz scs
       fp->subcarrier_spacing = nr_subcarrier_spacing[NR_MU_2];
       fp->slots_per_subframe = nr_slots_per_subframe[NR_MU_2];
       break;
-
     case NR_MU_3:
       fp->subcarrier_spacing = nr_subcarrier_spacing[NR_MU_3];
       fp->slots_per_subframe = nr_slots_per_subframe[NR_MU_3];
-      fp->ssb_type = nr_ssb_type_D;
       break;
-
     case NR_MU_4:
       fp->subcarrier_spacing = nr_subcarrier_spacing[NR_MU_4];
       fp->slots_per_subframe = nr_slots_per_subframe[NR_MU_4];
-      fp->ssb_type = nr_ssb_type_E;
       break;
-
     default:
-      AssertFatal(1==0,"Invalid numerology index %d", mu);
+      AssertFatal(false, "Invalid numerology index %d", mu);
   }
 
+  fp->ssb_type = ssb_case;
   // Start with FFT size 512
   fp->ofdm_symbol_size = 512;
 
@@ -231,7 +143,7 @@ void set_scs_parameters (NR_DL_FRAME_PARMS *fp, int mu, int N_RB_DL)
         fp->ofdm_symbol_size);
 }
 
-void sl_set_scs_parameters (NR_DL_FRAME_PARMS *fp, int mu, int N_RB_SL)
+void sl_set_scs_parameters(NR_DL_FRAME_PARMS *fp, int mu, int N_RB_SL)
 {
 
   AssertFatal(mu >= NR_MU_0 && mu <= NR_MU_4,"Invalid numerology index %d", mu);
@@ -402,7 +314,7 @@ void nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg, NR_DL_FRAME_PARMS *
   fp->half_frame_bit = 0;  // half frame bit initialized to 0 here
   fp->numerology_index = mu;
 
-  set_scs_parameters(fp, mu, fp->N_RB_DL);
+  set_scs_parameters(fp, mu, fp->N_RB_DL, cfg->ssb_table.case_v3.value);
 
   fp->slots_per_frame = 10* fp->slots_per_subframe;
 
@@ -435,9 +347,7 @@ void nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg, NR_DL_FRAME_PARMS *
   fp->print_ue_help_cmdline_log = true;
 }
 
-int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
-                           fapi_nr_config_request_t* config,
-                           uint16_t nr_band)
+int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp, fapi_nr_config_request_t* config, uint16_t nr_band)
 {
 
   uint8_t nb_ant_ports_gNB  = 1;
@@ -488,7 +398,7 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp,
 
   fp->Ncp = Ncp;
   int N_RB = fp->N_RB_DL;
-  set_scs_parameters(fp, fp->numerology_index, N_RB);
+  set_scs_parameters(fp, fp->numerology_index, N_RB, config->ssb_table.ssb_case);
 
   fp->slots_per_frame = 10* fp->slots_per_subframe;
   fp->symbols_per_slot = ((Ncp == NORMAL)? 14 : 12); // to redefine for different slot formats
@@ -553,7 +463,7 @@ void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, const nrUE_cell_p
   frame_parms->frame_type = get_frame_type(frame_parms->nr_band, frame_parms->numerology_index);
 
   frame_parms->Ncp = NORMAL;
-  set_scs_parameters(frame_parms, frame_parms->numerology_index, frame_parms->N_RB_DL);
+  set_scs_parameters(frame_parms, frame_parms->numerology_index, frame_parms->N_RB_DL, set_ssb_case(mu, nr_band));
   set_Lmax(frame_parms);
 
   frame_parms->slots_per_frame = 10* frame_parms->slots_per_subframe;
