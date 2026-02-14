@@ -18,6 +18,7 @@ void usage(void)
 "                              (you can use several -f options)\n"
 "    -after <raw time> <nsec>  'event' time has to be greater than this\n"
 "    -count <n>                dump 'n' matching events (less if EOF reached)\n"
+"                              (default: no limit)\n"
   );
   exit(1);
 }
@@ -53,7 +54,7 @@ int main(int n, char **v)
   int filter_count = 0;
   int buffer_arg;
   int found;
-  int count = 1;
+  int count = -1;
   int check_time = 0;
   time_t sec = 0;  /* initialization not necessary but gcc is not happy */
   long nsec = 0;   /* initialization not necessary but gcc is not happy */
@@ -132,12 +133,12 @@ int main(int n, char **v)
     if (fwrite(e.e[buffer_arg].b, e.e[buffer_arg].bsize, 1, out) != 1)
       { perror(output_file); exit(1); }
     found++;
-    if (found == count)
+    if (count != -1 && found == count)
       break;
   }
 
   if (found == 0) printf("ERROR: event not found\n");
-  if (found != count)
+  if (count != -1 && found != count)
     printf("WARNING: dumped %d events (wanted %d)\n", found, count);
 
   fclose(out);
