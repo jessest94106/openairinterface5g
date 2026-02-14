@@ -313,31 +313,32 @@ void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
   gNB_config->carrier_config.num_tx_ant.value           = fp->nb_antennas_tx;
   gNB_config->carrier_config.num_rx_ant.value           = fp->nb_antennas_rx;
 
+  int nr_band = 78;
   switch (mu) {
     case 0:
       gNB->gNB_config.tdd_table.tdd_period.value = 7;
       fp->dl_CarrierFreq = 2600000000;
       fp->ul_CarrierFreq = 2600000000;
-      fp->nr_band = 38;
+      nr_band = 38;
       break;
     case 1:
       gNB->gNB_config.tdd_table.tdd_period.value = 6;
       fp->dl_CarrierFreq = 3600000000;
       fp->ul_CarrierFreq = 3600000000;
-      fp->nr_band = 78;
+      nr_band = 78;
       break;
     case 3:
       gNB->gNB_config.tdd_table.tdd_period.value = 3;
       fp->dl_CarrierFreq = 27524520000;
       fp->ul_CarrierFreq = 27524520000;
-      fp->nr_band = 261;
+      nr_band = 261;
       break;
     default:
       printf("unsupported numerology %d\n", mu);
       exit(-1);
   }
 
-  frequency_range_t frequency_range = get_freq_range_from_band(fp->nr_band);
+  frequency_range_t frequency_range = get_freq_range_from_band(nr_band);
   int bw_index = get_supported_band_index(mu, frequency_range, N_RB_DL);
   gNB_config->carrier_config.dl_bandwidth.value = get_supported_bw_mhz(frequency_range, bw_index);
 

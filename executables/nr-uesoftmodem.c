@@ -385,7 +385,7 @@ int main(int argc, char **argv)
         fapi_nr_config_request_t *nrUE_config = &UE_CC->nrUE_config;
         nr_init_frame_parms_ue(fp, nrUE_config, mac->nr_band);
 
-        cell.band = fp->nr_band;
+        cell.band = mac->nr_band;
         cell.rf_frequency = fp->dl_CarrierFreq;
         cell.rf_freq_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
         cell.numerology = fp->numerology_index;
