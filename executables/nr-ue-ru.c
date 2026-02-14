@@ -110,6 +110,12 @@ int nrue_get_cell_count(void)
   return nrue_cell_count;
 }
 
+int nrue_get_band(const PHY_VARS_NR_UE *UE)
+{
+  int cell_id = nrue_rus[UE->rf_map.card].used_by_cell;
+  return nrue_cells[cell_id].band;
+}
+
 const nrUE_cell_params_t *nrue_get_cell(int cell_id)
 {
   AssertFatal(cell_id >= 0 && cell_id < nrue_cell_count, "Invalid cell ID %d! Cell count = %d\n", cell_id, nrue_cell_count);

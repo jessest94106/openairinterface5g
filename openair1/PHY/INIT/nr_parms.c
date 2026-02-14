@@ -364,7 +364,6 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp, fapi_nr_config_request_t* conf
   fp->nb_antenna_ports_gNB = nb_ant_ports_gNB;
   fp->tdd_config           = tdd_cfg;
   fp->Nid_cell             = Nid_cell;
-  fp->nr_band              = nr_band;
 
   LOG_I(PHY, "Initializing frame parms: set nb_antenna_ports_gNB %d, tdd_config, %d, Nid_cell %d\n", fp->nb_antenna_ports_gNB, fp->tdd_config, fp->Nid_cell);
 
@@ -382,13 +381,21 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp, fapi_nr_config_request_t* conf
   fp->N_RB_DL = config->carrier_config.dl_grid_size[fp->numerology_index];
   fp->N_RB_SL = config->carrier_config.sl_grid_size[fp->numerology_index];
 
-  fp->frame_type = get_frame_type(fp->nr_band, fp->numerology_index);
+  fp->frame_type = get_frame_type(nr_band, fp->numerology_index);
   int64_t uplink_frequency_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
   uplink_frequency_offset *= 1000;
 
-  LOG_I(PHY, "Initializing frame parms: DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %ld Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, uplink_frequency_offset);
+  LOG_I(PHY,
+        "Initializing frame parms: DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %ld Hz\n",
+        fp->dl_CarrierFreq,
+        fp->ul_CarrierFreq,
+        nr_band,
+        uplink_frequency_offset);
 
-  AssertFatal(fp->frame_type==config->cell_config.frame_duplex_type, "Invalid duplex type (frame_type %d,cell_config.frame_duplex_type %d) in config request file for band %d\n", fp->frame_type,config->cell_config.frame_duplex_type,fp->nr_band);
+  AssertFatal(fp->frame_type == config->cell_config.frame_duplex_type,
+              "Invalid duplex type (frame_type %d,cell_config.frame_duplex_type %d) in config request file for band %d\n",
+              fp->frame_type,config->cell_config.frame_duplex_type,
+              nr_band);
 
   LOG_I(PHY,"Initializing frame parms for mu %d, N_RB %d, Ncp %d\n",fp->numerology_index, fp->N_RB_DL, Ncp);
 
@@ -459,8 +466,7 @@ void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, const nrUE_cell_p
   frame_parms->N_RB_DL = N_RB_DL;
   frame_parms->N_RB_UL = frame_parms->N_RB_DL;
 
-  frame_parms->nr_band = nr_band;
-  frame_parms->frame_type = get_frame_type(frame_parms->nr_band, frame_parms->numerology_index);
+  frame_parms->frame_type = get_frame_type(nr_band, frame_parms->numerology_index);
 
   frame_parms->Ncp = NORMAL;
   set_scs_parameters(frame_parms, frame_parms->numerology_index, frame_parms->N_RB_DL, set_ssb_case(mu, nr_band));
@@ -506,7 +512,6 @@ void nr_dump_frame_parms(NR_DL_FRAME_PARMS *fp)
   LOG_I(PHY, "fp->Ncp=%d\n", fp->Ncp);
   LOG_I(PHY, "fp->N_RB_DL=%d\n", fp->N_RB_DL);
   LOG_I(PHY, "fp->numerology_index=%d\n", fp->numerology_index);
-  LOG_I(PHY, "fp->nr_band=%d\n", fp->nr_band);
   LOG_I(PHY, "fp->ofdm_offset_divisor=%d\n", fp->ofdm_offset_divisor);
   LOG_I(PHY, "fp->threequarter_fs=%d\n", fp->threequarter_fs);
   LOG_I(PHY, "fp->sl_CarrierFreq=%lu\n", fp->sl_CarrierFreq);
@@ -522,8 +527,6 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
   fp->ofdm_offset_divisor = ofdm_offset_divisor;
   fp->threequarter_fs = threequarter_fs;
 
-  fp->nr_band = get_band(config->sl_carrier_config.sl_frequency, 0, 0, 0);
-
   fp->att_rx = 0;
   fp->att_tx = 0;
   fp->nb_antennas_rx = config->sl_carrier_config.sl_num_rx_ant;
@@ -535,7 +538,7 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
   fp->N_RB_UL = fp->N_RB_SL;
   fp->Ncp = config->sl_bwp_config.sl_cyclic_prefix;
 
-  fp->frame_type = get_frame_type(fp->nr_band, fp->numerology_index);
+  fp->frame_type = get_frame_type(config->sl_carrier_config.band, fp->numerology_index);
 
   uint64_t bw_khz = (12 * config->sl_carrier_config.sl_grid_size) * (15 << config->sl_bwp_config.sl_scs);
   // REfer to section 3GPP spec 38.101 5.4E.2.1
@@ -555,7 +558,7 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
         fp->dl_CarrierFreq,
         fp->ul_CarrierFreq,
         fp->sl_CarrierFreq,
-        fp->nr_band);
+        config->sl_carrier_config.band);
 
   AssertFatal(fp->frame_type == TDD, "Sidelink bands only support TDD");
 
