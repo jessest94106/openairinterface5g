@@ -101,7 +101,6 @@ TEST(nr_frame_params, test_mu_3)
   cfg.cell_config.frame_duplex_type.value = TDD;
   cfg.ssb_config.scs_common.value = mu;
   fp.dl_CarrierFreq = 27524520000;
-  fp.nr_band = 261;
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
@@ -121,7 +120,6 @@ TEST(nr_frame_params, test_mu_2)
   cfg.cell_config.frame_duplex_type.value = TDD;
   cfg.ssb_config.scs_common.value = mu;
   fp.dl_CarrierFreq = 27524520000;
-  fp.nr_band = 261;
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
@@ -141,7 +139,6 @@ TEST(nr_frame_params, test_mu_1)
   cfg.cell_config.frame_duplex_type.value = TDD;
   cfg.ssb_config.scs_common.value = mu;
   fp.dl_CarrierFreq = 3600000000;
-  fp.nr_band = 78;
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);
@@ -161,7 +158,6 @@ TEST(nr_frame_params, test_mu_0)
   cfg.cell_config.frame_duplex_type.value = TDD;
   cfg.ssb_config.scs_common.value = mu;
   fp.dl_CarrierFreq = 2600000000;
-  fp.nr_band = 38;
   nr_init_frame_parms(&cfg, &fp);
   nr_dump_frame_parms(&fp);
   test_coherence_symbol_api(&fp);

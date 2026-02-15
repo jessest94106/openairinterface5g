@@ -173,8 +173,6 @@ struct NR_DL_FRAME_PARMS {
   uint8_t N_RBG;
   /// Total Number of Resource Block Groups SubSets: this is P
   uint8_t N_RBGS;
-  /// NR Band
-  uint16_t nr_band;
   /// DL carrier frequency
   uint64_t dl_CarrierFreq;
   /// UL carrier frequency
