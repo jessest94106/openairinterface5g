@@ -877,11 +877,13 @@ int main(int argc, char **argv)
                                 0,
                                 0);
 
-                                  float *h_channel_coeffs = NULL;
+#ifdef ENABLE_CUDA
+  float *h_channel_coeffs = NULL;
   if (use_cuda) {
     int num_links = n_tx * n_rx;
     h_channel_coeffs = (float *)malloc(num_links * gNB2UE->channel_length * sizeof(float) * 2);
   }
+#endif
   if (gNB2UE==NULL) {
     printf("Problem generating channel model. Exiting.\n");
     exit(-1);
