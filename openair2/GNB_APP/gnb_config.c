@@ -79,7 +79,7 @@
 #include "uper_encoder.h"
 #include "utils.h"
 #include "x2ap_messages_types.h"
-
+#include "gnb_config_common.h"
 
 static int DEFBANDS[] = {7};
 static int DEFENBS[] = {0};
@@ -95,45 +95,6 @@ static int DEFRUTPCORES[] = {-1,-1,-1,-1};
     (element)->present = NR_SetupRelease_##type##_PR_setup;                  \
     (element)->choice.setup = CALLOC(1, sizeof(*((element)->choice.setup))); \
   } while (0)
-
-static uint16_t set_snssai_config(nssai_t *nssai, const int max_num_ssi, uint8_t k, uint8_t l)
-{
-  char snssaistr[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(snssaistr, sizeof(snssaistr), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, k, GNB_CONFIG_STRING_PLMN_LIST, l);
-  GET_PARAMS_LIST(SNSSAIParamList,
-                  SNSSAIParams,
-                  GNBSNSSAIPARAMS_DESC,
-                  GNB_CONFIG_STRING_SNSSAI_LIST,
-                  snssaistr,
-                  SNSSAIPARAMS_CHECK);
-  uint16_t num_ssi = SNSSAIParamList.numelt;
-  AssertFatal(num_ssi < max_num_ssi, "S-NSSAI size %d exceeds the max array size %d", num_ssi, max_num_ssi);
-  for (int s = 0; s < num_ssi; ++s) {
-    nssai[s].sst = *SNSSAIParamList.paramarray[s][GNB_SLICE_SERVICE_TYPE_IDX].uptr;
-    // SD is optional
-    // 0xffffff is "no SD", see 23.003 Sec 28.4.2
-    nssai[s].sd = *SNSSAIParamList.paramarray[s][GNB_SLICE_DIFFERENTIATOR_IDX].uptr;
-    AssertFatal(nssai[s].sd <= 0xffffff, "SD cannot be bigger than 0xffffff, but is %d\n", nssai[s].sd);
-  }
-  return num_ssi;
-}
-
-static uint8_t set_plmn_config(plmn_id_t *p, uint8_t idx)
-{
-  char gnbpath[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(gnbpath, sizeof(gnbpath), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, idx);
-  GET_PARAMS_LIST(PLMNParamList, PLMNParams, GNBPLMNPARAMS_DESC, GNB_CONFIG_STRING_PLMN_LIST, gnbpath, PLMNPARAMS_CHECK);
-  uint8_t num_plmn = PLMNParamList.numelt;
-  AssertFatal(num_plmn >= 1 && num_plmn <= 6, "The number of PLMN IDs must be in [1,6], but is %d\n", num_plmn);
-  for (int l = 0; l < num_plmn; ++l) {
-    plmn_id_t *plmn = &p[l];
-    plmn->mcc = *PLMNParamList.paramarray[l][GNB_MOBILE_COUNTRY_CODE_IDX].uptr;
-    plmn->mnc = *PLMNParamList.paramarray[l][GNB_MOBILE_NETWORK_CODE_IDX].uptr;
-    plmn->mnc_digit_length = *PLMNParamList.paramarray[l][GNB_MNC_DIGIT_LENGTH].u8ptr;
-    AssertFatal((plmn->mnc_digit_length == 2) || (plmn->mnc_digit_length == 3), "BAD MNC DIGIT LENGTH %d", plmn->mnc_digit_length);
-  }
-  return num_plmn;
-}
 
 /**
  * Allocate memory and initialize ServingCellConfigCommon struct members
@@ -2129,130 +2090,6 @@ gNB_RRC_INST *RCconfig_NRRRC()
   config_pdcp(config_get_if(), &rrc->pdcp_config);
 
   return rrc;
-}
-
-int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i)
-{
-  int               j,k = 0;
-  int               gnb_id;
-
-  char*             gnb_ipv4_address_for_NGU      = NULL;
-  uint32_t          gnb_port_for_NGU              = 0;
-  char*             gnb_ipv4_address_for_S1U      = NULL;
-  uint32_t          gnb_port_for_S1U              = 0;
-
-  GET_PARAMS(GNBSParams, GNBSPARAMS_DESC, NULL);
-  AssertFatal (i<GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt,
-     "Failed to parse config file %s, %uth attribute %s \n",
-     RC.config_file_name, i, GNB_CONFIG_STRING_ACTIVE_GNBS);
-    
-  
-  if (GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt>0) {
-    // Output a list of all gNBs.
-    GET_PARAMS_LIST(GNBParamList, GNBParams, GNBPARAMS_DESC, GNB_CONFIG_STRING_GNB_LIST, NULL);
-    if (GNBParamList.numelt > 0) {
-      for (k = 0; k < GNBParamList.numelt; k++) {
-        if (GNBParamList.paramarray[k][GNB_GNB_ID_IDX].uptr == NULL) {
-          // Calculate a default gNB ID
-          if (IS_SA_MODE(get_softmodem_params())) {
-            uint32_t hash;
-          
-          hash = ngap_generate_gNB_id ();
-          gnb_id = k + (hash & 0xFFFFFF8);
-          } else {
-            gnb_id = k;
-          }
-        } else {
-          gnb_id = *(GNBParamList.paramarray[k][GNB_GNB_ID_IDX].uptr);
-        }
-  
-  
-        // search if in active list
-        for (j=0; j < GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt; j++) {
-          if (strcmp(GNBSParams[GNB_ACTIVE_GNBS_IDX].strlistptr[j], *(GNBParamList.paramarray[k][GNB_GNB_NAME_IDX].strptr)) == 0) {
-
-            char aprefix[MAX_OPTNAME_SIZE*2 + 8];
-            NGAP_REGISTER_GNB_REQ (msg_p).gNB_id = gnb_id;
-            
-            if (strcmp(*(GNBParamList.paramarray[k][GNB_CELL_TYPE_IDX].strptr), "CELL_MACRO_GNB") == 0) {
-              NGAP_REGISTER_GNB_REQ (msg_p).cell_type = CELL_MACRO_GNB;
-            } else  if (strcmp(*(GNBParamList.paramarray[k][GNB_CELL_TYPE_IDX].strptr), "CELL_HOME_GNB") == 0) {
-              NGAP_REGISTER_GNB_REQ (msg_p).cell_type = CELL_HOME_ENB;
-            } else {
-              AssertFatal (0,
-              "Failed to parse gNB configuration file %s, gnb %u unknown value \"%s\" for cell_type choice: CELL_MACRO_GNB or CELL_HOME_GNB !\n",
-              RC.config_file_name, i, *(GNBParamList.paramarray[k][GNB_CELL_TYPE_IDX].strptr));
-            }
-            
-            NGAP_REGISTER_GNB_REQ (msg_p).gNB_name         = strdup(*(GNBParamList.paramarray[k][GNB_GNB_NAME_IDX].strptr));
-            NGAP_REGISTER_GNB_REQ (msg_p).tac              = *GNBParamList.paramarray[k][GNB_TRACKING_AREA_CODE_IDX].uptr;
-            AssertFatal(!GNBParamList.paramarray[k][GNB_MOBILE_COUNTRY_CODE_IDX_OLD].strptr
-                        && !GNBParamList.paramarray[k][GNB_MOBILE_NETWORK_CODE_IDX_OLD].strptr,
-                        "It seems that you use an old configuration file. Please change the existing\n"
-                        "    tracking_area_code  =  \"1\";\n"
-                        "    mobile_country_code =  \"208\";\n"
-                        "    mobile_network_code =  \"93\";\n"
-                        "to\n"
-                        "    tracking_area_code  =  1; // no string!!\n"
-                        "    plmn_list = ( { mcc = 208; mnc = 93; mnc_length = 2; } )\n");
-            // PLMN
-            plmn_id_t p[PLMN_LIST_MAX_SIZE] = {0};
-            NGAP_REGISTER_GNB_REQ(msg_p).num_plmn = set_plmn_config(p, 0);
-            for (int l = 0; l < NGAP_REGISTER_GNB_REQ(msg_p).num_plmn; ++l) {
-              NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].plmn = p[l];
-              // SNSSAI
-              NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].num_nssai = set_snssai_config(NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].s_nssai, 8, k, l);
-            }
-            NGAP_REGISTER_GNB_REQ(msg_p).default_drx = 0;
-            // NG
-            snprintf(aprefix, sizeof(aprefix), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, k);
-            GET_PARAMS_LIST(NGParamList, NGParams, GNBNGPARAMS_DESC, GNB_CONFIG_STRING_AMF_IP_ADDRESS, aprefix);
-            NGAP_REGISTER_GNB_REQ (msg_p).nb_amf = 0;
-            
-            for (int l = 0; l < NGParamList.numelt; l++) {
-              NGAP_REGISTER_GNB_REQ (msg_p).nb_amf += 1;
-              strcpy(NGAP_REGISTER_GNB_REQ (msg_p).amf_ip_address[l].ipv4_address,*(NGParamList.paramarray[l][GNB_AMF_IPV4_ADDRESS_IDX].strptr));
-              NGAP_REGISTER_GNB_REQ (msg_p).amf_ip_address[j].ipv4 = 1;
-              NGAP_REGISTER_GNB_REQ (msg_p).amf_ip_address[j].ipv6 = 0;
-              /* if no broadcasst_plmn array is defined, fill default values */
-              if (NGAP_REGISTER_GNB_REQ(msg_p).broadcast_plmn_num[l] == 0) {
-                NGAP_REGISTER_GNB_REQ(msg_p).broadcast_plmn_num[l] = NGAP_REGISTER_GNB_REQ(msg_p).num_plmn;
-                for (int el = 0; el < NGAP_REGISTER_GNB_REQ(msg_p).num_plmn; ++el)
-                  NGAP_REGISTER_GNB_REQ(msg_p).broadcast_plmn_index[l][el] = el;
-              }
-            }
-          
-            // SCTP SETTING
-            NGAP_REGISTER_GNB_REQ (msg_p).sctp_out_streams = SCTP_OUT_STREAMS;
-            NGAP_REGISTER_GNB_REQ (msg_p).sctp_in_streams  = SCTP_IN_STREAMS;
-            if (IS_SA_MODE(get_softmodem_params())) {
-              snprintf(aprefix, sizeof(aprefix), "%s.[%d].%s", GNB_CONFIG_STRING_GNB_LIST, k, GNB_CONFIG_STRING_SCTP_CONFIG);
-              GET_PARAMS(SCTPParams, GNBSCTPPARAMS_DESC, aprefix);
-              NGAP_REGISTER_GNB_REQ (msg_p).sctp_in_streams = (uint16_t)*(SCTPParams[GNB_SCTP_INSTREAMS_IDX].uptr);
-              NGAP_REGISTER_GNB_REQ (msg_p).sctp_out_streams = (uint16_t)*(SCTPParams[GNB_SCTP_OUTSTREAMS_IDX].uptr);
-            }
-
-            // NETWORK_INTERFACES
-            snprintf(aprefix, sizeof(aprefix), "%s.[%d].%s", GNB_CONFIG_STRING_GNB_LIST, k, GNB_CONFIG_STRING_NETWORK_INTERFACES_CONFIG);
-            GET_PARAMS(NETParams, GNBNETPARAMS_DESC, aprefix);
-            if (NETParams[GNB_IPV4_ADDRESS_FOR_NG_AMF_IDX].strptr != NULL) {
-              char *cidr = *(NETParams[GNB_IPV4_ADDRESS_FOR_NG_AMF_IDX].strptr);
-              char *save = NULL;
-              char *address = strtok_r(cidr, "/", &save);
-              strcpy(NGAP_REGISTER_GNB_REQ (msg_p).gnb_ip_address.ipv4_address, address);
-              LOG_I(GNB_APP, "Parsed IPv4 address for NG AMF: %s\n", address);
-            }
-
-            NGAP_REGISTER_GNB_REQ (msg_p).gnb_ip_address.ipv6 = 0;
-            NGAP_REGISTER_GNB_REQ (msg_p).gnb_ip_address.ipv4 = 1;
-
-            break;
-          }
-        }
-      }
-    }
-  }
-  return 0;
 }
 
 static pthread_mutex_t rc_mutex = PTHREAD_MUTEX_INITIALIZER;

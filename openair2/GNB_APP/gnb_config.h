@@ -44,7 +44,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg);
 void NRRCConfig(void);
 
 gNB_RRC_INST *RCconfig_NRRRC();
-int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i);
 int RCconfig_NR_X2(MessageDef *msg_p, uint32_t i);
 void wait_f1_setup_response(void);
 f1ap_tdd_info_t read_tdd_config(const NR_ServingCellConfigCommon_t *scc);

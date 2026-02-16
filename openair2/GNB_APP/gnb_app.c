@@ -53,6 +53,7 @@
 #include "openair2/E1AP/e1ap.h"
 #include "gnb_config.h"
 #include "openair2/LAYER2/NR_MAC_gNB/mac_proto.h"
+#include "openair2/GNB_APP/gnb_config_ng.h"
 
 extern RAN_CONTEXT_t RC;
 /*------------------------------------------------------------------------------*/

@@ -1308,6 +1308,8 @@ set (GNB_APP_SRC
   ${OPENAIR2_DIR}/GNB_APP/gnb_app.c
   ${OPENAIR2_DIR}/E1AP/e1ap_setup.c
   ${OPENAIR2_DIR}/GNB_APP/gnb_config.c
+  ${OPENAIR2_DIR}/GNB_APP/gnb_config_common.c
+  ${OPENAIR2_DIR}/GNB_APP/gnb_config_ng.c
   )
 
 set (MCE_APP_SRC
