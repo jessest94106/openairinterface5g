@@ -25,7 +25,6 @@ FROM ran-build-fhi72:latest AS ran-build
 
 #start from scratch for target executable
 FROM ubuntu:noble AS oai-nr-oru
-ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 
@@ -50,11 +49,6 @@ RUN apt-get update && \
         xz-utils \
         libnuma-dev \
         libyaml-cpp-dev && \
-# if the --sanitize option was used to build, additional packages are required
-    /bin/bash -c 'if [[ "$BUILD_OPTION" = "--sanitize" ]]; then DEBIAN_FRONTEND=noninteractive apt-get install --yes \
-        libasan8 \
-        libubsan1 \
-        liblapacke; fi' && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/nr-oru/bin
