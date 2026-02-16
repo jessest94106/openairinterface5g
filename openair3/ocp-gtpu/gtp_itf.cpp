@@ -613,6 +613,20 @@ instance_t gtpv1Init(openAddr_t context)
   return id;
 }
 
+/* \brief remove the GTP instance from the list of instances. Does not make an
+ * attempt to free corresponding TEIDs, as we have many and will simply not
+ * reuse it later. */
+int gtpv1Term(instance_t instance)
+{
+  pthread_mutex_lock(&globGtp.gtp_lock);
+  getInstRetInt(compatInst(instance));
+  gtpv1uReceiverCancel(inst->thrData.t);
+  close(instance);
+  globGtp.instances.erase(instance);
+  pthread_mutex_unlock(&globGtp.gtp_lock);
+  return 0;
+}
+
 void GtpuUpdateTunnelOutgoingAddressAndTeid(instance_t instance,
                                             ue_id_t ue_id,
                                             ebi_t bearer_id,

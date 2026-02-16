@@ -130,6 +130,7 @@ typedef struct gtpv1u_gnb_delete_tunnel_req_s gtpv1u_gnb_delete_tunnel_req_t;
                                      size_t len);
 
   instance_t gtpv1Init(openAddr_t context);
+  int gtpv1Term(instance_t inst);
   void *gtpv1uTask(void *args);
 
 #ifdef __cplusplus

@@ -136,6 +136,11 @@ static void run_basic_test(uint32_t ue_id,
   EXPECT_EQ(ret, 0);
   ret = newGtpuDeleteAllTunnels(ep2, ue_id);
   EXPECT_EQ(ret, 0);
+
+  ret = gtpv1Term(ep1);
+  EXPECT_EQ(ret, 0);
+  ret = gtpv1Term(ep2);
+  EXPECT_EQ(ret, 0);
 }
 
 static int recv_count_qfi = 0;
