@@ -1416,8 +1416,13 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
     rrc_gNB_generate_RRCReject(rrc, ue_context_p);
     return;
   }
-  /* Add PCell to serving_cells array */
-  rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+  /* Update PCell in serving_cells array */
+  ue_serving_cell_t *added = rrc_update_ue_pcell(UE, cell);
+  if (added == NULL) {
+    LOG_E(NR_RRC, "RRCSetup: failed to add PCell (cell %ld)\n", cell->info.cell_id);
+    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
+    return;
+  }
   UE->ongoing_reconfiguration = false;
   UE->measConfig = nr_rrc_get_measconfig(rrc, msg->nr_cellid);
   activate_srb(UE, 1);
@@ -1488,26 +1493,6 @@ static const nr_rrc_cell_container_t *get_previous_cell_by_pci_in_du(gNB_RRC_INS
     }
   }
   return rrc_get_cell_by_pci_for_du(&du->cells, pci);
-}
-
-/** @brief Update UE's PCell in serving_cells array
- * @param[in] UE UE context
- * @param[in] cell Cell container to set as PCell
- * @return Pointer to added serving cell entry, or NULL on failure
- * @note If UE already has a PCell, removes all serving cells from the old PCell's DU first */
-static ue_serving_cell_t *rrc_update_ue_pcell(gNB_RRC_UE_t *UE, const nr_rrc_cell_container_t *cell)
-{
-  DevAssert(UE != NULL);
-  DevAssert(cell != NULL);
-
-  // If UE already has a PCell, remove all serving cells from that DU first
-  const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
-  if (existing_pcell != NULL) {
-    rrc_remove_ue_scells_from_du(UE, existing_pcell->assoc_id);
-  }
-
-  // Add the new PCell
-  return rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
 }
 
 static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,

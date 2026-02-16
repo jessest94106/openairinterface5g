@@ -453,36 +453,22 @@ bool nr_rrc_update_cell_assoc_after_ho(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE)
     return false;
   }
 
-  if (UE->ho_context->source) {
-    /* F1 HO (intra-CU): migrate serving cells from source DU to target cell */
-    nr_ho_source_cu_t *source_ctx = UE->ho_context->source;
-
-    // Remove SCells that belong to the source DU during handover (cell group changes)
-    // This also removes PCell if it was on the source DU
-    rrc_remove_ue_scells_from_du(UE, source_ctx->cell->assoc_id);
-
-    // Update PCell in serving_cells
-    ue_serving_cell_t *added = rrc_add_ue_serving_cell(UE, target_ctx->cell, RRC_PCELL_INDEX);
-    if (added == NULL) {
-      LOG_E(NR_RRC,
-            "UE %d handover: failed to add PCell (cell %ld) to serving cells\n",
-            UE->rrc_ue_id,
-            target_ctx->cell->info.cell_id);
-      return false;
-    }
-  } else {
+  if (!UE->ho_context->source) {
     /* Inter-CU (N2/Xn target): this UE context has no serving cells yet */
     const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
     AssertFatal(existing_pcell == NULL, "UE context should not have PCell yet (inter-CU target)\n");
+  }
 
-    ue_serving_cell_t *added = rrc_add_ue_serving_cell(UE, target_ctx->cell, RRC_PCELL_INDEX);
-    if (added == NULL) {
-      LOG_E(NR_RRC,
-            "UE %d handover: failed to add PCell (cell %ld) to serving cells\n",
-            UE->rrc_ue_id,
-            target_ctx->cell->info.cell_id);
-      return false;
-    }
+  /* Update PCell: removes all serving cells from existing PCell's DU (if any)
+   * and adds the target cell as the new PCell. For F1 HO (intra-CU), this
+   * migrates serving cells from source DU to target DU. */
+  ue_serving_cell_t *added = rrc_update_ue_pcell(UE, target_ctx->cell);
+  if (added == NULL) {
+    LOG_E(NR_RRC,
+          "UE %d handover: failed to add PCell (cell %ld) to serving cells\n",
+          UE->rrc_ue_id,
+          target_ctx->cell->info.cell_id);
+    return false;
   }
 
   return true;
