@@ -186,7 +186,7 @@ def GetDeployedServices(ssh, file):
 		else:
 			c = ret.stdout
 			logging.info(f'service {s} with container id {c}')
-			deployed_services.append(s)
+			deployed_services.append((s, c))
 	return deployed_services
 
 def CheckLogs(self, filename, HTML, RAN):
@@ -790,7 +790,7 @@ class Containerize():
 		wd_yaml = f'{wd}/docker-compose.y*ml'
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
-			services = GetDeployedServices(ssh, wd_yaml)
+			services = [s for s, _ in GetDeployedServices(ssh, wd_yaml)]
 			success = []
 			fail = []
 			for s in reqServices:
@@ -820,7 +820,7 @@ class Containerize():
 			copyin_res = None
 			ssh.run(f'docker compose -f {wd_yaml} stop')
 			if services is not None:
-				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s in services]
+				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s, _ in services]
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd_yaml} down -v')
