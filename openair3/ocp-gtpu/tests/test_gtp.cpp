@@ -179,6 +179,38 @@ TEST(gtp, basic_conn_qfi)
   run_basic_test(ue_id, pdu_id, qfi, num_send, &recv_count_qfi, NULL, recv_basic_conn_qfi);
 }
 
+static int recv_count = 0;
+static bool recv_basic_conn(protocol_ctxt_t *ctxt,
+                            const srb_flag_t srb_flagP,
+                            const rb_id_t rb_idP,
+                            const mui_t muiP,
+                            const confirm_t confirmP,
+                            const sdu_size_t size,
+                            unsigned char *const buf,
+                            const pdcp_transmission_mode_t modeP,
+                            const uint32_t *sourceL2Id,
+                            const uint32_t *destinationL2Id)
+{
+  EXPECT_EQ(ctxt->rntiMaybeUEid, 12); // as defined in basic_conn
+  EXPECT_EQ(size, 3);
+  for (int i = 0; i < size; ++i)
+    EXPECT_EQ(buf[i], recv_count * size + i);
+  recv_count++;
+  LOG_I(GTPU, "received message %d with size 3, content %d.%d.%d\n", recv_count, buf[0], buf[1], buf[2]);
+  return true;
+}
+
+/* Test unidirectional GTP message forwarding for a single UE (without QFI). */
+TEST(gtp, basic_conn)
+{
+  /* we consider only a single UE on a specfic bearer (ID=3) */
+  uint32_t ue_id = 12;
+  long pdu_id = 5;
+  long noqfi = -1;
+  int num_send = 12;
+  run_basic_test(ue_id, pdu_id, noqfi, num_send, &recv_count, recv_basic_conn, NULL);
+}
+
 /* ideas for tests:
  * - share IP addresses among two instances (e.g., F1-U/NG-U on same IP/port)
  * - support of IPv6
