@@ -46,6 +46,7 @@ import cls_cmd
 import helpreadme as HELP
 import constants as CONST
 import cls_oaicitest
+import cls_analysis
 from cls_ci_helper import archiveArtifact
 from collections import deque
 
@@ -808,7 +809,7 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue(self.services, 'KO', [f'Failed stopping {" ".join(fail)}, succeeded {" ".join(success)}'])
 		return success
 
-	def UndeployObject(self, ctx, node, HTML, RAN):
+	def UndeployObject(self, ctx, node, HTML, to_analyze):
 		lSourcePath = self.eNBSourceCodePath
 		logging.info(f'\u001B[1m Undeploying all objects from server {node}\u001B[0m')
 		yaml = self.yamlPath.strip('/')
@@ -817,21 +818,27 @@ class Containerize():
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
 			services = GetDeployedServices(ssh, wd_yaml)
-			copyin_res = None
+			all_logs = True
 			ssh.run(f'docker compose -f {wd_yaml} stop')
 			if services is not None:
-				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s, _ in services]
+				service_desc = {}
+				for s, c in services:
+					ret = ssh.run(f'docker inspect {c} --format="{{{{.State.ExitCode}}}}"')
+					rc = int(ret.stdout.strip())
+					f = CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx)
+					all_logs = all_logs and f is not None
+					service_desc[s] = {'returncode': rc, 'logfile': f}
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd_yaml} down -v')
+			HTML.CreateHtmlTestRowQueue(node, 'OK', ['Undeployment successful'])
 			ssh.run(f'rm {wd}/.env')
-		if not copyin_res:
+		if not all_logs:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
-			logging.error(f"could not copy all files: {copyin_res=} {services=}")
+			logging.error(f"could not copy all files: {all_logs=} {services=}")
 			success = False
 		else:
-			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
-			success = all(log_results)
+			success = cls_analysis.AnalyzeServices(HTML, service_desc, to_analyze)
 		if success:
 			logging.info('\u001B[1m Undeploying objects Pass\u001B[0m')
 		else:

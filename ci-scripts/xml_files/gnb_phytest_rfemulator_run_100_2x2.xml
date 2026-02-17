@@ -59,6 +59,9 @@
     <node>caracal</node>
     <always_exec>true</always_exec>
     <desc>Terminate gNB</desc>
+    <analysis>
+      <service>nr-softmodem=ContainsString=Bye.</service>
+    </analysis>
   </testCase>
 
   <testCase>

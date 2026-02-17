@@ -53,5 +53,19 @@ class TestAnalysis(unittest.TestCase):
 		# TODO this one is not found, the CI does not recover this??
 		#self.assertEqual(s['Data']['DL & UL scheduling timing'], ['17', '97', '159371', '1.14'])
 
+	def test_analze_services_no_service(self):
+		service_desc = {} # nothing to analyze
+		to_analyze = ["testserv"] # some service requested to be analyze that does not exist
+		status = cls_analysis.AnalyzeServices(self.html, service_desc, to_analyze)
+		self.assertFalse(status)
+
+	# TODO this does not work: we don't evaluate return codes yet
+	#def test_analze_service_exit_nonnull(self):
+	#	service_desc = {}
+	#	service_desc["testserv"] = {'returncode': 129, 'logfile': 'tests/log-analysis/empty.log'}
+	#	to_analyze = ["testserv"] # some service requested to be analyze that does not exist
+	#	status = cls_analysis.AnalyzeServices(self.html, service_desc, to_analyze)
+	#	self.assertFalse(status)
+
 if __name__ == '__main__':
 	unittest.main()
