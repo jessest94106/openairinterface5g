@@ -549,10 +549,7 @@ void construct_HhH_elements(int *ch0conj_ch0, //00_00
   }
 }
 
-
-void squared_matrix_element(int32_t *Hh_h_00,
-                            int32_t *Hh_h_00_sq,
-                            unsigned short nb_rb)
+static void squared_matrix_element(int32_t *Hh_h_00, int32_t *Hh_h_00_sq, unsigned short nb_rb)
 {
 
   simde__m128i *Hh_h_00_128,*Hh_h_00_sq_128;

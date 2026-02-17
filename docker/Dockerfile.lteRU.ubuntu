@@ -49,7 +49,6 @@ RUN apt-get update && \
         libboost-thread1.83.0 \
         libboost-system1.83.0 \
         libboost-program-options1.83.0 \
-        libblas3 \
         libconfig9 \
         net-tools \
         gdb \
