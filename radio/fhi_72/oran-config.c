@@ -124,7 +124,7 @@ static void print_fh_init_io_cfg(const struct xran_io_cfg *io_cfg)
       io_cfg->one_vf_cu_plane);
   print_fh_eowd_cmn(io_cfg->id, &io_cfg->eowd_cmn[io_cfg->id]);
   printf("eowd_port (filled within xran library)\n");
-#ifdef F_RELEASE
+#if defined F_RELEASE
   printf("\
     bbu_offload %d\n",
       io_cfg->bbu_offload);
@@ -189,7 +189,7 @@ void print_fh_init(const struct xran_fh_init *fh_init)
   printf("\
   totalBfWeights %d\n",
       fh_init->totalBfWeights);
-#ifdef F_RELEASE
+#if defined F_RELEASE
   printf("\
   mlogxranenable %d\n\
   dlCpProcBurst %d\n",
@@ -232,7 +232,7 @@ static void print_prach_config(const struct xran_prach_config *prach_conf)
       prach_conf->timeOffset,
       prach_conf->freqOffset,
       prach_conf->eAxC_offset);
-#ifdef F_RELEASE
+#if defined F_RELEASE
   printf("\
     nPrachConfIdxLTE %d\n",
       prach_conf->nPrachConfIdxLTE);
@@ -396,7 +396,7 @@ void print_fh_config(const struct xran_fh_config *fh_config)
       fh_config->GPS_Alpha,
       fh_config->GPS_Beta);
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
   printf("\
   srsEnableCp %d\n\
   SrsDelaySym %d\n",
@@ -429,7 +429,7 @@ void print_fh_config(const struct xran_fh_config *fh_config)
       fh_config->max_sections_per_slot,
       fh_config->max_sections_per_symbol);
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
   printf("\
   RunSlotPrbMapBySymbolEnable %d\n\
   LiteOnIgnoreUPSectionIdEnable %d\n\
@@ -456,7 +456,7 @@ static uint64_t get_u64_mask(const paramdef_t *pd)
   return mask;
 }
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
 char bbdev_dev[32] = "";
 char bbdev_vfio_vf_token[64] = "";
 #endif
@@ -478,7 +478,7 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   for (int i = 0; i < num_dev; ++i) {
     io_cfg->dpdk_dev[i] = strdup(gpd(fhip, nump, ORAN_CONFIG_DPDK_DEVICES)->strlistptr[i]); // VFs devices
   }
-#ifdef F_RELEASE
+#if defined F_RELEASE
   io_cfg->bbdev_dev[0] = NULL; // BBDev dev name; max devices = 1
   io_cfg->bbdev_vfio_vf_token[0] = NULL; // BBDev dev token; max devices = 1
   char *shlibversion = NULL; // version of the LDPC coding library
@@ -556,7 +556,7 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   /* eCPRI OWDM per port variables for O-DU; this parameter is filled within xran library */
   // eowd_port[0][XRAN_VF_MAX]
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
   io_cfg->bbu_offload = 0; // enable packet handling on BBU cores
 #endif
 
@@ -756,7 +756,7 @@ static bool set_fh_init(void *mplane_api, struct xran_fh_init *fh_init, enum xra
   fh_init->filePrefix = strdup(*gpd(fhip, nump, ORAN_CONFIG_FILE_PREFIX)->strptr);
   fh_init->totalBfWeights = 0; // only used if id = O_RU (for emulation); C-plane extension types; section 5.4.6 of CUS spec
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
   fh_init->mlogxranenable = 0; // enable mlog; 0 -> disabled
   fh_init->dlCpProcBurst = 0; /* 1 -> DL CP processing will be done on single symbol,
                                  0 -> DL CP processing will be spread across all allowed symbols and multiple cores to reduce burstiness */
@@ -801,7 +801,7 @@ static bool set_fh_prach_config(void *mplane_api,
   prach_config->numPrbc = 0;
   prach_config->timeOffset = 0;
   prach_config->freqOffset = 0;
-#ifdef F_RELEASE
+#if defined F_RELEASE
   prach_config->nPrachConfIdxLTE = 0; // used only if DSS enabled and technology is XRAN_RAN_LTE
 #endif
 
@@ -966,7 +966,7 @@ static bool set_fh_config(void *mplane_api, int ru_idx, int num_rus, enum xran_c
   fh_config->srsEnable = 0; // enable SRS; used only if XRAN_CATEGORY_B
   // For LiteOn E release, no need to take care of prach eAxC_offset. xran lib is hacked to handle it.
   bool liteon_prach_eAxC_offset = false;
-#ifdef F_RELEASE
+#if defined F_RELEASE
   fh_config->srsEnableCp = 0; // enable SRS CP; used only if XRAN_CATEGORY_B
   fh_config->SrsDelaySym = 0; // number of SRS delay symbols; used only if XRAN_CATEGORY_B
   fh_config->RunSlotPrbMapBySymbolEnable    = *gpd(fhp, nfh, ORAN_CONFIG_RunSlotPrbMapBySymbol)->uptr;    // enable RunSlotPrbMapBySymbol
@@ -1014,7 +1014,7 @@ static bool set_fh_config(void *mplane_api, int ru_idx, int num_rus, enum xran_c
   fh_config->max_sections_per_slot = 0; // not used in xran
   fh_config->max_sections_per_symbol = 0; // not used in xran
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
   fh_config->dssEnable = 0; // enable DSS (extension-9)
   fh_config->dssPeriod = 0; // DSS pattern period for LTE/NR
   // fh_config->technology[XRAN_MAX_DSS_PERIODICITY] // technology array represents slot is LTE(0)/NR(1); used only if DSS enabled

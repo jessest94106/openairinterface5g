@@ -94,7 +94,7 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
   LOG_D(HW, "rx_callback at %4d.%3d (subframe %d), rx_sym %d ru_id %d\n", frame, slot, subframe, rx_sym, ru_id);
 
   if (rx_sym == 7) { // in F release this value is defined as XRAN_FULL_CB_SYM (full slot (offset + 7))
-#ifdef F_RELEASE
+#if defined F_RELEASE
     for (int ru_idx = 0; ru_idx < num_ports; ru_idx++) {
       struct xran_fh_config *fh_config = get_xran_fh_config(ru_idx);
       oran_buf_list_t *bufs = get_xran_buffers(ru_idx);
@@ -722,7 +722,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
   return (0);
 }
 
-#ifdef F_RELEASE
+#if defined F_RELEASE
 /** @details Read PRACH and PUSCH data from xran buffers.  If
  * I/Q compression (bitwidth < 16 bits) is configured, deccompresses the data
  * before writing. Prints ON TIME counters every 128 frames.

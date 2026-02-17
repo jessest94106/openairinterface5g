@@ -199,7 +199,7 @@ static void oran_allocate_cplane_buffers(void *instHandle,
                                          struct xran_flat_buffer buf[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN],
                                          uint32_t ant,
                                          uint32_t sect,
-                                       #ifdef F_RELEASE
+                                       #if defined F_RELEASE
                                          uint32_t mtu,
                                          const struct xran_fh_config *fh_config,
                                        #endif
@@ -258,7 +258,7 @@ static void oran_allocate_buffers(void *handle,
                                   int xran_inst,
                                   int num_sectors,
                                   oran_port_instance_t *portInstances,
-                                #ifdef F_RELEASE
+                                #if defined F_RELEASE
                                   uint32_t mtu,
                                 #endif
                                   const struct xran_fh_config *fh_config)
@@ -335,7 +335,7 @@ static void oran_allocate_buffers(void *handle,
                                bl->bufs.tx_prbmap,
                                xran_max_antenna_nr,
                                xran_max_sections_per_slot,
-                             #ifdef F_RELEASE
+                             #if defined F_RELEASE
                                mtu,
                                fh_config,
                              #endif
@@ -350,7 +350,7 @@ static void oran_allocate_buffers(void *handle,
                                bl->bufs.rx_prbmap,
                                xran_max_antenna_nr,
                                xran_max_sections_per_slot,
-                             #ifdef F_RELEASE
+                             #if defined F_RELEASE
                                mtu,
                                fh_config,
                              #endif
