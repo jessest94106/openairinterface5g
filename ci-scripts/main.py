@@ -279,15 +279,6 @@ def ExecuteActionWithParam(action, ctx, node):
 
 	return success
 
-#check if given test is in list
-#it is in list if one of the strings in 'list' is at the beginning of 'test'
-def test_in_list(test, list):
-	for check in list:
-		check=check.replace('+','')
-		if (test.startswith(check)):
-			return True
-	return False
-
 test_runner_abort = False
 def receive_signal(signum, frame):
     global test_runner_abort
@@ -365,18 +356,7 @@ elif re.match('^TerminateSPGW$', mode, re.IGNORECASE):
 elif re.match('^LogCollectBuild$', mode, re.IGNORECASE):
 	logging.warning("Option LogCollectBuild ignored")
 elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
-	if RAN.eNBSourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	if os.path.isdir('cmake_targets/log'):
-		cmd = 'zip -r enb.log.' + RAN.BuildId + '.zip cmake_targets/log'
-		logging.info(cmd)
-		try:
-			zipStatus = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True, timeout=60)
-		except subprocess.CalledProcessError as e:
-			logging.error("Command '{}' returned non-zero exit status {}.".format(e.cmd, e.returncode))
-			logging.error("Error output:\n{}".format(e.output))
-		sys.exit(0)
+	logging.warning("Option LogCollecteNB ignored")
 elif re.match('^LogCollectHSS$', mode, re.IGNORECASE):
 	logging.warning("Option LogCollectHSS ignored")
 elif re.match('^LogCollectMME$', mode, re.IGNORECASE):
