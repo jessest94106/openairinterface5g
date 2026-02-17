@@ -127,7 +127,7 @@ class RANManagement():
 
 		return enbDidSync
 
-	def TerminateeNB(self, ctx, node, HTML):
+	def TerminateeNB(self, ctx, node, HTML, to_analyze):
 		logging.debug('Stopping eNB/gNB on server: ' + node)
 		lSourcePath = self.eNBSourceCodePath
 		cmd = cls_cmd.getConnection(node)
@@ -142,6 +142,7 @@ class RANManagement():
 		if result is not None:
 			cmd.run('sudo -S killall --signal SIGKILL -r .*-softmodem')
 			time.sleep(5)
+		HTML.CreateHtmlTestRowQueue(node, 'OK', ['Undeployment successful'])
 
 		# see InitializeeNB()
 		logfile = f'{lSourcePath}/cmake_targets/enb.log'
@@ -156,13 +157,10 @@ class RANManagement():
 			return False
 
 		logging.debug('\u001B[1m Analyzing xNB logfile \u001B[0m ' + file)
-		logStatus = self.AnalyzeLogFile_eNB(file, HTML, self.ran_checkers)
-		if logStatus < 0:
-			HTML.CreateHtmlTestRow('N/A', 'KO', logStatus)
-		else:
-			HTML.CreateHtmlTestRow(self.runtime_stats, 'OK', CONST.ALL_PROCESSES_OK)
-
-		return logStatus >= 0
+		service_desc = {}
+		service_desc["nr-softmodem"] = {'returncode': 0, 'logfile': file}
+		success = cls_analysis.AnalyzeServices(HTML, service_desc, to_analyze)
+		return success
 
 	def AnalyzeRTStats(self, HTML, node, ctx, thresholds):
 		logging.info(f'Analyzing realtime stats from server: {node}')

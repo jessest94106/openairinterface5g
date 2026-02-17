@@ -115,7 +115,14 @@ def ExecuteActionWithParam(action, ctx, node):
 		string_field=test.findtext('u_retx_th')
 		if (string_field is not None):
 			RAN.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
-		success = RAN.TerminateeNB(ctx, node, HTML)
+		services = []
+		analysis = test.find("analysis")
+		if analysis is not None:
+			# services: multiple services to analyse, separated by whitespace
+			services = analysis.findtext("services", default="").split()
+			# service: individual services to analyze, in case they have whitespace
+			services = services + [s.text for s in analysis.findall("service")]
+		success = RAN.TerminateeNB(ctx, node, HTML, services)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
@@ -188,12 +195,6 @@ def ExecuteActionWithParam(action, ctx, node):
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace" or action == "Stop_Object":
 		CONTAINERS.yamlPath = test.findtext('yaml_path')
-		string_field=test.findtext('d_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
-		string_field=test.findtext('u_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
 		CONTAINERS.services = test.findtext('services')
 		CONTAINERS.num_attempts = int(test.findtext('num_attempts') or 1)
 		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
@@ -202,7 +203,14 @@ def ExecuteActionWithParam(action, ctx, node):
 		elif action == 'Stop_Object':
 			success = CONTAINERS.StopObject(ctx, node, HTML)
 		elif action == 'Undeploy_Object':
-			success = CONTAINERS.UndeployObject(ctx, node, HTML, RAN)
+			analysis = test.find("analysis")
+			services = []
+			if analysis is not None:
+				# services: multiple services to analyse, separated by whitespace
+				services = analysis.findtext("services", default="").split()
+				# service: individual services to analyze, in case they have whitespace
+				services = services + [s.text for s in analysis.findall("service")]
+			success = CONTAINERS.UndeployObject(ctx, node, HTML, services)
 		elif action == 'Create_Workspace':
 			if force_local:
 				# Do not create a working directory when running locally. Current repo directory will be used

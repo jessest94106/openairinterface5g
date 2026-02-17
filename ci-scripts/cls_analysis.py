@@ -24,9 +24,12 @@ import re
 import os
 import logging
 import yaml
+import signal
 
 import xml.etree.ElementTree as ET
 import json
+
+import importlib, inspect
 
 class Analysis():
 
@@ -147,3 +150,98 @@ class Analysis():
 				logging.debug(f'\u001B[1;30;43m normalized metric {k}={valnorm} deviates by more than {dev}\u001B[0m')
 				success = False
 		return success, datalog_rt_stats
+
+
+# returns tuple of (service, analyzer, option string)
+def _lookupServiceAnalyzerOpt(s, analyzers):
+	res = s.split("=", 2)
+	name = res[0]
+	if len(res) == 1:
+		return res[0], analyzers["Default"], None
+	opt = res[2] if len(res) > 2 else None
+	func = res[1]
+	a = analyzers[func] if func in analyzers else None
+	return name, a, opt
+
+# groups requested service analysis (service=func[=option]) on per service
+# basis and looks up analyzer func. If log analysis is requested, will always
+# run Default log analysis
+def _groupServices(to_analyze):
+	req_analysis = {}
+	# get content of cls_loganalysis module, then get all analyzers (classes) in this module
+	mod = importlib.import_module("cls_loganalysis")
+	analyzers = {name:cl for name, cl in inspect.getmembers(mod, inspect.isclass)}
+	for req in to_analyze:
+		s, func, opt = _lookupServiceAnalyzerOpt(req, analyzers)
+		logging.debug(f"requested check '{req}' => service {s}, function {func.__name__}, options '{opt}'")
+		# always put default analyzer first
+		l = req_analysis[s] if s in req_analysis else [(analyzers["Default"], None, "default")]
+		if func is not analyzers["Default"]:
+			l.append((func, opt, req))
+		req_analysis[s] = l
+	return req_analysis
+
+def _describe_exit_code(code):
+	if code > 128:
+		sig = code - 128
+		try:
+			return f"terminated by signal {sig} ({signal.Signals(sig).name})"
+		except ValueError:
+			return f"terminated by unknown signal {sig}"
+	else:
+		return f"custom exit code"
+
+def AnalyzeServices(HTML, service_desc, to_analyze):
+	success = True
+	# hack: we want to give as a description "log analysis", but the description
+	# is set outside, so retain what was set before
+	orig_html_desc = HTML.desc
+	# group analysis on a per-service basis, then iterate
+	for serv, list_analysis in _groupServices(to_analyze).items():
+		HTML.desc = f"Log analysis for service {serv}"
+		if serv not in service_desc:
+			success = False
+			logging.error(f"requested service {serv} not in list of services")
+			HTML.CreateHtmlTestRowQueue("N/A", 'KO', ["service not detected"])
+			continue
+		# pre-initialize with return code
+		rc = service_desc[serv]["returncode"]
+		logging.info(f"analyze service {serv}: return code {rc}")
+		service_success = True # TODO rc == 0: too many functions (eNB, lteUE, RIC, nrUE) fail non-zero
+		logs = []
+		if rc != 0:
+			logs.append(f"=> return code {rc}, likely " + _describe_exit_code(rc) + " [ignored by CI]")
+		# skip if the file is too big
+		logfile = service_desc[serv]["logfile"]
+		filename = os.path.basename(logfile)
+		b = os.path.getsize(logfile)
+		logging.debug(f"using logfile {logfile} of size {b} bytes")
+		if b > 10 * 1024 * 1024:
+			success = False
+			logs.append(f"logfile too big (>10MB)")
+			logging.error(logs)
+			HTML.CreateHtmlTestRowQueue(filename, 'KO', ["\n".join(logs)])
+			continue
+		# run each analyzer with its options on the logfile
+		for (func, opt, desc) in list_analysis:
+			if func is None:
+				service_success = False
+				logging.error(f"request analysis function for desc {desc} not found")
+				HTML.CreateHtmlTestRowQueue(serv, 'KO', [f"no analysis function for {desc}"])
+				continue
+			result, l = func.run(logfile, opt)
+			logging.info(f"service {serv}: analysis with func {func}, result {result}, logs '{l}'")
+			service_success = service_success and result
+			if not result:
+				logs.append(f"=> {func.__name__} check (options '{opt}') FAILED")
+				logs.append(l)
+		logs = '\n'.join(logs)
+		if not service_success:
+			logging.error(l)
+		else:
+			logging.info(l)
+		all_funcs = ", ".join([f.__name__ for (f, _, _) in list_analysis])
+		HTML.CreateHtmlTestRowQueue(f"Check {all_funcs} on {filename}", 'OK' if service_success else 'KO', [logs])
+		success = success and service_success
+	HTML.desc = orig_html_desc
+	return success
