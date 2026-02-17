@@ -36,7 +36,6 @@ RUN apt-get update && \
         pkg-config \
         libsctp1 \
         tzdata \
-        libblas3 \
         libconfig9 \
         openssl \
         net-tools \

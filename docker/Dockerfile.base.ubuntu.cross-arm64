@@ -57,9 +57,6 @@ RUN apt-get update && \
       tzdata \
       xxd \
       # ARM64 packages
-      libblas-dev:arm64 \
-      liblapack-dev:arm64 \
-      liblapacke-dev:arm64 \
       libreadline-dev:arm64 \
       libgnutls28-dev:arm64 \
       libconfig-dev:arm64 \

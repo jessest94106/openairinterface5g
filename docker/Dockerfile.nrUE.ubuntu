@@ -52,8 +52,6 @@ RUN apt-get update && \
         libboost-system1.83.0 \
         libboost-program-options1.83.0 \
         tzdata \
-        liblapacke \
-        libblas3 \
         libconfig9 \
         openssl \
         net-tools \

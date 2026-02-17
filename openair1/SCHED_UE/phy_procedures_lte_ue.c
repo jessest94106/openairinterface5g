@@ -2925,19 +2925,16 @@ void ue_pmch_procedures(PHY_VARS_UE *ue,
         else
           ue->dlsch_mtch_errors[sync_area][0]++;
 
-        LOG_E(PHY,"[UE %d] Frame %d, subframe %d: PMCH in error (%d,%d), not passing to L2 (TBS %d, iter %d,G %d)\n",
+        LOG_E(PHY,
+              "[UE %d] Frame %d, subframe %d: PMCH in error (%d,%d), not passing to L2 (TBS %d, iter %d,G %d)\n",
               ue->Mod_id,
-              frame_rx,subframe_rx,
+              frame_rx,
+              subframe_rx,
               ue->dlsch_mcch_errors[sync_area][0],
               ue->dlsch_mtch_errors[sync_area][0],
-              ue->dlsch_MCH[0]->harq_processes[0]->TBS>>3,
+              ue->dlsch_MCH[0]->harq_processes[0]->TBS >> 3,
               ue->dlsch_MCH[0]->max_turbo_iterations,
               ue->dlsch_MCH[0]->harq_processes[0]->G);
-        // dump_mch(ue,0,ue->dlsch_MCH[0]->harq_processes[0]->G,subframe_rx);
-        //if(subframe_rx == 3){
-        //dump_mch(ue,0,ue->dlsch_MCH[0]->harq_processes[0]->G,subframe_rx);
-        //exit_fun("nothing to add");
-        //}
 
         if (LOG_DEBUGFLAG(DEBUG_UE_PHYPROC)) {
           for (int i=0; i<ue->dlsch_MCH[0]->harq_processes[0]->TBS>>3; i++) {
@@ -2962,11 +2959,9 @@ void ue_pmch_procedures(PHY_VARS_UE *ue,
                         CC_id,
                         frame_rx,
                         ue->dlsch_MCH[0]->harq_processes[0]->b,
-                        ue->dlsch_MCH[0]->harq_processes[0]->TBS>>3,
-                        eNB_id,// not relevant in eMBMS context
+                        ue->dlsch_MCH[0]->harq_processes[0]->TBS >> 3,
+                        eNB_id, // not relevant in eMBMS context
                         sync_area);
-        //dump_mch(ue,0,ue->dlsch_MCH[0]->harq_processes[0]->G,subframe_rx);
-        //exit_fun("nothing to add");
 
         if (mcch_active == 1)
           ue->dlsch_mcch_received[sync_area][0]++;

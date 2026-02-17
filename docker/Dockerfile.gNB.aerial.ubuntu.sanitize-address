@@ -69,7 +69,6 @@ RUN apt-get update && \
         procps \
         libsctp1 \
         tzdata \
-        libblas3 \
         libconfig9 \
         openssl \
         net-tools \
