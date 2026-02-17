@@ -103,13 +103,6 @@ def ExecuteActionWithParam(action, ctx, node):
 
 	elif action == 'Initialize_eNB':
 		RAN.Initialize_eNB_args=test.findtext('Initialize_eNB_args')
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			RAN.air_interface = 'lte-softmodem'
-		else:
-			RAN.air_interface = air_interface.lower() +'-softmodem'
-
 		cmd_prefix = test.findtext('cmd_prefix')
 		if cmd_prefix is not None: RAN.cmd_prefix = cmd_prefix
 		success = RAN.InitializeeNB(ctx, node, HTML)
@@ -122,13 +115,6 @@ def ExecuteActionWithParam(action, ctx, node):
 		string_field=test.findtext('u_retx_th')
 		if (string_field is not None):
 			RAN.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
-
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			RAN.air_interface = 'lte-softmodem'
-		else:
-			RAN.air_interface = air_interface.lower() +'-softmodem'
 		success = RAN.TerminateeNB(ctx, node, HTML)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':

@@ -64,7 +64,6 @@ class RANManagement():
 		self.eNBSourceCodePath = ''
 		self.Initialize_eNB_args = ''
 		self.imageKind = ''
-		self.air_interface = ''
 		self.eNBOptions = ['', '', '']
 		self.eNBstatuses = [-1, -1, -1]
 		self.runtime_stats= ''
@@ -99,7 +98,7 @@ class RANManagement():
 
 		logfile = f'{lSourcePath}/cmake_targets/enb.log'
 		cmd.cd(f"{lSourcePath}/cmake_targets/") # important: set wd so nrL1_stats.log etc are logged here
-		cmd.run(f'sudo -E stdbuf -o0 {self.cmd_prefix} {lSourcePath}/cmake_targets/ran_build/build/{self.air_interface} -O {lSourcePath}/{full_config_file} {extra_options} > {logfile} 2>&1 &')
+		cmd.run(f'sudo -E stdbuf -o0 {self.cmd_prefix} {lSourcePath}/cmake_targets/ran_build/build/nr-softmodem -O {lSourcePath}/{full_config_file} {extra_options} > {logfile} 2>&1 &')
 
 		if extra_options != '':
 			self.eNBOptions = extra_options
@@ -113,12 +112,12 @@ class RANManagement():
 				enbDidSync = True
 				break
 		if not enbDidSync:
-			cmd.run(f'sudo killall -9 {self.air_interface}') # in case it did not stop automatically
+			cmd.run(f'sudo killall -9 nr-softmodem') # in case it did not stop automatically
 			archiveArtifact(cmd, ctx, logfile)
 
 		cmd.close()
 
-		msg = f'{self.cmd_prefix} {self.air_interface} -O {config_file} {extra_options}'
+		msg = f'{self.cmd_prefix} nr-softmodem -O {config_file} {extra_options}'
 		if enbDidSync:
 			logging.debug('\u001B[1m Initialize eNB/gNB Completed\u001B[0m')
 			HTML.CreateHtmlTestRowQueue(msg, 'OK', [])

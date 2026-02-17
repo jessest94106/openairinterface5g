@@ -59,7 +59,6 @@
     <node>caracal</node>
     <always_exec>true</always_exec>
     <desc>Terminate gNB</desc>
-    <air_interface>NR</air_interface>
   </testCase>
 
   <testCase>

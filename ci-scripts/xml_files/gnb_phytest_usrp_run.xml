@@ -37,7 +37,6 @@
     <desc>Initialize gNB USRP</desc>
     <node>caracal</node>
     <Initialize_eNB_args>-O ci-scripts/conf_files/gnb.band79.106prb.usrpn300.phytest-dora.conf --phy-test -q -U 768 -T 106 -t 23 -D 127 -m 28 -M 106 --usrp-tx-thread-config 1 --log_config.global_log_options level,nocolor,time</Initialize_eNB_args>
-    <air_interface>NR</air_interface>
     <cmd_prefix>numactl --cpunodebind=netdev:enp94s0f0np0 --membind=netdev:enp94s0f0np0</cmd_prefix>
   </testCase>
 
@@ -59,7 +58,6 @@
     <always_exec>true</always_exec>
     <desc>Terminate gNB</desc>
     <node>caracal</node>
-    <air_interface>NR</air_interface>
   </testCase>
 
   <testCase>

@@ -301,7 +301,6 @@ class OaiCiTest():
 		self.iperf_profile = ''
 		self.iperf_tcp_rate_target = ''
 		self.finalStatus = False
-		self.air_interface=''
 		self.ue_ids = []
 		self.svr_node = None
 		self.svr_id = None
