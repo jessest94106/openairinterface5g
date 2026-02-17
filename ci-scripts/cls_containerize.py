@@ -31,24 +31,17 @@
 #-----------------------------------------------------------
 # Import
 #-----------------------------------------------------------
-import sys	      # arg
 import re	       # reg
 import logging
 import os
-import shutil
-import time
-from zipfile import ZipFile
 
 #-----------------------------------------------------------
 # OAI Testing modules
 #-----------------------------------------------------------
 import cls_cmd
-import helpreadme as HELP
 import constants as CONST
-import cls_oaicitest
 import cls_analysis
 from cls_ci_helper import archiveArtifact
-from collections import deque
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes
@@ -189,59 +182,6 @@ def GetDeployedServices(ssh, file):
 			logging.info(f'service {s} with container id {c}')
 			deployed_services.append((s, c))
 	return deployed_services
-
-def CheckLogs(self, filename, HTML, RAN):
-	success = True
-	name = os.path.basename(filename)
-	if (any(sub in name for sub in ['oai_ue','oai-nr-ue','lte_ue'])):
-		logging.debug(f'\u001B[1m Analyzing UE logfile {filename} \u001B[0m')
-		logStatus = cls_oaicitest.OaiCiTest().AnalyzeLogFile_UE(filename, HTML, RAN)
-		opt = f"UE log analysis ({name})"
-		# usage of htmlUEFailureMsg/htmleNBFailureMsg is because Analyze log files
-		# abuse HTML to store their reports, and we here want to put custom options,
-		# which is not possible with CreateHtmlTestRow
-		# solution: use HTML templates, where we don't need different HTML write funcs
-		if (logStatus < 0):
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', [HTML.htmlUEFailureMsg])
-			success = False
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmlUEFailureMsg])
-		HTML.htmlUEFailureMsg = ""
-	elif 'nv-cubb' in name:
-		msg = 'Undeploy PNF/Nvidia CUBB'
-		HTML.CreateHtmlTestRow(msg, 'OK', CONST.ALL_PROCESSES_OK)
-	elif (any(sub in name for sub in ['enb','rru','rcc','cu','du','gnb','vnf'])):
-		logging.debug(f'\u001B[1m Analyzing XnB logfile {filename}\u001B[0m')
-		logStatus = RAN.AnalyzeLogFile_eNB(filename, HTML, self.ran_checkers)
-		opt = f"xNB log analysis ({name})"
-		if (logStatus < 0):
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', [HTML.htmleNBFailureMsg])
-			success = False
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
-		HTML.htmleNBFailureMsg = ""
-	elif 'xapp' in name:
-		opt = f"Undeploy {name}"
-		with open(f'{filename}', "r") as f:
-			last_line = deque(f, maxlen=1).pop()
-		if ('Test xApp run SUCCESSFULLY' in last_line):
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["xApp run successfully"])
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["xApp didn't run successfully"])
-			success = False
-	elif 'RIC' in name:
-		opt = f"Undeploy {name}"
-		with open(f'{filename}', 'r') as f:
-			last_line = deque(f, maxlen=1).pop()
-		if ('Removing E2 Node' in last_line):
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["nearRT-RIC run successfully"])
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["nearRT-RIC didn't run successfully"])
-			success = False
-	else:
-		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
-	logging.debug(f"log check: file {filename} passed analysis {success}")
-	return success
 
 #-----------------------------------------------------------
 # Class Declaration
