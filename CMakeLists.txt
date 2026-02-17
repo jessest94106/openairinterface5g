@@ -648,7 +648,6 @@ include_directories("${OPENAIR3_DIR}/S1AP")
 include_directories("${OPENAIR2_DIR}/X2AP")
 include_directories("${OPENAIR2_DIR}/M2AP")
 include_directories("${OPENAIR2_DIR}/F1AP")
-include_directories("${OPENAIR3_DIR}/ocp-gtpu")
 include_directories("${OPENAIR3_DIR}/M3AP")
 include_directories("${OPENAIR3_DIR}/MME_APP")
 include_directories("${OPENAIR_DIR}/radio/COMMON")
@@ -1149,7 +1148,7 @@ set(L2_SRC
   ${RRC_DIR}/rrc_eNB_S1AP.c
   ${RRC_DIR}/rrc_eNB_M2AP.c
   ${RRC_DIR}/rrc_eNB_UE_context.c
-  ${NR_RRC_DIR}/rrc_gNB_UE_context.c
+  ${RRC_DIR}/rrc_eNB_GTPV1U.c
   ${RRC_DIR}/rrc_common.c
   ${RRC_DIR}/L2_interface.c
   ${RRC_DIR}/L2_interface_common.c
@@ -1395,15 +1394,6 @@ include_directories("${OPENAIR1_DIR}/SCHED_NR_UE")
 
 # CN libs
 ##########################
-
-add_library (GTPV1U
-  ${RRC_DIR}/rrc_eNB_GTPV1U.c
-  ${OPENAIR3_DIR}/ocp-gtpu/gtp_itf.cpp
-  ${OPENAIR3_DIR}/ocp-gtpu/gtpu_extensions.c
-  )
-target_link_libraries(GTPV1U PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
-target_link_libraries(GTPV1U PRIVATE SIMU ds)
-include_directories(${OPENAIR3_DIR}/ocp-gtp)
 
 set (MME_APP_SRC
   ${OPENAIR3_DIR}/MME_APP/mme_app.c
