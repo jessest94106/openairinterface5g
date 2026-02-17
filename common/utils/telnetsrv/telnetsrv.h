@@ -162,7 +162,7 @@ typedef struct {
      cmdparser_t CmdParsers[TELNET_MAXCMD];   // array of registered modules.
      char msgbuff[TELNET_MAX_MSGLENGTH];      // internal buffer of the client_printf function which is used to print to the client terminal */
      unsigned int   listenport;           // ip port the telnet server is listening on
-     unsigned int   listenaddr;           // ip address the telnet server is listening on
+     char          *listenaddr;           // ip address the telnet server is listening on
      unsigned int   listenstdin;          // enable command input from stdin    
      unsigned int   loopcount;            // loop command param: number of loop iteration
      unsigned int   loopdelay;            // loop command param: delay in ms between 2 iterations
