@@ -512,9 +512,6 @@ static bool set_fh_io_cfg(struct xran_io_cfg *io_cfg, const paramdef_t *fhip, in
   } else {
     io_cfg->bbdev_mode = XRAN_BBDEV_NOT_USED; // DPDK for BBDev
   }
-#elif defined(E_RELEASE)
-  io_cfg->bbdev_dev[0] = NULL; // BBDev dev name; max devices = 1
-  io_cfg->bbdev_mode = XRAN_BBDEV_NOT_USED; // DPDK for BBDev
 #endif
   int dpdk_iova_mode_idx = config_paramidx_fromname((paramdef_t *)fhip, nump, ORAN_CONFIG_DPDK_IOVA_MODE);
   AssertFatal(dpdk_iova_mode_idx >= 0,"Index for dpdk_iova_mode config option not found!");

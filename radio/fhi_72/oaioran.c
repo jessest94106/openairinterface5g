@@ -415,22 +415,7 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
           uint8_t *pData;
           struct xran_section_desc *p_sec_desc = NULL;
           struct xran_prb_elm *pRbElm = &pRbMap->prbMap[idxElm];
-#ifdef E_RELEASE
-          uint32_t one_rb_size =
-              (((pRbElm->iqWidth == 0) || (pRbElm->iqWidth == 16)) ? (N_SC_PER_PRB * 2 * 2) : (3 * pRbElm->iqWidth + 1));
-          if (fh_init->mtu < num_totalRB * one_rb_size)
-            pData = bufs->dst[ant_id % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN]
-                        .pBuffers[sym_idx % XRAN_NUM_OF_SYMBOL_PER_SLOT]
-                        .pData;
-          else {
-            p_sec_desc = pRbElm->p_sec_desc[sym_idx][0];
-            pData = p_sec_desc->pData;
-          }
-          numRB = num_totalRB;
-          startRB = start_totalRB;
-          {
-            {
-#elif defined F_RELEASE
+#if defined F_RELEASE
           // UP_nRBSize & UP_nRBStart are for DL U-plane only
           LOG_D(HW, "[%d.%d] idxElm[%d] startSym[%d]:numSym[%d] UP_startRB[%d]:UP_numRB[%d] sym_idx[%d] ant_id[%d] pRbElm->nRBStart[%d]:pRbElm->nRBSize[%d]\n", *frame, *slot, idxElm, pRbElm->nStartSymb, pRbElm->numSymb, pRbElm->UP_nRBStart, pRbElm->UP_nRBSize, sym_idx, ant_id, pRbElm->nRBStart, pRbElm->nRBSize);
           for (int idxDesc = 0; idxDesc < XRAN_MAX_FRAGMENT; idxDesc++) {
@@ -578,10 +563,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
         for (uint32_t idxElm = 0; idxElm < pPrbMap->nPrbElm; idxElm++) {
           struct xran_prb_elm *pRbElm = &pPrbMap->prbMap[idxElm];
           int numRB, startRB;
-#ifdef E_RELEASE
-          numRB = pRbElm->nRBSize;
-          startRB = pRbElm->nRBStart;
-#elif F_RELEASE
+#if defined F_RELEASE
           numRB = pRbElm->UP_nRBSize;
           startRB = pRbElm->UP_nRBStart;
 #endif
@@ -662,15 +644,11 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
                 p_prbMapElm->nBeamIndex = 0;
             }
 
-            // radio-transport fragmentation is not supported in both E and F releases;
+            // radio-transport fragmentation is not supported in xran F release;
             // E-bit = 1 => each ethernet frame is considered as the last fragment;
             // a group of PRBs per each symbol is encapsulated in one ethernet frame.
             // => seems that the RUs don't check for E-bit
-#ifdef E_RELEASE
-            p_sec_desc = p_prbMapElm->p_sec_desc[sym_idx][0];
-            int16_t startRB = p_prbMapElm->nRBStart;
-            int16_t numRB = p_prbMapElm->nRBSize;
-#elif F_RELEASE
+#if defined F_RELEASE
             p_sec_desc = &p_prbMapElm->sec_desc[sym_idx][0];
             int16_t startRB = p_prbMapElm->UP_nRBStart;
             int16_t numRB = p_prbMapElm->UP_nRBSize;
