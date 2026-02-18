@@ -31,15 +31,15 @@ docker tag oai-nr-cuup oai-ci/oai-nr-cuup:develop-${SHORT_COMMIT_SHA}
 python3 main.py --mode=InitiateHtml --ranRepository=NONE --ranBranch=${CURRENT_BRANCH} \
     --ranCommitID=${COMMIT_SHA} --ranAllowMerge=false \
     --ranTargetBranch=NONE \
-    --XMLTestFile=xml_files/${TESTCASE} --local
+    --XMLTestFile=xml_files/${TESTCASE} --local --datefmt="%H:%M:%S"
 
 python3 main.py --mode=TesteNB --ranRepository=NONE --ranBranch=${CURRENT_BRANCH} \
     --ranCommitID=${COMMIT_SHA} --ranAllowMerge=false \
     --ranTargetBranch=NONE \
     --eNBSourceCodePath=${REPO_PATH} \
-    --XMLTestFile=${TESTCASE} --local
+    --XMLTestFile=${TESTCASE} --local --datefmt="%H:%M:%S"
 RET=$?
 
-python3 main.py --mode=FinalizeHtml --local
+python3 main.py --mode=FinalizeHtml --local --datefmt="%H:%M:%S"
 
 exit ${RET}

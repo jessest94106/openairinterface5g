@@ -62,13 +62,6 @@ import lxml.etree as ET
 import logging
 import signal
 import traceback
-logging.basicConfig(
-	level=logging.DEBUG,
-	stream=sys.stdout,
-	format="[%(asctime)s] %(levelname)8s: %(message)s"
-)
-
-
 
 
 #-----------------------------------------------------------
@@ -349,7 +342,12 @@ CLUSTER = cls_cluster.Cluster()
 import args_parse
 # Force local execution, move all execution targets to localhost
 force_local = False
-mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER)
+mode, force_local, date_fmt = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER)
+fmt = "%(levelname)8s: %(message)s"
+if date_fmt:
+    fmt = "[%(asctime)s] %(levelname)s %(message)s"
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format=fmt, datefmt=date_fmt,)
+
 
 #-----------------------------------------------------------
 # mode amd XML class (action) analysis
