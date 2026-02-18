@@ -267,8 +267,6 @@ class Containerize():
 		self.dockerfileprefix = ''
 		self.host = ''
 
-		#checkers from xml
-		self.ran_checkers={}
 		self.num_attempts = 1
 
 		self.flexricTag = ''

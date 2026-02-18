@@ -108,13 +108,6 @@ def ExecuteActionWithParam(action, ctx, node):
 		success = RAN.InitializeeNB(ctx, node, HTML)
 
 	elif action == 'Terminate_eNB':
-		#retx checkers
-		string_field = test.findtext('d_retx_th')
-		if (string_field is not None):
-			RAN.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
-		string_field=test.findtext('u_retx_th')
-		if (string_field is not None):
-			RAN.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
 		services = []
 		analysis = test.find("analysis")
 		if analysis is not None:
