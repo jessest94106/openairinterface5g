@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include "FGSNASSecurityModeReject.h"
 #include "common/utils/ds/byte_array.h"
+#include "common/utils/eq_check.h"
 #include "fgmm_lib.h"
 
 int encode_fgs_security_mode_reject(byte_array_t *buffer, const fgs_security_mode_reject_msg *msg)
@@ -45,6 +46,6 @@ int decode_fgs_security_mode_reject(fgs_security_mode_reject_msg *msg, const byt
 
 bool eq_sec_mode_reject(const fgs_security_mode_reject_msg *a, const fgs_security_mode_reject_msg *b)
 {
-  _NAS_EQ_CHECK_INT(a->cause, b->cause);
+  _EQ_CHECK_INT(a->cause, b->cause);
   return true;
 }

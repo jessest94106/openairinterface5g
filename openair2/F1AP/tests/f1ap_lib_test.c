@@ -44,6 +44,7 @@
 #include "lib/f1ap_interface_management.h"
 #include "lib/f1ap_ue_context.h"
 #include "lib/f1ap_positioning.h"
+#include "lib/f1ap_paging.h"
 
 void exit_function(const char *file, const char *function, const int line, const char *s, const int assert)
 {
@@ -2383,6 +2384,79 @@ static void test_f1ap_positioning_measurement_update()
   printf("%s() successful\n", __func__);
 }
 
+/** @brief Test F1 Paging encode/decode roundtrip and copy operations */
+static void test_f1ap_paging_rt(f1ap_paging_t *orig)
+{
+  F1AP_F1AP_PDU_t *f1enc = encode_f1ap_paging(orig);
+  F1AP_F1AP_PDU_t *f1dec = f1ap_encode_decode(f1enc);
+  f1ap_msg_free(f1enc);
+
+  f1ap_paging_t decoded = {0};
+  bool ret = decode_f1ap_paging(&decoded, f1dec);
+  AssertFatal(ret, "decode_f1ap_paging(): could not decode message\n");
+  f1ap_msg_free(f1dec);
+
+  ret = eq_f1ap_paging(orig, &decoded);
+  AssertFatal(ret, "eq_f1ap_paging(): decoded message doesn't match\n");
+  free_f1ap_paging(&decoded);
+
+  f1ap_paging_t cp = cp_f1ap_paging(orig);
+  ret = eq_f1ap_paging(orig, &cp);
+  AssertFatal(ret, "eq_f1ap_paging(): copied message doesn't match\n");
+  free_f1ap_paging(&cp);
+}
+
+/** @brief Test F1 Paging encoding/decoding */
+static void test_f1ap_paging(void)
+{
+  // Test with CN UE Paging Identity (5G-S-TMSI)
+  {
+    f1ap_paging_t orig = {0};
+    orig.ue_identity_index_value = 123;
+    orig.identity_type = F1AP_PAGING_IDENTITY_CN_UE;
+    orig.identity.cn_ue_paging_identity = 0x1234567890AB;
+    orig.drx = malloc_or_fail(sizeof(*orig.drx));
+    *orig.drx = F1AP_PAGING_DRX_32;
+    orig.n_cells = 2;
+    orig.cells = calloc_or_fail(orig.n_cells, sizeof(*orig.cells));
+    orig.cells[0].plmn.mcc = 208;
+    orig.cells[0].plmn.mnc = 95;
+    orig.cells[0].plmn.mnc_digit_length = 2;
+    orig.cells[0].nr_cellid = 123456;
+    orig.cells[1].plmn.mcc = 208;
+    orig.cells[1].plmn.mnc = 93;
+    orig.cells[1].plmn.mnc_digit_length = 2;
+    orig.cells[1].nr_cellid = 789012;
+
+    test_f1ap_paging_rt(&orig);
+    free_f1ap_paging(&orig);
+  }
+
+  // Test with RAN UE Paging Identity (I-RNTI)
+  {
+    f1ap_paging_t orig = {0};
+    orig.ue_identity_index_value = 456;
+    orig.identity_type = F1AP_PAGING_IDENTITY_RAN_UE;
+    orig.identity.ran_ue_paging_identity = 0x1234567890;
+    orig.drx = NULL;
+    orig.priority = malloc_or_fail(sizeof(*orig.priority));
+    *orig.priority = F1AP_PAGING_PRIO_LEVEL3;
+    orig.origin = malloc_or_fail(sizeof(*orig.origin));
+    *orig.origin = F1AP_PAGING_ORIGIN_NON_3GPP;
+    orig.n_cells = 1;
+    orig.cells = calloc_or_fail(orig.n_cells, sizeof(*orig.cells));
+    orig.cells[0].plmn.mcc = 1;
+    orig.cells[0].plmn.mnc = 1;
+    orig.cells[0].plmn.mnc_digit_length = 2;
+    orig.cells[0].nr_cellid = 987654;
+
+    test_f1ap_paging_rt(&orig);
+    free_f1ap_paging(&orig);
+  }
+
+  printf("%s() successful\n", __func__);
+}
+
 int main()
 {
   test_initial_ul_rrc_message_transfer();
@@ -2427,5 +2501,6 @@ int main()
   test_f1ap_positioning_measurement_abort();
   test_f1ap_positioning_measurement_failure_indication();
   test_f1ap_positioning_measurement_update();
+  test_f1ap_paging();
   return 0;
 }

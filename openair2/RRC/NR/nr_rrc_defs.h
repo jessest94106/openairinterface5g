@@ -362,6 +362,7 @@ typedef struct nr_mac_rrc_dl_if_s {
   ue_context_modification_refuse_func_t ue_context_modification_refuse;
   ue_context_release_command_func_t ue_context_release_command;
   dl_rrc_message_transfer_func_t dl_rrc_message_transfer;
+  f1_paging_transfer_func_t paging_transfer;
 } nr_mac_rrc_dl_if_t;
 
 typedef struct cucp_cuup_if_s {

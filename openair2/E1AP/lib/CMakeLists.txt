@@ -9,3 +9,7 @@ target_include_directories(e1ap_lib PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+if(ENABLE_TESTS)
+  target_compile_definitions(e1ap_lib PRIVATE ENABLE_TESTS)
+endif()
+

@@ -716,7 +716,7 @@ int do_RRCSetupRequest(uint8_t *buffer, size_t buffer_size, uint8_t *rv, uint64_
     str->buf[3] = rv[3];
     str->buf[4] = rv[4] & 0xfe;
   } else {
-    uint64_t fiveG_S_TMSI_part1 = fiveG_S_TMSI & ((1ULL << 39) - 1);
+    uint64_t fiveG_S_TMSI_part1 = nr_extract_5g_s_tmsi_part1(fiveG_S_TMSI);
     /** set the ue-Identity to ng-5G-S-TMSI-Part1
      * ng-5G-S-TMSI-Part1: the rightmost 39 bits of 5G-S-TMSI
      * BIT STRING (SIZE (39)) - 3GPP TS 38.331 */
@@ -840,7 +840,7 @@ int do_RRCSetupComplete(uint8_t *buffer,
       str->size = 2;
       str->bits_unused = 7;
       str->buf = calloc_or_fail(str->size, sizeof(str->buf[0]));
-      uint16_t fiveG_s_tmsi_part2 = (fiveG_s_tmsi >> 39) & ((1ULL << 9) - 1);
+      uint16_t fiveG_s_tmsi_part2 = nr_extract_5g_s_tmsi_part2(fiveG_s_tmsi);
       str->buf[0] = (fiveG_s_tmsi_part2 >> (8 - str->bits_unused)) & 0xFF;
       str->buf[1] = (fiveG_s_tmsi_part2 << str->bits_unused) & 0xFF;
       LOG_D(NR_RRC, "5G-S-TMSI part 2 %d in RRCSetupComplete (5G-S-TMSI %ld)\n", fiveG_s_tmsi_part2, fiveG_s_tmsi);

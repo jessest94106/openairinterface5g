@@ -109,6 +109,15 @@ int hex_char_to_hex_value (char c);
 // Converts an hexadecimal ASCII coded string into its value.**
 int hex_string_to_hex_value (uint8_t *hex_value, const char *hex_string, int size);
 
+/* Map task id to printable name. */
+typedef struct {
+  int id;
+  char text[256];
+} text_info_t;
+
+#define TO_TEXT(LabEl, nUmID) {nUmID, #LabEl},
+#define TO_ENUM(LabEl, nUmID) LabEl = nUmID,
+
 char *itoa(int i);
 
 #define STRINGIFY(S) #S
