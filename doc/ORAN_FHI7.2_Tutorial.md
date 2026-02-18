@@ -69,11 +69,10 @@ Tested libxran releases:
 
 | Vendor                                  |
 |-----------------------------------------|
-| `oran_e_maintenance_release_v1.0`       |
 | `oran_f_release_v1.0`                   |
 
 
-**Note**: The libxran driver of OAI identifies the above E release version as "5.1.0" (E is fifth letter, then 1.0), and the above F release as "6.1.0".
+**Note**: The libxran driver of OAI identifies the above F release version as "6.1.0" (F is the sixth letter, then 1.0).
 
 ### Configure your server
 
@@ -375,14 +374,6 @@ cd ~/openairinterface5g/
 
 Download ORAN FHI DU library, checkout the correct version, and apply the correct patch (available in `oai_folder/cmake_targets/tools/oran_fhi_integration_patches`).
 
-#### E release
-```bash
-git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git ~/phy
-cd ~/phy
-git checkout oran_e_maintenance_release_v1.0
-git apply ~/openairinterface5g/cmake_targets/tools/oran_fhi_integration_patches/E/oaioran_E.patch
-```
-
 #### F release
 ```bash
 git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git ~/phy
@@ -404,7 +395,6 @@ This feature is intended to enable experiments and future improvements on Arm sy
 ```bash
 cd ~/phy/fhi_lib/lib
 make clean
-RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1 # E release
 WIRELESS_SDK_TOOLCHAIN=gcc RTE_SDK=~/dpdk-stable-20.11.9/ XRAN_DIR=~/phy/fhi_lib make XRAN_LIB_SO=1 # F release
 ...
 [AR] build/libxran.so
@@ -967,7 +957,7 @@ Sample configuration files for OAI gNB, specific to the manufacturer of the radi
 4. Benetel 550 RU:
 [`gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-benetel550.conf)
 [`gnb.sa.band78.273prb.fhi72.4x2-benetel550.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x2-benetel550.conf)
-[`gnb.sa.band78.273prb.fhi72.2x2-benetel550-16b.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.2x2-benetel550-16b.conf) - only with E release; with F, UL U-plane fragmentation is not correct
+[`gnb.sa.band78.273prb.fhi72.2x2-benetel550-16b.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.2x2-benetel550-16b.conf) - tested successfully with E release; with F, UL U-plane fragmentation is not correct
 5. Metanoia RU:
 [`gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf`](../targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.273prb.fhi72.4x4-metanoia.conf)
 

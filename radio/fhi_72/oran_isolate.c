@@ -229,7 +229,7 @@ void oran_fh_if4p5_south_in(RU_t *ru, int *frame, int *slot)
   start_meas(&ru->rx_fhaul);
   struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   int ret = 0;
-#ifdef F_RELEASE
+#if defined F_RELEASE
   if (fh_cfg->RunSlotPrbMapBySymbolEnable)
     ret = xran_fh_rx_read_slot_BySymbol(&ru_info, &f, &sl);
   else
@@ -291,7 +291,7 @@ void oran_fh_if4p5_south_out(RU_t *ru, int frame, int slot, uint64_t timestamp)
 
   struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   int ret = 0;
-#ifdef F_RELEASE
+#if defined F_RELEASE
   if (fh_cfg->RunSlotPrbMapBySymbolEnable)
     ret = xran_fh_tx_send_slot_BySymbol(&ru_info, frame, slot, timestamp);
   else
