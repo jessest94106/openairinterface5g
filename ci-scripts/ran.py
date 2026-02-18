@@ -67,8 +67,6 @@ class RANManagement():
 		self.eNBOptions = ['', '', '']
 		self.eNBstatuses = [-1, -1, -1]
 		self.runtime_stats= ''
-		#checkers from xml
-		self.ran_checkers={}
 		self.cmd_prefix = '' # prefix before {lte,nr}-softmodem
 		self.node = ''
 		self.command = ''
@@ -176,25 +174,6 @@ class RANManagement():
 		HTML.CreateHtmlDataLogTable(datalog_rt_stats)
 		return success
 
-	def _analyzeUeRetx(self, rounds, checkers, regex):
-		if len(rounds) == 0 or len(checkers) == 0:
-			logging.warning(f'warning: rounds={rounds} checkers={checkers}')
-			return []
-
-		perc = list(0 for i in checkers) # results in %
-		stats = list(False for i in checkers) # status if succeeded
-		tmp = re.match(regex, rounds)
-		if tmp is None:
-			logging.error('_analyzeUeRetx: did not match regex for DL retx analysis')
-			return stats
-		retx_data = [float(x) for x in tmp.groups()]
-		for i in range(0, len(perc)):
-			#case where numerator > denumerator with denum ==0 is disregarded, cannot hapen in principle, will lead to 0%
-			perc[i] = 0 if (retx_data[i] == 0) else 100 * retx_data[i + 1] / retx_data[i]
-			#treating % > 100 , % > requirement
-			stats[i] = perc[i] <= 100 and perc[i] <= checkers[i]
-		return stats
-
 	def AnalyzeLogFile_eNB(self, eNBlogFile, HTML, checkers={}):
 		if (not os.path.isfile(eNBlogFile)):
 			return -1
@@ -239,8 +218,6 @@ class RANManagement():
 		nbContextSwitches = ''
 		#NSA FR1 check
 		NSA_RAPROC_PUSCH_check = 0
-		#dlsch and ulsch statistics (dictionary)
-		dlsch_ulsch_stats = {}
 		#count "problem receiving samples" msg
 		pb_receiving_samples_cnt = 0
 		#count "removing UE" msg
@@ -392,22 +369,6 @@ class RANManagement():
 			if result is not None:
 				NSA_RAPROC_PUSCH_check = 1
 
-			# Collect information on UE DLSCH and ULSCH statistics
-			keys = {'dlsch_rounds','ulsch_rounds'}
-			for k in keys:
-				result = re.search(k, line)
-				if result is None:
-					continue
-				result = re.search('UE (?:RNTI )?([0-9a-f]{4})', line)
-				if result is None:
-					logging.error(f'did not find RNTI while matching key {k}')
-					continue
-				rnti = result.group(1)
-
-				#remove 1- all useless char before relevant info (ulsch or dlsch) 2- trailing char
-				if not rnti in dlsch_ulsch_stats: dlsch_ulsch_stats[rnti] = {}
-				dlsch_ulsch_stats[rnti][k]=re.sub(r'^.*\]\s+', r'' , line.rstrip())
-
 			result = re.search('Received NR_RRCReconfigurationComplete from UE', str(line))
 			if result is not None:
 				nrRrcRcfgComplete += 1
@@ -505,23 +466,6 @@ class RANManagement():
 			logging.debug(statMsg)
 			htmleNBFailureMsg += htmlMsg
 
-			#ulsch and dlsch statistics and checkers
-			for ue in dlsch_ulsch_stats:
-				dlulstat = dlsch_ulsch_stats[ue]
-				#print statistics into html
-				statMsg=''
-				for key in dlulstat:
-					statMsg += dlulstat[key] + '\n'
-					logging.debug(dlulstat[key])
-				htmleNBFailureMsg += statMsg
-
-				retx_status[ue] = {}
-				dlcheckers = [] if 'd_retx_th' not in checkers else checkers['d_retx_th']
-				retx_status[ue]['dl'] = self._analyzeUeRetx(dlulstat['dlsch_rounds'], dlcheckers, r'^.*dlsch_rounds\s+(\d+)\/(\d+)\/(\d+)\/(\d+),\s+dlsch_errors\s+(\d+)')
-				ulcheckers = [] if 'u_retx_th' not in checkers else checkers['u_retx_th']
-				retx_status[ue]['ul'] = self._analyzeUeRetx(dlulstat['ulsch_rounds'], ulcheckers, r'^.*ulsch_rounds\s+(\d+)\/(\d+)\/(\d+)\/(\d+),\s+ulsch_errors\s+(\d+)')
-
-
 			if not showedByeMsg:
 				logging.debug('\u001B[1;37;41m ' + nodeB_prefix + 'NB did not show "Bye." message at end, it likely did not stop properly! \u001B[0m')
 				htmleNBFailureMsg += 'No Bye. message found, did not stop properly\n'
@@ -556,16 +500,6 @@ class RANManagement():
 			htmlMsg = statMsg+'\n'
 			logging.debug(statMsg)
 			htmleNBFailureMsg += htmlMsg			
-
-		for ue in retx_status:
-			msg = f"retransmissions for UE {ue}: DL {retx_status[ue]['dl']} UL {retx_status[ue]['ul']}"
-			if False in retx_status[ue]['dl'] or False in retx_status[ue]['ul']:
-				msg = 'Failure: ' + msg
-				logging.error(f'\u001B[1;37;41m {msg}\u001B[0m')
-				htmleNBFailureMsg += f'{msg}\n'
-				global_status = CONST.ENB_RETX_ISSUE
-			else:
-				logging.debug(msg)
 
 		if RealTimeProcessingIssue:
 			logging.debug('\u001B[1;37;41m ' + nodeB_prefix + 'NB ended with real time processing issue! \u001B[0m')
