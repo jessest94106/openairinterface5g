@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "fgs_nas_utils.h"
+#include "common/utils/utils.h" // text_info_t, TO_ENUM, TO_TEXT
 
 /* PDU Session Establish Accept Optional IE Identifiers - TS 24.501 Table 8.3.2.1.1 */
 

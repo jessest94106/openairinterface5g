@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include "OctetString.h"
 #include "fgs_nas_utils.h"
+#include "common/utils/utils.h" // text_info_t, TO_ENUM, TO_TEXT
 
 #ifndef FGS_MOBILE_IDENTITY_H_
 #define FGS_MOBILE_IDENTITY_H_

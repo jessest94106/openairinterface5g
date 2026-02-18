@@ -60,6 +60,7 @@
 #include "common/openairinterface5g_limits.h"
 #include "common/platform_constants.h"
 #include "common/ran_context.h"
+#include "common/utils/nr/nr_common.h"
 #include "common_lib.h"
 #include "constr_SEQUENCE.h"
 #include "constr_TYPE.h"
@@ -2077,7 +2078,7 @@ static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const N
         uint16_t stmsi_part2 = BIT_STRING_to_uint16(part2);
         LOG_I(RRC, "s_tmsi part2 %d (%02x %02x)\n", stmsi_part2, part2->buf[0], part2->buf[1]);
         // Part2 is leftmost 9, Part1 is rightmost 39 bits of 5G-S-TMSI
-        fiveg_s_TMSI = ((uint64_t) stmsi_part2) << 39 | UE->ng_5G_S_TMSI_Part1;
+        fiveg_s_TMSI = nr_build_full_5g_s_tmsi(UE->ng_5G_S_TMSI_Part1, stmsi_part2);
       } else {
         LOG_W(RRC, "UE %d received 5G-S-TMSI-Part2, but no 5G-S-TMSI-Part1 present, won't send 5G-S-TMSI to core\n", UE->rrc_ue_id);
         UE->Initialue_identity_5g_s_TMSI.presence = false;
@@ -2094,9 +2095,10 @@ static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const N
     }
 
     if (UE->Initialue_identity_5g_s_TMSI.presence) {
-      uint16_t amf_set_id = fiveg_s_TMSI >> 38;
-      uint8_t amf_pointer = (fiveg_s_TMSI >> 32) & 0x3F;
-      uint32_t fiveg_tmsi = (uint32_t) fiveg_s_TMSI;
+      uint16_t amf_set_id;
+      uint8_t amf_pointer;
+      uint32_t fiveg_tmsi;
+      nr_deconstruct_5g_s_tmsi(fiveg_s_TMSI, &amf_set_id, &amf_pointer, &fiveg_tmsi);
       LOG_I(NR_RRC,
             "5g_s_TMSI: 0x%lX, amf_set_id: 0x%X (%d), amf_pointer: 0x%X (%d), 5g TMSI: 0x%X \n",
             fiveg_s_TMSI,
@@ -3525,7 +3527,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case NGAP_PAGING_IND:
-        rrc_gNB_process_PAGING_IND(msg_p, instance);
+        rrc_gNB_process_PAGING_IND(RC.nrrrc[instance], instance, &NGAP_PAGING_IND(msg_p));
         break;
 
       case NGAP_HANDOVER_REQUEST:

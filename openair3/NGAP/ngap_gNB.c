@@ -57,6 +57,7 @@
 #include "ngap_messages_types.h"
 #include "ngap_gNB_mobility_management.h"
 #include "ngap_gNB_ue_context.h"
+#include "ngap_gNB_pdu_session_management.h"
 #include "oai_asn1.h"
 #include "openair3/SECU/kdf.h"
 #include "queue.h"

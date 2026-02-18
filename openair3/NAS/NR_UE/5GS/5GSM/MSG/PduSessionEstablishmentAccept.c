@@ -23,6 +23,7 @@
 #include <arpa/inet.h>
 #include "PduSessionEstablishmentAccept.h"
 #include "common/utils/LOG/log.h"
+#include "common/utils/utils.h" // text_info_t, TO_ENUM, TO_TEXT
 #include "fgs_nas_utils.h"
 
 /**
@@ -205,7 +206,7 @@ int decode_pdu_session_establishment_accept_msg(pdu_session_establishment_accept
       }
 
       default:
-        PRINT_NAS_ERROR("Unknown IEI %d\n", psea_iei);
+        PRINT_ERROR("Unknown IEI %d\n", psea_iei);
         curPtr = buffer + msg_length; // we force stop processing
         break;
     }

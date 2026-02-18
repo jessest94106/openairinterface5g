@@ -40,6 +40,7 @@ typedef void (*ue_context_modification_refuse_func_t)(sctp_assoc_t assoc_id, con
 typedef void (*ue_context_release_command_func_t)(sctp_assoc_t assoc_id, const f1ap_ue_context_rel_cmd_t *cmd);
 
 typedef void (*dl_rrc_message_transfer_func_t)(sctp_assoc_t assoc_id, const f1ap_dl_rrc_message_t *dl_rrc);
+typedef void (*f1_paging_transfer_func_t)(sctp_assoc_t assoc_id, const f1ap_paging_t *paging);
 
 struct nr_mac_rrc_dl_if_s;
 void mac_rrc_dl_direct_init(struct nr_mac_rrc_dl_if_s *mac_rrc);

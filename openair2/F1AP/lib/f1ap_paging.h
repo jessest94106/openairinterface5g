@@ -19,33 +19,19 @@
  *      contact@openairinterface.org
  */
 
-/*! \file ngap_gNB_management_procedures.h
- * \brief NGAP gNB task 
- * \author  Yoshio INOUE, Masayuki HARADA 
- * \date 2020
- * \email: yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com (yoshio.inoue%40fujitsu.com%2cmasayuki.harada%40fujitsu.com)
- * \version 1.0
- * @ingroup _ngap
- */
+#ifndef F1AP_PAGING_H_
+#define F1AP_PAGING_H_
 
-#include "ds/byte_array.h"
-#include "BIT_STRING.h"
+#include <stdbool.h>
+#include "f1ap_messages_types.h"
 
-#ifndef NGAP_GNB_MANAGEMENT_PROCEDURES_H_
-#define NGAP_GNB_MANAGEMENT_PROCEDURES_H_
+struct F1AP_F1AP_PDU;
 
-struct ngap_gNB_amf_data_s *ngap_gNB_get_AMF(ngap_gNB_instance_t *instance_p, sctp_assoc_t assoc_id, uint16_t cnx_id);
+/* F1 Paging */
+struct F1AP_F1AP_PDU *encode_f1ap_paging(const f1ap_paging_t *msg);
+bool decode_f1ap_paging(f1ap_paging_t *out, const struct F1AP_F1AP_PDU *pdu);
+void free_f1ap_paging(f1ap_paging_t *msg);
+bool eq_f1ap_paging(const f1ap_paging_t *a, const f1ap_paging_t *b);
+f1ap_paging_t cp_f1ap_paging(const f1ap_paging_t *orig);
 
-struct ngap_gNB_amf_data_s *ngap_gNB_get_AMF_from_instance(ngap_gNB_instance_t *instance_p);
-
-void ngap_gNB_remove_amf_desc(ngap_gNB_instance_t * instance);
-
-void ngap_gNB_insert_new_instance(ngap_gNB_instance_t *new_instance_p);
-
-ngap_gNB_instance_t *ngap_gNB_get_instance(uint8_t mod_id);
-
-uint16_t ngap_gNB_fetch_add_global_cnx_id(void);
-
-void ngap_gNB_prepare_internal_data(void);
-
-#endif /* NGAP_GNB_MANAGEMENT_PROCEDURES_H_ */
+#endif /* F1AP_PAGING_H_ */

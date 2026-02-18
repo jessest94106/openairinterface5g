@@ -47,8 +47,6 @@ MESSAGE_DEF(NGAP_PAGING_LOG    , MESSAGE_PRIORITY_MED, IttiMsgText              
 MESSAGE_DEF(NGAP_PDUSESSION_RELEASE_REQUEST_LOG   , MESSAGE_PRIORITY_MED, IttiMsgText                      , ngap_pdusession_release_request_log)
 MESSAGE_DEF(NGAP_PDUSESSION_RELEASE_RESPONSE_LOG  , MESSAGE_PRIORITY_MED, IttiMsgText                      , ngap_pdusession_release_response_log)
 MESSAGE_DEF(NGAP_ERROR_INDICATION_LOG        , MESSAGE_PRIORITY_MED, IttiMsgText                      , ngap_error_indication_log)
-MESSAGE_DEF(NGAP_PATH_SWITCH_REQ_LOG         , MESSAGE_PRIORITY_MED, IttiMsgText                      , ngap_path_switch_req_log)
-MESSAGE_DEF(NGAP_PATH_SWITCH_REQ_ACK_LOG     , MESSAGE_PRIORITY_MED, IttiMsgText                      , ngap_path_switch_req_ack_log)
 
 /* gNB application layer -> NGAP messages */
 MESSAGE_DEF(NGAP_REGISTER_GNB_REQ          , MESSAGE_PRIORITY_MED, ngap_register_gnb_req_t          , ngap_register_gnb_req)
@@ -65,8 +63,6 @@ MESSAGE_DEF(NGAP_INITIAL_CONTEXT_SETUP_RESP, MESSAGE_PRIORITY_MED, ngap_initial_
 MESSAGE_DEF(NGAP_INITIAL_CONTEXT_SETUP_FAIL, MESSAGE_PRIORITY_MED, ngap_initial_context_setup_fail_t, ngap_initial_context_setup_fail)
 MESSAGE_DEF(NGAP_NAS_NON_DELIVERY_IND      , MESSAGE_PRIORITY_MED, ngap_nas_non_delivery_ind_t      , ngap_nas_non_delivery_ind)
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_COMPLETE, MESSAGE_PRIORITY_MED, ngap_ue_release_complete_t      , ngap_ue_release_complete)
-MESSAGE_DEF(NGAP_UE_CTXT_MODIFICATION_RESP , MESSAGE_PRIORITY_MED, ngap_ue_ctxt_modification_resp_t , ngap_ue_ctxt_modification_resp)
-MESSAGE_DEF(NGAP_UE_CTXT_MODIFICATION_FAIL , MESSAGE_PRIORITY_MED, ngap_ue_ctxt_modification_fail_t , ngap_ue_ctxt_modification_fail)
 MESSAGE_DEF(NGAP_PDUSESSION_SETUP_RESP          , MESSAGE_PRIORITY_MED, ngap_pdusession_setup_resp_t          , ngap_pdusession_setup_resp)
 MESSAGE_DEF(NGAP_PDUSESSION_MODIFY_RESP          , MESSAGE_PRIORITY_MED, ngap_pdusession_modify_resp_t          , ngap_pdusession_modify_resp)
 MESSAGE_DEF(NGAP_PDUSESSION_RELEASE_RESPONSE    , MESSAGE_PRIORITY_MED, ngap_pdusession_release_resp_t        , ngap_pdusession_release_resp)
@@ -81,7 +77,6 @@ MESSAGE_DEF(NGAP_DL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_t
 /* NGAP -> RRC messages */
 MESSAGE_DEF(NGAP_DOWNLINK_NAS              , MESSAGE_PRIORITY_MED, ngap_downlink_nas_t              , ngap_downlink_nas )
 MESSAGE_DEF(NGAP_INITIAL_CONTEXT_SETUP_REQ , MESSAGE_PRIORITY_MED, ngap_initial_context_setup_req_t , ngap_initial_context_setup_req )
-MESSAGE_DEF(NGAP_UE_CTXT_MODIFICATION_REQ  , MESSAGE_PRIORITY_MED, ngap_ue_ctxt_modification_req_t  , ngap_ue_ctxt_modification_req)
 MESSAGE_DEF(NGAP_PAGING_IND                , MESSAGE_PRIORITY_MED, ngap_paging_ind_t                , ngap_paging_ind )
 MESSAGE_DEF(NGAP_PDUSESSION_SETUP_REQ            , MESSAGE_PRIORITY_MED, ngap_pdusession_setup_req_t        , ngap_pdusession_setup_req )
 MESSAGE_DEF(NGAP_PDUSESSION_MODIFY_REQ           , MESSAGE_PRIORITY_MED, ngap_pdusession_modify_req_t        , ngap_pdusession_modify_req )

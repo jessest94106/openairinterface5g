@@ -360,6 +360,18 @@ uint64_t nr_construct_5g_s_tmsi(uint16_t amf_set_id, uint8_t amf_pointer, uint32
 /** @brief Construct 5G-S-TMSI-Part1 from 5G-S-TMSI components */
 uint64_t nr_construct_5g_s_tmsi_part1(uint16_t amf_set_id, uint8_t amf_pointer, uint32_t m_tmsi);
 
+/** @brief Extract 5G-S-TMSI-Part1 from full 5G-S-TMSI */
+uint64_t nr_extract_5g_s_tmsi_part1(const uint64_t fiveg_s_tmsi);
+
+/** @brief Extract 5G-S-TMSI-Part2 from full 5G-S-TMSI */
+uint16_t nr_extract_5g_s_tmsi_part2(const uint64_t fiveg_s_tmsi);
+
+/** @brief Build full 5G-S-TMSI from Part1 and Part2 */
+uint64_t nr_build_full_5g_s_tmsi(const uint64_t part1, const uint16_t part2);
+
+/** @brief Deconstruct full 5G-S-TMSI into its components */
+void nr_deconstruct_5g_s_tmsi(const uint64_t fiveg_s_tmsi, uint16_t *amf_set_id, uint8_t *amf_pointer, uint32_t *m_tmsi);
+
 #define CEILIDIV(a,b) ((a+b-1)/b)
 #define ROUNDIDIV(a,b) (((a<<1)+b)/(b<<1))
 #define BOUNDED_EVAL(a, b, c) (min(c, max(a, b)))

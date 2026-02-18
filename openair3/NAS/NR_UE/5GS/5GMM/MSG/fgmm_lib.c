@@ -24,6 +24,7 @@
 #include <arpa/inet.h> // For htons and ntohs
 #include <stdlib.h> // For malloc and free
 #include "common/utils/ds/byte_array.h"
+#include "common/utils/eq_check.h"
 
 #define IEI_LEN 1
 #define GPRS_TIMER_LENGTH 3 // octets
@@ -41,7 +42,7 @@
 int encode_pdu_session_ie(byte_array_t *buffer, nas_service_IEI_t iei, const uint8_t *psi)
 {
   if (buffer->len < MIN_PDU_SESSION_CONTENTS_LEN + 2) {
-    PRINT_NAS_ERROR("%s failed: buffer is too small", __func__);
+    PRINT_ERROR("%s failed: buffer is too small", __func__);
     return -1;
   }
 
@@ -83,14 +84,14 @@ int decode_pdu_session_ie(uint8_t *psi, const byte_array_t *buffer)
   uint8_t *buf = buffer->buf;
 
   if (buffer->len < MIN_PDU_SESSION_CONTENTS_LEN + 2) {
-    PRINT_NAS_ERROR("%s failed: buffer length is too small", __func__);
+    PRINT_ERROR("%s failed: buffer length is too small", __func__);
     return -1;
   }
 
   // start decoding from length IE (IEI is decoded in the caller)
   uint8_t pdu_session_status_len = buf[decoded++];
   if (pdu_session_status_len > MAX_PDU_SESSION_CONTENTS_LEN) {
-    PRINT_NAS_ERROR("decoded length is out of bound for PDU Session Status/Reactivation result\n");
+    PRINT_ERROR("decoded length is out of bound for PDU Session Status/Reactivation result\n");
     return -1;
   }
 
@@ -116,7 +117,7 @@ int decode_pdu_session_ie(uint8_t *psi, const byte_array_t *buffer)
 int encode_gprs_timer_ie(byte_array_t *buffer, nas_service_IEI_t iei, const gprs_timer_t *timer)
 {
   if (buffer->len < GPRS_TIMER_LENGTH) {
-    PRINT_NAS_ERROR("Buffer length is too short to encode the GPRS Timer IE\n");
+    PRINT_ERROR("Buffer length is too short to encode the GPRS Timer IE\n");
     return -1;
   }
 
@@ -150,8 +151,8 @@ int decode_gprs_timer_ie(gprs_timer_t *timer, const byte_array_t *buffer)
 /** @brief Equality check for GPRS Timer */
 bool eq_gprs_timer(const gprs_timer_t *a, const gprs_timer_t *b)
 {
- _NAS_EQ_CHECK_INT(a->value, b->value);
- _NAS_EQ_CHECK_INT(a->unit, b->unit);
+  _EQ_CHECK_INT(a->value, b->value);
+  _EQ_CHECK_INT(a->unit, b->unit);
   return true;
 }
 
@@ -162,13 +163,13 @@ int encode_eap_msg_ie(byte_array_t *buffer, const byte_array_t *msg)
 
   // Sanity check on buffer length
   if (buffer->len < MIN_EAP_MSG_LEN) {
-    PRINT_NAS_ERROR("Invalid buffer length %ld", buffer->len);
+    PRINT_ERROR("Invalid buffer length %ld", buffer->len);
     return -1;
   }
 
   // Sanity check on input length
   if (msg->len < MIN_EAP_CONTENTS_LEN || msg->len > MAX_EAP_CONTENTS_LEN) {
-    PRINT_NAS_ERROR("Invalid EAP message length %ld", msg->len);
+    PRINT_ERROR("Invalid EAP message length %ld", msg->len);
     return -1;
   }
 
@@ -196,7 +197,7 @@ int decode_eap_msg_ie(byte_array_t *eap_msg, const byte_array_t *buffer)
 
   // Check buffer length validity
   if (buffer->len < min_len_to_decode) {
-    PRINT_NAS_ERROR("Invalid buffer for decoding EAP message IE");
+    PRINT_ERROR("Invalid buffer for decoding EAP message IE");
     return -1;
   }
 
@@ -206,13 +207,13 @@ int decode_eap_msg_ie(byte_array_t *eap_msg, const byte_array_t *buffer)
 
   // Check payload length validity
   if (eap_msg->len < MIN_EAP_CONTENTS_LEN || eap_msg->len > MAX_EAP_CONTENTS_LEN) {
-    PRINT_NAS_ERROR("Invalid EAP message length %ld", eap_msg->len);
+    PRINT_ERROR("Invalid EAP message length %ld", eap_msg->len);
     return -1;
   }
 
   // Check for buffer overflow
   if (buffer->len < decoded + eap_msg->len) {
-    PRINT_NAS_ERROR("Buffer too short for EAP message: %ld < %ld", buffer->len, decoded + eap_msg->len);
+    PRINT_ERROR("Buffer too short for EAP message: %ld < %ld", buffer->len, decoded + eap_msg->len);
     return -1;
   }
 

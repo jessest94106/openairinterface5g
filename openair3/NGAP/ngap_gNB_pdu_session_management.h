@@ -19,33 +19,18 @@
  *      contact@openairinterface.org
  */
 
-/*! \file ngap_gNB_management_procedures.h
- * \brief NGAP gNB task 
- * \author  Yoshio INOUE, Masayuki HARADA 
- * \date 2020
- * \email: yoshio.inoue@fujitsu.com,masayuki.harada@fujitsu.com (yoshio.inoue%40fujitsu.com%2cmasayuki.harada%40fujitsu.com)
- * \version 1.0
- * @ingroup _ngap
- */
+#ifndef NGAP_GNB_PDU_SESSION_MANAGEMENT_H_
+#define NGAP_GNB_PDU_SESSION_MANAGEMENT_H_
 
-#include "ds/byte_array.h"
-#include "BIT_STRING.h"
+#include <stdint.h>
+#include "assertions.h"
+#include "ngap_messages_types.h"
+#include "ngap_msg_includes.h"
 
-#ifndef NGAP_GNB_MANAGEMENT_PROCEDURES_H_
-#define NGAP_GNB_MANAGEMENT_PROCEDURES_H_
+int ngap_gNB_pdusession_setup_resp(instance_t instance, ngap_pdusession_setup_resp_t *pdusession_setup_resp_p);
 
-struct ngap_gNB_amf_data_s *ngap_gNB_get_AMF(ngap_gNB_instance_t *instance_p, sctp_assoc_t assoc_id, uint16_t cnx_id);
+int ngap_gNB_pdusession_modify_resp(instance_t instance, ngap_pdusession_modify_resp_t *pdusession_modify_resp_p);
 
-struct ngap_gNB_amf_data_s *ngap_gNB_get_AMF_from_instance(ngap_gNB_instance_t *instance_p);
+int ngap_gNB_pdusession_release_resp(instance_t instance, ngap_pdusession_release_resp_t *pdusession_release_resp_p);
 
-void ngap_gNB_remove_amf_desc(ngap_gNB_instance_t * instance);
-
-void ngap_gNB_insert_new_instance(ngap_gNB_instance_t *new_instance_p);
-
-ngap_gNB_instance_t *ngap_gNB_get_instance(uint8_t mod_id);
-
-uint16_t ngap_gNB_fetch_add_global_cnx_id(void);
-
-void ngap_gNB_prepare_internal_data(void);
-
-#endif /* NGAP_GNB_MANAGEMENT_PROCEDURES_H_ */
+#endif /* NGAP_GNB_PDU_SESSION_MANAGEMENT_H_ */

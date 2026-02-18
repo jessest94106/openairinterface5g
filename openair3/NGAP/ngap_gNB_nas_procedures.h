@@ -54,13 +54,4 @@ int ngap_gNB_initial_ctxt_fail(instance_t instance, ngap_initial_context_setup_f
 int ngap_gNB_ue_capabilities(instance_t instance,
                              ngap_ue_cap_info_ind_t *ue_cap_info_ind_p);
 
-int ngap_gNB_pdusession_setup_resp(instance_t instance,
-                              ngap_pdusession_setup_resp_t *pdusession_setup_resp_p);
-
-int ngap_gNB_pdusession_modify_resp(instance_t instance,
-                               ngap_pdusession_modify_resp_t *pdusession_modify_resp_p);
-
-int ngap_gNB_pdusession_release_resp(instance_t instance,
-                                ngap_pdusession_release_resp_t *pdusession_release_resp_p);
-
 #endif /* NGAP_GNB_NAS_PROCEDURES_H_ */
