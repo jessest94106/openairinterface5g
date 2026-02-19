@@ -1054,7 +1054,6 @@ int main(int argc, char **argv)
 
     NR_gNB_DLSCH_t *gNB_dlsch = &gNB->dlsch[0];
     memset(Sched_INFO, 0, sizeof(*Sched_INFO));
-    Sched_INFO->sched_response_id = -1;
     nfapi_nr_dl_tti_request_body_t *dl_req = &Sched_INFO->DL_req.dl_tti_request_body;
     // scheduler will place PDSCH second (after PDCCH), verification below
     nfapi_nr_dl_tti_request_pdu_t  *dl_tti_pdsch_pdu = &dl_req->dl_tti_pdu_list[1];
