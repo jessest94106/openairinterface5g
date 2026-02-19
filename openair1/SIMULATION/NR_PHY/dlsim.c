@@ -1012,7 +1012,7 @@ int main(int argc, char **argv)
   }
   //---------------
 
-  Sched_INFO = malloc(sizeof(*Sched_INFO));
+  Sched_INFO = memalign(32, sizeof(*Sched_INFO));
   if (Sched_INFO == NULL) {
     LOG_E(PHY, "out of memory\n");
     exit(1);
