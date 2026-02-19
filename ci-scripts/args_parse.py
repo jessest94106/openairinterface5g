@@ -33,7 +33,6 @@
 #-----------------------------------------------------------
 import sys		# arg
 import re		# reg
-import yaml
 import constants as CONST
 
 #-----------------------------------------------------------
@@ -162,9 +161,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
         elif re.match(r'^\-\-OCRegistry=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-OCRegistry=(.+)$', myArgv, re.IGNORECASE)
             CLUSTER.OCRegistry = matchReg.group(1)
-        elif re.match(r'^\-\-BuildId=(.+)$', myArgv, re.IGNORECASE):
-            matchReg = re.match(r'^\-\-BuildId=(.+)$', myArgv, re.IGNORECASE)
-            RAN.BuildId = matchReg.group(1)
         elif re.match(r'^\-\-FlexRicTag=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-FlexRicTag=(.+)$', myArgv, re.IGNORECASE)
             CONTAINERS.flexricTag = matchReg.group(1)
