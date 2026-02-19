@@ -72,9 +72,6 @@
   #define  SYNCHRO_RATE_CHANGE_FACTOR  (1)
 #endif
 
-#define SYNC_TMP_SIZE                  (NB_ANTENNAS_RX*SYNCHRO_FFT_SIZE_MAX*IQ_SIZE) /* to be aligned with existing lte synchro */
-#define SYNCF_TMP_SIZE                 (SYNCHRO_FFT_SIZE_MAX*IQ_SIZE)
-
 void init_context_synchro_nr(NR_DL_FRAME_PARMS *frame_parms_ue);
 int pss_synchro_nr(const c16_t **rxdata,
                    const NR_DL_FRAME_PARMS *frame_parms,
