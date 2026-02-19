@@ -94,5 +94,21 @@ UE 257a: ulsch_rounds 41777/2863/10/0, ulsch_errors 0, ulsch_DTX 17, BLER 0.1145
         self.assertFalse(result)
         self.assertEqual(log, expected)
 
+    def test_last_line_contains_false(self):
+        f = "tests/log-analysis/arbitrary.log"
+        opt = "Bye."
+        result, log = cls_loganalysis.LastLineContains.run(f, opt)
+        expected = f"could not find '{opt}' in last line"
+        self.assertFalse(result)
+        self.assertEqual(log, expected)
+
+    def test_last_line_contains_false(self):
+        f = "tests/log-analysis/arbitrary.log"
+        opt = "got sync"
+        result, log = cls_loganalysis.LastLineContains.run(f, opt)
+        expected = ""
+        self.assertTrue(result)
+        self.assertEqual(log, expected)
+
 if __name__ == '__main__':
 	unittest.main()
