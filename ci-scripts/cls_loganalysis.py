@@ -23,6 +23,7 @@
 import re
 import os
 import logging
+from collections import deque
 
 class Default:
 	def run(file, opt=None):
@@ -43,6 +44,14 @@ class ContainsString:
 				if re.search(needle, line):
 					return True, ""
 		return False, f"could not find '{needle}' in logs"
+
+class LastLineContains:
+	def run(file, string):
+		with open(file, "r") as f:
+			last_line = deque(f, maxlen=1).pop()
+		success = string in last_line
+		log = "" if success else f"could not find '{string}' in last line"
+		return success, log
 
 class RetxCheck():
 	def _parseList(s):
