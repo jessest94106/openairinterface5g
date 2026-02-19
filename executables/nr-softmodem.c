@@ -514,7 +514,7 @@ int main( int argc, char **argv ) {
   start_background_system();
 
   ///static configuration for NR at the moment
-  if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == NULL) {
+  if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == NULL || CONFIG_ISFLAGSET(CONFIG_ABORT)) {
     exit_fun("[SOFTMODEM] Error, configuration module init failed\n");
   }
 
@@ -527,11 +527,6 @@ int main( int argc, char **argv ) {
   logInit();
   lock_memory_to_ram();
   get_options(uniqCfg);
-
-  if (CONFIG_ISFLAGSET(CONFIG_ABORT) ) {
-    fprintf(stderr,"Getting configuration failed\n");
-    exit(-1);
-  }
 
   if (!has_cap_sys_nice())
     LOG_W(UTIL,
