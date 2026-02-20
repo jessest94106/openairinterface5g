@@ -205,6 +205,12 @@ void nrue_set_ru_params(configmodule_interface_t *cfg)
   if (RUParamList.numelt <= 0) {
     nrue_ru_count = 1;
     nrue_rus = calloc_or_fail(nrue_ru_count, sizeof(nrUE_RU_params_t));
+    AssertFatal(get_nrUE_params()->nb_antennas_tx <= NB_ANTENNAS_TX,
+                "Config file has %d TX antennas set, but the compile time max value in NB_ANTENNAS_TX\n",
+                get_nrUE_params()->nb_antennas_tx);
+    AssertFatal(get_nrUE_params()->nb_antennas_rx <= NB_ANTENNAS_RX,
+                "Config file has %d RX antennas set, but the compile time max value in NB_ANTENNAS_RX\n",
+                get_nrUE_params()->nb_antennas_tx);
     nrue_rus[0] = (nrUE_RU_params_t){.nb_tx = get_nrUE_params()->nb_antennas_tx,
                                      .nb_rx = get_nrUE_params()->nb_antennas_rx,
                                      .att_tx = get_nrUE_params()->tx_gain,

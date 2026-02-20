@@ -1737,7 +1737,13 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
     } /* strcmp(local_rf, "yes") != 0 */
 
     ru->nb_tx = *param[RU_NB_TX_IDX].uptr;
+    AssertFatal(ru->nb_tx <= NB_ANTENNAS_TX,
+                "Config file has %d TX antennas set, but the compile time max value in NB_ANTENNAS_TX\n",
+                ru->nb_tx);
     ru->nb_rx = *param[RU_NB_RX_IDX].uptr;
+    AssertFatal(ru->nb_rx <= NB_ANTENNAS_RX,
+                "Config file has %d RX antennas set, but the compile time max value in NB_ANTENNAS_RX\n",
+                ru->nb_rx);
     ru->att_tx = *param[RU_ATT_TX_IDX].uptr;
     ru->att_rx = *param[RU_ATT_RX_IDX].uptr;
     ru->if_frequency = *param[RU_IF_FREQUENCY].u64ptr;
