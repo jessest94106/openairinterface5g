@@ -69,5 +69,6 @@ void rrc_remove_ue_scells_from_du(gNB_RRC_UE_t *ue, sctp_assoc_t assoc_id);
 ue_serving_cell_t *rrc_get_ue_serving_cell_by_id(const gNB_RRC_UE_t *ue, uint8_t serving_cell_id);
 const ue_serving_cell_t *ue_get_pcell_entry(const gNB_RRC_UE_t *ue);
 nr_rrc_cell_container_t *rrc_get_pcell_for_ue(gNB_RRC_INST *rrc, const gNB_RRC_UE_t *ue);
+ue_serving_cell_t *rrc_update_ue_pcell(gNB_RRC_UE_t *UE, const nr_rrc_cell_container_t *cell);
 
 #endif /* RRC_CELL_MANAGEMENT_H_ */

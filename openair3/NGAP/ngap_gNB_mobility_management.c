@@ -31,6 +31,7 @@
 #include "ngap_gNB_management_procedures.h"
 #include "ngap_gNB_encoder.h"
 #include "ngap_gNB_itti_messaging.h"
+#include "NR_HandoverPreparationInformation.h"
 #include "conversions.h"
 
 /** @brief UE Mobility Management: encode Handover Required

@@ -32,9 +32,9 @@
 #include "common/5g_platform_types.h"
 #include "common/platform_constants.h"
 #include "common/platform_types.h"
-#include "common/5g_platform_types.h"
 #include "s1ap_messages_types.h"
 #include "ds/byte_array.h"
+#include "utils.h"
 
 // Defines to access message fields.
 #define NGAP_REGISTER_GNB_REQ(mSGpTR)           (mSGpTR)->ittiMsg.ngap_register_gnb_req
@@ -58,7 +58,6 @@
 
 #define NGAP_DOWNLINK_NAS(mSGpTR)               (mSGpTR)->ittiMsg.ngap_downlink_nas
 #define NGAP_INITIAL_CONTEXT_SETUP_REQ(mSGpTR)  (mSGpTR)->ittiMsg.ngap_initial_context_setup_req
-#define NGAP_UE_CTXT_MODIFICATION_REQ(mSGpTR)   (mSGpTR)->ittiMsg.ngap_ue_ctxt_modification_req
 #define NGAP_UE_CONTEXT_RELEASE_COMMAND(mSGpTR) (mSGpTR)->ittiMsg.ngap_ue_release_command
 #define NGAP_UE_CONTEXT_RELEASE_COMPLETE(mSGpTR) (mSGpTR)->ittiMsg.ngap_ue_release_complete
 #define NGAP_PDUSESSION_SETUP_REQ(mSGpTR)              (mSGpTR)->ittiMsg.ngap_pdusession_setup_req
@@ -89,39 +88,46 @@
 
 #define NGAP_MAX_NB_AMF_IP_ADDRESS 10
 
-#define NGAP_MAX_NO_TAI_PAGING 16 // 9.2.4.1 3GPP TS 38.413
-
 /* Security key length used within gNB
  * Even if only 16 bytes will be effectively used,
  * the key length is 32 bytes (256 bits)
  */
 #define SECURITY_KEY_LENGTH 32
 
-typedef enum ngap_paging_drx_e {
-  NGAP_PAGING_DRX_32  = 0x0,
-  NGAP_PAGING_DRX_64  = 0x1,
-  NGAP_PAGING_DRX_128 = 0x2,
-  NGAP_PAGING_DRX_256 = 0x3
-} ngap_paging_drx_t;
+#define NGAP_MAX_NO_TAI_PAGING 16 // 9.2.4.1 3GPP TS 38.413
 
-/* Lower value codepoint
- * indicates higher priority.
- */
-typedef enum ngap_paging_priority_s {
-  NGAP_PAGING_PRIO_LEVEL1  = 0,
-  NGAP_PAGING_PRIO_LEVEL2  = 1,
-  NGAP_PAGING_PRIO_LEVEL3  = 2,
-  NGAP_PAGING_PRIO_LEVEL4  = 3,
-  NGAP_PAGING_PRIO_LEVEL5  = 4,
-  NGAP_PAGING_PRIO_LEVEL6  = 5,
-  NGAP_PAGING_PRIO_LEVEL7  = 6,
-  NGAP_PAGING_PRIO_LEVEL8  = 7
-} ngap_paging_priority_t;
+/* Paging DRX values (3GPP TS 38.413) */
+#define FOREACH_PAGING_DRX(DRX_DEF) \
+  DRX_DEF(NGAP_PAGING_DRX_32, 0x0)  \
+  DRX_DEF(NGAP_PAGING_DRX_64, 0x1)  \
+  DRX_DEF(NGAP_PAGING_DRX_128, 0x2) \
+  DRX_DEF(NGAP_PAGING_DRX_256, 0x3)
 
-typedef enum ngap_cn_domain_s {
-  NGAP_CN_DOMAIN_PS = 1,
-  NGAP_CN_DOMAIN_CS = 2
-} ngap_cn_domain_t;
+/* Lower value codepoint indicates higher priority (3GPP TS 38.413) */
+#define FOREACH_PAGING_PRIORITY(PRIO_DEF) \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL1, 0)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL2, 1)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL3, 2)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL4, 3)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL5, 4)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL6, 5)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL7, 6)    \
+  PRIO_DEF(NGAP_PAGING_PRIO_LEVEL8, 7)
+
+/* Paging Origin (9.3.3.22 of 3GPP TS 38.413) */
+#define FOREACH_PAGING_ORIGIN(ORIGIN_DEF) ORIGIN_DEF(NGAP_PAGING_ORIGIN_NON_3GPP, 0)
+
+static const text_info_t paging_drx_text[] = {FOREACH_PAGING_DRX(TO_TEXT)};
+
+static const text_info_t paging_prio_text[] = {FOREACH_PAGING_PRIORITY(TO_TEXT)};
+
+static const text_info_t paging_origin_text[] = {FOREACH_PAGING_ORIGIN(TO_TEXT)};
+
+typedef enum { FOREACH_PAGING_DRX(TO_ENUM) } ngap_paging_drx_t;
+
+typedef enum { FOREACH_PAGING_PRIORITY(TO_ENUM) } ngap_paging_priority_t;
+
+typedef enum { FOREACH_PAGING_ORIGIN(TO_ENUM) } ngap_paging_origin_t;
 
 typedef struct ngap_net_ip_address_s {
   unsigned ipv4:1;
@@ -144,35 +150,32 @@ typedef struct ngap_security_capabilities_s {
   uint16_t eUTRAintegrity_algorithms;
 } ngap_security_capabilities_t;
 
-/* Provides the establishment cause for the RRC connection request as provided
- * by the upper layers. W.r.t. the cause value names: highPriorityAccess
- * concerns AC11..AC15, ‘mt Estands for ‘Mobile Terminating Eand ‘mo Efor
- * 'Mobile Originating'. Defined in TS 36.331.
- */
-typedef enum ngap_rrc_establishment_cause_e {
-  NGAP_RRC_CAUSE_EMERGENCY             = 0x0,
-  NGAP_RRC_CAUSE_HIGH_PRIO_ACCESS      = 0x1,
-  NGAP_RRC_CAUSE_MT_ACCESS             = 0x2,
-  NGAP_RRC_CAUSE_MO_SIGNALLING         = 0x3,
-  NGAP_RRC_CAUSE_MO_DATA               = 0x4,
-  NGAP_RRC_CAUSE_MO_VOICECALL          = 0x5,
-  NGAP_RRC_CAUSE_MO_VIDEOCALL          = 0x6,
-  NGAP_RRC_CAUSE_MO_SMS                = 0x7,
-  NGAP_RRC_CAUSE_MPS_PRIORITY_ACCESS   = 0x8,
-  NGAP_RRC_CAUSE_MCS_PRIORITY_ACCESS   = 0x9,
-  NGAP_RRC_CAUSE_NOTAVAILABLE          = 0x10,
-  NGAP_RRC_CAUSE_LAST
-} ngap_rrc_establishment_cause_t;
+/** @brief RRC Establishment Cause (9.3.1.111 of 3GPP TS 38.413)
+ * Indicates the reason for RRC Connection Establishment/Resume as received from the UE.
+ * The notAvailable value is used when re-establishing/resuming an RRC connection and the
+ * cause value from the UE does not map to any other value. */
+#define FOREACH_RRC_ESTABLISHMENT_CAUSE(CAUSE_DEF) \
+  CAUSE_DEF(NGAP_RRC_CAUSE_EMERGENCY, 0)           \
+  CAUSE_DEF(NGAP_RRC_CAUSE_HIGH_PRIO_ACCESS, 1)    \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MT_ACCESS, 2)           \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MO_SIGNALLING, 3)       \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MO_DATA, 4)             \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MO_VOICECALL, 5)        \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MO_VIDEOCALL, 6)        \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MO_SMS, 7)              \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MPS_PRIORITY_ACCESS, 8) \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MCS_PRIORITY_ACCESS, 9) \
+  CAUSE_DEF(NGAP_RRC_CAUSE_NOTAVAILABLE, 10)       \
+  CAUSE_DEF(NGAP_RRC_CAUSE_MO_EXCEPTION_DATA, 11)  \
+  CAUSE_DEF(NGAP_RRC_CAUSE_LAST, 12)
+
+typedef enum { FOREACH_RRC_ESTABLISHMENT_CAUSE(TO_ENUM) } ngap_rrc_establishment_cause_t;
 
 typedef struct fiveg_s_tmsi_s {
   uint16_t amf_set_id;
   uint8_t  amf_pointer;
   uint32_t m_tmsi;
 } fiveg_s_tmsi_t;
-
-typedef struct ngap_ue_paging_identity_s {
-  fiveg_s_tmsi_t s_tmsi;
-} ngap_ue_paging_identity_t;
 
 typedef enum ngap_ue_identities_presenceMask_e {
   NGAP_UE_IDENTITIES_FiveG_s_tmsi  = 1 << 1,
@@ -243,15 +246,16 @@ typedef struct pdusession_modify_s {
   qos_flow_addmod_response_item_t qos[MAX_QOS_FLOWS];
 } pdusession_modify_t;
 
-/* Cause (9.3.1.2 of 3GPP TS 38.413) */
-typedef enum ngap_cause_group_e {
-  NGAP_CAUSE_NOTHING, /* No components present */
-  NGAP_CAUSE_RADIO_NETWORK,
-  NGAP_CAUSE_TRANSPORT,
-  NGAP_CAUSE_NAS,
-  NGAP_CAUSE_PROTOCOL,
-  NGAP_CAUSE_MISC,
-} ngap_cause_group_t;
+/* Cause Group (9.3.1.2 of 3GPP TS 38.413) */
+#define FOREACH_CAUSE_GROUP(CAUSE_DEF)   \
+  CAUSE_DEF(NGAP_CAUSE_NOTHING, 0)       \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK, 1) \
+  CAUSE_DEF(NGAP_CAUSE_TRANSPORT, 2)     \
+  CAUSE_DEF(NGAP_CAUSE_NAS, 3)           \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL, 4)      \
+  CAUSE_DEF(NGAP_CAUSE_MISC, 5)
+
+typedef enum { FOREACH_CAUSE_GROUP(TO_ENUM) } ngap_cause_group_t;
 
 /* Cause (9.3.1.2 of 3GPP TS 38.413) */
 typedef struct ngap_cause_s {
@@ -259,73 +263,74 @@ typedef struct ngap_cause_s {
   uint8_t value;
 } ngap_cause_t;
 
-typedef enum ngap_Cause_radio_network_e {
-  NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED,
-  NGAP_CAUSE_RADIO_NETWORK_TXNRELOCOVERALL_EXPIRY,
-  NGAP_CAUSE_RADIO_NETWORK_SUCCESSFUL_HANDOVER,
-  NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON,
-  NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_5GC_GENERATED_REASON,
-  NGAP_CAUSE_RADIO_NETWORK_HANDOVER_CANCELLED,
-  NGAP_CAUSE_RADIO_NETWORK_PARTIAL_HANDOVER,
-  NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM,
-  NGAP_CAUSE_RADIO_NETWORK_HO_TARGET_NOT_ALLOWED,
-  NGAP_CAUSE_RADIO_NETWORK_TNGRELOCOVERALL_EXPIRY,
-  NGAP_CAUSE_RADIO_NETWORK_TNGRELOCPREP_EXPIRY,
-  NGAP_CAUSE_RADIO_NETWORK_CELL_NOT_AVAILABLE,
-  NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_TARGETID,
-  NGAP_CAUSE_RADIO_NETWORK_NO_RADIO_RESOURCES_AVAILABLE_IN_TARGET_CELL,
-  NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_LOCAL_UE_NGAP_ID,
-  NGAP_CAUSE_RADIO_NETWORK_INCONSISTENT_REMOTE_UE_NGAP_ID,
-  NGAP_CAUSE_RADIO_NETWORK_HANDOVER_DESIRABLE_FOR_RADIO_REASON,
-  NGAP_CAUSE_RADIO_NETWORK_TIME_CRITICAL_HANDOVER,
-  NGAP_CAUSE_RADIO_NETWORK_RESOURCE_OPTIMISATION_HANDOVER,
-  NGAP_CAUSE_RADIO_NETWORK_REDUCE_LOAD_IN_SERVING_CELL,
-  NGAP_CAUSE_RADIO_NETWORK_USER_INACTIVITY,
-  NGAP_CAUSE_RADIO_NETWORK_RADIO_CONNECTION_WITH_UE_LOST,
-  NGAP_CAUSE_RADIO_NETWORK_RADIO_RESOURCES_NOT_AVAILABLE,
-  NGAP_CAUSE_RADIO_NETWORK_INVALID_QOS_COMBINATION,
-  NGAP_CAUSE_RADIO_NETWORK_FAILURE_IN_RADIO_INTERFACE_PROCEDURE,
-  NGAP_CAUSE_RADIO_NETWORK_INTERACTION_WITH_OTHER_PROCEDURE,
-  NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID,
-  NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_QOS_FLOW_ID,
-  NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_PDU_SESSION_ID_INSTANCES,
-  NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_QOS_FLOW_ID_INSTANCES,
-  NGAP_CAUSE_RADIO_NETWORK_ENCRYPTION_AND_OR_INTEGRITY_PROTECTION_ALGORITHMS_NOT_SUPPORTED,
-  NGAP_CAUSE_RADIO_NETWORK_NG_INTRA_SYSTEM_HANDOVER_TRIGGERED,
-  NGAP_CAUSE_RADIO_NETWORK_NG_INTER_SYSTEM_HANDOVER_TRIGGERED,
-  NGAP_CAUSE_RADIO_NETWORK_XN_HANDOVER_TRIGGERED,
-  NGAP_CAUSE_RADIO_NETWORK_NOT_SUPPORTED_5QI_VALUE,
-  NGAP_CAUSE_RADIO_NETWORK_UE_CONTEXT_TRANSFER,
-  NGAP_CAUSE_RADIO_NETWORK_IMS_VOICE_EPS_FALLBACK_OR_RAT_FALLBACK_TRIGGERED,
-  NGAP_CAUSE_RADIO_NETWORK_UP_INTEGRITY_PROTECTION_NOT_POSSIBLE,
-  NGAP_CAUSE_RADIO_NETWORK_UP_CONFIDENTIALITY_PROTECTION_NOT_POSSIBLE,
-  NGAP_CAUSE_RADIO_NETWORK_SLICE_NOT_SUPPORTED,
-  NGAP_CAUSE_RADIO_NETWORK_UE_IN_RRC_INACTIVE_STATE_NOT_REACHABLE,
-  NGAP_CAUSE_RADIO_NETWORK_REDIRECTION,
-  NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE,
-  NGAP_CAUSE_RADIO_NETWORK_UE_MAX_INTEGRITY_PROTECTED_DATA_RATE_REASON,
-  NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_CN_DETECTED_MOBILITY,
-  NGAP_CAUSE_RADIO_NETWORK_N26_INTERFACE_NOT_AVAILABLE,
-  NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_PRE_EMPTION,
-  NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_LOCATION_REPORTING_REFERENCE_ID_INSTANCES,
-  NGAP_CAUSE_RADIO_NETWORK_RSN_NOT_AVAILABLE_FOR_THE_UP,
-  NGAP_CAUSE_RADIO_NETWORK_NPN_ACCESS_DENIED,
-  NGAP_CAUSE_RADIO_NETWORK_CAG_ONLY_ACCESS_DENIED,
-  NGAP_CAUSE_RADIO_NETWORK_INSUFFICIENT_UE_CAPABILITIES
-} ngap_cause_radio_network_t;
+/* Radio Network Cause (9.3.1.2 of 3GPP TS 38.413) */
+#define FOREACH_CAUSE_RADIO_NETWORK(CAUSE_DEF)                                                            \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED, 0)                                                      \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_TXNRELOCOVERALL_EXPIRY, 1)                                           \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_SUCCESSFUL_HANDOVER, 2)                                              \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_NGRAN_GENERATED_REASON, 3)                            \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_5GC_GENERATED_REASON, 4)                              \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_HANDOVER_CANCELLED, 5)                                               \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_PARTIAL_HANDOVER, 6)                                                 \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_HO_FAILURE_IN_TARGET_5GC_NGRAN_NODE_OR_TARGET_SYSTEM, 7)             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_HO_TARGET_NOT_ALLOWED, 8)                                            \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_TNGRELOCOVERALL_EXPIRY, 9)                                           \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_TNGRELOCPREP_EXPIRY, 10)                                             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_CELL_NOT_AVAILABLE, 11)                                              \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_TARGETID, 12)                                                \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_NO_RADIO_RESOURCES_AVAILABLE_IN_TARGET_CELL, 13)                     \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_LOCAL_UE_NGAP_ID, 14)                                        \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_INCONSISTENT_REMOTE_UE_NGAP_ID, 15)                                  \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_HANDOVER_DESIRABLE_FOR_RADIO_REASON, 16)                             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_TIME_CRITICAL_HANDOVER, 17)                                          \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RESOURCE_OPTIMISATION_HANDOVER, 18)                                  \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_REDUCE_LOAD_IN_SERVING_CELL, 19)                                     \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_USER_INACTIVITY, 20)                                                 \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RADIO_CONNECTION_WITH_UE_LOST, 21)                                   \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RADIO_RESOURCES_NOT_AVAILABLE, 22)                                   \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_INVALID_QOS_COMBINATION, 23)                                         \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_FAILURE_IN_RADIO_INTERFACE_PROCEDURE, 24)                            \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_INTERACTION_WITH_OTHER_PROCEDURE, 25)                                \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_PDU_SESSION_ID, 26)                                          \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UNKNOWN_QOS_FLOW_ID, 27)                                             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_PDU_SESSION_ID_INSTANCES, 28)                               \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_QOS_FLOW_ID_INSTANCES, 29)                                  \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_ENCRYPTION_AND_OR_INTEGRITY_PROTECTION_ALGORITHMS_NOT_SUPPORTED, 30) \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_NG_INTRA_SYSTEM_HANDOVER_TRIGGERED, 31)                              \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_NG_INTER_SYSTEM_HANDOVER_TRIGGERED, 32)                              \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_XN_HANDOVER_TRIGGERED, 33)                                           \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_NOT_SUPPORTED_5QI_VALUE, 34)                                         \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UE_CONTEXT_TRANSFER, 35)                                             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_IMS_VOICE_EPS_FALLBACK_OR_RAT_FALLBACK_TRIGGERED, 36)                \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UP_INTEGRITY_PROTECTION_NOT_POSSIBLE, 37)                            \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UP_CONFIDENTIALITY_PROTECTION_NOT_POSSIBLE, 38)                      \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_SLICE_NOT_SUPPORTED, 39)                                             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UE_IN_RRC_INACTIVE_STATE_NOT_REACHABLE, 40)                          \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_REDIRECTION, 41)                                                     \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RESOURCES_NOT_AVAILABLE_FOR_THE_SLICE, 42)                           \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_UE_MAX_INTEGRITY_PROTECTED_DATA_RATE_REASON, 43)                     \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_CN_DETECTED_MOBILITY, 44)                             \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_N26_INTERFACE_NOT_AVAILABLE, 45)                                     \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RELEASE_DUE_TO_PRE_EMPTION, 46)                                      \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_MULTIPLE_LOCATION_REPORTING_REFERENCE_ID_INSTANCES, 47)              \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_RSN_NOT_AVAILABLE_FOR_THE_UP, 48)                                    \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_NPN_ACCESS_DENIED, 49)                                               \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_CAG_ONLY_ACCESS_DENIED, 50)                                          \
+  CAUSE_DEF(NGAP_CAUSE_RADIO_NETWORK_INSUFFICIENT_UE_CAPABILITIES, 51)
 
-/**
- * NGAP protocol cause values as per 9.3.1.2 `Cause` section in 3GPP TS 38.413.
- */
-typedef enum ngap_cause_protocol_e {
-  NGAP_CAUSE_PROTOCOL_TRANSFER_SYNTAX_ERROR,
-  NGAP_CAUSE_PROTOCOL_ABSTRACT_SYNTAX_ERROR_REJECT,
-  NGAP_CAUSE_PROTOCOL_ABSTRACT_SYNTAX_ERROR_IGNORE,
-  NGAP_CAUSE_PROTOCOL_MSG_NOT_COMPATIBLE_WITH_RECEIVER_STATE,
-  NGAP_CAUSE_PROTOCOL_SEMANTIC_ERROR,
-  NGAP_CAUSE_PROTOCOL_ABSTRACT_SYNTAX_ERROR_FCM,
-  NGAP_CAUSE_PROTOCOL_UNSPECIFIED
-} ngap_cause_protocol_t;
+typedef enum { FOREACH_CAUSE_RADIO_NETWORK(TO_ENUM) } ngap_cause_radio_network_t;
+
+/** NGAP protocol cause values (9.3.1.2 of 3GPP TS 38.413) */
+#define FOREACH_CAUSE_PROTOCOL(CAUSE_DEF)                                  \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_TRANSFER_SYNTAX_ERROR, 0)                  \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_ABSTRACT_SYNTAX_ERROR_REJECT, 1)           \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_ABSTRACT_SYNTAX_ERROR_IGNORE, 2)           \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_MSG_NOT_COMPATIBLE_WITH_RECEIVER_STATE, 3) \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_SEMANTIC_ERROR, 4)                         \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_ABSTRACT_SYNTAX_ERROR_FCM, 5)              \
+  CAUSE_DEF(NGAP_CAUSE_PROTOCOL_UNSPECIFIED, 6)
+
+typedef enum { FOREACH_CAUSE_PROTOCOL(TO_ENUM) } ngap_cause_protocol_t;
 
 typedef struct pdusession_failed_s {
   /* Unique pdusession_id for the UE. */
@@ -352,7 +357,11 @@ typedef struct {
 } ngap_plmn_t;
 
 //-------------------------------------------------------------------------------------------//
-// gNB application layer -> NGAP messages
+
+/** @brief NG SETUP REQUEST message (9.2.6.1 of 3GPP TS 38.413)
+ * This message is sent by the NG-RAN node to transfer application layer information
+ * for an NG-C interface instance.
+ * Direction: NG-RAN node -> AMF */
 typedef struct ngap_register_gnb_req_s {
   /* Unique gNB_id to identify the gNB within EPC.
    * For macro gNB ids this field should be 20 bits long.
@@ -790,29 +799,6 @@ typedef struct ngap_initial_context_setup_req_s {
   byte_array_t nas_pdu;
 } ngap_initial_context_setup_req_t;
 
-
-typedef struct ngap_paging_ind_s {
-  /* UE paging identity */
-  ngap_ue_paging_identity_t ue_paging_identity;
-
-  /* Indicates origin of paging */
-  ngap_cn_domain_t cn_domain;
-
-  /* PLMN_identity in TAI of Paging*/
-  plmn_id_t plmn_identity[NGAP_MAX_NO_TAI_PAGING];
-
-  /* TAC in TAIList of Paging*/
-  int16_t tac[NGAP_MAX_NO_TAI_PAGING];
-
-  /* size of TAIList*/
-  int16_t tai_size;
-
-  /* Optional fields */
-  ngap_paging_drx_t paging_drx;
-
-  ngap_paging_priority_t paging_priority;
-} ngap_paging_ind_t;
-
 typedef struct ngap_pdusession_setup_req_s {
   /* UE id for initial connection to NGAP */
   uint32_t gNB_ue_ngap_id;
@@ -938,6 +924,45 @@ typedef struct ngap_pdusession_release_resp_s {
   uint16_t nb_of_pdusessions_released;
   pdusession_release_t pdusession_release[NGAP_MAX_PDU_SESSION];
 } ngap_pdusession_release_resp_t;
+
+/** NG PAGING PROCEDURES (9.2.4. of 3GPP TS 38.413) */
+
+typedef struct {
+  plmn_id_t plmn;
+  uint16_t tac;
+} nr_tai_t;
+
+typedef struct ngap_ue_paging_identity_s {
+  fiveg_s_tmsi_t s_tmsi;
+} ngap_ue_paging_identity_t;
+
+/** 9.3.1.72 Paging Attempt Information (3GPP TS 38.413) */
+typedef struct {
+  /* Paging Attempt Count */
+  uint8_t paging_attempt_count;
+  /* Intended Number of Paging Attempts */
+  uint8_t intended_paging_attempts;
+} ngap_paging_attempt_info_t;
+
+/** 9.2.4.1 3GPP TS 38.413 */
+typedef struct {
+  /* UE paging identity */
+  ngap_ue_paging_identity_t ue_paging_identity;
+
+  /* TAI List for Paging */
+  nr_tai_t tai_list[NGAP_MAX_NO_TAI_PAGING];
+  int16_t n_tai;
+
+  /* Optional fields */
+  ngap_paging_drx_t *paging_drx;
+  ngap_paging_priority_t *paging_priority;
+  /* UE Radio Capability for Paging (optional) */
+  byte_array_t *ue_radio_capability;
+  /* Paging Origin (optional) */
+  ngap_paging_origin_t *origin;
+  /* Assistance Data for Paging (optional) */
+  ngap_paging_attempt_info_t *paging_attempt_info;
+} ngap_paging_ind_t;
 
 /** 9.2.3.14 Uplink RAN Status Transfer (3GPP TS 38.413)
  * COUNT value used for both UL and DL PDCP SN + HFN (12-bit or 18-bit SN) */

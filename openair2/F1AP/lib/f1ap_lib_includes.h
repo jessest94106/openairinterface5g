@@ -90,5 +90,9 @@
 #include "F1AP_UL-RTOA-Measurement.h"
 #include "F1AP_GNB-RxTxTimeDiff.h"
 #include "F1AP_LCS-to-GCS-TranslationAoA.h"
+#include "F1AP_CNUEPagingIdentity.h"
+#include "F1AP_RANUEPagingIdentity.h"
+#include "F1AP_PagingIdentity.h"
+#include "F1AP_Paging.h"
 
 #endif /* F1AP_LIB_INCLUDES_H_ */

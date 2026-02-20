@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include "fgs_nas_utils.h"
 #include "common/utils/ds/byte_array.h"
+#include "common/utils/utils.h"
 
 /* The following defines are valide for
 both PDU Session Status and PDU session Reactivation Result IEs */

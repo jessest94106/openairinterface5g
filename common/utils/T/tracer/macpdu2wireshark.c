@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -387,6 +389,7 @@ void sr(void *_d, event e)
 #define MAC_NR_HARQID         0x06
 #define MAC_NR_FRAME_SLOT_TAG 0x07
 
+#define NR_FDD_RADIO 1
 #define NR_TDD_RADIO 2
 
 #define NR_DIRECTION_UPLINK   0
@@ -948,6 +951,18 @@ void usage(void)
   exit(1);
 }
 
+volatile int run = 1;
+
+static int sock = -1;
+
+void force_stop(int x)
+{
+  printf("\ngently quit...\n");
+  close(sock);
+  sock = -1;
+  run = 0;
+}
+
 int main(int n, char **v)
 {
   char *database_filename = NULL;
@@ -967,6 +982,9 @@ int main(int n, char **v)
   int live_port = DEFAULT_LIVE_PORT;
   int live = 0;
   memset(&d, 0, sizeof(ev_data));
+
+  /* write on a socket fails if the other end is closed and we get SIGPIPE */
+  if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) abort();
 
   for (i = 0; i < 65536; i++) {
     d.lte_rnti_to_ueid[i] = -1;
@@ -1014,8 +1032,10 @@ int main(int n, char **v)
       perror(input_filename);
       return 1;
     }
-  } else
+  } else {
     in = connect_to(live_ip, live_port);
+    sock = in;
+  }
 
   database = parse_database(database_filename);
   load_config_file(database_filename);
@@ -1121,10 +1141,15 @@ int main(int n, char **v)
     new_thread(receiver, &d);
   }
 
+  /* exit on ctrl+c and ctrl+z */
+  if (signal(SIGQUIT, force_stop) == SIG_ERR) abort();
+  if (signal(SIGINT, force_stop) == SIG_ERR) abort();
+  if (signal(SIGTSTP, force_stop) == SIG_ERR) abort();
+
   OBUF ebuf = {.osize = 0, .omaxsize = 0, .obuf = NULL};
 
   /* read messages */
-  while (1) {
+  while (run) {
     event e;
     e = get_event(in, &ebuf, database);
 

@@ -60,6 +60,7 @@
 #include "common/openairinterface5g_limits.h"
 #include "common/platform_constants.h"
 #include "common/ran_context.h"
+#include "common/utils/nr/nr_common.h"
 #include "common_lib.h"
 #include "constr_SEQUENCE.h"
 #include "constr_TYPE.h"
@@ -1416,8 +1417,13 @@ static void rrc_handle_RRCSetupRequest(gNB_RRC_INST *rrc,
     rrc_gNB_generate_RRCReject(rrc, ue_context_p);
     return;
   }
-  /* Add PCell to serving_cells array */
-  rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+  /* Update PCell in serving_cells array */
+  ue_serving_cell_t *added = rrc_update_ue_pcell(UE, cell);
+  if (added == NULL) {
+    LOG_E(NR_RRC, "RRCSetup: failed to add PCell (cell %ld)\n", cell->info.cell_id);
+    rrc_gNB_generate_RRCReject(rrc, ue_context_p);
+    return;
+  }
   UE->ongoing_reconfiguration = false;
   UE->measConfig = nr_rrc_get_measconfig(rrc, msg->nr_cellid);
   activate_srb(UE, 1);
@@ -1501,6 +1507,7 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
   long ngap_cause = NGAP_CAUSE_RADIO_NETWORK_UNSPECIFIED; /* cause in case of NGAP release req */
   const rnti_t old_rnti = req->ue_Identity.c_RNTI;
   rrc_gNB_ue_context_t *ue_context_p = NULL;
+  ue_serving_cell_t *added = NULL;
   LOG_I(NR_RRC,
         "Reestablishment RNTI %04x req C-RNTI %04x physCellId %ld cause %s\n",
         msg->crnti,
@@ -1514,12 +1521,6 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
     return;
   }
 
-  // Validate C-RNTI range (3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1)
-  if (old_rnti < 0x1 || old_rnti > 0xffef) {
-    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04x range error, fallback to RRC setup\n", old_rnti);
-    goto fallback_rrc_setup;
-  }
-
   // Fetch current cell: where the reestablishment request was received
   nr_rrc_cell_container_t *current_cell = get_cell_by_cell_id(&rrc->cells, msg->nr_cellid);
   if (current_cell == NULL || current_cell->assoc_id != du->assoc_id) {
@@ -1528,6 +1529,12 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
           msg->nr_cellid,
           assoc_id);
     return;
+  }
+
+  // Validate C-RNTI range (3GPP TS 38.321 version 15.13.0 Section 7.1 Table 7.1-1)
+  if (old_rnti < 0x1 || old_rnti > 0xffef) {
+    LOG_E(NR_RRC, "NR_RRCReestablishmentRequest c_RNTI %04x range error, fallback to RRC setup\n", old_rnti);
+    goto fallback_rrc_setup;
   }
 
   if (current_cell->mtc == NULL) {
@@ -1660,14 +1667,10 @@ static void rrc_handle_RRCReestablishmentRequest(gNB_RRC_INST *rrc,
 
   /* Update PCell in serving_cells array */
   DevAssert(cell->info.cell_id == msg->nr_cellid);
-  // Reset the serving set to the new PCell, remove all serving cells from the current PCell's DU.
-  const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
-  DevAssert(existing_pcell != NULL);
-  rrc_remove_ue_scells_from_du(UE, existing_pcell->assoc_id);
-  ue_serving_cell_t *added = rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+  added = rrc_update_ue_pcell(UE, cell);
   if (added == NULL) {
-    LOG_E(NR_RRC, "Reestablishment: failed to add PCell (cell %ld), rejecting reestablishment\n", cell->info.cell_id);
-    goto fallback_rrc_setup;
+    LOG_E(NR_RRC, "Reestablishment: failed to add PCell (cell %ld)\n", cell->info.cell_id);
+    return;
   }
 
   ue_data.secondary_ue = msg->gNB_DU_ue_id;
@@ -1688,6 +1691,8 @@ fallback_rrc_setup:
 
   rrc_gNB_ue_context_t *new = rrc_gNB_create_ue_context(assoc_id, msg->crnti, rrc, random_value, msg->gNB_DU_ue_id);
   activate_srb(&new->ue_context, 1);
+  added = rrc_update_ue_pcell(&new->ue_context, current_cell);
+  DevAssert(added);
   rrc_gNB_generate_RRCSetup(0, msg->crnti, new, msg->du2cu_rrc_container, msg->du2cu_rrc_container_length);
   return;
 }
@@ -2073,7 +2078,7 @@ static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const N
         uint16_t stmsi_part2 = BIT_STRING_to_uint16(part2);
         LOG_I(RRC, "s_tmsi part2 %d (%02x %02x)\n", stmsi_part2, part2->buf[0], part2->buf[1]);
         // Part2 is leftmost 9, Part1 is rightmost 39 bits of 5G-S-TMSI
-        fiveg_s_TMSI = ((uint64_t) stmsi_part2) << 39 | UE->ng_5G_S_TMSI_Part1;
+        fiveg_s_TMSI = nr_build_full_5g_s_tmsi(UE->ng_5G_S_TMSI_Part1, stmsi_part2);
       } else {
         LOG_W(RRC, "UE %d received 5G-S-TMSI-Part2, but no 5G-S-TMSI-Part1 present, won't send 5G-S-TMSI to core\n", UE->rrc_ue_id);
         UE->Initialue_identity_5g_s_TMSI.presence = false;
@@ -2090,9 +2095,10 @@ static void handle_rrcSetupComplete(gNB_RRC_INST *rrc, gNB_RRC_UE_t *UE, const N
     }
 
     if (UE->Initialue_identity_5g_s_TMSI.presence) {
-      uint16_t amf_set_id = fiveg_s_TMSI >> 38;
-      uint8_t amf_pointer = (fiveg_s_TMSI >> 32) & 0x3F;
-      uint32_t fiveg_tmsi = (uint32_t) fiveg_s_TMSI;
+      uint16_t amf_set_id;
+      uint8_t amf_pointer;
+      uint32_t fiveg_tmsi;
+      nr_deconstruct_5g_s_tmsi(fiveg_s_TMSI, &amf_set_id, &amf_pointer, &fiveg_tmsi);
       LOG_I(NR_RRC,
             "5g_s_TMSI: 0x%lX, amf_set_id: 0x%X (%d), amf_pointer: 0x%X (%d), 5g TMSI: 0x%X \n",
             fiveg_s_TMSI,
@@ -3521,7 +3527,7 @@ void *rrc_gnb_task(void *args_p) {
         break;
 
       case NGAP_PAGING_IND:
-        rrc_gNB_process_PAGING_IND(msg_p, instance);
+        rrc_gNB_process_PAGING_IND(RC.nrrrc[instance], instance, &NGAP_PAGING_IND(msg_p));
         break;
 
       case NGAP_HANDOVER_REQUEST:

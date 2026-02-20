@@ -32,24 +32,7 @@
 #include "F1AP_Cause.h"
 #include "F1AP_SNSSAI.h"
 #include "f1ap_messages_types.h"
-
-#ifdef ENABLE_TESTS
-  #define PRINT_ERROR(fmt, ...) fprintf(stderr, "%s:%d: " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
-#else
-  #define PRINT_ERROR(...)  // Do nothing
-#endif
-
-#define _F1_EQ_CHECK_GENERIC(condition, fmt, ...)                                                                       \
-  do {                                                                                                                  \
-    if (!(condition)) {                                                                                                 \
-      PRINT_ERROR("Equality condition '%s' failed: " fmt " != " fmt "\n", #condition, ##__VA_ARGS__); \
-      return false;                                                                                                     \
-    }                                                                                                                   \
-  } while (0)
-
-#define _F1_EQ_CHECK_LONG(A, B) _F1_EQ_CHECK_GENERIC(A == B, "%ld", A, B);
-#define _F1_EQ_CHECK_INT(A, B) _F1_EQ_CHECK_GENERIC(A == B, "%d", A, B);
-#define _F1_EQ_CHECK_STR(A, B) _F1_EQ_CHECK_GENERIC(strcmp(A, B) == 0, "'%s'", A, B);
+#include "common/utils/eq_check.h"
 
 #define _F1_CHECK_EXP(EXP)                 \
   do {                                     \
@@ -57,13 +40,6 @@
       PRINT_ERROR("Failed at " #EXP "\n"); \
       return false;                        \
     }                                      \
-  } while (0)
-
-#define _F1_EQ_CHECK_OPTIONAL_IE(A, B, FIELD, EQ_MACRO)                        \
-  do {                                                                         \
-    _F1_CHECK_EXP(((A)->FIELD && (B)->FIELD) || (!(A)->FIELD && !(B)->FIELD)); \
-    if ((A)->FIELD && (B)->FIELD)                                              \
-      EQ_MACRO(*(A)->FIELD, *(B)->FIELD);                                      \
   } while (0)
 
 /* macro to look up IE. If mandatory and not found, macro will print

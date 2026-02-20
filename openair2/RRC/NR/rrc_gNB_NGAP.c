@@ -84,6 +84,7 @@
 #include "nr_pdcp/nr_pdcp_oai_api.h"
 #include "oai_asn1.h"
 #include "openair2/F1AP/f1ap_ids.h"
+#include "openair2/F1AP/lib/f1ap_paging.h"
 #include "openair3/SECU/key_nas_deriver.h"
 #include "rrc_messages_types.h"
 #include "s1ap_messages_types.h"
@@ -1629,56 +1630,67 @@ int rrc_gNB_process_NGAP_PDUSESSION_RELEASE_COMMAND(ngap_pdusession_release_comm
   return 0;
 }
 
-int rrc_gNB_process_PAGING_IND(MessageDef *msg_p, instance_t instance)
+/** @brief Handle NGAP Paging Indication from the AMF.
+ *  For each TAI in the message, matches (PLMN + TAC) against the gNB configuration; on match,
+ *  builds an F1AP Paging message and distributes it to all DUs that serve cells in that PLMN. */
+int rrc_gNB_process_PAGING_IND(gNB_RRC_INST *rrc, const instance_t instance, const ngap_paging_ind_t *msg)
 {
-  ngap_paging_ind_t *msg = &NGAP_PAGING_IND(msg_p);
-  for (uint16_t tai_size = 0; tai_size < msg->tai_size; tai_size++) {
-    plmn_id_t *p = &msg->plmn_identity[tai_size];
-    LOG_I(NR_RRC,
-          "[gNB %ld] TAI List for Paging: MCC=%03d, MNC=%0*d, TAC=%d\n",
+  DevAssert(rrc);
+  DevAssert(msg);
+
+  // Construct 5G-S-TMSI from paging identity components
+  const fiveg_s_tmsi_t *s_tmsi = &msg->ue_paging_identity.s_tmsi;
+  const uint64_t fiveg_s_tmsi = nr_construct_5g_s_tmsi(s_tmsi->amf_set_id, s_tmsi->amf_pointer, s_tmsi->m_tmsi);
+  const nr_rrc_config_t *req = &rrc->configuration;
+  DevAssert(req->num_plmn > 0);
+
+  LOG_D(NR_RRC, "[gNB %ld] Processing NGAP Paging Indication for %d TAIs\n", instance, msg->n_tai);
+
+  // Paging Attempt Information (TS 38.413 §9.3.1.72, TS 38.300 §9.2.5)
+  // AMF provides attempt count and intended attempts for paging optimization (area expansion, retransmission logic).
+  if (msg->paging_attempt_info != NULL) {
+    LOG_D(NR_RRC,
+          "[gNB %ld] Paging Attempt Count: %u, Intended Number of Attempts: %u\n",
           instance,
-          p->mcc,
-          p->mnc_digit_length,
-          p->mnc,
-          msg->tac[tai_size]);
-    nr_rrc_config_t *req = &RC.nrrrc[instance]->configuration;
-    for (uint8_t j = 0; j < req->num_plmn; j++) {
-      plmn_id_t *req_plmn = &req->plmn[j];
-      if (req_plmn->mcc == p->mcc && req_plmn->mnc == p->mnc && req->tac == msg->tac[tai_size]) {
-        for (uint8_t CC_id = 0; CC_id < MAX_NUM_CCs; CC_id++) {
-          AssertFatal(false, "to be implemented properly\n");
-          if (NODE_IS_CU(RC.nrrrc[instance]->node_type)) {
-            MessageDef *m = itti_alloc_new_message(TASK_RRC_GNB, 0, F1AP_PAGING_IND);
-            F1AP_PAGING_IND(m).plmn = *req_plmn;
-            // Construct 5G-S-TMSI-Part1 from paging identity to find UE
-            const fiveg_s_tmsi_t *s_tmsi = &msg->ue_paging_identity.s_tmsi;
-            uint64_t s_tmsi_part1 = nr_construct_5g_s_tmsi_part1(s_tmsi->amf_set_id, s_tmsi->amf_pointer, s_tmsi->m_tmsi);
-            // Try to find UE by 5G-S-TMSI-Part1
-            rrc_gNB_ue_context_t *ue_context_p = rrc_gNB_ue_context_5g_s_tmsi_exist(RC.nrrrc[instance], s_tmsi_part1);
-            if (ue_context_p == NULL) {
-              LOG_W(NR_RRC, "UE not found by paging identity\n");
-              return -1;
-            }
-            // UE found: use its associated cell
-            gNB_RRC_UE_t *UE = &ue_context_p->ue_context;
-            nr_rrc_cell_container_t *cell = rrc_get_pcell_for_ue(RC.nrrrc[instance], UE);
-            if (cell == NULL) {
-              LOG_W(NR_RRC, "UE %d (rnti %04x) found by paging identity but has no valid cell\n", UE->rrc_ue_id, UE->rnti);
-              return -1;
-            }
-            F1AP_PAGING_IND(m).nr_cellid = cell->info.cell_id;
-            F1AP_PAGING_IND(m).ueidentityindexvalue = (uint16_t)(msg->ue_paging_identity.s_tmsi.m_tmsi % 1024);
-            F1AP_PAGING_IND(m).fiveg_s_tmsi = msg->ue_paging_identity.s_tmsi.m_tmsi;
-            F1AP_PAGING_IND(m).paging_drx = msg->paging_drx;
-            LOG_E(F1AP, "ueidentityindexvalue %u fiveg_s_tmsi %ld paging_drx %u\n", F1AP_PAGING_IND (m).ueidentityindexvalue, F1AP_PAGING_IND (m).fiveg_s_tmsi, F1AP_PAGING_IND (m).paging_drx);
-            itti_send_msg_to_task(TASK_CU_F1, instance, m);
-          } else {
-            //rrc_gNB_generate_pcch_msg(NGAP_PAGING_IND(msg_p).ue_paging_identity.s_tmsi.m_tmsi,(uint8_t)NGAP_PAGING_IND(msg_p).paging_drx, instance, CC_id);
-          } // end of nodetype check
-        } // end of cc loop
-      } // end of mcc mnc check
-    } // end of num_plmn
-  } // end of tai size
+          msg->paging_attempt_info->paging_attempt_count,
+          msg->paging_attempt_info->intended_paging_attempts);
+  }
+
+  if (msg->n_tai > NGAP_MAX_NO_TAI_PAGING) {
+    LOG_E(NR_RRC,
+          "[gNB %ld] Paging message error: n_tai (%d) exceeds NGAP_MAX_NO_TAI_PAGING (%d)\n",
+          instance,
+          msg->n_tai,
+          NGAP_MAX_NO_TAI_PAGING);
+    return -1;
+  }
+
+  // Build F1AP paging message once for all TAIs
+  f1ap_paging_t f1ap_msg = {0};
+  f1ap_msg.ue_identity_index_value = s_tmsi->m_tmsi % 1024;
+  f1ap_msg.identity_type = F1AP_PAGING_IDENTITY_CN_UE;
+  f1ap_msg.identity.cn_ue_paging_identity = fiveg_s_tmsi;
+  if (msg->paging_drx != NULL) {
+    /* Mapping 1:1 between NGAP and F1AP Paging DRX */
+    f1ap_msg.drx = malloc_or_fail(sizeof(*f1ap_msg.drx));
+    *f1ap_msg.drx = (f1ap_paging_drx_t)*msg->paging_drx;
+  }
+  if (msg->paging_priority != NULL) {
+    /* Mapping 1:1 between NGAP and F1AP Paging Priority */
+    f1ap_msg.priority = malloc_or_fail(sizeof(*f1ap_msg.priority));
+    *f1ap_msg.priority = (f1ap_paging_priority_t)*msg->paging_priority;
+  }
+  if (msg->origin != NULL) {
+    /* Mapping 1:1 between NGAP and F1AP Paging Origin */
+    f1ap_msg.origin = malloc_or_fail(sizeof(*f1ap_msg.origin));
+    *f1ap_msg.origin = (f1ap_paging_origin_t)*msg->origin;
+  }
+
+  // For each DU, collect cells matching any AMF TAI (PLMN+TAC) and send
+  // one Paging with that cell list.
+  rrc_send_paging_to_dus(rrc, msg->tai_list, msg->n_tai, &f1ap_msg);
+
+  free_f1ap_paging(&f1ap_msg);
 
   return 0;
 }

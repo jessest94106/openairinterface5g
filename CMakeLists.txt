@@ -434,7 +434,9 @@ add_library(ngap
   ${NGAP_DIR}/ngap_gNB_handlers.c
   ${NGAP_DIR}/ngap_gNB_itti_messaging.c
   ${NGAP_DIR}/ngap_gNB_management_procedures.c
+  ${NGAP_DIR}/ngap_gNB_paging.c
   ${NGAP_DIR}/ngap_gNB_nas_procedures.c
+  ${NGAP_DIR}/ngap_gNB_pdu_session_management.c
   ${NGAP_DIR}/ngap_gNB_nnsf.c
   ${NGAP_DIR}/ngap_gNB_overload.c
   ${NGAP_DIR}/ngap_gNB_trace.c
@@ -442,6 +444,9 @@ add_library(ngap
   )
 target_link_libraries(ngap PUBLIC asn1_ngap)
 target_link_libraries(ngap PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
+if(ENABLE_TESTS)
+  target_compile_definitions(ngap PRIVATE ENABLE_TESTS)
+endif()
 
 #M2AP
 ##############
@@ -648,7 +653,6 @@ include_directories("${OPENAIR3_DIR}/S1AP")
 include_directories("${OPENAIR2_DIR}/X2AP")
 include_directories("${OPENAIR2_DIR}/M2AP")
 include_directories("${OPENAIR2_DIR}/F1AP")
-include_directories("${OPENAIR3_DIR}/ocp-gtpu")
 include_directories("${OPENAIR3_DIR}/M3AP")
 include_directories("${OPENAIR3_DIR}/MME_APP")
 include_directories("${OPENAIR_DIR}/radio/COMMON")
@@ -926,7 +930,6 @@ set(PHY_SRC_UE
   ${OPENAIR1_DIR}/PHY/LTE_TRANSPORT/sss_gen.c
   ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/dlsch_demodulation.c
   ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/dlsch_llr_computation.c
-  ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/linear_preprocessing_rec.c
   ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/dlsch_decoding.c
   ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/dci_tools_ue.c
   ${OPENAIR1_DIR}/PHY/LTE_UE_TRANSPORT/uci_tools_ue.c
@@ -1072,16 +1075,8 @@ add_dependencies(PHY_COMMON dfts)
 add_library(PHY ${PHY_SRC})
 target_link_libraries(PHY PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 
-pkg_check_modules(blas REQUIRED blas)
-pkg_check_modules(lapacke REQUIRED lapacke)
-
 add_library(PHY_UE ${PHY_SRC_UE})
 target_link_libraries(PHY_UE PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs UTIL)
-# RHEL needs also cblas, but Ubuntu does not have it. So `cblas_LIBRARIES` and
-# `cblas_INCLUDE_DIRS` will be empty for Ubuntu, a no-op
-pkg_check_modules(cblas cblas)
-target_link_libraries(PHY_UE PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES})
-target_include_directories(PHY_UE PRIVATE ${blas_INCLUDE_DIRS} ${cblas_INCLUDE_DIRS} ${lapacke_INCLUDE_DIRS})
 
 add_library(PHY_NR_COMMON ${PHY_NR_SRC_COMMON})
 target_link_libraries(PHY_NR_COMMON PUBLIC UTIL)
@@ -1158,7 +1153,7 @@ set(L2_SRC
   ${RRC_DIR}/rrc_eNB_S1AP.c
   ${RRC_DIR}/rrc_eNB_M2AP.c
   ${RRC_DIR}/rrc_eNB_UE_context.c
-  ${NR_RRC_DIR}/rrc_gNB_UE_context.c
+  ${RRC_DIR}/rrc_eNB_GTPV1U.c
   ${RRC_DIR}/rrc_common.c
   ${RRC_DIR}/L2_interface.c
   ${RRC_DIR}/L2_interface_common.c
@@ -1404,15 +1399,6 @@ include_directories("${OPENAIR1_DIR}/SCHED_NR_UE")
 
 # CN libs
 ##########################
-
-add_library (GTPV1U
-  ${RRC_DIR}/rrc_eNB_GTPV1U.c
-  ${OPENAIR3_DIR}/ocp-gtpu/gtp_itf.cpp
-  ${OPENAIR3_DIR}/ocp-gtpu/gtpu_extensions.c
-  )
-target_link_libraries(GTPV1U PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
-target_link_libraries(GTPV1U PRIVATE SIMU ds)
-include_directories(${OPENAIR3_DIR}/ocp-gtp)
 
 set (MME_APP_SRC
   ${OPENAIR3_DIR}/MME_APP/mme_app.c
@@ -1773,7 +1759,6 @@ target_link_libraries(lte-softmodem PRIVATE
 target_link_libraries(lte-softmodem PRIVATE pthread m CONFIG_LIB rt)
 target_link_libraries(lte-softmodem PRIVATE ${T_LIB})
 target_link_libraries(lte-softmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
-target_link_libraries(lte-softmodem PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES} ${lapack_LIBRARIES})
 
 if(E2_AGENT)
   target_link_libraries(lte-softmodem PUBLIC e2_agent e2_agent_arg e2_ran_func_du_cucp_cuup)
@@ -1824,7 +1809,6 @@ target_link_libraries(lte-uesoftmodem PRIVATE
 target_link_libraries(lte-uesoftmodem PRIVATE pthread m CONFIG_LIB rt)
 target_link_libraries(lte-uesoftmodem PRIVATE ${T_LIB})
 target_link_libraries(lte-uesoftmodem PRIVATE asn1_nr_rrc_hdrs asn1_lte_rrc_hdrs)
-target_link_libraries(lte-uesoftmodem PRIVATE ${blas_LIBRARIES} ${cblas_LIBRARIES} ${lapacke_LIBRARIES} ${lapack_LIBRARIES})
 
 # force the generation of ASN.1 so that we don't need to wait during the build
 target_link_libraries(lte-uesoftmodem PRIVATE

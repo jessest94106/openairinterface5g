@@ -409,3 +409,22 @@ nr_rrc_cell_container_t *rrc_get_pcell_for_ue(gNB_RRC_INST *rrc, const gNB_RRC_U
   return get_cell_by_cell_id(&rrc->cells, pcell_entry->nci);
 }
 
+/** @brief Update UE's PCell in serving_cells array
+ * @param[in] UE UE context
+ * @param[in] cell Cell container to set as PCell
+ * @return Pointer to added serving cell entry, or NULL on failure
+ * @note If UE already has a PCell, removes all serving cells from the old PCell's DU first */
+ue_serving_cell_t *rrc_update_ue_pcell(gNB_RRC_UE_t *UE, const nr_rrc_cell_container_t *cell)
+{
+  DevAssert(UE != NULL);
+  DevAssert(cell != NULL);
+
+  // If UE already has a PCell, remove all serving cells from that DU first
+  const ue_serving_cell_t *existing_pcell = ue_get_pcell_entry(UE);
+  if (existing_pcell != NULL) {
+    rrc_remove_ue_scells_from_du(UE, existing_pcell->assoc_id);
+  }
+
+  // Add the new PCell
+  return rrc_add_ue_serving_cell(UE, cell, RRC_PCELL_INDEX);
+}

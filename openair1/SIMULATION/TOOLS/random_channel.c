@@ -1849,27 +1849,6 @@ int random_channel(channel_desc_t *desc, uint8_t abstraction_flag) {
       }
     }
 
-    /*
-    FIXME: Function cblas_zgemv has an undefined output (for the same input) after a second call in RHEL8 (acorr = nan)
-    alpha.r = 1.0;
-    alpha.i = 0.0;
-    beta.r = 0.0;
-    beta.i = 0.0;
-    cblas_zgemv(CblasRowMajor, CblasNoTrans, desc->nb_tx*desc->nb_rx, desc->nb_tx*desc->nb_rx,
-                (void *) &alpha, (void *) desc->R_sqrt[i/3], desc->nb_rx*desc->nb_tx,
-                (void *) anew, 1, (void *) &beta, (void *) acorr, 1);
-    */
-
-    /*
-    for (aarx=0;aarx<desc->nb_rx;aarx++) {
-      for (aatx=0;aatx<desc->nb_tx;aatx++) {
-        desc->a[i][aarx+(aatx*desc->nb_rx)].x = acorr[aarx+(aatx*desc->nb_rx)].x;
-        desc->a[i][aarx+(aatx*desc->nb_rx)].y = acorr[aarx+(aatx*desc->nb_rx)].y;
-        printf("tap %d, acorr1(%d,%d) = %f+1j*%f\n",i,aatx,aarx,acorr[aarx+(aatx*desc->nb_rx)].x, acorr[aarx+(aatx*desc->nb_rx)].y);
-      }
-    }
-    */
-
     if (desc->first_run==1) {
       memcpy(desc->a[i], acorr, desc->nb_tx * desc->nb_rx * sizeof(*acorr));
     } else {
