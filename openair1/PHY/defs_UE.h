@@ -56,6 +56,7 @@
 #include <math.h>
 #include "common_lib.h"
 
+#include "common/cmake_defs.h"
 #include "defs_common.h"
 #include "impl_defs_top.h"
 
