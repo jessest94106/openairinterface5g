@@ -37,6 +37,7 @@
 #include "PHY/NR_REFSIG/dmrs_nr.h"
 #include "PHY/NR_REFSIG/ptrs_nr.h"
 #include "common/utils/nr/nr_common.h"
+#include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "executables/softmodem-common.h"
 #include "SCHED_NR/sched_nr.h"
 
