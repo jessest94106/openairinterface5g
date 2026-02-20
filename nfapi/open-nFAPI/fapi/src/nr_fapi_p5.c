@@ -1032,6 +1032,10 @@ uint8_t pack_nr_config_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *e
   numTLVs++;
 #endif
   retval &=
+      pack_nr_tlv(NFAPI_NR_CONFIG_BETA_PSS_TAG, &(pNfapiMsg->ssb_table.beta_pss), ppWritePackedMsg, end, &pack_uint8_tlv_value);
+  numTLVs++;
+
+  retval &=
       pack_nr_tlv(NFAPI_NR_CONFIG_SSB_PERIOD_TAG, &(pNfapiMsg->ssb_table.ssb_period), ppWritePackedMsg, end, &pack_uint8_tlv_value);
   numTLVs++;
 

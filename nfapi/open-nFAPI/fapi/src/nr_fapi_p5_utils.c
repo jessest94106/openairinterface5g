@@ -226,6 +226,8 @@ bool eq_config_request(const nfapi_nr_config_request_scf_t *unpacked_req, const 
 
   EQ_TLV(unpacked_req->ssb_table.ssb_offset_point_a, req->ssb_table.ssb_offset_point_a);
 
+  EQ_TLV(unpacked_req->ssb_table.beta_pss, req->ssb_table.beta_pss);
+
   EQ_TLV(unpacked_req->ssb_table.ssb_period, req->ssb_table.ssb_period);
 
   EQ_TLV(unpacked_req->ssb_table.ssb_subcarrier_offset, req->ssb_table.ssb_subcarrier_offset);
@@ -771,6 +773,8 @@ void copy_config_request(const nfapi_nr_config_request_scf_t *src, nfapi_nr_conf
   COPY_TLV(dst->prach_config.prach_multiple_carriers_in_a_band, src->prach_config.prach_multiple_carriers_in_a_band);
 
   COPY_TLV(dst->ssb_table.ssb_offset_point_a, src->ssb_table.ssb_offset_point_a);
+
+  COPY_TLV(dst->ssb_table.beta_pss, src->ssb_table.beta_pss);
 
   COPY_TLV(dst->ssb_table.ssb_period, src->ssb_table.ssb_period);
 
