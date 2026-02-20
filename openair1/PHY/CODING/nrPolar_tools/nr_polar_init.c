@@ -97,7 +97,7 @@ t_nrPolar_params *nr_polar_params(int8_t messageType, uint16_t messageLength, ui
 
   //  printf("currentPtr %p (polarParams %p)\n",currentPtr,polarParams);
   // Else, initialize and add node to the end of the linked list.
-  t_nrPolar_params *newPolarInitNode = malloc(sizeof(t_nrPolar_params));
+  t_nrPolar_params *newPolarInitNode = memalign(32, sizeof(t_nrPolar_params));
 
   AssertFatal(newPolarInitNode, "[nr_polar_init] New t_nrPolar_params * could not be created");
   *newPolarInitNode = (t_nrPolar_params){.busy = true, .nextPtr = PolarList, .tree_linearization.is_initialized = false};
