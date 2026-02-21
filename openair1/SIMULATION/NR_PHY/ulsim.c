@@ -342,7 +342,6 @@ int main(int argc, char *argv[])
   int ilbrm = 0;
 
   UE_nr_rxtx_proc_t UE_proc;
-  FILE *scg_fd=NULL;
   FILE *uci_ulsch_matlab_vec = NULL;
   int file_offset = 0;
 
@@ -369,8 +368,6 @@ int main(int argc, char *argv[])
   int c;
   bool setAffinity=false;
   char gNBthreads[128]="n";
-  static struct option long_options[] = {{"cuda", no_argument, 0, 0}, {0, 0, 0, 0}};
-  int option_index = 0;
   int use_cuda = 0;
 
   void *h_tx_sig_pinned = NULL;
@@ -383,11 +380,7 @@ int main(int argc, char *argv[])
   void *d_channel_coeffs_gpu = NULL;
 #endif
 
-  while ((c = getopt_long(argc,
-                          argv,
-                          "--:O:a:b:c:d:ef:g:h:i:jk:m:n:o::p:q:r:s:t:u:v:w:y:z:A:C:F:G:H:I:M:N:PR:S:T:U:L:ZW:E:X:Y:",
-                          long_options,
-                          &option_index))
+  while ((c = getopt(argc, argv, "--:O:a:b:c:d:ef:g:h:i:jk:m:n:o::p:q:r:s:t:u:v:w:y:z:A:C:F:G:H:I:M:N:PR:S:T:U:L:ZW:E:X:Y:"))
          != -1) {
     /* ignore long options starting with '--', option '-O' and their arguments that are handled by configmodule */
     /* with this opstring getopt returns 1 for non-option arguments, refer to 'man 3 getopt' */
@@ -396,14 +389,6 @@ int main(int argc, char *argv[])
 
     printf("handling optarg %c\n",c);
     switch (c) {
-#ifdef ENABLE_CUDA
-      case 0:
-        if (strcmp(long_options[option_index].name, "cuda") == 0) {
-          use_cuda = 1;
-          printf("CUDA acceleration enabled.\n");
-        }
-        break;
-#endif
     case 'a':
       start_symbol = atoi(optarg);
       AssertFatal(start_symbol >= 0 && start_symbol < 13,"start_symbol %d is not in 0..12\n",start_symbol);
@@ -428,15 +413,17 @@ int main(int argc, char *argv[])
       break;
 
     case 'f':
-      scg_fd = fopen(optarg, "r");
-      
-      if (scg_fd == NULL) {
-        printf("Error opening %s\n", optarg);
+#ifdef ENABLE_CUDA
+      if (strcmp(optarg, "cuda") == 0) {
+        use_cuda = 1;
+      } else
+#endif
+      {
+        printf("Unsupported flag '%s' for -f. Run '-h' to see the list of available options.\n", optarg);
         exit(-1);
       }
-
       break;
-      
+
     case 'g':
 
       switch ((char) *optarg) {
@@ -688,7 +675,12 @@ int main(int argc, char *argv[])
       printf("-c RNTI\n");
       printf("-d Introduce delay in terms of number of samples\n");
       printf("-e To simulate MSG3 configuration\n");
-      printf("-f Input file to read from\n");// file not used in the code
+      printf("-f <flag> Enable optional feature flag. Available flags:\n");
+#ifdef ENABLE_CUDA
+      printf("          cuda    Enable CUDA channel simulation\n");
+#else
+      printf("          (none)  No optional features were compiled into this executable\n");
+#endif
       printf("-g Channel model configuration. Arguments list: Number of arguments = 3, {Channel model: [A] TDLA30, [B] TDLB100, [C] TDLC300}, {Correlation: [l] Low, [m] Medium, [h] High}, {Maximum Doppler shift} e.g. -g A,l,10\n");
       printf("-h This message\n");
       printf("-i Change channel estimation technique. Arguments list: Number of arguments=2, Frequency domain {0:Linear interpolation, 1:PRB based averaging}, Time domain {0:Estimates of last DMRS symbol, 1:Average of DMRS symbols}. e.g. -i 1,0\n");
@@ -1914,9 +1906,6 @@ int main(int argc, char *argv[])
 
   if (input_fd)
     fclose(input_fd);
-
-  if (scg_fd)
-    fclose(scg_fd);
 
   // closing csv file
   if (filename_csv != NULL) { // means we are asked to print stats to CSV
