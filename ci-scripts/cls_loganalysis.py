@@ -26,10 +26,15 @@ import logging
 
 class Default:
 	def run(file, opt=None):
-		# TODO add check on assertions, etc
-		if not os.path.exists(file):
-			return False, f"cannot find file {file}"
-		return True, ""
+		success = True
+		logs = []
+		with open(file, "r") as f:
+			for line in f.readlines():
+				result = re.search('[Aa]ssertion', line)
+				if result:
+					logs.append(line)
+					success = False
+		return success, "\n".join(logs)
 
 class ContainsString:
 	def run(file, needle):

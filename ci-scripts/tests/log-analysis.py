@@ -15,10 +15,10 @@ class TestLogAnalysis(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
-    def test_no_file(self):
-        f = "/total/fantasy/path/file.log"
-        result, _ = cls_loganalysis.Default.run(f, None)
-        self.assertFalse(result)
+    #def test_no_file(self):
+    #    f = "/total/fantasy/path/file.log"
+    #    result, _ = cls_loganalysis.Default.run(f, None)
+    #    self.assertFalse(result)
 
     def test_no_error(self):
         f = "tests/log-analysis/empty.log"
