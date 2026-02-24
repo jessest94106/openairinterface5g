@@ -338,7 +338,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
                              slot,
                              fp->N_RB_DL,
                              0,
-                             fp->Ncp == EXTENDED ? 12 : 14);
+                             fp->Ncp == NR_EXTENDED ? 12 : 14);
       }
       T(T_GNB_PHY_DL_OUTPUT_SIGNAL,
         T_INT(0),

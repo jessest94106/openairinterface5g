@@ -374,7 +374,7 @@ int main(int argc, char **argv)
 	frame_parms->nb_antennas_tx = n_tx;
 	frame_parms->nb_antennas_rx = n_rx;
 	frame_parms->N_RB_DL = N_RB_DL;
-	frame_parms->Ncp = extended_prefix_flag ? EXTENDED : NORMAL;
+	frame_parms->Ncp = extended_prefix_flag ? NR_EXTENDED : NR_NORMAL;
 	crcTableInit();
 	nr_phy_config_request_sim(gNB, N_RB_DL, N_RB_DL, mu, Nid_cell,SSB_positions);
     // TDD configuration

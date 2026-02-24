@@ -24,11 +24,10 @@
 #ifndef __NR_REFSIG__H__
 #define __NR_REFSIG__H__
 
-#include "PHY/defs_gNB.h"
 #include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
 #include "PHY/nr_phy_common/inc/nr_phy_common.h"
 
-int nr_pusch_dmrs_rx(PHY_VARS_gNB *gNB,
+int nr_pusch_dmrs_rx(nr_prefix_type_t Ncp,
                      unsigned int Ns,
                      const uint32_t *nr_gold_pusch,
                      c16_t *output,
@@ -43,7 +42,7 @@ void nr_generate_modulation_table(void);
 
 extern simde__m128i byte2m128i[256];
 
-int nr_pusch_lowpaprtype1_dmrs_rx(PHY_VARS_gNB *gNB,
+int nr_pusch_lowpaprtype1_dmrs_rx(nr_prefix_type_t Ncp,
                                   unsigned int Ns,
                                   c16_t *dmrs_seq,
                                   c16_t *output,

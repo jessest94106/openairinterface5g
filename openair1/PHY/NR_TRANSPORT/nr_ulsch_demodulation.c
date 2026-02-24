@@ -32,7 +32,7 @@ void nr_idft(int32_t *z, uint32_t Msc_PUSCH)
 
   int i, ip;
 
-  LOG_T(PHY,"Doing lte_idft for Msc_PUSCH %d\n",Msc_PUSCH);
+  LOG_T(PHY,"Doing nr_idft for Msc_PUSCH %d\n", Msc_PUSCH);
 
   if ((Msc_PUSCH % 1536) > 0) {
     // conjugate input
