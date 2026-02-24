@@ -25,27 +25,6 @@
 #define __NR_REFSIG_DEFS__H__
 
 #include "PHY/defs_nr_UE.h"
-#include "nr_refsig_common.h"
-
-/*!\brief This function generates the NR Gold sequence (38-211, Sec 5.2.1) for the PBCH DMRS.
-@param PHY_VARS_NR_UE* ue structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables
- */
-void nr_pbch_dmrs_rx(int dmrss, const unsigned int *nr_gold_pbch, c16_t *output, bool sidelink);
-
-/*!\brief This function generates the NR Gold sequence (38-211, Sec 5.2.1) for the PDCCH DMRS.
-@param PHY_VARS_NR_UE* ue structure provides configuration, frame parameters and the pointers to the 32 bits sequence storage tables
- */
-void nr_pdcch_dmrs_ref(const unsigned int *nr_gold_pdcch, c16_t *output, unsigned short nb_rb_corset);
-
-int nr_pdsch_dmrs_rx(nr_prefix_type_t Ncp,
-                     unsigned int Ns,
-                     const unsigned int *nr_gold_pdsch,
-                     c16_t *output,
-                     unsigned short p,
-                     unsigned char lp,
-                     unsigned short nb_pdsch_rb,
-                     uint8_t config_type,
-                     int16_t dmrs_scaling);
 
 void sl_generate_pss(SL_NR_UE_INIT_PARAMS_t *sl_init_params, uint8_t n_sl_id2, uint16_t scaling);
 void sl_generate_pss_ifft_samples(sl_nr_ue_phy_params_t *sl_ue_params, SL_NR_UE_INIT_PARAMS_t *sl_init_params);

@@ -35,7 +35,6 @@
 //#define DEBUG_PUSCH
 
 #include "PHY/TOOLS/tools_defs.h"
-#include "refsig_defs_ue.h"
 #include "nr_refsig.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface.h"
 

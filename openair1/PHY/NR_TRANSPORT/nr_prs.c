@@ -2,7 +2,6 @@
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "PHY/NR_REFSIG/nr_refsig.h"
 #include "PHY/sse_intrin.h"
-#include "openair1/PHY/NR_REFSIG/refsig_defs_ue.h"
 #include "openair1/PHY/NR_REFSIG/nr_mod_table.h"
 //#define DEBUG_PRS_MOD
 //#define DEBUG_PRS_MAP
