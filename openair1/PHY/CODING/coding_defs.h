@@ -29,6 +29,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "common/utils/nr/nr_common.h"
 
 #define CRC24_A 0
 #define CRC24_B 1
@@ -38,6 +39,18 @@
 #define MAX_TURBO_ITERATIONS_MBSFN 8
 #define MAX_TURBO_ITERATIONS max_turbo_iterations
 
+static inline int lenWithCrc(int nbSeg, int len)
+{
+  if (nbSeg > 1)
+    return (len + 24 + 24 * nbSeg) / nbSeg;
+  return len + (len > NR_MAX_PDSCH_TBS ? 24 : 16);
+}
+static inline int crcType(int nbSeg, int len)
+{
+  if (nbSeg > 1)
+    return CRC24_B;
+  return len > NR_MAX_PDSCH_TBS ? CRC24_A : CRC16;
+}
 
 #define LTE_NULL 2
 typedef struct {

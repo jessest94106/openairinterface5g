@@ -99,6 +99,9 @@
 /** Maximum number of segments per TB = MAX_NUM_NR_DLSCH_SEGMENTS_PER_LAYER*NR_MAX_NB_LAYERS */
 #define NR_LDPC_MAX_NUM_CB 144
 
+/* LDPC maximum code block size - maximum E */
+#define LDPC_MAX_CB_SIZE 32768
+
 // ==============================================================================
 // GLOBAL CONSTANT VARIABLES
 

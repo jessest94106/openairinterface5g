@@ -159,19 +159,6 @@ typedef struct {
   //////////////////////////////////////////////////////////////
 } NR_UL_gNB_HARQ_t;
 
-static inline int lenWithCrc(int nbSeg, int len)
-{
-  if (nbSeg > 1)
-    return (len + 24 + 24 * nbSeg) / nbSeg;
-  return len + (len > NR_MAX_PDSCH_TBS ? 24 : 16);
-}
-static inline int crcType(int nbSeg, int len)
-{
-  if (nbSeg > 1)
-    return CRC24_B;
-  return len > NR_MAX_PDSCH_TBS ? CRC24_A : CRC16;
-}
-
 typedef struct {
   uint32_t frame;
   uint32_t slot;

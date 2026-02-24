@@ -9,6 +9,9 @@
 #include <common/utils/LOG/log.h>
 #define NR_LDPC_ENABLE_PARITY_CHECK
 
+#include "PHY/CODING/nrLDPC_decoder/nrLDPCdecoder_defs.h"
+#include "PHY/CODING/coding_defs.h"
+
 #include <stdint.h>
 #include <getopt.h>
 #include <inttypes.h>
