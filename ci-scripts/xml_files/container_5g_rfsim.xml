@@ -243,8 +243,9 @@
     <desc>Undeploy all OAI 5G stack</desc>
     <node>localhost</node>
     <yaml_path>ci-scripts/yaml_files/5g_rfsimulator</yaml_path>
-    <d_retx_th>1,0,0,0</d_retx_th>
-    <u_retx_th>1,0,0,0</u_retx_th>
+    <analysis>
+      <services>oai-gnb=RetxCheck=1,0,0,0 oai-gnb=EndsWithBye oai-nr-ue oai-nr-ue2 oai-nr-ue3 oai-nr-ue4 oai-nr-ue5 oai-nr-ue6 oai-nr-ue7 oai-nr-ue8 oai-nr-ue9 oai-nr-ue10</services>
+    </analysis>
   </testCase>
 
   <testCase>

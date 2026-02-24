@@ -133,6 +133,9 @@ Replaces xml_files/enb_usrp210_band40_test_20mhz_tm1.xml
     <desc>Undeploy eNB</desc>
     <node>starsky</node>
     <yaml_path>ci-scripts/yaml_files/lte_b200_tdd_20Mhz_tm1</yaml_path>
+    <analysis>
+      <services>enb_mono_tdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

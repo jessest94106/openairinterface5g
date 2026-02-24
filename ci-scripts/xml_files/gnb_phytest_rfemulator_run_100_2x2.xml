@@ -60,7 +60,7 @@
     <always_exec>true</always_exec>
     <desc>Terminate gNB</desc>
     <analysis>
-      <service>nr-softmodem=ContainsString=Bye.</service>
+      <services>nr-softmodem=EndsWithBye</services>
     </analysis>
   </testCase>
 

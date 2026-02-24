@@ -121,8 +121,9 @@
     <desc>Undeploy gNB</desc>
     <node>gracehopper1-oai</node>
     <yaml_path>ci-scripts/yaml_files/sa_gnb_aerial_ul</yaml_path>
-    <d_retx_th>20,100,100,100</d_retx_th>
-    <u_retx_th>20,100,100,100</u_retx_th>
+    <analysis>
+      <services>oai-gnb-aerial=RetxCheck=20,100,100,100 oai-gnb-aerial=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

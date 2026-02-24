@@ -205,6 +205,9 @@
     <desc>Undeploy nr UE</desc>
     <node>caracal</node>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n310_nrue</yaml_path>
+    <analysis>
+      <services>oai-nr-ue</services>
+    </analysis>
   </testCase>
 
   <testCase>
@@ -213,8 +216,9 @@
     <desc>Undeploy gNB</desc>
     <node>avra</node>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n310_gnb</yaml_path>
-    <d_retx_th>20,100,100,100</d_retx_th>
-    <u_retx_th>20,100,100,100</u_retx_th>
+    <analysis>
+      <services>oai-gnb=RetxCheck=20,100,100,100 oai-gnb=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

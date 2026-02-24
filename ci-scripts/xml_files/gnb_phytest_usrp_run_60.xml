@@ -58,6 +58,9 @@
     <always_exec>true</always_exec>
     <desc>Terminate gNB</desc>
     <node>caracal</node>
+    <analysis>
+      <services>nr-softmodem=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>
