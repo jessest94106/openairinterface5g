@@ -608,6 +608,16 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
 
     cfg->prach_config.num_prach_fd_occasions_list = (fapi_nr_num_prach_fd_occasions_t *)malloc(
         cfg->prach_config.num_prach_fd_occasions * sizeof(fapi_nr_num_prach_fd_occasions_t));
+
+    // Get UL carrier SCS for PRACH k1 calculation
+    int ul_carrier_scs;
+    if (scc->uplinkConfigCommon->frequencyInfoUL
+        && scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.count > 0) {
+      ul_carrier_scs = scc->uplinkConfigCommon->frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing;
+    } else {
+      ul_carrier_scs = scc->uplinkConfigCommon->initialUplinkBWP->genericParameters.subcarrierSpacing;
+    }
+
     for (int i = 0; i < cfg->prach_config.num_prach_fd_occasions; i++) {
       fapi_nr_num_prach_fd_occasions_t *prach_fd_occasion = &cfg->prach_config.num_prach_fd_occasions_list[i];
       prach_fd_occasion->num_prach_fd_occasions = i;
@@ -616,7 +626,8 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
       else
         prach_fd_occasion->prach_root_sequence_index = rach_ConfigCommon->prach_RootSequenceIndex.choice.l839;
 
-      prach_fd_occasion->k1 = rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart;
+      prach_fd_occasion->k1 = rach_ConfigCommon->rach_ConfigGeneric.msg1_FrequencyStart
+          + (get_N_RA_RB(cfg->prach_config.prach_sub_c_spacing, ul_carrier_scs) * i);
       prach_fd_occasion->prach_zero_corr_conf = rach_ConfigCommon->rach_ConfigGeneric.zeroCorrelationZoneConfig;
       prach_fd_occasion->num_root_sequences =
           compute_nr_root_seq(rach_ConfigCommon, nb_preambles, frame_type, mac->frequency_range);
