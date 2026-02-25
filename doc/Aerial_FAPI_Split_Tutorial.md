@@ -164,14 +164,17 @@ WantedBy=multi-user.target
 
 - Follow these
   [instructions](https://github.com/NVIDIA/aerial-cuda-accelerated-ran) to
-  clone the `aerial-cuda-accelerated-ran` repository, pull and build the cuBB
-  image.
--  The CMake flags we use to compile the L1 are:
+  clone the `aerial-cuda-accelerated-ran` repository, pull cuBB image.
+-  The CMake flags we use to build the SDK are:
   - `-DSCF_FAPI_10_04_SRS=ON` this flag must be used as of OAI tag `2025.w36`
     and this is due to the usage of the FAPI 10.04 version of the SRS PDU, and
     RX_Beamforming PDU.
   - `-DENABLE_CONFORMANCE_TM_PDSCH_PDCCH=OFF` this option should only be
     enabled when doing conformance testing with testmac.
+
+```bash
+./testBenches/phase4_test_scripts/build_aerial_sdk.sh --preset 10_02 -- -DSCF_FAPI_10_04_SRS=ON -DENABLE_CONFORMANCE_TM_PDSCH_PDCCH=OFF
+```
 
 ## Build OAI gNB
 
@@ -195,8 +198,8 @@ and install this library when building the L2 docker image.
 ./cuPHY-CP/container/run_aerial.sh
 
 # Pack the nvIPC sources and copy them to the host ( the command creates a `tar.gz` file with the following name format: `nvipc_src.YYYY.MM.DD.tar.gz`)
-aerial@c_aerial_oaicicd:/opt/nvidia/cuBB# cd cuPHY-CP/gt_common_libs
-aerial@c_aerial_oaicicd:/opt/nvidia/cuBB/cuPHY-CP/gt_common_libs#./pack_nvipc.sh
+aerial@c_aerial_<user>:/opt/nvidia/cuBB# cd cuPHY-CP/gt_common_libs
+aerial@c_aerial_<user>:/opt/nvidia/cuBB/cuPHY-CP/gt_common_libs#./pack_nvipc.sh
 nvipc_src.YYYY.MM.DD/ ... --------------------------------------------- Pack
 nvipc source code finished:/opt/nvidia/cuBB/cuPHY-CP/gt_common_libs/nvipc_src.YYYY.MM.DD.tar.gz
 ```
@@ -218,7 +221,9 @@ With the nvIPC sources in the project directory, the L2 docker image can be buil
 ### Building OAI gNB docker image
 
 In order to build the target image (`oai-gnb-aerial`), first you should build a
-common shared image (`ran-base`)
+common shared image (`ran-base`). For more information about `docker build`
+files please refer to this
+[tutorial](https://gitlab.eurecom.fr/oai/openairinterface5g/-/blob/ARC1.7_integration/docker/README.md?ref_type=heads)
 
 ```bash
 ~$ cd ~/openairinterface5g/
@@ -297,7 +302,7 @@ vlan:
 
 ### Docker compose
 
-We recommend the user to apply the patch below for `docker-compose.yaml`.
+Apply the patch below to include the Aerial repository cloned earlier in this tutorial.
 ```patch
 diff --git a/ci-scripts/yaml_files/sa_gnb_aerial/docker-compose.yaml b/ci-scripts/yaml_files/sa_gnb_aerial/docker-compose.yaml
 index 985fe9a6a3..0774d826ac 100644
