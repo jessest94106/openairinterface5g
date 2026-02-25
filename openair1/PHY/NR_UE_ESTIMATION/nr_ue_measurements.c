@@ -73,7 +73,7 @@ void nr_ue_measurements(PHY_VARS_NR_UE *ue,
               cmax(frame_parms->nb_antennas_rx, 1),
               false);
   allocCast3D(rx_spatial_power_dB,
-              unsigned short,
+              short,
               ue->measurements.rx_spatial_power_dB,
               NUMBER_OF_CONNECTED_gNB_MAX,
               cmax(frame_parms->nb_antenna_ports_gNB, 1),
@@ -96,16 +96,16 @@ void nr_ue_measurements(PHY_VARS_NR_UE *ue,
         if (rx_spatial_power[gNB_id][aatx][aarx] < 0)
           rx_spatial_power[gNB_id][aatx][aarx] = 0;
 
-        rx_spatial_power_dB[gNB_id][aatx][aarx] = (unsigned short)dB_fixed(rx_spatial_power[gNB_id][aatx][aarx]);
+        rx_spatial_power_dB[gNB_id][aatx][aarx] = dB_fixed(rx_spatial_power[gNB_id][aatx][aarx]);
         ue->measurements.rx_power[gNB_id][aarx] += rx_spatial_power[gNB_id][aatx][aarx];
       }
 
-      ue->measurements.rx_power_dB[gNB_id][aarx] = (unsigned short) dB_fixed(ue->measurements.rx_power[gNB_id][aarx]);
+      ue->measurements.rx_power_dB[gNB_id][aarx] = dB_fixed(ue->measurements.rx_power[gNB_id][aarx]);
       ue->measurements.rx_power_tot[gNB_id] += ue->measurements.rx_power[gNB_id][aarx];
 
     }
 
-    ue->measurements.rx_power_tot_dB[gNB_id] = (unsigned short) dB_fixed(ue->measurements.rx_power_tot[gNB_id]);
+    ue->measurements.rx_power_tot_dB[gNB_id] = dB_fixed(ue->measurements.rx_power_tot[gNB_id]);
 
   }
 
@@ -565,12 +565,12 @@ void nr_ue_rrc_measurements(PHY_VARS_NR_UE *ue,
     }
 
     ue->measurements.n0_power[aarx] /= 2*k_length;
-    ue->measurements.n0_power_dB[aarx] = (unsigned short) dB_fixed(ue->measurements.n0_power[aarx]);
+    ue->measurements.n0_power_dB[aarx] = dB_fixed(ue->measurements.n0_power[aarx]);
     ue->measurements.n0_power_tot += ue->measurements.n0_power[aarx];
 
   }
 
-  ue->measurements.n0_power_tot_dB = (unsigned short) dB_fixed(ue->measurements.n0_power_tot);
+  ue->measurements.n0_power_tot_dB = dB_fixed(ue->measurements.n0_power_tot);
 
   #ifdef DEBUG_MEAS_RRC
   const int psd_awgn = -174;

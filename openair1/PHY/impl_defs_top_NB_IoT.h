@@ -55,15 +55,15 @@ typedef struct {
   //! estimated noise power (linear)
   unsigned int   n0_power[NB_ANTENNAS_RX];
   //! estimated noise power (dB)
-  unsigned short n0_power_dB[NB_ANTENNAS_RX];
+  short n0_power_dB[NB_ANTENNAS_RX];
   //! total estimated noise power (linear)
   unsigned int   n0_power_tot;
   //! total estimated noise power (dB)
-  unsigned short n0_power_tot_dB;
+  short n0_power_tot_dB;
   //! average estimated noise power (linear)
   unsigned int   n0_power_avg;
   //! average estimated noise power (dB)
-  unsigned short n0_power_avg_dB;
+  short n0_power_avg_dB;
   //! total estimated noise power (dBm)
   short n0_power_tot_dBm;
 
@@ -71,24 +71,24 @@ typedef struct {
   //! estimated received spatial signal power (linear)
   int            rx_spatial_power[NUMBER_OF_CONNECTED_eNB_MAX][2][2];
   //! estimated received spatial signal power (dB)
-  unsigned short rx_spatial_power_dB[NUMBER_OF_CONNECTED_eNB_MAX][2][2];
+  short rx_spatial_power_dB[NUMBER_OF_CONNECTED_eNB_MAX][2][2];
 
   /// estimated received signal power (sum over all TX antennas)
   //int            wideband_cqi[NUMBER_OF_CONNECTED_eNB_MAX][NB_ANTENNAS_RX];
   int            rx_power[NUMBER_OF_CONNECTED_eNB_MAX][NB_ANTENNAS_RX];
   /// estimated received signal power (sum over all TX antennas)
   //int            wideband_cqi_dB[NUMBER_OF_CONNECTED_eNB_MAX][NB_ANTENNAS_RX];
-  unsigned short rx_power_dB[NUMBER_OF_CONNECTED_eNB_MAX][NB_ANTENNAS_RX];
+  short rx_power_dB[NUMBER_OF_CONNECTED_eNB_MAX][NB_ANTENNAS_RX];
 
   /// estimated received signal power (sum over all TX/RX antennas)
   int            rx_power_tot[NUMBER_OF_CONNECTED_eNB_MAX]; //NEW
   /// estimated received signal power (sum over all TX/RX antennas)
-  unsigned short rx_power_tot_dB[NUMBER_OF_CONNECTED_eNB_MAX]; //NEW
+  short rx_power_tot_dB[NUMBER_OF_CONNECTED_eNB_MAX]; //NEW
 
   //! estimated received signal power (sum of all TX/RX antennas, time average)
   int            rx_power_avg[NUMBER_OF_CONNECTED_eNB_MAX];
   //! estimated received signal power (sum of all TX/RX antennas, time average, in dB)
-  unsigned short rx_power_avg_dB[NUMBER_OF_CONNECTED_eNB_MAX];
+  short rx_power_avg_dB[NUMBER_OF_CONNECTED_eNB_MAX];
 
   /// SINR (sum of all TX/RX antennas, in dB)
   int            wideband_cqi_tot[NUMBER_OF_CONNECTED_eNB_MAX];
@@ -141,17 +141,17 @@ typedef struct {
   //! estimated noise power (linear)
   unsigned int   n0_power[NB_ANTENNAS_RX];
   //! estimated noise power (dB)
-  unsigned short n0_power_dB[NB_ANTENNAS_RX];
+  short n0_power_dB[NB_ANTENNAS_RX];
   //! total estimated noise power (linear)
   unsigned int   n0_power_tot;
   //! estimated avg noise power (dB)
-  unsigned short n0_power_tot_dB;
+  short n0_power_tot_dB;
   //! estimated avg noise power (dB)
   short n0_power_tot_dBm;
   //! estimated avg noise power per RB per RX ant (lin)
   unsigned short n0_subband_power[NB_ANTENNAS_RX][100];
   //! estimated avg noise power per RB per RX ant (dB)
-  unsigned short n0_subband_power_dB[NB_ANTENNAS_RX][100];
+  short n0_subband_power_dB[NB_ANTENNAS_RX][100];
   //! estimated avg noise power per RB (dB)
   short n0_subband_power_tot_dB[100];
   //! estimated avg noise power per RB (dBm)
@@ -160,7 +160,7 @@ typedef struct {
   //! estimated received spatial signal power (linear)
   unsigned int   rx_spatial_power[NUMBER_OF_UE_MAX][2][2];
   //! estimated received spatial signal power (dB)
-  unsigned short rx_spatial_power_dB[NUMBER_OF_UE_MAX][2][2];
+  short rx_spatial_power_dB[NUMBER_OF_UE_MAX][2][2];
   //! estimated rssi (dBm)
   short          rx_rssi_dBm[NUMBER_OF_UE_MAX];
   //! estimated correlation (wideband linear) between spatial channels (computed in dlsch_demodulation)
@@ -173,7 +173,7 @@ typedef struct {
   /// Wideband CQI in dB (= SINR dB)
   int            wideband_cqi_dB[NUMBER_OF_UE_MAX][NB_ANTENNAS_RX];
   /// Wideband CQI (sum of all RX antennas, in dB)
-  char           wideband_cqi_tot[NUMBER_OF_UE_MAX];
+  int           wideband_cqi_tot[NUMBER_OF_UE_MAX];
   /// Subband CQI per RX antenna and RB (= SINR)
   int            subband_cqi[NUMBER_OF_UE_MAX][NB_ANTENNAS_RX][100];
   /// Total Subband CQI and RB (= SINR)

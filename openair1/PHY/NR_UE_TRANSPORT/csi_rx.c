@@ -581,7 +581,7 @@ int nr_csi_rs_pmi_estimation(const PHY_VARS_NR_UE *ue,
                              const int16_t log2_re,
                              uint8_t *i1,
                              uint8_t *i2,
-                             uint32_t *precoded_sinr_dB)
+                             int32_t *precoded_sinr_dB)
 {
   const NR_DL_FRAME_PARMS *frame_parms = &ue->frame_parms;
 
@@ -948,7 +948,7 @@ void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
   uint8_t i1[3] = {0};
   uint8_t i2[1] = {0};
   uint8_t cqi = 0;
-  uint32_t precoded_sinr_dB = 0;
+  int32_t precoded_sinr_dB = 0;
   // bit 3 in bitmap to indicate RI measurment
   if (csirs_config_pdu->measurement_bitmap & 8) {
     nr_csi_rs_pmi_estimation(ue,

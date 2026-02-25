@@ -419,17 +419,17 @@ typedef struct {
   //! estimated noise power (linear)
   unsigned int   n0_power[MAX_NUM_RU_PER_eNB];
   //! estimated noise power (dB)
-  unsigned short n0_power_dB[MAX_NUM_RU_PER_eNB];
+  short n0_power_dB[MAX_NUM_RU_PER_eNB];
   //! total estimated noise power (linear)
   unsigned int   n0_power_tot;
   //! estimated avg noise power (dB)
-  unsigned short n0_power_tot_dB;
+  short n0_power_tot_dB;
   //! estimated avg noise power (dB)
   short n0_power_tot_dBm;
   //! estimated avg noise power per RB per RX ant (lin)
   unsigned short n0_subband_power[MAX_NUM_RU_PER_eNB][100];
   //! estimated avg noise power per RB per RX ant (dB)
-  unsigned short n0_subband_power_dB[MAX_NUM_RU_PER_eNB][100];
+  short n0_subband_power_dB[MAX_NUM_RU_PER_eNB][100];
   //! estimated avg noise power per RB (dB)
   short n0_subband_power_tot_dB[100];
   //! estimated avg noise power per RB (dBm)
@@ -440,7 +440,7 @@ typedef struct {
   //! estimated received spatial signal power (linear)
   unsigned int   rx_spatial_power[NUMBER_OF_SRS_MAX][2][2];
   //! estimated received spatial signal power (dB)
-  unsigned short rx_spatial_power_dB[NUMBER_OF_SRS_MAX][2][2];
+  short rx_spatial_power_dB[NUMBER_OF_SRS_MAX][2][2];
   //! estimated rssi (dBm)
   short          rx_rssi_dBm[NUMBER_OF_SRS_MAX];
   //! estimated correlation (wideband linear) between spatial channels (computed in dlsch_demodulation)
@@ -453,7 +453,7 @@ typedef struct {
   /// Wideband CQI in dB (= SINR dB)
   int            wideband_cqi_dB[NUMBER_OF_SRS_MAX][MAX_NUM_RU_PER_eNB];
   /// Wideband CQI (sum of all RX antennas, in dB)
-  char           wideband_cqi_tot[NUMBER_OF_SRS_MAX];
+  int           wideband_cqi_tot[NUMBER_OF_SRS_MAX];
   /// Subband CQI per RX antenna and RB (= SINR)
   int            subband_cqi[NUMBER_OF_SRS_MAX][MAX_NUM_RU_PER_eNB][100];
   /// Total Subband CQI and RB (= SINR)
