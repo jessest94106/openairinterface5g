@@ -393,7 +393,7 @@ int main(int argc, char **argv) {
                           subframe,
                           0); //Nf
   /* tx_lev_dB not used later, no need to set */
-  //tx_lev_dB = (unsigned int) dB_fixed(tx_lev);
+  //tx_lev_dB = dB_fixed(tx_lev);
   LOG_M("txsig0_new.m","txs0", &txdata[0][subframe*frame_parms->samples_per_tti],frame_parms->samples_per_tti,1,1);
   //LOG_M("txsig1.m","txs1", txdata[1],FRAME_LENGTH_COMPLEX_SAMPLES,1,1);
   // multipath channel
