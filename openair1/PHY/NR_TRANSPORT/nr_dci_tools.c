@@ -35,8 +35,6 @@
 
 //#define DEBUG_FILL_DCI
 
-#include "nr_dlsch.h"
-
 int compfunc(const void *a, const void *b)
 {
   return (*(int *)a - *(int *)b);

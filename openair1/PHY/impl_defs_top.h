@@ -240,20 +240,6 @@
 #define NR_MAX_ULSCH_HARQ_PROCESSES              (NR_MAX_HARQ_PROCESSES)  /* cf 38.214 6.1 UE procedure for receiving the physical uplink shared channel */
 #define NR_MAX_DLSCH_HARQ_PROCESSES              (NR_MAX_HARQ_PROCESSES)  /* cf 38.214 5.1 UE procedure for receiving the physical downlink shared channel */
 
-/// Data structure for transmission.
-typedef struct {
-  /// RAW TX sample buffer
-  char *TX_DMA_BUFFER[2];
-} TX_VARS ;
-
-/// Data structure for reception.
-typedef struct {
-  /// RAW TX sample buffer
-  char *TX_DMA_BUFFER[2];
-  /// RAW RX sample buffer
-  int *RX_DMA_BUFFER[2];
-} TX_RX_VARS;
-
 /// Measurement Variables
 
 //#define NUMBER_OF_SUBBANDS_MAX 13
