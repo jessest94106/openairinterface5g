@@ -372,12 +372,16 @@ class Containerize():
 		for image,pattern,name,option in imageNames:
 			cmd.run(f"{self.cli} image rm {name}:{imageTag}", reportNonZero=False)
 
+		cmd.run(f'docker login -u oaicicd -p oaicicd {DEFAULT_REGISTRY}')
+		ubuntuImage = "ubuntu:noble"
 		# Build the base image only on Push Events (not on Merge Requests)
 		# On when the base image docker file is being modified.
 		if forceBaseImageBuild:
 			cmd.run(f"{self.cli} image rm {baseImage}:{baseTag}")
 			logfile = f'{lSourcePath}/cmake_targets/log/ran-base.docker.log'
-			cmd.run(f"{self.cli} build {self.cliBuildOptions} --target {baseImage} --tag {baseImage}:{baseTag} --file docker/Dockerfile.base{self.dockerfileprefix} . &> {logfile}", timeout=1600)
+			if self.host == 'Ubuntu':
+				option = f" --build-arg UBUNTU_IMAGE={DEFAULT_REGISTRY}/{ubuntuImage}"
+			cmd.run(f"{self.cli} build {self.cliBuildOptions} --target {baseImage} --tag {baseImage}:{baseTag} --file docker/Dockerfile.base{self.dockerfileprefix} {option} . &> {logfile}", timeout=1600)
 			t = ("ran-base", archiveArtifact(cmd, ctx, logfile))
 			log_files.append(t)
 
@@ -420,6 +424,8 @@ class Containerize():
 			if image == 'oai-gnb-aerial':
 				cmd.run('cp -f /opt/nvidia-ipc/nvipc_src.2026.01.07.tar.gz .')
 			logfile = f'{lSourcePath}/cmake_targets/log/{name}.docker.log'
+			if self.host == 'Ubuntu':
+				option = option + f" --build-arg UBUNTU_IMAGE={DEFAULT_REGISTRY}/{ubuntuImage}"
 			ret = cmd.run(f'{self.cli} build {self.cliBuildOptions} --target {image} --tag {name}:{imageTag} --file docker/Dockerfile.{pattern}{self.dockerfileprefix} {option} . > {logfile} 2>&1', timeout=1200)
 			t = (name, archiveArtifact(cmd, ctx, logfile))
 			log_files.append(t)
@@ -446,7 +452,7 @@ class Containerize():
 					allImagesSize[name] = 'unknown'
 			# Now pruning dangling images in between target builds
 			cmd.run(f"{self.cli} image prune --force")
-
+		cmd.run(f'docker logout {DEFAULT_REGISTRY}')
 		# Remove all intermediate build images and clean up
 		cmd.run(f"{self.cli} image rm ran-build:{imageTag} ran-build-asan:{imageTag} ran-build-fhi72:{imageTag} || true")
 		cmd.run(f"{self.cli} volume prune --force")

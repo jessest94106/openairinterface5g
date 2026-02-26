@@ -24,6 +24,7 @@
 #   Valid for Ubuntu 24.04
 #
 #---------------------------------------------------------------------
+ARG UBUNTU_IMAGE=ubuntu:noble
 
 FROM ran-base:latest AS enb-base
 
@@ -31,7 +32,8 @@ FROM ran-build:latest AS enb-build
 
 
 #start from scratch for target executable
-FROM ubuntu:noble AS oai-enb
+FROM ${UBUNTU_IMAGE} AS oai-enb
+
 ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Paris
