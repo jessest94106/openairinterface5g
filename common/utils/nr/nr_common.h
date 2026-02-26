@@ -276,8 +276,8 @@ static __attribute__((always_inline)) inline int count_bits64_with_mask(uint64_t
 void warn_higher_threequarter_fs(const int n_rb, const int mu);
 
 uint64_t from_nrarfcn(int nr_bandP, uint8_t scs_index, uint32_t dl_nrarfcn);
-uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw);
-
+uint32_t to_nrarfcn(uint64_t dl_CarrierFreq);
+uint8_t set_ssb_case(int scs, int nr_band);
 int cce_to_reg_interleaving(const int R, int k, int n_shift, const int C, int L, const int N_regs);
 int get_SLIV(uint8_t S, uint8_t L);
 void get_coreset_rballoc(const uint8_t *FreqDomainResource, int *n_rb, int *rb_offset);
@@ -285,7 +285,6 @@ int get_coreset_num_cces(const uint8_t *FreqDomainResource, int duration);
 int get_nr_table_idx(int nr_bandP, uint8_t scs_index);
 int32_t get_delta_duplex(int nr_bandP, uint8_t scs_index);
 frame_type_t get_frame_type(uint16_t nr_bandP, uint8_t scs_index);
-uint16_t get_band(uint64_t downlink_frequency, int32_t delta_duplex, int64_t dlbw, int64_t ulbw);
 int NRRIV2BW(int locationAndBandwidth,int N_RB);
 int NRRIV2PRBOFFSET(int locationAndBandwidth,int N_RB);
 int PRBalloc_to_locationandbandwidth0(int NPRB,int RBstart,int BWPsize);

@@ -179,6 +179,9 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
     nfapi_resp->num_tlv++;
   }
 
+  FILL_TLV(nfapi_resp->ssb_table.case_v3, NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG, rand8());
+  nfapi_resp->num_tlv++;
+
   FILL_TLV(nfapi_resp->tdd_table.tdd_period, NFAPI_NR_CONFIG_TDD_PERIOD_TAG, 6 /* ms5 */);
   nfapi_resp->num_tlv++;
 

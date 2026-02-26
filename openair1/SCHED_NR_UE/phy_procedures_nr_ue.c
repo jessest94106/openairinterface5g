@@ -116,7 +116,7 @@ static uint32_t get_ssb_arfcn(NR_DL_FRAME_PARMS *frame_parms)
   uint32_t band_size_hz = frame_parms->N_RB_DL * 12 * frame_parms->subcarrier_spacing;
   int ssb_center_sc = frame_parms->ssb_start_subcarrier + 120; // ssb is 20 PRBs -> 240 sub-carriers
   uint64_t ssb_freq = frame_parms->dl_CarrierFreq - (band_size_hz / 2) + frame_parms->subcarrier_spacing * ssb_center_sc;
-  return to_nrarfcn(frame_parms->nr_band, ssb_freq, frame_parms->numerology_index, band_size_hz);
+  return to_nrarfcn(ssb_freq);
 }
 void nr_fill_rx_indication(fapi_nr_rx_indication_t *rx_ind,
                            uint8_t pdu_type,

@@ -841,7 +841,7 @@ void *UE_thread(void *arg)
         // Get list of GSCN in this band for UE's bandwidth and center frequency.
         LOG_W(PHY, "UE set to scan all GSCN in current bandwidth\n");
         syncMsg->numGscn =
-            get_scan_ssb_first_sc(fp->dl_CarrierFreq, fp->N_RB_DL, fp->nr_band, fp->numerology_index, syncMsg->gscnInfo);
+            get_scan_ssb_first_sc(fp->dl_CarrierFreq, fp->N_RB_DL, nrue_get_band(UE), fp->numerology_index, syncMsg->gscnInfo);
       } else {
         LOG_W(PHY, "SSB position provided\n");
         syncMsg->gscnInfo[0] = (nr_gscn_info_t){.ssbFirstSC = fp->ssb_start_subcarrier};

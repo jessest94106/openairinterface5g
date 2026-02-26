@@ -70,176 +70,6 @@ static int DEFRUTPCORES[] = {-1,-1,-1,-1};
 static void NRRCconfig_RU(configmodule_interface_t *cfg);
 
 /*************************************************************/
-/* Functions to attach and configure RRU                     */
-
-int attach_rru(RU_t *ru)
-{
-  RRU_CONFIG_msg_t rru_config_msg;
-  int received_capabilities=0;
-  wait_gNBs();
-
-  // Wait for capabilities
-  while (received_capabilities==0) {
-    rru_config_msg = (RRU_CONFIG_msg_t){.type = RAU_tick, .len = sizeof(rru_config_msg.msg)};
-    LOG_D(PHY, "Sending RAU tick to RRU %d\n", ru->idx);
-    AssertFatal((ru->ifdevice.trx_ctlsend_func(&ru->ifdevice,&rru_config_msg,rru_config_msg.len)!=-1),
-                "RU %d cannot access remote radio\n",ru->idx);
-    ssize_t msg_len = rru_config_msg.len + sizeof(RRU_capabilities_t);
-    // wait for answer with timeout
-    ssize_t len = ru->ifdevice.trx_ctlrecv_func(&ru->ifdevice, &rru_config_msg, msg_len);
-    if (len < 0) {
-      LOG_D(PHY, "Waiting for RRU %d\n", ru->idx);
-    } else if (rru_config_msg.type == RRU_capabilities) {
-      AssertFatal(rru_config_msg.len == msg_len,
-                  "Received capabilities with incorrect length (%ld!=%ld)\n",
-                  rru_config_msg.len,
-                  msg_len);
-      RRU_capabilities_t *cap = (RRU_capabilities_t *)rru_config_msg.msg;
-      LOG_I(PHY,
-            "Received capabilities from RRU %d (len %ld/%ld, num_bands %d,max_pdschReferenceSignalPower %d, max_rxgain %d, nb_tx "
-            "%d, nb_rx %d)\n",
-            ru->idx,
-            rru_config_msg.len,
-            msg_len,
-            cap->num_bands,
-            cap->max_pdschReferenceSignalPower[0],
-            cap->max_rxgain[0],
-            cap->nb_tx[0],
-            cap->nb_rx[0]);
-      received_capabilities=1;
-    } else {
-      LOG_E(PHY,"Received incorrect message %d from RRU %d\n",rru_config_msg.type,ru->idx);
-    }
-  }
-
-  configure_ru(ru, (RRU_capabilities_t *)rru_config_msg.msg);
-  rru_config_msg.type = RRU_config;
-  rru_config_msg.len  = sizeof(RRU_CONFIG_msg_t)-MAX_RRU_CONFIG_SIZE+sizeof(RRU_config_t);
-  RRU_config_t *conf = (RRU_config_t *)rru_config_msg.msg;
-  LOG_I(PHY,
-        "Sending Configuration to RRU %d (num_bands %d,band0 %d,txfreq %u,rxfreq %u,att_tx %d,att_rx %d,N_RB_DL %d,N_RB_UL "
-        "%d,3/4FS %d, prach_FO %d, prach_CI %d)\n",
-        ru->idx,
-        conf->num_bands,
-        conf->band_list[0],
-        conf->tx_freq[0],
-        conf->rx_freq[0],
-        conf->att_tx[0],
-        conf->att_rx[0],
-        conf->N_RB_DL[0],
-        conf->N_RB_UL[0],
-        conf->threequarter_fs[0],
-        conf->prach_FreqOffset[0],
-        conf->prach_ConfigIndex[0]);
-  AssertFatal((ru->ifdevice.trx_ctlsend_func(&ru->ifdevice,&rru_config_msg,rru_config_msg.len)!=-1),
-              "RU %d failed send configuration to remote radio\n",ru->idx);
-  int len = ru->ifdevice.trx_ctlrecv_func(&ru->ifdevice, &rru_config_msg, sizeof(rru_config_msg.msg));
-  if (len < 0) {
-    LOG_I(PHY,"Waiting for RRU %d\n",ru->idx);
-  } else if (rru_config_msg.type == RRU_config_ok) {
-    LOG_I(PHY, "RRU_config_ok received\n");
-  } else {
-    LOG_E(PHY,"Received incorrect message %d from RRU %d\n",rru_config_msg.type,ru->idx);
-  }
-
-  return 0;
-}
-
-int connect_rau(RU_t *ru) {
-  RRU_CONFIG_msg_t rru_config_msg;
-
-  // wait for RAU_tick
-  int tick_received = 0;
-  while (tick_received == 0) {
-    ssize_t msg_len = sizeof(rru_config_msg.msg);
-    int len = ru->ifdevice.trx_ctlrecv_func(&ru->ifdevice, &rru_config_msg, msg_len);
-    if (len < 0) {
-      LOG_I(PHY,"Waiting for RAU\n");
-    } else {
-      if (rru_config_msg.type == RAU_tick) {
-        LOG_I(PHY,"Tick received from RAU\n");
-        tick_received = 1;
-      } else
-        LOG_E(PHY, "Received erroneous message (%d)from RAU, expected RAU_tick\n", rru_config_msg.type);
-    }
-  }
-
-  // send capabilities
-  rru_config_msg.type = RRU_capabilities;
-  rru_config_msg.len  = sizeof(RRU_CONFIG_msg_t)-MAX_RRU_CONFIG_SIZE+sizeof(RRU_capabilities_t);
-  RRU_capabilities_t *cap = (RRU_capabilities_t *)rru_config_msg.msg;
-  LOG_I(PHY,
-        "Sending Capabilities (len %ld, num_bands %d,max_pdschReferenceSignalPower %d, max_rxgain %d, nb_tx %d, nb_rx %d)\n",
-        rru_config_msg.len,
-        ru->num_bands,
-        ru->max_pdschReferenceSignalPower,
-        ru->max_rxgain,
-        ru->nb_tx,
-        ru->nb_rx);
-
-  switch (ru->function) {
-    case NGFI_RRU_IF4p5:
-      cap->FH_fmt = OAI_IF4p5_only;
-      break;
-
-    case NGFI_RRU_IF5:
-      cap->FH_fmt = OAI_IF5_only;
-      break;
-
-    case MBP_RRU_IF5:
-      cap->FH_fmt = MBP_IF5;
-      break;
-
-    default:
-      AssertFatal(false, "RU_function is unknown %d\n", RC.ru[0]->function);
-      break;
-  }
-
-  cap->num_bands = ru->num_bands;
-  for (int i = 0; i < ru->num_bands; i++) {
-    LOG_I(PHY,"Band %d: nb_rx %d nb_tx %d pdschReferenceSignalPower %d rxgain %d\n",
-          ru->band[i],ru->nb_rx,ru->nb_tx,ru->max_pdschReferenceSignalPower,ru->max_rxgain);
-    cap->band_list[i]                             = ru->band[i];
-    cap->nb_rx[i]                                 = ru->nb_rx;
-    cap->nb_tx[i]                                 = ru->nb_tx;
-    cap->max_pdschReferenceSignalPower[i]         = ru->max_pdschReferenceSignalPower;
-    cap->max_rxgain[i]                            = ru->max_rxgain;
-  }
-
-  AssertFatal((ru->ifdevice.trx_ctlsend_func(&ru->ifdevice,&rru_config_msg,rru_config_msg.len)!=-1),
-              "RU %d failed send capabilities to RAU\n",ru->idx);
-  // wait for configuration
-  rru_config_msg.len  = sizeof(RRU_CONFIG_msg_t)-MAX_RRU_CONFIG_SIZE+sizeof(RRU_config_t);
-
-  int configuration_received = 0;
-  while (configuration_received == 0) {
-    int len = ru->ifdevice.trx_ctlrecv_func(&ru->ifdevice, &rru_config_msg, rru_config_msg.len);
-    if (len < 0) {
-      LOG_I(PHY,"Waiting for configuration from RAU\n");
-    } else {
-      RRU_config_t *conf = (RRU_config_t *)rru_config_msg.msg;
-      LOG_I(PHY,
-            "Configuration received from RAU  (num_bands %d,band0 %d,txfreq %u,rxfreq %u,att_tx %d,att_rx %d,N_RB_DL %d,N_RB_UL "
-            "%d,3/4FS %d, prach_FO %d, prach_CI %d)\n",
-            conf->num_bands,
-            conf->band_list[0],
-            conf->tx_freq[0],
-            conf->rx_freq[0],
-            conf->att_tx[0],
-            conf->att_rx[0],
-            conf->N_RB_DL[0],
-            conf->N_RB_UL[0],
-            conf->threequarter_fs[0],
-            conf->prach_FreqOffset[0],
-            conf->prach_ConfigIndex[0]);
-      configure_rru(ru, (void *)rru_config_msg.msg);
-      configuration_received = 1;
-    }
-  }
-
-  return 0;
-}
-/*************************************************************/
 /* Southbound Fronthaul functions, RCC/RAU                   */
 
 // southbound IF5 fronthaul for 16-bit OAI format
@@ -1034,15 +864,6 @@ void *ru_thread(void *param)
     LOG_I(PHY, "Starting IF interface for RU %d, nb_rx %d\n", ru->idx, ru->nb_rx);
     AssertFatal(ru->nr_start_if(ru, NULL) == 0, "Could not start the IF device\n");
 
-    if (ru->has_ctrl_prt > 0) {
-      if (ru->if_south == LOCAL_RF)
-        ret = connect_rau(ru);
-      else
-        ret = attach_rru(ru);
-
-      AssertFatal(ret == 0, "Cannot connect to remote radio\n");
-    }
-
   } else if (ru->if_south == LOCAL_RF) { // configure RF parameters only
     ret = openair0_device_load(&ru->rfdevice,&ru->openair0_cfg);
     AssertFatal(ret==0,"Cannot connect to local radio\n");
@@ -1257,123 +1078,6 @@ void kill_NR_RU_proc(int inst) {
   LOG_I(PHY, "RU %d RF device stopped\n",ru->idx);
 }
 
-int check_capabilities(RU_t *ru,RRU_capabilities_t *cap) {
-  FH_fmt_options_t fmt = cap->FH_fmt;
-  int i;
-  LOG_I(PHY,"RRU %d, num_bands %d, looking for band %d\n",ru->idx,cap->num_bands,ru->nr_frame_parms->nr_band);
-
-  for (i=0; i<cap->num_bands; i++) {
-    LOG_I(PHY,"band %d on RRU %d\n",cap->band_list[i],ru->idx);
-    if (ru->nr_frame_parms->nr_band == cap->band_list[i])
-      break;
-  }
-
-  if (i == cap->num_bands) {
-    LOG_I(PHY,"Couldn't find target NR band %d on RRU %d\n",ru->nr_frame_parms->nr_band,ru->idx);
-    return(-1);
-  }
-
-  switch (ru->if_south) {
-    case LOCAL_RF:
-      AssertFatal(1==0, "This RU should not have a local RF, exiting\n");
-      return(0);
-      break;
-
-    case REMOTE_IF5:
-      if (fmt == OAI_IF5_only || fmt == OAI_IF5_and_IF4p5)
-        return (0);
-      break;
-
-    case REMOTE_IF4p5:
-      if (fmt == OAI_IF4p5_only || fmt == OAI_IF5_and_IF4p5)
-        return (0);
-      break;
-
-    case REMOTE_MBP_IF5:
-      if (fmt == MBP_IF5)
-        return (0);
-      break;
-
-    default:
-      LOG_I(PHY,"No compatible Fronthaul interface found for RRU %d\n", ru->idx);
-      return(-1);
-  }
-
-  return(-1);
-}
-
-const char rru_format_options[4][20] = {"OAI_IF5_only", "OAI_IF4p5_only", "OAI_IF5_and_IF4p5", "MBP_IF5"};
-const char rru_formats[3][20] = {"OAI_IF5", "MBP_IF5", "OAI_IF4p5"};
-const char ru_if_formats[4][20] = {"LOCAL_RF", "REMOTE_OAI_IF5", "REMOTE_MBP_IF5", "REMOTE_OAI_IF4p5"};
-
-void configure_ru(void *ruu, void *arg)
-{
-  RU_t *ru = (RU_t *)ruu;
-  nfapi_nr_config_request_scf_t *cfg = &ru->config;
-  int ret;
-  LOG_I(PHY, "Received capabilities from RRU %d\n", ru->idx);
-
-  RRU_capabilities_t *capabilities = (RRU_capabilities_t *)arg;
-  if (capabilities->FH_fmt < MAX_FH_FMTs)
-    LOG_I(PHY, "RU FH options %s\n", rru_format_options[capabilities->FH_fmt]);
-
-  ret = check_capabilities(ru,capabilities);
-  AssertFatal(ret == 0, "Cannot configure RRU %d, check_capabilities returned %d\n", ru->idx, ret);
-  // take antenna capabilities of RRU
-  ru->nb_tx = capabilities->nb_tx[0];
-  ru->nb_rx = capabilities->nb_rx[0];
-  // Pass configuration to RRU
-  LOG_I(PHY, "Using %s fronthaul (%d), band %d \n",ru_if_formats[ru->if_south],ru->if_south,ru->nr_frame_parms->nr_band);
-
-  // wait for configuration
-  RRU_config_t *config = (RRU_config_t *)arg;
-  *config = (RRU_config_t){.FH_fmt = ru->if_south,
-                           .num_bands = 1,
-                           .band_list[0] = ru->nr_frame_parms->nr_band,
-                           .tx_freq[0] = ru->nr_frame_parms->dl_CarrierFreq,
-                           .rx_freq[0] = ru->nr_frame_parms->ul_CarrierFreq,
-                           .att_tx[0] = ru->att_tx,
-                           .att_rx[0] = ru->att_rx,
-                           .N_RB_DL[0] = cfg->carrier_config.dl_grid_size[cfg->ssb_config.scs_common.value].value,
-                           .N_RB_UL[0] = cfg->carrier_config.dl_grid_size[cfg->ssb_config.scs_common.value].value,
-                           .threequarter_fs[0] = ru->nr_frame_parms->threequarter_fs};
-  nr_init_frame_parms(&ru->config, ru->nr_frame_parms);
-  nr_phy_init_RU(ru);
-}
-
-void configure_rru(void *ruu, void *arg)
-{
-  RRU_config_t *config     = (RRU_config_t *)arg;
-  RU_t *ru = (RU_t *)ruu;
-  nfapi_nr_config_request_scf_t *cfg = &ru->config;
-  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
-
-  fp->nr_band = config->band_list[0];
-  fp->dl_CarrierFreq = config->tx_freq[0];
-  fp->ul_CarrierFreq = config->rx_freq[0];
-
-  if (fp->dl_CarrierFreq == fp->ul_CarrierFreq) {
-    cfg->cell_config.frame_duplex_type.value = TDD;
-  } else
-    cfg->cell_config.frame_duplex_type.value = FDD;
-
-  ru->att_tx = config->att_tx[0];
-  ru->att_rx = config->att_rx[0];
-  int mu = cfg->ssb_config.scs_common.value;
-  cfg->carrier_config.dl_grid_size[mu].value = config->N_RB_DL[0];
-  cfg->carrier_config.dl_grid_size[mu].value = config->N_RB_UL[0];
-  fp->threequarter_fs = config->threequarter_fs[0];
-
-  if (ru->function==NGFI_RRU_IF4p5) {
-    fp->att_rx = ru->att_rx;
-    fp->att_tx = ru->att_tx;
-  }
-
-  fill_rf_config(ru,ru->rf_config_file);
-  nr_init_frame_parms(&ru->config, fp);
-  nr_phy_init_RU(ru);
-}
-
 void set_function_spec_param(RU_t *ru)
 {
   switch (ru->if_south) {
@@ -1444,7 +1148,6 @@ void set_function_spec_param(RU_t *ru)
       ru->nr_start_if            = nr_start_if;         // need to start if interface for IF5
       ru->ifdevice.host_type     = RAU_HOST;
       ru->ifdevice.eth_params    = &ru->eth_params;
-      ru->ifdevice.configure_rru = configure_ru;
 
       break;
 
@@ -1464,7 +1167,6 @@ void set_function_spec_param(RU_t *ru)
       ru->nr_start_if            = nr_start_if;         // need to start if interface for IF4p5
       ru->ifdevice.host_type     = RAU_HOST;
       ru->ifdevice.eth_params    = &ru->eth_params;
-      ru->ifdevice.configure_rru = configure_ru;
       break;
 
     default:
@@ -1753,13 +1455,12 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
     for (int i = 0; i < ru->num_bands; i++)
       ru->band[i] = param[RU_BAND_LIST_IDX].iptr[i];
     ru->openair0_cfg.nr_flag = *param[RU_NR_FLAG].iptr;
-    ru->openair0_cfg.nr_band = ru->band[0];
+    // TODO remove band from RU?
     ru->openair0_cfg.nr_scs_for_raster = *param[RU_NR_SCS_FOR_RASTER].iptr;
     LOG_D(PHY,
-          "[RU %d] Setting nr_flag %d, nr_band %d, nr_scs_for_raster %d\n",
+          "[RU %d] Setting nr_flag %d, nr_scs_for_raster %d\n",
           j,
           ru->openair0_cfg.nr_flag,
-          ru->openair0_cfg.nr_band,
           ru->openair0_cfg.nr_scs_for_raster);
     ru->openair0_cfg.rxfh_cores[0] = *param[RU_RXFH_CORE_ID].iptr;
     ru->openair0_cfg.txfh_cores[0] = *param[RU_TXFH_CORE_ID].iptr;
