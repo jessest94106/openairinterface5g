@@ -51,7 +51,6 @@
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
 #include "PHY/TOOLS/tools_defs.h"
 #include "PHY/defs_RU.h"
-#include "PHY/defs_common.h"
 #include "PHY/defs_gNB.h"
 #include "PHY/defs_nr_common.h"
 #include "PHY/impl_defs_nr.h"
@@ -200,7 +199,7 @@ static void rx_func(processingData_L1_t *info)
       int soffset = (slot_rx % RU_RX_SLOT_DEPTH) * gNB->frame_parms.symbols_per_slot * gNB->frame_parms.ofdm_symbol_size;
       for (int bb = 0; bb < gNB->common_vars.num_beams_period; bb++) {
         for (int aa = 0; aa < gNB->frame_parms.nb_antennas_rx; aa++) {
-          const uint max_symb = (gNB->frame_parms.Ncp == EXTENDED) ? 12 : 14;
+          const uint max_symb = (gNB->frame_parms.Ncp == NR_EXTENDED) ? 12 : 14;
           for (int sym = 0; sym < max_symb; sym++)
             apply_nr_rotation_symbol_RX(&gNB->frame_parms,
                                         gNB->common_vars.rxdataF[bb][aa] + soffset + sym * gNB->frame_parms.ofdm_symbol_size,

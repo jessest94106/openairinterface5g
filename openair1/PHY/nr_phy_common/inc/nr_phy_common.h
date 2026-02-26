@@ -23,7 +23,7 @@
 #define __NR_PHY_COMMON__H__
 #include "PHY/impl_defs_top.h"
 #include "PHY/TOOLS/tools_defs.h"
-#include "PHY/NR_REFSIG/nr_refsig_common.h"
+#include "PHY/NR_REFSIG/nr_refsig.h"
 #include "PHY/MODULATION/nr_modulation.h"
 
 void init_byte2m128i(void);

@@ -321,7 +321,7 @@ void nr_init_frame_parms(nfapi_nr_config_request_scf_t* cfg, NR_DL_FRAME_PARMS *
   fp->nb_antennas_rx = cfg->carrier_config.num_rx_ant.value;      // It denotes the number of rx antennas at gNB
   fp->nb_antennas_tx = cfg->carrier_config.num_tx_ant.value;      // It corresponds to pdsch_AntennaPorts (logical antenna ports)
 
-  fp->symbols_per_slot = ((Ncp == NORMAL)? 14 : 12); // to redefine for different slot formats
+  fp->symbols_per_slot = ((Ncp == NR_NORMAL)? 14 : 12); // to redefine for different slot formats
   fp->samples_per_subframe_wCP = fp->ofdm_symbol_size * fp->symbols_per_slot * fp->slots_per_subframe;
   fp->samples_per_frame_wCP = 10 * fp->samples_per_subframe_wCP;
   fp->samples_per_slot_wCP = fp->symbols_per_slot*fp->ofdm_symbol_size; 
@@ -353,7 +353,7 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp, fapi_nr_config_request_t* conf
   uint8_t nb_ant_ports_gNB  = 1;
   uint8_t tdd_cfg           = 3;
   uint8_t Nid_cell          = 0;
-  int     Ncp               = NORMAL;
+  int Ncp = NR_NORMAL;
 
   if(fp->nb_antennas_rx == 0)
     fp->nb_antennas_rx = 1;
@@ -408,7 +408,7 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp, fapi_nr_config_request_t* conf
   set_scs_parameters(fp, fp->numerology_index, N_RB, config->ssb_table.ssb_case);
 
   fp->slots_per_frame = 10* fp->slots_per_subframe;
-  fp->symbols_per_slot = ((Ncp == NORMAL)? 14 : 12); // to redefine for different slot formats
+  fp->symbols_per_slot = ((Ncp == NR_NORMAL)? 14 : 12); // to redefine for different slot formats
   fp->samples_per_subframe_wCP = fp->ofdm_symbol_size * fp->symbols_per_slot * fp->slots_per_subframe;
   fp->samples_per_frame_wCP = 10 * fp->samples_per_subframe_wCP;
   fp->samples_per_slot_wCP = fp->symbols_per_slot*fp->ofdm_symbol_size; 
@@ -468,12 +468,12 @@ void nr_init_frame_parms_ue_sa(NR_DL_FRAME_PARMS *frame_parms, const nrUE_cell_p
 
   frame_parms->frame_type = get_frame_type(nr_band, frame_parms->numerology_index);
 
-  frame_parms->Ncp = NORMAL;
+  frame_parms->Ncp = NR_NORMAL;
   set_scs_parameters(frame_parms, frame_parms->numerology_index, frame_parms->N_RB_DL, set_ssb_case(mu, nr_band));
   set_Lmax(frame_parms);
 
   frame_parms->slots_per_frame = 10* frame_parms->slots_per_subframe;
-  frame_parms->symbols_per_slot = ((frame_parms->Ncp == NORMAL)? 14 : 12); // to redefine for different slot formats
+  frame_parms->symbols_per_slot = ((frame_parms->Ncp == NR_NORMAL)? 14 : 12); // to redefine for different slot formats
   frame_parms->samples_per_subframe_wCP = frame_parms->ofdm_symbol_size * frame_parms->symbols_per_slot * frame_parms->slots_per_subframe;
   frame_parms->samples_per_frame_wCP = 10 * frame_parms->samples_per_subframe_wCP;
   frame_parms->samples_per_slot_wCP = frame_parms->symbols_per_slot*frame_parms->ofdm_symbol_size;
@@ -565,7 +565,7 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
 
   LOG_I(PHY, "Initializing frame parms for mu %d, N_RB %d, Ncp %d\n", fp->numerology_index, fp->N_RB_DL, fp->Ncp);
 
-  if (fp->Ncp == EXTENDED)
+  if (fp->Ncp == NR_EXTENDED)
     AssertFatal(fp->numerology_index == NR_MU_2,
                 "Invalid cyclic prefix %d for numerology index %d\n",
                 fp->Ncp,
@@ -574,7 +574,7 @@ int nr_init_frame_parms_ue_sl(NR_DL_FRAME_PARMS *fp,
   sl_set_scs_parameters(fp, fp->numerology_index, fp->N_RB_SL);
 
   fp->slots_per_frame = 10 * fp->slots_per_subframe;
-  fp->symbols_per_slot = ((fp->Ncp == NORMAL) ? 14 : 12); // to redefine for different slot formats
+  fp->symbols_per_slot = ((fp->Ncp == NR_NORMAL) ? 14 : 12); // to redefine for different slot formats
   fp->samples_per_subframe_wCP = fp->ofdm_symbol_size * fp->symbols_per_slot * fp->slots_per_subframe;
   fp->samples_per_frame_wCP = 10 * fp->samples_per_subframe_wCP;
   fp->samples_per_slot_wCP = fp->symbols_per_slot * fp->ofdm_symbol_size;

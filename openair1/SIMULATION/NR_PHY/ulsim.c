@@ -741,7 +741,7 @@ int main(int argc, char *argv[])
   gNB->pusch_thres = -20;
   gNB->frame_parms.N_RB_DL = N_RB_DL;
   gNB->frame_parms.N_RB_UL = N_RB_UL;
-  gNB->frame_parms.Ncp = extended_prefix_flag ? EXTENDED : NORMAL;
+  gNB->frame_parms.Ncp = extended_prefix_flag ? NR_EXTENDED : NR_NORMAL;
 
   AssertFatal((gNB->if_inst = NR_IF_Module_init(0)) != NULL, "Cannot register interface");
   gNB->if_inst->NR_PHY_config_req = nr_phy_config_request;

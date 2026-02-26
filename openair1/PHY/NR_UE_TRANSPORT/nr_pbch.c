@@ -36,8 +36,8 @@
 #include "openair1/SCHED_NR_UE/defs.h"
 #include <openair1/PHY/NR_UE_TRANSPORT/nr_transport_proto_ue.h>
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
-#include "openair1/PHY/NR_REFSIG/nr_refsig_common.h"
 #include "PHY/nr_phy_common/inc/nr_phy_common.h"
+#include "openair1/PHY/NR_REFSIG/nr_refsig.h"
 #include "reverse_bits.h"
 #include "instrumentation.h"
 //#define DEBUG_PBCH

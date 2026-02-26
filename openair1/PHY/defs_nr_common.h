@@ -34,7 +34,6 @@
 #define __PHY_DEFS_NR_COMMON__H__
 
 #include "PHY/impl_defs_top.h"
-#include "nfapi_nr_interface_scf.h"
 #include "impl_defs_nr.h"
 #include "PHY/CODING/nrPolar_tools/nr_polar_defs.h"
 
@@ -83,6 +82,11 @@
 #define PBCH_MAX_RE_PER_SYMBOL (20 * 12)
 
 #define NR_PUCCH_DMRS_RB 4
+
+typedef enum {
+  NR_NORMAL = 0,
+  NR_EXTENDED = 1
+} nr_prefix_type_t;
 
 typedef enum {
   NR_MU_0=0,
@@ -228,7 +232,7 @@ struct NR_DL_FRAME_PARMS {
   /// Number of common transmit antenna ports in eNodeB (1 or 2)
   uint8_t nb_antenna_ports_gNB;
   /// Cyclic Prefix for DL (0=Normal CP, 1=Extended CP)
-  lte_prefix_type_t Ncp;
+  nr_prefix_type_t Ncp;
   /// sequence which is computed based on carrier frequency and numerology to rotate/derotate each OFDM symbol according to Section 5.3 in 38.211
   /// First dimension is for the direction of the link (0 DL, 1 UL, 2 SL)
   c16_t symbol_rotation[3][224];

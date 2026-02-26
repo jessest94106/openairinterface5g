@@ -42,7 +42,7 @@
 
 #include "PHY/NR_REFSIG/pss_nr.h"
 #include "PHY/NR_REFSIG/sss_nr.h"
-#include "PHY/NR_REFSIG/refsig_defs_ue.h"
+#include "PHY/NR_REFSIG/nr_refsig.h"
 #include "PHY/TOOLS/tools_defs.h"
 #include "nr-uesoftmodem.h"
 

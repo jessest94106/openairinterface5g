@@ -19,7 +19,7 @@
  *      contact@openairinterface.org
  */
 
-#include "refsig_defs_ue.h"
+#include "sl_refsig_defs.h"
 #include "openair1/PHY/LTE_TRANSPORT/transport_proto.h" // for lte_gold_generic()
 
 void sl_init_psbch_dmrs_gold_sequences(PHY_VARS_NR_UE *UE)

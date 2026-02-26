@@ -40,7 +40,6 @@
 #include "PHY/sse_intrin.h"
 #include "common/utils/nr/nr_common.h"
 #include <openair1/PHY/TOOLS/phy_scope_interface.h>
-#include "openair1/PHY/NR_REFSIG/refsig_defs_ue.h"
 #include "PHY/NR_UE_ESTIMATION/nr_estimation.h"
 
 #include "assertions.h"

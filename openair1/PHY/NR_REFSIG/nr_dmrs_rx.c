@@ -35,10 +35,7 @@
 //#define DEBUG_PUSCH
 
 #include "PHY/TOOLS/tools_defs.h"
-#include "refsig_defs_ue.h"
-#include "PHY/defs_nr_UE.h"
 #include "nr_refsig.h"
-#include "PHY/defs_gNB.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface.h"
 
 // Table 6.4.1.1.3-1/2 from TS 38.211
@@ -66,7 +63,7 @@ static inline c16_t get_modulated(const uint32_t *gold_sequence, const int idx_g
     return (c16_t){-val.r, -val.i};
 }
 
-int nr_pusch_dmrs_rx(PHY_VARS_gNB *gNB,
+int nr_pusch_dmrs_rx(nr_prefix_type_t Ncp,
                      unsigned int Ns,
                      const uint32_t *nr_gold_pusch,
                      c16_t *output,
@@ -88,7 +85,7 @@ int nr_pusch_dmrs_rx(PHY_VARS_gNB *gNB,
   const int nb_dmrs = dmrs_type == pusch_dmrs_type1 ? 6 : 4;
 
   if ((p>=1000) && (p<((dmrs_type==pusch_dmrs_type1) ? 1008 : 1012))) {
-      if (gNB->frame_parms.Ncp == NORMAL) {
+      if (Ncp == NR_NORMAL) {
         for (int k = 0; k < nb_pusch_rb * nb_dmrs; k++) {
           int i = k + dmrs_offset;
           int w = (wf[p - 1000][i & 1]) * (wt[p - 1000][lp]);
@@ -110,7 +107,7 @@ int nr_pusch_dmrs_rx(PHY_VARS_gNB *gNB,
   return(0);
 }
 
-int nr_pdsch_dmrs_rx(const PHY_VARS_NR_UE *ue,
+int nr_pdsch_dmrs_rx(nr_prefix_type_t Ncp,
                      unsigned int Ns,
                      const unsigned int *nr_gold_pdsch,
                      c16_t *output,
@@ -128,7 +125,7 @@ int nr_pdsch_dmrs_rx(const PHY_VARS_NR_UE *ue,
     LOG_E(PHY,"Bad PDSCH DMRS config type %d\n", config_type);
 
   if ((p >= 1000) && (p < ((config_type == NFAPI_NR_DMRS_TYPE1) ? 1008 : 1012))) {
-    if (ue->frame_parms.Ncp == NORMAL) {
+    if (Ncp == NR_NORMAL) {
       for (int i = 0; i < nb_pdsch_rb * ((config_type == NFAPI_NR_DMRS_TYPE1) ? 6 : 4); i++) {
         int w = (wf[p - 1000][i & 1]) * (wt[p - 1000][lp]);
         output[i] = get_modulated(nr_gold_pdsch, i, w == 1);
@@ -215,7 +212,7 @@ void nr_gen_ref_conj_symbols(const uint32_t *in, uint32_t length, c16_t *output,
     }
 }
 
-int nr_pusch_lowpaprtype1_dmrs_rx(PHY_VARS_gNB *gNB,
+int nr_pusch_lowpaprtype1_dmrs_rx(nr_prefix_type_t Ncp,
                                   unsigned int Ns,
                                   c16_t *dmrs_seq,
                                   c16_t *output,
@@ -234,7 +231,7 @@ int nr_pusch_lowpaprtype1_dmrs_rx(PHY_VARS_gNB *gNB,
     LOG_E(PHY,"PUSCH DMRS config type %d not valid\n", dmrs_type);
 
   if ((p>=1000) && (p<1008)) {
-      if (gNB->frame_parms.Ncp == NORMAL) {
+      if (Ncp == NR_NORMAL) {
         nb_dmrs = NR_NB_SC_PER_RB/2; // for DMRS TYPE 1 - 6 DMRS REs present per RB
         for (int i=dmrs_offset; i<dmrs_offset+(nb_pusch_rb*nb_dmrs); i++) {
           k = i-dmrs_offset;

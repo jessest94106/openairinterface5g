@@ -19,6 +19,8 @@
  *      contact@openairinterface.org
  */
 
+#include "openair1/PHY/defs_common.h"
+
 extern decoder_if_t *decoder16;
 extern decoder_if_t *decoder8;
 extern encoder_if_t *encoder;

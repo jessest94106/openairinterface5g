@@ -20,7 +20,6 @@
  */
 
 #include "PHY/defs_nr_UE.h"
-#include "PHY/LTE_REFSIG/lte_refsig.h"
 #include "PHY/NR_REFSIG/nr_mod_table.h"
 #include "PHY/NR_UE_TRANSPORT/nr_transport_proto_ue.h"
 #include "PHY/CODING/nrPolar_tools/nr_polar_psbch_defs.h"
