@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include "common/cmake_defs.h"
 #include <openair1/PHY/TOOLS/tools_defs.h>
 #include "record_player.h"
 #include "common/utils/threadPool/notified_fifo.h"

@@ -549,8 +549,10 @@ endif()
 
 # Hardware dependant options
 ###################################
-add_list1_option(NB_ANTENNAS_RX "4" "Number of antennas in reception" "1" "2" "4")
-add_list1_option(NB_ANTENNAS_TX "4" "Number of antennas in transmission" "1" "2" "4")
+set(NB_ANTENNAS_RX "4" CACHE STRING "Number of antennas in reception")
+set_property(CACHE NB_ANTENNAS_RX PROPERTY STRINGS "1" "2" "4" "8")
+set(NB_ANTENNAS_TX "4" CACHE STRING "Number of antennas in transmission")
+set_property(CACHE NB_ANTENNAS_TX PROPERTY STRINGS "1" "2" "4" "8")
 
 set (CONFIG_ROOTDIR ${OPENAIR_DIR}/common/config)
 add_library(config_internals OBJECT
