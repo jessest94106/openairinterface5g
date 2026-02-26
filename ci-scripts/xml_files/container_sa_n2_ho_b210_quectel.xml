@@ -160,6 +160,9 @@
     <desc>Undeploy Monolithic gNB-PCI0</desc>
     <node>groot</node>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n2_ho_b210</yaml_path>
+    <analysis>
+      <services>oai-gnb-pci0=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>
@@ -168,6 +171,9 @@
     <desc>Undeploy Monolithic gNB-PCI1</desc>
     <node>rocket</node>
     <yaml_path>ci-scripts/yaml_files/5g_sa_n2_ho_b210</yaml_path>
+    <analysis>
+      <services>oai-gnb-pci1=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

@@ -86,8 +86,9 @@
     <node>localhost</node>
     <desc>Undeploy all OAI 5G stack</desc>
     <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_e1</yaml_path>
-    <d_retx_th>1,0,0,0</d_retx_th>
-    <u_retx_th>1,0,0,0</u_retx_th>
+    <analysis>
+      <services>oai-cucp=EndsWithBye oai-cuup=EndsWithBye oai-cuup2=EndsWithBye oai-cuup3=EndsWithBye oai-du=RetxCheck=1,0,0,0 oai-du=EndsWithBye oai-du2=RetxCheck=1,0,0,0 oai-du2=EndsWithBye oai-du3=RetxCheck=1,0,0,0 oai-du3=EndsWithBye oai-nr-ue oai-nr-ue2 oai-nr-ue3</services>
+    </analysis>
   </testCase>
 
   <testCase>

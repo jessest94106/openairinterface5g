@@ -235,6 +235,9 @@
     <desc>Undeploy gNB</desc>
     <node>avra</node>
     <yaml_path>ci-scripts/yaml_files/sa_aw2s_2x2_gnb</yaml_path>
+    <analysis>
+      <services>oai-gnb=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

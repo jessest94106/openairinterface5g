@@ -165,6 +165,9 @@
     <desc>Undeploy RCC/RRU</desc>
     <node>hutch</node>
     <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_05Mhz_if4.5</yaml_path>
+    <analysis>
+      <services>rru_fdd=EndsWithBye rcc_fdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

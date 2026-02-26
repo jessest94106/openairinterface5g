@@ -500,6 +500,7 @@ int main(int argc, char **argv)
   time_manager_finish();
 
   free(pckg);
+  printf("Bye.\n");
   return 0;
 }
 

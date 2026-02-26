@@ -31,23 +31,17 @@
 #-----------------------------------------------------------
 # Import
 #-----------------------------------------------------------
-import sys	      # arg
 import re	       # reg
 import logging
 import os
-import shutil
-import time
-from zipfile import ZipFile
 
 #-----------------------------------------------------------
 # OAI Testing modules
 #-----------------------------------------------------------
 import cls_cmd
-import helpreadme as HELP
 import constants as CONST
-import cls_oaicitest
+import cls_analysis
 from cls_ci_helper import archiveArtifact
-from collections import deque
 
 #-----------------------------------------------------------
 # Helper functions used here and in other classes
@@ -186,61 +180,8 @@ def GetDeployedServices(ssh, file):
 		else:
 			c = ret.stdout
 			logging.info(f'service {s} with container id {c}')
-			deployed_services.append(s)
+			deployed_services.append((s, c))
 	return deployed_services
-
-def CheckLogs(self, filename, HTML, RAN):
-	success = True
-	name = os.path.basename(filename)
-	if (any(sub in name for sub in ['oai_ue','oai-nr-ue','lte_ue'])):
-		logging.debug(f'\u001B[1m Analyzing UE logfile {filename} \u001B[0m')
-		logStatus = cls_oaicitest.OaiCiTest().AnalyzeLogFile_UE(filename, HTML, RAN)
-		opt = f"UE log analysis ({name})"
-		# usage of htmlUEFailureMsg/htmleNBFailureMsg is because Analyze log files
-		# abuse HTML to store their reports, and we here want to put custom options,
-		# which is not possible with CreateHtmlTestRow
-		# solution: use HTML templates, where we don't need different HTML write funcs
-		if (logStatus < 0):
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', [HTML.htmlUEFailureMsg])
-			success = False
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmlUEFailureMsg])
-		HTML.htmlUEFailureMsg = ""
-	elif 'nv-cubb' in name:
-		msg = 'Undeploy PNF/Nvidia CUBB'
-		HTML.CreateHtmlTestRow(msg, 'OK', CONST.ALL_PROCESSES_OK)
-	elif (any(sub in name for sub in ['enb','rru','rcc','cu','du','gnb','vnf'])):
-		logging.debug(f'\u001B[1m Analyzing XnB logfile {filename}\u001B[0m')
-		logStatus = RAN.AnalyzeLogFile_eNB(filename, HTML, self.ran_checkers)
-		opt = f"xNB log analysis ({name})"
-		if (logStatus < 0):
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', [HTML.htmleNBFailureMsg])
-			success = False
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', [HTML.htmleNBFailureMsg])
-		HTML.htmleNBFailureMsg = ""
-	elif 'xapp' in name:
-		opt = f"Undeploy {name}"
-		with open(f'{filename}', "r") as f:
-			last_line = deque(f, maxlen=1).pop()
-		if ('Test xApp run SUCCESSFULLY' in last_line):
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["xApp run successfully"])
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["xApp didn't run successfully"])
-			success = False
-	elif 'RIC' in name:
-		opt = f"Undeploy {name}"
-		with open(f'{filename}', 'r') as f:
-			last_line = deque(f, maxlen=1).pop()
-		if ('Removing E2 Node' in last_line):
-			HTML.CreateHtmlTestRowQueue(opt, 'OK', ["nearRT-RIC run successfully"])
-		else:
-			HTML.CreateHtmlTestRowQueue(opt, 'KO', ["nearRT-RIC didn't run successfully"])
-			success = False
-	else:
-		logging.info(f"Skipping analysis of log '{filename}': no submatch for xNB/UE")
-	logging.debug(f"log check: file {filename} passed analysis {success}")
-	return success
 
 #-----------------------------------------------------------
 # Class Declaration
@@ -266,8 +207,6 @@ class Containerize():
 		self.dockerfileprefix = ''
 		self.host = ''
 
-		#checkers from xml
-		self.ran_checkers={}
 		self.num_attempts = 1
 
 		self.flexricTag = ''
@@ -796,7 +735,7 @@ class Containerize():
 		wd_yaml = f'{wd}/docker-compose.y*ml'
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
-			services = GetDeployedServices(ssh, wd_yaml)
+			services = [s for s, _ in GetDeployedServices(ssh, wd_yaml)]
 			success = []
 			fail = []
 			for s in reqServices:
@@ -814,7 +753,7 @@ class Containerize():
 			HTML.CreateHtmlTestRowQueue(self.services, 'KO', [f'Failed stopping {" ".join(fail)}, succeeded {" ".join(success)}'])
 		return success
 
-	def UndeployObject(self, ctx, node, HTML, RAN):
+	def UndeployObject(self, ctx, node, HTML, to_analyze):
 		lSourcePath = self.eNBSourceCodePath
 		logging.info(f'\u001B[1m Undeploying all objects from server {node}\u001B[0m')
 		yaml = self.yamlPath.strip('/')
@@ -823,23 +762,49 @@ class Containerize():
 		with cls_cmd.getConnection(node) as ssh:
 			ExistEnvFilePrint(ssh, wd)
 			services = GetDeployedServices(ssh, wd_yaml)
-			copyin_res = None
+			all_logs = True
 			ssh.run(f'docker compose -f {wd_yaml} stop')
 			if services is not None:
-				copyin_res = [CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx) for s in services]
+				service_desc = {}
+				for s, c in services:
+					ret = ssh.run(f'docker inspect {c} --format="{{{{.State.ExitCode}}}}"')
+					rc = int(ret.stdout.strip())
+					f = CopyinServiceLog(ssh, lSourcePath, s, wd_yaml, ctx)
+					all_logs = all_logs and f is not None
+					service_desc[s] = {'returncode': rc, 'logfile': f}
 			else:
 				logging.warning('could not identify services to stop => no log file')
 			ssh.run(f'docker compose -f {wd_yaml} down -v')
+			HTML.CreateHtmlTestRowQueue(node, 'OK', ['Undeployment successful'])
 			ssh.run(f'rm {wd}/.env')
-		if not copyin_res:
+		if not all_logs:
 			HTML.CreateHtmlTestRowQueue('N/A', 'KO', ['Could not copy logfile(s)'])
-			logging.error(f"could not copy all files: {copyin_res=} {services=}")
+			logging.error(f"could not copy all files: {all_logs=} {services=}")
 			success = False
 		else:
-			log_results = [CheckLogs(self, f, HTML, RAN) for f in copyin_res]
-			success = all(log_results)
+			success = cls_analysis.AnalyzeServices(HTML, service_desc, to_analyze)
 		if success:
 			logging.info('\u001B[1m Undeploying objects Pass\u001B[0m')
 		else:
 			logging.error('\u001B[1m Undeploying objects Failed\u001B[0m')
+		return success
+
+	def AnalyzeRTStatsObject(self, HTML, node, ctx, thresholds):
+		logging.info(f'Analyzing realtime stats from server: {node}')
+		yaml = self.yamlPath.strip('/')
+		wd = f'{self.eNBSourceCodePath}/{yaml}'
+		wd_yaml = f'{wd}/docker-compose.y*ml'
+
+		with cls_cmd.getConnection(node) as cmd:
+			services = GetDeployedServices(cmd, wd_yaml)
+			s, _ = services[0] # we simply assume something is deployed, if not Exception will report
+			# similar to BuildRunTests(), use docker cp to avoid problems with permissions
+			cmd.run(f'docker compose -f {wd_yaml} cp {s}:/opt/oai-gnb/nrL1_stats.log {wd}/')
+			l1_file = archiveArtifact(cmd, ctx, f"{wd}/nrL1_stats.log")
+			cmd.run(f'docker compose -f {wd_yaml} cp {s}:/opt/oai-gnb/nrMAC_stats.log {wd}/')
+			mac_file = archiveArtifact(cmd, ctx, f"{wd}/nrMAC_stats.log")
+
+		logging.info(f"check against thresholds from {thresholds}")
+		success, datalog_rt_stats = cls_analysis.Analysis.analyze_rt_stats(thresholds, l1_file, mac_file)
+		HTML.CreateHtmlDataLogTable(datalog_rt_stats)
 		return success

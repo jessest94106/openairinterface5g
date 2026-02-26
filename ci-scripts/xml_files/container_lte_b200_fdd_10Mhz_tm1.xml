@@ -168,6 +168,9 @@ Replaces xml_files/enb_usrp210_band7_test_10mhz_tm1.xml
     <desc>Undeploy eNB</desc>
     <node>hutch</node>
     <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_10Mhz_tm1</yaml_path>
+    <analysis>
+      <services>enb_mono_fdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>
