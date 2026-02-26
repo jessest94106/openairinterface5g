@@ -77,6 +77,153 @@ __global__ void sum_outputs_kernel(const short2 *__restrict__ *__restrict__ indi
 }
 
 extern "C" {
+
+void init_cuda_chsim_buffers(int use_cuda,
+                             int n_tx,
+                             int n_rx,
+                             void **d_tx_sig,
+                             void **d_intermediate_sig,
+                             void **d_final_output,
+                             void **d_curand_states,
+                             void **h_tx_sig_pinned,
+                             void **h_final_output_pinned,
+                             void **d_channel_coeffs_gpu)
+{
+  if (use_cuda) {
+    int num_samples_alloc = 153600;
+
+#if defined(USE_UNIFIED_MEMORY)
+    printf("Allocating CUDA Unified Memory...\n");
+    const int max_padding_alloc = 256 - 1;
+    size_t padded_tx_alloc_bytes = n_tx * (num_samples_alloc + max_padding_alloc) * 2 * sizeof(float);
+    CHECK_CUDA(cudaMallocManaged(d_tx_sig, padded_tx_alloc_bytes, cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMallocManaged(d_intermediate_sig, n_rx * num_samples_alloc * sizeof(float) * 2, cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMallocManaged(d_final_output, n_rx * num_samples_alloc * sizeof(short) * 2, cudaMemAttachGlobal));
+    *h_tx_sig_pinned = *d_tx_sig;
+    *h_final_output_pinned = *d_final_output;
+    int deviceId;
+    CHECK_CUDA(cudaGetDevice(&deviceId));
+    CHECK_CUDA(cudaMemAdvise(*d_tx_sig, padded_tx_alloc_bytes, cudaMemAdviseSetReadMostly, deviceId));
+    CHECK_CUDA(cudaMemAdvise(*d_intermediate_sig,
+                             n_rx * num_samples_alloc * sizeof(float) * 2,
+                             cudaMemAdviseSetPreferredLocation,
+                             deviceId));
+    CHECK_CUDA(
+        cudaMemAdvise(*d_final_output, n_rx * num_samples_alloc * sizeof(short) * 2, cudaMemAdviseSetPreferredLocation, deviceId));
+    CHECK_CUDA(
+        cudaMemAdvise(*d_final_output, n_rx * num_samples_alloc * sizeof(short) * 2, cudaMemAdviseSetAccessedBy, cudaCpuDeviceId));
+
+#elif defined(USE_ATS_MEMORY)
+    printf("Allocating memory for ATS Hybrid path...\n");
+    const int max_padding_alloc = 256 - 1;
+    size_t padded_tx_alloc_bytes = n_tx * (num_samples_alloc + max_padding_alloc) * 2 * sizeof(float);
+    *h_tx_sig_pinned = malloc(padded_tx_alloc_bytes);
+    CHECK_CUDA(cudaMalloc(d_intermediate_sig, n_rx * num_samples_alloc * sizeof(float) * 2));
+    CHECK_CUDA(cudaMalloc(d_final_output, n_rx * num_samples_alloc * sizeof(short) * 2));
+    *h_final_output_pinned = malloc(n_rx * num_samples_alloc * sizeof(short) * 2);
+    *d_tx_sig = NULL;
+#else // Explicit copy method
+    printf("Pre-allocating GPU & Pinned memory for the channel pipeline...\n");
+    const int max_padding_alloc = 256 - 1;
+    size_t padded_tx_alloc_bytes = n_tx * (num_samples_alloc + max_padding_alloc) * 2 * sizeof(float);
+    CHECK_CUDA(cudaMalloc(d_tx_sig, padded_tx_alloc_bytes));
+    CHECK_CUDA(cudaMalloc(d_intermediate_sig, n_rx * num_samples_alloc * sizeof(float) * 2));
+    CHECK_CUDA(cudaMalloc(d_final_output, n_rx * num_samples_alloc * sizeof(short) * 2));
+    CHECK_CUDA(cudaMallocHost(h_tx_sig_pinned, padded_tx_alloc_bytes));
+    CHECK_CUDA(cudaMallocHost(h_final_output_pinned, n_rx * num_samples_alloc * sizeof(short) * 2));
+#endif
+    const int max_taps_alloc = 256; // Upper bound for channel length
+    size_t channel_buffer_size = n_tx * n_rx * max_taps_alloc * sizeof(float) * 2;
+    CHECK_CUDA(cudaMalloc(d_channel_coeffs_gpu, channel_buffer_size));
+    int num_rand_elements = n_rx * num_samples_alloc;
+    *d_curand_states = create_and_init_curand_states_cuda(num_rand_elements, time(NULL));
+  }
+}
+
+void free_cuda_chsim_buffers(int use_cuda,
+                             void **d_tx_sig_p,
+                             void **d_intermediate_sig_p,
+                             void **d_final_output_p,
+                             void **d_curand_states_p,
+                             void **h_tx_sig_pinned_p,
+                             void **h_final_output_pinned_p,
+                             float **h_channel_coeffs_p,
+                             void **d_channel_coeffs_gpu_p)
+{
+  if (use_cuda) {
+    printf("Freeing GPU and Pinned memory...\n");
+#if defined(USE_UNIFIED_MEMORY)
+    if (*d_tx_sig_p) {
+      cudaFree(*d_tx_sig_p);
+      *d_tx_sig_p = NULL;
+      *h_tx_sig_pinned_p = NULL;
+    }
+    if (*d_intermediate_sig_p) {
+      cudaFree(*d_intermediate_sig_p);
+      *d_intermediate_sig_p = NULL;
+    }
+    if (*d_final_output_p) {
+      cudaFree(*d_final_output_p);
+      *d_final_output_p = NULL;
+      *h_final_output_pinned_p = NULL;
+    }
+#elif defined(USE_ATS_MEMORY)
+    if (*h_tx_sig_pinned_p) {
+      free(*h_tx_sig_pinned_p);
+      *h_tx_sig_pinned_p = NULL;
+    }
+    if (*d_intermediate_sig_p) {
+      cudaFree(*d_intermediate_sig_p);
+      *d_intermediate_sig_p = NULL;
+    }
+    if (*d_final_output_p) {
+      cudaFree(*d_final_output_p);
+      *d_final_output_p = NULL;
+    }
+    if (*h_final_output_pinned_p) {
+      free(*h_final_output_pinned_p);
+      *h_final_output_pinned_p = NULL;
+    }
+#else
+    if (*d_tx_sig_p) {
+      cudaFree(*d_tx_sig_p);
+      *d_tx_sig_p = NULL;
+    }
+    if (*d_intermediate_sig_p) {
+      cudaFree(*d_intermediate_sig_p);
+      *d_intermediate_sig_p = NULL;
+    }
+    if (*d_final_output_p) {
+      cudaFree(*d_final_output_p);
+      *d_final_output_p = NULL;
+    }
+    if (*h_tx_sig_pinned_p) {
+      cudaFreeHost(*h_tx_sig_pinned_p);
+      *h_tx_sig_pinned_p = NULL;
+    }
+    if (*h_final_output_pinned_p) {
+      cudaFreeHost(*h_final_output_pinned_p);
+      *h_final_output_pinned_p = NULL;
+    }
+#endif
+    if (*d_channel_coeffs_gpu_p) {
+      cudaFree(*d_channel_coeffs_gpu_p);
+      *d_channel_coeffs_gpu_p = NULL;
+    }
+    destroy_curand_states_cuda(*d_curand_states_p);
+    *d_curand_states_p = NULL;
+    if (*h_channel_coeffs_p) {
+      free(*h_channel_coeffs_p);
+      *h_channel_coeffs_p = NULL;
+    }
+  } else {
+    if (*h_tx_sig_pinned_p) {
+      free(*h_tx_sig_pinned_p);
+      *h_tx_sig_pinned_p = NULL;
+    }
+  }
+}
+
 void run_channel_pipeline_cuda(c16_t **output_signal,
                                int nb_tx,
                                int nb_rx,
