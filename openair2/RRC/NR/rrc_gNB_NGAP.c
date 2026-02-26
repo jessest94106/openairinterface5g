@@ -506,14 +506,38 @@ int rrc_gNB_process_NGAP_INITIAL_CONTEXT_SETUP_REQ(MessageDef *msg_p, instance_t
 
   if (req->nb_of_pdusessions > 0) {
     AssertFatal(req->has_ue_ambr, "UE aggregate maximum bitrate is required when there are PDU sessions to setup");
-    /* if there are PDU sessions to setup, store them to be created once
-     * security (and UE capabilities) are received */
-    UE->n_initial_pdu = req->nb_of_pdusessions;
-    UE->initial_pdus = calloc_or_fail(UE->n_initial_pdu, sizeof(*UE->initial_pdus));
-    for (int i = 0; i < UE->n_initial_pdu; ++i)
-      cp_pdusession_resource_item_to_pdusession(&UE->initial_pdus[i], &req->pdusession[i]);
-    UE->ambr.dl_br = req->ue_ambr.br_dl;
-    UE->ambr.ul_br = req->ue_ambr.br_ul;
+
+    /* Build the list of PDU sessions to actually set up, filtering out those
+     * whose PDU Session ID already identifies an active PDU session for this UE.
+     * According to TS 38.413, establishment of such a PDU session shall be
+     * reported as failed in the response. */
+    int ps_count = 0;
+    pdusession_t psessions[NGAP_MAX_PDU_SESSION] = {0};
+
+    for (int i = 0; i < req->nb_of_pdusessions; ++i) {
+      const pdusession_resource_item_t *src = &req->pdusession[i];
+
+      rrc_pdu_session_param_t *existing = find_pduSession(&UE->pduSessions, src->pdusession_id);
+      if (existing != NULL && existing->status == PDU_SESSION_STATUS_ESTABLISHED) {
+        LOG_W(NR_RRC, "UE %d: InitialContextSetup contains already active PDU session ID %d\n", UE->rrc_ue_id, src->pdusession_id);
+        continue;
+      }
+
+      /* This is a PDU session that is not yet active for this UE: add it to the list */
+      DevAssert(ps_count < req->nb_of_pdusessions);
+      cp_pdusession_resource_item_to_pdusession(&psessions[ps_count++], src);
+    }
+
+    UE->n_initial_pdu = 0;
+    if (ps_count > 0) {
+      UE->initial_pdus = calloc_or_fail(ps_count, sizeof(*UE->initial_pdus));
+      memcpy(UE->initial_pdus, psessions, ps_count * sizeof(*UE->initial_pdus));
+      UE->n_initial_pdu = ps_count;
+
+      /* If we have at least one session to set up, store AMBR */
+      UE->ambr.dl_br = req->ue_ambr.br_dl;
+      UE->ambr.ul_br = req->ue_ambr.br_ul;
+    }
   }
 
   /* security */
