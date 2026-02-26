@@ -110,5 +110,22 @@ UE 257a: ulsch_rounds 41777/2863/10/0, ulsch_errors 0, ulsch_DTX 17, BLER 0.1145
         self.assertTrue(result)
         self.assertEqual(log, expected)
 
+    def test_ends_no_bye(self):
+        f = "tests/log-analysis/arbitrary.log"
+        opt = None
+        result, log = cls_loganalysis.EndsWithBye.run(f, opt)
+        expected = "No Bye. message found, did not stop properly"
+        self.assertFalse(result)
+        self.assertEqual(log, expected)
+
+    def test_ends_with_bye(self):
+        f = "tests/log-analysis/with-bye.log"
+        opt = None
+        result, log = cls_loganalysis.EndsWithBye.run(f, opt)
+        expected = ""
+        self.assertTrue(result)
+        self.assertEqual(log, expected)
+
+
 if __name__ == '__main__':
 	unittest.main()
