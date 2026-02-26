@@ -166,7 +166,7 @@ services:
                                     --gNBs.[0].servingCellConfigCommon.[0].physCellId 1
                                     --gNBs.[0].servingCellConfigCommon.[0].absoluteFrequencySSB 643296
                                     --gNBs.[0].servingCellConfigCommon.[0].dl_absoluteFrequencyPointA 642024
-                                    --gNBs.[0].servingCellConfigCommon.[0].ssb_PositionsInBurst_Bitmap 3
+                                    --gNBs.[0].servingCellConfigCommon.[0].ssb_PositionsInBurst_Bitmap 2
                                     --MACRLCs.[0].local_n_address 192.168.71.172
                                     --rfsimulator.[0].serveraddr 192.168.71.181
             ASAN_OPTIONS: detect_leaks=0:detect_odr_violation=0
