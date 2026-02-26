@@ -57,6 +57,10 @@
 #include "common/utils/threadPool/notified_fifo.h"
 #include <readline/history.h>
 #include "common/oai_version.h"
+#include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 
 #include "telnetsrv_phycmd.h"
@@ -79,7 +83,7 @@ paramdef_t telnetoptions[] = {
     /*                                            configuration parameters for telnet utility                                                                                      */
     /*   optname                              helpstr                paramflags           XXXptr                               defXXXval               type                 numelt */
     /*-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-    {"listenaddr", "<listen ip address>\n", 0, .uptr = &telnetparams.listenaddr, .defstrval = "0.0.0.0", TYPE_IPV4ADDR, 0},
+    {"listenaddr", "<listen ip address>\n", 0, .strptr = &telnetparams.listenaddr, .defstrval = "0.0.0.0", TYPE_STRING, 0},
     {"listenport", "<local port>\n", 0, .uptr = &telnetparams.listenport, .defuintval = 9090, TYPE_UINT, 0},
     {"listenstdin", "enable input from stdin\n", PARAMFLAG_BOOL, .uptr = &telnetparams.listenstdin, .defuintval = 0, TYPE_UINT, 0},
     {"priority", "<scheduling policy (0-99)\n", 0, .iptr = &telnetparams.priority, .defuintval = 0, TYPE_INT, 0},
@@ -626,7 +630,6 @@ int process_command(char *buf, int iteration)
 
 void run_telnetsrv(void) {
   int sock;
-  struct sockaddr_in name;
   char buf[TELNET_MAX_MSGLENGTH];
   struct sockaddr cli_addr;
   unsigned int cli_len = sizeof(cli_addr);
@@ -636,23 +639,42 @@ void run_telnetsrv(void) {
   char prompt[sizeof(TELNET_PROMPT_PREFIX)+10];
   pthread_setname_np(pthread_self(), "telnet");
   set_sched(pthread_self(),0,telnetparams.priority);
-  sock = socket(AF_INET, SOCK_STREAM, 0);
 
-  if (sock < 0)
-    fprintf(stderr,"[TELNETSRV] Error %s on socket call\n",strerror(errno));
+  struct addrinfo hints = {
+    .ai_family = AF_UNSPEC,
+    .ai_socktype = SOCK_STREAM,
+    .ai_flags = AI_NUMERICHOST,
+  };
 
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
-  name.sin_family = AF_INET;
+  struct addrinfo *res;
+  sock = -1;
+  char port_str[6];
+  snprintf(port_str, sizeof(port_str), "%u", telnetparams.listenport);
 
-  if (telnetparams.listenaddr == 0)
-    name.sin_addr.s_addr = INADDR_ANY;
-  else
-    name.sin_addr.s_addr = telnetparams.listenaddr;
+  int ret = getaddrinfo(telnetparams.listenaddr, port_str, &hints, &res);
+  if (ret != 0) {
+    fprintf(stderr, "[TELNETSRV] Invalid listenaddr '%s': %s\n",
+            telnetparams.listenaddr, gai_strerror(ret));
+    exit(-1);
+  }
 
-  name.sin_port = htons((unsigned short)(telnetparams.listenport));
+  for (struct addrinfo *p = res; p != NULL; p = p-> ai_next){
 
-  if(bind(sock, (void *) &name, sizeof(name)))
-    fprintf(stderr,"[TELNETSRV] Error %s on bind call\n",strerror(errno));
+    sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+    if (sock < 0) continue;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+    if (bind(sock, p->ai_addr, p->ai_addrlen) == 0)
+      break;
+    close(sock);
+    sock = -1;
+  }
+
+  freeaddrinfo(res);
+
+  if (sock < 0) {
+    fprintf(stderr, "Failed to bind socket\n");
+    exit(-1);
+  }
 
   if(listen(sock, 1) == -1)
     fprintf(stderr,"[TELNETSRV] Error %s on listen call\n",strerror(errno));
