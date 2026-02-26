@@ -53,6 +53,19 @@ class LastLineContains:
 		log = "" if success else f"could not find '{string}' in last line"
 		return success, log
 
+class EndsWithBye:
+	def run(file, option):
+		# no option: we ignore any
+		with open(file, "r") as f:
+			n = 0
+			for line in reversed(f.readlines()):
+				if re.search(r'^Bye.\n', line, re.MULTILINE) is not None:
+					return True, ""
+				n = n + 1
+				if n > 50: # if not found in last 50 lines, assume it does not exist
+					break
+		return False, "No Bye. message found, did not stop properly"
+
 class RetxCheck():
 	def _parseList(s):
 		if not s:
