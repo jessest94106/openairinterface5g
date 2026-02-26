@@ -485,6 +485,22 @@ add_physim_test(cuda.5g.channelsim.test_channel_scalability.test55  "16 channels
 add_physim_test(cuda.5g.channelsim.test_channel_scalability.test56  "16 channels 61440 samples long channel 2T8R Stream" test_channel_scalability -c 16 -t 2 -r 8 -s 61440 -l 128 -m stream -n 12)
 add_physim_test(cuda.5g.channelsim.test_channel_scalability.test57  "16 channels 61440 samples long channel 2T8R Serial" test_channel_scalability -c 16 -t 2 -r 8 -s 61440 -l 128 -m serial -n 12)
 
+add_physim_test(cuda.5g.physims.nr_dlsim.test1 "SNR = 30, MCS = 25, 106 PRBs, 1 layer, TDL-A channel, GPU channel simulation"               nr_dlsim -n500 -s30 -S30.2 -e25 -b106 -R273 -X 8,9,10,11,12 -P -g A -t 85 -f cuda)
+add_physim_test(cuda.5g.physims.nr_dlsim.test2 "SNR = 30, MCS = 25, 106 PRBs, 2 layers, TDL-A channel, GPU channel simulation"              nr_dlsim -n500 -s30 -S30.2 -e25 -b106 -R273 -X 8,9,10,11,12 -P -g A -t 49 -f cuda -x2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_dlsim.test3 "SNR = 30, MCS = 25, 106 PRBs, 2 layers, 4 antennas, TDL-A channel, GPU channel simulation"  nr_dlsim -n500 -s30 -S30.2 -e25 -b106 -R273 -X 8,9,10,11,12 -P -g A -t 95 -f cuda -x2 -z4 -y4)
+add_physim_test(cuda.5g.physims.nr_dlsim.test4 "SNR = 30, MCS = 25, 273 PRBs, 2 layers, TDL-A channel, GPU channel simulation"              nr_dlsim -n500 -s30 -S30.2 -e25 -b273 -R273 -X 8,9,10,11,12 -P -g A -t 32 -f cuda -x2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_dlsim.test5 "SNR = 30, MCS = 25, 273 PRBs, 2 layers, 4 antennas, TDL-A channel, GPU channel simulation"  nr_dlsim -n500 -s30 -S30.2 -e25 -b273 -R273 -X 8,9,10,11,12 -P -g A -t 93 -f cuda -x2 -z4 -y4)
+add_physim_test(cuda.5g.physims.nr_dlsim.test6 "SNR = 30, MCS = 25, 106 PRBs, 2 layers, TDL-B channel, GPU channel simulation"              nr_dlsim -n500 -s30 -S30.2 -e25 -b106 -R273 -X 8,9,10,11,12 -P -g B -t 43 -f cuda -x2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_dlsim.test7 "SNR = 30, MCS = 25, 106 PRBs, 2 layers, 4 antennas, TDL-B channel, GPU channel simulation"  nr_dlsim -n500 -s30 -S30.2 -e25 -b106 -R273 -X 8,9,10,11,12 -P -g B -t 95 -f cuda -x2 -z4 -y4)
+add_physim_test(cuda.5g.physims.nr_dlsim.test8 "SNR = 30, MCS = 25, 273 PRBs, 2 layers, TDL-B channel, GPU channel simulation"              nr_dlsim -n500 -s30 -S30.2 -e25 -b273 -R273 -X 8,9,10,11,12 -P -g B -t 32 -f cuda -x2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_dlsim.test9 "SNR = 30, MCS = 25, 273 PRBs, 2 layers, 4 antennas, TDL-B channel, GPU channel simulation"  nr_dlsim -n500 -s30 -S30.2 -e25 -b273 -R273 -X 8,9,10,11,12 -P -g B -t 94 -f cuda -x2 -z4 -y4)
+
+add_physim_test(cuda.5g.physims.nr_ulsim.test1 "SNR = 30, MCS = 25, 106 PRBs, 1 layer, TDL-A channel, GPU channel simulation"              nr_ulsim -n500 -s30 -S30 -m25 -r106 -R106 -C10 -P -g A -t 84 -f cuda)
+add_physim_test(cuda.5g.physims.nr_ulsim.test2 "SNR = 30, MCS = 25, 106 PRBs, 2 layers, TDL-A channel, GPU channel simulation"             nr_ulsim -n500 -s30 -S30 -m25 -r106 -R106 -C10 -P -g A -t 90 -f cuda -W2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_ulsim.test3 "SNR = 30, MCS = 25, 273 PRBs, 2 layers, TDL-A channel, GPU channel simulation"             nr_ulsim -n500 -s30 -S30 -m25 -r273 -R273 -C10 -P -g A -t 83 -f cuda -W2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_ulsim.test4 "SNR = 30, MCS = 25, 106 PRBs, 2 layers, TDL-B channel, GPU channel simulation"             nr_ulsim -n500 -s30 -S30 -m25 -r106 -R106 -C10 -P -g B -t 78 -f cuda -W2 -z2 -y2)
+add_physim_test(cuda.5g.physims.nr_ulsim.test5 "SNR = 30, MCS = 25, 273 PRBs, 2 layers, TDL-B channel, GPU channel simulation"             nr_ulsim -n500 -s30 -S30 -m25 -r273 -R273 -C10 -P -g B -t 63 -f cuda -W2 -z2 -y2)
+
 endif()
 
 if(PHYSIM_CHECK_FILES)
