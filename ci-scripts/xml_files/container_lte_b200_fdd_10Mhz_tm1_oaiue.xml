@@ -133,6 +133,9 @@
     <desc>Undeploy LTE-UE</desc>
     <node>carabe</node>
     <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_10Mhz_oai_ue_magma</yaml_path>
+    <analysis>
+      <services>lte_ue0</services>
+    </analysis>
   </testCase>
 
   <testCase>
@@ -147,6 +150,9 @@
     <desc>Undeploy eNB</desc>
     <node>hutch</node>
     <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_10Mhz_tm1_magma</yaml_path>
+    <analysis>
+      <services>enb_mono_fdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

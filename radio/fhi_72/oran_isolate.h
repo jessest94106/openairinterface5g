@@ -27,6 +27,7 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include "common/cmake_defs.h"
 #include "xran_fh_o_du.h"
 #include "openair1/PHY/impl_defs_nr.h"
 #include "openair1/PHY/TOOLS/tools_defs.h"

@@ -110,6 +110,12 @@ int nrue_get_cell_count(void)
   return nrue_cell_count;
 }
 
+int nrue_get_band(const PHY_VARS_NR_UE *UE)
+{
+  int cell_id = nrue_rus[UE->rf_map.card].used_by_cell;
+  return nrue_cells[cell_id].band;
+}
+
 const nrUE_cell_params_t *nrue_get_cell(int cell_id)
 {
   AssertFatal(cell_id >= 0 && cell_id < nrue_cell_count, "Invalid cell ID %d! Cell count = %d\n", cell_id, nrue_cell_count);
@@ -205,6 +211,12 @@ void nrue_set_ru_params(configmodule_interface_t *cfg)
   if (RUParamList.numelt <= 0) {
     nrue_ru_count = 1;
     nrue_rus = calloc_or_fail(nrue_ru_count, sizeof(nrUE_RU_params_t));
+    AssertFatal(get_nrUE_params()->nb_antennas_tx <= NB_ANTENNAS_TX,
+                "Config file has %d TX antennas set, but the compile time max value in NB_ANTENNAS_TX\n",
+                get_nrUE_params()->nb_antennas_tx);
+    AssertFatal(get_nrUE_params()->nb_antennas_rx <= NB_ANTENNAS_RX,
+                "Config file has %d RX antennas set, but the compile time max value in NB_ANTENNAS_RX\n",
+                get_nrUE_params()->nb_antennas_tx);
     nrue_rus[0] = (nrUE_RU_params_t){.nb_tx = get_nrUE_params()->nb_antennas_tx,
                                      .nb_rx = get_nrUE_params()->nb_antennas_rx,
                                      .att_tx = get_nrUE_params()->tx_gain,

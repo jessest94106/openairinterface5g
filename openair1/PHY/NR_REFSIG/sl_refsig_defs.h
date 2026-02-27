@@ -19,17 +19,15 @@
  *      contact@openairinterface.org
  */
 
-/* Definitions for NR Reference signals */
+/* Definitions for LTE Reference signals */
+/* Author R. Knopp / EURECOM / OpenAirInterface.org */
+#ifndef __NR_REFSIG_DEFS__H__
+#define __NR_REFSIG_DEFS__H__
 
-#ifndef __NR_REFSIG_COMMON_H__
-#define __NR_REFSIG_COMMON_H__
+#include "PHY/defs_nr_UE.h"
 
-uint32_t *gold_cache(uint32_t key, int length);
-uint32_t *nr_gold_pbch(int Lmax, int Nid, int n_hf, int ssb);
-uint32_t *nr_gold_pdcch(int N_RB_DL, int symbols_per_slot, unsigned short n_idDMRS, int ns, int l);
-uint32_t *nr_gold_pdsch(int N_RB_DL, int symbols_per_slot, int nid, int nscid, int slot, int symbol);
-uint32_t *nr_gold_pusch(int N_RB_UL, int symbols_per_slot, int Nid, int nscid, int slot, int symbol);
-uint32_t *nr_gold_csi_rs(int N_RB_DL, int symbols_per_slot, int slot, int symb, uint32_t Nid);
-uint32_t *nr_gold_prs(int nid, int slot, int symbol);
-
+void sl_generate_pss(SL_NR_UE_INIT_PARAMS_t *sl_init_params, uint8_t n_sl_id2, uint16_t scaling);
+void sl_generate_pss_ifft_samples(sl_nr_ue_phy_params_t *sl_ue_params, SL_NR_UE_INIT_PARAMS_t *sl_init_params);
+void sl_generate_sss(SL_NR_UE_INIT_PARAMS_t *sl_init_params, uint16_t slss_id, uint16_t scaling);
+void sl_init_psbch_dmrs_gold_sequences(PHY_VARS_NR_UE *UE);
 #endif

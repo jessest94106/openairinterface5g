@@ -1032,6 +1032,10 @@ uint8_t pack_nr_config_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *e
   numTLVs++;
 #endif
   retval &=
+      pack_nr_tlv(NFAPI_NR_CONFIG_BETA_PSS_TAG, &(pNfapiMsg->ssb_table.beta_pss), ppWritePackedMsg, end, &pack_uint8_tlv_value);
+  numTLVs++;
+
+  retval &=
       pack_nr_tlv(NFAPI_NR_CONFIG_SSB_PERIOD_TAG, &(pNfapiMsg->ssb_table.ssb_period), ppWritePackedMsg, end, &pack_uint8_tlv_value);
   numTLVs++;
 
@@ -1229,6 +1233,14 @@ uint8_t pack_nr_config_request(void *msg, uint8_t **ppWritePackedMsg, uint8_t *e
   // only increase if it was set
   numTLVs += pNfapiMsg->analog_beamforming_ve.analog_bf_vendor_ext.tl.tag == NFAPI_NR_FAPI_ANALOG_BF_VENDOR_EXTENSION_TAG;
 
+  retval &= pack_nr_tlv(NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG,
+                      &(pNfapiMsg->ssb_table.case_v3),
+                      ppWritePackedMsg,
+                      end,
+                      &pack_uint8_tlv_value);
+
+  numTLVs += pNfapiMsg->ssb_table.case_v3.tl.tag == NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG;
+
   pNfapiMsg->num_tlv = numTLVs;
   retval &= push8(pNfapiMsg->num_tlv, &pNumTLVFields, end);
   return retval;
@@ -1391,10 +1403,13 @@ uint8_t unpack_nr_config_request(uint8_t **ppReadPackedMsg, uint8_t *end, void *
 #endif
       {NFAPI_NR_FAPI_NUM_BEAMS_PERIOD_VENDOR_EXTENSION_TAG,
        &(pNfapiMsg->analog_beamforming_ve.num_beams_period_vendor_ext),
-       &unpack_uint8_tlv_value},
-      {NFAPI_NR_FAPI_ANALOG_BF_VENDOR_EXTENSION_TAG,
-       &(pNfapiMsg->analog_beamforming_ve.analog_bf_vendor_ext),
-       &unpack_uint8_tlv_value},
+        &unpack_uint8_tlv_value},
+       {NFAPI_NR_FAPI_ANALOG_BF_VENDOR_EXTENSION_TAG,
+        &(pNfapiMsg->analog_beamforming_ve.analog_bf_vendor_ext),
+         &unpack_uint8_tlv_value},
+       {NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG,
+        &(pNfapiMsg->ssb_table.case_v3),
+        &unpack_uint8_tlv_value},
       {NFAPI_NR_CONFIG_RSSI_MEASUREMENT_TAG, &(pNfapiMsg->measurement_config.rssi_measurement), &unpack_uint8_tlv_value},
       {NFAPI_NR_CONFIG_BEAMFORMING_TABLE_TAG, NULL, &unpack_dbt_table_tlv_value},
       {NFAPI_NR_CONFIG_PRECODING_TABLE_V6_TAG, NULL, &unpack_pm_table_tlv_value},

@@ -25,13 +25,14 @@
 #
 #---------------------------------------------------------------------
 
+ARG UBUNTU_IMAGE=ubuntu:noble
 FROM ran-base:latest AS ru-base
 
 FROM ran-build:latest AS ru-build
 
 
 #start from scratch for target executable
-FROM ubuntu:noble AS oai-lte-ru
+FROM ${UBUNTU_IMAGE} AS oai-lte-ru
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Paris
 

@@ -156,6 +156,9 @@ Replaces xml_files/enb_usrp210_band7_test_05mhz_tm1_rrc_inactivity_no_flexran.xm
     <desc>Undeploy eNB</desc>
     <node>hutch</node>
     <yaml_path>ci-scripts/yaml_files/lte_b200_fdd_05Mhz_tm1_no_rrc_activity</yaml_path>
+    <analysis>
+      <services>enb_mono_fdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

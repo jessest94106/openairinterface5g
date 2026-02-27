@@ -156,6 +156,9 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
   FILL_TLV(nfapi_resp->ssb_table.ssb_offset_point_a, NFAPI_NR_CONFIG_SSB_OFFSET_POINT_A_TAG, rand16());
   nfapi_resp->num_tlv++;
 
+  FILL_TLV(nfapi_resp->ssb_table.beta_pss, NFAPI_NR_CONFIG_BETA_PSS_TAG, rand8());
+  nfapi_resp->num_tlv++;
+
   FILL_TLV(nfapi_resp->ssb_table.ssb_period, NFAPI_NR_CONFIG_SSB_PERIOD_TAG, rand16());
   nfapi_resp->num_tlv++;
 
@@ -175,6 +178,9 @@ static void fill_config_request_tlv_tdd_rand(nfapi_nr_config_request_scf_t *nfap
     FILL_TLV(nfapi_resp->ssb_table.ssb_beam_id_list[i].beam_id, NFAPI_NR_CONFIG_BEAM_ID_TAG, rand8());
     nfapi_resp->num_tlv++;
   }
+
+  FILL_TLV(nfapi_resp->ssb_table.case_v3, NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG, rand8());
+  nfapi_resp->num_tlv++;
 
   FILL_TLV(nfapi_resp->tdd_table.tdd_period, NFAPI_NR_CONFIG_TDD_PERIOD_TAG, 6 /* ms5 */);
   nfapi_resp->num_tlv++;
@@ -436,6 +442,8 @@ static void fill_config_request_tlv_fdd(nfapi_nr_config_request_scf_t *req)
 
   /* SSB table */
   FILL_TLV(req->ssb_table.ssb_offset_point_a, NFAPI_NR_CONFIG_SSB_OFFSET_POINT_A_TAG, 4);
+  req->num_tlv++;
+  FILL_TLV(req->ssb_table.beta_pss, NFAPI_NR_CONFIG_BETA_PSS_TAG, 0);
   req->num_tlv++;
   FILL_TLV(req->ssb_table.ssb_period, NFAPI_NR_CONFIG_SSB_PERIOD_TAG, 2);
   req->num_tlv++;

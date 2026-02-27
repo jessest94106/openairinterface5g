@@ -3050,7 +3050,7 @@ static int fill_drb_to_be_setup_from_e1_resp(const gNB_RRC_INST *rrc,
     const pdu_session_setup_t *session = &pduSession[p];
     rrc_pdu_session_param_t *pdu = find_pduSession(&UE->pduSessions, session->id);
     DevAssert(pdu);
-    nb_drb += fill_f1_drbs_from_e1(rrc, UE, pdu, session->DRBnGRanList, session->numDRBSetup, drbs);
+    nb_drb += fill_f1_drbs_from_e1(rrc, UE, pdu, session->DRBnGRanList, session->numDRBSetup, &drbs[nb_drb]);
   }
   DevAssert(nb_drb < MAX_DRBS_PER_UE);
   return nb_drb;

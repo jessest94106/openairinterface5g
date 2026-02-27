@@ -397,8 +397,9 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
   nrmac->common_channels[0].ServingCellConfigCommon = scc;
 
   // Carrier configuration
-  struct NR_FrequencyInfoDL *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
-  frequency_range_t frequency_range = get_freq_range_from_band(*frequencyInfoDL->frequencyBandList.list.array[0]);
+  NR_FrequencyInfoDL_t *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
+  NR_FreqBandIndicatorNR_t nr_band = *frequencyInfoDL->frequencyBandList.list.array[0];
+  frequency_range_t frequency_range = get_freq_range_from_band(nr_band);
   int bw_index = get_supported_band_index(frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing,
                                           frequency_range,
                                           frequencyInfoDL->scs_SpecificCarrierList.list.array[0]->carrierBandwidth);
@@ -406,7 +407,7 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
   cfg->carrier_config.dl_bandwidth.tl.tag = NFAPI_NR_CONFIG_DL_BANDWIDTH_TAG; // temporary
   cfg->num_tlv++;
 
-  cfg->carrier_config.dl_frequency.value = from_nrarfcn(*frequencyInfoDL->frequencyBandList.list.array[0],
+  cfg->carrier_config.dl_frequency.value = from_nrarfcn(nr_band,
                                                         *scc->ssbSubcarrierSpacing,
                                                         frequencyInfoDL->absoluteFrequencyPointA)
                                             / 1000; // freq in kHz
@@ -462,8 +463,7 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
     }
   }
 
-  NR_FreqBandIndicatorNR_t band = *frequencyInfoDL->frequencyBandList.list.array[0];
-  frame_type_t frame_type = get_frame_type(band, *scc->ssbSubcarrierSpacing);
+  frame_type_t frame_type = get_frame_type(nr_band, *scc->ssbSubcarrierSpacing);
   nrmac->common_channels[0].frame_type = frame_type;
 
   // Cell configuration
@@ -508,7 +508,7 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
   else {
     // If absent, use SCS as derived from the prach-ConfigurationIndex (for 839)
     int config_index = rach_ConfigCommon->rach_ConfigGeneric.prach_ConfigurationIndex;
-    int frame_type = get_frame_type(band, frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing);
+    int frame_type = get_frame_type(nr_band, frequencyInfoUL->scs_SpecificCarrierList.list.array[0]->subcarrierSpacing);
     int format = get_nr_prach_format_from_index(config_index, UL_pointA, frame_type) & 0xff;
     cfg->prach_config.prach_sub_c_spacing.value = get_delta_f_RA_long(format);
   }
@@ -604,6 +604,10 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
                                  scc->downlinkConfigCommon->frequencyInfoDL->absoluteFrequencyPointA,
                                  *scc->ssbSubcarrierSpacing);
   cfg->ssb_table.ssb_subcarrier_offset.tl.tag = NFAPI_NR_CONFIG_SSB_SUBCARRIER_OFFSET_TAG;
+  cfg->num_tlv++;
+
+  cfg->ssb_table.case_v3.value = set_ssb_case(*scc->ssbSubcarrierSpacing, nr_band);
+  cfg->ssb_table.case_v3.tl.tag = NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG;
   cfg->num_tlv++;
 
   uint8_t *mib_payload = nrmac->common_channels[0].MIB_pdu;
@@ -742,7 +746,7 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
             carr_ul - carr_dl,
             bw,
             mu,
-            band,
+            nr_band,
             12 * prb_offset + sc_offset,
             get_softmodem_params()->threequarter_fs ? "-E" : "");
     } else {
@@ -751,7 +755,7 @@ static void config_common(gNB_MAC_INST *nrmac, const nr_mac_config_t *config, NR
             carr_dl,
             bw,
             mu,
-            band,
+            nr_band,
             12 * prb_offset + sc_offset,
             get_softmodem_params()->threequarter_fs ? "-E" : "");
     }
@@ -1079,7 +1083,7 @@ bool nr_trigger_bwp_switch(uint16_t rnti, int bwp_id)
   } else if (UE->current_DL_BWP.bwp_id == bwp_id) {
     LOG_W(NR_MAC, "UE %04x is already on BWP ID %d, not triggering reconfiguration\n", rnti, bwp_id);
   } else { // UE != NULL && current_DL_BWP.bwp_id != bwp_id
-    nr_mac_trigger_reconfiguration(nrmac, UE, bwp_id);
+    nr_mac_trigger_reconfiguration(nrmac, UE, bwp_id, false);
     success = true;
   }
   NR_SCHED_UNLOCK(&nrmac->sched_lock);

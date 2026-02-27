@@ -365,7 +365,7 @@ typedef struct
   //Indicates presence of +/-5Khz shift wrt FREF for V2X reference frequencies.
   //Possible values: {-1,0,1}
   int8_t  sl_value_N;
-
+  uint32_t band;
 } sl_nr_carrier_config_t;
 
 

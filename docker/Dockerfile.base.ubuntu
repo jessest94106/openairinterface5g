@@ -26,7 +26,9 @@
 #---------------------------------------------------------------------
 
 
-FROM ubuntu:noble AS ran-base
+ARG UBUNTU_IMAGE=ubuntu:noble
+FROM ${UBUNTU_IMAGE} AS ran-base
+
 ARG NEEDED_GIT_PROXY
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive

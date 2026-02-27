@@ -23,7 +23,9 @@
  * \brief interface for libraries implementing coding/decoding algorithms
  */
 
-#include "PHY/defs_gNB.h"
+#include "common/utils/time_meas.h"
+#include "openair1/PHY/defs_common.h"
+#include "common/utils/threadPool/thread-pool.h"
 
 #ifndef __NRLDPC_CODING_INTERFACE__H__
 #define __NRLDPC_CODING_INTERFACE__H__

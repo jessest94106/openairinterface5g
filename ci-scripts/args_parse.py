@@ -33,7 +33,6 @@
 #-----------------------------------------------------------
 import sys		# arg
 import re		# reg
-import yaml
 import constants as CONST
 
 #-----------------------------------------------------------
@@ -44,6 +43,7 @@ import constants as CONST
 def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
 
     force_local = False
+    date_fmt = None
     while len(argvs) > 1:
         myArgv = argvs.pop(1)	# 0th is this file's name
 
@@ -56,6 +56,9 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
 
 
 	    #consider inline parameters
+        elif re.match(r'^\-\-datefmt=(.+)$', myArgv, re.IGNORECASE):
+            matchReg = re.match(r'^\-\-datefmt=(.+)$', myArgv, re.IGNORECASE)
+            date_fmt = matchReg.group(1)
         elif re.match(r'^\-\-mode=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-mode=(.+)$', myArgv, re.IGNORECASE)
             mode = matchReg.group(1)
@@ -158,9 +161,6 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
         elif re.match(r'^\-\-OCRegistry=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-OCRegistry=(.+)$', myArgv, re.IGNORECASE)
             CLUSTER.OCRegistry = matchReg.group(1)
-        elif re.match(r'^\-\-BuildId=(.+)$', myArgv, re.IGNORECASE):
-            matchReg = re.match(r'^\-\-BuildId=(.+)$', myArgv, re.IGNORECASE)
-            RAN.BuildId = matchReg.group(1)
         elif re.match(r'^\-\-FlexRicTag=(.+)$', myArgv, re.IGNORECASE):
             matchReg = re.match(r'^\-\-FlexRicTag=(.+)$', myArgv, re.IGNORECASE)
             CONTAINERS.flexricTag = matchReg.group(1)
@@ -168,4 +168,4 @@ def ArgsParse(argvs,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER):
             HELP.GenericHelp(CONST.Version)
             sys.exit('Invalid Parameter: ' + myArgv)
 
-    return mode, force_local
+    return mode, force_local, date_fmt

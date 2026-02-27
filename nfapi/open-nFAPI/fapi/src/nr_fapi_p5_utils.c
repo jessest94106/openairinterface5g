@@ -226,6 +226,8 @@ bool eq_config_request(const nfapi_nr_config_request_scf_t *unpacked_req, const 
 
   EQ_TLV(unpacked_req->ssb_table.ssb_offset_point_a, req->ssb_table.ssb_offset_point_a);
 
+  EQ_TLV(unpacked_req->ssb_table.beta_pss, req->ssb_table.beta_pss);
+
   EQ_TLV(unpacked_req->ssb_table.ssb_period, req->ssb_table.ssb_period);
 
   EQ_TLV(unpacked_req->ssb_table.ssb_subcarrier_offset, req->ssb_table.ssb_subcarrier_offset);
@@ -239,6 +241,8 @@ bool eq_config_request(const nfapi_nr_config_request_scf_t *unpacked_req, const 
   for (int i = 0; i < 64; i++) {
     EQ_TLV(unpacked_req->ssb_table.ssb_beam_id_list[i].beam_id, req->ssb_table.ssb_beam_id_list[i].beam_id);
   }
+
+  EQ_TLV(unpacked_req->ssb_table.case_v3, req->ssb_table.case_v3);
 
   if (req->cell_config.frame_duplex_type.value == 1 /* TDD */) {
     EQ_TLV(unpacked_req->tdd_table.tdd_period, req->tdd_table.tdd_period);
@@ -772,6 +776,8 @@ void copy_config_request(const nfapi_nr_config_request_scf_t *src, nfapi_nr_conf
 
   COPY_TLV(dst->ssb_table.ssb_offset_point_a, src->ssb_table.ssb_offset_point_a);
 
+  COPY_TLV(dst->ssb_table.beta_pss, src->ssb_table.beta_pss);
+
   COPY_TLV(dst->ssb_table.ssb_period, src->ssb_table.ssb_period);
 
   COPY_TLV(dst->ssb_table.ssb_subcarrier_offset, src->ssb_table.ssb_subcarrier_offset);
@@ -785,6 +791,8 @@ void copy_config_request(const nfapi_nr_config_request_scf_t *src, nfapi_nr_conf
   for (int i = 0; i < 64; i++) {
     COPY_TLV(dst->ssb_table.ssb_beam_id_list[i].beam_id, src->ssb_table.ssb_beam_id_list[i].beam_id);
   }
+
+  COPY_TLV(dst->ssb_table.case_v3, src->ssb_table.case_v3);
 
   if (src->cell_config.frame_duplex_type.value == 1 /* TDD */) {
     COPY_TLV(dst->tdd_table.tdd_period, src->tdd_table.tdd_period);
@@ -1225,6 +1233,10 @@ void dump_config_request(const nfapi_nr_config_request_scf_t *msg)
   depth--;
   INDENTED_TLV_PRINT("ssPBCH Multiple Carriers in a Band", ssb_table->ss_pbch_multiple_carriers_in_a_band);
   INDENTED_TLV_PRINT("Multiple Cells ssPBCH in a Carrier", ssb_table->multiple_cells_ss_pbch_in_a_carrier);
+  // Only print if it's filled
+  if (ssb_table->case_v3.tl.tag == NFAPI_NR_FAPI_SSB_CASE_VENDOR_EXTENSION_TAG) {
+    INDENTED_TLV_PRINT("SSB Case V3", ssb_table->case_v3);
+  }
   /* TDD Table */
   const nfapi_nr_tdd_table_t *tdd_table = &msg->tdd_table;
   if (cell_config->frame_duplex_type.value == 1 /* TDD */) {

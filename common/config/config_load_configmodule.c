@@ -63,7 +63,8 @@ static paramdef_t Config_Params[] = {
 };
 // clang-format on
 
-int load_config_sharedlib(configmodule_interface_t *cfgptr) {
+static int load_config_sharedlib(configmodule_interface_t *cfgptr)
+{
   void *lib_handle;
   char fname[128];
   char libname[FILENAME_MAX];
@@ -380,7 +381,7 @@ configmodule_interface_t *load_configmodule(int argc,
       Config_Params[idx].strptr = &(cfgptr->tmpdir);
       config_get(cfgptr, Config_Params, sizeofArray(Config_Params), CONFIG_SECTIONNAME);
     } else {
-      fprintf(stderr,"[CONFIG] %s %d config module \"%s\" couldn't be loaded\n", __FILE__, __LINE__,cfgmode);
+      fprintf(stderr, "[CONFIG] config module \"%s\" couldn't be loaded\n", cfgmode);
       cfgptr->rtflags = cfgptr->rtflags | CONFIG_HELP | CONFIG_ABORT;
     }
   } else {
@@ -395,11 +396,6 @@ configmodule_interface_t *load_configmodule(int argc,
   if (modeparams != NULL) free(modeparams);
 
   if (cfgmode != NULL) free(cfgmode);
-
-  if (CONFIG_ISFLAGSET(CONFIG_ABORT)) {
-    config_printhelp(Config_Params, sizeofArray(Config_Params), CONFIG_SECTIONNAME);
-    //       exit(-1);
-  }
 
   return cfgptr;
 }

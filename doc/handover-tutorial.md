@@ -104,6 +104,9 @@ information further below.
 
 A number of remarks:
 
+1. DU0 and DU1 should use different SSBs, i.e., make sure that
+   `ssb_PositionsInBurst_Bitmap` is set to send SSB in different slots in the
+   configurataion files of DU0 (e.g., set to 1) and DU1 (e.g., set to 2).
 1. It is important that you start DU0, UE, DU1 in order, and having UE connect
    to DU0 before starting DU1. This is because we don't employ any channel
    emulation, and the UE could not decode the SIB1 of DU0 to connect.
@@ -433,6 +436,8 @@ a core-network-based handover.
 
 We assume:
 
+* `ssb_PositionsInBurst_Bitmap` set to different values for gNB-PCI0 and
+  gNB-PCI1 as described further above.
 * Two independent gNBs connected to the same 5GC via N2 interface.
 * A UE initially connected to gNB-PCI0, which will be handed over to gNB-PCI1.
 * Handover is triggered by either a decision based measurement event (e.g. A3)

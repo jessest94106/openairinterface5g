@@ -30,6 +30,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
+#include "common/cmake_defs.h"
 #include "SIMULATION/TOOLS/defs.h"
 #include "SIMULATION/RF/defs.h"
 #include "PHY/types.h"

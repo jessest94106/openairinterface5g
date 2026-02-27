@@ -229,8 +229,9 @@
     <desc>Undeploy gNB</desc>
     <node>ofqot</node>
     <yaml_path>ci-scripts/yaml_files/sa_b200_gnb</yaml_path>
-    <d_retx_th>10,100,100,100</d_retx_th>
-    <u_retx_th>10,100,100,100</u_retx_th>
+    <analysis>
+      <services>gnb_mono_tdd=RetxCheck=10,100,100,100 gnb_mono_tdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>
