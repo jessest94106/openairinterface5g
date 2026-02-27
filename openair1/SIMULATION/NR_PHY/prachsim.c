@@ -844,7 +844,7 @@ int main(int argc, char **argv){
   free(RC.gNB[0]);
   free(RC.gNB);
 
-  term_nr_ue_signal(UE, 1);
+  term_nr_ue_signal(UE);
   free(UE->nrUE_config.prach_config.num_prach_fd_occasions_list);
   free(UE);
   free(PHY_vars_UE_g[0]);

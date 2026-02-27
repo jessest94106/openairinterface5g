@@ -819,7 +819,7 @@ static void setup_ra_response_window(NR_UE_MAC_INST_t *mac,
 
 // Random Access procedure initialization as per 5.1.1 and initialization of variables specific
 // to Random Access type as specified in clause 5.1.1a (3GPP TS 38.321 version 16.2.1 Release 16)
-bool init_RA(NR_UE_MAC_INST_t *mac, int frame)
+bool init_RA(NR_UE_MAC_INST_t *mac)
 {
   RA_config_t *ra = &mac->ra;
   LOG_D(NR_MAC, "Initialization of RA\n");
@@ -1023,7 +1023,7 @@ bool init_RA(NR_UE_MAC_INST_t *mac, int frame)
   return true;
 }
 
-void nr_Msg3_transmitted(NR_UE_MAC_INST_t *mac, uint8_t CC_id, frame_t frameP, slot_t slotP, uint8_t gNB_id)
+void nr_Msg3_transmitted(NR_UE_MAC_INST_t *mac)
 {
   RA_config_t *ra = &mac->ra;
   NR_RACH_ConfigCommon_t *nr_rach_ConfigCommon = mac->current_UL_BWP->rach_ConfigCommon;
@@ -1109,7 +1109,7 @@ void nr_get_Msg3_MsgA_PUSCH_payload(NR_UE_MAC_INST_t *mac, uint8_t *buf, int TBS
 // according to section 5 of 3GPP TS 38.321 version 16.2.1 Release 16
 // todo:
 // - complete handling of received contention-based RA preamble
-void nr_ra_succeeded(NR_UE_MAC_INST_t *mac, const uint8_t gNB_index, const frame_t frame, const int slot)
+void nr_ra_succeeded(NR_UE_MAC_INST_t *mac, const frame_t frame, const int slot)
 {
   RA_config_t *ra = &mac->ra;
 

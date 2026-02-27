@@ -673,8 +673,8 @@ int main(int argc, char **argv)
   free(r_re);
   free(r_im);
 
-  term_nr_ue_signal(UE_TX, 1);
-  term_nr_ue_signal(UE_RX, 1);
+  term_nr_ue_signal(UE_TX);
+  term_nr_ue_signal(UE_RX);
 
   free(UE_TX);
   free(UE_RX);

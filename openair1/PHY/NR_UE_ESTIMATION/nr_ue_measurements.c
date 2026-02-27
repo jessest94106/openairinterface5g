@@ -154,7 +154,6 @@ void nr_ue_measurements(PHY_VARS_NR_UE *ue,
 // This function calculates:
 // - SS reference signal received digital power in dB/RE
 uint32_t nr_ue_calculate_ssb_rsrp(const NR_DL_FRAME_PARMS *fp,
-                                  const UE_nr_rxtx_proc_t *proc,
                                   const c16_t rxdataF[][fp->samples_per_slot_wCP],
                                   int symbol_offset,
                                   int ssb_start_subcarrier)
@@ -242,7 +241,7 @@ void nr_ue_ssb_rsrp_measurements(PHY_VARS_NR_UE *ue,
   if (fp->half_frame_bit)
     symbol_offset += (fp->slots_per_frame >> 1) * fp->symbols_per_slot;
 
-  uint32_t rsrp_avg = nr_ue_calculate_ssb_rsrp(fp, proc, rxdataF, symbol_offset, fp->ssb_start_subcarrier);
+  uint32_t rsrp_avg = nr_ue_calculate_ssb_rsrp(fp, rxdataF, symbol_offset, fp->ssb_start_subcarrier);
   float rsrp_db_per_re = 10 * log10(rsrp_avg);
 
   openair0_config_t *cfg0 = &openair0_cfg[ue->rf_map.card];
@@ -489,7 +488,7 @@ void do_neighboring_cell_measurements(UE_nr_rxtx_proc_t *proc, PHY_VARS_NR_UE *u
     }
 
     // RSRP measurements
-    neighboring_cell_info->ssb_rsrp = nr_ue_calculate_ssb_rsrp(frame_parms, proc, rxdataF, 0, frame_parms->ssb_start_subcarrier);
+    neighboring_cell_info->ssb_rsrp = nr_ue_calculate_ssb_rsrp(frame_parms, rxdataF, 0, frame_parms->ssb_start_subcarrier);
 
     neighboring_cell_info->ssb_rsrp_dBm =
         10 * log10(neighboring_cell_info->ssb_rsrp) + 30 - SQ15_SQUARED_NORM_FACTOR_DB

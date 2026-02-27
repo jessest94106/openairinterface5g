@@ -394,8 +394,7 @@ int nr_rrc_mac_config_req_sl_preconfig(module_id_t module_id,
 
 
 //Copies the values of SSB time allocation from ASN format to MAC context
-static void sl_mac_config_ssb_time_alloc(uint8_t module_id,
-                                         NR_SL_SSB_TimeAllocation_r16_t *sl_SSB_TimeAllocation_r16,
+static void sl_mac_config_ssb_time_alloc(NR_SL_SSB_TimeAllocation_r16_t *sl_SSB_TimeAllocation_r16,
                                          sl_ssb_timealloc_t *ssb_time_alloc)
 {
 
@@ -432,9 +431,7 @@ void nr_rrc_mac_transmit_slss_req(module_id_t module_id,
   sl_mac->tx_sl_bch.num_ssb = 0;
   sl_mac->tx_sl_bch.ssb_slot = 0;
 
-  sl_mac_config_ssb_time_alloc(module_id,
-                               ssb_ta,
-                               &sl_mac->tx_sl_bch.ssb_time_alloc);
+  sl_mac_config_ssb_time_alloc(ssb_ta, &sl_mac->tx_sl_bch.ssb_time_alloc);
 
   LOG_I(NR_MAC,"[UE%d]SL RRC->MAC: TX SLSS REQ SLSS-id:%d, SL-MIB:%x, numssb:%d, offset:%d, interval:%d\n",
                                                   module_id, sl_mac->tx_sl_bch.slss_id,
@@ -489,9 +486,7 @@ void nr_rrc_mac_config_req_sl_mib(module_id_t module_id,
     sl_mac->rx_sl_bch.num_ssb = 0;
     sl_mac->rx_sl_bch.ssb_slot = 0;
 
-    sl_mac_config_ssb_time_alloc(module_id,
-                                ssb_ta,
-                                &sl_mac->rx_sl_bch.ssb_time_alloc);
+    sl_mac_config_ssb_time_alloc(ssb_ta, &sl_mac->rx_sl_bch.ssb_time_alloc);
 
     LOG_I(NR_MAC,"[UE%d]SL RRC->MAC: RX SLSS REQ SLSS-id:%d, SL-MIB:%x, numssb:%d, offset:%d, interval:%d\n",
                                                       module_id, sl_mac->rx_sl_bch.slss_id,

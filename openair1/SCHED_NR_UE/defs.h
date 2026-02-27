@@ -172,7 +172,6 @@ void nr_fill_sl_rx_indication(sl_nr_rx_indication_t *rx_ind,
                               uint8_t pdu_type,
                               PHY_VARS_NR_UE *ue,
                               uint16_t n_pdus,
-                              const UE_nr_rxtx_proc_t *proc,
                               void *typeSpecific,
                               uint16_t rx_slss_id);
 
