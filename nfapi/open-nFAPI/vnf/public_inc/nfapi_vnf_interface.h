@@ -30,9 +30,8 @@
 extern "C" {
 #endif
 
-typedef struct vnf_t vnf_t;
-typedef struct vnf_p7_t vnf_p7_t;
-
+typedef struct vnf_s vnf_t;
+typedef struct vnf_p7_s vnf_p7_t;
 
 /*! The nfapi VNF phy configuration information
  */

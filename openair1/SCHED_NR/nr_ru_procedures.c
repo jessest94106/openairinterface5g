@@ -35,7 +35,7 @@
 #include "sched_nr.h"
 #include "PHY/MODULATION/modulation_common.h"
 #include "PHY/MODULATION/nr_modulation.h"
-
+#include "openair1/PHY/defs_nr_common.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/system.h"
 

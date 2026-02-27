@@ -93,7 +93,7 @@ TEST(DISABLED_actor, thread_safety_with_core_affinity)
 
 // Thread safety can be ensured through data separation, here using C inheritance-like
 // model
-typedef struct TestActor_t {
+typedef struct {
   Actor_t actor;
   int count;
 } TestActor_t;

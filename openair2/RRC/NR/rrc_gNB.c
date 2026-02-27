@@ -207,7 +207,7 @@ static bool rrc_delay_transaction(instance_t instance, MessageDef *msg_p)
   return false; /* not delayed */
 }
 
-typedef struct deliver_ue_ctxt_release_data_t {
+typedef struct {
   gNB_RRC_INST *rrc;
   f1ap_ue_context_rel_cmd_t *release_cmd;
   sctp_assoc_t assoc_id;
