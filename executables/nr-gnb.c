@@ -120,13 +120,7 @@ static void tx_func(processingData_L1tx_t *info)
   if (tx_slot_type == NR_DOWNLINK_SLOT || tx_slot_type == NR_MIXED_SLOT || get_softmodem_params()->continuous_tx
       || IS_SOFTMODEM_RFSIM || cfg->analog_beamforming_ve.analog_bf_vendor_ext.value) {
     start_meas(&info->gNB->phy_proc_tx);
-    phy_procedures_gNB_TX(info->gNB,
-                          &sched_response.DL_req,
-                          &sched_response.TX_req,
-                          &sched_response.UL_dci_req,
-                          frame_tx,
-                          slot_tx,
-                          1);
+    phy_procedures_gNB_TX(info->gNB, &sched_response.DL_req, &sched_response.TX_req, &sched_response.UL_dci_req, frame_tx,slot_tx);
 
     PHY_VARS_gNB *gNB = info->gNB;
     processingData_RU_t syncMsgRU;

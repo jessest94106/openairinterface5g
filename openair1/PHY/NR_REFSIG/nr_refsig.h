@@ -36,7 +36,6 @@ uint32_t *nr_gold_csi_rs(int N_RB_DL, int symbols_per_slot, int slot, int symb, 
 uint32_t *nr_gold_prs(int nid, int slot, int symbol);
 
 int nr_pdsch_dmrs_rx(nr_prefix_type_t Ncp,
-                     unsigned int Ns,
                      const unsigned int *nr_gold_pdsch,
                      c16_t *output,
                      unsigned short p,
@@ -56,7 +55,6 @@ void nr_pbch_dmrs_rx(int dmrss, const unsigned int *nr_gold_pbch, c16_t *output,
 void nr_pdcch_dmrs_ref(const unsigned int *nr_gold_pdcch, c16_t *output, unsigned short nb_rb_corset);
 
 int nr_pusch_dmrs_rx(nr_prefix_type_t Ncp,
-                     unsigned int Ns,
                      const uint32_t *nr_gold_pusch,
                      c16_t *output,
                      unsigned short p,
@@ -71,7 +69,6 @@ void nr_generate_modulation_table(void);
 extern simde__m128i byte2m128i[256];
 
 int nr_pusch_lowpaprtype1_dmrs_rx(nr_prefix_type_t Ncp,
-                                  unsigned int Ns,
                                   c16_t *dmrs_seq,
                                   c16_t *output,
                                   unsigned short p,

@@ -261,7 +261,6 @@ static inline int dmrs_case00(c16_t *output,
                               const int amp,
                               int sz,
                               int start_sc,
-                              int remaining_re,
                               int dmrs_port,
                               const int dmrs_Type,
                               int symbol_sz,
@@ -438,7 +437,6 @@ static inline int do_onelayer(NR_DL_FRAME_PARMS *frame_parms,
                          amp,
                          sz,
                          start_sc,
-                         remaining_re,
                          dmrs_port,
                          dmrs_Type,
                          symbol_sz,
@@ -772,7 +770,6 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
 
 void nr_generate_pdsch(PHY_VARS_gNB *gNB, int n_dlsch, NR_gNB_DLSCH_t *dlsch_array, int frame, int slot)
 {
-  NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   time_stats_t *dlsch_encoding_stats = &gNB->dlsch_encoding_stats;
   time_stats_t *tinput = &gNB->tinput;
   time_stats_t *tprep = &gNB->tprep;
@@ -831,7 +828,6 @@ void nr_generate_pdsch(PHY_VARS_gNB *gNB, int n_dlsch, NR_gNB_DLSCH_t *dlsch_arr
                         dlsch_array,
                         frame,
                         slot,
-                        frame_parms,
                         output,
                         tinput,
                         tprep,

@@ -40,12 +40,7 @@
 
 NR_gNB_PHY_STATS_t *get_phy_stats(PHY_VARS_gNB *gNB, uint16_t rnti);
 
-int nr_generate_prs(int slot,
-                    c16_t *txdataF,
-                    int16_t amp,
-                    prs_config_t *prs_cfg,
-                    nfapi_nr_config_request_scf_t *config,
-                    const NR_DL_FRAME_PARMS *frame_parms);
+int nr_generate_prs(int slot, c16_t *txdataF, int16_t amp, prs_config_t *prs_cfg, const NR_DL_FRAME_PARMS *frame_parms);
 
 /*!
 \fn int nr_generate_pss
@@ -224,7 +219,6 @@ void nr_fill_srs(PHY_VARS_gNB *gNB,
 
 int nr_get_srs_signal(PHY_VARS_gNB *gNB,
                       c16_t **rxdataF,
-                      frame_t frame,
                       slot_t slot,
                       nfapi_nr_srs_pdu_t *srs_pdu,
                       nr_srs_info_t *nr_srs_info,

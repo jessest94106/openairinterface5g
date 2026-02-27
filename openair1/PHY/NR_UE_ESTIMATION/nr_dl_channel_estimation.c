@@ -1295,7 +1295,7 @@ void nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
   float beta_dmrs_pdsch = get_beta_dmrs(dlsch->n_dmrs_cdm_groups, config_type == NFAPI_NR_DMRS_TYPE2);
   int16_t dmrs_scaling = (int16_t)((1 / beta_dmrs_pdsch) * (1 << 14));
   const uint32_t *gold = nr_gold_pdsch(fp->N_RB_DL, fp->symbols_per_slot, dlsch->dlDmrsScramblingId, dlsch->nscid, slot, symbol);
-  nr_pdsch_dmrs_rx(fp->Ncp, slot, gold, pilot, 1000 + p, 0, nb_rb_pdsch + rb_offset, config_type, dmrs_scaling);
+  nr_pdsch_dmrs_rx(fp->Ncp, gold, pilot, 1000 + p, 0, nb_rb_pdsch + rb_offset, config_type, dmrs_scaling);
 
   delay_t delay = {0};
 
@@ -1380,8 +1380,7 @@ void nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
  *  2) Interpolate PTRS estimated value in TD after all PTRS symbols
  *  3) Compensate signal with PTRS estimation for slot
  *********************************************************************/
-void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
-                              int nbRx,
+void nr_pdsch_ptrs_processing(int nbRx,
                               c16_t ptrs_phase_per_slot[][14],
                               int32_t ptrs_re_per_slot[][14],
                               uint32_t rx_size_symbol,
@@ -1389,7 +1388,6 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
                               NR_DL_FRAME_PARMS *frame_parms,
                               NR_DL_UE_HARQ_t *dlsch0_harq,
                               NR_DL_UE_HARQ_t *dlsch1_harq,
-                              uint8_t gNB_id,
                               uint8_t nr_slot_rx,
                               unsigned char symbol,
                               uint16_t rnti,
@@ -1478,8 +1476,6 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
                                *ptrsReOffset,
                                *nb_rb,
                                rnti,
-                               nr_slot_rx,
-                               symbol,
                                frame_parms->ofdm_symbol_size,
                                (int16_t *)(rxdataF_comp[0][aarx] + symbol * rx_size_symbol),
                                gold,

@@ -3296,7 +3296,7 @@ static void nr_ue_process_rar(NR_UE_MAC_INST_t *mac, nr_downlink_indication_t *d
       rar = (NR_MAC_RAR *) (dlsch_buffer + n_subheaders + (n_subPDUs - 1) * sizeof(NR_MAC_RAR));
       handle_rar_reception(mac, rar, frame, slot);
       if (ra->cfra)
-        nr_ra_succeeded(mac, dl_info->gNB_index, frame, slot);
+        nr_ra_succeeded(mac, frame, slot);
       break;
     }
     if (rarh->E == 0) {
@@ -3818,12 +3818,7 @@ static bool check_ra_contention_resolution(const uint8_t *pdu, const uint8_t *co
   return true;
 }
 
-static int nr_ue_validate_successrar(uint8_t *pduP,
-                                     int32_t pdu_len,
-                                     NR_UE_MAC_INST_t *mac,
-                                     uint8_t gNB_index,
-                                     frame_t frameP,
-                                     int slot)
+static int nr_ue_validate_successrar(uint8_t *pduP, int32_t pdu_len, NR_UE_MAC_INST_t *mac, frame_t frameP, int slot)
 {
   // TS 38.321 - Figure 6.1.5a-1: BI MAC subheader
   // TS 38.321 - Figure 6.1.5a-3: SuccessRAR MAC subheader
@@ -3885,7 +3880,7 @@ static int nr_ue_validate_successrar(uint8_t *pduP,
 
         if (ra->RA_active && ra_success) {
           nr_timer_stop(&ra->response_window_timer);
-          nr_ra_succeeded(mac, gNB_index, frameP, slot);
+          nr_ra_succeeded(mac, frameP, slot);
         } else if (!ra_success) {
           nr_ra_backoff_setting(ra);
         }
@@ -3943,7 +3938,6 @@ static void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_
   fapi_nr_pdsch_pdu_t *pdsch_pdu = &(dl_info->rx_ind->rx_indication_body + pdu_id)->pdsch_pdu;
   uint8_t *pduP = pdsch_pdu->pdu;
   int32_t pdu_len = (int32_t)pdsch_pdu->pdu_length;
-  uint8_t gNB_index = dl_info->gNB_index;
   uint8_t CC_id = dl_info->cc_id;
   uint8_t done = 0;
   RA_config_t *ra = &mac->ra;
@@ -3963,7 +3957,7 @@ static void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_
         dl_info->rx_ind->number_pdus);
 
   if (ra->ra_type == RA_2_STEP && ra->ra_state == nrRA_WAIT_MSGB) {
-    int n = nr_ue_validate_successrar(pduP, pdu_len, mac, gNB_index, frameP, slot);
+    int n = nr_ue_validate_successrar(pduP, pdu_len, mac, frameP, slot);
     pduP += n;
     pdu_len -= n;
   }
@@ -4095,7 +4089,7 @@ static void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_
           bool ra_success = check_ra_contention_resolution(&pduP[1], ra->cont_res_id);
 
           if (ra->RA_active && ra_success) {
-            nr_ra_succeeded(mac, gNB_index, frameP, slot);
+            nr_ra_succeeded(mac, frameP, slot);
           } else if (!ra_success) {
             // consider this Contention Resolution not successful and discard the successfully decoded MAC PDU
             nr_ra_contention_resolution_failed(mac);
@@ -4135,14 +4129,9 @@ static void nr_ue_process_mac_pdu(NR_UE_MAC_INST_t *mac, nr_downlink_indication_
  * Function:      generating MAC CEs (MAC CE and subheader) for the ULSCH PDU
  * Parameters:
  * @mac_ce        pointer to the MAC sub-PDUs including the MAC CEs
- * @mac           pointer to the MAC instance
  * Return:        number of written bytes
  */
-int nr_write_ce_ulsch_pdu(uint8_t *mac_ce,
-                          NR_UE_MAC_INST_t *mac,
-                          NR_SINGLE_ENTRY_PHR_MAC_CE *power_headroom,
-                          const type_bsr_t *bsr,
-                          uint8_t *mac_ce_end)
+int nr_write_ce_ulsch_pdu(uint8_t *mac_ce, NR_SINGLE_ENTRY_PHR_MAC_CE *power_headroom, const type_bsr_t *bsr, uint8_t *mac_ce_end)
 {
   uint8_t *pdu = mac_ce;
   if (power_headroom) {

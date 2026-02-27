@@ -52,8 +52,7 @@
 //#define ONE_OVER_SQRT2 23170 // 32767/sqrt(2) = 23170 (ONE_OVER_SQRT2)
 //#define POLAR_CODING_DEBUG
 
-void nr_generate_pucch0(const PHY_VARS_NR_UE *ue,
-                        c16_t **txdataF,
+void nr_generate_pucch0(c16_t **txdataF,
                         const NR_DL_FRAME_PARMS *frame_parms,
                         const int16_t amp16,
                         const int nr_slot_tx,
@@ -156,8 +155,7 @@ void nr_generate_pucch0(const PHY_VARS_NR_UE *ue,
   }
 }
 
-void nr_generate_pucch1(const PHY_VARS_NR_UE *ue,
-                        c16_t **txdataF,
+void nr_generate_pucch1(c16_t **txdataF,
                         const NR_DL_FRAME_PARMS *frame_parms,
                         const int16_t amp16,
                         const int nr_slot_tx,
@@ -752,8 +750,7 @@ void nr_uci_encoding(uint64_t payload, uint8_t nr_bit, uint8_t nrofPRB, bool uci
   }
 }
 //#if 0
-void nr_generate_pucch2(const PHY_VARS_NR_UE *ue,
-                        c16_t **txdataF,
+void nr_generate_pucch2(c16_t **txdataF,
                         const NR_DL_FRAME_PARMS *frame_parms,
                         const int16_t amp16,
                         const int nr_slot_tx,
@@ -937,8 +934,7 @@ void nr_generate_pucch2(const PHY_VARS_NR_UE *ue,
   }
 }
 //#if 0
-void nr_generate_pucch3_4(const PHY_VARS_NR_UE *ue,
-                          c16_t **txdataF,
+void nr_generate_pucch3_4(c16_t **txdataF,
                           const NR_DL_FRAME_PARMS *frame_parms,
                           const int16_t amp16,
                           const int nr_slot_tx,

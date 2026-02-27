@@ -64,7 +64,6 @@ static inline c16_t get_modulated(const uint32_t *gold_sequence, const int idx_g
 }
 
 int nr_pusch_dmrs_rx(nr_prefix_type_t Ncp,
-                     unsigned int Ns,
                      const uint32_t *nr_gold_pusch,
                      c16_t *output,
                      unsigned short p,
@@ -108,7 +107,6 @@ int nr_pusch_dmrs_rx(nr_prefix_type_t Ncp,
 }
 
 int nr_pdsch_dmrs_rx(nr_prefix_type_t Ncp,
-                     unsigned int Ns,
                      const unsigned int *nr_gold_pdsch,
                      c16_t *output,
                      unsigned short p,
@@ -213,7 +211,6 @@ void nr_gen_ref_conj_symbols(const uint32_t *in, uint32_t length, c16_t *output,
 }
 
 int nr_pusch_lowpaprtype1_dmrs_rx(nr_prefix_type_t Ncp,
-                                  unsigned int Ns,
                                   c16_t *dmrs_seq,
                                   c16_t *output,
                                   unsigned short p,

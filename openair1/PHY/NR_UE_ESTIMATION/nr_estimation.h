@@ -94,7 +94,6 @@ void nr_pdsch_channel_estimation(PHY_VARS_NR_UE *ue,
 
 int nr_adjust_synch_ue(NR_DL_FRAME_PARMS *frame_parms,
                        PHY_VARS_NR_UE *ue,
-                       module_id_t gNB_id,
                        int estimateSz,
                        struct complex16 dl_ch_estimates_time[][estimateSz],
                        uint8_t frame,
@@ -108,7 +107,6 @@ void nr_ue_measurements(PHY_VARS_NR_UE *ue,
                         int32_t dl_ch_estimates[][pdsch_est_size]);
 
 uint32_t nr_ue_calculate_ssb_rsrp(const NR_DL_FRAME_PARMS *fp,
-                                  const UE_nr_rxtx_proc_t *proc,
                                   const c16_t rxdataF[][fp->samples_per_slot_wCP],
                                   int symbol_offset,
                                   int ssb_start_subcarrier);
@@ -139,8 +137,7 @@ void phy_adjust_gain_nr(PHY_VARS_NR_UE *ue,
                         uint32_t rx_power_fil_dB,
                         uint8_t gNB_id);
 
-void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
-                              int nbRx,
+void nr_pdsch_ptrs_processing(int nbRx,
                               c16_t ptrs_phase_per_slot[][14],
                               int32_t ptrs_re_per_slot[][14],
                               uint32_t rx_size_symbol,
@@ -148,7 +145,6 @@ void nr_pdsch_ptrs_processing(PHY_VARS_NR_UE *ue,
                               NR_DL_FRAME_PARMS *frame_parms,
                               NR_DL_UE_HARQ_t *dlsch0_harq,
                               NR_DL_UE_HARQ_t *dlsch1_harq,
-                              uint8_t gNB_id,
                               uint8_t nr_slot_rx,
                               unsigned char symbol,
                               uint16_t rnti,
