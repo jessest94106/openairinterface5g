@@ -693,7 +693,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
 
               xranlib_compress_avx512(&bfp_com_req, &bfp_com_rsp);
 #elif defined(__arm__) || defined(__aarch64__)
-              armral_bfp_compression(p_prbMapElm->iqWidth, numRB, (int16_t *)local_src, (int8_t *)dst);
+              armral_bfp_compression(p_prbMapElm->iqWidth, numRB, (int16_t *)(local_src + startRB * N_SC_PER_PRB), (int8_t *)dst);
 #else
               AssertFatal(1 == 0, "BFP compression not supported on this architecture");
 #endif
