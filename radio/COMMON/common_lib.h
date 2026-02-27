@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include "common/cmake_defs.h"
 #include <openair1/PHY/TOOLS/tools_defs.h>
 #include "record_player.h"
 #include "common/utils/threadPool/notified_fifo.h"
@@ -275,8 +276,6 @@ typedef struct openair0_config {
   recplay_conf_t *recplay_conf;
   //! Flag to indicate this configuration is for NR
   int nr_flag;
-  //! NR band number
-  int nr_band;
   //! NR scs for raster
   int nr_scs_for_raster;
   //! Core IDs for RX FH

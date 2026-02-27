@@ -257,6 +257,9 @@
     <desc>Undeploy all OAI 5G stack</desc>
     <node>localhost</node>
     <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_24prb</yaml_path>
+    <analysis>
+      <services>oai-gnb=EndsWithBye oai-nr-ue</services>
+    </analysis>
   </testCase>
 
   <testCase>

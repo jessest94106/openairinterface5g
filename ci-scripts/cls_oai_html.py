@@ -218,7 +218,7 @@ class HTMLManagement():
 				cmd = "sed -i -e 's/__STATE_" + self.htmlTabNames[0] + "__//' test_results.html"
 				subprocess.run(cmd, shell=True)
 			else:
-				cmd = "sed -i -e 's/__STATE_" + self.htmlTabNames[0] + "__/<span class=\"glyphicon glyphicon-remove\"><\/span>/' test_results.html"
+				cmd = "sed -i -e 's/__STATE_" + self.htmlTabNames[0] + r"__/<span class=\"glyphicon glyphicon-remove\"><\/span>/' test_results.html"
 				subprocess.run(cmd, shell=True)
 		self.htmlFooterCreated = False
 

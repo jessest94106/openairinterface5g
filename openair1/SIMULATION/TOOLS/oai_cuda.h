@@ -59,6 +59,27 @@ __global__ void add_noise_and_phase_noise_kernel(const float2 *__restrict__ r_si
 extern "C" {
 #endif
 
+void init_cuda_chsim_buffers(int use_cuda,
+                             int n_tx,
+                             int n_rx,
+                             void **d_tx_sig_p,
+                             void **d_intermediate_sig_p,
+                             void **d_final_output_p,
+                             void **d_curand_states_p,
+                             void **h_tx_sig_pinned_p,
+                             void **h_final_output_pinned_p,
+                             void **d_channel_coeffs_gpu_p);
+
+void free_cuda_chsim_buffers(int use_cuda,
+                             void **d_tx_sig_p,
+                             void **d_intermediate_sig_p,
+                             void **d_final_output_p,
+                             void **d_curand_states_p,
+                             void **h_tx_sig_pinned_p,
+                             void **h_final_output_pinned_p,
+                             float **h_channel_coeffs_p,
+                             void **d_channel_coeffs_gpu_p);
+
 void multipath_channel_cuda(float **rx_sig_re,
                             float **rx_sig_im,
                             int nb_tx,

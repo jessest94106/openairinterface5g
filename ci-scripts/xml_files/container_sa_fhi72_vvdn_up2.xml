@@ -138,6 +138,9 @@
     <desc>Undeploy gNB</desc>
     <node>cacofonix</node>
     <yaml_path>ci-scripts/yaml_files/sa_fhi_7.2_vvdn_gnb</yaml_path>
+    <analysis>
+      <services>oai-gnb=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

@@ -1,6 +1,7 @@
 add_subdirectory(utils)
 add_subdirectory(config/yaml)
 
+configure_file(cmake_defs.h.in cmake_defs.h @ONLY)
 configure_file(oai_version.h.in oai_version.h @ONLY)
 
 add_library(instrumentation INTERFACE)

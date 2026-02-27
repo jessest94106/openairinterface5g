@@ -191,6 +191,9 @@
     <desc>Undeploy CU-DU0</desc>
     <node>groot</node>
     <yaml_path>ci-scripts/yaml_files/5g_sa_f1_b210_ho</yaml_path>
+    <analysis>
+      <services>oai-cu=EndsWithBye oai-du0=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>
@@ -199,6 +202,9 @@
     <desc>Undeploy DU1</desc>
     <node>rocket</node>
     <yaml_path>ci-scripts/yaml_files/5g_sa_f1_b210_ho</yaml_path>
+    <analysis>
+      <services>oai-du1=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

@@ -35,6 +35,7 @@
 #include <unistd.h>
 #include <execinfo.h>
 #include <signal.h>
+#include "common/cmake_defs.h"
 #include "common/config/config_load_configmodule.h"
 #include "common/utils/LOG/log.h"
 #include "common/utils/var_array.h"

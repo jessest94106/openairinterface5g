@@ -34,7 +34,6 @@
 #include <string.h>
 #include <errno.h>
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
-#include "openair1/PHY/defs_gNB.h"
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface_scf.h"
 #include "openair1/PHY/LTE_TRANSPORT/transport_common.h"
 #include "softmodem-common.h"

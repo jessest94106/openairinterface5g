@@ -56,7 +56,7 @@ void mac_top_init_gNB(ngran_node_t node_type,
                       const nr_rlc_configuration_t *default_rlc_config);
 void mac_top_destroy_gNB(gNB_MAC_INST *mac);
 void nr_mac_send_f1_setup_req(void);
-
+int get_ssbidx_from_beam(gNB_MAC_INST *mac, int beam_idx);
 void nr_mac_config_scc(gNB_MAC_INST *nrmac, NR_ServingCellConfigCommon_t *scc, const nr_mac_config_t *mac_config);
 void nr_mac_configure_sib1(gNB_MAC_INST *nrmac, const plmn_id_t *plmn, uint64_t cellID, int tac);
 bool nr_mac_configure_other_sib(gNB_MAC_INST *nrmac, int num_cu_sib, const f1ap_sib_msg_t cu_sib[num_cu_sib]);
@@ -455,7 +455,8 @@ int16_t get_allocated_beam(const NR_beam_info_t *beam_info, int frame, int slot,
 uint16_t convert_to_fapi_beam(const uint16_t beam_idx, const nr_beam_mode_t mode);
 NR_beam_alloc_t beam_allocation_procedure(NR_beam_info_t *beam_info, int frame, int slot, int16_t beam_index, int slots_per_frame);
 void reset_beam_status(NR_beam_info_t *beam_info, int frame, int slot, int16_t beam_index, int slots_per_frame, bool new_beam);
-void beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE);
+int beam_selection_procedures(gNB_MAC_INST *mac, NR_UE_info_t *UE);
+void beam_switching_procedure(gNB_MAC_INST *mac, NR_UE_info_t *UE, int new_beam_index);
 void nr_sr_reporting(gNB_MAC_INST *nrmac, frame_t frameP, slot_t slotP);
 bwp_info_t get_pdsch_bwp_start_size(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE);
 bwp_info_t get_pusch_bwp_start_size(NR_UE_info_t *UE);
@@ -483,7 +484,7 @@ void nr_mac_trigger_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl, NR_SubcarrierSpac
 void nr_mac_reset_ul_failure(NR_UE_sched_ctrl_t *sched_ctrl);
 bool nr_mac_check_ul_failure(gNB_MAC_INST *nrmac, int rnti, NR_UE_sched_ctrl_t *sched_ctrl);
 
-void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int new_bwp_id);
+void nr_mac_trigger_reconfiguration(const gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int new_bwp_id, bool new_beam);
 
 bool nr_mac_add_lcid(NR_UE_sched_ctrl_t *sched_ctrl, const nr_lc_config_t *c);
 nr_lc_config_t *nr_mac_get_lc_config(NR_UE_sched_ctrl_t* sched_ctrl, int lcid);

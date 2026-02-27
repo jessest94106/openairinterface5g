@@ -62,13 +62,6 @@ import lxml.etree as ET
 import logging
 import signal
 import traceback
-logging.basicConfig(
-	level=logging.DEBUG,
-	stream=sys.stdout,
-	format="[%(asctime)s] %(levelname)8s: %(message)s"
-)
-
-
 
 
 #-----------------------------------------------------------
@@ -109,41 +102,20 @@ def ExecuteActionWithParam(action, ctx, node):
 			success = CONTAINERS.BuildRunTests(ctx, node, HTML)
 
 	elif action == 'Initialize_eNB':
-		datalog_rt_stats_file=test.findtext('rt_stats_cfg')
-		if datalog_rt_stats_file is None:
-			RAN.datalog_rt_stats_file='datalog_rt_stats.default.yaml'
-		else:
-			RAN.datalog_rt_stats_file=datalog_rt_stats_file
 		RAN.Initialize_eNB_args=test.findtext('Initialize_eNB_args')
-		USRPIPAddress = test.findtext('USRP_IPAddress') or ''
-
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			RAN.air_interface = 'lte-softmodem'
-		else:
-			RAN.air_interface = air_interface.lower() +'-softmodem'
-
 		cmd_prefix = test.findtext('cmd_prefix')
 		if cmd_prefix is not None: RAN.cmd_prefix = cmd_prefix
 		success = RAN.InitializeeNB(ctx, node, HTML)
 
 	elif action == 'Terminate_eNB':
-		#retx checkers
-		string_field = test.findtext('d_retx_th')
-		if (string_field is not None):
-			RAN.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
-		string_field=test.findtext('u_retx_th')
-		if (string_field is not None):
-			RAN.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
-
-		#local variable air_interface
-		air_interface = test.findtext('air_interface')		
-		if (air_interface is None) or (air_interface.lower() not in ['nr','lte']):
-			RAN.air_interface = 'lte-softmodem'
-		else:
-			RAN.air_interface = air_interface.lower() +'-softmodem'
-		success = RAN.TerminateeNB(ctx, node, HTML)
+		services = []
+		analysis = test.find("analysis")
+		if analysis is not None:
+			# services: multiple services to analyse, separated by whitespace
+			services = analysis.findtext("services", default="").split()
+			# service: individual services to analyze, in case they have whitespace
+			services = services + [s.text for s in analysis.findall("service")]
+		success = RAN.TerminateeNB(ctx, node, HTML, services)
 
 	elif action == 'Initialize_UE' or action == 'Attach_UE' or action == 'Detach_UE' or action == 'Terminate_UE' or action == 'CheckStatusUE' or action == 'DataEnable_UE' or action == 'DataDisable_UE':
 		CiTestObj.ue_ids = test.findtext('id').split(' ')
@@ -216,12 +188,6 @@ def ExecuteActionWithParam(action, ctx, node):
 
 	elif action == 'Deploy_Object' or action == 'Undeploy_Object' or action == "Create_Workspace" or action == "Stop_Object":
 		CONTAINERS.yamlPath = test.findtext('yaml_path')
-		string_field=test.findtext('d_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['d_retx_th'] = [float(x) for x in string_field.split(',')]
-		string_field=test.findtext('u_retx_th')
-		if (string_field is not None):
-			CONTAINERS.ran_checkers['u_retx_th'] = [float(x) for x in string_field.split(',')]
 		CONTAINERS.services = test.findtext('services')
 		CONTAINERS.num_attempts = int(test.findtext('num_attempts') or 1)
 		CONTAINERS.deploymentTag = cls_containerize.CreateTag(CONTAINERS.ranCommitID, CONTAINERS.ranBranch, CONTAINERS.ranAllowMerge)
@@ -230,7 +196,14 @@ def ExecuteActionWithParam(action, ctx, node):
 		elif action == 'Stop_Object':
 			success = CONTAINERS.StopObject(ctx, node, HTML)
 		elif action == 'Undeploy_Object':
-			success = CONTAINERS.UndeployObject(ctx, node, HTML, RAN)
+			analysis = test.find("analysis")
+			services = []
+			if analysis is not None:
+				# services: multiple services to analyse, separated by whitespace
+				services = analysis.findtext("services", default="").split()
+				# service: individual services to analyze, in case they have whitespace
+				services = services + [s.text for s in analysis.findall("service")]
+			success = CONTAINERS.UndeployObject(ctx, node, HTML, services)
 		elif action == 'Create_Workspace':
 			if force_local:
 				# Do not create a working directory when running locally. Current repo directory will be used
@@ -280,20 +253,19 @@ def ExecuteActionWithParam(action, ctx, node):
 		images = test.findtext('images').split()
 		success = CLUSTER.PullClusterImage(HTML, node, images, tag_prefix=tag_prefix)
 
+	elif action == 'AnalyzeRTStats':
+		yaml = test.findtext('stats_cfg')
+		success = RAN.AnalyzeRTStats(HTML, node, ctx, yaml)
+
+	elif action == 'AnalyzeRTStats_Object':
+		yaml = test.findtext('stats_cfg')
+		success = CONTAINERS.AnalyzeRTStatsObject(HTML, node, ctx, yaml)
+
 	else:
 		logging.warning(f"unknown action {action}, skip step")
 		success = True # by default, we skip the step and print a warning
 
 	return success
-
-#check if given test is in list
-#it is in list if one of the strings in 'list' is at the beginning of 'test'
-def test_in_list(test, list):
-	for check in list:
-		check=check.replace('+','')
-		if (test.startswith(check)):
-			return True
-	return False
 
 test_runner_abort = False
 def receive_signal(signum, frame):
@@ -349,7 +321,12 @@ CLUSTER = cls_cluster.Cluster()
 import args_parse
 # Force local execution, move all execution targets to localhost
 force_local = False
-mode, force_local = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER)
+mode, force_local, date_fmt = args_parse.ArgsParse(sys.argv,CiTestObj,RAN,HTML,CONTAINERS,HELP,SCA,CLUSTER)
+fmt = "%(levelname)8s: %(message)s"
+if date_fmt:
+    fmt = "[%(asctime)s] %(levelname)s %(message)s"
+logging.basicConfig(level=logging.DEBUG, stream=sys.stdout, format=fmt, datefmt=date_fmt,)
+
 
 #-----------------------------------------------------------
 # mode amd XML class (action) analysis
@@ -367,18 +344,7 @@ elif re.match('^TerminateSPGW$', mode, re.IGNORECASE):
 elif re.match('^LogCollectBuild$', mode, re.IGNORECASE):
 	logging.warning("Option LogCollectBuild ignored")
 elif re.match('^LogCollecteNB$', mode, re.IGNORECASE):
-	if RAN.eNBSourceCodePath == '':
-		HELP.GenericHelp(CONST.Version)
-		sys.exit('Insufficient Parameter')
-	if os.path.isdir('cmake_targets/log'):
-		cmd = 'zip -r enb.log.' + RAN.BuildId + '.zip cmake_targets/log'
-		logging.info(cmd)
-		try:
-			zipStatus = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True, timeout=60)
-		except subprocess.CalledProcessError as e:
-			logging.error("Command '{}' returned non-zero exit status {}.".format(e.cmd, e.returncode))
-			logging.error("Error output:\n{}".format(e.output))
-		sys.exit(0)
+	logging.warning("Option LogCollecteNB ignored")
 elif re.match('^LogCollectHSS$', mode, re.IGNORECASE):
 	logging.warning("Option LogCollectHSS ignored")
 elif re.match('^LogCollectMME$', mode, re.IGNORECASE):

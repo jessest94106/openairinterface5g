@@ -24,7 +24,6 @@
 
 #include "PHY/defs_eNB.h"
 #include "PHY/defs_UE.h"
-#include "PHY/defs_gNB.h"
 
 #include "LTE_SystemInformationBlockType2.h"
 //#include "RadioResourceConfigCommonSIB.h"

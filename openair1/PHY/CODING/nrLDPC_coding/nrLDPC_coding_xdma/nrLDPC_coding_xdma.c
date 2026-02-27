@@ -30,15 +30,8 @@
 #include <nr_rate_matching.h>
 #include "PHY/CODING/coding_defs.h"
 #include "PHY/CODING/coding_extern.h"
-#include "PHY/CODING/lte_interleaver_inline.h"
 #include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_xdma/nrLDPC_coding_xdma_offload.h"
 #include "PHY/CODING/nrLDPC_extern.h"
-#include "PHY/NR_TRANSPORT/nr_dlsch.h"
-#include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
-#include "PHY/NR_TRANSPORT/nr_transport_proto.h"
-#include "PHY/NR_TRANSPORT/nr_ulsch.h"
-#include "PHY/defs_gNB.h"
-#include "SCHED_NR/sched_nr.h"
 #include "common/utils/LOG/log.h"
 #include "defs.h"
 // #define DEBUG_ULSCH_DECODING

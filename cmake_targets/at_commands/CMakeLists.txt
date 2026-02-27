@@ -51,16 +51,6 @@ set(OPENAIR_NAS_DIR       ${OPENAIR_DIR}/openair3/NAS)
 
 set(CMAKE_MODULE_PATH "${OPENAIR_DIR}/cmake_targets/tools/MODULES" "${CMAKE_MODULE_PATH}")
 
-macro(add_option name val helpstr)
-  if(DEFINED ${name})
-    set(value ${${name}})
-  else(DEFINED ${name})
-    set(value ${val})
-  endif()
-  set(${name} ${value} CACHE STRING "${helpstr}")
-  add_definitions("-D${name}=${value}")
-endmacro(add_option)
-
 macro(add_boolean_option name val helpstr)
   if(DEFINED ${name})
     set(value ${${name}})

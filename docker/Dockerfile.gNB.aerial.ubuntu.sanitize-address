@@ -25,6 +25,8 @@
 #
 #---------------------------------------------------------------------
 
+ARG UBUNTU_IMAGE=ubuntu:noble
+
 FROM ran-base:latest AS ran-build
 
 RUN apt-get update && \
@@ -58,7 +60,7 @@ RUN /bin/sh oaienv && \
 
 
 #start from scratch for target executable
-FROM ubuntu:noble AS oai-gnb-aerial
+FROM ${UBUNTU_IMAGE} AS oai-gnb-aerial
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 

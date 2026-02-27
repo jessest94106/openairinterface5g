@@ -1556,7 +1556,9 @@ static void handle_pdu_session_accept(const nr_ue_nas_t *nas, uint8_t *pdu_buffe
   int idx;
   for (idx = 0; idx < nas->uicc->n_pdu_sessions; ++idx) {
     const pdu_session_config_t *pdu = &nas->uicc->pdu_sessions[idx];
-    if (pdu->id == sm_header.pdu_session_id && pdu->type == msg.pdu_type)
+    bool msg_ipv4or6 = msg.pdu_type == PDU_SESSION_TYPE_IPV4 || msg.pdu_type == PDU_SESSION_TYPE_IPV6;
+    bool correct_type = pdu->type == msg.pdu_type || (pdu->type == PDU_SESSION_TYPE_IPV4V6 && msg_ipv4or6);
+    if (pdu->id == sm_header.pdu_session_id && correct_type)
       break;
   }
   if (idx == nas->uicc->n_pdu_sessions) {

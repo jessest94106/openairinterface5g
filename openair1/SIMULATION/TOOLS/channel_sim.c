@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "common/cmake_defs.h"
 #include "SIMULATION/TOOLS/sim.h"
 #include "SIMULATION/RF/rf.h"
 #include "PHY/phy_extern_ue.h"

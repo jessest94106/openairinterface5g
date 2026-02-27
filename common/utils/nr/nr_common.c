@@ -152,6 +152,32 @@ int get_smallest_supported_bandwidth_index(int scs, frequency_range_t frequency_
   return -1; // not found
 }
 
+// Table 5.4.3.3-1 38-101
+uint8_t set_ssb_case(int scs, int nr_band)
+{
+  uint8_t ssb_case = 0;
+  switch (scs) {
+    case 0:
+      ssb_case = 0; // case A
+      break;
+    case 1:
+      if (nr_band == 5 || nr_band == 24 || nr_band == 66 || nr_band == 255)
+        ssb_case = 1; // case B
+      else
+        ssb_case = 2; // case C
+      break;
+    case 3:
+      ssb_case = 3; // case D
+      break;
+    case 4:
+      ssb_case = 4; // case E
+      break;
+    default:
+      AssertFatal(false, "Invalid sub-carrier spacing for SSB\n");
+  }
+  return ssb_case;
+}
+
 // Table 5.2-1 NR operating bands in FR1 & FR2 (3GPP TS 38.101) (Rel.17)
 // Table 5.4.2.3-1 Applicable NR-ARFCN per operating band in FR1 & FR2 (3GPP TS 38.101)
 // Notes:
@@ -393,77 +419,6 @@ bool compare_relative_ul_channel_bw(int nr_band, int scs, int channel_bandwidth,
   return rel_bw > limit;
 }
 
-static bool check_delta_duplex(int index, uint64_t dlfreq_khz, uint64_t ulfreq_khz, int64_t dlbw, int64_t ulbw)
-{
-  int uldl_min_offset = nr_bandtable[index].dl_min - nr_bandtable[index].ul_min;
-  int txrx_offset = dlfreq_khz - ulfreq_khz;
-  LOG_I(NR_PHY, "dlfreq:%ld ulfreq:%ld deltaduplex:%d khz, uldl_min_offset:%d khz\n",
-                              dlfreq_khz, ulfreq_khz, txrx_offset, uldl_min_offset);
-  if (txrx_offset == uldl_min_offset)
-    return true;
-
-  int band = nr_bandtable[index].band;
-
-  // Refer to section 5.4.4 in spec 38.101-5
-  if (band == 256 && txrx_offset >= 165000 && txrx_offset <= 215000)
-    return true;
-  if (band == 255 && txrx_offset >= -130500 && txrx_offset <= -72500)
-    return true;
-  if (band == 254 && txrx_offset >= 862000 && txrx_offset <= 885000)
-    return true;
-
-  // Refer to section 5.4.4 in spec 38.101-1 for these bands 24, 91-94, 109
-  if (band == 24 && (txrx_offset == -101500 || txrx_offset == -120500))
-    return true;
-  //Delta duplex is also a range for these bands n91-n94, n109.
-  if ((band >= 91 && band <= 94) || band == 109) {
-    dlbw = ((dlbw / 1000) + 1)  * 1000;
-    ulbw = ((ulbw / 1000) + 1) * 1000;
-    int lower_limit = nr_bandtable[index].dl_min - nr_bandtable[index].ul_max + ((dlbw + ulbw) >> 1);
-    int upper_limit = nr_bandtable[index].dl_max - nr_bandtable[index].ul_min - ((dlbw + ulbw) >> 1);
-    LOG_I(NR_PHY, "Band %d dlbw:%ld Khz, ulbw: %ld Khz RXTX lower limit:%d khz, upper limit:%d khz\n",
-                                            band, dlbw, ulbw, lower_limit, upper_limit);
-
-    if (txrx_offset >= lower_limit && txrx_offset <= upper_limit)
-      return true;
-  }
-
-  return false;
-}
-
-uint16_t get_band(uint64_t downlink_frequency, int32_t delta_duplex, int64_t dlbw, int64_t ulbw)
-{
-  const int64_t dl_freq_khz = downlink_frequency / 1000;
-  const int32_t  delta_duplex_khz = delta_duplex / 1000;
-  const int64_t ul_freq_khz = dl_freq_khz + delta_duplex_khz;
-
-  uint16_t current_band = 0;
-
-  for (int ind = 0; ind < sizeofArray(nr_bandtable); ind++) {
-
-    if (dl_freq_khz < nr_bandtable[ind].dl_min || dl_freq_khz > nr_bandtable[ind].dl_max)
-      continue;
-
-    if (ul_freq_khz < nr_bandtable[ind].ul_min || ul_freq_khz > nr_bandtable[ind].ul_max)
-      continue;
-
-    if (!check_delta_duplex(ind, dl_freq_khz, ul_freq_khz, dlbw, ulbw))
-      continue;
-
-    current_band = nr_bandtable[ind].band;
-  }
-
-  printf("DL frequency %"PRIu64": band %d, UL frequency %"PRIu64"\n",
-        downlink_frequency, current_band, downlink_frequency+delta_duplex);
-
-  AssertFatal(current_band != 0,
-              "Can't find EUTRA band for frequency %" PRIu64 " and duplex_spacing %d\n",
-              downlink_frequency,
-              delta_duplex);
-
-  return current_band;
-}
-
 int NRRIV2BW(int locationAndBandwidth,int N_RB) {
   int tmp = locationAndBandwidth/N_RB;
   int tmp2 = locationAndBandwidth%N_RB;
@@ -595,44 +550,26 @@ void get_delta_arfcn(int i, uint32_t nrarfcn, uint64_t N_OFFs)
     LOG_E(NR_MAC, "nrarfcn %u is not on the channel raster for step size %lu\n", nrarfcn, nr_bandtable[i].step_size);
 }
 
-uint32_t to_nrarfcn(int nr_bandP, uint64_t dl_CarrierFreq, uint8_t scs_index, uint32_t bw)
+uint32_t to_nrarfcn(uint64_t CarrierFreq)
 {
-  uint64_t dl_CarrierFreq_by_1k = dl_CarrierFreq / 1000;
-  int bw_kHz = bw / 1000;
-  uint32_t nrarfcn;
-  int i = get_nr_table_idx(nr_bandP, scs_index);
-
-  LOG_D(NR_MAC, "Searching for nr band %d DL Carrier frequency %llu bw %u\n", nr_bandP, (long long unsigned int)dl_CarrierFreq, bw);
-
-  AssertFatal(dl_CarrierFreq_by_1k >= nr_bandtable[i].dl_min,
-              "Band %d, bw %u : DL carrier frequency %llu kHz < %llu\n",
-	      nr_bandP, bw, (long long unsigned int)dl_CarrierFreq_by_1k,
-	      (long long unsigned int)nr_bandtable[i].dl_min);
-  AssertFatal(dl_CarrierFreq_by_1k <= (nr_bandtable[i].dl_max - bw_kHz/2),
-              "Band %d, dl_CarrierFreq %llu bw %u: DL carrier frequency %llu kHz > %llu\n",
-	      nr_bandP, (long long unsigned int)dl_CarrierFreq,bw, (long long unsigned int)dl_CarrierFreq_by_1k,
-	      (long long unsigned int)(nr_bandtable[i].dl_max - bw_kHz/2));
-
+  uint64_t CarrierFreq_by_1k = CarrierFreq / 1000;
+  // FR2
   int deltaFglobal = 60;
   uint32_t N_REF_Offs = 2016667;
   uint64_t F_REF_Offs_khz = 24250080;
-
-  if (dl_CarrierFreq < 24.25e9) {
+  // FR1
+  if (CarrierFreq < 3e9) {
+    deltaFglobal = 5;
+    N_REF_Offs = 0;
+    F_REF_Offs_khz = 0;
+  } else if (CarrierFreq < 24.25e9) {
     deltaFglobal = 15;
     N_REF_Offs = 600000;
     F_REF_Offs_khz = 3000000;
   }
-  if (dl_CarrierFreq < 3e9) {
-    deltaFglobal = 5;
-    N_REF_Offs = 0;
-    F_REF_Offs_khz = 0;
-  }
 
   // This is equation before Table 5.4.2.1-1 in 38101-1-f30
-  // F_REF=F_REF_Offs + deltaF_Global(N_REF-NREF_REF_Offs)
-  nrarfcn =  (((dl_CarrierFreq_by_1k - F_REF_Offs_khz) / deltaFglobal) + N_REF_Offs);
-  //get_delta_arfcn(i, nrarfcn, nr_bandtable[i].N_OFFs_DL);
-
+  uint32_t nrarfcn =  (((CarrierFreq_by_1k - F_REF_Offs_khz) / deltaFglobal) + N_REF_Offs);
   return nrarfcn;
 }
 
@@ -794,6 +731,19 @@ int get_subband_size(int NPRB,int size) {
   if (NPRB<275) return (size==0 ? 16 : 32);
   AssertFatal(1==0,"Shouldn't get here, NPRB %d\n",NPRB);
  
+}
+
+void warn_higher_threequarter_fs(const int n_rb, const int mu)
+{
+  LOG_W(NR_PHY,
+        "3/4 sampling is not possible for current PRB size: %d and numerology: %d.\n "
+        "So 6/4 sampling is chosen to support x3xx type USRPs.\n "
+        "Note that this sampling rate increases fronthaul traffic, FFT buffer size and processing time by a factor of two compared "
+        "to 3/4 sampling rate.\n "
+        "Some PRACH configuration might not be supported with 6/4 FFT size.\n "
+        "Consider reducing the PRB size that would fit within the FFT size of 3/4 sampling\n",
+        n_rb,
+        mu);
 }
 
 void get_samplerate_and_bw(int mu,

@@ -26,7 +26,6 @@
 #include "PHY/NR_UE_TRANSPORT/nr_transport_proto_ue.h"
 #include "PHY/CODING/coding_defs.h"
 #include "PHY/CODING/coding_extern.h"
-#include "PHY/CODING/lte_interleaver_inline.h"
 #include "PHY/CODING/nrLDPC_extern.h"
 #include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/NR_UE_TRANSPORT/nr_transport_ue.h"

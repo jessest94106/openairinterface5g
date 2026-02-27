@@ -61,20 +61,15 @@
   </testCase>
 
   <testCase>
-    <class>Custom_Command</class>
-    <desc>Check that UE synched</desc>
-    <node>localhost</node>
-    <command>docker logs rfsim5g-oai-nr-ue-2 | grep -m 1 "PSBCH RX:OK"</command>
-  </testCase>
-
-  <testCase>
     <class>Undeploy_Object</class>
     <always_exec>true</always_exec>
     <desc>Undeploy all OAI 5G stack</desc>
     <node>localhost</node>
     <yaml_path>ci-scripts/yaml_files/5g_rfsimulator_sidelink</yaml_path>
-    <d_retx_th>1,0,0,0</d_retx_th>
-    <u_retx_th>1,0,0,0</u_retx_th>
+    <analysis>
+      <services>oai-nr-ue-1</services>
+      <service>oai-nr-ue-2=ContainsString=PSBCH RX:OK</service>
+    </analysis>
   </testCase>
 
   <testCase>

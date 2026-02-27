@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
   NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   fp->N_RB_DL = N_RB_DL;
   fp->N_RB_UL = N_RB_UL;
-  fp->Ncp = extended_prefix_flag ? EXTENDED : NORMAL;
+  fp->Ncp = extended_prefix_flag ? NR_EXTENDED : NR_NORMAL;
   fp->nb_antennas_tx = n_tx;
   fp->nb_antennas_rx = n_rx;
   fp->threequarter_fs = threequarter_fs;

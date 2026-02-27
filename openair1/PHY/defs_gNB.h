@@ -37,7 +37,6 @@
 #include "defs_nr_common.h"
 #include "CODING/nrPolar_tools/nr_polar_pbch_defs.h"
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
-#include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "PHY/impl_defs_top.h"
 #include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/CODING/nrLDPC_extern.h"
@@ -158,19 +157,6 @@ typedef struct {
   int llrLen;
   //////////////////////////////////////////////////////////////
 } NR_UL_gNB_HARQ_t;
-
-static inline int lenWithCrc(int nbSeg, int len)
-{
-  if (nbSeg > 1)
-    return (len + 24 + 24 * nbSeg) / nbSeg;
-  return len + (len > NR_MAX_PDSCH_TBS ? 24 : 16);
-}
-static inline int crcType(int nbSeg, int len)
-{
-  if (nbSeg > 1)
-    return CRC24_B;
-  return len > NR_MAX_PDSCH_TBS ? CRC24_A : CRC16;
-}
 
 typedef struct {
   uint32_t frame;

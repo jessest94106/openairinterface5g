@@ -25,13 +25,15 @@
 #
 #---------------------------------------------------------------------
 
+ARG UBUNTU_IMAGE=ubuntu:noble
+
 FROM ran-base:latest AS lte-ue-base
 
-FROM ran-build:latest AS lte-ue-build 
+FROM ran-build:latest AS lte-ue-build
 
 
 #start from scratch for target executable
-FROM ubuntu:noble AS oai-lte-ue
+FROM ${UBUNTU_IMAGE} AS oai-lte-ue
 ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Paris

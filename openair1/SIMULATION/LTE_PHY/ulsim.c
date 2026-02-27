@@ -33,6 +33,7 @@
 #include <string.h>
 #include <math.h>
 #include <unistd.h>
+#include "common/cmake_defs.h"
 #include "common/utils/var_array.h"
 #include "PHY/types.h"
 #include "PHY/defs_common.h"

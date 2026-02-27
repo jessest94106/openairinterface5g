@@ -248,7 +248,7 @@ int main(int argc, char **argv)
 {
   start_background_system();
 
-  if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == NULL) {
+  if ((uniqCfg = load_configmodule(argc, argv, CONFIG_ENABLECMDLINEONLY)) == NULL || CONFIG_ISFLAGSET(CONFIG_ABORT)) {
     exit_fun("[SOFTMODEM] Error, configuration module init failed\n");
   }
   //set_softmodem_sighandler();
@@ -385,7 +385,7 @@ int main(int argc, char **argv)
         fapi_nr_config_request_t *nrUE_config = &UE_CC->nrUE_config;
         nr_init_frame_parms_ue(fp, nrUE_config, mac->nr_band);
 
-        cell.band = fp->nr_band;
+        cell.band = mac->nr_band;
         cell.rf_frequency = fp->dl_CarrierFreq;
         cell.rf_freq_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
         cell.numerology = fp->numerology_index;
@@ -500,6 +500,7 @@ int main(int argc, char **argv)
   time_manager_finish();
 
   free(pckg);
+  printf("Bye.\n");
   return 0;
 }
 

@@ -35,7 +35,6 @@
 #include "PHY/defs_gNB.h"
 #include "PHY/CODING/nrLDPC_coding/nrLDPC_coding_interface.h"
 #include "PHY/INIT/nr_phy_init.h"
-#include "PHY/NR_REFSIG/refsig_defs_ue.h"
 #include "PHY/MODULATION/modulation_eNB.h"
 #include "PHY/MODULATION/modulation_UE.h"
 #include "PHY/NR_TRANSPORT/nr_transport_proto.h"
@@ -393,7 +392,7 @@ int main(int argc, char **argv)
   frame_parms = &gNB->frame_parms; //to be initialized I suppose (maybe not necessary for PBCH)
   frame_parms->N_RB_DL = N_RB_DL;
   frame_parms->N_RB_UL = N_RB_UL;
-  frame_parms->Ncp = extended_prefix_flag ? EXTENDED : NORMAL;
+  frame_parms->Ncp = extended_prefix_flag ? NR_EXTENDED : NR_NORMAL;
   gNB->max_ldpc_iterations = max_ldpc_iterations;
 
   crcTableInit();

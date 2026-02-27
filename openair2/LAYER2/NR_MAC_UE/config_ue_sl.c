@@ -126,9 +126,9 @@ static void  sl_prepare_phy_config(int module_id,
 
   AssertFatal(SSB_ARFCN, "sl_AbsoluteFrequencySSB cannot be 0\n");
 
-  LOG_I(NR_MAC, "SIDELINK CONFIGs: AbsFreqSSB:%d, AbsFreqPointA:%d, SL band:%d\n",
-                                                        SSB_ARFCN,pointA_ARFCN, sl_band);
+  LOG_I(NR_MAC, "SIDELINK CONFIGs: AbsFreqSSB:%d, AbsFreqPointA:%d, SL band:%d\n", SSB_ARFCN, pointA_ARFCN, sl_band);
 
+  phycfg->sl_carrier_config.band = sl_band;
   //FREQSHIFT_7P5KHZ is DISABLED
   phycfg->sl_carrier_config.sl_frequency_shift_7p5khz = 0;
   phycfg->sl_carrier_config.sl_value_N = freqcfg->valueN_r16;
@@ -141,8 +141,7 @@ static void  sl_prepare_phy_config(int module_id,
   int bw_index = get_supported_band_index(carriercfg->subcarrierSpacing, FR1, carriercfg->carrierBandwidth);
   phycfg->sl_carrier_config.sl_bandwidth = get_supported_bw_mhz(FR1, bw_index);
 
-  phycfg->sl_carrier_config.sl_frequency =
-              from_nrarfcn(sl_band,carriercfg->subcarrierSpacing,pointA_ARFCN); // freq in kHz
+  phycfg->sl_carrier_config.sl_frequency = from_nrarfcn(sl_band, carriercfg->subcarrierSpacing, pointA_ARFCN); // freq in kHz
 
   phycfg->sl_carrier_config.sl_grid_size = carriercfg->carrierBandwidth;
   //For sidelink offset to carrier is 0. hence not used

@@ -313,31 +313,32 @@ void nr_phy_config_request_sim(PHY_VARS_gNB *gNB,
   gNB_config->carrier_config.num_tx_ant.value           = fp->nb_antennas_tx;
   gNB_config->carrier_config.num_rx_ant.value           = fp->nb_antennas_rx;
 
+  int nr_band = 78;
   switch (mu) {
     case 0:
       gNB->gNB_config.tdd_table.tdd_period.value = 7;
       fp->dl_CarrierFreq = 2600000000;
       fp->ul_CarrierFreq = 2600000000;
-      fp->nr_band = 38;
+      nr_band = 38;
       break;
     case 1:
       gNB->gNB_config.tdd_table.tdd_period.value = 6;
       fp->dl_CarrierFreq = 3600000000;
       fp->ul_CarrierFreq = 3600000000;
-      fp->nr_band = 78;
+      nr_band = 78;
       break;
     case 3:
       gNB->gNB_config.tdd_table.tdd_period.value = 3;
       fp->dl_CarrierFreq = 27524520000;
       fp->ul_CarrierFreq = 27524520000;
-      fp->nr_band = 261;
+      nr_band = 261;
       break;
     default:
       printf("unsupported numerology %d\n", mu);
       exit(-1);
   }
 
-  frequency_range_t frequency_range = get_freq_range_from_band(fp->nr_band);
+  frequency_range_t frequency_range = get_freq_range_from_band(nr_band);
   int bw_index = get_supported_band_index(mu, frequency_range, N_RB_DL);
   gNB_config->carrier_config.dl_bandwidth.value = get_supported_bw_mhz(frequency_range, bw_index);
 
@@ -366,9 +367,8 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   fp->ul_CarrierFreq = ((ul_bw_khz>>1) + gNB_config->carrier_config.uplink_frequency.value)*1000 ;
 
   int32_t dlul_offset = fp->ul_CarrierFreq - fp->dl_CarrierFreq;
-  fp->nr_band = get_band(fp->dl_CarrierFreq, dlul_offset, dl_bw_khz, ul_bw_khz);
 
-  LOG_I(PHY, "DL frequency %lu Hz, UL frequency %lu Hz: band %d, uldl offset %d Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, fp->nr_band, dlul_offset);
+  LOG_I(PHY, "DL frequency %lu Hz, UL frequency %lu Hz: uldl offset %d Hz\n", fp->dl_CarrierFreq, fp->ul_CarrierFreq, dlul_offset);
 
   fp->threequarter_fs = get_softmodem_params()->threequarter_fs;
   LOG_D(PHY,"Configuring MIB for instance %d, : (Nid_cell %d,DL freq %llu, UL freq %llu)\n",

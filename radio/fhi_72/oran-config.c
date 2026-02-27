@@ -902,7 +902,6 @@ static bool set_fh_config(void *mplane_api, int ru_idx, int num_rus, enum xran_c
   DevAssert(oai0->rx_freq[0] > 0);
   for (int i = 1; i < oai0->rx_num_channels; ++i)
     DevAssert(oai0->rx_freq[0] == oai0->rx_freq[i]);
-  DevAssert(oai0->nr_band > 0);
   paramdef_t FHconfigs[] = ORAN_FH_DESC;
   paramlist_def_t FH_ConfigList = {CONFIG_STRING_ORAN_FH};
   char aprefix[MAX_OPTNAME_SIZE] = {0};

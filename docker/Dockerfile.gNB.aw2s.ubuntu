@@ -25,6 +25,7 @@
 #
 #---------------------------------------------------------------------
 
+ARG UBUNTU_IMAGE=ubuntu:noble
 FROM ran-base:latest AS gnb-base
 
 FROM ran-build:latest AS gnb-build
@@ -38,7 +39,7 @@ RUN /bin/sh oaienv && \
     ./build_oai -w AW2SORI -t Ethernet
 
 #start from scratch for target executable
-FROM ubuntu:noble AS oai-gnb-aw2s
+FROM ${UBUNTU_IMAGE} AS oai-gnb-aw2s
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 

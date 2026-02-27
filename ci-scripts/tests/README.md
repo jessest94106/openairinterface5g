@@ -10,12 +10,15 @@ directory, i.e., `ci-scripts/`, and run
 
 To run individual unit tests, start them like so:
 
+    python tests/analysis.py -v
     python tests/build.py -v
     python tests/cmd.py -v
     python tests/corenetwork.py -v
     python tests/deployment.py -v
     python tests/iperf-analysis.py -v
+    python tests/log-analysis.py -v
     python tests/ping-iperf.py -v
+    python tests/pull-clean-int-registry.py -v
 
 The logs will indicate if all tests passed. `tests/deployment.py` requires
 these images to be present:

@@ -140,7 +140,7 @@ void apply_ntn_timing_advance_and_doppler(PHY_VARS_NR_UE *UE, const NR_DL_FRAME_
 
 // apply values based on the NTN-Config
 void apply_ntn_config(PHY_VARS_NR_UE *UE,
-                      NR_DL_FRAME_PARMS *fp,
+                      const NR_DL_FRAME_PARMS *fp,
                       int hfn_rx,
                       int frame_rx,
                       int slot_rx,

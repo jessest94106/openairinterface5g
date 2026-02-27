@@ -31,7 +31,6 @@
  */
 #include "PHY/sse_intrin.h"
 #include "PHY/impl_defs_nr.h"
-#include "PHY/defs_nr_UE.h"
 #include "PHY/NR_TRANSPORT/nr_prach.h"
 #include "PHY/NR_TRANSPORT/nr_transport_common_proto.h"
 #include "common/utils/LOG/log.h"

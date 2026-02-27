@@ -125,6 +125,9 @@
     <desc>Undeploy gNB</desc>
     <node>obelix</node>
     <yaml_path>ci-scripts/yaml_files/lte_n3xx_tdd_2x2_tm1</yaml_path>
+    <analysis>
+      <services>oai-enb=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

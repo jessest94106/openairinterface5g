@@ -263,8 +263,9 @@
     <desc>Undeploy CU-DU</desc>
     <node>ofqot</node>
     <yaml_path>ci-scripts/yaml_files/sa_f1_b200_gnb</yaml_path>
-    <d_retx_th>10,100,100,100</d_retx_th>
-    <u_retx_th>10,100,100,100</u_retx_th>
+    <analysis>
+      <services>gnb_cu=EndsWithBye gnb_du_fdd=RetxCheck=10,100,100,100 gnb_du_fdd=EndsWithBye</services>
+    </analysis>
   </testCase>
 
   <testCase>

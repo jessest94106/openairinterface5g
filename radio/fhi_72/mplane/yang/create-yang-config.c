@@ -248,7 +248,7 @@ static bool create_uplane_conf_v2(const ru_session_t *ru_session, const openair0
     VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"center-of-channel-bandwidth\" node.\n");
 
     char rx_arfcn[16];
-    snprintf(rx_arfcn, sizeof(rx_arfcn), "%d", to_nrarfcn(oai->nr_band, oai->rx_freq[0], oai->nr_scs_for_raster, oai->rx_bw));
+    snprintf(rx_arfcn, sizeof(rx_arfcn), "%d", to_nrarfcn(oai->rx_freq[0]));
     ret = lyd_new_term(rx_carrier_node, NULL, "absolute-frequency-center", rx_arfcn, 0, NULL);
     VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"absolute-frequency-center\" node.\n");
 
@@ -290,7 +290,7 @@ static bool create_uplane_conf_v2(const ru_session_t *ru_session, const openair0
     VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"center-of-channel-bandwidth\" node.\n");
 
     char tx_arfcn[16];
-    snprintf(tx_arfcn, sizeof(tx_arfcn), "%d", to_nrarfcn(oai->nr_band, oai->tx_freq[0], oai->nr_scs_for_raster, oai->tx_bw));
+    snprintf(tx_arfcn, sizeof(tx_arfcn), "%d", to_nrarfcn(oai->tx_freq[0]));
     ret = lyd_new_term(tx_carrier_node, NULL, "absolute-frequency-center", tx_arfcn, 0, NULL);
     VERIFY_SUCCESS(ret == LY_SUCCESS, "[MPLANE] Failed to create \"absolute-frequency-center\" node.\n");
 
