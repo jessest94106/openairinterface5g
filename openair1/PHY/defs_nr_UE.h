@@ -104,17 +104,10 @@
 /// Context data structure for gNB subframe processing
 typedef struct {
   /// Component Carrier index
-  uint8_t              CC_id;
+  uint8_t CC_id;
   /// Last RX timestamp
   openair0_timestamp_t timestamp_rx;
 } UE_nr_proc_t;
-
-typedef enum {
-  NR_PBCH_EST=0,
-  NR_PDCCH_EST,
-  NR_PDSCH_EST,
-  NR_SSS_EST,
-} NR_CHANNEL_EST_t;
 
 #define debug_msg if (((mac_xface->frame%100) == 0) || (mac_xface->frame < 50)) msg
 
@@ -144,10 +137,6 @@ typedef struct {
   int ssb_rsrp_dBm[64];
   float ssb_sinr_dB[64];
   // common measurements
-  //! estimated noise power (linear)
-  unsigned int   n0_power[NB_ANTENNAS_RX];
-  //! estimated noise power (dB)
-  unsigned short n0_power_dB[NB_ANTENNAS_RX];
   //! total estimated noise power (linear)
   unsigned int   n0_power_tot;
   //! total estimated noise power (dB)
@@ -165,59 +154,27 @@ typedef struct {
   //! estimated received spatial signal power (dB)
   fourDimArray_t *rx_spatial_power_dB;
 
-  /// estimated received signal power (sum over all TX antennas)
-  int            rx_power[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX];
-  /// estimated received signal power (sum over all TX antennas)
-  unsigned short rx_power_dB[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX];
-
   /// estimated received signal power (sum over all TX/RX antennas)
-  int            rx_power_tot[NUMBER_OF_CONNECTED_gNB_MAX]; //NEW
+  int rx_power_tot[NUMBER_OF_CONNECTED_gNB_MAX]; //NEW
   /// estimated received signal power (sum over all TX/RX antennas)
   unsigned short rx_power_tot_dB[NUMBER_OF_CONNECTED_gNB_MAX]; //NEW
 
   //! estimated received signal power (sum of all TX/RX antennas, time average)
-  int            rx_power_avg[NUMBER_OF_CONNECTED_gNB_MAX];
+  int rx_power_avg[NUMBER_OF_CONNECTED_gNB_MAX];
   //! estimated received signal power (sum of all TX/RX antennas, time average, in dB)
   unsigned short rx_power_avg_dB[NUMBER_OF_CONNECTED_gNB_MAX];
 
   /// SINR (sum of all TX/RX antennas, in dB)
-  int            wideband_cqi_tot[NUMBER_OF_CONNECTED_gNB_MAX];
+  int wideband_cqi_tot[NUMBER_OF_CONNECTED_gNB_MAX];
   /// SINR (sum of all TX/RX antennas, time average, in dB)
-  int            wideband_cqi_avg[NUMBER_OF_CONNECTED_gNB_MAX];
+  int wideband_cqi_avg[NUMBER_OF_CONNECTED_gNB_MAX];
 
   //! estimated rssi (dBm)
-  short          rx_rssi_dBm[NUMBER_OF_CONNECTED_gNB_MAX];
-  //! estimated correlation (wideband linear) between spatial channels (computed in dlsch_demodulation)
-  int            rx_correlation[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX][NR_MAX_NB_LAYERS*NR_MAX_NB_LAYERS];//
-  //! estimated correlation (wideband dB) between spatial channels (computed in dlsch_demodulation)
-  int            rx_correlation_dB[NUMBER_OF_CONNECTED_gNB_MAX][2];
+  short rx_rssi_dBm[NUMBER_OF_CONNECTED_gNB_MAX];
 
-  /// Wideband CQI (sum of all RX antennas, in dB, for precoded transmission modes (3,4,5,6), up to 4 spatial streams)
-  int            precoded_cqi_dB[NUMBER_OF_CONNECTED_gNB_MAX+1][4];
-  /// Subband CQI per RX antenna (= SINR)
-  int            subband_cqi[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX][NUMBER_OF_SUBBANDS_MAX];
-  /// Total Subband CQI  (= SINR)
-  int            subband_cqi_tot[NUMBER_OF_CONNECTED_gNB_MAX][NUMBER_OF_SUBBANDS_MAX];
-  /// Subband CQI in dB (= SINR dB)
-  int            subband_cqi_dB[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX][NUMBER_OF_SUBBANDS_MAX];
-  /// Total Subband CQI
-  int            subband_cqi_tot_dB[NUMBER_OF_CONNECTED_gNB_MAX][NUMBER_OF_SUBBANDS_MAX];
-  /// Wideband PMI for each RX antenna
-  int            wideband_pmi_re[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX];
-  /// Wideband PMI for each RX antenna
-  int            wideband_pmi_im[NUMBER_OF_CONNECTED_gNB_MAX][NB_ANTENNAS_RX];
-  ///Subband PMI for each RX antenna
-  int            subband_pmi_re[NUMBER_OF_CONNECTED_gNB_MAX][NUMBER_OF_SUBBANDS_MAX][NB_ANTENNAS_RX];
-  ///Subband PMI for each RX antenna
-  int            subband_pmi_im[NUMBER_OF_CONNECTED_gNB_MAX][NUMBER_OF_SUBBANDS_MAX][NB_ANTENNAS_RX];
-  /// chosen RX antennas (1=Rx antenna 1, 2=Rx antenna 2, 3=both Rx antennas)
-  unsigned char           selected_rx_antennas[NUMBER_OF_CONNECTED_gNB_MAX][NUMBER_OF_SUBBANDS_MAX];
-  /// Wideband Rank indication
-  unsigned char  rank[NUMBER_OF_CONNECTED_gNB_MAX];
   /// Number of RX Antennas
   unsigned char  nb_antennas_rx;
-  /// DLSCH error counter
-  // short          dlsch_errors;
+
   /// Info about neighboring cells to perform the measurements
   neighboring_cell_info_t neighboring_cell_info[NUMBER_OF_NEIGHBORING_CELLS_MAX];
   bool meas_request_pending;
@@ -263,17 +220,6 @@ typedef struct {
 
 #define MAX_NR_DCI_DECODED_SLOT     10    // This value is not specified
 
-typedef enum {
-  _format_0_0_found = 0,
-  _format_0_1_found = 1,
-  _format_1_0_found = 2,
-  _format_1_1_found = 3,
-  _format_2_0_found = 4,
-  _format_2_1_found = 5,
-  _format_2_2_found = 6,
-  _format_2_3_found = 7
-} format_found_t;
-
 #endif
 typedef struct {
   int nb_search_space;
@@ -282,18 +228,6 @@ typedef struct {
 
 #define NR_PSBCH_DMRS_LENGTH 297 // in mod symbols
 #define NR_PSBCH_DMRS_LENGTH_DWORD 20 // ceil(2(QPSK)*NR_PBCH_DMRS_LENGTH/32)
-
-/* NR Sidelink PSBCH payload fields
-   TODO: This will be removed in the future and
-   filled in by the upper layers once developed. */
-typedef struct {
-  uint32_t coverageIndicator : 1;
-  uint32_t tddConfig : 12;
-  uint32_t DFN : 10;
-  uint32_t slotIndex : 7;
-  uint32_t reserved : 2;
-} PSBCH_payload;
-
 #define PBCH_A 24
 
 typedef struct {
@@ -426,15 +360,11 @@ typedef struct PHY_VARS_NR_UE_s {
   fapi_nr_config_request_t nrUE_config;
   nr_synch_request_t synch_request;
 
-  NR_UE_PRACH     *prach_vars[NUMBER_OF_CONNECTED_gNB_MAX];
-  NR_UE_PRS       *prs_vars[NR_MAX_PRS_COMB_SIZE];
-  uint8_t          prs_active_gNBs;
+  NR_UE_PRACH *prach_vars[NUMBER_OF_CONNECTED_gNB_MAX];
+  NR_UE_PRS *prs_vars[NR_MAX_PRS_COMB_SIZE];
+  uint8_t prs_active_gNBs;
   NR_DL_UE_HARQ_t  dl_harq_processes[2][NR_MAX_DLSCH_HARQ_PROCESSES];
   NR_UL_UE_HARQ_t  ul_harq_processes[NR_MAX_ULSCH_HARQ_PROCESSES];
-  //Paging parameters
-  uint32_t              IMSImod1024;
-  uint32_t              PF;
-  uint32_t              PO;
 
   // Scrambling IDs used in PUSCH DMRS
   c16_t X_u[64][839];
@@ -463,21 +393,6 @@ typedef struct PHY_VARS_NR_UE_s {
   int dlsch_received[NUMBER_OF_CONNECTED_gNB_MAX];
   int dlsch_received_last[NUMBER_OF_CONNECTED_gNB_MAX];
   int dlsch_fer[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_SI_received[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_SI_errors[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_ra_received[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_ra_errors[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_p_received[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_p_errors[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mch_received[NUMBER_OF_CONNECTED_gNB_MAX];
-  int current_dlsch_cqi[NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mch_received_sf[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mcch_received[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mtch_received[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mcch_errors[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mtch_errors[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mcch_trials[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
-  int dlsch_mtch_trials[MAX_MBSFN_AREA][NUMBER_OF_CONNECTED_gNB_MAX];
   uint8_t init_sync_frame;
   /// temporary offset during cell search prior to MIB decoding
   int ssb_offset;
