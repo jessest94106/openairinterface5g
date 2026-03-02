@@ -107,8 +107,7 @@ check_supported_distribution() {
         "ubuntu22.04") return 0 ;;
         "debian11")    return 0 ;;
         "debian12")    return 0 ;;
-        "fedora41")    return 0 ;;
-        "fedora40")    return 0 ;;
+        "fedora43")    return 0 ;;
         "rhel8.2")     return 0 ;;
         "rhel8.3")     return 0 ;;
         "rhel8.4")     return 0 ;;
