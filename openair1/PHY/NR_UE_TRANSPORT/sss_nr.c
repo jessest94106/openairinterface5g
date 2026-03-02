@@ -189,8 +189,8 @@ void insert_sss_nr(int16_t *sss_time,
 
 static int pss_ch_est_nr(const NR_DL_FRAME_PARMS *frame_parms,
                          int nid2,
-                         c16_t pss_ext[NB_ANTENNAS_RX][LENGTH_PSS_NR],
-                         c16_t sss_ext[NB_ANTENNAS_RX][LENGTH_SSS_NR])
+                         c16_t pss_ext[frame_parms->nb_antennas_rx][LENGTH_PSS_NR],
+                         c16_t sss_ext[frame_parms->nb_antennas_rx][LENGTH_SSS_NR])
 {
   int16_t *pss = get_primary_synchro_nr2(nid2);
 
@@ -250,15 +250,14 @@ static int pss_ch_est_nr(const NR_DL_FRAME_PARMS *frame_parms,
 *
 *********************************************************************/
 
-static int do_pss_sss_extract_nr(
-    const NR_DL_FRAME_PARMS *frame_parms,
-    c16_t pss_ext[NB_ANTENNAS_RX][LENGTH_PSS_NR],
-    c16_t sss_ext[NB_ANTENNAS_RX][LENGTH_SSS_NR],
-    uint8_t doPss,
-    uint8_t doSss,
-    uint8_t subframe,
-    int ssb_start_subcarrier,
-    c16_t rxdataF[][frame_parms->samples_per_slot_wCP]) // add flag to indicate extracting only PSS, only SSS, or both
+static int do_pss_sss_extract_nr(const NR_DL_FRAME_PARMS *frame_parms,
+                                 c16_t pss_ext[frame_parms->nb_antennas_rx][LENGTH_PSS_NR],
+                                 c16_t sss_ext[frame_parms->nb_antennas_rx][LENGTH_SSS_NR],
+                                 uint8_t doPss,
+                                 uint8_t doSss,
+                                 uint8_t subframe,
+                                 int ssb_start_subcarrier,
+                                 c16_t rxdataF[][frame_parms->samples_per_slot_wCP]) // add flag to indicate extracting only PSS, only SSS, or both
 {
   AssertFatal(frame_parms->nb_antennas_rx > 0, "UB as sss_ext is not set to any value\n");
 
@@ -331,8 +330,8 @@ static int do_pss_sss_extract_nr(
 *********************************************************************/
 
 static int pss_sss_extract_nr(const NR_DL_FRAME_PARMS *frame_parms,
-                              c16_t pss_ext[NB_ANTENNAS_RX][LENGTH_PSS_NR],
-                              c16_t sss_ext[NB_ANTENNAS_RX][LENGTH_SSS_NR],
+                              c16_t pss_ext[frame_parms->nb_antennas_rx][LENGTH_PSS_NR],
+                              c16_t sss_ext[frame_parms->nb_antennas_rx][LENGTH_SSS_NR],
                               uint8_t subframe,
                               int ssb_start_subcarrier,
                               c16_t rxdataF[][frame_parms->samples_per_slot_wCP])
@@ -371,8 +370,8 @@ bool rx_sss_nr(const NR_DL_FRAME_PARMS *frame_parms,
                c16_t rxdataF[][frame_parms->samples_per_slot_wCP])
 {
   uint8_t i;
-  c16_t pss_ext[NB_ANTENNAS_RX][LENGTH_PSS_NR] = {0};
-  c16_t sss_ext[NB_ANTENNAS_RX][LENGTH_SSS_NR] = {0};
+  c16_t pss_ext[frame_parms->nb_antennas_rx][LENGTH_PSS_NR];
+  c16_t sss_ext[frame_parms->nb_antennas_rx][LENGTH_SSS_NR];
   uint8_t Nid2 = GET_NID2(nid2);
   uint16_t Nid1;
   uint8_t phase;

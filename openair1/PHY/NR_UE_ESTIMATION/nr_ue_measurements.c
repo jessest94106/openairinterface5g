@@ -81,32 +81,21 @@ void nr_ue_measurements(PHY_VARS_NR_UE *ue,
               false);
 
   // signal measurements
-  for (gNB_id = 0; gNB_id < ue->n_connected_gNB; gNB_id++){
-
+  for (gNB_id = 0; gNB_id < ue->n_connected_gNB; gNB_id++) {
     ue->measurements.rx_power_tot[gNB_id] = 0;
-
-    for (aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++){
-
-      ue->measurements.rx_power[gNB_id][aarx] = 0;
-
-      for (aatx = 0; aatx < frame_parms->nb_antenna_ports_gNB; aatx++){
+    for (aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
+      int rx_power = 0;
+      for (aatx = 0; aatx < frame_parms->nb_antenna_ports_gNB; aatx++) {
         const int z = signal_energy_nodc((c16_t*)&dl_ch_estimates[gNB_id][ch_offset], number_rbs * NR_NB_SC_PER_RB);
         rx_spatial_power[gNB_id][aatx][aarx] = z;
-
         if (rx_spatial_power[gNB_id][aatx][aarx] < 0)
           rx_spatial_power[gNB_id][aatx][aarx] = 0;
-
         rx_spatial_power_dB[gNB_id][aatx][aarx] = (unsigned short)dB_fixed(rx_spatial_power[gNB_id][aatx][aarx]);
-        ue->measurements.rx_power[gNB_id][aarx] += rx_spatial_power[gNB_id][aatx][aarx];
+        rx_power += rx_spatial_power[gNB_id][aatx][aarx];
       }
-
-      ue->measurements.rx_power_dB[gNB_id][aarx] = (unsigned short) dB_fixed(ue->measurements.rx_power[gNB_id][aarx]);
-      ue->measurements.rx_power_tot[gNB_id] += ue->measurements.rx_power[gNB_id][aarx];
-
+      ue->measurements.rx_power_tot[gNB_id] += rx_power;
     }
-
     ue->measurements.rx_power_tot_dB[gNB_id] = (unsigned short) dB_fixed(ue->measurements.rx_power_tot[gNB_id]);
-
   }
 
   // filter to remove jitter
@@ -533,9 +522,9 @@ void nr_ue_rrc_measurements(PHY_VARS_NR_UE *ue,
 
   LOG_D(PHY, "In %s doing measurements for ssb_offset %d l_sss %d \n", __FUNCTION__, ssb_offset, l_sss);
 
-  for (aarx = 0; aarx<ue->frame_parms.nb_antennas_rx; aarx++) {
+  for (aarx = 0; aarx < ue->frame_parms.nb_antennas_rx; aarx++) {
 
-    ue->measurements.n0_power[aarx] = 0;
+    uint32_t n0_power = 0;
     rxF_sss = (int16_t *)&rxdataF[aarx][l_sss*ue->frame_parms.ofdm_symbol_size];
 
     //-ve spectrum from SSS
@@ -547,8 +536,7 @@ void nr_ue_rrc_measurements(PHY_VARS_NR_UE *ue,
       LOG_I(PHY, "In %s -rxF_sss %d %d\n", __FUNCTION__, rxF_sss[re*2], rxF_sss[re*2 + 1]);
       #endif
 
-      ue->measurements.n0_power[aarx] += (((int32_t)rxF_sss[re*2]*rxF_sss[re*2]) + ((int32_t)rxF_sss[re*2 + 1]*rxF_sss[re*2 + 1]));
-
+      n0_power += (((int32_t)rxF_sss[re * 2] * rxF_sss[re * 2]) + ((int32_t)rxF_sss[re * 2 + 1] * rxF_sss[re * 2 + 1]));
     }
 
     //+ve spectrum from SSS
@@ -560,14 +548,11 @@ void nr_ue_rrc_measurements(PHY_VARS_NR_UE *ue,
       LOG_I(PHY, "In %s +rxF_sss %d %d\n", __FUNCTION__, rxF_sss[re*2], rxF_sss[re*2 + 1]);
       #endif
 
-      ue->measurements.n0_power[aarx] += (((int32_t)rxF_sss[re*2]*rxF_sss[re*2]) + ((int32_t)rxF_sss[re*2 + 1]*rxF_sss[re*2 + 1]));
-
+      n0_power += (((int32_t)rxF_sss[re * 2]*rxF_sss[re * 2]) + ((int32_t)rxF_sss[re * 2 + 1] * rxF_sss[re * 2 + 1]));
     }
 
-    ue->measurements.n0_power[aarx] /= 2*k_length;
-    ue->measurements.n0_power_dB[aarx] = (unsigned short) dB_fixed(ue->measurements.n0_power[aarx]);
-    ue->measurements.n0_power_tot += ue->measurements.n0_power[aarx];
-
+    n0_power /= 2 * k_length;
+    ue->measurements.n0_power_tot += n0_power;
   }
 
   ue->measurements.n0_power_tot_dB = (unsigned short) dB_fixed(ue->measurements.n0_power_tot);
