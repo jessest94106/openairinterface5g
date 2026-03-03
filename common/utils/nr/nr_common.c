@@ -1043,9 +1043,10 @@ uint32_t get_ssb_offset_to_pointA(uint32_t absoluteFrequencySSB,
   const int scaling = (absoluteFrequencyPointA >= 2016667) ? 1 << (ssbSubcarrierSpacing - 2) : 1 << ssbSubcarrierSpacing;
   const int scaled_abs_diff = absolute_diff / (scaling_5khz * scaling);
   // absoluteFrequencySSB is the central frequency of SSB which is made by 20RBs in total
-  const int ssb_offset_point_a = ((scaled_abs_diff / 12) - 10) * scaling;
+  const int ssb_offset_scaling = (frequency_range == FR2) ? 1 << (ssbSubcarrierSpacing - 2) : 1 << ssbSubcarrierSpacing;
+  const int ssb_offset_point_a = ((scaled_abs_diff / 12) - 10) * ssb_offset_scaling;
   // Offset to point A needs to be divisible by scaling
-  AssertFatal(ssb_offset_point_a % scaling == 0, "PRB offset %d not valid for scs %d\n", ssb_offset_point_a, ssbSubcarrierSpacing);
+  AssertFatal(ssb_offset_point_a % ssb_offset_scaling == 0, "PRB offset %d not valid for scs %d\n", ssb_offset_point_a, ssbSubcarrierSpacing);
   AssertFatal(ssb_offset_point_a >= 0, "ssb offset is negative %d for scs %d\n", ssb_offset_point_a, ssbSubcarrierSpacing);
   return ssb_offset_point_a;
 }
