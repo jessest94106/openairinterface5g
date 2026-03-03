@@ -59,7 +59,7 @@
 #include "s1ap_messages_types.h"
 #include "xer_encoder.h"
 #include "ds/byte_array.h"
-
+#include "intertask_interface.h"
 /** @brief Selects the AMF instance for a given UE based on identity information.
  *         It attempts to select an AMF using the following prioritized criteria:
  *         1. GUAMI, if provided and valid (via Region ID, Set ID, Pointer).
