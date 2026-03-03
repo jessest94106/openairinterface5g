@@ -34,6 +34,15 @@
   </testCase>
 
   <testCase>
+    <class>Custom_Script</class>
+    <always_exec>true</always_exec>
+    <desc>Configure 100 MHz bandwidth on WNC RU</desc>
+    <node>gracehopper1-oai</node>
+    <script>scripts/set-wnc-bandwidth.sh</script>
+    <args>100</args>
+  </testCase>
+
+  <testCase>
     <class>Detach_UE</class>
     <always_exec>true</always_exec>
     <desc>Detach Quectel</desc>
