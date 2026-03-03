@@ -107,8 +107,10 @@ typedef struct nr_bandentry_s {
   uint64_t ul_max;
   uint64_t dl_min;
   uint64_t dl_max;
-  uint64_t step_size;
-  uint64_t N_OFFs_DL;
+  uint8_t ul_stepsize;
+  uint8_t dl_stepsize;
+  uint32_t N_OFFs_UL;
+  uint32_t N_OFFs_DL;
   uint8_t deltaf_raster;
 } nr_bandentry_t;
 
