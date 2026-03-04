@@ -1,4 +1,4 @@
-set(    XNAP_GRAMMAR ASN1/xnap_R16.2.0.asn)
+set(XNAP_GRAMMAR ASN1/xnap_R16.2.0.asn)
 
 set(xnap_source
     ANY.c
@@ -9,6 +9,7 @@ set(xnap_source
     asn_application.c
     asn_bit_data.c
     asn_codecs_prim.c
+    asn_codecs_prim_xer.c
     asn_internal.c
     asn_random_fill.c
     asn_SEQUENCE_OF.c
@@ -16,20 +17,73 @@ set(xnap_source
     ber_tlv_length.c
     ber_tlv_tag.c
     BIT_STRING.c
+    BIT_STRING_print.c
+    BIT_STRING_rfill.c
+    BIT_STRING_uper.c
+    BIT_STRING_xer.c
     constraints.c
     constr_CHOICE.c
+    constr_CHOICE_aper.c
+    constr_CHOICE_rfill.c
+    constr_CHOICE_print.c
+    constr_CHOICE_uper.c
+    constr_CHOICE_xer.c
     constr_SEQUENCE.c
+    constr_SEQUENCE_aper.c
     constr_SEQUENCE_OF.c
+    constr_SEQUENCE_OF_aper.c
+    constr_SEQUENCE_OF_uper.c
+    constr_SEQUENCE_OF_xer.c
+    constr_SEQUENCE_print.c
+    constr_SEQUENCE_rfill.c
+    constr_SEQUENCE_uper.c
+    constr_SEQUENCE_xer.c
     constr_SET_OF.c
+    constr_SET_OF_aper.c
+    constr_SET_OF_print.c
+    constr_SET_OF_rfill.c
+    constr_SET_OF_uper.c
+    constr_SET_OF_xer.c
     constr_TYPE.c
     INTEGER.c
+    INTEGER_aper.c
+    INTEGER_print.c
+    INTEGER_rfill.c
+    INTEGER_uper.c
+    INTEGER_xer.c 
     Makefile.am.libasncodec
     NativeEnumerated.c
+    NativeEnumerated_aper.c
+    NativeEnumerated_uper.c
+    NativeEnumerated_xer.c
     NativeInteger.c
+    NativeInteger_aper.c
+    NativeInteger_print.c 
+    NativeInteger_rfill.c
+    NativeInteger_uper.c
+    NativeInteger_xer.c
     NULL.c
+    NULL_aper.c
+    NULL_print.c
+    NULL_rfill.c
+    NULL_uper.c
+    NULL_xer.c
     OBJECT_IDENTIFIER.c
+    OBJECT_IDENTIFIER_print.c
+    OBJECT_IDENTIFIER_rfill.c
+    OBJECT_IDENTIFIER_xer.c
     OCTET_STRING.c
+    OCTET_STRING_aper.c 
+    OCTET_STRING_print.c
+    OCTET_STRING_rfill.c
+    OCTET_STRING_uper.c
+    OCTET_STRING_xer.c
     OPEN_TYPE.c
+    OPEN_TYPE_aper.c
+    OPEN_TYPE_uper.c
+    OPEN_TYPE_xer.c
+    per_opentype.c
+    per_encoder.c
     VisibleString.c
     xer_decoder.c
     xer_encoder.c
@@ -819,14 +873,22 @@ set(xnap_source
     XNAP_XnUAddressIndication.c
     XNAP_XnUAddressInfoperPDUSession-Item.c
     XNAP_XnUAddressInfoperPDUSession-List.c
+    uper_encoder.c
+    uper_opentype.c
+    uper_support.c
 )
 
 set(xnap_headers
     ANY.h
+    aper_decoder.h
+    aper_encoder.h
+    aper_opentype.h
+    aper_support.h
     asn_application.h
     asn_bit_data.h
     asn_codecs.h
     asn_codecs_prim.h
+    asn_codecs_prim_xer.h
     asn_internal.h
     asn_ioc.h
     asn_random_fill.h
@@ -836,23 +898,72 @@ set(xnap_headers
     ber_tlv_length.h
     ber_tlv_tag.h
     BIT_STRING.h
+    BIT_STRING_print.h
+    BIT_STRING_rfill.h
+    BIT_STRING_uper.h
+    BIT_STRING_xer.h
     constraints.h
     constr_CHOICE.h
+    constr_CHOICE_aper.h
+    constr_CHOICE_print.h
+    constr_CHOICE_rfill.h
+    constr_CHOICE_uper.h
+    constr_CHOICE_xer.h
     constr_SEQUENCE.h
+    constr_SEQUENCE_aper.h
     constr_SEQUENCE_OF.h
+    constr_SEQUENCE_OF_aper.h
+    constr_SEQUENCE_OF_uper.h
+    constr_SEQUENCE_OF_xer.h
+    constr_SEQUENCE_print.h
+    constr_SEQUENCE_rfill.h
+    constr_SEQUENCE_uper.h
+    constr_SEQUENCE_xer.h
     constr_SET_OF.h
+    constr_SET_OF_aper.h
+    constr_SET_OF_print.h
+    constr_SET_OF_rfill.h
+    constr_SET_OF_uper.h
+    constr_SET_OF_xer.h
     constr_TYPE.h
     INTEGER.h
+    INTEGER_aper.h
+    INTEGER_print.h
+    INTEGER_rfill.h
+    INTEGER_uper.h
+    INTEGER_xer.h 
     NativeEnumerated.h
+    NativeEnumerated_aper.h
+    NativeEnumerated_uper.h
+    NativeEnumerated_xer.h
     NativeInteger.h
+    NativeInteger_aper.h
+    NativeInteger_print.h 
+    NativeInteger_rfill.h
+    NativeInteger_xer.h
+    NativeInteger_uper.h
     NULL.h
+    NULL_aper.h
+    NULL_print.h
+    NULL_rfill.h 
+    NULL_uper.h
+    NULL_xer.h
     OBJECT_IDENTIFIER.h
+    OBJECT_IDENTIFIER_print.h
+    OBJECT_IDENTIFIER_rfill.h
+    OBJECT_IDENTIFIER_xer.h
     OCTET_STRING.h
+    OCTET_STRING_aper.h 
+    OCTET_STRING_print.h
+    OCTET_STRING_rfill.h
+    OCTET_STRING_uper.h
+    OCTET_STRING_xer.h
     OPEN_TYPE.h
-    aper_decoder.h
-    aper_encoder.h
-    aper_opentype.h
-    aper_support.h
+    OPEN_TYPE_aper.h
+    OPEN_TYPE_uper.h
+    OPEN_TYPE_xer.h
+    per_encoder.h
+    per_opentype.h
     VisibleString.h
     xer_decoder.h
     xer_encoder.h
@@ -1643,5 +1754,8 @@ set(xnap_headers
     XNAP_XnUAddressIndication.h
     XNAP_XnUAddressInfoperPDUSession-Item.h
     XNAP_XnUAddressInfoperPDUSession-List.h
+    uper_encoder.h
+    uper_opentype.h
+    uper_support.h
 )
 

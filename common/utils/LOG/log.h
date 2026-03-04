@@ -162,6 +162,7 @@ static const char *const flag_name[] = {FOREACH_FLAG(FLAG_TEXT) ""};
   COMP_DEF(USIM, log)           \
   COMP_DEF(F1U, )               \
   COMP_DEF(X2AP, )              \
+  COMP_DEF(XNAP, )              \
   COMP_DEF(M2AP, )              \
   COMP_DEF(M3AP, )              \
   COMP_DEF(NGAP, )              \
