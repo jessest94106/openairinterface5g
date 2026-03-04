@@ -993,7 +993,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
 
     int first_symb = 0, num_symb = 0;
     if (frame_parms->frame_type == TDD)
-      for (int symbol_count = 0; symbol_count < NR_NUMBER_OF_SYMBOLS_PER_SLOT; symbol_count++) {
+      for (int symbol_count = 0; symbol_count < NR_SYMBOLS_PER_SLOT; symbol_count++) {
         if (slot_conf[symbol_count].slot_config.value == 1) {
           if (num_symb == 0)
             first_symb = symbol_count;
@@ -1001,7 +1001,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
         }
       }
     else
-      num_symb = NR_NUMBER_OF_SYMBOLS_PER_SLOT;
+      num_symb = NR_SYMBOLS_PER_SLOT;
     gNB_I0_measurements(gNB, slot_rx, first_symb, num_symb, rb_mask_ul);
   }
 

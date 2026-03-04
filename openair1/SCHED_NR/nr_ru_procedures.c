@@ -157,7 +157,7 @@ void nr_feptx_ofdm(RU_t *ru,int frame_tx,int tti_tx)
   if (nr_slot_select(cfg,frame_tx,slot) == NR_UPLINK_SLOT)
     return;
 
-  nr_feptx0(ru,slot,0,NR_NUMBER_OF_SYMBOLS_PER_SLOT,aa);
+  nr_feptx0(ru, slot, 0, NR_SYMBOLS_PER_SLOT, aa);
 
   LOG_D(PHY,
         "feptx_ofdm (TXPATH): frame %d, slot %d: txp (time %p) %d dB, txp (freq) %d dB\n",

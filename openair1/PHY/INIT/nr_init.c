@@ -435,8 +435,8 @@ void init_nr_transport(PHY_VARS_gNB *gNB)
                             fp->slots_per_frame;
   int nb_ul_slots_period = 0;
   if (cfg->cell_config.frame_duplex_type.value) {
-    for(int i=0; i<nb_slots_per_period; i++) {
-      for(int j=0; j<NR_NUMBER_OF_SYMBOLS_PER_SLOT; j++) {
+    for(int i = 0; i < nb_slots_per_period; i++) {
+      for(int j = 0; j < NR_SYMBOLS_PER_SLOT; j++) {
         if(cfg->tdd_table.max_tdd_periodicity_list[i].max_num_of_symbol_per_slot_list[j].slot_config.value == 1) { // UL symbol
           nb_ul_slots_period++;
           break;

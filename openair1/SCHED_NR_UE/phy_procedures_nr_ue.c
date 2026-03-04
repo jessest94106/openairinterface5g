@@ -304,10 +304,10 @@ static void configure_srs_info(fapi_nr_ul_config_srs_pdu *srs_config_pdu, nr_srs
 *
 *********************************************************************/
 bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
-                                 const UE_nr_rxtx_proc_t *proc,
-                                 c16_t **txdataF,
-                                 nr_phy_data_tx_t *phy_data,
-                                 bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT])
+                          const UE_nr_rxtx_proc_t *proc,
+                          c16_t **txdataF,
+                          nr_phy_data_tx_t *phy_data,
+                          bool was_symbol_used[NR_SYMBOLS_PER_SLOT])
 {
   if(phy_data->srs_vars.active == false) {
     return false;
@@ -383,7 +383,7 @@ void phy_procedures_nrUE_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, n
     txdataF[i] = &txdataF_buf[i * samplesF_per_slot];
 
   LOG_D(PHY,"****** start TX-Chain for AbsSubframe %d.%d ******\n", frame_tx, slot_tx);
-  bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
+  bool was_symbol_used[NR_SYMBOLS_PER_SLOT] = {0};
 
   start_meas_nr_ue_phy(ue, PHY_PROC_TX);
 

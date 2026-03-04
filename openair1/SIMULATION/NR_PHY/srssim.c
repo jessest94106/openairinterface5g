@@ -496,7 +496,7 @@ int main(int argc, char *argv[])
   proc.frame_tx = frame;
   proc.nr_slot_tx = slot;
   proc.nr_slot_rx = slot;
-  bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
+  bool was_symbol_used[NR_SYMBOLS_PER_SLOT] = {0};
   int slot_offset = get_samples_slot_timestamp(fp, slot);
   uint16_t ofdm_symbol_size = fp->ofdm_symbol_size;
   int slot_offsetF = (slot % RU_RX_SLOT_DEPTH) * fp->symbols_per_slot * ofdm_symbol_size;
