@@ -517,6 +517,17 @@ add_library(x2ap
 target_link_libraries(x2ap PUBLIC asn1_x2ap)
 target_link_libraries(x2ap PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
 
+#XNAP
+##############
+set(XNAP_DIR ${OPENAIR2_DIR}/XNAP)
+add_library(xnap
+  ${XNAP_DIR}/xnap_common.c
+ )
+target_include_directories(xnap PUBLIC XNAP_DIR)
+target_link_libraries(xnap PUBLIC asn1_xnap)
+target_link_libraries(xnap PRIVATE nr_rrc xnap_lib)
+target_include_directories(xnap PRIVATE ${XNAP_DIR}/lib)
+
 # F1AP
 ##############
 set(F1AP_DIR ${OPENAIR2_DIR}/F1AP)
