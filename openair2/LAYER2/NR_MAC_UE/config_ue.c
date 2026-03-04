@@ -537,16 +537,15 @@ static void config_common_ue(NR_UE_MAC_INST_t *mac, NR_ServingCellConfigCommon_t
 
   // SSB Table config
   if (frequencyInfoDL && frequencyInfoDL->absoluteFrequencySSB) {
-    int scs_scaling = 1 << (cfg->ssb_config.scs_common);
-    if (frequencyInfoDL->absoluteFrequencyPointA < 600000)
-      scs_scaling = scs_scaling * 3;
-    if (frequencyInfoDL->absoluteFrequencyPointA > 2016666)
-      scs_scaling = scs_scaling >> 2;
-    uint32_t absolute_diff = (*frequencyInfoDL->absoluteFrequencySSB - frequencyInfoDL->absoluteFrequencyPointA);
-    cfg->ssb_table.ssb_offset_point_a = absolute_diff / (12 * scs_scaling) - 10;
+    cfg->ssb_table.ssb_offset_point_a = get_ssb_offset_to_pointA(*frequencyInfoDL->absoluteFrequencySSB,
+                                                                 frequencyInfoDL->absoluteFrequencyPointA,
+                                                                 cfg->ssb_config.scs_common,
+                                                                 mac->frequency_range);
     cfg->ssb_table.ssb_period = *scc->ssb_periodicityServingCell;
     // NSA -> take ssb offset from SCS
-    cfg->ssb_table.ssb_subcarrier_offset = absolute_diff % (12 * scs_scaling);
+    cfg->ssb_table.ssb_subcarrier_offset = get_ssb_subcarrier_offset(*frequencyInfoDL->absoluteFrequencySSB,
+                                                                     frequencyInfoDL->absoluteFrequencyPointA,
+                                                                     cfg->ssb_config.scs_common);
     cfg->ssb_table.ssb_case = set_ssb_case(*scc->ssbSubcarrierSpacing, mac->nr_band);
   }
 
@@ -2107,18 +2106,24 @@ static void handle_reconfiguration_with_sync(NR_UE_MAC_INST_t *mac,
       configure_common_BWP_dl(mac, bwp_id, scc->downlinkConfigCommon->initialDownlinkBWP);
     if (scc->uplinkConfigCommon)
       configure_common_BWP_ul(mac, bwp_id, scc->uplinkConfigCommon->initialUplinkBWP);
+
+    // Update PDCCH config as MAC configuration has changed
+    if (IS_SA_MODE(get_softmodem_params()))
+      update_pdcch_config(mac);
   }
 
   mac->state = UE_NOT_SYNC_RECONF;
   ra->ra_state = nrRA_UE_IDLE;
   nr_ue_mac_default_configs(mac);
 
+  // PHY CONFIG request should be sent, ahead of SYNC request
+  // As SYNC request processes the new config
+  mac->if_module->phy_config_request(&mac->phy_config);
+  mac->phy_config.config_req.ntn_config.params_changed = false;
   mac->synch_request.Mod_id = mac->ue_id;
   mac->synch_request.CC_id = cc_idP;
   mac->synch_request.synch_req.target_Nid_cell = mac->physCellId;
   mac->if_module->synch_request(&mac->synch_request);
-  mac->if_module->phy_config_request(&mac->phy_config);
-  mac->phy_config.config_req.ntn_config.params_changed = false;
 }
 
 static void configure_physicalcellgroup(NR_UE_MAC_INST_t *mac,

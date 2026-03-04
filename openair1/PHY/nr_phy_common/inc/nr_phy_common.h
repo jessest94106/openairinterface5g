@@ -389,4 +389,9 @@ void nr_generate_csi_rs(const NR_DL_FRAME_PARMS *frame_parms,
                         const uint8_t cdm_type,
                         c16_t **dataF);
 
+int nr_get_ssb_start_sc(int scs,
+                        int ssb_offset_point_a,
+                        int ssb_sco,
+                        frequency_range_t freq_range);
+
 #endif
