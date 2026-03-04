@@ -77,19 +77,19 @@ void sl_set_tdd_config_nr_ue(fapi_nr_tdd_table_t *tdd_table,
 
   for(int memory_alloc = 0 ; memory_alloc < nb_slots_per_period; memory_alloc++)
     tdd_table->max_tdd_periodicity_list[memory_alloc].max_num_of_symbol_per_slot_list =
-      (fapi_nr_max_num_of_symbol_per_slot_t *) malloc(NR_NUMBER_OF_SYMBOLS_PER_SLOT*sizeof(fapi_nr_max_num_of_symbol_per_slot_t));
+      (fapi_nr_max_num_of_symbol_per_slot_t *) malloc(NR_SYMBOLS_PER_SLOT*sizeof(fapi_nr_max_num_of_symbol_per_slot_t));
 
   int slot_number = (nb_slots_per_period - nrofUplinkSlots) - (nrofUplinkSymbols ? 1 : 0);
   if (nrofUplinkSymbols != 0) {
-    for(int number_of_symbol = NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofUplinkSymbols; number_of_symbol < NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
+    for(int number_of_symbol = NR_SYMBOLS_PER_SLOT - nrofUplinkSymbols; number_of_symbol < NR_SYMBOLS_PER_SLOT; number_of_symbol++) {
       tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol].slot_config = 1;
     }
     slot_number++;
   }
   while(slot_number < nb_slots_per_period) {
-    for (int number_of_symbol = 0; number_of_symbol < nrofUplinkSlots * NR_NUMBER_OF_SYMBOLS_PER_SLOT; number_of_symbol++) {
-      tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol%NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config = 1;
-      if((number_of_symbol + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0)
+    for (int number_of_symbol = 0; number_of_symbol < nrofUplinkSlots * NR_SYMBOLS_PER_SLOT; number_of_symbol++) {
+      tdd_table->max_tdd_periodicity_list[slot_number].max_num_of_symbol_per_slot_list[number_of_symbol%NR_SYMBOLS_PER_SLOT].slot_config = 1;
+      if((number_of_symbol + 1) % NR_SYMBOLS_PER_SLOT == 0)
         slot_number++;
     }
   }

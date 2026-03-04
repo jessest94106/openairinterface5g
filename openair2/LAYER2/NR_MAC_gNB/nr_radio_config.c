@@ -1145,7 +1145,7 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
     int nb_slots_per_period = ((1 << mu) * 10) / nb_periods_per_frame;
 
     // make TDA for the mixed slot
-    long mixed_sliv = get_SLIV(NR_NUMBER_OF_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1);
+    long mixed_sliv = get_SLIV(NR_SYMBOLS_PER_SLOT - ul_symb, ul_symb - 1);
     int mixed_min_ul_symb = 3; // need at least two symbols PUSCH + PUCCH
     bool has_ul_mixed = ul_symb >= mixed_min_ul_symb;
     if (has_ul_mixed && (k2 <= N_dl1 || (p2 && N_ul2 == 0))) {

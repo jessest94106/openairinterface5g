@@ -227,7 +227,7 @@ void nr_ofdm_demod_and_rx_rotation(c16_t **rxdata,
                                    int slot,
                                    int slot_offsetF,
                                    enum nr_Link linktype,
-                                   bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT])
+                                   bool was_symbol_used[NR_SYMBOLS_PER_SLOT])
 {
   for (int aa = 0; aa < nb_antennas; aa++) {
     for (uint8_t symbol = 0; symbol < fp->symbols_per_slot; symbol++) {

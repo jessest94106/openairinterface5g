@@ -74,9 +74,8 @@ void set_tdd_config_nr(nfapi_nr_config_request_scf_t *cfg, frame_structure_t *fs
   cfg->tdd_table.max_tdd_periodicity_list = calloc_or_fail(nb_slots_to_set, sizeof(nfapi_nr_max_tdd_periodicity_t));
   for (int slot = 0; slot < nb_slots_to_set; slot++) {
     nfapi_nr_max_tdd_periodicity_t *p_list = &cfg->tdd_table.max_tdd_periodicity_list[slot];
-    p_list->max_num_of_symbol_per_slot_list =
-        calloc_or_fail(NR_NUMBER_OF_SYMBOLS_PER_SLOT, sizeof(*p_list->max_num_of_symbol_per_slot_list));
-    for (int sym = 0; sym < NR_NUMBER_OF_SYMBOLS_PER_SLOT; sym++) {
+    p_list->max_num_of_symbol_per_slot_list = calloc_or_fail(NR_SYMBOLS_PER_SLOT, sizeof(*p_list->max_num_of_symbol_per_slot_list));
+    for (int sym = 0; sym < NR_SYMBOLS_PER_SLOT; sym++) {
       // for each symbol, assign the TLV tag for usage when packing
       p_list->max_num_of_symbol_per_slot_list[sym].slot_config.tl.tag = NFAPI_NR_CONFIG_SLOT_CONFIG_TAG;
     }
@@ -89,9 +88,9 @@ void set_tdd_config_nr(nfapi_nr_config_request_scf_t *cfg, frame_structure_t *fs
     nfapi_nr_max_tdd_periodicity_t *list = &cfg->tdd_table.max_tdd_periodicity_list[slot_number];
     // FULL DOWNLINK SLOTS
     if (tdd_slot_bitmap[slot_index].slot_type == TDD_NR_DOWNLINK_SLOT) {
-      for (int sym = 0; sym < NR_NUMBER_OF_SYMBOLS_PER_SLOT; sym++) {
-        list->max_num_of_symbol_per_slot_list[sym % NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config.value = 0;
-        if ((sym + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0) {
+      for (int sym = 0; sym < NR_SYMBOLS_PER_SLOT; sym++) {
+        list->max_num_of_symbol_per_slot_list[sym % NR_SYMBOLS_PER_SLOT].slot_config.value = 0;
+        if ((sym + 1) % NR_SYMBOLS_PER_SLOT == 0) {
           slot_number++;
           list += 1;
         }
@@ -101,7 +100,7 @@ void set_tdd_config_nr(nfapi_nr_config_request_scf_t *cfg, frame_structure_t *fs
     if (tdd_slot_bitmap[slot_index].slot_type == TDD_NR_MIXED_SLOT) {
       int nrofDLSymbolsInSlot = tdd_slot_bitmap[slot_index].num_dl_symbols;
       int nrofULSymbolsInSlot = tdd_slot_bitmap[slot_index].num_ul_symbols;
-      AssertFatal(nrofDLSymbolsInSlot + nrofULSymbolsInSlot < NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+      AssertFatal(nrofDLSymbolsInSlot + nrofULSymbolsInSlot < NR_SYMBOLS_PER_SLOT,
                   "illegal symbol configuration DL %d, UL %d\n",
                   nrofDLSymbolsInSlot,
                   nrofULSymbolsInSlot);
@@ -110,11 +109,11 @@ void set_tdd_config_nr(nfapi_nr_config_request_scf_t *cfg, frame_structure_t *fs
         list->max_num_of_symbol_per_slot_list[sym].slot_config.value = 0;
       }
       // Flexible Symbols
-      for (int sym = nrofDLSymbolsInSlot; sym < NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofULSymbolsInSlot; sym++) {
+      for (int sym = nrofDLSymbolsInSlot; sym < NR_SYMBOLS_PER_SLOT - nrofULSymbolsInSlot; sym++) {
         list->max_num_of_symbol_per_slot_list[sym].slot_config.value = 2;
       }
       // UL Symbols
-      for (int sym = NR_NUMBER_OF_SYMBOLS_PER_SLOT - nrofULSymbolsInSlot; sym < NR_NUMBER_OF_SYMBOLS_PER_SLOT; sym++) {
+      for (int sym = NR_SYMBOLS_PER_SLOT - nrofULSymbolsInSlot; sym < NR_SYMBOLS_PER_SLOT; sym++) {
         list->max_num_of_symbol_per_slot_list[sym].slot_config.value = 1;
       }
       slot_number++;
@@ -122,9 +121,9 @@ void set_tdd_config_nr(nfapi_nr_config_request_scf_t *cfg, frame_structure_t *fs
     }
     // FULL UPLINK SLOTS
     if (tdd_slot_bitmap[slot_index].slot_type == TDD_NR_UPLINK_SLOT) {
-      for (int sym = 0; sym < NR_NUMBER_OF_SYMBOLS_PER_SLOT; sym++) {
-        list->max_num_of_symbol_per_slot_list[sym % NR_NUMBER_OF_SYMBOLS_PER_SLOT].slot_config.value = 1;
-        if ((sym + 1) % NR_NUMBER_OF_SYMBOLS_PER_SLOT == 0) {
+      for (int sym = 0; sym < NR_SYMBOLS_PER_SLOT; sym++) {
+        list->max_num_of_symbol_per_slot_list[sym % NR_SYMBOLS_PER_SLOT].slot_config.value = 1;
+        if ((sym + 1) % NR_SYMBOLS_PER_SLOT == 0) {
           slot_number++;
           list += 1;
         }
@@ -134,14 +133,14 @@ void set_tdd_config_nr(nfapi_nr_config_request_scf_t *cfg, frame_structure_t *fs
   // Dump 1 period on the output
   for (int s = 0; s < fs->numb_slots_period; s++) {
     if (tdd_slot_bitmap[s].slot_type == TDD_NR_MIXED_SLOT) {
-      char flexi_slot[NR_NUMBER_OF_SYMBOLS_PER_SLOT + 1];
+      char flexi_slot[NR_SYMBOLS_PER_SLOT + 1];
       memset(flexi_slot, 0, sizeof(flexi_slot));
-      for (int symb = 0; symb < NR_NUMBER_OF_SYMBOLS_PER_SLOT; symb++) {
+      for (int symb = 0; symb < NR_SYMBOLS_PER_SLOT; symb++) {
         uint8_t val = cfg->tdd_table.max_tdd_periodicity_list[s].max_num_of_symbol_per_slot_list[symb].slot_config.value;
         char *symb_type_s[] = {"D", "U", "F"};
         flexi_slot[symb] = *symb_type_s[val];
       }
-      flexi_slot[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = '\0';
+      flexi_slot[NR_SYMBOLS_PER_SLOT] = '\0';
       LOG_I(NR_PHY, "TDD period configuration: slot %d is FLEXIBLE: %s\n", s, flexi_slot);
     } else {
       LOG_I(NR_PHY,
@@ -163,25 +162,25 @@ int nr_slot_select(const nfapi_nr_config_request_scf_t *cfg, int nr_frame, int n
     return (NR_UPLINK_SLOT | NR_DOWNLINK_SLOT);
   }
 
-  for (int symbol_count = 0; symbol_count < NR_NUMBER_OF_SYMBOLS_PER_SLOT; symbol_count++) {
+  for (int symbol_count = 0; symbol_count < NR_SYMBOLS_PER_SLOT; symbol_count++) {
     if (cfg->tdd_table.max_tdd_periodicity_list[nr_slot].max_num_of_symbol_per_slot_list[symbol_count].slot_config.value == 1) {
       check_slot++;
     }
   }
 
-  if (check_slot == NR_NUMBER_OF_SYMBOLS_PER_SLOT) {
+  if (check_slot == NR_SYMBOLS_PER_SLOT) {
     return (NR_UPLINK_SLOT);
   }
 
   check_slot = 0;
 
-  for (int symbol_count = 0; symbol_count < NR_NUMBER_OF_SYMBOLS_PER_SLOT; symbol_count++) {
+  for (int symbol_count = 0; symbol_count < NR_SYMBOLS_PER_SLOT; symbol_count++) {
     if (cfg->tdd_table.max_tdd_periodicity_list[nr_slot].max_num_of_symbol_per_slot_list[symbol_count].slot_config.value == 0) {
       check_slot++;
     }
   }
 
-  if (check_slot == NR_NUMBER_OF_SYMBOLS_PER_SLOT) {
+  if (check_slot == NR_SYMBOLS_PER_SLOT) {
     return (NR_DOWNLINK_SLOT);
   } else {
     return (NR_MIXED_SLOT);

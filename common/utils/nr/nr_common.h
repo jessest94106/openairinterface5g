@@ -84,8 +84,8 @@ static inline const char *rnti_types(nr_rnti_type_t rr)
 
 #define MU_SCS(m) (15 << m)
 #define MAX_GSCN_BAND 620 // n78 has the highest GSCN range of 619
-#define NR_NUMBER_OF_SYMBOLS_PER_SLOT 14
-#define NR_NUMBER_OF_SYMBOLS_PER_SLOT_EXTENDED_CP 12
+#define NR_SYMBOLS_PER_SLOT 14
+#define NR_SYMBOLS_PER_SLOT_EXTENDED_CP 12
 #define NR_MAX_NB_LAYERS 4 // 8
 #define NR_MAX_CSI_PORTS 12
 

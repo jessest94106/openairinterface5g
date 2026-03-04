@@ -104,7 +104,7 @@ void nr_preprocessor_phytest(gNB_MAC_INST *mac, post_process_pdsch_t *pp_pdsch)
       const long band = *scc->downlinkConfigCommon->frequencyInfoDL->frequencyBandList.list.array[0];
       uint16_t ssb_start_symbol = get_ssb_start_symbol(band, scs, i_ssb);
       // select beam for PDSCH in current slot based on SSB beam
-      if ((ssb_start_symbol / NR_NUMBER_OF_SYMBOLS_PER_SLOT) == (slot % mac->frame_structure.numb_slots_period)) {
+      if ((ssb_start_symbol / NR_SYMBOLS_PER_SLOT) == (slot % mac->frame_structure.numb_slots_period)) {
         ssb_idx_beam = i_ssb;
         break;
       }
