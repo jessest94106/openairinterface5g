@@ -628,6 +628,27 @@ ID = LEGACY_X2AP_TRACE
     GROUP = ALL:LEGACY_X2AP:LEGACY_GROUP_TRACE:LEGACY
     FORMAT = string,log
 
+ID = LEGACY_XNAP_INFO
+    DESC = XNAP legacy logs - info level
+    GROUP = ALL:LEGACY_XNAP:LEGACY_GROUP_INFO:LEGACY
+    FORMAT = string,log
+ID = LEGACY_XNAP_ERROR
+    DESC = XNAP legacy logs - error level
+    GROUP = ALL:LEGACY_XNAP:LEGACY_GROUP_ERROR:LEGACY
+    FORMAT = string,log
+ID = LEGACY_XNAP_WARNING
+    DESC = XNAP legacy logs - warning level
+    GROUP = ALL:LEGACY_XNAP:LEGACY_GROUP_WARNING:LEGACY
+    FORMAT = string,log
+ID = LEGACY_XNAP_DEBUG
+    DESC = XNAP legacy logs - debug level
+    GROUP = ALL:LEGACY_XNAP:LEGACY_GROUP_DEBUG:LEGACY
+    FORMAT = string,log
+ID = LEGACY_XNAP_TRACE
+    DESC = XNAP legacy logs - trace level
+    GROUP = ALL:LEGACY_XNAP:LEGACY_GROUP_TRACE:LEGACY
+    FORMAT = string,log
+
 ID = LEGACY_M2AP_INFO
     DESC = M2AP legacy logs - info level
     GROUP = ALL:LEGACY_M2AP:LEGACY_GROUP_INFO:LEGACY
