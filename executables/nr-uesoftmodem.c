@@ -240,6 +240,13 @@ static void trigger_deregistration(int sig)
   }
 }
 
+void *nrue_ru_start_thread(void *arg)
+{
+  (void)arg;
+  nrue_ru_start();
+  return NULL;
+}
+
 int NB_UE_INST = 1;
 configmodule_interface_t *uniqCfg = NULL;
 nrLDPC_coding_interface_t nrLDPC_coding_interface = {0};
@@ -450,7 +457,11 @@ int main(int argc, char **argv)
     load_module_shlib("imscope_record", NULL, 0, PHY_vars_UE_g[0][0]);
   }
 
-  nrue_ru_start();
+  // Launch a temporary high-priority thread to start the UE RU, ensuring radio library threads inherit this priority
+  pthread_t ru_start_thread;
+  threadCreate(&ru_start_thread, nrue_ru_start_thread, NULL, "ru_start_thread", -1, OAI_PRIORITY_RT_MAX);
+  int ret = pthread_join(ru_start_thread, NULL);
+  AssertFatal(ret == 0, "pthread_join error %d, errno %d (%s)\n", ret, errno, strerror(errno));
 
   for (int inst = 0; inst < NB_UE_INST; inst++) {
     LOG_I(PHY,"Intializing UE Threads for instance %d ...\n", inst);
