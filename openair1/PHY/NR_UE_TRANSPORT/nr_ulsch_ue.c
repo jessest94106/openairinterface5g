@@ -1603,19 +1603,19 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
   stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
 }
 
-uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
-                                    const NR_DL_FRAME_PARMS *frame_parms,
-                                    const uint8_t n_antenna_ports,
-                                    c16_t **txdataF,
-                                    c16_t **txdata,
-                                    uint32_t linktype,
-                                    bool was_symbol_used[NR_SYMBOLS_PER_SLOT],
-                                    bool no_phase_pre_comp)
+void nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
+                                 const NR_DL_FRAME_PARMS *frame_parms,
+                                 const uint8_t n_antenna_ports,
+                                 c16_t **txdataF,
+                                 c16_t **txdata,
+                                 uint32_t linktype,
+                                 bool was_symbol_used[NR_SYMBOLS_PER_SLOT],
+                                 bool no_phase_pre_comp)
 {
   int N_RB = (linktype == link_type_sl) ? frame_parms->N_RB_SL : frame_parms->N_RB_UL;
 
   if (!no_phase_pre_comp) {
-    for (int i = 0; i < NR_SYMBOLS_PER_SLOT; i++) {
+    for (int i = 0; i < frame_parms->symbols_per_slot; i++) {
       if (was_symbol_used[i] == false)
         continue;
       for (int ap = 0; ap < n_antenna_ports; ap++) {
@@ -1626,7 +1626,7 @@ uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
 
   for (int ap = 0; ap < n_antenna_ports; ap++) {
     if (frame_parms->Ncp == 1) { // extended cyclic prefix
-      for (int i = 0; i < NR_SYMBOLS_PER_SLOT_EXTENDED_CP; i++) {
+      for (int i = 0; i < frame_parms->symbols_per_slot; i++) {
         if (was_symbol_used[i] == false) {
           memset(&txdata[ap][(frame_parms->ofdm_symbol_size + frame_parms->nb_prefix_samples) * i],
                  0,
@@ -1641,11 +1641,7 @@ uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
                      CYCLIC_PREFIX);
       }
     } else { // normal cyclic prefix
-      nr_normal_prefix_mod(txdataF[ap], txdata[ap], NR_SYMBOLS_PER_SLOT, frame_parms, slot, was_symbol_used);
+      nr_normal_prefix_mod(txdataF[ap], txdata[ap], frame_parms->symbols_per_slot, frame_parms, slot, was_symbol_used);
     }
   }
-
-  ///////////
-  ////////////////////////////////////////////////////
-  return 0;
 }
