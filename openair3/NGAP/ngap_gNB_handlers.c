@@ -78,6 +78,8 @@ void ngap_handle_ng_setup_message(ngap_gNB_amf_data_t *amf_desc_p, int sctp_shut
         /* Decrease associated AMF number */
         amf_desc_p->ngap_gNB_instance->ngap_amf_associated_nb --;
       }
+      /* Release UE context and start reconnection process*/
+      ngap_release_ues_for_amf(amf_desc_p);
 
       /* If there are no more associated AMF, inform gNB app */
       if (amf_desc_p->ngap_gNB_instance->ngap_amf_associated_nb == 0) {
