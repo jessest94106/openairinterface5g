@@ -27,6 +27,7 @@
 | groot         | Groot                 | gNB (n77)            | B210 (30AD30F)                                        |
 | rocket        | Rocket                | gNB (n77)            | B210 (31F8010)                                        |
 | raspix        | Raspix                | COTS UE              | Quectel RM520N                                        |
+| jetson1-oai   | Jetson1-oai           | nrUE                 | USRP B210                                             |
 
 > **Note:** The available resources, and their current usage, is indicated here:
 > - [Lockable resources of jenkins-oai](https://jenkins-oai.eurecom.fr/lockable-resources/):
@@ -238,6 +239,10 @@ information on how the images are built.
   ~5G-NR
   - gracehopper1-oai
   - run channel simulation on CPU and GPU using test_channel_scalability
+- [RAN-SA-AERIAL-OAIUE-CN5G](https://jenkins-oai.eurecom.fr/job/RAN-SA-AERIAL-OAIUE-CN5G/)
+  ~5G-NR ~nrUE
+  - 5G-NR SA test setup: OAI VNF + PNF/NVIDIA CUBB on gracehopper1-oai + WNC RU, OAIUE on jetson1-oai + B210, OAI CN5G
+  - OpenShift cluster for CN deployment and container images for gNB and UE deployment
 
 ### RAN-CI-NSA-Trigger
 
