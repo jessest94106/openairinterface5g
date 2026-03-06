@@ -51,6 +51,8 @@ RUN apt-get update && \
        bison \
        flex \
        m4 \
+       # libzstd-dev for ClickHouse C++ library
+       libzstd-dev \
        # python3-pip for conf template generation
        python3-pip \
        wget \
