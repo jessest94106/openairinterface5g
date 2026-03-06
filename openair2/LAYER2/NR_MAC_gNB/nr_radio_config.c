@@ -1207,10 +1207,16 @@ static void set_dl_DataToUL_ACK(NR_PUCCH_Config_t *pucch_Config, int min_feedbac
   long *delay[8];
   for (int i = 0; i < 8; i++) {
     int curr_delay = i + min_feedback_time;
+    // dl-DataToUL-ACK SEQUENCE (SIZE (1..8)) OF INTEGER (0..15)
+    if (curr_delay > 15)
+      break;
     delay[i] = calloc(1,sizeof(*delay[i]));
     *delay[i] = curr_delay;
     asn1cSeqAdd(&pucch_Config->dl_DataToUL_ACK->list,delay[i]);
   }
+  AssertFatal(pucch_Config->dl_DataToUL_ACK->list.count > 0,
+              "Minimum feedback time too high %d, cannot set any dl_DataToUL_ACK value\n",
+              min_feedback_time);
 }
 
 // PUCCH resource set 0 for configuration with O_uci <= 2 bits and/or a positive or negative SR (section 9.2.1 of 38.213)
