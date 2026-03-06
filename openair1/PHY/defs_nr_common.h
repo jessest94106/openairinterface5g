@@ -156,9 +156,7 @@ typedef struct {
 } prach_list_t;
 void init_prach_list(prach_list_t *);
 
-typedef struct NR_DL_FRAME_PARMS NR_DL_FRAME_PARMS;
-
-struct NR_DL_FRAME_PARMS {
+typedef struct NR_DL_FRAME_PARMS_s {
   /// frequency range
   frequency_range_t freq_range;
   //  /// Placeholder to replace overlapping fields below
@@ -269,7 +267,7 @@ struct NR_DL_FRAME_PARMS {
   uint16_t tdd_slot_config;
   uint8_t tdd_period;
   bool print_ue_help_cmdline_log;
-};
+} NR_DL_FRAME_PARMS;
 
 // PRS config structures
 typedef struct {

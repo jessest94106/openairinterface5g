@@ -199,7 +199,7 @@ typedef struct {
 
 typedef nssai_t e1ap_nssai_t;
 
-typedef struct e1ap_net_config_t {
+typedef struct {
   net_ip_address_t CUUP_e1_ip_address;
   net_ip_address_t CUCP_e1_ip_address;
   uint16_t remotePortF1U;
@@ -230,7 +230,7 @@ typedef struct e1ap_cucp_setup_req_s {
   uint64_t transac_id;
 } e1ap_cucp_setup_req_t;
 
-typedef struct e1ap_register_req_t {
+typedef struct {
   e1ap_setup_req_t setup_req;
   e1ap_net_config_t net_config;
   uint32_t gnb_id; // unused in CU-UP, but might be necessary for some functionality, e.g., E2 agent
@@ -658,7 +658,7 @@ typedef struct e1ap_bearer_modif_resp_s {
 } e1ap_bearer_modif_resp_t;
 
 /* E1AP Connection Loss indication */
-typedef struct e1ap_lost_connection_t {
+typedef struct {
   int dummy;
 } e1ap_lost_connection_t;
 

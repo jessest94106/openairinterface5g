@@ -130,9 +130,8 @@ static int decode_SIB1( const protocol_ctxt_t *const ctxt_pP, const uint8_t eNB_
 
 static int decode_SIB1_MBMS( const protocol_ctxt_t *const ctxt_pP, const uint8_t eNB_index, const uint8_t rsrq, const uint8_t rsrp );
 
-typedef struct rrc_dcch_data_copy_t
-{
-    LTE_DL_DCCH_Message_t *dl_dcch_msg;
+typedef struct {
+  LTE_DL_DCCH_Message_t *dl_dcch_msg;
 } rrc_dcch_data_copy_t;
 
 static void rrc_ue_process_ueCapabilityEnquiry(const protocol_ctxt_t *const ctxt_pP,

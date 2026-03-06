@@ -80,12 +80,10 @@ typedef struct {
 
 } pnf_p7_rx_reassembly_queue_t;
 
+typedef struct pnf_p7_s {
+  nfapi_pnf_p7_config_t _public;
 
-struct pnf_p7_t {
-
-	nfapi_pnf_p7_config_t _public;
-
-	//private data
+  //private data
 	int p7_sock;
 
 	uint8_t terminate;
@@ -138,7 +136,7 @@ struct pnf_p7_t {
 	pnf_p7_stats_t stats;
 	pnf_p7_nr_stats_t nr_stats;
 
-};
+} pnf_p7_t;
 
 int pnf_p7_message_pump(pnf_p7_t* pnf_p7);
 int pnf_nr_p7_message_pump(pnf_p7_t* pnf_p7);

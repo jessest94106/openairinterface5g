@@ -25,7 +25,7 @@
 
 
 nr_bler_struct nr_bler_data[NR_NUM_MCS];
-slot_rnti_mcs_s slot_rnti_mcs[NUM_NFAPI_SLOT];
+slot_rnti_mcs_t slot_rnti_mcs[NUM_NFAPI_SLOT];
 void read_channel_param(const nfapi_nr_dl_tti_pdsch_pdu_rel15_t * pdu, int slot, int index)
 {
   if (pdu == NULL)

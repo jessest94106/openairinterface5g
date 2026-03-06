@@ -84,7 +84,7 @@
 /* 9.3.1.42 of 3GPP TS 38.473 - gNB-CU System Information */
 #define F1AP_MAX_NO_SIB_TYPES 32
 
-typedef struct f1ap_net_config_t {
+typedef struct f1ap_net_config_s {
   char *CU_f1_ip_address;
   char *DU_f1c_ip_address;
   char *DU_f1u_ip_address;
@@ -97,31 +97,31 @@ typedef struct f1ap_cp_tnl_s {
   uint16_t port;
 } f1ap_cp_tnl_t;
 
-typedef enum f1ap_mode_t { F1AP_MODE_TDD = 0, F1AP_MODE_FDD = 1 } f1ap_mode_t;
+typedef enum f1ap_mode_e { F1AP_MODE_TDD = 0, F1AP_MODE_FDD = 1 } f1ap_mode_t;
 
-typedef struct f1ap_nr_frequency_info_t {
+typedef struct f1ap_nr_frequency_info_s {
   uint32_t arfcn;
   int band;
 } f1ap_nr_frequency_info_t;
 
-typedef struct f1ap_transmission_bandwidth_t {
+typedef struct f1ap_transmission_bandwidth_s {
   uint8_t scs;
   uint16_t nrb;
 } f1ap_transmission_bandwidth_t;
 
-typedef struct f1ap_fdd_info_t {
+typedef struct f1ap_fdd_info_s {
   f1ap_nr_frequency_info_t ul_freqinfo;
   f1ap_nr_frequency_info_t dl_freqinfo;
   f1ap_transmission_bandwidth_t ul_tbw;
   f1ap_transmission_bandwidth_t dl_tbw;
 } f1ap_fdd_info_t;
 
-typedef struct f1ap_tdd_info_t {
+typedef struct f1ap_tdd_info_s {
   f1ap_nr_frequency_info_t freqinfo;
   f1ap_transmission_bandwidth_t tbw;
 } f1ap_tdd_info_t;
 
-typedef struct f1ap_served_cell_info_t {
+typedef struct f1ap_served_cell_info_s {
   // NR CGI (Mandatory)
   plmn_id_t plmn;
   uint64_t nr_cellid; // NR Global Cell Id
@@ -143,7 +143,7 @@ typedef struct f1ap_served_cell_info_t {
   int measurement_timing_config_len;
 } f1ap_served_cell_info_t;
 
-typedef struct f1ap_gnb_du_system_info_t {
+typedef struct f1ap_gnb_du_system_info_s {
   // MIB message (Mandatory)
   uint8_t *mib;
   int mib_length;
@@ -171,12 +171,12 @@ typedef struct f1ap_setup_req_s {
   } *cell;
 } f1ap_setup_req_t;
 
-typedef struct f1ap_du_register_req_t {
+typedef struct f1ap_du_register_req_s {
   f1ap_setup_req_t setup_req;
   f1ap_net_config_t net_config;
 } f1ap_du_register_req_t;
 
-typedef struct f1ap_sib_msg_t {
+typedef struct f1ap_sib_msg_s {
   /// RRC container with system information owned by gNB-CU
   uint8_t *SI_container;
   int SI_container_length;
@@ -260,7 +260,7 @@ typedef struct f1ap_gnb_cu_configuration_update_failure_s {
   uint16_t criticality_diagnostics; 
 } f1ap_gnb_cu_configuration_update_failure_t;
 
-typedef struct f1ap_cell_status_t {
+typedef struct f1ap_cell_status_s {
   // NR CGI
   plmn_id_t plmn;
   uint64_t nr_cellid; // NR Global Cell Id
@@ -372,7 +372,7 @@ typedef enum preemption_vulnerability_e {
   PREEMPTABLE,
 } preemption_vulnerability_t;
 
-typedef enum f1ap_rlc_mode_t { F1AP_RLC_MODE_AM, F1AP_RLC_MODE_UM_BIDIR, F1AP_RLC_UM_UNI_UL, F1AP_RLC_UM_UNI_DL } f1ap_rlc_mode_t;
+typedef enum f1ap_rlc_mode_e { F1AP_RLC_MODE_AM, F1AP_RLC_MODE_UM_BIDIR, F1AP_RLC_UM_UNI_UL, F1AP_RLC_UM_UNI_DL } f1ap_rlc_mode_t;
 
 typedef struct f1ap_cu_to_du_rrc_info_s {
   byte_array_t *cg_configinfo;
@@ -382,7 +382,7 @@ typedef struct f1ap_cu_to_du_rrc_info_s {
   byte_array_t *ho_prep_info;
 } f1ap_cu_to_du_rrc_info_t;
 
-typedef struct f1ap_du_to_cu_rrc_info_t {
+typedef struct f1ap_du_to_cu_rrc_info_s {
   byte_array_t cell_group_config;
   byte_array_t *meas_gap_config;
 } f1ap_du_to_cu_rrc_info_t;
@@ -412,28 +412,28 @@ typedef enum lower_layer_status_e {
   LOWER_LAYERS_RESUME,
 } lower_layer_status_t;
 
-typedef struct f1ap_srb_to_setup_t {
+typedef struct f1ap_srb_to_setup_s {
   int id;
 } f1ap_srb_to_setup_t;
 
-typedef struct f1ap_srb_setup_t {
+typedef struct f1ap_srb_setup_s {
   int id;
   int lcid;
 } f1ap_srb_setup_t;
 
 /// 9.3.1.52 Packet Error Rate
-typedef struct f1ap_per_t {
+typedef struct f1ap_per_s {
   uint8_t scalar;
   uint8_t exponent;
 } f1ap_per_t;
 
 // 9.3.1.49 Non-Dynamic 5QI Descriptor
-typedef struct f1ap_nondynamic_5qi_t {
+typedef struct f1ap_nondynamic_5qi_s {
   int fiveQI;
 } f1ap_nondynamic_5qi_t;
 
 // 9.3.1.47 Dynamic 5QI Descriptor
-typedef struct f1ap_dynamic_5qi_t {
+typedef struct f1ap_dynamic_5qi_s {
   int prio; /// QoS Priority Level
   int pdb; /// Packet Delay Budget
   f1ap_per_t per; /// Packet Error Rate
@@ -441,14 +441,14 @@ typedef struct f1ap_dynamic_5qi_t {
   int *avg_win; /// Averaging Window
 } f1ap_dynamic_5qi_t;
 
-typedef struct f1ap_arp_t {
+typedef struct f1ap_arp_s {
   uint16_t prio;
   preemption_capability_t preempt_cap;
   preemption_vulnerability_t preempt_vuln;
 } f1ap_arp_t;
 
 // 9.3.1.45 QoS Flow Level QoS Parameters
-typedef struct f1ap_qos_flow_param_t {
+typedef struct f1ap_qos_flow_param_s {
   fiveQI_t qos_type;
   union {
     f1ap_nondynamic_5qi_t nondyn;
@@ -458,13 +458,13 @@ typedef struct f1ap_qos_flow_param_t {
 } f1ap_qos_flow_param_t;
 
 // in 9.2.2.1 Flows Mapped to DRB Item
-typedef struct f1ap_drb_flows_mapped_t {
+typedef struct f1ap_drb_flows_mapped_s {
   int qfi;
   f1ap_qos_flow_param_t param;
 } f1ap_drb_flows_mapped_t;
 
 /// in 9.2.2.1 DRB Info in UE Context Setup Request
-typedef struct f1ap_drb_info_nr_t {
+typedef struct f1ap_drb_info_nr_s {
   f1ap_qos_flow_param_t drb_qos;
   nssai_t nssai;
   int flows_len;
@@ -473,7 +473,7 @@ typedef struct f1ap_drb_info_nr_t {
 
 typedef enum { F1AP_PDCP_SN_12B, F1AP_PDCP_SN_18B } f1ap_pdcp_sn_len_t;
 /// in 9.2.2.1 DRB to Be Setup Item IEs
-typedef struct f1ap_drb_to_setup_t {
+typedef struct f1ap_drb_to_setup_s {
   int id;
   enum { F1AP_QOS_CHOICE_EUTRAN, F1AP_QOS_CHOICE_NR } qos_choice;
   union {
@@ -487,14 +487,14 @@ typedef struct f1ap_drb_to_setup_t {
   f1ap_pdcp_sn_len_t *ul_pdcp_sn_len;
 } f1ap_drb_to_setup_t;
 
-typedef struct f1ap_drb_setup_t {
+typedef struct f1ap_drb_setup_s {
   int id;
   int *lcid;
   int up_dl_tnl_len;
   f1ap_up_tnl_t up_dl_tnl[2];
 } f1ap_drb_setup_t;
 
-typedef struct f1ap_drb_to_release_t {
+typedef struct f1ap_drb_to_release_s {
   int id;
 } f1ap_drb_to_release_t;
 
@@ -534,7 +534,7 @@ typedef struct f1ap_ue_context_setup_resp_s {
   f1ap_srb_setup_t *srbs;
 } f1ap_ue_context_setup_resp_t;
 
-typedef struct f1ap_ue_context_mod_req_t {
+typedef struct f1ap_ue_context_mod_req_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
 
@@ -565,7 +565,7 @@ typedef struct f1ap_ue_context_mod_req_t {
   lower_layer_status_t *status;
 } f1ap_ue_context_mod_req_t;
 
-typedef struct f1ap_ue_context_mod_resp {
+typedef struct f1ap_ue_context_mod_resp_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
 
@@ -586,7 +586,7 @@ typedef enum F1ap_Cause_e {
   F1AP_CAUSE_MISC,
 } f1ap_Cause_t;
 
-typedef struct f1ap_ue_context_modif_required_t {
+typedef struct f1ap_ue_context_modif_required_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
   du_to_cu_rrc_information_t *du_to_cu_rrc_information;
@@ -594,28 +594,28 @@ typedef struct f1ap_ue_context_modif_required_t {
   long cause_value;
 } f1ap_ue_context_modif_required_t;
 
-typedef struct f1ap_ue_context_modif_confirm_t {
+typedef struct f1ap_ue_context_modif_confirm_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
   uint8_t *rrc_container;
   int      rrc_container_length;
 } f1ap_ue_context_modif_confirm_t;
 
-typedef struct f1ap_ue_context_modif_refuse_t {
+typedef struct f1ap_ue_context_modif_refuse_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
   f1ap_Cause_t cause;
   long cause_value;
 } f1ap_ue_context_modif_refuse_t;
 
-typedef struct f1ap_ue_context_rel_req_t {
+typedef struct f1ap_ue_context_rel_req_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
   f1ap_Cause_t cause;
   long cause_value;
 } f1ap_ue_context_rel_req_t;
 
-typedef struct f1ap_ue_context_rel_cmd_t {
+typedef struct f1ap_ue_context_rel_cmd_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
   f1ap_Cause_t cause;
@@ -627,7 +627,7 @@ typedef struct f1ap_ue_context_rel_cmd_t {
   uint32_t *old_gNB_DU_ue_id; // if after reestablishment request
 } f1ap_ue_context_rel_cmd_t;
 
-typedef struct f1ap_ue_context_rel_cplt_t {
+typedef struct f1ap_ue_context_rel_cplt_s {
   uint32_t gNB_CU_ue_id;
   uint32_t gNB_DU_ue_id;
 } f1ap_ue_context_rel_cplt_t;
@@ -694,7 +694,7 @@ typedef struct {
   f1ap_paging_cell_item_t *cells;
 } f1ap_paging_t;
 
-typedef struct f1ap_lost_connection_t {
+typedef struct f1ap_lost_connection_s {
   int dummy;
 } f1ap_lost_connection_t;
 
@@ -703,12 +703,12 @@ typedef enum F1AP_ResetType_e {
   F1AP_RESET_PART_OF_F1_INTERFACE
 } f1ap_ResetType_t;
 
-typedef struct f1ap_ue_to_reset_t {
+typedef struct f1ap_ue_to_reset_s {
   uint32_t *gNB_CU_ue_id;
   uint32_t *gNB_DU_ue_id;
 } f1ap_ue_to_reset_t;
 
-typedef struct f1ap_reset_t {
+typedef struct f1ap_reset_s {
   uint64_t          transaction_id;
   f1ap_Cause_t      cause;
   long              cause_value;
@@ -717,7 +717,7 @@ typedef struct f1ap_reset_t {
   f1ap_ue_to_reset_t *ue_to_reset; // array of num_ue_to_reset elements
 } f1ap_reset_t;
 
-typedef struct f1ap_reset_ack_t {
+typedef struct f1ap_reset_ack_s {
   uint64_t transaction_id;
   int num_ue_to_reset;
   f1ap_ue_to_reset_t *ue_to_reset; // array of num_ue_to_reset elements

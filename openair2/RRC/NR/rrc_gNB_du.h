@@ -37,8 +37,8 @@ struct f1ap_served_cell_info_t;
 #include "f1ap_messages_types.h"
 #include "ngap_messages_types.h"
 
-void rrc_gNB_process_f1_setup_req(struct f1ap_setup_req_s *req, sctp_assoc_t assoc_id);
-void rrc_CU_process_f1_lost_connection(struct gNB_RRC_INST_s *rrc, struct f1ap_lost_connection_t *lc, sctp_assoc_t assoc_id);
+void rrc_gNB_process_f1_setup_req(f1ap_setup_req_t *req, sctp_assoc_t assoc_id);
+void rrc_CU_process_f1_lost_connection(struct gNB_RRC_INST_s *rrc, f1ap_lost_connection_t *lc, sctp_assoc_t assoc_id);
 void rrc_gNB_process_f1_du_configuration_update(struct f1ap_gnb_du_configuration_update_s *conf_up, sctp_assoc_t assoc_id);
 
 struct nr_rrc_du_container_t *get_du_for_ue(struct gNB_RRC_INST_s *rrc, uint32_t ue_id);

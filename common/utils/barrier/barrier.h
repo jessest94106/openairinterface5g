@@ -27,7 +27,7 @@
 typedef void (*callback_t)(void*);
 
 /// @brief This thread barrier allows modifying the maximum joins after it is initialized
-typedef struct dynamic_barrier_t {
+typedef struct {
   pthread_mutex_t barrier_lock;
   int completed_jobs;
   int max_joins;
