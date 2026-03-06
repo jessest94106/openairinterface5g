@@ -44,13 +44,6 @@ typedef struct {
   uint8_t area_code;
 } nr_channel_status;
 
-typedef struct nr_phy_channel_params_t {
-  uint16_t sfn_slot;
-  uint16_t message_id;
-  uint16_t nb_of_csi;
-  nr_channel_status csi[NR_NUM_LAYER];
-} nr_phy_channel_params_t;
-
 typedef struct {
   uint8_t slot;
   uint16_t rnti[MAX_NR_CHAN_PARAMS];
@@ -61,7 +54,7 @@ typedef struct {
   bool drop_flag[MAX_NR_CHAN_PARAMS];
   bool latest;
   uint8_t area_code;
-} slot_rnti_mcs_s;
+} slot_rnti_mcs_t;
 
 typedef struct {
   uint16_t length;

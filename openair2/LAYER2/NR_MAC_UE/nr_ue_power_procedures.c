@@ -59,7 +59,7 @@ static const int nb_symbols_excluding_dmrs[11][2][2]
 };
 
 // ∆MPR according to Table 6.2.2-3 38.101-1
-static float get_delta_mpr(uint16_t nr_band, frame_type_t frame_type, int scs, int channel_bandwidth, int n_prbs, int start_prb, int power_class)
+static float get_delta_mpr(uint16_t nr_band, frame_type_t frame_type, int scs, int channel_bandwidth, int power_class)
 {
   if (compare_relative_ul_channel_bw(nr_band, scs, channel_bandwidth, frame_type)) {
     if (power_class == 3) {
@@ -191,7 +191,7 @@ float nr_get_Pcmax(int p_Max,
     int delta_TC = 0;
 
     float MPR = get_mpr(Qm, N_RB_UL, is_transform_precoding, n_prbs, start_prb, power_class);
-    float delta_MPR = get_delta_mpr(nr_band, frame_type, scs, channel_bandwidth, n_prbs, start_prb, power_class);
+    float delta_MPR = get_delta_mpr(nr_band, frame_type, scs, channel_bandwidth, power_class);
     int A_MPR = 0; // TODO too complicated to implement for now (see 6.2.3 in 38.101-1)
     int delta_rx_SRS = 0; // TODO for SRS
     int P_MPR = 0; // to ensure compliance with applicable electromagnetic energy absorption requirements

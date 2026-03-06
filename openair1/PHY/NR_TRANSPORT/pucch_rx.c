@@ -1177,7 +1177,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
 
   uint64_t decodedPayload[nb_symbols];
   memset(decodedPayload,0,sizeof(decodedPayload));
-  uint8_t corr_dB;
+  int8_t corr_dB;
   int decoderState = 2;
   if (pucch2_levdB < gNB->measurements.n0_subband_power_avg_dB + (gNB->pucch0_thres / 10))
     decoderState = 1; // assuming missed detection, only attempt to decode for polar case (with CRC)
@@ -1371,68 +1371,4 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
   if (pucch_pdu->bit_len_csi_part2>0) {
     uci_pdu->pduBitmap|=8;
   }
-}
-
-void nr_dump_uci_stats(FILE *fd,PHY_VARS_gNB *gNB,int frame) {
-  int strpos = 0;
-  char output[16384];
-
-  for (int i = 0; i < MAX_MOBILES_PER_GNB; i++) {
-    NR_gNB_PHY_STATS_t *stats = &gNB->phy_stats[i];
-    if (!stats->active)
-      return;
-    NR_gNB_UCI_STATS_t *uci_stats = &stats->uci_stats;
-    if (uci_stats->pucch0_sr_trials > 0)
-      strpos += sprintf(output + strpos,
-                        "UCI %d RNTI %x: pucch0_sr_trials %d, pucch0_n00 %d dB, pucch0_n01 %d dB, pucch0_sr_thres %d dB, current "
-                        "pucch1_stat0 %d dB, current pucch1_stat1 %d dB, positive SR count %d\n",
-                        i,
-                        stats->rnti,
-                        uci_stats->pucch0_sr_trials,
-                        uci_stats->pucch0_n00,
-                        uci_stats->pucch0_n01,
-                        uci_stats->pucch0_sr_thres,
-                        dB_fixed(uci_stats->current_pucch0_sr_stat0),
-                        dB_fixed(uci_stats->current_pucch0_sr_stat1),
-                        uci_stats->pucch0_positive_SR);
-    if (uci_stats->pucch01_trials > 0)
-      strpos += sprintf(output + strpos,
-                        "UCI %d RNTI %x: pucch01_trials %d, pucch0_n00 %d dB, pucch0_n01 %d dB, pucch0_thres %d dB, current "
-                        "pucch0_stat0 %d dB, current pucch1_stat1 %d dB, pucch01_DTX %d\n",
-                        i,
-                        stats->rnti,
-                        uci_stats->pucch01_trials,
-                        uci_stats->pucch0_n01,
-                        uci_stats->pucch0_n01,
-                        uci_stats->pucch0_thres,
-                        dB_fixed(uci_stats->current_pucch0_stat0),
-                        dB_fixed(uci_stats->current_pucch0_stat1),
-                        uci_stats->pucch01_DTX);
-
-    if (uci_stats->pucch02_trials > 0)
-      strpos += sprintf(output + strpos,
-                        "UCI %d RNTI %x: pucch01_trials %d, pucch0_n00 %d dB, pucch0_n01 %d dB, pucch0_thres %d dB, current "
-                        "pucch0_stat0 %d dB, current pucch0_stat1 %d dB, pucch01_DTX %d\n",
-                        i,
-                        stats->rnti,
-                        uci_stats->pucch02_trials,
-                        uci_stats->pucch0_n00,
-                        uci_stats->pucch0_n01,
-                        uci_stats->pucch0_thres,
-                        dB_fixed(uci_stats->current_pucch0_stat0),
-                        dB_fixed(uci_stats->current_pucch0_stat1),
-                        uci_stats->pucch02_DTX);
-
-    if (uci_stats->pucch2_trials > 0)
-      strpos += sprintf(output + strpos,
-                        "UCI %d RNTI %x: pucch2_trials %d, pucch2_DTX %d\n",
-                        i,
-                        stats->rnti,
-                        uci_stats->pucch2_trials,
-                        uci_stats->pucch2_DTX);
-  }
-  if (fd)
-    fprintf(fd, "%s", output);
-  else
-    printf("%s", output);
 }

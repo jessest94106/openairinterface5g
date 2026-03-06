@@ -66,7 +66,6 @@ void nr_fill_sl_rx_indication(sl_nr_rx_indication_t *rx_ind,
                               uint8_t pdu_type,
                               PHY_VARS_NR_UE *ue,
                               uint16_t n_pdus,
-                              const UE_nr_rxtx_proc_t *proc,
                               void *typeSpecific,
                               uint16_t rx_slss_id)
 {
@@ -157,7 +156,7 @@ static int nr_ue_psbch_procedures(PHY_VARS_NR_UE *ue,
   }
 
   nr_fill_sl_indication(&sl_indication, &rx_ind, NULL, proc, ue, phy_data);
-  nr_fill_sl_rx_indication(&rx_ind, SL_NR_RX_PDU_TYPE_SSB, ue, number_pdus, proc, (void *)result, rx_slss_id);
+  nr_fill_sl_rx_indication(&rx_ind, SL_NR_RX_PDU_TYPE_SSB, ue, number_pdus, (void *)result, rx_slss_id);
 
   if (ue->if_inst && ue->if_inst->sl_indication)
     ue->if_inst->sl_indication(&sl_indication);
@@ -232,7 +231,7 @@ int psbch_pscch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr
     if (ue->no_timing_correction == 0 && psbchSuccess == 0) {
       LOG_D(NR_PHY, "start adjust sync slot = %d no timing %d\n", nr_slot_rx, ue->no_timing_correction);
       sampleShift =
-          nr_adjust_synch_ue(fp, ue, proc->gNB_id, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
+          nr_adjust_synch_ue(fp, ue, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
     }
 
     LOG_D(NR_PHY, "Doing N0 measurements in %s\n", __FUNCTION__);

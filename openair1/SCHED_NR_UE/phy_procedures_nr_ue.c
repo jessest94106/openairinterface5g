@@ -1066,7 +1066,6 @@ int pbch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_da
   TracyCZone(ctx, true);
   int frame_rx = proc->frame_rx;
   int nr_slot_rx = proc->nr_slot_rx;
-  int gNB_id = proc->gNB_id;
   NR_DL_FRAME_PARMS *fp = &ue->frame_parms;
   int sampleShift = INT_MAX;
   nr_ue_dlsch_init(phy_data->dlsch, NR_MAX_NB_LAYERS>4 ? 2:1, ue->max_ldpc_iterations);
@@ -1152,7 +1151,7 @@ int pbch_processing(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc, nr_phy_da
           if (ue->no_timing_correction == 0 && pbchSuccess == 0) {
             LOG_D(PHY,"start adjust sync slot = %d no timing %d\n", nr_slot_rx, ue->no_timing_correction);
             sampleShift =
-                nr_adjust_synch_ue(fp, ue, gNB_id, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
+                nr_adjust_synch_ue(fp, ue, fp->ofdm_symbol_size, dl_ch_estimates_time, frame_rx, nr_slot_rx, 16384);
           }
 
           if (get_nrUE_params()->cont_fo_comp && pbchSuccess == 0) {

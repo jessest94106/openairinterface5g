@@ -1120,7 +1120,7 @@ int main(int argc, char **argv)
         }
 
         start_meas(&gNB->phy_proc_tx);
-        phy_procedures_gNB_TX(gNB, &Sched_INFO->DL_req, &Sched_INFO->TX_req, &Sched_INFO->UL_dci_req, frame, slot, 1);
+        phy_procedures_gNB_TX(gNB, &Sched_INFO->DL_req, &Sched_INFO->TX_req, &Sched_INFO->UL_dci_req, frame, slot);
         stop_meas(&gNB->phy_proc_tx);
 
         int txdataF_offset = slot * frame_parms->samples_per_slot_wCP;

@@ -20,19 +20,16 @@
 
 #include "nfapi_vnf_interface.h"
 
-struct vnf_t
-{
+typedef struct vnf_s {
+  nfapi_vnf_config_t _public;
 
-	nfapi_vnf_config_t _public;
-
-	uint8_t terminate;
+  uint8_t terminate;
 	uint8_t sctp;
 
 	uint8_t tx_message_buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
-	uint16_t next_phy_id;
-	
-};
+  uint16_t next_phy_id;
 
+} vnf_t;
 
 int vnf_pack_and_send_p5_message(vnf_t* vnf, uint16_t p5_idx, nfapi_p4_p5_message_header_t* msg, uint16_t msg_len);
 

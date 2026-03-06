@@ -33,9 +33,7 @@
 #define SSS_NR_H
 
 #include "limits.h"
-#include "PHY/defs_nr_UE.h"
 #include "PHY/types.h"
-
 #include "pss_nr.h"
 
 /************** DEFINE ********************************************/

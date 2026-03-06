@@ -511,7 +511,7 @@ int main(int argc, char **argv)
   if (input_fd == NULL) {
     uint8_t ULSCH_ids[] = {0};
     nr_ulsch_pre_encoding(UE, ulsch_ue, 0, 0, &G, 1, ULSCH_ids);
-    nr_ulsch_encoding(UE, ulsch_ue, 0, 0, &G, 1, ULSCH_ids, 0);
+    nr_ulsch_encoding(UE, ulsch_ue, 0, 0, &G, 1, ULSCH_ids);
   }
   
   printf("\n");
@@ -609,7 +609,7 @@ int main(int argc, char **argv)
     free(gNB->gNB_config.tdd_table.max_tdd_periodicity_list[i].max_num_of_symbol_per_slot_list);
   free(gNB->gNB_config.tdd_table.max_tdd_periodicity_list);
 
-  term_nr_ue_signal(UE, 1);
+  term_nr_ue_signal(UE);
   free(UE);
 
   abortTpool(&gNB->threadPool);

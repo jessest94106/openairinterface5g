@@ -598,8 +598,7 @@ typedef struct {
   int non_mbsfn_SubframeConfig;
 } NonMBSFN_config_t;
 
-
-typedef struct LTE_DL_FRAME_PARMS {
+typedef struct LTE_DL_FRAME_PARMS_s {
   /// Number of resource blocks (RB) in DL
   uint8_t N_RB_DL;
   /// Number of resource blocks (RB) in UL

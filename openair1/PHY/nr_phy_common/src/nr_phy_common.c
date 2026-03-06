@@ -481,3 +481,26 @@ void nr_fo_compensation(double fo_Hz, int samples_per_ms, int sample_offset, con
   mult_complex_vectors(rxdata_in, rot, rxdata_out, size, 14);
 #endif
 }
+
+/*!
+* Setting the first subcarrier
+* 3GPP TS 38.211 sections 7.4.3.1 and 4.4.4.2
+* for FR1 offsetToPointA and k_SSB are expressed in terms of 15 kHz SCS
+* for FR2 offsetToPointA is expressed in terms of 60 kHz SCS and k_SSB expressed in terms of the SCS provided
+* by the higher-layer parameter subCarrierSpacingCommon
+*/
+int nr_get_ssb_start_sc(int scs, int ssb_offset_point_a, int ssb_sco, frequency_range_t freq_range)
+{
+  const int prb_offset =
+      (freq_range == FR1) ? ssb_offset_point_a >> scs : ssb_offset_point_a >> (scs - 2);
+  const int sc_offset =
+      (freq_range == FR1) ? ssb_sco >> scs : ssb_sco;
+
+  int ssb_start_subcarrier = (12 * prb_offset + sc_offset);
+
+  LOG_D(NR_PHY, "prb_offset:%d, ssb_subcarrier_offset:%d,scs :%d, Fr:%d, ssb_start_subcarrier:%d\n",
+                        prb_offset, ssb_sco, scs, freq_range, ssb_start_subcarrier);
+
+  return ssb_start_subcarrier;
+
+}
