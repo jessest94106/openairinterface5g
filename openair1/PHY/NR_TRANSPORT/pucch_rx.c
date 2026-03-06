@@ -1177,7 +1177,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
 
   uint64_t decodedPayload[nb_symbols];
   memset(decodedPayload,0,sizeof(decodedPayload));
-  uint8_t corr_dB;
+  int8_t corr_dB;
   int decoderState = 2;
   if (pucch2_levdB < gNB->measurements.n0_subband_power_avg_dB + (gNB->pucch0_thres / 10))
     decoderState = 1; // assuming missed detection, only attempt to decode for polar case (with CRC)
