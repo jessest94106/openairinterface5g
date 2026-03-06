@@ -470,8 +470,7 @@ void set_antenna_port_parameters(fapi_nr_dl_config_dlsch_pdu_rel15_t *dlsch_pdu,
 void ul_ports_config(NR_UE_MAC_INST_t *mac,
                      int *n_front_load_symb,
                      nfapi_nr_ue_pusch_pdu_t *pusch_config_pdu,
-                     dci_pdu_rel15_t *dci,
-                     nr_dci_format_t dci_format)
+                     dci_pdu_rel15_t *dci)
 {
   uint8_t rank = pusch_config_pdu->nrOfLayers;
   NR_PUSCH_Config_t *pusch_Config = mac->current_UL_BWP->pusch_Config;

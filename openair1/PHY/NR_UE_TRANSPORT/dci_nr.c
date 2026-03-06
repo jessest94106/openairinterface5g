@@ -324,7 +324,6 @@ static void nr_pdcch_detection_mrc(int nb_ant, int sz, c16_t rxdataF_comp[][sz])
 static void nr_rx_pdcch_symbol(PHY_VARS_NR_UE *ue,
                                const UE_nr_rxtx_proc_t *proc,
                                int symbol,
-                               int rel_symb_monOcc,
                                int ss_idx,
                                nr_phy_data_t *phy_data,
                                int llr_size_symbol,
@@ -430,12 +429,6 @@ int get_max_pdcch_monOcc(const NR_UE_PDCCH_CONFIG *phy_pdcch_config)
   return monOcc;
 }
 
-static void nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
-                                      const UE_nr_rxtx_proc_t *proc,
-                                      c16_t *pdcch_e_rx,
-                                      fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15,
-                                      fapi_nr_dci_indication_t *dci_ind);
-
 void set_first_last_pdcch_symb(const NR_UE_PDCCH_CONFIG *phy_pdcch_config, int *first_symb, int *last_symb)
 {
   *first_symb = NR_SYMBOLS_PER_SLOT; // max first pdcch symbol
@@ -478,7 +471,6 @@ void nr_pdcch_generate_llr(PHY_VARS_NR_UE *ue,
         nr_rx_pdcch_symbol(ue,
                            proc,
                            symbol,
-                           rel_symb_monOcc,
                            ss_idx,
                            phy_data,
                            llr_size_symbol,
@@ -487,64 +479,6 @@ void nr_pdcch_generate_llr(PHY_VARS_NR_UE *ue,
       }
     }
   }
-}
-
-/* Decode DCI from LLRs for each Search-Space and send to MAC */
-void nr_pdcch_dci_indication(const UE_nr_rxtx_proc_t *proc,
-                             int llr_size,
-                             int max_monOcc,
-                             PHY_VARS_NR_UE *ue,
-                             nr_phy_data_t *phy_data,
-                             c16_t llr[phy_data->phy_pdcch_config.nb_search_space][max_monOcc][llr_size])
-{
-  NR_UE_PDCCH_CONFIG *phy_pdcch_config = &phy_data->phy_pdcch_config;
-
-  nr_downlink_indication_t dl_indication;
-  fapi_nr_dci_indication_t dci_ind = {.SFN = proc->frame_rx, .slot = proc->nr_slot_rx};
-
-  for (int ss_idx = 0; ss_idx < phy_pdcch_config->nb_search_space; ss_idx++) {
-    fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15 = &phy_pdcch_config->pdcch_config[ss_idx];
-    uint8_t unused_start_symb[NR_SYMBOLS_PER_SLOT] = {0};
-    const int num_monitoring_occ = get_pdcch_mon_occasions_slot(rel15, unused_start_symb);
-    const int llr_stride = llr_size / rel15->coreset.duration;
-    int n_rb, cset_start;
-    get_coreset_rballoc(rel15->coreset.frequency_domain_resource, &n_rb, &cset_start);
-
-    for (int m = 0; m < num_monitoring_occ; m++) {
-      /// PDCCH/DCI e-sequence (input to rate matching).
-      c16_t pdcch_e_rx[NR_MAX_PDCCH_SIZE];
-
-      nr_pdcch_demapping_deinterleaving(n_rb,
-                                        llr[ss_idx][m],
-                                        pdcch_e_rx,
-                                        rel15->coreset.duration,
-                                        rel15->coreset.RegBundleSize,
-                                        rel15->coreset.InterleaverSize,
-                                        rel15->coreset.ShiftIndex,
-                                        rel15->number_of_candidates,
-                                        rel15->CCE,
-                                        rel15->L,
-                                        llr_stride);
-
-      nr_dci_decoding_procedure(ue, proc, pdcch_e_rx, rel15, &dci_ind);
-    }
-  }
-
-  for (int i = 0; i < dci_ind.number_of_dcis; i++) {
-    LOG_D(PHY,
-          "Frame.slot: %d.%d: DCI %i of %d total DCIs found --> rnti %x : format %d\n",
-          proc->frame_rx,
-          proc->nr_slot_rx,
-          i + 1,
-          dci_ind.number_of_dcis,
-          dci_ind.dci_list[i].rnti,
-          dci_ind.dci_list[i].dci_format);
-  }
-
-  /* Send to MAC */
-  nr_fill_dl_indication(&dl_indication, &dci_ind, NULL, proc, ue, phy_data);
-  ue->if_inst->dl_indication(&dl_indication);
-  phy_pdcch_config->nb_search_space = 0;
 }
 
 static void nr_pdcch_unscrambling(c16_t *e_rx,
@@ -566,8 +500,7 @@ static void nr_pdcch_unscrambling(c16_t *e_rx,
   }
 }
 
-static void nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
-                                      const UE_nr_rxtx_proc_t *proc,
+static void nr_dci_decoding_procedure(const UE_nr_rxtx_proc_t *proc,
                                       c16_t *pdcch_e_rx,
                                       fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15,
                                       fapi_nr_dci_indication_t *dci_ind)
@@ -658,4 +591,62 @@ static void nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
     }
     e_rx_cand_idx += RE_PER_RB_OUT_DMRS * L * 6; // e_rx index for next candidate (L CCEs, 6 REGs per CCE and 9 REs per REG )
   }
+}
+
+/* Decode DCI from LLRs for each Search-Space and send to MAC */
+void nr_pdcch_dci_indication(const UE_nr_rxtx_proc_t *proc,
+                             int llr_size,
+                             int max_monOcc,
+                             PHY_VARS_NR_UE *ue,
+                             nr_phy_data_t *phy_data,
+                             c16_t llr[phy_data->phy_pdcch_config.nb_search_space][max_monOcc][llr_size])
+{
+  NR_UE_PDCCH_CONFIG *phy_pdcch_config = &phy_data->phy_pdcch_config;
+
+  nr_downlink_indication_t dl_indication;
+  fapi_nr_dci_indication_t dci_ind = {.SFN = proc->frame_rx, .slot = proc->nr_slot_rx};
+
+  for (int ss_idx = 0; ss_idx < phy_pdcch_config->nb_search_space; ss_idx++) {
+    fapi_nr_dl_config_dci_dl_pdu_rel15_t *rel15 = &phy_pdcch_config->pdcch_config[ss_idx];
+    uint8_t unused_start_symb[NR_SYMBOLS_PER_SLOT] = {0};
+    const int num_monitoring_occ = get_pdcch_mon_occasions_slot(rel15, unused_start_symb);
+    const int llr_stride = llr_size / rel15->coreset.duration;
+    int n_rb, cset_start;
+    get_coreset_rballoc(rel15->coreset.frequency_domain_resource, &n_rb, &cset_start);
+
+    for (int m = 0; m < num_monitoring_occ; m++) {
+      /// PDCCH/DCI e-sequence (input to rate matching).
+      c16_t pdcch_e_rx[NR_MAX_PDCCH_SIZE];
+
+      nr_pdcch_demapping_deinterleaving(n_rb,
+                                        llr[ss_idx][m],
+                                        pdcch_e_rx,
+                                        rel15->coreset.duration,
+                                        rel15->coreset.RegBundleSize,
+                                        rel15->coreset.InterleaverSize,
+                                        rel15->coreset.ShiftIndex,
+                                        rel15->number_of_candidates,
+                                        rel15->CCE,
+                                        rel15->L,
+                                        llr_stride);
+
+      nr_dci_decoding_procedure(proc, pdcch_e_rx, rel15, &dci_ind);
+    }
+  }
+
+  for (int i = 0; i < dci_ind.number_of_dcis; i++) {
+    LOG_D(PHY,
+          "Frame.slot: %d.%d: DCI %i of %d total DCIs found --> rnti %x : format %d\n",
+          proc->frame_rx,
+          proc->nr_slot_rx,
+          i + 1,
+          dci_ind.number_of_dcis,
+          dci_ind.dci_list[i].rnti,
+          dci_ind.dci_list[i].dci_format);
+  }
+
+  /* Send to MAC */
+  nr_fill_dl_indication(&dl_indication, &dci_ind, NULL, proc, ue, phy_data);
+  ue->if_inst->dl_indication(&dl_indication);
+  phy_pdcch_config->nb_search_space = 0;
 }

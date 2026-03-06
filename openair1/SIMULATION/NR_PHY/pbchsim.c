@@ -654,7 +654,7 @@ int main(int argc, char **argv)
         nr_gscn_info_t gscnInfo[MAX_GSCN_BAND] = {0};
         const int numGscn = 1;
         gscnInfo[0].ssbFirstSC = frame_parms->ssb_start_subcarrier;
-        nr_initial_sync_t ret = nr_initial_sync(&proc, UE, 1, 0, gscnInfo, numGscn);
+        nr_initial_sync_t ret = nr_initial_sync(&proc, UE, 1, gscnInfo, numGscn);
         printf("nr_initial_sync1 returns %s\n", ret.cell_detected ? "cell detected" : "cell not detected");
         if (!ret.cell_detected)
           n_errors++;
@@ -761,7 +761,7 @@ int main(int argc, char **argv)
   free(RC.gNB[0]);
   free(RC.gNB);
 
-  term_nr_ue_signal(UE, 1);
+  term_nr_ue_signal(UE);
   free(UE);
 
   for (i=0; i<2; i++) {

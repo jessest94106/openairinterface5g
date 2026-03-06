@@ -159,8 +159,7 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
                       const uint8_t slot,
                       unsigned int *G,
                       int nb_ulsch,
-                      uint8_t *ULSCH_ids,
-                      uint16_t number_dmrs_symbols)
+                      uint8_t *ULSCH_ids)
 {
   start_meas_nr_ue_phy(ue, ULSCH_ENCODING_STATS);
 
