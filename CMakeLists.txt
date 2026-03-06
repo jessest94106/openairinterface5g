@@ -441,6 +441,7 @@ add_library(ngap
   ${NGAP_DIR}/ngap_gNB_overload.c
   ${NGAP_DIR}/ngap_gNB_trace.c
   ${NGAP_DIR}/ngap_gNB_ue_context.c
+  ${NGAP_DIR}/ngap_gNB_NRPPa_transport_procedures.c
   )
 target_link_libraries(ngap PUBLIC asn1_ngap)
 target_link_libraries(ngap PRIVATE asn1_lte_rrc_hdrs asn1_nr_rrc_hdrs)
@@ -1308,6 +1309,8 @@ set (GNB_APP_SRC
   ${OPENAIR2_DIR}/GNB_APP/gnb_app.c
   ${OPENAIR2_DIR}/E1AP/e1ap_setup.c
   ${OPENAIR2_DIR}/GNB_APP/gnb_config.c
+  ${OPENAIR2_DIR}/GNB_APP/gnb_config_common.c
+  ${OPENAIR2_DIR}/GNB_APP/gnb_config_ng.c
   )
 
 set (MCE_APP_SRC

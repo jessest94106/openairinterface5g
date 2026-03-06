@@ -121,8 +121,9 @@ The other SDRs (AW2S, LimeSDR, ...) have no READMEs.
 ## Testing
 
 - [UnitTests.md](./UnitTests.md) explains the unit testing setup
-- Component tests are under `tests/`. Currently, there is a simple CU-UP
-  tester, see the corresponding [README.md](../tests/nr-cuup/README.md).
+- Component tests are under `tests/`. Currently, the following component tests are supported
+  - A simple CU-UP tester, see the corresponding [README.md](../tests/nr-cuup/README.md).
+  - A CU-NRPPA tester, see the corresponding [README.md](../tests/nr-cu-nrppa/README.md).
 - [TESTBenches.md](./TESTBenches.md) lists the CI setup and links to pipelines
 - The CI setup uses a [custom framework](../ci-scripts/README.md) to run
   end-to-end tests.
