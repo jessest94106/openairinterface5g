@@ -94,6 +94,38 @@ uint32_t ngap_generate_gNB_id(void)
   return gNB_id;
 }
 
+static void ngap_gNB_redial_amf(ngap_gNB_amf_data_t *amf_desc_p)
+{
+  NGAP_INFO("AMF cnx_id = %u\n", amf_desc_p->cnx_id);
+  NGAP_INFO("AMF state  = %d\n", amf_desc_p->state);
+  /*reconnect with the amf */
+  MessageDef *message_p = itti_alloc_new_message(TASK_NGAP, 0, SCTP_NEW_ASSOCIATION_REQ);
+  sctp_new_association_req_t *req = &message_p->ittiMsg.sctp_new_association_req;
+
+  /*amf descriptor */
+  req->port = NGAP_PORT_NUMBER;
+  req->ppid = NGAP_SCTP_PPID;
+  req->in_streams = amf_desc_p->in_streams;
+  req->out_streams = amf_desc_p->out_streams;
+  req->ulp_cnx_id = amf_desc_p->cnx_id;
+
+  ngap_gNB_instance_t *inst = amf_desc_p->ngap_gNB_instance;
+
+  memcpy(&req->remote_address, &amf_desc_p->amf_s1_ip, sizeof(req->remote_address));
+  memcpy(&req->local_address, &inst->gNB_ng_ip, sizeof(req->local_address));
+
+  NGAP_INFO("[gNB %ld] Re-dial AMF cnx_id=%u (streams in=%u out=%u)\n",
+            inst->instance,
+            amf_desc_p->cnx_id,
+            req->in_streams,
+            req->out_streams);
+
+  inst->ngap_amf_nb++;
+  inst->ngap_amf_pending_nb++;
+
+  itti_send_msg_to_task(TASK_SCTP, inst->instance, message_p);
+}
+
 static void ngap_gNB_register_amf(ngap_gNB_instance_t *instance_p,
                                   net_ip_address_t    *amf_ip_address,
                                   net_ip_address_t    *local_ip_addr,
@@ -550,6 +582,15 @@ void *ngap_gNB_process_itti_msg(void *notUsed) {
       case SCTP_NEW_ASSOCIATION_RESP:
         ngap_gNB_handle_sctp_association_resp(instance, &received_msg->ittiMsg.sctp_new_association_resp);
         break;
+
+      case TIMER_HAS_EXPIRED: {
+        timer_has_expired_t *th = &received_msg->ittiMsg.timer_has_expired;
+        ngap_gNB_amf_data_t *amf_desc_p = (ngap_gNB_amf_data_t *)th->arg;
+        if (amf_desc_p) {
+          ngap_gNB_redial_amf(amf_desc_p);
+        }
+        break;
+      }
 
       case SCTP_DATA_IND:
         ngap_gNB_handle_sctp_data_ind(&received_msg->ittiMsg.sctp_data_ind);

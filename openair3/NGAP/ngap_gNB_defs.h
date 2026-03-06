@@ -161,6 +161,8 @@ struct ngap_gNB_instance_s;
 
 /* This structure describes association of a gNB to a AMF */
 typedef struct ngap_gNB_amf_data_s {
+  long t_reconnect; // ITTI timer id (or equivalent)
+
   /* AMF descriptors tree, ordered by sctp assoc id */
   RB_ENTRY(ngap_gNB_amf_data_s) entry;
 
