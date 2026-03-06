@@ -374,7 +374,7 @@ void nr_scan_ssb(void *arg)
                                                          &ssbInfo->pbchResult,
                                                          rxdataF); // start pbch detection at first symbol after pss
       if (ssbInfo->syncRes.cell_detected) {
-        uint32_t rsrp_avg = nr_ue_calculate_ssb_rsrp(ssbInfo->fp, ssbInfo->proc, rxdataF, 0, ssbInfo->gscnInfo.ssbFirstSC);
+        uint32_t rsrp_avg = nr_ue_calculate_ssb_rsrp(ssbInfo->fp, rxdataF, 0, ssbInfo->gscnInfo.ssbFirstSC);
         int rsrp_db_per_re = 10 * log10(rsrp_avg);
         ssbInfo->adjust_rxgain = TARGET_RX_POWER - rsrp_db_per_re;
         LOG_I(PHY, "pbch rx ok. rsrp:%d dB/RE, adjust_rxgain:%d dB\n", rsrp_db_per_re, ssbInfo->adjust_rxgain);
@@ -388,7 +388,6 @@ void nr_scan_ssb(void *arg)
 nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
                                   PHY_VARS_NR_UE *ue,
                                   int n_frames,
-                                  int sa,
                                   nr_gscn_info_t gscnInfo[MAX_GSCN_BAND],
                                   int numGscn)
 {

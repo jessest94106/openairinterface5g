@@ -33,23 +33,10 @@
 #ifndef DMRS_NR_H
 #define DMRS_NR_H
 
-#include "PHY/defs_nr_UE.h"
 #include "PHY/types.h"
 #include "PHY/NR_REFSIG/ss_pbch_nr.h"
 #include "PHY/NR_REFSIG/pss_nr.h"
 #include "PHY/NR_REFSIG/sss_nr.h"
-
-/************** CODE GENERATION ***********************************/
-
-/************** DEFINE ********************************************/
-
-
-/************* STRUCTURES *****************************************/
-
-
-/************** VARIABLES *****************************************/
-
-/************** FUNCTION ******************************************/
 
 int pseudo_random_sequence(int M_PN, uint32_t *c, uint32_t cinit);
 void lte_gold_new(LTE_DL_FRAME_PARMS *frame_parms, uint32_t lte_gold_table[20][2][14], uint16_t Nid_cell);

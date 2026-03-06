@@ -38,13 +38,8 @@ struct NR_MeasurementTimingConfiguration;
 struct NR_PDSCH_TimeDomainResourceAllocationList;
 
 // forward declaration of MAC configuration parameters, definition is included in C file
-struct nr_mac_config_t;
-typedef struct nr_mac_config_t nr_mac_config_t;
-
-struct nr_mac_timers;
+typedef struct nr_mac_config_s nr_mac_config_t;
 typedef struct nr_mac_timers nr_mac_timers_t;
-
-struct measgap_config;
 typedef struct measgap_config measgap_config_t;
 
 void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsch_TimeDomainAllocationList,

@@ -184,7 +184,7 @@ typedef enum {
   SSB_SINR,
 } nr_config_report_type_t;
 
-typedef struct nr_mac_config_t {
+typedef struct nr_mac_config_s {
   nr_pdsch_AntennaPorts_t pdsch_AntennaPorts;
   int pusch_AntennaPorts;
   int minRXTXTIME;
@@ -855,7 +855,7 @@ typedef struct gNB_MAC_INST_s gNB_MAC_INST;
 typedef void (*nr_pp_impl_dl)(gNB_MAC_INST *nr_mac, post_process_pdsch_t *pp_pdsch);
 typedef void (*nr_pp_impl_ul)(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp_pusch);
 
-typedef struct f1_config_t {
+typedef struct {
   f1ap_setup_req_t *setup_req;
   f1ap_setup_resp_t *setup_resp;
   uint32_t gnb_id; // associated gNB's ID, not used in DU itself

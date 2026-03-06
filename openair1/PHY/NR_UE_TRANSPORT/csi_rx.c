@@ -581,7 +581,7 @@ int nr_csi_rs_pmi_estimation(const PHY_VARS_NR_UE *ue,
                              const int16_t log2_re,
                              uint8_t *i1,
                              uint8_t *i2,
-                             uint32_t *precoded_sinr_dB)
+                             int32_t *precoded_sinr_dB)
 {
   const NR_DL_FRAME_PARMS *frame_parms = &ue->frame_parms;
 
@@ -730,7 +730,6 @@ int nr_csi_rs_cqi_estimation(const uint32_t precoded_sinr,
 }
 
 static void nr_csi_im_power_estimation(const PHY_VARS_NR_UE *ue,
-                                       const UE_nr_rxtx_proc_t *proc,
                                        const fapi_nr_dl_config_csiim_pdu_rel15_t *csiim_config_pdu,
                                        uint32_t *interference_plus_noise_power,
                                        const c16_t rxdataF[][ue->frame_parms.samples_per_slot_wCP])
@@ -822,7 +821,7 @@ void nr_ue_csi_im_procedures(PHY_VARS_NR_UE *ue,
   LOG_I(NR_PHY, "csiim_config_pdu->l_csiim = %i.%i.%i.%i\n", csiim_config_pdu->l_csiim[0], csiim_config_pdu->l_csiim[1], csiim_config_pdu->l_csiim[2], csiim_config_pdu->l_csiim[3]);
 #endif
 
-  nr_csi_im_power_estimation(ue, proc, csiim_config_pdu, &ue->nr_csi_info->interference_plus_noise_power, rxdataF);
+  nr_csi_im_power_estimation(ue, csiim_config_pdu, &ue->nr_csi_info->interference_plus_noise_power, rxdataF);
   ue->nr_csi_info->csi_im_meas_computed = true;
 }
 
@@ -948,7 +947,7 @@ void nr_ue_csi_rs_procedures(PHY_VARS_NR_UE *ue,
   uint8_t i1[3] = {0};
   uint8_t i2[1] = {0};
   uint8_t cqi = 0;
-  uint32_t precoded_sinr_dB = 0;
+  int32_t precoded_sinr_dB = 0;
   // bit 3 in bitmap to indicate RI measurment
   if (csirs_config_pdu->measurement_bitmap & 8) {
     nr_csi_rs_pmi_estimation(ue,

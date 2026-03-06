@@ -33,20 +33,6 @@
 #ifndef PTRS_NR_H
 #define PTRS_NR_H
 
-#include "PHY/defs_nr_UE.h"
-
-/************** CODE GENERATION ***********************************/
-
-/************** DEFINE ********************************************/
-
-
-/************* STRUCTURES *****************************************/
-
-
-/************** VARIABLES *****************************************/
-
-/************** FUNCTION ******************************************/
-
 void set_ptrs_symb_idx(uint16_t *ptrs_symbols,
                        uint8_t duration_in_symbols,
                        uint8_t start_symbol,
@@ -86,15 +72,13 @@ int8_t nr_ptrs_process_slot(uint16_t dmrsSymbPos,
                             uint16_t ptrsSymbPos,
                             int16_t *estPerSymb,
                             uint16_t startSymbIdx,
-                            uint16_t noSymb
-                            );
+                            uint16_t noSymb);
+
 /*  general function to estimate common phase error based upon PTRS */
 void nr_ptrs_cpe_estimation(uint8_t K_ptrs,
                             uint8_t ptrsReOffset,
                             uint16_t nb_rb,
                             uint16_t rnti,
-                            unsigned char Ns,
-                            unsigned char symbol,
                             uint16_t ofdm_symbol_size,
                             int16_t *rxF_comp,
                             const uint32_t *gold_seq,

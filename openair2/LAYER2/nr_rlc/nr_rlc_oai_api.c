@@ -875,8 +875,7 @@ struct srb0_data {
   void (*send_initial_ul_rrc_message)(int ue_id, const uint8_t *sdu, sdu_size_t sdu_len, void *data);
 };
 
-void deliver_sdu_srb0(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size)
+void deliver_sdu_srb0(void *deliver_sdu_data, nr_rlc_entity_t *entity, char *buf, int size)
 {
   struct srb0_data *s0 = (struct srb0_data *)deliver_sdu_data;
   s0->send_initial_ul_rrc_message(s0->ue_id, (unsigned char *)buf, size, s0->data);

@@ -435,8 +435,7 @@ static void map_current_symbol(const nr_phy_pxsch_params_t p,
 /*
 TS 38.211 table 6.4.1.1.3-1 and 2
 */
-static void dmrs_amp_mult(const uint32_t dmrs_port,
-                          const int Wt,
+static void dmrs_amp_mult(const int Wt,
                           const int Wf[2],
                           const c16_t *mod_dmrs,
                           c16_t *mod_dmrs_out,
@@ -493,9 +492,9 @@ static void map_symbols(const nr_phy_pxsch_params_t p,
       c16_t mod_dmrs[ALNARS_16_4(n_dmrs)] __attribute((aligned(16)));
       if (p.transform_precoding == transformPrecoder_disabled) {
         nr_modulation(gold, n_dmrs * 2, DMRS_MOD_ORDER, (int16_t *)mod_dmrs);
-        dmrs_amp_mult(p.dmrs_port, p.Wt, p.Wf, mod_dmrs, mod_dmrs_amp, n_dmrs, p.dmrs_type, p.num_cdm_no_data);
+        dmrs_amp_mult(p.Wt, p.Wf, mod_dmrs, mod_dmrs_amp, n_dmrs, p.dmrs_type, p.num_cdm_no_data);
       } else {
-        dmrs_amp_mult(p.dmrs_port, p.Wt, p.Wf, dmrs_seq, mod_dmrs_amp, n_dmrs, p.dmrs_type, p.num_cdm_no_data);
+        dmrs_amp_mult(p.Wt, p.Wf, dmrs_seq, mod_dmrs_amp, n_dmrs, p.dmrs_type, p.num_cdm_no_data);
       }
     } else if ((p.pdu_bit_map & PUSCH_PDU_BITMAP_PUSCH_PTRS) && ptrs_symbol) {
       AssertFatal(p.transform_precoding == transformPrecoder_disabled, "PTRS NOT SUPPORTED IF TRANSFORM PRECODING IS ENABLED\n");
@@ -1190,7 +1189,7 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
     rm_info = calc_rate_match_info_uci(pusch_pdu, harq_process_ul_ue, nl_qm, &G[pusch_id]);
   }
 
-  if (nr_ulsch_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids, number_dmrs_symbols) == -1) {
+  if (nr_ulsch_encoding(UE, &phy_data->ulsch, frame, slot, G, 1, ULSCH_ids) == -1) {
     stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
     return;
   }

@@ -92,36 +92,36 @@ typedef struct {
   uint8_t  mode;               /* 0: PDCP AM, 1: PDCP UM, 2: PDCP TM */
 } nr_pdcp_statistics_t;
 
-typedef struct nr_pdcp_entity_t {
+typedef struct nr_pdcp_entity_s {
   nr_pdcp_entity_type_t type;
 
   /* functions provided by the PDCP module */
-  void (*recv_pdu)(struct nr_pdcp_entity_t *entity, char *buffer, int size);
-  int (*process_sdu)(struct nr_pdcp_entity_t *entity, char *buffer, int size,
-                     int sdu_id, char *pdu_buffer, int pdu_max_size);
-  void (*delete_entity)(struct nr_pdcp_entity_t *entity);
-  void (*release_entity)(struct nr_pdcp_entity_t *entity);
-  void (*suspend_entity)(struct nr_pdcp_entity_t *entity);
-  void (*reestablish_entity)(struct nr_pdcp_entity_t *entity,
-                             const nr_pdcp_entity_security_keys_and_algos_t *parameters);
-  void (*get_stats)(struct nr_pdcp_entity_t *entity, nr_pdcp_statistics_t *out);
+  void (*recv_pdu)(struct nr_pdcp_entity_s *entity, char *buffer, int size);
+  int (*process_sdu)(struct nr_pdcp_entity_s *entity, char *buffer, int size, int sdu_id, char *pdu_buffer, int pdu_max_size);
+  void (*delete_entity)(struct nr_pdcp_entity_s *entity);
+  void (*release_entity)(struct nr_pdcp_entity_s *entity);
+  void (*suspend_entity)(struct nr_pdcp_entity_s *entity);
+  void (*reestablish_entity)(struct nr_pdcp_entity_s *entity, const nr_pdcp_entity_security_keys_and_algos_t *parameters);
+  void (*get_stats)(struct nr_pdcp_entity_s *entity, nr_pdcp_statistics_t *out);
 
   /* set_security: pass -1 to parameters->integrity_algorithm / parameters->ciphering_algorithm
    *               to keep the corresponding current algorithm and key
    */
-  void (*set_security)(struct nr_pdcp_entity_t *entity,
-                       const nr_pdcp_entity_security_keys_and_algos_t *parameters);
+  void (*set_security)(struct nr_pdcp_entity_s *entity, const nr_pdcp_entity_security_keys_and_algos_t *parameters);
 
   /* check_integrity is used by RRC */
-  bool (*check_integrity)(struct nr_pdcp_entity_t *entity,
-                          const uint8_t *buffer, int buffer_length,
+  bool (*check_integrity)(struct nr_pdcp_entity_s *entity,
+                          const uint8_t *buffer,
+                          int buffer_length,
                           const nr_pdcp_integrity_data_t *msg_integrity);
 
-  void (*set_time)(struct nr_pdcp_entity_t *entity, uint64_t now);
+  void (*set_time)(struct nr_pdcp_entity_s *entity, uint64_t now);
 
   /* callbacks provided to the PDCP module */
-  void (*deliver_sdu)(void *deliver_sdu_data, struct nr_pdcp_entity_t *entity,
-                      char *buf, int size,
+  void (*deliver_sdu)(void *deliver_sdu_data,
+                      struct nr_pdcp_entity_s *entity,
+                      char *buf,
+                      int size,
                       const nr_pdcp_integrity_data_t *msg_integrity);
   void *deliver_sdu_data;
   void (*deliver_pdu)(void *deliver_pdu_data, ue_id_t ue_id, int rb_id,
@@ -186,10 +186,10 @@ typedef struct nr_pdcp_entity_t {
   bool entity_suspended;
 
   /* PDCP Count API */
-  nr_pdcp_count_t (*get_pdcp_count_dl)(struct nr_pdcp_entity_t *entity);
-  nr_pdcp_count_t (*get_pdcp_count_ul)(struct nr_pdcp_entity_t *entity);
-  void (*set_pdcp_count_dl)(struct nr_pdcp_entity_t *entity, nr_pdcp_count_t count, int sn_size);
-  void (*set_pdcp_count_ul)(struct nr_pdcp_entity_t *entity, nr_pdcp_count_t count, int sn_size);
+  nr_pdcp_count_t (*get_pdcp_count_dl)(struct nr_pdcp_entity_s *entity);
+  nr_pdcp_count_t (*get_pdcp_count_ul)(struct nr_pdcp_entity_s *entity);
+  void (*set_pdcp_count_dl)(struct nr_pdcp_entity_s *entity, nr_pdcp_count_t count, int sn_size);
+  void (*set_pdcp_count_ul)(struct nr_pdcp_entity_s *entity, nr_pdcp_count_t count, int sn_size);
 
 } nr_pdcp_entity_t;
 
@@ -200,12 +200,13 @@ nr_pdcp_entity_t *new_nr_pdcp_entity(
     int pdusession_id,
     bool has_sdap_rx,
     bool has_sdap_tx,
-    void (*deliver_sdu)(void *deliver_sdu_data, struct nr_pdcp_entity_t *entity,
-                        char *buf, int size,
+    void (*deliver_sdu)(void *deliver_sdu_data,
+                        struct nr_pdcp_entity_s *entity,
+                        char *buf,
+                        int size,
                         const nr_pdcp_integrity_data_t *msg_integrity),
     void *deliver_sdu_data,
-    void (*deliver_pdu)(void *deliver_pdu_data, ue_id_t ue_id, int rb_id,
-                        char *buf, int size, int sdu_id),
+    void (*deliver_pdu)(void *deliver_pdu_data, ue_id_t ue_id, int rb_id, char *buf, int size, int sdu_id),
     void *deliver_pdu_data,
     int sn_size,
     int t_reordering,

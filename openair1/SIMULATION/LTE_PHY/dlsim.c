@@ -520,7 +520,8 @@ int main(int argc, char **argv) {
   DCI_ALLOC_t da;
   DCI_ALLOC_t *dci_alloc = &da;
   unsigned int coded_bits_per_codeword=0,nsymb; //,tbs=0;
-  unsigned int tx_lev=0,tx_lev_dB=0,trials;
+  unsigned int tx_lev = 0, trials;
+  int tx_lev_dB = 0;
   unsigned int errs[4],errs2[4],round_trials[4],dci_errors[4];//,num_layers;
   memset(errs,0,4*sizeof(unsigned int));
   memset(errs2,0,4*sizeof(unsigned int));
@@ -1494,7 +1495,7 @@ int main(int argc, char **argv) {
                                       eNB->frame_parms.samples_per_tti);
             }
 
-            tx_lev_dB = (unsigned int) dB_fixed(tx_lev);
+            tx_lev_dB = dB_fixed(tx_lev);
 
             if (n_frames==1) {
               printf("tx_lev = %u (%u dB)\n",tx_lev,tx_lev_dB);

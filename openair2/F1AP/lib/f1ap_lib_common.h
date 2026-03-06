@@ -83,14 +83,10 @@
   } while (0)
 
 bool eq_f1ap_plmn(const plmn_id_t *a, const plmn_id_t *b);
-struct f1ap_served_cell_info_t;
-bool eq_f1ap_cell_info(const struct f1ap_served_cell_info_t *a, const struct f1ap_served_cell_info_t *b);
-struct f1ap_gnb_du_system_info_t;
-bool eq_f1ap_sys_info(const struct f1ap_gnb_du_system_info_t *a, const struct f1ap_gnb_du_system_info_t *b);
-struct f1ap_nr_frequency_info_t;
-bool eq_f1ap_freq_info(const struct f1ap_nr_frequency_info_t *a, const struct f1ap_nr_frequency_info_t *b);
-struct f1ap_transmission_bandwidth_t;
-bool eq_f1ap_tx_bandwidth(const struct f1ap_transmission_bandwidth_t *a, const struct f1ap_transmission_bandwidth_t *b);
+bool eq_f1ap_cell_info(const f1ap_served_cell_info_t *a, const f1ap_served_cell_info_t *b);
+bool eq_f1ap_sys_info(const f1ap_gnb_du_system_info_t *a, const f1ap_gnb_du_system_info_t *b);
+bool eq_f1ap_freq_info(const f1ap_nr_frequency_info_t *a, const f1ap_nr_frequency_info_t *b);
+bool eq_f1ap_tx_bandwidth(const f1ap_transmission_bandwidth_t *a, const f1ap_transmission_bandwidth_t *b);
 
 struct OCTET_STRING;
 uint8_t *cp_octet_string(const struct OCTET_STRING *os, int *len);

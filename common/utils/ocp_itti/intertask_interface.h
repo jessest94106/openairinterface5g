@@ -230,6 +230,7 @@ typedef struct IttiMsgText_s {
 #include <openair2/COMMON/udp_messages_types.h>
 #include <openair2/COMMON/gtpv1_u_messages_types.h>
 #include <openair2/COMMON/ngap_messages_types.h>
+#include <openair2/COMMON/nrppa_messages_types.h>
 #include <openair3/SCTP/sctp_eNB_task.h>
 #include <openair3/NAS/UE/nas_proc_defs.h>
 #include <openair3/NAS/UE/ESM/esmData.h>
@@ -294,6 +295,7 @@ typedef struct {
   TASK_DEF(TASK_RAL_ENB, 200)         \
   TASK_DEF(TASK_S1AP, 200)            \
   TASK_DEF(TASK_NGAP, 200)            \
+  TASK_DEF(TASK_NRPPA, 200)           \
   TASK_DEF(TASK_X2AP, 200)            \
   TASK_DEF(TASK_M2AP_ENB, 200)        \
   TASK_DEF(TASK_M2AP_MCE, 200)        \

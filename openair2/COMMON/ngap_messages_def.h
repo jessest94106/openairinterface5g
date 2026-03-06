@@ -73,6 +73,7 @@ MESSAGE_DEF(NGAP_HANDOVER_NOTIFY, MESSAGE_PRIORITY_MED, ngap_handover_notify_t, 
 MESSAGE_DEF(NGAP_HANDOVER_CANCEL, MESSAGE_PRIORITY_MED, ngap_handover_cancel_t, ngap_handover_cancel)
 MESSAGE_DEF(NGAP_UL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_transfer_t, ngap_ul_ran_status_transfer)
 MESSAGE_DEF(NGAP_DL_RAN_STATUS_TRANSFER, MESSAGE_PRIORITY_MED, ngap_ran_status_transfer_t, ngap_dl_ran_status_transfer)
+MESSAGE_DEF(NGAP_RECONNECT_TIMER, MESSAGE_PRIORITY_MED, IttiMsgText, ngap_gNB_amf_data)
 
 /* NGAP -> RRC messages */
 MESSAGE_DEF(NGAP_DOWNLINK_NAS              , MESSAGE_PRIORITY_MED, ngap_downlink_nas_t              , ngap_downlink_nas )
@@ -88,3 +89,18 @@ MESSAGE_DEF(NGAP_HANDOVER_CANCEL_ACK, MESSAGE_PRIORITY_MED, ngap_handover_cancel
 
 /* NGAP <-> RRC messages (can be initiated either by MME or gNB) */
 MESSAGE_DEF(NGAP_UE_CONTEXT_RELEASE_REQ    , MESSAGE_PRIORITY_MED, ngap_ue_release_req_t            , ngap_ue_release_req)
+
+/* NGAP -> NRPPA messages*/
+MESSAGE_DEF(NGAP_DOWNLINKUEASSOCIATEDNRPPA,
+            MESSAGE_PRIORITY_MED,
+            ngap_downlink_ue_associated_nrppa_t,
+            ngap_downlink_ue_associated_nrppa)
+MESSAGE_DEF(NGAP_DOWNLINKNONUEASSOCIATEDNRPPA,
+            MESSAGE_PRIORITY_MED,
+            ngap_downlink_non_ue_associated_nrppa_t,
+            ngap_downlink_non_ue_associated_nrppa)
+MESSAGE_DEF(NGAP_UPLINKUEASSOCIATEDNRPPA, MESSAGE_PRIORITY_MED, ngap_uplink_ue_associated_nrppa_t, ngap_uplink_ue_associated_nrppa)
+MESSAGE_DEF(NGAP_UPLINKNONUEASSOCIATEDNRPPA,
+            MESSAGE_PRIORITY_MED,
+            ngap_uplink_non_ue_associated_nrppa_t,
+            ngap_uplink_non_ue_associated_nrppa)

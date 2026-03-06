@@ -33,11 +33,8 @@
 #ifndef LOWPAPR_SEQUENCES_NR_H
 #define LOWPAPR_SEQUENCES_NR_H
 
-#include "PHY/defs_nr_UE.h"
 #include "PHY/types.h"
-
 #include "PHY/NR_REFSIG/ss_pbch_nr.h"
-
 #include "PHY/defs_nr_common.h"
 #include "PHY/defs_gNB.h"
 

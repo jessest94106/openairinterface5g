@@ -24,9 +24,9 @@
    author: Hongzhi WANG (TCL)
    date: 12.09.2017
 */
-#include "PHY/defs_nr_UE.h"
-//#include "SCHED/extern.h"
 
+#include "common/utils/LOG/log.h"
+#include "openair1/PHY/CODING/coding_defs.h"
 //#define DEBUG_SEGMENTATION
 
 int32_t nr_segmentation(unsigned char *input_buffer,
@@ -173,8 +173,6 @@ else
 
   return Kb;
 }
-
-
 
 #ifdef MAIN
 main()

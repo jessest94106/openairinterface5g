@@ -667,7 +667,7 @@ int main(int argc, char **argv){
   generate_nr_prach(UE, 0, frame, slot, tx);
 
   /* tx_lev_dB not used later, no need to set */
-  //tx_lev_dB = (unsigned int) dB_fixed(tx_lev);
+  //tx_lev_dB = dB_fixed(tx_lev);
 
 #ifdef NR_PRACH_DEBUG
   LOG_M("txsig0.m", "txs0", &txdata[0][subframe*frame_parms->samples_per_subframe], frame_parms->samples_per_subframe, 1, 1);
@@ -844,7 +844,7 @@ int main(int argc, char **argv){
   free(RC.gNB[0]);
   free(RC.gNB);
 
-  term_nr_ue_signal(UE, 1);
+  term_nr_ue_signal(UE);
   free(UE->nrUE_config.prach_config.num_prach_fd_occasions_list);
   free(UE);
   free(PHY_vars_UE_g[0]);

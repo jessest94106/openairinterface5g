@@ -60,7 +60,6 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                           c16_t dl_ch_magb[][n_rx][rx_size_symbol],
                           c16_t dl_ch_magr[][n_rx][rx_size_symbol],
                           int32_t dl_ch_estimates_ext[][rx_size_symbol],
-                          unsigned short nb_rb,
                           unsigned char mod_order,
                           int shift,
                           unsigned char symbol,
@@ -86,7 +85,6 @@ static void nr_dlsch_llr(uint32_t rx_size_symbol,
                          c16_t dl_ch_mag[rx_size_symbol],
                          c16_t dl_ch_magb[rx_size_symbol],
                          c16_t dl_ch_magr[rx_size_symbol],
-                         NR_DL_UE_HARQ_t *dlsch0_harq,
                          NR_DL_UE_HARQ_t *dlsch1_harq,
                          unsigned char symbol,
                          uint32_t len,
@@ -141,7 +139,6 @@ static void nr_dlsch_channel_level_median(uint32_t rx_size_symbol,
     @param rho Cross-correlation between two spatial channels on each RX antenna
     @param frame_parms Pointer to frame descriptor
     @param symbol Symbol on which to operate
-    @param first_symbol_flag set to 1 on first DLSCH symbol
     @param mod_order Modulation order of allocation
     @param nb_rb Number of RBs in allocation
     @param output_shift Rescaling for compensated output (should be energy-normalizing)
@@ -161,7 +158,6 @@ static void nr_dlsch_channel_compensation(uint32_t rx_size_symbol,
                                           uint8_t n_layers,
                                           unsigned char symbol,
                                           int length,
-                                          bool first_symbol_flag,
                                           unsigned char mod_order,
                                           unsigned short nb_rb,
                                           unsigned char output_shift,
@@ -555,7 +551,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                                   nl,
                                   symbol,
                                   nb_re_pdsch,
-                                  first_symbol_flag,
                                   dlsch_config->qamModOrder,
                                   nb_rb_pdsch,
                                   *log2_maxh,
@@ -614,7 +609,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                       dl_ch_magb,
                       dl_ch_magr,
                       dl_ch_estimates_ext,
-                      nb_rb_pdsch,
                       dlsch_config->qamModOrder,
                       *log2_maxh,
                       symbol,
@@ -649,8 +643,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
 
   /* Check for PTRS bitmap and process it respectively */
   if((pduBitmap & 0x1) && (dlsch[0].rnti_type == TYPE_C_RNTI_)) {
-    nr_pdsch_ptrs_processing(ue,
-                             nbRx,
+    nr_pdsch_ptrs_processing(nbRx,
                              ptrs_phase_per_slot,
                              ptrs_re_per_slot,
                              rx_size_symbol,
@@ -658,7 +651,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                              fp,
                              dlsch0_harq,
                              dlsch1_harq,
-                             gNB_id,
                              nr_slot_rx,
                              symbol,
                              dlsch[0].rnti,
@@ -674,7 +666,6 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
                dl_ch_mag[0][0],
                dl_ch_magb[0][0],
                dl_ch_magr[0][0],
-               dlsch0_harq,
                dlsch1_harq,
                symbol,
                dl_valid_re[symbol],
@@ -769,7 +760,6 @@ static void nr_dlsch_channel_compensation(uint32_t rx_size_symbol,
                                           uint8_t n_layers,
                                           unsigned char symbol,
                                           int length,
-                                          bool first_symbol_flag,
                                           unsigned char mod_order,
                                           unsigned short nb_rb,
                                           unsigned char output_shift,
@@ -868,24 +858,11 @@ static void nr_dlsch_channel_compensation(uint32_t rx_size_symbol,
     for (int aarx = 0; aarx < frame_parms->nb_antennas_rx; aarx++) {
       for (int l = 0; l < n_layers; l++) {
         for (int atx = 0; atx < n_layers; atx++) {
-        rho128 = (simde__m128i *)&rho[aarx][l * n_layers + atx][symbol * nb_rb * 12];
-        dl_ch128 = (simde__m128i *)dl_ch_estimates_ext[l * frame_parms->nb_antennas_rx + aarx];
-        dl_ch128_2 = (simde__m128i *)dl_ch_estimates_ext[atx * frame_parms->nb_antennas_rx + aarx];
-        
-        // multiply by conjugated channel
-        mult_cpx_conj_vector((c16_t *)dl_ch128, (c16_t *)dl_ch128_2, (c16_t *)rho128, 12 * nb_rb_0, output_shift);
-
-        if (first_symbol_flag) {
-          // rho_nm = H_arx_n.conj(H_arx_m)
-          // rho_rx_corr[arx][nm] = |H_arx_n|^2.|H_arx_m|^2 &rho[aarx][l*n_layers+atx][symbol*nb_rb*12]
-          measurements->rx_correlation[0][aarx][l * n_layers + atx] =
-              signal_energy(&rho[aarx][l * n_layers + atx][symbol * nb_rb * 12], length);
-          // avg_rho_re[aarx][l*n_layers+atx] = 16*avg_rho_re[aarx][l*n_layers+atx]/length;
-          // avg_rho_im[aarx][l*n_layers+atx] = 16*avg_rho_im[aarx][l*n_layers+atx]/length;
-          // printf("rho[rx]%d tx%d tx%d = Re: %d Im: %d\n",aarx, l,atx, avg_rho_re[aarx][l*n_layers+atx],
-          // avg_rho_im[aarx][l*n_layers+atx]); printf("rho_corr[rx]%d tx%d tx%d = %d ...\n",aarx, l,atx,
-          // measurements->rx_correlation[0][aarx][l*n_layers+atx]);
-        }
+          rho128 = (simde__m128i *)&rho[aarx][l * n_layers + atx][symbol * nb_rb * 12];
+          dl_ch128 = (simde__m128i *)dl_ch_estimates_ext[l * frame_parms->nb_antennas_rx + aarx];
+          dl_ch128_2 = (simde__m128i *)dl_ch_estimates_ext[atx * frame_parms->nb_antennas_rx + aarx];
+          // multiply by conjugated channel
+          mult_cpx_conj_vector((c16_t *)dl_ch128, (c16_t *)dl_ch128_2, (c16_t *)rho128, 12 * nb_rb_0, output_shift);
         }
       }
     }
@@ -1364,7 +1341,6 @@ static void nr_dlsch_mmse(uint32_t rx_size_symbol,
                           c16_t dl_ch_magb[][n_rx][rx_size_symbol],
                           c16_t dl_ch_magr[][n_rx][rx_size_symbol],
                           int32_t dl_ch_estimates_ext[][rx_size_symbol],
-                          unsigned short nb_rb,
                           unsigned char mod_order,
                           int shift,
                           unsigned char symbol,
@@ -1556,7 +1532,6 @@ static void nr_dlsch_llr(uint32_t rx_size_symbol,
                          c16_t dl_ch_mag[rx_size_symbol],
                          c16_t dl_ch_magb[rx_size_symbol],
                          c16_t dl_ch_magr[rx_size_symbol],
-                         NR_DL_UE_HARQ_t *dlsch0_harq,
                          NR_DL_UE_HARQ_t *dlsch1_harq,
                          unsigned char symbol,
                          uint32_t len,

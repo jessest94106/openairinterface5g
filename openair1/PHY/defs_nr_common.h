@@ -156,9 +156,7 @@ typedef struct {
 } prach_list_t;
 void init_prach_list(prach_list_t *);
 
-typedef struct NR_DL_FRAME_PARMS NR_DL_FRAME_PARMS;
-
-struct NR_DL_FRAME_PARMS {
+typedef struct NR_DL_FRAME_PARMS_s {
   /// frequency range
   frequency_range_t freq_range;
   //  /// Placeholder to replace overlapping fields below
@@ -269,7 +267,7 @@ struct NR_DL_FRAME_PARMS {
   uint16_t tdd_slot_config;
   uint8_t tdd_period;
   bool print_ue_help_cmdline_log;
-};
+} NR_DL_FRAME_PARMS;
 
 // PRS config structures
 typedef struct {
@@ -304,6 +302,29 @@ typedef struct {
     float rsrp_dBm;
     int32_t reserved;
 } prs_meas_t;
+
+// Configuration parameters required for 5G Positioning
+// TRP Cartesian Coordinate information
+typedef struct trp_s {
+  // TRP id
+  uint32_t id;
+  // TRP x-axis value
+  uint32_t x_axis;
+  // TRP y-axis value
+  uint32_t y_axis;
+  // TRP z-axis value
+  uint32_t z_axis;
+  // 0 = mm, 1 = cm, 2 = dm
+  uint8_t unit;
+} trp_t;
+
+#define MAX_NUM_TRPs 8
+typedef struct {
+  trp_t trps[MAX_NUM_TRPs];
+  uint8_t num_trp;
+  // Serving gNB indicator
+  bool is_serving_gNB;
+} positioning_config_t;
 
 // rel16 prs k_prime table as per ts138.211 sec.7.4.1.7.2
 #define K_PRIME_TABLE_ROW_SIZE 4

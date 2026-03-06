@@ -25,7 +25,6 @@ FROM ran-build-fhi72:latest AS ran-build
 
 #start from scratch for target executable
 FROM ${UBUNTU_IMAGE} AS oai-nr-oru
-ARG BUILD_OPTION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe
 

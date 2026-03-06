@@ -163,7 +163,7 @@ static void nr_initiate_handover(const gNB_RRC_INST *rrc,
   rrc_f1_ue_context_setup_for_target_du(rrc, ue, target_cell, ho_prep_info);
 }
 
-typedef struct deliver_ue_ctxt_modification_data_t {
+typedef struct {
   gNB_RRC_INST *rrc;
   f1ap_ue_context_mod_req_t *modification_req;
   sctp_assoc_t assoc_id;

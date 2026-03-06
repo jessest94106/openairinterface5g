@@ -31,8 +31,8 @@ extern "C" {
 #include <sys/types.h>
 #include "openair1/PHY/defs_gNB.h"
 
-typedef struct pnf_t pnf_t;
-typedef struct pnf_p7_t pnf_p7_t;
+typedef struct pnf_s pnf_t;
+typedef struct pnf_p7_s pnf_p7_t;
 
 /*! This enum is used to describe the states of the pnf 
  */

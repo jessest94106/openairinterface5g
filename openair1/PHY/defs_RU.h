@@ -45,7 +45,7 @@
 #define MAX_BANDS_PER_RRU 4
 #define MAX_RRU_CONFIG_SIZE 1024
 
-
+typedef struct NR_DL_FRAME_PARMS_s NR_DL_FRAME_PARMS;
 
 typedef enum {
   normal_txrx=0,
@@ -176,7 +176,7 @@ typedef struct {
  int slot;
  const c16_t *rxdata;
  c16_t *rxdataF;
- const struct NR_DL_FRAME_PARMS *fp;
+ const NR_DL_FRAME_PARMS *fp;
  int32_t sample_offet;
  task_ans_t *ans;
 } feprx_cmd_t;
@@ -491,8 +491,8 @@ typedef struct RU_t_s {
   /// FAPI confiuration
   nfapi_nr_config_request_scf_t  config;
   /// Frame parameters
-  struct LTE_DL_FRAME_PARMS *frame_parms;
-  struct NR_DL_FRAME_PARMS *nr_frame_parms;
+  struct LTE_DL_FRAME_PARMS_s *frame_parms;
+  struct NR_DL_FRAME_PARMS_s *nr_frame_parms;
   ///timing offset used in TDD
   int N_TA_offset;
   /// SF extension used in TDD (unit: number of samples at 30.72MHz) (this is an expert option)

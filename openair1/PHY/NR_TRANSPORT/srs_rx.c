@@ -75,7 +75,6 @@ void nr_fill_srs(PHY_VARS_gNB *gNB, frame_t frame, slot_t slot, nfapi_nr_srs_pdu
 
 int nr_get_srs_signal(PHY_VARS_gNB *gNB,
                       c16_t **rxdataF,
-                      frame_t frame,
                       slot_t slot,
                       nfapi_nr_srs_pdu_t *srs_pdu,
                       nr_srs_info_t *nr_srs_info,

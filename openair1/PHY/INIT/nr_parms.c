@@ -24,6 +24,7 @@
 #include "common/utils/LOG/log.h"
 #include "executables/softmodem-common.h"
 #include "PHY/MODULATION/nr_modulation.h"
+#include "PHY/nr_phy_common/inc/nr_phy_common.h"
 
 /// Subcarrier spacings in Hz indexed by numerology index
 static const uint32_t nr_subcarrier_spacing[MAX_NUM_SUBCARRIER_SPACING] = {15e3, 30e3, 60e3, 120e3, 240e3};
@@ -421,16 +422,11 @@ int nr_init_frame_parms_ue(NR_DL_FRAME_PARMS *fp, fapi_nr_config_request_t* conf
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
   fp->freq_range = get_freq_range_from_freq(fp->dl_CarrierFreq);
 
-  uint8_t sco = 0;
-  if (((fp->freq_range == FR1) && (config->ssb_table.ssb_subcarrier_offset < 24)) ||
-      ((fp->freq_range == FR2) && (config->ssb_table.ssb_subcarrier_offset < 12))) {
-    if (fp->freq_range == FR1)
-      sco = config->ssb_table.ssb_subcarrier_offset>>config->ssb_config.scs_common;
-    else
-      sco = config->ssb_table.ssb_subcarrier_offset;
-  }
+  fp->ssb_start_subcarrier = nr_get_ssb_start_sc(config->ssb_config.scs_common,
+                                                 config->ssb_table.ssb_offset_point_a,
+                                                 config->ssb_table.ssb_subcarrier_offset,
+                                                 fp->freq_range);
 
-  fp->ssb_start_subcarrier = (12 * config->ssb_table.ssb_offset_point_a + sco);
   set_Lmax(fp);
 
   fp->L_ssb = (((uint64_t) config->ssb_table.ssb_mask_list[0].ssb_mask)<<32) | config->ssb_table.ssb_mask_list[1].ssb_mask;

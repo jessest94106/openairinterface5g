@@ -29,7 +29,7 @@
 
 #define SHUTDOWN_ACTOR(ptr) shutdown_actor((Actor_t *)ptr);
 
-typedef struct Actor_t {
+typedef struct {
   notifiedFIFO_t fifo;
   bool terminate;
   pthread_t thread;

@@ -4,11 +4,8 @@
 #include "nfapi/open-nFAPI/nfapi/public_inc/nfapi_nr_interface_scf.h"
 #include "openair2/NR_PHY_INTERFACE/NR_IF_Module.h"
 #include "openair1/PHY/LTE_TRANSPORT/transport_common.h"
-typedef struct pnf_t pnf_t;
-typedef struct pnf_p7_t pnf_p7_t;
-typedef struct vnf_t vnf_t;
-typedef struct vnf_p7_t vnf_p7_t;
-
+#include "nfapi/open-nFAPI/vnf/inc/vnf.h"
+#include "nfapi/open-nFAPI/pnf/inc/pnf.h"
 int l1_north_init_gNB(void){return 0;}
 
 int slot_ahead = 6;

@@ -19,12 +19,10 @@
  *      contact@openairinterface.org
  */
 
-#include "PHY/defs_nr_UE.h"
 #include "PHY/defs_gNB.h"
 #include "PHY/defs_nr_common.h"
 #include "modulation_UE.h"
 #include "nr_modulation.h"
-#include "PHY/LTE_ESTIMATION/lte_estimation.h"
 #include "PHY/NR_UE_ESTIMATION/nr_estimation.h"
 #include "PHY/nr_phy_common/inc/nr_phy_common.h"
 #include <common/utils/LOG/log.h>
