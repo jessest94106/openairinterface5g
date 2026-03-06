@@ -28,7 +28,6 @@
 /* forward declarations */
 typedef struct gNB_RRC_INST_s gNB_RRC_INST;
 typedef struct gNB_RRC_UE_s gNB_RRC_UE_t;
-typedef struct nr_rrc_cell_container_t nr_rrc_cell_container_t;
 
 typedef struct NR_CellGroupConfig NR_CellGroupConfig_t;
 

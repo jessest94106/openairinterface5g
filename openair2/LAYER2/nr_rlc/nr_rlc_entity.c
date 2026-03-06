@@ -71,26 +71,23 @@ static void nr_rlc_entity_get_stats(
     out->txsdu_avg_time_to_tx = 0;
 }
 
-nr_rlc_entity_t *new_nr_rlc_entity_am(
-    int rx_maxsize,
-    int tx_maxsize,
-    void (*deliver_sdu)(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size),
-    void *deliver_sdu_data,
-    void (*sdu_successful_delivery)(void *sdu_successful_delivery_data,
-                                    struct nr_rlc_entity_t *entity,
-                                    int sdu_id),
-    void *sdu_successful_delivery_data,
-    void (*max_retx_reached)(void *max_retx_reached_data,
-                             struct nr_rlc_entity_t *entity),
-    void *max_retx_reached_data,
-    int t_poll_retransmit,
-    int t_reassembly,
-    int t_status_prohibit,
-    int poll_pdu,
-    int poll_byte,
-    int max_retx_threshold,
-    int sn_field_length)
+nr_rlc_entity_t *new_nr_rlc_entity_am(int rx_maxsize,
+                                      int tx_maxsize,
+                                      void (*deliver_sdu)(void *deliver_sdu_data, nr_rlc_entity_t *entity, char *buf, int size),
+                                      void *deliver_sdu_data,
+                                      void (*sdu_successful_delivery)(void *sdu_successful_delivery_data,
+                                                                      nr_rlc_entity_t *entity,
+                                                                      int sdu_id),
+                                      void *sdu_successful_delivery_data,
+                                      void (*max_retx_reached)(void *max_retx_reached_data, nr_rlc_entity_t *entity),
+                                      void *max_retx_reached_data,
+                                      int t_poll_retransmit,
+                                      int t_reassembly,
+                                      int t_status_prohibit,
+                                      int poll_pdu,
+                                      int poll_byte,
+                                      int max_retx_threshold,
+                                      int sn_field_length)
 {
   nr_rlc_entity_am_t *ret;
 
@@ -150,14 +147,12 @@ nr_rlc_entity_t *new_nr_rlc_entity_am(
   return (nr_rlc_entity_t *)ret;
 }
 
-nr_rlc_entity_t *new_nr_rlc_entity_um(
-    int rx_maxsize,
-    int tx_maxsize,
-    void (*deliver_sdu)(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size),
-    void *deliver_sdu_data,
-    int t_reassembly,
-    int sn_field_length)
+nr_rlc_entity_t *new_nr_rlc_entity_um(int rx_maxsize,
+                                      int tx_maxsize,
+                                      void (*deliver_sdu)(void *deliver_sdu_data, nr_rlc_entity_t *entity, char *buf, int size),
+                                      void *deliver_sdu_data,
+                                      int t_reassembly,
+                                      int sn_field_length)
 {
   nr_rlc_entity_um_t *ret;
 
@@ -203,11 +198,9 @@ nr_rlc_entity_t *new_nr_rlc_entity_um(
   return (nr_rlc_entity_t *)ret;
 }
 
-nr_rlc_entity_t *new_nr_rlc_entity_tm(
-    int tx_maxsize,
-    void (*deliver_sdu)(void *deliver_sdu_data, struct nr_rlc_entity_t *entity,
-                      char *buf, int size),
-    void *deliver_sdu_data)
+nr_rlc_entity_t *new_nr_rlc_entity_tm(int tx_maxsize,
+                                      void (*deliver_sdu)(void *deliver_sdu_data, nr_rlc_entity_t *entity, char *buf, int size),
+                                      void *deliver_sdu_data)
 {
   nr_rlc_entity_tm_t *ret;
 

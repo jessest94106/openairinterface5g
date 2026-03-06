@@ -20,20 +20,17 @@
 
 #include "nfapi_pnf_interface.h"
 
+typedef struct pnf_s {
+  nfapi_pnf_config_t _public;
 
-struct pnf_t {
-
-	nfapi_pnf_config_t _public;
-
-	int p5_sock;
+  int p5_sock;
 	uint8_t tx_message_buffer[NFAPI_MAX_PACKED_MESSAGE_SIZE];
 
 	uint8_t sctp;
 
 	uint8_t terminate;
 
-};
-
+} pnf_t;
 
 int pnf_connect(pnf_t *pnf);
 int pnf_message_pump(pnf_t *pnf);
