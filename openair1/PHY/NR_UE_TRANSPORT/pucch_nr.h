@@ -42,29 +42,25 @@
 #include "T.h"
 #define ONE_OVER_SQRT2 23170 // 32767/sqrt(2) = 23170 (ONE_OVER_SQRT2)
 
-void nr_generate_pucch0(const PHY_VARS_NR_UE *ue,
-                        c16_t **txdataF,
+void nr_generate_pucch0(c16_t **txdataF,
                         const NR_DL_FRAME_PARMS *frame_parms,
                         const int16_t amp,
                         const int nr_slot_tx,
                         const fapi_nr_ul_config_pucch_pdu *pucch_pdu);
 
-void nr_generate_pucch1(const PHY_VARS_NR_UE *ue,
-                        c16_t **txdataF,
+void nr_generate_pucch1(c16_t **txdataF,
                         const NR_DL_FRAME_PARMS *frame_parms,
                         const int16_t amp,
                         const int nr_slot_tx,
                         const fapi_nr_ul_config_pucch_pdu *pucch_pdu);
 
-void nr_generate_pucch2(const PHY_VARS_NR_UE *ue,
-                        c16_t **txdataF,
+void nr_generate_pucch2(c16_t **txdataF,
                         const NR_DL_FRAME_PARMS *frame_parms,
                         const int16_t amp,
                         const int nr_slot_tx,
                         const fapi_nr_ul_config_pucch_pdu *pucch_pdu);
 
-void nr_generate_pucch3_4(const PHY_VARS_NR_UE *ue,
-                          c16_t **txdataF,
+void nr_generate_pucch3_4(c16_t **txdataF,
                           const NR_DL_FRAME_PARMS *frame_parms,
                           const int16_t amp,
                           const int nr_slot_tx,

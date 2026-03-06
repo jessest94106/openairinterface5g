@@ -126,8 +126,7 @@ int nr_ulsch_encoding(PHY_VARS_NR_UE *ue,
                       const uint8_t slot,
                       unsigned int *G,
                       int nb_ulsch,
-                      uint8_t *ULSCH_ids,
-                      uint16_t number_dmrs_symbols);
+                      uint8_t *ULSCH_ids);
 
 /*! \brief Perform PUSCH scrambling. TS 38.211 V15.4.0 subclause 6.3.1.1
   @param[in] in Pointer to input bits
@@ -242,7 +241,6 @@ double nr_ue_pbch_freq_offset(const NR_DL_FRAME_PARMS *frame_parms,
 nr_initial_sync_t nr_initial_sync(UE_nr_rxtx_proc_t *proc,
                                   PHY_VARS_NR_UE *phy_vars_ue,
                                   int n_frames,
-                                  int sa,
                                   nr_gscn_info_t gscnInfo[MAX_GSCN_BAND],
                                   int numGscn);
 

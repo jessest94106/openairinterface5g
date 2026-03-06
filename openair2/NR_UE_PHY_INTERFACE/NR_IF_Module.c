@@ -106,7 +106,6 @@ void print_ue_mac_stats(const module_id_t mod, const int frame_rx, const int slo
 static int handle_bcch_bch(NR_UE_MAC_INST_t *mac,
                            int cc_id,
                            unsigned int gNB_index,
-                           void *phy_data,
                            uint8_t *pduP,
                            unsigned int additional_bits,
                            uint32_t ssb_index_mod8,
@@ -149,17 +148,13 @@ static int handle_bcch_dlsch(NR_UE_MAC_INST_t *mac,
 }
 
 //  L2 Abstraction Layer
-static nr_dci_format_t handle_dci(NR_UE_MAC_INST_t *mac,
-                                  unsigned int gNB_index,
-                                  frame_t frame,
-                                  int slot,
-                                  fapi_nr_dci_indication_pdu_t *dci)
+static nr_dci_format_t handle_dci(NR_UE_MAC_INST_t *mac, frame_t frame, int slot, fapi_nr_dci_indication_pdu_t *dci)
 {
   // if notification of a reception of a PDCCH transmission of the SpCell is received from lower layers
   // if the C-RNTI MAC CE was included in Msg3
   // consider this Contention Resolution successful
   if (mac->msg3_C_RNTI && mac->ra.ra_state == nrRA_WAIT_CONTENTION_RESOLUTION)
-    nr_ra_succeeded(mac, gNB_index, frame, slot);
+    nr_ra_succeeded(mac, frame, slot);
 
   // suspend RAR response window timer
   // (in RFsim running multiple slot in parallel it might expire while decoding MSG2)
@@ -245,11 +240,7 @@ static uint32_t nr_ue_dl_processing(NR_UE_MAC_INST_t *mac, nr_downlink_indicatio
     LOG_T(MAC, "[L2][IF MODULE][DL INDICATION][DCI_IND]\n");
     for (int i = 0; i < dl_info->dci_ind->number_of_dcis; i++) {
       LOG_T(MAC, ">>>NR_IF_Module i=%d, dl_info->dci_ind->number_of_dcis=%d\n", i, dl_info->dci_ind->number_of_dcis);
-      nr_dci_format_t dci_format = handle_dci(mac,
-                                              dl_info->gNB_index,
-                                              dl_info->frame,
-                                              dl_info->slot,
-                                              dl_info->dci_ind->dci_list + i);
+      nr_dci_format_t dci_format = handle_dci(mac, dl_info->frame, dl_info->slot, dl_info->dci_ind->dci_list + i);
 
       /* The check below filters out UL_DCIs which are being processed as DL_DCIs. */
       if (dci_format != NR_DL_DCI_FORMAT_1_0 && dci_format != NR_DL_DCI_FORMAT_1_1) {
@@ -291,7 +282,6 @@ static uint32_t nr_ue_dl_processing(NR_UE_MAC_INST_t *mac, nr_downlink_indicatio
             ret_mask |= (handle_bcch_bch(mac,
                                          dl_info->cc_id,
                                          dl_info->gNB_index,
-                                         dl_info->phy_data,
                                          rx_indication_body.ssb_pdu.pdu,
                                          rx_indication_body.ssb_pdu.additional_bits,
                                          rx_indication_body.ssb_pdu.ssb_index,

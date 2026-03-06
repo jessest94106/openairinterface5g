@@ -38,8 +38,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
                            const nfapi_nr_tx_data_request_t *TX_req,
                            const nfapi_nr_ul_dci_request_t *UL_dci_req,
                            int frame,
-                           int slot,
-                           int do_meas);
+                           int slot);
 void nr_save_ul_tti_req(PHY_VARS_gNB *gNB, nfapi_nr_ul_tti_request_t *UL_tti_req);
 int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, NR_UL_IND_t *UL_INFO);
 void L1_nr_prach_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_rach_indication_t *rach_ind);

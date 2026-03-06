@@ -101,9 +101,8 @@ TEST(test_init_ra, four_step_cbra)
   mac.frame_structure.frame_type = TDD;
   mac.frame_structure.numb_slots_frame = 20;
   mac.frequency_range = FR1;
-  int frame = 151;
 
-  init_RA(&mac, frame);
+  init_RA(&mac);
 
   EXPECT_EQ(mac.ra.ra_type, RA_4_STEP);
   EXPECT_EQ(mac.state, UE_PERFORMING_RA);
@@ -135,14 +134,13 @@ TEST(test_init_ra, four_step_cfra)
   mac.frame_structure.frame_type = TDD;
   mac.frame_structure.numb_slots_frame = 20;
   mac.frequency_range = FR1;
-  int frame = 151;
 
   NR_RACH_ConfigDedicated_t rach_ConfigDedicated = {0};
   NR_CFRA_t cfra;
   rach_ConfigDedicated.cfra = &cfra;
   ra->rach_ConfigDedicated = &rach_ConfigDedicated;
 
-  init_RA(&mac, frame);
+  init_RA(&mac);
 
   EXPECT_EQ(mac.ra.ra_type, RA_4_STEP);
   EXPECT_EQ(mac.state, UE_PERFORMING_RA);

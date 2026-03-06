@@ -716,9 +716,7 @@ static void update_ss(void *ue_ss_in, void *nw_ss_in)
   }
 }
 
-static void configure_common_ss_coreset(const NR_UE_MAC_INST_t *mac,
-                                        NR_BWP_PDCCH_t *pdcch,
-                                        NR_PDCCH_ConfigCommon_t *pdcch_ConfigCommon)
+static void configure_common_ss_coreset(NR_BWP_PDCCH_t *pdcch, NR_PDCCH_ConfigCommon_t *pdcch_ConfigCommon)
 {
   if (!pdcch_ConfigCommon)
     return;
@@ -1777,7 +1775,7 @@ static void configure_common_BWP_dl(NR_UE_MAC_INST_t *mac, int bwp_id, NR_BWP_Do
     NR_BWP_PDCCH_t *pdcch = &mac->config_BWP_PDCCH[bwp_id];
     if (dl_common->pdcch_ConfigCommon) {
       if (dl_common->pdcch_ConfigCommon->present == NR_SetupRelease_PDCCH_ConfigCommon_PR_setup)
-        configure_common_ss_coreset(mac, pdcch, dl_common->pdcch_ConfigCommon->choice.setup);
+        configure_common_ss_coreset(pdcch, dl_common->pdcch_ConfigCommon->choice.setup);
       if (dl_common->pdcch_ConfigCommon->present == NR_SetupRelease_PDCCH_ConfigCommon_PR_release)
         release_common_ss_cset(pdcch);
     }

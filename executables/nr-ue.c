@@ -225,7 +225,7 @@ static void UE_synch(void *arg) {
     ret = sl_nr_slss_search(UE, &syncD->proc, SL_NR_SSB_REPETITION_IN_FRAMES);
   } else {
     nr_get_carrier_frequencies(UE, &dl_carrier, &ul_carrier);
-    ret = nr_initial_sync(&syncD->proc, UE, 2, IS_SA_MODE(get_softmodem_params()), syncD->gscnInfo, syncD->numGscn);
+    ret = nr_initial_sync(&syncD->proc, UE, 2, syncD->gscnInfo, syncD->numGscn);
   }
 
   if (ret.cell_detected) {

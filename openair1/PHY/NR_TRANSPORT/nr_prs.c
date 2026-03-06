@@ -27,12 +27,7 @@
 //#define DEBUG_PRS_MOD
 //#define DEBUG_PRS_MAP
 
-int nr_generate_prs(int slot,
-                    c16_t *txdataF,
-                    int16_t amp,
-                    prs_config_t *prs_cfg,
-                    nfapi_nr_config_request_scf_t *config,
-                    const NR_DL_FRAME_PARMS *frame_parms)
+int nr_generate_prs(int slot, c16_t *txdataF, int16_t amp, prs_config_t *prs_cfg, const NR_DL_FRAME_PARMS *frame_parms)
 {
   
   int k_prime = 0, k = 0, idx;

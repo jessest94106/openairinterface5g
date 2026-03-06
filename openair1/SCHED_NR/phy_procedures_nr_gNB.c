@@ -201,10 +201,7 @@ void clear_slot_beamid(PHY_VARS_gNB *gNB, int slot)
   }
 }
 
-static void nr_generate_csi_rs_gNB(PHY_VARS_gNB *gNB,
-                                   int slot,
-                                   const nfapi_nr_config_request_scf_t *cfg,
-                                   const nfapi_nr_dl_tti_csi_rs_pdu *csi_rs_pdu)
+static void nr_generate_csi_rs_gNB(PHY_VARS_gNB *gNB, int slot, const nfapi_nr_dl_tti_csi_rs_pdu *csi_rs_pdu)
 {
   const nfapi_nr_dl_tti_csi_rs_pdu_rel15_t *csi_params = &csi_rs_pdu->csi_rs_pdu_rel15;
   if (csi_params->csi_type == 2) // ZP-CSI
@@ -245,8 +242,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
                            const nfapi_nr_tx_data_request_t *TX_req,
                            const nfapi_nr_ul_dci_request_t *UL_dci_req,
                            int frame,
-                           int slot,
-                           int do_meas)
+                           int slot)
 {
   const NR_DL_FRAME_PARMS *fp = &gNB->frame_parms;
   nfapi_nr_config_request_scf_t *cfg = &gNB->gNB_config;
@@ -272,7 +268,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
       {
         int slot_prs = (slot - i * prs_config->PRSResourceTimeGap + fp->slots_per_frame) % fp->slots_per_frame;
         LOG_D(PHY,"gNB_TX: frame %d, slot %d, slot_prs %d, PRS Resource ID %d\n",frame, slot, slot_prs, rsc_id);
-        nr_generate_prs(slot_prs, &gNB->common_vars.txdataF[0][0][txdataF_offset], AMP, prs_config, cfg, fp);
+        nr_generate_prs(slot_prs, &gNB->common_vars.txdataF[0][0][txdataF_offset], AMP, prs_config, fp);
       }
     }
   }
@@ -291,7 +287,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
         nr_generate_dci(gNB, &dl_tti_pdu->pdcch_pdu.pdcch_pdu_rel15, txdataF_offset, &gNB->frame_parms, slot);
         break;
       case NFAPI_NR_DL_TTI_CSI_RS_PDU_TYPE:
-        nr_generate_csi_rs_gNB(gNB, slot, cfg, &dl_tti_pdu->csi_rs_pdu);
+        nr_generate_csi_rs_gNB(gNB, slot, &dl_tti_pdu->csi_rs_pdu);
         break;
       case NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE: {
         int tx_data_idx = dl_tti_pdu->pdsch_pdu.pdsch_pdu_rel15.pduIndex;
@@ -713,7 +709,6 @@ static void fill_ul_rb_mask(PHY_VARS_gNB *gNB,
 
 static int fill_srs_reported_symbol(nfapi_nr_srs_reported_symbol_t *reported_symbol,
                                     const nfapi_nr_srs_pdu_t *srs_pdu,
-                                    const int N_RB_UL,
                                     const int16_t *snr_per_rb,
                                     const int srs_est)
 {
@@ -882,7 +877,7 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
   stop_meas(&gNB->generate_srs_stats);
   c16_t **rxdataF = gNB->common_vars.rxdataF[srs->beam_nb];
   start_meas(&gNB->get_srs_signal_stats);
-  *srs_est = nr_get_srs_signal(gNB, rxdataF, frame_rx, slot_rx, srs_pdu, nr_srs_info, srs_received_signal, srs_received_noise);
+  *srs_est = nr_get_srs_signal(gNB, rxdataF, slot_rx, srs_pdu, nr_srs_info, srs_received_signal, srs_received_noise);
   stop_meas(&gNB->get_srs_signal_stats);
 
   uint32_t signal_power_avg = 0;
@@ -1267,7 +1262,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
         AssertFatal(nr_srs_bf_report.num_reported_symbols == 1,
                     "nr_srs_bf_report.num_reported_symbols %i not handled yet!\n",
                     nr_srs_bf_report.num_reported_symbols);
-        fill_srs_reported_symbol(&nr_srs_bf_report.reported_symbol_list[0], srs_pdu, frame_parms->N_RB_UL, snr_per_rb, srs_est);
+        fill_srs_reported_symbol(&nr_srs_bf_report.reported_symbol_list[0], srs_pdu, snr_per_rb, srs_est);
 
 #ifdef SRS_IND_DEBUG
         LOG_I(NR_PHY, "nr_srs_bf_report.prg_size = %i\n", nr_srs_bf_report.prg_size);

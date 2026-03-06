@@ -778,7 +778,7 @@ void RCconfig_nr_prs(void)
 /**
  * @brief Get number or blacklisted UL PRBs and their mapping from gNB config
  */
-static int get_prb_blacklist(uint8_t instance, uint16_t *prbbl)
+static int get_prb_blacklist(uint16_t *prbbl)
 {
   paramdef_t GNBSParams[] = GNBSPARAMS_DESC;
   paramlist_def_t GNBParamList = {GNB_CONFIG_STRING_GNB_LIST, NULL, 0};
@@ -832,7 +832,7 @@ void RCconfig_NR_L1(void)
 
       // PRB Blacklist
       uint16_t prbbl[MAX_BWP_SIZE] = {0};
-      int num_ulprbbl = get_prb_blacklist(j, prbbl);
+      int num_ulprbbl = get_prb_blacklist(prbbl);
       if (num_ulprbbl != -1) {
         RC.gNB[j]->num_ulprbbl = num_ulprbbl;
         LOG_D(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", RC.gNB[j]->num_ulprbbl);
@@ -905,7 +905,7 @@ bool is_pattern2_config(paramdef_t *param)
   return true;
 }
 
-static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cfg, int minRXTXTIME, int do_SRS)
+static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
 {
   NR_ServingCellConfigCommon_t *scc = calloc_or_fail(1, sizeof(*scc));
   uint64_t ssb_bitmap=0xff;
@@ -1001,8 +1001,7 @@ static NR_ServingCellConfigCommon_t *get_scc_config(configmodule_interface_t *cf
   return scc;
 }
 
-static int read_du_cell_info(configmodule_interface_t *cfg,
-                             bool separate_du,
+static int read_du_cell_info(bool separate_du,
                              uint32_t *gnb_id,
                              uint64_t *gnb_du_id,
                              char **name,
@@ -1173,7 +1172,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
   return req;
 }
 
-static nr_ptrs_config_t *get_ptrs_config(int gnb_idx)
+static nr_ptrs_config_t *get_ptrs_config()
 {
   char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
   snprintf(aprefix, sizeof(aprefix), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
@@ -1433,7 +1432,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   AssertFatal(config.maxMIMO_layers != 0 && config.maxMIMO_layers <= tot_ant, "Invalid maxMIMO_layers %d\n", config.maxMIMO_layers);
 
   config.redcap = get_redcap_config(0);
-  config.ptrs = get_ptrs_config(0);
+  config.ptrs = get_ptrs_config();
 
   char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
   snprintf(aprefix, sizeof(aprefix), "%s.[%d].%s", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_TIMERS_CONFIG);
@@ -1485,7 +1484,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.num_agg_level_candidates[PDCCH_AGG_LEVEL8],
         config.num_agg_level_candidates[PDCCH_AGG_LEVEL16]);
 
-  NR_ServingCellConfigCommon_t *scc = get_scc_config(cfg, config.minRXTXTIME, config.do_SRS);
+  NR_ServingCellConfigCommon_t *scc = get_scc_config(config.minRXTXTIME, config.do_SRS);
   // BWP
   get_bwp_config(&config, scc);
   AssertFatal(config.num_additional_bwps <= 4, "Impossible to configure more than 4 additional BWPs\n");
@@ -1584,7 +1583,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       RC.nrmac[j]->identity_pm = *(MacRLC_ParamList.paramarray[j][MACRLC_IDENTITY_PM_IDX].u8ptr);
       // PRB Blacklist
       uint16_t prbbl[MAX_BWP_SIZE] = {0};
-      int num_ulprbbl = get_prb_blacklist(j, prbbl);
+      int num_ulprbbl = get_prb_blacklist(prbbl);
       if (num_ulprbbl != -1) {
         LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_ulprbbl);
         memcpy(RC.nrmac[j]->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
@@ -1629,7 +1628,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     uint32_t gnb_id = 0;
     char *name = NULL;
     f1ap_served_cell_info_t info;
-    read_du_cell_info(cfg, NODE_IS_DU(node_type), &gnb_id, &gnb_du_id, &name, &info, 1);
+    read_du_cell_info(NODE_IS_DU(node_type), &gnb_id, &gnb_du_id, &name, &info, 1);
 
     NR_COMMON_channels_t *cc = &RC.nrmac[0]->common_channels[0];
     cc->du_SIBs = fill_du_sibs(GNBParamList.paramarray[0]);

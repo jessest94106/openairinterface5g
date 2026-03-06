@@ -151,7 +151,6 @@ static int sl_nr_pss_correlation(PHY_VARS_NR_UE *UE, int frame_index)
 }
 
 static void sl_nr_extract_sss(PHY_VARS_NR_UE *ue,
-                              UE_nr_rxtx_proc_t *proc,
                               int32_t *tot_metric,
                               uint8_t *phase_max,
                               c16_t rxdataF[][ue->SL_UE_PHY_PARAMS.sl_frame_params.samples_per_slot_wCP])
@@ -440,7 +439,7 @@ nr_initial_sync_t sl_nr_slss_search(PHY_VARS_NR_UE *UE, UE_nr_rxtx_proc_t *proc,
                       UE->common_vars.rxdata);
         }
 
-        sl_nr_extract_sss(UE, NULL, &metric_tdd_ncp, &phase_tdd_ncp, rxdataF);
+        sl_nr_extract_sss(UE, &metric_tdd_ncp, &phase_tdd_ncp, rxdataF);
 
         // save detected cell id to psbch
         rx_slss_id = UE->SL_UE_PHY_PARAMS.sync_params.N_sl_id;
@@ -510,7 +509,7 @@ nr_initial_sync_t sl_nr_slss_search(PHY_VARS_NR_UE *UE, UE_nr_rxtx_proc_t *proc,
           sl_nr_rx_indication_t rx_ind = {0};
           uint16_t number_pdus = 1;
           nr_fill_sl_indication(&sl_indication, &rx_ind, NULL, proc, UE, NULL);
-          nr_fill_sl_rx_indication(&rx_ind, SL_NR_RX_PDU_TYPE_SSB, UE, number_pdus, proc, (void *)decoded_output, rx_slss_id);
+          nr_fill_sl_rx_indication(&rx_ind, SL_NR_RX_PDU_TYPE_SSB, UE, number_pdus, (void *)decoded_output, rx_slss_id);
 
           LOG_D(PHY, "Sidelink SLSS SEARCH PSBCH RX OK. Send SL-SSB TO MAC\n");
 
