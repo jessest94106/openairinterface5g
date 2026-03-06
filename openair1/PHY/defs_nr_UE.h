@@ -140,11 +140,11 @@ typedef struct {
   //! total estimated noise power (linear)
   unsigned int   n0_power_tot;
   //! total estimated noise power (dB)
-  unsigned short n0_power_tot_dB;
+  short n0_power_tot_dB;
   //! average estimated noise power (linear)
   unsigned int   n0_power_avg;
   //! average estimated noise power (dB)
-  unsigned short n0_power_avg_dB;
+  short n0_power_avg_dB;
   //! total estimated noise power (dBm)
   short n0_power_tot_dBm;
 
@@ -157,12 +157,12 @@ typedef struct {
   /// estimated received signal power (sum over all TX/RX antennas)
   int rx_power_tot[NUMBER_OF_CONNECTED_gNB_MAX]; //NEW
   /// estimated received signal power (sum over all TX/RX antennas)
-  unsigned short rx_power_tot_dB[NUMBER_OF_CONNECTED_gNB_MAX]; //NEW
+  short rx_power_tot_dB[NUMBER_OF_CONNECTED_gNB_MAX]; //NEW
 
   //! estimated received signal power (sum of all TX/RX antennas, time average)
   int rx_power_avg[NUMBER_OF_CONNECTED_gNB_MAX];
   //! estimated received signal power (sum of all TX/RX antennas, time average, in dB)
-  unsigned short rx_power_avg_dB[NUMBER_OF_CONNECTED_gNB_MAX];
+  short rx_power_avg_dB[NUMBER_OF_CONNECTED_gNB_MAX];
 
   /// SINR (sum of all TX/RX antennas, in dB)
   int wideband_cqi_tot[NUMBER_OF_CONNECTED_gNB_MAX];

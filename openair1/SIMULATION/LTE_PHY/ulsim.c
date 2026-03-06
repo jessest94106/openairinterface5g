@@ -343,7 +343,8 @@ int main(int argc, char **argv) {
   unsigned short input_buffer_length;
   unsigned int ret;
   unsigned int coded_bits_per_codeword,nsymb;
-  unsigned int tx_lev = 0, tx_lev_dB = 0, trials, errs[6] = {0}, round_trials[4] = {0};
+  unsigned int tx_lev = 0, trials, errs[6] = {0}, round_trials[4] = {0};
+  int tx_lev_dB = 0;
   FILE *bler_fd=NULL;
   char bler_fname[512];
   FILE *time_meas_fd=NULL;
@@ -894,7 +895,7 @@ int main(int argc, char **argv) {
         //    LOG_M("txsig1.m","txs1", txdata[1],FRAME_LENGTH_COMPLEX_SAMPLES,1,1);
         tx_lev = signal_energy(&txdata[0][0],
                                OFDM_SYMBOL_SIZE_COMPLEX_SAMPLES);
-        tx_lev_dB = (unsigned int) dB_fixed(tx_lev);
+        tx_lev_dB = dB_fixed(tx_lev);
       }
 
       iter_trials=0;
