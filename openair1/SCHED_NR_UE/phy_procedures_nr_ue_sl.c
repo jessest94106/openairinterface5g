@@ -300,7 +300,7 @@ void phy_procedures_nrUE_SL_TX(PHY_VARS_NR_UE *ue, const UE_nr_rxtx_proc_t *proc
     tx_action = 1;
   }
 
-  bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT];
+  bool was_symbol_used[NR_SYMBOLS_PER_SLOT];
   for (int i = 0; i < 14; i++)
     was_symbol_used[i] = true;
   if (tx_action) {

@@ -72,7 +72,7 @@ void nr_normal_prefix_mod(c16_t *txdataF,
                           uint8_t nsymb,
                           const NR_DL_FRAME_PARMS *frame_parms,
                           uint32_t slot,
-                          bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT])
+                          bool was_symbol_used[NR_SYMBOLS_PER_SLOT])
 {
   // This function works only slot wise. For more generic symbol generation refer nr_feptx0()
   if (frame_parms->numerology_index != 0) { // case where numerology != 0

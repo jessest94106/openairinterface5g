@@ -330,7 +330,7 @@ static int nr_csi_rs_channel_estimation(
     }
 
 #ifdef NR_CSIRS_DEBUG
-    for(int symb = 0; symb < NR_SYMBOLS_PER_SLOT; symb++) {
+    for(int symb = 0; symb < fp->symbols_per_slot; symb++) {
       if(!is_csi_rs_in_symbol(*csirs_config_pdu,symb)) {
         continue;
       }
