@@ -145,19 +145,17 @@ void nr_feptx0(RU_t *ru, int tti_tx, int first_symbol, int num_symbols, int aa)
 void nr_feptx_ofdm(RU_t *ru,int frame_tx,int tti_tx)
 {
   nfapi_nr_config_request_scf_t *cfg = &ru->gNB_list[0]->gNB_config;
-  NR_DL_FRAME_PARMS *fp=ru->nr_frame_parms;
-  int cyclic_prefix_type = NFAPI_CP_NORMAL;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
 
   unsigned int aa=0;
-  int slot_sizeF = (fp->ofdm_symbol_size)*
-                   ((cyclic_prefix_type == 1) ? 12 : 14);
+  int slot_sizeF = fp->ofdm_symbol_size * fp->symbols_per_slot;
   int slot = tti_tx;
   int *txdata = &ru->common.txdata[aa][get_samples_slot_timestamp(fp, slot)];
 
   if (nr_slot_select(cfg,frame_tx,slot) == NR_UPLINK_SLOT)
     return;
 
-  nr_feptx0(ru,slot,0,NR_NUMBER_OF_SYMBOLS_PER_SLOT,aa);
+  nr_feptx0(ru, slot, 0, fp->symbols_per_slot, aa);
 
   LOG_D(PHY,
         "feptx_ofdm (TXPATH): frame %d, slot %d: txp (time %p) %d dB, txp (freq) %d dB\n",

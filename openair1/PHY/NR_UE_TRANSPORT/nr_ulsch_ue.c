@@ -1027,11 +1027,11 @@ static uci_on_pusch_bit_type_t *nr_data_control_mapping(const nfapi_nr_ue_pusch_
   if (!pusch_pdu || !codeword || codeword_len == 0 || !template)
     return NULL;
   const uint8_t n_symbols = pusch_pdu->nr_of_symbols;
-  if (n_symbols == 0 || n_symbols > NR_NUMBER_OF_SYMBOLS_PER_SLOT)
+  if (n_symbols == 0 || n_symbols > NR_SYMBOLS_PER_SLOT)
     return NULL;
 
-  uint32_t m_ulsch_initial[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
-  uint32_t m_uci_current[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0}; // This holds RE counts, not bit counts
+  uint32_t m_ulsch_initial[NR_SYMBOLS_PER_SLOT] = {0};
+  uint32_t m_uci_current[NR_SYMBOLS_PER_SLOT] = {0}; // This holds RE counts, not bit counts
 
   if (initialize_mapping_resources(pusch_pdu, m_ulsch_initial, m_uci_current) != 0) {
     LOG_E(PHY, "Failed to initialize mapping resources\n");
@@ -1048,8 +1048,8 @@ static uci_on_pusch_bit_type_t *nr_data_control_mapping(const nfapi_nr_ue_pusch_
 
   memset(template, 0, codeword_len * sizeof(uci_on_pusch_bit_type_t));
 
-  uint32_t positions_by_sym[NR_NUMBER_OF_SYMBOLS_PER_SLOT][MAX_UCI_CODED_BITS] = {0};
-  uint32_t count_by_sym[NR_NUMBER_OF_SYMBOLS_PER_SLOT] = {0};
+  uint32_t positions_by_sym[NR_SYMBOLS_PER_SLOT][MAX_UCI_CODED_BITS] = {0};
+  uint32_t count_by_sym[NR_SYMBOLS_PER_SLOT] = {0};
 
   struct map_uci_common_arg map_arg = {.template = template,
                                        .n_symbols = pusch_pdu->nr_of_symbols,
@@ -1094,7 +1094,7 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                             const uint8_t slot,
                             nr_phy_data_tx_t *phy_data,
                             c16_t **txdataF,
-                            bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT])
+                            bool was_symbol_used[NR_SYMBOLS_PER_SLOT])
 {
 
   int harq_pid = phy_data->ulsch.pusch_pdu.pusch_data.harq_process_id;
@@ -1603,19 +1603,19 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
   stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
 }
 
-uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
-                                    const NR_DL_FRAME_PARMS *frame_parms,
-                                    const uint8_t n_antenna_ports,
-                                    c16_t **txdataF,
-                                    c16_t **txdata,
-                                    uint32_t linktype,
-                                    bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT],
-                                    bool no_phase_pre_comp)
+void nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
+                                 const NR_DL_FRAME_PARMS *frame_parms,
+                                 const uint8_t n_antenna_ports,
+                                 c16_t **txdataF,
+                                 c16_t **txdata,
+                                 uint32_t linktype,
+                                 bool was_symbol_used[NR_SYMBOLS_PER_SLOT],
+                                 bool no_phase_pre_comp)
 {
   int N_RB = (linktype == link_type_sl) ? frame_parms->N_RB_SL : frame_parms->N_RB_UL;
 
   if (!no_phase_pre_comp) {
-    for (int i = 0; i < NR_NUMBER_OF_SYMBOLS_PER_SLOT; i++) {
+    for (int i = 0; i < frame_parms->symbols_per_slot; i++) {
       if (was_symbol_used[i] == false)
         continue;
       for (int ap = 0; ap < n_antenna_ports; ap++) {
@@ -1626,7 +1626,7 @@ uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
 
   for (int ap = 0; ap < n_antenna_ports; ap++) {
     if (frame_parms->Ncp == 1) { // extended cyclic prefix
-      for (int i = 0; i < NR_NUMBER_OF_SYMBOLS_PER_SLOT_EXTENDED_CP; i++) {
+      for (int i = 0; i < frame_parms->symbols_per_slot; i++) {
         if (was_symbol_used[i] == false) {
           memset(&txdata[ap][(frame_parms->ofdm_symbol_size + frame_parms->nb_prefix_samples) * i],
                  0,
@@ -1641,11 +1641,7 @@ uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
                      CYCLIC_PREFIX);
       }
     } else { // normal cyclic prefix
-      nr_normal_prefix_mod(txdataF[ap], txdata[ap], NR_NUMBER_OF_SYMBOLS_PER_SLOT, frame_parms, slot, was_symbol_used);
+      nr_normal_prefix_mod(txdataF[ap], txdata[ap], frame_parms->symbols_per_slot, frame_parms, slot, was_symbol_used);
     }
   }
-
-  ///////////
-  ////////////////////////////////////////////////////
-  return 0;
 }

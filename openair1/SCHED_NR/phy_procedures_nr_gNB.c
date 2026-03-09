@@ -980,7 +980,6 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
 
   const NR_DL_FRAME_PARMS *frame_parms = &gNB->frame_parms;
   const uint16_t ofdm_symbol_size = frame_parms->ofdm_symbol_size;
-  const int nb_symb = frame_parms->symbols_per_slot;
   const uint8_t nb_antennas_rx = frame_parms->nb_antennas_rx;
   LOG_D(PHY,"phy_procedures_gNB_uespec_RX frame %d, slot %d\n",frame_rx,slot_rx);
   {
@@ -993,7 +992,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
 
     int first_symb = 0, num_symb = 0;
     if (frame_parms->frame_type == TDD)
-      for (int symbol_count = 0; symbol_count < NR_NUMBER_OF_SYMBOLS_PER_SLOT; symbol_count++) {
+      for (int symbol_count = 0; symbol_count < frame_parms->symbols_per_slot; symbol_count++) {
         if (slot_conf[symbol_count].slot_config.value == 1) {
           if (num_symb == 0)
             first_symb = symbol_count;
@@ -1001,11 +1000,11 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
         }
       }
     else
-      num_symb = NR_NUMBER_OF_SYMBOLS_PER_SLOT;
+      num_symb = frame_parms->symbols_per_slot;
     gNB_I0_measurements(gNB, slot_rx, first_symb, num_symb, rb_mask_ul);
   }
 
-  const int soffset = (slot_rx & 3) * nb_symb * ofdm_symbol_size;
+  const int soffset = (slot_rx & 3) * frame_parms->symbols_per_slot * ofdm_symbol_size;
   start_meas(&gNB->phy_proc_rx);
 
   for (int i = 0; i < gNB->max_nb_pucch; i++) {
@@ -1368,7 +1367,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     T(T_GNB_PHY_PUCCH_PUSCH_IQ,
       T_INT(frame_rx),
       T_INT(slot_rx),
-      T_BUFFER(&gNB->common_vars.rxdataF[0][0][0], nb_symb * ofdm_symbol_size * 4));
+      T_BUFFER(&gNB->common_vars.rxdataF[0][0][0], frame_parms->symbols_per_slot * ofdm_symbol_size * 4));
   }
 
   return pusch_DTX;

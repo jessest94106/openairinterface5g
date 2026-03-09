@@ -554,7 +554,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   time_stats_t *dlsch_scrambling_stats = &gNB->dlsch_scrambling_stats;
   time_stats_t *dlsch_modulation_stats = &gNB->dlsch_modulation_stats;
   const nfapi_nr_dl_tti_pdsch_pdu_rel15_t *rel15 = &dlsch->pdsch_pdu->pdsch_pdu_rel15;
-  const int layerSz = frame_parms->N_RB_DL * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB;
+  const int layerSz = frame_parms->N_RB_DL * frame_parms->symbols_per_slot * NR_NB_SC_PER_RB;
   const int symbol_sz=frame_parms->ofdm_symbol_size;
   const int dmrs_Type = rel15->dmrsConfigType;
   const int nb_re_dmrs = rel15->numDmrsCdmGrpsNoData * (rel15->dmrsConfigType == NFAPI_NR_DMRS_TYPE1 ? 6 : 4);
@@ -765,7 +765,7 @@ static int do_one_dlsch(unsigned char *input_ptr, PHY_VARS_gNB *gNB, NR_gNB_DLSC
   /* output and its parts for each dlsch should be aligned on 64 bytes (or 8 * 64 bits)
    * should remain a multiple of 8 * 64 with enough offset to fit each dlsch
    */
-  uint32_t size_output_tb = rel15->rbSize * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB * Qm * rel15->nrOfLayers;
+  uint32_t size_output_tb = rel15->rbSize * frame_parms->symbols_per_slot * NR_NB_SC_PER_RB * Qm * rel15->nrOfLayers;
   return ((size_output_tb + 511) >> 9) << 6;
 }
 

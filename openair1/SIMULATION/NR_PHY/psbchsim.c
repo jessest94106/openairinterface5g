@@ -246,7 +246,7 @@ static int freq_domain_loopback(PHY_VARS_NR_UE *UE_tx, PHY_VARS_NR_UE *UE_rx, in
          sl_ue2->sl_config.sl_sync_source.rx_slss_id);
 
   NR_DL_FRAME_PARMS *fp = &sl_ue1->sl_frame_params;
-  const int samplesF_per_slot = NR_SYMBOLS_PER_SLOT * fp->ofdm_symbol_size;
+  const int samplesF_per_slot = fp->symbols_per_slot * fp->ofdm_symbol_size;
   c16_t txdataF_buf[fp->nb_antennas_tx * samplesF_per_slot] __attribute__((aligned(32)));
   memset(txdataF_buf, 0, sizeof(txdataF_buf));
   c16_t *txdataF[fp->nb_antennas_tx]; /* workaround to be compatible with current txdataF usage in all tx procedures. */

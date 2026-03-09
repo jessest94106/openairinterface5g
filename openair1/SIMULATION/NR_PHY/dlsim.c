@@ -1152,7 +1152,7 @@ int main(int argc, char **argv)
                          frame_parms->nb_prefix_samples,
                          CYCLIC_PREFIX);
           } else {
-            bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT];
+            bool was_symbol_used[NR_SYMBOLS_PER_SLOT];
             for (int i = 0; i < 14; i++) {
               was_symbol_used[i] = true;
             }
