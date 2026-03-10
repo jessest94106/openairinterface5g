@@ -103,7 +103,7 @@ RAN_CONTEXT_t RC;
 int oai_exit = 0;
 
 uint64_t        downlink_frequency[MAX_NUM_CCs][4];
-int32_t         uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t         uplink_frequency_offset[MAX_NUM_CCs][4];
 uint64_t        sidelink_frequency[MAX_NUM_CCs][4];
 
 // UE and OAI config variables
