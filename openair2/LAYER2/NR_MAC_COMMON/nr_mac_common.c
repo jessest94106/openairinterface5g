@@ -1184,6 +1184,7 @@ typedef struct {
 } nr_prach_info_3gpp_fr2_t;
 
 // Table 6.3.3.2-4: Random access configurations for FR2 and unpaired spectrum
+// and NTN-FR2 and paired as defined in 38.211v18.06
 static const nr_prach_info_3gpp_fr2_t table_6_3_3_2_4_prachConfig_Index[256] = {
     // format,      format,       x,          y,           y,              SFN_nbr,       star_symb,   slots_sfn,  occ_slot,
     // duration
@@ -1458,7 +1459,8 @@ int get_format0(uint8_t index, uint8_t unpaired, frequency_range_t frequency_ran
     if (frequency_range==FR1)
       format = table_6_3_3_2_2_prachConfig_Index[index].format;
     else
-      AssertFatal(0==1,"no paired spectrum for FR2\n");
+      // Table defined for NTN-FR2 and paired in 3GPP Spec 38.211v18.06
+      format = table_6_3_3_2_4_prachConfig_Index[index].format;
   }
   return format;
 }

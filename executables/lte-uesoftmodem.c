@@ -92,7 +92,7 @@ unsigned int                    mmapped_dma=0;
 UE_MAC_INST *UE_mac_inst = NULL;
 
 uint64_t                 downlink_frequency[MAX_NUM_CCs][4];
-int32_t                  uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t                  uplink_frequency_offset[MAX_NUM_CCs][4];
 
 
 
