@@ -217,7 +217,7 @@ static void writerProcessWaitingQueue(nrue_ru_write_t nrue_ru_write, PHY_VARS_NR
           else
             wroteSamples = device->trx_write_func(device, timestamp, txp, nsamps, nbAnt, flags);
           if (wroteSamples != nsamps)
-            LOG_E(HW, "Failed to write to rf\n");
+            LOG_W(HW, "Failed to write to RF: wrote %d out of %d samples\n", wroteSamples, nsamps);
         }
         ctx->nextTS = timestamp + nsamps;
         pthread_mutex_lock(&ctx->mutex_store);
@@ -258,6 +258,8 @@ int openair0_write_reorder_common(nrue_ru_write_t nrue_ru_write,
           wroteSamples = nrue_ru_write(UE, timestamp, txp, nsamps, nbAnt, flags);
         else
           wroteSamples = device->trx_write_func(device, timestamp, txp, nsamps, nbAnt, flags);
+        if (wroteSamples != nsamps)
+          LOG_W(HW, "Failed to write to RF: wrote %d out of %d samples\n", wroteSamples, nsamps);
       } else
         wroteSamples = nsamps;
       ctx->nextTS = timestamp + nsamps;
