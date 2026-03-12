@@ -59,16 +59,13 @@ int nr_generate_sss(  c16_t *txdataF,
   /// Resource mapping
 
   // SSS occupies a predefined position (subcarriers 56-182, symbol 2) within the SSB block starting from
-  int k = frame_parms->first_carrier_offset + frame_parms->ssb_start_subcarrier + 56; //and
+  int k = frame_parms->ssb_start_subcarrier + 56;
   int l = ssb_start_symbol + 2;
 
   for (int i = 0; i < NR_SSS_LENGTH; i++) {
     int16_t d_sss = (1 - 2*x0[(i + m0) % NR_SSS_LENGTH] ) * (1 - 2*x1[(i + m1) % NR_SSS_LENGTH] ) * 23170;
     ((int16_t*)txdataF)[2*(l*frame_parms->ofdm_symbol_size + k)] = (((int16_t)amp) * d_sss) >> 15;
     k++;
-
-    if (k >= frame_parms->ofdm_symbol_size)
-      k-=frame_parms->ofdm_symbol_size;
   }
 #ifdef NR_SSS_DEBUG
   //  write_output("sss_0.m", "sss_0", (void*)txdataF[0][l*frame_parms->ofdm_symbol_size], frame_parms->ofdm_symbol_size, 1, 1);

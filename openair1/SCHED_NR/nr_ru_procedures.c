@@ -173,7 +173,6 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
   PHY_VARS_gNB *gNB = gNB_list[0];
   nfapi_nr_config_request_scf_t *cfg = &ru->gNB_list[0]->gNB_config;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
-  int txdataF_offset = slot_tx * fp->samples_per_slot_wCP;
   start_meas(&ru->precoding_stats);
 
   if (gNB->common_vars.analog_bf) {
@@ -193,8 +192,8 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
     for (int b = 0; b < ru->num_beams_period; b++) {
       for (int i = 0; i < Ptx; ++i) {
         int tx_idx = i + b * ru->nb_tx;
-        memcpy((void*)ru->common.txdataF_BF[tx_idx],
-               (void*)&gNB->common_vars.txdataF[b][i][txdataF_offset],
+        memcpy((void *)ru->common.txdataF_BF[tx_idx],
+               (void *)gNB->common_vars.txdataF[b][i],
                fp->samples_per_slot_wCP * sizeof(int32_t));
       }
     }
@@ -216,9 +215,6 @@ void nr_feptx(void *arg)
   int startSymbol = feptx->startSymbol;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   int numSymbols = feptx->numSymbols;
-  int numSamples = feptx->numSymbols * fp->ofdm_symbol_size;
-  int txdataF_offset = (slot * fp->samples_per_slot_wCP) + startSymbol * fp->ofdm_symbol_size;
-  int txdataF_BF_offset = startSymbol * fp->ofdm_symbol_size;
 
   int tx_idx = aa + bb * ru->nb_tx;
 
@@ -232,11 +228,17 @@ void nr_feptx(void *arg)
   }
 
   // If there is no digital beamforming we just need to copy the data to RU
-  if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf)
-     memcpy((void*)&ru->common.txdataF_BF[tx_idx][txdataF_BF_offset],
-            (void*)&ru->gNB_list[0]->common_vars.txdataF[bb][aa][txdataF_offset],
-            numSamples * sizeof(int32_t));
-  else {
+  if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf) {
+    // FFT shift
+    const NR_DL_FRAME_PARMS *fp = &ru->gNB_list[0]->frame_parms;
+    fft_shift(ru->gNB_list[0]->common_vars.txdataF[bb][aa],
+              fp->ofdm_symbol_size,
+              fp->N_RB_DL,
+              (c16_t *)ru->common.txdataF_BF[tx_idx],
+              fp->ofdm_symbol_size,
+              startSymbol,
+              numSymbols);
+  } else {
     AssertFatal(false, "This needs to be fixed by using appropriate beams from config\n");
   }
 
