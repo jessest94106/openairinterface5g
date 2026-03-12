@@ -20,7 +20,7 @@ Ref :
   Slot Indication : 5.0
   feprx : 43.0
   feptx_ofdm (per port, half_slot) : 30
-  feptx_total : 57
+  feptx_total : 43
 DeviationThreshold :
   feprx : 0.25
   feptx_prec : 0.25
