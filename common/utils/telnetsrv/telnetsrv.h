@@ -35,8 +35,8 @@
 
 #define TELNET_MAX_MSGLENGTH      2048
 #define TELNET_PROMPT_PREFIX      "softmodem"
-#define TELNET_MAXCMD             20
-#define TELNET_CMD_MAXSIZE        20
+#define TELNET_MAXCMD             64
+#define TELNET_CMD_MAXSIZE        64
 #define TELNET_HELPSTR_SIZE       80
 
 /* status return by the command parser after it analysed user input */
