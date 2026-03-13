@@ -53,7 +53,7 @@ void nr_normal_prefix_mod(c16_t *txdataF,
                           uint8_t nsymb,
                           const NR_DL_FRAME_PARMS *frame_parms,
                           uint32_t slot,
-                          bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT]);
+                          bool was_symbol_used[NR_SYMBOLS_PER_SLOT]);
 
 void do_OFDM_mod(c16_t **txdataF, c16_t **txdata, uint32_t frame,uint16_t next_slot, LTE_DL_FRAME_PARMS *frame_parms);
 

@@ -55,7 +55,7 @@ void free_gNB_dlsch(NR_gNB_DLSCH_t *dlsch, uint16_t N_RB, const NR_DL_FRAME_PARM
     dlsch->b = NULL;
   }
   if (dlsch->f) {
-    free16(dlsch->f, N_RB * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB * 8 * NR_MAX_NB_LAYERS);
+    free16(dlsch->f, N_RB * frame_parms->symbols_per_slot * NR_NB_SC_PER_RB * 8 * NR_MAX_NB_LAYERS);
     dlsch->f = NULL;
   }
   for (int r = 0; r < a_segments; r++) {
@@ -94,9 +94,9 @@ NR_gNB_DLSCH_t new_gNB_dlsch(NR_DL_FRAME_PARMS *frame_parms, uint16_t N_RB)
     bzero(dlsch.c[r], 8448);
   }
 
-  dlsch.f = malloc16(N_RB * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB * 8 * NR_MAX_NB_LAYERS);
+  dlsch.f = malloc16(N_RB * frame_parms->symbols_per_slot * NR_NB_SC_PER_RB * 8 * NR_MAX_NB_LAYERS);
   AssertFatal(dlsch.f, "cannot allocate dlsch->f\n");
-  bzero(dlsch.f, N_RB * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB * 8 * NR_MAX_NB_LAYERS);
+  bzero(dlsch.f, N_RB * frame_parms->symbols_per_slot * NR_NB_SC_PER_RB * 8 * NR_MAX_NB_LAYERS);
 
   return (dlsch);
 }
@@ -262,7 +262,7 @@ int nr_dlsch_encoding(PHY_VARS_gNB *gNB,
     /* output and its parts for each dlsch should be aligned on 64 bytes (or 8 * 64 bits)
      * => dlsch_offset should remain a multiple of 8 * 64 with enough offset to fit each dlsch
      */
-    const size_t dlsch_size = rel15->rbSize * NR_SYMBOLS_PER_SLOT * NR_NB_SC_PER_RB * rel15->qamModOrder[0] * rel15->nrOfLayers;
+    const size_t dlsch_size = rel15->rbSize * gNB->frame_parms.symbols_per_slot * NR_NB_SC_PER_RB * rel15->qamModOrder[0] * rel15->nrOfLayers;
     dlsch_offset += ceil_mod(dlsch_size, 8 * 64);
   }
 

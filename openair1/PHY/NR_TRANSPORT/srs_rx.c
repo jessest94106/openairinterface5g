@@ -63,7 +63,7 @@ void nr_fill_srs(PHY_VARS_gNB *gNB, frame_t frame, slot_t slot, nfapi_nr_srs_pdu
                                              fapi_beam_idx,
                                              &gNB->common_vars,
                                              slot,
-                                             NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+                                             gNB->frame_parms.symbols_per_slot,
                                              bitmap);
       }
       memcpy((void *)&srs->srs_pdu, (void *)srs_pdu, sizeof(nfapi_nr_srs_pdu_t));

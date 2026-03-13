@@ -252,9 +252,9 @@ static bool check_srs_config(NR_SRS_Config_t *srs_Config)
   if (srs_Config->srs_ResourceToAddModList) {
     for (int i = 0; i < srs_Config->srs_ResourceToAddModList->list.count; i++) {
       NR_SRS_Resource_t *res = srs_Config->srs_ResourceToAddModList->list.array[i];
-      int start = NR_NUMBER_OF_SYMBOLS_PER_SLOT - res->resourceMapping.startPosition - 1;
+      int start = NR_SYMBOLS_PER_SLOT - res->resourceMapping.startPosition - 1;
       int num = 1 << res->resourceMapping.nrofSymbols;
-      if (start + num > NR_NUMBER_OF_SYMBOLS_PER_SLOT) {
+      if (start + num > NR_SYMBOLS_PER_SLOT) {
         LOG_E(NR_RRC, "The configured SRS resource exceeds the slot boundary\n");
         return false;
       }

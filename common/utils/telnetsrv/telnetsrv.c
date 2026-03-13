@@ -561,7 +561,7 @@ int process_command(char *buf, int iteration)
   }
 
   rt=CMDSTATUS_NOTFOUND;
-  j = sscanf(buf,"%19s %19s %m[^\t\n]",modulename,cmd,&cmdb);
+  j = sscanf(buf,"%19s %63s %m[^\t\n]",modulename,cmd,&cmdb);
 
   if (telnetparams.telnetdbg > 0)
     printf("process_command: %i words, module=%s cmd=%s, parameters= %s\n", j, modulename, cmd, (cmdb == NULL) ? "" : cmdb);
@@ -947,6 +947,12 @@ int add_telnetcmd(char *modulename, telnetshell_vardef_t *var, telnetshell_cmdde
       telnetparams.CmdParsers[i].cmd = cmd;
       telnetparams.CmdParsers[i].var = var;
       for (int j = 0; cmd[j].cmdfunc != NULL; j++) {
+        size_t cmdnamelen = strnlen(cmd[j].cmdname, TELNET_CMD_MAXSIZE);
+        AssertFatal(cmdnamelen < TELNET_CMD_MAXSIZE,
+                    "cmdname %s too long: %ld >= %d",
+                    cmd[j].cmdname,
+                    cmdnamelen,
+                    TELNET_CMD_MAXSIZE);
         if (cmd[j].cmdflags & TELNETSRV_CMDFLAG_PUSHINTPOOLQ) {
           if (afifo == NULL) {
             afifo = calloc_or_fail(1, sizeof(notifiedFIFO_t));

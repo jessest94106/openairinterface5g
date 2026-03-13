@@ -73,7 +73,7 @@ void nr_fill_pucch(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_pucch_pdu_t 
                                                fapi_beam_idx,
                                                &gNB->common_vars,
                                                slot,
-                                               NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+                                               gNB->frame_parms.symbols_per_slot,
                                                bitmap);
       }
       memcpy((void *)&pucch->pucch_pdu, (void *)pucch_pdu, sizeof(nfapi_nr_pucch_pdu_t));
@@ -1069,7 +1069,7 @@ void nr_decode_pucch2(PHY_VARS_gNB *gNB,
     // first compute DMRS component
     const int scramble = pucch_pdu->dmrs_scrambling_id * 2;
     uint32_t x2 =
-        ((1ULL << 17) * ((NR_NUMBER_OF_SYMBOLS_PER_SLOT * slot + pucch_pdu->start_symbol_index + symb + 1) * (scramble + 1))
+        ((1ULL << 17) * ((frame_parms->symbols_per_slot * slot + pucch_pdu->start_symbol_index + symb + 1) * (scramble + 1))
          + scramble)
         % (1U << 31); // c_init calculation according to TS38.211 subclause
 #ifdef DEBUG_NR_PUCCH_RX

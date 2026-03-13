@@ -105,6 +105,7 @@ void nr_beam_precoding(c16_t **txdataF,
 
 void apply_nr_rotation_TX(const NR_DL_FRAME_PARMS *fp,
                           c16_t *txdataF,
+                          bool is_flat_buff,
                           const c16_t *symbol_rotation,
                           int slot,
                           int nb_rb,
@@ -118,7 +119,7 @@ void nr_ofdm_demod_and_rx_rotation(c16_t **rxdata,
                                    int slot,
                                    int slot_offsetF,
                                    enum nr_Link linktype,
-                                   bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT]);
+                                   bool was_symbol_used[NR_SYMBOLS_PER_SLOT]);
 
 void perform_symbol_rotation(NR_DL_FRAME_PARMS *fp, double f0, c16_t *symbol_rotation);
 
@@ -161,4 +162,12 @@ void nr_layer_precoder_simd(const int n_layers,
                             const int sc_offset,
                             const int re_cnt,
                             c16_t *txdataF_precoded);
+
+void fft_shift(const c16_t *in,
+               uint32_t in_symb_sz,
+               uint16_t num_prb,
+               c16_t *out,
+               uint16_t fft_size_out,
+               uint16_t start_symb,
+               uint16_t num_symb);
 #endif

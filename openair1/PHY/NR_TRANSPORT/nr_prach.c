@@ -105,7 +105,7 @@ prach_item_t *nr_schedule_rx_prach(PHY_VARS_gNB *gNB, int SFN, int Slot, nfapi_n
                                               fapi_beam_idx,
                                               &gNB->common_vars,
                                               Slot,
-                                              NR_NUMBER_OF_SYMBOLS_PER_SLOT,
+                                              gNB->frame_parms.symbols_per_slot,
                                               bitmap);
     }
   }

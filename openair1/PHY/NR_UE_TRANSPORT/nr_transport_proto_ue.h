@@ -69,11 +69,9 @@ typedef struct pdsch_scope_req_s {
 void nr_ue_dlsch_init(NR_UE_DLSCH_t *dlsch_list, int num_dlsch, uint8_t max_ldpc_iterations);
 void nr_conjch0_mult_ch1(c16_t *ch0, c16_t *ch1, c16_t *ch0conj_ch1, unsigned short nb_rb, unsigned char output_shift0);
 
-void set_first_last_pdcch_symb(const NR_UE_PDCCH_CONFIG *phy_pdcch_config, int *first_symb, int *last_symb);
+void set_first_last_pdcch_symb(const NR_UE_PDCCH_CONFIG *phy_pdcch_config, int symb_slot, int *first_symb, int *last_symb);
 
-int get_pdcch_mon_occasions_slot(const fapi_nr_dl_config_dci_dl_pdu_rel15_t *ss, uint8_t start_symb[NR_SYMBOLS_PER_SLOT]);
-
-int get_max_pdcch_monOcc(const NR_UE_PDCCH_CONFIG *phy_pdcch_config);
+int get_max_pdcch_monOcc(const NR_UE_PDCCH_CONFIG *phy_pdcch_config, int nb_symb_slot);
 
 /** \brief This is the alternative top-level entry point for DLSCH decoding in UE.
     It handles all the HARQ processes in only one call. The routine first
@@ -162,25 +160,25 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
                             const uint8_t slot,
                             nr_phy_data_tx_t *phy_data,
                             c16_t **txdataF,
-                            bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT]);
+                            bool was_symbol_used[NR_SYMBOLS_PER_SLOT]);
 
 /** \brief This function does IFFT for PUSCH
 */
 
-uint8_t nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
-                                    const NR_DL_FRAME_PARMS *frame_parms,
-                                    const uint8_t n_antenna_ports,
-                                    c16_t **txdataF,
-                                    c16_t **txdata,
-                                    uint32_t linktype,
-                                    bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT],
-                                    bool no_phase_pre_comp);
+void nr_tx_rotation_and_ofdm_mod(const uint8_t slot,
+                                 const NR_DL_FRAME_PARMS *frame_parms,
+                                 const uint8_t n_antenna_ports,
+                                 c16_t **txdataF,
+                                 c16_t **txdata,
+                                 uint32_t linktype,
+                                 bool was_symbol_used[NR_SYMBOLS_PER_SLOT],
+                                 bool no_phase_pre_comp);
 
 bool ue_srs_procedures_nr(PHY_VARS_NR_UE *ue,
                                  const UE_nr_rxtx_proc_t *proc,
                                  c16_t **txdataF,
                                  nr_phy_data_tx_t *phy_data,
-                                 bool was_symbol_used[NR_NUMBER_OF_SYMBOLS_PER_SLOT]);
+                                 bool was_symbol_used[NR_SYMBOLS_PER_SLOT]);
 
 void clean_UE_harq(PHY_VARS_NR_UE *UE);
 

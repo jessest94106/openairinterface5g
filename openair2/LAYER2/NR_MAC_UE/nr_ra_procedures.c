@@ -425,8 +425,8 @@ static bool check_mixed_slot_prach(frame_structure_t *fs, int slot, int start_pr
     tdd_bitmap_t *bitmap = &fs->period_cfg.tdd_slot_bitmap[slot % fs->numb_slots_period];
     if (bitmap->num_ul_symbols == 0)
       return false;
-    int ul_end = NR_NUMBER_OF_SYMBOLS_PER_SLOT - 1;
-    int ul_start = NR_NUMBER_OF_SYMBOLS_PER_SLOT - bitmap->num_ul_symbols;
+    int ul_end = NR_SYMBOLS_PER_SLOT - 1;
+    int ul_start = NR_SYMBOLS_PER_SLOT - bitmap->num_ul_symbols;
     if (start_prach < ul_start || end_prach > ul_end)
       return false;
   }
