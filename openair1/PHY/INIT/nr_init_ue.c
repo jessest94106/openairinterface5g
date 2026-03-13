@@ -265,7 +265,7 @@ int init_nr_ue_signal(PHY_VARS_NR_UE *ue, int nb_connected_gNB)
     ue->nr_csi_info->csi_rs_generated_signal = malloc16(NR_MAX_CSI_PORTS * sizeof(*ue->nr_csi_info->csi_rs_generated_signal));
     for (int i = 0; i < NR_MAX_CSI_PORTS; i++) {
       ue->nr_csi_info->csi_rs_generated_signal[i] =
-          malloc16_clear(fp->samples_per_frame_wCP * sizeof(**ue->nr_csi_info->csi_rs_generated_signal));
+          malloc16_clear(fp->samples_per_slot_wCP * sizeof(**ue->nr_csi_info->csi_rs_generated_signal));
     }
 
     ue->nr_srs_info = malloc16_clear(sizeof(nr_srs_info_t));

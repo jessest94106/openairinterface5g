@@ -145,19 +145,17 @@ void nr_feptx0(RU_t *ru, int tti_tx, int first_symbol, int num_symbols, int aa)
 void nr_feptx_ofdm(RU_t *ru,int frame_tx,int tti_tx)
 {
   nfapi_nr_config_request_scf_t *cfg = &ru->gNB_list[0]->gNB_config;
-  NR_DL_FRAME_PARMS *fp=ru->nr_frame_parms;
-  int cyclic_prefix_type = NFAPI_CP_NORMAL;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
 
   unsigned int aa=0;
-  int slot_sizeF = (fp->ofdm_symbol_size)*
-                   ((cyclic_prefix_type == 1) ? 12 : 14);
+  int slot_sizeF = fp->ofdm_symbol_size * fp->symbols_per_slot;
   int slot = tti_tx;
   int *txdata = &ru->common.txdata[aa][get_samples_slot_timestamp(fp, slot)];
 
   if (nr_slot_select(cfg,frame_tx,slot) == NR_UPLINK_SLOT)
     return;
 
-  nr_feptx0(ru,slot,0,NR_NUMBER_OF_SYMBOLS_PER_SLOT,aa);
+  nr_feptx0(ru, slot, 0, fp->symbols_per_slot, aa);
 
   LOG_D(PHY,
         "feptx_ofdm (TXPATH): frame %d, slot %d: txp (time %p) %d dB, txp (freq) %d dB\n",
@@ -175,7 +173,6 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
   PHY_VARS_gNB *gNB = gNB_list[0];
   nfapi_nr_config_request_scf_t *cfg = &ru->gNB_list[0]->gNB_config;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
-  int txdataF_offset = slot_tx * fp->samples_per_slot_wCP;
   start_meas(&ru->precoding_stats);
 
   if (gNB->common_vars.analog_bf) {
@@ -195,8 +192,8 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
     for (int b = 0; b < ru->num_beams_period; b++) {
       for (int i = 0; i < Ptx; ++i) {
         int tx_idx = i + b * ru->nb_tx;
-        memcpy((void*)ru->common.txdataF_BF[tx_idx],
-               (void*)&gNB->common_vars.txdataF[b][i][txdataF_offset],
+        memcpy((void *)ru->common.txdataF_BF[tx_idx],
+               (void *)gNB->common_vars.txdataF[b][i],
                fp->samples_per_slot_wCP * sizeof(int32_t));
       }
     }
@@ -218,9 +215,6 @@ void nr_feptx(void *arg)
   int startSymbol = feptx->startSymbol;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
   int numSymbols = feptx->numSymbols;
-  int numSamples = feptx->numSymbols * fp->ofdm_symbol_size;
-  int txdataF_offset = (slot * fp->samples_per_slot_wCP) + startSymbol * fp->ofdm_symbol_size;
-  int txdataF_BF_offset = startSymbol * fp->ofdm_symbol_size;
 
   int tx_idx = aa + bb * ru->nb_tx;
 
@@ -234,11 +228,17 @@ void nr_feptx(void *arg)
   }
 
   // If there is no digital beamforming we just need to copy the data to RU
-  if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf)
-     memcpy((void*)&ru->common.txdataF_BF[tx_idx][txdataF_BF_offset],
-            (void*)&ru->gNB_list[0]->common_vars.txdataF[bb][aa][txdataF_offset],
-            numSamples * sizeof(int32_t));
-  else {
+  if (ru->config.dbt_config.num_dig_beams == 0 || ru->gNB_list[0]->common_vars.analog_bf) {
+    // FFT shift
+    const NR_DL_FRAME_PARMS *fp = &ru->gNB_list[0]->frame_parms;
+    fft_shift(ru->gNB_list[0]->common_vars.txdataF[bb][aa],
+              fp->ofdm_symbol_size,
+              fp->N_RB_DL,
+              (c16_t *)ru->common.txdataF_BF[tx_idx],
+              fp->ofdm_symbol_size,
+              startSymbol,
+              numSymbols);
+  } else {
     AssertFatal(false, "This needs to be fixed by using appropriate beams from config\n");
   }
 

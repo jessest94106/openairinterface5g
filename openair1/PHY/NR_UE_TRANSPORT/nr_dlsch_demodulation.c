@@ -701,7 +701,7 @@ int nr_rx_pdsch(PHY_VARS_NR_UE *ue,
         UEunlockScopeData(ue, pdschRxdataF_comp)
       }
     } else {
-      UEscopeCopy(ue, pdschRxdataF_comp, rxdataF_comp[0], sizeof(c16_t), nbRx, rx_size_symbol * NR_SYMBOLS_PER_SLOT, 0);
+      UEscopeCopy(ue, pdschRxdataF_comp, rxdataF_comp[0], sizeof(c16_t), nbRx, rx_size_symbol * fp->symbols_per_slot, 0);
     }
   }
 

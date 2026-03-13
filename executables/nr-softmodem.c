@@ -101,7 +101,7 @@ int oai_exit = 0;
 unsigned int mmapped_dma=0;
 
 uint64_t downlink_frequency[MAX_NUM_CCs][4];
-int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 char *uecap_file;
 
 runmode_t mode = normal_txrx;

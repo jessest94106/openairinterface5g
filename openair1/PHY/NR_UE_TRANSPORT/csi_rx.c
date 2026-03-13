@@ -281,7 +281,6 @@ static int nr_csi_rs_channel_estimation(
     int16_t *log2_maxh,
     uint32_t *noise_power)
 {
-  const int dataF_offset = proc->nr_slot_rx * fp->samples_per_slot_wCP;
   *noise_power = 0;
   int maxh = 0;
   int count = 0;
@@ -316,7 +315,7 @@ static int nr_csi_rs_channel_estimation(
             for (int lp = 0; lp <= csi_mapping->lprime; lp++) {
               uint16_t symb = lp + csi_mapping->loverline[cdm_id];
               uint64_t symbol_offset = symb * fp->ofdm_symbol_size;
-              const c16_t *tx_csi_rs_signal = &csi_rs_generated_signal[port_tx][symbol_offset+dataF_offset];
+              const c16_t *tx_csi_rs_signal = &csi_rs_generated_signal[port_tx][symbol_offset];
               const c16_t *rx_csi_rs_signal = &csi_rs_received_signal[ant_rx][symbol_offset];
               c16_t tmp = c16MulConjShift(tx_csi_rs_signal[k], rx_csi_rs_signal[k], nr_csi_info->csi_rs_generated_signal_bits);
               // This is not just the LS estimation for each (k,l), but also the sum of the different contributions
@@ -330,7 +329,7 @@ static int nr_csi_rs_channel_estimation(
     }
 
 #ifdef NR_CSIRS_DEBUG
-    for(int symb = 0; symb < NR_SYMBOLS_PER_SLOT; symb++) {
+    for(int symb = 0; symb < fp->symbols_per_slot; symb++) {
       if(!is_csi_rs_in_symbol(*csirs_config_pdu,symb)) {
         continue;
       }

@@ -281,7 +281,7 @@ static int nr_ue_slot_select(const fapi_nr_config_request_t *cfg, int nr_slot)
   if (current_slot->max_num_of_symbol_per_slot_list[0].slot_config == 2)
     return NR_MIXED_SLOT;
 
-  for (int i = 1; i < NR_NUMBER_OF_SYMBOLS_PER_SLOT; i++) {
+  for (int i = 1; i < NR_SYMBOLS_PER_SLOT; i++) {
     // if the 1st symbol is DL and any other is not, the slot is mixed
     if (current_slot->max_num_of_symbol_per_slot_list[i].slot_config != 0) {
       return NR_MIXED_SLOT;

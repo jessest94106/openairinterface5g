@@ -497,6 +497,16 @@ do {                                                    \
     (bITsTRING)->bits_unused = 4;                       \
 } while(0)
 
+#define MACRO_BIT_STRING_TO_GNB_ID(bITsTRING, oUT)          \
+do {                                                        \
+    uint8_t *_buf = (bITsTRING)->buf;                       \
+    (oUT) =                                                 \
+        ((uint32_t)_buf[0] << 20) |                         \
+        ((uint32_t)_buf[1] << 12) |                         \
+        ((uint32_t)_buf[2] << 4)  |                         \
+        (((uint32_t)_buf[3] & 0xF0) >> 4);                  \
+} while (0)
+
 /* TS 36.413 v10.9.0 section 9.2.1.38:
  * E-UTRAN CGI/Cell Identity
  * The leftmost bits of the Cell

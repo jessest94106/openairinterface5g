@@ -1024,7 +1024,7 @@ static bool get_feasible_msg3_tda(const NR_ServingCellConfigCommon_t *scc,
     int s = get_slot_idx_in_period(temp_slot, fs);
     const tdd_bitmap_t *bm = &fs->period_cfg.tdd_slot_bitmap[s];
     bool is_mixed = is_mixed_slot(s, fs);
-    uint16_t slot_mask = is_mixed ? SL_to_bitmap(NR_NUMBER_OF_SYMBOLS_PER_SLOT - bm->num_ul_symbols, bm->num_ul_symbols) : 0x3fff;
+    uint16_t slot_mask = is_mixed ? SL_to_bitmap(NR_SYMBOLS_PER_SLOT - bm->num_ul_symbols, bm->num_ul_symbols) : 0x3fff;
     long startSymbolAndLength = tda_list->list.array[i]->startSymbolAndLength;
     int start, nr;
     SLIV2SL(startSymbolAndLength, &start, &nr);
@@ -1699,21 +1699,23 @@ static void nr_generate_Msg4_MsgB(module_id_t module_idP,
     /* get the PID of a HARQ process awaiting retrnasmission, or -1 otherwise */
     int current_harq_pid = sched_ctrl->retrans_dl_harq.head;
 
-    logical_chan_id_t lcid = DL_SCH_LCID_CCCH;
+    logical_chan_id_t lcid = 0;
     if (current_harq_pid < 0) {
-      // Check for data on SRB0 (RRCSetup)
-      mac_rlc_status_resp_t srb_status = nr_mac_rlc_status_ind(UE->rnti, frameP, lcid);
+      const logical_chan_id_t lcid_l[2] = {DL_SCH_LCID_CCCH, DL_SCH_LCID_DCCH};
+      mac_rlc_status_resp_t stat[2];
+      nr_mac_rlc_status_ind(UE->rnti, frameP, 2, lcid_l, stat);
 
-      if (srb_status.bytes_in_buffer == 0) {
-        lcid = DL_SCH_LCID_DCCH;
-        // Check for data on SRB1 (RRCReestablishment, RRCReconfiguration)
-        srb_status = nr_mac_rlc_status_ind(UE->rnti, frameP, lcid);
+      if (stat[0].bytes_in_buffer > 0) {
+        // some data in SRB0 (likely RRCSetup)
+        mac_sdu_length = stat[0].bytes_in_buffer;
+        lcid = lcid_l[0];
+      } else if (stat[1].bytes_in_buffer > 0) {
+        // some data in SRB1 (likely RRCReestablishmnt/RRCReconfiguration)
+        mac_sdu_length = stat[1].bytes_in_buffer;
+        lcid = lcid_l[1];
+      } else {
+        return; // no data to forward
       }
-
-      // Need to wait until data for Msg4 is ready
-      if (srb_status.bytes_in_buffer == 0)
-        return;
-      mac_sdu_length = srb_status.bytes_in_buffer;
     }
 
     const int n_slots_frame = nr_mac->frame_structure.numb_slots_frame;

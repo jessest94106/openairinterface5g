@@ -55,7 +55,7 @@
 PHY_VARS_gNB *gNB;
 PHY_VARS_NR_UE *UE;
 RAN_CONTEXT_t RC;
-int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 
 double cpuf;
 
@@ -525,17 +525,28 @@ int main(int argc, char **argv)
         nr_common_signal_procedures (gNB,frame,slot, &ssb_pdu[i]);
 
         int samp = get_samples_slot_timestamp(frame_parms, slot);
-        for (aa=0; aa<gNB->frame_parms.nb_antennas_tx; aa++) {
+        for (aa = 0; aa < gNB->frame_parms.nb_antennas_tx; aa++) {
+          c16_t fft_in_buff[frame_parms->ofdm_symbol_size * frame_parms->symbols_per_slot] __attribute__((aligned(64)));
+          memset(fft_in_buff, 0, sizeof(fft_in_buff));
           if (cyclic_prefix_type == 1) {
             apply_nr_rotation_TX(frame_parms,
                                  gNB->common_vars.txdataF[0][aa],
+                                 true,
                                  frame_parms->symbol_rotation[0],
                                  slot,
                                  frame_parms->N_RB_DL,
                                  0,
                                  12);
 
-            PHY_ofdm_mod((int *)gNB->common_vars.txdataF[0][aa],
+            fft_shift(gNB->common_vars.txdataF[0][aa],
+                      frame_parms->ofdm_symbol_size,
+                      frame_parms->N_RB_DL,
+                      fft_in_buff,
+                      frame_parms->ofdm_symbol_size,
+                      0,
+                      12);
+
+            PHY_ofdm_mod((int *)fft_in_buff,
                          (int *)&txdata[aa][samp],
                          frame_parms->ofdm_symbol_size,
                          12,
@@ -544,21 +555,30 @@ int main(int argc, char **argv)
           } else {
             apply_nr_rotation_TX(frame_parms,
                                  gNB->common_vars.txdataF[0][aa],
+                                 true,
                                  frame_parms->symbol_rotation[0],
                                  slot,
                                  frame_parms->N_RB_DL,
                                  0,
                                  14);
 
-            PHY_ofdm_mod((int *)gNB->common_vars.txdataF[0][aa],
-                         (int*)&txdata[aa][samp],
+            fft_shift(gNB->common_vars.txdataF[0][aa],
+                      frame_parms->ofdm_symbol_size,
+                      frame_parms->N_RB_DL,
+                      fft_in_buff,
+                      frame_parms->ofdm_symbol_size,
+                      0,
+                      14);
+
+            PHY_ofdm_mod((int *)fft_in_buff,
+                         (int *)&txdata[aa][samp],
                          frame_parms->ofdm_symbol_size,
                          1,
                          frame_parms->nb_prefix_samples0,
                          CYCLIC_PREFIX);
 
-            PHY_ofdm_mod((int *)&gNB->common_vars.txdataF[0][aa][frame_parms->ofdm_symbol_size],
-                         (int*)&txdata[aa][samp + frame_parms->nb_prefix_samples0 + frame_parms->ofdm_symbol_size],
+            PHY_ofdm_mod((int *)fft_in_buff + frame_parms->ofdm_symbol_size,
+                         (int *)&txdata[aa][samp + frame_parms->nb_prefix_samples0 + frame_parms->ofdm_symbol_size],
                          frame_parms->ofdm_symbol_size,
                          13,
                          frame_parms->nb_prefix_samples,
@@ -567,9 +587,9 @@ int main(int argc, char **argv)
         }
       }
     }
-    LOG_M("txsigF0.m","txsF0", gNB->common_vars.txdataF[0][0],frame_length_complex_samples_no_prefix, 1, 1);
-    if (gNB->frame_parms.nb_antennas_tx>1)
-      LOG_M("txsigF1.m","txsF1", gNB->common_vars.txdataF[0][1],frame_length_complex_samples_no_prefix, 1, 1);
+    LOG_M("txsigF0.m", "txsF0", gNB->common_vars.txdataF[0][0], frame_parms->samples_per_slot_wCP, 1, 1);
+    if (gNB->frame_parms.nb_antennas_tx > 1)
+      LOG_M("txsigF1.m", "txsF1", gNB->common_vars.txdataF[0][1], frame_parms->samples_per_slot_wCP, 1, 1);
 
   } else {
     printf("Reading %d samples from file to antenna buffer %d\n",frame_length_complex_samples,0);

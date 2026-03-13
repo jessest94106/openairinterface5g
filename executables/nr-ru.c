@@ -538,7 +538,7 @@ void tx_rf(RU_t *ru, int frame,int slot, uint64_t timestamp)
     if(slot_type == NR_MIXED_SLOT) {
       int txsymb = 0;
 
-      for(int symbol_count = 0; symbol_count<NR_NUMBER_OF_SYMBOLS_PER_SLOT; symbol_count++) {
+      for(int symbol_count = 0; symbol_count < fp->symbols_per_slot; symbol_count++) {
         if (cfg->tdd_table.max_tdd_periodicity_list[slot].max_num_of_symbol_per_slot_list[symbol_count].slot_config.value == 0)
           txsymb++;
       }

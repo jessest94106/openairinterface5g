@@ -84,7 +84,7 @@ extern void init_RU_proc(RU_t *ru);
 extern void kill_RU_proc(RU_t *ru);
 extern void set_function_spec_param(RU_t *ru);
 
-int32_t uplink_frequency_offset[MAX_NUM_CCs][4];
+int64_t uplink_frequency_offset[MAX_NUM_CCs][4];
 
 
 void nfapi_setmode(nfapi_mode_t nfapi_mode) { return; }
