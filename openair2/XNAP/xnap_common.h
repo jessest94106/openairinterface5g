@@ -25,7 +25,6 @@
 #define XNAP_COMMON_H_
 
 #include "XNAP_XnAP-PDU.h"
-#include "intertask_interface.h"
 #include "common/openairinterface5g_limits.h"
 #include "oai_asn1.h"
 #include "XNAP_ProtocolIE-Field.h"
