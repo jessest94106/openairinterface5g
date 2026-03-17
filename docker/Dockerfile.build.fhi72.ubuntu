@@ -43,7 +43,6 @@ RUN apt-get update && \
 
 RUN rm -Rf /oai-ran
 WORKDIR /oai-ran
-COPY . .
 
 ## Download and build DPDK
 RUN wget http://fast.dpdk.org/rel/dpdk-20.11.9.tar.xz && \
@@ -53,15 +52,30 @@ RUN wget http://fast.dpdk.org/rel/dpdk-20.11.9.tar.xz && \
     ninja -C build && \
     ninja install -C build
 
+COPY ./cmake_targets/tools/oran_fhi_integration_patches/F/oaioran_F.patch ./cmake_targets/tools/oran_fhi_integration_patches/F/oru.patch /tmp/
+
 ## Build Fronthaul library
 RUN git clone https://gerrit.o-ran-sc.org/r/o-du/phy.git /opt/phy && \
     cd /opt/phy && \
     git checkout oran_f_release_v1.0 &&\
-    git apply /oai-ran/cmake_targets/tools/oran_fhi_integration_patches/F/oaioran_F.patch && \
+    git apply /tmp/oaioran_F.patch && \
+    git apply /tmp/oru.patch && \
     cd /opt/phy/fhi_lib/lib && \
     WIRELESS_SDK_TOOLCHAIN=gcc RTE_SDK=/oai-ran/dpdk-stable-20.11.9/ XRAN_DIR=/opt/phy/fhi_lib make XRAN_LIB_SO=1 
 
+COPY . .
+
 FROM ran-base AS ran-build-fhi72
+
+## Build FlexRIC for SM Models
+RUN mkdir -p openair2/E2AP/flexric/build && \
+    cd openair2/E2AP/flexric/build && \
+    cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DKPM_VERSION=$KPM_VERSION \
+          -DE2AP_VERSION=$E2AP_VERSION .. && \
+    ninja && \
+    ninja install
+
 ## Build and install OAI
 #run build_oai to build the target image
 RUN /bin/sh oaienv && \ 
@@ -76,12 +90,3 @@ RUN /bin/sh oaienv && \
     ldd ran_build/build/nr-softmodem && \
     ldd ran_build/build/liboran_fhlib_5g.so && \
     ldd /opt/phy/fhi_lib/lib/build/libxran.so
-
-## Build FlexRIC for SM Models
-RUN mkdir -p openair2/E2AP/flexric/build && \
-    cd openair2/E2AP/flexric/build && \
-    cmake -GNinja -DCMAKE_BUILD_TYPE=Release \
-          -DKPM_VERSION=$KPM_VERSION \
-          -DE2AP_VERSION=$E2AP_VERSION .. && \
-    ninja && \
-    ninja install
