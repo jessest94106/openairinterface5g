@@ -116,11 +116,18 @@ static packet_processor_context_t packet_processor_context;
 static void init_packet_processor_context(packet_processor_context_t *context, int mu)
 {
   memset(context, 0, sizeof(packet_processor_context_t));
-  context->uplane_data_ring = rte_ring_create("uplane_data_ring", UPLANE_DATA_RING_SIZE, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
+  context->uplane_data_ring = rte_ring_create("uplane_data_ring", UPLANE_DATA_RING_SIZE, rte_socket_id(), 0);
   AssertFatal(context->uplane_data_ring != NULL, "Failed to create ring uplane_data_ring\n");
   for (int i = 0; i < NUM_UPLANE_DATA_ELEMENTS; i++) {
     int ret = rte_ring_enqueue(context->uplane_data_ring, &context->uplane_data_pool[i]);
-    AssertFatal(ret == 0, "Failed to push elements to uplane_data_ring\n");
+    AssertFatal(ret == 0,
+                "Failed to push element %d/%d to uplane_data_ring, ring_size %d entries %d free entries %d return value %d \n",
+                i,
+                NUM_UPLANE_DATA_ELEMENTS,
+                UPLANE_DATA_RING_SIZE,
+                rte_ring_count(context->uplane_data_ring),
+                rte_ring_free_count(context->uplane_data_ring),
+                ret);
   }
   LOG_I(HW, "Enqueued %d elements to uplane_data_ring\n", NUM_UPLANE_DATA_ELEMENTS);
   int num_slots_per_frame = 10 << mu;
@@ -129,7 +136,7 @@ static void init_packet_processor_context(packet_processor_context_t *context, i
   for (int i = 0; i < num_symbol_rings; i++) {
     char name[128];
     snprintf(name, sizeof(name), "up_symbol_%d", i);
-    struct rte_ring *ring = rte_ring_create(name, UPLANE_SYMBOL_RING_SIZE, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
+    struct rte_ring *ring = rte_ring_create(name, UPLANE_SYMBOL_RING_SIZE, rte_socket_id(), 0);
     AssertFatal(ring != NULL, "Failed to create ring %s\n", name);
     context->uplane_symbol_rings[i] = ring;
   }
