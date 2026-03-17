@@ -227,6 +227,7 @@ int main(int argc, char **argv)
   AssertFatal(ret == 0, "RU %u: trx_start_func() ret %d: cannot start vrtsim\n", ru->idx, ret);
 
   signal(SIGINT, stop_ru);
+  signal(SIGTERM, stop_ru);
   threadCreate(&oru.north_read_thread, oru_north_read_thread, (void *)&oru, "north_read_thread", -1, OAI_PRIORITY_RT_MAX);
   threadCreate(&oru.south_read_thread, oru_south_read_thread, (void *)&oru, "south_read_thread", -1, OAI_PRIORITY_RT_MAX);
   threadCreate(&oru.oru_sync_thread, oru_sync_thread, (void *)&oru, "oru_sync_thread", -1, OAI_PRIORITY_RT_MAX);
