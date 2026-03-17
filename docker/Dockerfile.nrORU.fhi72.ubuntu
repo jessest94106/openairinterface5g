@@ -57,11 +57,10 @@ COPY ./docker/scripts/nr_oru_entrypoint.sh ./entrypoint.sh
 
 COPY --from=ran-build \
     /oai-ran/cmake_targets/ran_build/build/liboai_transpro.so \
-    /oai-ran/cmake_targets/ran_build/build/libcoding.so \
     /oai-ran/cmake_targets/ran_build/build/libparams_libconfig.so \
     /oai-ran/cmake_targets/ran_build/build/libdfts.so \
-    /oai-ran/cmake_targets/ran_build/build/libldpc*.so \
     /oai-ran/cmake_targets/ran_build/build/libparams_yaml.so \
+    /oai-ran/cmake_targets/ran_build/build/libvrtsim.so \
     /usr/local/lib/
 
 ## Libxran library
@@ -77,10 +76,8 @@ RUN ldconfig && \
     ldd /opt/nr-oru/bin/nr-oru && \
     echo "---- ldd on shared libraries ----" && \
     ldd /usr/local/lib/liboai_transpro.so \
-        /usr/local/lib/libcoding.so \
         /usr/local/lib/libparams_libconfig.so \
         /usr/local/lib/libdfts.so \
-        /usr/local/lib/libldpc*.so \
         /opt/phy/fhi_lib/lib/build/libxran.so
 
 WORKDIR /opt/nr-oru
