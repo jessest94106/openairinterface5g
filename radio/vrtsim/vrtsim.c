@@ -439,7 +439,6 @@ static int vrtsim_connect(openair0_device_t *device)
 
     server_publish_client_info(client_info, vrtsim_state->connection_descriptor);
     vrtsim_state->peer_info.num_rx_antennas = vrtsim_state->client_num_rx_antennas;
-    vrtsim_state->last_received_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
     vrtsim_state->run_timing_thread = true;
     threadCreate(&vrtsim_state->timing_thread, vrtsim_timing_job, vrtsim_state, "vrtsim_timing", -1, OAI_PRIORITY_RT_MAX);
   } else {
