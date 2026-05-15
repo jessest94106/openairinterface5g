@@ -245,6 +245,18 @@ static void oran_allocate_cplane_buffers(void *instHandle,
       } else {
         xran_init_PrbMap_from_cfg(src, ptr, mtu);
       }
+
+      // Log PRB map after xRAN initialization to verify compression settings
+      struct xran_prb_map *initialized_map = (struct xran_prb_map *)ptr;
+      if (a < 2 && j < 2) {  // Log only first couple of antennas/slots
+        LOG_I(HW, "[PRB MAP INIT] ant=%d, slot=%d: After xran_init, dir=%d, nPrbElm=%d\n",
+              a, j, initialized_map->dir, initialized_map->nPrbElm);
+        if (initialized_map->nPrbElm > 0) {
+          LOG_I(HW, "[PRB MAP INIT]   prbMap[0]: compMethod=%d, iqWidth=%d, nRBStart=%d, nRBSize=%d\n",
+                initialized_map->prbMap[0].compMethod, initialized_map->prbMap[0].iqWidth,
+                initialized_map->prbMap[0].nRBStart, initialized_map->prbMap[0].nRBSize);
+        }
+      }
 #endif
     }
   }

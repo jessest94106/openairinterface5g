@@ -197,7 +197,7 @@ void nr_feptx_prec(RU_t *ru, int frame_tx, int slot_tx)
                fp->samples_per_slot_wCP * sizeof(int32_t));
       }
     }
-  }  else {
+  } else {
     AssertFatal(false, "This needs to be fixed by using appropriate beams from config\n");
   }
   stop_meas(&ru->precoding_stats);

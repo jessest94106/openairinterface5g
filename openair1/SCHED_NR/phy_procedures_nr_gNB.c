@@ -274,6 +274,22 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
   for (int i = 0; i < UL_dci_req->numPdus; ++i)
     nr_generate_dci(gNB, &UL_dci_req->ul_dci_pdu_list[i].pdcch_pdu.pdcch_pdu_rel15, &gNB->frame_parms, slot);
 
+  // Debug: log DL PDU scheduling
+  static int dl_sched_log_count = 0;
+  if ((slot == 0 && dl_sched_log_count++ < 30) || (frame % 256 == 0 && slot == 0)) {
+    LOG_I(PHY, "[MAC SCHED] frame %d, slot %d: DL_req has %d PDUs\n",
+          frame, slot, DL_req->dl_tti_request_body.nPDUs);
+    for (int i = 0; i < DL_req->dl_tti_request_body.nPDUs; ++i) {
+      const nfapi_nr_dl_tti_request_pdu_t *pdu = &DL_req->dl_tti_request_body.dl_tti_pdu_list[i];
+      const char *pdu_name = "UNKNOWN";
+      if (pdu->PDUType == NFAPI_NR_DL_TTI_SSB_PDU_TYPE) pdu_name = "SSB";
+      else if (pdu->PDUType == NFAPI_NR_DL_TTI_PDCCH_PDU_TYPE) pdu_name = "PDCCH";
+      else if (pdu->PDUType == NFAPI_NR_DL_TTI_CSI_RS_PDU_TYPE) pdu_name = "CSI_RS";
+      else if (pdu->PDUType == NFAPI_NR_DL_TTI_PDSCH_PDU_TYPE) pdu_name = "PDSCH";
+      LOG_I(PHY, "[MAC SCHED]   PDU[%d]: type=%s (%d)\n", i, pdu_name, pdu->PDUType);
+    }
+  }
+
   int num_pdsch = 0;
   for (int i = 0; i < DL_req->dl_tti_request_body.nPDUs; ++i) {
     const nfapi_nr_dl_tti_request_pdu_t *dl_tti_pdu = &DL_req->dl_tti_request_body.dl_tti_pdu_list[i];

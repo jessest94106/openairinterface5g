@@ -377,7 +377,7 @@ void *oru_north_read_thread(void *arg)
     }
     nfapi_nr_config_request_scf_t *cfg = &ru->config;
     int slot_type = nr_slot_select(cfg, sense_of_time.frame, sense_of_time.slot % fp->slots_per_frame);
-    if (slot_type != NR_UPLINK_SLOT)
+    if (slot_type != NR_UPLINK_SLOT) {
       oru_downlink_processing(oru,
                               txDataF_ptr,
                               sense_of_time.frame,
@@ -385,6 +385,7 @@ void *oru_north_read_thread(void *arg)
                               sense_of_time.symbol,
                               num_symbols,
                               timestamp_tx);
+    }
   }
   return NULL;
 }
@@ -612,6 +613,12 @@ static void oru_downlink_processing(ORU_t *oru,
                                     int num_symbols,
                                     openair0_timestamp_t timestamp_tx)
 {
+  static int dl_proc_count = 0;
+  if (dl_proc_count++ < 10) {
+    LOG_I(PHY, "[ORU] oru_downlink_processing ENTER: frame %d, slot %d, sym %d, num_sym %d\n",
+          frame, slot, start_symbol, num_symbols);
+  }
+
   RU_t *ru = oru->ru;
   start_meas(&ru->tx_fhaul);
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
@@ -620,6 +627,12 @@ static void oru_downlink_processing(ORU_t *oru,
   dl_symbol_process_t dl_process_args[ru->nb_tx][num_paralell_workers_per_antenna];
   task_ans_t task_ans;
   init_task_ans(&task_ans, num_paralell_workers_per_antenna * ru->nb_tx);
+
+  if (dl_proc_count <= 10) {
+    LOG_I(PHY, "[ORU] Scheduling %d tasks (%d antennas x %d workers)\n",
+          ru->nb_tx * num_paralell_workers_per_antenna, ru->nb_tx, num_paralell_workers_per_antenna);
+  }
+
   for (int aatx = 0; aatx < ru->nb_tx; aatx++) {
     for (int i = 0; i < num_paralell_workers_per_antenna; i++) {
       tasks[aatx][i].func = dl_symbol_process;
@@ -636,15 +649,23 @@ static void oru_downlink_processing(ORU_t *oru,
       pushTpool(&oru->tpool, tasks[aatx][i]);
     }
   }
-  LOG_D(PHY,
-        "[RU_thread] transmit data: frame %d, slot %d, start_symbol %d, num_symbols %d, timestamp %ld\n",
-        frame,
-        slot,
-        start_symbol,
-        num_symbols,
-        timestamp_tx);
+
+  if (dl_proc_count <= 10) {
+    LOG_I(PHY, "[ORU] Tasks scheduled, joining...\n");
+  }
+
   join_task_ans(&task_ans);
+
+  if (dl_proc_count <= 10) {
+    LOG_I(PHY, "[ORU] Tasks completed, calling tx_rf_symbols for frame %d, slot %d\n", frame, slot);
+  }
+
   tx_rf_symbols(ru, frame, slot, timestamp_tx, start_symbol, num_symbols);
+
+  if (dl_proc_count <= 10) {
+    LOG_I(PHY, "[ORU] tx_rf_symbols returned\n");
+  }
+
   stop_meas(&ru->tx_fhaul);
 }
 
