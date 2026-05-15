@@ -860,7 +860,12 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   AssertFatal(buf, "incorrect mbuf size\n");
 
   struct xran_ecpri_hdr *ecpri_header = (struct xran_ecpri_hdr *)rte_pktmbuf_mtod(mbuf, char *);
-  uint16_t ecpri_payload_size = xran_get_ecpri_hdr_size() + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr) + data_len;
+  uint16_t ecpri_payload_size = xran_get_ecpri_hdr_size() + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr);
+  // Add compression header size in DYNAMIC mode when compression is enabled
+  if (fh_cfg->ru_conf.compMeth_PRACH != XRAN_COMPMETHOD_NONE && fh_cfg->ru_conf.xranCompHdrType == XRAN_COMP_HDR_TYPE_DYNAMIC) {
+    ecpri_payload_size += sizeof(struct data_section_compression_hdr);
+  }
+  ecpri_payload_size += data_len;
   fill_ecpri_header(ecpri_header, ECPRI_IQ_DATA, ecpri_payload_size, 0, aarx + fh_cfg->prach_conf.eAxC_offset, prach_seq_id[aarx]++, 0);
 
   struct radio_app_common_hdr *radio_app_header = (struct radio_app_common_hdr *)(ecpri_header + 1);
@@ -869,7 +874,18 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   struct data_section_hdr *data_section_header = (struct data_section_hdr *)(radio_app_header + 1);
   fill_data_section_header(data_section_header, prach_config->num_prb, prach_config->start_prb, prach_config->section_id);
 
-  void *iq_data_start = (void *)(data_section_header + 1);
+  void *iq_data_start;
+  // Add compression header in DYNAMIC mode when compression is enabled
+  if (fh_cfg->ru_conf.compMeth_PRACH != XRAN_COMPMETHOD_NONE && fh_cfg->ru_conf.xranCompHdrType == XRAN_COMP_HDR_TYPE_DYNAMIC) {
+    struct data_section_compression_hdr *compression_header = (struct data_section_compression_hdr *)(data_section_header + 1);
+    compression_header->ud_comp_hdr.ud_comp_meth = fh_cfg->ru_conf.compMeth_PRACH;
+    compression_header->ud_comp_hdr.ud_iq_width = XRAN_CONVERT_IQWIDTH(fh_cfg->ru_conf.iqWidth_PRACH);
+    compression_header->rsrvd = 0;
+    iq_data_start = (void *)(compression_header + 1);
+  } else {
+    iq_data_start = (void *)(data_section_header + 1);
+  }
+
   int16_t *dest = (int16_t *)iq_data_start;
   uint16_t *src = (uint16_t *)prachF;
   if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_NONE) {
@@ -890,6 +906,29 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
           local_src[idx + g_kbar] = src[idx];
         }
 
+        // Log input and local_src for debugging
+        static int prach_log_count = 0;
+        // Check if there's any non-zero data
+        bool has_nonzero = false;
+        for (int i = 0; i < 139 * 2; i++) {
+          if (src[i] != 0) {
+            has_nonzero = true;
+            break;
+          }
+        }
+        // Log first 5 times OR when we have non-zero data
+        if (prach_log_count < 5 || has_nonzero) {
+          LOG_I(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
+                frame, slot, symbol, g_kbar, has_nonzero);
+          LOG_I(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+                src[0], src[1], src[100], src[138]);
+          LOG_I(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+                local_src[0], local_src[4], local_src[100], local_src[281]);
+          if (!has_nonzero && prach_log_count < 5) {
+            prach_log_count++;
+          }
+        }
+
 #if defined(__i386__) || defined(__x86_64__)
         struct xranlib_compress_request bfp_req = {};
         struct xranlib_compress_response bfp_rsp = {};
@@ -900,10 +939,23 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
         bfp_req.compMethod = XRAN_COMPMETHOD_BLKFLOAT;
         bfp_req.iqWidth = fh_cfg->ru_conf.iqWidth_PRACH;
 
+        if (prach_log_count <= 5 || has_nonzero) {
+          LOG_I(HW, "[ORU PRACH COMP] Using iqWidth=%d, numRBs=%d, data_len=%d, compHdrType=%s\n",
+                fh_cfg->ru_conf.iqWidth_PRACH, nRBs, data_len,
+                fh_cfg->ru_conf.xranCompHdrType == XRAN_COMP_HDR_TYPE_DYNAMIC ? "DYNAMIC" : "STATIC");
+        }
+
         bfp_rsp.data_out = (int8_t *)dest;
         bfp_rsp.len = 0;
 
         xranlib_compress_avx512(&bfp_req, &bfp_rsp);
+
+        // Log compressed output
+        if (prach_log_count <= 5 || has_nonzero) {
+          LOG_I(HW, "[ORU PRACH COMP] Compressed output: [0]=0x%02x [1]=0x%02x [27]=0x%02x [28]=0x%02x [29]=0x%02x [55]=0x%02x [56]=0x%02x, len=%d\n",
+                ((uint8_t*)dest)[0], ((uint8_t*)dest)[1], ((uint8_t*)dest)[27], ((uint8_t*)dest)[28],
+                ((uint8_t*)dest)[29], ((uint8_t*)dest)[55], ((uint8_t*)dest)[56], bfp_rsp.len);
+        }
 
 #elif defined(__arm__) || defined(__aarch64__)
         armral_bfp_compression(
@@ -928,6 +980,29 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
         /* Copy PRACH data into RB-aligned buffer */
         for (int idx = 0; idx < 139 * 2; idx++) {
           local_src[idx + g_kbar] = src[idx];
+        }
+
+        // Log input and local_src for debugging
+        static int prach_log_count = 0;
+        // Check if there's any non-zero data
+        bool has_nonzero = false;
+        for (int i = 0; i < 139 * 2; i++) {
+          if (src[i] != 0) {
+            has_nonzero = true;
+            break;
+          }
+        }
+        // Log first 5 times OR when we have non-zero data
+        if (prach_log_count < 5 || has_nonzero) {
+          LOG_I(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
+                frame, slot, symbol, g_kbar, has_nonzero);
+          LOG_I(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+                src[0], src[1], src[100], src[138]);
+          LOG_I(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+                local_src[0], local_src[4], local_src[100], local_src[281]);
+          if (!has_nonzero && prach_log_count < 5) {
+            prach_log_count++;
+          }
         }
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -960,6 +1035,29 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
         /* Copy PRACH data into RB-aligned buffer */
         for (int idx = 0; idx < 139 * 2; idx++) {
           local_src[idx + g_kbar] = src[idx];
+        }
+
+        // Log input and local_src for debugging
+        static int prach_log_count = 0;
+        // Check if there's any non-zero data
+        bool has_nonzero = false;
+        for (int i = 0; i < 139 * 2; i++) {
+          if (src[i] != 0) {
+            has_nonzero = true;
+            break;
+          }
+        }
+        // Log first 5 times OR when we have non-zero data
+        if (prach_log_count < 5 || has_nonzero) {
+          LOG_I(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
+                frame, slot, symbol, g_kbar, has_nonzero);
+          LOG_I(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+                src[0], src[1], src[100], src[138]);
+          LOG_I(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+                local_src[0], local_src[4], local_src[100], local_src[281]);
+          if (!has_nonzero && prach_log_count < 5) {
+            prach_log_count++;
+          }
         }
 
 #if defined(__i386__) || defined(__x86_64__)
