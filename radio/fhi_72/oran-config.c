@@ -853,7 +853,7 @@ static bool set_fh_ru_config(void *mplane_api, const paramdef_t *rup, uint16_t f
 {
   ru_config->xranTech = XRAN_RAN_5GNR; // 5GNR or LTE
   ru_config->xranCat = xran_cat; // mode: Catergory A or Category B
-  ru_config->xranCompHdrType = XRAN_COMP_HDR_TYPE_STATIC; // dynamic or static udCompHdr handling
+  ru_config->xranCompHdrType = XRAN_COMP_HDR_TYPE_DYNAMIC; // dynamic or static udCompHdr handling
 #ifdef OAI_MPLANE
   xran_mplane_t *xran_mplane = (xran_mplane_t *)mplane_api;
   ru_config->iqWidth = xran_mplane->iq_width;
@@ -864,9 +864,50 @@ static bool set_fh_ru_config(void *mplane_api, const paramdef_t *rup, uint16_t f
   ru_config->iqWidth_PRACH = *gpd(rup, nru, ORAN_RU_CONFIG_IQWIDTH_PRACH)->uptr; // IQ bit width for PRACH
   AssertFatal(ru_config->iqWidth_PRACH <= 16, "IQ Width for PRACH cannot be > 16!\n");
 #endif
-  ru_config->compMeth = ru_config->iqWidth < 16 ? XRAN_COMPMETHOD_BLKFLOAT : XRAN_COMPMETHOD_NONE; // compression method
-  ru_config->compMeth_PRACH = ru_config->iqWidth_PRACH < 16 ? XRAN_COMPMETHOD_BLKFLOAT : XRAN_COMPMETHOD_NONE; // compression method for PRACH
+  //ru_config->compMeth = ru_config->iqWidth < 16 ? XRAN_COMPMETHOD_BLKFLOAT : XRAN_COMPMETHOD_NONE; // compression method
+  //ru_config->compMeth_PRACH = ru_config->iqWidth_PRACH < 16 ? XRAN_COMPMETHOD_BLKFLOAT : XRAN_COMPMETHOD_NONE; // compression method for PRACH
+  ru_config->compMeth = *gpd(rup, nru, ORAN_RU_CONFIG_COMPMETH)->uptr;
+  if (ru_config->iqWidth == 16)
+      ru_config->compMeth = XRAN_COMPMETHOD_NONE;
+  else{
+      switch(ru_config->compMeth) {
+        case 0:
+          ru_config->compMeth = XRAN_COMPMETHOD_NONE;
+          break;
+        case 1:
+          ru_config->compMeth = XRAN_COMPMETHOD_BLKFLOAT;
+          break;
+        case 2:
+          ru_config->compMeth = XRAN_COMPMETHOD_BLKSCALE;
+          break;
+        case 3:
+          ru_config->compMeth = XRAN_COMPMETHOD_ULAW;
+          break;
+      }
 
+  }
+
+   ru_config->compMeth_PRACH = *gpd(rup, nru, ORAN_RU_CONFIG_COMPMETH_PRACH)->uptr;
+
+  if (ru_config->iqWidth_PRACH == 16)
+      ru_config->compMeth_PRACH = XRAN_COMPMETHOD_NONE;
+  else{
+      switch(ru_config->compMeth_PRACH) {
+        case 0:
+          ru_config->compMeth_PRACH = XRAN_COMPMETHOD_NONE;
+          break;
+        case 1:
+          ru_config->compMeth_PRACH = XRAN_COMPMETHOD_BLKFLOAT;
+          break;
+        case 2:
+          ru_config->compMeth_PRACH = XRAN_COMPMETHOD_BLKSCALE;
+          break;
+        case 3:
+          ru_config->compMeth_PRACH = XRAN_COMPMETHOD_ULAW;
+          break;
+      }
+
+  }
   AssertFatal(fftSize > 0, "FFT size cannot be 0\n");
   ru_config->fftSize = fftSize; // FFT Size
   ru_config->byteOrder = XRAN_NE_BE_BYTE_ORDER; // order of bytes in int16_t in buffer; big or little endian
@@ -897,7 +938,9 @@ static bool set_fh_config(void *mplane_api,
                           enum xran_category xran_cat,
                           const openair0_config_t *oai0,
                           struct xran_fh_config *fh_config,
-                          bool is_du)
+                          bool is_du,
+                          int gps_alpha,
+                          int gps_beta)
 {
   AssertFatal(num_rus == 1 || num_rus == 2, "only support 1 or 2 RUs as of now\n");
   AssertFatal(ru_idx < num_rus, "illegal ru_idx %d: must be < %d\n", ru_idx, num_rus);
@@ -1018,8 +1061,8 @@ static bool set_fh_config(void *mplane_api,
   fh_config->debugStop = 0; // enable auto stop; only used if id = O_RU
   fh_config->debugStopCount = 0; // enable auto stop after number of Tx packets; not used in xran
   fh_config->DynamicSectionEna = 0; // enable dynamic C-Plane section allocation
-  fh_config->GPS_Alpha = 0; // refers to alpha as defined in section 9.7.2 of ORAN spec. this value should be alpha*(1/1.2288ns), range 0 - 1e7 (ns); offset_nsec = (pConf->GPS_Beta - offset_sec * 100) * 1e7 + pConf->GPS_Alpha
-  fh_config->GPS_Beta = 0; // beta value as defined in section 9.7.2 of ORAN spec. range -32767 ~ +32767; offset_sec = pConf->GPS_Beta / 100
+  fh_config->GPS_Alpha = gps_alpha; // refers to alpha as defined in section 9.7.2 of ORAN spec. this value should be alpha*(1/1.2288ns), range 0 - 1e7 (ns); offset_nsec = (pConf->GPS_Beta - offset_sec * 100) * 1e7 + pConf->GPS_Alpha
+  fh_config->GPS_Beta = gps_beta; // beta value as defined in section 9.7.2 of ORAN spec. range -32767 ~ +32767; offset_sec = pConf->GPS_Beta / 100
 
   if (!set_fh_prach_config(mplane_api, oai0, fh_config->neAxc, prachp, nprach, &fh_config->prach_conf, liteon_prach_eAxC_offset))
     return false;
@@ -1073,11 +1116,22 @@ bool get_xran_config(void *mplane_api, const struct openair0_config *openair0_cf
     return false;
   }
 
+  // Read GPS timing parameters from global config
+  paramdef_t fhip[] = ORAN_GLOBALPARAMS_DESC;
+  int nump = sizeofArray(fhip);
+  int ret = config_get(config_get_if(), fhip, nump, CONFIG_STRING_ORAN);
+  if (ret <= 0) {
+    printf("could not read global ORAN config for GPS parameters\n");
+    return false;
+  }
+  int gps_alpha = *gpd(fhip, nump, ORAN_CONFIG_GPS_ALPHA)->iptr;
+  int gps_beta = *gpd(fhip, nump, ORAN_CONFIG_GPS_BETA)->iptr;
+
 #ifdef OAI_MPLANE
   ru_session_list_t *ru_session_list = (ru_session_list_t *)mplane_api;
   for (int32_t o_xu_id = 0; o_xu_id < fh_init->xran_ports; o_xu_id++) {
     xran_mplane_t *xran_mplane = &ru_session_list->ru_session[o_xu_id].xran_mplane;
-    if (!set_fh_config(xran_mplane, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id], true)) {
+    if (!set_fh_config(xran_mplane, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id], true, gps_alpha, gps_beta)) {
       MP_LOG_I("could not read FHI 7.2/RU-specific config\n");
       return false;
     }
@@ -1085,7 +1139,7 @@ bool get_xran_config(void *mplane_api, const struct openair0_config *openair0_cf
 #else
   bool is_du = fh_init->io_cfg.id == 0;
   for (int32_t o_xu_id = 0; o_xu_id < fh_init->xran_ports; o_xu_id++) {
-    if (!set_fh_config(NULL, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id], is_du)) {
+    if (!set_fh_config(NULL, o_xu_id, fh_init->xran_ports, xran_cat, openair0_cfg, &fh_config[o_xu_id], is_du, gps_alpha, gps_beta)) {
       printf("could not read FHI 7.2/RU-specific config\n");
       return false;
     }

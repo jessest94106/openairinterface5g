@@ -45,6 +45,8 @@
 #define ORAN_CONFIG_DPDK_IOVA_MODE "dpdk_iova_mode"
 #define ORAN_CONFIG_ECPRI_OWDM "owdm_enable"
 #define ORAN_CONFIG_APP_ID "app_id"
+#define ORAN_CONFIG_GPS_ALPHA "GPS_Alpha"
+#define ORAN_CONFIG_GPS_BETA "GPS_Beta"
 
 #define APP_ID_O_DU "DU"
 #define APP_ID_O_RU "RU"
@@ -74,7 +76,9 @@
   {ORAN_CONFIG_DPDK_MEM_SIZE,   "DPDK huge page pre-allocation in MiB\n",   0,                   .uptr=NULL,       .defuintval=8192,    TYPE_UINT,       0}, \
   {ORAN_CONFIG_DPDK_IOVA_MODE,  "DPDK IOVA mode\n",                         0,                   .strptr=NULL,     .defstrval="PA",     TYPE_STRING,     0}, \
   {ORAN_CONFIG_ECPRI_OWDM,      "eCPRI One-Way Delay Measurements\n",       PARAMFLAG_BOOL,      .uptr=NULL,       .defuintval=0,       TYPE_UINT,       0}, \
-  {ORAN_CONFIG_APP_ID,          "Either DU or RU",                          0,                   .strptr=NULL,     .defstrval=APP_ID_O_DU, TYPE_STRING,  0}  \
+  {ORAN_CONFIG_APP_ID,          "Either DU or RU",                          0,                   .strptr=NULL,     .defstrval=APP_ID_O_DU, TYPE_STRING,  0}, \
+  {ORAN_CONFIG_GPS_ALPHA,       "GPS Alpha timing parameter\n",             0,                   .iptr=NULL,       .defintval=0,        TYPE_INT,        0}, \
+  {ORAN_CONFIG_GPS_BETA,        "GPS Beta timing parameter\n",              0,                   .iptr=NULL,       .defintval=-9000,    TYPE_INT,        0}  \
 }
 
 // clang-format off
@@ -99,6 +103,8 @@
     { .s5 = { NULL } },                          \
     { .s3a = { config_checkstr_assign_integer,   \
 	       {APP_ID_O_DU, APP_ID_O_RU}, {XRAN_APP_ID_O_DU, XRAN_APP_ID_O_RU}, 2} },             \
+    { .s5 = { NULL } },                          \
+    { .s5 = { NULL } },                          \
 }
 
 
@@ -134,11 +140,15 @@
 
 #define ORAN_RU_CONFIG_IQWIDTH "iq_width" // not needed if M-plane used
 #define ORAN_RU_CONFIG_IQWIDTH_PRACH "iq_width_prach" // not needed if M-plane used
+#define ORAN_RU_CONFIG_COMPMETH "compMeth" // not needed if M-plane used
+#define ORAN_RU_CONFIG_COMPMETH_PRACH "compMeth_prach" // not needed if M-plane used
 
 // clang-format off
 #define ORAN_RU_DESC {\
   {ORAN_RU_CONFIG_IQWIDTH,       "sample IQ width (16=uncompressed)\n",       PARAMFLAG_MANDATORY, .u8ptr=NULL, .defuintval=16, TYPE_UINT8, 0}, \
   {ORAN_RU_CONFIG_IQWIDTH_PRACH, "PRACH sample IQ width (16=uncompressed)\n", PARAMFLAG_MANDATORY, .u8ptr=NULL, .defuintval=16, TYPE_UINT8, 0}, \
+  {ORAN_RU_CONFIG_COMPMETH, "Enum representing compression method to use\n", PARAMFLAG_MANDATORY, .u8ptr=NULL, .defuintval=0, TYPE_UINT8, 0}, \
+  {ORAN_RU_CONFIG_COMPMETH_PRACH, "Enum representing compression method to use for PRACH\n", PARAMFLAG_MANDATORY, .u8ptr=NULL, .defuintval=0, TYPE_UINT8, 0}, \
 }
 // clang-format on
 

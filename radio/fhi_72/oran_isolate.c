@@ -231,11 +231,9 @@ void oran_fh_if4p5_south_in(RU_t *ru, int *frame, int *slot)
 
   RU_proc_t *proc = &ru->proc;
   int f, sl;
-  LOG_D(HW, "Read rxdataF %p,%p\n", ru_info.rxdataF[0], ru_info.rxdataF[1]);
   start_meas(&ru->rx_fhaul);
   int ret = xran_fh_rx_read_slot(&ru_info, &f, &sl);
   stop_meas(&ru->rx_fhaul);
-  LOG_D(HW, "Read %d.%d rxdataF %p,%p\n", f, sl, ru_info.rxdataF[0], ru_info.rxdataF[1]);
   if (ret != 0) {
     printf("ORAN: %d.%d ORAN_fh_if4p5_south_in ERROR in RX function \n", f, sl);
   }

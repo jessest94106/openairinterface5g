@@ -274,6 +274,12 @@ extern uint16_t xran_map_ecpriPcid_to_vf(void *p_dev_ctx, int32_t dir, int32_t c
 
 void symbol_callback(void *args, struct xran_sense_of_time *p_sense_of_time)
 {
+  static int call_count = 0;
+  static int first_call_true_count = 0;
+  call_count++;
+  if (call_count < 10 || (first_call_set && first_call_true_count++ < 10)) {
+    LOG_I(HW, "[ORU] symbol_callback called, count=%d, first_call_set=%d\n", call_count, first_call_set);
+  }
   if (!first_call_set) {
     return;
   }
@@ -342,11 +348,21 @@ void symbol_callback(void *args, struct xran_sense_of_time *p_sense_of_time)
 
   AssertFatal(info->ts.tv_nsec < 1000000000UL, "ORAN: Invalid tv_nsec %ld\n", info->ts.tv_nsec);
 
+  static int push_count = 0;
+  if (push_count++ < 10) {
+    LOG_I(HW, "[ORU] Pushing DL sync to FIFO: frame=%d, slot=%d, symbol=%d, count=%d\n", info->frame, info->slot, info->symbol, push_count);
+  }
   pushNotifiedFIFO(&ru_dl_sync_fifo, req);
 }
 
 int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, int *symbol, int *num_symbols, struct timespec *ts)
 {
+  static int call_count = 0;
+  call_count++;
+  if (call_count <= 10 || call_count % 1000 == 0) {
+    LOG_I(HW, "[ORU north] xran_oru_tx_read_slot called, count=%d\n", call_count);
+  }
+
   notifiedFIFO_elt_t *res = pullNotifiedFIFO(&ru_dl_sync_fifo);
   ru_dl_sync_info_t *info = NotifiedFifoData(res);
 
@@ -355,6 +371,12 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
   *symbol = info->symbol;
   *num_symbols = info->num_symbols;
   *ts = info->ts;
+
+  if (call_count <= 10) {
+    LOG_I(HW, "[ORU north] Read from FIFO: frame=%d, slot=%d, symbol=%d, num_symbols=%d\n",
+          *frame, *slot, *symbol, *num_symbols);
+  }
+
   delNotifiedFIFO_elt(res);
 
   if (*frame % 256 == 0 && *slot == 0 && *symbol == 0) {
@@ -370,23 +392,90 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
   int num_sc_second_copy = nPRBs * NR_NB_SC_PER_RB - num_sc_first_copy;
 
   c16_t tx_data_sym[nb_tx][nPRBs * NR_NB_SC_PER_RB];
+  static int total_symbols_processed = 0;
+  static int symbols_with_packets = 0;
   for (int sym = *symbol; sym < *symbol + *num_symbols; sym++) {
     uplane_data_t *uplane_data[MAX_UPLANE_PACKETS_PER_SYMBOL];
     int num_packets = pull_uplane_packet_data(&packet_processor_context, uplane_data, MAX_UPLANE_PACKETS_PER_SYMBOL, *slot, sym);
+    total_symbols_processed++;
     if (num_packets) {
+      symbols_with_packets++;
+      if (symbols_with_packets <= 10 || symbols_with_packets % 100 == 0) {
+        LOG_I(HW, "[ORU north] Symbol %d has %d packets (total symbols: %d, with packets: %d)\n",
+              sym, num_packets, total_symbols_processed, symbols_with_packets);
+      }
       memset(tx_data_sym, 0, sizeof(tx_data_sym));
+      // AssertFatal(comp_meth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
+      static int dl_decomp_log_count = 0;
       for (int i = 0; i < num_packets; i++) {
-        int start_prb = uplane_data[i]->start_prb;
-        int num_prb = uplane_data[i]->num_prb;
-        int comp_meth = uplane_data[i]->comp_meth;
-        int aatx = uplane_data[i]->aatx;
-        void *iq_data = uplane_data[i]->iq_data;
-        AssertFatal(comp_meth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
-        uint16_t *source = (uint16_t *)iq_data;
-        int16_t *destination = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
-        for (int j = 0; j < num_prb * NR_NB_SC_PER_RB * 2; j++) {
-          destination[j] = (int16_t)ntohs(source[j]);
-        }
+          int start_prb = uplane_data[i]->start_prb;
+          int num_prb = uplane_data[i]->num_prb;
+          int comp_meth = uplane_data[i]->comp_meth;
+          int aatx = uplane_data[i]->aatx;
+          void *iq_data = uplane_data[i]->iq_data;
+          uint16_t *source = (uint16_t *)iq_data;
+          int16_t *destination = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
+
+          if (dl_decomp_log_count < 10) {
+            LOG_I(HW, "[ORU DL RX] sym=%d, packet %d/%d: comp_meth=%d, iq_width=%d, start_prb=%d, num_prb=%d\n",
+                  sym, i, num_packets, comp_meth, uplane_data[i]->iq_width, start_prb, num_prb);
+            dl_decomp_log_count++;
+          }
+
+          if (comp_meth == XRAN_COMPMETHOD_NONE) {
+          for (int j = 0; j < num_prb * NR_NB_SC_PER_RB * 2; j++) {
+            destination[j] = (int16_t)ntohs(source[j]);
+          }
+        } else if (comp_meth == XRAN_COMPMETHOD_BLKFLOAT) {
+              struct xranlib_decompress_request bfp_decom_req = {};
+              struct xranlib_decompress_response bfp_decom_rsp = {};
+
+              bfp_decom_req.data_in = (int8_t *)source;
+              bfp_decom_req.numRBs = num_prb;
+              bfp_decom_req.len = (3 * uplane_data[i]->iq_width + 1) *num_prb;
+              bfp_decom_req.compMethod = comp_meth;
+              bfp_decom_req.iqWidth = uplane_data[i]->iq_width;
+
+              bfp_decom_rsp.data_out = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
+              bfp_decom_rsp.len = 0;
+
+              xranlib_decompress_avx512(&bfp_decom_req, &bfp_decom_rsp);
+            }
+              else if (comp_meth == XRAN_COMPMETHOD_BLKSCALE) {
+              struct xranlib_decompress_request bs_decom_req = {};
+              struct xranlib_decompress_response bs_decom_rsp = {};
+
+              bs_decom_req.data_in = (int8_t *)source;
+              bs_decom_req.numRBs = num_prb;
+              bs_decom_req.len = (3 * uplane_data[i]->iq_width + 1) * num_prb;
+              bs_decom_req.compMethod = comp_meth;
+              bs_decom_req.iqWidth = uplane_data[i]->iq_width;
+
+              bs_decom_rsp.data_out = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
+              bs_decom_rsp.len = 0;
+
+              xranlib_decompress_blkscale_avx512(&bs_decom_req, &bs_decom_rsp);
+            }
+
+            else if (comp_meth == XRAN_COMPMETHOD_ULAW) {
+              struct xranlib_decompress_request ulaw_decom_req = {};
+              struct xranlib_decompress_response ulaw_decom_rsp = {};
+
+              ulaw_decom_req.data_in = (int8_t *)source;
+              ulaw_decom_req.numRBs = num_prb;
+              ulaw_decom_req.len = (3 * uplane_data[i]->iq_width + 1) * num_prb;
+              ulaw_decom_req.compMethod = comp_meth;
+              ulaw_decom_req.iqWidth = uplane_data[i]->iq_width;
+
+              ulaw_decom_rsp.data_out = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
+              ulaw_decom_rsp.len = 0;
+
+              xranlib_decompress_ulaw_avx512(&ulaw_decom_req, &ulaw_decom_rsp);
+            } else {                                                                                                                                                     
+                  AssertFatal(0, "Unsupported DL compression method %d\n", comp_meth);                                                                                       
+            }                                                                                                                                                            
+        
+
         rte_pktmbuf_free(uplane_data[i]->mbuf_to_free);
       }
       push_uplane_packet_data(&packet_processor_context, uplane_data, num_packets);
@@ -398,6 +487,12 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
         memcpy(&txdataF[aatx][fftsize * sym], &tx_data_sym[aatx][num_sc_first_copy], num_sc_second_copy * sizeof(c16_t));
       }
     } else {
+      static int no_packet_count = 0;
+      no_packet_count++;
+      if (no_packet_count <= 20 || no_packet_count % 1000 == 0) {
+        LOG_I(HW, "[ORU north] No packets for frame=%d, slot=%d, symbol=%d (count=%d)\n",
+              *frame, *slot, sym, no_packet_count);
+      }
       for (int aatx = 0; aatx < nb_tx; aatx++) {
         memset(&txdataF[aatx][sym * fftsize], 0, sizeof(c16_t) * fftsize);
       }
@@ -412,6 +507,10 @@ int process_ru_uplane(struct rte_mbuf *pkt,
                       uint16_t port_id,
                       struct xran_sense_of_time *p_sense_of_time)
 {
+  static int call_count = 0;
+  if (call_count++ < 10) {
+    LOG_I(HW, "[ORU] process_ru_uplane called, count=%d\n", call_count);
+  }
   if (!first_call_set) {
     return MBUF_FREE;
   }
@@ -479,7 +578,7 @@ int process_ru_uplane(struct rte_mbuf *pkt,
         iqWidth,
         is_prach);
 
-  AssertFatal(compMeth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
+  // AssertFatal(compMeth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
   int mu = fh_cfg->frame_conf.nNumerology;
   int slots_per_subframe = 1 << mu;
   int current_symbol_index = NR_SYMBOLS_PER_SLOT * (p_sense_of_time->nSlotIdx + p_sense_of_time->nSubframeIdx * slots_per_subframe) + p_sense_of_time->nSymIdx;
@@ -726,14 +825,17 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   uint8_t mu = fh_cfg->frame_conf.nNumerology;
 
-  AssertFatal(fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
+  // AssertFatal(fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
   // TODO: With compression, have to add compression header to header_len
   size_t header_length = sizeof(struct xran_ecpri_hdr) + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr);
 
   // TODO: For compression, have to re-evaluate data size;
   // TODO: Only support short format PRACH
   const uint prach_length = 139;
+  const uint num_prb = 12;
   size_t data_len = sizeof(int32_t) * prach_length;
+  if (fh_cfg->ru_conf.compMeth_PRACH != XRAN_COMPMETHOD_NONE)
+    data_len = (3 * fh_cfg->ru_conf.iqWidth_PRACH + 1) * num_prb;
 
   oran_prach_cplane_config_t *prach_config = &prach_config_per_antenna[aarx];
   if (prach_config->section_id == -1) {
@@ -770,9 +872,118 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   void *iq_data_start = (void *)(data_section_header + 1);
   int16_t *dest = (int16_t *)iq_data_start;
   uint16_t *src = (uint16_t *)prachF;
-  for (int i = 0; i < prach_length * 2; i++) {
-    dest[i + g_kbar] = (int16_t)htons(src[i]);
-  }
+  if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_NONE) {
+    for (int i = 0; i < prach_length * 2; i++) {
+      dest[i + g_kbar] = (int16_t)htons(src[i]);
+    }
+  } else if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_BLKFLOAT) {
+
+        /* PRACH uses 139 REs → pack into 12 PRBs */
+        int nRBs = 12;
+        //int payload_len = (3 * fh_cfg->ru_conf.iqWidth_PRACH + 1) * nRBs;
+
+        /* Zero-padded local buffer for BFP input */
+        int16_t local_src[12 * 12 * 2] __attribute__((aligned(64))) = {0};
+
+        /* Copy PRACH data into RB-aligned buffer */
+        for (int idx = 0; idx < 139 * 2; idx++) {
+          local_src[idx + g_kbar] = src[idx];
+        }
+
+#if defined(__i386__) || defined(__x86_64__)
+        struct xranlib_compress_request bfp_req = {};
+        struct xranlib_compress_response bfp_rsp = {};
+
+        bfp_req.data_in = local_src;
+        bfp_req.numRBs = nRBs;
+        bfp_req.len = data_len;
+        bfp_req.compMethod = XRAN_COMPMETHOD_BLKFLOAT;
+        bfp_req.iqWidth = fh_cfg->ru_conf.iqWidth_PRACH;
+
+        bfp_rsp.data_out = (int8_t *)dest;
+        bfp_rsp.len = 0;
+
+        xranlib_compress_avx512(&bfp_req, &bfp_rsp);
+
+#elif defined(__arm__) || defined(__aarch64__)
+        armral_bfp_compression(
+            fh_cfg->ru_conf.iqWidth_PRACH,
+            nRBs,
+            local_src,
+            (int8_t *)dest
+        );
+#else
+        AssertFatal(0, "PRACH BFP compression not supported on this architecture");
+#endif
+
+      } else if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_BLKSCALE ) {
+
+        /* PRACH uses 139 REs → pack into 12 PRBs */
+        int nRBs = 12;
+        //int payload_len = (3 * fh_cfg->ru_conf.iqWidth_PRACH + 1) * nRBs;
+
+        /* Zero-padded local buffer for BFP input */
+        int16_t local_src[12 * 12 * 2] __attribute__((aligned(64))) = {0};
+
+        /* Copy PRACH data into RB-aligned buffer */
+        for (int idx = 0; idx < 139 * 2; idx++) {
+          local_src[idx + g_kbar] = src[idx];
+        }
+
+#if defined(__i386__) || defined(__x86_64__)
+        struct xranlib_compress_request bs_req = {};
+        struct xranlib_compress_response bs_rsp = {};
+
+        bs_req.data_in = local_src;
+        bs_req.numRBs = nRBs;
+        bs_req.len = data_len;
+        bs_req.compMethod = XRAN_COMPMETHOD_BLKSCALE;
+        bs_req.iqWidth = fh_cfg->ru_conf.iqWidth_PRACH;
+
+        bs_rsp.data_out = (int8_t *)dest;
+        bs_rsp.len = 0;
+
+        xranlib_compress_blkscale_avx512(&bs_req, &bs_rsp);
+#else
+        AssertFatal(0, "PRACH Block Scale compression not supported on this architecture");
+#endif
+
+      }  else if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_ULAW ) {
+
+        /* PRACH uses 139 REs → pack into 12 PRBs */
+        int nRBs = 12;
+        //int payload_len = (3 * fh_cfg->ru_conf.iqWidth_PRACH + 1) * nRBs;
+
+        /* Zero-padded local buffer for BFP input */
+        int16_t local_src[12 * 12 * 2] __attribute__((aligned(64))) = {0};
+
+        /* Copy PRACH data into RB-aligned buffer */
+        for (int idx = 0; idx < 139 * 2; idx++) {
+          local_src[idx + g_kbar] = src[idx];
+        }
+
+#if defined(__i386__) || defined(__x86_64__)
+        struct xranlib_compress_request ulaw_req = {};
+        struct xranlib_compress_response ulaw_rsp = {};
+
+        ulaw_req.data_in = local_src;
+        ulaw_req.numRBs = nRBs;
+        ulaw_req.len = data_len;
+        ulaw_req.compMethod = XRAN_COMPMETHOD_ULAW;
+        ulaw_req.iqWidth = fh_cfg->ru_conf.iqWidth_PRACH;
+
+        ulaw_rsp.data_out = (int8_t *)dest;
+        ulaw_rsp.len = 0;
+
+        xranlib_compress_ulaw_avx512(&ulaw_req, &ulaw_rsp);
+#else
+        AssertFatal(0, "PRACH ULAW compression not supported on this architecture");
+#endif
+
+      } else {
+        AssertFatal(0, "Unsupported PRACH compression method %d\n",
+                    fh_cfg->ru_conf.compMeth_PRACH);
+      }
 
   buf = rte_pktmbuf_prepend(mbuf, sizeof(struct rte_ether_hdr));
   AssertFatal(buf != NULL, "incorrect mbuf size\n");
@@ -803,15 +1014,17 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   const int num_ul_rbs = fh_cfg->nULRBs;
   int num_prb = pusch_config[aarx][slot][symbol].num_prb;
   int start_prb = pusch_config[aarx][slot][symbol].start_prb;
-  AssertFatal(num_prb == num_ul_rbs && start_prb == 0, "only support full bandwidth reception\n");
+  // AssertFatal(num_prb == num_ul_rbs && start_prb == 0, "only support full bandwidth reception\n");
 
-  AssertFatal(fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
+  // AssertFatal(fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
   // TODO: With compression, have to add compression header to header_len
   size_t header_length = sizeof(struct xran_ecpri_hdr) + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr);
 
   // TODO: For compression, have to re-evaluate data size;
   const uint num_sc = num_ul_rbs * NR_NB_SC_PER_RB;
   size_t data_len = sizeof(int32_t) * num_sc;
+  if (fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE)
+    data_len = (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
 
   struct rte_mbuf *mbuf = xran_ethdi_mbuf_alloc();
   AssertFatal(mbuf != NULL, "out of mbufs\n");
@@ -826,12 +1039,16 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   fill_radio_app_header(radio_app_header, 0, XRAN_DIR_UL, frame, slot, symbol, mu);
 
   struct data_section_hdr *data_section_header = (struct data_section_hdr *)(radio_app_header + 1);
-  fill_data_section_header(data_section_header, fh_cfg->nULRBs, 0, section_id);
+  if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE)
+    fill_data_section_header(data_section_header, fh_cfg->nULRBs, 0, section_id);
+  else
+    fill_data_section_header(data_section_header, num_prb, 0, section_id);
+
 
   // TODO: O-DU expect compression header here even though the standard says it's not required
   struct data_section_compression_hdr *compression_header = (struct data_section_compression_hdr *)(data_section_header + 1);
-  compression_header->ud_comp_hdr.ud_comp_meth = XRAN_COMPMETHOD_NONE;
-  compression_header->ud_comp_hdr.ud_iq_width = XRAN_CONVERT_IQWIDTH(16);
+  compression_header->ud_comp_hdr.ud_comp_meth = fh_cfg->ru_conf.compMeth;// XRAN_COMPMETHOD_NONE;
+  compression_header->ud_comp_hdr.ud_iq_width = XRAN_CONVERT_IQWIDTH(fh_cfg->ru_conf.iqWidth);
   compression_header->rsrvd = 0;
 
   int fftsize = 1 << fh_cfg->nULFftSize;
@@ -841,6 +1058,37 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   void *iq_data_start = (void *)(compression_header + 1);
   int16_t* dest = (int16_t*)iq_data_start;
   uint16_t* src = (uint16_t*)&puschF[first_carrier_offset];
+  if (fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE) {                                                                                                      
+    // Calculate split based on start position
+    int neg_len = 0;                                                                                                                                           
+    int pos_len = 0;                                                                                                                                           
+                                              
+    if (start_prb < (num_ul_rbs >> 1))                                                                                                                         
+      neg_len = min((num_ul_rbs * NR_NB_SC_PER_RB / 2) - (start_prb * NR_NB_SC_PER_RB),                                                                        
+                    num_prb * NR_NB_SC_PER_RB);                                                                                                                
+                                                                                                                                                               
+    pos_len = (num_prb * NR_NB_SC_PER_RB) - neg_len;                                                                                                           
+                                                                                                                                                               
+    // Set up source pointers                                                                                                                                  
+    uint16_t *src1 = (uint16_t *)&puschF[(neg_len == 0)                                                                                                        
+                     ? ((start_prb * NR_NB_SC_PER_RB) - (num_ul_rbs * NR_NB_SC_PER_RB / 2))                                                                    
+                     : 0];                                                                                                                                     
+                                                                  
+    uint16_t *src2 = (uint16_t *)&puschF[(start_prb * NR_NB_SC_PER_RB) +                                                                                       
+                                          fftsize - (num_ul_rbs * NR_NB_SC_PER_RB / 2)];                                                                       
+                                                                                                                                                               
+    // Reorder into local buffer                                                                                                                               
+    uint32_t local_src[num_prb * NR_NB_SC_PER_RB] __attribute__((aligned(64)));                                                                                
+    memcpy(local_src, src2, neg_len * 4);                                                                                                                      
+    memcpy(&local_src[neg_len], src1, pos_len * 4);                                                                                                            
+                                                                                                                                                               
+    // Update src to point to reordered data                                                                                                                   
+    src = (uint16_t *)local_src;                                                                                                                               
+  }            
+
+
+   /* ---------- NO COMPRESSION ---------- */
+   if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE) {
   for (int i = 0; i < num_sc_first_copy * 2; i++) {
     *dest++ = (int16_t)htons(src[i]);
   }
@@ -848,6 +1096,95 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   for (int i = 0; i < num_sc_second_copy * 2; i++) {
     *dest++ = (int16_t)htons(src[i]);
   }
+}   else if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_BLKFLOAT) {
+
+      data_len =
+          (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
+
+#if defined(__i386__) || defined(__x86_64__)
+
+      struct xranlib_compress_request  req = {};
+      struct xranlib_compress_response rsp = {};
+
+      req.data_in    = (int16_t *)src;
+      req.numRBs     = num_prb;
+      req.len        = data_len;
+      req.compMethod = XRAN_COMPMETHOD_BLKFLOAT;
+      req.iqWidth    = fh_cfg->ru_conf.iqWidth;
+
+      rsp.data_out = (int8_t *)dest;
+      xranlib_compress_avx512(&req, &rsp);
+
+#elif defined(__arm__) || defined(__aarch64__)
+
+      armral_bfp_compression(
+          fh_cfg->ru_conf.iqWidth,
+          num_prb,
+          (int16_t *)src,
+          (int8_t *)dest);
+
+#else
+      AssertFatal(0, "BFP compression not supported on this architecture");
+#endif
+
+    }
+
+     else if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_BLKSCALE) {
+
+      data_len =
+          (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
+
+#if defined(__i386__) || defined(__x86_64__)
+
+      struct xranlib_compress_request  req = {};
+      struct xranlib_compress_response rsp = {};
+
+      req.data_in    = (int16_t *)src;
+      req.numRBs     = num_prb;
+      req.len        = data_len;
+      req.compMethod = XRAN_COMPMETHOD_BLKSCALE;
+      req.iqWidth    = fh_cfg->ru_conf.iqWidth;
+
+      rsp.data_out = (int8_t *)dest;
+      xranlib_compress_blkscale_avx512(&req, &rsp);
+
+#else
+      AssertFatal(0, "BLKSCALE compression not supported on this architecture");
+#endif
+
+    }
+
+
+    else if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_ULAW) {
+
+      data_len =
+          (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
+
+#if defined(__i386__) || defined(__x86_64__)
+
+      struct xranlib_compress_request  req = {};
+      struct xranlib_compress_response rsp = {};
+
+      req.data_in    = (int16_t *)src;
+      req.numRBs     = num_prb;
+      req.len        = data_len;
+      req.compMethod = XRAN_COMPMETHOD_ULAW;
+      req.iqWidth    = fh_cfg->ru_conf.iqWidth;
+
+      rsp.data_out = (int8_t *)dest;
+      xranlib_compress_ulaw_avx512(&req, &rsp);
+
+#else
+      AssertFatal(0, "ULAW compression not supported on this architecture");
+#endif
+
+    }
+        else {
+      AssertFatal(0, "Unsupported PUSCH compression method %d\n",
+                  fh_cfg->ru_conf.compMeth);
+    }
+
+
 
   buf = rte_pktmbuf_prepend(mbuf, sizeof(struct rte_ether_hdr));
   AssertFatal(buf != NULL, "incorrect mbuf size\n");
