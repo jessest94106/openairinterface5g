@@ -236,10 +236,11 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
           // Log when we have non-zero compressed data OR for first 10 occurrences
           bool should_log = (prach_decomp_log_count < 10 || non_zero_compressed > 0);
           if (should_log) {
-            LOG_I(HW, "[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d\n",
-                  frame, slot, sym_idx, aa, ru_conf->iqWidth_PRACH, payload_len, non_zero_compressed, payload_len);
-            LOG_I(HW, "[gNB PRACH RX] Compressed src first bytes: [0]=0x%02x [1]=0x%02x [2]=0x%02x [3]=0x%02x\n",
-                  ((uint8_t*)src)[0], ((uint8_t*)src)[1], ((uint8_t*)src)[2], ((uint8_t*)src)[3]);
+            LOG_I(HW, "[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d, g_kbar=%d\n",
+                  frame, slot, sym_idx, aa, ru_conf->iqWidth_PRACH, payload_len, non_zero_compressed, payload_len, g_kbar);
+            LOG_I(HW, "[gNB PRACH RX] Compressed input: [0]=0x%02x [1]=0x%02x [27]=0x%02x [28]=0x%02x [29]=0x%02x [55]=0x%02x [56]=0x%02x\n",
+                  ((uint8_t*)src)[0], ((uint8_t*)src)[1], ((uint8_t*)src)[27], ((uint8_t*)src)[28],
+                  ((uint8_t*)src)[29], ((uint8_t*)src)[55], ((uint8_t*)src)[56]);
           }
 
           bfp_decom_req.data_in = (int8_t *)src;
@@ -255,8 +256,8 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
 
           if (should_log) {
             LOG_I(HW, "[gNB PRACH RX] Decompression returned, rsp.len=%d\n", bfp_decom_rsp.len);
-            LOG_I(HW, "[gNB PRACH RX] local_dst samples: [0]=%d [1]=%d [10]=%d [100]=%d\n",
-                  local_dst[0], local_dst[1], local_dst[10], local_dst[100]);
+            LOG_I(HW, "[gNB PRACH RX] local_dst: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+                  local_dst[0], local_dst[4], local_dst[100], local_dst[281]);
             int max_val = 0, min_val = 0;
             int non_zero_count = 0;
             for (int i = 0; i < 12 * 2 * N_SC_PER_PRB; i++) {
@@ -280,6 +281,17 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
           else
             for (idx = 0; idx < (139 * 2); idx++)
               dst[idx] += (local_dst[idx + g_kbar]);
+
+          // Log extracted PRACH data for first and last symbol
+          if (prach_decomp_log_count <= 5) {
+            if (sym_idx == prach_start_sym) {
+              LOG_I(HW, "[gNB PRACH RX] First symbol dst after g_kbar: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+                    dst[0], dst[1], dst[100], dst[138]);
+            } else if (sym_idx == prach_start_sym + 11) {
+              LOG_I(HW, "[gNB PRACH RX] Final accumulated dst (all 12 syms): [0]=%d [1]=%d [100]=%d [138]=%d\n",
+                    dst[0], dst[1], dst[100], dst[138]);
+            }
+          }
         } // COMPMETHOD_BLKFLOAT
 
 
