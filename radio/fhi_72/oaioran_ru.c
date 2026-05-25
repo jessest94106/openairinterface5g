@@ -261,13 +261,51 @@ typedef struct {
   int section_id;
   int num_prb;
   int start_prb;
+  int frame;
+  int slot;
+  int start_symbol;
+  int num_symbols;
+  int mu;
+  int filter_id;
 } oran_pusch_cplane_config_t;
 
 static oran_pusch_cplane_config_t pusch_config[MAX_NUM_ANTENNAS][20][14];
 
-oran_prach_cplane_config_t prach_config_per_antenna[MAX_NUM_ANTENNAS] = {0};
+#define PRACH_FRAME_ID_MOD 256
+#define PRACH_SLOTS_PER_FRAME 20
+
+static oran_prach_cplane_config_t prach_config_by_frame_slot[MAX_NUM_ANTENNAS][PRACH_FRAME_ID_MOD][PRACH_SLOTS_PER_FRAME] = {0};
 static uint8_t prach_seq_id[MAX_NUM_ANTENNAS] = {0};
 static _Atomic(uint8_t) pusch_seq_id[MAX_NUM_ANTENNAS] = {0};
+
+#ifdef ORU_PUSCH_CPLANE_DEBUG
+static int oru_pusch_msg3_debug_window(int slot, int symbol, int start_prb, int num_prb, int nonzero_iq)
+{
+  return nonzero_iq > 0 || num_prb <= 8 || (slot == 18 && symbol >= 10 && symbol <= 13);
+}
+#endif
+
+static int get_oru_prach_frame_adjust(void)
+{
+  static int initialized = 0;
+  static int adjust = 0;
+  if (!initialized) {
+    const char *env = getenv("ORU_PRACH_FRAME_ADJUST");
+    if (env != NULL)
+      adjust = atoi(env);
+    LOG_I(HW, "ORU PRACH frame adjust %d frame(s)\n", adjust);
+    initialized = 1;
+  }
+  return adjust;
+}
+
+static int adjusted_prach_frame(int frame)
+{
+  int adjusted = (frame + get_oru_prach_frame_adjust()) % 1024;
+  if (adjusted < 0)
+    adjusted += 1024;
+  return adjusted;
+}
 
 extern int32_t xran_ethdi_mbuf_send(struct rte_mbuf *mb, uint16_t ethertype, uint16_t vf_id);
 extern uint16_t xran_map_ecpriPcid_to_vf(void *p_dev_ctx, int32_t dir, int32_t cc_id, int32_t ru_port_id);
@@ -278,7 +316,7 @@ void symbol_callback(void *args, struct xran_sense_of_time *p_sense_of_time)
   static int first_call_true_count = 0;
   call_count++;
   if (call_count < 10 || (first_call_set && first_call_true_count++ < 10)) {
-    LOG_I(HW, "[ORU] symbol_callback called, count=%d, first_call_set=%d\n", call_count, first_call_set);
+    LOG_D(HW, "[ORU] symbol_callback called, count=%d, first_call_set=%d\n", call_count, first_call_set);
   }
   if (!first_call_set) {
     return;
@@ -350,7 +388,7 @@ void symbol_callback(void *args, struct xran_sense_of_time *p_sense_of_time)
 
   static int push_count = 0;
   if (push_count++ < 10) {
-    LOG_I(HW, "[ORU] Pushing DL sync to FIFO: frame=%d, slot=%d, symbol=%d, count=%d\n", info->frame, info->slot, info->symbol, push_count);
+    LOG_D(HW, "[ORU] Pushing DL sync to FIFO: frame=%d, slot=%d, symbol=%d, count=%d\n", info->frame, info->slot, info->symbol, push_count);
   }
   pushNotifiedFIFO(&ru_dl_sync_fifo, req);
 }
@@ -360,7 +398,7 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
   static int call_count = 0;
   call_count++;
   if (call_count <= 10 || call_count % 1000 == 0) {
-    LOG_I(HW, "[ORU north] xran_oru_tx_read_slot called, count=%d\n", call_count);
+    LOG_D(HW, "[ORU north] xran_oru_tx_read_slot called, count=%d\n", call_count);
   }
 
   notifiedFIFO_elt_t *res = pullNotifiedFIFO(&ru_dl_sync_fifo);
@@ -373,7 +411,7 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
   *ts = info->ts;
 
   if (call_count <= 10) {
-    LOG_I(HW, "[ORU north] Read from FIFO: frame=%d, slot=%d, symbol=%d, num_symbols=%d\n",
+    LOG_D(HW, "[ORU north] Read from FIFO: frame=%d, slot=%d, symbol=%d, num_symbols=%d\n",
           *frame, *slot, *symbol, *num_symbols);
   }
 
@@ -401,7 +439,7 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
     if (num_packets) {
       symbols_with_packets++;
       if (symbols_with_packets <= 10 || symbols_with_packets % 100 == 0) {
-        LOG_I(HW, "[ORU north] Symbol %d has %d packets (total symbols: %d, with packets: %d)\n",
+        LOG_D(HW, "[ORU north] Symbol %d has %d packets (total symbols: %d, with packets: %d)\n",
               sym, num_packets, total_symbols_processed, symbols_with_packets);
       }
       memset(tx_data_sym, 0, sizeof(tx_data_sym));
@@ -417,7 +455,7 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
           int16_t *destination = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
 
           if (dl_decomp_log_count < 10) {
-            LOG_I(HW, "[ORU DL RX] sym=%d, packet %d/%d: comp_meth=%d, iq_width=%d, start_prb=%d, num_prb=%d\n",
+            LOG_D(HW, "[ORU DL RX] sym=%d, packet %d/%d: comp_meth=%d, iq_width=%d, start_prb=%d, num_prb=%d\n",
                   sym, i, num_packets, comp_meth, uplane_data[i]->iq_width, start_prb, num_prb);
             dl_decomp_log_count++;
           }
@@ -490,7 +528,7 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
       static int no_packet_count = 0;
       no_packet_count++;
       if (no_packet_count <= 20 || no_packet_count % 1000 == 0) {
-        LOG_I(HW, "[ORU north] No packets for frame=%d, slot=%d, symbol=%d (count=%d)\n",
+        LOG_D(HW, "[ORU north] No packets for frame=%d, slot=%d, symbol=%d (count=%d)\n",
               *frame, *slot, sym, no_packet_count);
       }
       for (int aatx = 0; aatx < nb_tx; aatx++) {
@@ -509,31 +547,31 @@ int process_ru_uplane(struct rte_mbuf *pkt,
 {
   static int call_count = 0;
   if (call_count++ < 10) {
-    LOG_I(HW, "[ORU] process_ru_uplane called, count=%d\n", call_count);
+    LOG_D(HW, "[ORU] process_ru_uplane called, count=%d\n", call_count);
   }
   if (!first_call_set) {
     return MBUF_FREE;
   }
-  const struct xran_fh_config *fh_cfg = get_xran_fh_config(port_id);
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   void *iq_data_start = NULL;
   uint8_t CC_ID = 0xFF;
   uint8_t Ant_ID = 0xFF;
-  uint8_t frame_id;
-  uint8_t subframe_id;
-  uint8_t slot_id;
-  uint8_t symb_id;
-  uint8_t filter_id;
-  union ecpri_seq_id seq_id;
-  uint16_t num_prbu;
-  uint16_t start_prbu;
-  uint16_t sym_inc;
-  uint16_t rb;
-  uint16_t sect_id;
+  uint8_t frame_id = 0;
+  uint8_t subframe_id = 0;
+  uint8_t slot_id = 0;
+  uint8_t symb_id = 0;
+  uint8_t filter_id = 0;
+  union ecpri_seq_id seq_id = {0};
+  uint16_t num_prbu = 0;
+  uint16_t start_prbu = 0;
+  uint16_t sym_inc = 0;
+  uint16_t rb = 0;
+  uint16_t sect_id = 0;
   int expect_comp = fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE;
   enum xran_comp_hdr_type staticComp = fh_cfg->ru_conf.xranCompHdrType;
   uint8_t compMeth = XRAN_COMPMETHOD_NONE;
   uint8_t iqWidth = 0;
-  uint8_t is_prach;
+  uint8_t is_prach = 0;
   int ret = xran_extract_iq_samples(pkt,
                                     &iq_data_start,
                                     &CC_ID,
@@ -601,7 +639,26 @@ int process_ru_uplane(struct rte_mbuf *pkt,
   }
 
 
+  int num_slots_per_frame = NR_NUMBER_OF_SUBFRAMES_PER_FRAME * slots_per_subframe;
   int slot_in_frame = slot_id + subframe_id * slots_per_subframe;
+  if (slot_in_frame >= num_slots_per_frame && slot_id < num_slots_per_frame) {
+    slot_in_frame = slot_id;
+  }
+  static int parsed_log_count = 0;
+  if (parsed_log_count < 20) {
+    LOG_D(HW, "[ORU] U-plane parsed: port=%u frame=%u subframe=%u slot=%u slot_in_frame=%d symbol=%u ant=%u start_prb=%u num_prb=%u ret=%d\n",
+          port_id, frame_id, subframe_id, slot_id, slot_in_frame, symb_id, Ant_ID, start_prbu, num_prbu, ret);
+    parsed_log_count++;
+  }
+  if (slot_in_frame < 0 || slot_in_frame >= num_slots_per_frame || symb_id >= NR_SYMBOLS_PER_SLOT || Ant_ID >= fh_cfg->neAxc ||
+      start_prbu >= fh_cfg->nDLRBs || num_prbu == 0 || start_prbu + num_prbu > fh_cfg->nDLRBs) {
+    LOG_W(HW, "[ORU] Drop invalid U-plane packet: port=%u frame=%u subframe=%u slot=%u slot_in_frame=%d symbol=%u ant=%u start_prb=%u num_prb=%u nDLRBs=%u neAxc=%u\n",
+          port_id, frame_id, subframe_id, slot_id, slot_in_frame, symb_id, Ant_ID, start_prbu, num_prbu, fh_cfg->nDLRBs, fh_cfg->neAxc);
+    packet_processor_context.up_malformed++;
+    packet_processor_context.up_dropped++;
+    return MBUF_FREE;
+  }
+
   enqueue_uplane_packet(&packet_processor_context,
                         iq_data_start,
                         pkt,
@@ -618,7 +675,7 @@ int process_ru_uplane(struct rte_mbuf *pkt,
 
 int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, struct xran_sense_of_time *p_sense_of_time)
 {
-  const struct xran_fh_config *fh_cfg = get_xran_fh_config(port_id);
+  const struct xran_fh_config *fh_cfg = get_xran_fh_config(0);
   struct xran_ecpri_hdr *ecpri_hdr;
   struct xran_recv_packet_info xran_recv_packet_info;
   int ret = xran_parse_ecpri_hdr(pkt, &ecpri_hdr, &xran_recv_packet_info);
@@ -653,18 +710,49 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
         return MBUF_FREE;
       }
       *((uint64_t *)section) = rte_be_to_cpu_64(*((uint64_t *)section));
-      int mu = hdr->frameStructure.uScs;
+      int mu = fh_cfg->frame_conf.nNumerology;
       int aarx = xran_recv_packet_info.eaxc.ruPortId - fh_cfg->prach_conf.eAxC_offset;
+      int slot = hdr->cmnhdr.field.slotId + hdr->cmnhdr.field.subframeId * (1 << mu);
+      if (aarx < 0 || aarx >= MAX_NUM_ANTENNAS || slot < 0 || slot >= PRACH_SLOTS_PER_FRAME) {
+        LOG_W(HW,
+              "Invalid PRACH C-plane config: frame=%d subframe=%d slot_id=%d slot=%d aarx=%d eAxC_offset=%u\n",
+              hdr->cmnhdr.field.frameId,
+              hdr->cmnhdr.field.subframeId,
+              hdr->cmnhdr.field.slotId,
+              slot,
+              aarx,
+              fh_cfg->prach_conf.eAxC_offset);
+        return MBUF_FREE;
+      }
       oran_prach_cplane_config_t prach_config = {
           .frame = hdr->cmnhdr.field.frameId,
-          .slot = hdr->cmnhdr.field.slotId + hdr->cmnhdr.field.subframeId + hdr->cmnhdr.field.subframeId * hdr->frameStructure.uScs,
+          .slot = slot,
           .num_prb = section->hdr.u1.common.numPrbc,
           .start_prb = section->hdr.u1.common.startPrbc,
           .section_id = section->hdr.u1.common.sectionId,
           .mu = mu,
           .filter_id = hdr->cmnhdr.field.filterIndex
       };
-      prach_config_per_antenna[aarx] = prach_config;
+      prach_config_by_frame_slot[aarx][prach_config.frame][slot] = prach_config;
+#ifdef ORU_PRACH_CPLANE_DEBUG
+      static int prach_cp_rx_dbg_count = 0;
+      if (prach_cp_rx_dbg_count < 64) {
+        LOG_A(HW,
+              "[ORU PRACH CP RX] frame=%d subframe=%d slot_id=%d slot=%d aarx=%d section=%d start_prb=%d num_prb=%d filter=%d mu=%d eaxc=%u\n",
+              hdr->cmnhdr.field.frameId,
+              hdr->cmnhdr.field.subframeId,
+              hdr->cmnhdr.field.slotId,
+              slot,
+              aarx,
+              prach_config.section_id,
+              prach_config.start_prb,
+              prach_config.num_prb,
+              prach_config.filter_id,
+              mu,
+              xran_recv_packet_info.eaxc.ruPortId);
+        prach_cp_rx_dbg_count++;
+      }
+#endif
       return MBUF_FREE;
     }
     case XRAN_CP_SECTIONTYPE_1: {
@@ -688,6 +776,20 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
       int numPrbc = section->hdr.u1.common.numPrbc;
       int num_symbols = section->hdr.u.s1.numSymbol;
       int aarx = xran_recv_packet_info.eaxc.ruPortId;
+      if (aarx < 0 || aarx >= MAX_NUM_ANTENNAS || slot < 0 || slot >= 20) {
+        LOG_W(HW,
+              "Invalid PUSCH C-plane config: frame=%d subframe=%d slot_id=%d slot=%d aarx=%d start_sym=%u num_sym=%d start_prb=%d num_prb=%d\n",
+              hdr->cmnhdr.field.frameId,
+              hdr->cmnhdr.field.subframeId,
+              hdr->cmnhdr.field.slotId,
+              slot,
+              aarx,
+              start_symbol,
+              num_symbols,
+              startPrbc,
+              numPrbc);
+        return MBUF_FREE;
+      }
       if (start_symbol + num_symbols > 14) {
         LOG_W(HW, "Invalid symbol index >= 14 start_symbol %d num_symbols %d\n", start_symbol, num_symbols);
       }
@@ -701,10 +803,38 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
             numPrbc,
             start_symbol,
             num_symbols);
+#ifdef ORU_PUSCH_CPLANE_DEBUG
+      static int pusch_cp_rx_dbg_count = 0;
+      const int pusch_cp_msg3_debug = oru_pusch_msg3_debug_window(slot, start_symbol, startPrbc, numPrbc, 0);
+      if (pusch_cp_msg3_debug && pusch_cp_rx_dbg_count < 4096) {
+        LOG_A(HW,
+              "[ORU PUSCH CP RX] frame=%d subframe=%d slot_id=%d slot=%d aarx=%d section=%d start_prb=%d num_prb=%d start_sym=%u num_sym=%d filter=%d mu=%d eaxc=%u\n",
+              hdr->cmnhdr.field.frameId,
+              hdr->cmnhdr.field.subframeId,
+              hdr->cmnhdr.field.slotId,
+              slot,
+              aarx,
+              section_id,
+              startPrbc,
+              numPrbc,
+              start_symbol,
+              num_symbols,
+              hdr->cmnhdr.field.filterIndex,
+              mu,
+              xran_recv_packet_info.eaxc.ruPortId);
+        pusch_cp_rx_dbg_count++;
+      }
+#endif
       for (int symbol = start_symbol; symbol < start_symbol + num_symbols && symbol < 14; symbol++) {
         pusch_config[aarx][slot][symbol].section_id = section_id;
         pusch_config[aarx][slot][symbol].start_prb = startPrbc;
         pusch_config[aarx][slot][symbol].num_prb = numPrbc;
+        pusch_config[aarx][slot][symbol].frame = hdr->cmnhdr.field.frameId;
+        pusch_config[aarx][slot][symbol].slot = slot;
+        pusch_config[aarx][slot][symbol].start_symbol = start_symbol;
+        pusch_config[aarx][slot][symbol].num_symbols = num_symbols;
+        pusch_config[aarx][slot][symbol].mu = mu;
+        pusch_config[aarx][slot][symbol].filter_id = hdr->cmnhdr.field.filterIndex;
       }
       return MBUF_FREE;
     }
@@ -722,16 +852,26 @@ void init_oru_packet_processor(void *handle, int callbacks_per_slot)
   AssertFatal(!installed, "Cannot init oru twice\n");
   installed = true;
   for (int aarx = 0; aarx < MAX_NUM_ANTENNAS; aarx++) {
-    prach_config_per_antenna[aarx].section_id = -1;
-    prach_config_per_antenna[aarx].num_prb = -1;
-    prach_config_per_antenna[aarx].start_prb = -1;
-    prach_config_per_antenna[aarx].slot = -1;
-    prach_config_per_antenna[aarx].frame = -1;
+    for (int frame = 0; frame < PRACH_FRAME_ID_MOD; frame++) {
+      for (int slot = 0; slot < PRACH_SLOTS_PER_FRAME; slot++) {
+        prach_config_by_frame_slot[aarx][frame][slot].section_id = -1;
+        prach_config_by_frame_slot[aarx][frame][slot].num_prb = -1;
+        prach_config_by_frame_slot[aarx][frame][slot].start_prb = -1;
+        prach_config_by_frame_slot[aarx][frame][slot].slot = -1;
+        prach_config_by_frame_slot[aarx][frame][slot].frame = -1;
+      }
+    }
   }
   for (int aarx = 0; aarx < MAX_NUM_ANTENNAS; aarx++) {
     for (int slot = 0; slot < 20; slot++) {
       for (int symbol = 0; symbol < 14; symbol++) {
         pusch_config[aarx][slot][symbol].section_id = -1;
+        pusch_config[aarx][slot][symbol].frame = -1;
+        pusch_config[aarx][slot][symbol].slot = -1;
+        pusch_config[aarx][slot][symbol].start_symbol = -1;
+        pusch_config[aarx][slot][symbol].num_symbols = -1;
+        pusch_config[aarx][slot][symbol].start_prb = -1;
+        pusch_config[aarx][slot][symbol].num_prb = -1;
       }
     }
   }
@@ -833,22 +973,53 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   // TODO: Only support short format PRACH
   const uint prach_length = 139;
   const uint num_prb = 12;
-  size_t data_len = sizeof(int32_t) * prach_length;
+  const int prach_payload_iq16 = num_prb * 12 * 2;
+  size_t data_len = sizeof(int16_t) * prach_payload_iq16;
   if (fh_cfg->ru_conf.compMeth_PRACH != XRAN_COMPMETHOD_NONE)
     data_len = (3 * fh_cfg->ru_conf.iqWidth_PRACH + 1) * num_prb;
 
-  oran_prach_cplane_config_t *prach_config = &prach_config_per_antenna[aarx];
-  if (prach_config->section_id == -1) {
-    RATE_LIMIT(1000)
-      LOG_W(HW, "PRACH was not yet configured by the O-DU\n");
+  int tx_frame = adjusted_prach_frame(frame);
+  int tx_frame8 = tx_frame & 0xff;
+  if (aarx < 0 || aarx >= MAX_NUM_ANTENNAS || slot < 0 || slot >= PRACH_SLOTS_PER_FRAME) {
+    LOG_W(HW, "Invalid PRACH TX lookup: frame.slot %d.%d adjusted %d.%d frame8 %d aarx %d\n", frame, slot, tx_frame, slot, tx_frame8, aarx);
     return;
   }
-  if (prach_config->frame != (frame & 0xff) || prach_config->slot != slot) {
-    RATE_LIMIT(1000)
-      LOG_W(HW,
-            "PRACH was not configured for frame.slot %d.%d, configuration is for frame.slot %d.%d\n",
+  oran_prach_cplane_config_t *prach_config = &prach_config_by_frame_slot[aarx][tx_frame8][slot];
+  if (prach_config->section_id == -1) {
+#ifdef ORU_PRACH_CPLANE_DEBUG
+    static int prach_no_cp_dbg_count = 0;
+    if (prach_no_cp_dbg_count < 64) {
+      LOG_A(HW,
+            "[ORU PRACH NO CP] rx_frame.slot.symbol=%d.%d.%d adjusted=%d.%d frame8=%d aarx=%d\n",
             frame,
             slot,
+            symbol,
+            tx_frame,
+            slot,
+            tx_frame8,
+            aarx);
+      prach_no_cp_dbg_count++;
+    }
+#endif
+    RATE_LIMIT(1000)
+      LOG_W(HW,
+            "PRACH was not configured for frame.slot %d.%d adjusted %d.%d frame8 %d: no C-plane config cached\n",
+            frame,
+            slot,
+            tx_frame,
+            slot,
+            tx_frame8);
+    return;
+  }
+  if (prach_config->frame != tx_frame8 || prach_config->slot != slot) {
+    RATE_LIMIT(1000)
+      LOG_W(HW,
+            "PRACH cache corruption for frame.slot %d.%d adjusted %d.%d frame8 %d, configuration is for frame.slot %d.%d\n",
+            frame,
+            slot,
+            tx_frame,
+            slot,
+            tx_frame8,
             prach_config->frame,
             prach_config->slot);
     return;
@@ -869,7 +1040,7 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   fill_ecpri_header(ecpri_header, ECPRI_IQ_DATA, ecpri_payload_size, 0, aarx + fh_cfg->prach_conf.eAxC_offset, prach_seq_id[aarx]++, 0);
 
   struct radio_app_common_hdr *radio_app_header = (struct radio_app_common_hdr *)(ecpri_header + 1);
-  fill_radio_app_header(radio_app_header, prach_config->filter_id, XRAN_DIR_UL, frame, slot, symbol, mu);
+  fill_radio_app_header(radio_app_header, prach_config->filter_id, XRAN_DIR_UL, tx_frame, slot, symbol, mu);
 
   struct data_section_hdr *data_section_header = (struct data_section_hdr *)(radio_app_header + 1);
   fill_data_section_header(data_section_header, prach_config->num_prb, prach_config->start_prb, prach_config->section_id);
@@ -888,10 +1059,84 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
 
   int16_t *dest = (int16_t *)iq_data_start;
   uint16_t *src = (uint16_t *)prachF;
+  memset(iq_data_start, 0, data_len);
+  AssertFatal(g_kbar >= 0 && g_kbar + (int)(prach_length * 2) <= prach_payload_iq16,
+              "Invalid PRACH g_kbar %d for payload iq16 count %d and PRACH length %u\n",
+              g_kbar,
+              prach_payload_iq16,
+              prach_length);
+  bool prach_has_nonzero = false;
+  for (int i = 0; i < prach_length * 2; i++) {
+    if (src[i] != 0) {
+      prach_has_nonzero = true;
+      break;
+    }
+  }
   if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_NONE) {
     for (int i = 0; i < prach_length * 2; i++) {
       dest[i + g_kbar] = (int16_t)htons(src[i]);
     }
+
+#ifdef ORU_PRACH_UPLANE_DEBUG
+    int src_nonzero = 0;
+    int dst_nonzero = 0;
+    int16_t src_min = 0;
+    int16_t src_max = 0;
+    int16_t dst_min = 0;
+    int16_t dst_max = 0;
+    for (int i = 0; i < prach_length * 2; i++) {
+      int16_t v = (int16_t)src[i];
+      if (i == 0 || v < src_min)
+        src_min = v;
+      if (i == 0 || v > src_max)
+        src_max = v;
+      if (v != 0)
+        src_nonzero++;
+    }
+    for (int i = 0; i < prach_payload_iq16; i++) {
+      int16_t v = (int16_t)ntohs((uint16_t)dest[i]);
+      if (i == 0 || v < dst_min)
+        dst_min = v;
+      if (i == 0 || v > dst_max)
+        dst_max = v;
+      if (v != 0)
+        dst_nonzero++;
+    }
+    static int prach_tx_dbg_count = 0;
+    if ((symbol == 0 && prach_tx_dbg_count < 1024) || prach_has_nonzero) {
+      LOG_A(HW,
+            "[ORU PRACH TX UNCOMP] rx_frame.slot.symbol=%d.%d.%d tx_frame=%d frame8=%d section=%d start_prb=%d num_prb=%d src_nonzero=%d/%u src_min=%d src_max=%d dst_nonzero=%d/%d dst_min=%d dst_max=%d\n",
+            frame,
+            slot,
+            symbol,
+            tx_frame,
+            tx_frame8,
+            prach_config->section_id,
+            prach_config->start_prb,
+            prach_config->num_prb,
+            src_nonzero,
+            prach_length * 2,
+            src_min,
+            src_max,
+            dst_nonzero,
+            prach_payload_iq16,
+            dst_min,
+            dst_max);
+      LOG_A(HW,
+            "[ORU PRACH TX UNCOMP] samples src[0]=%d src[1]=%d src[100]=%d src[277]=%d dst[0]=%d dst[g]=%d dst[g+1]=%d dst[g+100]=%d dst[g+277]=%d\n",
+            (int16_t)src[0],
+            (int16_t)src[1],
+            (int16_t)src[100],
+            (int16_t)src[277],
+            (int16_t)ntohs((uint16_t)dest[0]),
+            (int16_t)ntohs((uint16_t)dest[g_kbar]),
+            (int16_t)ntohs((uint16_t)dest[g_kbar + 1]),
+            (int16_t)ntohs((uint16_t)dest[g_kbar + 100]),
+            (int16_t)ntohs((uint16_t)dest[g_kbar + 277]));
+      if (symbol == 0 && !prach_has_nonzero)
+        prach_tx_dbg_count++;
+    }
+#endif
   } else if (fh_cfg->ru_conf.compMeth_PRACH == XRAN_COMPMETHOD_BLKFLOAT) {
 
         /* PRACH uses 139 REs → pack into 12 PRBs */
@@ -908,21 +1153,14 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
 
         // Log input and local_src for debugging
         static int prach_log_count = 0;
-        // Check if there's any non-zero data
-        bool has_nonzero = false;
-        for (int i = 0; i < 139 * 2; i++) {
-          if (src[i] != 0) {
-            has_nonzero = true;
-            break;
-          }
-        }
+        bool has_nonzero = prach_has_nonzero;
         // Log first 5 times OR when we have non-zero data
         if (prach_log_count < 5 || has_nonzero) {
-          LOG_I(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
                 frame, slot, symbol, g_kbar, has_nonzero);
-          LOG_I(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
                 src[0], src[1], src[100], src[138]);
-          LOG_I(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
                 local_src[0], local_src[4], local_src[100], local_src[281]);
           if (!has_nonzero && prach_log_count < 5) {
             prach_log_count++;
@@ -940,7 +1178,7 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
         bfp_req.iqWidth = fh_cfg->ru_conf.iqWidth_PRACH;
 
         if (prach_log_count <= 5 || has_nonzero) {
-          LOG_I(HW, "[ORU PRACH COMP] Using iqWidth=%d, numRBs=%d, data_len=%d, compHdrType=%s\n",
+          LOG_D(HW, "[ORU PRACH COMP] Using iqWidth=%d, numRBs=%d, data_len=%zu, compHdrType=%s\n",
                 fh_cfg->ru_conf.iqWidth_PRACH, nRBs, data_len,
                 fh_cfg->ru_conf.xranCompHdrType == XRAN_COMP_HDR_TYPE_DYNAMIC ? "DYNAMIC" : "STATIC");
         }
@@ -952,7 +1190,7 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
 
         // Log compressed output
         if (prach_log_count <= 5 || has_nonzero) {
-          LOG_I(HW, "[ORU PRACH COMP] Compressed output: [0]=0x%02x [1]=0x%02x [27]=0x%02x [28]=0x%02x [29]=0x%02x [55]=0x%02x [56]=0x%02x, len=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] Compressed output: [0]=0x%02x [1]=0x%02x [27]=0x%02x [28]=0x%02x [29]=0x%02x [55]=0x%02x [56]=0x%02x, len=%d\n",
                 ((uint8_t*)dest)[0], ((uint8_t*)dest)[1], ((uint8_t*)dest)[27], ((uint8_t*)dest)[28],
                 ((uint8_t*)dest)[29], ((uint8_t*)dest)[55], ((uint8_t*)dest)[56], bfp_rsp.len);
         }
@@ -984,21 +1222,14 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
 
         // Log input and local_src for debugging
         static int prach_log_count = 0;
-        // Check if there's any non-zero data
-        bool has_nonzero = false;
-        for (int i = 0; i < 139 * 2; i++) {
-          if (src[i] != 0) {
-            has_nonzero = true;
-            break;
-          }
-        }
+        bool has_nonzero = prach_has_nonzero;
         // Log first 5 times OR when we have non-zero data
         if (prach_log_count < 5 || has_nonzero) {
-          LOG_I(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
                 frame, slot, symbol, g_kbar, has_nonzero);
-          LOG_I(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
                 src[0], src[1], src[100], src[138]);
-          LOG_I(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
                 local_src[0], local_src[4], local_src[100], local_src[281]);
           if (!has_nonzero && prach_log_count < 5) {
             prach_log_count++;
@@ -1039,21 +1270,14 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
 
         // Log input and local_src for debugging
         static int prach_log_count = 0;
-        // Check if there's any non-zero data
-        bool has_nonzero = false;
-        for (int i = 0; i < 139 * 2; i++) {
-          if (src[i] != 0) {
-            has_nonzero = true;
-            break;
-          }
-        }
+        bool has_nonzero = prach_has_nonzero;
         // Log first 5 times OR when we have non-zero data
         if (prach_log_count < 5 || has_nonzero) {
-          LOG_I(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] frame=%d, slot=%d, symbol=%d, g_kbar=%d, has_nonzero=%d\n",
                 frame, slot, symbol, g_kbar, has_nonzero);
-          LOG_I(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] Input src: [0]=%d [1]=%d [100]=%d [138]=%d\n",
                 src[0], src[1], src[100], src[138]);
-          LOG_I(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
+          LOG_D(HW, "[ORU PRACH COMP] local_src: [0]=%d [4]=%d [100]=%d [281]=%d\n",
                 local_src[0], local_src[4], local_src[100], local_src[281]);
           if (!has_nonzero && prach_log_count < 5) {
             prach_log_count++;
@@ -1089,6 +1313,22 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
   int vf_id = xran_map_ecpriPcid_to_vf(gxran_handle, XRAN_DIR_UL, 0, aarx + fh_cfg->prach_conf.eAxC_offset);
   int ret = xran_ethdi_mbuf_send(mbuf, ETHER_TYPE_ECPRI, vf_id);
   AssertFatal(ret == 1, "Error sending mbuf\n");
+#ifdef ORU_PRACH_UPLANE_DEBUG
+  if (prach_has_nonzero) {
+    LOG_A(HW,
+          "[RAR DEBUG] ORU PRACH TX frame.slot.symbol %d.%d.%d rx_frame %d ant %d section %d start_prb %d num_prb %d vf %d bytes %zu\n",
+          tx_frame,
+          slot,
+          symbol,
+          frame,
+          aarx,
+          prach_config->section_id,
+          prach_config->start_prb,
+          prach_config->num_prb,
+          vf_id,
+          header_length + data_len);
+  }
+#endif
 }
 
 void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int symbol)
@@ -1100,18 +1340,36 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
     AssertFatal(frame_conf->sSlotConfig[slot_in_pattern].nSymbolType[symbol] == 1, "Attempting to send PUSCH on non-UL slot\n");
   }
 
-  int section_id = pusch_config[aarx][slot][symbol].section_id;
+  oran_pusch_cplane_config_t cfg = pusch_config[aarx][slot][symbol];
+  int section_id = cfg.section_id;
 
   if (section_id == -1) {
-    RATE_LIMIT(1000)
-      LOG_W(HW, "PUSCH was not yet configured by the O-DU frame %d, slot %d, symbol %d, aarx %d\n", frame, slot, symbol, aarx);
+#ifdef ORU_PUSCH_CPLANE_DEBUG
+    static int pusch_no_cp_dbg_count = 0;
+    if (pusch_no_cp_dbg_count < 256) {
+      LOG_D(HW, "[ORU PUSCH NO CP] frame=%d slot=%d symbol=%d aarx=%d cached_section=%d cached_frame=%d cached_start_prb=%d cached_num_prb=%d\n",
+            frame, slot, symbol, aarx, cfg.section_id, cfg.frame, cfg.start_prb, cfg.num_prb);
+      pusch_no_cp_dbg_count++;
+    }
+#endif
     return;
+  }
+
+  if (cfg.frame >= 0 && cfg.frame != (frame & 0xff)) {
+#ifdef ORU_PUSCH_CPLANE_DEBUG
+    static int pusch_frame_mismatch_dbg_count = 0;
+    if (pusch_frame_mismatch_dbg_count < 256) {
+      LOG_D(HW, "[ORU PUSCH CP FRAME MISMATCH] tx_frame=%d cp_frame=%d slot=%d symbol=%d aarx=%d section=%d start_prb=%d num_prb=%d cp_start_sym=%d cp_num_sym=%d\n",
+            frame, cfg.frame, slot, symbol, aarx, section_id, cfg.start_prb, cfg.num_prb, cfg.start_symbol, cfg.num_symbols);
+      pusch_frame_mismatch_dbg_count++;
+    }
+#endif
   }
 
   uint8_t mu = fh_cfg->frame_conf.nNumerology;
   const int num_ul_rbs = fh_cfg->nULRBs;
-  int num_prb = pusch_config[aarx][slot][symbol].num_prb;
-  int start_prb = pusch_config[aarx][slot][symbol].start_prb;
+  int num_prb = cfg.num_prb;
+  int start_prb = cfg.start_prb;
   // AssertFatal(num_prb == num_ul_rbs && start_prb == 0, "only support full bandwidth reception\n");
 
   // AssertFatal(fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
@@ -1185,13 +1443,37 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   }            
 
 
+#ifdef ORU_PUSCH_UPLANE_DEBUG
+   int pusch_src_nonzero = 0;
+   int16_t pusch_src_min = INT16_MAX;
+   int16_t pusch_src_max = INT16_MIN;
+#endif
+
    /* ---------- NO COMPRESSION ---------- */
-   if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE) {
+  if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE) {
   for (int i = 0; i < num_sc_first_copy * 2; i++) {
+#ifdef ORU_PUSCH_UPLANE_DEBUG
+    int16_t sample = (int16_t)src[i];
+    if (sample != 0)
+      pusch_src_nonzero++;
+    if (sample < pusch_src_min)
+      pusch_src_min = sample;
+    if (sample > pusch_src_max)
+      pusch_src_max = sample;
+#endif
     *dest++ = (int16_t)htons(src[i]);
   }
   src = (uint16_t*)puschF;
   for (int i = 0; i < num_sc_second_copy * 2; i++) {
+#ifdef ORU_PUSCH_UPLANE_DEBUG
+    int16_t sample = (int16_t)src[i];
+    if (sample != 0)
+      pusch_src_nonzero++;
+    if (sample < pusch_src_min)
+      pusch_src_min = sample;
+    if (sample > pusch_src_max)
+      pusch_src_max = sample;
+#endif
     *dest++ = (int16_t)htons(src[i]);
   }
 }   else if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_BLKFLOAT) {
@@ -1283,6 +1565,34 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
     }
 
 
+
+#ifdef ORU_PUSCH_UPLANE_DEBUG
+  if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE) {
+    static int pusch_tx_dbg_count = 0;
+    if (pusch_tx_dbg_count < 4096) {
+      LOG_A(HW,
+            "[ORU PUSCH TX] frame=%d slot=%d symbol=%d aarx=%d section=%d cp_frame=%d cp_start_sym=%d cp_num_sym=%d start_prb=%d num_prb=%d hdr_start_prb=%d hdr_num_prb=%d src_nonzero=%d/%u src_min=%d src_max=%d comp=%d\n",
+            frame,
+            slot,
+            symbol,
+            aarx,
+            section_id,
+            cfg.frame,
+            cfg.start_symbol,
+            cfg.num_symbols,
+            start_prb,
+            num_prb,
+            0,
+            fh_cfg->nULRBs,
+            pusch_src_nonzero,
+            num_sc * 2,
+            pusch_src_nonzero ? pusch_src_min : 0,
+            pusch_src_nonzero ? pusch_src_max : 0,
+            fh_cfg->ru_conf.compMeth);
+      pusch_tx_dbg_count++;
+    }
+  }
+#endif
 
   buf = rte_pktmbuf_prepend(mbuf, sizeof(struct rte_ether_hdr));
   AssertFatal(buf != NULL, "incorrect mbuf size\n");

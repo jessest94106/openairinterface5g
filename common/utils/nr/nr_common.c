@@ -924,6 +924,18 @@ void get_samplerate_and_bw(int mu,
         *rx_bw = 20e6;
       }
       break;
+    case 38:
+      if (threequarter_fs) {
+        *sample_rate=17.28e6;
+        *tx_bw = 15e6;
+        *rx_bw = 15e6;
+      }
+      else {
+        *sample_rate=23.04e6;
+        *tx_bw = 15e6;
+        *rx_bw = 15e6;
+      }
+      break;
     case 24:
       if (threequarter_fs) {
         *sample_rate=11.52e6;

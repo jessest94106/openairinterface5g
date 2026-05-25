@@ -755,6 +755,20 @@ void nr_initiate_ra_proc(module_id_t module_idP,
   }
 
   LOG_A(NR_MAC, "%d.%d UE RA-RNTI %04x TC-RNTI %04x: initiating RA procedure\n", frame, slot, ra->RA_rnti, UE->rnti);
+#ifdef NR_RA_DEBUG
+  LOG_A(NR_MAC,
+        "[RAR DEBUG] PRACH detected at %d.%d symbol %u freq_index %u RAPID %u timing_offset %d power %u -> RA-RNTI %04x TC-RNTI %04x state %d\n",
+        frame,
+        slot,
+        symbol,
+        freq_index,
+        preamble_index,
+        timing_offset,
+        preamble_power,
+        ra->RA_rnti,
+        UE->rnti,
+        ra->ra_state);
+#endif
 
    // return current SSB order in the list of tranmitted SSBs
   int n_ssb = ssb_index_from_prach(module_idP, frame, slot, preamble_index, freq_index, symbol);
@@ -908,6 +922,25 @@ static void nr_generate_Msg3_retransmission(module_id_t module_idP,
                                                       UE->rnti,
                                                       nr_mac->beam_info.beam_mode);
   future_ul_tti_req->n_pdus += 1;
+#ifdef NR_RA_DEBUG
+  LOG_A(NR_MAC,
+        "[MSG3 SCHED RETX] cur=%d.%d msg3=%d.%d rnti=%04x round=%d rb_start=%d rb_size=%d bwp_start=%d start_sym=%d num_sym=%d mcs=%d rv=%d tda=%d harq=%d\n",
+        frame,
+        slot,
+        sched_frame,
+        sched_slot,
+        UE->rnti,
+        ra->msg3_round,
+        pusch_pdu->rb_start,
+        pusch_pdu->rb_size,
+        pusch_pdu->bwp_start,
+        pusch_pdu->start_symbol_index,
+        pusch_pdu->nr_of_symbols,
+        pusch_pdu->mcs_index,
+        pusch_pdu->pusch_data.rv_index,
+        ra->Msg3_tda_id,
+        pusch_pdu->pusch_data.harq_process_id);
+#endif
 
   // generation of DCI 0_0 to schedule msg3 retransmission
   nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15 = nr_mac->pdcch_pdu_idx[CC_id][coresetid];
@@ -1206,6 +1239,25 @@ static void nr_add_msg3(module_id_t module_idP, int CC_id, frame_t frameP, slot_
                                                       UE->rnti,
                                                       mac->beam_info.beam_mode);
   future_ul_tti_req->n_pdus += 1;
+#ifdef NR_RA_DEBUG
+  LOG_A(NR_MAC,
+        "[MSG3 SCHED] cur=%d.%d msg3=%d.%d rnti=%04x round=%d rb_start=%d rb_size=%d bwp_start=%d start_sym=%d num_sym=%d mcs=%d rv=%d tda=%d harq=%d\n",
+        frameP,
+        slotP,
+        ra->Msg3_frame,
+        ra->Msg3_slot,
+        UE->rnti,
+        ra->msg3_round,
+        pusch_pdu->rb_start,
+        pusch_pdu->rb_size,
+        pusch_pdu->bwp_start,
+        pusch_pdu->start_symbol_index,
+        pusch_pdu->nr_of_symbols,
+        pusch_pdu->mcs_index,
+        pusch_pdu->pusch_data.rv_index,
+        ra->Msg3_tda_id,
+        pusch_pdu->pusch_data.harq_process_id);
+#endif
 
   // calling function to fill rar message
   nr_fill_rar(module_idP, UE, RAR_pdu, pusch_pdu);
@@ -1424,6 +1476,17 @@ static void nr_generate_Msg2(module_id_t module_idP,
 
   // no DL -> cannot send Msg2
   if (!is_dl_slot(slotP, &nr_mac->frame_structure)) {
+#ifdef NR_RA_DEBUG
+    LOG_A(NR_MAC,
+          "[RAR DEBUG] Msg2 wait: current %d.%d is not DL for RA-RNTI %04x TC-RNTI %04x, PRACH was %d.%d RAPID %d\n",
+          frameP,
+          slotP,
+          UE->ra->RA_rnti,
+          UE->rnti,
+          UE->ra->preamble_frame,
+          UE->ra->preamble_slot,
+          UE->ra->preamble_index);
+#endif
     return;
   }
 
@@ -1449,6 +1512,9 @@ static void nr_generate_Msg2(module_id_t module_idP,
   NR_SearchSpace_t *ss = sched_ctrl->search_space;
   if (!check_msg2_monitoring(ss, n_slots_frame, frameP, slotP)) {
     LOG_E(NR_MAC, "UE RA-RNTI %04x TC-RNTI %04x: Msg2 not monitored by UE\n", ra->RA_rnti, UE->rnti);
+#ifdef NR_RA_DEBUG
+    LOG_E(NR_MAC, "[RAR DEBUG] UE RA-RNTI %04x TC-RNTI %04x: Msg2 not monitored by UE at %d.%d\n", ra->RA_rnti, UE->rnti, frameP, slotP);
+#endif
     return;
   }
   NR_beam_alloc_t beam = beam_allocation_procedure(&nr_mac->beam_info, frameP, slotP, UE->UE_beam_index, n_slots_frame);
@@ -1471,7 +1537,18 @@ static void nr_generate_Msg2(module_id_t module_idP,
                                    UE->UE_beam_index,
                                    &nr_mac->frame_structure);
   if (!ret || ra->Msg3_tda_id > 15) {
+#ifdef NR_RA_DEBUG
+    LOG_A(NR_MAC,
+          "[RAR DEBUG] Cannot schedule Msg2 for RA-RNTI %04x TC-RNTI %04x at %d.%d: infeasible Msg3 TDA ret=%d tda=%d\n",
+          ra->RA_rnti,
+          UE->rnti,
+          frameP,
+          slotP,
+          ret,
+          ra->Msg3_tda_id);
+#else
     LOG_D(NR_MAC, "UE RNTI %04x %d.%d: infeasible Msg3 TDA\n", UE->rnti, frameP, slotP);
+#endif
     reset_beam_status(&nr_mac->beam_info, frameP, slotP, UE->UE_beam_index, n_slots_frame, beam.new_beam);
     return;
   }
@@ -1497,7 +1574,19 @@ static void nr_generate_Msg2(module_id_t module_idP,
                                            coresetid,
                                            false);
   if (!tda_info.valid_tda)
+  {
+#ifdef NR_RA_DEBUG
+    LOG_A(NR_MAC,
+          "[RAR DEBUG] Cannot schedule Msg2 for RA-RNTI %04x TC-RNTI %04x at %d.%d: invalid DL TDA assignment %d coreset %d\n",
+          ra->RA_rnti,
+          UE->rnti,
+          frameP,
+          slotP,
+          time_domain_assignment,
+          coresetid);
+#endif
     return;
+  }
 
   uint16_t *vrb_map = cc[CC_id].vrb_map[beam.idx];
   for (int i = 0; (i < rbSize) && (rbStart <= (bwp_info.bwpSize - rbSize)); i++) {
@@ -1536,6 +1625,14 @@ static void nr_generate_Msg2(module_id_t module_idP,
   // get an actual Msg3 allocation in CBRA
   bool msg3_ret = nr_get_Msg3alloc(nr_mac, CC_id, slotP, frameP, UE);
   if (!msg3_ret) {
+#ifdef NR_RA_DEBUG
+    LOG_A(NR_MAC,
+          "[RAR DEBUG] Cannot schedule Msg2 for RA-RNTI %04x TC-RNTI %04x at %d.%d: Msg3 allocation failed\n",
+          ra->RA_rnti,
+          UE->rnti,
+          frameP,
+          slotP);
+#endif
     reset_beam_status(&nr_mac->beam_info, ra->Msg3_frame, ra->Msg3_slot, UE->UE_beam_index, n_slots_frame, ra->Msg3_beam.new_beam);
     reset_beam_status(&nr_mac->beam_info, frameP, slotP, UE->UE_beam_index, n_slots_frame, beam.new_beam);
     return;
@@ -1652,6 +1749,26 @@ static void nr_generate_Msg2(module_id_t module_idP,
   TX_req->SFN = frameP;
   TX_req->Number_of_PDUs++;
   TX_req->Slot = slotP;
+
+#ifdef NR_RA_DEBUG
+  LOG_A(NR_MAC,
+        "[RAR DEBUG] Msg2/RAR TX_DATA scheduled at %d.%d: RA-RNTI %04x TC-RNTI %04x RAPID %d pdu_index %d TBS %u bytes rbStart %d rbSize %d mcs %d Msg3 %d.%d first_rb %d nb_rb %d tda %d\n",
+        frameP,
+        slotP,
+        ra->RA_rnti,
+        UE->rnti,
+        ra->preamble_index,
+        pduindex,
+        TBS,
+        rbStart,
+        rbSize,
+        mcsIndex,
+        ra->Msg3_frame,
+        ra->Msg3_slot,
+        ra->msg3_first_rb,
+        ra->msg3_nb_rb,
+        ra->Msg3_tda_id);
+#endif
 
   T(T_GNB_MAC_DL_RAR_PDU_WITH_DATA,
     T_INT(module_idP),
@@ -2100,6 +2217,21 @@ static void nr_fill_rar(uint8_t Mod_idP, NR_UE_info_t *UE, uint8_t *dlsch_buffer
   rar->UL_GRANT_2 = (uint8_t) (ul_grant >> 16) & 0xff;
   rar->UL_GRANT_3 = (uint8_t) (ul_grant >> 8) & 0xff;
   rar->UL_GRANT_4 = (uint8_t) ul_grant & 0xff;
+
+#ifdef NR_RA_DEBUG
+  LOG_A(NR_MAC,
+        "[RAR DEBUG] Filled RAR MAC PDU Msg2 %d.%d: RAPID %u TA %d TC-RNTI %04x UL_GRANT 0x%07x msg3_first_rb %d msg3_nb_rb %d msg3_tda %d mcs %d\n",
+        ra->Msg2_frame,
+        ra->Msg2_slot,
+        ra->preamble_index,
+        ra->timing_offset,
+        UE->rnti,
+        ul_grant,
+        ra->msg3_first_rb,
+        ra->msg3_nb_rb,
+        ra->Msg3_tda_id,
+        pusch_pdu->mcs_index);
+#endif
 
 #ifdef DEBUG_RAR
   LOG_I(NR_MAC, "rarh->E = 0x%x\n", rarh->E);

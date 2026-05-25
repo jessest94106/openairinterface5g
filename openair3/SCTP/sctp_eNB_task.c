@@ -303,8 +303,8 @@ sctp_handle_new_association_req_multi(
 
         /* Connect to remote host and port */
         if (sctp_connectx(sd, (struct sockaddr *)addr, 1, &assoc_id) < 0) {
-            /* sctp_connectx on non-blocking socket return EINPROGRESS */
-            if (errno != EINPROGRESS) {
+            /* sctp_connectx on non-blocking socket may return EINPROGRESS/EALREADY */
+            if (errno != EINPROGRESS && errno != EALREADY) {
                 SCTP_ERROR("Connect failed: %s\n", strerror(errno));
                 sctp_itti_send_association_resp(
                     requestor, instance, -1, sctp_new_association_req_p->ulp_cnx_id,
@@ -473,8 +473,8 @@ static void sctp_handle_new_association_req(const instance_t instance,
       SCTP_DEBUG("Trying to connect to %s for remote end %s\n", ip, remote);
 
       if (sctp_connectx(sd, p->ai_addr, 1, &assoc_id) < 0) {
-        /* sctp_connectx on non-blocking socket return EINPROGRESS */
-        if (errno != EINPROGRESS) {
+        /* sctp_connectx on non-blocking socket may return EINPROGRESS/EALREADY */
+        if (errno != EINPROGRESS && errno != EALREADY) {
           SCTP_ERROR("Connect failed: %s\n", strerror(errno));
           sctp_itti_send_association_resp(requestor, instance, -1, req->ulp_cnx_id, SCTP_STATE_UNREACHABLE, 0, 0);
           freeaddrinfo(serv);

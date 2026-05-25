@@ -246,6 +246,7 @@ static void oran_allocate_cplane_buffers(void *instHandle,
         xran_init_PrbMap_from_cfg(src, ptr, mtu);
       }
 
+#ifdef GNB_FHI_PRB_DEBUG
       // Log PRB map after xRAN initialization to verify compression settings
       struct xran_prb_map *initialized_map = (struct xran_prb_map *)ptr;
       if (a < 2 && j < 2) {  // Log only first couple of antennas/slots
@@ -257,6 +258,7 @@ static void oran_allocate_cplane_buffers(void *instHandle,
                 initialized_map->prbMap[0].nRBStart, initialized_map->prbMap[0].nRBSize);
         }
       }
+#endif
 #endif
     }
   }
@@ -474,8 +476,7 @@ int *oai_oran_initialize(struct xran_fh_init *xran_fh_init, struct xran_fh_confi
   memcpy(&g_fh_config, xran_fh_config, sizeof(*xran_fh_config) * xran_fh_init->xran_ports);
 
   if (!is_du) {
-    // Use half-slot parallelization
-    const int callback_per_slot = 2;
+    const int callback_per_slot = 14;
     init_oru_packet_processor(gxran_handle, callback_per_slot);
   }
 

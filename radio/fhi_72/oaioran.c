@@ -159,8 +159,10 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
  * call. */
 int oai_physide_dl_tti_call_back(void *param)
 {
+#ifdef GNB_FHI_TIMING_DEBUG
   if (!first_call_set)
     LOG_I(HW, "first_call set from phy cb\n");
+#endif
   first_call_set = true;
   return 0;
 }
@@ -208,6 +210,24 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
         src = (int16_t *)bufs->prachdstdecomp[aa % nb_rx_per_ru][tti % XRAN_N_FE_BUF_LEN].pBuffers[sym_idx].pData;
         /* convert Network order to host order */
         if (ru_conf->compMeth_PRACH == XRAN_COMPMETHOD_NONE) {
+          int src_nonzero_full = 0;
+          int src_nonzero_extract = 0;
+          int src_min = 0;
+          int src_max = 0;
+          for (idx = 0; idx < 12 * 2 * N_SC_PER_PRB; idx++) {
+            int16_t val = (int16_t)ntohs(src[idx]);
+            if (val != 0) {
+              src_nonzero_full++;
+              if (val < src_min)
+                src_min = val;
+              if (val > src_max)
+                src_max = val;
+            }
+          }
+          for (idx = 0; idx < 139 * 2; idx++) {
+            if ((int16_t)ntohs(src[idx + g_kbar]) != 0)
+              src_nonzero_extract++;
+          }
           if (sym_idx == prach_start_sym) {
             for (idx = 0; idx < 139 * 2; idx++) {
               dst[idx] = ((int16_t)ntohs(src[idx + g_kbar]));
@@ -216,6 +236,56 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
             for (idx = 0; idx < 139 * 2; idx++) {
               dst[idx] += ((int16_t)ntohs(src[idx + g_kbar]));
             }
+          }
+          int dst_nonzero = 0;
+          int dst_min = 0;
+          int dst_max = 0;
+          for (idx = 0; idx < 139 * 2; idx++) {
+            if (dst[idx] != 0) {
+              dst_nonzero++;
+              if (dst[idx] < dst_min)
+                dst_min = dst[idx];
+              if (dst[idx] > dst_max)
+                dst_max = dst[idx];
+            }
+          }
+          static int prach_uncomp_log_count = 0;
+#ifdef GNB_PRACH_UPLANE_DEBUG
+          bool should_log_uncomp = prach_uncomp_log_count < 32 || src_nonzero_full > 0 || dst_nonzero > 0;
+#else
+          bool should_log_uncomp = false;
+#endif
+          if (should_log_uncomp) {
+            LOG_A(HW,
+                  "[gNB PRACH RX UNCOMP] frame=%d slot=%d sym=%d aa=%d tti=%d g_kbar=%d src_nonzero_full=%d/288 "
+                  "src_nonzero_extract=%d/278 src_min=%d src_max=%d dst_nonzero=%d/278 dst_min=%d dst_max=%d\n",
+                  frame,
+                  slot,
+                  sym_idx,
+                  aa,
+                  tti,
+                  g_kbar,
+                  src_nonzero_full,
+                  src_nonzero_extract,
+                  src_min,
+                  src_max,
+                  dst_nonzero,
+                  dst_min,
+                  dst_max);
+            LOG_A(HW,
+                  "[gNB PRACH RX UNCOMP] src[0]=%d src[g]=%d src[g+1]=%d src[g+100]=%d src[g+277]=%d "
+                  "dst[0]=%d dst[1]=%d dst[100]=%d dst[277]=%d\n",
+                  (int16_t)ntohs(src[0]),
+                  (int16_t)ntohs(src[g_kbar]),
+                  (int16_t)ntohs(src[g_kbar + 1]),
+                  (int16_t)ntohs(src[g_kbar + 100]),
+                  (int16_t)ntohs(src[g_kbar + 277]),
+                  dst[0],
+                  dst[1],
+                  dst[100],
+                  dst[277]);
+            if (prach_uncomp_log_count < 16)
+              prach_uncomp_log_count++;
           }
         } else if (ru_conf->compMeth_PRACH == XRAN_COMPMETHOD_BLKFLOAT) {
 
@@ -234,7 +304,11 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
 
           static int prach_decomp_log_count = 0;
           // Log when we have non-zero compressed data OR for first 10 occurrences
+#ifdef GNB_PRACH_UPLANE_DEBUG
           bool should_log = (prach_decomp_log_count < 10 || non_zero_compressed > 0);
+#else
+          bool should_log = false;
+#endif
           if (should_log) {
             LOG_I(HW, "[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d, g_kbar=%d\n",
                   frame, slot, sym_idx, aa, ru_conf->iqWidth_PRACH, payload_len, non_zero_compressed, payload_len, g_kbar);
@@ -282,6 +356,7 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
             for (idx = 0; idx < (139 * 2); idx++)
               dst[idx] += (local_dst[idx + g_kbar]);
 
+#ifdef GNB_PRACH_UPLANE_DEBUG
           // Log extracted PRACH data for first and last symbol
           if (prach_decomp_log_count <= 5) {
             if (sym_idx == prach_start_sym) {
@@ -292,6 +367,7 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
                     dst[0], dst[1], dst[100], dst[138]);
             }
           }
+#endif
         } // COMPMETHOD_BLKFLOAT
 
 
@@ -542,10 +618,64 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
               if (ptr == NULL || pos == NULL)
                 continue;
               src = pData;
+              int pusch_src_nonzero = 0;
+              int pusch_dst_nonzero = 0;
+              int16_t pusch_src_min = 32767;
+              int16_t pusch_src_max = -32768;
+              int16_t pusch_dst_min = 32767;
+              int16_t pusch_dst_max = -32768;
               if (pRbElm->compMethod == XRAN_COMPMETHOD_NONE) {
                 // NOTE: gcc 11 knows how to generate AVX2 for this!
-                for (idx = 0; idx < (numRB * N_SC_PER_PRB) * 2; idx++)
-                  ((int16_t *)local_dst)[idx + startRB * N_SC_PER_PRB * 2] = ((int16_t)ntohs(((uint16_t *)src)[idx])) >> 2;
+                for (idx = 0; idx < (numRB * N_SC_PER_PRB) * 2; idx++) {
+                  int16_t sample = (int16_t)ntohs(((uint16_t *)src)[idx]);
+                  int16_t shifted = sample >> 2;
+                  if (sample != 0)
+                    pusch_src_nonzero++;
+                  if (shifted != 0)
+                    pusch_dst_nonzero++;
+                  if (sample < pusch_src_min)
+                    pusch_src_min = sample;
+                  if (sample > pusch_src_max)
+                    pusch_src_max = sample;
+                  if (shifted < pusch_dst_min)
+                    pusch_dst_min = shifted;
+                  if (shifted > pusch_dst_max)
+                    pusch_dst_max = shifted;
+                  ((int16_t *)local_dst)[idx + startRB * N_SC_PER_PRB * 2] = shifted;
+                }
+                static int pusch_rx_uncomp_dbg_count = 0;
+#ifdef GNB_PUSCH_UPLANE_DEBUG
+                const int pusch_rx_msg3_debug = 1;
+#else
+                const int pusch_rx_msg3_debug = 0;
+#endif
+                if (pusch_rx_msg3_debug && pusch_rx_uncomp_dbg_count < 4096) {
+                  LOG_A(HW,
+                        "[gNB PUSCH RX UNCOMP] frame=%d slot=%d sym=%d ant=%d idxElm=%u idxDesc=%d map_startRB=%d map_numRB=%d desc_startRB=%d desc_numRB=%d elm_startSym=%d elm_numSym=%d comp=%d iqWidth=%d src_nonzero=%d/%d src_min=%d src_max=%d dst_nonzero=%d/%d dst_min=%d dst_max=%d\n",
+                        *frame,
+                        *slot,
+                        sym_idx,
+                        ant_id,
+                        idxElm,
+                        idxDesc,
+                        start_totalRB,
+                        num_totalRB,
+                        startRB,
+                        numRB,
+                        pRbElm->nStartSymb,
+                        pRbElm->numSymb,
+                        pRbElm->compMethod,
+                        pRbElm->iqWidth,
+                        pusch_src_nonzero,
+                        (numRB * N_SC_PER_PRB) * 2,
+                        pusch_src_nonzero ? pusch_src_min : 0,
+                        pusch_src_nonzero ? pusch_src_max : 0,
+                        pusch_dst_nonzero,
+                        (numRB * N_SC_PER_PRB) * 2,
+                        pusch_dst_nonzero ? pusch_dst_min : 0,
+                        pusch_dst_nonzero ? pusch_dst_max : 0);
+                  pusch_rx_uncomp_dbg_count++;
+                }
               } else if (pRbElm->compMethod == XRAN_COMPMETHOD_BLKFLOAT) {
 #if defined(__i386__) || defined(__x86_64__)
                 struct xranlib_decompress_request bfp_decom_req = {};
@@ -900,6 +1030,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
               }
             }
 
+#ifdef GNB_FHI_PRB_DEBUG
             // Log PRB map element compression settings before packet header construction
             static int prb_elm_log_count = 0;
             if (prb_elm_log_count < 5 && sym_idx >= 2 && sym_idx <= 5 && slot == 0) {
@@ -908,6 +1039,7 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
                     p_prbMapElm->nRBStart, p_prbMapElm->nRBSize);
               prb_elm_log_count++;
             }
+#endif
 
             dst = xran_add_hdr_offset(dst, p_prbMapElm->compMethod);
 
