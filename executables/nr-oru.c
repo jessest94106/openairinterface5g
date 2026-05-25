@@ -21,6 +21,7 @@
 #include "PHY/defs_RU.h"
 #include "assertions.h"
 #include "common/config/config_userapi.h"
+#include "common/utils/nr/nr_common.h"
 #include "nr-oru.h"
 #include "openair1/PHY/defs_nr_common.h"
 #include "openair1/PHY/MODULATION/nr_modulation.h"
@@ -126,6 +127,211 @@ extern void rx_nr_prach_ru_internal(prach_item_t *p,
                                     int rep_index,
                                     uint reps);
 
+#ifdef ORU_PRACH_RAW_DEBUG
+static void debug_oru_prach_raw_window(ORU_t *oru, int frame, int slot, int prach_symbol)
+{
+  RU_t *ru = oru->ru;
+  NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
+  prach_item_t *p = &oru->prach_item;
+  const int prachStartSymbol = oru->prach_info.start_symbol;
+  const int sum = fp->ofdm_symbol_size + fp->nb_prefix_samples;
+  const int sum0 = fp->ofdm_symbol_size + fp->nb_prefix_samples0;
+  int sample_offset_slot;
+  if (prachStartSymbol == 0) {
+    sample_offset_slot = 0;
+  } else if (fp->slots_per_subframe == 1) {
+    if (prachStartSymbol <= 7)
+      sample_offset_slot = sum * (prachStartSymbol - 1) + sum0;
+    else
+      sample_offset_slot = sum * (prachStartSymbol - 2) + sum0 * 2;
+  } else {
+    if (!(slot % (fp->slots_per_subframe / 2)))
+      sample_offset_slot = sum * (prachStartSymbol - 1) + sum0;
+    else
+      sample_offset_slot = sum * prachStartSymbol;
+  }
+
+  int Ncp = 0;
+  int dftlen = 0;
+  const int mu = p->numerology_index;
+  if (p->prach_sequence_length == 0) {
+    switch (p->pdu.prach_format) {
+      case 0: Ncp = 3168; dftlen = 24576; break;
+      case 1: Ncp = 21024; dftlen = 24576; break;
+      case 2: Ncp = 4688; dftlen = 24576; break;
+      case 3: Ncp = 3168; dftlen = 6144; break;
+      default: return;
+    }
+  } else {
+    switch (p->pdu.prach_format) {
+      case 4: Ncp = 288 >> mu; break;
+      case 5: Ncp = 576 >> mu; break;
+      case 6: Ncp = 864 >> mu; break;
+      case 7: Ncp = 216 >> mu; break;
+      case 8: Ncp = 936 >> mu; break;
+      case 9: Ncp = 1240 >> mu; break;
+      case 10: Ncp = 2048 >> mu; break;
+      default: return;
+    }
+    dftlen = 2048 >> mu;
+  }
+
+  if (p->numerology_index == 0) {
+    if (prachStartSymbol == 0 || prachStartSymbol == 7)
+      Ncp += 16;
+  } else {
+    if (slot % (fp->slots_per_subframe / 2) == 0 && prachStartSymbol == 0)
+      Ncp += 16;
+  }
+
+  switch (fp->samples_per_subframe) {
+    case 7680: Ncp >>= 2; dftlen >>= 2; break;
+    case 15360: Ncp >>= 1; dftlen >>= 1; break;
+    case 23040: Ncp = (Ncp * 3) / 4; dftlen = (dftlen * 3) / 4; break;
+    case 30720: break;
+    case 46080: Ncp = (Ncp * 3) / 2; dftlen = (dftlen * 3) / 2; break;
+    case 61440: Ncp <<= 1; dftlen <<= 1; break;
+    case 92160: Ncp *= 3; dftlen *= 3; break;
+    case 122880: Ncp <<= 2; dftlen <<= 2; break;
+    case 184320: Ncp *= 6; dftlen *= 6; break;
+    case 245760: Ncp <<= 3; dftlen <<= 3; break;
+    default: return;
+  }
+
+  const int frame_samples = fp->samples_per_frame;
+  const int slot_start = get_samples_slot_timestamp(fp, slot);
+  const int slot_len = get_samples_slot_duration(fp, slot, 1);
+  const int base = slot_start + sample_offset_slot - ru->N_TA_offset;
+  const int fft_start = base + Ncp + prach_symbol * dftlen;
+  const int raw_span = Ncp + (prach_symbol + 1) * dftlen;
+
+  for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
+    c16_t *rx = (c16_t *)ru->common.rxdata[aarx];
+    int slot_nonzero = 0;
+    int slot_first_nonzero = -1;
+    int slot_last_nonzero = -1;
+    int slot_peak_index = -1;
+    uint64_t slot_energy = 0;
+    int slot_peak = 0;
+    for (int i = 0; i < slot_len; i++) {
+      int idx = (slot_start + i) % frame_samples;
+      int re = rx[idx].r;
+      int im = rx[idx].i;
+      int mag = abs(re) + abs(im);
+      if (mag != 0) {
+        if (slot_first_nonzero < 0)
+          slot_first_nonzero = i;
+        slot_last_nonzero = i;
+        slot_nonzero++;
+      }
+      if (mag > slot_peak) {
+        slot_peak = mag;
+        slot_peak_index = i;
+      }
+      slot_energy += (uint64_t)re * re + (uint64_t)im * im;
+    }
+
+    int raw_nonzero = 0;
+    int raw_first_nonzero = -1;
+    int raw_last_nonzero = -1;
+    int raw_peak_index = -1;
+    uint64_t raw_energy = 0;
+    int raw_peak = 0;
+    for (int i = 0; i < raw_span; i++) {
+      int idx = (base + i + frame_samples) % frame_samples;
+      int re = rx[idx].r;
+      int im = rx[idx].i;
+      int mag = abs(re) + abs(im);
+      if (mag != 0) {
+        if (raw_first_nonzero < 0)
+          raw_first_nonzero = i;
+        raw_last_nonzero = i;
+        raw_nonzero++;
+      }
+      if (mag > raw_peak) {
+        raw_peak = mag;
+        raw_peak_index = i;
+      }
+      raw_energy += (uint64_t)re * re + (uint64_t)im * im;
+    }
+
+    int fft_nonzero = 0;
+    int fft_first_nonzero = -1;
+    int fft_last_nonzero = -1;
+    int fft_peak_index = -1;
+    uint64_t fft_energy = 0;
+    int fft_peak = 0;
+    for (int i = 0; i < dftlen; i++) {
+      int idx = (fft_start + i + frame_samples) % frame_samples;
+      int re = rx[idx].r;
+      int im = rx[idx].i;
+      int mag = abs(re) + abs(im);
+      if (mag != 0) {
+        if (fft_first_nonzero < 0)
+          fft_first_nonzero = i;
+        fft_last_nonzero = i;
+        fft_nonzero++;
+      }
+      if (mag > fft_peak) {
+        fft_peak = mag;
+        fft_peak_index = i;
+      }
+      fft_energy += (uint64_t)re * re + (uint64_t)im * im;
+    }
+
+    const bool raw_dbg_frame = (frame >= 500 && frame <= 850 && slot == 19 && prach_symbol == 0);
+    if (raw_dbg_frame || raw_nonzero || fft_nonzero) {
+      LOG_I(HW,
+            "[ORU PRACH RAW] frame.slot.prach_symbol=%d.%d.%d ant=%d start_symbol=%d N_TA=%d sample_offset=%d Ncp=%d dftlen=%d slot_start=%d slot_len=%d base=%d fft_start=%d raw_span=%d slot_nz=%d raw_nz=%d fft_nz=%d slot_first=%d slot_last=%d slot_peak_idx=%d raw_first=%d raw_last=%d raw_peak_idx=%d fft_first=%d fft_last=%d fft_peak_idx=%d slot_peak=%d raw_peak=%d fft_peak=%d slot_energy=%lu raw_energy=%lu fft_energy=%lu\n",
+            frame,
+            slot,
+            prach_symbol,
+            aarx,
+            prachStartSymbol,
+            ru->N_TA_offset,
+            sample_offset_slot,
+            Ncp,
+            dftlen,
+            slot_start,
+            slot_len,
+            base,
+            fft_start,
+            raw_span,
+            slot_nonzero,
+            raw_nonzero,
+            fft_nonzero,
+            slot_first_nonzero,
+            slot_last_nonzero,
+            slot_peak_index,
+            raw_first_nonzero,
+            raw_last_nonzero,
+            raw_peak_index,
+            fft_first_nonzero,
+            fft_last_nonzero,
+            fft_peak_index,
+            slot_peak,
+            raw_peak,
+            fft_peak,
+            slot_energy,
+            raw_energy,
+            fft_energy);
+      LOG_I(HW,
+            "[ORU PRACH RAW] samples base=(%d,%d) fft=(%d,%d) fft+100=(%d,%d) fft+511=(%d,%d)\n",
+            rx[(base + frame_samples) % frame_samples].r,
+            rx[(base + frame_samples) % frame_samples].i,
+            rx[(fft_start + frame_samples) % frame_samples].r,
+            rx[(fft_start + frame_samples) % frame_samples].i,
+            rx[(fft_start + 100 + frame_samples) % frame_samples].r,
+            rx[(fft_start + 100 + frame_samples) % frame_samples].i,
+            rx[(fft_start + dftlen - 1 + frame_samples) % frame_samples].r,
+            rx[(fft_start + dftlen - 1 + frame_samples) % frame_samples].i);
+    }
+  }
+}
+
+#endif
+
+
 static void oru_downlink_processing(ORU_t *oru,
                                     c16_t *txDataF_ptr[oru->ru->nb_tx],
                                     int frame,
@@ -218,6 +424,13 @@ void oru_init_frame_parms(ORU_t *oru)
                              + (fp->nb_prefix_samples + fp->ofdm_symbol_size) * (fp->symbols_per_slot * fp->slots_per_subframe - 2);
   fp->samples_per_frame = 10 * fp->samples_per_subframe;
   fp->freq_range = (oru->carrier_freq_tx[0] < 6e6) ? FR1 : FR2;
+  ru->N_TA_offset = set_default_nta_offset(fp->freq_range, fp->samples_per_subframe);
+  LOG_I(PHY,
+        "ORU Setting N_TA_offset to %d samples (UL Freq %lu, N_RB %d, mu %d)\n",
+        ru->N_TA_offset,
+        oru->carrier_freq_rx[0],
+        fp->N_RB_UL,
+        fp->numerology_index);
 
   fp->dl_CarrierFreq = (double)oru->carrier_freq_tx[0] * 1000;
   fp->ul_CarrierFreq = (double)oru->carrier_freq_rx[0] * 1000;
@@ -300,6 +513,9 @@ void receive_prach(ORU_t *oru, int frame, int slot, int prach_symbol)
   oru->prach_item.frame = frame;
   oru->prach_item.slot = slot;
 
+#ifdef ORU_PRACH_RAW_DEBUG
+  debug_oru_prach_raw_window(oru, frame, slot, prach_symbol);
+#endif
 
   rx_nr_prach_ru_internal(&oru->prach_item,
                           0,

@@ -598,21 +598,6 @@ void tx_rf_symbols(RU_t *ru, int frame, int slot, uint64_t timestamp, int start_
                                              nt,
                                              flags);
 
-  // Data verification logging for vrtsim writes
-  static int vrtsim_write_count = 0;
-  if ((slot == 0 && vrtsim_write_count++ < 20) || (frame % 256 == 0 && slot == 0)) {
-    double energy = signal_energy(txp[0], siglen + sf_extension);
-    int32_t *samples = (int32_t *)txp[0];
-    LOG_I(PHY, "[VRTSIM WRITE] frame %d, slot %d, symbol %d-%d: wrote %d samples, energy=%.2f dB, "
-               "first_samples[0]=%d+%di [1]=%d+%di [2]=%d+%di, txs_ret=%d\n",
-          frame, slot, start_symbol, start_symbol + num_symbols - 1, siglen + sf_extension,
-          10 * log10(energy > 0 ? energy : 1.0),
-          ((int16_t*)samples)[0], ((int16_t*)samples)[1],
-          ((int16_t*)samples)[2], ((int16_t*)samples)[3],
-          ((int16_t*)samples)[4], ((int16_t*)samples)[5],
-          txs);
-  }
-
   LOG_D(PHY,
         "[TXPATH] RU %d tx_rf, writing to TS %lu, %d.%d, unwrapped_frame %d, slot %d, flags %d, siglen+sf_extension %d, "
         "returned %d, E %f\n",
@@ -1518,4 +1503,3 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
   } // j=0..num_rus
   return;
 }
-

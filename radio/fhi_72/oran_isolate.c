@@ -266,10 +266,14 @@ void oran_fh_if4p5_south_in(RU_t *ru, int *frame, int *slot)
     }
   } else {
     proc->first_rx = 0;
+#ifdef GNB_FHI_TIMING_DEBUG
     LOG_I(HW, "before adjusting, OAI: frame=%d slot=%d, XRAN: frame=%d slot=%d\n", *frame, *slot, proc->frame_rx, proc->tti_rx);
+#endif
     *frame = proc->frame_rx;
     *slot = proc->tti_rx;
+#ifdef GNB_FHI_TIMING_DEBUG
     LOG_I(HW, "After adjusting, OAI: frame=%d slot=%d, XRAN: frame=%d slot=%d\n", *frame, *slot, proc->frame_rx, proc->tti_rx);
+#endif
   }
 }
 

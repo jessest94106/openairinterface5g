@@ -70,6 +70,7 @@ typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
   "sample time scale. 1.0 means realtime. Values > 1 mean faster than realtime. Values < 1 mean slower than realtime\n"
 #define TAPS_SOCKET_HLP "Socket to connect to the channel emulation server\n"
 #define CLIENT_NUM_RX_HLP "Number of RX antennas of the client, specified on the server\n"
+#define TX_SAMPLE_ADVANCE_HLP "TX timestamp advance in samples for server writes\n"
 #define CONNECTION_DESCRIPTOR_HLP "Path to the file written by the server that the client can use to connect."
 #define DEFAULT_CHANNEL_NAME "vrtsim_channel"
 #define DEFAULT_DESCRIPTOR "/tmp/vrtsim_connection"
@@ -83,6 +84,7 @@ typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
      {"chanmod",                "Enable channel modelling",  0, .iptr = &vrtsim_state->chanmod,                  .defintval = 0,                  TYPE_INT,    0}, \
      {"taps-socket",            TAPS_SOCKET_HLP,             0, .strptr = &vrtsim_state->taps_socket,            .defstrval = NULL,               TYPE_STRING, 0}, \
      {"client-num-rx-antennas", CLIENT_NUM_RX_HLP,           0, .iptr = &vrtsim_state->client_num_rx_antennas,   .defintval = 1,                  TYPE_INT,    0}, \
+     {"tx-sample-advance",      TX_SAMPLE_ADVANCE_HLP,       0, .iptr = &vrtsim_state->tx_sample_advance,        .defintval = 4096,               TYPE_INT,    0}, \
      /* CIR DB enable and paths */ \
      {"cirdb",                  "Use CIR database for channel taps (1 yes, 0 no)", 0, .iptr = &vrtsim_state->use_cirdb,  .defintval = 0, TYPE_INT, 0}, \
      {"cirdb-path",             "Directory that holds vrtsim.yaml and cir_db.bin", 0, .strptr = &vrtsim_state->cirdb_path, .defstrval = NULL, TYPE_STRING, 0}, \
@@ -146,6 +148,7 @@ typedef struct {
   tx_timing_t *tx_timing;
   peer_info_t peer_info;
   int chanmod;
+  int tx_sample_advance;
   double rx_freq;
   double tx_bw;
   int tx_num_channels;
@@ -177,7 +180,76 @@ typedef struct {
   int total_dl_streams;
   sample_t *ul_combine_buffer;
   size_t ul_combine_buffer_len;
+#ifdef VRTSIM_IQ_DEBUG
+  uint64_t ul_tx_nonzero_debug_logs;
+  uint64_t ul_rx_nonzero_debug_logs;
+  uint64_t ul_tx_slot19_debug_logs;
+  uint64_t ul_rx_slot19_debug_logs;
+#endif
 } vrtsim_state_t;
+
+#ifdef VRTSIM_IQ_DEBUG
+typedef struct {
+  int nonzero;
+  int first_nonzero;
+  int peak_index;
+  int peak;
+  int16_t first_r;
+  int16_t first_i;
+  int16_t peak_r;
+  int16_t peak_i;
+  uint64_t energy;
+} vrtsim_iq_stats_t;
+
+static bool vrtsim_timestamp_to_mu1_slot(const vrtsim_state_t *vrtsim_state, openair0_timestamp_t timestamp, int *frame, int *slot)
+{
+  const int samples_per_frame = (int)(vrtsim_state->sample_rate / 100.0 + 0.5);
+  if (samples_per_frame <= 0)
+    return false;
+
+  const int slots_per_frame = 20;
+  const int samples_per_slot = samples_per_frame / slots_per_frame;
+  if (samples_per_slot <= 0)
+    return false;
+
+  const int64_t ts = timestamp >= 0 ? timestamp : 0;
+  *frame = (int)((ts / samples_per_frame) % 1024);
+  *slot = (int)((ts % samples_per_frame) / samples_per_slot);
+  return true;
+}
+
+static vrtsim_iq_stats_t vrtsim_iq_stats(const c16_t *samples, int nsamps)
+{
+  vrtsim_iq_stats_t stats = {
+      .first_nonzero = -1,
+      .peak_index = -1,
+  };
+
+  for (int i = 0; i < nsamps; i++) {
+    const int re = samples[i].r;
+    const int im = samples[i].i;
+    const int mag = abs(re) + abs(im);
+    if (mag != 0) {
+      if (stats.first_nonzero < 0) {
+        stats.first_nonzero = i;
+        stats.first_r = re;
+        stats.first_i = im;
+      }
+      stats.nonzero++;
+    }
+    if (mag > stats.peak) {
+      stats.peak = mag;
+      stats.peak_index = i;
+      stats.peak_r = re;
+      stats.peak_i = im;
+    }
+    stats.energy += (uint64_t)re * re + (uint64_t)im * im;
+  }
+
+  return stats;
+}
+
+#endif
 
 static void histogram_add(histogram_t *histogram, double diff)
 {
@@ -243,6 +315,10 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   } else {
     AssertFatal(false, "Invalid role configuration\n");
   }
+  AssertFatal(vrtsim_state->tx_sample_advance >= 0,
+              "VRTSIM tx-sample-advance must be non-negative, got %d\n",
+              vrtsim_state->tx_sample_advance);
+  LOG_I(HW, "VRTSIM: TX sample advance %d samples\n", vrtsim_state->tx_sample_advance);
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
     LOG_A(HW, "VRTSIM: will use taps socket %s\n", vrtsim_state->taps_socket);
@@ -482,7 +558,23 @@ static int vrtsim_connect(openair0_device_t *device)
     }
     vrtsim_state->channel = shm_td_iq_channel_connect(DEFAULT_CHANNEL_NAME, 10);
     vrtsim_state->peer_info.num_rx_antennas = client_info.gnb_num_rx_ant;
-    vrtsim_state->last_received_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+    const uint64_t current_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+    const uint64_t samples_per_frame = (uint64_t)(vrtsim_state->sample_rate / 100.0 + 0.5);
+    if (samples_per_frame > 0) {
+      const uint64_t frame_remainder = current_sample % samples_per_frame;
+      vrtsim_state->last_received_sample = frame_remainder == 0 ? current_sample : current_sample + samples_per_frame - frame_remainder;
+      LOG_I(HW,
+            "VRTSIM: client RX aligned to frame boundary current_sample=%lu aligned_sample=%lu samples_per_frame=%lu\n",
+            current_sample,
+            vrtsim_state->last_received_sample,
+            samples_per_frame);
+    } else {
+      vrtsim_state->last_received_sample = current_sample;
+      LOG_W(HW,
+            "VRTSIM: invalid samples_per_frame from sample_rate %.3f, starting client RX at current_sample=%lu\n",
+            vrtsim_state->sample_rate,
+            current_sample);
+    }
   }
 
   // Handle channel modelling after number of RX antennas are known
@@ -619,6 +711,44 @@ static int vrtsim_write_internal(vrtsim_state_t *vrtsim_state,
   histogram_add(&tx_timing->tx_histogram, budget);
 
   int ret = shm_td_iq_channel_tx(vrtsim_state->channel, timestamp, nsamps, aarx, (sample_t *)samples);
+
+#ifdef VRTSIM_IQ_DEBUG
+  if (vrtsim_state->role == ROLE_CLIENT) {
+    const vrtsim_iq_stats_t stats = vrtsim_iq_stats(samples, nsamps);
+    int nr_frame = -1;
+    int nr_slot = -1;
+    const bool has_slot = vrtsim_timestamp_to_mu1_slot(vrtsim_state, timestamp, &nr_frame, &nr_slot);
+    const bool slot19 = has_slot && nr_slot == 19;
+    const bool error = ret == CHANNEL_ERROR_TOO_LATE || ret == CHANNEL_ERROR_TOO_EARLY;
+    const bool log_nonzero = stats.nonzero > 0 && vrtsim_state->ul_tx_nonzero_debug_logs++ < 4000;
+    const bool log_slot19_zero = slot19 && stats.nonzero == 0 && vrtsim_state->ul_tx_slot19_debug_logs++ < 1200;
+    if (log_nonzero || log_slot19_zero || error) {
+      LOG_I(HW,
+            "[VRTSIM UL TX] ue=%d ant=%d approx_frame.slot=%d.%d timestamp=%ld nsamps=%d channel_sample=%lu diff=%ld budget_us=%.1f ret=%d nonzero=%d/%d first=%d peak_idx=%d peak=%d energy=%lu first_iq=(%d,%d) peak_iq=(%d,%d) flags=%d\n",
+            vrtsim_state->ue_id,
+            aarx,
+            nr_frame,
+            nr_slot,
+            (long)timestamp,
+            nsamps,
+            sample,
+            (long)diff,
+            budget,
+            ret,
+            stats.nonzero,
+            nsamps,
+            stats.first_nonzero,
+            stats.peak_index,
+            stats.peak,
+            stats.energy,
+            stats.first_r,
+            stats.first_i,
+            stats.peak_r,
+            stats.peak_i,
+            flags);
+    }
+  }
+#endif
 
   if (ret == CHANNEL_ERROR_TOO_LATE) {
     tx_timing->tx_samples_late += nsamps;
@@ -878,6 +1008,8 @@ static int vrtsim_write(openair0_device_t *device,
   AssertFatal(timestamp >= 0, "Timestamp must be non-negative, got %ld\n", timestamp);
   timestamp -= device->openair0_cfg->command_line_sample_advance;
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
+  if (vrtsim_state->role == ROLE_SERVER)
+    timestamp += vrtsim_state->tx_sample_advance;
   bool channel_modelling = vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb;
   if (channel_modelling) {
     return vrtsim_write_with_chanmod(vrtsim_state, timestamp, samplesVoid, nsamps, nbAnt, flags);
@@ -920,9 +1052,11 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
   if (shm_td_iq_channel_is_aborted(vrtsim_state->channel)) {
     return 0;
   }
+  const uint64_t read_sample = vrtsim_state->last_received_sample
+                               + (vrtsim_state->role == ROLE_SERVER ? vrtsim_state->tx_sample_advance : 0);
   if (vrtsim_state->role == ROLE_SERVER) {
     uint64_t timeout_uS = 0; // 0 means no timeout
-    shm_td_iq_channel_wait(vrtsim_state->channel, vrtsim_state->last_received_sample + nsamps, timeout_uS);
+    shm_td_iq_channel_wait(vrtsim_state->channel, read_sample + nsamps, timeout_uS);
   } else {
     uint64_t start_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
     uint64_t timeout_uS = 2 * 1000 * 1000; // 2 seconds timeout waiting for sample number to change
@@ -940,6 +1074,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       }
     }
   }
+  int rx_ret = 0;
   if (vrtsim_state->role == ROLE_SERVER) {
     if (vrtsim_state->num_ues > 1) {
       /* Multi-UE UL combining */
@@ -955,7 +1090,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
         for (int aarx = 0; aarx < nbAnt; aarx++) {
           int stream = u * nbAnt + aarx;
           int ret = shm_td_iq_channel_rx(vrtsim_state->channel,
-                                         vrtsim_state->last_received_sample,
+                                         read_sample,
                                          nsamps,
                                          stream,
                                          vrtsim_state->ul_combine_buffer);
@@ -964,6 +1099,8 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
             vrtsim_state->rx_early += 1;
           }
+          if (ret != 0 && rx_ret == 0)
+            rx_ret = ret;
           int16_t *out = (int16_t *)samplesVoid[aarx];
           int16_t *in  = (int16_t *)vrtsim_state->ul_combine_buffer;
           for (int i = 0; i < nsamps * 2; i++) {
@@ -974,17 +1111,56 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       }
     } else {
       /* Single-UE server UL read */
-      int ret = shm_td_iq_channel_rx(vrtsim_state->channel, vrtsim_state->last_received_sample, nsamps, 0, samplesVoid[0]);
+      int ret = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, 0, samplesVoid[0]);
       if (ret == CHANNEL_ERROR_TOO_LATE) {
         vrtsim_state->rx_samples_late += nsamps;
       } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
         vrtsim_state->rx_early += 1;
       }
+      rx_ret = ret;
       for (int aarx = 1; aarx < nbAnt; aarx++) {
         if (samplesVoid[aarx] != NULL)
           memcpy(samplesVoid[aarx], samplesVoid[0], nsamps * sizeof(sample_t));
       }
     }
+#ifdef VRTSIM_IQ_DEBUG
+    const uint64_t channel_sample = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+    int nr_frame = -1;
+    int nr_slot = -1;
+    const bool has_slot = vrtsim_timestamp_to_mu1_slot(vrtsim_state, vrtsim_state->last_received_sample, &nr_frame, &nr_slot);
+    const bool slot19 = has_slot && nr_slot == 19;
+    const bool error = rx_ret == CHANNEL_ERROR_TOO_LATE || rx_ret == CHANNEL_ERROR_TOO_EARLY;
+    for (int aarx = 0; aarx < nbAnt; aarx++) {
+      if (samplesVoid[aarx] == NULL)
+        continue;
+      const vrtsim_iq_stats_t stats = vrtsim_iq_stats((const c16_t *)samplesVoid[aarx], nsamps);
+      const bool log_nonzero = stats.nonzero > 0 && vrtsim_state->ul_rx_nonzero_debug_logs++ < 4000;
+      const bool log_slot19_zero = slot19 && stats.nonzero == 0 && vrtsim_state->ul_rx_slot19_debug_logs++ < 1200;
+      if (log_nonzero || log_slot19_zero || error) {
+        LOG_I(HW,
+              "[VRTSIM UL RX] ant=%d approx_frame.slot=%d.%d timestamp=%ld read_sample=%lu nsamps=%d channel_sample=%lu lag=%ld ret=%d nonzero=%d/%d first=%d peak_idx=%d peak=%d energy=%lu first_iq=(%d,%d) peak_iq=(%d,%d)\n",
+              aarx,
+              nr_frame,
+              nr_slot,
+              (long)vrtsim_state->last_received_sample,
+              read_sample,
+              nsamps,
+              channel_sample,
+              (long)(channel_sample - read_sample),
+              rx_ret,
+              stats.nonzero,
+              nsamps,
+              stats.first_nonzero,
+              stats.peak_index,
+              stats.peak,
+              stats.energy,
+              stats.first_r,
+              stats.first_i,
+              stats.peak_r,
+              stats.peak_i);
+      }
+    }
+#endif
   } else {
     for (int aarx = 0; aarx < nbAnt; aarx++) {
       int global_dl_ant = vrtsim_state->ue.rx_offset + aarx;
@@ -1096,6 +1272,9 @@ static int vrtsim_set_beams2(openair0_device_t *device, int *beam_ids, int num_b
 openair0_timestamp_t vrtsim_get_timestamp(openair0_device_t *device, struct timespec *ts)
 {
   vrtsim_state_t *vrtsim_state = (vrtsim_state_t *)device->priv;
+  if (vrtsim_state->channel != NULL)
+    return shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+
   uint64_t diff = (ts->tv_sec - vrtsim_state->start_ts.tv_sec) * 1000000000 + (ts->tv_nsec - vrtsim_state->start_ts.tv_nsec);
   double diff_samples = vrtsim_state->sample_rate * vrtsim_state->timescale * diff / 1e9;
   return diff_samples > 0 ? diff_samples : 0;

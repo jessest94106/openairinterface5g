@@ -274,6 +274,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
   for (int i = 0; i < UL_dci_req->numPdus; ++i)
     nr_generate_dci(gNB, &UL_dci_req->ul_dci_pdu_list[i].pdcch_pdu.pdcch_pdu_rel15, &gNB->frame_parms, slot);
 
+#ifdef NR_MAC_SCHED_DEBUG
   // Debug: log DL PDU scheduling
   static int dl_sched_log_count = 0;
   if ((slot == 0 && dl_sched_log_count++ < 30) || (frame % 256 == 0 && slot == 0)) {
@@ -289,6 +290,7 @@ void phy_procedures_gNB_TX(PHY_VARS_gNB *gNB,
       LOG_I(PHY, "[MAC SCHED]   PDU[%d]: type=%s (%d)\n", i, pdu_name, pdu->PDUType);
     }
   }
+#endif
 
   int num_pdsch = 0;
   for (int i = 0; i < DL_req->dl_tti_request_body.nPDUs; ++i) {
@@ -1075,6 +1077,9 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     AssertFatal(ulsch_harq != NULL, "harq_pid %d is not allocated\n", ulsch->harq_pid);
     if (!(ulsch->active && ulsch->frame == frame_rx && ulsch->slot == slot_rx && !ulsch->handled))
       continue;
+#if defined(DEBUG_RXDATA) || defined(NR_MSG3_PHY_DEBUG)
+    nfapi_nr_pusch_pdu_t *pdu = &ulsch_harq->ulsch_pdu;
+#endif
     LOG_D(PHY, "PUSCH ID %d with RNTI %x detection started in frame %d slot %d\n", ULSCH_id, ulsch->rnti, frame_rx, slot_rx);
 
 #ifdef DEBUG_RXDATA
@@ -1117,15 +1122,42 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
       pusch_vars->ulsch_power_tot += pusch_vars->ulsch_power[aarx];
       pusch_vars->ulsch_noise_power_tot += pusch_vars->ulsch_noise_power[aarx];
     }
-    if (dB_fixed_x10(pusch_vars->ulsch_power_tot) < dB_fixed_x10(pusch_vars->ulsch_noise_power_tot) + gNB->pusch_thres) {
+    int power_x10 = dB_fixed_x10(pusch_vars->ulsch_power_tot);
+    int noise_x10 = dB_fixed_x10(pusch_vars->ulsch_noise_power_tot);
+    int dtx_decision = power_x10 < noise_x10 + gNB->pusch_thres;
+#ifdef NR_MSG3_PHY_DEBUG
+    static int msg3_phy_dbg_count = 0;
+    if (msg3_phy_dbg_count < 512) {
+      LOG_D(PHY,
+            "[MSG3 PHY] frame=%d slot=%d ulsch_id=%d rnti=%04x harq=%d rb_start=%d rb_size=%d bwp_start=%d start_sym=%d num_sym=%d mcs=%d rv=%d power_x10=%d noise_x10=%d thres_x10=%d dtx=%d\n",
+            frame_rx,
+            slot_rx,
+            ULSCH_id,
+            ulsch->rnti,
+            pdu->pusch_data.harq_process_id,
+            pdu->rb_start,
+            pdu->rb_size,
+            pdu->bwp_start,
+            pdu->start_symbol_index,
+            pdu->nr_of_symbols,
+            pdu->mcs_index,
+            pdu->pusch_data.rv_index,
+            power_x10,
+            noise_x10,
+            noise_x10 + gNB->pusch_thres,
+            dtx_decision);
+      msg3_phy_dbg_count++;
+    }
+#endif
+    if (dtx_decision) {
       NR_gNB_PHY_STATS_t *stats = get_phy_stats(gNB, ulsch->rnti);
 
       LOG_D(PHY,
             "PUSCH not detected in %d.%d (%d,%d,%d)\n",
             frame_rx,
             slot_rx,
-            dB_fixed_x10(pusch_vars->ulsch_power_tot),
-            dB_fixed_x10(pusch_vars->ulsch_noise_power_tot),
+            power_x10,
+            noise_x10,
             gNB->pusch_thres);
       pusch_vars->ulsch_power_tot = pusch_vars->ulsch_noise_power_tot;
       pusch_vars->DTX = 1;
@@ -1146,8 +1178,8 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
             "PUSCH detected in %d.%d (%d,%d,%d)\n",
             frame_rx,
             slot_rx,
-            dB_fixed_x10(pusch_vars->ulsch_power_tot),
-            dB_fixed_x10(pusch_vars->ulsch_noise_power_tot),
+            power_x10,
+            noise_x10,
             gNB->pusch_thres);
 
       pusch_vars->DTX = 0;
