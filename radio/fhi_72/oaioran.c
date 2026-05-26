@@ -109,7 +109,11 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
             // LOG_D(HW, "cb pRbMap->nPrbElm %d\n", pRbMap->nPrbElm);
             for (uint32_t idxElm = 0; idxElm < pRbMap->nPrbElm; idxElm++ ) {
               struct xran_prb_elm *pRbElm = &pRbMap->prbMap[idxElm];
-              pRbElm->nSecDesc[sym_id] = 0; // number of section descriptors per symbol; M-plane info <supported-section-types>
+              pRbElm->nSecDesc[sym_id] = 0;
+              // Clear pCtrl so OAI does not read stale F-1 mbuf pointers for
+              // mixed-slot UL symbols (sym 10-13) that arrive after this callback.
+              for (int f = 0; f < XRAN_MAX_FRAGMENT; f++)
+                pRbElm->sec_desc[sym_id][f].pCtrl = NULL;
             }
           }
         }
@@ -607,8 +611,19 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
             if (p_sec_desc == NULL)
               continue;
             if (sym_idx >= pRbElm->nStartSymb && sym_idx < pRbElm->nStartSymb + pRbElm->numSymb) {
-              if (!p_sec_desc->pCtrl)
-                continue;
+              if (!p_sec_desc->pCtrl) {
+                // UL symbols in mixed slot (sym 10-13) arrive ~107-214 µs after the
+                // sym-7 callback fires. Spin-wait on the first fragment; remaining
+                // fragments will be NULL (no fragmentation in this config) and fall
+                // through to the continue below.
+                if (idxDesc == 0) {
+                  void *volatile *pCtrl_v = (void *volatile *)&p_sec_desc->pCtrl;
+                  for (int w = 0; w < 300000 && !*pCtrl_v; w++)
+                    __asm__ volatile("pause" ::: "memory");
+                }
+                if (!p_sec_desc->pCtrl)
+                  continue;
+              }
               pData = p_sec_desc->pData;
               numRB = p_sec_desc->num_prbu;
               startRB = p_sec_desc->start_prbu;
@@ -702,6 +717,12 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
 
                 oai_bfp_decompression(bfp_decom_req.iqWidth, bfp_decom_req.numRBs, bfp_decom_req.data_in, bfp_decom_rsp.data_out);
                 bfp_decom_rsp.len = bfp_decom_req.numRBs * 24 * sizeof(int16_t);
+
+                // BFP output is ±(2^(iqWidth-1)-1)*2^exponent; scale down by 2 bits
+                // to match the IQ16 NONE path which applies >> 2 (see above).
+                int16_t *bfp_out = bfp_decom_rsp.data_out;
+                for (int s = 0; s < numRB * N_SC_PER_PRB * 2; s++)
+                  bfp_out[s] >>= 2;
 
                 if (pusch_decomp_log_count < 5) {
                   LOG_I(HW, "[PUSCH BFP] Decompression returned, rsp.len=%d\n", bfp_decom_rsp.len);
