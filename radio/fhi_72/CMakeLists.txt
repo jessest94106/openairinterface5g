@@ -13,6 +13,7 @@ add_library(oran_fhlib_5g MODULE
             oran_isolate.c
             oaioran_ru.c
             oaioran.c
+            oai_bfp_compression.c
             oran-config.c
             oran-init.c
 )
