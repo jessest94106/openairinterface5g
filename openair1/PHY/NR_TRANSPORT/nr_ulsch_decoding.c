@@ -236,6 +236,7 @@ int nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
     uint8_t ULSCH_id = ULSCH_ids[pusch_id];
     NR_gNB_ULSCH_t *ulsch = &phy_vars_gNB->ulsch[ULSCH_id];
     NR_UL_gNB_HARQ_t *harq_process = ulsch->harq_process;
+    nfapi_nr_pusch_pdu_t *pusch_pdu = &harq_process->ulsch_pdu;
     short *ulsch_llr = phy_vars_gNB->pusch_vars[ULSCH_id].llr;
 
     if (!ulsch_llr) {
@@ -268,6 +269,52 @@ int nr_ulsch_decoding(PHY_VARS_gNB *phy_vars_gNB,
 
       r_offset += segment_parameters->E;
     }
+    static int ulsch_dec_input_trace_count = 0;
+    if (ulsch_dec_input_trace_count < 0) {
+      int16_t llr_min = 32767, llr_max = -32768;
+      int nonzero = 0;
+      const uint32_t llr_count = G[pusch_id];
+      for (uint32_t ii = 0; ii < llr_count; ii++) {
+        if (ulsch_llr[ii] < llr_min) llr_min = ulsch_llr[ii];
+        if (ulsch_llr[ii] > llr_max) llr_max = ulsch_llr[ii];
+        if (ulsch_llr[ii] != 0) nonzero++;
+      }
+      LOG_I(PHY,
+            "ULSCH DEC input %d.%d rnti %04x harq %d round %d rv %d TBS %d G %u C %d K %d Z %d F %d E0 %d rb %d+%d sym %d+%d mcs %d Qm %d LLR min %d max %d nonzero %d/%u llr0 %d,%d,%d,%d,%d,%d,%d,%d\n",
+            frame,
+            nr_tti_rx,
+            ulsch->rnti,
+            ulsch->harq_pid,
+            harq_process->round,
+            pusch_pdu->pusch_data.rv_index,
+            harq_process->TBS,
+            G[pusch_id],
+            TB_parameters->C,
+            TB_parameters->K,
+            TB_parameters->Z,
+            TB_parameters->F,
+            TB_parameters->segments[0].E,
+            pusch_pdu->rb_start,
+            pusch_pdu->rb_size,
+            pusch_pdu->start_symbol_index,
+            pusch_pdu->nr_of_symbols,
+            pusch_pdu->mcs_index,
+            pusch_pdu->qam_mod_order,
+            llr_min,
+            llr_max,
+            nonzero,
+            llr_count,
+            llr_count > 0 ? ulsch_llr[0] : 0,
+            llr_count > 1 ? ulsch_llr[1] : 0,
+            llr_count > 2 ? ulsch_llr[2] : 0,
+            llr_count > 3 ? ulsch_llr[3] : 0,
+            llr_count > 4 ? ulsch_llr[4] : 0,
+            llr_count > 5 ? ulsch_llr[5] : 0,
+            llr_count > 6 ? ulsch_llr[6] : 0,
+            llr_count > 7 ? ulsch_llr[7] : 0);
+      ulsch_dec_input_trace_count++;
+    }
+
     if (harq_process->harq_to_be_cleared) {
       for (int r = 0; r < TB_parameters->C; r++) {
         harq_process->d_to_be_cleared[r] = true;
