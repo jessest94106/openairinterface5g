@@ -27,6 +27,7 @@
 #include "xran_fh_o_du.h"
 #include "xran_compression.h"
 #include "armral_bfp_compression.h"
+#include "oai_bfp_compression.h"
 
 #if defined(__arm__) || defined(__aarch64__)
 #else
@@ -326,7 +327,8 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
           bfp_decom_rsp.data_out = (int16_t *)local_dst;
           bfp_decom_rsp.len = 0;
 
-          xranlib_decompress_avx512(&bfp_decom_req, &bfp_decom_rsp);
+          oai_bfp_decompression(bfp_decom_req.iqWidth, bfp_decom_req.numRBs, bfp_decom_req.data_in, bfp_decom_rsp.data_out);
+          bfp_decom_rsp.len = bfp_decom_req.numRBs * 24 * sizeof(int16_t);
 
           if (should_log) {
             LOG_I(HW, "[gNB PRACH RX] Decompression returned, rsp.len=%d\n", bfp_decom_rsp.len);
@@ -698,7 +700,8 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
                 bfp_decom_rsp.data_out = (int16_t *) (local_dst + startRB * N_SC_PER_PRB);
                 bfp_decom_rsp.len = 0;
 
-                xranlib_decompress_avx512(&bfp_decom_req, &bfp_decom_rsp);
+                oai_bfp_decompression(bfp_decom_req.iqWidth, bfp_decom_req.numRBs, bfp_decom_req.data_in, bfp_decom_rsp.data_out);
+                bfp_decom_rsp.len = bfp_decom_req.numRBs * 24 * sizeof(int16_t);
 
                 if (pusch_decomp_log_count < 5) {
                   LOG_I(HW, "[PUSCH BFP] Decompression returned, rsp.len=%d\n", bfp_decom_rsp.len);
@@ -786,34 +789,55 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
   if ((*frame & 0x7f) == 0 && *slot == 0 && xran_get_common_counters(gxran_handle, &x_counters[0]) == XRAN_STATUS_SUCCESS) {
     // Initialize stats file on first run
     if (!stats_file_initialized) {
-      stats_file = fopen("gnb_compression_stats.txt", "w");
+      stats_file = fopen("fh_load_stats.csv", "w");
       if (stats_file != NULL) {
-        fprintf(stats_file, "# gNB Compression Statistics Log\n");
-        fprintf(stats_file, "# Format: [timestamp] o_xu_id rx_kbps tx_kbps\n");
+        fprintf(stats_file, "timestamp,o_xu_id,rx_kbps,tx_kbps,total_kbps,rx_pps,tx_pps,total_pps,total_msgs_rcvd\n");
         fflush(stats_file);
       }
       stats_file_initialized = 1;
     }
     for (int o_xu_id = 0; o_xu_id < fh_init->xran_ports; o_xu_id++) {
+      const long rx_pps = x_counters[o_xu_id].rx_counter - old_rx_counter[o_xu_id];
+      const long tx_pps = x_counters[o_xu_id].tx_counter - old_tx_counter[o_xu_id];
+      const long rx_kbps = x_counters[o_xu_id].rx_bytes_per_sec * 8 / 1000L;
+      const long tx_kbps = x_counters[o_xu_id].tx_bytes_per_sec * 8 / 1000L;
+      const long total_kbps = rx_kbps + tx_kbps;
       LOG_I(HW,
             "[%s%d][rx %7ld pps %7ld kbps %7ld][tx %7ld pps %7ld kbps %7ld][Total Msgs_Rcvd %ld]\n",
             "o-du ",
             o_xu_id,
             x_counters[o_xu_id].rx_counter,
-            x_counters[o_xu_id].rx_counter - old_rx_counter[o_xu_id],
-            x_counters[o_xu_id].rx_bytes_per_sec * 8 / 1000L,
+            rx_pps,
+            rx_kbps,
             x_counters[o_xu_id].tx_counter,
-            x_counters[o_xu_id].tx_counter - old_tx_counter[o_xu_id],
-            x_counters[o_xu_id].tx_bytes_per_sec * 8 / 1000L,
+            tx_pps,
+            tx_kbps,
             x_counters[o_xu_id].Total_msgs_rcvd);
+      LOG_I(HW,
+            "[FH LOAD][o-du %d] rx=%ld.%03ld Mbps tx=%ld.%03ld Mbps total=%ld.%03ld Mbps rx_pps=%ld tx_pps=%ld total_pps=%ld\n",
+            o_xu_id,
+            rx_kbps / 1000L,
+            rx_kbps % 1000L,
+            tx_kbps / 1000L,
+            tx_kbps % 1000L,
+            total_kbps / 1000L,
+            total_kbps % 1000L,
+            rx_pps,
+            tx_pps,
+            rx_pps + tx_pps);
       // Log to file
       if (stats_file != NULL) {
         time_t now = time(NULL);
-        fprintf(stats_file, "[%ld] o_xu_id=%d rx_kbps=%ld tx_kbps=%ld\n",
+        fprintf(stats_file, "%ld,%d,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n",
                 now,
                 o_xu_id,
-                x_counters[o_xu_id].rx_bytes_per_sec * 8 / 1000L,
-                x_counters[o_xu_id].tx_bytes_per_sec * 8 / 1000L);
+                rx_kbps,
+                tx_kbps,
+                total_kbps,
+                rx_pps,
+                tx_pps,
+                rx_pps + tx_pps,
+                x_counters[o_xu_id].Total_msgs_rcvd);
         fflush(stats_file);  // Ensure data is written immediately
       }
       for (int rxant = 0; rxant < ru->nb_rx / fh_init->xran_ports; rxant++)
@@ -1073,7 +1097,8 @@ int xran_fh_tx_send_slot(ru_info_t *ru, int frame, int slot, uint64_t timestamp)
               bfp_com_rsp.data_out = (int8_t *)dst;
               bfp_com_rsp.len = 0;
 
-              xranlib_compress_avx512(&bfp_com_req, &bfp_com_rsp);
+              oai_bfp_compression(bfp_com_req.iqWidth, bfp_com_req.numRBs, bfp_com_req.data_in, bfp_com_rsp.data_out);
+              bfp_com_rsp.len = (3 * bfp_com_req.iqWidth + 1) * bfp_com_req.numRBs;
 #elif defined(__arm__) || defined(__aarch64__)
               armral_bfp_compression(p_prbMapElm->iqWidth, numRB, (int16_t *)pos_start, (int8_t *)dst);
 #else

@@ -35,6 +35,7 @@
 #include "xran_fh_o_ru.h"
 #include "xran_compression.h"
 #include "armral_bfp_compression.h"
+#include "oai_bfp_compression.h"
 #include <xran_pkt.h>
 #include <xran_pkt_cp.h>
 #include <xran_pkt_up.h>
@@ -477,7 +478,8 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
               bfp_decom_rsp.data_out = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];
               bfp_decom_rsp.len = 0;
 
-              xranlib_decompress_avx512(&bfp_decom_req, &bfp_decom_rsp);
+              oai_bfp_decompression(bfp_decom_req.iqWidth, bfp_decom_req.numRBs, bfp_decom_req.data_in, bfp_decom_rsp.data_out);
+              bfp_decom_rsp.len = bfp_decom_req.numRBs * 24 * sizeof(int16_t);
             }
               else if (comp_meth == XRAN_COMPMETHOD_BLKSCALE) {
               struct xranlib_decompress_request bs_decom_req = {};
@@ -1186,7 +1188,8 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
         bfp_rsp.data_out = (int8_t *)dest;
         bfp_rsp.len = 0;
 
-        xranlib_compress_avx512(&bfp_req, &bfp_rsp);
+        oai_bfp_compression(bfp_req.iqWidth, bfp_req.numRBs, bfp_req.data_in, bfp_rsp.data_out);
+        bfp_rsp.len = (3 * bfp_req.iqWidth + 1) * bfp_req.numRBs;
 
         // Log compressed output
         if (prach_log_count <= 5 || has_nonzero) {
@@ -1493,7 +1496,8 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
       req.iqWidth    = fh_cfg->ru_conf.iqWidth;
 
       rsp.data_out = (int8_t *)dest;
-      xranlib_compress_avx512(&req, &rsp);
+      oai_bfp_compression(req.iqWidth, req.numRBs, req.data_in, rsp.data_out);
+      rsp.len = (3 * req.iqWidth + 1) * req.numRBs;
 
 #elif defined(__arm__) || defined(__aarch64__)
 
