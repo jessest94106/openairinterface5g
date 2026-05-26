@@ -50,6 +50,11 @@
 #include "PHY/log_tools.h"
 #include "PHY/NR_UE_TRANSPORT/pucch_nr.h"
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <sched.h>
+#include <unistd.h>
 
 #define MAX_RE_PER_SYMBOL_IN_ALLOC (275 * 12)
 #define MAX_NLQM (4 * 8)
@@ -60,6 +65,194 @@
 //#define DEBUG_DFT_IDFT
 
 //extern int32_t uplink_counter;
+
+#define UE_PUSCH_RT_TRACE_ENABLE 0
+
+#if UE_PUSCH_RT_TRACE_ENABLE
+#define UE_PUSCH_RT_TRACE_CAP 8192
+#define UE_PUSCH_RT_TRACE_RE 8
+#define UE_PUSCH_RT_TRACE_HARD_BYTES 96
+
+typedef struct {
+  int frame;
+  int slot;
+  uint16_t rnti;
+  uint8_t harq_pid;
+  uint8_t rv;
+  uint16_t rb_start;
+  uint16_t rb_size;
+  uint8_t symbol;
+  uint8_t dmrs;
+  uint8_t qam;
+  uint8_t mcs;
+  uint32_t tb_size;
+  uint32_t start_sc;
+  int64_t tx_energy;
+  uint16_t hard_bits;
+  uint32_t sign_hash;
+  uint8_t hard[UE_PUSCH_RT_TRACE_HARD_BYTES];
+  c16_t tx[UE_PUSCH_RT_TRACE_RE];
+} ue_pusch_rt_trace_t;
+
+static ue_pusch_rt_trace_t ue_pusch_rt_trace[UE_PUSCH_RT_TRACE_CAP];
+static unsigned int ue_pusch_rt_trace_count;
+static unsigned int ue_pusch_rt_trace_last_dump_count;
+
+static void dump_ue_pusch_rt_trace(void)
+{
+  FILE *f = fopen("/tmp/oai_ue_pusch_rt_trace.csv", "w");
+  if (f == NULL)
+    return;
+
+  fprintf(f, "idx,frame,slot,rnti,harq,rv,rb_start,rb_size,symbol,dmrs,qam,mcs,tb_size,start_sc,tx_energy,hard_bits,sign_hash,hard_hex");
+  for (int re = 0; re < UE_PUSCH_RT_TRACE_RE; re++)
+    fprintf(f, ",tx%d_r,tx%d_i", re, re);
+  fprintf(f, "\n");
+
+  unsigned int n = ue_pusch_rt_trace_count < UE_PUSCH_RT_TRACE_CAP ? ue_pusch_rt_trace_count : UE_PUSCH_RT_TRACE_CAP;
+  for (unsigned int i = 0; i < n; i++) {
+    const ue_pusch_rt_trace_t *t = &ue_pusch_rt_trace[i];
+    fprintf(f, "%u,%d,%d,%04x,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%ld,%u,%08x,",
+            i,
+            t->frame,
+            t->slot,
+            t->rnti,
+            t->harq_pid,
+            t->rv,
+            t->rb_start,
+            t->rb_size,
+            t->symbol,
+            t->dmrs,
+            t->qam,
+            t->mcs,
+            t->tb_size,
+            t->start_sc,
+            (long)t->tx_energy,
+            t->hard_bits,
+            t->sign_hash);
+    int hard_bytes = (t->hard_bits + 7) >> 3;
+    if (hard_bytes > UE_PUSCH_RT_TRACE_HARD_BYTES)
+      hard_bytes = UE_PUSCH_RT_TRACE_HARD_BYTES;
+    for (int b = 0; b < hard_bytes; b++)
+      fprintf(f, "%02x", t->hard[b]);
+    for (int re = 0; re < UE_PUSCH_RT_TRACE_RE; re++)
+      fprintf(f, ",%d,%d", t->tx[re].r, t->tx[re].i);
+    fprintf(f, "\n");
+  }
+  fclose(f);
+}
+
+static void *ue_pusch_rt_trace_dump_thread(void *unused)
+{
+  (void)unused;
+  for (;;) {
+    sleep(1);
+    unsigned int count = __atomic_load_n(&ue_pusch_rt_trace_count, __ATOMIC_RELAXED);
+    if (count != ue_pusch_rt_trace_last_dump_count) {
+      dump_ue_pusch_rt_trace();
+      ue_pusch_rt_trace_last_dump_count = count;
+    }
+  }
+  return NULL;
+}
+
+static void start_ue_pusch_rt_trace_dump_thread(void)
+{
+  pthread_t thread;
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+  pthread_attr_setschedpolicy(&attr, SCHED_OTHER);
+  struct sched_param sp = {0};
+  pthread_attr_setschedparam(&attr, &sp);
+  if (pthread_create(&thread, &attr, ue_pusch_rt_trace_dump_thread, NULL) != 0)
+    atexit(dump_ue_pusch_rt_trace);
+  pthread_attr_destroy(&attr);
+}
+
+static void init_ue_pusch_rt_trace_dump(void) __attribute__((constructor));
+static void init_ue_pusch_rt_trace_dump(void)
+{
+  atexit(dump_ue_pusch_rt_trace);
+  start_ue_pusch_rt_trace_dump_thread();
+}
+#endif
+
+static void record_ue_pusch_rt_trace(int frame,
+                                     int slot,
+                                     uint16_t rnti,
+                                     uint8_t harq_pid,
+                                     const nfapi_nr_ue_pusch_pdu_t *pusch_pdu,
+                                     uint16_t start_sc,
+                                     uint16_t start_rb,
+                                     uint16_t nb_rb,
+                                     uint8_t symbol,
+                                     c16_t **txdataF,
+                                     const NR_DL_FRAME_PARMS *frame_parms)
+{
+#if UE_PUSCH_RT_TRACE_ENABLE
+  unsigned int idx = __atomic_fetch_add(&ue_pusch_rt_trace_count, 1, __ATOMIC_RELAXED);
+  if (idx >= UE_PUSCH_RT_TRACE_CAP)
+    return;
+
+  ue_pusch_rt_trace_t *t = &ue_pusch_rt_trace[idx];
+  *t = (ue_pusch_rt_trace_t){0};
+  t->frame = frame;
+  t->slot = slot;
+  t->rnti = rnti;
+  t->harq_pid = harq_pid;
+  t->rv = pusch_pdu->pusch_data.rv_index;
+  t->rb_start = start_rb;
+  t->rb_size = nb_rb;
+  t->symbol = symbol;
+  t->dmrs = (pusch_pdu->ul_dmrs_symb_pos >> symbol) & 0x01;
+  t->qam = pusch_pdu->qam_mod_order;
+  t->mcs = pusch_pdu->mcs_index;
+  t->tb_size = pusch_pdu->pusch_data.tb_size;
+  t->start_sc = start_sc;
+
+  uint16_t k = start_sc;
+  uint32_t sign_hash = 2166136261u;
+  int bit = 0;
+  const int max_re = nb_rb * NR_NB_SC_PER_RB;
+  for (int re = 0; re < max_re; re++) {
+    c16_t v = txdataF[0][symbol * frame_parms->ofdm_symbol_size + k];
+    if (re < UE_PUSCH_RT_TRACE_RE)
+      t->tx[re] = v;
+    t->tx_energy += (int64_t)v.r * v.r + (int64_t)v.i * v.i;
+    uint8_t code = 0;
+    if (v.r < 0)
+      code |= 1;
+    if (v.i < 0)
+      code |= 2;
+    sign_hash = (sign_hash ^ code) * 16777619u;
+    if (bit < UE_PUSCH_RT_TRACE_HARD_BYTES * 8 && (code & 1))
+      t->hard[bit >> 3] |= 1u << (bit & 7);
+    bit++;
+    if (bit < UE_PUSCH_RT_TRACE_HARD_BYTES * 8 && (code & 2))
+      t->hard[bit >> 3] |= 1u << (bit & 7);
+    bit++;
+    if (++k >= frame_parms->ofdm_symbol_size)
+      k -= frame_parms->ofdm_symbol_size;
+  }
+  t->hard_bits = bit;
+  t->sign_hash = sign_hash;
+#else
+  (void)frame;
+  (void)slot;
+  (void)rnti;
+  (void)harq_pid;
+  (void)pusch_pdu;
+  (void)start_sc;
+  (void)start_rb;
+  (void)nb_rb;
+  (void)symbol;
+  (void)txdataF;
+  (void)frame_parms;
+#endif
+}
+
 
 static void nr_pusch_codeword_scrambling_uci(uint8_t *in,
                                              uint32_t size,
@@ -1599,6 +1792,12 @@ void nr_ue_ulsch_procedures(PHY_VARS_NR_UE *UE,
       } // RB loop
     } // symbol loop
   } // port loop
+
+  if (pusch_pdu->pusch_data.tb_size >= 7 && pusch_pdu->pusch_data.rv_index == 0) {
+    for (int l = start_symbol; l < start_symbol + number_of_symbols; l++)
+      if (((ul_dmrs_symb_pos >> l) & 0x01) == 0)
+        record_ue_pusch_rt_trace(frame, slot, rnti, harq_pid, pusch_pdu, start_sc, start_rb, nb_rb, l, txdataF, frame_parms);
+  }
 
   stop_meas_nr_ue_phy(UE, PUSCH_PROC_STATS);
 }

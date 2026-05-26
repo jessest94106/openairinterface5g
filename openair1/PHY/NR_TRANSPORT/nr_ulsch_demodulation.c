@@ -14,6 +14,214 @@
 #include "T.h"
 #include <sys/time.h>
 #include "PHY/log_tools.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <sched.h>
+#include <unistd.h>
+
+
+#define GNB_PUSCH_RT_TRACE_ENABLE 0
+
+#if GNB_PUSCH_RT_TRACE_ENABLE
+#define GNB_PUSCH_RT_TRACE_CAP 8192
+#define GNB_PUSCH_RT_TRACE_RE 8
+#define GNB_PUSCH_RT_TRACE_HARD_BYTES 96
+
+typedef struct {
+  int frame;
+  int slot;
+  uint16_t rnti;
+  uint8_t harq_pid;
+  uint8_t round;
+  uint8_t rv;
+  uint16_t rb_start;
+  uint16_t rb_size;
+  uint8_t symbol;
+  uint8_t dmrs;
+  uint8_t qam;
+  uint8_t mcs;
+  uint32_t tb_size;
+  int64_t raw_energy;
+  int64_t ch_energy;
+  int64_t comp_energy;
+  uint16_t hard_bits;
+  uint32_t comp_sign_hash;
+  uint8_t hard[GNB_PUSCH_RT_TRACE_HARD_BYTES];
+  c16_t raw[GNB_PUSCH_RT_TRACE_RE];
+  c16_t ch[GNB_PUSCH_RT_TRACE_RE];
+  c16_t comp[GNB_PUSCH_RT_TRACE_RE];
+} gnb_pusch_rt_trace_t;
+
+static gnb_pusch_rt_trace_t gnb_pusch_rt_trace[GNB_PUSCH_RT_TRACE_CAP];
+static unsigned int gnb_pusch_rt_trace_count;
+static unsigned int gnb_pusch_rt_trace_last_dump_count;
+
+static void dump_gnb_pusch_rt_trace(void)
+{
+  FILE *f = fopen("/tmp/oai_gnb_pusch_rt_trace.csv", "w");
+  if (f == NULL)
+    return;
+
+  fprintf(f, "idx,frame,slot,rnti,harq,round,rv,rb_start,rb_size,symbol,dmrs,qam,mcs,tb_size,raw_energy,ch_energy,comp_energy,hard_bits,comp_sign_hash,hard_hex");
+  for (int re = 0; re < GNB_PUSCH_RT_TRACE_RE; re++)
+    fprintf(f, ",raw%d_r,raw%d_i,ch%d_r,ch%d_i,comp%d_r,comp%d_i", re, re, re, re, re, re);
+  fprintf(f, "\n");
+
+  unsigned int n = gnb_pusch_rt_trace_count < GNB_PUSCH_RT_TRACE_CAP ? gnb_pusch_rt_trace_count : GNB_PUSCH_RT_TRACE_CAP;
+  for (unsigned int i = 0; i < n; i++) {
+    const gnb_pusch_rt_trace_t *t = &gnb_pusch_rt_trace[i];
+    fprintf(f, "%u,%d,%d,%04x,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%ld,%ld,%ld,%u,%08x,",
+            i,
+            t->frame,
+            t->slot,
+            t->rnti,
+            t->harq_pid,
+            t->round,
+            t->rv,
+            t->rb_start,
+            t->rb_size,
+            t->symbol,
+            t->dmrs,
+            t->qam,
+            t->mcs,
+            t->tb_size,
+            (long)t->raw_energy,
+            (long)t->ch_energy,
+            (long)t->comp_energy,
+            t->hard_bits,
+            t->comp_sign_hash);
+    int hard_bytes = (t->hard_bits + 7) >> 3;
+    if (hard_bytes > GNB_PUSCH_RT_TRACE_HARD_BYTES)
+      hard_bytes = GNB_PUSCH_RT_TRACE_HARD_BYTES;
+    for (int b = 0; b < hard_bytes; b++)
+      fprintf(f, "%02x", t->hard[b]);
+    for (int re = 0; re < GNB_PUSCH_RT_TRACE_RE; re++)
+      fprintf(f, ",%d,%d,%d,%d,%d,%d",
+              t->raw[re].r,
+              t->raw[re].i,
+              t->ch[re].r,
+              t->ch[re].i,
+              t->comp[re].r,
+              t->comp[re].i);
+    fprintf(f, "\n");
+  }
+  fclose(f);
+}
+
+static void *gnb_pusch_rt_trace_dump_thread(void *unused)
+{
+  (void)unused;
+  for (;;) {
+    sleep(1);
+    unsigned int count = __atomic_load_n(&gnb_pusch_rt_trace_count, __ATOMIC_RELAXED);
+    if (count != gnb_pusch_rt_trace_last_dump_count) {
+      dump_gnb_pusch_rt_trace();
+      gnb_pusch_rt_trace_last_dump_count = count;
+    }
+  }
+  return NULL;
+}
+
+static void start_gnb_pusch_rt_trace_dump_thread(void)
+{
+  pthread_t thread;
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+  pthread_attr_setschedpolicy(&attr, SCHED_OTHER);
+  struct sched_param sp = {0};
+  pthread_attr_setschedparam(&attr, &sp);
+  if (pthread_create(&thread, &attr, gnb_pusch_rt_trace_dump_thread, NULL) != 0)
+    atexit(dump_gnb_pusch_rt_trace);
+  pthread_attr_destroy(&attr);
+}
+
+static void init_gnb_pusch_rt_trace_dump(void) __attribute__((constructor));
+static void init_gnb_pusch_rt_trace_dump(void)
+{
+  atexit(dump_gnb_pusch_rt_trace);
+  start_gnb_pusch_rt_trace_dump_thread();
+}
+#endif
+
+static void record_gnb_pusch_rt_trace(int frame,
+                                      int slot,
+                                      uint16_t rnti,
+                                      uint8_t harq_pid,
+                                      uint8_t round,
+                                      const nfapi_nr_pusch_pdu_t *rel15_ul,
+                                      uint8_t symbol,
+                                      const c16_t *raw,
+                                      const c16_t *ch,
+                                      const c16_t *comp,
+                                      int valid_re)
+{
+#if GNB_PUSCH_RT_TRACE_ENABLE
+  unsigned int idx = __atomic_fetch_add(&gnb_pusch_rt_trace_count, 1, __ATOMIC_RELAXED);
+  if (idx >= GNB_PUSCH_RT_TRACE_CAP)
+    return;
+
+  gnb_pusch_rt_trace_t *t = &gnb_pusch_rt_trace[idx];
+  *t = (gnb_pusch_rt_trace_t){0};
+  t->frame = frame;
+  t->slot = slot;
+  t->rnti = rnti;
+  t->harq_pid = harq_pid;
+  t->round = round;
+  t->rv = rel15_ul->pusch_data.rv_index;
+  t->rb_start = rel15_ul->rb_start;
+  t->rb_size = rel15_ul->rb_size;
+  t->symbol = symbol;
+  t->dmrs = (rel15_ul->ul_dmrs_symb_pos >> symbol) & 0x01;
+  t->qam = rel15_ul->qam_mod_order;
+  t->mcs = rel15_ul->mcs_index;
+  t->tb_size = rel15_ul->pusch_data.tb_size;
+
+  uint32_t sign_hash = 2166136261u;
+  int bit = 0;
+  for (int re = 0; re < valid_re; re++) {
+    c16_t r = raw[re];
+    c16_t h = ch[re];
+    c16_t c = comp[re];
+    if (re < GNB_PUSCH_RT_TRACE_RE) {
+      t->raw[re] = r;
+      t->ch[re] = h;
+      t->comp[re] = c;
+    }
+    t->raw_energy += (int64_t)r.r * r.r + (int64_t)r.i * r.i;
+    t->ch_energy += (int64_t)h.r * h.r + (int64_t)h.i * h.i;
+    t->comp_energy += (int64_t)c.r * c.r + (int64_t)c.i * c.i;
+    uint8_t code = 0;
+    if (c.r < 0)
+      code |= 1;
+    if (c.i < 0)
+      code |= 2;
+    sign_hash = (sign_hash ^ code) * 16777619u;
+    if (bit < GNB_PUSCH_RT_TRACE_HARD_BYTES * 8 && (code & 1))
+      t->hard[bit >> 3] |= 1u << (bit & 7);
+    bit++;
+    if (bit < GNB_PUSCH_RT_TRACE_HARD_BYTES * 8 && (code & 2))
+      t->hard[bit >> 3] |= 1u << (bit & 7);
+    bit++;
+  }
+  t->hard_bits = bit;
+  t->comp_sign_hash = sign_hash;
+#else
+  (void)frame;
+  (void)slot;
+  (void)rnti;
+  (void)harq_pid;
+  (void)round;
+  (void)rel15_ul;
+  (void)symbol;
+  (void)raw;
+  (void)ch;
+  (void)comp;
+  (void)valid_re;
+#endif
+}
 
 
 #if T_TRACER
@@ -863,6 +1071,7 @@ static uint8_t nr_ulsch_mmse_2layers(int **rxdataF_comp,
 
 static void inner_rx(PHY_VARS_gNB *gNB,
                      int ulsch_id,
+                     uint32_t frame,
                      int slot,
                      NR_DL_FRAME_PARMS *frame_parms,
                      NR_gNB_PUSCH *pusch_vars,
@@ -1008,6 +1217,24 @@ static void inner_rx(PHY_VARS_gNB *gNB,
                            pusch_vars->ul_valid_re_per_slot[symbol],
                            symbol,
                            rel15_ul->qam_mod_order);
+
+  if (rel15_ul->pusch_data.tb_size >= 7
+      && rel15_ul->pusch_data.rv_index == 0
+      && (((rel15_ul->ul_dmrs_symb_pos >> symbol) & 0x01) == 0)) {
+    NR_UL_gNB_HARQ_t *harq = gNB->ulsch[ulsch_id].harq_process;
+    int valid_re = length < buffer_length ? length : buffer_length;
+    record_gnb_pusch_rt_trace(frame,
+                              slot,
+                              rel15_ul->rnti,
+                              gNB->ulsch[ulsch_id].harq_pid,
+                              harq->round,
+                              rel15_ul,
+                              symbol,
+                              rxFext[0],
+                              chFext[0][0],
+                              (c16_t *)&pusch_vars->rxdataF_comp[0][symbol * buffer_length],
+                              valid_re);
+  }
 }
 
 typedef struct puschSymbolProc_s {
@@ -1015,6 +1242,7 @@ typedef struct puschSymbolProc_s {
   NR_DL_FRAME_PARMS *frame_parms;
   nfapi_nr_pusch_pdu_t *rel15_ul;
   int ulsch_id;
+  uint32_t frame;
   int slot;
   int startSymbol;
   int numSymbols;
@@ -1049,6 +1277,7 @@ static void nr_pusch_symbol_processing(void *arg)
 
     inner_rx(gNB,
              ulsch_id,
+             rdata->frame,
              slot,
              frame_parms,
              pusch_vars,
@@ -1362,6 +1591,46 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   if (pusch_vars->log2_maxh < 0)
     pusch_vars->log2_maxh = 0;
 
+  // nr_qpsk_llr() applies an additional >>4 after channel compensation. The log2_maxh formula
+  // normalises the MF output to ~±1 amplitude, so the combined >>log2_maxh >>4 over-attenuates
+  // in low-amplitude paths (e.g. vrtsim), producing int8 LLRs of only ~±2-5 — too weak for
+  // the LDPC decoder to converge in max_iter iterations.  Absorb the QPSK downstream shift
+  // into log2_maxh so the channel comp output is 16× larger and nr_qpsk_llr yields ~±50 LLRs.
+  if (rel15_ul->qam_mod_order == 2) {
+    const int qpsk_llr_shift = 4;
+    pusch_vars->log2_maxh = (pusch_vars->log2_maxh > qpsk_llr_shift)
+                            ? pusch_vars->log2_maxh - qpsk_llr_shift : 0;
+  }
+
+  static int pusch_demod_trace_count = 0;
+  if (pusch_demod_trace_count < 0) {
+    NR_UL_gNB_HARQ_t *harq = gNB->ulsch[ulsch_id].harq_process;
+    LOG_I(PHY,
+          "PUSCH demod trace %d.%d rnti %04x harq %d round %d rv %d rb %d+%d sym %d+%d dmrs 0x%x meas_sym %d dmrs_sym %d G %d avgs %d avg0 %d log2_maxh %d max_ch %d nvar %u qam %d mcs %d\n",
+          frame,
+          slot,
+          rel15_ul->rnti,
+          gNB->ulsch[ulsch_id].harq_pid,
+          harq->round,
+          rel15_ul->pusch_data.rv_index,
+          rel15_ul->rb_start,
+          rel15_ul->rb_size,
+          rel15_ul->start_symbol_index,
+          rel15_ul->nr_of_symbols,
+          rel15_ul->ul_dmrs_symb_pos,
+          meas_symbol,
+          dmrs_symbol,
+          G,
+          avgs,
+          avg[0],
+          pusch_vars->log2_maxh,
+          max_ch,
+          nvar,
+          rel15_ul->qam_mod_order,
+          rel15_ul->mcs_index);
+    pusch_demod_trace_count++;
+  }
+
   stop_meas(&gNB->rx_pusch_init_stats);
 
   start_meas(&gNB->rx_pusch_symbol_processing_stats);
@@ -1397,6 +1666,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
       // Last task processes remainder symbols
       rdata->numSymbols = task_index == loop_iter - 1 ? rel15_ul->nr_of_symbols - (loop_iter - 1) * numSymbols : numSymbols;
       rdata->ulsch_id = ulsch_id;
+      rdata->frame = frame;
       rdata->llr = pusch_vars->llr;
       rdata->scramblingSequence = scramblingSequence;
       rdata->nvar = nvar;

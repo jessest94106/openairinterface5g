@@ -199,6 +199,31 @@ static void nr_process_decode_segment(void *arg)
   for (int i = 0, j = 0; j < ((Kc * rdata->Z) >> 4) + 1; i += 2, j++) {
     pl[j] = simde_mm_packs_epi16(pv[i], pv[i + 1]);
   }
+  // Diagnostic: BG, Z, LLR stats, and sample values across the codeword
+  {
+    static int _ldpc_diag_remaining = 0;
+    if (__atomic_fetch_sub(&_ldpc_diag_remaining, 1, __ATOMIC_RELAXED) > 0) {
+      const int NKc = Kc * rdata->Z;
+      int8_t l_min = 127, l_max = -128;
+      int nonzero = 0;
+      for (int ii = 0; ii < NKc; ii++) {
+        if (l[ii] < l_min) l_min = l[ii];
+        if (l[ii] > l_max) l_max = l[ii];
+        if (l[ii] != 0) nonzero++;
+      }
+      const int off = 2 * rdata->Z;
+      LOG_I(PHY, "LDPC_LLR_DIAG BG=%d rv=%d Z=%u Kc=%u E=%d A=%u R=%d: "
+            "l_min=%d l_max=%d nonzero=%d/%d "
+            "ulsch_llr[0..3]=%d,%d,%d,%d "
+            "l[2Z..2Z+3]=%d,%d,%d,%d "
+            "l[0..3]=%d,%d,%d,%d\n",
+            p_decoderParms->BG, rv_index, rdata->Z, Kc, E, rdata->A, p_decoderParms->R,
+            (int)l_min, (int)l_max, nonzero, NKc,
+            (int)ulsch_llr[0], (int)ulsch_llr[1], (int)ulsch_llr[2], (int)ulsch_llr[3],
+            (int)l[off+0], (int)l[off+1], (int)l[off+2], (int)l[off+3],
+            (int)l[0], (int)l[1], (int)l[2], (int)l[3]);
+    }
+  }
   //////////////////////////////////////////////////////////////////////////////////////////
 
   //////////////////////////////////////////////////////////////////////////////////////////
@@ -207,8 +232,27 @@ static void nr_process_decode_segment(void *arg)
 
   ////////////////////////////////// pl =====> llrProcBuf //////////////////////////////////
   int decodeIterations = LDPCdecoder(p_decoderParms, l, llrProcBuf, p_procTime, rdata->abort_decode);
+  const bool decode_success = decodeIterations < p_decoderParms->numMaxIter;
+  {
+    static int _ldpc_result_diag_remaining = 0;
+    if (__atomic_fetch_sub(&_ldpc_result_diag_remaining, 1, __ATOMIC_RELAXED) > 0) {
+      LOG_I(PHY,
+            "LDPC_RESULT_DIAG BG=%d rv=%d Z=%u Kc=%u E=%d A=%u R=%d iter=%d/%d success=%d abort=%d\n",
+            p_decoderParms->BG,
+            rv_index,
+            rdata->Z,
+            Kc,
+            E,
+            rdata->A,
+            p_decoderParms->R,
+            decodeIterations,
+            p_decoderParms->numMaxIter,
+            decode_success,
+            check_abort(rdata->abort_decode));
+    }
+  }
 
-  if (decodeIterations < p_decoderParms->numMaxIter) {
+  if (decode_success) {
     memcpy(rdata->c, llrProcBuf, K >> 3);
     *rdata->decodeSuccess = true;
   } else {

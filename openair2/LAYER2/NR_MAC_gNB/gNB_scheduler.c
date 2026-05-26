@@ -171,7 +171,7 @@ void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, frame_t frame, slot_t slo
     const int prev_slot = frame * slots_frame + slot + size - 1;
     for (int i = 0; i < num_beams; i++) {
       uint16_t *vrb_map_UL = cc[CC_id].vrb_map_UL[i];
-      memcpy(&vrb_map_UL[prev_slot % size * MAX_BWP_SIZE], &gNB->ulprbbl, sizeof(uint16_t) * MAX_BWP_SIZE);
+      memset(&vrb_map_UL[prev_slot % size * MAX_BWP_SIZE], 0, sizeof(uint16_t) * MAX_BWP_SIZE);
     }
     clear_nr_nfapi_information(gNB, CC_id, frame, slot);
   }

@@ -512,7 +512,34 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
 
     nfapi_nr_crc_t *crc = &UL_INFO->crc_ind.crc_list[UL_INFO->crc_ind.number_crcs++];
     nfapi_nr_rx_data_pdu_t *pdu = &UL_INFO->rx_ind.pdu_list[UL_INFO->rx_ind.number_of_pdus++];
-    if (crc_valid && !check_abort(&ulsch_harq->abort_decode) && !pusch->DTX) {
+    const bool abort_decode = check_abort(&ulsch_harq->abort_decode);
+    if (crc_valid && !abort_decode && !pusch->DTX) {
+      static int ulsch_ack_trace_count = 0;
+      if (ulsch_ack_trace_count < 32) {
+        LOG_I(PHY,
+              "ULSCH ACK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB TAest %d\n",
+              ulsch->frame,
+              ulsch->slot,
+              ulsch->rnti,
+              ulsch->harq_pid,
+              ulsch_harq->round,
+              ulsch_harq->ulsch_pdu.pusch_data.rv_index,
+              crc_valid,
+              ulsch_harq->processedSegments,
+              ulsch_harq->C,
+              abort_decode,
+              pusch->DTX,
+              ulsch_harq->TBS,
+              pusch_pdu->rb_start,
+              pusch_pdu->rb_size,
+              pusch_pdu->start_symbol_index,
+              pusch_pdu->nr_of_symbols,
+              pusch_pdu->mcs_index,
+              pusch_pdu->qam_mod_order,
+              (dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot)) / 10.0,
+              gNB->ulsch[ULSCH_id].delay.est_delay);
+        ulsch_ack_trace_count++;
+      }
       LOG_D(NR_PHY,
             "[gNB %d] ULSCH %d: Setting ACK for SFN/SF %d.%d (rnti %x, pid %d, ndi %d, status %d, round %d, TBS %d, Max interation "
             "(all seg) %d)\n",
@@ -533,6 +560,32 @@ static int nr_ulsch_procedures(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, boo
       ulsch_harq->round = 0;
       ulsch->last_iteration_cnt = ulsch->max_ldpc_iterations - 1; // Setting to max_ldpc_iterations - 1 is sufficient given that this variable is only used for checking for failure
     } else {
+      static int ulsch_nak_trace_count = 0;
+      if (ulsch_nak_trace_count < 32) {
+        LOG_W(PHY,
+              "ULSCH NAK trace %d.%d rnti %04x harq %d round %d rv %d crc_valid %d processed %d/%d abort %d dtx %d TBS %d rb %d+%d sym %d+%d mcs %d Qm %d SNR %.1f dB TAest %d\n",
+              ulsch->frame,
+              ulsch->slot,
+              ulsch->rnti,
+              ulsch->harq_pid,
+              ulsch_harq->round,
+              ulsch_harq->ulsch_pdu.pusch_data.rv_index,
+              crc_valid,
+              ulsch_harq->processedSegments,
+              ulsch_harq->C,
+              abort_decode,
+              pusch->DTX,
+              ulsch_harq->TBS,
+              pusch_pdu->rb_start,
+              pusch_pdu->rb_size,
+              pusch_pdu->start_symbol_index,
+              pusch_pdu->nr_of_symbols,
+              pusch_pdu->mcs_index,
+              pusch_pdu->qam_mod_order,
+              (dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot)) / 10.0,
+              gNB->ulsch[ULSCH_id].delay.est_delay);
+        ulsch_nak_trace_count++;
+      }
       LOG_D(PHY,
             "[gNB %d] ULSCH: Setting NAK for SFN/SF %d/%d (pid %d, ndi %d, status %d, round %d, RV %d, prb_start %d, prb_size %d, "
             "TBS %d)\n",

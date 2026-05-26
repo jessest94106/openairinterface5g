@@ -1793,6 +1793,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
                                        post_process_pusch_t *pp_pusch,
                                        uint16_t *rballoc_mask,
                                        int *n_rb_sched,
+                                       int rb_start_min,
                                        int dci_beam_idx,
                                        NR_UE_info_t *UE,
                                        int harq_pid,
@@ -1809,7 +1810,7 @@ static bool allocate_ul_retransmission(gNB_MAC_INST *nrmac,
   NR_sched_pusch_t new_sched = *retInfo; // potential new allocation
   NR_UE_UL_BWP_t *ul_bwp = &UE->current_UL_BWP;
 
-  int rbStart = 0; // wrt BWP start
+  int rbStart = rb_start_min; // wrt BWP start
   bwp_info_t bwp_info = get_pusch_bwp_start_size(UE);
   const uint32_t bwpSize = bwp_info.bwpSize;
   const uint32_t bwpStart = bwp_info.bwpStart;
@@ -1959,6 +1960,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                   NR_UE_info_t *UE_list[],
                   int max_num_ue,
                   int num_beams,
+                  int rb_start_sched[num_beams],
                   int n_rb_sched[num_beams])
 {
   const int CC_id = 0;
@@ -2031,6 +2033,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                                           pp_pusch,
                                           rballoc_mask,
                                           &n_rb_sched[beam.idx],
+                                          rb_start_sched[beam.idx],
                                           dci_beam.idx,
                                           UE,
                                           ul_harq_pid,
@@ -2177,7 +2180,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     uint16_t *rballoc_mask = &nrmac->common_channels[CC_id].vrb_map_UL[beam.idx][index * MAX_BWP_SIZE];
 
     /* find maximum amount of RBs that we can schedule starting from first free RB */
-    int rbStart = 0;
+    int rbStart = rb_start_sched[beam.idx];
     const uint16_t slbitmap = SL_to_bitmap(tda_info->startSymbolIndex, tda_info->nrOfSymbols);
     bwp_info_t bi = get_pusch_bwp_start_size(iterator->UE);
     while (rbStart < bi.bwpSize && (rballoc_mask[rbStart + bi.bwpStart] & slbitmap))
@@ -2714,11 +2717,14 @@ static void nr_ulsch_preprocessor(gNB_MAC_INST *nr_mac, post_process_pusch_t *pp
     AssertFatal(tda >= 0 && tda < 16, "illegal TDA index %d\n", tda);
 
     nr_mac->mac_stats.ul.total_prb_aggregate += bw;
+    int start[num_beams];
     int len[num_beams];
-    for (int i = 0; i < num_beams; i++)
+    for (int i = 0; i < num_beams; i++) {
+      start[i] = rb_start;
       len[i] = rb_len;
+    }
     /* proportional fair scheduling algorithm */
-    int sched = pf_ul(nr_mac, pp_pusch, tda, tda_info, nr_mac->UE_info.connected_ue_list, max_dci, num_beams, len);
+    int sched = pf_ul(nr_mac, pp_pusch, tda, tda_info, nr_mac->UE_info.connected_ue_list, max_dci, num_beams, start, len);
     LOG_D(NR_MAC, "run pf_ul() at %4d.%2d with tda %d k2 %d (ULSCH at %4d.%2d) scheduled %d last_dl %d\n", frame, slot, tda, k2, next->f, next->s, sched, last_dl);
     /* if we did not schedule anything, and it's not the last slot, break. In
      * the case we did schedule or it's the last slot (see above!), continue
