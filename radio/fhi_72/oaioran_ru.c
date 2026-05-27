@@ -1375,14 +1375,14 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   int start_prb = cfg.start_prb;
   // AssertFatal(num_prb == num_ul_rbs && start_prb == 0, "only support full bandwidth reception\n");
 
-  // AssertFatal(fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
-  // TODO: With compression, have to add compression header to header_len
+  const int use_comp_hdr = (fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE);
   size_t header_length = sizeof(struct xran_ecpri_hdr) + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr);
+  if (use_comp_hdr)
+    header_length += sizeof(struct data_section_compression_hdr);
 
-  // TODO: For compression, have to re-evaluate data size;
   const uint num_sc = num_ul_rbs * NR_NB_SC_PER_RB;
   size_t data_len = sizeof(int32_t) * num_sc;
-  if (fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE)
+  if (use_comp_hdr)
     data_len = (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
 
   struct rte_mbuf *mbuf = xran_ethdi_mbuf_alloc();
@@ -1392,32 +1392,37 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
 
   struct xran_ecpri_hdr *ecpri_header = (struct xran_ecpri_hdr *)rte_pktmbuf_mtod(mbuf, char *);
   uint16_t ecpri_payload_size = xran_get_ecpri_hdr_size() + sizeof(struct radio_app_common_hdr) + sizeof(struct data_section_hdr) + data_len;
+  if (use_comp_hdr)
+    ecpri_payload_size += sizeof(struct data_section_compression_hdr);
   fill_ecpri_header(ecpri_header, ECPRI_IQ_DATA, ecpri_payload_size, 0, aarx, pusch_seq_id[aarx]++, 0);
 
   struct radio_app_common_hdr *radio_app_header = (struct radio_app_common_hdr *)(ecpri_header + 1);
   fill_radio_app_header(radio_app_header, 0, XRAN_DIR_UL, frame, slot, symbol, mu);
 
   struct data_section_hdr *data_section_header = (struct data_section_hdr *)(radio_app_header + 1);
-  if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE)
+  if (!use_comp_hdr)
     fill_data_section_header(data_section_header, fh_cfg->nULRBs, 0, section_id);
   else
     fill_data_section_header(data_section_header, num_prb, 0, section_id);
 
-
-  // TODO: O-DU expect compression header here even though the standard says it's not required
-  struct data_section_compression_hdr *compression_header = (struct data_section_compression_hdr *)(data_section_header + 1);
-  compression_header->ud_comp_hdr.ud_comp_meth = fh_cfg->ru_conf.compMeth;// XRAN_COMPMETHOD_NONE;
-  compression_header->ud_comp_hdr.ud_iq_width = XRAN_CONVERT_IQWIDTH(fh_cfg->ru_conf.iqWidth);
-  compression_header->rsrvd = 0;
+  void *iq_data_start;
+  if (use_comp_hdr) {
+    struct data_section_compression_hdr *compression_header = (struct data_section_compression_hdr *)(data_section_header + 1);
+    compression_header->ud_comp_hdr.ud_comp_meth = fh_cfg->ru_conf.compMeth;
+    compression_header->ud_comp_hdr.ud_iq_width = XRAN_CONVERT_IQWIDTH(fh_cfg->ru_conf.iqWidth);
+    compression_header->rsrvd = 0;
+    iq_data_start = (void *)(compression_header + 1);
+  } else {
+    iq_data_start = (void *)(data_section_header + 1);
+  }
 
   int fftsize = 1 << fh_cfg->nULFftSize;
   int first_carrier_offset = fftsize - (fh_cfg->nULRBs * NR_NB_SC_PER_RB / 2);
   int num_sc_first_copy = (fftsize - first_carrier_offset);
   int num_sc_second_copy = fh_cfg->nULRBs * NR_NB_SC_PER_RB - num_sc_first_copy;
-  void *iq_data_start = (void *)(compression_header + 1);
   int16_t* dest = (int16_t*)iq_data_start;
   uint16_t* src = (uint16_t*)&puschF[first_carrier_offset];
-  if (fh_cfg->ru_conf.compMeth != XRAN_COMPMETHOD_NONE) {                                                                                                      
+  if (use_comp_hdr) {
     // Calculate split based on start position
     int neg_len = 0;                                                                                                                                           
     int pos_len = 0;                                                                                                                                           
@@ -1453,7 +1458,7 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
 #endif
 
    /* ---------- NO COMPRESSION ---------- */
-  if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_NONE) {
+  if (!use_comp_hdr) {
   for (int i = 0; i < num_sc_first_copy * 2; i++) {
 #ifdef ORU_PUSCH_UPLANE_DEBUG
     int16_t sample = (int16_t)src[i];
@@ -1479,10 +1484,7 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
 #endif
     *dest++ = (int16_t)htons(src[i]);
   }
-}   else if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_BLKFLOAT) {
-
-      data_len =
-          (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
+  } else if (fh_cfg->ru_conf.compMeth == XRAN_COMPMETHOD_BLKFLOAT) {
 
 #if defined(__i386__) || defined(__x86_64__)
 
