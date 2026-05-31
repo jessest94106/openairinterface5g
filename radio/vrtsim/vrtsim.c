@@ -71,6 +71,10 @@ typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
 #define TAPS_SOCKET_HLP "Socket to connect to the channel emulation server\n"
 #define CLIENT_NUM_RX_HLP "Number of RX antennas of the client, specified on the server\n"
 #define TX_SAMPLE_ADVANCE_HLP "TX timestamp advance in samples for server writes\n"
+#define VRTSIM_RX_SNR_DISABLED (-1000)
+#define RX_TARGET_SNR_HLP \
+  "Target UL time-domain RX SNR in dB. When set (client/UE only), per-slot AGC measures the post-channel " \
+  "signal power and scales injected Gaussian noise to hit this SNR. Unset = no AGC noise.\n"
 #define CONNECTION_DESCRIPTOR_HLP "Path to the file written by the server that the client can use to connect."
 #define DEFAULT_CHANNEL_NAME "vrtsim_channel"
 #define DEFAULT_DESCRIPTOR "/tmp/vrtsim_connection"
@@ -85,6 +89,7 @@ typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
      {"taps-socket",            TAPS_SOCKET_HLP,             0, .strptr = &vrtsim_state->taps_socket,            .defstrval = NULL,               TYPE_STRING, 0}, \
      {"client-num-rx-antennas", CLIENT_NUM_RX_HLP,           0, .iptr = &vrtsim_state->client_num_rx_antennas,   .defintval = 1,                  TYPE_INT,    0}, \
      {"tx-sample-advance",      TX_SAMPLE_ADVANCE_HLP,       0, .iptr = &vrtsim_state->tx_sample_advance,        .defintval = 4096,               TYPE_INT,    0}, \
+     {"rx-target-snr-db",       RX_TARGET_SNR_HLP,           0, .iptr = &vrtsim_state->rx_target_snr_db,         .defintval = VRTSIM_RX_SNR_DISABLED, TYPE_INT, 0}, \
      /* CIR DB enable and paths */ \
      {"cirdb",                  "Use CIR database for channel taps (1 yes, 0 no)", 0, .iptr = &vrtsim_state->use_cirdb,  .defintval = 0, TYPE_INT, 0}, \
      {"cirdb-path",             "Directory that holds vrtsim.yaml and cir_db.bin", 0, .strptr = &vrtsim_state->cirdb_path, .defstrval = NULL, TYPE_STRING, 0}, \
@@ -149,6 +154,7 @@ typedef struct {
   peer_info_t peer_info;
   int chanmod;
   int tx_sample_advance;
+  int rx_target_snr_db;  // UL time-domain RX SNR target in dB (per-slot AGC); VRTSIM_RX_SNR_DISABLED = off
   double rx_freq;
   double tx_bw;
   int tx_num_channels;
@@ -794,6 +800,13 @@ static void perform_channel_modelling(void *arg)
   int global_aarx = aarx;
   int target_ue = 0;
 
+  // Per-slot target-SNR AGC: UL only (client = UE TX -> RU/gNB RX). Accumulate this
+  // slot's signal/noise power across batches to log the achieved time-domain RX SNR.
+  const bool agc_on = (vrtsim_state->rx_target_snr_db != VRTSIM_RX_SNR_DISABLED)
+                      && (vrtsim_state->role == ROLE_CLIENT);
+  double snr_psig_acc = 0.0, snr_pnoise_acc = 0.0;
+  long snr_nsamp_acc = 0;
+
   if (vrtsim_state->role == ROLE_CLIENT) {
     global_aarx = vrtsim_state->ue_id * vrtsim_state->peer_info.num_rx_antennas + aarx;
   }
@@ -886,9 +899,7 @@ static void perform_channel_modelling(void *arg)
     cf_t samples[aligned_batch] __attribute__((aligned(64)));
     memset(samples, 0, sizeof(samples));
 
-    // Apply noise from global settings (only valid samples)
-    get_noise_vector((float *)samples, num_samples * 2);
-
+    // Convolve TX with the channel into 'samples' (signal only; noise added below).
     for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
       cf_t *impulse_response = channel_impulse_response_p[aatx];
       for (int i = 0; i < num_samples; i++) {
@@ -901,6 +912,36 @@ static void perform_channel_modelling(void *arg)
           samples[i].r += tx_input.r * impulse_response[l].r - tx_input.i * impulse_response[l].i;
           samples[i].i += tx_input.i * impulse_response[l].r + tx_input.r * impulse_response[l].i;
         }
+      }
+    }
+
+    // Add receiver noise on top of the signal.
+    float noisebuf[2 * aligned_batch] __attribute__((aligned(64)));
+    get_noise_vector(noisebuf, num_samples * 2);
+    if (agc_on) {
+      // Measure this batch's mean signal power, then scale unit-variance noise so
+      // that Psig/Pnoise == 10^(target_snr/10). Only inject where there is signal
+      // (UL TDD slots), so silent slots stay silent.
+      double psig = 0.0;
+      for (int i = 0; i < num_samples; i++)
+        psig += (double)samples[i].r * samples[i].r + (double)samples[i].i * samples[i].i;
+      psig /= (num_samples > 0 ? num_samples : 1);
+      if (psig > 1.0) {
+        const double pnoise = psig / pow(10.0, vrtsim_state->rx_target_snr_db / 10.0);
+        const double sigma = sqrt(pnoise / 2.0);  // per-component (I,Q) std
+        for (int i = 0; i < num_samples; i++) {
+          samples[i].r += (float)(sigma * noisebuf[2 * i]);
+          samples[i].i += (float)(sigma * noisebuf[2 * i + 1]);
+        }
+        snr_psig_acc += psig * num_samples;
+        snr_pnoise_acc += pnoise * num_samples;
+        snr_nsamp_acc += num_samples;
+      }
+    } else {
+      // Fixed global noise floor (noise_power_dBFS; pool is all-zero when unset).
+      for (int i = 0; i < num_samples; i++) {
+        samples[i].r += noisebuf[2 * i];
+        samples[i].i += noisebuf[2 * i + 1];
       }
     }
 
@@ -933,6 +974,17 @@ static void perform_channel_modelling(void *arg)
                           global_aarx,
                           channel_modelling_args->flags,
                           aarx);
+  }
+
+  // Report the achieved UL time-domain RX SNR (throttled; ~1 line/sec at mu1).
+  if (agc_on && snr_nsamp_acc > 0 && snr_pnoise_acc > 0.0) {
+    static __thread uint64_t snr_log_ctr = 0;
+    if ((snr_log_ctr++ % 1000) == 0) {
+      LOG_I(HW,
+            "VRTSIM RX SNR (time-domain, UL client_tx): %.2f dB (target %d dB)\n",
+            10.0 * log10(snr_psig_acc / snr_pnoise_acc),
+            vrtsim_state->rx_target_snr_db);
+    }
   }
 }
 
@@ -1326,6 +1378,13 @@ __attribute__((__visibility__("default"))) int device_init(openair0_device_t *de
     randominit();
     int noise_power_dBFS = get_noise_power_dBFS();
     int16_t noise_power = noise_power_dBFS == INVALID_DBFS_VALUE ? 0 : (int16_t)(32767.0 / powf(10.0, .05 * -noise_power_dBFS));
+    if (vrtsim_state->rx_target_snr_db != VRTSIM_RX_SNR_DISABLED) {
+      // AGC mode: hold a unit-variance noise pool; perform_channel_modelling scales
+      // it per slot from the measured signal power to hit the target RX SNR.
+      noise_power = 1;
+      LOG_A(HW, "VRTSIM: RX-SNR AGC enabled, target %d dB (UL/client_tx); noise pool = unit variance\n",
+            vrtsim_state->rx_target_snr_db);
+    }
     LOG_A(HW, "VRTSIM: Noise power %d sample value\n", noise_power);
     init_noise_device(noise_power);
   }
