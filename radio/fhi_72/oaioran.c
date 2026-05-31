@@ -105,15 +105,20 @@ void oai_xran_fh_rx_callback(void *pCallbackTag, xran_status_t status)
           struct xran_prb_map *pRbMap = (struct xran_prb_map *)bufs->dstcp[ant_id][tti % XRAN_N_FE_BUF_LEN].pBuffers->pData;
           AssertFatal(pRbMap != NULL, "(%d:%d:%d)pRbMap == NULL. Aborting.\n", cc_id, tti % XRAN_N_FE_BUF_LEN, ant_id);
 
-          for (uint32_t sym_id = 0; sym_id < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_id++) {
-            // LOG_D(HW, "cb pRbMap->nPrbElm %d\n", pRbMap->nPrbElm);
-            for (uint32_t idxElm = 0; idxElm < pRbMap->nPrbElm; idxElm++ ) {
-              struct xran_prb_elm *pRbElm = &pRbMap->prbMap[idxElm];
-              pRbElm->nSecDesc[sym_id] = 0;
-              // Clear pCtrl so OAI does not read stale F-1 mbuf pointers for
-              // mixed-slot UL symbols (sym 10-13) that arrive after this callback.
-              for (int f = 0; f < XRAN_MAX_FRAGMENT; f++)
-                pRbElm->sec_desc[sym_id][f].pCtrl = NULL;
+          // Reset a buffer HALF A RING ahead, far from both the buffer being
+          // filled now (tti) and the one about to be read. Resetting (tti+1) was
+          // wiping the next slot's EARLY symbols: the RU streams UL symbol-by-
+          // symbol and the next slot's first packets arrive before this mid-slot
+          // callback, so (tti+1)'s syms 0-8 were cleared after landing — leaving
+          // only the last ~5 symbols (mask=...011111) and forcing every UL TB to
+          // need 3 HARQ rounds. With N=20, (tti+10) is clear long before its slot.
+          uint32_t next_buf = (tti + (XRAN_N_FE_BUF_LEN / 2)) % XRAN_N_FE_BUF_LEN;
+          struct xran_prb_map *pNextRbMap = (struct xran_prb_map *)bufs->dstcp[ant_id][next_buf].pBuffers->pData;
+          if (pNextRbMap != NULL) {
+            for (uint32_t sym_id = 0; sym_id < XRAN_NUM_OF_SYMBOL_PER_SLOT; sym_id++) {
+              for (uint32_t idxElm = 0; idxElm < pNextRbMap->nPrbElm; idxElm++) {
+                pNextRbMap->prbMap[idxElm].nSecDesc[sym_id] = 0;
+              }
             }
           }
         }
@@ -611,19 +616,36 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
             if (p_sec_desc == NULL)
               continue;
             if (sym_idx >= pRbElm->nStartSymb && sym_idx < pRbElm->nStartSymb + pRbElm->numSymb) {
-              if (!p_sec_desc->pCtrl) {
-                // UL symbols in mixed slot (sym 10-13) arrive ~107-214 µs after the
-                // sym-7 callback fires. Spin-wait on the first fragment; remaining
-                // fragments will be NULL (no fragmentation in this config) and fall
-                // through to the continue below.
-                if (idxDesc == 0) {
-                  void *volatile *pCtrl_v = (void *volatile *)&p_sec_desc->pCtrl;
-                  for (int w = 0; w < 300000 && !*pCtrl_v; w++)
+              // nSecDesc is reset for the NEXT slot's buffer at the start of each
+              // full-slot callback, then incremented by xran_process_rx_sym as
+              // each fragment arrives.  Use it to distinguish fresh writes (for
+              // this frame) from stale pCtrl/pData left over from two frames ago.
+              //
+              // Sym 0-9 arrive in the first half of the slot, well before the
+              // end-of-slot callback; spin-wait is unnecessary and would race
+              // with the reset of the buffer at the slot boundary.  Only spin on
+              // sym >= 10 (the last four symbols, which may arrive fractionally
+              // after the deadline timer fires).
+              // NOTE: a spin-wait on ALL allocated symbols was tried and did NOT
+              // recover the missing UL REs — ~71% of a multi-symbol PUSCH's REs
+              // are absent from the read buffer per slot (random subset), so the
+              // loss is upstream of this read (xran RX buffer rotation/timing),
+              // not merely late arrival. See investigation notes.
+              if (idxDesc == 0 && sym_idx >= 10) {
+                if (pRbElm->nSecDesc[sym_idx] == 0) {
+                  volatile uint16_t *ns = (volatile uint16_t *)&pRbElm->nSecDesc[sym_idx];
+                  for (int w = 0; w < 300000 && *ns == 0; w++)
                     __asm__ volatile("pause" ::: "memory");
                 }
-                if (!p_sec_desc->pCtrl)
+                if (pRbElm->nSecDesc[sym_idx] == 0)
                   continue;
+              } else if (idxDesc >= (int)pRbElm->nSecDesc[sym_idx]) {
+                // Fragment not received this frame or sym arrived early and is
+                // already counted — skip stale sec_desc entries.
+                continue;
               }
+              if (!p_sec_desc->pCtrl)
+                continue;
               pData = p_sec_desc->pData;
               numRB = p_sec_desc->num_prbu;
               startRB = p_sec_desc->start_prbu;

@@ -78,7 +78,12 @@ int nr_get_R_ldpc_decoder(int rvidx, int E, int BG, int Z, int *llrLen, int roun
   float decoderR = (float)sysBits / (infoBits + 2 * Z);
 
   if (BG == 2)
-    return 15;
+    if (decoderR < 0.3333)
+      return 15;
+    else if (decoderR < 0.6667)
+      return 13;
+    else
+      return 23;
   else if (decoderR < 0.6667)
     return 13;
   else if (decoderR < 0.8889)

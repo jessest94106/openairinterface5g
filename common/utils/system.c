@@ -287,7 +287,12 @@ void threadCreate(pthread_t* t, void * (*func)(void*), void * param, char* name,
   strncpy(short_name, name, sizeof(short_name) - 1);
   short_name[sizeof(short_name) - 1] = '\0';
   ret = pthread_setname_np(*t, short_name);
-  AssertFatal(ret == 0, "Error in pthread_setname_np(): ret: %d, errno: %d\n", ret, errno);
+  // Naming a thread is purely cosmetic (for debugging). In environments where
+  // RLIMIT_RTPRIO=0, SCHED_FIFO threads can race such that the TID is briefly
+  // unresolvable (ESRCH) at setname time. Do not crash the whole modem over a
+  // failed thread name — just warn.
+  if (ret != 0)
+    LOG_W(UTIL, "pthread_setname_np(%s) failed: ret %d errno %d (non-fatal)\n", short_name, ret, errno);
 
   if (affinity != -1 ) {
     cpu_set_t cpuset;

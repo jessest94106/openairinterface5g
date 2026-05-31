@@ -116,6 +116,11 @@ static uint32_t next_power_2(uint32_t num)
   return power;
 }
 
+/* Enlarge the xran U/C-plane buffer pools so a throttled FH (e.g. a VF tx rate-cap) queues
+   packets (adds real FH latency) instead of draining the pool and asserting mbuf==NULL.
+   Only the first ant*N_FE_BUF*14 buffers are held; the rest are free TX headroom. 1 = upstream. */
+#define ORAN_FH_POOL_HEADROOM 1
+
 static uint32_t oran_allocate_uplane_buffers(
     void *instHandle,
     struct xran_buffer_list list[XRAN_MAX_ANTENNA_NR][XRAN_N_FE_BUF_LEN],
@@ -128,7 +133,7 @@ static uint32_t oran_allocate_uplane_buffers(
   /* xran_bm_init() uses rte_pktmbuf_pool_create() which recommends to use a power of two for the buffers;
     the E release sample app didn't take this into account, but we introduced it ourselves;
     the F release sample app took this into account, so we can proudly say we assumed correctly */
-  uint32_t numBufs = next_power_2(XRAN_N_FE_BUF_LEN * ant * XRAN_NUM_OF_SYMBOL_PER_SLOT) - 1;
+  uint32_t numBufs = next_power_2(ORAN_FH_POOL_HEADROOM * XRAN_N_FE_BUF_LEN * ant * XRAN_NUM_OF_SYMBOL_PER_SLOT) - 1;
   status = xran_bm_init(instHandle, &pool, numBufs, bufSize);
   AssertFatal(XRAN_STATUS_SUCCESS == status, "Failed at xran_bm_init(), status %d\n", status);
   printf("xran_bm_init() hInstance %p poolIdx %u elements %u size %u\n", instHandle, pool, numBufs, bufSize);
@@ -212,7 +217,7 @@ static void oran_allocate_cplane_buffers(void *instHandle,
   xran_status_t status;
   uint32_t count1 = 0;
   uint32_t poolPrb;
-  uint32_t numBufsPrb = next_power_2(XRAN_N_FE_BUF_LEN * ant * XRAN_NUM_OF_SYMBOL_PER_SLOT) - 1;
+  uint32_t numBufsPrb = next_power_2(ORAN_FH_POOL_HEADROOM * XRAN_N_FE_BUF_LEN * ant * XRAN_NUM_OF_SYMBOL_PER_SLOT) - 1;
   uint32_t bufSizePrb = size_of_prb_map;
   status = xran_bm_init(instHandle, &poolPrb, numBufsPrb, bufSizePrb);
   AssertFatal(XRAN_STATUS_SUCCESS == status, "Failed at xran_bm_init(), status %d\n", status);

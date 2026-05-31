@@ -1422,6 +1422,7 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   int num_sc_second_copy = fh_cfg->nULRBs * NR_NB_SC_PER_RB - num_sc_first_copy;
   int16_t* dest = (int16_t*)iq_data_start;
   uint16_t* src = (uint16_t*)&puschF[first_carrier_offset];
+  uint32_t local_src[num_prb * NR_NB_SC_PER_RB] __attribute__((aligned(64)));
   if (use_comp_hdr) {
     // Calculate split based on start position
     int neg_len = 0;                                                                                                                                           
@@ -1442,7 +1443,6 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
                                           fftsize - (num_ul_rbs * NR_NB_SC_PER_RB / 2)];                                                                       
                                                                                                                                                                
     // Reorder into local buffer                                                                                                                               
-    uint32_t local_src[num_prb * NR_NB_SC_PER_RB] __attribute__((aligned(64)));                                                                                
     memcpy(local_src, src2, neg_len * 4);                                                                                                                      
     memcpy(&local_src[neg_len], src1, pos_len * 4);                                                                                                            
                                                                                                                                                                

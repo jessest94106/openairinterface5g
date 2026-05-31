@@ -584,8 +584,15 @@ static int vrtsim_connect(openair0_device_t *device)
                                                                                       : vrtsim_state->peer_info.num_rx_antennas;
 
     vrtsim_state->channel_modelling_actors = calloc_or_fail(num_actors, sizeof(Actor_t));
+    // Pin chanmod actors to free isolated cores so the (scalar) FIR convolution does not
+    // contend on the busy non-isolated cores 0-3. Was -1 (unpinned) -> RU "application layer
+    // too slow" -> UL samples written late -> gNB reads zeros -> prach_I0=0.0 -> no attach.
+    // Role-aware because vrtsim.c is loaded by both RU (server) and UE (client):
+    //   server actors -> cores 24..27, client actors -> cores 28..31 (DU=4-9,17,18 RU=10-15 UE=20-23 are taken).
+    const int chanmod_core_base = (vrtsim_state->role == ROLE_SERVER) ? 24 : 28;
     for (int i = 0; i < num_actors; i++) {
-      init_actor(&vrtsim_state->channel_modelling_actors[i], "chanmod", -1);
+      int chanmod_core = (i < 4) ? (chanmod_core_base + i) : -1;
+      init_actor(&vrtsim_state->channel_modelling_actors[i], "chanmod", chanmod_core);
     }
     if (vrtsim_state->taps_socket) {
       taps_client_connect(0,
