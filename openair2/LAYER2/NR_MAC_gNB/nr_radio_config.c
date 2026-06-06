@@ -1030,9 +1030,14 @@ void nr_rrc_config_dl_tda(struct NR_PDSCH_TimeDomainResourceAllocationList *pdsc
                           int curr_bwp)
 {
   // coreset duration setting to be improved in the framework of RRC harmonization, potentially using a common function
-  int len_coreset = 1;
-  if (curr_bwp < 48)
-    len_coreset = 2;
+  // NOTE: the original heuristic was `len_coreset = (curr_bwp < 48) ? 2 : 1`, which assumes a wide
+  // (48/96-RB) 1-symbol CORESET0 whenever the initial DL BWP is >= 48 PRB. This lab keeps a 24-RB /
+  // 2-symbol CORESET0 (initialDLBWPcontrolResourceSetZero=2, TS 38.213 table 13-4) at ALL bandwidths,
+  // so at >= 48 PRB (e.g. 51 PRB / 20 MHz) the old value 1 placed the Msg2/RAR PDSCH at startSymbol 1,
+  // overlapping the real 2-symbol CORESET0 -> AssertFatal in prepare_dl_pdus(). Use 2: correct for a
+  // 2-symbol CORESET0, and safe (non-overlapping; at worst one wasted symbol) for a 1-symbol CORESET0.
+  // Unchanged for curr_bwp < 48 (was already 2), so the 24-PRB path is byte-identical.
+  int len_coreset = 2;
   // setting default TDA for DL with TDA index 0
   struct NR_PDSCH_TimeDomainResourceAllocation *timedomainresourceallocation = CALLOC(1,sizeof(NR_PDSCH_TimeDomainResourceAllocation_t));
   // k0: Slot offset between DCI and its scheduled PDSCH (see TS 38.214 clause 5.1.2.1) When the field is absent the UE applies the value 0.
