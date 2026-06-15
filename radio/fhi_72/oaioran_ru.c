@@ -60,6 +60,10 @@
 
 #define RATE_LIMIT(n) if (({ static int _counter = 0; _counter++ % (n) == 0; }))
 #define ETHER_TYPE_ECPRI 0xAEFE
+// 2026-06-09: enable the RU PRACH send-side debug (mirrors GNB_PRACH_UPLANE_DEBUG in oaioran.c)
+// to pin the 106-PRB "wire carries zero PRACH payloads" bug: src-zeros vs dst-zeros. Bounded
+// prints (symbol-0 first-1024 + nonzero events) — same perturbation class as the DU side.
+#define ORU_PRACH_UPLANE_DEBUG 1
 #define MAX_NUM_ANTENNAS 4
 #define XRAN_GET_MU_FROM_SECT_ID(sectId) (sectId/XRAN_MAX_SECTIONS_PER_SLOT)
 
@@ -110,6 +114,10 @@ typedef struct {
   _Atomic(uint64_t) up_late;
   _Atomic(uint64_t) up_early;
   _Atomic(uint64_t) up_malformed;
+  /* R1: FH U-plane arrival lead-time stats (symbols). lead-time*symbol_dur = FH timing margin; lower mean = higher FH latency. */
+  _Atomic(int64_t) diff_sum;
+  _Atomic(uint64_t) diff_count;
+  _Atomic(int64_t) diff_min;
 } packet_processor_context_t;
 
 static packet_processor_context_t packet_processor_context;
@@ -117,6 +125,7 @@ static packet_processor_context_t packet_processor_context;
 static void init_packet_processor_context(packet_processor_context_t *context, int mu)
 {
   memset(context, 0, sizeof(packet_processor_context_t));
+  context->diff_min = INT64_MAX;
   context->uplane_data_ring = rte_ring_create("uplane_data_ring", UPLANE_DATA_RING_SIZE, rte_socket_id(), 0);
   AssertFatal(context->uplane_data_ring != NULL, "Failed to create ring uplane_data_ring\n");
   for (int i = 0; i < NUM_UPLANE_DATA_ELEMENTS; i++) {
@@ -239,6 +248,13 @@ static void print_statistics(packet_processor_context_t *context)
     LOG_W(HW, "Packets early: %lu\n", context->up_early);
     context->up_early = 0;
   }
+  if (context->diff_count > 0) {
+    LOG_W(HW, "FH lead-time symbols: mean=%.2f min=%ld (n=%lu)\n",
+          (double)context->diff_sum / context->diff_count, (long)context->diff_min, (unsigned long)context->diff_count);
+    context->diff_sum = 0;
+    context->diff_count = 0;
+    context->diff_min = INT64_MAX;
+  }
   if (context->up_malformed > 0) {
     LOG_W(HW, "Packets malformed (packet couldn't be processed): %lu\n", context->up_malformed);
     context->up_malformed = 0;
@@ -272,10 +288,17 @@ typedef struct {
 
 static oran_pusch_cplane_config_t pusch_config[MAX_NUM_ANTENNAS][20][14];
 
+#define ORU_PRACH_CPLANE_DEBUG 1
 #define PRACH_FRAME_ID_MOD 256
 #define PRACH_SLOTS_PER_FRAME 20
 
 static oran_prach_cplane_config_t prach_config_by_frame_slot[MAX_NUM_ANTENNAS][PRACH_FRAME_ID_MOD][PRACH_SLOTS_PER_FRAME] = {0};
+/* Frame-independent latest C-plane config per (antenna,slot), used as a fallback when the
+ * frame-keyed lookup misses. Needed under XRAN_TIMESCALE dilation: the DU's xran SFN is
+ * GPS-second-anchored while the RU's vrtsim air frame free-runs, so under dilation the two
+ * frame counters drift and the frame key won't match. The PRACH C-plane config is identical
+ * every occasion for a fixed prach config, so using the latest for that slot is valid. */
+static oran_prach_cplane_config_t prach_config_latest_by_slot[MAX_NUM_ANTENNAS][PRACH_SLOTS_PER_FRAME] = {0};
 static uint8_t prach_seq_id[MAX_NUM_ANTENNAS] = {0};
 static _Atomic(uint8_t) pusch_seq_id[MAX_NUM_ANTENNAS] = {0};
 
@@ -629,6 +652,12 @@ int process_ru_uplane(struct rte_mbuf *pkt,
     diff += max_sym;
   }
 
+  /* R1 instrumentation: FH U-plane arrival lead-time (timing margin in symbols; lower = higher FH latency) */
+  packet_processor_context.diff_sum += diff;
+  packet_processor_context.diff_count++;
+  if (diff < packet_processor_context.diff_min)
+    packet_processor_context.diff_min = diff;
+
   int slot_duration_uS = 1000 / (1 << mu);
   int symbol_duration_uS = slot_duration_uS / NR_SYMBOLS_PER_SLOT;
   int rx_window_start = fh_cfg->T2a_max_up / symbol_duration_uS;
@@ -652,6 +681,11 @@ int process_ru_uplane(struct rte_mbuf *pkt,
           port_id, frame_id, subframe_id, slot_id, slot_in_frame, symb_id, Ant_ID, start_prbu, num_prbu, ret);
     parsed_log_count++;
   }
+  // O-RAN U-plane: numPrbu==0 encodes "ALL PRBs" (mandatory when N_RB > 255, e.g. 273-PRB/100 MHz,
+  // since the numPrbc field is 8-bit). The DU's xran sends full-band sections this way; translating
+  // here instead of dropping (2026-06-09: 273-PRB DL was 100% dropped as "invalid", 653k pkts/run).
+  if (num_prbu == 0 && start_prbu < fh_cfg->nDLRBs)
+    num_prbu = fh_cfg->nDLRBs - start_prbu;
   if (slot_in_frame < 0 || slot_in_frame >= num_slots_per_frame || symb_id >= NR_SYMBOLS_PER_SLOT || Ant_ID >= fh_cfg->neAxc ||
       start_prbu >= fh_cfg->nDLRBs || num_prbu == 0 || start_prbu + num_prbu > fh_cfg->nDLRBs) {
     LOG_W(HW, "[ORU] Drop invalid U-plane packet: port=%u frame=%u subframe=%u slot=%u slot_in_frame=%d symbol=%u ant=%u start_prb=%u num_prb=%u nDLRBs=%u neAxc=%u\n",
@@ -736,10 +770,11 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
           .filter_id = hdr->cmnhdr.field.filterIndex
       };
       prach_config_by_frame_slot[aarx][prach_config.frame][slot] = prach_config;
+      prach_config_latest_by_slot[aarx][slot] = prach_config;
 #ifdef ORU_PRACH_CPLANE_DEBUG
       static int prach_cp_rx_dbg_count = 0;
-      if (prach_cp_rx_dbg_count < 64) {
-        LOG_A(HW,
+      if (prach_cp_rx_dbg_count < 100000) {
+        printf(
               "[ORU PRACH CP RX] frame=%d subframe=%d slot_id=%d slot=%d aarx=%d section=%d start_prb=%d num_prb=%d filter=%d mu=%d eaxc=%u\n",
               hdr->cmnhdr.field.frameId,
               hdr->cmnhdr.field.subframeId,
@@ -827,6 +862,13 @@ int32_t process_ru_cplane(struct rte_mbuf *pkt, void *handle, uint16_t port_id, 
         pusch_cp_rx_dbg_count++;
       }
 #endif
+      // O-RAN: numPrbc==0 encodes "ALL PRBs" (mandatory at N_RB > 255, e.g. 273-PRB/100 MHz —
+      // 8-bit field). Translate at parse time or the UL send slices ZERO PRBs and the gNB sees
+      // "MSG3 ULSCH with no signal" (2026-06-09, 273-PRB bring-up; mirrors the DL-side fix).
+      if (numPrbc == 0) {
+        const struct xran_fh_config *cp_fh_cfg = get_xran_fh_config(0);
+        numPrbc = cp_fh_cfg->nULRBs - startPrbc;
+      }
       for (int symbol = start_symbol; symbol < start_symbol + num_symbols && symbol < 14; symbol++) {
         pusch_config[aarx][slot][symbol].section_id = section_id;
         pusch_config[aarx][slot][symbol].start_prb = startPrbc;
@@ -861,6 +903,7 @@ void init_oru_packet_processor(void *handle, int callbacks_per_slot)
         prach_config_by_frame_slot[aarx][frame][slot].start_prb = -1;
         prach_config_by_frame_slot[aarx][frame][slot].slot = -1;
         prach_config_by_frame_slot[aarx][frame][slot].frame = -1;
+        prach_config_latest_by_slot[aarx][slot].section_id = -1;
       }
     }
   }
@@ -987,6 +1030,11 @@ void xran_oru_send_prach(uint32_t *prachF, int aarx, int frame, int slot, int sy
     return;
   }
   oran_prach_cplane_config_t *prach_config = &prach_config_by_frame_slot[aarx][tx_frame8][slot];
+  if (prach_config->section_id == -1 && prach_config_latest_by_slot[aarx][slot].section_id != -1) {
+    /* Frame-keyed miss (DU/RU frame drift under XRAN_TIMESCALE dilation): fall back to the
+     * latest C-plane config seen for this slot — valid since the PRACH config is periodic. */
+    prach_config = &prach_config_latest_by_slot[aarx][slot];
+  }
   if (prach_config->section_id == -1) {
 #ifdef ORU_PRACH_CPLANE_DEBUG
     static int prach_no_cp_dbg_count = 0;
@@ -1384,6 +1432,90 @@ void xran_oru_send_pusch(uint32_t *puschF, int aarx, int frame, int slot, int sy
   size_t data_len = sizeof(int32_t) * num_sc;
   if (use_comp_hdr)
     data_len = (3 * fh_cfg->ru_conf.iqWidth + 1) * num_prb;
+
+  /* === O-RAN application-layer FRAGMENTATION (rev-19) ===========================
+   * A full 273-PRB symbol at iq>=12 exceeds the 9600 MTU (iq12=10101 B, iq16=13104 B)
+   * so the single-packet path below would AssertFatal. O-RAN WG4 CUS-plane allows one
+   * symbol to be carried across N U-plane sections (same section_id, consecutive
+   * startPrbu/numPrbu), each <= MTU; the DU RX already reassembles via sec_desc[sym][]
+   * (xran_rx_proc.c) and the consumer DC-reassembles on the fragment that completes the
+   * band (oaioran.c). iq8/9/10 fit one packet -> n_frag==1 -> fall through UNCHANGED. */
+  {
+    const size_t bytes_per_prb = use_comp_hdr ? (size_t)(3 * fh_cfg->ru_conf.iqWidth + 1)
+                                              : (size_t)(NR_NB_SC_PER_RB * 4);
+    const size_t frag_payload_max = 8192; /* safe < 9600 MTU after eCPRI/section/ether headers */
+    int max_prb_per_frag = (int)(frag_payload_max / bytes_per_prb);
+    if (max_prb_per_frag > 255) max_prb_per_frag = 255; /* numPrbu <=255 (0=all) */
+    if (max_prb_per_frag < 1)   max_prb_per_frag = 1;
+    int n_frag = (num_prb + max_prb_per_frag - 1) / max_prb_per_frag;
+    if (n_frag > 1) {
+      int fftsize = 1 << fh_cfg->nULFftSize;
+      /* reorder the whole symbol into host-order linear-PRB local_src (DC-uncentered) */
+      uint32_t local_src[num_prb * NR_NB_SC_PER_RB] __attribute__((aligned(64)));
+      {
+        int neg_len = 0, pos_len = 0;
+        if (start_prb < (num_ul_rbs >> 1))
+          neg_len = min((num_ul_rbs * NR_NB_SC_PER_RB / 2) - (start_prb * NR_NB_SC_PER_RB),
+                        num_prb * NR_NB_SC_PER_RB);
+        pos_len = (num_prb * NR_NB_SC_PER_RB) - neg_len;
+        uint16_t *src1 = (uint16_t *)&puschF[(neg_len == 0)
+                          ? ((start_prb * NR_NB_SC_PER_RB) - (num_ul_rbs * NR_NB_SC_PER_RB / 2)) : 0];
+        uint16_t *src2 = (uint16_t *)&puschF[(start_prb * NR_NB_SC_PER_RB) + fftsize
+                          - (num_ul_rbs * NR_NB_SC_PER_RB / 2)];
+        memcpy(local_src, src2, neg_len * 4);
+        memcpy(&local_src[neg_len], src1, pos_len * 4);
+      }
+      int base = num_prb / n_frag;
+      for (int f = 0; f < n_frag; f++) {
+        int cs = f * base;                                  /* fragment start PRB (0-based in alloc) */
+        int cl = (f == n_frag - 1) ? (num_prb - cs) : base; /* fragment PRB count (<=255) */
+        size_t frag_data_len = bytes_per_prb * (size_t)cl;
+        struct rte_mbuf *fmbuf = xran_ethdi_mbuf_alloc();
+        AssertFatal(fmbuf != NULL, "out of mbufs (frag)\n");
+        char *fbuf = rte_pktmbuf_append(fmbuf, header_length + frag_data_len);
+        AssertFatal(fbuf, "frag mbuf too small\n");
+        struct xran_ecpri_hdr *eh = (struct xran_ecpri_hdr *)rte_pktmbuf_mtod(fmbuf, char *);
+        uint16_t eps = xran_get_ecpri_hdr_size() + sizeof(struct radio_app_common_hdr)
+                     + sizeof(struct data_section_hdr) + frag_data_len;
+        if (use_comp_hdr) eps += sizeof(struct data_section_compression_hdr);
+        fill_ecpri_header(eh, ECPRI_IQ_DATA, eps, 0, aarx, pusch_seq_id[aarx]++, 0);
+        struct radio_app_common_hdr *rah = (struct radio_app_common_hdr *)(eh + 1);
+        fill_radio_app_header(rah, 0, XRAN_DIR_UL, frame, slot, symbol, mu);
+        struct data_section_hdr *dsh = (struct data_section_hdr *)(rah + 1);
+        fill_data_section_header(dsh, cl, cs, section_id);  /* numPrbu=cl, startPrbu=cs */
+        void *iq;
+        if (use_comp_hdr) {
+          struct data_section_compression_hdr *ch = (struct data_section_compression_hdr *)(dsh + 1);
+          ch->ud_comp_hdr.ud_comp_meth = fh_cfg->ru_conf.compMeth;
+          ch->ud_comp_hdr.ud_iq_width = XRAN_CONVERT_IQWIDTH(fh_cfg->ru_conf.iqWidth);
+          ch->rsrvd = 0;
+          iq = (void *)(ch + 1);
+        } else {
+          iq = (void *)(dsh + 1);
+        }
+        if (use_comp_hdr) {
+#if defined(__i386__) || defined(__x86_64__)
+          oai_bfp_compression(fh_cfg->ru_conf.iqWidth, cl,
+                              (int16_t *)&local_src[cs * NR_NB_SC_PER_RB], (int8_t *)iq);
+#elif defined(__arm__) || defined(__aarch64__)
+          armral_bfp_compression(fh_cfg->ru_conf.iqWidth, cl,
+                                 (int16_t *)&local_src[cs * NR_NB_SC_PER_RB], (int8_t *)iq);
+#endif
+        } else {
+          uint16_t *s = (uint16_t *)&local_src[cs * NR_NB_SC_PER_RB];
+          int16_t *d = (int16_t *)iq;
+          for (int i = 0; i < cl * NR_NB_SC_PER_RB * 2; i++)
+            d[i] = (int16_t)htons(s[i]);
+        }
+        char *epre = rte_pktmbuf_prepend(fmbuf, sizeof(struct rte_ether_hdr));
+        AssertFatal(epre != NULL, "frag ether prepend failed\n");
+        int vf_id = xran_map_ecpriPcid_to_vf(gxran_handle, XRAN_DIR_UL, 0, aarx);
+        int ret = xran_ethdi_mbuf_send(fmbuf, ETHER_TYPE_ECPRI, vf_id);
+        AssertFatal(ret == 1, "Error sending frag mbuf\n");
+      }
+      return;
+    }
+  }
 
   struct rte_mbuf *mbuf = xran_ethdi_mbuf_alloc();
   AssertFatal(mbuf != NULL, "out of mbufs\n");

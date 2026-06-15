@@ -182,6 +182,7 @@ int oai_physide_dl_tti_call_back(void *param)
  * @details Reads PRACH data from xran-specific buffers and, if I/Q compression
  * (bitwidth < 16 bits) is configured, uncompresses the data. Places PRACH data
  * in OAI buffer. */
+#define GNB_PRACH_UPLANE_DEBUG 1
 static int read_prach_data(ru_info_t *ru, int frame, int slot)
 {
   /* calculate tti and subframe_id from frame, slot num */
@@ -320,7 +321,7 @@ static int read_prach_data(ru_info_t *ru, int frame, int slot)
           bool should_log = false;
 #endif
           if (should_log) {
-            LOG_I(HW, "[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d, g_kbar=%d\n",
+            printf("[gNB PRACH RX] ENTER: frame=%d, slot=%d, sym=%d, aa=%d, iqWidth=%d, payload_len=%d, non_zero_compressed=%d/%d, g_kbar=%d\n",
                   frame, slot, sym_idx, aa, ru_conf->iqWidth_PRACH, payload_len, non_zero_compressed, payload_len, g_kbar);
             LOG_I(HW, "[gNB PRACH RX] Compressed input: [0]=0x%02x [1]=0x%02x [27]=0x%02x [28]=0x%02x [29]=0x%02x [55]=0x%02x [56]=0x%02x\n",
                   ((uint8_t*)src)[0], ((uint8_t*)src)[1], ((uint8_t*)src)[27], ((uint8_t*)src)[28],
@@ -505,6 +506,11 @@ static bool is_tdd_ul_guard_slot(const struct xran_frame_config *frame_conf, int
  * Function is blocking and waits for next frame/slot combination. It is unblocked
  * by oai_xran_fh_rx_callback(). It writes the current slot into parameters
  * frame/slot. */
+/* UL FH-latency metric: fraction of expected UL symbols whose U-plane data arrived by DU read time.
+   Tightening Ta4 (the O-DU UL receive deadline) makes the xran lib drop late UL symbols -> present rate falls. */
+static uint64_t g_ul_sym_present = 0;
+static uint64_t g_ul_sym_expected = 0;
+
 int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
 {
   void *ptr = NULL;
@@ -521,7 +527,17 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
   atomic_fetch_sub(&xran_queue_length, 1);
   oran_sync_info_t *info = NotifiedFifoData(res);
 
-#define MAX_QUEUE_LENGTH_NO_JUMP 3
+  // Skip threshold: jump-to-latest when the DU L1 falls this many slots behind the FH
+  // sync callbacks. Default 3 (real-time HW). Under non-real-time dilation on a bursty
+  // fabric (e.g. 2-physical-port wire over a PCIe gen3 x1 link), U-plane arrives in bursts
+  // and a deeper queue rides them out without a desyncing jump. Bounded by XRAN_N_FE_BUF_LEN/2=10
+  // (the half-ring buffer-reset horizon) -> keep <10. Tunable via OAI_FH_MAX_QUEUE_NO_JUMP.
+  static int MAX_QUEUE_LENGTH_NO_JUMP = 0;
+  if (MAX_QUEUE_LENGTH_NO_JUMP == 0) {
+    const char *e_mq = getenv("OAI_FH_MAX_QUEUE_NO_JUMP");
+    MAX_QUEUE_LENGTH_NO_JUMP = (e_mq && atoi(e_mq) > 0) ? atoi(e_mq) : 3;
+    LOG_I(HW, "FH TTI-skip threshold MAX_QUEUE_LENGTH_NO_JUMP=%d\n", MAX_QUEUE_LENGTH_NO_JUMP);
+  }
   if (xran_queue_length > 0 && xran_queue_length < MAX_QUEUE_LENGTH_NO_JUMP) {
     LOG_D(HW, "%4d.%2d TTI processing delay detected\n", info->f, info->sl);
   } else if (xran_queue_length >= MAX_QUEUE_LENGTH_NO_JUMP) {
@@ -600,6 +616,16 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
         // therefore, I took the liberty to just extract these values from the first prbMap
         int num_totalRB = pRbMap->prbMap[0].nRBSize;
         int start_totalRB = pRbMap->prbMap[0].nRBStart;
+        /* UL FH-latency: was this UL symbol's U-plane data present (arrived) by read time? */
+        g_ul_sym_expected++;
+        if (pRbMap->prbMap[0].nSecDesc[sym_idx] > 0)
+          g_ul_sym_present++;
+        if (g_ul_sym_expected % 5000 == 0) {
+          LOG_W(HW, "UL sym present: %lu/%lu (%.1f%%)\n", (unsigned long)g_ul_sym_present,
+                (unsigned long)g_ul_sym_expected, 100.0 * g_ul_sym_present / g_ul_sym_expected);
+          g_ul_sym_present = 0;
+          g_ul_sym_expected = 0;
+        }
         int32_t local_dst[num_totalRB * N_SC_PER_PRB] __attribute__((aligned(64)));
 
         // LOG_D(HW, "[%d.%d] pRbMap->nPrbElm %d\n", *frame, *slot, pRbMap->nPrbElm);
@@ -633,8 +659,15 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
               // not merely late arrival. See investigation notes.
               if (idxDesc == 0 && sym_idx >= 10) {
                 if (pRbElm->nSecDesc[sym_idx] == 0) {
+                  // Spin-wait cap for a late/missing tail-symbol fragment. Default 300000 (real-time HW).
+                  // At iq>=10 a rare missing fragment makes the FULL spin (~10 ms wall) blow the dilated
+                  // slot and cascade into a 20k-skip collapse. Lowering the cap = give up fast on a
+                  // genuinely-missing symbol so one slot's loss doesn't snowball. iq9 (~100% present at
+                  // read) essentially never reaches it, so this is safe for working widths. Env-tunable.
+                  static int spin_cap = 0;
+                  if (spin_cap == 0) { const char *e_sc = getenv("OAI_FH_SPIN_CAP"); spin_cap = (e_sc && atoi(e_sc) > 0) ? atoi(e_sc) : 300000; LOG_I(HW, "FH spin cap = %d\n", spin_cap); }
                   volatile uint16_t *ns = (volatile uint16_t *)&pRbElm->nSecDesc[sym_idx];
-                  for (int w = 0; w < 300000 && *ns == 0; w++)
+                  for (int w = 0; w < spin_cap && *ns == 0; w++)
                     __asm__ volatile("pause" ::: "memory");
                 }
                 if (pRbElm->nSecDesc[sym_idx] == 0)
