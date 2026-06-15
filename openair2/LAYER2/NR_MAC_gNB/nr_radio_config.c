@@ -1183,6 +1183,20 @@ void nr_rrc_config_ul_tda(NR_ServingCellConfigCommon_t *scc, int min_fb_delay, i
           asn1cSeqAdd(&tda_list->list, tda);
         }
       }
+    } else {
+      // UL-throughput fix: large k2 (>= N_ul, e.g. min_rxtxtime=6 with 3 UL slots)
+      // means only ONE full-UL slot/period is reachable (default builds k2 only),
+      // so the preprocessor grants 1 of N_ul UL slots/period. Add full-UL TDAs with
+      // k2+1..k2+N_ul so each full UL slot of the next period has a matching k2 and
+      // all N_ul UL slots can be granted per period.
+      for (int i = k2 + 1; i <= k2 + N_ul; ++i) {
+        tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 13));
+        asn1cSeqAdd(&tda_list->list, tda);
+        if (do_SRS) {
+          tda = set_TimeDomainResourceAllocation(i, get_SLIV(0, 12));
+          asn1cSeqAdd(&tda_list->list, tda);
+        }
+      }
     }
 
     // for Msg3, an additional get_delta_for_k2(mu) is added to k2.
@@ -3217,7 +3231,7 @@ static NR_MAC_CellGroupConfig_t *configure_mac_cellgroup(const nr_mac_timers_t *
   NR_MAC_CellGroupConfig_t * mac_CellGroupConfig = calloc(1, sizeof(*mac_CellGroupConfig));
   AssertFatal(mac_CellGroupConfig != NULL, "Couldn't allocate mac-CellGroupConfig. Out of memory!\n");
   mac_CellGroupConfig->bsr_Config = calloc(1, sizeof(*mac_CellGroupConfig->bsr_Config));
-  mac_CellGroupConfig->bsr_Config->periodicBSR_Timer = NR_BSR_Config__periodicBSR_Timer_sf5;
+  mac_CellGroupConfig->bsr_Config->periodicBSR_Timer = NR_BSR_Config__periodicBSR_Timer_sf5; // (UL-throughput exp tried sf1 here -> NO effect on UL, reverted to default)
   mac_CellGroupConfig->bsr_Config->retxBSR_Timer = NR_BSR_Config__retxBSR_Timer_sf80;
   mac_CellGroupConfig->tag_Config = calloc(1, sizeof(*mac_CellGroupConfig->tag_Config));
   mac_CellGroupConfig->tag_Config->tag_ToReleaseList = NULL;
