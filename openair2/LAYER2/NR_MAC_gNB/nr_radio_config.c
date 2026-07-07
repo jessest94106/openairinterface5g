@@ -1591,6 +1591,15 @@ long ue_supported_ul_layers(const NR_UE_NR_Capability_t *uecap)
 
 static long set_ul_max_layers(const nr_mac_config_t *configuration, const NR_UE_NR_Capability_t *uecap)
 {
+  // SU-MIMO test hook (2026-07-07): the OAI UE advertises a MINIMAL capability (maxNumberMIMO
+  // LayersCB_PUSCH absent -> ue_supported_ul_layers=1), so maxRank stays 1 and the gNB uses UL
+  // DCI 0_0 (1 layer), bypassing OAI_UL_FORCE_LAYERS. Forcing maxRank here propagates to the UE's
+  // pusch_Config->maxRank via RRC reconfig (so the UE accepts 2-layer grants) AND lets the SS use
+  // DCI 0_1. Still capped by pusch_AntennaPorts (the physical RX ports). Env OAI_UL_FORCE_LAYERS.
+  const char *e = getenv("OAI_UL_FORCE_LAYERS");
+  long forced = (e && e[0]) ? atoi(e) : 0;
+  if (forced > 0)
+    return min(forced, configuration->pusch_AntennaPorts);
   return min(ue_supported_ul_layers(uecap), configuration->pusch_AntennaPorts);
 }
 

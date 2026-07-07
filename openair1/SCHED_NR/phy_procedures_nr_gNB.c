@@ -658,7 +658,13 @@ static void nr_fill_indication(PHY_VARS_gNB *gNB,
           timing_advance_update);
 
   // estimate UL_CQI for MAC
-  int SNRtimes10 = dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot);
+  // MRC correction (2026-07-06): power_tot/noise_tot are per-antenna SUMS, so their ratio is
+  // the per-antenna AVERAGE SNR, not the post-combine SINR the decoder actually enjoys
+  // (sum(S)/avg(N) for equal branches = +10log10(N_rx)). Without this the MAC's link
+  // adaptation picks the same MCS at N-RX as at 1-RX and cancels the array gain
+  // (measured: 4-RX reported 6.4 dB at true 12.4 dB). No-op at 1-RX.
+  int SNRtimes10 = dB_fixed_x10(pusch->ulsch_power_tot) - dB_fixed_x10(pusch->ulsch_noise_power_tot)
+                   + dB_fixed_x10(gNB->frame_parms.nb_antennas_rx);
 
   LOG_D(PHY,
         "%d.%d: Estimated SNR for PUSCH is = %f dB (ulsch_power %f, noise %f) delay %d\n",

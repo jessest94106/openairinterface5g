@@ -67,7 +67,7 @@ void L1_nr_prach_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_rac
     // given wrt to start of the 15kHz slot or 60kHz slot. Here we work slot based, so this function is anyway only called in slots
     // where there is PRACH. Its up to the MAC to schedule another PRACH PDU in the case there are there N_RA_slot \in {0,1}.
     rx_prach_out_t res = rx_nr_prach(prach_id, prach_oc);
-    LOG_D(NR_PHY,
+    printf(
           "[RAPROC] Frame %d, slot %d, occasion %d (prachStartSymbol %d) : Most likely preamble %d, energy %d.%d dB delay %d "
           "(prach_energy counter %d)\n",
           frame,
@@ -80,6 +80,12 @@ void L1_nr_prach_procedures(PHY_VARS_gNB *gNB, int frame, int slot, nfapi_nr_rac
           res.max_preamble_delay,
           gNB->prach_energy_counter);
 
+    if (res.max_preamble_energy > 100)
+      printf("[RAPROC-COND] f=%d s=%d energy=%d I0=%d thres=%d counter=%d/%d ndpus=%d  cond_counter=%d cond_energy=%d\n",
+             frame, slot, res.max_preamble_energy, gNB->measurements.prach_I0, gNB->prach_thres,
+             gNB->prach_energy_counter, NUM_PRACH_RX_FOR_NOISE_ESTIMATE, rach_ind->number_of_pdus,
+             (gNB->prach_energy_counter == NUM_PRACH_RX_FOR_NOISE_ESTIMATE),
+             (res.max_preamble_energy > gNB->measurements.prach_I0 + gNB->prach_thres));
     if ((gNB->prach_energy_counter == NUM_PRACH_RX_FOR_NOISE_ESTIMATE)
         && (res.max_preamble_energy > gNB->measurements.prach_I0 + gNB->prach_thres)
         && (rach_ind->number_of_pdus < MAX_NUM_NR_RX_RACH_PDUS)) {

@@ -151,7 +151,16 @@ IQChannelErrorType shm_td_iq_channel_tx(ShmTDIQChannel *channel,
   ShmTDIQChannelData *data = channel->data;
   // timestamp in the past
   uint64_t current_time = data->timestamp;
-  if (timestamp < current_time) {
+  // TOO_LATE grace (2026-07-06): the guard only needs writes to beat the READER, which
+  // trails the clock by the UL read advance (~1 slot). In multi-UE server mode the extra
+  // per-tick work makes UE JIT writes miss the clock by a hair -> silent drops (UL dead).
+  // Allow bounded lateness; safe while grace < reader advance. VRTSIM_TX_LATE_GRACE samples.
+  static int64_t late_grace = -1;
+  if (late_grace < 0) {
+    const char *g = getenv("VRTSIM_TX_LATE_GRACE");
+    late_grace = (g && g[0]) ? atoll(g) : 0;
+  }
+  if (timestamp + (uint64_t)late_grace < current_time) {
     return CHANNEL_ERROR_TOO_LATE;
   }
   // timestamp is too far in the future

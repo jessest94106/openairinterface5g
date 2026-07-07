@@ -557,6 +557,26 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
 
   *slot = info->sl;
   *frame = info->f;
+  // UL slot delay (2026-07-05): under vrtsim the RU's south read trails the UE's ring
+  // writes by one slot (ORU_UL_LABEL_SHIFT companion), so UL U-plane for slot N finishes
+  // arriving ~2 slots after N. Process an OLDER slot per sync callback so the buffer is
+  // complete when read. Safe up to <10 (half-ring reset horizon). Default 0 = stock.
+  static int ul_slot_delay = -1;
+  if (ul_slot_delay < 0) {
+    const char *e_d = getenv("OAI_FH_UL_SLOT_DELAY");
+    ul_slot_delay = (e_d && atoi(e_d) > 0) ? atoi(e_d) : 0;
+    if (ul_slot_delay)
+      LOG_I(HW, "FH UL slot delay = %d slots\n", ul_slot_delay);
+  }
+  if (ul_slot_delay > 0) {
+    struct xran_fh_config *fh_cfg_d = get_xran_fh_config(0);
+    int spf_d = 10 << fh_cfg_d->frame_conf.nNumerology;
+    int t_d = spf_d * (*frame) + (*slot) - ul_slot_delay;
+    if (t_d < 0)
+      t_d += 1024 * spf_d;
+    *frame = (t_d / spf_d) & 1023;
+    *slot = t_d % spf_d;
+  }
   delNotifiedFIFO_elt(res);
 #else
   *slot = oran_sync_info.sl;
@@ -620,6 +640,13 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
         g_ul_sym_expected++;
         if (pRbMap->prbMap[0].nSecDesc[sym_idx] > 0)
           g_ul_sym_present++;
+        else {
+          // Misses are rare (~0.02%) but at 4 antennas they compound into a per-TB BLER
+          // floor that pins OLLA/MCS low. Log each one to correlate with TB failures.
+          static int miss_log_count = 0;
+          if (miss_log_count++ < 2000)
+            LOG_W(HW, "[UL SYM MISS] f=%d s=%d sym=%d ant=%d\n", *frame, *slot, sym_idx, ant_id);
+        }
         if (g_ul_sym_expected % 5000 == 0) {
           LOG_W(HW, "UL sym present: %lu/%lu (%.1f%%)\n", (unsigned long)g_ul_sym_present,
                 (unsigned long)g_ul_sym_expected, 100.0 * g_ul_sym_present / g_ul_sym_expected);
@@ -778,6 +805,32 @@ int xran_fh_rx_read_slot(ru_info_t *ru, int *frame, int *slot)
                 int16_t *bfp_out = bfp_decom_rsp.data_out;
                 for (int s = 0; s < numRB * N_SC_PER_PRB * 2; s++)
                   bfp_out[s] >>= 2;
+                // Per-antenna divergence probe (2026-07-06): the RU sends 4 byte-identical
+                // streams; log a per-(slot,sym,ant) signature post-decompress to find where
+                // they diverge (per-eAxC staleness/reorder at the DU). OAI_PUSCH_ANT_DEBUG=1.
+                {
+                  static int ant_dbg = -1;
+                  static int ant_dbg_count = 0;
+                  if (ant_dbg < 0) {
+                    const char *e_ad = getenv("OAI_PUSCH_ANT_DEBUG");
+                    ant_dbg = (e_ad && e_ad[0]) ? 1 : 0;
+                  }
+                  if (ant_dbg && ant_dbg_count < 8192) {
+                    int nz_s = 0;
+                    long asum = 0;
+                    const int n16 = numRB * N_SC_PER_PRB * 2;
+                    for (int s = 0; s < n16; s++) {
+                      if (bfp_out[s]) nz_s++;
+                      asum += bfp_out[s] < 0 ? -bfp_out[s] : bfp_out[s];
+                    }
+                    if (nz_s > 0) {
+                      LOG_A(HW, "[PUSCH ANT] f=%d s=%d sym=%d ant=%d elm=%u nz=%d/%d asum=%ld mid=(%d,%d)\n",
+                            *frame, *slot, sym_idx, ant_id, idxElm, nz_s, n16, asum,
+                            bfp_out[n16 / 2], bfp_out[n16 / 2 + 1]);
+                      ant_dbg_count++;
+                    }
+                  }
+                }
 
                 if (pusch_decomp_log_count < 5) {
                   LOG_I(HW, "[PUSCH BFP] Decompression returned, rsp.len=%d\n", bfp_decom_rsp.len);

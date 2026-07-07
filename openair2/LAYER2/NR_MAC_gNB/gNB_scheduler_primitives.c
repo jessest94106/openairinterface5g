@@ -145,10 +145,19 @@ uint8_t get_dl_nrOfLayers(const NR_UE_sched_ctrl_t *sched_ctrl, const nr_dci_for
 
 int get_ul_nrOfLayers(const NR_UE_sched_ctrl_t *sched_ctrl, const nr_dci_format_t dci_format)
 {
+  // SU-MIMO test hook (2026-07-06): SRS rank feedback is not produced under vrtsim, so ul_ri
+  // stays 0 -> 1 layer. Force a fixed UL rank for the 2-layer spatial-multiplexing experiment.
+  // Only applies with DCI 0_1 (0_0 is spec-limited to 1 layer). Env OAI_UL_FORCE_LAYERS.
+  static int force_layers = -1;
+  if (force_layers == -1) {
+    const char *e = getenv("OAI_UL_FORCE_LAYERS");
+    force_layers = (e && e[0]) ? atoi(e) : 0;
+  }
   if(dci_format == NR_UL_DCI_FORMAT_0_0)
     return 1;
-  else
-    return sched_ctrl->srs_feedback.ul_ri + 1;
+  if (force_layers > 0)
+    return force_layers;
+  return sched_ctrl->srs_feedback.ul_ri + 1;
 }
 
 // Table 5.2.2.2.1-3 and Table 5.2.2.2.1-4 in 38.214

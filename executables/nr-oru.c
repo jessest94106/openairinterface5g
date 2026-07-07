@@ -127,6 +127,7 @@ extern void rx_nr_prach_ru_internal(prach_item_t *p,
                                     int rep_index,
                                     uint reps);
 
+#define ORU_PRACH_RAW_DEBUG 1
 #ifdef ORU_PRACH_RAW_DEBUG
 static void debug_oru_prach_raw_window(ORU_t *oru, int frame, int slot, int prach_symbol)
 {
@@ -279,9 +280,9 @@ static void debug_oru_prach_raw_window(ORU_t *oru, int frame, int slot, int prac
       fft_energy += (uint64_t)re * re + (uint64_t)im * im;
     }
 
-    const bool raw_dbg_frame = (frame >= 500 && frame <= 850 && slot == 19 && prach_symbol == 0);
+    const bool raw_dbg_frame = (slot == 19 && prach_symbol == 0);
     if (raw_dbg_frame || raw_nonzero || fft_nonzero) {
-      LOG_I(HW,
+      printf(
             "[ORU PRACH RAW] frame.slot.prach_symbol=%d.%d.%d ant=%d start_symbol=%d N_TA=%d sample_offset=%d Ncp=%d dftlen=%d slot_start=%d slot_len=%d base=%d fft_start=%d raw_span=%d slot_nz=%d raw_nz=%d fft_nz=%d slot_first=%d slot_last=%d slot_peak_idx=%d raw_first=%d raw_last=%d raw_peak_idx=%d fft_first=%d fft_last=%d fft_peak_idx=%d slot_peak=%d raw_peak=%d fft_peak=%d slot_energy=%lu raw_energy=%lu fft_energy=%lu\n",
             frame,
             slot,
@@ -517,13 +518,22 @@ void receive_prach(ORU_t *oru, int frame, int slot, int prach_symbol)
   debug_oru_prach_raw_window(oru, frame, slot, prach_symbol);
 #endif
 
+  // The UE places the PRACH at slot-end (offset ~57056, symbol 13) not symbol 0 in the vrtsim
+  // write buffer, so the extraction window (base = slot_start - N_TA_offset) misses it. Allow a
+  // tunable sample shift: base moves later by ORU_PRACH_SAMPLE_SHIFT (passed as -shift into N_TA_offset).
+  static int prach_shift = -1;
+  if (prach_shift == -1) {
+    const char *s = getenv("ORU_PRACH_SAMPLE_SHIFT");
+    prach_shift = (s && s[0]) ? atoi(s) : 0;
+    if (prach_shift) LOG_A(PHY, "[ORU] PRACH extraction sample shift = %d\n", prach_shift);
+  }
   rx_nr_prach_ru_internal(&oru->prach_item,
                           0,
                           oru->prach_info.start_symbol,
                           0,
                           ru->common.rxdata,
                           fp,
-                          ru->N_TA_offset,
+                          ru->N_TA_offset - prach_shift,
                           prach_symbol,
                           1);
   for (int aarx = 0; aarx < fp->nb_antennas_rx; aarx++) {
@@ -685,6 +695,21 @@ void *oru_south_read_thread(void *arg)
   RU_t *ru = oru->ru;
   NR_DL_FRAME_PARMS *fp = ru->nr_frame_parms;
 
+  // Msg3 fix (2026-07-05): the south-read label counter runs one slot AHEAD of the ring
+  // content (UE slot-N PUSCH shows up under label N+1 -> DU decodes zeros at slot N ->
+  // "MSG3 ULSCH with no signal"). Shift the label back so labels match content. Reads
+  // themselves are unchanged (still trail the UE's writes -> no race with the writer).
+  const char *lsh = getenv("ORU_UL_LABEL_SHIFT");
+  if (lsh && lsh[0]) {
+    int shift = atoi(lsh);
+    slot -= shift;
+    while (slot < 0) {
+      slot += fp->slots_per_frame;
+      frame = (frame + 1023) % 1024;
+    }
+    LOG_A(PHY, "ORU south read: label shift -%d slot(s) -> start frame %d slot %d\n", shift, frame, slot);
+  }
+
   const int max_pusch_jobs = 300;
   pusch_symbol_job_t pusch_job_pool[max_pusch_jobs];
   uint32_t pusch_job_index = 0;
@@ -701,6 +726,67 @@ void *oru_south_read_thread(void *arg)
       openair0_timestamp_t timestamp;
       int num_samples_read = ru->rfdevice.trx_read_func(&ru->rfdevice, &timestamp, (void **)rxp, samples_to_read, ru->nb_rx);
       AssertFatal(num_samples_read == samples_to_read, "Unexpected number of samples received\n");
+      // mMIMO gain experiment (2026-07-05): per-antenna INDEPENDENT UL noise, label-exact
+      // PRACH skip (slot 19). Injected here (not vrtsim) because only the RU knows its label
+      // grid post slot-snap, and the per-antenna streams exist here post-duplication.
+      // ORU_UL_NOISE_STD = A -> uniform [-A,A] per int16 (std ~= A/sqrt(3)).
+      static int ul_noise_A = -1;
+      if (ul_noise_A < 0) {
+        const char *ne = getenv("ORU_UL_NOISE_STD");
+        ul_noise_A = (ne && ne[0]) ? atoi(ne) : 0;
+        if (ul_noise_A > 0)
+          LOG_A(PHY, "[ORU] UL noise injection A=%d (per-antenna independent, PRACH slot skipped)\n", ul_noise_A);
+      }
+      if (ul_noise_A > 0 && slot != 19 && (rx_slot_type == NR_UPLINK_SLOT || rx_slot_type == NR_MIXED_SLOT)) {
+        static unsigned int noise_seed[8] = {0};
+        static int noise_mask = -1; // bitmask of antennas to noise; default all
+        if (noise_mask < 0) {
+          const char *me = getenv("ORU_UL_NOISE_ANT_MASK");
+          noise_mask = (me && me[0]) ? atoi(me) : 0xff;
+        }
+        const unsigned int range = (unsigned int)(2 * ul_noise_A + 1);
+        for (int aarx = 0; aarx < fp->nb_antennas_rx && aarx < 8; aarx++) {
+          if (!(noise_mask & (1 << aarx)))
+            continue;
+          unsigned int x = noise_seed[aarx] ? noise_seed[aarx] : 0x9E3779B9u * (aarx + 1);
+          int16_t *sp16 = (int16_t *)rxp[aarx];
+          for (int i = 0; i < samples_to_read * 2; i++) {
+            x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+            int v = (int)sp16[i] + ((int)(x % range) - ul_noise_A);
+            sp16[i] = v > 32767 ? 32767 : (v < -32768 ? -32768 : (int16_t)v);
+          }
+          noise_seed[aarx] = x;
+        }
+      }
+      // Lightweight UL-delivery probe: nonzero count of the just-read symbol on UL/mixed slots.
+      // Tells us if the Msg3 PUSCH (slot 18) reaches the RU rxdata, and at which symbol.
+      if (rx_slot_type == NR_UPLINK_SLOT || rx_slot_type == NR_MIXED_SLOT) {
+        static int ul_probe_cnt = 0;
+        int nz = 0, first_nz = -1, last_nz = -1;
+        const c16_t *sp = (const c16_t *)rxp[0];
+        for (int i = 0; i < samples_to_read; i++)
+          if (sp[i].r || sp[i].i) {
+            nz++;
+            if (first_nz < 0) first_nz = i;
+            last_nz = i;
+          }
+        if (nz > 0 && ul_probe_cnt++ < 6000) {
+          // per-antenna comparison: nz + a mid-burst sample per antenna — diverging antennas
+          // at the RU implicate the vrtsim duplicate path; identical -> DU-side.
+          int nz_a[4] = {0}, mid = (first_nz + last_nz) / 2;
+          int mr[4] = {0}, mi[4] = {0};
+          for (int a = 0; a < fp->nb_antennas_rx && a < 4; a++) {
+            const c16_t *ap = (const c16_t *)rxp[a];
+            for (int i = 0; i < samples_to_read; i++)
+              if (ap[i].r || ap[i].i) nz_a[a]++;
+            mr[a] = ap[mid].r; mi[a] = ap[mid].i;
+          }
+          LOG_A(PHY, "[ORU UL PROBE] frame=%d slot=%d sym=%d nz=%d/%d first=%d last=%d antnz=%d,%d,%d,%d mid=(%d,%d)(%d,%d)(%d,%d)(%d,%d)\n",
+                frame, slot, symbol, nz, samples_to_read, first_nz, last_nz,
+                nz_a[0], nz_a[1], nz_a[2], nz_a[3],
+                mr[0], mi[0], mr[1], mi[1], mr[2], mi[2], mr[3], mi[3]);
+        }
+      }
       LOG_D(PHY,
             "[ORU south] read data: frame %d, slot %d, symbol %d, timestamp %ld num_symbols %d, samples %d\n",
             frame,
@@ -763,6 +849,47 @@ void perform_initial_sync(ORU_t *oru, sense_of_time_t *sense_of_time, initial_sy
   initial_sync->slot = sense_of_time->slot;
   initial_sync->symbol = sense_of_time->symbol;
   initial_sync->sample = oru->ru->rfdevice.get_timestamp(&oru->ru->rfdevice, &sense_of_time->ts);
+  // LOTTERY FIX (2026-06-10): the vrtsim client aligns its radio grid to ring-sample multiples of
+  // samples_per_frame, but this wall-clock-derived lock lands at an ARBITRARY ring sample. The
+  // per-launch residue (lock mod frame) shifts every rxdata read/write by a constant -> UE slot-k
+  // traffic lands in RU slot k-n: PRACH window reads zeros, idle calibration reads junk (gNB I0
+  // poisoned to ~300), or DL never syncs — the run-level attach lottery. Snap the lock to the
+  // nearest ring frame boundary so both ends share one grid.
+  {
+    // MEASUREMENT ONLY (2026-06-10): grid-snap experiments (floor AND ceil) went 0/N against a
+    // ~0% same-day baseline — inconclusive-to-negative; snap REVERTED. Keep the residue
+    // observable per launch so good/bad runs can be correlated with it offline.
+    const uint64_t spf = (uint64_t)oru->ru->nr_frame_parms->samples_per_subframe * 10;
+    LOG_A(PHY, "ORU initial sync: ring sample %ld (frame-grid residue %ld of %lu)\n",
+          initial_sync->sample, (long)(initial_sync->sample % spf), spf);
+    // CLEAN RE-TEST (2026-07-04): snap the RU read grid to the ring frame boundary so it shares the
+    // UE write grid (residue 0). ORU_FRAMEGRID_SNAP=1 to enable. The prior 0/N was against a ~0%
+    // same-day baseline (inconclusive); today's harness has a good baseline, so this is the clean test.
+    const char *snap_env = getenv("ORU_FRAMEGRID_SNAP");
+    if (snap_env && snap_env[0] == '1') {
+      // SLOT-boundary snap (2026-07-05, was frame-boundary): frame-snap displaced the anchor
+      // by up to 19 slots past its label -> when displacement > Ta4 (~3.5 slots) the DU's
+      // mod-20 buffer filing wraps the UL into the NEXT frame (RAR addressed to the wrong
+      // RA window; measured threshold 4-5 slots across 34 runs). Slot-snap keeps the
+      // label<->position mapping error < 1 slot = always inside Ta4. Frame alignment was
+      // never required: the UE's grid follows the SSB content, not ring frame boundaries.
+      const uint64_t sps = spf / oru->ru->nr_frame_parms->slots_per_frame;
+      uint64_t r = (uint64_t)initial_sync->sample % sps;
+      if (r != 0) initial_sync->sample += (openair0_timestamp_t)(sps - r);
+      // SNAP_SLOTS (2026-07-05): residue-0 snap leaves a measured +1-slot content skew
+      // (UE slot N shows up under RU label N+1). Anchor the grid D slots BEFORE the frame
+      // boundary instead (the geometry natural good-face launches had) so labels, content
+      // and wall-time all line up without downstream label/delay compensations.
+      const char *snap_slots_env = getenv("ORU_FRAMEGRID_SNAP_SLOTS");
+      if (snap_slots_env && snap_slots_env[0]) {
+        int d = atoi(snap_slots_env);
+        uint64_t sps = spf / oru->ru->nr_frame_parms->slots_per_frame;
+        initial_sync->sample -= (openair0_timestamp_t)(d * sps);
+      }
+      LOG_A(PHY, "ORU initial sync: FRAMEGRID SNAP applied -> ring sample %ld (residue %ld)\n",
+            initial_sync->sample, (long)(initial_sync->sample % spf));
+    }
+  }
   LOG_I(PHY,
         "RU synchronized: frame, slot %d.%d, symbol %d, sample: %ld\n",
         initial_sync->frame,

@@ -342,6 +342,13 @@ static void config_preamble_index(NR_UE_MAC_INST_t *mac)
     int ssb_pr_idx = mac->ssb_list.nb_ssb_per_index[mac->mib_ssb] % (int)ra->ssb_ro_config.ssb_per_ro;
     ra->ra_PreambleIndex = groupOffset + (ssb_pr_idx * ra->ssb_ro_config.preambles_per_ssb) + rand_preamb;
   }
+  // Test harness: force a fixed CBRA preamble so detected-vs-sent is directly comparable at the gNB
+  // (disambiguates PRACH timing/detection from the RAR handshake). OAI_UE_FIXED_PREAMBLE=<idx>.
+  const char *fp_env = getenv("OAI_UE_FIXED_PREAMBLE");
+  if (fp_env && fp_env[0]) {
+    ra->ra_PreambleIndex = atoi(fp_env);
+    LOG_A(NR_MAC, "[UE] fixed preamble index forced to %d (OAI_UE_FIXED_PREAMBLE)\n", ra->ra_PreambleIndex);
+  }
 }
 
 static void configure_ra_preamble(NR_UE_MAC_INST_t *mac)

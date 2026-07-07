@@ -470,10 +470,22 @@ int xran_oru_tx_read_slot(uint32_t **txdataF, int nb_tx, int *frame, int *slot, 
       // AssertFatal(comp_meth == XRAN_COMPMETHOD_NONE, "Compression not supported\n");
       static int dl_decomp_log_count = 0;
       for (int i = 0; i < num_packets; i++) {
+          // DL U-plane has only nb_tx antenna streams (PDSCH eAxC = [0..Ntx-1]), but the
+          // enqueue validation bounds Ant_ID by neAxc=max(nb_tx,nb_rx). For asymmetric configs
+          // (nb_tx < nb_rx, e.g. massive-MIMO 1TX/4RX) a stray DL pkt with aatx in [nb_tx, nb_rx)
+          // would write past tx_data_sym[nb_tx][] on the stack -> smashes uplane_data[] -> crash
+          // in oru_sync_thread at rte_pktmbuf_free. Drop such packets (no DL content exists there).
+          int aatx = uplane_data[i]->aatx;
+          if (aatx < 0 || aatx >= nb_tx) {
+            static int dl_aatx_oob_log = 0;
+            if (dl_aatx_oob_log++ < 20)
+              LOG_W(HW, "[ORU DL RX] drop DL pkt aatx=%d out of [0,nb_tx=%d) (asymmetric neAxc guard)\n", aatx, nb_tx);
+            rte_pktmbuf_free(uplane_data[i]->mbuf_to_free);
+            continue;
+          }
           int start_prb = uplane_data[i]->start_prb;
           int num_prb = uplane_data[i]->num_prb;
           int comp_meth = uplane_data[i]->comp_meth;
-          int aatx = uplane_data[i]->aatx;
           void *iq_data = uplane_data[i]->iq_data;
           uint16_t *source = (uint16_t *)iq_data;
           int16_t *destination = (int16_t *)&tx_data_sym[aatx][start_prb * NR_NB_SC_PER_RB];

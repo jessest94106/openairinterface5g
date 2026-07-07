@@ -378,6 +378,36 @@ void rx_nr_prach_ru_internal(prach_item_t *p,
       }
     }
     memcpy(p->rxsigF[prachOccasion][aa], rxsigF_tmp, sizeof(rxsigF_tmp));
+#if 1 // ORU PRACH EXTRACT DEBUG (2026-06-10): pin the wide-BW phase race. Bounded (first 200 calls).
+      // Prints whether the extraction's OWN dft-input window has energy at read time (src) vs its
+      // output slice (out). src=0 -> reads zeros (writer race / wrong buffer); src>0,out=0 -> the
+      // k-slice misses the preamble bins. Compare vs the independent [ORU PRACH RAW] same-call window.
+    {
+      static int prach_ext_dbg = 0;
+      static long prach_ext_calls = 0, prach_ext_zero = 0;
+      const c16_t *win = prach2 + rep_index * dftlen;
+      int src_nz = 0, out_nz = 0;
+      long src_e = 0;
+      for (int j = 0; j < dftlen; j++) {
+        if (win[j].r || win[j].i) src_nz++;
+        src_e += labs((long)win[j].r) + labs((long)win[j].i);
+      }
+      for (int j = 0; j < N_ZC; j++)
+        if (rxsigF_tmp[j].r || rxsigF_tmp[j].i) out_nz++;
+      prach_ext_calls++;
+      if (src_nz == 0)
+        prach_ext_zero++;
+      // print ONLY energetic extractions (the preamble moments) — idle-air zeros don't burn the cap
+      if (src_nz > 0 && prach_ext_dbg < 200) {
+        prach_ext_dbg++;
+        LOG_A(PHY,
+              "[PRACH EXTRACT] f.s.rep=%d.%d.%d aa=%d k=%d dftlen=%d Ncp=%d src_nz=%d/%d src_e=%ld out_nz=%d/%d\n",
+              p->frame, p->slot, rep_index, aa, k, dftlen, Ncp, src_nz, dftlen, src_e, out_nz, N_ZC);
+      } else if ((prach_ext_calls % 2400) == 0) {
+        LOG_A(PHY, "[PRACH EXTRACT STAT] calls=%ld all_zero=%ld\n", prach_ext_calls, prach_ext_zero);
+      }
+    }
+#endif
   }
 }
 
@@ -447,7 +477,18 @@ rx_prach_out_t rx_nr_prach(const prach_item_t *in, int occasion)
   int16_t preamble_shift = 0;
   const int dft_sz = N_ZC == 839 ? 1024 : 256;
   int32_t prach_ifft[dft_sz] __attribute__((aligned(32)));
-  for (int preamble_index = 0; preamble_index < 64; preamble_index++) {
+  // Diagnostic/single-UE guardrail: OAI_PRACH_ONLY_PREAMBLE=N restricts the matched-filter search to root N.
+  // A clean peak on the forced preamble confirms its ZC energy is present-but-out-argmax'd by a distorted
+  // wrong root (subcarrier-domain extraction distortion); also deterministically yields RAPID=N for a
+  // single forced-preamble UE (masks, not cures, the distortion). -1 = normal full 64-root search.
+  static int only_pre = -2;
+  if (only_pre == -2) {
+    const char *e = getenv("OAI_PRACH_ONLY_PREAMBLE");
+    only_pre = (e && e[0]) ? atoi(e) : -1;
+  }
+  const int pre_lo = (only_pre >= 0) ? only_pre : 0;
+  const int pre_hi = (only_pre >= 0) ? only_pre + 1 : 64;
+  for (int preamble_index = pre_lo; preamble_index < pre_hi; preamble_index++) {
     if (LOG_DEBUGFLAG(DEBUG_PRACH)) {
       int en = dB_fixed(signal_energy((int32_t *)in->rxsigF[occasion][0], N_ZC == 839 ? 840 : 140));
       if (en > 60)

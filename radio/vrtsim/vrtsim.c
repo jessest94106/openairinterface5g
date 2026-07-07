@@ -55,6 +55,7 @@
 #include "cirdb_provider.h"
 #include "cirdb_yaml.h"
 
+
 // Simulator role
 typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
 
@@ -154,7 +155,16 @@ typedef struct {
   peer_info_t peer_info;
   int chanmod;
   int tx_sample_advance;
+  int ul_read_advance;   // server UL read offset; default = tx_sample_advance (legacy), env VRTSIM_UL_READ_ADVANCE overrides.
+                         // The DL write-ahead (tx_sample_advance) was wrongly reused for the UL read, shifting the
+                         // server's UL read ~1 slot off the UE's write -> PRACH/PUSCH read as zeros (massive-MIMO 4RX).
   int rx_target_snr_db;  // UL time-domain RX SNR target in dB (per-slot AGC); VRTSIM_RX_SNR_DISABLED = off
+  int ul_noise_std;      // per-antenna INDEPENDENT UL noise stddev (int16 units), env VRTSIM_UL_NOISE_STD. 0=off.
+                         // Raises the gNB PRACH I0 (no-chanmod passthrough has none -> saturated 48 dB detection).
+                         // Independent per RX antenna so the 4-RX coherent combine yields real array gain
+                         // (signal +12 dB coherent, noise +6 dB incoherent -> +6 dB SNR = the massive-MIMO gain).
+  unsigned int ul_noise_seed[MAX_NUM_ANTENNAS_TX];
+  int ul_atten_shift;    // per-antenna UL right-shift (bits) to de-saturate the coherent Nrx combine; env VRTSIM_UL_ATTEN_SHIFT.
   double rx_freq;
   double tx_bw;
   int tx_num_channels;
@@ -325,6 +335,29 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
               "VRTSIM tx-sample-advance must be non-negative, got %d\n",
               vrtsim_state->tx_sample_advance);
   LOG_I(HW, "VRTSIM: TX sample advance %d samples\n", vrtsim_state->tx_sample_advance);
+  // UL read offset (server): default to the legacy tx_sample_advance, override via env.
+  // Set to 0 so the UL read aligns with *ptimestamp (last_received) instead of reading a slot ahead.
+  vrtsim_state->ul_read_advance = vrtsim_state->tx_sample_advance;
+  const char *ulra = getenv("VRTSIM_UL_READ_ADVANCE");
+  if (ulra != NULL && ulra[0] != '\0') {
+    vrtsim_state->ul_read_advance = atoi(ulra);
+    LOG_I(HW, "VRTSIM: UL read advance overridden to %d samples (env)\n", vrtsim_state->ul_read_advance);
+  }
+  // Per-antenna independent UL noise (raise gNB I0 / de-saturate PRACH; enable massive-MIMO array gain).
+  vrtsim_state->ul_noise_std = 0;
+  const char *ulns = getenv("VRTSIM_UL_NOISE_STD");
+  if (ulns != NULL && ulns[0] != '\0') {
+    vrtsim_state->ul_noise_std = atoi(ulns);
+    LOG_I(HW, "VRTSIM: UL per-antenna noise stddev %d (env)\n", vrtsim_state->ul_noise_std);
+  }
+  vrtsim_state->ul_atten_shift = 0;
+  const char *ulat = getenv("VRTSIM_UL_ATTEN_SHIFT");
+  if (ulat != NULL && ulat[0] != '\0') {
+    vrtsim_state->ul_atten_shift = atoi(ulat);
+    LOG_I(HW, "VRTSIM: UL per-antenna attenuation right-shift %d bits (env)\n", vrtsim_state->ul_atten_shift);
+  }
+  for (int a = 0; a < MAX_NUM_ANTENNAS_TX; a++)
+    vrtsim_state->ul_noise_seed[a] = 0x9E3779B9u * (a + 1); // distinct per-antenna seed -> independent noise
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
     LOG_A(HW, "VRTSIM: will use taps socket %s\n", vrtsim_state->taps_socket);
@@ -412,6 +445,15 @@ static void parse_ue_config(vrtsim_state_t *vrtsim_state)
 {
   AssertFatal(vrtsim_state->num_ues > 0 && vrtsim_state->num_ues <= MAX_NUM_UES,
               "num_ues=%d out of range (1..%d)\n", vrtsim_state->num_ues, MAX_NUM_UES);
+
+  // Multi-UE advance scaling REMOVED (2026-07-06): tx_sample_advance is added to the DL write
+  // TIMESTAMPS (vrtsim_write) -> it is a RING-POSITION shift, not just wall-time budget. Scaling
+  // it x num_ues moved the whole DL grid ~1 slot -> the UEs' SSB-derived grids followed -> their
+  // UL returned ~1 slot late (dilation-invariant, config-proven: N=2 attaches with the product
+  // held at 65536, dies otherwise). The June "0.2%->5% DL reads" datum was position-sampling on
+  // the broken grid, not a margin effect. The unscaled 65536 = ~2.1 ms wall margin at ts=0.25;
+  // the per-UE loop cost is microseconds -> ample for any practical N. If a wall-budget wall is
+  // ever hit at large N, add a WALL-ONLY lead (produce earlier), never a timestamp shift.
 
   for (int i = 0; i < vrtsim_state->num_ues; i++) {
     char prefix[64];
@@ -503,8 +545,14 @@ static int vrtsim_connect(openair0_device_t *device)
     int ul_streams = (vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb)
                      ? vrtsim_state->num_ues * device->openair0_cfg[0].rx_num_channels
                      : vrtsim_state->total_ul_streams;
+    // Ring region sizing (fix 2026-07-07): the DL region (tx_iq_data, arg1=num_tx_ant — server
+    // writes / client reads) must hold total_dl_streams; the UL region (rx_iq_data, arg2=num_rx_ant
+    // — client writes / server reads) must hold ul_streams. The args were swapped, which was
+    // invisible while ul_streams == total_dl_streams (all 1x1 and symmetric multi-UE configs) but
+    // segfaulted the first asymmetric case: SU-MIMO's 2-TX/1-RX UE wrote UL antenna 1 past a
+    // 1-stream UL region. Size each region by the count it actually carries.
     vrtsim_state->channel =
-        shm_td_iq_channel_create(DEFAULT_CHANNEL_NAME, ul_streams, vrtsim_state->total_dl_streams);
+        shm_td_iq_channel_create(DEFAULT_CHANNEL_NAME, vrtsim_state->total_dl_streams, ul_streams);
     size_t max_nsamps = 7680 * 2;
     vrtsim_state->ul_combine_buffer = calloc_or_fail(max_nsamps, sizeof(sample_t));
     vrtsim_state->ul_combine_buffer_len = max_nsamps;
@@ -690,6 +738,16 @@ static int vrtsim_connect(openair0_device_t *device)
       }
     } else {
       load_channel_model(vrtsim_state);
+      // Multi-UE fix (2026-07-06): the per-UE descriptor array was only populated in the
+      // CIRDB branch; the modellist path left it NULL -> every DL actor bailed with
+      // "channel_desc is NULL" -> no DL written -> no UE could sync (June's chanmod-multi-UE
+      // wall). Point all UEs at the single configured model (fine for static AWGN passthrough;
+      // per-UE DISTINCT channels should use CIRDB or per-UE modellist entries).
+      if (vrtsim_state->role == ROLE_SERVER && vrtsim_state->num_ues > 1) {
+        for (int u = 0; u < vrtsim_state->num_ues; u++)
+          vrtsim_state->channel_desc_per_ue[u] = vrtsim_state->channel_desc;
+        pthread_mutex_init(&vrtsim_state->cirdb_mutex, NULL);
+      }
     }
     num_tx_stats = vrtsim_state->peer_info.num_rx_antennas;
     if (vrtsim_state->role == ROLE_SERVER && vrtsim_state->num_ues > 1) {
@@ -1002,7 +1060,13 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
   const int batch_size = 4096;
 
   AssertFatal(nbAnt <= MAX_NUM_ANTENNAS_TX, "Number of antennas %d exceeds maximum %d\n", nbAnt, MAX_NUM_ANTENNAS_TX);
-  for (int aarx = 0; aarx < vrtsim_state->peer_info.num_rx_antennas; aarx++) {
+  // Multi-UE fix (2026-07-06): fan out over the SAME count the actors were allocated with
+  // (total_dl_streams for a multi-UE server) — the old peer_info bound (default 1) left
+  // UE1..N-1's DL streams unwritten (June's "chanmod breaks multi-UE sync").
+  const int n_dl_streams = (vrtsim_state->role == ROLE_SERVER && vrtsim_state->num_ues > 1)
+                               ? vrtsim_state->total_dl_streams
+                               : vrtsim_state->peer_info.num_rx_antennas;
+  for (int aarx = 0; aarx < n_dl_streams; aarx++) {
     notifiedFIFO_elt_t *task = newNotifiedFIFO_elt(sizeof(channel_modelling_args_t), 0, NULL, perform_channel_modelling);
     channel_modelling_args_t *args = (channel_modelling_args_t *)NotifiedFifoData(task);
     args->vrtsim_state = vrtsim_state;
@@ -1080,7 +1144,17 @@ static int vrtsim_write(openair0_device_t *device,
     }
     return nsamps;
   } else {
-    AssertFatal(nbAnt == 1, "Multi-TX gNB not yet supported in multi-UE no-chanmod mode\n");
+    // Multi-TX gNB: the gNB generates all nbAnt antenna-carriers (the FH carries nbAnt eAxC upstream
+    // of here). On the RU->UE radio, SUM all nbAnt gNB TX antennas into each UE RX antenna - this
+    // models the over-the-air combination of the beamformed elements ("N physical elements -> few
+    // decodable ports", analog-BF style). The UE then decodes the multi-port DL (SIB1 etc.) from one
+    // combined stream and attaches, while the FH stays loaded at nbAnt eAxC. (Was AssertFatal(nbAnt==1).)
+    // Deliver gNB TX antenna 0 to every UE RX antenna (rank-1 DL). Enough for the UE to attach when
+    // the DL is 1-2 ports; the point here is to LOAD the FH (nbAnt eAxC), not model DL MIMO.
+    // NOTE: a physical over-the-air sum of the antennas would be more correct, but the no-chanmod
+    // passthrough gives every antenna h=1, so summing precoded ports coherently CANCELS (PDSCH -> 0).
+    // Proper multi-antenna DL needs per-antenna chanmod; not needed for FH-load measurement.
+    (void)nbAnt;
     for (int u = 0; u < vrtsim_state->num_ues; u++) {
       int rx_offset = vrtsim_state->ue_conf[u].rx_offset;
       int num_rx_ant = vrtsim_state->ue_conf[u].rx_ant;
@@ -1112,7 +1186,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
     return 0;
   }
   const uint64_t read_sample = vrtsim_state->last_received_sample
-                               + (vrtsim_state->role == ROLE_SERVER ? vrtsim_state->tx_sample_advance : 0);
+                               + (vrtsim_state->role == ROLE_SERVER ? vrtsim_state->ul_read_advance : 0);
   if (vrtsim_state->role == ROLE_SERVER) {
     uint64_t timeout_uS = 0; // 0 means no timeout
     shm_td_iq_channel_wait(vrtsim_state->channel, read_sample + nsamps, timeout_uS);
@@ -1145,13 +1219,19 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       }
       for (int aarx = 0; aarx < nbAnt; aarx++)
         memset(samplesVoid[aarx], 0, nsamps * sizeof(sample_t));
+      // Asymmetric-safe combine (2026-07-06): the old stream index (u*nbAnt+aarx) assumed
+      // UE tx count == gNB rx count — at 1-TX UEs with a 4-RX gNB it read nonexistent
+      // streams AND destructively double-read real ones. Correct model (matching the
+      // single-UE path): read each UE tx stream ONCE (ring layout = ue_conf tx_offset),
+      // then add it into EVERY gNB antenna (rank-1 duplicate = coherent copies).
       for (int u = 0; u < vrtsim_state->num_ues; u++) {
-        for (int aarx = 0; aarx < nbAnt; aarx++) {
-          int stream = u * nbAnt + aarx;
+        const int ue_tx = vrtsim_state->ue_conf[u].tx_ant;
+        const int base = vrtsim_state->ue_conf[u].tx_offset;
+        for (int t = 0; t < ue_tx; t++) {
           int ret = shm_td_iq_channel_rx(vrtsim_state->channel,
                                          read_sample,
                                          nsamps,
-                                         stream,
+                                         base + t,
                                          vrtsim_state->ul_combine_buffer);
           if (ret == CHANNEL_ERROR_TOO_LATE) {
             vrtsim_state->rx_samples_late += nsamps;
@@ -1160,11 +1240,51 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           }
           if (ret != 0 && rx_ret == 0)
             rx_ret = ret;
-          int16_t *out = (int16_t *)samplesVoid[aarx];
-          int16_t *in  = (int16_t *)vrtsim_state->ul_combine_buffer;
+          const int16_t *in = (const int16_t *)vrtsim_state->ul_combine_buffer;
+          for (int aarx = 0; aarx < nbAnt; aarx++) {
+            if (samplesVoid[aarx] == NULL)
+              continue;
+            int16_t *out = (int16_t *)samplesVoid[aarx];
+            for (int i = 0; i < nsamps * 2; i++) {
+              int32_t sum = (int32_t)out[i] + (int32_t)in[i];
+              out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+            }
+          }
+        }
+      }
+    } else if (vrtsim_state->ue.tx_ant >= 2) {
+      /* Single-UE SU-MIMO (2-layer) read: the UE transmits N_L=ue.tx_ant layer streams
+       * (ring streams 0..N_L-1). Present them to the gNB's nbAnt RX antennas through an
+       * orthogonal steering matrix so H = [N_rx x N_L] is well-conditioned and the gNB's
+       * 2-layer MMSE / ML receiver can separate them:  rx[a] = sum_L  sgn(L,a) * x[L].
+       * Hadamard signs (row L, col a) give orthogonal antenna columns per layer. */
+      const int NL = vrtsim_state->ue.tx_ant;
+      size_t need = (size_t)NL * nsamps;
+      if (need > (size_t)vrtsim_state->ul_combine_buffer_len) {
+        sample_t *tmp = realloc(vrtsim_state->ul_combine_buffer, need * sizeof(sample_t));
+        AssertFatal(tmp != NULL, "Failed to realloc SU-MIMO layer buffer\n");
+        vrtsim_state->ul_combine_buffer = tmp;
+        vrtsim_state->ul_combine_buffer_len = need;
+      }
+      rx_ret = 0;
+      for (int L = 0; L < NL; L++) {
+        int ret = shm_td_iq_channel_rx(vrtsim_state->channel, read_sample, nsamps, L,
+                                       vrtsim_state->ul_combine_buffer + (size_t)L * nsamps);
+        if (ret == CHANNEL_ERROR_TOO_LATE) vrtsim_state->rx_samples_late += nsamps;
+        else if (ret == CHANNEL_ERROR_TOO_EARLY) vrtsim_state->rx_early += 1;
+        if (ret != 0 && rx_ret == 0) rx_ret = ret;
+      }
+      for (int aarx = 0; aarx < nbAnt; aarx++) {
+        if (samplesVoid[aarx] == NULL) continue;
+        int16_t *out = (int16_t *)samplesVoid[aarx];
+        for (int i = 0; i < nsamps * 2; i++) out[i] = 0;
+        for (int L = 0; L < NL; L++) {
+          // Walsh-Hadamard sign: parity of popcount(L & aarx) -> +1/-1 (orthogonal columns).
+          int s = __builtin_parity((unsigned)(L & aarx)) ? -1 : 1;
+          const int16_t *lay = (const int16_t *)(vrtsim_state->ul_combine_buffer + (size_t)L * nsamps);
           for (int i = 0; i < nsamps * 2; i++) {
-            int32_t sum = (int32_t)out[i] + (int32_t)in[i];
-            out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+            int32_t v = (int32_t)out[i] + s * (int32_t)lay[i];
+            out[i] = (int16_t)((v > 32767) ? 32767 : (v < -32768) ? -32768 : v);
           }
         }
       }
@@ -1180,6 +1300,50 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       for (int aarx = 1; aarx < nbAnt; aarx++) {
         if (samplesVoid[aarx] != NULL)
           memcpy(samplesVoid[aarx], samplesVoid[0], nsamps * sizeof(sample_t));
+      }
+      // Per-antenna UL attenuation (right-shift) to de-saturate the coherent Nrx combine: with Nrx identical
+      // copies summed at the gNB, a full-scale UE PRACH overflows the correlator (capped 48 dB, sidelobes
+      // across roots). Shift each antenna down by VRTSIM_UL_ATTEN_SHIFT bits so Nrx*sum stays in range,
+      // WITHOUT touching the coherent combine (array gain preserved). ~= lowering UE TX power / path loss.
+      if (vrtsim_state->ul_atten_shift > 0) {
+        const int sh = vrtsim_state->ul_atten_shift;
+        for (int aarx = 0; aarx < nbAnt; aarx++) {
+          if (samplesVoid[aarx] == NULL)
+            continue;
+          int16_t *s = (int16_t *)samplesVoid[aarx];
+          for (int i = 0; i < nsamps * 2; i++)
+            s[i] = (int16_t)(s[i] >> sh);
+        }
+      }
+      // Add INDEPENDENT per-antenna noise (identical signal + independent noise = array gain on combine).
+      // Fast path: one inline xorshift32 per int16 (uniform in [-A,A], stddev ~= A/sqrt(3)). VRTSIM_UL_NOISE_STD=A.
+      // PRACH-immunity gate (2026-07-05): skip noise on slot 19 (the PRACH slot) — the gNB's
+      // PRACH argmax false-alarms on injected noise (random preambles at 40+ dB) long before
+      // the PUSCH SNR gets interesting, killing attach. Identical gate in the 1-RX and N-RX
+      // arms of the gain experiment, so the comparison stays fair.
+      // gate on read_sample (cursor + ul_read_advance) = the slot of the CONTENT actually read,
+      // not the cursor slot (they differ by the ~1-slot read advance). Inline slot math
+      // (the mu1-slot debug helper is #ifdef VRTSIM_IQ_DEBUG-only).
+      const uint64_t noise_spf = (uint64_t)(vrtsim_state->sample_rate / 100.0 + 0.5); // samples per 10ms frame
+      const uint64_t noise_sps = noise_spf / 20; // mu=1: 20 slots/frame
+      const int noise_nr_slot = noise_sps ? (int)((read_sample % noise_spf) / noise_sps) : -1;
+      const bool noise_prach_slot = noise_nr_slot == 19;
+      if (vrtsim_state->ul_noise_std > 0 && !noise_prach_slot) {
+        const int A = vrtsim_state->ul_noise_std;
+        const unsigned int range = (unsigned int)(2 * A + 1);
+        for (int aarx = 0; aarx < nbAnt; aarx++) {
+          if (samplesVoid[aarx] == NULL)
+            continue;
+          int16_t *s = (int16_t *)samplesVoid[aarx];
+          unsigned int x = vrtsim_state->ul_noise_seed[aarx];
+          for (int i = 0; i < nsamps * 2; i++) {
+            x ^= x << 13; x ^= x >> 17; x ^= x << 5; // xorshift32
+            int n = (int)(x % range) - A;
+            int v = (int)s[i] + n;
+            s[i] = v > 32767 ? 32767 : (v < -32768 ? -32768 : (int16_t)v);
+          }
+          vrtsim_state->ul_noise_seed[aarx] = x;
+        }
       }
     }
 #ifdef VRTSIM_IQ_DEBUG
