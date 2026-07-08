@@ -1192,6 +1192,14 @@ static void inner_rx(PHY_VARS_gNB *gNB,
           LOG_E(PHY, "[MU DIAG] normal-path |chFext[0]@10|=%ld |rxFext@10|=%ld (non-zero => estimate ok)\n", s0, r0);
         }
       }
+      // Partner-channel guard (Defect-2 fix): if the detected partner has no live channel this
+      // symbol (stale pusch_pdu => |chPart|~0), the 2-layer MMSE degenerates and zeroes even the
+      // self stream (outAbsMean=0, llr=0 observed). Fall through to normal MRC rather than destroy
+      // the self decode. IRC only runs on genuinely-live co-scheduled pairs.
+      long partE = 0;
+      for (int a = 0; a < nb_rx_ant; a++)
+        for (int i = 0; i < 32 && i < buffer_length; i++) partE += abs(chF2[1][a][i].r) + abs(chF2[1][a][i].i);
+      if (partE >= 8) {
       int32_t comp2buf[2 * nb_rx_ant][buffer_length] __attribute__((aligned(32)));
       int *comp2[2 * nb_rx_ant];
       for (int i = 0; i < 2 * nb_rx_ant; i++) { comp2[i] = comp2buf[i]; memset(comp2buf[i], 0, sizeof(int32_t) * buffer_length); }
@@ -1229,6 +1237,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         }
       }
       return;
+      } // end if (partE >= 8): live partner -> IRC path; else fall through to normal MRC
     }
   }
 

@@ -1983,6 +1983,12 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   int numUE = 0;
   bool scheduled_something = false;
 
+  // MU co-sched attach-guard: a UE mid-RA has no channel estimate yet, so its Msg3 cannot be
+  // separated from a co-scheduled full-band UE and would collide (root cause of the 2nd-UE
+  // WAIT_Msg3 failure). Freeze co-scheduling (stay OFDMA) whenever ANY UE is in RA.
+  bool any_ra_in_progress = false;
+  UE_iterator(UE_list, ue_ra) { if (ue_ra->ra != NULL) { any_ra_in_progress = true; break; } }
+
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
 
@@ -2309,7 +2315,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     // the co-scheduled UEs would collide before the Phase-4 joint receiver exists. Off => unchanged.
     static int cosched = -1;
     if (cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); cosched = (e && e[0]) ? 1 : 0; }
-    bool mu_overlap = cosched && iterator->UE->ra == NULL;
+    bool mu_overlap = cosched && iterator->UE->ra == NULL && !any_ra_in_progress;
     if (!mu_overlap) {
       n_rb_sched[beam.idx] -= sched.rbSize;
       for (int rb = bi.bwpStart; rb < sched.rbSize; rb++)
