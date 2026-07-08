@@ -1140,6 +1140,64 @@ static void inner_rx(PHY_VARS_gNB *gNB,
   for (int i = 0; i < nb_layer; i++)
     memset(&pusch_vars->rxdataF_comp[i*nb_rx_ant][symbol * buffer_length], 0, sizeof(int32_t) * buffer_length);
 
+  // Phase-4 UL MU-MIMO joint MMSE-IRC (env OAI_UL_MU_IRC). If this connected 1-layer UE is
+  // co-scheduled with a partner on the same PRBs (same rb_start/rb_size), run a 2-stream receiver
+  // [layer0=self, layer1=partner] to NULL the partner and decode self. Reuses the existing 2-layer
+  // channel-compensation + nr_ulsch_mmse_2layers; local 2-layer buffers; writes only this UE's
+  // llr[0] on data symbols. DMRS symbols fall through to the normal path. Off => unchanged.
+  {
+    static int mu_irc = -1;
+    if (mu_irc < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_irc = (e && e[0]) ? 1 : 0; }
+    int partner = -1;
+    // Only fire on genuine co-scheduled DATA: large allocation (co-sched forces full band; RA/
+    // Msg3/registration are small so they keep normal MRC and attach unbroken), distinct rnti,
+    // matching PRBs. Prevents the IRC mis-pairing during attach that breaks decode.
+    if (mu_irc && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
+      for (int id = 0; id < gNB->max_nb_pusch; id++) {
+        if (id == ulsch_id) continue;
+        nfapi_nr_pusch_pdu_t *p = &gNB->ulsch[id].harq_process->ulsch_pdu;
+        if (p->rb_size == rel15_ul->rb_size && p->rb_start == rel15_ul->rb_start && p->rnti != rel15_ul->rnti) {
+          partner = id;
+          break;
+        }
+      }
+    }
+    if (partner >= 0) {
+      NR_gNB_PUSCH *pv_p = &gNB->pusch_vars[partner];
+      c16_t chF2[2][nb_rx_ant][buffer_length] __attribute__((aligned(32)));
+      c16_t rxF2[nb_rx_ant][buffer_length] __attribute__((aligned(32)));
+      c16_t dummy[buffer_length] __attribute__((aligned(32)));
+      memset(chF2, 0, sizeof(chF2));
+      memset(rxF2, 0, sizeof(rxF2));
+      for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
+        nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)pusch_vars->ul_ch_estimates[aarx], rxF2[aarx], chF2[0][aarx],
+                             soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
+                             aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
+        nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)pv_p->ul_ch_estimates[aarx], dummy, chF2[1][aarx],
+                             soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
+                             aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
+      }
+      int32_t comp2buf[2 * nb_rx_ant][buffer_length] __attribute__((aligned(32)));
+      int *comp2[2 * nb_rx_ant];
+      for (int i = 0; i < 2 * nb_rx_ant; i++) { comp2[i] = comp2buf[i]; memset(comp2buf[i], 0, sizeof(int32_t) * buffer_length); }
+      c16_t rho2[2][2][buffer_length] __attribute__((aligned(32)));
+      c16_t mga[2][buffer_length] __attribute__((aligned(32)));
+      c16_t mgb[2][buffer_length] __attribute__((aligned(32)));
+      c16_t mgc[2][buffer_length] __attribute__((aligned(32)));
+      memset(rho2, 0, sizeof(rho2)); memset(mga, 0, sizeof(mga)); memset(mgb, 0, sizeof(mgb)); memset(mgc, 0, sizeof(mgc));
+      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxF2, chF2, mga, mgb, mgc, comp2, 2, rho2, rel15_ul, symbol, output_shift);
+      nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
+                            rel15_ul->qam_mod_order, pusch_vars->log2_maxh, symbol, pusch_vars->ul_valid_re_per_slot[symbol], nvar);
+      // self stream = comp2[0]; compute this UE's LLR and finish this symbol via IRC
+      nr_ulsch_compute_llr((int32_t *)comp2[0], mga[0], mgb[0], mgc[0], llr[0],
+                           pusch_vars->ul_valid_re_per_slot[symbol], symbol, rel15_ul->qam_mod_order);
+      static int d = 0;
+      if (d++ < 8) LOG_E(PHY, "[MU IRC] ulsch=%d rnti=%04x partner=%d 2-stream separate on same PRBs\n",
+                         ulsch_id, rel15_ul->rnti, partner);
+      return;
+    }
+  }
+
   nr_ulsch_channel_compensation(buffer_length,
                                 nb_rx_ant,
                                 rxFext,
