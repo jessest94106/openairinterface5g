@@ -1162,20 +1162,35 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         }
       }
     }
+    // Signal-present guard: only run IRC when there's actually a received signal to separate on
+    // this symbol (rxFext non-trivial). Prevents firing on empty/phantom-grant symbols where the
+    // UE isn't transmitting (rxFext~0), which corrupted decode and broke attach.
+    if (partner >= 0) {
+      long rxe = 0;
+      for (int a = 0; a < nb_rx_ant; a++)
+        for (int i = 0; i < 32 && i < buffer_length; i++) rxe += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
+      if (rxe < 8) partner = -1; // no real signal this symbol -> fall through to normal path
+    }
     if (partner >= 0) {
       NR_gNB_PUSCH *pv_p = &gNB->pusch_vars[partner];
       c16_t chF2[2][nb_rx_ant][buffer_length] __attribute__((aligned(32)));
-      c16_t rxF2[nb_rx_ant][buffer_length] __attribute__((aligned(32)));
       c16_t dummy[buffer_length] __attribute__((aligned(32)));
       memset(chF2, 0, sizeof(chF2));
-      memset(rxF2, 0, sizeof(rxF2));
+      // REUSE the normal extraction: rxFext (received) + chFext[0] (self channel) are already
+      // filled above. Only extract the PARTNER channel into chF2[1]. chF2[0] = self.
       for (int aarx = 0; aarx < nb_rx_ant; aarx++) {
-        nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)pusch_vars->ul_ch_estimates[aarx], rxF2[aarx], chF2[0][aarx],
-                             soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
-                             aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
+        memcpy(chF2[0][aarx], chFext[0][aarx], buffer_length * sizeof(c16_t));
         nr_ulsch_extract_rbs(rxF[aarx], (c16_t *)pv_p->ul_ch_estimates[aarx], dummy, chF2[1][aarx],
                              soffset + (symbol * frame_parms->ofdm_symbol_size), dmrs_symbol * frame_parms->ofdm_symbol_size,
                              aarx, dmrs_symbol_flag, rel15_ul, frame_parms);
+      }
+      { // diagnostic: is the (normal) self channel estimate non-zero here?
+        static int cd = 0;
+        if (cd++ < 4) {
+          long s0 = 0, r0 = 0;
+          for (int a = 0; a < nb_rx_ant; a++) { s0 += abs(chFext[0][a][10].r) + abs(chFext[0][a][10].i); r0 += abs(rxFext[a][10].r) + abs(rxFext[a][10].i); }
+          LOG_E(PHY, "[MU DIAG] normal-path |chFext[0]@10|=%ld |rxFext@10|=%ld (non-zero => estimate ok)\n", s0, r0);
+        }
       }
       int32_t comp2buf[2 * nb_rx_ant][buffer_length] __attribute__((aligned(32)));
       int *comp2[2 * nb_rx_ant];
@@ -1185,15 +1200,34 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       c16_t mgb[2][buffer_length] __attribute__((aligned(32)));
       c16_t mgc[2][buffer_length] __attribute__((aligned(32)));
       memset(rho2, 0, sizeof(rho2)); memset(mga, 0, sizeof(mga)); memset(mgb, 0, sizeof(mgb)); memset(mgc, 0, sizeof(mgc));
-      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxF2, chF2, mga, mgb, mgc, comp2, 2, rho2, rel15_ul, symbol, output_shift);
+      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, rel15_ul, symbol, output_shift);
       nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
                             rel15_ul->qam_mod_order, pusch_vars->log2_maxh, symbol, pusch_vars->ul_valid_re_per_slot[symbol], nvar);
       // self stream = comp2[0]; compute this UE's LLR and finish this symbol via IRC
       nr_ulsch_compute_llr((int32_t *)comp2[0], mga[0], mgb[0], mgc[0], llr[0],
                            pusch_vars->ul_valid_re_per_slot[symbol], symbol, rel15_ul->qam_mod_order);
-      static int d = 0;
-      if (d++ < 8) LOG_E(PHY, "[MU IRC] ulsch=%d rnti=%04x partner=%d 2-stream separate on same PRBs\n",
-                         ulsch_id, rel15_ul->rnti, partner);
+      // Stage-0 separation-health metric: chest magnitudes (self vs partner), post-eq output energy,
+      // and LLR distribution of the separated self-stream. Diagnoses the DSP handoffs without a
+      // reference: LLR~0 => extraction/scaling dead; LLR saturated => overflow; healthy+CRC-fail =>
+      // residual interference (separation incomplete). Rate-limited, env OAI_UL_MU_IRC only.
+      {
+        static int m = 0;
+        if (m++ < 10) {
+          int nre = pusch_vars->ul_valid_re_per_slot[symbol];
+          long ch0 = 0, ch1 = 0, out0 = 0;
+          for (int a = 0; a < nb_rx_ant; a++) {
+            ch0 += abs(chF2[0][a][nre / 2].r) + abs(chF2[0][a][nre / 2].i);
+            ch1 += abs(chF2[1][a][nre / 2].r) + abs(chF2[1][a][nre / 2].i);
+          }
+          const c16_t *o = (const c16_t *)comp2[0];
+          for (int i = 0; i < nre; i++) out0 += abs(o[i].r) + abs(o[i].i);
+          long labs = 0; int lmax = 0;
+          for (int i = 0; i < nre * rel15_ul->qam_mod_order; i++) { int v = abs(llr[0][i]); labs += v; if (v > lmax) lmax = v; }
+          LOG_E(PHY, "[MU METRIC] rnti=%04x partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d\n",
+                rel15_ul->rnti, partner, symbol, nre, ch0, ch1, pusch_vars->log2_maxh,
+                nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax);
+        }
+      }
       return;
     }
   }
