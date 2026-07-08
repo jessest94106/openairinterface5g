@@ -46,6 +46,9 @@
 #define CONFIG_STRING_ORU_NUM_DL_SYMBOLS           "num_dl_symbols"
 #define CONFIG_STRING_ORU_NUM_UL_SYMBOLS           "num_ul_symbols"
 #define CONFIG_STRING_ORU_TP_CORES                  "tp_cores"
+#define CONFIG_STRING_NB_FH_STREAMS                 "nb_fh_streams"
+#define CONFIG_STRING_CODEBOOK_NB_BEAMS             "codebook_nb_beams"
+#define CONFIG_STRING_CODEBOOK_WEIGHTS              "codebook_weights"
 
 #define HLP_ORU_TX_BW "set the TX bandwidth list per component carrier"
 #define HLP_ORU_RX_BW "set the RX bandwidth list per component carrier"
@@ -61,6 +64,9 @@
 #define HLP_ORU_NUM_DL_SYMBOLS "set the number of DL symbols in the mixed slot"
 #define HLP_ORU_NUM_UL_SYMBOLS "set the number of UL symbols in the mixed slot"
 #define HLP_ORU_TP_CORES       "CPU cores used for threadpool"
+#define HLP_NB_FH_STREAMS "number of fronthaul streams from DU (0=passthrough, enables Cat-B codebook when > 0)"
+#define HLP_CODEBOOK_NB_BEAMS "number of beams in the O-RU codebook"
+#define HLP_CODEBOOK_WEIGHTS "Q15 codebook weights: nb_beams * nb_tx * nb_fh_streams interleaved Re/Im pairs"
 
 #define CMDLINE_PARAMS_DESC_ORU \
 { \
@@ -78,6 +84,9 @@
   {CONFIG_STRING_ORU_NUM_DL_SYMBOLS,            HLP_ORU_NUM_DL_SYMBOLS,             0,    .uptr=NULL,       .defintval=7,                 TYPE_UINT,         0}, \
   {CONFIG_STRING_ORU_NUM_UL_SYMBOLS,            HLP_ORU_NUM_UL_SYMBOLS,             0,    .uptr=NULL,       .defintval=3,                 TYPE_UINT,         0}, \
   {CONFIG_STRING_ORU_TP_CORES,                  HLP_ORU_TP_CORES,                   0,    .iptr=NULL,       .defintarrayval=DEFTPCORES,   TYPE_INTARRAY,     4}, \
+  {CONFIG_STRING_NB_FH_STREAMS,                 HLP_NB_FH_STREAMS,                  0,    .iptr=NULL,       .defintval=0,                 TYPE_INT,          0}, \
+  {CONFIG_STRING_CODEBOOK_NB_BEAMS,             HLP_CODEBOOK_NB_BEAMS,              0,    .iptr=NULL,       .defintval=0,                 TYPE_INT,          0}, \
+  {CONFIG_STRING_CODEBOOK_WEIGHTS,              HLP_CODEBOOK_WEIGHTS,               0,    .iptr=NULL,       .defintarrayval=NULL,         TYPE_INTARRAY,     0}, \
 }
 // clang-format on
 
@@ -371,6 +380,32 @@ int get_oru_options(ORU_t *oru)
   oru->num_DL_symbols = *gpd(param, nump, CONFIG_STRING_ORU_NUM_DL_SYMBOLS)->iptr;
   oru->num_UL_symbols = *gpd(param, nump, CONFIG_STRING_ORU_NUM_UL_SYMBOLS)->iptr;
 
+  // Cat-B codebook beamforming (ported from oru_new_beamforming). Default nb_fh_streams=0 =>
+  // passthrough (weights untouched, current behaviour). >0 loads the Q15 codebook.
+  oru->codebook.nb_fh_streams = *gpd(param, nump, CONFIG_STRING_NB_FH_STREAMS)->iptr;
+  oru->codebook.nb_beams = *gpd(param, nump, CONFIG_STRING_CODEBOOK_NB_BEAMS)->iptr;
+  if (oru->codebook.nb_fh_streams > 0) {
+    AssertFatal(oru->codebook.nb_fh_streams <= ORU_CODEBOOK_MAX_STREAMS,
+                "nb_fh_streams %d exceeds maximum %d\n", oru->codebook.nb_fh_streams, ORU_CODEBOOK_MAX_STREAMS);
+    AssertFatal(oru->codebook.nb_beams > 0 && oru->codebook.nb_beams <= ORU_CODEBOOK_MAX_BEAMS,
+                "codebook_nb_beams %d invalid (range 1..%d)\n", oru->codebook.nb_beams, ORU_CODEBOOK_MAX_BEAMS);
+    AssertFatal(oru->ru->nb_tx <= ORU_CODEBOOK_MAX_NB_TX, "nb_tx %d exceeds maximum %d\n", oru->ru->nb_tx, ORU_CODEBOOK_MAX_NB_TX);
+    paramdef_t *wgt = gpd(param, nump, CONFIG_STRING_CODEBOOK_WEIGHTS);
+    int expected = oru->codebook.nb_beams * oru->ru->nb_tx * oru->codebook.nb_fh_streams * 2;
+    AssertFatal(wgt->numelt == expected,
+                "codebook_weights: expected %d elements (nb_beams=%d * nb_tx=%d * nb_fh_streams=%d * 2)\n",
+                expected, oru->codebook.nb_beams, oru->ru->nb_tx, oru->codebook.nb_fh_streams);
+    int idx = 0;
+    for (int b = 0; b < oru->codebook.nb_beams; b++)
+      for (int t = 0; t < oru->ru->nb_tx; t++)
+        for (int s = 0; s < oru->codebook.nb_fh_streams; s++) {
+          oru->codebook.w[b][t][s].r = (int16_t)wgt->iptr[idx++];
+          oru->codebook.w[b][t][s].i = (int16_t)wgt->iptr[idx++];
+        }
+    LOG_A(PHY, "[ORU] Cat-B codebook loaded: nb_fh_streams=%d nb_beams=%d nb_tx=%d\n",
+          oru->codebook.nb_fh_streams, oru->codebook.nb_beams, oru->ru->nb_tx);
+  }
+
   int* tp_cores = gpd(param, nump, CONFIG_STRING_ORU_TP_CORES)->iptr;
   int num_tp_cores = gpd(param, nump, CONFIG_STRING_ORU_TP_CORES)->numelt;
   AssertFatal(num_tp_cores > 0, "No threadpool cores specified\n");
@@ -561,6 +596,29 @@ int get_prach_symbol(ORU_t *oru, int frame, int slot, int symbol, int numerology
   return -1;
 }
 
+// Cat-B codebook precoding at the O-RU: tx_out[txru] = sum_s W[beam][txru][s] * fh_in[s]
+// (Q15 complex MAC), ported from oru_new_beamforming ebb57947.
+static void apply_codebook_weights(const c16_t **fh_in,
+                                   c16_t **tx_out,
+                                   int nb_tx,
+                                   int nb_fh,
+                                   int n_re,
+                                   const oru_codebook_t *cb,
+                                   uint16_t beam_id)
+{
+  int bidx = (beam_id < (uint16_t)cb->nb_beams) ? beam_id : 0;
+  for (int txru = 0; txru < nb_tx; txru++) {
+    memset(tx_out[txru], 0, n_re * sizeof(c16_t));
+    for (int s = 0; s < nb_fh; s++) {
+      c16_t w = cb->w[bidx][txru][s];
+      for (int re = 0; re < n_re; re++) {
+        tx_out[txru][re].r += (int16_t)(((int32_t)fh_in[s][re].r * w.r - (int32_t)fh_in[s][re].i * w.i) >> 15);
+        tx_out[txru][re].i += (int16_t)(((int32_t)fh_in[s][re].r * w.i + (int32_t)fh_in[s][re].i * w.r) >> 15);
+      }
+    }
+  }
+}
+
 void *oru_north_read_thread(void *arg)
 {
   ORU_t *oru = (ORU_t *)arg;
@@ -577,6 +635,21 @@ void *oru_north_read_thread(void *arg)
   }
   ru->common.txdataF_BF = (int32_t **)txDataF_ptr;
 
+  // Cat-B beamforming: when enabled, the DU sends nb_fh logical layers -> read those into a
+  // separate FH buffer, then precode to the nb_tx physical antennas. Off (nb_fh_streams==0):
+  // fh buffer aliases txDataF_ptr, north_in reads nb_tx directly = unchanged passthrough.
+  const int nb_fh = (oru->codebook.nb_fh_streams > 0) ? oru->codebook.nb_fh_streams : ru->nb_tx;
+  __attribute__((aligned(32))) c16_t txDataF_fh_buf[nb_fh][fp->ofdm_symbol_size * 14];
+  c16_t *txDataF_fh_ptr[nb_fh];
+  if (oru->codebook.nb_fh_streams > 0) {
+    memset(txDataF_fh_buf, 0, sizeof(txDataF_fh_buf));
+    for (int i = 0; i < nb_fh; i++)
+      txDataF_fh_ptr[i] = txDataF_fh_buf[i];
+  } else {
+    for (int i = 0; i < nb_fh; i++)
+      txDataF_fh_ptr[i] = txDataF_ptr[i];
+  }
+
   notifiedFIFO_elt_t *elt = pullNotifiedFIFO(&oru->sync_fifo);
   initial_sync_t *initial_sync = NotifiedFifoData(elt);
   sync_params_t sync_params;
@@ -591,7 +664,11 @@ void *oru_north_read_thread(void *arg)
   while (!oai_exit) {
     int num_symbols = 0;
     sense_of_time_t sense_of_time;
-    ru->ifdevice.xran_api.north_in_func((uint32_t **)txDataF_ptr, ru->nb_tx, &sense_of_time, &num_symbols);
+    ru->ifdevice.xran_api.north_in_func((uint32_t **)txDataF_fh_ptr, nb_fh, &sense_of_time, &num_symbols);
+    if (oru->codebook.nb_fh_streams > 0)
+      apply_codebook_weights((const c16_t **)txDataF_fh_ptr, txDataF_ptr, ru->nb_tx, nb_fh,
+                             fp->ofdm_symbol_size * num_symbols, &oru->codebook,
+                             0 /* beam_id: C-plane beamid reception not ported; single beam for now */);
     openair0_timestamp_t timestamp_tx = get_timestamp(oru, &sense_of_time, &sync_params);
     if ((sense_of_time.frame % 256 == 0) && sense_of_time.slot == 0) {
       LOG_I(PHY,

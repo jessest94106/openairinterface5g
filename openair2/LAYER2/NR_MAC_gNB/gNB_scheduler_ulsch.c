@@ -2302,9 +2302,31 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     /* save allocation to FAPI structures */
     post_process_ulsch(nrmac, pp_pusch, iterator->UE, &sched);
 
-    n_rb_sched[beam.idx] -= sched.rbSize;
-    for (int rb = bi.bwpStart; rb < sched.rbSize; rb++)
-      rballoc_mask[rb + sched.rbStart] |= slbitmap;
+    // Phase-3 UL MU-MIMO co-scheduling (env OAI_UL_MU_COSCHED): for CONNECTED UEs, do NOT mark the
+    // granted RBs used and do NOT decrement the free-RB count, so the next connected UE's rbStart
+    // search finds the same RBs free -> both get the SAME PRBs (spatially separated by the Phase-1
+    // steering + Phase-2 scid). Gated to connected UEs (UE->ra==NULL): RA/attach stays OFDMA, else
+    // the co-scheduled UEs would collide before the Phase-4 joint receiver exists. Off => unchanged.
+    static int cosched = -1;
+    if (cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); cosched = (e && e[0]) ? 1 : 0; }
+    bool mu_overlap = cosched && iterator->UE->ra == NULL;
+    if (!mu_overlap) {
+      n_rb_sched[beam.idx] -= sched.rbSize;
+      for (int rb = bi.bwpStart; rb < sched.rbSize; rb++)
+        rballoc_mask[rb + sched.rbStart] |= slbitmap;
+    } else {
+      // Log once per distinct rnti (first overlap) so BOTH co-scheduled UEs show, plus the
+      // per-slot overlap count so we can see both hitting the same PRBs in the same slot.
+      static rnti_t seen[8] = {0};
+      static int seen_cnt = 0;
+      bool known = false;
+      for (int i = 0; i < seen_cnt; i++) if (seen[i] == iterator->UE->rnti) { known = true; break; }
+      if (!known && seen_cnt < 8) {
+        seen[seen_cnt++] = iterator->UE->rnti;
+        LOG_E(NR_MAC, "[MU COSCHED] rnti=%04x co-scheduled on SAME PRBs rbStart=%d rbSize=%d slot=%d.%d\n",
+              iterator->UE->rnti, sched.rbStart, sched.rbSize, frame, slot);
+      }
+    }
 
     /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
     remainUEs[beam.idx]--;
@@ -2353,6 +2375,51 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
   // DMRS
   pusch_pdu->num_dmrs_cdm_grps_no_data = sched_pusch->dmrs_info.num_dmrs_cdm_grps_no_data;
   pusch_pdu->dmrs_ports = ((1 << sched_pusch->nrOfLayers) - 1);
+  // Phase-2 UL MU-MIMO (2026-07-07): base OAI puts every UE on DMRS port 0, so co-scheduled UEs
+  // would collide. Shift each UE's port bitmap by its uid so UE0->port0, UE1->port1, ... (ports
+  // 0/1 are FD-OCC-orthogonal within CDM group 0). The PHY estimator is already per-port
+  // (get_dmrs_port), so distinct ports let the gNB estimate each UE's channel separately once
+  // they share PRBs (Phase 3). Env OAI_UL_MU_DMRS; single-layer only; off => unchanged.
+  {
+    static int mu_dmrs = -1;
+    if (mu_dmrs < 0) { const char *e = getenv("OAI_UL_MU_DMRS"); mu_dmrs = (e && e[0]) ? atoi(e) : 0; }
+    // Only shift CONNECTED UEs (UE->ra==NULL): Msg3/RA PUSCH must stay on port 0 (the UE ignores a
+    // shifted port during RA -> gNB can't decode Msg3 -> contention resolution fails).
+    if (mu_dmrs > 0 && sched_pusch->nrOfLayers == 1 && UE->ra == NULL) {
+      // Assign a distinct DMRS port per connected UE by CONNECTION ORDER (first-seen rnti ->
+      // port 0, second -> port 1, ...). uid is not reliably 0/1, so map rnti -> index instead.
+      static rnti_t mu_map[8] = {0};
+      static int mu_cnt = 0;
+      int port = -1;
+      for (int i = 0; i < mu_cnt; i++) if (mu_map[i] == rnti) { port = i; break; }
+      if (port < 0 && mu_cnt < 8) {
+        port = mu_cnt;
+        mu_map[mu_cnt++] = rnti;
+        LOG_E(NR_MAC, "[MU DMRS] assign rnti=%04x order=%d -> port %d (dmrs_ports=0x%x)\n",
+              rnti, port, port % mu_dmrs, ((1 << sched_pusch->nrOfLayers) - 1) << (port % mu_dmrs));
+      }
+      if (port < 0) port = 0;
+      int shift = port % mu_dmrs;
+      // Isolation test: OAI_UL_MU_FORCE_PORT forces every connected UE onto that port so a
+      // single UE can be put on port 1 to test the port-1 DCI/decode path in isolation.
+      static int fp = -2;
+      if (fp == -2) { const char *e = getenv("OAI_UL_MU_FORCE_PORT"); fp = (e && e[0]) ? atoi(e) : -1; }
+      if (fp >= 0) shift = fp;
+      // Alternative to distinct PORTS (which OAI can't decode on port>0): distinct SCID. Keep both
+      // UEs on port 0 but give each a different DMRS scrambling (nSCID) -> quasi-orthogonal DMRS,
+      // estimable without the port-1 antenna-ports DCI gap. OAI_UL_MU_SCID => use scid=port_index.
+      static int use_scid = -1;
+      if (use_scid < 0) { const char *e = getenv("OAI_UL_MU_SCID"); use_scid = (e && e[0]) ? 1 : 0; }
+      static int force_scid = -2;
+      if (force_scid == -2) { const char *e = getenv("OAI_UL_MU_FORCE_SCID"); force_scid = (e && e[0]) ? atoi(e) : -1; }
+      if (use_scid || force_scid >= 0) {
+        pusch_pdu->scid = (force_scid >= 0) ? force_scid : (port % 2);
+        // dmrs_ports stays default (port 0)
+      } else {
+        pusch_pdu->dmrs_ports = ((1 << sched_pusch->nrOfLayers) - 1) << shift;
+      }
+    }
+  }
   pusch_pdu->ul_dmrs_symb_pos = sched_pusch->dmrs_info.ul_dmrs_symb_pos;
   pusch_pdu->dmrs_config_type = sched_pusch->dmrs_info.dmrs_config_type;
   pusch_pdu->scid = sched_pusch->dmrs_info.scid; // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]

@@ -26,8 +26,23 @@
 #include "common/utils/nr/nr_common.h"
 #include "openair2/LAYER2/NR_MAC_COMMON/nr_prach_config.h"
 
+// Cat-B codebook beamforming at the O-RU (ported from duranta-project/oru_new_beamforming
+// ebb57947). The DU sends nb_fh_streams logical layers; the O-RU precodes them onto nb_tx
+// physical antennas via a Q15 codebook W[beam][txru][stream], selected by C-plane beam_id.
+// nb_fh_streams==0 => passthrough (no beamforming), the default/unchanged behaviour.
+#define ORU_CODEBOOK_MAX_BEAMS 64
+#define ORU_CODEBOOK_MAX_NB_TX 8
+#define ORU_CODEBOOK_MAX_STREAMS 8
+
+typedef struct {
+  int nb_fh_streams;
+  int nb_beams;
+  c16_t w[ORU_CODEBOOK_MAX_BEAMS][ORU_CODEBOOK_MAX_NB_TX][ORU_CODEBOOK_MAX_STREAMS];
+} oru_codebook_t;
+
 typedef struct {
   RU_t *ru;
+  oru_codebook_t codebook;
   /// tx carrier
   uint64_t carrier_freq_tx[MAX_BANDS_PER_RRU];
   /// rx carrier

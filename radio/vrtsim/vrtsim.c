@@ -31,6 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <math.h>
 #include <errno.h>
 #include <sys/epoll.h>
 #include <netdb.h>
@@ -165,6 +166,15 @@ typedef struct {
                          // (signal +12 dB coherent, noise +6 dB incoherent -> +6 dB SNR = the massive-MIMO gain).
   unsigned int ul_noise_seed[MAX_NUM_ANTENNAS_TX];
   int ul_atten_shift;    // per-antenna UL right-shift (bits) to de-saturate the coherent Nrx combine; env VRTSIM_UL_ATTEN_SHIFT.
+  // Phase-1 UL MU-MIMO channel emulation: per-UE spatial signature across the gNB RX antennas.
+  // Replaces the identical rank-1 duplicate (all UEs same signature -> inseparable) with a
+  // distinct steering vector per UE so H=[h_0..h_{K-1}] is rank-K = separable. Q15 unit-phase
+  // DFT beams by default (orthogonal); per-UE spatial frequency overridable via VRTSIM_UL_MU_STEER
+  // (comma list, cycles/antenna). Enables the MU-MIMO conditioning sweep (orthogonal->collinear).
+  int ul_mu_steer;                                     // 0=off (rank-1 duplicate, unchanged), 1=on
+  int ul_mu_steer_ready;                               // steering table computed (lazy, needs nbAnt)
+  double ul_mu_angle[MAX_NUM_UES];                     // per-UE spatial frequency (cycles/antenna)
+  c16_t ul_mu_w[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];     // per-(UE,antenna) Q15 steering weight
   double rx_freq;
   double tx_bw;
   int tx_num_channels;
@@ -358,6 +368,25 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   }
   for (int a = 0; a < MAX_NUM_ANTENNAS_TX; a++)
     vrtsim_state->ul_noise_seed[a] = 0x9E3779B9u * (a + 1); // distinct per-antenna seed -> independent noise
+  // Phase-1 UL MU-MIMO steering: VRTSIM_UL_MU_STEER = "auto" (orthogonal DFT beams, angle_u=u/nbAnt)
+  // or a comma list of per-UE spatial frequencies (cycles/antenna), e.g. "0,0.25". Absent/empty=off.
+  vrtsim_state->ul_mu_steer = 0;
+  vrtsim_state->ul_mu_steer_ready = 0;
+  for (int u = 0; u < MAX_NUM_UES; u++)
+    vrtsim_state->ul_mu_angle[u] = -1.0; // sentinel: fill with default u/nbAnt lazily
+  const char *ulmu = getenv("VRTSIM_UL_MU_STEER");
+  if (ulmu != NULL && ulmu[0] != '\0') {
+    vrtsim_state->ul_mu_steer = 1;
+    if (strncmp(ulmu, "auto", 4) != 0) {
+      int u = 0;
+      char buf[256];
+      strncpy(buf, ulmu, sizeof(buf) - 1);
+      buf[sizeof(buf) - 1] = '\0';
+      for (char *tok = strtok(buf, ","); tok && u < MAX_NUM_UES; tok = strtok(NULL, ","))
+        vrtsim_state->ul_mu_angle[u++] = atof(tok);
+    }
+    LOG_A(HW, "VRTSIM: UL MU-MIMO steering ENABLED (%s)\n", ulmu);
+  }
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
     LOG_A(HW, "VRTSIM: will use taps socket %s\n", vrtsim_state->taps_socket);
@@ -392,7 +421,8 @@ static void *vrtsim_timing_job(void *arg)
     int64_t samples_to_produce = sample_index - last_sample_index;
     shm_td_iq_channel_produce_samples(vrtsim_state->channel, samples_to_produce);
     last_sample_index = sample_index;
-    usleep(1);
+    usleep(20); // was usleep(1) — reduce OS scheduler pressure from the timing thread
+                // (ported from oru_new_beamforming 75d7fa27; may steady cold-start sync)
   }
   return 0;
 }
@@ -1219,11 +1249,28 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       }
       for (int aarx = 0; aarx < nbAnt; aarx++)
         memset(samplesVoid[aarx], 0, nsamps * sizeof(sample_t));
-      // Asymmetric-safe combine (2026-07-06): the old stream index (u*nbAnt+aarx) assumed
-      // UE tx count == gNB rx count — at 1-TX UEs with a 4-RX gNB it read nonexistent
-      // streams AND destructively double-read real ones. Correct model (matching the
-      // single-UE path): read each UE tx stream ONCE (ring layout = ue_conf tx_offset),
-      // then add it into EVERY gNB antenna (rank-1 duplicate = coherent copies).
+      // Phase-1 UL MU-MIMO: lazily build the per-UE steering table now that nbAnt is known.
+      // w[u][a] = unit-phase DFT beam exp(j*2*pi*a*angle_u), angle_u = u/nbAnt by default
+      // (orthogonal beams) or the configured VRTSIM_UL_MU_STEER value. Q15.
+      if (vrtsim_state->ul_mu_steer && !vrtsim_state->ul_mu_steer_ready) {
+        for (int u = 0; u < vrtsim_state->num_ues; u++) {
+          double ang = (vrtsim_state->ul_mu_angle[u] >= 0.0) ? vrtsim_state->ul_mu_angle[u]
+                                                             : (double)u / (double)nbAnt;
+          for (int a = 0; a < nbAnt && a < MAX_NUM_ANTENNAS_TX; a++) {
+            double ph = 2.0 * M_PI * (double)a * ang;
+            vrtsim_state->ul_mu_w[u][a].r = (int16_t)lround(cos(ph) * 32767.0);
+            vrtsim_state->ul_mu_w[u][a].i = (int16_t)lround(sin(ph) * 32767.0);
+          }
+          LOG_A(HW, "VRTSIM: UL MU steer UE%d angle=%.3f cyc/ant w[0..%d]=[%d,%d %d,%d ...]\n",
+                u, ang, nbAnt - 1, vrtsim_state->ul_mu_w[u][0].r, vrtsim_state->ul_mu_w[u][0].i,
+                vrtsim_state->ul_mu_w[u][1 % nbAnt].r, vrtsim_state->ul_mu_w[u][1 % nbAnt].i);
+        }
+        vrtsim_state->ul_mu_steer_ready = 1;
+      }
+      // Combine: read each UE tx stream ONCE (ring layout = ue_conf tx_offset), then add it into
+      // every gNB antenna. Default = rank-1 duplicate (identical, all UEs same signature). With
+      // MU steering ON, multiply by the per-(UE,antenna) weight w[u][a] so each UE gets a distinct
+      // spatial signature -> H is rank-K and the (future) joint receiver can separate the UEs.
       for (int u = 0; u < vrtsim_state->num_ues; u++) {
         const int ue_tx = vrtsim_state->ue_conf[u].tx_ant;
         const int base = vrtsim_state->ue_conf[u].tx_offset;
@@ -1245,9 +1292,21 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
             if (samplesVoid[aarx] == NULL)
               continue;
             int16_t *out = (int16_t *)samplesVoid[aarx];
-            for (int i = 0; i < nsamps * 2; i++) {
-              int32_t sum = (int32_t)out[i] + (int32_t)in[i];
-              out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+            if (vrtsim_state->ul_mu_steer) {
+              const c16_t w = vrtsim_state->ul_mu_w[u][aarx];
+              for (int i = 0; i < nsamps; i++) {
+                int32_t sr = (int32_t)in[2 * i], si = (int32_t)in[2 * i + 1];
+                int32_t pr = (sr * w.r - si * w.i) >> 15;
+                int32_t pi = (sr * w.i + si * w.r) >> 15;
+                int32_t or_ = (int32_t)out[2 * i] + pr, oi = (int32_t)out[2 * i + 1] + pi;
+                out[2 * i]     = (int16_t)((or_ > 32767) ? 32767 : (or_ < -32768) ? -32768 : or_);
+                out[2 * i + 1] = (int16_t)((oi > 32767) ? 32767 : (oi < -32768) ? -32768 : oi);
+              }
+            } else {
+              for (int i = 0; i < nsamps * 2; i++) {
+                int32_t sum = (int32_t)out[i] + (int32_t)in[i];
+                out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+              }
             }
           }
         }

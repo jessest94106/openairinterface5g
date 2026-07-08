@@ -456,6 +456,25 @@ static void nr_pusch_antenna_processing(void *arg)
       printf("%d\n", idxP);
     }
 #endif
+    // Phase-1 UL MU-MIMO verification (OAI_MU_CHEST_DEBUG): dump the per-antenna channel
+    // estimate per UE at a mid-band subcarrier. Distinct per-UE phase-ramps across antennas
+    // prove the vrtsim steering gave each UE a distinct spatial signature (separable H).
+    {
+      static int mu_dbg = -1;
+      if (mu_dbg < 0) { const char *e = getenv("OAI_MU_CHEST_DEBUG"); mu_dbg = (e && e[0]) ? 1 : 0; }
+      if (mu_dbg && nl == 0) {
+        static int cnt[8] = {0};
+        int ai = antenna & 7;
+        if (cnt[ai]++ < 40) {
+          const c16_t *che = &ul_ch_estimates[nl * frame_parms->nb_antennas_rx + antenna][symbol_offset];
+          int mid = k0 + nb_rb_pusch * 6; // ~middle of the allocation
+          if (mid >= symbolSize) mid -= symbolSize;
+          double ph = atan2((double)che[mid].i, (double)che[mid].r) * 180.0 / M_PI;
+          LOG_E(PHY, "[MU CHEST] rnti=%04x ant=%d re=%d im=%d |ph=%.0f deg\n",
+                pusch_pdu->rnti, antenna, che[mid].r, che[mid].i, ph);
+        }
+      }
+    }
     // update the values inside the arrays
     *(rdata->noise_amp2) = noise_amp2;
     *(rdata->nest_count) = nest_count;
