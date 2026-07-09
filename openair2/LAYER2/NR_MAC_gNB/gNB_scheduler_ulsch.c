@@ -2366,6 +2366,17 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
         LOG_E(NR_MAC, "[MU COSCHED] rnti=%04x co-scheduled on SAME PRBs rbStart=%d rbSize=%d slot=%d.%d\n",
               iterator->UE->rnti, sched.rbStart, sched.rbSize, frame, slot);
       }
+      // Sustained-reuse metric (reliable regardless of nb_rx, unlike the ULSCH-trace count which
+      // collision-hides one UE at 1 antenna): each pf_ul call schedules ONE sched_slot, so count the
+      // overlap-UEs within this call; a call with >=2 = a real 2-UE same-PRB reuse slot.
+      static int last_ss = -1, ss_cnt = 0;
+      static long total_overlaps = 0, reuse_slots = 0;
+      int ss = sched_frame * 100 + sched_slot;
+      if (ss != last_ss) { last_ss = ss; ss_cnt = 0; }
+      ss_cnt++; total_overlaps++;
+      if (ss_cnt == 2) reuse_slots++;
+      if ((total_overlaps % 500) == 0)
+        LOG_E(NR_MAC, "[MU REUSE] overlaps=%ld real-reuse-slots(>=2UE/slot)=%ld\n", total_overlaps, reuse_slots);
     }
 
     /* reduce max_num_ue once we are sure UE can be allocated, i.e., has CCE */
