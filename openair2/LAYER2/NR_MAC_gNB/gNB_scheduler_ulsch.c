@@ -2455,6 +2455,25 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
   pusch_pdu->scid = sched_pusch->dmrs_info.scid; // DMRS sequence initialization [TS38.211, sec 6.4.1.1.1]
   pusch_pdu->pusch_identity = sched_pusch->dmrs_info.pusch_identity;
   pusch_pdu->ul_dmrs_scrambling_id = sched_pusch->dmrs_info.dmrs_scrambling_id;
+  // Phase-2 MU-MIMO distinct pilots (MUST be after the default scid above, which else clobbers it):
+  // co-scheduled UEs on the same PRBs need orthogonal DMRS or the joint receiver estimates h0+h1 for
+  // both (chSelf==chPart -> singular MMSE). Give each connected co-scheduled UE a distinct nSCID by
+  // connection order (UE0->0, UE1->1). Gated on g_mu_mimo_active (trigger + both attached + no RA) so
+  // attach keeps the default scid. Env OAI_UL_MU_SCID; single-layer only; off => unchanged.
+  {
+    extern volatile int g_mu_mimo_active;
+    static int mu_scid2 = -1;
+    if (mu_scid2 < 0) { const char *e = getenv("OAI_UL_MU_SCID"); mu_scid2 = (e && e[0]) ? 1 : 0; }
+    if (mu_scid2 && g_mu_mimo_active && UE->ra == NULL && sched_pusch->nrOfLayers == 1) {
+      static rnti_t scid_map[8] = {0};
+      static int scid_cnt = 0;
+      int idx = -1;
+      for (int i = 0; i < scid_cnt; i++) if (scid_map[i] == rnti) { idx = i; break; }
+      if (idx < 0 && scid_cnt < 8) { idx = scid_cnt; scid_map[scid_cnt++] = rnti; }
+      if (idx < 0) idx = 0;
+      pusch_pdu->scid = idx % 2;  // distinct DMRS scrambling per co-scheduled UE
+    }
+  }
   /* Allocation in frequency domain */
   pusch_pdu->resource_alloc = 1; //type 1
   pusch_pdu->rb_start = sched_pusch->rbStart;
