@@ -2012,6 +2012,11 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   // AND >=2 UEs are connected AND nobody is in RA (excludes full-band Msg3 from tripping IRC).
   extern volatile int g_mu_mimo_active;
   g_mu_mimo_active = (mu_trigger_latched && connected_ues >= 2 && !any_ra_in_progress) ? 1 : 0;
+  // MU regime = co-scheduling requested AND the MU regime is active. Used for BOTH the per-UE
+  // "always a candidate" bypass (below) and the same-PRB overlap (allocation loop).
+  static int mu_cosched = -1;
+  if (mu_cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); mu_cosched = (e && e[0]) ? 1 : 0; }
+  const bool mu_regime = mu_cosched && g_mu_mimo_active;
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
@@ -2105,7 +2110,14 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
                                                    nrmac->ulsch_max_frame_inactivity);
 
     LOG_D(NR_MAC,"pf_ul: do_sched UE %04x => %s\n", UE->rnti, do_sched ? "yes" : "no");
-    if ((B == 0 && !do_sched) || nr_timer_is_active(&sched_ctrl->transm_interrupt)) {
+    // MU per-UE PRB scheduling: a saturated MU UE's REAL UL buffer is never empty; only the estimate
+    // B = estimated_ul_buffer - sched_ul_bytes lags after a full-band grant goes in flight. That lag
+    // drops the UE from candidacy for several slots -> the two UEs SERIALIZE (take turns) -> they
+    // almost never co-schedule the same slot (the root of sporadic PRB reuse). Keep each MU UE a
+    // candidate EVERY slot so BOTH enter UE_sched together -> both allocated full band -> cosched
+    // overlaps them on the same PRBs. Gated on mu_regime (OAI_UL_MU_COSCHED + MU active); off => unchanged.
+    const bool mu_force = mu_regime && UE->ra == NULL;
+    if (!mu_force && ((B == 0 && !do_sched) || nr_timer_is_active(&sched_ctrl->transm_interrupt))) {
       reset_beam_status(&nrmac->beam_info, sched_frame, sched_slot, UE->UE_beam_index, slots_per_frame, beam.new_beam);
       reset_beam_status(&nrmac->beam_info, frame, slot, UE->UE_beam_index, slots_per_frame, dci_beam.new_beam);
       continue;
@@ -2337,9 +2349,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     // search finds the same RBs free -> both get the SAME PRBs (spatially separated by the Phase-1
     // steering + Phase-2 scid). Gated to connected UEs (UE->ra==NULL): RA/attach stays OFDMA, else
     // the co-scheduled UEs would collide before the Phase-4 joint receiver exists. Off => unchanged.
-    static int cosched = -1;
-    if (cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); cosched = (e && e[0]) ? 1 : 0; }
-    bool mu_overlap = cosched && iterator->UE->ra == NULL && g_mu_mimo_active;
+    bool mu_overlap = mu_regime && iterator->UE->ra == NULL;  // mu_regime = OAI_UL_MU_COSCHED && MU active
     if (!mu_overlap) {
       n_rb_sched[beam.idx] -= sched.rbSize;
       for (int rb = bi.bwpStart; rb < sched.rbSize; rb++)
