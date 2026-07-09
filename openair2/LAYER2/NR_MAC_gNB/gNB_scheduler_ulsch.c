@@ -31,6 +31,7 @@
 
 #include "LAYER2/NR_MAC_gNB/mac_proto.h"
 #include "executables/softmodem-common.h"
+#include <unistd.h>  // access(): MU attach-first trigger latch
 #include "common/utils/nr/nr_common.h"
 #include "utils.h"
 #include <openair2/UTIL/OPT/opt.h>
@@ -1995,11 +1996,22 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     if (ue_ra->ra != NULL) any_ra_in_progress = true;
     else connected_ues++;
   }
-  // MU-MIMO regime marker for the PHY receiver: the joint MMSE-IRC must run ONLY when there are
-  // >=2 fully-connected UEs and nobody is in RA. Otherwise (attach/storm) full-band Msg3 (rb 0+273)
-  // trips the PHY's rb_size filter and IRC corrupts RA -> PRACH-retry storm. The PHY reads this flag.
+  // MU attach-first latch: NOTHING MU (co-sched, PHY IRC, RU steering) may engage until BOTH UEs
+  // are FULLY attached (PDU session up), signalled by the harness touching the trigger file — the
+  // SAME file the RU steering waits on, so all three activate together. Otherwise co-sched+IRC fire
+  // on a UE that is MAC-connected but pre-PDU, WITHOUT steering (identical signatures, unseparable),
+  // corrupting its NAS/PDU traffic so it never completes -> trigger never fires (chicken-and-egg).
+  // Latched: once seen, stays on (UEs remain attached); only stat the file until then.
+  static int mu_trigger_latched = 0;
+  if (!mu_trigger_latched) {
+    const char *trg = getenv("VRTSIM_UL_MU_STEER_TRIGGER");
+    if (trg == NULL || trg[0] == '\0') trg = "/tmp/vrtsim_mu_steer_on";
+    if (access(trg, F_OK) == 0) mu_trigger_latched = 1;
+  }
+  // MU-MIMO regime marker for the PHY receiver: joint MMSE-IRC runs ONLY when the trigger has fired
+  // AND >=2 UEs are connected AND nobody is in RA (excludes full-band Msg3 from tripping IRC).
   extern volatile int g_mu_mimo_active;
-  g_mu_mimo_active = (connected_ues >= 2 && !any_ra_in_progress) ? 1 : 0;
+  g_mu_mimo_active = (mu_trigger_latched && connected_ues >= 2 && !any_ra_in_progress) ? 1 : 0;
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
@@ -2327,7 +2339,7 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     // the co-scheduled UEs would collide before the Phase-4 joint receiver exists. Off => unchanged.
     static int cosched = -1;
     if (cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); cosched = (e && e[0]) ? 1 : 0; }
-    bool mu_overlap = cosched && iterator->UE->ra == NULL && !any_ra_in_progress;
+    bool mu_overlap = cosched && iterator->UE->ra == NULL && g_mu_mimo_active;
     if (!mu_overlap) {
       n_rb_sched[beam.idx] -= sched.rbSize;
       for (int rb = bi.bwpStart; rb < sched.rbSize; rb++)
