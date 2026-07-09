@@ -2496,6 +2496,9 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
       if (idx < 0 && scid_cnt < 8) { idx = scid_cnt; scid_map[scid_cnt++] = rnti; }
       if (idx < 0) idx = 0;
       pusch_pdu->scid = idx % 2;  // distinct DMRS scrambling per co-scheduled UE
+      { static int sd = 0; if (sd++ < 8)
+          LOG_E(NR_MAC, "[MU PILOT] rnti=%04x idx=%d scid=%d dci_format=%d dmrs_ports=0x%x nlayer=%d\n",
+                rnti, idx, pusch_pdu->scid, UE->current_UL_BWP.dci_format, pusch_pdu->dmrs_ports, sched_pusch->nrOfLayers); }
     }
   }
   /* Allocation in frequency domain */
