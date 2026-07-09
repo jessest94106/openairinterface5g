@@ -1223,7 +1223,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // residual interference (separation incomplete). Rate-limited, env OAI_UL_MU_IRC only.
       {
         static int m = 0;
-        if (m++ < 10) {
+        if ((m++ % 4000) == 0) {  // sample periodically through the whole run (catch post-steering state)
           int nre = pusch_vars->ul_valid_re_per_slot[symbol];
           long ch0 = 0, ch1 = 0, out0 = 0;
           for (int a = 0; a < nb_rx_ant; a++) {
