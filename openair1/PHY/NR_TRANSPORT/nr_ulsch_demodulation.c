@@ -1158,6 +1158,9 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // nb_rx_ant >= 2 REQUIRED: the 2-layer joint detector is degenerate at 1 antenna (can't
     // separate 2 co-channel UEs with 1 RX) -> it corrupts EVERY decode (grants carry garbage,
     // both UEs starve). At 1 antenna the co-scheduled UEs simply collide; IRC cannot help.
+    { static int dg = 0; if (mu_irc && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && dg++ < 6)
+        LOG_E(PHY, "[MU GATE] nb_rx_ant=%d g_mu=%d nb_layer=%d rb_size=%d max_pusch=%d\n",
+              nb_rx_ant, g_mu_mimo_active, nb_layer, rel15_ul->rb_size, gNB->max_nb_pusch); }
     if (mu_irc && g_mu_mimo_active && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
       for (int id = 0; id < gNB->max_nb_pusch; id++) {
         if (id == ulsch_id) continue;

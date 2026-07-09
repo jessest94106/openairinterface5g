@@ -2017,6 +2017,9 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   static int mu_cosched = -1;
   if (mu_cosched < 0) { const char *e = getenv("OAI_UL_MU_COSCHED"); mu_cosched = (e && e[0]) ? 1 : 0; }
   const bool mu_regime = mu_cosched && g_mu_mimo_active;
+  { static long gd = 0; if (mu_cosched && (gd++ % 2000) == 0)
+      LOG_E(NR_MAC, "[MU STATE] g_mu=%d connected=%d any_ra=%d trig_latched=%d\n",
+            g_mu_mimo_active, connected_ues, any_ra_in_progress, mu_trigger_latched); }
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
