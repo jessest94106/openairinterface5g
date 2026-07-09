@@ -1260,8 +1260,18 @@ static void inner_rx(PHY_VARS_gNB *gNB,
           for (int i = 0; i < nre; i++) out0 += abs(o[i].r) + abs(o[i].i);
           long labs = 0; int lmax = 0;
           for (int i = 0; i < nre * rel15_ul->qam_mod_order; i++) { int v = abs(llr[0][i]); labs += v; if (v > lmax) lmax = v; }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d\n",
-                rel15_ul->rnti, partner, symbol, nre, ch0, ch1, pusch_vars->log2_maxh,
+          // Spatial conditioning = correlation between the two UEs' channel vectors across antennas:
+          // corr2pct = 100*|<h0,h1>|^2 / (|h0|^2 |h1|^2). ~0 = orthogonal (separable, real spatial
+          // diversity); ~100 = collinear (rank-1, NO diversity -> IRC cannot separate). THIS answers
+          // "is it a spatial diversity issue". Computed at one RE across all nb_rx_ant antennas.
+          long ipr = 0, ipi = 0, e0 = 0, e1 = 0; int re = nre / 2;
+          for (int a = 0; a < nb_rx_ant; a++) {
+            long h0r = chF2[0][a][re].r, h0i = chF2[0][a][re].i, h1r = chF2[1][a][re].r, h1i = chF2[1][a][re].i;
+            ipr += h0r*h1r + h0i*h1i; ipi += h0r*h1i - h0i*h1r; e0 += h0r*h0r + h0i*h0i; e1 += h1r*h1r + h1i*h1i;
+          }
+          int corr2pct = (e0 > 0 && e1 > 0) ? (int)(100.0 * ((double)ipr*ipr + (double)ipi*ipi) / ((double)e0 * e1)) : -1;
+          LOG_E(PHY, "[MU METRIC] rnti=%04x partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d\n",
+                rel15_ul->rnti, partner, symbol, nre, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax);
         }
       }
