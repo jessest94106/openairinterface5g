@@ -28,6 +28,7 @@
  * \email       guido.casati@iis.fraunhofer.de
  */
 
+#include <unistd.h>
 #include <stdio.h>
 #include <math.h>
 #include <pthread.h>
@@ -626,6 +627,14 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
     pusch_config_pdu->ul_dmrs_scrambling_id = mac->physCellId;
     if (dci_format == NR_UL_DCI_FORMAT_0_1)
       pusch_config_pdu->scid = dci->dmrs_sequence_initialization.val;
+    // MU-MIMO distinct pilots: the DCI nSCID isn't reaching the UE (both UEs tx scid=0 -> identical
+    // DMRS -> gNB estimates the same channel for both -> corr~100% -> unseparable). Force the UE's
+    // nSCID via env (per-UE process) to MATCH the gNB's per-UE scid, bypassing the broken DCI path.
+    // Gated on DCI 0_1 (NOT Msg3/RA which use 0_0 + scid=0) AND the trigger file (both UEs attached
+    // = gNB MU regime active, so gNB estimates with the same scid) — /tmp is shared across netns.
+    { static int fs = -2; if (fs == -2) { const char *e = getenv("OAI_UE_FORCE_SCID"); fs = (e && e[0]) ? atoi(e) : -1; }
+      if (fs >= 0 && dci_format == NR_UL_DCI_FORMAT_0_1 && access("/tmp/vrtsim_mu_steer_on", F_OK) == 0)
+        pusch_config_pdu->scid = fs; }
 
     /* TRANSFORM PRECODING ------------------------------------------------------------------------------------------*/
     if (tp_enabled) {
