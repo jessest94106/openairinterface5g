@@ -1155,7 +1155,10 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     int partner = -1;
     // Only fire on genuine co-scheduled DATA: MU regime active, large allocation, distinct rnti,
     // matching PRBs. Prevents the IRC mis-pairing during attach that breaks decode.
-    if (mu_irc && g_mu_mimo_active && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
+    // nb_rx_ant >= 2 REQUIRED: the 2-layer joint detector is degenerate at 1 antenna (can't
+    // separate 2 co-channel UEs with 1 RX) -> it corrupts EVERY decode (grants carry garbage,
+    // both UEs starve). At 1 antenna the co-scheduled UEs simply collide; IRC cannot help.
+    if (mu_irc && g_mu_mimo_active && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
       for (int id = 0; id < gNB->max_nb_pusch; id++) {
         if (id == ulsch_id) continue;
         nfapi_nr_pusch_pdu_t *p = &gNB->ulsch[id].harq_process->ulsch_pdu;
