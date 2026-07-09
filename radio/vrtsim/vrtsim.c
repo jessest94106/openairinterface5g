@@ -173,6 +173,8 @@ typedef struct {
   // (comma list, cycles/antenna). Enables the MU-MIMO conditioning sweep (orthogonal->collinear).
   int ul_mu_steer;                                     // 0=off (rank-1 duplicate, unchanged), 1=on
   int ul_mu_steer_ready;                               // steering table computed (lazy, needs nbAnt)
+  int ul_mu_steer_active;                              // gate: 0 until trigger file appears (attach-first)
+  int ul_mu_steer_poll;                                // rate-limit counter for the trigger-file stat
   double ul_mu_angle[MAX_NUM_UES];                     // per-UE spatial frequency (cycles/antenna)
   c16_t ul_mu_w[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];     // per-(UE,antenna) Q15 steering weight
   double rx_freq;
@@ -372,6 +374,8 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   // or a comma list of per-UE spatial frequencies (cycles/antenna), e.g. "0,0.25". Absent/empty=off.
   vrtsim_state->ul_mu_steer = 0;
   vrtsim_state->ul_mu_steer_ready = 0;
+  vrtsim_state->ul_mu_steer_active = 0;
+  vrtsim_state->ul_mu_steer_poll = 0;
   for (int u = 0; u < MAX_NUM_UES; u++)
     vrtsim_state->ul_mu_angle[u] = -1.0; // sentinel: fill with default u/nbAnt lazily
   const char *ulmu = getenv("VRTSIM_UL_MU_STEER");
@@ -1267,6 +1271,20 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
         }
         vrtsim_state->ul_mu_steer_ready = 1;
       }
+      // Attach-first gate: steering's per-UE phase-ramp degrades the multi-antenna PRACH detector,
+      // storming RA when applied during attach. Keep the plain rank-1 duplicate until BOTH UEs are
+      // connected, signalled by the harness touching the trigger file (default /tmp/vrtsim_mu_steer_on,
+      // env VRTSIM_UL_MU_STEER_TRIGGER). Poll cheaply (~every 256 reads) only while still inactive.
+      if (vrtsim_state->ul_mu_steer && !vrtsim_state->ul_mu_steer_active) {
+        if ((vrtsim_state->ul_mu_steer_poll++ & 0xFF) == 0) {
+          const char *trg = getenv("VRTSIM_UL_MU_STEER_TRIGGER");
+          if (trg == NULL || trg[0] == '\0') trg = "/tmp/vrtsim_mu_steer_on";
+          if (access(trg, F_OK) == 0) {
+            vrtsim_state->ul_mu_steer_active = 1;
+            LOG_A(HW, "VRTSIM: UL MU steering ACTIVATED (trigger %s seen; attach-first complete)\n", trg);
+          }
+        }
+      }
       // Combine: read each UE tx stream ONCE (ring layout = ue_conf tx_offset), then add it into
       // every gNB antenna. Default = rank-1 duplicate (identical, all UEs same signature). With
       // MU steering ON, multiply by the per-(UE,antenna) weight w[u][a] so each UE gets a distinct
@@ -1292,7 +1310,7 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
             if (samplesVoid[aarx] == NULL)
               continue;
             int16_t *out = (int16_t *)samplesVoid[aarx];
-            if (vrtsim_state->ul_mu_steer) {
+            if (vrtsim_state->ul_mu_steer && vrtsim_state->ul_mu_steer_active) {
               const c16_t w = vrtsim_state->ul_mu_w[u][aarx];
               for (int i = 0; i < nsamps; i++) {
                 int32_t sr = (int32_t)in[2 * i], si = (int32_t)in[2 * i + 1];

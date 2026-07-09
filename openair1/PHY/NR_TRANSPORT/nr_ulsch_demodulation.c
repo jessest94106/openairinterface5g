@@ -1148,11 +1148,14 @@ static void inner_rx(PHY_VARS_gNB *gNB,
   {
     static int mu_irc = -1;
     if (mu_irc < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_irc = (e && e[0]) ? 1 : 0; }
+    // MU regime gate (set by the MAC scheduler): only true when >=2 UEs are fully connected and
+    // nobody is in RA. Without this, full-band Msg3 (rb 0+273) passes the rb_size filter below and
+    // IRC corrupts RA -> endless PRACH-retry storm. This is the scheduler->PHY co-sched marker.
+    extern volatile int g_mu_mimo_active;
     int partner = -1;
-    // Only fire on genuine co-scheduled DATA: large allocation (co-sched forces full band; RA/
-    // Msg3/registration are small so they keep normal MRC and attach unbroken), distinct rnti,
+    // Only fire on genuine co-scheduled DATA: MU regime active, large allocation, distinct rnti,
     // matching PRBs. Prevents the IRC mis-pairing during attach that breaks decode.
-    if (mu_irc && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
+    if (mu_irc && g_mu_mimo_active && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
       for (int id = 0; id < gNB->max_nb_pusch; id++) {
         if (id == ulsch_id) continue;
         nfapi_nr_pusch_pdu_t *p = &gNB->ulsch[id].harq_process->ulsch_pdu;

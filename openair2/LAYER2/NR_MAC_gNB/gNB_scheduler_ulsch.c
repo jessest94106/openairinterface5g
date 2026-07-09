@@ -1953,6 +1953,9 @@ static int comparator(const void *p, const void *q)
   return 0;
 }
 
+// MU-MIMO regime flag: set by pf_ul (>=2 connected UEs, no RA), read by the PHY joint receiver.
+volatile int g_mu_mimo_active = 0;
+
 static int  pf_ul(gNB_MAC_INST *nrmac,
                   post_process_pusch_t *pp_pusch,
                   int tda,
@@ -1987,7 +1990,16 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   // separated from a co-scheduled full-band UE and would collide (root cause of the 2nd-UE
   // WAIT_Msg3 failure). Freeze co-scheduling (stay OFDMA) whenever ANY UE is in RA.
   bool any_ra_in_progress = false;
-  UE_iterator(UE_list, ue_ra) { if (ue_ra->ra != NULL) { any_ra_in_progress = true; break; } }
+  int connected_ues = 0;
+  UE_iterator(UE_list, ue_ra) {
+    if (ue_ra->ra != NULL) any_ra_in_progress = true;
+    else connected_ues++;
+  }
+  // MU-MIMO regime marker for the PHY receiver: the joint MMSE-IRC must run ONLY when there are
+  // >=2 fully-connected UEs and nobody is in RA. Otherwise (attach/storm) full-band Msg3 (rb 0+273)
+  // trips the PHY's rb_size filter and IRC corrupts RA -> PRACH-retry storm. The PHY reads this flag.
+  extern volatile int g_mu_mimo_active;
+  g_mu_mimo_active = (connected_ues >= 2 && !any_ra_in_progress) ? 1 : 0;
 
   /* Loop UE_list to calculate throughput and coeff */
   UE_iterator(UE_list, UE) {
