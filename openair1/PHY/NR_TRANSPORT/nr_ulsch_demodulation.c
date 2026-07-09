@@ -1211,12 +1211,32 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       c16_t mgb[2][buffer_length] __attribute__((aligned(32)));
       c16_t mgc[2][buffer_length] __attribute__((aligned(32)));
       memset(rho2, 0, sizeof(rho2)); memset(mga, 0, sizeof(mga)); memset(mgb, 0, sizeof(mgb)); memset(mgc, 0, sizeof(mgc));
-      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, rel15_ul, symbol, output_shift);
-      nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
-                            rel15_ul->qam_mod_order, pusch_vars->log2_maxh, symbol, pusch_vars->ul_valid_re_per_slot[symbol], nvar);
-      // self stream = comp2[0]; compute this UE's LLR and finish this symbol via IRC
-      nr_ulsch_compute_llr((int32_t *)comp2[0], mga[0], mgb[0], mgc[0], llr[0],
-                           pusch_vars->ul_valid_re_per_slot[symbol], symbol, rel15_ul->qam_mod_order);
+      // Stage-2 joint detector. OAI's 2-layer path loops on rel15_ul->nrOfLayers (=1 for each
+      // co-scheduled single-layer UE) -> only layer 0 compensated -> partner stream missing ->
+      // degenerate MMSE -> zero output. Temporarily present a 2-layer context so BOTH chF2[0](self)
+      // and chF2[1](partner) get matched-filtered. channel_compensation uses `symbol` ONLY for the
+      // rxComp output offset [layer*nb_rx][symbol*buffer_length] (verified) -> pass 0 so it writes
+      // into our compact offset-0 comp2buf; rho/mag are offset-0 regardless.
+      nfapi_nr_pusch_pdu_t *mu_pdu = (nfapi_nr_pusch_pdu_t *)rel15_ul; // underlying ulsch_pdu is mutable
+      const uint8_t mu_saved_layers = mu_pdu->nrOfLayers;
+      mu_pdu->nrOfLayers = 2;
+      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, rel15_ul, 0, output_shift);
+      mu_pdu->nrOfLayers = mu_saved_layers;
+      const int mu_nre = pusch_vars->ul_valid_re_per_slot[symbol];
+      // layer 0 = self at comp2buf[0], layer 1 = partner at comp2buf[nb_rx_ant] (rxComp[layer*nb_rx]).
+      if (rel15_ul->qam_mod_order <= 6) {
+        // QPSK/16/64QAM: interference-aware ML joint demapper (uses rho). llr[0]=self; scratch=partner.
+        int16_t mu_llr1[buffer_length * 8] __attribute__((aligned(32)));
+        nr_ulsch_compute_ML_llr(pusch_vars, symbol,
+                                (c16_t *)comp2buf[0], (c16_t *)comp2buf[nb_rx_ant],
+                                mga[0], mga[1], llr[0], mu_llr1,
+                                rho2[0][1], rho2[1][0], mu_nre, rel15_ul->qam_mod_order);
+      } else {
+        // 256QAM: MMSE-IRC to null the partner, then per-stream LLR of the separated self.
+        nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
+                              rel15_ul->qam_mod_order, pusch_vars->log2_maxh, symbol, mu_nre, nvar);
+        nr_ulsch_compute_llr((int32_t *)comp2buf[0], mga[0], mgb[0], mgc[0], llr[0], mu_nre, symbol, rel15_ul->qam_mod_order);
+      }
       // Stage-0 separation-health metric: chest magnitudes (self vs partner), post-eq output energy,
       // and LLR distribution of the separated self-stream. Diagnoses the DSP handoffs without a
       // reference: LLR~0 => extraction/scaling dead; LLR saturated => overflow; healthy+CRC-fail =>
