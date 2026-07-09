@@ -633,8 +633,12 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
     // Gated on DCI 0_1 (NOT Msg3/RA which use 0_0 + scid=0) AND the trigger file (both UEs attached
     // = gNB MU regime active, so gNB estimates with the same scid) — /tmp is shared across netns.
     { static int fs = -2; if (fs == -2) { const char *e = getenv("OAI_UE_FORCE_SCID"); fs = (e && e[0]) ? atoi(e) : -1; }
-      if (fs >= 0 && dci_format == NR_UL_DCI_FORMAT_0_1 && access("/tmp/vrtsim_mu_steer_on", F_OK) == 0)
-        pusch_config_pdu->scid = fs; }
+      int trig = (fs >= 0) ? (access("/tmp/vrtsim_mu_steer_on", F_OK) == 0) : 0;
+      if (fs >= 0 && dci_format == NR_UL_DCI_FORMAT_0_1 && trig) {
+        pusch_config_pdu->scid = fs;
+        static int fl = 0; if (fl++ % 2000 == 0) LOG_E(NR_MAC, "[UE FORCE SCID] applied scid=%d (fs=%d dci=0_1 trig=1)\n", pusch_config_pdu->scid, fs);
+      } else { static int fl2 = 0; if (fs >= 0 && fl2++ % 4000 == 0) LOG_E(NR_MAC, "[UE FORCE SCID] NOT applied fs=%d dci_format=%d trig=%d\n", fs, dci_format, trig); }
+    }
 
     /* TRANSFORM PRECODING ------------------------------------------------------------------------------------------*/
     if (tp_enabled) {
