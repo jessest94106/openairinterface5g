@@ -2006,7 +2006,8 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
   if (!mu_trigger_latched) {
     const char *trg = getenv("VRTSIM_UL_MU_STEER_TRIGGER");
     if (trg == NULL || trg[0] == '\0') trg = "/tmp/vrtsim_mu_steer_on";
-    if (access(trg, F_OK) == 0) mu_trigger_latched = 1;
+    if (access(trg, F_OK) == 0) { mu_trigger_latched = 1;
+      LOG_E(NR_MAC, "[MU TRIG] DU latched trigger at %d.%d (connected=%d)\n", frame, slot, connected_ues); }
   }
   // MU-MIMO regime marker for the PHY receiver: joint MMSE-IRC runs ONLY when the trigger has fired
   // AND >=2 UEs are connected AND nobody is in RA (excludes full-band Msg3 from tripping IRC).

@@ -1221,9 +1221,16 @@ static void inner_rx(PHY_VARS_gNB *gNB,
           if (so < 0) so = 0;
           if (po < 0) po = 1;
           if (genie == 2) { int t = so; so = po; po = t; }  // swap assignment
+          // Reference amplitude = mean per-antenna |chFext[0]| over the band, so the genie channel
+          // magnitude MATCHES the true gain (and log2_maxh, computed from the estimate) -> MMSE well
+          // scaled. Per-RE |chFext| is noisy/small at many REs (gave chSelf=22, tiny LLR); a band
+          // mean is stable and correctly scaled.
+          long asum = 0; int an = 0;
+          for (int rr = 0; rr < buffer_length; rr += 12)
+            for (int a = 0; a < nb_rx_ant; a++) { asum += abs(chFext[0][a][rr].r) + abs(chFext[0][a][rr].i); an++; }
+          int gamp = (an > 0) ? (int)(asum / an) : 200; if (gamp < 16) gamp = 200;
           for (int re = 0; re < buffer_length; re++) {
-            int amp = (abs(chFext[0][0][re].r) + abs(chFext[0][0][re].i)) / 2;
-            if (amp < 4) amp = 4;
+            int amp = gamp;
             for (int a = 0; a < nb_rx_ant; a++) {
               double ps = 2.0 * M_PI * a * so / (double)nb_rx_ant, pp = 2.0 * M_PI * a * po / (double)nb_rx_ant;
               chF2[0][a][re].r = (int16_t)lround(cos(ps) * amp); chF2[0][a][re].i = (int16_t)lround(sin(ps) * amp);
