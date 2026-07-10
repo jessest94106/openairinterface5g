@@ -639,6 +639,15 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
         static int fl = 0; if (fl++ % 2000 == 0) LOG_E(NR_MAC, "[UE FORCE SCID] applied scid=%d (fs=%d dci=0_1 trig=1)\n", pusch_config_pdu->scid, fs);
       } else { static int fl2 = 0; if (fs >= 0 && fl2++ % 4000 == 0) LOG_E(NR_MAC, "[UE FORCE SCID] NOT applied fs=%d dci_format=%d trig=%d\n", fs, dci_format, trig); }
     }
+    // Stage-2 FD-OCC ports: force this UE's DMRS PORT (the UE hardcodes dmrs_ports=1/port0 above and
+    // ignores DCI antenna_ports, like nSCID). Gated the same way (connected-mode DCI 0_1 + trigger);
+    // RA/Msg3 stays port 0. Matches the gNB's per-UE port (OAI_UL_MU_PORTS, connection order).
+    { static int fpp = -2; if (fpp == -2) { const char *e = getenv("OAI_UE_FORCE_DMRS_PORT"); fpp = (e && e[0]) ? atoi(e) : -1; }
+      if (fpp >= 0 && dci_format == NR_UL_DCI_FORMAT_0_1 && access("/tmp/vrtsim_mu_steer_on", F_OK) == 0) {
+        pusch_config_pdu->dmrs_ports = 1 << fpp;
+        static int pl = 0; if (pl++ % 2000 == 0) LOG_E(NR_MAC, "[UE FORCE PORT] applied dmrs_ports=0x%x (port %d)\n", pusch_config_pdu->dmrs_ports, fpp);
+      }
+    }
 
     /* TRANSFORM PRECODING ------------------------------------------------------------------------------------------*/
     if (tp_enabled) {

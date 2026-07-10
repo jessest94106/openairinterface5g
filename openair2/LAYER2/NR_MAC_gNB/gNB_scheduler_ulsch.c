@@ -2502,6 +2502,27 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
                 rnti, idx, pusch_pdu->scid, UE->current_UL_BWP.dci_format, pusch_pdu->dmrs_ports, sched_pusch->nrOfLayers); }
     }
   }
+  // Stage-2 FD-OCC PORTS (OAI_UL_MU_PORTS): TRULY orthogonal pilots — assign each co-scheduled UE a
+  // distinct DMRS PORT in CDM group 0 (port0 Wf=[+,+], port1 Wf=[+,-]); the gNB estimator de-spreads
+  // the cover code per port (nr_dmrs_rx.c wf/wt) => estimator-separable h0,h1 (unlike nSCID, which
+  // the single-UE estimator can't exploit). Same gating as scid: MU regime only, connected UEs only
+  // (RA/Msg3 stays port 0). The UE side is forced via OAI_UE_FORCE_DMRS_PORT (it hardcodes port 0).
+  {
+    extern volatile int g_mu_mimo_active;
+    static int mu_ports = -1;
+    if (mu_ports < 0) { const char *e = getenv("OAI_UL_MU_PORTS"); mu_ports = (e && e[0]) ? 1 : 0; }
+    if (mu_ports && g_mu_mimo_active && UE->ra == NULL && sched_pusch->nrOfLayers == 1) {
+      static rnti_t port_map[8] = {0};
+      static int port_cnt = 0;
+      int idx = -1;
+      for (int i = 0; i < port_cnt; i++) if (port_map[i] == rnti) { idx = i; break; }
+      if (idx < 0 && port_cnt < 8) { idx = port_cnt; port_map[port_cnt++] = rnti; }
+      if (idx < 0) idx = 0;
+      pusch_pdu->dmrs_ports = 1 << (idx % 2);  // UE0 -> port0 (0x1), UE1 -> port1 (0x2)
+      { static int pd = 0; if (pd++ < 8)
+          LOG_E(NR_MAC, "[MU PORT] rnti=%04x idx=%d dmrs_ports=0x%x\n", rnti, idx, pusch_pdu->dmrs_ports); }
+    }
+  }
   /* Allocation in frequency domain */
   pusch_pdu->resource_alloc = 1; //type 1
   pusch_pdu->rb_start = sched_pusch->rbStart;
