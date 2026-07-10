@@ -1162,9 +1162,18 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         LOG_E(PHY, "[MU GATE] nb_rx_ant=%d g_mu=%d nb_layer=%d rb_size=%d max_pusch=%d\n",
               nb_rx_ant, g_mu_mimo_active, nb_layer, rel15_ul->rb_size, gNB->max_nb_pusch); }
     if (mu_irc && g_mu_mimo_active && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
+      // CRASH FIX (was Block-1): gNB->ulsch[id].harq_process is NULL for unused slots -> the old
+      // unguarded ->ulsch_pdu deref segfaulted (at 0) the first time the scan ran past the active
+      // ids (dmesg: Tpool segfault at 0, du.log dead right after first [MU METRIC] in EVERY run —
+      // the "instability/churn" was the DU dying). Guard active+harq_process, and require the
+      // partner to be scheduled THIS SAME frame/slot (kills the stale-partner mispairing too).
+      const NR_gNB_ULSCH_t *cur = &gNB->ulsch[ulsch_id];
       for (int id = 0; id < gNB->max_nb_pusch; id++) {
         if (id == ulsch_id) continue;
-        nfapi_nr_pusch_pdu_t *p = &gNB->ulsch[id].harq_process->ulsch_pdu;
+        const NR_gNB_ULSCH_t *u = &gNB->ulsch[id];
+        if (!u->active || u->harq_process == NULL) continue;
+        if (u->frame != cur->frame || u->slot != cur->slot) continue; // co-scheduled this slot only
+        const nfapi_nr_pusch_pdu_t *p = &u->harq_process->ulsch_pdu;
         if (p->rb_size == rel15_ul->rb_size && p->rb_start == rel15_ul->rb_start && p->rnti != rel15_ul->rnti) {
           partner = id;
           break;
