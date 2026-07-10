@@ -2508,10 +2508,15 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
   // the single-UE estimator can't exploit). Same gating as scid: MU regime only, connected UEs only
   // (RA/Msg3 stays port 0). The UE side is forced via OAI_UE_FORCE_DMRS_PORT (it hardcodes port 0).
   {
-    extern volatile int g_mu_mimo_active;
     static int mu_ports = -1;
     if (mu_ports < 0) { const char *e = getenv("OAI_UL_MU_PORTS"); mu_ports = (e && e[0]) ? 1 : 0; }
-    if (mu_ports && g_mu_mimo_active && UE->ra == NULL && sched_pusch->nrOfLayers == 1) {
+    // STICKY trigger latch (same semantics as the UE's OAI_UE_FORCE_DMRS_PORT gate): the UE keeps
+    // port 1 forever once the trigger file appears, so the gNB MUST too. Gating on g_mu_mimo_active
+    // (dynamic) desyncs on any transient: gNB estimates port0 while UE1 still transmits port1 ->
+    // OCC de-spread mismatch -> UE1 estimate ~0 (log2h=0) -> undecodable -> drop -> churn.
+    static int port_trig = 0;
+    if (mu_ports && !port_trig && access("/tmp/vrtsim_mu_steer_on", F_OK) == 0) port_trig = 1;
+    if (mu_ports && port_trig && UE->ra == NULL && sched_pusch->nrOfLayers == 1) {
       static rnti_t port_map[8] = {0};
       static int port_cnt = 0;
       int idx = -1;
