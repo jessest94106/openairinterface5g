@@ -1490,11 +1490,27 @@ static void nr_pusch_symbol_processing(void *arg)
   // later when chest is done; ans completes on the successful re-run. MU-gated; default unchanged.
   { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? 1 : 0; }
     extern volatile int g_mu_mimo_active;
-    if (mu_rq && g_mu_mimo_active && pusch_vars->log2_maxh == 0 && rdata->bounces < 2) {
-      rdata->bounces++;
-      task_t t = {.func = &nr_pusch_symbol_processing, .args = rdata};
-      pushTpool(&gNB->threadPool, t);
-      return;
+    if (mu_rq && g_mu_mimo_active && rdata->bounces < 2) {
+      // partner estimate too: a co-scheduled decode with an unready PARTNER estimate skips IRC and
+      // falls to MRC with the interference still on it (parte leak) — same race, same cure: defer.
+      int unready = (pusch_vars->log2_maxh == 0);
+      if (!unready) {
+        for (int id = 0; id < gNB->max_nb_pusch; id++) {
+          if (id == ulsch_id) continue;
+          const NR_gNB_ULSCH_t *u = &gNB->ulsch[id];
+          if (!u->active || u->harq_process == NULL) continue;
+          if (u->frame != rdata->frame || u->slot != rdata->slot) continue;
+          const nfapi_nr_pusch_pdu_t *p = &u->harq_process->ulsch_pdu;
+          if (p->rb_size == rel15_ul->rb_size && p->rb_start == rel15_ul->rb_start && p->rnti != rel15_ul->rnti
+              && gNB->pusch_vars[id].log2_maxh == 0) { unready = 1; break; }
+        }
+      }
+      if (unready) {
+        rdata->bounces++;
+        task_t t = {.func = &nr_pusch_symbol_processing, .args = rdata};
+        pushTpool(&gNB->threadPool, t);
+        return;
+      }
     } }
   for (int symbol = rdata->startSymbol; symbol < rdata->startSymbol + rdata->numSymbols; symbol++) {
     if (gNB->pusch_vars[ulsch_id].ul_valid_re_per_slot[symbol] == 0) 
