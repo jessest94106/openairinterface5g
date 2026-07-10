@@ -376,6 +376,18 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   vrtsim_state->ul_mu_steer_ready = 0;
   vrtsim_state->ul_mu_steer_active = 0;
   vrtsim_state->ul_mu_steer_poll = 0;
+  // Steering ON FROM BOOT (VRTSIM_UL_MU_STEER_BOOT=1): skip the attach-first trigger and steer from
+  // the first sample. Eliminates the mid-run activation transient: flipping steering on mid-slot
+  // makes DMRS (unsteered) and data (steered) see DIFFERENT channels in the same slot -> guaranteed
+  // CRC fail + tracker step-change -> UE drop the moment co-scheduling engages (Block-1 suspect).
+  // With boot steering the channel is constant for the UE's entire lifetime (incl. PRACH/attach).
+  {
+    const char *b = getenv("VRTSIM_UL_MU_STEER_BOOT");
+    if (b && b[0] && b[0] != '0') {
+      vrtsim_state->ul_mu_steer_active = 1;
+      LOG_A(HW, "VRTSIM: UL MU steering ACTIVE FROM BOOT (no attach-first trigger)\n");
+    }
+  }
   for (int u = 0; u < MAX_NUM_UES; u++)
     vrtsim_state->ul_mu_angle[u] = -1.0; // sentinel: fill with default u/nbAnt lazily
   const char *ulmu = getenv("VRTSIM_UL_MU_STEER");
