@@ -1270,11 +1270,13 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // and chF2[1](partner) get matched-filtered. channel_compensation uses `symbol` ONLY for the
       // rxComp output offset [layer*nb_rx][symbol*buffer_length] (verified) -> pass 0 so it writes
       // into our compact offset-0 comp2buf; rho/mag are offset-0 regardless.
-      nfapi_nr_pusch_pdu_t *mu_pdu = (nfapi_nr_pusch_pdu_t *)rel15_ul; // underlying ulsch_pdu is mutable
-      const uint8_t mu_saved_layers = mu_pdu->nrOfLayers;
-      mu_pdu->nrOfLayers = 2;
-      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, rel15_ul, 0, output_shift);
-      mu_pdu->nrOfLayers = mu_saved_layers;
+      // LOCAL COPY of the pdu with nrOfLayers=2 — NEVER mutate the shared pdu: the per-symbol Tpool
+      // workers run in parallel, and another symbol's worker reading a transient nrOfLayers==2 in
+      // the caller's layer-demap (line ~1491) indexes llrss[1]==NULL for this 1-layer UE ->
+      // segfault at 0 across Tpool threads (the second DU-killer after the partner-scan NULL).
+      nfapi_nr_pusch_pdu_t mu_pdu2 = *rel15_ul;
+      mu_pdu2.nrOfLayers = 2;
+      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, &mu_pdu2, 0, output_shift);
       const int mu_nre = pusch_vars->ul_valid_re_per_slot[symbol];
       // layer 0 = self at comp2buf[0], layer 1 = partner at comp2buf[nb_rx_ant] (rxComp[layer*nb_rx]).
       if (rel15_ul->qam_mod_order <= 6) {
