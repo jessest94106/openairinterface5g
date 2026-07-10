@@ -1247,12 +1247,25 @@ void config_uldci(const NR_UE_ServingCell_Info_t *sc_info,
                                                                                &pusch_pdu->nrOfLayers,
                                                                                tpmi);
 
-      // antenna_ports.val = 0 for transform precoder is disabled, dmrs-Type=1, maxLength=1, Rank=1/2/3/4
-      // Antenna Ports
-      dci_pdu_rel15->antenna_ports.val = 0;
+      // Antenna Ports — STANDARD ENCODE (was hardcoded 0, so the gNB never signalled the DMRS
+      // port and MU-MIMO port assignment could not reach the UE). 38.212 Table 7.3.1.1.2-8
+      // (transform precoding disabled, dmrs-Type=1, maxLength=1, rank 1):
+      // val = 2*(num_dmrs_cdm_grps_no_data-1) + port  (0:1grp/p0, 1:1grp/p1, 2:2grps/p0, 3:2grps/p1)
+      if (pusch_pdu->nrOfLayers == 1) {
+        int mu_port = 0;
+        for (int b = 0; b < 4; b++) if (pusch_pdu->dmrs_ports & (1 << b)) { mu_port = b; break; }
+        dci_pdu_rel15->antenna_ports.val = 2 * (pusch_pdu->num_dmrs_cdm_grps_no_data - 1) + mu_port;
+      } else {
+        dci_pdu_rel15->antenna_ports.val = 0; // multi-layer mapping not implemented (unchanged)
+      }
 
       // DMRS sequence initialization
       dci_pdu_rel15->dmrs_sequence_initialization.val = pusch_pdu->scid;
+      { static int dl = 0; if (dl++ < 12)
+          LOG_E(NR_MAC, "[DCI TX] rnti=%04x ant_ports.val=%d(nbits=%d) dmrs_seq_init.val=%d(nbits=%d) ports=0x%x scid=%d cdm=%d\n",
+                pusch_pdu->rnti, dci_pdu_rel15->antenna_ports.val, dci_pdu_rel15->antenna_ports.nbits,
+                dci_pdu_rel15->dmrs_sequence_initialization.val, dci_pdu_rel15->dmrs_sequence_initialization.nbits,
+                pusch_pdu->dmrs_ports, pusch_pdu->scid, pusch_pdu->num_dmrs_cdm_grps_no_data); }
       break;
     default :
       AssertFatal(0, "Valid UL formats are 0_0 and 0_1\n");

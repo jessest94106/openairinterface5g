@@ -627,6 +627,20 @@ int nr_config_pusch_pdu(NR_UE_MAC_INST_t *mac,
     pusch_config_pdu->ul_dmrs_scrambling_id = mac->physCellId;
     if (dci_format == NR_UL_DCI_FORMAT_0_1)
       pusch_config_pdu->scid = dci->dmrs_sequence_initialization.val;
+    // Antenna Ports — STANDARD DECODE (the UE extracted dci->antenna_ports but never USED it;
+    // dmrs_ports stayed hardcoded to port 0, so a gNB port assignment could never take effect).
+    // 38.212 Table 7.3.1.1.2-8 (tp disabled, dmrs-Type=1, maxLength=1, rank 1):
+    // val -> num_cdm_grps = (val>>1)+1, port = val&1.
+    if (dci_format == NR_UL_DCI_FORMAT_0_1 && !tp_enabled && pusch_config_pdu->nrOfLayers == 1
+        && dci->antenna_ports.val < 4) {
+      pusch_config_pdu->dmrs_ports = 1 << (dci->antenna_ports.val & 1);
+      pusch_config_pdu->num_dmrs_cdm_grps_no_data = (dci->antenna_ports.val >> 1) + 1;
+    }
+    { static int rl = 0; if (dci_format == NR_UL_DCI_FORMAT_0_1 && rl++ < 12)
+        LOG_E(NR_MAC, "[DCI RX] ant_ports.val=%d(nbits=%d) dmrs_seq_init.val=%d(nbits=%d) -> ports=0x%x scid=%d cdm=%d\n",
+              dci->antenna_ports.val, dci->antenna_ports.nbits,
+              dci->dmrs_sequence_initialization.val, dci->dmrs_sequence_initialization.nbits,
+              pusch_config_pdu->dmrs_ports, pusch_config_pdu->scid, pusch_config_pdu->num_dmrs_cdm_grps_no_data); }
     // MU-MIMO distinct pilots: the DCI nSCID isn't reaching the UE (both UEs tx scid=0 -> identical
     // DMRS -> gNB estimates the same channel for both -> corr~100% -> unseparable). Force the UE's
     // nSCID via env (per-UE process) to MATCH the gNB's per-UE scid, bypassing the broken DCI path.
