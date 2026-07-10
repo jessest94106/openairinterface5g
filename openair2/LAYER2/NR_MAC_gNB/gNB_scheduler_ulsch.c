@@ -2516,7 +2516,11 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
     // OCC de-spread mismatch -> UE1 estimate ~0 (log2h=0) -> undecodable -> drop -> churn.
     static int port_trig = 0;
     if (mu_ports && !port_trig && access("/tmp/vrtsim_mu_steer_on", F_OK) == 0) port_trig = 1;
-    if (mu_ports && port_trig && UE->ra == NULL && sched_pusch->nrOfLayers == 1) {
+    // dci_format gate: a DCI 0_0 grant CANNOT carry a port (no antenna-ports field) and the UE
+    // correctly defaults to port 0 on it — so the pdu must stay port 0 too, or the gNB estimates
+    // port 1 while the UE transmits port 0 (OCC mismatch poisons BOTH UEs' estimates).
+    if (mu_ports && port_trig && UE->ra == NULL && sched_pusch->nrOfLayers == 1
+        && UE->current_UL_BWP.dci_format == NR_UL_DCI_FORMAT_0_1) {
       static rnti_t port_map[8] = {0};
       static int port_cnt = 0;
       int idx = -1;

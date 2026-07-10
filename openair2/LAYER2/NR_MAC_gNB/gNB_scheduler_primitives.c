@@ -2205,6 +2205,12 @@ void fill_dci_pdu_rel15(const NR_UE_ServingCell_Info_t *servingCellInfo,
         // UL-SCH indicator
         pos += 1;
         *dci_pdu |= ((uint64_t)dci_pdu_rel15->ulsch_indicator & 0x1) << (dci_size - pos);
+        // [DCI PACK] authoritative gNB-side view: nbits AFTER nr_dci_size ran (the fill-site log
+        // reads them before sizing -> false zeros). This is what actually goes on the air.
+        { static int pk = 0; if (pk++ < 12)
+            LOG_E(NR_MAC, "[DCI PACK] 0_1 size=%d ant.val=%d(nbits=%d) dmrsseq.val=%d(nbits=%d)\n",
+                  dci_size, dci_pdu_rel15->antenna_ports.val, dci_pdu_rel15->antenna_ports.nbits,
+                  dci_pdu_rel15->dmrs_sequence_initialization.val, dci_pdu_rel15->dmrs_sequence_initialization.nbits); }
 
 #ifdef DEBUG_DCI
         LOG_I(NR_MAC,"============= NR_UL_DCI_FORMAT_0_1 =============\n");
