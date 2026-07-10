@@ -1320,9 +1320,15 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           { static uint64_t stale_u[MAX_NUM_UES], wtot_u[MAX_NUM_UES];
             uint64_t need = read_sample + nsamps;
             int spins = 0;
-            while (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need && spins < 0) { // count-only: usleep in the RT read path hurt the healthy UE
-              usleep(10);
-              spins++;
+            // conditional wait: only when the writer is CLOSE behind (actively racing this region);
+            // a far-behind watermark means the stream is idle there (benign, e.g. DL portions) and
+            // waiting is futile + chokes the RT loop (the earlier blanket-wait failure).
+            uint64_t wm0 = shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t);
+            if (0) { // disabled: every wait variant taxes the RT loop; counters stay
+              while (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need && spins < 40) {
+                usleep(5);
+                spins++;
+              }
             }
             wtot_u[u]++;
             if (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need) stale_u[u]++;
