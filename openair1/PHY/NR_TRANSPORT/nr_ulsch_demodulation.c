@@ -1161,7 +1161,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     { static int dg = 0; if (mu_irc && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && dg++ < 6)
         LOG_E(PHY, "[MU GATE] nb_rx_ant=%d g_mu=%d nb_layer=%d rb_size=%d max_pusch=%d\n",
               nb_rx_ant, g_mu_mimo_active, nb_layer, rel15_ul->rb_size, gNB->max_nb_pusch); }
-    if (mu_irc && g_mu_mimo_active && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
+    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
       // CRASH FIX (was Block-1): gNB->ulsch[id].harq_process is NULL for unused slots -> the old
       // unguarded ->ulsch_pdu deref segfaulted (at 0) the first time the scan ran past the active
       // ids (dmesg: Tpool segfault at 0, du.log dead right after first [MU METRIC] in EVERY run —
@@ -1184,7 +1184,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // symbol is decoded by plain MRC WITH co-channel interference => garbage LLRs for those REs.
     // Track why symbols fall through; printed with [MU METRIC].
     static long mu_c_irc = 0, mu_c_nopart = 0, mu_c_rxe = 0, mu_c_parte = 0;
-    if (mu_irc && g_mu_mimo_active && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && partner < 0)
+    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && partner < 0)
       mu_c_nopart++;
     // Signal-present guard: only run IRC when there's actually a received signal to separate on
     // this symbol (rxFext non-trivial). Prevents firing on empty/phantom-grant symbols where the
@@ -1347,8 +1347,8 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             }
             if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
           }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
-                rel15_ul->rnti, partner, symbol, nre, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
+          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
+                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
                 sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte);
         }

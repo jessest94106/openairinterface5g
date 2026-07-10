@@ -681,8 +681,8 @@ static void map_symbols(const nr_phy_pxsch_params_t p,
     if (dmrs_symbol || ptrs_symbol) {
       gold = nr_gold_pusch(p.num_rb_max, p.symbols_per_slot, p.dmrs_scrambling_id, p.scid, slot, l);
       { static int ud = 0; if (dmrs_symbol && (ud++ % 2000) == 0)
-          LOG_E(PHY, "[UE DMRS TX] rnti=%04x scid=%d scrambling_id=%d (gold0=%u)\n",
-                p.rnti, p.scid, p.dmrs_scrambling_id, gold ? gold[0] : 0); }
+          LOG_E(PHY, "[UE DMRS TX] rnti=%04x port=%d scid=%d scrambling_id=%d (gold0=%u)\n",
+                p.rnti, (int)p.dmrs_port, p.scid, p.dmrs_scrambling_id, gold ? gold[0] : 0); }
     }
     if (dmrs_symbol) {
       c16_t mod_dmrs[ALNARS_16_4(n_dmrs)] __attribute((aligned(16)));
