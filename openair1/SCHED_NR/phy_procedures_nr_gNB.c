@@ -1047,27 +1047,6 @@ void nr_srs_rx_procedures(PHY_VARS_gNB *gNB,
   }
 }
 
-// MU two-phase dispatch: run every co-scheduled ULSCH's nr_rx_pusch_tp concurrently so all channel
-// estimations start simultaneously — serial per-ULSCH processing meant UE-A's joint receiver always
-// read UE-B's estimates before B's chest had ever run (the parte leak). Needs pool > n_ulsch workers
-// (each task joins its own symbol tasks inside).
-typedef struct mu_pusch_tp_arg {
-  PHY_VARS_gNB *gNB;
-  int ulsch_id;
-  uint32_t frame;
-  uint8_t slot;
-  unsigned char harq_pid;
-  int beam_nb;
-  task_ans_t *ans;
-} mu_pusch_tp_arg_t;
-
-static void mu_pusch_tp_task(void *p)
-{
-  mu_pusch_tp_arg_t *a = (mu_pusch_tp_arg_t *)p;
-  nr_rx_pusch_tp(a->gNB, a->ulsch_id, a->frame, a->slot, a->harq_pid, a->beam_nb);
-  completed_task_ans(a->ans);
-}
-
 int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, NR_UL_IND_t *UL_INFO)
 {
   /* those variables to log T_GNB_PHY_PUCCH_PUSCH_IQ only when we try to decode */
@@ -1151,10 +1130,9 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
   UL_INFO->rx_ind.pdu_list = UL_INFO->rx_pdu_list;
   bool ulsch_to_decode[gNB->max_nb_pusch];
   bzero(ulsch_to_decode, sizeof(ulsch_to_decode));
-  // MU two-phase: when >=2 ULSCHs share this slot, run all nr_rx_pusch_tp concurrently (parallel
-  // chest) instead of serially, then do per-UE post-processing in the loop below.
-  bool mu_tp_done[gNB->max_nb_pusch];
-  bzero(mu_tp_done, sizeof(mu_tp_done));
+  // MU two-phase (serial): when >=2 ULSCHs share this slot, run ALL channel estimations first,
+  // then decode — otherwise UE-A's joint receiver reads UE-B's estimates before B's chest has
+  // ever run (the parte leak). Serial and in-thread: no new concurrency in the real-time path.
   {
     static int mu_tp = -1;
     if (mu_tp < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_tp = (e && e[0]) ? 1 : 0; }
@@ -1167,24 +1145,10 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
           ids[n++] = i;
       }
       if (n >= 2) {
-        // log2_maxh doubles as the "this slot's estimate is ready" flag for the defer/requeue in
-        // nr_pusch_symbol_processing — it persists from the previous slot, so zero it first or the
-        // partner check reads stale-ready and consumes last slot's estimates.
+        gNB->mu_chest_only = 1;
         for (int k = 0; k < n; k++)
-          gNB->pusch_vars[ids[k]].log2_maxh = 0;
-        task_ans_t ans;
-        init_task_ans(&ans, n);
-        mu_pusch_tp_arg_t args[n];
-        for (int k = 0; k < n; k++) {
-          NR_gNB_ULSCH_t *u = &gNB->ulsch[ids[k]];
-          args[k] = (mu_pusch_tp_arg_t){.gNB = gNB, .ulsch_id = ids[k], .frame = frame_rx, .slot = slot_rx,
-                                        .harq_pid = u->harq_pid, .beam_nb = u->beam_nb, .ans = &ans};
-          task_t t = {.func = &mu_pusch_tp_task, .args = &args[k]};
-          pushTpool(&gNB->threadPool, t);
-        }
-        join_task_ans(&ans);
-        for (int k = 0; k < n; k++)
-          mu_tp_done[ids[k]] = true;
+          nr_rx_pusch_tp(gNB, ids[k], frame_rx, slot_rx, gNB->ulsch[ids[k]].harq_pid, gNB->ulsch[ids[k]].beam_nb);
+        gNB->mu_chest_only = 0;
       }
     }
   }
@@ -1231,8 +1195,7 @@ int phy_procedures_gNB_uespec_RX(PHY_VARS_gNB *gNB, int frame_rx, int slot_rx, N
     pusch_decode_done = 1;
 
     start_meas(&gNB->rx_pusch_stats);
-    if (!mu_tp_done[ULSCH_id]) // MU two-phase already ran it concurrently above
-      nr_rx_pusch_tp(gNB, ULSCH_id, frame_rx, slot_rx, ulsch->harq_pid, ulsch->beam_nb);
+    nr_rx_pusch_tp(gNB, ULSCH_id, frame_rx, slot_rx, ulsch->harq_pid, ulsch->beam_nb);
     NR_gNB_PUSCH *pusch_vars = &gNB->pusch_vars[ULSCH_id];
     pusch_vars->ulsch_power_tot = 0;
     pusch_vars->ulsch_noise_power_tot = 0;

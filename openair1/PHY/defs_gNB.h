@@ -239,6 +239,10 @@ typedef struct {
   int32_t **rxdataF_comp;
   /// \f$\log_2(\max|H_i|^2)\f$
   int16_t log2_maxh;
+  /// MU two-phase: chest already done for this slot (phase 1); decode phase reuses stored results
+  int mu_chest_done;
+  int mu_max_ch;
+  uint32_t mu_nvar;
   /// measured RX power based on DRS
   uint32_t ulsch_power[8];
   /// total signal over antennas
@@ -419,6 +423,8 @@ typedef struct PHY_VARS_gNB_s {
 
   int pucch0_thres;
   int pusch_thres;
+  /// MU two-phase: L1 thread sets this to run nr_rx_pusch_tp as chest-only (phase 1), serial-safe
+  int mu_chest_only;
   int prach_thres;
   int srs_thres;
   uint64_t bad_pucch;

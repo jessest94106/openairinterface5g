@@ -1490,7 +1490,7 @@ static void nr_pusch_symbol_processing(void *arg)
   // later when chest is done; ans completes on the successful re-run. MU-gated; default unchanged.
   { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? 1 : 0; }
     extern volatile int g_mu_mimo_active;
-    if (mu_rq && g_mu_mimo_active && rdata->bounces < 16) { // wide budget: partner chest now runs concurrently
+    if (mu_rq && g_mu_mimo_active && rdata->bounces < 2) { // backstop only: two-phase ordering makes estimates ready before decode
       // partner estimate too: a co-scheduled decode with an unready PARTNER estimate skips IRC and
       // falls to MRC with the interference still on it (parte leak) — same race, same cure: defer.
       int unready = (pusch_vars->log2_maxh == 0);
@@ -1640,6 +1640,15 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
   int max_ch = 0;
   uint32_t nvar = 0;
   int end_symbol = rel15_ul->start_symbol_index + rel15_ul->nr_of_symbols;
+  // MU two-phase: phase 1 hoisted the chest (all co-scheduled UEs estimated before any decode,
+  // so the joint receiver's partner estimates are always fresh). Reuse stored results here.
+  const bool mu_skip_chest = pusch_vars->mu_chest_done != 0;
+  if (mu_skip_chest) {
+    max_ch = pusch_vars->mu_max_ch;
+    nvar = pusch_vars->mu_nvar;
+    pusch_vars->mu_chest_done = 0;
+  }
+  if (!mu_skip_chest)
   for (uint8_t symbol = rel15_ul->start_symbol_index; symbol < end_symbol; symbol++) {
     uint8_t dmrs_symbol_flag = (rel15_ul->ul_dmrs_symb_pos >> symbol) & 0x01;
     LOG_D(PHY, "symbol %d, dmrs_symbol_flag :%d\n", symbol, dmrs_symbol_flag);
@@ -1665,6 +1674,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
     }
   }
 
+  if (!mu_skip_chest) {
   nvar /= (rel15_ul->nr_of_symbols * rel15_ul->nrOfLayers * frame_parms->nb_antennas_rx);
 
   allocCast2D(n0_subband_power,
@@ -1718,8 +1728,18 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
                              rel15_ul->start_symbol_index,
                              rel15_ul->ul_dmrs_symb_pos,
                              rel15_ul->rb_size);
+  } // !mu_skip_chest
 
   stop_meas(&gNB->ulsch_channel_estimation_stats);
+
+  // MU two-phase, phase 1: store chest outputs and return; decode phase reuses them.
+  if (gNB->mu_chest_only) {
+    pusch_vars->mu_max_ch = max_ch;
+    pusch_vars->mu_nvar = nvar;
+    pusch_vars->mu_chest_done = 1;
+    return 0;
+  }
+mu_chest_skipped:;
 
   start_meas(&gNB->rx_pusch_init_stats);
 
