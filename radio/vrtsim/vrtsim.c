@@ -1331,7 +1331,18 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
               }
             }
             wtot_u[u]++;
-            if (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need) stale_u[u]++;
+            if (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need) {
+              stale_u[u]++;
+              // Option-1 diagnosis: WHERE do stale reads land (slot phase + how far behind + reader-vs-clock)?
+              static uint64_t sl_cnt = 0;
+              if ((sl_cnt++ & 0x3F) == 0) {
+                uint64_t clk = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
+                LOG_W(HW, "[STALE POS] ue%d slot=%lu sym=%lu gap=%ld rd_vs_clk=%ld\n", u,
+                      (unsigned long)((read_sample / 61440UL) % 20UL),
+                      (unsigned long)((read_sample % 61440UL) / 4389UL),
+                      (long)(need - wm0), (long)(read_sample - clk));
+              }
+            }
             if (u == 0 && t == 0 && (wtot_u[0] % 2000) == 0)
               for (int k = 0; k < vrtsim_state->num_ues; k++)
                 LOG_W(HW, "[SRV STALE] ue%d reads=%lu stale=%lu\n", k, (unsigned long)wtot_u[k], (unsigned long)stale_u[k]);

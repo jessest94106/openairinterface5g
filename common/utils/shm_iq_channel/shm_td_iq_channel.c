@@ -199,18 +199,22 @@ IQChannelErrorType shm_td_iq_channel_tx(ShmTDIQChannel *channel,
   } else {
     memcpy(base_ptr + first_sample, tx_iq_data, num_samples * sizeof(sample_t));
   }
-  if (antenna < SHM_MAX_STREAMS) {
-    uint64_t end = timestamp + num_samples;
-    if (end > data->write_watermark[antenna])
-      __atomic_store_n(&data->write_watermark[antenna], end, __ATOMIC_RELEASE);
-  }
+  { // UL (client tx) and DL (server tx) streams share antenna numbering -> separate index spaces
+    int wm_idx = (channel->type == IQ_CHANNEL_TYPE_CLIENT) ? data->num_antennas_tx + antenna : antenna;
+    if (wm_idx < SHM_MAX_STREAMS) {
+      uint64_t end = timestamp + num_samples;
+      if (end > data->write_watermark[wm_idx])
+        __atomic_store_n(&data->write_watermark[wm_idx], end, __ATOMIC_RELEASE);
+    } }
   return CHANNEL_NO_ERROR;
 }
 
 uint64_t shm_td_iq_channel_stream_watermark(const ShmTDIQChannel *channel, int antenna)
 {
-  if (antenna >= SHM_MAX_STREAMS) return 0;
-  return __atomic_load_n(&channel->data->write_watermark[antenna], __ATOMIC_ACQUIRE);
+  // reads the UL (client-written) stream watermark
+  int wm_idx = channel->data->num_antennas_tx + antenna;
+  if (wm_idx >= SHM_MAX_STREAMS) return 0;
+  return __atomic_load_n(&channel->data->write_watermark[wm_idx], __ATOMIC_ACQUIRE);
 }
 
 IQChannelErrorType shm_td_iq_channel_rx(ShmTDIQChannel *channel,
