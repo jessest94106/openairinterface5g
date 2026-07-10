@@ -1490,7 +1490,7 @@ static void nr_pusch_symbol_processing(void *arg)
   // later when chest is done; ans completes on the successful re-run. MU-gated; default unchanged.
   { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? 1 : 0; }
     extern volatile int g_mu_mimo_active;
-    if (mu_rq && g_mu_mimo_active && rdata->bounces < 2) {
+    if (mu_rq && g_mu_mimo_active && rdata->bounces < 16) { // wide budget: partner chest now runs concurrently
       // partner estimate too: a co-scheduled decode with an unready PARTNER estimate skips IRC and
       // falls to MRC with the interference still on it (parte leak) — same race, same cure: defer.
       int unready = (pusch_vars->log2_maxh == 0);
