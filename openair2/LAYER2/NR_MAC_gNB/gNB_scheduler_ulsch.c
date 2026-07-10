@@ -2536,7 +2536,11 @@ nfapi_nr_pusch_pdu_t *prepare_pusch_pdu(nfapi_nr_ul_tti_request_t *future_ul_tti
       for (int i = 0; i < port_cnt; i++) if (port_map[i] == rnti) { idx = i; break; }
       if (idx < 0 && port_cnt < 8) { idx = port_cnt; port_map[port_cnt++] = rnti; }
       if (idx < 0) idx = 0;
-      pusch_pdu->dmrs_ports = 1 << (idx % 2);  // UE0 -> port0 (0x1), UE1 -> port1 (0x2)
+      // OAI_UL_MU_PORT_FLIP: swap the port<->attach-order mapping — discriminator for whether the
+      // one-sided round-0 failure follows the PORT (receiver defect) or the ATTACH ORDER (state bug)
+      static int mu_pflip = -1;
+      if (mu_pflip < 0) { const char *e = getenv("OAI_UL_MU_PORT_FLIP"); mu_pflip = (e && e[0]) ? 1 : 0; }
+      pusch_pdu->dmrs_ports = 1 << ((idx + mu_pflip) % 2);  // default: UE0 -> port0 (0x1), UE1 -> port1 (0x2)
       { static int pd = 0; if (pd++ < 8)
           LOG_E(NR_MAC, "[MU PORT] rnti=%04x idx=%d dmrs_ports=0x%x\n", rnti, idx, pusch_pdu->dmrs_ports); }
     }

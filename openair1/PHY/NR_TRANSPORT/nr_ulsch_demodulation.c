@@ -1305,13 +1305,19 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // residual interference (separation incomplete). Rate-limited, env OAI_UL_MU_IRC only.
       {
         static int m = 0;
-        if ((m++ % 4000) == 0) {  // sample periodically through the whole run (catch post-steering state)
+        if ((m++ % 500) == 0) {  // dense: distribution per port, not just spot checks
           int nre = pusch_vars->ul_valid_re_per_slot[symbol];
           long ch0 = 0, ch1 = 0, out0 = 0;
           for (int a = 0; a < nb_rx_ant; a++) {
             ch0 += abs(chF2[0][a][nre / 2].r) + abs(chF2[0][a][nre / 2].i);
             ch1 += abs(chF2[1][a][nre / 2].r) + abs(chF2[1][a][nre / 2].i);
           }
+          // raw received band energy: discriminates "UE absent" (half energy, one UE's worth)
+          // from "UE present but despread-cancelled" (full energy, timing-shifted pilots)
+          long rxa = 0; int rxn = (nre < 256 ? nre : 256);
+          for (int a = 0; a < nb_rx_ant; a++)
+            for (int i = 0; i < rxn; i++) rxa += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
+          rxa /= (nb_rx_ant * rxn * 2);
           const c16_t *o = (const c16_t *)comp2[0];
           for (int i = 0; i < nre; i++) out0 += abs(o[i].r) + abs(o[i].i);
           long labs = 0; int lmax = 0;
@@ -1347,8 +1353,8 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             }
             if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
           }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
-                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
+          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
+                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, rxa, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
                 sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte);
         }

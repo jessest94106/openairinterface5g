@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <string.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <errno.h>
 #include "assertions.h"
@@ -35,6 +36,7 @@
 
 #define CIRCULAR_BUFFER_SIZE (30720 * 14 * 20)
 
+#define SHM_MAX_STREAMS 64
 typedef struct {
   int magic;
   int num_antennas_tx;
@@ -42,6 +44,9 @@ typedef struct {
   uint64_t timestamp;
   pthread_mutex_t mutex;
   pthread_cond_t cond;
+  // per-stream write high-watermark: furthest sample (timestamp+len) each stream has written.
+  // Lets the reader detect never-written/stale regions, which the clock-window checks cannot see.
+  uint64_t write_watermark[SHM_MAX_STREAMS];
 } ShmTDIQChannelData;
 
 typedef struct ShmTDIQChannel_s {
@@ -160,6 +165,16 @@ IQChannelErrorType shm_td_iq_channel_tx(ShmTDIQChannel *channel,
     const char *g = getenv("VRTSIM_TX_LATE_GRACE");
     late_grace = (g && g[0]) ? atoll(g) : 0;
   }
+  // write-margin telemetry: how far ahead of the shared clock this client writes (negative =
+  // behind = the reader has likely already passed = silent stale reads server-side).
+  { static int64_t min_margin = INT64_MAX; static uint64_t mcnt = 0;
+    int64_t margin = (int64_t)timestamp - (int64_t)current_time;
+    if (margin < min_margin) min_margin = margin;
+    if ((++mcnt & 0x7FF) == 0) {
+      printf("[SHM TX MARGIN] cur=%+" PRId64 " minwin=%+" PRId64 " (samples; neg=behind clock)\n", margin, min_margin);
+      fflush(stdout);
+      min_margin = INT64_MAX; // windowed: dips between prints stay visible
+    } }
   if (timestamp + (uint64_t)late_grace < current_time) {
     return CHANNEL_ERROR_TOO_LATE;
   }
@@ -184,7 +199,18 @@ IQChannelErrorType shm_td_iq_channel_tx(ShmTDIQChannel *channel,
   } else {
     memcpy(base_ptr + first_sample, tx_iq_data, num_samples * sizeof(sample_t));
   }
+  if (antenna < SHM_MAX_STREAMS) {
+    uint64_t end = timestamp + num_samples;
+    if (end > data->write_watermark[antenna])
+      __atomic_store_n(&data->write_watermark[antenna], end, __ATOMIC_RELEASE);
+  }
   return CHANNEL_NO_ERROR;
+}
+
+uint64_t shm_td_iq_channel_stream_watermark(const ShmTDIQChannel *channel, int antenna)
+{
+  if (antenna >= SHM_MAX_STREAMS) return 0;
+  return __atomic_load_n(&channel->data->write_watermark[antenna], __ATOMIC_ACQUIRE);
 }
 
 IQChannelErrorType shm_td_iq_channel_rx(ShmTDIQChannel *channel,

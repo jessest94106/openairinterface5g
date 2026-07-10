@@ -155,5 +155,7 @@ void shm_td_iq_channel_destroy(ShmTDIQChannel *channel);
  * @return Current time as sample count since beginning of transmission
  */
 uint64_t shm_td_iq_channel_get_current_sample(const ShmTDIQChannel *channel);
+// furthest sample written on a stream (0 if never); detects stale/unwritten reads
+uint64_t shm_td_iq_channel_stream_watermark(const ShmTDIQChannel *channel, int antenna);
 
 #endif
