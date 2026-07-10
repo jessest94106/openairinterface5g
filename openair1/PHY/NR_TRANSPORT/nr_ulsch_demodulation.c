@@ -1180,6 +1180,12 @@ static void inner_rx(PHY_VARS_gNB *gNB,
         }
       }
     }
+    // Coverage counters: a TB whose data symbols are only PARTLY IRC'd dies — any fall-through
+    // symbol is decoded by plain MRC WITH co-channel interference => garbage LLRs for those REs.
+    // Track why symbols fall through; printed with [MU METRIC].
+    static long mu_c_irc = 0, mu_c_nopart = 0, mu_c_rxe = 0, mu_c_parte = 0;
+    if (mu_irc && g_mu_mimo_active && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && partner < 0)
+      mu_c_nopart++;
     // Signal-present guard: only run IRC when there's actually a received signal to separate on
     // this symbol (rxFext non-trivial). Prevents firing on empty/phantom-grant symbols where the
     // UE isn't transmitting (rxFext~0), which corrupted decode and broke attach.
@@ -1187,7 +1193,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       long rxe = 0;
       for (int a = 0; a < nb_rx_ant; a++)
         for (int i = 0; i < 32 && i < buffer_length; i++) rxe += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
-      if (rxe < 8) partner = -1; // no real signal this symbol -> fall through to normal path
+      if (rxe < 8) { partner = -1; mu_c_rxe++; } // no real signal this symbol -> fall through
     }
     if (partner >= 0) {
       NR_gNB_PUSCH *pv_p = &gNB->pusch_vars[partner];
@@ -1255,6 +1261,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       long partE = 0;
       for (int a = 0; a < nb_rx_ant; a++)
         for (int i = 0; i < 32 && i < buffer_length; i++) partE += abs(chF2[1][a][i].r) + abs(chF2[1][a][i].i);
+      if (partE < 8) mu_c_parte++; else mu_c_irc++;
       if (partE >= 8) {
       int32_t comp2buf[2 * nb_rx_ant][buffer_length] __attribute__((aligned(32)));
       int *comp2[2 * nb_rx_ant];
@@ -1324,9 +1331,26 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             if (e0 > 0 && e1 > 0) { corr_sum += ((double)ipr*ipr + (double)ipi*ipi) / ((double)e0 * e1); corr_n++; }
           }
           int corr2pct = corr_n ? (int)(100.0 * corr_sum / corr_n) : -1;
-          LOG_E(PHY, "[MU METRIC] rnti=%04x partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d\n",
+          // POST-COMBINING SINR per UE (EVM-based, QPSK): ideal points are (+-m, +-m) with
+          // m = mean(|I|,|Q|); SINR = signal power / error power around the nearest ideal point.
+          // High (>20 dB) => MMSE-IRC output is clean and TB failures come from COVERAGE (fall-
+          // through symbols decoded with interference); low => separation itself is weak.
+          double sinr_db = -99.0;
+          {
+            long msum = 0;
+            for (int i = 0; i < nre; i++) msum += abs(o[i].r) + abs(o[i].i);
+            long m = nre ? msum / (2 * nre) : 0;
+            double err = 0, sig = 0;
+            for (int i = 0; i < nre; i++) {
+              double er = (double)(abs(o[i].r) - m), ei = (double)(abs(o[i].i) - m);
+              err += er * er + ei * ei; sig += 2.0 * (double)m * m;
+            }
+            if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
+          }
+          LOG_E(PHY, "[MU METRIC] rnti=%04x partner=%d sym=%d nre=%d |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
                 rel15_ul->rnti, partner, symbol, nre, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
-                nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax);
+                nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
+                sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte);
         }
       }
       return;
