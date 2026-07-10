@@ -236,6 +236,12 @@ static void config_dci_pdu(NR_UE_MAC_INST_t *mac,
       return;
     rel15->dci_length_options[i] = dci_size;
   }
+  { static int zl = 0; if (ss->searchSpaceType->present == NR_SearchSpace__searchSpaceType_PR_ue_Specific && zl++ < 12)
+      LOG_E(NR_MAC, "[UE DCI SZ] opts=%d fmt0=%d len0=%d fmt1=%d len1=%d ss=%d\n",
+            temp_num_dci_options, rel15->dci_format_options[0], rel15->dci_length_options[0],
+            temp_num_dci_options > 1 ? rel15->dci_format_options[1] : -1,
+            temp_num_dci_options > 1 ? rel15->dci_length_options[1] : -1,
+            ss->searchSpaceType->present); }
 
   // DCI 0_0 and 1_0 are same size, L1 just needs to look for 1 option
   // L2 decides format based on format indicator in payload

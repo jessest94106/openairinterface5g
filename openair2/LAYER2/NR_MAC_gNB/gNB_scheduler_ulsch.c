@@ -2028,6 +2028,15 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     if (!nr_mac_ue_is_active(UE))
       continue;
+    // MU policy: never grant a co-scheduled UE while its PDCCH state is CSS/0_0 (fallback) — a
+    // 0_0 grant cannot carry the DMRS port, the UE correctly defaults to port 0, and the slot is
+    // a guaranteed pilot collision (worse than not granting). Defer to a later slot; the state
+    // returns to USS/0_1. Standard-clean: scheduling choice, UE untouched.
+    if (mu_regime && UE->ra == NULL && UE->current_UL_BWP.dci_format != NR_UL_DCI_FORMAT_0_1) {
+      static long mu_defer = 0;
+      if ((mu_defer++ % 500) == 0) LOG_E(NR_MAC, "[MU DEFER] rnti=%04x in CSS/0_0 state, deferred (total=%ld)\n", UE->rnti, mu_defer);
+      continue;
+    }
 
     LOG_D(NR_MAC,"pf_ul: preparing UL scheduling for UE %04x\n",UE->rnti);
     NR_UE_UL_BWP_t *current_BWP = &UE->current_UL_BWP;
