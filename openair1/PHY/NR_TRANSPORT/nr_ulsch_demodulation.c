@@ -1469,6 +1469,7 @@ typedef struct puschSymbolProc_s {
   uint32_t nvar;
   int beam_nb;
   task_ans_t *ans;
+  int bounces;  // Step-2(B) estimation-race requeue counter
   c16_t *pusch_ch_est_dmrs_interpl_slot_mem;
   c16_t *rxFext_slot_mem;
 } puschSymbolProc_t;
@@ -1483,6 +1484,18 @@ static void nr_pusch_symbol_processing(void *arg)
   int ulsch_id = rdata->ulsch_id;
   int slot = rdata->slot;
   NR_gNB_PUSCH *pusch_vars = &gNB->pusch_vars[ulsch_id];
+  // Step-2(B): estimation-race requeue. If this slot's channel estimate is not ready (log2_maxh==0,
+  // set by chest on completion), decoding is doomed (zero channel -> zero LLRs -> certain CRC fail
+  // poisoning BLER/MCS). Re-push this task to the pool tail (bounded) so it re-runs microseconds
+  // later when chest is done; ans completes on the successful re-run. MU-gated; default unchanged.
+  { static int mu_rq = -1; if (mu_rq < 0) { const char *e = getenv("OAI_UL_MU_IRC"); mu_rq = (e && e[0]) ? 1 : 0; }
+    extern volatile int g_mu_mimo_active;
+    if (mu_rq && g_mu_mimo_active && pusch_vars->log2_maxh == 0 && rdata->bounces < 2) {
+      rdata->bounces++;
+      task_t t = {.func = &nr_pusch_symbol_processing, .args = rdata};
+      pushTpool(&gNB->threadPool, t);
+      return;
+    } }
   for (int symbol = rdata->startSymbol; symbol < rdata->startSymbol + rdata->numSymbols; symbol++) {
     if (gNB->pusch_vars[ulsch_id].ul_valid_re_per_slot[symbol] == 0) 
       continue;
@@ -1889,6 +1902,7 @@ int nr_rx_pusch_tp(PHY_VARS_gNB *gNB,
       rdata->scramblingSequence = scramblingSequence;
       rdata->nvar = nvar;
       rdata->beam_nb = beam_nb;
+      rdata->bounces = 0;
       rdata->rxFext_slot_mem = rxFext_slot_mem;
       rdata->pusch_ch_est_dmrs_interpl_slot_mem = pusch_ch_est_dmrs_interpl_slot_mem;
 
