@@ -1201,6 +1201,37 @@ static void inner_rx(PHY_VARS_gNB *gNB,
           LOG_E(PHY, "[MU DIAG] normal-path |chFext[0]@10|=%ld |rxFext@10|=%ld (non-zero => estimate ok)\n", s0, r0);
         }
       }
+      // STAGE-1 GENIE (OAI_UL_MU_GENIE): replace the ESTIMATED channels with the KNOWN orthogonal
+      // vrtsim steering beams (DFT: order k -> h[a]=exp(j2*pi*a*k/nb_rx)), assigned by connection
+      // order. Isolates the receiver from DMRS estimation: if both UEs decode with genie channels
+      // then the chain (co-sched / 2 antennas / IRC math) is PROVEN and the ONLY remaining problem
+      // is pilot estimation. corr2pct should read ~0. Scale to the estimated per-RE magnitude so the
+      // fixed-point MMSE stays in range. (If both CRC-fail but corr~0, the self/partner beam
+      // assignment is swapped vs vrtsim -> try OAI_UL_MU_GENIE=2 to swap.)
+      {
+        static int genie = -1;
+        if (genie < 0) { const char *e = getenv("OAI_UL_MU_GENIE"); genie = (e && e[0]) ? atoi(e) : 0; }
+        if (genie) {
+          static rnti_t gord[8] = {0}; static int gcnt = 0;
+          rnti_t prnti = gNB->ulsch[partner].harq_process->ulsch_pdu.rnti;
+          int so = -1, po = -1;
+          for (int i = 0; i < gcnt; i++) { if (gord[i] == rel15_ul->rnti) so = i; if (gord[i] == prnti) po = i; }
+          if (so < 0 && gcnt < 8) { so = gcnt; gord[gcnt++] = rel15_ul->rnti; }
+          if (po < 0 && gcnt < 8) { po = gcnt; gord[gcnt++] = prnti; }
+          if (so < 0) so = 0;
+          if (po < 0) po = 1;
+          if (genie == 2) { int t = so; so = po; po = t; }  // swap assignment
+          for (int re = 0; re < buffer_length; re++) {
+            int amp = (abs(chFext[0][0][re].r) + abs(chFext[0][0][re].i)) / 2;
+            if (amp < 4) amp = 4;
+            for (int a = 0; a < nb_rx_ant; a++) {
+              double ps = 2.0 * M_PI * a * so / (double)nb_rx_ant, pp = 2.0 * M_PI * a * po / (double)nb_rx_ant;
+              chF2[0][a][re].r = (int16_t)lround(cos(ps) * amp); chF2[0][a][re].i = (int16_t)lround(sin(ps) * amp);
+              chF2[1][a][re].r = (int16_t)lround(cos(pp) * amp); chF2[1][a][re].i = (int16_t)lround(sin(pp) * amp);
+            }
+          }
+        }
+      }
       // Partner-channel guard (Defect-2 fix): if the detected partner has no live channel this
       // symbol (stale pusch_pdu => |chPart|~0), the 2-layer MMSE degenerates and zeroes even the
       // self stream (outAbsMean=0, llr=0 observed). Fall through to normal MRC rather than destroy
