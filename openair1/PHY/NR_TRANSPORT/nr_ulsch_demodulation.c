@@ -1314,9 +1314,13 @@ static void inner_rx(PHY_VARS_gNB *gNB,
           }
           // raw received band energy: discriminates "UE absent" (half energy, one UE's worth)
           // from "UE present but despread-cancelled" (full energy, timing-shifted pilots)
-          long rxa = 0; int rxn = (nre < 256 ? nre : 256);
-          for (int a = 0; a < nb_rx_ant; a++)
-            for (int i = 0; i < rxn; i++) rxa += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
+          long rxa = 0, rxA[2] = {0, 0}; int rxn = (nre < 256 ? nre : 256);
+          for (int a = 0; a < nb_rx_ant; a++) {
+            long t = 0;
+            for (int i = 0; i < rxn; i++) t += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
+            if (a < 2) rxA[a] = t / (rxn * 2);
+            rxa += t;
+          }
           rxa /= (nb_rx_ant * rxn * 2);
           const c16_t *o = (const c16_t *)comp2[0];
           for (int i = 0; i < nre; i++) out0 += abs(o[i].r) + abs(o[i].i);
@@ -1353,8 +1357,8 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             }
             if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
           }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
-                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, rxa, ch0, ch1, corr2pct, pusch_vars->log2_maxh,
+          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
+                rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, rxa, rxA[0], rxA[1], ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
                 sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte);
         }

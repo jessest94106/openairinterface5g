@@ -873,15 +873,6 @@ static int vrtsim_write_internal(vrtsim_state_t *vrtsim_state,
     tx_timing->tx_early += 1;
   }
   tx_timing->tx_samples_total += nsamps;
-  // periodic drop-rate print (LOG_W: survives hw_log_level=warn; harness pkill -9 never lets the
-  // exit stats print). One line per ~8M samples ≈ every few seconds.
-  { static uint64_t nextp = 8000000;
-    if (tx_timing->tx_samples_total >= nextp) {
-      nextp += 8000000;
-      LOG_W(HW, "[VRTSIM TX LATE] total=%lu late=%lu (%.2f%%) early=%lu\n",
-            (unsigned long)tx_timing->tx_samples_total, (unsigned long)tx_timing->tx_samples_late,
-            100.0 * tx_timing->tx_samples_late / tx_timing->tx_samples_total, (unsigned long)tx_timing->tx_early);
-    } }
 
   return nsamps;
 }
@@ -1314,39 +1305,6 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
         const int ue_tx = vrtsim_state->ue_conf[u].tx_ant;
         const int base = vrtsim_state->ue_conf[u].tx_offset;
         for (int t = 0; t < ue_tx; t++) {
-          // watermark guard: don't consume a region this client hasn't written yet (the clock
-          // checks can't see it -> silent stale reads were poisoning one UE's UL). Bounded wait,
-          // then count-and-read-anyway (visibility beats blocking the RT path).
-          { static uint64_t stale_u[MAX_NUM_UES], wtot_u[MAX_NUM_UES];
-            uint64_t need = read_sample + nsamps;
-            int spins = 0;
-            // conditional wait: only when the writer is CLOSE behind (actively racing this region);
-            // a far-behind watermark means the stream is idle there (benign, e.g. DL portions) and
-            // waiting is futile + chokes the RT loop (the earlier blanket-wait failure).
-            uint64_t wm0 = shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t);
-            if (0) { // disabled: every wait variant taxes the RT loop; counters stay
-              while (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need && spins < 40) {
-                usleep(5);
-                spins++;
-              }
-            }
-            wtot_u[u]++;
-            if (shm_td_iq_channel_stream_watermark(vrtsim_state->channel, base + t) < need) {
-              stale_u[u]++;
-              // Option-1 diagnosis: WHERE do stale reads land (slot phase + how far behind + reader-vs-clock)?
-              static uint64_t sl_cnt = 0;
-              if ((sl_cnt++ & 0x3F) == 0) {
-                uint64_t clk = shm_td_iq_channel_get_current_sample(vrtsim_state->channel);
-                LOG_W(HW, "[STALE POS] ue%d slot=%lu sym=%lu gap=%ld rd_vs_clk=%ld\n", u,
-                      (unsigned long)((read_sample / 61440UL) % 20UL),
-                      (unsigned long)((read_sample % 61440UL) / 4389UL),
-                      (long)(need - wm0), (long)(read_sample - clk));
-              }
-            }
-            if (u == 0 && t == 0 && (wtot_u[0] % 2000) == 0)
-              for (int k = 0; k < vrtsim_state->num_ues; k++)
-                LOG_W(HW, "[SRV STALE] ue%d reads=%lu stale=%lu\n", k, (unsigned long)wtot_u[k], (unsigned long)stale_u[k]);
-          }
           int ret = shm_td_iq_channel_rx(vrtsim_state->channel,
                                          read_sample,
                                          nsamps,
@@ -1357,17 +1315,6 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
           } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
             vrtsim_state->rx_early += 1;
           }
-          // per-UE server-side read-error telemetry: the silent hop where a client's slot can be
-          // consumed stale (printed periodically; exit stats never survive pkill -9)
-          { static uint64_t late_u[MAX_NUM_UES], early_u[MAX_NUM_UES], tot_u[MAX_NUM_UES];
-            if (ret == CHANNEL_ERROR_TOO_LATE) late_u[u] += nsamps;
-            else if (ret == CHANNEL_ERROR_TOO_EARLY) early_u[u] += nsamps;
-            tot_u[u] += nsamps;
-            if (u == 0 && (tot_u[0] % (61440UL * 2000)) < (uint64_t)nsamps) {
-              for (int k = 0; k < vrtsim_state->num_ues; k++)
-                LOG_W(HW, "[SRV UL RD] ue%d tot=%lu late=%lu early=%lu\n", k,
-                      (unsigned long)tot_u[k], (unsigned long)late_u[k], (unsigned long)early_u[k]);
-            } }
           if (ret != 0 && rx_ret == 0)
             rx_ret = ret;
           const int16_t *in = (const int16_t *)vrtsim_state->ul_combine_buffer;

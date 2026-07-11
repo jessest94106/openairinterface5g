@@ -2129,6 +2129,8 @@ static int  pf_ul(gNB_MAC_INST *nrmac,
     // almost never co-schedule the same slot (the root of sporadic PRB reuse). Keep each MU UE a
     // candidate EVERY slot so BOTH enter UE_sched together -> both allocated full band -> cosched
     // overlaps them on the same PRBs. Gated on mu_regime (OAI_UL_MU_COSCHED + MU active); off => unchanged.
+    // MU regime: always grant so both UEs stay co-scheduled every UL slot. Packing several UL
+    // DCIs per DL slot is safe since the UE-side multi-DCI fix (dci_nr.c payload dedup).
     const bool mu_force = mu_regime && UE->ra == NULL;
     if (!mu_force && ((B == 0 && !do_sched) || nr_timer_is_active(&sched_ctrl->transm_interrupt))) {
       reset_beam_status(&nrmac->beam_info, sched_frame, sched_slot, UE->UE_beam_index, slots_per_frame, beam.new_beam);

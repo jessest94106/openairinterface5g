@@ -520,17 +520,11 @@ static void nr_dci_decoding_procedure(const UE_nr_rxtx_proc_t *proc,
     // Loop over possible DCI lengths
     
     for (int k = 0; k < rel15->num_dci_options; k++) {
-      // skip this candidate if we've already found one with the
-      // same rnti and size at a different aggregation level
+      // NOTE: the old pre-decode skip ("already found one with same rnti and size") silently
+      // discarded every ADDITIONAL UL grant in the slot — all 0_1 grants share one size, so a
+      // gNB packing N UL DCIs (different target UL slots) per DL slot only ever got 1 through.
+      // True duplicates (same DCI at nested ALs) are now filtered AFTER decode by payload compare.
       int dci_length = rel15->dci_length_options[k];
-      int ind;
-      for (ind = 0; ind < dci_ind->number_of_dcis; ind++) {
-        if (!is_SI && rel15->rnti == dci_ind->dci_list[ind].rnti && dci_length == dci_ind->dci_list[ind].payloadSize) {
-          break;
-        }
-      }
-      if (ind < dci_ind->number_of_dcis)
-        continue;
 
       uint64_t dci_estimation[2] = {0};
       LOG_D(NR_PHY_DCI,
@@ -565,6 +559,16 @@ static void nr_dci_decoding_procedure(const UE_nr_rxtx_proc_t *proc,
               CCEind,
               dci_length,
               *(unsigned long long *)dci_estimation);
+        // payload-level dedup: same rnti + size + identical bits = the same DCI seen at another
+        // aggregation level / candidate; deliver distinct payloads (multiple UL grants per slot).
+        int dup = 0;
+        for (int ind2 = 0; ind2 < dci_ind->number_of_dcis; ind2++) {
+          fapi_nr_dci_indication_pdu_t *e = dci_ind->dci_list + ind2;
+          if (e->rnti == n_rnti && e->payloadSize == dci_length
+              && memcmp(e->payloadBits, dci_estimation, (dci_length + 7) / 8) == 0) { dup = 1; break; }
+        }
+        if (dup)
+          break; // same content: skip remaining lengths for this candidate
         AssertFatal(dci_ind->number_of_dcis < sizeofArray(dci_ind->dci_list), "Fix allocation\n");
         fapi_nr_dci_indication_pdu_t *dci = dci_ind->dci_list + dci_ind->number_of_dcis;
         *dci = (fapi_nr_dci_indication_pdu_t){
