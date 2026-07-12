@@ -176,6 +176,8 @@ typedef struct {
   int ul_mu_steer_active;                              // gate: 0 until trigger file appears (attach-first)
   int ul_mu_steer_poll;                                // rate-limit counter for the trigger-file stat
   double ul_mu_angle[MAX_NUM_UES];                     // per-UE spatial frequency (cycles/antenna)
+  double ul_mu_tv_freq;                                // time-varying channel: angle oscillation rate (Hz, sim time); 0=static
+  double ul_mu_tv_amp;                                 // oscillation amplitude (cycles/antenna); UEs counter-rotate +/-amp
   c16_t ul_mu_w[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];     // per-(UE,antenna) Q15 steering weight
   double rx_freq;
   double tx_bw;
@@ -402,6 +404,22 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
         vrtsim_state->ul_mu_angle[u++] = atof(tok);
     }
     LOG_A(HW, "VRTSIM: UL MU-MIMO steering ENABLED (%s)\n", ulmu);
+  }
+  // Time-varying channel: VRTSIM_UL_MU_TV="f_hz[,amp_cycles]" makes the per-UE steering angles
+  // counter-oscillate, ang_u(t) = base_u -/+ amp*sin(2*pi*f*t) (t in sim seconds), sweeping the
+  // inter-UE spatial correlation |cos(pi*dAng)| between 0 (orthogonal) and sin(2*pi*amp) each
+  // half-period. Slot-rate variation the gNB chest must track; weights stay unit-modulus so
+  // power/PRACH are unaffected. Default amp 0.1 cycles.
+  vrtsim_state->ul_mu_tv_freq = 0.0;
+  vrtsim_state->ul_mu_tv_amp = 0.1;
+  const char *ultv = getenv("VRTSIM_UL_MU_TV");
+  if (ultv != NULL && ultv[0] != '\0') {
+    vrtsim_state->ul_mu_tv_freq = atof(ultv);
+    const char *c = strchr(ultv, ',');
+    if (c)
+      vrtsim_state->ul_mu_tv_amp = atof(c + 1);
+    LOG_A(HW, "VRTSIM: UL MU time-varying channel f=%.3f Hz amp=%.3f cyc/ant\n",
+          vrtsim_state->ul_mu_tv_freq, vrtsim_state->ul_mu_tv_amp);
   }
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
@@ -1268,18 +1286,26 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
       // Phase-1 UL MU-MIMO: lazily build the per-UE steering table now that nbAnt is known.
       // w[u][a] = unit-phase DFT beam exp(j*2*pi*a*angle_u), angle_u = u/nbAnt by default
       // (orthogonal beams) or the configured VRTSIM_UL_MU_STEER value. Q15.
-      if (vrtsim_state->ul_mu_steer && !vrtsim_state->ul_mu_steer_ready) {
+      const bool mu_tv = vrtsim_state->ul_mu_tv_freq > 0.0 && vrtsim_state->ul_mu_steer_active;
+      if (vrtsim_state->ul_mu_steer && (!vrtsim_state->ul_mu_steer_ready || mu_tv)) {
+        // time-varying: counter-rotate the UE angles by +/- amp*sin(2*pi*f*t), t = sim seconds
+        const double tvoff = mu_tv ? vrtsim_state->ul_mu_tv_amp
+                                         * sin(2.0 * M_PI * vrtsim_state->ul_mu_tv_freq
+                                               * ((double)read_sample / vrtsim_state->sample_rate))
+                                   : 0.0;
         for (int u = 0; u < vrtsim_state->num_ues; u++) {
           double ang = (vrtsim_state->ul_mu_angle[u] >= 0.0) ? vrtsim_state->ul_mu_angle[u]
                                                              : (double)u / (double)nbAnt;
+          ang += (u & 1) ? -tvoff : tvoff;
           for (int a = 0; a < nbAnt && a < MAX_NUM_ANTENNAS_TX; a++) {
             double ph = 2.0 * M_PI * (double)a * ang;
             vrtsim_state->ul_mu_w[u][a].r = (int16_t)lround(cos(ph) * 32767.0);
             vrtsim_state->ul_mu_w[u][a].i = (int16_t)lround(sin(ph) * 32767.0);
           }
-          LOG_A(HW, "VRTSIM: UL MU steer UE%d angle=%.3f cyc/ant w[0..%d]=[%d,%d %d,%d ...]\n",
-                u, ang, nbAnt - 1, vrtsim_state->ul_mu_w[u][0].r, vrtsim_state->ul_mu_w[u][0].i,
-                vrtsim_state->ul_mu_w[u][1 % nbAnt].r, vrtsim_state->ul_mu_w[u][1 % nbAnt].i);
+          if (!vrtsim_state->ul_mu_steer_ready)
+            LOG_A(HW, "VRTSIM: UL MU steer UE%d angle=%.3f cyc/ant w[0..%d]=[%d,%d %d,%d ...]\n",
+                  u, ang, nbAnt - 1, vrtsim_state->ul_mu_w[u][0].r, vrtsim_state->ul_mu_w[u][0].i,
+                  vrtsim_state->ul_mu_w[u][1 % nbAnt].r, vrtsim_state->ul_mu_w[u][1 % nbAnt].i);
         }
         vrtsim_state->ul_mu_steer_ready = 1;
       }
