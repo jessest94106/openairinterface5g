@@ -1187,7 +1187,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // Coverage counters: a TB whose data symbols are only PARTLY IRC'd dies — any fall-through
     // symbol is decoded by plain MRC WITH co-channel interference => garbage LLRs for those REs.
     // Track why symbols fall through; printed with [MU METRIC].
-    static long mu_c_irc = 0, mu_c_nopart = 0, mu_c_rxe = 0, mu_c_parte = 0;
+    static long mu_c_irc = 0, mu_c_nopart = 0, mu_c_rxe = 0, mu_c_parte = 0, mu_c_byp = 0;
     if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > 137 && partner < 0)
       mu_c_nopart++;
     // Signal-present guard: only run IRC when there's actually a received signal to separate on
@@ -1265,9 +1265,30 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       long partE = 0;
       for (int a = 0; a < nb_rx_ant; a++)
         for (int i = 0; i < 32 && i < buffer_length; i++) partE += abs(chF2[1][a][i].r) + abs(chF2[1][a][i].i);
-      if (partE < 8) mu_c_parte++; else mu_c_irc++;
+      // Near-orthogonal bypass (env OAI_UL_MU_RHO_BYPASS, percent, default 2; 0=off): band-averaged
+      // corr2pct between the two UEs' estimates. Near-zero => plain MRC already suppresses the
+      // partner (post-MF SIR ~ 1/corr > 17 dB) ABOVE the joint-ML kernels' LLR-fidelity ceiling
+      // (~MCS 15-18), while the per-stream LLR path decodes MCS 28 clean -> fall through to it.
+      // Estimates are per-slot constants -> the decision is TB-consistent across all symbols.
+      static int mu_rho_byp = -1;
+      if (mu_rho_byp < 0) { const char *e = getenv("OAI_UL_MU_RHO_BYPASS"); mu_rho_byp = (e && e[0]) ? atoi(e) : 2; }
+      int mu_corr2 = -1;
+      if (partE >= 8 && mu_rho_byp > 0) {
+        double cs = 0.0; int cn = 0;
+        for (int re = 0; re < buffer_length; re += 12) {
+          long ipr = 0, ipi = 0, e0 = 0, e1 = 0;
+          for (int a = 0; a < nb_rx_ant; a++) {
+            long h0r = chF2[0][a][re].r, h0i = chF2[0][a][re].i, h1r = chF2[1][a][re].r, h1i = chF2[1][a][re].i;
+            ipr += h0r*h1r + h0i*h1i; ipi += h0r*h1i - h0i*h1r; e0 += h0r*h0r + h0i*h0i; e1 += h1r*h1r + h1i*h1i;
+          }
+          if (e0 > 0 && e1 > 0) { cs += ((double)ipr*ipr + (double)ipi*ipi) / ((double)e0 * e1); cn++; }
+        }
+        mu_corr2 = cn ? (int)(100.0 * cs / cn) : -1;
+      }
+      const int mu_byp = (mu_corr2 >= 0 && mu_corr2 < mu_rho_byp);
+      if (partE < 8) mu_c_parte++; else if (mu_byp) mu_c_byp++; else mu_c_irc++;
 
-      if (partE >= 8) {
+      if (partE >= 8 && !mu_byp) {
       int32_t comp2buf[2 * nb_rx_ant][buffer_length] __attribute__((aligned(32)));
       int *comp2[2 * nb_rx_ant];
       for (int i = 0; i < 2 * nb_rx_ant; i++) { comp2[i] = comp2buf[i]; memset(comp2buf[i], 0, sizeof(int32_t) * buffer_length); }
@@ -1315,11 +1336,12 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       const int mu_shift = (output_shift > mu_shift_adj) ? output_shift - mu_shift_adj : 0;
       nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, &mu_pdu2, 0, mu_shift);
       const int mu_nre = pusch_vars->ul_valid_re_per_slot[symbol];
-      // OAI_UL_MU_MMSE=1: use MMSE-null + standard per-stream LLR for ALL Qm (the ML joint
-      // kernels carry an LLR-fidelity ceiling ~MCS 15-18 even on a perfect channel; the
-      // per-stream LLR path decodes MCS 28 clean when interference is nulled).
+      // MMSE-null + standard per-stream LLR for ALL Qm — DEFAULT (OAI_UL_MU_MMSE=0 restores the
+      // joint-ML kernels). The ML kernels carry an LLR-fidelity ceiling ~MCS 15-18 even on a
+      // perfect channel (int16 max-log arithmetic); MMSE-IRC + per-stream LLR measured at
+      // |rho|=0.588: 692 MB / MCS 22-28 vs 400 MB / MCS 14-16 for joint-ML (same window).
       static int mu_mmse = -1;
-      if (mu_mmse < 0) { const char *e = getenv("OAI_UL_MU_MMSE"); mu_mmse = (e && e[0]) ? atoi(e) : 0; }
+      if (mu_mmse < 0) { const char *e = getenv("OAI_UL_MU_MMSE"); mu_mmse = (e && e[0]) ? atoi(e) : 1; }
       // layer 0 = self at comp2buf[0], layer 1 = partner at comp2buf[nb_rx_ant] (rxComp[layer*nb_rx]).
       if (!mu_mmse && rel15_ul->qam_mod_order <= 6) {
         // QPSK/16/64QAM: interference-aware ML joint demapper (uses rho). llr[0]=self; scratch=partner.
@@ -1336,9 +1358,13 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             l0[i] >>= mu_shift_adj;
         }
       } else {
-        // 256QAM: MMSE-IRC to null the partner, then per-stream LLR of the separated self.
+        // MMSE-IRC to null the partner, then per-stream LLR of the separated self.
+        // symbol MUST be 0 here: comp2buf was filled by channel_compensation at offset 0 (we pass
+        // symbol=0 there), and mmse_2layers indexes rxdataF_comp[.][symbol*buffer_length]. Passing
+        // the real symbol made every symbol>0 read zeros/garbage and write out-of-row — the reason
+        // the earlier OAI_UL_MU_MMSE=1 experiment collapsed to MCS 6.
         nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
-                              rel15_ul->qam_mod_order, pusch_vars->log2_maxh, symbol, mu_nre, nvar);
+                              rel15_ul->qam_mod_order, pusch_vars->log2_maxh, /*symbol*/ 0, mu_nre, nvar);
         nr_ulsch_compute_llr((int32_t *)comp2buf[0], mga[0], mgb[0], mgc[0], llr[0], mu_nre, symbol, rel15_ul->qam_mod_order);
       }
       // Stage-0 separation-health metric: chest magnitudes (self vs partner), post-eq output energy,
@@ -1399,10 +1425,10 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             }
             if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
           }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld)\n",
+          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld byp=%ld)\n",
                 rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, rxa, rxA[0], rxA[1], ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
-                sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte);
+                sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte, mu_c_byp);
         }
       }
       return;
