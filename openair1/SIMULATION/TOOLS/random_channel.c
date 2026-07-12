@@ -371,12 +371,14 @@ void tdlModel(int  tdl_paths, double *tdl_delays, double *tdl_amps_dB, double DS
     sum_amps += chan_desc->amps[i];
   }
 
+  // Scale into a private array — the passed tdl_delays is a STATIC table shared by every model
+  // allocation in the process; the old in-place `tdl_delays[i] *= DS_TDL` scaled it AGAIN for
+  // each subsequent allocation (2nd model got DS^2, ...), silently shrinking the delay spread.
+  chan_desc->delays = calloc(chan_desc->nb_taps, sizeof(double));
   for (int i = 0; i<chan_desc->nb_taps; i++) {
     chan_desc->amps[i] /= sum_amps;
-    tdl_delays[i] *= DS_TDL;
+    chan_desc->delays[i] = tdl_delays[i] * DS_TDL;
   }
-
-  chan_desc->delays         = tdl_delays;
   chan_desc->aoa            = 0;
   chan_desc->random_aoa     = 0;
   chan_desc->ch             = calloc(nb_tx*nb_rx, sizeof(struct complexd *));

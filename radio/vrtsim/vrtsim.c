@@ -61,7 +61,9 @@
 typedef enum { ROLE_SERVER = 1, ROLE_CLIENT } role;
 
 #define MAX_NUM_ANTENNAS_TX 4
-#define SAVED_SAMPLES_LEN 256
+// 4096 samples = 33 us of history @122.88 Msps: enough for any in-CP TDL delay spread. Was 256
+// (2.08 us), which silently truncated large-DS taps in the sparse path.
+#define SAVED_SAMPLES_LEN 4096
 #define MAX_NUM_UES MAX_MOBILES_PER_GNB
 
 #define ROLE_CLIENT_STRING "client"
@@ -184,6 +186,7 @@ typedef struct {
   double ul_mu_ds_angoff;                              // 2nd-tap extra steering angle (cycles/antenna)
   c16_t ul_mu_w2[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];    // per-(UE,antenna) Q15 weight of the delayed tap
   double doppler_hz;                                   // 3GPP fading rate (sim-time Hz); 0 = static taps
+  double ue_speed_kmh;                                 // UE mobility; converted to doppler_hz at fc on first write
   openair0_timestamp_t last_chan_update;               // last tap-evolution timestamp (samples)
   pthread_mutex_t chanmod_tap_mutex;                   // guards desc->ch against actor reads during evolution
   double rx_freq;
@@ -458,6 +461,15 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
   if (dop != NULL && dop[0] != '\0') {
     vrtsim_state->doppler_hz = atof(dop);
     LOG_A(HW, "VRTSIM: chanmod Doppler fd=%.1f Hz (sim time), slot-rate tap evolution\n", vrtsim_state->doppler_hz);
+  }
+  // Preferred mobility input (3GPP style): VRTSIM_UE_SPEED_KMH=<v> -> fd = v/3.6 * fc / c,
+  // converted at the actual carrier on first chanmod write (rx_freq known by then).
+  // An explicit VRTSIM_DOPPLER_HZ takes precedence.
+  vrtsim_state->ue_speed_kmh = 0.0;
+  const char *spd = getenv("VRTSIM_UE_SPEED_KMH");
+  if (spd != NULL && spd[0] != '\0') {
+    vrtsim_state->ue_speed_kmh = atof(spd);
+    LOG_A(HW, "VRTSIM: UE mobility %.1f km/h (Doppler derived from carrier at first use)\n", vrtsim_state->ue_speed_kmh);
   }
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
@@ -1063,8 +1075,13 @@ static void perform_channel_modelling(void *arg)
         for (int l = 0; l < channel_desc->nb_taps; l++) {
           // same units/expression as the dense sinc interp: k = delays[l]*sampling_rate + offset
           int d = (int)lround(channel_desc->delays[l] * channel_desc->sampling_rate + (double)channel_desc->channel_offset);
-          if (d < 0 || d >= SAVED_SAMPLES_LEN)
-            continue; // outside representable history; drop (weak far taps only)
+          if (d < 0 || d >= SAVED_SAMPLES_LEN) {
+            static int sp_drop_warn = 0;
+            if (sp_drop_warn++ < 4)
+              LOG_E(HW, "VRTSIM: sparse TDL tap %d DROPPED d=%d samples (>=%d) delays[l]=%e fs=%.0f — check ds_tdl units!\n",
+                    l, d, SAVED_SAMPLES_LEN, channel_desc->delays[l], channel_desc->sampling_rate);
+            continue;
+          }
           const struct complexd av = channel_desc->a[l][local_aarx + (aatx * channel_desc->nb_rx)];
           // accumulate taps that round to the same sample
           int k = sp_n[aatx];
@@ -1074,6 +1091,14 @@ static void perform_channel_modelling(void *arg)
           sp_c[aatx][k].r += (float)av.r * pathloss_linear;
           sp_c[aatx][k].i += (float)av.i * pathloss_linear;
         }
+      }
+      { // one-shot ground truth of the tap layout actually used (units sanity)
+        static int sp_dbg = 0;
+        if (sp_dbg++ < 2)
+          LOG_A(HW, "VRTSIM: sparse TDL kept %d/%d taps, d(samples)=[%d %d %d ... %d] delays[last]=%e fs=%.0f\n",
+                sp_n[0], channel_desc->nb_taps, sp_n[0] > 0 ? sp_d[0][0] : -1, sp_n[0] > 1 ? sp_d[0][1] : -1,
+                sp_n[0] > 2 ? sp_d[0][2] : -1, sp_n[0] > 0 ? sp_d[0][sp_n[0] - 1] : -1,
+                channel_desc->delays[channel_desc->nb_taps - 1], channel_desc->sampling_rate);
       }
     } else {
       // Convert channel impulse response to float + apply pathloss
@@ -1227,6 +1252,14 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
   const int batch_size = 4096;
 
   AssertFatal(nbAnt <= MAX_NUM_ANTENNAS_TX, "Number of antennas %d exceeds maximum %d\n", nbAnt, MAX_NUM_ANTENNAS_TX);
+  // Mobility given as speed: derive the classical Doppler fd = v/3.6 * fc / c once, at the
+  // actual carrier (rx_freq is populated at device init, before any write reaches here).
+  if (vrtsim_state->doppler_hz <= 0.0 && vrtsim_state->ue_speed_kmh > 0.0) {
+    const double fc = vrtsim_state->rx_freq > 0.0 ? vrtsim_state->rx_freq : 3.5e9;
+    vrtsim_state->doppler_hz = vrtsim_state->ue_speed_kmh / 3.6 * fc / 299792458.0;
+    LOG_A(HW, "VRTSIM: mobility %.1f km/h @ fc=%.1f MHz -> Doppler fd=%.1f Hz\n",
+          vrtsim_state->ue_speed_kmh, fc / 1e6, vrtsim_state->doppler_hz);
+  }
   // 3GPP fading (VRTSIM_DOPPLER_HZ): evolve the TDL taps once per slot with AR(1) whose lag-1
   // autocorrelation matches Jakes J0(2*pi*fd*T); random_channel() rebuilds desc->ch (sinc-interp
   // of the TR 38.901 PDP) from the evolved taps. Mutex keeps in-flight actor tap copies coherent.
