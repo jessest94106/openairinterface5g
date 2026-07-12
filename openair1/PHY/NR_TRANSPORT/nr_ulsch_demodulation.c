@@ -1161,7 +1161,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     { static int dg = 0; if (mu_irc && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && dg++ < 6)
         LOG_E(PHY, "[MU GATE] nb_rx_ant=%d g_mu=%d nb_layer=%d rb_size=%d max_pusch=%d\n",
               nb_rx_ant, g_mu_mimo_active, nb_layer, rel15_ul->rb_size, gNB->max_nb_pusch); }
-    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137) {
+    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > 137) {
       // CRASH FIX (was Block-1): gNB->ulsch[id].harq_process is NULL for unused slots -> the old
       // unguarded ->ulsch_pdu deref segfaulted (at 0) the first time the scan ran past the active
       // ids (dmesg: Tpool segfault at 0, du.log dead right after first [MU METRIC] in EVERY run —
@@ -1171,7 +1171,11 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       for (int id = 0; id < gNB->max_nb_pusch; id++) {
         if (id == ulsch_id) continue;
         const NR_gNB_ULSCH_t *u = &gNB->ulsch[id];
-        if (!u->active || u->harq_process == NULL) continue;
+        // NOT gated on u->active: the partner clears active the moment ITS decode completes, which
+        // stripped IRC from the slower UE's tail symbols mid-slot (MRC + co-channel interference =
+        // garbage LLRs = every co-channel TB dead at high rho). frame/slot match already rejects
+        // stale entries; estimates/pdu persist for the slot after completion.
+        if (u->harq_process == NULL) continue;
         if (u->frame != cur->frame || u->slot != cur->slot) continue; // co-scheduled this slot only
         const nfapi_nr_pusch_pdu_t *p = &u->harq_process->ulsch_pdu;
         if (p->rb_size == rel15_ul->rb_size && p->rb_start == rel15_ul->rb_start && p->rnti != rel15_ul->rnti) {
@@ -1184,7 +1188,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
     // symbol is decoded by plain MRC WITH co-channel interference => garbage LLRs for those REs.
     // Track why symbols fall through; printed with [MU METRIC].
     static long mu_c_irc = 0, mu_c_nopart = 0, mu_c_rxe = 0, mu_c_parte = 0;
-    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && !dmrs_symbol_flag && rel15_ul->rb_size > 137 && partner < 0)
+    if (mu_irc && g_mu_mimo_active && pusch_vars->log2_maxh > 0 && nb_rx_ant >= 2 && nb_layer == 1 && rel15_ul->rb_size > 137 && partner < 0)
       mu_c_nopart++;
     // Signal-present guard: only run IRC when there's actually a received signal to separate on
     // this symbol (rxFext non-trivial). Prevents firing on empty/phantom-grant symbols where the
@@ -1262,6 +1266,7 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       for (int a = 0; a < nb_rx_ant; a++)
         for (int i = 0; i < 32 && i < buffer_length; i++) partE += abs(chF2[1][a][i].r) + abs(chF2[1][a][i].i);
       if (partE < 8) mu_c_parte++; else mu_c_irc++;
+
       if (partE >= 8) {
       int32_t comp2buf[2 * nb_rx_ant][buffer_length] __attribute__((aligned(32)));
       int *comp2[2 * nb_rx_ant];
@@ -1281,18 +1286,55 @@ static void inner_rx(PHY_VARS_gNB *gNB,
       // workers run in parallel, and another symbol's worker reading a transient nrOfLayers==2 in
       // the caller's layer-demap (line ~1491) indexes llrss[1]==NULL for this 1-layer UE ->
       // segfault at 0 across Tpool threads (the second DU-killer after the partner-scan NULL).
+      // PRB-bundled estimate denoising: per-RE LS chest noise (~-12 dB) feeds the ML hypotheses
+      // (rho/mag/MF) and floors the post-IRC SINR at ~15 dB regardless of channel quality.
+      // Boxcar-average both UEs' estimates over OAI_UL_MU_CH_AVG REs (default 12 = 1 PRB, the
+      // standard bundling assumption) => chest noise -10.8 dB => ML quality tracks the channel.
+      { static int ch_avg = -1;
+        if (ch_avg < 0) { const char *e = getenv("OAI_UL_MU_CH_AVG"); ch_avg = (e && e[0]) ? atoi(e) : 0; }
+        if (ch_avg > 1) {
+          for (int u = 0; u < 2; u++)
+            for (int a = 0; a < nb_rx_ant; a++)
+              for (int b = 0; b < buffer_length; b += ch_avg) {
+                int n = (b + ch_avg <= buffer_length) ? ch_avg : buffer_length - b;
+                int sr = 0, si = 0;
+                for (int i = 0; i < n; i++) { sr += chF2[u][a][b + i].r; si += chF2[u][a][b + i].i; }
+                c16_t m = {(int16_t)(sr / n), (int16_t)(si / n)};
+                for (int i = 0; i < n; i++) chF2[u][a][b + i] = m;
+              }
+        } }
       nfapi_nr_pusch_pdu_t mu_pdu2 = *rel15_ul;
       mu_pdu2.nrOfLayers = 2;
-      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, &mu_pdu2, 0, output_shift);
+      // The 1-layer log2_maxh over-attenuates the 2-layer ML demapper inputs: rho/mag land at
+      // ~10-100 LSB, so the demapper's interference-hypothesis squares ((x*Q15)^2>>15) underflow
+      // to 0 and cancellation floors ~10 dB regardless of SNR. Give the joint path K fewer bits
+      // of right-shift (OAI's native nrOfLayers==2 formula is 3 bits hotter; headroom-safe to 5:
+      // psi terms ~3*comp must stay < 32767). Env OAI_UL_MU_SHIFT_ADJ, default 3.
+      static int mu_shift_adj = -1;
+      if (mu_shift_adj < 0) { const char *e = getenv("OAI_UL_MU_SHIFT_ADJ"); mu_shift_adj = (e && e[0]) ? atoi(e) : 0; }
+      const int mu_shift = (output_shift > mu_shift_adj) ? output_shift - mu_shift_adj : 0;
+      nr_ulsch_channel_compensation(buffer_length, nb_rx_ant, rxFext, chF2, mga, mgb, mgc, comp2, 2, rho2, &mu_pdu2, 0, mu_shift);
       const int mu_nre = pusch_vars->ul_valid_re_per_slot[symbol];
+      // OAI_UL_MU_MMSE=1: use MMSE-null + standard per-stream LLR for ALL Qm (the ML joint
+      // kernels carry an LLR-fidelity ceiling ~MCS 15-18 even on a perfect channel; the
+      // per-stream LLR path decodes MCS 28 clean when interference is nulled).
+      static int mu_mmse = -1;
+      if (mu_mmse < 0) { const char *e = getenv("OAI_UL_MU_MMSE"); mu_mmse = (e && e[0]) ? atoi(e) : 0; }
       // layer 0 = self at comp2buf[0], layer 1 = partner at comp2buf[nb_rx_ant] (rxComp[layer*nb_rx]).
-      if (rel15_ul->qam_mod_order <= 6) {
+      if (!mu_mmse && rel15_ul->qam_mod_order <= 6) {
         // QPSK/16/64QAM: interference-aware ML joint demapper (uses rho). llr[0]=self; scratch=partner.
         int16_t mu_llr1[buffer_length * 8] __attribute__((aligned(32)));
         nr_ulsch_compute_ML_llr(pusch_vars, symbol,
                                 (c16_t *)comp2buf[0], (c16_t *)comp2buf[nb_rx_ant],
                                 mga[0], mga[1], llr[0], mu_llr1,
                                 rho2[0][1], rho2[1][0], mu_nre, rel15_ul->qam_mod_order);
+        // renormalize: demapper LLRs are ~linear in input scale, so undo the K extra bits to
+        // keep the downstream int8 LDPC input in its usual range (internal precision retained)
+        if (mu_shift_adj > 0) {
+          int16_t *l0 = llr[0];
+          for (int i = 0, nll = mu_nre * rel15_ul->qam_mod_order; i < nll; i++)
+            l0[i] >>= mu_shift_adj;
+        }
       } else {
         // 256QAM: MMSE-IRC to null the partner, then per-stream LLR of the separated self.
         nr_ulsch_mmse_2layers(comp2, buffer_length, nb_rx_ant, mga, mgb, mgc, chF2, rel15_ul->rb_size,
