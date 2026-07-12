@@ -1382,11 +1382,23 @@ static void inner_rx(PHY_VARS_gNB *gNB,
           }
           // raw received band energy: discriminates "UE absent" (half energy, one UE's worth)
           // from "UE present but despread-cancelled" (full energy, timing-shifted pilots)
-          long rxa = 0, rxA[2] = {0, 0}; int rxn = (nre < 256 ? nre : 256);
+          long rxa = 0, rxA[4] = {0, 0, 0, 0}; int rxn = (nre < 256 ? nre : 256);
+          // per-antenna PRE-COMBINING SNR: band signal power vs the gNB's own measured noise
+          // floor n0_power[a] (idle-RE estimate; = quantization/interference floor in a
+          // noiseless sim). Post-combining adds ~10log10(nb_rx_ant) on top of this.
+          double presnr[4] = {-99, -99, -99, -99};
           for (int a = 0; a < nb_rx_ant; a++) {
-            long t = 0;
-            for (int i = 0; i < rxn; i++) t += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
-            if (a < 2) rxA[a] = t / (rxn * 2);
+            long t = 0; double p = 0;
+            for (int i = 0; i < rxn; i++) {
+              t += abs(rxFext[a][i].r) + abs(rxFext[a][i].i);
+              p += (double)rxFext[a][i].r * rxFext[a][i].r + (double)rxFext[a][i].i * rxFext[a][i].i;
+            }
+            if (a < 4) {
+              rxA[a] = t / (rxn * 2);
+              double n0 = (double)gNB->measurements.n0_power[a];
+              if (n0 < 1.0) n0 = 1.0;
+              if (p > 0) presnr[a] = 10.0 * log10((p / rxn) / n0);
+            }
             rxa += t;
           }
           rxa /= (nb_rx_ant * rxn * 2);
@@ -1425,10 +1437,10 @@ static void inner_rx(PHY_VARS_gNB *gNB,
             }
             if (err > 0 && sig > 0) sinr_db = 10.0 * log10(sig / err);
           }
-          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld byp=%ld)\n",
+          LOG_E(PHY, "[MU METRIC] rnti=%04x port=0x%x rnd=%d partner=%d sym=%d nre=%d rxAbs=%ld rx0=%ld rx1=%ld |chSelf|=%ld |chPart|=%ld corr2pct=%d log2h=%d outAbsMean=%ld llrAbsMean=%ld llrMax=%d postSINR=%.1fdB preSNR=[%.1f %.1f %.1f %.1f]dB cov(irc=%ld nopart=%ld rxe=%ld parte=%ld byp=%ld)\n",
                 rel15_ul->rnti, rel15_ul->dmrs_ports, gNB->ulsch[ulsch_id].harq_process->round, partner, symbol, nre, rxa, rxA[0], rxA[1], ch0, ch1, corr2pct, pusch_vars->log2_maxh,
                 nre ? out0 / nre : 0, (nre * rel15_ul->qam_mod_order) ? labs / (nre * rel15_ul->qam_mod_order) : 0, lmax,
-                sinr_db, mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte, mu_c_byp);
+                sinr_db, presnr[0], presnr[1], presnr[2], presnr[3], mu_c_irc, mu_c_nopart, mu_c_rxe, mu_c_parte, mu_c_byp);
         }
       }
       return;

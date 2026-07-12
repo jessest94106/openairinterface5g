@@ -760,10 +760,12 @@ static int vrtsim_connect(openair0_device_t *device)
     //   server actors -> cores 24..27, client actors -> cores 28..31 (DU=4-9,17,18 RU=10-15 UE=20-23 are taken).
     // Client base is per-UE: the multi-UE harness tasksets UE0 to {20,21,28,29} and UE1 to
     // {22,23,30,31} — a fixed base 28 would pin UE1's actors OUTSIDE its cpuset (and contend
-    // with UE0's). Two actor cores per UE (gnb_rx_ant=2).
+    // with UE0's). Only 2 in-cpuset cores exist per UE, so pin at most 2 actors per client
+    // (with 4 gNB RX antennas the client spawns 4 actors; the extra ones run unpinned).
     const int chanmod_core_base = (vrtsim_state->role == ROLE_SERVER) ? 24 : 28 + 2 * (vrtsim_state->ue_id % 2);
+    const int max_pinned = (vrtsim_state->role == ROLE_SERVER) ? 4 : 2;
     for (int i = 0; i < num_actors; i++) {
-      int chanmod_core = (i < 4) ? (chanmod_core_base + i) : -1;
+      int chanmod_core = (i < max_pinned) ? (chanmod_core_base + i) : -1;
       init_actor(&vrtsim_state->channel_modelling_actors[i], "chanmod", chanmod_core);
     }
     if (vrtsim_state->taps_socket) {
