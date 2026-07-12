@@ -183,6 +183,9 @@ typedef struct {
   double ul_mu_ds_gain;                                // 2nd-tap linear gain (parsed from dB)
   double ul_mu_ds_angoff;                              // 2nd-tap extra steering angle (cycles/antenna)
   c16_t ul_mu_w2[MAX_NUM_UES][MAX_NUM_ANTENNAS_TX];    // per-(UE,antenna) Q15 weight of the delayed tap
+  double doppler_hz;                                   // 3GPP fading rate (sim-time Hz); 0 = static taps
+  openair0_timestamp_t last_chan_update;               // last tap-evolution timestamp (samples)
+  pthread_mutex_t chanmod_tap_mutex;                   // guards desc->ch against actor reads during evolution
   double rx_freq;
   double tx_bw;
   int tx_num_channels;
@@ -445,6 +448,16 @@ static void vrtsim_readconfig(vrtsim_state_t *vrtsim_state)
     }
     LOG_A(HW, "VRTSIM: UL MU delay-spread tap2 D=%d samples gain=%.3f angoff=%.3f cyc/ant\n",
           vrtsim_state->ul_mu_ds_delay, vrtsim_state->ul_mu_ds_gain, vrtsim_state->ul_mu_ds_angoff);
+  }
+  // 3GPP fading: VRTSIM_DOPPLER_HZ=<fd> (sim-time Hz) evolves the chanmod TDL taps at slot rate
+  // with AR(1) matched to the Jakes lag-1 autocorrelation J0(2*pi*fd*T) — random_channel() then
+  // rebuilds the sinc-interpolated TR 38.901 impulse response. Only meaningful with chanmod on.
+  vrtsim_state->doppler_hz = 0.0;
+  vrtsim_state->last_chan_update = 0;
+  const char *dop = getenv("VRTSIM_DOPPLER_HZ");
+  if (dop != NULL && dop[0] != '\0') {
+    vrtsim_state->doppler_hz = atof(dop);
+    LOG_A(HW, "VRTSIM: chanmod Doppler fd=%.1f Hz (sim time), slot-rate tap evolution\n", vrtsim_state->doppler_hz);
   }
 #ifdef OAI_VRTSIM_TAPS_CLIENT
   if (vrtsim_state->taps_socket) {
@@ -723,6 +736,7 @@ static int vrtsim_connect(openair0_device_t *device)
   // Handle channel modelling after number of RX antennas are known
   int num_tx_stats = 1;
   if (vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb) {
+    pthread_mutex_init(&vrtsim_state->chanmod_tap_mutex, NULL);
     int num_actors = (vrtsim_state->role == ROLE_SERVER && vrtsim_state->num_ues > 1) ? vrtsim_state->total_dl_streams
                                                                                       : vrtsim_state->peer_info.num_rx_antennas;
 
@@ -732,7 +746,10 @@ static int vrtsim_connect(openair0_device_t *device)
     // too slow" -> UL samples written late -> gNB reads zeros -> prach_I0=0.0 -> no attach.
     // Role-aware because vrtsim.c is loaded by both RU (server) and UE (client):
     //   server actors -> cores 24..27, client actors -> cores 28..31 (DU=4-9,17,18 RU=10-15 UE=20-23 are taken).
-    const int chanmod_core_base = (vrtsim_state->role == ROLE_SERVER) ? 24 : 28;
+    // Client base is per-UE: the multi-UE harness tasksets UE0 to {20,21,28,29} and UE1 to
+    // {22,23,30,31} — a fixed base 28 would pin UE1's actors OUTSIDE its cpuset (and contend
+    // with UE0's). Two actor cores per UE (gnb_rx_ant=2).
+    const int chanmod_core_base = (vrtsim_state->role == ROLE_SERVER) ? 24 : 28 + 2 * (vrtsim_state->ue_id % 2);
     for (int i = 0; i < num_actors; i++) {
       int chanmod_core = (i < 4) ? (chanmod_core_base + i) : -1;
       init_actor(&vrtsim_state->channel_modelling_actors[i], "chanmod", chanmod_core);
@@ -826,6 +843,12 @@ static int vrtsim_connect(openair0_device_t *device)
         LOG_A(HW, "VRTSIM: channel taps via CIR DB\n");
       }
     } else {
+      // Per-UE RNG decorrelation: nr-uesoftmodem seeds the taus generator with a FIXED
+      // set_taus_seed(0), so every UE process would draw IDENTICAL TDL tap realizations ->
+      // all UEs' UL channels collinear -> MU-MIMO separation impossible by construction.
+      // Re-seed per ue_id before drawing the channel.
+      if (vrtsim_state->role == ROLE_CLIENT)
+        set_taus_seed(0x5eed0000u + (unsigned int)vrtsim_state->ue_id);
       load_channel_model(vrtsim_state);
       // Multi-UE fix (2026-07-06): the per-UE descriptor array was only populated in the
       // CIRDB branch; the modellist path left it NULL -> every DL actor bailed with
@@ -1017,17 +1040,54 @@ static void perform_channel_modelling(void *arg)
 
   cf_t channel_impulse_response[nb_tx_ant][channel_desc->channel_length];
   cf_t *channel_impulse_response_p[nb_tx_ant];
+  // Sparse-TDL fast path: convolve with the nb_taps DELTA taps at nearest-sample delays instead
+  // of the sinc-interpolated dense response. The dense FIR (channel_length 56-86 @122.88 Msps) is
+  // ~tens of GFLOP/s per stream — the actors fall behind, UL ring writes miss the read deadline
+  // and the gNB sees zeros (PRACH energy 0.0). Nearest-sample rounding error (one sample) is
+  // negligible against the configured delay spread. Same tap values/delays as the dense path.
+  #define VRTSIM_SPARSE_MAX_TAPS 64
+  int sp_n[MAX_NUM_ANTENNAS_TX] = {0};
+  int sp_d[MAX_NUM_ANTENNAS_TX][VRTSIM_SPARSE_MAX_TAPS];
+  cf_t sp_c[MAX_NUM_ANTENNAS_TX][VRTSIM_SPARSE_MAX_TAPS];
+  const bool sparse_tdl = !vrtsim_state->taps_socket && !vrtsim_state->use_cirdb
+                          && channel_desc->nb_taps > 1 && channel_desc->nb_taps <= VRTSIM_SPARSE_MAX_TAPS
+                          && channel_desc->a != NULL && channel_desc->delays != NULL;
   if (!vrtsim_state->taps_socket && !vrtsim_state->use_cirdb) {
     const float pathloss_linear = powf(10, channel_desc->path_loss_dB / 20.0);
-    // Convert channel impulse response to float + apply pathloss
-    for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
-      const struct complexd *channelModel = channel_desc->ch[local_aarx + (aatx * channel_desc->nb_rx)];
-      for (int i = 0; i < channel_desc->channel_length; i++) {
-        channel_impulse_response[aatx][i].r = channelModel[i].r * pathloss_linear;
-        channel_impulse_response[aatx][i].i = channelModel[i].i * pathloss_linear;
+    // Tap mutex: with Doppler on, random_channel() rewrites desc->a/desc->ch from the writer
+    // thread while actors copy them here.
+    if (vrtsim_state->doppler_hz > 0.0)
+      pthread_mutex_lock(&vrtsim_state->chanmod_tap_mutex);
+    if (sparse_tdl) {
+      for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
+        for (int l = 0; l < channel_desc->nb_taps; l++) {
+          // same units/expression as the dense sinc interp: k = delays[l]*sampling_rate + offset
+          int d = (int)lround(channel_desc->delays[l] * channel_desc->sampling_rate + (double)channel_desc->channel_offset);
+          if (d < 0 || d >= SAVED_SAMPLES_LEN)
+            continue; // outside representable history; drop (weak far taps only)
+          const struct complexd av = channel_desc->a[l][local_aarx + (aatx * channel_desc->nb_rx)];
+          // accumulate taps that round to the same sample
+          int k = sp_n[aatx];
+          for (int m = 0; m < sp_n[aatx]; m++)
+            if (sp_d[aatx][m] == d) { k = m; break; }
+          if (k == sp_n[aatx]) { sp_d[aatx][k] = d; sp_c[aatx][k].r = 0; sp_c[aatx][k].i = 0; sp_n[aatx]++; }
+          sp_c[aatx][k].r += (float)av.r * pathloss_linear;
+          sp_c[aatx][k].i += (float)av.i * pathloss_linear;
+        }
       }
-      channel_impulse_response_p[aatx] = channel_impulse_response[aatx];
+    } else {
+      // Convert channel impulse response to float + apply pathloss
+      for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
+        const struct complexd *channelModel = channel_desc->ch[local_aarx + (aatx * channel_desc->nb_rx)];
+        for (int i = 0; i < channel_desc->channel_length; i++) {
+          channel_impulse_response[aatx][i].r = channelModel[i].r * pathloss_linear;
+          channel_impulse_response[aatx][i].i = channelModel[i].i * pathloss_linear;
+        }
+        channel_impulse_response_p[aatx] = channel_impulse_response[aatx];
+      }
     }
+    if (vrtsim_state->doppler_hz > 0.0)
+      pthread_mutex_unlock(&vrtsim_state->chanmod_tap_mutex);
   } else {
     for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
       struct complexf *channelModel = channel_desc->ch_ps[local_aarx + (aatx * channel_desc->nb_rx)];
@@ -1047,6 +1107,23 @@ static void perform_channel_modelling(void *arg)
     memset(samples, 0, sizeof(samples));
 
     // Convolve TX with the channel into 'samples' (signal only; noise added below).
+    if (sparse_tdl) {
+      // Sparse form: cost = nb_taps (not channel_length) MACs/sample. Tap-outer loop keeps the
+      // inner sample loop contiguous and auto-vectorizable.
+      for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
+        for (int l = 0; l < sp_n[aatx]; l++) {
+          const int d = sp_d[aatx][l];
+          const float cr = sp_c[aatx][l].r, ci = sp_c[aatx][l].i;
+          for (int i = 0; i < num_samples; i++) {
+            const int idx = start_sample + i - d;
+            const c16_t tx_input = idx >= 0 ? input_samples[aatx][idx]
+                                            : channel_modelling_args->saved_samples[aatx][SAVED_SAMPLES_LEN + idx];
+            samples[i].r += tx_input.r * cr - tx_input.i * ci;
+            samples[i].i += tx_input.i * cr + tx_input.r * ci;
+          }
+        }
+      }
+    } else {
     for (int aatx = 0; aatx < nb_tx_ant; aatx++) {
       cf_t *impulse_response = channel_impulse_response_p[aatx];
       for (int i = 0; i < num_samples; i++) {
@@ -1060,6 +1137,7 @@ static void perform_channel_modelling(void *arg)
           samples[i].i += tx_input.i * impulse_response[l].r + tx_input.r * impulse_response[l].i;
         }
       }
+    }
     }
 
     // Add receiver noise on top of the signal.
@@ -1149,6 +1227,23 @@ static int vrtsim_write_with_chanmod(vrtsim_state_t *vrtsim_state,
   const int batch_size = 4096;
 
   AssertFatal(nbAnt <= MAX_NUM_ANTENNAS_TX, "Number of antennas %d exceeds maximum %d\n", nbAnt, MAX_NUM_ANTENNAS_TX);
+  // 3GPP fading (VRTSIM_DOPPLER_HZ): evolve the TDL taps once per slot with AR(1) whose lag-1
+  // autocorrelation matches Jakes J0(2*pi*fd*T); random_channel() rebuilds desc->ch (sinc-interp
+  // of the TR 38.901 PDP) from the evolved taps. Mutex keeps in-flight actor tap copies coherent.
+  // Multi-UE server: all per-UE descs alias one desc (modellist path) -> one update covers all.
+  if (vrtsim_state->doppler_hz > 0.0 && vrtsim_state->chanmod && !vrtsim_state->taps_socket && !vrtsim_state->use_cirdb) {
+    const openair0_timestamp_t period = (openair0_timestamp_t)(vrtsim_state->sample_rate / 2000.0); // 1 slot @ mu1
+    if (period > 0 && timestamp - vrtsim_state->last_chan_update >= period) {
+      vrtsim_state->last_chan_update = timestamp;
+      const double T = (double)period / vrtsim_state->sample_rate;
+      const double rho1 = j0(2.0 * M_PI * vrtsim_state->doppler_hz * T);
+      pthread_mutex_lock(&vrtsim_state->chanmod_tap_mutex);
+      channel_desc_t *d = vrtsim_state->channel_desc;
+      d->forgetting_factor = fmin(0.999999, fmax(0.0, rho1 * rho1)); // a-evolution uses sqrt(ff)
+      random_channel(d, 0);
+      pthread_mutex_unlock(&vrtsim_state->chanmod_tap_mutex);
+    }
+  }
   // Multi-UE fix (2026-07-06): fan out over the SAME count the actors were allocated with
   // (total_dl_streams for a multi-UE server) — the old peer_info bound (default 1) left
   // UE1..N-1's DL streams unwritten (June's "chanmod breaks multi-UE sync").
@@ -1355,6 +1450,43 @@ static int vrtsim_read(openair0_device_t *device, openair0_timestamp_t *ptimesta
             LOG_A(HW, "VRTSIM: UL MU steering ACTIVATED (trigger %s seen; attach-first complete)\n", trg);
           }
         }
+      }
+      // UL chanmod combine: each UE's client convolves its TX with a per-(UE, gNB-antenna) TDL
+      // impulse response and writes ONE stream PER gNB ANTENNA at global index ue_id*nbAnt + a
+      // (see vrtsim_write_with_chanmod / perform_channel_modelling, client role). Route stream a
+      // into antenna a ONLY — the spatial/temporal channel lives in the taps. The old path read
+      // ue_conf tx_offset (stream 0 = antenna-0 channel) and duplicated it into every antenna =
+      // the rank-1 "UL chanmod multi-ant scaling defect": no diversity, no MU separability.
+      if (vrtsim_state->chanmod || vrtsim_state->taps_socket || vrtsim_state->use_cirdb) {
+        for (int u = 0; u < vrtsim_state->num_ues; u++) {
+          for (int a = 0; a < nbAnt; a++) {
+            if (samplesVoid[a] == NULL)
+              continue;
+            int ret = shm_td_iq_channel_rx(vrtsim_state->channel,
+                                           read_sample,
+                                           nsamps,
+                                           u * nbAnt + a,
+                                           vrtsim_state->ul_combine_buffer);
+            if (ret == CHANNEL_ERROR_TOO_LATE) {
+              vrtsim_state->rx_samples_late += nsamps;
+            } else if (ret == CHANNEL_ERROR_TOO_EARLY) {
+              vrtsim_state->rx_early += 1;
+            }
+            if (ret != 0 && rx_ret == 0)
+              rx_ret = ret;
+            const int16_t *in = (const int16_t *)vrtsim_state->ul_combine_buffer;
+            int16_t *out = (int16_t *)samplesVoid[a];
+            for (int i = 0; i < nsamps * 2; i++) {
+              int32_t sum = (int32_t)out[i] + (int32_t)in[i];
+              out[i] = (int16_t)((sum > 32767) ? 32767 : (sum < -32768) ? -32768 : sum);
+            }
+          }
+        }
+        // mirror the common epilogue exactly: report the CURSOR (not read_sample = cursor +
+        // ul_read_advance) or the DU's slot clock shifts by the read advance
+        *ptimestamp = vrtsim_state->last_received_sample;
+        vrtsim_state->last_received_sample += nsamps;
+        return nsamps;
       }
       // Combine: read each UE tx stream ONCE (ring layout = ue_conf tx_offset), then add it into
       // every gNB antenna. Default = rank-1 duplicate (identical, all UEs same signature). With
